@@ -195,7 +195,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 				}
 		}
 		if ( ! setup_done) {
-			tp->csr6 = dev->if_port & 1 ? 0x83860000 : 0x82420000;
+			tp->csr6 = (dev->if_port & 1 ? 0x838E0000 : 0x82420000) | (tp->csr6 & 0x20ff);
 			if (tp->full_duplex)
 				tp->csr6 |= 0x0200;
 			outl(1, ioaddr + CSR13);
@@ -230,7 +230,8 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			t21142_start_nway(dev);
 			tp->timer.expires = RUN_AT(3*HZ);
 			add_timer(&tp->timer);
-		}
+		} else if (dev->if_port == 5)
+			outl(inl(ioaddr + CSR14) & ~0x080, ioaddr + CSR14);
 	} else if (dev->if_port == 0  ||  dev->if_port == 4) {
 		if ((csr12 & 4) == 0)
 			printk(KERN_INFO"%s: 21143 10baseT link beat good.\n",
@@ -249,7 +250,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			printk(KERN_INFO"%s: 21143 100baseTx sensed media.\n",
 				   dev->name);
 		dev->if_port = 3;
-		tp->csr6 = 0x83860000;
+		tp->csr6 = 0x838E0000 | (tp->csr6 & 0x20ff);
 		outl(0x0003FF7F, ioaddr + CSR14);
 		outl(0x0301, ioaddr + CSR12);
 		tulip_restart_rxtx(tp);

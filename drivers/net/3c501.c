@@ -11,9 +11,11 @@
     Do not purchase this card, even as a joke.  It's performance is horrible,
     and it breaks in many ways.
 
-    The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
-    Center of Excellence in Space Data and Information Sciences
-       Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+    The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
+
 
     Fixed (again!) the missing interrupt locking on TX/RX shifting.
     		Alan Cox <Alan.Cox@linux.org>

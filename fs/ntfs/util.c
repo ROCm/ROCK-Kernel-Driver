@@ -1,16 +1,16 @@
-/*  util.c -  Miscellaneous support
+/*
+ * util.c -  Miscellaneous support
  *
- *  Copyright (C) 1997,1999 Martin von Löwis
- *  Copyright (C) 1997 Régis Duchesne
- *  Copyright (C) 2001 Anton Altaparmakov (AIA)
+ * Copyright (C) 1997,1999 Martin von Löwis
+ * Copyright (C) 1997 Régis Duchesne
+ * Copyright (C) 2001 Anton Altaparmakov (AIA)
  *
- *  The utf8 routines are copied from Python wstrop module.
+ * The utf8 routines are copied from Python wstrop module.
  */
 
 #include "ntfstypes.h"
 #include "struct.h"
 #include "util.h"
-
 #include <linux/string.h>
 #include <linux/errno.h>
 #include "support.h"
@@ -258,7 +258,7 @@ int ntfs_uni_strncmp(short int* a, short int *b, int n)
 		if (NTFS_GETU16(b + i) < NTFS_GETU16(a + i))
 			return 1;
 		if (NTFS_GETU16(a + i) == 0)
-			return 0;
+			break;
 	}
 	return 0;
 }

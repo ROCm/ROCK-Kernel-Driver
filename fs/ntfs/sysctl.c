@@ -1,10 +1,8 @@
 /*
- *  sysctl.c
- *  System control stuff
+ * sysctl.c - System control stuff
  *
- *  Copyright (C) 1997 Martin von Löwis
- *  Copyright (C) 1997 Régis Duchesne
- *
+ * Copyright (C) 1997 Martin von Löwis
+ * Copyright (C) 1997 Régis Duchesne
  */
 
 #include "sysctl.h"
@@ -55,8 +53,3 @@ void ntfs_sysctl(int add)
 }
 #endif /* DEBUG */
 
-/*
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

@@ -99,16 +99,12 @@ static int ext2_alloc_block (struct inode * inode, unsigned long goal, int *err)
 		result = inode->u.ext2_i.i_prealloc_block++;
 		inode->u.ext2_i.i_prealloc_count--;
 		/* Writer: end */
-#ifdef EXT2FS_DEBUG
 		ext2_debug ("preallocation hit (%lu/%lu).\n",
 			    ++alloc_hits, ++alloc_attempts);
-#endif
 	} else {
 		ext2_discard_prealloc (inode);
-#ifdef EXT2FS_DEBUG
 		ext2_debug ("preallocation miss (%lu/%lu).\n",
 			    alloc_hits, ++alloc_attempts);
-#endif
 		if (S_ISREG(inode->i_mode))
 			result = ext2_new_block (inode, goal, 
 				 &inode->u.ext2_i.i_prealloc_count,
@@ -367,7 +363,7 @@ static inline int ext2_find_goal(struct inode *inode,
  *	be placed into *branch->p to fill that gap.
  *
  *	If allocation fails we free all blocks we've allocated (and forget
- *	ther buffer_heads) and return the error value the from failed
+ *	their buffer_heads) and return the error value the from failed
  *	ext2_alloc_block() (normally -ENOSPC). Otherwise we set the chain
  *	as described above and return 0.
  */
@@ -964,12 +960,10 @@ void ext2_read_inode (struct inode * inode)
 	inode->u.ext2_i.i_frag_no = raw_inode->i_frag;
 	inode->u.ext2_i.i_frag_size = raw_inode->i_fsize;
 	inode->u.ext2_i.i_file_acl = le32_to_cpu(raw_inode->i_file_acl);
-	if (S_ISDIR(inode->i_mode))
-		inode->u.ext2_i.i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
-	else {
-		inode->u.ext2_i.i_high_size = le32_to_cpu(raw_inode->i_size_high);
+	if (S_ISREG(inode->i_mode))
 		inode->i_size |= ((__u64)le32_to_cpu(raw_inode->i_size_high)) << 32;
-	}
+	else
+		inode->u.ext2_i.i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
 	inode->u.ext2_i.i_prealloc_count = 0;
 	inode->u.ext2_i.i_block_group = block_group;
@@ -1114,7 +1108,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 		raw_inode->i_dir_acl = cpu_to_le32(inode->u.ext2_i.i_dir_acl);
 	else {
 		raw_inode->i_size_high = cpu_to_le32(inode->i_size >> 32);
-		if (raw_inode->i_size_high) {
+		if (inode->i_size > 0x7fffffffULL) {
 			struct super_block *sb = inode->i_sb;
 			if (!EXT2_HAS_RO_COMPAT_FEATURE(sb,
 					EXT2_FEATURE_RO_COMPAT_LARGE_FILE) ||

@@ -363,7 +363,7 @@ ino_t ext2_inode_by_name(struct inode * dir, struct dentry *dentry)
 void ext2_set_link(struct inode *dir, struct ext2_dir_entry_2 *de,
 			struct page *page, struct inode *inode)
 {
-	unsigned from = (char *)de-(char*)page_address(page);
+	unsigned from = (char *) de - (char *) page_address(page);
 	unsigned to = from + le16_to_cpu(de->rec_len);
 	int err;
 
@@ -578,5 +578,6 @@ not_empty:
 struct file_operations ext2_dir_operations = {
 	read:		generic_read_dir,
 	readdir:	ext2_readdir,
+	ioctl:		ext2_ioctl,
 	fsync:		ext2_sync_file,
 };

@@ -86,11 +86,14 @@ static struct dentry *sysv_lookup(struct inode * dir, struct dentry * dentry)
 static int sysv_mknod(struct inode * dir, struct dentry * dentry, int mode, int rdev)
 {
 	struct inode * inode = sysv_new_inode(dir, mode);
-	if (!inode)
-		return -ENOSPC;
-	sysv_set_inode(inode, rdev);
-	mark_inode_dirty(inode);
-	return add_nondir(dentry, inode);
+	int err = PTR_ERR(inode);
+
+	if (!IS_ERR(inode)) {
+		sysv_set_inode(inode, rdev);
+		mark_inode_dirty(inode);
+		err = add_nondir(dentry, inode);
+	}
+	return err;
 }
 
 static int sysv_create(struct inode * dir, struct dentry * dentry, int mode)
@@ -108,16 +111,17 @@ static int sysv_symlink(struct inode * dir, struct dentry * dentry,
 	if (l > dir->i_sb->s_blocksize)
 		goto out;
 
-	err = -ENOSPC;
 	inode = sysv_new_inode(dir, S_IFLNK|0777);
-	if (!inode)
+	err = PTR_ERR(inode);
+	if (IS_ERR(inode))
 		goto out;
-
+	
 	sysv_set_inode(inode, 0);
 	err = block_symlink(inode, symname, l);
 	if (err)
 		goto out_fail;
 
+	mark_inode_dirty(inode);
 	err = add_nondir(dentry, inode);
 out:
 	return err;
@@ -153,16 +157,13 @@ static int sysv_mkdir(struct inode * dir, struct dentry *dentry, int mode)
 
 	if (dir->i_nlink >= dir->i_sb->sv_link_max) 
 		goto out;
-
 	inc_count(dir);
 
-	if (dir->i_mode & S_ISGID)
-		mode |= S_ISGID;
-
-	err = -ENOSPC;
 	inode = sysv_new_inode(dir, S_IFDIR|mode);
-	if (!inode)
+	err = PTR_ERR(inode);
+	if (IS_ERR(inode))
 		goto out_dir;
+
 	sysv_set_inode(inode, 0);
 
 	inc_count(inode);
@@ -217,6 +218,7 @@ static int sysv_rmdir(struct inode * dir, struct dentry * dentry)
 	if (sysv_empty_dir(inode)) {
 		err = sysv_unlink(dir, dentry);
 		if (!err) {
+			inode->i_size = 0;
 			dec_count(inode);
 			dec_count(dir);
 		}

@@ -1,11 +1,11 @@
-/*  ntfsendian.h
+/*
+ * ntfsendian.h
  *
- *  Copyright (C) 1998, 1999 Martin von Löwis
- *  Copyright (C) 1998 Joseph Malicki
- *  Copyright (C) 1999 Werner Seiler
- *  Copyright (C) 2001 Anton Altaparmakov (AIA)
+ * Copyright (C) 1998, 1999 Martin von Löwis
+ * Copyright (C) 1998 Joseph Malicki
+ * Copyright (C) 1999 Werner Seiler
+ * Copyright (C) 2001 Anton Altaparmakov (AIA)
  */
-
 #include <asm/byteorder.h>
 
 #define CPU_TO_LE16(a) __cpu_to_le16(a)
@@ -56,4 +56,5 @@
 #define NTFS_PUTS16(p,v)     NTFS_PUTU16(p,v)
 #define NTFS_PUTS24(p,v)     NTFS_PUTU24(p,v)
 #define NTFS_PUTS32(p,v)     NTFS_PUTU32(p,v)
+#define NTFS_PUTS64(p,v)     NTFS_PUTU64(p,v)
 

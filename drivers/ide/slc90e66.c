@@ -349,11 +349,11 @@ unsigned int __init ata66_slc90e66 (ide_hwif_t *hwif)
 {
 #if 1
 	byte reg47 = 0, ata66 = 0;
-	byte mask = hwif->channel ? 0x02 : 0x01;
+	byte mask = hwif->channel ? 0x01 : 0x02;	/* bit0:Primary */
 
 	pci_read_config_byte(hwif->pci_dev, 0x47, &reg47);
 
-	ata66 = (reg47 & mask) ? 1 : 0;
+	ata66 = (reg47 & mask) ? 0 : 1;	/* bit[0(1)]: 0:80, 1:40 */
 #else
 	byte ata66 = 0;
 #endif

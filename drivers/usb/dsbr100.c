@@ -85,6 +85,8 @@ static int usb_dsbr100_ioctl(struct video_device *dev, unsigned int cmd,
 static int usb_dsbr100_open(struct video_device *dev, int flags);
 static void usb_dsbr100_close(struct video_device *dev);
 
+static int radio_nr = -1;
+MODULE_PARM(radio_nr, "i");
 
 typedef struct
 {	struct urb readurb,writeurb;
@@ -107,7 +109,6 @@ static struct video_device usb_dsbr100_radio=
 };
 
 static int users = 0;
-static int radio_nr = -1;
 
 static struct usb_device_id usb_dsbr100_table [] = {
 	{ USB_DEVICE(DSB100_VENDOR, DSB100_PRODUCT) },

@@ -570,8 +570,9 @@ static void __init rd_load_image(kdev_t device, int offset, int unit)
 	char *buf;
 	unsigned short rotate = 0;
 	unsigned short devblocks = 0;
+#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC_ISERIES)
 	char rotator[4] = { '|' , '/' , '-' , '\\' };
-
+#endif
 	ram_device = MKDEV(MAJOR_NR, unit);
 
 	if ((inode = get_empty_inode()) == NULL)
@@ -672,7 +673,7 @@ static void __init rd_load_image(kdev_t device, int offset, int unit)
 		}
 		infile.f_op->read(&infile, buf, BLOCK_SIZE, &infile.f_pos);
 		outfile.f_op->write(&outfile, buf, BLOCK_SIZE, &outfile.f_pos);
-#if !defined(CONFIG_ARCH_S390)
+#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC_ISERIES)
 		if (!(i % 16)) {
 			printk("%c\b", rotator[rotate & 0x3]);
 			rotate++;

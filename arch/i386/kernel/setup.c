@@ -1994,6 +1994,9 @@ static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 		wrmsr(0x119,lo,hi);
 		printk(KERN_NOTICE "CPU serial number disabled.\n");
 		clear_bit(X86_FEATURE_PN, &c->x86_capability);
+
+		/* Disabling the serial number may affect the cpuid level */
+		c->cpuid_level = cpuid_eax(0);
 	}
 }
 

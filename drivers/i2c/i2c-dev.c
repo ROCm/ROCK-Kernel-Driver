@@ -241,6 +241,9 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 				   sizeof(rdwr_arg)))
 			return -EFAULT;
 
+		if(rdwr_arg.nmsgs > 2048)
+			return -EINVAL;
+			
 		rdwr_pa = (struct i2c_msg *)
 			kmalloc(rdwr_arg.nmsgs * sizeof(struct i2c_msg), 
 			GFP_KERNEL);

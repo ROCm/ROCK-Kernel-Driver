@@ -742,7 +742,7 @@ tulip_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-static void tulip_release_unconsumed_tx_buffers(struct tulip_private *tp)
+static void tulip_clean_tx_ring(struct tulip_private *tp)
 {
 	unsigned int dirty_tx;
 
@@ -751,10 +751,12 @@ static void tulip_release_unconsumed_tx_buffers(struct tulip_private *tp)
 		int entry = dirty_tx % TX_RING_SIZE;
 		int status = le32_to_cpu(tp->tx_ring[entry].status);
 
-		if (status > 0)
-			break;		/* It has been Txed */
+		if (status < 0) {
+			tp->stats.tx_errors++;	/* It wasn't Txed */
+			tp->tx_ring[entry].status = 0;
+		}
 
-		/* Check for Rx filter setup frames. */
+		/* Check for Tx filter setup frames. */
 		if (tp->tx_buffers[entry].skb == NULL) {
 			/* test because dummy frames not mapped */
 			if (tp->tx_buffers[entry].mapping)
@@ -764,7 +766,6 @@ static void tulip_release_unconsumed_tx_buffers(struct tulip_private *tp)
 					PCI_DMA_TODEVICE);
 			continue;
 		}
-		tp->stats.tx_errors++;
 
 		pci_unmap_single(tp->pdev, tp->tx_buffers[entry].mapping,
 				tp->tx_buffers[entry].skb->len,
@@ -797,7 +798,7 @@ static void tulip_down (struct net_device *dev)
 	tulip_refill_rx(dev);
 
 	/* release any unconsumed transmit buffers */
-	tulip_release_unconsumed_tx_buffers(tp);
+	tulip_clean_tx_ring(tp);
 
 	/* 21040 -- Leave the card in 10baseT state. */
 	if (tp->chip_id == DC21040)
@@ -1434,7 +1435,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	ioaddr = pci_resource_start (pdev, 0);
 	irq = pdev->irq;
 
-	/* init_etherdev ensures aligned and zeroed private structures */
+	/* alloc_etherdev ensures aligned and zeroed private structures */
 	dev = alloc_etherdev (sizeof (*tp));
 	if (!dev) {
 		printk (KERN_ERR PFX "ether device alloc failed, aborting\n");
@@ -1467,7 +1468,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	/*
 	 * initialize private data structure 'tp'
-	 * it is zeroed and aligned in init_etherdev
+	 * it is zeroed and aligned in alloc_etherdev
 	 */
 	tp = dev->priv;
 

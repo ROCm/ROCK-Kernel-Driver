@@ -3,6 +3,7 @@
  * Revised: Mon Dec 28 21:59:02 1998 by faith@acm.org
  * Author: Rickard E. Faith, faith@cs.unc.edu
  * Copyright 1992-1996, 1998 Rickard E. Faith (faith@acm.org)
+ * Shared IRQ supported added 7/7/2001  Alan Cox <alan@redhat.com>
 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -982,7 +983,7 @@ int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
       /* Register the IRQ with the kernel */
 
       retcode = request_irq( interrupt_level,
-			     do_fdomain_16x0_intr, 0, "fdomain", NULL);
+			     do_fdomain_16x0_intr, pdev?SA_SHIRQ:0, "fdomain", NULL);
 
       if (retcode < 0) {
 	 if (retcode == -EINVAL) {
@@ -1229,8 +1230,11 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 				   interruptions while this routine is
 				   running. */
 
-   /* sti();			 Yes, we really want sti() here if we want to lock up our machine */
-   
+   /* Check for other IRQ sources */
+   if((inb(TMC_Status_port)&0x01)==0)   
+   	return;
+
+   /* It is our IRQ */   	
    outb( 0x00, Interrupt_Cntl_port );
 
    /* We usually have one spurious interrupt after each command.  Ignore it. */

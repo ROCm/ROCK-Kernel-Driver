@@ -5,7 +5,7 @@ static const char version[] = "znet.c:v1.02 9/23/94 becker@cesdis.gsfc.nasa.gov\
 /*
 	Written by Donald Becker.
 
-	The author may be reached as becker@cesdis.gsfc.nasa.gov.
+	The author may be reached as becker@scyld.com.
 	This driver is based on the Linux skeleton driver.  The copyright of the
 	skeleton driver is held by the United States Government, as represented
 	by DIRNSA, and it is released under the GPL.

@@ -45,6 +45,7 @@
 #include <linux/quotaops.h>
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
+#include <linux/completion.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -1159,7 +1160,7 @@ void __brelse(struct buffer_head * buf)
 		put_bh(buf);
 		return;
 	}
-	printk("VFS: brelse: Trying to free free buffer\n");
+	printk(KERN_ERR "VFS: brelse: Trying to free free buffer\n");
 }
 
 /*
@@ -2262,7 +2263,7 @@ static int grow_buffers(int size)
 	int isize;
 
 	if ((size & 511) || (size > PAGE_SIZE)) {
-		printk("VFS: grow_buffers: size = %d\n",size);
+		printk(KERN_ERR "VFS: grow_buffers: size = %d\n",size);
 		return 0;
 	}
 
@@ -2692,7 +2693,7 @@ asmlinkage long sys_bdflush(int func, long data)
  * the syscall above, but now we launch it ourselves internally with
  * kernel_thread(...)  directly after the first thread in init/main.c
  */
-int bdflush(void *sem)
+int bdflush(void *startup)
 {
 	struct task_struct *tsk = current;
 	int flushed;
@@ -2713,7 +2714,7 @@ int bdflush(void *sem)
 	recalc_sigpending(tsk);
 	spin_unlock_irq(&tsk->sigmask_lock);
 
-	up((struct semaphore *)sem);
+	complete((struct completion *)startup);
 
 	for (;;) {
 		CHECK_EMERGENCY_SYNC
@@ -2738,7 +2739,7 @@ int bdflush(void *sem)
  * You don't need to change your userspace configuration since
  * the userspace `update` will do_exit(0) at the first sys_bdflush().
  */
-int kupdate(void *sem)
+int kupdate(void *startup)
 {
 	struct task_struct * tsk = current;
 	int interval;
@@ -2754,7 +2755,7 @@ int kupdate(void *sem)
 	recalc_sigpending(tsk);
 	spin_unlock_irq(&tsk->sigmask_lock);
 
-	up((struct semaphore *)sem);
+	complete((struct completion *)startup);
 
 	for (;;) {
 		/* update interval */
@@ -2781,7 +2782,7 @@ int kupdate(void *sem)
 				goto stop_kupdate;
 		}
 #ifdef DEBUG
-		printk("kupdate() activated...\n");
+		printk(KERN_DEBUG "kupdate() activated...\n");
 #endif
 		sync_old_buffers();
 	}
@@ -2789,11 +2790,12 @@ int kupdate(void *sem)
 
 static int __init bdflush_init(void)
 {
-	DECLARE_MUTEX_LOCKED(sem);
-	kernel_thread(bdflush, &sem, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
-	down(&sem);
-	kernel_thread(kupdate, &sem, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
-	down(&sem);
+	static DECLARE_COMPLETION(startup);
+
+	kernel_thread(bdflush, &startup, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	wait_for_completion(&startup);
+	kernel_thread(kupdate, &startup, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	wait_for_completion(&startup);
 	return 0;
 }
 

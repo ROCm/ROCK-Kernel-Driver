@@ -446,20 +446,17 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		return NULL;
 	}
 	/*
-	 * Note: s_es must be initialized s_es as soon as possible because
-	 * some ext2 macro-instructions depend on its value
+	 * Note: s_es must be initialized as soon as possible because
+	 *       some ext2 macro-instructions depend on its value
 	 */
 	es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 	sb->u.ext2_sb.s_es = es;
 	sb->s_magic = le16_to_cpu(es->s_magic);
 	if (sb->s_magic != EXT2_SUPER_MAGIC) {
 		if (!silent)
-			printk ("VFS: Can't find an ext2 filesystem on dev "
-				"%s.\n", bdevname(dev));
-	failed_mount:
-		if (bh)
-			brelse(bh);
-		return NULL;
+			printk ("VFS: Can't find ext2 filesystem on dev %s.\n",
+				bdevname(dev));
+		goto failed_mount;
 	}
 	if (le32_to_cpu(es->s_rev_level) == EXT2_GOOD_OLD_REV &&
 	    (EXT2_HAS_COMPAT_FEATURE(sb, ~0U) ||
@@ -622,11 +619,9 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		}
 	}
 	if (!ext2_check_descriptors (sb)) {
-		for (j = 0; j < db_count; j++)
-			brelse (sb->u.ext2_sb.s_group_desc[j]);
-		kfree(sb->u.ext2_sb.s_group_desc);
-		printk ("EXT2-fs: group descriptors corrupted !\n");
-		goto failed_mount;
+		printk ("EXT2-fs: group descriptors corrupted!\n");
+		db_count = i;
+		goto failed_mount2;
 	}
 	for (i = 0; i < EXT2_MAX_GROUP_LOADED; i++) {
 		sb->u.ext2_sb.s_inode_bitmap_number[i] = 0;
@@ -642,17 +637,25 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 	 */
 	sb->s_op = &ext2_sops;
 	sb->s_root = d_alloc_root(iget(sb, EXT2_ROOT_INO));
-	if (!sb->s_root) {
-		for (i = 0; i < db_count; i++)
-			if (sb->u.ext2_sb.s_group_desc[i])
-				brelse (sb->u.ext2_sb.s_group_desc[i]);
-		kfree(sb->u.ext2_sb.s_group_desc);
-		brelse (bh);
-		printk ("EXT2-fs: get root inode failed\n");
-		return NULL;
+	if (!sb->s_root || !S_ISDIR(sb->s_root->d_inode->i_mode) ||
+	    !sb->s_root->d_inode->i_blocks || !sb->s_root->d_inode->i_size) {
+		if (sb->s_root) {
+			dput(sb->s_root);
+			sb->s_root = NULL;
+			printk ("EXT2-fs: corrupt root inode, run e2fsck\n");
+		} else
+			printk ("EXT2-fs: get root inode failed\n");
+		goto failed_mount2;
 	}
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);
 	return sb;
+failed_mount2:
+	for (i = 0; i < db_count; i++)
+		brelse(sb->u.ext2_sb.s_group_desc[i]);
+	kfree(sb->u.ext2_sb.s_group_desc);
+failed_mount:
+	brelse(bh);
+	return NULL;
 }
 
 static void ext2_commit_super (struct super_block * sb,

@@ -90,6 +90,38 @@ affs_adjust_bitmapchecksum(struct buffer_head *bh, u32 val)
 	((u32 *)bh->b_data)[0] = cpu_to_be32(tmp - val);
 }
 
+static inline void
+affs_lock_link(struct inode *inode)
+{
+	down(&AFFS_INODE->i_link_lock);
+}
+static inline void
+affs_unlock_link(struct inode *inode)
+{
+	up(&AFFS_INODE->i_link_lock);
+}
+static inline void
+affs_lock_dir(struct inode *inode)
+{
+	down(&AFFS_INODE->i_hash_lock);
+}
+static inline void
+affs_unlock_dir(struct inode *inode)
+{
+	up(&AFFS_INODE->i_hash_lock);
+}
+static inline void
+affs_lock_ext(struct inode *inode)
+{
+	down(&AFFS_INODE->i_ext_lock);
+}
+static inline void
+affs_unlock_ext(struct inode *inode)
+{
+	up(&AFFS_INODE->i_ext_lock);
+}
+
+
 #define MIN(a, b) ({		\
 	typeof(a) _a = (a);	\
 	typeof(b) _b = (b);	\

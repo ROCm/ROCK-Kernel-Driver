@@ -16,7 +16,7 @@ static const char version[] =
  *
  *	Adapted to the sample network driver core for linux,
  *	written by: Donald Becker <becker@super.org>
- *	C/O Supercomputing Research Ctr., 17100 Science Dr., Bowie MD 20715
+ *		(Now at <becker@scyld.com>)
  *
  *	compile-command:
  *	"gcc -D__KERNEL__  -Wall -Wstrict-prototypes -O6 -fomit-frame-pointer \

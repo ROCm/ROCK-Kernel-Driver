@@ -10,9 +10,10 @@
 
 	This driver is for the 3Com EtherLinkIII series.
 
-	The author may be reached as becker@cesdis.gsfc.nasa.gov or
-	C/O Center of Excellence in Space Data and Information Sciences
-		Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+	The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
 
 	Known limitations:
 	Because of the way 3c509 ISA detection works it's difficult to predict

@@ -22,7 +22,7 @@
  *   //      - for bug hunting and many ideas
  *   //   Alan Cox (Alan.Cox@linux.org)
  *   //	     - for consulting in some hardcore questions
- *   //   Donald Becker (becker@cesdis.gsfc.nasa.gov)
+ *   //   Donald Becker (becker@scyld.com)
  *   //      - for pretty nice skeleton 
  * 
  *   More info and useful utilities to work w/ SBNI you can find at 

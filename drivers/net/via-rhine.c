@@ -64,6 +64,11 @@
 	                 (media selection + eeprom reload)
 	- David Vrabel:  merges from D-Link "1.11" version
 	                 (disable WOL and PME on startup)
+
+	LK1.1.10:
+	- Manfred Spraul: use "singlecopy" for unaligned buffers
+	                  don't allocate bounce buffers for !ReqTxAlign cards
+
 */
 
 
@@ -118,7 +123,6 @@ static const int multicast_filter_limit = 32;
 /* max time out delay time */
 #define W_MAX_TIMEOUT	0x0FFFU
 
-
 #if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
 #warning  You must compile this file with the correct options!
 #warning  See the last lines of the source file.
@@ -147,7 +151,7 @@ static const int multicast_filter_limit = 32;
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "via-rhine.c:v1.10-LK1.1.9  05/31/2001  Written by Donald Becker\n"
+KERN_INFO "via-rhine.c:v1.10-LK1.1.10  07/12/2001  Written by Donald Becker\n"
 KERN_INFO "  http://www.scyld.com/network/via-rhine.html\n";
 
 static char shortname[] __devinitdata = "via-rhine";
@@ -641,6 +645,8 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->do_ioctl = mii_ioctl;
 	dev->tx_timeout = via_rhine_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+	if (np->drv_flags & ReqTxAlign)
+		dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
 	
 	i = register_netdev(dev);
 	if (i)
@@ -723,21 +729,22 @@ static int alloc_ring(struct net_device* dev)
 		printk(KERN_ERR "Could not allocate DMA memory.\n");
 		return -ENOMEM;
 	}
-	np->tx_bufs = pci_alloc_consistent(np->pdev, PKT_BUF_SZ * TX_RING_SIZE,
+	if (np->drv_flags & ReqTxAlign) {
+		np->tx_bufs = pci_alloc_consistent(np->pdev, PKT_BUF_SZ * TX_RING_SIZE,
 								   &np->tx_bufs_dma);
-	if (np->tx_bufs == NULL) {
-		pci_free_consistent(np->pdev, 
-			    RX_RING_SIZE * sizeof(struct rx_desc) +
-			    TX_RING_SIZE * sizeof(struct tx_desc),
-			    ring, ring_dma);
-		return -ENOMEM;
+		if (np->tx_bufs == NULL) {
+			pci_free_consistent(np->pdev, 
+				    RX_RING_SIZE * sizeof(struct rx_desc) +
+				    TX_RING_SIZE * sizeof(struct tx_desc),
+				    ring, ring_dma);
+			return -ENOMEM;
+		}
 	}
 
 	np->rx_ring = ring;
 	np->tx_ring = ring + RX_RING_SIZE * sizeof(struct rx_desc);
 	np->rx_ring_dma = ring_dma;
 	np->tx_ring_dma = ring_dma + RX_RING_SIZE * sizeof(struct rx_desc);
-
 
 	return 0;
 }
@@ -1100,17 +1107,23 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 	/* Caution: the write order is important here, set the field
 	   with the "ownership" bits last. */
 
-	/* lock eth irq */
-	spin_lock_irq (&np->lock);
-
 	/* Calculate the next Tx descriptor entry. */
 	entry = np->cur_tx % TX_RING_SIZE;
 
 	np->tx_skbuff[entry] = skb;
 
-	if ((np->drv_flags & ReqTxAlign) && ((long)skb->data & 3)) {
+	if ((np->drv_flags & ReqTxAlign) &&
+		(((long)skb->data & 3) || skb_shinfo(skb)->nr_frags != 0 || skb->ip_summed == CHECKSUM_HW)
+		) {
 		/* Must use alignment buffer. */
-		memcpy(np->tx_buf[entry], skb->data, skb->len);
+		if (skb->len > PKT_BUF_SZ) {
+			/* packet too long, drop it */
+			dev_kfree_skb(skb);
+			np->tx_skbuff[entry] = NULL;
+			np->stats.tx_dropped++;
+			return 0;
+		}
+		skb_copy_and_csum_dev(skb, np->tx_buf[entry]);
 		np->tx_skbuff_dma[entry] = 0;
 		np->tx_ring[entry].addr = cpu_to_le32(np->tx_bufs_dma +
 										  (np->tx_buf[entry] - np->tx_bufs));
@@ -1122,7 +1135,12 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	np->tx_ring[entry].desc_length = 
 		cpu_to_le32(0x00E08000 | (skb->len >= ETH_ZLEN ? skb->len : ETH_ZLEN));
+
+	/* lock eth irq */
+	spin_lock_irq (&np->lock);
+	wmb();
 	np->tx_ring[entry].tx_status = cpu_to_le32(DescOwn);
+	wmb();
 
 	np->cur_tx++;
 

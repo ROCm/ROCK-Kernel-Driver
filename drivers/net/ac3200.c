@@ -6,8 +6,10 @@
 	according to the terms of the GNU General Public License as modified by SRC,
 	incorporated herein by reference.
 
-	The author may be reached as becker@cesdis.gsfc.nasa.gov, or
-	C/O Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+	The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
 
 	This is driver for the Ansel Communications Model 3200 EISA Ethernet LAN
 	Adapter.  The programming information is from the users manual, as related

@@ -10,8 +10,10 @@
 
 	This is a driver for the Cabletron E2100 series ethercards.
 
-	The Author may be reached as becker@cesdis.gsfc.nasa.gov, or
-	C/O Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+	The Author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
 
 	The E2100 series ethercard is a fairly generic shared memory 8390
 	implementation.  The only unusual aspect is the way the shared memory

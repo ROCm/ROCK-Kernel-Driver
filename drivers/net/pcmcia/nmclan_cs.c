@@ -27,7 +27,7 @@ References
   Tom Pollard, New Media Corporation
   Dean Siasoyco, New Media Corporation
   Ken Lesniak, Silicon Graphics, Inc. <lesniak@boston.sgi.com>
-  Donald Becker <becker@cesdis1.gsfc.nasa.gov>
+  Donald Becker <becker@scyld.com>
   David Hinds <dahinds@users.sourceforge.net>
 
   The Linux client driver is based on the 3c589_cs.c client driver by

@@ -37,7 +37,7 @@ else
 	"$CONFIG_SGI_IP27" != "y" ]; then
       define_bool CONFIG_MSDOS_PARTITION y
    fi
-   if [ "$CONFIG_AMIGA" = "y" ]; then
+   if [ "$CONFIG_AMIGA" = "y" -o "CONFIG_AFFS_FS" = "y" ]; then
       define_bool CONFIG_AMIGA_PARTITION y
    fi
    if [ "$CONFIG_MAC" = "y" ]; then

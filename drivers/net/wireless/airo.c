@@ -333,7 +333,8 @@ static int do8bitIO = 0;
 #define EV_LINK 0x80
 #define EV_AWAKE 0x100
 #define EV_UNKNOWN 0x800
-#define STATUS_INTS ( EV_AWAKE | EV_LINK | EV_TXEXC | EV_TX | EV_RX | EV_UNKNOWN)
+#define STATUS_INTS ( EV_AWAKE | EV_LINK | EV_TXEXC | EV_TX | EV_RX)
+#define IGNORE_INTS ( EV_CMD | EV_UNKNOWN)
 
 /* The RIDs */
 #define RID_CAPABILITIES 0xFF00
@@ -656,7 +657,6 @@ const long frequency_list[] = { 2412, 2417, 2422, 2427, 2432, 2437, 2442,
 // A few details needed for WEP (Wireless Equivalent Privacy)
 #define MAX_KEY_SIZE 13			// 128 (?) bits
 #define MIN_KEY_SIZE  5			// 40 bits RC4 - WEP
-#define MAX_KEYS      4			// 4 different keys
 typedef struct wep_key_t {
 	u16	len;
 	u8	key[16];	/* 40-bit and 104-bit keys */
@@ -724,11 +724,12 @@ struct airo_info {
         spinlock_t aux_lock;
         spinlock_t cmd_lock;
         int flags;
-#define FLAG_PROMISC   0x01
+#define FLAG_PROMISC   IFF_PROMISC
 #define FLAG_RADIO_OFF 0x02
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen, 
 			int whichbap);
 	int (*header_parse)(struct sk_buff*, unsigned char *);
+	unsigned short *flash;
 #ifdef WIRELESS_EXT
 	int			need_commit;	// Need to set config
 	struct iw_statistics	wstats;		// wireless stats
@@ -949,10 +950,17 @@ static void airo_set_multicast_list(struct net_device *dev) {
 	Cmd cmd;
 	Resp rsp;
 	  
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.cmd=CMD_SETMODE;
-	cmd.parm0=(dev->flags&IFF_PROMISC) ? PROMISC : NOPROMISC;
-	issuecommand(ai, &cmd, &rsp);
+	/* For some reason this command takes a lot of time (~20 ms) and it's
+	 * run in an interrupt handler, so we'd better be sure we needed it
+	 * before executing it.
+	 */
+	if ((dev->flags ^ ai->flags) & IFF_PROMISC) {
+		memset(&cmd, 0, sizeof(cmd));
+		cmd.cmd=CMD_SETMODE;
+		cmd.parm0=(dev->flags&IFF_PROMISC) ? PROMISC : NOPROMISC;
+		issuecommand(ai, &cmd, &rsp);
+		ai->flags^=IFF_PROMISC;
+	}
 
 	if ((dev->flags&IFF_ALLMULTI)||dev->mc_count>0) {
 		/* Turn on multicast.  (Should be already setup...) */
@@ -994,6 +1002,8 @@ static void del_airo_dev( struct net_device *dev );
 void stop_airo_card( struct net_device *dev, int freeres ) 
 {
 	struct airo_info *ai = (struct airo_info*)dev->priv;
+	if (ai->flash)
+		kfree(ai->flash);
 	takedown_proc_entry( dev, ai );
 	if (ai->registered) {
 		unregister_netdev( dev );
@@ -1113,11 +1123,10 @@ int waitbusy (struct airo_info *ai) {
 }
 
 int reset_airo_card( struct net_device *dev ) {
-	int i, flags;
+	int i;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 
 	disable_MAC(ai);
-	spin_lock_irqsave(&ai->cmd_lock, flags);
 	waitbusy (ai);
 	OUT4500(ai,COMMAND,CMD_SOFTRESET);
 	set_current_state (TASK_UNINTERRUPTIBLE);
@@ -1125,7 +1134,6 @@ int reset_airo_card( struct net_device *dev ) {
 	waitbusy (ai);
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	schedule_timeout (HZ/5);
-	spin_unlock_irqrestore(&ai->cmd_lock, flags);
 	if ( setup_card(ai, dev->dev_addr, &(ai)->config) != SUCCESS ) {
 		printk( KERN_ERR "airo: MAC could not be enabled\n" );
 		return -1;
@@ -1359,10 +1367,10 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 			apriv->stats.tx_errors++;
 		}
 	}
-	if ( status & ~STATUS_INTS ) 
+	if ( status & ~STATUS_INTS & ~IGNORE_INTS ) 
 		printk( KERN_WARNING 
 			"airo: Got weird status %x\n", 
-			status & ~STATUS_INTS );
+			status & ~STATUS_INTS & ~IGNORE_INTS );
 	OUT4500( apriv, EVACK, status & STATUS_INTS );
 	OUT4500( apriv, EVINTEN, savedInterrupts );
 	
@@ -1446,6 +1454,10 @@ static u16 setup_card(struct airo_info *ai, u8 *mac,
 	int rc;
 
 	memset( &mySsid, 0, sizeof( mySsid ) );
+	if (ai->flash) {
+		kfree (ai->flash);
+		ai->flash = NULL;
+	}
 
 	/* The NOP is the first step in getting the card going */
 	cmd.cmd = NOP;
@@ -1561,6 +1573,10 @@ static u16 issuecommand(struct airo_info *ai, Cmd *pCmd, Resp *pRsp) {
 		if ( IN4500(ai, COMMAND) == pCmd->cmd) { 
 			// PC4500 didn't notice command, try again
 			OUT4500(ai, COMMAND, pCmd->cmd);
+		}
+		if (!(max_tries & 255) && !in_interrupt()) {
+			set_current_state(TASK_RUNNING);
+			schedule();
 		}
 	}
 	if ( max_tries == -1 ) {
@@ -3134,9 +3150,12 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 				/* Set the SSID */
 				memset(essid, 0, sizeof(essid));
-				copy_from_user(essid,
+				if (copy_from_user(essid,
 					       wrq->u.data.pointer,
-					       wrq->u.data.length);
+					       wrq->u.data.length)) {
+					rc = -EFAULT;
+					break;
+				}
 				memcpy(SSID_rid.ssids[index].ssid, essid,
 				       sizeof(essid) - 1);
 				SSID_rid.ssids[index].len = wrq->u.data.length - 1;
@@ -3199,7 +3218,11 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				break;
 			}
 			memset(name, 0, sizeof(name));
-			copy_from_user(name, wrq->u.data.pointer, wrq->u.data.length);
+			if (copy_from_user(name, wrq->u.data.pointer,
+					   wrq->u.data.length)) {
+				rc = -EFAULT;
+				break;
+			}
 			memcpy(config.nodeName, name, 16);
 			local->need_commit = 1;
 		}
@@ -3395,7 +3418,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				break;
 			}
 			/* Check the index (none -> use current) */
-			if ((index < 0) || (index >= MAX_KEYS))
+			if ((index < 0) || (index>=(cap_rid.softCap&0x80)?4:1))
 				index = current_index;
 			/* Set the length */
 			if (wrq->u.encoding.length > MIN_KEY_SIZE)
@@ -3433,7 +3456,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		} else {
 			/* Do we want to just set the transmit key index ? */
 			int index = (wrq->u.encoding.flags & IW_ENCODE_INDEX) - 1;
-			if ((index >= 0) && (index < MAX_KEYS)) {
+			if ((index>=0) && (index<(cap_rid.softCap&0x80)?4:1)) {
 				set_wep_key(local, index, 0, 0, 1);
 			} else
 				/* Don't complain if only change the mode */
@@ -3490,7 +3513,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			}
 
 			/* Which key do we want ? -1 -> tx index */
-			if((index < 0) || (index >= MAX_KEYS))
+			if((index < 0) || (index >= (cap_rid.softCap&0x80)?4:1))
 				index = get_wep_key(local, 0xffff);
 			wrq->u.encoding.flags |= index + 1;
 			/* Copy the key to the user buffer */
@@ -3614,7 +3637,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 					range.num_encoding_sizes = 2;
 				} else
 					range.num_encoding_sizes = 1;
-				range.max_encoding_tokens = 4;	// 4 keys
+				range.max_encoding_tokens = (cap_rid.softCap & 0x80) ? 4 : 1;
 			} else {
 				range.num_encoding_sizes = 0;
 				range.max_encoding_tokens = 0;
@@ -3785,8 +3808,14 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				memcpy(address[i].sa_data, local->spy_address[i], 6);
 				address[i].sa_family = AF_UNIX;
 			}
-			copy_to_user(wrq->u.data.pointer, address, sizeof(struct sockaddr) * local->spy_number);
-			copy_to_user(wrq->u.data.pointer + (sizeof(struct sockaddr)*local->spy_number), local->spy_stat, sizeof(struct iw_quality) * local->spy_number);
+			if (copy_to_user(wrq->u.data.pointer, address, sizeof(struct sockaddr) * local->spy_number)) {
+				rc = -EFAULT;
+				break;
+			}
+			if (copy_to_user(wrq->u.data.pointer + (sizeof(struct sockaddr)*local->spy_number), local->spy_stat, sizeof(struct iw_quality) * local->spy_number)) {
+				rc = -EFAULT;
+				break;
+			}
 			for (i=0; i<local->spy_number; i++)
 				local->spy_stat[i].updated = 0;
 		}
@@ -3833,7 +3862,10 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		 */
 	{
 		aironet_ioctl com;
-		copy_from_user(&com,rq->ifr_data,sizeof(com));
+		if (copy_from_user(&com,rq->ifr_data,sizeof(com))) {
+			rc = -EFAULT;
+			break;
+		}
 
 		/* Seperate R/W functions bracket legality here
 		 */
@@ -4035,7 +4067,8 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	if(comp->len > sizeof(iobuf))
 		return -EINVAL;
 
-	copy_from_user(iobuf,comp->data,comp->len);
+	if (copy_from_user(iobuf,comp->data,comp->len))
+		return -EFAULT;
 	if((*writer)((struct airo_info *)dev->priv, ridcode, iobuf,comp->len))
 		return -EIO;
 	return 0;
@@ -4056,9 +4089,8 @@ int flashcard(struct net_device *dev, aironet_ioctl *comp) {
 	int setflashmode(struct airo_info *);
 	int flashgchar(struct airo_info *,int,int);
 	int flashpchar(struct airo_info *,int,int);
-	int flashputbuf(struct airo_info *, unsigned short *);
+	int flashputbuf(struct airo_info *);
 	int flashrestart(struct airo_info *,struct net_device *);
-	unsigned short * flashbuffer;
 
 	/* Only super-user can modify flash */
 	if (!capable(CAP_NET_ADMIN))
@@ -4070,32 +4102,34 @@ int flashcard(struct net_device *dev, aironet_ioctl *comp) {
 		return cmdreset((struct airo_info *)dev->priv);
 
 	case AIROFLSHSTFL:
+		if (!((struct airo_info *)dev->priv)->flash &&
+			(((struct airo_info *)dev->priv)->flash = kmalloc (FLASHSIZE, GFP_KERNEL)) == NULL)
+			return -ENOMEM;
 		return setflashmode((struct airo_info *)dev->priv);
 
 	case AIROFLSHGCHR: /* Get char from aux */
 		if(comp->len != sizeof(int))
 			return -EINVAL;
-		copy_from_user(&z,comp->data,comp->len);
+		if (copy_from_user(&z,comp->data,comp->len))
+			return -EFAULT;
 		return flashgchar((struct airo_info *)dev->priv,z,8000);
 
 	case AIROFLSHPCHR: /* Send char to card. */
 		if(comp->len != sizeof(int))
 			return -EINVAL;
-		copy_from_user(&z,comp->data,comp->len);
+		if (copy_from_user(&z,comp->data,comp->len))
+			return -EFAULT;
 		return flashpchar((struct airo_info *)dev->priv,z,8000);
 
 	case AIROFLPUTBUF: /* Send 32k to card */
+		if (!((struct airo_info *)dev->priv)->flash)
+			return -ENOMEM;
 		if(comp->len > FLASHSIZE)
 			return -EINVAL;
-		if ((flashbuffer = kmalloc (FLASHSIZE, GFP_KERNEL)) == NULL)
-			return -ENOMEM;
-		if(copy_from_user(flashbuffer,comp->data,comp->len)) {
-			kfree (flashbuffer);
-			return -EINVAL;
-		}
+		if(copy_from_user(((struct airo_info *)dev->priv)->flash,comp->data,comp->len))
+			return -EFAULT;
 
-		flashputbuf((struct airo_info *)dev->priv,flashbuffer);
-		kfree (flashbuffer);
+		flashputbuf((struct airo_info *)dev->priv);
 		return 0;
 
 	case AIRORESTART:
@@ -4115,11 +4149,8 @@ int flashcard(struct net_device *dev, aironet_ioctl *comp) {
  */
 
 int cmdreset(struct airo_info *ai) {
-	int flags;
-
 	disable_MAC(ai);
 
-	spin_lock_irqsave(&ai->cmd_lock, flags);
 	if(!waitbusy (ai)){
 		printk(KERN_INFO "Waitbusy hang before RESET\n");
 		return -EBUSY;
@@ -4134,7 +4165,6 @@ int cmdreset(struct airo_info *ai) {
 		printk(KERN_INFO "Waitbusy hang AFTER RESET\n");
 		return -EBUSY;
 	}
-	spin_unlock_irqrestore(&ai->cmd_lock, flags);
 	return 0;
 }
 
@@ -4144,16 +4174,12 @@ int cmdreset(struct airo_info *ai) {
  */
 
 int setflashmode (struct airo_info *ai) {
-	int flags;
-
-	spin_lock_irqsave(&ai->cmd_lock, flags);
 	OUT4500(ai, SWS0, FLASH_COMMAND);
 	OUT4500(ai, SWS1, FLASH_COMMAND);
 	OUT4500(ai, SWS0, FLASH_COMMAND);
 	OUT4500(ai, COMMAND,0x10);
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	schedule_timeout (HZ/2); /* 500ms delay */
-	spin_unlock_irqrestore(&ai->cmd_lock, flags);
   
 	if(!waitbusy(ai)) {
 		printk(KERN_INFO "Waitbusy hang after setflash mode\n");
@@ -4237,7 +4263,7 @@ int flashgchar(struct airo_info *ai,int matchbyte,int dwelltime){
  * send to the card 
  */
 
-int flashputbuf(struct airo_info *ai, unsigned short *bufp){
+int flashputbuf(struct airo_info *ai){
 	int            nwords;
 
 	/* Write stuff */
@@ -4245,7 +4271,7 @@ int flashputbuf(struct airo_info *ai, unsigned short *bufp){
 	OUT4500(ai,AUXOFF,0);
 
 	for(nwords=0;nwords != FLASHSIZE / 2;nwords++){
-		OUT4500(ai,AUXDATA,bufp[nwords] & 0xffff);
+		OUT4500(ai,AUXDATA,ai->flash[nwords] & 0xffff);
 	}
   
 	OUT4500(ai,SWS0,0x8000);

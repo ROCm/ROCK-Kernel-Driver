@@ -153,6 +153,7 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/ethtool.h>
 #include <linux/delay.h>
 #include <linux/rtnetlink.h>
+#include <linux/mii.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -737,11 +738,12 @@ static void init_registers(struct net_device *dev)
 	   of the 100Mbit autodetection circuitry.  Also, we only want to do
 	   this for rev C of the chip.
 
-	   There seems to be a typo on page 78: the fixup should be performed
-	   for "DP83815CVNG (SRR = 203h)", but the description of the
-	   SiliconRev regsiters says "DP83815CVNG: 00000302h"
+	   There seems to be a typo on page 78, but there isn't.  The fixup 
+	   should be performed for "DP83815CVNG (SRR = 203h)", which is a 
+	   pretty old rev.  This is not to be confused with 302h, which is 
+	   current.  Confirmed with engineers at NSC.
 	*/
-	if (readl(ioaddr + SiliconRev) == 0x302) {
+	if (readl(ioaddr + SiliconRev) == 0x203) {
 		writew(0x0001, ioaddr + PGSEL);
 		writew(0x189C, ioaddr + PMDCSR);
 		writew(0x0000, ioaddr + TSTDAT);
@@ -1035,14 +1037,13 @@ static void netdev_tx_done(struct net_device *dev)
 		/* The ring is no longer full, wake queue. */
 		netif_wake_queue(dev);
 	}
-	spin_unlock(&np->lock);
-
 }
+
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
-	struct net_device *dev = (struct net_device *)dev_instance;
+	struct net_device *dev = dev_instance;
 	struct netdev_private *np;
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
@@ -1335,8 +1336,8 @@ static void __set_rx_mode(struct net_device *dev)
 	}
 	writel(rx_mode, ioaddr + RxFilterAddr);
 	np->cur_rx_mode = rx_mode;
-	spin_unlock_irq(&np->lock);
 }
+
 static void set_rx_mode(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
@@ -1372,23 +1373,28 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
-	u16 *data = (u16 *)&rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
 	case SIOCETHTOOL:
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
-		data[0] = 1;
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = 1;
 		/* Fall Through */
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
-		data[3] = mdio_read(dev, data[0] & 0x1f, data[1] & 0x1f);
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
+		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		return 0;
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (data[0] == 1) {
-			u16 miireg = data[1] & 0x1f;
-			u16 value = data[2];
+		if (data->phy_id == 1) {
+			u16 miireg = data->reg_num & 0x1f;
+			u16 value = data->val_in;
 			writew(value, dev->base_addr + 0x80 + (miireg << 2));
 			switch (miireg) {
 			case 4: np->advertising = value; break;

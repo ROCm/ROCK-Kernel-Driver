@@ -12204,34 +12204,38 @@ CONFIG_VXFS_FS
   The module is called freevxfs.o. If you want to compile it as a module,
   say M here and read Documentation/modules.txt. If unsure, say N.
 
-NTFS support (read only)
+NTFS file system support (read-only)
 CONFIG_NTFS_FS
   NTFS is the file system of Microsoft Windows NT. Say Y if you want
   to get read access to files on NTFS partitions of your hard drive.
   The Linux NTFS driver supports most of the mount options of the VFAT
-  driver, see Documentation/filesystems/ntfs.txt. Saying Y here will
-  give you read-only access to NTFS partitions.
+  driver, see <file:Documentation/filesystems/ntfs.txt>. Saying Y here
+  will give you read-only access to NTFS partitions.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called ntfs.o. If you want to compile it as a
-  module, say M here and read Documentation/modules.txt.
+  module, say M here and read <file:Documentation/modules.txt>.
 
 NTFS write support (DANGEROUS)
 CONFIG_NTFS_RW
   If you say Y here, you will (maybe) be able to write to NTFS file
-  systems as well as read from them. The read-write support in
-  NTFS is far from being complete and is not well tested. If you
-  say Y here, back up your NTFS volume first since it may get
-  damaged. Also, make sure to run chkdsk from within Microsoft
-  Windows NT after having performed any writes to a NTFS partition
-  from Linux to detect any problems as early as possible.
+  systems as well as read from them. The read-write support in NTFS
+  is far from being complete and is not well tested. If you say Y
+  here, back up your NTFS volume first, since it will probably get
+  damaged. Also, download the Linux-NTFS project distribution from
+  Sourceforge at <http://linux-ntfs.sf.net/> and always run the
+  included ntfsfix utility after writing to an NTFS partition from
+  Linux to fix some of the damage done by the driver. You should run
+  ntfsfix _after_ unmounting the partition in Linux but _before_
+  rebooting into Windows. When Windows next boots, chkdsk will be
+  run automatically to fix the remaining damage.
   Please note that write support is limited to Windows NT4 and
   earlier versions.
 
   If unsure, say N.
 
-System V, Version 7, Xenix and Coherent filesystem support (read only)
+System V, Version 7, Xenix and Coherent filesystem support
 CONFIG_SYSV_FS
   SCO, Xenix and Coherent are commercial Unix systems for Intel
   machines, and Version 7 was used on the DEC PDP-11. Saying Y
@@ -12241,14 +12245,12 @@ CONFIG_SYSV_FS
 
   If you have floppies or hard disk partitions like that, it is likely
   that they contain binaries from those other Unix systems; in order
-  to run these binaries, you will want to install iBCS2 (Intel Binary
-  Compatibility Standard is a kernel module which lets you run SCO,
-  Xenix, Wyse, UnixWare, Dell Unix and System V programs under Linux
-  and is often needed to run commercial software that's only available
-  for those systems. It's available via FTP (user: anonymous) from
-  ftp://tsx-11.mit.edu/pub/linux/BETA ). NOTE: that will work only for
-  binaries from Intel-based systems; PDP ones will have to wait until
-  somebody ports Linux to -11 ;-)
+  to run these binaries, you will want to install linux-abi which is a
+  a set of kernel modules that lets you run SCO, Xenix, Wyse, UnixWare,
+  Dell Unix and System V programs under Linux.  It's available via FTP
+  (user: ftp) from ftp://ftp.openlinux.org/pub/people/hch/linux-abi).
+  NOTE: that will work only for binaries from Intel-based systems;
+  PDP ones will have to wait until somebody ports Linux to -11 ;-)
 
   If you only intend to mount files from some other Unix over the
   network using NFS, you don't need the System V file system support
@@ -12268,15 +12270,6 @@ CONFIG_SYSV_FS
   called sysv.o. 
 
   If you haven't heard about all of this before, it's safe to say N.
-
-SYSV file system write support (DANGEROUS)
-CONFIG_SYSV_FS_WRITE
-  If you say Y here, you will be able to write to hard drive
-  partitions and floppy disks which carry a SYSV file system used the
-  commercial Unixes SCO, Xenix and Coherent. 
-
-  This support is experimental and you may destroy your data. If
-  unsure, say N.
 
 Amiga FFS file system support
 CONFIG_AFFS_FS
@@ -15631,9 +15624,18 @@ CONFIG_SOUND_WAVEARTIST
 VIA 82Cxxx Audio Codec
 CONFIG_SOUND_VIA82CXXX
   Say Y here to include support for the audio codec found on VIA
-  82Cxxx-based chips. Typically these are built into a motherboard. DO
-  NOT select Sound Blaster or Adlib with this driver, unless you have
-  a Sound Blaster or Adlib card in addition to your VIA audio chip.
+  82Cxxx-based chips. Typically these are built into a motherboard.
+
+  DO NOT select Sound Blaster or Adlib with this driver, unless
+  you have a Sound Blaster or Adlib card in addition to your VIA
+  audio chip.
+
+VIA 82C686 MIDI
+CONFIG_MIDI_VIA82CXXX
+   Answer Y to use the MIDI interface of the Via686. You may need to
+   enable this in the BIOS before it will work. This is for connection
+   to external MIDI hardware, and is not required for software playback
+   of MIDI files.
 
 NeoMagic 256AV/256ZX sound chipsets
 CONFIG_SOUND_NM256

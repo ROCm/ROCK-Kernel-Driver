@@ -25,6 +25,7 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
+#include <linux/completion.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -606,8 +607,11 @@ still_running_back:
 #endif
 	spin_unlock_irq(&runqueue_lock);
 
-	if (prev == next)
+	if (prev == next) {
+		/* We won't go through the normal tail, so do this by hand */
+		prev->policy &= ~SCHED_YIELD;
 		goto same_process;
+	}
 
 #ifdef CONFIG_SMP
  	/*
@@ -756,6 +760,36 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr)
 		__wake_up_common(q, mode, nr, 1);
 		wq_read_unlock_irqrestore(&q->lock, flags);
 	}
+}
+
+void complete(struct completion *x)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&x->wait.lock, flags);
+	x->done++;
+	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, 0);
+	spin_unlock_irqrestore(&x->wait.lock, flags);
+}
+
+void wait_for_completion(struct completion *x)
+{
+	spin_lock_irq(&x->wait.lock);
+	if (!x->done) {
+		DECLARE_WAITQUEUE(wait, current);
+
+		wait.flags |= WQ_FLAG_EXCLUSIVE;
+		__add_wait_queue_tail(&x->wait, &wait);
+		do {
+			__set_current_state(TASK_UNINTERRUPTIBLE);
+			spin_unlock_irq(&x->wait.lock);
+			schedule();
+			spin_lock_irq(&x->wait.lock);
+		} while (!x->done);
+		__remove_wait_queue(&x->wait, &wait);
+	}
+	x->done--;
+	spin_unlock_irq(&x->wait.lock);
 }
 
 #define	SLEEP_ON_VAR				\

@@ -1189,7 +1189,7 @@ int zoran_ioctl(struct video_device* dev, unsigned int cmd, void *arg)
 		if (vw.flags)
 			return -EINVAL;
 
-		if (vw.clipcount>256)
+		if (vw.clipcount <0 || vw.clipcount>256)
 			return -EDOM;   /* Too many! */
 
 		/*

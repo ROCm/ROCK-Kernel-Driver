@@ -261,11 +261,13 @@ static unsigned char i810tco_getdevice (void)
 	 */
 
 	pci_for_each_dev(dev) {
-		if (pci_match_device(i810tco_pci_tbl, dev))
+		if (pci_match_device(i810tco_pci_tbl, dev)) {
+			i810tco_pci = dev;
 			break;
+		}
 	}
 
-	if ((i810tco_pci = dev)) {
+	if (i810tco_pci) {
 		/*
 		 *      Find the ACPI base I/O address which is the base
 		 *      for the TCO registers (TCOBASE=ACPIBASE + 0x60)

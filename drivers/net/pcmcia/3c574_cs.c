@@ -1,7 +1,7 @@
 /* 3c574.c: A PCMCIA ethernet driver for the 3com 3c574 "RoadRunner".
 
 	Written 1993-1998 by
-	Donald Becker, becker@cesdis.gsfc.nasa.gov, (driver core) and
+	Donald Becker, becker@scyld.com, (driver core) and
 	David Hinds, dahinds@users.sourceforge.net (from his PC card code).
 
 	This software may be used and distributed according to the terms of
@@ -16,7 +16,7 @@
 
 /* Driver author info must always be in the binary.  Version too.. */
 static const char *tc574_version =
-"3c574_cs.c v1.08 9/24/98 Donald Becker/David Hinds, becker@cesdis.gsfc.nasa.gov.\n";
+"3c574_cs.c v1.08 9/24/98 Donald Becker/David Hinds, becker@scyld.com.\n";
 
 /*
 				Theory of Operation
@@ -217,7 +217,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"3c574_cs.c 1.000 1998/1/8 Donald Becker, becker@cesdis.gsfc.nasa.gov.\n";
+"3c574_cs.c 1.000 1998/1/8 Donald Becker, becker@scyld.com.\n";
 #else
 #define DEBUG(n, args...)
 #endif

@@ -28,11 +28,10 @@
 #include <linux/highuid.h>
 #include <asm/byteorder.h>
 
-
 /* This is only called on sync() and umount(), when s_dirt=1. */
 static void sysv_write_super(struct super_block *sb)
 {
-	if (buffer_dirty(sb->sv_bh1) || buffer_dirty(sb->sv_bh2)) {
+	if (!(sb->s_flags & MS_RDONLY)) {
 		/* If we are going to write out the super block,
 		   then attach current time stamp.
 		   But if the filesystem was marked clean, keep it clean. */
@@ -49,13 +48,16 @@ static void sysv_write_super(struct super_block *sb)
 
 static void sysv_put_super(struct super_block *sb)
 {
-	/* we can assume sysv_write_super() has already been called,
-	   and that the superblock is locked */
+	if (!(sb->s_flags & MS_RDONLY)) {
+		/* XXX ext2 also updates the state here */
+		mark_buffer_dirty(sb->sv_bh1);
+		if (sb->sv_bh1 != sb->sv_bh2)
+			mark_buffer_dirty(sb->sv_bh2);
+	}
+
 	brelse(sb->sv_bh1);
-	if (sb->sv_bh1 != sb->sv_bh2) brelse(sb->sv_bh2);
-	/* switch back to default block size */
-	if (sb->s_blocksize != BLOCK_SIZE)
-		set_blocksize(sb->s_dev,BLOCK_SIZE);
+	if (sb->sv_bh1 != sb->sv_bh2)
+		brelse(sb->sv_bh2);
 }
 
 static int sysv_statfs(struct super_block *sb, struct statfs *buf)

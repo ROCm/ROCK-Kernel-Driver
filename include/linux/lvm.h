@@ -299,7 +299,7 @@
 
 #define	LVM_SNAPSHOT_MAX_CHUNK	1024	/* 1024 KB */
 #define	LVM_SNAPSHOT_DEF_CHUNK	64	/* 64  KB */
-#define	LVM_SNAPSHOT_MIN_CHUNK	1	/* 1   KB */
+#define	LVM_SNAPSHOT_MIN_CHUNK	(PAGE_SIZE/1024)	/* 4 or 8 KB */
 
 #define	UNDEF	-1
 #define FALSE	0
@@ -585,7 +585,7 @@ typedef struct {
 } le_remap_req_t;
 
 typedef struct lv_bmap {
-	ulong lv_block;
+	uint32_t lv_block;
 	dev_t lv_dev;
 } lv_bmap_t;
 

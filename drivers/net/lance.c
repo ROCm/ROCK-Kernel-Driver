@@ -10,9 +10,10 @@
 	This driver is for the Allied Telesis AT1500 and HP J2405A, and should work
 	with most other LANCE-based bus-master (NE2100/NE2500) ethercards.
 
-	The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
-	Center of Excellence in Space Data and Information Sciences
-	   Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+	The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
 
 	Andrey V. Savochkin:
 	- alignment problem with 1.3.* kernel and some minor changes.

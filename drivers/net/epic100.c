@@ -48,13 +48,16 @@
 	* ethtool driver info support (jgarzik)
 
 	LK1.1.9:
-	* MII ioctl support (jgarzik)
+	* ethtool media get/set support (jgarzik)
+
+	LK1.1.10:
+	* revert MII transceiver init change (jgarzik)
 
 */
 
 #define DRV_NAME	"epic100"
-#define DRV_VERSION	"1.11+LK1.1.9"
-#define DRV_RELDATE	"July 2, 2001"
+#define DRV_VERSION	"1.11+LK1.1.10"
+#define DRV_RELDATE	"July 6, 2001"
 
 
 /* The user-configurable values.
@@ -448,7 +451,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	outl(0x0008, ioaddr + TEST1);
 
 	/* Turn on the MII transceiver. */
-	outl(dev->if_port == 1 ? 0x13 : 0x12, ioaddr + MIICfg);
+	outl(0x12, ioaddr + MIICfg);
 	if (chip_idx == 1)
 		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 	outl(0x0200, ioaddr + GENCTL);
@@ -670,7 +673,9 @@ static int epic_open(struct net_device *dev)
 	   required by the details of which bits are reset and the transceiver
 	   wiring on the Ositech CardBus card.
 	*/
+#if 0
 	outl(dev->if_port == 1 ? 0x13 : 0x12, ioaddr + MIICfg);
+#endif
 	if (ep->chip_flags & MII_PWRDWN)
 		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 

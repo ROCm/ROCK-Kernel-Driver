@@ -87,7 +87,7 @@ static const int buddha_irqports[CATWEASEL_NUM_HWIFS] __initdata = {
      *  Board information
      */
 
-static u_long buddha_board = 0;
+static u_long buddha_board;
 static int buddha_num_hwifs = -1;
 
 

@@ -1,8 +1,9 @@
-/*  support.c -  Specific support functions
+/*
+ * support.c -  Specific support functions
  *
- *  Copyright (C) 1997 Martin von Löwis
- *  Copyright (C) 1997 Régis Duchesne
- *  Copyright (C) 2001 Anton Altaparmakov (AIA)
+ * Copyright (C) 1997 Martin von Löwis
+ * Copyright (C) 1997 Régis Duchesne
+ * Copyright (C) 2001 Anton Altaparmakov (AIA)
  */
 
 #include "ntfstypes.h"
@@ -12,10 +13,14 @@
 #include <stdarg.h>
 #include <linux/slab.h>
 #include <linux/locks.h>
-#include <linux/nls.h>
+#include <linux/fs.h>
 #include "util.h"
 #include "inode.h"
 #include "macros.h"
+
+#ifndef NLS_MAX_CHARSET_SIZE
+#include <linux/nls.h>
+#endif
 
 static char print_buf[1024];
 
@@ -29,7 +34,7 @@ void ntfs_debug(int mask, const char *fmt, ...)
 	va_list ap;
 
 	/* Filter it with the debugging level required */
-	if(ntdebug & mask){
+	if (ntdebug & mask) {
 		va_start(ap,fmt);
 		strcpy(print_buf, KERN_DEBUG);
 		vsprintf(print_buf + 3, fmt, ap);
@@ -114,13 +119,13 @@ int ntfs_read_mft_record(ntfs_volume *vol, int mftno, char *buf)
 	int error;
 	ntfs_io io;
 
-	ntfs_debug(DEBUG_OTHER, "read_mft_record %x\n",mftno);
-	if(mftno == FILE_$Mft)
+	ntfs_debug(DEBUG_OTHER, "read_mft_record 0x%x\n", mftno);
+	if (mftno == FILE_$Mft)
 	{
-		ntfs_memcpy(buf, vol->mft, vol->mft_recordsize);
+		ntfs_memcpy(buf, vol->mft, vol->mft_record_size);
 		return 0;
 	}
-	if(!vol->mft_ino)
+	if (!vol->mft_ino)
 	{
 		printk(KERN_ERR "NTFS: mft_ino is NULL. Something is terribly "
 				"wrong here!\n");
@@ -129,28 +134,31 @@ int ntfs_read_mft_record(ntfs_volume *vol, int mftno, char *buf)
  	io.fn_put = ntfs_put;
 	io.fn_get = 0;
 	io.param = buf;
-	io.size = vol->mft_recordsize;
+	io.size = vol->mft_record_size;
+	ntfs_debug(DEBUG_OTHER, "read_mft_record: calling ntfs_read_attr with: "
+		"mftno = 0x%x, vol->mft_record_size_bits = 0x%x, "
+		"mftno << vol->mft_record_size_bits = 0x%Lx\n", mftno,
+		vol->mft_record_size_bits,
+		(__s64)mftno << vol->mft_record_size_bits);
 	error = ntfs_read_attr(vol->mft_ino, vol->at_data, NULL,
-					mftno * vol->mft_recordsize, &io);
-	if (error || (io.size != vol->mft_recordsize))
-	{
-		ntfs_debug(DEBUG_OTHER, "read_mft_record: read %x failed "
+				(__s64)mftno << vol->mft_record_size_bits, &io);
+	if (error || (io.size != vol->mft_record_size)) {
+		ntfs_debug(DEBUG_OTHER, "read_mft_record: read 0x%x failed "
 				   	"(%d,%d,%d)\n", mftno, error, io.size,
-				   	vol->mft_recordsize);
+				   	vol->mft_record_size);
 		return error ? error : -ENODATA;
 	}
-	ntfs_debug(DEBUG_OTHER, "read_mft_record: finished read %x\n", mftno);
-	if(!ntfs_check_mft_record(vol, buf))
-	{
+	ntfs_debug(DEBUG_OTHER, "read_mft_record: finished read 0x%x\n", mftno);
+	if (!ntfs_check_mft_record(vol, buf)) {
 		/* FIXME: This is incomplete behaviour. We might be able to
 		 * recover at this stage. ntfs_check_mft_record() is too
 		 * conservative at aborting it's operations. It is OK for
 		 * now as we just can't handle some on disk structures
 		 * this way. (AIA) */
-		printk(KERN_WARNING "NTFS: Invalid MFT record for %x\n", mftno);
+		printk(KERN_WARNING "NTFS: Invalid MFT record for 0x%x\n", mftno);
 		return -EINVAL;
 	}
-	ntfs_debug(DEBUG_OTHER, "read_mft_record: Done %x\n", mftno);
+	ntfs_debug(DEBUG_OTHER, "read_mft_record: Done 0x%x\n", mftno);
 	return 0;
 }
 
@@ -159,32 +167,57 @@ int ntfs_getput_clusters(ntfs_volume *vol, int cluster,	ntfs_size_t start_offs,
 {
 	struct super_block *sb = NTFS_SB(vol);
 	struct buffer_head *bh;
-	ntfs_size_t to_copy;
 	int length = buf->size;
+	int error = 0;
+	ntfs_size_t to_copy;
 
 	ntfs_debug(DEBUG_OTHER, "%s_clusters %d %d %d\n", 
 		   buf->do_read ? "get" : "put", cluster, start_offs, length);
 	while (length) {
-		if (!(bh = bread(sb->s_dev, cluster, vol->clustersize))) {
+		if (!(bh = bread(sb->s_dev, cluster, vol->cluster_size))) {
 			ntfs_debug(DEBUG_OTHER, "%s failed\n",
 				   buf->do_read ? "Reading" : "Writing");
-			return -EIO;
+			error = -EIO;
+			goto error_ret;
 		}
-		to_copy = min(vol->clustersize - start_offs, length);
+		to_copy = min(vol->cluster_size - start_offs, length);
 		lock_buffer(bh);
-		if (buf->do_read)
+		if (buf->do_read) {
 			buf->fn_put(buf, bh->b_data + start_offs, to_copy);
-		else {
+			unlock_buffer(bh);
+		} else {
 			buf->fn_get(bh->b_data + start_offs, buf, to_copy);
 			mark_buffer_dirty(bh);
+			unlock_buffer(bh);
+			/*
+			 * Note: We treat synchronous IO on a per volume basis
+			 * disregarding flags of individual inodes. This can
+			 * lead to some strange write ordering effects upon a
+			 * remount with a change in the sync flag but it should
+			 * not break anything. [Except if the system crashes
+			 * at that point in time but there would be more thigs
+			 * to worry about than that in that case...]. (AIA)
+			 */
+			if (sb->s_flags & MS_SYNCHRONOUS) {
+				ll_rw_block(WRITE, 1, &bh);
+				wait_on_buffer(bh);
+				if (buffer_req(bh) && !buffer_uptodate(bh)) {
+					printk(KERN_ERR "IO error syncing NTFS "
+					       "cluster [%s:%i]\n",
+					       bdevname(sb->s_dev), cluster);
+					brelse(bh);
+					error = -EIO;
+					goto error_ret;
+				}
+			}
 		}
-		unlock_buffer(bh);
 		length -= to_copy;
 		start_offs = 0;
 		cluster++;
 		brelse(bh);
 	}
-	return 0;
+error_ret:
+	return error;
 }
 
 ntfs_time64_t ntfs_now(void)
@@ -241,6 +274,10 @@ int ntfs_dupuni2map(ntfs_volume *vol, ntfs_u16 *in, int in_len, char **out,
 				/* adjust result buffer */
 				if (chl > 1) {
 					buf = ntfs_malloc(*out_len + chl - 1);
+					if (!buf) {
+						ntfs_free(result);
+						return -ENOMEM;
+					}
 					memcpy(buf, result, o);
 					ntfs_free(result);
 					result = buf;

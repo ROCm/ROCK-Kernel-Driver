@@ -3,7 +3,8 @@
  *
  * Copyright (C) 2000 Linus Torvalds.
  *		 2000 Transmeta Corp.
- *		 2000 Christoph Rohland
+ *		 2000-2001 Christoph Rohland
+ *		 2000-2001 SAP AG
  * 
  * This file is released under the GPL.
  */
@@ -33,7 +34,7 @@
 #define TMPFS_MAGIC	0x01021994
 
 #define ENTRIES_PER_PAGE (PAGE_SIZE/sizeof(unsigned long))
-#define NR_SINGLE (ENTRIES_PER_PAGE + SHMEM_NR_DIRECT)
+#define SHMEM_MAX_BLOCKS (SHMEM_NR_DIRECT + ENTRIES_PER_PAGE*ENTRIES_PER_PAGE)
 
 static struct super_operations shmem_ops;
 static struct address_space_operations shmem_aops;
@@ -193,7 +194,14 @@ static void shmem_truncate (struct inode * inode)
 	}
 
 out:
-	info->max_index = index;
+	/*
+	 * We have no chance to give an error, so we limit it to max
+	 * size here and the application will fail later
+	 */
+	if (index > SHMEM_MAX_BLOCKS) 
+		info->max_index = SHMEM_MAX_BLOCKS;
+	else
+		info->max_index = index;
 	info->swapped -= freed;
 	shmem_recalc_inode(inode);
 	spin_unlock (&info->lock);
@@ -311,6 +319,7 @@ repeat:
 		return page;
 	}
 	
+	shmem_recalc_inode(inode);
 	if (entry->val) {
 		unsigned long flags;
 
@@ -390,22 +399,9 @@ wait_retry:
 
 static int shmem_getpage(struct inode * inode, unsigned long idx, struct page **ptr)
 {
-	struct address_space * mapping = inode->i_mapping;
 	int error;
 
-	*ptr = NOPAGE_SIGBUS;
-	if (inode->i_size <= (loff_t) idx * PAGE_CACHE_SIZE)
-		return -EFAULT;
-
-	*ptr = __find_get_page(mapping, idx, page_hash(mapping, idx));
-	if (*ptr) {
-		if (Page_Uptodate(*ptr))
-			return 0;
-		page_cache_release(*ptr);
-	}
-
 	down (&inode->i_sem);
-	/* retest we may have slept */
 	if (inode->i_size < (loff_t) idx * PAGE_CACHE_SIZE)
 		goto sigbus;
 	*ptr = shmem_getpage_locked(inode, idx);
@@ -1024,6 +1020,8 @@ static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)
 	unsigned long max_inodes, inodes;
 	struct shmem_sb_info *info = &sb->u.shmem_sb;
 
+	max_blocks = info->max_blocks;
+	max_inodes = info->max_inodes;
 	if (shmem_parse_options (data, NULL, &max_blocks, &max_inodes))
 		return -EINVAL;
 
@@ -1071,7 +1069,7 @@ static struct super_block *shmem_read_super(struct super_block * sb, void * data
 	sb->u.shmem_sb.free_blocks = blocks;
 	sb->u.shmem_sb.max_inodes = inodes;
 	sb->u.shmem_sb.free_inodes = inodes;
-	sb->s_maxbytes = (unsigned long long)(SHMEM_NR_DIRECT + (ENTRIES_PER_PAGE*ENTRIES_PER_PAGE)) << PAGE_CACHE_SHIFT;
+	sb->s_maxbytes = (unsigned long long)SHMEM_MAX_BLOCKS << PAGE_CACHE_SHIFT;
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = TMPFS_MAGIC;
@@ -1279,9 +1277,11 @@ struct file *shmem_file_setup(char * name, loff_t size)
 	struct qstr this;
 	int vm_enough_memory(long pages);
 
-	error = -ENOMEM;
+	if (size > (unsigned long long) SHMEM_MAX_BLOCKS << PAGE_CACHE_SHIFT)
+		return ERR_PTR(-EINVAL);
+
 	if (!vm_enough_memory((size) >> PAGE_SHIFT))
-		goto out;
+		return ERR_PTR(-ENOMEM);
 
 	this.name = name;
 	this.len = strlen(name);
@@ -1289,7 +1289,7 @@ struct file *shmem_file_setup(char * name, loff_t size)
 	root = tmpfs_fs_type.kern_mnt->mnt_root;
 	dentry = d_alloc(root, &this);
 	if (!dentry)
-		goto out;
+		return ERR_PTR(-ENOMEM);
 
 	error = -ENFILE;
 	file = get_empty_filp();
@@ -1315,7 +1315,6 @@ close_file:
 	put_filp(file);
 put_dentry:
 	dput (dentry);
-out:
 	return ERR_PTR(error);	
 }
 /*

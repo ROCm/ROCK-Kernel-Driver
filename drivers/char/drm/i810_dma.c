@@ -1416,6 +1416,11 @@ int i810_copybuf(struct inode *inode, struct file *filp, unsigned int cmd,
    	buf_priv = buf->dev_private;
 	if (buf_priv->currently_mapped != I810_BUF_MAPPED) return -EPERM;
 
+	/* Stopping end users copying their data to the entire kernel
+	   is good.. */
+	if (d.used < 0 || d.used > buf->total)
+		return -EINVAL;
+		
    	if (copy_from_user(buf_priv->virtual, d.address, d.used))
 		return -EFAULT;
 

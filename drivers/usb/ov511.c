@@ -152,6 +152,7 @@ MODULE_PARM(sensor_gbr, "i");
 MODULE_PARM_DESC(sensor_gbr, "Make sensor output GBR422 rather than YUV420");
 MODULE_PARM(dumppix, "i");
 MODULE_PARM_DESC(dumppix, "Dump raw pixel data, in one of 3 formats. See ov511_dumppix() for details");
+MODULE_PARM(video_nr,"i");
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
@@ -2521,6 +2522,9 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 		PDEBUG(4, "syncing to frame %d, grabstate = %d", frame,
 		       ov511->frame[frame].grabstate);
 
+		if(frame < 0 || frame >= OV511_NUMFRAMES)
+			return -EINVAL;
+			
 		switch (ov511->frame[frame].grabstate) {
 		case FRAME_UNUSED:
 			return -EINVAL;
@@ -3146,11 +3150,6 @@ static int ov511_configure(struct usb_ov511 *ov511)
 
 	init_waitqueue_head(&ov511->wq);
 
-	if (video_register_device(&ov511->vdev, VFL_TYPE_GRABBER, video_nr) < 0) {
-		err("video_register_device failed");
-		return -EBUSY;
-	}
-
 	if (ov511_write_regvals(dev, aRegvalsInit)) goto error;
 	if (ov511_write_regvals(dev, aRegvalsNorm511)) goto error;
 
@@ -3219,7 +3218,6 @@ static int ov511_configure(struct usb_ov511 *ov511)
 	return 0;
 	
 error:
-	video_unregister_device(&ov511->vdev);
 	usb_driver_release_interface(&ov511_driver,
 		&dev->actconfig->interface[ov511->iface]);
 
@@ -3328,6 +3326,11 @@ ov511_probe(struct usb_device *dev, unsigned int ifnum,
 		ov511->buf_state = BUF_NOT_ALLOCATED;
 	} else {
 		err("Failed to configure camera");
+		goto error;
+	}
+
+	if (video_register_device(&ov511->vdev, VFL_TYPE_GRABBER, video_nr) < 0) {
+		err("video_register_device failed");
 		goto error;
 	}
 

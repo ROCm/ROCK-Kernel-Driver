@@ -214,8 +214,8 @@
 
 static u32 ns_read_sram(ns_dev *card, u32 sram_address);
 static void ns_write_sram(ns_dev *card, u32 sram_address, u32 *value, int count);
-static int ns_init_card(int i, struct pci_dev *pcidev);
-static void ns_init_card_error(ns_dev *card, int error);
+static int __init ns_init_card(int i, struct pci_dev *pcidev);
+static void __init ns_init_card_error(ns_dev *card, int error);
 static scq_info *get_scq(int size, u32 scd);
 static void free_scq(scq_info *scq, struct atm_vcc *vcc);
 static void push_rxbufs(ns_dev *card, u32 type, u32 handle1, u32 addr1,
@@ -277,7 +277,7 @@ MODULE_PARM(mac, "1-" __MODULE_STRING(NS_MAX_CARDS) "s");
 
 #ifdef MODULE
 
-int init_module(void)
+int __init init_module(void)
 {
    int i;
    unsigned error = 0;	/* Initialized to remove compile warning */
@@ -511,7 +511,7 @@ static void ns_write_sram(ns_dev *card, u32 sram_address, u32 *value, int count)
 }
 
 
-static int ns_init_card(int i, struct pci_dev *pcidev)
+static int __init ns_init_card(int i, struct pci_dev *pcidev)
 {
    int j;
    struct ns_dev *card = NULL;
@@ -1007,7 +1007,7 @@ static int ns_init_card(int i, struct pci_dev *pcidev)
 
 
 
-static void ns_init_card_error(ns_dev *card, int error)
+static void __init ns_init_card_error(ns_dev *card, int error)
 {
    if (error >= 17)
    {

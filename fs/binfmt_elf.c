@@ -888,11 +888,15 @@ static int dump_seek(struct file *file, off_t off)
  */
 static inline int maydump(struct vm_area_struct *vma)
 {
-	if (!(vma->vm_flags & (VM_READ|VM_WRITE|VM_EXEC)))
+	/*
+	 * If we may not read the contents, don't allow us to dump
+	 * them either. "dump_write()" can't handle it anyway.
+	 */
+	if (!(vma->vm_flags & VM_READ))
 		return 0;
 
 	/* Do not dump I/O mapped devices! -DaveM */
-	if(vma->vm_flags & VM_IO)
+	if (vma->vm_flags & VM_IO)
 		return 0;
 #if 1
 	if (vma->vm_flags & (VM_WRITE|VM_GROWSUP|VM_GROWSDOWN))
@@ -1205,13 +1209,12 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 			pte_t *pte;
 
 			pgd = pgd_offset(vma->vm_mm, addr);
+			if (pgd_none(*pgd))
+				goto nextpage_coredump;
 			pmd = pmd_offset(pgd, addr);
-	
-			if (!pmd)
+			if (pmd_none(*pmd))
 				goto nextpage_coredump;
 			pte = pte_offset(pmd, addr);
-			if (!pte)
-				goto nextpage_coredump;
 			if (pte_none(*pte)) {
 nextpage_coredump:
 				DUMP_SEEK (file->f_pos + PAGE_SIZE);

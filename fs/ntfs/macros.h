@@ -19,7 +19,6 @@
 
 #define IS_MAGIC(a,b)		(*(int*)(a) == *(int*)(b))
 #define IS_MFT_RECORD(a)	IS_MAGIC((a),"FILE")
-#define IS_NTFS_VOLUME(a)	IS_MAGIC((a) + 3,"NTFS")
 #define IS_INDEX_RECORD(a)	IS_MAGIC((a),"INDX")
 
 /* 'NTFS' in little endian */

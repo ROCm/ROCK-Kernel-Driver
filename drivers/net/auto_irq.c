@@ -2,9 +2,7 @@
 /*
     Written 1994 by Donald Becker.
 
-    The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
-    Center of Excellence in Space Data and Information Sciences
-      Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+    The author may be reached as becker@scyld.com
 
     This code is a general-purpose IRQ line detector for devices with
     jumpered IRQ lines.  If you can make the device raise an IRQ (and
@@ -29,7 +27,7 @@
 
 #ifdef version
 static const char *version=
-"auto_irq.c:v1.11 Donald Becker (becker@cesdis.gsfc.nasa.gov)";
+"auto_irq.c:v1.11 Donald Becker (becker@scyld.com)";
 #endif
 
 #include <linux/module.h>

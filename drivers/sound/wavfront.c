@@ -166,7 +166,7 @@ static int (*midi_load_patch) (int devno, int format, const char *addr,
 
 /*** Module-accessible parameters ***************************************/
 
-int wf_raw = 0; /* we normally check for "raw state" to firmware
+int wf_raw;     /* we normally check for "raw state" to firmware
 		   loading. if set, then during driver loading, the
 		   state of the board is ignored, and we reset the
 		   board and load the firmware anyway.
@@ -179,7 +179,7 @@ int fx_raw = 1; /* if this is zero, we'll leave the FX processor in
 		   operation, whatever that means.
 		*/
 
-int debug_default = 0;  /* you can set this to control debugging
+int debug_default;      /* you can set this to control debugging
 			      during driver loading. it takes any combination
 			      of the WF_DEBUG_* flags defined in
 			      wavefront.h

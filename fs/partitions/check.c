@@ -328,6 +328,8 @@ static void devfs_register_partition (struct gendisk *dev, int minor, int part)
 			    dev->fops, NULL);
 }
 
+static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
+
 static void devfs_register_disc (struct gendisk *dev, int minor)
 {
 	int pos = 0;
@@ -335,7 +337,6 @@ static void devfs_register_disc (struct gendisk *dev, int minor)
 	devfs_handle_t dir, slave;
 	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	char dirname[64], symlink[16];
-	static unsigned int disc_counter;
 	static devfs_handle_t devfs_handle;
 
 	if (dev->part[minor].de) return;
@@ -356,7 +357,8 @@ static void devfs_register_disc (struct gendisk *dev, int minor)
 	}
 	if (!devfs_handle)
 		devfs_handle = devfs_mk_dir (NULL, "discs", NULL);
-	sprintf (symlink, "disc%u", disc_counter++);
+	dev->part[minor].number = devfs_alloc_unique_number (&disc_numspace);
+	sprintf (symlink, "disc%d", dev->part[minor].number);
 	devfs_mk_symlink (devfs_handle, symlink, DEVFS_FL_DEFAULT,
 			  dirname + pos, &slave, NULL);
 	dev->part[minor].de =
@@ -386,6 +388,8 @@ void devfs_register_partitions (struct gendisk *dev, int minor, int unregister)
 	if (unregister) {
 		devfs_unregister (dev->part[minor].de);
 		dev->part[minor].de = NULL;
+		devfs_dealloc_unique_number (&disc_numspace,
+					     dev->part[minor].number);
 	}
 #endif  /*  CONFIG_DEVFS_FS  */
 }

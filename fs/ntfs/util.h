@@ -1,7 +1,8 @@
-/*  util.h - Header file for util.c
+/*
+ * util.h - Header file for util.c
  *
- *  Copyright (C) 1997 Régis Duchesne
- *  Copyright (C) 2001 Anton Altaparmakov
+ * Copyright (C) 1997 Régis Duchesne
+ * Copyright (C) 2001 Anton Altaparmakov (AIA)
  */
 
 /* Which character set is used for file names. */
@@ -16,7 +17,7 @@
 /*  Use a mapping table to determine printables. */
 #define nct_map              16
 
-/* The first 16 inodes correspond to NTFS special files */
+/* The first 16 inodes correspond to NTFS special files. */
 typedef enum {
 	FILE_$Mft	= 0,
 	FILE_$MftMirr	= 1,

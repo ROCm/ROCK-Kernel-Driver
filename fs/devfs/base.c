@@ -507,6 +507,10 @@
 	       Replaced <devfsd_read> stack usage with <devfsd_ioctl> kmalloc.
 	       Simplified locking in <devfsd_ioctl> and fixed memory leak.
   v0.106
+    20010709   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed broken devnum allocation and use <devfs_alloc_devnum>.
+	       Fixed old devnum leak by calling new <devfs_dealloc_devnum>.
+  v0.107
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -524,8 +528,6 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/locks.h>
-#include <linux/kdev_t.h>
 #include <linux/devfs_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
@@ -541,7 +543,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "0.106 (20010617)"
+#define DEVFS_VERSION            "0.107 (20010709)"
 
 #define DEVFS_NAME "devfs"
 
@@ -549,9 +551,6 @@
 #define FIRST_INODE 1
 
 #define STRING_LENGTH 256
-
-#define MIN_DEVNUM 36864  /*  Use major numbers 144   */
-#define MAX_DEVNUM 61439  /*  through 239, inclusive  */
 
 #ifndef TRUE
 #  define TRUE 1
@@ -626,6 +625,7 @@ struct fcb_type  /*  File, char, block type  */
     unsigned char aopen_notify:1;
     unsigned char removable:1;  /*  Belongs in device_type, but save space   */
     unsigned char open:1;       /*  Not entirely correct                     */
+    unsigned char autogen:1;    /*  Belongs in device_type, but save space   */
 };
 
 struct symlink_type
@@ -712,8 +712,6 @@ struct fs_info      /*  This structure is for the mounted devfs  */
 };
 
 static struct fs_info fs_info = {devfsd_buffer_lock: SPIN_LOCK_UNLOCKED};
-static unsigned int next_devnum_char = MIN_DEVNUM;
-static unsigned int next_devnum_block = MIN_DEVNUM;
 static const int devfsd_buf_size = PAGE_SIZE / sizeof(struct devfsd_buf_entry);
 #ifdef CONFIG_DEVFS_DEBUG
 static unsigned int devfs_debug_init __initdata = DEBUG_NONE;
@@ -873,6 +871,7 @@ static void update_devfs_inode_from_entry (struct devfs_entry *de)
 
 static struct devfs_entry *get_root_entry (void)
 {
+    kdev_t devnum;
     struct devfs_entry *new;
 
     /*  Always ensure the root is created  */
@@ -885,9 +884,9 @@ static struct devfs_entry *get_root_entry (void)
     /*  And create the entry for ".devfsd"  */
     if ( ( new = create_entry (root_entry, ".devfsd", 0) ) == NULL )
 	return NULL;
-    new->u.fcb.u.device.major = next_devnum_char >> 8;
-    new->u.fcb.u.device.minor = next_devnum_char & 0xff;
-    ++next_devnum_char;
+    devnum = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
+    new->u.fcb.u.device.major = MAJOR (devnum);
+    new->u.fcb.u.device.minor = MINOR (devnum);
     new->mode = S_IFCHR | S_IRUSR | S_IWUSR;
     new->u.fcb.default_uid = 0;
     new->u.fcb.default_gid = 0;
@@ -1264,7 +1263,9 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 			       unsigned int major, unsigned int minor,
 			       umode_t mode, void *ops, void *info)
 {
+    char devtype = S_ISCHR (mode) ? DEVFS_SPECIAL_CHR : DEVFS_SPECIAL_BLK;
     int is_new;
+    kdev_t devnum = NODEV;
     struct devfs_entry *de;
 
     if (name == NULL)
@@ -1296,29 +1297,17 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 		DEVFS_NAME, name);
 	return NULL;
     }
-    if ( S_ISCHR (mode) && (flags & DEVFS_FL_AUTO_DEVNUM) )
+    if ( ( S_ISCHR (mode) || S_ISBLK (mode) ) &&
+	 (flags & DEVFS_FL_AUTO_DEVNUM) )
     {
-	if (next_devnum_char >= MAX_DEVNUM)
+	if ( ( devnum = devfs_alloc_devnum (devtype) ) == NODEV )
 	{
-	    printk ("%s: devfs_register(%s): exhausted char device numbers\n",
-		    DEVFS_NAME, name);
+	    printk ("%s: devfs_register(%s): exhausted %s device numbers\n",
+		    DEVFS_NAME, name, S_ISCHR (mode) ? "char" : "block");
 	    return NULL;
 	}
-	major = next_devnum_char >> 8;
-	minor = next_devnum_char & 0xff;
-	++next_devnum_char;
-    }
-    if ( S_ISBLK (mode) && (flags & DEVFS_FL_AUTO_DEVNUM) )
-    {
-	if (next_devnum_block >= MAX_DEVNUM)
-	{
-	    printk ("%s: devfs_register(%s): exhausted block device numbers\n",
-		    DEVFS_NAME, name);
-	    return NULL;
-	}
-	major = next_devnum_block >> 8;
-	minor = next_devnum_block & 0xff;
-	++next_devnum_block;
+	major = MAJOR (devnum);
+	minor = MINOR (devnum);
     }
     de = search_for_entry (dir, name, strlen (name), TRUE, TRUE, &is_new,
 			   FALSE);
@@ -1326,6 +1315,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     {
 	printk ("%s: devfs_register(): could not create entry: \"%s\"\n",
 		DEVFS_NAME, name);
+	if (devnum != NODEV) devfs_dealloc_devnum (devtype, devnum);
 	return NULL;
     }
 #ifdef CONFIG_DEVFS_DEBUG
@@ -1341,19 +1331,23 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 	{
 	    printk ("%s: devfs_register(): existing non-device/file entry: \"%s\"\n",
 		    DEVFS_NAME, name);
+	    if (devnum != NODEV) devfs_dealloc_devnum (devtype, devnum);
 	    return NULL;
 	}
 	if (de->registered)
 	{
 	    printk("%s: devfs_register(): device already registered: \"%s\"\n",
 		   DEVFS_NAME, name);
+	    if (devnum != NODEV) devfs_dealloc_devnum (devtype, devnum);
 	    return NULL;
 	}
     }
+    de->u.fcb.autogen = 0;
     if ( S_ISCHR (mode) || S_ISBLK (mode) )
     {
 	de->u.fcb.u.device.major = major;
 	de->u.fcb.u.device.minor = minor;
+	de->u.fcb.autogen = (devnum == NODEV) ? 0 : 1;
     }
     else if ( S_ISREG (mode) ) de->u.fcb.u.file.size = 0;
     else
@@ -1417,6 +1411,14 @@ static void unregister (struct devfs_entry *de)
     {
 	de->registered = FALSE;
 	de->u.fcb.ops = NULL;
+	if (!S_ISREG (de->mode) && de->u.fcb.autogen)
+	{
+	    devfs_dealloc_devnum ( S_ISCHR (de->mode) ? DEVFS_SPECIAL_CHR :
+				   DEVFS_SPECIAL_BLK,
+				   MKDEV (de->u.fcb.u.device.major,
+					  de->u.fcb.u.device.minor) );
+	}
+	de->u.fcb.autogen = 0;
 	return;
     }
     if (S_ISLNK (de->mode) && de->registered)

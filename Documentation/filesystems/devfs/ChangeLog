@@ -1661,3 +1661,17 @@ Changes for patch v181
 - Replaced <devfsd_read> stack usage with <devfsd_ioctl> kmalloc
 
 - Simplified locking in <devfsd_ioctl> and fixed memory leak
+===============================================================================
+Changes for patch v182
+
+- Created <devfs_*alloc_major> and <devfs_*alloc_devnum>
+
+- Removed broken devnum allocation and use <devfs_alloc_devnum>
+
+- Fixed old devnum leak by calling new <devfs_dealloc_devnum>
+
+- Created <devfs_*alloc_unique_number>
+
+- Fixed number leak for /dev/cdroms/cdrom%d
+
+- Fixed number leak for /dev/discs/disc%d

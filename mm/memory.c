@@ -888,8 +888,7 @@ static inline void break_cow(struct vm_area_struct * vma, struct page *	old_page
  * change only once the write actually happens. This avoids a few races,
  * and potentially makes it more efficient.
  *
- * We enter with the page table read-lock held, and need to exit without
- * it.
+ * We hold the mm semaphore and the page_table_lock on entry and exit.
  */
 static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	unsigned long address, pte_t *page_table, pte_t pte)

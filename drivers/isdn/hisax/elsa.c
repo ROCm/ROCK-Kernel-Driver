@@ -590,13 +590,13 @@ check_arcofi(struct IsdnCardState *cs)
 		if (cs->subtyp==ELSA_QS1000) {
 			cs->subtyp = ELSA_QS3000;
 			printk(KERN_INFO
-				"Elsa: %s detected modem at 0x%x\n",
+				"Elsa: %s detected modem at 0x%lx\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
 			release_region(cs->hw.elsa.base, 8);
 			if (check_region(cs->hw.elsa.base, 16)) {
 				printk(KERN_WARNING
-				"HiSax: %s config port %x-%x already in use\n",
+				"HiSax: %s config port %lx-%lx already in use\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base + 8,
 				cs->hw.elsa.base + 16);
@@ -606,13 +606,13 @@ check_arcofi(struct IsdnCardState *cs)
 		} else if (cs->subtyp==ELSA_PCC16) {
 			cs->subtyp = ELSA_PCF;
 			printk(KERN_INFO
-				"Elsa: %s detected modem at 0x%x\n",
+				"Elsa: %s detected modem at 0x%lx\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
 			release_region(cs->hw.elsa.base, 8);
 			if (check_region(cs->hw.elsa.base, 16)) {
 				printk(KERN_WARNING
-				"HiSax: %s config port %x-%x already in use\n",
+				"HiSax: %s config port %lx-%lx already in use\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base + 8,
 				cs->hw.elsa.base + 16);
@@ -621,7 +621,7 @@ check_arcofi(struct IsdnCardState *cs)
 					"elsa isdn modem");
 		} else
 			printk(KERN_INFO
-				"Elsa: %s detected modem at 0x%x\n",
+				"Elsa: %s detected modem at 0x%lx\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
 		arcofi_fsm(cs, ARCOFI_START, &ARCOFI_XOP_0);

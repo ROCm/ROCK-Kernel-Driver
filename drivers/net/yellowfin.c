@@ -86,6 +86,9 @@ static int gx_fix;
 #define TX_RING_SIZE	16
 #define TX_QUEUE_SIZE	12		/* Must be > 4 && <= TX_RING_SIZE */
 #define RX_RING_SIZE	64
+#define STATUS_TOTAL_SIZE	TX_RING_SIZE*sizeof(struct tx_status_words)
+#define TX_TOTAL_SIZE		2*TX_RING_SIZE*sizeof(struct yellowfin_desc)
+#define RX_TOTAL_SIZE		RX_RING_SIZE*sizeof(struct yellowfin_desc)
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
@@ -126,10 +129,6 @@ static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n"
 KERN_INFO "  http://www.scyld.com/network/yellowfin.html\n"
 KERN_INFO "  (unofficial 2.4.x port, " DRV_VERSION ", " DRV_RELDATE ")\n";
-
-/* Condensed operations for readability. */
-#define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
-#define le32desc_to_virt(addr)  bus_to_virt(le32_to_cpu(addr))
 
 #ifndef USE_IO_OPS
 #undef inb
@@ -351,19 +350,21 @@ enum intr_status_bits {
 struct yellowfin_private {
 	/* Descriptor rings first for alignment.
 	   Tx requires a second descriptor for status. */
-	struct yellowfin_desc rx_ring[RX_RING_SIZE];
-	struct yellowfin_desc tx_ring[TX_RING_SIZE*2];
-	/* The addresses of receive-in-place skbuffs. */
+	struct yellowfin_desc *rx_ring;
+	struct yellowfin_desc *tx_ring;
 	struct sk_buff* rx_skbuff[RX_RING_SIZE];
-	/* The saved address of a sent-in-place packet/buffer, for later free(). */
 	struct sk_buff* tx_skbuff[TX_RING_SIZE];
-	struct tx_status_words tx_status[TX_RING_SIZE];
+	dma_addr_t rx_ring_dma;
+	dma_addr_t tx_ring_dma;
+
+	struct tx_status_words *tx_status;
+	dma_addr_t tx_status_dma;
+
 	struct timer_list timer;	/* Media selection timer. */
 	struct net_device_stats stats;
 	/* Frequently used and paired value: keep adjacent for cache effect. */
 	int chip_id, drv_flags;
 	struct pci_dev *pci_dev;
-	struct yellowfin_desc *rx_head_desc;
 	unsigned int cur_rx, dirty_rx;		/* Producer/consumer ring indices */
 	unsigned int rx_buf_sz;				/* Based on MTU+slack. */
 	struct tx_status_words *tx_tail_desc;
@@ -409,6 +410,8 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	long ioaddr, real_ioaddr;
 	int i, option = find_cnt < MAX_UNITS ? options[find_cnt] : 0;
 	int drv_flags = pci_id_tbl[chip_idx].drv_flags;
+        void *ring_space;
+        dma_addr_t ring_dma;
 	
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -460,11 +463,29 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	dev->irq = irq;
 
 	pci_set_drvdata(pdev, dev);
-	np->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&np->lock);
 
 	np->pci_dev = pdev;
 	np->chip_id = chip_idx;
 	np->drv_flags = drv_flags;
+
+	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
+	if (!ring_space)
+		goto err_out_cleardev;
+	np->tx_ring = (struct yellowfin_desc *)ring_space;
+	np->tx_ring_dma = ring_dma;
+
+	ring_space = pci_alloc_consistent(pdev, RX_TOTAL_SIZE, &ring_dma);
+	if (!ring_space)
+		goto err_out_unmap_tx;
+	np->rx_ring = (struct yellowfin_desc *)ring_space;
+	np->rx_ring_dma = ring_dma;
+
+	ring_space = pci_alloc_consistent(pdev, STATUS_TOTAL_SIZE, &ring_dma);
+	if (!ring_space)
+		goto err_out_unmap_rx;
+	np->tx_status = (struct tx_status_words *)ring_space;
+	np->tx_status_dma = ring_dma;
 
 	if (dev->mem_start)
 		option = dev->mem_start;
@@ -498,7 +519,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 
 	i = register_netdev(dev);
 	if (i)
-		goto err_out_cleardev;
+		goto err_out_unmap_status;
 
 	printk(KERN_INFO "%s: %s type %8x at 0x%lx, ",
 		   dev->name, pci_id_tbl[chip_idx].name, inl(ioaddr + ChipRev), ioaddr);
@@ -525,6 +546,13 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	
 	return 0;
 
+err_out_unmap_status:
+        pci_free_consistent(pdev, STATUS_TOTAL_SIZE, np->tx_status, 
+		np->tx_status_dma);
+err_out_unmap_rx:
+        pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
+err_out_unmap_tx:
+        pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
 err_out_cleardev:
 	pci_set_drvdata(pdev, NULL);
 #ifndef USE_IO_OPS
@@ -597,8 +625,8 @@ static int yellowfin_open(struct net_device *dev)
 
 	yellowfin_init_ring(dev);
 
-	outl(virt_to_bus(yp->rx_ring), ioaddr + RxPtr);
-	outl(virt_to_bus(yp->tx_ring), ioaddr + TxPtr);
+	outl(yp->rx_ring_dma, ioaddr + RxPtr);
+	outl(yp->tx_ring_dma, ioaddr + TxPtr);
 
 	for (i = 0; i < 6; i++)
 		outb(dev->dev_addr[i], ioaddr + StnAddr + i);
@@ -742,24 +770,23 @@ static void yellowfin_init_ring(struct net_device *dev)
 	yp->dirty_tx = 0;
 
 	yp->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
-	yp->rx_head_desc = &yp->rx_ring[0];
 
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		yp->rx_ring[i].dbdma_cmd =
 			cpu_to_le32(CMD_RX_BUF | INTR_ALWAYS | yp->rx_buf_sz);
-		yp->rx_ring[i].branch_addr = virt_to_le32desc(&yp->rx_ring[i+1]);
+		yp->rx_ring[i].branch_addr = cpu_to_le32(yp->rx_ring_dma +
+			((i+1)%RX_RING_SIZE)*sizeof(struct yellowfin_desc));
 	}
-	/* Mark the last entry as wrapping the ring. */
-	yp->rx_ring[i-1].branch_addr = virt_to_le32desc(&yp->rx_ring[0]);
 
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb = dev_alloc_skb(yp->rx_buf_sz);
 		yp->rx_skbuff[i] = skb;
 		if (skb == NULL)
 			break;
-		skb->dev = dev;			/* Mark as being used by this device. */
+		skb->dev = dev;		/* Mark as being used by this device. */
 		skb_reserve(skb, 2);	/* 16 byte align the IP header. */
-		yp->rx_ring[i].addr = virt_to_le32desc(skb->tail);
+		yp->rx_ring[i].addr = pci_map_single(yp->pci_dev, skb->tail,
+			yp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 	}
 	yp->rx_ring[i-1].dbdma_cmd = cpu_to_le32(CMD_STOP);
 	yp->dirty_rx = (unsigned int)(i - RX_RING_SIZE);
@@ -770,35 +797,47 @@ static void yellowfin_init_ring(struct net_device *dev)
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		yp->tx_skbuff[i] = 0;
 		yp->tx_ring[i].dbdma_cmd = cpu_to_le32(CMD_STOP);
-		yp->tx_ring[i].branch_addr = virt_to_le32desc(&yp->tx_ring[i+1]);
+		yp->tx_ring[i].branch_addr = cpu_to_le32(yp->tx_ring_dma +
+			((i+1)%TX_RING_SIZE)*sizeof(struct yellowfin_desc));
 	}
 	/* Wrap ring */
 	yp->tx_ring[--i].dbdma_cmd = cpu_to_le32(CMD_STOP | BRANCH_ALWAYS);
-	yp->tx_ring[i].branch_addr = virt_to_le32desc(&yp->tx_ring[0]);
 #else
+{
+	int j;
+
 	/* Tx ring needs a pair of descriptors, the second for the status. */
-	for (i = 0; i < TX_RING_SIZE*2; i++) {
-		yp->tx_skbuff[i/2] = 0;
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		j = 2*i;
+		yp->tx_skbuff[i] = 0;
 		/* Branch on Tx error. */
-		yp->tx_ring[i].dbdma_cmd = cpu_to_le32(CMD_STOP);
-		yp->tx_ring[i].branch_addr = virt_to_le32desc(&yp->tx_ring[i+1]);
-		i++;
+		yp->tx_ring[j].dbdma_cmd = cpu_to_le32(CMD_STOP);
+		yp->tx_ring[j].branch_addr = cpu_to_le32(yp->tx_ring_dma +
+			(j+1)*sizeof(struct yellowfin_desc);
+		j++;
 		if (yp->flags & FullTxStatus) {
-			yp->tx_ring[i].dbdma_cmd =
-				cpu_to_le32(CMD_TXSTATUS | sizeof(yp->tx_status[i]));
-			yp->tx_ring[i].request_cnt = sizeof(yp->tx_status[i]);
-			yp->tx_ring[i].addr = virt_to_le32desc(&yp->tx_status[i/2]);
-		} else {				/* Symbios chips write only tx_errs word. */
-			yp->tx_ring[i].dbdma_cmd =
+			yp->tx_ring[j].dbdma_cmd =
+				cpu_to_le32(CMD_TXSTATUS | sizeof(*yp->tx_status));
+			yp->tx_ring[j].request_cnt = sizeof(*yp->tx_status);
+			yp->tx_ring[j].addr = cpu_to_le32(yp->tx_status_dma +
+				i*sizeof(struct tx_status_words);
+		} else {
+			/* Symbios chips write only tx_errs word. */
+			yp->tx_ring[j].dbdma_cmd =
 				cpu_to_le32(CMD_TXSTATUS | INTR_ALWAYS | 2);
-			yp->tx_ring[i].request_cnt = 2;
-			yp->tx_ring[i].addr = virt_to_le32desc(&yp->tx_status[i/2].tx_errs);
+			yp->tx_ring[j].request_cnt = 2;
+			/* Om pade ummmmm... */
+			yp->tx_ring[j].addr = cpu_to_le32(yp->tx_status_dma +
+				i*sizeof(struct tx_status_words) +
+				&(yp->tx_status[0].tx_errs) - 
+				&(yp->tx_status[0]));
 		}
-		yp->tx_ring[i].branch_addr = virt_to_le32desc(&yp->tx_ring[i+1]);
+		yp->tx_ring[j].branch_addr = cpu_to_le32(yp->tx_ring_dma + 
+			((j+1)%(2*TX_RING_SIZE))*sizeof(struct yellowfin_desc));
 	}
 	/* Wrap ring */
-	yp->tx_ring[--i].dbdma_cmd |= cpu_to_le32(BRANCH_ALWAYS | INTR_ALWAYS);
-	yp->tx_ring[i].branch_addr = virt_to_le32desc(&yp->tx_ring[0]);
+	yp->tx_ring[++j].dbdma_cmd |= cpu_to_le32(BRANCH_ALWAYS | INTR_ALWAYS);
+}
 #endif
 	yp->tx_tail_desc = &yp->tx_status[0];
 	return;
@@ -819,14 +858,15 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	yp->tx_skbuff[entry] = skb;
 
-	if (gx_fix) {		/* Note: only works for paddable protocols e.g. IP. */
-		int cacheline_end = (virt_to_bus(skb->data) + skb->len) % 32;
+	if (gx_fix) {	/* Note: only works for paddable protocols e.g.  IP. */
+		int cacheline_end = ((unsigned long)skb->data + skb->len) % 32;
 		/* Fix GX chipset errata. */
 		if (cacheline_end > 24  || cacheline_end == 0)
 			skb->len += 32 - cacheline_end + 1;
 	}
 #ifdef NO_TXSTATS
-	yp->tx_ring[entry].addr = virt_to_le32desc(skb->data);
+	yp->tx_ring[entry].addr = cpu_to_le32(pci_map_single(yp->pci_dev, 
+		skb->data, skb->len, PCI_DMA_TODEVICE));
 	yp->tx_ring[entry].result_status = 0;
 	if (entry >= TX_RING_SIZE-1) {
 		/* New stop command. */
@@ -841,9 +881,10 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	yp->cur_tx++;
 #else
 	yp->tx_ring[entry<<1].request_cnt = skb->len;
-	yp->tx_ring[entry<<1].addr = virt_to_le32desc(skb->data);
-	/* The input_last (status-write) command is constant, but we must rewrite
-	   the subsequent 'stop' command. */
+	yp->tx_ring[entry<<1].addr = cpu_to_le32(pci_map_single(yp->pci_dev, 
+		skb->data, skb->len, PCI_DMA_TODEVICE));
+	/* The input_last (status-write) command is constant, but we must 
+	   rewrite the subsequent 'stop' command. */
 
 	yp->cur_tx++;
 	{
@@ -914,12 +955,17 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 #ifdef NO_TXSTATS
 		for (; yp->cur_tx - yp->dirty_tx > 0; yp->dirty_tx++) {
 			int entry = yp->dirty_tx % TX_RING_SIZE;
+			struct sk_buff *skb;
+
 			if (yp->tx_ring[entry].result_status == 0)
 				break;
+			skb = yp->tx_skbuff[entry];
 			yp->stats.tx_packets++;
-			yp->stats.tx_bytes += yp->tx_skbuff[entry]->len;
+			yp->stats.tx_bytes += skb->len;
 			/* Free the original skb. */
-			dev_kfree_skb_irq(yp->tx_skbuff[entry]);
+			pci_unmap_single(yp->pci_dev, yp->tx_ring[entry].addr,
+				skb->len, PCI_DMA_TODEVICE);
+			dev_kfree_skb_irq(skb);
 			yp->tx_skbuff[entry] = 0;
 		}
 		if (yp->tx_full
@@ -929,8 +975,7 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 			netif_wake_queue(dev);
 		}
 #else
-		if (intr_status & IntrTxDone
-			|| yp->tx_tail_desc->tx_errs) {
+		if ((intr_status & IntrTxDone) || (yp->tx_tail_desc->tx_errs)) {
 			unsigned dirty_tx = yp->dirty_tx;
 
 			for (dirty_tx = yp->dirty_tx; yp->cur_tx - dirty_tx > 0;
@@ -938,6 +983,7 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 				/* Todo: optimize this. */
 				int entry = dirty_tx % TX_RING_SIZE;
 				u16 tx_errs = yp->tx_status[entry].tx_errs;
+				struct sk_buff *skb;
 
 #ifndef final_version
 				if (yellowfin_debug > 5)
@@ -950,7 +996,8 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 						   yp->tx_status[entry].paused);
 #endif
 				if (tx_errs == 0)
-					break;			/* It still hasn't been Txed */
+					break;	/* It still hasn't been Txed */
+				skb = yp->tx_skbuff[entry];
 				if (tx_errs & 0xF810) {
 					/* There was an major error, log it. */
 #ifndef final_version
@@ -975,12 +1022,15 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 #ifdef ETHER_STATS
 					if (tx_errs & 0x0400) yp->stats.tx_deferred++;
 #endif
-					yp->stats.tx_bytes += yp->tx_skbuff[entry]->len;
+					yp->stats.tx_bytes += skb->len;
 					yp->stats.collisions += tx_errs & 15;
 					yp->stats.tx_packets++;
 				}
 				/* Free the original skb. */
-				dev_kfree_skb_irq(yp->tx_skbuff[entry]);
+				pci_unmap_single(yp->pci_dev, 
+					yp->tx_ring[entry<<1].addr, skb->len, 
+					PCI_DMA_TODEVICE);
+				dev_kfree_skb_irq(skb);
 				yp->tx_skbuff[entry] = 0;
 				/* Mark status as empty. */
 				yp->tx_status[entry].tx_errs = 0;
@@ -1043,15 +1093,23 @@ static int yellowfin_rx(struct net_device *dev)
 	}
 
 	/* If EOP is set on the next entry, it's a new packet. Send it up. */
-	while (yp->rx_head_desc->result_status) {
-		struct yellowfin_desc *desc = yp->rx_head_desc;
-		u16 desc_status = le32_to_cpu(desc->result_status) >> 16;
-		int data_size =
-			(le32_to_cpu(desc->dbdma_cmd) - le32_to_cpu(desc->result_status))
-			& 0xffff;
-		u8 *buf_addr = le32desc_to_virt(desc->addr);
-		s16 frame_status = get_unaligned((s16*)&(buf_addr[data_size - 2]));
+	while (1) {
+		struct yellowfin_desc *desc = &yp->rx_ring[entry];
+		struct sk_buff *rx_skb = yp->rx_skbuff[entry];
+		s16 frame_status;
+		u16 desc_status;
+		int data_size;
+		u8 *buf_addr;
 
+		if(!desc->result_status)
+			break;
+		pci_dma_sync_single(yp->pci_dev, desc->addr, 
+			yp->rx_buf_sz, PCI_DMA_FROMDEVICE);
+		desc_status = le32_to_cpu(desc->result_status) >> 16;
+		buf_addr = rx_skb->tail;
+		data_size = (le32_to_cpu(desc->dbdma_cmd) - 
+			le32_to_cpu(desc->result_status)) & 0xffff;
+		frame_status = get_unaligned((s16*)&(buf_addr[data_size - 2]));
 		if (yellowfin_debug > 4)
 			printk(KERN_DEBUG "  yellowfin_rx() status was %4.4x.\n",
 				   frame_status);
@@ -1080,12 +1138,14 @@ static int yellowfin_rx(struct net_device *dev)
 			if (status2 & 0x03) yp->stats.rx_frame_errors++;
 			if (status2 & 0x04) yp->stats.rx_crc_errors++;
 			if (status2 & 0x80) yp->stats.rx_dropped++;
-#ifdef YF_PROTOTYPE			/* Support for prototype hardware errata. */
+#ifdef YF_PROTOTYPE		/* Support for prototype hardware errata. */
 		} else if ((yp->flags & HasMACAddrBug)  &&
-				   memcmp(le32desc_to_virt(yp->rx_ring[entry].addr),
-						  dev->dev_addr, 6) != 0
-				   && memcmp(le32desc_to_virt(yp->rx_ring[entry].addr),
-							 "\377\377\377\377\377\377", 6) != 0) {
+			memcmp(le32_to_cpu(yp->rx_ring_dma +
+				entry*sizeof(struct yellowfin_desc)),
+				dev->dev_addr, 6) != 0 && 
+			memcmp(le32_to_cpu(yp->rx_ring_dma +
+				entry*sizeof(struct yellowfin_desc)),
+				"\377\377\377\377\377\377", 6) != 0) {
 			if (bogus_rx++ == 0)
 				printk(KERN_WARNING "%s: Bad frame to %2.2x:%2.2x:%2.2x:%2.2x:"
 					   "%2.2x:%2.2x.\n",
@@ -1107,16 +1167,12 @@ static int yellowfin_rx(struct net_device *dev)
 			/* Check if the packet is long enough to just pass up the skbuff
 			   without copying to a properly sized skbuff. */
 			if (pkt_len > rx_copybreak) {
-				char *temp = skb_put(skb = yp->rx_skbuff[entry], pkt_len);
+				skb_put(skb = rx_skb, pkt_len);
+				pci_unmap_single(yp->pci_dev, 
+					yp->rx_ring[entry].addr, 
+					yp->rx_buf_sz, 
+					PCI_DMA_FROMDEVICE);
 				yp->rx_skbuff[entry] = NULL;
-#ifndef final_version				/* Remove after testing. */
-				if (le32desc_to_virt(yp->rx_ring[entry].addr) != temp)
-					printk(KERN_ERR "%s: Internal fault: The skbuff addresses "
-						   "do not match in yellowfin_rx: %p vs. %p / %p.\n",
-						   dev->name,
-						   le32desc_to_virt(yp->rx_ring[entry].addr),
-						   skb->head, temp);
-#endif
 			} else {
 				skb = dev_alloc_skb(pkt_len + 2);
 				if (skb == NULL)
@@ -1124,11 +1180,11 @@ static int yellowfin_rx(struct net_device *dev)
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
 #if HAS_IP_COPYSUM
-				eth_copy_and_sum(skb, yp->rx_skbuff[entry]->tail, pkt_len, 0);
+				eth_copy_and_sum(skb, rx_skb->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
 #else
-				memcpy(skb_put(skb, pkt_len), yp->rx_skbuff[entry]->tail,
-					   pkt_len);
+				memcpy(skb_put(skb, pkt_len), 
+					rx_skb->tail, pkt_len);
 #endif
 			}
 			skb->protocol = eth_type_trans(skb, dev);
@@ -1138,7 +1194,6 @@ static int yellowfin_rx(struct net_device *dev)
 			yp->stats.rx_bytes += pkt_len;
 		}
 		entry = (++yp->cur_rx) % RX_RING_SIZE;
-		yp->rx_head_desc = &yp->rx_ring[entry];
 	}
 
 	/* Refill the Rx ring buffers. */
@@ -1146,12 +1201,13 @@ static int yellowfin_rx(struct net_device *dev)
 		entry = yp->dirty_rx % RX_RING_SIZE;
 		if (yp->rx_skbuff[entry] == NULL) {
 			struct sk_buff *skb = dev_alloc_skb(yp->rx_buf_sz);
-			yp->rx_skbuff[entry] = skb;
 			if (skb == NULL)
 				break;				/* Better luck next round. */
-			skb->dev = dev;			/* Mark as being used by this device. */
+			yp->rx_skbuff[entry] = skb;
+			skb->dev = dev;	/* Mark as being used by this device. */
 			skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
-			yp->rx_ring[entry].addr = virt_to_le32desc(skb->tail);
+			yp->rx_ring[entry].addr = pci_map_single(yp->pci_dev,
+				skb->tail, yp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 		}
 		yp->rx_ring[entry].dbdma_cmd = cpu_to_le32(CMD_STOP);
 		yp->rx_ring[entry].result_status = 0;	/* Clear complete bit. */
@@ -1208,8 +1264,7 @@ static int yellowfin_close(struct net_device *dev)
 
 #if defined(__i386__)
 	if (yellowfin_debug > 2) {
-		printk("\n"KERN_DEBUG"  Tx ring at %8.8x:\n",
-			   (int)virt_to_bus(yp->tx_ring));
+		printk("\n"KERN_DEBUG"  Tx ring at %8.8x:\n", yp->tx_ring_dma);
 		for (i = 0; i < TX_RING_SIZE*2; i++)
 			printk(" %c #%d desc. %8.8x %8.8x %8.8x %8.8x.\n",
 				   inl(ioaddr + TxPtr) == (long)&yp->tx_ring[i] ? '>' : ' ',
@@ -1221,8 +1276,7 @@ static int yellowfin_close(struct net_device *dev)
 				   i, yp->tx_status[i].tx_cnt, yp->tx_status[i].tx_errs,
 				   yp->tx_status[i].total_tx_cnt, yp->tx_status[i].paused);
 
-		printk("\n"KERN_DEBUG "  Rx ring %8.8x:\n",
-			   (int)virt_to_bus(yp->rx_ring));
+		printk("\n"KERN_DEBUG "  Rx ring %8.8x:\n", yp->rx_ring_dma);
 		for (i = 0; i < RX_RING_SIZE; i++) {
 			printk(KERN_DEBUG " %c #%d desc. %8.8x %8.8x %8.8x\n",
 				   inl(ioaddr + RxPtr) == (long)&yp->rx_ring[i] ? '>' : ' ',
@@ -1422,6 +1476,10 @@ static void __devexit yellowfin_remove_one (struct pci_dev *pdev)
 		BUG();
 	np = dev->priv;
 
+        pci_free_consistent(pdev, STATUS_TOTAL_SIZE, np->tx_status, 
+		np->tx_status_dma);
+	pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
+	pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
 	unregister_netdev (dev);
 
 	pci_release_regions (pdev);

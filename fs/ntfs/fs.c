@@ -1,9 +1,13 @@
-/*  fs.c - NTFS driver for Linux 2.4.x
+/*
+ * fs.c - NTFS driver for Linux 2.4.x
  *
- *  Copyright (C) 1995-1997, 1999 Martin von Löwis
- *  Copyright (C) 1996 Richard Russon
- *  Copyright (C) 1996-1997 Régis Duchesne
- *  Copyright (C) 2000-2001, Anton Altaparmakov (AIA)
+ * Development has as of recently (since June '01) been sponsored
+ * by Legato Systems, Inc. (http://www.legato.com)
+ *
+ * Copyright (C) 1995-1997, 1999 Martin von Löwis
+ * Copyright (C) 1996 Richard Russon
+ * Copyright (C) 1996-1997 Régis Duchesne
+ * Copyright (C) 2000-2001, Anton Altaparmakov (AIA)
  */
 
 #include <linux/config.h>
@@ -19,11 +23,14 @@
 #include "sysctl.h"
 #include <linux/module.h>
 #include <asm/uaccess.h>
-#include <linux/nls.h>
 #include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <asm/page.h>
+
+#ifndef NLS_MAX_CHARSET_SIZE
+#include <linux/nls.h>
+#endif
 
 /* Forward declarations. */
 static struct inode_operations ntfs_dir_inode_operations;
@@ -55,6 +62,7 @@ static void ntfs_getuser_update_vm(void *dest, ntfs_io *src, ntfs_size_t len)
 }
 #endif
 
+/* loff_t is 64 bit signed, so is cool. */
 static ssize_t ntfs_read(struct file *filp, char *buf, size_t count,loff_t *off)
 {
 	int error;
@@ -64,20 +72,28 @@ static ssize_t ntfs_read(struct file *filp, char *buf, size_t count,loff_t *off)
 	/* Inode is not properly initialized. */
 	if (!ino)
 		return -EINVAL;
-	ntfs_debug(DEBUG_OTHER, "ntfs_read %x,%x,%x ->",
-		   (unsigned)ino->i_number, (unsigned)*off, (unsigned)count);
+	ntfs_debug(DEBUG_OTHER, "ntfs_read %x, %Lx, %x ->",
+		   (unsigned)ino->i_number, (unsigned long long)*off,
+		   (unsigned)count);
 	/* Inode has no unnamed data attribute. */
-	if(!ntfs_find_attr(ino, ino->vol->at_data, NULL))
+	if(!ntfs_find_attr(ino, ino->vol->at_data, NULL)) {
+		ntfs_debug(DEBUG_OTHER, "ntfs_read: $DATA not found!\n");
 		return -EINVAL;
+	}
 	/* Read the data. */
 	io.fn_put = ntfs_putuser;
 	io.fn_get = 0;
 	io.param = buf;
 	io.size = count;
 	error = ntfs_read_attr(ino, ino->vol->at_data, NULL, *off, &io);
-	if (error && !io.size)
+	if (error && !io.size) {
+		ntfs_debug(DEBUG_OTHER, "ntfs_read: read_attr failed with "
+				"error %i, io size %u.\n", error, io.size);
 		return error;
+	}
 	*off += io.size;
+	ntfs_debug(DEBUG_OTHER, "ntfs_read: finished. read %u bytes.\n",
+								io.size);
 	return io.size;
 }
 
@@ -326,6 +342,13 @@ static int parse_options(ntfs_volume* vol, char *opt)
 			if (!simple_getbool(value, &val))
 				goto needs_bool;
 			vol->ngt = val ? ngt_posix : ngt_nt;
+		} else if (strcmp(opt, "show_sys_files") == 0) {
+			int val = 0;
+			if (!value || !*value)
+				val = 1;
+			else if (!simple_getbool(value, &val))
+				goto needs_bool;
+			vol->ngt = val ? ngt_full : ngt_nt;
 		} else if (strcmp(opt, "utf8") == 0) {
 			int val = 0;
 			if (!value || !*value)
@@ -433,8 +456,13 @@ static int ntfs_create(struct inode* dir, struct dentry *d, int mode)
 	ino = NTFS_LINO2NINO(r);
 	error = ntfs_alloc_file(NTFS_LINO2NINO(dir), ino, (char*)d->d_name.name,
 				d->d_name.len);
-	if (error)
+	if (error) {
+		ntfs_error("ntfs_alloc_file FAILED: error = %i", error);
 		goto fail;
+	}
+	/* Not doing this one was causing a huge amount of corruption! Now the
+	 * bugger bytes the dust! (-8 (AIA) */
+	r->i_ino = ino->i_number;
 	error = ntfs_update_inode(ino);
 	if (error)
 		goto fail;
@@ -491,6 +519,9 @@ static int _linux_ntfs_mkdir(struct inode *dir, struct dentry* d, int mode)
 			   ino);
 	if (error)
 		goto out;
+	/* Not doing this one was causing a huge amount of corruption! Now the
+	 * bugger bytes the dust! (-8 (AIA) */
+	r->i_ino = ino->i_number;
 	r->i_uid = vol->uid;
 	r->i_gid = vol->gid;
 	si = ntfs_find_attr(ino, vol->at_standard_information, NULL);
@@ -608,19 +639,75 @@ static void ntfs_read_inode(struct inode* inode)
 
 	vol = NTFS_INO2VOL(inode);
 	inode->i_mode = 0;
-	ntfs_debug(DEBUG_OTHER, "ntfs_read_inode %x\n", (unsigned)inode->i_ino);
+	ntfs_debug(DEBUG_OTHER, "ntfs_read_inode 0x%x\n", (unsigned)inode->i_ino);
+	/*
+	 * This kills all accesses to system files (except $Extend directory).
+	 * The driver can bypass this by calling ntfs_init_inode() directly.
+	 * Only if ngt is ngt_full do we allow access to the system files.
+	 */
 	switch (inode->i_ino) {
 		/* Those are loaded special files. */
 	case FILE_$Mft:
-		ntfs_error("Trying to open MFT\n");
-		return;
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to open $MFT!\n");
+			return;
+		}
+		if (!vol->mft_ino || ((vol->ino_flags & 1) == 0))
+			goto sys_file_error;
+		ntfs_memcpy(&inode->u.ntfs_i, vol->mft_ino, sizeof(ntfs_inode));
+		ino = vol->mft_ino;
+		vol->mft_ino = &inode->u.ntfs_i;
+		vol->ino_flags &= ~1;
+		ntfs_free(ino);
+		ino = vol->mft_ino;
+		ntfs_debug(DEBUG_OTHER, "Opening $MFT!\n");
+		break;
+	case FILE_$MftMirr:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to open $MFTMirr!\n");
+			return;
+		}
+		if (!vol->mftmirr || ((vol->ino_flags & 2) == 0))
+			goto sys_file_error;
+		ntfs_memcpy(&inode->u.ntfs_i, vol->mftmirr, sizeof(ntfs_inode));
+		ino = vol->mftmirr;
+		vol->mftmirr = &inode->u.ntfs_i;
+		vol->ino_flags &= ~2;
+		ntfs_free(ino);
+		ino = vol->mftmirr;
+		ntfs_debug(DEBUG_OTHER, "Opening $MFTMirr!\n");
+		break;
+	case FILE_$BitMap:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to open $Bitmap!\n");
+			return;
+		}
+		if (!vol->bitmap || ((vol->ino_flags & 4) == 0))
+			goto sys_file_error;
+		ntfs_memcpy(&inode->u.ntfs_i, vol->bitmap, sizeof(ntfs_inode));
+		ino = vol->bitmap;
+		vol->bitmap = &inode->u.ntfs_i;
+		vol->ino_flags &= ~4;
+		ntfs_free(ino);
+		ino = vol->bitmap;
+		ntfs_debug(DEBUG_OTHER, "Opening $Bitmap!\n");
+		break;
+	case FILE_$LogFile ... FILE_$AttrDef:
+	/* We need to allow reading the root directory. */
+	case FILE_$Boot ... FILE_$UpCase:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to open system file %i!\n",
+								inode->i_ino);
+	 		return;
+		} /* Do the default for ngt_full. */
+		ntfs_debug(DEBUG_OTHER, "Opening system file %i!\n", inode->i_ino);
 	default:
 		ino = &inode->u.ntfs_i;
 		if (!ino || ntfs_init_inode(ino, NTFS_INO2VOL(inode),
 								inode->i_ino))
 		{
-			ntfs_debug(DEBUG_OTHER, "NTFS :Error loading inode "
-					"%x\n", (unsigned int)inode->i_ino);
+			ntfs_debug(DEBUG_OTHER, "NTFS: Error loading inode "
+					"0x%x\n", (unsigned int)inode->i_ino);
 			return;
 		}
 	}
@@ -641,7 +728,7 @@ static void ntfs_read_inode(struct inode* inode)
 		can_mmap = 0;
 	}
 	/* Get the file modification times from the standard information. */
-	si = ntfs_find_attr(ino,vol->at_standard_information, NULL);
+	si = ntfs_find_attr(ino, vol->at_standard_information, NULL);
 	if (si) {
 		char *attr = si->d.data;
 		inode->i_atime = ntfs_ntutc2unixutc(NTFS_GETU64(attr + 0x18));
@@ -678,24 +765,85 @@ static void ntfs_read_inode(struct inode* inode)
 		inode->i_mode |= S_IWUGO;
 #endif
 	inode->i_mode &= ~vol->umask;
+	return;
+sys_file_error:
+	ntfs_error("Critical error. Tried to call ntfs_read_inode() before we "
+		"have completed read_super() or VFS error.\n");
+	// FIXME: Should we panic() at this stage?
 }
 
 #ifdef CONFIG_NTFS_RW
 static void ntfs_write_inode(struct inode *ino, int unused)
 {
 	lock_kernel();
-	ntfs_debug(DEBUG_LINUX, "ntfs_write_inode %x\n", ino->i_ino);
+	ntfs_debug(DEBUG_LINUX, "ntfs_write_inode 0x%x\n", ino->i_ino);
 	ntfs_update_inode(NTFS_LINO2NINO(ino));
 	unlock_kernel();
 }
 #endif
 
-static void _ntfs_clear_inode(struct inode *ino)
+static void _ntfs_clear_inode(struct inode *inode)
 {
+	ntfs_inode *ino;
+	ntfs_volume *vol;
+	
 	lock_kernel();
-	ntfs_debug(DEBUG_OTHER, "ntfs_clear_inode %lx\n", ino->i_ino);
-	if (ino->i_ino != FILE_$Mft)
-		ntfs_clear_inode(&ino->u.ntfs_i);
+	ntfs_debug(DEBUG_OTHER, "_ntfs_clear_inode 0x%x\n", inode->i_ino);
+	vol = NTFS_INO2VOL(inode);
+	if (!vol)
+		ntfs_error("_ntfs_clear_inode: vol = NTFS_INO2VOL(inode) is NULL.\n");
+	switch (inode->i_ino) {
+	case FILE_$Mft:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to _clear_inode of $MFT!\n");
+			goto unl_out;
+		}
+		if (vol->mft_ino && ((vol->ino_flags & 1) == 0)) {
+			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
+			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
+			vol->mft_ino = ino;
+			vol->ino_flags |= 1;
+			goto unl_out;
+		}
+		break;
+	case FILE_$MftMirr:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to _clear_inode of $MFTMirr!\n");
+			goto unl_out;
+		}
+		if (vol->mftmirr && ((vol->ino_flags & 2) == 0)) {
+			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
+			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
+			vol->mftmirr = ino;
+			vol->ino_flags |= 2;
+			goto unl_out;
+		}
+		break;
+	case FILE_$BitMap:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to _clear_inode of $Bitmap!\n");
+			goto unl_out;
+		}
+		if (vol->bitmap && ((vol->ino_flags & 4) == 0)) {
+			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
+			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
+			vol->bitmap = ino;
+			vol->ino_flags |= 4;
+			goto unl_out;
+		}
+		break;
+	case FILE_$LogFile ... FILE_$AttrDef:
+	case FILE_$Boot ... FILE_$UpCase:
+		if (vol->ngt != ngt_full) {
+			ntfs_error("Trying to _clear_inode of system file %i! "
+					"Shouldn't happen.\n", inode->i_ino);
+			goto unl_out;
+		} /* Do the default for ngt_full. */
+	default:
+		/* Nothing. Just clear the inode and exit. */
+	}
+	ntfs_clear_inode(&inode->u.ntfs_i);
+unl_out:
 	unlock_kernel();
 	return;
 }
@@ -718,25 +866,29 @@ static int ntfs_statfs(struct super_block *sb, struct statfs *sf)
 {
 	struct inode *mft;
 	ntfs_volume *vol;
-	ntfs_u64 size;
+	__s64 size;
 	int error;
 
 	ntfs_debug(DEBUG_OTHER, "ntfs_statfs\n");
 	vol = NTFS_SB2VOL(sb);
 	sf->f_type = NTFS_SUPER_MAGIC;
-	sf->f_bsize = vol->clustersize;
+	sf->f_bsize = vol->cluster_size;
 	error = ntfs_get_volumesize(NTFS_SB2VOL(sb), &size);
 	if (error)
 		return error;
 	sf->f_blocks = size;	/* Volumesize is in clusters. */
-	sf->f_bfree = ntfs_get_free_cluster_count(vol->bitmap);
-	sf->f_bavail = sf->f_bfree;
+	size = (__s64)ntfs_get_free_cluster_count(vol->bitmap);
+	/* Just say zero if the call failed. */
+	if (size < 0LL)
+		size = 0;
+	sf->f_bfree = sf->f_bavail = size;
+	ntfs_debug(DEBUG_OTHER, "ntfs_statfs: calling mft = iget(sb, FILE_$Mft)\n");
 	mft = iget(sb, FILE_$Mft);
+	ntfs_debug(DEBUG_OTHER, "ntfs_statfs: iget(sb, FILE_$Mft) returned 0x%x\n", mft);
 	if (!mft)
 		return -EIO;
-	/* So ... we lie... thus this following cast of loff_t value is ok
-	 * here.. */
-	sf->f_files = (unsigned long)mft->i_size / vol->mft_recordsize;
+	sf->f_files = mft->i_size >> vol->mft_record_size_bits;
+	ntfs_debug(DEBUG_OTHER, "ntfs_statfs: calling iput(mft)\n");
 	iput(mft);
 	/* Should be read from volume. */
 	sf->f_namelen = 255;
@@ -763,6 +915,77 @@ static struct super_operations ntfs_super_operations = {
 	clear_inode:	_ntfs_clear_inode,
 };
 
+/**
+ * is_boot_sector_ntfs - check an NTFS boot sector for validity
+ * @b:		buffer containing bootsector to check
+ * 
+ * Check whether @b contains a valid NTFS boot sector.
+ * Return 1 if @b is a valid NTFS bootsector or 0 if not.
+ */
+static int is_boot_sector_ntfs(ntfs_u8 *b)
+{
+	ntfs_u32 i;
+
+	/* FIXME: We don't use checksumming yet as NT4(SP6a) doesn't either...
+	 * But we might as well have the code ready to do it. (AIA) */
+#if 0
+	/* Calculate the checksum. */
+	if (b < b + 0x50) {
+		ntfs_u32 *u;
+		ntfs_u32 *bi = (ntfs_u32 *)(b + 0x50);
+		
+		for (u = bi, i = 0; u < bi; ++u)
+			i += NTFS_GETU32(*u);
+	}
+#endif
+	/* Check magic is "NTFS    " */
+	if (b[3] != 0x4e) goto not_ntfs;
+	if (b[4] != 0x54) goto not_ntfs;
+	if (b[5] != 0x46) goto not_ntfs;
+	if (b[6] != 0x53) goto not_ntfs;
+	for (i = 7; i < 0xb; ++i)
+		if (b[i] != 0x20) goto not_ntfs;
+	/* Check bytes per sector value is between 512 and 4096. */
+	if (b[0xb] != 0) goto not_ntfs;
+	if (b[0xc] > 0x10) goto not_ntfs;
+	/* Check sectors per cluster value is valid. */
+	switch (b[0xd]) {
+	case 1: case 2: case 4: case 8: case 16:
+	case 32: case 64: case 128:
+		break;
+	default:
+		goto not_ntfs;
+	}
+	/* Check reserved sectors value and four other fields are zero. */
+	for (i = 0xe; i < 0x15; ++i) 
+		if (b[i] != 0) goto not_ntfs;
+	if (b[0x16] != 0) goto not_ntfs;
+	if (b[0x17] != 0) goto not_ntfs;
+	for (i = 0x20; i < 0x24; ++i)
+		if (b[i] != 0) goto not_ntfs;
+	/* Check clusters per file record segment value is valid. */
+	if (b[0x40] < 0xe1 || b[0x40] > 0xf7) {
+		switch (b[0x40]) {
+		case 1: case 2: case 4: case 8: case 16: case 32: case 64:
+			break;
+		default:
+			goto not_ntfs;
+		}
+	}
+	/* Check clusters per index block value is valid. */
+	if (b[0x44] < 0xe1 || b[0x44] > 0xf7) {
+		switch (b[0x44]) {
+		case 1: case 2: case 4: case 8: case 16: case 32: case 64:
+			break;
+		default:
+			goto not_ntfs;
+		}
+	}
+	return 1;
+not_ntfs:
+	return 0;
+}
+
 /* Called to mount a filesystem by read_super() in fs/super.c.
  * Return a super block, the main structure of a filesystem.
  *
@@ -782,10 +1005,6 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 	vol = NTFS_SB2VOL(sb);
 	if (!parse_options(vol, (char*)options))
 		goto ntfs_read_super_vol;
-#if 0
-	/* Set to read only, user option might reset it */
-	sb->s_flags |= MS_RDONLY;
-#endif
 	/* Assume a 512 bytes block device for now. */
 	set_blocksize(sb->s_dev, 512);
 	/* Read the super block (boot block). */
@@ -795,50 +1014,49 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 	}
 	ntfs_debug(DEBUG_OTHER, "Done reading boot block\n");
 	/* Check for 'NTFS' magic number */
-	if (!IS_NTFS_VOLUME(bh->b_data)) {
+	if (!is_boot_sector_ntfs(bh->b_data)) {
 		ntfs_debug(DEBUG_OTHER, "Not a NTFS volume\n");
-		brelse(bh);
+		bforget(bh);
 		goto ntfs_read_super_unl;
 	}
 	ntfs_debug(DEBUG_OTHER, "Going to init volume\n");
 	if (ntfs_init_volume(vol, bh->b_data) < 0) {
 		ntfs_debug(DEBUG_OTHER, "Init volume failed.\n");
-		brelse(bh);
+		bforget(bh);
 		goto ntfs_read_super_unl;
 	}
-	ntfs_debug(DEBUG_OTHER, "$Mft at cluster 0x%Lx\n", vol->mft_cluster);
-	brelse(bh);
+	ntfs_debug(DEBUG_OTHER, "$Mft at cluster 0x%Lx\n", vol->mft_lcn);
+	bforget(bh);
 	NTFS_SB(vol) = sb;
+	if (vol->cluster_size > PAGE_SIZE) {
+		ntfs_error("Partition cluster size is not supported yet (it "
+			   "is > max kernel blocksize).\n");
+		goto ntfs_read_super_unl;
+	}
 	ntfs_debug(DEBUG_OTHER, "Done to init volume\n");
 	/* Inform the kernel that a device block is a NTFS cluster. */
-	sb->s_blocksize = vol->clustersize;
-	if (sb->s_blocksize > PAGE_SIZE) {
-		ntfs_error("Partition cluster size is not supported yet (too "
-			   "large for kernel blocksize).\n");
-		goto ntfs_read_super_unl;
-	}
+	sb->s_blocksize = vol->cluster_size;
 	for (i = sb->s_blocksize, sb->s_blocksize_bits = 0; i != 1; i >>= 1)
 		sb->s_blocksize_bits++;
 	set_blocksize(sb->s_dev, sb->s_blocksize);
 	ntfs_debug(DEBUG_OTHER, "set_blocksize\n");
-
-	/* Allocate a MFT record (MFT record can be smaller than a cluster). */
-	if (!(vol->mft = ntfs_malloc(max(vol->mft_recordsize,
-							   vol->clustersize))))
+	/* Allocate an MFT record (MFT record can be smaller than a cluster). */
+	if (!(vol->mft = ntfs_malloc(max(vol->mft_record_size,
+							 vol->cluster_size))))
 		goto ntfs_read_super_unl;
 
 	/* Read at least the MFT record for $Mft. */
 	for (i = 0; i < max(vol->mft_clusters_per_record, 1); i++) {
-		if (!(bh = bread(sb->s_dev, vol->mft_cluster + i,
-							  vol->clustersize))) {
+		if (!(bh = bread(sb->s_dev, vol->mft_lcn + i,
+							  vol->cluster_size))) {
 			ntfs_error("Could not read $Mft record 0\n");
 			goto ntfs_read_super_mft;
 		}
-		ntfs_memcpy(vol->mft + i * vol->clustersize, bh->b_data,
-							     vol->clustersize);
+		ntfs_memcpy(vol->mft + ((__s64)i << vol->cluster_size_bits),
+						bh->b_data, vol->cluster_size);
 		brelse(bh);
-		ntfs_debug(DEBUG_OTHER, "Read cluster %x\n",
-							 vol->mft_cluster + i);
+		ntfs_debug(DEBUG_OTHER, "Read cluster 0x%x\n",
+							 vol->mft_lcn + i);
 	}
 	/* Check and fixup this MFT record */
 	if (!ntfs_check_mft_record(vol, vol->mft)){
@@ -848,7 +1066,7 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 	/* Inform the kernel about which super operations are available. */
 	sb->s_op = &ntfs_super_operations;
 	sb->s_magic = NTFS_SUPER_MAGIC;
-	sb->s_maxbytes = ~0ULL;
+	sb->s_maxbytes = ~0ULL >> 1;
 	ntfs_debug(DEBUG_OTHER, "Reading special files\n");
 	if (ntfs_load_special_files(vol)) {
 		ntfs_error("Error loading special files\n");
@@ -860,14 +1078,15 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 		ntfs_error("Could not get root dir inode\n");
 		goto ntfs_read_super_mft;
 	}
+ntfs_read_super_ret:
 	ntfs_debug(DEBUG_OTHER, "read_super: done\n");
 	return sb;
 ntfs_read_super_mft:
 	ntfs_free(vol->mft);
 ntfs_read_super_unl:
 ntfs_read_super_vol:
-	ntfs_debug(DEBUG_OTHER, "read_super: done\n");
-	return NULL;
+	sb = NULL;
+	goto ntfs_read_super_ret;
 }
 
 /* Define the filesystem */
@@ -894,7 +1113,11 @@ static void __exit exit_ntfs_fs(void)
 }
 
 EXPORT_NO_SYMBOLS;
-MODULE_AUTHOR("Martin von Löwis");
+/*
+ * Not strictly true. The driver was written originally by Martin von Löwis.
+ * I am just maintaining and rewriting it.
+ */
+MODULE_AUTHOR("Anton Altaparmakov <aia21@cus.cam.ac.uk>");
 MODULE_DESCRIPTION("NTFS driver");
 #ifdef DEBUG
 MODULE_PARM(ntdebug, "i");

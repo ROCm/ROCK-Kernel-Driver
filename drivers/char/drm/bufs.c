@@ -202,6 +202,12 @@ int drm_addbufs(struct inode *inode, struct file *filp, unsigned int cmd,
 		return -ENOMEM;	/* May only call once for each order */
 	}
 	
+	if(count < 0 || count > 4096)
+	{
+		up(&dev->struct_sem);
+		return -EINVAL;
+	}
+	
 	entry->buflist = drm_alloc(count * sizeof(*entry->buflist),
 				   DRM_MEM_BUFS);
 	if (!entry->buflist) {

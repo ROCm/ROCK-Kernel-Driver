@@ -1,3 +1,35 @@
+2001-07-17  Erik A. Hendriks  <hendriks@lanl.gov>
+
+	* 21142.c: Merge fix from tulip.c 0.92w which prevents the
+	overwriting of csr6 bits we want to preserve.
+
+2001-07-10  Jeff Golds  <jgolds@resilience.com>
+
+	* tulip_core.c: Fix two comments
+
+2001-07-06  Stephen Degler  <sdegler@degler.net>
+
+	* media.c:
+	The media selection process at the end of NWAY is busted
+	because for the case of MII/SYM it needs to be:
+
+        csr13 <- 0
+        csr14 <- 0
+        csr6 <-  the value calculated is okay.
+
+	In the other media cases csr14 is computed by
+	t21142_csr14val[dev->if_port], which seems ok.  The value of
+	zero as opposed to 3FFFFF comes straight from appendix D of the
+	21143 data book, and it makes logical sense because you're
+	bypassing all the SIA interface when you usa MII or SYM (see
+	figure 1-1 in the data book if your're visually oriented)
+
+2001-07-03  Jeff Golds  <jgolds@resilience.com>
+
+	* tulip_core.c (tulip_clean_tx_ring):
+	Clear status for in-progress Tx's, and count
+	Tx errors for all packets being released.
+
 2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip.h, tulip_core.c:

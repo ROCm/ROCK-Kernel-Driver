@@ -4308,7 +4308,7 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		i=verify_area(VERIFY_READ, (void *) arg, sizeof(struct cdrom_read_audio));
 		if (i) RETURN_UP(i);
 		copy_from_user(&read_audio, (void *) arg, sizeof(struct cdrom_read_audio));
-		if (read_audio.nframes>D_S[d].sbp_audsiz) RETURN_UP(-EINVAL);
+		if (read_audio.nframes < 0 || read_audio.nframes>D_S[d].sbp_audsiz) RETURN_UP(-EINVAL);
 		i=verify_area(VERIFY_WRITE, read_audio.buf,
 			      read_audio.nframes*CD_FRAMESIZE_RAW);
 		if (i) RETURN_UP(i);

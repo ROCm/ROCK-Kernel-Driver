@@ -429,11 +429,14 @@ static int finddriver(struct usb_driver **driver, char *name)
 }
 #endif
 
-static int check_ctrlrecip(struct dev_state *ps, unsigned int recip, unsigned int index)
+static int check_ctrlrecip(struct dev_state *ps, unsigned int requesttype, unsigned int index)
 {
 	int ret;
 
-	switch (recip & USB_RECIP_MASK) {
+	if (USB_TYPE_VENDOR == (USB_TYPE_MASK & requesttype))
+		return 0;
+
+	switch (requesttype & USB_RECIP_MASK) {
 	case USB_RECIP_ENDPOINT:
 		if ((ret = findintfep(ps->dev, index & 0xff)) < 0)
 			return ret;
@@ -760,7 +763,8 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 
 	if (copy_from_user(&uurb, arg, sizeof(uurb)))
 		return -EFAULT;
-	if (uurb.flags & ~(USBDEVFS_URB_ISO_ASAP|USBDEVFS_URB_DISABLE_SPD|USBDEVFS_URB_QUEUE_BULK))
+	if (uurb.flags & ~(USBDEVFS_URB_ISO_ASAP|USBDEVFS_URB_DISABLE_SPD|USBDEVFS_URB_QUEUE_BULK|
+			   USB_NO_FSBR|USB_ZERO_PACKET))
 		return -EINVAL;
 	if (!uurb.buffer)
 		return -EINVAL;

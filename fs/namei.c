@@ -886,7 +886,7 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int error;
 
-	mode &= S_IALLUGO & ~current->fs->umask;
+	mode &= S_IALLUGO;
 	mode |= S_IFREG;
 
 	down(&dir->i_zombie);
@@ -975,7 +975,8 @@ do_last:
 
 	/* Negative dentry, just create the file */
 	if (!dentry->d_inode) {
-		error = vfs_create(dir->d_inode, dentry, mode);
+		error = vfs_create(dir->d_inode, dentry,
+				   mode & ~current->fs->umask);
 		up(&dir->d_inode->i_sem);
 		dput(nd->dentry);
 		nd->dentry = dentry;
@@ -1164,8 +1165,6 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	int error = -EPERM;
 
-	mode &= ~current->fs->umask;
-
 	down(&dir->i_zombie);
 	if ((S_ISCHR(mode) || S_ISBLK(mode)) && !capable(CAP_MKNOD))
 		goto exit_lock;
@@ -1208,6 +1207,8 @@ asmlinkage long sys_mknod(const char * filename, int mode, dev_t dev)
 		goto out;
 	dentry = lookup_create(&nd, 0);
 	error = PTR_ERR(dentry);
+
+	mode &= ~current->fs->umask;
 	if (!IS_ERR(dentry)) {
 		switch (mode & S_IFMT) {
 		case 0: case S_IFREG:
@@ -1246,7 +1247,7 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		goto exit_lock;
 
 	DQUOT_INIT(dir);
-	mode &= (S_IRWXUGO|S_ISVTX) & ~current->fs->umask;
+	mode &= (S_IRWXUGO|S_ISVTX);
 	lock_kernel();
 	error = dir->i_op->mkdir(dir, dentry, mode);
 	unlock_kernel();
@@ -1276,7 +1277,8 @@ asmlinkage long sys_mkdir(const char * pathname, int mode)
 		dentry = lookup_create(&nd, 1);
 		error = PTR_ERR(dentry);
 		if (!IS_ERR(dentry)) {
-			error = vfs_mkdir(nd.dentry->d_inode, dentry, mode);
+			error = vfs_mkdir(nd.dentry->d_inode, dentry,
+					  mode & ~current->fs->umask);
 			dput(dentry);
 		}
 		up(&nd.dentry->d_inode->i_sem);

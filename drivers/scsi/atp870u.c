@@ -10,6 +10,8 @@
  *		   support atp876 chip
  *		   enable 32 bit fifo transfer
  *		   support cdrom & remove device run ultra speed
+ *		   fix disconnect bug  2000/12/21
+ *		   support atp880 chip lvd u160 2001/05/15
  */
 
 #include <linux/module.h>
@@ -63,6 +65,7 @@ struct atp_unit
 	unsigned short wide_idu;
 	unsigned short active_idu;
 	unsigned short ultra_map;
+	unsigned short deviceid;
 	unsigned char ata_cdbu[16];
 	Scsi_Cmnd *querequ[qcnt];
 	struct atp_id
@@ -137,14 +140,6 @@ stop_dma:
 		tmport -= 0x08;
 
 		i = inb(tmport);
-		if ((j & 0x40) == 0)
-		{
-			if ((dev->last_cmd & 0x40) == 0)
-			{
-				dev->last_cmd = 0xff;
-			}
-		}
-		else dev->last_cmd |= 0x40;
 
 		tmport -= 0x02;
 		target_id = inb(tmport);
@@ -160,8 +155,21 @@ stop_dma:
 			target_id &= 0x07;
 		}
 
+		if ((j & 0x40) != 0)
+		{
+		     if (dev->last_cmd == 0xff)
+		     {
+			dev->last_cmd = target_id;
+		     }
+		     dev->last_cmd |= 0x40;
+		}
+
 		if (i == 0x85)
 		{
+			if ((dev->last_cmd & 0xf0) != 0x40)
+			{
+			   dev->last_cmd = 0xff;
+			}
 			/*
 			 *	Flip wide
 			 */
@@ -188,8 +196,20 @@ stop_dma:
 			dev->in_int = 0;
 			return;
 		}
+
+		if (i == 0x40)
+		{
+		     dev->last_cmd |= 0x40;
+		     dev->in_int = 0;
+		     return;
+		}
+
 		if (i == 0x21)
 		{
+			if ((dev->last_cmd & 0xf0) != 0x40)
+			{
+			   dev->last_cmd = 0xff;
+			}
 			tmport -= 0x05;
 			adrcntu = 0;
 			((unsigned char *) &adrcntu)[2] = inb(tmport++);
@@ -215,6 +235,10 @@ stop_dma:
 				tmport += 0x0d;
 				lun = inb(tmport) & 0x07;
 			} else {
+				if ((dev->last_cmd & 0xf0) != 0x40)
+				{
+				   dev->last_cmd = 0xff;
+				}
 				if (j == 0x41)
 				{
 					tmport += 0x02;
@@ -244,6 +268,10 @@ stop_dma:
 					dev->in_int = 0;
 					return;
 				}
+			}
+			if (dev->last_cmd != 0xff)
+			{
+			   dev->last_cmd |= 0x40;
 			}
 			tmport = workportu + 0x10;
 			outb(0x45, tmport);
@@ -279,15 +307,31 @@ stop_dma:
 			outb(0x80, tmport);
 
 			/* enable 32 bit fifo transfer */
-			tmport = workportu + 0x3a;
-			if ((dev->ata_cdbu[0] == 0x08) || (dev->ata_cdbu[0] == 0x28) ||
-			    (dev->ata_cdbu[0] == 0x0a) || (dev->ata_cdbu[0] == 0x2a))
+			if (dev->deviceid != 0x8081)
 			{
-				outb((unsigned char)((inb(tmport) & 0xf3) | 0x08),tmport);
+			   tmport = workportu + 0x3a;
+			   if ((dev->ata_cdbu[0] == 0x08) || (dev->ata_cdbu[0] == 0x28) ||
+			       (dev->ata_cdbu[0] == 0x0a) || (dev->ata_cdbu[0] == 0x2a))
+			   {
+			      outb((unsigned char)((inb(tmport) & 0xf3) | 0x08),tmport);
+			   }
+			   else
+			   {
+			      outb((unsigned char)(inb(tmport) & 0xf3),tmport);
+			   }
 			}
 			else
 			{
-				outb((unsigned char)(inb(tmport) & 0xf3),tmport);
+			   tmport = workportu - 0x05;
+			   if ((dev->ata_cdbu[0] == 0x08) || (dev->ata_cdbu[0] == 0x28) ||
+			       (dev->ata_cdbu[0] == 0x0a) || (dev->ata_cdbu[0] == 0x2a))
+			   {
+			      outb((unsigned char)((inb(tmport) & 0x3f) | 0xc0),tmport);
+			   }
+			   else
+			   {
+			      outb((unsigned char)(inb(tmport) & 0x3f),tmport);
+			   }
 			}
 
 			tmport = workportu + 0x1b;
@@ -303,7 +347,7 @@ stop_dma:
 			outb(j, tmport);
 			while ((inb(tmport) & 0x01) != j)
 			{
-				outb(j,tmport);
+			   outb(j,tmport);
 			}
 
 			if (dev->id[target_id].last_lenu == 0) {
@@ -365,12 +409,20 @@ stop_dma:
 		workrequ = dev->id[target_id].curr_req;
 
 		if (i == 0x42) {
+			if ((dev->last_cmd & 0xf0) != 0x40)
+			{
+			   dev->last_cmd = 0xff;
+			}
 			errstus = 0x02;
 			workrequ->result = errstus;
 			goto go_42;
 		}
 		if (i == 0x16)
 		{
+			if ((dev->last_cmd & 0xf0) != 0x40)
+			{
+			   dev->last_cmd = 0xff;
+			}
 			errstus = 0;
 			tmport -= 0x08;
 			errstus = inb(tmport);
@@ -381,13 +433,13 @@ go_42:
 			 */
 			spin_lock_irqsave(&io_request_lock, flags);
 			(*workrequ->scsi_done) (workrequ);
-			spin_unlock_irqrestore(&io_request_lock, flags);
 
 			/*
 			 *	Clear it off the queue
 			 */
 			dev->id[target_id].curr_req = 0;
 			dev->working--;
+			spin_unlock_irqrestore(&io_request_lock, flags);
 			/*
 			 *	Take it back wide
 			 */
@@ -396,7 +448,7 @@ go_42:
 				outb(0x01,tmport);
 				while ((inb(tmport) & 0x01) != 0x01)
 				{
-					outb(0x01,tmport);
+				   outb(0x01,tmport);
 				}
 			}
 			/*
@@ -405,10 +457,14 @@ go_42:
 			if (((dev->last_cmd != 0xff) || (dev->quhdu != dev->quendu)) &&
 			    (dev->in_snd == 0))
 			{
-				send_s870(h);
+			   send_s870(h);
 			}
 			dev->in_int = 0;
 			return;
+		}
+		if ((dev->last_cmd & 0xf0) != 0x40)
+		{
+		   dev->last_cmd = 0xff;
 		}
 		if (i == 0x4f) {
 			i = 0x89;
@@ -474,7 +530,7 @@ go_42:
 
 int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))
 {
-	unsigned char i, h;
+	unsigned char h;
 	unsigned long flags;
 	unsigned short int m;
 	unsigned int tmport;
@@ -516,6 +572,8 @@ host_ok:
 	/*
 	 *	Count new command
 	 */
+	save_flags(flags);
+	cli();
 	dev->quendu++;
 	if (dev->quendu >= qcnt) {
 		dev->quendu = 0;
@@ -523,18 +581,17 @@ host_ok:
 	/*
 	 *	Check queue state
 	 */
-wait_que_empty:
 	if (dev->quhdu == dev->quendu) {
-		goto wait_que_empty;
+		if (dev->quendu == 0) {
+			dev->quendu = qcnt;
+		}
+		dev->quendu--;
+		req_p->result = 0x00020000;
+		done(req_p);
+		restore_flags(flags);
+		return 0;
 	}
-	save_flags(flags);
-	cli();
 	dev->querequ[dev->quendu] = req_p;
-	if (dev->quendu == 0) {
-		i = qcnt - 1;
-	} else {
-		i = dev->quendu - 1;
-	}
 	tmport = dev->ioport + 0x1c;
 	restore_flags(flags);
 	if ((inb(tmport) == 0) && (dev->in_int == 0) && (dev->in_snd == 0)) {
@@ -582,10 +639,16 @@ void send_s870(unsigned char h)
 		dev->last_cmd = 0xff;
 		if (dev->quhdu == dev->quendu)
 		{
-			dev->in_snd = 0;
-			restore_flags(flags);
-			return ;
+		   dev->in_snd = 0;
+		   restore_flags(flags);
+		   return ;
 		}
+	}
+	if ((dev->last_cmd != 0xff) && (dev->working != 0))
+	{
+	     dev->in_snd = 0;
+	     restore_flags(flags);
+	     return ;
 	}
 	dev->working++;
 	j = dev->quhdu;
@@ -629,15 +692,6 @@ oktosend:
 	if (dev->ata_cdbu[0] == 0x00) {
 		workrequ->request_bufflen = 0;
 	}
-	/*
-	 *	Why limit this ????
-	 */
-	if (dev->ata_cdbu[0] == INQUIRY) {
-		if (workrequ->request_bufflen > 0x24) {
-			workrequ->request_bufflen = 0x24;
-			dev->ata_cdbu[4] = 0x24;
-		}
-	}
 
 	tmport = workportu + 0x1b;
 	j = 0;
@@ -654,7 +708,7 @@ oktosend:
 	outb(j, tmport);
 	while ((inb(tmport) & 0x01) != j)
 	{
-		outb(j,tmport);
+	   outb(j,tmport);
 	}
 
 	/*
@@ -780,15 +834,31 @@ oktosend:
 	outb(0x00, tmpcip);
 	tmpcip = tmpcip - 2;
 
-	tmport = workportu + 0x3a;
-	if ((dev->ata_cdbu[0] == 0x08) || (dev->ata_cdbu[0] == 0x28) ||
-	    (dev->ata_cdbu[0] == 0x0a) || (dev->ata_cdbu[0] == 0x2a))
+	if (dev->deviceid != 0x8081)
 	{
-		outb((unsigned char)((inb(tmport) & 0xf3) | 0x08),tmport);
+	   tmport = workportu + 0x3a;
+	   if ((dev->ata_cdbu[0] == 0x08) || (dev->ata_cdbu[0] == 0x28) ||
+	       (dev->ata_cdbu[0] == 0x0a) || (dev->ata_cdbu[0] == 0x2a))
+	   {
+	      outb((unsigned char)((inb(tmport) & 0xf3) | 0x08),tmport);
+	   }
+	   else
+	   {
+	      outb((unsigned char)(inb(tmport) & 0xf3),tmport);
+	   }
 	}
 	else
 	{
-		outb((unsigned char)(inb(tmport) & 0xf3),tmport);
+	   tmport = workportu - 0x05;
+	   if ((dev->ata_cdbu[0] == 0x08) || (dev->ata_cdbu[0] == 0x28) ||
+	       (dev->ata_cdbu[0] == 0x0a) || (dev->ata_cdbu[0] == 0x2a))
+	   {
+	      outb((unsigned char)((inb(tmport) & 0x3f) | 0xc0),tmport);
+	   }
+	   else
+	   {
+	      outb((unsigned char)(inb(tmport) & 0x3f),tmport);
+	   }
 	}
 	tmport = workportu + 0x1c;
 
@@ -1152,11 +1222,11 @@ void is870(unsigned long host, unsigned int wkport)
 		}
 		tmport = wkport + 0x1b;
 		if (dev->chip_veru == 4) {
-			outb(0x01, tmport);
+		   outb(0x01, tmport);
 		}
 		else
 		{
-			outb(0x00, tmport);
+		   outb(0x00, tmport);
 		}
 		tmport = wkport + 1;
 		outb(0x08, tmport++);
@@ -1615,6 +1685,639 @@ tar_dcons:
 	outb((unsigned char) (inb(tmport) & 0xef), tmport);
 }
 
+void is880(unsigned long host, unsigned int wkport)
+{
+	unsigned int tmport;
+	unsigned char i, j, k, rmb, n, lvdmode;
+	unsigned short int m;
+	static unsigned char mbuf[512];
+	static unsigned char satn[9] =	{0, 0, 0, 0, 0, 0, 0, 6, 6};
+	static unsigned char inqd[9] =	{0x12, 0, 0, 0, 0x24, 0, 0, 0x24, 6};
+	static unsigned char synn[6] =	{0x80, 1, 3, 1, 0x19, 0x0e};
+	static unsigned char synu[6] =	{0x80, 1, 3, 1, 0x0a, 0x0e};
+	static unsigned char synw[6] =	{0x80, 1, 3, 1, 0x0a, 0x0e};
+	static unsigned char wide[6] =	{0x80, 1, 2, 3, 1, 0};
+	static unsigned char u3[9] = { 0x80,1,6,4,0x09,00,0x0e,0x01,0x02 };
+	struct atp_unit *dev = &atp_unit[host];
+
+	sync_idu = 0;
+	lvdmode=inb(wkport + 0x3f) & 0x40;
+
+	for (i = 0; i < 16; i++) {
+		m = 1;
+		m = m << i;
+		if ((m & dev->active_idu) != 0) {
+			continue;
+		}
+		if (i == dev->host_idu) {
+			printk(KERN_INFO "         ID: %2d  Host Adapter\n", dev->host_idu);
+			continue;
+		}
+		tmport = wkport + 0x5b;
+		outb(0x01, tmport);
+		tmport = wkport + 0x41;
+		outb(0x08, tmport++);
+		outb(0x7f, tmport++);
+		outb(satn[0], tmport++);
+		outb(satn[1], tmport++);
+		outb(satn[2], tmport++);
+		outb(satn[3], tmport++);
+		outb(satn[4], tmport++);
+		outb(satn[5], tmport++);
+		tmport += 0x06;
+		outb(0, tmport);
+		tmport += 0x02;
+		outb(dev->id[i].devspu, tmport++);
+		outb(0, tmport++);
+		outb(satn[6], tmport++);
+		outb(satn[7], tmport++);
+		j = i;
+		if ((j & 0x08) != 0) {
+			j = (j & 0x07) | 0x40;
+		}
+		outb(j, tmport);
+		tmport += 0x03;
+		outb(satn[8], tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		if ((inb(tmport) != 0x11) && (inb(tmport) != 0x8e)) {
+			continue;
+		}
+		while (inb(tmport) != 0x8e);
+		dev->active_idu |= m;
+
+		tmport = wkport + 0x50;
+		outb(0x30, tmport);
+		tmport = wkport + 0x54;
+		outb(0x00, tmport);
+
+phase_cmd:
+		tmport = wkport + 0x58;
+		outb(0x08, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		j = inb(tmport);
+		if (j != 0x16) {
+			tmport = wkport + 0x50;
+			outb(0x41, tmport);
+			goto phase_cmd;
+		}
+sel_ok:
+		tmport = wkport + 0x43;
+		outb(inqd[0], tmport++);
+		outb(inqd[1], tmport++);
+		outb(inqd[2], tmport++);
+		outb(inqd[3], tmport++);
+		outb(inqd[4], tmport++);
+		outb(inqd[5], tmport);
+		tmport += 0x07;
+		outb(0, tmport);
+		tmport += 0x02;
+		outb(dev->id[i].devspu, tmport++);
+		outb(0, tmport++);
+		outb(inqd[6], tmport++);
+		outb(inqd[7], tmport++);
+		tmport += 0x03;
+		outb(inqd[8], tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		if ((inb(tmport) != 0x11) && (inb(tmport) != 0x8e)) {
+			continue;
+		}
+		while (inb(tmport) != 0x8e);
+		tmport = wkport + 0x5b;
+		outb(0x00, tmport);
+		tmport = wkport + 0x58;
+		outb(0x08, tmport);
+		tmport += 0x07;
+		j = 0;
+rd_inq_data:
+		k = inb(tmport);
+		if ((k & 0x01) != 0) {
+			tmport -= 0x06;
+			mbuf[j++] = inb(tmport);
+			tmport += 0x06;
+			goto rd_inq_data;
+		}
+		if ((k & 0x80) == 0) {
+			goto rd_inq_data;
+		}
+		tmport -= 0x08;
+		j = inb(tmport);
+		if (j == 0x16) {
+			goto inq_ok;
+		}
+		tmport = wkport + 0x50;
+		outb(0x46, tmport);
+		tmport += 0x02;
+		outb(0, tmport++);
+		outb(0, tmport++);
+		outb(0, tmport++);
+		tmport += 0x03;
+		outb(0x08, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		if (inb(tmport) != 0x16) {
+			goto sel_ok;
+		}
+inq_ok:
+		mbuf[36] = 0;
+		printk(KERN_INFO "         ID: %2d  %s\n", i, &mbuf[8]);
+		dev->id[i].devtypeu = mbuf[0];
+		rmb = mbuf[1];
+		n = mbuf[7];
+		if ((mbuf[7] & 0x60) == 0) {
+			goto not_wide;
+		}
+		if ((dev->global_map & 0x20) == 0) {
+			goto not_wide;
+		}
+		if (lvdmode == 0)
+		{
+		   goto chg_wide;
+		}
+		if ((mbuf[2] & 0x07) < 0x03)	      // force u2
+		{
+		   goto chg_wide;
+		}
+		tmport = wkport + 0x5b;
+		outb(0x01, tmport);
+		tmport = wkport + 0x43;
+		outb(satn[0], tmport++);
+		outb(satn[1], tmport++);
+		outb(satn[2], tmport++);
+		outb(satn[3], tmport++);
+		outb(satn[4], tmport++);
+		outb(satn[5], tmport++);
+		tmport += 0x06;
+		outb(0, tmport);
+		tmport += 0x02;
+		outb(dev->id[i].devspu, tmport++);
+		outb(0, tmport++);
+		outb(satn[6], tmport++);
+		outb(satn[7], tmport++);
+		tmport += 0x03;
+		outb(satn[8], tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		if ((inb(tmport) != 0x11) && (inb(tmport) != 0x8e)) {
+			continue;
+		}
+		while (inb(tmport) != 0x8e);
+try_u3:
+		j = 0;
+		tmport = wkport + 0x54;
+		outb(0x09, tmport);
+		tmport += 0x04;
+		outb(0x20, tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0) {
+			if ((inb(tmport) & 0x01) != 0) {
+				tmport -= 0x06;
+				outb(u3[j++], tmport);
+				tmport += 0x06;
+			}
+		}
+		tmport -= 0x08;
+		while ((inb(tmport) & 0x80) == 0x00);
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto u3p_in;
+		}
+		if (j == 0x0a) {
+			goto u3p_cmd;
+		}
+		if (j == 0x0e) {
+			goto try_u3;
+		}
+		continue;
+u3p_out:
+		tmport = wkport + 0x58;
+		outb(0x20, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0) {
+			if ((inb(tmport) & 0x01) != 0) {
+				tmport -= 0x06;
+				outb(0, tmport);
+				tmport += 0x06;
+			}
+		}
+		tmport -= 0x08;
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto u3p_in;
+		}
+		if (j == 0x0a) {
+			goto u3p_cmd;
+		}
+		if (j == 0x0e) {
+			goto u3p_out;
+		}
+		continue;
+u3p_in:
+		tmport = wkport + 0x54;
+		outb(0x09, tmport);
+		tmport += 0x04;
+		outb(0x20, tmport);
+		tmport += 0x07;
+		k = 0;
+u3p_in1:
+		j = inb(tmport);
+		if ((j & 0x01) != 0) {
+			tmport -= 0x06;
+			mbuf[k++] = inb(tmport);
+			tmport += 0x06;
+			goto u3p_in1;
+		}
+		if ((j & 0x80) == 0x00) {
+			goto u3p_in1;
+		}
+		tmport -= 0x08;
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto u3p_in;
+		}
+		if (j == 0x0a) {
+			goto u3p_cmd;
+		}
+		if (j == 0x0e) {
+			goto u3p_out;
+		}
+		continue;
+u3p_cmd:
+		tmport = wkport + 0x50;
+		outb(0x30, tmport);
+		tmport = wkport + 0x54;
+		outb(0x00, tmport);
+		tmport += 0x04;
+		outb(0x08, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		j = inb(tmport);
+		if (j != 0x16) {
+			if (j == 0x4e) {
+				goto u3p_out;
+			}
+			continue;
+		}
+		if (mbuf[0] != 0x01) {
+			goto chg_wide;
+		}
+		if (mbuf[1] != 0x06) {
+			goto chg_wide;
+		}
+		if (mbuf[2] != 0x04) {
+			goto chg_wide;
+		}
+		if (mbuf[3] == 0x09) {
+		   m = 1;
+		   m = m << i;
+		   dev->wide_idu |= m;
+		   dev->id[i].devspu = 0xce;
+		   continue;
+		}
+chg_wide:
+		tmport = wkport + 0x5b;
+		outb(0x01, tmport);
+		tmport = wkport + 0x43;
+		outb(satn[0], tmport++);
+		outb(satn[1], tmport++);
+		outb(satn[2], tmport++);
+		outb(satn[3], tmport++);
+		outb(satn[4], tmport++);
+		outb(satn[5], tmport++);
+		tmport += 0x06;
+		outb(0, tmport);
+		tmport += 0x02;
+		outb(dev->id[i].devspu, tmport++);
+		outb(0, tmport++);
+		outb(satn[6], tmport++);
+		outb(satn[7], tmport++);
+		tmport += 0x03;
+		outb(satn[8], tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		if ((inb(tmport) != 0x11) && (inb(tmport) != 0x8e)) {
+			continue;
+		}
+		while (inb(tmport) != 0x8e);
+try_wide:
+		j = 0;
+		tmport = wkport + 0x54;
+		outb(0x05, tmport);
+		tmport += 0x04;
+		outb(0x20, tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0) {
+			if ((inb(tmport) & 0x01) != 0) {
+				tmport -= 0x06;
+				outb(wide[j++], tmport);
+				tmport += 0x06;
+			}
+		}
+		tmport -= 0x08;
+		while ((inb(tmport) & 0x80) == 0x00);
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto widep_in;
+		}
+		if (j == 0x0a) {
+			goto widep_cmd;
+		}
+		if (j == 0x0e) {
+			goto try_wide;
+		}
+		continue;
+widep_out:
+		tmport = wkport + 0x58;
+		outb(0x20, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0) {
+			if ((inb(tmport) & 0x01) != 0) {
+				tmport -= 0x06;
+				outb(0, tmport);
+				tmport += 0x06;
+			}
+		}
+		tmport -= 0x08;
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto widep_in;
+		}
+		if (j == 0x0a) {
+			goto widep_cmd;
+		}
+		if (j == 0x0e) {
+			goto widep_out;
+		}
+		continue;
+widep_in:
+		tmport = wkport + 0x54;
+		outb(0xff, tmport);
+		tmport += 0x04;
+		outb(0x20, tmport);
+		tmport += 0x07;
+		k = 0;
+widep_in1:
+		j = inb(tmport);
+		if ((j & 0x01) != 0) {
+			tmport -= 0x06;
+			mbuf[k++] = inb(tmport);
+			tmport += 0x06;
+			goto widep_in1;
+		}
+		if ((j & 0x80) == 0x00) {
+			goto widep_in1;
+		}
+		tmport -= 0x08;
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto widep_in;
+		}
+		if (j == 0x0a) {
+			goto widep_cmd;
+		}
+		if (j == 0x0e) {
+			goto widep_out;
+		}
+		continue;
+widep_cmd:
+		tmport = wkport + 0x50;
+		outb(0x30, tmport);
+		tmport = wkport + 0x54;
+		outb(0x00, tmport);
+		tmport += 0x04;
+		outb(0x08, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		j = inb(tmport);
+		if (j != 0x16) {
+			if (j == 0x4e) {
+				goto widep_out;
+			}
+			continue;
+		}
+		if (mbuf[0] != 0x01) {
+			goto not_wide;
+		}
+		if (mbuf[1] != 0x02) {
+			goto not_wide;
+		}
+		if (mbuf[2] != 0x03) {
+			goto not_wide;
+		}
+		if (mbuf[3] != 0x01) {
+			goto not_wide;
+		}
+		m = 1;
+		m = m << i;
+		dev->wide_idu |= m;
+not_wide:
+		if ((dev->id[i].devtypeu == 0x00) || (dev->id[i].devtypeu == 0x07) ||
+		    ((dev->id[i].devtypeu == 0x05) && ((n & 0x10) != 0)))
+		{
+			goto set_sync;
+		}
+		continue;
+set_sync:
+		tmport = wkport + 0x5b;
+		j = 0;
+		if ((m & dev->wide_idu) != 0) {
+			j |= 0x01;
+		}
+		outb(j, tmport);
+		tmport = wkport + 0x43;
+		outb(satn[0], tmport++);
+		outb(satn[1], tmport++);
+		outb(satn[2], tmport++);
+		outb(satn[3], tmport++);
+		outb(satn[4], tmport++);
+		outb(satn[5], tmport++);
+		tmport += 0x06;
+		outb(0, tmport);
+		tmport += 0x02;
+		outb(dev->id[i].devspu, tmport++);
+		outb(0, tmport++);
+		outb(satn[6], tmport++);
+		outb(satn[7], tmport++);
+		tmport += 0x03;
+		outb(satn[8], tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		if ((inb(tmport) != 0x11) && (inb(tmport) != 0x8e)) {
+			continue;
+		}
+		while (inb(tmport) != 0x8e);
+try_sync:
+		j = 0;
+		tmport = wkport + 0x54;
+		outb(0x06, tmport);
+		tmport += 0x04;
+		outb(0x20, tmport);
+		tmport += 0x07;
+
+		while ((inb(tmport) & 0x80) == 0) {
+			if ((inb(tmport) & 0x01) != 0) {
+				tmport -= 0x06;
+				if ((m & dev->wide_idu) != 0) {
+					outb(synw[j++], tmport);
+				} else {
+					if ((m & dev->ultra_map) != 0) {
+						outb(synu[j++], tmport);
+					} else {
+						outb(synn[j++], tmport);
+					}
+				}
+				tmport += 0x06;
+			}
+		}
+		tmport -= 0x08;
+		while ((inb(tmport) & 0x80) == 0x00);
+		j = inb(tmport) & 0x0f;
+		if (j == 0x0f) {
+			goto phase_ins;
+		}
+		if (j == 0x0a) {
+			goto phase_cmds;
+		}
+		if (j == 0x0e) {
+			goto try_sync;
+		}
+		continue;
+phase_outs:
+		tmport = wkport + 0x58;
+		outb(0x20, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00) {
+			if ((inb(tmport) & 0x01) != 0x00) {
+				tmport -= 0x06;
+				outb(0x00, tmport);
+				tmport += 0x06;
+			}
+		}
+		tmport -= 0x08;
+		j = inb(tmport);
+		if (j == 0x85) {
+			goto tar_dcons;
+		}
+		j &= 0x0f;
+		if (j == 0x0f) {
+			goto phase_ins;
+		}
+		if (j == 0x0a) {
+			goto phase_cmds;
+		}
+		if (j == 0x0e) {
+			goto phase_outs;
+		}
+		continue;
+phase_ins:
+		tmport = wkport + 0x54;
+		outb(0x06, tmport);
+		tmport += 0x04;
+		outb(0x20, tmport);
+		tmport += 0x07;
+		k = 0;
+phase_ins1:
+		j = inb(tmport);
+		if ((j & 0x01) != 0x00) {
+			tmport -= 0x06;
+			mbuf[k++] = inb(tmport);
+			tmport += 0x06;
+			goto phase_ins1;
+		}
+		if ((j & 0x80) == 0x00) {
+			goto phase_ins1;
+		}
+		tmport -= 0x08;
+		while ((inb(tmport) & 0x80) == 0x00);
+		j = inb(tmport);
+		if (j == 0x85) {
+			goto tar_dcons;
+		}
+		j &= 0x0f;
+		if (j == 0x0f) {
+			goto phase_ins;
+		}
+		if (j == 0x0a) {
+			goto phase_cmds;
+		}
+		if (j == 0x0e) {
+			goto phase_outs;
+		}
+		continue;
+phase_cmds:
+		tmport = wkport + 0x50;
+		outb(0x30, tmport);
+tar_dcons:
+		tmport = wkport + 0x54;
+		outb(0x00, tmport);
+		tmport += 0x04;
+		outb(0x08, tmport);
+		tmport += 0x07;
+		while ((inb(tmport) & 0x80) == 0x00);
+		tmport -= 0x08;
+		j = inb(tmport);
+		if (j != 0x16) {
+			continue;
+		}
+		if (mbuf[0] != 0x01) {
+			continue;
+		}
+		if (mbuf[1] != 0x03) {
+			continue;
+		}
+		if (mbuf[4] == 0x00) {
+			continue;
+		}
+		if (mbuf[3] > 0x64) {
+			continue;
+		}
+		if (mbuf[4] > 0x0e) {
+			mbuf[4] = 0x0e;
+		}
+		dev->id[i].devspu = mbuf[4];
+		if (mbuf[3] < 0x0c){
+			j = 0xb0;
+			goto set_syn_ok;
+		}
+		if ((mbuf[3] < 0x0d) && (rmb == 0)) {
+			j = 0xa0;
+			goto set_syn_ok;
+		}
+		if (mbuf[3] < 0x1a) {
+			j = 0x20;
+			goto set_syn_ok;
+		}
+		if (mbuf[3] < 0x33) {
+			j = 0x40;
+			goto set_syn_ok;
+		}
+		if (mbuf[3] < 0x4c) {
+			j = 0x50;
+			goto set_syn_ok;
+		}
+		j = 0x60;
+	      set_syn_ok:
+		dev->id[i].devspu = (dev->id[i].devspu & 0x0f) | j;
+	}
+}
+
 /* return non-zero on detection */
 int atp870u_detect(Scsi_Host_Template * tpnt)
 {
@@ -1624,12 +2327,13 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 	unsigned short index = 0;
 	struct pci_dev *pdev[3];
 	unsigned char chip_ver[3], host_id;
+	unsigned short dev_id[3];
 	struct Scsi_Host *shpnt = NULL;
 	int tmpcnt = 0;
 	int count = 0;
 
-	static unsigned short devid[8] = {
-		0x8002, 0x8010, 0x8020, 0x8030, 0x8040, 0x8050, 0x8060, 0
+	static unsigned short devid[9] = {
+	  0x8081, 0x8002, 0x8010, 0x8020, 0x8030, 0x8040, 0x8050, 0x8060, 0
 	};
 
 	printk(KERN_INFO "aec671x_detect: \n");
@@ -1675,6 +2379,7 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 			continue;
 		}
 		chip_ver[2] = 0;
+		dev_id[2] = devid[h];
 
 		if (devid[h] == 0x8002) {
 			error = pci_read_config_byte(pdev[2], 0x08, &chip_ver[2]);
@@ -1682,11 +2387,13 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 				goto nxt_devfn;
 			}
 		}
-		if (devid[h] == 0x8010 || devid[h] == 0x8050) {
+		if (devid[h] == 0x8010 || devid[h] == 0x8081 || devid[h] == 0x8050)
+		{
 			chip_ver[2] = 0x04;
 		}
 		pdev[tmpcnt] = pdev[2];
 		chip_ver[tmpcnt] = chip_ver[2];
+		dev_id[tmpcnt] = dev_id[2];
 		tmpcnt++;
 	      nxt_devfn:
 		index++;
@@ -1706,77 +2413,154 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		/* Found an atp870u/w. */
 		base_io = pci_resource_start(pdev[h], 0);
 		irq = pdev[h]->irq;
-		error = pci_read_config_byte(pdev[h],0x49,&host_id);
 
-		base_io &= 0xfffffff8;
+		if (dev_id[h] != 0x8081)
+		{
+		   error = pci_read_config_byte(pdev[h],0x49,&host_id);
 
-		if (check_region(base_io,0x40) != 0)
-		{  
-			return 0;
+		   base_io &= 0xfffffff8;
+
+		   if (check_region(base_io,0x40) != 0)
+		   {
+			   return 0;
+		   }
+		   printk(KERN_INFO "   ACARD AEC-671X PCI Ultra/W SCSI-3 Host Adapter: %d    IO:%x, IRQ:%d.\n"
+			  ,h, base_io, irq);
+		   dev->ioport = base_io;
+		   dev->pciport = base_io + 0x20;
+		   dev->deviceid = dev_id[h];
+		   irqnumu[h] = irq;
+		   host_id &= 0x07;
+		   dev->host_idu = host_id;
+		   dev->chip_veru = chip_ver[h];
+
+		   tmport = base_io + 0x22;
+		   dev->scam_on = inb(tmport);
+		   tmport += 0x0b;
+		   dev->global_map = inb(tmport++);
+		   dev->ultra_map = inw(tmport);
+		   if (dev->ultra_map == 0) {
+			   dev->scam_on = 0x00;
+			   dev->global_map = 0x20;
+			   dev->ultra_map = 0xffff;
+		   }
+		   shpnt = scsi_register(tpnt, 4);
+		   if(shpnt==NULL)
+			   return count;
+
+		   save_flags(flags);
+		   cli();
+		   if (request_irq(irq, atp870u_intr_handle, SA_SHIRQ, "atp870u", dev)) {
+			   printk(KERN_ERR "Unable to allocate IRQ for Acard controller.\n");
+			   goto unregister;
+		   }
+
+		   if (chip_ver[h] > 0x07)	     /* check if atp876 chip   */
+		   {				     /* then enable terminator */
+		      tmport = base_io + 0x3e;
+		      outb(0x00, tmport);
+		   }
+
+		   tmport = base_io + 0x3a;
+		   k = (inb(tmport) & 0xf3) | 0x10;
+		   outb(k, tmport);
+		   outb((k & 0xdf), tmport);
+		   mydlyu(0x8000);
+		   outb(k, tmport);
+		   mydlyu(0x8000);
+		   tmport = base_io;
+		   outb((host_id | 0x08), tmport);
+		   tmport += 0x18;
+		   outb(0, tmport);
+		   tmport += 0x07;
+		   while ((inb(tmport) & 0x80) == 0);
+		   tmport -= 0x08;
+		   inb(tmport);
+		   tmport = base_io + 1;
+		   outb(8, tmport++);
+		   outb(0x7f, tmport);
+		   tmport = base_io + 0x11;
+		   outb(0x20, tmport);
+
+		   tscam(h);
+		   is870(h, base_io);
+		   tmport = base_io + 0x3a;
+		   outb((inb(tmport) & 0xef), tmport);
+		   tmport++;
+		   outb((inb(tmport) | 0x20),tmport);
 		}
-		printk(KERN_INFO "   ACARD AEC-671X PCI Ultra/W SCSI-3 Host Adapter: %d    IO:%x, IRQ:%d.\n"
-		       ,h, base_io, irq);
-		dev->ioport = base_io;
-		dev->pciport = base_io + 0x20;
-		irqnumu[h] = irq;
-		host_id &= 0x07;
-		dev->host_idu = host_id;
-		dev->chip_veru = chip_ver[h];
+		else
+		{
+		   base_io &= 0xfffffff8;
 
-		tmport = base_io + 0x22;
-		dev->scam_on = inb(tmport);
-		tmport += 0x0b;
-		dev->global_map = inb(tmport++);
-		dev->ultra_map = inw(tmport);
-		if (dev->ultra_map == 0) {
-			dev->scam_on = 0x00;
-			dev->global_map = 0x20;
-			dev->ultra_map = 0xffff;
+		   if (check_region(base_io,0x60) != 0)
+		   {
+			   return 0;
+		   }
+		   host_id = inb(base_io + 0x39);
+		   host_id >>= 0x04;
+
+		   printk(KERN_INFO "   ACARD AEC-67160 PCI Ultra3 LVD Host Adapter: %d    IO:%x, IRQ:%d.\n"
+			  ,h, base_io, irq);
+		   dev->ioport = base_io + 0x40;
+		   dev->pciport = base_io + 0x28;
+		   dev->deviceid = dev_id[h];
+		   irqnumu[h] = irq;
+		   dev->host_idu = host_id;
+		   dev->chip_veru = chip_ver[h];
+
+		   tmport = base_io + 0x22;
+		   dev->scam_on = inb(tmport);
+		   tmport += 0x13;
+		   dev->global_map = inb(tmport);
+		   tmport += 0x07;
+		   dev->ultra_map = inw(tmport);
+		   if (dev->ultra_map == 0) {
+			   dev->scam_on = 0x00;
+			   dev->global_map = 0x20;
+			   dev->ultra_map = 0xffff;
+		   }
+		   shpnt = scsi_register(tpnt, 4);
+		   if(shpnt==NULL)
+			   return count;
+
+		   save_flags(flags);
+		   cli();
+		   if (request_irq(irq, atp870u_intr_handle, SA_SHIRQ, "atp870u", dev)) {
+			   printk(KERN_ERR "Unable to allocate IRQ for Acard controller.\n");
+			   goto unregister;
+		   }
+
+		   tmport = base_io + 0x38;
+		   k = inb(tmport) & 0x80;
+		   outb(k, tmport);
+		   tmport += 0x03;
+		   outb(0x20, tmport);
+		   mydlyu(0x8000);
+		   outb(0, tmport);
+		   mydlyu(0x8000);
+		   tmport = base_io + 0x5b;
+		   inb(tmport);
+		   tmport -= 0x04;
+		   inb(tmport);
+		   tmport = base_io + 0x40;
+		   outb((host_id | 0x08), tmport);
+		   tmport += 0x18;
+		   outb(0, tmport);
+		   tmport += 0x07;
+		   while ((inb(tmport) & 0x80) == 0);
+		   tmport -= 0x08;
+		   inb(tmport);
+		   tmport = base_io + 0x41;
+		   outb(8, tmport++);
+		   outb(0x7f, tmport);
+		   tmport = base_io + 0x51;
+		   outb(0x20, tmport);
+
+		   is880(h, base_io);
+		   tmport = base_io + 0x38;
+		   outb(0xb0, tmport);
 		}
-		shpnt = scsi_register(tpnt, 4);
-		if(shpnt==NULL)
-			return count;
-
-		save_flags(flags);
-		cli();
-		if (request_irq(irq, atp870u_intr_handle, SA_SHIRQ, "atp870u", dev)) {
-			printk(KERN_ERR "Unable to allocate IRQ for Acard controller.\n");
-			goto unregister;
-		}
-
-		if (chip_ver[h] > 0x07) 	  /* check if atp876 chip   */
-		{				  /* then enable terminator */
-			tmport = base_io + 0x3e;
-			outb(0x30, tmport);
-		}
-
-		tmport = base_io + 0x3a;
-		k = (inb(tmport) & 0xf3) | 0x10;
-		outb(k, tmport);
-		outb((k & 0xdf), tmport);
-		mydlyu(0x8000);
-		outb(k, tmport);
-		mydlyu(0x8000);
-		tmport = base_io;
-		outb((host_id | 0x08), tmport);
-		tmport += 0x18;
-		outb(0, tmport);
-		tmport += 0x07;
-		while ((inb(tmport) & 0x80) == 0);
-		tmport -= 0x08;
-		inb(tmport);
-		tmport = base_io + 1;
-		outb(8, tmport++);
-		outb(0x7f, tmport);
-		tmport = base_io + 0x11;
-		outb(0x20, tmport);
-
-		tscam(h);
-		is870(h, base_io);
-		tmport = base_io + 0x3a;
-		outb((inb(tmport) & 0xef), tmport);
-		tmport++;
-		outb((inb(tmport) | 0x20),tmport);
 
 		atp_host[h] = shpnt;
 		if (dev->chip_veru == 4) {
@@ -1785,11 +2569,24 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		shpnt->this_id = host_id;
 		shpnt->unique_id = base_io;
 		shpnt->io_port = base_io;
-		shpnt->n_io_port = 0x40;	/* Number of bytes of I/O space used */
+		if (dev_id[h] == 0x8081)
+		{
+		   shpnt->n_io_port = 0x60;	   /* Number of bytes of I/O space used */
+		}
+		else
+		{
+		   shpnt->n_io_port = 0x40;	   /* Number of bytes of I/O space used */
+		}
 		shpnt->irq = irq;
-		scsi_set_pci_device(shpnt, pdev[h]);
 		restore_flags(flags);
-		request_region(base_io, 0x40, "atp870u");       /* Register the IO ports that we use */
+		if (dev_id[h] == 0x8081)
+		{
+		   request_region(base_io, 0x60, "atp870u");       /* Register the IO ports that we use */
+		}
+		else
+		{
+		   request_region(base_io, 0x40, "atp870u");       /* Register the IO ports that we use */
+		}
 		count++;
 		index++;
 		continue;
@@ -1809,7 +2606,8 @@ unregister:
 
 int atp870u_abort(Scsi_Cmnd * SCpnt)
 {
-	unsigned char h, j;
+	unsigned char h, j, k;
+	Scsi_Cmnd *workrequ;
 	unsigned int tmport;
 	struct atp_unit *dev;
 	for (h = 0; h <= admaxu; h++) {
@@ -1830,18 +2628,34 @@ find_adp:
 	printk(" r1c=%2x", inb(tmport));
 	tmport += 0x03;
 	printk(" r1f=%2x in_snd=%2x ", inb(tmport), dev->in_snd);
-	tmport++;
+	tmport= dev->pciport;
 	printk(" r20=%2x", inb(tmport));
 	tmport += 0x02;
 	printk(" r22=%2x", inb(tmport));
-	tmport += 0x18;
+	tmport = dev->ioport + 0x3a;
 	printk(" r3a=%2x \n",inb(tmport));
+	tmport = dev->ioport + 0x3b;
+	printk(" r3b=%2x \n",inb(tmport));
+	for(j=0;j<16;j++)
+	{
+	   if (dev->id[j].curr_req != NULL)
+	   {
+		workrequ = dev->id[j].curr_req;
+		printk("\n que cdb= ");
+		for (k=0; k < workrequ->cmd_len; k++)
+		{
+		    printk(" %2x ",workrequ->cmnd[k]);
+		}
+		printk(" last_lenu= %x ",dev->id[j].last_lenu);
+	   }
+	}
 	return (SCSI_ABORT_SNOOZE);
 }
 
 int atp870u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 {
 	unsigned char h;
+	struct atp_unit *dev;
 	/*
 	 * See if a bus reset was suggested.
 	 */
@@ -1852,6 +2666,7 @@ int atp870u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 	}
 	panic("Reset bus host not found !");
 find_host:
+	dev=&atp_unit[h];
 /*	SCpnt->result = 0x00080000;
 	SCpnt->scsi_done(SCpnt);
 	dev->working=0;
@@ -1865,7 +2680,7 @@ const char *atp870u_info(struct Scsi_Host *notused)
 {
 	static char buffer[128];
 
-	strcpy(buffer, "ACARD AEC-6710/6712 PCI Ultra/W SCSI-3 Adapter Driver V2.1+ac ");
+	strcpy(buffer, "ACARD AEC-6710/6712/67160 PCI Ultra/W/LVD SCSI-3 Adapter Driver V2.4+ac ");
 
 	return buffer;
 }
@@ -1910,7 +2725,7 @@ int atp870u_proc_info(char *buffer, char **start, off_t offset, int length,
 	if (offset == 0) {
 		memset(buff, 0, sizeof(buff));
 	}
-	size += sprintf(BLS, "ACARD AEC-671X Driver Version: 2.1+ac\n");
+	size += sprintf(BLS, "ACARD AEC-671X Driver Version: 2.4+ac\n");
 	len += size;
 	pos = begin + len;
 	size = 0;
@@ -1976,3 +2791,4 @@ int atp870u_release (struct Scsi_Host *pshost)
 
 static Scsi_Host_Template driver_template = ATP870U;
 #include "scsi_module.c"
+

@@ -66,18 +66,6 @@
  */
 #define RX_BUFFS 64
 
-/*
- * Private ioctls that de facto are well known and used for example
- * by mii-tool.  These are deprecated and will go away in 2.5.0.
- */
-#define SIOCGMIIPHY (SIOCDEVPRIVATE)	/* Read from current PHY */
-#define SIOCGMIIREG (SIOCDEVPRIVATE+1)	/* Read any PHY register */
-#define SIOCSMIIREG (SIOCDEVPRIVATE+2)	/* Write any PHY register */
-
-/* These exist in other drivers; we don't use them at this time.  */
-#define SIOCGPARAMS (SIOCDEVPRIVATE+3)	/* Read operational parameters */
-#define SIOCSPARAMS (SIOCDEVPRIVATE+4)	/* Set operational parameters */
-
 /* Timer state engine. */
 enum ioc3_timer_state {
 	arbwait  = 0,	/* Waiting for auto negotiation to complete.          */
@@ -1513,7 +1501,7 @@ static void __devexit ioc3_remove_one (struct pci_dev *pdev)
 	struct ioc3 *ioc3 = ip->regs;
 
 	iounmap(ioc3);
-	/* pci_release_regions(pdev);  Will be used in 2.4.3 */
+	pci_release_regions(pdev);
 	kfree(dev);
 }
 

@@ -988,6 +988,10 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 
 	case LV_BMAP:
 		/* turn logical block into (dev_t, block). non privileged. */
+		/* don't bmap a snapshot, since the mapping can change */
+		if (lv_ptr->lv_access & LV_SNAPSHOT)
+			return -EPERM;
+
 		return lvm_user_bmap(inode, (struct lv_bmap *) arg);
 		break;
 
@@ -1075,8 +1079,8 @@ static int lvm_user_bmap(struct inode *inode, struct lv_bmap *user_result)
 		return -EFAULT;
 
 	memset(&bh,0,sizeof bh);
-	bh.b_rsector = block;
-	bh.b_dev = bh.b_rdev = inode->i_dev;
+	bh.b_blocknr = block;
+	bh.b_dev = bh.b_rdev = inode->i_rdev;
 	bh.b_size = lvm_get_blksize(bh.b_dev);
 	if ((err=lvm_map(&bh, READ)) < 0)  {
 		printk("lvm map failed: %d\n", err);
@@ -1084,7 +1088,8 @@ static int lvm_user_bmap(struct inode *inode, struct lv_bmap *user_result)
 	}
 
 	return put_user(kdev_t_to_nr(bh.b_rdev), &user_result->lv_dev) ||
-	put_user(bh.b_rsector, &user_result->lv_block) ? -EFAULT : 0;
+	       put_user(bh.b_rsector/(bh.b_size>>9), &user_result->lv_block) ?
+	       -EFAULT : 0;
 }
 
 

@@ -367,7 +367,7 @@ read_next:
 #ifdef DEBUG_READ
 			printk(KERN_DEBUG "%s: promise_read: waiting for"
 			       "interrupt\n", drive->name);
-#endif 
+#endif
 			return ide_started;
 		}
 		printk(KERN_ERR "%s: Eeek! promise_read_intr: sectors left "
@@ -457,8 +457,8 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
 
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: promise_write: sectors(%ld-%ld), "
-	       "buffer=0x%08x\n", drive->name, rq->sector,
-	       rq->sector + rq->nr_sectors - 1, (unsigned int)rq->buffer);
+	       "buffer=%p\n", drive->name, rq->sector,
+	       rq->sector + rq->nr_sectors - 1, rq->buffer);
 #endif
 
 	/*

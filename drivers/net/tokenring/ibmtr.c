@@ -7,7 +7,7 @@
  *	This device driver should work with Any IBM Token Ring Card that does
  *	not use DMA.
  *
- *	I used Donald Becker's (becker@cesdis.gsfc.nasa.gov) device driver work
+ *	I used Donald Becker's (becker@scyld.com) device driver work
  *	as a base for most of my initial work.
  *
  *	Changes by Peter De Schrijver

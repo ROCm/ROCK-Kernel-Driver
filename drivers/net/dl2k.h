@@ -35,9 +35,9 @@
 #define TX_RING_SIZE	16
 #define TX_QUEUE_LEN	10	/* Limit ring entries actually used.  */
 #define RX_RING_SIZE	16
+#define TX_TOTAL_SIZE	TX_RING_SIZE*sizeof(struct netdev_desc)
+#define RX_TOTAL_SIZE	RX_RING_SIZE*sizeof(struct netdev_desc)
 
-#define virt_to_le64desc(addr)  cpu_to_le64(virt_to_bus(addr))
-#define le64desc_to_virt(addr)  bus_to_virt(le64_to_cpu(addr))
 /* This driver was written to use PCI memory space, however x86-oriented
    hardware often uses I/O space accesses. */
 #ifdef USE_IO_OPS
@@ -570,15 +570,15 @@ struct netdev_desc {
    within the structure. */
 struct netdev_private {
 	/* Descriptor rings first for alignment. */
-	struct netdev_desc rx_ring[RX_RING_SIZE];
-	struct netdev_desc tx_ring[TX_RING_SIZE];
-	/* The addresses of receive-in-place skbuffs. */
+	struct netdev_desc *rx_ring;
+	struct netdev_desc *tx_ring;
 	struct sk_buff *rx_skbuff[RX_RING_SIZE];
-	/* The saved address of a sent-in-place packet/buffer, for later free(). */
 	struct sk_buff *tx_skbuff[TX_RING_SIZE];
-	struct net_device_stats stats;
+	dma_addr_t tx_ring_dma;
+	dma_addr_t rx_ring_dma;
+	struct pci_dev * pdev;
 	spinlock_t lock;
-	struct netdev_desc *rx_head_desc;
+	struct net_device_stats stats;
 	unsigned int rx_buf_sz;	/* Based on MTU+slack. */
 	unsigned int tx_full:1;	/* The Tx queue is full. */
 	unsigned int full_duplex:1;	/* Full-duplex operation requested. */
@@ -588,8 +588,8 @@ struct netdev_private {
 	unsigned int chip_id;	/* PCI table chip id */
 	unsigned int jumbo;
 	struct netdev_desc *last_tx;	/* Last Tx descriptor used. */
-	u64 cur_rx, old_rx;	/* Producer/consumer ring indices */
-	u64 cur_tx, old_tx;
+	unsigned long cur_rx, old_rx;	/* Producer/consumer ring indices */
+	unsigned long cur_tx, old_tx;
 	int wake_polarity;
 	char name[256];		/* net device description */
 	u8 duplex_polarity;
@@ -649,10 +649,11 @@ debug_tfd_dump (struct netdev_private *np)
 		for (i = 0; i < TX_RING_SIZE; i++) {
 			desc = &np->tx_ring[i];
 			printk
-			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-			     (u32) virt_to_bus (desc), (u32) desc->next_desc,
-			     (u32) desc->status, (u32) (desc->fraginfo >> 32),
-			     (u32) desc->fraginfo);
+				("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+				(u32) np->tx_ring_dma + i*sizeof(*desc),
+				(u32) desc->next_desc, (u32) desc->status, 
+				(u32) (desc->fraginfo >> 32),
+				(u32) desc->fraginfo);
 			printk ("\n");
 		}
 		printk ("\n");
@@ -669,10 +670,11 @@ debug_rfd_dump (struct netdev_private *np, int flag)
 		for (i = 0; i < RX_RING_SIZE; i++) {
 			desc = &np->rx_ring[i];
 			printk
-			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-			     (u32) virt_to_bus (desc), (u32) desc->next_desc,
-			     (u32) desc->status, (u32) (desc->fraginfo >> 32),
-			     (u32) desc->fraginfo);
+				("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+				(u32) np->rx_ring_dma + i*sizeof(*desc),
+				(u32) desc->next_desc, (u32) desc->status, 
+				(u32) (desc->fraginfo >> 32),
+				(u32) desc->fraginfo);
 			printk ("\n");
 		}
 		printk ("\n");
@@ -700,18 +702,20 @@ debug_rfd_dump (struct netdev_private *np, int flag)
 static inline void
 debug_pkt_dump (struct netdev_private *np, int pkt_len)
 {
-	int i;
-	struct netdev_desc *desc = np->rx_head_desc;
+	int entry = np->cur_rx % RX_RING_SIZE;
+	struct netdev_desc *desc = &np->rx_ring[entry];
+	u64 frame_status = le64_to_cpu (desc->status);
 	unsigned char *pchar;
 	unsigned char *phead;
-	u64 frame_status = le64_to_cpu (desc->status);
+	int i;
 
 	if (np->rx_debug == 4) {
 		printk ("  rcv_pkt: status was %4.4x %4.4x.\n",
 			(u32) (frame_status >> 32), (u32) frame_status);
 	}
 	if (np->rx_debug == 7) {
-		phead = le64desc_to_virt ((desc->fraginfo & 0xffffffffff));
+		
+		phead = bus_to_virt(le64_to_cpu(desc->fraginfo & 0xffffffffff));
 		for (pchar = phead, i = 0; i < pkt_len; i++, pchar++) {
 			printk ("%02x ", *pchar);
 			if ((i + 1) % 20 == 0)

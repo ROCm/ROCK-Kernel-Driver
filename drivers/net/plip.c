@@ -2,7 +2,7 @@
 /* PLIP: A parallel port "network" driver for Linux. */
 /* This driver is for parallel port with 5-bit cable (LapLink (R) cable). */
 /*
- * Authors:	Donald Becker <becker@super.org>
+ * Authors:	Donald Becker <becker@scyld.com>
  *		Tommy Thorn <thorn@daimi.aau.dk>
  *		Tanabe Hiroyasu <hiro@sanpo.t.u-tokyo.ac.jp>
  *		Alan Cox <gw4pts@gw4pts.ampr.org>
@@ -37,7 +37,7 @@
  */
 
 /*
- * Original version and the name 'PLIP' from Donald Becker <becker@super.org>
+ * Original version and the name 'PLIP' from Donald Becker <becker@scyld.com>
  * inspired by Russ Nelson's parallel port packet driver.
  *
  * NOTE:

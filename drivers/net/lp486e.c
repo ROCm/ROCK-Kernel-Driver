@@ -10,8 +10,10 @@
 	distributed according to the terms of the GNU Public License
 	as modified by SRC, incorporated herein by reference.
 
-        The author may be reached as becker@super.org or
-        C/O Supercomputing Research Ctr., 17100 Science Dr., Bowie MD 20715
+        The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
 
     Apricot
         Written 1994 by Mark Evans.

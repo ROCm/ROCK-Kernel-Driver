@@ -185,7 +185,7 @@ static void	bsd_incomp (void *state, unsigned char *ibuf, int icnt);
 static int	bsd_decompress (void *state, unsigned char *ibuf, int isize,
 				unsigned char *obuf, int osize);
 
-/* These are in ppp.c */
+/* These are in ppp_generic.c */
 extern int  ppp_register_compressor   (struct compressor *cp);
 extern void ppp_unregister_compressor (struct compressor *cp);
 
@@ -1158,7 +1158,7 @@ static struct compressor ppp_bsd_compress = {
  * Module support routines
  *************************************************************/
 
-int bsdcomp_init(void)
+int __init bsdcomp_init(void)
 {
 	int answer = ppp_register_compressor(&ppp_bsd_compress);
 	if (answer == 0)
@@ -1166,7 +1166,7 @@ int bsdcomp_init(void)
 	return answer;
 }
 
-void bsdcomp_cleanup(void)
+void __exit bsdcomp_cleanup(void)
 {
 	ppp_unregister_compressor(&ppp_bsd_compress);
 }

@@ -189,6 +189,10 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
     
     /* First, what does a floating port look like? */
     b = kmalloc(256, GFP_KERNEL);
+    if (!b) {
+            printk(KERN_ERR "do_io_probe: unable to kmalloc 256 bytes");
+            return;
+    }   
     memset(b, 0, 256);
     for (i = base, most = 0; i < base+num; i += 8) {
 	if (check_io_resource(i, 8))

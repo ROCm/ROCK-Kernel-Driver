@@ -21,6 +21,7 @@
 /*
  * USB types
  */
+#define USB_TYPE_MASK			(0x03 << 5)
 #define USB_TYPE_STANDARD		(0x00 << 5)
 #define USB_TYPE_CLASS			(0x01 << 5)
 #define USB_TYPE_VENDOR			(0x02 << 5)
@@ -595,6 +596,7 @@ struct usb_device {
 	int slow;			/* Slow device? */
 
 	atomic_t refcnt;		/* Reference count */
+	struct semaphore serialize;
 
 	unsigned int toggle[2];		/* one bit for each endpoint ([0] = IN, [1] = OUT) */
 	unsigned int halted[2];		/* endpoint halts; one bit per endpoint # & direction; */

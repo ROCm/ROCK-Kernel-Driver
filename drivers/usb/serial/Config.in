@@ -4,7 +4,7 @@
 mainmenu_option next_comment
 comment 'USB Serial Converter support'
 
-tristate 'USB Serial Converter support' CONFIG_USB_SERIAL $CONFIG_USB
+dep_tristate 'USB Serial Converter support' CONFIG_USB_SERIAL $CONFIG_USB
 if [ "$CONFIG_USB_SERIAL" != "n" ]; then
   if [ "$CONFIG_USB_SERIAL" = "y" ]; then
      bool '  USB Serial Converter verbose debug' CONFIG_USB_SERIAL_DEBUG

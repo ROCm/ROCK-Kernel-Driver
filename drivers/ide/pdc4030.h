@@ -41,4 +41,4 @@ struct dc_ident {
 	u8	pad[SECTOR_WORDS*4 - 32];
 };
 
-#endif IDE_PROMISE_H
+#endif /* IDE_PROMISE_H */

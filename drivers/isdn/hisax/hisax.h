@@ -535,7 +535,7 @@ struct Channel {
 };
 
 struct elsa_hw {
-	unsigned int base;
+	unsigned long base;
 	unsigned int cfg;
 	unsigned int ctrl;
 	unsigned int ale;
@@ -597,9 +597,9 @@ struct diva_hw {
 	unsigned long cfg_reg;
 	unsigned long pci_cfg;
 	unsigned int ctrl;
-	unsigned int isac_adr;
+	unsigned long isac_adr;
 	unsigned int isac;
-	unsigned int hscx_adr;
+	unsigned long hscx_adr;
 	unsigned int hscx;
 	unsigned int status;
 	struct timer_list tl;
@@ -653,7 +653,7 @@ struct mic_hw {
 };
 
 struct njet_hw {
-	unsigned int base;
+	unsigned long base;
 	unsigned int isac;
 	unsigned int auxa;
 	unsigned char auxd;
@@ -692,7 +692,7 @@ struct hfcPCI_hw {
 };
 
 struct hfcSX_hw {
-        unsigned int  base;
+        unsigned long base;
 	unsigned char cirm;
 	unsigned char ctmt;
 	unsigned char conn;
@@ -754,15 +754,15 @@ struct saphir_hw {
 };
 
 struct bkm_hw {
-	unsigned int base;
+	unsigned long base;
 	/* A4T stuff */
-	unsigned int isac_adr;
+	unsigned long isac_adr;
 	unsigned int isac_ale;
-	unsigned int jade_adr;
+	unsigned long jade_adr;
 	unsigned int jade_ale;
 	/* Scitel Quadro stuff */
-	unsigned int plx_adr;
-	unsigned int data_adr;
+	unsigned long plx_adr;
+	unsigned long data_adr;
 };	
 
 struct gazel_hw {
@@ -1275,7 +1275,7 @@ extern void Logl2Frame(struct IsdnCardState *cs, struct sk_buff *skb, char *buf,
 struct IsdnCard {
 	int typ;
 	int protocol;		/* EDSS1, 1TR6 or NI1 */
-	unsigned int para[4];
+	unsigned long para[4];
 	struct IsdnCardState *cs;
 };
 

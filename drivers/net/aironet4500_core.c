@@ -394,7 +394,7 @@ int awc_bap_setup(struct awc_command * cmd) {
      	DEBUG(1,"no bap or bap not locked cmd %d !!", cmd->command);
 
 	if (bap_setup_spinlock)
-		my_spin_lock_irqsave(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
+		spin_lock_irqsave(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
 	  status = AWC_IN(cmd->bap->offset);
 	  
 	  if (status & ~0x2000 ){
@@ -526,19 +526,19 @@ int awc_bap_setup(struct awc_command * cmd) {
 
 ejected_unlock:
      if (bap_setup_spinlock)
-	my_spin_unlock_irqrestore(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
+	spin_unlock_irqrestore(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
      AWC_ENTRY_EXIT_DEBUG(" ejected_unlock_exit \n");	
      return -1;
 
 return_AWC_ERROR:
      if (bap_setup_spinlock)
-	my_spin_unlock_irqrestore(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
+	spin_unlock_irqrestore(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
      AWC_ENTRY_EXIT_DEBUG(" AWC_ERROR_exit \n");
      return AWC_ERROR;          
 
 return_AWC_SUCCESS:
      if (bap_setup_spinlock)
-	my_spin_unlock_irqrestore(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
+	spin_unlock_irqrestore(&cmd->priv->bap_setup_spinlock,cmd->priv->bap_setup_spinlock_flags);	  
      AWC_ENTRY_EXIT_DEBUG(" exit \n");
      return AWC_SUCCESS;          
 }
@@ -1190,7 +1190,7 @@ awc_tx_fid_lookup_and_remove(struct net_device * dev, u16 fid_handle){
 	
      AWC_ENTRY_EXIT_DEBUG(" entry awc_tx_fid_lookup ");
 
-	my_spin_lock_irqsave(&(priv->queues_lock),flags);
+	spin_lock_irqsave(&(priv->queues_lock),flags);
 
 
 	fid = priv->tx_in_transmit.head;
@@ -1198,14 +1198,14 @@ awc_tx_fid_lookup_and_remove(struct net_device * dev, u16 fid_handle){
 	while (fid){
 	  	if (fid->u.tx.fid == fid_handle){
 	  		awc_fid_queue_remove(&priv->tx_in_transmit, fid);
-	  		my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+	  		spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return fid;
 	  	}
 	  	fid = fid->next;
 	//	printk("iT\n");
 		if (cnt++ > 200) {
 	//		printk("bbb in awc_fid_queue\n");
-			my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+			spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return 0;
 		};
 	};
@@ -1215,14 +1215,14 @@ awc_tx_fid_lookup_and_remove(struct net_device * dev, u16 fid_handle){
 	while (fid){
 	  	if (fid->u.tx.fid == fid_handle){
 	  		awc_fid_queue_remove(&priv->tx_post_process, fid);
-	  		my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+	  		spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return fid;
 	  	}
 	  	fid = fid->next;
 	//	printk("pp\n");
 		if (cnt++ > 200) {
 	//		printk("bbb in awc_fid_queue\n");
-			my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+			spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return 0;
 		};
 
@@ -1233,14 +1233,14 @@ awc_tx_fid_lookup_and_remove(struct net_device * dev, u16 fid_handle){
 	while (fid){
 	  	if (fid->u.tx.fid == fid_handle){
 	  		awc_fid_queue_remove(&priv->tx_large_ready, fid);
-	  		my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+	  		spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return fid;
 	  	}
 	  	fid = fid->next;
 	//	printk("lr\n");
 		if (cnt++ > 200) {
 	//		printk("bbb in awc_fid_queue\n");
-			my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+			spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return 0;
 		};
 
@@ -1250,20 +1250,20 @@ awc_tx_fid_lookup_and_remove(struct net_device * dev, u16 fid_handle){
 	while (fid){
 	  	if (fid->u.tx.fid == fid_handle){
 	  		awc_fid_queue_remove(&priv->tx_small_ready, fid);
-	  		my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+	  		spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return fid;
 	  	}
 	  	fid = fid->next;
 	//	printk("sr\n");
 		if (cnt++ > 200) {
 	//		printk("bbb in awc_fid_queue\n");
-			my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+			spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	  		return 0;
 		};
 
 	};
 
-	my_spin_unlock_irqrestore(&(priv->queues_lock),flags);
+	spin_unlock_irqrestore(&(priv->queues_lock),flags);
 	
 	printk(KERN_ERR "%s tx fid %x not found \n",dev->name, fid_handle);  
         AWC_ENTRY_EXIT_DEBUG(" BAD exit \n");   	  
@@ -2792,7 +2792,7 @@ char name[] = "ElmerLinux";
 	// here we go, bad aironet
 	memset(&priv->SSIDs,0,sizeof(priv->SSIDs));
 
-	my_spin_lock_init(&priv->queues_lock);
+	spin_lock_init(&priv->queues_lock);
         priv->SSIDs.ridLen		=0;
         if (!SSID) {
 	        priv->SSIDs.SSID[0].SSID[0] 	='a';
@@ -2849,29 +2849,29 @@ int awc_private_init(struct net_device * dev){
 	
 	memset(priv, 0, sizeof(struct awc_private)); 
 	
-	my_spin_lock_init(&priv->queues_lock);
+	spin_lock_init(&priv->queues_lock);
 	
 	priv->bap0.select 	= dev->base_addr + awc_Select0_register;
 	priv->bap0.offset 	= dev->base_addr + awc_Offset0_register;
 	priv->bap0.data		= dev->base_addr + awc_Data0_register;
 	priv->bap0.lock 	= 0;
 	priv->bap0.status	= 0;
-	my_spin_lock_init(&priv->bap0.spinlock);
+	spin_lock_init(&priv->bap0.spinlock);
 	init_MUTEX(&priv->bap0.sem);
 	priv->bap1.select 	= dev->base_addr + awc_Select1_register;
 	priv->bap1.offset 	= dev->base_addr + awc_Offset1_register;
 	priv->bap1.data		= dev->base_addr + awc_Data1_register;
 	priv->bap1.lock 	= 0;
 	priv->bap1.status	= 0;
-	my_spin_lock_init(&priv->bap1.spinlock);
+	spin_lock_init(&priv->bap1.spinlock);
 	init_MUTEX(&priv->bap1.sem);
 	priv->sleeping_bap	= 1;
 	
 //spinlock now	init_MUTEX(&priv->command_semaphore);
-	my_spin_lock_init(&priv->command_issuing_spinlock);
-	my_spin_lock_init(&priv->both_bap_spinlock);
-	my_spin_lock_init(&priv->bap_setup_spinlock);
-	my_spin_lock_init(&priv->interrupt_spinlock);
+	spin_lock_init(&priv->command_issuing_spinlock);
+	spin_lock_init(&priv->both_bap_spinlock);
+	spin_lock_init(&priv->bap_setup_spinlock);
+	spin_lock_init(&priv->interrupt_spinlock);
 	
 	priv->command_semaphore_on = 0;
 	priv->unlock_command_postponed = 0;
@@ -3098,7 +3098,7 @@ inline int awc_rx(struct net_device *dev, struct awc_fid * rx_fid) {
 
  void awc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	struct net_device *dev = (struct net_device *)dev_id;
+	struct net_device *dev = dev_id;
 	struct awc_private *priv;
 	unsigned long flags;
 
@@ -3110,11 +3110,11 @@ inline int awc_rx(struct net_device *dev, struct awc_fid * rx_fid) {
 	
 
 	DEBUG(2, "%s: awc_interrupt \n",  dev->name);
-	my_spin_lock_irqsave(&priv->interrupt_spinlock, flags);	  
+	spin_lock_irqsave(&priv->interrupt_spinlock, flags);	  
 
 	awc_interrupt_process(dev);
 
-	my_spin_unlock_irqrestore(&priv->interrupt_spinlock, flags);	  
+	spin_unlock_irqrestore(&priv->interrupt_spinlock, flags);	  
 
 	return;
 }

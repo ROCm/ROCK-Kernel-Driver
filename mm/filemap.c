@@ -760,7 +760,7 @@ repeat:
 		lock_page(page);
 
 		/* Is the page still hashed? Ok, good.. */
-		if (page->mapping)
+		if (page->mapping == mapping && page->index == offset)
 			return page;
 
 		/* Nope: we raced. Release and try again.. */

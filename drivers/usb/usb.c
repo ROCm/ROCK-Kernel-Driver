@@ -698,10 +698,12 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 		return -1;
 	}
 
+	down(&dev->serialize);
+
 	interface = dev->actconfig->interface + ifnum;
 
 	if (usb_interface_claimed(interface))
-		return -1;
+		goto out_err;
 
 	private = NULL;
 	for (tmp = usb_driver_list.next; tmp != &usb_driver_list;) {
@@ -709,7 +711,6 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 		driver = list_entry(tmp, struct usb_driver, driver_list);
 		tmp = tmp->next;
 
-		down(&driver->serialize);
 		id = driver->id_table;
 		/* new style driver? */
 		if (id) {
@@ -717,7 +718,9 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 			  	interface->act_altsetting = i;
 				id = usb_match_id(dev, interface, id);
 				if (id) {
+					down(&driver->serialize);
 					private = driver->probe(dev,ifnum,id);
+					up(&driver->serialize);
 					if (private != NULL)
 						break;
 				}
@@ -727,15 +730,21 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 				interface->act_altsetting = 0;
 		}
 		else /* "old style" driver */
+		{
+			down(&driver->serialize);
 			private = driver->probe(dev, ifnum, NULL);
+			up(&driver->serialize);
+		}
 
-		up(&driver->serialize);
 		if (private) {
 			usb_driver_claim_interface(driver, interface, private);
+			up(&dev->serialize);
 			return 0;
 		}
 	}
 
+out_err:
+	up(&dev->serialize);
 	return -1;
 }
 
@@ -934,6 +943,8 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	atomic_set(&dev->refcnt, 1);
 	INIT_LIST_HEAD(&dev->inodes);
 	INIT_LIST_HEAD(&dev->filelist);
+
+	init_MUTEX(&dev->serialize);
 
 	dev->bus->op->allocate(dev);
 

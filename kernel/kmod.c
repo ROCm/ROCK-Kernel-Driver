@@ -24,6 +24,7 @@
 #include <linux/unistd.h>
 #include <linux/kmod.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 
 #include <asm/uaccess.h>
 
@@ -263,7 +264,7 @@ EXPORT_SYMBOL(hotplug_path);
 #endif /* CONFIG_HOTPLUG */
 
 struct subprocess_info {
-	struct semaphore *sem;
+	struct completion *complete;
 	char *path;
 	char **argv;
 	char **envp;
@@ -302,7 +303,7 @@ static void __call_usermodehelper(void *data)
 	pid = kernel_thread(____call_usermodehelper, sub_info, CLONE_VFORK | SIGCHLD);
 	if (pid < 0)
 		sub_info->retval = pid;
-	up(sub_info->sem);
+	complete(sub_info->complete);
 }
 
 /**
@@ -320,9 +321,9 @@ static void __call_usermodehelper(void *data)
  */
 int call_usermodehelper(char *path, char **argv, char **envp)
 {
-	DECLARE_MUTEX_LOCKED(sem);
+	DECLARE_COMPLETION(work);
 	struct subprocess_info sub_info = {
-		sem:		&sem,
+		complete:	&work,
 		path:		path,
 		argv:		argv,
 		envp:		envp,
@@ -341,7 +342,7 @@ int call_usermodehelper(char *path, char **argv, char **envp)
 		__call_usermodehelper(&sub_info);
 	} else {
 		schedule_task(&tqs);
-		down(&sem);		/* Wait until keventd has started the subprocess */
+		wait_for_completion(&work);
 	}
 out:
 	return sub_info.retval;

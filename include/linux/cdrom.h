@@ -729,7 +729,8 @@ struct cdrom_device_info {
 	struct cdrom_device_ops  *ops;  /* link to device_ops */
 	struct cdrom_device_info *next; /* next device_info for this major */
 	void *handle;		        /* driver-dependent data */
-	devfs_handle_t de;		/* real driver creates this  */
+	devfs_handle_t de;		/* real driver should create this  */
+	int number;			/* generic driver updates this  */
 /* specifications */
         kdev_t dev;	                /* device number */
 	int mask;                       /* mask of capability: disables them */

@@ -1,5 +1,5 @@
 
-    D-Link DL2000-based Gigabit Ethernet Adapter Installation 
+    D-Link DL2000-based Gigabit Ethernet Adapter Installation
     for Linux
     July 5, 2001
 
@@ -22,7 +22,7 @@ D-Link DGE-550T Gigabit Ethernet Adapter.
 D-Link DL2000-based Gigabit Ethernet Adapter.
 
 
-The driver support Linux kernal 2.4.x later. We had tested it 
+The driver support Linux kernal 2.4.x later. We had tested it
 on the environments below.
 
  . Red Hat v6.2 (update to kernel 2.4.4)
@@ -35,17 +35,17 @@ Quick Install
 Install linux driver as following command:
 
 1. make all
-2. insmod dl2x.o 
+2. insmod dl2x.o
 3. ifconfig eth0 up 10.xxx.xxx.xxx netmask 255.0.0.0
-                    ^^^^^^^^^^^^^^^\        ^^^^^^^^\
-		    		    IP	             NETMASK 
-Now eth0 bring up, you can test it by "ping" or get more information by 
+		    ^^^^^^^^^^^^^^^\	    ^^^^^^^^\
+				    IP		     NETMASK
+Now eth0 bring up, you can test it by "ping" or get more information by
 "ifconfig". If test ok, then continue next step.
 
 4. cp dl2x.o /lib/modules/`uname -r`/kernel/drivers/net
 5. Add the following lines to /etc/modules.conf:
 	alias eth0 dl2x
-6. Run "netconfig" or "netconf" to create configuration script ifcfg-eth0 
+6. Run "netconfig" or "netconf" to create configuration script ifcfg-eth0
    located at /etc/sysconfig/network-scripts or create it manually.
    [see - Configuration Script Sample]
 7. Driver will automatically load and configure at next boot time.
@@ -64,7 +64,7 @@ kernel features that are not present in a given Linux installation.
 The 3 files necessary to build Linux device driver are dl2x.c, dl2x.h and
 Makefile. To compile, the Linux installation must include the gcc compiler,
 the kernel source, and the kernel headers. The Linux driver supports Linux
-Kernels 2.4.x. Copy the files to a directory and enter the following command 
+Kernels 2.4.x. Copy the files to a directory and enter the following command
 to compile and link the driver:
 
 CD-ROM drive
@@ -76,7 +76,7 @@ CD-ROM drive
 [root@XXX /root] mkdir dl2x
 [root@XXX /root] cd dl2x
 [root@XXX dl2x] cp /cdrom/linux/dl2x.tgz /root/dl2x
-[root@XXX dl2x] tar xfvz dl2x.tgz 
+[root@XXX dl2x] tar xfvz dl2x.tgz
 [root@XXX dl2x] make all
 
 Floppy disc drive
@@ -86,7 +86,7 @@ Floppy disc drive
 [root@XXX /root] mkdir dl2x
 [root@XXX /root] cd dl2x
 [root@XXX dl2x] mcopy a:/linux/dl2x.tgz /root/dl2x
-[root@XXX dl2x] tar xfvz dl2x.tgz 
+[root@XXX dl2x] tar xfvz dl2x.tgz
 [root@XXX dl2x] make all
 
 Installing the Driver
@@ -99,15 +99,15 @@ Installing the Driver
   module enter the command:
 
   insmod dl2x.o
- 
+
 
   or
 
-  insmod dl2x.o <optional parameter>    ; add parameter
-  
+  insmod dl2x.o <optional parameter>	; add parameter
+
   ===============================================================
    example: insmod dl2x.o media=100mbps_hd
-   or       insmod dl2x.o media=3
+   or	    insmod dl2x.o media=3
    or	    insmod dl2x.o media=3 2	; for 2 cards
   ===============================================================
 
@@ -172,37 +172,37 @@ Installing the Driver
 
 Parameter Description
 =====================
-You can install this driver without any addtional parameter. However, if you 
-are going to have extensive functions then it is necessary to set extra 
-parameter. Below is a list of the command line parameters supported by the 
+You can install this driver without any addtional parameter. However, if you
+are going to have extensive functions then it is necessary to set extra
+parameter. Below is a list of the command line parameters supported by the
 Linux device
 driver.
 
-mtu=packet_size                 - Specifies the maximum packet size. default
-                                  is 1500.
+mtu=packet_size			- Specifies the maximum packet size. default
+				  is 1500.
 
 media=xxxxxxxxx			- Specifies the media type the NIC operates at.
 				  autosense	Autosensing active media.
-				  10mbps_hd 	10Mbps half duplex.
-				  10mbps_fd 	10Mbps full duplex.
-				  100mbps_hd 	100Mbps half duplex.
-				  100mbps_fd 	100Mbps full duplex.
+				  10mbps_hd	10Mbps half duplex.
+				  10mbps_fd	10Mbps full duplex.
+				  100mbps_hd	100Mbps half duplex.
+				  100mbps_fd	100Mbps full duplex.
 				  1000mbps_fd	1000Mbps full duplex.
 				  1000mbps_hd	1000Mbps half duplex.
 				  0		Autosensing active media.
-				  1	 	10Mbps half duplex.
-				  2	 	10Mbps full duplex.
-				  3	 	100Mbps half duplex.
-				  4	 	100Mbps full duplex.
+				  1		10Mbps half duplex.
+				  2		10Mbps full duplex.
+				  3		100Mbps half duplex.
+				  4		100Mbps full duplex.
 				  5		1000Mbps full duplex.
 				  6		1000Mbps half duplex.
 				  By default, the NIC operates at autosense.
-				  
-vlan=x				- Specifies the VLAN ID. If vlan=0, the  
+
+vlan=x				- Specifies the VLAN ID. If vlan=0, the
 				  Virtual Local Area Network (VLAN) function is
-				  disable. 
-				  
-jumbo=x				- Specifies the jumbo frame support. If jumbo=1, 
+				  disable.
+
+jumbo=x				- Specifies the jumbo frame support. If jumbo=1,
 				  the NIC accept jumbo frames. By default, this
 				  function is disabled.
 
@@ -222,15 +222,25 @@ IPADDR=207.200.5.2
 
 Troubleshooting
 ===============
-Q: Couldn't compiler the driver ?
-A1: Copy all necessary files on same current directory. Make sure all files 
-   are Unix file format (no LF). You can use some convertible program conver 
-   it from DOS to UNIX. (Like dos2unix,  UltraEdit-32 ...).
-      
-A2: The default include directory configured in Makefile is 
-    /usr/src/linux/include. If kernel source was not installed, you could 
-    not compile driver. Try to install kernel source, and make sure kernel 
-    source in /usr/src/linux. If there is a copy of header files in 
-    /usr/include, you can try to change the variable "INCLUDEDIR" in Makefile from 
-    /usr/src/linux/include to /usr/include.
-    
+Q1. Source files contain behind every line.
+	Make sure all files are Unix file format (no LF). Try the following
+    shell command to convert files.
+
+	cat dl2k.c | col -b > dl2k.tmp
+	mv dl2k.tmp dl2k.c
+
+	OR
+
+	cat dl2k.c | tr -d "\r" > dl2k.tmp
+	mv dl2k.tmp dl2k.c
+
+Q2: Could not find header files (*.h) ?
+	To compile the driver, you need kernel header files. After
+    installing the kernel source, the header files are usually located in
+    /usr/src/linux/include, which is the default include directory configured
+    in Makefile. For some distributions, there is a copy of header files in
+    /usr/src/include/linux and /usr/src/include/asm, that you can change the
+    INCLUDEDIR in Makefile to /usr/include without installing kernel source.
+	Note that RH 7.0 didn't provide correct header files in /usr/include,
+    including those files will make a wrong version driver.
+

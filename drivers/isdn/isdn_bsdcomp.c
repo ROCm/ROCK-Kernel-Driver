@@ -76,6 +76,7 @@
 #include <linux/skbuff.h>
 #include <linux/inet.h>
 #include <linux/ioctl.h>
+#include <linux/vmalloc.h>
 
 #include <linux/ppp_defs.h>
 

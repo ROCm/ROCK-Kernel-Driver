@@ -69,7 +69,7 @@ static loff_t ext2_file_lseek(
 
 /*
  * Called when an inode is released. Note that this is different
- * from ext2_file_open: open gets called at every open, but release
+ * from ext2_open_file: open gets called at every open, but release
  * gets called only when /all/ the files are closed.
  */
 static int ext2_release_file (struct inode * inode, struct file * filp)

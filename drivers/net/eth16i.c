@@ -28,7 +28,7 @@
    
    Sources:
      - skeleton.c  a sample network driver core for linux,
-       written by Donald Becker <becker@CESDIS.gsfc.nasa.gov>
+       written by Donald Becker <becker@scyld.com>
      - at1700.c a driver for Allied Telesis AT1700, written 
        by Donald Becker.
      - e16iSRV.asm a Netware 3.X Server Driver for ICL EtherTeam16i

@@ -1,8 +1,8 @@
-/*  dir.h - Header file for dir.c
+/*
+ * dir.h - Header file for dir.c
  *
- *  Copyright (C) 1997 Régis Duchesne
+ * Copyright (C) 1997 Régis Duchesne
  */
-
 #define ITERATE_SPLIT_DONE      1
 
 enum ntfs_iterate_e {
@@ -12,7 +12,7 @@ enum ntfs_iterate_e {
 };
 
 /* not all fields are used for all operations */
-typedef struct ntfs_iterate_s{
+typedef struct ntfs_iterate_s {
 	enum ntfs_iterate_e type;
 	ntfs_inode *dir;
 	union{

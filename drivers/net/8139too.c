@@ -294,6 +294,7 @@ static struct pci_device_id rtl8139_pci_tbl[] __devinitdata = {
 	 * so we simply don't match on the main vendor id.
 	 */
 	{PCI_ANY_ID, 0x8139, 0x10ec, 0x8139, 0, 0, RTL8139 },
+	{PCI_ANY_ID, 0x8139, 0x1186, 0x1300, 0, 0, DFE538TX },
 
 	{0,}
 };
@@ -1168,6 +1169,7 @@ static char mii_2_8139_map[8] = {
 };
 
 
+#ifdef CONFIG_8139TOO_8129
 /* Syncronize the MII management interface by shifting 32 one bits out. */
 static void mdio_sync (void *mdio_addr)
 {
@@ -1184,15 +1186,17 @@ static void mdio_sync (void *mdio_addr)
 
 	DPRINTK ("EXIT\n");
 }
-
+#endif
 
 static int mdio_read (struct net_device *dev, int phy_id, int location)
 {
 	struct rtl8139_private *tp = dev->priv;
+	int retval = 0;
+#ifdef CONFIG_8139TOO_8129
 	void *mdio_addr = tp->mmio_addr + Config4;
 	int mii_cmd = (0xf6 << 10) | (phy_id << 5) | location;
-	int retval = 0;
 	int i;
+#endif
 
 	DPRINTK ("ENTER\n");
 
@@ -1233,9 +1237,11 @@ static void mdio_write (struct net_device *dev, int phy_id, int location,
 			int value)
 {
 	struct rtl8139_private *tp = dev->priv;
+#ifdef CONFIG_8139TOO_8129
 	void *mdio_addr = tp->mmio_addr + Config4;
 	int mii_cmd = (0x5002 << 16) | (phy_id << 23) | (location << 18) | value;
 	int i;
+#endif
 
 	DPRINTK ("ENTER\n");
 
@@ -1732,7 +1738,6 @@ static int rtl8139_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	RTL_W32_F (TxAddr0 + (entry * 4), dma_addr);
 	RTL_W32_F (TxStatus0 + (entry * sizeof (u32)),
 		   tp->tx_flag | (skb->len >= ETH_ZLEN ? skb->len : ETH_ZLEN));
-	spin_unlock_irq(&tp->lock);
 
 	dev->trans_start = jiffies;
 
@@ -1740,6 +1745,7 @@ static int rtl8139_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	mb();
 	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx)
 		netif_stop_queue (dev);
+	spin_unlock_irq(&tp->lock);
 
 	DPRINTK ("%s: Queued Tx packet at %p size %u to slot %d.\n",
 		 dev->name, skb->data, skb->len, entry);

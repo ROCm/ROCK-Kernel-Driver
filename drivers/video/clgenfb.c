@@ -46,7 +46,7 @@
 #include <linux/init.h>
 #include <linux/selection.h>
 #include <asm/pgtable.h>
-#include <asm/io.h>
+
 #ifdef CONFIG_ZORRO
 #include <linux/zorro.h>
 #endif
@@ -168,15 +168,15 @@ static const struct clgen_board_info_rec {
 		TRUE,
 		TRUE,
 		TRUE,
-		0xF0,		
+		0xF0,
 		0xF0,
 		0,		/* unused, does not multiplex */
 		0xF1,
 		0,		/* unused, does not multiplex */
-		0x20 },		
+		0x20 },
 	{ BT_PICCOLO,
 		"CL Piccolo",
-		90000,		
+		90000,
 		TRUE,
 		TRUE,
 		FALSE,
@@ -286,22 +286,28 @@ static const struct {
 static const struct {
 	clgen_board_t btype;
 	zorro_id id, id2;
+	unsigned long size;
 } clgen_zorro_probe_list[] __initdata = {
 	{ BT_SD64,
 		ZORRO_PROD_HELFRICH_SD64_RAM,
-		ZORRO_PROD_HELFRICH_SD64_REG },
+		ZORRO_PROD_HELFRICH_SD64_REG,
+		0x400000 },
 	{ BT_PICCOLO,
 		ZORRO_PROD_HELFRICH_PICCOLO_RAM,
-		ZORRO_PROD_HELFRICH_PICCOLO_REG },
+		ZORRO_PROD_HELFRICH_PICCOLO_REG,
+		0x200000 },
 	{ BT_PICASSO,
 		ZORRO_PROD_VILLAGE_TRONIC_PICASSO_II_II_PLUS_RAM,
-		ZORRO_PROD_VILLAGE_TRONIC_PICASSO_II_II_PLUS_REG },
+		ZORRO_PROD_VILLAGE_TRONIC_PICASSO_II_II_PLUS_REG,
+		0x200000 },
 	{ BT_SPECTRUM,
 		ZORRO_PROD_GVP_EGS_28_24_SPECTRUM_RAM,
-		ZORRO_PROD_GVP_EGS_28_24_SPECTRUM_REG },
+		ZORRO_PROD_GVP_EGS_28_24_SPECTRUM_REG,
+		0x200000 },
 	{ BT_PICASSO4,
 		ZORRO_PROD_VILLAGE_TRONIC_PICASSO_IV_Z3,
-		0 },
+		0,
+		0x400000 },
 };
 #endif /* CONFIG_ZORRO */
 
@@ -431,7 +437,7 @@ static const struct {
 	 }
 	},
 
-	/* 
+	/*
 	   Modeline from XF86Config:
 	   Mode "1024x768" 80  1024 1136 1340 1432  768 770 774 805
 	 */
@@ -705,7 +711,7 @@ static long clgen_get_mclk (long freq, int bpp, long *div)
 	assert (div != NULL);
 
 	/* Calculate MCLK, in case VCLK is high enough to require > 50MHz.
-	 * Assume a 64-bit data path for now.  The formula is: 
+	 * Assume a 64-bit data path for now.  The formula is:
 	 * ((B * PCLK * 2)/W) * 1.2
 	 * B = bytes per pixel, PCLK = pixclock, W = data width in bytes */
 	mclk = ((bpp / 8) * freq * 2) / 4;
@@ -1211,7 +1217,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 		/* 1280x1024 */
 		vga_wcrt (fb_info->regs, VGA_CRTC_MODE, 0xc7);
 	else
-		/* mode control: VGA_CRTC_START_HI enable, ROTATE(?), 16bit 
+		/* mode control: VGA_CRTC_START_HI enable, ROTATE(?), 16bit
 		 * address wrap, no compat. */
 		vga_wcrt (fb_info->regs, VGA_CRTC_MODE, 0xc3);
 
@@ -1243,7 +1249,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 	 * 1 bpp
 	 *
 	 */
-	
+
 	/* programming for different color depths */
 	if (_par->var.bits_per_pixel == 1) {
 		DPRINTK ("clgen: preparing for 1 bit deep display\n");
@@ -1269,7 +1275,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			vga_wseq (fb_info->regs, CL_SEQR7,
 				vga_rseq (fb_info->regs, CL_SEQR7) & ~0x01);
 			break;
-			
+
 		default:
 			printk (KERN_WARNING "clgen: unknown Board\n");
 			break;
@@ -1310,7 +1316,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			DPRINTK (" (for GD54xx)\n");
 			/* do nothing */
 			break;
-			
+
 		default:
 			printk (KERN_WARNING "clgen: unknown Board\n");
 			break;
@@ -1325,13 +1331,13 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 		vga_wseq (fb_info->regs, VGA_SEQ_PLANE_WRITE, 0x01);	/* plane mask: only write to first plane */
 		offset = _par->var.xres_virtual / 16;
 	}
-	
+
 	/******************************************************
 	 *
 	 * 8 bpp
 	 *
 	 */
-	
+
 	else if (_par->var.bits_per_pixel == 8) {
 		DPRINTK ("clgen: preparing for 8 bit deep display\n");
 		switch (fb_info->btype) {
@@ -1353,7 +1359,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			vga_wseq (fb_info->regs, CL_SEQR7,
 				vga_rseq (fb_info->regs, CL_SEQR7) | 0x01);
 			break;
-			
+
 		default:
 			printk (KERN_WARNING "clgen: unknown Board\n");
 			break;
@@ -1395,7 +1401,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			DPRINTK (" (for GD54xx)\n");
 			/* do nothing */
 			break;
-			
+
 		default:
 			printk (KERN_WARNING "clgen: unknown Board\n");
 			break;
@@ -1411,13 +1417,13 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 		vga_wseq (fb_info->regs, VGA_SEQ_PLANE_WRITE, 0xff);	/* plane mask: enable writing to all 4 planes */
 		offset = _par->var.xres_virtual / 8;
 	}
-	
+
 	/******************************************************
 	 *
 	 * 16 bpp
 	 *
 	 */
-	
+
 	else if (_par->var.bits_per_pixel == 16) {
 		DPRINTK ("clgen: preparing for 16 bit deep display\n");
 		switch (fb_info->btype) {
@@ -1469,7 +1475,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			vga_wseq (fb_info->regs, CL_SEQR7,
 				vga_rseq (fb_info->regs, CL_SEQR7) & ~0x01);
 			break;
-			
+
 		default:
 			printk (KERN_WARNING "CLGEN: unknown Board\n");
 			break;
@@ -1479,20 +1485,21 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 		WGen (fb_info, VGA_PEL_MSK, 0xff);	/* pixel mask: pass-through all planes */
 #ifdef CONFIG_PCI
 		WHDR (fb_info, 0xc0);	/* Copy Xbh */
-#elif CONFIG_ZORRO
+#elif defined(CONFIG_ZORRO)
+		/* FIXME: CONFIG_PCI and CONFIG_ZORRO may be defined both */
 		WHDR (fb_info, 0xa0);	/* hidden dac reg: nothing special */
 #endif
 		vga_wseq (fb_info->regs, VGA_SEQ_MEMORY_MODE, 0x0a);	/* memory mode: chain4, ext. memory */
 		vga_wseq (fb_info->regs, VGA_SEQ_PLANE_WRITE, 0xff);	/* plane mask: enable writing to all 4 planes */
 		offset = _par->var.xres_virtual / 4;
 	}
-	
+
 	/******************************************************
 	 *
 	 * 32 bpp
 	 *
 	 */
-	
+
 	else if (_par->var.bits_per_pixel == 32) {
 		DPRINTK ("clgen: preparing for 24/32 bit deep display\n");
 		switch (fb_info->btype) {
@@ -1541,7 +1548,7 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			vga_wseq (fb_info->regs, CL_SEQR7,
 				vga_rseq (fb_info->regs, CL_SEQR7) & ~0x01);
 			break;
-			
+
 		default:
 			printk (KERN_WARNING "clgen: unknown Board\n");
 			break;
@@ -1554,18 +1561,18 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 		vga_wseq (fb_info->regs, VGA_SEQ_PLANE_WRITE, 0xff);	/* plane mask: enable writing to all 4 planes */
 		offset = _par->var.xres_virtual / 4;
 	}
-	
+
 	/******************************************************
 	 *
 	 * unknown/unsupported bpp
 	 *
 	 */
-	
+
 	else {
 		printk (KERN_ERR "clgen: What's this?? requested color depth == %d.\n",
 			_par->var.bits_per_pixel);
 	}
-	
+
 	vga_wcrt (fb_info->regs, VGA_CRTC_OFFSET, offset & 0xff);
 	tmp = 0x22;
 	if (offset & 0x100)
@@ -1674,7 +1681,7 @@ static int clgen_setcolreg (unsigned regno, unsigned red, unsigned green,
 
 	if (regno >= 16)
 		return 0;
-		
+
 	switch (fb_info->currentmode.var.bits_per_pixel) {
 
 #ifdef FBCON_HAS_CFB16
@@ -1871,11 +1878,11 @@ static int clgen_blank (int blank_mode, struct fb_info_gen *info)
 static void __init init_vgachip (struct clgenfb_info *fb_info)
 {
 	const struct clgen_board_info_rec *bi;
-	
+
 	DPRINTK ("ENTER\n");
 
 	assert (fb_info != NULL);
-	
+
 	bi = &clgen_board_info[fb_info->btype];
 
 	/* reset board globally */
@@ -1918,16 +1925,7 @@ static void __init init_vgachip (struct clgenfb_info *fb_info)
 		break;
 	}
 
-#ifdef CLGEN_USE_HARDCODED_RAM_SETTINGS
-	/* "pre-set" a RAMsize; if the test succeeds, double it */
-	if (fb_info->btype == BT_SD64 ||
-	    fb_info->btype == BT_PICASSO4)
-		fb_info->size = 0x400000;
-	else
-		fb_info->size = 0x200000;
-#else
 	assert (fb_info->size > 0); /* make sure RAM size set by this point */
-#endif
 
 	/* assume it's a "large memory" board (2/4 MB) */
 	fb_info->smallboard = FALSE;
@@ -2141,7 +2139,7 @@ static void switch_monitor (struct clgenfb_info *fb_info, int on)
 		default: /* do nothing */ break;
 		}
 	}
-	
+
 	DPRINTK ("EXIT\n");
 #endif /* CONFIG_ZORRO */
 }
@@ -2154,10 +2152,10 @@ static void clgen_set_disp (const void *par, struct display *disp,
 	int accel_text;
 
 	DPRINTK ("ENTER\n");
-	
+
 	assert (_par != NULL);
 	assert (fb_info != NULL);
-	
+
 	accel_text = _par->var.accel_flags & FB_ACCELF_TEXT;
 
 	printk ("Cirrus Logic video mode: ");
@@ -2428,19 +2426,19 @@ static struct pci_dev * __init clgen_pci_dev_get (clgen_board_t *btype)
 	int i;
 
 	DPRINTK ("ENTER\n");
-	
+
 	for (i = 0; i < ARRAY_SIZE(clgen_pci_probe_list); i++) {
 		pdev = NULL;
 		while ((pdev = pci_find_device (PCI_VENDOR_ID_CIRRUS,
 				clgen_pci_probe_list[i].device, pdev)) != NULL) {
 			if (pci_enable_device(pdev) == 0) {
-				*btype = clgen_pci_probe_list[i - 1].btype;
+				*btype = clgen_pci_probe_list[i].btype;
 				DPRINTK ("EXIT, returning pdev=%p\n", pdev);
 				return pdev;
 			}
 		}
 	}
-	
+
 	DPRINTK ("EXIT, returning NULL\n");
 	return NULL;
 }
@@ -2572,7 +2570,7 @@ static int __init clgen_pci_setup (struct clgenfb_info *info,
 #ifdef CONFIG_ZORRO
 static int __init clgen_zorro_find (struct zorro_dev **z_o,
 				    struct zorro_dev **z2_o,
-				    clgen_board_t *btype)
+				    clgen_board_t *btype, unsigned long *size)
 {
 	struct zorro_dev *z = NULL;
 	int i;
@@ -2590,14 +2588,16 @@ static int __init clgen_zorro_find (struct zorro_dev **z_o,
 			*z2_o = zorro_find_device(clgen_zorro_probe_list[i].id2, NULL);
 		else
 			*z2_o = NULL;
-		*btype = clgen_zorro_probe_list[i - 1].btype;
-		
+
+		*btype = clgen_zorro_probe_list[i].btype;
+		*size = clgen_zorro_probe_list[i].size;
+
 		printk (KERN_INFO "clgen: %s board detected; ",
 			clgen_board_info[*btype].name);
-		
+
 		return 0;
 	}
-	
+
 	printk (KERN_NOTICE "clgen: no supported board found.\n");
 	return -1;
 }
@@ -2621,20 +2621,21 @@ static int __init clgen_zorro_setup (struct clgenfb_info *info,
 				     clgen_board_t *btype)
 {
 	struct zorro_dev *z = NULL, *z2 = NULL;
-	unsigned long board_addr, board_size;
-	
+	unsigned long board_addr, board_size, size;
+
 	assert (info != NULL);
 	assert (btype != NULL);
 
-	if (clgen_zorro_find (&z, &z2, btype))
+	if (clgen_zorro_find (&z, &z2, btype, &size))
 		return -1;
 
 	assert (z > 0);
 	assert (z2 >= 0);
 	assert (*btype != BT_NONE);
-	
+
 	info->board_addr = board_addr = z->resource.start;
 	info->board_size = board_size = z->resource.end-z->resource.start+1;
+	info->size = size;
 
 	if (!request_mem_region(board_addr, board_size, "clgenfb")) {
 		printk(KERN_ERR "clgen: cannot reserve region 0x%lx, abort\n",
@@ -2675,7 +2676,7 @@ static int __init clgen_zorro_setup (struct clgenfb_info *info,
 	}
 
 	printk (KERN_INFO "Cirrus Logic chipset on Zorro bus\n");
-	
+
 	return 0;
 }
 #endif /* CONFIG_ZORRO */
@@ -2704,7 +2705,8 @@ int __init clgenfb_init(void)
 		return -ENXIO;
 	}
 
-#elif CONFIG_ZORRO
+#elif defined(CONFIG_ZORRO)
+	/* FIXME: CONFIG_PCI and CONFIG_ZORRO may be defined both */
 	if (clgen_zorro_setup (fb_info, &btype)) {
 		DPRINTK ("EXIT, returning -ENXIO\n");
 		return -ENXIO;
@@ -2808,18 +2810,18 @@ static void __exit clgenfb_cleanup (struct clgenfb_info *info)
 int __init clgenfb_setup(char *options) {
 	char *this_opt, s[32];
 	int i;
-	
+
 	DPRINTK ("ENTER\n");
-	
+
 	if (!options || !*options)
 		return 0;
-	
+
 	for (this_opt = strtok (options, ","); this_opt != NULL;
 	     this_opt = strtok (NULL, ",")) {
 		if (!*this_opt) continue;
-		
+
 		DPRINTK("clgenfb_setup: option '%s'\n", this_opt);
-		
+
 		for (i = 0; i < NUM_TOTAL_MODES; i++) {
 			sprintf (s, "mode:%s", clgenfb_predefined[i].name);
 			if (strcmp (this_opt, s) == 0)
@@ -2915,9 +2917,9 @@ static void AttrOn (const struct clgenfb_info *fb_info)
 }
 
 /*** WHDR() - write into the Hidden DAC register ***/
-/* as the HDR is the only extension register that requires special treatment 
+/* as the HDR is the only extension register that requires special treatment
  * (the other extension registers are accessible just like the "ordinary"
- * registers of their functional group) here is a specialized routine for 
+ * registers of their functional group) here is a specialized routine for
  * accessing the HDR
  */
 static void WHDR (const struct clgenfb_info *fb_info, unsigned char val)
@@ -2966,7 +2968,7 @@ static void WSFR (struct clgenfb_info *fb_info, unsigned char val)
 #ifdef CONFIG_ZORRO
 	assert (fb_info->regs != NULL);
 	fb_info->SFR = val;
-	writeb (val, fb_info->regs + 0x8000);
+	z_writeb (val, fb_info->regs + 0x8000);
 #endif
 }
 
@@ -2978,7 +2980,7 @@ static void WSFR2 (struct clgenfb_info *fb_info, unsigned char val)
 	/* to flip to Amiga display */
 	assert (fb_info->regs != NULL);
 	fb_info->SFR = val;
-	writeb (val, fb_info->regs + 0x9000);
+	z_writeb (val, fb_info->regs + 0x9000);
 #endif
 }
 
@@ -3383,7 +3385,7 @@ void clgen_dbg_print_regs (caddr_t regbase, clgen_dbg_reg_class_t reg_class,...)
  *
  * DESCRIPTION:
  */
- 
+
 static
 void clgen_dump (void)
 {

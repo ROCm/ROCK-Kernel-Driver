@@ -4302,7 +4302,7 @@ void cleanup_module(void)
  * It is based on other device drivers and information
  * either written or supplied by:
  *	Ajay Bakre (bakre@paul.rutgers.edu),
- *	Donald Becker (becker@cesdis.gsfc.nasa.gov),
+ *	Donald Becker (becker@scyld.com),
  *	Loeke Brederveld (Loeke.Brederveld@Utrecht.NCR.com),
  *	Anders Klemets (klemets@it.kth.se),
  *	Vladimir V. Kolpakov (w@stier.koenig.ru),

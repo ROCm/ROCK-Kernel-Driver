@@ -85,7 +85,7 @@ affs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		stored++;
 	}
 
-	down(&AFFS_INODE->i_hash_lock);
+	affs_lock_dir(inode);
 	chain_pos = (f_pos - 2) & 0xffff;
 	hash_pos  = (f_pos - 2) >> 16;
 	if (chain_pos == 0xffff) {
@@ -157,7 +157,7 @@ readdir_done:
 readdir_out:
 	affs_brelse(dir_bh);
 	affs_brelse(fh_bh);
-	up(&AFFS_INODE->i_hash_lock);
+	affs_unlock_dir(inode);
 	pr_debug("AFFS: readdir()=%d\n", stored);
 	return res;
 }

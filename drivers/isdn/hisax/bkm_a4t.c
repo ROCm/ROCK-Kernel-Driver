@@ -28,7 +28,7 @@ const char *bkm_a4t_revision = "$Revision: 1.13.6.4 $";
 
 
 static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+readreg(unsigned int ale, unsigned long adr, u_char off)
 {
 	register u_int ret;
 	long flags;
@@ -46,7 +46,7 @@ readreg(unsigned int ale, unsigned int adr, u_char off)
 
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+readfifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int size)
 {
 	/* fifo read without cli because it's allready done  */
 	int i;
@@ -56,7 +56,7 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 
 
 static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+writereg(unsigned int ale, unsigned long adr, u_char off, u_char data)
 {
 	long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
@@ -71,7 +71,7 @@ writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 
 
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+writefifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int size)
 {
 	/* fifo write without cli because it's allready done  */
 	int i;
@@ -316,11 +316,11 @@ setup_bkm_a4t(struct IsdnCard *card)
 		printk(KERN_WARNING "HiSax: %s: No Memory base address\n", CardType[card->typ]);
 		return (0);
 	}
-	cs->hw.ax.base = (u_int) ioremap(pci_memaddr, 4096);
+	cs->hw.ax.base = (long) ioremap(pci_memaddr, 4096);
 	/* Check suspecious address */
 	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
 	if ((pI20_Regs->i20IntStatus & 0x8EFFFFFF) != 0) {
-		printk(KERN_WARNING "HiSax: %s address %x-%x suspecious\n",
+		printk(KERN_WARNING "HiSax: %s address %lx-%lx suspecious\n",
 		       CardType[card->typ], cs->hw.ax.base, cs->hw.ax.base + 4096);
 		iounmap((void *) cs->hw.ax.base);
 		cs->hw.ax.base = 0;
@@ -335,7 +335,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 	printk(KERN_WARNING "HiSax: %s: unable to configure\n", CardType[card->typ]);
 	return (0);
 #endif				/* CONFIG_PCI */
-	printk(KERN_INFO "HiSax: %s: Card configured at 0x%X IRQ %d\n",
+	printk(KERN_INFO "HiSax: %s: Card configured at 0x%lX IRQ %d\n",
 	       CardType[card->typ], cs->hw.ax.base, cs->irq);
 
 	reset_bkm(cs);

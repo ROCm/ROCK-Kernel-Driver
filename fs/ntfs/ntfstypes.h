@@ -1,17 +1,14 @@
-/*  ntfstypes.h - This file defines four things:
- *   - Generic platform independent fixed-size types (e.g. ntfs_u32).
- *   - Specific fixed-size types (e.g. ntfs_offset_t).
- *   - Macros that read and write those types from and to byte arrays.
- *   - Types derived from OS specific ones.
+/*
+ * ntfstypes.h - This file defines four things:
+ * - Generic platform independent fixed-size types (e.g. ntfs_u32).
+ * - Specific fixed-size types (e.g. ntfs_offset_t).
+ * - Macros that read and write those types from and to byte arrays.
+ * - Types derived from OS specific ones.
  *
- *  Copyright (C) 1996, 1998, 1999 Martin von Löwis
- *  Copyright (C) 2001 Anton Altaparmakov (AIA)
+ * Copyright (C) 1996, 1998, 1999 Martin von Löwis
+ * Copyright (C) 2001 Anton Altaparmakov (AIA)
  */
-
 #include <linux/fs.h>
-
-/* We don't need to define __LITTLE_ENDIAN, as we use
-   <asm/byteorder>. */
 #include "ntfsendian.h"
 #include <asm/types.h>
 
@@ -36,21 +33,24 @@ typedef u16 ntfs_wchar_t;
 /* File offset */
 #ifndef NTFS_OFFSET_T
 #define NTFS_OFFSET_T
-typedef u64 ntfs_offset_t;
+typedef s64 ntfs_offset_t;
 #endif
 /* UTC */
 #ifndef NTFS_TIME64_T
 #define NTFS_TIME64_T
 typedef u64 ntfs_time64_t;
 #endif
-/* This is really unsigned long long. So we support only volumes up to 2Tb. */
+/*
+ * This is really signed long long. So we support only volumes up to 2Tb. This
+ * is ok as Win2k also only uses 32-bits to store clusters.
+ * Whatever you do keep this a SIGNED value or a lot of NTFS users with
+ * corrupted filesystems will lynch you! It causes massive fs corruption when
+ * unsigned due to the nature of many checks relying on being performed on
+ * signed quantities. (AIA)
+ */
 #ifndef NTFS_CLUSTER_T
 #define NTFS_CLUSTER_T
-typedef u32 ntfs_cluster_t;
-#endif
-
-#ifndef MAX_CLUSTER_T
-#define MAX_CLUSTER_T (~((ntfs_cluster_t)0))
+typedef s32 ntfs_cluster_t;
 #endif
 
 /* Architecture independent macros. */

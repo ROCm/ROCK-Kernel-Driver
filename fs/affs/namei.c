@@ -217,9 +217,9 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 
 	pr_debug("AFFS: lookup(\"%.*s\")\n",(int)dentry->d_name.len,dentry->d_name.name);
 
-	down(&AFFS_DIR->i_hash_lock);
+	affs_lock_dir(dir);
 	bh = affs_find_entry(dir, dentry);
-	up(&AFFS_DIR->i_hash_lock);
+	affs_unlock_dir(dir);
 	if (IS_ERR(bh))
 		return ERR_PTR(PTR_ERR(bh));
 	if (bh) {
@@ -228,7 +228,8 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 		/* store the real header ino in d_fsdata for faster lookups */
 		dentry->d_fsdata = (void *)(long)ino;
 		switch (be32_to_cpu(AFFS_TAIL(sb, bh)->stype)) {
-		case ST_LINKDIR:
+		//link to dirs disabled
+		//case ST_LINKDIR:
 		case ST_LINKFILE:
 			ino = be32_to_cpu(AFFS_TAIL(sb, bh)->original);
 		}
@@ -381,7 +382,7 @@ affs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 				symname++;
 	}
 	*p = 0;
-	mark_buffer_dirty(bh);
+	mark_buffer_dirty_inode(bh, inode);
 	affs_brelse(bh);
 	mark_inode_dirty(inode);
 
@@ -407,6 +408,9 @@ affs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 	pr_debug("AFFS: link(%u, %u, \"%.*s\")\n", (u32)inode->i_ino, (u32)dir->i_ino,
 		 (int)dentry->d_name.len,dentry->d_name.name);
 
+	if (S_ISDIR(inode->i_mode))
+		return -EPERM;
+
 	error = affs_add_entry(dir, inode, dentry, S_ISDIR(inode->i_mode) ? ST_LINKDIR : ST_LINKFILE);
 	if (error) {
 		inode->i_nlink = 0;
@@ -422,7 +426,6 @@ affs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	    struct inode *new_dir, struct dentry *new_dentry)
 {
 	struct super_block *sb = old_dir->i_sb;
-	struct inode *dir;
 	struct buffer_head *bh = NULL;
 	int retval;
 
@@ -445,30 +448,28 @@ affs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (!bh)
 		goto done;
 
+	affs_lock_dir(old_dir);
+	if (old_dir != new_dir)
+		affs_lock_dir(new_dir);
+
 	/* Remove header from its parent directory. */
-	dir = old_dir;
-	down(&AFFS_DIR->i_hash_lock);
-	retval = affs_remove_hash(dir, bh);
+	retval = affs_remove_hash(old_dir, bh);
 	if (retval)
 		goto done_unlock;
-
-	up(&AFFS_DIR->i_hash_lock);
 
 	/* And insert it into the new directory with the new name. */
-	dir = new_dir;
 	affs_copy_name(AFFS_TAIL(sb, bh)->name, new_dentry);
 	affs_fix_checksum(sb, bh);
-	down(&AFFS_DIR->i_hash_lock);
 	retval = affs_insert_hash(new_dir, bh);
-	if (retval)
-		goto done_unlock;
-	up(&AFFS_DIR->i_hash_lock);
-
-done:
-	affs_brelse(bh);
-	return retval;
+	/* TODO: move it back to old_dir? */
 
 done_unlock:
-	up(&AFFS_DIR->i_hash_lock);
-	goto done;
+	affs_unlock_dir(old_dir);
+	if (old_dir != new_dir)
+		affs_unlock_dir(new_dir);
+
+done:
+	mark_buffer_dirty_inode(bh, retval ? old_dir : new_dir);
+	affs_brelse(bh);
+	return retval;
 }

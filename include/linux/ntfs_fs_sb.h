@@ -1,6 +1,8 @@
 #ifndef _LINUX_NTFS_FS_SB_H
 #define _LINUX_NTFS_FS_SB_H
 
+typedef __s64 LCN;
+
 struct ntfs_sb_info{
 	/* Configuration provided by user at mount time. */
 	ntfs_uid_t uid;
@@ -26,14 +28,16 @@ struct ntfs_sb_info{
 	ntfs_u32 at_bitmap;
 	ntfs_u32 at_symlink; /* aka SYMBOLIC_LINK or REPARSE_POINT */
 	/* Data read / calculated from the boot file. */
-	int blocksize;
-	int clusterfactorbits;
-	int clustersize;
-	int mft_recordsize;
+	int sector_size;
+	int cluster_size;
+	int cluster_size_bits;
 	int mft_clusters_per_record;
-	int index_recordsize;
+	int mft_record_size;
+	int mft_record_size_bits;
 	int index_clusters_per_record;
-	int mft_cluster;
+	int index_record_size;
+	int index_record_size_bits;
+	LCN mft_lcn;
 	/* Data read from special files. */
 	unsigned char *mft;
 	unsigned short *upcase;
@@ -43,6 +47,7 @@ struct ntfs_sb_info{
 	struct ntfs_inode_info *mftmirr;
 	struct ntfs_inode_info *bitmap;
 	struct super_block *sb;
+	unsigned char ino_flags;
 };
 
 #endif

@@ -265,6 +265,9 @@ enum sis630_revision_id {
 
 #define NUM_TX_DESC     16      	/* Number of Tx descriptor registers. */
 #define NUM_RX_DESC     16       	/* Number of Rx descriptor registers. */
+#define TX_TOTAL_SIZE	NUM_TX_DESC*sizeof(BufferDesc)
+#define RX_TOTAL_SIZE	NUM_RX_DESC*sizeof(BufferDesc)
 
+/* PCI stuff, should be move to pci.h */
 #define SIS630_VENDOR_ID        0x1039
 #define SIS630_DEVICE_ID        0x0630

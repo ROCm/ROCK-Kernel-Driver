@@ -100,6 +100,15 @@ int radeon_addbufs_agp(struct inode *inode, struct file *filp,
 		return -ENOMEM; /* May only call once for each order */
 	}
 
+	/* Might be too low a limit. XFree folks need to fix this properly */
+	
+	if(count < 0 || count > 4096)
+	{
+		up(&dev->struct_sem);
+		atomic_dec(&dev->buf_alloc);
+		return -EINVAL;
+	}
+		
 	entry->buflist = drm_alloc(count * sizeof(*entry->buflist),
 				   DRM_MEM_BUFS);
 	if (!entry->buflist) {

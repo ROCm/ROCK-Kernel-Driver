@@ -516,7 +516,8 @@ void __init ide_init_piix (ide_hwif_t *hwif)
 	hwif->autodma = 0;
 #else /* CONFIG_BLK_DEV_IDEDMA */
 #ifdef CONFIG_PIIX_TUNING
-	hwif->autodma = 1;
+	if (!noautodma)
+		hwif->autodma = 1;
 	hwif->dmaproc = &piix_dmaproc;
 	hwif->speedproc = &piix_tune_chipset;
 #endif /* CONFIG_PIIX_TUNING */

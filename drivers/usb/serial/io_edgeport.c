@@ -25,6 +25,9 @@
  *
  * Version history:
  * 
+ * 2.1 2001_07_09 greg kroah-hartman
+ *	- added support for TIOCMBIS and TIOCMBIC.
+ *
  *     (04/08/2001) gb
  *	- Identify version on module load.
  *
@@ -260,7 +263,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v2.0.0"
+#define DRIVER_VERSION "v2.1"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com> and David Iacovelli"
 #define DRIVER_DESC "Edgeport USB Serial Driver"
 
@@ -1718,7 +1721,7 @@ static int get_number_bytes_avail(struct edgeport_port *edge_port, unsigned int 
 	return -ENOIOCTLCMD;
 }
 
-static int set_modem_info(struct edgeport_port *edge_port, unsigned int *value)
+static int set_modem_info(struct edgeport_port *edge_port, unsigned int cmd, unsigned int *value)
 {
 	unsigned int mcr = edge_port->shadowMCR;
 	unsigned int arg;
@@ -1726,11 +1729,34 @@ static int set_modem_info(struct edgeport_port *edge_port, unsigned int *value)
 	if (copy_from_user(&arg, value, sizeof(int)))
 		return -EFAULT;
 
-	// turn off the RTS and DTR
-	mcr &=  ~(MCR_RTS | MCR_DTR);
+	switch (cmd) {
+		case TIOCMBIS:
+			if (arg & TIOCM_RTS)
+				mcr |= MCR_RTS;
+			if (arg & TIOCM_DTR)
+				mcr |= MCR_RTS;
+			if (arg & TIOCM_LOOP)
+				mcr |= MCR_LOOPBACK;
+			break;
 
-	mcr |= ((arg & TIOCM_RTS) ? MCR_RTS : 0);
-	mcr |= ((arg & TIOCM_DTR) ? MCR_DTR : 0);
+		case TIOCMBIC:
+			if (arg & TIOCM_RTS)
+				mcr &= ~MCR_RTS;
+			if (arg & TIOCM_DTR)
+				mcr &= ~MCR_RTS;
+			if (arg & TIOCM_LOOP)
+				mcr &= ~MCR_LOOPBACK;
+			break;
+
+		case TIOCMSET:
+			/* turn off the RTS and DTR and LOOPBACK 
+			 * and then only turn on what was asked to */
+			mcr &=  ~(MCR_RTS | MCR_DTR | MCR_LOOPBACK);
+			mcr |= ((arg & TIOCM_RTS) ? MCR_RTS : 0);
+			mcr |= ((arg & TIOCM_DTR) ? MCR_DTR : 0);
+			mcr |= ((arg & TIOCM_LOOP) ? MCR_LOOPBACK : 0);
+			break;
+	}
 
 	edge_port->shadowMCR = mcr;
 
@@ -1827,9 +1853,11 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 			return get_lsr_info(edge_port, (unsigned int *) arg);
 			return 0;
 
-		case TIOCMSET:  
-			dbg(__FUNCTION__" (%d) TIOCMSET",  port->number);
-			return set_modem_info(edge_port, (unsigned int *) arg);
+		case TIOCMBIS:
+		case TIOCMBIC:
+		case TIOCMSET:
+			dbg(__FUNCTION__" (%d) TIOCMSET/TIOCMBIC/TIOCMSET",  port->number);
+			return set_modem_info(edge_port, cmd, (unsigned int *) arg);
 
 		case TIOCMGET:  
 			dbg(__FUNCTION__" (%d) TIOCMGET",  port->number);
@@ -3037,7 +3065,7 @@ int __init edgeport_init(void)
 	usb_serial_register (&edgeport_16dual_device);
 	usb_serial_register (&edgeport_compat_id_device);
 	usb_serial_register (&edgeport_8i_device);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
+	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
 

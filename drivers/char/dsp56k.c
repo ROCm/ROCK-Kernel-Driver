@@ -64,7 +64,7 @@
 
 #define wait_some(n) \
 { \
-	current->state = TASK_INTERRUPTIBLE; \
+	set_current_state(TASK_INTERRUPTIBLE); \
 	schedule_timeout(n); \
 }
 
@@ -149,7 +149,7 @@ static int sizeof_bootstrap = 375;
 
 
 static struct dsp56k_device {
-	int in_use;
+	long in_use;
 	long maxio, timeout;
 	int tx_wsize, rx_wsize;
 } dsp56k;
@@ -451,10 +451,9 @@ static int dsp56k_open(struct inode *inode, struct file *file)
 	{
 	case DSP56K_DEV_56001:
 
-		if (dsp56k.in_use)
+		if (test_and_set_bit(0, &dsp56k.in_use))
 			return -EBUSY;
 
-		dsp56k.in_use = 1;
 		dsp56k.timeout = TIMEOUT;
 		dsp56k.maxio = MAXIO;
 		dsp56k.rx_wsize = dsp56k.tx_wsize = 4; 
@@ -469,8 +468,7 @@ static int dsp56k_open(struct inode *inode, struct file *file)
 		break;
 
 	default:
-		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);
-		return -ENXIO;
+		return -ENODEV;
 	}
 
 	return 0;
@@ -483,11 +481,7 @@ static int dsp56k_release(struct inode *inode, struct file *file)
 	switch(dev)
 	{
 	case DSP56K_DEV_56001:
-
-		lock_kernel();
-		dsp56k.in_use = 0;
-		unlock_kernel();
-
+		clear_bit(0, &dsp56k.in_use);
 		break;
 	default:
 		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);

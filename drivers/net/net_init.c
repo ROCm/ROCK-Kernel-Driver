@@ -2,9 +2,10 @@
 /*
 	Written 1993,1994,1995 by Donald Becker.
 
-	The author may be reached as becker@cesdis.gsfc.nasa.gov or
-	C/O Center of Excellence in Space Data and Information Sciences
-		Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+	The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
 
 	This file contains the initialization for the "pl14+" style ethernet
 	drivers.  It should eventually replace most of drivers/net/Space.c.

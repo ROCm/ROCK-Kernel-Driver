@@ -232,7 +232,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 				outl(csr13val, ioaddr + CSR13);
 			} else {
 				csr13val = 1;
-				csr14val = 0x0003FFFF;
+				csr14val = 0;
 				csr15dir = (setup[0]<<16) | 0x0008;
 				csr15val = (setup[1]<<16) | 0x0008;
 				if (dev->if_port <= 4)

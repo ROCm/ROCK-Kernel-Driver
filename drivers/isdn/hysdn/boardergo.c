@@ -35,6 +35,7 @@
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
+#include <linux/vmalloc.h>
 
 #include "hysdn_defs.h"
 #include "boardergo.h"

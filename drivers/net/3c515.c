@@ -7,9 +7,11 @@
 
 	This driver is for the 3Com ISA EtherLink XL "Corkscrew" 3c515 ethercard.
 
-	The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
-	Center of Excellence in Space Data and Information Sciences
-	   Code 930.5, Goddard Space Flight Center, Greenbelt MD 20771
+	The author may be reached as becker@scyld.com, or C/O
+	Scyld Computing Corporation
+	410 Severn Ave., Suite 210
+	Annapolis MD 21403
+
 
 	2/2/00- Added support for kernel-level ISAPnP 
 		by Stephen Frost <sfrost@snowman.net> and Alessandro Zummo
@@ -78,7 +80,7 @@ static int max_interrupt_work = 20;
 #define REQUEST_IRQ(i,h,f,n, instance) request_irq(i,h,f,n, instance)
 #define IRQ(irq, dev_id, pt_regs) (irq, dev_id, pt_regs)
 
-MODULE_AUTHOR("Donald Becker <becker@cesdis.gsfc.nasa.gov>");
+MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("3Com 3c515 Corkscrew driver");
 MODULE_PARM(debug, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(8) "i");

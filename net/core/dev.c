@@ -2654,10 +2654,6 @@ int __init net_dev_init(void)
 	if (!dev_boot_phase)
 		return 0;
 
-#ifdef CONFIG_NET_SCHED
-	pktsched_init();
-#endif
-
 #ifdef CONFIG_NET_DIVERT
 	dv_init();
 #endif /* CONFIG_NET_DIVERT */
@@ -2771,6 +2767,10 @@ int __init net_dev_init(void)
 
 	dst_init();
 	dev_mcast_init();
+
+#ifdef CONFIG_NET_SCHED
+	pktsched_init();
+#endif
 
 	/*
 	 *	Initialise network devices

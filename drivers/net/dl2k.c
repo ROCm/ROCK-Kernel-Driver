@@ -84,6 +84,8 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	int err, irq = pdev->irq;
 	long ioaddr;
 	static int version_printed;
+	void *ring_space;
+	dma_addr_t ring_dma;
 
 	if (!version_printed++)
 		printk ("%s", version);
@@ -119,6 +121,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->irq = irq;
 	np = dev->priv;
 	np->chip_id = chip_idx;
+	np->pdev = pdev;
 	spin_lock_init (&np->lock);
 
 	/* Parse manual configuration */
@@ -181,13 +184,25 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 	pci_set_drvdata (pdev, dev);
 
+	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
+	if (!ring_space)
+		goto err_out_iounmap;
+	np->tx_ring = (struct netdev_desc *)ring_space;
+	np->tx_ring_dma = ring_dma;
+
+	ring_space = pci_alloc_consistent(pdev, RX_TOTAL_SIZE, &ring_dma);
+	if (!ring_space)
+		goto err_out_unmap_tx;
+	np->rx_ring = (struct netdev_desc *)ring_space;
+	np->rx_ring_dma = ring_dma;
+
 	/* Parse eeprom data */
 	parse_eeprom (dev);
 
 	/* Find PHY address */
 	err = find_miiphy (dev);
 	if (err)
-		goto err_out_unmap;
+		goto err_out_unmap_rx;
 
 	/* Set media and reset PHY */
 	mii_set_media (dev);
@@ -198,7 +213,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	err = register_netdev (dev);
 	if (err)
-		goto err_out_unmap;
+		goto err_out_unmap_rx;
 
 	card_idx++;
 
@@ -209,7 +224,11 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 		irq);
 	return 0;
 
-err_out_unmap:
+err_out_unmap_rx:
+        pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
+err_out_unmap_tx:
+        pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
+err_out_iounmap:
 #ifndef USE_IO_OPS
 	iounmap ((void *) ioaddr);
 
@@ -253,7 +272,7 @@ int
 parse_eeprom (struct net_device *dev)
 {
 	int i, j;
-	int ioaddr = dev->base_addr;
+	long ioaddr = dev->base_addr;
 	u8 sromdata[256];
 	u8 *psib;
 	u32 crc;
@@ -335,7 +354,7 @@ rio_open (struct net_device *dev)
 	writel (readl (ioaddr + DebugCtrl) | 0x0230, ioaddr + DebugCtrl);
 
 	/* Jumbo frame */
-	if (jumbo != 0)
+	if (np->jumbo != 0)
 		writew (9014, ioaddr + MaxFrameSize);
 
 	alloc_list (dev);
@@ -400,7 +419,6 @@ alloc_list (struct net_device *dev)
 	np->cur_rx = np->cur_tx = 0;
 	np->old_rx = np->old_tx = 0;
 	np->rx_buf_sz = (dev->mtu <= 1500 ? PACKET_SIZE : dev->mtu + 32);
-	np->rx_head_desc = &np->rx_ring[0];
 
 	/* Initialize Tx descriptors, TFDListPtr leaves in start_xmit(). */
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -410,15 +428,12 @@ alloc_list (struct net_device *dev)
 
 	/* Initialize Rx descriptors */
 	for (i = 0; i < RX_RING_SIZE; i++) {
-		np->rx_ring[i].next_desc =
-		    virt_to_le64desc (&np->rx_ring[i + 1]);
+		np->rx_ring[i].next_desc = cpu_to_le64(np->rx_ring_dma +
+			((i+1)%RX_RING_SIZE)*sizeof(struct netdev_desc));
 		np->rx_ring[i].status = 0;
 		np->rx_ring[i].fraginfo = 0;
 		np->rx_skbuff[i] = 0;
 	}
-
-	/* Chain the next pointer to the top */
-	np->rx_ring[i - 1].next_desc = virt_to_le64desc (&np->rx_ring[0]);
 
 	/* Allocate the rx buffers */
 	for (i = 0; i < RX_RING_SIZE; i++) {
@@ -434,13 +449,14 @@ alloc_list (struct net_device *dev)
 		skb->dev = dev;	/* Mark as being used by this device. */
 		skb_reserve (skb, 2);	/* 16 byte align the IP header. */
 		/* Rubicon now supports 40 bits of addressing space. */
-		np->rx_ring[i].fraginfo = virt_to_le64desc (skb->tail);
+		np->rx_ring[i].fraginfo = cpu_to_le64(pci_map_single(
+			np->pdev, skb->tail, np->rx_buf_sz, 
+			PCI_DMA_FROMDEVICE));
 		np->rx_ring[i].fraginfo |= cpu_to_le64 (np->rx_buf_sz) << 48;
 	}
 
 	/* Set RFDListPtr */
-	writel (cpu_to_le32 (virt_to_bus (&np->rx_ring[0])),
-		dev->base_addr + RFDListPtr0);
+	writel (cpu_to_le32 (np->rx_ring_dma), dev->base_addr + RFDListPtr0);
 	writel (0, dev->base_addr + RFDListPtr1);
 
 	return;
@@ -453,6 +469,8 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 	struct netdev_desc *txdesc;
 	unsigned entry;
 	u32 ioaddr;
+	int tx_shift;
+	unsigned flags;
 
 	ioaddr = dev->base_addr;
 	entry = np->cur_tx % TX_RING_SIZE;
@@ -472,21 +490,23 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 	}
 #endif
 	if (np->vlan) {
-		txdesc->status |= cpu_to_le64 (VLANTagInsert |
-					       cpu_to_le64 (vlan) << 32 |
-					       cpu_to_le64 (skb->
-							    priority) << 45);
+		txdesc->status |=
+			cpu_to_le64 (VLANTagInsert) |
+			(cpu_to_le64 (np->vlan) << 32) |
+			(cpu_to_le64 (skb->priority) << 45);
 	}
 
 	/* Send one packet each time at 10Mbps mode */
 	if (entry % 0x08 == 0 || np->speed == 10)
 		txdesc->status |= cpu_to_le64 (TxIndicate);
-	txdesc->fraginfo = virt_to_le64desc (skb->data);
+	txdesc->fraginfo = cpu_to_le64 (pci_map_single(np->pdev, skb->data, 
+		skb->len, PCI_DMA_TODEVICE));
 	txdesc->fraginfo |= cpu_to_le64 (skb->len) << 48;
 
 	/* Chain the last descriptor's pointer to this one */
 	if (np->last_tx)
-		np->last_tx->next_desc = virt_to_le64desc (txdesc);
+		np->last_tx->next_desc = cpu_to_le64 (np->tx_ring_dma +
+			entry*sizeof(struct netdev_desc));
 	np->last_tx = txdesc;
 
 	/* Clear TFDDone, then TxDMA start to send this descriptor */
@@ -507,11 +527,19 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 	/* The first TFDListPtr */
 	if (readl (dev->base_addr + TFDListPtr0) == 0) {
-		writel (virt_to_bus (&np->tx_ring[entry]),
+		writel (np->tx_ring_dma + entry*sizeof(struct netdev_desc),
 			dev->base_addr + TFDListPtr0);
 		writel (0, dev->base_addr + TFDListPtr1);
 	}
-
+	
+	spin_lock_irqsave (&np->lock, flags);
+	if (np->old_tx > TX_RING_SIZE) {
+		tx_shift = TX_RING_SIZE;
+		np->old_tx -= tx_shift;
+		np->cur_tx -= tx_shift;
+	}
+	spin_unlock_irqrestore (&np->lock, flags);	
+	
 	/* NETDEV WATCHDOG timer */
 	dev->trans_start = jiffies;
 	return 0;
@@ -561,9 +589,14 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 		/* Free used tx skbuffs */
 		for (; np->cur_tx - np->old_tx > 0; np->old_tx++) {
 			int entry = np->old_tx % TX_RING_SIZE;
+			struct sk_buff *skb;
+
 			if (!(np->tx_ring[entry].status & TFDDone))
 				break;
-			dev_kfree_skb_irq (np->tx_skbuff[entry]);
+			skb = np->tx_skbuff[entry];
+                	pci_unmap_single(np->pdev, np->tx_ring[entry].fraginfo,
+				skb->len, PCI_DMA_TODEVICE);
+			dev_kfree_skb_irq (skb);
 			np->tx_skbuff[entry] = 0;
 		}
 		/* If the ring is no longer full, clear tx_full and 
@@ -617,7 +650,7 @@ tx_error (struct net_device *dev, int tx_status)
 			mdelay (1);
 		}
 		/* Reset TFDListPtr */
-		writel (virt_to_bus (&np->tx_ring[frame_id]),
+		writel (np->tx_ring_dma + frame_id*sizeof(struct netdev_desc),
 			dev->base_addr + TFDListPtr0);
 		writel (0, dev->base_addr + TFDListPtr1);
 
@@ -657,19 +690,33 @@ receive_packet (struct net_device *dev)
 	struct netdev_private *np = (struct netdev_private *) dev->priv;
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int cnt = np->old_rx + RX_RING_SIZE - np->cur_rx;
+	int rx_shift;
 
+	if (np->old_rx > RX_RING_SIZE) {
+		rx_shift = RX_RING_SIZE;
+		np->old_rx -= rx_shift;
+		np->cur_rx -= rx_shift;
+	}
 	DEBUG_RFD_DUMP (np, 1);
 	/* If RFDDone, FrameStart and FrameEnd set, there is a new packet in. */
-	while (np->rx_head_desc->status & RFDDone &&
-	       np->rx_head_desc->status & FrameStart &&
-	       np->rx_head_desc->status & FrameEnd) {
-		struct netdev_desc *desc = np->rx_head_desc;
-		u64 frame_status = le64_to_cpu (desc->status);
-		int pkt_len = le64_to_cpu (desc->status & 0xffff);	/* Chip omits the CRC. */
+	while (1) {
+		struct netdev_desc *desc = &np->rx_ring[entry];
+		int pkt_len;
+		u64 frame_status; 
 
+		if (!(desc->status & RFDDone) || 
+			!(desc->status & FrameStart) ||
+			!(desc->status & FrameEnd))
+			break;
+
+		/* Chip omits the CRC. */
+		pkt_len = le64_to_cpu (desc->status & 0xffff);	
+		frame_status = le64_to_cpu (desc->status);
 		if (--cnt < 0)
 			break;
 		DEBUG_PKT_DUMP (np, pkt_len);
+                pci_dma_sync_single(np->pdev, desc->fraginfo, np->rx_buf_sz,
+			PCI_DMA_FROMDEVICE);
 		/* Update rx error statistics, drop packet. */
 		if (frame_status & 0x003f0000) {
 			np->stats.rx_errors++;
@@ -683,13 +730,17 @@ receive_packet (struct net_device *dev)
 				np->stats.rx_crc_errors++;
 		} else {
 			struct sk_buff *skb;
+
 			/* Small skbuffs for short packets */
 			if (pkt_len > copy_thresh) {
+                		pci_unmap_single(np->pdev, desc->fraginfo,
+					np->rx_buf_sz, PCI_DMA_FROMDEVICE);
 				skb_put (skb = np->rx_skbuff[entry], pkt_len);
 				np->rx_skbuff[entry] = NULL;
 			} else if ((skb = dev_alloc_skb (pkt_len + 2)) != NULL) {
 				skb->dev = dev;
-				skb_reserve (skb, 2);	/* 16 byte align the IP header */
+				/* 16 byte align the IP header */
+				skb_reserve (skb, 2);
 				eth_copy_and_sum (skb,
 						  np->rx_skbuff[entry]->tail,
 						  pkt_len, 0);
@@ -706,7 +757,6 @@ receive_packet (struct net_device *dev)
 			dev->last_rx = jiffies;
 		}
 		entry = (++np->cur_rx) % RX_RING_SIZE;
-		np->rx_head_desc = &np->rx_ring[entry];
 	}
 
 	/* Re-allocate skbuffs to fill the descriptor ring */
@@ -725,9 +775,11 @@ receive_packet (struct net_device *dev)
 			}
 			np->rx_skbuff[entry] = skb;
 			skb->dev = dev;
-			skb_reserve (skb, 2);	/* 16 byte align the IP header */
-			np->rx_ring[entry].fraginfo =
-			    virt_to_le64desc (skb->tail);
+			/* 16 byte align the IP header */
+			skb_reserve (skb, 2);
+			np->rx_ring[entry].fraginfo = cpu_to_le64(pci_map_single(
+				np->pdev, skb->tail, np->rx_buf_sz, 
+				PCI_DMA_FROMDEVICE));
 		}
 		np->rx_ring[entry].fraginfo |=
 		    cpu_to_le64 (np->rx_buf_sz) << 48;
@@ -843,7 +895,8 @@ get_stats (struct net_device *dev)
 int
 change_mtu (struct net_device *dev, int new_mtu)
 {
-	int max = (jumbo) ? 9000 : 1536;
+	struct netdev_private *np = dev->priv;
+	int max = (np->jumbo) ? 9000 : 1536;
 
 	if ((new_mtu < 68) || (new_mtu > max)) {
 		return -EINVAL;
@@ -960,18 +1013,19 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		netif_wake_queue (dev);
 		break;
 	case SIOCDEVPRIVATE + 7:
-		printk ("tx_full=%x cur_tx=%x old_tx=%x cur_rx=%x old_rx=%x\n",
-			(u32) np->tx_full, (u32) np->cur_tx, (u32) np->old_tx,
-			(u32) np->cur_rx, (u32) np->old_rx);
+		printk ("tx_full=%x cur_tx=%lx old_tx=%lx cur_rx=%lx old_rx=%lx\n",
+			np->tx_full, np->cur_tx, np->old_tx,
+			np->cur_rx, np->old_rx);
 		break;
 	case SIOCDEVPRIVATE + 8:
 		for (i = 0; i < TX_RING_SIZE; i++) {
 			desc = &np->tx_ring[i];
 			printk
-			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-			     (u32) virt_to_bus (desc), (u32) desc->next_desc,
-			     (u32) desc->status, (u32) (desc->fraginfo >> 32),
-			     (u32) desc->fraginfo);
+				("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+				(u32) (np->tx_ring_dma + i*sizeof(*desc)),
+				(u32) desc->next_desc,
+				(u32) desc->status, (u32) (desc->fraginfo >> 32),
+				(u32) desc->fraginfo);
 			printk ("\n");
 		}
 		printk ("\n");
@@ -1101,7 +1155,7 @@ enum phy_ctrl_bits {
 static void
 mii_sendbit (struct net_device *dev, u32 data)
 {
-	int ioaddr = dev->base_addr + PhyCtrl;
+	long ioaddr = dev->base_addr + PhyCtrl;
 	data = (data) ? MII_DATA1 : 0;
 	data |= MII_WRITE;
 	data |= (readb (ioaddr) & 0xf8) | MII_WRITE;
@@ -1114,7 +1168,7 @@ mii_sendbit (struct net_device *dev, u32 data)
 static int
 mii_getbit (struct net_device *dev)
 {
-	int ioaddr = dev->base_addr + PhyCtrl;
+	long ioaddr = dev->base_addr + PhyCtrl;
 	u8 data;
 
 	data = (readb (ioaddr) & 0xf8) | MII_READ;
@@ -1363,6 +1417,7 @@ rio_close (struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
+	struct sk_buff *skb;
 	int i;
 
 	netif_stop_queue (dev);
@@ -1379,15 +1434,22 @@ rio_close (struct net_device *dev)
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		np->rx_ring[i].status = 0;
 		np->rx_ring[i].fraginfo = 0;
-		if (np->rx_skbuff[i]) {
-			dev_kfree_skb (np->rx_skbuff[i]);
+		skb = np->rx_skbuff[i];
+		if (skb) {
+                	pci_unmap_single(np->pdev, np->rx_ring[i].fraginfo, 
+				skb->len, PCI_DMA_FROMDEVICE);
+			dev_kfree_skb (skb);
+			np->rx_skbuff[i] = 0;
 		}
-		np->rx_skbuff[i] = 0;
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		if (np->tx_skbuff[i])
-			dev_kfree_skb (np->tx_skbuff[i]);
-		np->tx_skbuff[i] = 0;
+		skb = np->tx_skbuff[i];
+		if (skb) {
+                	pci_unmap_single(np->pdev, np->tx_ring[i].fraginfo, 
+				skb->len, PCI_DMA_TODEVICE);
+			dev_kfree_skb (skb);
+			np->tx_skbuff[i] = 0;
+		}
 	}
 	return 0;
 }
@@ -1396,8 +1458,15 @@ static void __devexit
 rio_remove1 (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
+
 	if (dev) {
+		struct netdev_private *np = dev->priv;
+
 		unregister_netdev (dev);
+        	pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, 
+			np->rx_ring_dma);
+        	pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, 
+			np->tx_ring_dma);
 #ifndef USE_IO_OPS
 		iounmap ((char *) (dev->base_addr));
 #endif

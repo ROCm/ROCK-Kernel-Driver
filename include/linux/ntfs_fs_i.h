@@ -42,34 +42,41 @@ typedef __kernel_time_t ntfs_time_t;
 /* unicode character type */
 #ifndef NTFS_WCHAR_T
 #define NTFS_WCHAR_T
-typedef unsigned short     ntfs_wchar_t;
+typedef u16 ntfs_wchar_t;
 #endif
 /* file offset */
 #ifndef NTFS_OFFSET_T
 #define NTFS_OFFSET_T
-typedef unsigned long long ntfs_offset_t;
+typedef s64 ntfs_offset_t;
 #endif
 /* UTC */
 #ifndef NTFS_TIME64_T
 #define NTFS_TIME64_T
-typedef unsigned long long ntfs_time64_t;
+typedef u64 ntfs_time64_t;
 #endif
-/* This is really unsigned long long. So we support only volumes up to 2 TB */
+/*
+ * This is really signed long long. So we support only volumes up to 2Tb. This
+ * is ok as Win2k also only uses 32-bits to store clusters.
+ * Whatever you do keep this a SIGNED value or a lot of NTFS users with
+ * corrupted filesystems will lynch you! It causes massive fs corruption when
+ * unsigned due to the nature of many checks relying on being performed on
+ * signed quantities. (AIA)
+ */
 #ifndef NTFS_CLUSTER_T
 #define NTFS_CLUSTER_T
-typedef unsigned int ntfs_cluster_t;
+typedef s32 ntfs_cluster_t;
 #endif
 
 /* Definition of the NTFS in-memory inode structure. */
 struct ntfs_inode_info{
 	unsigned long mmu_private;
 	struct ntfs_sb_info *vol;
-	int i_number;                /* Should be really 48 bits. */
-	__u16 sequence_number;	     /* The current sequence number. */
-	unsigned char* attr;         /* Array of the attributes. */
-	int attr_count;              /* Size of attrs[]. */
+	unsigned long i_number;		/* Should be really 48 bits. */
+	__u16 sequence_number;		/* The current sequence number. */
+	unsigned char *attr;		/* Array of the attributes. */
+	int attr_count;			/* Size of attrs[]. */
 	struct ntfs_attribute *attrs;
-	int record_count;            /* Size of records[]. */
+	int record_count;		/* Size of records[]. */
 	int *records; /* Array of the record numbers of the $Mft whose 
 		       * attributes have been inserted in the inode. */
 	union {

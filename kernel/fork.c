@@ -18,6 +18,7 @@
 #include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/vmalloc.h>
+#include <linux/completion.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -269,11 +270,12 @@ void mmput(struct mm_struct *mm)
 void mm_release(void)
 {
 	struct task_struct *tsk = current;
+	struct completion *vfork_done = tsk->vfork_done;
 
 	/* notify parent sleeping on vfork() */
-	if (tsk->flags & PF_VFORK) {
-		tsk->flags &= ~PF_VFORK;
-		up(tsk->p_opptr->vfork_sem);
+	if (vfork_done) {
+		tsk->vfork_done = NULL;
+		complete(vfork_done);
 	}
 }
 
@@ -536,12 +538,10 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 {
 	unsigned long new_flags = p->flags;
 
-	new_flags &= ~(PF_SUPERPRIV | PF_USEDFPU | PF_VFORK);
+	new_flags &= ~(PF_SUPERPRIV | PF_USEDFPU);
 	new_flags |= PF_FORKNOEXEC;
 	if (!(clone_flags & CLONE_PTRACE))
 		p->ptrace = 0;
-	if (clone_flags & CLONE_VFORK)
-		new_flags |= PF_VFORK;
 	p->flags = new_flags;
 }
 
@@ -557,18 +557,22 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	    struct pt_regs *regs, unsigned long stack_size)
 {
-	int retval = -ENOMEM;
+	int retval;
 	struct task_struct *p;
-	DECLARE_MUTEX_LOCKED(sem);
+	struct completion vfork;
 
+	retval = -EPERM;
+
+	/* 
+	 * CLONE_PID is only allowed for the initial SMP swapper
+	 * calls
+	 */
 	if (clone_flags & CLONE_PID) {
-		/* This is only allowed from the boot up thread */
 		if (current->pid)
-			return -EPERM;
+			goto fork_out;
 	}
-	
-	current->vfork_sem = &sem;
 
+	retval = -ENOMEM;
 	p = alloc_task_struct();
 	if (!p)
 		goto fork_out;
@@ -578,6 +582,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	retval = -EAGAIN;
 	if (atomic_read(&p->user->processes) >= p->rlim[RLIMIT_NPROC].rlim_cur)
 		goto bad_fork_free;
+
 	atomic_inc(&p->user->__count);
 	atomic_inc(&p->user->processes);
 
@@ -604,14 +609,13 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	p->run_list.next = NULL;
 	p->run_list.prev = NULL;
 
-	if ((clone_flags & CLONE_VFORK) || !(clone_flags & CLONE_PARENT)) {
-		p->p_opptr = current;
-		if (!(p->ptrace & PT_PTRACED))
-			p->p_pptr = current;
-	}
 	p->p_cptr = NULL;
 	init_waitqueue_head(&p->wait_chldexit);
-	p->vfork_sem = NULL;
+	p->vfork_done = NULL;
+	if (clone_flags & CLONE_VFORK) {
+		p->vfork_done = &vfork;
+		init_completion(&vfork);
+	}
 	spin_lock_init(&p->alloc_lock);
 
 	p->sigpending = 0;
@@ -685,11 +689,24 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	retval = p->pid;
 	p->tgid = retval;
 	INIT_LIST_HEAD(&p->thread_group);
+
+	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
+
+	/* CLONE_PARENT and CLONE_THREAD re-use the old parent */
+	p->p_opptr = current->p_opptr;
+	p->p_pptr = current->p_pptr;
+	if (!(clone_flags & (CLONE_PARENT | CLONE_THREAD))) {
+		p->p_opptr = current;
+		if (!(p->ptrace & PT_PTRACED))
+			p->p_pptr = current;
+	}
+
 	if (clone_flags & CLONE_THREAD) {
 		p->tgid = current->tgid;
 		list_add(&p->thread_group, &current->thread_group);
 	}
+
 	SET_LINKS(p);
 	hash_pid(p);
 	nr_threads++;
@@ -700,10 +717,10 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 
 	wake_up_process(p);		/* do this last */
 	++total_forks;
+	if (clone_flags & CLONE_VFORK)
+		wait_for_completion(&vfork);
 
 fork_out:
-	if ((clone_flags & CLONE_VFORK) && (retval > 0)) 
-		down(&sem);
 	return retval;
 
 bad_fork_cleanup_mm:

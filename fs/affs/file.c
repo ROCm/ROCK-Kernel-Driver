@@ -174,14 +174,14 @@ affs_alloc_extblock(struct inode *inode, struct buffer_head *bh, u32 ext)
 	AFFS_TAIL(sb, new_bh)->parent = cpu_to_be32(inode->i_ino);
 	affs_fix_checksum(sb, new_bh);
 
-	mark_buffer_dirty(new_bh);
+	mark_buffer_dirty_inode(new_bh, inode);
 
 	tmp = be32_to_cpu(AFFS_TAIL(sb, bh)->extension);
 	if (tmp)
 		affs_warning(sb, "alloc_ext", "previous extension set (%x)", tmp);
 	AFFS_TAIL(sb, bh)->extension = cpu_to_be32(blocknr);
 	affs_adjust_checksum(bh, blocknr - tmp);
-	mark_buffer_dirty(bh);
+	mark_buffer_dirty_inode(bh, inode);
 
 	AFFS_INODE->i_extcnt++;
 	mark_inode_dirty(inode);
@@ -349,7 +349,7 @@ affs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, i
 		create = 0;
 
 	//lock cache
-	down(&AFFS_INODE->i_ext_lock);
+	affs_lock_ext(inode);
 
 	ext = block / AFFS_SB->s_hashsize;
 	block -= ext * AFFS_SB->s_hashsize;
@@ -388,7 +388,7 @@ affs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, i
 
 	affs_brelse(ext_bh);
 	//unlock cache
-	up(&AFFS_INODE->i_ext_lock);
+	affs_unlock_ext(inode);
 	return 0;
 
 err_small:
@@ -399,13 +399,13 @@ err_big:
 	return -EIO;
 err_ext:
 	// unlock cache
-	up(&AFFS_INODE->i_ext_lock);
+	affs_unlock_ext(inode);
 	return PTR_ERR(ext_bh);
 err_alloc:
 	brelse(ext_bh);
 	bh_result->b_state &= ~(1UL << BH_Mapped);
 	// unlock cache
-	up(&AFFS_INODE->i_ext_lock);
+	affs_unlock_ext(inode);
 	return -ENOSPC;
 }
 
@@ -561,7 +561,7 @@ affs_extent_file_ofs(struct file *file, u32 newsize)
 		memset(AFFS_DATA(bh) + boff, 0, tmp);
 		AFFS_DATA_HEAD(bh)->size = cpu_to_be32(be32_to_cpu(AFFS_DATA_HEAD(bh)->size) + tmp);
 		affs_fix_checksum(sb, bh);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_inode(bh, inode);
 		size += tmp;
 		bidx++;
 	} else if (bidx) {
@@ -581,14 +581,14 @@ affs_extent_file_ofs(struct file *file, u32 newsize)
 		AFFS_DATA_HEAD(bh)->sequence = cpu_to_be32(bidx);
 		AFFS_DATA_HEAD(bh)->size = cpu_to_be32(tmp);
 		affs_fix_checksum(sb, bh);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_inode(bh, inode);
 		if (prev_bh) {
 			u32 tmp = be32_to_cpu(AFFS_DATA_HEAD(prev_bh)->next);
 			if (tmp)
 				affs_warning(sb, "prepare_write_ofs", "next block already set for %d (%d)", bidx, tmp);
 			AFFS_DATA_HEAD(prev_bh)->next = cpu_to_be32(bh->b_blocknr);
 			affs_adjust_checksum(prev_bh, bidx - tmp);
-			mark_buffer_dirty(prev_bh);
+			mark_buffer_dirty_inode(prev_bh, inode);
 			affs_brelse(prev_bh);
 		}
 		size += bsize;
@@ -688,7 +688,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 		memcpy(AFFS_DATA(bh) + boff, data + from, tmp);
 		AFFS_DATA_HEAD(bh)->size = cpu_to_be32(be32_to_cpu(AFFS_DATA_HEAD(bh)->size) + tmp);
 		affs_fix_checksum(sb, bh);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_inode(bh, inode);
 		written += tmp;
 		from += tmp;
 		bidx++;
@@ -715,12 +715,12 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 					affs_warning(sb, "prepare_write_ofs", "next block already set for %d (%d)", bidx, tmp);
 				AFFS_DATA_HEAD(prev_bh)->next = cpu_to_be32(bh->b_blocknr);
 				affs_adjust_checksum(prev_bh, bidx - tmp);
-				mark_buffer_dirty(prev_bh);
+				mark_buffer_dirty_inode(prev_bh, inode);
 			}
 		}
 		affs_brelse(prev_bh);
 		affs_fix_checksum(sb, bh);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_inode(bh, inode);
 		written += bsize;
 		from += bsize;
 		bidx++;
@@ -744,13 +744,13 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 					affs_warning(sb, "prepare_write_ofs", "next block already set for %d (%d)", bidx, tmp);
 				AFFS_DATA_HEAD(prev_bh)->next = cpu_to_be32(bh->b_blocknr);
 				affs_adjust_checksum(prev_bh, bidx - tmp);
-				mark_buffer_dirty(prev_bh);
+				mark_buffer_dirty_inode(prev_bh, inode);
 			}
 		} else if (be32_to_cpu(AFFS_DATA_HEAD(bh)->size) < tmp)
 			AFFS_DATA_HEAD(bh)->size = cpu_to_be32(tmp);
 		affs_brelse(prev_bh);
 		affs_fix_checksum(sb, bh);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_inode(bh, inode);
 		written += tmp;
 		from += tmp;
 		bidx++;
@@ -866,7 +866,7 @@ affs_truncate(struct inode *inode)
 	}
 	AFFS_TAIL(sb, ext_bh)->extension = 0;
 	affs_fix_checksum(sb, ext_bh);
-	mark_buffer_dirty(ext_bh);
+	mark_buffer_dirty_inode(ext_bh, inode);
 	affs_brelse(ext_bh);
 
 	if (inode->i_size) {

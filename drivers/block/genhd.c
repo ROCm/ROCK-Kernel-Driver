@@ -21,6 +21,9 @@ extern int blk_dev_init(void);
 #ifdef CONFIG_BLK_DEV_DAC960
 extern void DAC960_Initialize(void);
 #endif
+#ifdef CONFIG_FUSION_BOOT
+extern int fusion_init(void);
+#endif
 extern int net_dev_init(void);
 extern void console_map_init(void);
 extern int soc_probe(void);
@@ -38,6 +41,9 @@ int __init device_init(void)
 #endif
 #ifdef CONFIG_BLK_DEV_DAC960
 	DAC960_Initialize();
+#endif
+#ifdef CONFIG_FUSION_BOOT
+	fusion_init();
 #endif
 #ifdef CONFIG_FC4_SOC
 	/* This has to be done before scsi_dev_init */

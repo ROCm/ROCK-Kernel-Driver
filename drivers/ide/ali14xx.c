@@ -81,9 +81,9 @@ static struct { byte reg1, reg2, reg3, reg4; } regTab[4] = {
 	{0x2d, 0x32, 0x2e, 0x33},     /* drive 3 */
 };
 
-static int basePort = 0;	/* base port address */
-static int regPort = 0;		/* port for register number */
-static int dataPort = 0;	/* port for register data */
+static int basePort;	/* base port address */
+static int regPort;	/* port for register number */
+static int dataPort;	/* port for register data */
 static byte regOn;	/* output to base port to access registers */
 static byte regOff;	/* output to base port to close registers */
 

@@ -841,6 +841,12 @@ P:	Zach Brown
 M:	zab@zabbo.net
 S:	Odd Fixes
 
+MATROX FRAMEBUFFER DRIVER
+P:	Petr Vandrovec
+M:	vandrove@vc.cvut.cz
+L:	linux-fbdev-devel@lists.sourceforge.net
+S:	Maintained
+
 MEMORY TECHNOLOGY DEVICES
 P:	David Woodhouse
 M:	dwmw2@redhat.com
@@ -1304,10 +1310,11 @@ W:	http://tlan.kernel.dk
 S:	Maintained
 
 TOKEN-RING NETWORK DRIVER
-P:	Paul Norton
-M:	pnorton@ieee.org
+P:	Mike Phillips
+M:	mikep@linuxtr.net
 L:	linux-net@vger.kernel.org
 L:	linux-tr@linuxtr.net
+W:	http://www.linuxtr.net
 S:	Maintained
 
 TRIDENT 4DWAVE/SIS 7018 PCI AUDIO CORE

@@ -1570,7 +1570,6 @@ MODULE_PARM				(io, "i");
 MODULE_PARM				(irq, "i");
 MODULE_PARM				(mem, "i");
 MODULE_PARM				(write_ndelay, "i");
-MODULE_PARM				(major, "i");
 MODULE_PARM				(fifosize, "i");
 MODULE_PARM				(calibrate_signal, "i");
 #ifndef MSND_CLASSIC

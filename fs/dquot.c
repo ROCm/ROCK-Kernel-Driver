@@ -1467,7 +1467,7 @@ static int quota_on(struct super_block *sb, short type, char *path)
 	if (IS_ERR(f))
 		goto out_lock;
 	error = -EIO;
-	if (!f->f_op || (!f->f_op->read && !f->f_op->write))
+	if (!f->f_op || !f->f_op->read || !f->f_op->write)
 		goto out_f;
 	inode = f->f_dentry->d_inode;
 	error = -EACCES;

@@ -97,7 +97,17 @@ int mga_addbufs_agp(struct inode *inode, struct file *filp, unsigned int cmd,
 		atomic_dec(&dev->buf_alloc);
 		return -ENOMEM; /* May only call once for each order */
 	}
-   
+
+	/* This isnt neccessarily a good limit, but we have to stop a dumb
+	   32 bit overflow problem below */
+	   
+	if ( count < 0 || count > 4096)
+	{
+		up(&dev->struct_sem);
+		atomic_dec(&dev->buf_alloc);
+		return -EINVAL;
+	}
+		   
 	entry->buflist = drm_alloc(count * sizeof(*entry->buflist),
 				   DRM_MEM_BUFS);
 	if (!entry->buflist) {
@@ -248,6 +258,13 @@ int mga_addbufs_pci(struct inode *inode, struct file *filp, unsigned int cmd,
 		up(&dev->struct_sem);
 		atomic_dec(&dev->buf_alloc);
 		return -ENOMEM;	/* May only call once for each order */
+	}
+	
+	if(count < 0 || count > 4096)
+	{
+		up(&dev->struct_sem);
+		atomic_dec(&dev->buf_alloc);
+		return -EINVAL;
 	}
 	
 	entry->buflist = drm_alloc(count * sizeof(*entry->buflist),

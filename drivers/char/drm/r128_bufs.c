@@ -103,6 +103,16 @@ int r128_addbufs_agp(struct inode *inode, struct file *filp, unsigned int cmd,
 		return -ENOMEM; /* May only call once for each order */
 	}
 
+	/* Might be a poor limit, but take that up with XFree86 
+	   if its a problem */
+	   
+	if(count < 0 || count > 4096)
+	{
+		up(&dev->struct_sem);
+		atomic_dec(&dev->buf_alloc);
+		return -EINVAL;
+	}
+		
 	entry->buflist = drm_alloc(count * sizeof(*entry->buflist),
 				   DRM_MEM_BUFS);
 	if (!entry->buflist) {

@@ -51,6 +51,7 @@ struct hd_struct {
 	long start_sect;
 	long nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
+	int number;                     /* stupid old code wastes space  */
 };
 
 #define GENHD_FL_REMOVABLE  1

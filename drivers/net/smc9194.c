@@ -25,7 +25,7 @@
  .
  . Sources:
  .    o   SMC databook
- .    o   skeleton.c by Donald Becker ( becker@cesdis.gsfc.nasa.gov )
+ .    o   skeleton.c by Donald Becker ( becker@scyld.com )
  .    o   ( a LOT of advice from Becker as well )
  .
  . History:

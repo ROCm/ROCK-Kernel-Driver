@@ -13,7 +13,7 @@
  *
  *	Adapted to the sample network driver core for linux,
  *	written by: Donald Becker <becker@super.org>
- *		(Now at <becker@cesdis.gsfc.nasa.gov>
+ *		(Now at <becker@scyld.com>)
  *
  *	Valuable assistance from:
  *		J. Joshua Kopper <kopper@rtsg.mot.com>

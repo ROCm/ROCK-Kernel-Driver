@@ -1,11 +1,12 @@
-/*  inode.c
+/*
+ * inode.c
  *
- *  Copyright (C) 1995-1999 Martin von Löwis
- *  Copyright (C) 1996 Albert D. Cahalan
- *  Copyright (C) 1996-1997 Régis Duchesne
- *  Copyright (C) 1998 Joseph Malicki
- *  Copyright (C) 1999 Steve Dodd
- *  Copyright (C) 2000-2001 Anton Altaparmakov (AIA)
+ * Copyright (C) 1995-1999 Martin von Löwis
+ * Copyright (C) 1996 Albert D. Cahalan
+ * Copyright (C) 1996-1997 Régis Duchesne
+ * Copyright (C) 1998 Joseph Malicki
+ * Copyright (C) 1999 Steve Dodd
+ * Copyright (C) 2000-2001 Anton Altaparmakov (AIA)
  */
 
 #include "ntfstypes.h"
@@ -19,6 +20,7 @@
 #include "dir.h"
 #include "support.h"
 #include "util.h"
+#include <linux/smp_lock.h>
 
 typedef struct {
 	int recno;
@@ -86,27 +88,31 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 	/* Try to allocate at least 0.1% of the remaining disk space for
 	 * inodes. If the disk is almost full, make sure at least one inode is
 	 * requested. */
-	int size, rcount, error, block;
+	int rcount, error, block, blockbits;
+	__s64 size;
 	ntfs_attribute *mdata, *bmp;
 	ntfs_u8 *buf;
 	ntfs_io io;
 
 	mdata = ntfs_find_attr(vol->mft_ino, vol->at_data, 0);
 	/* First check whether there is uninitialized space. */
-	if (mdata->allocated < mdata->size + vol->mft_recordsize) {
-		size = ntfs_get_free_cluster_count(vol->bitmap) *
-							      vol->clustersize;
-		block = vol->mft_recordsize;
-		size = max(size / 1000, mdata->size + vol->mft_recordsize);
-		size = ((size + block - 1) / block) * block;
+	if (mdata->allocated < mdata->size + vol->mft_record_size) {
+		size = (__s64)ntfs_get_free_cluster_count(vol->bitmap) <<
+							vol->cluster_size_bits;
+		/* On error, size will be negative. We can ignore this as we
+		 * will fall back to the minimal size allocation below. (AIA) */
+		block = vol->mft_record_size;
+		blockbits = vol->mft_record_size_bits;
+		size = max(size >> 10, mdata->size + vol->mft_record_size);
+		size = (__s64)((size + block - 1) >> blockbits) << blockbits;
 		/* Require this to be a single chunk. */
 		error = ntfs_extend_attr(vol->mft_ino, mdata, &size,
 							   ALLOC_REQUIRE_SIZE);
 		/* Try again, now we have the largest available fragment. */
 		if (error == -ENOSPC) {
 			/* Round down to multiple of mft record size. */
-			size = (size / vol->mft_recordsize) *
-							   vol->mft_recordsize;
+			size = (__s64)(size >> vol->mft_record_size_bits) <<
+						vol->mft_record_size_bits;
 			if (!size)
 				return -ENOSPC;
 			error = ntfs_extend_attr(vol->mft_ino, mdata, &size,
@@ -117,9 +123,9 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 	}
 	/* Even though we might have allocated more than needed, we initialize
 	 * only one record. */
-	mdata->size += vol->mft_recordsize;
+	mdata->size += vol->mft_record_size;
 	/* Now extend the bitmap if necessary. */
-	rcount = mdata->size / vol->mft_recordsize;
+	rcount = mdata->size >> vol->mft_record_size_bits;
 	bmp = ntfs_find_attr(vol->mft_ino, vol->at_bitmap, 0);
 	if (bmp->size * 8 < rcount) { /* Less bits than MFT records. */
 		ntfs_u8 buf[1];
@@ -141,20 +147,20 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 			return -EIO;
 	}
 	/* Now fill in the MFT header for the new block. */
-	buf = ntfs_calloc(vol->mft_recordsize);
+	buf = ntfs_calloc(vol->mft_record_size);
 	if (!buf)
 		return -ENOMEM;
-	ntfs_fill_mft_header(buf, vol->mft_recordsize, vol->blocksize, 0);
-	ntfs_insert_fixups(buf, vol->blocksize);
+	ntfs_fill_mft_header(buf, vol->mft_record_size, vol->sector_size, 0);
+	ntfs_insert_fixups(buf, vol->sector_size);
 	io.param = buf;
-	io.size = vol->mft_recordsize;
+	io.size = vol->mft_record_size;
 	io.fn_put = ntfs_put;
 	io.fn_get = ntfs_get;
 	error = ntfs_write_attr(vol->mft_ino, vol->at_data, 0,
-				(rcount - 1) * vol->mft_recordsize, &io);
+			(__s64)(rcount - 1) << vol->mft_record_size_bits, &io);
 	if (error)
 		return error;
-	if (io.size != vol->mft_recordsize)
+	if (io.size != vol->mft_record_size)
 		return -EIO;
 	error = ntfs_update_inode(vol->mft_ino);
 	if (error)
@@ -162,35 +168,47 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 	return 0;
 }
 
-/* Insert all attributes from the record mftno of the MFT in the inode ino.
+/*
+ * Insert all attributes from the record mftno of the MFT in the inode ino.
+ * If mftno is a base mft record we abort as soon as we find the attribute
+ * list, but only on the first pass. We will get called later when the attribute
+ * list attribute is being parsed so we need to distinguish the two cases.
  * FIXME: We should be performing structural consistency checks. (AIA)
- * Return 0 on success or -errno on error. */
+ * Return 0 on success or -errno on error.
+ */
 static int ntfs_insert_mft_attributes(ntfs_inode* ino, char *mft, int mftno)
 {
-	int i, error, type, len;
+	int i, error, type, len, present = 0;
 	char *it;
-	
-	/* Check for duplicate. */
-	for(i = 0; i < ino->record_count; i++)
-		if (ino->records[i] == mftno)
-			return 0;
-	/* (re-)allocate space if necessary. */
-	if (ino->record_count % 8 == 0)	{
-		int *new;
 
-		new = ntfs_malloc((ino->record_count + 8) * sizeof(int));
-		if (!new)
-			return -ENOMEM;
-		if (ino->records) {
-			for (i = 0; i < ino->record_count; i++)
-				new[i] = ino->records[i];
-			ntfs_free(ino->records);
+	/* Check for duplicate extension record. */
+	for(i = 0; i < ino->record_count; i++)
+		if (ino->records[i] == mftno) {
+			if (i)
+				return 0;
+			present = 1;
+			break;
 		}
-		ino->records = new;
+	if (!present) {
+		/* (re-)allocate space if necessary. */
+		if (ino->record_count % 8 == 0)	{
+			int *new;
+
+			new = ntfs_malloc((ino->record_count + 8) *
+								sizeof(int));
+			if (!new)
+				return -ENOMEM;
+			if (ino->records) {
+				for (i = 0; i < ino->record_count; i++)
+					new[i] = ino->records[i];
+				ntfs_free(ino->records);
+			}
+			ino->records = new;
+		}
+		ino->records[ino->record_count] = mftno;
+		ino->record_count++;
 	}
-	ino->records[ino->record_count] = mftno;
-	ino->record_count++;
-	it = mft + NTFS_GETU16(mft + 0x14);
+	it = mft + NTFS_GETU16(mft + 0x14); /* mft->attrs_offset */
 	do {
 		type = NTFS_GETU32(it);
 		len = NTFS_GETU32(it + 4);
@@ -199,8 +217,66 @@ static int ntfs_insert_mft_attributes(ntfs_inode* ino, char *mft, int mftno)
 			if (error)
 				return error;
 		}
+		/* If we have just processed the attribute list and this is
+		 * the first time we are parsing this (base) mft record then we
+		 * are done so that the attribute list gets parsed before the
+		 * entries in the base mft record. Otherwise we run into
+		 * problems with encountering attributes out of order and when
+		 * this happens with different attribute extents we die. )-:
+		 * This way we are ok as the attribute list is always sorted
+		 * fully and correctly. (-: */
+		if (type == 0x20 && !present)
+			return 0;
 		it += len;
-	} while (type != -1); /* Attribute list ends with type -1. */
+	} while (type != -1); /* Attribute listing ends with type -1. */
+	return 0;
+}
+
+/*
+ * Insert a single specific attribute from the record mftno of the MFT in the
+ * inode ino. We disregard the attribute list assuming we have already parsed
+ * it.
+ * FIXME: We should be performing structural consistency checks. (AIA)
+ * Return 0 on success or -errno on error.
+ */
+static int ntfs_insert_mft_attribute(ntfs_inode* ino, int mftno,
+				     ntfs_u8 *attr)
+{
+	int i, error, present = 0;
+
+	/* Check for duplicate extension record. */
+	for(i = 0; i < ino->record_count; i++)
+		if (ino->records[i] == mftno) {
+			present = 1;
+			break;
+		}
+	if (!present) {
+		/* (re-)allocate space if necessary. */
+		if (ino->record_count % 8 == 0)	{
+			int *new;
+
+			new = ntfs_malloc((ino->record_count + 8) *
+								sizeof(int));
+			if (!new)
+				return -ENOMEM;
+			if (ino->records) {
+				for (i = 0; i < ino->record_count; i++)
+					new[i] = ino->records[i];
+				ntfs_free(ino->records);
+			}
+			ino->records = new;
+		}
+		ino->records[ino->record_count] = mftno;
+		ino->record_count++;
+	}
+	if (NTFS_GETU32(attr) == -1) {
+		ntfs_debug(DEBUG_FILE3, "ntfs_insert_mft_attribute: attribute "
+				"type is -1.\n");
+		return 0;
+	}
+	error = ntfs_insert_attribute(ino, attr);
+	if (error)
+		return error;
 	return 0;
 }
 
@@ -208,12 +284,17 @@ static int ntfs_insert_mft_attributes(ntfs_inode* ino, char *mft, int mftno)
  * Return the number of remaining bytes in *plen. */
 static int parse_attributes(ntfs_inode *ino, ntfs_u8 *alist, int *plen)
 {
-	char *mft;
+	ntfs_u8 *mft, *attr;
 	int mftno, l, error;
 	int last_mft = -1;
 	int len = *plen;
 	
-	mft = ntfs_malloc(ino->vol->mft_recordsize);
+	if (!ino->attr) {
+		ntfs_error("parse_attributes: called on inode 0x%x without a "
+				"loaded base mft record.\n", ino->i_number);
+		return -EINVAL;
+	}
+	mft = ntfs_malloc(ino->vol->mft_record_size);
 	if (!mft)
 		return -ENOMEM;
 	while (len > 8)	{
@@ -222,23 +303,49 @@ static int parse_attributes(ntfs_inode *ino, ntfs_u8 *alist, int *plen)
 			break;
 	        /* Process an attribute description. */
 		mftno = NTFS_GETU32(alist + 0x10); 
-			/* FIXME: The mft reference (alist + 0x10) is __u64.
+			/* FIXME: The mft reference (alist + 0x10) is __s64.
 			* - Not a problem unless we encounter a huge partition.
 			* - Should be consistency checking the sequence numbers
 			*   though! This should maybe happen in 
 			*   ntfs_read_mft_record() itself and a hotfix could
 			*   then occur there or the user notified to run
 			*   ntfsck. (AIA) */
-		if (mftno != last_mft){
+		if (mftno != ino->i_number && mftno != last_mft) {
 			last_mft = mftno;
-			/* FIXME: Avoid loading record if it's already
-			 * processed. */
 			error = ntfs_read_mft_record(ino->vol, mftno, mft);
-			if (error)
+			if (error) {
+				ntfs_debug(DEBUG_FILE3, "parse_attributes: "
+					"ntfs_read_mft_record(mftno = 0x%x) "
+					"failed\n", mftno);
+				ntfs_free(mft);
 				return error;
-			error = ntfs_insert_mft_attributes(ino, mft, mftno);
-			if (error)
-				return error;
+			}
+		}
+		attr = ntfs_find_attr_in_mft_rec(
+				ino->vol,		/* ntfs volume */
+				mftno == ino->i_number ?/* mft record is: */
+					ino->attr:	/*   base record */
+					mft,		/*   extension record */
+				NTFS_GETU32(alist + 0),	/* type */
+				(wchar_t*)(alist + alist[7]),	/* name */
+				alist[6], 		/* name length */
+				1,			/* ignore case */
+				NTFS_GETU16(alist + 24)	/* instance number */
+				);
+		if (!attr) {
+			ntfs_error("parse_attributes: mft records 0x%x and/or "
+				       "0x%x corrupt!\n", ino->i_number, mftno);
+			ntfs_free(mft);
+			return -EINVAL; /* FIXME: Better error code? (AIA) */
+		}
+		error = ntfs_insert_mft_attribute(ino, mftno, attr);
+		if (error) {
+			ntfs_debug(DEBUG_FILE3, "parse_attributes: "
+				"ntfs_insert_mft_attribute(mftno 0x%x, "
+				"attribute type 0x%x) failed\n", mftno,
+				NTFS_GETU32(alist + 0));
+			ntfs_free(mft);
+			return error;
 		}
 		len -= l;
 		alist += l;
@@ -266,10 +373,13 @@ static void ntfs_load_attributes(ntfs_inode* ino)
 		return;
 	ntfs_debug(DEBUG_FILE2, "load_attributes %x 4\n", ino->i_number);
 	datasize = alist->size;
+	ntfs_debug(DEBUG_FILE2, "load_attributes %x: alist->size = 0x%x\n",
+			ino->i_number, alist->size);
 	if (alist->resident) {
 		parse_attributes(ino, alist->d.data, &datasize);
 		return;
 	}
+	ntfs_debug(DEBUG_FILE2, "load_attributes %x 5\n", ino->i_number);
 	buf = ntfs_malloc(1024);
 	if (!buf)    /* FIXME: Should be passing error code to caller. (AIA) */
 		return;
@@ -281,16 +391,24 @@ static void ntfs_load_attributes(ntfs_inode* ino)
 		io.fn_get = 0;
 		io.param = buf + delta;
 		io.size = len = min(datasize, 1024 - delta);
+		ntfs_debug(DEBUG_FILE2, "load_attributes %x: len = %i\n",
+						ino->i_number, len);
+		ntfs_debug(DEBUG_FILE2, "load_attributes %x: delta = %i\n",
+						ino->i_number, delta);
 		if (ntfs_read_attr(ino, vol->at_attribute_list, 0, offset,
 				   &io))
 			ntfs_error("error in load_attributes\n");
 		delta += len;
+		ntfs_debug(DEBUG_FILE2, "load_attributes %x: after += len, "
+				"delta = %i\n", ino->i_number, delta);
 		parse_attributes(ino, buf, &delta);
+		ntfs_debug(DEBUG_FILE2, "load_attributes %x: after parse_attr, "
+				"delta = %i\n", ino->i_number, delta);
 		if (delta)
 			/* Move remaining bytes to buffer start. */
 			ntfs_memmove(buf, buf + len - delta, delta);
 	}
-	ntfs_debug(DEBUG_FILE2, "load_attributes %x 5\n", ino->i_number);
+	ntfs_debug(DEBUG_FILE2, "load_attributes %x 6\n", ino->i_number);
 	ntfs_free(buf);
 }
 	
@@ -300,11 +418,9 @@ int ntfs_init_inode(ntfs_inode *ino, ntfs_volume *vol, int inum)
 	int error;
 
 	ntfs_debug(DEBUG_FILE1, "Initializing inode %x\n", inum);
-	if (!vol)
-		ntfs_error("NO VOLUME!\n");
 	ino->i_number = inum;
 	ino->vol = vol;
-	ino->attr = buf = ntfs_malloc(vol->mft_recordsize);
+	ino->attr = buf = ntfs_malloc(vol->mft_record_size);
 	if (!buf)
 		return -ENOMEM;
 	error = ntfs_read_mft_record(vol, inum, ino->attr);
@@ -342,7 +458,7 @@ void ntfs_clear_inode(ntfs_inode *ino)
 				ntfs_free(ino->attrs[i].d.data);
 		} else {
 			if (ino->attrs[i].d.r.runlist)
-				ntfs_free(ino->attrs[i].d.r.runlist);
+				ntfs_vfree(ino->attrs[i].d.r.runlist);
 		}
 	}
 	ntfs_free(ino->attrs);
@@ -352,7 +468,7 @@ void ntfs_clear_inode(ntfs_inode *ino)
 /* Check and fixup a MFT record. */
 int ntfs_check_mft_record(ntfs_volume *vol, char *record)
 {
-	return ntfs_fixup_record(vol, record, "FILE", vol->mft_recordsize);
+	return ntfs_fixup_record(vol, record, "FILE", vol->mft_record_size);
 }
 
 /* Return (in result) the value indicating the next available attribute 
@@ -406,7 +522,7 @@ check_namelen:
 	return it;
 }
 
-int ntfs_get_attr_size(ntfs_inode *ino, int type, char *name)
+__s64 ntfs_get_attr_size(ntfs_inode *ino, int type, char *name)
 {
 	ntfs_attribute *attr = ntfs_find_attr(ino, type, name);
 	if (!attr)
@@ -462,6 +578,7 @@ int ntfs_decompress_run(unsigned char **data, int *length,
 		ntfs_error("Can't decode run type field %x\n", type);
 		return -1;
 	}
+//	ntfs_debug(DEBUG_FILE3, "ntfs_decompress_run: length = 0x%x\n",*length);
 	if (*length < 0)
 	{
 		ntfs_error("Negative run length decoded\n");
@@ -502,6 +619,8 @@ int ntfs_decompress_run(unsigned char **data, int *length,
 		ntfs_error("Can't decode run type field %x\n", type);
 		return -1;
 	}
+//	ntfs_debug(DEBUG_FILE3, "ntfs_decompress_run: cluster = 0x%x\n",
+//								*cluster);
 	*data += (type >> 4);
 	return 0;
 }
@@ -519,17 +638,18 @@ int ntfs_decompress_run(unsigned char **data, int *length,
 /* Reads l bytes of the attribute (attr, name) of ino starting at offset on
  * vol into buf. Returns the number of bytes read in the ntfs_io struct.
  * Returns 0 on success, errno on failure */
-int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, int offset,
+int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 			ntfs_io *dest)
 {
 	int rnum;
 	ntfs_cluster_t cluster, s_cluster, vcn, len;
-	int l, chunk, copied;
+	__s64 l, chunk, copied;
 	int s_vcn;
-	int clustersize;
-	int error;
+	int error, clustersizebits;
 
-	clustersize = ino->vol->clustersize;
+	ntfs_debug(DEBUG_FILE3, "ntfs_readwrite_attr 0: inode = 0x%x, attr->"
+		"type = 0x%x, offset = 0x%Lx, dest->size = 0x%x\n",
+		ino->i_number, attr->type, offset, dest->size);
 	l = dest->size;
 	if (l == 0)
 		return 0;
@@ -567,40 +687,49 @@ int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, int offset,
 		dest->size = l;
 		return 0;
 	}
-	/* Read uninitialized data. */
-	if (offset >= attr->initialized && dest->do_read)
-		return ntfs_read_zero(dest, l);
-	if (offset + l > attr->initialized && dest->do_read) {
-		dest->size = chunk = offset + l - attr->initialized;
-		error = ntfs_readwrite_attr(ino, attr, offset, dest);
-		if (error)
-			return error;		
-		return ntfs_read_zero(dest, l - chunk);
-	}
-	if (attr->compressed) {
-		if (dest->do_read)
+	if (dest->do_read) {
+		/* Read uninitialized data. */
+		if (offset >= attr->initialized)
+			return ntfs_read_zero(dest, l);
+		if (offset + l > attr->initialized) {
+			dest->size = chunk = offset + l - attr->initialized;
+			error = ntfs_readwrite_attr(ino, attr, offset, dest);
+			if (error)
+				return error;
+			return ntfs_read_zero(dest, l - chunk);
+		}
+		if (attr->compressed)
 			return ntfs_read_compressed(ino, attr, offset, dest);
-		else
+	} else {
+		if (attr->compressed)
 			return ntfs_write_compressed(ino, attr, offset, dest);
 	}
 	vcn = 0;
-	s_vcn = offset / clustersize;
+	clustersizebits = ino->vol->cluster_size_bits;
+	s_vcn = offset >> clustersizebits;
 	for (rnum = 0; rnum < attr->d.r.len && 
-		       vcn + attr->d.r.runlist[rnum].len <= s_vcn; rnum++)
+		       vcn + attr->d.r.runlist[rnum].len <= s_vcn; rnum++) {
 		vcn += attr->d.r.runlist[rnum].len;
-	if (rnum == attr->d.r.len)
+	}
+	if (rnum == attr->d.r.len) {
+		ntfs_debug(DEBUG_FILE3, "ntfs_readwrite_attr: EOPNOTSUPP: "
+			"inode = 0x%x, rnum = %i, offset = 0x%Lx, vcn = , 0x%x"
+			"s_vcn = 0x%x\n", ino->i_number, rnum, offset, vcn,
+			s_vcn);
 		/*FIXME: Should extend runlist. */
 		return -EOPNOTSUPP;
+	}
 	copied = 0;
 	while (l) {
-		s_vcn = offset / clustersize;
+		s_vcn = offset >> clustersizebits;
 		cluster = attr->d.r.runlist[rnum].cluster;
 		len = attr->d.r.runlist[rnum].len;
 		s_cluster = cluster + s_vcn - vcn;
-		chunk = min((vcn + len) * clustersize - offset, l);
+		chunk = min(((__s64)(vcn + len) << clustersizebits) - offset,
+									l);
 		dest->size = chunk;
-		error = ntfs_getput_clusters(ino->vol, s_cluster, 
-					   offset - s_vcn * clustersize, dest);
+		error = ntfs_getput_clusters(ino->vol, s_cluster, offset -
+				((__s64)s_vcn << clustersizebits), dest);
 		if (error) {
 			ntfs_error("Read/write error\n");
 			dest->size = copied;
@@ -609,7 +738,7 @@ int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, int offset,
 		l -= chunk;
 		copied += chunk;
 		offset += chunk;
-		if (l && offset >= ((vcn + len) * clustersize))	{
+		if (l && offset >= ((__s64)(vcn + len) << clustersizebits)) {
 			rnum++;
 			vcn += len;
 			cluster = attr->d.r.runlist[rnum].cluster;
@@ -620,19 +749,22 @@ int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, int offset,
 	return 0;
 }
 
-int ntfs_read_attr(ntfs_inode *ino, int type, char *name, int offset,
+int ntfs_read_attr(ntfs_inode *ino, int type, char *name, __s64 offset,
 		   ntfs_io *buf)
 {
 	ntfs_attribute *attr;
 
 	buf->do_read = 1;
 	attr = ntfs_find_attr(ino, type, name);
-	if (!attr)
+	if (!attr) {
+		ntfs_debug(DEBUG_FILE3, "ntfs_read_attr: attr 0x%x not found "
+				"in inode 0x%x\n", type, ino->i_number);
 		return -EINVAL;
+	}
 	return ntfs_readwrite_attr(ino, attr, offset, buf);
 }
 
-int ntfs_write_attr(ntfs_inode *ino, int type, char *name, int offset,
+int ntfs_write_attr(ntfs_inode *ino, int type, char *name, __s64 offset,
 		    ntfs_io *buf)
 {
 	ntfs_attribute *attr;
@@ -653,15 +785,19 @@ int ntfs_vcn_to_lcn(ntfs_inode *ino, int vcn)
 	/* It's hard to give an error code. */
 	if (!data || data->resident || data->compressed)
 		return -1;
-	if (data->size <= vcn*ino->vol->clustersize)
+	if (data->size <= (__s64)vcn << ino->vol->cluster_size_bits)
 		return -1;
-	/* For Linux, block number 0 represents a hole.
-	 * Hopefully, nobody will attempt to bmap $Boot. */
-	if (data->initialized <= vcn * ino->vol->clustersize)
+	/*
+	 * For Linux, block number 0 represents a hole. Hopefully, nobody will
+	 * attempt to bmap $Boot. FIXME: Hopes are not good enough! We need to
+	 * fix this properly before reenabling mmap-ed stuff. (AIA)
+	 */
+	if (data->initialized <= (__s64)vcn << ino->vol->cluster_size_bits)
 		return 0;
 	for (rnum = 0; rnum < data->d.r.len &&
-		       vcn >= data->d.r.runlist[rnum].len; rnum++)
+				vcn >= data->d.r.runlist[rnum].len; rnum++)
 		vcn -= data->d.r.runlist[rnum].len;
+	/* We need to cope with sparse runs. (AIA) */
 	return data->d.r.runlist[rnum].cluster + vcn;
 }
 
@@ -685,7 +821,7 @@ static int allocate_store(ntfs_volume *vol, ntfs_disk_inode *store, int count)
 		store->records = n;
 	}
 	for (i = store->count; i < count; i++) {
-		store->records[i].record = ntfs_malloc(vol->mft_recordsize);
+		store->records[i].record = ntfs_malloc(vol->mft_record_size);
 		if (!store->records[i].record)
 			return -ENOMEM;
 		store->count++;
@@ -717,79 +853,99 @@ static void deallocate_store(ntfs_disk_inode* store)
  * mapping pairs array. On exit, it contains the offset in @rec of the first
  * byte after the end of the mapping pairs array.
  */
-static int layout_runs(ntfs_attribute *attr, char* rec, int* offs, int size)
+static int layout_runs(ntfs_attribute *attr, char *rec, int *offs, int size)
 {
 	int i, len, offset, coffs;
+	/* ntfs_cluster_t MUST be signed! (AIA) */
 	ntfs_cluster_t cluster, rclus;
 	ntfs_runlist *rl = attr->d.r.runlist;
 	cluster = 0;
 	offset = *offs;
 	for (i = 0; i < attr->d.r.len; i++) {
+		/*
+		 * We cheat with this check on the basis that cluster will never
+		 * be less than -1 and the cluster delta will fit in signed
+		 * 32-bits (ntfs_cluster_t). (AIA)
+		 */
+		if (rl[i].cluster < (ntfs_cluster_t)-1) {
+			ntfs_error("layout_runs() encountered an out of bounds "
+					"cluster delta!\n");
+			return -ERANGE;
+		}
 		rclus = rl[i].cluster - cluster;
 		len = rl[i].len;
 		rec[offset] = 0;
  		if (offset + 9 > size)
 			return -E2BIG; /* It might still fit, but this
 					* simplifies testing. */
-		/* Run length is stored as signed number. */
-		if (len <= 0x7F) {
-			NTFS_PUTU8(rec + offset + 1, len);
+		/*
+		 * Run length is stored as signed number, so deal with it
+		 * properly, i.e. observe that a negative number will have all
+		 * its most significant bits set to 1 but we don't store that
+		 * in the mapping pairs array. We store the smallest type of
+		 * negative number required, thus in the first if we check
+		 * whether len fits inside a signed byte and if so we store it
+		 * as such, the next ifs check for a signed short, then a signed
+		 * 24-bit and finally the full blown signed 32-bit. Same goes
+		 * for rlus below. (AIA)
+		 */
+		if (len >= -0x80 && len <= 0x7f) {
+			NTFS_PUTU8(rec + offset + 1, len & 0xff);
 			coffs = 1;
- 		} else if (len <= 0x7FFF) {
-			NTFS_PUTU16(rec + offset + 1, len);
+ 		} else if (len >= -0x8000 && len <= 0x7fff) {
+			NTFS_PUTU16(rec + offset + 1, len & 0xffff);
 			coffs = 2;
- 		} else if (len <= 0x7FFFFF) {
-			NTFS_PUTU24(rec + offset + 1, len);
+ 		} else if (len >= -0x800000 && len <= 0x7fffff) {
+			NTFS_PUTU24(rec + offset + 1, len & 0xffffff);
 			coffs = 3;
-		} else {
+		} else /* if (len >= -0x80000000LL && len <= 0x7fffffff */ {
 			NTFS_PUTU32(rec + offset + 1, len);
 			coffs = 4;
-		}
-    		*(rec + offset) |= coffs++;
-		if (rl[i].cluster == MAX_CLUSTER_T) /* Compressed run. */
+		} /* else ... FIXME: When len becomes 64-bit we need to extend
+		   * 		     the else if () statements. (AIA) */
+		*(rec + offset) |= coffs++;
+		if (rl[i].cluster == (ntfs_cluster_t)-1) /* Compressed run. */
 			/* Nothing */;
-		else if (rclus >= -0x80 && rclus <= 0x7F) {
+		else if (rclus >= -0x80 && rclus <= 0x7f) {
 			*(rec + offset) |= 0x10;
-			NTFS_PUTS8(rec + offset + coffs, rclus);
+			NTFS_PUTS8(rec + offset + coffs, rclus & 0xff);
 			coffs += 1;
-		} else if(rclus >= -0x8000 && rclus <= 0x7FFF) {
+		} else if (rclus >= -0x8000 && rclus <= 0x7fff) {
 			*(rec + offset) |= 0x20;
-			NTFS_PUTS16(rec + offset + coffs, rclus);
+			NTFS_PUTS16(rec + offset + coffs, rclus & 0xffff);
 			coffs += 2;
-		} else if(rclus >= -0x800000 && rclus <= 0x7FFFFF) {
+		} else if (rclus >= -0x800000 && rclus <= 0x7fffff) {
 			*(rec + offset) |= 0x30;
-			NTFS_PUTS24(rec + offset + coffs, rclus);
+			NTFS_PUTS24(rec + offset + coffs, rclus & 0xffffff);
 			coffs += 3;
-		} else
-#if 0 /* In case ntfs_cluster_t ever becomes 64bit. */
-	       	if (rclus >= -0x80000000LL && rclus <= 0x7FFFFFFF)
-#endif
-		{
+		} else /* if (rclus >= -0x80000000LL && rclus <= 0x7fffffff)*/ {
 			*(rec + offset) |= 0x40;
-			NTFS_PUTS32(rec + offset + coffs, rclus);
+			NTFS_PUTS32(rec + offset + coffs, rclus
+							/* & 0xffffffffLL */);
 			coffs += 4;
-		}
-#if 0 /* For 64-bit ntfs_cluster_t */
+		} /* FIXME: When rclus becomes 64-bit.
 		else if (rclus >= -0x8000000000 && rclus <= 0x7FFFFFFFFF) {
 			*(rec + offset) |= 0x50;
-			NTFS_PUTS40(rec + offset + coffs, rclus);
+			NTFS_PUTS40(rec + offset + coffs, rclus &
+							0xffffffffffLL);
 			coffs += 5;
 		} else if (rclus >= -0x800000000000 && 
 						rclus <= 0x7FFFFFFFFFFF) {
 			*(rec + offset) |= 0x60;
-			NTFS_PUTS48(rec + offset + coffs, rclus);
+			NTFS_PUTS48(rec + offset + coffs, rclus &
+							0xffffffffffffLL);
 			coffs += 6;
 		} else if (rclus >= -0x80000000000000 && 
 						rclus <= 0x7FFFFFFFFFFFFF) {
 			*(rec + offset) |= 0x70;
-			NTFS_PUTS56(rec + offset + coffs, rclus);
+			NTFS_PUTS56(rec + offset + coffs, rclus &
+							0xffffffffffffffLL);
 			coffs += 7;
 		} else {
 			*(rec + offset) |= 0x80;
 			NTFS_PUTS64(rec + offset + coffs, rclus);
 			coffs += 8;
-		}
-#endif
+		} */
 		offset += coffs;
 		if (rl[i].cluster)
 			cluster = rl[i].cluster;
@@ -828,64 +984,59 @@ static void count_runs(ntfs_attribute *attr, char *buf)
  */
 static int layout_attr(ntfs_attribute* attr, char *buf, int size, int *psize)
 {
-	int asize, error;
-	if (size < 10)
-		return -E2BIG;
-	NTFS_PUTU32(buf, attr->type);
-	/* Fill in length later. */
-	NTFS_PUTU8(buf + 8, attr->resident ? 0 : 1);
-	NTFS_PUTU8(buf + 9, attr->namelen);
-	/* Fill in offset to name later. */
-	NTFS_PUTU16(buf + 0xA, 0);
-	NTFS_PUTU16(buf + 0xC, attr->compressed);
-	/* Assign attribute instance. */
-	NTFS_PUTU16(buf + 0xE, attr->attrno);
+	int nameoff, hdrsize, asize;
+	
 	if (attr->resident) {
-		if (size < attr->size + 0x18 + attr->namelen)
+		nameoff = 0x18;
+		hdrsize = (nameoff + 2 * attr->namelen + 7) & ~7;
+		asize = (hdrsize + attr->size + 7) & ~7;
+		if (size < asize)
 			return -E2BIG;
-		asize = 0x18;
 		NTFS_PUTU32(buf + 0x10, attr->size);
 		NTFS_PUTU16(buf + 0x16, attr->indexed);
-		if (attr->name) {
-			ntfs_memcpy(buf + asize, attr->name, 2 * attr->namelen);
-			NTFS_PUTU16(buf + 0xA, asize);
-			asize += 2 * attr->namelen;
-			asize = (asize + 7) & ~7;
-		}
-		NTFS_PUTU16(buf + 0x14, asize);
-		ntfs_memcpy(buf + asize, attr->d.data, attr->size);
-		asize += attr->size;
+		NTFS_PUTU16(buf + 0x14, hdrsize);
+		if (attr->size)
+			ntfs_memcpy(buf + hdrsize, attr->d.data, attr->size);
 	} else {
+		int error;
+
+ 		if (attr->compressed)
+ 			nameoff = 0x48;
+ 		else
+ 			nameoff = 0x40;
+ 		hdrsize = (nameoff + 2 * attr->namelen + 7) & ~7;
+ 		if (size < hdrsize)
+ 			return -E2BIG;
+ 		/* Make asize point at the end of the attribute record header,
+		   i.e. at the beginning of the mapping pairs array. */
+ 		asize = hdrsize;
+ 		error = layout_runs(attr, buf, &asize, size);
+ 		/* Now, asize points one byte beyond the end of the mapping
+		   pairs array. */
+		if (error)
+ 			return error;
+ 		/* The next attribute has to begin on 8-byte boundary. */
+		asize = (asize + 7) & ~7;
 		/* FIXME: fragments */
 		count_runs(attr, buf);
-		/* Offset to data is added later. */
+		NTFS_PUTU16(buf + 0x20, hdrsize);
 		NTFS_PUTU16(buf + 0x22, attr->cengine);
 		NTFS_PUTU32(buf + 0x24, 0);
-		NTFS_PUTU64(buf + 0x28, attr->allocated);
-		NTFS_PUTU64(buf + 0x30, attr->size);
-		NTFS_PUTU64(buf + 0x38, attr->initialized);
-		if (attr->compressed) {
-			NTFS_PUTU64(buf + 0x40, attr->compsize);
-			asize = 0x48;
-		} else
-			asize = 0x40;
-		if (attr->name) {
-			NTFS_PUTU16(buf + 0xA, asize);
-			ntfs_memcpy(buf + asize, attr->name, 2 * attr->namelen);
-			asize += 2 * attr->namelen;
-			/* SRD: you whaaa? - AIA: Align to next 8 byte boundary
-			 * as required by NTFS design and implementation. */
-			asize = (asize + 7) & ~7;
-		}
-		/* asize points at the beginning of the data. */
-		NTFS_PUTU16(buf + 0x20, asize);
-		error = layout_runs(attr, buf, &asize, size);
-		/* Now asize points at the end of the data. */
-		if (error)
-			return error;
+		NTFS_PUTS64(buf + 0x28, attr->allocated);
+		NTFS_PUTS64(buf + 0x30, attr->size);
+		NTFS_PUTS64(buf + 0x38, attr->initialized);
+		if (attr->compressed)
+			NTFS_PUTS64(buf + 0x40, attr->compsize);
 	}
-	asize = (asize + 7) & ~7;
+	NTFS_PUTU32(buf, attr->type);
 	NTFS_PUTU32(buf + 4, asize);
+	NTFS_PUTU8(buf + 8, attr->resident ? 0 : 1);
+	NTFS_PUTU8(buf + 9, attr->namelen);
+	NTFS_PUTU16(buf + 0xa, nameoff);
+	NTFS_PUTU16(buf + 0xc, attr->compressed);
+	NTFS_PUTU16(buf + 0xe, attr->attrno);
+	if (attr->namelen)
+		ntfs_memcpy(buf + nameoff, attr->name, 2 * attr->namelen);
 	*psize = asize;
 	return 0;
 }
@@ -905,42 +1056,56 @@ static int layout_attr(ntfs_attribute* attr, char *buf, int size, int *psize)
  */
 int layout_inode(ntfs_inode *ino, ntfs_disk_inode *store)
 {
-	int offset, i;
+	int offset, i, size, psize, error, count, recno;
 	ntfs_attribute *attr;
 	unsigned char *rec;
-	int size, psize;
-	int error;
 
-	if (ino->record_count > 1) {
-		ntfs_error("layout_inode: attribute lists not supported\n");
-		return -EOPNOTSUPP;
-	}
-	error = allocate_store(ino->vol, store, 1);
+	error = allocate_store(ino->vol, store, ino->record_count);
 	if (error)
 		return error;
-	rec = store->records[0].record;
-	size = ino->vol->mft_recordsize;
-	store->records[0].recno = ino->records[0];
-	/* Copy header. */
-	offset = NTFS_GETU16(ino->attr + 0x14);
-	ntfs_memcpy(rec, ino->attr, offset);
-	for (i = 0; i < ino->attr_count; i++) {
-		attr = ino->attrs + i;
-		error = layout_attr(attr, rec + offset, size - offset, &psize);
-		if (error)
-			return error;
-		offset += psize;
-	}
-	/* Terminating attribute. */
-	if (offset + 8 < size) {
+	size = ino->vol->mft_record_size;
+ 	count = i = 0;
+ 	do {
+ 		if (count < ino->record_count) {
+ 			recno = ino->records[count];
+ 		} else {
+ 			error = allocate_store(ino->vol, store, count + 1);
+ 			if (error)
+ 				return error;
+	 		recno = -1;
+		}
+		/*
+		 * FIXME: We need to support extension records properly.
+		 * At the moment they wouldn't work. Probably would "just" get
+		 * corrupted if we write to them... (AIA)
+		 */
+	 	store->records[count].recno = recno;
+ 		rec = store->records[count].record;
+	 	count++;
+ 		/* Copy header. */
+	 	offset = NTFS_GETU16(ino->attr + 0x14);
+		ntfs_memcpy(rec, ino->attr, offset);
+	 	/* Copy attributes. */
+ 		while (i < ino->attr_count) {
+ 			attr = ino->attrs + i;
+	 		error = layout_attr(attr, rec + offset,
+						size - offset - 8, &psize);
+	 		if (error == -E2BIG && offset != NTFS_GETU16(ino->attr
+						+ 0x14))
+ 				break;
+ 			if (error)
+ 				return error;
+ 			offset += psize;
+ 			i++;
+ 		}
+ 		/* Terminating attribute. */
 		NTFS_PUTU32(rec + offset, 0xFFFFFFFF);
 		offset += 4;
 		NTFS_PUTU32(rec + offset, 0);
 		offset += 4;
-	} else
-		return -E2BIG;
-	NTFS_PUTU32(rec + 0x18, offset);
-	return 0;
+		NTFS_PUTU32(rec + 0x18, offset);
+	} while (i < ino->attr_count || count < ino->record_count);
+	return count - ino->record_count;
 }
 
 /*
@@ -952,13 +1117,11 @@ int layout_inode(ntfs_inode *ino, ntfs_disk_inode *store)
  */
 int ntfs_update_inode(ntfs_inode *ino)
 {
-	int error;
+	int error, i;
 	ntfs_disk_inode store;
 	ntfs_io io;
-	int i;
 
-	store.count = store.size = 0;
-	store.records = 0;
+	ntfs_bzero(&store, sizeof(store));
 	error = layout_inode(ino, &store);
 	if (error == -E2BIG) {
 		error = ntfs_split_indexroot(ino);
@@ -970,13 +1133,14 @@ int ntfs_update_inode(ntfs_inode *ino)
 		if (!error)
 			error = layout_inode(ino, &store);
 	}
-	if (error == -E2BIG) {
-		/* FIXME: should try: introduce extension records */
-		ntfs_error("cannot handle saving inode %x\n", ino->i_number);
-		deallocate_store(&store);
-		return -EOPNOTSUPP;
+	if (error > 0) {
+		/* FIXME: Introduce extension records. */
+		error = -E2BIG;
 	}
 	if (error) {
+		if (error == -E2BIG)
+			ntfs_error("cannot handle saving inode %x\n",
+				   ino->i_number);
 		deallocate_store(&store);
 		return error;
 	}
@@ -984,21 +1148,22 @@ int ntfs_update_inode(ntfs_inode *ino)
 	io.fn_put = 0;
 	for (i = 0; i < store.count; i++) {
 		ntfs_insert_fixups(store.records[i].record,
-							  ino->vol->blocksize);
+						ino->vol->sector_size);
 		io.param = store.records[i].record;
-		io.size = ino->vol->mft_recordsize;
+		io.size = ino->vol->mft_record_size;
 		/* FIXME: Is this the right way? */
 		error = ntfs_write_attr(ino->vol->mft_ino, ino->vol->at_data,
-					0, store.records[i].recno * 
-					ino->vol->mft_recordsize, &io);
-		if (error || io.size != ino->vol->mft_recordsize) {
+					0, (__s64)store.records[i].recno <<
+					ino->vol->mft_record_size_bits, &io);
+		if (error || io.size != ino->vol->mft_record_size) {
 			/* Big trouble, partially written file. */
-			ntfs_error("Please unmount: Write error in inode %x\n",
-				   ino->i_number);
+			ntfs_error("Please unmount: Write error in inode "
+					"0x%x\n", ino->i_number);
 			deallocate_store(&store);
 			return error ? error : -EIO;
 		}
 	}
+	deallocate_store(&store);
 	return 0;
 }	
 
@@ -1080,19 +1245,42 @@ void ntfs_decompress(unsigned char *dest, unsigned char *src, ntfs_size_t l)
 	}
 }
 
-/* Caveat: No range checking in either ntfs_set_bit or ntfs_clear_bit. */
-void ntfs_set_bit(unsigned char *byte, int bit)
+/*
+ * NOTE: Neither of the ntfs_*_bit functions are atomic! But we don't need
+ * them atomic at present as we never operate on shared/cached bitmaps.
+ */
+static __inline__ int ntfs_get_bit(unsigned char *byte, const int bit)
 {
-	byte += (bit >> 3);
-	bit &= 7;
-	*byte |= (1 << bit);
+	return byte[bit >> 3] & (1 << (bit & 7)) ? 1 : 0;
 }
 
-void ntfs_clear_bit(unsigned char *byte, int bit)
+static __inline__ void ntfs_set_bit(unsigned char *byte, const int bit)
 {
-	byte += (bit >> 3);
-	bit &= 7;
-	*byte &= ~(1 << bit);
+	byte[bit >> 3] |= 1 << (bit & 7);
+}
+
+static __inline__ void ntfs_clear_bit(unsigned char *byte, const int bit)
+{
+	byte[bit >> 3] &= ~(1 << (bit & 7));
+}
+
+__inline__ int ntfs_test_and_set_bit(unsigned char *byte, const int bit)
+{
+	unsigned char *ptr = byte + (bit >> 3);
+	int b = 1 << (bit & 7);
+	int oldbit = *ptr & b ? 1 : 0;
+	*ptr |= b;
+	return oldbit;
+}
+
+static __inline__ int ntfs_test_and_clear_bit(unsigned char *byte,
+					      const int bit)
+{
+	unsigned char *ptr = byte + (bit >> 3);
+	int b = 1 << (bit & 7);
+	int oldbit = *ptr & b ? 1 : 0;
+	*ptr &= ~b;
+	return oldbit;
 }
 
 /**
@@ -1104,50 +1292,87 @@ void ntfs_clear_bit(unsigned char *byte, int bit)
  * and allocating it in the mft bitmap.
  * Return 0 on success or -ERRNO on error.
  *
- * TODO(AIA): Implement mft bitmap caching. Replace function by race safe one.
+ * TODO(AIA): Implement mft bitmap caching.
  */
-static int ntfs_new_inode(ntfs_volume* vol, int* result)
+static int ntfs_new_inode(ntfs_volume *vol, unsigned long *result)
 {
-	int byte, error;
-	int bit;
-	int size, length;
+	int byte, bit, error, size, length;
 	unsigned char value;
 	ntfs_u8 *buffer;
 	ntfs_io io;
 	ntfs_attribute *data;
 
-	buffer = ntfs_malloc(2048);
+	*result = 0;
+	/* Determine the number of mft records in the mft. */
+	data = ntfs_find_attr(vol->mft_ino, vol->at_data, 0);
+	length = data->size >> vol->mft_record_size_bits;
+	/* Allocate sufficient space for the mft bitmap attribute value,
+	   inferring it from the number of mft records. */
+	buffer = ntfs_malloc((length + 7) >> 3);
 	if (!buffer)
 		return -ENOMEM;
 	io.fn_put = ntfs_put;
 	io.fn_get = ntfs_get;
+try_again:
 	io.param = buffer;
-	/* FIXME: Bitmaps larger than 2048 bytes. */
-	io.size = 2048;
+	io.size = (length + 7) >> 3;
 	error = ntfs_read_attr(vol->mft_ino, vol->at_bitmap, 0, 0, &io);
-	if (error) {
-		ntfs_free(buffer);
-		return error;
-	}
+	if (error)
+		goto err_out;
 	size = io.size;
-	data = ntfs_find_attr(vol->mft_ino, vol->at_data, 0);
-	length = data->size / vol->mft_recordsize;
-	/* SRD: Start at byte 0: bits for system files _are_ already set in 
-	 * bitmap. AIA: This includes the reserved entries as well. */
-	for (byte = 0; 8 * byte < length; byte++) {
+	/* Start at byte 0, as the bits for all 16 system files are already
+	   set in the bitmap. */
+	for (bit = byte = 0; (byte << 3) < length; byte++) {
 		value = buffer[byte];
 		if (value == 0xFF)
 			continue;
-		for (bit = 0; (bit < 8) && (8 * byte + bit < length); 
-							 bit++, value >>= 1) {
-			if (!(value & 1)) {
-				*result = byte * 8 + bit;
-				return 0;
-			}
-		}
+		bit = ffz(value);
+		if (bit < 8)
+			break;
 	}
-	/* There is no free space. We must first extend the MFT. */
-	return -ENOSPC;
+	if ((byte << 3) + bit >= length) {
+		/* No free space left. Need to extend the mft. */
+		error = -ENOSPC;
+		goto err_out;
+	}
+	/* Get the byte containing our bit again, now taking the BKL. */
+	io.param = buffer;
+	io.size = 1;
+	lock_kernel();
+	error = ntfs_read_attr(vol->mft_ino, vol->at_bitmap, 0, byte, &io);
+	if (error || (io.size != 1 && (error = -EIO, 1)))
+		goto err_unl_out;
+	if (ntfs_test_and_set_bit(buffer, bit)) {
+		unlock_kernel();
+		/* Give other process(es) a chance to finish. */
+		schedule();
+		goto try_again;
+	}
+	io.param = buffer;
+ 	error = ntfs_write_attr(vol->mft_ino, vol->at_bitmap, 0, byte, &io);
+	if (error || (io.size != 1 && (error = -EIO, 1)))
+		goto err_unl_out;
+	/* Change mft on disk, required when mft bitmap is resident. */
+	error = ntfs_update_inode(vol->mft_ino);
+	if (!error)
+		*result = (byte << 3) + bit;
+err_unl_out:
+	unlock_kernel();
+err_out:
+	ntfs_free(buffer);
+#ifdef DEBUG
+	if (error)
+		printk(KERN_INFO "ntfs_new_inode() failed to allocate an "
+				 "mft record. Error = %i\n", error);
+	else
+		printk(KERN_INFO "ntfs_new_inode() allocated mft record number "
+				 "0x%lx\n", *result);
+#endif
+	return error;
+	/*
+	 * FIXME: Don't forget $MftMirr, though this probably belongs
+	 * in ntfs_update_inode() (or even deeper). (AIA)
+	 */
 }
 
 static int add_mft_header(ntfs_inode *ino)
@@ -1156,8 +1381,8 @@ static int add_mft_header(ntfs_inode *ino)
 	ntfs_volume *vol = ino->vol;
 
 	mft = ino->attr;
-	ntfs_bzero(mft, vol->mft_recordsize);
-	ntfs_fill_mft_header(mft, vol->mft_recordsize, vol->blocksize,
+	ntfs_bzero(mft, vol->mft_record_size);
+	ntfs_fill_mft_header(mft, vol->mft_record_size, vol->sector_size,
 			     ino->sequence_number);
 	return 0;
 }
@@ -1183,8 +1408,6 @@ static int add_standard_information(ntfs_inode *ino)
 	return error;
 }
 
-/* FIXME: Need to pass in the size of the file (Data size) as well as the
- * allocated size for file data on disk (Allocated size). (AIA) */
 static int add_filename(ntfs_inode* ino, ntfs_inode* dir, 
 			const unsigned char *filename, int length, 
 			ntfs_u32 flags)
@@ -1201,7 +1424,6 @@ static int add_filename(ntfs_inode* ino, ntfs_inode* dir,
 	data = ntfs_malloc(size);
 	if (!data)
 		return -ENOMEM;
-	ntfs_bzero(data, size);
 	/* Search for a position. */
 	position = data;
 	NTFS_PUTINUM(position, dir);			/* Inode num of dir */
@@ -1210,10 +1432,16 @@ static int add_filename(ntfs_inode* ino, ntfs_inode* dir,
 	NTFS_PUTU64(position + 0x10, now);		/* Last modification */
 	NTFS_PUTU64(position + 0x18, now);		/* Last mod for MFT */
 	NTFS_PUTU64(position + 0x20, now);		/* Last access */
-	/*NTFS_PUTU64(position + 0x28, 0);*/		/* Allocated size */
-	/*NTFS_PUTU64(position + 0x30, 0);*/		/* Data size */
+	/* FIXME: Get the following two sizes by finding the data attribute
+	 * in ino->attr and copying the corresponding fields from there.
+	 * If no data present then set to zero. In current implementation
+	 * add_data is called after add_filename so zero is correct on
+	 * creation. Need to change when we have hard links / support different
+	 * filename namespaces. (AIA) */
+	NTFS_PUTS64(position + 0x28, 0);		/* Allocated size */
+	NTFS_PUTS64(position + 0x30, 0);		/* Data size */
 	NTFS_PUTU32(position + 0x38, flags);		/* File flags */
-	/*NTFS_PUTU32(position + 0x3c, 0);*/		/* We don't use these
+	NTFS_PUTU32(position + 0x3c, 0);		/* We don't use these
 							 * features yet. */
 	NTFS_PUTU8(position + 0x40, length);		/* Filename length */
 	NTFS_PUTU8(position + 0x41, 0);			/* Only long name */
@@ -1281,11 +1509,10 @@ static int add_data(ntfs_inode* ino, unsigned char *data, int length)
 int ntfs_alloc_inode(ntfs_inode *dir, ntfs_inode *result, const char *filename,
 		     int namelen, ntfs_u32 flags)
 {
-	ntfs_io io;
 	int error;
-	ntfs_u8 buffer[2];
 	ntfs_volume *vol = dir->vol;
-	int byte, bit;
+	ntfs_u8 buffer[2];
+	ntfs_io io;
 
 	error = ntfs_new_inode(vol, &(result->i_number));
 	if (error == -ENOSPC) {
@@ -1295,50 +1522,26 @@ int ntfs_alloc_inode(ntfs_inode *dir, ntfs_inode *result, const char *filename,
 		error = ntfs_new_inode(vol, &(result->i_number));
 	}
 	if (error) {
-		ntfs_error("ntfs_get_empty_inode: no free inodes\n");
+		if (error == -ENOSPC)
+			ntfs_error("ntfs_get_empty_inode: no free inodes\n");
 		return error;
 	}
-	byte = result->i_number / 8;
-	bit = result->i_number & 7;
+	/* Get the sequence number. */
 	io.fn_put = ntfs_put;
 	io.fn_get = ntfs_get;
 	io.param = buffer;
-	io.size = 1;
-	/* Set a single bit. */
-	error = ntfs_read_attr(vol->mft_ino, vol->at_bitmap, 0, byte, &io);
-	if (error)
-		return error;
-	if (io.size != 1)
-		return -EIO;
-	ntfs_set_bit(buffer, bit);
-	io.param = buffer;
-	io.size = 1;
- 	error = ntfs_write_attr(vol->mft_ino, vol->at_bitmap, 0, byte, &io);
-	if (error)
-		return error;
-	if (io.size != 1)
-		return -EIO;
-	/* FIXME: Should change $Mft on disk.
-	 * error = ntfs_update_inode(vol->mft_ino);
-	 * if (error)
-	 * 	return error; 
-	 * FIXME: And don't forget $MftMirr, though this probably belongs
-	 * in ntfs_update_inode() (or even deeper). (AIA) */
-	/* Get the sequence number. */
-	io.param = buffer;
 	io.size = 2;
 	error = ntfs_read_attr(vol->mft_ino, vol->at_data, 0, 
-			       result->i_number * vol->mft_recordsize + 0x10,
-			       &io);
+			((__s64)result->i_number << vol->mft_record_size_bits)
+			+ 0x10, &io);
 	if (error)
 		return error;
 	/* Increment the sequence number skipping zero. */
-	if (NTFS_GETU16(buffer) == 0xffff)
-		result->sequence_number = 1;
-	else
-		result->sequence_number = NTFS_GETU16(buffer) + 1;
+	result->sequence_number = (NTFS_GETU16(buffer) + 1) & 0xffff;
+	if (!result->sequence_number)
+		result->sequence_number++;
 	result->vol = vol;
-	result->attr = ntfs_malloc(vol->mft_recordsize);
+	result->attr = ntfs_malloc(vol->mft_record_size);
 	if (!result->attr)
 		return -ENOMEM;
 	result->attr_count = 0;

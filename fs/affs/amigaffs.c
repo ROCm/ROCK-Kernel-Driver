@@ -57,6 +57,7 @@ affs_insert_hash(struct inode *dir, struct buffer_head *bh)
 	}
 	AFFS_TAIL(sb, bh)->parent = cpu_to_be32(dir->i_ino);
 	AFFS_TAIL(sb, bh)->hash_chain = 0;
+	affs_fix_checksum(sb, bh);
 
 	if (dir->i_ino == dir_bh->b_blocknr)
 		AFFS_HEAD(dir_bh)->table[offset] = cpu_to_be32(ino);
@@ -64,7 +65,7 @@ affs_insert_hash(struct inode *dir, struct buffer_head *bh)
 		AFFS_TAIL(sb, dir_bh)->hash_chain = cpu_to_be32(ino);
 
 	affs_adjust_checksum(dir_bh, ino);
-	mark_buffer_dirty(dir_bh);
+	mark_buffer_dirty_inode(dir_bh, dir);
 	affs_brelse(dir_bh);
 
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
@@ -105,7 +106,8 @@ affs_remove_hash(struct inode *dir, struct buffer_head *rem_bh)
 			else
 				AFFS_TAIL(sb, bh)->hash_chain = ino;
 			affs_adjust_checksum(bh, be32_to_cpu(ino) - hash_ino);
-			mark_buffer_dirty(bh);
+			mark_buffer_dirty_inode(bh, dir);
+			AFFS_TAIL(sb, rem_bh)->parent = 0;
 			retval = 0;
 			break;
 		}
@@ -159,7 +161,6 @@ affs_remove_link(struct dentry *dentry)
 	int retval;
 
 	pr_debug("AFFS: remove_link(key=%ld)\n", inode->i_ino);
-	down(&AFFS_INODE->i_link_lock);
 	retval = -EIO;
 	bh = affs_bread(sb, inode->i_ino);
 	if (!bh)
@@ -179,18 +180,20 @@ affs_remove_link(struct dentry *dentry)
 		if (!dir)
 			goto done;
 
-		down(&AFFS_DIR->i_hash_lock);
+		affs_lock_dir(dir);
 		affs_fix_dcache(dentry, link_ino);
 		retval = affs_remove_hash(dir, link_bh);
 		if (retval)
 			goto done;
+		mark_buffer_dirty_inode(link_bh, inode);
 
 		memcpy(AFFS_TAIL(sb, bh)->name, AFFS_TAIL(sb, link_bh)->name, 32);
 		retval = affs_insert_hash(dir, bh);
 		if (retval)
 			goto done;
+		mark_buffer_dirty_inode(bh, inode);
 
-		up(&AFFS_DIR->i_hash_lock);
+		affs_unlock_dir(dir);
 		iput(dir);
 	} else {
 		link_bh = affs_bread(sb, link_ino);
@@ -203,7 +206,7 @@ affs_remove_link(struct dentry *dentry)
 			ino = AFFS_TAIL(sb, link_bh)->link_chain;
 			AFFS_TAIL(sb, bh)->link_chain = ino;
 			affs_adjust_checksum(bh, be32_to_cpu(ino) - link_ino);
-			mark_buffer_dirty(bh);
+			mark_buffer_dirty_inode(bh, inode);
 			retval = 0;
 			/* Fix the link count, if bh is a normal header block without links */
 			switch (be32_to_cpu(AFFS_TAIL(sb, bh)->stype)) {
@@ -226,7 +229,6 @@ affs_remove_link(struct dentry *dentry)
 done:
 	affs_brelse(link_bh);
 	affs_brelse(bh);
-	up(&AFFS_INODE->i_link_lock);
 	return retval;
 }
 
@@ -281,28 +283,41 @@ affs_remove_header(struct dentry *dentry)
 		goto done;
 
 	pr_debug("AFFS: remove_header(key=%ld)\n", inode->i_ino);
-	down(&AFFS_DIR->i_hash_lock);
-	if (S_ISDIR(inode->i_mode)) {
-		retval = affs_empty_dir(inode);
-		if (retval)
-			goto done_unlock;
-	}
-
 	retval = -EIO;
-	bh = affs_bread(sb, inode->i_ino);
+	bh = affs_bread(sb, (u32)dentry->d_fsdata);
 	if (!bh)
 		goto done;
+
+	affs_lock_link(inode);
+	affs_lock_dir(dir);
+	switch (be32_to_cpu(AFFS_TAIL(sb, bh)->stype)) {
+	case ST_USERDIR:
+		/* if we ever want to support links to dirs
+		 * i_hash_lock of the inode must only be
+		 * taken after some checks
+		 */
+		affs_lock_dir(inode);
+		retval = affs_empty_dir(inode);
+		affs_unlock_dir(inode);
+		if (retval)
+			goto done_unlock;
+		break;
+	default:
+		break;
+	}
 
 	retval = affs_remove_hash(dir, bh);
 	if (retval)
 		goto done_unlock;
+	mark_buffer_dirty_inode(bh, inode);
 
-	up(&AFFS_DIR->i_hash_lock);
+	affs_lock_dir(dir);
 
 	if (inode->i_nlink > 1)
 		retval = affs_remove_link(dentry);
 	else
 		inode->i_nlink = 0;
+	affs_unlock_link(inode);
 	inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 
@@ -311,7 +326,8 @@ done:
 	return retval;
 
 done_unlock:
-	up(&AFFS_DIR->i_hash_lock);
+	affs_unlock_dir(dir);
+	affs_unlock_link(inode);
 	goto done;
 }
 

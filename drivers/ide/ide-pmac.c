@@ -176,7 +176,8 @@ void pmac_ide_init_hwif_ports(hw_regs_t *hw,
 	if (pmac_ide[ix].dma_regs && pmac_ide[ix].dma_table) {
 		ide_hwifs[ix].dmaproc = &pmac_ide_dmaproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
-		ide_hwifs[ix].autodma = 1;
+		if (!noautodma)
+			ide_hwifs[ix].autodma = 1;
 #endif
 	}
 }
@@ -676,7 +677,8 @@ pmac_ide_setup_dma(struct device_node *np, int ix)
 
 	ide_hwifs[ix].dmaproc = &pmac_ide_dmaproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
-	ide_hwifs[ix].autodma = 1;
+	if (!noautodma)
+		ide_hwifs[ix].autodma = 1;
 #endif
 }
 

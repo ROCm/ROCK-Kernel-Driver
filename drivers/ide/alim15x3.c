@@ -679,19 +679,21 @@ void __init ide_init_ali15x3 (ide_hwif_t *hwif)
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 	hwif->speedproc = &ali15x3_tune_chipset;
-#ifndef CONFIG_BLK_DEV_IDEDMA
-	hwif->autodma = 0;
-	return;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	if ((hwif->dma_base) && (m5229_revision >= 0x20)) {
 		/*
 		 * M1543C or newer for DMAing
 		 */
 		hwif->dmaproc = &ali15x3_dmaproc;
-		if (!noautodma)
-			hwif->autodma = 1;
+		hwif->autodma = 1;
 	}
+
+	if (noautodma)
+		hwif->autodma = 0;
+#else
+	hwif->autodma = 0;
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 void __init ide_dmacapable_ali15x3 (ide_hwif_t *hwif, unsigned long dmabase)

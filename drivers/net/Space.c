@@ -9,7 +9,7 @@
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
- *		Donald J. Becker, <becker@super.org>
+ *		Donald J. Becker, <becker@scyld.com>
  *
  * Changelog:
  *		Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 09/1999

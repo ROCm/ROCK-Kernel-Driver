@@ -28,6 +28,18 @@ Known bugs:
 
 Please direct bug reports to: zippel@linux-m68k.org
 
+Version 3.16
+------------
+
+- use mark_buffer_dirty_inode instead of mark_buffer_dirty.
+- introduce affs_lock_{link|dir|ext}.
+
+Version 3.15
+------------
+
+- disable link to directories until we can properly support them.
+- locking fixes for link creation/removal.
+
 Version 3.14
 ------------
 

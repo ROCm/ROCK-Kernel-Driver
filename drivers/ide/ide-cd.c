@@ -254,7 +254,7 @@
  *			  They will disappear later when I get the time to
  *			  do it cleanly.
  *			- Minimize the TOC reading - only do it when we
- *			  know a media change has occured.
+ *			  know a media change has occurred.
  *			- Moved all the CDROMREADx ioctls to the Uniform layer.
  *			- Heiko Eissfeldt <heiko@colossus.escape.de> supplied
  *			  some fixes for CDI.
