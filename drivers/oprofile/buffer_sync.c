@@ -310,26 +310,23 @@ static void release_mm(struct mm_struct * mm)
 /* Take the task's mmap_sem to protect ourselves from
  * races when we do lookup_dcookie().
  */
-static struct mm_struct * take_task_mm(struct task_struct * task)
+static struct mm_struct * take_tasks_mm(struct task_struct * task)
 {
-	struct mm_struct * mm = task->mm;
- 
-	/* if task->mm !NULL, mm_count must be at least 1. It cannot
-	 * drop to 0 without the task exiting, which will have to sleep
-	 * on buffer_sem first. So we do not need to mark mm_count
-	 * ourselves.
+	struct mm_struct * mm;
+       
+	/* Subtle. We don't need to keep a reference to this task's mm,
+	 * because, for the mm to be freed on another CPU, that would have
+	 * to go through the task exit notifier, which ends up sleeping
+	 * on the buffer_sem we hold, so we end up with mutual exclusion
+	 * anyway.
 	 */
+	task_lock(task);
+	mm = task->mm;
+	task_unlock(task);
+ 
 	if (mm) {
-		/* More ugliness. If a task took its mmap
-		 * sem then came to sleep on buffer_sem we
-		 * will deadlock waiting for it. So we can
-		 * but try. This will lose samples :/
-		 */
-		if (!down_read_trylock(&mm->mmap_sem)) {
-			/* FIXME: this underestimates samples lost */
-			atomic_inc(&oprofile_stats.sample_lost_mmap_sem);
-			mm = NULL;
-		}
+		/* needed to walk the task's VMAs */
+		down_read(&mm->mmap_sem);
 	}
  
 	return mm;
@@ -399,7 +396,7 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 				new = (struct task_struct *)s->event;
 
 				release_mm(mm);
-				mm = take_task_mm(new);
+				mm = take_tasks_mm(new);
 
 				cookie = get_exec_dcookie(mm);
 				add_user_ctx_switch(new->pid, cookie);
@@ -460,4 +457,3 @@ static void timer_ping(unsigned long data)
 	schedule_work(&sync_wq);
 	/* timer is re-added by the scheduled task */
 }
-
