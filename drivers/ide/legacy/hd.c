@@ -660,7 +660,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 	unsigned int cmd, unsigned long arg)
 {
 	struct hd_i_struct *disk = inode->i_bdev->bd_disk->private_data;
-	struct hd_geometry *loc = (struct hd_geometry *) arg;
+	struct hd_geometry __user *loc = (struct hd_geometry __user *) arg;
 	struct hd_geometry g; 
 
 	if (cmd != HDIO_GETGEO)

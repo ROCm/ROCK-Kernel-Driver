@@ -733,7 +733,7 @@ static int x25_asy_ioctl(struct tty_struct *tty, struct file *file,
 
 	switch(cmd) {
 	case SIOCGIFNAME:
-		if (copy_to_user((void *)arg, sl->dev->name,
+		if (copy_to_user((void __user *)arg, sl->dev->name,
 					strlen(sl->dev->name) + 1))
 			return -EFAULT;
 		return 0;

@@ -272,7 +272,7 @@ static void cisco_stop(struct net_device *dev)
 
 int hdlc_cisco_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
-	cisco_proto *cisco_s = ifr->ifr_settings.ifs_ifsu.cisco;
+	cisco_proto __user *cisco_s = ifr->ifr_settings.ifs_ifsu.cisco;
 	const size_t size = sizeof(cisco_proto);
 	cisco_proto new_settings;
 	hdlc_device *hdlc = dev_to_hdlc(dev);
