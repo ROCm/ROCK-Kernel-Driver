@@ -42,11 +42,11 @@ static struct gatt_mask ati_generic_masks[] =
 
 typedef struct _ati_page_map {
 	unsigned long *real;
-        unsigned long *remapped;
+	unsigned long __iomem *remapped;
 } ati_page_map;
 
 static struct _ati_generic_private {
-	volatile u8 *registers;
+	volatile u8 __iomem *registers;
 	ati_page_map **gatt_pages;
 	int num_tables;
 } ati_generic_private;
@@ -76,7 +76,7 @@ static int ati_create_page_map(ati_page_map *page_map)
 	global_cache_flush();
 
 	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
-		page_map->remapped[i] = agp_bridge->scratch_page;
+		writel(agp_bridge->scratch_page, page_map->remapped+i);
 
 	return 0;
 }
@@ -206,7 +206,7 @@ static void ati_cleanup(void)
 		temp = ((temp & ~(0x0000000f)) | previous_size->size_value);
 		pci_write_config_dword(agp_bridge->dev, ATI_RS300_APSIZE, temp);
 	}
-	iounmap((void *) ati_generic_private.registers);
+	iounmap((volatile u8 __iomem *)ati_generic_private.registers);
 }
 
 
@@ -217,7 +217,7 @@ static int ati_configure(void)
 	/* Get the memory mapped registers */
 	pci_read_config_dword(agp_bridge->dev, ATI_GART_MMBASE_ADDR, &temp);
 	temp = (temp & 0xfffff000);
-	ati_generic_private.registers = (volatile u8 *) ioremap(temp, 4096);
+	ati_generic_private.registers = (volatile u8 __iomem *) ioremap(temp, 4096);
 
 	if (is_r200())
        	pci_write_config_dword(agp_bridge->dev, ATI_RS100_IG_AGPMODE, 0x20000);
@@ -261,7 +261,7 @@ static int ati_insert_memory(struct agp_memory * mem,
 			     off_t pg_start, int type)
 {
 	int i, j, num_entries;
-	unsigned long *cur_gatt;
+	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
 	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
@@ -276,7 +276,7 @@ static int ati_insert_memory(struct agp_memory * mem,
 	while (j < (pg_start + mem->page_count)) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		if (!PGE_EMPTY(agp_bridge,cur_gatt[GET_GATT_OFF(addr)]))
+		if (!PGE_EMPTY(agp_bridge,readl(cur_gatt+GET_GATT_OFF(addr))))
 			return -EBUSY;
 		j++;
 	}
@@ -290,8 +290,7 @@ static int ati_insert_memory(struct agp_memory * mem,
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		cur_gatt[GET_GATT_OFF(addr)] =
-			agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
+		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
 	}
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
@@ -301,7 +300,7 @@ static int ati_remove_memory(struct agp_memory * mem, off_t pg_start,
 			     int type)
 {
 	int i;
-	unsigned long *cur_gatt;
+	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
 	if (type != 0 || mem->type != 0) {
@@ -310,8 +309,7 @@ static int ati_remove_memory(struct agp_memory * mem, off_t pg_start,
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		cur_gatt[GET_GATT_OFF(addr)] =
-			(unsigned long) agp_bridge->scratch_page;
+		writel(agp_bridge->scratch_page, cur_gatt+GET_GATT_OFF(addr));
 	}
 
 	agp_bridge->driver->tlb_flush(mem);
@@ -340,7 +338,7 @@ static int ati_create_gatt_table(void)
 	}
 
 	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
-	agp_bridge->gatt_table = (u32 *)page_dir.remapped;
+	agp_bridge->gatt_table = (u32 __iomem *) page_dir.remapped;
 	agp_bridge->gatt_bus_addr = virt_to_bus(page_dir.real);
 
 	/* Write out the size register */
@@ -371,9 +369,8 @@ static int ati_create_gatt_table(void)
 
 	/* Calculate the agp offset */
 	for(i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
-		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] =
-			virt_to_bus(ati_generic_private.gatt_pages[i]->real);
-		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] |= 0x00000001;
+		writel(virt_to_bus(ati_generic_private.gatt_pages[i]->real) | 1,
+			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
 	}
 
 	return 0;
@@ -384,7 +381,7 @@ static int ati_free_gatt_table(void)
 	ati_page_map page_dir;
 
 	page_dir.real = (unsigned long *)agp_bridge->gatt_table_real;
-	page_dir.remapped = (unsigned long *)agp_bridge->gatt_table;
+	page_dir.remapped = (unsigned long __iomem *)agp_bridge->gatt_table;
 
 	ati_free_gatt_pages();
 	ati_free_page_map(&page_dir);
