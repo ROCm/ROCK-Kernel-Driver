@@ -1,10 +1,3 @@
-  . = ALIGN(16);		/* Exception table */
-  __start___ex_table = .;
-  __ex_table : { *(__ex_table) }
-  __stop___ex_table = .;
-
-  RODATA
-
   .fini      : { *(.fini)    } =0x9090
   _etext = .;
   PROVIDE (etext = .);
@@ -12,6 +5,25 @@
   . = ALIGN(4096);
   _sdata = .;
   PROVIDE (sdata = .);
+
+  . = ALIGN(16);		/* Exception table */
+  __start___ex_table = .;
+  __ex_table : { *(__ex_table) }
+  __stop___ex_table = .;
+
+  RODATA
+
+  __start___ksymtab = .;	/* Kernel symbol table */
+  __ksymtab : { *(__ksymtab) }
+  __stop___ksymtab = .;
+
+  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
+  __gpl_ksymtab : { *(__gpl_ksymtab) }
+  __stop___gpl_ksymtab = .;
+
+  __start___kallsyms = .;       /* All kernel symbols */
+  __kallsyms : { *(__kallsyms) }
+  __stop___kallsyms = .;
 
   .unprotected : { *(.unprotected) }
   . = ALIGN(4096);
@@ -54,18 +66,21 @@
 	*(.initcall7.init)
   }
   __initcall_end = .;
+
   __uml_initcall_start = .;
   .uml.initcall.init : { *(.uml.initcall.init) }
   __uml_initcall_end = .;
   __init_end = .;
+
   __exitcall_begin = .;
   .exitcall : { *(.exitcall.exit) }
   __exitcall_end = .;
+
   __uml_exitcall_begin = .;
   .uml.exitcall : { *(.uml.exitcall.exit) }
   __uml_exitcall_end = .;
 
-   . = ALIGN(4096);
-   __initramfs_start = .;
-   .init.ramfs : { *(.init.ramfs) }
-   __initramfs_end = .;
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
