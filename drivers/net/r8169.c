@@ -136,7 +136,8 @@ enum mac_version {
 	RTL_GIGA_MAC_VER_B = 0x00,
 	/* RTL_GIGA_MAC_VER_C = 0x03, */
 	RTL_GIGA_MAC_VER_D = 0x01,
-	RTL_GIGA_MAC_VER_E = 0x02
+	RTL_GIGA_MAC_VER_E = 0x02,
+	RTL_GIGA_MAC_VER_X = 0x04	/* Greater than RTL_GIGA_MAC_VER_E */
 };
 
 enum phy_version {
@@ -869,6 +870,7 @@ static void rtl8169_get_mac_version(struct rtl8169_private *tp, void *ioaddr)
 		u32 mask;
 		int mac_version;
 	} mac_info[] = {
+		{ 0x1 << 28,	RTL_GIGA_MAC_VER_X },
 		{ 0x1 << 26,	RTL_GIGA_MAC_VER_E },
 		{ 0x1 << 23,	RTL_GIGA_MAC_VER_D }, 
 		{ 0x00000000,	RTL_GIGA_MAC_VER_B } /* Catch-all */
