@@ -135,6 +135,11 @@ enum {
 	XFRM_MSG_POLEXPIRE,
 #define XFRM_MSG_POLEXPIRE XFRM_MSG_POLEXPIRE
 
+	XFRM_MSG_FLUSHSA,
+#define XFRM_MSG_FLUSHSA XFRM_MSG_FLUSHSA
+	XFRM_MSG_FLUSHPOLICY,
+#define XFRM_MSG_FLUSHPOLICY XFRM_MSG_FLUSHPOLICY
+
 	XFRM_MSG_MAX
 };
 
@@ -240,6 +245,10 @@ struct xfrm_user_expire {
 struct xfrm_user_polexpire {
 	struct xfrm_userpolicy_info	pol;
 	__u8				hard;
+};
+
+struct xfrm_usersa_flush {
+	__u8				proto;
 };
 
 #define XFRMGRP_ACQUIRE		1
