@@ -5,8 +5,6 @@
 # In the future, some of these should be built conditionally.
 #
 
-O_TARGET := i2o.o
-
 export-objs	:= i2o_pci.o i2o_core.o i2o_config.o i2o_block.o i2o_lan.o i2o_scsi.o i2o_proc.o
 
 obj-$(CONFIG_I2O_PCI)	+= i2o_pci.o

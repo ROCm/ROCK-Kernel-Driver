@@ -23,8 +23,6 @@
 #      Linux.
 #
 
-O_TARGET := ftape.o
-
 obj-$(CONFIG_FTAPE)		+= lowlevel/
 obj-$(CONFIG_ZFTAPE)		+= zftape/
 obj-$(CONFIG_ZFT_COMPRESSOR)	+= compressor/
