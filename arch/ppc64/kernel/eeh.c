@@ -532,6 +532,9 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
 
 		schedule_work(&eeh_event_wq);
+
+		/* do not pci_dev_put */
+		return val;
 	} else {
 		__get_cpu_var(false_positives)++;
 	}
@@ -769,6 +772,7 @@ void eeh_add_device_late(struct pci_dev *dev)
 	       pci_pretty_name(dev));
 #endif
 
+	pci_dev_get (dev);
 	pci_addr_cache_insert_device (dev);
 }
 EXPORT_SYMBOL(eeh_add_device_late);
