@@ -21,6 +21,7 @@
  */
 
 #include <sound/driver.h>
+#include <linux/interrupt.h>
 #include <sound/core.h>
 #include "mixart.h"
 #include "mixart_hwdep.h"
