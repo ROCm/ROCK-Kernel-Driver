@@ -29,9 +29,9 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	int i;
 
 	page_map->real = (unsigned long *) __get_free_page(GFP_KERNEL);
-	if (page_map->real == NULL) {
+	if (page_map->real == NULL)
 		return -ENOMEM;
-	}
+
 	SetPageReserved(virt_to_page(page_map->real));
 	global_cache_flush();
 	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real), 
@@ -44,9 +44,8 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	}
 	global_cache_flush();
 
-	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
+	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
 		page_map->remapped[i] = agp_bridge->scratch_page;
-	}
 
 	return 0;
 }
@@ -65,12 +64,11 @@ static void amd_free_gatt_pages(void)
 	struct amd_page_map *entry;
 
 	tables = amd_irongate_private.gatt_pages;
-	for(i = 0; i < amd_irongate_private.num_tables; i++) {
+	for (i = 0; i < amd_irongate_private.num_tables; i++) {
 		entry = tables[i];
 		if (entry != NULL) {
-			if (entry->real != NULL) {
+			if (entry->real != NULL)
 				amd_free_page_map(entry);
-			}
 			kfree(entry);
 		}
 	}
@@ -87,25 +85,27 @@ static int amd_create_gatt_pages(int nr_tables)
 
 	tables = kmalloc((nr_tables + 1) * sizeof(struct amd_page_map *), 
 			 GFP_KERNEL);
-	if (tables == NULL) {
+	if (tables == NULL)
 		return -ENOMEM;
-	}
-	memset(tables, 0, sizeof(struct amd_page_map *) * (nr_tables + 1));
+
+	memset (tables, 0, sizeof(struct amd_page_map *) * (nr_tables + 1));
 	for (i = 0; i < nr_tables; i++) {
 		entry = kmalloc(sizeof(struct amd_page_map), GFP_KERNEL);
 		if (entry == NULL) {
 			retval = -ENOMEM;
 			break;
 		}
-		memset(entry, 0, sizeof(struct amd_page_map));
+		memset (entry, 0, sizeof(struct amd_page_map));
 		tables[i] = entry;
 		retval = amd_create_page_map(entry);
-		if (retval != 0) break;
+		if (retval != 0)
+			break;
 	}
 	amd_irongate_private.num_tables = nr_tables;
 	amd_irongate_private.gatt_pages = tables;
 
-	if (retval != 0) amd_free_gatt_pages();
+	if (retval != 0)
+		amd_free_gatt_pages();
 
 	return retval;
 }
@@ -132,9 +132,8 @@ static int amd_create_gatt_table(void)
 
 	value = A_SIZE_LVL2(agp_bridge->current_size);
 	retval = amd_create_page_map(&page_dir);
-	if (retval != 0) {
+	if (retval != 0)
 		return retval;
-	}
 
 	retval = amd_create_gatt_pages(value->num_entries / 1024);
 	if (retval != 0) {
@@ -156,7 +155,7 @@ static int amd_create_gatt_table(void)
 	agp_bridge->gart_bus_addr = addr;
 
 	/* Calculate the agp offset */
-	for(i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
+	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] =
 			virt_to_phys(amd_irongate_private.gatt_pages[i]->real);
 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] |= 0x00000001;
@@ -266,14 +265,12 @@ static void amd_irongate_cleanup(void)
  * entries.
  */
 
-static void amd_irongate_tlbflush(agp_memory * temp)
+static void amd_irongate_tlbflush(agp_memory *temp)
 {
 	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
 }
 
-
-static int amd_insert_memory(agp_memory * mem,
-			     off_t pg_start, int type)
+static int amd_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
 	unsigned long *cur_gatt;
@@ -281,12 +278,11 @@ static int amd_insert_memory(agp_memory * mem,
 
 	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
 
-	if (type != 0 || mem->type != 0) {
+	if (type != 0 || mem->type != 0)
 		return -EINVAL;
-	}
-	if ((pg_start + mem->page_count) > num_entries) {
+
+	if ((pg_start + mem->page_count) > num_entries)
 		return -EINVAL;
-	}
 
 	j = pg_start;
 	while (j < (pg_start + mem->page_count)) {
@@ -312,16 +308,15 @@ static int amd_insert_memory(agp_memory * mem,
 	return 0;
 }
 
-static int amd_remove_memory(agp_memory * mem, off_t pg_start,
-			     int type)
+static int amd_remove_memory(agp_memory *mem, off_t pg_start, int type)
 {
 	int i;
 	unsigned long *cur_gatt;
 	unsigned long addr;
 
-	if (type != 0 || mem->type != 0) {
+	if (type != 0 || mem->type != 0)
 		return -EINVAL;
-	}
+
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
