@@ -887,22 +887,18 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 	va_list args;
 	va_start(args, dep);
 	if (constrs->rules_num >= constrs->rules_all) {
-		snd_pcm_hw_rule_t *old = constrs->rules;
-		if (constrs->rules_all == 0)
-			constrs->rules_all = 32;
-		else {
-			old = constrs->rules;
-			constrs->rules_all += 10;
-		}
-		constrs->rules = kcalloc(constrs->rules_all, sizeof(*c),
-					     GFP_KERNEL);
-		if (!constrs->rules)
+		snd_pcm_hw_rule_t *new;
+		unsigned int new_rules = constrs->rules_all + 16;
+		new = kcalloc(new_rules, sizeof(*c), GFP_KERNEL);
+		if (!new)
 			return -ENOMEM;
-		if (old) {
-			memcpy(constrs->rules, old,
+		if (constrs->rules) {
+			memcpy(new, constrs->rules,
 			       constrs->rules_num * sizeof(*c));
-			kfree(old);
+			kfree(constrs->rules);
 		}
+		constrs->rules = new;
+		constrs->rules_all = new_rules;
 	}
 	c = &constrs->rules[constrs->rules_num];
 	c->cond = cond;
