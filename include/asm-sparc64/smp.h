@@ -23,30 +23,6 @@
 
 #ifndef __ASSEMBLY__
 
-/* Per processor Sparc parameters we need. */
-
-/* Keep this a multiple of 64-bytes for cache reasons. */
-typedef struct {
-	/* Dcache line 1 */
-	unsigned int	__pad0;		/* bh_count moved to irq_stat for consistency. KAO */
-	unsigned int	multiplier;
-	unsigned int	counter;
-	unsigned int	idle_volume;
-	unsigned long	clock_tick;	/* %tick's per second */
-	unsigned long	udelay_val;
-
-	/* Dcache line 2 */
-	unsigned int	pgcache_size;
-	unsigned int	pgdcache_size;
-	unsigned long	*pte_cache[2];
-	unsigned long	*pgd_cache;
-
-	/* Dcache lines 3 and 4 */
-	unsigned int	irq_worklists[16];
-} ____cacheline_aligned cpuinfo_sparc;
-
-extern cpuinfo_sparc cpu_data[NR_CPUS];
-
 /*
  *	Private routines/data
  */
@@ -96,28 +72,6 @@ static __inline__ int hard_smp_processor_id(void)
 }
 
 #define smp_processor_id() (current_thread_info()->cpu)
-
-/* This needn't do anything as we do not sleep the cpu
- * inside of the idler task, so an interrupt is not needed
- * to get a clean fast response.
- *
- * XXX Reverify this assumption... -DaveM
- *
- * Addendum: We do want it to do something for the signal
- *           delivery case, we detect that by just seeing
- *           if we are trying to send this to an idler or not.
- */
-static __inline__ void smp_send_reschedule(int cpu)
-{
-	extern void smp_receive_signal(int);
-	if (cpu_data[cpu].idle_volume == 0)
-		smp_receive_signal(cpu);
-}
-
-/* This is a nop as well because we capture all other cpus
- * anyways when making the PROM active.
- */
-static __inline__ void smp_send_stop(void) { }
 
 #endif /* !(__ASSEMBLY__) */
 

@@ -25,6 +25,7 @@
 #include <asm/atomic.h>
 #include <asm/tlbflush.h>
 #include <asm/mmu_context.h>
+#include <asm/cpudata.h>
 
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -41,7 +42,7 @@
 extern int linux_num_cpus;
 extern void calibrate_delay(void);
 
-cpuinfo_sparc cpu_data[NR_CPUS];
+DEFINE_PER_CPU(cpuinfo_sparc, __cpu_data) = { 0 };
 
 /* Please don't make this stuff initdata!!!  --DaveM */
 static unsigned char boot_cpu_id;
@@ -73,32 +74,29 @@ void smp_bogo(struct seq_file *m)
 			seq_printf(m,
 				   "Cpu%dBogo\t: %lu.%02lu\n"
 				   "Cpu%dClkTck\t: %016lx\n",
-				   i, cpu_data[i].udelay_val / (500000/HZ),
-				   (cpu_data[i].udelay_val / (5000/HZ)) % 100,
-				   i, cpu_data[i].clock_tick);
+				   i, cpu_data(i).udelay_val / (500000/HZ),
+				   (cpu_data(i).udelay_val / (5000/HZ)) % 100,
+				   i, cpu_data(i).clock_tick);
 }
 
 void __init smp_store_cpu_info(int id)
 {
-	int i, cpu_node;
+	int cpu_node;
 
 	/* multiplier and counter set by
 	   smp_setup_percpu_timer()  */
-	cpu_data[id].udelay_val			= loops_per_jiffy;
+	cpu_data(id).udelay_val			= loops_per_jiffy;
 
 	cpu_find_by_mid(id, &cpu_node);
-	cpu_data[id].clock_tick = prom_getintdefault(cpu_node,
+	cpu_data(id).clock_tick = prom_getintdefault(cpu_node,
 						     "clock-frequency", 0);
 
-	cpu_data[id].pgcache_size		= 0;
-	cpu_data[id].pte_cache[0]		= NULL;
-	cpu_data[id].pte_cache[1]		= NULL;
-	cpu_data[id].pgdcache_size		= 0;
-	cpu_data[id].pgd_cache			= NULL;
-	cpu_data[id].idle_volume		= 1;
-
-	for (i = 0; i < 16; i++)
-		cpu_data[id].irq_worklists[i] = 0;
+	cpu_data(id).pgcache_size		= 0;
+	cpu_data(id).pte_cache[0]		= NULL;
+	cpu_data(id).pte_cache[1]		= NULL;
+	cpu_data(id).pgdcache_size		= 0;
+	cpu_data(id).pgd_cache			= NULL;
+	cpu_data(id).idle_volume		= 1;
 }
 
 static void smp_setup_percpu_timer(void);
@@ -1039,8 +1037,8 @@ void smp_promstop_others(void)
 
 extern void sparc64_do_profile(struct pt_regs *regs);
 
-#define prof_multiplier(__cpu)		cpu_data[(__cpu)].multiplier
-#define prof_counter(__cpu)		cpu_data[(__cpu)].counter
+#define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
+#define prof_counter(__cpu)		cpu_data(__cpu).counter
 
 void smp_percpu_timer_interrupt(struct pt_regs *regs)
 {
@@ -1303,7 +1301,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_online(i))
-			bogosum += cpu_data[i].udelay_val;
+			bogosum += cpu_data(i).udelay_val;
 	}
 	printk("Total of %ld processors activated "
 	       "(%lu.%02lu BogoMIPS).\n",
@@ -1316,3 +1314,27 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	 */
 	smp_tune_scheduling();
 }
+
+/* This needn't do anything as we do not sleep the cpu
+ * inside of the idler task, so an interrupt is not needed
+ * to get a clean fast response.
+ *
+ * XXX Reverify this assumption... -DaveM
+ *
+ * Addendum: We do want it to do something for the signal
+ *           delivery case, we detect that by just seeing
+ *           if we are trying to send this to an idler or not.
+ */
+void smp_send_reschedule(int cpu)
+{
+	if (cpu_data(cpu).idle_volume == 0)
+		smp_receive_signal(cpu);
+}
+
+/* This is a nop because we capture all other cpus
+ * anyways when making the PROM active.
+ */
+void smp_send_stop(void)
+{
+}
+

@@ -21,6 +21,7 @@
 #include <linux/fs_struct.h>
 #include <linux/mm.h>
 #include <linux/socket.h>
+#include <linux/percpu.h>
 #include <net/compat.h>
 
 #include <asm/oplib.h>
@@ -55,6 +56,7 @@
 #include <asm/a.out.h>
 #include <asm/ns87303.h>
 #include <asm/timer.h>
+#include <asm/cpudata.h>
 
 struct poll {
 	int fd;
@@ -143,7 +145,7 @@ EXPORT_SYMBOL_NOVERS(mcount);
 #endif
 
 /* Per-CPU information table */
-EXPORT_SYMBOL(cpu_data);
+EXPORT_PER_CPU_SYMBOL(__cpu_data);
 
 /* CPU online map and active count.  */
 EXPORT_SYMBOL(cpu_online_map);

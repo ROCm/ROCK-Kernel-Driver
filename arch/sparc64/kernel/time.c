@@ -42,6 +42,7 @@
 #include <asm/starfire.h>
 #include <asm/smp.h>
 #include <asm/sections.h>
+#include <asm/cpudata.h>
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -1013,7 +1014,7 @@ unsigned long sparc64_get_clock_tick(unsigned int cpu)
 	if (ft->clock_tick_ref)
 		return ft->clock_tick_ref;
 #ifdef CONFIG_SMP
-	return cpu_data[cpu].clock_tick;
+	return cpu_data(cpu).clock_tick;
 #else
 	return up_clock_tick;
 #endif
@@ -1031,16 +1032,16 @@ static int sparc64_cpufreq_notifier(struct notifier_block *nb, unsigned long val
 #ifdef CONFIG_SMP
 	if (!ft->ref_freq) {
 		ft->ref_freq = freq->old;
-		ft->udelay_val_ref = cpu_data[cpu].udelay_val;
-		ft->clock_tick_ref = cpu_data[cpu].clock_tick;
+		ft->udelay_val_ref = cpu_data(cpu).udelay_val;
+		ft->clock_tick_ref = cpu_data(cpu).clock_tick;
 	}
 	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
 	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
-		cpu_data[cpu].udelay_val =
+		cpu_data(cpu).udelay_val =
 			cpufreq_scale(ft->udelay_val_ref,
 				      ft->ref_freq,
 				      freq->new);
-		cpu_data[cpu].clock_tick =
+		cpu_data(cpu).clock_tick =
 			cpufreq_scale(ft->clock_tick_ref,
 				      ft->ref_freq,
 				      freq->new);

@@ -10,11 +10,12 @@
 #include <asm/page.h>
 #include <asm/spitfire.h>
 #include <asm/pgtable.h>
+#include <asm/cpudata.h>
 
 /* Page table allocation/freeing. */
 #ifdef CONFIG_SMP
 /* Sliiiicck */
-#define pgt_quicklists	cpu_data[smp_processor_id()]
+#define pgt_quicklists	cpu_data(smp_processor_id())
 #else
 extern struct pgtable_cache_struct {
 	unsigned long *pgd_cache;
