@@ -19,6 +19,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
@@ -578,7 +579,8 @@ static void __exit longhaul_exit (void)
 	kfree(longhaul_table);
 }
 
-MODULE_PARM (dont_scale_voltage, "i");
+module_param (dont_scale_voltage, int, 0644);
+MODULE_PARM_DESC(dont_scale_voltage, "Don't scale voltage of processor");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Longhaul driver for VIA Cyrix processors.");
