@@ -76,6 +76,8 @@ int ncr53c8xx_release(struct Scsi_Host *);
 			info:           ncr53c8xx_info, 	\
 			queuecommand:   ncr53c8xx_queue_command,\
 			slave_attach:   ncr53c8xx_slave_attach, \
+			abort:          ncr53c8xx_abort,	\
+			reset:          ncr53c8xx_reset,	\
 			can_queue:      SCSI_NCR_CAN_QUEUE,	\
 			this_id:        7,			\
 			sg_tablesize:   SCSI_NCR_SG_TABLESIZE,	\
