@@ -187,12 +187,13 @@ static int imm_detect(Scsi_Host_Template * host)
 			dev->mode = IMM_PS2;
 
 		/* Done configuration */
-		imm_pb_release(dev);
 
 		if (imm_init(dev)) {
+			imm_pb_release(dev);
 			parport_unregister_device(dev->dev);
 			continue;
 		}
+		imm_pb_release(dev);
 
 		/* now the glue ... */
 		switch (dev->mode) {
@@ -726,26 +727,13 @@ static int imm_select(imm_struct *dev, int target)
 
 static int imm_init(imm_struct *dev)
 {
-	int retv;
-
-#if defined(CONFIG_PARPORT) || defined(CONFIG_PARPORT_MODULE)
-	if (imm_pb_claim(dev))
-		while (dev->p_busy)
-			schedule();	/* We can safe schedule here */
-#endif
-	retv = imm_connect(dev, 0);
-
-	if (retv == 1) {
-		imm_reset_pulse(dev->base);
-		udelay(1000);	/* Delay to allow devices to settle */
-		imm_disconnect(dev);
-		udelay(1000);	/* Another delay to allow devices to settle */
-		retv = device_check(dev);
-		imm_pb_release(dev);
-		return retv;
-	}
-	imm_pb_release(dev);
-	return 1;
+	if (imm_connect(dev, 0) != 1)
+		return 1;
+	imm_reset_pulse(dev->base);
+	udelay(1000);	/* Delay to allow devices to settle */
+	imm_disconnect(dev);
+	udelay(1000);	/* Another delay to allow devices to settle */
+	return device_check(dev);
 }
 
 static inline int imm_send_command(Scsi_Cmnd *cmd)
