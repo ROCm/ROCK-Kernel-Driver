@@ -8,7 +8,6 @@
 #include <linux/timer.h>
 #include <linux/skbuff.h>
 #include <linux/netfilter_ipv4.h>
-#include <linux/brlock.h>
 #include <linux/vmalloc.h>
 #include <net/checksum.h>
 #include <net/icmp.h>
