@@ -298,10 +298,15 @@ static int wait_for_locked_buffers(kdev_t dev, int index, int refile)
  * We will ultimately want to put these in a separate list, but for
  * now we search all of the lists for dirty buffers.
  */
-int sync_buffers(kdev_t dev, int wait)
+int sync_buffers(struct block_device *bdev, int wait)
 {
 	int err = 0;
+	kdev_t dev;
 
+	if (!bdev)
+		return 0;
+
+	dev = to_kdev_t(bdev->bd_dev);
 	/* One pass for no-wait, three for wait:
 	 * 0) write out all dirty, unlocked buffers;
 	 * 1) wait for all dirty locked buffers;
@@ -317,10 +322,28 @@ int sync_buffers(kdev_t dev, int wait)
 	return err;
 }
 
+int sync_all_buffers(int wait)
+{
+	int err = 0;
+
+	/* One pass for no-wait, three for wait:
+	 * 0) write out all dirty, unlocked buffers;
+	 * 1) wait for all dirty locked buffers;
+	 * 2) write out all dirty, unlocked buffers;
+	 * 2) wait for completion by waiting for all buffers to unlock.
+	 */
+	write_unlocked_buffers(NODEV);
+	if (wait) {
+		err = wait_for_locked_buffers(NODEV, BUF_DIRTY, 0);
+		write_unlocked_buffers(NODEV);
+		err |= wait_for_locked_buffers(NODEV, BUF_LOCKED, 1);
+	}
+	return err;
+}
+
 int fsync_super(struct super_block *sb)
 {
-	kdev_t dev = sb->s_dev;
-	sync_buffers(dev, 0);
+	sync_buffers(sb->s_bdev, 0);
 
 	lock_kernel();
 	sync_inodes_sb(sb);
@@ -331,14 +354,13 @@ int fsync_super(struct super_block *sb)
 	unlock_super(sb);
 	unlock_kernel();
 
-	return sync_buffers(dev, 1);
+	return sync_buffers(sb->s_bdev, 1);
 }
 
 int fsync_no_super(struct block_device *bdev)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	sync_buffers(dev, 0);
-	return sync_buffers(dev, 1);
+	sync_buffers(bdev, 0);
+	return sync_buffers(bdev, 1);
 }
 
 int fsync_dev(kdev_t dev)
@@ -365,7 +387,7 @@ int fsync_bdev(struct block_device *bdev)
 
 asmlinkage long sys_sync(void)
 {
-	sync_buffers(NODEV, 0);
+	sync_all_buffers(0);
 
 	lock_kernel();
 	sync_inodes();
@@ -373,7 +395,7 @@ asmlinkage long sys_sync(void)
 	sync_supers();
 	unlock_kernel();
 
-	sync_buffers(NODEV, 1);
+	sync_all_buffers(1);
 	return 0;
 }
 
@@ -385,7 +407,6 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
 	struct inode * inode = dentry->d_inode;
 	struct super_block * sb;
-	kdev_t dev;
 	int ret;
 
 	lock_kernel();
@@ -400,8 +421,7 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	unlock_super(sb);
 
 	/* .. finally sync the buffers to disk */
-	dev = inode->i_dev;
-	ret = sync_buffers(dev, 1);
+	ret = sync_buffers(sb->s_bdev, 1);
 	unlock_kernel();
 	return ret;
 }

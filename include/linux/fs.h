@@ -1215,7 +1215,7 @@ extern void __invalidate_buffers(kdev_t dev, int);
 extern void sync_inodes(void);
 extern void sync_unlocked_inodes(void);
 extern void write_inode_now(struct inode *, int);
-extern int sync_buffers(kdev_t, int);
+extern int sync_buffers(struct block_device *, int);
 extern int fsync_dev(kdev_t);
 extern int fsync_bdev(struct block_device *);
 extern int fsync_super(struct super_block *);
