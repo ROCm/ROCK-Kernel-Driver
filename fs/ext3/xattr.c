@@ -823,7 +823,6 @@ getblk_failed:
 			error = ext3_journal_dirty_metadata(handle, new_bh);
 			if (error)
 				goto cleanup;
-			ext3_xattr_update_super_block(handle, sb);
 		}
 	}
 
@@ -1001,6 +1000,7 @@ ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 		}
 	}
 	if (!error) {
+		ext3_xattr_update_super_block(handle, inode->i_sb);
 		inode->i_ctime = CURRENT_TIME_SEC;
 		error = ext3_mark_iloc_dirty(handle, inode, &is.iloc);
 		/*
