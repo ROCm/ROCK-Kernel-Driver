@@ -3799,7 +3799,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 	 * We're not supposed to change timestamps in readonly-mounted
 	 * filesystems.  Throw it away if anyone asks us.
 	 */
-	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+	if (unlikely(vp->v_vfsp->vfs_flag & VFS_RDONLY))
 		return;
 
 	/*
@@ -3813,17 +3813,17 @@ xfs_ichgtime(xfs_inode_t *ip,
 
 	nanotime(&tv);
 	if (flags & XFS_ICHGTIME_MOD) {
-		inode->i_mtime = tv;
+		VN_MTIMESET(vp, &tv);
 		ip->i_d.di_mtime.t_sec = (__int32_t)tv.tv_sec;
 		ip->i_d.di_mtime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 	if (flags & XFS_ICHGTIME_ACC) {
-		inode->i_atime  = tv;
+		VN_ATIMESET(vp, &tv);
 		ip->i_d.di_atime.t_sec = (__int32_t)tv.tv_sec;
 		ip->i_d.di_atime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 	if (flags & XFS_ICHGTIME_CHG) {
-		inode->i_ctime  = tv;
+		VN_CTIMESET(vp, &tv);
 		ip->i_d.di_ctime.t_sec = (__int32_t)tv.tv_sec;
 		ip->i_d.di_ctime.t_nsec = (__int32_t)tv.tv_nsec;
 	}

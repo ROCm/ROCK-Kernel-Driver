@@ -587,6 +587,13 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 }
 
 /*
+ * Update modify/access/change times on the vnode
+ */
+#define VN_MTIMESET(vp, tvp)	(LINVFS_GET_IP(vp)->i_mtime = *(tvp))
+#define VN_ATIMESET(vp, tvp)	(LINVFS_GET_IP(vp)->i_atime = *(tvp))
+#define VN_CTIMESET(vp, tvp)	(LINVFS_GET_IP(vp)->i_ctime = *(tvp))
+
+/*
  * Some useful predicates.
  */
 #define VN_MAPPED(vp)	\
