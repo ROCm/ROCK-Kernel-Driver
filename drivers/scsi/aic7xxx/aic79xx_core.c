@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#184 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#185 $
  *
  * $FreeBSD$
  */
@@ -2192,6 +2192,13 @@ ahd_clear_critical_section(struct ahd_softc *ahd)
 		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
 		ahd_outb(ahd, SEQCTL0, ahd_inb(ahd, SEQCTL0) & ~STEP);
   		ahd_outb(ahd, SIMODE1, simode1);
+		/*
+		 * SCSIINT seems to glitch occassionally when
+		 * the interrupt masks are cleared.  Clear SCSIINT
+		 * one more time so that only persistent errors
+		 * are seen as a real interrupt.
+		 */
+		ahd_outb(ahd, CLRINT, CLRSCSIINT);
 	}
 	ahd_restore_modes(ahd, saved_modes);
 }
