@@ -194,7 +194,7 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strlcpy(new_client->name, name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->name, name, I2C_NAME_SIZE);
 
 	new_client->id = lm75_id++;
 	data->valid = 0;

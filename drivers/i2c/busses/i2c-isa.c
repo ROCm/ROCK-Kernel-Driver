@@ -30,20 +30,28 @@
 #include <linux/errno.h>
 #include <linux/i2c.h>
 
+static u32 isa_func(struct i2c_adapter *adapter);
+
 /* This is the actual algorithm we define */
 static struct i2c_algorithm isa_algorithm = {
 	.name		= "ISA bus algorithm",
 	.id		= I2C_ALGO_ISA,
+	.functionality	= isa_func,
 };
 
 /* There can only be one... */
 static struct i2c_adapter isa_adapter = {
 	.owner		= THIS_MODULE,
-	.id		= I2C_ALGO_ISA | I2C_HW_ISA,
 	.class          = I2C_ADAP_CLASS_SMBUS,
 	.algo		= &isa_algorithm,
 	.name		= "ISA main adapter",
 };
+
+/* We can't do a thing... */
+static u32 isa_func(struct i2c_adapter *adapter)
+{
+	return 0;
+}
 
 static int __init i2c_isa_init(void)
 {
