@@ -221,33 +221,30 @@ xfs_start_flags(
 		mp->m_swidth = ap->swidth;
 	}
 
-	if ((mp->m_logdev_targp != NULL) &&
-	    (mp->m_logdev_targp != mp->m_ddev_targp)) {
-		if (ap->logbufs != 0 && ap->logbufs != -1 &&
-		    (ap->logbufs < XLOG_NUM_ICLOGS ||
-		     ap->logbufs > XLOG_MAX_ICLOGS)) {
-			cmn_err(CE_WARN, 
-				"XFS: invalid logbufs value: %d [not %d-%d]\n",
-				ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
-			return XFS_ERROR(EINVAL);
-		}
-		mp->m_logbufs = ap->logbufs;
-		if (ap->logbufsize != -1 &&
-		    ap->logbufsize != 16 * 1024 &&
-		    ap->logbufsize != 32 * 1024 &&
-		    ap->logbufsize != 64 * 1024 &&
-		    ap->logbufsize != 128 * 1024 &&
-		    ap->logbufsize != 256 * 1024) {
-			cmn_err(CE_WARN,
-		"XFS: invalid logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
-				ap->logbufsize);
-			return XFS_ERROR(EINVAL);
-		}
-		mp->m_logbsize = ap->logbufsize;
-		mp->m_fsname_len = strlen(ap->fsname) + 1;
-		mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
-		strcpy(mp->m_fsname, ap->fsname);
+	if (ap->logbufs != 0 && ap->logbufs != -1 &&
+	    (ap->logbufs < XLOG_NUM_ICLOGS ||
+	     ap->logbufs > XLOG_MAX_ICLOGS)) {
+		cmn_err(CE_WARN, 
+			"XFS: invalid logbufs value: %d [not %d-%d]\n",
+			ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
+		return XFS_ERROR(EINVAL);
 	}
+	mp->m_logbufs = ap->logbufs;
+	if (ap->logbufsize != -1 &&
+	    ap->logbufsize != 16 * 1024 &&
+	    ap->logbufsize != 32 * 1024 &&
+	    ap->logbufsize != 64 * 1024 &&
+	    ap->logbufsize != 128 * 1024 &&
+	    ap->logbufsize != 256 * 1024) {
+		cmn_err(CE_WARN,
+	"XFS: invalid logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
+			ap->logbufsize);
+		return XFS_ERROR(EINVAL);
+	}
+	mp->m_logbsize = ap->logbufsize;
+	mp->m_fsname_len = strlen(ap->fsname) + 1;
+	mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
+	strcpy(mp->m_fsname, ap->fsname);
 
 	/*
 	 * Pull in the 'wsync' and 'ino64' mount options before we do the real
