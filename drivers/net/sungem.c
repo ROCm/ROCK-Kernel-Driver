@@ -2823,7 +2823,7 @@ use_random:
 	dev_addr[0] = 0x08;
 	dev_addr[1] = 0x00;
 	dev_addr[2] = 0x20;
-	get_random_bytes(dev_addr, 3);
+	get_random_bytes(dev_addr + 3, 3);
 	return;
 }
 #endif /* not Sparc and not PPC */
