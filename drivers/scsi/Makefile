@@ -26,7 +26,6 @@ else
 endif
 
 export-objs	:= scsi_syms.o
-list-multi	:= scsi_mod.o initio.o a100u2w.o
 
 CFLAGS_aha152x.o =   -DAHA152X_STAT -DAUTOCONF
 CFLAGS_gdth.o    = # -DDEBUG_GDTH=2 -D__SERIAL__ -D__COM2__ -DGDTH_STATISTICS
@@ -126,12 +125,13 @@ obj-$(CONFIG_BLK_DEV_SD)	+= sd_mod.o
 obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
+list-multi	:= scsi_mod.o sd_mod.o sr_mod.o initio.o a100u2w.o
 scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o \
 			scsicam.o scsi_proc.o scsi_error.o \
 			scsi_obsolete.o scsi_queue.o scsi_lib.o \
 			scsi_merge.o scsi_dma.o scsi_scan.o \
 			scsi_syms.o
-			
+sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o
 a100u2w-objs	:= inia100.o i60uscsi.o
@@ -142,8 +142,8 @@ include $(TOPDIR)/Rules.make
 scsi_mod.o: $(scsi_mod-objs)
 	$(LD) -r -o $@ $(scsi_mod-objs)
 
-sd_mod.o: sd.o
-	$(LD) -r -o $@ sd.o
+sd_mod.o: $(sd_mod-objs)
+	$(LD) -r -o $@ $(sd_mod-objs)
 
 sr_mod.o: $(sr_mod-objs)
 	$(LD) -r -o $@ $(sr_mod-objs)

@@ -93,12 +93,12 @@ extern __inline__ void free_pgd_slow(pgd_t *pgd)
  * We don't have any real pmd's, and this code never triggers because
  * the pgd will always be present..
  */
-#define pmd_alloc_one_fast()            ({ BUG(); ((pmd_t *)1); })
-#define pmd_alloc_one()                 ({ BUG(); ((pmd_t *)2); })
+#define pmd_alloc_one_fast(mm, address) ({ BUG(); ((pmd_t *)1); })
+#define pmd_alloc_one(mm,address)       ({ BUG(); ((pmd_t *)2); })
 #define pmd_free(x)                     do { } while (0)
-#define pgd_populate(pmd, pte)          BUG()
+#define pgd_populate(mm, pmd, pte)      BUG()
 
-static inline pte_t *pte_alloc_one(unsigned long address)
+static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte;
 	extern int mem_init_done;
@@ -113,7 +113,7 @@ static inline pte_t *pte_alloc_one(unsigned long address)
 	return pte;
 }
 
-static inline pte_t *pte_alloc_one_fast(unsigned long address)
+static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
         unsigned long *ret;
 
@@ -139,7 +139,7 @@ extern __inline__ void pte_free_slow(pte_t *pte)
 
 #define pte_free(pte)    pte_free_slow(pte)
 
-#define pmd_populate(pmd, pte)	(pmd_val(*(pmd)) = (unsigned long) (pte))
+#define pmd_populate(mm, pmd, pte)	(pmd_val(*(pmd)) = (unsigned long) (pte))
 
 extern int do_check_pgt_cache(int, int);
 

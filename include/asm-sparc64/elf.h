@@ -79,9 +79,9 @@ do {	unsigned char flags = current->thread.flags;	\
 		if (flags & SPARC_FLAG_32BIT) {		\
 		  pgd_t *pgd0 = &current->mm->pgd[0];	\
 		  if (pgd_none (*pgd0)) {		\
-		    pmd_t *page = pmd_alloc_one_fast();	\
+		    pmd_t *page = pmd_alloc_one_fast(NULL, 0);	\
 		    if (!page)				\
-		      page = pmd_alloc_one();		\
+		      page = pmd_alloc_one(NULL, 0);	\
                     pgd_set(pgd0, page);		\
 		  }					\
 		  pgd_cache = pgd_val(*pgd0) << 11UL;	\

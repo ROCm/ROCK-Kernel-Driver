@@ -50,11 +50,11 @@ int do_check_pgt_cache(int low, int high)
 				freed++;
 			}
 			if (pmd_quicklist) {
-				pmd_free_slow(pmd_alloc_one_fast());
+				pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
 				freed++;
 			}
 			if (pte_quicklist) {
-				pte_free_slow(pte_alloc_one_fast(0));
+				pte_free_slow(pte_alloc_one_fast(NULL, 0));
 				freed++;
 			}
 		} while(pgtable_cache_size > low);

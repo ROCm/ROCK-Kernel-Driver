@@ -11,7 +11,7 @@
 #define pte_quicklist (current_cpu_data.pte_quick)
 #define pgtable_cache_size (current_cpu_data.pgtable_cache_sz)
 
-#define pmd_populate(pmd, pte) \
+#define pmd_populate(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
 /*
@@ -94,7 +94,7 @@ extern __inline__ void free_pgd_slow(pgd_t *pgd)
 #endif
 }
 
-static inline pte_t *pte_alloc_one(unsigned long address)
+static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte;
 
@@ -104,7 +104,7 @@ static inline pte_t *pte_alloc_one(unsigned long address)
 	return pte;
 }
 
-static inline pte_t *pte_alloc_one_fast(unsigned long address)
+static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long *ret;
 
@@ -138,12 +138,12 @@ extern __inline__ void pte_free_slow(pte_t *pte)
  * (In the PAE case we free the pmds as part of the pgd.)
  */
 
-#define pmd_alloc_one_fast()		({ BUG(); ((pmd_t *)1); })
-#define pmd_alloc_one()			({ BUG(); ((pmd_t *)2); })
+#define pmd_alloc_one_fast(mm, addr)	({ BUG(); ((pmd_t *)1); })
+#define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
 #define pmd_free_slow(x)		do { } while (0)
 #define pmd_free_fast(x)		do { } while (0)
 #define pmd_free(x)			do { } while (0)
-#define pgd_populate(pmd, pte)		BUG()
+#define pgd_populate(mm, pmd, pte)	BUG()
 
 extern int do_check_pgt_cache(int, int);
 

@@ -2037,7 +2037,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 			ret = cdrom_read_block(cdi, &cgc, lba, nr, 1, CD_FRAMESIZE_RAW);
 			if (ret)
 				break;
-			__copy_to_user(ra.buf, cgc.buffer, CD_FRAMESIZE_RAW);
+			__copy_to_user(ra.buf, cgc.buffer, CD_FRAMESIZE_RAW*nr);
 			ra.buf += CD_FRAMESIZE_RAW * nr;
 			ra.nframes -= nr;
 			lba += nr;

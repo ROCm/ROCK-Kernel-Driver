@@ -14,7 +14,7 @@ obj-$(CONFIG_FC4) += fc4.o
 obj-$(CONFIG_FC4_SOC) += soc.o
 obj-$(CONFIG_FC4_SOCAL) += socal.o
 
+include $(TOPDIR)/Rules.make
+
 fc4.o: $(fc4-objs)
 	$(LD) -r -o $@ $(fc4-objs)
-
-include $(TOPDIR)/Rules.make

@@ -12,7 +12,7 @@ O_TARGET := pcmcia.o
 
 export-objs := ds.o cs.o cb_enabler.o yenta.o pci_socket.o
 
-multi-list = pcmcia_core.o yenta_socket.o
+list-multi := pcmcia_core.o yenta_socket.o
 
 yenta_socket-objs := pci_socket.o yenta.o
 pcmcia_core-objs := cistpl.o rsrc_mgr.o bulkmem.o cs.o

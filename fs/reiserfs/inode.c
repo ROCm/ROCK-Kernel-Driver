@@ -304,6 +304,7 @@ static int _get_block_create_0 (struct inode * inode, long block,
     char * p = NULL;
     int chars;
     int ret ;
+    int done = 0 ;
     unsigned long offset ;
 
     // prepare the key to look for the 'block'-th block of file
@@ -355,6 +356,14 @@ research:
 	return -ENOENT;
     }
 
+    /* if we've got a direct item, and the buffer was uptodate,
+    ** we don't want to pull data off disk again.  skip to the
+    ** end, where we map the buffer and return
+    */
+    if (buffer_uptodate(bh_result)) {
+        goto finished ;
+    }
+
     // read file tail into part of page
     offset = (cpu_key_k_offset(&key) - 1) & (PAGE_CACHE_SIZE - 1) ;
     fs_gen = get_generation(inode->i_sb) ;
@@ -375,8 +384,24 @@ research:
 	if (!is_direct_le_ih (ih)) {
 	    BUG ();
         }
-	chars = le16_to_cpu (ih->ih_item_len) - path.pos_in_item;
+	/* make sure we don't read more bytes than actually exist in
+	** the file.  This can happen in odd cases where i_size isn't
+	** correct, and when direct item padding results in a few 
+	** extra bytes at the end of the direct item
+	*/
+        if ((le_ih_k_offset(ih) + path.pos_in_item) > inode->i_size)
+	    break ;
+	if ((le_ih_k_offset(ih) - 1 + ih_item_len(ih)) > inode->i_size) {
+	    chars = inode->i_size - (le_ih_k_offset(ih) - 1) - path.pos_in_item;
+	    done = 1 ;
+	} else {
+	    chars = le16_to_cpu (ih->ih_item_len) - path.pos_in_item;
+	}
 	memcpy (p, B_I_PITEM (bh, ih) + path.pos_in_item, chars);
+
+	if (done) 
+	    break ;
+
 	p += chars;
 
 	if (PATH_LAST_POSITION (&path) != (B_NR_ITEMS (bh) - 1))
@@ -395,16 +420,14 @@ research:
 	ih = get_ih (&path);
     } while (1);
 
+finished:
     pathrelse (&path);
-    
-    // FIXME: b_blocknr == 0 here. but b_data contains correct data
-    // from tail. ll_rw_block will skip uptodate buffers
     bh_result->b_blocknr = 0 ;
     bh_result->b_dev = inode->i_dev;
     mark_buffer_uptodate (bh_result, 1);
     bh_result->b_state |= (1UL << BH_Mapped);
+    flush_dcache_page(bh_result->b_page) ;
     kunmap(bh_result->b_page) ;
-
     return 0;
 }
 
@@ -1567,8 +1590,9 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     /* so, if page != NULL, we have a buffer head for the offset at 
     ** the end of the file. if the bh is mapped, and bh->b_blocknr != 0, 
     ** then we have an unformatted node.  Otherwise, we have a direct item, 
-    ** and no zeroing is required.  We zero after the truncate, because the 
-    ** truncate might pack the item anyway (it will unmap bh if it packs).
+    ** and no zeroing is required on disk.  We zero after the truncate, 
+    ** because the truncate might pack the item anyway 
+    ** (it will unmap bh if it packs).
     */
     prevent_flush_page_lock(page, p_s_inode) ;
     journal_begin(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 ) ;
@@ -1578,7 +1602,7 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     journal_end(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 ) ;
     allow_flush_page_lock(page, p_s_inode) ;
 
-    if (page && buffer_mapped(bh) && bh->b_blocknr != 0) {
+    if (page) {
         length = offset & (blocksize - 1) ;
 	/* if we are not on a block boundary */
 	if (length) {
@@ -1586,14 +1610,14 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
 	    memset((char *)kmap(page) + offset, 0, length) ;   
 	    flush_dcache_page(page) ;
 	    kunmap(page) ;
-	    mark_buffer_dirty(bh) ;
+	    if (buffer_mapped(bh) && bh->b_blocknr != 0) {
+	        mark_buffer_dirty(bh) ;
+	    }
 	}
-    } 
-
-    if (page) {
 	UnlockPage(page) ;
 	page_cache_release(page) ;
     }
+
     return ;
 }
 
@@ -1646,6 +1670,7 @@ research:
 	    goto out ;
 	}
 	set_block_dev_mapped(bh_result, le32_to_cpu(item[pos_in_item]), inode);
+	mark_buffer_uptodate(bh_result, 1);
     } else if (is_direct_le_ih(ih)) {
         char *p ; 
         p = page_address(bh_result->b_page) ;
@@ -1665,6 +1690,7 @@ research:
 	journal_mark_dirty(&th, inode->i_sb, bh) ;
 	bytes_copied += copy_size ;
 	set_block_dev_mapped(bh_result, 0, inode);
+	mark_buffer_uptodate(bh_result, 1);
 
 	/* are there still bytes left? */
         if (bytes_copied < bh_result->b_size && 

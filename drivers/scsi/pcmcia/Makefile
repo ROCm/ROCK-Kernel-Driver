@@ -21,17 +21,17 @@ obj-$(CONFIG_PCMCIA_FDOMAIN)	+= fdomain_cs.o
 obj-$(CONFIG_PCMCIA_AHA152X)	+= aha152x_cs.o
 
 list-multi	:= qlogic_cs.o fdomain_cs.o aha152x_cs.o
-aha152x-objs	:= aha152x_stub.o aha152x.o
-fdomain-objs	:= fdomain_stub.o fdomain.o
-qlogic-objs	:= qlogic_stub.o qlogicfas.o
+aha152x_cs-objs	:= aha152x_stub.o aha152x.o
+fdomain_cs-objs	:= fdomain_stub.o fdomain.o
+qlogic_cs-objs	:= qlogic_stub.o qlogicfas.o
 
 include $(TOPDIR)/Rules.make
 
-aha152x_cs.o: $(aha152x-objs)
-	$(LD) -r -o $@ $(aha152x-objs)
+aha152x_cs.o: $(aha152x_cs-objs)
+	$(LD) -r -o $@ $(aha152x_cs-objs)
 
-fdomain_cs.o: $(fdomain-objs)
-	$(LD) -r -o $@ $(fdomain-objs)
+fdomain_cs.o: $(fdomain_cs-objs)
+	$(LD) -r -o $@ $(fdomain_cs-objs)
 
-qlogic_cs.o: $(qlogic-objs)
-	$(LD) -r -o $@ $(qlogic-objs)
+qlogic_cs.o: $(qlogic_cs-objs)
+	$(LD) -r -o $@ $(qlogic_cs-objs)

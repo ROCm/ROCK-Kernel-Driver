@@ -1284,10 +1284,10 @@ pmd_t *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 	pmd_t *new;
 
 	/* "fast" allocation can happen without dropping the lock.. */
-	new = pmd_alloc_one_fast();
+	new = pmd_alloc_one_fast(mm, address);
 	if (!new) {
 		spin_unlock(&mm->page_table_lock);
-		new = pmd_alloc_one();
+		new = pmd_alloc_one(mm, address);
 		spin_lock(&mm->page_table_lock);
 		if (!new)
 			return NULL;
@@ -1301,7 +1301,7 @@ pmd_t *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 			goto out;
 		}
 	}
-	pgd_populate(pgd, new);
+	pgd_populate(mm, pgd, new);
 out:
 	return pmd_offset(pgd, address);
 }
@@ -1318,10 +1318,10 @@ pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 		pte_t *new;
 
 		/* "fast" allocation can happen without dropping the lock.. */
-		new = pte_alloc_one_fast(address);
+		new = pte_alloc_one_fast(mm, address);
 		if (!new) {
 			spin_unlock(&mm->page_table_lock);
-			new = pte_alloc_one(address);
+			new = pte_alloc_one(mm, address);
 			spin_lock(&mm->page_table_lock);
 			if (!new)
 				return NULL;
@@ -1335,7 +1335,7 @@ pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 				goto out;
 			}
 		}
-		pmd_populate(pmd, new);
+		pmd_populate(mm, pmd, new);
 	}
 out:
 	return pte_offset(pmd, address);

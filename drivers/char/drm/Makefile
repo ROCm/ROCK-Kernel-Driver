@@ -3,12 +3,10 @@
 # the Direct Rendering Infrastructure (DRI) in XFree86 4.x.
 #
 
-# drm.o is a fake target -- it is never built
-# The real targets are in the module-list
 O_TARGET	:= drm.o
 
-module-list     := gamma.o tdfx.o r128.o ffb.o mga.o i810.o
-export-objs     := $(patsubst %.o,%_drv.o,$(module-list))
+export-objs     := gamma_drv.o tdfx_drv.o r128_drv.o ffb_drv.o mga_drv.o \
+		   i810_drv.o
 
 # lib-objs are included in every module so that radical changes to the
 # architecture of the DRM support library can be made at a later time.
@@ -42,6 +40,7 @@ else
  endif
 endif
 
+list-multi  := gamma.o tdfx.o r128.o ffb.o mga.o i810.o
 gamma-objs  := gamma_drv.o  gamma_dma.o
 tdfx-objs   := tdfx_drv.o                 tdfx_context.o
 r128-objs   := r128_drv.o   r128_cce.o    r128_context.o r128_bufs.o r128_state.o

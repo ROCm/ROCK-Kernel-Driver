@@ -1,4 +1,4 @@
-/* $Id: envctrl.c,v 1.21 2001/02/13 04:07:38 davem Exp $
+/* $Id: envctrl.c,v 1.22 2001/03/25 09:12:15 davem Exp $
  * envctrl.c: Temperature and Fan monitoring on Machines providing it.
  *
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
@@ -983,6 +983,17 @@ static int __init envctrl_init(void)
 	struct linux_ebus_device *edev = NULL;
 	struct linux_ebus_child *edev_child = NULL;
 	int i = 0;
+
+	for_each_ebus(ebus) {
+		for_each_ebusdev(edev, ebus) {
+			if (!strcmp(edev->prom_name, "bbc")) {
+				/* If we find a boot-bus controller node,
+				 * then this envctrl driver is not for us.
+				 */
+				return -ENODEV;
+			}
+		}
+	}
 
 	/* Traverse through ebus and ebus device list for i2c device and
 	 * adc and gpio nodes.

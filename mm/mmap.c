@@ -204,6 +204,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	int correct_wcount = 0;
 	int error;
 
+	if (file && (!file->f_op || !file->f_op->mmap))
+		return -ENODEV;
+
 	if ((len = PAGE_ALIGN(len)) == 0)
 		return addr;
 
@@ -245,9 +248,6 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	}
 
 	if (file) {
-		if (!file->f_op || !file->f_op->mmap)
-			return -ENODEV;
-
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
 			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))

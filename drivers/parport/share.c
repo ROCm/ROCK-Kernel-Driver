@@ -810,6 +810,10 @@ void parport_unregister_device(struct pardevice *dev)
 struct parport *parport_find_number (int number)
 {
 	struct parport *port, *result = NULL;
+
+	if (!portlist)
+		get_lowlevel_driver ();
+
 	spin_lock (&parportlist_lock);
 	for (port = portlist; port; port = port->next)
 		if (port->number == number) {
@@ -835,6 +839,10 @@ struct parport *parport_find_number (int number)
 struct parport *parport_find_base (unsigned long base)
 {
 	struct parport *port, *result = NULL;
+
+	if (!portlist)
+		get_lowlevel_driver ();
+
 	spin_lock (&parportlist_lock);
 	for (port = portlist; port; port = port->next)
 		if (port->base == base) {

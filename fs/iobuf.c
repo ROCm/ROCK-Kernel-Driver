@@ -55,7 +55,7 @@ int alloc_kiovec(int nr, struct kiobuf **bufp)
 			return -ENOMEM;
 		}
 		kiobuf_init(iobuf);
-		*bufp++ = iobuf;
+		bufp[i] = iobuf;
 	}
 	
 	return 0;

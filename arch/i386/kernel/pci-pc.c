@@ -968,23 +968,13 @@ static void __init pci_fixup_vt8363(struct pci_dev *d)
 		printk("PCI: Bus master Pipeline request disabled\n");
 		pci_write_config_byte(d, 0x54, tmp & ~(1<<2));
 	}
-	pci_read_config_byte(d, 0x54, &tmp);
-	if(tmp & (1)) {
-		printk("PCI: Fast Write to Read turnaround disabled\n");
-		pci_write_config_byte(d, 0x54, tmp & ~(1));
-	}
 	pci_read_config_byte(d, 0x70, &tmp);
 	if(tmp & (1<<3)) {
 		printk("PCI: Disabled enhanced CPU to PCI writes\n");
 		pci_write_config_byte(d, 0x70, tmp & ~(1<<3));
 	}
-	pci_read_config_byte(d, 0x70, &tmp);
-	if(tmp & (1<<2)) {
-		printk("PCI: Disabled Master Read Caching\n");
-		pci_write_config_byte(d, 0x70, tmp & ~(1<<2));
-	}
 	pci_read_config_byte(d, 0x71, &tmp);
-	if ((tmp & (1<<3))==0) {
+	if((tmp & (1<<3)) == 0) {
 		printk("PCI: Bursting cornercase bug worked around\n");
 		pci_write_config_byte(d, 0x71, tmp | (1<<3));
 	}

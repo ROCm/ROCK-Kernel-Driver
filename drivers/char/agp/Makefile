@@ -7,7 +7,7 @@ O_TARGET	:= agp.o
 
 export-objs := agpgart_be.o
 
-multi-objs := agpgart.o
+list-multi := agpgart.o
 agpgart-objs := agpgart_fe.o agpgart_be.o
 
 obj-$(CONFIG_AGP) += agpgart.o

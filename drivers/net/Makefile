@@ -15,8 +15,9 @@ O_TARGET := net.o
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o ppp_async.o \
-			ppp_generic.o slhc.o pppox.o auto_irq.o
+export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
+			ppp_async.o ppp_generic.o slhc.o pppox.o auto_irq.o \
+			net_init.o
 
 ifeq ($(CONFIG_TULIP),y)
   obj-y += tulip/tulip.o

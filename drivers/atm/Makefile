@@ -50,6 +50,9 @@ obj-$(CONFIG_ATM_FORE200E) += fore_200e.o
 
 EXTRA_CFLAGS=-g
 
+list-multi	:= fore_200e.o
+fore_200e-objs	:= fore200e.o $(FORE200E_FW_OBJS)
+
 include $(TOPDIR)/Rules.make
 
 
@@ -82,9 +85,8 @@ fore200e_mkfirm: fore200e_mkfirm.c
 	objcopy -Iihex $< -Obinary $@.gz
 	gzip -df $@.gz
 
-# module build
-fore_200e.o: fore200e.o $(FORE200E_FW_OBJS)
-	$(LD) -r -o $@ $< $(FORE200E_FW_OBJS)
+fore_200e.o: $(fore_200e-objs)
+	$(LD) -r -o $@ $(fore_200e-objs)
 
 # firmware dependency stuff taken from drivers/sound/Makefile
 FORE200E_FW_UP_TO_DATE :=

@@ -19,12 +19,12 @@ Parport as modules
 
 If you load the parport code as a module, say
 
-	# insmod parport.o
+	# insmod parport
 
 to load the generic parport code.  You then must load the
 architecture-dependent code with (for example):
 
-	# insmod parport_pc.o io=0x3bc,0x378,0x278 irq=none,7,auto
+	# insmod parport_pc io=0x3bc,0x378,0x278 irq=none,7,auto
 
 to tell the parport code that you want three PC-style ports, one at
 0x3bc with no IRQ, one at 0x378 using IRQ 7, and one at 0x278 with an
@@ -192,7 +192,7 @@ is loaded it will create one lp device for each port found.  You can
 override this, though, by using parameters either when you load the lp
 driver:
 
-	# insmod lp.o parport=0,2
+	# insmod lp parport=0,2
 
 or on the LILO command line:
 

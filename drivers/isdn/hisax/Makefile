@@ -34,7 +34,6 @@ hisax-objs-$(CONFIG_HISAX_DIEHLDIVA) += diva.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_ASUSCOM) += asuscom.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_TELEINT) += teleint.o isac.o arcofi.o hfc_2bs0.o
 hisax-objs-$(CONFIG_HISAX_SEDLBAUER) += sedlbauer.o isac.o arcofi.o hscx.o isar.o
-hisax-objs-$(CONFIG_HISAX_SEDLBAUER_CS) += sedlbauer_cs.o
 hisax-objs-$(CONFIG_HISAX_SPORTSTER) += sportster.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_MIC) += mic.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_NETJET) += nj_s.o netjet.o isac.o arcofi.o
@@ -55,7 +54,8 @@ hisax-objs += $(sort $(hisax-objs-y))
 
 # Each configuration option enables a list of files.
 
-obj-$(CONFIG_ISDN_DRV_HISAX)	+= hisax.o
+obj-$(CONFIG_ISDN_DRV_HISAX)		+= hisax.o
+obj-$(CONFIG_HISAX_SEDLBAUER_CS)	+= sedlbauer_cs.o
 
 MD5FILES 	:= isac.c isdnl1.c isdnl2.c isdnl3.c \
 		   tei.c callc.c cert.c l3dss1.c l3_1tr6.c \

@@ -7,16 +7,14 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-include ../../.config
+O_TARGET	:= atm.o
 
-O_TARGET= atm.o
+export-objs 	:= common.o atm_misc.o raw.o resources.o ipcommon.o proc.o
 
-export-objs = common.o atm_misc.o raw.o resources.o ipcommon.o proc.o
+list-multi	:= mpoa.o
+mpoa-objs	:= mpc.o mpoa_caches.o mpoa_proc.o
 
-multi-list = mpoa.o
-mpoa-objs = mpc.o mpoa_caches.o mpoa_proc.o
-
-obj-$(CONFIG_ATM) = addr.o pvc.o signaling.o svc.o common.o atm_misc.o raw.o resources.o
+obj-$(CONFIG_ATM) := addr.o pvc.o signaling.o svc.o common.o atm_misc.o raw.o resources.o
 
 ifeq ($(CONFIG_ATM_CLIP),y)
 obj-y += clip.o

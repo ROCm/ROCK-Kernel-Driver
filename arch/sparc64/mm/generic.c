@@ -1,4 +1,4 @@
-/* $Id: generic.c,v 1.15 2001/03/24 09:36:01 davem Exp $
+/* $Id: generic.c,v 1.16 2001/03/25 04:40:05 davem Exp $
  * generic.c: Generic Sparc mm routines that are not dependent upon
  *            MMU type but are Sparc specific.
  *
@@ -107,9 +107,7 @@ static inline int io_remap_pmd_range(pmd_t * pmd, unsigned long address, unsigne
 		pte_t * pte = pte_alloc(current->mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
-		spin_lock(&current->mm->page_table_lock);
 		io_remap_pte_range(pte, address, end - address, address + offset, prot, space);
-		spin_unlock(&current->mm->page_table_lock);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address < end);
@@ -122,11 +120,14 @@ int io_remap_page_range(unsigned long from, unsigned long offset, unsigned long 
 	pgd_t * dir;
 	unsigned long beg = from;
 	unsigned long end = from + size;
+	struct mm_struct *mm = current->mm;
 
 	prot = __pgprot(pg_iobits);
 	offset -= from;
-	dir = pgd_offset(current->mm, from);
-	flush_cache_range(current->mm, beg, end);
+	dir = pgd_offset(mm, from);
+	flush_cache_range(mm, beg, end);
+
+	spin_lock(&mm->page_table_lock);
 	while (from < end) {
 		pmd_t *pmd = pmd_alloc(current->mm, dir, from);
 		error = -ENOMEM;
@@ -138,6 +139,8 @@ int io_remap_page_range(unsigned long from, unsigned long offset, unsigned long 
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	}
+	spin_unlock(&mm->page_table_lock);
+
 	flush_tlb_range(current->mm, beg, end);
 	return error;
 }

@@ -76,7 +76,7 @@ struct isdn_ppp_comp_data {
  *
  * We use this same struct for the reset entry of the compressor to commu-
  * nicate to its caller how to deal with sending of a Reset Ack. In this
- * case, expra is not used, but other options still apply (supressing
+ * case, expra is not used, but other options still apply (suppressing
  * sending with rsend, appending arbitrary data, etc).
  */
 

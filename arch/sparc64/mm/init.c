@@ -66,9 +66,9 @@ int do_check_pgt_cache(int low, int high)
 				free_pgd_slow(get_pgd_fast()), freed++;
 #endif
 			if (pte_quicklist[0])
-				free_pte_slow(pte_alloc_one_fast(0)), freed++;
+				free_pte_slow(pte_alloc_one_fast(NULL, 0)), freed++;
 			if (pte_quicklist[1])
-				free_pte_slow(pte_alloc_one_fast(1 << (PAGE_SHIFT + 10))), freed++;
+				free_pte_slow(pte_alloc_one_fast(NULL, 1 << (PAGE_SHIFT + 10))), freed++;
 		} while (pgtable_cache_size > low);
 	}
 #ifndef CONFIG_SMP 
@@ -904,7 +904,7 @@ struct pgtable_cache_struct pgt_quicklists;
  *	3) Process faults back in the page, the old pre-dirtied copy
  *	   is provided and here is the corruption.
  */
-pte_t *pte_alloc_one(unsigned long address)
+pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *page = alloc_pages(GFP_KERNEL, 1);
 	unsigned long color = ((address >> (PAGE_SHIFT + 10)) & 1UL);

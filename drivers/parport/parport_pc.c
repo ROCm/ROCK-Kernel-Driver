@@ -1691,11 +1691,6 @@ static int __devinit parport_ECP_supported(struct parport *pb)
 		config & 0x80 ? "Level" : "Pulses");
 
 	configb = inb (CONFIGB (pb));
-	if (!(configb & 0x40)) {
-		printk (KERN_WARNING "0x%lx: possible IRQ conflict!\n",
-			pb->base);
-		pb->irq = PARPORT_IRQ_NONE;
-	}
 	printk (KERN_DEBUG "0x%lx: ECP port cfgA=0x%02x cfgB=0x%02x\n",
 		pb->base, config, configb);
         printk (KERN_DEBUG "0x%lx: ECP settings irq=", pb->base);

@@ -1,4 +1,4 @@
-/* $Id: boardergo.c,v 1.5.6.2 2001/02/16 16:43:30 kai Exp $
+/* $Id: boardergo.c,v 1.5.6.3 2001/03/13 16:17:09 kai Exp $
 
  * Linux driver for HYSDN cards, specific routines for ergo type boards.
  *

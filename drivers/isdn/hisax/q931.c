@@ -1,4 +1,4 @@
-/* $Id: q931.c,v 1.10.6.1 2001/02/16 16:43:28 kai Exp $
+/* $Id: q931.c,v 1.10.6.2 2001/03/13 16:17:08 kai Exp $
  *
  * q931.c       code to decode ITU Q.931 call control messages
  *

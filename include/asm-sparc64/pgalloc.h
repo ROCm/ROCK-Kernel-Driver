@@ -227,9 +227,9 @@ extern __inline__ void free_pgd_slow(pgd_t *pgd)
 
 #endif /* CONFIG_SMP */
 
-#define pgd_populate(PGD, PMD)	pgd_set(PGD, PMD)
+#define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
 
-extern __inline__ pmd_t *pmd_alloc_one(void)
+extern __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	pmd_t *pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
 	if (pmd)
@@ -237,7 +237,7 @@ extern __inline__ pmd_t *pmd_alloc_one(void)
 	return pmd;
 }
 
-extern __inline__ pmd_t *pmd_alloc_one_fast(void)
+extern __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long *ret;
 	int color = 0;
@@ -267,11 +267,11 @@ extern __inline__ void free_pmd_slow(pmd_t *pmd)
 	free_page((unsigned long)pmd);
 }
 
-#define pmd_populate(PMD, PTE)	pmd_set(PMD, PTE)
+#define pmd_populate(MM, PMD, PTE)	pmd_set(PMD, PTE)
 
-extern pte_t *pte_alloc_one(unsigned long address);
+extern pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address);
 
-extern __inline__ pte_t *pte_alloc_one_fast(unsigned long address)
+extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long color = (address >> (PAGE_SHIFT + 10)) & 0x1UL;
 	unsigned long *ret;

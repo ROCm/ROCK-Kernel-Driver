@@ -1,11 +1,14 @@
 /*
- * $Id: b1lli.h,v 1.8 1999/07/01 15:26:54 calle Exp $
+ * $Id: b1lli.h,v 1.8.8.1 2001/03/15 09:58:30 kai Exp $
  *
  * ISDN lowlevel-module for AVM B1-card.
  *
  * Copyright 1996 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: b1lli.h,v $
+ * Revision 1.8.8.1  2001/03/15 09:58:30  kai
+ * spelling fix
+ *
  * Revision 1.8  1999/07/01 15:26:54  calle
  * complete new version (I love it):
  * + new hardware independed "capi_driver" interface that will make it easy to:
@@ -129,7 +132,7 @@ typedef struct avmb1_extcarddef {
 #define	AVMB1_LOAD_AND_CONFIG	3	/* load image and config to card */
 #define	AVMB1_ADDCARD_WITH_TYPE	4	/* add a new card, with cardtype */
 #define AVMB1_GET_CARDINFO	5	/* get cardtype */
-#define AVMB1_REMOVECARD	6	/* remove a card (usefull for T1) */
+#define AVMB1_REMOVECARD	6	/* remove a card (useful for T1) */
 
 #define	AVMB1_REGISTERCARD_IS_OBSOLETE
 

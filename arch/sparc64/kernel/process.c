@@ -416,9 +416,9 @@ void flush_thread(void)
 			unsigned long pgd_cache;
 
 			if (pgd_none(*pgd0)) {
-				pmd_t *page = pmd_alloc_one_fast();
+				pmd_t *page = pmd_alloc_one_fast(NULL, 0);
 				if (!page)
-					page = pmd_alloc_one();
+					page = pmd_alloc_one(NULL, 0);
 				pgd_set(pgd0, page);
 			}
 			pgd_cache = pgd_val(*pgd0) << 11UL;
