@@ -304,7 +304,14 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 {
 	struct acpi_table_hpet *hpet_tbl;
 
-	hpet_tbl = __va(phys);
+	if (!phys || !size)
+		return -EINVAL;
+
+	hpet_tbl = (struct acpi_table_hpet *) __acpi_map_table(phys, size);
+	if (!hpet_tbl) {
+		printk(KERN_WARNING PREFIX "Unable to map HPET\n");
+		return -ENODEV;
+	}
 
 	if (hpet_tbl->addr.space_id != ACPI_SPACE_MEM) {
 		printk(KERN_WARNING PREFIX "HPET timers must be located in "
