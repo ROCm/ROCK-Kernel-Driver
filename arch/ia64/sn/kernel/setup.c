@@ -147,7 +147,6 @@ char drive_info[4*16];
  * Sets up an initial console to aid debugging.  Intended primarily
  * for bringup.  See start_kernel() in init/main.c.
  */
-#if defined(CONFIG_IA64_EARLY_PRINTK_SGI_SN) || defined(CONFIG_IA64_SGI_SN_SIM)
 
 void __init
 early_sn_setup(void)
@@ -189,7 +188,6 @@ early_sn_setup(void)
 		printk(KERN_DEBUG "early_sn_setup: setting master_node_bedrock_address to 0x%lx\n", master_node_bedrock_address);
 	}
 }
-#endif /* CONFIG_IA64_EARLY_PRINTK_SGI_SN */
 
 #ifdef CONFIG_IA64_MCA
 extern int platform_intr_list[];

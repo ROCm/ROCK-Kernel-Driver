@@ -408,11 +408,7 @@ struct exception_table_entry {
 extern void handle_exception (struct pt_regs *regs, const struct exception_table_entry *e);
 extern const struct exception_table_entry *search_exception_tables (unsigned long addr);
 
-#ifdef GAS_HAS_LOCAL_TAGS
 # define SEARCH_EXCEPTION_TABLE(regs) search_exception_tables(regs->cr_iip + ia64_psr(regs)->ri)
-#else
-# define SEARCH_EXCEPTION_TABLE(regs) search_exception_tables(regs->cr_iip)
-#endif
 
 static inline int
 done_with_exception (struct pt_regs *regs)
