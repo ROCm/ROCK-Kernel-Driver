@@ -438,12 +438,6 @@ static int carm_bdev_ioctl(struct inode *ino, struct file *fil,
 	return -EOPNOTSUPP;
 }
 
-static void msleep(unsigned long msecs)
-{
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(msecs));
-}
-
 static const u32 msg_sizes[] = { 32, 64, 128, CARM_MSG_SIZE };
 
 static inline int carm_lookup_bucket(u32 msg_size)
