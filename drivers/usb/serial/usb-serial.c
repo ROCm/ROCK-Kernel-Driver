@@ -467,9 +467,13 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	down (&port->sem);
 	port->tty = tty;
 	 
-	/* lock this module before we call it */
+	/* lock this module before we call it,
+	   this may, which means we must bail out, safe because we are called with BKL held */
 	if (serial->type->owner)
-		__MOD_INC_USE_COUNT(serial->type->owner);
+		if (!try_module_get(serial->type->owner)) {
+			retval = -ENODEV;
+			goto bailout;
+		}
 
 	++port->open_count;
 	if (port->open_count == 1) {
@@ -485,6 +489,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 				__MOD_DEC_USE_COUNT(serial->type->owner);
 		}
 	}
+bailout:
 
 	up (&port->sem);
 	return retval;
