@@ -63,6 +63,7 @@
 
 /*
  * Ethernet gadget driver -- with CDC and non-CDC options
+ * Builds on hardware support for a full duplex link.
  *
  * CDC Ethernet is the standard USB solution for sending Ethernet frames
  * using USB.  Real hardware tends to use the same framing protocol but look
@@ -859,7 +860,7 @@ static char				product_desc [40] = DRIVER_DESC;
 static char				ethaddr [2 * ETH_ALEN + 1];
 #endif
 
-/* static strings, in iso 8859/1 */
+/* static strings, in UTF-8 */
 static struct usb_string		strings [] = {
 	{ STRING_MANUFACTURER,	manufacturer, },
 	{ STRING_PRODUCT,	product_desc, },
@@ -901,9 +902,9 @@ config_buf (enum usb_device_speed speed,
 
 	if (type == USB_DT_OTHER_SPEED_CONFIG)
 		hs = !hs;
-#define which_fn(t)	(hs ? & hs_ ## t ## _function : & fs_ ## t ## _function)
+#define which_fn(t)	(hs ? hs_ ## t ## _function : fs_ ## t ## _function)
 #else
-#define	which_fn(t)	(& fs_ ## t ## _function)
+#define	which_fn(t)	(fs_ ## t ## _function)
 #endif
 
 	if (index >= device_desc.bNumConfigurations)
@@ -915,14 +916,12 @@ config_buf (enum usb_device_speed speed,
 	 */
 	if (device_desc.bNumConfigurations == 2 && index == 0) {
 		config = &rndis_config;
-		function = (const struct usb_descriptor_header **)
-				which_fn (rndis);
+		function = which_fn (rndis);
 	} else
 #endif
 	{
 		config = &eth_config;
-		function = (const struct usb_descriptor_header **)
-				which_fn (eth);
+		function = which_fn (eth);
 	}
 
 	/* for now, don't advertise srp-only devices */
