@@ -6,6 +6,8 @@
 #ifndef __MODE_SKAS_H__
 #define __MODE_SKAS_H__
 
+#include <sysdep/ptrace.h>
+
 extern unsigned long exec_regs[];
 extern unsigned long exec_fp_regs[];
 extern unsigned long exec_fpx_regs[];

@@ -228,6 +228,39 @@ int protect_memory(unsigned long addr, unsigned long len, int r, int w, int x,
 	return(0);
 }
 
+#if 0
+/* Debugging facility for dumping stuff out to the host, avoiding the timing
+ * problems that come with printf and breakpoints.
+ * Enable in case of emergency.
+ */
+
+int logging = 1;
+int logging_fd = -1;
+
+int logging_line = 0;
+char logging_buf[512];
+
+void log(char *fmt, ...)
+{
+        va_list ap;
+        struct timeval tv;
+        struct openflags flags;
+
+        if(logging == 0) return;
+        if(logging_fd < 0){
+                flags = of_create(of_trunc(of_rdwr(OPENFLAGS())));
+                logging_fd = os_open_file("log", flags, 0644);
+        }
+        gettimeofday(&tv, NULL);
+        sprintf(logging_buf, "%d\t %u.%u  ", logging_line++, tv.tv_sec,
+                tv.tv_usec);
+        va_start(ap, fmt);
+        vsprintf(&logging_buf[strlen(logging_buf)], fmt, ap);
+        va_end(ap);
+        write(logging_fd, logging_buf, strlen(logging_buf));
+}
+#endif
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

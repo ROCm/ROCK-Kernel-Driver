@@ -308,7 +308,8 @@ int os_seek_file(int fd, __u64 offset)
 	__u64 actual;
 
 	actual = lseek64(fd, offset, SEEK_SET);
-	if(actual != offset) return(-errno);
+	if(actual != offset)
+		return(-errno);
 	return(0);
 }
 
