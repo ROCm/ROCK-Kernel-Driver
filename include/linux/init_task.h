@@ -52,6 +52,8 @@
     mm:			NULL,						\
     active_mm:		&init_mm,					\
     run_list:		LIST_HEAD_INIT(tsk.run_list),			\
+    migration_list:	LIST_HEAD_INIT(tsk.migration_list),		\
+    migration_sem:	__MUTEX_INITIALIZER(tsk.migration_sem),		\
     time_slice:		HZ,						\
     next_task:		&tsk,						\
     prev_task:		&tsk,						\

@@ -413,7 +413,12 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
-
+	/*
+	 * Let the per-CPU migration threads start up:
+	 */
+#if CONFIG_SMP
+	migration_init();
+#endif
 	/*
 	 * Tell the world that we're going to be the grim
 	 * reaper of innocent orphaned children.

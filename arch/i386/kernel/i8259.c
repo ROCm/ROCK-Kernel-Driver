@@ -79,7 +79,6 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd)
  * through the ICC by us (IPIs)
  */
 #ifdef CONFIG_SMP
-BUILD_SMP_INTERRUPT(task_migration_interrupt,TASK_MIGRATION_VECTOR)
 BUILD_SMP_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
 BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
 BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
@@ -473,9 +472,6 @@ void __init init_IRQ(void)
 	 * IPI, driven by wakeup.
 	 */
 	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
-
-	/* IPI for task migration */
-	set_intr_gate(TASK_MIGRATION_VECTOR, task_migration_interrupt);
 
 	/* IPI for invalidation */
 	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
