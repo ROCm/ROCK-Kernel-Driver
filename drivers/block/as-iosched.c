@@ -1306,6 +1306,15 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 	as_update_arq(ad, arq); /* keep state machine up to date */
 }
 
+/*
+ * FIXME: HACK for AS requeue problems
+ */
+static void as_requeue_request(request_queue_t *q, struct request *rq)
+{
+	elv_completed_request(q, rq);
+	__elv_add_request(q, rq, 0, 0);
+}
+
 static void
 as_insert_request(request_queue_t *q, struct request *rq,
 			struct list_head *insert_here)
@@ -1821,6 +1830,7 @@ elevator_t iosched_as = {
 	.elevator_next_req_fn =		as_next_request,
 	.elevator_add_req_fn =		as_insert_request,
 	.elevator_remove_req_fn =	as_remove_request,
+	.elevator_requeue_req_fn = 	as_requeue_request,
 	.elevator_queue_empty_fn =	as_queue_empty,
 	.elevator_completed_req_fn =	as_completed_request,
 	.elevator_former_req_fn =	as_former_request,
