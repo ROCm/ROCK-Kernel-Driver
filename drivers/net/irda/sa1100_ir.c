@@ -969,13 +969,7 @@ static int sa1100_irda_net_init(struct net_device *dev)
 {
 	struct sa1100_irda *si = dev->priv;
 	unsigned int baudrate_mask;
-	int err = -ENOMEM;
-
-	si = kmalloc(sizeof(struct sa1100_irda), GFP_KERNEL);
-	if (!si)
-		goto out;
-
-	memset(si, 0, sizeof(*si));
+	int err;
 
 	si->dev = &sa1100ir_device.dev;
 
@@ -989,14 +983,12 @@ static int sa1100_irda_net_init(struct net_device *dev)
 	if (err)
 		goto out_free_rx;
 
-	dev->priv = si;
 	dev->hard_start_xmit	= sa1100_irda_hard_xmit;
 	dev->open		= sa1100_irda_start;
 	dev->stop		= sa1100_irda_stop;
 	dev->do_ioctl		= sa1100_irda_ioctl;
 	dev->get_stats		= sa1100_irda_stats;
 
-	irda_device_setup(dev);
 	irda_init_max_qos_capabilies(&si->qos);
 
 	/*
@@ -1036,35 +1028,13 @@ static int sa1100_irda_net_init(struct net_device *dev)
 out_free_rx:
 	kfree(si->rx_buff.head);
 out:
-	kfree(si);
-
 	return err;
-}
-
-/*
- * Remove all traces of this driver module from the kernel, so we can't be
- * called.  Note that the device has already been stopped, so we don't have
- * to worry about interrupts or dma.
- */
-static void sa1100_irda_net_uninit(struct net_device *dev)
-{
-	struct sa1100_irda *si = dev->priv;
-
-	dev->hard_start_xmit	= NULL;
-	dev->open		= NULL;
-	dev->stop		= NULL;
-	dev->do_ioctl		= NULL;
-	dev->get_stats		= NULL;
-	dev->priv		= NULL;
-
-	kfree(si->tx_buff.head);
-	kfree(si->rx_buff.head);
-	kfree(si);
 }
 
 static int __init sa1100_irda_init(void)
 {
 	struct net_device *dev;
+	struct sa1100_irda *si;
 	int err;
 
 	/*
@@ -1084,36 +1054,42 @@ static int __init sa1100_irda_init(void)
 	err = request_mem_region(__PREG(Ser2HSCR2), 0x04, "IrDA") ? 0 : -EBUSY;
 	if (err)
 		goto err_mem_3;
+	dev = alloc_irdadev(sizeof(struct sa1100_irda));
+	if (!dev)
+		goto err_alloc;
 
 	driver_register(&sa1100ir_driver);
 	sys_device_register(&sa1100ir_device);
 
+	dev->irq    = IRQ_Ser2ICP;
+
+	err = sa1100_irda_net_init(dev);
+	if (err)
+		goto err_init;
+
 	rtnl_lock();
-	dev = dev_alloc("irda%d", &err);
-	if (dev) {
-		dev->irq    = IRQ_Ser2ICP;
-		dev->init   = sa1100_irda_net_init;
-		dev->uninit = sa1100_irda_net_uninit;
-
-		err = register_netdevice(dev);
-
-		if (err)
-			kfree(dev);
-		else
-			dev_set_drvdata(&sa1100ir_device.dev, dev);
-	}
+	err = register_netdevice(dev);
+	if (err)
+		goto err_register;
+	dev_set_drvdata(&sa1100ir_device.dev, dev);
 	rtnl_unlock();
+	return 0;
 
-	if (err) {
-		sys_device_unregister(&sa1100ir_device);
-		driver_unregister(&sa1100ir_driver);
-
-		release_mem_region(__PREG(Ser2HSCR2), 0x04);
+err_register:
+	rtnl_unlock();
+	si = dev->priv;
+	kfree(si->tx_buff.head);
+	kfree(si->rx_buff.head);
+err_init:
+	free_netdev(dev);
+	sys_device_unregister(&sa1100ir_device);
+	driver_unregister(&sa1100ir_driver);
+err_alloc:
+	release_mem_region(__PREG(Ser2HSCR2), 0x04);
 err_mem_3:
-		release_mem_region(__PREG(Ser2HSCR0), 0x1c);
+	release_mem_region(__PREG(Ser2HSCR0), 0x1c);
 err_mem_2:
-		release_mem_region(__PREG(Ser2UTCR0), 0x24);
-	}
+	release_mem_region(__PREG(Ser2UTCR0), 0x24);
 err_mem_1:
 	return err;
 }
@@ -1132,8 +1108,12 @@ static void __exit sa1100_irda_exit(void)
 	release_mem_region(__PREG(Ser2HSCR0), 0x1c);
 	release_mem_region(__PREG(Ser2UTCR0), 0x24);
 
-	if(dev)
+	if(dev) {
+		struct sa1100_irda *si = dev->priv;
+		kfree(si->tx_buff.head);
+		kfree(si->rx_buff.head);
 		free_netdev(dev);
+	}
 }
 
 static int __init sa1100ir_setup(char *line)
