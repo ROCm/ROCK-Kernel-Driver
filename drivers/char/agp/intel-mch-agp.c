@@ -569,15 +569,16 @@ static void __devexit agp_intelmch_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
-	pci_dev_put(pdev);
 	agp_remove_bridge(bridge);
+	if (intel_i830_private.i830_dev)
+		pci_dev_put(intel_i830_private.i830_dev);
 	agp_put_bridge(bridge);
 }
 
 static int agp_intelmch_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
-	
+
 	pci_restore_state(pdev);
 
 	if (bridge->driver == &intel_845_driver)
