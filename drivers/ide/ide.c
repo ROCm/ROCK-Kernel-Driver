@@ -1741,7 +1741,6 @@ extern void init_hwif_data(unsigned int index);
 
 void ide_unregister (unsigned int index)
 {
-	struct gendisk *gd;
 	ide_drive_t *drive, *d;
 	ide_hwif_t *hwif, *g;
 	ide_hwgroup_t *hwgroup;
@@ -1863,12 +1862,10 @@ void ide_unregister (unsigned int index)
 	unregister_blkdev(hwif->major, hwif->name);
 	blk_dev[hwif->major].data = NULL;
 	blk_dev[hwif->major].queue = NULL;
-	gd = hwif->drives[0].disk;
-	if (gd) {
-		int i;
-		for (i = 0; i < MAX_DRIVES; i++)
-			hwif->drives[i].disk = NULL;
-		kfree(gd);
+	for (i = 0; i < MAX_DRIVES; i++) {
+		struct gendisk *disk = hwif->drives[i].disk;
+		hwif->drives[i].disk = NULL;
+		put_disk(disk);
 	}
 	old_hwif			= *hwif;
 	init_hwif_data(index);	/* restore hwif data to pristine status */

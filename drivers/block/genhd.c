@@ -236,3 +236,18 @@ int __init device_init(void)
 __initcall(device_init);
 
 EXPORT_SYMBOL(disk_devclass);
+
+struct gendisk *alloc_disk(void)
+{
+	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+	if (disk)
+		memset(disk, 0, sizeof(struct gendisk));
+	return disk;
+}
+
+void put_disk(struct gendisk *disk)
+{
+	kfree(disk);
+}
+EXPORT_SYMBOL(alloc_disk);
+EXPORT_SYMBOL(put_disk);

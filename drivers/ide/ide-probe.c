@@ -954,20 +954,20 @@ EXPORT_SYMBOL(init_irq);
  */
 static void init_gendisk (ide_hwif_t *hwif)
 {
-	struct gendisk *gd;
-	unsigned int unit, units, minors;
+	unsigned int unit, units;
 	extern devfs_handle_t ide_devfs_handle;
+	struct gendisk *disks[MAX_DRIVES];
 
 	units = MAX_DRIVES;
 
-	minors    = units * (1<<PARTN_BITS);
-	gd        = kmalloc(MAX_DRIVES * sizeof(struct gendisk), GFP_KERNEL);
-	if (!gd)
-		goto err_kmalloc_gd;
-	memset(gd, 0, MAX_DRIVES * sizeof(struct gendisk));
+	for (unit = 0; unit < MAX_DRIVES; unit++) {
+		disks[unit] = alloc_disk();
+		if (!disks[unit])
+			goto err_kmalloc_gd;
+	}
 
 	for (unit = 0; unit < units; ++unit) {
-		struct gendisk *disk = &gd[unit];
+		struct gendisk *disk = disks[unit];
 		disk->major  = hwif->major;
 		disk->first_minor = unit << PARTN_BITS;
 		sprintf(disk->disk_name,"hd%c",'a'+hwif->index*MAX_DRIVES+unit);
@@ -997,10 +997,10 @@ static void init_gendisk (ide_hwif_t *hwif)
 	}
 	return;
 
-err_kmalloc_gd_names:
-	kfree(gd);
 err_kmalloc_gd:
 	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");
+	while (unit--)
+		put_disk(disks[unit]);
 }
 
 EXPORT_SYMBOL(init_gendisk);

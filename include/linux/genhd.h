@@ -262,6 +262,9 @@ char *disk_name (struct gendisk *hd, int part, char *buf);
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
 extern void update_partition(struct gendisk *disk, int part);
 
+extern struct gendisk *alloc_disk(void);
+extern void put_disk(struct gendisk *disk);
+
 /* will go away */
 extern void blk_set_probe(int major, struct gendisk *(p)(int));
 

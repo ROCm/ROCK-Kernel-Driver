@@ -1298,26 +1298,22 @@ static int sd_attach(Scsi_Device * sdp)
 	Scsi_Disk *sdkp;
 	int dsk_nr;
 	unsigned long iflags;
-	struct {
-		struct gendisk disk;
-	} *p;
 	struct gendisk *gd;
 
 	if ((NULL == sdp) ||
 	    ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD)))
 		return 0;
 
-	gd = kmalloc(sizeof(*p), GFP_KERNEL);
+	gd = alloc_disk();
 	if (!gd)
 		return 1;
-	memset(gd, 0, sizeof(*p));
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 	if (sd_template.nr_dev >= sd_template.dev_max) {
 		sdp->attached--;
 		printk(KERN_ERR "sd_init: no more room for device\n");
-		kfree(gd);
+		put_disk(gd);
 		return 1;
 	}
 
@@ -1337,7 +1333,7 @@ static int sd_attach(Scsi_Device * sdp)
 	if (dsk_nr >= sd_template.dev_max) {
 		/* panic("scsi_devices corrupt (sd)");  overkill */
 		printk(KERN_ERR "sd_init: sd_dsk_arr corrupted\n");
-		kfree(gd);
+		put_disk(gd);
 		return 1;
 	}
 
@@ -1417,7 +1413,7 @@ static void sd_detach(Scsi_Device * sdp)
 	sdp->attached--;
 	sd_template.dev_noticed--;
 	sd_template.nr_dev--;
-	kfree(sd_disks[dsk_nr]);
+	put_disk(sd_disks[dsk_nr]);
 	sd_disks[dsk_nr] = NULL;
 }
 
