@@ -13,6 +13,7 @@
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/sysctl.h>
+#include <linux/module.h>
 
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
