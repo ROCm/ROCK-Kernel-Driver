@@ -1358,7 +1358,10 @@ static struct net_device_stats *b44_get_stats(struct net_device *dev)
 				   hwstat->rx_symbol_errs);
 
 	nstat->tx_aborted_errors = hwstat->tx_underruns;
+#if 0
+	/* Carrier lost counter seems to be broken for some devices */
 	nstat->tx_carrier_errors = hwstat->tx_carrier_lost;
+#endif
 
 	return nstat;
 }
