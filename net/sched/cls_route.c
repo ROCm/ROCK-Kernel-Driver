@@ -272,7 +272,6 @@ static void route4_put(struct tcf_proto *tp, unsigned long f)
 
 static int route4_init(struct tcf_proto *tp)
 {
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -281,10 +280,8 @@ static void route4_destroy(struct tcf_proto *tp)
 	struct route4_head *head = xchg(&tp->root, NULL);
 	int h1, h2;
 
-	if (head == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (head == NULL)
 		return;
-	}
 
 	for (h1=0; h1<=256; h1++) {
 		struct route4_bucket *b;
@@ -309,7 +306,6 @@ static void route4_destroy(struct tcf_proto *tp)
 		}
 	}
 	kfree(head);
-	MOD_DEC_USE_COUNT;
 }
 
 static int route4_delete(struct tcf_proto *tp, unsigned long arg)
@@ -607,18 +603,18 @@ rtattr_failure:
 }
 
 struct tcf_proto_ops cls_route4_ops = {
-	NULL,
-	"route",
-	route4_classify,
-	route4_init,
-	route4_destroy,
-
-	route4_get,
-	route4_put,
-	route4_change,
-	route4_delete,
-	route4_walk,
-	route4_dump
+	.next		=	NULL,
+	.kind		=	"route",
+	.classify	=	route4_classify,
+	.init		=	route4_init,
+	.destroy	=	route4_destroy,
+	.get		=	route4_get,
+	.put		=	route4_put,
+	.change		=	route4_change,
+	.delete		=	route4_delete,
+	.walk		=	route4_walk,
+	.dump		=	route4_dump,
+	.owner		=	THIS_MODULE,
 };
 
 #ifdef MODULE

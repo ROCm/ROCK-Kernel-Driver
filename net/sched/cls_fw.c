@@ -117,7 +117,6 @@ static void fw_put(struct tcf_proto *tp, unsigned long f)
 
 static int fw_init(struct tcf_proto *tp)
 {
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -127,10 +126,8 @@ static void fw_destroy(struct tcf_proto *tp)
 	struct fw_filter *f;
 	int h;
 
-	if (head == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (head == NULL)
 		return;
-	}
 
 	for (h=0; h<256; h++) {
 		while ((f=head->ht[h]) != NULL) {
@@ -146,7 +143,6 @@ static void fw_destroy(struct tcf_proto *tp)
 		}
 	}
 	kfree(head);
-	MOD_DEC_USE_COUNT;
 }
 
 static int fw_delete(struct tcf_proto *tp, unsigned long arg)
@@ -351,18 +347,18 @@ rtattr_failure:
 }
 
 struct tcf_proto_ops cls_fw_ops = {
-	NULL,
-	"fw",
-	fw_classify,
-	fw_init,
-	fw_destroy,
-
-	fw_get,
-	fw_put,
-	fw_change,
-	fw_delete,
-	fw_walk,
-	fw_dump
+	.next		=	NULL,
+	.kind		=	"fw",
+	.classify	=	fw_classify,
+	.init		=	fw_init,
+	.destroy	=	fw_destroy,
+	.get		=	fw_get,
+	.put		=	fw_put,
+	.change		=	fw_change,
+	.delete		=	fw_delete,
+	.walk		=	fw_walk,
+	.dump		=	fw_dump,
+	.owner		=	THIS_MODULE,
 };
 
 #ifdef MODULE

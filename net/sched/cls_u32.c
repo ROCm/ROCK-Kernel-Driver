@@ -257,17 +257,14 @@ static int u32_init(struct tcf_proto *tp)
 	struct tc_u_hnode *root_ht;
 	struct tc_u_common *tp_c;
 
-	MOD_INC_USE_COUNT;
-
 	for (tp_c = u32_list; tp_c; tp_c = tp_c->next)
 		if (tp_c->q == tp->q)
 			break;
 
 	root_ht = kmalloc(sizeof(*root_ht), GFP_KERNEL);
-	if (root_ht == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (root_ht == NULL)
 		return -ENOBUFS;
-	}
+
 	memset(root_ht, 0, sizeof(*root_ht));
 	root_ht->divisor = 0;
 	root_ht->refcnt++;
@@ -277,7 +274,6 @@ static int u32_init(struct tcf_proto *tp)
 		tp_c = kmalloc(sizeof(*tp_c), GFP_KERNEL);
 		if (tp_c == NULL) {
 			kfree(root_ht);
-			MOD_DEC_USE_COUNT;
 			return -ENOBUFS;
 		}
 		memset(tp_c, 0, sizeof(*tp_c));
@@ -402,7 +398,6 @@ static void u32_destroy(struct tcf_proto *tp)
 		kfree(tp_c);
 	}
 
-	MOD_DEC_USE_COUNT;
 	tp->data = NULL;
 }
 
@@ -690,18 +685,18 @@ rtattr_failure:
 }
 
 struct tcf_proto_ops cls_u32_ops = {
-	NULL,
-	"u32",
-	u32_classify,
-	u32_init,
-	u32_destroy,
-
-	u32_get,
-	u32_put,
-	u32_change,
-	u32_delete,
-	u32_walk,
-	u32_dump
+	.next		=	NULL,
+	.kind		=	"u32",
+	.classify	=	u32_classify,
+	.init		=	u32_init,
+	.destroy	=	u32_destroy,
+	.get		=	u32_get,
+	.put		=	u32_put,
+	.change		=	u32_change,
+	.delete		=	u32_delete,
+	.walk		=	u32_walk,
+	.dump		=	u32_dump,
+	.owner		=	THIS_MODULE,
 };
 
 #ifdef MODULE
