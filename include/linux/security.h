@@ -1121,6 +1121,8 @@ struct security_operations {
 	int (*unregister_security) (const char *name,
 	                            struct security_operations *ops);
 
+	void (*d_instantiate) (struct dentry *dentry, struct inode *inode);
+
 #ifdef CONFIG_SECURITY_NETWORK
 	int (*unix_stream_connect) (struct socket * sock,
 				    struct socket * other, struct sock * newsk);
