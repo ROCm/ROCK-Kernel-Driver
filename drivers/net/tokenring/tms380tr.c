@@ -761,7 +761,7 @@ static void tms380tr_timer_chk(unsigned long data)
 	if(time_before(tp->LastSendTime + SEND_TIMEOUT, jiffies)
 		&& (tp->QueueSkb < MAX_TX_QUEUE || tp->TplFree != tp->TplBusy))
 	{
-		/* Anything to send, but stalled to long */
+		/* Anything to send, but stalled too long */
 		tp->LastSendTime = jiffies;
 		tms380tr_exec_cmd(dev, OC_CLOSE);	/* Does reopen automatically */
 	}

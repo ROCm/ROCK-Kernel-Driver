@@ -140,7 +140,7 @@ void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log)
 /*
  * Function irlmp_expire_discoveries (log, saddr, force)
  *
- *    Go through all discoveries and expire all that has stayed to long
+ *    Go through all discoveries and expire all that has stayed too long
  *
  * Note : this assume that IrLAP won't change its saddr, which
  * currently is a valid assumption...

@@ -1202,7 +1202,7 @@ struct s_smc *smc ;
 			goto abort_frame ;
 		}
 		if (len > FDDI_RAW_MTU-4) {
-			DB_RX("Frame to long error",0,0,2) ;
+			DB_RX("Frame too long error",0,0,2) ;
 			smc->hw.fp.err_stats.err_too_long++ ;
 			goto abort_frame ;
 		}

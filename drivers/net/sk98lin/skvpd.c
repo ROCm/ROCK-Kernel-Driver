@@ -1064,7 +1064,8 @@ char		*buf)	/* buffer where the keyword value can be read from */
 		len = VPD_MAX_LEN ;
 		rtv = 2 ;
 		SK_DBG_MSG(pAC,SK_DBGMOD_VPD,SK_DBGCAT_ERR,
-			("keyword to long, cut after %d bytes\n",VPD_MAX_LEN)) ;
+			   ("keyword too long, cut after %d bytes\n",
+			    VPD_MAX_LEN));
 	}
 	if ((rtv2 = VpdSetupPara(pAC,key,buf,len,VPD_RW_KEY,OWR_KEY)) != 0) {
 		SK_DBG_MSG(pAC,SK_DBGMOD_VPD,SK_DBGCAT_ERR,
