@@ -198,7 +198,7 @@ export MODVERDIR := .tmp_versions
 comma := ,
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
-noconfig_targets := xconfig menuconfig config oldconfig randconfig \
+noconfig_targets := xconfig gconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean rpm \
 		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
@@ -604,14 +604,17 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 # Kernel configuration
 # ---------------------------------------------------------------------------
 
-.PHONY: oldconfig xconfig menuconfig config \
+.PHONY: oldconfig xconfig gconfig menuconfig config \
 	make_with_config rpm
 
-scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
+scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf scripts/kconfig/gconf: scripts/fixdep FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 xconfig: scripts/kconfig/qconf
 	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
+
+gconfig: scripts/kconfig/gconf
+	./scripts/kconfig/gconf arch/$(ARCH)/Kconfig
 
 menuconfig: scripts/kconfig/mconf
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
