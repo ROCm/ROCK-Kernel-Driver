@@ -293,6 +293,7 @@ CONFIG_E1000=y
 # CONFIG_NS83820 is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
+# CONFIG_R8169 is not set
 # CONFIG_SK98LIN is not set
 # CONFIG_TIGON3 is not set
 # CONFIG_FDDI is not set
@@ -622,6 +623,12 @@ CONFIG_FONT_8x16=y
 # Bluetooth support
 #
 # CONFIG_BT is not set
+
+#
+# Profiling support
+#
+CONFIG_PROFILING=y
+CONFIG_OPROFILE=y
 
 #
 # Kernel hacking

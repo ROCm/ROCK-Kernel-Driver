@@ -13,6 +13,7 @@
 #define _PPC64_HW_IRQ_H
 
 #include <linux/config.h>
+#include <linux/errno.h>
 #include <asm/irq.h>
 
 int timer_interrupt(struct pt_regs *);
