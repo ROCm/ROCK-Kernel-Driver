@@ -5,6 +5,8 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #include <linux/timer.h>
+#include <linux/skbuff.h>
+
 #include <asm/semaphore.h>
 
 #include "ieee1394_types.h"
@@ -21,8 +23,8 @@ struct hpsb_host {
 
         atomic_t generation;
 
-        struct list_head pending_packets;
-        spinlock_t pending_pkt_lock;
+	struct sk_buff_head pending_packet_queue;
+
 	struct timer_list timeout;
 	unsigned long timeout_interval;
 
@@ -164,7 +166,7 @@ struct hpsb_host_driver {
          * called.  Return 0 on success, negative errno on failure.
          * NOTE: The function must be callable in interrupt context.
          */
-        int (*transmit_packet) (struct hpsb_host *host, 
+        int (*transmit_packet) (struct hpsb_host *host,
                                 struct hpsb_packet *packet);
 
         /* This function requests miscellanous services from the driver, see

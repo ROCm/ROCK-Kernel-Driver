@@ -96,7 +96,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	/* fill scatter/gather list with pages */
 	for (i = 0; i < dma->n_pages; i++) {
 		unsigned long va = (unsigned long) dma->kvirt + (i << PAGE_SHIFT);
-			
+
 		dma->sglist[i].page = vmalloc_to_page((void *)va);
 		dma->sglist[i].length = PAGE_SIZE;
 	}
@@ -196,6 +196,8 @@ void dma_region_sync_for_device(struct dma_region *dma, unsigned long offset, un
 	pci_dma_sync_sg_for_device(dma->dev, &dma->sglist[first], last - first + 1, dma->direction);
 }
 
+#ifdef CONFIG_MMU
+
 /* nopage() handler for mmap access */
 
 static struct page*
@@ -251,3 +253,12 @@ int dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_st
 
 	return 0;
 }
+
+#else /* CONFIG_MMU */
+
+int dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_struct *vma)
+{
+	return -EINVAL;
+}
+
+#endif /* CONFIG_MMU */

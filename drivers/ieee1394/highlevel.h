@@ -5,7 +5,7 @@
 
 struct hpsb_address_serve {
         struct list_head host_list; /* per host list */
-        
+
         struct list_head hl_list; /* hpsb_highlevel list */
 
         struct hpsb_address_ops *op;
@@ -19,7 +19,7 @@ struct hpsb_address_serve {
 
 /*
  * The above structs are internal to highlevel driver handling.  Only the
- * following structures are of interest to actual highlevel drivers.  
+ * following structures are of interest to actual highlevel drivers.
  */
 
 struct hpsb_highlevel {
@@ -68,8 +68,8 @@ struct hpsb_highlevel {
 
 struct hpsb_address_ops {
         /*
-         * Null function pointers will make the respective operation complete 
-         * with RCODE_TYPE_ERROR.  Makes for easy to implement read-only 
+         * Null function pointers will make the respective operation complete
+         * with RCODE_TYPE_ERROR.  Makes for easy to implement read-only
          * registers (just leave everything but read NULL).
          *
          * All functions shall return appropriate IEEE 1394 rcodes.
@@ -77,7 +77,7 @@ struct hpsb_address_ops {
 
         /* These functions have to implement block reads for themselves. */
         /* These functions either return a response code
-           or a negative number. In the first case a response will be generated; in the 
+           or a negative number. In the first case a response will be generated; in the
            later case, no response will be sent and the driver, that handled the request
            will send the response itself
         */
@@ -104,7 +104,7 @@ void highlevel_host_reset(struct hpsb_host *host);
    a packet arrives. The flags argument contains the second word of the first header
    quadlet of the incoming packet (containing transaction label, retry code,
    transaction code and priority). These functions either return a response code
-   or a negative number. In the first case a response will be generated; in the 
+   or a negative number. In the first case a response will be generated; in the
    later case, no response will be sent and the driver, that handled the request
    will send the response itself.
 */
@@ -155,7 +155,7 @@ int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
  * Enable or disable receving a certain isochronous channel through the
  * iso_receive op.
  */
-int hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host, 
+int hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                          unsigned int channel);
 void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                            unsigned int channel);

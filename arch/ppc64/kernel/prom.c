@@ -1926,6 +1926,11 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	np->name = get_property(np, "name", 0);
 	np->type = get_property(np, "device_type", 0);
 
+	if (!np->name)
+		np->name = "<NULL>";
+	if (!np->type)
+		np->type = "<NULL>";
+
 	/* get the device addresses and interrupts */
 	if (ifunc != NULL)
 		mem_start = ifunc(np, mem_start, naddrc, nsizec);

@@ -93,8 +93,13 @@
 _stext:
 #ifdef CONFIG_PPC_PSERIES
 _STATIC(__start)
+	/* NOP this out unconditionally */
+BEGIN_FTR_SECTION
 	b .__start_initialization_pSeries
+END_FTR_SECTION(0, 1)
 #endif
+	/* Catch branch to 0 in real mode */
+	trap
 #ifdef CONFIG_PPC_ISERIES
 	/*
 	 * At offset 0x20, there is a pointer to iSeries LPAR data.
