@@ -263,12 +263,12 @@ void ext3_discard_prealloc (struct inode * inode)
 static int ext3_alloc_block (handle_t *handle,
 			struct inode * inode, unsigned long goal, int *err)
 {
-#ifdef EXT3FS_DEBUG
-	static unsigned long alloc_hits = 0, alloc_attempts = 0;
-#endif
 	unsigned long result;
 
 #ifdef EXT3_PREALLOCATE
+#ifdef EXT3FS_DEBUG
+	static unsigned long alloc_hits = 0, alloc_attempts = 0;
+#endif
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_prealloc* */
 	if (ei->i_prealloc_count &&
@@ -1357,14 +1357,21 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 	handle = ext3_journal_current_handle();
 	lock_kernel();
 
-	/* And attach them to the current transaction */
+	/*
+	 * And attach them to the current transaction.  But only if 
+	 * block_write_full_page() succeeded.  Otherwise they are unmapped,
+	 * and generally junk.
+	 */
 	if (order_data) {
-		err = walk_page_buffers(handle, page_bufs,
-			0, PAGE_CACHE_SIZE, NULL, ext3_journal_dirty_data);
+		if (ret == 0) {
+			err = walk_page_buffers(handle, page_bufs,
+				0, PAGE_CACHE_SIZE, NULL,
+				ext3_journal_dirty_data);
+			if (!ret)
+				ret = err;
+		}
 		walk_page_buffers(handle, page_bufs, 0,
 				PAGE_CACHE_SIZE, NULL, bput_one);
-		if (!ret)
-			ret = err;
 	}
 
 	err = ext3_journal_stop(handle, inode);

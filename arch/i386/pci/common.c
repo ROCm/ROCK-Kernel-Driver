@@ -180,13 +180,8 @@ char * __devinit  pcibios_setup(char *str)
 		return NULL;
 	}
 #endif
-	else if (!strcmp(str, "rom")) {
-		pci_probe |= PCI_ASSIGN_ROMS;
-		return NULL;
-	} else if (!strcmp(str, "assign-busses")) {
-		pci_probe |= PCI_ASSIGN_ALL_BUSSES;
-		return NULL;
-	} else if (!strcmp(str, "usepirqmask")) {
+#ifndef CONFIG_X86_VISWS
+	else if (!strcmp(str, "usepirqmask")) {
 		pci_probe |= PCI_USE_PIRQ_MASK;
 		return NULL;
 	} else if (!strncmp(str, "irqmask=", 8)) {
@@ -194,6 +189,14 @@ char * __devinit  pcibios_setup(char *str)
 		return NULL;
 	} else if (!strncmp(str, "lastbus=", 8)) {
 		pcibios_last_bus = simple_strtol(str+8, NULL, 0);
+		return NULL;
+	}
+#endif
+	else if (!strcmp(str, "rom")) {
+		pci_probe |= PCI_ASSIGN_ROMS;
+		return NULL;
+	} else if (!strcmp(str, "assign-busses")) {
+		pci_probe |= PCI_ASSIGN_ALL_BUSSES;
 		return NULL;
 	}
 	return str;

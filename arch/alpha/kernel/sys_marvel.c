@@ -223,7 +223,7 @@ io7_redirect_one_lsi(struct io7 *io7, unsigned int which, unsigned int where)
 	 */
 	val = io7->csrs->PO7_LSI_CTL[which].csr;
 	val &= ~(0x1ffUL << 14);		/* clear the target pid */
-	val |= ((unsigned long)where << 14);	/* set teh new target pid */
+	val |= ((unsigned long)where << 14);	/* set the new target pid */
 
 	io7->csrs->PO7_LSI_CTL[which].csr = val;
 	mb();
@@ -240,7 +240,7 @@ io7_redirect_one_msi(struct io7 *io7, unsigned int which, unsigned int where)
 	 */
 	val = io7->csrs->PO7_MSI_CTL[which].csr;
 	val &= ~(0x1ffUL << 14);		/* clear the target pid */
-	val |= ((unsigned long)where << 14);	/* set teh new target pid */
+	val |= ((unsigned long)where << 14);	/* set the new target pid */
 
 	io7->csrs->PO7_MSI_CTL[which].csr = val;
 	mb();

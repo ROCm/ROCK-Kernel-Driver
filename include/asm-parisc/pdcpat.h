@@ -99,7 +99,7 @@
 				       ** Monarch Processor */
 #define PDC_PAT_HPMC_RENDEZ_CPU     0L /* go into spin loop */
 #define PDC_PAT_HPMC_SET_PARAMS     1L /* Allows OS to specify intr which PDC 
-                                        * will use to interupt OS during machine
+                                        * will use to interrupt OS during machine
                                         * check rendezvous */
 
 /* parameters for PDC_PAT_HPMC_SET_PARAMS: */

@@ -9,8 +9,6 @@
 
 #define DISPLAY_SIIMAGE_TIMINGS
 
-#define CONFIG_TRY_MMIO_SIIMAGE
-//#undef CONFIG_TRY_MMIO_SIIMAGE
 #undef SIIMAGE_VIRTUAL_DMAPIO
 #undef SIIMAGE_BUFFERED_TASKFILE
 #undef SIIMAGE_LARGE_DMA
@@ -31,62 +29,10 @@ typedef struct ide_io_ops_s siimage_iops {
 
 #define ADJREG(B,R)	((B)|(R)|((hwif->channel)<<(4+(2*(hwif->mmio)))))
 #define SELREG(R)	ADJREG((0xA0),(R))
-#define SELADDR(R)	((((u32)hwif->hwif_data)*(hwif->mmio))|SELREG((R)))
-#define HWIFADDR(R)	((((u32)hwif->hwif_data)*(hwif->mmio))|(R))
-#define DEVADDR(R)	(((u32) pci_get_drvdata(dev))|(R))
+#define SELADDR(R)	((((unsigned long)hwif->hwif_data)*(hwif->mmio))|SELREG((R)))
+#define HWIFADDR(R)	((((unsigned long)hwif->hwif_data)*(hwif->mmio))|(R))
+#define DEVADDR(R)	(((unsigned long) pci_get_drvdata(dev))|(R))
 
-
-inline u8 sii_inb (u32 port)
-{
-	return (u8) readb(port);
-}
-
-inline u16 sii_inw (u32 port)
-{
-	return (u16) readw(port);
-}
-
-inline void sii_insw (u32 port, void *addr, u32 count)
-{
-	while (count--) { *(u16 *)addr = readw(port); addr += 2; }
-}
-
-inline u32 sii_inl (u32 port)
-{
-	return (u32) readl(port);
-}
-
-inline void sii_insl (u32 port, void *addr, u32 count)
-{
-	sii_insw(port, addr, (count)<<1);
-//	while (count--) { *(u32 *)addr = readl(port); addr += 4; }
-}
-
-inline void sii_outb (u8 value, u32 port)
-{
-	writeb(value, port);
-}
-
-inline void sii_outw (u16 value, u32 port)
-{
-	writew(value, port);
-}
-
-inline void sii_outsw (u32 port, void *addr, u32 count)
-{
-	while (count--) { writew(*(u16 *)addr, port); addr += 2; }
-}
-
-inline void sii_outl (u32 value, u32 port)
-{
-	writel(value, port);
-}
-
-inline void sii_outsl (u32 port, void *addr, u32 count)
-{
-	sii_outsw(port, addr, (count)<<1);
-//	while (count--) { writel(*(u32 *)addr, port); addr += 4; }
-}
 
 #if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>

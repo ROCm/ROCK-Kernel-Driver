@@ -200,48 +200,7 @@
 
 
 /* ioctl() commands */
-
-enum {
-	/* I don't like using 0 as a valid ioctl() */
-	DV1394_INVALID = 0,
-
-
-	/* get the driver ready to transmit video.
-	   pass a struct dv1394_init* as the parameter (see below),
-	   or NULL to get default parameters */
-	DV1394_INIT,
-
-
-	/* stop transmitting video and free the ringbuffer */
-	DV1394_SHUTDOWN,
-
-
-	/* submit N new frames to be transmitted, where
-	   the index of the first new frame is first_clear_buffer,
-	   and the index of the last new frame is
-	   (first_clear_buffer + N) % n_frames */
-	DV1394_SUBMIT_FRAMES,
-
-
-	/* block until N buffers are clear (pass N as the parameter)
-	   Because we re-transmit the last frame on underrun, there
-	   will at most be n_frames - 1 clear frames at any time */
-	DV1394_WAIT_FRAMES,
-
-	/* capture new frames that have been received, where
-	   the index of the first new frame is first_clear_buffer,
-	   and the index of the last new frame is
-	   (first_clear_buffer + N) % n_frames */
-	DV1394_RECEIVE_FRAMES,
-
-
-	DV1394_START_RECEIVE,
-
-
-	/* pass a struct dv1394_status* as the parameter (see below) */
-	DV1394_GET_STATUS,
-};
-
+#include "ieee1394-ioctl.h"
 
 
 enum pal_or_ntsc {

@@ -1,6 +1,8 @@
 #ifndef _M68KNOMMU_MACHDEP_H
 #define _M68KNOMMU_MACHDEP_H
 
+#include <linux/seq_file.h>
+
 struct pt_regs;
 struct kbd_repeat;
 struct mktime;

@@ -218,7 +218,7 @@ static void sa1111_unmask_lowirq(unsigned int irq)
  * be triggered.  In fact, its very difficult, if not impossible to get
  * INTSET to re-trigger the interrupt.
  */
-static void sa1111_rerun_lowirq(unsigned int irq)
+static int sa1111_retrigger_lowirq(unsigned int irq)
 {
 	unsigned int mask = SA1111_IRQMASK_LO(irq);
 	int i;
@@ -233,6 +233,7 @@ static void sa1111_rerun_lowirq(unsigned int irq)
 	if (i == 8)
 		printk(KERN_ERR "Danger Will Robinson: failed to "
 			"re-trigger IRQ%d\n", irq);
+	return i == 8 ? -1 : 0;
 }
 
 static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
@@ -270,7 +271,7 @@ static struct irqchip sa1111_low_chip = {
 	.ack		= sa1111_ack_irq,
 	.mask		= sa1111_mask_lowirq,
 	.unmask		= sa1111_unmask_lowirq,
-	.rerun		= sa1111_rerun_lowirq,
+	.retrigger	= sa1111_retrigger_lowirq,
 	.type		= sa1111_type_lowirq,
 	.wake		= sa1111_wake_lowirq,
 };
@@ -292,7 +293,7 @@ static void sa1111_unmask_highirq(unsigned int irq)
  * be triggered.  In fact, its very difficult, if not impossible to get
  * INTSET to re-trigger the interrupt.
  */
-static void sa1111_rerun_highirq(unsigned int irq)
+static int sa1111_retrigger_highirq(unsigned int irq)
 {
 	unsigned int mask = SA1111_IRQMASK_HI(irq);
 	int i;
@@ -307,6 +308,7 @@ static void sa1111_rerun_highirq(unsigned int irq)
 	if (i == 8)
 		printk(KERN_ERR "Danger Will Robinson: failed to "
 			"re-trigger IRQ%d\n", irq);
+	return i == 8 ? -1 : 0;
 }
 
 static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
@@ -344,7 +346,7 @@ static struct irqchip sa1111_high_chip = {
 	.ack		= sa1111_ack_irq,
 	.mask		= sa1111_mask_highirq,
 	.unmask		= sa1111_unmask_highirq,
-	.rerun		= sa1111_rerun_highirq,
+	.retrigger	= sa1111_retrigger_highirq,
 	.type		= sa1111_type_highirq,
 	.wake		= sa1111_wake_highirq,
 };

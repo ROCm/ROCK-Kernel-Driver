@@ -205,6 +205,8 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 int cpufreq_restore(void);
 #endif
 
+/* the proc_intf.c needs this */
+int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
 #ifdef CONFIG_CPU_FREQ_24_API
 /*********************************************************************
@@ -297,6 +299,7 @@ enum {
 
 #endif /* CONFIG_CPU_FREQ_24_API */
 
+
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *
  *********************************************************************/
@@ -310,6 +313,7 @@ struct cpufreq_frequency_table {
 				    * order */
 };
 
+#if defined(CONFIG_CPU_FREQ_TABLE) || defined(CONFIG_CPU_FREQ_TABLE_MODULE)
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 				    struct cpufreq_frequency_table *table);
 
@@ -325,5 +329,7 @@ int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   unsigned int target_freq,
 				   unsigned int relation,
 				   unsigned int *index);
+
+#endif /* CONFIG_CPU_FREQ_TABLE */
 
 #endif /* _LINUX_CPUFREQ_H */

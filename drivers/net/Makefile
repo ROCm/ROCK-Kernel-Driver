@@ -33,6 +33,7 @@ obj-$(CONFIG_OAKNET) += oaknet.o 8390.o
 obj-$(CONFIG_DGRS) += dgrs.o
 obj-$(CONFIG_RCPCI) += rcpci.o
 obj-$(CONFIG_VORTEX) += 3c59x.o
+obj-$(CONFIG_TYPHOON) += typhoon.o
 obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
 obj-$(CONFIG_PCNET32) += pcnet32.o mii.o
 obj-$(CONFIG_EEPRO100) += eepro100.o mii.o
@@ -58,11 +59,6 @@ obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
 #
 
 obj-$(CONFIG_MII) += mii.o
-obj-$(CONFIG_AIRONET4500) 	+= aironet4500_core.o
-obj-$(CONFIG_AIRONET4500_CS) 	+= aironet4500_core.o
-obj-$(CONFIG_AIRONET4500_NONCS)  += aironet4500_card.o
-obj-$(CONFIG_AIRONET4500_PROC)	+= aironet4500_proc.o
-obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_proc.o
 
 obj-$(CONFIG_WINBOND_840) += mii.o
 obj-$(CONFIG_SUNDANCE) += sundance.o mii.o
@@ -110,7 +106,6 @@ ifeq ($(CONFIG_SLIP_COMPRESSED),y)
   obj-$(CONFIG_SLIP) += slhc.o
 endif
 
-obj-$(CONFIG_STRIP) += strip.o
 obj-$(CONFIG_DUMMY) += dummy.o
 obj-$(CONFIG_BONDING) += bonding.o
 obj-$(CONFIG_DE600) += de600.o
@@ -135,7 +130,6 @@ obj-$(CONFIG_EEXPRESS) += eexpress.o
 obj-$(CONFIG_EEXPRESS_PRO) += eepro.o
 obj-$(CONFIG_8139CP) += 8139cp.o mii.o
 obj-$(CONFIG_8139TOO) += 8139too.o mii.o
-obj-$(CONFIG_ARLAN) += arlan.o arlan-proc.o
 obj-$(CONFIG_ZNET) += znet.o
 obj-$(CONFIG_LAN_SAA9730) += saa9730.o
 obj-$(CONFIG_DEPCA) += depca.o

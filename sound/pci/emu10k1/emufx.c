@@ -532,7 +532,7 @@ static int snd_emu10k1_fx8010_playback_transfer(snd_pcm_substream_t *substream,
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
-		pcm->sw_ready += diff;
+		frames += diff;
 	}
 	pcm->sw_ready += frames;
 	pcm->appl_ptr = appl_ptr + frames;

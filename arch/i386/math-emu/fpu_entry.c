@@ -25,6 +25,7 @@
  +---------------------------------------------------------------------------*/
 
 #include <linux/signal.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/desc.h>

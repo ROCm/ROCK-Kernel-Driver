@@ -257,7 +257,7 @@ static int i8042_open(struct serio *port)
 /*
  * i8042_close() frees the interrupt, so that it can possibly be used
  * by another driver. We never know - if the user doesn't have a mouse,
- * the BIOS could have used the AUX interupt for PCI.
+ * the BIOS could have used the AUX interrupt for PCI.
  */
 
 static void i8042_close(struct serio *port)

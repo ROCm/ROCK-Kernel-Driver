@@ -6269,7 +6269,7 @@ sgl_done:
 add_ext:
 	addq.l		&1,FTEMP_LO(%a0)	# add 1 to l-bit
 	bcc.b		xcc_clr			# test for carry out
-	addq.l		&1,FTEMP_HI(%a0)	# propogate carry
+	addq.l		&1,FTEMP_HI(%a0)	# propagate carry
 	bcc.b		xcc_clr
 	roxr.w		FTEMP_HI(%a0)		# mant is 0 so restore v-bit
 	roxr.w		FTEMP_HI+2(%a0)		# mant is 0 so restore v-bit
@@ -6289,7 +6289,7 @@ add_ext_done:
 add_dbl:
 	add.l		&ad_1_dbl, FTEMP_LO(%a0) # add 1 to lsb
 	bcc.b		dcc_clr			# no carry
-	addq.l		&0x1, FTEMP_HI(%a0)	# propogate carry
+	addq.l		&0x1, FTEMP_HI(%a0)	# propagate carry
 	bcc.b		dcc_clr			# no carry
 
 	roxr.w		FTEMP_HI(%a0)		# mant is 0 so restore v-bit

@@ -77,7 +77,7 @@
 #define CDROM_GET_MCN		0x5311 /* Obtain the "Universal Product Code" 
                                            if available (struct cdrom_mcn) */
 #define CDROM_GET_UPC		CDROM_GET_MCN  /* This one is depricated, 
-                                          but here anyway for compatability */
+                                          but here anyway for compatibility */
 #define CDROMRESET		0x5312 /* hard-reset the drive */
 #define CDROMVOLREAD		0x5313 /* Get the drive's volume setting 
                                           (struct cdrom_volctrl) */

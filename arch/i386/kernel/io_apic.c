@@ -222,7 +222,7 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 # endif
 
 extern unsigned long irq_affinity [NR_IRQS];
-unsigned long __cacheline_aligned irq_balance_mask [NR_IRQS];
+int __cacheline_aligned pending_irq_balance_apicid [NR_IRQS];
 static int irqbalance_disabled __initdata = 0;
 static int physical_balance = 0;
 
@@ -441,7 +441,7 @@ tryanotherirq:
 		Dprintk("irq = %d moved to cpu = %d\n", selected_irq, min_loaded);
 		/* mark for change destination */
 		spin_lock(&desc->lock);
-		irq_balance_mask[selected_irq] = target_cpu_mask;
+		pending_irq_balance_apicid[selected_irq] = cpu_to_logical_apicid(min_loaded);
 		spin_unlock(&desc->lock);
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
@@ -500,7 +500,7 @@ static inline void balance_irq (int cpu, int irq)
 	if (cpu != new_cpu) {
 		irq_desc_t *desc = irq_desc + irq;
 		spin_lock(&desc->lock);
-		irq_balance_mask[irq] = cpu_to_logical_apicid(new_cpu);
+		pending_irq_balance_apicid[irq] = cpu_to_logical_apicid(new_cpu);
 		spin_unlock(&desc->lock);
 	}
 }
@@ -515,7 +515,7 @@ int balanced_irq(void *unused)
 	
 	/* push everything to CPU 0 to give us a starting point.  */
 	for (i = 0 ; i < NR_IRQS ; i++)
-		irq_balance_mask[i] = 1 << 0;
+		pending_irq_balance_apicid[i] = cpu_to_logical_apicid(0);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		time_remaining = schedule_timeout(time_remaining);
@@ -580,9 +580,9 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask);
 static inline void move_irq(int irq)
 {
 	/* note - we hold the desc->lock */
-	if (unlikely(irq_balance_mask[irq])) {
-		set_ioapic_affinity(irq, irq_balance_mask[irq]);
-		irq_balance_mask[irq] = 0;
+	if (unlikely(pending_irq_balance_apicid[irq])) {
+		set_ioapic_affinity(irq, pending_irq_balance_apicid[irq]);
+		pending_irq_balance_apicid[irq] = 0;
 	}
 }
 
@@ -668,7 +668,9 @@ static int __init find_isa_irq_pin(int irq, int type)
 
 		if ((mp_bus_id_to_type[lbus] == MP_BUS_ISA ||
 		     mp_bus_id_to_type[lbus] == MP_BUS_EISA ||
-		     mp_bus_id_to_type[lbus] == MP_BUS_MCA) &&
+		     mp_bus_id_to_type[lbus] == MP_BUS_MCA ||
+		     mp_bus_id_to_type[lbus] == MP_BUS_NEC98
+		    ) &&
 		    (mp_irqs[i].mpc_irqtype == type) &&
 		    (mp_irqs[i].mpc_srcbusirq == irq))
 
@@ -762,6 +764,12 @@ static int __init EISA_ELCR(unsigned int irq)
 #define default_MCA_trigger(idx)	(1)
 #define default_MCA_polarity(idx)	(0)
 
+/* NEC98 interrupts are always polarity zero edge triggered,
+ * when listed as conforming in the MP table. */
+
+#define default_NEC98_trigger(idx)     (0)
+#define default_NEC98_polarity(idx)    (0)
+
 static int __init MPBIOS_polarity(int idx)
 {
 	int bus = mp_irqs[idx].mpc_srcbus;
@@ -794,6 +802,11 @@ static int __init MPBIOS_polarity(int idx)
 				case MP_BUS_MCA: /* MCA pin */
 				{
 					polarity = default_MCA_polarity(idx);
+					break;
+				}
+				case MP_BUS_NEC98: /* NEC 98 pin */
+				{
+					polarity = default_NEC98_polarity(idx);
 					break;
 				}
 				default:
@@ -865,6 +878,11 @@ static int __init MPBIOS_trigger(int idx)
 					trigger = default_MCA_trigger(idx);
 					break;
 				}
+				case MP_BUS_NEC98: /* NEC 98 pin */
+				{
+					trigger = default_NEC98_trigger(idx);
+					break;
+				}
 				default:
 				{
 					printk(KERN_WARNING "broken BIOS!!\n");
@@ -926,6 +944,7 @@ static int pin_2_irq(int idx, int apic, int pin)
 		case MP_BUS_ISA: /* ISA pin */
 		case MP_BUS_EISA:
 		case MP_BUS_MCA:
+		case MP_BUS_NEC98:
 		{
 			irq = mp_irqs[idx].mpc_srcbusirq;
 			break;
@@ -1133,8 +1152,9 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 
 void __init UNEXPECTED_IO_APIC(void)
 {
-	printk(KERN_WARNING " WARNING: unexpected IO-APIC, please mail\n");
-	printk(KERN_WARNING "          to linux-smp@vger.kernel.org\n");
+	printk(KERN_WARNING "INFO: unexpected IO-APIC, please file a report at\n");
+	printk(KERN_WARNING "      http://bugzilla.kernel.org\n");
+	printk(KERN_WARNING "      if your kernel is less than 3 months old.\n");
 }
 
 void __init print_IO_APIC(void)
@@ -1809,18 +1829,6 @@ static struct hw_interrupt_type lapic_irq_type = {
 	ack_lapic_irq,
 	end_lapic_irq
 };
-
-void enable_NMI_through_LVT0 (void * dummy)
-{
-	unsigned int v, ver;
-
-	ver = apic_read(APIC_LVR);
-	ver = GET_APIC_VERSION(ver);
-	v = APIC_DM_NMI;			/* unmask and set to NMI */
-	if (!APIC_INTEGRATED(ver))		/* 82489DX */
-		v |= APIC_LVT_LEVEL_TRIGGER;
-	apic_write_around(APIC_LVT0, v);
-}
 
 static void setup_nmi (void)
 {

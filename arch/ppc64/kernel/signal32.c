@@ -750,6 +750,8 @@ long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 	return ret;
 }
 
+extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
+
 int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)
 {

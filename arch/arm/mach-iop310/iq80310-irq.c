@@ -15,6 +15,7 @@
  *     Fixes for various revision boards - DS
  */
 #include <linux/init.h>
+#include <linux/list.h>
 
 #include <asm/irq.h>
 #include <asm/mach/irq.h>

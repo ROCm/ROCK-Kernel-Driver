@@ -48,6 +48,7 @@
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/bitops.h>
@@ -1583,6 +1584,24 @@ static struct pccard_operations pcic_operations = {
 
 /*====================================================================*/
 
+static struct pcmcia_socket_class_data i82365_data = {
+	.ops = &pcic_operations,
+};
+
+static struct device_driver i82365_driver = {
+	.name = "i82365",
+	.bus = &platform_bus_type,
+	.devclass = &pcmcia_socket_class,
+};
+
+static struct platform_device i82365_device = {
+	.name = "i82365",
+	.id = 0,
+	.dev = {
+		.name = "i82365",
+	},
+};
+
 static int __init init_i82365(void)
 {
     servinfo_t serv;
@@ -1595,6 +1614,7 @@ static int __init init_i82365(void)
     DEBUG(0, "%s\n", version);
     printk(KERN_INFO "Intel PCIC probe: ");
     sockets = 0;
+    driver_register(&i82365_driver);
 
 #ifdef CONFIG_ISA
     isa_probe();
@@ -1602,6 +1622,7 @@ static int __init init_i82365(void)
 
     if (sockets == 0) {
 	printk("not found.\n");
+	driver_unregister(&i82365_driver);
 	return -ENODEV;
     }
 
@@ -1611,9 +1632,11 @@ static int __init init_i82365(void)
 	request_irq(cs_irq, pcic_interrupt, 0, "i82365", pcic_interrupt);
 #endif
     
-    if (register_ss_entry(sockets, &pcic_operations) != 0)
-	printk(KERN_NOTICE "i82365: register_ss_entry() failed\n");
+    platform_device_register(&i82365_device);
 
+    i82365_data.nsock = sockets;
+    i82365_device.dev.class_data = &i82365_data;
+    
     /* Finally, schedule a polling interrupt */
     if (poll_interval != 0) {
 	poll_timer.function = pcic_interrupt_wrapper;
@@ -1633,7 +1656,7 @@ static void __exit exit_i82365(void)
 #ifdef CONFIG_PROC_FS
     for (i = 0; i < sockets; i++) pcic_proc_remove(i);
 #endif
-    unregister_ss_entry(&pcic_operations);
+    platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
 	del_timer_sync(&poll_timer);
 #ifdef CONFIG_ISA
@@ -1649,6 +1672,7 @@ static void __exit exit_i82365(void)
     if (i82365_pnpdev)
     		pnp_disable_dev(i82365_pnpdev);
 #endif
+    driver_unregister(&i82365_driver);
 } /* exit_i82365 */
 
 module_init(init_i82365);

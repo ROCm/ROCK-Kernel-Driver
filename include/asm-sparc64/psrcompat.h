@@ -4,7 +4,7 @@
 
 #include <asm/pstate.h>
 
-/* Old 32-bit PSR fields for the compatability conversion code. */
+/* Old 32-bit PSR fields for the compatibility conversion code. */
 #define PSR_CWP     0x0000001f         /* current window pointer     */
 #define PSR_ET      0x00000020         /* enable traps field         */
 #define PSR_PS      0x00000040         /* previous privilege level   */

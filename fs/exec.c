@@ -823,6 +823,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 			
 	flush_signal_handlers(current);
 	flush_old_files(current->files);
+	exit_itimers(current);
 
 	return 0;
 

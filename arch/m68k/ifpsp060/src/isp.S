@@ -2625,7 +2625,7 @@ mul64_neg:
 	addx.l		%d7, %d4		# add carry to hi(result)
 
 # the result is saved to the register file.
-# for '040 compatability, if Dl == Dh then only the hi(result) is
+# for '040 compatibility, if Dl == Dh then only the hi(result) is
 # saved. so, saving hi after lo accomplishes this without need to
 # check Dl,Dh equality.
 mul64_done:

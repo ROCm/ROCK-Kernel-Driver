@@ -1,4 +1,6 @@
-/* linux/arch/m68knommu/kernel/head.S:  A startup file for the MC68332 
+/*
+ * linux/arch/m68knommu/platform/68328/pilot/crt0_rom.S
+ * - A startup file for the MC68332 
  *
  * Copyright (C) 1998  D. Jeff Dionne <jeff@ryeham.ee.ryerson.ca>,
  *                     Kenneth Albanowski <kjahds@kjahds.com>,
@@ -16,8 +18,6 @@
 #include <linux/config.h>
 
 .global _stext
-.global __bss_start
-
 .global _start
 
 .global _rambase
@@ -81,29 +81,27 @@ _stext:
 	movew	#0x0800, 0xfffff906 /* Ignore CTS */
 	movew	#0x010b, 0xfffff902 /* BAUD to 9600 */
 
-	movew	#0x2410,	0xfffff200 /* PLLCR */
-	movew	#0x123,	0xfffff202 /* PLLFSR */
+	movew	#0x2410, 0xfffff200 /* PLLCR */
+	movew	#0x123, 0xfffff202 /* PLLFSR */
 
 #ifdef CONFIG_PILOT
-	moveb	#0,      0xfffffA27 /* LCKCON */
+	moveb	#0, 0xfffffA27 /* LCKCON */
 	movel   #_start, 0xfffffA00 /* LSSA */
-	moveb   #0xa,    0xfffffA05 /* LVPW */
-	movew	#0x9f,   0xFFFFFa08 /* LXMAX */
-	movew	#0x9f,   0xFFFFFa0a /* LYMAX */
-	moveb   #9,      0xfffffa29 /* LBAR */
-	moveb   #0,      0xfffffa25 /* LPXCD */
-	moveb	#0x04,   0xFFFFFa20 /* LPICF */
-	moveb	#0x58,   0xfffffA27 /* LCKCON */
-	moveb	#0x85,	0xfffff429 /* PFDATA */
-	moveb	#0xd8,   0xfffffA27 /* LCKCON */
-	moveb	#0xc5,	0xfffff429 /* PFDATA */
-	moveb	#0xd5,	0xfffff429 /* PFDATA */
+	moveb   #0xa, 0xfffffA05 /* LVPW */
+	movew	#0x9f, 0xFFFFFa08 /* LXMAX */
+	movew	#0x9f, 0xFFFFFa0a /* LYMAX */
+	moveb   #9, 0xfffffa29 /* LBAR */
+	moveb   #0, 0xfffffa25 /* LPXCD */
+	moveb	#0x04, 0xFFFFFa20 /* LPICF */
+	moveb	#0x58, 0xfffffA27 /* LCKCON */
+	moveb	#0x85, 0xfffff429 /* PFDATA */
+	moveb	#0xd8, 0xfffffA27 /* LCKCON */
+	moveb	#0xc5, 0xfffff429 /* PFDATA */
+	moveb	#0xd5, 0xfffff429 /* PFDATA */
 
 	moveal	#0x00100000, %a3
 	moveal	#0x100ffc00, %a4
-
 #endif /* CONFIG_PILOT */
-
 
 #endif /* CONFIG_M68328 */
 
@@ -126,7 +124,7 @@ L0:
 	movel	#__ramvec, %d7
 	addl	#16, %d7
 	moveal	%d7, %a0
-	moveal	#end, %a1
+	moveal	#_ebss, %a1
 	lea	%a1@(512), %a2
 
 	DBG_PUTC('C')
@@ -139,9 +137,9 @@ L2:
 	bhi	L2
 
 	/* Copy data segment from ROM to RAM */
-	moveal	#__data_rom_start, %a0
-	moveal	#__data_start, %a1
-	moveal	#__data_end, %a2
+	moveal	#_etext, %a0
+	moveal	#_sdata, %a1
+	moveal	#_edata, %a2
 
 	DBG_PUTC('D')
 
@@ -154,8 +152,8 @@ LD1:
 
 	DBG_PUTC('E')
 
-	moveal	#__bss_start, %a0
-	moveal	#end, %a1
+	moveal	#_sbss, %a0
+	moveal	#_ebss, %a1
 
 	/* Copy 0 to %a0 until %a0 == %a1 */
 L1:
@@ -166,7 +164,7 @@ L1:
 	DBG_PUTC('F')
 
 	/* Copy command line from end of bss to command line */
-	moveal	#end, %a0
+	moveal	#_ebss, %a0
 	moveal	#command_line, %a1
 	lea	%a1@(512), %a2
 
@@ -180,17 +178,17 @@ L3:
 	bhi	L3
 
 	movel	#_sdata, %d0	
-	movel	%d0,	_rambase	
-	movel	#end,	%d0
-	movel	%d0,	_ramstart
+	movel	%d0, _rambase	
+	movel	#_ebss,	%d0
+	movel	%d0, _ramstart
 
-	movel	%a4,	%d0
-	subl	#4096,	%d0	/* Reserve 4K of stack */
+	movel	%a4, %d0
+	subl	#4096, %d0	/* Reserve 4K of stack */
 	moveq	#79, %d7
-	movel	%d0,	_ramend
+	movel	%d0, _ramend
 
-	movel	%a3,	%d0
-	movel	%d0,	rom_length
+	movel	%a3, %d0
+	movel	%d0, rom_length
 
 	pea	0
 	pea	env
@@ -200,12 +198,10 @@ L3:
 	DBG_PUTC('H')
 
 #ifdef CONFIG_PILOT
-	
-	movel	#penguin_bits,	0xFFFFFA00
-	moveb	#10,		0xFFFFFA05
-	movew	#160,		0xFFFFFA08
-	movew	#160,		0xFFFFFA0A
-
+	movel	#penguin_bits, 0xFFFFFA00
+	moveb	#10, 0xFFFFFA05
+	movew	#160, 0xFFFFFA08
+	movew	#160, 0xFFFFFA0A
 #endif /* CONFIG_PILOT */
 
 	DBG_PUTC('I')

@@ -526,7 +526,7 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 			mii_status = mdio_read(net_dev, phy_addr, MII_STATUS);
 
 		if (mii_status == 0xffff || mii_status == 0x0000)
-			/* the mii is not accessable, try next one */
+			/* the mii is not accessible, try next one */
 			continue;
 		
 		if ((mii_phy = kmalloc(sizeof(struct mii_phy), GFP_KERNEL)) == NULL) {

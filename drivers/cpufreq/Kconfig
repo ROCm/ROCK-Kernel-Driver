@@ -1,0 +1,11 @@
+config CPU_FREQ_PROC_INTF
+	tristate "/proc/cpufreq interface (deprecated)"
+	depends on CPU_FREQ && PROC_FS
+	help
+	  This enables the /proc/cpufreq interface for controlling
+	  CPUFreq. Please note that it is recommended to use the sysfs
+	  interface instead (which is built automatically). 
+	  
+	  For details, take a look at linux/Documentation/cpufreq. 
+	  
+	  If in doubt, say N.

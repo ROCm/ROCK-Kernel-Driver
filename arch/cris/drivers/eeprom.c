@@ -207,7 +207,7 @@ int __init eeprom_init(void)
      * it will mirror the address space:
      * 1. We read two locations (that are mirrored), 
      *    if the content differs * it's a 16kB EEPROM.
-     * 2. if it doesn't differ - write diferent value to one of the locations,
+     * 2. if it doesn't differ - write different value to one of the locations,
      *    check the other - if content still is the same it's a 2k EEPROM,
      *    restore original data.
      */
@@ -802,7 +802,7 @@ static int eeprom_address(unsigned long addr)
   return 1;
 }
 
-/* Reads from current adress. */
+/* Reads from current address. */
 
 static int read_from_eeprom(char * buf, int count)
 {

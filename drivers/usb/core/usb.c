@@ -679,6 +679,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	memset(dev, 0, sizeof(*dev));
 
 	device_initialize(&dev->dev);
+	dev->present = 1;
 
 	usb_bus_get(bus);
 
@@ -853,6 +854,10 @@ void usb_disconnect(struct usb_device **pdev)
 		usbfs_remove_device(dev);
 	}
 	device_unregister(&dev->dev);
+
+	/* mark the device as not present so any further urb submissions for
+	 * this device will fail. */
+	dev->present = 0;
 
 	/* Decrement the reference count, it'll auto free everything when */
 	/* it hits 0 which could very well be now */

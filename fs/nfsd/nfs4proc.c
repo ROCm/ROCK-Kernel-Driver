@@ -264,6 +264,7 @@ nfsd4_create(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_cre
 {
 	struct svc_fh resfh;
 	int status;
+	dev_t rdev;
 
 	fh_init(&resfh, NFS4_FHSIZE);
 
@@ -288,21 +289,23 @@ nfsd4_create(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_cre
 		break;
 
 	case NF4BLK:
-		if (create->cr_specdata1 >= MAX_BLKDEV || create->cr_specdata2 > 0xFF)
+		rdev = MKDEV(create->cr_specdata1, create->cr_specdata2);
+		if (MAJOR(rdev) != create->cr_specdata1 ||
+		    MINOR(rdev) != create->cr_specdata2)
 			return nfserr_inval;
 		status = nfsd_create(rqstp, current_fh, create->cr_name,
-				     create->cr_namelen, &create->cr_iattr, S_IFBLK,
-				     MKDEV(create->cr_specdata1, create->cr_specdata2),
-				     &resfh);
+				     create->cr_namelen, &create->cr_iattr,
+				     S_IFBLK, rdev, &resfh);
 		break;
 
 	case NF4CHR:
-		if (create->cr_specdata1 >= MAX_CHRDEV || create->cr_specdata2 > 0xFF)
+		rdev = MKDEV(create->cr_specdata1, create->cr_specdata2);
+		if (MAJOR(rdev) != create->cr_specdata1 ||
+		    MINOR(rdev) != create->cr_specdata2)
 			return nfserr_inval;
 		status = nfsd_create(rqstp, current_fh, create->cr_name,
-				     create->cr_namelen, &create->cr_iattr, S_IFCHR,
-				     MKDEV(create->cr_specdata1, create->cr_specdata2),
-				     &resfh);
+				     create->cr_namelen, &create->cr_iattr,
+				     S_IFCHR, rdev, &resfh);
 		break;
 
 	case NF4SOCK:
@@ -568,9 +571,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
-	resp->tagp = resp->p + 1; /* skip over status */
-	/* reserve space for: status, taglen, tag, and opcnt */
-	resp->p += 3 + XDR_QUADLEN(args->taglen);
+	resp->tagp = resp->p;
+	/* reserve space for: taglen, tag, and opcnt */
+	resp->p += 2 + XDR_QUADLEN(args->taglen);
 	resp->end = rqstp->rq_res.head[0].iov_base + PAGE_SIZE;
 	resp->taglen = args->taglen;
 	resp->tag = args->tag;

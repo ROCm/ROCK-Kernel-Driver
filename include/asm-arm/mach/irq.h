@@ -33,9 +33,12 @@ struct irqchip {
 	 */
 	void (*unmask)(unsigned int);
 	/*
-	 * Re-run the IRQ
+	 * Ask the hardware to re-trigger the IRQ.
+	 * Note: This method _must_ _not_ call the interrupt handler.
+	 * If you are unable to retrigger the interrupt, do not
+	 * provide a function, or if you do, return non-zero.
 	 */
-	void (*rerun)(unsigned int);
+	int (*retrigger)(unsigned int);
 	/*
 	 * Set the type of the IRQ.
 	 */
@@ -50,6 +53,7 @@ struct irqdesc {
 	irq_handler_t	handle;
 	struct irqchip	*chip;
 	struct irqaction *action;
+	struct list_head pend;
 	unsigned int	disable_depth;
 
 	unsigned int	triggered: 1;		/* IRQ has occurred	      */

@@ -40,6 +40,7 @@
 #include <linux/blk.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
+#include <linux/mca-legacy.h>
 
 #include "scsi.h"
 #include "hosts.h"

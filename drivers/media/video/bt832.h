@@ -4,7 +4,7 @@
   color digital camera directly to video capture devices via an 8-bit,
   4:2:2 YUV or YCrCb video interface.
 
- i2c adresses: 0x88 or 0x8a
+ i2c addresses: 0x88 or 0x8a
  */
 
 /* The 64 registers: */

@@ -25,7 +25,7 @@
  *  $Id: amba.c,v 1.41 2002/07/28 10:03:27 rmk Exp $
  *
  * This is a generic driver for ARM AMBA-type serial ports.  They
- * have a lot of 16550-like features, but are not register compatable.
+ * have a lot of 16550-like features, but are not register compatible.
  * Note that although they do have CTS, DCD and DSR inputs, they do
  * not have an RI input, nor do they have DTR or RTS outputs.  If
  * required, these have to be supplied via some other means (eg, GPIO)

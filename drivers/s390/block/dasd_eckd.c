@@ -1195,7 +1195,7 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 	rc = dasd_sleep_on_immediatly(cqr);
 
 	if (rc == -EIO) {
-		/* Request got an eror or has been timed out. */
+		/* Request got an error or has been timed out. */
 		dasd_eckd_release(bdev, no, args);
 	}
 	dasd_kfree_request(cqr, cqr->device);
@@ -1238,7 +1238,7 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 	rc = dasd_sleep_on_immediatly(cqr);
 
 	if (rc == -EIO) {
-		/* Request got an eror or has been timed out. */
+		/* Request got an error or has been timed out. */
 		dasd_eckd_release(bdev, no, args);
 	}
 	dasd_kfree_request(cqr, cqr->device);

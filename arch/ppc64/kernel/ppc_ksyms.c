@@ -232,8 +232,3 @@ EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
-
-#ifdef CONFIG_PROFILING
-EXPORT_SYMBOL_GPL(register_profile_notifier);
-EXPORT_SYMBOL_GPL(unregister_profile_notifier);
-#endif

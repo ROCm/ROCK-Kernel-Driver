@@ -433,12 +433,11 @@ extern int  scsi_partsize(unsigned char *buf, unsigned long capacity,
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
 extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
-extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
-extern void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt);
-extern int scsi_prep_fn(struct request_queue *q, struct request *req);
-extern void scsi_request_fn(request_queue_t * q);
+extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
+extern request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost);
+extern void scsi_free_queue(request_queue_t *q);
 extern int scsi_init_queue(void);
 extern void scsi_exit_queue(void);
 

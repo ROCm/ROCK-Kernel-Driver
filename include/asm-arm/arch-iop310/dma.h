@@ -69,7 +69,7 @@ typedef void (*dma_callback_t) (void *buf_context);
  */
 typedef struct _dma_desc
 {
-	u32 NDAR;					/* next descriptor adress */
+	u32 NDAR;					/* next descriptor address */
 	u32 PDAR;					/* PCI address */
 	u32 PUADR;					/* upper PCI address */
 	u32 LADR;					/* local address */

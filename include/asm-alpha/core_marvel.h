@@ -222,7 +222,7 @@ union IO7_POx_WBASE {
 /*
  * IO7 IID (Interrupt IDentifier) format
  *
- * For level-sensative interupts, int_num is encoded as:
+ * For level-sensative interrupts, int_num is encoded as:
  *
  *	bus/port	slot/device	INTx
  *	<7:5>		<4:2>		<1:0>

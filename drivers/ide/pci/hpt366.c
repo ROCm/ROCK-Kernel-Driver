@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/hpt366.c		Version 0.34	Sept 17, 2002
+ * linux/drivers/ide/pci/hpt366.c		Version 0.34	Sept 17, 2002
  *
  * Copyright (C) 1999-2002		Andre Hedrick <andre@linux-ide.org>
  * Portions Copyright (C) 2001	        Sun Microsystems, Inc.
@@ -807,7 +807,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 	} else if (freq < 0xc8) {
 		pll = F_LOW_PCI_50;
 		if (hpt_minimum_revision(dev,8))
-			return -EOPNOTSUPP;
+			pci_set_drvdata(dev, NULL);
 		else if (hpt_minimum_revision(dev,5))
 			pci_set_drvdata(dev, (void *) fifty_base_hpt372);
 		else if (hpt_minimum_revision(dev,4))
@@ -820,7 +820,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 		if (hpt_minimum_revision(dev,8))
 		{
 			printk(KERN_ERR "HPT37x: 66MHz timings are not supported.\n");
-			return -EOPNOTSUPP;
+			pci_set_drvdata(dev, NULL);
 		}
 		else if (hpt_minimum_revision(dev,5))
 			pci_set_drvdata(dev, (void *) sixty_six_base_hpt372);
@@ -923,7 +923,7 @@ static int __init init_hpt366 (struct pci_dev *dev)
 	if (!pci_get_drvdata(dev))
 	{
 		printk(KERN_ERR "hpt366: unknown bus timing.\n");
-		return -EOPNOTSUPP;
+		pci_set_drvdata(dev, NULL);
 	}
 	return 0;
 }
@@ -1061,6 +1061,12 @@ static void __init init_dma_hpt366 (ide_hwif_t *hwif, unsigned long dmabase)
 
 	if (!dmabase)
 		return;
+		
+	if(pci_get_drvdata(hwif->pci_dev) == NULL)
+	{
+		printk(KERN_WARNING "hpt: no known IDE timings, disabling DMA.\n");
+		return;
+	}
 
 	dma_old = hwif->INB(dmabase+2);
 

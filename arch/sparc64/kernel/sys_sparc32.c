@@ -54,6 +54,7 @@
 #include <linux/compat.h>
 #include <linux/vfs.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -3527,7 +3528,7 @@ asmlinkage int sys32_sendfile64(int out_fd, int in_fd, compat_loff_t *offset, s3
 	return ret;
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 
 struct timex32 {
 	u32 modes;

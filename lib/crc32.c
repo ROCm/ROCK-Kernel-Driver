@@ -87,55 +87,51 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 {
 # if CRC_LE_BITS == 8
 	const u32      *b =(u32 *)p;
-	const u32      *e;
-	/* load data 32 bits wide, xor data 32 bits wide. */
+	const u32      *tab = crc32table_le;
+
+# ifdef __LITTLE_ENDIAN
+#  define DO_CRC crc = (crc>>8) ^ tab[ crc & 255 ]
+#  define ENDIAN_SHIFT 0
+# else
+#  define DO_CRC crc = (crc<<8) ^ tab[ crc >> 24 ]
+#  define ENDIAN_SHIFT 24
+# endif
 
 	crc = __cpu_to_le32(crc);
 	/* Align it */
-	for ( ; ((long)b)&3 && len ; len--){
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_le[ (crc ^ *((u8 *)b)++) & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_le[ crc>>24 ^ *((u8 *)b)++ ];
-# endif
+	if(unlikely(((long)b)&3 && len)){
+		do {
+			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
+			DO_CRC;
+		} while ((--len) && ((long)b)&3 );
 	}
-	e = (u32 *) ( (u8 *)b + (len & ~7));
-	while (b < e) {
-		crc ^= *b++;
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-# endif
-		crc ^= *b++;
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_le[ crc & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_le[ crc >> 24 ];
-# endif
+	if(likely(len >= 4)){
+		/* load data 32 bits wide, xor data 32 bits wide. */
+		size_t save_len = len & 3;
+	        len = len >> 2;
+		--b; /* use pre increment below(*++b) for speed */
+		do {
+			crc ^= *++b;
+			DO_CRC;
+			DO_CRC;
+			DO_CRC;
+			DO_CRC;
+		} while (--len);
+		b++; /* point to next byte(s) */
+		len = save_len;
 	}
 	/* And the last few bytes */
-	e = (u32 *)((u8 *)b + (len & 7));
-	while (b < e){
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_le[ (crc ^ *((u8 *)b)++) & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_le[ crc>>24 ^ *((u8 *)b)++ ];
-# endif
+	if(len){
+		do {
+			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
+			DO_CRC;
+		} while (--len);
 	}
-	return __le32_to_cpu(crc) ;
+
+	return __le32_to_cpu(crc);
+#undef ENDIAN_SHIFT
+#undef DO_CRC
+
 # elif CRC_LE_BITS == 4
 	while (len--) {
 		crc ^= *p++;
@@ -196,55 +192,50 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 {
 # if CRC_BE_BITS == 8
 	const u32      *b =(u32 *)p;
-	const u32      *e;
-	/* load data 32 bits wide, xor data 32 bits wide. */
+	const u32      *tab = crc32table_be;
+
+# ifdef __LITTLE_ENDIAN
+#  define DO_CRC crc = (crc>>8) ^ tab[ crc & 255 ]
+#  define ENDIAN_SHIFT 24
+# else
+#  define DO_CRC crc = (crc<<8) ^ tab[ crc >> 24 ]
+#  define ENDIAN_SHIFT 0
+# endif
 
 	crc = __cpu_to_be32(crc);
 	/* Align it */
-	for ( ; ((long)b)&3 && len ; len--){
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_be[ (crc ^ *((u8 *)b)++) & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_be[ crc>>24 ^ *((u8 *)b)++ ];
-# endif
+	if(unlikely(((long)b)&3 && len)){
+		do {
+			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
+			DO_CRC;
+		} while ((--len) && ((long)b)&3 );
 	}
-	e = (u32 *) ( (u8 *)b + (len & ~7));
-	while (b < e) {
-		crc ^= *b++;
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-# endif
-		crc ^= *b++;
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-		crc = (crc>>8) ^ crc32table_be[ crc & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-		crc = (crc<<8) ^ crc32table_be[ crc >> 24 ];
-# endif
+	if(likely(len >= 4)){
+		/* load data 32 bits wide, xor data 32 bits wide. */
+		size_t save_len = len & 3;
+	        len = len >> 2;
+		--b; /* use pre increment below(*++b) for speed */
+		do {
+			crc ^= *++b;
+			DO_CRC;
+			DO_CRC;
+			DO_CRC;
+			DO_CRC;
+		} while (--len);
+		b++; /* point to next byte(s) */
+		len = save_len;
 	}
 	/* And the last few bytes */
-	e = (u32 *)((u8 *)b + (len & 7));
-	while (b < e){
-# ifdef __LITTLE_ENDIAN
-		crc = (crc>>8) ^ crc32table_be[ (crc ^ *((u8 *)b)++) & 0xff ];
-# else
-		crc = (crc<<8) ^ crc32table_be[ crc>>24 ^ *((u8 *)b)++ ];
-# endif
+	if(len){
+		do {
+			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
+			DO_CRC;
+		} while (--len);
 	}
-	return __be32_to_cpu(crc) ;
+	return __be32_to_cpu(crc);
+#undef ENDIAN_SHIFT
+#undef DO_CRC
+
 # elif CRC_BE_BITS == 4
 	while (len--) {
 		crc ^= *p++ << 24;

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/hpt34x.c		Version 0.40	Sept 10, 2002
+ * linux/drivers/ide/pci/hpt34x.c		Version 0.40	Sept 10, 2002
  *
  * Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
  * May be copied or modified under the terms of the GNU General Public License

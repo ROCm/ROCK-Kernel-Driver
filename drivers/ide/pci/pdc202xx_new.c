@@ -224,7 +224,7 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	decode_registers(REG_D, DP);
 #endif /* PDC202XX_DECODE_REGISTER_INFO */
 #if PDC202XX_DEBUG_DRIVE_INFO
-	printk("%s: %s drive%d 0x%08x ",
+	printk(KERN_DEBUG "%s: %s drive%d 0x%08x ",
 		drive->name, ide_xfer_verbose(speed),
 		drive->dn, drive_conf);
 		pci_read_config_dword(dev, drive_pci, &drive_conf);
@@ -321,7 +321,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 		case PCI_DEVICE_ID_PROMISE_20268:
 			cable = pdcnew_new_cable_detect(hwif);
 #if PDC202_DEBUG_CABLE
-			printk("%s: %s-pin cable, %s-pin cable, %d\n",
+			printk(KERN_DEBUG "%s: %s-pin cable, %s-pin cable, %d\n",
 				hwif->name, hwif->udma_four ? "80" : "40",
 				cable ? "40" : "80", cable);
 #endif /* PDC202_DEBUG_CABLE */
@@ -347,15 +347,15 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 
 	if ((ultra_66) && (cable)) {
 #ifdef DEBUG
-		printk("ULTRA 66/100/133: %s channel of Ultra 66/100/133 "
+		printk(KERN_DEBUG "ULTRA 66/100/133: %s channel of Ultra 66/100/133 "
 			"requires an 80-pin cable for Ultra66 operation.\n",
 			hwif->channel ? "Secondary" : "Primary");
-		printk("         Switching to Ultra33 mode.\n");
+		printk(KERN_DEBUG "         Switching to Ultra33 mode.\n");
 #endif /* DEBUG */
 		/* Primary   : zero out second bit */
 		/* Secondary : zero out fourth bit */
-		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
-		printk("%s reduced to Ultra33 mode.\n", drive->name);
+		printk(KERN_WARNING "Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
+		printk(KERN_WARNING "%s reduced to Ultra33 mode.\n", drive->name);
 	}
 
 	if (drive->media != ide_disk)
@@ -444,7 +444,7 @@ static void pdcnew_new_reset (ide_drive_t *drive)
 	/*
 	 * Deleted this because it is redundant from the caller.
 	 */
-	printk("PDC202XX: %s channel reset.\n",
+	printk(KERN_WARNING "PDC202XX: %s channel reset.\n",
 		HWIF(drive)->channel ? "Secondary" : "Primary");
 }
 
@@ -459,7 +459,7 @@ static void pdcnew_reset_host (ide_hwif_t *hwif)
 	hwif->OUTB((udma_speed_flag & ~0x10), (high_16|0x001f));
 	mdelay(2000);	/* 2 seconds ?! */
 
-	printk("PDC202XX: %s channel reset.\n",
+	printk(KERN_WARNING "PDC202XX: %s channel reset.\n",
 		hwif->channel ? "Secondary" : "Primary");
 }
 
@@ -513,7 +513,7 @@ static unsigned int __init init_chipset_pdcnew (struct pci_dev *dev, const char 
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS,
 			dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n",
+		printk(KERN_INFO "%s: ROM enabled at 0x%08lx\n",
 			name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 
@@ -555,7 +555,7 @@ static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->drives[1].autodma = hwif->autodma;
 #if PDC202_DEBUG_CABLE
-	printk("%s: %s-pin cable\n",
+	printk(KERN_DEBUG "%s: %s-pin cable\n",
 		hwif->name, hwif->udma_four ? "80" : "40");
 #endif /* PDC202_DEBUG_CABLE */
 }

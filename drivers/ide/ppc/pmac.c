@@ -51,7 +51,7 @@ extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);
 #define DMA_WAIT_TIMEOUT	500
 
 typedef struct pmac_ide_hwif {
-	ide_ioreg_t			regbase;
+	unsigned long			regbase;
 	int				irq;
 	int				kind;
 	int				aapl_bus_id;
@@ -267,7 +267,7 @@ struct pmu_sleep_notifier idepmac_sleep_notifier = {
  */
 void __pmac
 pmac_ide_init_hwif_ports(hw_regs_t *hw,
-			      ide_ioreg_t data_port, ide_ioreg_t ctrl_port,
+			      unsigned long data_port, unsigned long ctrl_port,
 			      int *irq)
 {
 	int i, ix;
@@ -672,14 +672,14 @@ sanitize_timings(pmac_ide_hwif_t *pmif)
 	pmif->timings[0] = pmif->timings[1] = value;
 }
 
-ide_ioreg_t __pmac
+unsigned long __pmac
 pmac_ide_get_base(int index)
 {
 	return pmac_ide[index].regbase;
 }
 
 int __pmac
-pmac_ide_check_base(ide_ioreg_t base)
+pmac_ide_check_base(unsigned long base)
 {
 	int ix;
 	
@@ -690,7 +690,7 @@ pmac_ide_check_base(ide_ioreg_t base)
 }
 
 int __pmac
-pmac_ide_get_irq(ide_ioreg_t base)
+pmac_ide_get_irq(unsigned long base)
 {
 	int ix;
 

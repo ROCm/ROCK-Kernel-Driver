@@ -21,7 +21,7 @@
  */
 
 /*
- * The voodoo1 has the following memory mapped adress space:
+ * The voodoo1 has the following memory mapped address space:
  * 0x000000 - 0x3fffff : registers              (4MB)
  * 0x400000 - 0x7fffff : linear frame buffer    (4MB)
  * 0x800000 - 0xffffff : texture memory         (8MB)

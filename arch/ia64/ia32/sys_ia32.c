@@ -4063,7 +4063,7 @@ done:
 	return err;
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 
 struct timex32 {
 	u32 modes;

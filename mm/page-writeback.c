@@ -301,7 +301,7 @@ static void wb_kupdate(unsigned long arg)
 		writeback_inodes(&wbc);
 		if (wbc.nr_to_write > 0) {
 			if (wbc.encountered_congestion)
-				blk_congestion_wait(WRITE, HZ);
+				blk_congestion_wait(WRITE, HZ/10);
 			else
 				break;	/* All the old data is written */
 		}

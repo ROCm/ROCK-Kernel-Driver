@@ -10,7 +10,7 @@ pss_enable_joystick
 
 	This parameter is basically a flag.  A 0 will leave the joystick port 
 disabled, while a non-zero value would enable the joystick port.  The default 
-setting is pss_enable_joystick=0 as this keeps this driver fully compatable 
+setting is pss_enable_joystick=0 as this keeps this driver fully compatible 
 with systems that were using previous versions of this driver.  If you wish to 
 enable the joystick port you will have to add pss_enable_joystick=1 as an 
 argument to the driver.  To actually use the joystick port you will then have 
@@ -31,7 +31,7 @@ should load aztcd with the appropiate port option that matches the port you
 assigned to the CDROM port when you loaded your pss sound driver.  (ex. 
 modprobe pss pss_cdrom_port=0x340 && modprobe aztcd aztcd=0x340)  The default 
 setting of this parameter leaves the CDROM port disabled to maintain full 
-compatability with systems using previous versions of this driver.
+compatibility with systems using previous versions of this driver.
 
 	Other options have also been added for the added convenience and utility 
 of the user.  These options are only available if this driver is loaded as a 
@@ -49,7 +49,7 @@ this driver with the following command "rmmod pss && rmmod ad1848 && rmmod
 mpu401 && rmmod sound && rmmod soundcore" and retain the full functionality of 
 his CDROM and/or joystick port(s) while gaining back the memory previously used 
 by the sound drivers.  This default setting of this parameter is 0 to retain 
-full behavioral compatability with previous versions of this driver.
+full behavioral compatibility with previous versions of this driver.
 
 pss_keep_settings
 
@@ -60,7 +60,7 @@ flag can also be useful in that future versions of this driver may reset all
 emulations by default on the driver's unloading (as it probably should), so 
 specifying it now will ensure that all future versions of this driver will 
 continue to work as expected.  The default value of this parameter is 1 to 
-retain full behavioral compatability with previous versions of this driver.
+retain full behavioral compatibility with previous versions of this driver.
 
 pss_firmware
 

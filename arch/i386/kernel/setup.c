@@ -92,7 +92,6 @@ extern void dmi_scan_machine(void);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 extern int blk_nohighio;
-void __init visws_get_board_type_and_rev(void);
 
 unsigned long saved_videomode;
 

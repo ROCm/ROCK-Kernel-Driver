@@ -25,9 +25,8 @@ void dma_prog_region_init(struct dma_prog_region *prog)
 int  dma_prog_region_alloc(struct dma_prog_region *prog, unsigned long n_bytes, struct pci_dev *dev)
 {
 	/* round up to page size */
-	if(n_bytes % PAGE_SIZE)
-		n_bytes += PAGE_SIZE - (n_bytes & PAGE_SIZE);
-	
+	n_bytes = round_up_to_page(n_bytes);
+
 	prog->n_pages = n_bytes / PAGE_SIZE;
 
 	prog->kvirt = pci_alloc_consistent(dev, prog->n_pages * PAGE_SIZE, &prog->bus_addr);
@@ -47,7 +46,7 @@ void dma_prog_region_free(struct dma_prog_region *prog)
 	if(prog->kvirt) {
 		pci_free_consistent(prog->dev, prog->n_pages * PAGE_SIZE, prog->kvirt, prog->bus_addr);
 	}
-	
+
 	prog->kvirt = NULL;
 	prog->dev = NULL;
 	prog->n_pages = 0;
@@ -70,11 +69,10 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	unsigned int i, n_pages;
 
 	/* round up to page size */
-	if(n_bytes % PAGE_SIZE)
-		n_bytes += PAGE_SIZE - (n_bytes & PAGE_SIZE);
-	
+	n_bytes = round_up_to_page(n_bytes);
+
 	n_pages = n_bytes / PAGE_SIZE;
-	
+
 	dma->kvirt = vmalloc_32(n_pages * PAGE_SIZE);
 	if(!dma->kvirt) {
 		printk(KERN_ERR "dma_region_alloc: vmalloc_32() failed\n");
@@ -82,7 +80,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	}
 
 	dma->n_pages = n_pages;
-	
+
 	/* Clear the ram out, no junk to the user */
 	memset(dma->kvirt, 0, n_pages * PAGE_SIZE);
 
@@ -114,7 +112,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 
 	dma->dev = dev;
 	dma->direction = direction;
-	
+
 	return 0;
 
 err:
@@ -148,7 +146,7 @@ static inline int dma_region_find(struct dma_region *dma, unsigned long offset, 
 {
 	int i;
 	unsigned long off = offset;
-	
+
 	for(i = 0; i < dma->n_dma_pages; i++) {
 		if(off < sg_dma_len(&dma->sglist[i])) {
 			*rem = off;
@@ -157,14 +155,14 @@ static inline int dma_region_find(struct dma_region *dma, unsigned long offset, 
 
 		off -= sg_dma_len(&dma->sglist[i]);
 	}
-	
+
 	panic("dma_region_find: offset %lu beyond end of DMA mapping\n", offset);
 }
 
 dma_addr_t dma_region_offset_to_bus(struct dma_region *dma, unsigned long offset)
 {
 	unsigned long rem;
-	
+
 	struct scatterlist *sg = &dma->sglist[dma_region_find(dma, offset, &rem)];
 	return sg_dma_address(sg) + rem;
 }
@@ -176,10 +174,10 @@ void dma_region_sync(struct dma_region *dma, unsigned long offset, unsigned long
 
 	if(!len)
 		len = 1;
-	
+
 	first = dma_region_find(dma, offset, &rem);
 	last = dma_region_find(dma, offset + len - 1, &rem);
-	
+
 	pci_dma_sync_sg(dma->dev, &dma->sglist[first], last - first + 1, dma->direction);
 }
 
@@ -210,13 +208,13 @@ out:
 }
 
 static struct vm_operations_struct dma_region_vm_ops = {
-	nopage: dma_region_pagefault,
+	.nopage	= dma_region_pagefault,
 };
 
 int dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_struct *vma)
 {
 	unsigned long size;
-	
+
 	if(!dma->kvirt)
 		return -EINVAL;
 
@@ -233,6 +231,6 @@ int dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_st
 	vma->vm_private_data = dma;
 	vma->vm_file = file;
 	vma->vm_flags |= VM_RESERVED;
-	
+
 	return 0;
 }

@@ -226,6 +226,7 @@ struct raid5_private_data {
 							 * waiting for 25% to be free
 							 */        
 	spinlock_t		device_lock;
+	char			thread_name[MD_THREAD_NAME_MAX];
 };
 
 typedef struct raid5_private_data raid5_conf_t;

@@ -28,6 +28,8 @@ typedef char *		__kernel_caddr_t;
 typedef unsigned long	__kernel_sigset_t;	/* at least 32 bits */
 typedef unsigned short	__kernel_uid16_t;
 typedef unsigned short	__kernel_gid16_t;
+typedef int		__kernel_clockid_t;
+typedef int		__kernel_timer_t;
 
 typedef struct {
 	int	val[2];

@@ -90,6 +90,12 @@ M:	Philip.Blundell@pobox.com
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+3CR990 NETWORK DRIVER
+P:	David Dillow
+M:	dave@thedillows.org
+L:	linux-net@vger.kernel.org
+S:	Maintained
+
 53C700 AND 53C700-66 SCSI DRIVER
 P:	James E.J. Bottomley
 M:	James.Bottomley@HansenPartnership.com
@@ -207,6 +213,14 @@ AHA152X SCSI DRIVER
 P:	Juergen E. Fischer
 M:	Juergen Fischer <fischer@norbit.de>
 L:	linux-scsi@vger.kernel.org
+S:	Maintained
+
+ALCATEL SPEEDTOUCH USB DRIVER
+P:	Duncan Sands
+M:	duncan.sands@wanadoo.fr
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://www.linux-usb.org/SpeedTouch/
 S:	Maintained
 
 ALPHA PORT
@@ -1559,11 +1573,11 @@ W:	http://www.weinigel.se
 S:	Supported
 
 SGI VISUAL WORKSTATION 320 AND 540
-P:	Bent Hagemark
-M:	bh@sgi.com
-P:	Ingo Molnar
-M:	mingo@redhat.com
-S:	Maintained
+P:	Andrey Panin
+M:	pazke@orbita1.ru
+L:	linux-visws@lists.sf.net
+W:	http://linux-visws.sf.net
+S:	Maintained for 2.5.
 
 SIS 5513 IDE CONTROLLER DRIVER
 P:	Lionel Bouton

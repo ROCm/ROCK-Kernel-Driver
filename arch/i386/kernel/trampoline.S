@@ -46,8 +46,8 @@ r_base = .
 	movl	$0xA5A5A5A5, trampoline_data - r_base
 				# write marker for master knows we're running
 
-	lidt	idt_48 - r_base	# load idt with 0, 0
-	lgdt	gdt_48 - r_base	# load gdt with whatever is appropriate
+	lidt	boot_idt - r_base	# load idt with 0, 0
+	lgdt	boot_gdt - r_base	# load gdt with whatever is appropriate
 
 	xor	%ax, %ax
 	inc	%ax		# protected mode (PE) bit
@@ -57,7 +57,7 @@ flush_instr:
 	ljmpl	$__BOOT_CS, $0x00100000
 			# jump to startup_32 in arch/i386/kernel/head.S
 
-idt_48:
+boot_idt:
 	.word	0			# idt limit = 0
 	.word	0, 0			# idt base = 0L
 
@@ -65,8 +65,7 @@ idt_48:
 # NOTE: here we actually use CPU#0's GDT - but that is OK, we reload
 # the proper GDT shortly after booting up the secondary CPUs.
 #
-
-gdt_48:
+ENTRY(boot_gdt)
 	.word	__BOOT_DS + 7			# gdt limit
 	.long	boot_gdt_table-__PAGE_OFFSET	# gdt base = gdt (first SMP CPU)
 

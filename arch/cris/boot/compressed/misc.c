@@ -13,7 +13,7 @@
  */
 
 /* where the piggybacked kernel image expects itself to live.
- * it is the same adress we use when we network load an uncompressed
+ * it is the same address we use when we network load an uncompressed
  * image into DRAM, and it is the address the kernel is linked to live
  * at by etrax100.ld.
  */

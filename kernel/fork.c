@@ -427,7 +427,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 		complete(vfork_done);
 	}
 	if (tsk->clear_child_tid && atomic_read(&mm->mm_users) > 1) {
-		int * tidptr = tsk->clear_child_tid;
+		u32 * tidptr = tsk->clear_child_tid;
 		tsk->clear_child_tid = NULL;
 
 		/*
@@ -435,7 +435,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 		 * not set up a proper pointer then tough luck.
 		 */
 		put_user(0, tidptr);
-		sys_futex((unsigned long)tidptr, FUTEX_WAKE, 1, NULL);
+		sys_futex(tidptr, FUTEX_WAKE, 1, NULL);
 	}
 }
 
@@ -813,6 +813,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
+	INIT_LIST_HEAD(&p->posix_timers);
 	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);

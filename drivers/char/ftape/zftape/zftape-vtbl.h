@@ -72,7 +72,7 @@
 #define VTBL_FMT        125
 #define VTBL_RESERVED_2 126
 #define VTBL_RESERVED_3 127
-/* compatability with pre revision K */
+/* compatibility with pre revision K */
 #define VTBL_K_CMPR     120 
 
 /*  the next is used by QIC-3020 tapes with format code 6 (>2^16

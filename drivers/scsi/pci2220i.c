@@ -1439,14 +1439,14 @@ static void ReconTimerExpiry (unsigned long data)
 				break;
 				}
 
-	        // test LBA and multiper sector transfer compatability
+	        // test LBA and multiper sector transfer compatibility
 			if (!pid->SupportLBA || (pid->NumSectorsPerInt < SECTORSXFER) || !pid->Valid_64_70 )
 				{
 				DEB (printk ("\npci2220i: sub 3"));
 				break;
 				}
 
-	        // test PIO/bus matering mode compatability
+	        // test PIO/bus matering mode compatibility
 			if ( (pid->MinPIOCycleWithoutFlow > 240) && !pid->SupportIORDYDisable && !padapter->timingPIO )
 				{
 				DEB (printk ("\npci2220i: sub 4"));
@@ -2389,7 +2389,7 @@ static USHORT GetRegs (struct Scsi_Host *pshost, BOOL bigd, struct pci_dev *pcid
 	padapter->regRemap		= zr + RTR_LOCAL_REMAP;					// 32 bit local space remap
 	padapter->regDesc		= zr + RTR_REGIONS;	  					// 32 bit local region descriptor
 	padapter->regRange		= zr + RTR_LOCAL_RANGE;					// 32 bit local range
-	padapter->regIrqControl	= zr + RTR_INT_CONTROL_STATUS;			// 16 bit interupt control and status
+	padapter->regIrqControl	= zr + RTR_INT_CONTROL_STATUS;			// 16 bit interrupt control and status
 	padapter->regScratchPad	= zr + RTR_MAILBOX;	  					// 16 byte scratchpad I/O base address
 
 	padapter->regBase		= zl;
@@ -2549,7 +2549,7 @@ int Pci2220i_Detect (Scsi_Host_Template *tpnt)
 		if ( GetRegs (pshost, FALSE, pcidev) )
 			goto unregister;
 
-		scsi_set_pci_device(pshost, pcidev);
+		scsi_set_device(pshost, &pcidev->dev);
 		pshost->max_id = padapter->numberOfDrives;
 		for ( z = 0;  z < padapter->numberOfDrives;  z++ )
 			{

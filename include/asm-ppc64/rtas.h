@@ -168,5 +168,13 @@ extern void rtas_halt(void);
 
 extern struct proc_dir_entry *rtas_proc_dir;
 
+/* Some RTAS ops require a data buffer and that buffer must be < 4G.
+ * Rather than having a memory allocator, just use this buffer
+ * (get the lock first), make the RTAS call.  Copy the data instead
+ * of holding the buffer for long.
+ */
+#define RTAS_DATA_BUF_SIZE 1024
+extern spinlock_t rtas_data_buf_lock;
+extern char rtas_data_buf[RTAS_DATA_BUF_SIZE];
 
 #endif /* _PPC64_RTAS_H */

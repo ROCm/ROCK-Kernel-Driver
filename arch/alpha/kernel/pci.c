@@ -57,12 +57,6 @@ struct pci_controller *pci_isa_hose;
  */
 
 static void __init
-quirk_eisa_bridge(struct pci_dev *dev)
-{
-	dev->class = PCI_CLASS_BRIDGE_EISA << 8;
-}
-
-static void __init
 quirk_isa_bridge(struct pci_dev *dev)
 {
 	dev->class = PCI_CLASS_BRIDGE_ISA << 8;
@@ -125,8 +119,6 @@ pcibios_fixup_final(struct pci_dev *dev)
 }
 
 struct pci_fixup pcibios_fixups[] __initdata = {
-	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82375,
-	  quirk_eisa_bridge },
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82378,
 	  quirk_isa_bridge },
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229,

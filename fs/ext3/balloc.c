@@ -503,7 +503,8 @@ search_back:
 	
 got_block:
 
-	ext3_debug("using block group %d(%d)\n", i, gdp->bg_free_blocks_count);
+	ext3_debug("using block group %d(%d)\n",
+			group_no, gdp->bg_free_blocks_count);
 
 	/* Make sure we use undo access for the bitmap, because it is
            critical that we do the frozen_data COW on bitmap buffers in
@@ -658,7 +659,7 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 		bitmap_count += x;
 	}
 	brelse(bitmap_bh);
-	printk("ext3_count_free_blocks: stored = %lu, computed = %lu, %lu\n",
+	printk("ext3_count_free_blocks: stored = %u, computed = %lu, %lu\n",
 	       le32_to_cpu(es->s_free_blocks_count), desc_count, bitmap_count);
 	unlock_super(sb);
 	return bitmap_count;

@@ -4,8 +4,7 @@
 
 EXTRA_CFLAGS	+= -I../kernel
 
-obj-y				:= setup.o traps.o
+obj-y				:= setup.o traps.o reboot.o
 
-obj-$(CONFIG_PCI)		+= pci-visws.o
 obj-$(CONFIG_X86_VISWS_APIC)	+= visws_apic.o
 obj-$(CONFIG_X86_LOCAL_APIC)	+= mpparse.o

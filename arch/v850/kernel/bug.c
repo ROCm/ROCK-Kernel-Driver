@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/bug.c -- Bug reporting functions
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -37,12 +37,6 @@ int bad_trap (int trap_num, struct pt_regs *regs)
 	printk (KERN_CRIT
 		"unimplemented trap %d called at 0x%08lx, pid %d!\n",
 		trap_num, regs->pc, current->pid);
-	return -ENOSYS;
-}
-
-int debug_trap (struct pt_regs *regs)
-{
-	printk (KERN_CRIT "debug trap at 0x%08lx!\n", regs->pc);
 	return -ENOSYS;
 }
 

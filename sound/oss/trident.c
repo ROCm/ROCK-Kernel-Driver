@@ -223,7 +223,7 @@
 
 #define NR_HW_CH		32
 
-/* maxinum nuber of AC97 codecs connected, AC97 2.0 defined 4, but 7018 and 4D-NX only
+/* maximum number of AC97 codecs connected, AC97 2.0 defined 4, but 7018 and 4D-NX only
    have 2 SDATA_IN lines (currently) */
 #define NR_AC97		2	
 

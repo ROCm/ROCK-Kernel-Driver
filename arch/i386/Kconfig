@@ -83,18 +83,16 @@ config X86_BIGSMP
 
 	  If you don't have such a system, you should say N here.
 
-# Visual Workstation support is utterly broken.
-# If you want to see it working mail an VW540 to hch@infradead.org 8)
-#config X86_VISWS
-#	bool "SGI 320/540 (Visual Workstation)"
-#	help
-#	  The SGI Visual Workstation series is an IA32-based workstation
-#	  based on SGI systems chips with some legacy PC hardware attached.
-#
-#	  Say Y here to create a kernel to run on the SGI 320 or 540.
-#
-#	  A kernel compiled for the Visual Workstation will not run on PCs
-#	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
+config X86_VISWS
+	bool "SGI 320/540 (Visual Workstation)"
+	help
+	  The SGI Visual Workstation series is an IA32-based workstation
+	  based on SGI systems chips with some legacy PC hardware attached.
+
+	  Say Y here to create a kernel to run on the SGI 320 or 540.
+
+	  A kernel compiled for the Visual Workstation will not run on PCs
+	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
 
 endchoice
 
@@ -433,7 +431,7 @@ config PREEMPT
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors" if !SMP
-	depends on !X86_VOYAGER
+	depends on !(X86_VISWS || X86_VOYAGER)
 	---help---
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -969,7 +967,7 @@ config CPU_FREQ
 	  If in doubt, say N.
 
 config CPU_FREQ_PROC_INTF
-	bool "/proc/cpufreq interface (DEPRECATED)"
+	tristate "/proc/cpufreq interface (DEPRECATED)"
 	depends on CPU_FREQ && PROC_FS
 	help
 	  This enables the /proc/cpufreq interface for controlling
@@ -994,9 +992,19 @@ config CPU_FREQ_24_API
 
 	  If in doubt, say N.
 
+config CPU_FREQ_TABLE
+       tristate "CPU frequency table helpers"
+       depends on CPU_FREQ
+       default y
+       help
+         Many CPUFreq drivers use these helpers, so only say N here if
+	 the CPUFreq driver of your choice doesn't need these helpers.
+
+	 If in doubt, say Y.
+
 config X86_ACPI_CPUFREQ
 	tristate "ACPI Processor P-States driver"
-	depends on CPU_FREQ && ACPI_PROCESSOR
+	depends on CPU_FREQ_TABLE && ACPI_PROCESSOR
 	help
 	  This driver adds a CPUFreq driver which utilizes the ACPI
 	  Processor Performance States.
@@ -1007,7 +1015,7 @@ config X86_ACPI_CPUFREQ
 
 config X86_POWERNOW_K6
 	tristate "AMD Mobile K6-2/K6-3 PowerNow!"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD K6-2+ and mobile
 	  AMD K6-3+ processors.
@@ -1018,7 +1026,7 @@ config X86_POWERNOW_K6
 
 config X86_POWERNOW_K7
 	tristate "AMD Mobile Athlon/Duron PowerNow!"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD K7 mobile processors.
 
@@ -1028,7 +1036,7 @@ config X86_POWERNOW_K7
 
 config ELAN_CPUFREQ
 	tristate "AMD Elan"
-	depends on CPU_FREQ && MELAN
+	depends on CPU_FREQ_TABLE && MELAN
 	---help---
 	  This adds the CPUFreq driver for AMD Elan SC400 and SC410
 	  processors.
@@ -1055,7 +1063,7 @@ config X86_LONGHAUL
 
 config X86_SPEEDSTEP
 	tristate "Intel Speedstep"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for certain mobile Intel Pentium III
 	  (Coppermine), all mobile Intel Pentium III-M (Tulatin) and all
@@ -1067,7 +1075,7 @@ config X86_SPEEDSTEP
 
 config X86_P4_CLOCKMOD
 	tristate "Intel Pentium 4 clock modulation"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for Intel Pentium 4 / XEON
 	  processors.
@@ -1170,7 +1178,7 @@ config PCI_BIOS
 
 config PCI_DIRECT
 	bool
-	depends on !X86_VISWS && PCI && (PCI_GODIRECT || PCI_GOANY)
+ 	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
 	default y
 
 config SCx200
@@ -1663,7 +1671,7 @@ config X86_FIND_SMP_CONFIG
 
 config X86_MPPARSE
 	bool
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC && !X86_VISWS
 	default y
 
 endmenu
@@ -1681,15 +1689,15 @@ config X86_SMP
 
 config X86_HT
 	bool
-	depends on SMP && !X86_VOYAGER
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
 	default y
 
 config X86_BIOS_REBOOT
 	bool
-	depends on !X86_VOYAGER
+	depends on !(X86_VISWS || X86_VOYAGER)
 	default y
 
 config X86_TRAMPOLINE
 	bool
-	depends on SMP
+	depends on SMP || X86_VISWS
 	default y

@@ -629,7 +629,7 @@ sys_call_table:
 	.long  SYSCALL(sys_fremovexattr,sys32_fremovexattr_wrapper) /* 235 */
 	.long  SYSCALL(sys_gettid,sys_gettid)
 	.long  SYSCALL(sys_tkill,sys_tkill)
-	.long  SYSCALL(sys_futex,sys32_futex_wrapper)
+	.long  SYSCALL(sys_futex,compat_sys_futex_wrapper)
 	.long  SYSCALL(sys_sched_setaffinity,sys32_sched_setaffinity_wrapper)
 	.long  SYSCALL(sys_sched_getaffinity,sys32_sched_getaffinity_wrapper) /* 240 */
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
@@ -781,8 +781,8 @@ io_int_handler:
         GET_THREAD_INFO                # load pointer to task_struct to R9
         la      %r2,SP_PTREGS(%r15)    # address of register-save area
 	llgh    %r3,__LC_SUBCHANNEL_NR # load subchannel number
-        llgf    %r4,__LC_IO_INT_PARM   # load interuption parm
-        llgf    %r5,__LC_IO_INT_WORD   # load interuption word
+        llgf    %r4,__LC_IO_INT_PARM   # load interruption parm
+        llgf    %r5,__LC_IO_INT_WORD   # load interruption word
 	brasl   %r14,do_IRQ            # call standard irq handler
 
 io_return:

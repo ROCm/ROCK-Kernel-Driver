@@ -128,7 +128,7 @@ extern  void *vmalloc_start;
 #define _PAGE_PRESENT_BIT  22   /* (0x200) Software: translation valid */
 #define _PAGE_FLUSH_BIT    21   /* (0x400) Software: translation valid */
 				/*             for cache flushing only */
-#define _PAGE_USER_BIT     20   /* (0x800) Software: User accessable page */
+#define _PAGE_USER_BIT     20   /* (0x800) Software: User accessible page */
 
 /* N.B. The bits are defined in terms of a 32 bit word above, so the */
 /*      following macro is ok for both 32 and 64 bit.                */

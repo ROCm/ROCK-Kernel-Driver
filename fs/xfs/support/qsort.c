@@ -199,7 +199,7 @@ qsort (void *const pbase, size_t total_elems, size_t size,
   {
     char *const end_ptr = &base_ptr[size * (total_elems - 1)];
     char *tmp_ptr = base_ptr;
-    char *thresh = min(end_ptr, base_ptr + max_thresh);
+    char *const thresh = min_t(char *const, end_ptr, base_ptr + max_thresh);
     register char *run_ptr;
 
     /* Find smallest element in first threshold and place it at the

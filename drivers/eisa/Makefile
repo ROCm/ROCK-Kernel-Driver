@@ -1,6 +1,11 @@
 # Makefile for the Linux device tree
 
-obj-$(CONFIG_EISA)	+= eisa-bus.o
+obj-$(CONFIG_EISA)	        += eisa-bus.o
+obj-${CONFIG_EISA_PCI_EISA}     += pci_eisa.o
+
+# virtual_root.o should be the last EISA root device to initialize,
+# so leave it at the end of the list.
+obj-${CONFIG_EISA_VIRTUAL_ROOT} += virtual_root.o
 
 clean-files:= devlist.h
 

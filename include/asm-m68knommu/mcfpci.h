@@ -17,7 +17,7 @@
 #ifdef CONFIG_PCI
 
 /*
- *	Address regions in the PCI addres space are not mapped into the
+ *	Address regions in the PCI address space are not mapped into the
  *	normal memory space of the ColdFire. They must be accessed via
  *	handler routines. This is easy for I/O space (inb/outb/etc) but
  *	needs some code changes to support ordinary memory. Interrupts

@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/page.h -- VM ops
  *
- *  Copyright (C) 2001, 2002  NEC Corporation
- *  Copyright (C) 2001, 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -93,10 +93,6 @@ typedef unsigned long pgprot_t;
 
 
 #ifndef __ASSEMBLY__
-
-extern void __bug (void) __attribute__ ((noreturn));
-#define BUG()		__bug()
-#define PAGE_BUG(page)	__bug()
 
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order (unsigned long size)

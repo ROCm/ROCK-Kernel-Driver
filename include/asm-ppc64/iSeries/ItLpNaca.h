@@ -57,7 +57,7 @@ struct ItLpNaca
 	u16	xRsvd1_3;		// Reserved			x20-x21
 	u16	xPlicVrmIndex;		// VRM index of PLIC		x22-x23
 	u16	xMinSupportedSlicVrmInd;// Min supported OS VRM index	x24-x25
-	u16	xMinCompatableSlicVrmInd;// Min compatable OS VRM index x26-x27
+	u16	xMinCompatableSlicVrmInd;// Min compatible OS VRM index x26-x27
 	u64	xLoadAreaAddr;		// ER address of load area	x28-x2F
 	u32	xLoadAreaChunks;	// Chunks for the load area	x30-x33
 	u32	xPaseSysCallCRMask;	// Mask used to test CR before  x34-x37

@@ -2,33 +2,38 @@
 # Installing modules
 # ==========================================================================
 
-src := $(obj)
-
-.PHONY: modules_install
-modules_install:
-
-include .config
-
-include $(obj)/Makefile
+.PHONY: __modinst
+__modinst:
 
 include scripts/Makefile.lib
 
-# ==========================================================================
+#
 
-quiet_cmd_modules_install = INSTALL $(obj-m:.o=.ko)
-      cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(obj); \
-			    cp $(obj-m:.o=.ko) $(MODLIB)/kernel/$(obj)
+__modules := $(shell cat /dev/null $(wildcard $(MODVERDIR)/*.mod))
+modules := $(patsubst %.o,%.ko,$(wildcard $(__modules:.ko=.o)))
 
-modules_install: $(subdir-ym)
-ifneq ($(obj-m:.o=.ko),)
-	$(call cmd,modules_install)
-else
-	@:
+ifneq ($(filter-out $(modules),$(__modules)),)
+  $(warning *** Uh-oh, you have stale module entries. You messed with SUBDIRS, do not complain if something goes wrong.)
 endif
 
-# Descending
-# ---------------------------------------------------------------------------
+.PHONY: $(modules)
+__modinst: $(modules)
+	@:
 
-.PHONY: $(subdir-ym)
-$(subdir-ym):
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$@
+# Modules built within the kernel tree
+
+quiet_cmd_modules_install = INSTALL $@
+      cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(@D); \
+			    cp $@ $(MODLIB)/kernel/$(@D)
+
+$(filter-out ../% /%,$(modules)):
+	$(call cmd,modules_install)
+
+# Modules built outside just go into extra
+
+quiet_cmd_modules_install_extra = INSTALL $(obj-m:.o=.ko)
+      cmd_modules_install_extra = mkdir -p $(MODLIB)/extra; \
+			    	  cp $@ $(MODLIB)/extra
+
+$(filter     ../% /%,$(modules)):
+	$(call cmd,modules_install_extra)

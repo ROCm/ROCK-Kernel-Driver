@@ -16,7 +16,6 @@ obj-y	     	:= cache.o pacache.o setup.o traps.o time.o irq.o \
 		   processor.o pdc_chassis.o
 
 obj-$(CONFIG_SMP)	+= smp.o
-obj-$(CONFIG_PROFILING)	+= profile.o
 obj-$(CONFIG_PA11)	+= pci-dma.o
 obj-$(CONFIG_PCI)	+= pci.o
 obj-$(CONFIG_MODULES)	+= module.o

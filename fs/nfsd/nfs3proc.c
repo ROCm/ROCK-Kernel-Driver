@@ -317,11 +317,10 @@ nfsd3_proc_mknod(struct svc_rqst *rqstp, struct nfsd3_mknodargs *argp,
 	if (argp->ftype == 0 || argp->ftype >= NF3BAD)
 		RETURN_STATUS(nfserr_inval);
 	if (argp->ftype == NF3CHR || argp->ftype == NF3BLK) {
-		if ((argp->ftype == NF3CHR && argp->major >= MAX_CHRDEV)
-		    || (argp->ftype == NF3BLK && argp->major >= MAX_BLKDEV)
-		    || argp->minor > 0xFF)
-			RETURN_STATUS(nfserr_inval);
 		rdev = MKDEV(argp->major, argp->minor);
+		if (MAJOR(rdev) != argp->major ||
+		    MINOR(rdev) != argp->minor)
+			RETURN_STATUS(nfserr_inval);
 	} else
 		if (argp->ftype != NF3SOCK && argp->ftype != NF3FIFO)
 			RETURN_STATUS(nfserr_inval);

@@ -3656,6 +3656,7 @@ COMPATIBLE_IOCTL(TCSETA),
 COMPATIBLE_IOCTL(TCSETAW),
 COMPATIBLE_IOCTL(TCSETAF),
 COMPATIBLE_IOCTL(TCSBRK),
+COMPATIBLE_IOCTL(TCSBRKP),
 COMPATIBLE_IOCTL(TCXONC),
 COMPATIBLE_IOCTL(TCFLSH),
 COMPATIBLE_IOCTL(TCGETS),
@@ -4495,7 +4496,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 {
 	int i;
 	if (!additional_ioctls) {
-		additional_ioctls = get_zeroed_page(GFP_KERNEL);
+		additional_ioctls = (struct ioctl_trans *)get_zeroed_page(GFP_KERNEL);
 		if (!additional_ioctls)
 			return -ENOMEM;
 	}

@@ -17,6 +17,8 @@
 #ifndef LINUX_PCI_H
 #define LINUX_PCI_H
 
+#include <linux/mod_devicetable.h>
+
 /*
  * Under PCI, each device has 256 bytes of configuration address space,
  * of which the first 64 bytes are standardized as follows:
@@ -359,8 +361,6 @@ enum pci_mmap_state {
 #define DEVICE_COUNT_DMA	2
 #define DEVICE_COUNT_RESOURCE	12
 
-#define PCI_ANY_ID (~0)
-
 /*
  * The pci_dev structure is used to describe PCI devices.
  */
@@ -489,13 +489,6 @@ struct pbus_set_ranges_data
 	unsigned long io_start, io_end;
 	unsigned long mem_start, mem_end;
 	unsigned long prefetch_start, prefetch_end;
-};
-
-struct pci_device_id {
-	unsigned int vendor, device;		/* Vendor and device ID or PCI_ANY_ID */
-	unsigned int subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
-	unsigned int class, class_mask;		/* (class,subclass,prog-if) triplet */
-	unsigned long driver_data;		/* Data private to the driver */
 };
 
 struct pci_driver {

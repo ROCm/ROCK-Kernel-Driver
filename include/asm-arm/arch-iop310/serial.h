@@ -24,8 +24,8 @@
 
 #define STD_SERIAL_PORT_DEFNS			\
        /* UART CLK      PORT        IRQ        FLAGS        */			\
-	{ 0, BASE_BAUD, 0xfe810000, IRQ_UART2, STD_COM_FLAGS },  /* ttyS0 */	\
-	{ 0, BASE_BAUD, 0xfe800000, IRQ_UART1, STD_COM_FLAGS }  /* ttyS1 */
+	{ 0, BASE_BAUD, IQ80310_UART2, IRQ_UART2, STD_COM_FLAGS },  /* ttyS0 */	\
+	{ 0, BASE_BAUD, IQ80310_UART1, IRQ_UART1, STD_COM_FLAGS }  /* ttyS1 */
 
 #endif // CONFIG_ARCH_IQ80310
 

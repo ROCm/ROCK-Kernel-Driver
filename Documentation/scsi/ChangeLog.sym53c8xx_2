@@ -102,7 +102,7 @@ Mon July 2 12:00 2001 Gerard Roudier
 Sun Sep 9 18:00 2001 Gerard Roudier 
 	* version sym-2.1.12-20010909
 	- Change my email address.
-	- Add infrastructure for the forthcoming 64 bit DMA adressing support.
+	- Add infrastructure for the forthcoming 64 bit DMA addressing support.
 	  (Based on PCI 64 bit patch from David S. Miller)
 	- Donnot use anymore vm_offset_t type.
 

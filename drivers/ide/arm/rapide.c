@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/rapide.c
+ * linux/drivers/ide/arm/rapide.c
  *
  * Copyright (c) 1996-2002 Russell King.
  */
@@ -25,7 +25,7 @@ rapide_probe(struct expansion_card *ec, const struct ecard_id *id)
 	memset(&hw, 0, sizeof(hw));
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		hw.io_ports[i] = (ide_ioreg_t)port;
+		hw.io_ports[i] = port;
 		port += 1 << 4;
 	}
 	hw.io_ports[IDE_CONTROL_OFFSET] = port + 0x206;

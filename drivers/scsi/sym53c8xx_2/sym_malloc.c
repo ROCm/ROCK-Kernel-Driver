@@ -143,12 +143,15 @@ static void ___sym_mfree(m_pool_p mp, void *ptr, int size)
 	a = (m_addr_t) ptr;
 
 	while (1) {
-#ifdef SYM_MEM_FREE_UNUSED
 		if (s == SYM_MEM_CLUSTER_SIZE) {
+#ifdef SYM_MEM_FREE_UNUSED
 			M_FREE_MEM_CLUSTER(a);
+#else
+			((m_link_p) a)->next = h[i].next;
+			h[i].next = (m_link_p) a;
+#endif
 			break;
 		}
-#endif
 		b = a ^ s;
 		q = &h[i];
 		while (q->next && q->next != (m_link_p) b) {

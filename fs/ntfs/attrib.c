@@ -1183,7 +1183,8 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 			register int rc;
 			
 			rc = memcmp(val, (u8*)a + le16_to_cpu(
-					a->_ARA(value_offset)), min(val_len,
+					a->_ARA(value_offset)), 
+				    	min_t(const u32, val_len,
 					le32_to_cpu(a->_ARA(value_length))));
 			/*
 			 * If @val collates before the current attribute's

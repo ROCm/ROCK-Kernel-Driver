@@ -54,7 +54,6 @@ build_path_from_dentry(struct dentry *direntry)
 		temp = temp->d_parent;
 	}
 	namelen += 1;		/* allow for trailing null */
-	cFYI(1, ("Final namelength (in build_path): %d ", namelen));	/* BB remove */
 	full_path = kmalloc(namelen, GFP_KERNEL);
 	namelen--;
 	full_path[namelen] = 0;	/* trailing null */
@@ -66,13 +65,13 @@ build_path_from_dentry(struct dentry *direntry)
 			full_path[namelen] = '\\';
 			strncpy(full_path + namelen + 1, temp->d_name.name,
 				temp->d_name.len);
-			cFYI(1, (" name: %s ", full_path + namelen));	/* BB remove */
+			cFYI(0, (" name: %s ", full_path + namelen));
 		}
 		temp = temp->d_parent;
 	}
 	if (namelen != 0)
 		cERROR(1,
-		       ("\nWe did not end path lookup where we expected namelen is %d",
+		       ("We did not end path lookup where we expected namelen is %d",
 			namelen));
 
 	return full_path;
@@ -111,7 +110,7 @@ build_wildcard_path_from_dentry(struct dentry *direntry)
 	}
 	if (namelen != 0)
 		cERROR(1,
-		       ("\nWe did not end path lookup where we expected namelen is %d",
+		       ("We did not end path lookup where we expected namelen is %d",
 			namelen));
 
 	return full_path;
@@ -124,7 +123,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 {
 	int rc = -ENOENT;
 	int xid;
-	int oplock = FALSE;	/* no need to oplock when we are not going to read from the file */
+	int oplock = REQ_OPLOCK;
 	__u16 fileHandle;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
@@ -144,7 +143,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 			 /* 0x20197 was used previously */ , CREATE_NOT_DIR,
 			 &fileHandle, &oplock, cifs_sb->local_nls);
 	if (rc) {
-		cFYI(1, ("\ncifs_create returned 0x%x ", rc));
+		cFYI(1, ("cifs_create returned 0x%x ", rc));
 	} else {
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
@@ -154,14 +153,17 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 						 inode->i_sb);
 
 		if (rc != 0) {
-			cFYI(1,
-			     ("\nCreate worked but get_inode_info failed with rc = %d ",
+			cFYI(1,("Create worked but get_inode_info failed with rc = %d",
 			      rc));
 			/* close handle */
 		} else {
 			direntry->d_op = &cifs_dentry_ops;
 			d_instantiate(direntry, newinode);
 		}
+		/* BB check oplock state before deciding to call following */
+/*        if(*oplock)
+            save off handle in inode and dontdoclose */
+        
 		CIFSSMBClose(xid, pTcon, fileHandle);	
         /* BB In the future chain close with the NTCreateX to narrow window */
         
@@ -204,7 +206,7 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry)
 		cFYI(1, (" NULL inode in lookup"));
 	}
 	cFYI(1,
-	     (" Full path: %s inode = 0x%p\n", full_path, direntry->d_inode));
+	     (" Full path: %s inode = 0x%p", full_path, direntry->d_inode));
 	if (pTcon->ses->capabilities & CAP_UNIX)
 		rc = cifs_get_inode_info_unix(&newInode, full_path,
 					      parent_dir_inode->i_sb);
@@ -224,7 +226,7 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry)
 		d_add(direntry, NULL);
 	} else {
 		cERROR(1,
-		       ("Error 0x%x or (%d decimal) on cifs_get_inode_info in lookup\n",
+		       ("Error 0x%x or (%d decimal) on cifs_get_inode_info in lookup",
 			rc, rc));
 		/* BB special case check for Access Denied - watch security exposure of returning dir info implicitly via different rc if file exists or not but no access BB */
 	}
@@ -251,7 +253,7 @@ cifs_dir_open(struct inode *inode, struct file *file)
 
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
 
-	cFYI(1, (" inode = 0x%p and full path is %s\n", inode, full_path));
+	cFYI(1, (" inode = 0x%p and full path is %s", inode, full_path));
 
 	if (full_path)
 		kfree(full_path);
@@ -273,7 +275,7 @@ cifs_d_revalidate(struct dentry *direntry, int flags)
 		}
 	} else {
 		cFYI(1,
-		     ("In cifs_d_revalidate with no inode but name = %s and dentry 0x%p\n",
+		     ("In cifs_d_revalidate with no inode but name = %s and dentry 0x%p",
 		      direntry->d_name.name, direntry));
 	}
 
@@ -286,7 +288,7 @@ cifs_d_revalidate(struct dentry *direntry, int flags)
 {
 	int rc = 0;
 
-	cFYI(1, ("In cifs d_delete, name = %s\n", direntry->d_name.name));
+	cFYI(1, ("In cifs d_delete, name = %s", direntry->d_name.name));
 
 	return rc;
 }     */

@@ -604,7 +604,7 @@ static int rme96xx_startcard(rme96xx_info *s,int stop)
 		     return 1;
 		}
 	}
-	COMM       ("interupt disabled");
+	COMM       ("interrupt disabled");
 	/* first initialize all pointers on card */
 	for(i=0;i<RME96xx_num_of_init_regs;i++){
 		writel(0,s->iobase + i);

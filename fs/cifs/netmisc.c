@@ -753,12 +753,11 @@ cifs_print_status(__u32 status_code)
 {
 	int idx = 0;
 
-	printk("\nStatus code returned: 0x%08x ", status_code);
-
 	while (nt_errs[idx].nt_errstr != NULL) {
 		if (((nt_errs[idx].nt_errcode) & 0xFFFFFF) ==
 		    (status_code & 0xFFFFFF)) {
-			printk(nt_errs[idx].nt_errstr);
+			printk(KERN_NOTICE "Status code returned 0x%08x %s\n",
+				   status_code,nt_errs[idx].nt_errstr);
 		}
 		idx++;
 	}
@@ -815,11 +814,8 @@ map_smb_to_linux_error(struct smb_hdr *smb)
 	}
 
 	/* old style errors */
-	cFYI(1, (" !!Mapping smb error code %d ", smberrcode));
+
 	/* DOS class smb error codes - map DOS */
-
-	/* BB special case reconnect tid and reconnect uid here? */
-
 	if (smberrclass == ERRDOS) {	/* one byte field no need to byte reverse */
 		for (i = 0;
 		     i <
@@ -849,10 +845,7 @@ map_smb_to_linux_error(struct smb_hdr *smb)
 	}
 	/* else ERRHRD class errors or junk  - return EIO */
 
-	/* BB get smb->error_class and code lookup in table if ERR_STATUS is not
-	   set in this frame else translate newer NT Status code - in both cases 
-	   change to equivalent posix error BB */
-	cFYI(1, (" to POSIX err %d !!", rc));
+	cFYI(1, (" !!Mapping smb error code %d to POSIX err %d !!", smberrcode,rc));
 
 	/* generic corrective action e.g. reconnect SMB session on ERRbaduid could be added */
 

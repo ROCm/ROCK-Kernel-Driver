@@ -2324,7 +2324,7 @@ static void pm3fb_cfbX_putc(struct vc_data *conp, struct display *p,
 	PM3_WRITE_REG(PM3ForegroundColor, fgx);
 	PM3_WRITE_REG(PM3FillBackgroundColor, bgx);
 
-	/* WARNING : adress select X need to specify 8 bits for fontwidth <= 8 */
+	/* WARNING : address select X need to specify 8 bits for fontwidth <= 8 */
 	/* and 16 bits for fontwidth <= 16 */
 	/* same in _putcs, same for Y and fontheight */
 	if (fontwidth(p) <= 8)
@@ -2437,7 +2437,7 @@ static void pm3fb_cfbX_putcs(struct vc_data *conp, struct display *p,
 	PM3_WRITE_REG(PM3ForegroundColor, fgx);
 	PM3_WRITE_REG(PM3FillBackgroundColor, bgx);
 
-	/* WARNING : adress select X need to specify 8 bits for fontwidth <= 8 */
+	/* WARNING : address select X need to specify 8 bits for fontwidth <= 8 */
 	/* and 16 bits for fontwidth <= 16 */
 	/* same in _putc, same for Y and fontheight */
 	if (fontwidth(p) <= 8)

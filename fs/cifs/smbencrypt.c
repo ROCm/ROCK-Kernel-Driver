@@ -305,7 +305,7 @@ make_oem_passwd_hash(char data[516], const char *passwd,
 
 	if (new_pw_len > 512) {
 		cERROR(1,
-		       ("CIFS make_oem_passwd_hash: new password is too long.\n"));
+		       ("CIFS make_oem_passwd_hash: new password is too long."));
 		return FALSE;
 	}
 

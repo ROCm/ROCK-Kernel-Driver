@@ -227,7 +227,7 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 
 			printk (KERN_INFO PFX "Found KT400 in disguise as a KT266.\n");
 
-			/* Check AGP compatability mode. */
+			/* Check AGP compatibility mode. */
 			pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
 			if ((reg & (1<<1))==0)
 				return via_generic_agp3_setup(pdev);
@@ -271,7 +271,7 @@ static int __init via_kt400_setup(struct pci_dev *pdev)
 {
 	u8 reg;
 	pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
-	/* Check AGP 2.0 compatability mode. */
+	/* Check AGP 2.0 compatibility mode. */
 	if ((reg & (1<<1))==0)
 		return via_generic_agp3_setup(pdev);
 	return via_generic_setup(pdev);

@@ -17,7 +17,7 @@
  * to the PC bus and perform I/O, DMA and IRQ address decoding. There is
  * also a UART for the MPU-401 mode (not 82C928/Mozart).
  * The Mozart chip appears to be compatible with the 82C928, although later
- * issues of the card, using the OTI-605 chip, have an MPU-401 compatable Midi
+ * issues of the card, using the OTI-605 chip, have an MPU-401 compatible Midi
  * port. This port is configured differently to that of the OPTi audio chips.
  *
  *	Changes

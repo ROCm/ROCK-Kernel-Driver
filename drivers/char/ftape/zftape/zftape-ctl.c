@@ -717,7 +717,7 @@ int _zft_open(unsigned int dev_minor, unsigned int access_mode)
 			    ftape_disable());
 	}
 	/* zft_seg_pos should be greater than the vtbl segpos but not
-	 * if in compatability mode and only after we read in the
+	 * if in compatibility mode and only after we read in the
 	 * header segments
 	 *
 	 * might also be a problem if the user makes a backup with a

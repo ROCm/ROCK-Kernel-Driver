@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/entry.h -- Definitions used by low-level trap handlers
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -17,21 +17,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/machdep.h>
-
-
-/* If true, system calls save and restore all registers (except result
-   registers, of course).  If false, then `call clobbered' registers
-   will not be preserved, on the theory that system calls are basically
-   function calls anyway, and the caller should be able to deal with it.
-   This is a security risk, of course, as `internal' values may leak out
-   after a system call, but that certainly doesn't matter very much for
-   a processor with no MMU protection!  For a protected-mode kernel, it
-   would be faster to just zero those registers before returning.  */
-#define TRAPS_PRESERVE_CALL_CLOBBERED_REGS	0
-
-/* If TRAPS_PRESERVE_CALL_CLOBBERED_REGS is false, then zero `call
-   clobbered' registers before returning from a system call.  */
-#define TRAPS_ZERO_CALL_CLOBBERED_REGS		0
 
 
 /* These are special variables using by the kernel trap/interrupt code

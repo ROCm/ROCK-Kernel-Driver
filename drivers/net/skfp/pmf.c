@@ -122,7 +122,7 @@ static const struct s_p_tab {
 
 	/*
 	 * PRIVATE EXTENSIONS
-	 * only accessable locally to get/set passwd
+	 * only accessible locally to get/set passwd
 	 */
 	{ SMT_P10F0,AC_GR,	MOFFSA(fddiPRPMFPasswd),	"8"	} ,
 	{ SMT_P10F1,AC_GR,	MOFFSS(fddiPRPMFStation),	"8"	} ,
@@ -211,7 +211,7 @@ static const struct s_p_tab {
 
 	/*
 	 * PRIVATE EXTENSIONS
-	 * only accessable locally to get/set TMIN
+	 * only accessible locally to get/set TMIN
 	 */
 	{ SMT_P20F0,AC_NA						} ,
 	{ SMT_P20F1,AC_GR,	MOFFMS(fddiMACT_Min),		"lT"	} ,

@@ -27,7 +27,7 @@
 #define MAX_TREE_SIZE 2 + MAX_SERVER_SIZE + 1 + MAX_SHARE_SIZE + 1
 #define MAX_SERVER_SIZE 15
 #define MAX_SHARE_SIZE  64	/* used to be 20 - this should still be enough */
-#define MAX_USERNAME_SIZE 32	/* 22 is to allow for 15 char names + null
+#define MAX_USERNAME_SIZE 32	/* 32 is to allow for 15 char names + null
 				   termination then *2 for unicode versions */
 #define MAX_PASSWORD_SIZE 16
 
@@ -109,33 +109,6 @@ struct TCP_Server_Info {
 	struct semaphore tcpSem;
 	struct task_struct *tsk;
 	char server_GUID[16];
-};
-
-/*
- * The following is our shortcut to user information.  We surface the uid,
- * and name. We always get the password on the fly in case it
- * has changed. We also hang a list of sessions owned by this user off here. 
- */
-struct cifsUidInfo {
-	struct cifsUidInfo *next1;	/* BB replace with list and atomicize */
-	struct cifsSesInfo *ses;	/* list of sessions *//* BB replace with list and atomicize */
-	struct srSesInfo *sesSR;	/* Save/Restore session list */
-	uid_t linux_uid;
-	char user[MAX_USERNAME_SIZE + 1];	/* ascii name of user */
-	/* BB eventually need ptr into PAM or WinBind info */
-};
-
-/*
- * Session structure.  One of these for each uid session with a particular host
- */
-struct cifsSesInfo {
-	struct list_head cifsSessionList;
-	struct semaphore sesSem;
-	struct cifsUidInfo *uidInfo;	/* pointer to user info */
-	struct TCP_Server_Info *server;	/* pointer to server info */
-	atomic_t inUse;		/* # of CURRENT users of this ses */
-	enum statusEnum status;
-	int dialectIndex;	/* the negotiated dialect index */
 	char secMode;
 	enum securityEnum secType;
 	unsigned int maxReq;	/* Clients should submit no more */
@@ -148,15 +121,44 @@ struct cifsSesInfo {
 	/* SMB_COM_WRITE_RAW or SMB_COM_READ_RAW. */
 	char sessid[4];		/* unique token id for this session */
 	/* (returned on Negotiate */
-	__u16 ipc_tid;		/* special tid for connection to IPC share */
-	int capabilities;
+	int capabilities; /* allow selective disabling of caps by smb sess */
 	__u16 timeZone;
+	char cryptKey[CIFS_CRYPTO_KEY_SIZE];
+};
+
+/*
+ * The following is our shortcut to user information.  We surface the uid,
+ * and name. We always get the password on the fly in case it
+ * has changed. We also hang a list of sessions owned by this user off here. 
+ */
+struct cifsUidInfo {
+	struct list_head userList;
+	struct list_head sessionList; /* SMB sessions for this user */
+	uid_t linux_uid;
+	char user[MAX_USERNAME_SIZE + 1];	/* ascii name of user */
+	/* BB may need ptr or callback for PAM or WinBind info */
+};
+
+/*
+ * Session structure.  One of these for each uid session with a particular host
+ */
+struct cifsSesInfo {
+	struct list_head cifsSessionList;
+	struct semaphore sesSem;
+	struct cifsUidInfo *uidInfo;	/* pointer to user info */
+	struct TCP_Server_Info *server;	/* pointer to server info */
+	atomic_t inUse;		/* # of CURRENT users of this ses */
+	enum statusEnum status;
+	__u16 ipc_tid;		/* special tid for connection to IPC share */
 	char *serverOS;		/* name of operating system underlying the server */
 	char *serverNOS;	/* name of network operating system that the server is running */
 	char *serverDomain;	/* security realm of server */
 	int Suid;		/* needed for user level security */
+	int capabilities;
 	char serverName[SERVER_NAME_LEN_WITH_NULL * 2];	/* BB make bigger for tcp names - will ipv6 and sctp addresses fit here?? */
-	char userName[MAX_USERNAME_SIZE + 1];	/* BB remove and replace with list of cifsUidInfo structures */
+	char userName[MAX_USERNAME_SIZE + 1];
+    char domainName[MAX_USERNAME_SIZE + 1];
+    char password_with_pad[CIFS_ENCPWD_SIZE];
 };
 
 /*
@@ -172,6 +174,7 @@ struct cifsTconInfo {
 	char *nativeFileSystem;
 	__u16 tid;		/* The 2 byte transaction id */
 	__u16 Flags;		/* optional support bits */
+	enum statusEnum tidStatus;
 	atomic_t useCount;	/* how many mounts (explicit or implicit refer to this share */
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
 	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* note file system name may be truncated - but very unlikely */
@@ -214,11 +217,11 @@ struct cifsInodeInfo {
 	struct list_head lockList;
 	/* BB add in lists for dirty pages - i.e. write caching info for oplock */
 	struct list_head openFileList;
-	__u32 cifsAttrs;	/* e.g. DOS archive bit, sparse, compressed, system etc. */
-	atomic_t inUse;		/* num concurrent users (local openers cifs) of file */
+	__u32 cifsAttrs; /* e.g. DOS archive bit, sparse, compressed, system */
+	atomic_t inUse;	 /* num concurrent users (local openers cifs) of file*/
 	unsigned long time;	/* jiffies of last update/check of inode */
-	int clientCanCache:1;	/* oplocked.  We need to extend cases beyond this i.e. what
-			   if file read-only or if file locked? or if file on r/o vol? */
+	int clientCanCacheRead:1; /* read oplock */
+    int clientCanCacheAll:1;  /* read and writebehind oplock */
 	struct inode vfs_inode;
 };
 

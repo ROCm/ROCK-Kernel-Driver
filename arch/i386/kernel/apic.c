@@ -50,9 +50,21 @@ void __init apic_intr_init(void)
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
 
-int prof_multiplier[NR_CPUS] = { 1, };
-int prof_old_multiplier[NR_CPUS] = { 1, };
-DEFINE_PER_CPU(int, prof_counter) = 1;
+static DEFINE_PER_CPU(int, prof_multiplier) = 1;
+static DEFINE_PER_CPU(int, prof_old_multiplier) = 1;
+static DEFINE_PER_CPU(int, prof_counter) = 1;
+
+void enable_NMI_through_LVT0 (void * dummy)
+{
+	unsigned int v, ver;
+
+	ver = apic_read(APIC_LVR);
+	ver = GET_APIC_VERSION(ver);
+	v = APIC_DM_NMI;			/* unmask and set to NMI */
+	if (!APIC_INTEGRATED(ver))		/* 82489DX */
+		v |= APIC_LVT_LEVEL_TRIGGER;
+	apic_write_around(APIC_LVT0, v);
+}
 
 int get_maxlvt(void)
 {
@@ -974,7 +986,7 @@ int setup_profiling_timer(unsigned int multiplier)
 	 * accordingly.
 	 */
 	for (i = 0; i < NR_CPUS; ++i)
-		prof_multiplier[i] = multiplier;
+		per_cpu(prof_multiplier, i) = multiplier;
 
 	return 0;
 }
@@ -1006,12 +1018,14 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 		 *
 		 * Interrupts are already masked off at this point.
 		 */
-		per_cpu(prof_counter, cpu) = prof_multiplier[cpu];
-		if (per_cpu(prof_counter, cpu) != prof_old_multiplier[cpu]) {
+		per_cpu(prof_counter, cpu) = per_cpu(prof_multiplier, cpu);
+		if (per_cpu(prof_counter, cpu) !=
+					per_cpu(prof_old_multiplier, cpu)) {
 			__setup_APIC_LVTT(
 					calibration_result/
 					per_cpu(prof_counter, cpu));
-			prof_old_multiplier[cpu] = per_cpu(prof_counter, cpu);
+			per_cpu(prof_old_multiplier, cpu) =
+						per_cpu(prof_counter, cpu);
 		}
 
 #ifdef CONFIG_SMP

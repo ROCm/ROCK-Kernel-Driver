@@ -98,6 +98,22 @@ void free_dma(unsigned int dmanr)
 
 } /* free_dma */
 
+#else
+
+int request_dma(unsigned int dmanr, const char *device_id)
+{
+	return -EINVAL;
+}
+
+void free_dma(unsigned int dmanr)
+{
+}
+
+#endif
+
+#ifdef CONFIG_PROC_FS
+
+#ifdef MAX_DMA_CHANNELS
 static int proc_dma_show(struct seq_file *m, void *v)
 {
 	int i;
@@ -110,27 +126,14 @@ static int proc_dma_show(struct seq_file *m, void *v)
 	}
 	return 0;
 }
-
 #else
-
-int request_dma(unsigned int dmanr, const char *device_id)
-{
-	return -EINVAL;
-}
-
-void free_dma(unsigned int dmanr)
-{
-}
-
 static int proc_dma_show(struct seq_file *m, void *v)
 {
 	seq_puts(m, "No DMA\n");
 	return 0;
 }
+#endif /* MAX_DMA_CHANNELS */
 
-#endif
-
-#ifdef CONFIG_PROC_FS
 static int proc_dma_open(struct inode *inode, struct file *file)
 {
 	char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);

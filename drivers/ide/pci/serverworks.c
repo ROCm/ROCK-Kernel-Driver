@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/serverworks.c		Version 0.7	10 Sept 2002
+ * linux/drivers/ide/pci/serverworks.c		Version 0.7	10 Sept 2002
  *
  * Copyright (C) 1998-2000 Michel Aubry
  * Copyright (C) 1998-2000 Andrzej Krzysztofowicz
@@ -20,6 +20,9 @@
  *         *** to detect 80-conductor cable presence. ***
  *
  *   CSB6: `Champion South Bridge' IDE Interface (optional: third channel)
+ *
+ * Documentation:
+ *	Available under NDA only. Errata info very hard to get.
  *
  */
 
@@ -575,7 +578,7 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 			 * This is a device pin issue on CSB6.
 			 * Since there will be a future raid mode,
 			 * early versions of the chipset require the
-			 * interrupt pin to be set, and it is a compatablity
+			 * interrupt pin to be set, and it is a compatiblity
 			 * mode issue.
 			 */
 			dev->irq = 0;

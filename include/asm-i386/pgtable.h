@@ -39,7 +39,7 @@ extern unsigned long empty_zero_page[1024];
  * newer 3-level PAE-mode page tables.
  */
 #ifndef __ASSEMBLY__
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
 #else
 # include <asm/pgtable-2level.h>
@@ -79,7 +79,7 @@ void pgtable_cache_init(void);
 #define VMALLOC_START	(((unsigned long) high_memory + 2*VMALLOC_OFFSET-1) & \
 						~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 # define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
 #else
 # define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
@@ -212,6 +212,7 @@ static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, &ptep-
  */
 
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
+#define mk_pte_huge(entry) ((entry).pte_low |= _PAGE_PRESENT | _PAGE_PSE)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {

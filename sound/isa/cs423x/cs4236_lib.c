@@ -282,7 +282,9 @@ int snd_cs4236_create(snd_card_t * card,
 	}
 	if ((err = snd_cs4231_create(card, port, cport, irq, dma1, dma2, hardware, hwshare, &chip)) < 0)
 		return err;
+
 	if (!(chip->hardware & CS4231_HW_CS4236B_MASK)) {
+	        snd_printk("CS4236+: MODE3 and extended registers not available, hardware=0x%lx\n",chip->hardware);
 		snd_device_free(card, chip);
 		return -ENODEV;
 	}

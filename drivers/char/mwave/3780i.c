@@ -698,7 +698,7 @@ int dsp3780I_GetIPCSource(unsigned short usDspBaseIO,
 		usDspBaseIO, pusIPCSource);
 
 	/*
-	* Disable DSP to PC interrupts, read the interupt register,
+	* Disable DSP to PC interrupts, read the interrupt register,
 	* clear the pending IPC bits, and reenable DSP to PC interrupts
 	*/
 	spin_lock_irqsave(&dsp_lock, flags);

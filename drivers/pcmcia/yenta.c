@@ -577,39 +577,6 @@ static void yenta_get_socket_capabilities(pci_socket_t *socket, u32 isa_irq_mask
 	printk("Yenta IRQ list %04x, PCI irq%d\n", socket->cap.irq_mask, socket->cb_irq);
 }
 
-extern void cardbus_register(pci_socket_t *socket);
-
-/*
- * 'Bottom half' for the yenta_open routine. Allocate the interrupt line
- *  and register the socket with the upper layers.
- */
-static void yenta_open_bh(void * data)
-{
-	pci_socket_t * socket = (pci_socket_t *) data;
-
-	/* It's OK to overwrite this now */
-	INIT_WORK(&socket->tq_task, yenta_bh, socket);
-
-	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->dev.name, socket)) {
-		/* No IRQ or request_irq failed. Poll */
-		socket->cb_irq = 0; /* But zero is a valid IRQ number. */
-		init_timer(&socket->poll_timer);
-		socket->poll_timer.function = yenta_interrupt_wrapper;
-		socket->poll_timer.data = (unsigned long)socket;
-		socket->poll_timer.expires = jiffies + HZ;
-		add_timer(&socket->poll_timer);
-	}
-
-	/* Figure out what the dang thing can do for the PCMCIA layer... */
-	yenta_get_socket_capabilities(socket, isa_interrupts);
-	printk("Socket status: %08x\n", cb_readl(socket, CB_SOCKET_STATE));
-
-	/* Register it with the pcmcia layer.. */
-	cardbus_register(socket);
-
-	MOD_DEC_USE_COUNT;
-}
-
 static void yenta_clear_maps(pci_socket_t *socket)
 {
 	int i;
@@ -881,6 +848,9 @@ static struct cardbus_override_struct {
 
 #define NR_OVERRIDES (sizeof(cardbus_override)/sizeof(struct cardbus_override_struct))
 
+
+extern int cardbus_register(struct pci_dev *p_dev);
+
 /*
  * Initialize a cardbus controller. Make sure we have a usable
  * interrupt, and that we can map the cardbus area. Fill in the
@@ -932,16 +902,26 @@ static int yenta_open(pci_socket_t *socket)
 		}
 	}
 
-	/* Get the PCMCIA kernel thread to complete the
-	   initialisation later. We can't do this here,
-	   because, er, because Linus says so :)
-	*/
-	INIT_WORK(&socket->tq_task, yenta_open_bh, socket);
+	/* We must finish initialization here */
 
-	MOD_INC_USE_COUNT;
-	schedule_work(&socket->tq_task);
+	INIT_WORK(&socket->tq_task, yenta_bh, socket);
 
-	return 0;
+	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->dev.name, socket)) {
+		/* No IRQ or request_irq failed. Poll */
+		socket->cb_irq = 0; /* But zero is a valid IRQ number. */
+		init_timer(&socket->poll_timer);
+		socket->poll_timer.function = yenta_interrupt_wrapper;
+		socket->poll_timer.data = (unsigned long)socket;
+		socket->poll_timer.expires = jiffies + HZ;
+		add_timer(&socket->poll_timer);
+	}
+
+	/* Figure out what the dang thing can do for the PCMCIA layer... */
+	yenta_get_socket_capabilities(socket, isa_interrupts);
+	printk("Socket status: %08x\n", cb_readl(socket, CB_SOCKET_STATE));
+
+	/* Register it with the pcmcia layer.. */
+	return cardbus_register(dev);
 }
 
 /*

@@ -960,7 +960,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    	return 0;
    shpnt->irq = interrupt_level;
    shpnt->io_port = port_base;
-   scsi_set_pci_device(shpnt, pdev);
+   scsi_set_device(shpnt, &pdev->dev);
    shpnt->n_io_port = 0x10;
    print_banner( shpnt );
 

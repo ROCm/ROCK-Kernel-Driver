@@ -64,6 +64,7 @@ setup_memory_node(int nid, void *kernel_end)
 	unsigned long bootmap_size, bootmap_pages, bootmap_start;
 	unsigned long start, end;
 	unsigned long node_pfn_start, node_pfn_end;
+	unsigned long node_min_pfn, node_max_pfn;
 	int i;
 	unsigned long node_datasz = PFN_UP(sizeof(pg_data_t));
 	int show_init = 0;
@@ -76,8 +77,9 @@ setup_memory_node(int nid, void *kernel_end)
 	memdesc = (struct memdesc_struct *)
 	  (hwrpb->mddt_offset + (unsigned long) hwrpb);
 
-	/* find the bounds of this node (min_low_pfn/max_low_pfn) */
-	min_low_pfn = ~0UL;
+	/* find the bounds of this node (node_min_pfn/node_max_pfn) */
+	node_min_pfn = ~0UL;
+	node_max_pfn = 0UL;
 	for_each_mem_cluster(memdesc, cluster, i) {
 		/* Bit 0 is console/PALcode reserved.  Bit 1 is
 		   non-volatile memory -- we might want to mark
@@ -104,42 +106,48 @@ setup_memory_node(int nid, void *kernel_end)
 		if (end > node_pfn_end)
 			end = node_pfn_end;
 
-		if (start < min_low_pfn)
-			min_low_pfn = start;
-		if (end > max_low_pfn)
-			max_pfn = max_low_pfn = end;
+		if (start < node_min_pfn)
+			node_min_pfn = start;
+		if (end > node_max_pfn)
+			node_max_pfn = end;
 	}
 
-	if (mem_size_limit && max_low_pfn > mem_size_limit) {
+	if (mem_size_limit && node_max_pfn > mem_size_limit) {
 		static int msg_shown = 0;
 		if (!msg_shown) {
 			msg_shown = 1;
 			printk("setup: forcing memory size to %ldK (from %ldK).\n",
 			       mem_size_limit << (PAGE_SHIFT - 10),
-			       max_low_pfn    << (PAGE_SHIFT - 10));
+			       node_max_pfn    << (PAGE_SHIFT - 10));
 		}
-		max_low_pfn = mem_size_limit;
+		node_max_pfn = mem_size_limit;
 	}
 
-	if (min_low_pfn >= max_low_pfn)
+	if (node_min_pfn >= node_max_pfn)
 		return;
 
-	num_physpages += max_low_pfn - min_low_pfn;
+	/* Update global {min,max}_low_pfn from node information. */
+	if (node_min_pfn < min_low_pfn)
+		min_low_pfn = node_min_pfn;
+	if (node_max_pfn > max_low_pfn)
+		max_pfn = max_low_pfn = node_max_pfn;
+
+	num_physpages += node_max_pfn - node_min_pfn;
 
 #if 0 /* we'll try this one again in a little while */
 	/* Cute trick to make sure our local node data is on local memory */
-	node_data[nid] = (pg_data_t *)(__va(min_low_pfn << PAGE_SHIFT));
+	node_data[nid] = (pg_data_t *)(__va(node_min_pfn << PAGE_SHIFT));
 #endif
 	/* Quasi-mark the pg_data_t as in-use */
-	min_low_pfn += node_datasz;
-	if (min_low_pfn >= max_low_pfn) {
+	node_min_pfn += node_datasz;
+	if (node_min_pfn >= node_max_pfn) {
 		printk(" not enough mem to reserve NODE_DATA");
 		return;
 	}
 	NODE_DATA(nid)->bdata = &node_bdata[nid];
 
 	printk(" Detected node memory:   start %8lu, end %8lu\n",
-	       min_low_pfn, max_low_pfn);
+	       node_min_pfn, node_max_pfn);
 
 	DBGDCONT(" DISCONTIG: node_data[%d]   is at 0x%p\n", nid, NODE_DATA(nid));
 	DBGDCONT(" DISCONTIG: NODE_DATA(%d)->bdata is at 0x%p\n", nid, NODE_DATA(nid)->bdata);
@@ -149,15 +157,15 @@ setup_memory_node(int nid, void *kernel_end)
 	end_kernel_pfn = PFN_UP(virt_to_phys(kernel_end));
 	bootmap_start = -1;
 
-	if (!nid && (max_low_pfn < end_kernel_pfn || min_low_pfn > start_kernel_pfn))
+	if (!nid && (node_max_pfn < end_kernel_pfn || node_min_pfn > start_kernel_pfn))
 		panic("kernel loaded out of ram");
 
 	/* Zone start phys-addr must be 2^(MAX_ORDER-1) aligned */
-	min_low_pfn = (min_low_pfn + ((1UL << (MAX_ORDER-1))-1)) & ~((1UL << (MAX_ORDER-1))-1);
+	node_min_pfn = (node_min_pfn + ((1UL << (MAX_ORDER-1))-1)) & ~((1UL << (MAX_ORDER-1))-1);
 
 	/* We need to know how many physically contiguous pages
 	   we'll need for the bootmap.  */
-	bootmap_pages = bootmem_bootmap_pages(max_low_pfn-min_low_pfn);
+	bootmap_pages = bootmem_bootmap_pages(node_max_pfn-node_min_pfn);
 
 	/* Now find a good region where to allocate the bootmap.  */
 	for_each_mem_cluster(memdesc, cluster, i) {
@@ -167,13 +175,13 @@ setup_memory_node(int nid, void *kernel_end)
 		start = cluster->start_pfn;
 		end = start + cluster->numpages;
 
-		if (start >= max_low_pfn || end <= min_low_pfn)
+		if (start >= node_max_pfn || end <= node_min_pfn)
 			continue;
 
-		if (end > max_low_pfn)
-			end = max_low_pfn;
-		if (start < min_low_pfn)
-			start = min_low_pfn;
+		if (end > node_max_pfn)
+			end = node_max_pfn;
+		if (start < node_min_pfn)
+			start = node_min_pfn;
 
 		if (start < start_kernel_pfn) {
 			if (end > end_kernel_pfn
@@ -195,7 +203,7 @@ setup_memory_node(int nid, void *kernel_end)
 
 	/* Allocate the bootmap and mark the whole MM as reserved.  */
 	bootmap_size = init_bootmem_node(NODE_DATA(nid), bootmap_start,
-					 min_low_pfn, max_low_pfn);
+					 node_min_pfn, node_max_pfn);
 	DBGDCONT(" bootmap_start %lu, bootmap_size %lu, bootmap_pages %lu\n",
 		 bootmap_start, bootmap_size, bootmap_pages);
 
@@ -207,13 +215,13 @@ setup_memory_node(int nid, void *kernel_end)
 		start = cluster->start_pfn;
 		end = cluster->start_pfn + cluster->numpages;
 
-		if (start >= max_low_pfn || end <= min_low_pfn)
+		if (start >= node_max_pfn || end <= node_min_pfn)
 			continue;
 
-		if (end > max_low_pfn)
-			end = max_low_pfn;
-		if (start < min_low_pfn)
-			start = min_low_pfn;
+		if (end > node_max_pfn)
+			end = node_max_pfn;
+		if (start < node_min_pfn)
+			start = node_min_pfn;
 
 		if (start < start_kernel_pfn) {
 			if (end > end_kernel_pfn) {
@@ -249,6 +257,9 @@ setup_memory(void *kernel_end)
 	show_mem_layout();
 
 	numnodes = 0;
+
+	min_low_pfn = ~0UL;
+	max_low_pfn = 0UL;
 	for (nid = 0; nid < MAX_NUMNODES; nid++)
 		setup_memory_node(nid, kernel_end);
 
@@ -268,7 +279,8 @@ setup_memory(void *kernel_end)
 				       initrd_end,
 				       phys_to_virt(PFN_PHYS(max_low_pfn)));
 		} else {
-			reserve_bootmem_node(NODE_DATA(KVADDR_TO_NID(initrd_start)),
+			nid = NODE_DATA(kvaddr_to_nid(initrd_start));
+			reserve_bootmem_node(nid,
 					     virt_to_phys((void *)initrd_start),
 					     INITRD_SIZE);
 		}
@@ -338,8 +350,8 @@ void __init mem_init(void)
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
 
 	printk("Memory: %luk/%luk available (%luk kernel code, %luk reserved, "
-		"%luk data, %luk init)\n",
-	       nr_free_pages() << (PAGE_SHIFT-10),
+	       "%luk data, %luk init)\n",
+	       (unsigned long)nr_free_pages() << (PAGE_SHIFT-10),
 	       num_physpages << (PAGE_SHIFT-10),
 	       codesize >> 10,
 	       reservedpages << (PAGE_SHIFT-10),

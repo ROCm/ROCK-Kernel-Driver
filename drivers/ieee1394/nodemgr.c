@@ -786,7 +786,7 @@ static void nodemgr_call_policy(char *verb, struct unit_directory *ud)
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 	HPSB_DEBUG("NodeMgr: %s %s %016Lx", argv[0], verb, (long long unsigned)ud->ne->guid);
 #endif
-	value = call_usermodehelper(argv[0], argv, envp);
+	value = call_usermodehelper(argv[0], argv, envp, 0);
 	kfree(buf);
 	kfree(envp);
 	if (value != 0)
@@ -1089,8 +1089,7 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 
 static void nodemgr_remove_node(struct node_entry *ne)
 {
-	HPSB_DEBUG("%s removed: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
-		   (ne->host->node_id == ne->nodeid) ? "Host" : "Device",
+	HPSB_DEBUG("Device removed: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
 		   NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid,
 		   ne->vendor_name ?: "Unknown");
 

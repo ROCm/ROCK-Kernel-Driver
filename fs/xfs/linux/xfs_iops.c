@@ -640,7 +640,8 @@ linvfs_getxattr(
 	struct dentry	*dentry,
 	const char	*name,
 	void		*data,
-	size_t		size)
+	size_t		size,
+	int		flags)
 {
 	ssize_t		error;
 	int		xflags = 0;
@@ -697,7 +698,8 @@ STATIC ssize_t
 linvfs_listxattr(
 	struct dentry		*dentry,
 	char			*data,
-	size_t			size)
+	size_t			size,
+	int			flags)
 {
 	ssize_t			error;
 	int			result = 0;
@@ -741,7 +743,8 @@ linvfs_listxattr(
 STATIC int
 linvfs_removexattr(
 	struct dentry	*dentry,
-	const char	*name)
+	const char	*name,
+	int		flags)
 {
 	int		error;
 	int		xflags = 0;

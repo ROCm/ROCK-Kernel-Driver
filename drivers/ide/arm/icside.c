@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/icside.c
+ * linux/drivers/ide/arm/icside.c
  *
  * Copyright (c) 1996-2002 Russell King.
  *
@@ -813,7 +813,7 @@ static ide_hwif_t *icside_find_hwif(unsigned long dataport)
 
 	for (index = 0; index < MAX_HWIFS; ++index) {
 		hwif = &ide_hwifs[index];
-		if (hwif->io_ports[IDE_DATA_OFFSET] == (ide_ioreg_t)dataport)
+		if (hwif->io_ports[IDE_DATA_OFFSET] == dataport)
 			goto found;
 	}
 
@@ -841,8 +841,8 @@ icside_setup(unsigned long base, struct cardinfo *info, int irq)
 		memset(&hwif->hw, 0, sizeof(hw_regs_t));
 
 		for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-			hwif->hw.io_ports[i] = (ide_ioreg_t)port;
-			hwif->io_ports[i] = (ide_ioreg_t)port;
+			hwif->hw.io_ports[i] = port;
+			hwif->io_ports[i] = port;
 			port += 1 << info->stepping;
 		}
 		hwif->hw.io_ports[IDE_CONTROL_OFFSET] = base + info->ctrloffset;

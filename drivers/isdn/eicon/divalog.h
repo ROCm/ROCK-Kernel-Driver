@@ -1,5 +1,5 @@
 /*
- * Include file for defining the kernel loggger messages
+ * Include file for defining the kernel logger messages
  * These definitions are shared between the klog driver and the
  * klogd daemon process
  *

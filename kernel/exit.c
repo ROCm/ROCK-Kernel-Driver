@@ -435,32 +435,6 @@ void exit_fs(struct task_struct *tsk)
 }
 
 /*
- * We can use these to temporarily drop into
- * "lazy TLB" mode and back.
- */
-struct mm_struct * start_lazy_tlb(void)
-{
-	struct mm_struct *mm = current->mm;
-	current->mm = NULL;
-	/* active_mm is still 'mm' */
-	atomic_inc(&mm->mm_count);
-	enter_lazy_tlb(mm, current, smp_processor_id());
-	return mm;
-}
-
-void end_lazy_tlb(struct mm_struct *mm)
-{
-	struct mm_struct *active_mm = current->active_mm;
-
-	current->mm = mm;
-	if (mm != active_mm) {
-		current->active_mm = mm;
-		activate_mm(active_mm, mm);
-	}
-	mmdrop(active_mm);
-}
-
-/*
  * Turn us into a lazy TLB process if we
  * aren't already..
  */
@@ -694,10 +668,8 @@ static void exit_notify(struct task_struct *tsk)
 	 * only has special meaning to our real parent.
 	 */
 	if (tsk->exit_signal != -1) {
-		if (tsk->parent == tsk->real_parent)
-			do_notify_parent(tsk, tsk->exit_signal);
-		else
-			do_notify_parent(tsk, SIGCHLD);
+		int signal = tsk->parent == tsk->real_parent ? tsk->exit_signal : SIGCHLD;
+		do_notify_parent(tsk, signal);
 	}
 
 	tsk->state = TASK_ZOMBIE;
@@ -731,8 +703,10 @@ NORET_TYPE void do_exit(long code)
 
 	profile_exit_task(tsk);
  
-	if (unlikely(current->ptrace & PT_TRACE_EXIT))
+	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
+		current->ptrace_message = code;
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
+	}
 
 	acct_process(code);
 	__exit_mm(tsk);
@@ -741,6 +715,7 @@ NORET_TYPE void do_exit(long code)
 	__exit_files(tsk);
 	__exit_fs(tsk);
 	exit_namespace(tsk);
+	exit_itimers(tsk);
 	exit_thread();
 
 	if (tsk->leader)

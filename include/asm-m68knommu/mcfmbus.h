@@ -23,7 +23,7 @@
 
 
 /*
-*	Define the 5307 MBUS register set adresses
+*	Define the 5307 MBUS register set addresses
 */
 
 #define MCFMBUS_MADR	0x00

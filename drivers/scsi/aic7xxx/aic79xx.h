@@ -404,7 +404,7 @@ struct target_status {
  * Initiator mode SCB shared data area.
  * If the embedded CDB is 12 bytes or less, we embed
  * the sense buffer address in the SCB.  This allows
- * us to retrieve sense information without interupting
+ * us to retrieve sense information without interrupting
  * the host in packetized mode.
  */
 typedef uint32_t sense_addr_t;

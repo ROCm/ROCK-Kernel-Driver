@@ -765,7 +765,7 @@ lba_fixup_bus(struct pci_bus *bus)
 			pci_read_bridge_bases(bus);
 		} else {
 			/* Not configured.
-			** For now, propogate HBA limits to the bus;
+			** For now, propagate HBA limits to the bus;
 			**	PCI will adjust them later.
 			*/
 			bus->resource[0]->end = ldev->hba.io_space.end;

@@ -2516,7 +2516,7 @@ if (pAC->RlmtNets == 1) {
 		/*
 		 * Do not set the Limit to 0, because this could cause
 		 * wrap around with ReQueue'ed buffers (a buffer could
-		 * be requeued in the same position, made accessable to
+		 * be requeued in the same position, made accessible to
 		 * the hardware, and the hardware could change its
 		 * contents!
 		 */

@@ -704,7 +704,7 @@ unsigned long ext3_count_free_inodes (struct super_block * sb)
 		bitmap_count += x;
 	}
 	brelse(bitmap_bh);
-	printk("ext3_count_free_inodes: stored = %lu, computed = %lu, %lu\n",
+	printk("ext3_count_free_inodes: stored = %u, computed = %lu, %lu\n",
 		le32_to_cpu(es->s_free_inodes_count), desc_count, bitmap_count);
 	unlock_super(sb);
 	return desc_count;

@@ -225,7 +225,7 @@ config SOUND_SONICVIBES
 
 config SOUND_VWSND
 	tristate "SGI Visual Workstation Sound"
-	depends on SOUND_PRIME!=n && VISWS && SOUND
+	depends on SOUND_PRIME!=n && X86_VISWS && SOUND
 	help
 	  Say Y or M if you have an SGI Visual Workstation and you want to be
 	  able to use its on-board audio.  Read

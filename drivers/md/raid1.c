@@ -319,8 +319,10 @@ static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 		 * Let's see if all mirrored write operations have finished
 		 * already.
 		 */
-		if (atomic_dec_and_test(&r1_bio->remaining))
+		if (atomic_dec_and_test(&r1_bio->remaining)) {
+			md_write_end(r1_bio->mddev,conf->thread);
 			raid_end_bio_io(r1_bio, uptodate);
+		}	
 	}
 	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
 	return 0;
@@ -540,6 +542,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		 * If all mirrors are non-operational
 		 * then return an IO error:
 		 */
+		md_write_end(mddev,conf->thread);
 		raid_end_bio_io(r1_bio, 0);
 		return 0;
 	}
@@ -555,6 +558,8 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * do end_request by hand if all requests finish until we had a
 	 * chance to set up the semaphore correctly ... lots of races).
 	 */
+
+	md_write_start(mddev);
 	for (i=disks; i--; ) {
 		struct bio *mbio;
 		mbio = r1_bio->write_bios[i];
@@ -902,10 +907,11 @@ static void raid1d(void *data)
 	struct bio *bio;
 	unsigned long flags;
 	mddev_t *mddev;
-	conf_t *conf;
+	conf_t *conf = data;
 	mdk_rdev_t *rdev;
 
-
+	md_handle_safemode(conf->mddev);
+	
 	for (;;) {
 		spin_lock_irqsave(&retry_list_lock, flags);
 		if (list_empty(head))
@@ -1184,9 +1190,9 @@ static int run(mddev_t *mddev)
 
 
 	{
-		const char * name = "raid1d";
+		snprintf(conf->thread_name,MD_THREAD_NAME_MAX,"raid1d_md%d",mdidx(mddev));
 
-		conf->thread = md_register_thread(raid1d, conf, name);
+		conf->thread = md_register_thread(raid1d, conf, conf->thread_name);
 		if (!conf->thread) {
 			printk(THREAD_ERROR, mdidx(mddev));
 			goto out_free_conf;

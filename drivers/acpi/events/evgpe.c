@@ -5,21 +5,40 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2003, R. Byron Moore
+ * All rights reserved.
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  */
 
 #include <acpi/acpi.h>
@@ -255,7 +274,7 @@ acpi_ev_gpe_initialize (void)
 				ACPI_HIDWORD (acpi_gbl_gpe_block_info[gpe_block].block_address->address),
 				ACPI_LODWORD (acpi_gbl_gpe_block_info[gpe_block].block_address->address)));
 
-			ACPI_REPORT_INFO (("GPE Block%d defined as GPE%d to GPE%d\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d defined as GPE%d to GPE%d\n",
 				(s32) gpe_block,
 				(u32) acpi_gbl_gpe_block_info[gpe_block].block_base_number,
 				(u32) (acpi_gbl_gpe_block_info[gpe_block].block_base_number +
@@ -307,7 +326,7 @@ acpi_ev_save_method_info (
 	void                            **return_value)
 {
 	u32                             gpe_number;
-	u32                             gpe_number_index;
+	struct acpi_gpe_number_info     *gpe_number_info;
 	char                            name[ACPI_NAME_SIZE + 1];
 	u8                              type;
 	acpi_status                     status;
@@ -357,19 +376,22 @@ acpi_ev_save_method_info (
 
 	/* Get GPE index and ensure that we have a valid GPE number */
 
-	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
-	if (gpe_number_index == ACPI_GPE_INVALID) {
+	gpe_number_info = acpi_ev_get_gpe_number_info (gpe_number);
+	if (!gpe_number_info) {
 		/* Not valid, all we can do here is ignore it */
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"GPE number associated with method is not valid %s\n",
+			name));
 		return (AE_OK);
 	}
 
 	/*
-	 * Now we can add this information to the gpe_info block
+	 * Now we can add this information to the gpe_number_info block
 	 * for use during dispatch of this GPE.
 	 */
-	acpi_gbl_gpe_number_info [gpe_number_index].type  = type;
-	acpi_gbl_gpe_number_info [gpe_number_index].method_node = (struct acpi_namespace_node *) obj_handle;
+	gpe_number_info->type     = type;
+	gpe_number_info->method_node = (struct acpi_namespace_node *) obj_handle;
 
 	/*
 	 * Enable the GPE (SCIs should be disabled at this point)
@@ -532,7 +554,7 @@ acpi_ev_asynch_execute_gpe_method (
 {
 	u32                             gpe_number = (u32) ACPI_TO_INTEGER (context);
 	u32                             gpe_number_index;
-	struct acpi_gpe_number_info     gpe_info;
+	struct acpi_gpe_number_info     gpe_number_info;
 	acpi_status                     status;
 
 
@@ -553,26 +575,26 @@ acpi_ev_asynch_execute_gpe_method (
 		return_VOID;
 	}
 
-	gpe_info = acpi_gbl_gpe_number_info [gpe_number_index];
+	gpe_number_info = acpi_gbl_gpe_number_info [gpe_number_index];
 	status = acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	if (ACPI_FAILURE (status)) {
 		return_VOID;
 	}
 
-	if (gpe_info.method_node) {
+	if (gpe_number_info.method_node) {
 		/*
 		 * Invoke the GPE Method (_Lxx, _Exx):
 		 * (Evaluate the _Lxx/_Exx control method that corresponds to this GPE.)
 		 */
-		status = acpi_ns_evaluate_by_handle (gpe_info.method_node, NULL, NULL);
+		status = acpi_ns_evaluate_by_handle (gpe_number_info.method_node, NULL, NULL);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("%s while evaluating method [%4.4s] for GPE[%2.2X]\n",
 				acpi_format_exception (status),
-				gpe_info.method_node->name.ascii, gpe_number));
+				gpe_number_info.method_node->name.ascii, gpe_number));
 		}
 	}
 
-	if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
+	if (gpe_number_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
 		/*
 		 * GPE is level-triggered, we clear the GPE status bit after handling
 		 * the event.
@@ -609,31 +631,28 @@ u32
 acpi_ev_gpe_dispatch (
 	u32                             gpe_number)
 {
-	u32                             gpe_number_index;
-	struct acpi_gpe_number_info     *gpe_info;
+	struct acpi_gpe_number_info     *gpe_number_info;
 	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_gpe_dispatch");
 
 
-	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
-	if (gpe_number_index == ACPI_GPE_INVALID) {
+	/*
+	 * We don't have to worry about mutex on gpe_number_info because we are
+	 * executing at interrupt level.
+	 */
+	gpe_number_info = acpi_ev_get_gpe_number_info (gpe_number);
+	if (!gpe_number_info) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "GPE[%X] is not a valid event\n", gpe_number));
 		return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 	}
 
 	/*
-	 * We don't have to worry about mutex on gpe_info because we are
-	 * executing at interrupt level.
-	 */
-	gpe_info = &acpi_gbl_gpe_number_info [gpe_number_index];
-
-	/*
 	 * If edge-triggered, clear the GPE status bit now.  Note that
 	 * level-triggered events are cleared after the GPE is serviced.
 	 */
-	if (gpe_info->type & ACPI_EVENT_EDGE_TRIGGERED) {
+	if (gpe_number_info->type & ACPI_EVENT_EDGE_TRIGGERED) {
 		status = acpi_hw_clear_gpe (gpe_number);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("acpi_ev_gpe_dispatch: Unable to clear GPE[%2.2X]\n", gpe_number));
@@ -648,12 +667,12 @@ acpi_ev_gpe_dispatch (
 	 * If there is neither a handler nor a method, we disable the level to
 	 * prevent further events from coming in here.
 	 */
-	if (gpe_info->handler) {
+	if (gpe_number_info->handler) {
 		/* Invoke the installed handler (at interrupt level) */
 
-		gpe_info->handler (gpe_info->context);
+		gpe_number_info->handler (gpe_number_info->context);
 	}
-	else if (gpe_info->method_node) {
+	else if (gpe_number_info->method_node) {
 		/*
 		 * Disable GPE, so it doesn't keep firing before the method has a
 		 * chance to run.
@@ -692,7 +711,7 @@ acpi_ev_gpe_dispatch (
 	/*
 	 * It is now safe to clear level-triggered evnets.
 	 */
-	if (gpe_info->type & ACPI_EVENT_LEVEL_TRIGGERED) {
+	if (gpe_number_info->type & ACPI_EVENT_LEVEL_TRIGGERED) {
 		status = acpi_hw_clear_gpe (gpe_number);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("acpi_ev_gpe_dispatch: Unable to clear GPE[%2.2X]\n", gpe_number));

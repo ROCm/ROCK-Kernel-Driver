@@ -188,6 +188,8 @@ static struct isapnp_card_id snd_card_pnpids[] __devinitdata = {
 	ISAPNP_CS4232('C','S','C',0x1a32,0x0000,0x0010,0x0003),
 	/* HP Omnibook 5500 onboard */
 	ISAPNP_CS4232('C','S','C',0x4232,0x0000,0x0002,0x0003),
+	/* Unnamed CS4236 card (Made in Taiwan) */
+	ISAPNP_CS4232('C','S','C',0x4236,0x0000,0x0010,0x0003),
 	/* Turtle Beach TBS-2000 (CS4232) */
 	ISAPNP_CS4232('C','S','C',0x7532,0x0000,0x0010,0xb006),
 	/* Turtle Beach Tropez Plus (CS4232) */

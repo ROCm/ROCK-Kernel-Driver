@@ -91,7 +91,7 @@ Lkernel_return:
 Luser_return:
 	/* only allow interrupts when we are really the last one on the*/
 	/* kernel stack, otherwise stack overflow can occur during*/
-	/* heavy interupt load*/
+	/* heavy interrupt load*/
 	andw	#ALLOWINT,%sr
 
 	movel	%sp,%d1			/* get thread_info pointer */
