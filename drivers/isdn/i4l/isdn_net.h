@@ -128,8 +128,12 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 	spin_lock_irqsave(&master_lp->netdev->queue_lock, flags);
 	lp->last->next = lp->next;
 	lp->next->last = lp->last;
-	if (master_lp->netdev->queue == lp)
+	if (master_lp->netdev->queue == lp) {
 		master_lp->netdev->queue = lp->next;
+		if (lp->next == lp) { /* last in queue */
+			master_lp->netdev->queue = master_lp->netdev->local;
+		}
+	}
 	lp->next = lp->last = lp;	/* (re)set own pointers */
 	spin_unlock_irqrestore(&master_lp->netdev->queue_lock, flags);
 }
