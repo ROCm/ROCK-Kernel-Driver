@@ -45,13 +45,6 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 #define THHOBP(hca_hndl)   ((THH_hob_t)(hca_hndl->device))
 
-#if LINUX_KERNEL_2_6
-#define DEV_NAME pretty_name
-#else
-#define DEV_NAME name
-#endif
-
-
 /* if non-zero, indicates legacy sqp initialization.  May be modified by insmod parameter */
 static int  thh_legacy_sqp = 0;
 MODULE_PARM(thh_legacy_sqp,"i");
@@ -202,7 +195,7 @@ static HH_ret_t THH_init_hh_all_tavor(void)
       hw_props[found_dev_index].bus = dev_info_p->bus->number;
       hw_props[found_dev_index].dev_func = dev_info_p->devfn;
       MTL_DEBUG4(MT_FLFMT("InfiniHost%d: pci_find_device returned: %s @ bus=%d, dev_func=%d"), 
-                 found_dev_index,dev_info_p->DEV_NAME,dev_info_p->bus->number, dev_info_p->devfn);
+                 found_dev_index,pci_pretty_name(dev_info_p),dev_info_p->bus->number, dev_info_p->devfn);
 
 
       rc = card_supported(dev_info_p, found_dev_index);
@@ -255,7 +248,7 @@ static HH_ret_t THH_init_hh_all_tavor(void)
       /* Enable "master" and "memory" flags */
       pci_set_master(dev_info_p);
       if (pci_enable_device(dev_info_p) != 0) {
-        MTL_ERROR1(MT_FLFMT("Failed enabling PCI device: %s"),dev_info_p->DEV_NAME);
+        MTL_ERROR1(MT_FLFMT("Failed enabling PCI device: %s"),pci_pretty_name(dev_info_p));
         PCI_ENUM_CONT; 
       }
       valid_dev[found_dev_index] = 1;
