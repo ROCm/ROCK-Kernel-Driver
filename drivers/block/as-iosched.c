@@ -1641,6 +1641,20 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 	return 1;
 }
 
+static int as_may_queue(request_queue_t *q, int rw)
+{
+	struct as_data *ad = q->elevator.elevator_data;
+	struct as_io_context *aic;
+	if (ad->antic_status == ANTIC_WAIT_REQ ||
+			ad->antic_status == ANTIC_WAIT_NEXT) {
+		aic = get_as_io_context();
+		if (ad->as_io_context == aic)
+			return 1;
+	}
+
+	return 0;
+}
+
 static void as_exit(request_queue_t *q, elevator_t *e)
 {
 	struct as_data *ad = e->elevator_data;
@@ -1879,6 +1893,7 @@ elevator_t iosched_as = {
 	.elevator_latter_req_fn =	as_latter_request,
 	.elevator_set_req_fn =		as_set_request,
 	.elevator_put_req_fn =		as_put_request,
+	.elevator_may_queue_fn =	as_may_queue,
 	.elevator_init_fn =		as_init,
 	.elevator_exit_fn =		as_exit,
 
