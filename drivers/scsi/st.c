@@ -3785,9 +3785,9 @@ static void st_detach(Scsi_Device * SDp)
 				devfs_unregister (tpnt->de_r[mode]);
 				tpnt->de_r[mode] = NULL;
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   st_device_type_file.name);
+						   &st_device_type_file);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   st_device_kdev_file.name);
+						   &st_device_kdev_file);
 				put_device(&tpnt->driverfs_dev_r[mode]);
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;

@@ -317,17 +317,17 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 		if ((p[part].nr_sects >= 1)) {
 			current_driverfs_dev = &p[part].hd_driverfs_dev;
 			device_remove_file(current_driverfs_dev,
-					partition_device_type_file.name);
+					&partition_device_type_file);
 			device_remove_file(current_driverfs_dev,
-					partition_device_kdev_file.name);
+					&partition_device_kdev_file);
 			put_device(current_driverfs_dev);	
 		}
 	}
 	current_driverfs_dev = &p->hd_driverfs_dev;
 	device_remove_file(current_driverfs_dev, 
-				partition_device_type_file.name);
+			   &partition_device_type_file);
 	device_remove_file(current_driverfs_dev, 
-				partition_device_kdev_file.name);
+			   &partition_device_kdev_file);
 	put_device(current_driverfs_dev);	
 	return;
 }

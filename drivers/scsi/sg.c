@@ -1556,8 +1556,8 @@ static void sg_detach(Scsi_Device * scsidp)
             }
 	    SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d, dirty\n", k));
 	    devfs_unregister (sdp->de);
-	    device_remove_file(&sdp->sg_driverfs_dev,sg_device_type_file.name);
-	    device_remove_file(&sdp->sg_driverfs_dev,sg_device_kdev_file.name);
+	    device_remove_file(&sdp->sg_driverfs_dev,&sg_device_type_file);
+	    device_remove_file(&sdp->sg_driverfs_dev,&sg_device_kdev_file);
 	    put_device(&sdp->sg_driverfs_dev);
 	    sdp->de = NULL;
 	    if (NULL == sdp->headfp) {
