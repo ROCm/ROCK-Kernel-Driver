@@ -179,6 +179,7 @@ static inline void cursor_undrawn(void)
 static const char *fbcon_startup(void);
 static void fbcon_init(struct vc_data *vc, int init);
 static void fbcon_deinit(struct vc_data *vc);
+static int fbcon_changevar(int con);
 static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 			int width);
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos);
@@ -194,6 +195,7 @@ static int fbcon_blank(struct vc_data *vc, int blank);
 static int fbcon_font_op(struct vc_data *vc, struct console_font_op *op);
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table);
 static int fbcon_scrolldelta(struct vc_data *vc, int lines);
+
 
 /*
  *  Internal routines
@@ -213,7 +215,7 @@ static __inline__ void ypan_down(struct display *p, struct vc_data *vc,
 				 int count);
 static void fbcon_bmove_rec(struct display *p, int sy, int sx, int dy,
 			    int dx, int height, int width, u_int y_break);
-static int fbcon_changevar(int con);
+
 static int fbcon_show_logo(void);
 
 #ifdef CONFIG_MAC
@@ -261,15 +263,22 @@ static int __init fbconsole_setup(char *options)
 
 __setup("fbcon=", fbconsole_setup);
 
-void gen_set_disp(struct vc_data *vc, struct fb_info *info)
+void gen_set_disp(int con, struct fb_info *info)
 {
-	struct display *display = fb_display + vc->vc_num;
+	struct display *display = fb_display + con;
 
-	if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR ||
-	    info->fix.visual == FB_VISUAL_DIRECTCOLOR)
-		display->dispsw_data = NULL;
-	else
-		display->dispsw_data = info->pseudo_palette;
+	/*
+	 * If we are setting all the virtual consoles, also set
+	 * the defaults used to create new consoles.
+	 *
+	 if (con < 0 || info->var.activate & FB_ACTIVATE_ALL) {
+	 int unit;
+
+	 for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
+	 if (fb_display[unit].conp && con2fb_map[unit] == minor(info->node))
+	 fb_display[unit].var = info->var;
+	 }
+	 */
 
 	display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
 #ifdef FBCON_HAS_ACCEL
@@ -278,7 +287,7 @@ void gen_set_disp(struct vc_data *vc, struct fb_info *info)
 #else
 	display->dispsw = &fbcon_dummy;
 #endif
-	fbcon_changevar(vc->vc_num);
+	fbcon_changevar(con);
 	return;
 }
 
@@ -333,13 +342,13 @@ void set_con2fb_map(int unit, int newidx)
 		fb_display[unit]._fontheightlog = fontheightlog;
 		fb_display[unit].userfont = userfont;
 		fb_display[unit].fb_info = newfb;
-		gen_set_disp(vc, newfb);
+		gen_set_disp(unit, newfb);
 		if (vc)
 			vc->vc_display_fg = &newfb->display_fg;
 		if (!newfb->display_fg)
 			newfb->display_fg = vc;
 		/* tell console var has changed */
-		fbcon_changevar(vc->vc_num);
+		fbcon_changevar(unit);
 	}
 }
 
@@ -354,8 +363,8 @@ struct display_switch fbcon_dummy;
 static const char *fbcon_startup(void)
 {
 	const char *display_desc = "frame buffer device";
-	static int done = 0;
 	int irqres = 1;
+	static int done = 0;
 
 	/*
 	 *  If num_registered_fb is zero, this is a call for the dummy part.
@@ -438,6 +447,7 @@ static const char *fbcon_startup(void)
 		cursor_timer.expires = jiffies + HZ / 50;
 		add_timer(&cursor_timer);
 	}
+
 	return display_desc;
 }
 
@@ -453,7 +463,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 	if (info->fbops->fb_set_par)
 		info->fbops->fb_set_par(info);
 
-	gen_set_disp(vc, info);
+	gen_set_disp(unit, info);
 	DPRINTK("mode:   %s\n", info->modename);
 	DPRINTK("visual: %d\n", info->fix.visual);
 	DPRINTK("res:    %dx%d-%d\n", fb_display[unit].var.xres,
@@ -575,7 +585,8 @@ static void fbcon_set_display(int con, int init, int logo)
 	fbcon_free_font(p);
 	if (i < MAX_NR_CONSOLES) {
 		struct display *q = &fb_display[i];
-
+		struct vc_data *tmp = vc_cons[i].d;
+		
 		if (fontwidthvalid(p, fontwidth(q))) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
@@ -943,13 +954,15 @@ static int scrollback_phys_max = 0;
 static int scrollback_max = 0;
 static int scrollback_current = 0;
 
-int update_var(struct vc_data *vc, struct fb_info *info)
+int update_var(int con, struct fb_info *info)
 {
 	int err;
 
-	if (vc->vc_num == info->currcon) {
+	if (con == info->currcon) {
 		if (info->fbops->fb_pan_display) {
-			if ((err = info->fbops->fb_pan_display(&info->var, info)))
+			if ((err =
+			     info->fbops->fb_pan_display(&info->var,
+							 info)))
 				return err;
 		}
 	}
@@ -967,7 +980,7 @@ static __inline__ void ywrap_up(struct display *p, struct vc_data *vc,
 	info->var.xoffset = 0;
 	info->var.yoffset = p->yscroll * fontheight(p);
 	info->var.vmode |= FB_VMODE_YWRAP;
-	update_var(vc, info);
+	update_var(vc->vc_num, info);
 	scrollback_max += count;
 	if (scrollback_max > scrollback_phys_max)
 		scrollback_max = scrollback_phys_max;
@@ -985,7 +998,7 @@ static __inline__ void ywrap_down(struct display *p, struct vc_data *vc,
 	info->var.xoffset = 0;
 	info->var.yoffset = p->yscroll * fontheight(p);
 	info->var.vmode |= FB_VMODE_YWRAP;
-	update_var(vc, info);
+	update_var(vc->vc_num, info);
 	scrollback_max -= count;
 	if (scrollback_max < 0)
 		scrollback_max = 0;
@@ -1006,7 +1019,7 @@ static __inline__ void ypan_up(struct display *p, struct vc_data *vc,
 	info->var.xoffset = 0;
 	info->var.yoffset = p->yscroll * fontheight(p);
 	info->var.vmode &= ~FB_VMODE_YWRAP;
-	update_var(vc, info);
+	update_var(vc->vc_num, info);
 	if (p->dispsw->clear_margins)
 		p->dispsw->clear_margins(vc, p, 1);
 	scrollback_max += count;
@@ -1030,7 +1043,7 @@ static __inline__ void ypan_down(struct display *p, struct vc_data *vc,
 	info->var.xoffset = 0;
 	info->var.yoffset = p->yscroll * fontheight(p);
 	info->var.vmode &= ~FB_VMODE_YWRAP;
-	update_var(vc, info);
+	update_var(vc->vc_num, info);
 	if (p->dispsw->clear_margins)
 		p->dispsw->clear_margins(vc, p, 1);
 	scrollback_max -= count;
@@ -1239,8 +1252,8 @@ void fbcon_redraw_clear(struct vc_data *vc, struct display *p, int sy,
  *
  */
 
-void fbcon_redraw_bmove(struct vc_data *vc, struct display *p, int sy, int sx, 
-			int dy, int dx, int h, int w)
+void fbcon_redraw_bmove(struct vc_data *vc, struct display *p, int sy, int sx, int dy, int dx,
+			int h, int w)
 {
 	if (sy != dy)
 		panic("fbcon_redraw_bmove width sy != dy");
@@ -1592,7 +1605,7 @@ static int fbcon_switch(struct vc_data *vc)
 	scrollback_max = 0;
 	scrollback_current = 0;
 
-	update_var(vc, info);
+	update_var(unit, info);
 
 	if (p->dispsw->clear_margins && vt_cons[unit]->vc_mode == KD_TEXT)
 		p->dispsw->clear_margins(vc, p, 0);
@@ -1620,48 +1633,38 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 
 	if (!p->can_soft_blank) {
 		if (blank) {
-			if (info->fix.visual == FB_VISUAL_MONO01) {
-				/*
-				   if (info->screen_base)
-				   fb_memset255(info->screen_base,
-				   info->var.xres_virtual*info->var.yres_virtual*
-				   info->var.bits_per_pixel>>3);
-				 */
-			} else {
-				unsigned short oldc;
-				u_int height;
-				u_int y_break;
+			unsigned short oldc;
+			u_int height;
+			u_int y_break;
 
-				oldc = vc->vc_video_erase_char;
-				vc->vc_video_erase_char &= p->charmask;
-				height = vc->vc_rows;
-				y_break = p->vrows - p->yscroll;
-				if (height > y_break) {
-					p->dispsw->clear(vc, p,
-							 real_y(p, 0), 0,
-							 y_break,
-							 vc->vc_cols);
-					p->dispsw->clear(vc, p,
-							 real_y(p,
-								y_break),
-							 0,
-							 height - y_break,
-							 vc->vc_cols);
-				} else
-					p->dispsw->clear(vc, p,
-							 real_y(p, 0), 0,
-							 height,
-							 vc->vc_cols);
-				vc->vc_video_erase_char = oldc;
-			}
-			return 0;
-		} else {
-			/* Tell console.c that it has to restore the screen itself */
-			return 1;
+			oldc = vc->vc_video_erase_char;
+			vc->vc_video_erase_char &= p->charmask;
+			height = vc->vc_rows;
+			y_break = p->vrows - p->yscroll;
+			if (height > y_break) {
+				p->dispsw->clear(vc, p,
+						 real_y(p, 0), 0,
+						 y_break,
+						 vc->vc_cols);
+				p->dispsw->clear(vc, p,
+						 real_y(p,
+						y_break),
+						0,
+						 height - y_break,
+						 vc->vc_cols);
+			} else
+				p->dispsw->clear(vc, p,
+						 real_y(p, 0), 0,
+						 height,
+						 vc->vc_cols);
+			vc->vc_video_erase_char = oldc;
 		}
+		return 0;
+	} else {
+		/* Tell console.c that it has to restore the screen itself */
+		return 1;
 	}
-	if (info->fbops->fb_blank)
-		(*info->fbops->fb_blank) (blank, info);
+	fb_blank(blank, info);
 	return 0;
 }
 
@@ -1733,7 +1736,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 }
 
 static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
-			     u8 *data, int userfont)
+			     u8 * data, int userfont)
 {
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
@@ -1749,8 +1752,8 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		return -ENXIO;
 	}
 
-	if (CON_IS_VISIBLE(vc) && softback_lines)
-		fbcon_set_origin(vc);
+	if (CON_IS_VISIBLE(p->conp) && softback_lines)
+		fbcon_set_origin(p->conp);
 
 	resize = (w != fontwidth(p)) || (h != fontheight(p));
 	if (p->userfont)
@@ -1764,16 +1767,17 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		REFCOUNT(data)++;
 	p->_fontwidth = w;
 	p->_fontheight = h;
-	if (vc->vc_hi_font_mask && cnt == 256) {
-		vc->vc_hi_font_mask = 0;
-		if (vc->vc_can_do_color)
-			vc->vc_complement_mask >>= 1;
+	if (p->conp->vc_hi_font_mask && cnt == 256) {
+		p->conp->vc_hi_font_mask = 0;
+		if (p->conp->vc_can_do_color)
+			p->conp->vc_complement_mask >>= 1;
 		p->fgshift--;
 		p->bgshift--;
 		p->charmask = 0xff;
 
 		/* ++Edmund: reorder the attribute bits */
-		if (vc->vc_can_do_color) {
+		if (p->conp->vc_can_do_color) {
+			struct vc_data *vc = p->conp;
 			unsigned short *cp =
 			    (unsigned short *) vc->vc_origin;
 			int count = vc->vc_screenbuf_size / 2;
@@ -1789,16 +1793,17 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 			vc->vc_attr >>= 1;
 		}
 
-	} else if (!vc->vc_hi_font_mask && cnt == 512) {
-		vc->vc_hi_font_mask = 0x100;
-		if (vc->vc_can_do_color)
-			vc->vc_complement_mask <<= 1;
+	} else if (!p->conp->vc_hi_font_mask && cnt == 512) {
+		p->conp->vc_hi_font_mask = 0x100;
+		if (p->conp->vc_can_do_color)
+			p->conp->vc_complement_mask <<= 1;
 		p->fgshift++;
 		p->bgshift++;
 		p->charmask = 0x1ff;
 
 		/* ++Edmund: reorder the attribute bits */
 		{
+			struct vc_data *vc = p->conp;
 			unsigned short *cp =
 			    (unsigned short *) vc->vc_origin;
 			int count = vc->vc_screenbuf_size / 2;
@@ -1827,6 +1832,7 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	fbcon_font_widths(p);
 
 	if (resize) {
+		struct vc_data *vc = p->conp;
 		/* reset wrap/pan */
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;
 		p->vrows = info->var.yres_virtual / h;
@@ -1846,10 +1852,10 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 				softback_top = 0;
 			}
 		}
-	} else if (CON_IS_VISIBLE(vc)
+	} else if (CON_IS_VISIBLE(p->conp)
 		   && vt_cons[vc->vc_num]->vc_mode == KD_TEXT) {
 		if (p->dispsw->clear_margins)
-			p->dispsw->clear_margins(vc, p, 0);
+			p->dispsw->clear_margins(p->conp, p, 0);
 		update_screen(vc->vc_num);
 	}
 
@@ -2013,7 +2019,8 @@ static struct fb_cmap palette_cmap = {
 
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 {
-	struct display *p = &fb_display[vc->vc_num];
+	int unit = vc->vc_num;
+	struct display *p = &fb_display[unit];
 	struct fb_info *info = p->fb_info;
 	int i, j, k;
 	u8 val;
@@ -2040,8 +2047,8 @@ static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 
 static u16 *fbcon_screen_pos(struct vc_data *vc, int offset)
 {
-	unsigned long p;
 	int line;
+	unsigned long p;
 
 	if (vc->vc_num != fg_console || !softback_lines)
 		return (u16 *) (vc->vc_origin + offset);
@@ -2058,9 +2065,8 @@ static u16 *fbcon_screen_pos(struct vc_data *vc, int offset)
 static unsigned long fbcon_getxy(struct vc_data *vc, unsigned long pos,
 				 int *px, int *py)
 {
-	unsigned long ret;
 	int x, y;
-
+	unsigned long ret;
 	if (pos >= vc->vc_origin && pos < vc->vc_scr_end) {
 		unsigned long offset = (pos - vc->vc_origin) / 2;
 
@@ -2201,7 +2207,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 		offset -= limit;
 	info->var.xoffset = 0;
 	info->var.yoffset = offset * fontheight(p);
-	update_var(vc, info);
+	update_var(unit, info);
 	if (!scrollback_current)
 		fbcon_cursor(vc, CM_DRAW);
 	return 0;

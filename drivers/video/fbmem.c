@@ -402,6 +402,9 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (!info || ! info->screen_base)
 		return -ENODEV;
 
+	if (info->fbops->fb_read)
+		return info->fbops->fb_read(file, buf, count, ppos);
+	
 	if (p >= info->fix.smem_len)
 	    return 0;
 	if (count >= info->fix.smem_len)
@@ -432,6 +435,9 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (!info || !info->screen_base)
 		return -ENODEV;
 
+	if (info->fbops->fb_write)
+		return info->fbops->fb_write(file, buf, count, ppos);
+	
 	if (p > info->fix.smem_len)
 	    return -ENOSPC;
 	if (count >= info->fix.smem_len)
@@ -516,6 +522,26 @@ int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	return 0;
 }
 
+int
+fb_blank(int blank, struct fb_info *info)
+{	
+	u16 black[info->cmap.len];
+	struct fb_cmap cmap;
+	
+	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
+		return 0;
+	if (blank) { 
+		memset(black, 0, info->cmap.len * sizeof(u16));
+		cmap.red = cmap.green = cmap.blue = black;
+		if (info->cmap.transp)
+			cmap.transp = black;
+		cmap.start = info->cmap.start;
+		cmap.len = info->cmap.len;
+	} else
+		cmap = info->cmap;
+	return fb_set_cmap(&cmap, 1, info);
+}
+
 static int 
 fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	 unsigned long arg)
@@ -594,9 +620,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return 0;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
-		if (fb->fb_blank == NULL)
-			return -EINVAL;
-		return fb->fb_blank(arg, info);
+		return fb_blank(arg, info);
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;

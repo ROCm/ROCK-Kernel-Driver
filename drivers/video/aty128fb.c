@@ -21,6 +21,9 @@
  *			- Convert to new framebuffer API,
  *			  fix colormap setting at 16 bits/pixel (565)
  *
+ *		  Paul Mundt 
+ *		  	- PCI hotplug
+ *
  *  Based off of Geert's atyfb.c and vfb.c.
  *
  *  TODO:
@@ -80,12 +83,6 @@
 #ifdef CONFIG_BOOTX_TEXT
 #include <asm/btext.h>
 #endif /* CONFIG_BOOTX_TEXT */
-
-#include <video/fbcon.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb24.h>
-#include <video/fbcon-cfb32.h>
 
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
@@ -326,7 +323,6 @@ struct aty128fb_par {
 
 struct fb_info_aty128 {
 	struct fb_info fb_info;
-	struct display disp;
 	struct aty128fb_par par;
 	u32 pseudo_palette[17];
 	struct fb_info_aty128 *next;
@@ -354,11 +350,11 @@ static int aty128fb_check_var(struct fb_var_screeninfo *var,
 static int aty128fb_set_par(struct fb_info *info);
 static int aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			      u_int transp, struct fb_info *info);
-static int aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
+static int aty128fb_pan_display(struct fb_var_screeninfo *var,
 			   struct fb_info *fb);
 static int aty128fb_blank(int blank, struct fb_info *fb);
 static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-			  u_long arg, int con, struct fb_info *info);
+			  u_long arg, struct fb_info *info);
 static int aty128fb_sync(struct fb_info *info);
 
     /*
@@ -393,7 +389,6 @@ static u32 depth_to_dst(u32 depth);
 
 static struct fb_ops aty128fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_check_var	= aty128fb_check_var,
 	.fb_set_par	= aty128fb_set_par,
 	.fb_setcolreg	= aty128fb_setcolreg,
@@ -1337,8 +1332,7 @@ aty128fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
  *  Pan or Wrap the Display
  */
 static int
-aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
-		     struct fb_info *fb)
+aty128fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *fb) 
 {
 	struct aty128fb_par *par = fb->par;
 	u32 xoffset, yoffset;
@@ -1680,7 +1674,6 @@ aty128_pci_register(struct pci_dev *pdev,
 	par = &lump->par;
 
 	info->par = par;
-	info->disp = &lump->disp;
 	info->fix = aty128fb_fix;
 	info->pseudo_palette = lump->pseudo_palette;
 
@@ -1715,13 +1708,13 @@ aty128_pci_register(struct pci_dev *pdev,
 	}
 
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
-	if (!(bios_seg = aty128find_ROM(info)))
+	if (!(bios_seg = aty128find_ROM()))
 		printk(KERN_INFO "aty128fb: Rage128 BIOS not located. "
 					"Guessing...\n");
 	else {
 		printk(KERN_INFO "aty128fb: Rage128 BIOS located at "
 				"segment %4.4X\n", (unsigned int)bios_seg);
-		aty128_get_pllinfo(info, bios_seg);
+		aty128_get_pllinfo(par, bios_seg);
 	}
 #endif
 	aty128_timings(par);
@@ -1734,9 +1727,9 @@ aty128_pci_register(struct pci_dev *pdev,
 
 #ifdef CONFIG_MTRR
 	if (mtrr) {
-		info->mtrr.vram = mtrr_add(info->fix.smem_start,
-				info->vram_size, MTRR_TYPE_WRCOMB, 1);
-		info->mtrr.vram_valid = 1;
+		par->mtrr.vram = mtrr_add(info->fix.smem_start,
+				par->vram_size, MTRR_TYPE_WRCOMB, 1);
+		par->mtrr.vram_valid = 1;
 		/* let there be speed */
 		printk(KERN_INFO "aty128fb: Rage128 MTRR set to ON\n");
 	}
@@ -1813,10 +1806,8 @@ static char * __init aty128find_ROM(void)
 			iounmap(rom_base);
 			continue;
 		}
-
 		return rom_base;
 	}
-
 	return NULL;
 }
 
@@ -2036,7 +2027,7 @@ aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 #define FBIO_ATY128_SET_MIRROR	_IOW('@', 2, sizeof(__u32*))
 
 static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-			  u_long arg, int con, struct fb_info *info)
+			  u_long arg, struct fb_info *info)
 {
 #ifdef CONFIG_PMAC_PBOOK
 	struct aty128fb_par *par = info->par;

@@ -55,13 +55,6 @@ struct display {
     u_short can_soft_blank;         /* zero if no hardware blanking */
     u_short inverse;                /* != 0 text black on white as default */
     struct display_switch *dispsw;  /* low level operations */
-    void *dispsw_data;              /* optional dispsw helper data */
-
-#if 0
-    struct fb_fix_cursorinfo fcrsr;
-    struct fb_var_cursorinfo *vcrsr;
-    struct fb_cursorstate crsrstate;
-#endif
 
     /* Filled in by the low-level console driver */
     struct vc_data *conp;           /* pointer to console data */
