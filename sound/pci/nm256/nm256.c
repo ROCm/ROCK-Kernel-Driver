@@ -62,7 +62,6 @@ static int buffer_top[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* not spe
 static int use_cache[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
 static int vaio_hack[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
 static int reset_workaround[SNDRV_CARDS];
-static int boot_devs;
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -82,7 +81,7 @@ module_param_array(use_cache, bool, NULL, 0444);
 MODULE_PARM_DESC(use_cache, "Enable the cache for coefficient table access.");
 module_param_array(vaio_hack, bool, NULL, 0444);
 MODULE_PARM_DESC(vaio_hack, "Enable workaround for Sony VAIO notebooks.");
-module_param_array(reset_workaround, bool, boot_devs, 0444);
+module_param_array(reset_workaround, bool, NULL, 0444);
 MODULE_PARM_DESC(reset_workaround, "Enable AC97 RESET workaround for some laptops.");
 
 /*
