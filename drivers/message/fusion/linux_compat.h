@@ -254,8 +254,7 @@ static __inline__ int __get_order(unsigned long size)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
 #define mptscsih_save_flags(flags) \
-({	local_save_flags(flags); \
-	local_irq_disable(); \
+({	local_irq_save(flags); \
 })
 #else
 #define mptscsih_save_flags(flags) \
