@@ -66,21 +66,10 @@
 #ifndef ZEXTERN
 #  define ZEXTERN extern
 #endif
-#ifndef FAR
-#   define FAR
-#endif
 
 typedef unsigned char  Byte;  /* 8 bits */
 typedef unsigned int   uInt;  /* 16 bits or more */
 typedef unsigned long  uLong; /* 32 bits or more */
-
-typedef Byte  FAR Bytef;
-typedef char  FAR charf;
-typedef int   FAR intf;
-typedef uInt  FAR uIntf;
-typedef uLong FAR uLongf;
-
-typedef void FAR *voidpf;
 typedef void     *voidp;
 
 #include <linux/types.h> /* for off_t */

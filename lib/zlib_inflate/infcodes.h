@@ -14,7 +14,7 @@
 #include "infblock.h"
 
 struct inflate_codes_state;
-typedef struct inflate_codes_state FAR inflate_codes_statef;
+typedef struct inflate_codes_state inflate_codes_statef;
 
 extern inflate_codes_statef *zlib_inflate_codes_new OF((
     uInt, uInt,

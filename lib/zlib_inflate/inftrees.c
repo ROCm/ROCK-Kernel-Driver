@@ -23,16 +23,16 @@ struct internal_state;
 
 
 local int huft_build OF((
-    uIntf *,            /* code lengths in bits */
+    uInt *,             /* code lengths in bits */
     uInt,               /* number of codes */
     uInt,               /* number of "simple" codes */
-    const uIntf *,      /* list of base values for non-simple codes */
-    const uIntf *,      /* list of extra bits for non-simple codes */
-    inflate_huft * FAR*,/* result: starting table */
-    uIntf *,            /* maximum lookup bits (returns actual) */
+    const uInt *,       /* list of base values for non-simple codes */
+    const uInt *,       /* list of extra bits for non-simple codes */
+    inflate_huft **,    /* result: starting table */
+    uInt *,             /* maximum lookup bits (returns actual) */
     inflate_huft *,     /* space for trees */
     uInt *,             /* hufts used in space */
-    uIntf * ));         /* space for values */
+    uInt * ));          /* space for values */
 
 /* Tables for deflate from PKZIP's appnote.txt. */
 local const uInt cplens[31] = { /* Copy lengths for literal codes 257..285 */
@@ -88,16 +88,16 @@ local const uInt cpdext[30] = { /* Extra bits for distance codes */
 #define BMAX 15         /* maximum bit length of any code */
 
 local int huft_build(
-	uIntf *b,               /* code lengths in bits (all assumed <= BMAX) */
-	uInt n,                 /* number of codes (assumed <= 288) */
-	uInt s,                 /* number of simple-valued codes (0..s-1) */
-	const uIntf *d,         /* list of base values for non-simple codes */
-	const uIntf *e,         /* list of extra bits for non-simple codes */
-	inflate_huft * FAR *t,  /* result: starting table */
-	uIntf *m,               /* maximum lookup bits, returns actual */
-	inflate_huft *hp,       /* space for trees */
-	uInt *hn,               /* hufts used in space */
-	uIntf *v                /* working area: values in order of bit length */
+	uInt *b,               /* code lengths in bits (all assumed <= BMAX) */
+	uInt n,                /* number of codes (assumed <= 288) */
+	uInt s,                /* number of simple-valued codes (0..s-1) */
+	const uInt *d,         /* list of base values for non-simple codes */
+	const uInt *e,         /* list of extra bits for non-simple codes */
+	inflate_huft **t,      /* result: starting table */
+	uInt *m,               /* maximum lookup bits, returns actual */
+	inflate_huft *hp,      /* space for trees */
+	uInt *hn,              /* hufts used in space */
+	uInt *v                /* working area: values in order of bit length */
 )
 /* Given a list of code lengths and a maximum table size, make a set of
    tables to decode that set of codes.  Return Z_OK on success, Z_BUF_ERROR
@@ -116,13 +116,13 @@ local int huft_build(
   register int k;               /* number of bits in current code */
   int l;                        /* bits per table (returned in m) */
   uInt mask;                    /* (1 << w) - 1, to avoid cc -O bug on HP */
-  register uIntf *p;            /* pointer into c[], b[], or v[] */
+  register uInt *p;             /* pointer into c[], b[], or v[] */
   inflate_huft *q;              /* points to current table */
   struct inflate_huft_s r;      /* table entry for structure assignment */
   inflate_huft *u[BMAX];        /* table stack */
   register int w;               /* bits before this table == (l * h) */
   uInt x[BMAX+1];               /* bit offsets, then code stack */
-  uIntf *xp;                    /* pointer into x */
+  uInt *xp;                     /* pointer into x */
   int y;                        /* number of dummy codes added */
   uInt z;                       /* number of entries in current table */
 
@@ -290,19 +290,19 @@ local int huft_build(
 
 
 int zlib_inflate_trees_bits(
-	uIntf *c,               /* 19 code lengths */
-	uIntf *bb,              /* bits tree desired/actual depth */
-	inflate_huft * FAR *tb, /* bits tree result */
+	uInt *c,                /* 19 code lengths */
+	uInt *bb,               /* bits tree desired/actual depth */
+	inflate_huft **tb,      /* bits tree result */
 	inflate_huft *hp,       /* space for trees */
 	z_streamp z             /* for messages */
 )
 {
   int r;
   uInt hn = 0;          /* hufts used in space */
-  uIntf *v;             /* work area for huft_build */
+  uInt *v;              /* work area for huft_build */
   
   v = WS(z)->tree_work_area_1;
-  r = huft_build(c, 19, 19, (uIntf*)Z_NULL, (uIntf*)Z_NULL,
+  r = huft_build(c, 19, 19, (uInt*)Z_NULL, (uInt*)Z_NULL,
                  tb, bb, hp, &hn, v);
   if (r == Z_DATA_ERROR)
     z->msg = (char*)"oversubscribed dynamic bit lengths tree";
@@ -317,18 +317,18 @@ int zlib_inflate_trees_bits(
 int zlib_inflate_trees_dynamic(
 	uInt nl,                /* number of literal/length codes */
 	uInt nd,                /* number of distance codes */
-	uIntf *c,               /* that many (total) code lengths */
-	uIntf *bl,              /* literal desired/actual bit depth */
-	uIntf *bd,              /* distance desired/actual bit depth */
-	inflate_huft * FAR *tl, /* literal/length tree result */
-	inflate_huft * FAR *td, /* distance tree result */
+	uInt *c,                /* that many (total) code lengths */
+	uInt *bl,               /* literal desired/actual bit depth */
+	uInt *bd,               /* distance desired/actual bit depth */
+	inflate_huft **tl,      /* literal/length tree result */
+	inflate_huft **td,      /* distance tree result */
 	inflate_huft *hp,       /* space for trees */
 	z_streamp z             /* for messages */
 )
 {
   int r;
   uInt hn = 0;          /* hufts used in space */
-  uIntf *v;             /* work area for huft_build */
+  uInt *v;              /* work area for huft_build */
 
   /* allocate work area */
   v = WS(z)->tree_work_area_2;
@@ -380,10 +380,10 @@ int zlib_inflate_trees_dynamic(
 
 
 int zlib_inflate_trees_fixed(
-	uIntf *bl,               /* literal desired/actual bit depth */
-	uIntf *bd,               /* distance desired/actual bit depth */
-	inflate_huft * FAR *tl,  /* literal/length tree result */
-	inflate_huft * FAR *td,  /* distance tree result */
+	uInt *bl,                /* literal desired/actual bit depth */
+	uInt *bd,                /* distance desired/actual bit depth */
+	inflate_huft **tl,       /* literal/length tree result */
+	inflate_huft **td,       /* distance tree result */
 	z_streamp z              /* for memory allocation */
 )
 {

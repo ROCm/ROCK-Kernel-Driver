@@ -46,7 +46,7 @@ typedef struct ct_data_s {
         ush  dad;        /* father node in Huffman tree */
         ush  len;        /* length of bit string */
     } dl;
-} FAR ct_data;
+} ct_data;
 
 #define Freq fc.freq
 #define Code fc.code
@@ -59,10 +59,9 @@ typedef struct tree_desc_s {
     ct_data *dyn_tree;           /* the dynamic tree */
     int     max_code;            /* largest code with non zero frequency */
     static_tree_desc *stat_desc; /* the corresponding static tree */
-} FAR tree_desc;
+} tree_desc;
 
 typedef ush Pos;
-typedef Pos FAR Posf;
 typedef unsigned IPos;
 
 /* A Pos is an index in the character window. We use short instead of int to
@@ -72,9 +71,9 @@ typedef unsigned IPos;
 typedef struct deflate_state {
     z_streamp strm;      /* pointer back to this zlib stream */
     int   status;        /* as the name implies */
-    Bytef *pending_buf;  /* output still pending */
+    Byte *pending_buf;   /* output still pending */
     ulg   pending_buf_size; /* size of pending_buf */
-    Bytef *pending_out;  /* next pending byte to output to the stream */
+    Byte *pending_out;   /* next pending byte to output to the stream */
     int   pending;       /* nb of bytes in the pending buffer */
     int   noheader;      /* suppress zlib header and adler32 */
     Byte  data_type;     /* UNKNOWN, BINARY or ASCII */
@@ -87,7 +86,7 @@ typedef struct deflate_state {
     uInt  w_bits;        /* log2(w_size)  (8..16) */
     uInt  w_mask;        /* w_size - 1 */
 
-    Bytef *window;
+    Byte *window;
     /* Sliding window. Input bytes are read into the second half of the window,
      * and move to the first half later to keep a dictionary of at least wSize
      * bytes. With this organization, matches are limited to a distance of
@@ -102,13 +101,13 @@ typedef struct deflate_state {
      * is directly used as sliding window.
      */
 
-    Posf *prev;
+    Pos *prev;
     /* Link to older string with same hash index. To limit the size of this
      * array to 64K, this link is maintained only for the last 32K strings.
      * An index in this array is thus a window index modulo 32K.
      */
 
-    Posf *head; /* Heads of the hash chains or NIL. */
+    Pos *head; /* Heads of the hash chains or NIL. */
 
     uInt  ins_h;          /* hash index of string to be inserted */
     uInt  hash_size;      /* number of elements in hash table */
@@ -188,7 +187,7 @@ typedef struct deflate_state {
     /* Depth of each subtree used as tie breaker for trees of equal frequency
      */
 
-    uchf *l_buf;          /* buffer for literals or lengths */
+    uch *l_buf;          /* buffer for literals or lengths */
 
     uInt  lit_bufsize;
     /* Size of match buffer for literals/lengths.  There are 4 reasons for
@@ -212,7 +211,7 @@ typedef struct deflate_state {
 
     uInt last_lit;      /* running index in l_buf */
 
-    ushf *d_buf;
+    ush *d_buf;
     /* Buffer for distances. To simplify the code, d_buf and l_buf have
      * the same number of elements. To use different lengths, an extra flag
      * array would be necessary.
@@ -237,7 +236,7 @@ typedef struct deflate_state {
      * are always zero.
      */
 
-} FAR deflate_state;
+} deflate_state;
 
 typedef struct deflate_workspace {
     /* State memory for the deflator */
@@ -267,10 +266,10 @@ typedef struct deflate_workspace {
         /* in trees.c */
 void zlib_tr_init         OF((deflate_state *s));
 int  zlib_tr_tally        OF((deflate_state *s, unsigned dist, unsigned lc));
-ulg  zlib_tr_flush_block  OF((deflate_state *s, charf *buf, ulg stored_len,
+ulg  zlib_tr_flush_block  OF((deflate_state *s, char *buf, ulg stored_len,
 			      int eof));
 void zlib_tr_align        OF((deflate_state *s));
-void zlib_tr_stored_block OF((deflate_state *s, charf *buf, ulg stored_len,
+void zlib_tr_stored_block OF((deflate_state *s, char *buf, ulg stored_len,
 			      int eof));
 void zlib_tr_stored_type_only OF((deflate_state *));
 

@@ -24,9 +24,7 @@
 /* compile with -Dlocal if your debugger can't find static symbols */
 
 typedef unsigned char  uch;
-typedef uch FAR uchf;
 typedef unsigned short ush;
-typedef ush FAR ushf;
 typedef unsigned long  ulg;
 
         /* common constants */
@@ -64,7 +62,7 @@ typedef unsigned long  ulg;
 
          /* functions */
 
-typedef uLong (ZEXPORT *check_func) OF((uLong check, const Bytef *buf,
+typedef uLong (ZEXPORT *check_func) OF((uLong check, const Byte *buf,
 				       uInt len));
 
 
@@ -96,7 +94,7 @@ typedef uLong (ZEXPORT *check_func) OF((uLong check, const Bytef *buf,
      if (adler != original_adler) error();
 */
 static inline uLong zlib_adler32(uLong adler,
-				 const Bytef *buf,
+				 const Byte *buf,
 				 uInt len)
 {
     unsigned long s1 = adler & 0xffff;

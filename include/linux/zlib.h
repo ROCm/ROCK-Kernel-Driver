@@ -60,22 +60,19 @@ extern "C" {
   crash even in case of corrupted input.
 */
 
-typedef voidpf (*alloc_func) OF((voidpf opaque, uInt items, uInt size));
-typedef void   (*free_func)  OF((voidpf opaque, voidpf address));
-
 struct internal_state;
 
 typedef struct z_stream_s {
-    Bytef    *next_in;  /* next input byte */
+    Byte    *next_in;   /* next input byte */
     uInt     avail_in;  /* number of bytes available at next_in */
     uLong    total_in;  /* total nb of input bytes read so far */
 
-    Bytef    *next_out; /* next output byte should be put there */
+    Byte    *next_out;  /* next output byte should be put there */
     uInt     avail_out; /* remaining free space at next_out */
     uLong    total_out; /* total nb of bytes output so far */
 
     char     *msg;      /* last error message, NULL if no error */
-    struct internal_state FAR *state; /* not visible by applications */
+    struct internal_state *state; /* not visible by applications */
 
     void     *workspace; /* memory allocated for this stream */
 
@@ -84,7 +81,7 @@ typedef struct z_stream_s {
     uLong   reserved;   /* reserved for future use */
 } z_stream;
 
-typedef z_stream FAR *z_streamp;
+typedef z_stream *z_streamp;
 
 /*
    The application must update next_in and avail_in when avail_in has
@@ -452,7 +449,7 @@ ZEXTERN int ZEXPORT deflateInit2 OF((z_streamp strm,
 */
                             
 ZEXTERN int ZEXPORT zlib_deflateSetDictionary OF((z_streamp strm,
-						     const Bytef *dictionary,
+						     const Byte *dictionary,
 						     uInt  dictLength));
 /*
      Initializes the compression dictionary from the given byte sequence
@@ -561,7 +558,7 @@ ZEXTERN int ZEXPORT inflateInit2 OF((z_streamp strm,
 */
 
 ZEXTERN int ZEXPORT zlib_inflateSetDictionary OF((z_streamp strm,
-						     const Bytef *dictionary,
+						     const Byte *dictionary,
 						     uInt  dictLength));
 /*
      Initializes the decompression dictionary from the given uncompressed byte
@@ -643,9 +640,9 @@ ZEXTERN int ZEXPORT zlib_inflateInit2_ OF((z_streamp strm, int  windowBits,
     struct internal_state {int dummy;}; /* hack for buggy compilers */
 #endif
 
-ZEXTERN const char   * ZEXPORT zlib_zError           OF((int err));
-ZEXTERN int            ZEXPORT zlib_inflateSyncPoint OF((z_streamp z));
-ZEXTERN const uLongf * ZEXPORT zlib_get_crc_table    OF((void));
+ZEXTERN const char  * ZEXPORT zlib_zError           OF((int err));
+ZEXTERN int           ZEXPORT zlib_inflateSyncPoint OF((z_streamp z));
+ZEXTERN const uLong * ZEXPORT zlib_get_crc_table    OF((void));
 
 #ifdef __cplusplus
 }
