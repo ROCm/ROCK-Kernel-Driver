@@ -14,11 +14,6 @@ ToDo:
 	  strictly a speed optimization. Obviously need to keep the ->run_list
 	  locked or RACE. load_attribute_list() already performs such an
 	  optimization so use the same optimization where desired.
-	- Optimize all our readpage functions to not do i/o on buffer heads
-	  beyond initialized_size, just zero the buffer heads instead.
-	  Question: How to setup the buffer heads so they point to the on disk
-	  location correctly (after all they are allocated) but are not read
-	  from disk?
 	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
 	  with initialized_size < data_size. I don't think it can happen but
 	  it requires more careful consideration.
@@ -26,6 +21,24 @@ ToDo:
 	  several copies of almost identicall functions and the functions are
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
+	- Want to use dummy inodes for address space i/o. We need some VFS
+	  changes first, which are currently under discussion.
+
+2.0.6 - Major bugfix to make compatible with other kernel changes.
+
+	- Initialize the mftbmp address space properly now that there are more
+	  fields in the struct address_space. This was leading to hangs and
+	  oopses on umount since 2.5.12 because of changes to other parts of
+	  the kernel. We probably want a kernel generic init_address_space()
+	  function...
+	- Drop BKL from ntfs_readdir() after consultation with Al Viro. The
+	  only caller of ->readdir() is vfs_readdir() which holds i_sem during
+	  the call, and i_sem is sufficient protection against changes in the
+	  directory inode (including ->i_size).
+	- Use generic_file_llseek() for directories (as opposed to
+	  default_llseek()) as this downs i_sem instead of the BKL which is
+	  what we now need for exclusion against ->f_pos changes considering we
+	  no longer take the BKL in ntfs_readdir().
 
 2.0.5 - Major bugfix. Buffer overflow in extent inode handling.
 

@@ -500,7 +500,12 @@ static inline int ntfs_filldir(ntfs_volume *vol, struct file *filp,
 }
 
 /*
- * VFS calls readdir with BKL held so no possible RACE conditions.
+ * VFS calls readdir without BKL but with i_sem held. This protects the VFS
+ * parts (e.g. ->f_pos and ->i_size, and it also protects against directory
+ * modifications). Together with the rw semaphore taken by the call to
+ * map_mft_record(), the directory is truly locked down so we have a race free
+ * ntfs_readdir() without the BKL. (-:
+ *
  * We use the same basic approach as the old NTFS driver, i.e. we parse the
  * index root entries and then the index allocation entries that are marked
  * as in use in the index bitmap.
@@ -525,7 +530,6 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	u8 *kaddr, *bmp, *index_end;
 	attr_search_context *ctx;
 
-	lock_kernel();
 	ntfs_debug("Entering for inode 0x%Lx, f_pos 0x%Lx.",
 			(unsigned long long)ndir->mft_no, filp->f_pos);
 	rc = err = 0;
@@ -794,7 +798,6 @@ done:
 		ntfs_debug("filldir returned %i, f_pos 0x%Lx, returning 0.",
 				rc, filp->f_pos);
 #endif
-	unlock_kernel();
 	return 0;
 map_page_err_out:
 	ntfs_error(sb, "Reading index allocation data failed.");
@@ -817,7 +820,8 @@ dir_err_out:
 }
 
 struct file_operations ntfs_dir_ops = {
-	read:			generic_read_dir,	/* Return -EISDIR. */
-	readdir:		ntfs_readdir,		/* Read directory. */
+	llseek:		generic_file_llseek,	/* Seek inside directory. */
+	read:		generic_read_dir,	/* Return -EISDIR. */
+	readdir:	ntfs_readdir,		/* Read directory contents. */
 };
 
