@@ -45,14 +45,14 @@ static int buffers = 2;
 
 /* insmod parameter: some programs (e.g. ´vic´) do not allow to
    specify the used video-mode, so you have to tell this to the
-   modules by hand, 0 = PAL, 1 = NTSC  */
-static int mode = 0;
+   modules by hand, 0 = PAL (default), 1 = NTSC  */
+static int mode;
 
-/* debug levels: 0 -- no debugging outputs
+/* debug levels: 0 -- no debugging outputs: default
 		 1 -- prints out entering (and exiting if useful) of functions
 		 2 -- prints out very, very detailed informations of what is going on
 		 3 -- both of the above */
-int saa7146_debug = 0;	/* insmod parameter */
+int saa7146_debug;	/* insmod parameter */
 
 #define dprintk		if (saa7146_debug & 1) printk
 #define hprintk		if (saa7146_debug & 2) printk
@@ -796,7 +796,7 @@ void remove_saa7146(struct saa7146 *saa)
 static int saa7146_suspend(struct pci_dev *pdev, u32 state)
 {
         printk("saa7146_suspend()\n");
-	saa7146_core_command(((struct saa7146 *) pdev->driver_data)->i2c_bus,
+	saa7146_core_command(((struct saa7146 *)pci_get_drvdata(pdev))->i2c_bus,
 			     SAA7146_SUSPEND, 0);
 	return 0;
 }
@@ -805,7 +805,7 @@ static int
 saa7146_resume(struct pci_dev *pdev)
 {
         printk("saa7146_resume()\n");
-	saa7146_core_command(((struct saa7146 *) pdev->driver_data)->i2c_bus,
+	saa7146_core_command(((struct saa7146 *)pci_get_drvdata(pdev))->i2c_bus,
 			     SAA7146_RESUME, 0);
 	return 0;
 }
@@ -839,7 +839,7 @@ int __devinit saa7146_init_one (struct pci_dev *pdev,
 	memset (saa, 0, sizeof (struct saa7146));
 
 	saa->device = pdev;
-	saa->device->driver_data = saa;
+	pci_set_drvdata(pdev, saa);
 	saa->card_type = card_type;
 	saa->dvb_adapter = adap;
 
@@ -855,7 +855,7 @@ int __devinit saa7146_init_one (struct pci_dev *pdev,
 static
 void __devexit saa7146_remove_one (struct pci_dev *pdev)
 {
-	struct saa7146 *saa = pdev->driver_data;
+	struct saa7146 *saa = pci_get_drvdata(pdev);
 
 	dprintk("saa7146_remove_one()\n");
 
