@@ -1874,6 +1874,8 @@ long sys32_quotactl(void)
 	return -ENOSYS;
 } 
 
+cond_syscall(sys32_ipc)
+
 struct exec_domain ia32_exec_domain = { 
 	.name = "linux/x86",
 	.pers_low = PER_LINUX32,

@@ -13,6 +13,7 @@
 #include <linux/string.h>
 #include <linux/syscalls.h>
 #include <linux/tty.h>
+#include <linux/ioctl32.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>
@@ -221,3 +222,5 @@ EXPORT_SYMBOL(clear_page);
 EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL_GPL(flush_tlb_all);
 #endif
+
+EXPORT_SYMBOL(sys_ioctl);
