@@ -12,7 +12,7 @@ obj-y	 += mem.o tty_io.o n_tty.o tty_ioctl.o pty.o misc.o random.o
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs     :=	busmouse.o vt.o generic_serial.o ip2main.o \
+export-objs     :=	busmouse.o vt.o generic_serial.o ip2main.o consolemap.o\
 			ite_gpio.o keyboard.o misc.o nvram.o random.o rtc.o \
 			selection.o sonypi.o sysrq.o tty_io.o tty_ioctl.o
 
