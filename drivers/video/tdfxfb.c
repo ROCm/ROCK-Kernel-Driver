@@ -1109,7 +1109,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	/*
 	 * Our driver data
 	 */
-	pdev->driver_data = info;
+	pci_set_drvdata(pdev, info);
 	return 0; 
 }
 
@@ -1124,7 +1124,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
  */
 static void __devexit tdfxfb_remove(struct pci_dev *pdev)
 {
-	struct fb_info *info = (struct fb_info *)pdev->driver_data;
+	struct fb_info *info = pci_get_drvdata(pdev);
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
 
 	unregister_framebuffer(info);
@@ -1138,6 +1138,7 @@ static void __devexit tdfxfb_remove(struct pci_dev *pdev)
 			   pci_resource_len(pdev, 1));
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
+	pci_set_drvdata(pdev, NULL);
 }
 
 int __init tdfxfb_init(void)

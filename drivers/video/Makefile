@@ -114,7 +114,6 @@ obj-$(CONFIG_FBCON_ILBM)          += fbcon-ilbm.o
 obj-$(CONFIG_FBCON_IPLAN2P2)      += fbcon-iplan2p2.o
 obj-$(CONFIG_FBCON_IPLAN2P4)      += fbcon-iplan2p4.o
 obj-$(CONFIG_FBCON_IPLAN2P8)      += fbcon-iplan2p8.o
-obj-$(CONFIG_FBCON_IPLAN2P16)     += fbcon-iplan2p16.o
 obj-$(CONFIG_FBCON_MAC)           += fbcon-mac.o
 obj-$(CONFIG_FBCON_MFB)           += fbcon-mfb.o
 obj-$(CONFIG_FBCON_VGA)           += fbcon-vga.o

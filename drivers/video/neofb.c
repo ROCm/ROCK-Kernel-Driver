@@ -1915,8 +1915,7 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 	/*
 	 * Our driver data
 	 */
-	dev->driver_data = info;
-
+	pci_set_drvdata(dev, info);
 	return 0;
 
       failed:
@@ -1929,7 +1928,7 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 
 static void __devexit neofb_remove(struct pci_dev *dev)
 {
-	struct fb_info *info = (struct fb_info *) dev->driver_data;
+	struct fb_info *info = pci_get_drvdata(dev);
 
 	DBG("neofb_remove");
 
@@ -1951,7 +1950,7 @@ static void __devexit neofb_remove(struct pci_dev *dev)
 		 * Ensure that the driver data is no longer
 		 * valid.
 		 */
-		dev->driver_data = NULL;
+		pci_set_drvdata(dev, NULL);
 	}
 }
 
