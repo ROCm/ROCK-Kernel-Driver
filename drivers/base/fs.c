@@ -30,7 +30,7 @@ int device_create_file(struct device * dev, struct device_attribute * entry)
 
 	if (dev) {
 		get_device(dev);
-		error = driverfs_create_file(entry,&dev->dir);
+		error = driverfs_create_file(&entry->attr,&dev->dir);
 		put_device(dev);
 	}
 	return error;
@@ -46,7 +46,7 @@ void device_remove_file(struct device * dev, struct device_attribute * attr)
 {
 	if (dev) {
 		get_device(dev);
-		driverfs_remove_file(&dev->dir,attr->name);
+		driverfs_remove_file(&dev->dir,attr->attr.name);
 		put_device(dev);
 	}
 }

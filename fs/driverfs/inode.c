@@ -282,7 +282,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	struct device * dev;
 
 	dir = file->f_dentry->d_parent->d_fsdata;
-	entry = (struct device_attribute *)file->f_dentry->d_fsdata;
+	entry = to_dev_attr(file->f_dentry->d_fsdata);
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
@@ -349,7 +349,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 
 	dir = file->f_dentry->d_parent->d_fsdata;
 
-	entry = (struct device_attribute *)file->f_dentry->d_fsdata;
+	entry = to_dev_attr(file->f_dentry->d_fsdata);
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
@@ -618,7 +618,7 @@ driverfs_create_dir(struct driver_dir_entry * entry,
  * @parent:	directory to create it in
  */
 int
-driverfs_create_file(struct device_attribute * entry,
+driverfs_create_file(struct attribute * entry,
 		     struct driver_dir_entry * parent)
 {
 	struct dentry * dentry;

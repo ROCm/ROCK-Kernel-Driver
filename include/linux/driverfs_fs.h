@@ -32,22 +32,27 @@ struct driver_dir_entry {
 	mode_t			mode;
 };
 
+struct attribute {
+	char			* name;
+	mode_t			mode;
+};
+
 struct device;
 
 struct device_attribute {
-	char			* name;
-	mode_t			mode;
+	struct attribute	attr;
 	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
 	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
 };
 
-#define DEVICE_ATTR(_name,_str,_mode,_show,_store) \
-struct device_attribute dev_attr_##_name = { \
-	.name	= _str,		\
-	.mode	= _mode,	\
-	.show	= _show,	\
-	.store	= _store,	\
+#define DEVICE_ATTR(_name,_str,_mode,_show,_store)	\
+struct device_attribute dev_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
 };
+
+#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
 
 extern int
 driverfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);
@@ -56,7 +61,7 @@ extern void
 driverfs_remove_dir(struct driver_dir_entry * entry);
 
 extern int
-driverfs_create_file(struct device_attribute * entry,
+driverfs_create_file(struct attribute * attr,
 		     struct driver_dir_entry * parent);
 
 extern int 
