@@ -130,12 +130,7 @@ static int ubd0_init(void)
 
 __initcall(ubd0_init);
 
-static struct hd_driveid ubd_id = {
-        .cyls =		0,
-	.heads =	128,
-	.sectors =	32,
-};
-
+/* Only changed by fake_ide_setup which is a setup */
 static int fake_ide = 0;
 static struct proc_dir_entry *proc_ide_root = NULL;
 static struct proc_dir_entry *proc_ide = NULL;
@@ -161,7 +156,6 @@ static int proc_ide_read_media(char *page, char **start, off_t off, int count,
 	else len = count;
 	*start = page + off;
 	return len;
-	
 }
 
 static void make_ide_entries(char *dev_name)
@@ -380,8 +374,6 @@ void kill_io_thread(void)
 
 __uml_exitcall(kill_io_thread);
 
-int sync = 0;
-
 static int ubd_file_size(struct ubd *dev, __u64 *size_out)
 {
 	char *file;
@@ -566,7 +558,7 @@ int ubd_driver_init(void){
 	unsigned long stack;
 	int err;
 
-	if(sync){
+	if(global_openflags.s){
 		printk(KERN_INFO "ubd : Synchronous mode\n");
 		return(0);
 	}
@@ -590,9 +582,9 @@ device_initcall(ubd_driver_init);
 
 static void ubd_close(struct ubd *dev)
 {
-	close_fd(dev->fd);
+	os_close_file(dev->fd);
 	if(dev->cow.file != NULL) {
-		close_fd(dev->cow.fd);
+		os_close_file(dev->cow.fd);
 		vfree(dev->cow.bitmap);
 		dev->cow.bitmap = NULL;
 	}
@@ -695,9 +687,6 @@ static int ubd_release(struct inode * inode, struct file * file)
 	return(0);
 }
 
-int cow_read = 0;
-int cow_write = 0;
-
 void cowify_req(struct io_thread_req *req, struct ubd *dev)
 {
         int i, update_bitmap, sector = req->offset >> 9;
@@ -710,14 +699,12 @@ void cowify_req(struct io_thread_req *req, struct ubd *dev)
 					dev->cow.bitmap)){
 				ubd_set_bit(i, (unsigned char *) 
 					    &req->sector_mask);
-				cow_read++;
 			}
                 }
         } 
         else {
 		update_bitmap = 0;
 		for(i = 0; i < req->length >> 9; i++){
-			cow_write++;
 			ubd_set_bit(i, (unsigned char *) 
 				    &req->sector_mask);
 			if(!ubd_test_bit(sector + i, (unsigned char *) 
@@ -819,6 +806,12 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
  	struct ubd *dev;
 	int n, min, err;
+	struct hd_driveid ubd_id = {
+		.cyls =		0,
+		.heads =	128,
+		.sectors =	32,
+	};
+
 
         if(!inode) return(-EINVAL);
 	min = minor(inode->i_rdev);

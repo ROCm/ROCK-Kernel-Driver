@@ -30,6 +30,7 @@ Jeff Dike (jdike@karaya.com) : Modified for integration into uml
 #include "user_util.h"
 #include "user.h"
 #include "os.h"
+#include "tempfile.h"
 
 static int debugger_wait(debugger_state *debugger, int *status, int options,
 			 int (*syscall)(debugger_state *debugger, pid_t child),

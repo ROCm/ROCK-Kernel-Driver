@@ -184,7 +184,6 @@ static void free_port(void)
 
 	list_for_each(ele, &ports){
 		port = list_entry(ele, struct port_list, list);
- 		free_irq(ACCEPT_IRQ, port);
 		os_close_file(port->fd);
 	}
 }

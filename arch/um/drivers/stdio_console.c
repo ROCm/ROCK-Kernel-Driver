@@ -130,15 +130,6 @@ int stdio_init(void)
 
 	printk(KERN_INFO "Initializing stdio console driver\n");
 
-	console_driver = ((struct tty_driver)
-		      {
-			      open :	 	con_open,
-			      close :	 	con_close,
-			      write :	 	con_write,
-			      chars_in_buffer :	chars_in_buffer,
-			      set_termios :	set_termios
-		      });
-
 	line_register_devfs(&console_lines, &driver, &console_driver, vts, 
 			    sizeof(vts)/sizeof(vts[0]));
 
@@ -157,8 +148,19 @@ __initcall(stdio_init);
 static void console_write(struct console *console, const char *string, 
 			  unsigned len)
 {
+	if(con_init_done) down(&vts[console->index].sem);
 	console_write_chan(&vts[console->index].chan_list, string, len);
+	if(con_init_done) up(&vts[console->index].sem);
 }
+
+static struct tty_driver console_driver = {
+	refcount :		&console_refcount,
+	open :	 		con_open,
+	close :	 		con_close,
+	write :	 		con_write,
+	chars_in_buffer :	chars_in_buffer,
+	set_termios :		set_termios
+};
 
 static kdev_t console_device(struct console *c)
 {
@@ -193,7 +195,6 @@ __channel_help(console_chan_setup, "con");
 static void console_exit(void)
 {
 	if(!con_init_done) return;
-	line_close(vts, NULL);
 	close_lines(vts, sizeof(vts)/sizeof(vts[0]));
 }
 

@@ -3,9 +3,9 @@ EXTRA_TARGETS	:= unmap_fin.o
 
 obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o mem.o mem_user.o \
-	process.o process_kern.o ptrace.o reboot.o resource.o setup.o \
-	sigio_user.o sigio_kern.o signal_kern.o signal_user.o smp.o \
-	syscall_kern.o syscall_user.o sysrq.o sys_call_table.o time.o \
+	process.o process_kern.o ptrace.o reboot.o resource.o sigio_user.o \
+	sigio_kern.o signal_kern.o signal_user.o smp.o syscall_kern.o \
+	syscall_user.o sysrq.o sys_call_table.o tempfile.o time.o \
 	time_kern.o tlb.o trap_kern.o trap_user.o uaccess_user.o um_arch.o \
 	umid.o user_util.o
 
@@ -14,8 +14,8 @@ obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
 # user_syms.o not included here because Rules.make has its own ideas about
 # building anything in export-objs
 
-USER_OBJS := $(filter %_user.o,$(obj-y)) config.o frame.o helper.o process.o \
-	time.o tty_log.o umid.o user_util.o user_syms.o
+USER_OBJS := $(filter %_user.o,$(obj-y)) config.o helper.o process.o \
+	tempfile.o time.o tty_log.o umid.o user_util.o user_syms.o
 USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/kernel/$(file))
 
 export-objs := ksyms.o process_kern.o signal_kern.o gprof_syms.o gmon_syms.o
@@ -50,6 +50,9 @@ arch/um/kernel/unmap.o: arch/um/kernel/unmap.c
 
 arch/um/kernel/unmap_fin.o : arch/um/kernel/unmap.o
 	ld -r -o $@ $< -lc -L/usr/lib
+
+arch/um/kernel/frame.o: arch/um/kernel/frame.c
+	$(CC) $(CFLAGS_$@) -c -o $@ $<
 
 QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
 

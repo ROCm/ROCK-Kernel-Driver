@@ -229,7 +229,7 @@ void *switch_to(void *prev, void *next, void *last)
 	set_current(to);
 
 	reading = 0;
-	err = user_write(to->thread.switch_pipe[1], &c, sizeof(c));
+	err = os_write_file(to->thread.switch_pipe[1], &c, sizeof(c));
 	if(err != sizeof(c))
 		panic("write of switch_pipe failed, errno = %d", -err);
 
@@ -237,7 +237,7 @@ void *switch_to(void *prev, void *next, void *last)
 	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
 		os_kill_process(os_getpid());
 
-	err = user_read(from->thread.switch_pipe[0], &c, sizeof(c));
+	err = os_read_file(from->thread.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
 		panic("read of switch_pipe failed, errno = %d", -err);
 

@@ -57,7 +57,7 @@ int change_sig(int signal, int on)
 	sigemptyset(&sigset);
 	sigaddset(&sigset, signal);
 	sigprocmask(on ? SIG_UNBLOCK : SIG_BLOCK, &sigset, &old);
-	return(sigismember(&old, signal));
+	return(!sigismember(&old, signal));
 }
 
 static void change_signals(int type)

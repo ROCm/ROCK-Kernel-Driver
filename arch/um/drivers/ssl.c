@@ -24,9 +24,12 @@
 
 static int ssl_version = 1;
 
-static struct tty_driver ssl_driver;
-
+/* Referenced only by tty_driver below - presumably it's locked correctly
+ * by the tty driver.
+ */
 static int ssl_refcount = 0;
+
+static struct tty_driver ssl_driver;
 
 #define NR_PORTS 64
 
@@ -153,6 +156,27 @@ void ssl_hangup(struct tty_struct *tty)
 {
 }
 
+static struct tty_driver ssl_driver = {
+	refcount :		&ssl_refcount,
+	open :	 		ssl_open,
+	close :	 		ssl_close,
+	write :	 		ssl_write,
+	put_char :		ssl_put_char,
+	flush_chars :		ssl_flush_chars,
+	chars_in_buffer :	ssl_chars_in_buffer,
+	flush_buffer :		ssl_flush_buffer,
+	ioctl :	 		ssl_ioctl,
+	throttle :		ssl_throttle,
+	unthrottle :		ssl_unthrottle,
+	set_termios :		ssl_set_termios,
+	stop :	 		ssl_stop,
+	start :	 		ssl_start,
+	hangup :	 	ssl_hangup
+};
+
+/* Changed by ssl_init and referenced by ssl_exit, which are both serialized
+ * by being an initcall and exitcall, respectively.
+ */
 static int ssl_init_done = 0;
 
 int ssl_init(void)
@@ -161,25 +185,6 @@ int ssl_init(void)
 
 	printk(KERN_INFO "Initializing software serial port version %d\n", 
 	       ssl_version);
-
-	ssl_driver = ((struct tty_driver)
-		      {
-			      refcount :	&ssl_refcount,
-			      open :	 	ssl_open,
-			      close :	 	ssl_close,
-			      write :	 	ssl_write,
-			      put_char :	ssl_put_char,
-			      flush_chars :	ssl_flush_chars,
-			      chars_in_buffer :	ssl_chars_in_buffer,
-			      flush_buffer :	ssl_flush_buffer,
-			      ioctl :	 	ssl_ioctl,
-			      throttle :	ssl_throttle,
-			      unthrottle :	ssl_unthrottle,
-			      set_termios :	ssl_set_termios,
-			      stop :	 	ssl_stop,
-			      start :	 	ssl_start,
-			      hangup :	 	ssl_hangup
-		      });
 
 	line_register_devfs(&lines, &driver, &ssl_driver, serial_lines, 
 			    sizeof(serial_lines)/sizeof(serial_lines[0]));
