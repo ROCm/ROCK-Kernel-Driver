@@ -2,8 +2,6 @@
 # Makefile for the Linux ACPI interpreter
 # 
 
-O_TARGET := acpi.o
-
 export ACPI_CFLAGS
 
 ACPI_CFLAGS	:= -D_LINUX -I$(CURDIR)/include
