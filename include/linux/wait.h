@@ -220,22 +220,6 @@ static inline void remove_wait_queue_locked(wait_queue_head_t *q,
 	__remove_wait_queue(q,  wait);
 }
 
-#define add_wait_queue_cond(q, wait, cond) \
-	({							\
-		unsigned long flags;				\
-		int _raced = 0;					\
-		spin_lock_irqsave(&(q)->lock, flags);	\
-		(wait)->flags = 0;				\
-		__add_wait_queue((q), (wait));			\
-		rmb();						\
-		if (!(cond)) {					\
-			_raced = 1;				\
-			__remove_wait_queue((q), (wait));	\
-		}						\
-		spin_lock_irqrestore(&(q)->lock, flags);	\
-		_raced;						\
-	})
-
 /*
  * These are the old interfaces to sleep waiting for an event.
  * They are racy.  DO NOT use them, use the wait_event* interfaces above.  
