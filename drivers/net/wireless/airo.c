@@ -982,6 +982,7 @@ static void timer_func( struct net_device *dev );
 static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 #ifdef WIRELESS_EXT
 struct iw_statistics *airo_get_wireless_stats (struct net_device *dev);
+static void airo_read_wireless_stats (struct airo_info *local);
 #endif /* WIRELESS_EXT */
 #ifdef CISCO_EXT
 static int readrids(struct net_device *dev, aironet_ioctl *comp);
@@ -1027,7 +1028,7 @@ struct airo_info {
 #define FLAG_PENDING_XMIT 9
 #define FLAG_PENDING_XMIT11 10
 #define FLAG_PCI	11
-#define JOB_MASK	0xff0000
+#define JOB_MASK	0x1ff0000
 #define JOB_DIE		16
 #define JOB_XMIT	17
 #define JOB_XMIT11	18
@@ -1036,6 +1037,7 @@ struct airo_info {
 #define JOB_MIC		21
 #define JOB_EVENT	22
 #define JOB_AUTOWEP	23
+#define JOB_WSTATS	24
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
@@ -1692,8 +1694,8 @@ static int writeConfigRid(struct airo_info*ai, int lock) {
 
 	return PC4500_writerid( ai, RID_CONFIG, &cfgr, sizeof(cfgr), lock);
 }
-static int readStatusRid(struct airo_info*ai, StatusRid *statr) {
-	int rc = PC4500_readrid(ai, RID_STATUS, statr, sizeof(*statr), 1);
+static int readStatusRid(struct airo_info*ai, StatusRid *statr, int lock) {
+	int rc = PC4500_readrid(ai, RID_STATUS, statr, sizeof(*statr), lock);
 	u16 *s;
 
 	statr->len = le16_to_cpu(statr->len);
@@ -2415,6 +2417,8 @@ static int airo_thread(void *data) {
 			airo_end_xmit11(dev);
 		else if (test_bit(JOB_STATS, &ai->flags))
 			airo_read_stats(ai);
+		else if (test_bit(JOB_WSTATS, &ai->flags))
+			airo_read_wireless_stats(ai);
 		else if (test_bit(JOB_PROMISC, &ai->flags))
 			airo_set_promisc(ai);
 #ifdef MICSUPPORT
@@ -3722,7 +3726,7 @@ static int proc_status_open( struct inode *inode, struct file *file ) {
 		return -ENOMEM;
 	}
 
-	readStatusRid(apriv, &status_rid);
+	readStatusRid(apriv, &status_rid, 1);
 	readCapabilityRid(apriv, &cap_rid);
 
         i = sprintf(data->rbuffer, "Status: %s%s%s%s%s%s%s%s%s\n",
@@ -4766,7 +4770,7 @@ static int airo_get_freq(struct net_device *dev,
 	if ((local->config.opmode & 0xFF) == MODE_STA_ESS)
 		status_rid.channel = local->config.channelSet;
 	else
-		readStatusRid(local, &status_rid);
+		readStatusRid(local, &status_rid, 1);
 
 #ifdef WEXT_USECHANNELS
 	fwrq->m = ((int)status_rid.channel) + 1;
@@ -4841,7 +4845,7 @@ static int airo_get_essid(struct net_device *dev,
 	struct airo_info *local = dev->priv;
 	StatusRid status_rid;		/* Card status info */
 
-	readStatusRid(local, &status_rid);
+	readStatusRid(local, &status_rid, 1);
 
 	/* Note : if dwrq->flags != 0, we should
 	 * get the relevant SSID from the SSID list... */
@@ -4905,7 +4909,7 @@ static int airo_get_wap(struct net_device *dev,
 	struct airo_info *local = dev->priv;
 	StatusRid status_rid;		/* Card status info */
 
-	readStatusRid(local, &status_rid);
+	readStatusRid(local, &status_rid, 1);
 
 	/* Tentative. This seems to work, wow, I'm lucky !!! */
 	memcpy(awrq->sa_data, status_rid.bssid[0], ETH_ALEN);
@@ -5038,7 +5042,7 @@ static int airo_get_rate(struct net_device *dev,
 	struct airo_info *local = dev->priv;
 	StatusRid status_rid;		/* Card status info */
 
-	readStatusRid(local, &status_rid);
+	readStatusRid(local, &status_rid, 1);
 
 	vwrq->value = status_rid.currentXmitRate * 500000;
 	/* If more than one rate, set auto */
@@ -5754,7 +5758,7 @@ static int airo_get_aplist(struct net_device *dev,
 	}
 	if (!i) {
 		StatusRid status_rid;		/* Card status info */
-		readStatusRid(local, &status_rid);
+		readStatusRid(local, &status_rid, 1);
 		for (i = 0;
 		     i < min(IW_MAX_AP, 4) &&
 			     (status_rid.bssid[i][0]
@@ -6561,16 +6565,17 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  *
  * Jean
  */
-struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
+static void airo_read_wireless_stats(struct airo_info *local)
 {
-	struct airo_info *local = dev->priv;
 	StatusRid status_rid;
 	StatsRid stats_rid;
 	u32 *vals = stats_rid.vals;
 
 	/* Get stats out of the card */
-	readStatusRid(local, &status_rid);
-	readStatsRid(local, &stats_rid, RID_STATS, 1);
+	clear_bit(JOB_WSTATS, &local->flags);
+	readStatusRid(local, &status_rid, 0);
+	readStatsRid(local, &stats_rid, RID_STATS, 0);
+	up(&local->sem);
 
 	/* The status */
 	local->wstats.status = status_rid.mode;
@@ -6597,6 +6602,19 @@ struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
 	local->wstats.discard.retries = vals[10];
 	local->wstats.discard.misc = vals[1] + vals[32];
 	local->wstats.miss.beacon = vals[34];
+}
+
+struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
+{
+	struct airo_info *local =  dev->priv;
+
+	/* Get stats out of the card if available */
+	if (down_trylock(&local->sem) != 0) {
+		set_bit(JOB_WSTATS, &local->flags);
+		wake_up_interruptible(&local->thr_wait);
+	} else
+		airo_read_wireless_stats(local);
+
 	return &local->wstats;
 }
 #endif /* WIRELESS_EXT */
