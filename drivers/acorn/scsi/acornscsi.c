@@ -2935,9 +2935,9 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
 	}
     }
 
-    p += sprintf(p, "\nAttached devices:%s\n", instance->host_queue ? "" : " none");
+    p += sprintf(p, "\nAttached devices:\n");
 
-    for (scd = instance->host_queue; scd; scd = scd->next) {
+    list_for_each_entry(scd, &instance->my_devices, siblings) {
 	int len;
 
 	proc_print_scsidevice(scd, p, &len, 0);
@@ -3051,7 +3051,7 @@ acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	acornscsi_resetcard(ashost);
 
-	ret = scsi_add_host(host);
+	ret = scsi_add_host(host, &ec->dev);
 	if (ret == 0)
 		goto out;
 

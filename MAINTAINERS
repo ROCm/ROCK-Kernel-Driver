@@ -261,11 +261,11 @@ M:	ralf@linux-mips.org
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
-BAYCOM/HDLCDRV/SOUNDMODEM DRIVERS FOR AX.25
+BAYCOM/HDLCDRV DRIVERS FOR AX.25
 P:	Thomas Sailer
-M:	sailer@ife.ee.ethz.ch
+M:	t.sailer@alumni.ethz.ch
 L:	linux-hams@vger.kernel.org
-W:	http://www.ife.ee.ethz.ch/~sailer/ham/ham.html
+W:	http://www.baycom.org/~tom/ham/ham.html
 S:	Maintained
 
 BERKSHIRE PRODUCTS PC WATCHDOG DRIVER
