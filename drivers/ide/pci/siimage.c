@@ -955,6 +955,22 @@ static int is_dev_seagate_sata(ide_drive_t *drive)
 }
 
 /**
+ *	siimage_fixup		-	post probe fixups
+ *	@hwif: interface to fix up
+ *
+ *	Called after drive probe we use this to decide whether the
+ *	Seagate fixup must be applied. This used to be in init_iops but
+ *	that can occur before we know what drives are present.
+ */
+
+static void __devinit siimage_fixup(ide_hwif_t *hwif)
+{
+	/* Try and raise the rqsize */
+	if (!is_sata(hwif) || !is_dev_seagate_sata(&hwif->drives[0]))
+		hwif->rqsize = 128;
+}
+
+/**
  *	init_iops_siimage	-	set up iops
  *	@hwif: interface to set up
  *
@@ -974,9 +990,8 @@ static void __devinit init_iops_siimage(ide_hwif_t *hwif)
 	
 	hwif->hwif_data = NULL;
 
-	hwif->rqsize = 128;
-	if (is_sata(hwif) && is_dev_seagate_sata(&hwif->drives[0]))
-		hwif->rqsize = 15;
+	/* Pessimal until we finish probing */
+	hwif->rqsize = 15;
 
 	if (pci_get_drvdata(dev) == NULL)
 		return;
@@ -1064,6 +1079,7 @@ static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 		.init_chipset	= init_chipset_siimage,	\
 		.init_iops	= init_iops_siimage,	\
 		.init_hwif	= init_hwif_siimage,	\
+		.fixup		= siimage_fixup,	\
 		.channels	= 2,			\
 		.autodma	= AUTODMA,		\
 		.bootable	= ON_BOARD,		\
