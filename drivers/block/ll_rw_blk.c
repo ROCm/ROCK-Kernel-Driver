@@ -1576,10 +1576,8 @@ get_rq:
 		/*
 		 * READA bit set
 		 */
-		if (bio->bi_rw & (1 << BIO_RW_AHEAD)) {
-			set_bit(BIO_RW_BLOCK, &bio->bi_flags);
+		if (bio_flagged(bio, BIO_RW_AHEAD))
 			goto end_io;
-		}
 
 		freereq = get_request_wait(q, rw);
 		spin_lock_irq(q->queue_lock);
@@ -1616,7 +1614,7 @@ out:
 	return 0;
 
 end_io:
-	bio->bi_end_io(bio);
+	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
 	return 0;
 }
 
@@ -1705,7 +1703,7 @@ void generic_make_request(struct bio *bio)
 			       bdevname(bio->bi_bdev),
 			       (long long) bio->bi_sector);
 end_io:
-			bio->bi_end_io(bio);
+			bio_endio(bio, 0, -EIO);
 			break;
 		}
 
@@ -1825,6 +1823,7 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 	total_nsect = 0;
 	while ((bio = req->bio)) {
 		nsect = bio_iovec(bio)->bv_len >> 9;
+		total_nsect += nsect;
 
 		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
@@ -1834,38 +1833,31 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 		if (unlikely(nsect > nr_sectors)) {
 			int partial = nr_sectors << 9;
 
-			bio->bi_size -= partial;
 			bio_iovec(bio)->bv_offset += partial;
 			bio_iovec(bio)->bv_len -= partial;
-			blk_recalc_rq_sectors(req, nr_sectors);
+			blk_recalc_rq_sectors(req, total_nsect);
 			blk_recalc_rq_segments(req);
+			bio_endio(bio, partial, !uptodate ? -EIO : 0);
 			return 1;
 		}
 
 		/*
-		 * account transfer
+		 * if bio->bi_end_io returns 0, this bio is done. move on
 		 */
-		bio->bi_size -= bio_iovec(bio)->bv_len;
-		bio->bi_idx++;
-
-		nr_sectors -= nsect;
-		total_nsect += nsect;
-
-		if (!bio->bi_size) {
-			req->bio = bio->bi_next;
-
-			bio_endio(bio, uptodate);
-
-			total_nsect = 0;
+		req->bio = bio->bi_next;
+		if (bio_endio(bio, nsect << 9, !uptodate ? -EIO : 0)) {
+			bio->bi_idx++;
+			req->bio = bio;
 		}
 
-		if ((bio = req->bio)) {
-			blk_recalc_rq_sectors(req, nsect);
+		nr_sectors -= nsect;
 
+		if ((bio = req->bio)) {
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
 			if (unlikely(nr_sectors <= 0)) {
+				blk_recalc_rq_sectors(req, total_nsect);
 				blk_recalc_rq_segments(req);
 				return 1;
 			}

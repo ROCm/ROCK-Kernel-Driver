@@ -36,10 +36,13 @@
  * status of that page is hard.  See end_buffer_async_read() for the details.
  * There is no point in duplicating all that complexity.
  */
-static void mpage_end_io_read(struct bio *bio)
+static int mpage_end_io_read(struct bio *bio, unsigned int bytes_done, int err)
 {
 	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct bio_vec *bvec = bio->bi_io_vec + bio->bi_vcnt - 1;
+
+	if (bio->bi_size)
+		return 1;
 
 	do {
 		struct page *page = bvec->bv_page;
@@ -56,12 +59,16 @@ static void mpage_end_io_read(struct bio *bio)
 		unlock_page(page);
 	} while (bvec >= bio->bi_io_vec);
 	bio_put(bio);
+	return 0;
 }
 
-static void mpage_end_io_write(struct bio *bio)
+static int mpage_end_io_write(struct bio *bio, unsigned int bytes_done, int err)
 {
 	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct bio_vec *bvec = bio->bi_io_vec + bio->bi_vcnt - 1;
+
+	if (bio->bi_size)
+		return 1;
 
 	do {
 		struct page *page = bvec->bv_page;
@@ -74,6 +81,7 @@ static void mpage_end_io_write(struct bio *bio)
 		end_page_writeback(page);
 	} while (bvec >= bio->bi_io_vec);
 	bio_put(bio);
+	return 0;
 }
 
 struct bio *mpage_bio_submit(int rw, struct bio *bio)

@@ -51,7 +51,7 @@ struct bio_vec {
 };
 
 struct bio;
-typedef void (bio_end_io_t) (struct bio *);
+typedef int (bio_end_io_t) (struct bio *, unsigned int, int);
 typedef void (bio_destructor_t) (struct bio *);
 
 /*
@@ -161,7 +161,7 @@ struct bio {
 #define BIO_SEG_BOUNDARY(q, b1, b2) \
 	BIOVEC_SEG_BOUNDARY((q), __BVEC_END((b1)), __BVEC_START((b2)))
 
-#define bio_io_error(bio) bio_endio((bio), 0)
+#define bio_io_error(bio, bytes) bio_endio((bio), (bytes), -EIO)
 
 /*
  * drivers should not use the __ version unless they _really_ want to
@@ -194,7 +194,7 @@ struct bio {
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
-extern void bio_endio(struct bio *, int);
+extern int bio_endio(struct bio *, unsigned int, int);
 struct request_queue;
 extern inline int bio_phys_segments(struct request_queue *, struct bio *);
 extern inline int bio_hw_segments(struct request_queue *, struct bio *);

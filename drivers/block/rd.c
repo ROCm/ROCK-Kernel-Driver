@@ -277,11 +277,10 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 	if (rd_blkdev_bio_IO(sbh, minor))
 		goto fail;
 
-	set_bit(BIO_UPTODATE, &sbh->bi_flags);
-	sbh->bi_end_io(sbh);
+	bio_endio(sbh, sbh->bi_size, 0);
 	return 0;
  fail:
-	bio_io_error(sbh);
+	bio_io_error(sbh, sbh->bi_size);
 	return 0;
 } 
 
