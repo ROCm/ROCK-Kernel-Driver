@@ -663,10 +663,11 @@ static void sctp_cmd_delete_tcb(sctp_cmd_seq_t *cmds,
 	struct sock *sk = asoc->base.sk;
 
 	/* If it is a non-temporary association belonging to a TCP-style
-	 * listening socket, do not free it so that accept() can pick it
-	 * up later.
+	 * listening socket that is not closed, do not free it so that accept() 
+	 * can pick it up later.
 	 */ 
-	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING) && (!asoc->temp))
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING) &&
+	    (!asoc->temp) && (sk->sk_shutdown != SHUTDOWN_MASK))
 		return;
 
 	sctp_unhash_established(asoc);
