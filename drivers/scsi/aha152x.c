@@ -1379,8 +1379,6 @@ static int aha152x_release(struct Scsi_Host *shpnt)
  */ 
 static int setup_expected_interrupts(struct Scsi_Host *shpnt)
 {
-	ASSERT_LOCK(&QLOCK,1);
-
 	if(CURRENT_SC) {
 		CURRENT_SC->SCp.phase |= 1 << 16;
 	

@@ -747,9 +747,9 @@ MODULE_LICENSE("GPL");
 #ifdef GDTH_IOCTL_CHRDEV
 /* ioctl interface */
 static struct file_operations gdth_fops = {
-    ioctl:gdth_ioctl,
-    open:gdth_open,
-    release:gdth_close,
+	.ioctl		= gdth_ioctl,
+	.open		= gdth_open,
+	.release	= gdth_close,
 };
 #endif
 

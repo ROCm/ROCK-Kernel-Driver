@@ -376,15 +376,15 @@ static void print_inquiry(unsigned char *inq_result)
 }
 
 /**
- * scsi_alloc_sdev - allocate and setup a Scsi_Device
+ * scsi_alloc_sdev - allocate and setup a scsi_Device
  *
  * Description:
- *     Allocate, initialize for io, and return a pointer to a Scsi_Device.
- *     Stores the @shost, @channel, @id, and @lun in the Scsi_Device, and
- *     adds Scsi_Device to the appropriate list.
+ *     Allocate, initialize for io, and return a pointer to a scsi_Device.
+ *     Stores the @shost, @channel, @id, and @lun in the scsi_Device, and
+ *     adds scsi_Device to the appropriate list.
  *
  * Return value:
- *     Scsi_Device pointer, or NULL on failure.
+ *     scsi_Device pointer, or NULL on failure.
  **/
 static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	       	uint channel, uint id, uint lun)
@@ -465,9 +465,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	return sdev;
 
 out_free_queue:
-	if (sdev->request_queue)
-		scsi_free_queue(sdev->request_queue);
-
+	scsi_free_queue(sdev->request_queue);
 out_free_dev:
 	kfree(sdev);
 out:
@@ -476,8 +474,8 @@ out:
 }
 
 /**
- * scsi_free_sdev - cleanup and free a Scsi_Device
- * @sdev:	cleanup and free this Scsi_Device
+ * scsi_free_sdev - cleanup and free a scsi_device
+ * @sdev:	cleanup and free this scsi_device
  *
  * Description:
  *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
@@ -499,8 +497,7 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 	spin_lock_irqsave(sdev->host->host_lock, flags);
 	list_del(&sdev->starved_entry);
 	if (sdev->single_lun) {
-		sdev->sdev_target->starget_refcnt--;
-		if (sdev->sdev_target->starget_refcnt == 0)
+		if (--sdev->sdev_target->starget_refcnt == 0)
 			kfree(sdev->sdev_target);
 	}
 	spin_unlock_irqrestore(sdev->host->host_lock, flags);
@@ -1004,6 +1001,7 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int possible_inq_resp_len;
 
+ repeat_inquiry:
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: INQUIRY to host %d"
 			" channel %d id %d lun %d\n", sdev->host->host_no,
 			sdev->channel, sdev->id, sdev->lun));
@@ -1070,8 +1068,14 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 2nd INQUIRY"
 				" %s with code 0x%x\n", sreq->sr_result ?
 				"failed" : "successful", sreq->sr_result));
-		if (sreq->sr_result)
-			return;
+		if (sreq->sr_result) {
+			/* if the longer inquiry has failed, flag the device
+			 * as only accepting 36 byte inquiries and retry the
+			 * 36 byte inquiry */
+			printk(KERN_INFO "scsi scan: %d byte inquiry failed with code %d.  Consider BLIST_INQUIRY_36 for this device\n", sreq->sr_result);
+			*bflags |= BLIST_INQUIRY_36;
+			goto repeat_inquiry;
+		}
 
 		/*
 		 * The INQUIRY can change, this means the length can change.
@@ -1482,25 +1486,25 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 
 #ifdef CONFIG_SCSI_REPORT_LUNS
 /**
- * scsilun_to_int: convert a ScsiLun to an int
- * @scsilun:	ScsiLun to be converted.
+ * scsilun_to_int: convert a scsi_lun to an int
+ * @scsilun:	struct scsi_lun to be converted.
  *
  * Description:
- *     Convert @scsilun from a ScsiLun to a four byte host byte-ordered
+ *     Convert @scsilun from a struct scsi_lun to a four byte host byte-ordered
  *     integer, and return the result. The caller must check for
  *     truncation before using this function.
  *
  * Notes:
- *     The ScsiLun is assumed to be four levels, with each level
+ *     The struct scsi_lun is assumed to be four levels, with each level
  *     effectively containing a SCSI byte-ordered (big endian) short; the
  *     addressing bits of each level are ignored (the highest two bits).
  *     For a description of the LUN format, post SCSI-3 see the SCSI
  *     Architecture Model, for SCSI-3 see the SCSI Controller Commands.
  *
- *     Given a ScsiLun of: 0a 04 0b 03 00 00 00 00, this function returns
+ *     Given a struct scsi_lun of: 0a 04 0b 03 00 00 00 00, this function returns
  *     the integer: 0x0b030a04
  **/
-static int scsilun_to_int(ScsiLun *scsilun)
+static int scsilun_to_int(struct scsi_lun *scsilun)
 {
 	int i;
 	unsigned int lun;
@@ -1511,7 +1515,6 @@ static int scsilun_to_int(ScsiLun *scsilun)
 			      scsilun->scsi_lun[i + 1]) << (i * 8));
 	return lun;
 }
-#endif
 
 /**
  * scsi_report_lun_scan - Scan using SCSI REPORT LUN results
@@ -1528,18 +1531,16 @@ static int scsilun_to_int(ScsiLun *scsilun)
  *     0: scan completed (or no memory, so further scanning is futile)
  *     1: no report lun scan, or not configured
  **/
-static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
+static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags)
 {
-#ifdef CONFIG_SCSI_REPORT_LUNS
-
 	char devname[64];
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	unsigned int length;
 	unsigned int lun;
 	unsigned int num_luns;
 	unsigned int retries;
-	ScsiLun *fcp_cur_lun, *lun_data;
-	Scsi_Request *sreq;
+	struct scsi_lun *lunp, *lun_data;
+	struct scsi_request *sreq;
 	char *data;
 
 	/*
@@ -1551,15 +1552,14 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 		return 0;
 
 	sreq = scsi_allocate_request(sdev);
-	if (sreq == NULL) {
-		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		return 0;
-	}
+	if (!sreq)
+		goto out;
 
-	sprintf(devname, "host %d channel %d id %d", sdev->host->host_no,
-		sdev->channel, sdev->id);
+	sprintf(devname, "host %d channel %d id %d",
+		sdev->host->host_no, sdev->channel, sdev->id);
+
 	/*
-	 * Allocate enough to hold the header (the same size as one ScsiLun)
+	 * Allocate enough to hold the header (the same size as one scsi_lun)
 	 * plus the max number of luns we are requesting.
 	 *
 	 * Reallocating and trying again (with the exact amount we need)
@@ -1568,24 +1568,19 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 	 * kmalloc - we don't want a kmalloc() failure of a huge value to
 	 * prevent us from finding any LUNs on this target.
 	 */
-	length = (max_scsi_report_luns + 1) * sizeof(ScsiLun);
-	lun_data = (ScsiLun *) kmalloc(length, GFP_ATOMIC |
-					   (sdev->host->unchecked_isa_dma ?
-					    GFP_DMA : 0));
-	if (lun_data == NULL) {
-		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		scsi_release_request(sreq);
-		/*
-		 * We are out of memory, don't try scanning any further.
-		 */
-		return 0;
-	}
+	length = (max_scsi_report_luns + 1) * sizeof(struct scsi_lun);
+	lun_data = kmalloc(length, GFP_ATOMIC |
+			   (sdev->host->unchecked_isa_dma ? __GFP_DMA : 0));
+	if (!lun_data)
+		goto out_release_request;
 
 	scsi_cmd[0] = REPORT_LUNS;
+
 	/*
 	 * bytes 1 - 5: reserved, set to zero.
 	 */
 	memset(&scsi_cmd[1], 0, 5);
+
 	/*
 	 * bytes 6 - 9: length of the command.
 	 */
@@ -1609,19 +1604,18 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 	 * should come through as a check condition, and will not generate
 	 * a retry.
 	 */
-	retries = 0;
-	while (retries++ < 3) {
+	for (retries = 0; retries < 3; retries++) {
 		SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: Sending"
 				" REPORT LUNS to %s (try %d)\n", devname,
 				retries));
-		scsi_wait_req(sreq, (void *) scsi_cmd, (void *) lun_data,
-			      length, SCSI_TIMEOUT + 4 * HZ, 3);
+		scsi_wait_req(sreq, scsi_cmd, lun_data, length,
+				SCSI_TIMEOUT + 4*HZ, 3);
 		SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: REPORT LUNS"
 				" %s (try %d) result 0x%x\n", sreq->sr_result
 				?  "failed" : "successful", retries,
 				sreq->sr_result));
-		if (sreq->sr_result == 0
-		    || sreq->sr_sense_buffer[2] != UNIT_ATTENTION)
+		if (sreq->sr_result == 0 ||
+		    sreq->sr_sense_buffer[2] != UNIT_ATTENTION)
 			break;
 	}
 
@@ -1629,7 +1623,7 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 		/*
 		 * The device probably does not support a REPORT LUN command
 		 */
-		kfree((char *) lun_data);
+		kfree(lun_data);
 		scsi_release_request(sreq);
 		return 1;
 	}
@@ -1641,31 +1635,32 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 	data = (char *) lun_data->scsi_lun;
 	length = ((data[0] << 24) | (data[1] << 16) |
 		  (data[2] << 8) | (data[3] << 0));
-	if ((length / sizeof(ScsiLun)) > max_scsi_report_luns) {
+
+	num_luns = (length / sizeof(struct scsi_lun));
+	if (num_luns > max_scsi_report_luns) {
 		printk(KERN_WARNING "scsi: On %s only %d (max_scsi_report_luns)"
 		       " of %d luns reported, try increasing"
 		       " max_scsi_report_luns.\n", devname,
-		       max_scsi_report_luns, length / sizeof(ScsiLun));
+		       max_scsi_report_luns, num_luns);
 		num_luns = max_scsi_report_luns;
-	} else
-		num_luns = (length / sizeof(ScsiLun));
+	}
 
 	SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: REPORT LUN scan of"
 			" host %d channel %d id %d\n", sdev->host->host_no,
 			sdev->channel, sdev->id));
+
 	/*
 	 * Scan the luns in lun_data. The entry at offset 0 is really
 	 * the header, so start at 1 and go up to and including num_luns.
 	 */
-	for (fcp_cur_lun = &lun_data[1];
-	     fcp_cur_lun <= &lun_data[num_luns]; fcp_cur_lun++) {
-		lun = scsilun_to_int(fcp_cur_lun);
+	for (lunp = &lun_data[1]; lunp <= &lun_data[num_luns]; lunp++) {
+		lun = scsilun_to_int(lunp);
+
 		/*
-		 * Check if the unused part of fcp_cur_lun is non-zero,
-		 * and so does not fit in lun.
+		 * Check if the unused part of lunp is non-zero, and so
+		 * does not fit in lun.
 		 */
-		if (memcmp(&fcp_cur_lun->scsi_lun[sizeof(lun)],
-			   "\0\0\0\0", 4) != 0) {
+		if (memcmp(&lunp->scsi_lun[sizeof(lun)], "\0\0\0\0", 4)) {
 			int i;
 
 			/*
@@ -1674,8 +1669,8 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 			 * integer LUN value.
 			 */
 			printk(KERN_WARNING "scsi: %s lun 0x", devname);
-			data = (char *) fcp_cur_lun->scsi_lun;
-			for (i = 0; i < sizeof(ScsiLun); i++)
+			data = (char *)lunp->scsi_lun;
+			for (i = 0; i < sizeof(struct scsi_lun); i++)
 				printk("%02x", data[i]);
 			printk(" has a LUN larger than currently supported.\n");
 		} else if (lun == 0) {
@@ -1703,14 +1698,21 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, int bflags)
 		}
 	}
 
-	kfree((char *) lun_data);
+	kfree(lun_data);
 	return 0;
 
-#else
-	return 1;
-#endif	/* CONFIG_SCSI_REPORT_LUNS */
-
+ out_release_request:
+	scsi_release_request(sreq);
+ out:
+	/*
+	 * We are out of memory, don't try scanning any further.
+	 */
+	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+	return 0;
 }
+#else
+# define scsi_report_lun_scan(sdev, blags)	(1)
+#endif	/* CONFIG_SCSI_REPORT_LUNS */
 
 struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 				    uint channel, uint id, uint lun)

@@ -133,6 +133,7 @@
 #include <linux/blk.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -1432,7 +1433,7 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 	return 1;
 }
 
-void
+irqreturn_t
 NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct Scsi_Host *host = (struct Scsi_Host *)dev_id;
@@ -1442,6 +1443,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	__u32 resume_offset = 0;
 	__u8 pun = 0xff, lun = 0xff;
 	unsigned long flags;
+	irqreturn_t retval = IRQ_NONE;
 
 	/* Use the host lock to serialise acess to the 53c700
 	 * hardware.  Note: In future, we may need to take the queue
@@ -1456,6 +1458,8 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 		__u32 dsp;
 		Scsi_Cmnd *SCp = hostdata->cmd;
 		enum NCR_700_Host_State state;
+
+		retval = IRQ_HANDLED;
 
 		state = hostdata->state;
 		SCp = hostdata->cmd;
@@ -1697,6 +1701,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	}
  out_unlock:
 	spin_unlock_irqrestore(host->host_lock, flags);
+	return retval;
 }
 
 /* FIXME: Need to put some proc information in and plumb it
