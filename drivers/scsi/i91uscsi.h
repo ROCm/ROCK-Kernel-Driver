@@ -53,6 +53,7 @@
  *
  **************************************************************************/
 
+
 #include <linux/config.h>
 #include <linux/types.h>
 
@@ -67,21 +68,10 @@
 #define UDWORD  unsigned long
 #define U32     u32
 
-#ifndef FAILURE
-#define FAILURE  (-1)
-#endif
-
 #define TOTAL_SG_ENTRY		32
 #define MAX_SUPPORTED_ADAPTERS  8
 #define MAX_OFFSET		15
 #define MAX_TARGETS		16
-
-#define INI_VENDOR_ID   0x1101	/* Initio's PCI vendor ID       */
-#define I950_DEVICE_ID	0x9500	/* Initio's inic-950 product ID   */
-#define I940_DEVICE_ID	0x9400	/* Initio's inic-940 product ID   */
-#define I935_DEVICE_ID	0x9401	/* Initio's inic-935 product ID   */
-
-#define	_I91USCSI_H
 
 typedef struct {
 	unsigned short base;
@@ -423,7 +413,7 @@ typedef struct Scsi_Ctrl_Blk {
 	U32 SCB_SGPAddr;	/*44 SG List/Sense Buf phy. Addr. */
 	U32 SCB_SensePtr;	/*48 Sense data pointer */
 	void (*SCB_Post) (BYTE *, BYTE *);	/*4C POST routine */
-	unsigned char *SCB_Srb;	/*50 SRB Pointer */
+	struct scsi_cmnd *SCB_Srb;	/*50 SRB Pointer */
 	SG SCB_SGList[TOTAL_SG_ENTRY];	/*54 Start of SG list */
 } SCB;
 
@@ -472,7 +462,7 @@ typedef struct Scsi_Ctrl_Blk {
 /* Error Codes for SCB_TaStat */
 #define TARGET_CHKCOND  0x02
 #define TARGET_BUSY     0x08
-#define QUEUE_FULL	0x28
+#define INI_QUEUE_FULL	0x28
 
 /* SCSI MESSAGE */
 #define MSG_COMP        0x00
@@ -586,11 +576,9 @@ typedef struct Ha_Ctrl_Struc {
 	UBYTE HCS_MaxTags[16];	/* 58 */
 	UBYTE HCS_ActTags[16];	/* 68 */
 	TCS HCS_Tcs[MAX_TARGETS];	/* 78 */
-	ULONG pSRB_head;	/* SRB save queue header     */
-	ULONG pSRB_tail;	/* SRB save queue tail       */
 	spinlock_t HCS_AvailLock;
 	spinlock_t HCS_SemaphLock;
-	spinlock_t pSRB_lock;	/* SRB queue lock            */
+	struct pci_dev *pci_dev;
 } HCS;
 
 /* Bit Definition for HCB_Config */
@@ -694,117 +682,6 @@ typedef struct _NVRAM {
 #define DISC_ALLOW              0xC0	/* Disconnect is allowed        */
 #define SCSICMD_RequestSense    0x03
 
-
-/*----------------------------------------------------------------------*/
-/*                              PCI                                     */
-/*----------------------------------------------------------------------*/
-#define PCI_FUNCTION_ID         0xB1
-#define PCI_BIOS_PRESENT        0x01
-#define FIND_PCI_DEVICE         0x02
-#define FIND_PCI_CLASS_CODE     0x03
-#define GENERATE_SPECIAL_CYCLE  0x06
-#define READ_CONFIG_BYTE        0x08
-#define READ_CONFIG_WORD        0x09
-#define READ_CONFIG_DWORD       0x0A
-#define WRITE_CONFIG_BYTE       0x0B
-#define WRITE_CONFIG_WORD       0x0C
-#define WRITE_CONFIG_DWORD      0x0D
-
-#define SUCCESSFUL              0x00
-#define FUNC_NOT_SUPPORTED      0x81
-#define BAD_VENDOR_ID           0x83	/* Bad vendor ID                */
-#define DEVICE_NOT_FOUND        0x86	/* PCI device not found         */
-#define BAD_REGISTER_NUMBER     0x87
-
-#define MAX_PCI_DEVICES         21	/* Maximum devices supportted   */
-
-#define MAX_PCI_CHANL           4
-
-typedef struct _BIOS32_ENTRY_STRUCTURE {
-	DWORD Signatures;	/* Should be "_32_"             */
-	DWORD BIOS32Entry;	/* 32-bit physical address      */
-	BYTE Revision;		/* Revision level, should be 0  */
-	BYTE Length;		/* Multiply of 16, should be 1  */
-	BYTE CheckSum;		/* Checksum of whole structure  */
-	BYTE Reserved[5];	/* Reserved                     */
-} BIOS32_ENTRY_STRUCTURE, *PBIOS32_ENTRY_STRUCTURE;
-
-typedef struct {
-	union {
-		unsigned int eax;
-		struct {
-			unsigned short ax;
-		} word;
-		struct {
-			unsigned char al;
-			unsigned char ah;
-		} byte;
-	} eax;
-	union {
-		unsigned int ebx;
-		struct {
-			unsigned short bx;
-		} word;
-		struct {
-			unsigned char bl;
-			unsigned char bh;
-		} byte;
-	} ebx;
-	union {
-		unsigned int ecx;
-		struct {
-			unsigned short cx;
-		} word;
-		struct {
-			unsigned char cl;
-			unsigned char ch;
-		} byte;
-	} ecx;
-	union {
-		unsigned int edx;
-		struct {
-			unsigned short dx;
-		} word;
-		struct {
-			unsigned char dl;
-			unsigned char dh;
-		} byte;
-	} edx;
-	union {
-		unsigned int edi;
-		struct {
-			unsigned short di;
-		} word;
-	} edi;
-	union {
-		unsigned int esi;
-		struct {
-			unsigned short si;
-		} word;
-	} esi;
-} REGS;
-
-typedef union {			/* Union define for mechanism 1 */
-	struct {
-		unsigned char RegNum;
-		unsigned char FcnNum:3;
-		unsigned char DeviceNum:5;
-		unsigned char BusNum;
-		unsigned char Reserved:7;
-		unsigned char Enable:1;
-	} sConfigAdr;
-	unsigned long lConfigAdr;
-} CONFIG_ADR;
-
-typedef union {			/* Union define for mechanism 2 */
-	struct {
-		unsigned char RegNum;
-		unsigned char DeviceNum;
-		unsigned short Reserved;
-	} sHostAdr;
-	unsigned long lHostAdr;
-} HOST_ADR;
-
 typedef struct _HCSinfo {
 	ULONG base;
 	UCHAR vec;
@@ -841,3 +718,22 @@ typedef struct _HCSinfo {
 #define SCSI_RESET_BUS_RESET 0x100
 #define SCSI_RESET_HOST_RESET 0x200
 #define SCSI_RESET_ACTION   0xff
+
+extern void init_i91uAdapter_table(void);
+extern int Addi91u_into_Adapter_table(WORD, WORD, BYTE, BYTE, BYTE);
+extern int tul_ReturnNumberOfAdapters(void);
+extern void get_tulipPCIConfig(HCS * pHCB, int iChannel_index);
+extern int init_tulip(HCS * pHCB, SCB * pSCB, int tul_num_scb, BYTE * pbBiosAdr, int reset_time);
+extern SCB *tul_alloc_scb(HCS * pHCB);
+extern int tul_abort_srb(HCS * pHCB, struct scsi_cmnd * pSRB);
+extern void tul_exec_scb(HCS * pHCB, SCB * pSCB);
+extern void tul_release_scb(HCS * pHCB, SCB * pSCB);
+extern void tul_stop_bm(HCS * pHCB);
+extern int tul_reset_scsi(HCS * pCurHcb, int seconds);
+extern int tul_isr(HCS * pHCB);
+extern int tul_reset(HCS * pHCB, struct scsi_cmnd * pSRB, unsigned char target);
+extern int tul_reset_scsi_bus(HCS * pCurHcb);
+extern int tul_device_reset(HCS * pCurHcb, struct scsi_cmnd *pSrb,
+		unsigned int target, unsigned int ResetFlags);
+				/* ---- EXTERNAL VARIABLES ---- */
+extern HCS tul_hcs[];

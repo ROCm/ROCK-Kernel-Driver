@@ -1,5 +1,4 @@
 /**************************************************************************
- * Initio 9100 device driver for Linux.
  *
  * Copyright (c) 1994-1998 Initio Corporation
  * Copyright (c) 1998 Bas Vermeulen <bvermeul@blackstar.xs4all.nl>
@@ -83,6 +82,8 @@
 #include <linux/delay.h>
 #include <linux/blkdev.h>
 #include <asm/io.h>
+
+#include <scsi/scsi.h>
 
 #include "i91uscsi.h"
 
@@ -499,7 +500,7 @@ int Addi91u_into_Adapter_table(WORD wBIOS, WORD wBASE, BYTE bInterrupt,
 		if (i91u_adpt[i].ADPT_BIOS == wBIOS) {
 			if (i91u_adpt[i].ADPT_BASE == wBASE) {
 				if (i91u_adpt[i].ADPT_Bus != 0xFF)
-					return (FAILURE);
+					return 1;
 			} else if (i91u_adpt[i].ADPT_BASE < wBASE)
 					continue;
 		}
@@ -515,9 +516,9 @@ int Addi91u_into_Adapter_table(WORD wBIOS, WORD wBASE, BYTE bInterrupt,
 		i91u_adpt[i].ADPT_BIOS = wBIOS;
 		i91u_adpt[i].ADPT_Bus = bBus;
 		i91u_adpt[i].ADPT_Device = bDevice;
-		return (SUCCESSFUL);
+		return 0;
 	}
-	return (FAILURE);
+	return 1;
 }
 
 void init_i91uAdapter_table(void)
@@ -977,7 +978,7 @@ SCB *tul_find_done_scb(HCS * pCurHcb)
 }
 
 /***************************************************************************/
-int tul_abort_srb(HCS * pCurHcb, ULONG srbp)
+int tul_abort_srb(HCS * pCurHcb, struct scsi_cmnd *srbp)
 {
 	ULONG flags;
 	SCB *pTmpScb, *pPrevScb;
@@ -1004,7 +1005,7 @@ int tul_abort_srb(HCS * pCurHcb, ULONG srbp)
 	pPrevScb = pTmpScb = pCurHcb->HCS_FirstPend;	/* Check Pend queue */
 	while (pTmpScb != NULL) {
 		/* 07/27/98 */
-		if (pTmpScb->SCB_Srb == (unsigned char *) srbp) {
+		if (pTmpScb->SCB_Srb == srbp) {
 			if (pTmpScb == pCurHcb->HCS_ActScb) {
 				spin_unlock_irqrestore(&(pCurHcb->HCS_SemaphLock), flags);
 				return SCSI_ABORT_BUSY;
@@ -1030,7 +1031,7 @@ int tul_abort_srb(HCS * pCurHcb, ULONG srbp)
 	pPrevScb = pTmpScb = pCurHcb->HCS_FirstBusy;	/* Check Busy queue */
 	while (pTmpScb != NULL) {
 
-		if (pTmpScb->SCB_Srb == (unsigned char *) srbp) {
+		if (pTmpScb->SCB_Srb == srbp) {
 
 			if (pTmpScb == pCurHcb->HCS_ActScb) {
 				spin_unlock_irqrestore(&(pCurHcb->HCS_SemaphLock), flags);
@@ -1087,7 +1088,8 @@ int tul_bad_seq(HCS * pCurHcb)
 }
 
 /************************************************************************/
-int tul_device_reset(HCS * pCurHcb, ULONG pSrb, unsigned int target, unsigned int ResetFlags)
+int tul_device_reset(HCS * pCurHcb, struct scsi_cmnd *pSrb,
+		unsigned int target, unsigned int ResetFlags)
 {
 	ULONG flags;
 	SCB *pScb;
@@ -1114,7 +1116,7 @@ int tul_device_reset(HCS * pCurHcb, ULONG pSrb, unsigned int target, unsigned in
 		}
 		pScb = pCurHcb->HCS_FirstBusy;	/* Check Busy queue */
 		while (pScb != NULL) {
-			if (pScb->SCB_Srb == (unsigned char *) pSrb)
+			if (pScb->SCB_Srb == pSrb)
 				break;
 			pScb = pScb->SCB_NxtScb;
 		}
@@ -1136,7 +1138,7 @@ int tul_device_reset(HCS * pCurHcb, ULONG pSrb, unsigned int target, unsigned in
 
 	pScb->SCB_Srb = 0;
 	if (ResetFlags & SCSI_RESET_SYNCHRONOUS) {
-		pScb->SCB_Srb = (unsigned char *) pSrb;
+		pScb->SCB_Srb = pSrb;
 	}
 	tul_push_pend_scb(pCurHcb, pScb);	/* push this SCB to Pending queue */
 
@@ -1251,7 +1253,7 @@ int tulip_main(HCS * pCurHcb)
 		tulip_scsi(pCurHcb);	/* Call tulip_scsi              */
 
 		while ((pCurScb = tul_find_done_scb(pCurHcb)) != NULL) {	/* find done entry */
-			if (pCurScb->SCB_TaStat == QUEUE_FULL) {
+			if (pCurScb->SCB_TaStat == INI_QUEUE_FULL) {
 				pCurHcb->HCS_MaxTags[pCurScb->SCB_Target] =
 				    pCurHcb->HCS_ActTags[pCurScb->SCB_Target] - 1;
 				pCurScb->SCB_TaStat = 0;
@@ -1409,11 +1411,7 @@ void tulip_scsi(HCS * pCurHcb)
 			}
 		}
 	} else if (pCurScb->SCB_Opcode == AbortCmd) {
-		ULONG srbp;
-
-		srbp = (ULONG) pCurScb->SCB_Srb;
-/* 08/03/98 */
-		if (tul_abort_srb(pCurHcb, srbp) != 0) {
+		if (tul_abort_srb(pCurHcb, pCurScb->SCB_Srb) != 0) {
 
 
 			tul_unlink_pend_scb(pCurHcb, pCurScb);

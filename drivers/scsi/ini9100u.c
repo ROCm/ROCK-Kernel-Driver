@@ -110,12 +110,6 @@
  *		- Re-add reset_bus support
  **************************************************************************/
 
-#define CVT_LINUX_VERSION(V,P,S)        (V * 65536 + P * 256 + S)
-
-#ifndef LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif
-
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
@@ -132,45 +126,39 @@
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-
 #include <asm/io.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
-#include "ini9100u.h"
+#include <scsi/scsi_tcq.h>
+
+#include "i91uscsi.h"
+
+#define SENSE_SIZE		14
+
+#define i91u_MAXQUEUE		2
+#define i91u_REVID "Initio INI-9X00U/UW SCSI device driver; Revision: 1.04a"
+
+#define INI_VENDOR_ID   0x1101	/* Initio's PCI vendor ID       */
+#define DMX_VENDOR_ID	0x134a	/* Domex's PCI vendor ID	*/
+#define I950_DEVICE_ID	0x9500	/* Initio's inic-950 product ID   */
+#define I940_DEVICE_ID	0x9400	/* Initio's inic-940 product ID   */
+#define I935_DEVICE_ID	0x9401	/* Initio's inic-935 product ID   */
+#define I920_DEVICE_ID	0x0002	/* Initio's other product ID      */
 
 #ifdef DEBUG_i91u
-unsigned int i91u_debug = DEBUG_DEFAULT;
+static unsigned int i91u_debug = DEBUG_DEFAULT;
 #endif
-
-static Scsi_Host_Template driver_template = {
-	.proc_name	= "INI9100U",
-	.name		= i91u_REVID,
-	.detect		= i91u_detect,
-	.release	= i91u_release,
-	.queuecommand	= i91u_queue,
-//	.abort		= i91u_abort,
-//	.reset		= i91u_reset,
-	.eh_bus_reset_handler = i91u_bus_reset,
-	.bios_param	= i91u_biosparam,
-	.can_queue	= 1,
-	.this_id	= 1,
-	.sg_tablesize	= SG_ALL,
-	.cmd_per_lun 	= 1,
-	.use_clustering	= ENABLE_CLUSTERING,
-};
-#include "scsi_module.c"
-
-char *i91uCopyright = "Copyright (C) 1996-98";
-char *i91uInitioName = "by Initio Corporation";
-char *i91uProductName = "INI-9X00U/UW";
-char *i91uVersion = "v1.04a";
 
 #define TULSZ(sz)     (sizeof(sz) / sizeof(sz[0]))
 #define TUL_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
 
-/* set by i91_setup according to the command line */
-static int setup_called = 0;
+typedef struct PCI_ID_Struc {
+	unsigned short vendor_id;
+	unsigned short device_id;
+} PCI_ID;
 
 static int tul_num_ch = 4;	/* Maximum 4 adapters           */
 static int tul_num_scb;
@@ -181,90 +169,18 @@ static SCB *tul_scb;
 static int setup_debug = 0;
 #endif
 
-static char *setup_str = (char *) NULL;
-
-static void i91u_panic(char *msg);
-
 static void i91uSCBPost(BYTE * pHcb, BYTE * pScb);
 
 				/* ---- EXTERNAL FUNCTIONS ---- */
 					/* Get total number of adapters */
-extern void init_i91uAdapter_table(void);
-extern int Addi91u_into_Adapter_table(WORD, WORD, BYTE, BYTE, BYTE);
-extern int tul_ReturnNumberOfAdapters(void);
-extern void get_tulipPCIConfig(HCS * pHCB, int iChannel_index);
-extern int init_tulip(HCS * pHCB, SCB * pSCB, int tul_num_scb, BYTE * pbBiosAdr, int reset_time);
-extern SCB *tul_alloc_scb(HCS * pHCB);
-extern int tul_abort_srb(HCS * pHCB, Scsi_Cmnd * pSRB);
-extern void tul_exec_scb(HCS * pHCB, SCB * pSCB);
-extern void tul_release_scb(HCS * pHCB, SCB * pSCB);
-extern void tul_stop_bm(HCS * pHCB);
-extern int tul_reset_scsi(HCS * pCurHcb, int seconds);
-extern int tul_isr(HCS * pHCB);
-extern int tul_reset(HCS * pHCB, Scsi_Cmnd * pSRB, unsigned char target);
-extern int tul_reset_scsi_bus(HCS * pCurHcb);
-extern int tul_device_reset(HCS * pCurHcb, ULONG pSrb, unsigned int target, unsigned int ResetFlags);
-				/* ---- EXTERNAL VARIABLES ---- */
-extern HCS tul_hcs[];
 
-const PCI_ID i91u_pci_devices[] = {
+static const PCI_ID i91u_pci_devices[] = {
 	{ INI_VENDOR_ID, I950_DEVICE_ID },
 	{ INI_VENDOR_ID, I940_DEVICE_ID },
 	{ INI_VENDOR_ID, I935_DEVICE_ID },
 	{ INI_VENDOR_ID, I920_DEVICE_ID },
 	{ DMX_VENDOR_ID, I920_DEVICE_ID },
 };
-
-/*
- *  queue services:
- */
-/*****************************************************************************
- Function name  : i91uAppendSRBToQueue
- Description    : This function will push current request into save list
- Input          : pSRB  -       Pointer to SCSI request block.
-		  pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : None.
-*****************************************************************************/
-static void i91uAppendSRBToQueue(HCS * pHCB, Scsi_Cmnd * pSRB)
-{
-	ULONG flags;
-	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
-
-	pSRB->host_scribble = NULL;	/* Pointer to next */
-
-	if (pHCB->pSRB_head == NULL)
-		pHCB->pSRB_head = pSRB;
-	else
-		pHCB->pSRB_tail->host_scribble = (char *)pSRB;	/* Pointer to next */
-	pHCB->pSRB_tail = pSRB;
-
-	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
-	return;
-}
-
-/*****************************************************************************
- Function name  : i91uPopSRBFromQueue
- Description    : This function will pop current request from save list
- Input          : pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : pSRB  -       Pointer to SCSI request block.
-*****************************************************************************/
-static Scsi_Cmnd *i91uPopSRBFromQueue(HCS * pHCB)
-{
-	Scsi_Cmnd *pSRB;
-	ULONG flags;
-
-	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
-
-	if ((pSRB = pHCB->pSRB_head) != NULL) {
-		pHCB->pSRB_head = (struct scsi_cmnd *)pHCB->pSRB_head->host_scribble;
-		pSRB->host_scribble = NULL;
-	}
-	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
-
-	return (pSRB);
-}
 
 static irqreturn_t i91u_intr(int irqno, void *dev_id, struct pt_regs *regs)
 {
@@ -277,22 +193,7 @@ static irqreturn_t i91u_intr(int irqno, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-/* called from init/main.c */
-
-void i91u_setup(char *str, int *ints)
-{
-	if (setup_called)
-		i91u_panic("i91u: i91u_setup called twice.\n");
-
-	setup_called = ints[0];
-	setup_str = str;
-
-#ifdef DEBUG_i91u
-	setup_debug = ints[0] >= 1 ? ints[1] : DEBUG_DEFAULT;
-#endif
-}
-
-int tul_NewReturnNumberOfAdapters(void)
+static int tul_NewReturnNumberOfAdapters(void)
 {
 	struct pci_dev *pDev = NULL;	/* Start from none              */
 	int iAdapters = 0;
@@ -331,7 +232,7 @@ int tul_NewReturnNumberOfAdapters(void)
 	return (iAdapters);
 }
 
-int i91u_detect(Scsi_Host_Template * tpnt)
+static int i91u_detect(struct scsi_host_template * tpnt)
 {
 	HCS *pHCB;
 	struct Scsi_Host *hreg;
@@ -340,20 +241,6 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 	ULONG dBiosAdr;
 	BYTE *pbBiosAdr;
 
-	tpnt->proc_name = "INI9100U";
-
-	if (setup_called) {	/* Setup by i91u_setup          */
-		printk("i91u: processing commandline: ");
-
-#ifdef DEBUG_i91u
-		if (setup_called > 1) {
-			printk("\ni91u: %s\n", setup_str);
-			printk("i91u: usage: i91u[=<DEBUG>]\n");
-			i91u_panic("i91u panics in line %d", __LINE__);
-		}
-		i91u_debug = setup_debug;
-#endif
-	}
 	/* Get total number of adapters in the motherboard */
 	iAdapters = tul_NewReturnNumberOfAdapters();
 	if (iAdapters == 0)	/* If no tulip founded, return */
@@ -386,9 +273,6 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 	for (i = 0, pHCB = &tul_hcs[0];		/* Get pointer for control block */
 	     i < tul_num_ch;
 	     i++, pHCB++) {
-		pHCB->pSRB_head = NULL;		/* Initial SRB save queue       */
-		pHCB->pSRB_tail = NULL;		/* Initial SRB save queue       */
-		pHCB->pSRB_lock = SPIN_LOCK_UNLOCKED;	/* SRB save queue lock */
 		get_tulipPCIConfig(pHCB, i);
 
 		dBiosAdr = pHCB->HCS_BIOS;
@@ -430,7 +314,7 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 	return 1;
 }
 
-static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
+static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, struct scsi_cmnd * SCpnt)
 {				/* Create corresponding SCB     */
 	struct scatterlist *pSrbSG;
 	SG *pSG;		/* Pointer to SG list           */
@@ -498,38 +382,29 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 	}
 }
 
-/* 
- *  Queue a command and setup interrupts for a free bus.
- */
-int i91u_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+static int i91u_queuecommand(struct scsi_cmnd *cmd,
+		void (*done)(struct scsi_cmnd *))
 {
+	HCS *pHCB = (HCS *) cmd->device->host->base;
 	register SCB *pSCB;
-	HCS *pHCB;		/* Point to Host adapter control block */
 
-	if (SCpnt->device->lun > 16) {	/* 07/22/98 */
+	cmd->scsi_done = done;
 
-		SCpnt->result = (DID_TIME_OUT << 16);
-		done(SCpnt);	/* Notify system DONE           */
-		return (0);
-	}
-	pHCB = (HCS *) SCpnt->device->host->base;
+	pSCB = tul_alloc_scb(pHCB);
+	if (!pSCB)
+		return SCSI_MLQUEUE_HOST_BUSY;
 
-	SCpnt->scsi_done = done;
-	/* Get free SCSI control block  */
-	if ((pSCB = tul_alloc_scb(pHCB)) == NULL) {
-		i91uAppendSRBToQueue(pHCB, SCpnt);	/* Buffer this request  */
-		return (0);
-	}
-	i91uBuildSCB(pHCB, pSCB, SCpnt);
-	tul_exec_scb(pHCB, pSCB);	/* Start execute SCB            */
-	return (0);
+	i91uBuildSCB(pHCB, pSCB, cmd);
+	tul_exec_scb(pHCB, pSCB);
+	return 0;
 }
 
+#if 0 /* no new EH yet */
 /*
  *  Abort a queued command
  *  (commands that are on the bus can't be aborted easily)
  */
-int i91u_abort(Scsi_Cmnd * SCpnt)
+static int i91u_abort(struct scsi_cmnd * SCpnt)
 {
 	HCS *pHCB;
 
@@ -541,7 +416,7 @@ int i91u_abort(Scsi_Cmnd * SCpnt)
  *  Reset registers, reset a hanging bus and
  *  kill active and disconnected commands for target w/o soft reset
  */
-int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+static int i91u_reset(struct scsi_cmnd * SCpnt, unsigned int reset_flags)
 {				/* I need Host Control Block Information */
 	HCS *pHCB;
 
@@ -550,10 +425,11 @@ int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 	if (reset_flags & (SCSI_RESET_SUGGEST_BUS_RESET | SCSI_RESET_SUGGEST_HOST_RESET))
 		return tul_reset_scsi_bus(pHCB);
 	else
-		return tul_device_reset(pHCB, (ULONG) SCpnt, SCpnt->device->id, reset_flags);
+		return tul_device_reset(pHCB, SCpnt, SCpnt->device->id, reset_flags);
 }
+#endif
 
-int i91u_bus_reset(Scsi_Cmnd * SCpnt)
+static int i91u_bus_reset(struct scsi_cmnd * SCpnt)
 {
 	HCS *pHCB;
 
@@ -565,7 +441,7 @@ int i91u_bus_reset(Scsi_Cmnd * SCpnt)
 /*
  * Return the "logical geometry"
  */
-int i91u_biosparam(struct scsi_device *sdev, struct block_device *dev,
+static int i91u_biosparam(struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int *info_array)
 {
 	HCS *pHcb;		/* Point to Host adapter control block */
@@ -607,7 +483,7 @@ static void i91u_unmap_cmnd(struct pci_dev *pci_dev, struct scsi_cmnd *cmnd)
 	if (cmnd->SCp.ptr) {
 		dma_unmap_single(&pci_dev->dev,
 				 (dma_addr_t)((unsigned long)cmnd->SCp.ptr),
-				 SENSE_SIZE, SCSI_DATA_READ);
+				 SENSE_SIZE, DMA_FROM_DEVICE);
 		cmnd->SCp.ptr = NULL;
 	}
 
@@ -638,7 +514,7 @@ static void i91u_unmap_cmnd(struct pci_dev *pci_dev, struct scsi_cmnd *cmnd)
 *****************************************************************************/
 static void i91uSCBPost(BYTE * pHcb, BYTE * pScb)
 {
-	Scsi_Cmnd *pSRB;	/* Pointer to SCSI request block */
+	struct scsi_cmnd *pSRB;	/* Pointer to SCSI request block */
 	HCS *pHCB;
 	SCB *pSCB;
 
@@ -693,35 +569,36 @@ static void i91uSCBPost(BYTE * pHcb, BYTE * pScb)
 
 	i91u_unmap_cmnd(pHCB->pci_dev, pSRB);
 	pSRB->scsi_done(pSRB);	/* Notify system DONE           */
-	if ((pSRB = i91uPopSRBFromQueue(pHCB)) != NULL)
-		/* Find the next pending SRB    */
-	{			/* Assume resend will success   */
-		/* Reuse old SCB                */
-		i91uBuildSCB(pHCB, pSCB, pSRB);		/* Create corresponding SCB     */
 
-		tul_exec_scb(pHCB, pSCB);	/* Start execute SCB            */
-	} else {		/* No Pending SRB               */
-		tul_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
-	}
-	return;
-}
-
-/* 
- * Dump the current driver status and panic...
- */
-static void i91u_panic(char *msg)
-{
-	printk("\ni91u_panic: %s\n", msg);
-	panic("i91u panic");
+	tul_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
 }
 
 /*
  * Release ressources
  */
-int i91u_release(struct Scsi_Host *hreg)
+static int i91u_release(struct Scsi_Host *hreg)
 {
 	free_irq(hreg->irq, hreg);
 	release_region(hreg->io_port, 256);
 	return 0;
 }
 MODULE_LICENSE("Dual BSD/GPL");
+
+static struct scsi_host_template driver_template = {
+	.proc_name	= "INI9100U",
+	.name		= i91u_REVID,
+	.detect		= i91u_detect,
+	.release	= i91u_release,
+	.queuecommand	= i91u_queuecommand,
+//	.abort		= i91u_abort,
+//	.reset		= i91u_reset,
+	.eh_bus_reset_handler = i91u_bus_reset,
+	.bios_param	= i91u_biosparam,
+	.can_queue	= 1,
+	.this_id	= 1,
+	.sg_tablesize	= SG_ALL,
+	.cmd_per_lun 	= 1,
+	.use_clustering	= ENABLE_CLUSTERING,
+};
+#include "scsi_module.c"
+
