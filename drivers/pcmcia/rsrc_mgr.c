@@ -454,16 +454,13 @@ static u_long inv_probe(resource_map_t *m, struct pcmcia_socket *s)
     return do_mem_probe(m->base, m->num, s);
 }
 
-void validate_mem(struct pcmcia_socket *s)
+static void validate_mem(struct pcmcia_socket *s)
 {
     resource_map_t *m, mm;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     static int hi = 0, lo = 0;
     u_long b, i, ok = 0;
     int force_low = !(s->features & SS_CAP_PAGE_REGS);
-
-    if (!probe_mem)
-	return;
 
     down(&rsrc_sem);
     /* We do up to four passes through the list */
@@ -500,12 +497,12 @@ void validate_mem(struct pcmcia_socket *s)
 
 #else /* CONFIG_PCMCIA_PROBE */
 
-void validate_mem(struct pcmcia_socket *s)
+static void validate_mem(struct pcmcia_socket *s)
 {
     resource_map_t *m, mm;
     static int done = 0;
     
-    if (probe_mem && done++ == 0) {
+    if (done++ == 0) {
 	down(&rsrc_sem);
 	for (m = mem_db.next; m != &mem_db; m = mm.next) {
 	    mm = *m;
@@ -517,6 +514,18 @@ void validate_mem(struct pcmcia_socket *s)
 }
 
 #endif /* CONFIG_PCMCIA_PROBE */
+
+void pcmcia_validate_mem(struct pcmcia_socket *s)
+{
+	down(&s->skt_sem);
+
+	if (probe_mem && s->state & SOCKET_PRESENT)
+		validate_mem(s);
+
+	up(&s->skt_sem);
+}
+
+EXPORT_SYMBOL(pcmcia_validate_mem);
 
 struct pcmcia_align_data {
 	unsigned long	mask;

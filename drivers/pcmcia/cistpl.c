@@ -107,7 +107,6 @@ set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flag
     pccard_mem_map *mem = &s->cis_mem;
     if (!(s->features & SS_CAP_STATIC_MAP) &&
 	mem->sys_start == 0) {
-	validate_mem(s);
 	mem->sys_start = 0;
 	if (find_mem_region(&mem->sys_start, s->map_size,
 			    s->map_size, 0, "card services", s)) {

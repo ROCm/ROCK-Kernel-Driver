@@ -180,7 +180,7 @@ int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
 int copy_memory(memory_handle_t handle, copy_op_t *req);
 
 /* In rsrc_mgr */
-void validate_mem(struct pcmcia_socket *s);
+void pcmcia_validate_mem(struct pcmcia_socket *s);
 struct resource *find_io_region(unsigned long base, int num, unsigned long align,
 		   char *name, struct pcmcia_socket *s);
 int adjust_io_region(struct resource *res, unsigned long r_start,
