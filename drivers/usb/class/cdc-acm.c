@@ -653,7 +653,7 @@ next_desc:
 	dbg("interfaces are valid");
 	for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
 
-	if (acm_table[minor]) {
+	if (minor == ACM_TTY_MINORS) {
 		err("no more free acm devices");
 		return -ENODEV;
 	}
