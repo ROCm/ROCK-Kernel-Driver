@@ -1957,9 +1957,11 @@ config SK98LIN
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Abit)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Albatron)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Asus)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (ECS)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Epox)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Foxconn)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
 	    - Marvell RDK-8001 Adapter
@@ -2005,8 +2007,10 @@ config SK98LIN
 	  Questions concerning this driver may be addressed to:
 	      linux@syskonnect.de
 	  
-	  To compile this driver as a module, choose M here: the module
-	  will be called sk98lin.  This is recommended.
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read Documentation/modules.txt. This is recommended.
+	  The module will be called sk98lin. This is recommended.
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"
