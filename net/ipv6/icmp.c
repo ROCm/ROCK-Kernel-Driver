@@ -95,7 +95,7 @@ struct icmpv6_msg {
 	__u32			csum;
 };
 
-static __inline__ void icmpv6_xmit_lock(void)
+static __inline__ int icmpv6_xmit_lock(void)
 {
 	local_bh_disable();
 
