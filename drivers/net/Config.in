@@ -108,6 +108,9 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       dep_tristate '    NI5210 support' CONFIG_NI52 $CONFIG_ISA
       dep_tristate '    NI6510 support' CONFIG_NI65 $CONFIG_ISA
    fi
+   if [ "$CONFIG_PCI" = "y" -o "$CONFIG_EISA" = "y" -o "$CONFIG_CARDBUS" != "n" ]; then
+      source drivers/net/tulip/Config.in
+   fi
    if [ "$CONFIG_ISA" = "y" -o "$CONFIG_MCA" = "y" ]; then
          dep_tristate '  AT1700/1720 support (EXPERIMENTAL)' CONFIG_AT1700 $CONFIG_EXPERIMENTAL
    fi
@@ -320,9 +323,6 @@ fi
 
 source drivers/net/wan/Config.in
 
-if [ "$CONFIG_PCI" = "y" -o "$CONFIG_EISA" = "y" -o "$CONFIG_CARDBUS" != "n" ]; then
-   source drivers/net/tulip/Config.in
-fi
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
    source drivers/net/pcmcia/Config.in
 fi
