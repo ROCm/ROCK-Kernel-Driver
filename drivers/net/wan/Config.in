@@ -111,7 +111,7 @@ if [ "$CONFIG_WAN" = "y" ]; then
 	 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 	    dep_tristate '    Cyclom 2X(tm) cards (EXPERIMENTAL)' CONFIG_CYCLADES_SYNC $CONFIG_WAN_ROUTER_DRIVERS
 	    if [ "$CONFIG_CYCLADES_SYNC" != "n" ]; then
-	       bool '      Cyclom 2X X.25 support' CONFIG_CYCLOMX_X25
+	       bool '      Cyclom 2X X.25 support (EXPERIMENTAL)' CONFIG_CYCLOMX_X25
 	    fi
 	 fi
       fi
