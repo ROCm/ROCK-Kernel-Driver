@@ -39,7 +39,8 @@ static void ssp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * @data: 16-bit, MSB justified data to write.
  *
  * Wait for a free entry in the SSP transmit FIFO, and write a data
- * word to the SSP port.
+ * word to the SSP port.  Wait for the SSP port to start sending
+ * the data.
  *
  * The caller is expected to perform the necessary locking.
  *
@@ -53,6 +54,9 @@ int ssp_write_word(u16 data)
 		cpu_relax();
 
 	Ser4SSDR = data;
+
+	while (!(Ser4SSSR & SSSR_BSY))
+		cpu_relax();
 
 	return 0;
 }
