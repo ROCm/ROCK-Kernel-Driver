@@ -19,7 +19,7 @@
  * Usage is:
  * 		int __deprecated foo(void)
  */
-#if ( __GNUC__ == 3 && __GNUC_MINOR > 0 ) || __GNUC__ > 3
+#if ( __GNUC__ == 3 && __GNUC_MINOR__ > 0 ) || __GNUC__ > 3
 #define __deprecated	__attribute__((deprecated))
 #else
 #define __deprecated
