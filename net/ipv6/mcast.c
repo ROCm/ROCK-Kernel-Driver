@@ -47,6 +47,9 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv6.h>
+
 #include <net/sock.h>
 #include <net/snmp.h>
 
@@ -1270,6 +1273,7 @@ static void mld_sendpack(struct sk_buff *skb)
 	struct mld2_report *pmr = (struct mld2_report *)skb->h.raw;
 	int payload_len, mldlen;
 	struct inet6_dev *idev = in6_dev_get(skb->dev);
+	int err;
 
 	payload_len = skb->tail - (unsigned char *)skb->nh.ipv6h -
 		sizeof(struct ipv6hdr);
@@ -1278,8 +1282,10 @@ static void mld_sendpack(struct sk_buff *skb)
 
 	pmr->csum = csum_ipv6_magic(&pip6->saddr, &pip6->daddr, mldlen,
 		IPPROTO_ICMPV6, csum_partial(skb->h.raw, mldlen, 0));
-	dev_queue_xmit(skb);
-	ICMP6_INC_STATS(idev,Icmp6OutMsgs);
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, skb->dev,
+		dev_queue_xmit);
+	if (!err)
+		ICMP6_INC_STATS(idev,Icmp6OutMsgs);
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 }
@@ -1608,12 +1614,15 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 
 	idev = in6_dev_get(skb->dev);
 
-	dev_queue_xmit(skb);
-	if (type == ICMPV6_MGM_REDUCTION)
-		ICMP6_INC_STATS(idev, Icmp6OutGroupMembReductions);
-	else
-		ICMP6_INC_STATS(idev, Icmp6OutGroupMembResponses);
-	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, skb->dev,
+		dev_queue_xmit);
+	if (!err) {
+		if (type == ICMPV6_MGM_REDUCTION)
+			ICMP6_INC_STATS(idev, Icmp6OutGroupMembReductions);
+		else
+			ICMP6_INC_STATS(idev, Icmp6OutGroupMembResponses);
+		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	}
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);

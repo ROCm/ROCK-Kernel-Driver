@@ -13,9 +13,6 @@
 #include <asm/byteorder.h>
 
 
-/* The great kdev_t changeover in 2.5.x */
-#include <linux/kdev_t.h>
-
 /* Transaction Label handling */
 struct hpsb_tlabel_pool {
 	DECLARE_BITMAP(pool, 64);

@@ -92,7 +92,7 @@ void hpsb_unref_host(struct hpsb_host *host)
 
 	down(&hpsb_hosts_lock);
         if (atomic_dec_and_test(&host->refcount) && host->is_shutdown)
-                kfree(host);
+		device_unregister(&host->device);
 	up(&hpsb_hosts_lock);
 }
 

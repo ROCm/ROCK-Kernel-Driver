@@ -472,6 +472,15 @@ extern __inline__ unsigned long do_gettimeoffset(void)
 	return (*master_l10_counter >> 10) & 0x1fffff;
 }
 
+/*
+ * Returns nanoseconds
+ * XXX This is a suboptimal implementation.
+ */
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
+}
+
 /* Ok, my cute asm atomicity trick doesn't work anymore.
  * There are just too many variables that need to be protected
  * now (both members of xtime, wall_jiffies, et al.)
