@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.35 2003/01/17 13:46:13 cohuck Exp $
+ * $Id: ctcmain.c,v 1.36 2003/02/18 09:15:14 mschwide Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.35 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.36 $
  *
  */
 
@@ -273,7 +273,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.35 $";
+	char vbuf[] = "$Revision: 1.36 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -1198,7 +1198,7 @@ ch_action_start(fsm_instance * fi, int event, void *arg)
 		fsm_deltimer(&ch->timer);
 		ccw_check_return_code(ch, rc);
 	}
-	pr_debug(KERN_DEBUG "ctc: %s(): leaving\n", __FUNCTION__);
+	pr_debug("ctc: %s(): leaving\n", __FUNCTION__);
 }
 
 /**

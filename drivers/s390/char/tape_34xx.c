@@ -28,7 +28,7 @@ enum tape34xx_type {
 };
 
 /*
- * Medium sense (asyncronous with callback) for 34xx tapes. There is no 'real'
+ * Medium sense (asynchronous with callback) for 34xx tapes. There is no 'real'
  * medium sense call. So we just do a normal sense.
  */
 static void
@@ -44,7 +44,7 @@ __tape_34xx_medium_sense_callback(struct tape_request *request, void *data)
 
 		/*
 		 * This isn't quite correct. But since INTERVENTION_REQUIRED
-		 * means that the drive is 'neither ready nor online' it is
+		 * means that the drive is 'neither ready nor on-line' it is
 		 * only slightly inaccurate to say there is no tape loaded if
 		 * the drive isn't online...
 		 */
@@ -133,7 +133,7 @@ tape_34xx_schedule_work(struct tape_device *device, enum tape_op op)
 }
 
 /*
- * Done Handler is called when dev stat = DEVICE-END (successfull operation)
+ * Done Handler is called when dev stat = DEVICE-END (successful operation)
  */
 static int
 tape_34xx_done(struct tape_device *device, struct tape_request *request)
@@ -153,10 +153,10 @@ tape_34xx_erp_failed(struct tape_device *device,
 }
 
 static inline int
-tape_34xx_erp_succeded(struct tape_device *device,
+tape_34xx_erp_succeeded(struct tape_device *device,
 		       struct tape_request *request)
 {
-	DBF_EVENT(3, "Error Recovery successfull for %s\n",
+	DBF_EVENT(3, "Error Recovery successful for %s\n",
 		  tape_op_verbose[request->op]);
 	return tape_34xx_done(device, request);
 }
@@ -417,13 +417,13 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 	case 0x22:
 		/*
 		 * Path equipment check. Might be drive adapter error, buffer
-		 * error on the lower interface, internal path not useable,
+		 * error on the lower interface, internal path not usable,
 		 * or error during cartridge load.
 		 */
 		PRINT_WARN("A path equipment check occurred. One of the "
 			   "following conditions occurred:\n");
 		PRINT_WARN("drive adapter error, buffer error on the lower "
-			   "interface, internal path not useable, error "
+			   "interface, internal path not usable, error "
 			   "during cartridge load.\n");
 		return tape_34xx_erp_failed(device, request, -EIO);
 	case 0x24:
@@ -432,20 +432,20 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 		 * but the drive is displaying a drive check message. Can
 		 * be threated as "device end".
 		 */
-		return tape_34xx_erp_succeded(device, request);
+		return tape_34xx_erp_succeeded(device, request);
 	case 0x27:
 		/*
 		 * Command reject. May indicate illegal channel program or
-		 * buffer over/underrun. Since all channel programms are
+		 * buffer over/underrun. Since all channel programs are
 		 * issued by this driver and ought be correct, we assume a
-		 * over/underrun situaltion and retry the channel program.
+		 * over/underrun situation and retry the channel program.
 		 */
 		return tape_34xx_erp_retry(device, request);
 	case 0x29:
 		/*
 		 * Function incompatible. Either the tape is idrc compressed
 		 * but the hardware isn't capable to do idrc, or a perform
-		 * subsystem func is issued and the CU is not online.
+		 * subsystem func is issued and the CU is not on-line.
 		 */
 		PRINT_WARN ("Function incompatible. Try to switch off idrc\n");
 		return tape_34xx_erp_failed(device, request, -EIO);
@@ -463,7 +463,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 		if (request->op == TO_RUN) {
 			/* Rewind unload completed ok. */
 			tape_med_state_set(device, MS_UNLOADED);
-			return tape_34xx_erp_succeded(device, request);
+			return tape_34xx_erp_succeeded(device, request);
 		}
 		/* tape_34xx doesn't use read buffered log commands. */
 		return tape_34xx_erp_bug(device, request, irb, sense[3]);
@@ -497,7 +497,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 		return tape_34xx_erp_failed(device, request, -EIO);
 	case 0x33:
 		/*
-		 * Load Failure. The catridge was not inserted correctly or
+		 * Load Failure. The cartridge was not inserted correctly or
 		 * the tape is not threaded correctly.
 		 */
 		PRINT_WARN("Cartridge load failure. Reload the cartridge "
@@ -548,7 +548,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 			return tape_34xx_erp_failed(device, request, -ENOSPC);
 		return tape_34xx_erp_failed(device, request, -EIO);
 	case 0x39:
-		/* Backward at Beginnig of tape. */
+		/* Backward at Beginning of tape. */
 		return tape_34xx_erp_failed(device, request, -EIO);
 	case 0x3a:
 		/* Drive switched to not ready. */
@@ -562,14 +562,14 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 	case 0x42:
 		/*
 		 * Degraded mode. A condition that can cause degraded
-		 * performace is detected.
+		 * performance is detected.
 		 */
 		PRINT_WARN("Subsystem is running in degraded mode.\n");
 		return tape_34xx_erp_retry(device, request);
 	case 0x43:
 		/* Drive not ready. */
 		tape_med_state_set(device, MS_UNLOADED);
-		/* Some commands commands are sucessful even in this case */
+		/* Some commands commands are successful even in this case */
 		if(sense[1] & SENSE_DRIVE_ONLINE) {
 			switch(request->op) {
 				case TO_ASSIGN:
@@ -584,7 +584,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 		PRINT_WARN("The drive is not ready.\n");
 		return tape_34xx_erp_failed(device, request, -ENOMEDIUM);
 	case 0x44:
-		/* Locate Block unsuccessfull. */
+		/* Locate Block unsuccessful. */
 		if (request->op != TO_BLOCK && request->op != TO_LBL)
 			/* No locate block was issued. */
 			return tape_34xx_erp_bug(device, request,
@@ -596,11 +596,11 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 		return tape_34xx_erp_failed(device, request, -EIO);
 	case 0x46:
 		/*
-		 * Drive not online. Drive may be switched offline,
+		 * Drive not on-line. Drive may be switched offline,
 		 * the power supply may be switched off or
 		 * the drive address may not be set correctly.
 		 */
-		PRINT_WARN("The drive is not online.");
+		PRINT_WARN("The drive is not on-line.");
 		return tape_34xx_erp_failed(device, request, -EIO);
 	case 0x47:
 		/* Volume fenced. CU reports volume integrity is lost. */
@@ -645,7 +645,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 	case 0x4e:
 		if (device->cdev->id.driver_info == tape_3490) {
 			/*
-			 * Maximum block size exeeded. This indicates, that
+			 * Maximum block size exceeded. This indicates, that
 			 * the block to be written is larger than allowed for
 			 * buffered mode.
 			 */
@@ -675,7 +675,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 		/* End of Volume complete. Rewind unload completed ok. */
 		if (request->op == TO_RUN) {
 			tape_med_state_set(device, MS_UNLOADED);
-			return tape_34xx_erp_succeded(device, request);
+			return tape_34xx_erp_succeeded(device, request);
 		}
 		return tape_34xx_erp_bug(device, request, irb, sense[3]);
 	case 0x53:
@@ -700,7 +700,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 			return tape_34xx_erp_retry(device, request);
 		} else {
 			/* Global status intercept. */
-			PRINT_WARN("An global status intercept was recieved, "
+			PRINT_WARN("An global status intercept was received, "
 				   "which will be recovered.\n");
 			return tape_34xx_erp_retry(device, request);
 		}
@@ -734,7 +734,7 @@ tape_34xx_unit_check(struct tape_device *device, struct tape_request *request,
 	case 0x5e:
 		/* Compaction algorithm incompatible. */
 		PRINT_WARN("The volume is recorded using an incompatible "
-			   "compaction algorith, which is not supported by "
+			   "compaction algorithm, which is not supported by "
 			   "the control unit.\n");
 		return tape_34xx_erp_failed(device, request, -EMEDIUMTYPE);
 
@@ -1042,7 +1042,7 @@ tape_34xx_init (void)
 {
 	int rc;
 
-	DBF_EVENT(3, "34xx init: $Revision: 1.6 $\n");
+	DBF_EVENT(3, "34xx init: $Revision: 1.7 $\n");
 	/* Register driver for 3480/3490 tapes. */
 	rc = ccw_driver_register(&tape_34xx_driver);
 	if (rc)
@@ -1061,7 +1061,7 @@ tape_34xx_exit(void)
 MODULE_DEVICE_TABLE(ccw, tape_34xx_ids);
 MODULE_AUTHOR("(C) 2001-2002 IBM Deutschland Entwicklung GmbH");
 MODULE_DESCRIPTION("Linux on zSeries channel attached 3480 tape "
-		   "device driver ($Revision: 1.6 $)");
+		   "device driver ($Revision: 1.7 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_34xx_init);

@@ -121,7 +121,7 @@ struct tape_request {
 /* Function type for magnetic tape commands */
 typedef int (*tape_mtop_fn)(struct tape_device *, int);
 
-/* Size of the arry containing the mtops for a discipline */
+/* Size of the array containing the mtops for a discipline */
 #define TAPE_NR_MTOPS (MTMKPART+1)
 
 /* Tape Discipline */
@@ -151,7 +151,7 @@ struct tape_discipline {
  * The discipline irq function either returns an error code (<0) which
  * means that the request has failed with an error or one of the following:
  */
-#define TAPE_IO_SUCCESS 0	/* request sucessful */
+#define TAPE_IO_SUCCESS 0	/* request successful */
 #define TAPE_IO_PENDING 1	/* request still running */
 #define TAPE_IO_RETRY	2	/* retry to current request */
 #define TAPE_IO_STOP	3	/* stop the running request */
