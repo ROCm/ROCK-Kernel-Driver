@@ -71,10 +71,13 @@ MODULE_PARM_DESC(seq_default_timer_resolution, "The default timer resolution in 
  *  INIT PART
  */
 
+int snd_seq_in_init;
 
 static int __init alsa_seq_init(void)
 {
 	int err;
+
+	snd_seq_in_init = 1;
 
 	if ((err = client_init_data()) < 0)
 		return err;
@@ -99,6 +102,7 @@ static int __init alsa_seq_init(void)
 	if ((err = snd_seq_system_client_init()) < 0)
 		return err;
 
+	snd_seq_in_init = 0;
 	return 0;
 }
 

@@ -464,8 +464,8 @@ struct snd_cs4281_dma {
 struct snd_cs4281 {
 	int irq;
 
-	unsigned long ba0;		/* virtual (accessible) address */
-	unsigned long ba1;		/* virtual (accessible) address */
+	void __iomem *ba0;		/* virtual (accessible) address */
+	void __iomem *ba1;		/* virtual (accessible) address */
 	unsigned long ba0_addr;
 	unsigned long ba1_addr;
 
@@ -1359,9 +1359,9 @@ static int snd_cs4281_free(cs4281_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	if (chip->ba0)
-		iounmap((void *) chip->ba0);
+		iounmap(chip->ba0);
 	if (chip->ba1)
-		iounmap((void *) chip->ba1);
+		iounmap(chip->ba1);
 	pci_release_regions(chip->pci);
 
 	kfree(chip);
@@ -1423,8 +1423,8 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	}
 	chip->irq = pci->irq;
 
-	chip->ba0 = (unsigned long) ioremap_nocache(chip->ba0_addr, pci_resource_len(pci, 0));
-	chip->ba1 = (unsigned long) ioremap_nocache(chip->ba1_addr, pci_resource_len(pci, 1));
+	chip->ba0 = ioremap_nocache(chip->ba0_addr, pci_resource_len(pci, 0));
+	chip->ba1 = ioremap_nocache(chip->ba1_addr, pci_resource_len(pci, 1));
 	if (!chip->ba0 || !chip->ba1) {
 		snd_cs4281_free(chip);
 		return -ENOMEM;
@@ -1952,8 +1952,8 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		return err;
 	}
 	if ((err = snd_opl3_create(card,
-				   (chip->ba0 + BA0_B0AP) >> 2,
-				   (chip->ba0 + BA0_B1AP) >> 2,
+				   (unsigned long)(chip->ba0 + BA0_B0AP),
+				   (unsigned long)(chip->ba0 + BA0_B1AP),
 				   OPL3_HW_OPL3_CS4281, 1, &opl3)) < 0) {
 		snd_card_free(card);
 		return err;

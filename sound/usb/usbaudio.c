@@ -2823,6 +2823,56 @@ static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface
 	return 0;
 }
 
+/*
+ * Create a stream for an Edirol UA-1000 interface.
+ */
+static int create_ua1000_quirk(snd_usb_audio_t *chip, struct usb_interface *iface)
+{
+	static const struct audioformat ua1000_format = {
+		.format = SNDRV_PCM_FORMAT_S32_LE,
+		.fmt_type = USB_FORMAT_TYPE_I,
+		.altsetting = 1,
+		.altset_idx = 1,
+		.attributes = 0,
+		.rates = SNDRV_PCM_RATE_CONTINUOUS,
+	};
+	struct usb_host_interface *alts;
+	struct usb_interface_descriptor *altsd;
+	struct audioformat *fp;
+	int stream, err;
+
+	if (iface->num_altsetting != 2)
+		return -ENXIO;
+	alts = &iface->altsetting[1];
+	altsd = get_iface_desc(alts);
+	if (alts->extralen != 11 || alts->extra[1] != CS_AUDIO_INTERFACE ||
+	    altsd->bNumEndpoints != 1)
+		return -ENXIO;
+
+	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
+	if (!fp)
+		return -ENOMEM;
+	memcpy(fp, &ua1000_format, sizeof(*fp));
+
+	fp->channels = alts->extra[4];
+	fp->iface = altsd->bInterfaceNumber;
+	fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
+	fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
+	fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+	fp->rate_max = fp->rate_min = combine_triple(&alts->extra[8]);
+
+	stream = (fp->endpoint & USB_DIR_IN)
+		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+	err = add_audio_endpoint(chip, stream, fp);
+	if (err < 0) {
+		kfree(fp);
+		return err;
+	}
+	/* FIXME: playback must be synchronized to capture */
+	usb_set_interface(chip->dev, fp->iface, 0);
+	return 0;
+}
+
 static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 				struct usb_interface *iface,
 				const snd_usb_audio_quirk_t *quirk);
@@ -2912,6 +2962,8 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 		return create_standard_interface_quirk(chip, iface, quirk);
 	case QUIRK_AUDIO_EDIROL_UA700:
 		return create_ua700_quirk(chip, iface);
+	case QUIRK_AUDIO_EDIROL_UA1000:
+		return create_ua1000_quirk(chip, iface);
 	default:
 		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
 		return -ENXIO;

@@ -265,7 +265,7 @@ static irqreturn_t snd_bt87x_interrupt(int irq, void *dev_id, struct pt_regs *re
 				   status, pci_status);
 		}
 	}
-	if (status & INT_RISCI) {
+	if ((status & INT_RISCI) && (chip->reg_control & CTL_ACAP_EN)) {
 		int current_block, irq_block;
 
 		/* assume that exactly one line has been recorded */

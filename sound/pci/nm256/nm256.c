@@ -190,7 +190,7 @@ struct snd_nm256_stream {
 	
 	u32 buf;	/* offset from chip->buffer */
 	int bufsize;	/* buffer size in bytes */
-	unsigned long bufptr;		/* mapped pointer */
+	void __iomem *bufptr;		/* mapped pointer */
 	unsigned long bufptr_addr;	/* physical address of the mapped pointer */
 
 	int dma_size;		/* buffer size of the substream in bytes */
@@ -205,11 +205,11 @@ struct snd_nm256 {
 	
 	snd_card_t *card;
 
-	unsigned long cport;		/* control port */
+	void __iomem *cport;		/* control port */
 	struct resource *res_cport;	/* its resource */
 	unsigned long cport_addr;	/* physical address */
 
-	unsigned long buffer;		/* buffer */
+	void __iomem *buffer;		/* buffer */
 	struct resource *res_buffer;	/* its resource */
 	unsigned long buffer_addr;	/* buffer phyiscal address */
 
@@ -329,7 +329,7 @@ snd_nm256_write_buffer(nm256_t *chip, void *src, int offset, int size)
 		return;
 	}
 #endif
-	memcpy_toio((void *)chip->buffer + offset, src, size);
+	memcpy_toio(chip->buffer + offset, src, size);
 }
 
 /*
@@ -887,8 +887,8 @@ snd_nm256_pcm(nm256_t *chip, int device)
 
 	for (i = 0; i < 2; i++) {
 		nm256_stream_t *s = &chip->streams[i];
-		s->bufptr = chip->buffer +  s->buf - chip->buffer_start;
-		s->bufptr_addr = chip->buffer_addr + s->buf - chip->buffer_start;
+		s->bufptr = chip->buffer + (s->buf - chip->buffer_start);
+		s->bufptr_addr = chip->buffer_addr + (s->buf - chip->buffer_start);
 	}
 
 	err = snd_pcm_new(chip->card, chip->card->driver, device,
@@ -1226,13 +1226,13 @@ static int __devinit
 snd_nm256_peek_for_sig(nm256_t *chip)
 {
 	/* The signature is located 1K below the end of video RAM.  */
-	unsigned long temp;
+	void __iomem *temp;
 	/* Default buffer end is 5120 bytes below the top of RAM.  */
 	unsigned long pointer_found = chip->buffer_end - 0x1400;
 	u32 sig;
 
-	temp = (unsigned long) ioremap_nocache(chip->buffer_addr + chip->buffer_end - 0x400, 16);
-	if (temp == 0) {
+	temp = ioremap_nocache(chip->buffer_addr + chip->buffer_end - 0x400, 16);
+	if (temp == NULL) {
 		snd_printk("Unable to scan for card signature in video RAM\n");
 		return -EBUSY;
 	}
@@ -1248,7 +1248,7 @@ snd_nm256_peek_for_sig(nm256_t *chip)
 		    pointer < chip->buffer_size ||
 		    pointer > chip->buffer_end) {
 			snd_printk("invalid signature found: 0x%x\n", pointer);
-			iounmap((void *)temp);
+			iounmap(temp);
 			return -ENODEV;
 		} else {
 			pointer_found = pointer;
@@ -1256,7 +1256,7 @@ snd_nm256_peek_for_sig(nm256_t *chip)
 		}
 	}
 
-	iounmap((void *)temp);
+	iounmap(temp);
 	chip->buffer_end = pointer_found;
 
 	return 0;
@@ -1305,9 +1305,9 @@ static int snd_nm256_free(nm256_t *chip)
 		synchronize_irq(chip->irq);
 
 	if (chip->cport)
-		iounmap((void *) chip->cport);
+		iounmap(chip->cport);
 	if (chip->buffer)
-		iounmap((void *) chip->buffer);
+		iounmap(chip->buffer);
 	if (chip->res_cport) {
 		release_resource(chip->res_cport);
 		kfree_nocheck(chip->res_cport);
@@ -1380,8 +1380,8 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		err = -EBUSY;
 		goto __error;
 	}
-	chip->cport = (unsigned long) ioremap_nocache(chip->cport_addr, NM_PORT2_SIZE);
-	if (chip->cport == 0) {
+	chip->cport = ioremap_nocache(chip->cport_addr, NM_PORT2_SIZE);
+	if (chip->cport == NULL) {
 		snd_printk("unable to map control port %lx\n", chip->cport_addr);
 		err = -ENOMEM;
 		goto __error;
@@ -1445,8 +1445,8 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		err = -EBUSY;
 		goto __error;
 	}
-	chip->buffer = (unsigned long) ioremap_nocache(chip->buffer_addr, chip->buffer_size);
-	if (chip->buffer == 0) {
+	chip->buffer = ioremap_nocache(chip->buffer_addr, chip->buffer_size);
+	if (chip->buffer == NULL) {
 		err = -ENOMEM;
 		snd_printk("unable to map ring buffer at %lx\n", chip->buffer_addr);
 		goto __error;

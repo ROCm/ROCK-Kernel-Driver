@@ -203,12 +203,6 @@ static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 
 	val = snd_cs46xx_codec_read(chip, reg, codec_index);
 
-	/* HACK: voyetra uses EAPD bit in the reverse way.
-	 * we flip the bit to show the mixer status correctly
-	 */
-	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
-		val ^= 0x8000;
-
 	return val;
 }
 
@@ -289,12 +283,6 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 		   codec_index == CS46XX_SECONDARY_CODEC_INDEX,
 		   return);
 
-	/* HACK: voyetra uses EAPD bit in the reverse way.
-	 * we flip the bit to show the mixer status correctly
-	 */
-	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
-		val ^= 0x8000;
-
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
 }
 
@@ -308,7 +296,7 @@ int snd_cs46xx_download(cs46xx_t *chip,
                         unsigned long offset,
                         unsigned long len)
 {
-	unsigned long dst;
+	void __iomem *dst;
 	unsigned int bank = offset >> 16;
 	offset = offset & 0xffff;
 
@@ -336,7 +324,7 @@ int snd_cs46xx_clear_BA1(cs46xx_t *chip,
                          unsigned long offset,
                          unsigned long len) 
 {
-	unsigned long dst;
+	void __iomem *dst;
 	unsigned int bank = offset >> 16;
 	offset = offset & 0xffff;
 
@@ -2405,6 +2393,8 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
+	if (chip->amplifier_ctrl == amp_voyetra)
+		ac97.scaps = AC97_SCAP_INV_EAPD;
 
 	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000,
 			       CS46XX_PRIMARY_CODEC_INDEX);
@@ -2902,7 +2892,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	for (idx = 0; idx < 5; idx++) {
 		snd_cs46xx_region_t *region = &chip->region.idx[idx];
 		if (region->remap_addr)
-			iounmap((void *) region->remap_addr);
+			iounmap(region->remap_addr);
 		if (region->resource) {
 			release_resource(region->resource);
 			kfree_nocheck(region->resource);
@@ -3868,8 +3858,8 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 			snd_cs46xx_free(chip);
 			return -EBUSY;
 		}
-		region->remap_addr = (unsigned long) ioremap_nocache(region->base, region->size);
-		if (region->remap_addr == 0) {
+		region->remap_addr = ioremap_nocache(region->base, region->size);
+		if (region->remap_addr == NULL) {
 			snd_printk("%s ioremap problem\n", region->name);
 			snd_cs46xx_free(chip);
 			return -ENOMEM;

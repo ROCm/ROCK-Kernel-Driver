@@ -439,6 +439,30 @@ DEFINE_ALSA_IOCTL_ENTRY(pcm_sync_ptr, pcm_sync_ptr, SNDRV_PCM_IOCTL_SYNC_PTR);
 
 
 /*
+ * When PCM is used on 32bit mode, we need to disable
+ * mmap of PCM status/control records because of the size
+ * incompatibility.
+ * 
+ * Since INFO ioctl is always called at first, we mark the
+ * mmap-disabling in this ioctl wrapper.
+ */
+static int snd_pcm_info_ioctl32(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *filp)
+{
+	snd_pcm_file_t *pcm_file;
+	snd_pcm_substream_t *substream;
+	if (! filp->f_op || ! filp->f_op->ioctl)
+		return -ENOTTY;
+	pcm_file = filp->private_data;
+	if (! pcm_file)
+		return -ENOTTY;
+	substream = pcm_file->substream;
+	if (! substream)
+		return -ENOTTY;
+	substream->no_mmap_ctrl = 1;
+	return filp->f_op->ioctl(filp->f_dentry->d_inode, filp, cmd, arg);
+}
+
+/*
  */
 #define AP(x) snd_ioctl32_##x
 
@@ -456,13 +480,14 @@ enum {
 	SNDRV_PCM_IOCTL_READN_FRAMES32 = _IOR('A', 0x53, struct sndrv_xfern32),
 	SNDRV_PCM_IOCTL_HW_REFINE_OLD32 = _IOWR('A', 0x10, struct sndrv_pcm_hw_params_old32),
 	SNDRV_PCM_IOCTL_HW_PARAMS_OLD32 = _IOWR('A', 0x11, struct sndrv_pcm_hw_params_old32),
-	SNDRV_PCM_IOCTL_SYNC_PTR32 = _IOWR('A', 0x23, struct sndrv_pcm_sync_ptr),
+	SNDRV_PCM_IOCTL_SYNC_PTR32 = _IOWR('A', 0x23, struct sndrv_pcm_sync_ptr32),
 
 };
 
 struct ioctl32_mapper pcm_mappers[] = {
 	MAP_COMPAT(SNDRV_PCM_IOCTL_PVERSION),
-	MAP_COMPAT(SNDRV_PCM_IOCTL_INFO),
+	/* MAP_COMPAT(SNDRV_PCM_IOCTL_INFO), */
+	{ SNDRV_PCM_IOCTL_INFO, snd_pcm_info_ioctl32 },
 	MAP_COMPAT(SNDRV_PCM_IOCTL_TSTAMP),
 	{ SNDRV_PCM_IOCTL_HW_REFINE32, AP(pcm_hw_refine) },
 	{ SNDRV_PCM_IOCTL_HW_PARAMS32, AP(pcm_hw_params) },

@@ -18,7 +18,7 @@
  *
  *
  * This file registers the converters from 32-bit ioctls to 64-bit ones.
- * The converter assumes that a 32-bit user-pointer can be casted by A(x)
+ * The converter assumes that a 32-bit user-pointer can be casted by compat_ptr(x)
  * macro to a valid 64-bit pointer which is accessible via copy_from/to_user.
  *
  */

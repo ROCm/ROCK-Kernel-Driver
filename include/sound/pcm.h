@@ -405,6 +405,8 @@ struct _snd_pcm_substream {
 	snd_info_entry_t *proc_sw_params_entry;
 	snd_info_entry_t *proc_status_entry;
 	snd_info_entry_t *proc_prealloc_entry;
+	/* misc flags */
+	unsigned int no_mmap_ctrl: 1;
 };
 
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
