@@ -731,8 +731,6 @@ static struct atm_dev atmarpd_dev = {
 
 static int atm_init_atmarp(struct atm_vcc *vcc)
 {
-	struct net_device *dev;
-
 	if (atmarpd) return -EADDRINUSE;
 	if (start_timer) {
 		start_timer = 0;
