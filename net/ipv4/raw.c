@@ -715,6 +715,7 @@ static struct sock *raw_get_next(struct seq_file *seq, struct sock *sk)
 	do {
 		sk = sk->next;
 try_again:
+		;
 	} while (sk && sk->family != PF_INET);
 
 	if (!sk && ++state->bucket < RAWV4_HTABLE_SIZE) {
