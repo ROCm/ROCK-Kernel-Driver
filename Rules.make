@@ -126,8 +126,10 @@ endif
 
 # for make >= 3.78 the following is cleaner:
 # multi-used := $(foreach m,$(obj-y) $(obj-m), $(if $($(basename $(m))-objs), $(m)))
-multi-used-y := $(sort $(foreach m,$(obj-y),$(patsubst %,$(m),$($(basename $(m))-objs))))
-multi-used-m := $(sort $(foreach m,$(obj-m),$(patsubst %,$(m),$($(basename $(m))-objs))))
+__obj-y = $(filter-out export.o,$(obj-y))
+__obj-m = $(filter-out export.o,$(obj-m))
+multi-used-y := $(sort $(foreach m,$(__obj-y),$(patsubst %,$(m),$($(basename $(m))-objs))))
+multi-used-m := $(sort $(foreach m,$(__obj-m),$(patsubst %,$(m),$($(basename $(m))-objs))))
 ld-multi-used-y := $(filter-out $(list-multi),$(multi-used-y))
 ld-multi-used-m := $(filter-out $(list-multi),$(multi-used-m))
 ld-multi-objs-y := $(foreach m, $(ld-multi-used-y), $($(basename $(m))-objs))
