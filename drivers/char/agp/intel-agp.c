@@ -1382,6 +1382,10 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 		}
 		name = "865";
 		break;
+	case PCI_DEVICE_ID_INTEL_82875_HB:
+		bridge->driver = &intel_845_driver;
+		name = "i875";
+		break;
 	case PCI_DEVICE_ID_INTEL_7505_0:
 		bridge->driver = &intel_7505_driver;
 		name =  "E7505";
