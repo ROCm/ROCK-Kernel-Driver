@@ -214,7 +214,7 @@ niccy_reset(struct IsdnCardState *cs)
 		val |= PCI_IRQ_ENABLE;
 		outl(val, cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
 	}
-	inithscxisac(cs, 3);
+	inithscxisac(cs);
 }
 
 static int

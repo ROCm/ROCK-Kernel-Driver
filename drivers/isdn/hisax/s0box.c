@@ -207,7 +207,7 @@ S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_s0box(cs);
 			break;
 		case CARD_INIT:
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			break;
 		case CARD_TEST:
 			break;

@@ -679,7 +679,6 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_INIT:
 			cs->debug |= L1_DEB_IPAC;
-			inithscxisac(cs, 1);
 			if ((cs->subtyp == ELSA_QS1000) ||
 			    (cs->subtyp == ELSA_QS3000))
 			{
@@ -687,7 +686,7 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			}
 			if (cs->hw.elsa.trig)
 				byteout(cs->hw.elsa.trig, 0xff);
-			inithscxisac(cs, 2);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			if ((cs->subtyp == ELSA_PCMCIA) ||

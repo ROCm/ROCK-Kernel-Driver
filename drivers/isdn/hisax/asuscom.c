@@ -295,7 +295,7 @@ Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_INIT:
 			cs->debug |= L1_DEB_IPAC;
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);

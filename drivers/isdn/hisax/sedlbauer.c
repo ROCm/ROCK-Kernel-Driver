@@ -488,7 +488,7 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 				/* RESET Receiver and Transmitter */
 				cs->writeisac(cs, ISAC_CMDR, 0x41);
 			} else {
-				inithscxisac(cs, 3);
+				inithscxisac(cs);
 			}
 			return(0);
 		case CARD_TEST:

@@ -251,7 +251,7 @@ BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_INIT:
 			cs->debug |= L1_DEB_IPAC;
 			set_ipac_active(cs, 1);
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			/* Enable ints */
 			enable_bkm_int(cs, 1);
 			return (0);

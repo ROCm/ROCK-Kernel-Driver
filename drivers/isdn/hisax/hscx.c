@@ -257,21 +257,18 @@ inithscx(struct IsdnCardState *cs)
 
 	modehscx(cs->bcs, 0, 0);
 	modehscx(cs->bcs + 1, 0, 0);
+
+	/* Reenable all IRQ */
+	cs->BC_Write_Reg(cs, 0, HSCX_MASK, 0);
+	cs->BC_Write_Reg(cs, 1, HSCX_MASK, 0);
 }
 
 void __init
-inithscxisac(struct IsdnCardState *cs, int part)
+inithscxisac(struct IsdnCardState *cs)
 {
-	if (part & 1) {
-		initisac(cs);
-		inithscx(cs);
-	}
-	if (part & 2) {
-		/* Reenable all IRQ */
-		cs->writeisac(cs, ISAC_MASK, 0);
-		cs->BC_Write_Reg(cs, 0, HSCX_MASK, 0);
-		cs->BC_Write_Reg(cs, 1, HSCX_MASK, 0);
-		/* RESET Receiver and Transmitter */
-		cs->writeisac(cs, ISAC_CMDR, 0x41);
-	}
+	initisac(cs);
+	inithscx(cs);
+	
+	/* RESET Receiver and Transmitter */
+	cs->writeisac(cs, ISAC_CMDR, 0x41);
 }

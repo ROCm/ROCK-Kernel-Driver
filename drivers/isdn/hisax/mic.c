@@ -188,8 +188,7 @@ mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_mic(cs);
 			return(0);
 		case CARD_INIT:
-			inithscx(cs); /* /RTSA := ISAC RST */
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);

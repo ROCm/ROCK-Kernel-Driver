@@ -251,7 +251,7 @@ Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_teles0(cs);
 			return(0);
 		case CARD_INIT:
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);

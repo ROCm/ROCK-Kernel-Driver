@@ -163,10 +163,9 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_ioregs(cs, 0x3f);
 			return(0);
 		case CARD_INIT:
-			inithscxisac(cs, 1);
 			byteout(cs->hw.avm.cfg_reg, 0x16);
 			byteout(cs->hw.avm.cfg_reg, 0x1E);
-			inithscxisac(cs, 2);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);
