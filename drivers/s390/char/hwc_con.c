@@ -34,11 +34,11 @@ void hwc_console_unblank (void);
 struct console hwc_console =
 {
 
-	name:hwc_console_name,
-	write:hwc_console_write,
-	device:hwc_console_device,
-	unblank:hwc_console_unblank,
-	flags:CON_PRINTBUFFER,
+	.name = hwc_console_name,
+	.write = hwc_console_write,
+	.device = hwc_console_device,
+	.unblank = hwc_console_unblank,
+	.flags = CON_PRINTBUFFER,
 };
 
 void 

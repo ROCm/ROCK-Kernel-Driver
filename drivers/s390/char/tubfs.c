@@ -24,13 +24,13 @@ extern void tty3270_refresh(tub_t *);
 
 static struct file_operations fs3270_fops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
-	owner: THIS_MODULE,		/* owner */
+	.owner = THIS_MODULE,		/* owner */
 #endif
-	read: 	fs3270_read,	/* read */
-	write:	fs3270_write,	/* write */
-	ioctl:	fs3270_ioctl,	/* ioctl */
-	open: 	fs3270_open,	/* open */
-	release:fs3270_close,	/* release */
+	.read 	= fs3270_read,	/* read */
+	.write	= fs3270_write,	/* write */
+	.ioctl	= fs3270_ioctl,	/* ioctl */
+	.open 	= fs3270_open,	/* open */
+	.release = fs3270_close,	/* release */
 };
 
 #ifdef CONFIG_DEVFS_FS
