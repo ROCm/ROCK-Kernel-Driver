@@ -39,6 +39,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_request.h>
 #include <scsi/scsi_transport.h>
+#include <scsi/scsi_eh.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -325,6 +326,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 	int first_inquiry_len, try_inquiry_len, next_inquiry_len;
 	int response_len = 0;
 	int pass, count;
+	struct scsi_sense_hdr sshdr;
 
 	*bflags = 0;
 
@@ -360,17 +362,20 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 				sreq->sr_result));
 
 		if (sreq->sr_result) {
-
-			/* not-ready to ready transition or power-on - good */
-			/* dpg: bogus? INQUIRY never returns UNIT_ATTENTION */
-			/* Supposedly, but many buggy devices do so anyway. */
+			/*
+			 * not-ready to ready transition [asc/ascq=0x28/0x0]
+			 * or power-on, reset [asc/ascq=0x29/0x0], continue.
+			 * INQUIRY should not yield UNIT_ATTENTION
+			 * but many buggy devices do so anyway. 
+			 */
 			if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
-					(sreq->sr_sense_buffer[2] & 0xf) ==
-						UNIT_ATTENTION &&
-					(sreq->sr_sense_buffer[12] == 0x28 ||
-					 sreq->sr_sense_buffer[12] == 0x29) &&
-					sreq->sr_sense_buffer[13] == 0)
-				continue;
+			    scsi_request_normalize_sense(sreq, &sshdr)) {
+				if ((sshdr.sense_key == UNIT_ATTENTION) &&
+				    ((sshdr.asc == 0x28) ||
+				     (sshdr.asc == 0x29)) &&
+				    (sshdr.ascq == 0))
+					continue;
+			}
 		}
 		break;
 	}
@@ -898,6 +903,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	struct scsi_lun *lunp, *lun_data;
 	struct scsi_request *sreq;
 	u8 *data;
+	struct scsi_sense_hdr sshdr;
 
 	/*
 	 * Only support SCSI-3 and up devices if BLIST_NOREPORTLUN is not set.
@@ -975,9 +981,12 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 				" %s (try %d) result 0x%x\n", sreq->sr_result
 				?  "failed" : "successful", retries,
 				sreq->sr_result));
-		if (sreq->sr_result == 0 ||
-		    sreq->sr_sense_buffer[2] != UNIT_ATTENTION)
+		if (sreq->sr_result == 0)
 			break;
+		else if (scsi_request_normalize_sense(sreq, &sshdr)) {
+			if (sshdr.sense_key != UNIT_ATTENTION)
+				break;
+		}
 	}
 
 	if (sreq->sr_result) {

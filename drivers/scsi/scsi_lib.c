@@ -718,7 +718,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			clear_errors = 0;
 			if (scsi_command_normalize_sense(cmd, &sshdr)) {
 				/*
-				 * SG_IO wants to know about deferred errors
+				 * SG_IO wants current and deferred errors
 				 */
 				int len = 8 + cmd->sense_buffer[7];
 
@@ -844,9 +844,10 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			cmd = scsi_end_request(cmd, 0, this_count, 1);
 			return;
 		case VOLUME_OVERFLOW:
-			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
-			       cmd->device->host->host_no, (int) cmd->device->channel,
-			       (int) cmd->device->id, (int) cmd->device->lun);
+			printk(KERN_INFO "Volume overflow <%d %d %d %d> CDB: ",
+			       cmd->device->host->host_no,
+			       (int)cmd->device->channel,
+			       (int)cmd->device->id, (int)cmd->device->lun);
 			__scsi_print_command(cmd->data_cmnd);
 			scsi_print_sense("", cmd);
 			cmd = scsi_end_request(cmd, 0, block_bytes, 1);
@@ -865,8 +866,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		return;
 	}
 	if (result) {
-		printk("SCSI error : <%d %d %d %d> return code = 0x%x\n",
-		       cmd->device->host->host_no,
+		printk(KERN_INFO "SCSI error : <%d %d %d %d> return code "
+		       "= 0x%x\n", cmd->device->host->host_no,
 		       cmd->device->channel,
 		       cmd->device->id,
 		       cmd->device->lun, result);
@@ -1604,12 +1605,15 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)
 	sreq->sr_data_direction = DMA_NONE;
 	scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
 
-	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
-	    ((sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION ||
-	     (sreq->sr_sense_buffer[2] & 0x0f) == NOT_READY) &&
-	    sdev->removable) {
-		sdev->changed = 1;
-		sreq->sr_result = 0;
+	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) && sdev->removable) {
+		struct scsi_sense_hdr sshdr;
+
+		if ((scsi_request_normalize_sense(sreq, &sshdr)) &&
+		    ((sshdr.sense_key == UNIT_ATTENTION) ||
+		     (sshdr.sense_key == NOT_READY))) {
+			sdev->changed = 1;
+			sreq->sr_result = 0;
+		}
 	}
 	result = sreq->sr_result;
 	scsi_release_request(sreq);
