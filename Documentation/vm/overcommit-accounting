@@ -37,13 +37,13 @@ How It Works
 The overcommit is based on the following rules
 
 For a file backed map
-	SHARED or READ only	-	0 cost (the file is the map not swap)
+	SHARED or READ-only	-	0 cost (the file is the map not swap)
+	PRIVATE WRITABLE	-	size of mapping per instance
 
-	WRITABLE SHARED		-	size of mapping per instance
-
-For a direct map
-	SHARED or READ only	-	size of mapping
-	PRIVATE WRITEABLE	-	size of mapping per instance
+For an anonymous or /dev/zero map
+	SHARED			-	size of mapping
+	PRIVATE READ-only	-	0 cost (but of little use)
+	PRIVATE WRITABLE	-	size of mapping per instance
 
 Additional accounting
 	Pages made writable copies by mmap
@@ -66,5 +66,3 @@ o	Implement actual limit enforcement
 To Do
 -----
 o	Account ptrace pages (this is hard)
-o	Account for shared anonymous mappings properly
-	- right now we account them per instance
