@@ -73,6 +73,7 @@ static void mpu401_clear_rx(emu10k1_t *emu, emu10k1_midi_t *mpu)
 
 static void do_emu10k1_midi_interrupt(emu10k1_t *emu, emu10k1_midi_t *midi, unsigned int status)
 {
+	unsigned long flags;
 	unsigned char byte;
 
 	if (midi->rmidi == NULL) {
@@ -86,15 +87,13 @@ static void do_emu10k1_midi_interrupt(emu10k1_t *emu, emu10k1_midi_t *midi, unsi
 			mpu401_clear_rx(emu, midi);
 		} else {
 			byte = mpu401_read_data(emu, midi);
-			spin_unlock(&midi->input_lock);
 			if (midi->substream_input)
 				snd_rawmidi_receive(midi->substream_input, &byte, 1);
-			spin_lock(&midi->input_lock);
 		}
 	}
 	spin_unlock(&midi->input_lock);
 
-	spin_lock(&midi->output_lock);
+	spin_lock_irqsave(&midi->output_lock, flags);
 	if ((status & midi->ipr_tx) && mpu401_output_ready(emu, midi)) {
 		if (midi->substream_output &&
 		    snd_rawmidi_transmit(midi->substream_output, &byte, 1) == 1) {
@@ -103,7 +102,7 @@ static void do_emu10k1_midi_interrupt(emu10k1_t *emu, emu10k1_midi_t *midi, unsi
 			snd_emu10k1_intr_disable(emu, midi->tx_enable);
 		}
 	}
-	spin_unlock(&midi->output_lock);
+	spin_unlock_irqrestore(&midi->output_lock, flags);
 }
 
 static void snd_emu10k1_midi_interrupt(emu10k1_t *emu, unsigned int status)

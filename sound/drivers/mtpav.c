@@ -413,10 +413,11 @@ static void snd_mtpav_input_trigger(snd_rawmidi_substream_t * substream, int up)
 
 static void snd_mtpav_output_timer(unsigned long data)
 {
+	unsigned long flags;
 	mtpav_t *chip = (mtpav_t *)data;
 	int p;
 
-	spin_lock(&chip->spinlock);
+	spin_lock_irqsave(&chip->spinlock, flags);
 	/* reprogram timer */
 	chip->timer.expires = 1 + jiffies;
 	add_timer(&chip->timer);
@@ -426,7 +427,7 @@ static void snd_mtpav_output_timer(unsigned long data)
 		if ((portp->mode & MTPAV_MODE_OUTPUT_TRIGGERED) && portp->output)
 			snd_mtpav_output_port_write(portp, portp->output);
 	}
-	spin_unlock(&chip->spinlock);
+	spin_unlock_irqrestore(&chip->spinlock, flags);
 }
 
 /* spinlock held! */
@@ -514,9 +515,7 @@ static void snd_mtpav_inmidi_process(mtpav_t *mcrd, u8 inbyte)
 
 	portp = &mcrd->ports[mcrd->inmidiport];
 	if (portp->mode & MTPAV_MODE_INPUT_TRIGGERED) {
-		spin_unlock(&mcrd->spinlock);
 		snd_rawmidi_receive(portp->input, &inbyte, 1);
-		spin_lock(&mcrd->spinlock);
 	}
 }
 
@@ -581,12 +580,13 @@ static void snd_mtpav_read_bytes(mtpav_t * mcrd)
 
 static irqreturn_t snd_mtpav_irqh(int irq, void *dev_id, struct pt_regs *regs)
 {
+	unsigned long flags;
 	mtpav_t *mcard = dev_id;
 
 	//printk("irqh()\n");
-	spin_lock(&mcard->spinlock);
+	spin_lock_irqsave(&mcard->spinlock, flags);
 	snd_mtpav_read_bytes(mcard);
-	spin_unlock(&mcard->spinlock);
+	spin_unlock_irqrestore(&mcard->spinlock, flags);
 	return IRQ_HANDLED;
 }
 

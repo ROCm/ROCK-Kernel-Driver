@@ -23,6 +23,7 @@
  */
 
 #include <sound/asound.h>
+#include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <asm/semaphore.h>
@@ -65,8 +66,7 @@ typedef struct _snd_rawmidi_global_ops {
 } snd_rawmidi_global_ops_t;
 
 struct _snd_rawmidi_runtime {
-	unsigned int trigger: 1, /* transfer is running */
-		     drain: 1,	/* drain stage */
+	unsigned int drain: 1,	/* drain stage */
 		     oss: 1;	/* OSS compatible mode */
 	/* midi stream buffer */
 	unsigned char *buffer;	/* buffer for MIDI data */
@@ -80,6 +80,7 @@ struct _snd_rawmidi_runtime {
 	spinlock_t lock;
 	wait_queue_head_t sleep;
 	/* event handler (room [output] or new bytes [input]) */
+	struct tasklet_struct event_tasklet;
 	void (*event)(snd_rawmidi_substream_t *substream);
 	/* private data */
 	void *private_data;

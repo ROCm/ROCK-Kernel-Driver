@@ -336,6 +336,7 @@ struct _snd_ice1712 {
 
 	struct semaphore open_mutex;
 	snd_pcm_substream_t *pcm_reserved[4];
+	snd_pcm_hw_constraint_list_t *hw_rates; /* card-specific rate constraints */
 
 	unsigned int akm_codecs;
 	akm4xxx_t *akm;

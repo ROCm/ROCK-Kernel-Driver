@@ -103,6 +103,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445372, 0xffffffff, "AD1981A",		patch_ad1981a,	NULL },
 { 0x41445374, 0xffffffff, "AD1981B",		patch_ad1981b,	NULL },
 { 0x41445375, 0xffffffff, "AD1985",		patch_ad1985,	NULL },
+{ 0x41445378, 0xffffffff, "AD1986",		patch_ad1985,	NULL },
 { 0x414c4300, 0xffffff00, "ALC100/100P", 	NULL,		NULL },
 { 0x414c4710, 0xfffffff0, "ALC200/200P",	NULL,		NULL },
 { 0x414c4721, 0xffffffff, "ALC650D",		NULL,	NULL }, /* already patched */
@@ -1184,7 +1185,7 @@ snd_kcontrol_t *snd_ac97_cnew(const snd_kcontrol_new_t *_template, ac97_t * ac97
 /*
  * create mute switch(es) for normal stereo controls
  */
-static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac97)
+static int snd_ac97_cmute_new_stereo(snd_card_t *card, char *name, int reg, int check_stereo, ac97_t *ac97)
 {
 	snd_kcontrol_t *kctl;
 	int err;
@@ -1195,7 +1196,7 @@ static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac9
 
 	mute_mask = 0x8000;
 	val = snd_ac97_read(ac97, reg);
-	if (ac97->flags & AC97_STEREO_MUTES) {
+	if (check_stereo || (ac97->flags & AC97_STEREO_MUTES)) {
 		/* check whether both mute bits work */
 		val1 = val | 0x8080;
 		snd_ac97_write(ac97, reg, val1);
@@ -1253,7 +1254,7 @@ static int snd_ac97_cvol_new(snd_card_t *card, char *name, int reg, unsigned int
 /*
  * create a mute-switch and a volume for normal stereo/mono controls
  */
-static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, ac97_t *ac97)
+static int snd_ac97_cmix_new_stereo(snd_card_t *card, const char *pfx, int reg, int check_stereo, ac97_t *ac97)
 {
 	int err;
 	char name[44];
@@ -1264,7 +1265,7 @@ static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, ac97_t 
 
 	if (snd_ac97_try_bit(ac97, reg, 15)) {
 		sprintf(name, "%s Switch", pfx);
-		if ((err = snd_ac97_cmute_new(card, name, reg, ac97)) < 0)
+		if ((err = snd_ac97_cmute_new_stereo(card, name, reg, check_stereo, ac97)) < 0)
 			return err;
 	}
 	check_volume_resolution(ac97, reg, &lo_max, &hi_max);
@@ -1276,6 +1277,8 @@ static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, ac97_t 
 	return 0;
 }
 
+#define snd_ac97_cmix_new(card, pfx, reg, ac97)	snd_ac97_cmix_new_stereo(card, pfx, reg, 0, ac97)
+#define snd_ac97_cmute_new(card, name, reg, ac97)	snd_ac97_cmute_new_stereo(card, name, reg, 0, ac97)
 
 static unsigned int snd_ac97_determine_spdif_rates(ac97_t *ac97);
 
@@ -1326,7 +1329,8 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 
 	/* build surround controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_SURROUND_MASTER)) {
-		if ((err = snd_ac97_cmix_new(card, "Surround Playback", AC97_SURROUND_MASTER, ac97)) < 0)
+		/* Surround Master (0x38) is with stereo mutes */
+		if ((err = snd_ac97_cmix_new_stereo(card, "Surround Playback", AC97_SURROUND_MASTER, 1, ac97)) < 0)
 			return err;
 	}
 
@@ -1592,6 +1596,7 @@ static int snd_ac97_test_rate(ac97_t *ac97, int reg, int shadow_reg, int rate)
 static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsigned int *r_result)
 {
 	unsigned int result = 0;
+	unsigned short saved;
 
 	if (ac97->bus->no_vra) {
 		*r_result = SNDRV_PCM_RATE_48000;
@@ -1601,6 +1606,7 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 		return;
 	}
 
+	saved = snd_ac97_read(ac97, reg);
 	if ((ac97->ext_id & AC97_EI_DRA) && reg == AC97_PCM_FRONT_DAC_RATE)
 		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
 				     AC97_EA_DRA, 0);
@@ -1639,6 +1645,10 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
 				     AC97_EA_DRA, 0);
 	}
+	/* restore the default value */
+	snd_ac97_write_cache(ac97, reg, saved);
+	if (shadow_reg)
+		snd_ac97_write_cache(ac97, shadow_reg, saved);
 	*r_result = result;
 }
 
@@ -2501,7 +2511,7 @@ static int apply_quirk_str(ac97_t *ac97, const char *typestr)
 	}
 	/* for compatibility, accept the numbers, too */
 	if (*typestr >= '0' && *typestr <= '9')
-		return apply_quirk(ac97, (int)simple_strtol(typestr, NULL, 10));
+		return apply_quirk(ac97, (int)simple_strtoul(typestr, NULL, 10));
 	return -EINVAL;
 }
 

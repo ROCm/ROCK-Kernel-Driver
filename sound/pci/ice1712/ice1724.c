@@ -718,6 +718,13 @@ static snd_pcm_hardware_t snd_vt1724_2ch_stereo =
 static int set_rate_constraints(ice1712_t *ice, snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	if (ice->hw_rates) {
+		/* hardware specific */
+		runtime->hw.rate_min = ice->hw_rates->list[0];
+		runtime->hw.rate_max = ice->hw_rates->list[ice->hw_rates->count - 1];
+		runtime->hw.rates = SNDRV_PCM_RATE_KNOT;
+		return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, ice->hw_rates);
+	}
 	if (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S) {
 		/* I2S */
 		/* VT1720 doesn't support more than 96kHz */

@@ -1116,8 +1116,10 @@ static struct alc_channel_mode alc260_modes[1] = {
 };
 
 snd_kcontrol_new_t alc260_base_mixer[] = {
-	HDA_CODEC_VOLUME("PCM Playback Volume", 0x08, 0x0, HDA_OUTPUT),
-	HDA_CODEC_MUTE("PCM Playback Switch", 0x0f, 0x0, HDA_OUTPUT),
+	HDA_CODEC_VOLUME("Front Playback Volume", 0x08, 0x0, HDA_OUTPUT),
+	/* use LINE2 for the output */
+	/* HDA_CODEC_MUTE("Front Playback Switch", 0x0f, 0x0, HDA_OUTPUT), */
+	HDA_CODEC_MUTE("Front Playback Switch", 0x15, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME("CD Playback Volume", 0x07, 0x04, HDA_INPUT),
 	HDA_CODEC_MUTE("CD Playback Switch", 0x07, 0x04, HDA_INPUT),
 	HDA_CODEC_VOLUME("Line Playback Volume", 0x07, 0x02, HDA_INPUT),
@@ -1149,6 +1151,14 @@ static struct hda_verb alc260_init_verbs[] = {
 	{0x12, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x24},
 	/* Mic2 (front panel) pin widget for input and vref at 80% */
 	{0x13, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x24},
+	/* LINE-2 is used for line-out in rear */
+	{0x15, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
+	/* select line-out */
+	{0x15, AC_VERB_SET_CONNECT_SEL, 0x00},
+	/* LINE-OUT pin */
+	{0x0f, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
+	/* enable HP */
+	{0x10, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
 	/* unmute amp left and right */
 	{0x04, AC_VERB_SET_AMP_GAIN_MUTE, 0x7000},
 	/* set connection select to line in (default select for this ADC) */
@@ -1156,11 +1166,13 @@ static struct hda_verb alc260_init_verbs[] = {
 	/* unmute Line-Out mixer amp left and right (volume = 0) */
 	{0x08, AC_VERB_SET_AMP_GAIN_MUTE, 0xb000},
 	/* mute pin widget amp left and right (no gain on this amp) */
-	{0x0f, AC_VERB_SET_AMP_GAIN_MUTE, 0x0000},
+	{0x0f, AC_VERB_SET_AMP_GAIN_MUTE, 0xb000},
 	/* unmute HP mixer amp left and right (volume = 0) */
 	{0x09, AC_VERB_SET_AMP_GAIN_MUTE, 0xb000},
 	/* mute pin widget amp left and right (no gain on this amp) */
-	{0x10, AC_VERB_SET_AMP_GAIN_MUTE, 0x0000},
+	{0x10, AC_VERB_SET_AMP_GAIN_MUTE, 0xb080},
+	/* mute LINE-2 out */
+	{0x15, AC_VERB_SET_AMP_GAIN_MUTE, 0xb080},
 	/* Amp Indexes: CD = 0x04, Line In 1 = 0x02, Mic 1 = 0x00 & Line In 2 = 0x03 */
 	/* unmute CD */
 	{0x07, AC_VERB_SET_AMP_GAIN_MUTE, (0x7000 | (0x04 << 8))},

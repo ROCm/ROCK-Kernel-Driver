@@ -292,30 +292,32 @@ static void snd_uart16550_io_loop(snd_uart16550_t * uart)
  */
 static irqreturn_t snd_uart16550_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	unsigned long flags;
 	snd_uart16550_t *uart;
 
 	uart = (snd_uart16550_t *) dev_id;
-	spin_lock(&uart->open_lock);
+	spin_lock_irqsave(&uart->open_lock, flags);
 	if (uart->filemode == SERIAL_MODE_NOT_OPENED) {
-		spin_unlock(&uart->open_lock);
+		spin_unlock_irqrestore(&uart->open_lock, flags);
 		return IRQ_NONE;
 	}
 	inb(uart->base + UART_IIR);		/* indicate to the UART that the interrupt has been serviced */
 	snd_uart16550_io_loop(uart);
-	spin_unlock(&uart->open_lock);
+	spin_unlock_irqrestore(&uart->open_lock, flags);
 	return IRQ_HANDLED;
 }
 
 /* When the polling mode, this function calls snd_uart16550_io_loop. */
 static void snd_uart16550_buffer_timer(unsigned long data)
 {
+	unsigned long flags;
 	snd_uart16550_t *uart;
 
 	uart = (snd_uart16550_t *)data;
-	spin_lock(&uart->open_lock);
+	spin_lock_irqsave(&uart->open_lock, flags);
 	snd_uart16550_del_timer(uart);
 	snd_uart16550_io_loop(uart);
-	spin_unlock(&uart->open_lock);
+	spin_unlock_irqrestore(&uart->open_lock, flags);
 }
 
 /*
@@ -840,6 +842,16 @@ static int __init snd_uart16550_create(snd_card_t * card,
 	return 0;
 }
 
+static void __init snd_uart16550_substreams(snd_rawmidi_str_t *stream)
+{
+	struct list_head *list;
+
+	list_for_each(list, &stream->substreams) {
+		snd_rawmidi_substream_t *substream = list_entry(list, snd_rawmidi_substream_t, list);
+		sprintf(substream->name, "Serial MIDI %d", substream->number + 1);
+	}
+}
+
 static int __init snd_uart16550_rmidi(snd_uart16550_t *uart, int device, int outs, int ins, snd_rawmidi_t **rmidi)
 {
 	snd_rawmidi_t *rrawmidi;
@@ -849,7 +861,9 @@ static int __init snd_uart16550_rmidi(snd_uart16550_t *uart, int device, int out
 		return err;
 	snd_rawmidi_set_ops(rrawmidi, SNDRV_RAWMIDI_STREAM_INPUT, &snd_uart16550_input);
 	snd_rawmidi_set_ops(rrawmidi, SNDRV_RAWMIDI_STREAM_OUTPUT, &snd_uart16550_output);
-	sprintf(rrawmidi->name, "uart16550 MIDI #%d", device);
+	strcpy(rrawmidi->name, "Serial MIDI");
+	snd_uart16550_substreams(&rrawmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT]);
+	snd_uart16550_substreams(&rrawmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT]);
 	rrawmidi->info_flags = SNDRV_RAWMIDI_INFO_OUTPUT |
 			       SNDRV_RAWMIDI_INFO_INPUT |
 			       SNDRV_RAWMIDI_INFO_DUPLEX;
@@ -906,7 +920,7 @@ static int __init snd_serial_probe(int dev)
 		return -ENOMEM;
 
 	strcpy(card->driver, "Serial");
-	strcpy(card->shortname, "Serial midi (uart16550A)");
+	strcpy(card->shortname, "Serial MIDI (UART16550A)");
 
 	if ((err = snd_uart16550_create(card,
 					port[dev],

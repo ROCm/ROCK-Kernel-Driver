@@ -1863,9 +1863,8 @@ static void snd_pcm_system_tick_set(snd_pcm_substream_t *substream,
 	if (ticks == 0)
 		del_timer(&runtime->tick_timer);
 	else {
+		ticks += (1000000 / HZ) - 1;
 		ticks /= (1000000 / HZ);
-		if (ticks % (1000000 / HZ))
-			ticks++;
 		mod_timer(&runtime->tick_timer, jiffies + ticks);
 	}
 }
@@ -2142,11 +2141,9 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 			break;
 		}
 		appl_ptr += frames;
-		if (appl_ptr >= runtime->boundary) {
-			runtime->control->appl_ptr = 0;
-		} else {
-			runtime->control->appl_ptr = appl_ptr;
-		}
+		if (appl_ptr >= runtime->boundary)
+			appl_ptr -= runtime->boundary;
+		runtime->control->appl_ptr = appl_ptr;
 		if (substream->ops->ack)
 			substream->ops->ack(substream);
 
@@ -2441,11 +2438,9 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream,
 			break;
 		}
 		appl_ptr += frames;
-		if (appl_ptr >= runtime->boundary) {
-			runtime->control->appl_ptr = 0;
-		} else {
-			runtime->control->appl_ptr = appl_ptr;
-		}
+		if (appl_ptr >= runtime->boundary)
+			appl_ptr -= runtime->boundary;
+		runtime->control->appl_ptr = appl_ptr;
 		if (substream->ops->ack)
 			substream->ops->ack(substream);
 

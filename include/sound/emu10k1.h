@@ -765,8 +765,8 @@
 #define A_SPDIF_SAMPLERATE	0x76		/* Set the sample rate of SPDIF output		*/
 #define A_SPDIF_RATE_MASK	0x000000c0
 #define A_SPDIF_48000		0x00000000
-#define A_SPDIF_44100		0x00000040
-#define A_SPDIF_96000		0x00000080
+#define A_SPDIF_44100		0x00000080
+#define A_SPDIF_96000		0x00000040
 
 /* 0x77,0x78,0x79 "something i2s-related" - default to 0x01080000 on my audigy 2 ZS --rlrevell	*/
 /* 0x7a, 0x7b - lookup tables */

@@ -1149,6 +1149,7 @@ static int snd_cs46xx_capture_prepare(snd_pcm_substream_t * substream)
 
 static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	unsigned long flags;
 	cs46xx_t *chip = dev_id;
 	u32 status1;
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -1212,14 +1213,12 @@ static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *r
 	if ((status1 & HISR_MIDI) && chip->rmidi) {
 		unsigned char c;
 		
-		spin_lock(&chip->reg_lock);
+		spin_lock_irqsave(&chip->reg_lock, flags);
 		while ((snd_cs46xx_peekBA0(chip, BA0_MIDSR) & MIDSR_RBE) == 0) {
 			c = snd_cs46xx_peekBA0(chip, BA0_MIDRP);
 			if ((chip->midcr & MIDCR_RIE) == 0)
 				continue;
-			spin_unlock(&chip->reg_lock);
 			snd_rawmidi_receive(chip->midi_input, &c, 1);
-			spin_lock(&chip->reg_lock);
 		}
 		while ((snd_cs46xx_peekBA0(chip, BA0_MIDSR) & MIDSR_TBF) == 0) {
 			if ((chip->midcr & MIDCR_TIE) == 0)
@@ -1231,7 +1230,7 @@ static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *r
 			}
 			snd_cs46xx_pokeBA0(chip, BA0_MIDWP, c);
 		}
-		spin_unlock(&chip->reg_lock);
+		spin_unlock_irqrestore(&chip->reg_lock, flags);
 	}
 	/*
 	 *  EOI to the PCI part....reenables interrupts

@@ -183,4 +183,6 @@ MODULE_PARM_DESC(rtctimer_freq, "timer frequency in Hz");
 
 MODULE_LICENSE("GPL");
 
+MODULE_ALIAS("snd-timer-" __stringify(SNDRV_TIMER_GLOBAL_RTC));
+
 #endif /* CONFIG_RTC || CONFIG_RTC_MODULE */

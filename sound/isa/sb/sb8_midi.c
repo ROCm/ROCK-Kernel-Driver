@@ -46,20 +46,16 @@ irqreturn_t snd_sb8dsp_midi_interrupt(sb_t * chip)
 		inb(SBP(chip, DATA_AVAIL));	/* ack interrupt */
 		return IRQ_NONE;
 	}
+	spin_lock(&chip->midi_input_lock);
 	while (max-- > 0) {
-		spin_lock(&chip->midi_input_lock);
 		if (inb(SBP(chip, DATA_AVAIL)) & 0x80) {
 			byte = inb(SBP(chip, READ));
 			if (chip->open & SB_OPEN_MIDI_INPUT_TRIGGER) {
-				spin_unlock(&chip->midi_input_lock);
 				snd_rawmidi_receive(chip->midi_substream_input, &byte, 1);
-			} else {
-				spin_unlock(&chip->midi_input_lock);
 			}
-		} else {
-			spin_unlock(&chip->midi_input_lock);
 		}
 	}
+	spin_unlock(&chip->midi_input_lock);
 	return IRQ_HANDLED;
 }
 

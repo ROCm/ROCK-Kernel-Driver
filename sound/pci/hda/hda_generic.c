@@ -254,6 +254,10 @@ static int parse_output_path(struct hda_codec *codec, struct hda_gspec *spec,
 
 	node->checked = 1;
 	if (node->type == AC_WID_AUD_OUT) {
+		if (node->wid_caps & AC_WCAP_DIGITAL) {
+			snd_printdd("Skip Digital OUT node %x\n", node->nid);
+			return 0;
+		}
 		snd_printdd("AUD_OUT found %x\n", node->nid);
 		if (spec->dac_node) {
 			/* already DAC node is assigned, just unmute & connect */
@@ -321,6 +325,8 @@ static struct hda_gnode *parse_output_jack(struct hda_codec *codec,
 		if (jack_type >= 0) {
 			if (jack_type != get_defcfg_type(node))
 				continue;
+			if (node->wid_caps & AC_WCAP_DIGITAL)
+				continue; /* skip SPDIF */
 		} else {
 			/* output as default? */
 			if (! (node->pin_ctl & AC_PINCTL_OUT_EN))
@@ -482,6 +488,9 @@ static int parse_adc_sub_nodes(struct hda_codec *codec, struct hda_gspec *spec,
 	if (! (node->pin_caps & AC_PINCAP_IN))
 		return 0;
 
+	if (node->wid_caps & AC_WCAP_DIGITAL)
+		return 0; /* skip SPDIF */
+
 	if (spec->input_mux.num_items >= HDA_MAX_NUM_INPUTS) {
 		snd_printk(KERN_ERR "hda_generic: Too many items for capture\n");
 		return -EINVAL;
@@ -582,6 +591,8 @@ static int parse_input(struct hda_codec *codec)
 	 */
 	list_for_each(p, &spec->nid_list) {
 		node = list_entry(p, struct hda_gnode, list);
+		if (node->wid_caps & AC_WCAP_DIGITAL)
+			continue; /* skip SPDIF */
 		if (node->type == AC_WID_AUD_IN) {
 			err = parse_input_path(codec, node);
 			if (err < 0)

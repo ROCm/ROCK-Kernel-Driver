@@ -413,8 +413,8 @@ snd_wavefront_midi_interrupt (snd_wavefront_card_t *card)
 		return;
 	}
 
+	spin_lock_irqsave (&midi->virtual, flags);
 	while (--max) {
-		spin_lock_irqsave (&midi->virtual, flags);
 
 		if (input_avail (midi)) {
 			byte = read_data (midi);
@@ -433,21 +433,17 @@ snd_wavefront_midi_interrupt (snd_wavefront_card_t *card)
 			}
 
 			if (substream == NULL) {
-				spin_unlock_irqrestore (&midi->virtual, flags);
 				continue;
 			}
 
 			if (midi->mode[mpu] & MPU401_MODE_INPUT_TRIGGER) {
-				spin_unlock_irqrestore (&midi->virtual, flags);
 				snd_rawmidi_receive(substream, &byte, 1);
-			} else {
-				spin_unlock_irqrestore (&midi->virtual, flags);
 			}
 		} else {
-			spin_unlock_irqrestore (&midi->virtual, flags);
 			break;
 		}
 	} 
+	spin_unlock_irqrestore (&midi->virtual, flags);
 
 	snd_wavefront_midi_output_write(card);
 }

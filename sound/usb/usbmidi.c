@@ -38,6 +38,7 @@
 #include <sound/driver.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <linux/bitops.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
@@ -104,11 +105,13 @@ struct snd_usb_midi {
 		snd_usb_midi_out_endpoint_t *out;
 		snd_usb_midi_in_endpoint_t *in;
 	} endpoints[MIDI_MAX_ENDPOINTS];
+	unsigned long input_triggered;
 };
 
 struct snd_usb_midi_out_endpoint {
 	snd_usb_midi_t* umidi;
 	struct urb* urb;
+	int urb_active;
 	int max_transfer;		/* size of urb buffer */
 	struct tasklet_struct tasklet;
 
@@ -186,8 +189,7 @@ static void snd_usbmidi_input_data(snd_usb_midi_in_endpoint_t* ep, int portidx,
 		snd_printd("unexpected port %d!\n", portidx);
 		return;
 	}
-	if (!port->substream->runtime ||
-	    !port->substream->runtime->trigger)
+	if (!test_bit(port->substream->number, &ep->umidi->input_triggered))
 		return;
 	snd_rawmidi_receive(port->substream, data, length);
 }
@@ -230,6 +232,9 @@ static void snd_usbmidi_out_urb_complete(struct urb* urb, struct pt_regs *regs)
 {
 	snd_usb_midi_out_endpoint_t* ep = urb->context;
 
+	spin_lock(&ep->buffer_lock);
+	ep->urb_active = 0;
+	spin_unlock(&ep->buffer_lock);
 	if (urb->status < 0) {
 		if (snd_usbmidi_urb_error(urb->status) < 0)
 			return;
@@ -247,7 +252,7 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 	unsigned long flags;
 
 	spin_lock_irqsave(&ep->buffer_lock, flags);
-	if (urb->status == -EINPROGRESS || ep->umidi->chip->shutdown) {
+	if (ep->urb_active || ep->umidi->chip->shutdown) {
 		spin_unlock_irqrestore(&ep->buffer_lock, flags);
 		return;
 	}
@@ -259,7 +264,7 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 		dump_urb("sending", urb->transfer_buffer,
 			 urb->transfer_buffer_length);
 		urb->dev = ep->umidi->chip->dev;
-		snd_usbmidi_submit_urb(urb, GFP_ATOMIC);
+		ep->urb_active = snd_usbmidi_submit_urb(urb, GFP_ATOMIC) >= 0;
 	}
 	spin_unlock_irqrestore(&ep->buffer_lock, flags);
 }
@@ -733,6 +738,12 @@ static int snd_usbmidi_input_close(snd_rawmidi_substream_t* substream)
 
 static void snd_usbmidi_input_trigger(snd_rawmidi_substream_t* substream, int up)
 {
+	snd_usb_midi_t* umidi = substream->rmidi->private_data;
+
+	if (up)
+		set_bit(substream->number, &umidi->input_triggered);
+	else
+		clear_bit(substream->number, &umidi->input_triggered);
 }
 
 static snd_rawmidi_ops_t snd_usbmidi_output_ops = {

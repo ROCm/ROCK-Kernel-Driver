@@ -23,12 +23,12 @@ send the F5 NN command sequence at all; perhaps it ought to.
 
 Usage example for simple serial converter:
 
-	/sbin/setserial /dev/ttyS0 none
+	/sbin/setserial /dev/ttyS0 uart none
 	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 speed=115200
 
 Usage example for Roland SoundCanvas with 4 MIDI ports:
 
-	/sbin/setserial /dev/ttyS0 none
+	/sbin/setserial /dev/ttyS0 uart none
 	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 outs=4
 
 In MS-124T mode, one raw MIDI substream is supported (midiCnD0); the outs
@@ -38,7 +38,7 @@ parameter to match (A=19200, B=9600).
 
 Usage example for MS-124T, with A-B switch in A position:
 
-	/sbin/setserial /dev/ttyS0 none
+	/sbin/setserial /dev/ttyS0 uart none
 	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 adaptor=1 \
 			speed=19200
 
@@ -48,7 +48,7 @@ the same data to all four MIDI Out connectors at full MIDI speed.
 
 Usage example for S/A mode:
 
-	/sbin/setserial /dev/ttyS0 none
+	/sbin/setserial /dev/ttyS0 uart none
 	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 adaptor=2
 
 In MS-124W M/B mode, the driver supports 16 ALSA raw MIDI substreams;
@@ -64,7 +64,7 @@ one byte every 320 us per port.
 
 Usage example for M/B mode:
 
-	/sbin/setserial /dev/ttyS0 none
+	/sbin/setserial /dev/ttyS0 uart none
 	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 adaptor=3
 
 The MS-124W hardware's M/A mode is currently not supported. This mode allows

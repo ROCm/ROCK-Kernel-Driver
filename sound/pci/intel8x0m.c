@@ -47,6 +47,8 @@ MODULE_SUPPORTED_DEVICE("{{Intel,82801AA-ICH},"
 		"{Intel,82801CA-ICH3},"
 		"{Intel,82801DB-ICH4},"
 		"{Intel,ICH5},"
+		"{Intel,ICH6},"
+		"{Intel,ICH7},"
 	        "{Intel,MX440},"
 		"{SiS,7013},"
 		"{NVidia,NForce Modem},"
@@ -93,6 +95,12 @@ MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_ICH5_6
 #define PCI_DEVICE_ID_INTEL_ICH5_6	0x24d6
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH6_6
+#define PCI_DEVICE_ID_INTEL_ICH6_6	0x266d
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH7_6
+#define PCI_DEVICE_ID_INTEL_ICH7_6	0x27dd
 #endif
 #ifndef PCI_DEVICE_ID_SI_7013
 #define PCI_DEVICE_ID_SI_7013		0x7013
@@ -269,6 +277,8 @@ static struct pci_device_id snd_intel8x0m_ids[] = {
 	{ 0x8086, 0x2486, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH3 */
 	{ 0x8086, 0x24c6, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL }, /* ICH4 */
 	{ 0x8086, 0x24d6, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL }, /* ICH5 */
+	{ 0x8086, 0x266d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH6 */
+	{ 0x8086, 0x27dd, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH7 */
 	{ 0x8086, 0x7196, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1022, 0x7446, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0x1039, 0x7013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7013 */
@@ -1350,6 +1360,8 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH3_6, "Intel 82801CA-ICH3" },
 	{ PCI_DEVICE_ID_INTEL_ICH4_6, "Intel 82801DB-ICH4" },
 	{ PCI_DEVICE_ID_INTEL_ICH5_6, "Intel ICH5" },
+	{ PCI_DEVICE_ID_INTEL_ICH6_6, "Intel ICH6" },
+	{ PCI_DEVICE_ID_INTEL_ICH7_6, "Intel ICH7" },
 	{ 0x7446, "AMD AMD768" },
 	{ PCI_DEVICE_ID_SI_7013, "SiS SI7013" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_MODEM, "NVidia nForce" },
