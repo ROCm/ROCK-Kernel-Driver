@@ -2501,11 +2501,8 @@ void cleanup_module (void)
 {
 	int index;
 
-	for (index = 0; index < MAX_HWIFS; ++index) {
+	for (index = 0; index < MAX_HWIFS; ++index)
 		ide_unregister(index);
-		if (ide_hwifs[index].dma_base)
-			(void) ide_release_dma(&ide_hwifs[index]);
-	}
 
 #ifdef CONFIG_PROC_FS
 	proc_ide_destroy();
