@@ -36,7 +36,6 @@
 #include <linux/sched.h>
 #include <linux/video_decoder.h>
 
-#include <linux/version.h>
 #include <asm/uaccess.h>
 
 #include "tuner.h"
