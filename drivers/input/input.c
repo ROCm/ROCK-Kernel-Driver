@@ -737,11 +737,10 @@ static int __init input_init(void)
 
 static void __exit input_exit(void)
 {
-#ifdef CONFIG_PROC_FS
 	remove_proc_entry("devices", proc_bus_input_dir);
 	remove_proc_entry("handlers", proc_bus_input_dir);
 	remove_proc_entry("input", proc_bus);
-#endif
+
 	devfs_remove("input");
 	unregister_chrdev(INPUT_MAJOR, "input");
 	class_unregister(&input_class);
