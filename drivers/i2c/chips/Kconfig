@@ -45,6 +45,17 @@ config SENSORS_EEPROM
 	  This driver can also be built as a module.  If so, the module
 	  will be called eeprom.
 
+config SENSORS_FSCHER
+	tristate "FSC Hermes"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Fujitsu Siemens
+	  Computers Hermes sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called fscher.
+
 config SENSORS_GL518SM
 	tristate "Genesys Logic GL518SM"
 	depends on I2C && EXPERIMENTAL
