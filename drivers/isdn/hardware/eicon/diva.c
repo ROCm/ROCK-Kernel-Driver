@@ -1,4 +1,4 @@
-/* $Id: diva.c,v 1.21 2004/03/21 17:30:25 armin Exp $ */
+/* $Id: diva.c,v 1.21.4.1 2004/05/08 14:33:43 armin Exp $ */
 
 #define CARDTYPE_H_WANT_DATA            1
 #define CARDTYPE_H_WANT_IDI_DATA        0
@@ -156,7 +156,7 @@ static diva_os_xdi_adapter_t *diva_q_get_next(struct list_head * what)
 {
 	diva_os_xdi_adapter_t *a = NULL;
 
-	if (what && !list_empty(what))
+	if (what && (what->next != &adapter_queue))
 		a = list_entry(what->next, diva_os_xdi_adapter_t, link);
 
 	return(a);
