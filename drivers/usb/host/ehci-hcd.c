@@ -279,6 +279,8 @@ static void ehci_watchdog (unsigned long param)
 	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
+#ifdef	CONFIG_PCI
+
 /* EHCI 0.96 (and later) section 5.1 says how to kick BIOS/SMM/...
  * off the controller (maybe it can boot from highspeed USB disks).
  */
@@ -307,6 +309,8 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 	return 0;
 }
 
+#endif
+
 static int
 ehci_reboot (struct notifier_block *self, unsigned long code, void *null)
 {
@@ -326,6 +330,7 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			temp;
+	unsigned		count = 256/4;
 
 	spin_lock_init (&ehci->lock);
 
@@ -335,17 +340,26 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	dbg_hcs_params (ehci, "reset");
 	dbg_hcc_params (ehci, "reset");
 
+#ifdef	CONFIG_PCI
 	/* EHCI 0.96 and later may have "extended capabilities" */
-	temp = HCC_EXT_CAPS (readl (&ehci->caps->hcc_params));
-	while (temp) {
+	if (hcd->self.controller->bus == &pci_bus_type)
+		temp = HCC_EXT_CAPS (readl (&ehci->caps->hcc_params));
+	else
+		temp = 0;
+	while (temp && count--) {
 		u32		cap;
 
-		pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), temp, &cap);
+		pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller),
+				temp, &cap);
 		ehci_dbg (ehci, "capability %04x at %02x\n", cap, temp);
 		switch (cap & 0xff) {
 		case 1:			/* BIOS/SMM/... handoff */
 			if (bios_handoff (ehci, temp, cap) != 0)
 				return -EOPNOTSUPP;
+			break;
+		case 0x0a:		/* appendix C */
+			ehci_dbg (ehci, "debug registers, BAR %d offset %d\n",
+				(cap >> 29) & 0x07, (cap >> 16) & 0x0fff);
 			break;
 		case 0:			/* illegal reserved capability */
 			ehci_warn (ehci, "illegal capability!\n");
@@ -356,6 +370,11 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 		}
 		temp = (cap >> 8) & 0xff;
 	}
+	if (!count) {
+		ehci_err (ehci, "bogus capabilities ... PCI problems!\n");
+		return -EIO;
+	}
+#endif
 
 	/* cache this readonly data; minimize PCI reads */
 	ehci->hcs_params = readl (&ehci->caps->hcs_params);
@@ -372,7 +391,11 @@ static int ehci_start (struct usb_hcd *hcd)
 	struct usb_bus		*bus;
 	int			retval;
 	u32			hcc_params;
-	u8                      tempbyte;
+	u8                      sbrn = 0;
+
+	init_timer (&ehci->watchdog);
+	ehci->watchdog.function = ehci_watchdog;
+	ehci->watchdog.data = (unsigned long) ehci;
 
 	/*
 	 * hw default: 1K periodic list heads, one per frame.
@@ -401,6 +424,29 @@ static int ehci_start (struct usb_hcd *hcd)
 	}
 	writel (INTR_MASK, &ehci->regs->intr_enable);
 	writel (ehci->periodic_dma, &ehci->regs->frame_list);
+
+#ifdef	CONFIG_PCI
+	if (hcd->self.controller->bus == &pci_bus_type) {
+		struct pci_dev		*pdev;
+
+		pdev = to_pci_dev(hcd->self.controller);
+
+		/* Serial Bus Release Number is at PCI 0x60 offset */
+		pci_read_config_byte(pdev, 0x60, &sbrn);
+
+		/* help hc dma work well with cachelines */
+		pci_set_mwi (pdev);
+
+		/* chip-specific init */
+		switch (pdev->vendor) {
+		case PCI_VENDOR_ID_ARC:
+			if (pdev->device == PCI_DEVICE_ID_ARC_EHCI)
+				ehci->is_arc_rh_tt = 1;
+			break;
+		}
+
+	}
+#endif
 
 	/*
 	 * dedicate a qh for the async ring head, since we couldn't unlink
@@ -439,9 +485,6 @@ static int ehci_start (struct usb_hcd *hcd)
 #endif
 	}
 
-	/* help hc dma work well with cachelines */
-	pci_set_mwi (to_pci_dev(ehci->hcd.self.controller));
-
 	/* clear interrupt enables, set irq latency */
 	temp = readl (&ehci->regs->command) & 0x0fff;
 	if (log2_irq_thresh < 0 || log2_irq_thresh > 6)
@@ -468,10 +511,6 @@ static int ehci_start (struct usb_hcd *hcd)
 
 	/* set async sleep time = 10 us ... ? */
 
-	init_timer (&ehci->watchdog);
-	ehci->watchdog.function = ehci_watchdog;
-	ehci->watchdog.data = (unsigned long) ehci;
-
 	/* wire up the root hub */
 	bus = hcd_to_bus (hcd);
 	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
@@ -493,12 +532,10 @@ done2:
 	writel (FLAG_CF, &ehci->regs->configured_flag);
 	readl (&ehci->regs->command);	/* unblock posted write */
 
-        /* PCI Serial Bus Release Number is at 0x60 offset */
-	pci_read_config_byte(to_pci_dev(hcd->self.controller), 0x60, &tempbyte);
 	temp = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	ehci_info (ehci,
 		"USB %x.%x enabled, EHCI %x.%02x, driver %s\n",
-		((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
+		((sbrn & 0xf0)>>4), (sbrn & 0x0f),
 		temp >> 8, temp & 0xff, DRIVER_VERSION);
 
 	/*
@@ -550,7 +587,8 @@ static void ehci_stop (struct usb_hcd *hcd)
 
 	/* root hub is shut down separately (first, when possible) */
 	spin_lock_irq (&ehci->lock);
-	ehci_work (ehci, NULL);
+	if (ehci->async)
+		ehci_work (ehci, NULL);
 	spin_unlock_irq (&ehci->lock);
 	ehci_mem_cleanup (ehci);
 
@@ -995,7 +1033,9 @@ static const struct hc_driver ehci_driver = {
 
 /*-------------------------------------------------------------------------*/
 
-/* EHCI spec says PCI is required. */
+/* EHCI 1.0 doesn't require PCI */
+
+#ifdef	CONFIG_PCI
 
 /* PCI driver selection metadata; PCI hotplugging uses this */
 static const struct pci_device_id pci_ids [] = { {
@@ -1020,6 +1060,9 @@ static struct pci_driver ehci_pci_driver = {
 	.resume =	usb_hcd_pci_resume,
 #endif
 };
+
+#endif	/* PCI */
+
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 

@@ -660,16 +660,15 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 
 			struct video_window vw;
 
-			if (copy_from_user(&vw, arg, sizeof(vw)))
-			{
+			if (copy_from_user(&vw, arg, sizeof(vw))) {
 				retval = -EFAULT;
-			break;
+				break;
 			}
 
 			DBG("VIDIOCSWIN %d x %d\n", vw.width, vw.height);
 			
 			if ( vw.width != 320 || vw.height != 240 )
-			retval = -EINVAL;
+				retval = -EFAULT;
 
 			break;
 		}
@@ -1281,6 +1280,8 @@ static struct usb_driver vicam_driver = {
 
 /**
  *	vicam_probe
+ *	@intf: the interface
+ *	@id: the device id
  *
  *	Called by the usb core when a new device is connected that it thinks
  *	this driver might be interested in.

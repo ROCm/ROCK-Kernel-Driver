@@ -27,7 +27,7 @@ static inline void lprintk(char *buf)
 		p = strchr(buf, '\n');
 		if (p)
 			*p = 0;
-		printk("%s\n", buf);
+		printk(KERN_DEBUG "%s\n", buf);
 		buf = p;
 		if (buf)
 			buf++;
@@ -210,7 +210,7 @@ static const char *qh_names[] = {
   "skel_int32_qh", "skel_int16_qh",
   "skel_int8_qh", "skel_int4_qh",
   "skel_int2_qh", "skel_int1_qh",
-  "skel_ls_control_qh", "skel_hs_control_qh",
+  "skel_ls_control_qh", "skel_fs_control_qh",
   "skel_bulk_qh", "skel_term_qh"
 };
 
@@ -328,21 +328,17 @@ static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp, char *bu
 	//out += sprintf(out, "Inserttime=%lx ",urbp->inserttime);
 	//out += sprintf(out, "FSBRtime=%lx ",urbp->fsbrtime);
 
-	spin_lock(&urbp->urb->lock);
 	count = 0;
 	list_for_each(tmp, &urbp->td_list)
 		count++;
-	spin_unlock(&urbp->urb->lock);
 	out += sprintf(out, "TDs=%d ",count);
 
 	if (urbp->queued)
 		out += sprintf(out, "queued\n");
 	else {
-		spin_lock(&uhci->frame_list_lock);
 		count = 0;
 		list_for_each(tmp, &urbp->queue_list)
 			count++;
-		spin_unlock(&uhci->frame_list_lock);
 		out += sprintf(out, "queued URBs=%d\n", count);
 	}
 
@@ -352,12 +348,10 @@ static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp, char *bu
 static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
 {
 	char *out = buf;
-	unsigned long flags;
 	struct list_head *head, *tmp;
 	int count;
 
 	out += sprintf(out, "Main list URBs:");
-	spin_lock_irqsave(&uhci->urb_list_lock, flags);
 	if (list_empty(&uhci->urb_list))
 		out += sprintf(out, " Empty\n");
 	else {
@@ -373,10 +367,8 @@ static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
 			tmp = tmp->next;
 		}
 	}
-	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
 	out += sprintf(out, "Remove list URBs:");
-	spin_lock_irqsave(&uhci->urb_remove_list_lock, flags);
 	if (list_empty(&uhci->urb_remove_list))
 		out += sprintf(out, " Empty\n");
 	else {
@@ -392,10 +384,8 @@ static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
 			tmp = tmp->next;
 		}
 	}
-	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
 
 	out += sprintf(out, "Complete list URBs:");
-	spin_lock_irqsave(&uhci->complete_list_lock, flags);
 	if (list_empty(&uhci->complete_list))
 		out += sprintf(out, " Empty\n");
 	else {
@@ -411,7 +401,6 @@ static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
 			tmp = tmp->next;
 		}
 	}
-	spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
 
 	return out - buf;
 }
@@ -425,7 +414,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 	struct uhci_td *td;
 	struct list_head *tmp, *head;
 
-	spin_lock_irqsave(&uhci->frame_list_lock, flags);
+	spin_lock_irqsave(&uhci->schedule_lock, flags);
 
 	out += sprintf(out, "HC status\n");
 	out += uhci_show_status(uhci, out, len - (out - buf));
@@ -508,10 +497,10 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 		}
 	}
 
-	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
-
 	if (debug > 2)
 		out += uhci_show_lists(uhci, out, len - (out - buf));
+
+	spin_unlock_irqrestore(&uhci->schedule_lock, flags);
 
 	return out - buf;
 }
@@ -623,4 +612,3 @@ static struct file_operations uhci_proc_operations = {
 	.release =	uhci_proc_release,
 };
 #endif
-

@@ -1169,7 +1169,8 @@ static int test_halt (int ep, struct urb *urb)
 
 	/* set halt (protocol test only), verify it worked */
 	retval = usb_control_msg (urb->dev, usb_sndctrlpipe (urb->dev, 0),
-			USB_REQ_SET_FEATURE, USB_RECIP_ENDPOINT, 0, ep,
+			USB_REQ_SET_FEATURE, USB_RECIP_ENDPOINT,
+			USB_ENDPOINT_HALT, ep,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval < 0) {
 		dbg ("ep %02x couldn't set halt, %d", ep, retval);

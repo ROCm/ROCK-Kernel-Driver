@@ -516,7 +516,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	dev = kmalloc (sizeof(struct usb_skel), GFP_KERNEL);
 	if (dev == NULL) {
 		err ("Out of memory");
-		goto error;
+		return -ENOMEM;
 	}
 	memset (dev, 0x00, sizeof (*dev));
 

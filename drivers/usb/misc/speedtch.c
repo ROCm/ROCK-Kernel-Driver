@@ -84,6 +84,10 @@
 #define VERBOSE_DEBUG
 */
 
+#if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
+#	define DEBUG
+#endif
+
 #include <linux/usb.h>
 
 #ifdef DEBUG
@@ -102,8 +106,8 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #endif
 
 #define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
-#define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
-#define DRIVER_VERSION	"1.7"
+#define DRIVER_VERSION	"1.8"
+#define DRIVER_DESC	"Alcatel SpeedTouch USB driver version " DRIVER_VERSION
 
 static const char udsl_driver_name [] = "speedtch";
 
@@ -293,6 +297,19 @@ static struct usb_driver udsl_usb_driver = {
 	.ioctl =	udsl_usb_ioctl,
 	.id_table =	udsl_usb_ids,
 };
+
+
+/***********
+**  misc  **
+***********/
+
+static inline void udsl_pop (struct atm_vcc *vcc, struct sk_buff *skb)
+{
+	if (vcc->pop)
+		vcc->pop (vcc, skb);
+	else
+		dev_kfree_skb (skb);
+}
 
 
 /*************
@@ -716,10 +733,7 @@ made_progress:
 	if (!UDSL_SKB (skb)->num_cells) {
 		struct atm_vcc *vcc = UDSL_SKB (skb)->atm_data.vcc;
 
-		if (vcc->pop)
-			vcc->pop (vcc, skb);
-		else
-			dev_kfree_skb (skb);
+		udsl_pop (vcc, skb);
 		instance->current_skb = NULL;
 
 		atomic_inc (&vcc->stats->tx);
@@ -738,10 +752,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 		if (UDSL_SKB (skb)->atm_data.vcc == vcc) {
 			dbg ("udsl_cancel_send: popping skb 0x%p", skb);
 			__skb_unlink (skb, &instance->sndqueue);
-			if (vcc->pop)
-				vcc->pop (vcc, skb);
-			else
-				dev_kfree_skb (skb);
+			udsl_pop (vcc, skb);
 		}
 	spin_unlock_irq (&instance->sndqueue.lock);
 
@@ -749,10 +760,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 	if ((skb = instance->current_skb) && (UDSL_SKB (skb)->atm_data.vcc == vcc)) {
 		dbg ("udsl_cancel_send: popping current skb (0x%p)", skb);
 		instance->current_skb = NULL;
-		if (vcc->pop)
-			vcc->pop (vcc, skb);
-		else
-			dev_kfree_skb (skb);
+		udsl_pop (vcc, skb);
 	}
 	tasklet_enable (&instance->send_tasklet);
 	dbg ("udsl_cancel_send done");
@@ -761,22 +769,26 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
+	int err;
 
 	vdbg ("udsl_atm_send called (skb 0x%p, len %u)", skb, skb->len);
 
 	if (!instance || !instance->usb_dev) {
 		dbg ("udsl_atm_send: NULL data!");
-		return -ENODEV;
+		err = -ENODEV;
+		goto fail;
 	}
 
 	if (vcc->qos.aal != ATM_AAL5) {
 		dbg ("udsl_atm_send: unsupported ATM type %d!", vcc->qos.aal);
-		return -EINVAL;
+		err = -EINVAL;
+		goto fail;
 	}
 
 	if (skb->len > ATM_MAX_AAL5_PDU) {
 		dbg ("udsl_atm_send: packet too long (%d vs %d)!", skb->len, ATM_MAX_AAL5_PDU);
-		return -EINVAL;
+		err = -EINVAL;
+		goto fail;
 	}
 
 	PACKETDEBUG (skb->data, skb->len);
@@ -786,6 +798,10 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 	tasklet_schedule (&instance->send_tasklet);
 
 	return 0;
+
+fail:
+	udsl_pop (vcc, skb);
+	return err;
 }
 
 
@@ -1331,6 +1347,7 @@ module_exit (udsl_usb_cleanup);
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
+MODULE_VERSION (DRIVER_VERSION);
 
 
 /************

@@ -731,6 +731,15 @@ int usb_descriptor_fillbuf(void *, unsigned,
 int usb_gadget_config_buf(const struct usb_config_descriptor *config,
 	void *buf, unsigned buflen, const struct usb_descriptor_header **desc);
 
+/*-------------------------------------------------------------------------*/
+
+/* utility wrapping a simple endpoint selection policy */
+
+extern struct usb_ep *usb_ep_autoconfig (struct usb_gadget *,
+			struct usb_endpoint_descriptor *) __init;
+
+extern void usb_ep_autoconfig_reset (struct usb_gadget *) __init;
+
 #endif  /* __KERNEL__ */
 
 #endif	/* __LINUX_USB_GADGET_H */

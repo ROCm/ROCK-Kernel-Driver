@@ -766,7 +766,7 @@ int __init usbfs_init(void)
 	return 0;
 }
 
-void __exit usbfs_cleanup(void)
+void usbfs_cleanup(void)
 {
 	usb_deregister(&usbdevfs_driver);
 	unregister_filesystem(&usb_fs_type);

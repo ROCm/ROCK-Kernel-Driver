@@ -233,7 +233,7 @@ static int ohci_urb_enqueue (
 	spin_lock (&urb->lock);
 	if (urb->status != -EINPROGRESS) {
 		spin_unlock (&urb->lock);
-
+		urb->hcpriv = urb_priv;
 		finish_urb (ohci, urb, 0);
 		retval = 0;
 		goto fail;
@@ -344,8 +344,11 @@ rescan:
 	if (!ed)
 		goto done;
 
-	if (!HCD_IS_RUNNING (ohci->hcd.state))
+	if (!HCD_IS_RUNNING (ohci->hcd.state)) {
 		ed->state = ED_IDLE;
+		finish_unlinks (ohci, 0, 0);
+	}
+
 	switch (ed->state) {
 	case ED_UNLINK:		/* wait for hw to finish? */
 		/* major IRQ delivery trouble loses INTR_SF too... */
