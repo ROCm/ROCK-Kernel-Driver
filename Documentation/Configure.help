@@ -3245,6 +3245,18 @@ CONFIG_FB_ATY
   module will be called atyfb.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
   
+ATI Mach64 GX display support (EXPERIMENTAL)
+CONFIG_FB_ATY_GX
+  This options adds support for the first generation ATI Mach64
+  graphics chips, i.e. the Mach64 GX and CX. Note that this support is
+  limited.
+
+ATI Mach64 CT/VT/GT/LT display support (EXPERIMENTAL)
+CONFIG_FB_ATY_CT
+  This option adss support for ATI Mach64 graphics chips starting
+  with the Mach64 CT family. This includes the Mach64 VT (limited
+  support), GT (3D RAGE family), and LT.
+
 ATI Rage128 display support (EXPERIMENTAL)
 CONFIG_FB_ATY128
   This driver supports graphics boards with the ATI Rage128 chips.

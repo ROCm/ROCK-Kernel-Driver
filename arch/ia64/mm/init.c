@@ -42,7 +42,7 @@ do_check_pgt_cache (int low, int high)
 	if (pgtable_cache_size > high) {
 		do {
 			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast()), ++freed;
+				free_page((unsigned long)pgd_alloc_one_fast(0)), ++freed;
 			if (pmd_quicklist)
 				free_page((unsigned long)pmd_alloc_one_fast(0, 0)), ++freed;
 			if (pte_quicklist)
@@ -111,7 +111,7 @@ free_initrd_mem(unsigned long start, unsigned long end)
 	 *
 	 * To avoid freeing/using the wrong page (kernel sized) we:
 	 *	- align up the beginning of initrd
-	 *	- keep the end untouched
+	 *	- align down the end of initrd
 	 *
 	 *  |             |
 	 *  |=============| a000
@@ -135,11 +135,14 @@ free_initrd_mem(unsigned long start, unsigned long end)
 	 * initrd_start and keep initrd_end as is.
 	 */
 	start = PAGE_ALIGN(start);
+	end = end & PAGE_MASK;
 
 	if (start < end)
 		printk ("Freeing initrd memory: %ldkB freed\n", (end - start) >> 10);
 
 	for (; start < end; start += PAGE_SIZE) {
+		if (!VALID_PAGE(virt_to_page(start)))
+			continue;
 		clear_bit(PG_reserved, &virt_to_page(start)->flags);
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
@@ -225,7 +228,7 @@ put_gate_page (struct page *page, unsigned long address)
 }
 
 void __init
-ia64_mmu_init (void)
+ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long flags, rid, pta, impl_va_bits;
 	extern void __init tlb_init (void);
@@ -242,7 +245,7 @@ ia64_mmu_init (void)
 	ia64_clear_ic(flags);
 
 	rid = ia64_rid(IA64_REGION_ID_KERNEL, __IA64_UNCACHED_OFFSET);
-	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (_PAGE_SIZE_64M << 2));
+	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (KERNEL_PG_SHIFT << 2));
 
 	rid = ia64_rid(IA64_REGION_ID_KERNEL, VMALLOC_START);
 	ia64_set_rr(VMALLOC_START, (rid << 8) | (PAGE_SHIFT << 2) | 1);
@@ -251,8 +254,7 @@ ia64_mmu_init (void)
 	ia64_srlz_d();
 
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
-		 pte_val(mk_pte_phys(__pa(&cpu_data[smp_processor_id()]), PAGE_KERNEL)),
-		 PAGE_SHIFT);
+		 pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL)), PAGE_SHIFT);
 
 	__restore_flags(flags);
 	ia64_srlz_i();
@@ -354,6 +356,7 @@ mem_init (void)
 {
 	extern char __start_gate_section[];
 	long reserved_pages, codesize, datasize, initsize;
+	unsigned long num_pgt_pages;
 
 #ifdef CONFIG_PCI
 	/*
@@ -386,6 +389,19 @@ mem_init (void)
 	       (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
 	       max_mapnr << (PAGE_SHIFT - 10), codesize >> 10, reserved_pages << (PAGE_SHIFT - 10),
 	       datasize >> 10, initsize >> 10);
+
+	/*
+	 * Allow for enough (cached) page table pages so that we can map the entire memory
+	 * at least once.  Each task also needs a couple of page tables pages, so add in a
+	 * fudge factor for that (don't use "threads-max" here; that would be wrong!).
+	 * Don't allow the cache to be more than 10% of total memory, though.
+	 */
+#	define NUM_TASKS	500	/* typical number of tasks */
+	num_pgt_pages = nr_free_pages() / PTRS_PER_PGD + NUM_TASKS;
+	if (num_pgt_pages > nr_free_pages() / 10)
+		num_pgt_pages = nr_free_pages() / 10;
+	if (num_pgt_pages > pgt_cache_water[1])
+		pgt_cache_water[1] = num_pgt_pages;
 
 	/* install the gate page in the global page table: */
 	put_gate_page(virt_to_page(__start_gate_section), GATE_ADDR);

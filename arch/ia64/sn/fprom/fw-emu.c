@@ -8,7 +8,6 @@
  * Copyright (C) 2000 Silicon Graphics, Inc.
  * Copyright (C) 2000 by Jack Steiner (steiner@sgi.com)
  */
-
 #include <asm/efi.h>
 #include <asm/pal.h>
 #include <asm/sal.h>

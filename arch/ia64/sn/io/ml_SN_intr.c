@@ -36,7 +36,6 @@
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/intr.h>
 
-
 #if DEBUG_INTR_TSTAMP_DEBUG
 #include <sys/debug.h>
 #include <sys/idbg.h>

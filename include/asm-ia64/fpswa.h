@@ -9,10 +9,6 @@
  * Copyright (C) 1999 Goutham Rao <goutham.rao@intel.com>
  */
 
-#if 1
-#define FPSWA_BUG
-#endif
-
 typedef struct {
 	/* 4 * 128 bits */
 	unsigned long fp_lp[4*2];

@@ -51,7 +51,8 @@
 
 #ifndef __ASSEMBLY__
 
-extern void __init iosapic_init (unsigned long address, unsigned int base_irq);
+extern void __init iosapic_init (unsigned long address, unsigned int base_irq,
+                                 int pcat_compat);
 extern void iosapic_register_legacy_irq (unsigned long irq, unsigned long pin,
 					 unsigned long polarity, unsigned long trigger);
 extern void iosapic_pci_fixup (int);

@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <linux/time.h>
 #include <linux/types.h>
+#include <linux/proc_fs.h>
 
 #include <asm/page.h>
 #include <asm/system.h>
@@ -237,7 +238,7 @@ extern void efi_map_pal_code (void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timeval *tv);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
-
+extern u64  efi_get_iobase (void);
 
 /*
  * Variable Attributes
@@ -245,5 +246,13 @@ extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if pos
 #define EFI_VARIABLE_NON_VOLATILE       0x0000000000000001
 #define EFI_VARIABLE_BOOTSERVICE_ACCESS 0x0000000000000002
 #define EFI_VARIABLE_RUNTIME_ACCESS     0x0000000000000004
+
+
+/*
+ * efi_dir is allocated in arch/ia64/kernel/efi.c.
+ */
+#ifdef CONFIG_PROC_FS
+extern struct proc_dir_entry *efi_dir;
+#endif
 
 #endif /* _ASM_IA64_EFI_H */

@@ -16,15 +16,15 @@
 /*
  * No irq_cpustat_t for IA-64.  The data is held in the per-CPU data structure.
  */
-#define softirq_active(cpu)		(cpu_data[cpu].softirq.active)
-#define softirq_mask(cpu)		(cpu_data[cpu].softirq.mask)
-#define irq_count(cpu)			(cpu_data[cpu].irq_stat.f.irq_count)
-#define bh_count(cpu)			(cpu_data[cpu].irq_stat.f.bh_count)
+#define softirq_pending(cpu)		(cpu_data(cpu)->softirq_pending)
+#define ksoftirqd_task(cpu)		(cpu_data(cpu)->ksoftirqd)
+#define irq_count(cpu)			(cpu_data(cpu)->irq_stat.f.irq_count)
+#define bh_count(cpu)			(cpu_data(cpu)->irq_stat.f.bh_count)
 #define syscall_count(cpu)		/* unused on IA-64 */
 #define nmi_count(cpu)			0
 
-#define local_softirq_active()		(local_cpu_data->softirq.active)
-#define local_softirq_mask()		(local_cpu_data->softirq.mask)
+#define local_softirq_pending()		(local_cpu_data->softirq_pending)
+#define local_ksoftirqd_task()		(local_cpu_data->ksoftirqd)
 #define local_irq_count()		(local_cpu_data->irq_stat.f.irq_count)
 #define local_bh_count()		(local_cpu_data->irq_stat.f.bh_count)
 #define local_syscall_count()		/* unused on IA-64 */

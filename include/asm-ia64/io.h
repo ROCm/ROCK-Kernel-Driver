@@ -333,7 +333,7 @@ __writeq (unsigned long val, void *addr)
 #define readb(a)	__readb((void *)(a))
 #define readw(a)	__readw((void *)(a))
 #define readl(a)	__readl((void *)(a))
-#define readq(a)	__readqq((void *)(a))
+#define readq(a)	__readq((void *)(a))
 #define __raw_readb	readb
 #define __raw_readw	readw
 #define __raw_readl	readl

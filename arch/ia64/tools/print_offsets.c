@@ -21,6 +21,8 @@
 #include <asm-ia64/siginfo.h>
 #include <asm-ia64/sigcontext.h>
 
+#include "../kernel/sigframe.h"
+
 #ifdef offsetof
 # undef offsetof
 #endif
@@ -46,6 +48,7 @@ tab[] =
     { "IA64_SWITCH_STACK_SIZE",		sizeof (struct switch_stack) },
     { "IA64_SIGINFO_SIZE",		sizeof (struct siginfo) },
     { "IA64_CPU_SIZE",			sizeof (struct cpuinfo_ia64) },
+    { "SIGFRAME_SIZE",			sizeof (struct sigframe) },
     { "UNW_FRAME_INFO_SIZE",		sizeof (struct unw_frame_info) },
     { "", 0 },			/* spacer */
     { "IA64_TASK_PTRACE_OFFSET",	offsetof (struct task_struct, ptrace) },
@@ -153,16 +156,25 @@ tab[] =
     { "IA64_SWITCH_STACK_AR_BSPSTORE_OFFSET",	offsetof (struct switch_stack, ar_bspstore) },
     { "IA64_SWITCH_STACK_PR_OFFSET",	offsetof (struct switch_stack, pr) },
     { "IA64_SIGCONTEXT_AR_BSP_OFFSET",	offsetof (struct sigcontext, sc_ar_bsp) },
+    { "IA64_SIGCONTEXT_AR_FPSR_OFFSET", offsetof (struct sigcontext, sc_ar_fpsr) },
     { "IA64_SIGCONTEXT_AR_RNAT_OFFSET",	offsetof (struct sigcontext, sc_ar_rnat) },
-    { "IA64_SIGCONTEXT_FLAGS_OFFSET",	offsetof (struct sigcontext, sc_flags) },
+    { "IA64_SIGCONTEXT_AR_UNAT_OFFSET", offsetof (struct sigcontext, sc_ar_unat) },
+    { "IA64_SIGCONTEXT_B0_OFFSET",	offsetof (struct sigcontext, sc_br[0]) },
     { "IA64_SIGCONTEXT_CFM_OFFSET",	offsetof (struct sigcontext, sc_cfm) },
+    { "IA64_SIGCONTEXT_FLAGS_OFFSET",	offsetof (struct sigcontext, sc_flags) },
     { "IA64_SIGCONTEXT_FR6_OFFSET",	offsetof (struct sigcontext, sc_fr[6]) },
+    { "IA64_SIGCONTEXT_PR_OFFSET",	offsetof (struct sigcontext, sc_pr) },
+    { "IA64_SIGCONTEXT_R12_OFFSET",	offsetof (struct sigcontext, sc_gr[12]) },
+    { "IA64_SIGFRAME_ARG0_OFFSET",		offsetof (struct sigframe, arg0) },
+    { "IA64_SIGFRAME_ARG1_OFFSET",		offsetof (struct sigframe, arg1) },
+    { "IA64_SIGFRAME_ARG2_OFFSET",		offsetof (struct sigframe, arg2) },
+    { "IA64_SIGFRAME_RBS_BASE_OFFSET",		offsetof (struct sigframe, rbs_base) },
+    { "IA64_SIGFRAME_HANDLER_OFFSET",		offsetof (struct sigframe, handler) },
+    { "IA64_SIGFRAME_SIGCONTEXT_OFFSET",	offsetof (struct sigframe, sc) },
     { "IA64_CLONE_VFORK",		CLONE_VFORK },
     { "IA64_CLONE_VM",			CLONE_VM },
     { "IA64_CPU_IRQ_COUNT_OFFSET",	offsetof (struct cpuinfo_ia64, irq_stat.f.irq_count) },
     { "IA64_CPU_BH_COUNT_OFFSET",	offsetof (struct cpuinfo_ia64, irq_stat.f.bh_count) },
-    { "IA64_CPU_SOFTIRQ_ACTIVE_OFFSET",		offsetof (struct cpuinfo_ia64, softirq.active) },
-    { "IA64_CPU_SOFTIRQ_MASK_OFFSET",		offsetof (struct cpuinfo_ia64, softirq.mask) },
     { "IA64_CPU_PHYS_STACKED_SIZE_P8_OFFSET",	offsetof (struct cpuinfo_ia64, phys_stacked_size_p8) },
 };
 

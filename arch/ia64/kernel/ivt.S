@@ -9,16 +9,14 @@
  * 00/12/20 David Mosberger-Tang <davidm@hpl.hp.com> DTLB/ITLB handler now uses virtual PT.
  */
 /*
- * This file defines the interrupt vector table used by the CPU.
+ * This file defines the interruption vector table used by the CPU.
  * It does not include one entry per possible cause of interruption.
- *
- * External interrupts only use 1 entry. All others are internal interrupts
  *
  * The first 20 entries of the table contain 64 bundles each while the
  * remaining 48 entries contain only 16 bundles each.
  *
  * The 64 bundles are used to allow inlining the whole handler for critical
- * interrupts like TLB misses.
+ * interruptions like TLB misses.
  *
  *  For each entry, the comment is as follows:
  *
@@ -27,7 +25,7 @@
  *  entry number ---------/         /                  /          /
  *  size of the entry -------------/                  /          /
  *  vector name -------------------------------------/          /
- *  related interrupts (what is the real interrupt?) ----------/
+ *  interruptions triggering this vector ----------------------/
  *
  * The table is 32KB in size and must be aligned on 32KB boundary.
  * (The CPU ignores the 15 lower bits of the address)
@@ -363,7 +361,7 @@ ENTRY(page_fault)
 	;;
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i					// guarantee that interrupt collection is enabled
+	srlz.i					// guarantee that interruption collectin is on
 	;;
 (p15)	ssm psr.i				// restore psr.i
 	movl r14=ia64_leave_kernel
@@ -536,8 +534,7 @@ ENTRY(iaccess_bit)
 	;;
 1:	ld8 r18=[r17]
 	;;
-# if defined(CONFIG_IA32_SUPPORT) && \
-    (defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_B0_SPECIFIC))
+# if defined(CONFIG_IA32_SUPPORT) && defined(CONFIG_ITANIUM_B0_SPECIFIC)
 	/*
 	 * Erratum 85 (Access bit fault could be reported before page not present fault)
 	 *   If the PTE is indicates the page is not present, then just turn this into a
@@ -567,8 +564,7 @@ ENTRY(iaccess_bit)
 	;;
 1:	ld8 r18=[r17]
 	;;
-# if defined(CONFIG_IA32_SUPPORT) && \
-    (defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_B0_SPECIFIC))
+# if defined(CONFIG_IA32_SUPPORT) && defined(CONFIG_ITANIUM_B0_SPECIFIC)
 	/*
 	 * Erratum 85 (Access bit fault could be reported before page not present fault)
 	 *   If the PTE is indicates the page is not present, then just turn this into a
@@ -650,7 +646,7 @@ ENTRY(break_fault)
 
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i					// guarantee that interrupt collection is enabled
+	srlz.i					// guarantee that interruption collection is on
 	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
 	;;
 (p15)	ssm psr.i		// restore psr.i
@@ -702,7 +698,7 @@ ENTRY(break_fault)
 	st8 [r16]=r18				// store new value for cr.isr
 
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
-	br.call.sptk.many rp=ia64_trace_syscall	// rp will be overwritten (ignored)
+	br.cond.sptk.many ia64_trace_syscall
 	// NOT REACHED
 END(break_fault)
 
@@ -724,11 +720,14 @@ ENTRY(demine_args)
 	tnat.nz p15,p0=in7
 
 (p11)	mov in3=-1
+	tnat.nz p8,p0=r15	// demining r15 is not a must, but it is safer
+
 (p12)	mov in4=-1
 (p13)	mov in5=-1
 	;;
 (p14)	mov in6=-1
 (p15)	mov in7=-1
+(p8)	mov r15=-1
 	br.ret.sptk.many rp
 END(demine_args)
 
@@ -790,7 +789,7 @@ ENTRY(dispatch_illegal_op_fault)
 	SAVE_MIN_WITH_COVER
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i		// guarantee that interrupt collection is enabled
+	srlz.i		// guarantee that interruption collection is on
 	;;
 (p15)	ssm psr.i	// restore psr.i
 	adds r3=8,r2	// set up second base pointer for SAVE_REST
@@ -839,7 +838,7 @@ ENTRY(dispatch_to_ia32_handler)
 	mov r14=cr.isr
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i					// guarantee that interrupt collection is enabled
+	srlz.i					// guarantee that interruption collection is on
 	;;
 (p15)	ssm psr.i
 	adds r3=8,r2            // Base pointer for SAVE_REST
@@ -890,8 +889,7 @@ ENTRY(dispatch_to_ia32_handler)
 	;;
 	mov rp=r15
 (p8)	br.call.sptk.many b6=b6
-	;;
-	br.call.sptk.many rp=ia32_trace_syscall	// rp will be overwritten (ignored)
+	br.cond.sptk.many ia32_trace_syscall
 
 non_ia32_syscall:
 	alloc r15=ar.pfs,0,0,2,0
@@ -928,7 +926,7 @@ ENTRY(non_syscall)
 
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i				// guarantee that interrupt collection is enabled
+	srlz.i				// guarantee that interruption collection is on
 	;;
 (p15)	ssm psr.i			// restore psr.i
 	movl r15=ia64_leave_kernel
@@ -961,7 +959,7 @@ ENTRY(dispatch_unaligned_handler)
 
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i					// guarantee that interrupt collection is enabled
+	srlz.i					// guarantee that interruption collection is on
 	;;
 (p15)	ssm psr.i				// restore psr.i
 	adds r3=8,r2				// set up second base pointer
@@ -1003,7 +1001,7 @@ ENTRY(dispatch_to_fault_handler)
 	;;
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
-	srlz.i					// guarantee that interrupt collection is enabled
+	srlz.i					// guarantee that interruption collection is on
 	;;
 (p15)	ssm psr.i				// restore psr.i
 	adds r3=8,r2				// set up second base pointer for SAVE_REST

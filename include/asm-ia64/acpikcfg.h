@@ -1,6 +1,6 @@
-#include <linux/config.h>
+#ifndef _ASM_IA64_ACPIKCFG_H
+#define _ASM_IA64_ACPIKCFG_H
 
-#ifdef	CONFIG_ACPI_KERNEL_CONFIG
 /*
  *  acpikcfg.h - ACPI based Kernel Configuration Manager External Interfaces
  *
@@ -26,4 +26,5 @@ acpi_cf_print_pci_vectors (
 	int				num_pci_vectors
 	);
 #endif
-#endif	/* CONFIG_ACPI_KERNEL_CONFIG */
+
+#endif /* _ASM_IA64_ACPIKCFG_H */

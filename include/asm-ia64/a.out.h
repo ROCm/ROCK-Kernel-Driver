@@ -32,7 +32,7 @@ struct exec {
 #ifdef __KERNEL__
 # include <asm/page.h>
 # define STACK_TOP	(0x8000000000000000UL + (1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)
-# define IA64_RBS_BOT	(STACK_TOP - 0x80000000L)	/* bottom of register backing store */
+# define IA64_RBS_BOT	(STACK_TOP - 0x80000000L + PAGE_SIZE)	/* bottom of reg. backing store */
 #endif
 
 #endif /* _ASM_IA64_A_OUT_H */

@@ -27,28 +27,15 @@ extern struct console hpsim_cons;
 /*
  * Simulator system call.
  */
-inline long
-ia64_ssc (long arg0, long arg1, long arg2, long arg3, int nr)
-{
-#ifdef __GCC_DOESNT_KNOW_IN_REGS__
-	register long in0 asm ("r32") = arg0;
-	register long in1 asm ("r33") = arg1;
-	register long in2 asm ("r34") = arg2;
-	register long in3 asm ("r35") = arg3;
-#else
-	register long in0 asm ("in0") = arg0;
-	register long in1 asm ("in1") = arg1;
-	register long in2 asm ("in2") = arg2;
-	register long in3 asm ("in3") = arg3;
-#endif
-	register long r8 asm ("r8");
-	register long r15 asm ("r15") = nr;
-
-	asm volatile ("break 0x80001"
-		      : "=r"(r8)
-		      : "r"(r15), "r"(in0), "r"(in1), "r"(in2), "r"(in3));
-	return r8;
-}
+asm (".text\n"
+     ".align 32\n"
+     ".global ia64_ssc\n"
+     ".proc ia64_ssc\n"
+     "ia64_ssc:\n"
+     "mov r15=r36\n"
+     "break 0x80001\n"
+     "br.ret.sptk.many rp\n"
+     ".endp\n");
 
 void
 ia64_ssc_connect_irq (long intr, long irq)

@@ -72,6 +72,11 @@ void
 ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 {
 	unsigned long saved_tpr;
+#ifdef CONFIG_SMP
+#	define IS_RESCHEDULE(vec)	(vec == IA64_IPI_RESCHEDULE)
+#else
+#	define IS_RESCHEDULE(vec)	(0)
+#endif
 
 #if IRQ_DEBUG
 	{
@@ -110,24 +115,25 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 */
 	saved_tpr = ia64_get_tpr();
 	ia64_srlz_d();
-	do {
-		ia64_set_tpr(vector);
-		ia64_srlz_d();
+	while (vector != IA64_SPURIOUS_INT_VECTOR) {
+		if (!IS_RESCHEDULE(vector)) {
+			ia64_set_tpr(vector);
+			ia64_srlz_d();
 
-		do_IRQ(local_vector_to_irq(vector), regs);
+			do_IRQ(local_vector_to_irq(vector), regs);
 
-		/*
-		 * Disable interrupts and send EOI:
-		 */
-		local_irq_disable();
-		ia64_set_tpr(saved_tpr);
+			/*
+			 * Disable interrupts and send EOI:
+			 */
+			local_irq_disable();
+			ia64_set_tpr(saved_tpr);
+		}
 		ia64_eoi();
 		vector = ia64_get_ivr();
-	} while (vector != IA64_SPURIOUS_INT_VECTOR);
+	}
 }
 
 #ifdef CONFIG_SMP
-
 extern void handle_IPI (int irq, void *dev_id, struct pt_regs *regs);
 
 static struct irqaction ipi_irqaction = {
@@ -147,7 +153,7 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 		if (irq_to_vector(irq) == vec) {
 			desc = irq_desc(irq);
 			desc->status |= IRQ_PER_CPU;
-			desc->handler = &irq_type_ia64_sapic;
+			desc->handler = &irq_type_ia64_lsapic;
 			if (action)
 				setup_irq(irq, action);
 		}

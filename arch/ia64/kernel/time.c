@@ -25,6 +25,7 @@
 
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
+extern unsigned long last_time_offset;
 
 #ifdef CONFIG_IA64_DEBUG_IRQ
 
@@ -45,9 +46,8 @@ do_profile (unsigned long ip)
 		ip -= (unsigned long) &_stext;
 		ip >>= prof_shift;
 		/*
-		 * Don't ignore out-of-bounds IP values silently,
-		 * put them into the last histogram slot, so if
-		 * present, they will show up as a sharp peak.
+		 * Don't ignore out-of-bounds IP values silently, put them into the last
+		 * histogram slot, so if present, they will show up as a sharp peak.
 		 */
 		if (ip > prof_len - 1)
 			ip = prof_len - 1;
@@ -57,34 +57,29 @@ do_profile (unsigned long ip)
 }
 
 /*
- * Return the number of micro-seconds that elapsed since the last
- * update to jiffy.  The xtime_lock must be at least read-locked when
- * calling this routine.
+ * Return the number of micro-seconds that elapsed since the last update to jiffy.  The
+ * xtime_lock must be at least read-locked when calling this routine.
  */
 static inline unsigned long
 gettimeoffset (void)
 {
-#ifdef CONFIG_SMP
-	/*
-	 * The code below doesn't work for SMP because only CPU 0
-	 * keeps track of the time.
-	 */
-	return 0;
-#else
-	unsigned long now = ia64_get_itc(), last_tick;
 	unsigned long elapsed_cycles, lost = jiffies - wall_jiffies;
+	unsigned long now, last_tick;
+#	define time_keeper_id	0	/* smp_processor_id() of time-keeper */
 
-	last_tick = (local_cpu_data->itm_next - (lost+1)*local_cpu_data->itm_delta);
-# if 1
+	last_tick = (cpu_data(time_keeper_id)->itm_next
+		     - (lost + 1)*cpu_data(time_keeper_id)->itm_delta);
+
+	now = ia64_get_itc();
 	if ((long) (now - last_tick) < 0) {
-		printk("Yikes: now < last_tick (now=0x%lx,last_tick=%lx)!  No can do.\n",
-		       now, last_tick);
-		return 0;
-	}
+# if 1
+		printk("CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
+		       smp_processor_id(), now, last_tick);
 # endif
+		return last_time_offset;
+	}
 	elapsed_cycles = now - last_tick;
 	return (elapsed_cycles*local_cpu_data->usec_per_cyc) >> IA64_USEC_PER_CYC_SHIFT;
-#endif
 }
 
 void
@@ -93,11 +88,10 @@ do_settimeofday (struct timeval *tv)
 	write_lock_irq(&xtime_lock);
 	{
 		/*
-		 * This is revolting. We need to set "xtime"
-		 * correctly. However, the value in this location is
-		 * the value at the most recent update of wall time.
-		 * Discover what correction gettimeofday would have
-		 * done, and then undo it!
+		 * This is revolting. We need to set "xtime" correctly. However, the value
+		 * in this location is the value at the most recent update of wall time.
+		 * Discover what correction gettimeofday would have done, and then undo
+		 * it!
 		 */
 		tv->tv_usec -= gettimeoffset();
 		tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
@@ -119,11 +113,23 @@ do_settimeofday (struct timeval *tv)
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long flags, usec, sec;
+	unsigned long flags, usec, sec, old;
 
 	read_lock_irqsave(&xtime_lock, flags);
 	{
 		usec = gettimeoffset();
+
+		/*
+		 * Ensure time never goes backwards, even when ITC on different CPUs are
+		 * not perfectly synchronized.
+		 */
+		do {
+			old = last_time_offset;
+			if (usec <= old) {
+				usec = old;
+				break;
+			}
+		} while (cmpxchg(&last_time_offset, old, usec) != old);
 
 		sec = xtime.tv_sec;
 		usec += xtime.tv_usec;
@@ -162,6 +168,8 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef CONFIG_SMP
 		smp_do_timer(regs);
 #endif
+		new_itm += local_cpu_data->itm_delta;
+
 		if (smp_processor_id() == 0) {
 			/*
 			 * Here we are in the timer irq handler. We have irqs locally
@@ -171,11 +179,11 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			write_lock(&xtime_lock);
 			do_timer(regs);
+			local_cpu_data->itm_next = new_itm;
 			write_unlock(&xtime_lock);
-		}
+		} else
+			local_cpu_data->itm_next = new_itm;
 
-		new_itm += local_cpu_data->itm_delta;
-		local_cpu_data->itm_next = new_itm;
 		if (time_after(new_itm, ia64_get_itc()))
 			break;
 	}
@@ -228,9 +236,9 @@ ia64_init_itm (void)
 	long status;
 
 	/*
-	 * According to SAL v2.6, we need to use a SAL call to determine the
-	 * platform base frequency and then a PAL call to determine the
-	 * frequency ratio between the ITC and the base frequency.
+	 * According to SAL v2.6, we need to use a SAL call to determine the platform base
+	 * frequency and then a PAL call to determine the frequency ratio between the ITC
+	 * and the base frequency.
 	 */
 	status = ia64_sal_freq_base(SAL_FREQ_BASE_PLATFORM, &platform_base_freq, &drift);
 	if (status != 0) {
@@ -284,6 +292,6 @@ void __init
 time_init (void)
 {
 	register_percpu_irq(IA64_TIMER_VECTOR, &timer_irqaction);
-	efi_gettimeofday(&xtime);
+	efi_gettimeofday((struct timeval *) &xtime);
 	ia64_init_itm();
 }

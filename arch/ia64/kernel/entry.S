@@ -140,8 +140,8 @@ GLOBAL_ENTRY(ia64_switch_to)
 	dep r20=0,in0,61,3		// physical address of "current"
 	;;
 	st8 [r22]=sp			// save kernel stack pointer of old task
-	shr.u r26=r20,_PAGE_SIZE_64M
-	mov r16=1
+	shr.u r26=r20,KERNEL_PG_SHIFT
+	mov r16=KERNEL_PG_NUM
 	;;
 	cmp.ne p6,p7=r26,r16		// check >= 64M && < 128M
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
@@ -175,7 +175,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 	srlz.d
 	or r23=r25,r20			// construct PA | page properties
-	mov r25=_PAGE_SIZE_64M<<2
+	mov r25=KERNEL_PG_SHIFT<<2
 	;;
 	mov cr.itir=r25
 	mov cr.ifa=in0			// VA of next task...
@@ -212,23 +212,20 @@ GLOBAL_ENTRY(save_switch_stack)
 	.save @priunat,r17
 	mov r17=ar.unat		// preserve caller's
 	.body
-#if !(defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) \
-      || defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
+#if !(defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
 	adds r3=80,sp
 	;;
 	lfetch.fault.excl.nt1 [r3],128
 #endif
 	mov ar.rsc=0		// put RSE in mode: enforced lazy, little endian, pl 0
-#if !(defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) \
-      || defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
+#if !(defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
 	adds r2=16+128,sp
 	;;
 	lfetch.fault.excl.nt1 [r2],128
 	lfetch.fault.excl.nt1 [r3],128
 #endif
 	adds r14=SW(R4)+16,sp
-#if !(defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) \
-      || defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
+#if !(defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
 	;;
 	lfetch.fault.excl [r2]
 	lfetch.fault.excl [r3]
@@ -325,8 +322,7 @@ ENTRY(load_switch_stack)
 	.prologue
 	.altrp b7
 	.body
-#if !(defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) \
-      || defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
+#if !(defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
 
 	lfetch.fault.nt1 [sp]
 #endif
@@ -496,15 +492,13 @@ END(ia64_trace_syscall)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
-#ifdef CONFIG_SMP
 	/*
-	 * In SMP mode, we need to call invoke_schedule_tail to complete the scheduling process.
+	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
 	 * address of the previously executing task.
 	 */
 	br.call.sptk.few rp=invoke_schedule_tail
 .ret8:
-#endif
 	adds r2=IA64_TASK_PTRACE_OFFSET,r13
 	;;
 	ld8 r2=[r2]
@@ -530,14 +524,9 @@ END(ia64_ret_from_syscall)
 	// fall through
 GLOBAL_ENTRY(ia64_leave_kernel)
 	PT_REGS_UNWIND_INFO(0)
-	cmp.eq p16,p0=r0,r0			// set the "first_time" flag
-	movl r15=PERCPU_ADDR+IA64_CPU_SOFTIRQ_ACTIVE_OFFSET  // r15 = &cpu_data.softirq.active
-	;;
-	ld8 r2=[r15]
+	lfetch.fault [sp]
 	movl r14=.restart
 	;;
-	lfetch.fault [sp]
-	shr.u r3=r2,32			// r3 = cpu_data.softirq.mask
 	MOVBR(.ret.sptk,rp,r14,.restart)
 .restart:
 	adds r17=IA64_TASK_NEED_RESCHED_OFFSET,r13
@@ -546,37 +535,28 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	adds r19=IA64_TASK_PFM_NOTIFY_OFFSET,r13
 #endif
 	;;
-	ld8 r17=[r17]				// load current->need_resched
-	ld4 r18=[r18]				// load current->sigpending
-(p16)	and r2=r2,r3				// r2 <- (softirq.active & softirq.mask)
-	;;
 #ifdef CONFIG_PERFMON
 	ld8 r19=[r19]				// load current->task.pfm_notify
 #endif
-(p16)	cmp4.ne.unc p6,p0=r2,r0			// p6 <- (softirq.active & softirq.mask) != 0
-(pUser)	cmp.ne.unc p7,p0=r17,r0			// current->need_resched != 0?
+	ld8 r17=[r17]				// load current->need_resched
+	ld4 r18=[r18]				// load current->sigpending
 	;;
-(pUser)	cmp.ne.unc p8,p0=r18,r0			// current->sigpending != 0?
 #ifdef CONFIG_PERFMON
 	cmp.ne p9,p0=r19,r0			// current->task.pfm_notify != 0?
 #endif
-	cmp.ne p16,p0=r0,r0			// clear the "first_time" flag
+(pUser)	cmp.ne.unc p7,p0=r17,r0			// current->need_resched != 0?
+(pUser)	cmp.ne.unc p8,p0=r18,r0			// current->sigpending != 0?
 	;;
-# if __GNUC__ < 3
-(p6)	br.call.spnt.many b7=invoke_do_softirq
-# else
-(p6)	br.call.spnt.many b7=do_softirq
-# endif
+	adds r2=PT(R8)+16,r12
+	adds r3=PT(R9)+16,r12
 #ifdef CONFIG_PERFMON
 (p9)	br.call.spnt.many b7=pfm_overflow_notify
 #endif
-# if __GNUC__ < 3
+#if __GNUC__ < 3
 (p7)	br.call.spnt.many b7=invoke_schedule
 #else
 (p7)	br.call.spnt.many b7=schedule
 #endif
-	adds r2=PT(R8)+16,r12
-	adds r3=PT(R9)+16,r12
 (p8)	br.call.spnt.many b7=handle_signal_delivery	// check & deliver pending signals
 	;;
 	// start restoring the state saved on the kernel stack (struct pt_regs):
@@ -634,14 +614,6 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	;;
 	bsw.0			// switch back to bank 0
 	;;
-#ifdef CONFIG_ITANIUM_ASTEP_SPECIFIC
-	nop.i 0x0
-	;;
-	nop.i 0x0
-	;;
-	nop.i 0x0
-	;;
-#endif
 	adds r16=16,r12
 	adds r17=24,r12
 	;;
@@ -792,7 +764,6 @@ ENTRY(handle_syscall_error)
 	br.cond.sptk.many ia64_leave_kernel
 END(handle_syscall_error)
 
-# ifdef CONFIG_SMP
 	/*
 	 * Invoke schedule_tail(task) while preserving in0-in7, which may be needed
 	 * in case a system call gets restarted.
@@ -809,29 +780,7 @@ ENTRY(invoke_schedule_tail)
 	br.ret.sptk.many rp
 END(invoke_schedule_tail)
 
-# endif /* CONFIG_SMP */
-
 #if __GNUC__ < 3
-	/*
-	 * Invoke do_softirq() while preserving in0-in7, which may be needed
-	 * in case a system call gets restarted.  Note that declaring do_softirq()
-	 * with asmlinkage() is NOT enough because that will only preserve as many
-	 * registers as there are formal arguments.
-	 *
-	 * XXX fix me: with gcc 3.0, we won't need this anymore because syscall_linkage
-	 *	renders all eight input registers (in0-in7) as "untouchable".
-	 */
-ENTRY(invoke_do_softirq)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
-	alloc loc1=ar.pfs,8,2,0,0
-	mov loc0=rp
-	;;
-	.body
-	br.call.sptk.few rp=do_softirq
-.ret13:	mov ar.pfs=loc1
-	mov rp=loc0
-	br.ret.sptk.many rp
-END(invoke_do_softirq)
 
 	/*
 	 * Invoke schedule() while preserving in0-in7, which may be needed
@@ -1187,7 +1136,7 @@ sys_call_table:
 	data8 sys_newfstat
 	data8 sys_clone2
 	data8 sys_getdents64
-	data8 ia64_ni_syscall			// 1215
+	data8 sys_getunwind			// 1215
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall

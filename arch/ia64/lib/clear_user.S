@@ -69,7 +69,7 @@ GLOBAL_ENTRY(__do_clear_user)
 (p6)	br.cond.dptk.few long_do_clear
 	;;				// WAR on ar.lc
 	//
-	// worst case 16 cyles, avg 8 cycles
+	// worst case 16 iterations, avg 8 iterations
 	//
 	// We could have played with the predicates to use the extra
 	// M slot for 2 stores/iteration but the cost the initialization

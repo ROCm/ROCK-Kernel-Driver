@@ -220,11 +220,16 @@ struct switch_stack {
   struct task_struct;			/* forward decl */
 
   extern void show_regs (struct pt_regs *);
-  extern unsigned long ia64_get_user_bsp (struct task_struct *, struct pt_regs *);
-  extern long ia64_peek (struct task_struct *, unsigned long, unsigned long, long *);
-  extern long ia64_poke (struct task_struct *, unsigned long, unsigned long, long);
+  extern unsigned long ia64_get_user_rbs_end (struct task_struct *, struct pt_regs *,
+					      unsigned long *);
+  extern long ia64_peek (struct task_struct *, struct switch_stack *, unsigned long,
+			 unsigned long, long *);
+  extern long ia64_poke (struct task_struct *, struct switch_stack *, unsigned long,
+			 unsigned long, long);
   extern void ia64_flush_fph (struct task_struct *);
   extern void ia64_sync_fph (struct task_struct *);
+  extern long ia64_sync_user_rbs (struct task_struct *, struct switch_stack *,
+				  unsigned long, unsigned long);
 
   /* get nat bits for scratch registers such that bit N==1 iff scratch register rN is a NaT */
   extern unsigned long ia64_get_scratch_nat_bits (struct pt_regs *pt, unsigned long scratch_unat);

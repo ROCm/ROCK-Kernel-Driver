@@ -593,13 +593,9 @@ dirty_page_rescan:
 			 * If we're freeing buffer cache pages, stop when
 			 * we've got enough free memory.
 			 */
-			if (freed_page) {
-				if (zone) {
-					if (!zone_free_shortage(zone))
-						break;
-				} else if (!free_shortage()) 
-					break;
-			}
+			if (freed_page && !total_free_shortage())
+				break;
+
 			continue;
 		} else if (page->mapping && !PageDirty(page)) {
 			/*
@@ -1000,10 +996,8 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 
 	ret += page_launder(gfp_mask, user);
 
-	if (total_free_shortage()) {
-		shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
-		shrink_icache_memory(DEF_PRIORITY, gfp_mask);
-	}
+	ret += shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
+	ret += shrink_icache_memory(DEF_PRIORITY, gfp_mask);
 
 	/*
 	 * If needed, we move pages from the active list

@@ -263,7 +263,7 @@ swiotlb_alloc_consistent (struct pci_dev *hwdev, size_t size, dma_addr_t *dma_ha
 
 	memset(ret, 0, size);
 	pci_addr = virt_to_phys(ret);
-	if ((pci_addr & ~hwdev->dma_mask) != 0)
+	if (hwdev && (pci_addr & ~hwdev->dma_mask) != 0)
 		panic("swiotlb_alloc_consistent: allocated memory is out of range for PCI device");
 	*dma_handle = pci_addr;
 	return ret;

@@ -1,7 +1,7 @@
 #include <linux/config.h>
 
 /* XXX fixme */
-#if defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC)
+#if defined(CONFIG_ITANIUM_B1_SPECIFIC)
 # define MOVBR(type,br,gr,lbl)	mov br=gr
 #else
 # define MOVBR(type,br,gr,lbl)	mov##type br=gr,lbl

@@ -204,6 +204,7 @@
 #define __NR_fstat			1212
 #define __NR_clone2			1213
 #define __NR_getdents64			1214
+#define __NR_getunwind			1215
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

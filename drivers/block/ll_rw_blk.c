@@ -119,17 +119,10 @@ int * max_readahead[MAX_BLKDEV];
 int * max_sectors[MAX_BLKDEV];
 
 /*
- * queued sectors for all devices, used to make sure we don't fill all
- * of memory with locked buffers
+ * How many reqeusts do we allocate per queue,
+ * and how many do we "batch" on freeing them?
  */
-atomic_t queued_sectors;
-
-/*
- * high and low watermark for above
- */
-static int high_queued_sectors, low_queued_sectors;
-static int batch_requests, queue_nr_requests;
-static DECLARE_WAIT_QUEUE_HEAD(blk_buffers_wait);
+static int queue_nr_requests, batch_requests;
 
 static inline int get_max_sectors(kdev_t dev)
 {
@@ -592,13 +585,6 @@ inline void blkdev_release_request(struct request *req)
 	 */
 	if (q) {
 		/*
-		 * we've released enough buffers to start I/O again
-		 */
-		if (waitqueue_active(&blk_buffers_wait)
-		    && atomic_read(&queued_sectors) < low_queued_sectors)
-			wake_up(&blk_buffers_wait);
-
-		/*
 		 * Add to pending free list and batch wakeups
 		 */
 		list_add(&req->table, &q->pending_freelist[rw]);
@@ -1032,16 +1018,6 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	for (i = 0; i < nr; i++) {
 		struct buffer_head *bh = bhs[i];
 
-		/*
-		 * don't lock any more buffers if we are above the high
-		 * water mark. instead start I/O on the queued stuff.
-		 */
-		if (atomic_read(&queued_sectors) >= high_queued_sectors) {
-			run_task_queue(&tq_disk);
-			wait_event(blk_buffers_wait,
-			 atomic_read(&queued_sectors) < low_queued_sectors);
-		}
-
 		/* Only one thread can actually submit the I/O. */
 		if (test_and_set_bit(BH_Lock, &bh->b_state))
 			continue;
@@ -1168,42 +1144,21 @@ int __init blk_dev_init(void)
 	memset(max_readahead, 0, sizeof(max_readahead));
 	memset(max_sectors, 0, sizeof(max_sectors));
 
-	atomic_set(&queued_sectors, 0);
 	total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
 
 	/*
-	 * Try to keep 128MB max hysteris. If not possible,
-	 * use half of RAM
+	 * Free request slots per queue.
+	 * (Half for reads, half for writes)
 	 */
-	high_queued_sectors = (total_ram * 2) / 3;
-	low_queued_sectors = high_queued_sectors / 3;
-	if (high_queued_sectors - low_queued_sectors > MB(128))
-		low_queued_sectors = high_queued_sectors - MB(128);
-
+	queue_nr_requests = 64;
+	if (total_ram > MB(32))
+		queue_nr_requests = 128;
 
 	/*
-	 * make it sectors (512b)
+	 * Batch frees according to queue length
 	 */
-	high_queued_sectors <<= 1;
-	low_queued_sectors <<= 1;
-
-	/*
-	 * Scale free request slots per queue too
-	 */
-	total_ram = (total_ram + MB(32) - 1) & ~(MB(32) - 1);
-	if ((queue_nr_requests = total_ram >> 9) > QUEUE_NR_REQUESTS)
-		queue_nr_requests = QUEUE_NR_REQUESTS;
-
-	/*
-	 * adjust batch frees according to queue length, with upper limit
-	 */
-	if ((batch_requests = queue_nr_requests >> 3) > 32)
-		batch_requests = 32;
-
-	printk("block: queued sectors max/low %dkB/%dkB, %d slots per queue\n",
-						high_queued_sectors / 2,
-						low_queued_sectors / 2,
-						queue_nr_requests);
+	batch_requests = queue_nr_requests >> 3;
+	printk("block: %d slots per queue, batch=%d\n", queue_nr_requests, batch_requests);
 
 #ifdef CONFIG_AMIGA_Z2RAM
 	z2_init();
@@ -1324,4 +1279,3 @@ EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(generic_make_request);
 EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
-EXPORT_SYMBOL(queued_sectors);

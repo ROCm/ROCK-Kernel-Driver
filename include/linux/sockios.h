@@ -109,6 +109,8 @@
  *	vector. Each device should include this file and redefine these names
  *	as their own. Because these are device dependent it is a good idea
  *	_NOT_ to issue them to random objects and hope.
+ *
+ *	THESE IOCTLS ARE _DEPRECATED_ AND WILL DISAPPEAR IN 2.5.X -DaveM
  */
  
 #define SIOCDEVPRIVATE	0x89F0	/* to 89FF */

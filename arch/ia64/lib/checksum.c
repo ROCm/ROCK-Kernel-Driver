@@ -9,7 +9,7 @@
  * This file contains network checksum routines that are better done
  * in an architecture-specific manner due to speed..
  */
- 
+
 #include <linux/string.h>
 
 #include <asm/byteorder.h>
@@ -55,8 +55,7 @@ unsigned int csum_tcpudp_nofold(unsigned long saddr,
 		  ((unsigned long) ntohs(len) << 16) +
 		  ((unsigned long) proto << 8));
 
-	/* Fold down to 32-bits so we don't loose in the typedef-less 
-	   network stack.  */
+	/* Fold down to 32-bits so we don't loose in the typedef-less network stack.  */
 	/* 64 to 33 */
 	result = (result & 0xffffffff) + (result >> 32);
 	/* 33 to 32 */
@@ -64,8 +63,7 @@ unsigned int csum_tcpudp_nofold(unsigned long saddr,
 	return result;
 }
 
-extern unsigned long do_csum(const unsigned char *, unsigned int, unsigned int);
-extern unsigned long do_csum_c(const unsigned char *, unsigned int, unsigned int);
+extern unsigned long do_csum (const unsigned char *, long);
 
 /*
  *	This is a version of ip_compute_csum() optimized for IP headers,
@@ -73,7 +71,7 @@ extern unsigned long do_csum_c(const unsigned char *, unsigned int, unsigned int
  */
 unsigned short ip_fast_csum(unsigned char * iph, unsigned int ihl)
 {
-	return ~do_csum(iph,ihl*4,0);
+	return ~do_csum(iph, ihl*4);
 }
 
 /*
@@ -90,7 +88,7 @@ unsigned short ip_fast_csum(unsigned char * iph, unsigned int ihl)
  */
 unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
 {
-	unsigned long result = do_csum(buff, len, 0);
+	unsigned long result = do_csum(buff, len);
 
 	/* add in old sum, and carry.. */
 	result += sum;
@@ -106,5 +104,5 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
  */
 unsigned short ip_compute_csum(unsigned char * buff, int len)
 {
-	return ~do_csum(buff,len, 0);
+	return ~do_csum(buff,len);
 }

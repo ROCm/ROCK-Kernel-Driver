@@ -672,7 +672,7 @@ ia64_monarch_init_handler:
 	//
 	mov	r17=cr.lid
 	// XXX fix me: this is wrong: hard_smp_processor_id() is a pair of lid/eid
-	movl	r18=__cpu_physical_id
+	movl	r18=ia64_cpu_to_sapicid
 	;;
 	dep	r18=0,r18,61,3		// convert to physical address
 	;;

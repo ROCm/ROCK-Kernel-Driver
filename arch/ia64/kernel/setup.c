@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
  * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2001 Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
@@ -46,26 +46,51 @@
 # error "struct cpuinfo_ia64 too big!"
 #endif
 
+#define MIN(a,b)	((a) < (b) ? (a) : (b))
+#define MAX(a,b)	((a) > (b) ? (a) : (b))
+
 extern char _end;
 
-/* cpu_data[0] is data for the bootstrap processor: */
-struct cpuinfo_ia64 cpu_data[NR_CPUS] __attribute__ ((section ("__special_page_section")));
+#ifdef CONFIG_NUMA
+ struct cpuinfo_ia64 *boot_cpu_data;
+#else
+ struct cpuinfo_ia64 _cpu_data[NR_CPUS] __attribute__ ((section ("__special_page_section")));
+#endif
 
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
-/* This tells _start which CPU is booting.  */
-int cpu_now_booting;
-
-#ifdef CONFIG_SMP
-volatile unsigned long cpu_online_map;
-#endif
 
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
 
 #define COMMAND_LINE_SIZE	512
 
 char saved_command_line[COMMAND_LINE_SIZE]; /* used in proc filesystem */
+
+/*
+ * Entries defined so far:
+ * 	- boot param structure itself
+ * 	- memory map
+ * 	- initrd (optional)
+ * 	- command line string
+ * 	- kernel code & data
+ *
+ * More could be added if necessary
+ */
+#define IA64_MAX_RSVD_REGIONS 5
+
+struct rsvd_region {
+	unsigned long start;	/* virtual address of beginning of element */
+	unsigned long end;	/* virtual address of end of element + 1 */
+};
+
+/*
+ * We use a special marker for the end of memory and it uses the extra (+1) slot
+ */
+static struct rsvd_region rsvd_region[IA64_MAX_RSVD_REGIONS + 1];
+static int num_rsvd_regions;
+
+static unsigned long bootmap_start; /* physical address where the bootmem map is located */
 
 static int
 find_max_pfn (unsigned long start, unsigned long end, void *arg)
@@ -78,48 +103,180 @@ find_max_pfn (unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
+#define IGNORE_PFN0	1	/* XXX fix me: ignore pfn 0 until TLB miss handler is updated... */
+
+/*
+ * Free available memory based on the primitive map created from
+ * the boot parameters. This routine does not assume the incoming
+ * segments are sorted.
+ */
 static int
 free_available_memory (unsigned long start, unsigned long end, void *arg)
 {
-#	define KERNEL_END	((unsigned long) &_end)
-#	define MIN(a,b)		((a) < (b) ? (a) : (b))
-#	define MAX(a,b)		((a) > (b) ? (a) : (b))
-	unsigned long range_start, range_end;
+	unsigned long range_start, range_end, prev_start;
+	int i;
 
-	range_start = MIN(start, KERNEL_START);
-	range_end   = MIN(end, KERNEL_START);
-
+#if IGNORE_PFN0
+	if (start == PAGE_OFFSET) {
+		printk("warning: skipping physical page 0\n");
+		start += PAGE_SIZE;
+		if (start >= end) return 0;
+	}
+#endif
 	/*
-	 * XXX This should not be necessary, but the bootmem allocator
-	 * is broken and fails to work correctly when the starting
-	 * address is not properly aligned.
+	 * lowest possible address(walker uses virtual)
 	 */
-	range_start = PAGE_ALIGN(range_start);
+	prev_start = PAGE_OFFSET;
 
-	if (range_start < range_end)
-		free_bootmem(__pa(range_start), range_end - range_start);
+	for (i = 0; i < num_rsvd_regions; ++i) {
+		range_start = MAX(start, prev_start);
+		range_end   = MIN(end, rsvd_region[i].start);
 
-	range_start = MAX(start, KERNEL_END);
-	range_end   = MAX(end, KERNEL_END);
+		if (range_start < range_end)
+			free_bootmem(__pa(range_start), range_end - range_start);
 
-	/*
-	 * XXX This should not be necessary, but the bootmem allocator
-	 * is broken and fails to work correctly when the starting
-	 * address is not properly aligned.
-	 */
-	range_start = PAGE_ALIGN(range_start);
+		/* nothing more available in this segment */
+		if (range_end == end) return 0;
 
-	if (range_start < range_end)
-		free_bootmem(__pa(range_start), range_end - range_start);
-
+		prev_start = rsvd_region[i].end;
+	}
+	/* end of memory marker allows full processing inside loop body */
 	return 0;
+}
+
+
+static int
+find_bootmap_location (unsigned long start, unsigned long end, void *arg)
+{
+	unsigned long needed = *(unsigned long *)arg;
+	unsigned long range_start, range_end, free_start;
+	int i;
+
+#if IGNORE_PFN0
+	if (start == PAGE_OFFSET) {
+		start += PAGE_SIZE;
+		if (start >= end) return 0;
+	}
+#endif
+
+	free_start = PAGE_OFFSET;
+
+	for (i = 0; i < num_rsvd_regions; i++) {
+		range_start = MAX(start, free_start);
+		range_end   = MIN(end, rsvd_region[i].start);
+
+		if (range_end <= range_start) continue;	/* skip over empty range */
+
+	       	if (range_end - range_start >= needed) {
+			bootmap_start = __pa(range_start);
+			return 1;	/* done */
+		}
+
+		/* nothing more available in this segment */
+		if (range_end == end) return 0;
+
+		free_start = rsvd_region[i].end;
+	}
+	return 0;
+}
+
+static void
+sort_regions (struct rsvd_region *rsvd_region, int max)
+{
+	int j;
+
+	/* simple bubble sorting */
+	while (max--) {
+		for (j = 0; j < max; ++j) {
+			if (rsvd_region[j].start > rsvd_region[j+1].start) {
+				struct rsvd_region tmp;
+				tmp = rsvd_region[j];
+				rsvd_region[j] = rsvd_region[j + 1];
+				rsvd_region[j + 1] = tmp;
+			}
+		}
+	}
+}
+
+static void
+find_memory (void)
+{
+#	define KERNEL_END	((unsigned long) &_end)
+	unsigned long bootmap_size;
+	unsigned long max_pfn;
+	int n = 0;
+
+	/*
+	 * none of the entries in this table overlap
+	 */
+	rsvd_region[n].start = (unsigned long) ia64_boot_param;
+	rsvd_region[n].end   = rsvd_region[n].start + sizeof(*ia64_boot_param);
+	n++;
+
+	rsvd_region[n].start = (unsigned long) __va(ia64_boot_param->efi_memmap);
+	rsvd_region[n].end   = rsvd_region[n].start + ia64_boot_param->efi_memmap_size;
+	n++;
+
+	rsvd_region[n].start = (unsigned long) __va(ia64_boot_param->command_line);
+	rsvd_region[n].end   = (rsvd_region[n].start
+				+ strlen(__va(ia64_boot_param->command_line)) + 1);
+	n++;
+
+	rsvd_region[n].start = KERNEL_START;
+	rsvd_region[n].end   = KERNEL_END;
+	n++;
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (ia64_boot_param->initrd_start) {
+		rsvd_region[n].start = (unsigned long)__va(ia64_boot_param->initrd_start);
+		rsvd_region[n].end   = rsvd_region[n].start + ia64_boot_param->initrd_size;
+		n++;
+	}
+#endif
+
+	/* end of memory marker */
+	rsvd_region[n].start = ~0UL;
+	rsvd_region[n].end   = ~0UL;
+	n++;
+
+	num_rsvd_regions = n;
+
+	sort_regions(rsvd_region, num_rsvd_regions);
+
+	/* first find highest page frame number */
+	max_pfn = 0;
+	efi_memmap_walk(find_max_pfn, &max_pfn);
+
+	/* how many bytes to cover all the pages */
+	bootmap_size = bootmem_bootmap_pages(max_pfn) << PAGE_SHIFT;
+
+	/* look for a location to hold the bootmap */
+	bootmap_start = ~0UL;
+	efi_memmap_walk(find_bootmap_location, &bootmap_size);
+	if (bootmap_start == ~0UL)
+		panic("Cannot find %ld bytes for bootmap\n", bootmap_size);
+
+	bootmap_size = init_bootmem(bootmap_start >> PAGE_SHIFT, max_pfn);
+
+	/* Free all available memory, then mark bootmem-map as being in use.  */
+	efi_memmap_walk(free_available_memory, 0);
+	reserve_bootmem(bootmap_start, bootmap_size);
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (ia64_boot_param->initrd_start) {
+		initrd_start = (unsigned long)__va(ia64_boot_param->initrd_start);
+		initrd_end   = initrd_start+ia64_boot_param->initrd_size;
+
+		printk("Initial ramdisk at: 0x%lx (%lu bytes)\n",
+		       initrd_start, ia64_boot_param->initrd_size);
+	}
+#endif
 }
 
 void __init
 setup_arch (char **cmdline_p)
 {
 	extern unsigned long ia64_iobase;
-	unsigned long max_pfn, bootmap_start, bootmap_size;
 
 	unw_init();
 
@@ -129,75 +286,8 @@ setup_arch (char **cmdline_p)
 
 	efi_init();
 
-	max_pfn = 0;
-	efi_memmap_walk(find_max_pfn, &max_pfn);
+	find_memory();
 
-	/*
-	 * This is wrong, wrong, wrong.  Darn it, you'd think if they
-	 * change APIs, they'd do things for the better.  Grumble...
-	 */
-	bootmap_start = PAGE_ALIGN(__pa(&_end));
-	if (ia64_boot_param->initrd_size)
-		bootmap_start = PAGE_ALIGN(bootmap_start + ia64_boot_param->initrd_size);
-	bootmap_size = init_bootmem(bootmap_start >> PAGE_SHIFT, max_pfn);
-
-	efi_memmap_walk(free_available_memory, 0);
-
-	reserve_bootmem(bootmap_start, bootmap_size);
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	initrd_start = ia64_boot_param->initrd_start;
-
-	if (initrd_start) {
-		u64 start, size;
-#		define is_same_page(a,b) (((a)&PAGE_MASK) == ((b)&PAGE_MASK))
-
-#if 1
-		/* XXX for now some backwards compatibility... */
-		if (initrd_start >= PAGE_OFFSET)
-			printk("Warning: boot loader passed virtual address "
-			       "for initrd, please upgrade the loader\n");
-		else
-#endif
-			/*
-			 * The loader ONLY passes physical addresses
-			 */
-			initrd_start = (unsigned long)__va(initrd_start);
-		initrd_end = initrd_start+ia64_boot_param->initrd_size;
-		start      = initrd_start;
-		size       = ia64_boot_param->initrd_size;
-
-		printk("Initial ramdisk at: 0x%p (%lu bytes)\n",
-		       (void *) initrd_start, ia64_boot_param->initrd_size);
-
-		/*
-		 * The kernel end and the beginning of initrd can be
-		 * on the same page. This would cause the page to be
-		 * reserved twice.  While not harmful, it does lead to
-		 * a warning message which can cause confusion.  Thus,
-		 * we make sure that in this case we only reserve new
-		 * pages, i.e., initrd only pages. We need to:
-		 *
-		 *	- align up start
-		 *	- adjust size of reserved section accordingly
-		 *
-		 * It should be noted that this operation is only
-		 * valid for the reserve_bootmem() call and does not
-		 * affect the integrety of the initrd itself.
-		 *
-		 * reserve_bootmem() considers partial pages as reserved.
-		 */
-		if (is_same_page(initrd_start, (unsigned long)&_end)) {
-			start  = PAGE_ALIGN(start);
-			size  -= start-initrd_start;
-
-			printk("Initial ramdisk & kernel on the same page: "
-			       "reserving start=%lx size=%ld bytes\n",
-			       start, size);
-		}
-		reserve_bootmem(__pa(start), size);
-	}
-#endif
 #if 0
 	/* XXX fix me */
 	init_mm.start_code = (unsigned long) &_stext;
@@ -217,27 +307,37 @@ setup_arch (char **cmdline_p)
 	/*
 	 *  Set `iobase' to the appropriate address in region 6
 	 *    (uncached access range)
+	 *
+	 *  The EFI memory map is the "prefered" location to get the I/O port
+	 *  space base, rather the relying on AR.KR0. This should become more
+	 *  clear in future SAL specs. We'll fall back to getting it out of
+	 *  AR.KR0 if no appropriate entry is found in the memory map.
 	 */
-	ia64_iobase = ia64_get_kr(IA64_KR_IO_BASE);
+	ia64_iobase = efi_get_iobase();
+	if (ia64_iobase)
+		/* set AR.KR0 since this is all we use it for anyway */
+		ia64_set_kr(IA64_KR_IO_BASE, ia64_iobase);
+	else {
+		ia64_iobase = ia64_get_kr(IA64_KR_IO_BASE);
+		printk("No I/O port range found in EFI memory map, falling back to AR.KR0\n");
+		printk("I/O port base = 0x%lx\n", ia64_iobase);
+	}
 	ia64_iobase = __IA64_UNCACHED_OFFSET | (ia64_iobase & ~PAGE_OFFSET);
-
-	cpu_init();	/* initialize the bootstrap CPU */
 
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();
 #endif
 
+	cpu_init();	/* initialize the bootstrap CPU */
+
 #ifdef CONFIG_IA64_GENERIC
 	machvec_init(acpi_get_sysname());
 #endif
 
-#ifdef	CONFIG_ACPI20
 	if (efi.acpi20) {
 		/* Parse the ACPI 2.0 tables */
 		acpi20_parse(efi.acpi20);
-	} else
-#endif
-	if (efi.acpi) {
+	} else if (efi.acpi) {
 		/* Parse the ACPI tables */
 		acpi_parse(efi.acpi);
 	}
@@ -257,6 +357,8 @@ setup_arch (char **cmdline_p)
 
 	platform_setup(cmdline_p);
 	paging_init();
+
+	unw_create_gate_table();
 }
 
 /*
@@ -270,26 +372,18 @@ get_cpuinfo (char *buffer)
 #else
 #	define lpj	loops_per_jiffy
 #endif
-	char family[32], model[32], features[128], *cp, *p = buffer;
+	char family[32], features[128], *cp, *p = buffer;
 	struct cpuinfo_ia64 *c;
-	unsigned long mask;
+	unsigned long mask, cpu;
 
-	for (c = cpu_data; c < cpu_data + NR_CPUS; ++c) {
-#ifdef CONFIG_SMP
-		if (!(cpu_online_map & (1UL << (c - cpu_data))))
-			continue;
-#endif
-
+	for (cpu = 0; cpu < smp_num_cpus; ++cpu) {
+		c = cpu_data(cpu);
 		mask = c->features;
 
-		if (c->family == 7)
-			memcpy(family, "IA-64", 6);
-		else
-			sprintf(family, "%u", c->family);
-
-		switch (c->model) {
-		      case 0:	strcpy(model, "Itanium"); break;
-		      default:	sprintf(model, "%u", c->model); break;
+		switch (c->family) {
+		      case 0x07:	memcpy(family, "Itanium", 8); break;
+		      case 0x1f:	memcpy(family, "McKinley", 9); break;
+		      default:		sprintf(family, "%u", c->family); break;
 		}
 
 		/* build the feature string: */
@@ -306,8 +400,9 @@ get_cpuinfo (char *buffer)
 		p += sprintf(p,
 			     "processor  : %lu\n"
 			     "vendor     : %s\n"
+			     "arch       : IA-64\n"
 			     "family     : %s\n"
-			     "model      : %s\n"
+			     "model      : %u\n"
 			     "revision   : %u\n"
 			     "archrev    : %u\n"
 			     "features   :%s\n"	/* don't change this---it _is_ right! */
@@ -316,8 +411,7 @@ get_cpuinfo (char *buffer)
 			     "cpu MHz    : %lu.%06lu\n"
 			     "itc MHz    : %lu.%06lu\n"
 			     "BogoMIPS   : %lu.%02lu\n\n",
-			     c - cpu_data, c->vendor, family, model, c->revision, c->archrev,
-			     features,
+			     cpu, c->vendor, family, c->model, c->revision, c->archrev, features,
 			     c->ppn, c->number, c->proc_freq / 1000000, c->proc_freq % 1000000,
 			     c->itc_freq / 1000000, c->itc_freq % 1000000,
 			     lpj*HZ/500000, (lpj*HZ/5000) % 100);
@@ -385,18 +479,54 @@ identify_cpu (struct cpuinfo_ia64 *c)
 void
 cpu_init (void)
 {
-	extern void __init ia64_mmu_init (void);
+	extern void __init ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
+	struct cpuinfo_ia64 *my_cpu_data;
+#ifdef CONFIG_NUMA
+	int cpu, order;
 
 	/*
-	 * We can't pass "local_cpu_data" do identify_cpu() because we haven't called
+	 * If NUMA is configured, the cpu_data array is not preallocated. The boot cpu
+	 * allocates entries for every possible cpu. As the remaining cpus come online,
+	 * they reallocate a new cpu_data structure on their local node. This extra work
+	 * is required because some boot code references all cpu_data structures
+	 * before the cpus are actually started.
+	 */
+	if (!boot_cpu_data) {
+		my_cpu_data = alloc_bootmem_pages_node(NODE_DATA(numa_node_id()),
+						       sizeof(struct cpuinfo_ia64));
+		boot_cpu_data = my_cpu_data;
+		my_cpu_data->cpu_data[0] = my_cpu_data;
+		for (cpu = 1; cpu < NR_CPUS; ++cpu)
+			my_cpu_data->cpu_data[cpu]
+				= alloc_bootmem_pages_node(NODE_DATA(numa_node_id()),
+							   sizeof(struct cpuinfo_ia64));
+		for (cpu = 1; cpu < NR_CPUS; ++cpu)
+			memcpy(my_cpu_data->cpu_data[cpu]->cpu_data_ptrs,
+			       my_cpu_data->cpu_data, sizeof(my_cpu_data->cpu_data));
+	} else {
+		order = get_order(sizeof(struct cpuinfo_ia64));
+		my_cpu_data = page_address(alloc_pages_node(numa_node_id(), GFP_KERNEL, order));
+		memcpy(my_cpu_data, boot_cpu_data->cpu_data[smp_processor_id()],
+		       sizeof(struct cpuinfo_ia64));
+		__free_pages(virt_to_page(boot_cpu_data->cpu_data[smp_processor_id()]),
+			     order);
+		for (cpu = 0; cpu < NR_CPUS; ++cpu)
+			boot_cpu_data->cpu_data[cpu]->cpu_data[smp_processor_id()] = my_cpu_data;
+	}
+#else
+	my_cpu_data = cpu_data(smp_processor_id());
+#endif
+
+	/*
+	 * We can't pass "local_cpu_data" to identify_cpu() because we haven't called
 	 * ia64_mmu_init() yet.  And we can't call ia64_mmu_init() first because it
 	 * depends on the data returned by identify_cpu().  We break the dependency by
-	 * accessing cpu_data[] the old way, through identity mapped space.
+	 * accessing cpu_data() the old way, through identity mapped space.
 	 */
-	identify_cpu(&cpu_data[smp_processor_id()]);
+	identify_cpu(my_cpu_data);
 
 	/* Clear the stack memory reserved for pt_regs: */
 	memset(ia64_task_regs(current), 0, sizeof(struct pt_regs));
@@ -415,13 +545,11 @@ cpu_init (void)
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 
-	ia64_mmu_init();
+	ia64_mmu_init(my_cpu_data);
 
 #ifdef CONFIG_IA32_SUPPORT
 	/* initialize global ia32 state - CR0 and CR4 */
-	__asm__("mov ar.cflg = %0"
-		: /* no outputs */
-		: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
+	asm volatile ("mov ar.cflg = %0" :: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
 #endif
 
 	/* disable all local interrupt sources: */

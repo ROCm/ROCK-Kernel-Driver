@@ -49,6 +49,7 @@ typedef u8 ia64_vector;
 #define IA64_PERFMON_VECTOR		0xee	/* performanc monitor interrupt vector */
 #define IA64_TIMER_VECTOR		0xef	/* use highest-prio group 15 interrupt for timer */
 #define	IA64_MCA_WAKEUP_VECTOR		0xf0	/* MCA wakeup (must be >MCA_RENDEZ_VECTOR) */
+#define IA64_IPI_RESCHEDULE		0xfd	/* SMP reschedule */
 #define IA64_IPI_VECTOR			0xfe	/* inter-processor interrupt vector */
 
 /* IA64 inter-cpu interrupt related definitions */
@@ -69,7 +70,7 @@ extern __u8 isa_irq_to_vector_map[16];
 
 extern unsigned long ipi_base_addr;
 
-extern struct hw_interrupt_type irq_type_ia64_sapic;	/* CPU-internal interrupt controller */
+extern struct hw_interrupt_type irq_type_ia64_lsapic;	/* CPU-internal interrupt controller */
 
 extern int ia64_alloc_irq (void);	/* allocate a free irq */
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);

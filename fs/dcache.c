@@ -547,7 +547,7 @@ void shrink_dcache_parent(struct dentry * parent)
  *  ...
  *   6 - base-level: try to shrink a bit.
  */
-void shrink_dcache_memory(int priority, unsigned int gfp_mask)
+int shrink_dcache_memory(int priority, unsigned int gfp_mask)
 {
 	int count = 0;
 
@@ -563,13 +563,13 @@ void shrink_dcache_memory(int priority, unsigned int gfp_mask)
 	 * block allocations, but for now:
 	 */
 	if (!(gfp_mask & __GFP_FS))
-		return;
+		return 0;
 
-	if (priority)
-		count = dentry_stat.nr_unused / priority;
+	count = dentry_stat.nr_unused >> priority;
 
 	prune_dcache(count);
 	kmem_cache_shrink(dentry_cache);
+	return 0;
 }
 
 #define NAME_ALLOC_LEN(len)	((len+16) & ~15)

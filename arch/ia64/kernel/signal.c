@@ -25,6 +25,8 @@
 #include <asm/rse.h>
 #include <asm/sigcontext.h>
 
+#include "sigframe.h"
+
 #define DEBUG_SIG	0
 #define STACK_ALIGN	16		/* minimal alignment for stack pointer */
 #define _BLOCKABLE	(~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
@@ -41,11 +43,6 @@ struct sigscratch {
 	unsigned long scratch_unat;	/* ar.unat for the general registers saved in pt */
 	unsigned long pad;
 	struct pt_regs pt;
-};
-
-struct sigframe {
-	struct siginfo info;
-	struct sigcontext sc;
 };
 
 extern long ia64_do_signal (sigset_t *, struct sigscratch *, long);	/* forward decl */
@@ -380,7 +377,13 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err  = copy_siginfo_to_user(&frame->info, info);
+	err  = __put_user(sig, &frame->arg0);
+	err |= __put_user(&frame->info, &frame->arg1);
+	err |= __put_user(&frame->sc, &frame->arg2);
+	err |= __put_user(new_rbs, &frame->rbs_base);
+	err |= __put_user(ka->sa.sa_handler, &frame->handler);
+
+	err |= copy_siginfo_to_user(&frame->info, info);
 
 	err |= __put_user(current->sas_ss_sp, &frame->sc.sc_stack.ss_sp);
 	err |= __put_user(current->sas_ss_size, &frame->sc.sc_stack.ss_size);
@@ -390,19 +393,16 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	if (err)
 		goto give_sigsegv;
 
-	scr->pt.r12 = (unsigned long) frame - 16;		/* new stack pointer */
-	scr->pt.r2  = sig;					/* signal number */
-	scr->pt.r3  = (unsigned long) ka->sa.sa_handler;	/* addr. of handler's proc desc */
-	scr->pt.r15 = new_rbs;
+	scr->pt.r12 = (unsigned long) frame - 16;	/* new stack pointer */
 	scr->pt.ar_fpsr = FPSR_DEFAULT;			/* reset fpsr for signal handler */
 	scr->pt.cr_iip = tramp_addr;
 	ia64_psr(&scr->pt)->ri = 0;			/* start executing in first slot */
 
 	/*
-	 * Note: this affects only the NaT bits of the scratch regs
-	 * (the ones saved in pt_regs), which is exactly what we want.
+	 * Note: this affects only the NaT bits of the scratch regs (the ones saved in
+	 * pt_regs), which is exactly what we want.
 	 */
-	scr->scratch_unat = 0; /* ensure NaT bits of at least r2, r3, r12, and r15 are clear */
+	scr->scratch_unat = 0; /* ensure NaT bits of r12 is clear */
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sig=%d sp=%lx ip=%lx handler=%lx\n",

@@ -20,7 +20,7 @@
 
 #define MB	(1024*1024UL)
 
-#define NUM_MEM_DESCS	2
+#define NUM_MEM_DESCS	3
 
 static char fw_mem[(  sizeof(struct ia64_boot_param)
 		    + sizeof(efi_system_table_t)
@@ -121,68 +121,63 @@ offtime (unsigned long t, efi_time_t *tp)
  */
 extern void pal_emulator_static (void);
 
-asm ("
-	.proc pal_emulator_static
-pal_emulator_static:
-	mov r8=-1
-
-	mov r9=256
-	;;
-	cmp.gtu p6,p7=r9,r28		/* r28 <= 255? */
-(p6)	br.cond.sptk.few static
-	;;
-	mov r9=512
-	;;
-	cmp.gtu p6,p7=r9,r28
-(p6)	br.cond.sptk.few stacked
-	;;
-static:	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */
-(p7)	br.cond.sptk.few 1f
-	;;
-	mov r8=0			/* status = 0 */
-	movl r9=0x100000000		/* tc.base */
-	movl r10=0x0000000200000003	/* count[0], count[1] */
-	movl r11=0x1000000000002000	/* stride[0], stride[1] */
-	br.cond.sptk.few rp
-
-1:	cmp.eq p6,p7=14,r28		/* PAL_FREQ_RATIOS */
-(p7)	br.cond.sptk.few 1f
-	mov r8=0			/* status = 0 */
-	movl r9 =0x100000064		/* proc_ratio (1/100) */
-	movl r10=0x100000100		/* bus_ratio<<32 (1/256) */
-	movl r11=0x100000064		/* itc_ratio<<32 (1/100) */
-	;;
-1:	cmp.eq p6,p7=19,r28		/* PAL_RSE_INFO */
-(p7)	br.cond.sptk.few 1f
-	mov r8=0			/* status = 0 */
-	mov r9=96			/* num phys stacked */
-	mov r10=0			/* hints */
-	mov r11=0
-	br.cond.sptk.few rp
-
-1:	cmp.eq p6,p7=1,r28		/* PAL_CACHE_FLUSH */
-(p7)	br.cond.sptk.few 1f
-	mov r9=ar.lc
-	movl r8=524288			/* flush 512k million cache lines (16MB) */
-	;;
-	mov ar.lc=r8
-	movl r8=0xe000000000000000
-	;;
-.loop:	fc r8
-	add r8=32,r8
-	br.cloop.sptk.few .loop
-	sync.i
-	;;
-	srlz.i
-	;;
-	mov ar.lc=r9
-	mov r8=r0
-1:	br.cond.sptk.few rp
-
-stacked:
-	br.ret.sptk.few rp
-
-	.endp pal_emulator_static\n");
+asm (
+"	.proc pal_emulator_static\n"
+"pal_emulator_static:"
+"	mov r8=-1\n"
+"	mov r9=256\n"
+"	;;\n"
+"	cmp.gtu p6,p7=r9,r28		/* r28 <= 255? */\n"
+"(p6)	br.cond.sptk.few static\n"
+"	;;\n"
+"	mov r9=512\n"
+"	;;\n"
+"	cmp.gtu p6,p7=r9,r28\n"
+"(p6)	br.cond.sptk.few stacked\n"
+"	;;\n"
+"static:	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */\n"
+"(p7)	br.cond.sptk.few 1f\n"
+"	;;\n"
+"	mov r8=0			/* status = 0 */\n"
+"	movl r9=0x100000000		/* tc.base */\n"
+"	movl r10=0x0000000200000003	/* count[0], count[1] */\n"
+"	movl r11=0x1000000000002000	/* stride[0], stride[1] */\n"
+"	br.cond.sptk.few rp\n"
+"1:	cmp.eq p6,p7=14,r28		/* PAL_FREQ_RATIOS */\n"
+"(p7)	br.cond.sptk.few 1f\n"
+"	mov r8=0			/* status = 0 */\n"
+"	movl r9 =0x100000064		/* proc_ratio (1/100) */\n"
+"	movl r10=0x100000100		/* bus_ratio<<32 (1/256) */\n"
+"	movl r11=0x100000064		/* itc_ratio<<32 (1/100) */\n"
+"	;;\n"
+"1:	cmp.eq p6,p7=19,r28		/* PAL_RSE_INFO */\n"
+"(p7)	br.cond.sptk.few 1f\n"
+"	mov r8=0			/* status = 0 */\n"
+"	mov r9=96			/* num phys stacked */\n"
+"	mov r10=0			/* hints */\n"
+"	mov r11=0\n"
+"	br.cond.sptk.few rp\n"
+"1:	cmp.eq p6,p7=1,r28		/* PAL_CACHE_FLUSH */\n"
+"(p7)	br.cond.sptk.few 1f\n"
+"	mov r9=ar.lc\n"
+"	movl r8=524288			/* flush 512k million cache lines (16MB) */\n"
+"	;;\n"
+"	mov ar.lc=r8\n"
+"	movl r8=0xe000000000000000\n"
+"	;;\n"
+".loop:	fc r8\n"
+"	add r8=32,r8\n"
+"	br.cloop.sptk.few .loop\n"
+"	sync.i\n"
+"	;;\n"
+"	srlz.i\n"
+"	;;\n"
+"	mov ar.lc=r9\n"
+"	mov r8=r0\n"
+"1:	br.cond.sptk.few rp\n"
+"stacked:\n"
+"	br.ret.sptk.few rp\n"
+"	.endp pal_emulator_static\n");
 
 /* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
 
@@ -437,8 +432,17 @@ sys_fw_init (const char *args, int arglen)
 
 	sal_systab->checksum = -checksum;
 
-	/* fill in a memory descriptor: */
+	/* simulate free memory at physical address zero */
 	md = &efi_memmap[0];
+	md->type = EFI_BOOT_SERVICES_DATA;
+	md->pad = 0;
+	md->phys_addr = 0*MB;
+	md->virt_addr = 0;
+	md->num_pages = (1*MB) >> 12;	/* 1MB (in 4KB pages) */
+	md->attribute = EFI_MEMORY_WB;
+
+	/* fill in a memory descriptor: */
+	md = &efi_memmap[1];
 	md->type = EFI_CONVENTIONAL_MEMORY;
 	md->pad = 0;
 	md->phys_addr = 2*MB;
@@ -447,7 +451,7 @@ sys_fw_init (const char *args, int arglen)
 	md->attribute = EFI_MEMORY_WB;
 
 	/* descriptor for firmware emulator: */
-	md = &efi_memmap[1];
+	md = &efi_memmap[2];
 	md->type = EFI_PAL_CODE;
 	md->pad = 0;
 	md->phys_addr = 1*MB;
@@ -462,7 +466,7 @@ sys_fw_init (const char *args, int arglen)
 	 */
 
 	/* descriptor for high memory (>4GB): */
-	md = &efi_memmap[2];
+	md = &efi_memmap[3];
 	md->type = EFI_CONVENTIONAL_MEMORY;
 	md->pad = 0;
 	md->phys_addr = 4096*MB;

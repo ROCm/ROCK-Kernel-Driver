@@ -25,7 +25,7 @@ SECTIONS
   .text : AT(ADDR(.text) - PAGE_OFFSET)
     {
 	*(.text.ivt)
-	/* these are not really text pages, but the zero page needs to be in a fixed location: */
+	/* these are not really text pages, but they need to be page aligned: */
 	*(__special_page_section)
 	__start_gate_section = .;
 	*(.text.gate)
@@ -74,9 +74,9 @@ SECTIONS
   __stop___kallsyms = .;
 
   /* Unwind info & table: */
+  . = ALIGN(8);
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
 	{ *(.IA_64.unwind_info*) }
-  . = ALIGN(8);
   ia64_unw_start = .;
   .IA_64.unwind : AT(ADDR(.IA_64.unwind) - PAGE_OFFSET)
 	{ *(.IA_64.unwind*) }

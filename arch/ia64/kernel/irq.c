@@ -626,6 +626,8 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		desc->handler->end(irq);
 		spin_unlock(&desc->lock);
 	}
+	if (local_softirq_pending())
+		do_softirq();
 	return 1;
 }
 

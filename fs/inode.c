@@ -681,7 +681,7 @@ free_unused:
 	goto free_unused;
 }
 
-void shrink_icache_memory(int priority, int gfp_mask)
+int shrink_icache_memory(int priority, int gfp_mask)
 {
 	int count = 0;
 
@@ -693,13 +693,13 @@ void shrink_icache_memory(int priority, int gfp_mask)
 	 * in clear_inode() and friends..
 	 */
 	if (!(gfp_mask & __GFP_FS))
-		return;
+		return 0;
 
-	if (priority)
-		count = inodes_stat.nr_unused / priority;
+	count = inodes_stat.nr_unused >> priority;
 
 	prune_icache(count);
 	kmem_cache_shrink(inode_cachep);
+	return 0;
 }
 
 /*

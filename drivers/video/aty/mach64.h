@@ -1,10 +1,10 @@
 /*
- * Exported procedures for the ATI/mach64 display driver on PowerMacs.
+ * ATI Mach64 Register Definitions
  *
  * Copyright (C) 1997 Michael AK Tesch
  *  written with much help from Jon Howell
  *
- * Updated for 3D RAGE PRO by Geert Uytterhoeven
+ * Updated for 3D RAGE PRO and 3D RAGE Mobility by Geert Uytterhoeven
  *	
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,81 +20,124 @@
 
 /* NON-GUI MEMORY MAPPED Registers - expressed in BYTE offsets */
 
+/* Accelerator CRTC */
 #define CRTC_H_TOTAL_DISP	0x0000	/* Dword offset 0_00 */
+#define CRTC2_H_TOTAL_DISP	0x0000	/* Dword offset 0_00 */
 #define CRTC_H_SYNC_STRT_WID	0x0004	/* Dword offset 0_01 */
+#define CRTC2_H_SYNC_STRT_WID	0x0004	/* Dword offset 0_01 */
 #define CRTC_H_SYNC_STRT	0x0004
+#define CRTC2_H_SYNC_STRT	0x0004
 #define CRTC_H_SYNC_DLY		0x0005
+#define CRTC2_H_SYNC_DLY	0x0005
 #define CRTC_H_SYNC_WID		0x0006
-
+#define CRTC2_H_SYNC_WID	0x0006
 #define CRTC_V_TOTAL_DISP	0x0008	/* Dword offset 0_02 */
+#define CRTC2_V_TOTAL_DISP	0x0008	/* Dword offset 0_02 */
 #define CRTC_V_TOTAL		0x0008
+#define CRTC2_V_TOTAL		0x0008
 #define CRTC_V_DISP		0x000A
+#define CRTC2_V_DISP		0x000A
 #define CRTC_V_SYNC_STRT_WID	0x000C	/* Dword offset 0_03 */
+#define CRTC2_V_SYNC_STRT_WID	0x000C	/* Dword offset 0_03 */
 #define CRTC_V_SYNC_STRT	0x000C
+#define CRTC2_V_SYNC_STRT	0x000C
 #define CRTC_V_SYNC_WID		0x000E
-
+#define CRTC2_V_SYNC_WID	0x000E
 #define CRTC_VLINE_CRNT_VLINE	0x0010	/* Dword offset 0_04 */
+#define CRTC2_VLINE_CRNT_VLINE	0x0010	/* Dword offset 0_04 */
 #define CRTC_OFF_PITCH		0x0014	/* Dword offset 0_05 */
 #define CRTC_OFFSET		0x0014
 #define CRTC_PITCH		0x0016
-
 #define CRTC_INT_CNTL		0x0018	/* Dword offset 0_06 */
 #define CRTC_GEN_CNTL		0x001C	/* Dword offset 0_07 */
 #define CRTC_PIX_WIDTH		0x001D
 #define CRTC_FIFO		0x001E
 #define CRTC_EXT_DISP		0x001F
 
+/* Memory Buffer Control */
 #define DSP_CONFIG		0x0020	/* Dword offset 0_08 */
+#define PM_DSP_CONFIG		0x0020	/* Dword offset 0_08 (Mobility Only) */
 #define DSP_ON_OFF		0x0024	/* Dword offset 0_09 */
+#define PM_DSP_ON_OFF		0x0024	/* Dword offset 0_09 (Mobility Only) */
 #define TIMER_CONFIG		0x0028	/* Dword offset 0_0A */
 #define MEM_BUF_CNTL		0x002C	/* Dword offset 0_0B */
 #define MEM_ADDR_CONFIG		0x0034	/* Dword offset 0_0D */
 
+/* Accelerator CRTC */
 #define CRT_TRAP		0x0038	/* Dword offset 0_0E */
 
 #define I2C_CNTL_0		0x003C	/* Dword offset 0_0F */
 
+/* Overscan */
 #define OVR_CLR			0x0040	/* Dword offset 0_10 */
+#define OVR2_CLR		0x0040	/* Dword offset 0_10 */
 #define OVR_WID_LEFT_RIGHT	0x0044	/* Dword offset 0_11 */
+#define OVR2_WID_LEFT_RIGHT	0x0044	/* Dword offset 0_11 */
 #define OVR_WID_TOP_BOTTOM	0x0048	/* Dword offset 0_12 */
+#define OVR2_WID_TOP_BOTTOM	0x0048	/* Dword offset 0_12 */
 
+/* Memory Buffer Control */
 #define VGA_DSP_CONFIG		0x004C	/* Dword offset 0_13 */
+#define PM_VGA_DSP_CONFIG	0x004C	/* Dword offset 0_13 (Mobility Only) */
 #define VGA_DSP_ON_OFF		0x0050	/* Dword offset 0_14 */
+#define PM_VGA_DSP_ON_OFF	0x0050	/* Dword offset 0_14 (Mobility Only) */
+#define DSP2_CONFIG		0x0054	/* Dword offset 0_15 */
+#define PM_DSP2_CONFIG		0x0054	/* Dword offset 0_15 (Mobility Only) */
+#define DSP2_ON_OFF		0x0058	/* Dword offset 0_16 */
+#define PM_DSP2_ON_OFF		0x0058	/* Dword offset 0_16 (Mobility Only) */
 
+/* Accelerator CRTC */
+#define CRTC2_OFF_PITCH		0x005C	/* Dword offset 0_17 */
+
+/* Hardware Cursor */
 #define CUR_CLR0		0x0060	/* Dword offset 0_18 */
+#define CUR2_CLR0		0x0060	/* Dword offset 0_18 */
 #define CUR_CLR1		0x0064	/* Dword offset 0_19 */
+#define CUR2_CLR1		0x0064	/* Dword offset 0_19 */
 #define CUR_OFFSET		0x0068	/* Dword offset 0_1A */
+#define CUR2_OFFSET		0x0068	/* Dword offset 0_1A */
 #define CUR_HORZ_VERT_POSN	0x006C	/* Dword offset 0_1B */
+#define CUR2_HORZ_VERT_POSN	0x006C	/* Dword offset 0_1B */
 #define CUR_HORZ_VERT_OFF	0x0070	/* Dword offset 0_1C */
+#define CUR2_HORZ_VERT_OFF	0x0070	/* Dword offset 0_1C */
 
 #define CONFIG_PANEL_LG		0x0074	/* Dword offset 0_1D */
 
+/* General I/O Control */
 #define GP_IO			0x0078	/* Dword offset 0_1E */
 
+/* Test and Debug */
 #define HW_DEBUG		0x007C	/* Dword offset 0_1F */
 
+/* Scratch Pad and Test */
 #define SCRATCH_REG0		0x0080	/* Dword offset 0_20 */
 #define SCRATCH_REG1		0x0084	/* Dword offset 0_21 */
+#define SCRATCH_REG2		0x0088	/* Dword offset 0_22 */
+#define SCRATCH_REG3		0x008C	/* Dword offset 0_23 */
 
+/* Clock Control */
 #define CLOCK_CNTL		0x0090	/* Dword offset 0_24 */
 #define CLOCK_SEL_CNTL		0x0090	/* Dword offset 0_24 */
 
+/* Configuration */
 #define CONFIG_STAT1		0x0094	/* Dword offset 0_25 */
 #define CONFIG_STAT2		0x0098	/* Dword offset 0_26 */
 
+/* Bus Control */
 #define BUS_CNTL		0x00A0	/* Dword offset 0_28 */
 
 #define LCD_INDEX		0x00A4	/* Dword offset 0_29 */
 #define LCD_DATA		0x00A8	/* Dword offset 0_2A */
 
+/* Memory Control */
 #define EXT_MEM_CNTL		0x00AC	/* Dword offset 0_2B */
 #define MEM_CNTL		0x00B0	/* Dword offset 0_2C */
-
 #define MEM_VGA_WP_SEL		0x00B4	/* Dword offset 0_2D */
 #define MEM_VGA_RP_SEL		0x00B8	/* Dword offset 0_2E */
 
 #define I2C_CNTL_1		0x00BC	/* Dword offset 0_2F */
 
+/* DAC Control */
 #define DAC_REGS		0x00C0	/* Dword offset 0_30 */
 #define DAC_W_INDEX		0x00C0	/* Dword offset 0_30 */
 #define DAC_DATA		0x00C1	/* Dword offset 0_30 */
@@ -104,21 +147,29 @@
 
 #define EXT_DAC_REGS		0x00C8	/* Dword offset 0_32 */
 
+/* Test and Debug */
 #define GEN_TEST_CNTL		0x00D0	/* Dword offset 0_34 */
 
+/* Custom Macros */
 #define CUSTOM_MACRO_CNTL	0x00D4	/* Dword offset 0_35 */
+
 #define LCD_GEN_CNTL_LG		0x00D4	/* Dword offset 0_35 */
 
 #define POWER_MANAGEMENT_LG	0x00D8	/* Dword offset 0_36 (LG) */
 
+/* Configuration */
 #define CONFIG_CNTL		0x00DC	/* Dword offset 0_37 (CT, ET, VT) */
 #define CONFIG_CHIP_ID		0x00E0	/* Dword offset 0_38 */
 #define CONFIG_STAT0		0x00E4	/* Dword offset 0_39 */
+
+/* Test and Debug */
 #define CRC_SIG			0x00E8	/* Dword offset 0_3A */
+#define CRC2_SIG		0x00E8	/* Dword offset 0_3A */
 
 
 /* GUI MEMORY MAPPED Registers */
 
+/* Draw Engine Destination Trajectory */
 #define DST_OFF_PITCH		0x0100	/* Dword offset 0_40 */
 #define DST_X			0x0104	/* Dword offset 0_41 */
 #define DST_Y			0x0108	/* Dword offset 0_42 */
@@ -151,6 +202,7 @@
 #define SECONDARY_T_Y_INC	0x0178	/* Dword offset 0_5E */
 #define SECONDARY_T_START	0x017C	/* Dword offset 0_5F */
 
+/* Draw Engine Source Trajectory */
 #define SRC_OFF_PITCH		0x0180	/* Dword offset 0_60 */
 #define SRC_X			0x0184	/* Dword offset 0_61 */
 #define SRC_Y			0x0188	/* Dword offset 0_62 */
@@ -196,6 +248,7 @@
 #define SCALE_VACC		0x01F8	/* Dword offset 0_7E */
 #define SCALE_3D_CNTL		0x01FC	/* Dword offset 0_7F */
 
+/* Host Data */
 #define HOST_DATA0		0x0200	/* Dword offset 0_80 */
 #define HOST_DATA1		0x0204	/* Dword offset 0_81 */
 #define HOST_DATA2		0x0208	/* Dword offset 0_82 */
@@ -214,15 +267,18 @@
 #define HOST_DATAF		0x023C	/* Dword offset 0_8F */
 #define HOST_CNTL		0x0240	/* Dword offset 0_90 */
 
+/* GUI Bus Mastering */
 #define BM_HOSTDATA		0x0244	/* Dword offset 0_91 */
 #define BM_ADDR			0x0248	/* Dword offset 0_92 */
 #define BM_DATA			0x0248	/* Dword offset 0_92 */
 #define BM_GUI_TABLE_CMD	0x024C	/* Dword offset 0_93 */
 
+/* Pattern */
 #define PAT_REG0		0x0280	/* Dword offset 0_A0 */
 #define PAT_REG1		0x0284	/* Dword offset 0_A1 */
 #define PAT_CNTL		0x0288	/* Dword offset 0_A2 */
 
+/* Scissors */
 #define SC_LEFT			0x02A0	/* Dword offset 0_A8 */
 #define SC_RIGHT		0x02A4	/* Dword offset 0_A9 */
 #define SC_LEFT_RIGHT		0x02A8	/* Dword offset 0_AA */
@@ -230,6 +286,9 @@
 #define SC_BOTTOM		0x02B0	/* Dword offset 0_AC */
 #define SC_TOP_BOTTOM		0x02B4	/* Dword offset 0_AD */
 
+/* Data Path */
+#define USR1_DST_OFF_PITCH	0x02B8	/* Dword offset 0_AE */
+#define USR2_DST_OFF_PITCH	0x02BC	/* Dword offset 0_AF */
 #define DP_BKGD_CLR		0x02C0	/* Dword offset 0_B0 */
 #define DP_FOG_CLR		0x02C4	/* Dword offset 0_B1 */
 #define DP_FRGD_CLR		0x02C4	/* Dword offset 0_B1 */
@@ -239,24 +298,32 @@
 #define DP_MIX			0x02D4	/* Dword offset 0_B5 */
 #define DP_SRC			0x02D8	/* Dword offset 0_B6 */
 #define DP_FRGD_CLR_MIX		0x02DC	/* Dword offset 0_B7 */
-#define DP_FRGD_BLGD_CLR	0x02E0	/* Dword offset 0_B8 */
+#define DP_FRGD_BKGD_CLR	0x02E0	/* Dword offset 0_B8 */
 
+/* Draw Engine Destination Trajectory */
 #define DST_X_Y			0x02E8	/* Dword offset 0_BA */
 #define DST_WIDTH_HEIGHT	0x02EC	/* Dword offset 0_BB */
+
+/* Data Path */
 #define USR_DST_PICTH		0x02F0	/* Dword offset 0_BC */
 #define DP_SET_GUI_ENGINE2	0x02F8	/* Dword offset 0_BE */
 #define DP_SET_GUI_ENGINE	0x02FC	/* Dword offset 0_BF */
 
+/* Color Compare */
 #define CLR_CMP_CLR		0x0300	/* Dword offset 0_C0 */
 #define CLR_CMP_MASK		0x0304	/* Dword offset 0_C1 */
 #define CLR_CMP_CNTL		0x0308	/* Dword offset 0_C2 */
 
+/* Command FIFO */
 #define FIFO_STAT		0x0310	/* Dword offset 0_C4 */
 
 #define CONTEXT_MASK		0x0320	/* Dword offset 0_C8 */
 #define CONTEXT_LOAD_CNTL	0x032C	/* Dword offset 0_CB */
 
+/* Engine Control */
 #define GUI_TRAJ_CNTL		0x0330	/* Dword offset 0_CC */
+
+/* Engine Status/FIFO */
 #define GUI_STAT		0x0338	/* Dword offset 0_CE */
 
 #define TEX_PALETTE_INDEX	0x0340	/* Dword offset 0_D0 */
@@ -287,6 +354,7 @@
 #define SCALE_OFF_ACC		0x0388	/* Dword offset 0_E2 */
 #define SCALE_DST_Y_X		0x038C	/* Dword offset 0_E3 */
 
+/* Draw Engine Destination Trajectory */
 #define COMPOSITE_SHADOW_ID	0x0398	/* Dword offset 0_E6 */
 
 #define SECONDARY_SCALE_X_INC	0x039C	/* Dword offset 0_E7 */
@@ -363,6 +431,7 @@
 #define CAPTURE_DEBUG		0x0464	/* Dword offset 1_19 */
 #define VIDEO_SYNC_TEST		0x0468	/* Dword offset 1_1A */
 
+/* GenLocking */
 #define SNAPSHOT_VH_COUNTS	0x0470	/* Dword offset 1_1C */
 #define SNAPSHOT_F_COUNT	0x0474	/* Dword offset 1_1D */
 #define N_VIF_COUNT		0x0478	/* Dword offset 1_1E */
@@ -372,14 +441,22 @@
 #define CAPTURE_BUF1_OFFSET	0x0484	/* Dword offset 1_21 */
 #define CAPTURE_BUF_PITCH	0x0488	/* Dword offset 1_22 */
 
+/* GenLocking */
+#define SNAPSHOT2_VH_COUNTS	0x04B0	/* Dword offset 1_2C */
+#define SNAPSHOT2_F_COUNT	0x04B4	/* Dword offset 1_2D */
+#define N_VIF2_COUNT		0x04B8	/* Dword offset 1_2E */
+#define SNAPSHOT2_VIF_COUNT	0x04BC	/* Dword offset 1_2F */
+
 #define MPP_CONFIG		0x04C0	/* Dword offset 1_30 */
 #define MPP_STROBE_SEQ		0x04C4	/* Dword offset 1_31 */
 #define MPP_ADDR		0x04C8	/* Dword offset 1_32 */
 #define MPP_DATA		0x04CC	/* Dword offset 1_33 */
 #define TVO_CNTL		0x0500	/* Dword offset 1_40 */
 
+/* Test and Debug */
 #define CRT_HORZ_VERT_LOAD	0x0544	/* Dword offset 1_51 */
 
+/* AGP */
 #define AGP_BASE		0x0548	/* Dword offset 1_52 */
 #define AGP_CNTL		0x054C	/* Dword offset 1_53 */
 
@@ -390,8 +467,12 @@
 #define SCALER_H_COEFF3		0x0560	/* Dword offset 1_58 */
 #define SCALER_H_COEFF4		0x0564	/* Dword offset 1_59 */
 
+/* Command FIFO */
+#define GUI_CMDFIFO_DEBUG	0x0570	/* Dword offset 1_5C */
+#define GUI_CMDFIFO_DATA	0x0574	/* Dword offset 1_5D */
 #define GUI_CNTL		0x0578	/* Dword offset 1_5E */
 
+/* Bus Mastering */
 #define BM_FRAME_BUF_OFFSET	0x0580	/* Dword offset 1_60 */
 #define BM_SYSTEM_MEM_ADDR	0x0584	/* Dword offset 1_61 */
 #define BM_COMMAND		0x0588	/* Dword offset 1_62 */
@@ -404,6 +485,7 @@
 #define SCALER_BUF1_OFFSET_U	0x05DC	/* Dword offset 1_77 */
 #define SCALER_BUF1_OFFSET_V	0x05E0	/* Dword offset 1_78 */
 
+/* Setup Engine */
 #define VERTEX_1_S		0x0640	/* Dword offset 1_90 */
 #define VERTEX_1_T		0x0644	/* Dword offset 1_91 */
 #define VERTEX_1_W		0x0648	/* Dword offset 1_92 */
@@ -460,6 +542,7 @@
 #define VERTEX_2_SECONDARY_S	0x0734	/* Dword offset 1_CD */
 #define VERTEX_2_SECONDARY_T	0x0738	/* Dword offset 1_CE */
 #define VERTEX_2_SECONDARY_W	0x073C	/* Dword offset 1_CF */
+
 
 #define GTC_3D_RESET_DELAY	3	/* 3D engine reset delay in ms */
 
@@ -579,7 +662,7 @@
 #define CLOCK_STROBE		0x40
 #define PLL_WR_EN		0x02
 
-/* PLL registers */
+/* PLL register indices */
 #define MPLL_CNTL		0x00
 #define VPLL_CNTL		0x01
 #define PLL_REF_DIV		0x02
@@ -593,9 +676,37 @@
 #define VCLK3_FB_DIV		0x0A
 #define PLL_EXT_CNTL		0x0B
 #define DLL_CNTL		0x0C
+#define DLL1_CNTL		0x0C
 #define VFC_CNTL		0x0D
-#define PLL_TEST_CTRL		0x0E
+#define PLL_TEST_CNTL		0x0E
 #define PLL_TEST_COUNT		0x0F
+#define LVDS_CNTL0		0x10
+#define LVDS_CNTL1		0x11
+#define AGP1_CNTL		0x12
+#define AGP2_CNTL		0x13
+#define DLL2_CNTL		0x14
+#define SCLK_FB_DIV		0x15
+#define SPLL_CNTL1		0x16
+#define SPLL_CNTL2		0x17
+#define APLL_STRAPS		0x18
+#define EXT_VPLL_CNTL		0x19
+#define EXT_VPLL_REF_DIV	0x1A
+#define EXT_VPLL_FB_DIV		0x1B
+#define EXT_VPLL_MSB		0x1C
+#define HTOTAL_CNTL		0x1D
+#define BYTE_CLK_CNTL		0x1E
+#define TV_PLL_CNTL1		0x1F
+#define TV_PLL_CNTL2		0x20
+#define TV_PLL_CNTL		0x21
+#define EXT_TV_PLL		0x22
+#define V2PLL_CNTL		0x23
+#define PLL_V2CLK_CNTL		0x24
+#define EXT_V2PLL_REF_DIV	0x25
+#define EXT_V2PLL_FB_DIV	0x26
+#define EXT_V2PLL_MSB		0x27
+#define HTOTAL2_CNTL		0x28
+#define PLL_YCLK_CNTL		0x29
+#define PM_DYN_CLK_CNTL		0x2A
 
 /* Fields in PLL registers */
 #define PLL_PC_GAIN		0x07
@@ -991,17 +1102,52 @@
 #define CRTC2_DISPLAY_DIS	0x00000400
 
 /* LCD register indices */
-#define LCD_CONFIG_PANEL	0x00
+#define CONFIG_PANEL		0x00
 #define LCD_GEN_CTRL		0x01
-#define LCD_DSTN_CONTROL	0x02
-#define LCD_HFB_PITCH_ADDR	0x03
-#define LCD_HORZ_STRETCHING	0x04
-#define LCD_VERT_STRETCHING	0x05
-#define LCD_EXT_VERT_STRETCH	0x06
-#define LCD_LT_GIO		0x07
-#define LCD_POWER_MANAGEMENT	0x08
-#define LCD_ZVGPIO		0x09
+#define DSTN_CONTROL		0x02
+#define HFB_PITCH_ADDR		0x03
+#define HORZ_STRETCHING		0x04
+#define VERT_STRETCHING		0x05
+#define EXT_VERT_STRETCH	0x06
+#define LT_GIO			0x07
+#define POWER_MANAGEMENT	0x08
+#define ZVGPIO			0x09
+#define ICON_CLR0		0x0A
+#define ICON_CLR1		0x0B
+#define ICON_OFFSET		0x0C
+#define ICON_HORZ_VERT_POSN	0x0D
+#define ICON_HORZ_VERT_OFF	0x0E
+#define ICON2_CLR0		0x0F
+#define ICON2_CLR1		0x10
+#define ICON2_OFFSET		0x11
+#define ICON2_HORZ_VERT_POSN	0x12
+#define ICON2_HORZ_VERT_OFF	0x13
 #define LCD_MISC_CNTL		0x14
+#define APC_CNTL		0x1C
+#define POWER_MANAGEMENT_2	0x1D
+#define ALPHA_BLENDING		0x25
+#define PORTRAIT_GEN_CNTL	0x26
+#define APC_CTRL_IO		0x27
+#define TEST_IO			0x28
+#define TEST_OUTPUTS		0x29
+#define DP1_MEM_ACCESS		0x2A
+#define DP0_MEM_ACCESS		0x2B
+#define DP0_DEBUG_A		0x2C
+#define DP0_DEBUG_B		0x2D
+#define DP1_DEBUG_A		0x2E
+#define DP1_DEBUG_B		0x2F
+#define DPCTRL_DEBUG_A		0x30
+#define DPCTRL_DEBUG_B		0x31
+#define MEMBLK_DEBUG		0x32
+#define APC_LUT_AB		0x33
+#define APC_LUT_CD		0x34
+#define APC_LUT_EF		0x35
+#define APC_LUT_GH		0x36
+#define APC_LUT_IJ		0x37
+#define APC_LUT_KL		0x38
+#define APC_LUT_MN		0x39
+#define APC_LUT_OP		0x3A
+
 
 /* Values in LCD_MISC_CNTL */
 #define BIAS_MOD_LEVEL_MASK	0x0000ff00

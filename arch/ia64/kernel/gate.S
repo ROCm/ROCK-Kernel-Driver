@@ -15,15 +15,23 @@
 
 	.section .text.gate,"ax"
 
-	.align PAGE_SIZE
+#	define ARG0_OFF		(16 + IA64_SIGFRAME_ARG0_OFFSET)
+#	define ARG1_OFF		(16 + IA64_SIGFRAME_ARG1_OFFSET)
+#	define ARG2_OFF		(16 + IA64_SIGFRAME_ARG2_OFFSET)
+#	define RBS_BASE_OFF	(16 + IA64_SIGFRAME_RBS_BASE_OFFSET)
+#	define SIGHANDLER_OFF	(16 + IA64_SIGFRAME_HANDLER_OFFSET)
+#	define SIGCONTEXT_OFF	(16 + IA64_SIGFRAME_SIGCONTEXT_OFFSET)
 
-#	define SIGINFO_OFF	16
-#	define SIGCONTEXT_OFF	(SIGINFO_OFF + ((IA64_SIGINFO_SIZE + 15) & ~15))
 #	define FLAGS_OFF	IA64_SIGCONTEXT_FLAGS_OFFSET
 #	define CFM_OFF		IA64_SIGCONTEXT_CFM_OFFSET
 #	define FR6_OFF		IA64_SIGCONTEXT_FR6_OFFSET
 #	define BSP_OFF		IA64_SIGCONTEXT_AR_BSP_OFFSET
 #	define RNAT_OFF		IA64_SIGCONTEXT_AR_RNAT_OFFSET
+#	define UNAT_OFF		IA64_SIGCONTEXT_AR_UNAT_OFFSET
+#	define FPSR_OFF		IA64_SIGCONTEXT_AR_FPSR_OFFSET
+#	define PR_OFF		IA64_SIGCONTEXT_PR_OFFSET
+#	define RP_OFF		IA64_SIGCONTEXT_B0_OFFSET
+#	define SP_OFF		IA64_SIGCONTEXT_R12_OFFSET
 #	define base0		r2
 #	define base1		r3
 	/*
@@ -31,17 +39,9 @@
 	 *
 	 *   +===============================+
        	 *   |				     |
-       	 *   //	    struct sigcontext        //
+       	 *   //	    struct sigframe          //
        	 *   |				     |
-	 *   +===============================+ <-- sp+SIGCONTEXT_OFF
-       	 *   |				     |
-	 *   //     rest of siginfo    	     //
-       	 *   | 			   	     |
-       	 *   +               +---------------+
-       	 *   | 		     | siginfo.code  |
-	 *   +---------------+---------------+
-	 *   | siginfo.errno | siginfo.signo |
-	 *   +-------------------------------+ <-- sp+SIGINFO_OFF
+	 *   +-------------------------------+ <-- sp+16
 	 *   |      16 byte of scratch       |
 	 *   |            space              |
 	 *   +-------------------------------+ <-- sp
@@ -51,46 +51,60 @@
 	 * incoming general register may be a NaT value (including sp, in which case the
 	 * process ends up dying with a SIGSEGV).
 	 *
-	 * The first need to do is a cover to get the registers onto the backing store.
-	 * Once that is done, we invoke the signal handler which may modify some of the
-	 * machine state.  After returning from the signal handler, we return control to
-	 * the previous context by executing a sigreturn system call.  A signal handler
-	 * may call the rt_sigreturn() function to directly return to a given sigcontext.
-	 * However, the user-level sigreturn() needs to do much more than calling the
-	 * rt_sigreturn() system call as it needs to unwind the stack to restore preserved
-	 * registers that may have been saved on the signal handler's call stack.
-	 *
-	 * On entry:
-	 *	r2	= signal number
-	 *	r3	= plabel of signal handler
-	 *	r15	= new register backing store
-	 *	[sp+16] = sigframe
+	 * The first thing need to do is a cover to get the registers onto the backing
+	 * store.  Once that is done, we invoke the signal handler which may modify some
+	 * of the machine state.  After returning from the signal handler, we return
+	 * control to the previous context by executing a sigreturn system call.  A signal
+	 * handler may call the rt_sigreturn() function to directly return to a given
+	 * sigcontext.  However, the user-level sigreturn() needs to do much more than
+	 * calling the rt_sigreturn() system call as it needs to unwind the stack to
+	 * restore preserved registers that may have been saved on the signal handler's
+	 * call stack.
 	 */
 
 GLOBAL_ENTRY(ia64_sigtramp)
-	ld8 r10=[r3],8				// get signal handler entry point
-	br.call.sptk.many rp=invoke_sighandler
-END(ia64_sigtramp)
+	// describe the state that is active when we get here:
+	.prologue
+	.unwabi @svr4, 's'		// mark this as a sigtramp handler (saves scratch regs)
+	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF
+	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF
+	.savesp pr, PR_OFF+SIGCONTEXT_OFF
+	.savesp rp, RP_OFF+SIGCONTEXT_OFF
+	.vframesp SP_OFF+SIGCONTEXT_OFF
+	.body
 
-ENTRY(invoke_sighandler)
-	ld8 gp=[r3]			// get signal handler's global pointer
-	mov b6=r10
+	.prologue
+	adds base0=SIGHANDLER_OFF,sp
+	adds base1=RBS_BASE_OFF,sp
+	br.call.sptk.many rp=1f
+1:
+	ld8 r17=[base0],(ARG0_OFF-SIGHANDLER_OFF)	// get pointer to signal handler's plabel
+	ld8 r15=[base1],(ARG1_OFF-RBS_BASE_OFF)		// get address of new RBS base (or NULL)
 	cover				// push args in interrupted frame onto backing store
 	;;
+	.save ar.pfs, r8
 	alloc r8=ar.pfs,0,0,3,0		// get CFM0, EC0, and CPL0 into r8
+	ld8 out0=[base0],16		// load arg0 (signum)
 	;;
-	mov r17=ar.bsp			// fetch ar.bsp
+	ld8 out1=[base1]		// load arg1 (siginfop)
+	ld8 r10=[r17],8			// get signal handler entry point
+	;;
+	ld8 out2=[base0]		// load arg2 (sigcontextp)
+	ld8 gp=[r17]			// get signal handler's global pointer
 	cmp.ne p8,p0=r15,r0		// do we need to switch the rbs?
-	mov out0=r2			// signal number
+
+	mov.m r17=ar.bsp		// fetch ar.bsp
+	.spillsp.p p8, ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 (p8)	br.cond.spnt.few setup_rbs	// yup -> (clobbers r14 and r16)
 back_from_setup_rbs:
 	adds base0=(BSP_OFF+SIGCONTEXT_OFF),sp
 	;;
+	.spillsp ar.bsp, BSP_OFF+SIGCONTEXT_OFF
 	st8 [base0]=r17,(CFM_OFF-BSP_OFF)	// save sc_ar_bsp
-	dep r8=0,r8,38,26		// clear EC0, CPL0 and reserved bits
+	dep r8=0,r8,38,26			// clear EC0, CPL0 and reserved bits
 	adds base1=(FR6_OFF+16+SIGCONTEXT_OFF),sp
 	;;
-
+	.spillsp ar.pfs, CFM_OFF
 	st8 [base0]=r8				// save CFM0
 	adds base0=(FR6_OFF+SIGCONTEXT_OFF),sp
 	;;
@@ -99,14 +113,13 @@ back_from_setup_rbs:
 	;;
 	stf.spill [base0]=f8,32
 	stf.spill [base1]=f9,32
+	mov b6=r10
 	;;
 	stf.spill [base0]=f10,32
 	stf.spill [base1]=f11,32
-	adds out1=SIGINFO_OFF,sp	// siginfo pointer
 	;;
 	stf.spill [base0]=f12,32
 	stf.spill [base1]=f13,32
-	adds out2=SIGCONTEXT_OFF,sp	// sigcontext pointer
 	;;
 	stf.spill [base0]=f14,32
 	stf.spill [base1]=f15,32
@@ -140,9 +153,8 @@ back_from_restore_rbs:
 	ldf.fill f15=[base1],32
 	mov r15=__NR_rt_sigreturn
 	break __BREAK_SYSCALL
-END(invoke_sighandler)
 
-ENTRY(setup_rbs)
+setup_rbs:
 	flushrs					// must be first in insn
 	mov ar.rsc=0				// put RSE into enforced lazy mode
 	adds r16=(RNAT_OFF+SIGCONTEXT_OFF),sp
@@ -150,13 +162,13 @@ ENTRY(setup_rbs)
 	mov r14=ar.rnat				// get rnat as updated by flushrs
 	mov ar.bspstore=r15			// set new register backing store area
 	;;
+	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 	st8 [r16]=r14				// save sc_ar_rnat
 	mov ar.rsc=0xf				// set RSE into eager mode, pl 3
 	invala					// invalidate ALAT
 	br.cond.sptk.many back_from_setup_rbs
-END(setup_rbs)
 
-ENTRY(restore_rbs)
+restore_rbs:
 	flushrs
 	mov ar.rsc=0				// put RSE into enforced lazy mode
 	adds r16=(RNAT_OFF+SIGCONTEXT_OFF),sp
@@ -168,4 +180,4 @@ ENTRY(restore_rbs)
 	mov ar.rsc=0xf				// (will be restored later on from sc_ar_rsc)
 	// invala not necessary as that will happen when returning to user-mode
 	br.cond.sptk.many back_from_restore_rbs
-END(restore_rbs)
+END(ia64_sigtramp)

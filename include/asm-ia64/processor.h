@@ -235,11 +235,7 @@ struct ia64_psr {
  * state comes earlier:
  */
 struct cpuinfo_ia64 {
-	/* irq_stat and softirq should be 64-bit aligned */
-	struct {
-		__u32 active;
-		__u32 mask;
-	} softirq;
+	/* irq_stat must be 64-bit aligned */
 	union {
 		struct {
 			__u32 irq_count;
@@ -247,8 +243,8 @@ struct cpuinfo_ia64 {
 		} f;
 		__u64 irq_and_bh_counts;
 	} irq_stat;
+	__u32 softirq_pending;
 	__u32 phys_stacked_size_p8;	/* size of physical stacked registers + 8 */
-	__u32 pad0;
 	__u64 itm_delta;	/* # of clock cycles between clock ticks */
 	__u64 itm_next;		/* interval timer mask value to use for next clock tick */
 	__u64 *pgd_quick;
@@ -273,12 +269,16 @@ struct cpuinfo_ia64 {
 	__u64 ptce_base;
 	__u32 ptce_count[2];
 	__u32 ptce_stride[2];
+	struct task_struct *ksoftirqd;	/* kernel softirq daemon for this CPU */
 #ifdef CONFIG_SMP
 	__u64 loops_per_jiffy;
 	__u64 ipi_count;
 	__u64 prof_counter;
 	__u64 prof_multiplier;
 	__u64 ipi_operation;
+#endif
+#ifdef CONFIG_NUMA
+	struct cpuinfo_ia64 *cpu_data[NR_CPUS];
 #endif
 } __attribute__ ((aligned (PAGE_SIZE))) ;
 
@@ -288,7 +288,22 @@ struct cpuinfo_ia64 {
  */
 #define local_cpu_data		((struct cpuinfo_ia64 *) PERCPU_ADDR)
 
-extern struct cpuinfo_ia64 cpu_data[NR_CPUS];
+/*
+ * On NUMA systems, cpu_data for each cpu is allocated during cpu_init() & is allocated on
+ * the node that contains the cpu. This minimizes off-node memory references.  cpu_data
+ * for each cpu contains an array of pointers to the cpu_data structures of each of the
+ * other cpus.
+ *
+ * On non-NUMA systems, cpu_data is a static array allocated at compile time.  References
+ * to the cpu_data of another cpu is done by direct references to the appropriate entry of
+ * the array.
+ */
+#ifdef CONFIG_NUMA
+# define cpu_data(cpu)		local_cpu_data->cpu_data_ptrs[cpu]
+#else
+  extern struct cpuinfo_ia64 _cpu_data[NR_CPUS];
+# define cpu_data(cpu)		(&_cpu_data[cpu])
+#endif
 
 extern void identify_cpu (struct cpuinfo_ia64 *);
 extern void print_cpu_info (struct cpuinfo_ia64 *);
@@ -314,20 +329,10 @@ struct siginfo;
 struct thread_struct {
 	__u64 ksp;			/* kernel stack pointer */
 	unsigned long flags;		/* various flags */
-	struct ia64_fpreg fph[96];	/* saved/loaded on demand */
-	__u64 dbr[IA64_NUM_DBG_REGS];
-	__u64 ibr[IA64_NUM_DBG_REGS];
-#ifdef CONFIG_PERFMON
-	__u64 pmc[IA64_NUM_PMC_REGS];
-	__u64 pmd[IA64_NUM_PMD_REGS];
-	unsigned long pfm_pend_notify;	/* non-zero if we need to notify and block */
-	void *pfm_context;		/* pointer to detailed PMU context */
-# define INIT_THREAD_PM		{0, }, {0, }, 0, 0,
-#else
-# define INIT_THREAD_PM
-#endif
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
+	struct siginfo *siginfo;	/* current siginfo struct for ptrace() */
+
 #ifdef CONFIG_IA32_SUPPORT
 	__u64 eflag;			/* IA32 EFLAGS reg */
 	__u64 fsr;			/* IA32 floating pt status reg */
@@ -345,7 +350,18 @@ struct thread_struct {
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
-	struct siginfo *siginfo;	/* current siginfo struct for ptrace() */
+#ifdef CONFIG_PERFMON
+	__u64 pmc[IA64_NUM_PMC_REGS];
+	__u64 pmd[IA64_NUM_PMD_REGS];
+	unsigned long pfm_pend_notify;	/* non-zero if we need to notify and block */
+	void *pfm_context;		/* pointer to detailed PMU context */
+# define INIT_THREAD_PM		{0, }, {0, }, 0, 0,
+#else
+# define INIT_THREAD_PM
+#endif
+	__u64 dbr[IA64_NUM_DBG_REGS];
+	__u64 ibr[IA64_NUM_DBG_REGS];
+	struct ia64_fpreg fph[96];	/* saved/loaded on demand */
 };
 
 #define INIT_MMAP {								\
@@ -356,14 +372,14 @@ struct thread_struct {
 #define INIT_THREAD {					\
 	0,				/* ksp */	\
 	0,				/* flags */	\
-	{{{{0}}}, },			/* fph */	\
-	{0, },				/* dbr */	\
-	{0, },				/* ibr */	\
-	INIT_THREAD_PM					\
 	DEFAULT_MAP_BASE,		/* map_base */	\
 	DEFAULT_TASK_SIZE,		/* task_size */	\
+	0,				/* siginfo */	\
 	INIT_THREAD_IA32				\
-	0				/* siginfo */	\
+	INIT_THREAD_PM					\
+	{0, },				/* dbr */	\
+	{0, },				/* ibr */	\
+	{{{{0}}}, }			/* fph */	\
 }
 
 #define start_thread(regs,new_ip,new_sp) do {							\
@@ -416,7 +432,7 @@ struct task_struct;
 /*
  * Free all resources held by a thread. This is called after the
  * parent of DEAD_TASK has collected the exist status of the task via
- * wait().  This is a no-op on IA-64.
+ * wait().
  */
 #ifdef CONFIG_PERFMON
   extern void release_thread (struct task_struct *task);
@@ -513,8 +529,8 @@ extern void ia64_save_debug_regs (unsigned long *save_area);
 extern void ia64_load_debug_regs (unsigned long *save_area);
 
 #ifdef CONFIG_IA32_SUPPORT
-extern void ia32_save_state (struct thread_struct *thread);
-extern void ia32_load_state (struct thread_struct *thread);
+extern void ia32_save_state (struct task_struct *task);
+extern void ia32_load_state (struct task_struct *task);
 #endif
 
 #ifdef CONFIG_PERFMON

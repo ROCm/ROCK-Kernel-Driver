@@ -140,7 +140,7 @@ ia32_syscall_table:
 	data8 sys_lchown
 	data8 sys32_ni_syscall	  /* old break syscall holder */
 	data8 sys32_ni_syscall
-	data8 sys_lseek
+	data8 sys32_lseek
 	data8 sys_getpid	  /* 20 */
 	data8 sys_mount
 	data8 sys_oldumount
@@ -233,7 +233,7 @@ ia32_syscall_table:
 	data8 sys32_ni_syscall
 	data8 sys_iopl		  /* 110 */
 	data8 sys_vhangup
-	data8 sys32_ni_syscall		// used to be sys_idle
+	data8 sys32_ni_syscall		/* used to be sys_idle */
 	data8 sys32_ni_syscall
 	data8 sys32_wait4
 	data8 sys_swapoff	  /* 115 */
@@ -244,7 +244,7 @@ ia32_syscall_table:
 	data8 sys_clone		  /* 120 */
 	data8 sys_setdomainname
 	data8 sys32_newuname
-	data8 sys_modify_ldt
+	data8 sys32_modify_ldt
 	data8 sys_adjtimex
 	data8 sys32_mprotect	  /* 125 */
 	data8 sys_sigprocmask
@@ -286,13 +286,13 @@ ia32_syscall_table:
 	data8 sys32_nanosleep
 	data8 sys_mremap
 	data8 sys_setresuid
-	data8 sys_getresuid	  /* 165 */
+	data8 sys32_getresuid	  /* 165 */
 	data8 sys_vm86
 	data8 sys_query_module
 	data8 sys_poll
 	data8 sys_nfsservctl
 	data8 sys_setresgid	  /* 170 */
-	data8 sys_getresgid
+	data8 sys32_getresgid
 	data8 sys_prctl
 	data8 sys32_rt_sigreturn
 	data8 sys32_rt_sigaction

@@ -630,8 +630,8 @@ unsigned int zone_free_shortage(zone_t *zone)
 		goto ret;
 
 	if (zone->inactive_clean_pages + zone->free_pages
-			< zone->pages_min) {
-		sum += zone->pages_min;
+			< zone->pages_high) {
+		sum += zone->pages_high;
 		sum -= zone->free_pages;
 		sum -= zone->inactive_clean_pages;
 	}

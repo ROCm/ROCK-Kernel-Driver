@@ -20,7 +20,7 @@
  * Here is what the interrupt logic between a PCI device and the CPU looks like:
  *
  * (1) A PCI device raises one of the four interrupt pins (INTA, INTB, INTC, INTD).  The
- *     device is uniquely identified by its bus-, device-, and slot-number (the function
+ *     device is uniquely identified by its bus--, and slot-number (the function
  *     number does not matter here because all functions share the same interrupt
  *     lines).
  *
@@ -51,6 +51,7 @@
 #include <linux/irq.h>
 
 #include <asm/acpi-ext.h>
+#include <asm/acpikcfg.h>
 #include <asm/delay.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
@@ -59,9 +60,6 @@
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
-#ifdef	CONFIG_ACPI_KERNEL_CONFIG
-# include <asm/acpikcfg.h>
-#endif
 
 #undef DEBUG_IRQ_ROUTING
 
@@ -207,7 +205,45 @@ unmask_irq (unsigned int irq)
 static void
 iosapic_set_affinity (unsigned int irq, unsigned long mask)
 {
-	printk("iosapic_set_affinity: not implemented yet\n");
+#ifdef CONFIG_SMP
+	unsigned long flags;
+	u32 high32, low32;
+	int dest, pin;
+	char *addr;
+
+	mask &= (1UL << smp_num_cpus) - 1;
+
+	if (!mask || irq >= IA64_NUM_VECTORS)
+		return;
+
+	dest = cpu_physical_id(ffz(~mask));
+
+	pin = iosapic_irq[irq].pin;
+	addr = iosapic_irq[irq].addr;
+
+	if (pin < 0)
+		return;			/* not an IOSAPIC interrupt */
+
+	/* dest contains both id and eid */
+	high32 = dest << IOSAPIC_DEST_SHIFT;
+
+	spin_lock_irqsave(&iosapic_lock, flags);
+	{
+		/* get current delivery mode by reading the low32 */
+		writel(IOSAPIC_RTE_LOW(pin), addr + IOSAPIC_REG_SELECT);
+		low32 = readl(addr + IOSAPIC_WINDOW);
+
+		/* change delivery mode to fixed */
+		low32 &= ~(7 << IOSAPIC_DELIVERY_SHIFT);
+		low32 |= (IOSAPIC_FIXED << IOSAPIC_DELIVERY_SHIFT);
+
+		writel(IOSAPIC_RTE_HIGH(pin), addr + IOSAPIC_REG_SELECT);
+		writel(high32, addr + IOSAPIC_WINDOW);
+		writel(IOSAPIC_RTE_LOW(pin), addr + IOSAPIC_REG_SELECT);
+		writel(low32, addr + IOSAPIC_WINDOW);
+	}
+	spin_unlock_irqrestore(&iosapic_lock, flags);
+#endif
 }
 
 /*
@@ -330,7 +366,7 @@ iosapic_register_legacy_irq (unsigned long irq,
 }
 
 void __init
-iosapic_init (unsigned long phys_addr, unsigned int base_irq)
+iosapic_init (unsigned long phys_addr, unsigned int base_irq, int pcat_compat)
 {
 	struct hw_interrupt_type *irq_type;
 	int i, irq, max_pin, vector;
@@ -348,13 +384,7 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 		/*
 		 * Fetch the PCI interrupt routing table:
 		 */
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
 		acpi_cf_get_pci_vectors(&pci_irq.route, &pci_irq.num_routes);
-#else
-		pci_irq.route =
-			(struct pci_vector_struct *) __va(ia64_boot_param->pci_vectors);
-		pci_irq.num_routes = ia64_boot_param->num_pci_vectors;
-#endif
 	}
 
 	addr = ioremap(phys_addr, 0);
@@ -365,7 +395,7 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 	printk("IOSAPIC: version %x.%x, address 0x%lx, IRQs 0x%02x-0x%02x\n",
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, base_irq, base_irq + max_pin);
 
-	if (base_irq == 0)
+	if ((base_irq == 0) && pcat_compat)
 		/*
 		 * Map the legacy ISA devices into the IOSAPIC data.  Some of these may
 		 * get reprogrammed later on with data from the ACPI Interrupt Source

@@ -325,11 +325,11 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 
 	DPRINT("ubs_end=%p bsp=%p addr=%px\n", (void *) ubs_end, (void *) bsp, (void *) addr);
 
-	ia64_poke(current, (unsigned long) ubs_end, (unsigned long) addr, val);
+	ia64_poke(current, sw, (unsigned long) ubs_end, (unsigned long) addr, val);
 
 	rnat_addr = ia64_rse_rnat_addr(addr);
 
-	ia64_peek(current, (unsigned long) ubs_end, (unsigned long) rnat_addr, &rnats);
+	ia64_peek(current, sw, (unsigned long) ubs_end, (unsigned long) rnat_addr, &rnats);
 	DPRINT("rnat @%p = 0x%lx nat=%d old nat=%ld\n",
 	       (void *) rnat_addr, rnats, nat, (rnats >> ia64_rse_slot_num(addr)) & 1);
 
@@ -338,7 +338,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 		rnats |=  nat_mask;
 	else
 		rnats &= ~nat_mask;
-	ia64_poke(current, (unsigned long) ubs_end, (unsigned long) rnat_addr, rnats);
+	ia64_poke(current, sw, (unsigned long) ubs_end, (unsigned long) rnat_addr, rnats);
 
 	DPRINT("rnat changed to @%p = 0x%lx\n", (void *) rnat_addr, rnats);
 }
@@ -394,7 +394,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 
 	DPRINT("ubs_end=%p bsp=%p addr=%p\n", (void *) ubs_end, (void *) bsp, (void *) addr);
 
-	ia64_peek(current, (unsigned long) ubs_end, (unsigned long) addr, val);
+	ia64_peek(current, sw, (unsigned long) ubs_end, (unsigned long) addr, val);
 
 	if (nat) {
 		rnat_addr = ia64_rse_rnat_addr(addr);
@@ -402,7 +402,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 
 		DPRINT("rnat @%p = 0x%lx\n", (void *) rnat_addr, rnats);
 
-		ia64_peek(current, (unsigned long) ubs_end, (unsigned long) rnat_addr, &rnats);
+		ia64_peek(current, sw, (unsigned long) ubs_end, (unsigned long) rnat_addr, &rnats);
 		*nat = (rnats & nat_mask) != 0;
 	}
 }
@@ -1299,7 +1299,12 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 			len = sprintf(buf, "%s(%d): unaligned access to 0x%016lx, "
 				      "ip=0x%016lx\n\r", current->comm, current->pid,
 				      ifa, regs->cr_iip + ipsr->ri);
-			tty_write_message(current->tty, buf);
+			/*
+			 * Don't call tty_write_message() if we're in the kernel; we might
+			 * be holding locks...
+			 */
+			if (user_mode(regs))
+				tty_write_message(current->tty, buf);
 			buf[len-1] = '\0';	/* drop '\r' */
 			printk(KERN_WARNING "%s", buf);	/* watch for command names containing %s */
 		}

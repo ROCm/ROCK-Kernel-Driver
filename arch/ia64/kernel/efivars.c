@@ -6,8 +6,8 @@
  * This code takes all variables accessible from EFI runtime and
  *  exports them via /proc
  *
- * Reads to /proc/efi/varname return an efi_variable_t structure.
- * Writes to /proc/efi/varname must be an efi_variable_t structure.
+ * Reads to /proc/efi/vars/varname return an efi_variable_t structure.
+ * Writes to /proc/efi/vars/varname must be an efi_variable_t structure.
  * Writes with DataSize = 0 or Attributes = 0 deletes the variable.
  * Writes with a new value in VariableName+VendorGuid creates
  * a new variable.
@@ -28,6 +28,15 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Changelog:
+ *
+ *  20 April 2001 - Matt Domsch <Matt_Domsch@dell.com>
+ *   Moved vars from /proc/efi to /proc/efi/vars, and made
+ *   efi.c own the /proc/efi directory.
+ *   v0.03 release to linux-ia64@linuxia64.org
+ *
+ *  26 March 2001 - Matt Domsch <Matt_Domsch@dell.com>
+ *   At the request of Stephane, moved ownership of /proc/efi
+ *   to efi.c, and now efivars lives under /proc/efi/vars.
  *
  *  12 March 2001 - Matt Domsch <Matt_Domsch@dell.com>
  *   Feedback received from Stephane Eranian incorporated.
@@ -57,7 +66,7 @@
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("/proc interface to EFI Variables");
 
-#define EFIVARS_VERSION "0.02 2001-Mar-12"
+#define EFIVARS_VERSION "0.03 2001-Apr-20"
 
 static int
 efivar_read(char *page, char **start, off_t off,
@@ -92,7 +101,7 @@ typedef struct _efivar_entry_t {
 
 spinlock_t efivars_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(efivar_list);
-static struct proc_dir_entry *efi_dir = NULL;
+static struct proc_dir_entry *efi_vars_dir = NULL;
 
 #define efivar_entry(n) list_entry(n, efivar_entry_t, list)
 
@@ -188,7 +197,7 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 
 
 	/* Create the entry in proc */
-	new_efivar->entry = create_proc_entry(short_name, 0600, efi_dir);
+	new_efivar->entry = create_proc_entry(short_name, 0600, efi_vars_dir);
 	kfree(short_name); short_name = NULL;
 	if (!new_efivar->entry) return 1;
 
@@ -286,7 +295,7 @@ efivar_write(struct file *file, const char *buffer,
 	/* Since the data ptr we've currently got is probably for
 	   a different variable find the right variable.
 	   This allows any properly formatted data structure to
-	   be written to any of the files in /proc/efi and it will work.
+	   be written to any of the files in /proc/efi/vars and it will work.
 	*/
 	list_for_each(pos, &efivar_list) {
 		search_efivar = efivar_entry(pos);
@@ -320,7 +329,7 @@ efivar_write(struct file *file, const char *buffer,
 
 	if (!var_data->DataSize || !var_data->Attributes) {
 		/* We just deleted the NVRAM variable */
-		remove_proc_entry(efivar->entry->name, efi_dir);
+		remove_proc_entry(efivar->entry->name, efi_vars_dir);
 		list_del(&efivar->list);
 		kfree(efivar);
 	}
@@ -354,11 +363,21 @@ efivars_init(void)
 
 	printk(KERN_INFO "EFI Variables Facility v%s\n", EFIVARS_VERSION);
 
+        /* Since efi.c happens before procfs is available,
+           we create the directory here if it doesn't
+           already exist.  There's probably a better way
+           to do this.
+        */
+        if (!efi_dir)
+                efi_dir = proc_mkdir("efi", NULL);
+
+	efi_vars_dir = proc_mkdir("vars", efi_dir);
+
+
+
 	/* Per EFI spec, the maximum storage allocated for both
 	   the variable name and variable data is 1024 bytes.
 	*/
-
-	efi_dir = proc_mkdir("efi", NULL);
 
 	memset(variable_name, 0, 1024);
 
@@ -401,11 +420,11 @@ efivars_exit(void)
 
 	list_for_each(pos, &efivar_list) {
 		efivar = efivar_entry(pos);
-		remove_proc_entry(efivar->entry->name, efi_dir);
+		remove_proc_entry(efivar->entry->name, efi_vars_dir);
 		list_del(&efivar->list);
 		kfree(efivar);
 	}
-	remove_proc_entry(efi_dir->name, NULL);
+	remove_proc_entry(efi_vars_dir->name, efi_dir);
 	spin_unlock(&efivars_lock);
 
 }

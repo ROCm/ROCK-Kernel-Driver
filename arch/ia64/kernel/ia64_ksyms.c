@@ -7,6 +7,7 @@
 
 #include <linux/string.h>
 EXPORT_SYMBOL_NOVERS(memset);
+EXPORT_SYMBOL(memchr);
 EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL(memmove);
@@ -30,6 +31,9 @@ EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
 
+#include <linux/interrupt.h>
+EXPORT_SYMBOL(probe_irq_mask);
+
 #include <linux/in6.h>
 #include <asm/checksum.h>
 /* not coded yet?? EXPORT_SYMBOL(csum_ipv6_magic); */
@@ -48,15 +52,14 @@ EXPORT_SYMBOL_NOVERS(__down);
 EXPORT_SYMBOL_NOVERS(__down_interruptible);
 EXPORT_SYMBOL_NOVERS(__down_trylock);
 EXPORT_SYMBOL_NOVERS(__up);
-EXPORT_SYMBOL_NOVERS(__down_read_failed);
-EXPORT_SYMBOL_NOVERS(__down_write_failed);
-EXPORT_SYMBOL_NOVERS(__rwsem_wake);
 
 #include <asm/page.h>
 EXPORT_SYMBOL(clear_page);
 
 #include <asm/processor.h>
-EXPORT_SYMBOL(cpu_data);
+# ifndef CONFIG_NUMA
+EXPORT_SYMBOL(_cpu_data);
+# endif
 EXPORT_SYMBOL(kernel_thread);
 
 #include <asm/system.h>
@@ -78,6 +81,7 @@ EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_single);
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 
 #include <linux/smp.h>
 EXPORT_SYMBOL(smp_num_cpus);
@@ -137,3 +141,8 @@ EXPORT_SYMBOL(ia64_pal_call_static);
 
 extern struct efi efi;
 EXPORT_SYMBOL(efi);
+
+#include <linux/proc_fs.h>
+extern struct proc_dir_entry *efi_dir;
+EXPORT_SYMBOL(efi_dir);
+

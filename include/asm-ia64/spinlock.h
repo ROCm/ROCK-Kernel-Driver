@@ -19,12 +19,12 @@
 
 #ifdef NEW_LOCK
 
-typedef struct { 
+typedef struct {
 	volatile unsigned int lock;
 } spinlock_t;
 
 #define SPIN_LOCK_UNLOCKED			(spinlock_t) { 0 }
-#define spin_lock_init(x)			((x)->lock = 0) 
+#define spin_lock_init(x)			((x)->lock = 0)
 
 /*
  * Streamlined test_and_set_bit(0, (x)).  We use test-and-test-and-set
@@ -62,12 +62,12 @@ typedef struct {
 })
 
 #define spin_is_locked(x)	((x)->lock != 0)
-#define spin_unlock(x)		do {((spinlock_t *) x)->lock = 0;} while (0)
-#define spin_unlock_wait(x)	do {} while ((x)->lock)
+#define spin_unlock(x)		do { barrier(); ((spinlock_t *) x)->lock = 0;} while (0)
+#define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 
 #else /* !NEW_LOCK */
 
-typedef struct { 
+typedef struct {
 	volatile unsigned int lock;
 } spinlock_t;
 
@@ -96,7 +96,7 @@ typedef struct {
 	:: "r"(&(x)->lock) : "r2", "r29", "memory")
 
 #define spin_is_locked(x)	((x)->lock != 0)
-#define spin_unlock(x)		do {((spinlock_t *) x)->lock = 0; barrier(); } while (0)
+#define spin_unlock(x)		do { barrier(); ((spinlock_t *) x)->lock = 0; } while (0)
 #define spin_trylock(x)		(cmpxchg_acq(&(x)->lock, 0, 1) == 0)
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 

@@ -5,12 +5,12 @@
  * Advanced Configuration and Power Infterface
  * Based on 'ACPI Specification 1.0b' Febryary 2, 1999
  * and 'IA-64 Extensions to the ACPI Specification' Rev 0.6
- * 
+ *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 2000 Intel Corp.
  * Copyright (C) 2000 J.I. Lee <jung-ik.lee@intel.com>
- *	ACPI 2.0 specification 
+ *	ACPI 2.0 specification
  */
 
 #include <linux/types.h>
@@ -146,6 +146,9 @@ typedef struct {
 	u32 lapic_address;
 	u32 flags;
 } acpi_madt_t;
+
+/* acpi 2.0 MADT flags */
+#define MADT_PCAT_COMPAT	(1<<0)
 
 /* acpi 2.0 MADT structure types */
 #define ACPI20_ENTRY_LOCAL_APIC                 0

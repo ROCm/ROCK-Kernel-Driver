@@ -2,24 +2,29 @@
 #define _ASM_IA64_BITOPS_H
 
 /*
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
- *
- * 02/04/00 D. Mosberger  Require 64-bit alignment for bitops, per suggestion from davem
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <asm/system.h>
 
-/*
- * These operations need to be atomic.  The address must be (at least)
- * 32-bit aligned.  Note that there are driver (e.g., eepro100) which
- * use these operations to operate on hw-defined data-structures, so
- * we can't easily change these operations to force a bigger
- * alignment.
+/**
+ * set_bit - Atomically set a bit in memory
+ * @nr: the bit to set
+ * @addr: the address to start counting from
+ *
+ * This function is atomic and may not be reordered.  See __set_bit()
+ * if you do not require the atomic guarantees.
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
+ *
+ * The address must be (at least) "long" aligned.
+ * Note that there are driver (e.g., eepro100) which use these operations to operate on
+ * hw-defined data-structures, so we can't easily change these operations to force a
+ * bigger alignment.
  *
  * bit 0 is the LSB of addr; bit 32 is the LSB of (addr+1).
  */
-
 static __inline__ void
 set_bit (int nr, volatile void *addr)
 {
@@ -36,11 +41,37 @@ set_bit (int nr, volatile void *addr)
 	} while (cmpxchg_acq(m, old, new) != old);
 }
 
+/**
+ * __set_bit - Set a bit in memory
+ * @nr: the bit to set
+ * @addr: the address to start counting from
+ *
+ * Unlike set_bit(), this function is non-atomic and may be reordered.
+ * If it's called on the same region of memory simultaneously, the effect
+ * may be that only one operation succeeds.
+ */
+static __inline__ void
+__set_bit (int nr, volatile void *addr)
+{
+	*((__u32 *) addr + (nr >> 5)) |= (1 << (nr & 31));
+}
+
 /*
  * clear_bit() doesn't provide any barrier for the compiler.
  */
 #define smp_mb__before_clear_bit()	smp_mb()
 #define smp_mb__after_clear_bit()	smp_mb()
+
+/**
+ * clear_bit - Clears a bit in memory
+ * @nr: Bit to clear
+ * @addr: Address to start counting from
+ *
+ * clear_bit() is atomic and may not be reordered.  However, it does
+ * not contain a memory barrier, so if it is used for locking purposes,
+ * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
+ * in order to ensure changes are visible on other processors.
+ */
 static __inline__ void
 clear_bit (int nr, volatile void *addr)
 {
@@ -57,6 +88,15 @@ clear_bit (int nr, volatile void *addr)
 	} while (cmpxchg_acq(m, old, new) != old);
 }
 
+/**
+ * change_bit - Toggle a bit in memory
+ * @nr: Bit to clear
+ * @addr: Address to start counting from
+ *
+ * change_bit() is atomic and may not be reordered.
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
+ */
 static __inline__ void
 change_bit (int nr, volatile void *addr)
 {
@@ -73,6 +113,29 @@ change_bit (int nr, volatile void *addr)
 	} while (cmpxchg_acq(m, old, new) != old);
 }
 
+/**
+ * __change_bit - Toggle a bit in memory
+ * @nr: the bit to set
+ * @addr: the address to start counting from
+ *
+ * Unlike change_bit(), this function is non-atomic and may be reordered.
+ * If it's called on the same region of memory simultaneously, the effect
+ * may be that only one operation succeeds.
+ */
+static __inline__ void
+__change_bit (int nr, volatile void *addr)
+{
+	*((__u32 *) addr + (nr >> 5)) ^= (1 << (nr & 31));
+}
+
+/**
+ * test_and_set_bit - Set a bit and return its old value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is atomic and cannot be reordered.  
+ * It also implies a memory barrier.
+ */
 static __inline__ int
 test_and_set_bit (int nr, volatile void *addr)
 {
@@ -90,6 +153,34 @@ test_and_set_bit (int nr, volatile void *addr)
 	return (old & bit) != 0;
 }
 
+/**
+ * __test_and_set_bit - Set a bit and return its old value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is non-atomic and can be reordered.  
+ * If two examples of this operation race, one can appear to succeed
+ * but actually fail.  You must protect multiple accesses with a lock.
+ */
+static __inline__ int
+__test_and_set_bit (int nr, volatile void *addr)
+{
+	__u32 *p = (__u32 *) addr + (nr >> 5);
+	__u32 m = 1 << (nr & 31);
+	int oldbitset = (*p & m) != 0;
+
+	*p |= m;
+	return oldbitset;
+}
+
+/**
+ * test_and_clear_bit - Clear a bit and return its old value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is atomic and cannot be reordered.  
+ * It also implies a memory barrier.
+ */
 static __inline__ int
 test_and_clear_bit (int nr, volatile void *addr)
 {
@@ -107,6 +198,34 @@ test_and_clear_bit (int nr, volatile void *addr)
 	return (old & ~mask) != 0;
 }
 
+/**
+ * __test_and_clear_bit - Clear a bit and return its old value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is non-atomic and can be reordered.  
+ * If two examples of this operation race, one can appear to succeed
+ * but actually fail.  You must protect multiple accesses with a lock.
+ */
+static __inline__ int
+__test_and_clear_bit(int nr, volatile void * addr)
+{
+	__u32 *p = (__u32 *) addr + (nr >> 5);
+	__u32 m = 1 << (nr & 31);
+	int oldbitset = *p & m;
+
+	*p &= ~m;
+	return oldbitset;
+}
+
+/**
+ * test_and_change_bit - Change a bit and return its new value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is atomic and cannot be reordered.  
+ * It also implies a memory barrier.
+ */
 static __inline__ int
 test_and_change_bit (int nr, volatile void *addr)
 {
@@ -124,15 +243,33 @@ test_and_change_bit (int nr, volatile void *addr)
 	return (old & bit) != 0;
 }
 
+/*
+ * WARNING: non atomic version.
+ */
+static __inline__ int
+__test_and_change_bit (int nr, void *addr)
+{
+	__u32 old, bit = (1 << (nr & 31));
+	__u32 *m = (__u32 *) addr + (nr >> 5);
+
+	old = *m;
+	*m = old ^ bit;
+	return (old & bit) != 0;
+}
+
 static __inline__ int
 test_bit (int nr, volatile void *addr)
 {
 	return 1 & (((const volatile __u32 *) addr)[nr >> 5] >> (nr & 31));
 }
 
-/*
- * ffz = Find First Zero in word. Undefined if no zero exists,
- * so code should check against ~0UL first..
+/**
+ * ffz - find the first zero bit in a memory region
+ * @x: The address to start the search at
+ *
+ * Returns the bit-number (0..63) of the first (least significant) zero bit, not
+ * the number of the byte containing a bit.  Undefined if no zero exists, so
+ * code should check against ~0UL first...
  */
 static inline unsigned long
 ffz (unsigned long x)
@@ -146,8 +283,8 @@ ffz (unsigned long x)
 #ifdef __KERNEL__
 
 /*
- * Find the most significant bit that is set (undefined if no bit is
- * set).
+ * find_last_zero_bit - find the last zero bit in a 64 bit quantity
+ * @x: The value to search
  */
 static inline unsigned long
 ia64_fls (unsigned long x)
@@ -160,9 +297,10 @@ ia64_fls (unsigned long x)
 }
 
 /*
- * ffs: find first bit set. This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
+ * ffs: find first bit set. This is defined the same way as the libc and compiler builtin
+ * ffs routines, therefore differs in spirit from the above ffz (man ffs): it operates on
+ * "int" values only and the result value is the bit number + 1.  ffs(0) is defined to
+ * return zero.
  */
 #define ffs(x)	__builtin_ffs(x)
 

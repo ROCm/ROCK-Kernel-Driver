@@ -173,7 +173,7 @@
 #define PT_AR_BSPSTORE		0x0868
 #define PT_PR			0x0870
 #define PT_B6			0x0878
-#define PT_AR_BSP		0x0880
+#define PT_AR_BSP		0x0880	/* note: this points to the *end* of the backing store! */
 #define PT_R1			0x0888
 #define PT_R2			0x0890
 #define PT_R3			0x0898

@@ -59,6 +59,9 @@ if [ "$CONFIG_FB" = "y" ]; then
    if [ "$CONFIG_ATARI" = "y" ]; then
       bool '  Atari native chipset support' CONFIG_FB_ATARI
       tristate '  ATI Mach64 display support' CONFIG_FB_ATY
+      if [ "$CONFIG_FB_ATY" != "n" ]; then
+	 define_bool CONFIG_FB_ATY_GX y
+      fi
    fi
    if [ "$CONFIG_PPC" = "y" ]; then
       bool '  Open Firmware frame buffer device support' CONFIG_FB_OF
@@ -122,6 +125,10 @@ if [ "$CONFIG_FB" = "y" ]; then
 	    bool '    Multihead support' CONFIG_FB_MATROX_MULTIHEAD
 	 fi
 	 tristate '  ATI Mach64 display support (EXPERIMENTAL)' CONFIG_FB_ATY
+	 if [ "$CONFIG_FB_ATY" != "n" ]; then
+	    bool '    Mach64 GX support (EXPERIMENTAL)' CONFIG_FB_ATY_GX
+	    bool '    Mach64 CT/VT/GT/LT (incl. 3D RAGE) support' CONFIG_FB_ATY_CT
+	 fi
 	 tristate '  ATI Rage 128 display support (EXPERIMENTAL)' CONFIG_FB_ATY128
 	 tristate '  3Dfx Banshee/Voodoo3 display support (EXPERIMENTAL)' CONFIG_FB_3DFX
 	 tristate '  SIS 630/540 display support (EXPERIMENTAL)' CONFIG_FB_SIS
@@ -157,6 +164,9 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 bool '  PCI framebuffers' CONFIG_FB_PCI
 	 if [ "$CONFIG_FB_PCI" != "n" ]; then
 	    tristate '    ATI Mach64 display support' CONFIG_FB_ATY
+	    if [ "$CONFIG_FB_ATY" != "n" ]; then
+	       define_bool CONFIG_FB_ATY_CT y
+	    fi
 	 fi
       fi
    fi

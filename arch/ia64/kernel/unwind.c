@@ -24,6 +24,7 @@
  *	o if both the unw.lock spinlock and a script's read-write lock must be
  *	  acquired, then the read-write lock must be acquired first.
  */
+#include <linux/bootmem.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -36,6 +37,7 @@
 #include <asm/ptrace_offsets.h>
 #include <asm/rse.h>
 #include <asm/system.h>
+#include <asm/uaccess.h>
 
 #include "entry.h"
 #include "unwind_i.h"
@@ -96,6 +98,10 @@ static struct {
 
 	/* unwind table for the kernel: */
 	struct unw_table kernel_table;
+
+	/* unwind table describing the gate page (kernel code that is mapped into user space): */
+	size_t gate_table_size;
+	unsigned long *gate_table;
 
 	/* hash table that maps instruction pointer to script index: */
 	unsigned short hash[UNW_HASH_SIZE];
@@ -323,8 +329,13 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 		else
 			*nat_addr &= ~nat_mask;
 	} else {
-		*val = *addr;
-		*nat = (*nat_addr & nat_mask) != 0;
+		if ((*nat_addr & nat_mask) == 0) {
+			*val = *addr;
+			*nat = 0;
+		} else {
+			*val = 0;	/* if register is a NaT, *addr may contain kernel data! */
+			*nat = 1;
+		}
 	}
 	return 0;
 }
@@ -1350,10 +1361,10 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 	}
 }
 
-static inline struct unw_table_entry *
+static inline const struct unw_table_entry *
 lookup (struct unw_table *table, unsigned long rel_ip)
 {
-	struct unw_table_entry *e = 0;
+	const struct unw_table_entry *e = 0;
 	unsigned long lo, hi, mid;
 
 	/* do a binary search for right entry: */
@@ -1378,7 +1389,7 @@ static inline struct unw_script *
 build_script (struct unw_frame_info *info)
 {
 	struct unw_reg_state *rs, *next;
-	struct unw_table_entry *e = 0;
+	const struct unw_table_entry *e = 0;
 	struct unw_script *script = 0;
 	unsigned long ip = info->ip;
 	struct unw_state_record sr;
@@ -1836,9 +1847,9 @@ unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t)
 
 static void
 init_unwind_table (struct unw_table *table, const char *name, unsigned long segment_base,
-		   unsigned long gp, void *table_start, void *table_end)
+		   unsigned long gp, const void *table_start, const void *table_end)
 {
-	struct unw_table_entry *start = table_start, *end = table_end;
+	const struct unw_table_entry *start = table_start, *end = table_end;
 
 	table->name = name;
 	table->segment_base = segment_base;
@@ -1851,9 +1862,9 @@ init_unwind_table (struct unw_table *table, const char *name, unsigned long segm
 
 void *
 unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned long gp,
-		      void *table_start, void *table_end)
+		      const void *table_start, const void *table_end)
 {
-	struct unw_table_entry *start = table_start, *end = table_end;
+	const struct unw_table_entry *start = table_start, *end = table_end;
 	struct unw_table *table;
 	unsigned long flags;
 
@@ -1936,6 +1947,47 @@ unw_remove_unwind_table (void *handle)
 }
 
 void
+unw_create_gate_table (void)
+{
+	extern char __start_gate_section[], __stop_gate_section[];
+	unsigned long *lp, start, end, segbase = unw.kernel_table.segment_base;
+	const struct unw_table_entry *entry, *first;
+	size_t info_size, size;
+	char *info;
+
+	start = (unsigned long) __start_gate_section - segbase;
+	end   = (unsigned long) __stop_gate_section - segbase;
+	size  = 0;
+	first = lookup(&unw.kernel_table, start);
+
+	for (entry = first; entry->start_offset < end; ++entry)
+		size += 3*8 + 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
+	size += 8;	/* reserve space for "end of table" marker */
+
+	unw.gate_table = alloc_bootmem(size);
+	if (!unw.gate_table) {
+		unw.gate_table_size = 0;
+		printk("unwind: unable to create unwind data for gate page!\n");
+		return;
+	}
+	unw.gate_table_size = size;
+
+	lp = unw.gate_table;
+	info = (char *) unw.gate_table + size;
+
+	for (entry = first; entry->start_offset < end; ++entry, lp += 3) {
+		info_size = 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
+		info -= info_size;
+		memcpy(info, (char *) segbase + entry->info_offset, info_size);
+
+		lp[0] = entry->start_offset - start + GATE_ADDR;	/* start */
+		lp[1] = entry->end_offset - start + GATE_ADDR;		/* end */
+		lp[2] = info - (char *) unw.gate_table;			/* info */
+	}
+	*lp = 0;	/* end-of-table marker */
+}
+
+void
 unw_init (void)
 {
 	extern int ia64_unw_start, ia64_unw_end, __gp;
@@ -1973,4 +2025,35 @@ unw_init (void)
 
 	init_unwind_table(&unw.kernel_table, "kernel", KERNEL_START, (unsigned long) &__gp,
 			  &ia64_unw_start, &ia64_unw_end);
+}
+
+/*
+ * This system call copies the unwind data into the buffer pointed to by BUF and returns
+ * the size of the unwind data.  If BUF_SIZE is smaller than the size of the unwind data
+ * or if BUF is NULL, nothing is copied, but the system call still returns the size of the
+ * unwind data.
+ *
+ * The first portion of the unwind data contains an unwind table and rest contains the
+ * associated unwind info (in no particular order).  The unwind table consists of a table
+ * of entries of the form:
+ *
+ *	u64 start;	(64-bit address of start of function)
+ *	u64 end;	(64-bit address of start of function)
+ *	u64 info;	(BUF-relative offset to unwind info)
+ *
+ * The end of the unwind table is indicated by an entry with a START address of zero.
+ *
+ * Please see the IA-64 Software Conventions and Runtime Architecture manual for details
+ * on the format of the unwind info.
+ *
+ * ERRORS
+ *	EFAULT	BUF points outside your accessible address space.
+ */
+asmlinkage long
+sys_getunwind (void *buf, size_t buf_size)
+{
+	if (buf && buf_size >= unw.gate_table_size)
+		if (copy_to_user(buf, unw.gate_table, unw.gate_table_size) != 0)
+			return -EFAULT;
+	return unw.gate_table_size;
 }

@@ -40,6 +40,8 @@ struct sigcontext {
 	unsigned long		sc_gr[32];	/* general registers (static partition) */
 	struct ia64_fpreg	sc_fr[128];	/* floating-point registers */
 
+	unsigned long		sc_rsvd[16];	/* reserved for future use */
+
 	/*
 	 * The mask must come last so we can increase _NSIG_WORDS
 	 * without breaking binary compatibility.

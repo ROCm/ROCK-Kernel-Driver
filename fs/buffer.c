@@ -184,22 +184,14 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 /*
  * The buffers have been marked clean and locked.  Just submit the dang
  * things.. 
- *
- * We'll wait for the first one of them - "sync" is not exactly
- * performance-critical, and this makes us not hog the IO subsystem
- * completely, while still allowing for a fair amount of concurrent IO. 
  */
 static void write_locked_buffers(struct buffer_head **array, unsigned int count)
 {
-	struct buffer_head *wait = *array;
-	get_bh(wait);
 	do {
 		struct buffer_head * bh = *array++;
 		bh->b_end_io = end_buffer_io_sync;
 		submit_bh(WRITE, bh);
 	} while (--count);
-	wait_on_buffer(wait);
-	put_bh(wait);
 }
 
 #define NRSYNC (32)
@@ -310,11 +302,11 @@ int fsync_super(struct super_block *sb)
 
 	lock_kernel();
 	sync_inodes_sb(sb);
+	DQUOT_SYNC(dev);
 	lock_super(sb);
 	if (sb->s_dirt && sb->s_op && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
 	unlock_super(sb);
-	DQUOT_SYNC(dev);
 	unlock_kernel();
 
 	return sync_buffers(dev, 1);
@@ -325,9 +317,9 @@ int fsync_dev(kdev_t dev)
 	sync_buffers(dev, 0);
 
 	lock_kernel();
-	sync_supers(dev);
 	sync_inodes(dev);
 	DQUOT_SYNC(dev);
+	sync_supers(dev);
 	unlock_kernel();
 
 	return sync_buffers(dev, 1);
@@ -2608,8 +2600,8 @@ void wakeup_bdflush(int block)
 static int sync_old_buffers(void)
 {
 	lock_kernel();
-	sync_supers(0);
 	sync_unlocked_inodes();
+	sync_supers(0);
 	unlock_kernel();
 
 	flush_dirty_buffers(1);

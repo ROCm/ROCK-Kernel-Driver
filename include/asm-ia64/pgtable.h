@@ -17,6 +17,7 @@
 #include <asm/mman.h>
 #include <asm/page.h>
 #include <asm/processor.h>
+#include <asm/system.h>
 #include <asm/types.h>
 
 #define IA64_MAX_PHYS_BITS	50	/* max. number of physical address bits (architected) */
@@ -125,7 +126,7 @@
 
 #include <asm/bitops.h>
 #include <asm/mmu_context.h>
-#include <asm/system.h>
+#include <asm/processor.h>
 
 /*
  * Next come the mappings that determine how mmap() protection bits
@@ -443,7 +444,7 @@ extern void paging_init (void);
 
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0xff)
 #define SWP_OFFSET(entry)		(((entry).val << 1) >> 10)
-#define SWP_ENTRY(type,offset)		((swp_entry_t) { ((type) << 1) | ((offset) << 9) })
+#define SWP_ENTRY(type,offset)		((swp_entry_t) { ((type) << 1) | ((long) (offset) << 9) })
 #define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define swp_entry_to_pte(x)		((pte_t) { (x).val })
 
@@ -463,5 +464,13 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define HAVE_ARCH_UNMAPPED_AREA
 
 # endif /* !__ASSEMBLY__ */
+
+/*
+ * Identity-mapped regions use a large page size.  KERNEL_PG_NUM is the
+ * number of the (large) page frame that mapps the kernel.
+ */
+#define KERNEL_PG_SHIFT		_PAGE_SIZE_64M
+#define KERNEL_PG_SIZE		(1 << KERNEL_PG_SHIFT)
+#define KERNEL_PG_NUM		((KERNEL_START - PAGE_OFFSET) / KERNEL_PG_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */

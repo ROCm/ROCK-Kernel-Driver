@@ -87,9 +87,6 @@ _start (void)
 	asm volatile ("movl gp=__gp;;" ::: "memory");
 	asm volatile ("mov sp=%0" :: "r"(stack) : "memory");
 	asm volatile ("bsw.1;;");
-#ifdef CONFIG_ITANIUM_ASTEP_SPECIFIC
-	asm volative ("nop 0;; nop 0;; nop 0;;");
-#endif /* CONFIG_ITANIUM_ASTEP_SPECIFIC */
 
 	ssc(0, 0, 0, 0, SSC_CONSOLE_INIT);
 

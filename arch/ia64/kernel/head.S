@@ -63,17 +63,17 @@ start_ap:
 	 * that maps the kernel's text and data:
 	 */
 	rsm psr.i | psr.ic
-	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET) << 8) | (_PAGE_SIZE_64M << 2))
+	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET) << 8) | (KERNEL_PG_SHIFT << 2))
 	;;
 	srlz.i
-	mov r18=_PAGE_SIZE_64M<<2
-	movl r17=PAGE_OFFSET + 64*1024*1024
+	mov r18=KERNEL_PG_SHIFT<<2
+	movl r17=PAGE_OFFSET + KERNEL_PG_NUM*KERNEL_PG_SIZE
 	;;
 	mov rr[r17]=r16
 	mov cr.itir=r18
 	mov cr.ifa=r17
 	mov r16=IA64_TR_KERNEL
-	movl r18=(64*1024*1024 | PAGE_KERNEL)
+	movl r18=(KERNEL_PG_NUM*KERNEL_PG_SIZE | PAGE_KERNEL)
 	;;
 	srlz.i
 	;;
@@ -111,7 +111,7 @@ start_ap:
 	;;
 
 #ifdef CONFIG_IA64_EARLY_PRINTK
-	mov r3=(6<<8) | (_PAGE_SIZE_64M<<2)
+	mov r3=(6<<8) | (KERNEL_PG_SHIFT<<2)
 	movl r2=6<<61
 	;;
 	mov rr[r2]=r3
@@ -123,11 +123,12 @@ start_ap:
 #define isAP	p2	// are we an Application Processor?
 #define isBP	p3	// are we the Bootstrap Processor?
 
+#ifdef CONFIG_SMP
 	/*
 	 * Find the init_task for the currently booting CPU.  At poweron, and in
-	 * UP mode, cpu_now_booting is 0.
+	 * UP mode, cpucount is 0.
 	 */
-	movl r3=cpu_now_booting
+	movl r3=cpucount
  	;;
 	ld4 r3=[r3]		// r3 <- smp_processor_id()
 	movl r2=init_tasks
@@ -135,6 +136,11 @@ start_ap:
 	shladd r2=r3,3,r2
 	;;
 	ld8 r2=[r2]
+#else
+	mov r3=0
+	movl r2=init_task_union
+	;;
+#endif
 	cmp4.ne isAP,isBP=r3,r0
 	;;			// RAW on r2
 	extr r3=r2,0,61		// r3 == phys addr of task struct
@@ -182,7 +188,7 @@ alive_msg:
 #endif /* CONFIG_IA64_EARLY_PRINTK */
 
 #ifdef CONFIG_SMP
-(isAP)	br.call.sptk.few rp=smp_callin
+(isAP)	br.call.sptk.few rp=start_secondary
 .ret0:
 (isAP)	br.cond.sptk.few self
 #endif
@@ -212,8 +218,7 @@ GLOBAL_ENTRY(ia64_save_debug_regs)
 	add r19=IA64_NUM_DBG_REGS*8,in0
 	;;
 1:	mov r16=dbr[r18]
-#if defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_BSTEP_SPECIFIC) \
-    || defined(CONFIG_ITANIUM_C0_SPECIFIC)
+#if defined(CONFIG_ITANIUM_C0_SPECIFIC)
 	;;
 	srlz.d
 #endif
@@ -230,8 +235,7 @@ END(ia64_save_debug_regs)
 
 GLOBAL_ENTRY(ia64_load_debug_regs)
 	alloc r16=ar.pfs,1,0,0,0
-#if !(defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) \
-   || defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
+#if !(defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
 	lfetch.nta [in0]
 #endif
 	mov r20=ar.lc			// preserve ar.lc
@@ -244,8 +248,7 @@ GLOBAL_ENTRY(ia64_load_debug_regs)
 	add r18=1,r18
 	;;
 	mov dbr[r18]=r16
-#if defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_BSTEP_SPECIFIC) \
-    || defined(CONFIG_ITANIUM_C0_SPECIFIC)
+#if defined(CONFIG_ITANIUM_BSTEP_SPECIFIC) || defined(CONFIG_ITANIUM_C0_SPECIFIC)
 	;;
 	srlz.d
 #endif

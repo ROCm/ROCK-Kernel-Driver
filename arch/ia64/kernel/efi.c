@@ -18,10 +18,12 @@
  * Goutham Rao: <goutham.rao@intel.com>
  *	Skip non-WB memory and ignore empty memory ranges.
  */
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/time.h>
+#include <linux/proc_fs.h>
 
 #include <asm/efi.h>
 #include <asm/io.h>
@@ -35,6 +37,17 @@ extern efi_status_t efi_call_phys (void *, ...);
 
 struct efi efi;
 static efi_runtime_services_t *runtime;
+
+/*
+ * efi_dir is allocated here, but the directory isn't created
+ * here, as proc_mkdir() doesn't work this early in the bootup
+ * process.  Therefore, each module, like efivars, must test for
+ *    if (!efi_dir)  efi_dir = proc_mkdir("efi", NULL);
+ * prior to creating their own entries under /proc/efi.
+ */
+#ifdef CONFIG_PROC_FS
+struct proc_dir_entry *efi_dir = NULL;
+#endif
 
 static unsigned long mem_limit = ~0UL;
 
@@ -220,10 +233,8 @@ efi_map_pal_code (void)
 		/*
 		 * The only ITLB entry in region 7 that is used is the one installed by
 		 * __start().  That entry covers a 64MB range.
-		 *
-		 * XXX Fixme: should be dynamic here (for page size)
 		 */
-		mask  = ~((1 << _PAGE_SIZE_64M) - 1);
+		mask  = ~((1 << KERNEL_PG_SHIFT) - 1);
 		vaddr = PAGE_OFFSET + md->phys_addr;
 
 		/*
@@ -246,14 +257,14 @@ efi_map_pal_code (void)
 
 		printk("CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
 		       smp_processor_id(), md->phys_addr, md->phys_addr + (md->num_pages << 12),
-		       vaddr & mask, (vaddr & mask) + 64*1024*1024);
+		       vaddr & mask, (vaddr & mask) + KERNEL_PG_SIZE);
 
 		/*
 		 * Cannot write to CRx with PSR.ic=1
 		 */
 		ia64_clear_ic(flags);
 		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
-			 pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL)), _PAGE_SIZE_64M);
+			 pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL)), KERNEL_PG_SHIFT);
 		local_irq_restore(flags);
 		ia64_srlz_i();
 	}
@@ -440,4 +451,36 @@ efi_enter_virtual_mode (void)
 	efi.set_variable = __va(runtime->set_variable);
 	efi.get_next_high_mono_count = __va(runtime->get_next_high_mono_count);
 	efi.reset_system = __va(runtime->reset_system);
+}
+
+/*
+ * Walk the EFI memory map looking for the I/O port range.  There can only be one entry of
+ * this type, other I/O port ranges should be described via ACPI.
+ */
+u64
+efi_get_iobase (void)
+{
+	void *efi_map_start, *efi_map_end, *p;
+	efi_memory_desc_t *md;
+	u64 efi_desc_size;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		md = p;
+		if (md->type == EFI_MEMORY_MAPPED_IO_PORT_SPACE) {
+			/* paranoia attribute checking */
+			if (md->attribute == (EFI_MEMORY_UC | EFI_MEMORY_RUNTIME))
+				return md->phys_addr;
+		}
+	}
+	return 0;
+}
+
+static void __exit
+efivars_exit(void)
+{
+ 	remove_proc_entry(efi_dir->name, NULL);
 }

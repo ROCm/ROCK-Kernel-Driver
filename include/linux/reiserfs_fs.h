@@ -1652,7 +1652,6 @@ int reiserfs_convert_objectid_map_v1(struct super_block *) ;
 
 /* stree.c */
 int B_IS_IN_TREE(struct buffer_head *);
-extern inline void copy_key (void * to, void * from);
 extern inline void copy_short_key (void * to, void * from);
 extern inline void copy_item_head(void * p_v_to, void * p_v_from);
 

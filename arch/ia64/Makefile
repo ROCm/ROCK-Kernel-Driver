@@ -14,18 +14,18 @@ AWK := awk
 export AWK
 
 LINKFLAGS = -static -T arch/$(ARCH)/vmlinux.lds
-AFLAGS += -Wa,-x
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=
 
-CFLAGS := $(CFLAGS) -pipe $(EXTRA) -Wa,-x -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
-	  -funwind-tables -falign-functions=32
-# -frename-registers (this crashes the Nov 17 compiler...)
+CFLAGS := $(CFLAGS) -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 -falign-functions=32
 CFLAGS_KERNEL := -mconstant-gp
 
-ifeq ($(CONFIG_ITANIUM_ASTEP_SPECIFIC),y)
-	CFLAGS += -ma-step
+GCC_VERSION=$(shell $(CROSS_COMPILE)$(HOSTCC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
+
+ifneq ($(GCC_VERSION),2)
+	CFLAGS += -frename-registers
 endif
+
 ifeq ($(CONFIG_ITANIUM_BSTEP_SPECIFIC),y)
 	CFLAGS += -mb-step
 endif

@@ -94,9 +94,10 @@ struct unw_frame_info {
  * Initialize unwind support.
  */
 extern void unw_init (void);
+extern void unw_create_gate_table (void);
 
 extern void *unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned long gp,
-				   void *table_start, void *table_end);
+				   const void *table_start, const void *table_end);
 
 extern void unw_remove_unwind_table (void *handle);
 

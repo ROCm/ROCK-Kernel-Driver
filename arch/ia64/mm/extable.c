@@ -6,8 +6,9 @@
  */
 
 #include <linux/config.h>
-#include <linux/module.h>
+
 #include <asm/uaccess.h>
+#include <asm/module.h>
 
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
@@ -15,35 +16,25 @@ extern const struct exception_table_entry __stop___ex_table[];
 static inline const struct exception_table_entry *
 search_one_table (const struct exception_table_entry *first,
 		  const struct exception_table_entry *last,
-		  signed long value)
+		  unsigned long ip, unsigned long gp)
 {
-	/* Abort early if the search value is out of range.  */
-	if (value != (signed int)value)
-		return 0;
-
         while (first <= last) {
 		const struct exception_table_entry *mid;
 		long diff;
-		/*
-		 * We know that first and last are both kernel virtual
-		 * pointers (region 7) so first+last will cause an
-		 * overflow.  We fix that by calling __va() on the
-		 * result, which will ensure that the top two bits get
-		 * set again.
-		 */
-		mid = (void *) __va((((__u64) first + (__u64) last)/2/sizeof(*mid))*sizeof(*mid));
-		diff = mid->addr - value;
+
+		mid = &first[(last - first)/2];
+		diff = (mid->addr + gp) - ip;
                 if (diff == 0)
                         return mid;
                 else if (diff < 0)
-                        first = mid+1;
+                        first = mid + 1;
                 else
-                        last = mid-1;
+                        last = mid - 1;
         }
         return 0;
 }
 
-#ifndef CONFIG_MODULE
+#ifndef CONFIG_MODULES
 register unsigned long main_gp __asm__("gp");
 #endif
 
@@ -53,23 +44,25 @@ search_exception_table (unsigned long addr)
 	const struct exception_table_entry *entry;
 	struct exception_fixup fix = { 0 };
 
-#ifndef CONFIG_MODULE
+#ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
-	entry = search_one_table(__start___ex_table, __stop___ex_table - 1, addr - main_gp);
+	entry = search_one_table(__start___ex_table, __stop___ex_table - 1, addr, main_gp);
 	if (entry)
 		fix.cont = entry->cont + main_gp;
 	return fix;
 #else
-	struct exception_table_entry *ret;
-	/* The kernel is the last "module" -- no need to treat it special. */
+	struct archdata *archdata;
 	struct module *mp;
 
+	/* The kernel is the last "module" -- no need to treat it special. */
 	for (mp = module_list; mp ; mp = mp->next) {
 		if (!mp->ex_table_start)
 			continue;
-		entry = search_one_table(mp->ex_table_start, mp->ex_table_end - 1, addr - mp->gp);
+		archdata = (struct archdata *) mp->archdata_start;
+		entry = search_one_table(mp->ex_table_start, mp->ex_table_end - 1,
+					 addr, (unsigned long) archdata->gp);
 		if (entry) {
-			fix.cont = entry->cont + mp->gp;
+			fix.cont = entry->cont + (unsigned long) archdata->gp;
 			return fix;
 		}
 	}

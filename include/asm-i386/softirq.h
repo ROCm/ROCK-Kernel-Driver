@@ -25,9 +25,7 @@
 #define local_bh_enable()						\
 do {									\
 	unsigned int *ptr = &local_bh_count(smp_processor_id());	\
-	unsigned long flags;						\
 									\
-	__save_flags(flags);						\
 	barrier();							\
 	if (!--*ptr)							\
 		__asm__ __volatile__ (					\

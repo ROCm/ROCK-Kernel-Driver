@@ -25,14 +25,12 @@
 #include <linux/irq.h>
 
 #include <asm/acpi-ext.h>
+#include <asm/acpikcfg.h>
 #include <asm/efi.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
-# include <asm/acpikcfg.h>
-#endif
 
 #undef ACPI_DEBUG		/* Guess what this does? */
 
@@ -40,7 +38,8 @@
 int __initdata available_cpus;
 int __initdata total_cpus;
 
-void (*pm_idle)(void);
+void (*pm_idle) (void);
+void (*pm_power_off) (void);
 
 asm (".weak iosapic_register_legacy_irq");
 asm (".weak iosapic_init");
@@ -206,11 +205,21 @@ acpi20_parse_madt (acpi_madt_t *madt)
 		case ACPI20_ENTRY_IO_SAPIC:
 			iosapic = (acpi_entry_iosapic_t *) p;
 			if (iosapic_init)
-				iosapic_init(iosapic->address, iosapic->irq_base);
+				/*
+				 * The PCAT_COMPAT flag indicates that the system has a
+				 * dual-8259 compatible setup.
+				 */
+				iosapic_init(iosapic->address, iosapic->irq_base,
+#ifdef CONFIG_ITANIUM
+					     1 /* fw on some Itanium systems is broken... */
+#else
+					     (madt->flags & MADT_PCAT_COMPAT)
+#endif
+					);
 			break;
 
 		case ACPI20_ENTRY_PLATFORM_INT_SOURCE:
-			printk("ACPI 2.0 MADT: PLATFORM INT SOUCE\n");
+			printk("ACPI 2.0 MADT: PLATFORM INT SOURCE\n");
 			acpi20_platform(p);
 			break;
 
@@ -257,6 +266,7 @@ acpi20_parse_madt (acpi_madt_t *madt)
 int __init
 acpi20_parse (acpi20_rsdp_t *rsdp20)
 {
+# ifdef CONFIG_ACPI
 	acpi_xsdt_t *xsdt;
 	acpi_desc_table_hdr_t *hdrp;
 	int tables, i;
@@ -287,9 +297,7 @@ acpi20_parse (acpi20_rsdp_t *rsdp20)
 		hdrp->oem_revision >> 16,
 		hdrp->oem_revision & 0xffff);
 
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
 	acpi_cf_init((void *)rsdp20);
-#endif
 
 	tables =(hdrp->length -sizeof(acpi_desc_table_hdr_t))>>3;
 
@@ -305,17 +313,16 @@ acpi20_parse (acpi20_rsdp_t *rsdp20)
 		acpi20_parse_madt((acpi_madt_t *) hdrp);
 	}
 
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
 	acpi_cf_terminate();
-#endif
 
-#ifdef CONFIG_SMP
+#  ifdef CONFIG_SMP
 	if (available_cpus == 0) {
 		printk("ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
 	smp_boot_data.cpu_count = total_cpus;
-#endif
+#  endif
+# endif /* CONFIG_ACPI */
 	return 1;
 }
 /*
@@ -395,7 +402,12 @@ acpi_parse_msapic (acpi_sapic_t *msapic)
 		      case ACPI_ENTRY_IO_SAPIC:
 			iosapic = (acpi_entry_iosapic_t *) p;
 			if (iosapic_init)
-				iosapic_init(iosapic->address, iosapic->irq_base);
+				/*
+				 * The ACPI I/O SAPIC table doesn't have a PCAT_COMPAT
+				 * flag like the MADT table, but we can safely assume that
+				 * ACPI 1.0b systems have a dual-8259 setup.
+				 */
+				iosapic_init(iosapic->address, iosapic->irq_base, 1);
 			break;
 
 		      case ACPI_ENTRY_INT_SRC_OVERRIDE:
@@ -421,6 +433,7 @@ acpi_parse_msapic (acpi_sapic_t *msapic)
 int __init
 acpi_parse (acpi_rsdp_t *rsdp)
 {
+# ifdef CONFIG_ACPI
 	acpi_rsdt_t *rsdt;
 	acpi_desc_table_hdr_t *hdrp;
 	long tables, i;
@@ -439,9 +452,7 @@ acpi_parse (acpi_rsdp_t *rsdp)
 	printk("ACPI: %.6s %.8s %d.%d\n", rsdt->header.oem_id, rsdt->header.oem_table_id,
 	       rsdt->header.oem_revision >> 16, rsdt->header.oem_revision & 0xffff);
 
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
 	acpi_cf_init(rsdp);
-#endif
 
 	tables = (rsdt->header.length - sizeof(acpi_desc_table_hdr_t)) / 8;
 	for (i = 0; i < tables; i++) {
@@ -454,16 +465,15 @@ acpi_parse (acpi_rsdp_t *rsdp)
 		acpi_parse_msapic((acpi_sapic_t *) hdrp);
 	}
 
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
 	acpi_cf_terminate();
-#endif
 
-#ifdef CONFIG_SMP
+#  ifdef CONFIG_SMP
 	if (available_cpus == 0) {
 		printk("ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
 	smp_boot_data.cpu_count = total_cpus;
-#endif
+#  endif
+# endif /* CONFIG_ACPI */
 	return 1;
 }

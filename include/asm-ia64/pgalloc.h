@@ -34,7 +34,7 @@
 #define pgtable_cache_size	(local_cpu_data->pgtable_cache_sz)
 
 static inline pgd_t*
-pgd_alloc_one_fast (void)
+pgd_alloc_one_fast (struct mm_struct *mm)
 {
 	unsigned long *ret = pgd_quicklist;
 
@@ -51,7 +51,7 @@ static inline pgd_t*
 pgd_alloc (struct mm_struct *mm)
 {
 	/* the VM system never calls pgd_alloc_one_fast(), so we do it here. */
-	pgd_t *pgd = pgd_alloc_one_fast();
+	pgd_t *pgd = pgd_alloc_one_fast(mm);
 
 	if (__builtin_expect(pgd == NULL, 0)) {
 		pgd = (pgd_t *)__get_free_page(GFP_KERNEL);

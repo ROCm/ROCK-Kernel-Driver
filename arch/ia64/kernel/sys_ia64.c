@@ -22,16 +22,18 @@
 #define COLOR_ALIGN(addr)	(((addr) + SHMLBA - 1) & ~(SHMLBA - 1))
 
 unsigned long
-arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
+arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len,
+			unsigned long pgoff, unsigned long flags)
 {
 	struct vm_area_struct * vmm;
+	long map_shared = (flags & MAP_SHARED);
 
 	if (len > RGN_MAP_LIMIT)
 		return -ENOMEM;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (flags & MAP_SHARED)
+	if (map_shared)
 		addr = COLOR_ALIGN(addr);
 	else
 		addr = PAGE_ALIGN(addr);
@@ -45,7 +47,7 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
 		addr = vmm->vm_end;
-		if (flags & MAP_SHARED)
+		if (map_shared)
 			addr = COLOR_ALIGN(addr);
 	}
 }
@@ -176,11 +178,22 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	unsigned long roff;
 	struct file *file = 0;
 
+	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
+	if (!(flags & MAP_ANONYMOUS)) {
+		file = fget(fd);
+		if (!file)
+			return -EBADF;
+
+		if (!file->f_op || !file->f_op->mmap)
+			return -ENODEV;
+	}
+
 	/*
-	 * A zero mmap always succeeds in Linux, independent of
-	 * whether or not the remaining arguments are valid.
+	 * A zero mmap always succeeds in Linux, independent of whether or not the
+	 * remaining arguments are valid.
 	 */
-	if (PAGE_ALIGN(len) == 0)
+	len = PAGE_ALIGN(len);
+	if (len == 0)
 		return addr;
 
 	/* don't permit mappings into unmapped space or the virtual page table of a region: */
@@ -191,13 +204,6 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	/* don't permit mappings that would cross a region boundary: */
 	if (rgn_index(addr) != rgn_index(addr + len))
 		return -EINVAL;
-
-	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-	if (!(flags & MAP_ANONYMOUS)) {
-		file = fget(fd);
-		if (!file)
-			return -EBADF;
-	}
 
 	down_write(&current->mm->mmap_sem);
 	addr = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
@@ -244,13 +250,6 @@ asmlinkage long
 sys_vm86 (long arg0, long arg1, long arg2, long arg3)
 {
 	printk(KERN_ERR "sys_vm86(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
-	return -ENOSYS;
-}
-
-asmlinkage long
-sys_modify_ldt (long arg0, long arg1, long arg2, long arg3)
-{
-	printk(KERN_ERR "sys_modify_ldt(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
 	return -ENOSYS;
 }
 

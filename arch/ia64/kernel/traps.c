@@ -215,12 +215,9 @@ static inline int
 fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long *pr, long *ifs,
 	    struct pt_regs *regs)
 {
+	struct ia64_fpreg f6_11[6];
 	fp_state_t fp_state;
 	fpswa_ret_t ret;
-#define FPSWA_BUG
-#ifdef FPSWA_BUG
-	struct ia64_fpreg f6_15[10];
-#endif
 
 	if (!fpswa_interface)
 		return -1;
@@ -232,23 +229,12 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 	 * kernel, so set those bits in the mask and set the low volatile
 	 * pointer to point to these registers.
 	 */
-#ifndef FPSWA_BUG
-	fp_state.bitmask_low64 = 0x3c0;  /* bit 6..9 */
-	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) &regs->f6;
-#else
-	fp_state.bitmask_low64 = 0xffc0;  /* bit6..bit15 */
-	f6_15[0] = regs->f6;
-	f6_15[1] = regs->f7;
-	f6_15[2] = regs->f8;
-	f6_15[3] = regs->f9;
-	__asm__ ("stf.spill %0=f10%P0" : "=m"(f6_15[4]));
-	__asm__ ("stf.spill %0=f11%P0" : "=m"(f6_15[5]));
-	__asm__ ("stf.spill %0=f12%P0" : "=m"(f6_15[6]));
-	__asm__ ("stf.spill %0=f13%P0" : "=m"(f6_15[7]));
-	__asm__ ("stf.spill %0=f14%P0" : "=m"(f6_15[8]));
-	__asm__ ("stf.spill %0=f15%P0" : "=m"(f6_15[9]));
-	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) f6_15;
-#endif
+	fp_state.bitmask_low64 = 0xfc0;  /* bit6..bit11 */
+	f6_11[0] = regs->f6; f6_11[1] = regs->f7;
+	f6_11[2] = regs->f8; f6_11[3] = regs->f9;
+	__asm__ ("stf.spill %0=f10%P0" : "=m"(f6_11[4]));
+	__asm__ ("stf.spill %0=f11%P0" : "=m"(f6_11[5]));
+	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) f6_11;
 	/*
 	 * unsigned long (*EFI_FPSWA) (
 	 *      unsigned long    trap_type,
@@ -264,18 +250,10 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 					(unsigned long *) ipsr, (unsigned long *) fpsr,
 					(unsigned long *) isr, (unsigned long *) pr,
 					(unsigned long *) ifs, &fp_state);
-#ifdef FPSWA_BUG
-	__asm__ ("ldf.fill f10=%0%P0" :: "m"(f6_15[4]));
-	__asm__ ("ldf.fill f11=%0%P0" :: "m"(f6_15[5]));
-	__asm__ ("ldf.fill f12=%0%P0" :: "m"(f6_15[6]));
-	__asm__ ("ldf.fill f13=%0%P0" :: "m"(f6_15[7]));
-	__asm__ ("ldf.fill f14=%0%P0" :: "m"(f6_15[8]));
-	__asm__ ("ldf.fill f15=%0%P0" :: "m"(f6_15[9]));
-	regs->f6 = f6_15[0];
-	regs->f7 = f6_15[1];
-	regs->f8 = f6_15[2];
-	regs->f9 = f6_15[3];
-#endif
+	regs->f6 = f6_11[0]; regs->f7 = f6_11[1];
+	regs->f8 = f6_11[2]; regs->f9 = f6_11[3];
+	__asm__ ("ldf.fill f10=%0%P0" :: "m"(f6_11[4]));
+	__asm__ ("ldf.fill f11=%0%P0" :: "m"(f6_11[5]));
 	return ret.status;
 }
 
@@ -321,7 +299,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			}
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_errno = 0;
-			siginfo.si_code = 0;
+			siginfo.si_code = __SI_FAULT;	/* default code */
 			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 			if (isr & 0x11) {
 				siginfo.si_code = FPE_FLTINV;
@@ -339,7 +317,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			/* raise exception */
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_errno = 0;
-			siginfo.si_code = 0;
+			siginfo.si_code = __SI_FAULT;	/* default code */
 			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 			if (isr & 0x880) {
 				siginfo.si_code = FPE_FLTOVF;
@@ -443,14 +421,12 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		sprintf(buf, "General Exception: %s%s", reason[code],
 			(code == 3) ? ((isr & (1UL << 37))
 				       ? " (RSE access)" : " (data access)") : "");
-#ifndef CONFIG_ITANIUM_ASTEP_SPECIFIC
 		if (code == 8) {
 # ifdef CONFIG_IA64_PRINT_HAZARDS
 			printk("%016lx:possible hazard, pr = %016lx\n", regs->cr_iip, regs->pr);
 # endif
 			return;
 		}
-#endif
 		break;
 
 	      case 25: /* Disabled FP-Register */

@@ -143,7 +143,7 @@ ia64_save_extra (struct task_struct *task)
 		pfm_save_regs(task);
 #endif
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
-		ia32_save_state(&task->thread);
+		ia32_save_state(task);
 }
 
 void
@@ -156,7 +156,7 @@ ia64_load_extra (struct task_struct *task)
 		pfm_load_regs(task);
 #endif
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
-		ia32_load_state(&task->thread);
+		ia32_load_state(task);
 }
 
 /*
@@ -282,10 +282,11 @@ copy_thread (int nr, unsigned long clone_flags,
 	 * state from the current task to the new task
 	 */
 	if (IS_IA32_PROCESS(ia64_task_regs(current)))
-		ia32_save_state(&p->thread);
+		ia32_save_state(p);
 #endif
 #ifdef CONFIG_PERFMON
-	if (current->thread.pfm_context)
+	p->thread.pfm_pend_notify = 0;
+	if (p->thread.pfm_context)
 		retval = pfm_inherit(p);
 #endif
 	return retval;
@@ -294,11 +295,10 @@ copy_thread (int nr, unsigned long clone_flags,
 void
 do_copy_regs (struct unw_frame_info *info, void *arg)
 {
-	unsigned long ar_bsp, addr, mask, sp, nat_bits = 0, ip, ar_rnat;
+	unsigned long mask, sp, nat_bits = 0, ip, ar_rnat, urbs_end, cfm;
 	elf_greg_t *dst = arg;
 	struct pt_regs *pt;
 	char nat;
-	long val;
 	int i;
 
 	memset(dst, 0, sizeof(elf_gregset_t));	/* don't leak any kernel bits to user-level */
@@ -309,17 +309,13 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 	unw_get_sp(info, &sp);
 	pt = (struct pt_regs *) (sp + 16);
 
-	ar_bsp = ia64_get_user_bsp(current, pt);
+	urbs_end = ia64_get_user_rbs_end(current, pt, &cfm);
 
-	/*
-	 * Write portion of RSE backing store living on the kernel stack to the VM of the
-	 * process.
-	 */
-	for (addr = pt->ar_bspstore; addr < ar_bsp; addr += 8)
-		if (ia64_peek(current, ar_bsp, addr, &val) == 0)
-			access_process_vm(current, addr, &val, sizeof(val), 1);
+	if (ia64_sync_user_rbs(current, info->sw, pt->ar_bspstore, urbs_end) < 0)
+		return;
 
-	ia64_peek(current, ar_bsp, (long) ia64_rse_rnat_addr((long *) addr - 1), &ar_rnat);
+	ia64_peek(current, info->sw, urbs_end, (long) ia64_rse_rnat_addr((long *) urbs_end),
+		  &ar_rnat);
 
 	/*
 	 * coredump format:
@@ -347,7 +343,7 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 
 	unw_get_rp(info, &ip);
 	dst[42] = ip + ia64_psr(pt)->ri;
-	dst[43] = pt->cr_ifs & 0x3fffffffff;
+	dst[43] = cfm;
 	dst[44] = pt->cr_ipsr & IA64_PSR_UM;
 
 	unw_get_ar(info, UNW_AR_RSC, &dst[45]);
@@ -355,7 +351,7 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 	 * For bsp and bspstore, unw_get_ar() would return the kernel
 	 * addresses, but we need the user-level addresses instead:
 	 */
-	dst[46] = ar_bsp;
+	dst[46] = urbs_end;	/* note: by convention PT_AR_BSP points to the end of the urbs! */
 	dst[47] = pt->ar_bspstore;
 	dst[48] = ar_rnat;
 	unw_get_ar(info, UNW_AR_CCV, &dst[49]);
@@ -528,13 +524,11 @@ machine_restart (char *restart_cmd)
 void
 machine_halt (void)
 {
-	printk("machine_halt: need PAL or ACPI version here!!\n");
-	machine_restart(0);
 }
 
 void
 machine_power_off (void)
 {
-	printk("machine_power_off: unimplemented (need ACPI version here)\n");
-	machine_halt ();
+	if (pm_power_off)
+		pm_power_off();
 }

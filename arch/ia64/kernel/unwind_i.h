@@ -58,7 +58,7 @@ struct unw_table {
 	unsigned long segment_base;	/* base for offsets in the unwind table entries */
 	unsigned long start;
 	unsigned long end;
-	struct unw_table_entry *array;
+	const struct unw_table_entry *array;
 	unsigned long length;
 };
 

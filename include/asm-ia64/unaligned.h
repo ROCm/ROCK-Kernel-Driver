@@ -1,6 +1,8 @@
 #ifndef _ASM_IA64_UNALIGNED_H
 #define _ASM_IA64_UNALIGNED_H
 
+#include <linux/types.h>
+
 /*
  * The main single-value unaligned transfer routines.  Derived from
  * the Linux/Alpha version.

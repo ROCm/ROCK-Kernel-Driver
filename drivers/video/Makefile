@@ -46,7 +46,6 @@ obj-$(CONFIG_FB_PM2)              += pm2fb.o fbgen.o
 obj-$(CONFIG_FB_APOLLO)           += dnfb.o
 obj-$(CONFIG_FB_Q40)              += q40fb.o
 obj-$(CONFIG_FB_ATARI)            += atafb.o
-obj-$(CONFIG_FB_ATY)              += atyfb.o
 obj-$(CONFIG_FB_ATY128)           += aty128fb.o
 obj-$(CONFIG_FB_IGA)              += igafb.o
 obj-$(CONFIG_FB_CONTROL)          += controlfb.o
@@ -92,6 +91,11 @@ endif
 subdir-$(CONFIG_FB_SIS)		  += sis
 ifeq ($(CONFIG_FB_SIS),y)
 obj-y				  += sis/sisfb.o
+endif
+
+subdir-$(CONFIG_FB_ATY)		  += aty
+ifeq ($(CONFIG_FB_ATY),y)
+obj-y				  += aty/atyfb.o
 endif
 
 obj-$(CONFIG_FB_SUN3)             += sun3fb.o

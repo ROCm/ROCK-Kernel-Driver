@@ -171,11 +171,11 @@ extern int d_invalidate(struct dentry *);
 #define shrink_dcache() prune_dcache(0)
 struct zone_struct;
 /* dcache memory management */
-extern void shrink_dcache_memory(int, unsigned int);
+extern int shrink_dcache_memory(int, unsigned int);
 extern void prune_dcache(int);
 
 /* icache memory management (defined in linux/fs/inode.c) */
-extern void shrink_icache_memory(int, int);
+extern int shrink_icache_memory(int, int);
 extern void prune_icache(int);
 
 /* only used at mount-time */

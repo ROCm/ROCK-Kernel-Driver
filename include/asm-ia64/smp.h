@@ -1,7 +1,7 @@
 /*
  * SMP Support
  *
- * Copyright (C) 1999 VA Linux Systems 
+ * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 2001 Hewlett-Packard Co
  * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
@@ -35,14 +35,13 @@ extern struct smp_boot_data {
 
 extern char no_int_routing __initdata;
 
-extern unsigned long cpu_present_map;
-extern unsigned long cpu_online_map;
+extern volatile unsigned long cpu_online_map;
 extern unsigned long ipi_base_addr;
-extern int __cpu_physical_id[NR_CPUS];
 extern unsigned char smp_int_redirect;
 extern int smp_num_cpus;
 
-#define cpu_physical_id(i)	__cpu_physical_id[i]
+extern volatile int ia64_cpu_to_sapicid[];
+#define cpu_physical_id(i)	ia64_cpu_to_sapicid[i]
 #define cpu_number_map(i)	(i)
 #define cpu_logical_map(i)	(i)
 
@@ -70,7 +69,7 @@ cpu_logical_id (int cpuid)
  *	max_xtp   : never deliver interrupts to this CPU.
  */
 
-static inline void 
+static inline void
 min_xtp (void)
 {
 	if (smp_int_redirect & SMP_IRQ_REDIRECTION)
@@ -85,13 +84,13 @@ normal_xtp (void)
 }
 
 static inline void
-max_xtp (void) 
+max_xtp (void)
 {
 	if (smp_int_redirect & SMP_IRQ_REDIRECTION)
 		writeb(0x0f, ipi_base_addr | XTP_OFFSET); /* Set XTP to max */
 }
 
-static inline unsigned int 
+static inline unsigned int
 hard_smp_processor_id (void)
 {
 	union {

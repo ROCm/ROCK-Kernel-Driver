@@ -32,6 +32,7 @@
 #include <asm/processor.h>
 #include <asm/signal.h>
 #include <asm/system.h>
+#include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h> /* for ia64_get_itc() */
 
@@ -467,7 +468,7 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long which_pmds, unsigned lon
 	if (size > current->rlim[RLIMIT_MEMLOCK].rlim_cur) return -EAGAIN;
 
 	/* find some free area in address space */
-	addr = get_unmapped_area(NULL, 0, size, 0, 0);
+	addr = get_unmapped_area(NULL, 0, size, 0, MAP_PRIVATE);
 	if (!addr) goto no_addr;
 
 	DBprintk((" entries=%ld aligned size=%ld, unmapped @0x%lx\n", entries, size, addr));
@@ -573,11 +574,7 @@ pfx_is_sane(pfreq_context_t *pfx)
 	/* cannot send to process 1, 0 means do not notify */
 	if (pfx->notify_pid < 0 || pfx->notify_pid == 1) return 0;
 
-	/* asked for sampling, but nothing to record ! */
-	if (pfx->smpl_entries > 0 && pfm_smpl_entry_size(&pfx->smpl_regs, 1) == 0) return 0;
-
 	/* probably more to add here */
-
 
 	return 1;
 }
@@ -786,26 +783,22 @@ pfm_read_pmds(struct task_struct *ta, perfmon_req_t *req, int count)
 	/* XXX: ctx locking may be required here */
 
 	for (i = 0; i < count; i++, req++) {
-		int k;
-
 		if (copy_from_user(&tmp, req, sizeof(tmp))) return -EFAULT;
 
 		if (!PMD_IS_IMPL(tmp.pfr_reg.reg_num)) return -EINVAL;
-
-		k = tmp.pfr_reg.reg_num - PMU_FIRST_COUNTER;
 
 		if (PMD_IS_COUNTER(tmp.pfr_reg.reg_num)) {
 			if (ta == current){
 				val = ia64_get_pmd(tmp.pfr_reg.reg_num);
 			} else {
-				val = th->pmd[k];
+				val = th->pmd[tmp.pfr_reg.reg_num];
 			}
 			val &= pmu_conf.perf_ovfl_val;
 			/*
 			 * lower part of .val may not be zero, so we must be an addition because of
 			 * residual count (see update_counters).
 			 */
-			val += ctx->ctx_pmds[k].val;
+			val += ctx->ctx_pmds[tmp.pfr_reg.reg_num - PMU_FIRST_COUNTER].val;
 		} else {
 			/* for now */
 			if (ta != current) return -EINVAL;
@@ -1646,7 +1639,7 @@ perfmon_init (void)
 
 	pmu_conf.pfm_is_disabled = 1;
 
-	printk("perfmon: version %s\n", PFM_VERSION);
+	printk("perfmon: version %s (sampling format v%d)\n", PFM_VERSION, PFM_SMPL_HDR_VERSION);
 	printk("perfmon: Interrupt vectored to %u\n", IA64_PERFMON_VECTOR);
 
 	if ((status=ia64_pal_perf_mon_info(pmu_conf.impl_regs, &pm_info)) != 0) {
@@ -1658,11 +1651,8 @@ perfmon_init (void)
 	pmu_conf.num_pmds      = find_num_pm_regs(pmu_conf.impl_regs);
 	pmu_conf.num_pmcs      = find_num_pm_regs(&pmu_conf.impl_regs[4]);
 
-	printk("perfmon: Counters are %d bits\n", pm_info.pal_perf_mon_info_s.width);
-	printk("perfmon: Maximum counter value 0x%lx\n", pmu_conf.perf_ovfl_val);
-	printk("perfmon: %ld PMC/PMD pairs\n", pmu_conf.max_counters);
-	printk("perfmon: %ld PMCs, %ld PMDs\n", pmu_conf.num_pmcs, pmu_conf.num_pmds);
-	printk("perfmon: Sampling format v%d\n", PFM_SMPL_HDR_VERSION);
+	printk("perfmon: %d bits counters (max value 0x%lx)\n", pm_info.pal_perf_mon_info_s.width, pmu_conf.perf_ovfl_val);
+	printk("perfmon: %ld PMC/PMD pairs, %ld PMCs, %ld PMDs\n", pmu_conf.max_counters, pmu_conf.num_pmcs, pmu_conf.num_pmds);
 
 	/* sanity check */
 	if (pmu_conf.num_pmds >= IA64_NUM_PMD_REGS || pmu_conf.num_pmcs >= IA64_NUM_PMC_REGS) {

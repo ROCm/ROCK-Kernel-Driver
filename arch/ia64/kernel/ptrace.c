@@ -144,12 +144,10 @@ ia64_decrement_ip (struct pt_regs *regs)
 }
 
 /*
- * This routine is used to read an rnat bits that are stored on the
- * kernel backing store.  Since, in general, the alignment of the user
- * and kernel are different, this is not completely trivial.  In
- * essence, we need to construct the user RNAT based on up to two
- * kernel RNAT values and/or the RNAT value saved in the child's
- * pt_regs.
+ * This routine is used to read an rnat bits that are stored on the kernel backing store.
+ * Since, in general, the alignment of the user and kernel are different, this is not
+ * completely trivial.  In essence, we need to construct the user RNAT based on up to two
+ * kernel RNAT values and/or the RNAT value saved in the child's pt_regs.
  *
  * user rbs
  *
@@ -182,20 +180,18 @@ ia64_decrement_ip (struct pt_regs *regs)
  *					+--------+
  *						  <--- child_stack->ar_bspstore
  *
- * The way to think of this code is as follows: bit 0 in the user rnat
- * corresponds to some bit N (0 <= N <= 62) in one of the kernel rnat
- * value.  The kernel rnat value holding this bit is stored in
- * variable rnat0.  rnat1 is loaded with the kernel rnat value that
+ * The way to think of this code is as follows: bit 0 in the user rnat corresponds to some
+ * bit N (0 <= N <= 62) in one of the kernel rnat value.  The kernel rnat value holding
+ * this bit is stored in variable rnat0.  rnat1 is loaded with the kernel rnat value that
  * form the upper bits of the user rnat value.
  *
  * Boundary cases:
  *
- * o when reading the rnat "below" the first rnat slot on the kernel
- *   backing store, rnat0/rnat1 are set to 0 and the low order bits
- *   are merged in from pt->ar_rnat.
+ * o when reading the rnat "below" the first rnat slot on the kernel backing store,
+ *   rnat0/rnat1 are set to 0 and the low order bits are merged in from pt->ar_rnat.
  *
- * o when reading the rnat "above" the last rnat slot on the kernel
- *   backing store, rnat0/rnat1 gets its value from sw->ar_rnat.
+ * o when reading the rnat "above" the last rnat slot on the kernel backing store,
+ *   rnat0/rnat1 gets its value from sw->ar_rnat.
  */
 static unsigned long
 get_rnat (struct pt_regs *pt, struct switch_stack *sw,
@@ -289,57 +285,82 @@ put_rnat (struct pt_regs *pt, struct switch_stack *sw,
 	}
 }
 
+/*
+ * Read a word from the user-level backing store of task CHILD.  ADDR is the user-level
+ * address to read the word from, VAL a pointer to the return value, and USER_BSP gives
+ * the end of the user-level backing store (i.e., it's the address that would be in ar.bsp
+ * after the user executed a "cover" instruction).
+ *
+ * This routine takes care of accessing the kernel register backing store for those
+ * registers that got spilled there.  It also takes care of calculating the appropriate
+ * RNaT collection words.
+ */
 long
-ia64_peek (struct task_struct *child, unsigned long user_bsp, unsigned long addr, long *val)
+ia64_peek (struct task_struct *child, struct switch_stack *child_stack, unsigned long user_rbs_end,
+	   unsigned long addr, long *val)
 {
-	unsigned long *bspstore, *krbs, regnum, *laddr, *ubsp = (long *) user_bsp;
-	struct switch_stack *child_stack;
+	unsigned long *bspstore, *krbs, regnum, *laddr, *urbs_end, *rnat_addr;
 	struct pt_regs *child_regs;
 	size_t copied;
 	long ret;
 
+	urbs_end = (long *) user_rbs_end;
 	laddr = (unsigned long *) addr;
 	child_regs = ia64_task_regs(child);
-	child_stack = (struct switch_stack *) (child->thread.ksp + 16);
 	bspstore = (unsigned long *) child_regs->ar_bspstore;
 	krbs = (unsigned long *) child + IA64_RBS_OFFSET/8;
-	if (laddr >= bspstore && laddr <= ia64_rse_rnat_addr(ubsp)) {
+	if (laddr >= bspstore && laddr <= ia64_rse_rnat_addr(urbs_end)) {
 		/*
 		 * Attempt to read the RBS in an area that's actually on the kernel RBS =>
 		 * read the corresponding bits in the kernel RBS.
 		 */
-		if (ia64_rse_is_rnat_slot(laddr))
-			ret = get_rnat(child_regs, child_stack, krbs, laddr);
-		else {
-			if (laddr >= ubsp)
-				ret = 0;
-			else {
-				regnum = ia64_rse_num_regs(bspstore, laddr);
-				ret = *ia64_rse_skip_regs(krbs, regnum);
-			}
+		rnat_addr = ia64_rse_rnat_addr(laddr);
+		ret = get_rnat(child_regs, child_stack, krbs, rnat_addr);
+
+		if (laddr == rnat_addr) {
+			/* return NaT collection word itself */
+			*val = ret;
+			return 0;
 		}
-	} else {
-		copied = access_process_vm(child, addr, &ret, sizeof(ret), 0);
-		if (copied != sizeof(ret))
-			return -EIO;
+
+		if (((1UL << ia64_rse_slot_num(laddr)) & ret) != 0) {
+			/*
+			 * It is implementation dependent whether the data portion of a
+			 * NaT value gets saved on a st8.spill or RSE spill (e.g., see
+			 * EAS 2.6, 4.4.4.6 Register Spill and Fill).  To get consistent
+			 * behavior across all possible IA-64 implementations, we return
+			 * zero in this case.
+			 */
+			*val = 0;
+			return 0;
+		}
+
+		if (laddr < urbs_end) {
+			/* the desired word is on the kernel RBS and is not a NaT */
+			regnum = ia64_rse_num_regs(bspstore, laddr);
+			*val = *ia64_rse_skip_regs(krbs, regnum);
+			return 0;
+		}
 	}
+	copied = access_process_vm(child, addr, &ret, sizeof(ret), 0);
+	if (copied != sizeof(ret))
+		return -EIO;
 	*val = ret;
 	return 0;
 }
 
 long
-ia64_poke (struct task_struct *child, unsigned long user_bsp, unsigned long addr, long val)
+ia64_poke (struct task_struct *child, struct switch_stack *child_stack, unsigned long user_rbs_end,
+	   unsigned long addr, long val)
 {
-	unsigned long *bspstore, *krbs, regnum, *laddr, *ubsp = (long *) user_bsp;
-	struct switch_stack *child_stack;
+	unsigned long *bspstore, *krbs, regnum, *laddr, *urbs_end = (long *) user_rbs_end;
 	struct pt_regs *child_regs;
 
 	laddr = (unsigned long *) addr;
 	child_regs = ia64_task_regs(child);
-	child_stack = (struct switch_stack *) (child->thread.ksp + 16);
 	bspstore = (unsigned long *) child_regs->ar_bspstore;
 	krbs = (unsigned long *) child + IA64_RBS_OFFSET/8;
-	if (laddr >= bspstore && laddr <= ia64_rse_rnat_addr(ubsp)) {
+	if (laddr >= bspstore && laddr <= ia64_rse_rnat_addr(urbs_end)) {
 		/*
 		 * Attempt to write the RBS in an area that's actually on the kernel RBS
 		 * => write the corresponding bits in the kernel RBS.
@@ -347,7 +368,7 @@ ia64_poke (struct task_struct *child, unsigned long user_bsp, unsigned long addr
 		if (ia64_rse_is_rnat_slot(laddr))
 			put_rnat(child_regs, child_stack, krbs, laddr, val);
 		else {
-			if (laddr < ubsp) {
+			if (laddr < urbs_end) {
 				regnum = ia64_rse_num_regs(bspstore, laddr);
 				*ia64_rse_skip_regs(krbs, regnum) = val;
 			}
@@ -359,11 +380,13 @@ ia64_poke (struct task_struct *child, unsigned long user_bsp, unsigned long addr
 }
 
 /*
- * Calculate the user-level address that would have been in ar.bsp had the user executed a
- * "cover" instruction right before entering the kernel.
+ * Calculate the address of the end of the user-level register backing store.  This is the
+ * address that would have been stored in ar.bsp if the user had executed a "cover"
+ * instruction right before entering the kernel.  If CFMP is not NULL, it is used to
+ * return the "current frame mask" that was active at the time the kernel was entered.
  */
 unsigned long
-ia64_get_user_bsp (struct task_struct *child, struct pt_regs *pt)
+ia64_get_user_rbs_end (struct task_struct *child, struct pt_regs *pt, unsigned long *cfmp)
 {
 	unsigned long *krbs, *bspstore, cfm;
 	struct unw_frame_info info;
@@ -372,6 +395,7 @@ ia64_get_user_bsp (struct task_struct *child, struct pt_regs *pt)
 	krbs = (unsigned long *) child + IA64_RBS_OFFSET/8;
 	bspstore = (unsigned long *) pt->ar_bspstore;
 	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
+	cfm = pt->cr_ifs & ~(1UL << 63);
 
 	if ((long) pt->cr_ifs >= 0) {
 		/*
@@ -385,81 +409,102 @@ ia64_get_user_bsp (struct task_struct *child, struct pt_regs *pt)
 			ndirty += (cfm & 0x7f);
 		}
 	}
+	if (cfmp)
+		*cfmp = cfm;
 	return (unsigned long) ia64_rse_skip_regs(bspstore, ndirty);
 }
 
 /*
  * Synchronize (i.e, write) the RSE backing store living in kernel space to the VM of the
- * indicated child process.
- *
- * If new_bsp is non-zero, the bsp will (effectively) be updated to the new value upon
- * resumption of the child process.  This is accomplished by setting the loadrs value to
- * zero and the bspstore value to the new bsp value.
- *
- * When new_bsp and flush_user_rbs are both 0, the register backing store in kernel space
- * is written to user space and the loadrs and bspstore values are left alone.
- *
- * When new_bsp is zero and flush_user_rbs is 1 (non-zero), loadrs is set to 0, and the
- * bspstore value is set to the old bsp value.  This will cause the stacked registers (r32
- * and up) to be obtained entirely from the child's memory space rather than from the
- * kernel.  (This makes it easier to write code for modifying the stacked registers in
- * multi-threaded programs.)
- *
- * Note: I had originally written this function without the flush_user_rbs parameter; it
- * was written so that loadrs would always be set to zero.  But I had problems with
- * certain system calls apparently causing a portion of the RBS to be zeroed.  (I still
- * don't understand why this was happening.) Anyway, it'd definitely less intrusive to
- * leave loadrs and bspstore alone if possible.
+ * CHILD task.  SW and PT are the pointers to the switch_stack and pt_regs structures,
+ * respectively.  USER_RBS_END is the user-level address at which the backing store ends.
  */
-static long
-sync_kernel_register_backing_store (struct task_struct *child, long user_bsp, long new_bsp,
-				    int flush_user_rbs)
+long
+ia64_sync_user_rbs (struct task_struct *child, struct switch_stack *sw,
+		    unsigned long user_rbs_start, unsigned long user_rbs_end)
 {
-	struct pt_regs *child_regs = ia64_task_regs(child);
 	unsigned long addr, val;
 	long ret;
 
-	/*
-	 * Return early if nothing to do.  Note that new_bsp will be zero if the caller
-	 * wants to force synchronization without changing bsp.
-	 */
-	if (user_bsp == new_bsp)
-		return 0;
-
-	/* Write portion of backing store living on kernel stack to the child's VM. */
-	for (addr = child_regs->ar_bspstore; addr < user_bsp; addr += 8) {
-		ret = ia64_peek(child, user_bsp, addr, &val);
-		if (ret != 0)
+	/* now copy word for word from kernel rbs to user rbs: */
+	for (addr = user_rbs_start; addr < user_rbs_end; addr += 8) {
+		ret = ia64_peek(child, sw, user_rbs_end, addr, &val);
+		if (ret < 0)
 			return ret;
 		if (access_process_vm(child, addr, &val, sizeof(val), 1) != sizeof(val))
 			return -EIO;
 	}
-
-	if (new_bsp != 0) {
-		flush_user_rbs = 1;
-		user_bsp = new_bsp;
-	}
-
-	if (flush_user_rbs) {
-		child_regs->loadrs = 0;
-		child_regs->ar_bspstore = user_bsp;
-	}
 	return 0;
 }
 
+/*
+ * Simulate user-level "flushrs".  Note: we can't just add pt->loadrs>>16 to
+ * pt->ar_bspstore because the kernel backing store and the user-level backing store may
+ * have different alignments (and therefore a different number of intervening rnat slots).
+ */
 static void
-sync_thread_rbs (struct task_struct *child, long bsp, struct mm_struct *mm, int make_writable)
+user_flushrs (struct task_struct *task, struct pt_regs *pt)
 {
+	unsigned long *krbs;
+	long ndirty;
+
+	krbs = (unsigned long *) task + IA64_RBS_OFFSET/8;
+	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
+
+	pt->ar_bspstore = (unsigned long) ia64_rse_skip_regs((unsigned long *) pt->ar_bspstore,
+							     ndirty);
+	pt->loadrs = 0;
+}
+
+/*
+ * Synchronize the RSE backing store of CHILD and all tasks that share the address space
+ * with it.  CHILD_URBS_END is the address of the end of the register backing store of
+ * CHILD.  If MAKE_WRITABLE is set, a user-level "flushrs" is simulated such that the VM
+ * can be written via ptrace() and the tasks will pick up the newly written values.  It
+ * would be OK to unconditionally simulate a "flushrs", but this would be more intrusive
+ * than strictly necessary (e.g., it would make it impossible to obtain the original value
+ * of ar.bspstore).
+ */
+static void
+threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, int make_writable)
+{
+	struct switch_stack *sw;
+	unsigned long urbs_end;
 	struct task_struct *p;
-	read_lock(&tasklist_lock);
+	struct mm_struct *mm;
+	struct pt_regs *pt;
+	long multi_threaded;
+
+	task_lock(child);
 	{
-		for_each_task(p) {
-			if (p->mm == mm && p->state != TASK_RUNNING)
-				sync_kernel_register_backing_store(p, bsp, 0, make_writable);
-		}
+		mm = child->mm;
+		multi_threaded = mm && (atomic_read(&mm->mm_users) > 1);
 	}
-	read_unlock(&tasklist_lock);
-	child->thread.flags |= IA64_THREAD_KRBS_SYNCED;
+	task_unlock(child);
+
+	if (!multi_threaded) {
+		sw = (struct switch_stack *) (child->thread.ksp + 16);
+		pt = ia64_task_regs(child);
+		ia64_sync_user_rbs(child, sw, pt->ar_bspstore, child_urbs_end);
+		if (make_writable)
+			user_flushrs(child, pt);
+	} else {
+		read_lock(&tasklist_lock);
+		{
+			for_each_task(p) {
+				if (p->mm == mm && p->state != TASK_RUNNING) {
+					sw = (struct switch_stack *) (p->thread.ksp + 16);
+					pt = ia64_task_regs(p);
+					urbs_end = ia64_get_user_rbs_end(p, pt, NULL);
+					ia64_sync_user_rbs(p, sw, pt->ar_bspstore, urbs_end);
+					if (make_writable)
+						user_flushrs(p, pt);
+				}
+			}
+		}
+		read_unlock(&tasklist_lock);
+	}
+	child->thread.flags |= IA64_THREAD_KRBS_SYNCED;	/* set the flag in the child thread only */
 }
 
 /*
@@ -528,7 +573,7 @@ access_fr (struct unw_frame_info *info, int regnum, int hi, unsigned long *data,
 static int
 access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data, int write_access)
 {
-	unsigned long *ptr, regnum, bsp, rnat_addr;
+	unsigned long *ptr, regnum, urbs_end, rnat_addr;
 	struct switch_stack *sw;
 	struct unw_frame_info info;
 	struct pt_regs *pt;
@@ -625,13 +670,24 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		/* scratch state */
 		switch (addr) {
 		      case PT_AR_BSP:
-			bsp = ia64_get_user_bsp(child, pt);
-			if (write_access)
-				return sync_kernel_register_backing_store(child, bsp, *data, 1);
-			else {
-				*data = bsp;
-				return 0;
-			}
+			/*
+			 * By convention, we use PT_AR_BSP to refer to the end of the user-level
+			 * backing store.  Use ia64_rse_skip_regs(PT_AR_BSP, -CFM.sof) to get
+			 * the real value of ar.bsp at the time the kernel was entered.
+			 */
+			urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
+			if (write_access) {
+				if (*data != urbs_end) {
+					if (ia64_sync_user_rbs(child, sw,
+							       pt->ar_bspstore, urbs_end) < 0)
+						return -1;
+					/* simulate user-level write of ar.bsp: */
+					pt->loadrs = 0;
+					pt->ar_bspstore = *data;
+				}
+			} else
+				*data = urbs_end;
+			return 0;
 
 		      case PT_CFM:
 			if ((long) pt->cr_ifs < 0) {
@@ -666,12 +722,12 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			return 0;
 
 		      case PT_AR_RNAT:
-			bsp = ia64_get_user_bsp(child, pt);
-			rnat_addr = (long) ia64_rse_rnat_addr((long *) bsp - 1);
+			urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
+			rnat_addr = (long) ia64_rse_rnat_addr((long *) urbs_end);
 			if (write_access)
-				return ia64_poke(child, bsp, rnat_addr, *data);
+				return ia64_poke(child, sw, urbs_end, rnat_addr, *data);
 			else
-				return ia64_peek(child, bsp, rnat_addr, data);
+				return ia64_peek(child, sw, urbs_end, rnat_addr, data);
 
 				   case PT_R1:  case PT_R2:  case PT_R3:
 		      case PT_R8:  case PT_R9:  case PT_R10: case PT_R11:
@@ -738,8 +794,9 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	    long arg4, long arg5, long arg6, long arg7, long stack)
 {
 	struct pt_regs *pt, *regs = (struct pt_regs *) &stack;
+	unsigned long flags, urbs_end;
 	struct task_struct *child;
-	unsigned long flags, bsp;
+	struct switch_stack *sw;
 	long ret;
 
 	lock_kernel();
@@ -784,25 +841,17 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		goto out_tsk;
 
 	pt = ia64_task_regs(child);
+	sw = (struct switch_stack *) (child->thread.ksp + 16);
 
 	switch (request) {
 	      case PTRACE_PEEKTEXT:
 	      case PTRACE_PEEKDATA:		/* read word at location addr */
-		bsp = ia64_get_user_bsp(child, pt);
-		if (!(child->thread.flags & IA64_THREAD_KRBS_SYNCED)) {
-			struct mm_struct *mm;
-			long do_sync;
+		urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
 
-			task_lock(child);
-			{
-				mm = child->mm;
-				do_sync = mm && (atomic_read(&mm->mm_users) > 1);
-			}
-			task_unlock(child);
-			if (do_sync)
-				sync_thread_rbs(child, bsp, mm, 0);
-		}
-		ret = ia64_peek(child, bsp, addr, &data);
+		if (!(child->thread.flags & IA64_THREAD_KRBS_SYNCED))
+			threads_sync_user_rbs(child, urbs_end, 0);
+
+		ret = ia64_peek(child, sw, urbs_end, addr, &data);
 		if (ret == 0) {
 			ret = data;
 			regs->r8 = 0;	/* ensure "ret" is not mistaken as an error code */
@@ -811,21 +860,11 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 
 	      case PTRACE_POKETEXT:
 	      case PTRACE_POKEDATA:		/* write the word at location addr */
-		bsp = ia64_get_user_bsp(child, pt);
-		if (!(child->thread.flags & IA64_THREAD_KRBS_SYNCED)) {
-			struct mm_struct *mm;
-			long do_sync;
+		urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
+		if (!(child->thread.flags & IA64_THREAD_KRBS_SYNCED))
+			threads_sync_user_rbs(child, urbs_end, 1);
 
-			task_lock(child);
-			{
-				mm = child->mm;
-				do_sync = mm && (atomic_read(&child->mm->mm_users) > 1);
-			}
-			task_unlock(child);
-			if (do_sync)
-				sync_thread_rbs(child, bsp, mm, 1);
-		}
-		ret = ia64_poke(child, bsp, addr, data);
+		ret = ia64_poke(child, sw, urbs_end, addr, data);
 		goto out_tsk;
 
 	      case PTRACE_PEEKUSR:		/* read the word at addr in the USER area */

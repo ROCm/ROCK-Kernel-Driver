@@ -7,8 +7,18 @@
  */
 #include <asm/hardirq.h>
 
+#define __local_bh_enable()	do { barrier(); local_bh_count()--; } while (0)
+
 #define local_bh_disable()	do { local_bh_count()++; barrier(); } while (0)
-#define local_bh_enable()	do { barrier(); local_bh_count()--; } while (0)
+#define local_bh_enable()								\
+do {											\
+	__local_bh_enable();								\
+	if (__builtin_expect(local_softirq_pending(), 0) && local_bh_count() == 0)	\
+		do_softirq();								\
+} while (0)
+
+
+#define __cpu_raise_softirq(cpu,nr)	set_bit((nr), &softirq_pending(cpu))
 
 #define in_softirq()		(local_bh_count() != 0)
 

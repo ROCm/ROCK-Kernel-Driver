@@ -101,7 +101,7 @@ out:
  * This is very ugly but temporary. THIS NEEDS SERIOUS ENHANCEMENTS.
  * But it's very tricky to get right even in C.
  */
-extern unsigned long do_csum(const unsigned char *, int);
+extern unsigned long do_csum(const unsigned char *, long);
 
 static unsigned int
 do_csum_partial_copy_from_user (const char *src, char *dst, int len,

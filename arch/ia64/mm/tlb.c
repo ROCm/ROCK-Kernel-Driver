@@ -97,7 +97,7 @@ flush_tlb_no_ptcg (unsigned long start, unsigned long end, unsigned long nbits)
 	/*
 	 * Wait for other CPUs to finish purging entries.
 	 */
-#if defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_BSTEP_SPECIFIC)
+#if defined(CONFIG_ITANIUM_BSTEP_SPECIFIC)
 	{
 		extern void smp_resend_flush_tlb (void);
 		unsigned long start = ia64_get_itc();

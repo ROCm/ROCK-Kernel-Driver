@@ -655,24 +655,34 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			}
 #endif
 		}
-		if ((SCpnt->sense_buffer[0] & 0x7f) == 0x70
-		    && (SCpnt->sense_buffer[2] & 0xf) == UNIT_ATTENTION) {
-			if (SCpnt->device->removable) {
-				/* detected disc change.  set a bit and quietly refuse
-				 * further access.
-				 */
-				SCpnt->device->changed = 1;
-				SCpnt = scsi_end_request(SCpnt, 0, this_count);
-				return;
-			} else {
-				/*
-				 * Must have been a power glitch, or a
-				 * bus reset.  Could not have been a
-				 * media change, so we just retry the
-				 * request and see what happens.  
-				 */
+		if ((SCpnt->sense_buffer[0] & 0x7f) == 0x70) {
+			/*
+			 * If the device is in the process of becoming ready,
+			 * retry.
+			 */
+			if (SCpnt->sense_buffer[12] == 0x04 &&
+			    SCpnt->sense_buffer[13] == 0x01) {
 				scsi_queue_next_request(q, SCpnt);
 				return;
+			}
+			if ((SCpnt->sense_buffer[2] & 0xf) == UNIT_ATTENTION) {
+				if (SCpnt->device->removable) {
+					/* detected disc change.  set a bit 
+					 * and quietly refuse further access.
+		 			 */
+					SCpnt->device->changed = 1;
+					SCpnt = scsi_end_request(SCpnt, 0, this_count);
+					return;
+				} else {
+					/*
+				 	* Must have been a power glitch, or a
+				 	* bus reset.  Could not have been a
+				 	* media change, so we just retry the
+				 	* request and see what happens.  
+				 	*/
+					scsi_queue_next_request(q, SCpnt);
+					return;
+				}
 			}
 		}
 		/* If we had an ILLEGAL REQUEST returned, then we may have

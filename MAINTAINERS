@@ -608,6 +608,13 @@ M:	nils@kernelconcepts.de
 W:	http://www.kernelconcepts.de/
 S:	Maintained
 
+IA64 (Itanium) PLATFORM
+P:	David Mosberger-Tang
+M:	davidm@hpl.hp.com
+L:	linux-ia64@linuxia64.org
+W:	http://www.linuxia64.org/
+S:	Maintained
+
 IBM MCA SCSI SUBSYSTEM DRIVER
 P:	Michael Lang
 M:	langa2@kph.uni-mainz.de
