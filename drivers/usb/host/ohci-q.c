@@ -726,10 +726,6 @@ static void td_done (struct urb *urb, struct td *td)
 		int	dlen = 0;
 
  		cc = (tdPSW >> 12) & 0xF;
-		if (! ((urb->transfer_flags & USB_DISABLE_SPD)
-				&& (cc == TD_DATAUNDERRUN)))
-			cc = TD_CC_NOERROR;
-
 		if (usb_pipeout (urb->pipe))
 			dlen = urb->iso_frame_desc [td->index].length;
 		else
@@ -758,9 +754,9 @@ static void td_done (struct urb *urb, struct td *td)
 				usb_pipeendpoint (urb->pipe),
 				usb_pipeout (urb->pipe));
 
-		/* update packet status if needed (short may be ok) */
-		if (((urb->transfer_flags & USB_DISABLE_SPD) != 0
-				&& cc == TD_DATAUNDERRUN))
+		/* update packet status if needed (short is normally ok) */
+		if (cc == TD_DATAUNDERRUN
+				&& !(urb->transfer_flags & URB_SHORT_NOT_OK))
 			cc = TD_CC_NOERROR;
 		if (cc != TD_CC_NOERROR) {
 			spin_lock (&urb->lock);

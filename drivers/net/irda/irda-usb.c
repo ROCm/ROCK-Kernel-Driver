@@ -273,7 +273,7 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self)
                       frame, IRDA_USB_SPEED_MTU,
                       speed_bulk_callback, self);
 	urb->transfer_buffer_length = USB_IRDA_HEADER;
-	urb->transfer_flags = USB_QUEUE_BULK | USB_ASYNC_UNLINK;
+	urb->transfer_flags = USB_ASYNC_UNLINK;
 	urb->timeout = MSECS_TO_JIFFIES(100);
 
 	/* Irq disabled -> GFP_ATOMIC */
@@ -410,7 +410,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 	urb->transfer_buffer_length = skb->len;
 	/* Note : unlink *must* be Asynchronous because of the code in 
 	 * irda_usb_net_timeout() -> call in irq - Jean II */
-	urb->transfer_flags = USB_QUEUE_BULK | USB_ASYNC_UNLINK;
+	urb->transfer_flags = USB_ASYNC_UNLINK;
 	/* This flag (USB_ZERO_PACKET) indicates that what we send is not
 	 * a continuous stream of data but separate packets.
 	 * In this case, the USB layer will insert an empty USB frame (TD)
@@ -736,7 +736,6 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, struc
 		      usb_rcvbulkpipe(self->usbdev, self->bulk_in_ep), 
 		      skb->data, skb->truesize,
                       irda_usb_receive, skb);
-	urb->transfer_flags = USB_QUEUE_BULK;
 	/* Note : unlink *must* be synchronous because of the code in 
 	 * irda_usb_net_close() -> free the skb - Jean II */
 	urb->status = 0;

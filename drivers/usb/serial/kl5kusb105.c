@@ -391,7 +391,6 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 		      port->read_urb->transfer_buffer_length,
 		      klsi_105_read_bulk_callback,
 		      port);
-	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
 	rc = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (rc) {
@@ -537,8 +536,6 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 			      URB_TRANSFER_BUFFER_SIZE,
 			      klsi_105_write_bulk_callback,
 			      port);
-		urb->transfer_flags |= USB_QUEUE_BULK;
-
 
 		/* send the data out the bulk port */
 		result = usb_submit_urb(urb, GFP_ATOMIC);
