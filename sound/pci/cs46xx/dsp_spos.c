@@ -222,16 +222,13 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 		return NULL;
 	memset(ins, 0, sizeof(*ins));
 
-	init_MUTEX(&ins->scb_mutex);
-	init_MUTEX(&ins->pcm_mutex);
-
 	/* better to use vmalloc for this big table */
 	ins->symbol_table.nsymbols = 0;
 	ins->symbol_table.symbols = vmalloc(sizeof(symbol_entry_t) * DSP_MAX_SYMBOLS);
 	ins->symbol_table.highest_frag_index = 0;
 
 	if (ins->symbol_table.symbols == NULL) {
-		cs46xx_dsp_spos_destroy(ins);
+		cs46xx_dsp_spos_destroy(chip);
 		return NULL;
 	}
 
@@ -240,7 +237,7 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 	ins->code.data = kmalloc(DSP_CODE_BYTE_SIZE, GFP_KERNEL);
 
 	if (ins->code.data == NULL) {
-		cs46xx_dsp_spos_destroy(ins);
+		cs46xx_dsp_spos_destroy(chip);
 		return NULL;
 	}
 
@@ -251,7 +248,7 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 	ins->modules = kmalloc(sizeof(dsp_module_desc_t) * DSP_MAX_MODULES, GFP_KERNEL);
 
 	if (ins->modules == NULL) {
-		cs46xx_dsp_spos_destroy(ins);
+		cs46xx_dsp_spos_destroy(chip);
 		return NULL;
 	}
 
@@ -265,19 +262,19 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 	return ins;
 }
 
-void  cs46xx_dsp_spos_destroy (dsp_spos_instance_t * ins)
+void  cs46xx_dsp_spos_destroy (cs46xx_t * chip)
 {
 	int i;
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
 	snd_assert(ins != NULL, return);
 
-	down(&ins->scb_mutex);
+	down(&chip->spos_mutex);
 	for (i = 0; i < ins->nscb; ++i) {
 		if (ins->scbs[i].deleted) continue;
 
 		cs46xx_dsp_proc_free_scb_desc ( (ins->scbs + i) );
 	}
-	up(&ins->scb_mutex);
 
 	if (ins->code.data)
 		kfree(ins->code.data);
@@ -286,6 +283,7 @@ void  cs46xx_dsp_spos_destroy (dsp_spos_instance_t * ins)
 	if (ins->modules)
 		kfree(ins->modules);
 	kfree(ins);  
+	up(&chip->spos_mutex);
 }
 
 int cs46xx_dsp_load_module (cs46xx_t * chip, dsp_module_desc_t * module)
@@ -479,6 +477,7 @@ static void cs46xx_dsp_proc_modules_read (snd_info_entry_t *entry, snd_info_buff
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i,j;
 
+	down(&chip->spos_mutex);
 	snd_iprintf(buffer, "MODULES:\n");
 	for ( i = 0; i < ins->nmodules; ++i ) {
 		snd_iprintf(buffer, "\n%s:\n", ins->modules[i].module_name);
@@ -491,6 +490,7 @@ static void cs46xx_dsp_proc_modules_read (snd_info_entry_t *entry, snd_info_buff
 				    desc->segment_type,desc->offset, desc->size);
 		}
 	}
+	up(&chip->spos_mutex);
 }
 
 static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
@@ -500,6 +500,7 @@ static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_bu
 	int i,j,col;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
 
+	down(&chip->spos_mutex);
 	snd_iprintf(buffer, "TASK TREES:\n");
 	for ( i = 0; i < ins->ntask; ++i) {
 		snd_iprintf(buffer,"\n%04x %s:\n",ins->tasks[i].address,ins->tasks[i].task_name);
@@ -516,6 +517,7 @@ static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_bu
 	}
 
 	snd_iprintf(buffer,"\n");  
+	up(&chip->spos_mutex);
 }
 
 static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
@@ -524,6 +526,7 @@ static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i;
 
+	down(&chip->spos_mutex);
 	snd_iprintf(buffer, "SCB's:\n");
 	for ( i = 0; i < ins->nscb; ++i) {
 		if (ins->scbs[i].deleted)
@@ -546,6 +549,7 @@ static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t
 	}
 
 	snd_iprintf(buffer,"\n");
+	up(&chip->spos_mutex);
 }
 
 static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
@@ -809,12 +813,14 @@ int cs46xx_dsp_proc_init (snd_card_t * card, cs46xx_t *chip)
 	}
 	ins->proc_scb_info_entry = entry;
 
+	down(&chip->spos_mutex);
 	/* register/update SCB's entries on proc */
 	for (i = 0; i < ins->nscb; ++i) {
 		if (ins->scbs[i].deleted) continue;
 
 		cs46xx_dsp_proc_register_scb_desc (chip, (ins->scbs + i));
 	}
+	up(&chip->spos_mutex);
 
 	return 0;
 }
@@ -854,12 +860,12 @@ int cs46xx_dsp_proc_done (cs46xx_t *chip)
 		ins->proc_task_info_entry = NULL;
 	}
 
-	down(&ins->scb_mutex);
+	down(&chip->spos_mutex);
 	for (i = 0; i < ins->nscb; ++i) {
 		if (ins->scbs[i].deleted) continue;
 		cs46xx_dsp_proc_free_scb_desc ( (ins->scbs + i) );
 	}
-	up(&ins->scb_mutex);
+	up(&chip->spos_mutex);
 
 	if (ins->proc_dsp_dir) {
 		snd_info_unregister (ins->proc_dsp_dir);
@@ -930,6 +936,7 @@ static dsp_scb_descriptor_t * _map_scb (cs46xx_t *chip,char * name,u32 dest)
 	ins->scbs[index].proc_info = NULL;
 	ins->scbs[index].ref_count = 1;
 	ins->scbs[index].deleted = 0;
+	spin_lock_init(&ins->scbs[index].lock);
 
 	desc = (ins->scbs + index);
 	ins->scbs[index].scb_symbol = add_symbol (chip, name, dest, SYMBOL_PARAMETER);
@@ -1313,8 +1320,10 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 							     codec_out_scb,
 							     sec_codec_out_scb,
 							     SCB_ON_PARENT_SUBLIST_SCB);
+
 	if (!magic_snoop_scb) goto _fail_end;
 	ins->ref_snoop_scb = magic_snoop_scb;
+
 
 	/* The asynch. transfer task */
 	asynch_tx_scb = cs46xx_dsp_create_asynch_fg_tx_scb(chip,"AsynchFGTxSCB",ASYNCTX_SCB_ADDR,
@@ -1576,6 +1585,8 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 
 	snd_assert (ins->asynch_rx_scb == NULL,return -EINVAL);
 	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
+
+	down(&chip->spos_mutex);
 	/* create and start the asynchronous receiver SCB */
 	ins->asynch_rx_scb = cs46xx_dsp_create_asynch_fg_rx_scb(chip,"AsynchFGRxSCB",
 								ASYNCRX_SCB_ADDR,
@@ -1586,6 +1597,7 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 
 	save_flags(flags);
 	cli();
+
 	/* reset SPDIF input sample buffer pointer */
 	snd_cs46xx_poke (chip, (SPDIFI_SCB_INST + 0x0c) << 2,
 			 (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC);
@@ -1605,6 +1617,7 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 
 	/* monitor state */
 	ins->spdif_status_in = 1;
+	up(&chip->spos_mutex);
 
 	return 0;
 }
@@ -1616,6 +1629,7 @@ int cs46xx_dsp_disable_spdif_in (cs46xx_t *chip)
 	snd_assert (ins->asynch_rx_scb != NULL, return -EINVAL);
 	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
 
+	down(&chip->spos_mutex);
 	/* Remove the asynchronous receiver SCB */
 	cs46xx_dsp_remove_scb (chip,ins->asynch_rx_scb);
 	ins->asynch_rx_scb = NULL;
@@ -1624,6 +1638,7 @@ int cs46xx_dsp_disable_spdif_in (cs46xx_t *chip)
 
 	/* monitor state */
 	ins->spdif_status_in = 0;
+	up(&chip->spos_mutex);
 
 	/* restore amplifier */
 	chip->active_ctrl(chip, -1);
@@ -1639,9 +1654,11 @@ int cs46xx_dsp_enable_pcm_capture (cs46xx_t *chip)
 	snd_assert (ins->pcm_input == NULL,return -EINVAL);
 	snd_assert (ins->ref_snoop_scb != NULL,return -EINVAL);
 
+	down(&chip->spos_mutex);
 	ins->pcm_input = cs46xx_add_record_source(chip,ins->ref_snoop_scb,PCMSERIALIN_PCM_SCB_ADDR,
                                                   "PCMSerialInput_Wave");
-                                                  
+	up(&chip->spos_mutex);
+
 	return 0;
 }
 
@@ -1651,8 +1668,10 @@ int cs46xx_dsp_disable_pcm_capture (cs46xx_t *chip)
 
 	snd_assert (ins->pcm_input != NULL,return -EINVAL);
 
+	down(&chip->spos_mutex);
 	cs46xx_dsp_remove_scb (chip,ins->pcm_input);
 	ins->pcm_input = NULL;
+	up(&chip->spos_mutex);
 
 	return 0;
 }
@@ -1664,9 +1683,11 @@ int cs46xx_dsp_enable_adc_capture (cs46xx_t *chip)
 	snd_assert (ins->adc_input == NULL,return -EINVAL);
 	snd_assert (ins->codec_in_scb != NULL,return -EINVAL);
 
+	down(&chip->spos_mutex);
 	ins->adc_input = cs46xx_add_record_source(chip,ins->codec_in_scb,PCMSERIALIN_SCB_ADDR,
 						  "PCMSerialInput_ADC");
-                                                  
+	up(&chip->spos_mutex);
+
 	return 0;
 }
 
@@ -1676,8 +1697,10 @@ int cs46xx_dsp_disable_adc_capture (cs46xx_t *chip)
 
 	snd_assert (ins->adc_input != NULL,return -EINVAL);
 
+    down(&chip->spos_mutex);
 	cs46xx_dsp_remove_scb (chip,ins->adc_input);
 	ins->adc_input = NULL;
+    up(&chip->spos_mutex);
 
 	return 0;
 }
@@ -1697,7 +1720,7 @@ int cs46xx_poke_via_dsp (cs46xx_t *chip,u32 address,u32 data)
 
 	snd_cs46xx_poke(chip,( SPIOWRITE_SCB_ADDR      << 2), temp);
 	snd_cs46xx_poke(chip,((SPIOWRITE_SCB_ADDR + 1) << 2), data); /* offset 1 <-- data1 */
-	snd_cs46xx_poke(chip,((SPIOWRITE_SCB_ADDR + 2) << 2), data); /* offset 1 <-- data2*/
+	snd_cs46xx_poke(chip,((SPIOWRITE_SCB_ADDR + 2) << 2), data); /* offset 1 <-- data2 */
     
 	/* Poke this location to tell the task to start */
 	snd_cs46xx_poke(chip,((SPIOWRITE_SCB_ADDR + 6) << 2), SPIOWRITE_SCB_ADDR << 0x10);

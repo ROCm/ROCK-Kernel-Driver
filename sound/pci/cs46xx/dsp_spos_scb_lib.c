@@ -75,7 +75,7 @@ static void cs46xx_dsp_proc_scb_info_read (snd_info_entry_t *entry, snd_info_buf
 
 	ins = chip->dsp_spos_instance;
 
-	down(&ins->scb_mutex);
+	down(&chip->spos_mutex);
 	snd_iprintf(buffer,"%04x %s:\n",scb->address,scb->scb_name);
 
 	for (col = 0,j = 0;j < 0x10; j++,col++) {
@@ -103,7 +103,7 @@ static void cs46xx_dsp_proc_scb_info_read (snd_info_entry_t *entry, snd_info_buf
 		    scb->task_entry->address);
 
 	snd_iprintf(buffer,"index [%d] ref_count [%d]\n",scb->index,scb->ref_count);  
-	up(&ins->scb_mutex);
+	up(&chip->spos_mutex);
 }
 
 static void _dsp_unlink_scb (cs46xx_t *chip,dsp_scb_descriptor_t * scb)
@@ -180,11 +180,10 @@ void cs46xx_dsp_remove_scb (cs46xx_t *chip, dsp_scb_descriptor_t * scb)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
-	down(&ins->scb_mutex);
 	/* check integrety */
 	snd_assert ( (scb->index >= 0 && 
 		      scb->index < ins->nscb && 
-		      (ins->scbs + scb->index) == scb), goto _end );
+		      (ins->scbs + scb->index) == scb), return );
 
 #if 0
 	/* cant remove a SCB with childs before 
@@ -194,10 +193,12 @@ void cs46xx_dsp_remove_scb (cs46xx_t *chip, dsp_scb_descriptor_t * scb)
 		     goto _end);
 #endif
 
+	spin_lock(&scb->lock);
 	_dsp_unlink_scb (chip,scb);
-  
+	spin_unlock(&scb->lock);
+
 	cs46xx_dsp_proc_free_scb_desc(scb);
-	snd_assert (scb->scb_symbol != NULL, goto _end);
+	snd_assert (scb->scb_symbol != NULL, return );
 	remove_symbol (chip,scb->scb_symbol);
 
 	ins->scbs[scb->index].deleted = 1;
@@ -219,11 +220,6 @@ void cs46xx_dsp_remove_scb (cs46xx_t *chip, dsp_scb_descriptor_t * scb)
 		ins->scbs[i - 1].index = i - 1;
 	}
 #endif
-
-#ifdef CONFIG_SND_DEBUG
- _end:
-#endif
-	up(&ins->scb_mutex);
 }
 
 
@@ -248,7 +244,6 @@ void cs46xx_dsp_proc_register_scb_desc (cs46xx_t *chip,dsp_scb_descriptor_t * sc
 	snd_info_entry_t * entry;
 	proc_scb_info_t * scb_info;
 
-	down(&ins->scb_mutex);
 	/* register to proc */
 	if (ins->snd_card != NULL && ins->proc_dsp_dir != NULL &&
 	    scb->proc_info == NULL) {
@@ -275,7 +270,6 @@ void cs46xx_dsp_proc_register_scb_desc (cs46xx_t *chip,dsp_scb_descriptor_t * sc
 
 		scb->proc_info = entry;
 	}
-	up(&ins->scb_mutex);
 }
 
 static dsp_scb_descriptor_t * 
@@ -289,8 +283,7 @@ _dsp_create_generic_scb (cs46xx_t *chip,char * name, u32 * scb_data,u32 dest,
   
 	unsigned long flags;
 
-	down(&ins->scb_mutex);
-	snd_assert (ins->the_null_scb != NULL,goto _fail_end);
+	snd_assert (ins->the_null_scb != NULL,return NULL);
 
 	/* fill the data that will be wroten to DSP */
 	scb_data[SCBsubListPtr] = 
@@ -321,17 +314,17 @@ _dsp_create_generic_scb (cs46xx_t *chip,char * name, u32 * scb_data,u32 dest,
 		/* link to  parent SCB */
 		if (scb_child_type == SCB_ON_PARENT_NEXT_SCB) {
 			snd_assert ( (scb->parent_scb_ptr->next_scb_ptr == ins->the_null_scb),
-				     goto _fail_end);
+				     return NULL);
 
 			scb->parent_scb_ptr->next_scb_ptr = scb;
 
 		} else if (scb_child_type == SCB_ON_PARENT_SUBLIST_SCB) {
 			snd_assert ( (scb->parent_scb_ptr->sub_list_ptr == ins->the_null_scb),
-				     goto _fail_end);
+				     return NULL);
 
 			scb->parent_scb_ptr->sub_list_ptr = scb;
 		} else {
-			snd_assert (0,goto _fail_end);
+			snd_assert (0,return NULL);
 		}
 
 		spin_lock_irqsave(&chip->reg_lock, flags);
@@ -345,17 +338,9 @@ _dsp_create_generic_scb (cs46xx_t *chip,char * name, u32 * scb_data,u32 dest,
 	}
 
 
-	up(&ins->scb_mutex);
-
 	cs46xx_dsp_proc_register_scb_desc (chip,scb);
 
 	return scb;
-#ifdef CONFIG_SND_DEBUG
- _fail_end:
-
-	up(&ins->scb_mutex);
-	return NULL;
-#endif
 }
 
 dsp_scb_descriptor_t * 
@@ -914,6 +899,7 @@ cs46xx_dsp_create_asynch_fg_rx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		/* There is no correct initial value, it will depend upon the detected
 		   rate etc  */
 		0x18000000,         
+
 		/* Mute stream */
 		0x8000,0x8000,       
 		0xffff,0xffff
@@ -1111,12 +1097,10 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * src_scb = NULL,* pcm_scb;
-	dsp_scb_descriptor_t * pcm_parent_scb;
+	/*dsp_scb_descriptor_t * pcm_parent_scb;*/
 	char scb_name[DSP_MAX_SCB_NAME];
 	int i,pcm_index = -1, insert_point, src_index = -1;
 	unsigned long flags;
-
-	down(&ins->pcm_mutex); 
 
 	/* default sample rate is 44100 */
 	if (!sample_rate) sample_rate = 44100;
@@ -1142,7 +1126,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 
 	if (pcm_index == -1) {
 		snd_printk (KERN_ERR "dsp_spos: no free PCM channel\n");
-		goto _end;
+		return NULL;
 	}
 
 	if (src_scb == NULL) {
@@ -1150,7 +1134,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 
 		if (ins->nsrc_scb >= DSP_MAX_SRC_NR) {
 			snd_printk(KERN_ERR "dsp_spos: to many SRC instances\n!");
-			goto _end;
+			return NULL;
 		}
 
 		/* find a free slot */
@@ -1161,7 +1145,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 				break;
 			}
 		}
-		snd_assert (src_index != -1,goto _end);
+		snd_assert (src_index != -1,return NULL);
 
 		/* we need to create a new SRC SCB */
 		if (ins->master_mix_scb->sub_list_ptr == ins->the_null_scb) {
@@ -1185,32 +1169,13 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 
 		if (!src_scb) {
 			snd_printk (KERN_ERR "dsp_spos: failed to create SRCtaskSCB\n");
-			goto _end;
+			return NULL;
 		}
 
 		cs46xx_dsp_set_src_sample_rate(chip,src_scb,sample_rate);
 
 		ins->nsrc_scb ++;
-
-		/* insert point for the PCMreader task */
-		pcm_parent_scb = src_scb;
-		insert_point = SCB_ON_PARENT_SUBLIST_SCB;
-	} else {
-      
-      /* if channel is unlinked then src_scb->sub_list_ptr == null_scb, and
-         that's a correct state.
-        snd_assert (src_scb->sub_list_ptr != ins->the_null_scb, goto _end); 
-      */
-      if (src_scb->sub_list_ptr != ins->the_null_scb) {
-		pcm_parent_scb = find_next_free_scb(chip,src_scb->sub_list_ptr);
-        
-		insert_point = SCB_ON_PARENT_NEXT_SCB;
-      } else {
-        pcm_parent_scb = src_scb;
-		insert_point = SCB_ON_PARENT_SUBLIST_SCB;
-      }
-	}
-  
+	} 
   
   
 	snprintf (scb_name,DSP_MAX_SCB_NAME,"PCMReader_SCB%d",pcm_index);
@@ -1221,21 +1186,22 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 						   pcm_reader_buffer_addr[pcm_index],
 						   /* 0x200 - 400 PCMreader SCBs */
 						   (pcm_index * 0x10) + 0x200,
-						   pcm_index, /* virtual channel 0-31 */
-						   hw_dma_addr, /* pcm hw addr */
-						   pcm_parent_scb,
-						   insert_point);
+						   pcm_index,    /* virtual channel 0-31 */
+						   hw_dma_addr,  /* pcm hw addr */
+                           NULL,         /* parent SCB ptr */
+                           0             /* insert point */ 
+                           );
 
 	if (!pcm_scb) {
 		snd_printk (KERN_ERR "dsp_spos: failed to create PCMreaderSCB\n");
-		goto _end;
+		return NULL;
 	}
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	ins->pcm_channels[pcm_index].sample_rate = sample_rate;
 	ins->pcm_channels[pcm_index].pcm_reader_scb = pcm_scb;
 	ins->pcm_channels[pcm_index].src_scb = src_scb;
-	ins->pcm_channels[pcm_index].unlinked = 0;  
+	ins->pcm_channels[pcm_index].unlinked = 1;
 	ins->pcm_channels[pcm_index].private_data = private_data;
 	ins->pcm_channels[pcm_index].src_slot = src_index;
 	ins->pcm_channels[pcm_index].active = 1;
@@ -1243,12 +1209,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 	ins->npcm_channels ++;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
-	up(&ins->pcm_mutex);  
 	return (ins->pcm_channels + pcm_index);
- _end:
-
-	up(&ins->pcm_mutex);
-	return NULL;
 }
 
 void cs46xx_dsp_destroy_pcm_channel (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel)
@@ -1256,11 +1217,9 @@ void cs46xx_dsp_destroy_pcm_channel (cs46xx_t * chip,pcm_channel_descriptor_t * 
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	unsigned long flags;
 
-	down(&ins->pcm_mutex);
-  
-	snd_assert(pcm_channel->active,goto _end);
-	snd_assert(ins->npcm_channels > 0,goto _end);
-	snd_assert(pcm_channel->src_scb->ref_count > 0,goto _end);
+	snd_assert(pcm_channel->active, return );
+	snd_assert(ins->npcm_channels > 0, return );
+	snd_assert(pcm_channel->src_scb->ref_count > 0, return );
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	pcm_channel->unlinked = 1;
@@ -1276,18 +1235,11 @@ void cs46xx_dsp_destroy_pcm_channel (cs46xx_t * chip,pcm_channel_descriptor_t * 
 		cs46xx_dsp_remove_scb(chip,pcm_channel->src_scb);
 
 		snd_assert (pcm_channel->src_slot >= 0 && pcm_channel->src_slot <= DSP_MAX_SRC_NR,
-			    goto _end);
+			    return );
 
 		ins->src_scb_slots[pcm_channel->src_slot] = 0;
 		ins->nsrc_scb --;
 	}
-
-
-#ifdef CONFIG_SND_DEBUG
- _end:
-#endif
-
-	up(&ins->pcm_mutex);
 }
 
 int cs46xx_dsp_pcm_unlink (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel)
@@ -1295,14 +1247,15 @@ int cs46xx_dsp_pcm_unlink (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channe
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	unsigned long flags;
 
-	down(&ins->pcm_mutex);
-	down(&ins->scb_mutex);
+	snd_assert(pcm_channel->active,return -EIO);
+	snd_assert(ins->npcm_channels > 0,return -EIO);
 
-	snd_assert(pcm_channel->active,goto _end);
-	snd_assert(ins->npcm_channels > 0,goto _end);
+	spin_lock(&pcm_channel->src_scb->lock);
 
-	if (pcm_channel->unlinked)
-		goto _end;
+	if (pcm_channel->unlinked) {
+		spin_unlock(&pcm_channel->src_scb->lock);
+		return -EIO;
+	}
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	pcm_channel->unlinked = 1;
@@ -1310,10 +1263,7 @@ int cs46xx_dsp_pcm_unlink (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channe
 
 	_dsp_unlink_scb (chip,pcm_channel->pcm_reader_scb);
 
- _end:
-	up(&ins->scb_mutex);
-	up(&ins->pcm_mutex);
-
+	spin_unlock(&pcm_channel->src_scb->lock);
 	return 0;
 }
 
@@ -1324,25 +1274,32 @@ int cs46xx_dsp_pcm_link (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel)
 	dsp_scb_descriptor_t * src_scb = pcm_channel->src_scb;
 	unsigned long flags;
 
-	down(&ins->pcm_mutex);
-	down(&ins->scb_mutex);
+	spin_lock(&pcm_channel->src_scb->lock);
 
-	if (pcm_channel->unlinked == 0)
-		goto _end;
-
-	if (src_scb->sub_list_ptr == ins->the_null_scb) {
-		parent_scb = src_scb;
-		parent_scb->sub_list_ptr = pcm_channel->pcm_reader_scb;
-	} else {
-		parent_scb = find_next_free_scb(chip,src_scb->sub_list_ptr);
-		parent_scb->next_scb_ptr = pcm_channel->pcm_reader_scb;
+	if (pcm_channel->unlinked == 0) {
+		spin_unlock(&pcm_channel->src_scb->lock);
+		return -EIO;
 	}
-  
+
+	parent_scb = src_scb;
+
+	if (src_scb->sub_list_ptr != ins->the_null_scb) {
+		src_scb->sub_list_ptr->parent_scb_ptr = pcm_channel->pcm_reader_scb;
+		pcm_channel->pcm_reader_scb->next_scb_ptr = src_scb->sub_list_ptr;
+	}
+
+	src_scb->sub_list_ptr = pcm_channel->pcm_reader_scb;
+
 	snd_assert (pcm_channel->pcm_reader_scb->parent_scb_ptr == NULL, ; );
 	pcm_channel->pcm_reader_scb->parent_scb_ptr = parent_scb;
 
 	/* update entry in DSP RAM */
 	spin_lock_irqsave(&chip->reg_lock, flags);
+	snd_cs46xx_poke(chip,
+			(pcm_channel->pcm_reader_scb->address + SCBsubListPtr) << 2,
+			(pcm_channel->pcm_reader_scb->sub_list_ptr->address << 0x10) |
+			(pcm_channel->pcm_reader_scb->next_scb_ptr->address));
+    
 	snd_cs46xx_poke(chip,
 			(parent_scb->address + SCBsubListPtr) << 2,
 			(parent_scb->sub_list_ptr->address << 0x10) |
@@ -1351,12 +1308,10 @@ int cs46xx_dsp_pcm_link (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel)
 	pcm_channel->unlinked = 0;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
- _end:
-	up(&ins->scb_mutex);
-	up(&ins->pcm_mutex);
-
+	spin_unlock(&pcm_channel->src_scb->lock);
 	return 0;
 }
+
 
 #define GOF_PER_SEC 200
   
@@ -1414,9 +1369,8 @@ void cs46xx_dsp_set_src_sample_rate(cs46xx_t *chip,dsp_scb_descriptor_t * src, u
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
-dsp_scb_descriptor_t *
-cs46xx_add_record_source (cs46xx_t *chip,dsp_scb_descriptor_t * source,
-			  u16 addr,char * scb_name)
+dsp_scb_descriptor_t * cs46xx_add_record_source (cs46xx_t *chip,dsp_scb_descriptor_t * source,
+                                                 u16 addr,char * scb_name)
 {
   	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * parent;
@@ -1442,27 +1396,14 @@ cs46xx_add_record_source (cs46xx_t *chip,dsp_scb_descriptor_t * source,
 
 int cs46xx_src_unlink(cs46xx_t *chip,dsp_scb_descriptor_t * src)
 {
-	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
-	down(&ins->pcm_mutex);
-	down(&ins->scb_mutex);
-
-	snd_assert (src->parent_scb_ptr != NULL,goto _fail_end);
+	snd_assert (src->parent_scb_ptr != NULL,  return -EINVAL );
 
 	/* mute SCB */
 	snd_cs46xx_poke(chip, (src->address + 0xE) << 2, 0xffffffff);
 
 	_dsp_unlink_scb (chip,src);
 
-	up(&ins->scb_mutex);
-	up(&ins->pcm_mutex);
-
 	return 0;
-
- _fail_end:
-	up(&ins->scb_mutex);
-	up(&ins->pcm_mutex);
-
-	return -EINVAL;
 }
 
 int cs46xx_src_link(cs46xx_t *chip,dsp_scb_descriptor_t * src)
@@ -1471,11 +1412,8 @@ int cs46xx_src_link(cs46xx_t *chip,dsp_scb_descriptor_t * src)
 	dsp_scb_descriptor_t * parent_scb;
 	unsigned int flags;
 
-	down(&ins->pcm_mutex);
-	down(&ins->scb_mutex);
-
-	snd_assert (src->parent_scb_ptr == NULL,goto _fail_end);
-	snd_assert(ins->master_mix_scb !=NULL,goto _fail_end);
+	snd_assert (src->parent_scb_ptr == NULL,   return -EINVAL );
+	snd_assert(ins->master_mix_scb !=NULL,   return -EINVAL );
 
 	if (ins->master_mix_scb->sub_list_ptr != ins->the_null_scb) {
 		parent_scb = find_next_free_scb (chip,ins->master_mix_scb->sub_list_ptr);
@@ -1497,14 +1435,5 @@ int cs46xx_src_link(cs46xx_t *chip,dsp_scb_descriptor_t * src)
 
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
   
-	up(&ins->scb_mutex);
-	up(&ins->pcm_mutex);
-
 	return 0;
-
- _fail_end:
-	up(&ins->scb_mutex);
-	up(&ins->pcm_mutex);
- 
-	return -EINVAL;
 }

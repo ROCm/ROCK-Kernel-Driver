@@ -1817,6 +1817,8 @@ struct _snd_cs46xx {
   int current_gpio;
 #endif
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
+	struct semaphore spos_mutex;
+
 	dsp_spos_instance_t * dsp_spos_instance;
 #else /* for compatibility */
 	cs46xx_pcm_t *playback_pcm;

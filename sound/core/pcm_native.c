@@ -173,11 +173,11 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 			continue;
 #ifdef RULES_DEBUG
 		printk("%s = ", snd_pcm_hw_param_names[k]);
-		printk("%x -> ", *m);
+		printk("%04x%04x%04x%04x -> ", m->bits[3], m->bits[2], m->bits[1], m->bits[0]);
 #endif
 		changed = snd_mask_refine(m, constrs_mask(constrs, k));
 #ifdef RULES_DEBUG
-		printk("%x\n", *m);
+		printk("%04x%04x%04x%04x\n", m->bits[3], m->bits[2], m->bits[1], m->bits[0]);
 #endif
 		if (changed)
 			params->cmask |= 1 << k;

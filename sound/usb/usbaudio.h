@@ -27,6 +27,7 @@
 
 #define USB_SUBCLASS_AUDIO_CONTROL	0x01
 #define USB_SUBCLASS_AUDIO_STREAMING	0x02
+#define USB_SUBCLASS_MIDI_STREAMING	0x03
 
 #define USB_DT_CS_DEVICE                0x21
 #define USB_DT_CS_CONFIG                0x22
@@ -55,6 +56,8 @@
 #define FORMAT_SPECIFIC			0x03
 
 #define EP_GENERAL			0x01
+
+#define MS_GENERAL			0x01
 
 /* endpoint attributes */
 #define EP_ATTR_MASK			0x0c
@@ -115,6 +118,11 @@
 #define USB_AUDIO_FORMAT_IEC1937_MPEG2_LAYER23_LS	0x2006
 
 
+/* maximum number of endpoints per interface */
+#define MIDI_MAX_ENDPOINTS 2
+
+#define SNDRV_SEQ_DEV_ID_USBMIDI "usb-midi"
+
 /*
  */
 
@@ -130,7 +138,52 @@ struct snd_usb_audio {
 	struct list_head pcm_list;	/* list of pcm streams */
 	int pcm_devs;
 
+#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+	int next_seq_device;
+#endif
 };  
+
+/*
+ * Information about devices with broken descriptors
+ */
+typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
+typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
+
+struct snd_usb_audio_quirk {
+	const char *vendor_name;
+	const char *product_name;
+	int ifnum;
+
+	/* MIDI specific */
+	struct snd_usb_midi_endpoint_info {
+		int16_t epnum;		/* ep number, -1 autodetect */
+		uint16_t out_cables;	/* bitmask */
+		uint16_t in_cables;	/* bitmask */
+	} endpoints[MIDI_MAX_ENDPOINTS];
+};
+
+/*
+ * USB MIDI sequencer device data
+ */
+typedef struct snd_usb_midi snd_usb_midi_t;
+typedef struct snd_usb_midi_endpoint snd_usb_midi_endpoint_t;
+typedef struct snd_usb_midi_out_endpoint snd_usb_midi_out_endpoint_t;
+typedef struct snd_usb_midi_in_endpoint snd_usb_midi_in_endpoint_t;
+
+struct snd_usb_midi {
+	/* filled by usbaudio.c */
+	snd_usb_audio_t *chip;
+	int ifnum;
+	const snd_usb_audio_quirk_t *quirk;
+
+	/* used internally in usbmidi.c */
+	int seq_client;
+	struct snd_usb_midi_endpoint {
+		snd_usb_midi_out_endpoint_t *out;
+		snd_usb_midi_in_endpoint_t *in;
+		snd_rawmidi_t *rmidi[0x10];
+	} endpoints[MIDI_MAX_ENDPOINTS];
+};
 
 
 /*

@@ -58,7 +58,7 @@
 #define AC97_PCM_FRONT_DAC_RATE 0x2c	/* PCM Front DAC Rate */
 #define AC97_PCM_SURR_DAC_RATE	0x2e	/* PCM Surround DAC Rate */
 #define AC97_PCM_LFE_DAC_RATE	0x30	/* PCM LFE DAC Rate */
-#define AC97_PCM_LR_ADC_RATE	0x32	/* PCM LR DAC Rate */
+#define AC97_PCM_LR_ADC_RATE	0x32	/* PCM LR ADC Rate */
 #define AC97_PCM_MIC_ADC_RATE	0x34	/* PCM MIC ADC Rate */
 #define AC97_CENTER_LFE_MASTER	0x36	/* Center + LFE Master Volume */
 #define AC97_SURROUND_MASTER	0x38	/* Surround (Rear) Master Volume */
@@ -68,25 +68,43 @@
 #define AC97_VENDOR_ID1		0x7c	/* Vendor ID1 */
 #define AC97_VENDOR_ID2		0x7e	/* Vendor ID2 / revision */
 
+/* extended audio ID bit defines */
+#define AC97_EI_VRA		0x0001	/* Variable bit rate supported */
+#define AC97_EI_DRA		0x0002	/* Double rate supported */
+#define AC97_EI_SPDIF		0x0004	/* S/PDIF out supported */
+#define AC97_EI_VRM		0x0008	/* Variable bit rate supported for MIC */
+#define AC97_EI_DACS_SLOT_MASK	0x0030	/* DACs slot assignment */
+#define AC97_EI_DACS_SLOT_SHIFT	4
+#define AC97_EI_CDAC		0x0040	/* PCM Center DAC available */
+#define AC97_EI_SDAC		0x0080	/* PCM Surround DACs available */
+#define AC97_EI_LDAC		0x0100	/* PCM LFE DAC available */
+#define AC97_EI_AMAP		0x0200	/* indicates optional slot/DAC mapping based on codec ID */
+#define AC97_EI_REV_MASK	0x0c00	/* AC'97 revision mask */
+#define AC97_EI_REV_22		0x0100	/* AC'97 revision 2.2 */
+#define AC97_EI_REV_SHIFT	8
+#define AC97_EI_ADDR_MASK	0xc000	/* physical codec ID (address) */
+#define AC97_EI_ADDR_SHIFT	14
+
 /* extended audio status and control bit defines */
 #define AC97_EA_VRA		0x0001	/* Variable bit rate enable bit */
 #define AC97_EA_DRA		0x0002	/* Double-rate audio enable bit */
-#define AC97_EA_SPDIF		0x0004	/* S/PDIF Enable bit */
+#define AC97_EA_SPDIF		0x0004	/* S/PDIF out enable bit */
 #define AC97_EA_VRM		0x0008	/* Variable bit rate for MIC enable bit */
+#define AC97_EA_SPSA_SLOT_MASK	0x0030	/* Mask for slot assignment bits */
+#define AC97_EA_SPSA_SLOT_SHIFT 4
+#define AC97_EA_SPSA_3_4	0x0000	/* Slot assigned to 3 & 4 */
+#define AC97_EA_SPSA_7_8	0x0010	/* Slot assigned to 7 & 8 */
+#define AC97_EA_SPSA_6_9	0x0020	/* Slot assigned to 6 & 9 */
+#define AC97_EA_SPSA_10_11	0x0030	/* Slot assigned to 10 & 11 */
 #define AC97_EA_CDAC		0x0040	/* PCM Center DAC is ready (Read only) */
-#define AC97_EA_SDAC		0x0040	/* PCM Surround DACs are ready (Read only) */
-#define AC97_EA_LDAC		0x0080	/* PCM LFE DAC is ready (Read only) */
-#define AC97_EA_MDAC		0x0100	/* MIC ADC is ready (Read only) */
+#define AC97_EA_SDAC		0x0080	/* PCM Surround DACs are ready (Read only) */
+#define AC97_EA_LDAC		0x0100	/* PCM LFE DAC is ready (Read only) */
+#define AC97_EA_MDAC		0x0200	/* MIC ADC is ready (Read only) */
 #define AC97_EA_SPCV		0x0400	/* S/PDIF configuration valid (Read only) */
 #define AC97_EA_PRI		0x0800	/* Turns the PCM Center DAC off */
 #define AC97_EA_PRJ		0x1000	/* Turns the PCM Surround DACs off */
 #define AC97_EA_PRK		0x2000	/* Turns the PCM LFE DAC off */
 #define AC97_EA_PRL		0x4000	/* Turns the MIC ADC off */
-#define AC97_EA_SLOT_MASK	0xffcf	/* Mask for slot assignment bits */
-#define AC97_EA_SPSA_3_4	0x0000	/* Slot assigned to 3 & 4 */
-#define AC97_EA_SPSA_7_8	0x0010	/* Slot assigned to 7 & 8 */
-#define AC97_EA_SPSA_6_9	0x0020	/* Slot assigned to 6 & 9 */
-#define AC97_EA_SPSA_10_11	0x0030	/* Slot assigned to 10 & 11 */
 
 /* S/PDIF control bit defines */
 #define AC97_SC_PRO		0x0001	/* Professional status */
@@ -145,8 +163,16 @@
 #define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
 #define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
 
-/*
+/* rates indexes */
+#define AC97_RATES_FRONT_DAC	0
+#define AC97_RATES_SURR_DAC	1
+#define AC97_RATES_LFE_DAC	2
+#define AC97_RATES_ADC		3
+#define AC97_RATES_MIC_ADC	4
+#define AC97_RATES_SPDIF	5
 
+/*
+ *
  */
 
 typedef struct _snd_ac97 ac97_t;
@@ -172,11 +198,7 @@ struct _snd_ac97 {
 	unsigned int scaps;	/* driver capabilities */
 	unsigned int flags;	/* specific code */
 	unsigned int clock;	/* AC'97 clock (usually 48000Hz) */
-	unsigned int rates_front_dac;
-	unsigned int rates_surr_dac;
-	unsigned int rates_lfe_dac;
-	unsigned int rates_adc;
-	unsigned int rates_mic_adc;
+	unsigned int rates[6];	/* see AC97_RATES_* defines */
 	unsigned int spdif_status;
 	unsigned short regs[0x80]; /* register cache */
 	unsigned int limited_regs; /* allow limited registers only */
@@ -192,6 +214,17 @@ struct _snd_ac97 {
 	} spec;
 };
 
+/* conditions */
+static inline int ac97_is_rev22(ac97_t * ac97)
+{
+	return (ac97->ext_id & AC97_EI_REV_MASK) == AC97_EI_REV_22;
+}
+static inline int ac97_can_amap(ac97_t * ac97)
+{
+	return (ac97->ext_id & AC97_EI_AMAP) != 0;
+}
+
+/* functions */
 int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);

@@ -50,7 +50,6 @@ static void snd_gf1_interrupt_midi_in(snd_gus_card_t * gus)
 		if (stat & 0x10) {	/* framing error */
 			gus->gf1.uart_framing++;
 			spin_unlock_irqrestore(&gus->uart_cmd_lock, flags);
-			snd_rawmidi_receive_reset(gus->midi_substream_input);
 			continue;
 		}
 		byte = snd_gf1_uart_get(gus);
@@ -58,7 +57,6 @@ static void snd_gf1_interrupt_midi_in(snd_gus_card_t * gus)
 		snd_rawmidi_receive(gus->midi_substream_input, &byte, 1);
 		if (stat & 0x20) {
 			gus->gf1.uart_overrun++;
-			snd_rawmidi_receive_reset(gus->midi_substream_input);
 		}
 	}
 }

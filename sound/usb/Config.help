@@ -1,5 +1,4 @@
 CONFIG_SND_USB_AUDIO
   Say 'Y' or 'M' to include support for USB audio devices.
-
-CONFIG_SND_USB_MIDI
-  Say 'Y' or 'M' to include support for MIDI devices connected via USB.
+  To support USB MIDI devices, you need to enable ALSA sequencer support
+  (CONFIG_SND_SEQUENCER).

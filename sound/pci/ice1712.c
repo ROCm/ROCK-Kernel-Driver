@@ -1628,7 +1628,7 @@ static int snd_ice1712_capture_open(snd_pcm_substream_t * substream)
 
 	ice->capture_con_substream = substream;
 	runtime->hw = snd_ice1712_capture;
-	runtime->hw.rates = ice->ac97->rates_adc;
+	runtime->hw.rates = ice->ac97->rates[AC97_RATES_ADC];
 	if (!(runtime->hw.rates & SNDRV_PCM_RATE_8000))
 		runtime->hw.rate_min = 48000;
 	return 0;
@@ -1660,8 +1660,6 @@ static int snd_ice1712_capture_close(snd_pcm_substream_t * substream)
 {
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
-	/* disable ADC power */
-	snd_ac97_update_bits(ice->ac97, AC97_POWERDOWN, 0x0100, 0x0100);
 	ice->capture_con_substream = NULL;
 	return 0;
 }
@@ -2396,14 +2394,6 @@ static int __init snd_ice1712_build_pro_mixer(ice1712_t *ice)
 	return 0;
 }
 
-static void snd_ice1712_ac97_init(ac97_t *ac97)
-{
-	// ice1712_t *ice = snd_magic_cast(ice1712_t, ac97->private_data, return);
-
-        /* disable center DAC/surround DAC/LFE DAC/MIC ADC */
-        snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, 0xe800, 0xe800);
-}
-
 static void snd_ice1712_mixer_free_ac97(ac97_t *ac97)
 {
 	ice1712_t *ice = snd_magic_cast(ice1712_t, ac97->private_data, return);
@@ -2419,7 +2409,6 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.write = snd_ice1712_ac97_write;
 		ac97.read = snd_ice1712_ac97_read;
-		ac97.init = snd_ice1712_ac97_init;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
 		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0) {
@@ -2437,7 +2426,6 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.write = snd_ice1712_pro_ac97_write;
 		ac97.read = snd_ice1712_pro_ac97_read;
-		ac97.init = snd_ice1712_ac97_init;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
 		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0) {

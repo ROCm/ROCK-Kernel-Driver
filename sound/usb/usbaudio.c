@@ -36,6 +36,7 @@
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
+#include <sound/seq_device.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
@@ -1234,6 +1235,7 @@ static void * usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 static void usb_audio_disconnect(struct usb_device *dev, void *ptr);
 
 static struct usb_device_id usb_audio_ids [] = {
+#include "usbquirks.h"
     { .match_flags = (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
       .bInterfaceClass = USB_CLASS_AUDIO,
       .bInterfaceSubClass = USB_SUBCLASS_AUDIO_CONTROL },
@@ -1716,11 +1718,14 @@ static int snd_usb_audio_stream_new(snd_usb_audio_t *chip, unsigned char *buffer
 
 
 /*
- * parse audio control descriptor and create pcm streams
+ * parse audio control descriptor and create pcm/midi streams
  */
 
-static int snd_usb_create_pcm(snd_usb_audio_t *chip, int ctrlif,
-			      unsigned char *buffer, int buflen)
+static int snd_usb_create_midi_interface(snd_usb_audio_t *chip, int ifnum,
+					 const snd_usb_audio_quirk_t *quirk);
+
+static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
+				  unsigned char *buffer, int buflen)
 {
 	struct usb_device *dev = chip->dev;
 	struct usb_config_descriptor *config;
@@ -1752,6 +1757,15 @@ static int snd_usb_create_pcm(snd_usb_audio_t *chip, int ctrlif,
 			continue;
 		}
 		iface = &config->interface[j];
+		if (iface->altsetting[0].bInterfaceClass == USB_CLASS_AUDIO &&
+		    iface->altsetting[0].bInterfaceSubClass == USB_SUBCLASS_MIDI_STREAMING) {
+			if (snd_usb_create_midi_interface(chip, j, NULL) < 0) {
+				snd_printk(KERN_ERR "%d:%u:%d: cannot create sequencer device\n", dev->devnum, ctrlif, j);
+				continue;
+			}
+			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
+			continue;
+		}
 		if (iface->altsetting[0].bInterfaceClass != USB_CLASS_AUDIO ||
 		    iface->altsetting[0].bInterfaceSubClass != USB_SUBCLASS_AUDIO_STREAMING) {
 			snd_printdd(KERN_ERR "%d:%u:%d: skipping non-supported interface %d\n", dev->devnum, ctrlif, j, iface->altsetting[0].bInterfaceClass);
@@ -1808,6 +1822,37 @@ static int snd_usb_create_pcm(snd_usb_audio_t *chip, int ctrlif,
 	return 0;
 }
 
+static int snd_usb_create_midi_interface(snd_usb_audio_t *chip, int ifnum,
+					 const snd_usb_audio_quirk_t *quirk)
+{
+#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+	snd_seq_device_t *seq_device;
+	snd_usb_midi_t *umidi;
+	int err;
+
+	err = snd_seq_device_new(chip->card, chip->next_seq_device,
+				 SNDRV_SEQ_DEV_ID_USBMIDI,
+				 sizeof(snd_usb_midi_t), &seq_device);
+	if (err < 0)
+		return err;
+	chip->next_seq_device++;
+	strcpy(seq_device->name, chip->card->shortname);
+	umidi = (snd_usb_midi_t *)SNDRV_SEQ_DEVICE_ARGPTR(seq_device);
+	umidi->chip = chip;
+	umidi->ifnum = ifnum;
+	umidi->quirk = quirk;
+	umidi->seq_client = -1;
+#endif
+	return 0;
+}
+
+static inline int snd_usb_create_quirk(snd_usb_audio_t *chip, int ifnum,
+	       			       const snd_usb_audio_quirk_t *quirk)
+{
+	/* in the future, there may be quirks for PCM devices */
+	return snd_usb_create_midi_interface(chip, ifnum, quirk);
+}
+
 
 /*
  * free the chip instance
@@ -1835,7 +1880,9 @@ static int snd_usb_audio_dev_free(snd_device_t *device)
 /*
  * create a chip instance and set its names.
  */
-static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev, snd_usb_audio_t **rchip)
+static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
+				const snd_usb_audio_quirk_t *quirk,
+				snd_usb_audio_t **rchip)
 {
 	snd_usb_audio_t *chip;
 	int err, len;
@@ -1858,18 +1905,50 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev, snd_us
 	}
 
 	strcpy(card->driver, "USB-Audio");
-	strcpy(card->shortname, "USB Audio Driver");
+
+	/* retrieve the device string as shortname */
+	if (dev->descriptor.iProduct)
+		len = usb_string(dev, dev->descriptor.iProduct,
+				 card->shortname, sizeof(card->shortname));
+	else
+		len = 0;
+	if (len <= 0) {
+ 		if (quirk && quirk->product_name) {
+			strncpy(card->shortname, quirk->product_name, sizeof(card->shortname) - 1);
+			card->shortname[sizeof(card->shortname) - 1] = '\0';
+		} else {
+			sprintf(card->shortname, "USB Device %#04x:%#04x",
+				dev->descriptor.idVendor, dev->descriptor.idProduct);
+		}
+	}
 
 	/* retrieve the vendor and device strings as longname */
-	len = usb_string(dev, 1, card->longname, sizeof(card->longname) - 1);
-	if (len <= 0)
+	if (dev->descriptor.iManufacturer)
+		len = usb_string(dev, dev->descriptor.iManufacturer,
+				 card->longname, sizeof(card->longname) - 1);
+	else
 		len = 0;
-	else {
+	if (len <= 0) {
+		if (quirk && quirk->vendor_name) {
+			strncpy(card->longname, quirk->vendor_name, sizeof(card->longname) - 2);
+			card->longname[sizeof(card->longname) - 2] = '\0';
+			len = strlen(card->longname);
+		} else {
+			len = 0;
+		}
+	}
+	if (len > 0) {
 		card->longname[len] = ' ';
 		len++;
 	}
-	card->longname[len] = 0;
-	usb_string(dev, 2, card->longname + len, sizeof(card->longname) - len);
+	card->longname[len] = '\0';
+	if ((!dev->descriptor.iProduct
+	     || usb_string(dev, dev->descriptor.iProduct,
+			   card->longname + len, sizeof(card->longname) - len) <= 0)
+	    && quirk && quirk->product_name) {
+		strncpy(card->longname + len, quirk->product_name, sizeof(card->longname) - len - 1);
+		card->longname[sizeof(card->longname) - 1] = '\0';
+	}
 
 	*rchip = chip;
 	return 0;
@@ -1926,11 +2005,15 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 			     const struct usb_device_id *id)
 {
 	struct usb_config_descriptor *config = dev->actconfig;	
+	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)id->driver_info;
 	unsigned char *buffer;
 	unsigned int index;
 	int i, buflen;
 	snd_card_t *card;
 	snd_usb_audio_t *chip;
+
+	if (quirk && ifnum != quirk->ifnum)
+		return NULL;
 
 	if (usb_set_configuration(dev, config->bConfigurationValue) < 0) {
 		snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", config->bConfigurationValue);
@@ -1966,7 +2049,7 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 					snd_printk(KERN_ERR "cannot create a card instance %d\n", i);
 					goto __error;
 				}
-				if (snd_usb_audio_create(card, dev, &chip) < 0) {
+				if (snd_usb_audio_create(card, dev, quirk, &chip) < 0) {
 					snd_card_free(card);
 					goto __error;
 				}
@@ -1980,10 +2063,15 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 	}
 
-	if (snd_usb_create_pcm(chip, ifnum, buffer, buflen) < 0)
-		goto __error;
-	if (snd_usb_create_mixer(chip, ifnum, buffer, buflen) < 0)
-		goto __error;
+	if (!quirk) {
+		if (snd_usb_create_streams(chip, ifnum, buffer, buflen) < 0)
+			goto __error;
+		if (snd_usb_create_mixer(chip, ifnum, buffer, buflen) < 0)
+			goto __error;
+	} else {
+		if (snd_usb_create_quirk(chip, ifnum, quirk) < 0)
+			goto __error;
+	}
 
 	/* we are allowed to call snd_card_register() many times */
 	if (snd_card_register(chip->card) < 0) {

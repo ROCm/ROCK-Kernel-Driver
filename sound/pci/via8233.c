@@ -591,7 +591,7 @@ static snd_pcm_hardware_t snd_via8233_playback =
 	.period_bytes_min =	32,
 	.period_bytes_max =	128 * 1024,
 	.periods_min =		2,
-	.periods_max =		1024,
+	.periods_max =		128,
 	.fifo_size =		0,
 };
 
@@ -610,7 +610,7 @@ static snd_pcm_hardware_t snd_via8233_capture =
 	.period_bytes_min =	32,
 	.period_bytes_max =	128 * 1024,
 	.periods_min =		2,
-	.periods_max =		1024,
+	.periods_max =		128,
 	.fifo_size =		0,
 };
 
@@ -634,17 +634,15 @@ static int snd_via8233_playback_open(snd_pcm_substream_t * substream)
 
 	chip->playback.substream = substream;
 	runtime->hw = snd_via8233_playback;
-	runtime->hw.rates = chip->ac97->rates_front_dac;
+	runtime->hw.rates = chip->ac97->rates[AC97_RATES_FRONT_DAC];
 	if (!(runtime->hw.rates & SNDRV_PCM_RATE_8000))
 		runtime->hw.rate_min = 48000;
 	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
 		return err;
 	if ((err = snd_pcm_hw_constraint_pow2(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES)) < 0)
 		return err;
-#if 0
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
 		return err;
-#endif
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels);
 	return 0;
 }
@@ -657,17 +655,15 @@ static int snd_via8233_capture_open(snd_pcm_substream_t * substream)
 
 	chip->capture.substream = substream;
 	runtime->hw = snd_via8233_capture;
-	runtime->hw.rates = chip->ac97->rates_adc;
+	runtime->hw.rates = chip->ac97->rates[AC97_RATES_ADC];
 	if (!(runtime->hw.rates & SNDRV_PCM_RATE_8000))
 		runtime->hw.rate_min = 48000;
 	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
 		return err;
 	if ((err = snd_pcm_hw_constraint_pow2(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES)) < 0)
 		return err;
-#if 0
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
 		return err;
-#endif
 	return 0;
 }
 
@@ -679,8 +675,6 @@ static int snd_via8233_playback_close(snd_pcm_substream_t * substream)
 	clean_via_table(&chip->playback, substream, chip->pci);
 	snd_pcm_sgbuf_delete(substream);
 	chip->playback.substream = NULL;
-	/* disable DAC power */
-	snd_ac97_update_bits(chip->ac97, AC97_POWERDOWN, 0x0200, 0x0200);
 	return 0;
 }
 
@@ -692,8 +686,6 @@ static int snd_via8233_capture_close(snd_pcm_substream_t * substream)
 	clean_via_table(&chip->capture, substream, chip->pci);
 	snd_pcm_sgbuf_delete(substream);
 	chip->capture.substream = NULL;
-	/* disable ADC power */
-	snd_ac97_update_bits(chip->ac97, AC97_POWERDOWN, 0x0100, 0x0100);
 	return 0;
 }
 
@@ -760,16 +752,6 @@ static int __devinit snd_via8233_pcm(via8233_t *chip, int device, snd_pcm_t ** r
  *  Mixer part
  */
 
-static void snd_via8233_codec_init(ac97_t *ac97)
-{
-	// via8233_t *chip = snd_magic_cast(via8233_t, ac97->private_data, return);
-
-	/* disable DAC & ADC power */
-	snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x0300, 0x0300);
-	/* disable center DAC/surround DAC/LFE DAC/MIC ADC */
-	snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, 0xe800, 0xe800);
-}
-
 static void snd_via8233_mixer_free_ac97(ac97_t *ac97)
 {
 	via8233_t *chip = snd_magic_cast(via8233_t, ac97->private_data, return);
@@ -784,7 +766,6 @@ static int __devinit snd_via8233_mixer(via8233_t *chip)
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.write = snd_via8233_codec_write;
 	ac97.read = snd_via8233_codec_read;
-	ac97.init = snd_via8233_codec_init;
 	ac97.private_data = chip;
 	ac97.private_free = snd_via8233_mixer_free_ac97;
 	ac97.clock = chip->ac97_clock;

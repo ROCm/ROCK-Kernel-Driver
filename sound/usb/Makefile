@@ -3,10 +3,14 @@
 #
 
 snd-usb-audio-objs := usbaudio.o usbmixer.o
+ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 snd-usb-midi-objs := usbmidi.o
+endif
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_USB_AUDIO) += snd-usb-audio.o
-obj-$(CONFIG_SND_USB_MIDI) += snd-usb-midi.o
+ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
+obj-$(CONFIG_SND_USB_AUDIO) += snd-usb-midi.o
+endif
 
 include $(TOPDIR)/Rules.make

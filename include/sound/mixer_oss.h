@@ -34,6 +34,8 @@ typedef int (*snd_mixer_oss_put_recsrc_t)(snd_mixer_oss_file_t *fmixer, snd_mixe
 typedef int (*snd_mixer_oss_get_recsrce_t)(snd_mixer_oss_file_t *fmixer, int *active_index);
 typedef int (*snd_mixer_oss_put_recsrce_t)(snd_mixer_oss_file_t *fmixer, int active_index);
 
+#define SNDRV_OSS_MAX_MIXERS	32
+
 struct _snd_oss_mixer_slot {
 	int number;
 	int stereo: 1;
@@ -50,12 +52,14 @@ struct _snd_oss_mixer {
 	snd_card_t *card;
 	char id[16];
 	char name[32];
-	snd_mixer_oss_slot_t slots[32];		/* OSS mixer slots */
+	snd_mixer_oss_slot_t slots[SNDRV_OSS_MAX_MIXERS]; /* OSS mixer slots */
 	unsigned int mask_recsrc;		/* exclusive recsrc mask */
 	snd_mixer_oss_get_recsrce_t get_recsrc;
 	snd_mixer_oss_put_recsrce_t put_recsrc;
 	void *private_data_recsrc;
 	void (*private_free_recsrc)(snd_mixer_oss_t *mixer);
+	struct semaphore reg_mutex;
+	snd_info_entry_t *proc_entry;
 	/* --- */
 	int oss_recsrc;
 };

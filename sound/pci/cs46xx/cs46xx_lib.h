@@ -28,11 +28,11 @@
  *  constants
  */
 
-#define CS46XX_BA0_SIZE		0x1000
-#define CS46XX_BA1_DATA0_SIZE	0x3000
-#define CS46XX_BA1_DATA1_SIZE	0x3800
-#define CS46XX_BA1_PRG_SIZE	0x7000
-#define CS46XX_BA1_REG_SIZE	0x0100
+#define CS46XX_BA0_SIZE		  0x1000
+#define CS46XX_BA1_DATA0_SIZE 0x3000
+#define CS46XX_BA1_DATA1_SIZE 0x3800
+#define CS46XX_BA1_PRG_SIZE	  0x7000
+#define CS46XX_BA1_REG_SIZE	  0x0100
 
 
 #define CS46XX_PERIOD_SIZE 2048
@@ -84,7 +84,7 @@ static inline unsigned int snd_cs46xx_peekBA0(cs46xx_t *chip, unsigned long offs
 }
 
 dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip);
-void                   cs46xx_dsp_spos_destroy (dsp_spos_instance_t * instance);
+void                   cs46xx_dsp_spos_destroy (cs46xx_t * chip);
 int                    cs46xx_dsp_load_module (cs46xx_t * chip,dsp_module_desc_t * module);
 symbol_entry_t *       cs46xx_dsp_lookup_symbol (cs46xx_t * chip,char * symbol_name,int symbol_type);
 symbol_entry_t *       cs46xx_dsp_lookup_symbol_addr (cs46xx_t * chip,u32 address,int symbol_type);

@@ -1501,7 +1501,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 				goto __access_ok;
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(HZ/100);
-		} while (end_time - (signed long)jiffies >= 0);
+		} while (time_after_eq(end_time, jiffies));
 		snd_printd("AC'97 %d:%d does not respond - RESET [REC_GAIN = 0x%x]\n", ac97->num, ac97->addr, err);
 		snd_ac97_free(ac97);
 		return -ENXIO;
@@ -1536,31 +1536,38 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 			goto __ready_ok;
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ/10);
-	} while (end_time - (signed long)jiffies >= 0);
+	} while (time_after_eq(end_time, jiffies));
 	snd_printk("AC'97 %d:%d analog subsections not ready\n", ac97->num, ac97->addr);
       __ready_ok:
 	if (ac97->clock == 0)
 		ac97->clock = 48000;	/* standard value */
+	ac97->addr = (ac97->ext_id & AC97_EI_ADDR_MASK) >> AC97_EI_ADDR_SHIFT;	
 	if (ac97->ext_id & 0x0189)	/* L/R, MIC, SDAC, LDAC VRA support */
 		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, ac97->ext_id & 0x0189);
-	if (ac97->ext_id & 0x0001) {	/* VRA support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_FRONT_DAC_RATE, &ac97->rates_front_dac);
-		snd_ac97_determine_rates(ac97, AC97_PCM_LR_ADC_RATE, &ac97->rates_adc);
+	if (ac97->ext_id & AC97_EI_VRA) {	/* VRA support */
+		snd_ac97_determine_rates(ac97, AC97_PCM_FRONT_DAC_RATE, &ac97->rates[AC97_RATES_FRONT_DAC]);
+		snd_ac97_determine_rates(ac97, AC97_PCM_LR_ADC_RATE, &ac97->rates[AC97_RATES_ADC]);
 	} else {
-		ac97->rates_front_dac = SNDRV_PCM_RATE_48000;
-		ac97->rates_adc = SNDRV_PCM_RATE_48000;
+		ac97->rates[AC97_RATES_FRONT_DAC] = SNDRV_PCM_RATE_48000;
+		ac97->rates[AC97_RATES_ADC] = SNDRV_PCM_RATE_48000;
 	}
-	if (ac97->ext_id & 0x0008) {	/* MIC VRA support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_MIC_ADC_RATE, &ac97->rates_mic_adc);
+	if (ac97->ext_id & AC97_EI_SPDIF) {
+		/* codec specific code (patch) should override these values */
+		ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000 |
+						SNDRV_PCM_RATE_44100 |
+						SNDRV_PCM_RATE_32000;
+	}
+	if (ac97->ext_id & AC97_EI_VRM) {	/* MIC VRA support */
+		snd_ac97_determine_rates(ac97, AC97_PCM_MIC_ADC_RATE, &ac97->rates[AC97_RATES_MIC_ADC]);
 	} else {
-		ac97->rates_mic_adc = SNDRV_PCM_RATE_48000;
+		ac97->rates[AC97_RATES_MIC_ADC] = SNDRV_PCM_RATE_48000;
 	}
-	if (ac97->ext_id & 0x0080) {	/* SDAC support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_SURR_DAC_RATE, &ac97->rates_surr_dac);
+	if (ac97->ext_id & AC97_EI_SDAC) {	/* SDAC support */
+		snd_ac97_determine_rates(ac97, AC97_PCM_SURR_DAC_RATE, &ac97->rates[AC97_RATES_SURR_DAC]);
 		ac97->scaps |= AC97_SCAP_SURROUND_DAC;
 	}
-	if (ac97->ext_id & 0x0100) {	/* LDAC support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_LFE_DAC_RATE, &ac97->rates_lfe_dac);
+	if (ac97->ext_id & AC97_EI_LDAC) {	/* LDAC support */
+		snd_ac97_determine_rates(ac97, AC97_PCM_LFE_DAC_RATE, &ac97->rates[AC97_RATES_LFE_DAC]);
 		ac97->scaps |= AC97_SCAP_CENTER_LFE_DAC;
 	}
 	/* additional initializations */
@@ -1849,54 +1856,35 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 {
 	unsigned short mask;
 	unsigned int tmp;
-	signed long end_time;
 	
 	switch (reg) {
 	case AC97_PCM_MIC_ADC_RATE:
 		mask = 0x0000;
-		if ((ac97->regs[AC97_EXTENDED_STATUS] & 0x0008) == 0)	/* MIC VRA */
+		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRM) == 0)	/* MIC VRA */
 			if (rate != 48000)
 				return -EINVAL;
 		break;
 	case AC97_PCM_FRONT_DAC_RATE:
 		mask = 0x0200;
-		if ((ac97->regs[AC97_EXTENDED_STATUS] & 0x0001) == 0)	/* VRA */
+		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRA) == 0)	/* VRA */
 			if (rate != 48000)
 				return -EINVAL;
 		break;
 	case AC97_PCM_LR_ADC_RATE:
 		mask = 0x0100;
-		if ((ac97->regs[AC97_EXTENDED_STATUS] & 0x0001) == 0)	/* VRA */
+		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRA) == 0)	/* VRA */
 			if (rate != 48000)
 				return -EINVAL;
 		break;
+	case AC97_SPDIF:
+		return 0;
 	default: return -EINVAL;
 	}
 	tmp = ((unsigned int)rate * ac97->clock) / 48000;
 	if (tmp > 65535)
 		return -EINVAL;
-	snd_ac97_update_bits(ac97, AC97_POWERDOWN, mask, mask);
-	end_time = jiffies + (HZ / 50);
-	do {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-	} while (end_time - (signed long)jiffies >= 0);
 	snd_ac97_update(ac97, reg, tmp & 0xffff);
-	udelay(10);
-	// XXXX update spdif rate here too?
-	snd_ac97_update_bits(ac97, AC97_POWERDOWN, mask, 0);
-	end_time = jiffies + (HZ / 50);
-	do {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-	} while (end_time - (signed long)jiffies >= 0);
-	end_time = jiffies + (HZ / 10);
-	do {
-		if ((snd_ac97_read(ac97, AC97_POWERDOWN) & 0x0003) == 0x0003)
-			break;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-	} while (end_time - (signed long)jiffies >= 0);
+	snd_ac97_read(ac97, reg);
 	return 0;
 }
 

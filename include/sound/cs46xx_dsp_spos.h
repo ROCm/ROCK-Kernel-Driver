@@ -109,6 +109,7 @@ typedef struct _dsp_scb_descriptor_t {
 
 	snd_info_entry_t *proc_info;
 	int ref_count;
+	spinlock_t lock;
 
 	int deleted;
 } dsp_scb_descriptor_t;
@@ -141,8 +142,6 @@ typedef struct _dsp_spos_instance_t {
 	segment_desc_t code;
 
 	/* PCM playback */
-	struct semaphore pcm_mutex;
-
 	dsp_scb_descriptor_t * master_mix_scb;
 	int npcm_channels;
 	int nsrc_scb;
@@ -162,7 +161,6 @@ typedef struct _dsp_spos_instance_t {
 	snd_info_entry_t * proc_sample_dump_info_entry;
 
 	/* SCB's descriptors */
-	struct semaphore scb_mutex;
 	int nscb;
 	int scb_highest_frag_index;
 	dsp_scb_descriptor_t scbs[DSP_MAX_SCB_DESC];

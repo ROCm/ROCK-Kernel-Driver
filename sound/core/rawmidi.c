@@ -820,11 +820,6 @@ int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 	return -ENOIOCTLCMD;
 }
 
-void snd_rawmidi_receive_reset(snd_rawmidi_substream_t * substream)
-{
-	/* TODO: reset current state */
-}
-
 int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char *buffer, int count)
 {
 	unsigned long flags;
@@ -967,11 +962,6 @@ static ssize_t snd_rawmidi_read(struct file *file, char *buf, size_t count, loff
 		count -= count1;
 	}
 	return result;
-}
-
-void snd_rawmidi_transmit_reset(snd_rawmidi_substream_t * substream)
-{
-	/* TODO: reset current state */
 }
 
 int snd_rawmidi_transmit_empty(snd_rawmidi_substream_t * substream)
@@ -1564,9 +1554,7 @@ EXPORT_SYMBOL(snd_rawmidi_input_params);
 EXPORT_SYMBOL(snd_rawmidi_drop_output);
 EXPORT_SYMBOL(snd_rawmidi_drain_output);
 EXPORT_SYMBOL(snd_rawmidi_drain_input);
-EXPORT_SYMBOL(snd_rawmidi_receive_reset);
 EXPORT_SYMBOL(snd_rawmidi_receive);
-EXPORT_SYMBOL(snd_rawmidi_transmit_reset);
 EXPORT_SYMBOL(snd_rawmidi_transmit_empty);
 EXPORT_SYMBOL(snd_rawmidi_transmit_peek);
 EXPORT_SYMBOL(snd_rawmidi_transmit_ack);
