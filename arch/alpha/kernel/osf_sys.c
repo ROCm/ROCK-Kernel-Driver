@@ -91,8 +91,8 @@ osf_set_program_attributes(unsigned long text_start, unsigned long text_len,
  * braindamage (it can't really handle filesystems where the directory
  * offset differences aren't the same as "d_reclen").
  */
-#define NAME_OFFSET(de) ((int) ((de)->d_name - (char __user *) (de)))
-#define ROUND_UP(x) (((x)+3) & ~3)
+#define NAME_OFFSET	offsetof (struct osf_dirent, d_name)
+#define ROUND_UP(x)	(((x)+3) & ~3)
 
 struct osf_dirent {
 	unsigned int d_ino;
@@ -114,7 +114,7 @@ osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 {
 	struct osf_dirent __user *dirent;
 	struct osf_dirent_callback *buf = (struct osf_dirent_callback *) __buf;
-	unsigned int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
+	unsigned int reclen = ROUND_UP(NAME_OFFSET + namlen + 1);
 
 	buf->error = -EINVAL;	/* only used if we fail */
 	if (reclen > buf->count)
@@ -989,7 +989,7 @@ osf_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp,
 	fd_set_bits fds;
 	char *bits;
 	size_t size;
-	unsigned long timeout;
+	long timeout;
 	int ret;
 
 	timeout = MAX_SCHEDULE_TIMEOUT;
