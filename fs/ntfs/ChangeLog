@@ -28,6 +28,7 @@ ToDo/Notes:
 	- Add fs/ntfs/attrib.[hc]::ntfs_find_vcn() which returns the locked
 	  runlist element containing a particular vcn.  It also takes care of
 	  mapping any needed runlist fragments.
+	- Implement cluster (de-)allocation code (fs/ntfs/lcnalloc.[hc]).
 
 2.1.16 - Implement access time updates, file sync, async io, and read/writev.
 

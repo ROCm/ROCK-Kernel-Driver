@@ -818,37 +818,86 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	vol->serial_no = le64_to_cpu(b->volume_serial_number);
 	ntfs_debug("vol->serial_no = 0x%llx",
 			(unsigned long long)vol->serial_no);
-	/*
-	 * Determine MFT zone size. This is not strictly the right place to do
-	 * this, but I am too lazy to create a function especially for it...
-	 */
-	vol->mft_zone_end = vol->nr_clusters;
-	switch (vol->mft_zone_multiplier) {  /* % of volume size in clusters */
-	case 4:
-		vol->mft_zone_end = vol->mft_zone_end >> 1;	/* 50%   */
-		break;
-	case 3:
-		vol->mft_zone_end = (vol->mft_zone_end +
-				(vol->mft_zone_end >> 1)) >> 2;	/* 37.5% */
-		break;
-	case 2:
-		vol->mft_zone_end = vol->mft_zone_end >> 2;	/* 25%   */
-		break;
-	default:
-		vol->mft_zone_multiplier = 1;
-		/* Fall through into case 1. */
-	case 1:
-		vol->mft_zone_end = vol->mft_zone_end >> 3;	/* 12.5% */
-		break;
-	}
+	return TRUE;
+}
+
+/**
+ * setup_lcn_allocator - initialize the cluster allocator
+ * @vol:	volume structure for which to setup the lcn allocator
+ *
+ * Setup the cluster (lcn) allocator to the starting values.
+ */
+static void setup_lcn_allocator(ntfs_volume *vol)
+{
+#ifdef NTFS_RW
+	LCN mft_zone_size, mft_lcn;
+#endif /* NTFS_RW */
+
 	ntfs_debug("vol->mft_zone_multiplier = 0x%x",
 			vol->mft_zone_multiplier);
-	vol->mft_zone_start = vol->mft_lcn;
-	vol->mft_zone_end += vol->mft_lcn;
+#ifdef NTFS_RW
+	/* Determine the size of the MFT zone. */
+	mft_zone_size = vol->nr_clusters;
+	switch (vol->mft_zone_multiplier) {  /* % of volume size in clusters */
+	case 4:
+		mft_zone_size >>= 1;			/* 50%   */
+		break;
+	case 3:
+		mft_zone_size = (mft_zone_size +
+				(mft_zone_size >> 1)) >> 2;	/* 37.5% */
+		break;
+	case 2:
+		mft_zone_size >>= 2;			/* 25%   */
+		break;
+	/* case 1: */
+	default:
+		mft_zone_size >>= 3;			/* 12.5% */
+		break;
+	}
+	/* Setup the mft zone. */
+	vol->mft_zone_start = vol->mft_zone_pos = vol->mft_lcn;
+	ntfs_debug("vol->mft_zone_pos = 0x%llx",
+			(unsigned long long)vol->mft_zone_pos);
+	/*
+	 * Calculate the mft_lcn for an unmodified NTFS volume (see mkntfs
+	 * source) and if the actual mft_lcn is in the expected place or even
+	 * further to the front of the volume, extend the mft_zone to cover the
+	 * beginning of the volume as well.  This is in order to protect the
+	 * area reserved for the mft bitmap as well within the mft_zone itself.
+	 * On non-standard volumes we do not protect it as the overhead would
+	 * be higher than the speed increase we would get by doing it.
+	 */
+	mft_lcn = (8192 + 2 * vol->cluster_size - 1) / vol->cluster_size;
+	if (mft_lcn * vol->cluster_size < 16 * 1024)
+		mft_lcn = (16 * 1024 + vol->cluster_size - 1) /
+				vol->cluster_size;
+	if (vol->mft_zone_start <= mft_lcn)
+		vol->mft_zone_start = 0;
 	ntfs_debug("vol->mft_zone_start = 0x%llx",
-			(long long)vol->mft_zone_start);
-	ntfs_debug("vol->mft_zone_end = 0x%llx", (long long)vol->mft_zone_end);
-	return TRUE;
+			(unsigned long long)vol->mft_zone_start);
+	/*
+	 * Need to cap the mft zone on non-standard volumes so that it does
+	 * not point outside the boundaries of the volume.  We do this by
+	 * halving the zone size until we are inside the volume.
+	 */
+	vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
+	while (vol->mft_zone_end >= vol->nr_clusters) {
+		mft_zone_size >>= 1;
+		vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
+	}
+	ntfs_debug("vol->mft_zone_end = 0x%llx",
+			(unsigned long long)vol->mft_zone_end);
+	/*
+	 * Set the current position within each data zone to the start of the
+	 * respective zone.
+	 */
+	vol->data1_zone_pos = vol->mft_zone_end;
+	ntfs_debug("vol->data1_zone_pos = 0x%llx",
+			(unsigned long long)vol->data1_zone_pos);
+	vol->data2_zone_pos = 0;
+	ntfs_debug("vol->data2_zone_pos = 0x%llx",
+			(unsigned long long)vol->data2_zone_pos);
+#endif /* NTFS_RW */
 }
 
 #ifdef NTFS_RW
@@ -2195,6 +2244,9 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 * using it.
 	 */
 	result = parse_ntfs_boot_sector(vol, (NTFS_BOOT_SECTOR*)bh->b_data);
+
+	/* Initialize the cluster allocator. */
+	setup_lcn_allocator(vol);
 
 	brelse(bh);
 

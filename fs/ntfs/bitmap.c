@@ -56,8 +56,9 @@ int __ntfs_bitmap_set_bits_in_run(struct inode *vi, const s64 start_bit,
 
 	BUG_ON(!vi);
 	ntfs_debug("Entering for i_ino 0x%lx, start_bit 0x%llx, count 0x%llx, "
-			"value %u.", vi->i_ino, (unsigned long long)start_bit,
-			(unsigned long long)cnt, (unsigned int)value);
+			"value %u.%s", vi->i_ino, (unsigned long long)start_bit,
+			(unsigned long long)cnt, (unsigned int)value,
+			is_rollback ? " (rollback)" : "");
 	BUG_ON(start_bit < 0);
 	BUG_ON(cnt < 0);
 	BUG_ON(value > 1);

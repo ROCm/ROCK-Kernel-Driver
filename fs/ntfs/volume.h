@@ -73,8 +73,18 @@ typedef struct {
 	/* Mount specific NTFS information. */
 	u32 upcase_len;			/* Number of entries in upcase[]. */
 	ntfschar *upcase;		/* The upcase table. */
+
+#ifdef NTFS_RW
+	/* Variables used by the cluster and mft allocators. */
 	LCN mft_zone_start;		/* First cluster of the mft zone. */
 	LCN mft_zone_end;		/* First cluster beyond the mft zone. */
+	LCN mft_zone_pos;		/* Current position in the mft zone. */
+	LCN data1_zone_pos;		/* Current position in the first data
+					   zone. */
+	LCN data2_zone_pos;		/* Current position in the second data
+					   zone. */
+#endif /* NTFS_RW */
+
 	struct inode *mft_ino;		/* The VFS inode of $MFT. */
 
 	struct inode *mftbmp_ino;	/* Attribute inode for $MFT/$BITMAP. */
