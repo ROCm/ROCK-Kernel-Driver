@@ -271,7 +271,7 @@ void switch_exec_pids(task_t *leader, task_t *thread)
 void __init pidhash_init(void)
 {
 	int i, j, pidhash_size;
-	unsigned long megabytes = max_pfn >> (20 - PAGE_SHIFT);
+	unsigned long megabytes = nr_kernel_pages >> (20 - PAGE_SHIFT);
 
 	pidhash_shift = max(4, fls(megabytes * 4));
 	pidhash_shift = min(12, pidhash_shift);
