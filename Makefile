@@ -159,7 +159,7 @@ STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 AWK		= awk
-GENKSYMS	= /sbin/genksyms
+GENKSYMS	= scripts/genksyms/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
@@ -377,7 +377,7 @@ cmd_kallsyms = $(NM) -n $< | scripts/kallsyms > $@
 	$(call cmd,kallsyms)
 
 .tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
-	$(call if_changed_rule,vmlinux__)
+	+$(call if_changed_rule,vmlinux__)
 
 .tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/vmlinux.lds.s FORCE
 	$(call if_changed_rule,vmlinux__)
@@ -457,14 +457,14 @@ include/asm:
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
-	@echo '  SPLIT  include/linux/autoconf.h -> include/config/*'
+	@echo '  SPLIT   include/linux/autoconf.h -> include/config/*'
 	@scripts/split-include include/linux/autoconf.h include/config
 	@touch $@
 
 # 	if .config is newer than include/linux/autoconf.h, someone tinkered
 # 	with it and forgot to run make oldconfig
 
-include/linux/autoconf.h: .config
+include/linux/autoconf.h: .config scripts
 	$(Q)$(MAKE) $(build)=scripts/kconfig scripts/kconfig/conf
 	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
@@ -506,7 +506,7 @@ all: modules
 #	Build modules
 
 .PHONY: modules
-modules: $(SUBDIRS) $(if $(CONFIG_MODVERSIONS),vmlinux)
+modules: $(SUBDIRS) $(if $(KBUILD_BUILTIN),vmlinux)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
 
@@ -570,6 +570,7 @@ define generate-asm-offsets.h
 	 echo ""; \
 	 echo "#endif" )
 endef
+
 
 else # ifdef include_config
 
@@ -744,7 +745,7 @@ spec:
 	. scripts/mkspec >kernel.spec
 
 #	Build a tar ball, generate an rpm from it and pack the result
-#	There arw two bits of magic here
+#	There are two bits of magic here
 #	1) The use of /. to avoid tar packing just the symlink
 #	2) Removing the .dep files as they have source paths in them that
 #	   will become invalid

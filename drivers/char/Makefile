@@ -83,7 +83,7 @@ obj-$(CONFIG_HANGCHECK_TIMER) += hangcheck-timer.o
 clean-files := consolemap_deftbl.c defkeymap.c qtronixmap.c
 
 $(obj)/consolemap_deftbl.c: $(src)/$(FONTMAPFILE)
-	$(call do_cmd,CONMK  $@,$(objtree)/scripts/conmakehash $< > $@)
+	$(call do_cmd,CONMK   $@,$(objtree)/scripts/conmakehash $< > $@)
 
 $(obj)/defkeymap.o:  $(obj)/defkeymap.c
 
