@@ -66,7 +66,7 @@ static inline struct iommu_table *devnode_table(struct pci_dev *dev)
  * Returns the virtual address of the buffer and sets dma_handle
  * to the dma address (mapping) of the first page.
  */
-void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
+static void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t *dma_handle)
 {
 	struct iommu_table *tbl;
@@ -100,7 +100,7 @@ void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	memset(ret, 0, size);
 
 	/* Set up tces to cover the allocated range */
-	mapping = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
+	mapping = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL);
 
 	if (mapping == DMA_ERROR_CODE) {
 		free_pages((unsigned long)ret, order);
@@ -112,7 +112,7 @@ void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 }
 
 
-void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
+static void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
 	struct iommu_table *tbl;
@@ -136,15 +136,15 @@ void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
  * need not be page aligned, the dma_addr_t returned will point to the same
  * byte within the page as vaddr.
  */
-dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
-				size_t size, int direction)
+static dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
+		size_t size, enum dma_data_direction direction)
 {
 	struct iommu_table * tbl;
 	dma_addr_t dma_handle = DMA_ERROR_CODE;
 	unsigned long uaddr;
 	unsigned int npages;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	uaddr = (unsigned long)vaddr;
 	npages = PAGE_ALIGN(uaddr + size) - (uaddr & PAGE_MASK);
@@ -167,13 +167,13 @@ dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
 }
 
 
-void pci_iommu_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
-		      size_t size, int direction)
+static void pci_iommu_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+		size_t size, enum dma_data_direction direction)
 {
 	struct iommu_table *tbl;
 	unsigned int npages;
 	
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	npages = (PAGE_ALIGN(dma_handle + size) - (dma_handle & PAGE_MASK))
 		>> PAGE_SHIFT;
@@ -185,12 +185,12 @@ void pci_iommu_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
 }
 
 
-int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
-	       int direction)
+static int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
 	struct iommu_table * tbl;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	if (nelems == 0)
 		return 0;
@@ -202,12 +202,12 @@ int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelem
 	return iommu_alloc_sg(tbl, &pdev->dev, sglist, nelems, direction);
 }
 
-void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
-		  int direction)
+static void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
 	struct iommu_table *tbl;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
 
 	tbl = devnode_table(pdev); 
 	if (!tbl)

@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/seq_file.h>
+#include <linux/dma-mapping.h>
 
 struct pt_regs;
 struct pci_bus;	
@@ -57,7 +58,7 @@ struct machdep_calls {
 				     long index,
 				     long npages,
 				     unsigned long uaddr,
-				     int direction);
+				     enum dma_data_direction direction);
 	void		(*tce_free)(struct iommu_table *tbl,
 				    long index,
 				    long npages);

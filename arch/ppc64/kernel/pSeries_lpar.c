@@ -21,7 +21,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -130,8 +130,9 @@ long plpar_put_term_char(unsigned long termno,
 				  lbuf[1]);
 }
 
-static void tce_build_pSeriesLP(struct iommu_table *tbl, long tcenum, long npages,
-				unsigned long uaddr, int direction )
+static void tce_build_pSeriesLP(struct iommu_table *tbl, long tcenum,
+		long npages, unsigned long uaddr,
+		enum dma_data_direction direction)
 {
 	u64 rc;
 	union tce_entry tce;
@@ -139,7 +140,7 @@ static void tce_build_pSeriesLP(struct iommu_table *tbl, long tcenum, long npage
 	tce.te_word = 0;
 	tce.te_rpn = (virt_to_abs(uaddr)) >> PAGE_SHIFT;
 	tce.te_rdwr = 1;
-	if (direction != PCI_DMA_TODEVICE)
+	if (direction != DMA_TO_DEVICE)
 		tce.te_pciwr = 1;
 
 	while (npages--) {

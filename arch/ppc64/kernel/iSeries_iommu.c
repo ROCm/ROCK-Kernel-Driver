@@ -33,6 +33,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -69,7 +70,7 @@ extern struct list_head iSeries_Global_Device_List;
 
 
 static void tce_build_iSeries(struct iommu_table *tbl, long index, long npages,
-			      unsigned long uaddr, int direction)
+		unsigned long uaddr, enum dma_data_direction direction)
 {
 	u64 rc;
 	union tce_entry tce;
@@ -82,12 +83,12 @@ static void tce_build_iSeries(struct iommu_table *tbl, long index, long npages,
 			/* Virtual Bus */
 			tce.te_bits.tb_valid = 1;
 			tce.te_bits.tb_allio = 1;
-			if (direction != PCI_DMA_TODEVICE)
+			if (direction != DMA_TO_DEVICE)
 				tce.te_bits.tb_rdwr = 1;
 		} else {
 			/* PCI Bus */
 			tce.te_bits.tb_rdwr = 1; /* Read allowed */
-			if (direction != PCI_DMA_TODEVICE)
+			if (direction != DMA_TO_DEVICE)
 				tce.te_bits.tb_pciwr = 1;
 		}
 		

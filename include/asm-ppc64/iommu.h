@@ -25,6 +25,7 @@
 #include <asm/types.h>
 #include <linux/spinlock.h>
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
 
 /*
  * IOMAP_MAX_ORDER defines the largest contiguous block
@@ -132,14 +133,15 @@ extern struct iommu_table *iommu_init_table(struct iommu_table * tbl);
 
 /* allocates a range of tces and sets them to the pages  */
 extern dma_addr_t iommu_alloc(struct iommu_table *, void *page, 
-			      unsigned int numPages, int direction);
+			      unsigned int numPages,
+			      enum dma_data_direction direction);
 extern void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr, 
 		       unsigned int npages);
 
 /* same with sg lists */
 extern int iommu_alloc_sg(struct iommu_table *table, struct device *dev,
 			  struct scatterlist *sglist, int nelems,
-			  int direction);
+			  enum dma_data_direction direction);
 extern void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist,
 			  int nelems);
 

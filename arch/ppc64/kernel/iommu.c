@@ -31,7 +31,6 @@
 #include <linux/mm.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
-#include <linux/pci.h>
 #include <linux/dma-mapping.h>
 #include <linux/init.h>
 #include <asm/io.h>
@@ -142,7 +141,7 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
 }
 
 dma_addr_t iommu_alloc(struct iommu_table *tbl, void *page,
-		       unsigned int npages, int direction)
+		       unsigned int npages, enum dma_data_direction direction)
 {
 	unsigned long entry, flags;
 	dma_addr_t ret = DMA_ERROR_CODE;
@@ -227,7 +226,8 @@ void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 }
 
 int iommu_alloc_sg(struct iommu_table *tbl, struct device *dev,
-		   struct scatterlist *sglist, int nelems, int direction)
+		   struct scatterlist *sglist, int nelems,
+		   enum dma_data_direction direction)
 {
 	dma_addr_t dma_next, dma_addr;
 	unsigned long flags;
