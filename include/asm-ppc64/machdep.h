@@ -69,6 +69,9 @@ struct machdep_calls {
 	void		(*init_IRQ)(void);
 	int		(*get_irq)(struct pt_regs *);
 
+	/* PCI stuff */
+	void		(*pcibios_fixup)(void);
+
 	/* Optional, may be NULL. */
 	void		(*init)(void);
 

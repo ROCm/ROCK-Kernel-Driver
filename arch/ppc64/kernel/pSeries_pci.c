@@ -687,7 +687,7 @@ static void phbs_fixup_io(void)
 
 extern void chrp_request_regions(void);
 
-void __init pcibios_final_fixup(void)
+void __init pSeries_final_fixup(void)
 {
 	struct pci_dev *dev = NULL;
 

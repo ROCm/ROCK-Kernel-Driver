@@ -70,6 +70,7 @@ void chrp_progress(char *, unsigned short);
 extern void openpic_init_IRQ(void);
 
 extern void find_and_init_phbs(void);
+extern void pSeries_final_fixup(void);
 
 extern void pSeries_get_boot_time(struct rtc_time *rtc_time);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
@@ -264,6 +265,8 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	ppc_md.init           = chrp_init2;
+
+	ppc_md.pcibios_fixup  = pSeries_final_fixup;
 
 	ppc_md.restart        = rtas_restart;
 	ppc_md.power_off      = rtas_power_off;
