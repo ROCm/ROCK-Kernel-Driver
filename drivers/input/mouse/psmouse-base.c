@@ -173,6 +173,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		 * so it needs to receive all bytes one at a time.
 		 */
 		synaptics_process_byte(psmouse, regs);
+		psmouse->pktcnt = 0;
 		goto out;
 	}
 
