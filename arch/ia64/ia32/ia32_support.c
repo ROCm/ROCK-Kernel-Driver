@@ -33,6 +33,7 @@ struct exec_domain ia32_exec_domain;
 struct page *ia32_shared_page[NR_CPUS];
 unsigned long *ia32_boot_gdt;
 unsigned long *cpu_gdt_table[NR_CPUS];
+struct page *ia32_gate_page;
 
 static unsigned long
 load_desc (u16 selector)
@@ -158,7 +159,7 @@ ia32_gdt_init (void)
 /*
  * Setup IA32 GDT and TSS
  */
-void
+static void
 ia32_boot_gdt_init (void)
 {
 	unsigned long ldt_size;
@@ -172,12 +173,12 @@ ia32_boot_gdt_init (void)
 
 	/* CS descriptor in IA-32 (scrambled) format */
 	ia32_boot_gdt[__USER_CS >> 3]
-		= IA32_SEG_DESCRIPTOR(0, (IA32_PAGE_OFFSET-1) >> IA32_PAGE_SHIFT,
+		= IA32_SEG_DESCRIPTOR(0, (IA32_GATE_END-1) >> IA32_PAGE_SHIFT,
 				      0xb, 1, 3, 1, 1, 1, 1);
 
 	/* DS descriptor in IA-32 (scrambled) format */
 	ia32_boot_gdt[__USER_DS >> 3]
-		= IA32_SEG_DESCRIPTOR(0, (IA32_PAGE_OFFSET-1) >> IA32_PAGE_SHIFT,
+		= IA32_SEG_DESCRIPTOR(0, (IA32_GATE_END-1) >> IA32_PAGE_SHIFT,
 				      0x3, 1, 3, 1, 1, 1, 1);
 
 	ldt_size = PAGE_ALIGN(IA32_LDT_ENTRIES*IA32_LDT_ENTRY_SIZE);
@@ -185,6 +186,27 @@ ia32_boot_gdt_init (void)
 						       0xb, 0, 3, 1, 1, 1, 0);
 	ia32_boot_gdt[LDT_ENTRY] = IA32_SEG_DESCRIPTOR(IA32_LDT_OFFSET, ldt_size - 1,
 						       0x2, 0, 3, 1, 1, 1, 0);
+}
+
+static void
+ia32_gate_page_init(void)
+{
+	unsigned long *sr;
+
+	ia32_gate_page = alloc_page(GFP_KERNEL);
+	sr = page_address(ia32_gate_page);
+	/* This is popl %eax ; movl $,%eax ; int $0x80 */
+	*sr++ = 0xb858 | (__IA32_NR_sigreturn << 16) | (0x80cdUL << 48);
+
+	/* This is movl $,%eax ; int $0x80 */
+	*sr = 0xb8 | (__IA32_NR_rt_sigreturn << 8) | (0x80cdUL << 40);
+}
+
+void
+ia32_mem_init(void)
+{
+	ia32_boot_gdt_init();
+	ia32_gate_page_init();
 }
 
 /*

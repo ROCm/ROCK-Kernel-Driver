@@ -853,13 +853,18 @@ setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs
 		unsigned int restorer = IA32_SA_RESTORER(ka);
 		err |= __put_user(restorer, &frame->pretcode);
 	} else {
-		err |= __put_user((long)frame->retcode, &frame->pretcode);
-		/* This is popl %eax ; movl $,%eax ; int $0x80 */
-		err |= __put_user(0xb858, (short *)(frame->retcode+0));
-		err |= __put_user(__IA32_NR_sigreturn & 0xffff, (short *)(frame->retcode+2));
-		err |= __put_user(__IA32_NR_sigreturn >> 16, (short *)(frame->retcode+4));
-		err |= __put_user(0x80cd, (short *)(frame->retcode+6));
+		/* Pointing to restorer in ia32 gate page */
+		err |= __put_user(IA32_GATE_OFFSET, &frame->pretcode);
 	}
+
+	/* This is popl %eax ; movl $,%eax ; int $0x80
+	 * and there for historical reasons only.
+	 * See arch/i386/kernel/signal.c
+	 */
+
+	err |= __put_user(0xb858, (short *)(frame->retcode+0));
+	err |= __put_user(__IA32_NR_sigreturn, (int *)(frame->retcode+2));
+	err |= __put_user(0x80cd, (short *)(frame->retcode+6));
 
 	if (err)
 		goto give_sigsegv;
@@ -922,12 +927,18 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 		unsigned int restorer = IA32_SA_RESTORER(ka);
 		err |= __put_user(restorer, &frame->pretcode);
 	} else {
-		err |= __put_user((long)frame->retcode, &frame->pretcode);
-		/* This is movl $,%eax ; int $0x80 */
-		err |= __put_user(0xb8, (char *)(frame->retcode+0));
-		err |= __put_user(__IA32_NR_rt_sigreturn, (int *)(frame->retcode+1));
-		err |= __put_user(0x80cd, (short *)(frame->retcode+5));
+		/* Pointing to rt_restorer in ia32 gate page */
+		err |= __put_user(IA32_GATE_OFFSET + 8, &frame->pretcode);
 	}
+
+	/* This is movl $,%eax ; int $0x80
+	 * and there for historical reasons only.
+	 * See arch/i386/kernel/signal.c
+	 */
+
+	err |= __put_user(0xb8, (char *)(frame->retcode+0));
+	err |= __put_user(__IA32_NR_rt_sigreturn, (int *)(frame->retcode+1));
+	err |= __put_user(0x80cd, (short *)(frame->retcode+5));
 
 	if (err)
 		goto give_sigsegv;
