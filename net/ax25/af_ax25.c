@@ -203,15 +203,15 @@ struct sock *ax25_get_socket(ax25_address *my_addr, ax25_address *dest_addr,
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, my_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->sk->type == type) {
 			sk = s->sk;
+			/* XXX Sleeps with spinlock held, use refcounts instead. XXX */
 			lock_sock(sk);
 			break;
 		}
 	}
 
-out:
 	spin_unlock_bh(&ax25_list_lock);
 
-	return NULL;
+	return sk;
 }
 
 /*
