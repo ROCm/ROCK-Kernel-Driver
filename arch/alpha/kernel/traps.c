@@ -223,6 +223,8 @@ do_entArith(unsigned long summary, unsigned long write_mask,
 			si_code = alpha_fp_emul(regs->pc - 4);
 		else
 			si_code = alpha_fp_emul_imprecise(regs, write_mask);
+		if (si_code == 0)
+			return;
 	}
 	die_if_kernel("Arithmetic fault", regs, 0, 0);
 
