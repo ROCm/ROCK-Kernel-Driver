@@ -39,7 +39,6 @@ Building the Kernel
 -----------------------------
 make iq80310_config
 make oldconfig
-make dep
 make zImage
 
 This will build an image setup for BOOTP/NFS root support.  To change this,

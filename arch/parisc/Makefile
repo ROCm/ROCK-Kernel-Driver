@@ -20,13 +20,11 @@
 ifdef CONFIG_PARISC64
 CROSS_COMPILE	:= hppa64-linux-
 UTS_MACHINE	:= parisc64
-LDFLAGS_BLOB	:= --format binary --oformat elf64-hppa-linux
 else
 MACHINE := $(subst 64,,$(shell uname -m))
 ifneq ($(MACHINE),parisc)
 CROSS_COMPILE	:= hppa-linux-
 endif
-LDFLAGS_BLOB	:= --format binary --oformat elf32-hppa-linux
 endif
 
 FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align 

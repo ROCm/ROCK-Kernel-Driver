@@ -5,11 +5,10 @@ host-progs  := gen_init_cpio
 
 clean-files := initramfs_data.cpio.gz
 
-LDFLAGS_initramfs_data.o := $(LDFLAGS_BLOB) -r -T
-
-$(obj)/initramfs_data.o: $(src)/initramfs_data.scr \
-			 $(obj)/initramfs_data.cpio.gz FORCE
-	$(call if_changed,ld)
+# initramfs_data.o contains the initramfs_data.cpio.gz image.
+# The image is included using .incbin, a dependency which is not
+# tracked automatically.
+$(obj)/initramfs_data.o: $(obj)/initramfs_data.cpio.gz FORCE
 
 # initramfs-y are the programs which will be copied into the CPIO
 # archive. Currently, the filenames are hardcoded in gen_init_cpio,
