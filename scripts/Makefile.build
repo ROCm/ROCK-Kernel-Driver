@@ -7,9 +7,8 @@ src := $(obj)
 .PHONY: __build
 __build:
 
-ifdef include_config
-include .config
-endif
+# Read .config if it exist, otherwise ignore
+-include .config
 
 include $(obj)/Makefile
 
