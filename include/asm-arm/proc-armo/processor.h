@@ -20,6 +20,7 @@
 #define __ASM_PROC_PROCESSOR_H
 
 #include <linux/string.h>
+#include <asm/proc/ptrace.h>
 
 #define KERNEL_STACK_SIZE 4096
 
@@ -35,7 +36,10 @@ struct cpu_context_save {
 	unsigned long pc;
 };
 
-#define INIT_CSS (struct cpu_context_save){ 0, 0, 0, 0, 0, 0, 0, 0, SVC26_MODE }
+static inline void init_pc_psr(struct cpu_context_save *s, void *fn)
+{
+	s->pc = ((unsigned long)fn) | PSR_I_BIT | SVC26_MODE;
+}
 
 typedef struct {
 	void (*put_byte)(void);			/* Special calling convention */

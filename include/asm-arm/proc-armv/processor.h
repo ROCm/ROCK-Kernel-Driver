@@ -19,6 +19,7 @@
 #define __ASM_PROC_PROCESSOR_H
 
 #include <asm/proc/domain.h>
+#include <asm/proc/ptrace.h>
 
 #define KERNEL_STACK_SIZE	PAGE_SIZE
 
@@ -35,7 +36,11 @@ struct cpu_context_save {
 	unsigned long pc;
 };
 
-#define INIT_CSS (struct cpu_context_save){ SVC_MODE, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+static inline void init_pc_psr(struct cpu_context_save *s, void *fn)
+{
+	s->pc = (unsigned long)fn;
+	s->cpsr = PSR_I_BIT | SVC_MODE;
+}
 
 #define INIT_EXTRA_THREAD_INFO						\
 	cpu_domain:	  domain_val(DOMAIN_USER, DOMAIN_CLIENT) |	\

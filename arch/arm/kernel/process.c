@@ -310,9 +310,9 @@ void release_thread(struct task_struct *dead_task)
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
-int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
-	unsigned long unused,
-	struct task_struct * p, struct pt_regs * regs)
+int
+copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
+	    unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
 	struct pt_regs *childregs;
 	struct cpu_context_save *save;
@@ -323,8 +323,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	childregs->ARM_sp = esp;
 
 	save = ((struct cpu_context_save *)(childregs)) - 1;
-	*save = INIT_CSS;
-	save->pc |= (unsigned long)ret_from_fork;
+	memset(save, 0, sizeof(struct cpu_context_save));
+	init_pc_psr(save, ret_from_fork);
 
 	p->thread_info->cpu_context = save;
 
