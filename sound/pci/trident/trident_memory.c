@@ -76,8 +76,8 @@ static inline void set_tlb_bus(trident_t *trident, int page, unsigned long ptr, 
 static inline void set_silent_tlb(trident_t *trident, int page)
 {
 	page <<= 1;
-	__set_tlb_bus(trident, page, (unsigned long)trident->tlb.silent_page, trident->tlb.silent_page_dmaaddr);
-	__set_tlb_bus(trident, page+1, (unsigned long)trident->tlb.silent_page, trident->tlb.silent_page_dmaaddr);
+	__set_tlb_bus(trident, page, (unsigned long)trident->tlb.silent_page.area, trident->tlb.silent_page.addr);
+	__set_tlb_bus(trident, page+1, (unsigned long)trident->tlb.silent_page.area, trident->tlb.silent_page.addr);
 }
 
 #else
@@ -111,7 +111,7 @@ static inline void set_silent_tlb(trident_t *trident, int page)
 	int i;
 	page *= UNIT_PAGES;
 	for (i = 0; i < UNIT_PAGES; i++, page++)
-		__set_tlb_bus(trident, page, (unsigned long)trident->tlb.silent_page, trident->tlb.silent_page_dmaaddr);
+		__set_tlb_bus(trident, page, (unsigned long)trident->tlb.silent_page.area, trident->tlb.silent_page.addr);
 }
 
 #endif /* PAGE_SIZE */

@@ -296,8 +296,8 @@ static int __devinit snd_dt019x_pnp_probe(struct pnp_card_link *card,
 			return res;
 		dev++;
 		return 0;
-        }
-        return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 static void __devexit snd_dt019x_pnp_remove(struct pnp_card_link * pcard)
@@ -322,8 +322,10 @@ static int __init alsa_card_dt019x_init(void)
 	cards += pnp_register_card_driver(&dt019x_pnpc_driver);
 
 #ifdef MODULE
-	if (!cards)
+	if (!cards) {
+		pnp_unregister_card_driver(&dt019x_pnpc_driver);
 		snd_printk(KERN_ERR "no DT-019X / ALS-007 based soundcards found\n");
+	}
 #endif
 	return cards ? 0 : -ENODEV;
 }
