@@ -62,6 +62,12 @@ struct mapped_device {
 	 * io objects are allocated from here.
 	 */
 	mempool_t *io_pool;
+
+	/*
+	 * Event handling.
+	 */
+	uint32_t event_nr;
+	wait_queue_head_t eventq;
 };
 
 #define MIN_IOS 256
@@ -618,6 +624,8 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 
 	atomic_set(&md->pending, 0);
 	init_waitqueue_head(&md->wait);
+	init_waitqueue_head(&md->eventq);
+
 	return md;
 }
 
@@ -633,6 +641,16 @@ static void free_dev(struct mapped_device *md)
 /*
  * Bind a table to the device.
  */
+static void event_callback(void *context)
+{
+	struct mapped_device *md = (struct mapped_device *) context;
+
+	down_write(&md->lock);
+	md->event_nr++;
+	wake_up_interruptible(&md->eventq);
+	up_write(&md->lock);
+}
+
 static int __bind(struct mapped_device *md, struct dm_table *t)
 {
 	request_queue_t *q = &md->queue;
@@ -644,6 +662,8 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 	if (size == 0)
 		return 0;
 
+	dm_table_event_callback(md->map, event_callback, md);
+
 	dm_table_get(t);
 	dm_table_set_restrictions(t, q);
 	return 0;
@@ -651,6 +671,7 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 
 static void __unbind(struct mapped_device *md)
 {
+	dm_table_event_callback(md->map, NULL, NULL);
 	dm_table_put(md->map);
 	md->map = NULL;
 	set_capacity(md->disk, 0);
@@ -817,6 +838,42 @@ int dm_resume(struct mapped_device *md)
 	blk_run_queues();
 
 	return 0;
+}
+
+/*-----------------------------------------------------------------
+ * Event notification.
+ *---------------------------------------------------------------*/
+uint32_t dm_get_event_nr(struct mapped_device *md)
+{
+	uint32_t r;
+
+	down_read(&md->lock);
+	r = md->event_nr;
+	up_read(&md->lock);
+
+	return r;
+}
+
+int dm_add_wait_queue(struct mapped_device *md, wait_queue_t *wq,
+		      uint32_t event_nr)
+{
+	down_write(&md->lock);
+	if (event_nr != md->event_nr) {
+		up_write(&md->lock);
+		return 1;
+	}
+
+	add_wait_queue(&md->eventq, wq);
+	up_write(&md->lock);
+
+	return 0;
+}
+
+void dm_remove_wait_queue(struct mapped_device *md, wait_queue_t *wq)
+{
+	down_write(&md->lock);
+	remove_wait_queue(&md->eventq, wq);
+	up_write(&md->lock);
 }
 
 /*

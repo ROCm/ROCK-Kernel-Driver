@@ -705,7 +705,6 @@ static int get_status(struct dm_ioctl *param, struct dm_ioctl *user)
 static int wait_device_event(struct dm_ioctl *param, struct dm_ioctl *user)
 {
 	struct mapped_device *md;
-	struct dm_table *table;
 	DECLARE_WAITQUEUE(wq, current);
 
 	md = find_device(param);
@@ -724,12 +723,12 @@ static int wait_device_event(struct dm_ioctl *param, struct dm_ioctl *user)
 	 * Wait for a notification event
 	 */
 	set_current_state(TASK_INTERRUPTIBLE);
-	table = dm_get_table(md);
-	dm_table_add_wait_queue(table, &wq);
-	dm_table_put(table);
-	dm_put(md);
-
-	schedule();
+ 	if (!dm_add_wait_queue(md, &wq, dm_get_event_nr(md))) {
+ 		schedule();
+ 		dm_remove_wait_queue(md, &wq);
+ 	}
+  	set_current_state(TASK_RUNNING);
+ 	dm_put(md);
 
       out:
 	return results_to_user(user, param, NULL, 0);
