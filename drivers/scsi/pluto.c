@@ -360,3 +360,5 @@ static Scsi_Host_Template driver_template = {
 
 #include "scsi_module.c"
 
+MODULE_LICENSE("GPL");
+
