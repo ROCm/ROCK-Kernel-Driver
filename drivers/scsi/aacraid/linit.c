@@ -295,7 +295,6 @@ static int aac_detect(Scsi_Host_Template *template)
 			printk(KERN_WARNING "aacraid: unable to register \"aac\" device.\n");
 	}
 
-	template->present = aac_count; /* # of cards of this type found */
 	return aac_count;
 }
 
