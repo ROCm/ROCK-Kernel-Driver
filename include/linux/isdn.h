@@ -381,7 +381,6 @@ typedef struct isdn_net_dev_s {
   int                    sqfull;       /* Flag: netdev-queue overloaded    */
   ulong                  sqfull_stamp; /* Start-Time of overload           */
 
-  struct timer_list      hup_timer;    /* auto hangup timer                */
   int                    huptimer;     /* Timeout-counter for auto-hangup  */
   int                    charge;       /* Counter for charging units       */
   int                    charge_state; /* ChargeInfo state machine         */

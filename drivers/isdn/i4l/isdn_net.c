@@ -51,6 +51,7 @@ enum {
 	EV_NET_TIMER_OUT_DCONN = 0x203,
 	EV_NET_TIMER_OUT_BCONN = 0x204,
 	EV_NET_TIMER_CB        = 0x205,
+	EV_NET_TIMER_HUP       = 0x206,
 };
 
 /*
@@ -259,8 +260,10 @@ static void isdn_net_connected(isdn_net_dev *idev)
 	isdn_net_local *mlp = idev->mlp;
 
 	idev->dialstate = ST_ACTIVE;
-	idev->hup_timer.expires = jiffies + HZ;
-	add_timer(&idev->hup_timer);
+
+	idev->dial_event = EV_NET_TIMER_HUP;
+	idev->dial_timer.expires = jiffies + HZ;
+	add_timer(&idev->dial_timer);
 
 	if (mlp->p_encap != ISDN_NET_ENCAP_SYNCPPP)
 		isdn_net_add_to_bundle(mlp, idev);
@@ -400,6 +403,66 @@ do_dialout(isdn_net_dev *idev)
 	add_timer(&idev->dial_timer);
 }
 
+/*
+ * Perform auto-hangup for net-interfaces.
+ *
+ * auto-hangup:
+ * Increment idle-counter (this counter is reset on any incoming or
+ * outgoing packet), if counter exceeds configured limit either do a
+ * hangup immediately or - if configured - wait until just before the next
+ * charge-info.
+ */
+
+static void
+isdn_net_check_hup(isdn_net_dev *idev)
+{
+	isdn_net_local *mlp = idev->mlp;
+
+	if (!isdn_net_online(idev)) {
+		isdn_BUG();
+		return;
+	}
+	
+	dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
+		     idev->name, idev->huptimer, mlp->onhtime, idev->chargetime, idev->chargeint);
+
+	if (mlp->onhtime == 0)
+		return;
+	
+	if (idev->huptimer++ <= mlp->onhtime)
+		goto mod_timer;
+
+	if ((mlp->hupflags & (ISDN_MANCHARGE | ISDN_CHARGEHUP)) == (ISDN_MANCHARGE | ISDN_CHARGEHUP)) {
+		while (time_after(jiffies, idev->chargetime + idev->chargeint))
+			idev->chargetime += idev->chargeint;
+		
+		if (time_after(jiffies, idev->chargetime + idev->chargeint - 2 * HZ)) {
+			if (idev->outgoing || mlp->hupflags & ISDN_INHUP) {
+				isdn_net_hangup(idev);
+				return;
+			}
+		}
+	} else if (idev->outgoing) {
+		if (mlp->hupflags & ISDN_CHARGEHUP) {
+			if (idev->charge_state != ST_CHARGE_HAVE_CINT) {
+				dbg_net_dial("%s: did not get CINT\n", idev->name);
+				isdn_net_hangup(idev);
+				return;
+			} else if (time_after(jiffies, idev->chargetime + idev->chargeint)) {
+				dbg_net_dial("%s: chtime = %lu, chint = %d\n",
+					     idev->name, idev->chargetime, idev->chargeint);
+				isdn_net_hangup(idev);
+				return;
+			}
+		}
+	} else if (mlp->hupflags & ISDN_INHUP) {
+		isdn_net_hangup(idev);
+		return;
+	}
+ mod_timer:
+	mod_timer(&idev->dial_timer, idev->dial_timer.expires + HZ);
+}
+
 static int
 isdn_net_event_out_wait_dconn(isdn_net_dev *idev, int pr, void *arg)
 {
@@ -531,6 +594,9 @@ isdn_net_event_active(isdn_net_dev *idev, int pr, void *arg)
 	isdn_ctrl *c = arg;
 
 	switch (pr) {
+	case EV_NET_TIMER_HUP:
+		isdn_net_check_hup(idev);
+		return 1;
 	case ISDN_STAT_BSENT:
 		/* A packet has successfully been sent out */
 		isdn_net_dec_frame_cnt(idev);
@@ -610,7 +676,7 @@ isdn_net_hangup(isdn_net_dev *idev)
 	isdn_net_local *mlp = idev->mlp;
 	isdn_ctrl cmd;
 
-	del_timer_sync(&idev->hup_timer);
+	del_timer_sync(&idev->dial_timer);
 	if (!isdn_net_bound(idev))
 		return;
 

@@ -31,7 +31,6 @@ int isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg); /* FIXME */
 
 static void isdn_net_tasklet(unsigned long data);
 static void isdn_net_dial_timer(unsigned long data);
-static void isdn_net_hup_timer(unsigned long data);
 static int isdn_init_netif(struct net_device *ndev);
 
 /* ====================================================================== */
@@ -251,9 +250,6 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 	init_timer(&idev->dial_timer);
 	idev->dial_timer.data = (unsigned long) idev;
 	idev->dial_timer.function = isdn_net_dial_timer;
-	init_timer(&idev->hup_timer);
-	idev->hup_timer.data = (unsigned long) idev;
-	idev->hup_timer.function = isdn_net_hup_timer;
 
 	if (!mlp) {
 		/* Device shall be a master */
@@ -1030,66 +1026,5 @@ isdn_net_dial_timer(unsigned long data)
 	isdn_net_dev *idev = (isdn_net_dev *) data;
 
 	isdn_net_handle_event(idev, idev->dial_event, NULL);
-}
-
-/*
- * Perform auto-hangup for net-interfaces.
- *
- * auto-hangup:
- * Increment idle-counter (this counter is reset on any incoming or
- * outgoing packet), if counter exceeds configured limit either do a
- * hangup immediately or - if configured - wait until just before the next
- * charge-info.
- */
-
-static void
-isdn_net_hup_timer(unsigned long data)
-{
-	isdn_net_dev *idev = (isdn_net_dev *) data;
-	isdn_net_local *mlp = idev->mlp;
-
-	if (!isdn_net_online(idev)) {
-		isdn_BUG();
-		return;
-	}
-	
-	dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
-		     idev->name, idev->huptimer, mlp->onhtime, idev->chargetime, idev->chargeint);
-
-	if (mlp->onhtime == 0)
-		return;
-	
-	if (idev->huptimer++ <= mlp->onhtime)
-		goto mod_timer;
-
-	if ((mlp->hupflags & (ISDN_MANCHARGE | ISDN_CHARGEHUP)) == (ISDN_MANCHARGE | ISDN_CHARGEHUP)) {
-		while (time_after(jiffies, idev->chargetime + idev->chargeint))
-			idev->chargetime += idev->chargeint;
-		
-		if (time_after(jiffies, idev->chargetime + idev->chargeint - 2 * HZ)) {
-			if (idev->outgoing || mlp->hupflags & ISDN_INHUP) {
-				isdn_net_hangup(idev);
-				return;
-			}
-		}
-	} else if (idev->outgoing) {
-		if (mlp->hupflags & ISDN_CHARGEHUP) {
-			if (idev->charge_state != ST_CHARGE_HAVE_CINT) {
-				dbg_net_dial("%s: did not get CINT\n", idev->name);
-				isdn_net_hangup(idev);
-				return;
-			} else if (time_after(jiffies, idev->chargetime + idev->chargeint)) {
-				dbg_net_dial("%s: chtime = %lu, chint = %d\n",
-					     idev->name, idev->chargetime, idev->chargeint);
-				isdn_net_hangup(idev);
-				return;
-			}
-		}
-	} else if (mlp->hupflags & ISDN_INHUP) {
-		isdn_net_hangup(idev);
-		return;
-	}
- mod_timer:
-	mod_timer(&idev->hup_timer, idev->hup_timer.expires + HZ);
 }
 
