@@ -527,6 +527,7 @@ void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
 int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
+int		xfs_iflush_all(struct xfs_mount *, int);
 int		xfs_iaccess(xfs_inode_t *, mode_t, cred_t *);
 uint		xfs_iroundup(uint);
 void		xfs_ichgtime(xfs_inode_t *, int);
