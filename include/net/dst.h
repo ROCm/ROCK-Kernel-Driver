@@ -11,6 +11,7 @@
 #include <linux/config.h>
 #include <linux/rtnetlink.h>
 #include <net/neighbour.h>
+#include <asm/processor.h>
 
 /*
  * 0 - no debugging messages
@@ -141,10 +142,9 @@ void dst_release(struct dst_entry * dst)
 {
 	if (dst) {
 		if (atomic_read(&dst->__refcnt) < 1) {
-			__label__ __lbl;
 			printk("BUG: dst underflow %d: %p\n",
-			       atomic_read(&dst->__refcnt), &&__lbl);
-__lbl:
+			       atomic_read(&dst->__refcnt),
+			       current_text_addr());
 		}
 		atomic_dec(&dst->__refcnt);
 	}
