@@ -31,40 +31,41 @@
  *
  * PCM Vcc:
  *
- *  PCM Vcc on BadgePAD 4 can be jumpered for 3.3V (short pins 1 and 3
- *  on JP6) or 5V (short pins 3 and 5 on JP6).  N.B., 5V supply rail
- *  is enabled by the SA-1110's BADGE4_GPIO_PCMEN5V (GPIO 24).
+ *  PCM Vcc on BadgePAD 4 can be jumpered for 3v3 (short pins 1 and 3
+ *  on JP6) or 5v0 (short pins 3 and 5 on JP6).
  *
  * PCM Vpp:
  *
- *  PCM Vpp on BadgePAD 4 can be jumpered for 12V (short pins 2 and 4
- *  on JP6) or tied to PCM Vcc (short pins 4 and 6 on JP6).  N.B., 12V
- *  operation requires that the power supply actually supply 12V.
+ *  PCM Vpp on BadgePAD 4 can be jumpered for 12v0 (short pins 4 and 6
+ *  on JP6) or tied to PCM Vcc (short pins 2 and 4 on JP6).  N.B.,
+ *  12v0 operation requires that the power supply actually supply 12v0
+ *  via pin 7 of JP7.
  *
  * CF Vcc:
  *
- *  CF Vcc on BadgePAD 4 can be jumpered either for 3.3V (short pins 1
- *  and 2 on JP10) or 5V (short pins 2 and 3 on JP10).  The note above
- *  about the 5V supply rail applies.
+ *  CF Vcc on BadgePAD 4 can be jumpered either for 3v3 (short pins 1
+ *  and 2 on JP10) or 5v0 (short pins 2 and 3 on JP10).
  *
- * There's no way programmatically to determine how a given board is
- * jumpered.  This code assumes a default jumpering: 5V PCM Vcc (pins
- * 3 and 5 shorted) and PCM Vpp = PCM Vcc (pins 4 and 6 shorted) and
- * no jumpering for CF Vcc.  If this isn't correct, Override these
- * defaults with a pcmv setup argument: pcmv=<pcm vcc>,<pcm vpp>,<cf
- * vcc>.  E.g. pcmv=33,120,50 indicates 3.3V PCM Vcc, 12.0V PCM Vpp,
- * and 5.0V CF Vcc.
+ * Unfortunately there's no way programmatically to determine how a
+ * given board is jumpered.  This code assumes a default jumpering
+ * as described below.
+ *
+ * If the defaults aren't correct, you may override them with a pcmv
+ * setup argument: pcmv=<pcm vcc>,<pcm vpp>,<cf vcc>.  The units are
+ * tenths of volts; e.g. pcmv=33,120,50 indicates 3v3 PCM Vcc, 12v0
+ * PCM Vpp, and 5v0 CF Vcc.
  *
  */
 
-static int badge4_pcmvcc = 50;
-static int badge4_pcmvpp = 50;
-static int badge4_cfvcc = 33;
+static int badge4_pcmvcc = 50;  /* pins 3 and 5 jumpered on JP6 */
+static int badge4_pcmvpp = 50;  /* pins 2 and 4 jumpered on JP6 */
+static int badge4_cfvcc = 33;   /* pins 1 and 2 jumpered on JP10 */
 
 static int badge4_pcmcia_init(struct pcmcia_init *init)
 {
-	printk(KERN_INFO __FUNCTION__
-	       ": badge4_pcmvcc=%d, badge4_pcmvpp=%d, badge4_cfvcc=%d\n",
+	printk(KERN_INFO
+	       "%s: badge4_pcmvcc=%d, badge4_pcmvpp=%d, badge4_cfvcc=%d\n",
+	       __FUNCTION__,
 	       badge4_pcmvcc, badge4_pcmvpp, badge4_cfvcc);
 
 	return sa1111_pcmcia_init(init);
@@ -74,7 +75,7 @@ static int badge4_pcmcia_shutdown(void)
 {
 	int rc = sa1111_pcmcia_shutdown();
 
-	/* be sure to disable 5V use */
+	/* be sure to disable 5v0 use */
 	badge4_set_5V(BADGE4_5V_PCMCIA_SOCK0, 0);
 	badge4_set_5V(BADGE4_5V_PCMCIA_SOCK1, 0);
 
@@ -105,7 +106,8 @@ badge4_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 		    (conf->vcc != badge4_pcmvcc)) {
 			complain_about_jumpering(__FUNCTION__, "pcmvcc",
 						 badge4_pcmvcc, conf->vcc);
-			return -1;
+			// Apply power regardless of the jumpering.
+			// return -1;
 		}
 		if ((conf->vpp != 0) &&
 		    (conf->vpp != badge4_pcmvpp)) {
@@ -156,7 +158,7 @@ static struct pcmcia_low_level badge4_pcmcia_ops = {
 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_badge4_init(void)
+int pcmcia_badge4_init(void)
 {
 	int ret = -ENODEV;
 
@@ -166,7 +168,7 @@ int __init pcmcia_badge4_init(void)
 	return ret;
 }
 
-void __exit pcmcia_badge4_exit(void)
+void __devexit pcmcia_badge4_exit(void)
 {
 	sa1100_unregister_pcmcia(&badge4_pcmcia_ops);
 }
