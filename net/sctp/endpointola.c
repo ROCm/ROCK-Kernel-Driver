@@ -243,7 +243,8 @@ sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *ep,
 
 	sctp_read_lock(&ep->base.addr_lock);
 	if (ep->base.bind_addr.port == laddr->v4.sin_port) {
-		if (sctp_bind_addr_has_addr(&ep->base.bind_addr, laddr)) {
+		if (sctp_bind_addr_match(&ep->base.bind_addr, laddr,
+					 sctp_sk(ep->base.sk))) {
 			retval = ep;
 			goto out;
 		}

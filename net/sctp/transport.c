@@ -203,17 +203,18 @@ void sctp_transport_set_owner(sctp_transport_t *transport,
 /* Caches the dst entry for a transport's destination address and an optional
  * souce address.
  */ 
-void sctp_transport_route(sctp_transport_t *transport,
-			  union sctp_addr *saddr)
+void sctp_transport_route(sctp_transport_t *transport, union sctp_addr *saddr,
+			  struct sctp_opt *opt)
 {
 	sctp_association_t *asoc = transport->asoc;
-	sctp_func_t *af = transport->af_specific;
+	struct sctp_func *af = transport->af_specific;
 	union sctp_addr *daddr = &transport->ipaddr;
 	sctp_bind_addr_t *bp;
 	rwlock_t *addr_lock;
 	struct sockaddr_storage_list *laddr;
 	struct list_head *pos;
 	struct dst_entry *dst;
+	union sctp_addr dst_saddr;
 
 	dst = af->get_dst(daddr, saddr);
 
@@ -239,7 +240,8 @@ void sctp_transport_route(sctp_transport_t *transport,
 		list_for_each(pos, &bp->address_list) {
 			laddr = list_entry(pos, struct sockaddr_storage_list,
 					   list);
-			if (af->cmp_saddr(dst, &laddr->a))
+			af->dst_saddr(&dst_saddr, dst);
+	                if (opt->pf->cmp_addr(&dst_saddr, &laddr->a, opt))
 				goto out_unlock;
 		}
 		sctp_read_unlock(addr_lock);

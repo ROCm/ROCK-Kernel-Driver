@@ -176,8 +176,8 @@ struct dst_entry *sctp_v6_get_dst(union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
 	struct dst_entry *dst;
-	struct flowi fl = { .nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr,
-					       } } };
+	struct flowi fl = { 
+		.nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr, } } };
 
 
 	SCTP_DEBUG_PRINTK("%s: DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
@@ -261,20 +261,43 @@ static void sctp_v6_from_skb(union sctp_addr *addr,struct sk_buff *skb,
 	ipv6_addr_copy(&addr->v6.sin6_addr, from);
 }
 
-/* Check if the dst entry's source addr matches the given source addr. */
-static int sctp_v6_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
+/* Initialize a sctp_addr from a dst_entry. */
+static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst)
 {
 	struct rt6_info *rt = (struct rt6_info *)dst;
+	addr->sa.sa_family = AF_INET6;
+	ipv6_addr_copy(&addr->v6.sin6_addr, &rt->rt6i_src.addr);
+}
 
-	return ipv6_addr_cmp(&rt->rt6i_src.addr, &saddr->v6.sin6_addr);
+/* Compare addresses exactly.  Well.. almost exactly; ignore scope_id
+ * for now.  FIXME.
+ */
+static int sctp_v6_cmp_addr(const union sctp_addr *addr1, 
+			    const union sctp_addr *addr2)
+{
+	int match;
+	if (addr1->sa.sa_family != addr2->sa.sa_family)
+		return 0;
+	match = !ipv6_addr_cmp((struct in6_addr *)&addr1->v6.sin6_addr, 
+			       (struct in6_addr *)&addr2->v6.sin6_addr);
+
+	return match;
 }
 
 /* Initialize addr struct to INADDR_ANY. */
-void sctp_v6_inaddr_any(union sctp_addr *addr, unsigned short port)
+static void sctp_v6_inaddr_any(union sctp_addr *addr, unsigned short port)
 {
 	memset(addr, 0x00, sizeof(union sctp_addr));
 	addr->v6.sin6_family = AF_INET6;
 	addr->v6.sin6_port = port;
+}
+
+/* Is this a wildcard address? */
+static int sctp_v6_is_any(const union sctp_addr *addr)
+{
+	int type;
+	type = ipv6_addr_type((struct in6_addr *)&addr->v6.sin6_addr);
+	return IPV6_ADDR_ANY == type;
 }
 
 /* This function checks if the address is a valid address to be used for
@@ -417,6 +440,32 @@ static int sctp_inet6_af_supported(sa_family_t family)
 	}
 }
 
+/* Address matching with wildcards allowed.  This extra level
+ * of indirection lets us choose whether a PF_INET6 should
+ * disallow any v4 addresses if we so choose. 
+ */
+static int sctp_inet6_cmp_addr(const union sctp_addr *addr1, 
+			       const union sctp_addr *addr2,
+			       struct sctp_opt *opt)
+{
+	struct sctp_func *af1, *af2;
+	
+	af1 = sctp_get_af_specific(addr1->sa.sa_family);
+	af2 = sctp_get_af_specific(addr2->sa.sa_family);
+
+	if (!af1 || !af2)
+		return 0;
+	/* Today, wildcard AF_INET/AF_INET6. */
+	if (sctp_is_any(addr1) || sctp_is_any(addr2))
+		return 1;
+
+	if (addr1->sa.sa_family != addr2->sa.sa_family)
+		return 0;
+	
+	return af1->cmp_addr(addr1, addr2);
+}
+
+
 
 static struct proto_ops inet6_seqpacket_ops = {
 	.family     = PF_INET6,
@@ -459,10 +508,12 @@ static sctp_func_t sctp_ipv6_specific = {
 	.get_dst	 = sctp_v6_get_dst,
 	.copy_addrlist   = sctp_v6_copy_addrlist,
 	.from_skb        = sctp_v6_from_skb,
-	.cmp_saddr	 = sctp_v6_cmp_saddr,
+	.dst_saddr       = sctp_v6_dst_saddr,
+	.cmp_addr        = sctp_v6_cmp_addr,
 	.scope           = sctp_v6_scope,
 	.addr_valid      = sctp_v6_addr_valid,
 	.inaddr_any      = sctp_v6_inaddr_any,
+	.is_any          = sctp_v6_is_any,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),
 	.sa_family       = AF_INET6,
@@ -472,6 +523,7 @@ static sctp_pf_t sctp_pf_inet6_specific = {
 	.event_msgname = sctp_inet6_event_msgname,
 	.skb_msgname   = sctp_inet6_skb_msgname,
 	.af_supported  = sctp_inet6_af_supported,
+	.cmp_addr      = sctp_inet6_cmp_addr,
 	.af            = &sctp_ipv6_specific,
 };
 

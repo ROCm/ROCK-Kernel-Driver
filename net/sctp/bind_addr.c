@@ -282,15 +282,16 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
  * 2nd Level Abstractions
  ********************************************************************/
 
-/* Does this contain a specified address? */
-int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const union sctp_addr *addr)
+/* Does this contain a specified address?  Allow wildcarding. */
+int sctp_bind_addr_match(sctp_bind_addr_t *bp, const union sctp_addr *addr,
+			 struct sctp_opt *opt)
 {
 	struct sockaddr_storage_list *laddr;
 	struct list_head *pos;
 
 	list_for_each(pos, &bp->address_list) {
 		laddr = list_entry(pos, struct sockaddr_storage_list, list);
- 		if (sctp_cmp_addr(&laddr->a, addr))
+		if (opt->pf->cmp_addr(&laddr->a, addr, opt))
  			return 1;
 	}
 
@@ -323,30 +324,13 @@ static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
 	return error;
 }
 
-/* Is addr one of the wildcards?  */
+/* Is this a wildcard address?  */
 int sctp_is_any(const union sctp_addr *addr)
 {
-	int retval = 0;
-
-	switch (addr->sa.sa_family) {
-	case AF_INET:
-		if (INADDR_ANY == addr->v4.sin_addr.s_addr)
-			retval = 1;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-			if (IPV6_ADDR_ANY ==
-			    sctp_ipv6_addr_type(&addr->v6.sin6_addr))
-				retval = 1;
-			);
-		break;
-
-	default:
-		break;
-	};
-
-	return retval;
+	struct sctp_func *af = sctp_get_af_specific(addr->sa.sa_family);
+	if (!af)
+		return 0;
+	return af->is_any(addr);
 }
 
 /* Is 'addr' valid for 'scope'?  */
@@ -354,63 +338,19 @@ int sctp_in_scope(const union sctp_addr *addr, sctp_scope_t scope)
 {
 	sctp_scope_t addr_scope = sctp_scope(addr);
 
-	switch (addr->sa.sa_family) {
-	case AF_INET:
-		/* According to the SCTP IPv4 address scoping document -
-		 * <draft-stewart-tsvwg-sctp-ipv4-00.txt>, the scope has
-		 * a heirarchy of 5 levels:
-		 * Level 0 - unusable SCTP addresses
-		 * Level 1 - loopback address
-		 * Level 2 - link-local addresses
-		 * Level 3 - private addresses.
-		 * Level 4 - global addresses
-		 * For INIT and INIT-ACK address list, let L be the level of
-		 * of requested destination address, sender and receiver
-		 * SHOULD include all of its addresses with level greater
-		 * than or equal to L.
-		 */
-		/* The unusable SCTP addresses will not be considered with
-		 * any defined scopes.
-		 */
-		if (SCTP_SCOPE_UNUSABLE == addr_scope)
-			return 0;
-
-		/* Note that we are assuming that the scoping are the same
-		 * for both IPv4 addresses and IPv6 addresses, i.e., if the
-		 * scope is link local, both IPv4 link local addresses and
-		 * IPv6 link local addresses would be treated as in the
-		 * scope.  There is no filtering for IPv4 vs. IPv6 addresses
-		 * based on scoping alone.
-		 */
-		if (addr_scope <= scope)
-			return 1;
-		break;
-
-	case AF_INET6:
-		/* FIXME:
-		 * This is almost certainly wrong since scopes have an
-		 * heirarchy.  I don't know what RFC to look at.
-		 * There may be some guidance in the SCTP implementors
-		 * guide (an Internet Draft as of October 2001).
-		 *
-		 * Further verification on the correctness of the IPv6
-		 * scoping is needed.  According to the IPv6 scoping draft,
-		 * the link local and site local address may require
-		 * further scoping.
-		 *
-		 * Is the heirachy of the IPv6 scoping the same as what's
-		 * defined for IPv4?
-		 * If the same heirarchy indeed applies to both famiies,
-		 * this function can be simplified with one set of code.
-		 * (see the comments for IPv4 above)
-		 */
-		if (addr_scope <= scope)
-			return 1;
-		break;
-
-	default:
+	/* The unusable SCTP addresses will not be considered with
+	 * any defined scopes.
+	 */
+	if (SCTP_SCOPE_UNUSABLE == addr_scope)
 		return 0;
-	};
+	/*
+	 * For INIT and INIT-ACK address list, let L be the level of
+	 * of requested destination address, sender and receiver
+	 * SHOULD include all of its addresses with level greater
+	 * than or equal to L.
+	 */
+	if (addr_scope <= scope)
+		return 1;
 
 	return 0;
 }

@@ -250,8 +250,10 @@ typedef struct sctp_func {
 					 union sctp_addr *saddr);
 	void            (*copy_addrlist) (struct list_head *,
 					  struct net_device *);
-	int		(*cmp_saddr)	(struct dst_entry *dst,
-					 union sctp_addr *saddr);
+	void            (*dst_saddr)    (union sctp_addr *saddr,
+					 struct dst_entry *dst);
+	int             (*cmp_addr)     (const union sctp_addr *addr1,
+					 const union sctp_addr *addr2);
 	void            (*addr_copy)    (union sctp_addr *dst,
 					 union sctp_addr *src);
 	void            (*from_skb)     (union sctp_addr *,
@@ -260,6 +262,7 @@ typedef struct sctp_func {
 	int             (*addr_valid)   (union sctp_addr *);
 	sctp_scope_t    (*scope) (union sctp_addr *);
 	void            (*inaddr_any)   (union sctp_addr *, unsigned short);
+	int             (*is_any)       (const union sctp_addr *);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
@@ -273,6 +276,9 @@ typedef struct sctp_pf {
 	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
 	void (*skb_msgname)(struct sk_buff *, char *, int *);
 	int  (*af_supported)(sa_family_t);
+	int  (*cmp_addr) (const union sctp_addr *,
+			  const union sctp_addr *,
+			  struct sctp_opt *);
 	struct sctp_func *af;
 } sctp_pf_t;
 
@@ -758,7 +764,8 @@ extern sctp_transport_t *sctp_transport_new(const union sctp_addr *, int);
 extern sctp_transport_t *sctp_transport_init(sctp_transport_t *,
 					     const union sctp_addr *, int);
 extern void sctp_transport_set_owner(sctp_transport_t *, sctp_association_t *);
-extern void sctp_transport_route(sctp_transport_t *, union sctp_addr *);
+extern void sctp_transport_route(sctp_transport_t *, union sctp_addr *,
+				 struct sctp_opt *);
 extern void sctp_transport_free(sctp_transport_t *);
 extern void sctp_transport_destroy(sctp_transport_t *);
 extern void sctp_transport_reset_timers(sctp_transport_t *);
@@ -908,7 +915,8 @@ int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
 int sctp_add_bind_addr(sctp_bind_addr_t *, union sctp_addr *,
 		       int priority);
 int sctp_del_bind_addr(sctp_bind_addr_t *, union sctp_addr *);
-int sctp_bind_addr_has_addr(sctp_bind_addr_t *, const union sctp_addr *);
+int sctp_bind_addr_match(sctp_bind_addr_t *, const union sctp_addr *,
+			 struct sctp_opt *);
 union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
 					 int *addrs_len,
 					 int priority);
@@ -1565,13 +1573,10 @@ __u32 __sctp_association_get_next_tsn(sctp_association_t *);
 __u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
 __u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
 
-int sctp_cmp_addr(const union sctp_addr *ss1,
-		  const union sctp_addr *ss2);
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 		        const union sctp_addr *ss2);
 sctp_chunk_t *sctp_get_ecne_prepend(sctp_association_t *asoc);
 sctp_chunk_t *sctp_get_no_prepend(sctp_association_t *asoc);
-
 
 /* A convenience structure to parse out SCTP specific CMSGs. */
 typedef struct sctp_cmsgs {

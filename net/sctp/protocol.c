@@ -227,12 +227,11 @@ struct dst_entry *sctp_v4_get_dst(union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
 	struct rtable *rt;
-	struct flowi fl = {
-		.nl_u = {
-			.ip4_u = { .daddr =
-				   daddr->v4.sin_addr.s_addr, }},
-		.proto = IPPROTO_SCTP,
-	};
+	struct flowi fl;
+
+	memset(&fl, 0x0, sizeof(struct flowi));
+	fl.fl4_dst  = daddr->v4.sin_addr.s_addr;
+	fl.proto = IPPROTO_SCTP;
 
 	if (saddr)
 		fl.fl4_src = saddr->v4.sin_addr.s_addr;
@@ -275,20 +274,40 @@ static void sctp_v4_from_skb(union sctp_addr *addr, struct sk_buff *skb,
 	memcpy(&addr->v4.sin_addr.s_addr, from, sizeof(struct in_addr));
 }
 
-/* Check if the dst entry's source addr matches the given source addr. */
-int sctp_v4_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
+/* Initialize a sctp_addr from a dst_entry. */
+static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst)
 {
 	struct rtable *rt = (struct rtable *)dst;
+	saddr->v4.sin_family = AF_INET;
+	saddr->v4.sin_addr.s_addr = rt->rt_src;
+}
 
-	return (rt->rt_src == saddr->v4.sin_addr.s_addr);
+/* Compare two addresses exactly. */
+static int sctp_v4_cmp_addr(const union sctp_addr *addr1,
+			    const union sctp_addr *addr2)
+{
+	if (addr1->sa.sa_family != addr2->sa.sa_family)
+		return 0;
+	if (addr1->v4.sin_port != addr2->v4.sin_port)
+		return 0;
+	if (addr1->v4.sin_addr.s_addr != addr2->v4.sin_addr.s_addr)
+		return 0;
+
+	return 1;
 }
 
 /* Initialize addr struct to INADDR_ANY. */
-void sctp_v4_inaddr_any(union sctp_addr *addr, unsigned short port)
+static void sctp_v4_inaddr_any(union sctp_addr *addr, unsigned short port)
 {
 	addr->v4.sin_family = AF_INET;
 	addr->v4.sin_addr.s_addr = INADDR_ANY;
 	addr->v4.sin_port = port;
+}
+
+/* Is this a wildcard address? */
+static int sctp_v4_is_any(const union sctp_addr *addr)
+{
+	return INADDR_ANY == addr->v4.sin_addr.s_addr;
 }
 
 /* This function checks if the address is a valid address to be used for
@@ -310,6 +329,16 @@ static int sctp_v4_addr_valid(union sctp_addr *addr)
 /* Checking the loopback, private and other address scopes as defined in
  * RFC 1918.   The IPv4 scoping is based on the draft for SCTP IPv4
  * scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>.
+ *
+ * Level 0 - unusable SCTP addresses
+ * Level 1 - loopback address
+ * Level 2 - link-local addresses
+ * Level 3 - private addresses.
+ * Level 4 - global addresses
+ * For INIT and INIT-ACK address list, let L be the level of
+ * of requested destination address, sender and receiver
+ * SHOULD include all of its addresses with level greater
+ * than or equal to L.
  */
 static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 {
@@ -413,7 +442,8 @@ static void sctp_inet_msgname(char *msgname, int *addr_len)
 }
 
 /* Copy the primary address of the peer primary address as the msg_name. */
-static void sctp_inet_event_msgname(sctp_ulpevent_t *event, char *msgname, int *addr_len)
+static void sctp_inet_event_msgname(sctp_ulpevent_t *event, char *msgname,
+				    int *addr_len)
 {
 	struct sockaddr_in *sin, *sinfrom;
 
@@ -448,12 +478,31 @@ static int sctp_inet_af_supported(sa_family_t family)
 	return (AF_INET == family);
 }
 
+/* Address matching with wildcards allowed. */
+static int sctp_inet_cmp_addr(const union sctp_addr *addr1,
+			      const union sctp_addr *addr2,
+			      struct sctp_opt *opt)
+{
+	/* PF_INET only supports AF_INET addresses. */
+	if (addr1->sa.sa_family != addr2->sa.sa_family)
+		return 0;
+	if (INADDR_ANY == addr1->v4.sin_addr.s_addr ||
+	    INADDR_ANY == addr2->v4.sin_addr.s_addr)
+		return 1;
+	if (addr1->v4.sin_addr.s_addr == addr2->v4.sin_addr.s_addr)
+		return 1;
+
+	return 0;
+}
+
+
 struct sctp_func sctp_ipv4_specific;
 
 static sctp_pf_t sctp_pf_inet = {
 	.event_msgname = sctp_inet_event_msgname,
 	.skb_msgname   = sctp_inet_skb_msgname,
 	.af_supported  = sctp_inet_af_supported,
+	.cmp_addr      = sctp_inet_cmp_addr,
 	.af            = &sctp_ipv4_specific,
 };
 
@@ -509,9 +558,11 @@ struct sctp_func sctp_ipv4_specific = {
 	.get_dst	= sctp_v4_get_dst,
 	.copy_addrlist  = sctp_v4_copy_addrlist,
 	.from_skb       = sctp_v4_from_skb,
-	.cmp_saddr	= sctp_v4_cmp_saddr,
+	.dst_saddr      = sctp_v4_dst_saddr,
+	.cmp_addr       = sctp_v4_cmp_addr,
 	.addr_valid     = sctp_v4_addr_valid,
 	.inaddr_any     = sctp_v4_inaddr_any,
+	.is_any         = sctp_v4_is_any,
 	.scope          = sctp_v4_scope,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
