@@ -2,9 +2,10 @@
 #define __LINUX__AIO_H
 
 #include <linux/list.h>
-#include <asm/atomic.h>
-
+#include <linux/tqueue.h>
 #include <linux/aio_abi.h>
+
+#include <asm/atomic.h>
 
 #define AIO_MAXSEGS		4
 #define AIO_KIOGRP_NR_ATOMIC	8
@@ -22,28 +23,54 @@ struct kioctx;
 
 #define KIOCB_SYNC_KEY		(~0U)
 
-#define KIOCB_PRIVATE_SIZE	(16 * sizeof(long))
+#define KIOCB_PRIVATE_SIZE	(24 * sizeof(long))
+
+/* ki_flags bits */
+#define KIF_LOCKED		0
+#define KIF_KICKED		1
+#define KIF_CANCELLED		2
+
+#define kiocbTryLock(iocb)	test_and_set_bit(KIF_LOCKED, &(iocb)->ki_flags)
+#define kiocbTryKick(iocb)	test_and_set_bit(KIF_KICKED, &(iocb)->ki_flags)
+
+#define kiocbSetLocked(iocb)	set_bit(KIF_LOCKED, &(iocb)->ki_flags)
+#define kiocbSetKicked(iocb)	set_bit(KIF_KICKED, &(iocb)->ki_flags)
+#define kiocbSetCancelled(iocb)	set_bit(KIF_CANCELLED, &(iocb)->ki_flags)
+
+#define kiocbClearLocked(iocb)	set_bit(KIF_LOCKED, &(iocb)->ki_flags)
+#define kiocbClearKicked(iocb)	set_bit(KIF_KICKED, &(iocb)->ki_flags)
+#define kiocbClearCancelled(iocb)	set_bit(KIF_CANCELLED, &(iocb)->ki_flags)
+
+#define kiocbIsLocked(iocb)	test_bit(0, &(iocb)->ki_flags)
+#define kiocbIsKicked(iocb)	test_bit(1, &(iocb)->ki_flags)
+#define kiocbIsCancelled(iocb)	test_bit(2, &(iocb)->ki_flags)
 
 struct kiocb {
+	struct list_head	ki_run_list;
+	long			ki_flags;
 	int			ki_users;
 	unsigned		ki_key;		/* id of this request */
 
 	struct file		*ki_filp;
 	struct kioctx		*ki_ctx;	/* may be NULL for sync ops */
 	int			(*ki_cancel)(struct kiocb *, struct io_event *);
+	long			(*ki_retry)(struct kiocb *);
 
-	struct list_head	ki_list;
+	struct list_head	ki_list;	/* the aio core uses this
+						 * for cancellation */
 
-	void			*ki_data;	/* for use by the the file */
 	void			*ki_user_obj;	/* pointer to userland's iocb */
 	__u64			ki_user_data;	/* user's data for completion */
+	loff_t			ki_pos;
 
-	long			private[KIOCB_PRIVATE_SIZE/sizeof(long)];
+	char			private[KIOCB_PRIVATE_SIZE];
 };
 
+#define is_sync_kiocb(iocb)	((iocb)->ki_key == KIOCB_SYNC_KEY)
 #define init_sync_kiocb(x, filp)			\
 	do {						\
 		struct task_struct *tsk = current;	\
+		(x)->ki_flags = 0;			\
 		(x)->ki_users = 1;			\
 		(x)->ki_key = KIOCB_SYNC_KEY;		\
 		(x)->ki_filp = (filp);			\
@@ -101,10 +128,13 @@ struct kioctx {
 
 	int			reqs_active;
 	struct list_head	active_reqs;	/* used for cancellation */
+	struct list_head	run_list;	/* used for kicked reqs */
 
 	unsigned		max_reqs;
 
 	struct aio_ring_info	ring_info;
+
+	struct tq_struct	tq;
 };
 
 /* prototypes */
@@ -112,6 +142,7 @@ extern unsigned aio_max_size;
 
 extern ssize_t FASTCALL(wait_on_sync_kiocb(struct kiocb *iocb));
 extern int FASTCALL(aio_put_req(struct kiocb *iocb));
+extern void FASTCALL(kick_iocb(struct kiocb *iocb));
 extern int FASTCALL(aio_complete(struct kiocb *iocb, long res, long res2));
 extern void FASTCALL(__put_ioctx(struct kioctx *ctx));
 struct mm_struct;

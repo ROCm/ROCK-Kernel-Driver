@@ -1191,11 +1191,12 @@ out:
 }
 
 ssize_t
-generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t *ppos)
+generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t pos)
 {
 	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
 
-	return __generic_file_aio_read(iocb, &local_iov, 1, ppos);
+	BUG_ON(iocb->ki_pos != pos);
+	return __generic_file_aio_read(iocb, &local_iov, 1, &iocb->ki_pos);
 }
 
 ssize_t
@@ -1949,6 +1950,12 @@ out:
 	pagevec_lru_add(&lru_pvec);
 	current->backing_dev_info = 0;
 	return err;
+}
+
+ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
+			       size_t count, loff_t pos)
+{
+	return generic_file_write(iocb->ki_filp, buf, count, &iocb->ki_pos);
 }
 
 ssize_t generic_file_write(struct file *file, const char *buf,

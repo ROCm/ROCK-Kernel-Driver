@@ -131,7 +131,7 @@ asmlinkage long sys_uselib(const char * library)
 		goto out;
 
 	error = -ENOEXEC;
-	if(file->f_op && file->f_op->read) {
+	if(file->f_op) {
 		struct linux_binfmt * fmt;
 
 		read_lock(&binfmt_lock);
@@ -453,19 +453,16 @@ out:
 }
 
 int kernel_read(struct file *file, unsigned long offset,
-	char * addr, unsigned long count)
+	char *addr, unsigned long count)
 {
 	mm_segment_t old_fs;
 	loff_t pos = offset;
-	int result = -ENOSYS;
+	int result;
 
-	if (!file->f_op->read)
-		goto fail;
 	old_fs = get_fs();
 	set_fs(get_ds());
-	result = file->f_op->read(file, addr, count, &pos);
+	result = vfs_read(file, addr, count, &pos);
 	set_fs(old_fs);
-fail:
 	return result;
 }
 
