@@ -34,7 +34,7 @@ struct export_operations export_op_default;
 
 #define	CALL(ops,fun) ((ops->fun)?(ops->fun):export_op_default.fun)
 
-#define dprintk(x, ...) do{}while(0)
+#define dprintk(x, a...) do{}while(0)
 
 struct dentry *
 find_exported_dentry(struct super_block *sb, void *obj, void *parent,
