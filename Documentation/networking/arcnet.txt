@@ -108,7 +108,6 @@ All you will need to do in order to install the driver is:
 	make config
 		(be sure to choose ARCnet in the network devices 
 		and at least one chipset driver.)
-	make dep
 	make clean
 	make zImage
 	

@@ -3,11 +3,12 @@ obj-y := initramfs_data.o
 
 host-progs  := gen_init_cpio
 
-clean-files := initramfs_data.cpio.gz initramfs_data.S
+clean-files := initramfs_data.cpio.gz
 
-$(src)/initramfs_data.S: $(obj)/initramfs_data.cpio.gz
-	echo "	.section .init.ramfs,\"a\"" > $(src)/initramfs_data.S
-	echo ".incbin \"usr/initramfs_data.cpio.gz\"" >> $(src)/initramfs_data.S
+# initramfs_data.o contains the initramfs_data.cpio.gz image.
+# The image is included using .incbin, a dependency which is not
+# tracked automatically.
+$(obj)/initramfs_data.o: $(obj)/initramfs_data.cpio.gz FORCE
 
 # initramfs-y are the programs which will be copied into the CPIO
 # archive. Currently, the filenames are hardcoded in gen_init_cpio,

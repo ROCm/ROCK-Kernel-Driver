@@ -15,7 +15,7 @@ with this one.
 Of course you should time how long each build takes :-)
 Example:
    make config
-   time -v sh -c 'make dep ; make clean install modules modules_install'
+   time -v sh -c 'make clean install modules modules_install'
 
 If you are using some Compaq MP compliant machines you will need to set
 the operating system in the BIOS settings to "Unixware" - don't ask me

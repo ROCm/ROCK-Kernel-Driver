@@ -18,7 +18,6 @@
 LDFLAGS		:= -m elf_i386
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux :=
-LDFLAGS_BLOB	:= --format binary --oformat elf32-i386
 
 CFLAGS += -pipe
 
