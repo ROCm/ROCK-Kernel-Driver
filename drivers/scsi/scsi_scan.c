@@ -81,18 +81,18 @@ MODULE_PARM_DESC(max_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
 
 static int scsi_sparselun;
-module_param_named(scsi_sparselun, scsi_sparselun, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_sparselun,
+module_param_named(sparselun, scsi_sparselun, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(sparselun,
 		 "Assume sparse LUNs for all SCSI devices");
 
 static int scsi_largelun;
-module_param_named(scsi_largelun, scsi_largelun, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_largelun,
+module_param_named(largelun, scsi_largelun, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(largelun,
 		 "Assume all SCSI-2 devs support more than 8 LUNs");
 
 static unsigned int max_scsi_sparseluns;
-module_param_named(max_scsi_sparseluns, max_scsi_sparseluns, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(max_scsi_sparseluns,
+module_param_named(max_sparseluns, max_scsi_sparseluns, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(max_sparseluns,
 		 "Limit LUNs for scanning sparse LUN devices");
 
 /*
@@ -110,18 +110,18 @@ MODULE_PARM_DESC(max_report_luns,
 		 " between 1 and 16384)");
 
 static int scsi_noreportlun;
-module_param_named(scsi_noreportlun, scsi_noreportlun, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_noreportlun,
+module_param_named(noreportlun, scsi_noreportlun, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(noreportlun,
 		 "Don't use REPORT_LUNs for scanning SCSI-3 devs");
 
 static int scsi_reportlun2;
-module_param_named(scsi_reportlun2, scsi_reportlun2, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_reportlun2,
+module_param_named(reportlun2, scsi_reportlun2, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(reportlun2,
 		 "Use REPORT_LUNs for scanning SCSI-2 devs as well");
 
 static unsigned int scsi_allow_ghost_devices;
-module_param_named(scsi_allow_ghost_devices ,scsi_allow_ghost_devices, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_allow_ghost_devices, 
+module_param_named(allow_ghost_devices ,scsi_allow_ghost_devices, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(allow_ghost_devices, 
 		 "allow devices marked as being offline to be accessed anyway "
 		 "(0 = off, else allow ghosts on lun 0 through allow_ghost_devices - 1");
 
@@ -137,8 +137,8 @@ static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+25;
 static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+3;
 #endif
 
-module_param_named(scsi_inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_inq_timeout, 
+module_param_named(inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(inq_timeout, 
 		 "Timeout (in seconds) waiting for devices to answer INQUIRY."
 		 " Default is 6. Some non-compliant devices need more.");
 
