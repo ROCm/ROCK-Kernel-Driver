@@ -42,6 +42,17 @@
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
 
+/* Maximum number of readahead requests
+ * FIXME: this should really be a sysctl so that users may tune it to suit
+ *        their needs. People that do NFS over a slow network, might for
+ *        instance want to reduce it to something closer to 1 for improved
+ *        interactive response.
+ *
+ *        For the moment, though, we instead set it to RPC_MAXREQS, which
+ *        is the maximum number of simultaneous RPC requests on the wire.
+ */
+#define NFS_MAX_READAHEAD	RPC_MAXREQS
+
 static struct inode * __nfs_fhget(struct super_block *, struct nfs_fh *, struct nfs_fattr *);
 void nfs_zap_caches(struct inode *);
 static void nfs_invalidate_inode(struct inode *);
@@ -356,7 +367,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->acdirmin = server->acdirmax = 0;
 		sb->s_flags |= MS_SYNCHRONOUS;
 	}
-	server->backing_dev_info.ra_pages = server->rpages << 2;
+	server->backing_dev_info.ra_pages = server->rpages * NFS_MAX_READAHEAD;
 
 	sb->s_maxbytes = fsinfo.maxfilesize;
 	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
