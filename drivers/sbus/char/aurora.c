@@ -85,7 +85,7 @@ int irqhit=0;
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
-static struct tty_driver aurora_driver;
+static struct tty_driver *aurora_driver;
 static struct Aurora_board aurora_board[AURORA_NBOARD] = {
 	{0,},
 };
@@ -2252,6 +2252,24 @@ static void do_softint(void *private_)
 #endif
 }
 
+static struct tty_operations aurora_ops = {
+	.open  = aurora_open,
+	.close = aurora_close,
+	.write = aurora_write,
+	.put_char = aurora_put_char,
+	.flush_chars = aurora_flush_chars,
+	.write_room = aurora_write_room,
+	.chars_in_buffer = aurora_chars_in_buffer,
+	.flush_buffer = aurora_flush_buffer,
+	.ioctl = aurora_ioctl,
+	.throttle = aurora_throttle,
+	.unthrottle = aurora_unthrottle,
+	.set_termios = aurora_set_termios,
+	.stop = aurora_stop,
+	.start = aurora_start,
+	.hangup = aurora_hangup,
+};
+
 static int aurora_init_drivers(void)
 {
 	int error;
@@ -2266,38 +2284,25 @@ static int aurora_init_drivers(void)
 		return 1;
 	}
 	init_bh(AURORA_BH, do_aurora_bh);
-/*	memset(IRQ_to_board, 0, sizeof(IRQ_to_board));*/
-	memset(&aurora_driver, 0, sizeof(aurora_driver));
-	aurora_driver.magic = TTY_DRIVER_MAGIC;
-	aurora_driver.owner = THIS_MODULE;
-	aurora_driver.name = "ttyA";
-	aurora_driver.major = AURORA_MAJOR;
-	aurora_driver.num = AURORA_TNPORTS;
-	aurora_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	aurora_driver.subtype = SERIAL_TYPE_NORMAL;
-	aurora_driver.init_termios = tty_std_termios;
-	aurora_driver.init_termios.c_cflag =
+	aurora_driver = alloc_tty_driver(AURORA_INPORTS);
+	if (!aurora_driver) {
+		printk(KERN_ERR "aurora: Couldn't allocate tty driver.\n");
+		free_page((unsigned long) tmp_buf);
+		return 1;
+	}
+	aurora_driver->owner = THIS_MODULE;
+	aurora_driver->name = "ttyA";
+	aurora_driver->major = AURORA_MAJOR;
+	aurora_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	aurora_driver->subtype = SERIAL_TYPE_NORMAL;
+	aurora_driver->init_termios = tty_std_termios;
+	aurora_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	aurora_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	aurora_driver.open  = aurora_open;
-	aurora_driver.close = aurora_close;
-	aurora_driver.write = aurora_write;
-	aurora_driver.put_char = aurora_put_char;
-	aurora_driver.flush_chars = aurora_flush_chars;
-	aurora_driver.write_room = aurora_write_room;
-	aurora_driver.chars_in_buffer = aurora_chars_in_buffer;
-	aurora_driver.flush_buffer = aurora_flush_buffer;
-	aurora_driver.ioctl = aurora_ioctl;
-	aurora_driver.throttle = aurora_throttle;
-	aurora_driver.unthrottle = aurora_unthrottle;
-	aurora_driver.set_termios = aurora_set_termios;
-	aurora_driver.stop = aurora_stop;
-	aurora_driver.start = aurora_start;
-	aurora_driver.hangup = aurora_hangup;
-
-	error = tty_register_driver(&aurora_driver);
+	aurora_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(aurora_driver, &aurora_ops);
+	error = tty_register_driver(aurora_driver);
 	if (error) {
+		put_tty_driver(aurora_driver);
 		free_page((unsigned long) tmp_buf);
 		printk(KERN_ERR "aurora: Couldn't register aurora driver, error = %d\n",
 		       error);
@@ -2328,7 +2333,8 @@ static void aurora_release_drivers(void)
 	printk("aurora_release_drivers: start\n");
 #endif
 	free_page((unsigned long)tmp_buf);
-	tty_unregister_driver(&aurora_driver);
+	tty_unregister_driver(aurora_driver);
+	put_tty_driver(aurora_driver);
 #ifdef AURORA_DEBUG
 	printk("aurora_release_drivers: end\n");
 #endif
