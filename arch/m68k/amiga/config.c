@@ -88,6 +88,7 @@ static unsigned long amiga_gettimeoffset (void);
 static int a3000_hwclk (int, struct rtc_time *);
 static int a2000_hwclk (int, struct rtc_time *);
 static int amiga_set_clock_mmss (unsigned long);
+extern void amiga_mksound( unsigned int count, unsigned int ticks );
 #ifdef CONFIG_AMIGA_FLOPPY
 extern void amiga_floppy_setup(char *, int *);
 #endif

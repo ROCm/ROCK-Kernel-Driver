@@ -78,6 +78,8 @@ extern void oss_init(void);
 extern void psc_init(void);
 extern void baboon_init(void);
 
+extern void mac_mksound(unsigned int, unsigned int);
+
 extern void nubus_sweep_video(void);
 
 /* Mac specific debug functions (in debug.c) */
