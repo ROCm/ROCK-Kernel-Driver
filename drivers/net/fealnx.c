@@ -940,7 +940,7 @@ static int netdev_open(struct net_device *dev)
 // 89/9/1 modify,
 //   np->bcrvalue=0x38;
 	np->bcrvalue = 0x10;
-	np->cralue = 0xe00;	/* rx 128 burst length */
+	np->crvalue = 0xe00;	/* rx 128 burst length */
 #warning Processor architecture undefined!
 #endif
 // 89/12/29 add,
