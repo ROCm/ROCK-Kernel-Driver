@@ -692,7 +692,6 @@ static int suspend_prepare_image(void)
 		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
 		       name_suspend, nr_needed_pages-nr_free_pages());
 		root_swap = 0xFFFF;
-		spin_unlock_irq(&suspend_pagedir_lock);
 		return 1;
 	}
 	si_swapinfo(&i);	/* FIXME: si_swapinfo(&i) returns all swap devices information.
@@ -700,7 +699,6 @@ static int suspend_prepare_image(void)
 	if (i.freeswap < nr_needed_pages)  {
 		printk(KERN_CRIT "%sThere's not enough swap space available, on %ld pages short\n",
 		       name_suspend, nr_needed_pages-i.freeswap);
-		spin_unlock_irq(&suspend_pagedir_lock);
 		return 1;
 	}
 
@@ -710,7 +708,6 @@ static int suspend_prepare_image(void)
 		/* Shouldn't happen */
 		printk(KERN_CRIT "%sCouldn't allocate enough pages\n",name_suspend);
 		panic("Really should not happen");
-		spin_unlock_irq(&suspend_pagedir_lock);
 		return 1;
 	}
 	nr_copy_pages_check = nr_copy_pages;
@@ -724,12 +721,9 @@ static int suspend_prepare_image(void)
 	 * End of critical section. From now on, we can write to memory,
 	 * but we should not touch disk. This specially means we must _not_
 	 * touch swap space! Except we must write out our image of course.
-	 *
-	 * Following line enforces not writing to disk until we choose.
 	 */
 
 	printk( "critical section/: done (%d pages copied)\n", nr_copy_pages );
-	spin_unlock_irq(&suspend_pagedir_lock);
 	return 0;
 }
 
@@ -808,6 +802,24 @@ void do_magic_resume_2(void)
 #endif
 }
 
+/* do_magic() is implemented in arch/?/kernel/suspend_asm.S, and basically does:
+
+	if (!resume) {
+		do_magic_suspend_1();
+		save_processor_state();
+		SAVE_REGISTERS
+		do_magic_suspend_2();
+		return;
+	}
+	GO_TO_SWAPPER_PAGE_TABLES
+	do_magic_resume_1();
+	COPY_PAGES_BACK
+	RESTORE_REGISTERS
+	restore_processor_state();
+	do_magic_resume_2();
+
+ */
+
 void do_magic_suspend_1(void)
 {
 	mb();
@@ -818,8 +830,13 @@ void do_magic_suspend_1(void)
 
 void do_magic_suspend_2(void)
 {
+	int is_problem;
 	read_swapfiles();
-	if (!suspend_prepare_image()) {	/* suspend_save_image realeses suspend_pagedir_lock */
+	is_problem = suspend_prepare_image();
+	spin_unlock_irq(&suspend_pagedir_lock);
+	if (!is_problem) {
+		kernel_fpu_end();	/* save_processor_state() does kernel_fpu_begin, and we need to revert it in order to pass in_atomic() checks */
+		BUG_ON(in_atomic());
 		suspend_save_image();
 		suspend_power_down();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
 	}
@@ -1224,13 +1241,13 @@ void software_resume(void)
 	orig_loglevel = console_loglevel;
 	console_loglevel = new_loglevel;
 
-	if(!resume_file[0] && resume_status == RESUME_SPECIFIED) {
+	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
 		printk( "suspension device unspecified\n" );
 		return;
 	}
 
 	printk( "resuming from %s\n", resume_file);
-	if(read_suspend_image(resume_file, 0))
+	if (read_suspend_image(resume_file, 0))
 		goto read_failure;
 	do_magic(1);
 	panic("This never returns");

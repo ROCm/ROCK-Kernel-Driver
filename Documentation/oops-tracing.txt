@@ -52,7 +52,7 @@ latter, man ksymoops for details.
 Full Information
 ----------------
 
-From: Linus Torvalds <torvalds@transmeta.com>
+From: Linus Torvalds <torvalds@osdl.org>
 
 How to track down an Oops.. [originally a mail to linux-kernel]
 

@@ -41,7 +41,7 @@ Linux 2.4:
 Linux 2.5:
 	The same rules apply as 2.4 except that you should follow linux-kernel
 	to track changes in API's. The final contact point for Linux 2.5
-	submissions is Linus Torvalds <torvalds@transmeta.com>.
+	submissions is Linus Torvalds <torvalds@osdl.org>.
 
 What Criteria Determine Acceptance
 ----------------------------------
