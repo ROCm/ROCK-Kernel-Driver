@@ -8,9 +8,6 @@ ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
   obj-$(CONFIG_SND_SEQUENCER) += oss/
 endif
 
-export-objs  := seq_device.o seq.o seq_instr.o seq_midi_emul.o \
-		seq_midi_event.o seq_virmidi.o
-
 snd-seq-device-objs := seq_device.o
 snd-seq-objs := seq.o seq_lock.o seq_clientmgr.o seq_memory.o seq_queue.o \
                 seq_fifo.o seq_prioq.o seq_timer.o \

@@ -3,8 +3,6 @@ obj-y = bugs.o checksum.o extable.o fault.o ksyms.o ldt.o module.o \
 
 obj-$(CONFIG_HIGHMEM) += highmem.o
 
-export-objs = ksyms.o
-
 USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 

@@ -2,9 +2,6 @@
 # Makefile for the Linux Wireless network device drivers.
 #
 
-# Things that need to export symbols
-export-objs	:= airo.o orinoco.o hermes.o
-
 # Obsolete cards
 obj-$(CONFIG_WAVELAN)		+= wavelan.o
 obj-$(CONFIG_PCMCIA_NETWAVE)	+= netwave_cs.o

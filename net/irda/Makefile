@@ -2,8 +2,6 @@
 # Makefile for the Linux IrDA protocol layer.
 #
 
-export-objs := irsyms.o
-
 obj-$(CONFIG_IRDA) += irda.o
 obj-$(CONFIG_IRLAN) += irlan/
 obj-$(CONFIG_IRNET) += irnet/

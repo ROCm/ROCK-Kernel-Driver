@@ -38,8 +38,6 @@ EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 .S.o:
 	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
 
-export-objs = sn_ksyms.o iomv.o
-
 obj-y		= probe.o setup.o sn_asm.o sv.o bte.o iomv.o
 obj-$(CONFIG_IA64_SGI_SN1)      += irq.o mca.o
 obj-$(CONFIG_IA64_SGI_SN2)      += irq.o mca.o

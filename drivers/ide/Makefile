@@ -7,8 +7,6 @@
 # Note : at this point, these files are compiled on all systems.
 # In the future, some of these should be built conditionally.
 #
-export-objs := ide-iops.o ide-taskfile.o ide-proc.o ide.o ide-probe.o ide-dma.o ide-lib.o setup-pci.o ide-io.o
-
 # First come modules that register themselves with the core
 obj-$(CONFIG_BLK_DEV_IDEPCI)		+= pci/
 

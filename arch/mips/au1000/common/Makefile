@@ -6,8 +6,6 @@
 # Makefile for the Alchemy Au1000 CPU, generic files.
 #
 
-export-objs := serial.o
-
 obj-y := prom.o dbg_io.o int-handler.o irq.o puts.o time.o reset.o
 
 obj-$(CONFIG_AU1000_UART) += serial.o             

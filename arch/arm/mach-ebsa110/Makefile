@@ -9,6 +9,4 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:= io.o
-
 obj-$(CONFIG_LEDS)	+= leds.o

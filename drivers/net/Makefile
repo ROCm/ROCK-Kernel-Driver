@@ -2,12 +2,6 @@
 # Makefile for the Linux network (ethercard) device drivers.
 #
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
-			ppp_async.o ppp_generic.o slhc.o pppox.o auto_irq.o \
-			net_init.o mii.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
 
 ifeq ($(CONFIG_ISDN_PPP),y)

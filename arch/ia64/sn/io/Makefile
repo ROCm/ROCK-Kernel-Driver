@@ -13,8 +13,6 @@ ifdef CONFIG_IA64_SGI_SN2
 EXTRA_CFLAGS    += -DSHUB_SWAP_WAR
 endif
 
-export-objs := hcl.o pci_dma.o
-
 obj-$(CONFIG_IA64_SGI_SN) += stubs.o sgi_if.o xswitch.o klgraph_hack.o \
 		hcl.o labelcl.o invent.o sgi_io_sim.o \
 		klgraph_hack.o hcl_util.o cdl.o hubdev.o hubspc.o \

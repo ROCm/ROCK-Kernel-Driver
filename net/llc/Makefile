@@ -18,6 +18,3 @@ llc-y := llc_if.o llc_c_ev.o llc_c_ac.o llc_mac.o llc_sap.o llc_s_st.o \
 	 llc_main.o llc_s_ac.o llc_conn.o llc_c_st.o llc_stat.o llc_actn.o \
 	 llc_s_ev.o llc_evnt.o llc_pdu.o llc_proc.o
 llc-$(CONFIG_LLC_UI)	+= af_llc.o
-
-# Objects that export symbols.
-export-objs := llc_if.o

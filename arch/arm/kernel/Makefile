@@ -15,8 +15,6 @@ obj-m		:=
 obj-n		:=
 obj-		:=
 
-export-objs	:= armksyms.o apm.o dma.o ecard.o fiq.o io.o time.o
-
 obj-$(CONFIG_APM)		+= apm.o
 obj-$(CONFIG_ARCH_ACORN)	+= ecard.o time-acorn.o
 obj-$(CONFIG_ARCH_CLPS7500)	+= time-acorn.o

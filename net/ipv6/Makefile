@@ -2,8 +2,6 @@
 # Makefile for the Linux TCP/IP (INET6) layer.
 #
 
-export-objs :=  ipv6_syms.o
-
 obj-$(CONFIG_IPV6) += ipv6.o
 
 ipv6-objs :=	af_inet6.o ip6_output.o ip6_input.o addrconf.o sit.o \

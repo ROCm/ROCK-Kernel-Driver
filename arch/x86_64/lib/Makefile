@@ -3,8 +3,6 @@
 #
 
 L_TARGET := lib.a
-export-objs := io.o csum-wrappers.o csum-partial.o
-
 CFLAGS_csum-partial.o := -funroll-loops
 
 obj-y := csum-partial.o csum-copy.o csum-wrappers.o delay.o \

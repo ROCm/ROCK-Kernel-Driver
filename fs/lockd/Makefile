@@ -2,8 +2,6 @@
 # Makefile for the linux lock manager stuff
 #
 
-export-objs := lockd_syms.o
-
 obj-$(CONFIG_LOCKD) += lockd.o
 
 lockd-objs-y := clntlock.o clntproc.o host.o svc.o svclock.o svcshare.o \

@@ -2,8 +2,6 @@
 # Makefile for ALSA
 #
 
-export-objs += uda1341.o
-
 snd-uda1341-objs := uda1341.o
 
 # Module Dependency

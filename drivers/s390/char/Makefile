@@ -2,8 +2,6 @@
 # S/390 character devices
 #
 
-export-objs := sclp.o tape_core.o tape_devmap.o tape_std.o
-
 tub3270-objs := tuball.o tubfs.o tubtty.o \
                      tubttyaid.o tubttybld.o tubttyscl.o \
                      tubttyrcl.o tubttysiz.o

@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := emux.o
-
 snd-emux-synth-objs := emux.o emux_synth.o emux_seq.o emux_nrpn.o \
 		       emux_effect.o emux_proc.o soundfont.o \
 		       $(if $(CONFIG_SND_SEQUENCER_OSS),emux_oss.o)
