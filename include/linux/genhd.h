@@ -81,6 +81,7 @@ struct gendisk {
 	struct gendisk *next;
 	struct block_device_operations *fops;
 	sector_t capacity;
+	struct list_head list;
 
 	int flags;
 	int number;			/* devfs crap */
@@ -259,6 +260,9 @@ char *disk_name (struct gendisk *hd, int part, char *buf);
 
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
 extern void update_partition(struct gendisk *disk, int part);
+
+/* will go away */
+extern void blk_set_probe(int major, struct gendisk *(p)(int));
 
 static inline unsigned int disk_index (kdev_t dev)
 {
