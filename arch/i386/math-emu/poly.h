@@ -75,10 +75,10 @@ static inline unsigned long mul_32_32(const unsigned long arg1,
 /* Add the 12 byte Xsig x2 to Xsig dest, with no checks for overflow. */
 static inline void add_Xsig_Xsig(Xsig *dest, const Xsig *x2)
 {
-  asm volatile ("movl %1,%%edi; movl %2,%%esi;
-                 movl (%%esi),%%eax; addl %%eax,(%%edi);
-                 movl 4(%%esi),%%eax; adcl %%eax,4(%%edi);
-                 movl 8(%%esi),%%eax; adcl %%eax,8(%%edi);"
+  asm volatile ("movl %1,%%edi; movl %2,%%esi;\n"
+                "movl (%%esi),%%eax; addl %%eax,(%%edi);\n"
+                "movl 4(%%esi),%%eax; adcl %%eax,4(%%edi);\n"
+                "movl 8(%%esi),%%eax; adcl %%eax,8(%%edi);\n"
                  :"=g" (*dest):"g" (dest), "g" (x2)
                  :"ax","si","di");
 }
@@ -90,16 +90,16 @@ static inline void add_Xsig_Xsig(Xsig *dest, const Xsig *x2)
    problem, but keep fingers crossed! */
 static inline void add_two_Xsig(Xsig *dest, const Xsig *x2, long int *exp)
 {
-  asm volatile ("movl %2,%%ecx; movl %3,%%esi;
-                 movl (%%esi),%%eax; addl %%eax,(%%ecx);
-                 movl 4(%%esi),%%eax; adcl %%eax,4(%%ecx);
-                 movl 8(%%esi),%%eax; adcl %%eax,8(%%ecx);
-                 jnc 0f;
-		 rcrl 8(%%ecx); rcrl 4(%%ecx); rcrl (%%ecx)
-                 movl %4,%%ecx; incl (%%ecx)
-                 movl $1,%%eax; jmp 1f;
-                 0: xorl %%eax,%%eax;
-                 1:"
+  asm volatile ("movl %2,%%ecx; movl %3,%%esi;\n"
+                "movl (%%esi),%%eax; addl %%eax,(%%ecx);\n"
+                "movl 4(%%esi),%%eax; adcl %%eax,4(%%ecx);\n"
+                "movl 8(%%esi),%%eax; adcl %%eax,8(%%ecx);\n"
+                "jnc 0f;\n"
+		"rcrl 8(%%ecx); rcrl 4(%%ecx); rcrl (%%ecx)\n"
+                "movl %4,%%ecx; incl (%%ecx)\n"
+                "movl $1,%%eax; jmp 1f;\n"
+                "0: xorl %%eax,%%eax;\n"
+                "1:\n"
 		:"=g" (*exp), "=g" (*dest)
 		:"g" (dest), "g" (x2), "g" (exp)
 		:"cx","si","ax");
@@ -110,11 +110,11 @@ static inline void add_two_Xsig(Xsig *dest, const Xsig *x2, long int *exp)
 /* This is faster in a loop on my 386 than using the "neg" instruction. */
 static inline void negate_Xsig(Xsig *x)
 {
-  asm volatile("movl %1,%%esi; "
-               "xorl %%ecx,%%ecx; "
-               "movl %%ecx,%%eax; subl (%%esi),%%eax; movl %%eax,(%%esi); "
-               "movl %%ecx,%%eax; sbbl 4(%%esi),%%eax; movl %%eax,4(%%esi); "
-               "movl %%ecx,%%eax; sbbl 8(%%esi),%%eax; movl %%eax,8(%%esi); "
+  asm volatile("movl %1,%%esi;\n"
+               "xorl %%ecx,%%ecx;\n"
+               "movl %%ecx,%%eax; subl (%%esi),%%eax; movl %%eax,(%%esi);\n"
+               "movl %%ecx,%%eax; sbbl 4(%%esi),%%eax; movl %%eax,4(%%esi);\n"
+               "movl %%ecx,%%eax; sbbl 8(%%esi),%%eax; movl %%eax,8(%%esi);\n"
                :"=g" (*x):"g" (x):"si","ax","cx");
 }
 
