@@ -243,6 +243,8 @@ static void __init contig_initmem_init(void)
 
 void __init setup_arch(char **cmdline_p)
 {
+	unsigned long low_mem_size;
+
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
@@ -378,7 +380,13 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, standard_io_resources+i);
 	}
 
-	pci_mem_start = IOMAP_START; 
+	/* Will likely break when you have unassigned resources with more
+	   than 4GB memory and bridges that don't support more than 4GB. 
+	   Doing it properly would require to allocate GFP_DMA memory
+	   in this case. */
+	low_mem_size = ((end_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
+	if (low_mem_size > pci_mem_start)
+		pci_mem_start = low_mem_size;
 
 #ifdef CONFIG_GART_IOMMU
        iommu_hole_init();

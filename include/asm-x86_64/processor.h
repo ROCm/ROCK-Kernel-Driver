@@ -18,6 +18,7 @@
 #include <asm/current.h>
 #include <asm/system.h>
 #include <asm/mmsegment.h>
+#include <linux/personality.h>
 
 #define TF_MASK		0x00000100
 #define IF_MASK		0x00000200
@@ -172,7 +173,8 @@ static inline void clear_in_cr4 (unsigned long mask)
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_32 0xa0000000
+#define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
+#define TASK_UNMAPPED_32 (IA32_PAGE_OFFSET / 3)
 #define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
@@ -225,7 +227,6 @@ struct tss_struct {
 	 * 8 bytes, for an extra "long" of ~0UL
 	 */
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
-	u32 __cacheline_filler[4];      /* size is 0x100 */
 } __attribute__((packed)) ____cacheline_aligned;
 
 struct thread_struct {
