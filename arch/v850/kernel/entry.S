@@ -657,6 +657,12 @@ G_ENTRY(irq):
 	shl	16, r6			// clear upper 16 bits
 	shr	20, r6			// shift back, and remove lower nibble
 	add	-8, r6			// remove bias for irqs
+
+	// If the IRQ index is negative, it's actually one of the exception
+	// traps below 0x80 (currently, the illegal instruction trap, and
+	// the `debug trap').  Handle these separately.
+	bn	exception
+
 	// Call the high-level interrupt handling code.
 	jarl	CSYM(handle_irq), lp
 	// fall through
@@ -665,6 +671,23 @@ G_ENTRY(irq):
    handlers, below).  */
 ret_from_irq:
 	RETURN(IRQ)
+
+exception:
+	mov	hilo(ret_from_irq), lp	// where the handler should return
+	
+	cmp	-2, r6
+	bne	1f
+	// illegal instruction exception
+	addi	SIGILL, r0, r6		// Arg 0: signal number
+	mov	CURRENT_TASK, r7	// Arg 1: task
+	jr	CSYM(force_sig)		// tail call
+
+1:	cmp	-1, r6
+	bne	bad_trap_wrapper
+	// `dbtrap' exception
+	movea	PTO, sp, r6		// Arg 0: user regs
+	jr	CSYM(debug_trap)	// tail call
+
 END(irq)
 
 
@@ -692,44 +715,7 @@ G_ENTRY(nmi):
 	jarl	CSYM(handle_irq), lp
 
 	RETURN(NMI)
-END(nmi0)
-
-
-/*
- * Illegal instruction trap.
- *
- * The stack-pointer (r3) should have already been saved to the memory
- * location ENTRY_SP (the reason for this is that the interrupt vectors may be
- * beyond a 22-bit signed offset jump from the actual interrupt handler, and
- * this allows them to save the stack-pointer and use that register to do an
- * indirect jump).
- */
-G_ENTRY(illegal_instruction):
-	SAVE_STATE (IRQ, r0, ENTRY_SP)	// Save registers. 
-	ei
-	addi	SIGILL, r0, r6		// Arg 0: signal number
-	mov	CURRENT_TASK, r7	// Arg 1: task
-	mov	hilo(ret_from_irq), lp	// where the handler should return
-	jr	CSYM(force_sig)
-END(illegal_instruction)
-
-
-/*
- * `Debug' trap
- *
- * The stack-pointer (r3) should have already been saved to the memory
- * location ENTRY_SP (the reason for this is that the interrupt vectors may be
- * beyond a 22-bit signed offset jump from the actual interrupt handler, and
- * this allows them to save the stack-pointer and use that register to do an
- * indirect jump).
- */
-G_ENTRY(dbtrap):
-	SAVE_STATE (IRQ, r0, ENTRY_SP)	// Save registers. 
-	ei
-	movea	PTO, sp, r6		// Arg 0: user regs
-	mov	hilo(ret_from_irq), lp	// where the handler should return
-	jr	CSYM(debug_trap)
-END(dbtrap)
+END(nmi)
 
 
 /*
