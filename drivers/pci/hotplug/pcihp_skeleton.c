@@ -251,7 +251,7 @@ static int __init init_slots(void)
 	struct hotplug_slot *hotplug_slot;
 	struct hotplug_slot_info *info;
 	char *name;
-	int retval = 0;
+	int retval = -ENOMEM;
 	int i;
 
 	/*
@@ -261,33 +261,24 @@ static int __init init_slots(void)
 	for (i = 0; i < num_slots; ++i) {
 		slot = kmalloc(sizeof (struct slot), GFP_KERNEL);
 		if (!slot)
-			return -ENOMEM;
+			goto error;
 		memset(slot, 0, sizeof(struct slot));
 
 		hotplug_slot = kmalloc(sizeof (struct hotplug_slot), GFP_KERNEL);
-		if (!hotplug_slot) {
-			kfree (slot);
-			return -ENOMEM;
-		}
+		if (!hotplug_slot)
+			goto error_slot;
 		memset(hotplug_slot, 0, sizeof (struct hotplug_slot));
 		slot->hotplug_slot = hotplug_slot;
 
 		info = kmalloc(sizeof (struct hotplug_slot_info), GFP_KERNEL);
-		if (!info) {
-			kfree (hotplug_slot);
-			kfree (slot);
-			return -ENOMEM;
-		}
+		if (!info)
+			goto error_hpslot;
 		memset(info, 0, sizeof (struct hotplug_slot_info));
 		hotplug_slot->info = info;
 
 		name = kmalloc(SLOT_NAME_SIZE, GFP_KERNEL);
-		if (!name) {
-			kfree (info);
-			kfree (hotplug_slot);
-			kfree (slot);
-			return -ENOMEM;
-		}
+		if (!name)
+			goto error_info;
 		hotplug_slot->name = name;
 
 		slot->number = i;
@@ -310,17 +301,23 @@ static int __init init_slots(void)
 		retval = pci_hp_register(slot->hotplug_slot);
 		if (retval) {
 			err("pci_hp_register failed with error %d\n", retval);
-			kfree (info);
-			kfree (name);
-			kfree (hotplug_slot);
-			kfree (slot);
-			return retval;
+			goto error_name;
 		}
 
 		/* add slot to our internal list */
 		list_add (&slot->slot_list, &slot_list);
 	}
 
+	return 0;
+error_name:
+	kfree(name);
+error_info:
+	kfree(info);
+error_hpslot:
+	kfree(hotplug_slot);
+error_slot:
+	kfree(slot);
+error:
 	return retval;
 }
 
