@@ -424,25 +424,14 @@ static void disk_dtr(struct dirty_log *log)
 	core_dtr(log);
 }
 
-static int count_bits(const unsigned long *addr, unsigned size)
+static int count_bits32(uint32_t *addr, unsigned size)
 {
-	/* FIXME: test this */
-#if 1
-	int n, count = 0;
+	int count = 0, i;
 
-	n = find_first_bit(addr, size);
-	while (n < size) {
-		count++;
-		find_next_bit(addr, size, n + 1);
+	for (i = 0; i < size; i++) {
+		count += hweight32(*(addr+i));
 	}
-
 	return count;
-#else
-	int count = 0;
-        for (i = 0; i < lc->region_count; i++)
-                count += log_test_bit(lc->sync_bits, i);
-	return count;
-#endif
 }
 
 static int disk_resume(struct dirty_log *log)
@@ -469,7 +458,7 @@ static int disk_resume(struct dirty_log *log)
 
 	/* copy clean across to sync */
 	memcpy(lc->sync_bits, lc->clean_bits, size);
-	lc->sync_count = count_bits((const unsigned long *) lc->clean_bits, size);
+	lc->sync_count = count_bits32(lc->clean_bits, lc->bitset_uint32_count);
 
 	/* write the bits */
 	r = write_bits(lc);
