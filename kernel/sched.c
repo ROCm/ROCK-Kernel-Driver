@@ -500,9 +500,12 @@ repeat_lock_task:
 					resched_task(rq->curr);
 			}
 			success = 1;
-		} else
-			if (unlikely(kick) && task_running(rq, p))
-				resched_task(rq->curr);
+		}
+#ifdef CONFIG_SMP
+	       	else
+			if (unlikely(kick) && task_running(rq, p) && (p->thread_info->cpu != smp_processor_id()))
+				smp_send_reschedule(p->thread_info->cpu);
+#endif
 		p->state = TASK_RUNNING;
 	}
 	task_rq_unlock(rq, &flags);

@@ -145,8 +145,6 @@ static int tty_fasync(int fd, struct file * filp, int on);
 extern int vme_scc_init (void);
 extern int serial167_init(void);
 extern int rs_8xx_init(void);
-extern void sclp_tty_init(void);
-extern void tty3215_init(void);
 extern void tub3270_init(void);
 extern void rs_360_init(void);
 extern void tx3912_rs_init(void);
@@ -1307,7 +1305,6 @@ static int tty_open(struct inode * inode, struct file * filp)
 	int index;
 	kdev_t device;
 	unsigned short saved_flags;
-	char	buf[64];
 
 	saved_flags = filp->f_flags;
 retry_open:
@@ -1381,7 +1378,7 @@ got_driver:
 	    tty->driver->subtype == PTY_TYPE_MASTER)
 		noctty = 1;
 #ifdef TTY_DEBUG_HANGUP
-	printk(KERN_DEBUG "opening %s...", tty_name(tty, buf));
+	printk(KERN_DEBUG "opening %s...", tty->name);
 #endif
 	if (tty->driver->open)
 		retval = tty->driver->open(tty, filp);
@@ -1395,7 +1392,7 @@ got_driver:
 	if (retval) {
 #ifdef TTY_DEBUG_HANGUP
 		printk(KERN_DEBUG "error %d in opening %s...", retval,
-		       tty_name(tty, buf));
+		       tty->name);
 #endif
 
 		release_dev(filp);
@@ -1420,19 +1417,6 @@ got_driver:
 		current->tty_old_pgrp = 0;
 		tty->session = current->session;
 		tty->pgrp = current->pgrp;
-	}
-	if ((tty->driver->type == TTY_DRIVER_TYPE_SERIAL) &&
-	    (tty->driver->subtype == SERIAL_TYPE_CALLOUT) &&
-	    (tty->count == 1)) {
-		static int nr_warns;
-		if (nr_warns < 5) {
-			printk(KERN_WARNING "tty_io.c: "
-				"process %d (%s) used obsolete /dev/%s - "
-				"update software to use /dev/ttyS%d\n",
-				current->pid, current->comm,
-				tty_name(tty, buf), TTY_NUMBER(tty));
-			nr_warns++;
-		}
 	}
 	return 0;
 }
@@ -2479,9 +2463,6 @@ void __init tty_init(void)
 #endif	
 #ifdef CONFIG_TN3270
 	tub3270_init();
-#endif
-#ifdef CONFIG_SCLP_TTY
-	sclp_tty_init();
 #endif
 #ifdef CONFIG_A2232
 	a2232board_init();

@@ -1209,7 +1209,7 @@ CallcFreeChan(struct IsdnCardState *csta)
 			kfree(csta->channel[i].b_st);
 			csta->channel[i].b_st = NULL;
 		} else
-			printk(KERN_WARNING "CallcFreeChan b_st ch%d allready freed\n", i);
+			printk(KERN_WARNING "CallcFreeChan b_st ch%d already freed\n", i);
 		if (i || test_bit(FLG_TWO_DCHAN, &csta->HW_Flags)) {
 			release_d_st(csta->channel + i);
 		} else
@@ -1478,11 +1478,11 @@ lli_got_fac_req(struct Channel *chanp, capi_msg *cm) {
 		return;
 	switch(cm->para[3]) {
 		case 4: /* Suspend */
-			strncpy(chanp->setup.phone, &cm->para[5], cm->para[5] +1);
+			strlcpy(chanp->setup.phone, &cm->para[5], cm->para[5] +1);
 			FsmEvent(&chanp->fi, EV_SUSPEND, cm);
 			break;
 		case 5: /* Resume */
-			strncpy(chanp->setup.phone, &cm->para[5], cm->para[5] +1);
+			strlcpy(chanp->setup.phone, &cm->para[5], cm->para[5] +1);
 			if (chanp->fi.state == ST_NULL) {
 				FsmEvent(&chanp->fi, EV_RESUME, cm);
 			} else {

@@ -176,7 +176,7 @@ static	const unsigned char initseq[] = {
 
 	/* clear our private data */
 	memset(decoder, 0, sizeof(*decoder));
-	strncpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
+	strlcpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
 	decoder->client = client;
 	i2c_set_clientdata(client, decoder);
 	decoder->addr = addr;

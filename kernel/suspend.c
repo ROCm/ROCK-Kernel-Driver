@@ -201,7 +201,8 @@ void refrigerator(unsigned long flag)
 /* 0 = success, else # of processes that we failed to stop */
 int freeze_processes(void)
 {
-	int todo, start_time;
+       int todo;
+       unsigned long start_time;
 	struct task_struct *g, *p;
 	
 	printk( "Stopping tasks: " );

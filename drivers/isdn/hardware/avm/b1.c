@@ -433,9 +433,9 @@ void b1_parse_version(avmctrl_info *cinfo)
 	     j++, i += cinfo->versionbuf[i] + 1)
 		cinfo->version[j] = &cinfo->versionbuf[i + 1];
 
-	strncpy(ctrl->serial, cinfo->version[VER_SERIAL], CAPI_SERIAL_LEN);
+	strlcpy(ctrl->serial, cinfo->version[VER_SERIAL], sizeof(ctrl->serial));
 	memcpy(&ctrl->profile, cinfo->version[VER_PROFILE],sizeof(capi_profile));
-	strncpy(ctrl->manu, "AVM GmbH", CAPI_MANUFACTURER_LEN);
+	strlcpy(ctrl->manu, "AVM GmbH", sizeof(ctrl->manu));
 	dversion = cinfo->version[VER_DRIVER];
 	ctrl->version.majorversion = 2;
 	ctrl->version.minorversion = 0;
@@ -785,8 +785,7 @@ static int __init b1_init(void)
 	char rev[32];
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(rev, p + 2, sizeof(rev));
-		rev[sizeof(rev)-1] = 0;
+		strlcpy(rev, p + 2, sizeof(rev));
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
 		   *(p-1) = 0;
 	} else

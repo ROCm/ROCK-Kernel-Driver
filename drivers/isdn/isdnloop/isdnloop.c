@@ -125,7 +125,7 @@ isdnloop_parse_setup(char *setup, isdn_ctrl * cmd)
 	char *s = strpbrk(t, ",");
 
 	*s++ = '\0';
-	strncpy(cmd->parm.setup.phone, t, sizeof(cmd->parm.setup.phone));
+	strlcpy(cmd->parm.setup.phone, t, sizeof(cmd->parm.setup.phone));
 	s = strpbrk(t = s, ",");
 	*s++ = '\0';
 	if (!strlen(t))
@@ -139,7 +139,7 @@ isdnloop_parse_setup(char *setup, isdn_ctrl * cmd)
 	else
 		cmd->parm.setup.si2 =
 		    simple_strtoul(t, NULL, 10);
-	strncpy(cmd->parm.setup.eazmsn, s, sizeof(cmd->parm.setup.eazmsn));
+	strlcpy(cmd->parm.setup.eazmsn, s, sizeof(cmd->parm.setup.eazmsn));
 	cmd->parm.setup.plan = 0;
 	cmd->parm.setup.screen = 0;
 }
@@ -228,21 +228,21 @@ isdnloop_parse_status(u_char * status, int channel, isdnloop_card * card)
 			break;
 		case 5:
 			/* CIF */
-			strncpy(cmd.parm.num, status + 3, sizeof(cmd.parm.num) - 1);
+			strlcpy(cmd.parm.num, status + 3, sizeof(cmd.parm.num));
 			break;
 		case 6:
 			/* AOC */
-			sprintf(cmd.parm.num, "%d",
+			snprintf(cmd.parm.num, sizeof(cmd.parm.num), "%d",
 			     (int) simple_strtoul(status + 7, NULL, 16));
 			break;
 		case 7:
 			/* CAU */
 			status += 3;
 			if (strlen(status) == 4)
-				sprintf(cmd.parm.num, "%s%c%c",
+				snprintf(cmd.parm.num, sizeof(cmd.parm.num), "%s%c%c",
 				     status + 2, *status, *(status + 1));
 			else
-				strncpy(cmd.parm.num, status + 1, sizeof(cmd.parm.num) - 1);
+				strlcpy(cmd.parm.num, status + 1, sizeof(cmd.parm.num));
 			break;
 		case 8:
 			/* Misc Errors on L1 and L2 */
@@ -1467,7 +1467,7 @@ isdnloop_initcard(char *id)
 	    ISDN_FEATURE_L3_TRANS |
 	    ISDN_FEATURE_P_UNKNOWN;
 	card->ptype = ISDN_PTYPE_UNKNOWN;
-	strncpy(card->interface.id, id, sizeof(card->interface.id) - 1);
+	strlcpy(card->interface.id, id, sizeof(card->interface.id));
 	card->msg_buf_write = card->msg_buf;
 	card->msg_buf_read = card->msg_buf;
 	card->msg_buf_end = &card->msg_buf[sizeof(card->msg_buf) - 1];

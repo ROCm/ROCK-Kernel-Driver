@@ -254,7 +254,7 @@
         moved to optimize use of dma (useful for OCS/ECS overscan displays)
       - ddfstop is ddfstrt+ddfsize-fetchsize
       - If C= didn't change anything for AGA, then at following positions the
-        dma bus is allready used:
+        dma bus is already used:
         ddfstrt <  48 -> memory refresh
                 <  96 -> disk dma
                 < 160 -> audio dma

@@ -480,8 +480,7 @@ static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, 
 			/* Try to handle "next" here some way? */
 		}
 		if (dev && dev->driver) {
-			strncpy(bind_info->name, dev->driver->name, DEV_NAME_LEN);
-			bind_info->name[DEV_NAME_LEN-1] = '\0';
+			strlcpy(bind_info->name, dev->driver->name, DEV_NAME_LEN);
 			bind_info->major = 0;
 			bind_info->minor = 0;
 			bind_info->next = NULL;
@@ -507,8 +506,7 @@ static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, 
 	    if (node == bind_info->next) break;
     if (node == NULL) return -ENODEV;
 
-    strncpy(bind_info->name, node->dev_name, DEV_NAME_LEN);
-    bind_info->name[DEV_NAME_LEN-1] = '\0';
+    strlcpy(bind_info->name, node->dev_name, DEV_NAME_LEN);
     bind_info->major = node->major;
     bind_info->minor = node->minor;
     bind_info->next = node->next;

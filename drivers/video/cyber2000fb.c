@@ -1128,7 +1128,7 @@ int cyber2000fb_attach(struct cyberpro_info *info, int idx)
 		info->disable_extregs = cyber2000fb_disable_extregs;
 		info->info            = int_cfb_info;
 
-		strncpy(info->dev_name, int_cfb_info->fb.fix.id, sizeof(info->dev_name));
+		strlcpy(info->dev_name, int_cfb_info->fb.fix.id, sizeof(info->dev_name));
 	}
 
 	return int_cfb_info != NULL;
@@ -1319,7 +1319,7 @@ cyber2000fb_setup(char *options)
 			continue;
 
 		if (strncmp(opt, "font:", 5) == 0) {
-			strncpy(default_font_storage, opt + 5, sizeof(default_font_storage));
+			strlcpy(default_font_storage, opt + 5, sizeof(default_font_storage));
 			default_font = default_font_storage;
 			continue;
 		}

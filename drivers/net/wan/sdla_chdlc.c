@@ -284,7 +284,7 @@ static int wanpipe_tty_init(sdla_t *card);
 static void wanpipe_tty_receive(sdla_t *, unsigned, unsigned int);
 static void wanpipe_tty_trigger_poll(sdla_t *card);
 
-static struct tty_driver serial_driver, callout_driver;
+static struct tty_driver serial_driver;
 static int serial_refcount=1;
 static int tty_init_cnt=0;
 
@@ -1056,15 +1056,12 @@ static void disable_comm (sdla_t *card)
 	if (card->tty_opt){
 		struct serial_state * state;
 		if (!(--tty_init_cnt)){
-			int e1,e2;
+			int e1;
 			*serial_driver.refcount=0;
 			
 			if ((e1 = tty_unregister_driver(&serial_driver)))
 				printk("SERIAL: failed to unregister serial driver (%d)\n",
 				       e1);
-			if ((e2 = tty_unregister_driver(&callout_driver)))
-				printk("SERIAL: failed to unregister callout driver (%d)\n", 
-				       e2);
 			printk(KERN_INFO "%s: Unregistering TTY Driver, Major %i\n",
 					card->devname,WAN_TTY_MAJOR);
 		}
@@ -4444,27 +4441,10 @@ int wanpipe_tty_init(sdla_t *card)
 		serial_driver.wait_until_sent = wanpipe_tty_wait_until_sent;
 		serial_driver.read_proc = wanpipe_tty_read_proc;
 		
-		/*
-		 * The callout device is just like normal device except for
-		 * major number and the subtype code.
-		 */
-		callout_driver = serial_driver;
-		callout_driver.name = "cuw";
-		callout_driver.major = TTYAUX_MAJOR;
-		callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-		callout_driver.read_proc = 0;
-		callout_driver.proc_entry = 0;
-
 		if (tty_register_driver(&serial_driver)){
 			printk(KERN_INFO "%s: Failed to register serial driver!\n",
 					card->devname);
 		}
-
-		if (tty_register_driver(&callout_driver)){
-			printk(KERN_INFO "%s: Failed to register callout driver!\n",
-					card->devname);
-		}
-
 	}
 
 
@@ -4493,7 +4473,6 @@ int wanpipe_tty_init(sdla_t *card)
 	state->custom_divisor = 0;
 	state->close_delay = 5*HZ/10;
 	state->closing_wait = 30*HZ;
-	state->callout_termios = callout_driver.init_termios;
 	state->normal_termios = serial_driver.init_termios;
 	state->icount.cts = state->icount.dsr = 
 		state->icount.rng = state->icount.dcd = 0;

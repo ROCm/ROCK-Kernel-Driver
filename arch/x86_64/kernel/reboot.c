@@ -124,7 +124,7 @@ void machine_restart(char * __unused)
 {
 	int i;
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	smp_halt(); 
 #endif
 

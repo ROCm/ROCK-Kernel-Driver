@@ -2149,8 +2149,8 @@ static int mptscsih_user_command(MPT_ADAPTER *ioc, char *buffer, int length)
  * 	hostno: scsi host number
  *	func:   if write = 1; if read = 0
  */
-int mptscsih_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func)
+int mptscsih_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func)
 {
 	MPT_ADAPTER	*ioc = NULL;
 	MPT_SCSI_HOST	*hd = NULL;
@@ -2161,7 +2161,7 @@ int mptscsih_proc_info(char *buffer, char **start, off_t offset,
 			buffer, start, *start, offset, length));
 
 	for (ioc = mpt_adapter_find_first(); ioc != NULL; ioc = mpt_adapter_find_next(ioc)) {
-		if ((ioc->sh) && (ioc->sh->host_no == hostno)) {
+		if ((ioc->sh) && (ioc->sh == host)) {
 			hd = (MPT_SCSI_HOST *)ioc->sh->hostdata;
 			break;
 		}

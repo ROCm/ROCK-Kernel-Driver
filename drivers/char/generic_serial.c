@@ -554,7 +554,7 @@ void gs_hangup(struct tty_struct *tty)
 		return;
 
 	gs_shutdown_port (port);
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE |GS_ACTIVE);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE|GS_ACTIVE);
 	port->tty = NULL;
 	port->count = 0;
 
@@ -619,47 +619,19 @@ int gs_block_til_ready(void *port_, struct file * filp)
 	gs_dprintk (GS_DEBUG_BTR, "after hung up\n"); 
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == GS_TYPE_CALLOUT) {
-		if (port->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (port->session != current->session))
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (port->pgrp != current->pgrp))
-			return -EBUSY;
-		port->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-
-	gs_dprintk (GS_DEBUG_BTR, "after subtype\n");
-
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (port->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		port->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
 	gs_dprintk (GS_DEBUG_BTR, "after nonblock\n"); 
  
-	if (port->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (port->normal_termios.c_cflag & CLOCAL) 
-			do_clocal = 1;
-	} else {
-		if (C_CLOCAL(tty))
-			do_clocal = 1;
-	}
+	if (C_CLOCAL(tty))
+		do_clocal = 1;
 
 	/*
 	 * Block waiting for the carrier detect and the line to become
@@ -690,8 +662,7 @@ int gs_block_til_ready(void *port_, struct file * filp)
 				retval = -ERESTARTSYS;
 			break;
 		}
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(port->flags & ASYNC_CLOSING) &&
+		if (!(port->flags & ASYNC_CLOSING) &&
 		    (do_clocal || CD))
 			break;
 		gs_dprintk (GS_DEBUG_BTR, "signal_pending is now: %d (%lx)\n", 
@@ -769,8 +740,6 @@ void gs_close(struct tty_struct * tty, struct file * filp)
 	 */
 	if (port->flags & ASYNC_NORMAL_ACTIVE)
 		port->normal_termios = *tty->termios;
-	if (port->flags & ASYNC_CALLOUT_ACTIVE)
-		port->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -812,8 +781,7 @@ void gs_close(struct tty_struct * tty, struct file * filp)
 		}
 		wake_up_interruptible(&port->open_wait);
 	}
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-	                 ASYNC_CLOSING | ASYNC_INITIALIZED);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING | ASYNC_INITIALIZED);
 	wake_up_interruptible(&port->close_wait);
 
 	restore_flags(flags);

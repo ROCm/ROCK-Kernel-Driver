@@ -670,7 +670,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "kaweth", sizeof(info.driver)-1);
+		strlcpy(info.driver, "kaweth", sizeof(info.driver));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

@@ -18,7 +18,9 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
+#include <linux/init.h>
 #include <asm/s390_ext.h>
+#include <asm/processor.h>
 
 #include "sclp.h"
 
@@ -49,7 +51,7 @@ static char sclp_init_sccb[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 /* Timer for init mask retries. */
 static struct timer_list retry_timer;
 
-static unsigned long sclp_status = 0;
+static volatile unsigned long sclp_status = 0;
 /* some status flags */
 #define SCLP_INIT		0
 #define SCLP_RUNNING		1
@@ -275,20 +277,24 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 	struct list_head *l;
 	struct sclp_req *req, *tmp;
 
+	spin_lock(&sclp_lock);
 	/*
 	 * Only process interrupt if sclp is initialized.
 	 * This avoids strange effects for a pending request
 	 * from before the last re-ipl.
 	 */
-	if (!test_bit(SCLP_INIT, &sclp_status))
+	if (!test_bit(SCLP_INIT, &sclp_status)) {
+		/* Now clear the running bit */
+		clear_bit(SCLP_RUNNING, &sclp_status);
+		spin_unlock(&sclp_lock);
 		return;
+	}
 	ext_int_param = S390_lowcore.ext_params;
 	finished_sccb = ext_int_param & EXT_INT_SCCB_MASK;
 	evbuf_pending = ext_int_param & (EXT_INT_EVBUF_PENDING |
 					 EXT_INT_STATECHANGE_PENDING);
 	irq_enter();
 	req = NULL;
-	spin_lock(&sclp_lock);
 	if (finished_sccb != 0U) {
 		list_for_each(l, &sclp_req_queue) {
 			tmp = list_entry(l, struct sclp_req, list);
@@ -299,9 +305,6 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 			}
 		}
 	}
-	/* Head queue a read sccb if an event buffer is pending */
-	if (evbuf_pending)
-		__sclp_unconditional_read();
 	spin_unlock(&sclp_lock);
 	/* Perform callback */
 	if (req != NULL) {
@@ -309,8 +312,13 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 		if (req->callback != NULL)
 			req->callback(req, req->callback_data);
 	}
+	spin_lock(&sclp_lock);
+	/* Head queue a read sccb if an event buffer is pending */
+	if (evbuf_pending)
+		__sclp_unconditional_read();
 	/* Now clear the running bit */
 	clear_bit(SCLP_RUNNING, &sclp_status);
+	spin_unlock(&sclp_lock);
 	/* and start next request on the queue */
 	sclp_start_request();
 	irq_exit();
@@ -344,8 +352,10 @@ sclp_sync_wait(void)
 		      : "=m" (psw_mask) : "a" (&psw_mask) : "memory");
 
 	/* wait until ISR signals receipt of interrupt */
-	while (test_bit(SCLP_RUNNING, &sclp_status))
+	while (test_bit(SCLP_RUNNING, &sclp_status)) {
 		barrier();
+		cpu_relax();
+	}
 
 	/* disable external interruptions */
 	asm volatile ("SSM 0(%0)"
@@ -631,6 +641,14 @@ sclp_init(void)
 		/* Already initialized. */
 		return 0;
 
+	spin_lock_init(&sclp_lock);
+	INIT_LIST_HEAD(&sclp_req_queue);
+
+	/* init event list */
+	INIT_LIST_HEAD(&sclp_reg_list);
+	list_add(&sclp_state_change_event.list, &sclp_reg_list);
+	list_add(&sclp_quiesce_event.list, &sclp_reg_list);
+
 	/*
 	 * request the 0x2401 external interrupt
 	 * The sclp driver is initialized early (before kmalloc works). We
@@ -639,14 +657,6 @@ sclp_init(void)
 	if (register_early_external_interrupt(0x2401, sclp_interrupt_handler,
 					      &ext_int_info_hwc) != 0)
 		return -EBUSY;
-
-	spin_lock_init(&sclp_lock);
-	INIT_LIST_HEAD(&sclp_req_queue);
-
-	/* init event list */
-	INIT_LIST_HEAD(&sclp_reg_list);
-	list_add(&sclp_state_change_event.list, &sclp_reg_list);
-	list_add(&sclp_quiesce_event.list, &sclp_reg_list);
 
 	/* enable service-signal external interruptions,
 	 * Control Register 0 bit 22 := 1
@@ -761,6 +771,8 @@ sclp_remove_processed(struct sccb_header *sccb)
 
 	return unprocessed;
 }
+
+module_init(sclp_init);
 
 EXPORT_SYMBOL(sclp_add_request);
 EXPORT_SYMBOL(sclp_sync_wait);

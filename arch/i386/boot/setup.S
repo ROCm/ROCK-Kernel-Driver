@@ -893,6 +893,9 @@ flush_instr:
 	movw	%cs, %si
 	subw	$DELTA_INITSEG, %si
 	shll	$4, %esi			# Convert to 32-bit pointer
+
+# jump to startup_32 in arch/i386/kernel/head.S
+#	
 # NOTE: For high loaded big kernels we need a
 #	jmpi    0x100000,__BOOT_CS
 #

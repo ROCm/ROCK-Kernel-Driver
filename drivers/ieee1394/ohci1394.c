@@ -164,7 +164,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 931 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 938 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -3165,7 +3165,7 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 	struct config_rom_ptr cr;
 
 	memset(&cr, 0, sizeof(cr));
-	memset(ohci->csr_config_rom_cpu, 0, sizeof(*ohci->csr_config_rom_cpu));
+	memset(ohci->csr_config_rom_cpu, 0, OHCI_CONFIG_ROM_LEN);
 
 	cr.data = ohci->csr_config_rom_cpu;
 
@@ -3530,6 +3530,16 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 	}
 }
 
+
+#ifdef  CONFIG_PM
+static int ohci1394_pci_resume (struct pci_dev *dev)
+{
+	pci_enable_device(dev);
+	return 0;
+}
+#endif
+
+
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)
 
 static struct pci_device_id ohci1394_pci_tbl[] __devinitdata = {
@@ -3551,6 +3561,10 @@ static struct pci_driver ohci1394_pci_driver = {
 	.id_table =	ohci1394_pci_tbl,
 	.probe =	ohci1394_pci_probe,
 	.remove =	ohci1394_pci_remove,
+
+#ifdef  CONFIG_PM
+	.resume =	ohci1394_pci_resume,
+#endif  /* PM */
 };
 
 

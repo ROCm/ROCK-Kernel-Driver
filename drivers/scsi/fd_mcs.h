@@ -32,7 +32,6 @@ static int fd_mcs_host_reset(Scsi_Cmnd *);
 static int fd_mcs_queue(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int fd_mcs_biosparam(struct scsi_device *, struct block_device *,
 			    sector_t, int *);
-static int fd_mcs_proc_info(char *, char **, off_t, int, int, int);
 static const char *fd_mcs_info(struct Scsi_Host *);
 
 #endif				/* _FD_MCS_H */

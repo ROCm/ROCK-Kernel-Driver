@@ -1127,8 +1127,7 @@ idi_fill_in_T30(eicon_chan *chan, unsigned char *buffer)
 		//eicon_log(NULL, 128, "sT30:universal_7 = %x\n", t30->universal_7);
 		eicon_log(NULL, 128, "sT30:station_id_len = %x\n", t30->station_id_len);
 		eicon_log(NULL, 128, "sT30:head_line_len = %x\n", t30->head_line_len);
-		strncpy(st, t30->station_id, t30->station_id_len);
-		st[t30->station_id_len] = 0;
+		strlcpy(st, t30->station_id, t30->station_id_len + 1);
 		eicon_log(NULL, 128, "sT30:station_id = <%s>\n", st);
 	}
 	return(sizeof(eicon_t30_s));
@@ -1204,8 +1203,7 @@ idi_parse_edata(eicon_card *ccard, eicon_chan *chan, unsigned char *buffer, int 
 		//eicon_log(ccard, 128, "rT30:universal_7 = %x\n", p->universal_7);
 		eicon_log(ccard, 128, "rT30:station_id_len = %x\n", p->station_id_len);
 		eicon_log(ccard, 128, "rT30:head_line_len = %x\n", p->head_line_len);
-		strncpy(st, p->station_id, p->station_id_len);
-		st[p->station_id_len] = 0;
+		strlcpy(st, p->station_id, p->station_id_len + 1);
 		eicon_log(ccard, 128, "rT30:station_id = <%s>\n", st);
 	}
 	if (!chan->fax) {

@@ -14,7 +14,7 @@ typedef struct r1bio_s r1bio_t;
 
 struct r1_private_data_s {
 	mddev_t			*mddev;
-	mirror_info_t		mirrors[MD_SB_DISKS];
+	mirror_info_t		*mirrors;
 	int			raid_disks;
 	int			working_disks;
 	int			last_used;
@@ -67,13 +67,14 @@ struct r1bio_s {
 	 */
 	struct bio		*read_bio;
 	int			read_disk;
-	/*
-	 * if the IO is in WRITE direction, then multiple bios are used:
-	 */
-	struct bio		*write_bios[MD_SB_DISKS];
 
 	r1bio_t			*next_r1; /* next for retry or in free list */
 	struct list_head	retry_list;
+	/*
+	 * if the IO is in WRITE direction, then multiple bios are used.
+	 * We choose the number when they are allocated.
+	 */
+	struct bio		*write_bios[0];
 };
 
 /* bits for r1bio.state */

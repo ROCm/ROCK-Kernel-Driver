@@ -23,7 +23,6 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/raid/multipath.h>
-#include <linux/bio.h>
 #include <linux/buffer_head.h>
 #include <asm/atomic.h>
 
@@ -59,7 +58,7 @@ static void mp_pool_free(void *mpb, void *data)
 static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdevp)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
-	int i, disks = mddev->max_disks;
+	int i, disks = conf->raid_disks;
 
 	/*
 	 * Later we do read balancing on the read side 
@@ -128,9 +127,10 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		/*
 		 * oops, IO error:
 		 */
+		char b[BDEVNAME_SIZE];
 		md_error (mp_bh->mddev, rdev);
 		printk(KERN_ERR "multipath: %s: rescheduling sector %llu\n", 
-		       bdev_partition_name(rdev->bdev), 
+		       bdevname(rdev->bdev,b), 
 		       (unsigned long long)bio->bi_sector);
 		multipath_reschedule_retry(mp_bh);
 	}
@@ -147,7 +147,7 @@ static int multipath_read_balance (multipath_conf_t *conf)
 {
 	int disk;
 
-	for (disk = 0; disk < conf->mddev->max_disks; disk++) {
+	for (disk = 0; disk < conf->raid_disks; disk++) {
 		mdk_rdev_t *rdev = conf->multipaths[disk].rdev;
 		if (rdev && rdev->in_sync)
 			return disk;
@@ -221,6 +221,7 @@ static void multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 		 * Mark disk as unusable
 		 */
 		if (!rdev->faulty) {
+			char b[BDEVNAME_SIZE];
 			rdev->in_sync = 0;
 			rdev->faulty = 1;
 			mddev->sb_dirty = 1;
@@ -228,7 +229,7 @@ static void multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 			printk(KERN_ALERT "multipath: IO failure on %s,"
 				" disabling IO path. \n	Operation continuing"
 				" on %d IO paths.\n",
-				bdev_partition_name (rdev->bdev),
+				bdevname (rdev->bdev,b),
 				conf->working_disks);
 		}
 	}
@@ -247,12 +248,13 @@ static void print_multipath_conf (multipath_conf_t *conf)
 	printk(" --- wd:%d rd:%d\n", conf->working_disks,
 			 conf->raid_disks);
 
-	for (i = 0; i < conf->mddev->max_disks; i++) {
+	for (i = 0; i < conf->raid_disks; i++) {
+		char b[BDEVNAME_SIZE];
 		tmp = conf->multipaths + i;
 		if (tmp->rdev)
 			printk(" disk%d, o:%d, dev:%s\n",
 				i,!tmp->rdev->faulty,
-			       bdev_partition_name(tmp->rdev->bdev));
+			       bdevname(tmp->rdev->bdev,b));
 	}
 }
 
@@ -327,6 +329,7 @@ static void multipathd (mddev_t *mddev)
 
 	md_check_recovery(mddev);
 	for (;;) {
+		char b[BDEVNAME_SIZE];
 		spin_lock_irqsave(&retry_list_lock, flags);
 		mp_bh = multipath_retry_list;
 		if (!mp_bh)
@@ -342,13 +345,13 @@ static void multipathd (mddev_t *mddev)
 		if (multipath_map (mddev, &rdev)<0) {
 			printk(KERN_ALERT "multipath: %s: unrecoverable IO read"
 				" error for block %llu\n",
-				bdev_partition_name(bio->bi_bdev), 
+				bdevname(bio->bi_bdev,b),
 				(unsigned long long)bio->bi_sector);
 			multipath_end_bh_io(mp_bh, 0);
 		} else {
 			printk(KERN_ERR "multipath: %s: redirecting sector %llu"
 				" to another IO path\n",
-				bdev_partition_name(bio->bi_bdev), 
+				bdevname(bio->bi_bdev,b),
 				(unsigned long long)bio->bi_sector);
 			bio->bi_bdev = rdev->bdev;
 			generic_make_request(bio);
@@ -385,6 +388,15 @@ static int multipath_run (mddev_t *mddev)
 		goto out;
 	}
 	memset(conf, 0, sizeof(*conf));
+
+	conf->multipaths = kmalloc(sizeof(struct multipath_info)*mddev->raid_disks,
+				   GFP_KERNEL);
+	if (!conf->multipaths) {
+		printk(KERN_ERR 
+			"multipath: couldn't allocate memory for md%d\n",
+			mdidx(mddev));
+		goto out_free_conf;
+	}
 
 	conf->working_disks = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
@@ -444,6 +456,8 @@ static int multipath_run (mddev_t *mddev)
 out_free_conf:
 	if (conf->pool)
 		mempool_destroy(conf->pool);
+	if (conf->multipaths)
+		kfree(conf->multipaths);
 	kfree(conf);
 	mddev->private = NULL;
 out:
@@ -457,6 +471,7 @@ static int multipath_stop (mddev_t *mddev)
 
 	md_unregister_thread(mddev->thread);
 	mempool_destroy(conf->pool);
+	kfree(conf->multipaths);
 	kfree(conf);
 	mddev->private = NULL;
 	return 0;

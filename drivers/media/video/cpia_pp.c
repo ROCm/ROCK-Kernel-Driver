@@ -605,8 +605,8 @@ static int cpia_pp_transferCmd(void *privdata, u8 *command, u8 *data)
 			return -EINVAL;
 		}
 		if((err = ReadPacket(cam, buffer, 8)) < 0) {
-			return err;
 			DBG("Error reading command result\n");
+                       return err;
 		}
 		memcpy(data, buffer, databytes);
 	} else if(command[0] == DATA_OUT) {

@@ -216,6 +216,10 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
 	scsi_sysfs_remove_host(shost);
+
+	if (shost->hostt->release)
+		(*shost->hostt->release)(shost);
+
 	return 0;
 }
 
@@ -318,7 +322,12 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
            shost_tp->eh_host_reset_handler == NULL) {
 		printk(KERN_ERR "ERROR: SCSI host `%s' has no error handling\nERROR: This is not a safe way to run your SCSI host\nERROR: The error handling must be added to this driver\n", shost_tp->proc_name);
 		dump_stack();
-        } 
+        }
+	if(shost_tp->shost_attrs == NULL)
+		/* if its not set in the template, use the default */
+		 shost_tp->shost_attrs = scsi_sysfs_shost_attrs;
+	if(shost_tp->sdev_attrs == NULL)
+		 shost_tp->sdev_attrs = scsi_sysfs_sdev_attrs;
 	gfp_mask = GFP_KERNEL;
 	if (shost_tp->unchecked_isa_dma && xtr_bytes)
 		gfp_mask |= __GFP_DMA;

@@ -1279,11 +1279,12 @@ static void isofs_read_inode(struct inode * inode)
 	}
 #endif
 
-	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec =
-		iso_date(de->date, high_sierra);
-	inode->i_mtime.tv_nsec = 0;
-	inode->i_atime.tv_nsec = 0;
-	inode->i_mtime.tv_nsec = 0;
+	inode->i_mtime.tv_sec =
+	inode->i_atime.tv_sec =
+	inode->i_ctime.tv_sec = iso_date(de->date, high_sierra);
+	inode->i_mtime.tv_nsec =
+	inode->i_atime.tv_nsec =
+	inode->i_ctime.tv_nsec = 0;
 
 	ei->i_first_extent = (isonum_733 (de->extent) +
 			      isonum_711 (de->ext_attr_length));

@@ -801,7 +801,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		DEB_EE(("VIDIOC_QUERYCAP\n"));
 		
                 strcpy(cap->driver, "saa7146 v4l2");
-		strncpy(cap->card, dev->ext->name, sizeof(cap->card));
+		strlcpy(cap->card, dev->ext->name, sizeof(cap->card));
 		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
 		cap->version = SAA7146_VERSION_CODE;
 		cap->capabilities =
@@ -868,7 +868,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			}
 			memset(f,0,sizeof(*f));
 			f->index = index;
-			strncpy(f->description,formats[index].name,31);
+			strlcpy(f->description,formats[index].name,sizeof(f->description));
 			f->pixelformat = formats[index].pixelformat;
 			break;
 		}

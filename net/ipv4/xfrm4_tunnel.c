@@ -215,6 +215,7 @@ static void ipip_destroy(struct xfrm_state *x)
 
 static struct xfrm_type ipip_type = {
 	.description	= "IPIP",
+	.owner		= THIS_MODULE,
 	.proto	     	= IPPROTO_IPIP,
 	.init_state	= ipip_init_state,
 	.destructor	= ipip_destroy,
@@ -229,7 +230,6 @@ static struct inet_protocol ipip_protocol = {
 
 static int __init ipip_init(void)
 {
-	ipip_type.owner = THIS_MODULE;
 	if (xfrm_register_type(&ipip_type, AF_INET) < 0) {
 		printk(KERN_INFO "ipip init: can't add xfrm type\n");
 		return -EAGAIN;

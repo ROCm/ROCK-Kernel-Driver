@@ -178,7 +178,7 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 	pci_set_drvdata(dev, &cls_d);
 	cls_d->class_dev.class = &pcmcia_socket_class;
 	cls_d->class_dev.dev = &dev->dev;
-	strncpy(cls_d->class_dev.class_id, dev->dev.name, BUS_ID_SIZE);
+	strlcpy(cls_d->class_dev.class_id, dev->dev.name, BUS_ID_SIZE);
 	class_set_devdata(&cls_d->class_dev, cls_d);
 	class_device_register(&cls_d->class_dev);
 

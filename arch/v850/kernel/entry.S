@@ -29,28 +29,28 @@
 #define CSYM	C_SYMBOL_NAME
 
 
-/* The offset of the struct pt_regs in a `state save frame' on the stack.  */
+/* The offset of the struct pt_regs in a state-save-frame on the stack.  */
 #define PTO	STATE_SAVE_PT_OFFSET
 
 
-/* Save argument registers to the struct pt_regs pointed to by EP.  */
+/* Save argument registers to the state-save-frame pointed to by EP.  */
 #define SAVE_ARG_REGS							      \
 	sst.w	r6, PTO+PT_GPR(6)[ep];					      \
 	sst.w	r7, PTO+PT_GPR(7)[ep];					      \
 	sst.w	r8, PTO+PT_GPR(8)[ep];					      \
 	sst.w	r9, PTO+PT_GPR(9)[ep]
-/* Restore argument registers from the struct pt_regs pointed to by EP.  */
+/* Restore argument registers from the state-save-frame pointed to by EP.  */
 #define RESTORE_ARG_REGS						      \
 	sld.w	PTO+PT_GPR(6)[ep], r6;					      \
 	sld.w	PTO+PT_GPR(7)[ep], r7;					      \
 	sld.w	PTO+PT_GPR(8)[ep], r8;					      \
 	sld.w	PTO+PT_GPR(9)[ep], r9
 
-/* Save value return registers to the struct pt_regs pointed to by EP.  */
+/* Save value return registers to the state-save-frame pointed to by EP.  */
 #define SAVE_RVAL_REGS							      \
 	sst.w	r10, PTO+PT_GPR(10)[ep];				      \
 	sst.w	r11, PTO+PT_GPR(11)[ep]
-/* Restore value return registers from the struct pt_regs pointed to by EP.  */
+/* Restore value return registers from the state-save-frame pointed to by EP.  */
 #define RESTORE_RVAL_REGS						      \
 	sld.w	PTO+PT_GPR(10)[ep], r10;				      \
 	sld.w	PTO+PT_GPR(11)[ep], r11
@@ -81,13 +81,13 @@
 	sld.w	PTO+PT_GPR(18)[ep], r18;				      \
 	sld.w	PTO+PT_GPR(19)[ep], r19
 
-/* Save `call clobbered' registers to the struct pt_regs pointed to by EP.  */
+/* Save `call clobbered' registers to the state-save-frame pointed to by EP.  */
 #define SAVE_CALL_CLOBBERED_REGS					      \
 	SAVE_CALL_CLOBBERED_REGS_BEFORE_ARGS;				      \
 	SAVE_ARG_REGS;							      \
 	SAVE_RVAL_REGS;							      \
 	SAVE_CALL_CLOBBERED_REGS_AFTER_RVAL
-/* Restore `call clobbered' registers from the struct pt_regs pointed to
+/* Restore `call clobbered' registers from the state-save-frame pointed to
    by EP.  */
 #define RESTORE_CALL_CLOBBERED_REGS					      \
 	RESTORE_CALL_CLOBBERED_REGS_BEFORE_ARGS;			      \
@@ -96,19 +96,19 @@
 	RESTORE_CALL_CLOBBERED_REGS_AFTER_RVAL
 
 /* Save `call clobbered' registers except for the return-value registers
-   to the struct pt_regs pointed to by EP.  */
+   to the state-save-frame pointed to by EP.  */
 #define SAVE_CALL_CLOBBERED_REGS_NO_RVAL				      \
 	SAVE_CALL_CLOBBERED_REGS_BEFORE_ARGS;				      \
 	SAVE_ARG_REGS;							      \
 	SAVE_CALL_CLOBBERED_REGS_AFTER_RVAL
 /* Restore `call clobbered' registers except for the return-value registers
-   from the struct pt_regs pointed to by EP.  */
+   from the state-save-frame pointed to by EP.  */
 #define RESTORE_CALL_CLOBBERED_REGS_NO_RVAL				      \
 	RESTORE_CALL_CLOBBERED_REGS_BEFORE_ARGS;			      \
 	RESTORE_ARG_REGS;						      \
 	RESTORE_CALL_CLOBBERED_REGS_AFTER_RVAL
 
-/* Save `call saved' registers to the struct pt_regs pointed to by EP.  */
+/* Save `call saved' registers to the state-save-frame pointed to by EP.  */
 #define SAVE_CALL_SAVED_REGS						      \
 	sst.w	r2, PTO+PT_GPR(2)[ep];					      \
 	sst.w	r20, PTO+PT_GPR(20)[ep];				      \
@@ -121,7 +121,7 @@
 	sst.w	r27, PTO+PT_GPR(27)[ep];				      \
 	sst.w	r28, PTO+PT_GPR(28)[ep];				      \
 	sst.w	r29, PTO+PT_GPR(29)[ep]
-/* Restore `call saved' registers from the struct pt_regs pointed to by EP.  */
+/* Restore `call saved' registers from the state-save-frame pointed to by EP.  */
 #define RESTORE_CALL_SAVED_REGS						      \
 	sld.w	PTO+PT_GPR(2)[ep], r2;					      \
 	sld.w	PTO+PT_GPR(20)[ep], r20;				      \
@@ -136,12 +136,12 @@
 	sld.w	PTO+PT_GPR(29)[ep], r29
 
 
-/* Save the PC stored in the special register SAVEREG to the struct pt_regs
+/* Save the PC stored in the special register SAVEREG to the state-save-frame
    pointed to by EP.  r19 is clobbered.  */
 #define SAVE_PC(savereg)						      \
 	stsr	SR_ ## savereg, r19;					      \
 	sst.w	r19, PTO+PT_PC[ep]
-/* Restore the PC from the struct pt_regs pointed to by EP, to the special
+/* Restore the PC from the state-save-frame pointed to by EP, to the special
    register SAVEREG.  LP is clobbered (it is used as a scratch register
    because the POP_STATE macro restores it, and this macro is usually used
    inside POP_STATE).  */
@@ -149,11 +149,11 @@
 	sld.w	PTO+PT_PC[ep], lp;					      \
 	ldsr	lp, SR_ ## savereg
 /* Save the PSW register stored in the special register SAVREG to the
-   struct pt_regs pointed to by EP r19 is clobbered.  */
+   state-save-frame pointed to by EP.  r19 is clobbered.  */
 #define SAVE_PSW(savereg)						      \
 	stsr	SR_ ## savereg, r19;					      \
 	sst.w	r19, PTO+PT_PSW[ep]
-/* Restore the PSW register from the struct pt_regs pointed to by EP, to
+/* Restore the PSW register from the state-save-frame pointed to by EP, to
    the special register SAVEREG.  LP is clobbered (it is used as a scratch
    register because the POP_STATE macro restores it, and this macro is
    usually used inside POP_STATE).  */
@@ -161,7 +161,7 @@
 	sld.w	PTO+PT_PSW[ep], lp;					      \
 	ldsr	lp, SR_ ## savereg
 
-/* Save CTPC/CTPSW/CTBP registers to the struct pt_regs pointed to by REG.  
+/* Save CTPC/CTPSW/CTBP registers to the state-save-frame pointed to by REG.
    r19 is clobbered.  */
 #define SAVE_CT_REGS							      \
 	stsr	SR_CTPC, r19;						      \
@@ -170,7 +170,7 @@
 	sst.w	r19, PTO+PT_CTPSW[ep];					      \
 	stsr	SR_CTBP, r19;						      \
 	sst.w	r19, PTO+PT_CTBP[ep]
-/* Restore CTPC/CTPSW/CTBP registers from the struct pt_regs pointed to by EP.
+/* Restore CTPC/CTPSW/CTBP registers from the state-save-frame pointed to by EP.
    LP is clobbered (it is used as a scratch register because the POP_STATE
    macro restores it, and this macro is usually used inside POP_STATE).  */
 #define RESTORE_CT_REGS							      \
@@ -182,10 +182,11 @@
 	ldsr	lp, SR_CTBP
 
 
-/* Push register state, except for the stack pointer, on the stack in the form
-   of a struct pt_regs, in preparation for a system call.  This macro makes
-   sure that `special' registers, system registers; TYPE identifies the set of
-   extra registers to be saved as well.  EP is clobbered.  */
+/* Push register state, except for the stack pointer, on the stack in the
+   form of a state-save-frame (plus some extra padding), in preparation for
+   a system call.  This macro makes sure that the EP, GP, and LP
+   registers are saved, and TYPE identifies the set of extra registers to
+   be saved as well.  Also copies (the new value of) SP to EP.  */
 #define PUSH_STATE(type)						      \
 	addi	-STATE_SAVE_SIZE, sp, sp; /* Make room on the stack.  */      \
 	st.w	ep, PTO+PT_GPR(GPR_EP)[sp];				      \
@@ -193,8 +194,8 @@
 	sst.w	gp, PTO+PT_GPR(GPR_GP)[ep];				      \
 	sst.w	lp, PTO+PT_GPR(GPR_LP)[ep];				      \
 	type ## _STATE_SAVER
-/* Pop a register state, except for the stack pointer, from the struct pt_regs
-   on the stack.  */
+/* Pop a register state pushed by PUSH_STATE, except for the stack pointer,
+   from the the stack.  */
 #define POP_STATE(type)							      \
 	mov	sp, ep;							      \
 	type ## _STATE_RESTORER;					      \
@@ -205,7 +206,7 @@
 
 
 /* Switch to the kernel stack if necessary, and push register state on the
-   stack in the form of a struct pt_regs.  Also load the current task
+   stack in the form of a state-save-frame.  Also load the current task
    pointer if switching from user mode.  The stack-pointer (r3) should have
    already been saved to the memory location SP_SAVE_LOC (the reason for
    this is that the interrupt vectors may be beyond a 22-bit signed offset
@@ -234,25 +235,30 @@
 	sst.w	syscall_num, PTO+PT_CUR_SYSCALL[ep]
 
 
-/* Save register state not normally saved by PUSH_STATE for TYPE.  */
+/* Save register state not normally saved by PUSH_STATE for TYPE, to the
+   state-save-frame on the stack; also copies SP to EP.  r19 may be trashed. */
 #define SAVE_EXTRA_STATE(type)						      \
-        mov	sp, ep;							      \
+	mov	sp, ep;							      \
 	type ## _EXTRA_STATE_SAVER
-/* Restore register state not normally restored by POP_STATE for TYPE.  */
+/* Restore register state not normally restored by POP_STATE for TYPE,
+   from the state-save-frame on the stack; also copies SP to EP.
+   r19 may be trashed.  */
 #define RESTORE_EXTRA_STATE(type)					      \
-        mov	sp, ep;							      \
+	mov	sp, ep;							      \
 	type ## _EXTRA_STATE_RESTORER
 
-/* Save any call-clobbered registers not normally saved by PUSH_STATE
-   for TYPE.  */
-#define SAVE_EXTRA_STATE_FOR_FUNCALL(type)				      \
-        mov	sp, ep;							      \
-	type ## _FUNCALL_EXTRA_STATE_SAVER
-/* Restore any call-clobbered registers not normally restored by POP_STATE for
-   TYPE.  */
-#define RESTORE_EXTRA_STATE_FOR_FUNCALL(type)				      \
-        mov	sp, ep;							      \
-	type ## _FUNCALL_EXTRA_STATE_RESTORER
+/* Save any call-clobbered registers not normally saved by PUSH_STATE for
+   TYPE, to the state-save-frame on the stack.
+   EP may be trashed, but is not guaranteed to contain a copy of SP
+   (unlike after most SAVE_... macros).  r19 may be trashed.  */
+#define SAVE_EXTRA_STATE_FOR_SCHEDULE(type)				      \
+	type ## _SCHEDULE_EXTRA_STATE_SAVER
+/* Restore any call-clobbered registers not normally restored by
+   POP_STATE for TYPE, to the state-save-frame on the stack.
+   EP may be trashed, but is not guaranteed to contain a copy of SP
+   (unlike after most RESTORE_... macros).  r19 may be trashed.  */
+#define RESTORE_EXTRA_STATE_FOR_SCHEDULE(type)				      \
+	type ## _SCHEDULE_EXTRA_STATE_RESTORER
 
 
 /* These are extra_state_saver/restorer values for a user trap.  Note
@@ -263,36 +269,48 @@
    caller of the syscall function should have saved them.  */
 
 #define TRAP_RET reti
-/* Traps don't save call-clobbered registers (but do still save arg regs).  */
+/* Traps don't save call-clobbered registers (but do still save arg regs).
+   We preserve PSw to keep long-term state, namely interrupt status (for traps
+   from kernel-mode), and the single-step flag (for user traps).  */
 #define TRAP_STATE_SAVER						      \
 	SAVE_ARG_REGS;							      \
-	SAVE_PC(EIPC)
+	SAVE_PC(EIPC);							      \
+	SAVE_PSW(EIPSW)
 /* When traps return, they just leave call-clobbered registers (except for arg
-   regs) with whatever value they have from the kernel.  */
+   regs) with whatever value they have from the kernel.  Traps don't preserve
+   the PSW, but we zero EIPSW to ensure it doesn't contain anything dangerous
+   (in particular, the single-step flag).  */
 #define TRAP_STATE_RESTORER						      \
 	RESTORE_ARG_REGS;						      \
-	RESTORE_PC(EIPC)
+	RESTORE_PC(EIPC);						      \
+	RESTORE_PSW(EIPSW)
 /* Save registers not normally saved by traps.  We need to save r12, even
    though it's nominally call-clobbered, because it's used when restarting
    a system call (the signal-handling path uses SAVE_EXTRA_STATE, and
-   expects r12 to be restored when the trap returns).  Similarly, we must
-   save the PSW, so that it's at least in a known state in the the pt_regs
-   structure.  */
+   expects r12 to be restored when the trap returns).  */
 #define TRAP_EXTRA_STATE_SAVER						      \
 	SAVE_RVAL_REGS;							      \
 	sst.w	r12, PTO+PT_GPR(12)[ep];				      \
 	SAVE_CALL_SAVED_REGS;						      \
-	SAVE_PSW(EIPSW);						      \
 	SAVE_CT_REGS
 #define TRAP_EXTRA_STATE_RESTORER					      \
 	RESTORE_RVAL_REGS;						      \
 	sld.w	PTO+PT_GPR(12)[ep], r12;				      \
 	RESTORE_CALL_SAVED_REGS;					      \
-	RESTORE_PSW(EIPSW);						      \
 	RESTORE_CT_REGS
-#define TRAP_FUNCALL_EXTRA_STATE_SAVER					      \
+/* Save registers prior to calling scheduler (just before trap returns).
+   We have to save the return-value registers to preserve the trap's return
+   value.  Note that ..._SCHEDULE_EXTRA_STATE_SAVER, unlike most ..._SAVER
+   macros, is required to setup EP itself if EP is needed (this is because
+   in many cases, the macro is empty).  */
+#define TRAP_SCHEDULE_EXTRA_STATE_SAVER					      \
+	mov sp, ep;							      \
 	SAVE_RVAL_REGS
-#define TRAP_FUNCALL_EXTRA_STATE_RESTORER				      \
+/* Note that ..._SCHEDULE_EXTRA_STATE_RESTORER, unlike most ..._RESTORER
+   macros, is required to setup EP itself if EP is needed (this is because
+   in many cases, the macro is empty).  */
+#define TRAP_SCHEDULE_EXTRA_STATE_RESTORER				      \
+	mov sp, ep;							      \
 	RESTORE_RVAL_REGS
 
 /* Register saving/restoring for maskable interrupts.  */
@@ -311,8 +329,8 @@
 #define IRQ_EXTRA_STATE_RESTORER					      \
 	RESTORE_CALL_SAVED_REGS;					      \
 	RESTORE_CT_REGS
-#define IRQ_FUNCALL_EXTRA_STATE_SAVER       /* nothing */
-#define IRQ_FUNCALL_EXTRA_STATE_RESTORER    /* nothing */
+#define IRQ_SCHEDULE_EXTRA_STATE_SAVER	     /* nothing */
+#define IRQ_SCHEDULE_EXTRA_STATE_RESTORER    /* nothing */
 
 /* Register saving/restoring for non-maskable interrupts.  */
 #define NMI_RET reti
@@ -330,8 +348,8 @@
 #define NMI_EXTRA_STATE_RESTORER					      \
 	RESTORE_CALL_SAVED_REGS;					      \
 	RESTORE_CT_REGS
-#define NMI_FUNCALL_EXTRA_STATE_SAVER       /* nothing */
-#define NMI_FUNCALL_EXTRA_STATE_RESTORER    /* nothing */
+#define NMI_SCHEDULE_EXTRA_STATE_SAVER	     /* nothing */
+#define NMI_SCHEDULE_EXTRA_STATE_RESTORER    /* nothing */
 
 /* Register saving/restoring for debug traps.  */
 #define DBTRAP_RET .long 0x014607E0 /* `dbret', but gas doesn't support it. */
@@ -349,8 +367,8 @@
 #define DBTRAP_EXTRA_STATE_RESTORER					      \
 	RESTORE_CALL_SAVED_REGS;					      \
 	RESTORE_CT_REGS
-#define DBTRAP_FUNCALL_EXTRA_STATE_SAVER       /* nothing */
-#define DBTRAP_FUNCALL_EXTRA_STATE_RESTORER    /* nothing */
+#define DBTRAP_SCHEDULE_EXTRA_STATE_SAVER	/* nothing */
+#define DBTRAP_SCHEDULE_EXTRA_STATE_RESTORER	/* nothing */
 
 /* Register saving/restoring for a context switch.  We don't need to save
    too many registers, because context-switching looks like a function call
@@ -372,14 +390,14 @@
 	RESTORE_CT_REGS
 
 
-/* Restore register state from the struct pt_regs on the stack, switch back
+/* Restore register state from the state-save-frame on the stack, switch back
    to the user stack if necessary, and return from the trap/interrupt.
    EXTRA_STATE_RESTORER is a sequence of assembly language statements to
    restore anything not restored by this macro.  Only registers not saved by
    the C compiler are restored (that is, R3(sp), R4(gp), R31(lp), and
    anything restored by EXTRA_STATE_RESTORER).  */
 #define RETURN(type)							      \
-        ld.b	PTO+PT_KERNEL_MODE[sp], r19;				      \
+	ld.b	PTO+PT_KERNEL_MODE[sp], r19;				      \
 	di;				/* Disable interrupts */	      \
 	cmp	r19, r0;		/* See if returning to kernel mode, */\
 	bne	2f;			/* ... if so, skip resched &c.  */    \
@@ -390,33 +408,34 @@
 	ld.w	TI_FLAGS[r18], r19;					      \
 	andi	_TIF_NEED_RESCHED, r19, r0;				      \
 	bnz	3f;			/* Call the scheduler.  */	      \
-	andi	_TIF_SIGPENDING, r19, r0;				      \
-	bnz	4f;			/* Signals to handle, handle them */  \
+5:	andi	_TIF_SIGPENDING, r19, r18;				      \
+	ld.w	TASK_PTRACE[CURRENT_TASK], r19; /* ptrace flags */	      \
+	or	r18, r19;		/* see if either is non-zero */	      \
+	bnz	4f;			/* if so, handle them */	      \
 									      \
-/* Return to user state.  */					   	      \
+/* Return to user state.  */						      \
 1:	st.b	r0, KM;			/* Now officially in user state. */   \
 									      \
 /* Final return.  The stack-pointer fiddling is not needed when returning     \
    to kernel-mode, but they don't hurt, and this way we can share the	      \
-   (somtimes rather lengthy) POP_STATE macro.  */			      \
+   (sometimes rather lengthy) POP_STATE macro.  */			      \
 2:	POP_STATE(type);						      \
 	st.w	sp, KSP;		/* Save the kernel stack pointer. */  \
-	ld.w    PT_GPR(GPR_SP)-PT_SIZE[sp], sp; /* Restore stack pointer. */  \
+	ld.w	PT_GPR(GPR_SP)-PT_SIZE[sp], sp; /* Restore stack pointer. */  \
 	type ## _RET;			/* Return from the trap/interrupt. */ \
 									      \
 /* Call the scheduler before returning from a syscall/trap. */		      \
-3:	SAVE_EXTRA_STATE_FOR_FUNCALL(type); /* Prepare for funcall. */	      \
-	jarl	CSYM(schedule), lp;	/* Call scheduler */		      \
+3:	SAVE_EXTRA_STATE_FOR_SCHEDULE(type); /* Prepare to call scheduler. */ \
+	jarl	call_scheduler, lp;	/* Call scheduler */		      \
 	di;				/* The scheduler enables interrupts */\
-	RESTORE_EXTRA_STATE_FOR_FUNCALL(type);				      \
+	RESTORE_EXTRA_STATE_FOR_SCHEDULE(type);				      \
 	GET_CURRENT_THREAD(r18);					      \
 	ld.w	TI_FLAGS[r18], r19;					      \
-	andi	_TIF_SIGPENDING, r19, r0;				      \
-	bz	1b;			/* No signals, return.  */	      \
-	/* Signals to handle, fall through to handle them.  */		      \
+	br	5b;			/* Continue with return path. */      \
 									      \
-/* Handle a signal return.  */						      \
-4:      /* Not all registers are saved by the normal trap/interrupt entry     \
+/* Handle a signal or ptraced process return.				      \
+   r18 should be non-zero if there are pending signals.  */		      \
+4:	/* Not all registers are saved by the normal trap/interrupt entry     \
 	   points (for instance, call-saved registers (because the normal     \
 	   C-compiler calling sequence in the kernel makes sure they're	      \
 	   preserved), and call-clobbered registers in the case of	      \
@@ -424,12 +443,9 @@
 	   complete register state.  Here we save anything not saved by	      \
 	   the normal entry sequence, so that it may be safely restored	      \
 	   (in a possibly modified form) after do_signal returns.  */	      \
-        SAVE_EXTRA_STATE(type);		/* Save state not saved by entry. */  \
-	movea	PTO, sp, r6;		/* Arg 1: struct pt_regs *regs */     \
-	mov	r0, r7;			/* Arg 2: sigset_t *oldset */	      \
-	jarl	CSYM(do_signal), lp;	/* Handle any signals */	      \
-	di;				/* sig handling enables interrupts */ \
-        RESTORE_EXTRA_STATE(type);	/* Restore extra regs.  */	      \
+	SAVE_EXTRA_STATE(type);		/* Save state not saved by entry. */  \
+	jarl	handle_signal_or_ptrace_return, lp;			      \
+	RESTORE_EXTRA_STATE(type);	/* Restore extra regs.  */	      \
 	br	1b
 
 
@@ -471,7 +487,7 @@
  *   Return value in r10
  */
 G_ENTRY(trap):
-	SAVE_STATE (TRAP, r12, ENTRY_SP) // Save registers. 
+	SAVE_STATE (TRAP, r12, ENTRY_SP) // Save registers.
 	stsr	SR_ECR, r19		// Find out which trap it was.
 	ei				// Enable interrupts.
 	mov	hilo(ret_from_trap), lp	// where the trap should return
@@ -481,12 +497,12 @@ G_ENTRY(trap):
 	// numbers into the (0-31) << 2 range we want, (3) set the flags.
 	shl	27, r19			// chop off all high bits
 	shr	25, r19			// scale back down and then << 2
-	bnz	2f			// See if not trap 0. 
+	bnz	2f			// See if not trap 0.
 
-	// Trap 0 is a `short' system call, skip general trap table. 
-	MAKE_SYS_CALL			// Jump to the syscall function. 
+	// Trap 0 is a `short' system call, skip general trap table.
+	MAKE_SYS_CALL			// Jump to the syscall function.
 
-2:	// For other traps, use a table lookup. 
+2:	// For other traps, use a table lookup.
 	mov	hilo(CSYM(trap_table)), r18
 	add	r19, r18
 	ld.w	0[r18], r18
@@ -504,6 +520,7 @@ END(restore_extra_regs_and_ret_from_trap)
 L_ENTRY(ret_from_trap):
 	RETURN(TRAP)
 END(ret_from_trap)
+
 
 /* This the initial entry point for a new child thread, with an appropriate
    stack in place that makes it look the the child is in the middle of an
@@ -538,7 +555,7 @@ L_ENTRY(syscall_long):
 	mov	hilo(ret_from_long_syscall), lp
 
 	MAKE_SYS_CALL			// Jump to the syscall function.
-END(syscall_long)	
+END(syscall_long)
 
 /* Entry point used to return from a long syscall.  Only needed to restore
    r13/r14 if the general trap mechanism doesnt' do so.  */
@@ -554,11 +571,14 @@ END(ret_from_long_syscall)
 
 L_ENTRY(sys_fork_wrapper):
 #ifdef CONFIG_MMU
-	addi	SIGCHLD, r0, r6		// Arg 0: flags
+	addi	SIGCHLD, r0, r6		   // Arg 0: flags
 	ld.w	PTO+PT_GPR(GPR_SP)[sp], r7 // Arg 1: child SP (use parent's)
-	movea	PTO, sp, r8		// Arg 2: parent context
-	mov	hilo(CSYM(fork_common)), r18// Where the real work gets done
-	br	save_extra_state_tramp	// Save state and go there
+	movea	PTO, sp, r8		   // Arg 2: parent context
+	mov	r0, r9			   // Arg 3/4/5: 0
+	st.w	r0, 16[sp]
+	st.w	r0, 20[sp]
+	mov	hilo(CSYM(do_fork)), r18   // Where the real work gets done
+	br	save_extra_state_tramp	   // Save state and go there
 #else
 	// fork almost works, enough to trick you into looking elsewhere :-(
 	addi	-EINVAL, r0, r10
@@ -569,18 +589,24 @@ END(sys_fork_wrapper)
 L_ENTRY(sys_vfork_wrapper):
 	addi	CLONE_VFORK | CLONE_VM | SIGCHLD, r0, r6 // Arg 0: flags
 	ld.w	PTO+PT_GPR(GPR_SP)[sp], r7 // Arg 1: child SP (use parent's)
-	movea	PTO, sp, r8		// Arg 2: parent context
-	mov	hilo(CSYM(fork_common)), r18// Where the real work gets done
-	br	save_extra_state_tramp	// Save state and go there
+	movea	PTO, sp, r8		   // Arg 2: parent context
+	mov	r0, r9			   // Arg 3/4/5: 0
+	st.w	r0, 16[sp]
+	st.w	r0, 20[sp]
+	mov	hilo(CSYM(do_fork)), r18   // Where the real work gets done
+	br	save_extra_state_tramp	   // Save state and go there
 END(sys_vfork_wrapper)
 
 L_ENTRY(sys_clone_wrapper):
-	ld.w	PTO+PT_GPR(GPR_SP)[sp], r19 // parent's stack pointer
-        cmp	r7, r0			// See if child SP arg (arg 1) is 0.
-	cmov	z, r19, r7, r7		// ... and use the parent's if so. 
-	movea	PTO, sp, r8		// Arg 2: parent context
-	mov	hilo(CSYM(fork_common)), r18// Where the real work gets done
-	br	save_extra_state_tramp	// Save state and go there
+	ld.w	PTO+PT_GPR(GPR_SP)[sp], r19// parent's stack pointer
+	cmp	r7, r0			   // See if child SP arg (arg 1) is 0.
+	cmov	z, r19, r7, r7		   // ... and use the parent's if so.
+	movea	PTO, sp, r8		   // Arg 2: parent context
+	mov	r0, r9			   // Arg 3/4/5: 0
+	st.w	r0, 16[sp]
+	st.w	r0, 20[sp]
+	mov	hilo(CSYM(do_fork)), r18   // Where the real work gets done
+	br	save_extra_state_tramp	   // Save state and go there
 END(sys_clone_wrapper)
 
 
@@ -598,8 +624,8 @@ L_ENTRY(sys_sigsuspend_wrapper):
 END(sys_sigsuspend_wrapper)
 L_ENTRY(sys_rt_sigsuspend_wrapper):
 	movea	PTO, sp, r8		// add user context as 3rd arg
-	mov	hilo(CSYM(sys_rt_sigsuspend)), r18	// syscall function
-	jarl	save_extra_state_tramp, lp	// Save state and do it
+	mov	hilo(CSYM(sys_rt_sigsuspend)), r18 // syscall function
+	jarl	save_extra_state_tramp, lp	   // Save state and do it
 	br	restore_extra_regs_and_ret_from_trap
 END(sys_rt_sigsuspend_wrapper)
 
@@ -610,10 +636,9 @@ L_ENTRY(sys_sigreturn_wrapper):
 	br	restore_extra_regs_and_ret_from_trap
 END(sys_sigreturn_wrapper)
 L_ENTRY(sys_rt_sigreturn_wrapper):
-        SAVE_EXTRA_STATE(TRAP)		// Save state not saved by entry.
 	movea	PTO, sp, r6		// add user context as 1st arg
-	mov	hilo(CSYM(sys_rt_sigreturn)), r18	// syscall function
-	jarl	save_extra_state_tramp, lp	// Save state and do it
+	mov	hilo(CSYM(sys_rt_sigreturn)), r18// syscall function
+	jarl	save_extra_state_tramp, lp	 // Save state and do it
 	br	restore_extra_regs_and_ret_from_trap
 END(sys_rt_sigreturn_wrapper)
 
@@ -637,7 +662,7 @@ END(save_extra_state_tramp)
  * indirect jump).
  */
 G_ENTRY(irq):
-	SAVE_STATE (IRQ, r0, ENTRY_SP)	// Save registers. 
+	SAVE_STATE (IRQ, r0, ENTRY_SP)	// Save registers.
 
 	stsr	SR_ECR, r6		// Find out which interrupt it was.
 	movea	PTO, sp, r7		// User regs are arg2
@@ -657,7 +682,7 @@ G_ENTRY(irq):
 	RETURN(IRQ)
 END(irq)
 
-	
+
 /*
  * Debug trap / illegal-instruction exception
  *
@@ -668,22 +693,50 @@ END(irq)
  * indirect jump).
  */
 G_ENTRY(dbtrap):
-	SAVE_STATE (DBTRAP, r0, ENTRY_SP)// Save registers. 
+	SAVE_STATE (DBTRAP, r0, ENTRY_SP)// Save registers.
+
+	/* First see if we came from kernel mode; if so, the dbtrap
+	   instruction has a special meaning, to set the DIR (`debug
+	   information register') register.  This is because the DIR register
+	   can _only_ be manipulated/read while in `debug mode,' and debug
+	   mode is only active while we're inside the dbtrap handler.  The
+	   exact functionality is:  { DIR = (DIR | r6) & ~r7; return DIR; }. */
+	ld.b	PTO+PT_KERNEL_MODE[sp], r19
+	cmp	r19, r0
+	bz	1f
+
+	stsr	SR_DIR, r10
+	or	r6, r10
+	not	r7, r7
+	and	r7, r10
+	ldsr	r10, SR_DIR
+	stsr	SR_DIR, r10		// Confirm the value we set
+	st.w	r10, PTO+PT_GPR(10)[sp]	// return it
+	br	3f
+
+1:	ei				// Enable interrupts.
+
+	/* The default signal type we raise.  */
+	mov	SIGTRAP, r6
+
+	/* See if it's a single-step trap.  */
+	stsr	SR_DBPSW, r19
+	andi	0x0800, r19, r19
+	bnz	2f
 
 	/* Look to see if the preceding instruction was is a dbtrap or not,
 	   to decide which signal we should use.  */
 	stsr	SR_DBPC, r19		// PC following trapping insn
 	ld.hu	-2[r19], r19
-	mov	SIGTRAP, r6
 	ori	0xf840, r0, r20		// DBTRAP insn
 	cmp	r19, r20		// Was this trap caused by DBTRAP?
 	cmov	ne, SIGILL, r6, r6	// Choose signal appropriately
 
 	/* Raise the desired signal.  */
-	mov	CURRENT_TASK, r7	// Arg 1: task
-	jarl	CSYM(force_sig), lp	// tail call
+2:	mov	CURRENT_TASK, r7	// Arg 1: task
+	jarl	CSYM(send_sig), lp	// tail call
 
-	RETURN(DBTRAP)
+3:	RETURN(DBTRAP)
 END(dbtrap)
 
 
@@ -725,9 +778,93 @@ END(bad_trap_wrapper)
 
 
 /*
+ * Invoke the scheduler, called from the trap/irq kernel exit path.
+ *
+ * This basically just calls `schedule', but also arranges for extra
+ * registers to be saved for ptrace'd processes, so ptrace can modify them.
+ */
+L_ENTRY(call_scheduler):
+	ld.w	TASK_PTRACE[CURRENT_TASK], r19	// See if task is ptrace'd
+	cmp	r19, r0
+	bnz	1f			// ... yes, do special stuff
+	jr	CSYM(schedule)		// ... no, just tail-call scheduler
+
+	// Save extra regs for ptrace'd task.  We want to save anything
+	// that would otherwise only be `implicitly' saved by the normal
+	// compiler calling-convention.
+1:	mov	sp, ep			// Setup EP for SAVE_CALL_SAVED_REGS
+	SAVE_CALL_SAVED_REGS		// Save call-saved registers to stack
+	mov	lp, r20			// Save LP in a callee-saved register
+
+	jarl	CSYM(schedule), lp	// Call scheduler
+
+	mov	r20, lp
+	mov	sp, ep			// We can't rely on EP after return
+	RESTORE_CALL_SAVED_REGS		// Restore (possibly modified) regs
+	jmp	[lp]			// Return to the return path
+END(call_scheduler)
+
+
+/*
+ * This is an out-of-line handler for two special cases during the kernel
+ * trap/irq exit sequence:
+ *
+ *  (1) If r18 is non-zero then a signal needs to be handled, which is
+ *	done, and then the caller returned to.
+ *
+ *  (2) If r18 is non-zero then we're returning to a ptraced process, which
+ *	has several special cases -- single-stepping and trap tracing, both
+ *	of which require using the `dbret' instruction to exit the kernel
+ *	instead of the normal `reti' (this is because the CPU not correctly
+ *	single-step after a reti).  In this case, of course, this handler
+ *	never returns to the caller.
+ *
+ * In either case, all registers should have been saved to the current
+ * state-save-frame on the stack, except for callee-saved registers.
+ *
+ * [These two different cases are combined merely to avoid bloating the
+ * macro-inlined code, not because they really make much sense together!]
+ */
+L_ENTRY(handle_signal_or_ptrace_return):
+	cmp	r18, r0			// See if handling a signal
+	bz	1f			// ... nope, go do ptrace return
+
+	// Handle a signal
+	mov	lp, r20			// Save link-pointer
+	mov	r10, r21		// Save return-values (for trap)
+	mov	r11, r22
+
+	movea	PTO, sp, r6		// Arg 1: struct pt_regs *regs
+	mov	r0, r7			// Arg 2: sigset_t *oldset
+	jarl	CSYM(do_signal), lp	// Handle the signal
+	di				// sig handling enables interrupts
+
+	mov	r20, lp			// Restore link-pointer
+	mov	r21, r10		// Restore return-values (for trap)
+	mov	r22, r11
+	ld.w	TASK_PTRACE[CURRENT_TASK], r19  // check ptrace flags too
+	cmp	r19, r0
+	bnz	1f			// ... some set, so look more
+2:	jmp	[lp]			// ... none set, so return normally
+
+	// ptrace return
+1:	ld.w	PTO+PT_PSW[sp], r19	// Look at user-processes's flags
+	andi	0x0800, r19, r19	// See if single-step flag is set
+	bz	2b			// ... nope, return normally
+
+	// Return as if from a dbtrap insn
+	st.b	r0, KM			// Now officially in user state.
+	POP_STATE(DBTRAP)		// Restore regs
+	st.w	sp, KSP			// Save the kernel stack pointer.
+	ld.w	PT_GPR(GPR_SP)-PT_SIZE[sp], sp // Restore user stack pointer.
+	DBTRAP_RET			// Return from the trap/interrupt.
+END(handle_signal_or_ptrace_return)
+
+
+/*
  * This is where we switch between two threads.  The arguments are:
  *   r6 -- pointer to the struct thread for the `current' process
- *   r7 -- pointer to the struct thread for the `new' process.  
+ *   r7 -- pointer to the struct thread for the `new' process.
  * when this function returns, it will return to the new thread.
  */
 C_ENTRY(switch_thread):
@@ -754,8 +891,8 @@ C_END(switch_thread)
 
 	.align 4
 C_DATA(trap_table):
-	.long bad_trap_wrapper		// trap 0, doesn't use trap table. 
-	.long syscall_long		// trap 1, `long' syscall. 
+	.long bad_trap_wrapper		// trap 0, doesn't use trap table.
+	.long syscall_long		// trap 1, `long' syscall.
 	.long bad_trap_wrapper
 	.long bad_trap_wrapper
 	.long bad_trap_wrapper
@@ -774,7 +911,7 @@ C_END(trap_table)
 
 
 	.section .rodata
-	
+
 	.align 4
 C_DATA(sys_call_table):
 	.long CSYM(sys_restart_syscall)	// 0
@@ -835,7 +972,7 @@ C_DATA(sys_call_table):
 	.long CSYM(sys_fcntl)		// 55
 	.long CSYM(sys_ni_syscall)	// was: mpx
 	.long CSYM(sys_setpgid)
-	.long CSYM(sys_ni_syscall) 	// was: ulimit
+	.long CSYM(sys_ni_syscall)	// was: ulimit
 	.long CSYM(sys_ni_syscall)
 	.long CSYM(sys_umask)		// 60
 	.long CSYM(sys_chroot)
@@ -875,7 +1012,7 @@ C_DATA(sys_call_table):
 	.long CSYM(sys_fchown)		// 95
 	.long CSYM(sys_getpriority)
 	.long CSYM(sys_setpriority)
-	.long CSYM(sys_ni_syscall) 	// was: profil
+	.long CSYM(sys_ni_syscall)	// was: profil
 	.long CSYM(sys_statfs)
 	.long CSYM(sys_fstatfs)		// 100
 	.long CSYM(sys_ni_syscall)	// i386: ioperm
@@ -900,7 +1037,7 @@ C_DATA(sys_call_table):
 	.long sys_clone_wrapper		// 120
 	.long CSYM(sys_setdomainname)
 	.long CSYM(sys_newuname)
-	.long CSYM(sys_ni_syscall)	// i386: modify_ldt, m68k: cacheflush 
+	.long CSYM(sys_ni_syscall)	// i386: modify_ldt, m68k: cacheflush
 	.long CSYM(sys_adjtimex)
 	.long CSYM(sys_ni_syscall)	// 125 - sys_mprotect
 	.long CSYM(sys_sigprocmask)
@@ -937,7 +1074,7 @@ C_DATA(sys_call_table):
 	.long CSYM(sys_sched_getscheduler)
 	.long CSYM(sys_sched_yield)
 	.long CSYM(sys_sched_get_priority_max)
-	.long CSYM(sys_sched_get_priority_min)  // 160
+	.long CSYM(sys_sched_get_priority_min)	// 160
 	.long CSYM(sys_sched_rr_get_interval)
 	.long CSYM(sys_nanosleep)
 	.long CSYM(sys_ni_syscall)	// sys_mremap

@@ -1299,12 +1299,6 @@ extern void ide_fixstring(u8 *, const int, const int);
 extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long);
 
 /*
- * This routine is called from the partition-table code in genhd.c
- * to "convert" a drive to a logical geometry with fewer than 1024 cyls.
- */
-extern int ide_xlate_1024(struct block_device *, int, int, const char *);
-
-/*
  * Return the current idea about the total capacity of this drive.
  */
 extern unsigned long current_capacity (ide_drive_t *drive);

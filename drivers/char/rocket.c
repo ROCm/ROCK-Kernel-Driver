@@ -120,7 +120,7 @@ static struct termios *rocket_termios_locked[MAX_RP_PORTS];
 static void rp_wait_until_sent(struct tty_struct *tty, int timeout);
 static void rp_flush_buffer(struct tty_struct *tty);
 
-static struct tty_driver rocket_driver, callout_driver;
+static struct tty_driver rocket_driver;
 static int rocket_refcount;
 
 static int rp_num_ports_open;
@@ -410,10 +410,7 @@ static _INLINE_ void rp_handle_port(struct r_port *info)
 		printk("ttyR%d CD now %s...", info->line,
 		       (ChanStatus & CD_ACT) ? "on" : "off");
 #endif
-		if (!(ChanStatus & CD_ACT) &&
-		    info->cd_status &&
-		    !((info->flags & ROCKET_CALLOUT_ACTIVE) &&
-		      (info->flags & ROCKET_CALLOUT_NOHUP))) {
+		if (!(ChanStatus & CD_ACT) && info->cd_status) {
 #ifdef ROCKET_DEBUG_HANGUP
 			printk("CD drop, calling hangup.\n");
 #endif
@@ -551,7 +548,6 @@ static void init_r_port(int board, int aiop, int chan)
 	info->chan = chan;
 	info->closing_wait = 3000;
 	info->close_delay = 50;
-	info->callout_termios =callout_driver.init_termios;
 	info->normal_termios = rocket_driver.init_termios;
 	init_waitqueue_head(&info->open_wait);
 	init_waitqueue_head(&info->close_wait);
@@ -707,44 +703,18 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ROCKET_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ROCKET_CALLOUT_ACTIVE) &&
-		    (info->flags & ROCKET_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ROCKET_CALLOUT_ACTIVE) &&
-		    (info->flags & ROCKET_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ROCKET_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ROCKET_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ROCKET_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ROCKET_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -766,8 +736,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	restore_flags(flags);
 	info->blocked_open++;
 	while (1) {
-		if (!(info->flags & ROCKET_CALLOUT_ACTIVE) &&
-		    (tty->termios->c_cflag & CBAUD)) {
+		if ((tty->termios->c_cflag & CBAUD)) {
 			sSetDTR(&info->channel);
 			sSetRTS(&info->channel);
 		}
@@ -780,8 +749,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if (!(info->flags & ROCKET_CALLOUT_ACTIVE) &&
-		    !(info->flags & ROCKET_CLOSING) &&
+		if (!(info->flags & ROCKET_CLOSING) &&
 		    (do_clocal || (sGetChanStatusLo(&info->channel) &
 				   CD_ACT)))
 			break;
@@ -885,8 +853,6 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	/*
 	 * Info->count is now 1; so it's safe to sleep now.
 	 */
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 	
 	cp = &info->channel;
 	sSetRxTrigger(cp, TRIG_1);
@@ -943,10 +909,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ROCKET_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
+		*tty->termios = info->normal_termios;
 		configure_r_port(info);
 	}
 
@@ -1001,8 +964,6 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	 */
 	if (info->flags & ROCKET_NORMAL_ACTIVE)
 		info->normal_termios = *tty->termios;
-	if (info->flags & ROCKET_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
 	
 	cp = &info->channel;
 
@@ -1063,8 +1024,7 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 			info->xmit_buf = 0;
 		}
 	}
-	info->flags &= ~(ROCKET_INITIALIZED | ROCKET_CLOSING |
-			 ROCKET_CALLOUT_ACTIVE | ROCKET_NORMAL_ACTIVE);
+	info->flags &= ~(ROCKET_INITIALIZED | ROCKET_CLOSING | ROCKET_NORMAL_ACTIVE);
 	tty->closing = 0;
 	wake_up_interruptible(&info->close_wait);
 	
@@ -1270,7 +1230,7 @@ static int get_ports(struct r_port * info, struct rocket_ports * retports)
 		return -EFAULT;
 	memset(&tmp, 0, sizeof(tmp));
 	tmp.tty_major = rocket_driver.major;
-	tmp.callout_major = callout_driver.major;
+	tmp.callout_major = 0;
 	for (board = 0; board < 4; board++) {
 		index = board << 5;
 		for (port = 0; port < 32; port++, index++) {
@@ -1503,7 +1463,7 @@ static void rp_hangup(struct tty_struct *tty)
 	
 	xmit_flags[info->line >> 5] &= ~(1 << (info->line & 0x1f));
 	info->count = 0;
-	info->flags &= ~(ROCKET_NORMAL_ACTIVE|ROCKET_CALLOUT_ACTIVE);
+	info->flags &= ~ROCKET_NORMAL_ACTIVE;
 	info->tty = 0;
 
 	cp = &info->channel;
@@ -2041,28 +2001,6 @@ int __init rp_init(void)
 	rocket_driver.send_xchar = rp_send_xchar;
 	rocket_driver.wait_until_sent = rp_wait_until_sent;
 
-	/*
-	 * The callout device is just like normal device except for
-	 * the minor number and the subtype code.
-	 */
-	callout_driver = rocket_driver;
-#ifdef CONFIG_DEVFS_FS
-	callout_driver.name = "cua/R";
-#else
-	callout_driver.name = "cur";
-#endif
-	callout_driver.major = CUA_ROCKET_MAJOR;
-	callout_driver.minor_start = 0;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	
-	retval = tty_register_driver(&callout_driver);
-	if (retval < 0) {
-		printk("Couldn't install Rocketport callout driver "
-		       "(error %d)\n", -retval);
-		release_region(controller, 4);
-		return -1;
-	}
-
 	retval = tty_register_driver(&rocket_driver);
 	if (retval < 0) {
 		printk("Couldn't install tty Rocketport driver "
@@ -2071,8 +2009,8 @@ int __init rp_init(void)
 		return -1;
 	}
 #ifdef ROCKET_DEBUG_OPEN
-	printk("Rocketport driver is major %d, callout is %d\n",
-	       rocket_driver.major, callout_driver.major);
+	printk("Rocketport driver is major %d\n",
+	       rocket_driver.major);
 #endif
 
 	return 0;
@@ -2092,11 +2030,6 @@ cleanup_module( void) {
 
 	del_timer_sync(&rocket_timer);
 
-	retval = tty_unregister_driver(&callout_driver);
-	if (retval) {
-		printk("Error %d while trying to unregister "
-		       "rocketport callout driver\n", -retval);
-	}
 	retval = tty_unregister_driver(&rocket_driver);
 	if (retval) {
 		printk("Error %d while trying to unregister "

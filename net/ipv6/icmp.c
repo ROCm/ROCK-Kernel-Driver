@@ -263,7 +263,7 @@ static int icmpv6_getfrag(void *from, char *to, int offset, int len, int odd, st
 void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info, 
 		 struct net_device *dev)
 {
-	struct inet6_dev *idev;
+	struct inet6_dev *idev = NULL;
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct sock *sk = icmpv6_socket->sk;
 	struct ipv6_pinfo *np = inet6_sk(sk);
@@ -384,7 +384,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 				hlimit, NULL, &fl, (struct rt6_info*)dst, MSG_DONTWAIT);
 	if (err) {
 		ip6_flush_pending_frames(sk);
-		goto out;
+		goto out_put;
 	}
 	err = icmpv6_push_pending_frames(sk, &fl, &tmp_hdr, len + sizeof(struct icmp6hdr));
 	__skb_push(skb, plen);
@@ -393,6 +393,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6OutDestUnreachs, type - ICMPV6_DEST_UNREACH);
 	ICMP6_INC_STATS_BH(idev, Icmp6OutMsgs);
 
+out_put:
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 out:
@@ -455,13 +456,14 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 
 	if (err) {
 		ip6_flush_pending_frames(sk);
-		goto out;
+		goto out_put;
 	}
 	err = icmpv6_push_pending_frames(sk, &fl, &tmp_hdr, skb->len + sizeof(struct icmp6hdr));
 
         ICMP6_INC_STATS_BH(idev, Icmp6OutEchoReplies);
         ICMP6_INC_STATS_BH(idev, Icmp6OutMsgs);
 
+out_put: 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 out: 

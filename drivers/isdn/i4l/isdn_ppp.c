@@ -467,11 +467,11 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd,
 		memset(&pci, 0, sizeof(pci));
 
 		mlp = idev->mlp;
-		strncpy(pci.local_num, mlp->msn, 63);
+		strlcpy(pci.local_num, mlp->msn, sizeof(pci.local_num));
 		i = 0;
 		list_for_each_entry(phone, &mlp->phone[1], list) {
 			if (i++ == idev->dial) {
-				strncpy(pci.remote_num,phone->num,63);
+				strlcpy(pci.remote_num,phone->num,sizeof(pci.remote_num));
 				break;
 			}
 		}

@@ -89,8 +89,7 @@ int register_blkdev(unsigned int major, const char *name)
 	}
 
 	p->major = major;
-	strncpy(p->name, name, sizeof(p->name)-1);
-	p->name[sizeof(p->name)-1] = 0;
+	strlcpy(p->name, name, sizeof(p->name));
 	p->next = 0;
 	index = major_to_index(major);
 

@@ -222,6 +222,7 @@ struct bio_pair {
 };
 extern struct bio_pair *bio_split(struct bio *bi, mempool_t *pool,
 				  int first_sectors);
+extern mempool_t *bio_split_pool;
 extern void bio_pair_release(struct bio_pair *dbio);
 
 extern struct bio *bio_alloc(int, int);

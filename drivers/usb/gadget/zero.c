@@ -1205,8 +1205,7 @@ static int __init init (void)
 	/* a real value would likely come through some id prom
 	 * or module option.  this one takes at least two packets.
 	 */
-	strncpy (serial, "0123456789.0123456789.0123456789", sizeof serial);
-	serial [sizeof serial - 1] = 0;
+	strlcpy (serial, "0123456789.0123456789.0123456789", sizeof serial);
 
 	return usb_gadget_register_driver (&zero_driver);
 }

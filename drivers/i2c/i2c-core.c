@@ -105,7 +105,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	memset(&adap->class_dev, 0x00, sizeof(struct class_device));
 	adap->class_dev.dev = &adap->dev;
 	adap->class_dev.class = &i2c_adapter_class;
-	strncpy(adap->class_dev.class_id, adap->dev.bus_id, BUS_ID_SIZE);
+	strlcpy(adap->class_dev.class_id, adap->dev.bus_id, BUS_ID_SIZE);
 	class_device_register(&adap->class_dev);
 
 	/* inform drivers of new adapters */

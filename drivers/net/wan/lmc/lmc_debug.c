@@ -2,9 +2,7 @@
 #include <linux/types.h>
 #include <linux/netdevice.h>
 #include <linux/interrupt.h>
-#include <linux/version.h>
 
-#include "lmc_ver.h"
 #include "lmc_debug.h"
 
 /*

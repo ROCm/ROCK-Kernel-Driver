@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.94 $
+ * $Revision: 1.99 $
  */
 
 #include <linux/config.h>
@@ -297,19 +297,23 @@ dasd_increase_state(struct dasd_device *device)
 	    device->target >= DASD_STATE_KNOWN)
 		rc = dasd_state_new_to_known(device);
 
-	if (device->state == DASD_STATE_KNOWN &&
+	if (!rc &&
+	    device->state == DASD_STATE_KNOWN &&
 	    device->target >= DASD_STATE_BASIC)
 		rc = dasd_state_known_to_basic(device);
 
-	if (device->state == DASD_STATE_BASIC &&
+	if (!rc &&
+	    device->state == DASD_STATE_BASIC &&
 	    device->target >= DASD_STATE_ACCEPT)
 		rc = dasd_state_basic_to_accept(device);
 
-	if (device->state == DASD_STATE_ACCEPT &&
+	if (!rc &&
+	    device->state == DASD_STATE_ACCEPT &&
 	    device->target >= DASD_STATE_READY)
 		rc = dasd_state_accept_to_ready(device);
 
-	if (device->state == DASD_STATE_READY &&
+	if (!rc &&
+	    device->state == DASD_STATE_READY &&
 	    device->target >= DASD_STATE_ONLINE)
 		rc = dasd_state_ready_to_online(device);
 
@@ -729,6 +733,7 @@ dasd_term_IO(struct dasd_ccw_req * cqr)
 			DBF_DEV_EVENT(DBF_ERR, device, "%s",
 				      "I/O error, retry");
 			break;
+		case -EINVAL:
 		case -EBUSY:
 			DBF_DEV_EVENT(DBF_ERR, device, "%s",
 				      "device busy, retry later");
@@ -1727,7 +1732,7 @@ static int
 dasd_release(struct inode *inp, struct file *filp)
 {
 	struct gendisk *disk = inp->i_bdev->bd_disk;
-	struct dasd_device *device = isk->private_data;
+	struct dasd_device *device = disk->private_data;
 
 	if (device->state < DASD_STATE_ACCEPT) {
 		DBF_DEV_EVENT(DBF_ERR, device, " %s",
@@ -2051,7 +2056,7 @@ dasd_init(void)
 		rc = -ENOMEM;
 		goto failed;
 	}
-	debug_register_view(dasd_debug_area, &debug_sprintf_view);
+	debug_register_view(dasd_debug_area, &debug_hex_ascii_view);
 	debug_set_level(dasd_debug_area, DBF_ERR);
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");

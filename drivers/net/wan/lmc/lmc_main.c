@@ -11,7 +11,7 @@
   * With Help By:
   * David Boggs
   * Ron Crane
-  * Allan Cox
+  * Alan Cox
   *
   * This software may be used and distributed according to the terms
   * of the GNU General Public License version 2, incorporated herein by reference.
@@ -38,7 +38,6 @@
 
 /* $Id: lmc_main.c,v 1.36 2000/04/11 05:25:25 asj Exp $ */
 
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/string.h>
@@ -51,9 +50,6 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#if LINUX_VERSION_CODE < 0x20155
-#include <linux/bios32.h>
-#endif
 #include <linux/in.h>
 #include <linux/if_arp.h>
 #include <linux/netdevice.h>
@@ -67,12 +63,8 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#if LINUX_VERSION_CODE >= 0x20200
 #include <asm/uaccess.h>
 //#include <asm/spinlock.h>
-#else				/* 2.0 kernel */
-#define ARPHRD_HDLC 513
-#endif
 
 #define DRIVER_MAJOR_VERSION     1
 #define DRIVER_MINOR_VERSION    34
@@ -80,7 +72,6 @@
 
 #define DRIVER_VERSION  ((DRIVER_MAJOR_VERSION << 8) + DRIVER_MINOR_VERSION)
 
-#include "lmc_ver.h"
 #include "lmc.h"
 #include "lmc_var.h"
 #include "lmc_ioctl.h"
@@ -127,10 +118,8 @@ static void lmc_watchdog(unsigned long data);
 static int lmc_init(struct net_device * const);
 static void lmc_reset(lmc_softc_t * const sc);
 static void lmc_dec_reset(lmc_softc_t * const sc);
-#if LINUX_VERSION_CODE >= 0x20363
 static void lmc_driver_timeout(struct net_device *dev);
 int lmc_setup(void);
-#endif
 
 
 /*
@@ -165,7 +154,8 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
          * To date internally, just copy this out to the user.
          */
     case LMCIOCGINFO: /*fold01*/
-        LMC_COPY_TO_USER(ifr->ifr_data, &sc->ictl, sizeof (lmc_ctl_t));
+        if (copy_to_user(ifr->ifr_data, &sc->ictl, sizeof (lmc_ctl_t)))
+            return -EFAULT;
         ret = 0;
         break;
 
@@ -181,7 +171,8 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
             break;
         }
 
-        LMC_COPY_FROM_USER(&ctl, ifr->ifr_data, sizeof (lmc_ctl_t));
+        if (copy_from_user(&ctl, ifr->ifr_data, sizeof (lmc_ctl_t)))
+            return -EFAULT;
 
         sc->lmc_media->set_status (sc, &ctl);
 
@@ -211,7 +202,8 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
 		break;
 	    }
 
-	    LMC_COPY_FROM_USER(&new_type, ifr->ifr_data, sizeof(u_int16_t));
+	    if (copy_from_user(&new_type, ifr->ifr_data, sizeof(u_int16_t)))
+                return -EFAULT;
 
             
 	    if (new_type == old_type)
@@ -248,8 +240,9 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
 
         sc->lmc_xinfo.Magic1 = 0xDEADBEEF;
 
-        LMC_COPY_TO_USER(ifr->ifr_data, &sc->lmc_xinfo,
-                         sizeof (struct lmc_xinfo));
+        if (copy_to_user(ifr->ifr_data, &sc->lmc_xinfo,
+                         sizeof (struct lmc_xinfo)))
+            return -EFAULT;
         ret = 0;
 
         break;
@@ -279,8 +272,9 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                 regVal & T1FRAMER_SEF_MASK;
         }
 
-        LMC_COPY_TO_USER(ifr->ifr_data, &sc->stats,
-                         sizeof (struct lmc_statistics));
+        if (copy_to_user(ifr->ifr_data, &sc->stats,
+                         sizeof (struct lmc_statistics)))
+            return -EFAULT;
 
         ret = 0;
         break;
@@ -310,7 +304,8 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
             break;
         }
 
-        LMC_COPY_FROM_USER(&ctl, ifr->ifr_data, sizeof (lmc_ctl_t));
+        if (copy_from_user(&ctl, ifr->ifr_data, sizeof (lmc_ctl_t)))
+            return -EFAULT;
         sc->lmc_media->set_circuit_type(sc, ctl.circuit_type);
         sc->ictl.circuit_type = ctl.circuit_type;
         ret = 0;
@@ -335,8 +330,10 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
 
 #ifdef DEBUG
     case LMCIOCDUMPEVENTLOG:
-        LMC_COPY_TO_USER(ifr->ifr_data, &lmcEventLogIndex, sizeof (u32));
-        LMC_COPY_TO_USER(ifr->ifr_data + sizeof (u32), lmcEventLogBuf, sizeof (lmcEventLogBuf));
+        if (copy_to_user(ifr->ifr_data, &lmcEventLogIndex, sizeof (u32)))
+            return -EFAULT;
+        if (copy_to_user(ifr->ifr_data + sizeof (u32), lmcEventLogBuf, sizeof (lmcEventLogBuf)))
+            return -EFAULT;
 
         ret = 0;
         break;
@@ -359,9 +356,10 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
             /*
              * Stop the xwitter whlie we restart the hardware
              */
-            LMC_XMITTER_BUSY(dev);
+            netif_stop_queue(dev);
 
-            LMC_COPY_FROM_USER(&xc, ifr->ifr_data, sizeof (struct lmc_xilinx_control));
+            if (copy_from_user(&xc, ifr->ifr_data, sizeof (struct lmc_xilinx_control)))
+                return -EFAULT;
             switch(xc.command){
             case lmc_xilinx_reset: /*fold02*/
                 {
@@ -620,7 +618,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                 break;
             }
 
-            LMC_XMITTER_FREE(dev);
+            netif_wake_queue(dev);
             sc->lmc_txfull = 0;
 
         }
@@ -646,7 +644,7 @@ static void lmc_watchdog (unsigned long data) /*fold00*/
     lmc_softc_t *sc;
     int link_status;
     u_int32_t ticks;
-    LMC_SPIN_FLAGS;
+    unsigned long flags;
 
     sc = dev->priv;
 
@@ -836,11 +834,7 @@ static struct net_device *lmc_probe1 (struct net_device *dev, unsigned long ioad
      * Allocate our own device structure
      */
 
-#if LINUX_VERSION_CODE < 0x20363
-    dev = kmalloc (sizeof (struct ppp_device)+8, GFP_KERNEL);
-#else
     dev = kmalloc (sizeof (struct net_device)+8, GFP_KERNEL);
-#endif
     if (dev == NULL){
         printk (KERN_ERR "lmc: kmalloc for device failed\n");
         return NULL;
@@ -909,10 +903,8 @@ static struct net_device *lmc_probe1 (struct net_device *dev, unsigned long ioad
     dev->get_stats = lmc_get_stats;
     dev->do_ioctl = lmc_ioctl;
     dev->set_config = lmc_set_config;
-#if LINUX_VERSION_CODE >= 0x20363
     dev->tx_timeout = lmc_driver_timeout;
     dev->watchdog_timeo = (HZ); /* 1 second */
-#endif
     
     /*
      * Why were we changing this???
@@ -922,8 +914,6 @@ static struct net_device *lmc_probe1 (struct net_device *dev, unsigned long ioad
     /* Init the spin lock so can call it latter */
 
     spin_lock_init(&sc->lmc_lock);
-
-    LMC_SETUP_20_DEV;
 
     printk ("%s: detected at %lx, irq %d\n", dev->name, ioaddr, dev->irq);
 
@@ -1048,7 +1038,7 @@ int lmc_probe (struct net_device *dev) /*fold00*/
      * PCI bus, we are in trouble.
      */
 
-    if (!LMC_PCI_PRESENT()) {
+    if (!pci_present()) {
 /*        printk ("%s: We really want a pci bios!\n", dev->name);*/
         return -1;
     }
@@ -1124,11 +1114,7 @@ int lmc_probe (struct net_device *dev) /*fold00*/
     if (cards_found < 1)
         return -1;
 
-#if LINUX_VERSION_CODE >= 0x20200
     return foundaddr;
-#else
-    return 0;
-#endif
 }
 
 /* After this is called, packets can be sent.
@@ -1199,11 +1185,7 @@ static int lmc_open (struct net_device *dev) /*fold00*/
     dev->do_ioctl = lmc_ioctl;
 
 
-    LMC_XMITTER_INIT(dev);
-    
-#if LINUX_VERSION_CODE < 0x20363
-    dev->start = 1;
-#endif
+    netif_start_queue(dev);
     
     sc->stats.tx_tbusy0++ ;
 
@@ -1277,7 +1259,7 @@ static void lmc_running_reset (struct net_device *dev) /*fold00*/
 
     //dev->flags |= IFF_RUNNING;
     
-    LMC_XMITTER_FREE(dev);
+    netif_wake_queue(dev);
 
     sc->lmc_txfull = 0;
     sc->stats.tx_tbusy0++ ;
@@ -1327,7 +1309,7 @@ static int lmc_ifdown (struct net_device *dev) /*fold00*/
     
     /* Don't let anything else go on right now */
     //    dev->start = 0;
-    LMC_XMITTER_BUSY(dev);
+    netif_stop_queue(dev);
     sc->stats.tx_tbusy1++ ;
 
     /* stop interrupts */
@@ -1360,23 +1342,20 @@ static int lmc_ifdown (struct net_device *dev) /*fold00*/
         sc->lmc_rxring[i].length = 0;
         sc->lmc_rxring[i].buffer1 = 0xDEADBEEF;
         if (skb != NULL)
-        {
-            LMC_SKB_FREE(skb, 1);
-            LMC_DEV_KFREE_SKB (skb);
-        }
+            dev_kfree_skb(skb);
         sc->lmc_rxq[i] = NULL;
     }
 
     for (i = 0; i < LMC_TXDESCS; i++)
     {
         if (sc->lmc_txq[i] != NULL)
-            LMC_DEV_KFREE_SKB (sc->lmc_txq[i]);
+            dev_kfree_skb(sc->lmc_txq[i]);
         sc->lmc_txq[i] = NULL;
     }
 
     lmc_led_off (sc, LMC_MII16_LED_ALL);
 
-    LMC_XMITTER_FREE(dev);
+    netif_wake_queue(dev);
     sc->stats.tx_tbusy0++ ;
 
     lmc_trace(dev, "lmc_ifdown out");
@@ -1496,14 +1475,12 @@ static irqreturn_t lmc_interrupt (int irq, void *dev_instance, struct pt_regs *r
                 }
                 else {
                     
-#if LINUX_VERSION_CODE >= 0x20200
                     sc->stats.tx_bytes += sc->lmc_txring[i].length & 0x7ff;
-#endif
                     
                     sc->stats.tx_packets++;
                 }
                 
-                //                LMC_DEV_KFREE_SKB (sc->lmc_txq[i]);
+                //                dev_kfree_skb(sc->lmc_txq[i]);
                 dev_kfree_skb_irq(sc->lmc_txq[i]);
                 sc->lmc_txq[i] = 0;
 
@@ -1518,20 +1495,14 @@ static irqreturn_t lmc_interrupt (int irq, void *dev_instance, struct pt_regs *r
             }
             LMC_EVENT_LOG(LMC_EVENT_TBUSY0, n_compl, 0);
             sc->lmc_txfull = 0;
-            LMC_XMITTER_FREE(dev);
+            netif_wake_queue(dev);
             sc->stats.tx_tbusy0++ ;
-#if LINUX_VERSION_CODE < 0x20363
-            mark_bh (NET_BH);	/* Tell Linux to give me more packets */
-#endif
 
 
 #ifdef DEBUG
             sc->stats.dirtyTx = badtx;
             sc->stats.lmc_next_tx = sc->lmc_next_tx;
             sc->stats.lmc_txfull = sc->lmc_txfull;
-#if LINUX_VERSION_CODE < 0x20363
-            sc->stats.tbusy = dev->tbusy;
-#endif
 #endif
             sc->lmc_taint_tx = badtx;
 
@@ -1592,7 +1563,7 @@ static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00
     u32 flag;
     int entry;
     int ret = 0;
-    LMC_SPIN_FLAGS;
+    unsigned long flags;
 
     lmc_trace(dev, "lmc_start_xmit in");
 
@@ -1600,60 +1571,6 @@ static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00
 
     spin_lock_irqsave(&sc->lmc_lock, flags);
 
-    /*
-     * If the transmitter is busy
-     * this must be the 5 second polling
-     * from the kernel which called us.
-     * Poke the chip and try to get it running
-     *
-     */
-#if LINUX_VERSION_CODE < 0x20363
-    if(dev->tbusy != 0){
-        u32 csr6;
-
-        printk("%s: Xmitter busy|\n", dev->name);
-
-	sc->stats.tx_tbusy_calls++ ;
-        if (jiffies - dev->trans_start < TX_TIMEOUT) {
-            ret = 1;
-            goto lmc_start_xmit_bug_out;
-        }
-
-        /*
-         * Chip seems to have locked up
-         * Reset it
-         * This whips out all our decriptor
-         * table and starts from scartch
-         */
-
-        LMC_EVENT_LOG(LMC_EVENT_XMTPRCTMO,
-                      LMC_CSR_READ (sc, csr_status),
-                      sc->stats.tx_ProcTimeout);
-
-        lmc_running_reset (dev);
-
-        LMC_EVENT_LOG(LMC_EVENT_RESET1, LMC_CSR_READ (sc, csr_status), 0);
-        LMC_EVENT_LOG(LMC_EVENT_RESET2,
-                      lmc_mii_readreg (sc, 0, 16),
-                      lmc_mii_readreg (sc, 0, 17));
-
-        /* restart the tx processes */
-        csr6 = LMC_CSR_READ (sc, csr_command);
-        LMC_CSR_WRITE (sc, csr_command, csr6 | 0x0002);
-        LMC_CSR_WRITE (sc, csr_command, csr6 | 0x2002);
-
-        /* immediate transmit */
-        LMC_CSR_WRITE (sc, csr_txpoll, 0);
-
-        sc->stats.tx_errors++;
-        sc->stats.tx_ProcTimeout++;	/* -baz */
-
-        dev->trans_start = jiffies;
-
-        ret = 1;
-        goto lmc_start_xmit_bug_out;
-    }
-#endif
     /* normal path, tbusy known to be zero */
 
     entry = sc->lmc_next_tx % LMC_TXDESCS;
@@ -1669,26 +1586,26 @@ static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00
     {
         /* Do not interrupt on completion of this packet */
         flag = 0x60000000;
-        LMC_XMITTER_FREE(dev);
+        netif_wake_queue(dev);
     }
     else if (sc->lmc_next_tx - sc->lmc_taint_tx == LMC_TXDESCS / 2)
     {
         /* This generates an interrupt on completion of this packet */
         flag = 0xe0000000;
-        LMC_XMITTER_FREE(dev);
+        netif_wake_queue(dev);
     }
     else if (sc->lmc_next_tx - sc->lmc_taint_tx < LMC_TXDESCS - 1)
     {
         /* Do not interrupt on completion of this packet */
         flag = 0x60000000;
-        LMC_XMITTER_FREE(dev);
+        netif_wake_queue(dev);
     }
     else
     {
         /* This generates an interrupt on completion of this packet */
         flag = 0xe0000000;
         sc->lmc_txfull = 1;
-        LMC_XMITTER_BUSY(dev);
+        netif_stop_queue(dev);
     }
 #else
     flag = LMC_TDES_INTERRUPT_ON_COMPLETION;
@@ -1696,7 +1613,7 @@ static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00
     if (sc->lmc_next_tx - sc->lmc_taint_tx >= LMC_TXDESCS - 1)
     {				/* ring full, go busy */
         sc->lmc_txfull = 1;
-        LMC_XMITTER_BUSY(dev);
+        netif_stop_queue(dev);
         sc->stats.tx_tbusy1++ ;
         LMC_EVENT_LOG(LMC_EVENT_TBUSY1, entry, 0);
     }
@@ -1725,10 +1642,6 @@ static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00
     LMC_CSR_WRITE (sc, csr_txpoll, 0);
 
     dev->trans_start = jiffies;
-
-#if LINUX_VERSION_CODE < 0x20363
-lmc_start_xmit_bug_out:
-#endif
 
     spin_unlock_irqrestore(&sc->lmc_lock, flags);
 
@@ -1815,7 +1728,6 @@ static int lmc_rx (struct net_device *dev) /*fold00*/
         if(skb == 0x0){
             nsb = dev_alloc_skb (LMC_PKT_BUF_SZ + 2);
             if (nsb) {
-                LMC_SKB_FREE(nsb, 1);
                 sc->lmc_rxq[i] = nsb;
                 nsb->dev = dev;
                 sc->lmc_rxring[i].buffer1 = virt_to_bus (nsb->tail);
@@ -1859,7 +1771,6 @@ static int lmc_rx (struct net_device *dev) /*fold00*/
              */
             nsb = dev_alloc_skb (LMC_PKT_BUF_SZ + 2);
             if (nsb) {
-                LMC_SKB_FREE(nsb, 1);
                 sc->lmc_rxq[i] = nsb;
                 nsb->dev = dev;
                 sc->lmc_rxring[i].buffer1 = virt_to_bus (nsb->tail);
@@ -1948,7 +1859,7 @@ skip_out_of_mem:
 static struct net_device_stats *lmc_get_stats (struct net_device *dev) /*fold00*/
 {
     lmc_softc_t *sc;
-    LMC_SPIN_FLAGS;
+    unsigned long flags;
 
     lmc_trace(dev, "lmc_get_stats in");
 
@@ -1965,9 +1876,7 @@ static struct net_device_stats *lmc_get_stats (struct net_device *dev) /*fold00*
     return (struct net_device_stats *) &sc->stats;
 }
 
-#ifdef MODULE
-
-int init_module (void) /*fold00*/
+static int __init init_lmc(void)
 {
     printk ("lmc: module loaded\n");
 
@@ -1978,7 +1887,7 @@ int init_module (void) /*fold00*/
     return 0;
 }
 
-void cleanup_module (void) /*fold00*/
+static void __exit exit_lmc(void)
 {
     struct net_device *dev, *next;
     lmc_softc_t *sc;
@@ -2020,7 +1929,9 @@ void cleanup_module (void) /*fold00*/
     Lmc_root_dev = NULL;
     printk ("lmc module unloaded\n");
 }
-#endif
+
+module_init(init_lmc);
+module_exit(exit_lmc);
 
 unsigned lmc_mii_readreg (lmc_softc_t * const sc, unsigned devaddr, unsigned regno) /*fold00*/
 {
@@ -2148,7 +2059,6 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
         }
 
         skb->dev = sc->lmc_device;
-        LMC_SKB_FREE(skb, 1);
 
         /* owned by 21140 */
         sc->lmc_rxring[i].status = 0x80000000;
@@ -2367,11 +2277,10 @@ static void lmc_initcsrs(lmc_softc_t * const sc, lmc_csrptr_t csr_base, /*fold00
     lmc_trace(sc->lmc_device, "lmc_initcsrs out");
 }
 
-#if LINUX_VERSION_CODE >= 0x20363
 static void lmc_driver_timeout(struct net_device *dev) { /*fold00*/
     lmc_softc_t *sc;
     u32 csr6;
-    LMC_SPIN_FLAGS;
+    unsigned long flags;
 
     lmc_trace(dev, "lmc_driver_timeout in");
 
@@ -2430,4 +2339,3 @@ int lmc_setup(void) { /*FOLD00*/
    return lmc_probe(NULL);
 }
 
-#endif

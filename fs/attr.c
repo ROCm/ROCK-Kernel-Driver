@@ -68,10 +68,17 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	int error = 0;
 
 	if (ia_valid & ATTR_SIZE) {
-		if (attr->ia_size != inode->i_size)
+		if (attr->ia_size != inode->i_size) {
 			error = vmtruncate(inode, attr->ia_size);
-		if (error || (ia_valid == ATTR_SIZE))
-			goto out;
+			if (error || (ia_valid == ATTR_SIZE))
+				goto out;
+		} else {
+			/*
+			 * We skipped the truncate but must still update
+			 * timestamps
+			 */
+			ia_valid |= ATTR_MTIME|ATTR_CTIME;
+		}
 	}
 
 	lock_kernel();
