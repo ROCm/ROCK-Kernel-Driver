@@ -41,6 +41,43 @@ CROSS_COMPILE 	=
 
 all:	vmlinux
 
+#	Print entire command lines instead of short version
+#	For now, leave the default
+
+#KBUILD_VERBOSE := 1
+
+# Beautify output
+# ---------------------------------------------------------------------------
+#
+# Normally, we echo the whole command before executing it. By making
+# that echo $($(quiet)$(cmd)), we now have the possibility to set
+# $(quiet) to choose other forms of output instead, e.g.
+#
+#         quiet_cmd_cc_o_c = Compiling $(RELDIR)/$@
+#         cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
+#
+# If $(quiet) is empty, the whole command will be printed.
+# If it is set to "quiet_", only the short version will be printed. 
+# If it is set to "silent_", nothing wil be printed at all, since
+# the variable $(silent_cmd_cc_o_c) doesn't exist.
+
+#	If the user wants quiet mode, echo short versions of the commands 
+#	only and suppress the 'Entering/Leaving directory' messages
+
+ifneq ($(KBUILD_VERBOSE),1)
+  quiet=quiet_
+  MAKEFLAGS += --no-print-directory
+endif
+
+#	If the user is running make -s (silent mode), suppress echoing of
+#	commands
+
+ifneq ($(findstring s,$(MAKEFLAGS)),)
+  quiet=silent_
+endif
+
+export quiet
+
 #
 # Include the make variables (CC, etc...)
 #
@@ -164,6 +201,7 @@ boot: vmlinux
 
 vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
 
+quiet_cmd_link_vmlinux = LD     $@
 cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
@@ -181,7 +219,7 @@ define rule_link_vmlinux
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
 	$(MAKE) -C init
-	echo $(cmd_link_vmlinux)
+	$(call cmd,cmd_link_vmlinux)
 	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
@@ -255,7 +293,6 @@ include/linux/autoconf.h: .config
 #	this Makefile
 
 include/linux/version.h: Makefile
-	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
 # Helpers built in scripts/
@@ -281,9 +318,12 @@ depend dep: .hdepend
 #	we make "FORCE" a prequisite, to force redoing the
 #	dependencies. Yeah, that's ugly, and it'll go away soon.
 
+quiet_cmd_depend = Making dependencies (include)
+cmd_depend       = scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
+
 .hdepend: scripts/mkdep include/linux/version.h include/asm \
 	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
-	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
+	$(call cmd,cmd_depend)
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 ifdef CONFIG_MODVERSIONS
 	@$(MAKE) include/linux/modversions.h
@@ -549,7 +589,7 @@ MRPROPER_FILES += \
 	include/asm \
 	.hdepend scripts/mkdep scripts/split-include scripts/docproc \
 	$(TOPDIR)/include/linux/modversions.h \
-	kernel.spec
+	tags TAGS kernel.spec \
 
 # 	directories removed with 'make mrproper'
 MRPROPER_DIRS += \
@@ -561,23 +601,27 @@ MRPROPER_DIRS += \
 include arch/$(ARCH)/Makefile
 
 clean:	archclean
-	find . \( -name '*.[oas]' -o -name core -o -name '.*.cmd' \) -type f -print \
+	@echo 'Cleaning up'
+	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
-	rm -f $(CLEAN_FILES)
-	rm -rf $(CLEAN_DIRS)
+	@rm -f $(CLEAN_FILES)
+	@rm -rf $(CLEAN_DIRS)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
-	find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
-	rm -f $(MRPROPER_FILES)
-	rm -rf $(MRPROPER_DIRS)
+	@echo 'Making mrproper'
+	@find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
+	@rm -f $(MRPROPER_FILES)
+	@rm -rf $(MRPROPER_DIRS)
 	@$(MAKE) -C Documentation/DocBook mrproper
 
 distclean: mrproper
-	rm -f core `find . \( -not -type d \) -and \
-		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+	@echo 'Making distclean'
+	@find . \( -not -type d \) -and \
+	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
+	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
+		-print | xargs rm -f
 
 endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -599,5 +643,10 @@ if_changed_rule = $(if $(strip $? \
 		               $(filter-out $(cmd_$(1)),$(cmd_$(@F)))\
 			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
 	               @$(rule_$(1)))
+
+# If quiet is set, only print short version of rule
+
+cmd = @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1))
+
 
 FORCE:

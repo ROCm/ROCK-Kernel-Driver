@@ -86,15 +86,12 @@ subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
 real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
 
-# ==========================================================================
-#
 # Get things started.
-#
-first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
+# ==========================================================================
 
-#
-# Common rules
-#
+#	The echo suppresses the "Nothing to be done for first_rule"
+first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
+	@echo -n
 
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
@@ -117,17 +114,20 @@ $(export-objs:.o=.s): export_flags   := $(EXPORT_FLAGS)
 
 c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
-cmd_cc_s_c = $(CC) $(c_flags) -S -o $@ $< 
+quiet_cmd_cc_s_c = CC     $(RELDIR)/$@
+cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
 
 %.s: %.c FORCE
 	$(call if_changed,cmd_cc_s_c)
 
-cmd_cc_i_c = $(CPP) $(c_flags)   -o $@ $<
+quiet_cmd_cc_i_c = CPP    $(RELDIR)/$@
+cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 
 %.i: %.c FORCE
 	$(call if_changed,cmd_cc_i_c)
 
-cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
+quiet_cmd_cc_o_c = CC     $(RELDIR)/$@
+cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c FORCE
 	$(call if_changed,cmd_cc_o_c)
@@ -146,12 +146,14 @@ $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
 a_flags = $(AFLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
-cmd_as_s_S = $(CPP) $(a_flags)   -o $@ $< 
+quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
+cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 %.s: %.S FORCE
 	$(call if_changed,cmd_as_s_S)
 
-cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
+quiet_cmd_as_o_S = AS     $(RELDIR)/$@
+cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
 	$(call if_changed,cmd_as_o_S)
@@ -184,6 +186,7 @@ $(sort $(subdir-obj-y)): sub_dirs ;
 # Rule to compile a set of .o files into one .o file
 #
 ifdef O_TARGET
+quiet_cmd_link_o_target = LD     $(RELDIR)/$@
 # If the list of objects to link is empty, just create an empty O_TARGET
 cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
@@ -197,6 +200,7 @@ endif # O_TARGET
 # Rule to compile a set of .o files into one .a file
 #
 ifdef L_TARGET
+quiet_cmd_link_l_target = AR     $(RELDIR)/$@
 cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
 $(L_TARGET): $(obj-y) FORCE
@@ -207,7 +211,7 @@ endif
 # Rule to link composite objects
 #
 
-
+quiet_cmd_link_multi = LD     $(RELDIR)/$@
 cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
 
 # We would rather have a list of rules like
@@ -223,10 +227,14 @@ $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 #
 # This make dependencies quickly
 #
+
+quiet_cmd_fastdep = Making dependencies ($(RELDIR))
+cmd_fastdep       = $(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS]) > .depend
+
 fastdep: FORCE
-	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS]) > .depend
+	$(call cmd,cmd_fastdep)
 ifdef ALL_SUB_DIRS
-	$(MAKE) $(patsubst %,_sfdep_%,$(ALL_SUB_DIRS)) _FASTDEP_ALL_SUB_DIRS="$(ALL_SUB_DIRS)"
+	@$(MAKE) $(patsubst %,_sfdep_%,$(ALL_SUB_DIRS)) _FASTDEP_ALL_SUB_DIRS="$(ALL_SUB_DIRS)"
 endif
 
 ifdef _FASTDEP_ALL_SUB_DIRS
@@ -261,16 +269,19 @@ endif
 
 .PHONY: modules
 modules: $(obj-m) FORCE $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
+	@echo -n
 
 .PHONY: _modinst__
 _modinst__: FORCE
 ifneq "$(strip $(obj-m))" ""
-	mkdir -p $(MODLIB)/kernel/$(RELDIR)
-	cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
+	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
+	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
+	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
 endif
 
 .PHONY: modules_install
 modules_install: _modinst__ $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
+	@echo -n
 
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
@@ -395,4 +406,8 @@ endif
 if_changed = $(if $(strip $? \
 		          $(filter-out $($(1)),$(cmd_$(@F)))\
 			  $(filter-out $(cmd_$(@F)),$($(1)))),\
-	       @echo '$($(1))' && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
+	       @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
+
+# If quiet is set, only print short version of command
+
+cmd = @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1))

@@ -17,8 +17,9 @@ SUBLEVEL=$5
 
 if [ -r $TARGET ] && \
       cmp -s $TARGET .tmpversion; then
-   echo $TARGET is unchanged;
+   echo $TARGET was not updated;
    rm -f .tmpversion
 else
+   echo $TARGET was updated;
    mv -f .tmpversion $TARGET
 fi
