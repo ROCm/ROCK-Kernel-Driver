@@ -2019,8 +2019,9 @@ typedef struct {
 	s64 limit;		/* Hard quota (-1 if not limited). */
 	s64 exceeded_time;	/* How long the soft quota has been exceeded. */
 	SID sid;		/* The SID of the user/object associated with
-				   this quota entry. Equals zero for the quota
-				   defaults entry. */
+				   this quota entry.  Equals zero for the quota
+				   defaults entry (and in fact on a WinXP
+				   volume, it is not present at all). */
 } __attribute__ ((__packed__)) QUOTA_CONTROL_ENTRY;
 
 /*
@@ -2033,17 +2034,26 @@ typedef enum {
 } PREDEFINED_OWNER_IDS;
 
 /*
+ * Current constants for quota control entries.
+ */
+typedef enum {
+	/* Current version. */
+	QUOTA_VERSION	= 2,
+} QUOTA_CONTROL_ENTRY_CONSTANTS;
+
+/*
  * Index entry flags (16-bit).
  */
 typedef enum {
-	INDEX_ENTRY_NODE = const_cpu_to_le16(1), /* This entry contains a sub-node,
-					      i.e. a reference to an index
-					      block in form of a virtual
+	INDEX_ENTRY_NODE = const_cpu_to_le16(1), /* This entry contains a
+					      sub-node, i.e. a reference to an
+					      index block in form of a virtual
 					      cluster number (see below). */
-	INDEX_ENTRY_END  = const_cpu_to_le16(2), /* This signifies the last entry in
-					      an index block. The index entry
-					      does not represent a file but it
-					      can point to a sub-node. */
+	INDEX_ENTRY_END  = const_cpu_to_le16(2), /* This signifies the last
+					      entry in an index block.  The
+					      index entry does not represent a
+					      file but it can point to a
+					      sub-node. */
 	INDEX_ENTRY_SPACE_FILLER = 0xffff, /* Just to force 16-bit width. */
 } __attribute__ ((__packed__)) INDEX_ENTRY_FLAGS;
 

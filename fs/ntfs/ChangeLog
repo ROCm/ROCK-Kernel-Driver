@@ -76,6 +76,9 @@ ToDo/Notes:
 	  an index entry is in the index allocation attribute rather than the
 	  index root attribute it will not be written out (you will get a
 	  warning message about discarded changes instead).
+	- Load the quota file ($Quota) and check if quota tracking is enabled
+	  and if so, mark the quotas out of date.  This causes windows to
+	  rescan the volume on boot and update all quota entries.
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 

@@ -103,6 +103,13 @@ typedef struct {
 					   directory. */
 	struct inode *secure_ino;	/* The VFS inode of $Secure (NTFS3.0+
 					   only, otherwise NULL). */
+	struct inode *extend_ino;	/* The VFS inode of $Extend (NTFS3.0+
+					   only, otherwise NULL). */
+#ifdef NTFS_RW
+	/* $Quota stuff is NTFS3.0+ specific.  Unused/NULL otherwise. */
+	struct inode *quota_ino;	/* The VFS inode of $Quota. */
+	struct inode *quota_q_ino;	/* Attribute inode for $Quota/$Q. */
+#endif /* NTFS_RW */
 	struct nls_table *nls_map;
 } ntfs_volume;
 
@@ -117,6 +124,7 @@ typedef enum {
 				      Otherwise be case insensitive and create
 				      file names in WIN32 namespace. */
 	NV_LogFileEmpty,	/* 1: $LogFile journal is empty. */
+	NV_QuotaOutOfDate,	/* 1: $Quota is out of date. */
 } ntfs_volume_flags;
 
 /*
@@ -142,5 +150,6 @@ NVOL_FNS(Errors)
 NVOL_FNS(ShowSystemFiles)
 NVOL_FNS(CaseSensitive)
 NVOL_FNS(LogFileEmpty)
+NVOL_FNS(QuotaOutOfDate)
 
 #endif /* _LINUX_NTFS_VOLUME_H */

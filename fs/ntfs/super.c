@@ -32,6 +32,8 @@
 #include "ntfs.h"
 #include "sysctl.h"
 #include "logfile.h"
+#include "quota.h"
+#include "dir.h"
 #include "index.h"
 
 /* Number of mounted file systems which have compression enabled. */
@@ -414,7 +416,8 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 	 * flags are set.  Also, empty the logfile journal as it would become
 	 * stale as soon as something is written to the volume and mark the
 	 * volume dirty so that chkdsk is run if the volume is not umounted
-	 * cleanly.
+	 * cleanly.  Finally, mark the quotas out of date so Windows rescans
+	 * the volume on boot and updates them.
 	 *
 	 * When remounting read-only, mark the volume clean if no volume errors
 	 * have occured.
@@ -457,6 +460,12 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 #endif
 		if (!ntfs_empty_logfile(vol->logfile_ino)) {
 			ntfs_error(sb, "Failed to empty journal $LogFile%s",
+					es);
+			NVolSetErrors(vol);
+			return -EROFS;
+		}
+		if (!ntfs_mark_quotas_out_of_date(vol)) {
+			ntfs_error(sb, "Failed to mark quotas out of date%s",
 					es);
 			NVolSetErrors(vol);
 			return -EROFS;
@@ -1057,6 +1066,76 @@ static BOOL load_and_check_logfile(ntfs_volume *vol)
 	return TRUE;
 }
 
+/**
+ * load_and_init_quota - load and setup the quota file for a volume if present
+ * @vol:	ntfs super block describing device whose quota file to load
+ *
+ * Return TRUE on success or FALSE on error.  If $Quota is not present, we
+ * leave vol->quota_ino as NULL and return success.
+ */
+static BOOL load_and_init_quota(ntfs_volume *vol)
+{
+	MFT_REF mref;
+	struct inode *tmp_ino;
+	ntfs_name *name = NULL;
+	static const ntfschar Quota[7] = { const_cpu_to_le16('$'),
+			const_cpu_to_le16('Q'), const_cpu_to_le16('u'),
+			const_cpu_to_le16('o'), const_cpu_to_le16('t'),
+			const_cpu_to_le16('a'), const_cpu_to_le16(0) };
+	static ntfschar Q[3] = { const_cpu_to_le16('$'),
+			const_cpu_to_le16('Q'), const_cpu_to_le16(0) };
+
+	ntfs_debug("Entering.");
+	/*
+	 * Find the inode number for the quota file by looking up the filename
+	 * $Quota in the extended system files directory $Extend.
+	 */
+	down(&vol->extend_ino->i_sem);
+	mref = ntfs_lookup_inode_by_name(NTFS_I(vol->extend_ino), Quota, 6,
+			&name);
+	up(&vol->extend_ino->i_sem);
+	if (IS_ERR_MREF(mref)) {
+		/*
+		 * If the file does not exist, quotas are disabled and have
+		 * never been enabled on this volume, just return success.
+		 */
+		if (MREF_ERR(mref) == -ENOENT) {
+			ntfs_debug("$Quota not present.  Volume does not have "
+					"quotas enabled.");
+			/*
+			 * No need to try to set quotas out of date if they are
+			 * not enabled.
+			 */
+			NVolSetQuotaOutOfDate(vol);
+			return TRUE;
+		}
+		/* A real error occured. */
+		ntfs_error(vol->sb, "Failed to find inode number for $Quota.");
+		return FALSE;
+	}
+	/* We do not care for the type of match that was found. */
+	if (name)
+		kfree(name);
+	/* Get the inode. */
+	tmp_ino = ntfs_iget(vol->sb, MREF(mref));
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
+			iput(tmp_ino);
+		ntfs_error(vol->sb, "Failed to load $Quota.");
+		return FALSE;
+	}
+	vol->quota_ino = tmp_ino;
+	/* Get the $Q index allocation attribute. */
+	tmp_ino = ntfs_index_iget(vol->quota_ino, Q, 2);
+	if (IS_ERR(tmp_ino)) {
+		ntfs_error(vol->sb, "Failed to load $Quota/$Q index.");
+		return FALSE;
+	}
+	vol->quota_q_ino = tmp_ino;
+	ntfs_debug("Done.");
+	return TRUE;
+}
+
 #endif /* NTFS_RW */
 
 /**
@@ -1439,20 +1518,66 @@ get_ctx_vol_failed:
 	}
 	// FIXME: Initialize security.
 	/* Get the extended system files' directory inode. */
-	tmp_ino = ntfs_iget(sb, FILE_Extend);
-	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
-		if (!IS_ERR(tmp_ino))
-			iput(tmp_ino);
+	vol->extend_ino = ntfs_iget(sb, FILE_Extend);
+	if (IS_ERR(vol->extend_ino) || is_bad_inode(vol->extend_ino)) {
+		if (!IS_ERR(vol->extend_ino))
+			iput(vol->extend_ino);
 		ntfs_error(sb, "Failed to load $Extend.");
 		goto iput_sec_err_out;
 	}
-	// FIXME: Do something. E.g. want to delete the $UsnJrnl if exists.
-	// Note we might be doing this at the wrong level; we might want to
-	// d_alloc_root() and then do a "normal" open(2) of $Extend\$UsnJrnl
-	// rather than using ntfs_iget here, as we don't know the inode number
-	// for the files in $Extend directory.
-	iput(tmp_ino);
+#ifdef NTFS_RW
+	/* Find the quota file, load it if present, and set it up. */
+	if (!load_and_init_quota(vol)) {
+		static const char *es1 = "Failed to load $Quota";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						es1, es2);
+				goto iput_quota_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s", es1, es2);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
+	}
+	/* If (still) a read-write mount, mark the quotas out of date. */
+	if (!(sb->s_flags & MS_RDONLY) &&
+			!ntfs_mark_quotas_out_of_date(vol)) {
+		static const char *es1 = "Failed to mark quotas out of date";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_quota_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		NVolSetErrors(vol);
+	}
+	// TODO: Delete or checkpoint the $UsnJrnl if it exists.
+#endif /* NTFS_RW */
 	return TRUE;
+#ifdef NTFS_RW
+iput_quota_err_out:
+	if (vol->quota_q_ino)
+		iput(vol->quota_q_ino);
+	if (vol->quota_ino)
+		iput(vol->quota_ino);
+	iput(vol->extend_ino);
+#endif /* NTFS_RW */
 iput_sec_err_out:
 	iput(vol->secure_ino);
 iput_root_err_out:
@@ -1499,6 +1624,12 @@ static void ntfs_put_super(struct super_block *sb)
 
 	/* NTFS 3.0+ specific. */
 	if (vol->major_ver >= 3) {
+		if (vol->quota_q_ino)
+			ntfs_commit_inode(vol->quota_q_ino);
+		if (vol->quota_ino)
+			ntfs_commit_inode(vol->quota_ino);
+		if (vol->extend_ino)
+			ntfs_commit_inode(vol->extend_ino);
 		if (vol->secure_ino)
 			ntfs_commit_inode(vol->secure_ino);
 	}
@@ -1547,6 +1678,20 @@ static void ntfs_put_super(struct super_block *sb)
 
 	/* NTFS 3.0+ specific clean up. */
 	if (vol->major_ver >= 3) {
+#ifdef NTFS_RW
+		if (vol->quota_q_ino) {
+			iput(vol->quota_q_ino);
+			vol->quota_q_ino = NULL;
+		}
+		if (vol->quota_ino) {
+			iput(vol->quota_ino);
+			vol->quota_ino = NULL;
+		}
+#endif /* NTFS_RW */
+		if (vol->extend_ino) {
+			iput(vol->extend_ino);
+			vol->extend_ino = NULL;
+		}
 		if (vol->secure_ino) {
 			iput(vol->secure_ino);
 			vol->secure_ino = NULL;
@@ -2028,6 +2173,11 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->vol_ino = NULL;
 	vol->root_ino = NULL;
 	vol->secure_ino = NULL;
+	vol->extend_ino = NULL;
+#ifdef NTFS_RW
+	vol->quota_ino = NULL;
+	vol->quota_q_ino = NULL;
+#endif /* NTFS_RW */
 	vol->nls_map = NULL;
 
 	/*
@@ -2183,8 +2333,24 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->vol_ino = NULL;
 	/* NTFS 3.0+ specific clean up. */
 	if (vol->major_ver >= 3) {
-		iput(vol->secure_ino);
-		vol->secure_ino = NULL;
+#ifdef NTFS_RW
+		if (vol->quota_q_ino) {
+			iput(vol->quota_q_ino);
+			vol->quota_q_ino = NULL;
+		}
+		if (vol->quota_ino) {
+			iput(vol->quota_ino);
+			vol->quota_ino = NULL;
+		}
+#endif /* NTFS_RW */
+		if (vol->extend_ino) {
+			iput(vol->extend_ino);
+			vol->extend_ino = NULL;
+		}
+		if (vol->secure_ino) {
+			iput(vol->secure_ino);
+			vol->secure_ino = NULL;
+		}
 	}
 	iput(vol->root_ino);
 	vol->root_ino = NULL;
