@@ -28,11 +28,14 @@ int end_kio_request(struct kiobuf *kiobuf, int uptodate)
 
 static void kiobuf_init(struct kiobuf *iobuf)
 {
-	memset(iobuf, 0, sizeof(*iobuf));
 	init_waitqueue_head(&iobuf->wait_queue);
 	atomic_set(&iobuf->io_count, 0);
 	iobuf->array_len = KIO_STATIC_PAGES;
 	iobuf->maplist   = iobuf->map_array;
+	iobuf->nr_pages   = 0;
+	iobuf->locked   = 0;
+	iobuf->io_count.counter   = 0;
+	iobuf->end_io = NULL;
 }
 
 int alloc_kiovec(int nr, struct kiobuf **bufp)
