@@ -83,7 +83,7 @@
 
 extern unsigned long wall_jiffies;
 #define TICK_SIZE (tick_nsec / 1000)
-spinlock_t tmu0_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(tmu0_lock);
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 

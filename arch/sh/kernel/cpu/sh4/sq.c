@@ -32,7 +32,7 @@
 #include <asm/cpu/sq.h>
 
 static LIST_HEAD(sq_mapping_list);
-static spinlock_t sq_mapping_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sq_mapping_lock);
 
 /**
  * sq_flush - Flush (prefetch) the store queue cache
