@@ -933,15 +933,24 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	if (vcc->qos.aal != ATM_AAL5)
 		return -EINVAL;
 
+	if (!instance->firmware_loaded) {
+		dbg ("firmware not loaded!");
+		return -EAGAIN;
+	}
+
+	MOD_INC_USE_COUNT;
+
 	down (&instance->serialize); /* vs self, udsl_atm_close */
 
 	if (udsl_find_vcc (instance, vpi, vci)) {
 		up (&instance->serialize);
+		MOD_DEC_USE_COUNT;
 		return -EADDRINUSE;
 	}
 
 	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL))) {
 		up (&instance->serialize);
+		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 
@@ -967,10 +976,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 	dbg ("Allocated new SARLib vcc 0x%p with vpi %d vci %d", new, vpi, vci);
 
-	MOD_INC_USE_COUNT;
-
-	if (instance->firmware_loaded)
-		udsl_fire_receivers (instance);
+	udsl_fire_receivers (instance);
 
 	dbg ("udsl_atm_open successful");
 
@@ -1034,6 +1040,24 @@ static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
 **  USB  **
 **********/
 
+static int udsl_set_alternate (struct udsl_instance_data *instance)
+{
+	down (&instance->serialize); /* vs self */
+	if (!instance->firmware_loaded) {
+		int ret;
+
+		if ((ret = usb_set_interface (instance->usb_dev, 1, 1)) < 0) {
+			dbg ("usb_set_interface returned %d!", ret);
+			up (&instance->serialize);
+			return ret;
+		}
+		instance->firmware_loaded = 1;
+	}
+	up (&instance->serialize);
+	udsl_fire_receivers (instance);
+	return 0;
+}
+
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
@@ -1048,14 +1072,7 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 	switch (code) {
 	case UDSL_IOCTL_START:
 		instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
-		down (&instance->serialize); /* vs self */
-		if (!instance->firmware_loaded) {
-			usb_set_interface (instance->usb_dev, 1, 1);
-			instance->firmware_loaded = 1;
-		}
-		up (&instance->serialize);
-		udsl_fire_receivers (instance);
-		return 0;
+		return udsl_set_alternate (instance);
 	case UDSL_IOCTL_STOP:
 		instance->atm_dev->signal = ATM_PHY_SIG_LOST;
 		return 0;

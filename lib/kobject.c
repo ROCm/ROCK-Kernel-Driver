@@ -11,14 +11,6 @@
 
 static spinlock_t kobj_lock = SPIN_LOCK_UNLOCKED;
 
-static inline struct kobj_type * get_ktype(struct kobject * k)
-{
-	if (k->kset && k->kset->ktype)
-		return k->kset->ktype;
-	else 
-		return k->ktype;
-}
-
 /**
  *	populate_dir - populate directory with attributes.
  *	@kobj:	object we're working on.
@@ -67,6 +59,140 @@ static inline struct kobject * to_kobj(struct list_head * entry)
 }
 
 
+#ifdef CONFIG_HOTPLUG
+static int get_kobj_path_length(struct kset *kset, struct kobject *kobj)
+{
+	int length = 1;
+	struct kobject * parent = kobj;
+
+	/* walk up the ancestors until we hit the one pointing to the 
+	 * root.
+	 * Add 1 to strlen for leading '/' of each level.
+	 */
+	do {
+		length += strlen (parent->name) + 1;
+		parent = parent->parent;
+	} while (parent);
+	return length;
+}
+
+static void fill_kobj_path(struct kset *kset, struct kobject *kobj, char *path, int length)
+{
+	struct kobject * parent;
+
+	--length;
+	for (parent = kobj; parent; parent = parent->parent) {
+		int cur = strlen (parent->name);
+		/* back up enough to print this name with '/' */
+		length -= cur;
+		strncpy (path + length, parent->name, cur);
+		*(path + --length) = '/';
+	}
+
+	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
+}
+
+#define BUFFER_SIZE	1024	/* should be enough memory for the env */
+#define NUM_ENVP	32	/* number of env pointers */
+static void kset_hotplug(const char *action, struct kset *kset,
+			 struct kobject *kobj)
+{
+	char *argv [3];
+	char **envp;
+	char *buffer;
+	char *scratch;
+	int i = 0;
+	int retval;
+	int kobj_path_length;
+	char *kobj_path;
+	char *name = NULL;
+
+	/* If the kset has a filter operation, call it. If it returns
+	   failure, no hotplug event is required. */
+	if (kset->hotplug_ops->filter) {
+		if (!kset->hotplug_ops->filter(kset, kobj))
+			return;
+	}
+
+	pr_debug ("%s\n", __FUNCTION__);
+
+	if (!hotplug_path[0])
+		return;
+
+	envp = (char **)kmalloc(NUM_ENVP * sizeof (char *), GFP_KERNEL);
+	if (!envp)
+		return;
+	memset (envp, 0x00, NUM_ENVP * sizeof (char *));
+
+	buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
+	if (!buffer) {
+		kfree(envp);
+		return;
+	}
+
+	if (kset->hotplug_ops->name)
+		name = kset->hotplug_ops->name(kset, kobj);
+	if (name == NULL)
+		name = kset->kobj.name;
+
+	argv [0] = hotplug_path;
+	argv [1] = name;
+	argv [2] = 0;
+
+	/* minimal command environment */
+	envp [i++] = "HOME=/";
+	envp [i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
+
+	scratch = buffer;
+
+	envp [i++] = scratch;
+	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
+
+	kobj_path_length = get_kobj_path_length (kset, kobj);
+	kobj_path = kmalloc (kobj_path_length, GFP_KERNEL);
+	if (!kobj_path) {
+		kfree (buffer);
+		kfree (envp);
+		return;
+	}
+	memset (kobj_path, 0x00, kobj_path_length);
+	fill_kobj_path (kset, kobj, kobj_path, kobj_path_length);
+
+	envp [i++] = scratch;
+	scratch += sprintf (scratch, "DEVPATH=%s", kobj_path) + 1;
+
+	if (kset->hotplug_ops->hotplug) {
+		/* have the kset specific function add its stuff */
+		retval = kset->hotplug_ops->hotplug (kset, kobj,
+				  &envp[i], NUM_ENVP - i, scratch,
+				  BUFFER_SIZE - (scratch - buffer));
+		if (retval) {
+			pr_debug ("%s - hotplug() returned %d\n",
+				  __FUNCTION__, retval);
+			goto exit;
+		}
+	}
+
+	pr_debug ("%s: %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
+		  envp[0], envp[1], envp[2], envp[3]);
+	retval = call_usermodehelper (argv[0], argv, envp, 0);
+	if (retval)
+		pr_debug ("%s - call_usermodehelper returned %d\n",
+			  __FUNCTION__, retval);
+
+exit:
+	kfree (kobj_path);
+	kfree (buffer);
+	return;
+}
+#else
+static void kset_hotplug(const char *action, struct kset *kset,
+			 struct kobject *kobj)
+{
+	return 0;
+}
+#endif	/* CONFIG_HOTPLUG */
+
 /**
  *	kobject_init - initialize object.
  *	@kobj:	object in question.
@@ -111,6 +237,7 @@ int kobject_add(struct kobject * kobj)
 {
 	int error = 0;
 	struct kobject * parent;
+	struct kobject * top_kobj;
 
 	if (!(kobj = kobject_get(kobj)))
 		return -ENOENT;
@@ -134,6 +261,19 @@ int kobject_add(struct kobject * kobj)
 	error = create_dir(kobj);
 	if (error)
 		unlink(kobj);
+	else {
+		/* If this kobj does not belong to a kset,
+		   try to find a parent that does. */
+		top_kobj = kobj;
+		if (!top_kobj->kset && top_kobj->parent) {
+			do {
+				top_kobj = top_kobj->parent;
+			} while (!top_kobj->kset && top_kobj->parent);
+		}
+	
+		if (top_kobj->kset && top_kobj->kset->hotplug_ops)
+			kset_hotplug("add", top_kobj->kset, kobj);
+	}
 	return error;
 }
 
@@ -162,6 +302,20 @@ int kobject_register(struct kobject * kobj)
 
 void kobject_del(struct kobject * kobj)
 {
+	struct kobject * top_kobj;
+
+	/* If this kobj does not belong to a kset,
+	   try to find a parent that does. */
+	top_kobj = kobj;
+	if (!top_kobj->kset && top_kobj->parent) {
+		do {
+			top_kobj = top_kobj->parent;
+		} while (!top_kobj->kset && top_kobj->parent);
+	}
+
+	if (top_kobj->kset && top_kobj->kset->hotplug_ops)
+		kset_hotplug("remove", top_kobj->kset, kobj);
+
 	sysfs_remove_dir(kobj);
 	unlink(kobj);
 }

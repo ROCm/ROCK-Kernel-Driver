@@ -137,7 +137,10 @@ static void qtd_copy_status (
 			if (QTD_CERR (token))
 				urb->status = -EPIPE;
 			else {
-				dbg ("3strikes");
+				ehci_dbg (ehci, "devpath %s ep%d%s 3strikes\n",
+					urb->dev->devpath,
+					usb_pipeendpoint (urb->pipe),
+					usb_pipein (urb->pipe) ? "in" : "out");
 				urb->status = -EPROTO;
 			}
 		/* CERR nonzero + no errors + halt --> stall */
@@ -213,7 +216,6 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
 	usb_hcd_giveback_urb (&ehci->hcd, urb, regs);
-
 	spin_lock (&ehci->lock);
 }
 
@@ -827,7 +829,7 @@ static struct ehci_qh *qh_append_tds (
 			 * HC is allowed to fetch the old dummy (4.10.2).
 			 */
 			token = qtd->hw_token;
-			qtd->hw_token = 0;
+			qtd->hw_token = cpu_to_le32 (QTD_STS_HALT);
 			wmb ();
 			dummy = qh->dummy;
 
@@ -879,8 +881,7 @@ submit_async (
 	if (usb_pipein (urb->pipe) && !usb_pipecontrol (urb->pipe))
 		epnum |= 0x10;
 
-	vdbg ("%s: submit_async urb %p len %d ep %d-%s qtd %p [qh %p]",
-		hcd_to_bus (&ehci->hcd)->bus_name,
+	ehci_vdbg (ehci, "submit_async urb %p len %d ep%d%s qtd %p [qh %p]\n",
 		urb, urb->transfer_buffer_length,
 		epnum & 0x0f, (epnum & 0x10) ? "in" : "out",
 		qtd, dev ? dev->ep [epnum] : (void *)~0);
@@ -916,7 +917,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 
 	del_timer (&ehci->watchdog);
 
-	qh->hw_next = cpu_to_le32 (qh->qh_dma);
+	// qh->hw_next = cpu_to_le32 (qh->qh_dma);
 	qh->qh_state = QH_STATE_IDLE;
 	qh->qh_next.qh = 0;
 	qh_put (ehci, qh);			// refcount from reclaim 

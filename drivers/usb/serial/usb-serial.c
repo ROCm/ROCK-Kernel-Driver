@@ -531,7 +531,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* if disconnect beat us to the punch here, there's nothing to do */
-	if (tty->driver_data) {
+	if (tty && tty->driver_data) {
 		__serial_close(port, filp);
 	}
 }
@@ -830,6 +830,7 @@ static void destroy_serial (struct kobject *kobj)
 			while (port->open_count > 0) {
 				__serial_close(port, NULL);
 			}
+			port->tty = NULL;
 		}
 	}
 
