@@ -286,39 +286,49 @@ static struct parport_operations parport_sunbpp_ops =
 	.owner		= THIS_MODULE,
 };
 
+typedef struct {
+	struct list_head list;
+	struct parport *port;
+} Node;
+/* no locks, everything's serialized */
+static LIST_HEAD(port_list);
+
 static int __init init_one_port(struct sbus_dev *sdev)
 {
 	struct parport *p;
 	/* at least in theory there may be a "we don't dma" case */
 	struct parport_operations *ops;
 	unsigned long base;
-	int irq, dma, err, size;
+	int irq, dma, err = 0, size;
 	struct bpp_regs *regs;
 	unsigned char value_tcr;
+	Node *node;
 
 	dprintk((KERN_DEBUG "init_one_port(%p): ranges, alloc_io, ", sdev));
+	node = kmalloc(sizeof(Node), GFP_KERNEL);
+	if (!node)
+		goto out0;
+
 	irq = sdev->irqs[0];
 	base = sbus_ioremap(&sdev->resource[0], 0,
 			    sdev->reg_addrs[0].reg_size, 
 			    "sunbpp");
+	if (!base)
+		goto out1;
+
 	size = sdev->reg_addrs[0].reg_size;
 	dma = PARPORT_DMA_NONE;
 
 	dprintk(("alloc(ppops), "));
 	ops = kmalloc (sizeof (struct parport_operations), GFP_KERNEL);
-        if (!ops) {
-		sbus_iounmap(base, size);
-		return 0;
-        }
+        if (!ops)
+		goto out2;
 
         memcpy (ops, &parport_sunbpp_ops, sizeof (struct parport_operations));
 
 	dprintk(("register_port\n"));
-	if (!(p = parport_register_port(base, irq, dma, ops))) {
-		kfree(ops);
-		sbus_iounmap(base, size);
-		return 0;
-	}
+	if (!(p = parport_register_port(base, irq, dma, ops)))
+		goto out3;
 
 	p->size = size;
 
@@ -327,14 +337,10 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	if ((err = request_irq(p->irq, parport_sunbpp_interrupt,
 			       SA_SHIRQ, p->name, p)) != 0) {
 		dprintk(("ERROR %d\n", err));
-		parport_put_port(p);
-		kfree(ops);
-		sbus_iounmap(base, size);
-		return err;
-	} else {
-		dprintk(("OK\n"));
-		parport_sunbpp_enable_irq(p);
+		goto out4;
 	}
+	dprintk(("OK\n"));
+	parport_sunbpp_enable_irq(p);
 
 	regs = (struct bpp_regs *)p->base;
 	dprintk((KERN_DEBUG "forward\n"));
@@ -343,9 +349,22 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	sbus_writeb(value_tcr, &regs->p_tcr);
 
 	printk(KERN_INFO "%s: sunbpp at 0x%lx\n", p->name, p->base);
+	node->port = p;
+	list_add(&node->list, &port_list);
 	parport_announce_port (p);
 
 	return 1;
+
+out4:
+	parport_put_port(p);
+out3:
+	kfree(ops);
+out2:
+	sbus_iounmap(base, size);
+out1:
+	kfree(node);
+out0:
+	return err;
 }
 
 static int __init parport_sunbpp_init(void)
@@ -365,24 +384,21 @@ static int __init parport_sunbpp_init(void)
 
 static void __exit parport_sunbpp_exit(void)
 {
-	struct parport *p = parport_enumerate();
+	while (!list_empty(port_list)) {
+		Node *node = list_entry(port_list.next, Node, list);
+		struct parport *p = node->port;
+		struct parport_operations *ops = p->ops;
+		parport_remove_port(p);
 
-	while (p) {
-		struct parport *next = p->next;
-
-		if (1/*p->modes & PARPORT_MODE_PCSPP*/) { 
-			struct parport_operations *ops = p->ops;
-			parport_remove_port(p);
-
-			if (p->irq != PARPORT_IRQ_NONE) {
-				parport_sunbpp_disable_irq(p);
-				free_irq(p->irq, p);
-			}
-			sbus_iounmap(p->base, p->size);
-			parport_put_port(p);
-			kfree (ops);
+		if (p->irq != PARPORT_IRQ_NONE) {
+			parport_sunbpp_disable_irq(p);
+			free_irq(p->irq, p);
 		}
-		p = next;
+		sbus_iounmap(p->base, p->size);
+		parport_put_port(p);
+		kfree (ops);
+		list_del(&node->list);
+		kfree (node);
 	}
 }
 
