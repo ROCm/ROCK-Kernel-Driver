@@ -452,25 +452,6 @@ int eesoxscsi_proc_info(char *buffer, char **start, off_t offset,
 
 	pos += fas216_print_stats(&info->info, buffer + pos);
 
-	pos += sprintf(buffer+pos, "\nAttached devices:\n");
-
-	list_for_each_entry(scd, &host->my_devices, siblings) {
-		int len;
-
-		proc_print_scsidevice(scd, buffer, &len, pos);
-		pos += len;
-		pos += sprintf(buffer+pos, "Extensions: ");
-		if (scd->tagged_supported)
-			pos += sprintf(buffer+pos, "TAG %sabled [%d] ",
-					scd->tagged_queue ? "en" : "dis",
-					scd->current_tag);
-		pos += sprintf (buffer+pos, "\n");
-
-		if (pos + begin < offset) {
-			begin += pos;
-			pos = 0;
-		}
-	}
 	*start = buffer + (offset - begin);
 	pos -= offset - begin;
 	if (pos > length)

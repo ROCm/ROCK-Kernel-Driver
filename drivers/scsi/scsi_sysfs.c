@@ -14,6 +14,7 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
 
 /*
  * shost_show_function: macro to create an attr function that can be used to

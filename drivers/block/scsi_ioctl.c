@@ -299,13 +299,14 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 #define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
 #define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
 #define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
+#define OMAX_SB_LEN 16          /* For backward compatibility */
 
 static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 			 Scsi_Ioctl_Command *sic)
 {
 	struct request *rq;
 	int err, in_len, out_len, bytes, opcode, cmdlen;
-	char *buffer = NULL, sense[24];
+	char *buffer = NULL, sense[SCSI_SENSE_BUFFERSIZE];
 
 	/*
 	 * get in an out lengths, verify they don't exceed a page worth of data
@@ -378,9 +379,12 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	blk_do_rq(q, bdev, rq);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
 	if (err) {
-		if (rq->sense_len)
-			if (copy_to_user(sic->data, rq->sense, rq->sense_len))
+		if (rq->sense_len && rq->sense) {
+			bytes = (OMAX_SB_LEN > rq->sense_len) ?
+				rq->sense_len : OMAX_SB_LEN;
+			if (copy_to_user(sic->data, rq->sense, bytes))
 				err = -EFAULT;
+		}
 	} else {
 		if (copy_to_user(sic->data, buffer, out_len))
 			err = -EFAULT;

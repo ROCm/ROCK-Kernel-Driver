@@ -50,6 +50,7 @@
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>	/* For the door lock/unlock commands */
 
+#include "scsi_logging.h"
 #include "sr.h"
 
 

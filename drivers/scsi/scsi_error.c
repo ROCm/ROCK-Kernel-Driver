@@ -28,6 +28,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 #ifdef DEBUG
 #define SENSE_TIMEOUT SCSI_TIMEOUT
 #else
@@ -916,7 +919,6 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
  **/
 static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 {
-	struct scsi_device *sdev;
 	unsigned long flags;
 	int rtn;
 
@@ -934,16 +936,9 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(BUS_RESET_SETTLE_TIME);
-		/*
-		 * Mark all affected devices to expect a unit attention.
-		 */
-		list_for_each_entry(sdev, &scmd->device->host->my_devices,
-				    siblings)
-			if (scmd->device->channel == sdev->channel) {
-				sdev->was_reset = 1;
-				sdev->expecting_cc_ua = 1;
-			}
+		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 	}
+
 	return rtn;
 }
 
@@ -953,7 +948,6 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
  **/
 static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 {
-	struct scsi_device *sdev;
 	unsigned long flags;
 	int rtn;
 
@@ -971,16 +965,9 @@ static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(HOST_RESET_SETTLE_TIME);
-		/*
-		 * Mark all affected devices to expect a unit attention.
-		 */
-		list_for_each_entry(sdev, &scmd->device->host->my_devices,
-				    siblings)
-			if (scmd->device->channel == sdev->channel) {
-				sdev->was_reset = 1;
-				sdev->expecting_cc_ua = 1;
-			}
+		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 	}
+
 	return rtn;
 }
 
@@ -1674,13 +1661,10 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
     
 	scmd->scsi_done		= scsi_reset_provider_done_command;
 	scmd->done			= NULL;
-	scmd->reset_chain		= NULL;
-        
 	scmd->buffer			= NULL;
 	scmd->bufflen			= 0;
 	scmd->request_buffer		= NULL;
 	scmd->request_bufflen		= 0;
-
 	scmd->internal_timeout		= NORMAL_TIMEOUT;
 	scmd->abort_reason		= DID_ABORT;
 

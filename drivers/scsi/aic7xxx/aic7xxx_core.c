@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#124 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#128 $
  *
  * $FreeBSD$
  */
@@ -3949,7 +3949,6 @@ ahc_free(struct ahc_softc *ahc)
 {
 	int i;
 
-	ahc_fini_scbdata(ahc);
 	switch (ahc->init_level) {
 	default:
 	case 5:
@@ -3981,6 +3980,7 @@ ahc_free(struct ahc_softc *ahc)
 	ahc_dma_tag_destroy(ahc, ahc->parent_dmat);
 #endif
 	ahc_platform_free(ahc);
+	ahc_fini_scbdata(ahc);
 	for (i = 0; i < AHC_NUM_TARGETS; i++) {
 		struct ahc_tmode_tstate *tstate;
 
@@ -5100,7 +5100,7 @@ ahc_pause_and_flushwork(struct ahc_softc *ahc)
 	} while (--maxloops
 	      && (intstat != 0xFF || (ahc->features & AHC_REMOVABLE) == 0)
 	      && ((intstat & INT_PEND) != 0
-	       || (ahc_inb(ahc, SSTAT0) & (SELDO|SELINGO))));
+	       || (ahc_inb(ahc, SSTAT0) & (SELDO|SELINGO)) != 0));
 	if (maxloops == 0) {
 		printf("Infinite interrupt loop, INTSTAT = %x",
 		       ahc_inb(ahc, INTSTAT));

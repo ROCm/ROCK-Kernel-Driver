@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#131 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#140 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -150,8 +150,8 @@ typedef Scsi_Cmnd      *ahc_io_ctx_t;
 #endif /* BYTE_ORDER */
 
 /************************* Configuration Data *********************************/
-extern int aic7xxx_no_probe;
-extern int aic7xxx_allow_memio;
+extern u_int aic7xxx_no_probe;
+extern u_int aic7xxx_allow_memio;
 extern int aic7xxx_detect_complete;
 extern Scsi_Host_Template aic7xxx_driver_template;
 
@@ -267,7 +267,7 @@ typedef struct timer_list ahc_timer_t;
 
 /***************************** Timer Facilities *******************************/
 #define ahc_timer_init init_timer
-#define ahc_timer_stop del_timer
+#define ahc_timer_stop del_timer_sync
 typedef void ahc_linux_callback_t (u_long);  
 static __inline void ahc_timer_reset(ahc_timer_t *timer, int usec,
 				     ahc_callback_t *func, void *arg);
@@ -305,7 +305,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHC_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.31"
+#define AIC7XXX_DRIVER_VERSION "6.2.33"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -494,7 +494,18 @@ struct ahc_linux_target {
  * manner and are allocated below 4GB, the number of S/G segments is
  * unrestricted.
  */
-#define        AHC_NSEG 128
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+/*
+ * We dynamically adjust the number of segments in pre-2.5 kernels to
+ * avoid fragmentation issues in the SCSI mid-layer's private memory
+ * allocator.  See aic7xxx_osm.c ahc_linux_size_nseg() for details.
+ */
+extern u_int ahc_linux_nseg;
+#define	AHC_NSEG ahc_linux_nseg
+#define	AHC_LINUX_MIN_NSEG 64
+#else
+#define	AHC_NSEG 128
+#endif
 
 /*
  * Per-SCB OSM storage.
@@ -538,9 +549,7 @@ struct ahc_platform_data {
 	TAILQ_HEAD(, ahc_linux_device) device_runq;
 	struct ahc_completeq	 completeq;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t		 spin_lock;
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	struct tasklet_struct	 runq_tasklet;
 #endif
@@ -699,7 +708,6 @@ static __inline void ahc_list_lockinit(void);
 static __inline void ahc_list_lock(unsigned long *flags);
 static __inline void ahc_list_unlock(unsigned long *flags);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 static __inline void
 ahc_lockinit(struct ahc_softc *ahc)
 {
@@ -729,7 +737,8 @@ ahc_midlayer_entrypoint_lock(struct ahc_softc *ahc, unsigned long *flags)
 	 * trade the io_request_lock for our per-softc lock.
 	 */
 #if AHC_SCSI_HAS_HOST_LOCK == 0
-	ahc_lock(ahc, flags);
+	spin_unlock(&io_request_lock);
+	spin_lock(&ahc->platform_data->spin_lock);
 #endif
 }
 
@@ -737,7 +746,8 @@ static __inline void
 ahc_midlayer_entrypoint_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
 #if AHC_SCSI_HAS_HOST_LOCK == 0
-	ahc_unlock(ahc, flags);
+	spin_unlock(&ahd->platform_data->spin_lock);
+	spin_lock(&io_request_lock);
 #endif
 }
 
@@ -784,65 +794,6 @@ ahc_list_unlock(unsigned long *flags)
 {
 	spin_unlock_irqrestore(&ahc_list_spinlock, *flags);
 }
-
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,93) */
-
-static __inline void
-ahc_lockinit(struct ahc_softc *ahc)
-{
-}
-
-static __inline void
-ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
-{
-	save_flags(*flags);
-	cli();
-}
-
-static __inline void
-ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
-{
-	restore_flags(*flags);
-}
-
-static __inline void
-ahc_done_lockinit(struct ahc_softc *ahc)
-{
-}
-
-static __inline void
-ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
-{
-	/*
-	 * The done lock is always held while
-	 * the ahc lock is held so blocking
-	 * interrupts again would have no effect.
-	 */
-}
-
-static __inline void
-ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
-{
-}
-
-static __inline void
-ahc_list_lockinit()
-{
-}
-
-static __inline void
-ahc_list_lock(unsigned long *flags)
-{
-	save_flags(*flags);
-	cli();
-}
-
-static __inline void
-ahc_list_unlock(unsigned long *flags)
-{
-	restore_flags(*flags);
-}
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
 
 /******************************* PCI Definitions ******************************/
 /*
@@ -902,16 +853,6 @@ int			 aic7770_map_registers(struct ahc_softc *ahc,
 int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 
 /******************************* PCI Routines *********************************/
-/*
- * We need to use the bios32.h routines if we are kernel version 2.1.92 or less.
- */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
-#if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
-#endif
-#include <linux/bios32.h>
-#endif
-
 int			 ahc_linux_pci_init(void);
 void			 ahc_linux_pci_exit(void);
 int			 ahc_pci_map_registers(struct ahc_softc *ahc);
@@ -1224,7 +1165,8 @@ void	ahc_platform_set_tags(struct ahc_softc *ahc,
 int	ahc_platform_abort_scbs(struct ahc_softc *ahc, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-irqreturn_t ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
+AIC_LINUX_IRQRETURN_T
+	ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
 void	ahc_platform_flushwork(struct ahc_softc *ahc);
 int	ahc_softc_comp(struct ahc_softc *, struct ahc_softc *);
 void	ahc_done(struct ahc_softc*, struct scb*);
@@ -1239,5 +1181,5 @@ void	ahc_platform_dump_card_state(struct ahc_softc *ahc);
 #define AHC_PCI_CONFIG 0
 #endif
 #define bootverbose aic7xxx_verbose
-extern int aic7xxx_verbose;
+extern u_int aic7xxx_verbose;
 #endif /* _AIC7XXX_LINUX_H_ */

@@ -2935,37 +2935,6 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
 	}
     }
 
-    p += sprintf(p, "\nAttached devices:\n");
-
-    list_for_each_entry(scd, &instance->my_devices, siblings) {
-	int len;
-
-	proc_print_scsidevice(scd, p, &len, 0);
-	p += len;
-
-	p += sprintf(p, "Extensions: ");
-
-	if (scd->tagged_supported)
-	    p += sprintf(p, "TAG %sabled [%d] ",
-			  scd->tagged_queue ? "en" : "dis", scd->current_tag);
-	p += sprintf(p, "\nTransfers: ");
-	if (host->device[scd->id].sync_xfer & 15)
-	    p += sprintf(p, "sync, offset %d, %d ns\n",
-			  host->device[scd->id].sync_xfer & 15,
-			  acornscsi_getperiod(host->device[scd->id].sync_xfer));
-	else
-	    p += sprintf(p, "async\n");
-
-	pos = p - buffer;
-	if (pos + begin < offset) {
-	    begin += pos;
-	    p = buffer;
-	}
-	pos = p - buffer;
-	if (pos + begin > offset + length)
-	    break;
-    }
-
     pos = p - buffer;
 
     *start = buffer + (offset - begin);

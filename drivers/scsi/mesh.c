@@ -212,7 +212,7 @@ static void handle_reset(struct mesh_state *);
 static void handle_error(struct mesh_state *);
 static void handle_exception(struct mesh_state *);
 static void mesh_interrupt(int, void *, struct pt_regs *);
-static void do_mesh_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t do_mesh_interrupt(int, void *, struct pt_regs *);
 static void handle_msgin(struct mesh_state *);
 static void mesh_done(struct mesh_state *, int);
 static void mesh_completed(struct mesh_state *, Scsi_Cmnd *);
@@ -1471,7 +1471,7 @@ handle_reset(struct mesh_state *ms)
 	out_8(&mr->sequence, SEQ_ENBRESEL);
 }
 
-static void
+static irqreturn_t
 do_mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	unsigned long flags;
@@ -1480,6 +1480,7 @@ do_mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	spin_lock_irqsave(dev->host_lock, flags);
 	mesh_interrupt(irq, dev_id, ptregs);
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void handle_error(struct mesh_state *ms)
