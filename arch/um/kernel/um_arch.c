@@ -393,7 +393,7 @@ static int panic_exit(struct notifier_block *self, unsigned long unused1,
 		      void *unused2)
 {
 #ifdef CONFIG_MAGIC_SYSRQ
-	handle_sysrq('p', &current->thread.regs, NULL, NULL);
+	handle_sysrq('p', &current->thread.regs, NULL);
 #endif
 	machine_halt();
 	return(0);

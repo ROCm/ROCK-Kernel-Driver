@@ -589,6 +589,8 @@ config PC9800_OLDLP_CONSOLE
 	depends on PC9800_OLDLP
 
 
+source "drivers/char/lirc/Kconfig"
+
 menu "Mice"
 
 config BUSMOUSE
