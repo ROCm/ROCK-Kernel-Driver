@@ -283,7 +283,7 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 #ifndef CONFIG_NET_CLS_ACT
 #ifndef CONFIG_NETFILTER
 	printk("You MUST compile classifier actions into the kernel\n");
-	goto error;
+	return -EINVAL;
 #else
 	printk("Ingress scheduler: Classifier actions prefered over netfilter\n");
 #endif
@@ -294,7 +294,7 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 	if (!nf_registered) {
 		if (nf_register_hook(&ing_ops) < 0) {
 			printk("ingress qdisc registration error \n");
-			goto error;
+			return -EINVAL;
 		}
 		nf_registered++;
 	}
@@ -304,8 +304,6 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 	DPRINTK("ingress_init(sch %p,[qdisc %p],opt %p)\n",sch,p,opt);
 	p->q = &noop_qdisc;
 	return 0;
-error:
-	return -EINVAL;
 }
 
 
