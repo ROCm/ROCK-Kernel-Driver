@@ -400,7 +400,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, void __user *arg)
 				break;
 
 			hdr.dxferp = cgc.buffer;
-			hdr.sbp = (char *) cgc.sense;
+			hdr.sbp = cgc.sense;
 			if (hdr.sbp)
 				hdr.mx_sb_len = sizeof(struct request_sense);
 			hdr.timeout = cgc.timeout;
