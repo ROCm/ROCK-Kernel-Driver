@@ -9,8 +9,8 @@
 
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/linkage.h>
 #include <asm/atomic.h>
-
 
 enum bh_state_bits {
 	BH_Uptodate,	/* Contains valid data */
