@@ -88,12 +88,11 @@ struct slave {
  *    beforehand.
  */
 struct bonding {
-	struct slave *next;
-	struct slave *prev;
+	struct slave *first_slave;
 	struct slave *current_slave;
 	struct slave *primary_slave;
 	struct slave *current_arp_slave;
-	__s32 slave_cnt;
+	int slave_cnt; /* never change this value outside the attach/detach wrappers */
 	rwlock_t lock;
 	rwlock_t ptrlock;
 	struct timer_list mii_timer;
@@ -112,37 +111,45 @@ struct bonding {
 	struct alb_bond_info alb_info;
 };
 
-/* Forward declarations */
-void bond_set_slave_active_flags(struct slave *slave);
-void bond_set_slave_inactive_flags(struct slave *slave);
+/**
+ * bond_for_each_slave_from - iterate the slaves list from a starting point
+ * @bond:	the bond holding this list.
+ * @pos:	current slave.
+ * @cnt:	counter for max number of moves
+ * @start:	starting point.
+ *
+ * Caller must hold bond->lock
+ */
+#define bond_for_each_slave_from(bond, pos, cnt, start)	\
+	for (cnt = 0, pos = start;			\
+	     cnt < (bond)->slave_cnt;			\
+             cnt++, pos = (pos)->next)
 
 /**
- * These functions can be used for iterating the slave list
- * (which is circular)
- * Caller must hold bond lock for read
+ * bond_for_each_slave_from_to - iterate the slaves list from start point to stop point
+ * @bond:	the bond holding this list.
+ * @pos:	current slave.
+ * @cnt:	counter for number max of moves
+ * @start:	start point.
+ * @stop:	stop point.
+ *
+ * Caller must hold bond->lock
  */
-extern inline struct slave *
-bond_get_first_slave(struct bonding *bond)
-{
-	/* if there are no slaves return NULL */
-	if (bond->next == (struct slave *)bond) {
-		return NULL;
-	}
-	return bond->next;
-}
+#define bond_for_each_slave_from_to(bond, pos, cnt, start, stop)	\
+	for (cnt = 0, pos = start;					\
+	     ((cnt < (bond)->slave_cnt) && (pos != (stop)->next));	\
+             cnt++, pos = (pos)->next)
 
 /**
- * Caller must hold bond lock for read
+ * bond_for_each_slave - iterate the slaves list from head
+ * @bond:	the bond holding this list.
+ * @pos:	current slave.
+ * @cnt:	counter for max number of moves
+ *
+ * Caller must hold bond->lock
  */
-extern inline struct slave *
-bond_get_next_slave(struct bonding *bond, struct slave *slave)
-{
-	/* If we have reached the last slave return NULL */
-	if (slave->next == bond->next) {
-		return NULL;
-	}
-	return slave->next;
-}
+#define bond_for_each_slave(bond, pos, cnt)	\
+		bond_for_each_slave_from(bond, pos, cnt, (bond)->first_slave)
 
 /**
  * Returns NULL if the net_device does not belong to any of the bond's slaves
@@ -152,19 +159,16 @@ bond_get_next_slave(struct bonding *bond, struct slave *slave)
 extern inline struct slave *
 bond_get_slave_by_dev(struct bonding *bond, struct net_device *slave_dev)
 {
-	struct slave *our_slave = bond->next;
+	struct slave *slave = NULL;
+	int i;
 
-	/* check if the list of slaves is empty */
-	if (our_slave == (struct slave *)bond) {
-		return NULL;
-	}
-
-	for (; our_slave; our_slave = bond_get_next_slave(bond, our_slave)) {
-		if (our_slave->dev == slave_dev) {
+	bond_for_each_slave(bond, slave, i) {
+		if (slave->dev == slave_dev) {
 			break;
 		}
 	}
-	return our_slave;
+
+	return slave;
 }
 
 extern inline struct bonding *
@@ -176,6 +180,10 @@ bond_get_bond_by_slave(struct slave *slave)
 
 	return (struct bonding *)slave->dev->master->priv;
 }
+
+/* Forward declarations */
+void bond_set_slave_active_flags(struct slave *slave);
+void bond_set_slave_inactive_flags(struct slave *slave);
 
 #endif /* _LINUX_BONDING_H */
 

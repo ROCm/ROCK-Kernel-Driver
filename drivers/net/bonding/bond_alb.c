@@ -232,17 +232,17 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 	struct slave *slave;
 	struct slave *least_loaded;
 	s64 curr_gap, max_gap;
+	int i, found = 0;
 
 	/* Find the first enabled slave */
-	slave = bond_get_first_slave(bond);
-	while (slave) {
+	bond_for_each_slave(bond, slave, i) {
 		if (SLAVE_IS_OK(slave)) {
+			found = 1;
 			break;
 		}
-		slave = bond_get_next_slave(bond, slave);
 	}
 
-	if (!slave) {
+	if (!found) {
 		return NULL;
 	}
 
@@ -251,8 +251,7 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 			(s64)(SLAVE_TLB_INFO(slave).load * 8);
 
 	/* Find the slave with the largest gap */
-	slave = bond_get_next_slave(bond, slave);
-	while (slave) {
+	bond_for_each_slave_from(bond, slave, i, least_loaded) {
 		if (SLAVE_IS_OK(slave)) {
 			curr_gap = (s64)(slave->speed * 1000000) -
 					(s64)(SLAVE_TLB_INFO(slave).load * 8);
@@ -261,7 +260,6 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 				max_gap = curr_gap;
 			}
 		}
-		slave = bond_get_next_slave(bond, slave);
 	}
 
 	return least_loaded;
@@ -398,14 +396,10 @@ rlb_next_rx_slave(struct bonding *bond)
 
 	slave = bond_info->next_rx_slave;
 	if (slave == NULL) {
-		slave = bond->next;
+		slave = bond->first_slave;
 	}
 
-	/* this loop uses the circular linked list property of the
-	 * slave's list to go through all slaves
-	 */
-	for (i = 0; i < bond->slave_cnt; i++, slave = slave->next) {
-
+	bond_for_each_slave(bond, slave, i) {
 		if (SLAVE_IS_OK(slave)) {
 			if (!rx_slave) {
 				rx_slave = slave;
@@ -971,6 +965,7 @@ alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
 	struct slave *tmp_slave;
 	int perm_curr_diff;
 	int perm_bond_diff;
+	int i, found = 0;
 
 	perm_curr_diff = memcmp(slave->perm_hwaddr,
 				slave->dev->dev_addr,
@@ -979,17 +974,16 @@ alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
 				bond->device->dev_addr,
 				ETH_ALEN);
 	if (perm_curr_diff && perm_bond_diff) {
-		tmp_slave = bond_get_first_slave(bond);
-		while (tmp_slave) {
+		bond_for_each_slave(bond, tmp_slave, i) {
 			if (!memcmp(slave->perm_hwaddr,
 				   tmp_slave->dev->dev_addr,
 				   ETH_ALEN)) {
+				found = 1;
 				break;
 			}
-			tmp_slave = bond_get_next_slave(bond, tmp_slave);
 		}
 
-		if (tmp_slave) {
+		if (found) {
 			alb_swap_mac_addr(bond, slave, tmp_slave);
 		}
 	}
@@ -1023,7 +1017,8 @@ alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
 static int
 alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 {
-	struct slave *tmp_slave1, *tmp_slave2;
+	struct slave *tmp_slave1, *tmp_slave2, *free_mac_slave;
+	int i, j, found = 0;
 
 	if (bond->slave_cnt == 0) {
 		/* this is the first slave */
@@ -1035,14 +1030,14 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 	 * slaves in the bond.
 	 */
 	if (memcmp(slave->perm_hwaddr, bond->device->dev_addr, ETH_ALEN)) {
-		tmp_slave1 = bond_get_first_slave(bond);
-		for (; tmp_slave1; tmp_slave1 = bond_get_next_slave(bond, tmp_slave1)) {
+		bond_for_each_slave(bond, tmp_slave1, i) {
 			if (!memcmp(tmp_slave1->dev->dev_addr, slave->dev->dev_addr,
 				    ETH_ALEN)) {
+				found = 1;
 				break;
 			}
 		}
-		if (tmp_slave1) {
+		if (found) {
 			/* a slave was found that is using the mac address
 			 * of the new slave
 			 */
@@ -1058,36 +1053,36 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 	/* the slave's address is equal to the address of the bond
 	 * search for a spare address in the bond for this slave.
 	 */
-	tmp_slave1 = bond_get_first_slave(bond);
-	for (; tmp_slave1; tmp_slave1 = bond_get_next_slave(bond, tmp_slave1)) {
+	free_mac_slave = NULL;
 
-		tmp_slave2 = bond_get_first_slave(bond);
-		for (; tmp_slave2; tmp_slave2 = bond_get_next_slave(bond, tmp_slave2)) {
-
+	bond_for_each_slave(bond, tmp_slave1, i) {
+		found = 0;
+		bond_for_each_slave(bond, tmp_slave2, j) {
 			if (!memcmp(tmp_slave1->perm_hwaddr,
 				    tmp_slave2->dev->dev_addr,
 				    ETH_ALEN)) {
-
+				found = 1;
 				break;
 			}
 		}
 
-		if (!tmp_slave2) {
+		if (!found) {
 			/* no slave has tmp_slave1's perm addr
 			 * as its curr addr
 			 */
+			free_mac_slave = tmp_slave1;
 			break;
 		}
 	}
 
-	if (tmp_slave1) {
-		alb_set_slave_mac_addr(slave, tmp_slave1->perm_hwaddr,
+	if (free_mac_slave) {
+		alb_set_slave_mac_addr(slave, free_mac_slave->perm_hwaddr,
 				       bond->alb_info.rlb_enabled);
 
 		printk(KERN_WARNING DRV_NAME
 		       ": Warning: the hw address of slave %s is in use by "
 		       "the bond; giving it the hw address of %s\n",
-		       slave->dev->name, tmp_slave1->dev->name);
+		       slave->dev->name, free_mac_slave->dev->name);
 	} else {
 		printk(KERN_ERR DRV_NAME
 		       ": Error: the hw address of slave %s is in use by the "
@@ -1118,16 +1113,16 @@ static inline int
 alb_set_mac_address(struct bonding *bond, void *addr)
 {
 	struct sockaddr sa;
-	struct slave *slave;
+	struct slave *slave, *stop_at;
 	char tmp_addr[ETH_ALEN];
 	int error;
+	int i;
 
 	if (bond->alb_info.rlb_enabled) {
 		return 0;
 	}
 
-	slave = bond_get_first_slave(bond);
-	for (; slave; slave = bond_get_next_slave(bond, slave)) {
+	bond_for_each_slave(bond, slave, i) {
 		if (slave->dev->set_mac_address == NULL) {
 			error = -EOPNOTSUPP;
 			goto unwind;
@@ -1151,8 +1146,10 @@ alb_set_mac_address(struct bonding *bond, void *addr)
 unwind:
 	memcpy(sa.sa_data, bond->device->dev_addr, bond->device->addr_len);
 	sa.sa_family = bond->device->type;
-	slave = bond_get_first_slave(bond);
-	for (; slave; slave = bond_get_next_slave(bond, slave)) {
+
+	/* unwind from head to the slave that failed */
+	stop_at = slave;
+	bond_for_each_slave_from_to(bond, slave, i, bond->first_slave, stop_at) {
 		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
 		slave->dev->set_mac_address(slave->dev, &sa);
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
@@ -1323,6 +1320,7 @@ bond_alb_monitor(struct bonding *bond)
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *slave = NULL;
 	int delta_in_ticks = HZ / ALB_TIMER_TICKS_PER_SEC;
+	int i;
 
 	read_lock(&bond->lock);
 
@@ -1347,10 +1345,8 @@ bond_alb_monitor(struct bonding *bond)
 		 * read.
 		 */
 		read_lock(&bond->ptrlock);
-		slave = bond_get_first_slave(bond);
-		while (slave) {
+		bond_for_each_slave(bond, slave, i) {
 			alb_send_learning_packets(slave,slave->dev->dev_addr);
-			slave = bond_get_next_slave(bond, slave);
 		}
 		read_unlock(&bond->ptrlock);
 
@@ -1360,8 +1356,7 @@ bond_alb_monitor(struct bonding *bond)
 	/* rebalance tx traffic */
 	if (bond_info->tx_rebalance_counter >= BOND_TLB_REBALANCE_TICKS) {
 		read_lock(&bond->ptrlock);
-		slave = bond_get_first_slave(bond);
-		while (slave) {
+		bond_for_each_slave(bond, slave, i) {
 			tlb_clear_slave(bond, slave, 1);
 			if (slave == bond->current_slave) {
 				SLAVE_TLB_INFO(slave).load =
@@ -1369,7 +1364,6 @@ bond_alb_monitor(struct bonding *bond)
 						BOND_TLB_REBALANCE_INTERVAL;
 				bond_info->unbalanced_load = 0;
 			}
-			slave = bond_get_next_slave(bond, slave);
 		}
 		read_unlock(&bond->ptrlock);
 		bond_info->tx_rebalance_counter = 0;
@@ -1519,6 +1513,7 @@ void
 bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave)
 {
 	struct slave *swap_slave = bond->current_slave;
+	int i, found = 0;
 
 	if (bond->current_slave == new_slave) {
 		return;
@@ -1541,18 +1536,17 @@ bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave)
 	 */
 	if (!swap_slave) {
 		/* find slave that is holding the bond's mac address */
-		swap_slave = bond_get_first_slave(bond);
-		while (swap_slave) {
+		bond_for_each_slave(bond, swap_slave, i) {
 			if (!memcmp(swap_slave->dev->dev_addr,
 				bond->device->dev_addr, ETH_ALEN)) {
+				found = 1;
 				break;
 			}
-			swap_slave = bond_get_next_slave(bond, swap_slave);
 		}
 	}
 
 	/* current_slave must be set before calling alb_swap_mac_addr */
-	if (swap_slave) {
+	if (found) {
 		/* swap mac address */
 		alb_swap_mac_addr(bond, swap_slave, new_slave);
 	} else {
@@ -1571,6 +1565,7 @@ bond_alb_set_mac_address(struct net_device *dev, void *addr)
 	struct sockaddr *sa = addr;
 	struct slave *swap_slave = NULL;
 	int error = 0;
+	int i, found = 0;
 
 	if (!is_valid_ether_addr(sa->sa_data)) {
 		return -EADDRNOTAVAIL;
@@ -1591,15 +1586,14 @@ bond_alb_set_mac_address(struct net_device *dev, void *addr)
 		return 0;
 	}
 
-	swap_slave = bond_get_first_slave(bond);
-	while (swap_slave) {
+	bond_for_each_slave(bond, swap_slave, i) {
 		if (!memcmp(swap_slave->dev->dev_addr, dev->dev_addr, ETH_ALEN)) {
+			found = 1;
 			break;
 		}
-		swap_slave = bond_get_next_slave(bond, swap_slave);
 	}
 
-	if (swap_slave) {
+	if (found) {
 		alb_swap_mac_addr(bond, swap_slave, bond->current_slave);
 	} else {
 		alb_set_slave_mac_addr(bond->current_slave, dev->dev_addr,

@@ -198,13 +198,11 @@ static inline struct bonding *__get_bond_by_port(struct port *port)
  */
 static inline struct port *__get_first_port(struct bonding *bond)
 {
-	struct slave *slave = bond->next;
-
-	if (slave == (struct slave *)bond) {
+	if (bond->slave_cnt == 0) {
 		return NULL;
 	}
 
-	return &(SLAVE_AD_INFO(slave).port);
+	return &(SLAVE_AD_INFO(bond->first_slave).port);
 }
 
 /**
@@ -220,7 +218,7 @@ static inline struct port *__get_next_port(struct port *port)
 	struct slave *slave = port->slave;
 
 	// If there's no bond for this port, or this is the last slave
-	if ((bond == NULL) || (slave->next == bond->next)) {
+	if ((bond == NULL) || (slave->next == bond->first_slave)) {
 		return NULL;
 	}
 
@@ -238,12 +236,12 @@ static inline struct aggregator *__get_first_agg(struct port *port)
 {
 	struct bonding *bond = __get_bond_by_port(port);
 
-	// If there's no bond for this port, or this is the last slave
-	if ((bond == NULL) || (bond->next == (struct slave *)bond)) {
+	// If there's no bond for this port, or bond has no slaves
+	if ((bond == NULL) || (bond->slave_cnt == 0)) {
 		return NULL;
 	}
 
-	return &(SLAVE_AD_INFO(bond->next).aggregator);
+	return &(SLAVE_AD_INFO(bond->first_slave).aggregator);
 }
 
 /**
@@ -259,7 +257,7 @@ static inline struct aggregator *__get_next_agg(struct aggregator *aggregator)
 	struct bonding *bond = bond_get_bond_by_slave(slave);
 
 	// If there's no bond for this aggregator, or this is the last slave
-	if ((bond == NULL) || (slave->next == bond->next)) {
+	if ((bond == NULL) || (slave->next == bond->first_slave)) {
 		return NULL;
 	}
 
@@ -2131,7 +2129,7 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 	}
 
 	//check if there are any slaves
-	if (bond->next == (struct slave *)bond) {
+	if (bond->slave_cnt == 0) {
 		goto re_arm;
 	}
 
@@ -2359,6 +2357,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	int slave_agg_no;
 	int slaves_in_agg;
 	int agg_id;
+	int i;
 	struct ad_info ad_info;
 
 	if (!IS_UP(dev)) { /* bond down */
@@ -2373,10 +2372,9 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	read_lock(&bond->lock);
-	slave = bond->prev;
 
 	/* check if bond is empty */
-	if ((slave == (struct slave *)bond) || (bond->slave_cnt == 0)) {
+	if (bond->slave_cnt == 0) {
 		printk(KERN_DEBUG DRV_NAME ": Error: bond is empty\n");
 		dev_kfree_skb(skb);
 		read_unlock(&bond->lock);
@@ -2401,16 +2399,9 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 		return 0;
 	}
 
-	/* we're at the root, get the first slave */
-	if ((slave == NULL) || (slave->dev == NULL)) {
-		/* no suitable interface, frame not sent */
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
-	}
+	slave_agg_no = (data->h_dest[5]^bond->device->dev_addr[5]) % slaves_in_agg;
 
-	slave_agg_no = (data->h_dest[5]^slave->dev->dev_addr[5]) % slaves_in_agg;
-	while (slave != (struct slave *)bond) {
+	bond_for_each_slave(bond, slave, i) {
 		struct aggregator *agg = SLAVE_AD_INFO(slave).port.aggregator;
 
 		if (agg && (agg->aggregator_identifier == agg_id)) {
@@ -2419,17 +2410,9 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 				break;
 			}
 		}
-
-		slave = slave->prev;
-		if (slave == NULL) {
-			printk(KERN_ERR DRV_NAME ": Error: slave is NULL\n");
-			dev_kfree_skb(skb);
-			read_unlock(&bond->lock);
-			return 0;
-		}
 	}
 
-	if (slave == (struct slave *)bond) {
+	if (slave_agg_no >= 0) {
 		printk(KERN_ERR DRV_NAME ": Error: Couldn't find a slave to tx on for aggregator ID %d\n", agg_id);
 		dev_kfree_skb(skb);
 		read_unlock(&bond->lock);
@@ -2438,18 +2421,9 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 
 	start_at = slave;
 
-	do {
+	bond_for_each_slave_from(bond, slave, i, start_at) {
 		int slave_agg_id = 0;
-		struct aggregator *agg;
-
-		if (slave == NULL) {
-			printk(KERN_ERR DRV_NAME ": Error: slave is NULL\n");
-			dev_kfree_skb(skb);
-			read_unlock(&bond->lock);
-			return 0;
-		}
-
-		agg = SLAVE_AD_INFO(slave).port.aggregator;
+		struct aggregator *agg = SLAVE_AD_INFO(slave).port.aggregator;
 
 		if (agg) {
 			slave_agg_id = agg->aggregator_identifier;
@@ -2463,7 +2437,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 			read_unlock(&bond->lock);
 			return 0;
 		}
-	} while ((slave = slave->next) != start_at);
+	}
 
 	/* no suitable interface, frame not sent */
 	dev_kfree_skb(skb);
