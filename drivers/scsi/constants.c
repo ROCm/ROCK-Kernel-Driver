@@ -62,42 +62,54 @@ static const char *group_1_commands[] = {
 
 
 static const char *group_2_commands[] = {
-/* 40-41 */ "Change Definition", "Write Same", 
-/* 42-48 */ "Read sub-channel", "Read TOC", "Read header", 
-            "Play audio (10)", unknown, "Play audio msf",
-            "Play audio track/index", 
-/* 49-4f */ "Play track relative (10)", unknown, "Pause/resume", 
-            "Log Select", "Log Sense", unknown, unknown,
-/* 50-55 */ unknown, unknown, unknown, unknown, unknown, "Mode Select (10)",
-/* 56-5b */ unknown, unknown, unknown, unknown, "Mode Sense (10)", unknown,
-/* 5c-5f */ unknown, unknown, unknown,
+/* 40-41 */ "Change Definition", "Write Same",
+/* 42-48 */ "Read sub-channel", "Read TOC", "Read header",
+            "Play audio (10)", "Get configuration", "Play audio msf",
+            "Play audio track/index",
+/* 49-4f */ "Play track relative (10)", "Get event status notification",
+            "Pause/resume", "Log Select", "Log Sense", "Stop play/scan",
+            unknown,
+/* 50-55 */ "Xdwrite", "Xpwrite, Read disk info", "Xdread, Read track info",
+            "Reserve track", "Send OPC onfo", "Mode Select (10)",
+/* 56-5b */ "Reserve (10)", "Release (10)", "Repair track", "Read master cue",
+            "Mode Sense (10)", "Close track/session",
+/* 5c-5f */ "Read buffer capacity", "Send cue sheet", "Persistent reserve in",
+            "Persistent reserve out",
 };
 
 
 /* The following are 16 byte commands in group 4 */
 static const char *group_4_commands[] = {
-/* 80-84 */ unknown, unknown, unknown, unknown, unknown,
-/* 85-89 */ "Memory Export In (16)", unknown, unknown, unknown,
-            "Memory Export Out (16)",
-/* 8a-8f */ unknown, unknown, unknown, unknown, unknown, unknown,
-/* 90-94 */ unknown, unknown, unknown, unknown, unknown,
+/* 80-84 */ "Xdwrite (16)", "Rebuild (16)", "Regenerate (16)", "Extended copy",
+            "Receive copy results",
+/* 85-89 */ "Memory Export In (16)", "Access control in", "Access control out",
+            "Read (16)", "Memory Export Out (16)",
+/* 8a-8f */ "Write (16)", unknown, "Read attributes", "Write attributes",
+            "Write and verify (16)", "Verify (16)",
+/* 90-94 */ "Pre-fetch (16)", "Synchronize cache (16)",
+            "Lock/unlock cache (16)", "Write same (16)", unknown,
 /* 95-99 */ unknown, unknown, unknown, unknown, unknown,
-/* 9a-9f */ unknown, unknown, unknown, unknown, unknown, unknown,
+/* 9a-9f */ unknown, unknown, unknown, unknown, "Service action in",
+            "Service action out",
 };
-
 
 /* The following are 12 byte commands in group 5 */
 static const char *group_5_commands[] = {
-/* a0-a5 */ unknown, unknown, unknown, unknown, unknown,
-            "Move medium/play audio(12)",
-/* a6-a9 */ "Exchange medium", unknown, "Read(12)", "Play track relative(12)", 
-/* aa-ae */ "Write(12)", unknown, "Erase(12)", unknown, 
-            "Write and verify(12)", 
+/* a0-a5 */ "Report luns", "Blank", "Send event", "Maintenance (in)",
+            "Maintenance (out)", "Move medium/play audio(12)",
+/* a6-a9 */ "Exchange medium", "Move medium attached", "Read(12)",
+            "Play track relative(12)",
+/* aa-ae */ "Write(12)", unknown, "Erase(12), Get Performance",
+            "Read DVD structure", "Write and verify(12)",
 /* af-b1 */ "Verify(12)", "Search data high(12)", "Search data equal(12)",
-/* b2-b4 */ "Search data low(12)", "Set limits(12)", unknown,
-/* b5-b6 */ "Request volume element address", "Send volume tag",
-/* b7-b9 */ "Read defect data(12)", "Read element status", unknown,
-/* ba-bf */ unknown, unknown, unknown, unknown, unknown, unknown,
+/* b2-b4 */ "Search data low(12)", "Set limits(12)",
+            "Read element status attached",
+/* b5-b6 */ "Request volume element address", "Send volume tag, set streaming",
+/* b7-b9 */ "Read defect data(12)", "Read element status", "Read CD msf",
+/* ba-bc */ "Redundancy group (in), Scan",
+            "Redundancy group (out), Set cd-rom speed", "Spare (in), Play cd",
+/* bd-bf */ "Spare (out), Mechanism status", "Volume set (in), Read cd",
+            "Volume set (out), Send DVD structure",
 };
 
 

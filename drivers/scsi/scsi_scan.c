@@ -35,10 +35,10 @@
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_devinfo.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
-#include "scsi_devinfo.h"
 
 #define ALLOC_FAILURE_MSG	KERN_ERR "%s: Allocation failure during" \
 	" SCSI scanning, some SCSI devices might not be configured\n"
@@ -365,7 +365,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 	 * bit fields in Scsi_Device, so bflags need not be passed as an
 	 * argument.
 	 */
-	*bflags |= scsi_get_device_flags(&inq_result[8], &inq_result[16]);
+	*bflags |= scsi_get_device_flags(sdev, &inq_result[8], &inq_result[16]);
 
 	possible_inq_resp_len = (unsigned char) inq_result[4] + 5;
 	if (BLIST_INQUIRY_36 & *bflags)
@@ -625,7 +625,15 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
 
 	sdev->use_10_for_rw = 1;
-	sdev->use_10_for_ms = 0;
+
+	if (*bflags & BLIST_MS_SKIP_PAGE_08)
+		sdev->skip_ms_page_8 = 1;
+
+	if (*bflags & BLIST_MS_SKIP_PAGE_3F)
+		sdev->skip_ms_page_3f = 1;
+
+	if (*bflags & BLIST_USE_10_BYTE_MS)
+		sdev->use_10_for_ms = 1;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
@@ -678,7 +686,8 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 			if (sdevp)
 				*sdevp = sdev;
 			if (bflagsp)
-				*bflagsp = scsi_get_device_flags(sdev->vendor,
+				*bflagsp = scsi_get_device_flags(sdev,
+								 sdev->vendor,
 								 sdev->model);
 			return SCSI_SCAN_LUN_PRESENT;
 		}
@@ -1080,8 +1089,12 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 
 void scsi_rescan_device(struct device *dev)
 {
-	struct scsi_driver *drv = to_scsi_driver(dev->driver);
+	struct scsi_driver *drv;
+	
+	if (!dev->driver)
+		return;
 
+	drv = to_scsi_driver(dev->driver);
 	if (try_module_get(drv->owner)) {
 		if (drv->rescan)
 			drv->rescan(dev);

@@ -1,4 +1,5 @@
-
+#ifndef _SCSI_SCSI_DEVINFO_H
+#define _SCSI_SCSI_DEVINFO_H
 /*
  * Flags for SCSI devices that need special treatment
  */
@@ -14,4 +15,8 @@
 #define BLIST_LARGELUN		0x200	/* LUNs past 7 on a SCSI-2 device */
 #define BLIST_INQUIRY_36	0x400	/* override additional length field */
 #define BLIST_INQUIRY_58	0x800	/* ... for broken inquiry responses */
-#define BLIST_NOSTARTONADD      0x1000  /* do not do automatic start on add */
+#define BLIST_NOSTARTONADD	0x1000	/* do not do automatic start on add */
+#define BLIST_MS_SKIP_PAGE_08	0x2000	/* do not send ms page 0x08 */
+#define BLIST_MS_SKIP_PAGE_3F	0x4000	/* do not send ms page 0x3f */
+#define BLIST_USE_10_BYTE_MS	0x8000	/* use 10 byte ms before 6 byte ms */
+#endif
