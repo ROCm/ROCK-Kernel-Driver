@@ -421,7 +421,7 @@ void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		}
 		teli = parse_tlv_tnl_enc_lim(skb, skb->data);
 
-		if (teli && teli == info - 2) {
+		if (teli && teli == ntohl(info) - 2) {
 			tel = (struct ipv6_tlv_tnl_enc_lim *) &skb->data[teli];
 			if (tel->encap_limit == 0) {
 				if (net_ratelimit())
@@ -434,10 +434,9 @@ void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		}
 		break;
 	case ICMPV6_PKT_TOOBIG:
-		mtu = info - offset;
-		if (mtu <= IPV6_MIN_MTU) {
+		mtu = ntohl(info) - offset;
+		if (mtu < IPV6_MIN_MTU)
 			mtu = IPV6_MIN_MTU;
-		}
 		t->dev->mtu = mtu;
 
 		if ((len = sizeof (*ipv6h) + ipv6h->payload_len) > mtu) {
