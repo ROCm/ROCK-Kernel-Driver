@@ -916,7 +916,7 @@ static int r128_cce_dispatch_write_span( drm_device_t *dev,
 
 	count = depth->n;
 	if (count > 4096 || count <= 0)
-		return -EMSGSIZE;
+		return DRM_ERR(EMSGSIZE);
 
 	if ( DRM_COPY_FROM_USER( &x, depth->x, sizeof(x) ) ) {
 		return DRM_ERR(EFAULT);
@@ -1012,7 +1012,7 @@ static int r128_cce_dispatch_write_pixels( drm_device_t *dev,
 
 	count = depth->n;
 	if (count > 4096 || count <= 0)
-		return -EMSGSIZE;
+		return DRM_ERR(EMSGSIZE);
 
 	xbuf_size = count * sizeof(*x);
 	ybuf_size = count * sizeof(*y);
@@ -1131,7 +1131,7 @@ static int r128_cce_dispatch_read_span( drm_device_t *dev,
 
 	count = depth->n;
 	if (count > 4096 || count <= 0)
-		return -EMSGSIZE;
+		return DRM_ERR(EMSGSIZE);
 
 	if ( DRM_COPY_FROM_USER( &x, depth->x, sizeof(x) ) ) {
 		return DRM_ERR(EFAULT);
@@ -1176,7 +1176,7 @@ static int r128_cce_dispatch_read_pixels( drm_device_t *dev,
 
 	count = depth->n;
 	if (count > 4096 || count <= 0)
-		return -EMSGSIZE;
+		return DRM_ERR(EMSGSIZE);
 
 	if ( count > dev_priv->depth_pitch ) {
 		count = dev_priv->depth_pitch;
