@@ -7,8 +7,6 @@
  * Taken from i386 version.
  */
 
-/* $Id$ */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -88,10 +86,9 @@ sys_pipe(unsigned long r0, unsigned long r1, unsigned long r2,
 	return error;
 }
 
-static inline long do_mmap2(
-	unsigned long addr, unsigned long len,
+asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags,
-	int fd, unsigned long pgoff)
+	unsigned long fd, unsigned long pgoff)
 {
 	int error = -EBADF;
 	struct file *file = NULL;
@@ -111,62 +108,6 @@ static inline long do_mmap2(
 		fput(file);
 out:
 	return error;
-}
-
-asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
-	unsigned long prot, unsigned long flags,
-	unsigned long fd, unsigned long pgoff)
-{
-	return do_mmap2(addr, len, prot, flags, fd, pgoff);
-}
-
-/*
- * Perform the select(nd, in, out, ex, tv) and mmap() system
- * calls. Linux/M32R didn't use to be able to handle more than
- * 4 system call parameters, so these system calls used a memory
- * block for parameter passing..
- */
-
-struct mmap_arg_struct {
-	unsigned long addr;
-	unsigned long len;
-	unsigned long prot;
-	unsigned long flags;
-	unsigned long fd;
-	unsigned long offset;
-};
-
-asmlinkage int old_mmap(struct mmap_arg_struct *arg)
-{
-	struct mmap_arg_struct a;
-	int err = -EFAULT;
-
-	if (copy_from_user(&a, arg, sizeof(a)))
-		goto out;
-
-	err = -EINVAL;
-	if (a.offset & ~PAGE_MASK)
-		goto out;
-	err = do_mmap2(a.addr, a.len, a.prot, a.flags, a.fd,
-		a.offset>>PAGE_SHIFT);
-out:
-	return err;
-}
-
-struct sel_arg_struct {
-	unsigned long n;
-	fd_set __user *inp, *outp, *exp;
-	struct timeval __user *tvp;
-};
-
-asmlinkage int old_select(struct sel_arg_struct __user *arg)
-{
-	struct sel_arg_struct a;
-
-	if (copy_from_user(&a, arg, sizeof(a)))
-		return -EFAULT;
-	/* sys_select() does the appropriate kernel locking */
-	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
 }
 
 /*
