@@ -245,7 +245,9 @@ decode_acpi_resource (struct acpi_resource *resource, void *context)
 	acpi_resource_to_address64(resource, &address);
 
 	if (address.producer_consumer == ACPI_PRODUCER && address.address_length > 0) {
-		dbg("resource type: %d: 0x%llx - 0x%llx\n", address.resource_type, address.min_address_range, address.max_address_range);
+		dbg("resource type: %d: 0x%llx - 0x%llx\n", address.resource_type,
+		    (unsigned long long)address.min_address_range,
+		    (unsigned long long)address.max_address_range);
 		res = acpiphp_make_resource(address.min_address_range,
 				    address.address_length);
 		if (!res) {
