@@ -79,6 +79,26 @@ struct intersil *intersil_clock;
 
 #endif
 
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	extern int __copy_user_begin, __copy_user_end;
+	extern int __atomic_begin, __atomic_end;
+	extern int __bzero_begin, __bzero_end;
+	extern int __bitops_begin, __bitops_end;
+	unsigned long pc = regs->pc;
+
+	if ((pc >= (unsigned long) &__copy_user_begin &&
+	     pc < (unsigned long) &__copy_user_end) ||
+	    (pc >= (unsigned long) &__atomic_begin &&
+	     pc < (unsigned long) &__atomic_end) ||
+	    (pc >= (unsigned long) &__bzero_begin &&
+	     pc < (unsigned long) &__bzero_end) ||
+	    (pc >= (unsigned long) &__bitops_begin &&
+	     pc < (unsigned long) &__bitops_end))
+		pc = regs->u_regs[UREG_RETPC];
+	return pc;
+}
+
 static spinlock_t ticker_lock = SPIN_LOCK_UNLOCKED;
 
 /* 32-bit Sparc specific profiling function. */
@@ -86,20 +106,6 @@ void sparc_do_profile(unsigned long pc, unsigned long o7)
 {
 	if(prof_buffer && current->pid) {
 		extern int _stext;
-		extern int __copy_user_begin, __copy_user_end;
-		extern int __atomic_begin, __atomic_end;
-		extern int __bzero_begin, __bzero_end;
-		extern int __bitops_begin, __bitops_end;
-
-		if ((pc >= (unsigned long) &__copy_user_begin &&
-		     pc < (unsigned long) &__copy_user_end) ||
-		    (pc >= (unsigned long) &__atomic_begin &&
-		     pc < (unsigned long) &__atomic_end) ||
-		    (pc >= (unsigned long) &__bzero_begin &&
-		     pc < (unsigned long) &__bzero_end) ||
-		    (pc >= (unsigned long) &__bitops_begin &&
-		     pc < (unsigned long) &__bitops_end))
-			pc = o7;
 
 		pc -= (unsigned long) &_stext;
 		pc >>= prof_shift;
@@ -130,7 +136,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 #ifndef CONFIG_SMP
 	if(!user_mode(regs))
-		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
+		sparc_do_profile(profile_pc(regs));
 #endif
 
 	/* Protect counter clear so that do_gettimeoffset works */

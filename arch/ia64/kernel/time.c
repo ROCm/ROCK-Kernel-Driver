@@ -195,7 +195,7 @@ EXPORT_SYMBOL(do_gettimeofday);
 static inline void
 ia64_do_profile (struct pt_regs * regs)
 {
-	unsigned long ip, slot;
+	unsigned long ip;
 
 	profile_hook(regs);
 
@@ -205,12 +205,10 @@ ia64_do_profile (struct pt_regs * regs)
 	if (!prof_buffer)
 		return;
 
-	ip = instruction_pointer(regs);
 	/* Conserve space in histogram by encoding slot bits in address
 	 * bits 2 and 3 rather than bits 0 and 1.
 	 */
-	slot = ip & 3;
-	ip = (ip & ~3UL) + 4*slot;
+	ip = profile_pc(regs);
 
 	/*
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.

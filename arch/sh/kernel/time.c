@@ -262,9 +262,6 @@ static inline void sh_do_profile(unsigned long pc)
 	if (!prof_buffer || !current->pid)
 		return;
 
-	if (pc >= 0xa0000000UL && pc < 0xc0000000UL)
-		pc -= 0x20000000;
-
 	pc -= (unsigned long)&_stext;
 	pc >>= prof_shift;
 
@@ -288,7 +285,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	do_timer(regs);
 
 	if (!user_mode(regs))
-		sh_do_profile(regs->pc);
+		sh_do_profile(profile_pc(regs));
 
 #ifdef CONFIG_HEARTBEAT
 	if (sh_mv.mv_heartbeat != NULL) 

@@ -30,6 +30,7 @@
 
 #define pc_pointer(v) ((v) & ~PCMASK)   /* convert v to pc type address */
 #define instruction_pointer(regs) (pc_pointer((regs)->ARM_pc)) /* get pc */
+#define profile_pc(regs) instruction_pointer(regs)
 
 /* this struct defines the way the registers are stored on the
    stack during a system call. */

@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
+#include <linux/profile.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>

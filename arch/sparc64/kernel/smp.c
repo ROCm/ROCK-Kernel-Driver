@@ -19,6 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/cache.h>
 #include <linux/jiffies.h>
+#include <linux/profile.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>

@@ -29,6 +29,7 @@
 #include <linux/jiffies.h>
 #include <linux/cpufreq.h>
 #include <linux/percpu.h>
+#include <linux/profile.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -453,14 +454,8 @@ void sparc64_do_profile(struct pt_regs *regs)
 	if (!prof_buffer)
 		return;
 
-	pc = regs->tpc;
-
-	pc -= (unsigned long) _stext;
-	pc >>= prof_shift;
-
-	if(pc >= prof_len)
-		pc = prof_len - 1;
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
+	pc = (profile_pc(regs) - (unsigned long)_stext) >> prof_shift;
+	atomic_inc((atomic_t *)&prof_buffer[min(pc, prof_len-1)]);
 }
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
