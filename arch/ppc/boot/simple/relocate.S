@@ -50,7 +50,7 @@ relocate:
 	 * Check if we need to relocate ourselves to the link addr or were
 	 * we loaded there to begin with.
 	 */
-	cmp	cr0,r3,r4
+	cmpw	cr0,r3,r4
 	beq	start_ldr	/* If 0, we don't need to relocate */
 
 	/* Move this code somewhere safe.  This is max(load + size, end)
@@ -122,7 +122,7 @@ do_relocate:
 	GETSYM(r4, start)
 	mr	r3,r8		/* Get the load addr */
 
-	cmp	cr0,r4,r3	/* If we need to copy from the end, do so */
+	cmpw	cr0,r4,r3	/* If we need to copy from the end, do so */
 	bgt	do_relocate_from_end
 
 do_relocate_from_start:
@@ -165,7 +165,7 @@ start_ldr:
 	subi	r4,r4,4
 	li	r0,0
 50:	stwu	r0,4(r3)
-	cmp	cr0,r3,r4
+	cmpw	cr0,r3,r4
 	bne	50b
 90:	mr	r9,r1		/* Save old stack pointer (in case it matters) */
 	lis	r1,.stack@h

@@ -9,6 +9,8 @@
 #include <linux/fcntl.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/fs.h>
+
 #include <asm/uaccess.h>
 #include <asm/sections.h>
 #include <asm/prom.h>
@@ -154,7 +156,7 @@ anslcd_init(void)
 	retval = misc_register(&anslcd_dev);
 	if(retval < 0){
 		printk(KERN_INFO "LCD: misc_register failed\n");
-		iounmap(anslcd_ptr);
+		iounmap((void *)anslcd_ptr);
 		return retval;
 	}
 
@@ -177,7 +179,7 @@ static void __exit
 anslcd_exit(void)
 {
 	misc_deregister(&anslcd_dev);
-	iounmap(anslcd_ptr);
+	iounmap((void *)anslcd_ptr);
 }
 
 module_init(anslcd_init);

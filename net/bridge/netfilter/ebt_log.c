@@ -70,13 +70,13 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 	   out ? out->name : "");
 
 	printk("MAC source = ");
-	print_MAC((skb->mac.ethernet)->h_source);
+	print_MAC(eth_hdr(skb)->h_source);
 	printk("MAC dest = ");
-	print_MAC((skb->mac.ethernet)->h_dest);
+	print_MAC(eth_hdr(skb)->h_dest);
 
-	printk("proto = 0x%04x", ntohs(((*skb).mac.ethernet)->h_proto));
+	printk("proto = 0x%04x", ntohs(eth_hdr(skb)->h_proto));
 
-	if ((info->bitmask & EBT_LOG_IP) && skb->mac.ethernet->h_proto ==
+	if ((info->bitmask & EBT_LOG_IP) && eth_hdr(skb)->h_proto ==
 	   htons(ETH_P_IP)){
 		struct iphdr _iph, *ih;
 
@@ -106,8 +106,8 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 	}
 
 	if ((info->bitmask & EBT_LOG_ARP) &&
-	    ((skb->mac.ethernet->h_proto == __constant_htons(ETH_P_ARP)) ||
-	    (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_RARP)))) {
+	    ((eth_hdr(skb)->h_proto == htons(ETH_P_ARP)) ||
+	     (eth_hdr(skb)->h_proto == htons(ETH_P_RARP)))) {
 		struct arphdr _arph, *ah;
 
 		ah = skb_header_pointer(skb, 0, sizeof(_arph), &_arph);
@@ -121,7 +121,7 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 
 		/* If it's for Ethernet and the lengths are OK,
 		 * then log the ARP payload */
-		if (ah->ar_hrd == __constant_htons(1) &&
+		if (ah->ar_hrd == htons(1) &&
 		    ah->ar_hln == ETH_ALEN &&
 		    ah->ar_pln == sizeof(uint32_t)) {
 			struct arppayload _arpp, *ap;

@@ -973,7 +973,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!spin_trylock(&gp->tx_lock)) {
 		/* Tell upper layer to requeue */
 		local_irq_restore(flags);
-		return -1;
+		return NETDEV_TX_LOCKED;
 	}
 
 	/* This is a hard error, log it. */
@@ -982,7 +982,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		spin_unlock_irqrestore(&gp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
-		return 1;
+		return NETDEV_TX_BUSY;
 	}
 
 	entry = gp->tx_new;
@@ -1070,7 +1070,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	dev->trans_start = jiffies;
 
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 /* Jumbo-grams don't seem to work :-( */

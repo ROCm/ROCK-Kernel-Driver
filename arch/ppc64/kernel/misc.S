@@ -670,7 +670,7 @@ _GLOBAL(kernel_thread)
 	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
-	cmpi	0,r3,0		/* parent or child? */
+	cmpdi	0,r3,0		/* parent or child? */
 	bne	1f		/* return if parent */
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)

@@ -196,7 +196,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		si.si_signo = signal;
 		si.si_errno = 0;
 		si.si_code = code;
-		si.si_addr = (void *) address;
+		si.si_addr = (void __user *) address;
 		si.si_isr = isr;
 		si.si_flags = __ISR_VALID;
 		force_sig_info(signal, &si, current);

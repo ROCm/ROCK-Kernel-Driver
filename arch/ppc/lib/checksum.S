@@ -80,13 +80,13 @@ _GLOBAL(csum_partial)
 	adde	r0,r0,r5	/* be unnecessary to unroll this loop */
 	bdnz	2b
 	andi.	r4,r4,3
-3:	cmpi	0,r4,2
+3:	cmpwi	0,r4,2
 	blt+	4f
 	lhz	r5,4(r3)
 	addi	r3,r3,2
 	subi	r4,r4,2
 	adde	r0,r0,r5
-4:	cmpi	0,r4,1
+4:	cmpwi	0,r4,1
 	bne+	5f
 	lbz	r5,4(r3)
 	slwi	r5,r5,8		/* Upper byte of word */
@@ -143,7 +143,7 @@ _GLOBAL(csum_partial_copy_generic)
 	adde	r0,r0,r9
 	bdnz	82b
 13:	andi.	r5,r5,3
-3:	cmpi	0,r5,2
+3:	cmpwi	0,r5,2
 	blt+	4f
 83:	lhz	r6,4(r3)
 	addi	r3,r3,2
@@ -151,7 +151,7 @@ _GLOBAL(csum_partial_copy_generic)
 93:	sth	r6,4(r4)
 	addi	r4,r4,2
 	adde	r0,r0,r6
-4:	cmpi	0,r5,1
+4:	cmpwi	0,r5,1
 	bne+	5f
 84:	lbz	r6,4(r3)
 94:	stb	r6,4(r4)
@@ -188,7 +188,7 @@ src_error_3:
 97:	stbu	r6,1(r4)
 	bdnz	97b
 src_error:
-	cmpi	0,r7,0
+	cmpwi	0,r7,0
 	beq	1f
 	li	r6,-EFAULT
 	stw	r6,0(r7)
@@ -196,7 +196,7 @@ src_error:
 	blr
 
 dst_error:
-	cmpi	0,r8,0
+	cmpwi	0,r8,0
 	beq	1f
 	li	r6,-EFAULT
 	stw	r6,0(r8)

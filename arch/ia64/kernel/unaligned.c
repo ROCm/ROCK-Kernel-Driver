@@ -760,7 +760,7 @@ emulate_load_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 		return -1;
 	}
 	/* this assumes little-endian byte-order: */
-	if (copy_from_user(&val, (void *) ifa, len))
+	if (copy_from_user(&val, (void __user *) ifa, len))
 		return -1;
 	setreg(ld.r1, val, 0, regs);
 
@@ -869,7 +869,7 @@ emulate_store_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 	 *
 	 * extract the value to be stored
 	 */
-	getreg(ld.imm, &r2, 0, regs);
+	getreg(ld.imm, &r2, NULL, regs);
 
 	/*
 	 * we rely on the macros in unaligned.h for now i.e.,
@@ -887,7 +887,7 @@ emulate_store_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 	}
 
 	/* this assumes little-endian byte-order: */
-	if (copy_to_user((void *) ifa, &r2, len))
+	if (copy_to_user((void __user *) ifa, &r2, len))
 		return -1;
 
 	/*
@@ -1036,8 +1036,8 @@ emulate_load_floatpair (unsigned long ifa, load_store_t ld, struct pt_regs *regs
 		 * This assumes little-endian byte-order.  Note that there is no "ldfpe"
 		 * instruction:
 		 */
-		if (copy_from_user(&fpr_init[0], (void *) ifa, len)
-		    || copy_from_user(&fpr_init[1], (void *) (ifa + len), len))
+		if (copy_from_user(&fpr_init[0], (void __user *) ifa, len)
+		    || copy_from_user(&fpr_init[1], (void __user *) (ifa + len), len))
 			return -1;
 
 		DPRINT("ld.r1=%d ld.imm=%d x6_sz=%d\n", ld.r1, ld.imm, ld.x6_sz);
@@ -1138,7 +1138,7 @@ emulate_load_float (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 	 * See comments in ldX for descriptions on how the various loads are handled.
 	 */
 	if (ld.x6_op != 0x2) {
-		if (copy_from_user(&fpr_init, (void *) ifa, len))
+		if (copy_from_user(&fpr_init, (void __user *) ifa, len))
 			return -1;
 
 		DPRINT("ld.r1=%d x6_sz=%d\n", ld.r1, ld.x6_sz);
@@ -1230,7 +1230,7 @@ emulate_store_float (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 	DDUMP("fpr_init =", &fpr_init, len);
 	DDUMP("fpr_final =", &fpr_final, len);
 
-	if (copy_to_user((void *) ifa, &fpr_final, len))
+	if (copy_to_user((void __user *) ifa, &fpr_final, len))
 		return -1;
 
 	/*
@@ -1351,7 +1351,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	DPRINT("iip=%lx ifa=%lx isr=%lx (ei=%d, sp=%d)\n",
 	       regs->cr_iip, ifa, regs->cr_ipsr, ipsr->ri, ipsr->it);
 
-	if (__copy_from_user(bundle, (void *) regs->cr_iip, 16))
+	if (__copy_from_user(bundle, (void __user *) regs->cr_iip, 16))
 		goto failure;
 
 	/*
@@ -1496,7 +1496,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	si.si_signo = SIGBUS;
 	si.si_errno = 0;
 	si.si_code = BUS_ADRALN;
-	si.si_addr = (void *) ifa;
+	si.si_addr = (void __user *) ifa;
 	si.si_flags = 0;
 	si.si_isr = 0;
 	si.si_imm = 0;

@@ -40,7 +40,8 @@ int llc_mac_hdr_init(struct sk_buff *skb, unsigned char *sa, unsigned char *da)
 		struct net_device *dev = skb->dev;
 		struct trh_hdr *trh;
 		
-		trh = (struct trh_hdr *)skb_push(skb, sizeof(*trh));
+		skb->mac.raw = skb_push(skb, sizeof(*trh));
+		trh = tr_hdr(skb);
 		trh->ac = AC;
 		trh->fc = LLC_FRAME;
 		if (sa)
@@ -50,8 +51,8 @@ int llc_mac_hdr_init(struct sk_buff *skb, unsigned char *sa, unsigned char *da)
 		if (da) {
 			memcpy(trh->daddr, da, dev->addr_len);
 			tr_source_route(skb, trh, dev);
+			skb->mac.raw = skb->data;
 		}
-		skb->mac.raw = skb->data;
 		break;
 	}
 #endif
@@ -61,7 +62,7 @@ int llc_mac_hdr_init(struct sk_buff *skb, unsigned char *sa, unsigned char *da)
 		struct ethhdr *eth;
 
 		skb->mac.raw = skb_push(skb, sizeof(*eth));
-		eth = (struct ethhdr *)skb->mac.raw;
+		eth = eth_hdr(skb);
 		eth->h_proto = htons(len);
 		memcpy(eth->h_dest, da, ETH_ALEN);
 		memcpy(eth->h_source, sa, ETH_ALEN);

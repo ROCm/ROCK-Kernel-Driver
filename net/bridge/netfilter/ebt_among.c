@@ -72,14 +72,14 @@ static int ebt_mac_wormhash_check_integrity(const struct ebt_mac_wormhash
 
 static int get_ip_dst(const struct sk_buff *skb, uint32_t *addr)
 {
-	if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_IP)) {
+	if (eth_hdr(skb)->h_proto == htons(ETH_P_IP)) {
 		struct iphdr _iph, *ih;
 
 		ih = skb_header_pointer(skb, 0, sizeof(_iph), &_iph);
 		if (ih == NULL)
 			return -1;
 		*addr = ih->daddr;
-	} else if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_ARP)) {
+	} else if (eth_hdr(skb)->h_proto == htons(ETH_P_ARP)) {
 		struct arphdr _arph, *ah;
 		uint32_t buf, *bp;
 
@@ -100,14 +100,14 @@ static int get_ip_dst(const struct sk_buff *skb, uint32_t *addr)
 
 static int get_ip_src(const struct sk_buff *skb, uint32_t *addr)
 {
-	if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_IP)) {
+	if (eth_hdr(skb)->h_proto == htons(ETH_P_IP)) {
 		struct iphdr _iph, *ih;
 
 		ih = skb_header_pointer(skb, 0, sizeof(_iph), &_iph);
 		if (ih == NULL)
 			return -1;
 		*addr = ih->saddr;
-	} else if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_ARP)) {
+	} else if (eth_hdr(skb)->h_proto == htons(ETH_P_ARP)) {
 		struct arphdr _arph, *ah;
 		uint32_t buf, *bp;
 
@@ -139,7 +139,7 @@ static int ebt_filter_among(const struct sk_buff *skb,
 	wh_src = ebt_among_wh_src(info);
 
 	if (wh_src) {
-		smac = skb->mac.ethernet->h_source;
+		smac = eth_hdr(skb)->h_source;
 		if (get_ip_src(skb, &sip))
 			return EBT_NOMATCH;
 		if (!(info->bitmask & EBT_AMONG_SRC_NEG)) {
@@ -154,7 +154,7 @@ static int ebt_filter_among(const struct sk_buff *skb,
 	}
 
 	if (wh_dst) {
-		dmac = skb->mac.ethernet->h_dest;
+		dmac = eth_hdr(skb)->h_dest;
 		if (get_ip_dst(skb, &dip))
 			return EBT_NOMATCH;
 		if (!(info->bitmask & EBT_AMONG_DST_NEG)) {

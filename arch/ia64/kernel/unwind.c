@@ -446,7 +446,7 @@ EXPORT_SYMBOL(unw_access_br);
 int
 unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, int write)
 {
-	struct ia64_fpreg *addr = 0;
+	struct ia64_fpreg *addr = NULL;
 	struct pt_regs *pt;
 
 	if ((unsigned) (regnum - 2) >= 126) {
@@ -842,7 +842,7 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 		}
 		sr->gr_save_loc = grsave;
 		sr->any_spills = 0;
-		sr->imask = 0;
+		sr->imask = NULL;
 		sr->spill_offset = 0x10;	/* default to psp+16 */
 	}
 }
@@ -1205,7 +1205,7 @@ desc_spill_sprel_p (unsigned char qp, unw_word t, unsigned char abreg, unw_word 
 static inline unw_hash_index_t
 hash (unsigned long ip)
 {
-#	define hashmagic	0x9e3779b97f4a7c16	/* based on (sqrt(5)/2-1)*2^64 */
+#	define hashmagic	0x9e3779b97f4a7c16UL	/* based on (sqrt(5)/2-1)*2^64 */
 
 	return (ip >> 4)*hashmagic >> (64 - UNW_LOG_HASH_SIZE);
 #undef hashmagic
@@ -1230,7 +1230,7 @@ script_lookup (struct unw_frame_info *info)
 	unsigned long ip, pr;
 
 	if (UNW_DEBUG_ON(0))
-		return 0;	/* Always regenerate scripts in debug mode */
+		return NULL;	/* Always regenerate scripts in debug mode */
 
 	STAT(++unw.stat.cache.lookups);
 
@@ -1244,7 +1244,7 @@ script_lookup (struct unw_frame_info *info)
 
 	index = unw.hash[hash(ip)];
 	if (index >= UNW_CACHE_SIZE)
-		return 0;
+		return NULL;
 
 	script = unw.cache + index;
 	while (1) {
@@ -1255,7 +1255,7 @@ script_lookup (struct unw_frame_info *info)
 			return script;
 		}
 		if (script->coll_chain >= UNW_HASH_SIZE)
-			return 0;
+			return NULL;
 		script = unw.cache + script->coll_chain;
 		STAT(++unw.stat.cache.collision_chain_traversals);
 	}
@@ -1305,7 +1305,7 @@ script_new (unsigned long ip)
 		if (script->ip) {
 			index = hash(script->ip);
 			tmp = unw.cache + unw.hash[index];
-			prev = 0;
+			prev = NULL;
 			while (1) {
 				if (tmp == script) {
 					if (prev)
@@ -1510,7 +1510,7 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 static inline const struct unw_table_entry *
 lookup (struct unw_table *table, unsigned long rel_ip)
 {
-	const struct unw_table_entry *e = 0;
+	const struct unw_table_entry *e = NULL;
 	unsigned long lo, hi, mid;
 
 	/* do a binary search for right entry: */
@@ -1536,8 +1536,8 @@ lookup (struct unw_table *table, unsigned long rel_ip)
 static inline struct unw_script *
 build_script (struct unw_frame_info *info)
 {
-	const struct unw_table_entry *e = 0;
-	struct unw_script *script = 0;
+	const struct unw_table_entry *e = NULL;
+	struct unw_script *script = NULL;
 	struct unw_labeled_state *ls, *next;
 	unsigned long ip = info->ip;
 	struct unw_state_record sr;
@@ -1562,7 +1562,7 @@ build_script (struct unw_frame_info *info)
 	if (!script) {
 		UNW_DPRINT(0, "unwind.%s: failed to create unwind script\n",  __FUNCTION__);
 		STAT(unw.stat.script.build_time += ia64_get_itc() - start);
-		return 0;
+		return NULL;
 	}
 	unw.cache[info->prev_script].hint = script - unw.cache;
 
@@ -1835,7 +1835,7 @@ find_save_locs (struct unw_frame_info *info)
 		/* don't let obviously bad addresses pollute the cache */
 		/* FIXME: should really be level 0 but it occurs too often. KAO */
 		UNW_DPRINT(1, "unwind.%s: rejecting bad ip=0x%lx\n", __FUNCTION__, info->ip);
-		info->rp_loc = 0;
+		info->rp_loc = NULL;
 		return -1;
 	}
 
@@ -2092,12 +2092,12 @@ unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned lon
 	if (end - start <= 0) {
 		UNW_DPRINT(0, "unwind.%s: ignoring attempt to insert empty unwind table\n",
 			   __FUNCTION__);
-		return 0;
+		return NULL;
 	}
 
 	table = kmalloc(sizeof(*table), GFP_USER);
 	if (!table)
-		return 0;
+		return NULL;
 
 	init_unwind_table(table, name, segment_base, gp, table_start, table_end);
 
@@ -2299,7 +2299,7 @@ unw_init (void)
  *	EFAULT	BUF points outside your accessible address space.
  */
 asmlinkage long
-sys_getunwind (void *buf, size_t buf_size)
+sys_getunwind (void __user *buf, size_t buf_size)
 {
 	if (buf && buf_size >= unw.gate_table_size)
 		if (copy_to_user(buf, unw.gate_table, unw.gate_table_size) != 0)
