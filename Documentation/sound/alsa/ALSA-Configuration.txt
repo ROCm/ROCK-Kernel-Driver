@@ -661,8 +661,6 @@ Module parameters
 			* ALi m5455
 
     ac97_clock	  - AC'97 codec clock base (0 = auto-detect)
-    joystick      - Enable joystick (default off)
-    mpu_port      - MPU401 port # (0 = disabled, 0x330,0x300)
     ac97_quirk    - AC'97 workaround for strange hardware (-1 = default)
                     -1 = default, don't override
                      0 = disable
@@ -679,8 +677,9 @@ Module parameters
     if you still encounter too fast playback, specify the clock
     explicitly via the module option "ac97_clock=41194".
 
-    The joystick and MPU-401 are supported only certain hardwares.
-    MPU401 is experimental,  It doesn't work perfectly.
+    Joystick/MIDI ports are not supported by this driver.  If your
+    motherboard has these devices, use the ns558 or snd-mpu401
+    modules, respectively.
 
     The ac97_quirk option is used to enable/override the workaround
     for specific devices.  Some hardware have swapped output pins
