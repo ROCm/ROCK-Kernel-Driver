@@ -1,3 +1,6 @@
+
+ifndef no-rules.make
+
 #
 # This file contains rules which are shared between multiple Makefiles.
 #
@@ -163,7 +166,7 @@ ifneq ($(strip $(__clean-files) $(clean-rule)),)
 	rm -f $(__clean-files)
 	$(clean-rule)
 else
-	@/bin/true
+	@:
 endif
 
 else
@@ -179,7 +182,7 @@ ifeq ($(strip $(export-objs)),)
 # ---------------------------------------------------------------------------
 
 fastdep: $(subdir-ym)
-	@/bin/true
+	@:
 
 else
 
@@ -271,7 +274,7 @@ modules_install: $(subdir-ym)
 ifneq ($(obj-m),)
 	$(call cmd,modules_install)
 else
-	@/bin/true
+	@:
 endif
 
 else # ! modules_install
@@ -280,23 +283,18 @@ else # ! modules_install
 # Building
 # ==========================================================================
 
-# If a Makefile does define neither O_TARGET nor L_TARGET,
-# use a standard O_TARGET named "built-in.o"
-
-ifndef O_TARGET
-ifndef L_TARGET
-O_TARGET := $(obj)/built-in.o
-endif
-endif
+# If a Makefile does not define a L_TARGET, link an object called "built-in.o"
 
 ifdef L_TARGET
 L_TARGET := $(obj)/$(L_TARGET)
+else
+O_TARGET := $(obj)/built-in.o
 endif
 
 first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 	    $(if $(KBUILD_MODULES),$(obj-m)) \
 	    $(subdir-ym)
-	@/bin/true
+	@:
 
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
@@ -623,3 +621,5 @@ ifeq ($(KBUILD_VERBOSE),1)
 descend = echo '$(MAKE) -f $(1)/Makefile $(2)';
 endif
 descend += $(MAKE) -f $(1)/Makefile obj=$(1) $(2)
+
+endif
