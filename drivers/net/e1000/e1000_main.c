@@ -113,12 +113,16 @@ static struct pci_device_id e1000_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, e1000_pci_tbl);
 
-/* Local Function Prototypes */
-
 int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
 void e1000_reset(struct e1000_adapter *adapter);
 int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
+int e1000_setup_tx_resources(struct e1000_adapter *adapter);
+int e1000_setup_rx_resources(struct e1000_adapter *adapter);
+void e1000_free_tx_resources(struct e1000_adapter *adapter);
+void e1000_free_rx_resources(struct e1000_adapter *adapter);
+
+/* Local Function Prototypes */
 
 static int e1000_init_module(void);
 static void e1000_exit_module(void);
@@ -127,15 +131,11 @@ static void __devexit e1000_remove(struct pci_dev *pdev);
 static int e1000_sw_init(struct e1000_adapter *adapter);
 static int e1000_open(struct net_device *netdev);
 static int e1000_close(struct net_device *netdev);
-static int e1000_setup_tx_resources(struct e1000_adapter *adapter);
-static int e1000_setup_rx_resources(struct e1000_adapter *adapter);
 static void e1000_configure_tx(struct e1000_adapter *adapter);
 static void e1000_configure_rx(struct e1000_adapter *adapter);
 static void e1000_setup_rctl(struct e1000_adapter *adapter);
 static void e1000_clean_tx_ring(struct e1000_adapter *adapter);
 static void e1000_clean_rx_ring(struct e1000_adapter *adapter);
-static void e1000_free_tx_resources(struct e1000_adapter *adapter);
-static void e1000_free_rx_resources(struct e1000_adapter *adapter);
 static void e1000_set_multi(struct net_device *netdev);
 static void e1000_update_phy_info(unsigned long data);
 static void e1000_watchdog(unsigned long data);
@@ -749,7 +749,7 @@ e1000_close(struct net_device *netdev)
  * Return 0 on success, negative on failure
  **/
 
-static int
+int
 e1000_setup_tx_resources(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
@@ -866,7 +866,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
  * Returns 0 on success, negative on failure
  **/
 
-static int
+int
 e1000_setup_rx_resources(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *rxdr = &adapter->rx_ring;
@@ -1005,7 +1005,7 @@ e1000_configure_rx(struct e1000_adapter *adapter)
  * Free all transmit software resources
  **/
 
-static void
+void
 e1000_free_tx_resources(struct e1000_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
@@ -1073,7 +1073,7 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
  * Free all receive software resources
  **/
 
-static void
+void
 e1000_free_rx_resources(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *rx_ring = &adapter->rx_ring;

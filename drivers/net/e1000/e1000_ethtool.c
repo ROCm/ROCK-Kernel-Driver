@@ -39,6 +39,10 @@ extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
 extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
+extern int e1000_setup_rx_resources(struct e1000_adapter *adapter);
+extern int e1000_setup_tx_resources(struct e1000_adapter *adapter);
+extern void e1000_free_rx_resources(struct e1000_adapter *adapter);
+extern void e1000_free_tx_resources(struct e1000_adapter *adapter);
 
 struct e1000_stats {
 	char stat_string[ETH_GSTRING_LEN];
@@ -438,6 +442,71 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 seeprom_error:
 	kfree(eeprom_buff);
 	return ret_val;
+}
+
+static int
+e1000_ethtool_gring(struct e1000_adapter *adapter,
+                    struct ethtool_ringparam *ring)
+{
+	e1000_mac_type mac_type = adapter->hw.mac_type;
+	struct e1000_desc_ring *txdr = &adapter->tx_ring;
+	struct e1000_desc_ring *rxdr = &adapter->rx_ring;
+
+	ring->rx_max_pending = (mac_type < e1000_82544) ? E1000_MAX_RXD :
+		E1000_MAX_82544_RXD;
+	ring->tx_max_pending = (mac_type < e1000_82544) ? E1000_MAX_TXD :
+		E1000_MAX_82544_TXD;
+	ring->rx_mini_max_pending = 0;
+	ring->rx_jumbo_max_pending = 0;
+	ring->rx_pending = rxdr->count;
+	ring->tx_pending = txdr->count;
+	ring->rx_mini_pending = 0;
+	ring->rx_jumbo_pending = 0;
+
+	return 0;
+}
+static int 
+e1000_ethtool_sring(struct e1000_adapter *adapter,
+                    struct ethtool_ringparam *ring)
+{
+	int err;
+	e1000_mac_type mac_type = adapter->hw.mac_type;
+	struct e1000_desc_ring *txdr = &adapter->tx_ring;
+	struct e1000_desc_ring *rxdr = &adapter->rx_ring;
+
+	if(netif_running(adapter->netdev)) {
+		e1000_down(adapter);
+		e1000_free_rx_resources(adapter);
+		e1000_free_tx_resources(adapter);
+	}
+
+	rxdr->count = max(ring->rx_pending,(uint32_t)E1000_MIN_RXD);
+	rxdr->count = min(rxdr->count,(uint32_t)(mac_type < e1000_82544 ?
+		E1000_MAX_RXD : E1000_MAX_82544_RXD));
+	E1000_ROUNDUP(rxdr->count, REQ_RX_DESCRIPTOR_MULTIPLE); 
+
+	txdr->count = max(ring->tx_pending,(uint32_t)E1000_MIN_TXD);
+	txdr->count = min(txdr->count,(uint32_t)(mac_type < e1000_82544 ?
+		E1000_MAX_TXD : E1000_MAX_82544_TXD));
+	E1000_ROUNDUP(txdr->count, REQ_TX_DESCRIPTOR_MULTIPLE); 
+
+	if(netif_running(adapter->netdev)) {
+		if((err = e1000_setup_rx_resources(adapter)))
+			goto err_setup_rx;
+		if((err = e1000_setup_tx_resources(adapter)))
+			goto err_setup_tx;
+		if((err = e1000_up(adapter)))
+			goto err_up;
+	}
+
+	return 0;
+err_up:
+	e1000_free_tx_resources(adapter);
+err_setup_tx:
+	e1000_free_rx_resources(adapter);
+err_setup_rx:
+	e1000_reset(adapter);
+	return err;
 }
 
 #define REG_PATTERN_TEST(R, M, W)                                              \
@@ -1501,6 +1570,19 @@ err_geeprom_ioctl:
 
 		addr += offsetof(struct ethtool_eeprom, data);
 		return e1000_ethtool_seeprom(adapter, &eeprom, addr);
+	}
+	case ETHTOOL_GRINGPARAM: {
+		struct ethtool_ringparam ering = {ETHTOOL_GRINGPARAM};
+		e1000_ethtool_gring(adapter, &ering);
+		if(copy_to_user(addr, &ering, sizeof(ering)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SRINGPARAM: {
+		struct ethtool_ringparam ering;
+		if(copy_from_user(&ering, addr, sizeof(ering)))
+			return -EFAULT;
+		return e1000_ethtool_sring(adapter, &ering);
 	}
 	case ETHTOOL_GPAUSEPARAM: {
 		struct ethtool_pauseparam epause = {ETHTOOL_GPAUSEPARAM};
