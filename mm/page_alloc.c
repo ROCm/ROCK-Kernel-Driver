@@ -1088,6 +1088,109 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 	return j;
 }
 
+#ifdef CONFIG_NUMA
+#define MAX_NODE_LOAD (numnodes)
+static int __initdata node_load[MAX_NUMNODES];
+/**
+ * find_next_best_node - find the next node that should appear in a given
+ *    node's fallback list
+ * @node: node whose fallback list we're appending
+ * @used_node_mask: pointer to the bitmap of already used nodes
+ *
+ * We use a number of factors to determine which is the next node that should
+ * appear on a given node's fallback list.  The node should not have appeared
+ * already in @node's fallback list, and it should be the next closest node
+ * according to the distance array (which contains arbitrary distance values
+ * from each node to each node in the system), and should also prefer nodes
+ * with no CPUs, since presumably they'll have very little allocation pressure
+ * on them otherwise.
+ * It returns -1 if no node is found.
+ */
+static int __init find_next_best_node(int node, void *used_node_mask)
+{
+	int i, n, val;
+	int min_val = INT_MAX;
+	int best_node = -1;
+
+	for (i = 0; i < numnodes; i++) {
+		/* Start from local node */
+		n = (node+i)%numnodes;
+
+		/* Don't want a node to appear more than once */
+		if (test_bit(n, used_node_mask))
+			continue;
+
+		/* Use the distance array to find the distance */
+		val = node_distance(node, n);
+
+		/* Give preference to headless and unused nodes */
+		if (!cpus_empty(node_to_cpumask(n)))
+			val += PENALTY_FOR_NODE_WITH_CPUS;
+
+		/* Slight preference for less loaded node */
+		val *= (MAX_NODE_LOAD*MAX_NUMNODES);
+		val += node_load[n];
+
+		if (val < min_val) {
+			min_val = val;
+			best_node = n;
+		}
+	}
+
+	if (best_node >= 0)
+		set_bit(best_node, used_node_mask);
+
+	return best_node;
+}
+
+static void __init build_zonelists(pg_data_t *pgdat)
+{
+	int i, j, k, node, local_node;
+	int prev_node, load;
+	struct zonelist *zonelist;
+	DECLARE_BITMAP(used_mask, MAX_NUMNODES);
+
+	/* initialize zonelists */
+	for (i = 0; i < MAX_NR_ZONES; i++) {
+		zonelist = pgdat->node_zonelists + i;
+		memset(zonelist, 0, sizeof(*zonelist));
+		zonelist->zones[0] = NULL;
+	}
+
+	/* NUMA-aware ordering of nodes */
+	local_node = pgdat->node_id;
+	load = numnodes;
+	prev_node = local_node;
+	CLEAR_BITMAP(used_mask, MAX_NUMNODES);
+	while ((node = find_next_best_node(local_node, used_mask)) >= 0) {
+		/*
+		 * We don't want to pressure a particular node.
+		 * So adding penalty to the first node in same
+		 * distance group to make it round-robin.
+		 */
+		if (node_distance(local_node, node) !=
+				node_distance(local_node, prev_node))
+			node_load[node] += load;
+		prev_node = node;
+		load--;
+		for (i = 0; i < MAX_NR_ZONES; i++) {
+			zonelist = pgdat->node_zonelists + i;
+			for (j = 0; zonelist->zones[j] != NULL; j++);
+
+			k = ZONE_NORMAL;
+			if (i & __GFP_HIGHMEM)
+				k = ZONE_HIGHMEM;
+			if (i & __GFP_DMA)
+				k = ZONE_DMA;
+
+	 		j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+			zonelist->zones[j] = NULL;
+		}
+	}
+}
+
+#else	/* CONFIG_NUMA */
+
 static void __init build_zonelists(pg_data_t *pgdat)
 {
 	int i, j, k, node, local_node;
@@ -1123,6 +1226,8 @@ static void __init build_zonelists(pg_data_t *pgdat)
 		zonelist->zones[j++] = NULL;
 	} 
 }
+
+#endif	/* CONFIG_NUMA */
 
 void __init build_all_zonelists(void)
 {
