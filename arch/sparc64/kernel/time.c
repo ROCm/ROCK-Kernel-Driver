@@ -251,6 +251,138 @@ static struct sparc64_tick_ops stick_operations = {
 	.softint_mask	=	1UL << 16,
 };
 
+/* On Hummingbird the STICK/STICK_CMPR register is implemented
+ * in I/O space.  There are two 64-bit registers each, the
+ * first holds the low 32-bits of the value and the second holds
+ * the high 32-bits.
+ *
+ * Since STICK is constantly updating, we have to access it carefully.
+ *
+ * The sequence we use to read is:
+ * 1) read low
+ * 2) read high
+ * 3) read low again, if it rolled over increment high by 1
+ *
+ * Writing STICK safely is also tricky:
+ * 1) write low to zero
+ * 2) write high
+ * 3) write low
+ */
+#define HBIRD_STICKCMP_ADDR	0x1fe0000f060UL
+#define HBIRD_STICK_ADDR	0x1fe0000f070UL
+
+static unsigned long __hbird_read_stick(void)
+{
+	unsigned long ret, tmp1, tmp2, tmp3;
+	unsigned long addr = HBIRD_STICK_ADDR;
+
+	__asm__ __volatile__("ldxa	[%1] %5, %2\n\t"
+			     "add	%1, 0x8, %1\n\t"
+			     "ldxa	[%1] %5, %3\n\t"
+			     "sub	%1, 0x8, %1\n\t"
+			     "ldxa	[%1] %5, %4\n\t"
+			     "cmp	%4, %2\n\t"
+			     "bl,a,pn	%%xcc, 1f\n\t"
+			     " add	%3, 1, %3\n\t"
+			     "sllx	%3, 32, %3\n\t"
+			     "or	%3, %4, %0\n\t"
+			     : "=&r" (ret), "=&r" (addr),
+			       "=&r" (tmp1), "=&r" (tmp2), "=&r" (tmp3)
+			     : "i" (ASI_PHYS_BYPASS_EC_E), "1" (addr));
+
+	return ret;
+}
+
+static unsigned long __hbird_read_compare(void)
+{
+	unsigned long low, high;
+	unsigned long addr = HBIRD_STICKCMP_ADDR;
+
+	__asm__ __volatile__("ldxa	[%2] %3, %0\n\t"
+			     "add	%2, 0x8, %2\n\t"
+			     "ldxa	[%2] %3, %1"
+			     : "=&r" (low), "=&r" (high), "=&r" (addr)
+			     : "i" (ASI_PHYS_BYPASS_EC_E), "2" (addr));
+
+	return (high << 32UL) | low;
+}
+
+static void __hbird_write_stick(unsigned long val)
+{
+	unsigned long low = (val & 0xffffffffUL);
+	unsigned long high = (val >> 32UL);
+	unsigned long addr = HBIRD_STICK_ADDR;
+
+	__asm__ __volatile__("stxa	%%g0, [%0] %4\n\t"
+			     "add	%0, 0x8, %0\n\t"
+			     "stxa	%3, [%0] %4\n\t"
+			     "sub	%0, 0x8, %0\n\t"
+			     "stxa	%2, [%0] %4"
+			     : "=&r" (addr)
+			     : "0" (addr), "r" (low), "r" (high),
+			       "i" (ASI_PHYS_BYPASS_EC_E));
+}
+
+static void __hbird_write_compare(unsigned long val)
+{
+	unsigned long low = (val & 0xffffffffUL);
+	unsigned long high = (val >> 32UL);
+	unsigned long addr = HBIRD_STICKCMP_ADDR;
+
+	__asm__ __volatile__("stxa	%2, [%0] %4\n\t"
+			     "add	%0, 0x8, %0\n\t"
+			     "stxa	%3, [%0] %4"
+			     : "=&r" (addr)
+			     : "0" (addr), "r" (low), "r" (high),
+			       "i" (ASI_PHYS_BYPASS_EC_E));
+}
+
+static void hbtick_init_tick(unsigned long offset)
+{
+	tick_disable_protection();
+
+	__hbird_write_compare(__hbird_read_stick() + offset);
+}
+
+static unsigned long hbtick_get_tick(void)
+{
+	return __hbird_read_stick();
+}
+
+static unsigned long hbtick_get_compare(void)
+{
+	return __hbird_read_compare();
+}
+
+static unsigned long hbtick_add_tick(unsigned long adj, unsigned long offset)
+{
+	unsigned long val;
+
+	val = __hbird_read_stick() + adj;
+	__hbird_write_stick(val);
+	__hbird_write_compare(val + offset);
+
+	return val;
+}
+
+static unsigned long hbtick_add_compare(unsigned long adj)
+{
+	unsigned long val = __hbird_read_compare() + adj;
+
+	__hbird_write_compare(val);
+
+	return val;
+}
+
+static struct sparc64_tick_ops hbtick_operations = {
+	.init_tick	=	hbtick_init_tick,
+	.get_tick	=	hbtick_get_tick,
+	.get_compare	=	hbtick_get_compare,
+	.add_tick	=	hbtick_add_tick,
+	.add_compare	=	hbtick_add_compare,
+	.softint_mask	=	1UL << 0,
+};
+
 /* timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  *
@@ -781,9 +913,22 @@ static unsigned long sparc64_init_timers(void (*cfunc)(int, void *, struct pt_re
 #endif
 
 	if (tlb_type == spitfire) {
-		tick_ops = &tick_operations;
-		node = linux_cpus[0].prom_node;
-		clock = prom_getint(node, "clock-frequency");
+		unsigned long ver, manuf, impl;
+
+		__asm__ __volatile__ ("rdpr %%ver, %0"
+				      : "=&r" (ver));
+		manuf = ((ver >> 48) & 0xffff);
+		impl = ((ver >> 32) & 0xffff);
+		if (manuf == 0x17 && impl == 0x13) {
+			/* Hummingbird, aka Ultra-IIe */
+			tick_ops = &hbtick_operations;
+			node = prom_root_node;
+			clock = prom_getint(node, "stick-frequency");
+		} else {
+			tick_ops = &tick_operations;
+			node = linux_cpus[0].prom_node;
+			clock = prom_getint(node, "clock-frequency");
+		}
 	} else {
 		tick_ops = &stick_operations;
 		node = prom_root_node;
