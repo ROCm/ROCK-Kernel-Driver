@@ -1061,7 +1061,7 @@ static long snd_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 	case SNDRV_CTL_IOCTL_ELEM_ADD:
 		return snd_ctl_elem_add_user(ctl, argp, 0);
 	case SNDRV_CTL_IOCTL_ELEM_REPLACE:
-		return snd_ctl_elem_add(ctl, argp, 1);
+		return snd_ctl_elem_add_user(ctl, argp, 1);
 	case SNDRV_CTL_IOCTL_ELEM_REMOVE:
 		return snd_ctl_elem_remove(ctl, argp);
 	case SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS:

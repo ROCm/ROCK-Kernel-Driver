@@ -468,10 +468,13 @@ int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
 static void snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
 				 u32 op, u32 r, u32 a, u32 x, u32 y)
 {
+	u_int32_t *code;
 	snd_assert(*ptr < 512, return);
+	code = (u_int32_t *)icode->code + (*ptr) * 2;
 	set_bit(*ptr, icode->code_valid);
-	icode->code[(*ptr)   * 2 + 0] = ((x & 0x3ff) << 10) | (y & 0x3ff);
-	icode->code[(*ptr)++ * 2 + 1] = ((op & 0x0f) << 20) | ((r & 0x3ff) << 10) | (a & 0x3ff);
+	code[0] = ((x & 0x3ff) << 10) | (y & 0x3ff);
+	code[1] = ((op & 0x0f) << 20) | ((r & 0x3ff) << 10) | (a & 0x3ff);
+	(*ptr)++;
 }
 
 #define OP(icode, ptr, op, r, a, x, y) \
@@ -480,10 +483,13 @@ static void snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr
 static void snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
 					u32 op, u32 r, u32 a, u32 x, u32 y)
 {
+	u_int32_t *code;
 	snd_assert(*ptr < 1024, return);
+	code = (u_int32_t *)icode->code + (*ptr) * 2;
 	set_bit(*ptr, icode->code_valid);
-	icode->code[(*ptr)   * 2 + 0] = ((x & 0x7ff) << 12) | (y & 0x7ff);
-	icode->code[(*ptr)++ * 2 + 1] = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
+	code[0] = ((x & 0x7ff) << 12) | (y & 0x7ff);
+	code[1] = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
+	(*ptr)++;
 }
 
 #define A_OP(icode, ptr, op, r, a, x, y) \
@@ -994,17 +1000,19 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	u32 ptr;
 	emu10k1_fx8010_code_t *icode = NULL;
 	emu10k1_fx8010_control_gpr_t *controls = NULL, *ctl;
+	u32 *gpr_map;
 	mm_segment_t seg;
 
 	spin_lock_init(&emu->fx8010.irq_lock);
 	INIT_LIST_HEAD(&emu->fx8010.gpr_ctl);
 
 	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL ||
-	    (icode->gpr_map = kcalloc(512 + 256 + 256 + 2 * 1024, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
+	    (icode->gpr_map = (u_int32_t __user *)kcalloc(512 + 256 + 256 + 2 * 1024, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
 	    (controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(*controls), GFP_KERNEL)) == NULL) {
 		err = -ENOMEM;
 		goto __err;
 	}
+	gpr_map = (u32 *)icode->gpr_map;
 
 	icode->tram_data_map = icode->gpr_map + 512;
 	icode->tram_addr_map = icode->tram_data_map + 256;
@@ -1331,8 +1339,8 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	/* A_PUT_STEREO_OUTPUT(A_EXTOUT_FRONT_L, A_EXTOUT_FRONT_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS); */
 
 	/* IEC958 Optical Raw Playback Switch */ 
-	icode->gpr_map[gpr++] = 0x1008;
-	icode->gpr_map[gpr++] = 0xffff0000;
+	gpr_map[gpr++] = 0x1008;
+	gpr_map[gpr++] = 0xffff0000;
 	for (z = 0; z < 2; z++) {
 		A_OP(icode, &ptr, iMAC0, A_GPR(tmp + 2), A_FXBUS(FXBUS_PT_LEFT + z), A_C_00000000, A_C_00000000);
 		A_OP(icode, &ptr, iSKIP, A_GPR_COND, A_GPR_COND, A_GPR(gpr - 2), A_C_00000001);
@@ -1378,16 +1386,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 
 	seg = snd_enter_user();
 	icode->gpr_add_control_count = nctl;
-	icode->gpr_add_controls = controls;
+	icode->gpr_add_controls = (emu10k1_fx8010_control_gpr_t __user *)controls;
 	err = snd_emu10k1_icode_poke(emu, icode);
 	snd_leave_user(seg);
 
  __err:
- 	if (controls != NULL)
-		kfree(controls);
+	kfree(controls);
 	if (icode != NULL) {
-		if (icode->gpr_map != NULL)
-			kfree(icode->gpr_map);
+		kfree((void *)icode->gpr_map);
 		kfree(icode);
 	}
 	return err;
@@ -1453,6 +1459,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	emu10k1_fx8010_code_t *icode;
 	emu10k1_fx8010_pcm_t *ipcm = NULL;
 	emu10k1_fx8010_control_gpr_t *controls = NULL, *ctl;
+	u32 *gpr_map;
 	mm_segment_t seg;
 
 	spin_lock_init(&emu->fx8010.irq_lock);
@@ -1460,12 +1467,13 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 
 	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	if ((icode->gpr_map = kcalloc(256 + 160 + 160 + 2 * 512, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
+	if ((icode->gpr_map = (u_int32_t __user *)kcalloc(256 + 160 + 160 + 2 * 512, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
             (controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(emu10k1_fx8010_control_gpr_t), GFP_KERNEL)) == NULL ||
 	    (ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL)) == NULL) {
 		err = -ENOMEM;
 		goto __err;
 	}
+	gpr_map = (u32 *)icode->gpr_map;
 
 	icode->tram_data_map = icode->gpr_map + 256;
 	icode->tram_addr_map = icode->tram_data_map + 160;
@@ -1520,19 +1528,19 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	ipcm->etram[0] = 0;
 	ipcm->etram[1] = 1;
 
-	icode->gpr_map[gpr + 0] = 0xfffff000;
-	icode->gpr_map[gpr + 1] = 0xffff0000;
-	icode->gpr_map[gpr + 2] = 0x70000000;
-	icode->gpr_map[gpr + 3] = 0x00000007;
-	icode->gpr_map[gpr + 4] = 0x001f << 11;
-	icode->gpr_map[gpr + 5] = 0x001c << 11;
-	icode->gpr_map[gpr + 6] = (0x22  - 0x01) - 1;	/* skip at 01 to 22 */
-	icode->gpr_map[gpr + 7] = (0x22  - 0x06) - 1;	/* skip at 06 to 22 */
-	icode->gpr_map[gpr + 8] = 0x2000000 + (2<<11);
-	icode->gpr_map[gpr + 9] = 0x4000000 + (2<<11);
-	icode->gpr_map[gpr + 10] = 1<<11;
-	icode->gpr_map[gpr + 11] = (0x24 - 0x0a) - 1;	/* skip at 0a to 24 */
-	icode->gpr_map[gpr + 12] = 0;
+	gpr_map[gpr + 0] = 0xfffff000;
+	gpr_map[gpr + 1] = 0xffff0000;
+	gpr_map[gpr + 2] = 0x70000000;
+	gpr_map[gpr + 3] = 0x00000007;
+	gpr_map[gpr + 4] = 0x001f << 11;
+	gpr_map[gpr + 5] = 0x001c << 11;
+	gpr_map[gpr + 6] = (0x22  - 0x01) - 1;	/* skip at 01 to 22 */
+	gpr_map[gpr + 7] = (0x22  - 0x06) - 1;	/* skip at 06 to 22 */
+	gpr_map[gpr + 8] = 0x2000000 + (2<<11);
+	gpr_map[gpr + 9] = 0x4000000 + (2<<11);
+	gpr_map[gpr + 10] = 1<<11;
+	gpr_map[gpr + 11] = (0x24 - 0x0a) - 1;	/* skip at 0a to 24 */
+	gpr_map[gpr + 12] = 0;
 
 	/* if the trigger flag is not set, skip */
 	/* 00: */ OP(icode, &ptr, iMAC0, C_00000000, GPR(ipcm->gpr_trigger), C_00000000, C_00000000);
@@ -1972,19 +1980,16 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 		goto __err;
 	seg = snd_enter_user();
 	icode->gpr_add_control_count = i;
-	icode->gpr_add_controls = controls;
+	icode->gpr_add_controls = (emu10k1_fx8010_control_gpr_t __user *)controls;
 	err = snd_emu10k1_icode_poke(emu, icode);
 	snd_leave_user(seg);
 	if (err >= 0)
 		err = snd_emu10k1_ipcm_poke(emu, ipcm);
       __err:
-      	if (ipcm != NULL)
-		kfree(ipcm);
-	if (controls != NULL)
-		kfree(controls);
+	kfree(ipcm);
+	kfree(controls);
 	if (icode != NULL) {
-		if (icode->gpr_map != NULL)
-			kfree(icode->gpr_map);
+		kfree((void *)icode->gpr_map);
 		kfree(icode);
 	}
 	return err;

@@ -820,7 +820,7 @@ struct snd_m3 {
 	unsigned long iobase;
 
 	int irq;
-	int allegro_flag : 1;
+	unsigned int allegro_flag : 1;
 
 	ac97_t *ac97;
 

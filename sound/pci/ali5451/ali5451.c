@@ -188,7 +188,7 @@ typedef struct snd_ali_channel_control {
 
 struct snd_ali_stru_voice {
 	unsigned int number;
-	int use: 1,
+	unsigned int use: 1,
 	    pcm: 1,
 	    midi: 1,
 	    mode: 1,
@@ -199,7 +199,7 @@ struct snd_ali_stru_voice {
 	snd_pcm_substream_t *substream;
 	snd_ali_voice_t *extra;
 	
-	int running: 1;
+	unsigned int running: 1;
 
 	int eso;                /* final ESO value for channel */
 	int count;              /* runtime->period_size */

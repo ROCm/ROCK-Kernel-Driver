@@ -290,7 +290,7 @@ typedef struct {
 	int mode;		/* operation mode */
 	int client;		/* sequencer client number */
 	int port;		/* sequencer port number */
-	int midi_has_voices: 1;
+	unsigned int midi_has_voices: 1;
 } snd_trident_port_t;
 
 typedef struct snd_trident_memblk_arg {
@@ -308,7 +308,7 @@ typedef struct {
 
 struct _snd_trident_voice {
 	unsigned int number;
-	int use: 1,
+	unsigned int use: 1,
 	    pcm: 1,
 	    synth:1,
 	    midi: 1;
@@ -347,7 +347,7 @@ struct _snd_trident_voice {
 	trident_t *trident;
 	snd_pcm_substream_t *substream;
 	snd_trident_voice_t *extra;	/* extra PCM voice (acts as interrupt generator) */
-	int running: 1,
+	unsigned int running: 1,
             capture: 1,
             spdif: 1,
             foldback: 1,

@@ -910,7 +910,8 @@ static long snd_rawmidi_kernel_read1(snd_rawmidi_substream_t *substream,
 			memcpy(buf + result, runtime->buffer + runtime->appl_ptr, count1);
 		} else {
 			spin_unlock_irqrestore(&runtime->lock, flags);
-			if (copy_to_user(buf + result, runtime->buffer + runtime->appl_ptr, count1)) {
+			if (copy_to_user((char __user *)buf + result,
+					 runtime->buffer + runtime->appl_ptr, count1)) {
 				return result > 0 ? result : -EFAULT;
 			}
 			spin_lock_irqsave(&runtime->lock, flags);
@@ -969,7 +970,7 @@ static ssize_t snd_rawmidi_read(struct file *file, char __user *buf, size_t coun
 			spin_lock_irq(&runtime->lock);
 		}
 		spin_unlock_irq(&runtime->lock);
-		count1 = snd_rawmidi_kernel_read1(substream, buf, count, 0);
+		count1 = snd_rawmidi_kernel_read1(substream, (unsigned char *)buf, count, 0);
 		if (count1 < 0)
 			return result > 0 ? result : count1;
 		result += count1;
@@ -1137,7 +1138,8 @@ static long snd_rawmidi_kernel_write1(snd_rawmidi_substream_t * substream, const
 			memcpy(runtime->buffer + runtime->appl_ptr, buf, count1);
 		} else {
 			spin_unlock_irqrestore(&runtime->lock, flags);
-			if (copy_from_user(runtime->buffer + runtime->appl_ptr, buf, count1)) {
+			if (copy_from_user(runtime->buffer + runtime->appl_ptr,
+					   (char __user *)buf, count1)) {
 				spin_lock_irqsave(&runtime->lock, flags);
 				result = result > 0 ? result : -EFAULT;
 				goto __end;
@@ -1202,7 +1204,7 @@ static ssize_t snd_rawmidi_write(struct file *file, const char __user *buf, size
 			spin_lock_irq(&runtime->lock);
 		}
 		spin_unlock_irq(&runtime->lock);
-		count1 = snd_rawmidi_kernel_write1(substream, buf, count, 0);
+		count1 = snd_rawmidi_kernel_write1(substream, (unsigned char *)buf, count, 0);
 		if (count1 < 0)
 			return result > 0 ? result : count1;
 		result += count1;

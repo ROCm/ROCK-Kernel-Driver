@@ -247,7 +247,7 @@ struct _snd_intel8x0m {
 	snd_pcm_t *pcm[2];
 	ichdev_t ichd[2];
 
-	int in_ac97_init: 1;
+	unsigned int in_ac97_init: 1;
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;

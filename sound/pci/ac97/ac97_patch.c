@@ -1904,7 +1904,6 @@ static struct snd_ac97_build_ops patch_cm9739_ops = {
 int patch_cm9739(ac97_t * ac97)
 {
 	unsigned short val;
-	int spdif_in;
 
 	ac97->build_ops = &patch_cm9739_ops;
 
@@ -1916,22 +1915,13 @@ int patch_cm9739(ac97_t * ac97)
 	/* check spdif */
 	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
 	if (val & AC97_EA_SPCV) {
-		/* Special exception for ASUS W1000/CMI9739. It does not have an SPDIF in. */
-		if (ac97->pci &&
-		    ac97->subsystem_vendor == 0x1043 &&
-		    ac97->subsystem_device == 0x1843)
-			spdif_in = 0;
-		else {
-			/* enable spdif in */
-			snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
-					     snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) | 0x01);
-			spdif_in = 1;
-		}
+		/* enable spdif in */
+		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
+				     snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) | 0x01);
 		ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000; /* 48k only */
 	} else {
 		ac97->ext_id &= ~AC97_EI_SPDIF; /* disable extended-id */
 		ac97->rates[AC97_RATES_SPDIF] = 0;
-		spdif_in = 0;
 	}
 
 	/* set-up multi channel */
@@ -1946,13 +1936,22 @@ int patch_cm9739(ac97_t * ac97)
 	val = snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) & (1 << 4);
 	val |= (1 << 3);
 	val |= (1 << 13);
-	if (! spdif_in)
+	if (! (ac97->ext_id & AC97_EI_SPDIF))
 		val |= (1 << 14);
 	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, val);
 
 	/* FIXME: set up GPIO */
 	snd_ac97_write_cache(ac97, 0x70, 0x0100);
 	snd_ac97_write_cache(ac97, 0x72, 0x0020);
+	/* Special exception for ASUS W1000/CMI9739. It does not have an SPDIF in. */
+	if (ac97->pci &&
+	     ac97->subsystem_vendor == 0x1043 &&
+	     ac97->subsystem_device == 0x1843) {
+		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
+			snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) & ~0x01);
+		snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN,
+			snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) | (1 << 14));
+	}
 
 	return 0;
 }
@@ -2039,8 +2038,8 @@ int patch_cm9761(ac97_t *ac97)
 
 	/* CM9761 has no Master and PCM volume although the register reacts */
 	ac97->flags |= AC97_HAS_NO_MASTER_VOL | AC97_HAS_NO_PCM_VOL;
-	snd_ac97_write_cache(ac97, AC97_MASTER, 0x8000);
-	snd_ac97_write_cache(ac97, AC97_PCM, 0x8000);
+	snd_ac97_write_cache(ac97, AC97_MASTER, 0x8808);
+	snd_ac97_write_cache(ac97, AC97_PCM, 0x8808);
 
 	ac97->spec.dev_flags = 0; /* 1 = model 82 revision B */
 	if (ac97->id == AC97_ID_CM9761_82) {
@@ -2085,8 +2084,10 @@ int patch_cm9761(ac97_t *ac97)
 		val = 0x0214;
 	else
 		val = 0x321c;
-	snd_ac97_write_cache(ac97, AC97_CM9761_MULTI_CHAN, val);
 #endif
+	val = snd_ac97_read(ac97, AC97_CM9761_MULTI_CHAN);
+	val |= (1 << 4);
+	snd_ac97_write_cache(ac97, AC97_CM9761_MULTI_CHAN, val);
 
 	/* FIXME: set up GPIO */
 	snd_ac97_write_cache(ac97, 0x70, 0x0100);

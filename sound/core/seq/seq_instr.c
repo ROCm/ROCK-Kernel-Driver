@@ -430,7 +430,7 @@ static int instr_put(snd_seq_kinstr_ops_t *ops,
 
 	if (ev->data.ext.len < sizeof(snd_seq_instr_header_t))
 		goto __return;
-	if (copy_from_user(&put, ev->data.ext.ptr, sizeof(snd_seq_instr_header_t))) {
+	if (copy_from_user(&put, (void __user *)ev->data.ext.ptr, sizeof(snd_seq_instr_header_t))) {
 		result = -EFAULT;
 		goto __return;
 	}
@@ -466,7 +466,7 @@ static int instr_put(snd_seq_kinstr_ops_t *ops,
 	if (instr->type == SNDRV_SEQ_INSTR_ATYPE_DATA) {
 		result = ops->put(ops->private_data,
 				  instr,
-				  ev->data.ext.ptr + sizeof(snd_seq_instr_header_t),
+				  (void __user *)ev->data.ext.ptr + sizeof(snd_seq_instr_header_t),
 				  ev->data.ext.len - sizeof(snd_seq_instr_header_t),
 				  atomic,
 				  put.cmd);
@@ -513,7 +513,7 @@ static int instr_free(snd_seq_kinstr_ops_t *ops,
 
 	if (ev->data.ext.len < sizeof(snd_seq_instr_header_t))
 		goto __return;
-	if (copy_from_user(&ifree, ev->data.ext.ptr, sizeof(snd_seq_instr_header_t))) {
+	if (copy_from_user(&ifree, (void __user *)ev->data.ext.ptr, sizeof(snd_seq_instr_header_t))) {
 		result = -EFAULT;
 		goto __return;
 	}

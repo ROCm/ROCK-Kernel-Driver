@@ -37,8 +37,8 @@
 #include "seq_info.h"
 #include "seq_system.h"
 #include <sound/seq_device.h>
-#if defined(CONFIG_SND_BIT32_EMUL) || defined(CONFIG_SND_BIT32_EMUL_MODULE)
-#include "../ioctl32/ioctl32.h"
+#ifdef CONFIG_COMPAT
+#include <linux/compat.h>
 #endif
 
 /* Client Manager
@@ -413,7 +413,7 @@ static ssize_t snd_seq_read(struct file *file, char __user *buf, size_t count, l
 			}
 			count -= sizeof(snd_seq_event_t);
 			buf += sizeof(snd_seq_event_t);
-			err = snd_seq_expand_var_event(&cell->event, count, buf, 0, sizeof(snd_seq_event_t));
+			err = snd_seq_expand_var_event(&cell->event, count, (char *)buf, 0, sizeof(snd_seq_event_t));
 			if (err < 0)
 				break;
 			result += err;
@@ -1012,7 +1012,7 @@ static ssize_t snd_seq_write(struct file *file, const char __user *buf, size_t c
 			event.data.ext.ptr = (char*)buf + sizeof(snd_seq_event_t);
 			len += extlen; /* increment data length */
 		} else {
-#if defined(CONFIG_SND_BIT32_EMUL) || defined(CONFIG_SND_BIT32_EMUL_MODULE)
+#ifdef CONFIG_COMPAT
 			if (client->convert32 && snd_seq_ev_is_varusr(&event)) {
 				void *ptr = compat_ptr(event.data.raw32.d[1]);
 				event.data.ext.ptr = ptr;
@@ -2320,7 +2320,7 @@ int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void *arg)
 	if (client == NULL)
 		return -ENXIO;
 	fs = snd_enter_user();
-	result = snd_seq_do_ioctl(client, cmd, arg);
+	result = snd_seq_do_ioctl(client, cmd, (void __user *)arg);
 	snd_leave_user(fs);
 	return result;
 }

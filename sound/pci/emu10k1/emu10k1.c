@@ -149,6 +149,11 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		return err;
 	}
 
+	if ((err = snd_emu10k1_pcm_multi(emu, 3, NULL)) < 0) {
+		snd_card_free(card);
+		return err;
+	}		
+
 	if (emu->audigy) {
 		if ((err = snd_emu10k1_audigy_midi(emu)) < 0) {
 			snd_card_free(card);

@@ -168,6 +168,10 @@ static int snd_tea575x_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static void snd_tea575x_release(struct video_device *vfd)
+{
+}
+
 /*
  * initialize all the tea575x chips
  */
@@ -186,6 +190,7 @@ void snd_tea575x_init(tea575x_t *tea)
 	strcpy(tea->vd.name, tea->tea5759 ? "TEA5759 radio" : "TEA5757 radio");
 	tea->vd.type = VID_TYPE_TUNER;
 	tea->vd.hardware = VID_HARDWARE_RTRACK;	/* FIXME: assign new number */
+	tea->vd.release = snd_tea575x_release;
 	video_set_drvdata(&tea->vd, tea);
 	tea->vd.fops = &tea->fops;
 	tea->fops.owner = tea->card->module;

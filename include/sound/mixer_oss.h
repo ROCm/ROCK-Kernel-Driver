@@ -38,7 +38,7 @@ typedef int (*snd_mixer_oss_put_recsrce_t)(snd_mixer_oss_file_t *fmixer, unsigne
 
 struct _snd_oss_mixer_slot {
 	int number;
-	int stereo: 1;
+	unsigned int stereo: 1;
 	snd_mixer_oss_get_volume_t get_volume;
 	snd_mixer_oss_put_volume_t put_volume;
 	snd_mixer_oss_get_recsrc_t get_recsrc;

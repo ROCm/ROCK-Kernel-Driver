@@ -73,6 +73,21 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				val >>= 1;
 				pvoice++;
 			}
+			val = snd_emu10k1_ptr_read(emu, HLIPL, 0);
+			for (voice = 0; voice <= voice_max; voice++) {
+				if (voice == 0x20)
+					val = snd_emu10k1_ptr_read(emu, HLIPH, 0);
+				if (val & 1) {
+					if (pvoice->use && pvoice->interrupt != NULL) {
+						pvoice->interrupt(emu, pvoice);
+						snd_emu10k1_voice_half_loop_intr_ack(emu, voice);
+					} else {
+						snd_emu10k1_voice_half_loop_intr_disable(emu, voice);
+					}
+				}
+				val >>= 1;
+				pvoice++;
+			}
 			status &= ~IPR_CHANNELLOOP;
 		}
 		status &= ~IPR_CHANNELNUMBERMASK;

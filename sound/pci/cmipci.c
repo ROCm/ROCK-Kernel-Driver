@@ -156,6 +156,8 @@ MODULE_PARM_DESC(joystick_port, "Joystick port address.");
 #define CM_CHIP_MASK2		0xff000000
 #define CM_CHIP_039		0x04000000
 #define CM_CHIP_039_6CH		0x01000000
+#define CM_CHIP_055		0x08000000
+#define CM_CHIP_8768		0x20000000
 #define CM_TDMA_INT_EN		0x00040000
 #define CM_CH1_INT_EN		0x00020000
 #define CM_CH0_INT_EN		0x00010000
@@ -328,6 +330,13 @@ MODULE_PARM_DESC(joystick_port, "Joystick port address.");
 #define CM_REG_CH0_FRAME2	0x84
 #define CM_REG_CH1_FRAME1	0x88	/* 0-15: count of samples at bus master; buffer size */
 #define CM_REG_CH1_FRAME2	0x8C	/* 16-31: count of samples at codec; fragment size */
+#define CM_REG_MISC_CTRL_8768	0x92	/* reg. name the same as 0x18 */
+#define CM_CHB3D8C		0x20	/* 7.1 channels support */
+#define CM_SPD32FMT		0x10	/* SPDIF/IN 32k */
+#define CM_ADC2SPDIF		0x08	/* ADC output to SPDIF/OUT */
+#define CM_SHAREADC		0x04	/* DAC in ADC as Center/LFE */
+#define CM_REALTCMP		0x02	/* monitor the CMPL/CMPR of ADC */
+#define CM_INVLRCK		0x01	/* invert ZVPORT's LRCK */
 
 /*
  * size of i/o region
@@ -458,7 +467,7 @@ struct snd_stru_cmipci {
 	int opened[2];	/* open mode */
 	struct semaphore open_mutex;
 
-	int mixer_insensitive: 1;
+	unsigned int mixer_insensitive: 1;
 	snd_kcontrol_t *mixer_res_ctl[CM_SAVED_MIXERS];
 	int mixer_res_status[CM_SAVED_MIXERS];
 
@@ -674,7 +683,7 @@ static int snd_cmipci_hw_free(snd_pcm_substream_t * substream)
 /*
  */
 
-static unsigned int hw_channels[] = {1, 2, 4, 5, 6};
+static unsigned int hw_channels[] = {1, 2, 4, 5, 6, 8};
 static snd_pcm_hw_constraint_list_t hw_constraints_channels_4 = {
 	.count = 3,
 	.list = hw_channels,
@@ -682,6 +691,11 @@ static snd_pcm_hw_constraint_list_t hw_constraints_channels_4 = {
 };
 static snd_pcm_hw_constraint_list_t hw_constraints_channels_6 = {
 	.count = 5,
+	.list = hw_channels,
+	.mask = 0,
+};
+static snd_pcm_hw_constraint_list_t hw_constraints_channels_8 = {
+	.count = 6,
 	.list = hw_channels,
 	.mask = 0,
 };
@@ -704,12 +718,19 @@ static int set_dac_channels(cmipci_t *cm, cmipci_pcm_t *rec, int channels)
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_CHB3D5C);
 			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_CHB3D);
 		}
-		if (channels == 6) {
+		if (channels >= 6) {
 			snd_cmipci_set_bit(cm, CM_REG_LEGACY_CTRL, CM_CHB3D6C);
 			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_ENCENTER);
 		} else {
 			snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_CHB3D6C);
 			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_ENCENTER);
+		}
+		if (cm->chip_version == 68) {
+			if (channels == 8) {
+				snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL_8768, CM_CHB3D8C);
+			} else {
+				snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL_8768, CM_CHB3D8C);
+			}
 		}
 		spin_unlock_irq(&cm->reg_lock);
 
@@ -1504,6 +1525,7 @@ static int snd_cmipci_playback_open(snd_pcm_substream_t *substream)
 	if ((err = open_device_check(cm, CM_OPEN_PLAYBACK, substream)) < 0)
 		return err;
 	runtime->hw = snd_cmipci_playback;
+	runtime->hw.channels_max = cm->max_channels;
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x10000);
 	cm->dig_pcm_status = cm->dig_status;
 	return 0;
@@ -1518,6 +1540,10 @@ static int snd_cmipci_capture_open(snd_pcm_substream_t *substream)
 	if ((err = open_device_check(cm, CM_OPEN_CAPTURE, substream)) < 0)
 		return err;
 	runtime->hw = snd_cmipci_capture;
+	if (cm->chip_version == 68) {	// 8768 only supports 44k/48k recording
+		runtime->hw.rate_min = 41000;
+		runtime->hw.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000;
+	}
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x10000);
 	return 0;
 }
@@ -1537,8 +1563,10 @@ static int snd_cmipci_playback2_open(snd_pcm_substream_t *substream)
 			runtime->hw.channels_max = cm->max_channels;
 			if (cm->max_channels == 4)
 				snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels_4);
-			else
+			else if (cm->max_channels == 6)
 				snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels_6);
+			else if (cm->max_channels == 8)
+				snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels_8);
 		}
 		snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x10000);
 	}
@@ -2108,8 +2136,8 @@ typedef struct snd_cmipci_switch_args {
 	int reg;		/* register index */
 	unsigned int mask;	/* mask bits */
 	unsigned int mask_on;	/* mask bits to turn on */
-	int is_byte: 1;		/* byte access? */
-	int ac3_sensitive: 1;	/* access forbidden during non-audio operation? */
+	unsigned int is_byte: 1;		/* byte access? */
+	unsigned int ac3_sensitive: 1;	/* access forbidden during non-audio operation? */
 } snd_cmipci_switch_args_t;
 
 static int snd_cmipci_uswitch_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -2346,6 +2374,11 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 	spin_unlock_irq(&cm->reg_lock);
 
 	for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_mixers); idx++) {
+		if (cm->chip_version == 68) {	// 8768 has no PCM volume
+			if (!strcmp(snd_cmipci_mixers[idx].name,
+				"PCM Playback Volume"))
+				continue;
+		}
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cmipci_mixers[idx], cm))) < 0)
 			return err;
 	}
@@ -2496,21 +2529,29 @@ static void __devinit query_chip(cmipci_t *cm)
 		}
 	} else {
 		/* check reg 0Ch, bit 26 */
-		if (detect & CM_CHIP_039) {
+		if (detect & CM_CHIP_8768) {
+			cm->chip_version = 68;
+			cm->max_channels = 8;
+			cm->can_ac3_hw = 1;
+			cm->has_dual_dac = 1;
+			cm->can_multi_ch = 1;
+		} else if (detect & CM_CHIP_055) {
+			cm->chip_version = 55;
+			cm->max_channels = 6;
+			cm->can_ac3_hw = 1;
+			cm->has_dual_dac = 1;
+			cm->can_multi_ch = 1;
+		} else if (detect & CM_CHIP_039) {
 			cm->chip_version = 39;
-			if (detect & CM_CHIP_039_6CH)
-				cm->max_channels  = 6;
+			if (detect & CM_CHIP_039_6CH) /* 4 or 6 channels */
+				cm->max_channels = 6;
 			else
 				cm->max_channels = 4;
 			cm->can_ac3_hw = 1;
 			cm->has_dual_dac = 1;
 			cm->can_multi_ch = 1;
 		} else {
-			cm->chip_version = 55; /* 4 or 6 channels */
-			cm->max_channels  = 6;
-			cm->can_ac3_hw = 1;
-			cm->has_dual_dac = 1;
-			cm->can_multi_ch = 1;
+			printk(KERN_ERR "chip %x version not supported\n", detect);
 		}
 	}
 

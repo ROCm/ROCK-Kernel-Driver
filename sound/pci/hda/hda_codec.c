@@ -440,7 +440,8 @@ static int look_for_afg_node(struct hda_codec *codec)
 
 	total_nodes = snd_hda_get_sub_nodes(codec, AC_NODE_ROOT, &nid);
 	for (i = 0; i < total_nodes; i++, nid++) {
-		if (snd_hda_param_read(codec, nid, AC_PAR_FUNCTION_TYPE) == AC_GRP_AUDIO_FUNCTION)
+		if ((snd_hda_param_read(codec, nid, AC_PAR_FUNCTION_TYPE) & 0xff) ==
+		    AC_GRP_AUDIO_FUNCTION)
 			return nid;
 	}
 	return 0;
@@ -844,44 +845,75 @@ static int snd_hda_spdif_default_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	return 0;
 }
 
-static int snd_hda_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+/* convert from SPDIF status bits to HDA SPDIF bits
+ * bit 0 (DigEn) is always set zero (to be filled later)
+ */
+static unsigned short convert_from_spdif_status(unsigned int sbits)
 {
-	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
-	hda_nid_t nid = kcontrol->private_value;
-	unsigned int sbits;
-	unsigned short val;
-	int change;
+	unsigned short val = 0;
 
-	val = 0;
-	down(&codec->spdif_mutex);
-	sbits = codec->spdif_status & 1;
-	sbits |= ucontrol->value.iec958.status[0] & (IEC958_AES0_PROFESSIONAL|
-						     IEC958_AES0_NONAUDIO);
 	if (sbits & IEC958_AES0_PROFESSIONAL)
-		val = 1 << 6;
+		val |= 1 << 6;
 	if (sbits & IEC958_AES0_NONAUDIO)
 		val |= 1 << 5;
 	if (sbits & IEC958_AES0_PROFESSIONAL) {
-		sbits |= ucontrol->value.iec958.status[0] & IEC958_AES0_PRO_EMPHASIS;
 		if ((sbits & IEC958_AES0_PRO_EMPHASIS) == IEC958_AES0_PRO_EMPHASIS_5015)
 			val |= 1 << 3;
 	} else {
-		sbits |= ucontrol->value.iec958.status[0] & (IEC958_AES0_CON_EMPHASIS|
-							     IEC958_AES0_CON_NOT_COPYRIGHT);
 		if ((sbits & IEC958_AES0_CON_EMPHASIS) == IEC958_AES0_CON_EMPHASIS_5015)
 			val |= 1 << 3;
 		if (! (sbits & IEC958_AES0_CON_NOT_COPYRIGHT))
 			val |= 1 << 4;
-		sbits |= ucontrol->value.iec958.status[1] << 8;
 		if (sbits & (IEC958_AES1_CON_ORIGINAL << 8))
 			val |= 1 << 7;
 		val |= sbits & (IEC958_AES1_CON_CATEGORY << 8);
 	}
+	return val;
+}
 
-	change = codec->spdif_status != sbits;
-	codec->spdif_status = sbits;
+/* convert to SPDIF status bits from HDA SPDIF bits
+ */
+static unsigned int convert_to_spdif_status(unsigned short val)
+{
+	unsigned int sbits = 0;
 
-	if (change) {
+	if (val & (1 << 5))
+		sbits |= IEC958_AES0_NONAUDIO;
+	if (val & (1 << 6))
+		sbits |= IEC958_AES0_PROFESSIONAL;
+	if (sbits & IEC958_AES0_PROFESSIONAL) {
+		if (sbits & (1 << 3))
+			sbits |= IEC958_AES0_PRO_EMPHASIS_5015;
+	} else {
+		if (val & (1 << 3))
+			sbits |= IEC958_AES0_CON_EMPHASIS_5015;
+		if (! (val & (1 << 4)))
+			sbits |= IEC958_AES0_CON_NOT_COPYRIGHT;
+		if (val & (1 << 7))
+			sbits |= (IEC958_AES1_CON_ORIGINAL << 8);
+		sbits |= val & (0x7f << 8);
+	}
+	return sbits;
+}
+
+static int snd_hda_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
+	hda_nid_t nid = kcontrol->private_value;
+	unsigned short val;
+	int change;
+
+	down(&codec->spdif_mutex);
+	codec->spdif_status = ucontrol->value.iec958.status[0] |
+		((unsigned int)ucontrol->value.iec958.status[1] << 8) |
+		((unsigned int)ucontrol->value.iec958.status[2] << 16) |
+		((unsigned int)ucontrol->value.iec958.status[3] << 24);
+	val = convert_from_spdif_status(codec->spdif_status);
+	val |= codec->spdif_ctls & 1;
+	change = codec->spdif_ctls != val;
+	codec->spdif_ctls = val;
+
+	if (change || codec->in_resume) {
 		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_DIGI_CONVERT_1, val & 0xff);
 		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_DIGI_CONVERT_2, val >> 8);
 	}
@@ -903,7 +935,7 @@ static int snd_hda_spdif_out_switch_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 {
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 
-	ucontrol->value.integer.value[0] = codec->spdif_status & 1;
+	ucontrol->value.integer.value[0] = codec->spdif_ctls & 1;
 	return 0;
 }
 
@@ -911,17 +943,17 @@ static int snd_hda_spdif_out_switch_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 {
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 	hda_nid_t nid = kcontrol->private_value;
-	unsigned int sbits;
+	unsigned short val;
 	int change;
 
 	down(&codec->spdif_mutex);
-	sbits = codec->spdif_status & ~1;
+	val = codec->spdif_ctls & ~1;
 	if (ucontrol->value.integer.value[0])
-		sbits |= 1;
-	change = codec->spdif_status != sbits;
-	if (change) {
-		codec->spdif_status = sbits;
-		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_DIGI_CONVERT_1, sbits & 0xff);
+		val |= 1;
+	change = codec->spdif_ctls != val;
+	if (change || codec->in_resume) {
+		codec->spdif_ctls = val;
+		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_DIGI_CONVERT_1, val & 0xff);
 	}
 	up(&codec->spdif_mutex);
 	return change;
@@ -981,12 +1013,8 @@ int snd_hda_create_spdif_out_ctls(struct hda_codec *codec, hda_nid_t nid)
 		if ((err = snd_ctl_add(codec->bus->card, kctl)) < 0)
 			return err;
 	}
-#if 0
-	/* not enabled, consumer, audio, no emphasis, original, PCM coder */
-	codec->spdif_status = (1 << 7) | (0x02 << 8);
-#else
-	codec->spdif_status = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_DIGI_CONVERT, 0);
-#endif
+	codec->spdif_ctls = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_DIGI_CONVERT, 0);
+	codec->spdif_status = convert_to_spdif_status(codec->spdif_ctls);
 	return 0;
 }
 
@@ -1212,7 +1240,7 @@ int snd_hda_is_supported_format(struct hda_codec *codec, hda_nid_t nid,
 				unsigned int format)
 {
 	int i;
-	unsigned int val = 0, rate;
+	unsigned int val = 0, rate, stream;
 
 	if (nid != codec->afg &&
 	    snd_hda_param_read(codec, nid, AC_PAR_AUDIO_WIDGET_CAP) & AC_WCAP_FORMAT_OVRD) {
@@ -1226,7 +1254,7 @@ int snd_hda_is_supported_format(struct hda_codec *codec, hda_nid_t nid,
 			return 0;
 	}
 
-	rate = format & 0xffff;
+	rate = format & 0xff00;
 	for (i = 0; rate_bits[i][0]; i++)
 		if (rate_bits[i][2] == rate) {
 			if (val & (1 << i))
@@ -1236,15 +1264,15 @@ int snd_hda_is_supported_format(struct hda_codec *codec, hda_nid_t nid,
 	if (! rate_bits[i][0])
 		return 0;
 
-	val = snd_hda_param_read(codec, nid, AC_PAR_STREAM);
-	if (val == -1)
+	stream = snd_hda_param_read(codec, nid, AC_PAR_STREAM);
+	if (stream == -1)
 		return 0;
-	if (! val && nid != codec->afg)
-		val = snd_hda_param_read(codec, codec->afg, AC_PAR_STREAM);
-	if (! val || val == -1)
+	if (! stream && nid != codec->afg)
+		stream = snd_hda_param_read(codec, codec->afg, AC_PAR_STREAM);
+	if (! stream || stream == -1)
 		return 0;
 
-	if (val & AC_SUPFMT_PCM) {
+	if (stream & AC_SUPFMT_PCM) {
 		switch (format & 0xf0) {
 		case 0x00:
 			if (! (val & AC_SUPPCM_BITS_8))
@@ -1541,22 +1569,12 @@ int snd_hda_multi_out_analog_prepare(struct hda_codec *codec, struct hda_multi_o
 	down(&codec->spdif_mutex);
 	if (mout->dig_out_nid && mout->dig_out_used != HDA_DIG_EXCLUSIVE) {
 		if (chs == 2 &&
-		    snd_hda_is_supported_format(codec, mout->dig_out_nid, format)) {
-
+		    snd_hda_is_supported_format(codec, mout->dig_out_nid, format) &&
+		    ! (codec->spdif_status & IEC958_AES0_NONAUDIO)) {
 			mout->dig_out_used = HDA_DIG_ANALOG_DUP;
 			/* setup digital receiver */
 			snd_hda_codec_setup_stream(codec, mout->dig_out_nid,
 						   stream_tag, 0, format);
-
-			if (codec->spdif_status & AC_DIG1_NONAUDIO) {
-				/* non-audio SPDIF out, turning off all DACs */
-				for (i = 0; i < mout->num_dacs; i++)
-					snd_hda_codec_setup_stream(codec, nids[i], 0, 0, 0);
-				if (mout->hp_nid)
-					snd_hda_codec_setup_stream(codec, mout->hp_nid,0, 0, 0);
-				up(&codec->spdif_mutex);
-				return 0;
-			}
 		} else {
 			mout->dig_out_used = 0;
 			snd_hda_codec_setup_stream(codec, mout->dig_out_nid, 0, 0, 0);
@@ -1570,7 +1588,7 @@ int snd_hda_multi_out_analog_prepare(struct hda_codec *codec, struct hda_multi_o
 		/* headphone out will just decode front left/right (stereo) */
 		snd_hda_codec_setup_stream(codec, mout->hp_nid, stream_tag, 0, format);
 	/* surrounds */
-	for (i = 0; i < mout->num_dacs; i++) {
+	for (i = 1; i < mout->num_dacs; i++) {
 		if (i == HDA_REAR && chs == 2) /* copy front to rear */
 			snd_hda_codec_setup_stream(codec, nids[i], stream_tag, 0, format);
 		else if (chs >= (i + 1) * 2) /* independent out */

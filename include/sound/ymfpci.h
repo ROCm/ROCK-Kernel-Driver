@@ -262,7 +262,7 @@ typedef enum {
 struct _snd_ymfpci_voice {
 	ymfpci_t *chip;
 	int number;
-	int use: 1,
+	unsigned int use: 1,
 	    pcm: 1,
 	    synth: 1,
 	    midi: 1;
@@ -288,9 +288,9 @@ struct _snd_ymfpci_pcm {
 	snd_ymfpci_pcm_type_t type;
 	snd_pcm_substream_t *substream;
 	ymfpci_voice_t *voices[2];	/* playback only */
-	int running: 1;
-	int output_front: 1;
-	int output_rear: 1;
+	unsigned int running: 1;
+	unsigned int output_front: 1;
+	unsigned int output_rear: 1;
 	u32 period_size;		/* cached from runtime->period_size */
 	u32 buffer_size;		/* cached from runtime->buffer_size */
 	u32 period_pos;

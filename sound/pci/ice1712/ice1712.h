@@ -484,7 +484,7 @@ struct snd_ice1712_card_info {
 	char *driver;
 	int (*chip_init)(ice1712_t *);
 	int (*build_controls)(ice1712_t *);
-	int no_mpu401: 1;
+	unsigned int no_mpu401: 1;
 	unsigned int eeprom_size;
 	unsigned char *eeprom_data;
 };

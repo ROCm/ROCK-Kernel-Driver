@@ -529,7 +529,8 @@ struct hda_codec {
 	struct hda_amp_info amp_info[128]; /* big enough? */
 
 	struct semaphore spdif_mutex;
-	unsigned int spdif_status;
+	unsigned int spdif_status;	/* IEC958 status bits */
+	unsigned short spdif_ctls;	/* SPDIF control bits */
 };
 
 /* direction */

@@ -38,7 +38,7 @@ typedef struct _snd_virmidi {
 	int seq_mode;
 	int client;
 	int port;
-	int trigger: 1;
+	unsigned int trigger: 1;
 	snd_midi_event_t *parser;
 	snd_seq_event_t event;
 	snd_virmidi_dev_t *rdev;

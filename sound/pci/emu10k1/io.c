@@ -170,6 +170,63 @@ void snd_emu10k1_voice_intr_ack(emu10k1_t *emu, unsigned int voicenum)
 	spin_unlock_irqrestore(&emu->emu_lock, flags);
 }
 
+void snd_emu10k1_voice_half_loop_intr_enable(emu10k1_t *emu, unsigned int voicenum)
+{
+	unsigned long flags;
+	unsigned int val;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	/* voice interrupt */
+	if (voicenum >= 32) {
+		outl(HLIEH << 16, emu->port + PTR);
+		val = inl(emu->port + DATA);
+		val |= 1 << (voicenum - 32);
+	} else {
+		outl(HLIEL << 16, emu->port + PTR);
+		val = inl(emu->port + DATA);
+		val |= 1 << voicenum;
+	}
+	outl(val, emu->port + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+}
+
+void snd_emu10k1_voice_half_loop_intr_disable(emu10k1_t *emu, unsigned int voicenum)
+{
+	unsigned long flags;
+	unsigned int val;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	/* voice interrupt */
+	if (voicenum >= 32) {
+		outl(HLIEH << 16, emu->port + PTR);
+		val = inl(emu->port + DATA);
+		val &= ~(1 << (voicenum - 32));
+	} else {
+		outl(HLIEL << 16, emu->port + PTR);
+		val = inl(emu->port + DATA);
+		val &= ~(1 << voicenum);
+	}
+	outl(val, emu->port + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+}
+
+void snd_emu10k1_voice_half_loop_intr_ack(emu10k1_t *emu, unsigned int voicenum)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	/* voice interrupt */
+	if (voicenum >= 32) {
+		outl(HLIPH << 16, emu->port + PTR);
+		voicenum = 1 << (voicenum - 32);
+	} else {
+		outl(HLIPL << 16, emu->port + PTR);
+		voicenum = 1 << voicenum;
+	}
+	outl(voicenum, emu->port + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+}
+
 void snd_emu10k1_voice_set_loop_stop(emu10k1_t *emu, unsigned int voicenum)
 {
 	unsigned long flags;

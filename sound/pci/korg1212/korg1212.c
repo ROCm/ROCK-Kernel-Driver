@@ -610,7 +610,7 @@ static snd_korg1212rc snd_korg1212_Send1212Command(korg1212_t *korg1212, korg121
 static void snd_korg1212_SendStop(korg1212_t *korg1212)
 {
 	if (! korg1212->stop_pending_cnt) {
-		writel(0xffffffff, &korg1212->sharedBufferPtr->cardCommand);
+		korg1212->sharedBufferPtr->cardCommand = 0xffffffff;
 		/* program the timer */
 		korg1212->stop_pending_cnt = HZ;
 		korg1212->timer.expires = jiffies + 1;
@@ -634,7 +634,7 @@ static void snd_korg1212_timer_func(unsigned long data)
         korg1212_t *korg1212 = (korg1212_t *) data;
 	
 	spin_lock(&korg1212->lock);
-	if (readl(&korg1212->sharedBufferPtr->cardCommand) == 0) {
+	if (korg1212->sharedBufferPtr->cardCommand == 0) {
 		/* ack'ed */
 		korg1212->stop_pending_cnt = 0;
 		korg1212->dsp_stop_is_processed = 1;
@@ -649,7 +649,7 @@ static void snd_korg1212_timer_func(unsigned long data)
 			add_timer(&korg1212->timer);
 		} else {
 			snd_printd("korg1212_timer_func timeout\n");
-			writel(0, &korg1212->sharedBufferPtr->cardCommand);
+			korg1212->sharedBufferPtr->cardCommand = 0;
 			korg1212->dsp_stop_is_processed = 1;
 			wake_up(&korg1212->wait);
 #if K1212_DEBUG_LEVEL > 0
@@ -1195,7 +1195,7 @@ static irqreturn_t snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs 
 			snd_printk(KERN_ERR "korg1212: DMA Error\n");	
 			korg1212->errorcnt++;
 			korg1212->totalerrorcnt++;
-                        writel(0, &korg1212->sharedBufferPtr->cardCommand);
+			korg1212->sharedBufferPtr->cardCommand = 0;
 			snd_korg1212_setCardState(korg1212, K1212_STATE_ERRORSTOP);
                         break;
 
@@ -1207,7 +1207,7 @@ static irqreturn_t snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs 
 #if K1212_DEBUG_LEVEL > 1
                         K1212_DEBUG_PRINTK("K1212_DEBUG: IRQ CSTP count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
-                        writel(0, &korg1212->sharedBufferPtr->cardCommand);
+			korg1212->sharedBufferPtr->cardCommand = 0;
                         break;
 
                 default:
@@ -1622,7 +1622,7 @@ static int snd_korg1212_prepare(snd_pcm_substream_t *substream)
         	spin_unlock_irq(&korg1212->lock);
 		return -EAGAIN;
 		/*
-		writel(0, &korg1212->sharedBufferPtr->cardCommand);
+		korg1212->sharedBufferPtr->cardCommand = 0;
 		del_timer(&korg1212->timer);
 		korg1212->stop_pending_cnt = 0;
 		*/

@@ -49,6 +49,13 @@
 #include <sound/rawmidi.h>
 #include "usbaudio.h"
 
+
+/*
+ * define this to log all USB packets
+ */
+/* #define DUMP_PACKETS */
+
+
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_DESCRIPTION("USB Audio/MIDI helper module");
 MODULE_LICENSE("Dual BSD/GPL");
@@ -180,6 +187,18 @@ static void snd_usbmidi_input_data(snd_usb_midi_in_endpoint_t* ep, int portidx,
 	snd_rawmidi_receive(port->substream, data, length);
 }
 
+#ifdef DUMP_PACKETS
+static void dump_urb(const char *type, const u8 *data, int length)
+{
+	snd_printk(KERN_DEBUG "%s packet: [", type);
+	for (; length > 0; ++data, --length)
+		printk(" %02x", *data);
+	printk(" ]\n");
+}
+#else
+#define dump_urb(type, data, length) /* nothing */
+#endif
+
 /*
  * Processes the data read from the device.
  */
@@ -188,6 +207,7 @@ static void snd_usbmidi_in_urb_complete(struct urb* urb, struct pt_regs *regs)
 	snd_usb_midi_in_endpoint_t* ep = urb->context;
 
 	if (urb->status == 0) {
+		dump_urb("received", urb->transfer_buffer, urb->actual_length);
 		ep->umidi->usb_protocol_ops->input(ep, urb->transfer_buffer,
 						   urb->actual_length);
 	} else {
@@ -231,6 +251,8 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 	ep->umidi->usb_protocol_ops->output(ep);
 
 	if (urb->transfer_buffer_length > 0) {
+		dump_urb("sending", urb->transfer_buffer,
+			 urb->transfer_buffer_length);
 		urb->dev = ep->umidi->chip->dev;
 		snd_usbmidi_submit_urb(urb, GFP_ATOMIC);
 	}

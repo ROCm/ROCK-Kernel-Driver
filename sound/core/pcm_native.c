@@ -2677,7 +2677,7 @@ int snd_pcm_kernel_playback_ioctl(snd_pcm_substream_t *substream,
 	int result;
 	
 	fs = snd_enter_user();
-	result = snd_pcm_playback_ioctl1(substream, cmd, arg);
+	result = snd_pcm_playback_ioctl1(substream, cmd, (void __user *)arg);
 	snd_leave_user(fs);
 	return result;
 }
@@ -2689,7 +2689,7 @@ int snd_pcm_kernel_capture_ioctl(snd_pcm_substream_t *substream,
 	int result;
 	
 	fs = snd_enter_user();
-	result = snd_pcm_capture_ioctl1(substream, cmd, arg);
+	result = snd_pcm_capture_ioctl1(substream, cmd, (void __user *)arg);
 	snd_leave_user(fs);
 	return result;
 }

@@ -1943,7 +1943,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 	fs = get_fs();
 	set_fs (get_ds());
 
-	if ((fd = sys_open (path, 0, 0)) < 0) {
+	if ((fd = sys_open ((char __user *) path, 0, 0)) < 0) {
 		snd_printk ("Unable to load \"%s\".\n",
 			path);
 		return 1;
@@ -1952,7 +1952,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 	while (1) {
 		int x;
 
-		if ((x = sys_read (fd, &section_length, sizeof (section_length))) !=
+		if ((x = sys_read (fd, (char __user *) &section_length, sizeof (section_length))) !=
 		    sizeof (section_length)) {
 			snd_printk ("firmware read error.\n");
 			goto failure;
@@ -1968,7 +1968,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 			goto failure;
 		}
 
-		if (sys_read (fd, section, section_length) != section_length) {
+		if (sys_read (fd, (char __user *) section, section_length) != section_length) {
 			snd_printk ("firmware section "
 				"read error.\n");
 			goto failure;

@@ -291,7 +291,7 @@ get_voice(snd_emux_t *emu, snd_emux_port_t *port)
 			if (vp->ch < 0) {
 				/* allocate a voice */
 				emu10k1_voice_t *hwvoice;
-				if (snd_emu10k1_voice_alloc(hw, EMU10K1_SYNTH, 0, &hwvoice) < 0 || hwvoice == NULL)
+				if (snd_emu10k1_voice_alloc(hw, EMU10K1_SYNTH, 1, &hwvoice) < 0 || hwvoice == NULL)
 					continue;
 				vp->ch = hwvoice->number;
 				emu->num_voices++;

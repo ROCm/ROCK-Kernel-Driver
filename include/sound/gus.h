@@ -230,7 +230,7 @@ typedef struct {
 	int mode;		/* operation mode */
 	int client;		/* sequencer client number */
 	int port;		/* sequencer port number */
-	int midi_has_voices: 1;
+	unsigned int midi_has_voices: 1;
 } snd_gus_port_t;
 
 typedef struct _snd_gus_voice snd_gus_voice_t;
@@ -264,7 +264,7 @@ typedef enum {
 
 struct _snd_gus_voice {
 	int number;
-	int use: 1,
+	unsigned int use: 1,
 	    pcm: 1,
 	    synth:1,
 	    midi: 1;
