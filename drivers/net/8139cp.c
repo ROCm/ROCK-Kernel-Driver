@@ -991,6 +991,8 @@ static struct net_device_stats *cp_get_stats(struct net_device *dev)
 
 static void cp_stop_hw (struct cp_private *cp)
 {
+	struct net_device *dev = cp->dev;
+
 	cpw16(IntrMask, 0);
 	cpr16(IntrMask);
 	cpw8(Cmd, 0);
@@ -1002,6 +1004,10 @@ static void cp_stop_hw (struct cp_private *cp)
 
 	cp->rx_tail = 0;
 	cp->tx_head = cp->tx_tail = 0;
+
+	(void) dev; /* avoid compiler warning when synchronize_irq()
+		     * disappears during !CONFIG_SMP
+		     */
 }
 
 static void cp_reset_hw (struct cp_private *cp)
