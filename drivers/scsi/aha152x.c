@@ -860,9 +860,6 @@ static int aha152x_porttest(int io_port)
 {
 	int i;
 
-	if (check_region(io_port, IO_RANGE))
-		return 0;
-
 	SETPORT(io_port + O_DMACNTRL1, 0);	/* reset stack pointer */
 	for (i = 0; i < 16; i++)
 		SETPORT(io_port + O_STACK, i);
@@ -877,9 +874,6 @@ static int aha152x_porttest(int io_port)
 static int tc1550_porttest(int io_port)
 {
 	int i;
-
-	if (check_region(io_port, IO_RANGE))
-		return 0;
 
 	SETPORT(io_port + O_TC_DMACNTRL1, 0);	/* reset stack pointer */
 	for (i = 0; i < 16; i++)
@@ -903,13 +897,20 @@ static int checksetup(struct aha152x_setup *setup)
 	if (i == ARRAY_SIZE(ports))
 		return 0;
 #endif
+	if (!request_region(setup->io_port, IO_RANGE, "aha152x"))
+		return 0;
 
 	if(aha152x_porttest(setup->io_port)) {
-          setup->tc1550=0;
+		setup->tc1550=0;
         } else if(tc1550_porttest(setup->io_port)) {
-          setup->tc1550=1;
-        } else
-          return 0;
+		setup->tc1550=1;
+	} else {
+		release_region(setup->io_port, IO_RANGE);
+		return 0;
+	}
+
+	release_region(setup->io_port, IO_RANGE);
+
 
 	if ((setup->irq < IRQ_MIN) || (setup->irq > IRQ_MAX))
 		return 0;
@@ -965,7 +966,7 @@ struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *setup)
 {
 	struct Scsi_Host *shpnt;
 
-	shpnt = scsi_register(&aha152x_driver_template, sizeof(struct aha152x_hostdata));
+	shpnt = scsi_host_alloc(&aha152x_driver_template, sizeof(struct aha152x_hostdata));
 	if (!shpnt) {
 		printk(KERN_ERR "aha152x: scsi_register failed\n");
 		return NULL;
@@ -1080,6 +1081,9 @@ struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *setup)
 		printk(KERN_ERR "aha152x%d: failed to reassign interrupt.\n", shpnt->host_no);
 		goto out_unregister_host;
 	}
+
+	scsi_add_host(shpnt, 0);
+	scsi_scan_host(shpnt);
 	return shpnt;	/* the pcmcia stub needs the return value; */
 
 out_unregister_host:
@@ -1087,11 +1091,11 @@ out_unregister_host:
 out_release_region:
 	release_region(shpnt->io_port, IO_RANGE);
 out_unregister:
-	scsi_unregister(shpnt);
+	scsi_host_put(shpnt);
 	return NULL;
 }
 
-static int aha152x_detect(Scsi_Host_Template * tpnt)
+static int __init aha152x_init(void)
 {
 	int i, j, ok;
 #if defined(AUTOCONF)
@@ -1360,7 +1364,6 @@ static int aha152x_detect(Scsi_Host_Template * tpnt)
 	return registered_count>0;
 }
 
-
 static int aha152x_release(struct Scsi_Host *shpnt)
 {
 	if (shpnt->irq)
@@ -1374,10 +1377,24 @@ static int aha152x_release(struct Scsi_Host *shpnt)
 		pnp_device_detach(HOSTDATA(shpnt)->pnpdev);
 #endif
 
-	scsi_unregister(shpnt);
+	scsi_host_put(shpnt);
 
 	return 0;
 }
+
+static void __exit aha152x_exit(void)
+{
+	int i;
+
+	for(i=0; i<ARRAY_SIZE(setup); i++) {
+		if(aha152x_host[i]) {
+			scsi_remove_host(aha152x_host[i]);
+			aha152x_release(aha152x_host[i]);
+			aha152x_host[i]=0;
+		}
+	}
+}
+
 
 /*
  * setup controller to generate interrupts depending
@@ -3880,26 +3897,22 @@ static int aha152x_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start
 }
 
 static Scsi_Host_Template aha152x_driver_template = {
-	.module			= THIS_MODULE,
-	.name			= AHA152X_REVID,
-	.proc_name		= "aha152x",
-	.proc_info		= aha152x_proc_info,
-	.detect			= aha152x_detect,
-	.queuecommand		= aha152x_queue,
-	.eh_abort_handler	= aha152x_abort,
-	.eh_device_reset_handler = aha152x_device_reset,
-	.eh_bus_reset_handler	= aha152x_bus_reset,
-	.eh_host_reset_handler	= aha152x_host_reset,
-	.release		= aha152x_release,
-	.bios_param		= aha152x_biosparam,
-	.can_queue		= 1,
-	.this_id		= 7,
-	.sg_tablesize		= SG_ALL,
-	.cmd_per_lun		= 1,
-	.use_clustering		= DISABLE_CLUSTERING,
+	.module				= THIS_MODULE,
+	.name				= AHA152X_REVID,
+	.proc_name			= "aha152x",
+	.proc_info			= aha152x_proc_info,
+	.queuecommand			= aha152x_queue,
+	.eh_abort_handler		= aha152x_abort,
+	.eh_device_reset_handler	= aha152x_device_reset,
+	.eh_bus_reset_handler		= aha152x_bus_reset,
+	.eh_host_reset_handler		= aha152x_host_reset,
+	.bios_param			= aha152x_biosparam,
+	.can_queue			= 1,
+	.this_id			= 7,
+	.sg_tablesize			= SG_ALL,
+	.cmd_per_lun			= 1,
+	.use_clustering			= DISABLE_CLUSTERING,
 };
 
-#ifndef PCMCIA
-#define driver_template aha152x_driver_template
-#include "scsi_module.c"
-#endif
+module_init(aha152x_init);
+module_exit(aha152x_exit);

@@ -69,6 +69,8 @@ struct hpsb_host {
 	int id;
 
 	struct device device;
+
+	struct list_head addr_space;
 };
 
 

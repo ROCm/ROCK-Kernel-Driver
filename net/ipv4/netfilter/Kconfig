@@ -529,10 +529,23 @@ config IP_NF_TARGET_TCPMSS
 
 config IP_NF_ARPTABLES
 	tristate "ARP tables support"
+	help
+	  arptables is a general, extensible packet identification framework.
+	  The ARP packet filtering and mangling (manipulation)subsystems
+	  use this: say Y or M here if you want to use either of those.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_ARPFILTER
 	tristate "ARP packet filtering"
 	depends on IP_NF_ARPTABLES
+	help
+	  ARP packet filtering defines a table `filter', which has a series of
+	  rules for simple ARP packet filtering at local input and
+	  local output.  On a bridge, you can also specify filtering rules
+	  for forwarded ARP packets. See the man page for arptables(8).
+
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_ARP_MANGLE
 	tristate "ARP payload mangling"

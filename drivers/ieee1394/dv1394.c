@@ -110,6 +110,7 @@
 #include <linux/string.h>
 #include <linux/ioctl32.h>
 #include <linux/compat.h>
+#include <linux/cdev.h>
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -2165,6 +2166,7 @@ out:
 	spin_unlock(&video->spinlock);
 }
 
+static struct cdev dv1394_cdev;
 static struct file_operations dv1394_fops=
 {
 	.owner =	THIS_MODULE,
@@ -2607,17 +2609,17 @@ static void __exit dv1394_exit_module(void)
 	hpsb_unregister_protocol(&dv1394_driver);
 
 	hpsb_unregister_highlevel(&dv1394_highlevel);
-	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
+	cdev_unmap(IEEE1394_DV1394_DEV, 16);
+	cdev_del(&dv1394_cdev);
 	devfs_remove("ieee1394/dv");
 }
 
 static int __init dv1394_init_module(void)
 {
-	int ret;
-
-	ret = ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_DV1394,
-					THIS_MODULE, &dv1394_fops);
-	if (ret) {
+	cdev_init(&dv1394_cdev, &dv1394_fops);
+	dv1394_cdev.owner = THIS_MODULE;
+	kobject_set_name(&dv1394_cdev.kobj, "dv1394");
+	if (cdev_add(&dv1394_cdev, IEEE1394_DV1394_DEV, 16)) {
 		printk(KERN_ERR "dv1394: unable to register character device\n");
 		return -EIO;
 	}
@@ -2629,18 +2631,22 @@ static int __init dv1394_init_module(void)
 	hpsb_register_protocol(&dv1394_driver);
 
 #ifdef CONFIG_COMPAT
-	/* First compatible ones */
-	ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_START_RECEIVE, NULL);
+	{
+		int ret;
 
-	/* These need to be handled by translation */
-	ret |= register_ioctl32_conversion(DV1394_IOC32_INIT, handle_dv1394_init);
-	ret |= register_ioctl32_conversion(DV1394_IOC32_GET_STATUS, handle_dv1394_get_status);
-	if (ret)
-		printk(KERN_ERR "dv1394: Error registering ioctl32 translations\n");
+		/* First compatible ones */
+		ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_START_RECEIVE, NULL);
+
+		/* These need to be handled by translation */
+		ret |= register_ioctl32_conversion(DV1394_IOC32_INIT, handle_dv1394_init);
+		ret |= register_ioctl32_conversion(DV1394_IOC32_GET_STATUS, handle_dv1394_get_status);
+		if (ret)
+			printk(KERN_ERR "dv1394: Error registering ioctl32 translations\n");
+	}
 #endif
 
 	return 0;
@@ -2648,3 +2654,4 @@ static int __init dv1394_init_module(void)
 
 module_init(dv1394_init_module);
 module_exit(dv1394_exit_module);
+MODULE_ALIAS_CHARDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_DV1394 * 16);

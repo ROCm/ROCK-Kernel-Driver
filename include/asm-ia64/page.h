@@ -145,7 +145,7 @@ typedef union ia64_va {
 static __inline__ int
 get_order (unsigned long size)
 {
-	double d = size - 1;
+	long double d = size - 1;
 	long order;
 
 	order = ia64_getf_exp(d);

@@ -484,7 +484,7 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 	dma_addr = dma_map_single(&pHCB->pci_dev->dev, SCpnt->sense_buffer,
 				  SENSE_SIZE, DMA_FROM_DEVICE);
 	pSCB->SCB_SensePtr = cpu_to_le32((u32)dma_addr);
-	pSCB->SCB_SenseLen = SENSE_SIZE;
+	pSCB->SCB_SenseLen = cpu_to_le32(SENSE_SIZE);
 	SCpnt->SCp.ptr = (char *)(unsigned long)dma_addr;
 
 	pSCB->SCB_CDBLen = SCpnt->cmd_len;
@@ -502,7 +502,7 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 		dma_addr = dma_map_single(&pHCB->pci_dev->dev, &pSCB->SCB_SGList[0],
 					  sizeof(struct SG_Struc) * TOTAL_SG_ENTRY,
 					  DMA_BIDIRECTIONAL);
-		pSCB->SCB_BufPtr = dma_addr;
+		pSCB->SCB_BufPtr = cpu_to_le32((u32)dma_addr);
 		SCpnt->SCp.dma_handle = dma_addr;
 
 		pSrbSG = (struct scatterlist *) SCpnt->request_buffer;
@@ -512,8 +512,8 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 		pSCB->SCB_Flags |= SCF_SG;	/* Turn on SG list flag       */
 		for (i = 0, TotalLen = 0, pSG = &pSCB->SCB_SGList[0];	/* 1.01g */
 		     i < pSCB->SCB_SGLen; i++, pSG++, pSrbSG++) {
-			pSG->SG_Ptr = (u32)sg_dma_address(pSrbSG);
-			TotalLen += pSG->SG_Len = (u32)sg_dma_len(pSrbSG);
+			pSG->SG_Ptr = cpu_to_le32((u32)sg_dma_address(pSrbSG));
+			TotalLen += pSG->SG_Len = cpu_to_le32((u32)sg_dma_len(pSrbSG));
 		}
 
 		pSCB->SCB_BufLen = (SCpnt->request_bufflen > TotalLen) ?
@@ -523,8 +523,8 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 					  SCpnt->request_bufflen,
 					  SCpnt->sc_data_direction);
 		SCpnt->SCp.dma_handle = dma_addr;
-		pSCB->SCB_BufPtr = (u32)dma_addr;
-		pSCB->SCB_BufLen = (u32)SCpnt->request_bufflen;
+		pSCB->SCB_BufPtr = cpu_to_le32((u32)dma_addr);
+		pSCB->SCB_BufLen = cpu_to_le32((u32)SCpnt->request_bufflen);
 		pSCB->SCB_SGLen = 0;
 	} else {
 		pSCB->SCB_BufLen = 0;

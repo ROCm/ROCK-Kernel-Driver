@@ -3165,7 +3165,6 @@ int cpc_open(struct net_device *dev)
 		return result;
 	}
 
-	MOD_INC_USE_COUNT;
 	sprintf(ifr.ifr_name, "%s", dev->name);
 	cpc_opench(d);
 	netif_start_queue(dev);
@@ -3201,7 +3200,6 @@ int cpc_close(struct net_device *dev)
 	}
 #endif
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

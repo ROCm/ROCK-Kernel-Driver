@@ -1372,9 +1372,6 @@ void x25_kill_by_neigh(struct x25_neigh *nb)
 
 static int __init x25_init(void)
 {
-#ifdef MODULE
-	struct net_device *dev;
-#endif /* MODULE */
 	sock_register(&x25_family_ops);
 
 	dev_add_pack(&x25_packet_type);
@@ -1386,23 +1383,7 @@ static int __init x25_init(void)
 #ifdef CONFIG_SYSCTL
 	x25_register_sysctl();
 #endif
-
 	x25_proc_init();
-#ifdef MODULE
-	/*
-	 *	Register any pre existing devices.
-	 */
-	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev; dev = dev->next) {
-		if ((dev->flags & IFF_UP) && (dev->type == ARPHRD_X25
-#if defined(CONFIG_LLC) || defined(CONFIG_LLC_MODULE)
-					   || dev->type == ARPHRD_ETHER
-#endif
-			))
-			x25_link_device_up(dev);
-	}
-	read_unlock(&dev_base_lock);
-#endif /* MODULE */
 	return 0;
 }
 module_init(x25_init);

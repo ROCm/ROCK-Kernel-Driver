@@ -89,6 +89,8 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
         INIT_LIST_HEAD(&h->pending_packets);
         spin_lock_init(&h->pending_pkt_lock);
 
+	INIT_LIST_HEAD(&h->addr_space);
+
 	for (i = 0; i < ARRAY_SIZE(h->tpool); i++)
 		HPSB_TPOOL_INIT(&h->tpool[i]);
 

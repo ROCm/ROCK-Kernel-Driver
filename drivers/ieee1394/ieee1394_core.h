@@ -176,9 +176,9 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
  * task-specific interfaces (raw1394, video1394, dv1394, etc) in
  * blocks of 16.
  *
- * The core ieee1394.o modules handles the initial open() for all
- * character devices on major 171; it then dispatches to the
- * appropriate task-specific driver.
+ * The core ieee1394.o module allocates the device number region
+ * 171:0-255, the various drivers must then cdev_add() their cdev
+ * objects to handle their respective sub-regions.
  *
  * Minor device number block allocations:
  *
@@ -199,29 +199,19 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
 #define IEEE1394_MINOR_BLOCK_AMDTP         3
 #define IEEE1394_MINOR_BLOCK_EXPERIMENTAL 15
 
+#define IEEE1394_CORE_DEV		MKDEV(IEEE1394_MAJOR, 0)
+#define IEEE1394_RAW1394_DEV		MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16)
+#define IEEE1394_VIDEO1394_DEV		MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_VIDEO1394 * 16)
+#define IEEE1394_DV1394_DEV		MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_DV1394 * 16)
+#define IEEE1394_AMDTP_DEV		MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_AMDTP * 16)
+#define IEEE1394_EXPERIMENTAL_DEV	MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_EXPERIMENTAL * 16)
+
 /* return the index (within a minor number block) of a file */
 static inline unsigned char ieee1394_file_to_instance(struct file *file)
 {
-	unsigned char minor = iminor(file->f_dentry->d_inode);
-	
-	/* return lower 4 bits */
-	return minor & 0xF;
+	return file->f_dentry->d_inode->i_cindex;
 }
 
-/* 
- * Task-specific drivers should call ieee1394_register_chardev() to
- * request a block of 16 minor numbers.
- *
- * Returns 0 if the request was successful, -EBUSY if the block was
- * already taken.
- */
-
-int  ieee1394_register_chardev(int blocknum,           /* 0-15 */
-			       struct module *module,  /* THIS_MODULE */
-			       struct file_operations *file_ops);
-
-/* release a block of minor numbers */
-void ieee1394_unregister_chardev(int blocknum);
 
 /* Our sysfs bus entry */
 extern struct bus_type ieee1394_bus_type;

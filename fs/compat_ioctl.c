@@ -65,6 +65,7 @@
 #include <linux/ncp_fs.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+#include <linux/wireless.h>
 
 #include <net/sock.h>          /* siocdevprivate_ioctl */
 #include <net/bluetooth/bluetooth.h>
@@ -2970,6 +2971,48 @@ static int do_i2c_smbus_ioctl(unsigned int fd, unsigned int cmd, unsigned long a
 	return sys_ioctl(fd, cmd, (unsigned long)tdata);
 }
 
+struct compat_iw_point {
+	compat_caddr_t pointer;
+	__u16 length;
+	__u16 flags;
+};
+
+static int do_wireless_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct iwreq *iwr, *iwr_u;
+	struct iw_point *iwp;
+	struct compat_iw_point *iwp_u;
+	compat_caddr_t pointer;
+	__u16 length, flags;
+
+	iwr_u = (struct iwreq *) compat_ptr(arg);
+	iwp_u = (struct compat_iw_point *) &iwr_u->u.data;
+	iwr = compat_alloc_user_space(sizeof(*iwr));
+	if (iwr == NULL)
+		return -ENOMEM;
+
+	iwp = &iwr->u.data;
+
+	if (verify_area(VERIFY_WRITE, iwr, sizeof(*iwr)))
+		return -EFAULT;
+
+	if (__copy_in_user(&iwr->ifr_ifrn.ifrn_name[0],
+			   &iwr_u->ifr_ifrn.ifrn_name[0],
+			   sizeof(iwr->ifr_ifrn.ifrn_name)))
+		return -EFAULT;
+
+	if (__get_user(pointer, &iwp_u->pointer) ||
+	    __get_user(length, &iwp_u->length) ||
+	    __get_user(flags, &iwp_u->flags))
+		return -EFAULT;
+
+	if (__put_user(compat_ptr(pointer), &iwp->pointer) ||
+	    __put_user(length, &iwp->length) ||
+	    __put_user(flags, &iwp->flags))
+		return -EFAULT;
+
+	return sys_ioctl(fd, cmd, (unsigned long) iwr);
+}
 
 #undef CODE
 #endif
@@ -3133,6 +3176,20 @@ HANDLE_IOCTL(USBDEVFS_DISCSIGNAL32, do_usbdevfs_discsignal)
 HANDLE_IOCTL(I2C_FUNCS, w_long)
 HANDLE_IOCTL(I2C_RDWR, do_i2c_rdwr_ioctl)
 HANDLE_IOCTL(I2C_SMBUS, do_i2c_smbus_ioctl)
+/* wireless */
+HANDLE_IOCTL(SIOCGIWRANGE, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCSIWSPY, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWSPY, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCSIWTHRSPY, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWTHRSPY, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWAPLIST, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWSCAN, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCSIWESSID, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWESSID, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCSIWNICKN, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWNICKN, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCSIWENCODE, do_wireless_ioctl)
+HANDLE_IOCTL(SIOCGIWENCODE, do_wireless_ioctl)
 
 #undef DECLARES
 #endif

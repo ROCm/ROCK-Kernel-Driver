@@ -1,16 +1,17 @@
 /******************************************************************************
  *
  * Name:	sklm80.c
- * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.20 $
- * Date:	$Date: 2002/08/13 09:16:27 $
- * Purpose:	Funktions to access Voltage and Temperature Sensor (LM80)
+ * Project:	Gigabit Ethernet Adapters, TWSI-Module
+ * Version:	$Revision: 1.22 $
+ * Date:	$Date: 2003/10/20 09:08:21 $
+ * Purpose:	Functions to access Voltage and Temperature Sensor (LM80)
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -26,15 +27,21 @@
  * History:
  *
  *	$Log: sklm80.c,v $
+ *	Revision 1.22  2003/10/20 09:08:21  rschmidt
+ *	Editorial changes.
+ *	
+ *	Revision 1.21  2003/09/23 09:29:04  malthoff
+ *	Parameter Dev_Size added to macro SK_I2C_CTL.
+ *	
  *	Revision 1.20  2002/08/13 09:16:27  rschmidt
  *	Changed return value for SkLm80ReadSensor() back to 'int'
- *	Editorial changes
+ *	Editorial changes.
  *	
  *	Revision 1.19  2002/08/06 09:43:31  jschmalz
- *	Extensions and changes for Yukon
+ *	Extensions and changes for Yukon.
  *	
  *	Revision 1.18  2002/08/02 12:26:57  rschmidt
- *	Editorial changes
+ *	Editorial changes.
  *	
  *	Revision 1.17  1999/11/22 13:35:51  cgoos
  *	Changed license header to GPL.
@@ -93,16 +100,15 @@
  *	Revision 1.1  1998/07/17 09:57:12  gklug
  *	initial version
  *
- *
- *
  ******************************************************************************/
-
 
 /*
 	LM80 functions
 */
+#if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"$Id: sklm80.c,v 1.20 2002/08/13 09:16:27 rschmidt Exp $" ;
+	"@(#) $Id: sklm80.c,v 1.22 2003/10/20 09:08:21 rschmidt Exp $ (C) Marvell. ";
+#endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
 #include "h/lm80.h"
@@ -202,7 +208,7 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
 	switch (pSen->SenState) {
 	case SK_SEN_IDLE:
 		/* Send address to ADDR register */
-		SK_I2C_CTL(IoC, I2C_READ, pSen->SenDev, pSen->SenReg, 0);
+		SK_I2C_CTL(IoC, I2C_READ, pSen->SenDev, I2C_025K_DEV, pSen->SenReg, 0);
 
 		pSen->SenState = SK_SEN_VALUE ;
 		BREAK_OR_WAIT(pAC, IoC, I2C_READ);
@@ -250,7 +256,7 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
 			(pSen->SenValue % SK_LM80_TEMP_LSB);
 
 		/* Send address to ADDR register */
-		SK_I2C_CTL(IoC, I2C_READ, pSen->SenDev, LM80_TEMP_CTRL, 0);
+		SK_I2C_CTL(IoC, I2C_READ, pSen->SenDev, I2C_025K_DEV, LM80_TEMP_CTRL, 0);
 
 		pSen->SenState = SK_SEN_VALEXT ;
 		BREAK_OR_WAIT(pAC, IoC, I2C_READ);
@@ -284,3 +290,4 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
 	/* Not completed */
 	return(0);
 }
+
