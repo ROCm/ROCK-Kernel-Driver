@@ -796,3 +796,61 @@ CONFIG_BLK_DEV_TIVO
   Enable vendor-specific code for TiVo IDE disks.  Unless you are the
   IDE maintainer, you probably do not want to mess with this.
 
+CONFIG_IDEDISK_STROKE
+  Should you have a system w/ an AWARD Bios and your drives are larger
+  than 32GB and it will not boot, one is required to perform a few OEM
+  operations first.  The option is called "STROKE" because it allows
+  one to "soft clip" the drive to work around a barrier limit.  For
+  Maxtor drives it is called "jumpon.exe".  Please search Maxtor's
+  web-site for "JUMPON.EXE".  IBM has a similar tool at:
+  <http://www.storage.ibm.com/hdd/support/download.htm>.
+
+  If you are unsure, say N here.
+
+CONFIG_IDE_TASK_IOCTL
+  This is a direct raw access to the media.  It is a complex but
+  elegant solution to test and validate the domain of the hardware and
+  perform below the driver data recovery if needed.  This is the most
+  basic form of media-forensics.
+
+  If you are unsure, say N here.
+
+CONFIG_BLK_DEV_IDEDMA_FORCED
+  This is an old piece of lost code from Linux 2.0 Kernels.
+
+  Generally say N here.
+
+CONFIG_IDEDMA_ONLYDISK
+  This is used if you know your ATAPI Devices are going to fail DMA
+  Transfers.
+
+  Generally say N here.
+
+CONFIG_BLK_DEV_IT8172
+  Say Y here to support the on-board IDE controller on the Integrated
+  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+
+CONFIG_IT8172_TUNING
+  Say Y here to support tuning the ITE8172's IDE interface.  This makes
+  it possible to set DMA channel or PIO opration and the transfer rate.
+
+CONFIG_IT8172_REVC
+  Say Y here to support the older, Revision C version of the Integrated
+  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+
+CONFIG_IT8172_SCR0
+  Say Y here to support smart-card reader 0 (SCR0) on the Integrated
+  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+
+CONFIG_IT8172_SCR1
+  Say Y here to support smart-card reader 1 (SCR1) on the Integrated
+  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+

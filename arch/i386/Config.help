@@ -386,7 +386,7 @@ CONFIG_M386
      will run on a 386 class machine.
    - "486" for the AMD/Cyrix/IBM/Intel 486DX/DX2/DX4 or
      SL/SLC/SLC2/SLC3/SX/SX2 and UMC U5D or U5S.
-   - "586" for generic Pentium CPUs, possibly lacking the TSC
+   - "586" for generic Pentium CPUs lacking the TSC
      (time stamp counter) register.
    - "Pentium-Classic" for the Intel Pentium.
    - "Pentium-MMX" for the Intel Pentium MMX.
@@ -413,11 +413,68 @@ CONFIG_M486
 CONFIG_M586
   Select this for an x586 or x686 processor such as the AMD K5, the
   Intel 5x86 or 6x86, or the Intel 6x86MX.  This choice does not
-  assume the RDTSC instruction.
+  assume the RDTSC (Read Time Stamp Counter) instruction.
 
 CONFIG_M586TSC
   Select this for a Pentium Classic processor with the RDTSC (Read
   Time Stamp Counter) instruction for benchmarking.
+
+CONFIG_M586MMX
+  Select this for a Pentium with the MMX graphics/multimedia
+  extended instructions.
+
+CONFIG_M686
+  Select this for a Pro/Celeron/Pentium II.  This enables the use of
+  Pentium Pro extended instructions, and disables the init-time guard
+  against the f00f bug found in earlier Pentiums.
+
+CONFIG_MPENTIUMIII
+  Select this for Intel chips based on the Pentium-III and
+  Celeron-Coppermine core.  Enables use of some extended prefetch
+  instructions, in addition to the Pentium II extensions.
+
+CONFIG_MPENTIUM4
+  Select this for Intel Pentium 4 chips.  Presently these are
+  treated almost like Pentium IIIs, but with a different cache
+  shift.
+
+CONFIG_MCRUSOE
+  Select this for Transmeta Crusoe processor.  Treats the processor
+  like a 586 with TSC, and sets some GCC optimization flags (like a
+  Pentium Pro with no alignment requirements).
+
+CONFIG_MK6
+  Select this for an AMD K6-family processor.  Enables use of
+  some extended instructions, and passes appropriate optimization
+  flags to GCC.
+
+CONFIG_MK7
+  Select this for an AMD Athlon K7-family processor.  Enables use of
+  some extended instructions, and passes appropriate optimization
+  flags to GCC.
+
+CONFIG_MCYRIXIII
+  Select this for a Cyrix III or C3 chip.  Presently Linux and GCC
+  treat this chip as a generic 586. Whilst the CPU is 686 class,
+  it lacks the cmov extension which gcc assumes is present when
+  generating 686 code.
+
+CONFIG_MWINCHIPC6
+  Select this for a IDT Winchip C6 chip.  Linux and GCC
+  treat this chip as a 586TSC with some extended instructions
+  and alignment requirements.
+
+CONFIG_MWINCHIP2
+  Select this for a IDT Winchip-2.  Linux and GCC
+  treat this chip as a 586TSC with some extended instructions
+  and alignment requirements.
+
+CONFIG_MWINCHIP3D
+  Select this for a IDT Winchip-2A or 3.  Linux and GCC
+  treat this chip as a 586TSC with some extended instructions
+  and alignment reqirements.  Development kernels also enable
+  out of order memory stores for this CPU, which can increase
+  performance of some operations.
 
 CONFIG_VGA_CONSOLE
   Saying Y here will allow you to use Linux in text mode through a
