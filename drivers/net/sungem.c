@@ -2416,13 +2416,6 @@ static int gem_nway_reset(struct net_device *dev)
 	return 0;
 }
 
-static u32 gem_get_link(struct net_device *dev)
-{
-	struct gem *gp = dev->priv;
-
-	return (gp->lstate == link_up);
-}
-
 static u32 gem_get_msglevel(struct net_device *dev)
 {
 	struct gem *gp = dev->priv;
@@ -2441,7 +2434,6 @@ static struct ethtool_ops gem_ethtool_ops = {
 	.get_settings		= gem_get_settings,
 	.set_settings		= gem_set_settings,
 	.nway_reset		= gem_nway_reset,
-	.get_link		= gem_get_link,
 	.get_msglevel		= gem_get_msglevel,
 	.set_msglevel		= gem_set_msglevel,
 };
