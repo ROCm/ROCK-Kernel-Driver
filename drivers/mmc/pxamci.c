@@ -464,6 +464,7 @@ static int pxamci_probe(struct device *dev)
 	pxamci_stop_clock(host);
 	writel(0, host->base + MMC_SPI);
 	writel(64, host->base + MMC_RESTO);
+	writel(host->imask, host->base + MMC_I_MASK);
 
 	pxa_gpio_mode(GPIO6_MMCCLK_MD);
 	pxa_gpio_mode(GPIO8_MMCCS0_MD);
