@@ -379,6 +379,22 @@ static inline void percpu_modcopy(void *pcpudst, const void *src,
 }
 #endif /* CONFIG_SMP */
 
+static int add_attribute(struct module *mod, struct kernel_param *kp)
+{
+	struct module_attribute *a;
+	int retval;
+
+	a = &mod->mkobj->attr[mod->mkobj->num_attributes];
+	a->attr.name = (char *)kp->name;
+	a->attr.owner = mod;
+	a->attr.mode = kp->perm;
+	a->param = kp;
+	retval = sysfs_create_file(&mod->mkobj->kobj, &a->attr);
+	if (!retval)
+		mod->mkobj->num_attributes++;
+	return retval;
+}
+
 #ifdef CONFIG_MODULE_UNLOAD
 /* Init the unload section of the module. */
 static void module_unload_init(struct module *mod)
@@ -502,22 +518,6 @@ static int try_stop_module(struct module *mod, int flags, int *forced)
 	struct stopref sref = { mod, flags, forced };
 
 	return stop_machine_run(__try_stop_module, &sref, NR_CPUS);
-}
-
-static int add_attribute(struct module *mod, struct kernel_param *kp)
-{
-	struct module_attribute *a;
-	int retval;
-
-	a = &mod->mkobj->attr[mod->mkobj->num_attributes];
-	a->attr.name = (char *)kp->name;
-	a->attr.owner = mod;
-	a->attr.mode = kp->perm;
-	a->param = kp;
-	retval = sysfs_create_file(&mod->mkobj->kobj, &a->attr);
-	if (!retval)
-		mod->mkobj->num_attributes++;
-	return retval;
 }
 
 unsigned int module_refcount(struct module *mod)
