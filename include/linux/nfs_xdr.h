@@ -153,6 +153,7 @@ struct nfs_closeargs {
 	struct nfs_fh *         fh;
 	nfs4_stateid            stateid;
 	__u32                   seqid;
+	__u32			share_access;
 };
 
 struct nfs_closeres {

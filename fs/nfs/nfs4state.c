@@ -188,6 +188,23 @@ nfs4_client_grab_unused(struct nfs4_client *clp, struct rpc_cred *cred)
 	return sp;
 }
 
+static struct nfs4_state_owner *
+nfs4_find_state_owner(struct nfs4_client *clp, struct rpc_cred *cred)
+{
+	struct nfs4_state_owner *sp, *res = NULL;
+
+	list_for_each_entry(sp, &clp->cl_state_owners, so_list) {
+		if (sp->so_cred != cred)
+			continue;
+		atomic_inc(&sp->so_count);
+		/* Move to the head of the list */
+		list_move(&sp->so_list, &clp->cl_state_owners);
+		res = sp;
+		break;
+	}
+	return res;
+}
+
 /*
  * nfs4_alloc_state_owner(): this is called on the OPEN or CREATE path to
  * create a new state_owner.
@@ -208,6 +225,15 @@ nfs4_alloc_state_owner(void)
 	return sp;
 }
 
+static void
+nfs4_unhash_state_owner(struct nfs4_state_owner *sp)
+{
+	struct nfs4_client *clp = sp->so_client;
+	spin_lock(&clp->cl_lock);
+	list_del_init(&sp->so_list);
+	spin_unlock(&clp->cl_lock);
+}
+
 struct nfs4_state_owner *
 nfs4_get_state_owner(struct nfs_server *server, struct rpc_cred *cred)
 {
@@ -217,7 +243,9 @@ nfs4_get_state_owner(struct nfs_server *server, struct rpc_cred *cred)
 	get_rpccred(cred);
 	new = nfs4_alloc_state_owner();
 	spin_lock(&clp->cl_lock);
-	sp = nfs4_client_grab_unused(clp, cred);
+	sp = nfs4_find_state_owner(clp, cred);
+	if (sp == NULL)
+		sp = nfs4_client_grab_unused(clp, cred);
 	if (sp == NULL && new != NULL) {
 		list_add(&new->so_list, &clp->cl_state_owners);
 		new->so_client = clp;
@@ -248,6 +276,8 @@ nfs4_put_state_owner(struct nfs4_state_owner *sp)
 		return;
 	if (clp->cl_nunused >= OPENOWNER_POOL_SIZE)
 		goto out_free;
+	if (list_empty(&sp->so_list))
+		goto out_free;
 	list_move(&sp->so_list, &clp->cl_unused);
 	clp->cl_nunused++;
 	spin_unlock(&clp->cl_lock);
@@ -269,24 +299,38 @@ nfs4_alloc_open_state(void)
 	state = kmalloc(sizeof(*state), GFP_KERNEL);
 	if (!state)
 		return NULL;
-	state->pid = current->pid;
 	state->state = 0;
+	state->nreaders = 0;
+	state->nwriters = 0;
 	memset(state->stateid.data, 0, sizeof(state->stateid.data));
 	atomic_set(&state->count, 1);
 	return state;
 }
 
 static struct nfs4_state *
-__nfs4_find_state_bypid(struct inode *inode, pid_t pid)
+__nfs4_find_state(struct inode *inode, struct rpc_cred *cred, mode_t mode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs4_state *state;
 
+	mode &= (FMODE_READ|FMODE_WRITE);
 	list_for_each_entry(state, &nfsi->open_states, inode_states) {
-		if (state->pid == pid) {
-			atomic_inc(&state->count);
-			return state;
-		}
+		if (state->owner->so_cred != cred)
+			continue;
+		if ((mode & FMODE_READ) != 0 && state->nreaders == 0)
+			continue;
+		if ((mode & FMODE_WRITE) != 0 && state->nwriters == 0)
+			continue;
+		if ((state->state & mode) != mode)
+			continue;
+		/* Add the state to the head of the inode's list */
+		list_move(&state->inode_states, &nfsi->open_states);
+		atomic_inc(&state->count);
+		if (mode & FMODE_READ)
+			state->nreaders++;
+		if (mode & FMODE_WRITE)
+			state->nwriters++;
+		return state;
 	}
 	return NULL;
 }
@@ -298,7 +342,12 @@ __nfs4_find_state_byowner(struct inode *inode, struct nfs4_state_owner *owner)
 	struct nfs4_state *state;
 
 	list_for_each_entry(state, &nfsi->open_states, inode_states) {
+		/* Is this in the process of being freed? */
+		if (state->nreaders == 0 && state->nwriters == 0)
+			continue;
 		if (state->owner == owner) {
+			/* Add the state to the head of the inode's list */
+			list_move(&state->inode_states, &nfsi->open_states);
 			atomic_inc(&state->count);
 			return state;
 		}
@@ -307,16 +356,12 @@ __nfs4_find_state_byowner(struct inode *inode, struct nfs4_state_owner *owner)
 }
 
 struct nfs4_state *
-nfs4_find_state_bypid(struct inode *inode, pid_t pid)
+nfs4_find_state(struct inode *inode, struct rpc_cred *cred, mode_t mode)
 {
-	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs4_state *state;
 
 	spin_lock(&inode->i_lock);
-	state = __nfs4_find_state_bypid(inode, pid);
-	/* Add the state to the tail of the inode's list */
-	if (state)
-		list_move_tail(&state->inode_states, &nfsi->open_states);
+	state = __nfs4_find_state(inode, cred, mode);
 	spin_unlock(&inode->i_lock);
 	return state;
 }
@@ -387,6 +432,50 @@ nfs4_put_open_state(struct nfs4_state *state)
 	nfs4_put_state_owner(owner);
 }
 
+void
+nfs4_close_state(struct nfs4_state *state, mode_t mode)
+{
+	struct inode *inode = state->inode;
+	struct nfs4_state_owner *owner = state->owner;
+	int newstate;
+	int status = 0;
+
+	down(&owner->so_sema);
+	/* Protect against nfs4_find_state() */
+	spin_lock(&inode->i_lock);
+	if (mode & FMODE_READ)
+		state->nreaders--;
+	if (mode & FMODE_WRITE)
+		state->nwriters--;
+	if (state->nwriters == 0 && state->nreaders == 0)
+		list_del_init(&state->inode_states);
+	spin_unlock(&inode->i_lock);
+	do {
+	 	newstate = 0;
+		if (state->state == 0)
+			break;
+		if (state->nreaders)
+			newstate |= FMODE_READ;
+		if (state->nwriters)
+			newstate |= FMODE_WRITE;
+		if (state->state == newstate)
+			break;
+		if (newstate != 0)
+			status = nfs4_do_downgrade(inode, state, newstate);
+		else
+			status = nfs4_do_close(inode, state);
+		if (!status) {
+			state->state = newstate;
+			break;
+		}
+		up(&owner->so_sema);
+		status = nfs4_handle_error(NFS_SERVER(inode), status);
+		down(&owner->so_sema);
+	} while (!status);
+	up(&owner->so_sema);
+	nfs4_put_open_state(state);
+}
+
 /*
 * Called with sp->so_sema held.
 *
@@ -399,6 +488,9 @@ nfs4_increment_seqid(int status, struct nfs4_state_owner *sp)
 {
 	if (status == NFS_OK || seqid_mutating_err(-status))
 		sp->so_seqid++;
+	/* If the server returns BAD_SEQID, unhash state_owner here */
+	if (status == -NFS4ERR_BAD_SEQID)
+		nfs4_unhash_state_owner(sp);
 }
 
 static int reclaimer(void *);

@@ -176,6 +176,14 @@ static int nfs_stat_to_errno(int);
 					op_decode_hdr_maxsz + \
 					4 + 5 + 2 + 3 + \
 					decode_getattr_maxsz
+#define NFS4_enc_open_downgrade_sz \
+				compound_encode_hdr_maxsz + \
+                                encode_putfh_maxsz + \
+                                op_encode_hdr_maxsz + 7
+#define NFS4_dec_open_downgrade_sz \
+				compound_decode_hdr_maxsz + \
+                                decode_putfh_maxsz + \
+                                op_decode_hdr_maxsz + 4
 #define NFS4_enc_close_sz       compound_encode_hdr_maxsz + \
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + 5
@@ -712,6 +720,22 @@ encode_open_reclaim(struct xdr_stream *xdr, struct nfs_open_reclaimargs *arg)
 }
 
 static int
+encode_open_downgrade(struct xdr_stream *xdr, struct nfs_closeargs *arg)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(16+sizeof(arg->stateid.data));
+	WRITE32(OP_OPEN_DOWNGRADE);
+	WRITEMEM(arg->stateid.data, sizeof(arg->stateid.data));
+	WRITE32(arg->seqid);
+	WRITE32(arg->share_access);
+	/* No deny modes */
+	WRITE32(0);
+
+	return 0;
+}
+
+static int
 encode_putfh(struct xdr_stream *xdr, struct nfs_fh *fh)
 {
 	int len = fh->size;
@@ -1129,6 +1153,27 @@ out:
 	return status;
 }
 
+/*
+ * Encode an OPEN_DOWNGRADE request
+ */
+static int
+nfs4_xdr_enc_open_downgrade(struct rpc_rqst *req, uint32_t *p, struct nfs_closeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_open_downgrade(&xdr, args);
+out:
+	return status;
+}
 
 /*
  * Encode a READ request
@@ -2001,6 +2046,19 @@ decode_open_confirm(struct xdr_stream *xdr, struct nfs_open_confirmres *res)
         return 0;
 }
 
+static int
+decode_open_downgrade(struct xdr_stream *xdr, struct nfs_closeres *res)
+{
+	uint32_t *p;
+	int status;
+
+	status = decode_op_hdr(xdr, OP_OPEN_DOWNGRADE);
+	if (status)
+		return status;
+	READ_BUF(sizeof(res->stateid.data));
+	COPYMEM(res->stateid.data, sizeof(res->stateid.data));
+	return 0;
+}
 
 static int
 decode_putfh(struct xdr_stream *xdr)
@@ -2377,6 +2435,29 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 
 	DECODE_TAIL;
 }
+
+/*
+ * Decode OPEN_DOWNGRADE response
+ */
+static int
+nfs4_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                goto out;
+        status = decode_putfh(&xdr);
+        if (status)
+                goto out;
+        status = decode_open_downgrade(&xdr, res);
+out:
+        return status;
+}
+
 /*
  * END OF "GENERIC" DECODE ROUTINES.
  */
@@ -2827,6 +2908,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(OPEN,		enc_open,	dec_open),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
   PROC(OPEN_RECLAIM,	enc_open_reclaim,	dec_open_reclaim),
+  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade),
   PROC(CLOSE,		enc_close,	dec_close),
   PROC(SETATTR,		enc_setattr,	dec_setattr),
   PROC(FSINFO,		enc_fsinfo,	dec_fsinfo),

@@ -616,8 +616,13 @@ retry:
 		memcpy(&state->stateid, &oc_res.stateid, sizeof(state->stateid));
 	} else
 		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
+	spin_lock(&inode->i_lock);
+	if (flags & FMODE_READ)
+		state->nreaders++;
+	if (flags & FMODE_WRITE)
+		state->nwriters++;
 	state->state |= flags & (FMODE_READ|FMODE_WRITE);
-	state->pid = current->pid;
+	spin_unlock(&inode->i_lock);
 
 	up(&sp->so_sema);
 	nfs4_put_state_owner(sp);
@@ -633,6 +638,21 @@ out_up:
 	if (inode) {
 		iput(inode);
 		inode = NULL;
+	}
+	/* NOTE: BAD_SEQID means the server and client disagree about the
+	 * book-keeping w.r.t. state-changing operations
+	 * (OPEN/CLOSE/LOCK/LOCKU...)
+	 * It is actually a sign of a bug on the client or on the server.
+	 *
+	 * If we receive a BAD_SEQID error in the particular case of
+	 * doing an OPEN, we assume that nfs4_increment_seqid() will
+	 * have unhashed the old state_owner for us, and that we can
+	 * therefore safely retry using a new one. We should still warn
+	 * the user though...
+	 */
+	if (status == -NFS4ERR_BAD_SEQID) {
+		printk(KERN_WARNING "NFS: v4 server returned a bad sequence-id error!\n");
+		goto retry;
 	}
 	status = nfs4_handle_error(server, status);
 	if (!status)
@@ -722,6 +742,36 @@ nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 	 * the state_owner. we keep this around to process errors
 	 */
 	nfs4_increment_seqid(status, sp);
+	if (!status)
+		memcpy(&state->stateid, &res.stateid, sizeof(state->stateid));
+
+	return status;
+}
+
+int
+nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode) 
+{
+	struct nfs4_state_owner *sp = state->owner;
+	int status = 0;
+	struct nfs_closeargs arg = {
+		.fh		= NFS_FH(inode),
+		.seqid		= sp->so_seqid,
+		.share_access	= mode,
+	};
+	struct nfs_closeres res = {
+		.status		= 0,
+	};
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_OPEN_DOWNGRADE],
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+	};
+
+	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
+	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
+	nfs4_increment_seqid(status, sp);
+	if (!status)
+		memcpy(&state->stateid, &res.stateid, sizeof(state->stateid));
 
 	return status;
 }
@@ -771,7 +821,7 @@ nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
 		return 1;
 	}
 	d_drop(dentry);
-	nfs4_put_open_state(state);
+	nfs4_close_state(state, openflags);
 	iput(inode);
 	return 0;
 }
@@ -872,15 +922,14 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	fattr->valid = 0;
 	
 	if (size_change) {
-		state = nfs4_find_state_bypid(inode, current->pid);
-
+		struct rpc_cred *cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
+		state = nfs4_find_state(inode, cred, FMODE_WRITE);
 		if (!state) {
-			struct rpc_cred *cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
 			state = nfs4_do_open(dentry->d_parent->d_inode, 
 				&dentry->d_name, FMODE_WRITE, NULL, cred);
-			put_rpccred(cred);
 			need_iput = 1;
 		}
+		put_rpccred(cred);
 		if (IS_ERR(state))
 			return PTR_ERR(state);
 
@@ -895,7 +944,7 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 out:
 	if (state) {
 		inode = state->inode;
-		nfs4_put_open_state(state);
+		nfs4_close_state(state, FMODE_WRITE);
 		if (need_iput)
 			iput(inode);
 	}
@@ -1161,7 +1210,7 @@ nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 			status = nfs4_do_setattr(NFS_SERVER(dir), &fattr,
 			                     NFS_FH(inode), sattr, state);
 			if (status != 0) {
-				nfs4_put_open_state(state);
+				nfs4_close_state(state, flags);
 				iput(inode);
 				inode = ERR_PTR(status);
 			}
@@ -1742,6 +1791,7 @@ nfs4_proc_file_open(struct inode *inode, struct file *filp)
 {
 	struct dentry *dentry = filp->f_dentry;
 	struct nfs4_state *state;
+	struct rpc_cred *cred;
 
 	dprintk("nfs4_proc_file_open: starting on (%.*s/%.*s)\n",
 	                       (int)dentry->d_parent->d_name.len,
@@ -1750,12 +1800,14 @@ nfs4_proc_file_open(struct inode *inode, struct file *filp)
 
 
 	/* Find our open stateid */
-	state = nfs4_find_state_bypid(inode, current->pid);
+	cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
+	state = nfs4_find_state(inode, cred, filp->f_mode);
+	put_rpccred(cred);
 	if (state == NULL) {
 		printk(KERN_WARNING "NFS: v4 raced in function %s\n", __FUNCTION__);
 		return -EIO; /* ERACE actually */
 	}
-	nfs4_put_open_state(state);
+	nfs4_close_state(state, filp->f_mode);
 	if (filp->f_mode & FMODE_WRITE) {
 		lock_kernel();
 		nfs_set_mmcred(inode, state->owner->so_cred);
@@ -1774,7 +1826,7 @@ nfs4_proc_file_release(struct inode *inode, struct file *filp)
 	struct nfs4_state *state = (struct nfs4_state *)filp->private_data;
 
 	if (state)
-		nfs4_put_open_state(state);
+		nfs4_close_state(state, filp->f_mode);
 	return 0;
 }
 
@@ -1814,6 +1866,9 @@ nfs4_async_handle_error(struct rpc_task *task, struct nfs_server *server)
 		case -NFS4ERR_GRACE:
 		case -NFS4ERR_DELAY:
 			rpc_delay(task, NFS4_POLL_RETRY_TIME);
+			task->tk_status = 0;
+			return -EAGAIN;
+		case -NFS4ERR_OLD_STATEID:
 			task->tk_status = 0;
 			return -EAGAIN;
 	}
@@ -1891,6 +1946,9 @@ nfs4_handle_error(struct nfs_server *server, int errorcode)
 		case -NFS4ERR_GRACE:
 		case -NFS4ERR_DELAY:
 			ret = nfs4_delay(server->client);
+			break;
+		case -NFS4ERR_OLD_STATEID:
+			ret = 0;
 			break;
 		default:
 			if (errorcode <= -1000) {
