@@ -79,8 +79,9 @@ struct net_device *alloc_netdev(int sizeof_priv, const char *mask,
 
 	/* ensure 32-byte alignment of both the device and private area */
 
-	alloc_size = (sizeof(struct net_device) + 31) & ~31;
-	alloc_size += sizeof_priv + 31;
+	alloc_size = (sizeof(struct net_device) + NETDEV_ALIGN_CONST)
+			& ~NETDEV_ALIGN_CONST;
+	alloc_size += sizeof_priv + NETDEV_ALIGN_CONST;
 
 	p = kmalloc (alloc_size, GFP_KERNEL);
 	if (!p) {
@@ -90,7 +91,8 @@ struct net_device *alloc_netdev(int sizeof_priv, const char *mask,
 
 	memset(p, 0, alloc_size);
 
-	dev = (struct net_device *)(((long)p + 31) & ~31);
+	dev = (struct net_device *)(((long)p + NETDEV_ALIGN_CONST)
+				& ~NETDEV_ALIGN_CONST);
 	dev->padded = (char *)dev - (char *)p;
 
 	if (sizeof_priv)
