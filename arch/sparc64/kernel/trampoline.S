@@ -181,9 +181,6 @@ startup_continue:
 	wrpr		%g0, (PSTATE_PRIV | PSTATE_PEF), %pstate
 	wr		%g0, 0, %fprs
 
-	sethi		%uhi(PAGE_OFFSET), %g4
-	sllx		%g4, 32, %g4
-
 	/* XXX Buggy PROM... */
 	srl		%o0, 0, %o0
 	ldx		[%o0], %g6
@@ -257,6 +254,9 @@ startup_continue:
 #undef KERN_LOWBITS
 #undef VPTE_BASE_SPITFIRE
 #undef VPTE_BASE_CHEETAH
+
+	wrpr		%o1, 0x0, %pstate
+	ldx		[%g6 + TI_TASK], %g4
 
 	/* Setup interrupt globals, we are always SMP. */
 	wrpr		%o1, PSTATE_IG, %pstate

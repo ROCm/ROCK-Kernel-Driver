@@ -12,6 +12,7 @@
 #include <asm/mmu_context.h>
 #include <asm/pil.h>
 #include <asm/head.h>
+#include <asm/thread_info.h>
 
 	/* Basically, all this madness has to do with the
 	 * fact that Cheetah does not support IMMU flushes
@@ -288,9 +289,8 @@ __flush_icache_page:	/* %o0 = phys_page */
 	 addx		%g0, %g0, %g0
 	nop
 
-	sethi		%uhi(PAGE_OFFSET), %g4
 	retl
-	 sllx		%g4, 32, %g4
+	 ldx		[%g6 + TI_TASK], %g4
 
 iflush1:sub		%o1, 0x20, %g3
 	stxa		%g0, [%g3] ASI_IC_TAG
@@ -304,7 +304,9 @@ iflush2:sub		%o1, 0x20, %g3
 	.align		64
 	.globl		__flush_dcache_page
 __flush_dcache_page:	/* %o0=kaddr, %o1=flush_icache */
-	sub		%o0, %g4, %o0
+	sethi		%uhi(PAGE_OFFSET), %g1
+	sllx		%g1, 32, %g1
+	sub		%o0, %g1, %o0
 	
 	rdpr		%ver, %g1
 	sethi		%hi(0x003e0014), %g2

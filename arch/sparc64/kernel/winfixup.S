@@ -73,9 +73,8 @@ fill_fixup:
 	stx		%g5, [%g6 + TI_FAULT_ADDR]
 	wrpr		%g0, 0x0, %tl			! Out of trap levels.
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
-	sethi		%uhi(PAGE_OFFSET), %g4		! Prepare page_offset global reg
 	mov		%o7, %g6
-	sllx		%g4, 32, %g4			! and finish it...
+	ldx		[%g6 + TI_TASK], %g4
 
 	/* This is the same as below, except we handle this a bit special
 	 * since we must preserve %l5 and %l6, see comment above.
@@ -195,9 +194,8 @@ fill_fixup_mna:
 	mov		%g6, %o7			! Stash away current.
 	wrpr		%g0, 0x0, %tl			! Out of trap levels.
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
-	sethi		%uhi(PAGE_OFFSET), %g4		! Set page_offset global reg.
 	mov		%o7, %g6			! Get current back.
-	sllx		%g4, 32, %g4			! Finish it.
+	ldx		[%g6 + TI_TASK], %g4		! Finish it.
 	call		mem_address_unaligned
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
 
@@ -302,9 +300,8 @@ fill_fixup_dax:
 	mov		%g6, %o7			! Stash away current.
 	wrpr		%g0, 0x0, %tl			! Out of trap levels.
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
-	sethi		%uhi(PAGE_OFFSET), %g4		! Set page_offset global reg.
 	mov		%o7, %g6			! Get current back.
-	sllx		%g4, 32, %g4			! Finish it.
+	ldx		[%g6 + TI_TASK], %g4		! Finish it.
 	call		data_access_exception
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
 
