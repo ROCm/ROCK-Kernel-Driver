@@ -1486,6 +1486,7 @@ int lmLogClose(struct super_block *sb)
 		 *      in-line log in host file system
 		 */
 		rc = lmLogShutdown(log);
+		kfree(log);
 		goto out;
 	}
 
@@ -1514,6 +1515,8 @@ int lmLogClose(struct super_block *sb)
 
 	bd_release(bdev);
 	blkdev_put(bdev);
+
+	kfree(log);
 
       out:
 	up(&jfs_log_sem);
