@@ -47,6 +47,7 @@
 
 #define GOHUBS_VID	0x0921	/* GoHubs vendor id */
 #define GOHUBS_PID	0x1000	/* GoHubs single port serial converter's id (identical to the Peracom device) */
+#define HANDYLINK_PID	0x1200	/* HandyLink USB's id (identical to the Peracom device) */
 
 /* Vendor Request Interface */
 #define BELKIN_SA_SET_BAUDRATE_REQUEST	0  /* Set baud rate */
