@@ -326,9 +326,11 @@ skip_copy_pte_range:
 					 * Device driver pages must not be
 					 * tracked by the VM for unmapping.
 					 */
-					BUG_ON(!page_mapped(page));
-					BUG_ON(!page->mapping);
-					page_add_rmap(page, vma, address, PageAnon(page));
+					if (likely(page_mapped(page) && page->mapping))
+						page_add_rmap(page, vma, address, PageAnon(page));
+					else
+						printk("Badness in %s at %s:%d\n",
+						       __FUNCTION__, __FILE__, __LINE__);
 				} else {
 					BUG_ON(page_mapped(page));
 					BUG_ON(page->mapping);
@@ -1432,7 +1434,9 @@ retry:
 	 * real anonymous pages, they're "device" reserved pages instead.
 	 */
 	reserved = !!(vma->vm_flags & VM_RESERVED);
-	WARN_ON(reserved == pageable);
+	if (unlikely(reserved == pageable))
+		printk("Badness in %s at %s:%d\n",
+		       __FUNCTION__, __FILE__, __LINE__);
 
 	/*
 	 * Should we do an early C-O-W break?
