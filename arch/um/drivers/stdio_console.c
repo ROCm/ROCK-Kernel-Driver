@@ -230,7 +230,8 @@ console_initcall(stdio_console_init);
 
 static int console_chan_setup(char *str)
 {
-	line_setup(vts, sizeof(vts)/sizeof(vts[0]), str, 1);
+	if (0 != line_setup(vts, sizeof(vts)/sizeof(vts[0]), str, 1))
+		return 0;
 	return(1);
 }
 
