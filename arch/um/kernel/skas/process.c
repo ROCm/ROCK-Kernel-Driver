@@ -63,6 +63,7 @@ static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu
 {
 	int err, status;
 
+	/* Mark this as a syscall */
 	UPT_SYSCALL_NR(regs) = PT_SYSCALL_NR(regs->skas.regs);
 
 	if (!local_using_sysemu)
@@ -160,6 +161,7 @@ void userspace(union uml_pt_regs *regs)
 
 		regs->skas.is_user = 1;
 		save_registers(regs);
+		UPT_SYSCALL_NR(regs) = -1; /* Assume: It's not a syscall */
 
 		if(WIFSTOPPED(status)){
 		  	switch(WSTOPSIG(status)){
@@ -170,7 +172,6 @@ void userspace(union uml_pt_regs *regs)
 			        handle_trap(pid, regs, local_using_sysemu);
 				break;
 			case SIGTRAP:
-				UPT_SYSCALL_NR(regs) = -1;
 				relay_signal(SIGTRAP, regs);
 				break;
 			case SIGIO:
@@ -186,6 +187,9 @@ void userspace(union uml_pt_regs *regs)
 				       "%d\n", WSTOPSIG(status));
 			}
 			interrupt_end();
+
+			/* Avoid -ERESTARTSYS handling in host */
+			PT_SYSCALL_NR(regs->skas.regs) = -1;
 		}
 
 		restore_registers(regs);

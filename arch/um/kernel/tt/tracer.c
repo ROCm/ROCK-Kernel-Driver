@@ -303,6 +303,10 @@ int tracer(int (*init_proc)(void *), void *sp)
 			tracing = is_tracing(task);
 			old_tracing = tracing;
 
+			/* Assume: no syscall, when coming from user */
+			if ( tracing )
+				do_sigtrap(task);
+
 			local_using_sysemu = get_using_sysemu();
 			pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
@@ -354,7 +358,6 @@ int tracer(int (*init_proc)(void *), void *sp)
 					continue;
 				}
 				tracing = 0;
-				do_sigtrap(task);
 				break;
 			case SIGPROF:
 				if(tracing) sig = 0;

@@ -324,6 +324,8 @@ long sys_sigreturn(struct pt_regs regs)
 	if(copy_sc_from_user(&current->thread.regs, sc))
 		goto segfault;
 
+	/* Avoid ERESTART handling */
+	PT_REGS_SYSCALL_NR(&current->thread.regs) = -1;
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 
  segfault:
@@ -352,6 +354,8 @@ long sys_rt_sigreturn(struct pt_regs regs)
 	if(copy_sc_from_user(&current->thread.regs, &uc->uc_mcontext))
 		goto segfault;
 
+	/* Avoid ERESTART handling */
+	PT_REGS_SYSCALL_NR(&current->thread.regs) = -1;
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 
  segfault:
