@@ -61,7 +61,7 @@ config AIC7XXX_PROBE_EISA_VL
 
 config AIC7XXX_BUILD_FIRMWARE
 	bool "Build Adapter Firmware with Kernel Build"
-	depends on SCSI_AIC7XXX
+	depends on SCSI_AIC7XXX && !PREVENT_FIRMWARE_BUILD
 	help
 	This option should only be enabled if you are modifying the firmware
 	source to the aic7xxx driver and wish to have the generated firmware

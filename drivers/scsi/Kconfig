@@ -320,7 +320,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
 config SCSI_AIC7XXX_OLD
 	tristate "Adaptec AIC7xxx support (old driver)"
-	depends on SCSI
+	depends on (ISA || EISA || PCI ) && SCSI
 	help
 	  WARNING This driver is an older aic7xxx driver and is no longer
 	  under active development.  Adaptec, Inc. is writing a new driver to
@@ -395,15 +395,7 @@ config SCSI_IN2000
 	  To compile this driver as a module, choose M here: the
 	  module will be called in2000.
 
-config SCSI_MEGARAID
-	tristate "AMI MegaRAID support"
-	depends on PCI && SCSI
-	help
-	  This driver supports the AMI MegaRAID 418, 428, 438, 466, 762, 490
-	  and 467 SCSI host adapters.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called megaraid.
+source "drivers/scsi/megaraid/Kconfig.megaraid"
 
 config SCSI_SATA
 	bool "Serial ATA (SATA) support"
@@ -595,7 +587,7 @@ config SCSI_EATA_MAX_TAGS
 
 config SCSI_EATA_PIO
 	tristate "EATA-PIO (old DPT PM2001, PM2012A) support"
-	depends on SCSI
+	depends on (ISA || EISA || PCI) && SCSI
 	---help---
 	  This driver supports all EATA-PIO protocol compliant SCSI Host
 	  Adapters like the DPT PM2001 and the PM2012A.  EATA-DMA compliant
@@ -779,6 +771,15 @@ config SCSI_IPS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ips.
+
+config SCSI_IBMVSCSI
+	tristate "IBM Virtual SCSI support"
+	depends on PPC_PSERIES || PPC_ISERIES
+	help
+	  This is the IBM POWER Virtual SCSI Client
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ibmvscsic.
 
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
@@ -1507,7 +1508,7 @@ source "drivers/scsi/arm/Kconfig"
 
 config JAZZ_ESP
 	bool "MIPS JAZZ FAS216 SCSI support"
-	depends on MIPS_JAZZ && SCSI
+	depends on MACH_JAZZ && SCSI
 	help
 	  This is the driver for the onboard SCSI host adapter of MIPS Magnum
 	  4000, Acer PICA, Olivetti M700-10 and a few other identical OEM

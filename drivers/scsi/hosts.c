@@ -75,9 +75,9 @@ void scsi_host_cancel(struct Scsi_Host *shost, int recovery)
  **/
 void scsi_remove_host(struct Scsi_Host *shost)
 {
+	scsi_forget_host(shost);
 	scsi_host_cancel(shost, 0);
 	scsi_proc_host_rm(shost);
-	scsi_forget_host(shost);
 
 	set_bit(SHOST_DEL, &shost->shost_state);
 

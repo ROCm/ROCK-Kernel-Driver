@@ -129,8 +129,10 @@ struct scsi_device {
 #define transport_class_to_sdev(class_dev) \
 	container_of(class_dev, struct scsi_device, transport_classdev)
 
-extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
-		uint, uint, uint);
+extern struct scsi_device *__scsi_add_device(struct Scsi_Host *,
+		uint, uint, uint, void *hostdata);
+#define scsi_add_device(host, channel, target, lun) \
+	__scsi_add_device(host, channel, target, lun, NULL)
 extern void scsi_remove_device(struct scsi_device *);
 extern int scsi_device_cancel(struct scsi_device *, int);
 
@@ -188,8 +190,40 @@ extern int scsi_device_set_state(struct scsi_device *sdev,
 extern int scsi_device_quiesce(struct scsi_device *sdev);
 extern void scsi_device_resume(struct scsi_device *sdev);
 extern const char *scsi_device_state_name(enum scsi_device_state);
-static int inline scsi_device_online(struct scsi_device *sdev)
+static inline int scsi_device_online(struct scsi_device *sdev)
 {
 	return sdev->sdev_state != SDEV_OFFLINE;
+}
+
+/* accessor functions for the SCSI parameters */
+static inline int scsi_device_sync(struct scsi_device *sdev)
+{
+	return sdev->sdtr;
+}
+static inline int scsi_device_wide(struct scsi_device *sdev)
+{
+	return sdev->wdtr;
+}
+static inline int scsi_device_dt(struct scsi_device *sdev)
+{
+	return sdev->ppr;
+}
+static inline int scsi_device_dt_only(struct scsi_device *sdev)
+{
+	if (sdev->inquiry_len < 57)
+		return 0;
+	return (sdev->inquiry[56] & 0x0c) == 0x04;
+}
+static inline int scsi_device_ius(struct scsi_device *sdev)
+{
+	if (sdev->inquiry_len < 57)
+		return 0;
+	return sdev->inquiry[56] & 0x01;
+}
+static inline int scsi_device_qas(struct scsi_device *sdev)
+{
+	if (sdev->inquiry_len < 57)
+		return 0;
+	return sdev->inquiry[56] & 0x02;
 }
 #endif /* _SCSI_SCSI_DEVICE_H */

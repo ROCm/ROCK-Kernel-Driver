@@ -376,6 +376,8 @@ static void disconnect(struct AdapterCtlBlk *acb);
 static void reselect(struct AdapterCtlBlk *acb);
 static u8 start_scsi(struct AdapterCtlBlk *acb, struct DeviceCtlBlk *dcb,
 		struct ScsiReqBlk *srb);
+static inline void enable_msgout_abort(struct AdapterCtlBlk *acb,
+		struct ScsiReqBlk *srb);
 static void build_srb(struct scsi_cmnd *cmd, struct DeviceCtlBlk *dcb,
 		struct ScsiReqBlk *srb);
 static void doing_srb_done(struct AdapterCtlBlk *acb, u8 did_code,
@@ -384,13 +386,11 @@ static void scsi_reset_detect(struct AdapterCtlBlk *acb);
 static void pci_unmap_srb(struct AdapterCtlBlk *acb, struct ScsiReqBlk *srb);
 static void pci_unmap_srb_sense(struct AdapterCtlBlk *acb,
 		struct ScsiReqBlk *srb);
-static inline void enable_msgout_abort(struct AdapterCtlBlk *acb,
-		struct ScsiReqBlk *srb);
 static void srb_done(struct AdapterCtlBlk *acb, struct DeviceCtlBlk *dcb,
 		struct ScsiReqBlk *srb);
 static void request_sense(struct AdapterCtlBlk *acb, struct DeviceCtlBlk *dcb,
 		struct ScsiReqBlk *srb);
-static inline void set_xfer_rate(struct AdapterCtlBlk *acb,
+static void set_xfer_rate(struct AdapterCtlBlk *acb,
 		struct DeviceCtlBlk *dcb);
 static void waiting_timeout(unsigned long ptr);
 
@@ -1676,6 +1676,23 @@ static u8 start_scsi(struct AdapterCtlBlk* acb, struct DeviceCtlBlk* dcb,
 }
 
 
+#define DC395x_ENABLE_MSGOUT \
+ DC395x_write16 (acb, TRM_S1040_SCSI_CONTROL, DO_SETATN); \
+ srb->state |= SRB_MSGOUT
+
+
+/* abort command */
+static inline void enable_msgout_abort(struct AdapterCtlBlk *acb,
+		struct ScsiReqBlk *srb)
+{
+	srb->msgout_buf[0] = ABORT;
+	srb->msg_count = 1;
+	DC395x_ENABLE_MSGOUT;
+	srb->state &= ~SRB_MSGIN;
+	srb->state |= SRB_MSGOUT;
+}
+
+
 /**
  * dc395x_handle_interrupt - Handle an interrupt that has been confirmed to
  *                           have been triggered for this card.
@@ -2583,11 +2600,6 @@ static inline u8 msgin_completed(u8 * msgbuf, u32 len)
 	return 1;
 }
 
-#define DC395x_ENABLE_MSGOUT \
- DC395x_write16 (acb, TRM_S1040_SCSI_CONTROL, DO_SETATN); \
- srb->state |= SRB_MSGOUT
-
-
 /* reject_msg */
 static inline void msgin_reject(struct AdapterCtlBlk *acb,
 		struct ScsiReqBlk *srb)
@@ -2600,18 +2612,6 @@ static inline void msgin_reject(struct AdapterCtlBlk *acb,
 	dprintkl(KERN_INFO, "msgin_reject: 0x%02x <%02i-%i>\n",
 		srb->msgin_buf[0],
 		srb->dcb->target_id, srb->dcb->target_lun);
-}
-
-
-/* abort command */
-static inline void enable_msgout_abort(struct AdapterCtlBlk *acb,
-		struct ScsiReqBlk *srb)
-{
-	srb->msgout_buf[0] = ABORT;
-	srb->msg_count = 1;
-	DC395x_ENABLE_MSGOUT;
-	srb->state &= ~SRB_MSGIN;
-	srb->state |= SRB_MSGOUT;
 }
 
 

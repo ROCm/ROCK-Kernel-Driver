@@ -621,6 +621,8 @@ DC390/AM53C974 SCSI driver
 P:	Kurt Garloff
 M:	garloff@suse.de
 W:	http://www.garloff.de/kurt/linux/dc390/
+P:	Guennadi Liakhovetski
+M:	g.liakhovetski@gmx.de
 S:	Maintained
 
 DECnet NETWORK LAYER
@@ -950,6 +952,12 @@ P:	Philip Edelbrock
 M:	phil@netroedge.com
 L:	sensors@stimpy.netroedge.com
 W:	http://www.lm-sensors.nu/
+S:	Maintained
+
+I2O
+P:	Markus Lidel
+M:	markus.lidel@shadowconnect.com
+W:	http://i2o.shadowconnect.com/
 S:	Maintained
 
 i386 BOOT CODE

@@ -606,22 +606,23 @@ static int NCR53c406a_release(struct Scsi_Host *shost)
 }
 
 /* called from init/main.c */
-static void __init NCR53c406a_setup(char *str, int *ints)
+static int __init NCR53c406a_setup(char *str)
 {
 	static size_t setup_idx = 0;
 	size_t i;
+	int ints[4];
 
 	DEB(printk("NCR53c406a: Setup called\n");
 	    );
 
 	if (setup_idx >= PORT_COUNT - 1) {
 		printk("NCR53c406a: Setup called too many times.  Bad LILO params?\n");
-		return;
+		return 0;
 	}
 	if (ints[0] < 1 || ints[0] > 3) {
 		printk("NCR53c406a: Malformed command line\n");
 		printk("NCR53c406a: Usage: ncr53c406a=<PORTBASE>[,<IRQ>[,<FASTPIO>]]\n");
-		return;
+		return 0;
 	}
 	for (i = 0; i < PORT_COUNT && !port_base; i++)
 		if (ports[i] == ints[1]) {
@@ -631,7 +632,7 @@ static void __init NCR53c406a_setup(char *str, int *ints)
 		}
 	if (!port_base) {
 		printk("NCR53c406a: Invalid PORTBASE 0x%x specified\n", ints[1]);
-		return;
+		return 0;
 	}
 
 	if (ints[0] > 1) {
@@ -654,6 +655,7 @@ static void __init NCR53c406a_setup(char *str, int *ints)
 		fast_pio = ints[3];
 
 	DEB(printk("NCR53c406a: port_base=0x%x, irq=%d, fast_pio=%d\n", port_base, irq_level, fast_pio);)
+	return 1;
 }
 
 __setup("ncr53c406a=", NCR53c406a_setup);

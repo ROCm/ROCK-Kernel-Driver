@@ -89,3 +89,4 @@ module_exit(qla2200_exit);
 MODULE_AUTHOR("QLogic Corporation");
 MODULE_DESCRIPTION("QLogic ISP22xx FC-SCSI Host Bus Adapter driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(QLA2XXX_VERSION);

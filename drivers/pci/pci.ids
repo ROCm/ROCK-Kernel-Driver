@@ -225,10 +225,22 @@
 		1000 0530  MegaRAID 530 SCSI 320-0X RAID Controller
 		1000 0531  MegaRAID 531 SCSI 320-4X RAID Controller
 		1000 0532  MegaRAID 532 SCSI 320-2X RAID Controller
-		1028 0533  PowerEdge Expandable RAID Controller 4/QC
-		8086 0532  Storage RAID Controller SRCU42X
+		1028 0531  PowerEdge Expandable RAID Controller 4/QC
+		8086 0530  MegaRAID Intel RAID Controller SRCZCRX
+		8086 0532  MegaRAID Intel RAID Controller SRCU42X
 	0408  MegaRAID
-		1028 0002  PowerEdge Expandable RAID Controller 4e/DC
+		1000 0001  MegaRAID SCSI 320-1E RAID Controller
+		1000 0002  MegaRAID SCSI 320-2E RAID Controller
+		1028 0001  Dell PowerEdge RAID Controller PERC4e/SC
+		1028 0002  Dell PowerEdge RAID Controller PERC4e/DC
+		1734 1065  FSC MegaRAID PCI Express ROMB
+		8086 0002  MegaRAID Intel RAID Controller SRCU42E
+	0409  MegaRAID
+		1000 3004  MegaRAID SATA 300-4X RAID Controller
+		1000 3008  MegaRAID SATA 300-8X RAID Controller
+		8086 3008  MegaRAID Intel RAID Controller SRCS28X
+		8086 3431  MegaRAID Intel RAID Controller Alief SROMBU42E
+		8086 3499  MegaRAID Intel RAID Controller Harwich SROMBU42E
 	0621  FC909 Fibre Channel Adapter
 	0622  FC929 Fibre Channel Adapter
 		1000 1020  44929 O Dual Fibre Channel card
@@ -252,7 +264,7 @@
 	1960  MegaRAID
 		1000 0518  MegaRAID 518 SCSI 320-2 Controller
 		1000 0520  MegaRAID 520 SCSI 320-1 Controller
-		1000 0522  MegaRAID 522 i4133 RAID Controller
+		1000 0522  MegaRAID 522 i4 133 RAID Controller
 		1000 0523  MegaRAID SATA 150-6 RAID Controller
 		1000 4523  MegaRAID SATA 150-4 RAID Controller
 		1000 a520  MegaRAID ZCR SCSI 320-0 Controller
@@ -260,6 +272,8 @@
 		1028 0520  MegaRAID 520 DELL PERC 4/SC RAID Controller
 		1028 0531  PowerEdge Expandable RAID Controller 4/QC
 		1028 0533  PowerEdge Expandable RAID Controller 4/QC
+		8086 0520  MegaRAID Intel RAID Controller SRCU41L
+		8086 0523  MegaRAID Intel RAID Controller SRCS16
 1001  Kolter Electronic
 	0010  PCI 1616 Measurement card with 32 digital I/O lines
 	0011  OPTO-PCI Opto-Isolated digital I/O board
@@ -959,6 +973,7 @@
 	0180  Snipe chipset SCSI controller
 		1014 0241  iSeries 2757 DASD IOA
 		1014 0264  Quad Channel PCI-X U320 SCSI RAID Adapter (2780)
+		1014 02BD  Quad Channel PCI-X U320 DDR SCSI RAID Adapter (570F)
 	01a7  PCI-X to PCI-X Bridge
 	01bd  ServeRAID Controller
 		1014 01be  ServeRAID-4M
@@ -981,6 +996,8 @@
 	0266  PCI-X Dual Channel SCSI
 	0268  Gigabit Ethernet-SX Adapter (PCI-X)
 	0269  10/100/1000 Base-TX Ethernet Adapter (PCI-X)
+	028C  Citrine chipset SCSI controller
+		1014 02BE  Dual Channel PCI-X U320 DDR SCSI RAID Adapter (571B)
 	0302  X-Architecture Bridge [Summit]
 	ffff  MPIC-2 interrupt controller
 1015  LSI Logic Corp of Canada
@@ -1244,6 +1261,8 @@
 		1028 016c  PowerEdge Expandable RAID Controller 4e/Si
 		1028 016d  PowerEdge Expandable RAID Controller 4e/Di
 		1028 016e  PowerEdge Expandable RAID Controller 4e/Di
+		1028 016f  PowerEdge Expandable RAID Controller 4e/Di
+		1028 0170  PowerEdge Expandable RAID Controller 4e/Di
 	0014  Remote Access Card 4 Daughter Card SMIC interface
 1029  Siemens Nixdorf IS
 102a  LSI Logic
@@ -2118,6 +2137,8 @@
 		1014 0242  iSeries 2872 DASD IOA
 		1014 0266  Dual Channel PCI-X U320 SCSI Adapter
 		1014 0278  Dual Channel PCI-X U320 SCSI RAID Adapter
+		1014 02D3  Dual Channel PCI-X U320 SCSI Adapter
+		1014 02D4  Dual Channel PCI-X U320 SCSI RAID Adapter
 	ba55  eXtremeRAID 1100 support Device
 	ba56  eXtremeRAID 2000/3000 support Device
 106a  Aten Research Inc
