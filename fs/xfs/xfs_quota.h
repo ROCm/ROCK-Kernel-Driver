@@ -234,6 +234,7 @@ typedef struct xfs_qoff_logformat {
 #define XFS_QMOPT_QUOTALL	(XFS_QMOPT_UQUOTA|XFS_QMOPT_GQUOTA)
 #define XFS_QMOPT_RESBLK_MASK	(XFS_QMOPT_RES_REGBLKS | XFS_QMOPT_RES_RTBLKS)
 
+#ifdef __KERNEL__
 /*
  * This check is done typically without holding the inode lock;
  * that may seem racey, but it is harmless in the context that it is used.
@@ -260,8 +261,6 @@ typedef struct xfs_qoff_logformat {
 				 XFS_GQUOTA_ENFD|XFS_GQUOTA_CHKD)
 #define XFS_MOUNT_QUOTA_MASK	(XFS_MOUNT_QUOTA_ALL | XFS_UQUOTA_ACTIVE | \
 				 XFS_GQUOTA_ACTIVE)
-
-#define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
 
 
 /*
@@ -350,5 +349,7 @@ extern struct bhv_vfsops xfs_qmops;
 
 extern void xfs_qm_init(void);
 extern void xfs_qm_exit(void);
+
+#endif	/* __KERNEL__ */
 
 #endif	/* __XFS_QUOTA_H__ */
