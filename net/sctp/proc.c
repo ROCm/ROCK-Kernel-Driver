@@ -178,7 +178,7 @@ static int sctp_eps_seq_show(struct seq_file *seq, void *v)
 			ep = sctp_ep(epb);
 			sk = epb->sk;
 			seq_printf(seq, "%8p %8p %-3d %-3d %-4d %-5d ", ep, sk,
-				   sctp_sk(sk)->type, sk->state, hash,
+				   sctp_sk(sk)->type, sk->sk_state, hash,
 				   epb->bind_addr.port);
 			sctp_seq_dump_local_addrs(seq, epb);
 			seq_printf(seq, "\n");
@@ -241,7 +241,7 @@ static int sctp_assocs_seq_show(struct seq_file *seq, void *v)
 			sk = epb->sk;
 			seq_printf(seq,
 				   "%8p %8p %-3d %-3d %-2d %-4d %-5d %-5d ",
-				   assoc, sk, sctp_sk(sk)->type, sk->state,
+				   assoc, sk, sctp_sk(sk)->type, sk->sk_state,
 				   assoc->state, hash, epb->bind_addr.port,
 				   assoc->peer.port);
 			sctp_seq_dump_local_addrs(seq, epb);
