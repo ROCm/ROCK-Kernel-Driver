@@ -293,6 +293,12 @@ struct ata_device {
 						 * ATAPI7 spec size, 40 ASCII
 						 * characters
 						 */
+
+	/* cache info about current transfer mode */
+	u8			r_protocol;	/* taskfile read protocol */
+	u8			w_protocol;	/* taskfile write protocol */
+	u8			read_cmd;	/* opcode to use on read */
+	u8			write_cmd;	/* opcode to use on write */
 };
 
 struct ata_engine {

@@ -439,6 +439,62 @@ u8 ata_check_status_mmio(struct ata_port *ap)
        	return readb((void *) ap->ioaddr.status_addr);
 }
 
+static int ata_prot_to_cmd(int protocol, int lba48)
+{
+	int rcmd = 0, wcmd = 0;
+
+	switch (protocol) {
+	case ATA_PROT_PIO_READ:
+	case ATA_PROT_PIO_WRITE:
+		if (lba48) {
+			rcmd = ATA_CMD_PIO_READ_EXT;
+			wcmd = ATA_CMD_PIO_WRITE_EXT;
+		} else {
+			rcmd = ATA_CMD_PIO_READ;
+			wcmd = ATA_CMD_PIO_WRITE;
+		}
+		break;
+
+	case ATA_PROT_DMA_READ:
+	case ATA_PROT_DMA_WRITE:
+		if (lba48) {
+			rcmd = ATA_CMD_READ_EXT;
+			wcmd = ATA_CMD_WRITE_EXT;
+		} else {
+			rcmd = ATA_CMD_READ;
+			wcmd = ATA_CMD_WRITE;
+		}
+		break;
+
+	default:
+		return -1;
+	}
+
+	return rcmd | (wcmd << 8);
+}
+
+static void ata_dev_set_protocol(struct ata_device *dev)
+{
+	int pio = (dev->flags & ATA_DFLAG_PIO);
+	int lba48 = (dev->flags & ATA_DFLAG_LBA48);
+	int proto, cmd;
+
+	if (pio) {
+		proto = dev->r_protocol = ATA_PROT_PIO_READ;
+		dev->w_protocol = ATA_PROT_PIO_WRITE;
+	} else {
+		proto = dev->r_protocol = ATA_PROT_DMA_READ;
+		dev->w_protocol = ATA_PROT_DMA_WRITE;
+	}
+
+	cmd = ata_prot_to_cmd(proto, lba48);
+	if (cmd < 0)
+		BUG();
+
+	dev->read_cmd = cmd & 0xff;
+	dev->write_cmd = (cmd >> 8) & 0xff;
+}
+
 static const char * udma_str[] = {
 	"UDMA/16",
 	"UDMA/25",
@@ -1129,7 +1185,7 @@ void ata_port_disable(struct ata_port *ap)
  */
 static void ata_set_mode(struct ata_port *ap)
 {
-	unsigned int force_pio;
+	unsigned int force_pio, i;
 
 	ata_host_set_pio(ap);
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
@@ -1148,19 +1204,21 @@ static void ata_set_mode(struct ata_port *ap)
 	if (force_pio) {
 		ata_dev_set_pio(ap, 0);
 		ata_dev_set_pio(ap, 1);
-
-		if (ap->flags & ATA_FLAG_PORT_DISABLED)
-			return;
 	} else {
 		ata_dev_set_udma(ap, 0);
 		ata_dev_set_udma(ap, 1);
-
-		if (ap->flags & ATA_FLAG_PORT_DISABLED)
-			return;
 	}
+
+	if (ap->flags & ATA_FLAG_PORT_DISABLED)
+		return;
 
 	if (ap->ops->post_set_mode)
 		ap->ops->post_set_mode(ap);
+
+	for (i = 0; i < 2; i++) {
+		struct ata_device *dev = &ap->device[i];
+		ata_dev_set_protocol(dev);
+	}
 }
 
 /**

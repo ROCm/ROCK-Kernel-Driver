@@ -172,7 +172,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 {
 	struct ata_taskfile *tf = &qc->tf;
 	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
-	unsigned int dma = qc->flags & ATA_QCFLAG_DMA;
 
 	qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 	tf->flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
@@ -183,35 +182,13 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 
 	if (scsicmd[0] == READ_10 || scsicmd[0] == READ_6 ||
 	    scsicmd[0] == READ_16) {
-		if (likely(dma)) {
-			if (lba48)
-				tf->command = ATA_CMD_READ_EXT;
-			else
-				tf->command = ATA_CMD_READ;
-			tf->protocol = ATA_PROT_DMA_READ;
-		} else {
-			if (lba48)
-				tf->command = ATA_CMD_PIO_READ_EXT;
-			else
-				tf->command = ATA_CMD_PIO_READ;
-			tf->protocol = ATA_PROT_PIO_READ;
-		}
+		tf->command = qc->dev->read_cmd;
+		tf->protocol = qc->dev->r_protocol;
 		qc->flags &= ~ATA_QCFLAG_WRITE;
 		VPRINTK("reading\n");
 	} else {
-		if (likely(dma)) {
-			if (lba48)
-				tf->command = ATA_CMD_WRITE_EXT;
-			else
-				tf->command = ATA_CMD_WRITE;
-			tf->protocol = ATA_PROT_DMA_WRITE;
-		} else {
-			if (lba48)
-				tf->command = ATA_CMD_PIO_WRITE_EXT;
-			else
-				tf->command = ATA_CMD_PIO_WRITE;
-			tf->protocol = ATA_PROT_PIO_WRITE;
-		}
+		tf->command = qc->dev->write_cmd;
+		tf->protocol = qc->dev->w_protocol;
 		qc->flags |= ATA_QCFLAG_WRITE;
 		VPRINTK("writing\n");
 	}
