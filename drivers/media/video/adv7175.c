@@ -159,7 +159,7 @@ static const unsigned char init_ntsc[] = {
 	0x06, 0x1a,		/* subc. phase */
 };
 
-static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short flags, int kind)
+static int adv717x_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct adv7175 *encoder;
 	struct	i2c_client	*client;
@@ -191,7 +191,7 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		// We should never get here!!!
 		dname = unknown_name;
 	}
-	strlcpy(client->dev.name, dname, DEVICE_NAME_SIZE);
+	strlcpy(client->name, dname, DEVICE_NAME_SIZE);
 	init_MUTEX(&encoder->lock);
 	encoder->client = client;
 	i2c_set_clientdata(client, encoder);
@@ -203,7 +203,7 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	for (i=1; i<x_common; i++) {
 		rv = i2c_smbus_write_byte(client,init_common[i]);
 		if (rv < 0) {
-			printk(KERN_ERR "%s_attach: init error %d\n", client->dev.name, rv);
+			printk(KERN_ERR "%s_attach: init error %d\n", client->name, rv);
 			break;
 		}
 	}
@@ -213,7 +213,7 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		i2c_smbus_write_byte_data(client,0x07, TR0MODE);
 		i2c_smbus_read_byte_data(client,0x12);
 		printk(KERN_INFO "%s_attach: %s rev. %d at 0x%02x\n",
-		       client->dev.name, dname, rv & 1, client->addr);
+		       client->name, dname, rv & 1, client->addr);
 	}
 
 	i2c_attach_client(client);
@@ -297,9 +297,8 @@ static int adv717x_command(struct i2c_client *client, unsigned int cmd,
 					i2c_smbus_write_byte_data(client,0x07, TR0MODE);
 					break;
 				default:
-					printk(KERN_ERR
-					       "%s: illegal norm: %d\n",
-					       client->dev.name, iarg);
+					printk(KERN_ERR "%s: illegal norm: %d\n",
+					       client->name, iarg);
 					return -EINVAL;
 
 				}
@@ -353,9 +352,8 @@ static int adv717x_command(struct i2c_client *client, unsigned int cmd,
 					break;
 
 				default:
-					printk(KERN_ERR
-					       "%s: illegal input: %d\n",
-					       client->dev.name, iarg);
+					printk(KERN_ERR "%s: illegal input: %d\n",
+					       client->name, iarg);
 					return -EINVAL;
 
 				}
@@ -422,9 +420,7 @@ static struct i2c_driver i2c_driver_adv7176 = {
 
 static struct i2c_client client_template = {
 	.driver		= &i2c_driver_adv7175,
-	.dev		= {
-		.name	= "adv7175_client",
-	},
+	.name		= "adv7175_client",
 };
 
 static int adv717x_init(void)

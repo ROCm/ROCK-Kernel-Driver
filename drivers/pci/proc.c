@@ -483,7 +483,12 @@ static int show_dev_config(struct seq_file *m, void *v)
 		seq_printf(m, "    %s", class);
 	else
 		seq_printf(m, "    Class %04x", class_rev >> 16);
-	seq_printf(m, ": %s (rev %d).\n", dev->dev.name, class_rev & 0xff);
+#ifdef CONFIG_PCI_NAMES
+	seq_printf(m, ": %s", dev->pretty_name);
+#else
+	seq_printf(m, ": PCI device %04x:%04x", dev->vendor, dev->device);
+#endif
+	seq_printf(m, " (rev %d).\n", class_rev & 0xff);
 
 	if (dev->irq)
 		seq_printf(m, "      IRQ %d.\n", dev->irq);

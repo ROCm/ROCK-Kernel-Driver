@@ -147,7 +147,8 @@ clean_2:
 	hcd->description = driver->description;
 	hcd->pdev = dev;
 	hcd->self.bus_name = pci_name(dev);
-	hcd->product_desc = dev->dev.name;
+	if (hcd->product_desc == NULL)
+		hcd->product_desc = "USB Host Controller";
 	hcd->self.controller = &dev->dev;
 	hcd->controller = hcd->self.controller;
 

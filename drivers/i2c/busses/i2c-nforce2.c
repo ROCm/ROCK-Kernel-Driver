@@ -125,9 +125,7 @@ static struct i2c_adapter nforce2_adapter = {
 	.id             = I2C_ALGO_SMBUS | I2C_HW_SMBUS_NFORCE2,
 	.class          = I2C_ADAP_CLASS_SMBUS,
 	.algo           = &smbus_algorithm,
-	.dev            = {
-		.name   = "unset",
-	},
+	.name   	= "unset",
 };
 
 
@@ -342,7 +340,7 @@ static int __devinit nforce2_probe_smb (struct pci_dev *dev, int reg,
 */
 	smbus->adapter = nforce2_adapter;
 	smbus->adapter.dev.parent = &dev->dev;
-	snprintf(smbus->adapter.dev.name, DEVICE_NAME_SIZE,
+	snprintf(smbus->adapter.name, DEVICE_NAME_SIZE,
 		"SMBus nForce2 adapter at %04x", smbus->base);
 
 	error = i2c_add_adapter(&smbus->adapter);

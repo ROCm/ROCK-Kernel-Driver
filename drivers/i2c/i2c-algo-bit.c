@@ -527,7 +527,7 @@ int i2c_bit_add_bus(struct i2c_adapter *adap)
 	struct i2c_algo_bit_data *bit_adap = adap->algo_data;
 
 	if (bit_test) {
-		int ret = test_bus(bit_adap, adap->dev.name);
+		int ret = test_bus(bit_adap, adap->name);
 		if (ret<0)
 			return -ENODEV;
 	}

@@ -55,7 +55,6 @@ int usb_stor_euscsi_init(struct us_data *us)
 			0x0C, USB_RECIP_INTERFACE | USB_TYPE_VENDOR,
 			0x01, 0x0, us->iobuf, 0x1, 5*HZ);
 	US_DEBUGP("-- result is %d\n", result);
-	US_DEBUGP("-- data afterwards is %d\n", us->iobuf[0]);
 
 	return 0;
 }
@@ -67,6 +66,7 @@ int usb_stor_ucr61s2b_init(struct us_data *us)
 	struct bulk_cb_wrap *bcb = (struct bulk_cb_wrap*) us->iobuf;
 	struct bulk_cs_wrap *bcs = (struct bulk_cs_wrap*) us->iobuf;
 	int res, partial;
+	static char init_string[] = "\xec\x0a\x06\x00$PCCHIPS";
 
 	US_DEBUGP("Sending UCR-61S2B initialization packet...\n");
 
@@ -74,9 +74,9 @@ int usb_stor_ucr61s2b_init(struct us_data *us)
 	bcb->Tag = 0;
 	bcb->DataTransferLength = cpu_to_le32(0);
 	bcb->Flags = bcb->Lun = 0;
-	bcb->Length = sizeof(UCR61S2B_INIT);
+	bcb->Length = sizeof(init_string) - 1;
 	memset(bcb->CDB, 0, sizeof(bcb->CDB));
-	memcpy(bcb->CDB, UCR61S2B_INIT, sizeof(UCR61S2B_INIT));
+	memcpy(bcb->CDB, init_string, sizeof(init_string) - 1);
 
 	res = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe, bcb,
 			US_BULK_CB_WRAP_LEN, &partial);

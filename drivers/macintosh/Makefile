@@ -4,6 +4,8 @@
 
 # Each configuration option enables a list of files.
 
+obj-$(CONFIG_PPC_PMAC)		+= macio_asic.o
+
 obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o
 obj-$(CONFIG_MAC_SERIAL)	+= macserial.o
 ifneq ($(CONFIG_MAC),y)

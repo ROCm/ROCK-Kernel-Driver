@@ -978,68 +978,6 @@ int usb_set_address(struct usb_device *dev)
 	return retval;
 }
 
-
-/* improve on the default device description, if we can ... and
- * while we're at it, maybe show the vendor and product strings.
- */
-static void set_device_description (struct usb_device *dev)
-{
-	void    *buf;
-	int	mfgr = dev->descriptor.iManufacturer;
-	int	prod = dev->descriptor.iProduct;
-	int	vendor_id = dev->descriptor.idVendor;
-	int	product_id = dev->descriptor.idProduct;
-	char	*mfgr_str, *prod_str;
-
-	/* set default; keep it if there are no strings, or kmalloc fails */
-	sprintf (dev->dev.name, "USB device %04x:%04x",
-		 vendor_id, product_id);
-
-	if (!(buf = kmalloc(256 * 2, GFP_KERNEL)))
-		return;
-	
-	prod_str = (char *) buf;
-	mfgr_str = (char *) buf + 256;
-
-	if (prod && usb_string (dev, prod, prod_str, 256) > 0) {
-#ifdef DEBUG
-		dev_printk (KERN_INFO, &dev->dev, "Product: %s\n", prod_str);
-#endif
-	} else {
-		prod_str = 0;
-	}
-
-	if (mfgr && usb_string (dev, mfgr, mfgr_str, 256) > 0) {
-#ifdef DEBUG
-		dev_printk (KERN_INFO, &dev->dev, "Manufacturer: %s\n", mfgr_str);
-#endif
-	} else {
-		mfgr_str = 0;
-	}
-
-	/* much like pci ... describe as either:
-	 * - both strings:   'product descr (vendor descr)'
-	 * - product only:   'product descr (USB device vvvv:pppp)'
-	 * - vendor only:    'USB device vvvv:pppp (vendor descr)'
-	 * - neither string: 'USB device vvvv:pppp'
-	 */
-
-	if (prod_str && mfgr_str) {
-		snprintf(dev->dev.name, sizeof dev->dev.name,
-			 "%s (%s)", prod_str, mfgr_str);
-	} else if (prod_str) {
-		snprintf(dev->dev.name, sizeof dev->dev.name,
-			 "%s (USB device %04x:%04x)",
-			 prod_str, vendor_id, product_id);
-	} else if (mfgr_str) {
-		snprintf(dev->dev.name, sizeof dev->dev.name,
-			 "USB device %04x:%04x (%s)",
-			 vendor_id, product_id, mfgr_str);
-	}
-
-	kfree(buf);
-}
-
 /*
  * By the time we get here, we chose a new device address
  * and is in the default state. We need to identify the thing and
@@ -1056,7 +994,7 @@ static void set_device_description (struct usb_device *dev)
 #define SET_ADDRESS_RETRYS	2
 int usb_new_device(struct usb_device *dev, struct device *parent)
 {
-	int err = 0;
+	int err = -EINVAL;
 	int i;
 	int j;
 
@@ -1098,7 +1036,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		i = 8;
 		break;
 	default:
-		return -EINVAL;
+		goto fail;
 	}
 	dev->epmaxpacketin [0] = i;
 	dev->epmaxpacketout[0] = i;
@@ -1112,12 +1050,10 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 			wait_ms(200);
 		}
 		if (err < 0) {
-			dev_err(&dev->dev, "USB device not accepting new address=%d (error=%d)\n",
+			dev_err(&dev->dev,
+				"device not accepting address %d, error %d\n",
 				dev->devnum, err);
-			dev->state = USB_STATE_DEFAULT;
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
-			return 1;
+			goto fail;
 		}
 
 		wait_ms(10);	/* Let the SET_ADDRESS settle */
@@ -1130,13 +1066,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	}
 
 	if (err < 8) {
-		if (err < 0)
-			dev_err(&dev->dev, "USB device not responding, giving up (error=%d)\n", err);
-		else
-			dev_err(&dev->dev, "USB device descriptor short read (expected %i, got %i)\n", 8, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		dev_err(&dev->dev, "device descriptor read/8, error %d\n", err);
+		goto fail;
 	}
 	if (dev->speed == USB_SPEED_FULL) {
 		dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
@@ -1147,43 +1078,41 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
-		if (err < 0)
-			dev_err(&dev->dev, "unable to get device descriptor (error=%d)\n", err);
-		else
-			dev_err(&dev->dev, "USB device descriptor short read (expected %Zi, got %i)\n",
-				sizeof(dev->descriptor), err);
-	
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		dev_err(&dev->dev, "device descriptor read/all, error %d\n", err);
+		goto fail;
 	}
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
 		dev_err(&dev->dev, "unable to get device %d configuration (error=%d)\n",
 			dev->devnum, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		goto fail;
 	}
 
-	/* we set the default configuration here */
+	/* choose and set the configuration here */
+	if (dev->descriptor.bNumConfigurations != 1) {
+		dev_info(&dev->dev,
+			"configuration #%d chosen from %d choices\n",
+			dev->config[0].desc.bConfigurationValue,
+			dev->descriptor.bNumConfigurations);
+	}
 	err = usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
 	if (err) {
 		dev_err(&dev->dev, "failed to set device %d default configuration (error=%d)\n",
 			dev->devnum, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		goto fail;
 	}
 
 	/* USB device state == configured ... tell the world! */
 
 	dev_dbg(&dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
-	set_device_description (dev);
 
 #ifdef DEBUG
+	if (dev->descriptor.iProduct)
+		usb_show_string(dev, "Product", dev->descriptor.iProduct);
+	if (dev->descriptor.iManufacturer)
+		usb_show_string(dev, "Manufacturer", dev->descriptor.iManufacturer);
 	if (dev->descriptor.iSerialNumber)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
@@ -1191,7 +1120,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* put into sysfs, with device and config specific files */
 	err = device_add (&dev->dev);
 	if (err)
-		return err;
+		goto fail;
 	usb_create_driverfs_dev_files (dev);
 
 	/* Register all of the interfaces for this device with the driver core.
@@ -1208,20 +1137,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		sprintf (&interface->dev.bus_id[0], "%d-%s:%d",
 			 dev->bus->busnum, dev->devpath,
 			 desc->bInterfaceNumber);
-		if (!desc->iInterface
-				|| usb_string (dev, desc->iInterface,
-					interface->dev.name,
-					sizeof interface->dev.name) <= 0) {
-			/* typically devices won't bother with interface
-			 * descriptions; this is the normal case.  an
-			 * interface's driver might describe it better.
-			 * (also: iInterface is per-altsetting ...)
-			 */
-			sprintf (&interface->dev.name[0],
-				"usb-%s-%s interface %d",
-				dev->bus->bus_name, dev->devpath,
-				desc->bInterfaceNumber);
-		}
 		dev_dbg (&dev->dev, "%s - registering interface %s\n", __FUNCTION__, interface->dev.bus_id);
 		device_add (&interface->dev);
 		usb_create_driverfs_intf_files (interface);
@@ -1231,6 +1146,12 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	usbfs_add_device(dev);
 
 	return 0;
+fail:
+	dev->state = USB_STATE_DEFAULT;
+	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
+	dev->devnum = -1;
+	usb_put_dev(dev);
+	return err;
 }
 
 /**

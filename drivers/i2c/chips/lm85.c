@@ -853,19 +853,19 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	/* Fill in the chip specific driver values */
 	if ( kind == any_chip ) {
 		type_name = "lm85";
-		strlcpy(new_client->dev.name, "Generic LM85", DEVICE_NAME_SIZE);
+		strlcpy(new_client->name, "Generic LM85", DEVICE_NAME_SIZE);
 	} else if ( kind == lm85b ) {
 		type_name = "lm85b";
-		strlcpy(new_client->dev.name, "National LM85-B", DEVICE_NAME_SIZE);
+		strlcpy(new_client->name, "National LM85-B", DEVICE_NAME_SIZE);
 	} else if ( kind == lm85c ) {
 		type_name = "lm85c";
-		strlcpy(new_client->dev.name, "National LM85-C", DEVICE_NAME_SIZE);
+		strlcpy(new_client->name, "National LM85-C", DEVICE_NAME_SIZE);
 	} else if ( kind == adm1027 ) {
 		type_name = "adm1027";
-		strlcpy(new_client->dev.name, "Analog Devices ADM1027", DEVICE_NAME_SIZE);
+		strlcpy(new_client->name, "Analog Devices ADM1027", DEVICE_NAME_SIZE);
 	} else if ( kind == adt7463 ) {
 		type_name = "adt7463";
-		strlcpy(new_client->dev.name, "Analog Devices ADT7463", DEVICE_NAME_SIZE);
+		strlcpy(new_client->name, "Analog Devices ADT7463", DEVICE_NAME_SIZE);
 	} else {
 		dev_dbg(&adapter->dev, "Internal error, invalid kind (%d)!", kind);
 		err = -EFAULT ;
@@ -880,7 +880,7 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 
 	if (lm85debug) {
 		printk("lm85: Assigning ID %d to %s at %d,0x%02x\n",
-		new_client->id, new_client->dev.name,
+		new_client->id, new_client->name,
 		i2c_adapter_id(new_client->adapter),
 		new_client->addr);
 	}

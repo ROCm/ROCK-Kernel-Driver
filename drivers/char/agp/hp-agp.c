@@ -398,7 +398,7 @@ hp_zx1_setup (u64 ioc_hpa, u64 lba_hpa)
 	bridge->driver = &hp_zx1_driver;
 
 	fake_bridge_dev.vendor = PCI_VENDOR_ID_HP;
-	fake_bridge_dev.device = PCI_DEVICE_ID_HP_ZX1_LBA;
+	fake_bridge_dev.device = PCI_DEVICE_ID_HP_PCIX_LBA;
 	bridge->dev = &fake_bridge_dev;
 
 	return agp_add_bridge(bridge);
