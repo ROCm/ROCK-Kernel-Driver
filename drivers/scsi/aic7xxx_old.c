@@ -10974,7 +10974,8 @@ int
 aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[])
 {
-  int heads, sectors, cylinders, ret;
+  sector_t heads, sectors, cylinders;
+  int ret;
   struct aic7xxx_host *p;
   unsigned char *buf;
 
@@ -10991,18 +10992,22 @@ aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
   
   heads = 64;
   sectors = 32;
-  cylinders = (unsigned long)capacity / (heads * sectors);
+  cylinders = capacity >> 11;
 
   if ((p->flags & AHC_EXTEND_TRANS_A) && (cylinders > 1024))
   {
     heads = 255;
     sectors = 63;
-    cylinders = (unsigned long)capacity / (heads * sectors);
+    cylinders = capacity >> 14;
+    if(capacity > (65535 * heads * sectors))
+      cylinders = 65535;
+    else
+      cylinders = ((unsigned int)capacity) / (heads * sectors);
   }
 
-  geom[0] = heads;
-  geom[1] = sectors;
-  geom[2] = cylinders;
+  geom[0] = (int)heads;
+  geom[1] = (int)sectors;
+  geom[2] = (int)cylinders;
 
   return (0);
 }
