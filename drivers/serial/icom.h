@@ -123,6 +123,7 @@ struct func_dram {
 #define ICOM_CONTROL_START_D         0x00000002
 #define ICOM_CONTROL_STOP_D          0x00000001
 #define ICOM_IRAM_OFFSET             0x1000
+#define ICOM_IRAM_SIZE               0x0C00
 #define ICOM_DCE_IRAM_OFFSET         0x0A00
 #define ICOM_CABLE_ID_VALID          0x01
 #define ICOM_CABLE_ID_MASK           0xF0

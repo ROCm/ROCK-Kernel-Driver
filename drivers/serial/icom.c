@@ -53,6 +53,7 @@
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <linux/kobject.h>
+#include <linux/firmware.h>
 
 #include <asm/system.h>
 #include <asm/segment.h>
@@ -520,19 +521,19 @@ static int startup(struct icom_port *icom_port)
 	/* Get cable ID into the lower 4 bits (standard form) */
 	cable_id = (raw_cable_id & ICOM_CABLE_ID_MASK) >> 4;
 
-	/* Check Cable ID is RS232 */
-	if (!(raw_cable_id & ICOM_CABLE_ID_VALID)) {
+	/* Check for valid Cable ID */
+	if (!(raw_cable_id & ICOM_CABLE_ID_VALID) ||
+	    (cable_id != icom_port->cable_id)) {
 
 		/* reload adapter code, pick up any potential changes in cable id */
 		load_code(icom_port);
 
-		/* still no sign of RS232, error out */
+		/* still no sign of cable, error out */
 		raw_cable_id = readb(&icom_port->dram->cable_id);
-		if (!(raw_cable_id & ICOM_CABLE_ID_VALID)) {
-			dev_err(&icom_port->adapter->pci_dev->dev,
-				"Unusable Port, incorrect or no cable attached\n");
-			return -ENODEV;
-		}
+		cable_id = (raw_cable_id & ICOM_CABLE_ID_MASK) >> 4;
+		if (!(raw_cable_id & ICOM_CABLE_ID_VALID) ||
+		    (icom_port->cable_id == NO_CABLE))
+			return -EIO;
 	}
 
 	/*
@@ -596,7 +597,7 @@ static void shutdown(struct icom_port *icom_port)
 	unsigned long flags;
 
 	spin_lock_irqsave(&icom_lock, flags);
-	trace(icom_port, "SHUTDOWN", jiffies);
+	trace(icom_port, "SHUTDOWN", 0);
 
 	/*
 	 * disable all interrupts
@@ -640,11 +641,6 @@ static void shutdown(struct icom_port *icom_port)
 	if ((cmdReg | CMD_SND_BREAK) == CMD_SND_BREAK) {
 		writeb(cmdReg & ~CMD_SND_BREAK, &icom_port->dram->CmdReg);
 	}
-
-	/* drop DTR and RTS */
-	trace(icom_port, "DROP_DTR_RTS", 0);
-	writeb(0x00, &icom_port->dram->osr);
-
 }
 
 static int icom_write(struct uart_port *port)
@@ -652,8 +648,9 @@ static int icom_write(struct uart_port *port)
 	unsigned long data_count;
 	unsigned char cmdReg;
 	unsigned long offset;
+	int temp_tail = port->info->xmit.tail;
 
-	trace(ICOM_PORT, "WRITE", jiffies);
+	trace(ICOM_PORT, "WRITE", 0);
 
 	if (cpu_to_le16(ICOM_PORT->statStg->xmit[0].flags) &
 	    SA_FLAGS_READY_TO_XMIT) {
@@ -662,14 +659,14 @@ static int icom_write(struct uart_port *port)
 	}
 
 	data_count = 0;
-	while (!uart_circ_empty(&port->info->xmit) &&
+	while ((port->info->xmit.head != temp_tail) &&
 	       (data_count <= XMIT_BUFF_SZ)) {
 
 		ICOM_PORT->xmit_buf[data_count++] =
-		    port->info->xmit.buf[port->info->xmit.tail];
+		    port->info->xmit.buf[temp_tail];
 
-		port->info->xmit.tail++;
-		port->info->xmit.tail &= (UART_XMIT_SIZE - 1);
+		temp_tail++;
+		temp_tail &= (UART_XMIT_SIZE - 1);
 	}
 
 	if (data_count) {
@@ -724,9 +721,38 @@ static inline void check_modem_status(struct icom_port *icom_port)
 	spin_unlock_irqrestore(&icom_port->uart_port.lock, flags);
 }
 
-static void process_interrupt(u16 port_int_reg,
-			      struct icom_port *icom_port,
-			      struct pt_regs *regs)
+static void xmit_interrupt(u16 port_int_reg, struct icom_port *icom_port)
+{
+	unsigned short int count;
+	int i;
+
+	if (port_int_reg & (INT_XMIT_COMPLETED)) {
+		trace(icom_port, "XMIT_COMPLETE", 0);
+
+		/* clear buffer in use bit */
+		icom_port->statStg->xmit[0].flags &=
+			cpu_to_le16(~SA_FLAGS_READY_TO_XMIT);
+
+		count = (unsigned short int)
+			cpu_to_le16(icom_port->statStg->xmit[0].leLength);
+		icom_port->uart_port.icount.tx += count;
+
+		for (i=0; i<count &&
+			!uart_circ_empty(&icom_port->uart_port.info->xmit); i++) {
+
+			icom_port->uart_port.info->xmit.tail++;
+			icom_port->uart_port.info->xmit.tail &=
+				(UART_XMIT_SIZE - 1);
+		}
+
+		if (!icom_write(&icom_port->uart_port))
+			/* activate write queue */
+			uart_write_wakeup(&icom_port->uart_port);
+	} else
+		trace(icom_port, "XMIT_DISABLED", 0);
+}
+
+static void recv_interrupt(u16 port_int_reg, struct icom_port *icom_port)
 {
 	short int count, rcv_buff;
 	struct tty_struct *tty = icom_port->uart_port.info->tty;
@@ -734,154 +760,128 @@ static void process_interrupt(u16 port_int_reg,
 	struct uart_icount *icount;
 	unsigned long offset;
 
+	trace(icom_port, "RCV_COMPLETE", 0);
+	rcv_buff = icom_port->next_rcv;
+
+	status = cpu_to_le16(icom_port->statStg->rcv[rcv_buff].flags);
+	while (status & SA_FL_RCV_DONE) {
+
+		trace(icom_port, "FID_STATUS", status);
+		count = cpu_to_le16(icom_port->statStg->rcv[rcv_buff].leLength);
+
+		trace(icom_port, "RCV_COUNT", count);
+		if (count > (TTY_FLIPBUF_SIZE - tty->flip.count))
+			count = TTY_FLIPBUF_SIZE - tty->flip.count;
+
+		trace(icom_port, "REAL_COUNT", count);
+
+		offset =
+			cpu_to_le32(icom_port->statStg->rcv[rcv_buff].leBuffer) -
+			icom_port->recv_buf_pci;
+
+		memcpy(tty->flip.char_buf_ptr,(unsigned char *)
+		       ((unsigned long)icom_port->recv_buf + offset), count);
+
+		if (count > 0) {
+			tty->flip.count += count - 1;
+			tty->flip.char_buf_ptr += count - 1;
+
+			memset(tty->flip.flag_buf_ptr, 0, count);
+			tty->flip.flag_buf_ptr += count - 1;
+		}
+
+		icount = &icom_port->uart_port.icount;
+		icount->rx += count;
+
+		/* Break detect logic */
+		if ((status & SA_FLAGS_FRAME_ERROR)
+		    && (tty->flip.char_buf_ptr[0] == 0x00)) {
+			status &= ~SA_FLAGS_FRAME_ERROR;
+			status |= SA_FLAGS_BREAK_DET;
+			trace(icom_port, "BREAK_DET", 0);
+		}
+
+		if (status &
+		    (SA_FLAGS_BREAK_DET | SA_FLAGS_PARITY_ERROR |
+		     SA_FLAGS_FRAME_ERROR | SA_FLAGS_OVERRUN)) {
+
+			if (status & SA_FLAGS_BREAK_DET)
+				icount->brk++;
+			if (status & SA_FLAGS_PARITY_ERROR)
+				icount->parity++;
+			if (status & SA_FLAGS_FRAME_ERROR)
+				icount->frame++;
+			if (status & SA_FLAGS_OVERRUN)
+				icount->overrun++;
+
+			/*
+			 * Now check to see if character should be
+			 * ignored, and mask off conditions which
+			 * should be ignored.
+			 */
+			if (status & icom_port->ignore_status_mask) {
+				trace(icom_port, "IGNORE_CHAR", 0);
+				goto ignore_char;
+			}
+
+			status &= icom_port->read_status_mask;
+
+			if (status & SA_FLAGS_BREAK_DET) {
+				*tty->flip.flag_buf_ptr = TTY_BREAK;
+			} else if (status & SA_FLAGS_PARITY_ERROR) {
+				trace(icom_port, "PARITY_ERROR", 0);
+				*tty->flip.flag_buf_ptr = TTY_PARITY;
+			} else if (status & SA_FLAGS_FRAME_ERROR)
+				*tty->flip.flag_buf_ptr = TTY_FRAME;
+
+			if (status & SA_FLAGS_OVERRUN) {
+				/*
+				 * Overrun is special, since it's
+				 * reported immediately, and doesn't
+				 * affect the current character
+				 */
+				if (tty->flip.count < TTY_FLIPBUF_SIZE) {
+					tty->flip.count++;
+					tty->flip.flag_buf_ptr++;
+					tty->flip.char_buf_ptr++;
+					*tty->flip.flag_buf_ptr = TTY_OVERRUN;
+				}
+			}
+		}
+
+		tty->flip.flag_buf_ptr++;
+		tty->flip.char_buf_ptr++;
+		tty->flip.count++;
+		ignore_char:
+			icom_port->statStg->rcv[rcv_buff].flags = 0;
+		icom_port->statStg->rcv[rcv_buff].leLength = 0;
+		icom_port->statStg->rcv[rcv_buff].WorkingLength =
+			(unsigned short int) cpu_to_le16(RCV_BUFF_SZ);
+
+		rcv_buff++;
+		if (rcv_buff == NUM_RBUFFS)
+			rcv_buff = 0;
+
+		status = cpu_to_le16(icom_port->statStg->rcv[rcv_buff].flags);
+	}
+	icom_port->next_rcv = rcv_buff;
+	tty_flip_buffer_push(tty);
+}
+
+static void process_interrupt(u16 port_int_reg,
+			      struct icom_port *icom_port)
+{
 	unsigned long flags;
 
 	spin_lock_irqsave(&icom_port->uart_port.lock, flags);
-	trace(icom_port, "INTERRUPT", jiffies);
+	trace(icom_port, "INTERRUPT", port_int_reg);
 
-	if (port_int_reg & (INT_XMIT_COMPLETED | INT_XMIT_DISABLED)) {
-		if (port_int_reg & (INT_XMIT_COMPLETED))
-			trace(icom_port, "XMIT_COMPLETE", 0);
-		else
-			trace(icom_port, "XMIT_DISABLED", 0);
+	if (port_int_reg & (INT_XMIT_COMPLETED | INT_XMIT_DISABLED))
+		xmit_interrupt(port_int_reg, icom_port);
 
-		/* clear buffer in use bit */
-		icom_port->statStg->xmit[0].flags &=
-		    cpu_to_le16(~SA_FLAGS_READY_TO_XMIT);
-		icom_port->uart_port.icount.tx +=
-		    (unsigned short int) cpu_to_le16(icom_port->
-						     statStg->xmit[0].
-						     leLength);
+	if (port_int_reg & INT_RCV_COMPLETED)
+		recv_interrupt(port_int_reg, icom_port);
 
-		/* activate write queue */
-		uart_write_wakeup(&icom_port->uart_port);
-	}
-
-	if (port_int_reg & INT_RCV_COMPLETED) {
-
-		trace(icom_port, "RCV_COMPLETE", 0);
-		rcv_buff = icom_port->next_rcv;
-
-		status =
-		    cpu_to_le16(icom_port->statStg->rcv[rcv_buff].flags);
-		while (status & SA_FL_RCV_DONE) {
-
-			trace(icom_port, "FID_STATUS", status);
-
-			count =
-			    cpu_to_le16(icom_port->statStg->
-					rcv[rcv_buff].leLength);
-
-			trace(icom_port, "RCV_COUNT", count);
-			if (count > (TTY_FLIPBUF_SIZE - tty->flip.count))
-				count = TTY_FLIPBUF_SIZE - tty->flip.count;
-
-			trace(icom_port, "REAL_COUNT", count);
-
-			offset =
-			    cpu_to_le32(icom_port->statStg->
-					rcv[rcv_buff].leBuffer) -
-			    icom_port->recv_buf_pci;
-
-			memcpy(tty->flip.char_buf_ptr,
-			       (unsigned char *) ((unsigned long)
-						  icom_port->
-						  recv_buf + offset),
-			       count);
-
-			if (count > 0) {
-				tty->flip.count += count - 1;
-				tty->flip.char_buf_ptr += count - 1;
-
-				memset(tty->flip.flag_buf_ptr, 0, count);
-				tty->flip.flag_buf_ptr += count - 1;
-			}
-
-			icount = &icom_port->uart_port.icount;
-			icount->rx += count;
-
-			/* Break detect logic */
-			if ((status & SA_FLAGS_FRAME_ERROR)
-			    && (tty->flip.char_buf_ptr[0] == 0x00)) {
-				status &= ~SA_FLAGS_FRAME_ERROR;
-				status |= SA_FLAGS_BREAK_DET;
-				trace(icom_port, "BREAK_DET", 0);
-			}
-
-			if (status &
-			    (SA_FLAGS_BREAK_DET | SA_FLAGS_PARITY_ERROR |
-			     SA_FLAGS_FRAME_ERROR | SA_FLAGS_OVERRUN)) {
-
-				if (status & SA_FLAGS_BREAK_DET)
-					icount->brk++;
-				if (status & SA_FLAGS_PARITY_ERROR)
-					icount->parity++;
-				if (status & SA_FLAGS_FRAME_ERROR)
-					icount->frame++;
-				if (status & SA_FLAGS_OVERRUN)
-					icount->overrun++;
-
-				/*
-				 * Now check to see if character should be
-				 * ignored, and mask off conditions which
-				 * should be ignored.
-				 */
-				if (status & icom_port->ignore_status_mask) {
-					trace(icom_port, "IGNORE_CHAR", 0);
-					goto ignore_char;
-				}
-
-				status &= icom_port->read_status_mask;
-
-				if (status & SA_FLAGS_BREAK_DET) {
-					*tty->flip.flag_buf_ptr =
-					    TTY_BREAK;
-				} else if (status & SA_FLAGS_PARITY_ERROR) {
-					trace(icom_port, "PARITY_ERROR",
-					      0);
-					*tty->flip.flag_buf_ptr =
-					    TTY_PARITY;
-				} else if (status & SA_FLAGS_FRAME_ERROR)
-					*tty->flip.flag_buf_ptr =
-					    TTY_FRAME;
-
-				if (status & SA_FLAGS_OVERRUN) {
-					/*
-					 * Overrun is special, since it's
-					 * reported immediately, and doesn't
-					 * affect the current character
-					 */
-					if (tty->flip.count < TTY_FLIPBUF_SIZE) {
-						tty->flip.count++;
-						tty->flip.flag_buf_ptr++;
-						tty->flip.char_buf_ptr++;
-						*tty->flip.flag_buf_ptr =
-						    TTY_OVERRUN;
-					}
-				}
-			}
-
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
-		      ignore_char:
-			icom_port->statStg->rcv[rcv_buff].flags = 0;
-			icom_port->statStg->rcv[rcv_buff].leLength = 0;
-			icom_port->statStg->rcv[rcv_buff].
-			    WorkingLength =
-			    (unsigned short int) cpu_to_le16(RCV_BUFF_SZ);
-
-			rcv_buff++;
-			if (rcv_buff == NUM_RBUFFS)
-				rcv_buff = 0;
-
-			status =
-			    cpu_to_le16(icom_port->statStg->
-					rcv[rcv_buff].flags);
-		}
-		icom_port->next_rcv = rcv_buff;
-		tty_flip_buffer_push(tty);
-	}
 	spin_unlock_irqrestore(&icom_port->uart_port.lock, flags);
 }
 
@@ -906,7 +906,7 @@ static irqreturn_t icom_interrupt(int irq, void *dev_id,
 			/* port 2 interrupt,  NOTE:  for all ADAPTER_V2, port 2 will be active */
 			icom_port = &icom_adapter->port_info[2];
 			port_int_reg = (u16) adapter_interrupts;
-			process_interrupt(port_int_reg, icom_port, regs);
+			process_interrupt(port_int_reg, icom_port);
 			check_modem_status(icom_port);
 		}
 		if (adapter_interrupts & 0x3FFF0000) {
@@ -915,8 +915,7 @@ static irqreturn_t icom_interrupt(int irq, void *dev_id,
 			if (icom_port->status == ICOM_PORT_ACTIVE) {
 				port_int_reg =
 				    (u16) (adapter_interrupts >> 16);
-				process_interrupt(port_int_reg, icom_port,
-						  regs);
+				process_interrupt(port_int_reg, icom_port);
 				check_modem_status(icom_port);
 			}
 		}
@@ -935,7 +934,7 @@ static irqreturn_t icom_interrupt(int irq, void *dev_id,
 		/* port 0 interrupt, NOTE:  for all adapters, port 0 will be active */
 		icom_port = &icom_adapter->port_info[0];
 		port_int_reg = (u16) adapter_interrupts;
-		process_interrupt(port_int_reg, icom_port, regs);
+		process_interrupt(port_int_reg, icom_port);
 		check_modem_status(icom_port);
 	}
 	if (adapter_interrupts & 0x3FFF0000) {
@@ -943,7 +942,7 @@ static irqreturn_t icom_interrupt(int irq, void *dev_id,
 		icom_port = &icom_adapter->port_info[1];
 		if (icom_port->status == ICOM_PORT_ACTIVE) {
 			port_int_reg = (u16) (adapter_interrupts >> 16);
-			process_interrupt(port_int_reg, icom_port, regs);
+			process_interrupt(port_int_reg, icom_port);
 			check_modem_status(icom_port);
 		}
 	}
@@ -1035,15 +1034,13 @@ static void icom_start_tx(struct uart_port *port, unsigned int tty_start)
 {
 	unsigned char cmdReg;
 
-	if (tty_start)
-		icom_write(port);
-	else {
-		trace(ICOM_PORT, "START", 0);
-		cmdReg = readb(&ICOM_PORT->dram->CmdReg);
-		if ((cmdReg & CMD_HOLD_XMIT) == CMD_HOLD_XMIT)
-			writeb(cmdReg & ~CMD_HOLD_XMIT,
-			       &ICOM_PORT->dram->CmdReg);
-	}
+	trace(ICOM_PORT, "START", 0);
+	cmdReg = readb(&ICOM_PORT->dram->CmdReg);
+	if ((cmdReg & CMD_HOLD_XMIT) == CMD_HOLD_XMIT)
+		writeb(cmdReg & ~CMD_HOLD_XMIT,
+		       &ICOM_PORT->dram->CmdReg);
+
+	icom_write(port);
 }
 
 static void icom_send_xchar(struct uart_port *port, char ch)
@@ -1151,7 +1148,7 @@ static void icom_set_termios(struct uart_port *port,
 	unsigned long flags;
 
 	spin_lock_irqsave(&port->lock, flags);
-	trace(ICOM_PORT, "CHANGE_SPEED", jiffies);
+	trace(ICOM_PORT, "CHANGE_SPEED", 0);
 
 	cflag = termios->c_cflag;
 	iflag = termios->c_iflag;
@@ -1454,9 +1451,6 @@ static int __init icom_load_ports(struct icom_adapter *icom_adapter)
 
 			icom_port->adapter = icom_adapter;
 
-			/*
-			 * Load and start processor
-			 */
 			load_code(icom_port);
 
 			/* get port memory */
@@ -1695,10 +1689,8 @@ static int __init icom_init(void)
 
 	ret = pci_register_driver(&icom_pci_driver);
 
-	if (ret < 0) {
-		pci_unregister_driver(&icom_pci_driver);
+	if (ret < 0)
 		uart_unregister_driver(&icom_uart_driver);
-	}	
 
 	return ret;
 }
@@ -1716,8 +1708,8 @@ module_exit(icom_exit);
 static void trace(struct icom_port *icom_port, char *trace_pt,
 		  unsigned long trace_data)
 {
-	dev_info(&icom_port->adapter->pci_dev->dev, "%s : %lx\n", trace_pt,
-		 trace_data);
+	dev_info(&icom_port->adapter->pci_dev->dev, ":%d:%s - %lx\n",
+		 icom_port->port, trace_pt, trace_data);
 }
 #endif
 
