@@ -447,24 +447,18 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 
 		good_spot = 1;
 		for (j = 1; j <= num_ports-1; ++j)
-			if (serial_table[i+j])
+			if ((serial_table[i+j]) || (i+j >= SERIAL_TTY_MINORS)) {
 				good_spot = 0;
+				i += j;
+				break;
+			}
 		if (good_spot == 0)
 			continue;
 			
-		if (!serial) {
-			serial = kmalloc(sizeof(*serial), GFP_KERNEL);
-			if (!serial) {
-				err(__FUNCTION__ " - Out of memory");
-				return NULL;
-			}
-			memset(serial, 0, sizeof(*serial));
-		}
 		serial->magic = USB_SERIAL_MAGIC;
-		serial_table[i] = serial;
 		*minor = i;
 		dbg(__FUNCTION__ " - minor base = %d", *minor);
-		for (i = *minor+1; (i < (*minor + num_ports)) && (i < SERIAL_TTY_MINORS); ++i)
+		for (i = *minor; (i < (*minor + num_ports)) && (i < SERIAL_TTY_MINORS); ++i)
 			serial_table[i] = serial;
 		return serial;
 	}
@@ -1207,14 +1201,14 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		return(NULL);
 	}
 
+	serial = create_serial (dev, interface, type);
+	if (!serial) {
+		err ("%s - out of memory", __FUNCTION__);
+		return NULL;
+	}
+
 	/* if this device type has a probe function, call it */
 	if (type->probe) {
-		serial = create_serial (dev, interface, type);
-		if (!serial) {
-			err ("%s - out of memory", __FUNCTION__);
-			return NULL;
-		}
-
 		if (type->owner)
 			__MOD_INC_USE_COUNT(type->owner);
 		retval = type->probe (serial);
@@ -1293,6 +1287,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		num_ports = num_bulk_out;
 		if (num_ports == 0) {
 			err("Generic device with no bulk out, not allowed.");
+			kfree (serial);
 			return NULL;
 		}
 	}
@@ -1300,14 +1295,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!num_ports) {
 		/* if this device type has a calc_num_ports function, call it */
 		if (type->calc_num_ports) {
-			if (!serial) {
-				serial = create_serial (dev, interface, type);
-				if (!serial) {
-					err ("%s - out of memory", __FUNCTION__);
-					return NULL;
-				}
-			}
-
 			if (type->owner)
 				__MOD_INC_USE_COUNT(type->owner);
 			num_ports = type->calc_num_ports (serial);
@@ -1318,22 +1305,17 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 			num_ports = type->num_ports;
 	}
 
-	serial = get_free_serial (serial, num_ports, &minor);
-	if (serial == NULL) {
+	if (get_free_serial (serial, num_ports, &minor) == NULL) {
 		err("No more free serial devices");
+		kfree (serial);
 		return NULL;
 	}
 
-	serial->dev = dev;
-	serial->type = type;
-	serial->interface = interface;
 	serial->minor = minor;
 	serial->num_ports = num_ports;
 	serial->num_bulk_in = num_bulk_in;
 	serial->num_bulk_out = num_bulk_out;
 	serial->num_interrupt_in = num_interrupt_in;
-	serial->vendor = dev->descriptor.idVendor;
-	serial->product = dev->descriptor.idProduct;
 
 	/* set up the endpoint information */
 	for (i = 0; i < num_bulk_in; ++i) {
