@@ -268,7 +268,7 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 	sprintf(sunkbd->name, "Sun Type %d keyboard", sunkbd->type);
 
 	memcpy(sunkbd->keycode, sunkbd_keycode, sizeof(sunkbd->keycode));
-	for (i = 0; i < 255; i++)
+	for (i = 0; i < 127; i++)
 		set_bit(sunkbd->keycode[i], sunkbd->dev.keybit);
 	clear_bit(0, sunkbd->dev.keybit);
 
