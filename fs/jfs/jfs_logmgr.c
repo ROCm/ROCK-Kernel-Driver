@@ -1068,6 +1068,8 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 		return ENOMEM;
 	memset(log, 0, sizeof(log_t));
 
+	log->sb = sb;		/* This should be a list */
+
 	if (!(JFS_SBI(sb)->mntflag & JFS_INLINELOG))
 		goto externalLog;
 
@@ -1077,7 +1079,6 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * file system to log have 1-to-1 relationship;
 	 */
 
-	log->sb = sb;		/* This should be a list */
 	log->bdev = sb->s_bdev;
 	log->flag = JFS_INLINELOG;
 	log->base = addressPXD(&JFS_SBI(sb)->logpxd);
@@ -1114,7 +1115,6 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 		goto errout10;
 	}
 
-	log->sb = sb;		/* This should be a list */
 	log->bdev = bdev;
 	memcpy(log->uuid, JFS_SBI(sb)->loguuid, sizeof(log->uuid));
 	

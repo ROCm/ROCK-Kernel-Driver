@@ -158,7 +158,6 @@ static void jfs_put_super(struct super_block *sb)
 	sbi->direct_inode = NULL;
 	sbi->direct_mapping = NULL;
 
-	JFS_SBI(sb) = 0;
 	kfree(sbi);
 }
 
@@ -255,10 +254,10 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	jFYI(1, ("In jfs_read_super: s_flags=0x%lx\n", sb->s_flags));
 
 	sbi = kmalloc(sizeof(struct jfs_sb_info), GFP_KERNEL);
-	JFS_SBI(sb) = sbi;
 	if (!sbi)
 		return -ENOSPC;
 	memset(sbi, 0, sizeof(struct jfs_sb_info));
+	sb->u.generic_sbp = sbi;
 
 	if (!parse_options((char *)data, sbi)) {
 		kfree(sbi);
