@@ -399,6 +399,42 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif
 
+	/* Hack -- add console=ttySn,9600 if necessary */
+	if(strstr(cmd_line, "console=") == NULL) {
+		struct device_node *prom_stdout = find_path_device(of_stdout_device);
+		u32 *reg;
+		int i;
+		char *name, *val = NULL;
+		printk("of_stdout_device %s\n", of_stdout_device);
+		if (prom_stdout) {
+			name = (char *)get_property(prom_stdout, "name", NULL);
+			if (name) {
+				if (strcmp(name, "serial") == 0) {
+					reg = (u32 *)get_property(prom_stdout, "reg", &i);
+					if (i > 8) {
+						switch (reg[1]) {
+							case 0x3f8: val = "ttyS0,9600"; break;
+							case 0x2f8: val = "ttyS1,9600"; break;
+							case 0x898: val = "ttyS2,9600"; break;
+							case 0x890: val = "ttyS3,9600"; break;
+						}
+					}
+				} else if (strcmp(name, "vty") == 0) {
+					/* pSeries LPAR virtual console */
+					val = "hvc0";
+				}
+				if (val) {
+					char tmp_cmd_line[CMD_LINE_SIZE];
+					snprintf(tmp_cmd_line, CMD_LINE_SIZE,
+							"AUTOCONSOLE console=%s %s",
+							val, cmd_line);
+					memcpy(cmd_line, tmp_cmd_line, CMD_LINE_SIZE);
+					printk("console= not found, add console=%s\n", val);
+				}
+			}
+		}
+	}
+
 	/* Look for mem= option on command line */
 	if (strstr(cmd_line, "mem=")) {
 		char *p, *q;
