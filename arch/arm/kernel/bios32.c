@@ -346,20 +346,7 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
 	struct pci_dev *dev = bus->self;
 	int i;
 
-	if (dev) {
-		for (i = 0; i < 3; i++) {
-			if (root->resource[i]) {
-				bus->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES+i];
-				bus->resource[i]->end  = root->resource[i]->end;
-				bus->resource[i]->name = bus->name;
-			}
-		}
-		bus->resource[0]->flags |= pci_bridge_check_io(dev);
-		bus->resource[1]->flags |= IORESOURCE_MEM;
-
-		if (bus->resource[2] && root->resource[2])
-			bus->resource[2]->flags = root->resource[2]->flags;
-	} else {
+	if (!dev) {
 		/*
 		 * Assign root bus resources.
 		 */

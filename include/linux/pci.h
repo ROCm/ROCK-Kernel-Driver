@@ -464,9 +464,9 @@ struct pci_ops {
 
 struct pbus_set_ranges_data
 {
-	int found_vga;
 	unsigned long io_start, io_end;
 	unsigned long mem_start, mem_end;
+	unsigned long prefetch_start, prefetch_end;
 };
 
 struct pci_device_id {
@@ -582,8 +582,7 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 int pci_claim_resource(struct pci_dev *, int);
 void pci_assign_unassigned_resources(void);
 void pdev_enable_device(struct pci_dev *);
-void pdev_sort_resources(struct pci_dev *, struct resource_list *, u32);
-unsigned long pci_bridge_check_io(struct pci_dev *);
+void pdev_sort_resources(struct pci_dev *, struct resource_list *);
 void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
 		    int (*)(struct pci_dev *, u8, u8));
 #define HAVE_PCI_REQ_REGIONS

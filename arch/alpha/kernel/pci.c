@@ -246,25 +246,6 @@ pcibios_fixup_bus(struct pci_bus *bus)
 		/* Root bus */
 		bus->resource[0] = hose->io_space;
 		bus->resource[1] = hose->mem_space;
-	} else {
-		/* This is a bridge. Do not care how it's initialized,
-		   just link its resources to the bus ones */
-		int i;
-
-		for(i=0; i<3; i++) {
-			bus->resource[i] =
-				&dev->resource[PCI_BRIDGE_RESOURCES+i];
-			bus->resource[i]->name = bus->name;
-		}
-		bus->resource[0]->flags |= pci_bridge_check_io(dev);
-		bus->resource[1]->flags |= IORESOURCE_MEM;
-		/* For now, propogate hose limits to the bus;
-		   we'll adjust them later. */
-		bus->resource[0]->end = hose->io_space->end;
-		bus->resource[1]->end = hose->mem_space->end;
-		/* Turn off downstream PF memory address range by default */
-		bus->resource[2]->start = 1024*1024;
-		bus->resource[2]->end = bus->resource[2]->start - 1;
 	}
 
 	for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
@@ -349,6 +330,10 @@ pcibios_fixup_pbus_ranges(struct pci_bus * bus,
 	ranges->io_end -= hose->io_space->start;
 	ranges->mem_start -= hose->mem_space->start;
 	ranges->mem_end -= hose->mem_space->start;
+/* FIXME: On older alphas we could use dense memory space
+	  to access prefetchable resources. */
+	ranges->prefetch_start -= hose->mem_space->start;
+	ranges->prefetch_end -= hose->mem_space->start;
 }
 
 int
