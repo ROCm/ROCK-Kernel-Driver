@@ -20,6 +20,7 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
@@ -305,6 +306,72 @@ static void __devexit pci_plx9050_exit(struct pci_dev *dev)
 	}
 }
 
+/* SBS Technologies Inc. PMC-OCTPRO and P-OCTAL cards */
+static int
+sbs_setup(struct pci_dev *dev, struct pci_board *board,
+		struct serial_struct *req, int idx)
+{
+	unsigned int bar, offset = board->first_offset, maxnr;
+
+	bar = 0;
+
+	if (idx < 4) {
+		/* first four channels map to 0, 0x100, 0x200, 0x300 */
+		offset += idx * board->uart_offset;
+	} else if (idx < 8) {
+		/* last four channels map to 0x1000, 0x1100, 0x1200, 0x1300 */
+		offset += idx * board->uart_offset + 0xC00;
+	} else /* we have only 8 ports on PMC-OCTALPRO */
+		return 1;
+
+	return setup_port(dev, req, bar, offset, board->reg_shift);
+}
+
+/*
+* This does initialization for PMC OCTALPRO cards:
+* maps the device memory, resets the UARTs (needed, bc
+* if the module is removed and inserted again, the card
+* is in the sleep mode) and enables global interrupt.
+*/
+
+/* global control register offset for SBS PMC-OctalPro */
+#define OCT_REG_CR_OFF		0x500
+
+static int __devinit sbs_init(struct pci_dev *dev)
+{
+	u8 * p;
+
+	p = ioremap(pci_resource_start(dev, 0),pci_resource_len(dev,0));
+
+	if (p == NULL)
+		return -ENOMEM;
+	/* Set bit-4 Control Register (UART RESET) in to reset the uarts */
+	writeb(0x10,p + OCT_REG_CR_OFF);
+	udelay(50);
+	writeb(0x0,p + OCT_REG_CR_OFF);
+
+	/* Set bit-2 (INTENABLE) of Control Register */
+	writeb(0x4, p + OCT_REG_CR_OFF);
+	iounmap(p);
+
+	return 0;
+}
+
+/*
+ * Disables the global interrupt of PMC-OctalPro
+ */
+
+static void __devexit sbs_exit(struct pci_dev *dev)
+{
+	u8 * p;
+
+	p = ioremap(pci_resource_start(dev, 0),pci_resource_len(dev,0));
+	if (p != NULL) {
+		writeb(0, p + OCT_REG_CR_OFF);
+	}
+	iounmap(p);
+}
+
 /*
  * SIIG serial cards have an PCI interface chip which also controls
  * the UART clocking frequency. Each UART can be clocked independently
@@ -534,6 +601,15 @@ pci_default_setup(struct pci_dev *dev, struct pci_board *board,
 	return setup_port(dev, req, bar, offset, board->reg_shift);
 }
 
+/* This should be in linux/pci_ids.h */
+#define PCI_VENDOR_ID_SBSMODULARIO	0x124B
+#define PCI_SUBVENDOR_ID_SBSMODULARIO	0x124B
+#define PCI_DEVICE_ID_OCTPRO		0x0001
+#define PCI_SUBDEVICE_ID_OCTPRO232	0x0108
+#define PCI_SUBDEVICE_ID_OCTPRO422	0x0208
+#define PCI_SUBDEVICE_ID_POCTAL232	0x0308
+#define PCI_SUBDEVICE_ID_POCTAL422	0x0408
+
 /*
  * Master list of serial port init/setup/exit quirks.
  * This does not describe the general nature of the port.
@@ -618,6 +694,55 @@ static struct pci_serial_quirk pci_serial_quirks[] = {
 		.setup		= pci_default_setup,
 		.exit		= __devexit_p(pci_plx9050_exit),
 	},
+	/*
+	 * SBS Technologies, Inc., PMC-OCTALPRO 232
+	 */
+	{
+		.vendor		= PCI_VENDOR_ID_SBSMODULARIO,
+		.device		= PCI_DEVICE_ID_OCTPRO,
+		.subvendor	= PCI_SUBVENDOR_ID_SBSMODULARIO,
+		.subdevice	= PCI_SUBDEVICE_ID_OCTPRO232,
+		.init		= sbs_init,
+		.setup		= sbs_setup,
+		.exit		= sbs_exit
+	},
+	/*
+	 * SBS Technologies, Inc., PMC-OCTALPRO 422
+	 */
+	{
+		.vendor		= PCI_VENDOR_ID_SBSMODULARIO,
+		.device		= PCI_DEVICE_ID_OCTPRO,
+		.subvendor	= PCI_SUBVENDOR_ID_SBSMODULARIO,
+		.subdevice	= PCI_SUBDEVICE_ID_OCTPRO422,
+		.init		= sbs_init,
+		.setup		= sbs_setup,
+		.exit		= sbs_exit
+	},
+	/*
+	 * SBS Technologies, Inc., P-Octal 232
+	 */
+	{
+		.vendor		= PCI_VENDOR_ID_SBSMODULARIO,
+		.device		= PCI_DEVICE_ID_OCTPRO,
+		.subvendor	= PCI_SUBVENDOR_ID_SBSMODULARIO,
+		.subdevice	= PCI_SUBDEVICE_ID_POCTAL232,
+		.init		= sbs_init,
+		.setup		= sbs_setup,
+		.exit		= sbs_exit
+	},
+	/*
+	 * SBS Technologies, Inc., P-Octal 422
+	 */
+	{
+		.vendor		= PCI_VENDOR_ID_SBSMODULARIO,
+		.device		= PCI_DEVICE_ID_OCTPRO,
+		.subvendor	= PCI_SUBVENDOR_ID_SBSMODULARIO,
+		.subdevice	= PCI_SUBDEVICE_ID_POCTAL422,
+		.init		= sbs_init,
+		.setup		= sbs_setup,
+		.exit		= sbs_exit
+	},
+
 	/*
 	 * SIIG cards.
 	 *  It is not clear whether these could be collapsed.
@@ -944,7 +1069,18 @@ enum pci_board_num_t {
 	pbn_computone_4,
 	pbn_computone_6,
 	pbn_computone_8,
+	pbn_sbsxrsio,
 };
+
+/*
+ * uart_offset - the space between channels
+ * reg_shift   - describes how the UART registers are mapped
+ *               to PCI memory by the card.
+ * For example IER register on SBS, Inc. PMC-OctPro is located at
+ * offset 0x10 from the UART base, while UART_IER is defined as 1
+ * in include/linux/serial_reg.h,
+ * see first lines of serial_in() and serial_out() in 8250.c
+*/
 
 static struct pci_board pci_boards[] __devinitdata = {
 	[pbn_default] = {
@@ -1348,6 +1484,13 @@ static struct pci_board pci_boards[] __devinitdata = {
 		.reg_shift	= 2,
 		.first_offset	= 0x200,
 	},
+	[pbn_sbsxrsio] = {
+		.flags		= FL_BASE0,
+		.num_ports	= 8,
+		.base_baud	= 460800,
+		.uart_offset	= 256,
+		.reg_shift	= 4,
+	}
 };
 
 /*
@@ -1755,26 +1898,43 @@ static struct pci_device_id serial_pci_tbl[] = {
 		0x10b5, 0x106a, 0, 0,
 		pbn_plx_romulus },
 	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_QSC100,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b1_4_115200 },
 	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_DSC100,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b1_2_115200 },
 	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_ESC100D,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b1_8_115200 },
 	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_ESC100M,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b1_8_115200 },
 	{	PCI_VENDOR_ID_SPECIALIX, PCI_DEVICE_ID_OXSEMI_16PCI954,
-		PCI_VENDOR_ID_SPECIALIX, PCI_SUBDEVICE_ID_SPECIALIX_SPEED4, 0, 0, 
+		PCI_VENDOR_ID_SPECIALIX, PCI_SUBDEVICE_ID_SPECIALIX_SPEED4, 0, 0,
 		pbn_b0_4_921600 },
 	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI954,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_4_115200 },
 	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI952,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_bt_2_921600 },
+
+	/*
+	 * SBS Technologies, Inc. P-Octal and PMC-OCTPRO cards,
+	 * from skokodyn@yahoo.com
+	 */
+	{	PCI_VENDOR_ID_SBSMODULARIO, PCI_DEVICE_ID_OCTPRO,
+		PCI_SUBVENDOR_ID_SBSMODULARIO, PCI_SUBDEVICE_ID_OCTPRO232, 0, 0,
+		pbn_sbsxrsio },
+	{	PCI_VENDOR_ID_SBSMODULARIO, PCI_DEVICE_ID_OCTPRO,
+		PCI_SUBVENDOR_ID_SBSMODULARIO, PCI_SUBDEVICE_ID_OCTPRO422, 0, 0,
+		pbn_sbsxrsio },
+	{	PCI_VENDOR_ID_SBSMODULARIO, PCI_DEVICE_ID_OCTPRO,
+		PCI_SUBVENDOR_ID_SBSMODULARIO, PCI_SUBDEVICE_ID_POCTAL232, 0, 0,
+		pbn_sbsxrsio },
+	{	PCI_VENDOR_ID_SBSMODULARIO, PCI_DEVICE_ID_OCTPRO,
+		PCI_SUBVENDOR_ID_SBSMODULARIO, PCI_SUBDEVICE_ID_POCTAL422, 0, 0,
+		pbn_sbsxrsio },
 
 	/*
 	 * Digitan DS560-558, from jimd@esoft.com
