@@ -846,6 +846,25 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 	return serial;
 }
 
+static struct usb_serial_device_type *search_serial_device(struct usb_interface *iface)
+{
+	struct list_head *p;
+	const struct usb_device_id *id;
+	struct usb_serial_device_type *t;
+
+	/* List trough know devices and see if the usb id matches */
+	list_for_each(p, &usb_serial_driver_list) {
+		t = list_entry(p, struct usb_serial_device_type, driver_list);
+		id = usb_match_id(iface, t->id_table);
+		if (id != NULL) {
+			dbg("descriptor matches");
+			return t;
+		}
+	}
+
+	return NULL;
+}
+
 int usb_serial_probe(struct usb_interface *interface,
 			       const struct usb_device_id *id)
 {
@@ -858,9 +877,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	struct usb_endpoint_descriptor *bulk_in_endpoint[MAX_NUM_PORTS];
 	struct usb_endpoint_descriptor *bulk_out_endpoint[MAX_NUM_PORTS];
 	struct usb_serial_device_type *type = NULL;
-	struct list_head *tmp;
 	int retval;
-	int found;
 	int minor;
 	int buffer_size;
 	int i;
@@ -869,22 +886,9 @@ int usb_serial_probe(struct usb_interface *interface,
 	int num_bulk_out = 0;
 	int num_ports = 0;
 	int max_endpoints;
-	const struct usb_device_id *id_pattern = NULL;
 
-	/* loop through our list of known serial converters, and see if this
-	   device matches. */
-	found = 0;
-	list_for_each (tmp, &usb_serial_driver_list) {
-		type = list_entry(tmp, struct usb_serial_device_type, driver_list);
-		id_pattern = usb_match_id(interface, type->id_table);
-		if (id_pattern != NULL) {
-			dbg("descriptor matches");
-			found = 1;
-			break;
-		}
-	}
-	if (!found) {
-		/* no match */
+	type = search_serial_device(interface);
+	if (!type) {
 		dbg("none matched");
 		return -ENODEV;
 	}
@@ -897,12 +901,16 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	/* if this device type has a probe function, call it */
 	if (type->probe) {
+		const struct usb_device_id *id;
+
 		if (!try_module_get(type->owner)) {
 			dev_err(&interface->dev, "module get failed, exiting\n");
 			kfree (serial);
 			return -EIO;
 		}
-		retval = type->probe (serial, id_pattern);
+
+		id = usb_match_id(interface, type->id_table);
+		retval = type->probe(serial, id);
 		module_put(type->owner);
 
 		if (retval) {
