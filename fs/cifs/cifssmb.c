@@ -21,7 +21,7 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
- /* All SMB/CIFS PDU handling routines go here - except for a few leftovers in connect.c */
+ /* SMB/CIFS PDU handling routines here - except for leftovers in connect.c */
 
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -85,7 +85,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses,
     }
 
 	pSMB->ByteCount = strlen(protocols[0].name) + 1;
-	strncpy(pSMB->DialectsArray, protocols[0].name, 30);	/* null guaranteed to be at end of source and target buffers anyway */
+	strncpy(pSMB->DialectsArray, protocols[0].name, 30);	
+    /* null guaranteed to be at end of source and target buffers anyway */
 
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
@@ -94,17 +95,19 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc == 0) {
 		ses->dialectIndex = le16_to_cpu(pSMBr->DialectIndex);
-		ses->secMode = pSMBr->SecurityMode;	/* one byte - no need to convert this or EncryptionKeyLen field from le,  */
+		ses->secMode = pSMBr->SecurityMode;	
+        /* one byte - no need to convert this or EncryptionKeyLen from le,*/
 		ses->maxReq = le16_to_cpu(pSMBr->MaxMpxCount);
 		/* probably no need to store and check maxvcs */
 		ses->maxBuf =
 		    min(le32_to_cpu(pSMBr->MaxBufferSize),
 			(__u32) CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE);
-		ses->maxRw = le32_to_cpu(pSMBr->MaxRawSize);	/* BB le_to_host needed around here and ff */
+		ses->maxRw = le32_to_cpu(pSMBr->MaxRawSize);
 		cFYI(1, ("\nMax buf = %d ", ses->maxBuf));
 		GETU32(ses->sessid) = le32_to_cpu(pSMBr->SessionKey);
 		ses->capabilities = le32_to_cpu(pSMBr->Capabilities);
-		ses->timeZone = le16_to_cpu(pSMBr->ServerTimeZone);	/* BB with UTC do we ever need to be using srvr timezone? */
+		ses->timeZone = le16_to_cpu(pSMBr->ServerTimeZone);	
+        /* BB with UTC do we ever need to be using srvr timezone? */
 		if (pSMBr->EncryptionKeyLength == CIFS_CRYPTO_KEY_SIZE) {
 			memcpy(cryptokey, pSMBr->u.EncryptionKey,
 			       CIFS_CRYPTO_KEY_SIZE);
@@ -495,7 +498,6 @@ CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 		pSMBr->DataLength = le16_to_cpu(pSMBr->DataLength);
 		*nbytes = pSMBr->DataLength;
 		/* BB check that DataLength would not go beyond end of SMB BB */
-/* if(pSMBr->DataOffset < pSMBr->ByteCount + sizeof(READ_RSP) - 1 *//* BB fix this length check */
 		if (pSMBr->DataLength > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 			rc = -EIO;
 			*nbytes = 0;
@@ -541,7 +543,7 @@ CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
 		pSMB->DataLengthLow = count;
 	pSMB->DataLengthHigh = 0;
 	pSMB->DataOffset =
-	    cpu_to_le16((int) &(pSMB->Data) - (int) pSMB->hdr.Protocol);
+	    cpu_to_le16(offsetof(struct smb_com_write_req,Data) - 4);
 	copy_from_user(pSMB->Data, buf, pSMB->DataLengthLow);
 
 	pSMB->ByteCount += pSMB->DataLengthLow + 1 /* pad */ ;
@@ -685,7 +687,8 @@ CIFSSMBRename(const int xid, const struct cifsTconInfo *tcon,
 		name_len2++;	/* signature byte */
 	}
 
-	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;	/* we could also set search attributes but not needed */
+	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;	
+    /* we could also set search attributes but not needed */
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 
@@ -739,8 +742,8 @@ CIFSUnixCreateSymLink(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    (int) &(pSMB->InformationLevel) - (int) pSMB->hdr.Protocol;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
 
 	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
@@ -759,7 +762,7 @@ CIFSUnixCreateSymLink(const int xid, const struct cifsTconInfo *tcon,
 
 	pSMB->DataCount = name_len_target;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(1000);	/*BB find exact max SMB from sess */
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
@@ -825,8 +828,8 @@ CIFSUnixCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    (int) &(pSMB->InformationLevel) - (int) pSMB->hdr.Protocol;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
 
 	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
@@ -845,7 +848,7 @@ CIFSUnixCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
 
 	pSMB->DataCount = name_len_target;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB from sess*/
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
@@ -983,9 +986,8 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &(pSMB->InformationLevel) -
-			(int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qpi_req ,InformationLevel) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1084,8 +1086,8 @@ CIFSSMBQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = cpu_to_le16((int) &(pSMB->InformationLevel)
-					    - (int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qpi_req ,InformationLevel) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1161,9 +1163,8 @@ CIFSSMBUnixQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &(pSMB->InformationLevel) -
-			(int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qpi_req ,InformationLevel) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1238,9 +1239,8 @@ CIFSFindSingle(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &pSMB->InformationLevel -
-			(int) &pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(
+        offsetof(struct smb_com_transaction2_ffirst_req,InformationLevel) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;	/* one byte, no need to le convert */
@@ -1321,9 +1321,8 @@ CIFSFindFirst(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
 	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &pSMB->SearchAttributes -
-			(int) &pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(struct 
+        smb_com_transaction2_ffirst_req, SearchAttributes) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;	/* one byte no need to make endian neutral */
@@ -1407,8 +1406,8 @@ CIFSFindNext(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &pSMB->SearchHandle - (int) &pSMB->hdr.Protocol);
+	pSMB->ParameterOffset =  cpu_to_le16(offsetof(
+        struct smb_com_transaction2_fnext_req,SearchHandle) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1532,9 +1531,8 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &(pSMB->MaxReferralLevel) -
-			(int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_get_dfs_refer_req, MaxReferralLevel) - 4);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_GET_DFS_REFERRAL);
@@ -1587,8 +1585,8 @@ CIFSSMBQFSInfo(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
 	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
-	pSMB->ParameterOffset = cpu_to_le16((int) &(pSMB->InformationLevel)
-					    - (int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qfsi_req, InformationLevel) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1662,8 +1660,8 @@ CIFSSMBQFSAttributeInfo(int xid, struct cifsTconInfo *tcon,
 	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
 	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
-	pSMB->ParameterOffset = cpu_to_le16((int) &(pSMB->InformationLevel)
-					    - (int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qfsi_req, InformationLevel) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1725,9 +1723,9 @@ CIFSSMBQFSDeviceInfo(int xid, struct cifsTconInfo *tcon,
 	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
 	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &(pSMB->InformationLevel) -
-			(int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qfsi_req, InformationLevel) - 4);
+
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -1743,7 +1741,8 @@ CIFSSMBQFSDeviceInfo(int xid, struct cifsTconInfo *tcon,
 		cERROR(1, ("\nSend error in QFSDeviceInfo = %d\n", rc));
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO)) || (pSMBr->DataOffset > 512))	/* BB also check enough bytes returned */
+		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO))
+                 || (pSMBr->DataOffset > 512))
 			rc = -EIO;	/* bad smb */
 		else {
 			response_data =
@@ -1790,9 +1789,8 @@ CIFSSMBQFSUnixInfo(int xid, struct cifsTconInfo *tcon,
 	pSMB->ByteCount = pSMB->ParameterCount + 1 /* pad */ ;
 	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
-	pSMB->ParameterOffset =
-	    cpu_to_le16((int) &(pSMB->InformationLevel) -
-			(int) pSMB->hdr.Protocol);
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(struct 
+        smb_com_transaction2_qfsi_req, InformationLevel) - 4);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_FS_INFORMATION);
@@ -1806,7 +1804,7 @@ CIFSSMBQFSUnixInfo(int xid, struct cifsTconInfo *tcon,
 		cERROR(1, ("\nSend error in QFSUnixInfo = %d\n", rc));
 	} else {		/* decode response */
 		pSMBr->DataOffset = cpu_to_le16(pSMBr->DataOffset);
-		if ((pSMBr->ByteCount < 13) || (pSMBr->DataOffset > 512)) {	/* BB also check enough bytes returned */
+		if ((pSMBr->ByteCount < 13) || (pSMBr->DataOffset > 512)) {
 			rc = -EIO;	/* bad smb */
 		} else {
 			response_data =
@@ -1862,14 +1860,14 @@ CIFSSMBSetEOF(int xid, struct cifsTconInfo *tcon, char *fileName,
 	pSMB->ParameterCount = 6 + name_len;
 	pSMB->DataCount = sizeof (struct file_end_of_file_info);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find max SMB size from sess */
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    (int) &(pSMB->InformationLevel) - (int) pSMB->hdr.Protocol;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
     if(SetAllocation) {
         if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
@@ -1946,15 +1944,15 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    (int) &(pSMB->Fid) - (int) pSMB->hdr.Protocol;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_sfi_req,
+                                     Fid) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
 
 	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;	
 
 	pSMB->DataCount = sizeof(struct file_end_of_file_info);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find max SMB PDU from sess */
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_FILE_INFORMATION);
@@ -2042,8 +2040,8 @@ CIFSSMBSetTimes(int xid, struct cifsTconInfo *tcon, char *fileName,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    (int) &(pSMB->InformationLevel) - (int) pSMB->hdr.Protocol;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
 	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
 	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
@@ -2118,8 +2116,8 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =
-	    (int) &(pSMB->InformationLevel) - (int) pSMB->hdr.Protocol;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
 	data_offset =
 	    (FILE_UNIX_BASIC_INFO *) ((char *) &pSMB->hdr.Protocol +
@@ -2138,9 +2136,7 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Reserved4 = 0;
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	data_offset->Uid = cpu_to_le64(uid);
-	cFYI(1, ("\nUid = %lld from %lld ", data_offset->Uid, uid));
 	data_offset->Gid = cpu_to_le64(gid);
-	cFYI(1, ("\nGid = %lld from %lld ", data_offset->Gid, gid));
 	data_offset->Permissions = cpu_to_le64(mode);
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,

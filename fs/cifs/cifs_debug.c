@@ -32,7 +32,7 @@
 #include "cifs_debug.h"
 
 void
-dump_mem(char *label, void *data, int length)
+cifs_dump_mem(char *label, void *data, int length)
 {
 	int i, j;
 	int *intptr = data;

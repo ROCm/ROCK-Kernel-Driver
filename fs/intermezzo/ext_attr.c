@@ -1,10 +1,25 @@
-/* 
+/* -*- mode: c; c-basic-offset: 8; indent-tabs-mode: nil; -*-
+ * vim:expandtab:shiftwidth=8:tabstop=8:
+ * 
+ *  Copyright (C) 2001 Tacit Networks, Inc.
+ *    Author: Shirish H. Phatak <shirish@tacitnetworks.com>
+ *
+ *   This file is part of InterMezzo, http://www.inter-mezzo.org.
+ *
+ *   InterMezzo is free software; you can redistribute it and/or
+ *   modify it under the terms of version 2 of the GNU General Public
+ *   License as published by the Free Software Foundation.
+ *
+ *   InterMezzo is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with InterMezzo; if not, write to the Free Software
+ *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
  * Extended attribute handling for presto.
- *
- * Copyright (C) 2001. All rights reserved.
- * Shirish H. Phatak
- * Tacit Networks, Inc.
- *
  */
 
 #define __NO_VERSION__
@@ -14,6 +29,7 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
+#include <linux/smp_lock.h>
 #include <linux/unistd.h>
 
 #include <asm/system.h>
@@ -22,27 +38,22 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
+#include <linux/smp_lock.h>
 #include <linux/string.h>
 #include <asm/uaccess.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <asm/segment.h>
 #include <linux/smp_lock.h>
 
 #include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_upcall.h>
 #include <linux/intermezzo_psdev.h>
-#include <linux/intermezzo_kml.h>
-
 
 #ifdef CONFIG_FS_EXT_ATTR
 #include <linux/ext_attr.h>
 
 extern inline void presto_debug_fail_blkdev(struct presto_file_set *fset,
                                             unsigned long value);
-
-extern int presto_prep(struct dentry *, struct presto_cache **,
-                       struct presto_file_set **);
 
 
 /* VFS interface */
@@ -75,7 +86,7 @@ int presto_set_ext_attr(struct inode *inode,
          * we do a reverse mapping from inode to the first dentry 
          */
         if (list_empty(&inode->i_dentry)) {
-                printk("No alias for inode %d\n", (int) inode->i_ino);
+                CERROR("No alias for inode %d\n", (int) inode->i_ino);
                 EXIT;
                 return -EINVAL;
         }
@@ -99,12 +110,13 @@ int presto_set_ext_attr(struct inode *inode,
             * (works for ext3)
             */
             if (flags & EXT_ATTR_FLAG_USER) {
-                PRESTO_ALLOC(buf, char *, buffer_len);
+                PRESTO_ALLOC(buf, buffer_len);
                 if (!buf) {
-                        printk("InterMezzo: out of memory!!!\n");
+                        CERROR("InterMezzo: out of memory!!!\n");
                         return -ENOMEM;
                 }
-                if (copy_from_user(buf, buffer, buffer_len))
+                error = copy_from_user(buf, buffer, buffer_len);
+                if (error) 
                         return -EFAULT;
             } else 
                 buf = buffer;
@@ -172,7 +184,7 @@ int lento_set_ext_attr(const char *path, const char *name,
         fset = presto_fset(dentry);
         error = -EINVAL;
         if ( !fset ) {
-                printk("No fileset!\n");
+                CERROR("No fileset!\n");
                 EXIT;
                 goto exit_dentry;
         }

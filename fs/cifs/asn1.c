@@ -458,7 +458,7 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 	unsigned int cls, con, tag, oidlen, rc;
 	int use_ntlmssp = FALSE;
 
-	dump_mem(" Received SecBlob ", security_blob, length);
+	/* cifs_dump_mem(" Received SecBlob ", security_blob, length); */
 
 	asn1_open(&ctx, security_blob, length);
 

@@ -694,8 +694,8 @@ const struct nt_err_code_struct nt_errs[] = {
 /*****************************************************************************
  Print an error message from the status code
  *****************************************************************************/
-void
-print_status(__u32 status_code)
+/* void
+cifs_print_status(__u32 status_code)
 {
 	int idx = 0;
 
@@ -709,4 +709,4 @@ print_status(__u32 status_code)
 		idx++;
 	}
 	return;
-}
+} */
