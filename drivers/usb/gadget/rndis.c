@@ -37,6 +37,16 @@
 #include "rndis.h"
 
 
+/* The driver for your USB chip needs to support ep0 OUT to work with
+ * RNDIS, plus the same three descriptors as CDC Ethernet.
+ *
+ * Windows hosts need an INF file like Documentation/usb/linux.inf
+ */
+
+#ifndef	__LITTLE_ENDIAN
+#warning this code is missing all cpu_to_leXX() calls ...
+#endif
+
 #if 0
 #define DEBUG if (rndis_debug) printk 
 static int rndis_debug = 0;
@@ -89,8 +99,12 @@ static u32 devFlags2currentFilter (struct net_device *dev)
 
 static void currentFilter2devFlags (u32 currentFilter, struct net_device *dev)
 {
+	/* FIXME the filter is supposed to control what gets
+	 * forwarded from gadget to host; but dev->flags controls
+	 * reporting from host to gadget ...
+	 */
+#if 0
 	if (!dev) return;
-	
 	if (currentFilter & NDIS_PACKET_TYPE_MULTICAST)
 	    dev->flags |= IFF_MULTICAST;
 	if (currentFilter & NDIS_PACKET_TYPE_BROADCAST)
@@ -99,8 +113,13 @@ static void currentFilter2devFlags (u32 currentFilter, struct net_device *dev)
 	    dev->flags |= IFF_ALLMULTI;
 	if (currentFilter & NDIS_PACKET_TYPE_PROMISCUOUS)
 	    dev->flags |= IFF_PROMISC;
+#endif
 }
 
+/* FIXME OMITTED OIDs, that RNDIS-on-USB "must" support, include
+ *  - power management (OID_PNP_CAPABILITIES, ...)
+ *  - network wakeup (OID_PNP_ENABLE_WAKE_UP, ...)
+ */
 
 /* NDIS Functions */
 static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
@@ -112,8 +131,6 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 	if (!r) return -ENOMEM;
 	resp = (rndis_query_cmplt_type *) r->buf;
 
-	if (!resp) return -ENOMEM;
-	
 	if (!resp) return -ENOMEM;
 	
 	switch (OID) {
@@ -178,7 +195,8 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 	case OID_GEN_LINK_SPEED:
 		DEBUG("%s: OID_GEN_LINK_SPEED\n", __FUNCTION__);
 		length = 4;
-		if (rndis_per_dev_params [configNr].media_state)
+		if (rndis_per_dev_params [configNr].media_state
+			== NDIS_MEDIA_STATE_DISCONNECTED)
 		    *((u32 *) resp + 6) = 0;
 		else
 		    *((u32 *) resp + 6) = rndis_per_dev_params [configNr].speed;
@@ -611,15 +629,10 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 	case OID_802_3_PERMANENT_ADDRESS:
 		DEBUG("%s: OID_802_3_PERMANENT_ADDRESS\n", __FUNCTION__);
 		if (rndis_per_dev_params [configNr].dev) {
-			length = 6;
+			length = ETH_ALEN;
 			memcpy ((u8 *) resp + 24,
-				rndis_per_dev_params [configNr].dev->dev_addr,
+				rndis_per_dev_params [configNr].host_mac,
 				length);
-			/* 
-			 * we need a MAC address and hope that 
-			 * (our MAC + 1) is not in use
-			 */
-			*((u8 *) resp + 29) += 1;
 			retval = 0;
 		} else {
 			*((u32 *) resp + 6) = 0;
@@ -631,15 +644,10 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 	case OID_802_3_CURRENT_ADDRESS:
 		DEBUG("%s: OID_802_3_CURRENT_ADDRESS\n", __FUNCTION__);
 		if (rndis_per_dev_params [configNr].dev) {
-			length = 6;
+			length = ETH_ALEN;
 			memcpy ((u8 *) resp + 24,
-				rndis_per_dev_params [configNr].dev->dev_addr,
+				rndis_per_dev_params [configNr].host_mac,
 				length);
-			/* 
-			 * we need a MAC address and hope that 
-			 * (our MAC + 1) is not in use
-			 */
-			*((u8 *) resp + 29) += 1;
 			retval = 0;
 		}
 		break;
@@ -746,22 +754,38 @@ static int gen_ndis_set_resp (u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 	rndis_set_cmplt_type		*resp;
 	int 				i, retval = -ENOTSUPP;
 	struct rndis_config_parameter	*param;
-	
-	if (!r) return -ENOMEM;
+	struct rndis_params		*params;
+	u8 *cp;
+
+	if (!r)
+		return -ENOMEM;
 	resp = (rndis_set_cmplt_type *) r->buf;
-	
-	if (!resp) return -ENOMEM;
-	
+	if (!resp)
+		return -ENOMEM;
+
+	cp = (u8 *)resp;
+
 	switch (OID) {
 	case OID_GEN_CURRENT_PACKET_FILTER:
 		DEBUG("%s: OID_GEN_CURRENT_PACKET_FILTER\n", __FUNCTION__);
-		currentFilter2devFlags ((u32) ((u8 *) resp + 28), 
-					rndis_per_dev_params [configNr].dev);
+		params = &rndis_per_dev_params [configNr];
+		currentFilter2devFlags(cp[28], params->dev);
 		retval = 0;
-		if ((u32) ((u8 *) resp + 28))
-		    rndis_per_dev_params [configNr].state = RNDIS_INITIALIZED;
-		else
-		    rndis_per_dev_params [configNr].state = RNDIS_UNINITIALIZED;
+
+		/* this call has a significant side effect:  it's
+		 * what makes the packet flow start and stop, like
+		 * activating the CDC Ethernet altsetting.
+		 */
+		if (cp[28]) {
+			params->state = RNDIS_DATA_INITIALIZED;
+			netif_carrier_on(params->dev);
+			if (netif_running(params->dev))
+				netif_wake_queue (params->dev);
+		} else {
+			params->state = RNDIS_INITIALIZED;
+			netif_carrier_off (params->dev);
+			netif_stop_queue (params->dev);
+		}
 		break;
 		
 	case OID_802_3_MULTICAST_LIST:
@@ -937,10 +961,9 @@ static int rndis_keepalive_response (int configNr,
 {
 	rndis_keepalive_cmplt_type	*resp;
 	rndis_resp_t			*r;
-	
-	/* respond only in RNDIS_INITIALIZED state */
-	if (rndis_per_dev_params [configNr].state != RNDIS_INITIALIZED) 
-	    return 0;
+
+	/* host "should" check only in RNDIS_DATA_INITIALIZED state */
+
 	r = rndis_add_response (configNr, sizeof (rndis_keepalive_cmplt_type));
 	resp = (rndis_keepalive_cmplt_type *) r->buf;
 	if (!resp) return -ENOMEM;
@@ -1004,35 +1027,48 @@ int rndis_signal_disconnect (int configNr)
 					  RNDIS_STATUS_MEDIA_DISCONNECT);
 }
 
+void rndis_set_host_mac (int configNr, const u8 *addr)
+{
+	rndis_per_dev_params [configNr].host_mac = addr;
+}
+
 /* 
  * Message Parser 
  */
 int rndis_msg_parser (u8 configNr, u8 *buf)
 {
 	u32 MsgType, MsgLength, *tmp;
+	struct rndis_params		*params;
 	
-	if (!buf) return -ENOMEM;
+	if (!buf)
+		return -ENOMEM;
 	
 	tmp = (u32 *) buf; 
 	MsgType = *tmp;
 	MsgLength = *(tmp + 1);
 	
-	if (configNr >= RNDIS_MAX_CONFIGS) return -ENOTSUPP;
+	if (configNr >= RNDIS_MAX_CONFIGS)
+		return -ENOTSUPP;
+	params = &rndis_per_dev_params [configNr];
 	
+	/* For USB: responses may take up to 10 seconds */
 	switch (MsgType)
 	{
-	case REMOTE_NDIS_INIZIALIZE_MSG:
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_INIZIALIZE_MSG\n", 
+	case REMOTE_NDIS_INITIALIZE_MSG:
+		DEBUG(KERN_INFO "%s: REMOTE_NDIS_INITIALIZE_MSG\n", 
 			__FUNCTION__ );
-		rndis_per_dev_params [configNr].state = RNDIS_INITIALIZED;
+		params->state = RNDIS_INITIALIZED;
 		return  rndis_init_response (configNr,
 					     (rndis_init_msg_type *) buf);
-		break;
 		
 	case REMOTE_NDIS_HALT_MSG:
 		DEBUG(KERN_INFO "%s: REMOTE_NDIS_HALT_MSG\n",
 			__FUNCTION__ );
-		rndis_per_dev_params [configNr].state = RNDIS_UNINITIALIZED;
+		params->state = RNDIS_UNINITIALIZED;
+		if (params->dev) {
+			netif_carrier_off (params->dev);
+			netif_stop_queue (params->dev);
+		}
 		return 0;
 		
 	case REMOTE_NDIS_QUERY_MSG:
@@ -1040,29 +1076,26 @@ int rndis_msg_parser (u8 configNr, u8 *buf)
 			__FUNCTION__ );
 		return rndis_query_response (configNr, 
 					     (rndis_query_msg_type *) buf);
-		break;
 		
 	case REMOTE_NDIS_SET_MSG:
 		DEBUG(KERN_INFO "%s: REMOTE_NDIS_SET_MSG\n", 
 			__FUNCTION__ );
 		return rndis_set_response (configNr, 
 					   (rndis_set_msg_type *) buf);
-		break;
 		
 	case REMOTE_NDIS_RESET_MSG:
 		DEBUG(KERN_INFO "%s: REMOTE_NDIS_RESET_MSG\n", 
 			__FUNCTION__ );
 		return rndis_reset_response (configNr,
 					     (rndis_reset_msg_type *) buf);
-		break;
 
 	case REMOTE_NDIS_KEEPALIVE_MSG:
+		/* For USB: host does this every 5 seconds */
 		DEBUG(KERN_INFO "%s: REMOTE_NDIS_KEEPALIVE_MSG\n", 
 			__FUNCTION__ );
 		return rndis_keepalive_response (configNr,
 						 (rndis_keepalive_msg_type *) 
 						 buf);
-		break;
 		
 	default: 
 		printk (KERN_ERR "%s: unknown RNDIS Message Type 0x%08X\n", 
@@ -1240,9 +1273,15 @@ int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof,
 			 "vendor ID : 0x%08X\n"
 			 "vendor    : %s\n", 
 			 param->confignr, (param->used) ? "y" : "n", 
-			 (param->state)
-				? "RNDIS_INITIALIZED"
-				: "RNDIS_UNINITIALIZED",
+			 ({ char *s = "?";
+			 switch (param->state) {
+			 case RNDIS_UNINITIALIZED:
+				s = "RNDIS_UNINITIALIZED"; break;
+			 case RNDIS_INITIALIZED:
+				s = "RNDIS_INITIALIZED"; break;
+			 case RNDIS_DATA_INITIALIZED:
+				s = "RNDIS_DATA_INITIALIZED"; break;
+			}; s; }),
 			 param->medium, 
 			 (param->media_state) ? 0 : param->speed*100, 
 			 (param->media_state) ? "disconnected" : "connected",
@@ -1353,7 +1392,7 @@ int __init rndis_init (void)
 	return 0;
 }
 
-void __exit rndis_exit (void)
+void rndis_exit (void)
 {
 	u8 i;
 	char name [4];

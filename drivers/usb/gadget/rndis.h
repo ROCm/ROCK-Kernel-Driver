@@ -38,7 +38,7 @@
  */
 
 /* Message Set for Connectionless (802.3) Devices */
-#define REMOTE_NDIS_INIZIALIZE_MSG	0x00000002U	/* Initialize device */
+#define REMOTE_NDIS_INITIALIZE_MSG	0x00000002U	/* Initialize device */
 #define REMOTE_NDIS_HALT_MSG		0x00000003U
 #define REMOTE_NDIS_QUERY_MSG		0x00000004U
 #define REMOTE_NDIS_SET_MSG		0x00000005U
@@ -280,6 +280,7 @@ typedef struct rndis_params
 	u32			medium;
 	u32			speed;
 	u32			media_state;
+	const u8		*host_mac;
 	struct net_device 	*dev;
 	struct net_device_stats *stats;
 	u32			vendorID;
@@ -301,11 +302,13 @@ void rndis_add_hdr (struct sk_buff *skb);
 int  rndis_rm_hdr (u8 *buf, u32 *length);
 u8   *rndis_get_next_response (int configNr, u32 *length);
 void rndis_free_response (int configNr, u8 *buf);
+
 int  rndis_signal_connect (int configNr);
 int  rndis_signal_disconnect (int configNr);
 int  rndis_state (int configNr);
+extern void rndis_set_host_mac (int configNr, const u8 *addr);
 
 int __init rndis_init (void);
-void __exit rndis_exit (void);
+void rndis_exit (void);
 
 #endif  /* _LINUX_RNDIS_H */

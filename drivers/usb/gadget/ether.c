@@ -120,6 +120,7 @@ struct eth_dev {
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
 	int			rndis_config;
+	u8			host_mac [ETH_ALEN];
 };
 
 /* This version autoconfigures as much as possible at run-time.
@@ -159,9 +160,8 @@ static const char *EP_STATUS_NAME;
 
 /* For hardware that can talk RNDIS and either of the above protocols,
  * use this ID ... the windows INF files will know it.  Unless it's
- * used with CDC Ethernet, Linux hosts will need updates to choose the
- * non-MSFT configuration, either in the kernel (2.4) or else from a
- * hotplug script (2.6).
+ * used with CDC Ethernet, Linux 2.4 hosts will need updates to choose
+ * the non-RNDIS configuration.
  */
 #define RNDIS_VENDOR_NUM	0x0525	/* NetChip */
 #define RNDIS_PRODUCT_NUM	0xa4a2	/* Ethernet/RNDIS Gadget */
@@ -1334,8 +1334,10 @@ static void rndis_command_complete (struct usb_ep *ep, struct usb_request *req)
 	struct eth_dev          *dev = ep->driver_data;
 	
 	/* received RNDIS command from CDC_SEND_ENCAPSULATED_COMMAND */
+	spin_lock(&dev->lock);
 	if (rndis_msg_parser (dev->rndis_config, (u8 *) req->buf))
 		ERROR(dev, "%s: rndis parse error\n", __FUNCTION__ );
+	spin_unlock(&dev->lock);
 }
 
 #endif	/* RNDIS */
@@ -1486,14 +1488,14 @@ done_set_intf:
 				|| !dev->config
 				|| ctrl->wIndex > 1)
 			break;
-		if (!dev->cdc && ctrl->wIndex != 0)
+		if (!(dev->cdc || dev->rndis) && ctrl->wIndex != 0)
 			break;
 
-		/* if carrier is on, data interface is active. */
-		*(u8 *)req->buf =
-			((ctrl->wIndex == 1) && netif_carrier_ok (dev->net))
-				? 1
-				: 0,
+		/* for CDC, iff carrier is on, data interface is active. */
+		if (dev->rndis || ctrl->wIndex != 1)
+			*(u8 *)req->buf = 0;
+		else
+			*(u8 *)req->buf = netif_carrier_ok (dev->net) ? 1 : 0;
 		value = min (ctrl->wLength, (u16) 1);
 		break;
 
@@ -1552,6 +1554,7 @@ done_set_intf:
 				memcpy (req->buf, buf, value);
 				req->complete = rndis_response_complete;
 			}
+			/* else stalls ... spec says to avoid that */
 		}
 		break;
 #endif	/* RNDIS */
@@ -1589,6 +1592,8 @@ eth_disconnect (struct usb_gadget *gadget)
 	netif_carrier_off (dev->net);
 	eth_reset_config (dev);
 	spin_unlock_irqrestore (&dev->lock, flags);
+
+	/* FIXME RNDIS should enter RNDIS_UNINITIALIZED */
 
 	/* next we may get setup() calls to enumerate new connections;
 	 * or an unbind() during shutdown (including removing module).
@@ -2376,19 +2381,19 @@ autoconf_fail:
 	 */
 	random_ether_addr(net->dev_addr);
 
-#ifdef	DEV_CONFIG_CDC
 	/* ... another address for the host, on the other end of the
 	 * link, gets exported through CDC (see CDC spec table 41)
+	 * and RNDIS.
 	 */
-	if (cdc) {
-		u8		node_id [ETH_ALEN];
-
-		random_ether_addr(node_id);
+	if (cdc || rndis) {
+		random_ether_addr(dev->host_mac);
+#ifdef	DEV_CONFIG_CDC
 		snprintf (ethaddr, sizeof ethaddr, "%02X%02X%02X%02X%02X%02X",
-			node_id [0], node_id [1], node_id [2],
-			node_id [3], node_id [4], node_id [5]);
-	}
+			dev->host_mac [0], dev->host_mac [1],
+			dev->host_mac [2], dev->host_mac [3],
+			dev->host_mac [4], dev->host_mac [5]);
 #endif
+	}
 
 	if (rndis) {
 		status = rndis_init();
@@ -2448,10 +2453,11 @@ autoconf_fail:
 		net->dev_addr [2], net->dev_addr [3],
 		net->dev_addr [4], net->dev_addr [5]);
 
-#ifdef	DEV_CONFIG_CDC
-	if (cdc)
-		INFO (dev, "CDC host enet %s\n", ethaddr);
-#endif
+	if (cdc || rndis)
+		INFO (dev, "HOST MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
+			dev->host_mac [0], dev->host_mac [1],
+			dev->host_mac [2], dev->host_mac [3],
+			dev->host_mac [4], dev->host_mac [5]);
 
 #ifdef	CONFIG_USB_ETH_RNDIS
 	if (rndis) {
@@ -2468,6 +2474,7 @@ fail0:
 		}
 		
 		/* these set up a lot of the OIDs that RNDIS needs */
+		rndis_set_host_mac (dev->rndis_config, dev->host_mac);
 		if (rndis_set_param_dev (dev->rndis_config, dev->net,
 					 &dev->stats))
 			goto fail0;
