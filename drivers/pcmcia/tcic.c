@@ -60,7 +60,7 @@
 static int pc_debug;
 
 module_param(pc_debug, int, 0644);
-static const char *version =
+static const char version[] =
 "tcic.c 1.111 2000/02/15 04:13:12 (David Hinds)";
 
 #define debug(lvl, fmt, arg...) do {				\
