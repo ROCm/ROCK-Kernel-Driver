@@ -35,7 +35,7 @@
 
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
-static int ports_n_c = 0;
+static int ports_c = 0;
 static int max_dcc_channels = 8;
 static unsigned int dcc_timeout = 300;
 
@@ -288,7 +288,7 @@ static int __init init(void)
 			fini();
 			return -EBUSY;
 		}
-		ports_n_c++;
+		ports_c++;
 	}
 	return 0;
 }
@@ -298,7 +298,7 @@ static int __init init(void)
 static void fini(void)
 {
 	int i;
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		DEBUGP("unregistering port %d\n",
 		       ports[i]);
 		ip_conntrack_helper_unregister(&irc_helpers[i]);

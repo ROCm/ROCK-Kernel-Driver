@@ -291,7 +291,7 @@ static void fini(void)
 {
 	int i;
 
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		DEBUGP("ip_nat_ftp: unregistering port %d\n", ports[i]);
 		ip_nat_helper_unregister(&ftp[i]);
 	}

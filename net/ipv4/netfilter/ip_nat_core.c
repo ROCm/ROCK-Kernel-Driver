@@ -203,6 +203,7 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 		return NULL;
 }
 
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 /* If it's really a local destination manip, it may need to do a
    source manip too. */
 static int
@@ -221,6 +222,7 @@ do_extra_mangle(u_int32_t var_ip, u_int32_t *other_ipp)
 	ip_rt_put(rt);
 	return 1;
 }
+#endif
 
 /* Simple way to iterate through all. */
 static inline int fake_cmp(const struct ip_nat_hash *i,
@@ -996,4 +998,5 @@ void ip_nat_cleanup(void)
 {
 	ip_ct_selective_cleanup(&clean_nat, NULL);
 	ip_conntrack_destroyed = NULL;
+	vfree(bysource);
 }
