@@ -2978,7 +2978,6 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int d_namleft, len, outlen;
 	unsigned long dirent_buf;
 	char *name_ptr;
-	int dtlhdrdatalen;
 	u32 dir_index;
 	int do_index = 0;
 	uint loop_count = 0;
@@ -2998,7 +2997,6 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 *                      -1 = End of directory
 		 */
 		do_index = 1;
-		dtlhdrdatalen = DTLHDRDATALEN;
 
 		dir_index = (u32) filp->f_pos;
 
@@ -3083,8 +3081,6 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * pn > 0:              Real entries, pn=1 -> leftmost page
 		 * pn = index = -1:     No more entries
 		 */
-		dtlhdrdatalen = DTLHDRDATALEN_LEGACY;
-
 		dtpos = filp->f_pos;
 		if (dtpos == 0) {
 			/* build "." entry */
