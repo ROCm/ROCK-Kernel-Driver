@@ -418,6 +418,9 @@ int sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 {
 	struct rt_sigframe __user *rt_sf;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	rt_sf = (struct rt_sigframe __user *)
 		(regs->gpr[1] + __SIGNAL_FRAMESIZE + 16);
 	if (verify_area(VERIFY_READ, rt_sf, sizeof(struct rt_sigframe)))
@@ -513,6 +516,9 @@ int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	struct mcontext __user *sr;
 	sigset_t set;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	sc = (struct sigcontext __user *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
 		goto badframe;
@@ -569,10 +575,6 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 			regs->result = -EINTR;
 			regs->gpr[3] = EINTR;
 			/* note that the cr0.SO bit is already set */
-			/* clear any restart function that was set */
-			if (ret == ERESTART_RESTARTBLOCK)
-				current_thread_info()->restart_block.fn
-					= do_no_restart_syscall;
 		} else {
 			regs->nip -= 4;	/* Back up & retry system call */
 			regs->result = 0;

@@ -416,10 +416,10 @@ EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
 	;;
 	ld8 r18=[r18]			// r18 <- current->pending.signal
 	.pred.rel.mutex p6,p7,p8
-(p6)	or r3=r3,r14			// SIG_BLOCK
-(p7)	andcm r3=r3,r14			// SIG_UNBLOCK
+(p6)	or r14=r3,r14			// SIG_BLOCK
+(p7)	andcm r14=r3,r14		// SIG_UNBLOCK
 
-(p8)	mov r3=r14			// SIG_SETMASK
+(p8)	mov r14=r14			// SIG_SETMASK
 (p6)	mov r8=0			// clear error code
 	// recalc_sigpending()
 	add r17=IA64_SIGNAL_GROUP_STOP_COUNT_OFFSET,r19
@@ -437,7 +437,7 @@ EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
 	or r18=r18,r19		// r18 <- current->pending | current->signal->shared_pending
 	;;
 	// r18 <- (current->pending | current->signal->shared_pending) & ~current->blocked:
-	andcm r18=r18,r3
+	andcm r18=r18,r14
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
 	;;
 
@@ -452,7 +452,7 @@ EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
 	and r18=~_TIF_SIGPENDING,r17		// r18 <- r17 & ~(1 << TIF_SIGPENDING)
 	;;
 
-	st8 [r2]=r3				// update current->blocked with new mask
+	st8 [r2]=r14				// update current->blocked with new mask
 	cmpxchg4.acq r14=[r9],r18,ar.ccv	// current->thread_info->flags <- r18
 	;;
 	cmp.ne p6,p0=r17,r14			// update failed?
