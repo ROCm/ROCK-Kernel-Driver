@@ -474,6 +474,15 @@ UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
 		US_FL_MODE_XLATE ),
 #endif
 
+#ifdef CONFIG_USB_STORAGE_SDDR55
+/* Contributed by Peter Waechtler */
+UNUSUAL_DEV( 0x07c4, 0xa103, 0x0000, 0x9999,
+		"Datafab",
+		"MDSM-B reader",
+		US_SC_SCSI, US_PR_SDDR55, NULL,
+		US_FL_FIX_INQUIRY ),
+#endif
+
 /* Casio QV 2x00/3x00/4000/8000 digital still cameras are not conformant
  * to the USB storage specification in two ways:
  * - They tell us they are using transport protocol CBI. In reality they
