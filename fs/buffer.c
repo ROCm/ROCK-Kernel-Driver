@@ -923,11 +923,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		int pf_flags = current->flags;
-
-		current->flags |= PF_NOWARN;
 		bh = alloc_buffer_head();
-		current->flags = pf_flags;
 		if (!bh)
 			goto no_grow;
 

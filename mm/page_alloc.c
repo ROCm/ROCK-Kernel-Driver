@@ -543,7 +543,7 @@ rebalance:
 	}
 
 nopage:
-	if (!(current->flags & PF_NOWARN)) {
+	if (!(gfp_mask & __GFP_NOWARN)) {
 		printk("%s: page allocation failure."
 			" order:%d, mode:0x%x\n",
 			current->comm, order, gfp_mask);
