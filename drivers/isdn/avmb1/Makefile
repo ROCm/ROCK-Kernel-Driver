@@ -10,7 +10,6 @@ export-objs	:= kcapi.o capiutil.o b1dma.o b1pcmcia.o b1.o capifs.o
 
 # Multipart objects.
 
-list-multi	:= kernelcapi.o
 kernelcapi-objs	:= kcapi.o
 
 # Ordering constraints: kernelcapi.o first
@@ -32,9 +31,3 @@ obj-$(CONFIG_ISDN_DRV_AVMB1_C4)		+= c4.o b1.o
 # The global Rules.make.
 
 include $(TOPDIR)/Rules.make
-
-# Link rules for multi-part drivers.
-
-kernelcapi.o: $(kernelcapi-objs)
-	$(LD) -r -o $@ $(kernelcapi-objs)
-
