@@ -169,6 +169,17 @@ config SENSORS_LM85
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm85.
 
+config SENSORS_LM87
+	tristate "National Semiconductor LM87"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for National Semiconductor LM87
+	  sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm87.
+
 config SENSORS_LM90
 	tristate "National Semiconductor LM90 and compatibles"
 	depends on I2C
