@@ -49,7 +49,6 @@
 struct hiddev {
 	int exist;
 	int open;
-	int minor;
 	wait_queue_head_t wait;
 	struct hid_device *hid;
 	struct hiddev_list *list;
@@ -233,8 +232,8 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 static struct usb_class_driver hiddev_class;
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
+	hiddev_table[hiddev->hid->minor] = NULL;
 	usb_deregister_dev(hiddev->hid->intf, &hiddev_class);
-	hiddev_table[hiddev->minor] = NULL;
 	kfree(hiddev);
 }
 
@@ -783,7 +782,6 @@ int hiddev_connect(struct hid_device *hid)
 
 	init_waitqueue_head(&hiddev->wait);
 
- 	hiddev->minor = hid->intf->minor;
  	hiddev_table[hid->intf->minor - HIDDEV_MINOR_BASE] = hiddev;
 
 	hiddev->hid = hid;
