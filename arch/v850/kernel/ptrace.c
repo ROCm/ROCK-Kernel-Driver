@@ -141,7 +141,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 
 	rval = -EPERM;
 	if (pid == 1)		/* you may not mess with init */
-		goto out;
+		goto out_tsk;
 
 	if (request == PTRACE_ATTACH) {
 		rval = ptrace_attach(child);
