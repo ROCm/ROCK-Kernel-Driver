@@ -17,6 +17,7 @@
 #include <rxrpc/transport.h>
 #include <rxrpc/call.h>
 #include <rxrpc/peer.h>
+#include "cache.h"
 #include "cell.h"
 #include "server.h"
 #include "fsclient.h"
@@ -47,6 +48,18 @@ static struct rxrpc_peer_ops afs_peer_ops = {
 struct list_head afs_cb_hash_tbl[AFS_CB_HASH_COUNT];
 spinlock_t afs_cb_hash_lock = SPIN_LOCK_UNLOCKED;
 
+#ifdef AFS_CACHING_SUPPORT
+static struct cachefs_netfs_operations afs_cache_ops = {
+	.get_page_cookie	= afs_cache_get_page_cookie,
+};
+
+struct cachefs_netfs afs_cache_netfs = {
+	.name			= "afs",
+	.version		= 0,
+	.ops			= &afs_cache_ops,
+};
+#endif
+
 /*****************************************************************************/
 /*
  * initialise the AFS client FS module
@@ -64,34 +77,41 @@ static int afs_init(void)
 
 	/* register the /proc stuff */
 	ret = afs_proc_init();
-	if (ret<0)
+	if (ret < 0)
 		return ret;
+
+#ifdef AFS_CACHING_SUPPORT
+	/* we want to be able to cache */
+	ret = cachefs_register_netfs(&afs_cache_netfs,&afs_cache_cell_index_def);
+	if (ret < 0)
+		goto error;
+#endif
 
 	/* initialise the cell DB */
 	ret = afs_cell_init();
-	if (ret<0)
-		goto error;
+	if (ret < 0)
+		goto error_cache;
 
 	/* start the timeout daemon */
 	ret = afs_kafstimod_start();
-	if (ret<0)
-		goto error;
+	if (ret < 0)
+		goto error_cache;
 
 	/* start the async operation daemon */
 	ret = afs_kafsasyncd_start();
-	if (ret<0)
+	if (ret < 0)
 		goto error_kafstimod;
 
 	/* create the RxRPC transport */
 	ret = rxrpc_create_transport(7001,&afs_transport);
-	if (ret<0)
+	if (ret < 0)
 		goto error_kafsasyncd;
 
 	afs_transport->peer_ops = &afs_peer_ops;
 
 	/* register the filesystems */
 	ret = afs_fs_init();
-	if (ret<0)
+	if (ret < 0)
 		goto error_transport;
 
 	return ret;
@@ -102,7 +122,11 @@ static int afs_init(void)
 	afs_kafsasyncd_stop();
  error_kafstimod:
 	afs_kafstimod_stop();
+ error_cache:
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_unregister_netfs(&afs_cache_netfs);
  error:
+#endif
 	afs_cell_purge();
 	afs_proc_cleanup();
 	printk(KERN_ERR "kAFS: failed to register: %d\n",ret);
@@ -122,6 +146,9 @@ static void __exit afs_exit(void)
 	afs_kafstimod_stop();
 	afs_kafsasyncd_stop();
 	afs_cell_purge();
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_unregister_netfs(&afs_cache_netfs);
+#endif
 	afs_proc_cleanup();
 
 } /* end afs_exit() */
@@ -142,7 +169,7 @@ static int afs_adding_peer(struct rxrpc_peer *peer)
 
 	/* determine which server the peer resides in (if any) */
 	ret = afs_server_find_by_peer(peer,&server);
-	if (ret<0)
+	if (ret < 0)
 		return ret; /* none that we recognise, so abort */
 
 	_debug("Server %p{u=%d}\n",server,atomic_read(&server->usage));
@@ -191,3 +218,48 @@ static void afs_discarding_peer(struct rxrpc_peer *peer)
 	_leave("");
 
 } /* end afs_discarding_peer() */
+
+/*****************************************************************************/
+/*
+ * clear the dead space between task_struct and kernel stack
+ * - called by supplying -finstrument-functions to gcc
+ */
+#if 0
+void __cyg_profile_func_enter (void *this_fn, void *call_site)
+__attribute__((no_instrument_function));
+
+void __cyg_profile_func_enter (void *this_fn, void *call_site)
+{
+       asm volatile("  movl    %%esp,%%edi     \n"
+                    "  andl    %0,%%edi        \n"
+                    "  addl    %1,%%edi        \n"
+                    "  movl    %%esp,%%ecx     \n"
+                    "  subl    %%edi,%%ecx     \n"
+                    "  shrl    $2,%%ecx        \n"
+                    "  movl    $0xedededed,%%eax     \n"
+                    "  rep stosl               \n"
+                    :
+                    : "i"(~(THREAD_SIZE-1)), "i"(sizeof(struct thread_info))
+                    : "eax", "ecx", "edi", "memory", "cc"
+                    );
+}
+
+void __cyg_profile_func_exit(void *this_fn, void *call_site)
+__attribute__((no_instrument_function));
+
+void __cyg_profile_func_exit(void *this_fn, void *call_site)
+{
+       asm volatile("  movl    %%esp,%%edi     \n"
+                    "  andl    %0,%%edi        \n"
+                    "  addl    %1,%%edi        \n"
+                    "  movl    %%esp,%%ecx     \n"
+                    "  subl    %%edi,%%ecx     \n"
+                    "  shrl    $2,%%ecx        \n"
+                    "  movl    $0xdadadada,%%eax     \n"
+                    "  rep stosl               \n"
+                    :
+                    : "i"(~(THREAD_SIZE-1)), "i"(sizeof(struct thread_info))
+                    : "eax", "ecx", "edi", "memory", "cc"
+                    );
+}
+#endif

@@ -36,6 +36,19 @@ static char *rootcell;
 MODULE_PARM(rootcell,"s");
 MODULE_PARM_DESC(rootcell,"root AFS cell name and VL server IP addr list");
 
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_cell_cache_match(void *target, const void *entry);
+static void afs_cell_cache_update(void *source, void *entry);
+
+struct cachefs_index_def afs_cache_cell_index_def = {
+	.name			= "cell_ix",
+	.data_size		= sizeof(afs_cell_t),
+	.keys[0]		= { CACHEFS_INDEX_KEYS_ASCIIZ, 64 },
+	.match			= afs_cell_cache_match,
+	.update			= afs_cell_cache_update,
+};
+#endif
+
 /*****************************************************************************/
 /*
  * create a cell record
@@ -65,7 +78,6 @@ int afs_cell_create(const char *name, char *vllist, afs_cell_t **_cell)
 	atomic_set(&cell->usage,0);
 
 	INIT_LIST_HEAD(&cell->link);
-	INIT_LIST_HEAD(&cell->caches);
 
 	rwlock_init(&cell->sv_lock);
 	INIT_LIST_HEAD(&cell->sv_list);
@@ -96,7 +108,7 @@ int afs_cell_create(const char *name, char *vllist, afs_cell_t **_cell)
 		cell->vl_addrs[cell->vl_naddrs++].s_addr =
 			htonl((a<<24)|(b<<16)|(c<<8)|d);
 
-		if (cell->vl_naddrs>=16)
+		if (cell->vl_naddrs >= AFS_CELL_MAX_ADDRS)
 			break;
 
 	} while(vllist=next, vllist);
@@ -105,6 +117,14 @@ int afs_cell_create(const char *name, char *vllist, afs_cell_t **_cell)
 	ret = afs_proc_cell_setup(cell);
 	if (ret<0)
 		goto error;
+
+#ifdef AFS_CACHING_SUPPORT
+	/* put it up for caching */
+	cachefs_acquire_cookie(afs_cache_netfs.primary_index,
+			       &afs_vlocation_cache_index_def,
+			       cell,
+			       &cell->cache);
+#endif
 
 	/* add to the cell lists */
 	write_lock(&afs_cells_lock);
@@ -166,36 +186,45 @@ int afs_cell_init(void)
 /*
  * lookup a cell record
  */
-int afs_cell_lookup(const char *name, afs_cell_t **_cell)
+int afs_cell_lookup(const char *name, unsigned namesz, struct afs_cell **_cell)
 {
 	struct list_head *_p;
 	afs_cell_t *cell;
+	int ret;
 
-	_enter("\"%s\",",name?name:"*thiscell*");
+	_enter("\"%*.*s\",", namesz, namesz, name ? name : "");
 
-	cell = afs_cell_root;
+	*_cell = NULL;
 
 	if (name) {
 		/* if the cell was named, look for it in the cell record list */
+		ret = -ENOENT;
 		cell = NULL;
 		read_lock(&afs_cells_lock);
 
 		list_for_each(_p,&afs_cells) {
-			cell = list_entry(_p,afs_cell_t,link);
-			if (strcmp(cell->name,name)==0)
+			cell = list_entry(_p, struct afs_cell, link);
+			if (strncmp(cell->name, name, namesz) == 0) {
+				afs_get_cell(cell);
 				break;
+			}
 			cell = NULL;
 		}
 
 		read_unlock(&afs_cells_lock);
+
+		if (cell)
+			ret = 0;
+	}
+	else {
+		cell = afs_cell_root;
+		afs_get_cell(cell);
+		ret = 0;
 	}
 
-	if (cell)
-		afs_get_cell(cell);
-
 	*_cell = cell;
-	_leave(" = %d (%p)",cell?0:-ENOENT,cell);
-	return cell ? 0 : -ENOENT;
+	_leave(" = %d (%p)", ret, cell);
+	return ret;
 
 } /* end afs_cell_lookup() */
 
@@ -211,8 +240,8 @@ afs_cell_t *afs_get_cell_maybe(afs_cell_t **_cell)
 
 	cell = *_cell;
 	if (cell && !list_empty(&cell->link))
-		atomic_inc(&cell->usage);
-	else 
+		afs_get_cell(cell);
+	else
 		cell = NULL;
 
 	write_unlock(&afs_cells_lock);
@@ -226,6 +255,9 @@ afs_cell_t *afs_get_cell_maybe(afs_cell_t **_cell)
  */
 void afs_put_cell(afs_cell_t *cell)
 {
+	if (!cell)
+		return;
+
 	_enter("%p{%d,%s}",cell,atomic_read(&cell->usage),cell->name);
 
 	/* sanity check */
@@ -277,6 +309,10 @@ static void afs_cell_destroy(afs_cell_t *cell)
 	down_write(&afs_proc_cells_sem);
 	list_del_init(&cell->proc_link);
 	up_write(&afs_proc_cells_sem);
+
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_relinquish_cookie(cell->cache,0);
+#endif
 
 	up_write(&afs_cells_sem);
 
@@ -377,8 +413,7 @@ void afs_cell_purge(void)
 
 	_enter("");
 
-	if (afs_cell_root)
-		afs_put_cell(afs_cell_root);
+	afs_put_cell(afs_cell_root);
 
 	while (!list_empty(&afs_cells)) {
 		cell = NULL;
@@ -450,3 +485,46 @@ void afs_cell_purge(void)
 
 	_leave("");
 } /* end afs_cell_purge() */
+
+/*****************************************************************************/
+/*
+ * match a cell record obtained from the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_cell_cache_match(void *target, const void *entry)
+{
+	const struct afs_cache_cell *ccell = entry;
+	struct afs_cell *cell = target;
+
+	_enter("{%s},{%s}", ccell->name, cell->name);
+
+	if (strncmp(ccell->name, cell->name, sizeof(ccell->name)) == 0) {
+		_leave(" = SUCCESS");
+		return CACHEFS_MATCH_SUCCESS;
+	}
+
+	_leave(" = FAILED");
+	return CACHEFS_MATCH_FAILED;
+} /* end afs_cell_cache_match() */
+#endif
+
+/*****************************************************************************/
+/*
+ * update a cell record in the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static void afs_cell_cache_update(void *source, void *entry)
+{
+	struct afs_cache_cell *ccell = entry;
+	struct afs_cell *cell = source;
+
+	_enter("%p,%p", source, entry);
+
+	strncpy(ccell->name, cell->name, sizeof(ccell->name));
+
+	memcpy(ccell->vl_servers,
+	       cell->vl_addrs,
+	       min(sizeof(ccell->vl_servers), sizeof(cell->vl_addrs)));
+
+} /* end afs_cell_cache_update() */
+#endif

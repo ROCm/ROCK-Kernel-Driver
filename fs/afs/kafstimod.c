@@ -82,7 +82,7 @@ static int kafstimod(void *arg)
 
 	for (;;) {
 		unsigned long jif;
-		unsigned long timeout;
+		signed long timeout;
 
 		/* deal with the server being asked to die */
 		if (kafstimod_die) {
@@ -98,18 +98,18 @@ static int kafstimod(void *arg)
 		spin_lock(&kafstimod_lock);
 		if (list_empty(&kafstimod_list)) {
 			timeout = MAX_SCHEDULE_TIMEOUT;
-		} else {
-			unsigned long tmo;
-
-			timer = list_entry(kafstimod_list.next,
-					   afs_timer_t, link);
-			tmo = timer->timo_jif;
+		}
+		else {
+			timer = list_entry(kafstimod_list.next,afs_timer_t,link);
+			timeout = timer->timo_jif;
 			jif = jiffies;
 
-			if (time_before_eq(tmo,jif))
+			if (time_before_eq((unsigned long)timeout,jif))
 				goto immediate;
 
-			timeout = (long)tmo - (long)jiffies;
+			else {
+				timeout = (long)timeout - (long)jiffies;
+			}
 		}
 		spin_unlock(&kafstimod_lock);
 
@@ -170,7 +170,7 @@ void afs_kafstimod_add_timer(afs_timer_t *timer, unsigned long timeout)
 	wake_up(&kafstimod_sleepq);
 
 	_leave("");
-} /* end afs_kafstimod_queue_vlocation() */
+} /* end afs_kafstimod_add_timer() */
 
 /*****************************************************************************/
 /*

@@ -26,7 +26,7 @@
 #define kproto(FMT, a...)	printk("### "FMT"\n" , ## a)
 #define knet(FMT, a...)		printk(FMT"\n" , ## a)
 
-#if 0
+#ifdef __KDEBUG
 #define _enter(FMT, a...)	kenter(FMT , ## a)
 #define _leave(FMT, a...)	kleave(FMT , ## a)
 #define _debug(FMT, a...)	kdebug(FMT , ## a)
@@ -56,6 +56,9 @@ static inline void afs_discard_my_signals(void)
  */
 extern struct rw_semaphore afs_proc_cells_sem;
 extern struct list_head afs_proc_cells;
+#ifdef AFS_CACHING_SUPPORT
+extern struct cachefs_index_def afs_cache_cell_index_def;
+#endif
 
 /*
  * dir.c
@@ -70,6 +73,10 @@ extern struct address_space_operations afs_fs_aops;
 extern struct inode_operations afs_file_inode_operations;
 extern struct file_operations afs_file_file_operations;
 
+#ifdef AFS_CACHING_SUPPORT
+extern int afs_cache_get_page_cookie(struct page *page, struct cachefs_page **_page_cookie);
+#endif
+
 /*
  * inode.c
  */
@@ -78,10 +85,22 @@ extern int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry, struct
 extern void afs_clear_inode(struct inode *inode);
 
 /*
+ * main.c
+ */
+#ifdef AFS_CACHING_SUPPORT
+extern struct cachefs_netfs afs_cache_netfs;
+#endif
+
+/*
  * mntpt.c
  */
 extern struct inode_operations afs_mntpt_inode_operations;
 extern struct file_operations afs_mntpt_file_operations;
+#ifdef AFS_AUTOMOUNT_SUPPORT
+extern struct afs_timer afs_mntpt_expiry_timer;
+extern struct afs_timer_ops afs_mntpt_expiry_timer_ops;
+extern unsigned long afs_mntpt_expiry_timeout;
+#endif
 
 extern int afs_mntpt_check_symlink(afs_vnode_t *vnode);
 

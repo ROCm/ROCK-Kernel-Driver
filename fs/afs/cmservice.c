@@ -119,6 +119,7 @@ static int kafscmd(void *arg)
 	int die;
 
 	printk("kAFS: Started kafscmd %d\n",current->pid);
+
 	daemonize("kafscmd");
 
 	complete(&kafscmd_alive);
@@ -293,15 +294,20 @@ int afscm_start(void)
 
 	down_write(&afscm_sem);
 	if (!afscm_usage) {
-		ret = kernel_thread(kafscmd,NULL,0);
-		if (ret<0)
+		ret = kernel_thread(kafscmd, NULL, 0);
+		if (ret < 0)
 			goto out;
 
 		wait_for_completion(&kafscmd_alive);
 
-		ret = rxrpc_add_service(afs_transport,&AFSCM_service);
+		ret = rxrpc_add_service(afs_transport, &AFSCM_service);
 		if (ret<0)
 			goto kill;
+
+#ifdef AFS_AUTOMOUNT_SUPPORT
+		afs_kafstimod_add_timer(&afs_mntpt_expiry_timer,
+					afs_mntpt_expiry_timeout * HZ);
+#endif
 	}
 
 	afscm_usage++;
@@ -330,17 +336,20 @@ void afscm_stop(void)
 
 	down_write(&afscm_sem);
 
-	if (afscm_usage==0) BUG();
+	if (afscm_usage == 0) BUG();
 	afscm_usage--;
 
-	if (afscm_usage==0) {
+	if (afscm_usage == 0) {
 		/* don't want more incoming calls */
-		rxrpc_del_service(afs_transport,&AFSCM_service);
+		rxrpc_del_service(afs_transport, &AFSCM_service);
 
 		/* abort any calls I've still got open (the afscm_error() will dequeue them) */
 		spin_lock(&afscm_calls_lock);
 		while (!list_empty(&afscm_calls)) {
-			call = list_entry(afscm_calls.next,struct rxrpc_call,app_link);
+			call = list_entry(afscm_calls.next,
+					  struct rxrpc_call,
+					  app_link);
+
 			list_del_init(&call->app_link);
 			rxrpc_get_call(call);
 			spin_unlock(&afscm_calls_lock);
@@ -348,7 +357,8 @@ void afscm_stop(void)
 			rxrpc_call_abort(call,-ESRCH); /* abort, dequeue and put */
 
 			_debug("nuking active call %08x.%d",
-			       ntohl(call->conn->conn_id),ntohl(call->call_id));
+			       ntohl(call->conn->conn_id),
+			       ntohl(call->call_id));
 			rxrpc_put_call(call);
 			rxrpc_put_call(call);
 
@@ -376,6 +386,10 @@ void afscm_stop(void)
 			spin_lock(&kafscmd_attention_lock);
 		}
 		spin_unlock(&kafscmd_attention_lock);
+
+#ifdef AFS_AUTOMOUNT_SUPPORT
+		afs_kafstimod_del_timer(&afs_mntpt_expiry_timer);
+#endif
 	}
 
 	up_write(&afscm_sem);
@@ -490,7 +504,7 @@ static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
 	if (ret<0)
 		rxrpc_call_abort(call,ret);
 
-	if (server) afs_put_server(server);
+	afs_put_server(server);
 
 	_leave(" = %d",ret);
 
@@ -556,7 +570,7 @@ static void _SRXAFSCM_InitCallBackState(struct rxrpc_call *call)
 	if (ret<0)
 		rxrpc_call_abort(call,ret);
 
-	if (server) afs_put_server(server);
+	afs_put_server(server);
 
 	_leave(" = %d",ret);
 
@@ -622,7 +636,7 @@ static void _SRXAFSCM_Probe(struct rxrpc_call *call)
 	if (ret<0)
 		rxrpc_call_abort(call,ret);
 
-	if (server) afs_put_server(server);
+	afs_put_server(server);
 
 	_leave(" = %d",ret);
 

@@ -148,6 +148,9 @@ void afs_put_server(afs_server_t *server)
 {
 	afs_cell_t *cell;
 
+	if (!server)
+		return;
+
 	_enter("%p",server);
 
 	cell = server->cell;
