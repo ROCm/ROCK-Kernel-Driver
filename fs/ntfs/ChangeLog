@@ -32,6 +32,8 @@ ToDo:
 	- Define export operations (->s_export_op) for NTFS (ntfs_export_ops)
 	  and set them up in the super block at mount time (super.c) this
 	  allows mounted NTFS volumes to be exported via NFS.
+	- Add missing return -EOPNOTSUPP; in
+	  fs/ntfs/aops.c::ntfs_commit_nonresident_write().
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 
@@ -73,6 +75,10 @@ ToDo:
 	- Reduce function local stack usage from 0x3d4 bytes to just noise in
 	  fs/ntfs/upcase.c. (Randy Dunlap <rddunlap@osdl.ord>)
 	- Remove compiler warnings for newer gcc.
+	- Pages are no longer kmapped by mm/filemap.c::generic_file_write()
+	  around calls to ->{prepare,commit}_write.  Adapt NTFS appropriately
+	  in fs/ntfs/aops.c::ntfs_prepare_nonresident_write() by using
+	  kmap_atomic(KM_USER0).
 
 2.1.0 - First steps towards write support: implement file overwrite.
 
