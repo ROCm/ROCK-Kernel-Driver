@@ -2032,8 +2032,8 @@ int usb_set_address(struct usb_device *dev)
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Returns zero on success, or else the status code returned by the
- * underlying usb_control_msg() call.
+ * Returns the number of bytes received on success, or else the status code
+ * returned by the underlying usb_control_msg() call.
  */
 int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char index, void *buf, int size)
 {
@@ -2073,8 +2073,8 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Returns zero on success, or else the status code returned by the
- * underlying usb_control_msg() call.
+ * Returns the number of bytes received on success, or else the status code
+ * returned by the underlying usb_control_msg() call.
  */
 int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char index, void *buf, int size)
 {
@@ -2100,8 +2100,8 @@ int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char 
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Returns zero on success, or else the status code returned by the
- * underlying usb_control_msg() call.
+ * Returns the number of bytes received on success, or else the status code
+ * returned by the underlying usb_control_msg() call.
  */
 int usb_get_device_descriptor(struct usb_device *dev)
 {
@@ -2135,8 +2135,8 @@ int usb_get_device_descriptor(struct usb_device *dev)
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Returns zero on success, or else the status code returned by the
- * underlying usb_control_msg() call.
+ * Returns the number of bytes received on success, or else the status code
+ * returned by the underlying usb_control_msg() call.
  */
 int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 {
