@@ -81,7 +81,7 @@ static struct datalink_proto *pSNAP_datalink;
 
 static struct proto_ops ipx_dgram_ops;
 
-struct ipx_route *ipx_routes;
+LIST_HEAD(ipx_routes);
 rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
 
 LIST_HEAD(ipx_interfaces);
@@ -1277,12 +1277,14 @@ static struct ipx_route *ipxrtr_lookup(__u32 net)
 	struct ipx_route *r;
 
 	read_lock_bh(&ipx_routes_lock);
-	for (r = ipx_routes; r && r->ir_net != net; r = r->ir_next)
-		;
-	if (r)
-		ipxrtr_hold(r);
+	list_for_each_entry(r, &ipx_routes, node)
+		if (r->ir_net == net) {
+			ipxrtr_hold(r);
+			goto unlock;
+		}
+	r = NULL;
+unlock:
 	read_unlock_bh(&ipx_routes_lock);
-
 	return r;
 }
 
@@ -1305,8 +1307,7 @@ static int ipxrtr_add_route(__u32 network, struct ipx_interface *intrfc,
 		atomic_set(&rt->refcnt, 1);
 		ipxrtr_hold(rt);
 		write_lock_bh(&ipx_routes_lock);
-		rt->ir_next	= ipx_routes;
-		ipx_routes	= rt;
+		list_add(&rt->node, &ipx_routes);
 		write_unlock_bh(&ipx_routes_lock);
 	} else {
 		rc = -EEXIST;
@@ -1333,16 +1334,14 @@ out:
 
 static void ipxrtr_del_routes(struct ipx_interface *intrfc)
 {
-	struct ipx_route **r, *tmp;
+	struct ipx_route *r, *tmp;
 
 	write_lock_bh(&ipx_routes_lock);
-	for (r = &ipx_routes; (tmp = *r) != NULL;) {
-		if (tmp->ir_intrfc == intrfc) {
-			*r = tmp->ir_next;
-			ipxrtr_put(tmp);
-		} else
-			r = &(tmp->ir_next);
-	}
+	list_for_each_entry_safe(r, tmp, &ipx_routes, node)
+		if (r->ir_intrfc == intrfc) {
+			list_del(&r->node);
+			ipxrtr_put(r);
+		}
 	write_unlock_bh(&ipx_routes_lock);
 }
 
@@ -1363,26 +1362,21 @@ out:
 
 static int ipxrtr_delete(long net)
 {
-	struct ipx_route **r;
-	struct ipx_route *tmp;
+	struct ipx_route *r, *tmp;
 	int rc;
 
 	write_lock_bh(&ipx_routes_lock);
-	for (r = &ipx_routes; (tmp = *r) != NULL;) {
-		if (tmp->ir_net == net) {
+	list_for_each_entry_safe(r, tmp, &ipx_routes, node)
+		if (r->ir_net == net) {
 			/* Directly connected; can't lose route */
 			rc = -EPERM;
-			if (!tmp->ir_routed)
+			if (!r->ir_routed)
 				goto out;
-
-			*r = tmp->ir_next;
-			ipxrtr_put(tmp);
+			list_del(&r->node);
+			ipxrtr_put(r);
 			rc = 0;
 			goto out;
 		}
-
-		r = &(tmp->ir_next);
-	}
 	rc = -ENOENT;
 out:
 	write_unlock_bh(&ipx_routes_lock);

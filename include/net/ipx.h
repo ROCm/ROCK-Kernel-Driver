@@ -75,7 +75,7 @@ struct ipx_route {
 	struct ipx_interface	*ir_intrfc;
 	unsigned char		ir_routed;
 	unsigned char		ir_router_node[IPX_NODE_LEN];
-	struct ipx_route	*ir_next;
+	struct list_head	node; /* node in ipx_routes list */
 	atomic_t		refcnt;
 };
 
@@ -111,7 +111,7 @@ struct ipx_opt {
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000
 #define IPX_MAX_EPHEMERAL_SOCKET	0x7fff
 
-extern struct ipx_route *ipx_routes;
+extern struct list_head ipx_routes;
 extern rwlock_t ipx_routes_lock;
 
 extern struct list_head ipx_interfaces;

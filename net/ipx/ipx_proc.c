@@ -89,13 +89,33 @@ out:
 	return 0;
 }
 
+static struct ipx_route *ipx_routes_head(void)
+{
+	struct ipx_route *rc = NULL;
+
+	if (!list_empty(&ipx_routes))
+		rc = list_entry(ipx_routes.next, struct ipx_route, node);
+	return rc;
+}
+
+static struct ipx_route *ipx_routes_next(struct ipx_route *r)
+{
+	struct ipx_route *rc = NULL;
+
+	if (r->node.next != &ipx_routes)
+		rc = list_entry(r->node.next, struct ipx_route, node);
+	return rc;
+}
+
 static __inline__ struct ipx_route *ipx_get_route_idx(loff_t pos)
 {
 	struct ipx_route *r;
 
-	for (r = ipx_routes; pos && r; r = r->ir_next)
-		--pos;
-
+	list_for_each_entry(r, &ipx_routes, node)
+		if (!pos--)
+			goto out;
+	r = NULL;
+out:
 	return r;
 }
 
@@ -111,15 +131,10 @@ static void *ipx_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct ipx_route *r;
 
 	++*pos;
-	if (v == (void *)1) {
-		r = NULL;
-		if (ipx_routes)
-			r = ipx_routes;
-		goto out;
-	}
-	r = v;
-	r = r->ir_next;
-out:
+	if (v == (void *)1)
+		r = ipx_routes_head();
+	else
+		r = ipx_routes_next(v);
 	return r;
 }
 
