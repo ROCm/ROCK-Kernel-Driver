@@ -54,6 +54,7 @@ static int kill_proto(const struct ip_conntrack *i, void *data)
 			*((u_int8_t *) data));
 }
 
+#ifdef CONFIG_PROC_FS
 static unsigned int
 print_tuple(char *buffer, const struct ip_conntrack_tuple *tuple,
 	    struct ip_conntrack_protocol *proto)
@@ -367,6 +368,7 @@ static struct file_operations ct_cpu_seq_fops = {
 	.llseek  = seq_lseek,
 	.release = seq_release_private,
 };
+#endif
 
 static unsigned int ip_confirm(unsigned int hooknum,
 			       struct sk_buff **pskb,
@@ -726,10 +728,15 @@ static ctl_table ip_ct_net_table[] = {
 	},
 	{ .ctl_name = 0 }
 };
-#endif
+
+EXPORT_SYMBOL(ip_ct_log_invalid);
+#endif /* CONFIG_SYSCTL */
+
 static int init_or_cleanup(int init)
 {
+#ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc, *proc_exp, *proc_stat;
+#endif
 	int ret = 0;
 
 	if (!init) goto cleanup;
@@ -738,19 +745,20 @@ static int init_or_cleanup(int init)
 	if (ret < 0)
 		goto cleanup_nothing;
 
-	proc = proc_net_create("ip_conntrack", 0440, NULL);
+#ifdef CONFIG_PROC_FS
+	proc = proc_net_fops_create("ip_conntrack", 0440, &ct_file_ops);
 	if (!proc) goto cleanup_init;
-	proc->proc_fops = &ct_file_ops;
 
-	proc_exp = proc_net_create("ip_conntrack_expect", 0440, NULL);
+	proc_exp = proc_net_fops_create("ip_conntrack_expect", 0440,
+					&exp_file_ops);
 	if (!proc_exp) goto cleanup_proc;
-	proc_exp->proc_fops = &exp_file_ops;
 
 	proc_stat = proc_net_fops_create("ip_conntrack_stat", S_IRUGO,
 					 &ct_cpu_seq_fops);
 	if (!proc_stat)
 		goto cleanup_proc_exp;
 	proc_stat->owner = THIS_MODULE;
+#endif
 
 	ret = nf_register_hook(&ip_conntrack_defrag_ops);
 	if (ret < 0) {
@@ -814,12 +822,14 @@ static int init_or_cleanup(int init)
 	local_bh_enable();
 	nf_unregister_hook(&ip_conntrack_defrag_ops);
  cleanup_proc_stat:
+#ifdef CONFIG_PROC_FS
 	proc_net_remove("ip_conntrack_stat");
 cleanup_proc_exp:
 	proc_net_remove("ip_conntrack_exp");
  cleanup_proc:
 	proc_net_remove("ip_conntrack");
  cleanup_init:
+#endif /* CONFIG_PROC_FS */
 	ip_conntrack_cleanup();
  cleanup_nothing:
 	return ret;
@@ -912,4 +922,3 @@ EXPORT_SYMBOL(ip_conntrack_hash);
 EXPORT_SYMBOL(ip_conntrack_untracked);
 EXPORT_SYMBOL_GPL(ip_conntrack_find_get);
 EXPORT_SYMBOL_GPL(ip_conntrack_put);
-EXPORT_SYMBOL(ip_ct_log_invalid);
