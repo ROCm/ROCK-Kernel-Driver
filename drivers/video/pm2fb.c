@@ -64,16 +64,6 @@
 #endif
 
 /*
- * The 2.4 driver calls reset_card() at init time, where it also sets the
- * initial mode. I don't think the driver should touch the chip until
- * the console sets a video mode. So I was calling this at the start
- * of setting a mode. However, certainly on 1280x1024 depth 16 on my
- * PCI Graphics Blaster Exxtreme this causes the display to smear
- * slightly.  I don't know why. Guesses to jim.hague@acm.org.
- */
-#undef RESET_CARD_ON_MODE_SET
-
-/*
  * Driver data 
  */
 static char *mode __initdata = NULL;
@@ -102,6 +92,9 @@ struct pm2fb_par
 	unsigned char	__iomem *v_regs;/* virtual address of p_regs */
 	u32 	   	memclock;	/* memclock */
 	u32		video;		/* video flags before blanking */
+	u32		mem_config;	/* MemConfig reg at probe */
+	u32		mem_control;	/* MemControl reg at probe */
+	u32		boot_address;	/* BootAddress reg at probe */
 };
 
 /*
@@ -351,7 +344,6 @@ static void clear_palette(struct pm2fb_par* p) {
 	}
 }
 
-#ifdef RESET_CARD_ON_MODE_SET
 static void reset_card(struct pm2fb_par* p)
 {
 	if (p->type == PM2_TYPE_PERMEDIA2V)
@@ -366,8 +358,14 @@ static void reset_card(struct pm2fb_par* p)
 	pm2_WR(p, PM2R_FIFO_DISCON, 1);
 	mb();
 #endif
+
+	/* Restore stashed memory config information from probe */
+	WAIT_FIFO(p, 3);
+	pm2_WR(p, PM2R_MEM_CONTROL, p->mem_control);
+	pm2_WR(p, PM2R_BOOT_ADDRESS, p->boot_address);
+	wmb();
+	pm2_WR(p, PM2R_MEM_CONFIG, p->mem_config);
 }
-#endif
 
 static void reset_config(struct pm2fb_par* p)
 {
@@ -461,6 +459,28 @@ static void set_color(struct pm2fb_par* p, unsigned char regno,
 	pm2_WR(p, PM2R_RD_PALETTE_DATA, g);
 	wmb();
 	pm2_WR(p, PM2R_RD_PALETTE_DATA, b);
+}
+
+static void set_memclock(struct pm2fb_par* par, u32 clk)
+{
+	int i;
+	unsigned char m, n, p;
+
+	pm2_mnp(clk, &m, &n, &p);
+	WAIT_FIFO(par, 10);
+	pm2_RDAC_WR(par, PM2I_RD_MEMORY_CLOCK_3, 6);
+	wmb();
+	pm2_RDAC_WR(par, PM2I_RD_MEMORY_CLOCK_1, m);
+	pm2_RDAC_WR(par, PM2I_RD_MEMORY_CLOCK_2, n);
+	wmb();
+	pm2_RDAC_WR(par, PM2I_RD_MEMORY_CLOCK_3, 8|p);
+	wmb();
+	pm2_RDAC_RD(par, PM2I_RD_MEMORY_CLOCK_STATUS);
+	rmb();
+	for (i = 256;
+	     i && !(pm2_RD(par, PM2R_RD_INDEXED_DATA) & PM2F_PLL_LOCKED);
+	     i--)
+		;
 }
 
 static void set_pixclock(struct pm2fb_par* par, u32 clk)
@@ -664,11 +684,11 @@ static int pm2fb_set_par(struct fb_info *info)
 	u32 xres;
 	int data64;
 
-#ifdef RESET_CARD_ON_MODE_SET
 	reset_card(par);
-#endif
 	reset_config(par);
 	clear_palette(par);
+	if ( par->memclock )
+		set_memclock(par, par->memclock);
     
 	width = (info->var.xres_virtual + 7) & ~7;
 	height = info->var.yres_virtual;
@@ -1035,7 +1055,6 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
 	struct pm2fb_par *default_par;
 	struct fb_info *info;
 	int size, err;
-	u32 pci_mem_config;
 	int err_retval = -ENXIO;
 
 	err = pci_enable_device(pdev);
@@ -1087,9 +1106,16 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
 		goto err_exit_neither;
 	}
 
+	/* Stash away memory register info for use when we reset the board */
+	default_par->mem_control = pm2_RD(default_par, PM2R_MEM_CONTROL);
+	default_par->boot_address = pm2_RD(default_par, PM2R_BOOT_ADDRESS);
+	default_par->mem_config = pm2_RD(default_par, PM2R_MEM_CONFIG);
+	DPRINTK("MemControl 0x%x BootAddress 0x%x MemConfig 0x%x\n",
+		default_par->mem_control, default_par->boot_address,
+		default_par->mem_config);
+
 	/* Now work out how big lfb is going to be. */
-	pci_mem_config = RD32(default_par->v_regs, PM2R_MEM_CONFIG);
-	switch(pci_mem_config & PM2F_MEM_CONFIG_RAM_MASK) {
+	switch(default_par->mem_config & PM2F_MEM_CONFIG_RAM_MASK) {
 	case PM2F_MEM_BANKS_1:
 		default_par->fb_size=0x200000;
 		break;
