@@ -198,17 +198,21 @@
 /* channel features */
 #define FSF_FEATURE_QTCB_SUPPRESSION            0x00000001
 #define FSF_FEATURE_CFDC			0x00000002
-#define FSF_FEATURE_SENSEDATA_REPLICATION       0x00000004
-#define FSF_FEATURE_LOST_SAN_NOTIFICATION       0x00000008
 #define FSF_FEATURE_HBAAPI_MANAGEMENT           0x00000010
 #define FSF_FEATURE_ELS_CT_CHAINED_SBALS        0x00000020
 
 /* option */
 #define FSF_OPEN_LUN_SUPPRESS_BOXING		0x00000001
+#define FSF_OPEN_LUN_UNSOLICITED_SENSE_DATA	0x00000002
 
 /* adapter types */
 #define FSF_ADAPTER_TYPE_FICON                  0x00000001
 #define FSF_ADAPTER_TYPE_FICON_EXPRESS          0x00000002
+
+/* flags */
+#define FSF_CFDC_OPEN_LUN_ALLOWED		0x01
+#define FSF_CFDC_EXCLUSIVE_ACCESS		0x02
+#define FSF_CFDC_OUTBOUND_TRANSFER_ALLOWED	0x10
 
 /* port types */
 #define FSF_HBA_PORTTYPE_UNKNOWN		0x00000001
@@ -394,9 +398,10 @@ struct fsf_qtcb_bottom_support {
 	u64 res2;
 	u64 req_handle;
 	u32 service_class;
-	u8 res3[3];
+	u8  res3[3];
 	u8  timeout;
-	u8 res4[184];
+	u32 lun_access;
+	u8  res4[180];
 	u32 els1_length;
 	u32 els2_length;
 	u32 req_buf_length;

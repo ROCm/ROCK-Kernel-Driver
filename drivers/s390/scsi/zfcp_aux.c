@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.98 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.101 $"
 
 /********************** INCLUDES *********************************************/
 
@@ -421,8 +421,8 @@ zfcp_init_device_configure(void)
 		goto out_unit;
 	up(&zfcp_data.config_sema);
 	ccw_device_set_online(adapter->ccw_device);
-	down(&zfcp_data.config_sema);
 	wait_event(unit->scsi_add_wq, atomic_read(&unit->scsi_add_work) == 0);
+	down(&zfcp_data.config_sema);
 	zfcp_unit_put(unit);
  out_unit:
 	zfcp_port_put(port);
@@ -441,11 +441,6 @@ zfcp_module_init(void)
 
 	atomic_set(&zfcp_data.loglevel, loglevel);
 
-	ZFCP_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-
-	ZFCP_LOG_TRACE("Start Address of module: 0x%lx\n",
-		       (unsigned long) &zfcp_module_init);
-
 	/* initialize adapter list */
 	INIT_LIST_HEAD(&zfcp_data.adapter_list_head);
 
@@ -460,22 +455,18 @@ zfcp_module_init(void)
 	retval = register_ioctl32_conversion(zfcp_ioctl_trans.cmd,
 					     zfcp_ioctl_trans.handler);
 	if (retval != 0) {
-		ZFCP_LOG_INFO("Cannot register a 32-bit support of "
-			      "the IOC handler\n");
+		ZFCP_LOG_INFO("registration of ioctl32 conversion failed\n");
 		goto out_ioctl32;
 	}
 #endif
 	retval = misc_register(&zfcp_cfdc_misc);
 	if (retval != 0) {
-		ZFCP_LOG_INFO(
-			"Device file for the control file data channel "
-			"cannot be registered\n");
+		ZFCP_LOG_INFO("registration of misc device "
+			      "zfcp_cfdc failed\n");
 		goto out_misc_register;
 	} else {
-		ZFCP_LOG_INFO(
-			"Device file for the control file data channel "
-			"has become MAJOR/MINOR numbers %d/%d\n",
-			ZFCP_CFDC_DEV_MAJOR, zfcp_cfdc_misc.minor);
+		ZFCP_LOG_TRACE("major/minor for zfcp_cfdc: %d/%d\n",
+			       ZFCP_CFDC_DEV_MAJOR, zfcp_cfdc_misc.minor);
 	}
 
 	/* Initialise proc semaphores */
@@ -493,7 +484,7 @@ zfcp_module_init(void)
 	/* setup dynamic I/O */
 	retval = zfcp_ccw_register();
 	if (retval) {
-		ZFCP_LOG_NORMAL("Registering with common I/O layer failed.\n");
+		ZFCP_LOG_NORMAL("registration with common I/O layer failed\n");
 		goto out_ccw_register;
 	}
 
@@ -530,7 +521,6 @@ zfcp_module_exit(void)
 #ifdef ZFCP_STAT_REQSIZES
 	zfcp_statistics_clear_all();
 #endif
-	ZFCP_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 }
 
 /*
@@ -577,46 +567,35 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 	char *bus_id = NULL;
 	int retval = 0;
 
-	ZFCP_LOG_NORMAL(
-		"Control file data channel transaction opened\n");
-
 	sg_list = kmalloc(sizeof(struct zfcp_sg_list), GFP_KERNEL);
 	if (sg_list == NULL) {
-		ZFCP_LOG_NORMAL(
-			"Not enough memory for the scatter-gather list\n");
 		retval = -ENOMEM;
 		goto out;
 	}
 	sg_list->count = 0;
 
 	if (command != ZFCP_CFDC_IOC) {
-		ZFCP_LOG_NORMAL(
-			"IOC request code 0x%x is not valid\n",
-			command);
+		ZFCP_LOG_INFO("IOC request code 0x%x invalid\n", command);
 		retval = -ENOTTY;
 		goto out;
 	}
 
 	if ((sense_data_user = (struct zfcp_cfdc_sense_data*)buffer) == NULL) {
-		ZFCP_LOG_NORMAL(
-			"Sense data record is required\n");
+		ZFCP_LOG_INFO("sense data record is required\n");
 		retval = -EINVAL;
 		goto out;
 	}
 
 	retval = copy_from_user(&sense_data, sense_data_user,
-		sizeof(struct zfcp_cfdc_sense_data));
+				sizeof(struct zfcp_cfdc_sense_data));
 	if (retval) {
-		ZFCP_LOG_NORMAL("Cannot copy sense data record from user space "
-				"memory\n");
 		retval = -EFAULT;
 		goto out;
 	}
 
 	if (sense_data.signature != ZFCP_CFDC_SIGNATURE) {
-		ZFCP_LOG_NORMAL(
-			"No valid sense data request signature 0x%08x found\n",
-			ZFCP_CFDC_SIGNATURE);
+		ZFCP_LOG_INFO("invalid sense data request signature 0x%08x\n",
+			      ZFCP_CFDC_SIGNATURE);
 		retval = -EINVAL;
 		goto out;
 	}
@@ -649,16 +628,14 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	default:
-		ZFCP_LOG_NORMAL(
-			"Command code 0x%08x is not valid\n",
-			sense_data.command);
+		ZFCP_LOG_INFO("invalid command code 0x%08x\n",
+			      sense_data.command);
 		retval = -EINVAL;
 		goto out;
 	}
 
 	bus_id = kmalloc(BUS_ID_SIZE, GFP_KERNEL);
 	if (bus_id == NULL) {
-		ZFCP_LOG_NORMAL("Out of memory!\n");
 		retval = -ENOMEM;
 		goto out;
 	}
@@ -682,7 +659,7 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 	kfree(bus_id);
 
 	if (retval != 0) {
-		ZFCP_LOG_NORMAL("Specified adapter does not exist\n");
+		ZFCP_LOG_INFO("invalid adapter\n");
 		goto out;
 	}
 
@@ -690,8 +667,6 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		retval = zfcp_sg_list_alloc(sg_list,
 					    ZFCP_CFDC_MAX_CONTROL_FILE_SIZE);
 		if (retval) {
-			ZFCP_LOG_NORMAL("Not enough memory for the "
-					"scatter-gather list\n");
 			retval = -ENOMEM;
 			goto out;
 		}
@@ -703,8 +678,6 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 			sg_list, &sense_data_user->control_file,
 			ZFCP_CFDC_MAX_CONTROL_FILE_SIZE);
 		if (retval) {
-			ZFCP_LOG_NORMAL("Cannot copy control file from user "
-					"space memory\n");
 			retval = -EFAULT;
 			goto out;
 		}
@@ -713,12 +686,10 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 	retval = zfcp_fsf_control_file(
 		adapter, &fsf_req, fsf_command, option, sg_list);
 	if (retval == -EOPNOTSUPP) {
-		ZFCP_LOG_NORMAL(
-			"Specified adapter does not support control file\n");
+		ZFCP_LOG_INFO("adapter does not support cfdc\n");
 		goto out;
 	} else if (retval != 0) {
-		ZFCP_LOG_NORMAL(
-			"Cannot create or queue FSF request or create SBALs\n");
+		ZFCP_LOG_INFO("initiation of cfdc up/download failed\n");
 		retval = -EPERM;
 		goto out;
 	}
@@ -735,8 +706,6 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 	retval = copy_to_user(sense_data_user, &sense_data,
 		sizeof(struct zfcp_cfdc_sense_data));
 	if (retval) {
-		ZFCP_LOG_NORMAL(
-			"Cannot copy sense data record to user space memory\n");
 		retval = -EFAULT;
 		goto out;
 	}
@@ -746,8 +715,6 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 			&sense_data_user->control_file, sg_list,
 			ZFCP_CFDC_MAX_CONTROL_FILE_SIZE);
 		if (retval) {
-			ZFCP_LOG_NORMAL("Cannot copy control file to user "
-					"space memory\n");
 			retval = -EFAULT;
 			goto out;
 		}
@@ -764,9 +731,6 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		zfcp_sg_list_free(sg_list);
 		kfree(sg_list);
 	}
-
-	ZFCP_LOG_NORMAL(
-		"Control file data channel transaction closed\n");
 
 	return retval;
 }
@@ -860,7 +824,6 @@ zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list, void *user_buffer,
 		zfcp_buffer = (void*)
 			((page_to_pfn(sg->page) << PAGE_SHIFT) + sg->offset);
 		if (copy_from_user(zfcp_buffer, user_buffer, length)) {
-			ZFCP_LOG_INFO("Memory error (copy_from_user)\n");
 			retval = -EFAULT;
 			goto out;
 		}
@@ -895,7 +858,6 @@ zfcp_sg_list_copy_to_user(void *user_buffer, struct zfcp_sg_list *sg_list,
 		zfcp_buffer = (void*)
 			((page_to_pfn(sg->page) << PAGE_SHIFT) + sg->offset);
 		if (copy_to_user(user_buffer, zfcp_buffer, length)) {
-			ZFCP_LOG_INFO("Memory error (copy_to_user)\n");
 			retval = -EFAULT;
 			goto out;
 		}
@@ -978,7 +940,9 @@ zfcp_get_port_by_wwpn(struct zfcp_adapter *adapter, wwn_t wwpn)
 struct zfcp_unit *
 zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 {
-	struct zfcp_unit *unit;
+	struct zfcp_unit *unit, *tmp_unit;
+	scsi_lun_t scsi_lun;
+	int found;
 
 	/*
 	 * check that there is no unit with this FCP_LUN already in list
@@ -1002,18 +966,12 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	init_waitqueue_head(&unit->remove_wq);
 
 	unit->port = port;
-	/*
-	 * FIXME: reuse of scsi_luns!
-	 */
-	unit->scsi_lun = port->max_scsi_lun + 1;
 	unit->fcp_lun = fcp_lun;
-	unit->common_magic = ZFCP_MAGIC;
-	unit->specific_magic = ZFCP_MAGIC_UNIT;
 
 	/* setup for sysfs registration */
 	snprintf(unit->sysfs_device.bus_id, BUS_ID_SIZE, "0x%016llx", fcp_lun);
 	unit->sysfs_device.parent = &port->sysfs_device;
-	unit->sysfs_device.release = zfcp_sysfs_unit_release;
+	unit->sysfs_device.release = (void (*)(struct device *))kfree;
 	dev_set_drvdata(&unit->sysfs_device, unit);
 
 	/* mark unit unusable as long as sysfs registration is not complete */
@@ -1025,43 +983,29 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	}
 
 	if (zfcp_sysfs_unit_create_files(&unit->sysfs_device)) {
-		/*
-		 * failed to create all sysfs attributes, therefore the unit
-		 * must be put on the unit_remove listhead of the port where
-		 * the release function expects it.
-		 */
-		write_lock_irq(&zfcp_data.config_lock);
-		list_add_tail(&unit->list, &port->unit_remove_lh);
-		write_unlock_irq(&zfcp_data.config_lock);
 		device_unregister(&unit->sysfs_device);
 		return NULL;
 	}
 
-	/*
-	 * update max SCSI LUN of logical units attached to parent remote port
-	 */
-	port->max_scsi_lun++;
-
-	/*
-	 * update max SCSI LUN of logical units attached to parent adapter
-	 */
-	if (port->adapter->max_scsi_lun < port->max_scsi_lun)
-		port->adapter->max_scsi_lun = port->max_scsi_lun;
-
-	/*
-	 * update max SCSI LUN of logical units attached to host (SCSI stack)
-	 */
-	if (port->adapter->scsi_host &&
-	    (port->adapter->scsi_host->max_lun < port->max_scsi_lun))
-		port->adapter->scsi_host->max_lun = port->max_scsi_lun + 1;
-
 	zfcp_unit_get(unit);
 
-	/* unit is new and needs to be added to list */
+	scsi_lun = 0;
+	found = 0;
 	write_lock_irq(&zfcp_data.config_lock);
+	list_for_each_entry(tmp_unit, &port->unit_list_head, list) {
+		if (tmp_unit->scsi_lun != scsi_lun) {
+			found = 1;
+			break;
+		}
+		scsi_lun++;
+	}
+	unit->scsi_lun = scsi_lun;
+	if (found)
+		list_add_tail(&unit->list, &tmp_unit->list);
+	else
+		list_add_tail(&unit->list, &port->unit_list_head);
 	atomic_clear_mask(ZFCP_STATUS_COMMON_REMOVE, &unit->status);
 	atomic_set_mask(ZFCP_STATUS_COMMON_RUNNING, &unit->status);
-	list_add_tail(&unit->list, &port->unit_list_head);
 	write_unlock_irq(&zfcp_data.config_lock);
 
 	port->units++;
@@ -1070,21 +1014,17 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	return unit;
 }
 
-/* locks:  config_sema must be held */
 void
 zfcp_unit_dequeue(struct zfcp_unit *unit)
 {
-	/* remove specified unit data structure from list */
+	zfcp_unit_wait(unit);
 	write_lock_irq(&zfcp_data.config_lock);
 	list_del(&unit->list);
 	write_unlock_irq(&zfcp_data.config_lock);
-
 	unit->port->units--;
 	zfcp_port_put(unit->port);
-
-	kfree(unit);
-
-	return;
+	zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
+	device_unregister(&unit->sysfs_device);
 }
 
 static void *
@@ -1115,63 +1055,48 @@ zfcp_allocate_low_mem_buffers(struct zfcp_adapter *adapter)
 			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
 			       sizeof(struct zfcp_fsf_req_pool_element));
 
-	if (NULL == adapter->pool.fsf_req_erp) {
-		ZFCP_LOG_INFO("error: pool allocation failed (fsf_req_erp)\n");
+	if (NULL == adapter->pool.fsf_req_erp)
 		return -ENOMEM;
-	}
 
 	adapter->pool.fsf_req_scsi =
 		mempool_create(ZFCP_POOL_FSF_REQ_SCSI_NR,
 			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
 			       sizeof(struct zfcp_fsf_req_pool_element));
 
-	if (NULL == adapter->pool.fsf_req_scsi) {
-		ZFCP_LOG_INFO("error: pool allocation failed (fsf_req_scsi)\n");
+	if (NULL == adapter->pool.fsf_req_scsi)
 		return -ENOMEM;
-	}
 
 	adapter->pool.fsf_req_abort =
 		mempool_create(ZFCP_POOL_FSF_REQ_ABORT_NR,
 			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
 			       sizeof(struct zfcp_fsf_req_pool_element));
 
-	if (NULL == adapter->pool.fsf_req_abort) {
-		ZFCP_LOG_INFO("error: pool allocation failed "
-			      "(fsf_req_abort)\n");
+	if (NULL == adapter->pool.fsf_req_abort)
 		return -ENOMEM;
-	}
 
 	adapter->pool.fsf_req_status_read =
 		mempool_create(ZFCP_POOL_STATUS_READ_NR,
 			       zfcp_mempool_alloc, zfcp_mempool_free,
 			       (void *) sizeof(struct zfcp_fsf_req));
 
-	if (NULL == adapter->pool.fsf_req_status_read) {
-		ZFCP_LOG_INFO("error: pool allocation failed "
-			      "(fsf_req_status_read\n");
+	if (NULL == adapter->pool.fsf_req_status_read)
 		return -ENOMEM;
-	}
 
 	adapter->pool.data_status_read =
 		mempool_create(ZFCP_POOL_STATUS_READ_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free,
+			       zfcp_mempool_alloc, zfcp_mempool_free, 
 			       (void *) sizeof(struct fsf_status_read_buffer));
 
-	if (NULL == adapter->pool.data_status_read) {
-		ZFCP_LOG_INFO("error: pool allocation failed "
-			      "(data_status_read)\n");
+	if (NULL == adapter->pool.data_status_read)
 		return -ENOMEM;
-	}
 
 	adapter->pool.data_gid_pn =
 		mempool_create(ZFCP_POOL_DATA_GID_PN_NR,
 			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
 			       sizeof(struct zfcp_gid_pn_data));
 
-	if (NULL == adapter->pool.data_gid_pn) {
-		ZFCP_LOG_INFO("error: pool allocation failed (data_gid_pn)\n");
+	if (NULL == adapter->pool.data_gid_pn)
 		return -ENOMEM;
-	}
 
 	return 0;
 }
@@ -1223,7 +1148,7 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 	/* try to allocate new adapter data structure (zeroed) */
 	adapter = kmalloc(sizeof (struct zfcp_adapter), GFP_KERNEL);
 	if (!adapter) {
-		ZFCP_LOG_INFO("error: Allocation of base adapter "
+		ZFCP_LOG_INFO("error: allocation of base adapter "
 			      "structure failed\n");
 		goto out;
 	}
@@ -1243,12 +1168,10 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 		goto qdio_allocate_failed;
 
 	retval = zfcp_allocate_low_mem_buffers(adapter);
-	if (retval)
+	if (retval) {
+		ZFCP_LOG_INFO("error: pool allocation failed\n");
 		goto failed_low_mem_buffers;
-
-	/* set magics */
-	adapter->common_magic = ZFCP_MAGIC;
-	adapter->specific_magic = ZFCP_MAGIC_ADAPTER;
+	}
 
 	/* initialise reference count stuff */
 	atomic_set(&adapter->refcount, 0);
@@ -1301,10 +1224,8 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 					  ZFCP_REQ_DBF_AREAS,
 					  ZFCP_REQ_DBF_LENGTH);
 	if (!adapter->req_dbf) {
-		ZFCP_LOG_INFO
-		    ("error: Out of resources. Request debug feature for "
-		     "adapter %s could not be generated.\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
+			      zfcp_get_busid_by_adapter(adapter));
 		retval = -ENOMEM;
 		goto failed_req_dbf;
 	}
@@ -1323,10 +1244,8 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 					  ZFCP_CMD_DBF_AREAS,
 					  ZFCP_CMD_DBF_LENGTH);
 	if (!adapter->cmd_dbf) {
-		ZFCP_LOG_INFO
-		    ("error: Out of resources. Command debug feature for "
-		     "adapter %s could not be generated.\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
+			      zfcp_get_busid_by_adapter(adapter));
 		retval = -ENOMEM;
 		goto failed_cmd_dbf;
 	}
@@ -1343,10 +1262,8 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 					    ZFCP_ABORT_DBF_AREAS,
 					    ZFCP_ABORT_DBF_LENGTH);
 	if (!adapter->abort_dbf) {
-		ZFCP_LOG_INFO
-		    ("error: Out of resources. Abort debug feature for "
-		     "adapter %s could not be generated.\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
+			      zfcp_get_busid_by_adapter(adapter));
 		retval = -ENOMEM;
 		goto failed_abort_dbf;
 	}
@@ -1363,8 +1280,7 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 					     ZFCP_IN_ELS_DBF_AREAS,
 					     ZFCP_IN_ELS_DBF_LENGTH);
 	if (!adapter->in_els_dbf) {
-		ZFCP_LOG_INFO("error: Out of resources. ELS debug feature for "
-			      "adapter %s could not be generated.\n",
+		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		retval = -ENOMEM;
 		goto failed_in_els_dbf;
@@ -1380,8 +1296,7 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 					  ZFCP_ERP_DBF_AREAS,
 					  ZFCP_ERP_DBF_LENGTH);
 	if (!adapter->erp_dbf) {
-		ZFCP_LOG_INFO("error: Out of resources. ERP debug feature for "
-			      "adapter %s could not be generated.\n",
+		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		retval = -ENOMEM;
 		goto failed_erp_dbf;
@@ -1425,10 +1340,8 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
  failed_low_mem_buffers:
 	zfcp_free_low_mem_buffers(adapter);
 	if (qdio_free(ccw_device) != 0)
-		ZFCP_LOG_NORMAL
-		    ("bug: could not free memory used by data transfer "
-		     "mechanism for adapter %s\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_NORMAL("bug: qdio_free for adapter %s failed\n",
+				zfcp_get_busid_by_adapter(adapter));
  qdio_allocate_failed:
 	zfcp_qdio_free_queues(adapter);
  queues_alloc_failed:
@@ -1459,12 +1372,10 @@ zfcp_adapter_dequeue(struct zfcp_adapter *adapter)
 	retval = !list_empty(&adapter->fsf_req_list_head);
 	read_unlock_irqrestore(&adapter->fsf_req_list_lock, flags);
 	if (retval) {
-		ZFCP_LOG_NORMAL("bug: Adapter %s is still in use, "
-				"%i requests are still outstanding "
-				"(debug info 0x%lx)\n",
-				zfcp_get_busid_by_adapter(adapter),
-				atomic_read(&adapter->fsf_reqs_active),
-				(unsigned long) adapter);
+		ZFCP_LOG_NORMAL("bug: adapter %s (%p) still in use, "
+				"%i requests outstanding\n",
+				zfcp_get_busid_by_adapter(adapter), adapter, 
+				atomic_read(&adapter->fsf_reqs_active));
 		retval = -EBUSY;
 		goto out;
 	}
@@ -1477,16 +1388,15 @@ zfcp_adapter_dequeue(struct zfcp_adapter *adapter)
 	/* decrease number of adapters in list */
 	zfcp_data.adapters--;
 
-	ZFCP_LOG_TRACE("adapter 0x%lx removed from list, "
+	ZFCP_LOG_TRACE("adapter %s (%p) removed from list, "
 		       "%i adapters still in list\n",
-		       (unsigned long) adapter, zfcp_data.adapters);
+		       zfcp_get_busid_by_adapter(adapter),
+		       adapter, zfcp_data.adapters);
 
 	retval = qdio_free(adapter->ccw_device);
 	if (retval)
-		ZFCP_LOG_NORMAL
-		    ("bug: could not free memory used by data transfer "
-		     "mechanism for adapter %s\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_NORMAL("bug: qdio_free for adapter %s failed\n",
+				zfcp_get_busid_by_adapter(adapter));
 
 	debug_unregister(adapter->erp_dbf);
 
@@ -1508,32 +1418,27 @@ zfcp_adapter_dequeue(struct zfcp_adapter *adapter)
 	zfcp_free_low_mem_buffers(adapter);
 	/* free memory of adapter data structure and queues */
 	zfcp_qdio_free_queues(adapter);
-	ZFCP_LOG_TRACE("Freeing adapter structure.\n");
+	ZFCP_LOG_TRACE("freeing adapter structure\n");
 	kfree(adapter);
  out:
 	return;
 }
 
 /*
- * Enqueues a remote port at the end of the port list.
- * All port internal structures are set-up and the proc-fs entry is also 
- * allocated. Some SCSI-stack structures are modified for the port.
+ * Enqueues a remote port to the port list. All port internal structures
+ * are set up and the sysfs entry is also generated.
  *
- * returns:	0            if a new port was successfully enqueued
- *              ZFCP_KNOWN   if a port with the requested wwpn already exists
- *              -ENOMEM      if allocation failed
- *              -EINVAL      if at least one of the specified parameters was wrong
+ * returns:     pointer to port or NULL
  * locks:       config_sema must be held to serialise changes to the port list
- *              within this function (must not be held on entry)
  */
 struct zfcp_port *
 zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 {
-	struct zfcp_port *port;
-	int check_scsi_id;
+	struct zfcp_port *port, *tmp_port;
 	int check_wwpn;
+	scsi_id_t scsi_id;
+	int found;
 
-	check_scsi_id = !(status & ZFCP_STATUS_PORT_NO_SCSI_ID);
 	check_wwpn = !(status & ZFCP_STATUS_PORT_NO_WWPN);
 
 	/*
@@ -1561,16 +1466,10 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 
 	port->adapter = adapter;
 
-	if (check_scsi_id)
-		port->scsi_id = adapter->max_scsi_id + 1;
-
 	if (check_wwpn)
 		port->wwpn = wwpn;
 
 	atomic_set_mask(status, &port->status);
-
-	port->common_magic = ZFCP_MAGIC;
-	port->specific_magic = ZFCP_MAGIC_PORT;
 
 	/* setup for sysfs registration */
 	if (status & ZFCP_STATUS_PORT_NAMESERVER)
@@ -1579,7 +1478,7 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 		snprintf(port->sysfs_device.bus_id,
 			 BUS_ID_SIZE, "0x%016llx", wwpn);
 	port->sysfs_device.parent = &adapter->ccw_device->dev;
-	port->sysfs_device.release = zfcp_sysfs_port_release;
+	port->sysfs_device.release = (void (*)(struct device *))kfree;
 	dev_set_drvdata(&port->sysfs_device, port);
 
 	/* mark port unusable as long as sysfs registration is not complete */
@@ -1591,41 +1490,32 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 	}
 
 	if (zfcp_sysfs_port_create_files(&port->sysfs_device, status)) {
-		/*
-		 * failed to create all sysfs attributes, therefore the port
-		 * must be put on the port_remove listhead of the adapter
-		 * where the release function expects it.
-		 */
-		write_lock_irq(&zfcp_data.config_lock);
-		list_add_tail(&port->list, &adapter->port_remove_lh);
-		write_unlock_irq(&zfcp_data.config_lock);
 		device_unregister(&port->sysfs_device);
 		return NULL;
 	}
 
-	if (check_scsi_id) {
-		/*
-		 * update max. SCSI ID of remote ports attached to
-		 * "parent" adapter if necessary
-		 * (do not care about the adapters own SCSI ID)
-		 */
-		adapter->max_scsi_id++;
-
-		/*
-		 * update max. SCSI ID of remote ports attached to
-		 * "parent" host (SCSI stack) if necessary
-		 */
-		if (adapter->scsi_host &&
-		    (adapter->scsi_host->max_id < adapter->max_scsi_id + 1))
-			adapter->scsi_host->max_id = adapter->max_scsi_id + 1;
-	}
-
 	zfcp_port_get(port);
 
+	scsi_id = 1;
+	found = 0;
 	write_lock_irq(&zfcp_data.config_lock);
+	list_for_each_entry(tmp_port, &adapter->port_list_head, list) {
+		if (atomic_test_mask(ZFCP_STATUS_PORT_NO_SCSI_ID,
+				     &tmp_port->status))
+			continue;
+		if (tmp_port->scsi_id != scsi_id) {
+			found = 1;
+			break;
+		}
+		scsi_id++;
+	}
+	port->scsi_id = scsi_id;
+	if (found)
+		list_add_tail(&port->list, &tmp_port->list);
+	else
+		list_add_tail(&port->list, &adapter->port_list_head);
 	atomic_clear_mask(ZFCP_STATUS_COMMON_REMOVE, &port->status);
 	atomic_set_mask(ZFCP_STATUS_COMMON_RUNNING, &port->status);
-	list_add_tail(&port->list, &adapter->port_list_head);
 	write_unlock_irq(&zfcp_data.config_lock);
 
 	adapter->ports++;
@@ -1634,26 +1524,18 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 	return port;
 }
 
-/*
- * returns:	0 - struct zfcp_port data structure successfully removed
- *		!0 - struct zfcp_port data structure could not be removed
- *			(e.g. still used)
- * locks :	port list write lock is assumed to be held by caller
- */
 void
 zfcp_port_dequeue(struct zfcp_port *port)
 {
-	/* remove specified port from list */
+	zfcp_port_wait(port);
 	write_lock_irq(&zfcp_data.config_lock);
 	list_del(&port->list);
 	write_unlock_irq(&zfcp_data.config_lock);
-
 	port->adapter->ports--;
 	zfcp_adapter_put(port->adapter);
-
-	kfree(port);
-
-	return;
+	zfcp_sysfs_port_remove_files(&port->sysfs_device,
+				     atomic_read(&port->status));
+	device_unregister(&port->sysfs_device);
 }
 
 /* Enqueues a nameserver port */
@@ -1665,9 +1547,8 @@ zfcp_nameserver_enqueue(struct zfcp_adapter *adapter)
 	/* generate port structure */
 	port = zfcp_port_enqueue(adapter, 0, ZFCP_STATUS_PORT_NAMESERVER);
 	if (!port) {
-		ZFCP_LOG_INFO("error: Could not establish a connection to the "
-			      "fabric name server connected to the "
-			      "adapter %s\n",
+		ZFCP_LOG_INFO("error: enqueue of nameserver port for "
+			      "adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		return -ENXIO;
 	}
@@ -1730,8 +1611,8 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 			range_mask = ZFCP_PORTS_RANGE_FABRIC;
 			break;
 		default:
-			ZFCP_LOG_INFO("Received RSCN with unknown "
-				      "address format.\n");
+			ZFCP_LOG_INFO("incoming RSCN with unknown "
+				      "address format\n");
 			continue;
 		}
 		read_lock_irqsave(&zfcp_data.config_lock, flags);
@@ -1742,11 +1623,8 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 			/* Do we know this port? If not skip it. */
 			if (!atomic_test_mask
 			    (ZFCP_STATUS_PORT_DID_DID, &port->status)) {
-				ZFCP_LOG_INFO
-					("Received state change notification."
-					 "Trying to open the port with wwpn "
-					 "0x%Lx. Hope it's there now.\n",
-					 port->wwpn);
+				ZFCP_LOG_INFO("incoming RSCN, trying to open "
+					      "port 0x%016Lx\n", port->wwpn);
 				debug_text_event(adapter->erp_dbf, 1,
 						 "unsol_els_rscnu:");
 				zfcp_erp_port_reopen(port,
@@ -1760,7 +1638,7 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 			 */
 			if ((port->d_id & range_mask)
 			    == (fcp_rscn_element->nport_did & range_mask)) {
-				ZFCP_LOG_TRACE("reopen did 0x%x\n",
+				ZFCP_LOG_TRACE("reopen did 0x%08x\n",
 					       fcp_rscn_element->nport_did);
 				/*
 				 * Unfortunately, an RSCN does not specify the
@@ -1772,10 +1650,8 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 				 * Where would such code be put in?
 				 * (inside or outside erp)
 				 */
-				ZFCP_LOG_INFO
-				    ("Received state change notification."
-				     "Trying to reopen the port with wwpn "
-				     "0x%Lx.\n", port->wwpn);
+				ZFCP_LOG_INFO("incoming RSCN, trying to open "
+					      "port 0x%016Lx\n", port->wwpn);
 				debug_text_event(adapter->erp_dbf, 1,
 						 "unsol_els_rscnk:");
 				zfcp_test_link(port);
@@ -1803,10 +1679,8 @@ zfcp_fsf_incoming_els_plogi(struct zfcp_adapter *adapter,
 	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 
 	if (!port || (port->wwpn != (*(wwn_t *) & els_logi->nport_wwn))) {
-		ZFCP_LOG_DEBUG("Re-open port indication received "
-			       "for the non-existing port with D_ID "
-			       "0x%3.3x, on the adapter "
-			       "%s. Ignored.\n",
+		ZFCP_LOG_DEBUG("ignored incoming PLOGI for nonexisting port "
+			       "with d_id 0x%08x on adapter %s\n",
 			       status_buffer->d_id,
 			       zfcp_get_busid_by_adapter(adapter));
 	} else {
@@ -1834,10 +1708,8 @@ zfcp_fsf_incoming_els_logo(struct zfcp_adapter *adapter,
 	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 
 	if (!port || (port->wwpn != els_logo->nport_wwpn)) {
-		ZFCP_LOG_DEBUG("Re-open port indication received "
-			       "for the non-existing port with D_ID "
-			       "0x%3.3x, on the adapter "
-			       "%s. Ignored.\n",
+		ZFCP_LOG_DEBUG("ignored incoming LOGO for nonexisting port "
+			       "with d_id 0x%08x on adapter %s\n",
 			       status_buffer->d_id,
 			       zfcp_get_busid_by_adapter(adapter));
 	} else {
@@ -1852,9 +1724,8 @@ zfcp_fsf_incoming_els_unknown(struct zfcp_adapter *adapter,
 			      struct fsf_status_read_buffer *status_buffer)
 {
 	zfcp_in_els_dbf_event(adapter, "##undef", status_buffer, 24);
-	ZFCP_LOG_NORMAL("warning: Unknown incoming ELS (0x%x) received "
-			"for the adapter %s\n",
-			*(u32 *) (status_buffer->payload),
+	ZFCP_LOG_NORMAL("warning: unknown incoming ELS 0x%08x "
+			"for adapter %s\n", *(u32 *) (status_buffer->payload),
 			zfcp_get_busid_by_adapter(adapter));
 
 }
@@ -1900,12 +1771,10 @@ zfcp_gid_pn_buffers_alloc(struct zfcp_gid_pn_data **gid_pn, mempool_t *pool)
 		}
 	} else {
 		data = kmalloc(sizeof(struct zfcp_gid_pn_data), GFP_ATOMIC);
-		}
-
-        if (NULL == data){
-		ZFCP_LOG_DEBUG("Out of memory.\n");
-                return -ENOMEM;
 	}
+
+        if (NULL == data)
+                return -ENOMEM;
 
 	memset(data, 0, sizeof(*data));
         data->ct.req = &data->req;
@@ -1927,11 +1796,10 @@ zfcp_gid_pn_buffers_alloc(struct zfcp_gid_pn_data **gid_pn, mempool_t *pool)
 static void
 zfcp_gid_pn_buffers_free(struct zfcp_gid_pn_data *gid_pn)
 {
-        if ((gid_pn->ct.pool != 0)) {
+        if ((gid_pn->ct.pool != 0))
 		mempool_free(gid_pn, gid_pn->ct.pool);
-        } else {
+	else
                 kfree(gid_pn);
-	}
 
 	return;
 }
@@ -1950,11 +1818,10 @@ zfcp_ns_gid_pn_request(struct zfcp_erp_action *erp_action)
 
 	ret = zfcp_gid_pn_buffers_alloc(&gid_pn, adapter->pool.data_gid_pn);
 	if (ret < 0) {
-		ZFCP_LOG_INFO("error: Out of memory. Could not allocate "
-                              "buffers for nameserver request GID_PN. "
-                              "(adapter: %s)\n",
+		ZFCP_LOG_INFO("error: buffer allocation for gid_pn nameserver "
+			      "request failed for adapter %s\n",
 			      zfcp_get_busid_by_adapter(adapter));
-	goto out;
+		goto out;
 	}
 
 	/* setup nameserver request */
@@ -1978,8 +1845,8 @@ zfcp_ns_gid_pn_request(struct zfcp_erp_action *erp_action)
 	ret = zfcp_fsf_send_ct(&gid_pn->ct, adapter->pool.fsf_req_erp,
 			       erp_action);
 	if (ret) {
-		ZFCP_LOG_INFO("error: Could not send nameserver request GID_PN."
-                              "(adapter %s)\n",
+		ZFCP_LOG_INFO("error: initiation of gid_pn nameserver request "
+                              "failed for adapter %s\n",
 			      zfcp_get_busid_by_adapter(adapter));
 
                 zfcp_gid_pn_buffers_free(gid_pn);
@@ -2023,26 +1890,23 @@ static void zfcp_ns_gid_pn_handler(unsigned long data)
 	}
 	/* paranoia */
 	if (ct_iu_req->wwpn != port->wwpn) {
-		ZFCP_LOG_NORMAL(
-			"bug: Port WWPN returned by nameserver lookup "
-                        "does not correspond to the expected value "
-			"(adapter: %s, debug info: 0x%016Lx, 0x%016Lx)\n",
-			zfcp_get_busid_by_port(port), port->wwpn,
-                        ct_iu_req->wwpn);
+		ZFCP_LOG_NORMAL("bug: wwpn 0x%016Lx returned by nameserver "
+				"lookup does not match expected wwpn 0x%016Lx "
+				"for adapter %s\n", ct_iu_req->wwpn, port->wwpn,
+				zfcp_get_busid_by_port(port));
 		goto failed;
 	}
 
 	/* looks like a valid d_id */
         port->d_id = ct_iu_resp->d_id & ZFCP_DID_MASK;
 	atomic_set_mask(ZFCP_STATUS_PORT_DID_DID, &port->status);
-	ZFCP_LOG_DEBUG("busid %s:  WWPN=0x%Lx ---> D_ID=0x%6.6x\n",
-		       zfcp_get_busid_by_port(port),
-		       port->wwpn, (unsigned int) port->d_id);
+	ZFCP_LOG_DEBUG("adapter %s:  wwpn=0x%016Lx ---> d_id=0x%08x\n",
+		       zfcp_get_busid_by_port(port), port->wwpn, port->d_id);
 	goto out;
 
 failed:
-	ZFCP_LOG_NORMAL("warning: WWPN 0x%Lx not found by nameserver lookup "
-			"(adapter: %s)\n",
+	ZFCP_LOG_NORMAL("warning: failed gid_pn nameserver request for wwpn "
+			"0x%016Lx for adapter %s\n",
 			port->wwpn, zfcp_get_busid_by_port(port));
 	ZFCP_LOG_DEBUG("CT IUs do not match:\n");
 	ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG, (char *) ct_iu_req,

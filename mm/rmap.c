@@ -895,10 +895,11 @@ struct pte_chain *pte_chain_alloc(int gfp_flags)
 
 void __init pte_chain_init(void)
 {
+	// different because of the slab debug patch -arnd
 	pte_chain_cache = kmem_cache_create(	"pte_chain",
 						sizeof(struct pte_chain),
+						sizeof(struct pte_chain),
 						0,
-						SLAB_MUST_HWCACHE_ALIGN,
 						pte_chain_ctor,
 						NULL);
 

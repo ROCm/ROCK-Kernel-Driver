@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.48 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.51 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -55,6 +55,7 @@ static struct ccw_device_id zfcp_ccw_device_id[] = {
 };
 
 static struct ccw_driver zfcp_ccw_driver = {
+	.owner       = THIS_MODULE,
 	.name        = ZFCP_NAME,
 	.ids         = zfcp_ccw_device_id,
 	.probe       = zfcp_ccw_probe,
@@ -130,14 +131,9 @@ zfcp_ccw_remove(struct ccw_device *ccw_device)
 
 	list_for_each_entry_safe(port, p, &adapter->port_remove_lh, list) {
 		list_for_each_entry_safe(unit, u, &port->unit_remove_lh, list) {
-			zfcp_unit_wait(unit);
-			zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
-			device_unregister(&unit->sysfs_device);
+			zfcp_unit_dequeue(unit);
 		}
-		zfcp_port_wait(port);
-		zfcp_sysfs_port_remove_files(&port->sysfs_device,
-					     atomic_read(&port->status));
-		device_unregister(&port->sysfs_device);
+		zfcp_port_dequeue(port);
 	}
 	zfcp_adapter_wait(adapter);
 	zfcp_adapter_dequeue(adapter);
@@ -163,11 +159,10 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	down(&zfcp_data.config_sema);
 	adapter = dev_get_drvdata(&ccw_device->dev);
 
-	retval = zfcp_erp_thread_setup(adapter);
+	retval = zfcp_erp_thread_setup(adapter); 
 	if (retval) {
-		ZFCP_LOG_INFO("error: out of resources. "
-			      "error recovery thread for adapter %s "
-			      "could not be started\n",
+		ZFCP_LOG_INFO("error: start of error recovery thread for "
+			      "adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		goto out;
 	}
@@ -229,15 +224,15 @@ zfcp_ccw_notify(struct ccw_device *ccw_device, int event)
 	adapter = dev_get_drvdata(&ccw_device->dev);
 	switch (event) {
 	case CIO_GONE:
-		ZFCP_LOG_NORMAL("Adapter %s: device gone.\n",
+		ZFCP_LOG_NORMAL("adapter %s: device gone\n",
 				zfcp_get_busid_by_adapter(adapter));
 		break;
 	case CIO_NO_PATH:
-		ZFCP_LOG_NORMAL("Adapter %s: no path.\n",
+		ZFCP_LOG_NORMAL("adapter %s: no path\n",
 				zfcp_get_busid_by_adapter(adapter));
 		break;
 	case CIO_OPER:
-		ZFCP_LOG_NORMAL("Adapter %s: operational again.\n",
+		ZFCP_LOG_NORMAL("adapter %s: operational again\n",
 				zfcp_get_busid_by_adapter(adapter));
 		zfcp_erp_modify_adapter_status(adapter,
 					       ZFCP_STATUS_COMMON_RUNNING,

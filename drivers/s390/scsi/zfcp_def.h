@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.62 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.66 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -937,8 +937,6 @@ struct zfcp_erp_action {
 
 
 struct zfcp_adapter {
-	u32			common_magic;	   /* driver common magic */
-	u32			specific_magic;	   /* struct specific magic */
 	struct list_head	list;              /* list of adapters */
 	atomic_t                refcount;          /* reference count */
 	wait_queue_head_t	remove_wq;         /* can be used to wait for
@@ -956,15 +954,12 @@ struct zfcp_adapter {
         u32			hardware_version;  /* of FCP channel */
         u8			serial_number[32]; /* of hardware */
 	struct Scsi_Host	*scsi_host;	   /* Pointer to mid-layer */
-
 	unsigned short          scsi_host_no;      /* Assigned host number */
 	unsigned char		name[9];
 	struct list_head	port_list_head;	   /* remote port list */
 	struct list_head        port_remove_lh;    /* head of ports to be
 						      removed */
 	u32			ports;	           /* number of remote ports */
-	scsi_id_t		max_scsi_id;	   /* largest SCSI ID */
-	scsi_lun_t		max_scsi_lun;	   /* largest SCSI LUN */
         struct timer_list       scsi_er_timer;     /* SCSI err recovery watch */
 	struct list_head	fsf_req_list_head; /* head of FSF req list */
 	rwlock_t		fsf_req_list_lock; /* lock for ops on list of
@@ -1004,9 +999,13 @@ struct zfcp_adapter {
 	struct qdio_initialize  qdio_init_data;    /* for qdio_establish */
 };
 
+/*
+ * the struct device sysfs_device must be at the beginning of this structure.
+ * pointer to struct device is used to free port structure in release function
+ * of the device. don't change!
+ */
 struct zfcp_port {
-	u32		       common_magic;   /* driver wide common magic */
-	u32		       specific_magic; /* structure specific magic */
+	struct device          sysfs_device;   /* sysfs device */
 	struct list_head       list;	       /* list of remote ports */
 	atomic_t               refcount;       /* reference count */
 	wait_queue_head_t      remove_wq;      /* can be used to wait for
@@ -1021,37 +1020,36 @@ struct zfcp_port {
 	wwn_t		       wwnn;	       /* WWNN if known */
 	wwn_t		       wwpn;	       /* WWPN */
 	fc_id_t		       d_id;	       /* D_ID */
-	scsi_lun_t	       max_scsi_lun;   /* largest SCSI LUN */
 	u32		       handle;	       /* handle assigned by FSF */
 	struct zfcp_erp_action erp_action;     /* pending error recovery */
         atomic_t               erp_counter;
-	struct device          sysfs_device;   /* sysfs device */
 };
 
+/* the struct device sysfs_device must be at the beginning of this structure.
+ * pointer to struct device is used to free unit structure in release function
+ * of the device. don't change!
+ */
 struct zfcp_unit {
-	u32		       common_magic;   /* driver wide common magic */
-	u32		       specific_magic; /* structure specific magic */
+	struct device          sysfs_device;   /* sysfs device */
 	struct list_head       list;	       /* list of logical units */
 	atomic_t               refcount;       /* reference count */
 	wait_queue_head_t      remove_wq;      /* can be used to wait for
 						  refcount drop to zero */
 	struct zfcp_port       *port;	       /* remote port of unit */
 	atomic_t	       status;	       /* status of this logical unit */
+	u32		       lun_access;     /* access flags for this unit */
 	scsi_lun_t	       scsi_lun;       /* own SCSI LUN */
 	fcp_lun_t	       fcp_lun;	       /* own FCP_LUN */
 	u32		       handle;	       /* handle assigned by FSF */
         struct scsi_device     *device;        /* scsi device struct pointer */
 	struct zfcp_erp_action erp_action;     /* pending error recovery */
         atomic_t               erp_counter;
-	struct device          sysfs_device;   /* sysfs device */
 	atomic_t               scsi_add_work;  /* used to synchronize */
 	wait_queue_head_t      scsi_add_wq;    /* wait for scsi_add_device */
 };
 
 /* FSF request */
 struct zfcp_fsf_req {
-	u32		       common_magic;   /* driver wide common magic */
-	u32		       specific_magic; /* structure specific magic */
 	struct list_head       list;	       /* list of FSF requests */
 	struct zfcp_adapter    *adapter;       /* adapter request belongs to */
 	u8		       sbal_number;    /* nr of SBALs free for use */
@@ -1158,13 +1156,6 @@ struct zfcp_fsf_req_pool_element {
 
 #define ZFCP_INTERRUPTIBLE	1
 #define ZFCP_UNINTERRUPTIBLE	0
-
-/* some magics which may be used to authenticate data structures */
-#define ZFCP_MAGIC		0xFCFCFCFC
-#define ZFCP_MAGIC_ADAPTER	0xAAAAAAAA
-#define ZFCP_MAGIC_PORT		0xBBBBBBBB
-#define ZFCP_MAGIC_UNIT		0xCCCCCCCC
-#define ZFCP_MAGIC_FSFREQ	0xEEEEEEEE
 
 #ifndef atomic_test_mask
 #define atomic_test_mask(mask, target) \

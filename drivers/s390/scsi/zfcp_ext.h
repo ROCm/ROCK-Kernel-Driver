@@ -31,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.45 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.47 $"
 
 #include "zfcp_def.h"
 
@@ -46,8 +46,6 @@ extern int  zfcp_sysfs_port_create_files(struct device *, u32);
 extern void zfcp_sysfs_port_remove_files(struct device *, u32);
 extern int  zfcp_sysfs_unit_create_files(struct device *);
 extern void zfcp_sysfs_unit_remove_files(struct device *);
-extern void zfcp_sysfs_port_release(struct device *);
-extern void zfcp_sysfs_unit_release(struct device *);
 
 /**************************** CONFIGURATION  *********************************/
 extern struct zfcp_unit *zfcp_get_unit_by_lun(struct zfcp_port *,
@@ -154,7 +152,6 @@ extern int  zfcp_erp_unit_reopen(struct zfcp_unit *, int);
 extern int  zfcp_erp_unit_shutdown(struct zfcp_unit *, int);
 extern void zfcp_erp_unit_failed(struct zfcp_unit *);
 
-extern void zfcp_erp_scsi_low_mem_buffer_timeout_handler(unsigned long);
 extern int  zfcp_erp_thread_setup(struct zfcp_adapter *);
 extern int  zfcp_erp_thread_kill(struct zfcp_adapter *);
 extern int  zfcp_erp_wait(struct zfcp_adapter *);
