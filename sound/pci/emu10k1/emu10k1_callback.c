@@ -60,16 +60,16 @@ static void set_filterQ(emu10k1_t *hw, snd_emux_voice_t *vp);
  * set up operators
  */
 static snd_emux_operators_t emu10k1_ops = {
-	owner:		THIS_MODULE,
-	get_voice:	get_voice,
-	prepare:	start_voice,
-	trigger:	trigger_voice,
-	release:	release_voice,
-	update:		update_voice,
-	terminate:	terminate_voice,
-	free_voice:	free_voice,
-	sample_new:	snd_emu10k1_sample_new,
-	sample_free:	snd_emu10k1_sample_free,
+	.owner =	THIS_MODULE,
+	.get_voice =	get_voice,
+	.prepare =	start_voice,
+	.trigger =	trigger_voice,
+	.release =	release_voice,
+	.update =	update_voice,
+	.terminate =	terminate_voice,
+	.free_voice =	free_voice,
+	.sample_new =	snd_emu10k1_sample_new,
+	.sample_free =	snd_emu10k1_sample_free,
 };
 
 void

@@ -590,11 +590,11 @@ AC97_DOUBLE("PCM Playback Volume", AC97_PCM, 8, 0, 31, 1)
 
 static const snd_kcontrol_new_t snd_ac97_controls_capture[3] = {
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_ac97_info_mux,
-	get: snd_ac97_get_mux,
-	put: snd_ac97_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_ac97_info_mux,
+	.get = snd_ac97_get_mux,
+	.put = snd_ac97_put_mux,
 },
 AC97_SINGLE("Capture Switch", AC97_REC_GAIN, 15, 1, 1),
 AC97_DOUBLE("Capture Volume", AC97_REC_GAIN, 8, 0, 15, 0)

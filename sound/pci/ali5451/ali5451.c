@@ -1540,22 +1540,22 @@ static snd_pcm_uframes_t snd_ali_capture_pointer(snd_pcm_substream_t *substream)
 
 static snd_pcm_hardware_t snd_ali_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
+	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(256*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(256*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(256*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(256*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -1564,22 +1564,22 @@ static snd_pcm_hardware_t snd_ali_playback =
 
 static snd_pcm_hardware_t snd_ali_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
+	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static void snd_ali_pcm_free_substream(snd_pcm_runtime_t *runtime)
@@ -1666,25 +1666,25 @@ static int snd_ali_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_ali_playback_ops = {
-	open:		snd_ali_playback_open,
-	close:		snd_ali_playback_close,
-	ioctl:		snd_ali_ioctl,
-	hw_params:	snd_ali_playback_hw_params,
-	hw_free:	snd_ali_playback_hw_free,
-	prepare:	snd_ali_playback_prepare,
-	trigger:	snd_ali_trigger,
-	pointer:	snd_ali_playback_pointer,
+	.open =		snd_ali_playback_open,
+	.close =	snd_ali_playback_close,
+	.ioctl =	snd_ali_ioctl,
+	.hw_params =	snd_ali_playback_hw_params,
+	.hw_free =	snd_ali_playback_hw_free,
+	.prepare =	snd_ali_playback_prepare,
+	.trigger =	snd_ali_trigger,
+	.pointer =	snd_ali_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_ali_capture_ops = {
-	open:		snd_ali_capture_open,
-	close:		snd_ali_capture_close,
-	ioctl:		snd_ali_ioctl,
-	hw_params:	snd_ali_capture_hw_params,
-	hw_free:	snd_ali_capture_hw_free,
-	prepare:	snd_ali_capture_prepare,
-	trigger:	snd_ali_trigger,
-	pointer:	snd_ali_capture_pointer,
+	.open =		snd_ali_capture_open,
+	.close =	snd_ali_capture_close,
+	.ioctl =	snd_ali_ioctl,
+	.hw_params =	snd_ali_capture_hw_params,
+	.hw_free =	snd_ali_capture_hw_free,
+	.prepare =	snd_ali_capture_prepare,
+	.trigger =	snd_ali_trigger,
+	.pointer =	snd_ali_capture_pointer,
 };
 
 
@@ -1722,9 +1722,9 @@ static int __devinit snd_ali_pcm(ali_t * codec, int device, snd_pcm_t ** rpcm)
 }
 
 #define ALI5451_SPDIF(xname, xindex, value) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex,\
-info: snd_ali5451_spdif_info, get: snd_ali5451_spdif_get, \
-put: snd_ali5451_spdif_put, private_value: value}
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex,\
+.info = snd_ali5451_spdif_info, .get = snd_ali5451_spdif_get, \
+.put = snd_ali5451_spdif_put, .private_value = value}
 
 static int snd_ali5451_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
@@ -2240,13 +2240,13 @@ static void __devexit snd_ali_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "ALI 5451",
-	id_table: snd_ali_ids,
-	probe: snd_ali_probe,
-	remove: __devexit_p(snd_ali_remove),
+	.name = "ALI 5451",
+	.id_table = snd_ali_ids,
+	.probe = snd_ali_probe,
+	.remove = __devexit_p(snd_ali_remove),
 #ifdef CONFIG_PM
-	suspend: snd_ali_suspend,
-	resume: snd_ali_resume,
+	.suspend = snd_ali_suspend,
+	.resume = snd_ali_resume,
 #endif
 };                                
 

@@ -699,11 +699,11 @@ static int snd_ice1712_digmix_route_ac97_put(snd_kcontrol_t *kcontrol, snd_ctl_e
 }
 
 static snd_kcontrol_new_t snd_ice1712_mixer_digmix_route_ac97 __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Digital Mixer To AC97",
-	info: snd_ice1712_digmix_route_ac97_info,
-	get: snd_ice1712_digmix_route_ac97_get,
-	put: snd_ice1712_digmix_route_ac97_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Digital Mixer To AC97",
+	.info = snd_ice1712_digmix_route_ac97_info,
+	.get = snd_ice1712_digmix_route_ac97_get,
+	.put = snd_ice1712_digmix_route_ac97_put,
 };
 
 
@@ -865,9 +865,9 @@ static int ap_cs8427_probeaddr(snd_i2c_bus_t *bus, unsigned short addr)
 }
 
 static snd_i2c_ops_t ap_cs8427_i2c_ops = {
-	sendbytes: ap_cs8427_sendbytes,
-	readbytes: ap_cs8427_readbytes,
-	probeaddr: ap_cs8427_probeaddr,
+	.sendbytes = ap_cs8427_sendbytes,
+	.readbytes = ap_cs8427_readbytes,
+	.probeaddr = ap_cs8427_probeaddr,
 };
 
 /*
@@ -951,12 +951,12 @@ static void ewx_i2c_direction(snd_i2c_bus_t *bus, int clock, int data)
 }
 
 static snd_i2c_bit_ops_t snd_ice1712_ewx_cs8427_bit_ops = {
-	start: ewx_i2c_start,
-	stop: ewx_i2c_stop,
-	direction: ewx_i2c_direction,
-	setlines: ewx_i2c_setlines,
-	getclock: ewx_i2c_getclock,
-	getdata: ewx_i2c_getdata,
+	.start = ewx_i2c_start,
+	.stop = ewx_i2c_stop,
+	.direction = ewx_i2c_direction,
+	.setlines = ewx_i2c_setlines,
+	.getclock = ewx_i2c_getclock,
+	.getdata = ewx_i2c_getdata,
 };
 
 /* AK4524 chip select; address 0x48 bit 0-3 */
@@ -1538,61 +1538,61 @@ static snd_pcm_uframes_t snd_ice1712_capture_pointer(snd_pcm_substream_t * subst
 
 static snd_pcm_hardware_t snd_ice1712_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(64*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(64*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(64*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(64*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_ice1712_playback_ds =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		2,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		2,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_ice1712_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(64*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(64*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(64*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(64*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_ice1712_playback_open(snd_pcm_substream_t * substream)
@@ -1667,36 +1667,36 @@ static int snd_ice1712_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_ice1712_playback_ops = {
-	open:		snd_ice1712_playback_open,
-	close:		snd_ice1712_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ice1712_hw_params,
-	hw_free:	snd_ice1712_hw_free,
-	prepare:	snd_ice1712_playback_prepare,
-	trigger:	snd_ice1712_playback_trigger,
-	pointer:	snd_ice1712_playback_pointer,
+	.open =		snd_ice1712_playback_open,
+	.close =	snd_ice1712_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ice1712_hw_params,
+	.hw_free =	snd_ice1712_hw_free,
+	.prepare =	snd_ice1712_playback_prepare,
+	.trigger =	snd_ice1712_playback_trigger,
+	.pointer =	snd_ice1712_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_ice1712_playback_ds_ops = {
-	open:		snd_ice1712_playback_ds_open,
-	close:		snd_ice1712_playback_ds_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ice1712_hw_params,
-	hw_free:	snd_ice1712_hw_free,
-	prepare:	snd_ice1712_playback_ds_prepare,
-	trigger:	snd_ice1712_playback_ds_trigger,
-	pointer:	snd_ice1712_playback_ds_pointer,
+	.open =		snd_ice1712_playback_ds_open,
+	.close =	snd_ice1712_playback_ds_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ice1712_hw_params,
+	.hw_free =	snd_ice1712_hw_free,
+	.prepare =	snd_ice1712_playback_ds_prepare,
+	.trigger =	snd_ice1712_playback_ds_trigger,
+	.pointer =	snd_ice1712_playback_ds_pointer,
 };
 
 static snd_pcm_ops_t snd_ice1712_capture_ops = {
-	open:		snd_ice1712_capture_open,
-	close:		snd_ice1712_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ice1712_hw_params,
-	hw_free:	snd_ice1712_hw_free,
-	prepare:	snd_ice1712_capture_prepare,
-	trigger:	snd_ice1712_capture_trigger,
-	pointer:	snd_ice1712_capture_pointer,
+	.open =		snd_ice1712_capture_open,
+	.close =	snd_ice1712_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ice1712_hw_params,
+	.hw_free =	snd_ice1712_hw_free,
+	.prepare =	snd_ice1712_capture_prepare,
+	.trigger =	snd_ice1712_capture_trigger,
+	.pointer =	snd_ice1712_capture_pointer,
 };
 
 static void snd_ice1712_pcm_free(snd_pcm_t *pcm)
@@ -1780,9 +1780,9 @@ static unsigned int rates[] = { 8000, 9600, 11025, 12000, 16000, 22050, 24000,
 #define RATES sizeof(rates) / sizeof(rates[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: RATES,
-	list: rates,
-	mask: 0,
+	.count = RATES,
+	.list = rates,
+	.mask = 0,
 };
 
 #if 0
@@ -1980,42 +1980,42 @@ static snd_pcm_uframes_t snd_ice1712_capture_pro_pointer(snd_pcm_substream_t * s
 
 static snd_pcm_hardware_t snd_ice1712_playback_pro =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
-	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
-	rate_min:		4000,
-	rate_max:		96000,
-	channels_min:		10,
-	channels_max:		10,
-	buffer_bytes_max:	(256*1024),
-	period_bytes_min:	10 * 4 * 2,
-	period_bytes_max:	131040,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
+	.rate_min =		4000,
+	.rate_max =		96000,
+	.channels_min =		10,
+	.channels_max =		10,
+	.buffer_bytes_max =	(256*1024),
+	.period_bytes_min =	10 * 4 * 2,
+	.period_bytes_max =	131040,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_ice1712_capture_pro =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
-	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
-	rate_min:		4000,
-	rate_max:		96000,
-	channels_min:		12,
-	channels_max:		12,
-	buffer_bytes_max:	(256*1024),
-	period_bytes_min:	12 * 4 * 2,
-	period_bytes_max:	131040,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
+	.rate_min =		4000,
+	.rate_max =		96000,
+	.channels_min =		12,
+	.channels_max =		12,
+	.buffer_bytes_max =	(256*1024),
+	.period_bytes_min =	12 * 4 * 2,
+	.period_bytes_max =	131040,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_ice1712_playback_pro_open(snd_pcm_substream_t * substream)
@@ -2076,25 +2076,25 @@ static void snd_ice1712_pcm_profi_free(snd_pcm_t *pcm)
 }
 
 static snd_pcm_ops_t snd_ice1712_playback_pro_ops = {
-	open:		snd_ice1712_playback_pro_open,
-	close:		snd_ice1712_playback_pro_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ice1712_hw_params,
-	hw_free:	snd_ice1712_hw_free,
-	prepare:	snd_ice1712_playback_pro_prepare,
-	trigger:	snd_ice1712_pro_trigger,
-	pointer:	snd_ice1712_playback_pro_pointer,
+	.open =		snd_ice1712_playback_pro_open,
+	.close =	snd_ice1712_playback_pro_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ice1712_hw_params,
+	.hw_free =	snd_ice1712_hw_free,
+	.prepare =	snd_ice1712_playback_pro_prepare,
+	.trigger =	snd_ice1712_pro_trigger,
+	.pointer =	snd_ice1712_playback_pro_pointer,
 };
 
 static snd_pcm_ops_t snd_ice1712_capture_pro_ops = {
-	open:		snd_ice1712_capture_pro_open,
-	close:		snd_ice1712_capture_pro_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ice1712_hw_params,
-	hw_free:	snd_ice1712_hw_free,
-	prepare:	snd_ice1712_capture_pro_prepare,
-	trigger:	snd_ice1712_pro_trigger,
-	pointer:	snd_ice1712_capture_pro_pointer,
+	.open =		snd_ice1712_capture_pro_open,
+	.close =	snd_ice1712_capture_pro_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ice1712_hw_params,
+	.hw_free =	snd_ice1712_hw_free,
+	.prepare =	snd_ice1712_capture_pro_prepare,
+	.trigger =	snd_ice1712_pro_trigger,
+	.pointer =	snd_ice1712_capture_pro_pointer,
 };
 
 static int __devinit snd_ice1712_pcm_profi(ice1712_t * ice, int device, snd_pcm_t ** rpcm)
@@ -2531,11 +2531,11 @@ static int snd_ice1712_eeprom_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 static snd_kcontrol_new_t snd_ice1712_eeprom __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_CARD,
-	name: "ICE1712 EEPROM",
-	access: SNDRV_CTL_ELEM_ACCESS_READ,
-	info: snd_ice1712_eeprom_info,
-	get: snd_ice1712_eeprom_get
+	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
+	.name = "ICE1712 EEPROM",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ,
+	.info = snd_ice1712_eeprom_info,
+	.get = snd_ice1712_eeprom_get
 };
 
 /*
@@ -2610,11 +2610,11 @@ static int snd_ice1712_spdif_default_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ice1712_spdif_default __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_ice1712_spdif_default_info,
-	get:		snd_ice1712_spdif_default_get,
-	put:		snd_ice1712_spdif_default_put
+	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_ice1712_spdif_default_info,
+	.get =		snd_ice1712_spdif_default_get,
+	.put =		snd_ice1712_spdif_default_put
 };
 
 static int snd_ice1712_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -2686,20 +2686,20 @@ static int snd_ice1712_spdif_maskp_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ice1712_spdif_maskc __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-	info:		snd_ice1712_spdif_mask_info,
-	get:		snd_ice1712_spdif_maskc_get,
+	.access =		SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =		SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.info =		snd_ice1712_spdif_mask_info,
+	.get =		snd_ice1712_spdif_maskc_get,
 };
 
 static snd_kcontrol_new_t snd_ice1712_spdif_maskp __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
-	info:		snd_ice1712_spdif_mask_info,
-	get:		snd_ice1712_spdif_maskp_get,
+	.access =		SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =		SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
+	.info =		snd_ice1712_spdif_mask_info,
+	.get =		snd_ice1712_spdif_maskp_get,
 };
 
 static int snd_ice1712_spdif_stream_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -2772,18 +2772,18 @@ static int snd_ice1712_spdif_stream_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ice1712_spdif_stream __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_ice1712_spdif_stream_info,
-	get:		snd_ice1712_spdif_stream_get,
-	put:		snd_ice1712_spdif_stream_put
+	.access =		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_ice1712_spdif_stream_info,
+	.get =		snd_ice1712_spdif_stream_get,
+	.put =		snd_ice1712_spdif_stream_put
 };
 
 #define ICE1712_GPIO(xiface, xname, xindex, mask, invert, xaccess) \
-{ iface: xiface, name: xname, access: xaccess, info: snd_ice1712_gpio_info, \
-  get: snd_ice1712_gpio_get, put: snd_ice1712_gpio_put, \
-  private_value: mask | (invert << 24) }
+{ .iface = xiface, .name = xname, .access = xaccess, .info = snd_ice1712_gpio_info, \
+  .get = snd_ice1712_gpio_get, .put = snd_ice1712_gpio_put, \
+  .private_value = mask | (invert << 24) }
 
 static int snd_ice1712_gpio_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -2877,11 +2877,11 @@ static int snd_ice1712_pro_spdif_master_put(snd_kcontrol_t * kcontrol, snd_ctl_e
 }
 
 static snd_kcontrol_new_t snd_ice1712_pro_spdif_master __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Multi Track IEC958 Master",
-	info: snd_ice1712_pro_spdif_master_info,
-	get: snd_ice1712_pro_spdif_master_get,
-	put: snd_ice1712_pro_spdif_master_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Multi Track IEC958 Master",
+	.info = snd_ice1712_pro_spdif_master_info,
+	.get = snd_ice1712_pro_spdif_master_get,
+	.put = snd_ice1712_pro_spdif_master_put
 };
 
 /*
@@ -3028,19 +3028,19 @@ static int snd_ice1712_pro_route_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_el
 }
 
 static snd_kcontrol_new_t snd_ice1712_mixer_pro_analog_route __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "H/W Playback Route",
-	info: snd_ice1712_pro_route_info,
-	get: snd_ice1712_pro_route_analog_get,
-	put: snd_ice1712_pro_route_analog_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "H/W Playback Route",
+	.info = snd_ice1712_pro_route_info,
+	.get = snd_ice1712_pro_route_analog_get,
+	.put = snd_ice1712_pro_route_analog_put,
 };
 
 static snd_kcontrol_new_t snd_ice1712_mixer_pro_spdif_route __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "IEC958 Playback Route",
-	info: snd_ice1712_pro_route_info,
-	get: snd_ice1712_pro_route_spdif_get,
-	put: snd_ice1712_pro_route_spdif_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "IEC958 Playback Route",
+	.info = snd_ice1712_pro_route_info,
+	.get = snd_ice1712_pro_route_spdif_get,
+	.put = snd_ice1712_pro_route_spdif_put,
 };
 
 
@@ -3078,11 +3078,11 @@ static int snd_ice1712_pro_volume_rate_put(snd_kcontrol_t * kcontrol, snd_ctl_el
 }
 
 static snd_kcontrol_new_t snd_ice1712_mixer_pro_volume_rate __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Multi Track Volume Rate",
-	info: snd_ice1712_pro_volume_rate_info,
-	get: snd_ice1712_pro_volume_rate_get,
-	put: snd_ice1712_pro_volume_rate_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Multi Track Volume Rate",
+	.info = snd_ice1712_pro_volume_rate_info,
+	.get = snd_ice1712_pro_volume_rate_get,
+	.put = snd_ice1712_pro_volume_rate_put
 };
 
 static int snd_ice1712_pro_peak_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -3110,11 +3110,11 @@ static int snd_ice1712_pro_peak_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 }
 
 static snd_kcontrol_new_t snd_ice1712_mixer_pro_peak __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Multi Track Peak",
-	access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
-	info: snd_ice1712_pro_peak_info,
-	get: snd_ice1712_pro_peak_get
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Multi Track Peak",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
+	.info = snd_ice1712_pro_peak_info,
+	.get = snd_ice1712_pro_peak_get
 };
 
 /*
@@ -3166,21 +3166,21 @@ static int snd_ice1712_ewx_io_sense_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_
 }
 
 static snd_kcontrol_new_t snd_ice1712_ewx_input_sense __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Input Sensitivity Switch",
-	info: snd_ice1712_ewx_io_sense_info,
-	get: snd_ice1712_ewx_io_sense_get,
-	put: snd_ice1712_ewx_io_sense_put,
-	private_value: ICE1712_EWX2496_AIN_SEL,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Input Sensitivity Switch",
+	.info = snd_ice1712_ewx_io_sense_info,
+	.get = snd_ice1712_ewx_io_sense_get,
+	.put = snd_ice1712_ewx_io_sense_put,
+	.private_value = ICE1712_EWX2496_AIN_SEL,
 };
 
 static snd_kcontrol_new_t snd_ice1712_ewx_output_sense __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Output Sensitivity Switch",
-	info: snd_ice1712_ewx_io_sense_info,
-	get: snd_ice1712_ewx_io_sense_get,
-	put: snd_ice1712_ewx_io_sense_put,
-	private_value: ICE1712_EWX2496_AOUT_SEL,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Output Sensitivity Switch",
+	.info = snd_ice1712_ewx_io_sense_info,
+	.get = snd_ice1712_ewx_io_sense_get,
+	.put = snd_ice1712_ewx_io_sense_put,
+	.private_value = ICE1712_EWX2496_AOUT_SEL,
 };
 
 
@@ -3264,19 +3264,19 @@ static int snd_ice1712_ews88mt_input_sense_put(snd_kcontrol_t *kcontrol, snd_ctl
 }
 
 static snd_kcontrol_new_t snd_ice1712_ews88mt_input_sense __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Input Sensitivity Switch",
-	info: snd_ice1712_ewx_io_sense_info,
-	get: snd_ice1712_ews88mt_input_sense_get,
-	put: snd_ice1712_ews88mt_input_sense_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Input Sensitivity Switch",
+	.info = snd_ice1712_ewx_io_sense_info,
+	.get = snd_ice1712_ews88mt_input_sense_get,
+	.put = snd_ice1712_ews88mt_input_sense_put,
 };
 
 static snd_kcontrol_new_t snd_ice1712_ews88mt_output_sense __devinitdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Output Sensitivity Switch",
-	info: snd_ice1712_ewx_io_sense_info,
-	get: snd_ice1712_ews88mt_output_sense_get,
-	put: snd_ice1712_ews88mt_output_sense_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Output Sensitivity Switch",
+	.info = snd_ice1712_ewx_io_sense_info,
+	.get = snd_ice1712_ews88mt_output_sense_get,
+	.put = snd_ice1712_ews88mt_output_sense_put,
 };
 
 
@@ -3344,13 +3344,13 @@ static int snd_ice1712_ews88d_control_put(snd_kcontrol_t * kcontrol, snd_ctl_ele
 }
 
 #define EWS88D_CONTROL(xiface, xname, xshift, xinvert, xaccess) \
-{ iface: xiface,\
-  name: xname,\
-  access: xaccess,\
-  info: snd_ice1712_ews88d_control_info,\
-  get: snd_ice1712_ews88d_control_get,\
-  put: snd_ice1712_ews88d_control_put,\
-  private_value: xshift | (xinvert << 8),\
+{ .iface = xiface,\
+  .name = xname,\
+  .access = xaccess,\
+  .info = snd_ice1712_ews88d_control_info,\
+  .get = snd_ice1712_ews88d_control_get,\
+  .put = snd_ice1712_ews88d_control_put,\
+  .private_value = xshift | (xinvert << 8),\
 }
 
 static snd_kcontrol_new_t snd_ice1712_ews88d_controls[] __devinitdata = {
@@ -3442,13 +3442,13 @@ static int snd_ice1712_6fire_control_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 }
 
 #define DMX6FIRE_CONTROL(xiface, xname, xshift, xinvert, xaccess) \
-{ iface: xiface,\
-  name: xname,\
-  access: xaccess,\
-  info: snd_ice1712_6fire_control_info,\
-  get: snd_ice1712_6fire_control_get,\
-  put: snd_ice1712_6fire_control_put,\
-  private_value: xshift | (xinvert << 8),\
+{ .iface = xiface,\
+  .name = xname,\
+  .access = xaccess,\
+  .info = snd_ice1712_6fire_control_info,\
+  .get = snd_ice1712_6fire_control_get,\
+  .put = snd_ice1712_6fire_control_put,\
+  .private_value = xshift | (xinvert << 8),\
 }
 
 static snd_kcontrol_new_t snd_ice1712_6fire_led __devinitdata =
@@ -4123,7 +4123,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	ice1712_t *ice;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_ice1712_dev_free,
+		.dev_free =	snd_ice1712_dev_free,
 	};
 
 	*r_ice1712 = NULL;
@@ -4339,10 +4339,10 @@ static void __devexit snd_ice1712_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "ICE1712",
-	id_table: snd_ice1712_ids,
-	probe: snd_ice1712_probe,
-	remove: __devexit_p(snd_ice1712_remove),
+	.name = "ICE1712",
+	.id_table = snd_ice1712_ids,
+	.probe = snd_ice1712_probe,
+	.remove = __devexit_p(snd_ice1712_remove),
 };
 
 static int __init alsa_card_ice1712_init(void)

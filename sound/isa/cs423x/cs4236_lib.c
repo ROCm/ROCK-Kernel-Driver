@@ -366,10 +366,10 @@ int snd_cs4236_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
  */
 
 #define CS4236_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_single, \
-  .get = snd_cs4236_get_single, put: snd_cs4236_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+  .get = snd_cs4236_get_single, .put = snd_cs4236_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_cs4236_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -423,10 +423,10 @@ static int snd_cs4236_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define CS4236_SINGLEC(xname, xindex, reg, shift, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_single, \
-  .get = snd_cs4236_get_singlec, put: snd_cs4236_put_singlec, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+  .get = snd_cs4236_get_singlec, .put = snd_cs4236_put_singlec, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_cs4236_get_singlec(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
@@ -469,10 +469,10 @@ static int snd_cs4236_put_singlec(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define CS4236_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_double, \
-  .get = snd_cs4236_get_double, put: snd_cs4236_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+  .get = snd_cs4236_get_double, .put = snd_cs4236_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_cs4236_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -545,10 +545,10 @@ static int snd_cs4236_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define CS4236_DOUBLE1(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_double, \
-  .get = snd_cs4236_get_double1, put: snd_cs4236_put_double1, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+  .get = snd_cs4236_get_double1, .put = snd_cs4236_put_double1, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_cs4236_get_double1(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
@@ -604,10 +604,10 @@ static int snd_cs4236_put_double1(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define CS4236_MASTER_DIGITAL(xname, xindex) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_double, \
-  .get = snd_cs4236_get_master_digital, put: snd_cs4236_put_master_digital, \
-  private_value: 71 << 24 }
+  .get = snd_cs4236_get_master_digital, .put = snd_cs4236_put_master_digital, \
+  .private_value = 71 << 24 }
 
 static inline int snd_cs4236_mixer_master_digital_invert_volume(int vol)
 {
@@ -646,10 +646,10 @@ static int snd_cs4236_put_master_digital(snd_kcontrol_t * kcontrol, snd_ctl_elem
 }
 
 #define CS4235_OUTPUT_ACCU(xname, xindex) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_double, \
-  .get = snd_cs4235_get_output_accu, put: snd_cs4235_put_output_accu, \
-  private_value: 3 << 24 }
+  .get = snd_cs4235_get_output_accu, .put = snd_cs4235_put_output_accu, \
+  .private_value = 3 << 24 }
 
 static inline int snd_cs4235_mixer_output_accu_get_volume(int vol)
 {
@@ -807,10 +807,10 @@ CS4231_DOUBLE("Analog Loopback Switch", 0, CS4231_LEFT_INPUT, CS4231_RIGHT_INPUT
 };
 
 #define CS4236_IEC958_ENABLE(xname, xindex) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4236_info_single, \
-  .get = snd_cs4236_get_iec958_switch, put: snd_cs4236_put_iec958_switch, \
-  private_value: 1 << 16 }
+  .get = snd_cs4236_get_iec958_switch, .put = snd_cs4236_put_iec958_switch, \
+  .private_value = 1 << 16 }
 
 static int snd_cs4236_get_iec958_switch(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {

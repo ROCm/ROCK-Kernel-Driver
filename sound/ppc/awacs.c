@@ -164,11 +164,11 @@ static int snd_pmac_awacs_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 
 
 #define AWACS_VOLUME(xname, xreg, xshift) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = 0, \
   .info = snd_pmac_awacs_info_volume, \
   .get = snd_pmac_awacs_get_volume, \
   .put = snd_pmac_awacs_put_volume, \
-  private_value: (xreg) | ((xshift) << 8) }
+  .private_value = (xreg) | ((xshift) << 8) }
 
 /*
  * mute master/ogain for AWACS: mono
@@ -213,11 +213,11 @@ static int snd_pmac_awacs_put_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 }
 
 #define AWACS_SWITCH(xname, xreg, xshift, xinvert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = 0, \
   .info = snd_pmac_boolean_mono_info, \
   .get = snd_pmac_awacs_get_switch, \
   .put = snd_pmac_awacs_put_switch, \
-  private_value: (xreg) | ((xshift) << 8) | ((xinvert) << 16) }
+  .private_value = (xreg) | ((xshift) << 8) | ((xinvert) << 16) }
 
 
 #ifdef PMAC_AMP_AVAIL

@@ -91,20 +91,20 @@ static int snd_emu10k1_spdif_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_emu10k1_spdif_mask_control =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-        iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-        name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
-        info:           snd_emu10k1_spdif_info,
-        get:            snd_emu10k1_spdif_get_mask
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+        .name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
+        .info =         snd_emu10k1_spdif_info,
+        .get =          snd_emu10k1_spdif_get_mask
 };
 
 static snd_kcontrol_new_t snd_emu10k1_spdif_control =
 {
-        iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-        name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-        info:           snd_emu10k1_spdif_info,
-        get:            snd_emu10k1_spdif_get,
-        put:            snd_emu10k1_spdif_put
+        .iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+        .name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+        .info =         snd_emu10k1_spdif_info,
+        .get =          snd_emu10k1_spdif_get,
+        .put =          snd_emu10k1_spdif_put
 };
 
 
@@ -201,12 +201,12 @@ static int snd_emu10k1_send_routing_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_emu10k1_send_routing_control =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-        iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-        name:           "EMU10K1 PCM Send Routing",
-        info:           snd_emu10k1_send_routing_info,
-        get:            snd_emu10k1_send_routing_get,
-        put:            snd_emu10k1_send_routing_put
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+        .name =         "EMU10K1 PCM Send Routing",
+        .info =         snd_emu10k1_send_routing_info,
+        .get =          snd_emu10k1_send_routing_get,
+        .put =          snd_emu10k1_send_routing_put
 };
 
 static int snd_emu10k1_send_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -269,12 +269,12 @@ static int snd_emu10k1_send_volume_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_emu10k1_send_volume_control =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-        iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-        name:           "EMU10K1 PCM Send Volume",
-        info:           snd_emu10k1_send_volume_info,
-        get:            snd_emu10k1_send_volume_get,
-        put:            snd_emu10k1_send_volume_put
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+        .name =         "EMU10K1 PCM Send Volume",
+        .info =         snd_emu10k1_send_volume_info,
+        .get =          snd_emu10k1_send_volume_get,
+        .put =          snd_emu10k1_send_volume_put
 };
 
 static int snd_emu10k1_attn_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -331,12 +331,12 @@ static int snd_emu10k1_attn_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_emu10k1_attn_control =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-        iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-        name:           "EMU10K1 PCM Volume",
-        info:           snd_emu10k1_attn_info,
-        get:            snd_emu10k1_attn_get,
-        put:            snd_emu10k1_attn_put
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+        .name =         "EMU10K1 PCM Volume",
+        .info =         snd_emu10k1_attn_info,
+        .get =          snd_emu10k1_attn_get,
+        .put =          snd_emu10k1_attn_put
 };
 
 static int snd_emu10k1_shared_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -393,20 +393,20 @@ static int snd_emu10k1_shared_spdif_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_emu10k1_shared_spdif __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		"SB Live Analog/Digital Output Jack",
-	info:		snd_emu10k1_shared_spdif_info,
-	get:		snd_emu10k1_shared_spdif_get,
-	put:		snd_emu10k1_shared_spdif_put
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		"SB Live Analog/Digital Output Jack",
+	.info =		snd_emu10k1_shared_spdif_info,
+	.get =		snd_emu10k1_shared_spdif_get,
+	.put =		snd_emu10k1_shared_spdif_put
 };
 
 static snd_kcontrol_new_t snd_audigy_shared_spdif __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		"Audigy Analog/Digital Output Jack",
-	info:		snd_emu10k1_shared_spdif_info,
-	get:		snd_emu10k1_shared_spdif_get,
-	put:		snd_emu10k1_shared_spdif_put
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		"Audigy Analog/Digital Output Jack",
+	.info =		snd_emu10k1_shared_spdif_info,
+	.get =		snd_emu10k1_shared_spdif_get,
+	.put =		snd_emu10k1_shared_spdif_put
 };
 
 /*

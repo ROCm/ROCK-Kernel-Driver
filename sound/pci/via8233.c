@@ -577,41 +577,41 @@ static snd_pcm_uframes_t snd_via8233_capture_pointer(snd_pcm_substream_t * subst
 
 static snd_pcm_hardware_t snd_via8233_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			0,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		6,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	32,
-	period_bytes_max:	128 * 1024,
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		0,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		6,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	32,
+	.period_bytes_max =	128 * 1024,
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_via8233_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			0,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	32,
-	period_bytes_max:	128 * 1024,
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		0,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	32,
+	.period_bytes_max =	128 * 1024,
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static unsigned int channels[] = {
@@ -621,9 +621,9 @@ static unsigned int channels[] = {
 #define CHANNELS sizeof(channels) / sizeof(channels[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_channels = {
-	count: CHANNELS,
-	list: channels,
-	mask: 0,
+	.count = CHANNELS,
+	.list = channels,
+	.mask = 0,
 };
 
 static int snd_via8233_playback_open(snd_pcm_substream_t * substream)
@@ -698,31 +698,31 @@ static int snd_via8233_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_via8233_playback_ops = {
-	open:		snd_via8233_playback_open,
-	close:		snd_via8233_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_via8233_hw_params,
-	hw_free:	snd_via8233_hw_free,
-	prepare:	snd_via8233_playback_prepare,
-	trigger:	snd_via8233_playback_trigger,
-	pointer:	snd_via8233_playback_pointer,
-	copy:           snd_pcm_sgbuf_ops_copy_playback,
-	silence:        snd_pcm_sgbuf_ops_silence,
-	page:           snd_pcm_sgbuf_ops_page,
+	.open =		snd_via8233_playback_open,
+	.close =	snd_via8233_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_via8233_hw_params,
+	.hw_free =	snd_via8233_hw_free,
+	.prepare =	snd_via8233_playback_prepare,
+	.trigger =	snd_via8233_playback_trigger,
+	.pointer =	snd_via8233_playback_pointer,
+	.copy =		snd_pcm_sgbuf_ops_copy_playback,
+	.silence =	snd_pcm_sgbuf_ops_silence,
+	.page =		snd_pcm_sgbuf_ops_page,
 };
 
 static snd_pcm_ops_t snd_via8233_capture_ops = {
-	open:		snd_via8233_capture_open,
-	close:		snd_via8233_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_via8233_hw_params,
-	hw_free:	snd_via8233_hw_free,
-	prepare:	snd_via8233_capture_prepare,
-	trigger:	snd_via8233_capture_trigger,
-	pointer:	snd_via8233_capture_pointer,
-	copy:           snd_pcm_sgbuf_ops_copy_capture,
-	silence:        snd_pcm_sgbuf_ops_silence,
-	page:           snd_pcm_sgbuf_ops_page,
+	.open =		snd_via8233_capture_open,
+	.close =	snd_via8233_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_via8233_hw_params,
+	.hw_free =	snd_via8233_hw_free,
+	.prepare =	snd_via8233_capture_prepare,
+	.trigger =	snd_via8233_capture_trigger,
+	.pointer =	snd_via8233_capture_pointer,
+	.copy =		snd_pcm_sgbuf_ops_copy_capture,
+	.silence =	snd_pcm_sgbuf_ops_silence,
+	.page =		snd_pcm_sgbuf_ops_page,
 };
 
 static void snd_via8233_pcm_free(snd_pcm_t *pcm)
@@ -871,7 +871,7 @@ static int __devinit snd_via8233_create(snd_card_t * card,
 	via8233_t *chip;
 	int err;
         static snd_device_ops_t ops = {
-		dev_free:	snd_via8233_dev_free,
+		.dev_free =	snd_via8233_dev_free,
         };
 
 	if ((err = pci_enable_device(pci)) < 0)
@@ -991,10 +991,10 @@ static void __devexit snd_via8233_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "VIA 8233",
-	id_table: snd_via8233_ids,
-	probe: snd_via8233_probe,
-	remove: __devexit_p(snd_via8233_remove),
+	.name = "VIA 8233",
+	.id_table = snd_via8233_ids,
+	.probe = snd_via8233_probe,
+	.remove = __devexit_p(snd_via8233_remove),
 };
 
 static int __init alsa_card_via8233_init(void)

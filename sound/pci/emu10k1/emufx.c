@@ -739,15 +739,15 @@ static int snd_emu10k1_fx8010_playback_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_emu10k1_fx8010_playback_ops = {
-	open:			snd_emu10k1_fx8010_playback_open,
-	close:			snd_emu10k1_fx8010_playback_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_emu10k1_fx8010_playback_hw_params,
-	hw_free:		snd_emu10k1_fx8010_playback_hw_free,
-	prepare:		snd_emu10k1_fx8010_playback_prepare,
-	trigger:		snd_emu10k1_fx8010_playback_trigger,
-	copy:			snd_emu10k1_fx8010_playback_copy,
-	pointer:		snd_emu10k1_fx8010_playback_pointer,
+	.open =			snd_emu10k1_fx8010_playback_open,
+	.close =		snd_emu10k1_fx8010_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_emu10k1_fx8010_playback_hw_params,
+	.hw_free =		snd_emu10k1_fx8010_playback_hw_free,
+	.prepare =		snd_emu10k1_fx8010_playback_prepare,
+	.trigger =		snd_emu10k1_fx8010_playback_trigger,
+	.copy =			snd_emu10k1_fx8010_playback_copy,
+	.pointer =		snd_emu10k1_fx8010_playback_pointer,
 };
 
 static void snd_emu10k1_fx8010_pcm_free(snd_pcm_t *pcm)

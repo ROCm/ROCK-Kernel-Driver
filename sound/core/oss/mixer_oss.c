@@ -383,17 +383,17 @@ int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long a
 static struct file_operations snd_mixer_oss_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	open:		snd_mixer_oss_open,
-	release:	snd_mixer_oss_release,
-	ioctl:		snd_mixer_oss_ioctl,
+	.open =		snd_mixer_oss_open,
+	.release =	snd_mixer_oss_release,
+	.ioctl =	snd_mixer_oss_ioctl,
 };
 
 static snd_minor_t snd_mixer_oss_reg =
 {
-	comment:	"mixer",
-	f_ops:		&snd_mixer_oss_f_ops,
+	.comment =	"mixer",
+	.f_ops =	&snd_mixer_oss_f_ops,
 };
 
 /*

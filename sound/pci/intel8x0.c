@@ -617,43 +617,43 @@ static snd_pcm_uframes_t snd_intel8x0_capture_pointer(snd_pcm_substream_t * subs
 
 static snd_pcm_hardware_t snd_intel8x0_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			0,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	32,
-	period_bytes_max:	128 * 1024,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		0,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	32,
+	.period_bytes_max =	128 * 1024,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_intel8x0_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			0,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	32,
-	period_bytes_max:	128 * 1024,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		0,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	32,
+	.period_bytes_max =	128 * 1024,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static unsigned int channels4[] = {
@@ -663,9 +663,9 @@ static unsigned int channels4[] = {
 #define CHANNELS4 sizeof(channels4) / sizeof(channels4[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_channels4 = {
-	count: CHANNELS4,
-	list: channels4,
-	mask: 0,
+	.count = CHANNELS4,
+	.list = channels4,
+	.mask = 0,
 };
 
 static unsigned int channels6[] = {
@@ -675,9 +675,9 @@ static unsigned int channels6[] = {
 #define CHANNELS6 sizeof(channels6) / sizeof(channels6[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_channels6 = {
-	count: CHANNELS6,
-	list: channels6,
-	mask: 0,
+	.count = CHANNELS6,
+	.list = channels6,
+	.mask = 0,
 };
 
 static int snd_intel8x0_playback_open(snd_pcm_substream_t * substream)
@@ -748,25 +748,25 @@ static int snd_intel8x0_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_intel8x0_playback_ops = {
-	open:		snd_intel8x0_playback_open,
-	close:		snd_intel8x0_playback_close,
-	ioctl:		snd_intel8x0_playback_ioctl,
-	hw_params:	snd_intel8x0_hw_params,
-	hw_free:	snd_intel8x0_hw_free,
-	prepare:	snd_intel8x0_playback_prepare,
-	trigger:	snd_intel8x0_playback_trigger,
-	pointer:	snd_intel8x0_playback_pointer,
+	.open =		snd_intel8x0_playback_open,
+	.close =	snd_intel8x0_playback_close,
+	.ioctl =	snd_intel8x0_playback_ioctl,
+	.hw_params =	snd_intel8x0_hw_params,
+	.hw_free =	snd_intel8x0_hw_free,
+	.prepare =	snd_intel8x0_playback_prepare,
+	.trigger =	snd_intel8x0_playback_trigger,
+	.pointer =	snd_intel8x0_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_intel8x0_capture_ops = {
-	open:		snd_intel8x0_capture_open,
-	close:		snd_intel8x0_capture_close,
-	ioctl:		snd_intel8x0_capture_ioctl,
-	hw_params:	snd_intel8x0_hw_params,
-	hw_free:	snd_intel8x0_hw_free,
-	prepare:	snd_intel8x0_capture_prepare,
-	trigger:	snd_intel8x0_capture_trigger,
-	pointer:	snd_intel8x0_capture_pointer,
+	.open =		snd_intel8x0_capture_open,
+	.close =	snd_intel8x0_capture_close,
+	.ioctl =	snd_intel8x0_capture_ioctl,
+	.hw_params =	snd_intel8x0_hw_params,
+	.hw_free =	snd_intel8x0_hw_free,
+	.prepare =	snd_intel8x0_capture_prepare,
+	.trigger =	snd_intel8x0_capture_trigger,
+	.pointer =	snd_intel8x0_capture_pointer,
 };
 
 static void snd_intel8x0_pcm_free(snd_pcm_t *pcm)
@@ -855,22 +855,22 @@ static snd_pcm_uframes_t snd_intel8x0_capture_mic_pointer(snd_pcm_substream_t * 
 
 static snd_pcm_hardware_t snd_intel8x0_capture_mic =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			0,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		1,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	32,
-	period_bytes_max:	128 * 1024,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		0,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		1,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	32,
+	.period_bytes_max =	128 * 1024,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_intel8x0_capture_mic_open(snd_pcm_substream_t * substream)
@@ -901,14 +901,14 @@ static int snd_intel8x0_capture_mic_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_intel8x0_capture_mic_ops = {
-	open:		snd_intel8x0_capture_mic_open,
-	close:		snd_intel8x0_capture_mic_close,
-	ioctl:		snd_intel8x0_capture_mic_ioctl,
-	hw_params:	snd_intel8x0_hw_params,
-	hw_free:	snd_intel8x0_hw_free,
-	prepare:	snd_intel8x0_capture_mic_prepare,
-	trigger:	snd_intel8x0_capture_mic_trigger,
-	pointer:	snd_intel8x0_capture_mic_pointer,
+	.open =		snd_intel8x0_capture_mic_open,
+	.close =	snd_intel8x0_capture_mic_close,
+	.ioctl =	snd_intel8x0_capture_mic_ioctl,
+	.hw_params =	snd_intel8x0_hw_params,
+	.hw_free =	snd_intel8x0_hw_free,
+	.prepare =	snd_intel8x0_capture_mic_prepare,
+	.trigger =	snd_intel8x0_capture_mic_trigger,
+	.pointer =	snd_intel8x0_capture_mic_pointer,
 };
 
 static void snd_intel8x0_pcm_mic_free(snd_pcm_t *pcm)
@@ -1308,7 +1308,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	intel8x0_t *chip;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_intel8x0_dev_free,
+		.dev_free =	snd_intel8x0_dev_free,
 	};
 
 	*r_intel8x0 = NULL;
@@ -1510,7 +1510,7 @@ static void __devexit snd_intel8x0_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "Intel ICH",
+	.name = "Intel ICH",
 	id_table: snd_intel8x0_ids,
 	probe: snd_intel8x0_probe,
 	remove: __devexit_p(snd_intel8x0_remove),
@@ -1572,9 +1572,9 @@ static struct pci_device_id snd_intel8x0_joystick_ids[] __devinitdata = {
 };
 
 static struct pci_driver joystick_driver = {
-	name: "Intel ICH Joystick",
-	id_table: snd_intel8x0_joystick_ids,
-	probe: snd_intel8x0_joystick_probe,
+	.name = "Intel ICH Joystick",
+	.id_table = snd_intel8x0_joystick_ids,
+	.probe = snd_intel8x0_joystick_probe,
 };
 #endif
 

@@ -800,10 +800,10 @@ static int snd_es1688_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 }
 
 #define ES1688_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_es1688_info_single, \
-  .get = snd_es1688_get_single, put: snd_es1688_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+  .get = snd_es1688_get_single, .put = snd_es1688_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_es1688_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -859,10 +859,10 @@ static int snd_es1688_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define ES1688_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_es1688_info_double, \
-  .get = snd_es1688_get_double, put: snd_es1688_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+  .get = snd_es1688_get_double, .put = snd_es1688_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_es1688_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {

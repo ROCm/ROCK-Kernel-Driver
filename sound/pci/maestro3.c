@@ -1736,25 +1736,25 @@ snd_m3_capture_close(snd_pcm_substream_t *subs)
  */
 
 static snd_pcm_ops_t snd_m3_playback_ops = {
-	open:		snd_m3_playback_open,
-	close:		snd_m3_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_m3_pcm_hw_params,
-	hw_free:	snd_m3_pcm_hw_free,
-	prepare:	snd_m3_pcm_prepare,
-	trigger:	snd_m3_pcm_trigger,
-	pointer:	snd_m3_pcm_pointer,
+	.open =		snd_m3_playback_open,
+	.close =	snd_m3_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_m3_pcm_hw_params,
+	.hw_free =	snd_m3_pcm_hw_free,
+	.prepare =	snd_m3_pcm_prepare,
+	.trigger =	snd_m3_pcm_trigger,
+	.pointer =	snd_m3_pcm_pointer,
 };
 
 static snd_pcm_ops_t snd_m3_capture_ops = {
-	open:		snd_m3_capture_open,
-	close:		snd_m3_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_m3_pcm_hw_params,
-	hw_free:	snd_m3_pcm_hw_free,
-	prepare:	snd_m3_pcm_prepare,
-	trigger:	snd_m3_pcm_trigger,
-	pointer:	snd_m3_pcm_pointer,
+	.open =		snd_m3_capture_open,
+	.close =	snd_m3_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_m3_pcm_hw_params,
+	.hw_free =	snd_m3_pcm_hw_free,
+	.prepare =	snd_m3_pcm_prepare,
+	.trigger =	snd_m3_pcm_trigger,
+	.pointer =	snd_m3_pcm_pointer,
 };
 
 static int __devinit
@@ -2503,7 +2503,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	struct m3_quirk *quirk;
 	u16 subsystem_vendor, subsystem_device;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_m3_dev_free,
+		.dev_free =	snd_m3_dev_free,
 	};
 
 	*chip_ret = NULL;
@@ -2706,13 +2706,13 @@ static void __devexit snd_m3_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "Maestro3",
-	id_table: snd_m3_ids,
-	probe: snd_m3_probe,
-	remove: __devexit_p(snd_m3_remove),
+	.name = "Maestro3",
+	.id_table = snd_m3_ids,
+	.probe = snd_m3_probe,
+	.remove = __devexit_p(snd_m3_remove),
 #ifdef CONFIG_PM
-	suspend: snd_m3_suspend,
-	resume: snd_m3_resume,
+	.suspend = snd_m3_suspend,
+	.resume = snd_m3_resume,
 #endif
 };
 	

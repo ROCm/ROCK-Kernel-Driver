@@ -1246,44 +1246,44 @@ static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static snd_pcm_hardware_t snd_cs46xx_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED | 
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		(SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
+	.formats =		(SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE |
 				 SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_U16_BE),
-	.rates			= SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	.rate_min		= 5500,
-	.rate_max		= 48000,
-	.channels_min		= 1,
-	.channels_max		= 2,
-	.buffer_bytes_max	= (256 * 1024),
-	.period_bytes_min	= CS46XX_PERIOD_SIZE,
-	.period_bytes_max	= CS46XX_PERIOD_SIZE,
-	.periods_min		= CS46XX_FRAGS,
-	.periods_max		= 1024,
-	.fifo_size		= 0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5500,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(256 * 1024),
+	.period_bytes_min =	CS46XX_PERIOD_SIZE,
+	.period_bytes_max =	CS46XX_PERIOD_SIZE,
+	.periods_min =		CS46XX_FRAGS,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_cs46xx_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_RESUME),
-	.formats		= SNDRV_PCM_FMTBIT_S16_LE,
-	.rates			= SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	.rate_min		= 5500,
-	.rate_max		= 48000,
-	.channels_min		= 2,
-	.channels_max		= 2,
-	.buffer_bytes_max	= (256 * 1024),
-	.period_bytes_min	= CS46XX_PERIOD_SIZE,
-	.period_bytes_max	= CS46XX_PERIOD_SIZE,
-	.periods_min		= CS46XX_FRAGS,
-	.periods_max		= 1024,
-	.fifo_size		= 0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5500,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(256 * 1024),
+	.period_bytes_min =	CS46XX_PERIOD_SIZE,
+	.period_bytes_max =	CS46XX_PERIOD_SIZE,
+	.periods_min =		CS46XX_FRAGS,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static void snd_cs46xx_pcm_free_substream(snd_pcm_runtime_t *runtime)
@@ -1387,49 +1387,49 @@ static int snd_cs46xx_capture_close(snd_pcm_substream_t * substream)
 }
 
 snd_pcm_ops_t snd_cs46xx_playback_ops = {
-	.open			= snd_cs46xx_playback_open,
-	.close			= snd_cs46xx_playback_close,
-	.ioctl			= snd_pcm_lib_ioctl,
-	.hw_params		= snd_cs46xx_playback_hw_params,
-	.hw_free		= snd_cs46xx_playback_hw_free,
-	.prepare		= snd_cs46xx_playback_prepare,
-	.trigger		= snd_cs46xx_playback_trigger,
-	.pointer		= snd_cs46xx_playback_direct_pointer,
+	.open =			snd_cs46xx_playback_open,
+	.close =		snd_cs46xx_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_cs46xx_playback_hw_params,
+	.hw_free =		snd_cs46xx_playback_hw_free,
+	.prepare =		snd_cs46xx_playback_prepare,
+	.trigger =		snd_cs46xx_playback_trigger,
+	.pointer =		snd_cs46xx_playback_direct_pointer,
 };
 
 snd_pcm_ops_t snd_cs46xx_playback_indirect_ops = {
-	.open			= snd_cs46xx_playback_open,
-	.close			= snd_cs46xx_playback_close,
-	.ioctl			= snd_pcm_lib_ioctl,
-	.hw_params		= snd_cs46xx_playback_hw_params,
-	.hw_free		= snd_cs46xx_playback_hw_free,
-	.prepare		= snd_cs46xx_playback_prepare,
-	.trigger		= snd_cs46xx_playback_trigger,
-	.copy			= snd_cs46xx_playback_copy,
-	.pointer		= snd_cs46xx_playback_indirect_pointer,
+	.open =			snd_cs46xx_playback_open,
+	.close =		snd_cs46xx_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_cs46xx_playback_hw_params,
+	.hw_free =		snd_cs46xx_playback_hw_free,
+	.prepare =		snd_cs46xx_playback_prepare,
+	.trigger =		snd_cs46xx_playback_trigger,
+	.copy =			snd_cs46xx_playback_copy,
+	.pointer =		snd_cs46xx_playback_indirect_pointer,
 };
 
 snd_pcm_ops_t snd_cs46xx_capture_ops = {
-	.open			= snd_cs46xx_capture_open,
-	.close			= snd_cs46xx_capture_close,
-	.ioctl			= snd_pcm_lib_ioctl,
-	.hw_params		= snd_cs46xx_capture_hw_params,
-	.hw_free		= snd_cs46xx_capture_hw_free,
-	.prepare		= snd_cs46xx_capture_prepare,
-	.trigger		= snd_cs46xx_capture_trigger,
-	.pointer		= snd_cs46xx_capture_direct_pointer,
+	.open =			snd_cs46xx_capture_open,
+	.close =		snd_cs46xx_capture_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_cs46xx_capture_hw_params,
+	.hw_free =		snd_cs46xx_capture_hw_free,
+	.prepare =		snd_cs46xx_capture_prepare,
+	.trigger =		snd_cs46xx_capture_trigger,
+	.pointer =		snd_cs46xx_capture_direct_pointer,
 };
 
 snd_pcm_ops_t snd_cs46xx_capture_indirect_ops = {
-	.open			= snd_cs46xx_capture_open,
-	.close			= snd_cs46xx_capture_close,
-	.ioctl			= snd_pcm_lib_ioctl,
-	.hw_params		= snd_cs46xx_capture_hw_params,
-	.hw_free		= snd_cs46xx_capture_hw_free,
-	.prepare		= snd_cs46xx_capture_prepare,
-	.trigger		= snd_cs46xx_capture_trigger,
-	.copy			= snd_cs46xx_capture_copy,
-	.pointer		= snd_cs46xx_capture_indirect_pointer,
+	.open =			snd_cs46xx_capture_open,
+	.close =		snd_cs46xx_capture_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_cs46xx_capture_hw_params,
+	.hw_free =		snd_cs46xx_capture_hw_free,
+	.prepare =		snd_cs46xx_capture_prepare,
+	.trigger =		snd_cs46xx_capture_trigger,
+	.copy =			snd_cs46xx_capture_copy,
+	.pointer =		snd_cs46xx_capture_indirect_pointer,
 };
 
 static void snd_cs46xx_pcm_free(snd_pcm_t *pcm)
@@ -1768,103 +1768,103 @@ static int snd_cs46xx_egpio_put(snd_kcontrol_t *kcontrol,
 
 static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "DAC Volume",
-	info: snd_cs46xx_vol_info,
-	get: snd_cs46xx_vol_get,
-	put: snd_cs46xx_vol_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "DAC Volume",
+	.info = snd_cs46xx_vol_info,
+	.get = snd_cs46xx_vol_get,
+	.put = snd_cs46xx_vol_put,
 
 #ifndef CONFIG_SND_CS46XX_NEW_DSP
-	private_value: BA1_PVOL,
+	.private_value = BA1_PVOL,
 #else
-	private_value: (MASTERMIX_SCB_ADDR + 0xE) << 2,
+	.private_value = (MASTERMIX_SCB_ADDR + 0xE) << 2,
 #endif
 },
 
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "ADC Volume",
-	info: snd_cs46xx_vol_info,
-	get: snd_cs46xx_vol_get,
-	put: snd_cs46xx_vol_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "ADC Volume",
+	.info = snd_cs46xx_vol_info,
+	.get = snd_cs46xx_vol_get,
+	.put = snd_cs46xx_vol_put,
 #ifndef CONFIG_SND_CS46XX_NEW_DSP
-	private_value: BA1_CVOL,
+	.private_value = BA1_CVOL,
 #else
-	private_value: (VARIDECIMATE_SCB_ADDR + 0xE) << 2,
+	.private_value = (VARIDECIMATE_SCB_ADDR + 0xE) << 2,
 #endif
 },
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "ADC Capture Switch",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_adc_capture_get,
-	put: snd_cs46xx_adc_capture_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "ADC Capture Switch",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_adc_capture_get,
+	.put = snd_cs46xx_adc_capture_put
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "DAC Capture Switch",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_pcm_capture_get,
-	put: snd_cs46xx_pcm_capture_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "DAC Capture Switch",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_pcm_capture_get,
+	.put = snd_cs46xx_pcm_capture_put
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "IEC 958 Output Switch",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_iec958_get,
-	put: snd_cs46xx_iec958_put,
-	private_value: CS46XX_MIXER_SPDIF_OUTPUT_ELEMENT,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "IEC 958 Output Switch",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_iec958_get,
+	.put = snd_cs46xx_iec958_put,
+	.private_value = CS46XX_MIXER_SPDIF_OUTPUT_ELEMENT,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "IEC 958 Input Switch",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_iec958_get,
-	put: snd_cs46xx_iec958_put,
-    private_value: CS46XX_MIXER_SPDIF_INPUT_ELEMENT,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "IEC 958 Input Switch",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_iec958_get,
+	.put = snd_cs46xx_iec958_put,
+    .private_value = CS46XX_MIXER_SPDIF_INPUT_ELEMENT,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "IEC 958 Input Volume",
-	info: snd_cs46xx_vol_info,
-	get: snd_cs46xx_vol_get,
-	put: snd_cs46xx_vol_put,
-	private_value: (ASYNCRX_SCB_ADDR + 0xE) << 2,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "IEC 958 Input Volume",
+	.info = snd_cs46xx_vol_info,
+	.get = snd_cs46xx_vol_get,
+	.put = snd_cs46xx_vol_put,
+	.private_value = (ASYNCRX_SCB_ADDR + 0xE) << 2,
 },
 #endif
 #ifdef CONFIG_SND_CS46XX_DEBUG_GPIO
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "EGPIO select",
-	info: snd_cs46xx_egpio_select_info,
-	get: snd_cs46xx_egpio_select_get,
-	put: snd_cs46xx_egpio_select_put,
-	private_value: 0,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "EGPIO select",
+	.info = snd_cs46xx_egpio_select_info,
+	.get = snd_cs46xx_egpio_select_get,
+	.put = snd_cs46xx_egpio_select_put,
+	.private_value = 0,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "EGPIO Input/Output",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_egpio_get,
-	put: snd_cs46xx_egpio_put,
-	private_value: BA0_EGPIODR,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "EGPIO Input/Output",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_egpio_get,
+	.put = snd_cs46xx_egpio_put,
+	.private_value = BA0_EGPIODR,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "EGPIO CMOS/Open drain",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_egpio_get,
-	put: snd_cs46xx_egpio_put,
-	private_value: BA0_EGPIOPTR,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "EGPIO CMOS/Open drain",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_egpio_get,
+	.put = snd_cs46xx_egpio_put,
+	.private_value = BA0_EGPIOPTR,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "EGPIO On/Off",
-	info: snd_mixer_boolean_info,
-	get: snd_cs46xx_egpio_get,
-	put: snd_cs46xx_egpio_put,
-	private_value: BA0_EGPIOSR,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "EGPIO On/Off",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_egpio_get,
+	.put = snd_cs46xx_egpio_put,
+	.private_value = BA0_EGPIOSR,
 },
 #endif
 };
@@ -1873,11 +1873,11 @@ static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 /* Only available on the Hercules Game Theater XP soundcard */
 static snd_kcontrol_new_t snd_hercules_controls[] __devinitdata = {
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Optical/Coaxial SPDIF Input Switch",
-	info: snd_mixer_boolean_info,
-	get: snd_herc_spdif_select_get,
-	put: snd_herc_spdif_select_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Optical/Coaxial SPDIF Input Switch",
+	.info = snd_mixer_boolean_info,
+	.get = snd_herc_spdif_select_get,
+	.put = snd_herc_spdif_select_put,
 },
 };
 #endif
@@ -2125,16 +2125,16 @@ static void snd_cs46xx_midi_output_trigger(snd_rawmidi_substream_t * substream, 
 
 static snd_rawmidi_ops_t snd_cs46xx_midi_output =
 {
-	.open           = snd_cs46xx_midi_output_open,
-	.close          = snd_cs46xx_midi_output_close,
-	.trigger        = snd_cs46xx_midi_output_trigger,
+	.open =		snd_cs46xx_midi_output_open,
+	.close =	snd_cs46xx_midi_output_close,
+	.trigger =	snd_cs46xx_midi_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_cs46xx_midi_input =
 {
-	.open           = snd_cs46xx_midi_input_open,
-	.close          = snd_cs46xx_midi_input_close,
-	.trigger        = snd_cs46xx_midi_input_trigger,
+	.open =		snd_cs46xx_midi_input_open,
+	.close =	snd_cs46xx_midi_input_close,
+	.trigger =	snd_cs46xx_midi_input_trigger,
 };
 
 int __devinit snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rrawmidi)
@@ -3171,7 +3171,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	struct cs_card_type *cp;
 	u16 ss_card, ss_vendor;
 	static snd_device_ops_t ops = {
-		.dev_free	= snd_cs46xx_dev_free,
+		.dev_free =	snd_cs46xx_dev_free,
 	};
 	
 	*rchip = NULL;

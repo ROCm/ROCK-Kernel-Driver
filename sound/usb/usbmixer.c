@@ -572,11 +572,11 @@ static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 }
 
 static snd_kcontrol_new_t usb_feature_unit_ctl = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "", /* will be filled later manually */
-	info: mixer_ctl_feature_info,
-	get: mixer_ctl_feature_get,
-	put: mixer_ctl_feature_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "", /* will be filled later manually */
+	.info = mixer_ctl_feature_info,
+	.get = mixer_ctl_feature_get,
+	.put = mixer_ctl_feature_put,
 };
 
 
@@ -865,11 +865,11 @@ static int mixer_ctl_procunit_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 
 /* alsa control interface for processing/extension unit */
 static snd_kcontrol_new_t mixer_procunit_ctl = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "", /* will be filled later */
-	info: mixer_ctl_feature_info,
-	get: mixer_ctl_procunit_get,
-	put: mixer_ctl_procunit_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "", /* will be filled later */
+	.info = mixer_ctl_feature_info,
+	.get = mixer_ctl_procunit_get,
+	.put = mixer_ctl_procunit_put,
 };
 
 
@@ -1095,11 +1095,11 @@ static int mixer_ctl_selector_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 
 /* alsa control interface for selector unit */
 static snd_kcontrol_new_t mixer_selectunit_ctl = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "", /* will be filled later */
-	info: mixer_ctl_selector_info,
-	get: mixer_ctl_selector_get,
-	put: mixer_ctl_selector_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "", /* will be filled later */
+	.info = mixer_ctl_selector_info,
+	.get = mixer_ctl_selector_get,
+	.put = mixer_ctl_selector_put,
 };
 
 

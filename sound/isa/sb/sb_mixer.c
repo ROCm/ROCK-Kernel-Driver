@@ -65,7 +65,7 @@ unsigned char snd_sbmixer_read(sb_t *chip, unsigned char reg)
   .name = xname, \
   .info = snd_sbmixer_info_single, \
   .get = snd_sbmixer_get_single, put: snd_sbmixer_put_single, \
-  private_value: reg | (shift << 16) | (mask << 24) }
+  .private_value = reg | (shift << 16) | (mask << 24) }
 
 static int snd_sbmixer_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -124,7 +124,7 @@ static int snd_sbmixer_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
   .name = xname, \
   .info = snd_sbmixer_info_double, \
   .get = snd_sbmixer_get_double, put: snd_sbmixer_put_double, \
-  private_value: left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) }
+  .private_value = left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) }
 
 static int snd_sbmixer_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -367,7 +367,7 @@ static int snd_sb8mixer_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
   .name = xname, \
   .info = snd_sb16mixer_info_input_sw, \
   .get = snd_sb16mixer_get_input_sw, put: snd_sb16mixer_put_input_sw, \
-  private_value: reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
+  .private_value = reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
 
 static int snd_sb16mixer_info_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -529,11 +529,11 @@ SB_DOUBLE("Line Playback Switch", SB_DT019X_OUTPUT_SW1, SB_DT019X_OUTPUT_SW1, 4,
 SB_DOUBLE("PCM Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 2,1, 1),
 SB_DOUBLE("Synth Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 4,3, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_dt019x_input_sw_info,
-	get: snd_dt019x_input_sw_get,
-	put: snd_dt019x_input_sw_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_dt019x_input_sw_info,
+	.get = snd_dt019x_input_sw_get,
+	.put = snd_dt019x_input_sw_put,
 },
 };
 

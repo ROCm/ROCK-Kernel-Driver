@@ -494,13 +494,13 @@ static snd_kcontrol_new_t tumbler_mixers[] __initdata = {
 	  .name = "Master Playback Volume",
 	  .info = tumbler_info_master_volume,
 	  .get = tumbler_get_master_volume,
-	  put: tumbler_put_master_volume
+	  .put = tumbler_put_master_volume
 	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "Master Playback Switch",
 	  .info = snd_pmac_boolean_stereo_info,
 	  .get = tumbler_get_master_switch,
-	  put: tumbler_put_master_switch
+	  .put = tumbler_put_master_switch
 	},
 	DEFINE_MONO("Tone Control - Bass", bass),
 	DEFINE_MONO("Tone Control - Treble", treble),
@@ -510,13 +510,13 @@ static snd_kcontrol_new_t tumbler_mixers[] __initdata = {
 	  .name = "DRC Switch",
 	  .info = snd_pmac_boolean_mono_info,
 	  .get = tumbler_get_drc_switch,
-	  put: tumbler_put_drc_switch
+	  .put = tumbler_put_drc_switch
 	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "DRC Range",
 	  .info = tumbler_info_drc_value,
 	  .get = tumbler_get_drc_value,
-	  put: tumbler_put_drc_value
+	  .put = tumbler_put_drc_value
 	},
 };
 

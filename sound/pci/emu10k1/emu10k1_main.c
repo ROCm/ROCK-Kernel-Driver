@@ -535,7 +535,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	int err;
 	int is_audigy;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_emu10k1_dev_free,
+		.dev_free =	snd_emu10k1_dev_free,
 	};
 	
 	*remu = NULL;

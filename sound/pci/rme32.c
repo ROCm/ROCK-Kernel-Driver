@@ -284,7 +284,7 @@ static int snd_rme32_capture_copy(snd_pcm_substream_t * substream, int channel,	
  * Digital output capabilites (S/PDIF)
  */
 static snd_pcm_hardware_t snd_rme32_playback_spdif_info = {
-	info:		(SNDRV_PCM_INFO_MMAP |
+	.info =		(SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_INTERLEAVED | 
 			 SNDRV_PCM_INFO_PAUSE),
@@ -309,7 +309,7 @@ static snd_pcm_hardware_t snd_rme32_playback_spdif_info = {
  * Digital input capabilites (S/PDIF)
  */
 static snd_pcm_hardware_t snd_rme32_capture_spdif_info = {
-	info:		(SNDRV_PCM_INFO_MMAP |
+	.info =		(SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_PAUSE),
 	formats:	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE),
@@ -332,7 +332,7 @@ static snd_pcm_hardware_t snd_rme32_capture_spdif_info = {
  */
 static snd_pcm_hardware_t snd_rme32_playback_adat_info =
 {
-	info:		     (SNDRV_PCM_INFO_MMAP |
+	.info =		     (SNDRV_PCM_INFO_MMAP |
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
@@ -356,7 +356,7 @@ static snd_pcm_hardware_t snd_rme32_playback_adat_info =
  */
 static snd_pcm_hardware_t snd_rme32_capture_adat_info =
 {
-	info:		     (SNDRV_PCM_INFO_MMAP |
+	.info =		     (SNDRV_PCM_INFO_MMAP |
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
@@ -793,9 +793,9 @@ static unsigned int period_bytes[] = { RME32_BLOCK_SIZE };
 #define PERIOD_BYTES sizeof(period_bytes) / sizeof(period_bytes[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_period_bytes = {
-	count:PERIOD_BYTES,
-	list:period_bytes,
-	mask:0
+	.count = PERIOD_BYTES,
+	.list = period_bytes,
+	.mask = 0
 };
 
 static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
@@ -1142,53 +1142,53 @@ snd_rme32_capture_pointer(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_rme32_playback_spdif_ops = {
-	open:		snd_rme32_playback_spdif_open,
-	close:		snd_rme32_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_rme32_playback_hw_params,
-	hw_free:	snd_rme32_playback_hw_free,
-	prepare:	snd_rme32_playback_prepare,
-	trigger:	snd_rme32_playback_trigger,
-	pointer:	snd_rme32_playback_pointer,
-	copy:		snd_rme32_playback_copy,
-	silence:	snd_rme32_playback_silence,
+	.open =		snd_rme32_playback_spdif_open,
+	.close =	snd_rme32_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_rme32_playback_hw_params,
+	.hw_free =	snd_rme32_playback_hw_free,
+	.prepare =	snd_rme32_playback_prepare,
+	.trigger =	snd_rme32_playback_trigger,
+	.pointer =	snd_rme32_playback_pointer,
+	.copy =		snd_rme32_playback_copy,
+	.silence =	snd_rme32_playback_silence,
 };
 
 static snd_pcm_ops_t snd_rme32_capture_spdif_ops = {
-	open:		snd_rme32_capture_spdif_open,
-	close:		snd_rme32_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_rme32_capture_hw_params,
-	hw_free:	snd_rme32_capture_hw_free,
-	prepare:	snd_rme32_capture_prepare,
-	trigger:	snd_rme32_capture_trigger,
-	pointer:	snd_rme32_capture_pointer,
-	copy:		snd_rme32_capture_copy,
+	.open =		snd_rme32_capture_spdif_open,
+	.close =	snd_rme32_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_rme32_capture_hw_params,
+	.hw_free =	snd_rme32_capture_hw_free,
+	.prepare =	snd_rme32_capture_prepare,
+	.trigger =	snd_rme32_capture_trigger,
+	.pointer =	snd_rme32_capture_pointer,
+	.copy =		snd_rme32_capture_copy,
 };
 
 static snd_pcm_ops_t snd_rme32_playback_adat_ops = {
-	open:		snd_rme32_playback_adat_open,
-	close:		snd_rme32_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_rme32_playback_hw_params,
-	hw_free:	snd_rme32_playback_hw_free,
-	prepare:	snd_rme32_playback_prepare,
-	trigger:	snd_rme32_playback_trigger,
-	pointer:	snd_rme32_playback_pointer,
-	copy:		snd_rme32_playback_copy,
-	silence:	snd_rme32_playback_silence,
+	.open =		snd_rme32_playback_adat_open,
+	.close =	snd_rme32_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_rme32_playback_hw_params,
+	.hw_free =	snd_rme32_playback_hw_free,
+	.prepare =	snd_rme32_playback_prepare,
+	.trigger =	snd_rme32_playback_trigger,
+	.pointer =	snd_rme32_playback_pointer,
+	.copy =		snd_rme32_playback_copy,
+	.silence =	snd_rme32_playback_silence,
 };
 
 static snd_pcm_ops_t snd_rme32_capture_adat_ops = {
-	open:		snd_rme32_capture_adat_open,
-	close:		snd_rme32_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_rme32_capture_hw_params,
-	hw_free:	snd_rme32_capture_hw_free,
-	prepare:	snd_rme32_capture_prepare,
-	trigger:	snd_rme32_capture_trigger,
-	pointer:	snd_rme32_capture_pointer,
-	copy:		snd_rme32_capture_copy,
+	.open =		snd_rme32_capture_adat_open,
+	.close =	snd_rme32_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_rme32_capture_hw_params,
+	.hw_free =	snd_rme32_capture_hw_free,
+	.prepare =	snd_rme32_capture_prepare,
+	.trigger =	snd_rme32_capture_trigger,
+	.pointer =	snd_rme32_capture_pointer,
+	.copy =		snd_rme32_capture_copy,
 };
 
 static void snd_rme32_free(void *private_data)
@@ -1760,56 +1760,56 @@ static int snd_rme32_control_spdif_mask_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_rme32_controls[] = {
 	{
-		iface:	SNDRV_CTL_ELEM_IFACE_PCM,
-		name:	SNDRV_CTL_NAME_IEC958("", PLAYBACK, DEFAULT),
-		info:	snd_rme32_control_spdif_info,
-		get:	snd_rme32_control_spdif_get,
-		put:	snd_rme32_control_spdif_put
+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =	SNDRV_CTL_NAME_IEC958("", PLAYBACK, DEFAULT),
+		.info =	snd_rme32_control_spdif_info,
+		.get =	snd_rme32_control_spdif_get,
+		.put =	snd_rme32_control_spdif_put
 	},
 	{
-		access:	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-		iface:	SNDRV_CTL_ELEM_IFACE_PCM,
-		name:	SNDRV_CTL_NAME_IEC958("", PLAYBACK, PCM_STREAM),
-		info:	snd_rme32_control_spdif_stream_info,
-		get:	snd_rme32_control_spdif_stream_get,
-		put:	snd_rme32_control_spdif_stream_put
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =	SNDRV_CTL_NAME_IEC958("", PLAYBACK, PCM_STREAM),
+		.info =	snd_rme32_control_spdif_stream_info,
+		.get =	snd_rme32_control_spdif_stream_get,
+		.put =	snd_rme32_control_spdif_stream_put
 	},
 	{
-		access:	SNDRV_CTL_ELEM_ACCESS_READ,
-		iface:	SNDRV_CTL_ELEM_IFACE_MIXER,
-		name:	SNDRV_CTL_NAME_IEC958("", PLAYBACK, CON_MASK),
-		info:	snd_rme32_control_spdif_mask_info,
-		get:	snd_rme32_control_spdif_mask_get,
-		private_value:	IEC958_AES0_PROFESSIONAL | IEC958_AES0_CON_EMPHASIS
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name =	SNDRV_CTL_NAME_IEC958("", PLAYBACK, CON_MASK),
+		.info =	snd_rme32_control_spdif_mask_info,
+		.get =	snd_rme32_control_spdif_mask_get,
+		.private_value = IEC958_AES0_PROFESSIONAL | IEC958_AES0_CON_EMPHASIS
 	},
 	{
-		access:	SNDRV_CTL_ELEM_ACCESS_READ,
-		iface:	SNDRV_CTL_ELEM_IFACE_MIXER,
-		name:	SNDRV_CTL_NAME_IEC958("", PLAYBACK, PRO_MASK),
-		info:	snd_rme32_control_spdif_mask_info,
-		get:	snd_rme32_control_spdif_mask_get,
-		private_value:	IEC958_AES0_PROFESSIONAL | IEC958_AES0_PRO_EMPHASIS
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name =	SNDRV_CTL_NAME_IEC958("", PLAYBACK, PRO_MASK),
+		.info =	snd_rme32_control_spdif_mask_info,
+		.get =	snd_rme32_control_spdif_mask_get,
+		.private_value = IEC958_AES0_PROFESSIONAL | IEC958_AES0_PRO_EMPHASIS
 	},
 	{
-		iface:	SNDRV_CTL_ELEM_IFACE_PCM,
-		name:	"Input Connector",
-		info:	snd_rme32_info_inputtype_control,
-		get:	snd_rme32_get_inputtype_control,
-		put:	snd_rme32_put_inputtype_control
+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =	"Input Connector",
+		.info =	snd_rme32_info_inputtype_control,
+		.get =	snd_rme32_get_inputtype_control,
+		.put =	snd_rme32_put_inputtype_control
 	},
 	{
-		iface:	SNDRV_CTL_ELEM_IFACE_PCM,
-		name:	"Loopback Input",
-		info:	snd_rme32_info_loopback_control,
-		get:	snd_rme32_get_loopback_control,
-		put:	snd_rme32_put_loopback_control
+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =	"Loopback Input",
+		.info =	snd_rme32_info_loopback_control,
+		.get =	snd_rme32_get_loopback_control,
+		.put =	snd_rme32_put_loopback_control
 	},
 	{
-		iface:	SNDRV_CTL_ELEM_IFACE_PCM,
-		name:	"Clock Mode",
-		info:	snd_rme32_info_clockmode_control,
-		get:	snd_rme32_get_clockmode_control,
-		put:	snd_rme32_put_clockmode_control
+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =	"Clock Mode",
+		.info =	snd_rme32_info_clockmode_control,
+		.get =	snd_rme32_get_clockmode_control,
+		.put =	snd_rme32_put_clockmode_control
 	}
 };
 
@@ -1898,10 +1898,10 @@ static void __devexit snd_rme32_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name:		"RME Digi32",
-	id_table:	snd_rme32_ids,
-	probe:		snd_rme32_probe,
-	remove:		__devexit_p(snd_rme32_remove),
+	.name =		"RME Digi32",
+	.id_table =	snd_rme32_ids,
+	.probe =	snd_rme32_probe,
+	.remove =	__devexit_p(snd_rme32_remove),
 };
 
 static int __init alsa_card_rme32_init(void)

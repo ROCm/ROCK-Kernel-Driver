@@ -2506,7 +2506,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 	cmipci_t *cm;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_cmipci_dev_free,
+		.dev_free =	snd_cmipci_dev_free,
 	};
 	unsigned int val = 0;
 	int pcm_index, pcm_spdif_index;
