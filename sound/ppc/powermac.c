@@ -104,7 +104,7 @@ static int __init snd_pmac_probe(void)
 		sprintf(card->shortname, "PowerMac %s", name_ext);
 		sprintf(card->longname, "%s (Dev %d) Sub-frame %d",
 			card->shortname, chip->device_id, chip->subframe);
-		if ((err = snd_pmac_tumbler_init(chip)) < 0)
+		if ( snd_pmac_tumbler_init(chip) < 0 || snd_pmac_tumbler_post_init() < 0)
 			goto __error;
 		break;
 	case PMAC_AWACS:

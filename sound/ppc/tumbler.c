@@ -684,6 +684,8 @@ static int tumbler_put_mute_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 
 static int snapper_set_capture_source(pmac_tumbler_t *mix)
 {
+	if (! mix->i2c.client)
+		return -ENODEV;
 	return snd_pmac_keywest_write_byte(&mix->i2c, TAS_REG_ACS,
 					   mix->capture_source ? 2 : 0);
 }
