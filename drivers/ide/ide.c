@@ -763,17 +763,12 @@ static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 void ide_unregister(unsigned int index)
 {
 	ide_drive_t *drive;
-	ide_hwif_t *hwif, *g, *tmp_hwif;
+	ide_hwif_t *hwif, *g;
+	static ide_hwif_t tmp_hwif; /* protected by ide_cfg_sem */
 	ide_hwgroup_t *hwgroup;
 	int irq_count = 0, unit, i;
 
 	BUG_ON(index >= MAX_HWIFS);
-
-	tmp_hwif = kmalloc(sizeof(*tmp_hwif), GFP_KERNEL|__GFP_NOFAIL);
-	if (!tmp_hwif) {
-		printk(KERN_ERR "%s: unable to allocate memory\n", __FUNCTION__);
-		return;
-	}
 
 	BUG_ON(in_interrupt());
 	BUG_ON(irqs_disabled());
@@ -921,19 +916,17 @@ void ide_unregister(unsigned int index)
 	}
 
 	/* copy original settings */
-	*tmp_hwif = *hwif;
+	tmp_hwif = *hwif;
 
 	/* restore hwif data to pristine status */
 	init_hwif_data(hwif, index);
 	init_hwif_default(hwif, index);
 
-	ide_hwif_restore(hwif, tmp_hwif);
+	ide_hwif_restore(hwif, &tmp_hwif);
 
 abort:
 	spin_unlock_irq(&ide_lock);
 	up(&ide_cfg_sem);
-
-	kfree(tmp_hwif);
 }
 
 EXPORT_SYMBOL(ide_unregister);
