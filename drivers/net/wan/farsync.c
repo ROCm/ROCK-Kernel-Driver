@@ -328,7 +328,7 @@ struct buf_window {
 /*      Per port (line or channel) information
  */
 struct fst_port_info {
-        hdlc_device             hdlc;   /* HDLC device struct - must be first */
+        struct net_device      *dev;
         struct fst_card_info   *card;   /* Card we're associated with */
         int                     index;  /* Port index on the card */
         int                     hwif;   /* Line hardware (lineInterface copy) */
@@ -357,9 +357,8 @@ struct fst_card_info {
 };
 
 /* Convert an HDLC device pointer into a port info pointer and similar */
-#define hdlc_to_port(H) ((struct fst_port_info *)(H))
-#define dev_to_port(D)  hdlc_to_port(dev_to_hdlc(D))
-#define port_to_dev(P)  hdlc_to_dev(&(P)->hdlc)
+#define dev_to_port(D)  (dev_to_hdlc(D)->priv)
+#define port_to_dev(P)  ((P)->dev)
 
 
 /*
@@ -1454,53 +1453,25 @@ fst_init_card ( struct fst_card_info *card )
 {
         int i;
         int err;
-        struct net_device *dev;
 
         /* We're working on a number of ports based on the card ID. If the
          * firmware detects something different later (should never happen)
          * we'll have to revise it in some way then.
          */
-        for ( i = 0 ; i < card->nports ; i++ )
-        {
-		hdlc_device *hdlc;
-                card->ports[i].card   = card;
-                card->ports[i].index  = i;
-                card->ports[i].run    = 0;
-
-                dev = port_to_dev(&card->ports[i]);
-		hdlc = dev_to_hdlc(dev);
-
-                /* Fill in the net device info */
-                                /* Since this is a PCI setup this is purely
-                                 * informational. Give them the buffer addresses
-                                 * and basic card I/O.
-                                 */
-                dev->mem_start   = card->phys_mem
-                                 + BUF_OFFSET ( txBuffer[i][0][0]);
-                dev->mem_end     = card->phys_mem
-                                 + BUF_OFFSET ( txBuffer[i][NUM_TX_BUFFER][0]);
-                dev->base_addr   = card->pci_conf;
-                dev->irq         = card->irq;
-
-                dev->tx_queue_len          = FST_TX_QUEUE_LEN;
-                dev->open                  = fst_open;
-                dev->stop                  = fst_close;
-                dev->do_ioctl              = fst_ioctl;
-                dev->watchdog_timeo        = FST_TX_TIMEOUT;
-                dev->tx_timeout            = fst_tx_timeout;
-                hdlc->attach = fst_attach;
-                hdlc->xmit   = fst_start_xmit;
-
-                if (( err = register_hdlc_device(dev)) < 0 )
-                {
+        for ( i = 0 ; i < card->nports ; i++ ) {
+                err = register_hdlc_device(card->ports[i].dev);
+                if (err < 0) {
+			int j;
                         printk_err ("Cannot register HDLC device for port %d"
                                     " (errno %d)\n", i, -err );
+			for (j = i; j < card->nports; j++) {
+				free_hdlcdev(card->ports[j].dev);
+				card->ports[j].dev = NULL;
+			}
                         card->nports = i;
                         break;
                 }
         }
-
-        spin_lock_init ( &card->card_lock );
 
         printk ( KERN_INFO "%s-%s: %s IRQ%d, %d ports\n",
                         port_to_dev(&card->ports[0])->name,
@@ -1519,6 +1490,7 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
         static int firsttime_done = 0;
         struct fst_card_info *card;
         int err = 0;
+	int i;
 
         if ( ! firsttime_done )
         {
@@ -1555,6 +1527,46 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
 
         card->state       = FST_UNINIT;
 
+        spin_lock_init ( &card->card_lock );
+
+        for ( i = 0 ; i < card->nports ; i++ ) {
+		struct net_device *dev = alloc_hdlcdev(&card->ports[i]);
+		hdlc_device *hdlc;
+		if (!dev) {
+			while (i--)
+				free_hdlcdev(card->ports[i].dev);
+			printk_err ("FarSync: out of memory\n");
+			goto error_free_card;
+		}
+		card->ports[i].dev    = dev;
+                card->ports[i].card   = card;
+                card->ports[i].index  = i;
+                card->ports[i].run    = 0;
+
+		hdlc = dev_to_hdlc(dev);
+
+                /* Fill in the net device info */
+		/* Since this is a PCI setup this is purely
+		 * informational. Give them the buffer addresses
+		 * and basic card I/O.
+		 */
+                dev->mem_start   = card->phys_mem
+                                 + BUF_OFFSET ( txBuffer[i][0][0]);
+                dev->mem_end     = card->phys_mem
+                                 + BUF_OFFSET ( txBuffer[i][NUM_TX_BUFFER][0]);
+                dev->base_addr   = card->pci_conf;
+                dev->irq         = card->irq;
+
+                dev->tx_queue_len          = FST_TX_QUEUE_LEN;
+                dev->open                  = fst_open;
+                dev->stop                  = fst_close;
+                dev->do_ioctl              = fst_ioctl;
+                dev->watchdog_timeo        = FST_TX_TIMEOUT;
+                dev->tx_timeout            = fst_tx_timeout;
+                hdlc->attach = fst_attach;
+                hdlc->xmit   = fst_start_xmit;
+	}
+
         dbg ( DBG_PCI,"type %d nports %d irq %d\n", card->type,
                         card->nports, card->irq );
         dbg ( DBG_PCI,"conf %04x mem %08x ctlmem %08x\n",
@@ -1566,7 +1578,7 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
                 printk_err ("Unable to get config I/O @ 0x%04X\n",
                                                 card->pci_conf );
                 err = -ENODEV;
-                goto error_free_card;
+                goto error_free_ports;
         }
         if ( ! request_mem_region ( card->phys_mem, FST_MEMSIZE,"Shared RAM"))
         {
@@ -1637,6 +1649,9 @@ error_release_mem:
 error_release_io:
         release_region ( card->pci_conf, 0x80 );
 
+error_free_ports:
+	for (i = 0; i < card->nports; i++)
+		free_hdlcdev(card->ports[i].dev);
 error_free_card:
         kfree ( card );
         return err;
@@ -1669,6 +1684,9 @@ fst_remove_one ( struct pci_dev *pdev )
         release_mem_region ( card->phys_ctlmem, 0x10 );
         release_mem_region ( card->phys_mem, FST_MEMSIZE );
         release_region ( card->pci_conf, 0x80 );
+
+	for (i = 0; i < card->nports; i++)
+		free_hdlcdev(card->ports[i].dev);
 
         kfree ( card );
 }
