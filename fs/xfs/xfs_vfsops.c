@@ -1487,8 +1487,10 @@ xfs_syncsub(
 			 */
 			if (XFS_BUF_ISPINNED(bp))
 				xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
-			if (!(flags & SYNC_WAIT))
-				XFS_BUF_BFLAGS(bp) |= XFS_B_ASYNC;
+			if (flags & SYNC_WAIT)
+				XFS_BUF_UNASYNC(bp);
+			else
+				XFS_BUF_ASYNC(bp);
 			error = xfs_bwrite(mp, bp);
 		}
 		if (error) {
