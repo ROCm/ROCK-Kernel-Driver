@@ -35,8 +35,8 @@
 #include <linux/init.h>
 #include <linux/rtc.h>
 #include <linux/proc_fs.h>
+#include <linux/efi.h>
 
-#include <asm/efi.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
