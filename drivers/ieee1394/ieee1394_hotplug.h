@@ -1,23 +1,23 @@
 #ifndef _IEEE1394_HOTPLUG_H
 #define _IEEE1394_HOTPLUG_H
 
-#include <linux/device.h>
+#include <linux/kernel.h>
+#include <linux/types.h>
+#include <linux/mod_devicetable.h>
 
-#include "ieee1394_core.h"
-#include "nodemgr.h"
+/* Unit spec id and sw version entry for some protocols */
+#define AVC_UNIT_SPEC_ID_ENTRY		0x0000A02D
+#define AVC_SW_VERSION_ENTRY		0x00010001
+#define CAMERA_UNIT_SPEC_ID_ENTRY	0x0000A02D
+#define CAMERA_SW_VERSION_ENTRY		0x00000100
+
+/* Check to make sure this all isn't already defined */
+#ifndef IEEE1394_MATCH_VENDOR_ID
 
 #define IEEE1394_MATCH_VENDOR_ID	0x0001
 #define IEEE1394_MATCH_MODEL_ID		0x0002
 #define IEEE1394_MATCH_SPECIFIER_ID	0x0004
 #define IEEE1394_MATCH_VERSION		0x0008
-
-/*
- * Unit spec id and sw version entry for some protocols
- */
-#define AVC_UNIT_SPEC_ID_ENTRY					0x0000A02D
-#define AVC_SW_VERSION_ENTRY					0x00010001
-#define CAMERA_UNIT_SPEC_ID_ENTRY				0x0000A02D
-#define CAMERA_SW_VERSION_ENTRY					0x00000100
 
 struct ieee1394_device_id {
 	u32 match_flags;
@@ -28,33 +28,6 @@ struct ieee1394_device_id {
 	void *driver_data;
 };
 
-struct hpsb_protocol_driver {
-	/* The name of the driver, e.g. SBP2 or IP1394 */
-	const char *name;
-
-	/* 
-	 * The device id table describing the protocols and/or devices
-	 * supported by this driver.  This is used by the nodemgr to
-	 * decide if a driver could support a given node, but the
-	 * probe function below can implement further protocol
-	 * dependent or vendor dependent checking.
-	 */
-	struct ieee1394_device_id *id_table;
-
-	/* 
-	 * The update function is called when the node has just
-	 * survived a bus reset, i.e. it is still present on the bus.
-	 * However, it may be necessary to reestablish the connection
-	 * or login into the node again, depending on the protocol.
-	 */
-	void (*update)(struct unit_directory *ud);
-
-
-	/* Our LDM structure */
-	struct device_driver driver;
-};
-
-int hpsb_register_protocol(struct hpsb_protocol_driver *driver);
-void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver);
+#endif
 
 #endif /* _IEEE1394_HOTPLUG_H */
