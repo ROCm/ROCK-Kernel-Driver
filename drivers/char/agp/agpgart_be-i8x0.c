@@ -65,7 +65,7 @@ static int intel_8xx_fetch_size(void)
 	/* Intel 815 chipsets have a _weird_ APSIZE register with only
 	 * one non-reserved bit, so mask the others out ... */
 	if (agp_bridge.type == INTEL_I815)
-		temp &= (1 << 3)
+		temp &= (1 << 3);
 
 	values = A_SIZE_8(agp_bridge.aperture_sizes);
 
