@@ -26,6 +26,7 @@
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/sched.h>
+#include <linux/audit.h>
 #include <asm/semaphore.h>
 #include "flask.h"
 #include "avc.h"
@@ -548,32 +549,34 @@ out:
 	return rc;
 }
 
-static inline int compute_sid_handle_invalid_context(
+static int compute_sid_handle_invalid_context(
 	struct context *scontext,
 	struct context *tcontext,
 	u16 tclass,
 	struct context *newcontext)
 {
-	int rc = 0;
+	char *s = NULL, *t = NULL, *n = NULL;
+	u32 slen, tlen, nlen;
 
-	if (selinux_enforcing) {
-		rc = -EACCES;
-	} else {
-		char *s, *t, *n;
-		u32 slen, tlen, nlen;
-
-		context_struct_to_string(scontext, &s, &slen);
-		context_struct_to_string(tcontext, &t, &tlen);
-		context_struct_to_string(newcontext, &n, &nlen);
-		printk(KERN_ERR "security_compute_sid:  invalid context %s", n);
-		printk(" for scontext=%s", s);
-		printk(" tcontext=%s", t);
-		printk(" tclass=%s\n", policydb.p_class_val_to_name[tclass-1]);
-		kfree(s);
-		kfree(t);
-		kfree(n);
-	}
-	return rc;
+	if (context_struct_to_string(scontext, &s, &slen) < 0)
+		goto out;
+	if (context_struct_to_string(tcontext, &t, &tlen) < 0)
+		goto out;
+	if (context_struct_to_string(newcontext, &n, &nlen) < 0)
+		goto out;
+	audit_log(current->audit_context,
+		  "security_compute_sid:  invalid context %s"
+		  " for scontext=%s"
+		  " tcontext=%s"
+		  " tclass=%s",
+		  n, s, t, policydb.p_class_val_to_name[tclass-1]);
+out:
+	kfree(s);
+	kfree(t);
+	kfree(n);
+	if (!selinux_enforcing)
+		return 0;
+	return -EACCES;
 }
 
 static int security_compute_sid(u32 ssid,
