@@ -300,6 +300,7 @@ void free_pages_and_swap_cache(struct page **pages, int nr)
 	const int chunk = 16;
 	struct page **pagep = pages;
 
+	lru_add_drain();
 	while (nr) {
 		int todo = min(chunk, nr);
 		int i;

@@ -405,6 +405,8 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 
 	BUG_ON(address >= end);
 
+	lru_add_drain();
+
 	dir = pgd_offset(vma->vm_mm, address);
 	tlb_start_vma(tlb, vma);
 	do {
@@ -446,6 +448,8 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 		zap_hugepage_range(vma, address, size);
 		return;
 	}
+
+	lru_add_drain();
 
 	spin_lock(&mm->page_table_lock);
 

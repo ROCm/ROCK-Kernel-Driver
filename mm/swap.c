@@ -211,8 +211,19 @@ void release_pages(struct page **pages, int nr, int cold)
 	pagevec_free(&pages_to_free);
 }
 
+/*
+ * The pages which we're about to release may be in the deferred lru-addition
+ * queues.  That would prevent them from really being freed right now.  That's
+ * OK from a correctness point of view but is inefficient - those pages may be
+ * cache-warm and we want to give them back to the page allocator ASAP.
+ *
+ * So __pagevec_release() will drain those queues here.  __pagevec_lru_add()
+ * and __pagevec_lru_add_active() call release_pages() directly to avoid
+ * mutual recursion.
+ */
 void __pagevec_release(struct pagevec *pvec)
 {
+	lru_add_drain();
 	release_pages(pvec->pages, pagevec_count(pvec), pvec->cold);
 	pagevec_reinit(pvec);
 }
@@ -265,7 +276,8 @@ void __pagevec_lru_add(struct pagevec *pvec)
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
-	pagevec_release(pvec);
+	release_pages(pvec->pages, pvec->nr, pvec->cold);
+	pagevec_reinit(pvec);
 }
 
 void __pagevec_lru_add_active(struct pagevec *pvec)
@@ -291,7 +303,8 @@ void __pagevec_lru_add_active(struct pagevec *pvec)
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
-	pagevec_release(pvec);
+	release_pages(pvec->pages, pvec->nr, pvec->cold);
+	pagevec_reinit(pvec);
 }
 
 /*
