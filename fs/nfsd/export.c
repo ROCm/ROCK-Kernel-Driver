@@ -640,7 +640,6 @@ static int e_show(struct seq_file *m, void *p)
 	struct svc_export *exp = p;
 	struct svc_client *clp;
 	char *pbuf;
-	int j, first = 0;
 
 	if (p == (void *)1) {
 		seq_puts(m, "# Version 1.1\n");
@@ -659,31 +658,7 @@ static int e_show(struct seq_file *m, void *p)
 	seq_putc(m, '(');
 	exp_flags(m, exp->ex_flags, exp->ex_fsid, 
 		  exp->ex_anon_uid, exp->ex_anon_gid);
-	seq_puts(m, ") # ");
-	for (j = 0; j < clp->cl_naddr; j++) {
-		struct svc_clnthash **hp, **head, *tmp;
-		struct in_addr addr = clp->cl_addr[j]; 
-
-		head = &clnt_hash[CLIENT_HASH(addr.s_addr)];
-		for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
-			if (tmp->h_addr.s_addr == addr.s_addr)
-				break;
-		}
-		if (tmp) {
-			if (first++)
-				seq_putc(m, ' ');
-			if (tmp->h_client != clp)
-				seq_putc(m, '(');
-			seq_printf(m, "%d.%d.%d.%d",
-				htonl(addr.s_addr) >> 24 & 0xff,
-				htonl(addr.s_addr) >> 16 & 0xff,
-				htonl(addr.s_addr) >>  8 & 0xff,
-				htonl(addr.s_addr) >>  0 & 0xff);
-			if (tmp->h_client != clp)
-				seq_putc(m, ')');
-		}
-	}
-	seq_putc(m, '\n');
+	seq_puts(m, ")\n");
 	return 0;
 }
 
@@ -751,19 +726,13 @@ exp_addclient(struct nfsctl_client *ncp)
 		}
 	}
 
-	/* Copy addresses. */
-	for (i = 0; i < ncp->cl_naddr; i++) {
-		clp->cl_addr[i] = ncp->cl_addrlist[i];
-	}
-	clp->cl_naddr = ncp->cl_naddr;
-
 	/* Remove old client hash entries. */
 	if (change)
 		exp_unhashclient(clp);
 
 	/* Insert client into hashtable. */
 	for (i = 0; i < ncp->cl_naddr; i++) {
-		struct in_addr	addr = clp->cl_addr[i];
+		struct in_addr	addr = ncp->cl_addrlist[i];
 		int		hash;
 
 		hash = CLIENT_HASH(addr.s_addr);
@@ -853,8 +822,6 @@ again:
 			}
 		}
 	}
-	if (count != clp->cl_naddr)
-		printk(KERN_WARNING "nfsd: bad address count in freeclient!\n");
 	if (err)
 		goto again;
 	for (i = 0; i < count; i++)
