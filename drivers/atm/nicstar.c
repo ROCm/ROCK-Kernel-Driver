@@ -1606,9 +1606,9 @@ static void ns_close(struct atm_vcc *vcc)
 	        card->index);
          iovb = vc->rx_iov;
          recycle_iovec_rx_bufs(card, (struct iovec *) iovb->data,
-	                       ATM_SKB(iovb)->iovcnt);
-         ATM_SKB(iovb)->iovcnt = 0;
-         ATM_SKB(iovb)->vcc = NULL;
+	                       NS_SKB(iovb)->iovcnt);
+         NS_SKB(iovb)->iovcnt = 0;
+         NS_SKB(iovb)->vcc = NULL;
          ns_grab_int_lock(card, flags);
          recycle_iov_buf(card, iovb);
          spin_unlock_irqrestore(&card->int_lock, flags);
@@ -1806,7 +1806,7 @@ static int ns_send(struct atm_vcc *vcc, struct sk_buff *skb)
       return -EINVAL;
    }
    
-   if (ATM_SKB(skb)->iovcnt != 0)
+   if (skb_shinfo(skb)->nr_frags != 0)
    {
       printk("nicstar%d: No scatter-gather yet.\n", card->index);
       atomic_inc(&vcc->stats->tx_err);
@@ -2231,30 +2231,30 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
 	    }
 	 }
       vc->rx_iov = iovb;
-      ATM_SKB(iovb)->iovcnt = 0;
+      NS_SKB(iovb)->iovcnt = 0;
       iovb->len = 0;
       iovb->tail = iovb->data = iovb->head;
-      ATM_SKB(iovb)->vcc = vcc;
+      NS_SKB(iovb)->vcc = vcc;
       /* IMPORTANT: a pointer to the sk_buff containing the small or large
                     buffer is stored as iovec base, NOT a pointer to the 
 	            small or large buffer itself. */
    }
-   else if (ATM_SKB(iovb)->iovcnt >= NS_MAX_IOVECS)
+   else if (NS_SKB(iovb)->iovcnt >= NS_MAX_IOVECS)
    {
       printk("nicstar%d: received too big AAL5 SDU.\n", card->index);
       atomic_inc(&vcc->stats->rx_err);
       recycle_iovec_rx_bufs(card, (struct iovec *) iovb->data, NS_MAX_IOVECS);
-      ATM_SKB(iovb)->iovcnt = 0;
+      NS_SKB(iovb)->iovcnt = 0;
       iovb->len = 0;
       iovb->tail = iovb->data = iovb->head;
-      ATM_SKB(iovb)->vcc = vcc;
+      NS_SKB(iovb)->vcc = vcc;
    }
-   iov = &((struct iovec *) iovb->data)[ATM_SKB(iovb)->iovcnt++];
+   iov = &((struct iovec *) iovb->data)[NS_SKB(iovb)->iovcnt++];
    iov->iov_base = (void *) skb;
    iov->iov_len = ns_rsqe_cellcount(rsqe) * 48;
    iovb->len += iov->iov_len;
 
-   if (ATM_SKB(iovb)->iovcnt == 1)
+   if (NS_SKB(iovb)->iovcnt == 1)
    {
       if (skb->list != &card->sbpool.queue)
       {
@@ -2268,7 +2268,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
          return;
       }
    }
-   else /* ATM_SKB(iovb)->iovcnt >= 2 */
+   else /* NS_SKB(iovb)->iovcnt >= 2 */
    {
       if (skb->list != &card->lbpool.queue)
       {
@@ -2277,7 +2277,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
          which_list(card, skb);
          atomic_inc(&vcc->stats->rx_err);
          recycle_iovec_rx_bufs(card, (struct iovec *) iovb->data,
-	                       ATM_SKB(iovb)->iovcnt);
+	                       NS_SKB(iovb)->iovcnt);
          vc->rx_iov = NULL;
          recycle_iov_buf(card, iovb);
 	 return;
@@ -2301,7 +2301,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             printk(".\n");
          atomic_inc(&vcc->stats->rx_err);
          recycle_iovec_rx_bufs(card, (struct iovec *) iovb->data,
-	   ATM_SKB(iovb)->iovcnt);
+	   NS_SKB(iovb)->iovcnt);
 	 vc->rx_iov = NULL;
          recycle_iov_buf(card, iovb);
 	 return;
@@ -2309,7 +2309,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
 
       /* By this point we (hopefully) have a complete SDU without errors. */
 
-      if (ATM_SKB(iovb)->iovcnt == 1)	/* Just a small buffer */
+      if (NS_SKB(iovb)->iovcnt == 1)	/* Just a small buffer */
       {
          /* skb points to a small buffer */
          if (!atm_charge(vcc, skb->truesize))
@@ -2331,7 +2331,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             atomic_inc(&vcc->stats->rx);
          }
       }
-      else if (ATM_SKB(iovb)->iovcnt == 2)	/* One small plus one large buffer */
+      else if (NS_SKB(iovb)->iovcnt == 2)	/* One small plus one large buffer */
       {
          struct sk_buff *sb;
 
@@ -2408,7 +2408,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
                printk("nicstar%d: Out of huge buffers.\n", card->index);
                atomic_inc(&vcc->stats->rx_drop);
                recycle_iovec_rx_bufs(card, (struct iovec *) iovb->data,
-	                             ATM_SKB(iovb)->iovcnt);
+	                             NS_SKB(iovb)->iovcnt);
                vc->rx_iov = NULL;
                recycle_iov_buf(card, iovb);
                return;
@@ -2446,7 +2446,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
 
          if (!atm_charge(vcc, hb->truesize))
 	 {
-            recycle_iovec_rx_bufs(card, iov, ATM_SKB(iovb)->iovcnt);
+            recycle_iovec_rx_bufs(card, iov, NS_SKB(iovb)->iovcnt);
             if (card->hbpool.count < card->hbnr.max)
             {
                skb_queue_tail(&card->hbpool.queue, hb);
@@ -2469,7 +2469,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
                         0, 0);
 
             /* Copy all large buffers to the huge buffer and free them */
-            for (j = 1; j < ATM_SKB(iovb)->iovcnt; j++)
+            for (j = 1; j < NS_SKB(iovb)->iovcnt; j++)
             {
                lb = (struct sk_buff *) iov->iov_base;
                tocopy = MIN(remaining, iov->iov_len);

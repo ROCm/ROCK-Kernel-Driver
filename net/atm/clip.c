@@ -433,7 +433,6 @@ static int clip_start_xmit(struct sk_buff *skb,struct net_device *dev)
 		((u16 *) here)[3] = skb->protocol;
 	}
 	atomic_add(skb->truesize,&vcc->sk->wmem_alloc);
-	ATM_SKB(skb)->iovcnt = 0;
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 	entry->vccs->last_use = jiffies;
 	DPRINTK("atm_skb(%p)->vcc(%p)->dev(%p)\n",skb,vcc,vcc->dev);

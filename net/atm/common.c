@@ -391,27 +391,6 @@ int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		    (unsigned long) buff,eff_len);
 	DPRINTK("RcvM %d -= %d\n",atomic_read(&vcc->sk->rmem_alloc),skb->truesize);
 	atm_return(vcc,skb->truesize);
-	if (ATM_SKB(skb)->iovcnt) { /* @@@ hack */
-		/* iovcnt set, use scatter-gather for receive */
-		int el, cnt;
-		struct iovec *iov = (struct iovec *)skb->data;
-		unsigned char *p = (unsigned char *)buff;
-
-		el = eff_len;
-		error = 0;
-		for (cnt = 0; (cnt < ATM_SKB(skb)->iovcnt) && el; cnt++) {
-/*printk("s-g???: %p -> %p (%d)\n",iov->iov_base,p,iov->iov_len);*/
-			error = copy_to_user(p,iov->iov_base,
-			    (iov->iov_len > el) ? el : iov->iov_len) ?
-			    -EFAULT : 0;
-			if (error) break;
-			p += iov->iov_len;
-			el -= (iov->iov_len > el)?el:iov->iov_len;
-			iov++;
-		}
-		kfree_skb(skb);
-		return error ? error : eff_len;
-	}
 	error = copy_to_user(buff,skb->data,eff_len) ? -EFAULT : 0;
 	kfree_skb(skb);
 	return error ? error : eff_len;
@@ -470,7 +449,6 @@ int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	remove_wait_queue(&vcc->sleep,&wait);
 	if (error) return error;
 	skb->dev = NULL; /* for paths shared with net_device interfaces */
-	ATM_SKB(skb)->iovcnt = 0;
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 	if (copy_from_user(skb_put(skb,size),buff,size)) {
 		kfree_skb(skb);

@@ -385,7 +385,6 @@ struct atmphy_ops {
 
 struct atm_skb_data {
 	struct atm_vcc	*vcc;		/* ATM VCC */
-	int		iovcnt;		/* 0 for "normal" operation */
 	unsigned long	atm_options;	/* ATM layer options */
 };
 

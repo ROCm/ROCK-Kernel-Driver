@@ -523,7 +523,6 @@ static int send_via_shortcut(struct sk_buff *skb, struct mpoa_client *mpc)
 	}
 
 	atomic_add(skb->truesize, &entry->shortcut->sk->wmem_alloc);
-	ATM_SKB(skb)->iovcnt = 0; /* just to be safe ... */
 	ATM_SKB(skb)->atm_options = entry->shortcut->atm_options;
 	entry->shortcut->send(entry->shortcut, skb);
 	entry->packets_fwded++;

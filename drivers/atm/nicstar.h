@@ -750,6 +750,15 @@ typedef struct vc_map
 } vc_map;
 
 
+struct ns_skb_data
+{
+	struct atm_vcc *vcc;
+	int iovcnt;
+};
+
+#define NS_SKB(skb) (((struct ns_skb_data *) (skb)->cb))
+
+
 typedef struct ns_dev
 {
    int index;				/* Card ID to the device driver */

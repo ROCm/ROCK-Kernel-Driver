@@ -827,10 +827,10 @@ static int do_tx(struct sk_buff *skb)
 	vcc = ATM_SKB(skb)->vcc;
 	zatm_dev = ZATM_DEV(vcc->dev);
 	zatm_vcc = ZATM_VCC(vcc);
-	EVENT("iovcnt=%d\n",ATM_SKB(skb)->iovcnt,0);
+	EVENT("iovcnt=%d\n",skb_shinfo(skb)->nr_frags,0);
 	save_flags(flags);
 	cli();
-	if (!ATM_SKB(skb)->iovcnt) {
+	if (!skb_shinfo(skb)->nr_frags) {
 		if (zatm_vcc->txing == RING_ENTRIES-1) {
 			restore_flags(flags);
 			return RING_BUSY;

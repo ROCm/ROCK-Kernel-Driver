@@ -204,7 +204,6 @@ lec_send(struct atm_vcc *vcc, struct sk_buff *skb, struct lec_priv *priv)
 	if (atm_may_send(vcc, skb->len)) {
 		atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
 	        ATM_SKB(skb)->vcc = vcc;
-	        ATM_SKB(skb)->iovcnt = 0;
 	        ATM_SKB(skb)->atm_options = vcc->atm_options;
 		priv->stats.tx_packets++;
 		priv->stats.tx_bytes += skb->len;

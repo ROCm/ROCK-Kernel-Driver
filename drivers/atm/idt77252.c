@@ -1986,7 +1986,7 @@ idt77252_send_skb(struct atm_vcc *vcc, struct sk_buff *skb, int oam)
 		return -EINVAL;
 	}
 
-	if (ATM_SKB(skb)->iovcnt != 0) {
+	if (skb_shinfo(skb)->nr_frags != 0) {
 		printk("%s: No scatter-gather yet.\n", card->name);
 		atomic_inc(&vcc->stats->tx_err);
 		dev_kfree_skb(skb);
@@ -2024,7 +2024,6 @@ idt77252_send_oam(struct atm_vcc *vcc, void *cell, int flags)
 		return -ENOMEM;
 	}
 	atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
-	ATM_SKB(skb)->iovcnt = 0;
 
 	memcpy(skb_put(skb, 52), cell, 52);
 
