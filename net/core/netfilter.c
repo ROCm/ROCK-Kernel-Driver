@@ -745,6 +745,7 @@ copy_skb:
 pull_skb:
 	return pskb_may_pull(*pskb, writable_len);
 }
+EXPORT_SYMBOL(skb_ip_make_writable);
 #endif /*CONFIG_INET*/
 
 
