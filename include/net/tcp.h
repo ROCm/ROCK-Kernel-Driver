@@ -828,6 +828,11 @@ extern int tcp_sync_mss(struct sock *sk, u32 pmtu);
 
 extern const char timer_bug_msg[];
 
+/* Read 'sendfile()'-style from a TCP socket */
+typedef int (*sk_read_actor_t)(read_descriptor_t *, struct sk_buff *,
+				unsigned int, size_t);
+extern int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
+			 sk_read_actor_t recv_actor);
 
 static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 {

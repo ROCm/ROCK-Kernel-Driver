@@ -152,7 +152,6 @@
 #include <asm/io.h>		/* for inb(), outb(), etc. */
 #include <linux/time.h>	 	/* for do_gettimeofday */	
 #include <linux/in.h>		/* sockaddr_in */
-#include <linux/inet.h>		/* in_ntoa(), etc... */
 #include <asm/errno.h>
 
 #include <linux/ip.h>
@@ -2809,16 +2808,15 @@ static void process_route (netdevice_t *dev)
 		set_fs(fs);           /* restore old block */
 
 		if (err) {
-
 			printk(KERN_INFO 
 				"%s: Route Add failed.  Error: %d\n", 
 					card->devname,err);
-			printk(KERN_INFO "%s: Address: %s\n",
-				chan->name, in_ntoa(chan->ip_remote));
+			printk(KERN_INFO "%s: Address: %u.%u.%u.%u\n",
+				chan->name, NIPQUAD(chan->ip_remote));
 
 		}else {
-			printk(KERN_INFO "%s: Route Added Successfully: %s\n",
-				card->devname,in_ntoa(chan->ip_remote));
+			printk(KERN_INFO "%s: Route Added Successfully: %u.%u.%u.%U\n",
+				card->devname,NIPQUAD(chan->ip_remote));
 			chan->route_flag = ROUTE_ADDED;
 		}
 		break;
@@ -2841,17 +2839,15 @@ static void process_route (netdevice_t *dev)
 		set_fs(fs);    
 		
 		if (err) {
-
 			printk(KERN_INFO 
 				"%s: Deleting of route failed.  Error: %d\n", 
 					card->devname,err);
-			printk(KERN_INFO "%s: Address: %s\n",
-				dev->name,in_ntoa(chan->ip_remote) );
+			printk(KERN_INFO "%s: Address: %u.%u.%u.%u\n",
+				dev->name,NIPQUAD(chan->ip_remote) );
 
 		} else {
-
-			printk(KERN_INFO "%s: Route Removed Sucessfuly: %s\n", 
-				card->devname,in_ntoa(ip_tmp));
+			printk(KERN_INFO "%s: Route Removed Sucessfuly: %u.%u.%u.%u\n", 
+				card->devname,NIPQUAD(ip_tmp));
 			chan->route_flag = NO_ROUTE;
 		}
 		break;
@@ -2887,8 +2883,8 @@ static void process_route (netdevice_t *dev)
 		if (err) {
 			printk(KERN_INFO "%s: Adding of route failed.  Error: %d\n", 
 						card->devname,err);
-			printk(KERN_INFO "%s: Address: %s\n",
-				chan->name, in_ntoa(dev->pa_dstaddr) );
+			printk(KERN_INFO "%s: Address: %u.%u.%u.%u\n",
+				chan->name, NIPQUAD(dev->pa_dstaddr) );
 			}
 		else {
 			chan->route_flag = ROUTE_ADDED;
@@ -2902,11 +2898,10 @@ static void process_route (netdevice_t *dev)
 		set_fs(fs);           /* restore old block */
 
 		if (err) {
-
 		     printk(KERN_INFO "%s: Deleting of route failed.  Error: %d\n", 
 				card->devname,err);
-		     printk(KERN_INFO "%s: Address: %s\n",
-				dev->name,in_ntoa(dev->pa_dstaddr) );
+		     printk(KERN_INFO "%s: Address: %u.%u.%u.%u\n",
+				dev->name,NIPQUAD(dev->pa_dstaddr) );
 		} else {
 
 		     printk(KERN_INFO "%s: Removed route.\n",
@@ -4337,8 +4332,8 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
 	case 0x08:  // Inverse ARP request  -- Send Reply, add route.
 			
 		/* Check for valid Address */
-		printk(KERN_INFO "%s: Recvd PtP addr -InArp Req: %s\n", 
-			card->devname, in_ntoa(arphdr->ar_sip));
+		printk(KERN_INFO "%s: Recvd PtP addr -InArp Req: %u.%u.%u.%u\n", 
+			card->devname, NIPQUAD(arphdr->ar_sip));
 
 
 		/* Check that the network address is the same as ours, only
@@ -4348,15 +4343,14 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
 		if (in_dev->ifa_list->ifa_mask != 0xFFFFFFFF && 
 		    (in_dev->ifa_list->ifa_mask & arphdr->ar_sip) != 
 		    (in_dev->ifa_list->ifa_mask & in_dev->ifa_list->ifa_local)){
-
 			printk(KERN_INFO 
-				"%s: Invalid PtP address. %s  InARP ignored.\n", 
-					card->devname,in_ntoa(arphdr->ar_sip));
+				"%s: Invalid PtP address. %u.%u.%u.%u  InARP ignored.\n", 
+					card->devname,NIPQUAD(arphdr->ar_sip));
 
-			printk(KERN_INFO "%s: mask %s\n", 
-				card->devname, in_ntoa(in_dev->ifa_list->ifa_mask));
-				printk(KERN_INFO "%s: local %s\n", 
-				card->devname,in_ntoa(in_dev->ifa_list->ifa_local));
+			printk(KERN_INFO "%s: mask %u.%u.%u.%u\n", 
+				card->devname, NIPQUAD(in_dev->ida_list->ifa_mask));
+				printk(KERN_INFO "%s: local %u.%u.%u.%u\n", 
+				card->devname,NIPQUAD(in_dev->ida_list->ifa_local));
 			return -1;
 		}
 
@@ -4401,8 +4395,8 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
 	case 0x09:  // Inverse ARP reply
 
 		/* Check for valid Address */
-		printk(KERN_INFO "%s: Recvd PtP addr %s -InArp Reply\n", 
-				card->devname, in_ntoa(arphdr->ar_sip));
+		printk(KERN_INFO "%s: Recvd PtP addr %u.%u.%u.%u -InArp Reply\n", 
+				card->devname, NIPQUAD(arphdr->ar_sip));
 
 
 		/* Compare network addresses, only if network mask
@@ -4450,8 +4444,8 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
                 case 0x08:  // Inverse ARP request  -- Send Reply, add route.
 
                         /* Check for valid Address */
-                        printk(KERN_INFO "%s: Recvd PtP addr %s -InArp Req\n", 
-				((fr_channel_t *)dev->priv)->name, in_ntoa(arphdr->ar_sip));
+                        printk(KERN_INFO "%s: Recvd PtP addr %u.%u.%u.%u -InArp Req\n", 
+				((fr_channel_t *)dev->priv)->name, NIPQUAD(arphdr->ar_sip));
 
 
 			if (dev->pa_mask != 0xFFFFFFFF){
@@ -4492,8 +4486,8 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
                 case 0x09:  // Inverse ARP reply
 
                         /* Check for valid Address */
-                        printk(KERN_INFO "%s: Recvd PtP addr %s -InArp Reply\n", 
-				((fr_channel_t *)dev->priv)->name, in_ntoa(arphdr->ar_sip));
+                        printk(KERN_INFO "%s: Recvd PtP addr %u.%u.%u.%u -InArp Reply\n", 
+				((fr_channel_t *)dev->priv)->name, NIPQUAD(arphdr->ar_sip));
 
                         if ((dev->pa_mask & arphdr->ar_sip) != (dev->pa_mask & dev->pa_addr)) {
                                 printk(KERN_INFO "%s: Invalid PtP address.  InARP ignored.\n", 

@@ -52,7 +52,10 @@ tristate 'The IPX protocol' CONFIG_IPX
 if [ "$CONFIG_IPX" != "n" ]; then
    source net/ipx/Config.in
 fi
+
 tristate 'Appletalk protocol support' CONFIG_ATALK
+source drivers/net/appletalk/Config.in
+
 tristate 'DECnet Support' CONFIG_DECNET
 if [ "$CONFIG_DECNET" != "n" ]; then
    source net/decnet/Config.in
@@ -68,10 +71,10 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 #   fi
    if [ "$CONFIG_INET" = "y" ]; then
       tristate 'Acorn Econet/AUN protocols (EXPERIMENTAL)' CONFIG_ECONET
-   fi
-   if [ "$CONFIG_ECONET" != "n" ]; then
-      bool '  AUN over UDP' CONFIG_ECONET_AUNUDP
-      bool '  Native Econet' CONFIG_ECONET_NATIVE
+      if [ "$CONFIG_ECONET" != "n" ]; then
+	 bool '  AUN over UDP' CONFIG_ECONET_AUNUDP
+	 bool '  Native Econet' CONFIG_ECONET_NATIVE
+      fi
    fi
    tristate 'WAN router' CONFIG_WAN_ROUTER
    bool 'Fast switching (read help!)' CONFIG_NET_FASTROUTE

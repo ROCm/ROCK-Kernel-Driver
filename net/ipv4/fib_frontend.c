@@ -604,6 +604,11 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 	struct net_device *dev = ptr;
 	struct in_device *in_dev = __in_dev_get(dev);
 
+	if (event == NETDEV_UNREGISTER) {
+		fib_disable_ip(dev, 2);
+		return NOTIFY_DONE;
+	}
+
 	if (!in_dev)
 		return NOTIFY_DONE;
 
@@ -619,9 +624,6 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 		break;
 	case NETDEV_DOWN:
 		fib_disable_ip(dev, 0);
-		break;
-	case NETDEV_UNREGISTER:
-		fib_disable_ip(dev, 1);
 		break;
 	case NETDEV_CHANGEMTU:
 	case NETDEV_CHANGE:

@@ -1833,7 +1833,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 		break;
 	case RTM_DELADDR:
 		addrconf_leave_solict(ifp->idev->dev, &ifp->addr);
-		if (!ipv6_chk_addr(&ifp->addr, ifp->idev->dev))
+		if (!ipv6_chk_addr(&ifp->addr, NULL))
 			ip6_rt_addr_del(&ifp->addr, ifp->idev->dev);
 		break;
 	}

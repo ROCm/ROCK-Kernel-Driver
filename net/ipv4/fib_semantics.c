@@ -185,6 +185,7 @@ int ip_fib_check_default(u32 gw, struct net_device *dev)
 			continue;
 		for_nexthops(fi) {
 			if (nh->nh_dev == dev && nh->nh_gw == gw &&
+			    nh->nh_scope == RT_SCOPE_LINK &&
 			    !(nh->nh_flags&RTNH_F_DEAD)) {
 				read_unlock(&fib_info_lock);
 				return 0;
@@ -379,15 +380,23 @@ static int fib_check_nh(const struct rtmsg *r, struct fib_info *fi, struct fib_n
 		/* It is not necessary, but requires a bit of thinking */
 		if (key.scope < RT_SCOPE_LINK)
 			key.scope = RT_SCOPE_LINK;
-
 		if ((err = fib_lookup(&key, &res)) != 0)
 			return err;
+		err = -EINVAL;
+		if (res.type != RTN_UNICAST && res.type != RTN_LOCAL)
+			goto out;
 		nh->nh_scope = res.scope;
 		nh->nh_oif = FIB_RES_OIF(res);
-		nh->nh_dev = FIB_RES_DEV(res);
-		if (nh->nh_dev)
-			atomic_inc(&nh->nh_dev->refcnt);
+		if ((nh->nh_dev = FIB_RES_DEV(res)) == NULL)
+			goto out;
+		atomic_inc(&nh->nh_dev->refcnt);
+		err = -ENETDOWN;
+		if (!(nh->nh_dev->flags & IFF_UP))
+			goto out;
+		err = 0;
+out:
 		fib_res_put(&res);
+		return err;
 	} else {
 		struct in_device *in_dev;
 
@@ -875,13 +884,15 @@ int fib_sync_down(u32 local, struct net_device *dev, int force)
 					fi->fib_power -= nh->nh_power;
 					nh->nh_power = 0;
 					spin_unlock_bh(&fib_multipath_lock);
-					if (force && nh->nh_dev) {
-						dev_put(nh->nh_dev);
-						nh->nh_dev = NULL;
-					}
 #endif
 					dead++;
 				}
+#ifdef CONFIG_IP_ROUTE_MULTIPATH
+				if (force > 1 && nh->nh_dev == dev) {
+					dead = fi->fib_nhs;
+					break;
+				}
+#endif
 			} endfor_nexthops(fi)
 			if (dead == fi->fib_nhs) {
 				fi->fib_flags |= RTNH_F_DEAD;
@@ -913,10 +924,6 @@ int fib_sync_up(struct net_device *dev)
 			if (!(nh->nh_flags&RTNH_F_DEAD)) {
 				alive++;
 				continue;
-			}
-			if (nh->nh_dev == NULL && nh->nh_oif == dev->ifindex) {
-				dev_hold(dev);
-				nh->nh_dev = dev;
 			}
 			if (nh->nh_dev == NULL || !(nh->nh_dev->flags&IFF_UP))
 				continue;

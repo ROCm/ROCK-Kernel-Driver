@@ -2680,18 +2680,20 @@ static void process_route (sdla_t *card)
 		printk(KERN_INFO "%s: Dynamic route failure.\n",card->devname);
 
                 if(card->u.c.slarp_timer) {
+			u32 addr_net = htonl(chdlc_priv_area->IP_address);
 
-			printk(KERN_INFO "%s: Bad IP address %s received\n",
+			printk(KERN_INFO "%s: Bad IP address %u.%u.%u.%u received\n",
 				card->devname,
-				in_ntoa(ntohl(chdlc_priv_area->IP_address)));
+			       NIPQUAD(addr_net));
                         printk(KERN_INFO "%s: from remote station.\n",
 				card->devname);
 
                 }else{ 
+			u32 addr_net = htonl(chdlc_priv_area->IP_address);
 
-                        printk(KERN_INFO "%s: Bad IP address %s issued\n",
-				card->devname,
-				in_ntoa(ntohl(chdlc_priv_area->IP_address)));
+                        printk(KERN_INFO "%s: Bad IP address %u.%u.%u.%u issued\n",
+			       card->devname,
+			       NIPQUAD(addr_net));
                         printk(KERN_INFO "%s: to remote station. Local\n",
 				card->devname);
 			printk(KERN_INFO "%s: IP address must be A.B.C.1\n",
@@ -2810,16 +2812,16 @@ static void process_route (sdla_t *card)
 		}
 
                if(err) {
-			printk(KERN_INFO "%s: Add route %s failed (%d)\n", 
-				card->devname, in_ntoa(remote_IP_addr), err);
+			printk(KERN_INFO "%s: Add route %u.%u.%u.%u failed (%d)\n", 
+				card->devname, NIPQUAD(remote_IP_addr), err);
 		} else {
 			((chdlc_private_area_t *)dev->priv)->route_status = ROUTE_ADDED;
 			printk(KERN_INFO "%s: Dynamic route added.\n",
 				card->devname);
-			printk(KERN_INFO "%s:    Local IP addr : %s\n",
-				card->devname, in_ntoa(local_IP_addr));
-			printk(KERN_INFO "%s:    Remote IP addr: %s\n",
-				card->devname, in_ntoa(remote_IP_addr));
+			printk(KERN_INFO "%s:    Local IP addr : %u.%u.%u.%u\n",
+				card->devname, NIPQUAD(local_IP_addr));
+			printk(KERN_INFO "%s:    Remote IP addr: %u.%u.%u.%u\n",
+				card->devname, NIPQUAD(remote_IP_addr));
 			chdlc_priv_area->route_removed = 0;
 		}
 		break;
@@ -2851,13 +2853,13 @@ static void process_route (sdla_t *card)
 		if(err) {
 			printk(KERN_INFO
 				"%s: Remove route %s failed, (err %d)\n",
-					card->devname, in_ntoa(remote_IP_addr),
+					card->devname, NIPQUAD(remote_IP_addr),
 					err);
 		} else {
 			((chdlc_private_area_t *)dev->priv)->route_status =
 				NO_ROUTE;
-                        printk(KERN_INFO "%s: Dynamic route removed: %s\n",
-                                        card->devname, in_ntoa(local_IP_addr)); 
+                        printk(KERN_INFO "%s: Dynamic route removed: %u.%u.%u.%u\n",
+                                        card->devname, NIPQUAD(local_IP_addr)); 
 			chdlc_priv_area->route_removed = 1;
 		}
 		break;

@@ -190,11 +190,11 @@ CONFIG_DECNET
   The module is called decnet.o.
 
 CONFIG_ATALK
-  AppleTalk is the way Apple computers speak to each other on a
-  network.  If your Linux box is connected to such a network and you
-  want to join the conversation, say Y.  You will need to use the
-  netatalk package so that your Linux box can act as a print and file
-  server for Macs as well as access AppleTalk printers.  Check out
+  AppleTalk is the protocol that Apple computers can use to communicate
+  on a network.  If your Linux box is connected to such a network and you
+  wish to connect to it, say Y.  You will need to use the netatalk package
+  so that your Linux box can act as a print and file server for Macs as
+  well as access AppleTalk printers.  Check out
   <http://www.zettabyte.net/netatalk/> on the WWW for details.
   EtherTalk is the name used for AppleTalk over Ethernet and the
   cheaper and slower LocalTalk is AppleTalk over a proprietary Apple

@@ -34,8 +34,10 @@ ip6t_mac_checkentry(const char *tablename,
 		   unsigned int hook_mask)
 {
 	if (hook_mask
-	    & ~((1 << NF_IP6_PRE_ROUTING) | (1 << NF_IP6_LOCAL_IN))) {
-		printk("ip6t_mac: only valid for PRE_ROUTING or LOCAL_IN.\n");
+	    & ~((1 << NF_IP6_PRE_ROUTING) | (1 << NF_IP6_LOCAL_IN)
+		| (1 << NF_IP6_FORWARD))) {
+		printk("ip6t_mac: only valid for PRE_ROUTING, LOCAL_IN or"
+		       " FORWARD\n");
 		return 0;
 	}
 
@@ -60,3 +62,5 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("MAC address matching module for IPv6");

@@ -83,8 +83,7 @@ void nf_unregister_hook(struct nf_hook_ops *reg)
 /* Do exclusive ranges overlap? */
 static inline int overlap(int min1, int max1, int min2, int max2)
 {
-	return (min1 >= min2 && min1 < max2)
-		|| (max1 > min2 && max1 <= max2);
+	return max1 > min2 && min1 < max2;
 }
 
 /* Functions to register sockopt ranges (exclusive). */

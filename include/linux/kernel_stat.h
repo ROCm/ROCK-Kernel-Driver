@@ -29,9 +29,6 @@ struct kernel_stat {
 #if !defined(CONFIG_ARCH_S390)
 	unsigned int irqs[NR_CPUS][NR_IRQS];
 #endif
-	unsigned int ipackets, opackets;
-	unsigned int ierrors, oerrors;
-	unsigned int collisions;
 };
 
 extern struct kernel_stat kstat;

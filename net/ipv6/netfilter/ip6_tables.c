@@ -110,7 +110,7 @@ static LIST_HEAD(ip6t_tables);
 #define ADD_COUNTER(c,b,p) do { (c).bcnt += (b); (c).pcnt += (p); } while(0)
 
 #ifdef CONFIG_SMP
-#define TABLE_OFFSET(t,p) (SMP_ALIGN((t)->size)*cpu_number_map(p))
+#define TABLE_OFFSET(t,p) (SMP_ALIGN((t)->size)*(p))
 #else
 #define TABLE_OFFSET(t,p) 0
 #endif
@@ -336,7 +336,8 @@ ip6t_do_table(struct sk_buff **pskb,
 	read_lock_bh(&table->lock);
 	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
 	table_base = (void *)table->private->entries
-		+ TABLE_OFFSET(table->private, smp_processor_id());
+		+ TABLE_OFFSET(table->private, 
+				cpu_number_map(smp_processor_id()));
 	e = get_entry(table_base, table->private->hook_entry[hook]);
 
 #ifdef CONFIG_NETFILTER_DEBUG
@@ -426,7 +427,7 @@ ip6t_do_table(struct sk_buff **pskb,
 #endif
 				/* Target might have changed stuff. */
 				ipv6 = (*pskb)->nh.ipv6h;
-				protohdr = (u_int32_t *)ipv6 + IPV6_HDR_LEN;
+				protohdr = (u_int32_t *)((void *)ipv6 + IPV6_HDR_LEN);
 				datalen = (*pskb)->len - IPV6_HDR_LEN;
 
 				if (verdict == IP6T_CONTINUE)
@@ -913,7 +914,7 @@ translate_table(const char *name,
 
 	/* And one copy for every other CPU */
 	for (i = 1; i < smp_num_cpus; i++) {
-		memcpy(newinfo->entries + SMP_ALIGN(newinfo->size*i),
+		memcpy(newinfo->entries + SMP_ALIGN(newinfo->size)*i,
 		       newinfo->entries,
 		       SMP_ALIGN(newinfo->size));
 	}
@@ -1795,9 +1796,15 @@ static int __init init(void)
 	}
 
 #ifdef CONFIG_PROC_FS
-	if (!proc_net_create("ip6_tables_names", 0, ip6t_get_tables)) {
-		nf_unregister_sockopt(&ip6t_sockopts);
-		return -ENOMEM;
+	{
+		struct proc_dir_entry *proc;
+		proc = proc_net_create("ip6_tables_names", 0,
+					ip6t_get_tables);
+		if (!proc) {
+			nf_unregister_sockopt(&ip6t_sockopts);
+			return -ENOMEM;
+		}
+		proc->owner = THIS_MODULE;
 	}
 #endif
 

@@ -13,7 +13,6 @@
 #include <linux/uio.h>
 #include <linux/net.h>
 #include <linux/in.h>
-#include <linux/inet.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/xprt.h>
 #include <linux/sunrpc/sched.h>
@@ -69,7 +68,7 @@ nfs_gen_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh, int versi
 	dprintk("NFS:      nfs_mount(%08x:%s)\n",
 			(unsigned)ntohl(addr->sin_addr.s_addr), path);
 
-	strcpy(hostname, in_ntoa(addr->sin_addr.s_addr));
+	sprintf(hostname, "%u.%u.%u.%u", NIPQUAD(addr->sin_addr.s_addr));
 	if (!(mnt_clnt = mnt_create(hostname, addr, version)))
 		return -EACCES;
 
