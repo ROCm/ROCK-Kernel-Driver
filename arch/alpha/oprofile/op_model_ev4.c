@@ -9,6 +9,8 @@
 
 #include <linux/oprofile.h>
 #include <linux/init.h>
+#include <linux/smp.h>
+#include <asm/ptrace.h>
 #include <asm/system.h>
 
 #include "op_impl.h"
@@ -89,10 +91,25 @@ ev4_cpu_setup(void *x)
 	wrperfmon(3, reg->proc_mode);
 }
 
+static void
+ev4_handle_interrupt(unsigned long which, struct pt_regs *regs,
+		     struct op_counter_config *ctr)
+{
+	/* EV4 can't properly disable counters individually.
+	   Discard "disabled" events now.  */
+	if (!ctr[which].enabled)
+		return;
+
+	/* Record the sample.  */
+	oprofile_add_sample(regs->pc, which, smp_processor_id());
+}
+
+
 struct op_axp_model op_model_ev4 = {
 	.reg_setup		= ev4_reg_setup,
 	.cpu_setup		= ev4_cpu_setup,
 	.reset_ctr		= NULL,
+	.handle_interrupt	= ev4_handle_interrupt,
 	.cpu			= OPROFILE_CPU_AXP_EV4,
 	.num_counters		= 2,
 	.can_set_proc_mode	= 0,

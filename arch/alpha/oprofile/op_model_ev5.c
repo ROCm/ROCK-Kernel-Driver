@@ -9,6 +9,8 @@
 
 #include <linux/oprofile.h>
 #include <linux/init.h>
+#include <linux/smp.h>
+#include <asm/ptrace.h>
 #include <asm/system.h>
 
 #include "op_impl.h"
@@ -179,10 +181,20 @@ ev5_reset_ctr(struct op_register_config *reg, unsigned long ctr)
 	}
 }
 
+static void
+ev5_handle_interrupt(unsigned long which, struct pt_regs *regs,
+		     struct op_counter_config *ctr)
+{
+	/* Record the sample.  */
+	oprofile_add_sample(regs->pc, which, smp_processor_id());
+}
+
+
 struct op_axp_model op_model_ev5 = {
 	.reg_setup		= ev5_reg_setup,
 	.cpu_setup		= ev5_cpu_setup,
 	.reset_ctr		= ev5_reset_ctr,
+	.handle_interrupt	= ev5_handle_interrupt,
 	.cpu			= OPROFILE_CPU_AXP_EV5,
 	.num_counters		= 3,
 	.can_set_proc_mode	= 1,
@@ -192,6 +204,7 @@ struct op_axp_model op_model_pca56 = {
 	.reg_setup		= pca56_reg_setup,
 	.cpu_setup		= ev5_cpu_setup,
 	.reset_ctr		= ev5_reset_ctr,
+	.handle_interrupt	= ev5_handle_interrupt,
 	.cpu			= OPROFILE_CPU_AXP_PCA56,
 	.num_counters		= 3,
 	.can_set_proc_mode	= 1,

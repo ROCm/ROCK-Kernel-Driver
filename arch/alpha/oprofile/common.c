@@ -36,17 +36,8 @@ static struct op_register_config reg;
 static void
 op_handle_interrupt(unsigned long which, struct pt_regs *regs)
 {
-	if (model->handle_interrupt) {
-		model->handle_interrupt(which, regs, ctr);
-	} else {
-		/* EV4 can't properly disable counters individually.
-		   Discard "disabled" events now.  */
-		if (!ctr[which].enabled)
-			return;
+	model->handle_interrupt(which, regs, ctr);
 
-		/* Record the sample.  */
-		oprofile_add_sample(regs->pc, which, smp_processor_id());
-	}
 	/* If the user has selected an interrupt frequency that is
 	   not exactly the width of the counter, write a new value
 	   into the counter such that it'll overflow after N more

@@ -132,7 +132,8 @@ enum profileme_counters {
 
 static void
 op_add_pm(unsigned long pc, unsigned long counter,
-	  struct op_counter_config *ctr, unsigned long event) {
+	  struct op_counter_config *ctr, unsigned long event)
+{
 	unsigned long fake_counter = 2 + event;
 	if (counter == 1)
 		fake_counter += PM_NUM_COUNTERS;
@@ -142,7 +143,8 @@ op_add_pm(unsigned long pc, unsigned long counter,
 
 static void
 ev67_handle_interrupt(unsigned long which, struct pt_regs *regs,
-		      struct op_counter_config *ctr) {
+		      struct op_counter_config *ctr)
+{
 	unsigned long pmpc, pctr_ctl;
 	int mispredict = 0;
 	union {
