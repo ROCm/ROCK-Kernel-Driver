@@ -83,7 +83,7 @@ int mca_find_adapter(int id, int start)
 	info.mca_dev = NULL;
 
 	for(;;) {
-		bus_for_each_dev(&mca_bus_type, &info, mca_find_adapter_callback);
+		bus_for_each_dev(&mca_bus_type, NULL, &info, mca_find_adapter_callback);
 
 		if(info.mca_dev == NULL)
 			return MCA_NOTFOUND;
@@ -131,7 +131,7 @@ int mca_find_unused_adapter(int id, int start)
 	info.mca_dev = NULL;
 
 	for(;;) {
-		bus_for_each_dev(&mca_bus_type, &info, mca_find_adapter_callback);
+		bus_for_each_dev(&mca_bus_type, NULL, &info, mca_find_adapter_callback);
 
 		if(info.mca_dev == NULL)
 			return MCA_NOTFOUND;
@@ -176,7 +176,7 @@ struct mca_device *mca_find_device_by_slot(int slot)
 	info.slot = slot;
 	info.mca_dev = NULL;
 
-	bus_for_each_dev(&mca_bus_type, &info, mca_find_device_by_slot_callback);
+	bus_for_each_dev(&mca_bus_type, NULL, &info, mca_find_device_by_slot_callback);
 
 	return info.mca_dev;
 }

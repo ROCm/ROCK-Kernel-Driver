@@ -461,7 +461,7 @@ void mca_handle_nmi(void)
 	/* First try - scan the various adapters and see if a specific
 	 * adapter was responsible for the error.
 	 */
-	bus_for_each_dev(&mca_bus_type, NULL, mca_handle_nmi_callback);
+	bus_for_each_dev(&mca_bus_type, NULL, NULL, mca_handle_nmi_callback);
 
 	mca_nmi_hook();
 } /* mca_handle_nmi */
