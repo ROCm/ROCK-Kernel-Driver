@@ -126,6 +126,8 @@
 /* minimum number of free TX descriptors required to wake up TX process */
 #define TG3_TX_WAKEUP_THRESH		(TG3_TX_RING_SIZE / 4)
 
+#define TG3_NUM_STATS		25	/* number of ETHTOOL_GSTATS u64's */
+
 static char version[] __devinitdata =
 	DRV_MODULE_NAME ".c:v" DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")\n";
 
@@ -198,6 +200,37 @@ static struct pci_device_id tg3_pci_tbl[] = {
 };
 
 MODULE_DEVICE_TABLE(pci, tg3_pci_tbl);
+
+struct {
+	char string[ETH_GSTRING_LEN];
+} ethtool_stats_keys[TG3_NUM_STATS] = {
+	{ "rx_fragments" },
+	{ "rx_ucast_packets" },
+	{ "rx_bcast_packets" },
+	{ "rx_fcs_errors" },
+	{ "rx_xon_pause_rcvd" },
+	{ "rx_xoff_pause_rcvd" },
+	{ "rx_mac_ctrl_rcvd" },
+	{ "rx_xoff_entered" },
+	{ "rx_frame_too_long_errors" },
+	{ "rx_jabbers" },
+	{ "rx_undersize_packets" },
+	{ "rx_in_length_errors" },
+	{ "rx_out_length_errors" },
+
+	{ "tx_xon_sent" },
+	{ "tx_xoff_sent" },
+	{ "tx_flow_control" },
+	{ "tx_mac_errors" },
+	{ "tx_single_collisions" },
+	{ "tx_mult_collisions" },
+	{ "tx_deferred" },
+	{ "tx_excessive_collisions" },
+	{ "tx_late_collisions" },
+	{ "tx_ucast_packets" },
+	{ "tx_mcast_packets" },
+	{ "tx_bcast_packets" }
+};
 
 static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
 {
@@ -5587,6 +5620,7 @@ static int tg3_open(struct net_device *dev)
 #endif
 
 static struct net_device_stats *tg3_get_stats(struct net_device *);
+static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *);
 
 static int tg3_close(struct net_device *dev)
 {
@@ -5618,6 +5652,8 @@ static int tg3_close(struct net_device *dev)
 
 	memcpy(&tp->net_stats_prev, tg3_get_stats(tp->dev),
 	       sizeof(tp->net_stats_prev));
+	memcpy(&tp->estats_prev, tg3_get_estats(tp),
+	       sizeof(tp->estats_prev));
 
 	tg3_free_consistent(tp);
 
@@ -5658,6 +5694,49 @@ static unsigned long calc_crc_errors(struct tg3 *tp)
 	}
 
 	return get_stat64(&hw_stats->rx_fcs_errors);
+}
+
+#define ESTAT_ADD(member) \
+	estats->member =	old_estats->member + \
+				get_stat64(&hw_stats->member)
+
+static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
+{
+	struct tg3_ethtool_stats *estats = &tp->estats;
+	struct tg3_ethtool_stats *old_estats = &tp->estats_prev;
+	struct tg3_hw_stats *hw_stats = tp->hw_stats;
+
+	if (!hw_stats)
+		return old_estats;
+
+	ESTAT_ADD(rx_fragments);
+	ESTAT_ADD(rx_ucast_packets);
+	ESTAT_ADD(rx_bcast_packets);
+	ESTAT_ADD(rx_fcs_errors);
+	ESTAT_ADD(rx_xon_pause_rcvd);
+	ESTAT_ADD(rx_xoff_pause_rcvd);
+	ESTAT_ADD(rx_mac_ctrl_rcvd);
+	ESTAT_ADD(rx_xoff_entered);
+	ESTAT_ADD(rx_frame_too_long_errors);
+	ESTAT_ADD(rx_jabbers);
+	ESTAT_ADD(rx_undersize_packets);
+	ESTAT_ADD(rx_in_length_errors);
+	ESTAT_ADD(rx_out_length_errors);
+
+	ESTAT_ADD(tx_xon_sent);
+	ESTAT_ADD(tx_xoff_sent);
+	ESTAT_ADD(tx_flow_control);
+	ESTAT_ADD(tx_mac_errors);
+	ESTAT_ADD(tx_single_collisions);
+	ESTAT_ADD(tx_mult_collisions);
+	ESTAT_ADD(tx_deferred);
+	ESTAT_ADD(tx_excessive_collisions);
+	ESTAT_ADD(tx_late_collisions);
+	ESTAT_ADD(tx_ucast_packets);
+	ESTAT_ADD(tx_mcast_packets);
+	ESTAT_ADD(tx_bcast_packets);
+
+	return estats;
 }
 
 static struct net_device_stats *tg3_get_stats(struct net_device *dev)
@@ -6183,7 +6262,31 @@ static int tg3_set_tx_csum(struct net_device *dev, u32 data)
 
 	return 0;
 }
-  
+
+static int tg3_get_stats_count (struct net_device *dev)
+{
+	return TG3_NUM_STATS;
+}
+
+static void tg3_get_strings (struct net_device *dev, u32 stringset, u8 *buf)
+{
+	switch (stringset) {
+	case ETH_SS_STATS:
+		memcpy(buf, &ethtool_stats_keys, sizeof(ethtool_stats_keys));
+		break;
+	default:
+		WARN_ON(1);	/* we need a WARN() */
+		break;
+	}
+}
+
+static void tg3_get_ethtool_stats (struct net_device *dev,
+				   struct ethtool_stats *estats, u64 *tmp_stats)
+{
+	struct tg3 *tp = dev->priv;
+	memcpy(tmp_stats, &tp->estats, sizeof(tp->estats));
+}
+
 static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
@@ -6280,6 +6383,9 @@ static struct ethtool_ops tg3_ethtool_ops = {
 	.get_tso		= ethtool_op_get_tso,
 	.set_tso		= tg3_set_tso,
 #endif
+	.get_strings		= tg3_get_strings,
+	.get_stats_count	= tg3_get_stats_count,
+	.get_ethtool_stats	= tg3_get_ethtool_stats,
 };
 
 /* Chips other than 5700/5701 use the NVRAM for fetching info. */
