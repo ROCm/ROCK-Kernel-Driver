@@ -598,7 +598,7 @@ static void fd_error(void)
 	CURRENT->errors++;
 	if (CURRENT->errors >= MAX_ERRORS) {
 		printk("fd%d: too many errors.\n", SelectedDrive);
-		end_request(0);
+		end_request(CURRENT, 0);
 	} else if (CURRENT->errors == RECALIBRATE_ERRORS) {
 		printk("fd%d: recalibrating\n", SelectedDrive);
 		if (SelectedDrive != -1)
@@ -623,23 +623,25 @@ static void fd_error(void)
 
 static void do_fd_action(int drive)
 {
+	struct request *req;
 	DPRINT(("do_fd_action unit[drive].track=%d\n", unit[drive].track));
 
 #ifdef TRACKBUFFER
 repeat:
 
 	if (IS_BUFFERED( drive, ReqSide, ReqTrack )) {
+		req = CURRENT;
 		if (ReqCmd == READ) {
 			copy_buffer( SECTOR_BUFFER(ReqSector), ReqData );
-			if (++ReqCnt < CURRENT->current_nr_sectors) {
+			if (++ReqCnt < req->current_nr_sectors) {
 				/* read next sector */
 				setup_req_params( drive );
 				goto repeat;
 			} else {
 				/* all sectors finished */
-				CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
-				CURRENT->sector += CURRENT->current_nr_sectors;
-				end_request( 1 );
+				req->nr_sectors -= req->current_nr_sectors;
+				req->sector += req->current_nr_sectors;
+				end_request(req, 1);
 				redo_fd_request();
 				return;
 			}
@@ -1022,7 +1024,7 @@ static void fd_rwsec_done(int status)
 		/* all sectors finished */
 		CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
 		CURRENT->sector += CURRENT->current_nr_sectors;
-		end_request(1);
+		end_request(CURRENT, 1);
 		redo_fd_request();
 	}
 	return;
@@ -1234,7 +1236,7 @@ repeat:
 	if (!floppy->connected) {
 		/* drive not connected */
 		printk("Unknown Device: fd%d\n", drive);
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 	if (type == 0) {
@@ -1249,7 +1251,7 @@ repeat:
 		--type;
 		if (type >= NUM_DISK_TYPES) {
 			printk("fd%d: invalid disk format", drive);
-			end_request(0);
+			end_request(CURRENT, 0);
 			goto repeat;
 		}
 		floppy->disktype = &disk_type[type];
@@ -1258,7 +1260,7 @@ repeat:
 	}
 
 	if (CURRENT->sector + 1 > floppy->disktype->blocks) {
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 	/* stop deselect timer */

@@ -512,7 +512,7 @@ static void mfm_rw_intr(void)
 			CURRENT->sector += CURRENT->current_nr_sectors;
 			SectorsLeftInRequest -= CURRENT->current_nr_sectors;
 
-			end_request(1);
+			end_request(CURRENT, 1);
 			if (SectorsLeftInRequest) {
 				hdc63463_dataptr = (unsigned int) CURRENT->buffer;
 				Copy_buffer = CURRENT->buffer;
@@ -735,7 +735,7 @@ static void request_done(int uptodate)
 		/* Apparently worked - let's check bytes left to DMA */
 		if (hdc63463_dataleft != (PartFragRead_SectorsLeft * 256)) {
 			printk("mfm: request_done - dataleft=%d - should be %d - Eek!\n", hdc63463_dataleft, PartFragRead_SectorsLeft * 256);
-			end_request(0);
+			end_request(CURRENT, 0);
 			Busy = 0;
 		};
 		/* Potentially this means that we've done; but we might be doing
@@ -768,7 +768,7 @@ static void request_done(int uptodate)
 		DBG("request_done: returned from mfm_request\n");
 	} else {
 		printk("mfm:request_done: update=0\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		Busy = 0;
 	}
 }
@@ -930,7 +930,7 @@ static void mfm_request(void)
 				printk("mfm%c: bad access: block=%d, count=%d, nr_sects=%ld\n", (dev >> 6)+'a',
 				       block, nsect, mfm[dev].nr_sects);
 			printk("mfm: continue 1\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			Busy = 0;
 			continue;
 		}
@@ -951,7 +951,7 @@ static void mfm_request(void)
 
 		if (CURRENT->cmd != READ && CURRENT->cmd != WRITE) {
 			printk("unknown mfm-command %d\n", CURRENT->cmd);
-			end_request(0);
+			end_request(CURRENT, 0);
 			Busy = 0;
 			printk("mfm: continue 4\n");
 			continue;

@@ -1228,7 +1228,7 @@ static void do_ftl_request(request_arg_t)
 	  CURRENT->sector += CURRENT->current_nr_sectors;
 	}
 	
-	end_request((ret == 0) ? 1 : 0);
+	end_request(CURRENT, (ret == 0) ? 1 : 0);
     } while (1);
 } /* do_ftl_request */
 

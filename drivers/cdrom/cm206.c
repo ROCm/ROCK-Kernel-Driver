@@ -864,7 +864,7 @@ static void do_cm206_request(request_queue_t * q)
 		if (CURRENT->cmd != READ) {
 			debug(("Non-read command %d on cdrom\n",
 			       CURRENT->cmd));
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		spin_unlock_irq(q->queue_lock);
@@ -895,7 +895,7 @@ static void do_cm206_request(request_queue_t * q)
 			}
 		}
 		spin_lock_irq(q->queue_lock);
-		end_request(!error);
+		end_request(CURRENT, !error);
 	}
 }
 

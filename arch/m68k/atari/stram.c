@@ -983,33 +983,35 @@ static void do_stram_request(request_queue_t *q)
 	unsigned long len;
 
 	while (1) {
+		struct request *req;
 		if (blk_queue_empty(QUEUE))
 			return;
 
-		start = swap_start + (CURRENT->sector << 9);
-		len   = CURRENT->current_nr_sectors << 9;
+		req = CURRENT;
+		start = swap_start + (req->sector << 9);
+		len   = req->current_nr_sectors << 9;
 		if ((start + len) > swap_end) {
 			printk( KERN_ERR "stram: bad access beyond end of device: "
 					"block=%ld, count=%ld\n",
-					CURRENT->sector,
-					CURRENT->current_nr_sectors );
-			end_request( 0 );
+					req->sector,
+					req->current_nr_sectors );
+			end_request(req, 0);
 			continue;
 		}
 
-		if (CURRENT->cmd == READ) {
-			memcpy(CURRENT->buffer, start, len);
+		if (req->cmd == READ) {
+			memcpy(req->buffer, start, len);
 #ifdef DO_PROC
 			stat_swap_read += N_PAGES(len);
 #endif
 		}
 		else {
-			memcpy(start, CURRENT->buffer, len);
+			memcpy(start, req->buffer, len);
 #ifdef DO_PROC
 			stat_swap_write += N_PAGES(len);
 #endif
 		}
-		end_request( 1 );
+		end_request(req, 1);
 	}
 }
 

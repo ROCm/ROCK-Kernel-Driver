@@ -306,7 +306,7 @@ static void do_xd_request (request_queue_t * q)
 					break;
 			}
 		}
-		end_request(code);	/* wrap up, 0 = fail, 1 = success */
+		end_request(CURRENT, code);	/* wrap up, 0 = fail, 1 = success */
 	}
 }
 

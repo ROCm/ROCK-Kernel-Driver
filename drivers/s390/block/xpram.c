@@ -693,7 +693,7 @@ void xpram_request(request_queue_t * queue)
 			static int count = 0;
 			if (count++ < 5) /* print the message at most five times */
 				PRINT_WARN(" request for unknown device\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -703,7 +703,7 @@ void xpram_request(request_queue_t * queue)
                 /* does request exceed size of device ? */
 		if ( XPRAM_SEC2KB(sects_to_copy) > xpram_sizes[dev_no] ) {
 			PRINT_WARN(" request past end of device\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -717,20 +717,20 @@ void xpram_request(request_queue_t * queue)
                 if ( current_req->sector &  (XPRAM_SEC_IN_PG - 1) ) {
 			PRINT_WARN(" request does not start at an expanded storage page boundery\n");
 			PRINT_WARN(" referenced sector: %ld\n",current_req->sector);
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		/* Does request refere to partial expanded storage pages? */
                 if ( sects_to_copy & (XPRAM_SEC_IN_PG - 1) ) {
 			PRINT_WARN(" request referes to a partial expanded storage page\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 #endif /*  XPRAM_SEC_IN_PG != 1 */
 		/* Is request buffer aligned with kernel pages? */
 		if ( ((unsigned long)buffer) & (XPRAM_PGSIZE-1) ) {
 			PRINT_WARN(" request buffer is not aligned with kernel pages\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -768,11 +768,11 @@ void xpram_request(request_queue_t * queue)
 			break;
 		default:
 			/* can't happen */
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
-		if ( fault ) end_request(0);
-		else end_request(1); /* success */
+		if ( fault ) end_request(CURRENT, 0);
+		else end_request(CURRENT, 1); /* success */
 	}
 }
 

@@ -4864,7 +4864,7 @@ static void do_sbpcd_request(request_queue_t * q)
 	blkdev_dequeue_request(req);	/* task can fuck it up         GTL  */
 
 	if (req -> sector == -1)
-		end_request(0);
+		end_request(CURRENT, 0);
 	spin_unlock_irq(q->queue_lock);
 
 	down(&ioctl_read_sem);
@@ -4906,7 +4906,7 @@ static void do_sbpcd_request(request_queue_t * q)
 #endif
 		up(&ioctl_read_sem);
 		spin_lock_irq(q->queue_lock);
-		end_request(1);
+		end_request(CURRENT, 1);
 		goto request_loop;
 	}
 
@@ -4947,7 +4947,7 @@ static void do_sbpcd_request(request_queue_t * q)
 #endif
 			up(&ioctl_read_sem);
 			spin_lock_irq(q->queue_lock);
-			end_request(1);
+			end_request(CURRENT, 1);
 			goto request_loop;
 		}
 	}
@@ -4963,7 +4963,7 @@ static void do_sbpcd_request(request_queue_t * q)
 	up(&ioctl_read_sem);
 	sbp_sleep(0);    /* wait a bit, try again */
 	spin_lock_irq(q->queue_lock);
-	end_request(0);
+	end_request(CURRENT, 0);
 	goto request_loop;
 }
 /*==========================================================================*/

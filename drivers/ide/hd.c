@@ -378,7 +378,7 @@ static void bad_rw_intr(void)
 		return;
 	dev = DEVICE_NR(CURRENT->rq_dev);
 	if (++CURRENT->errors >= MAX_ERRORS || (hd_error & BBD_ERR)) {
-		end_request(0);
+		end_request(CURRENT, 0);
 		special_op[dev] = recalibrate[dev] = 1;
 	} else if (CURRENT->errors % RESET_FREQ == 0)
 		reset = 1;
@@ -428,7 +428,7 @@ ok_to_read:
 		(unsigned long) CURRENT->buffer+512));
 #endif
 	if (CURRENT->current_nr_sectors <= 0)
-		end_request(1);
+		end_request(CURRENT, 1);
 	if (i > 0) {
 		SET_HANDLER(&read_intr);
 		return;
@@ -466,7 +466,7 @@ ok_to_write:
 	--CURRENT->current_nr_sectors;
 	CURRENT->buffer += 512;
 	if (!i || (CURRENT->bio && !SUBSECTOR(i)))
-		end_request(1);
+		end_request(CURRENT, 1);
 	if (i > 0) {
 		SET_HANDLER(&write_intr);
 		outsw(HD_DATA,CURRENT->buffer,256);
@@ -511,7 +511,7 @@ static void hd_times_out(unsigned long dummy)
 #ifdef DEBUG
 		printk("hd%c: too many errors\n", dev+'a');
 #endif
-		end_request(0);
+		end_request(CURRENT, 0);
 	}
 	cli();
 	hd_request();
@@ -527,7 +527,7 @@ int do_special_op (unsigned int dev)
 	}
 	if (hd_info[dev].head > 16) {
 		printk ("hd%c: cannot handle device with more than 16 heads - giving up\n", dev+'a');
-		end_request(0);
+		end_request(CURRENT, 0);
 	}
 	special_op[dev] = 0;
 	return 1;
@@ -574,7 +574,7 @@ repeat:
 		else
 			printk("hd%c: bad access: block=%d, count=%d\n",
 				(minor(CURRENT->rq_dev)>>6)+'a', block, nsect);
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 
@@ -612,7 +612,7 @@ repeat:
 			break;
 		default:
 			printk("unknown hd-command\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			break;
 		}
 	}

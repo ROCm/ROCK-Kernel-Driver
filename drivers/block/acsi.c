@@ -775,7 +775,7 @@ static void bad_rw_intr( void )
 		return;
 
 	if (++CURRENT->errors >= MAX_ERRORS)
-		end_request(0);
+		end_request(CURRENT, 0);
 	/* Otherwise just retry */
 }
 
@@ -851,7 +851,7 @@ static void acsi_times_out( unsigned long dummy )
 #ifdef DEBUG
 		printk( KERN_ERR "ACSI: too many errors.\n" );
 #endif
-		end_request(0);
+		end_request(CURRENT, 0);
 	}
 
 	redo_acsi_request();
@@ -919,7 +919,7 @@ static void do_end_requests( void )
 		CURRENT->current_nr_sectors -= CurrentNSect;
 		CURRENT->sector += CurrentNSect;
 		if (CURRENT->nr_sectors == 0)
-			end_request(1);
+			end_request(CURRENT, 1);
 	}
 	else {
 		for( i = 0; i < CurrentNReq; ++i ) {
@@ -927,7 +927,7 @@ static void do_end_requests( void )
 			CURRENT->nr_sectors -= n;
 			CURRENT->current_nr_sectors -= n;
 			CURRENT->sector += n;
-			end_request(1);
+			end_request(CURRENT, 1);
 		}
 	}
 }
@@ -986,13 +986,13 @@ static void redo_acsi_request( void )
 		       block, block + CURRENT->nr_sectors - 1,
 		       acsi_part[dev].nr_sects);
 #endif
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 	if (acsi_info[DEVICE_NR(dev)].changed) {
 		printk( KERN_NOTICE "ad%c: request denied because cartridge has "
 				"been changed.\n", DEVICE_NR(dev)+'a' );
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 	

@@ -1096,7 +1096,7 @@ static void poll(unsigned long data)
 			if (transfer_is_active)
 				loop_again = 0;
 			if (current_valid())
-				end_request(0);
+				end_request(CURRENT, 0);
 			tries = 5;
 		}
 		error = 0;
@@ -1130,7 +1130,7 @@ static void poll(unsigned long data)
 			if (send_cmd(COMDRVST)) {
 				state = S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 			state = S_READ;
@@ -1157,7 +1157,7 @@ static void poll(unsigned long data)
 					: "disk removed");
 				state = S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 			if (!current_valid()) {
@@ -1212,7 +1212,7 @@ static void poll(unsigned long data)
 						break;
 					}
 					if (current_valid())
-						end_request(0);
+						end_request(CURRENT, 0);
 					tries = 5;
 				}
 				state = S_START;
@@ -1248,7 +1248,7 @@ static void poll(unsigned long data)
 						read_count = 0;
 						state = S_STOP;
 						loop_again = 1;
-						end_request(0);
+						end_request(CURRENT, 0);
 						break;
 					}
 					fetch_data(buf+
@@ -1278,7 +1278,7 @@ static void poll(unsigned long data)
 					while (current_valid()) {
 						transfer();
 						if (CURRENT -> nr_sectors == 0)
-							end_request(1);
+							end_request(CURRENT, 1);
 						else
 							break;
 					}
@@ -1309,7 +1309,7 @@ static void poll(unsigned long data)
 			if (send_cmd(COMDRVST)) {
 				state = S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 			state = S_STOPPING;
@@ -1350,7 +1350,7 @@ static void poll(unsigned long data)
 		if (exec_cmd(COMSTOP) < 0) {
 			state = S_IDLE;
 			while (current_valid())
-				end_request(0);
+				end_request(CURRENT, 0);
 			return;
 		}
 	}
@@ -1366,7 +1366,7 @@ static void do_optcd_request(request_queue_t * q)
 
 	if (disk_info.audio) {
 		printk(KERN_WARNING "optcd: tried to mount an Audio CD\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 
@@ -1374,14 +1374,14 @@ static void do_optcd_request(request_queue_t * q)
 	while (current_valid()) {
 		transfer();	/* First try to transfer block from buffers */
 		if (CURRENT -> nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 		} else {	/* Want to read a block not in buffer */
 			buf_out = NOBUF;
 			if (state == S_IDLE) {
 				/* %% Should this block the request queue?? */
 				if (update_toc() < 0) {
 					while (current_valid())
-						end_request(0);
+						end_request(CURRENT, 0);
 					break;
 				}
 				/* Start state machine */

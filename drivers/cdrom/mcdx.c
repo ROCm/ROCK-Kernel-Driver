@@ -575,14 +575,14 @@ void do_mcdx_request(request_queue_t * q)
 		xwarn("do_request(): bad device: %s\n",
 		      kdevname(CURRENT->rq_dev));
 		xtrace(REQUEST, "end_request(0): bad device\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 
 	if (stuffp->audio) {
 		xwarn("do_request() attempt to read from audio cd\n");
 		xtrace(REQUEST, "end_request(0): read from audio\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 
@@ -592,7 +592,7 @@ void do_mcdx_request(request_queue_t * q)
 	if (CURRENT->cmd != READ) {
 		xwarn("do_request(): non-read command to cd!!\n");
 		xtrace(REQUEST, "end_request(0): write\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 	else {
@@ -606,18 +606,18 @@ void do_mcdx_request(request_queue_t * q)
 					  CURRENT->nr_sectors);
 
 			if (i == -1) {
-				end_request(0);
+				end_request(CURRENT, 0);
 				goto again;
 			}
 			CURRENT->sector += i;
 			CURRENT->nr_sectors -= i;
 			CURRENT->buffer += (i * 512);
 		}
-		end_request(1);
+		end_request(CURRENT, 1);
 		goto again;
 
 		xtrace(REQUEST, "end_request(1)\n");
-		end_request(1);
+		end_request(CURRENT, 1);
 	}
 
 	goto again;

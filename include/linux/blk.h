@@ -114,11 +114,9 @@ extern inline struct request *elv_next_request(request_queue_t *q)
  * If we have our own end_request, we do not want to include this mess
  */
 #ifndef LOCAL_END_REQUEST
-static inline void end_request(int uptodate)
+static inline void end_request(struct request *req, int uptodate)
 {
-	struct request *req = CURRENT;
-
-	if (end_that_request_first(req, uptodate, CURRENT->hard_cur_sectors))
+	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
 		return;
 
 	add_blkdev_randomness(major(req->rq_dev));

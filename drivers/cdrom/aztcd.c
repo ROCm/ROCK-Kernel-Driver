@@ -1598,21 +1598,21 @@ static void do_aztcd_request(request_queue_t * q)
 #endif
 	if (DiskInfo.audio) {
 		printk("aztcd: Error, tried to mount an Audio CD\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 	azt_transfer_is_active = 1;
 	while (current_valid()) {
 		azt_transfer();
 		if (CURRENT->nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 		} else {
 			azt_buf_out = -1;	/* Want to read a block not in buffer */
 			if (azt_state == AZT_S_IDLE) {
 				if ((!aztTocUpToDate) || aztDiskChanged) {
 					if (aztUpdateToc() < 0) {
 						while (current_valid())
-							end_request(0);
+							end_request(CURRENT, 0);
 						break;
 					}
 				}
@@ -2009,7 +2009,7 @@ static void azt_poll(void)
 				loop_ctl = 0;
 			}
 			if (current_valid())
-				end_request(0);
+				end_request(CURRENT, 0);
 			AztTries = 5;
 		}
 		azt_error = 0;
@@ -2058,7 +2058,7 @@ static void azt_poll(void)
 						aztDiskChanged = 1;
 						aztTocUpToDate = 0;
 						azt_invalidate_buffers();
-						end_request(0);
+						end_request(CURRENT, 0);
 						printk
 						    ("aztcd: Disk Changed or Not Ready 1 - Unmount Disk!\n");
 					}
@@ -2072,7 +2072,7 @@ static void azt_poll(void)
 				aztTocUpToDate = 0;
 				printk
 				    ("aztcd: Disk Changed or Not Ready 2 - Unmount Disk!\n");
-				end_request(0);
+				end_request(CURRENT, 0);
 				printk((st & AST_DOOR_OPEN) ?
 				       "aztcd: door open\n" :
 				       "aztcd: disk removed\n");
@@ -2118,7 +2118,7 @@ static void azt_poll(void)
 						azt_invalidate_buffers();
 						printk
 						    ("aztcd: Disk Changed or Not Ready 3 - Unmount Disk!\n");
-						end_request(0);
+						end_request(CURRENT, 0);
 					}
 				} else
 					break;
@@ -2294,7 +2294,7 @@ static void azt_poll(void)
 						azt_read_count = 0;
 						azt_state = AZT_S_STOP;
 						loop_ctl = 1;
-						end_request(1);	/*should we have here (1) or (0)? */
+						end_request(CURRENT, 1);	/*should we have here (1) or (0)? */
 					} else {
 						if (azt_read_mode ==
 						    AZT_MODE_2) {
@@ -2339,7 +2339,7 @@ static void azt_poll(void)
 						azt_transfer();
 						if (CURRENT->nr_sectors ==
 						    0)
-							end_request(1);
+							end_request(CURRENT, 1);
 						else
 							break;
 					}
@@ -2414,7 +2414,7 @@ static void azt_poll(void)
 				azt_invalidate_buffers();
 				printk
 				    ("aztcd: Disk Changed or Not Ready 4 - Unmount Disk!\n");
-				end_request(0);
+				end_request(CURRENT, 0);
 			}
 
 #ifdef AZT_TEST3

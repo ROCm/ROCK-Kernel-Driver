@@ -213,7 +213,7 @@ static void jsfd_do_request(request_queue_t *q)
 
 		dev = MINOR(req->rq_dev);
 		if (dev >= JSF_MAX || (dev & JSF_PART_MASK) >= JSF_NPART) {
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		jdp = &jsf0.dv[dev & JSF_PART_MASK];
@@ -221,31 +221,31 @@ static void jsfd_do_request(request_queue_t *q)
 		offset = req->sector << 9;
 		len = req->current_nr_sectors << 9;
 		if ((offset + len) > jdp->dsize) {
-               		end_request(0);
+               		end_request(CURRENT, 0);
 			continue;
 		}
 
 		if (req->cmd == WRITE) {
 			printk(KERN_ERR "jsfd: write\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		if (req->cmd != READ) {
 			printk(KERN_ERR "jsfd: bad req->cmd %d\n", req->cmd);
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
 		if ((jdp->dbase & 0xff000000) != 0x20000000) {
 			printk(KERN_ERR "jsfd: bad base %x\n", (int)jdp->dbase);
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
 /* printk("jsfd%d: read buf %p off %x len %x\n", dev, req->buffer, (int)offset, (int)len); */ /* P3 */
 		jsfd_read(req->buffer, jdp->dbase + offset, len);
 
-		end_request(1);
+		end_request(CURRENT, 1);
 	}
 }
 

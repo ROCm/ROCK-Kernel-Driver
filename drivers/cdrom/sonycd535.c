@@ -818,7 +818,7 @@ do_cdu535_request(request_queue_t * q)
 		block = CURRENT->sector;
 		nsect = CURRENT->nr_sectors;
 		if (dev != 0) {
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		if(CURRENT->flags & REQ_CMD) {
@@ -830,11 +830,11 @@ do_cdu535_request(request_queue_t * q)
 				 */
 				
 				if (sony_toc->lead_out_start_lba <= (block / 4)) {
-					end_request(0);
+					end_request(CURRENT, 0);
 					return;
 				}
 				if (sony_toc->lead_out_start_lba <= ((block + nsect) / 4)) {
-					end_request(0);
+					end_request(CURRENT, 0);
 					return;
 				}
 				while (0 < nsect) {
@@ -896,7 +896,7 @@ do_cdu535_request(request_queue_t * q)
 									       status[0]);
 								sony_first_block = -1;
 								sony_last_block = -1;
-								end_request(0);
+								end_request(CURRENT, 0);
 								return;
 							}
 							if (readStatus == BAD_STATUS) {
@@ -925,11 +925,11 @@ do_cdu535_request(request_queue_t * q)
 					CURRENT->buffer += 512;
 				}
 
-				end_request(1);
+				end_request(CURRENT, 1);
 				break;
 				
 			case WRITE:
-				end_request(0);
+				end_request(CURRENT, 0);
 				break;
 				
 			default:
