@@ -38,29 +38,12 @@
 #include <asm/ppcdebug.h>
 
 extern int fix_alignment(struct pt_regs *);
-extern void bad_page_fault(struct pt_regs *, unsigned long);
+extern void bad_page_fault(struct pt_regs *, unsigned long, int);
 
 /* This is true if we are using the firmware NMI handler (typically LPAR) */
 extern int fwnmi_active;
 
-#ifdef CONFIG_XMON
-extern void xmon(struct pt_regs *regs);
-extern int xmon_bpt(struct pt_regs *regs);
-extern int xmon_sstep(struct pt_regs *regs);
-extern int xmon_iabr_match(struct pt_regs *regs);
-extern int xmon_dabr_match(struct pt_regs *regs);
-extern void (*xmon_fault_handler)(struct pt_regs *regs);
-#endif
-
-#ifdef CONFIG_XMON
-void (*debugger)(struct pt_regs *regs) = xmon;
-int (*debugger_bpt)(struct pt_regs *regs) = xmon_bpt;
-int (*debugger_sstep)(struct pt_regs *regs) = xmon_sstep;
-int (*debugger_iabr_match)(struct pt_regs *regs) = xmon_iabr_match;
-int (*debugger_dabr_match)(struct pt_regs *regs) = xmon_dabr_match;
-void (*debugger_fault_handler)(struct pt_regs *regs);
-#else
-#ifdef CONFIG_KGDB
+#ifdef CONFIG_DEBUG_KERNEL
 void (*debugger)(struct pt_regs *regs);
 int (*debugger_bpt)(struct pt_regs *regs);
 int (*debugger_sstep)(struct pt_regs *regs);
@@ -68,30 +51,44 @@ int (*debugger_iabr_match)(struct pt_regs *regs);
 int (*debugger_dabr_match)(struct pt_regs *regs);
 void (*debugger_fault_handler)(struct pt_regs *regs);
 #endif
-#endif
+
 /*
  * Trap & Exception support
  */
 
-void
-_exception(int signr, struct pt_regs *regs)
+/* Should we panic on bad kernel exceptions or try to recover */
+#undef PANIC_ON_ERROR
+
+static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+
+void die(const char *str, struct pt_regs *regs, long err)
 {
-	if (!user_mode(regs))
-	{
-		show_regs(regs);
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-		debugger(regs);
+	console_verbose();
+	spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
+	printk("Oops: %s, sig: %ld\n", str, err);
+	show_regs(regs);
+	print_backtrace((unsigned long *)regs->gpr[1]);
+	bust_spinlocks(0);
+	spin_unlock_irq(&die_lock);
+
+#ifdef PANIC_ON_ERROR
+	panic(str);
+#else
+	do_exit(SIGSEGV);
 #endif
-		print_backtrace((unsigned long *)regs->gpr[1]);
-		panic("Exception in kernel pc %lx signal %d",regs->nip,signr);
-#if defined(CONFIG_PPCDBG) && (defined(CONFIG_XMON) || defined(CONFIG_KGDB))
-	/* Allow us to catch SIGILLs for 64-bit app/glibc debugging. -Peter */
-	} else if (signr == SIGILL) {
-		ifppcdebug(PPCDBG_SIGNALXMON)
+}
+
+static void
+_exception(int signr, siginfo_t *info, struct pt_regs *regs)
+{
+	if (!user_mode(regs)) {
+		if (debugger)
 			debugger(regs);
-#endif
+		die("Exception in kernel mode\n", regs, signr);
 	}
-	force_sig(signr, current);
+
+	force_sig_info(signr, info, current);
 }
 
 /* Get the error information for errors coming through the
@@ -130,9 +127,8 @@ static void FWNMI_release_errinfo(void)
 void
 SystemResetException(struct pt_regs *regs)
 {
-	char *msg = "System Reset in kernel mode.\n";
-	udbg_printf(msg); printk(msg);
 	if (fwnmi_active) {
+		char *msg;
 		unsigned long *r3 = __va(regs->gpr[3]); /* for FWNMI debug */
 		struct rtas_error_log *errlog;
 
@@ -140,17 +136,31 @@ SystemResetException(struct pt_regs *regs)
 		udbg_printf(msg, r3); printk(msg, r3);
 		errlog = FWNMI_get_errinfo(regs);
 	}
-#if defined(CONFIG_XMON)
-	xmon(regs);
-	udbg_printf("leaving xmon...\n");
+
+	if (debugger)
+		debugger(regs);
+
+#ifdef PANIC_ON_ERROR
+	panic("System Reset");
 #else
-	for(;;);
+	/* Must die if the interrupt is not recoverable */
+	if (!(regs->msr & MSR_RI))
+		panic("Unrecoverable System Reset");
 #endif
+
+	/* What should we do here? We could issue a shutdown or hard reset. */
+}
+
+static int power4_handle_mce(struct pt_regs *regs)
+{
+	return 0;
 }
 
 void
 MachineCheckException(struct pt_regs *regs)
 {
+	siginfo_t info;
+
 	if (fwnmi_active) {
 		struct rtas_error_log *errhdr = FWNMI_get_errinfo(regs);
 		if (errhdr) {
@@ -158,117 +168,221 @@ MachineCheckException(struct pt_regs *regs)
 		}
 		FWNMI_release_errinfo();
 	}
-	if ( !user_mode(regs) )
-	{
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
+
+	if (!user_mode(regs)) {
+		/* Attempt to recover if the interrupt is recoverable */
+		if (regs->msr & MSR_RI) {
+			if (__is_processor(PV_POWER4) &&
+			    power4_handle_mce(regs))
+				return;
+		}
+
 		if (debugger_fault_handler) {
 			debugger_fault_handler(regs);
 			return;
 		}
-#endif
+		if (debugger)
+			debugger(regs);
+
+		console_verbose();
+		spin_lock_irq(&die_lock);
+		bust_spinlocks(1);
 		printk("Machine check in kernel mode.\n");
 		printk("Caused by (from SRR1=%lx): ", regs->msr);
 		show_regs(regs);
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-		debugger(regs);
-#endif
 		print_backtrace((unsigned long *)regs->gpr[1]);
-		panic("machine check");
+		bust_spinlocks(0);
+		spin_unlock_irq(&die_lock);
+		panic("Unrecoverable Machine Check");
 	}
-	_exception(SIGSEGV, regs);	
-}
 
-void
-SMIException(struct pt_regs *regs)
-{
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-	{
-		debugger(regs);
-		return;
-	}
-#endif
-	show_regs(regs);
-	print_backtrace((unsigned long *)regs->gpr[1]);
-	panic("System Management Interrupt");
+	/*
+	 * XXX we should check RI bit on exception exit and kill the
+	 * task if it was cleared
+	 */
+	info.si_signo = SIGBUS;
+	info.si_errno = 0;
+	info.si_code = BUS_ADRERR;
+	info.si_addr = (void *)regs->nip;
+	_exception(SIGSEGV, &info, regs);
 }
 
 void
 UnknownException(struct pt_regs *regs)
 {
+	siginfo_t info;
+
 	printk("Bad trap at PC: %lx, SR: %lx, vector=%lx\n",
 	       regs->nip, regs->msr, regs->trap);
-	_exception(SIGTRAP, regs);	
+
+	info.si_signo = SIGTRAP;
+	info.si_errno = 0;
+	info.si_code = 0;
+	info.si_addr = 0;
+	_exception(SIGTRAP, &info, regs);	
 }
 
 void
 InstructionBreakpointException(struct pt_regs *regs)
 {
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-	if (debugger_iabr_match(regs))
+	siginfo_t info;
+
+	if (debugger_iabr_match && debugger_iabr_match(regs))
 		return;
-#endif
-	_exception(SIGTRAP, regs);
+
+	info.si_signo = SIGTRAP;
+	info.si_errno = 0;
+	info.si_code = TRAP_BRKPT;
+	info.si_addr = (void *)regs->nip;
+	_exception(SIGTRAP, &info, regs);
+}
+
+static void parse_fpe(struct pt_regs *regs)
+{
+	siginfo_t info;
+	unsigned int *tmp;
+	unsigned int fpscr;
+
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
+	tmp = &current->thread.fpscr;
+	fpscr = *tmp;
+
+	/* Invalid operation */
+	if ((fpscr & FPSCR_VE) && (fpscr & FPSCR_VX))
+		info.si_code = FPE_FLTINV;
+
+	/* Overflow */
+	else if ((fpscr & FPSCR_OE) && (fpscr & FPSCR_OX))
+		info.si_code = FPE_FLTOVF;
+
+	/* Underflow */
+	else if ((fpscr & FPSCR_UE) && (fpscr & FPSCR_UX))
+		info.si_code = FPE_FLTUND;
+
+	/* Divide by zero */
+	else if ((fpscr & FPSCR_ZE) && (fpscr & FPSCR_ZX))
+		info.si_code = FPE_FLTDIV;
+
+	/* Inexact result */
+	else if ((fpscr & FPSCR_XE) && (fpscr & FPSCR_XX))
+		info.si_code = FPE_FLTRES;
+
+	else
+		info.si_code = 0;
+
+	info.si_signo = SIGFPE;
+	info.si_errno = 0;
+	info.si_addr = (void *)regs->nip;
+	_exception(SIGFPE, &info, regs);
 }
 
 void
 ProgramCheckException(struct pt_regs *regs)
 {
+	siginfo_t info;
+
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
-		_exception(SIGFPE, regs);
+
+		parse_fpe(regs);
+	} else if (regs->msr & 0x40000) {
+		/* Privileged instruction */
+
+		info.si_signo = SIGILL;
+		info.si_errno = 0;
+		info.si_code = ILL_PRVOPC;
+		info.si_addr = (void *)regs->nip;
+		_exception(SIGILL, &info, regs);
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-		if (debugger_bpt(regs))
+
+		if (debugger_bpt && debugger_bpt(regs))
 			return;
-#endif
-		_exception(SIGTRAP, regs);
+
+		info.si_signo = SIGTRAP;
+		info.si_errno = 0;
+		info.si_code = TRAP_BRKPT;
+		info.si_addr = (void *)regs->nip;
+		_exception(SIGTRAP, &info, regs);
 	} else {
-		_exception(SIGILL, regs);
+		/* Illegal instruction */
+
+		info.si_signo = SIGILL;
+		info.si_errno = 0;
+		info.si_code = ILL_ILLTRP;
+		info.si_addr = (void *)regs->nip;
+		_exception(SIGILL, &info, regs);
 	}
 }
 
 void
 SingleStepException(struct pt_regs *regs)
 {
-	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-	if (debugger_sstep(regs))
-		return;
-#endif
-	_exception(SIGTRAP, regs);	
-}
+	siginfo_t info;
 
-/* Dummy handler for Performance Monitor */
+	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
+
+	if (debugger_sstep && debugger_sstep(regs))
+		return;
+
+	info.si_signo = SIGTRAP;
+	info.si_errno = 0;
+	info.si_code = TRAP_TRACE;
+	info.si_addr = (void *)regs->nip;
+	_exception(SIGTRAP, &info, regs);	
+}
 
 void
 PerformanceMonitorException(struct pt_regs *regs)
 {
-	_exception(SIGTRAP, regs);
+	siginfo_t info;
+
+	info.si_signo = SIGTRAP;
+	info.si_errno = 0;
+	info.si_code = TRAP_BRKPT;
+	info.si_addr = 0;
+	_exception(SIGTRAP, &info, regs);
 }
 
 void
 AlignmentException(struct pt_regs *regs)
 {
 	int fixed;
+	siginfo_t info;
 
 	fixed = fix_alignment(regs);
+
 	if (fixed == 1) {
-		ifppcdebug(PPCDBG_ALIGNFIXUP)
-			if (!user_mode(regs))
-				PPCDBG(PPCDBG_ALIGNFIXUP, "fix alignment at %lx\n", regs->nip);
+		if (!user_mode(regs))
+			PPCDBG(PPCDBG_ALIGNFIXUP, "fix alignment at %lx\n",
+			       regs->nip);
 		regs->nip += 4;	/* skip over emulated instruction */
 		return;
 	}
+
+	/* Operand address was bad */	
 	if (fixed == -EFAULT) {
-		/* fixed == -EFAULT means the operand address was bad */
-		if (user_mode(regs))
-			force_sig(SIGSEGV, current);
-		else
-			bad_page_fault(regs, regs->dar);
+		if (user_mode(regs)) {
+			info.si_signo = SIGSEGV;
+			info.si_errno = 0;
+			info.si_code = SEGV_MAPERR;
+			info.si_addr = (void *)regs->dar;
+			force_sig_info(SIGSEGV, &info, current);
+		} else {
+			/* Search exception table */
+			bad_page_fault(regs, regs->dar, SIGSEGV);
+		}
+
 		return;
 	}
-	_exception(SIGBUS, regs);	
+
+	info.si_signo = SIGBUS;
+	info.si_errno = 0;
+	info.si_code = BUS_ADRALN;
+	info.si_addr = (void *)regs->nip;
+	_exception(SIGBUS, &info, regs);	
 }
 
 void __init trap_init(void)

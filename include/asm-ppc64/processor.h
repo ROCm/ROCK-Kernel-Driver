@@ -97,7 +97,7 @@
 #define FPSCR_VX	0x20000000	/* Invalid operation summary */
 #define FPSCR_OX	0x10000000	/* Overflow exception summary */
 #define FPSCR_UX	0x08000000	/* Underflow exception summary */
-#define FPSCR_ZX	0x04000000	/* Zero-devide exception summary */
+#define FPSCR_ZX	0x04000000	/* Zero-divide exception summary */
 #define FPSCR_XX	0x02000000	/* Inexact exception summary */
 #define FPSCR_VXSNAN	0x01000000	/* Invalid op for SNaN */
 #define FPSCR_VXISI	0x00800000	/* Invalid op for Inv - Inv */
@@ -651,9 +651,7 @@ struct thread_struct {
 	unsigned long	ksp;		/* Kernel stack pointer */
 	struct pt_regs	*regs;		/* Pointer to saved register state */
 	mm_segment_t	fs;		/* for get_fs() validation */
-	signed long     last_syscall;
 	double		fpr[32];	/* Complete floating point set */
-	unsigned long	fpscr_pad;	/* fpr ... fpscr must be contiguous */
 	unsigned long	fpscr;		/* Floating point status */
 };
 
@@ -663,8 +661,8 @@ struct thread_struct {
 	INIT_SP, /* ksp */ \
 	(struct pt_regs *)INIT_SP - 1, /* regs */ \
 	KERNEL_DS, /*fs*/ \
-	0, /* last_syscall */ \
-	{0}, 0, 0 \
+	{0}, /* fpr */ \
+	0 /* fpscr */ \
 }
 
 /*

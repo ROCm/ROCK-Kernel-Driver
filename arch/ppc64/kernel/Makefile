@@ -38,8 +38,6 @@ obj-$(CONFIG_PCI) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o eeh.o
 obj-y += rtasd.o nvram.o
 endif
 
-obj-$(CONFIG_KGDB) += ppc-stub.o
-
 obj-$(CONFIG_SMP) += smp.o
 
 obj-y += prom.o lmb.o rtas.o rtas-proc.o chrp_setup.o i8259.o

@@ -309,7 +309,6 @@ xmon(struct pt_regs *excp)
 			std	29,232(%0)\n\
 			std	30,240(%0)\n\
 			std	31,248(%0)" : : "b" (&regs));
-		printf("xmon called\n");
 		/* Fetch the link reg for this stack frame.
 		 NOTE: the prev printf fills in the lr. */
 		regs.nip = regs.link = ((unsigned long *)(regs.gpr[1]))[2];

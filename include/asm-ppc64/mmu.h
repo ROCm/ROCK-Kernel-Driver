@@ -211,18 +211,11 @@ static inline void _tlbie(unsigned long va, int large)
 	asm volatile("eieio; tlbsync; ptesync": : :"memory");
 }
 
-static inline void _tlbiel(unsigned long va, int large)
+static inline void _tlbiel(unsigned long va)
 {
 	asm volatile("ptesync": : :"memory");
-
-	if (large) {
-		asm volatile("clrldi	%0,%0,16\n\
-			      tlbiel	%0,1" : : "r"(va) : "memory");
-	} else {
-		asm volatile("clrldi	%0,%0,16\n\
-			      tlbiel	%0,0" : : "r"(va) : "memory");
-	}
-
+	asm volatile("clrldi	%0,%0,16\n\
+		      tlbiel	%0" : : "r"(va) : "memory");
 	asm volatile("ptesync": : :"memory");
 }
 

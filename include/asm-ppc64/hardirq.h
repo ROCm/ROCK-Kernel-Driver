@@ -26,7 +26,7 @@ typedef struct {
 #endif
 	unsigned int __local_bh_count;
 	unsigned int __syscall_count;
-	unsigned long __unused;
+	unsigned long idle_timestamp;
 	struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
