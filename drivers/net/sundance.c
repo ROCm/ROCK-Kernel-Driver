@@ -322,6 +322,8 @@ enum alta_offsets {
 	TxDMAPollPeriod = 0x0a,
 	RxDMAStatus = 0x0c,
 	RxListPtr = 0x10,
+	DebugCtrl0 = 0x1a,
+	DebugCtrl1 = 0x1c,
 	RxDMABurstThresh = 0x14,
 	RxDMAUrgentThresh = 0x15,
 	RxDMAPollPeriod = 0x16,
@@ -480,7 +482,7 @@ static void netdev_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static int  start_tx(struct sk_buff *skb, struct net_device *dev);
-static int reset_tx (struct net_device *dev, int irq);
+static int reset_tx (struct net_device *dev);
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void rx_poll(unsigned long data);
 static void refill_rx (struct net_device *dev);
@@ -934,6 +936,7 @@ static void tx_timeout(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	long flag;
 
+	writew(0, ioaddr + IntrEnable);
 	printk(KERN_WARNING "%s: Transmit timed out, TxStatus %2.2x "
 		   "TxFrameId %2.2x,"
 		   " resetting...\n", dev->name, readb(ioaddr + TxStatus),
@@ -948,9 +951,11 @@ static void tx_timeout(struct net_device *dev)
 		for (i = 0; i < TX_RING_SIZE; i++)
 			printk(" %8.8x", np->tx_ring[i].status);
 		printk("\n");
+		printk(KERN_DEBUG "cur_tx=%d dirty_tx=%d\n", np->cur_tx, np->dirty_tx);
+		printk(KERN_DEBUG "cur_rx=%d dirty_rx=%d\n", np->cur_rx, np->dirty_rx);
 	}
 	spin_lock_irqsave(&np->lock, flag);
-	reset_tx(dev, 0);
+	reset_tx(dev);
 	spin_unlock_irqrestore(&np->lock, flag);
 
 	/* Perhaps we should reinitialize the hardware here. */
@@ -962,9 +967,7 @@ static void tx_timeout(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-
-	if (!netif_queue_stopped(dev))
-		netif_wake_queue(dev);
+	netif_wake_queue(dev);
 }
 
 
@@ -1067,15 +1070,18 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 		writel (1000, ioaddr + DownCounter);
 	return 0;
 }
+/* Reset hardware tx and reset TxListPtr to TxFrameId */
 static int
-reset_tx (struct net_device *dev, int irq)
+reset_tx (struct net_device *dev)
 {
 	struct netdev_private *np = (struct netdev_private*) dev->priv;
 	long ioaddr = dev->base_addr;
+	struct sk_buff *skb;
 	int i;
-	int frame_id;
-
-	frame_id = readb(ioaddr + TxFrameId);
+	int irq = in_interrupt();
+	
+	/* reset tx logic */
+	writel (0, dev->base_addr + TxListPtr);
 	writew (TxReset | DMAReset | FIFOReset | NetworkReset,
 			ioaddr + ASICCtrl + 2);
 	for (i=50; i > 0; i--) {
@@ -1083,25 +1089,22 @@ reset_tx (struct net_device *dev, int irq)
 			break;
 		mdelay(1);
 	}
-	for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
-		int entry = np->dirty_tx % TX_RING_SIZE;
-		struct sk_buff *skb;
-		if (!(np->tx_ring[entry].status & 0x00010000))
-			break;
-		skb = np->tx_skbuff[entry];
-		/* Free the original skb. */
-		pci_unmap_single(np->pci_dev,
-			np->tx_ring[entry].frag[0].addr,
-			skb->len, PCI_DMA_TODEVICE);
-		if (irq)
-			dev_kfree_skb_irq (np->tx_skbuff[entry]);
-		else
-			dev_kfree_skb (np->tx_skbuff[entry]);
-
-		np->tx_skbuff[entry] = 0;
+	/* free all tx skbuff */
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		skb = np->tx_skbuff[i];
+		if (skb) {
+			pci_unmap_single(np->pci_dev, 
+				np->tx_ring[i].frag[0].addr, skb->len,
+				PCI_DMA_TODEVICE);
+			if (irq)
+				dev_kfree_skb_irq (skb);
+			else
+				dev_kfree_skb (skb);
+			np->tx_skbuff[i] = 0;
+			np->stats.tx_dropped++;
+		}
 	}
-	writel (np->tx_ring_dma + frame_id * sizeof(*np->tx_ring),
-			dev->base_addr + TxListPtr);
+	np->cur_tx = np->dirty_tx = 0;
 	return 0;
 }
 
@@ -1156,7 +1159,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 					if (tx_status & 0x10) {	/* Reset the Tx. */
 						np->stats.tx_fifo_errors++;
 						spin_lock(&np->lock);
-						reset_tx(dev, 1);
+						reset_tx(dev);
 						spin_unlock(&np->lock);
 					}
 					if (tx_status & 0x1e)	/* Restart the Tx. */
