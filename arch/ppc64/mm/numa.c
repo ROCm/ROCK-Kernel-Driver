@@ -24,9 +24,17 @@
 int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] = -1};
 int numa_memory_lookup_table[MAX_MEMORY >> MEMORY_INCREMENT_SHIFT] =
 	{ [ 0 ... ((MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1)] = -1};
+unsigned long numa_cpumask_lookup_table[MAX_NUMNODES];
 
 struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
+
+static inline void map_cpu_to_node(int cpu, int node)
+{
+	dbg("cpu %d maps to domain %d\n", cpu, node);
+	numa_cpu_lookup_table[cpu] = node;
+	numa_cpumask_lookup_table[node] |= 1UL << cpu;
+}
 
 static int __init parse_numa_properties(void)
 {
@@ -87,9 +95,7 @@ static int __init parse_numa_properties(void)
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
-		numa_cpu_lookup_table[cpu_nr] = numa_domain;
-
-		dbg("cpu %d maps to domain %d\n", cpu_nr, numa_domain);
+		map_cpu_to_node(cpu_nr, numa_domain);
 	}
 
 	for (memory = find_type_devices("memory"); memory;
@@ -134,7 +140,7 @@ new_range:
 
 		/* FIXME */
 		if (numa_domain == 0xffff) {
-			dbg("cpu has no numa doman\n");
+			dbg("memory has no numa doman\n");
 			numa_domain = 0;
 		}
 

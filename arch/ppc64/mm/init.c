@@ -69,8 +69,6 @@ struct mmu_context_queue_t mmu_context_queue;
 int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 
-static int boot_mapsize;
-
 extern pgd_t swapper_pg_dir[];
 extern char __init_begin, __init_end;
 extern char _start[], _end[];
@@ -454,6 +452,7 @@ void __init do_init_bootmem(void)
 	unsigned long i;
 	unsigned long start, bootmap_pages;
 	unsigned long total_pages = lmb_end_of_DRAM() >> PAGE_SHIFT;
+	int boot_mapsize;
 
 	/*
 	 * Find an area to use for the bootmem bitmap.  Calculate the size of
