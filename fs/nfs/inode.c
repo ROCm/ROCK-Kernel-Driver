@@ -968,7 +968,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	/* Protect against RPC races by saving the change attribute */
 	verifier = nfs_save_change_attribute(inode);
 	status = NFS_PROTO(inode)->getattr(server, NFS_FH(inode), &fattr);
-	if (status) {
+	if (status != 0) {
 		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%s/%Ld) getattr failed, error=%d\n",
 			 inode->i_sb->s_id,
 			 (long long)NFS_FILEID(inode), status);
@@ -1828,9 +1828,13 @@ static struct file_system_type nfs4_fs_type = {
 extern int nfs_init_nfspagecache(void);
 extern void nfs_destroy_nfspagecache(void);
 extern int nfs_init_readpagecache(void);
-extern int nfs_destroy_readpagecache(void);
+extern void nfs_destroy_readpagecache(void);
 extern int nfs_init_writepagecache(void);
-extern int nfs_destroy_writepagecache(void);
+extern void nfs_destroy_writepagecache(void);
+#ifdef CONFIG_NFS_DIRECTIO
+extern int nfs_init_directcache(void);
+extern void nfs_destroy_directcache(void);
+#endif
 
 static kmem_cache_t * nfs_inode_cachep;
 
@@ -1911,6 +1915,12 @@ static int __init init_nfs_fs(void)
 	if (err)
 		goto out1;
 
+#ifdef CONFIG_NFS_DIRECTIO
+	err = nfs_init_directcache();
+	if (err)
+		goto out0;
+#endif
+
 #ifdef CONFIG_PROC_FS
 	rpc_proc_register(&nfs_rpcstat);
 #endif
@@ -1921,8 +1931,14 @@ static int __init init_nfs_fs(void)
 		goto out;
 	return 0;
 out:
+#ifdef CONFIG_PROC_FS
 	rpc_proc_unregister("nfs");
+#endif
 	nfs_destroy_writepagecache();
+#ifdef CONFIG_NFS_DIRECTIO
+out0:
+	nfs_destroy_directcache();
+#endif
 out1:
 	nfs_destroy_readpagecache();
 out2:
@@ -1935,6 +1951,9 @@ out4:
 
 static void __exit exit_nfs_fs(void)
 {
+#ifdef CONFIG_NFS_DIRECTIO
+	nfs_destroy_directcache();
+#endif
 	nfs_destroy_writepagecache();
 	nfs_destroy_readpagecache();
 	nfs_destroy_inodecache();
