@@ -6,6 +6,7 @@
 #include <asm/errno.h>
 #include <asm/hardware.h>
 #include <asm/arch/irqs.h>
+#include <asm/arch/entry-macro.S>
 
 #ifndef MODE_SVC
 #define MODE_SVC 0x13
