@@ -1735,10 +1735,28 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Dell Optiplex GX260",	/* AD1981A */
 		.type = AC97_TUNE_HP_ONLY
 	},
+	{
+		.vendor = 0x1028,
+		.device = 0x012d,
+		.name = "Dell Precision 450",	/* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
 	{	/* FIXME: which codec? */
 		.vendor = 0x103c,
 		.device = 0x00c3,
 		.name = "Hewlett-Packard onboard",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x12f1,
+		.name = "HP xw8200",	/* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x3008,
+		.name = "HP xw4200",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
  	{
