@@ -136,6 +136,7 @@ extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in 
 extern int panic_on_oops;
 extern int tainted;
 extern const char *print_tainted(void);
+extern void add_taint(unsigned);
 
 /* Values used for system_state */
 extern enum system_states {
@@ -150,6 +151,7 @@ extern enum system_states {
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)
 #define TAINT_FORCED_RMMOD		(1<<3)
+#define TAINT_MACHINE_CHECK		(1<<4)
 
 extern void dump_stack(void);
 

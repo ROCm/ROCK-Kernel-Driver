@@ -191,6 +191,8 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 			panicm = m;
 			panicm_found = 1;
 		}
+
+		tainted |= TAINT_MACHINE_CHECK;
 	}
 
 	/* Never do anything final in the polling timer */

@@ -110,6 +110,7 @@ EXPORT_SYMBOL(panic);
  *  'P' - Proprietary module has been loaded.
  *  'F' - Module has been forcibly loaded.
  *  'S' - SMP with CPUs not designed for SMP.
+ *  'M' - Machine had a machine check experience.
  *
  *	The string is overwritten by the next call to print_taint().
  */
@@ -118,12 +119,19 @@ const char *print_tainted(void)
 {
 	static char buf[20];
 	if (tainted) {
-		snprintf(buf, sizeof(buf), "Tainted: %c%c%c",
+		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c",
 			tainted & TAINT_PROPRIETARY_MODULE ? 'P' : 'G',
 			tainted & TAINT_FORCED_MODULE ? 'F' : ' ',
-			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ');
+			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
+ 			tainted & TAINT_MACHINE_CHECK ? 'M' : ' ');
 	}
 	else
 		snprintf(buf, sizeof(buf), "Not tainted");
 	return(buf);
 }
+
+void add_taint(unsigned flag)
+{
+	tainted |= flag;
+}
+EXPORT_SYMBOL(add_taint);
