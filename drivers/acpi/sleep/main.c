@@ -273,4 +273,4 @@ static int __init acpi_sleep_init(void)
 	return_VALUE(0);
 }
 
-subsys_initcall(acpi_sleep_init);
+late_initcall(acpi_sleep_init);
