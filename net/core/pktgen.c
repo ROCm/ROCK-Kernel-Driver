@@ -634,7 +634,8 @@ static void inject(struct pktgen_info* info)
 
 		nr_frags = skb_shinfo(skb)->nr_frags;
 		   
-		spin_lock_bh(&odev->xmit_lock);
+		if (!(odev->features & NETIF_F_LLTX))
+			spin_lock_bh(&odev->xmit_lock);
 		if (!netif_queue_stopped(odev)) {
 
 			atomic_inc(&skb->users);
@@ -659,8 +660,8 @@ static void inject(struct pktgen_info* info)
 			last_ok = 0;
 		}
 		
-
-		spin_unlock_bh(&odev->xmit_lock);
+		if (!(odev->features & NETIF_F_LLTX))
+			spin_unlock_bh(&odev->xmit_lock);
 
 		if (info->ipg) {
 			/* Try not to busy-spin if we have larger sleep times.
