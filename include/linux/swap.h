@@ -133,7 +133,6 @@ extern unsigned long totalhigh_pages;
 extern unsigned int nr_free_pages(void);
 extern unsigned int nr_free_buffer_pages(void);
 extern unsigned int nr_free_pagecache_pages(void);
-extern void __remove_inode_page(struct page *);
 
 /* Incomplete types for prototype declarations: */
 struct task_struct;

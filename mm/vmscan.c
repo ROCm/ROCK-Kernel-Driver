@@ -288,7 +288,7 @@ page_freeable:
 
 		/* point of no return */
 		if (likely(!PageSwapCache(page))) {
-			__remove_inode_page(page);
+			__remove_from_page_cache(page);
 			write_unlock(&mapping->page_lock);
 		} else {
 			swp_entry_t swap;

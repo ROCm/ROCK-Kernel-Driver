@@ -269,12 +269,6 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			/* size in bytes */
 			ullval = bdev->bd_inode->i_size;
 			return put_user(ullval, (u64 *) arg);
-#if 0
-		case BLKRRPART: /* Re-read partition tables */
-			if (!capable(CAP_SYS_ADMIN)) 
-				return -EACCES;
-			return reread_partitions(dev, 1);
-#endif
 
 		case BLKPG:
 			return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);

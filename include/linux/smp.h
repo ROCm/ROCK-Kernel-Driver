@@ -100,6 +100,8 @@ static inline void smp_send_reschedule_all(void) { }
 #define per_cpu(var, cpu)			var
 #define this_cpu(var)				var
 
+struct notifier_block;
+
 /* Need to know about CPUs going up/down? */
 static inline int register_cpu_notifier(struct notifier_block *nb)
 {

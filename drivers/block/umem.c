@@ -818,14 +818,7 @@ static void del_battery_timer(void)
 static int mm_revalidate(kdev_t i_rdev)
 {
 	int card_number = DEVICE_NR(i_rdev);
-	kdev_t device = mk_kdev(MAJOR_NR, card_number << MM_SHIFT);
-	int res = dev_lock_part(device);
-	if (res < 0)
-		return res;
-	wipe_partitions(device);
-	printk(KERN_INFO "mm partition check: (%d)\n", card_number);
-	grok_partitions(device, cards[card_number].mm_size << 1);
-	dev_unlock_part(device);
+	mm_partitions[minor(i_rdev)] = cards[card_number].mm_size << 1;
 	return 0;
 }
 /*
@@ -835,22 +828,10 @@ static int mm_revalidate(kdev_t i_rdev)
 */
 static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned long arg)
 {
-	int err, size, card_number;
-	struct hd_geometry geo;
-	unsigned int minor;
-
-	if (!i)
-		return -EINVAL;
-
-	minor       = minor(i->i_rdev);
-	card_number = (minor >> MM_SHIFT);
-
-
-	switch(cmd) {
-	case BLKRRPART:
-		return (mm_revalidate(i->i_rdev));
-
-	case HDIO_GETGEO:
+	if (cmd == case HDIO_GETGEO) {
+		unsigned int minor = minor(i->i_rdev);
+		int err, size, card_number = (minor >> MM_SHIFT);
+		struct hd_geometry geo;
 		/*
 		 * get geometry: we have to fake one...  trim the size to a
 		 * multiple of 2048 (1M): tell we have 32 sectors, 64 heads,
@@ -867,12 +848,9 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 		if (copy_to_user((void *) arg, &geo, sizeof(geo)))
 			return -EFAULT;
 		return 0;
-
-	default:
-		return -EINVAL;
 	}
 
-	return -ENOTTY; /* unknown command */
+	return -EINVAL;
 }
 /*
 -----------------------------------------------------------------------------------

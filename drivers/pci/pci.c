@@ -602,18 +602,6 @@ EXPORT_SYMBOL(pci_save_state);
 EXPORT_SYMBOL(pci_restore_state);
 EXPORT_SYMBOL(pci_enable_wake);
 
-/* Obsolete functions */
-
-EXPORT_SYMBOL(pcibios_present);
-EXPORT_SYMBOL(pcibios_read_config_byte);
-EXPORT_SYMBOL(pcibios_read_config_word);
-EXPORT_SYMBOL(pcibios_read_config_dword);
-EXPORT_SYMBOL(pcibios_write_config_byte);
-EXPORT_SYMBOL(pcibios_write_config_word);
-EXPORT_SYMBOL(pcibios_write_config_dword);
-EXPORT_SYMBOL(pcibios_find_class);
-EXPORT_SYMBOL(pcibios_find_device);
-
 /* Quirk info */
 
 EXPORT_SYMBOL(isa_dma_bridge_buggy);

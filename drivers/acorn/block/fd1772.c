@@ -1324,37 +1324,25 @@ static int invalidate_drive(int rdev)
 #endif
 
 	set_bit(rdev & 3, &fake_change);
-	check_disk_change(rdev);
 	return 0;
 }
 
 static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
-	int drive, device;
+	struct block_device *bdev = inode->i_bdev;
+	int drive = MINOR(bdev->bd_dev);
 
-	device = inode->i_rdev;
-	drive = minor(device);
 	switch (cmd) {
-	case FDFMTBEG:
-		return 0;
-		/* case FDC1772LRPRM:  ??? DAG what does this do?? 
-		   unit[drive].disktype = NULL;
-		   floppy_sizes[drive] = MAX_DISK_SIZE;
-		   return invalidate_drive (device); */
 	case FDFMTEND:
 	case FDFLUSH:
-		return invalidate_drive(drive);
-	}
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	if (drive < 0 || drive > 3)
-		return -EINVAL;
-	switch (cmd) {
+		invalidate_drive(drive);
+		check_disk_change(bdev);
+	case FDFMTBEG:
+		return 0;
 	default:
 		return -EINVAL;
 	}
-	return 0;
 }
 
 
@@ -1520,7 +1508,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 		return 0;
 
 	if (filp->f_mode & 3) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 		if (filp->f_mode & 2) {
 			if (unit[drive].wpstat) {
 				floppy_release(inode, filp);

@@ -1558,7 +1558,7 @@ idepmac_wake_device(struct ata_device *drive, int used_dma)
 		ata_ops(drive)->check_media_change(drive);
 
 	/* We kick the VFS too (see fix in ide.c revalidate) */
-	check_disk_change(mk_kdev(drive->channel->major, (drive->select.b.unit) << PARTN_BITS));
+	__check_disk_change(MKDEV(drive->channel->major, (drive->select.b.unit) << PARTN_BITS));
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* We re-enable DMA on the drive if it was active. */

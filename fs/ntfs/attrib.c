@@ -110,7 +110,8 @@ static inline run_list_element *ntfs_rl_realloc(run_list_element *rl,
 static inline BOOL ntfs_are_rl_mergeable(run_list_element *dst,
 		run_list_element *src)
 {
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	if ((dst->lcn < 0) || (src->lcn < 0))     /* Are we merging holes? */
 		return FALSE;
@@ -192,7 +193,8 @@ static inline run_list_element *ntfs_rl_append(run_list_element *dst,
 	BOOL right;
 	int magic;
 
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* First, check if the right hand end needs merging. */
 	right = ntfs_are_rl_mergeable(src + ssize - 1, dst + loc + 1);
@@ -258,7 +260,8 @@ static inline run_list_element *ntfs_rl_insert(run_list_element *dst,
 	BOOL hole = FALSE;	/* Following a hole */
 	int magic;
 
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* disc => Discontinuity between the end of @dst and the start of @src.
 	 *         This means we might need to insert a hole.
@@ -362,7 +365,8 @@ static inline run_list_element *ntfs_rl_replace(run_list_element *dst,
 	BOOL right;
 	int magic;
 
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* First, merge the left and right ends, if necessary. */
 	right = ntfs_are_rl_mergeable(src + ssize - 1, dst + loc + 1);
@@ -423,7 +427,8 @@ static inline run_list_element *ntfs_rl_replace(run_list_element *dst,
 static inline run_list_element *ntfs_rl_split(run_list_element *dst, int dsize,
 		run_list_element *src, int ssize, int loc)
 {
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* Space required: @dst size + @src size + one new hole. */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize + 1);
@@ -948,7 +953,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	else
 		base_ni = ni->_INE(base_ntfs_ino);
 
-	mrec = map_mft_record(READ, base_ni);
+	mrec = map_mft_record(base_ni);
 	if (IS_ERR(mrec))
 		return PTR_ERR(mrec);
 	ctx = get_attr_search_ctx(base_ni, mrec);
@@ -979,7 +984,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	
 	put_attr_search_ctx(ctx);
 err_out:
-	unmap_mft_record(READ, base_ni);
+	unmap_mft_record(base_ni);
 	return err;
 }
 
@@ -1671,7 +1676,7 @@ void reinit_attr_search_ctx(attr_search_context *ctx)
 		return;
 	} /* Attribute list. */
 	if (ctx->ntfs_ino != ctx->base_ntfs_ino)
-		unmap_mft_record(READ, ctx->ntfs_ino);
+		unmap_mft_record(ctx->ntfs_ino);
 	init_attr_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
 	return;
 }
@@ -1704,7 +1709,7 @@ attr_search_context *get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 void put_attr_search_ctx(attr_search_context *ctx)
 {
 	if (ctx->base_ntfs_ino && ctx->ntfs_ino != ctx->base_ntfs_ino)
-		unmap_mft_record(READ, ctx->ntfs_ino);
+		unmap_mft_record(ctx->ntfs_ino);
 	kmem_cache_free(ntfs_attr_ctx_cache, ctx);
 	return;
 }

@@ -58,12 +58,6 @@
 struct hd_struct part_table[256];
 
 static struct block_device_operations nftl_fops;
-static struct gendisk nftl_gendisk = {
-	major:		MAJOR_NR,
-	major_name:	"nftl",
-	minor_shift:	NFTL_PARTN_BITS,	/* # of partition bits */
-	part:		part_table,		/* hd struct */
-};
 
 struct NFTLrecord *NFTLs[MAX_NFTLS];
 
@@ -73,6 +67,8 @@ static void NFTL_setup(struct mtd_info *mtd)
 	struct NFTLrecord *nftl;
 	unsigned long temp;
 	int firstfree = -1;
+	struct gendisk *gd;
+	char *name;
 
 	DEBUG(MTD_DEBUG_LEVEL1,"NFTL_setup\n");
 
@@ -91,7 +87,12 @@ static void NFTL_setup(struct mtd_info *mtd)
         }
 
 	nftl = kmalloc(sizeof(struct NFTLrecord), GFP_KERNEL);
-	if (!nftl) {
+	gd = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+	name = kmalloc(6, GFP_KERNEL);
+	if (!nftl || !gd || !name) {
+		kfree(nftl);
+		kfree(gd);
+		kfree(name);
 		printk(KERN_WARNING "Out of memory for NFTL data structures\n");
 		return;
 	}
@@ -106,6 +107,8 @@ static void NFTL_setup(struct mtd_info *mtd)
         if (NFTL_mount(nftl) < 0) {
 		printk(KERN_WARNING "Could not mount NFTL device\n");
 		kfree(nftl);
+		kfree(gd);
+		kfree(name);
 		return;
         }
 
@@ -142,19 +145,18 @@ static void NFTL_setup(struct mtd_info *mtd)
 		/* Oh no we don't have nftl->nr_sects = nftl->heads * nftl->cylinders * nftl->sectors; */
 	}
 	NFTLs[firstfree] = nftl;
-	/* Finally, set up the block device sizes */
-	part_table[firstfree * 16].nr_sects = nftl->nr_sects;
-
-	nftl_gendisk.nr_real++;
-
-	/* partition check ... */
-#if LINUX_VERSION_CODE < 0x20328
-	resetup_one_dev(&nftl_gendisk, firstfree);
-#else
-	register_disk(&nftl_gendisk,
-		      mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
+	memset(gd, 0, sizeof(struct gendisk));
+	sprintf(name, "nftl%c", 'a' + firstfree);
+	gd->major = MAJOR_NR;
+	gd->first_minor = firstfree << NFTL_PARTN_BITS;
+	gd->minor_shift = NFTL_PARTN_BITS;
+	gd->part = part_table + (firstfree << NFTL_PARTN_BITS);
+	gd->major_name = name;
+	gd->nr_real = 1;
+	nftl->disk = gd;
+	add_gendisk(gd);
+	register_disk(gd, mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
 		      1<<NFTL_PARTN_BITS, &nftl_fops, nftl->nr_sects);
-#endif
 }
 
 static void NFTL_unsetup(int i)
@@ -169,8 +171,9 @@ static void NFTL_unsetup(int i)
 		kfree(nftl->ReplUnitTable);
 	if (nftl->EUNtable)
 		kfree(nftl->EUNtable);
-		      
-	nftl_gendisk.nr_real--;
+	del_gendisk(nftl->disk);
+	kfree(nftl->disk->major_name);
+	kfree(nftl->disk);
 	kfree(nftl);
 }
 
@@ -796,21 +799,6 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		if (nftl->mtd->sync)
 			nftl->mtd->sync(nftl->mtd);
 		return 0;
-
-	case BLKRRPART:
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-		{
-		kdev_t device = mk_kdev(MAJOR_NR,
-			minor(inode->i_rdev) & -(1<<NFTL_PARTN_BITS));
-		res = dev_lock_part(device);
-		if (res < 0)
-			return res;
-		res = wipe_partitions(device);
-		if (!res)
-			grok_partitions(device, nftl->nr_sects);
-		dev_unlock_part(device);
-		}
-		return res;
 	default:
 		return -EINVAL;
 	}
@@ -964,16 +952,6 @@ static int nftl_release(struct inode *inode, struct file *fp)
 
 	return 0;
 }
-#if LINUX_VERSION_CODE < 0x20326
-static struct file_operations nftl_fops = {
-	read:		block_read,
-	write:		block_write,
-	ioctl:		nftl_ioctl,
-	open:		nftl_open,
-	release:	nftl_release,
-	fsync:		block_fsync,
-};
-#else
 static struct block_device_operations nftl_fops = 
 {
 	owner:		THIS_MODULE,
@@ -981,9 +959,6 @@ static struct block_device_operations nftl_fops =
 	release:	nftl_release,
 	ioctl: 		nftl_ioctl
 };
-#endif
-
-
 
 /****************************************************************************
  *
@@ -1009,10 +984,8 @@ int __init init_nftl(void)
 	if (register_blkdev(MAJOR_NR, "nftl", &nftl_fops)){
 		printk("unable to register NFTL block device on major %d\n", MAJOR_NR);
 		return -EBUSY;
-	} else {
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request, &nftl_lock);
-		add_gendisk(&nftl_gendisk);
 	}
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request, &nftl_lock);
 	
 	register_mtd_user(&nftl_notifier);
 
@@ -1023,10 +996,7 @@ static void __exit cleanup_nftl(void)
 {
   	unregister_mtd_user(&nftl_notifier);
   	unregister_blkdev(MAJOR_NR, "nftl");
-  	
   	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-
-	del_gendisk(&nftl_gendisk);
 }
 
 module_init(init_nftl);

@@ -162,6 +162,7 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 handle_name:
    {
 	struct dentry *real_dent;
+	MFT_RECORD *m;
 	attr_search_context *ctx;
 	ntfs_inode *ni = NTFS_I(dent_inode);
 	int err;
@@ -175,22 +176,23 @@ handle_name:
 				name->len * 3 + 1);
 		kfree(name);
 	} else /* if (name->type == FILE_NAME_DOS) */ {		/* Case 3. */
-		MFT_RECORD *m;
 		FILE_NAME_ATTR *fn;
 
 		kfree(name);
 
 		/* Find the WIN32 name corresponding to the matched DOS name. */
 		ni = NTFS_I(dent_inode);
-		m = map_mft_record(READ, ni);
+		m = map_mft_record(ni);
 		if (IS_ERR(m)) {
 			err = PTR_ERR(m);
-			goto name_err_out;
+			m = NULL;
+			ctx = NULL;
+			goto err_out;
 		}
 		ctx = get_attr_search_ctx(ni, m);
 		if (!ctx) {
 			err = -ENOMEM;
-			goto unm_err_out;
+			goto err_out;
 		}
 		do {
 			ATTR_RECORD *a;
@@ -202,21 +204,21 @@ handle_name:
 						"namespace counterpart to DOS "
 						"file name. Run chkdsk.");
 				err = -EIO;
-				goto put_unm_err_out;
+				goto err_out;
 			}
 			/* Consistency checks. */
 			a = ctx->attr;
 			if (a->non_resident || a->flags)
-				goto eio_put_unm_err_out;
+				goto eio_err_out;
 			val_len = le32_to_cpu(a->_ARA(value_length));
 			if (le16_to_cpu(a->_ARA(value_offset)) + val_len >
 					le32_to_cpu(a->length))
-				goto eio_put_unm_err_out;
+				goto eio_err_out;
 			fn = (FILE_NAME_ATTR*)((u8*)ctx->attr + le16_to_cpu(
 					ctx->attr->_ARA(value_offset)));
 			if ((u32)(fn->file_name_length * sizeof(uchar_t) +
 					sizeof(FILE_NAME_ATTR)) > val_len)
-				goto eio_put_unm_err_out;
+				goto eio_err_out;
 		} while (fn->file_name_type != FILE_NAME_WIN32);
 
 		/* Convert the found WIN32 name to current NLS code page. */
@@ -226,13 +228,15 @@ handle_name:
 				fn->file_name_length * 3 + 1);
 
 		put_attr_search_ctx(ctx);
-		unmap_mft_record(READ, ni);
+		unmap_mft_record(ni);
 	}
+	m = NULL;
+	ctx = NULL;
 
 	/* Check if a conversion error occured. */
 	if ((signed)nls_name.len < 0) {
 		err = (signed)nls_name.len;
-		goto name_err_out;
+		goto err_out;
 	}
 	nls_name.hash = full_name_hash(nls_name.name, nls_name.len);
 
@@ -248,7 +252,7 @@ handle_name:
 		kfree(nls_name.name);
 		if (!real_dent) {
 			err = -ENOMEM;
-			goto name_err_out;
+			goto err_out;
 		}
 		d_add(real_dent, dent_inode);
 		return real_dent;
@@ -269,14 +273,14 @@ handle_name:
 	d_instantiate(real_dent, dent_inode);
 	return real_dent;
 
-eio_put_unm_err_out:
+eio_err_out:
 	ntfs_error(vol->sb, "Illegal file name attribute. Run chkdsk.");
 	err = -EIO;
-put_unm_err_out:
-	put_attr_search_ctx(ctx);
-unm_err_out:
-	unmap_mft_record(READ, ni);
-name_err_out:
+err_out:
+	if (ctx)
+		put_attr_search_ctx(ctx);
+	if (m)
+		unmap_mft_record(ni);
 	iput(dent_inode);
 	return ERR_PTR(err);
    }

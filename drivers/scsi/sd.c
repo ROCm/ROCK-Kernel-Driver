@@ -91,7 +91,7 @@ static Scsi_Disk ** sd_dsk_arr;
 static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
 
 static int check_scsidisk_media_change(kdev_t);
-static int fop_revalidate_scsidisk(kdev_t);
+static int sd_revalidate(kdev_t);
 
 static void sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr);
 
@@ -243,12 +243,6 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 				return -EFAULT;
 			return 0;
 		}
-
-		case BLKRRPART: /* Re-read partition tables */
-		        if (!capable(CAP_SYS_ADMIN))
-		                return -EACCES;
-			return revalidate_scsidisk(dev, 1);
-
 		default:
 			return scsi_ioctl(sdp, cmd, (void *) arg);
 	}
@@ -501,7 +495,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	sdp->access_count++;
 
 	if (sdp->removable) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 
 		/*
 		 * If the drive is empty, just let the open fail.
@@ -600,7 +594,7 @@ static struct block_device_operations sd_fops =
 	release:		sd_release,
 	ioctl:			sd_ioctl,
 	check_media_change:	check_scsidisk_media_change,
-	revalidate:		fop_revalidate_scsidisk
+	revalidate:		sd_revalidate
 };
 
 static struct gendisk **sd_disks;
@@ -1318,6 +1312,7 @@ static int sd_attach(Scsi_Device * sdp)
 		devfs_handle_t de;
 		struct device *dev;
 		char flags;
+		char name[5];
 	} *p;
 	struct gendisk *gd;
 
@@ -1368,10 +1363,14 @@ static int sd_attach(Scsi_Device * sdp)
         gd->driverfs_dev_arr[0] = &sdp->sdev_driverfs_dev;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
-	gd->major_name = "sd";
 	gd->minor_shift = 4;
 	gd->part = sd + (dsk_nr << 4);
 	gd->fops = &sd_fops;
+	if (dsk_nr > 26)
+		sprintf(p->name, "sd%c%c", 'a'+dsk_nr/26-1, 'a'+dsk_nr%26);
+	else
+		sprintf(p->name, "sd%c", 'a'+dsk_nr%26);
+	gd->major_name = p->name;
         if (sdp->removable)
 		gd->flags[0] |= GENHD_FL_REMOVABLE;
 	sd_disks[dsk_nr] = gd;
@@ -1382,50 +1381,17 @@ static int sd_attach(Scsi_Device * sdp)
 	return 0;
 }
 
-/**
- *	revalidate_scsidisk - called to flush all partitions and partition 
- *	tables for a changed scsi disk. sd_init_onedisk() is then called
- *	followed by re-reading the new partition table.
- *      @dev: kernel device descriptor (kdev_t)
- *      @maxusage: 0 when called from block level, 1 when called from
- *      sd_ioctl().
- *
- *	Returns 0 if successful; negated errno value otherwise.
- */
-int revalidate_scsidisk(kdev_t dev, int maxusage)
+static int sd_revalidate(kdev_t dev)
 {
 	int dsk_nr = DEVICE_NR(dev);
-	Scsi_Disk * sdkp;
-	Scsi_Device * sdp;
-	kdev_t device = mk_kdev(major(dev), minor(dev) & ~15);
-	int res;
+	Scsi_Disk * sdkp = sd_get_sdisk(dsk_nr);
 
-	SCSI_LOG_HLQUEUE(3, printk("revalidate_scsidisk: dsk_nr=%d\n", 
-				   DEVICE_NR(dev)));
-	sdkp = sd_get_sdisk(dsk_nr);
-	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device)))
+	if (!sdkp || !sdkp->device)
 		return -ENODEV;
 
-	res = dev_lock_part(device);
-	if (res < 0)
-		return res;
-
-	res = wipe_partitions(device);
-	if (res)
-		goto leave;
-
 	sd_init_onedisk(sdkp, dsk_nr);
-
-	grok_partitions(device, sdkp->capacity);
-
-leave:
-	dev_unlock_part(device);
-	return res;
-}
-
-static int fop_revalidate_scsidisk(kdev_t dev)
-{
-	return revalidate_scsidisk(dev, 0);
+	sd_disks[dsk_nr]->part[0].nr_sects = sdkp->capacity;
+	return 0;
 }
 
 /**

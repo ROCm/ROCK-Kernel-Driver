@@ -101,6 +101,7 @@ typedef struct {
  * Defined bits for the flags field in the ntfs_volume structure.
  */
 typedef enum {
+	NV_Errors,		/* 1: Volume has errors, prevent remount rw. */
 	NV_ShowSystemFiles,	/* 1: Return system files in ntfs_readdir(). */
 	NV_CaseSensitive,	/* 1: Treat file names as case sensitive and
 				      create filenames in the POSIX namespace.
@@ -127,6 +128,7 @@ static inline void NVolClear##flag(ntfs_volume *vol)	\
 }
 
 /* Emit the ntfs volume bitops functions. */
+NVOL_FNS(Errors)
 NVOL_FNS(ShowSystemFiles)
 NVOL_FNS(CaseSensitive)
 

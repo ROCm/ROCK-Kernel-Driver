@@ -851,8 +851,13 @@ sys_call_table:
 	.quad osf_getrusage
 	.quad sys_getsockopt
 	.quad alpha_ni_syscall
+#ifdef CONFIG_OSF4_COMPAT
+	.quad osf_readv				/* 120 */
+	.quad osf_writev
+#else
 	.quad sys_readv				/* 120 */
 	.quad sys_writev
+#endif
 	.quad osf_settimeofday
 	.quad sys_fchown
 	.quad sys_fchmod

@@ -37,6 +37,7 @@
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 #include <asm/mmu_context.h>
+#include <asm/tlbflush.h>
 
 #define __KERNEL_SYSCALLS__
 #include <asm/unistd.h>
@@ -62,7 +63,6 @@ static struct {
 
 enum ipi_message_type {
 	IPI_RESCHEDULE,
-	IPI_MIGRATION,
 	IPI_CALL_FUNC,
 	IPI_CPU_STOP,
 };
@@ -84,9 +84,6 @@ int smp_num_cpus = 1;		/* Number that came online.  */
 int smp_threads_ready;		/* True once the per process idle is forked. */
 cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
-
-int __cpu_number_map[NR_CPUS];
-int __cpu_logical_map[NR_CPUS];
 
 extern void calibrate_delay(void);
 extern asmlinkage void entInt(void);
@@ -120,8 +117,6 @@ smp_store_cpu_info(int cpuid)
 	cpu_data[cpuid].last_asn = ASN_FIRST_VERSION;
 	cpu_data[cpuid].need_new_asn = 0;
 	cpu_data[cpuid].asn_lock = 0;
-	local_irq_count(cpuid) = 0;
-	local_bh_count(cpuid) = 0;
 }
 
 /*
@@ -446,7 +441,7 @@ fork_by_hand(void)
  * Bring one cpu online.
  */
 static int __init
-smp_boot_one_cpu(int cpuid, int cpunum)
+smp_boot_one_cpu(int cpuid)
 {
 	struct task_struct *idle;
 	long timeout;
@@ -463,9 +458,6 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 
 	init_idle(idle, cpuid);
 	unhash_process(idle);
-
-	__cpu_logical_map[cpunum] = cpuid;
-	__cpu_number_map[cpuid] = cpunum;
 
 	DBGS(("smp_boot_one_cpu: CPU %d state 0x%lx flags 0x%lx\n",
 	      cpuid, idle->state, idle->flags));
@@ -491,9 +483,7 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 		barrier();
 	}
 
-	/* We must invalidate our stuff as we failed to boot the CPU.  */
-	__cpu_logical_map[cpunum] = -1;
-	__cpu_number_map[cpuid] = -1;
+	/* We failed to boot the CPU.  */
 
 	printk(KERN_ERR "SMP: Processor %d is stuck.\n", cpuid);
 	return -1;
@@ -563,12 +553,8 @@ smp_boot_cpus(void)
 	unsigned long bogosum;
 
 	/* Take care of some initial bookkeeping.  */
-	memset(__cpu_number_map, -1, sizeof(__cpu_number_map));
-	memset(__cpu_logical_map, -1, sizeof(__cpu_logical_map));
 	memset(ipi_data, 0, sizeof(ipi_data));
 
-	__cpu_number_map[boot_cpuid] = 0;
-	__cpu_logical_map[0] = boot_cpuid;
 	current_thread_info()->cpu = boot_cpuid;
 
 	smp_store_cpu_info(boot_cpuid);
@@ -592,7 +578,7 @@ smp_boot_cpus(void)
 		if (((hwrpb_cpu_present_mask >> i) & 1) == 0)
 			continue;
 
-		if (smp_boot_one_cpu(i, cpu_count))
+		if (smp_boot_one_cpu(i))
 			continue;
 
 		cpu_present_mask |= 1UL << i;
@@ -617,14 +603,22 @@ smp_boot_cpus(void)
 	smp_num_cpus = cpu_count;
 }
 
-/*
- * Called by smp_init to release the blocking online cpus once they 
- * are all started.
- */
 void __init
-smp_commence(void)
+smp_prepare_cpus(unsigned int max_cpus)
 {
-	/* smp_init sets smp_threads_ready -- that's enough.  */
+	smp_boot_cpus();
+}
+
+int __devinit
+__cpu_up(unsigned int cpu)
+{
+	return cpu_online(cpu) ? 0 : -ENOSYS;
+}
+
+void __init
+smp_cpus_done(unsigned int max_cpus)
+{
+	smp_threads_ready = 1;
 	mb();
 }
 
@@ -644,15 +638,13 @@ smp_percpu_timer_interrupt(struct pt_regs *regs)
 		/* We need to make like a normal interrupt -- otherwise
 		   timer interrupts ignore the global interrupt lock,
 		   which would be a Bad Thing.  */
-		irq_enter(cpu, RTC_IRQ);
+		irq_enter();
 
 		update_process_times(user);
 
 		data->prof_counter = data->prof_multiplier;
-		irq_exit(cpu, RTC_IRQ);
 
-		if (softirq_pending(cpu))
-			do_softirq();
+		irq_exit();
 	}
 }
 
@@ -668,32 +660,20 @@ send_ipi_message(unsigned long to_whom, enum ipi_message_type operation)
 {
 	unsigned long i, set, n;
 
-	set = to_whom & -to_whom;
-	if (to_whom == set) {
+	mb();
+	for (i = to_whom; i ; i &= ~set) {
+		set = i & -i;
 		n = __ffs(set);
-		mb();
 		set_bit(operation, &ipi_data[n].bits);
-		mb();
-		wripir(n);
-	} else {
-		mb();
-		for (i = to_whom; i ; i &= ~set) {
-			set = i & -i;
-			n = __ffs(set);
-			set_bit(operation, &ipi_data[n].bits);
-		}
+	}
 
-		mb();
-		for (i = to_whom; i ; i &= ~set) {
-			set = i & -i;
-			n = __ffs(set);
-			wripir(n);
-		}
+	mb();
+	for (i = to_whom; i ; i &= ~set) {
+		set = i & -i;
+		n = __ffs(set);
+		wripir(n);
 	}
 }
-
-/* Data for IPI_MIGRATION.  */
-static task_t *migration_task;
 
 /* Structure and data for smp_call_function.  This is designed to 
    minimize static memory requirements.  Plus it looks cleaner.  */
@@ -768,15 +748,6 @@ handle_ipi(struct pt_regs *regs)
 			   is done by the interrupt return path.  */
 			break;
 
-		case IPI_MIGRATION:
-		    {
-			task_t *t = migration_task;
-			mb();
-			migration_task = 0;
-			sched_task_migrated(t);
-			break;
-		    }
-
 		case IPI_CALL_FUNC:
 		    {
 			struct smp_call_struct *data;
@@ -832,19 +803,6 @@ smp_send_reschedule(int cpu)
 		       "smp_send_reschedule: Sending IPI to self.\n");
 #endif
 	send_ipi_message(1UL << cpu, IPI_RESCHEDULE);
-}
-
-void
-smp_migrate_task(int cpu, task_t *t)
-{
-#if DEBUG_IPI_MSG
-	if (cpu == hard_smp_processor_id())
-		printk(KERN_WARNING
-		       "smp_migrate_task: Sending IPI to self.\n");
-#endif
-	/* Acquire the migration_task mutex.  */
-	pointer_lock(&migration_task, t, 1);
-	send_ipi_message(1UL << cpu, IPI_MIGRATION);
 }
 
 void
@@ -977,10 +935,9 @@ flush_tlb_mm(struct mm_struct *mm)
 	if (mm == current->active_mm) {
 		flush_tlb_current(mm);
 		if (atomic_read(&mm->mm_users) <= 1) {
-			int i, cpu, this_cpu = smp_processor_id();
-			for (i = 0; i < smp_num_cpus; i++) {
-				cpu = cpu_logical_map(i);
-				if (cpu == this_cpu)
+			int cpu, this_cpu = smp_processor_id();
+			for (cpu = 0; cpu < NR_CPUS; cpu++) {
+				if (!cpu_online(cpu) || cpu == this_cpu)
 					continue;
 				if (mm->context[cpu])
 					mm->context[cpu] = 0;
@@ -1021,10 +978,9 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 	if (mm == current->active_mm) {
 		flush_tlb_current_page(mm, vma, addr);
 		if (atomic_read(&mm->mm_users) <= 1) {
-			int i, cpu, this_cpu = smp_processor_id();
-			for (i = 0; i < smp_num_cpus; i++) {
-				cpu = cpu_logical_map(i);
-				if (cpu == this_cpu)
+			int cpu, this_cpu = smp_processor_id();
+			for (cpu = 0; cpu < NR_CPUS; cpu++) {
+				if (!cpu_online(cpu) || cpu == this_cpu)
 					continue;
 				if (mm->context[cpu])
 					mm->context[cpu] = 0;
@@ -1071,10 +1027,9 @@ flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 	if (mm == current->active_mm) {
 		__load_new_mm_context(mm);
 		if (atomic_read(&mm->mm_users) <= 1) {
-			int i, cpu, this_cpu = smp_processor_id();
-			for (i = 0; i < smp_num_cpus; i++) {
-				cpu = cpu_logical_map(i);
-				if (cpu == this_cpu)
+			int cpu, this_cpu = smp_processor_id();
+			for (cpu = 0; cpu < NR_CPUS; cpu++) {
+				if (!cpu_online(cpu) || cpu == this_cpu)
 					continue;
 				if (mm->context[cpu])
 					mm->context[cpu] = 0;
