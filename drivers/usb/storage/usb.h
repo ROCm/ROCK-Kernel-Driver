@@ -107,6 +107,7 @@ struct us_data {
 	 */
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
+	struct usb_interface	*pusb_intf;	 /* this interface */
 	unsigned long		flags;		 /* from filter initially */
 	unsigned int		send_bulk_pipe;	 /* cached pipe values */
 	unsigned int		recv_bulk_pipe;
@@ -114,7 +115,7 @@ struct us_data {
 	unsigned int		recv_ctrl_pipe;
 	unsigned int		recv_intr_pipe;
 
-	/* information about the device -- always good */
+	/* information about the device */
 	char			vendor[USB_STOR_STRING_LEN];
 	char			product[USB_STOR_STRING_LEN];
 	char			serial[USB_STOR_STRING_LEN];
@@ -124,11 +125,7 @@ struct us_data {
 	u8			protocol;
 	u8			max_lun;
 
-	/* information about the device -- only good if device is attached */
 	u8			ifnum;		 /* interface number   */
-	u8			ep_in;		 /* bulk in endpoint   */
-	u8			ep_out;		 /* bulk out endpoint  */
-	u8			ep_int;		 /* interrupt endpoint */ 
 	u8			ep_bInterval;	 /* interrupt interval */ 
 
 	/* function pointers for this device */
