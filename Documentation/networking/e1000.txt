@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/1000 Family of Adapters
 ===============================================================
 
-August 6, 2002
+October 12, 2002
 
 
 Contents
@@ -20,7 +20,7 @@ In This Release
 ===============
 
 This file describes the Linux* Base Driver for the Intel(R) PRO/1000 Family
-of Adapters, version 4.3.x.  This driver includes support for 
+of Adapters, version 4.4.x.  This driver includes support for 
 Itanium(TM)-based systems.
 
 This release version includes the following:
@@ -32,7 +32,7 @@ This release version includes the following:
      default in supporting kernels. It is not supported on the Intel(R)
      PRO/1000 Gigabit Server Adapter.
 
-New features include:
+Features include:
 
    - Support for the 82545 and 82546-based adapters listed below
 
@@ -144,8 +144,7 @@ Default Value: 80
 
 RxIntDelay
 Valid Range: 0-65535 (0=off)
-Default Value: 0 (82542, 82543, and 82544-based adapters)
-               128 (82540, 82545, and 82546-based adapters)
+Default Value: 0
     This value delays the generation of receive interrupts in units of 1.024 
     microseconds.  Receive interrupt reduction can improve CPU efficiency if 
     properly tuned for specific network traffic. Increasing this value adds 
@@ -154,13 +153,12 @@ Default Value: 0 (82542, 82543, and 82544-based adapters)
     may be set too high, causing the driver to run out of available receive 
     descriptors.
 
-    CAUTION: When setting RxIntDelay to a value other than 0, adapters based 
-             on the Intel 82543 and 82544 LAN controllers may hang (stop 
-             transmitting) under certain network conditions. If this occurs a
-             message is logged in the system event log. In addition, the 
-             controller is automatically reset, restoring the network 
-             connection. To eliminate the potential for the hang ensure that 
-             RxIntDelay is set to 0.
+    CAUTION: When setting RxIntDelay to a value other than 0, adapters may 
+             hang (stop transmitting) under certain network conditions. If
+             this occurs a NETDEV WATCHDOG message is logged in the system
+             event log. In addition, the controller is automatically reset,
+             restoring the network connection. To eliminate the potential for
+             the hang ensure that RxIntDelay is set to 0.
 
 RxAbsIntDelay (82540, 82545, and 82546-based adapters only)
 Valid Range: 0-65535 (0=off)
