@@ -408,12 +408,15 @@ void mm_release(void)
 		complete(vfork_done);
 	}
 	if (tsk->user_tid) {
+		int * user_tid = tsk->user_tid;
+		tsk->user_tid = NULL;
+
 		/*
 		 * We dont check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
-		put_user(0, tsk->user_tid);
-		sys_futex((unsigned long)tsk->user_tid, FUTEX_WAKE, 1, NULL);
+		put_user(0, user_tid);
+		sys_futex((unsigned long)user_tid, FUTEX_WAKE, 1, NULL);
 	}
 }
 
