@@ -139,8 +139,6 @@ void sym_mfree(void *m, int size, char *name)
 	SYM_UNLOCK_DRIVER(flags);
 }
 
-#ifdef	SYM_LINUX_DYNAMIC_DMA_MAPPING
-
 void *__sym_calloc_dma(m_pool_ident_t dev_dmat, int size, char *name)
 {
 	u_long flags;
@@ -168,9 +166,6 @@ m_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m)
 	SYM_UNLOCK_DRIVER(flags);
 	return b;
 }
-
-#endif	/* SYM_LINUX_DYNAMIC_DMA_MAPPING */
-
 
 /*
  *  Map/unmap a PCI memory window.
@@ -204,11 +199,7 @@ struct host_data {
 /*
  * Some type that fit DMA addresses as seen from BUS.
  */
-#ifndef SYM_LINUX_DYNAMIC_DMA_MAPPING
-typedef u_long		bus_addr_t;
-#else
 typedef dma_addr_t	bus_addr_t;
-#endif
 
 /*
  *  Used by the eh thread to wait for command completion.
@@ -227,10 +218,8 @@ struct sym_eh_wait {
  */
 struct sym_ucmd {		/* Override the SCSI pointer structure */
 	SYM_QUEHEAD link_cmdq;	/* Must stay at offset ZERO */
-#ifdef SYM_LINUX_DYNAMIC_DMA_MAPPING
 	bus_addr_t data_mapping;
 	u_char	data_mapped;
-#endif
 	struct sym_eh_wait *eh_wait;
 };
 
@@ -243,39 +232,18 @@ typedef struct sym_ucmd *ucmd_p;
 /*
  *  Deal with DMA mapping/unmapping.
  */
-
-#ifndef SYM_LINUX_DYNAMIC_DMA_MAPPING
-
-/* Linux versions prior to pci bus iommu kernel interface */
-
-#define __unmap_scsi_data(pdev, cmd)	do {; } while (0)
-#define __map_scsi_single_data(pdev, cmd) (__vtobus(pdev,(cmd)->request_buffer))
-#define __map_scsi_sg_data(pdev, cmd)	((cmd)->use_sg)
-#define __sync_scsi_data(pdev, cmd)	do {; } while (0)
-
-#define bus_sg_dma_address(sc)		vtobus((sc)->address)
-#define bus_sg_dma_len(sc)		((sc)->length)
-
-#else /* Linux version with pci bus iommu kernel interface */
-
 #define	bus_unmap_sg(pdev, sgptr, sgcnt, dir)		\
 	pci_unmap_sg(pdev, sgptr, sgcnt, dir)
-
 #define	bus_unmap_single(pdev, mapping, bufptr, dir)	\
 	pci_unmap_single(pdev, mapping, bufptr, dir)
-
 #define	bus_map_single(pdev, bufptr, bufsiz, dir)	\
 	pci_map_single(pdev, bufptr, bufsiz, dir)
- 
 #define	bus_map_sg(pdev, sgptr, sgcnt, dir)		\
 	pci_map_sg(pdev, sgptr, sgcnt, dir)
-
 #define	bus_dma_sync_sg(pdev, sgptr, sgcnt, dir)	\
 	pci_dma_sync_sg(pdev, sgptr, sgcnt, dir)
-
 #define	bus_dma_sync_single(pdev, mapping, bufsiz, dir)	\
 	pci_dma_sync_single(pdev, mapping, bufsiz, dir)
-
 #define bus_sg_dma_address(sc)	sg_dma_address(sc)
 #define bus_sg_dma_len(sc)	sg_dma_len(sc)
 
@@ -338,8 +306,6 @@ static void __sync_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 		break;
 	}
 }
-
-#endif	/* SYM_LINUX_DYNAMIC_DMA_MAPPING */
 
 #define unmap_scsi_data(np, cmd)	\
 		__unmap_scsi_data(np->s.device, cmd)
@@ -1742,7 +1708,6 @@ static void sym_free_resources(hcb_p np)
 /*
  *  Ask/tell the system about DMA addressing.
  */
-#ifdef SYM_LINUX_DYNAMIC_DMA_MAPPING
 static int sym_setup_bus_dma_mask(hcb_p np)
 {
 #if   SYM_CONF_DMA_ADDRESSING_MODE == 0
@@ -1774,7 +1739,6 @@ out_err32:
 			sym_name(np));
 	return -1;
 }
-#endif /* SYM_LINUX_DYNAMIC_DMA_MAPPING */
 
 /*
  *  Host attach and initialisations.
@@ -1831,7 +1795,6 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	 *  We keep track in the HCB of all the resources that 
 	 *  are to be released on error.
 	 */
-#ifdef	SYM_LINUX_DYNAMIC_DMA_MAPPING
 	np = __sym_calloc_dma(dev->pdev, sizeof(*np), "HCB");
 	if (np) {
 		np->s.device = dev->pdev;
@@ -1839,11 +1802,7 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	}
 	else
 		goto attach_failed;
-#else
-	np = sym_calloc_dma(sizeof(*np), "HCB");
-	if (!np)
-		goto attach_failed;
-#endif
+
 	host_data->ncb = np;
 	np->s.host = instance;
 
@@ -1877,10 +1836,8 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	/*
 	 *  Ask/tell the system about DMA addressing.
 	 */
-#ifdef SYM_LINUX_DYNAMIC_DMA_MAPPING
 	if (sym_setup_bus_dma_mask(np))
 		goto attach_failed;
-#endif
 
 	/*
 	 *  Try to map the controller chip to
