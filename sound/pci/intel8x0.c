@@ -68,6 +68,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int buggy_irq[SNDRV_CARDS];
+static int xbox[SNDRV_CARDS];
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -82,6 +83,8 @@ module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(buggy_irq, bool, boot_devs, 0444);
 MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
+module_param_array(xbox, bool, boot_devs, 0444);
+MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 codec detection.");
 
 /*
  *  Direct registers
@@ -385,10 +388,10 @@ struct _snd_intel8x0 {
 
 	unsigned int mmio;
 	unsigned long addr;
-	void __iomem * remap_addr;
+	void __iomem *remap_addr;
 	unsigned int bm_mmio;
 	unsigned long bmaddr;
-	void __iomem * remap_bmaddr;
+	void __iomem *remap_bmaddr;
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -403,8 +406,11 @@ struct _snd_intel8x0 {
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
+	int in_measurement: 1; /* during ac97 clock measurement */
 	int fix_nocache: 1; /* workaround for 440MX */
 	int buggy_irq: 1; /* workaround for buggy mobos */
+	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
+	int spdif_idx;	/* SPDIF BAR index; *_SPBAR or -1 if use PCMOUT */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
@@ -785,7 +791,8 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 	}
 
 	ichdev->position += step * ichdev->fragsize1;
-	ichdev->position %= ichdev->size;
+	if (! chip->in_measurement)
+		ichdev->position %= ichdev->size;
 	ichdev->lvi += step;
 	ichdev->lvi &= ICH_REG_LVI_MASK;
 	iputbyte(chip, port + ICH_REG_OFF_LVI, ichdev->lvi);
@@ -951,8 +958,8 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 				ichdev->pcm->r[dbl].slots);
 	if (err >= 0) {
 		ichdev->pcm_open_flag = 1;
-		/* FIXME: hack to enable spdif support */
-		if (ichdev->ichd == ICHD_PCMOUT && chip->device_type == DEVICE_SIS)
+		/* Force SPDIF setting */
+		if (ichdev->ichd == ICHD_PCMOUT && chip->spdif_idx < 0)
 			snd_ac97_set_rate(ichdev->pcm->r[0].codec[0], AC97_SPDIF, params_rate(hw_params));
 	}
 	return err;
@@ -1877,7 +1884,6 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	int err;
 	unsigned int i, codecs;
 	unsigned int glob_sta = 0;
-	int spdif_idx = -1; /* disabled */
 	ac97_bus_ops_t *ops;
 	static ac97_bus_ops_t standard_bus_ops = {
 		.write = snd_intel8x0_codec_write,
@@ -1888,16 +1894,16 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		.read = snd_intel8x0_ali_codec_read,
 	};
 
+	chip->spdif_idx = -1; /* use PCMOUT (or disabled) */
 	switch (chip->device_type) {
 	case DEVICE_NFORCE:
-		spdif_idx = NVD_SPBAR;
+		chip->spdif_idx = NVD_SPBAR;
 		break;
 	case DEVICE_ALI:
-		spdif_idx = ALID_AC97SPDIFOUT;
+		chip->spdif_idx = ALID_AC97SPDIFOUT;
 		break;
-	default:
-		if (chip->device_type == DEVICE_INTEL_ICH4)
-			spdif_idx = ICHD_SPBAR;
+	case DEVICE_INTEL_ICH4:
+		chip->spdif_idx = ICHD_SPBAR;
 		break;
 	};
 
@@ -1907,6 +1913,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	ac97.private_data = chip;
 	ac97.private_free = snd_intel8x0_mixer_free_ac97;
 	ac97.scaps = AC97_SCAP_SKIP_MODEM;
+	if (chip->xbox)
+		ac97.scaps |= AC97_SCAP_DETECT_BY_VENDOR;
 	if (chip->device_type != DEVICE_ALI) {
 		glob_sta = igetdword(chip, ICHREG(GLOB_STA));
 		ops = &standard_bus_ops;
@@ -1973,7 +1981,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	i = ARRAY_SIZE(ac97_pcm_defs);
 	if (chip->device_type != DEVICE_INTEL_ICH4)
 		i -= 2;		/* do not allocate PCM2IN and MIC2 */
-	if (spdif_idx < 0)
+	if (chip->spdif_idx < 0)
 		i--;		/* do not allocate S/PDIF */
 	err = snd_ac97_pcm_assign(pbus, i, ac97_pcm_defs);
 	if (err < 0)
@@ -1981,8 +1989,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	chip->ichd[ICHD_PCMOUT].pcm = &pbus->pcms[0];
 	chip->ichd[ICHD_PCMIN].pcm = &pbus->pcms[1];
 	chip->ichd[ICHD_MIC].pcm = &pbus->pcms[2];
-	if (spdif_idx >= 0)
-		chip->ichd[spdif_idx].pcm = &pbus->pcms[3];
+	if (chip->spdif_idx >= 0)
+		chip->ichd[chip->spdif_idx].pcm = &pbus->pcms[3];
 	if (chip->device_type == DEVICE_INTEL_ICH4) {
 		chip->ichd[ICHD_PCM2IN].pcm = &pbus->pcms[4];
 		chip->ichd[ICHD_MIC2].pcm = &pbus->pcms[5];
@@ -2020,7 +2028,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	}
 	if (chip->device_type == DEVICE_NFORCE) {
 		/* 48kHz only */
-		chip->ichd[spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
+		chip->ichd[chip->spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
 	}
 	chip->in_ac97_init = 0;
 	return 0;
@@ -2328,6 +2336,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	snd_intel8x0_setup_periods(chip, ichdev);
 	port = ichdev->reg_offset;
 	spin_lock_irq(&chip->reg_lock);
+	chip->in_measurement = 1;
 	/* trigger */
 	if (chip->device_type != DEVICE_ALI)
 		iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE | ICH_STARTBM);
@@ -2337,18 +2346,14 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	}
 	do_gettimeofday(&start_time);
 	spin_unlock_irq(&chip->reg_lock);
-#if 0
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 20);
-#else
-	/* FIXME: schedule() can take too long time and overlap the boundary.. */
-	mdelay(50);
-#endif
 	spin_lock_irq(&chip->reg_lock);
 	/* check the position */
 	pos = ichdev->fragsize1;
 	pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
 	pos += ichdev->position;
+	chip->in_measurement = 0;
 	do_gettimeofday(&stop_time);
 	/* stop */
 	if (chip->device_type == DEVICE_ALI) {
@@ -2512,8 +2517,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
 		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		chip->remap_addr = ioremap_nocache(chip->addr, pci_resource_len(pci, 2));
-		if (!chip->remap_addr) {
+		chip->remap_addr = ioremap_nocache(chip->addr,
+						   pci_resource_len(pci, 2));
+		if (chip->remap_addr == NULL) {
 			snd_printk("AC'97 space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;
@@ -2524,8 +2530,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
 		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
-		chip->remap_bmaddr = ioremap_nocache(chip->bmaddr, pci_resource_len(pci, 3));
-		if (!chip->remap_bmaddr) {
+		chip->remap_bmaddr = ioremap_nocache(chip->bmaddr,
+						     pci_resource_len(pci, 3));
+		if (chip->remap_bmaddr == NULL) {
 			snd_printk("Controller space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;
@@ -2689,6 +2696,8 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	}
 	if (buggy_irq[dev])
 		chip->buggy_irq = 1;
+	if (xbox[dev])
+		chip->xbox = 1;
 
 	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev], ac97_quirk[dev])) < 0) {
 		snd_card_free(card);
@@ -2701,8 +2710,9 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	
 	snd_intel8x0_proc_init(chip);
 
-	sprintf(card->longname, "%s at 0x%lx, irq %i",
-		card->shortname, chip->addr, chip->irq);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s with %s at %#lx, irq %i", card->shortname,
+		 snd_ac97_get_short_name(chip->ac97[0]), chip->addr, chip->irq);
 
 	if (! ac97_clock[dev])
 		intel8x0_measure_ac97_clock(chip);

@@ -1973,6 +1973,7 @@ static int snd_pcm_open_file(struct file *file,
 
 	str = substream->pstr;
 	substream->file = pcm_file;
+	substream->no_mmap_ctrl = 0;
 
 	pcm_file->substream = substream;
 
@@ -3158,8 +3159,12 @@ static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)
 	offset = area->vm_pgoff << PAGE_SHIFT;
 	switch (offset) {
 	case SNDRV_PCM_MMAP_OFFSET_STATUS:
+		if (substream->no_mmap_ctrl)
+			return -ENXIO;
 		return snd_pcm_mmap_status(substream, file, area);
 	case SNDRV_PCM_MMAP_OFFSET_CONTROL:
+		if (substream->no_mmap_ctrl)
+			return -ENXIO;
 		return snd_pcm_mmap_control(substream, file, area);
 	default:
 		return snd_pcm_mmap_data(substream, file, area);

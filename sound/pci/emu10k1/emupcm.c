@@ -1092,6 +1092,7 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	unsigned int nval[2], bits;
 	int nefx = emu->audigy ? 64 : 32;
+	int nefxb = emu->audigy ? 7 : 6;
 	int change, idx;
 	
 	nval[0] = nval[1] = 0;
@@ -1100,8 +1101,14 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 			nval[idx / 32] |= 1 << (idx % 32);
 			bits++;
 		}
-	if (bits != 1 && bits != 2 && bits != 4 && bits != 8)
+		
+	for (idx = 0; idx < nefxb; idx++)
+		if (1 << idx == bits)
+			break;
+	
+	if (idx >= nefxb)
 		return -EINVAL;
+
 	spin_lock_irq(&emu->reg_lock);
 	change = (nval[0] != emu->efx_voices_mask[0]) ||
 		(nval[1] != emu->efx_voices_mask[1]);

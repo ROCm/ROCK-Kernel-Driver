@@ -514,7 +514,7 @@ static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_bu
 	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i,j,col;
-	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
+	void __iomem *dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
 
 	down(&chip->spos_mutex);
 	snd_iprintf(buffer, "TASK TREES:\n");
@@ -573,7 +573,7 @@ static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_in
 	cs46xx_t *chip = entry->private_data;
 	/*dsp_spos_instance_t * ins = chip->dsp_spos_instance; */
 	unsigned int i,col = 0;
-	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
+	void __iomem *dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
 	symbol_entry_t * symbol; 
 
 	for (i = 0;i < DSP_PARAMETER_BYTE_SIZE; i += sizeof(u32),col ++) {
@@ -599,7 +599,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 {
 	cs46xx_t *chip = entry->private_data;
 	int i,col = 0;
-	unsigned long dst = chip->region.idx[2].remap_addr;
+	void __iomem *dst = chip->region.idx[2].remap_addr;
 
 	snd_iprintf(buffer,"PCMREADER:\n");
 	for (i = PCM_READER_BUF1;i < PCM_READER_BUF1 + 0x30; i += sizeof(u32),col ++) {
@@ -909,7 +909,7 @@ int cs46xx_dsp_proc_done (cs46xx_t *chip)
 static int debug_tree;
 static void _dsp_create_task_tree (cs46xx_t *chip,u32 * task_data, u32  dest, int size)
 {
-	unsigned long spdst = chip->region.idx[1].remap_addr + 
+	void __iomem *spdst = chip->region.idx[1].remap_addr + 
 		DSP_PARAMETER_BYTE_OFFSET + dest * sizeof(u32);
 	int i;
 
@@ -923,7 +923,7 @@ static void _dsp_create_task_tree (cs46xx_t *chip,u32 * task_data, u32  dest, in
 static int debug_scb;
 static void _dsp_create_scb (cs46xx_t *chip,u32 * scb_data, u32  dest)
 {
-	unsigned long spdst = chip->region.idx[1].remap_addr + 
+	void __iomem *spdst = chip->region.idx[1].remap_addr + 
 		DSP_PARAMETER_BYTE_OFFSET + dest * sizeof(u32);
 	int i;
 

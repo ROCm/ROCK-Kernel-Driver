@@ -88,20 +88,20 @@ void snd_opl3_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
 void snd_opl3_cs4281_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
 {
 	unsigned long flags;
-	unsigned long port;
+	void __iomem *port;
 
 	/*
 	 * CS4281 requires a special access to I/O registers
 	 */
 
-	port = (cmd & OPL3_RIGHT) ? opl3->r_port : opl3->l_port;
+	port = (void __iomem *)((cmd & OPL3_RIGHT) ? opl3->r_port : opl3->l_port);
 
 	spin_lock_irqsave(&opl3->reg_lock, flags);
 
-	writel((unsigned int)cmd, port << 2);
+	writel((unsigned int)cmd, port);
 	udelay(10);
 
-	writel((unsigned int)val, (port + 1) << 2);
+	writel((unsigned int)val, port + 4);
 	udelay(30);
 
 	spin_unlock_irqrestore(&opl3->reg_lock, flags);

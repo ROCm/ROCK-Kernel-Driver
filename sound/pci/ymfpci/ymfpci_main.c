@@ -2085,7 +2085,7 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 	}
 #endif
 	if (chip->reg_area_virt)
-		iounmap((void *)chip->reg_area_virt);
+		iounmap(chip->reg_area_virt);
 	if (chip->work_ptr.area)
 		snd_dma_free_pages(&chip->work_ptr);
 	
@@ -2217,7 +2217,7 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	chip->device_id = pci->device;
 	pci_read_config_byte(pci, PCI_REVISION_ID, (u8 *)&chip->rev);
 	chip->reg_area_phys = pci_resource_start(pci, 0);
-	chip->reg_area_virt = (unsigned long)ioremap_nocache(chip->reg_area_phys, 0x8000);
+	chip->reg_area_virt = ioremap_nocache(chip->reg_area_phys, 0x8000);
 	pci_set_master(pci);
 
 	if ((chip->res_reg_area = request_mem_region(chip->reg_area_phys, 0x8000, "YMFPCI")) == NULL) {

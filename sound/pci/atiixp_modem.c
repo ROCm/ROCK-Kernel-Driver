@@ -1238,7 +1238,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	}
 	chip->addr = pci_resource_start(pci, 0);
 	chip->remap_addr = ioremap_nocache(chip->addr, pci_resource_len(pci, 0));
-	if (chip->remap_addr == 0) {
+	if (chip->remap_addr == NULL) {
 		snd_printk(KERN_ERR "AC'97 space ioremap problem\n");
 		snd_atiixp_free(chip);
 		return -EIO;

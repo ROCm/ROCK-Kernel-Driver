@@ -1479,7 +1479,7 @@
   struct snd_mychip {
           ....
           unsigned long iobase_phys;
-          unsigned long iobase_virt;
+          void __iomem *iobase_virt;
   };
 ]]>
           </programlisting>
@@ -1495,8 +1495,7 @@
           return err;
   }
   chip->iobase_phys = pci_resource_start(pci, 0);
-  chip->iobase_virt = (unsigned long)
-                      ioremap_nocache(chip->iobase_phys,
+  chip->iobase_virt = ioremap_nocache(chip->iobase_phys,
                                       pci_resource_len(pci, 0));
 ]]>
           </programlisting>
@@ -1511,7 +1510,7 @@
   {
           ....
           if (chip->iobase_virt)
-                  iounmap((void *)chip->iobase_virt);
+                  iounmap(chip->iobase_virt);
           ....
           pci_release_regions(chip->pci);
           ....

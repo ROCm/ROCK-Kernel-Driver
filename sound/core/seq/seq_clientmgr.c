@@ -152,14 +152,16 @@ client_t *snd_seq_client_use_ptr(int clientid)
 		} else if (clientid >= 64 && clientid < 128) {
 			int card = (clientid - 64) / 8;
 			if (card < snd_ecards_limit) {
+				extern int snd_seq_in_init;
 				if (! card_requested[card]) {
 					card_requested[card] = 1;
 					snd_request_card(card);
 				}
-				/* FIXME: may cause blocking when called from
-				 * module_init(), so disable this feature
+				/* Calling request_module during module_init()
+				 * may cause blocking.
 				 */
-				/* snd_seq_device_load_drivers(); */
+				if (! snd_seq_in_init)
+					snd_seq_device_load_drivers();
 			}
 		}
 		spin_lock_irqsave(&clients_lock, flags);
@@ -423,7 +425,10 @@ static ssize_t snd_seq_read(struct file *file, char __user *buf, size_t count, l
 			count -= err;
 			buf += err;
 		} else {
-			copy_to_user(buf, &cell->event, sizeof(snd_seq_event_t));
+			if (copy_to_user(buf, &cell->event, sizeof(snd_seq_event_t))) {
+				err = -EFAULT;
+				break;
+			}
 			count -= sizeof(snd_seq_event_t);
 			buf += sizeof(snd_seq_event_t);
 		}

@@ -216,7 +216,7 @@ snd_vortex_create(snd_card_t * card, struct pci_dev *pci, vortex_t ** rchip)
 	vortex_core_shutdown(chip);
       core_out:
 	//FIXME: the type of chip->mmio might need to be changed??
-	iounmap((void *)chip->mmio);
+	iounmap(chip->mmio);
       ioremap_out:
 	pci_release_regions(chip->pci_dev);
       regions_out:
@@ -316,7 +316,7 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 #endif
 
 	// (5)
-	strcpy(card->driver, "Aureal Vortex");
+	strcpy(card->driver, CARD_NAME_SHORT);
 	strcpy(card->shortname, CARD_NAME_SHORT);
 	sprintf(card->longname, "%s at 0x%lx irq %i",
 		card->shortname, chip->io, chip->irq);
