@@ -1,8 +1,11 @@
-/*======================================================================
-
-	Device driver for the PCMCIA functionality of M32R.
-
-======================================================================*/
+/*
+ *  linux/arch/m32r/drivers/m32r_pcc.c
+ *
+ *  Device driver for the PCMCIA functionality of M32R.
+ *
+ *  Copyright (c) 2001, 2002, 2003, 2004
+ *    Hiroyuki Kondo, Naoto Sugai, Hayato Fujiwara
+ */
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -524,15 +527,15 @@ static int _pcc_set_mem_map(u_short sock, struct pccard_mem_map *mem)
 #endif
 #endif
 
-	DEBUG(3, "m32r-pcc: SetMemMap(%d, %d, %#2.2x, %d ns, %#5.5lx-%#5.5"
-		  "lx, %#5.5x)\n", sock, map, mem->flags, mem->speed,
-		  mem->sys_start, mem->sys_stop, mem->card_start);
+	DEBUG(3, "m32r-pcc: SetMemMap(%d, %d, %#2.2x, %d ns, "
+		 "%#5.5lx-%#5.5lx, %#5.5x)\n", sock, map, mem->flags,
+		 mem->speed, mem->res->start,  mem->res->end, mem->card_start);
 
 	/*
 	 * sanity check
 	 */
 	if ((map > MAX_WIN) || (mem->card_start > 0x3ffffff) ||
-		(mem->sys_start > mem->sys_stop)) {
+		(mem->res->start > mem->res->end)) {
 		return -EINVAL;
 	}
 
@@ -567,8 +570,8 @@ static int _pcc_set_mem_map(u_short sock, struct pccard_mem_map *mem)
 	addr = t->mapaddr + (mem->card_start & M32R_PCC_MAPMASK);
 	pcc_set(sock, PCADR, addr);
 
-	mem->sys_start = addr + mem->card_start;
-	mem->sys_stop = mem->sys_start + (M32R_PCC_MAPSIZE - 1);
+	mem->res->start = addr + mem->card_start;
+	mem->res->end = mem->res->start + (M32R_PCC_MAPSIZE - 1);
 
 	/*
 	 * Enable again
