@@ -39,8 +39,8 @@ LDFLAGS_vmlinux := -e stext
 
 CHECKFLAGS      += -D__x86_64__=1
 
-cflags-$(CONFIG_MK8) += $(call check_gcc,-march=k8,)
-cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=nocona,)
+cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
+cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
 CFLAGS += $(cflags-y)
 
 CFLAGS += -mno-red-zone
@@ -54,11 +54,11 @@ ifneq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS += -fno-asynchronous-unwind-tables
 # -fweb shrinks the kernel a bit, but the difference is very small
 # it also messes up debugging, so don't use it for now.
-#CFLAGS += $(call check_gcc,-fweb,)
+#CFLAGS += $(call cc-option,-fweb)
 endif
 # -funit-at-a-time shrinks the kernel .text considerably
 # unfortunately it makes reading oopses harder.
-CFLAGS += $(call check_gcc,-funit-at-a-time,)
+CFLAGS += $(call cc-option,-funit-at-a-time)
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 

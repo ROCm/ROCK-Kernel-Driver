@@ -31,7 +31,7 @@ cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	:= -ml
 cflags-$(CONFIG_CPU_SH2)		+= -m2
 cflags-$(CONFIG_CPU_SH3)		+= -m3
 cflags-$(CONFIG_CPU_SH4)		+= -m4 \
-	$(call check_gcc,-mno-implicit-fp,-m4-nofpu)
+	$(call cc-option,-mno-implicit-fp,-m4-nofpu)
 
 cflags-$(CONFIG_SH_DSP)			+= -Wa,-dsp
 cflags-$(CONFIG_SH_KGDB)		+= -g
