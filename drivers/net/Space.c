@@ -101,6 +101,9 @@ extern int mc32_probe(struct net_device *dev);
 #ifdef CONFIG_SDLA
 extern struct net_device *sdla_init(void);
 #endif
+#ifdef CONFIG_COPS
+extern struct net_device *cops_probe(int unit);
+#endif
   
 /* Detachable devices ("pocket adaptors") */
 extern int de620_probe(struct net_device *);
@@ -388,6 +391,11 @@ static int __init ethif_probe(struct net_device *dev)
 /*  Statically configured drivers -- order matters here. */
 void probe_old_netdevs(void)
 {
+#ifdef CONFIG_COPS
+	cops_probe(0);
+	cops_probe(1);
+	cops_probe(2);
+#endif
 #ifdef CONFIG_SDLA
 	sdla_init();
 #endif
@@ -404,27 +412,6 @@ static struct net_device dev_ltpc = {
 #undef NEXT_DEV
 #define NEXT_DEV	(&dev_ltpc)
 #endif  /* LTPC */
-
-#if defined(CONFIG_COPS)
-extern int cops_probe(struct net_device *);
-static struct net_device cops2_dev = {
-	.name		= "lt2",
-	.next		= NEXT_DEV,
-	.init		= cops_probe,
-};
-static struct net_device cops1_dev = {
-	.name		= "lt1",
-	.next		= &cops2_dev,
-	.init		= cops_probe,
-};
-static struct net_device cops0_dev = {
-	.name		= "lt0",
-	.next		= &cops1_dev,
-	.init		= cops_probe,
-};
-#undef NEXT_DEV
-#define NEXT_DEV     (&cops0_dev)
-#endif  /* COPS */
 
 static struct net_device eth7_dev = {
 	.name		= "eth%d",
