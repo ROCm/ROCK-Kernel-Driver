@@ -177,7 +177,7 @@ static struct pci_raw_ops pci_direct_conf2 = {
  * This should be close to trivial, but it isn't, because there are buggy
  * chipsets (yes, you guessed it, by Intel and Compaq) that have no class ID.
  */
-static int __devinit pci_sanity_check(struct pci_raw_ops *o)
+static int __init pci_sanity_check(struct pci_raw_ops *o)
 {
 	u32 x = 0;
 	int devfn;
