@@ -109,7 +109,6 @@ static int xd_manual_geo_init (char *command);
 static u_char xd_detect (u_char *controller, unsigned int *address);
 static u_char xd_initdrives (void (*init_drive)(u_char drive));
 
-static int xd_open (struct inode *inode,struct file *file);
 static void do_xd_request (request_queue_t * q);
 static int xd_ioctl (struct inode *inode,struct file *file,unsigned int cmd,unsigned long arg);
 static int xd_readwrite (u_char operation,u_char drive,char *buffer,u_int block,u_int count);
