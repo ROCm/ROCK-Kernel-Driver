@@ -684,7 +684,7 @@ err_ip_mib0:
 	
 }
 
-static void __exit cleanup_ipv6_mibs(void)
+static void cleanup_ipv6_mibs(void)
 {
 	kfree_percpu(ipv6_statistics[0]);
 	kfree_percpu(ipv6_statistics[1]);
