@@ -140,6 +140,7 @@ static void ext2_put_super (struct super_block * sb)
 		if (sbi->s_group_desc[i])
 			brelse (sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
+	kfree(sbi->s_debts);
 	brelse (sbi->s_sbh);
 	sb->s_fs_info = NULL;
 	kfree(sbi);
@@ -385,6 +386,10 @@ static int parse_options (char * options,
 				return 0;
 			sbi->s_resuid = v;
 		}
+		else if (!strcmp (this_char, "oldalloc"))
+			set_opt (sbi->s_mount_opt, OLDALLOC);
+		else if (!strcmp (this_char, "orlov"))
+			clear_opt (sbi->s_mount_opt, OLDALLOC);
 		/* Silently ignore the quota options */
 		else if (!strcmp (this_char, "grpquota")
 		         || !strcmp (this_char, "noquota")
@@ -756,13 +761,13 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		printk ("EXT2-fs: not enough memory\n");
 		goto failed_mount;
 	}
-	sbi->debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->debts),
-			GFP_KERNEL);
-	if (!sbi->debts) {
+	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->s_debts),
+			       GFP_KERNEL);
+	if (!sbi->s_debts) {
 		printk ("EXT2-fs: not enough memory\n");
 		goto failed_mount_group_desc;
 	}
-	memset(sbi->debts, 0, sbi->s_groups_count * sizeof(*sbi->debts));
+	memset(sbi->s_debts, 0, sbi->s_groups_count * sizeof(*sbi->s_debts));
 	for (i = 0; i < db_count; i++) {
 		block = descriptor_loc(sb, logic_sb_block, i);
 		sbi->s_group_desc[i] = sb_bread(sb, block);
@@ -771,7 +776,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 				brelse (sbi->s_group_desc[j]);
 			kfree(sbi->s_group_desc);
 			printk ("EXT2-fs: unable to read group descriptors\n");
-			goto failed_mount;
+			goto failed_mount_group_desc;
 		}
 	}
 	if (!ext2_check_descriptors (sb)) {
@@ -808,6 +813,8 @@ failed_mount2:
 		brelse(sbi->s_group_desc[i]);
 failed_mount_group_desc:
 	kfree(sbi->s_group_desc);
+	if (sbi->s_debts)
+		kfree(sbi->s_debts);
 failed_mount:
 	brelse(bh);
 failed_sbi:

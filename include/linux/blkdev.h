@@ -92,6 +92,7 @@ struct request {
 	/*
 	 * when request is used as a packet command carrier
 	 */
+	unsigned int cmd_len;
 	unsigned char cmd[16];
 
 	unsigned int data_len;
