@@ -101,20 +101,11 @@ static struct platform_device ixdp425_i2c_controller = {
 	.num_resources	= 0
 };
 
-static int __init ixdp425_init(void)
+static void __init ixdp425_init(void)
 {
-	if (!machine_is_ixdp425() 
-		&& !machine_is_ixcdp1100()
-		&& !machine_is_avila())
-		return -ENODEV;
-
 	platform_add_device(&ixdp425_flash_device);
 	platform_add_device(&ixdp425_i2c_controller);
-
-	return 0;
 }
-
-arch_initcall(ixdp425_init);
 
 MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
 	MAINTAINER("MontaVista Software, Inc.")
@@ -123,6 +114,7 @@ MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
 	MAPIO(ixdp425_map_io)
 	INITIRQ(ixp4xx_init_irq)
 	BOOT_PARAMS(0x0100)
+	INIT_MACHINE(ixdp425_init)
 MACHINE_END
 
 MACHINE_START(IXCDP1100, "Intel IXCDP1100 Development Platform")
@@ -132,6 +124,7 @@ MACHINE_START(IXCDP1100, "Intel IXCDP1100 Development Platform")
 	MAPIO(ixdp425_map_io)
 	INITIRQ(ixp4xx_init_irq)
 	BOOT_PARAMS(0x0100)
+	INIT_MACHINE(ixdp425_init)
 MACHINE_END
 
 /*
@@ -148,6 +141,7 @@ MACHINE_START(AVILA, "Gateworks Avila Network Platform")
 	MAPIO(ixdp425_map_io)
 	INITIRQ(ixp4xx_init_irq)
 	BOOT_PARAMS(0x0100)
+	INIT_MACHINE(ixdp425_init)
 MACHINE_END
 #endif
 
