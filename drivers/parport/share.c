@@ -44,6 +44,10 @@ int parport_default_spintime =  DEFAULT_SPIN_TIME;
 static struct parport *portlist = NULL, *portlist_tail = NULL;
 static spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
 
+/* list of all allocated ports, sorted by ->number */
+static LIST_HEAD(all_ports);
+static spinlock_t full_list_lock = SPIN_LOCK_UNLOCKED;
+
 static struct parport_driver *driver_chain = NULL;
 static spinlock_t driverlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -284,6 +288,9 @@ void parport_unregister_driver (struct parport_driver *arg)
 static void free_port (struct parport *port)
 {
 	int d;
+	spin_lock(&full_list_lock);
+	list_del(&port->full_list);
+	spin_unlock(&full_list_lock);
 	for (d = 0; d < 5; d++) {
 		if (port->probe_info[d].class_name)
 			kfree (port->probe_info[d].class_name);
@@ -386,8 +393,9 @@ struct parport *parport_enumerate(void)
 struct parport *parport_register_port(unsigned long base, int irq, int dma,
 				      struct parport_operations *ops)
 {
+	struct list_head *l;
 	struct parport *tmp;
-	int portnum;
+	int num;
 	int device;
 	char *name;
 
@@ -418,6 +426,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	init_MUTEX_LOCKED (&tmp->ieee1284.irq); /* actually a semaphore at 0 */
 	tmp->spintime = parport_default_spintime;
 	atomic_set (&tmp->ref_count, 1);
+	INIT_LIST_HEAD(&tmp->full_list);
 
 	name = kmalloc(15, GFP_KERNEL);
 	if (!name) {
@@ -427,52 +436,21 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	}
 	/* Search for the lowest free parport number. */
 
-	spin_lock_irq (&parportlist_lock);
-	for (portnum = 0; ; portnum++) {
-		struct parport *itr = portlist;
-		while (itr) {
-			if (itr->number == portnum)
-				/* No good, already used. */
-				break;
-			else
-				itr = itr->next;
-		}
-
-		if (itr == NULL)
-			/* Got to the end of the list. */
+	spin_lock(&full_list_lock);
+	for (l = all_ports.next, num = 0; l != &all_ports; l = l->next, num++) {
+		struct parport *p = list_entry(l, struct parport, full_list);
+		if (p->number != num)
 			break;
 	}
+	tmp->portnum = tmp->number = num;
+	list_add_tail(&tmp->full_list, l);
+	spin_unlock(&full_list_lock);
 
 	/*
 	 * Now that the portnum is known finish doing the Init.
 	 */
-	tmp->portnum = tmp->number = portnum;
-	sprintf(name, "parport%d", portnum);
+	sprintf(name, "parport%d", tmp->portnum = tmp->number);
 	tmp->name = name;
-
-	
-	/*
-	 * Chain the entry to our list.
-	 *
-	 * This function must not run from an irq handler so we don' t need
-	 * to clear irq on the local CPU. -arca
-	 */
-
-	/* We are locked against anyone else performing alterations, but
-	 * because of parport_enumerate people can still _read_ the list
-	 * while we are changing it; so be careful..
-	 *
-	 * It's okay to have portlist_tail a little bit out of sync
-	 * since it's only used for changing the list, not for reading
-	 * from it.
-	 */
-
-	if (portlist_tail)
-		portlist_tail->next = tmp;
-	portlist_tail = tmp;
-	if (!portlist)
-		portlist = tmp;
-	spin_unlock_irq(&parportlist_lock);
 
 	for (device = 0; device < 5; device++)
 		/* assume the worst */
@@ -497,6 +475,23 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 
 void parport_announce_port (struct parport *port)
 {
+
+	/* We are locked against anyone else performing alterations, but
+	 * because of parport_enumerate people can still _read_ the list
+	 * while we are changing it; so be careful..
+	 *
+	 * It's okay to have portlist_tail a little bit out of sync
+	 * since it's only used for changing the list, not for reading
+	 * from it.
+	 */
+
+	spin_lock_irq(&parportlist_lock);
+	if (portlist_tail)
+		portlist_tail->next = port;
+	portlist_tail = port;
+	if (!portlist)
+		portlist = port;
+	spin_unlock_irq(&parportlist_lock);
 #ifdef CONFIG_PARPORT_1284
 	/* Analyse the IEEE1284.3 topology of the port. */
 	if (parport_daisy_init (port) == 0) {
