@@ -447,7 +447,7 @@ ia32_sys_call_table:
 	.quad sys_setfsgid16
 	.quad sys_llseek		/* 140 */
 	.quad sys32_getdents
-	.quad sys32_select
+	.quad compat_sys_select
 	.quad sys_flock
 	.quad sys_msync
 	.quad compat_sys_readv		/* 145 */

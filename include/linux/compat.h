@@ -126,5 +126,9 @@ asmlinkage ssize_t compat_sys_writev(unsigned long fd,
 int compat_do_execve(char * filename, compat_uptr_t __user *argv,
 	        compat_uptr_t __user *envp, struct pt_regs * regs);
 
+asmlinkage long compat_sys_select(int n, compat_ulong_t __user *inp,
+		compat_ulong_t __user *outp, compat_ulong_t __user *exp,
+		struct compat_timeval __user *tvp);
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

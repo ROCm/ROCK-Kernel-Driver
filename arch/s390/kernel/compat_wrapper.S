@@ -641,14 +641,14 @@ sys32_getdents_wrapper:
 	llgfr	%r4,%r4			# unsigned int
 	jg	sys32_getdents		# branch to system call
 
-	.globl  sys32_select_wrapper 
-sys32_select_wrapper:
+	.globl  compat_sys_select_wrapper
+compat_sys_select_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# fd_set *
-	llgtr	%r4,%r4			# fd_set *
-	llgtr	%r5,%r5			# fd_set *
-	llgtr	%r6,%r6			# struct timeval_emu31 *
-	jg	sys32_select		# branch to system call
+	llgtr	%r3,%r3			# compat_fd_set *
+	llgtr	%r4,%r4			# compat_fd_set *
+	llgtr	%r5,%r5			# compat_fd_set *
+	llgtr	%r6,%r6			# struct compat_timeval *
+	jg	compat_sys_select	# branch to system call
 
 	.globl  sys32_flock_wrapper 
 sys32_flock_wrapper:

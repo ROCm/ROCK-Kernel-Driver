@@ -232,7 +232,7 @@
 	ENTRY_DIFF(getdents)
 	/* it is POSSIBLE that select will be OK because even though fd_set
 	 * contains longs, the macros and sizes are clever. */
-	ENTRY_DIFF(select)
+	ENTRY_COMP(select)
 	ENTRY_SAME(flock)
 	ENTRY_SAME(msync)
 	/* struct iovec contains pointers */

@@ -528,18 +528,15 @@ asmlinkage int sunos_pathconf(u32 u_path, int name)
 	return ret;
 }
 
-/* SunOS mount system call emulation */
-extern asmlinkage int
-sys32_select(int n, u32 inp, u32 outp, u32 exp, u32 tvp);
-
 asmlinkage int sunos_select(int width, u32 inp, u32 outp, u32 exp, u32 tvp_x)
 {
 	int ret;
 
 	/* SunOS binaries expect that select won't change the tvp contents */
-	ret = sys32_select (width, inp, outp, exp, tvp_x);
+	ret = compat_sys_select(width, compat_ptr(inp), compat_ptr(outp),
+				compat_ptr(exp), compat_ptr(tvp_x));
 	if (ret == -EINTR && tvp_x) {
-		struct compat_timeval *tvp = (struct compat_timeval *)A(tvp_x);
+		struct compat_timeval *tvp = compat_ptr(tvp_x);
 		time_t sec, usec;
 
 		__get_user(sec, &tvp->tv_sec);

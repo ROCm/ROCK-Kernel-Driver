@@ -150,7 +150,7 @@ SYSCALL(sys_setfsuid16,sys_ni_syscall,sys32_setfsuid16_wrapper)	/* old setfsuid1
 SYSCALL(sys_setfsgid16,sys_ni_syscall,sys32_setfsgid16_wrapper)	/* old setfsgid16 syscall */
 SYSCALL(sys_llseek,sys_llseek,sys32_llseek_wrapper)		/* 140 */
 SYSCALL(sys_getdents,sys_getdents,sys32_getdents_wrapper)
-SYSCALL(sys_select,sys_select,sys32_select_wrapper)
+SYSCALL(sys_select,sys_select,compat_sys_select_wrapper)
 SYSCALL(sys_flock,sys_flock,sys32_flock_wrapper)
 SYSCALL(sys_msync,sys_msync,sys32_msync_wrapper)
 SYSCALL(sys_readv,sys_readv,compat_sys_readv_wrapper)		/* 145 */

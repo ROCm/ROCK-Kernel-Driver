@@ -350,7 +350,7 @@ ia32_syscall_table:
 	data8 sys_setfsgid	/* 16-bit version */
 	data8 sys_llseek	  /* 140 */
 	data8 sys32_getdents
-	data8 sys32_select
+	data8 compat_sys_select
 	data8 sys_flock
 	data8 sys32_msync
 	data8 compat_sys_readv	  /* 145 */

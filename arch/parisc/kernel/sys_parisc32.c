@@ -488,126 +488,6 @@ set_fd_set32(unsigned long n, u32 *ufdset, unsigned long *fdset)
 		__put_user(*fdset, ufdset);
 }
 
-/*** This is a virtual copy of sys_select from fs/select.c and probably
- *** should be compared to it from time to time
- ***/
-static inline void *select_bits_alloc(int size)
-{
-	return kmalloc(6 * size, GFP_KERNEL);
-}
-
-static inline void select_bits_free(void *bits, int size)
-{
-	kfree(bits);
-}
-
-/*
- * We can actually return ERESTARTSYS instead of EINTR, but I'd
- * like to be certain this leads to no problems. So I return
- * EINTR just for safety.
- *
- * Update: ERESTARTSYS breaks at least the xview clock binary, so
- * I'm trying ERESTARTNOHAND which restart only when you want to.
- */
-#define MAX_SELECT_SECONDS \
-	((unsigned long) (MAX_SCHEDULE_TIMEOUT / HZ)-1)
-#define DIVIDE_ROUND_UP(x,y) (((x)+(y)-1)/(y))
-
-asmlinkage long
-sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, struct compat_timeval *tvp)
-{
-	fd_set_bits fds;
-	char *bits;
-	long timeout;
-	int ret, size, err;
-
-	timeout = MAX_SCHEDULE_TIMEOUT;
-	if (tvp) {
-		struct compat_timeval tv32;
-		time_t sec, usec;
-
-		if ((ret = copy_from_user(&tv32, tvp, sizeof tv32)))
-			goto out_nofds;
-
-		sec = tv32.tv_sec;
-		usec = tv32.tv_usec;
-
-		ret = -EINVAL;
-		if (sec < 0 || usec < 0)
-			goto out_nofds;
-
-		if ((unsigned long) sec < MAX_SELECT_SECONDS) {
-			timeout = DIVIDE_ROUND_UP(usec, 1000000/HZ);
-			timeout += sec * (unsigned long) HZ;
-		}
-	}
-
-	ret = -EINVAL;
-	if (n < 0)
-		goto out_nofds;
-
-	if (n > current->files->max_fdset)
-		n = current->files->max_fdset;
-
-	/*
-	 * We need 6 bitmaps (in/out/ex for both incoming and outgoing),
-	 * since we used fdset we need to allocate memory in units of
-	 * long-words. 
-	 */
-	ret = -ENOMEM;
-	size = FDS_BYTES(n);
-	bits = select_bits_alloc(size);
-	if (!bits)
-		goto out_nofds;
-	fds.in      = (unsigned long *)  bits;
-	fds.out     = (unsigned long *) (bits +   size);
-	fds.ex      = (unsigned long *) (bits + 2*size);
-	fds.res_in  = (unsigned long *) (bits + 3*size);
-	fds.res_out = (unsigned long *) (bits + 4*size);
-	fds.res_ex  = (unsigned long *) (bits + 5*size);
-
-	if ((ret = get_fd_set32(n, inp, fds.in)) ||
-	    (ret = get_fd_set32(n, outp, fds.out)) ||
-	    (ret = get_fd_set32(n, exp, fds.ex)))
-		goto out;
-	zero_fd_set(n, fds.res_in);
-	zero_fd_set(n, fds.res_out);
-	zero_fd_set(n, fds.res_ex);
-
-	ret = do_select(n, &fds, &timeout);
-
-	if (tvp && !(current->personality & STICKY_TIMEOUTS)) {
-		time_t sec = 0, usec = 0;
-		if (timeout) {
-			sec = timeout / HZ;
-			usec = timeout % HZ;
-			usec *= (1000000/HZ);
-		}
-		err = put_user(sec, &tvp->tv_sec);
-		err |= __put_user(usec, &tvp->tv_usec);
-		if (err)
-			ret = -EFAULT;
-	}
-
-	if (ret < 0)
-		goto out;
-	if (!ret) {
-		ret = -ERESTARTNOHAND;
-		if (signal_pending(current))
-			goto out;
-		ret = 0;
-	}
-
-	set_fd_set32(n, inp, fds.res_in);
-	set_fd_set32(n, outp, fds.res_out);
-	set_fd_set32(n, exp, fds.res_ex);
-
-out:
-	select_bits_free(bits, size);
-out_nofds:
-	return ret;
-}
-
 struct msgbuf32 {
     int mtype;
     char mtext[1];
@@ -664,7 +544,6 @@ asmlinkage long sys32_msgrcv(int msqid,
 	kfree(mb);
 	return err;
 }
-
 
 asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
 {
