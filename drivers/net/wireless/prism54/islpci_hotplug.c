@@ -107,9 +107,6 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	islpci_private *priv;
 	int rvalue;
 
-	/* TRACE(DRV_NAME); */
-	
-	
 	/* Enable the pci device */
 	if (pci_enable_device(pdev)) {
 		printk(KERN_ERR "%s: pci_enable_device() failed.\n", DRV_NAME);
