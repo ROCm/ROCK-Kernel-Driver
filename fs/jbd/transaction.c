@@ -862,22 +862,23 @@ out:
 }
 
 /** 
- * int journal_dirty_data() -  mark a buffer as containing dirty data which needs to be flushed before we can commit the current transaction.  
+ * int journal_dirty_data() -  mark a buffer as containing dirty data which
+ *                             needs to be flushed before we can commit the
+ *                             current transaction.  
  * @handle: transaction
  * @bh: bufferhead to mark
  * 
  * The buffer is placed on the transaction's data list and is marked as
  * belonging to the transaction.
  *
- * Returns error number or 0 on success.  
- */
-int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
-{
-/*
+ * Returns error number or 0 on success.
+ *
  * journal_dirty_data() can be called via page_launder->ext3_writepage
  * by kswapd.  So it cannot block.  Happily, there's nothing here
  * which needs lock_journal if `async' is set.
  */
+int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
+{
 	journal_t *journal = handle->h_transaction->t_journal;
 	int need_brelse = 0;
 	struct journal_head *jh;
@@ -1022,23 +1023,22 @@ no_journal:
  * @handle: transaction to add buffer to.
  * @bh: buffer to mark 
  * 
- * mark dirty metadata which needs to be journaled as part of the current transaction.
+ * mark dirty metadata which needs to be journaled as part of the current
+ * transaction.
  *
  * The buffer is placed on the transaction's metadata list and is marked
  * as belonging to the transaction.  
  *
  * Returns error number or 0 on success.  
- */
-int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
-{
-/*
+ *
  * Special care needs to be taken if the buffer already belongs to the
  * current committing transaction (in which case we should have frozen
  * data present for that commit).  In that case, we don't relink the
  * buffer: that only gets done when the old transaction finally
  * completes its commit.
- * 
  */
+int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
+{
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
 	struct journal_head *jh = bh2jh(bh);
