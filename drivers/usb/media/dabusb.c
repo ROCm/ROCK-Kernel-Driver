@@ -801,6 +801,7 @@ static struct usb_driver dabusb_driver =
 	disconnect:	dabusb_disconnect,
 	fops:		&dabusb_fops,
 	minor:		DABUSB_MINOR,
+	num_minors:	NRDABUSB,
 	id_table:	dabusb_ids,
 };
 

@@ -71,8 +71,10 @@ static ssize_t usb_driver_read(struct file *file, char *buf, size_t nbytes, loff
 		int minor = driver->fops ? driver->minor : -1;
 		if (minor == -1)
 			start += sprintf (start, "         %s\n", driver->name);
+		else if (driver->num_minors == 1)
+			start += sprintf (start, "    %3d: %s\n", minor, driver->name);
 		else
-			start += sprintf (start, "%3d-%3d: %s\n", minor, minor + 15, driver->name);
+			start += sprintf (start, "%3d-%3d: %s\n", minor, minor + driver->num_minors - 1, driver->name);
 		if (start > end) {
 			start += sprintf(start, "(truncated)\n");
 			break;
