@@ -530,7 +530,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	si = di = 0;
 
 	/* Skip any unmapped start element(s) in the source runlist. */
-	while (srl[si].length && srl[si].lcn < (LCN)LCN_HOLE)
+	while (srl[si].length && srl[si].lcn < LCN_HOLE)
 		si++;
 
 	/* Can't have an entirely unmapped source runlist. */
@@ -563,7 +563,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	for (dend = di; drl[dend].length; dend++)
 		;
 
-	if (srl[send].lcn == (LCN)LCN_ENOENT)
+	if (srl[send].lcn == LCN_ENOENT)
 		marker_vcn = srl[marker = send].vcn;
 
 	/* Scan to the last element with lcn >= LCN_HOLE. */
@@ -624,7 +624,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 						"with LCN_ENOENT.",
 						(unsigned long long)
 						drl[ds].lcn);
-				drl[ds].lcn = (LCN)LCN_ENOENT;
+				drl[ds].lcn = LCN_ENOENT;
 				goto finished;
 			}
 			/*
@@ -632,11 +632,11 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			 * @drl or extend an existing one before adding the
 			 * ENOENT terminator.
 			 */
-			if (drl[ds].lcn == (LCN)LCN_ENOENT) {
+			if (drl[ds].lcn == LCN_ENOENT) {
 				ds--;
 				slots = 1;
 			}
-			if (drl[ds].lcn != (LCN)LCN_RL_NOT_MAPPED) {
+			if (drl[ds].lcn != LCN_RL_NOT_MAPPED) {
 				/* Add an unmapped runlist element. */
 				if (!slots) {
 					/* FIXME/TODO: We need to have the
@@ -651,7 +651,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 				if (slots != 1)
 					drl[ds].vcn = drl[ds - 1].vcn +
 							drl[ds - 1].length;
-				drl[ds].lcn = (LCN)LCN_RL_NOT_MAPPED;
+				drl[ds].lcn = LCN_RL_NOT_MAPPED;
 				/* We now used up a slot. */
 				slots--;
 			}
@@ -666,7 +666,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 					goto critical_error;
 			}
 			drl[ds].vcn = marker_vcn;
-			drl[ds].lcn = (LCN)LCN_ENOENT;
+			drl[ds].lcn = LCN_ENOENT;
 			drl[ds].length = (s64)0;
 		}
 	}
@@ -753,8 +753,8 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		return ERR_PTR(-ENOMEM);
 	/* Insert unmapped starting element if necessary. */
 	if (vcn) {
-		rl->vcn = (VCN)0;
-		rl->lcn = (LCN)LCN_RL_NOT_MAPPED;
+		rl->vcn = 0;
+		rl->lcn = LCN_RL_NOT_MAPPED;
 		rl->length = vcn;
 		rlpos++;
 	}
@@ -819,7 +819,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		 * to LCN_HOLE.
 		 */
 		if (!(*buf & 0xf0))
-			rl[rlpos].lcn = (LCN)LCN_HOLE;
+			rl[rlpos].lcn = LCN_HOLE;
 		else {
 			/* Get the lcn change which really can be negative. */
 			u8 b2 = *buf & 0xf;
@@ -892,7 +892,7 @@ mpa_err:
 					(unsigned long long)max_cluster);
 			rl[rlpos].vcn = vcn;
 			vcn += rl[rlpos].length = max_cluster - deltaxcn;
-			rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
+			rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 			rlpos++;
 		} else if (unlikely(deltaxcn > max_cluster)) {
 			ntfs_error(vol->sb, "Corrupt attribute. deltaxcn = "
@@ -901,9 +901,9 @@ mpa_err:
 					(unsigned long long)max_cluster);
 			goto mpa_err;
 		}
-		rl[rlpos].lcn = (LCN)LCN_ENOENT;
+		rl[rlpos].lcn = LCN_ENOENT;
 	} else /* Not the base extent. There may be more extents to follow. */
-		rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
+		rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 
 	/* Setup terminating runlist element. */
 	rl[rlpos].vcn = vcn;
@@ -962,11 +962,11 @@ LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 	 * necessary.
 	 */
 	if (unlikely(!rl))
-		return (LCN)LCN_RL_NOT_MAPPED;
+		return LCN_RL_NOT_MAPPED;
 
 	/* Catch out of lower bounds vcn. */
 	if (unlikely(vcn < rl[0].vcn))
-		return (LCN)LCN_ENOENT;
+		return LCN_ENOENT;
 
 	for (i = 0; likely(rl[i].length); i++) {
 		if (unlikely(vcn < rl[i+1].vcn)) {
@@ -982,7 +982,7 @@ LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 	if (likely(rl[i].lcn < (LCN)0))
 		return rl[i].lcn;
 	/* Just in case... We could replace this with BUG() some day. */
-	return (LCN)LCN_ENOENT;
+	return LCN_ENOENT;
 }
 
 /**
@@ -1320,4 +1320,140 @@ err_out:
 	else
 		err = -EIO;
 	return err;
+}
+
+/**
+ * ntfs_rl_truncate_nolock - truncate a runlist starting at a specified vcn
+ * @runlist:	runlist to truncate
+ * @new_length:	the new length of the runlist in VCNs
+ *
+ * Truncate the runlist described by @runlist as well as the memory buffer
+ * holding the runlist elements to a length of @new_length VCNs.
+ *
+ * If @new_length lies within the runlist, the runlist elements with VCNs of
+ * @new_length and above are discarded.
+ *
+ * If @new_length lies beyond the runlist, a sparse runlist element is added to
+ * the end of the runlist @runlist or if the last runlist element is a sparse
+ * one already, this is extended.
+ *
+ * Return 0 on success and -errno on error.
+ *
+ * Locking: The caller must hold @runlist->lock for writing.
+ */
+int ntfs_rl_truncate_nolock(const ntfs_volume *vol, runlist *const runlist,
+		const s64 new_length)
+{
+	runlist_element *rl;
+	int old_size;
+
+	ntfs_debug("Entering for new_length 0x%llx.", (long long)new_length);
+	BUG_ON(!runlist);
+	BUG_ON(new_length < 0);
+	rl = runlist->rl;
+	if (unlikely(!rl)) {
+		/*
+		 * Create a runlist consisting of a sparse runlist element of
+		 * length @new_length followed by a terminator runlist element.
+		 */
+		rl = ntfs_malloc_nofs(PAGE_SIZE);
+		if (unlikely(!rl)) {
+			ntfs_error(vol->sb, "Not enough memory to allocate "
+					"runlist element buffer.");
+			return -ENOMEM;
+		}
+		runlist->rl = rl;
+		rl[1].length = rl->vcn = 0;
+		rl->lcn = LCN_HOLE;
+		rl[1].vcn = rl->length = new_length;
+		rl[1].lcn = LCN_ENOENT;
+		return 0;
+	}
+	BUG_ON(new_length < rl->vcn);
+	/* Find @new_length in the runlist. */
+	while (likely(rl->length && new_length >= rl[1].vcn))
+		rl++;
+	/*
+	 * If not at the end of the runlist we need to shrink it.
+	 * If at the end of the runlist we need to expand it.
+	 */
+	if (rl->length) {
+		runlist_element *trl;
+		BOOL is_end;
+
+		ntfs_debug("Shrinking runlist.");
+		/* Determine the runlist size. */
+		trl = rl + 1;
+		while (likely(trl->length))
+			trl++;
+		old_size = trl - runlist->rl + 1;
+		/* Truncate the run. */
+		rl->length = new_length - rl->vcn;
+		/*
+		 * If a run was partially truncated, make the following runlist
+		 * element a terminator.
+		 */
+		is_end = FALSE;
+		if (rl->length) {
+			rl++;
+			if (!rl->length)
+				is_end = TRUE;
+			rl->vcn = new_length;
+			rl->length = 0;
+		}
+		rl->lcn = LCN_ENOENT;
+		/* Reallocate memory if necessary. */
+		if (!is_end) {
+			int new_size = rl - runlist->rl + 1;
+			rl = ntfs_rl_realloc(runlist->rl, old_size, new_size);
+			if (IS_ERR(rl))
+				ntfs_warning(vol->sb, "Failed to shrink "
+						"runlist buffer.  This just "
+						"wastes a bit of memory "
+						"temporarily so we ignore it "
+						"and return success.");
+			else
+				runlist->rl = rl;
+		}
+	} else if (likely(/* !rl->length && */ new_length > rl->vcn)) {
+		ntfs_debug("Expanding runlist.");
+		/*
+		 * If there is a previous runlist element and it is a sparse
+		 * one, extend it.  Otherwise need to add a new, sparse runlist
+		 * element.
+		 */
+		if ((rl > runlist->rl) && ((rl - 1)->lcn == LCN_HOLE))
+			(rl - 1)->length = new_length - (rl - 1)->vcn;
+		else {
+			/* Determine the runlist size. */
+			old_size = rl - runlist->rl + 1;
+			/* Reallocate memory if necessary. */
+			rl = ntfs_rl_realloc(runlist->rl, old_size,
+					old_size + 1);
+			if (IS_ERR(rl)) {
+				ntfs_error(vol->sb, "Failed to expand runlist "
+						"buffer, aborting.");
+				return PTR_ERR(rl);
+			}
+			runlist->rl = rl;
+			/*
+			 * Set @rl to the same runlist element in the new
+			 * runlist as before in the old runlist.
+			 */
+			rl += old_size - 1;
+			/* Add a new, sparse runlist element. */
+			rl->lcn = LCN_HOLE;
+			rl->length = new_length - rl->vcn;
+			/* Add a new terminator runlist element. */
+			rl++;
+			rl->length = 0;
+		}
+		rl->vcn = new_length;
+		rl->lcn = LCN_ENOENT;
+	} else /* if (unlikely(!rl->length && new_length == rl->vcn)) */ {
+		/* Runlist already has same size as requested. */
+		rl->lcn = LCN_ENOENT;
+	}
+	ntfs_debug("Done.");
+	return 0;
 }

@@ -140,7 +140,7 @@ lock_retry_remap:
 	if (likely(rl && vcn >= rl[0].vcn)) {
 		while (likely(rl->length)) {
 			if (likely(vcn < rl[1].vcn)) {
-				if (likely(rl->lcn >= (LCN)LCN_HOLE)) {
+				if (likely(rl->lcn >= LCN_HOLE)) {
 					ntfs_debug("Done.");
 					return rl;
 				}
@@ -148,8 +148,8 @@ lock_retry_remap:
 			}
 			rl++;
 		}
-		if (likely(rl->lcn != (LCN)LCN_RL_NOT_MAPPED)) {
-			if (likely(rl->lcn == (LCN)LCN_ENOENT))
+		if (likely(rl->lcn != LCN_RL_NOT_MAPPED)) {
+			if (likely(rl->lcn == LCN_ENOENT))
 				err = -ENOENT;
 			else
 				err = -EIO;

@@ -234,7 +234,7 @@ lock_retry_remap:
 					rl++;
 				lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
 			} else
-				lcn = (LCN)LCN_RL_NOT_MAPPED;
+				lcn = LCN_RL_NOT_MAPPED;
 			/* Successful remap. */
 			if (lcn >= 0) {
 				/* Setup buffer head to correct block. */
@@ -639,7 +639,7 @@ lock_retry_remap:
 				rl++;
 			lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
 		} else
-			lcn = (LCN)LCN_RL_NOT_MAPPED;
+			lcn = LCN_RL_NOT_MAPPED;
 		/* Successful remap. */
 		if (lcn >= 0) {
 			/* Setup buffer head to point to correct block. */
@@ -1404,7 +1404,7 @@ lock_retry_remap:
 					rl++;
 				lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
 			} else
-				lcn = (LCN)LCN_RL_NOT_MAPPED;
+				lcn = LCN_RL_NOT_MAPPED;
 			if (unlikely(lcn < 0)) {
 				/*
 				 * We extended the attribute allocation above.

@@ -602,7 +602,7 @@ lock_retry_remap:
 				rl++;
 			lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
 		} else
-			lcn = (LCN)LCN_RL_NOT_MAPPED;
+			lcn = LCN_RL_NOT_MAPPED;
 		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
 				(unsigned long long)vcn,
 				(unsigned long long)lcn);
