@@ -278,7 +278,8 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 	int ngroups = sbi->s_groups_count;
 	int inodes_per_group = EXT2_INODES_PER_GROUP(sb);
 	int avefreei = le32_to_cpu(es->s_free_inodes_count) / ngroups;
-	int avefreeb = le32_to_cpu(es->s_free_blocks_count) / ngroups;
+	int free_blocks = percpu_counter_read(&sbi->s_freeblocks_counter);
+	int avefreeb = free_blocks / ngroups;
 	int blocks_per_dir;
 	int ndirs = sbi->s_dir_count;
 	int max_debt, max_dirs, min_blocks, min_inodes;
@@ -320,8 +321,7 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 		goto fallback;
 	}
 
-	blocks_per_dir = (le32_to_cpu(es->s_blocks_count) -
-			  le32_to_cpu(es->s_free_blocks_count)) / ndirs;
+	blocks_per_dir = (le32_to_cpu(es->s_blocks_count) - free_blocks) / ndirs;
 
 	max_dirs = ndirs / ngroups + inodes_per_group / 16;
 	min_inodes = avefreei - inodes_per_group / 4;
@@ -500,6 +500,7 @@ repeat:
 	es->s_free_inodes_count =
 		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
 
+	spin_lock(sb_bgl_lock(EXT2_SB(sb), group));
 	if (S_ISDIR(mode)) {
 		if (EXT2_SB(sb)->s_debts[group] < 255)
 			EXT2_SB(sb)->s_debts[group]++;
@@ -507,6 +508,7 @@ repeat:
 		if (EXT2_SB(sb)->s_debts[group])
 			EXT2_SB(sb)->s_debts[group]--;
 	}
+	spin_unlock(sb_bgl_lock(EXT2_SB(sb), group));
 
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	sb->s_dirt = 1;

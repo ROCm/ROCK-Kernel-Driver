@@ -805,8 +805,12 @@ extern __inline__ int fls(int x)
 
 #define ext2_set_bit(nr, addr)       \
 	test_and_set_bit((nr)^24, (unsigned long *)addr)
+#define ext2_set_bit_atomic(lock, nr, addr)       \
+	        test_and_set_bit((nr)^24, (unsigned long *)addr)
 #define ext2_clear_bit(nr, addr)     \
 	test_and_clear_bit((nr)^24, (unsigned long *)addr)
+#define ext2_clear_bit_atomic(lock, nr, addr)     \
+	        test_and_clear_bit((nr)^24, (unsigned long *)addr)
 #define ext2_test_bit(nr, addr)      \
 	test_bit((nr)^24, (unsigned long *)addr)
 

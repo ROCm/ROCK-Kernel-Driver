@@ -769,6 +769,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		printk ("EXT2-fs: not enough memory\n");
 		goto failed_mount;
 	}
+	percpu_counter_init(&sbi->s_freeblocks_counter);
+	bgl_lock_init(&sbi->s_blockgroup_lock);
 	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->s_debts),
 			       GFP_KERNEL);
 	if (!sbi->s_debts) {
@@ -814,6 +816,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		ext2_warning(sb, __FUNCTION__,
 			"mounting ext3 filesystem as ext2\n");
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);
+	percpu_counter_mod(&sbi->s_freeblocks_counter,
+				ext2_count_free_blocks(sb));
 	return 0;
 failed_mount2:
 	for (i = 0; i < db_count; i++)
@@ -840,6 +844,7 @@ static void ext2_commit_super (struct super_block * sb,
 
 static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
 {
+	es->s_free_blocks_count = cpu_to_le32(ext2_count_free_blocks(sb));
 	es->s_wtime = cpu_to_le32(get_seconds());
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	sync_dirty_buffer(EXT2_SB(sb)->s_sbh);
@@ -868,6 +873,7 @@ void ext2_write_super (struct super_block * sb)
 			ext2_debug ("setting valid to 0\n");
 			es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) &
 						  ~EXT2_VALID_FS);
+			es->s_free_blocks_count = cpu_to_le32(ext2_count_free_blocks(sb));
 			es->s_mtime = cpu_to_le32(get_seconds());
 			ext2_sync_super(sb, es);
 		} else
@@ -965,7 +971,7 @@ static int ext2_statfs (struct super_block * sb, struct statfs * buf)
 	buf->f_type = EXT2_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;
 	buf->f_blocks = le32_to_cpu(sbi->s_es->s_blocks_count) - overhead;
-	buf->f_bfree = ext2_count_free_blocks (sb);
+	buf->f_bfree = ext2_count_free_blocks(sb);
 	buf->f_bavail = buf->f_bfree - le32_to_cpu(sbi->s_es->s_r_blocks_count);
 	if (buf->f_bfree < le32_to_cpu(sbi->s_es->s_r_blocks_count))
 		buf->f_bavail = 0;

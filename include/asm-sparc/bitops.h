@@ -455,6 +455,25 @@ found_middle:
 
 #define ext2_set_bit			__test_and_set_le_bit
 #define ext2_clear_bit			__test_and_clear_le_bit
+
+#define ext2_set_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = ext2_set_bit((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
+#define ext2_clear_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = ext2_clear_bit((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
 #define ext2_test_bit			test_le_bit
 #define ext2_find_first_zero_bit	find_first_zero_le_bit
 #define ext2_find_next_zero_bit		find_next_zero_le_bit
