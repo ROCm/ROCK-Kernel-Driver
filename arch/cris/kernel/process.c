@@ -299,7 +299,9 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 asmlinkage int sys_fork(long r10, long r11, long r12, long r13, long mof, long srp,
 			struct pt_regs *regs)
 {
-	return do_fork(SIGCHLD, rdusp(), regs, 0);
+	struct task_struct *p;
+	p = do_fork(SIGCHLD, rdusp(), regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /* if newusp is 0, we just grab the old usp */
@@ -308,9 +310,11 @@ asmlinkage int sys_clone(unsigned long newusp, unsigned long flags,
 			 long r12, long r13, long mof, long srp,
 			 struct pt_regs *regs)
 {
+	struct task_struct *p;
 	if (!newusp)
 		newusp = rdusp();
-	return do_fork(flags, newusp, regs, 0);
+	p = do_fork(flags & ~CLONE_IDLETASK, newusp, regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /* vfork is a system call in i386 because of register-pressure - maybe
@@ -320,7 +324,9 @@ asmlinkage int sys_clone(unsigned long newusp, unsigned long flags,
 asmlinkage int sys_vfork(long r10, long r11, long r12, long r13, long mof, long srp,
 			 struct pt_regs *regs)
 {
-        return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0);
+	struct task_struct *p;
+        p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
