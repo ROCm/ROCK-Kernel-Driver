@@ -3,7 +3,7 @@
 #
 
 ifeq ($(CONFIG_CKRM),y)
-	obj-y = ckrm.o ckrmutils.o ckrm_tasks_stub.o
+	obj-y = ckrm.o ckrmutils.o ckrm_tasks_stub.o rbce/
 endif
 
 obj-$(CONFIG_CKRM_TYPE_TASKCLASS) += ckrm_tc.o 

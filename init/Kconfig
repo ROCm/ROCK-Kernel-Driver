@@ -279,6 +279,30 @@ config CKRM_RES_LISTENAQ
  
 	  If unsure, say N.
 
+config CKRM_RBCE
+	tristate "Vanilla Rule-based Classification Engine (RBCE)"
+	depends on CKRM && RCFS_FS
+	default m
+	help
+	  Provides an optional module to support creation of rules for automatic
+	  classification of kernel objects. Rules are created/deleted/modified 
+          through an rcfs interface. RBCE is not required for CKRM. 
+ 
+	  If unsure, say N.
+
+config CKRM_CRBCE
+	tristate "Enhanced Rule-based Classification Engine (RBCE)"
+	depends on CKRM && RCFS_FS && RELAYFS_FS && DELAY_ACCT
+	default m
+	help
+	  Provides an optional module to support creation of rules for automatic
+	  classification of kernel objects, just like RBCE above. In addition,
+	  CRBCE provides per-process delay data (requires DELAY_ACCT configured)
+	  enabled) and makes information on significant kernel events available
+	  to userspace tools through relayfs (requires RELAYFS_FS configured). 
+	
+	  If unsure, say N.
+
 endmenu
 
 config DELAY_ACCT
