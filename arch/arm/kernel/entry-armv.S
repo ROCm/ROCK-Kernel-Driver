@@ -756,7 +756,6 @@ __irq_svc:	sub	sp, sp, #S_FRAME_SIZE
 #ifdef CONFIG_PREEMPT
 		ldr	r0, [r8, #TI_FLAGS]		@ get flags
 		tst	r0, #_TIF_NEED_RESCHED
-		ldrne	r6, .LCirq_stat
 		blne	svc_preempt
 preempt_return:
 		ldr	r0, [r8, #TI_PREEMPT]		@ read preempt value
@@ -770,20 +769,20 @@ preempt_return:
 
 #ifdef CONFIG_PREEMPT
 svc_preempt:	teq	r9, #0				@ was preempt count = 0
+		ldreq	r6, .LCirq_stat
 		movne	pc, lr				@ no
 		ldr	r0, [r6, #4]			@ local_irq_count
 		ldr	r1, [r6, #8]			@ local_bh_count
 		adds	r0, r0, r1
 		movne	pc, lr
-		ldr	r1, [r8, #TI_TASK]
-		set_cpsr_c r2, #MODE_SVC		@ enable IRQs
-		str	r0, [r1, #0]			@ current->state = TASK_RUNNING
-1:		bl	SYMBOL_NAME(schedule)
+		mov	r7, #PREEMPT_ACTIVE
+		str	r7, [r8, #TI_PREEMPT]		@ set PREEMPT_ACTIVE
+1:		set_cpsr_c r2, #MODE_SVC		@ enable IRQs
+		bl	SYMBOL_NAME(schedule)
 		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC	@ disable IRQs
-		ldr	r0, [r8, #TI_FLAGS]
+		ldr	r0, [r8, #TI_FLAGS]		@ get new tasks TI_FLAGS
 		tst	r0, #_TIF_NEED_RESCHED
-		beq	preempt_return
-		set_cpsr_c r0, #MODE_SVC		@ enable IRQs
+		beq	preempt_return			@ go again
 		b	1b
 #endif
 

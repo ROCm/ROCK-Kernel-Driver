@@ -25,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/timex.h>
+#include <linux/errno.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>

@@ -76,6 +76,9 @@ __do_notify_resume:
  * This is how we return from a fork.
  */
 ENTRY(ret_from_fork)
+#ifdef CONFIG_PREEMPT
+	bl	schedule_tail
+#endif
 	get_thread_info tsk
 	ldr	ip, [tsk, #TI_FLAGS]		@ check for syscall tracing
 	mov	why, #1
