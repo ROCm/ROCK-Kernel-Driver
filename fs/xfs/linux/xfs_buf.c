@@ -370,8 +370,12 @@ _pagebuf_lookup_pages(
 	      retry:
 		page = find_or_create_page(mapping, first + i, gfp_mask);
 		if (unlikely(page == NULL)) {
-			if (flags & PBF_READ_AHEAD)
+			if (flags & PBF_READ_AHEAD) {
+				for (--i; i >= 0; i--)
+					page_cache_release(bp->pb_pages[i]);
+				_pagebuf_free_pages(bp);
 				return -ENOMEM;
+			}
 
 			/*
 			 * This could deadlock.
