@@ -943,10 +943,10 @@ extern int	   journal_force_commit(journal_t *);
 /*
  * journal_head management
  */
-extern struct journal_head
-		*journal_add_journal_head(struct buffer_head *bh);
-extern void	journal_remove_journal_head(struct buffer_head *bh);
-extern void	journal_put_journal_head(struct journal_head *jh);
+struct journal_head *journal_add_journal_head(struct buffer_head *bh);
+struct journal_head *journal_grab_journal_head(struct buffer_head *bh);
+void journal_remove_journal_head(struct buffer_head *bh);
+void journal_put_journal_head(struct journal_head *jh);
 
 /*
  * handle management

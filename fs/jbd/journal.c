@@ -1679,6 +1679,23 @@ repeat:
 	return bh->b_private;
 }
 
+/*
+ * Grab a ref against this buffer_head's journal_head.  If it ended up not
+ * having a journal_head, return NULL
+ */
+struct journal_head *journal_grab_journal_head(struct buffer_head *bh)
+{
+	struct journal_head *jh = NULL;
+
+	jbd_lock_bh_journal_head(bh);
+	if (buffer_jbd(bh)) {
+		jh = bh2jh(bh);
+		jh->b_jcount++;
+	}
+	jbd_unlock_bh_journal_head(bh);
+	return jh;
+}
+
 static void __journal_remove_journal_head(struct buffer_head *bh)
 {
 	struct journal_head *jh = bh2jh(bh);

@@ -1553,10 +1553,8 @@ void journal_unfile_buffer(journal_t *journal, struct journal_head *jh)
  * Called from journal_try_to_free_buffers().
  *
  * Called under jbd_lock_bh_state(bh)
- *
- * Returns non-zero iff we were able to free the journal_head.
  */
-static inline int
+static void
 __journal_try_to_free_buffer(journal_t *journal, struct buffer_head *bh)
 {
 	struct journal_head *jh;
@@ -1589,10 +1587,8 @@ __journal_try_to_free_buffer(journal_t *journal, struct buffer_head *bh)
 		}
 	}
 	spin_unlock(&journal->j_list_lock);
-	return !buffer_jbd(bh);
-
 out:
-	return 0;
+	return;
 }
 
 
@@ -1642,18 +1638,23 @@ int journal_try_to_free_buffers(journal_t *journal,
 	head = page_buffers(page);
 	bh = head;
 	do {
-		jbd_lock_bh_state(bh);
+		struct journal_head *jh;
+
 		/*
-		 * We don't have to worry about the buffer being pulled off its
-		 * journal_head in here, because __try_to_free_cp_buf runs
-		 * under jbd_lock_bh_state()
+		 * We take our own ref against the journal_head here to avoid
+		 * having to add tons of locking around each instance of
+		 * journal_remove_journal_head() and journal_put_journal_head().
 		 */
-		if (buffer_jbd(bh) &&
-				!__journal_try_to_free_buffer(journal, bh)) {
-			jbd_unlock_bh_state(bh);
-			goto busy;
-		}
+		jh = journal_grab_journal_head(bh);
+		if (!jh)
+			continue;
+
+		jbd_lock_bh_state(bh);
+		__journal_try_to_free_buffer(journal, bh);
+		journal_put_journal_head(jh);
 		jbd_unlock_bh_state(bh);
+		if (buffer_jbd(bh))
+			goto busy;
 	} while ((bh = bh->b_this_page) != head);
 	ret = try_to_free_buffers(page);
 busy:
