@@ -828,12 +828,12 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->writeurb) {
 		err("out of memory");
-		goto abort;
+		goto abort_minor;
 	}
 	usblp->readurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->readurb) {
 		err("out of memory");
-		goto abort;
+		goto abort_minor;
 	}
 
 	/* Malloc device ID string buffer to the largest expected length,
@@ -841,7 +841,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	 * could change in length. */
 	if (!(usblp->device_id_string = kmalloc(DEVICE_ID_SIZE, GFP_KERNEL))) {
 		err("out of memory for device_id_string");
-		goto abort;
+		goto abort_minor;
 	}
 
 	/* Malloc write/read buffers in one chunk.  We somewhat wastefully
@@ -849,7 +849,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	 * alternate setting can be changed later via an ioctl. */
 	if (!(usblp->buf = kmalloc(2 * USBLP_BUF_SIZE, GFP_KERNEL))) {
 		err("out of memory for buf");
-		goto abort;
+		goto abort_minor;
 	}
 
 	/* Lookup quirks for this printer. */
@@ -863,12 +863,12 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 		dbg("incompatible printer-class device 0x%4.4X/0x%4.4X",
 			dev->descriptor.idVendor,
 			dev->descriptor.idProduct);
-		goto abort;
+		goto abort_minor;
 	}
 
 	/* Setup the selected alternate setting and endpoints. */
 	if (usblp_set_protocol(usblp, protocol) < 0)
-		goto abort;
+		goto abort_minor;
 
 	/* Retrieve and store the device ID string. */
 	usblp_cache_device_id_string(usblp);
@@ -897,6 +897,8 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 
 	return usblp;
 
+abort_minor:
+	usb_deregister_dev (&usblp_driver, 1, usblp->minor);
 abort:
 	if (usblp) {
 		usb_free_urb(usblp->writeurb);

@@ -356,11 +356,10 @@ qh_completions (
 			 * from an interrupt QTD
 			 */
 			qtd->hw_token = (qtd->hw_token
-					& ~__constant_cpu_to_le32 (0x8300))
+					& __constant_cpu_to_le32 (0x8300))
 				| cpu_to_le32 (qtd->length << 16)
-				| __constant_cpu_to_le32 (QTD_IOC
-					| (EHCI_TUNE_CERR << 10)
-					| QTD_STS_ACTIVE);
+				| __constant_cpu_to_le32 (QTD_STS_ACTIVE
+					| (EHCI_TUNE_CERR << 10));
 			qtd->hw_buf [0] &= ~__constant_cpu_to_le32 (0x0fff);
 
 			/* this offset, and the length above,

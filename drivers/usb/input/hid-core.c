@@ -1396,12 +1396,12 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	if (usb_string(dev, dev->descriptor.iManufacturer, buf, 64) > 0) {
 		strcat(hid->name, buf);
 		if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0)
-			sprintf(hid->name, "%s %s", hid->name, buf);
+			snprintf(hid->name, 64, "%s %s", hid->name, buf);
 	} else
-		sprintf(hid->name, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
+		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
 
-	usb_make_path(dev, buf, 63);
-	sprintf(hid->phys, "%s/input%d", buf, ifnum);
+	usb_make_path(dev, buf, 64);
+	snprintf(hid->phys, 64, "%s/input%d", buf, ifnum);
 
 	if (usb_string(dev, dev->descriptor.iSerialNumber, hid->uniq, 64) <= 0)
 		hid->uniq[0] = 0;
