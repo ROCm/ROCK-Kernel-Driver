@@ -48,12 +48,6 @@ static inline int pfn_to_nid(unsigned long pfn)
 #endif
 }
 
-static inline struct pglist_data *pfn_to_pgdat(unsigned long pfn)
-{
-	return(NODE_DATA(pfn_to_nid(pfn)));
-}
-
-
 /*
  * Following are macros that are specific to this numa platform.
  */
