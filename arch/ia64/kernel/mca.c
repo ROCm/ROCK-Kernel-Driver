@@ -115,6 +115,7 @@ static struct irqaction mca_wkup_irqaction = {
 	.name =		"mca_wkup"
 };
 
+#ifdef CONFIG_ACPI
 static struct irqaction mca_cpe_irqaction = {
 	.handler =	ia64_mca_cpe_int_handler,
 	.flags =	SA_INTERRUPT,
@@ -126,6 +127,7 @@ static struct irqaction mca_cpep_irqaction = {
 	.flags =	SA_INTERRUPT,
 	.name =		"cpe_poll"
 };
+#endif /* CONFIG_ACPI */
 
 #define MAX_CPE_POLL_INTERVAL (15*60*HZ) /* 15 minutes */
 #define MIN_CPE_POLL_INTERVAL (2*60*HZ)  /* 2 minutes */
@@ -434,6 +436,7 @@ ia64_mca_check_errors (void)
 
 device_initcall(ia64_mca_check_errors);
 
+#ifdef CONFIG_ACPI
 /*
  * ia64_mca_register_cpev
  *
@@ -458,6 +461,7 @@ ia64_mca_register_cpev (int cpev)
 	IA64_MCA_DEBUG("ia64_mca_platform_init: corrected platform error "
 		       "vector %#x setup and enabled\n", cpev);
 }
+#endif /* CONFIG_ACPI */
 
 #endif /* PLATFORM_MCA_HANDLERS */
 
@@ -750,6 +754,7 @@ ia64_mca_init(void)
 	/* Setup the MCA wakeup interrupt vector */
 	register_percpu_irq(IA64_MCA_WAKEUP_VECTOR, &mca_wkup_irqaction);
 
+#ifdef CONFIG_ACPI
 	/* Setup the CPE interrupt vector */
 	{
 		irq_desc_t *desc;
@@ -767,6 +772,7 @@ ia64_mca_init(void)
 			ia64_mca_register_cpev(cpev);
 		}
 	}
+#endif
 
 	/* Initialize the areas set aside by the OS to buffer the
 	 * platform/processor error states for MCA/INIT/CMC
@@ -1279,11 +1285,13 @@ ia64_mca_late_init(void)
 	init_timer(&cpe_poll_timer);
 	cpe_poll_timer.function = ia64_mca_cpe_poll;
 
+#ifdef CONFIG_ACPI
 	/* If platform doesn't support CPEI, get the timer going. */
 	if (acpi_request_vector(ACPI_INTERRUPT_CPEI) < 0 && cpe_poll_enabled) {
 		register_percpu_irq(IA64_CPEP_VECTOR, &mca_cpep_irqaction);
 		ia64_mca_cpe_poll(0UL);
 	}
+#endif
 
 	return 0;
 }
@@ -1398,6 +1406,9 @@ ia64_log_init(int sal_info_type)
 
 	// SAL will tell us the maximum size of any error record of this type
 	max_size = ia64_sal_get_state_info_size(sal_info_type);
+	if (!max_size)
+		/* alloc_bootmem() doesn't like zero-sized allocations! */
+		return;
 
 	// set up OS data structures to hold error info
 	IA64_LOG_ALLOCATE(sal_info_type, max_size);

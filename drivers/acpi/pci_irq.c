@@ -24,6 +24,8 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#include <linux/config.h>
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -35,6 +37,9 @@
 #include <linux/acpi.h>
 #ifdef CONFIG_X86_IO_APIC
 #include <asm/mpspec.h>
+#endif
+#ifdef CONFIG_IOSAPIC
+# include <asm/iosapic.h>
 #endif
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>

@@ -1374,7 +1374,7 @@ msgctl32 (int first, int second, void *uptr)
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_msgctl(first, second, &m64);
+		err = sys_msgctl(first, second, (struct msqid_ds *)&m64);
 		set_fs(old_fs);
 		break;
 
@@ -1382,7 +1382,7 @@ msgctl32 (int first, int second, void *uptr)
 	      case MSG_STAT:
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_msgctl(first, second, (void *) &m64);
+		err = sys_msgctl(first, second, (struct msqid_ds *)&m64);
 		set_fs(old_fs);
 
 		if (version == IPC_64) {
@@ -1518,7 +1518,7 @@ shmctl32 (int first, int second, void *uptr)
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_shmctl(first, second, &s64);
+		err = sys_shmctl(first, second, (struct shmid_ds *)&s64);
 		set_fs(old_fs);
 		break;
 
@@ -1526,7 +1526,7 @@ shmctl32 (int first, int second, void *uptr)
 	      case SHM_STAT:
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_shmctl(first, second, (void *) &s64);
+		err = sys_shmctl(first, second, (struct shmid_ds *)&s64);
 		set_fs(old_fs);
 		if (err < 0)
 			break;
@@ -1693,6 +1693,10 @@ sys32_time (int *tloc)
 	}
 	return i;
 }
+
+asmlinkage long
+compat_sys_wait4 (compat_pid_t pid, compat_uint_t * stat_addr, int options,
+		 struct compat_rusage *ru);
 
 asmlinkage long
 sys32_waitpid (int pid, unsigned int *stat_addr, int options)

@@ -45,7 +45,7 @@ void
 ia64_do_show_stack (struct unw_frame_info *info, void *arg)
 {
 	unsigned long ip, sp, bsp;
-	char buf[80];			/* don't make it so big that it overflows the stack! */
+	char buf[128];			/* don't make it so big that it overflows the stack! */
 
 	printk("\nCall Trace:\n");
 	do {
@@ -55,7 +55,9 @@ ia64_do_show_stack (struct unw_frame_info *info, void *arg)
 
 		unw_get_sp(info, &sp);
 		unw_get_bsp(info, &bsp);
-		snprintf(buf, sizeof(buf), " [<%016lx>] %%s\n\t\t\t\tsp=%016lx bsp=%016lx\n",
+		snprintf(buf, sizeof(buf),
+			 " [<%016lx>] %%s\n"
+			 "                                sp=%016lx bsp=%016lx\n",
 			 ip, sp, bsp);
 		print_symbol(buf, ip);
 	} while (unw_unwind(info) >= 0);

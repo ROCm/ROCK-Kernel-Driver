@@ -893,7 +893,7 @@ static int __init pd_init(void)
 	if (register_blkdev(major, name))
 		return -1;
 
-	blk_init_queue(&pd_queue, do_pd_request, &pd_lock);
+	blk_init_queue(do_pd_request, &pd_lock);
 	blk_queue_max_sectors(&pd_queue, cluster);
 
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
