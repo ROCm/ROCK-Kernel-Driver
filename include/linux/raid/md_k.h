@@ -206,12 +206,14 @@ struct mddev_s
 
 	char				uuid[16];
 
+	struct mdk_thread_s		*thread;	/* management thread */
 	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
 
 	/* recovery/resync flags 
+	 * NEEDED:   we might need to start a resync/recover
 	 * RUNNING:  a thread is running, or about to be started
 	 * SYNC:     actually doing a resync, not a recovery
 	 * ERR:      and IO error was detected - abort the resync/recovery
@@ -223,6 +225,7 @@ struct mddev_s
 #define	MD_RECOVERY_ERR		2
 #define	MD_RECOVERY_INTR	3
 #define	MD_RECOVERY_DONE	4
+#define	MD_RECOVERY_NEEDED	5
 	unsigned long			recovery;
 
 	int				in_sync;	/* know to not need resync */
@@ -298,8 +301,8 @@ extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
 	ITERATE_RDEV_GENERIC(pending_raid_disks,rdev,tmp)
 
 typedef struct mdk_thread_s {
-	void			(*run) (void *data);
-	void			*data;
+	void			(*run) (mddev_t *mddev);
+	mddev_t			*mddev;
 	wait_queue_head_t	wqueue;
 	unsigned long           flags;
 	struct completion	*event;

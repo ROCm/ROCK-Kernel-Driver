@@ -71,12 +71,12 @@ static inline void __release_stripe(raid5_conf_t *conf, struct stripe_head *sh)
 				list_add_tail(&sh->lru, &conf->delayed_list);
 			else
 				list_add_tail(&sh->lru, &conf->handle_list);
-			md_wakeup_thread(conf->thread);
+			md_wakeup_thread(conf->mddev->thread);
 		} else {
 			if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state)) {
 				atomic_dec(&conf->preread_active_stripes);
 				if (atomic_read(&conf->preread_active_stripes) < IO_THRESHOLD)
-					md_wakeup_thread(conf->thread);
+					md_wakeup_thread(conf->mddev->thread);
 			}
 			list_add_tail(&sh->lru, &conf->inactive_list);
 			atomic_dec(&conf->active_stripes);
@@ -912,7 +912,7 @@ static void handle_stripe(struct stripe_head *sh)
 				struct bio *nextbi = bi->bi_next;
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
 				if (--bi->bi_phys_segments == 0) {
-					md_write_end(conf->mddev, conf->thread);
+					md_write_end(conf->mddev);
 					bi->bi_next = return_bi;
 					return_bi = bi;
 				}
@@ -969,7 +969,7 @@ static void handle_stripe(struct stripe_head *sh)
 			    while (wbi && wbi->bi_sector < dev->sector + STRIPE_SECTORS) {
 				    wbi2 = wbi->bi_next;
 				    if (--wbi->bi_phys_segments == 0) {
-					    md_write_end(conf->mddev, conf->thread);
+					    md_write_end(conf->mddev);
 					    wbi->bi_next = return_bi;
 					    return_bi = wbi;
 				    }
@@ -1112,7 +1112,7 @@ static void handle_stripe(struct stripe_head *sh)
 			if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state)) {
 				atomic_dec(&conf->preread_active_stripes);
 				if (atomic_read(&conf->preread_active_stripes) < IO_THRESHOLD)
-					md_wakeup_thread(conf->thread);
+					md_wakeup_thread(conf->mddev->thread);
 			}
 		}
 	}
@@ -1250,7 +1250,7 @@ static void raid5_unplug_device(void *data)
 
 	if (blk_remove_plug(q))
 		raid5_activate_delayed(conf);
-	md_wakeup_thread(conf->thread);
+	md_wakeup_thread(mddev->thread);
 
 	spin_unlock_irqrestore(&conf->device_lock, flags);
 }
@@ -1303,7 +1303,7 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		int bytes = bi->bi_size;
 
 		if ( bio_data_dir(bi) == WRITE )
-			md_write_end(mddev,conf->thread);
+			md_write_end(mddev);
 		bi->bi_size = 0;
 		bi->bi_end_io(bi, bytes, 0);
 	}
@@ -1355,16 +1355,17 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
  * During the scan, completed stripes are saved for us by the interrupt
  * handler, so that they will not have to wait for our next wakeup.
  */
-static void raid5d (void *data)
+static void raid5d (mddev_t *mddev)
 {
 	struct stripe_head *sh;
-	raid5_conf_t *conf = data;
-	mddev_t *mddev = conf->mddev;
+	raid5_conf_t *conf = mddev_to_conf(mddev);
 	int handled;
 
 	PRINTK("+++ raid5d active\n");
 
+	md_check_recovery(mddev);
 	md_handle_safemode(mddev);
+
 	handled = 0;
 	spin_lock_irq(&conf->device_lock);
 	while (1) {
@@ -1485,10 +1486,8 @@ static int run (mddev_t *mddev)
 	}
 
 	{
-		snprintf(conf->thread_name,MD_THREAD_NAME_MAX,"raid5d_md%d",mdidx(mddev));
-
-		conf->thread = md_register_thread(raid5d, conf, conf->thread_name);
-		if (!conf->thread) {
+		mddev->thread = md_register_thread(raid5d, mddev, "md%d_raid5");
+		if (!mddev->thread) {
 			printk(KERN_ERR "raid5: couldn't allocate thread for md%d\n", mdidx(mddev));
 			goto abort;
 		}
@@ -1499,7 +1498,7 @@ static int run (mddev_t *mddev)
 	if (grow_stripes(conf, conf->max_nr_stripes)) {
 		printk(KERN_ERR "raid5: couldn't allocate %dkB for buffers\n", memory);
 		shrink_stripes(conf);
-		md_unregister_thread(conf->thread);
+		md_unregister_thread(mddev->thread);
 		goto abort;
 	} else
 		printk(KERN_INFO "raid5: allocated %dkB for md%d\n", memory, mdidx(mddev));
@@ -1535,7 +1534,8 @@ static int stop (mddev_t *mddev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 
-	md_unregister_thread(conf->thread);
+	md_unregister_thread(mddev->thread);
+	mddev->thread = NULL;
 	shrink_stripes(conf);
 	free_pages((unsigned long) conf->stripe_hashtbl, HASH_PAGES_ORDER);
 	kfree(conf);
@@ -1573,8 +1573,6 @@ static void printall (raid5_conf_t *conf)
 		}
 	}
 	spin_unlock_irq(&conf->device_lock);
-
-	PRINTK("--- raid5d inactive\n");
 }
 #endif
 

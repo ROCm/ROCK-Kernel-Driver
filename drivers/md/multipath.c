@@ -86,7 +86,6 @@ static void multipath_reschedule_retry (struct multipath_bh *mp_bh)
 {
 	unsigned long flags;
 	mddev_t *mddev = mp_bh->mddev;
-	multipath_conf_t *conf = mddev_to_conf(mddev);
 
 	spin_lock_irqsave(&retry_list_lock, flags);
 	if (multipath_retry_list == NULL)
@@ -95,7 +94,7 @@ static void multipath_reschedule_retry (struct multipath_bh *mp_bh)
 	multipath_retry_tail = &mp_bh->next_mp;
 	mp_bh->next_mp = NULL;
 	spin_unlock_irqrestore(&retry_list_lock, flags);
-	md_wakeup_thread(conf->thread);
+	md_wakeup_thread(mddev->thread);
 }
 
 
@@ -333,14 +332,14 @@ abort:
  *	3.	Performs writes following reads for array syncronising.
  */
 
-static void multipathd (void *data)
+static void multipathd (mddev_t *mddev)
 {
 	struct multipath_bh *mp_bh;
 	struct bio *bio;
 	unsigned long flags;
-	mddev_t *mddev;
 	mdk_rdev_t *rdev;
 
+	md_check_recovery(mddev);
 	for (;;) {
 		spin_lock_irqsave(&retry_list_lock, flags);
 		mp_bh = multipath_retry_list;
@@ -470,10 +469,10 @@ static int multipath_run (mddev_t *mddev)
 	}
 
 	{
-		const char * name = "multipathd";
+		const char * name = "md%d_multipath";
 
-		conf->thread = md_register_thread(multipathd, conf, name);
-		if (!conf->thread) {
+		mddev->thread = md_register_thread(multipathd, mddev, name);
+		if (!mddev->thread) {
 			printk(THREAD_ERROR, mdidx(mddev));
 			goto out_free_conf;
 		}
@@ -512,7 +511,7 @@ static int multipath_stop (mddev_t *mddev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 
-	md_unregister_thread(conf->thread);
+	md_unregister_thread(mddev->thread);
 	mempool_destroy(conf->pool);
 	kfree(conf);
 	mddev->private = NULL;

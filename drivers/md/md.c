@@ -124,9 +124,6 @@ static ctl_table raid_root_table[] = {
 	{ .ctl_name = 0 }
 };
 
-static void md_recover_arrays(void);
-static mdk_thread_t *md_recovery_thread;
-
 sector_t md_size[MAX_MD_DEVS];
 
 static struct block_device_operations md_fops;
@@ -1527,7 +1524,8 @@ static int do_md_run(mddev_t * mddev)
 		mddev->in_sync = 1;
 	
 	md_update_sb(mddev);
-	md_recover_arrays();
+	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+	md_wakeup_thread(mddev->thread);
 	set_capacity(disk, md_size[mdidx(mddev)]<<1);
 	return (0);
 }
@@ -1563,7 +1561,8 @@ static int restart_array(mddev_t *mddev)
 		/*
 		 * Kick recovery or resync if necessary
 		 */
-		md_recover_arrays();
+		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+		md_wakeup_thread(mddev->thread);
 		err = 0;
 	} else {
 		printk(KERN_ERR "md: md%d has no personality assigned.\n",
@@ -2133,7 +2132,8 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 	 * Kick recovery, maybe this spare has to be added to the
 	 * array immediately.
 	 */
-	md_recover_arrays();
+	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+	md_wakeup_thread(mddev->thread);
 
 	return 0;
 
@@ -2482,7 +2482,7 @@ int md_thread(void * arg)
 	 * Detach thread
 	 */
 
-	daemonize(thread->name);
+	daemonize(thread->name, mdidx(thread->mddev));
 
 	current->exit_signal = SIGCHLD;
 	allow_signal(SIGKILL);
@@ -2503,7 +2503,7 @@ int md_thread(void * arg)
 
 	complete(thread->event);
 	while (thread->run) {
-		void (*run)(void *data);
+		void (*run)(mddev_t *);
 
 		wait_event_interruptible(thread->wqueue,
 					 test_bit(THREAD_WAKEUP, &thread->flags));
@@ -2514,7 +2514,7 @@ int md_thread(void * arg)
 
 		run = thread->run;
 		if (run) {
-			run(thread->data);
+			run(thread->mddev);
 			blk_run_queues();
 		}
 		if (signal_pending(current))
@@ -2531,8 +2531,8 @@ void md_wakeup_thread(mdk_thread_t *thread)
 	wake_up(&thread->wqueue);
 }
 
-mdk_thread_t *md_register_thread(void (*run) (void *),
-						void *data, const char *name)
+mdk_thread_t *md_register_thread(void (*run) (mddev_t *), mddev_t *mddev,
+				 const char *name)
 {
 	mdk_thread_t *thread;
 	int ret;
@@ -2549,7 +2549,7 @@ mdk_thread_t *md_register_thread(void (*run) (void *),
 	init_completion(&event);
 	thread->event = &event;
 	thread->run = run;
-	thread->data = data;
+	thread->mddev = mddev;
 	thread->name = name;
 	ret = kernel_thread(md_thread, thread, 0);
 	if (ret < 0) {
@@ -2584,16 +2584,6 @@ void md_unregister_thread(mdk_thread_t *thread)
 	kfree(thread);
 }
 
-static void md_recover_arrays(void)
-{
-	if (!md_recovery_thread) {
-		MD_BUG();
-		return;
-	}
-	md_wakeup_thread(md_recovery_thread);
-}
-
-
 void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
@@ -2611,7 +2601,8 @@ void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 	if (!mddev->pers->error_handler)
 		return;
 	mddev->pers->error_handler(mddev,rdev);
-	md_recover_arrays();
+	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+	md_wakeup_thread(mddev->thread);
 }
 
 /* seq_file implementation /proc/mdstat */
@@ -2897,7 +2888,7 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 	wake_up(&mddev->recovery_wait);
 	if (!ok) {
 		set_bit(MD_RECOVERY_ERR, &mddev->recovery);
-		md_recover_arrays();
+		md_wakeup_thread(mddev->thread);
 		// stop recovery, signal do_sync ....
 	}
 }
@@ -2917,10 +2908,10 @@ void md_write_start(mddev_t *mddev)
 		atomic_inc(&mddev->writes_pending);
 }
 
-void md_write_end(mddev_t *mddev, mdk_thread_t *thread)
+void md_write_end(mddev_t *mddev)
 {
 	if (atomic_dec_and_test(&mddev->writes_pending) && mddev->safemode)
-		md_wakeup_thread(thread);
+		md_wakeup_thread(mddev->thread);
 }
 static inline void md_enter_safemode(mddev_t *mddev)
 {
@@ -2950,9 +2941,8 @@ DECLARE_WAIT_QUEUE_HEAD(resync_wait);
 
 #define SYNC_MARKS	10
 #define	SYNC_MARK_STEP	(3*HZ)
-static void md_do_sync(void *data)
+static void md_do_sync(mddev_t *mddev)
 {
-	mddev_t *mddev = data;
 	mddev_t *mddev2;
 	unsigned int max_sectors, currspeed = 0,
 		j, window, err;
@@ -3129,13 +3119,16 @@ static void md_do_sync(void *data)
  skip:
 	mddev->curr_resync = 0;
 	set_bit(MD_RECOVERY_DONE, &mddev->recovery);
-	md_recover_arrays();
+	md_wakeup_thread(mddev->thread);
 }
 
 
 /*
- * This is the kernel thread that watches all md arrays for re-sync and other
- * action that might be needed.
+ * This routine is regularly called by all per-raid-array threads to
+ * deal with generic issues like resync and super-block update.
+ * Raid personalities that don't have a thread (linear/raid0) do not
+ * need this as they never do any recovery or update the superblock.
+ *
  * It does not do any resync itself, but rather "forks" off other threads
  * to do that as needed.
  * When it is determined that resync is needed, we set MD_RECOVERY_RUNNING in
@@ -3152,19 +3145,24 @@ static void md_do_sync(void *data)
  *  5/ If array is degraded, try to add spares devices
  *  6/ If array has spares or is not in-sync, start a resync thread.
  */
-void md_do_recovery(void *data)
+void md_check_recovery(mddev_t *mddev)
 {
-	mddev_t *mddev;
 	mdk_rdev_t *rdev;
-	struct list_head *tmp, *rtmp;
+	struct list_head *rtmp;
 
 
 	dprintk(KERN_INFO "md: recovery thread got woken up ...\n");
 
-	ITERATE_MDDEV(mddev,tmp) if (mddev_lock(mddev)==0) {
+	if (mddev->ro)
+		return;
+	if ( ! (
+		mddev->sb_dirty ||
+		test_bit(MD_RECOVERY_NEEDED, &mddev->recovery) ||
+		test_bit(MD_RECOVERY_DONE, &mddev->recovery)
+		))
+		return;
+	if (mddev_trylock(mddev)==0) {
 		int spares =0;
-		if (!mddev->raid_disks || !mddev->pers || mddev->ro)
-			goto unlock;
 		if (mddev->sb_dirty)
 			md_update_sb(mddev);
 		if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery) &&
@@ -3226,7 +3224,7 @@ void md_do_recovery(void *data)
 				set_bit(MD_RECOVERY_SYNC, &mddev->recovery);
 			mddev->sync_thread = md_register_thread(md_do_sync,
 								mddev,
-								"md_resync");
+								"md%d_resync");
 			if (!mddev->sync_thread) {
 				printk(KERN_ERR "md%d: could not start resync thread...\n", mdidx(mddev));
 				/* leave the spares where they are, it shouldn't hurt */
@@ -3238,8 +3236,6 @@ void md_do_recovery(void *data)
 	unlock:
 		mddev_unlock(mddev);
 	}
-	dprintk(KERN_INFO "md: recovery thread finished ...\n");
-
 }
 
 int md_notify_reboot(struct notifier_block *this,
@@ -3292,7 +3288,6 @@ static void md_geninit(void)
 
 int __init md_init(void)
 {
-	static char * name = "mdrecoveryd";
 	int minor;
 
 	printk(KERN_INFO "md: md driver %d.%d.%d MAX_MD_DEVS=%d, MD_SB_DISKS=%d\n",
@@ -3311,11 +3306,6 @@ int __init md_init(void)
 		devfs_register(NULL, name, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
 			       S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
 	}
-
-	md_recovery_thread = md_register_thread(md_do_recovery, NULL, name);
-	if (!md_recovery_thread)
-		printk(KERN_ALERT
-		       "md: bug: couldn't allocate md_recovery_thread\n");
 
 	register_reboot_notifier(&md_notifier);
 	raid_table_header = register_sysctl_table(raid_root_table, 1);
@@ -3374,7 +3364,6 @@ static __exit void md_exit(void)
 {
 	int i;
 	blk_unregister_region(MKDEV(MAJOR_NR,0), MAX_MD_DEVS);
-	md_unregister_thread(md_recovery_thread);
 	for (i=0; i < MAX_MD_DEVS; i++)
 		devfs_remove("md/%d", i);
 	devfs_remove("md");
@@ -3414,4 +3403,5 @@ EXPORT_SYMBOL(md_unregister_thread);
 EXPORT_SYMBOL(md_wakeup_thread);
 EXPORT_SYMBOL(md_print_devices);
 EXPORT_SYMBOL(md_interrupt_thread);
+EXPORT_SYMBOL(md_check_recovery);
 MODULE_LICENSE("GPL");
