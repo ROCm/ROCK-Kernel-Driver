@@ -86,8 +86,8 @@ static void prdump(unsigned long, long);
 static int ppc_inst_dump(unsigned long, long);
 void print_address(unsigned long);
 static int getsp(void);
-static void backtrace(struct pt_regs *);
-static void excprint(struct pt_regs *);
+static void backtrace(struct pt_regs *, int use_kallsyms);
+static void excprint(struct pt_regs *, int use_kallsyms);
 static void prregs(struct pt_regs *);
 static void memops(int);
 static void memlocate(void);
@@ -160,6 +160,7 @@ Commands:\n\
   di	dump instructions\n\
   df	dump float values\n\
   dd	dump double values\n\
+  E	print exception information with sym\n\
   e	print exception information\n\
   f	flush cache\n\
   la	lookup symbol+offset of specified address\n\
@@ -175,8 +176,8 @@ Commands:\n\
   r	print registers\n\
   s	single step\n\
   S	print special registers\n\
+  T	print backtrace with sym\n\
   t	print backtrace\n\
-  T	Enable/Disable PPCDBG flags\n\
   x	exit monitor\n\
   u	dump segment table or SLB\n\
   ?	help\n"
@@ -192,10 +193,14 @@ static int xmon_trace[NR_CPUS];
 static struct pt_regs *xmon_regs[NR_CPUS];
 
 void __xmon_print_symbol(const char *fmt, unsigned long address);
-#define xmon_print_symbol(fmt, addr)		\
+#define xmon_print_symbol(yes,fmt, addr)	\
 do {						\
+	if (yes) { 				\
 	__check_printsym_format(fmt, "");	\
 	__xmon_print_symbol(fmt, addr);		\
+	} else {				\
+	printf(fmt,"");				\
+	}					\
 } while(0)
 
 /*
@@ -296,7 +301,7 @@ xmon(struct pt_regs *excp)
 	msr = get_msr();
 	set_msrd(msr & ~MSR_EE);	/* disable interrupts */
 	xmon_regs[smp_processor_id()] = excp;
-	excprint(excp);
+	excprint(excp, 0);
 #ifdef CONFIG_SMP
 	leaving_xmon = 0;
 	/* possible race condition here if a CPU is held up and gets
@@ -344,7 +349,7 @@ xmon(struct pt_regs *excp)
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
 
-	return 0;
+	return 1;
 }
 
 int
@@ -358,13 +363,13 @@ xmon_bpt(struct pt_regs *regs)
 	if (bp->count) {
 		--bp->count;
 		remove_bpts();
-		excprint(regs);
+		excprint(regs, 0);
 		xmon_trace[smp_processor_id()] = BRSTEP;
 		regs->msr |= MSR_SE;
 	} else {
 		printf("Stopped at breakpoint %x (%lx ", (bp - bpts) + 1,
 			bp->address);
-		xmon_print_symbol("%s)\n", bp->address);
+		xmon_print_symbol(0, "%s)\n", bp->address);
 		xmon(regs);
 	}
 	return 1;
@@ -390,7 +395,7 @@ xmon_dabr_match(struct pt_regs *regs)
 	if (dabr.enabled && dabr.count) {
 		--dabr.count;
 		remove_bpts();
-		excprint(regs);
+		excprint(regs, 0);
 		xmon_trace[smp_processor_id()] = BRSTEP;
 		regs->msr |= MSR_SE;
 	} else {
@@ -406,7 +411,7 @@ xmon_iabr_match(struct pt_regs *regs)
 	if (iabr.enabled && iabr.count) {
 		--iabr.count;
 		remove_bpts();
-		excprint(regs);
+		excprint(regs, 0);
 		xmon_trace[smp_processor_id()] = BRSTEP;
 		regs->msr |= MSR_SE;
 	} else {
@@ -546,17 +551,26 @@ cmds(struct pt_regs *excp)
 			if (excp != NULL)
 				prregs(excp);	/* print regs */
 			break;
+		case 'E':
+			if (excp == NULL)
+				printf("No exception information\n");
+			else
+				excprint(excp, 1);
+			break;
 		case 'e':
 			if (excp == NULL)
 				printf("No exception information\n");
 			else
-				excprint(excp);
+				excprint(excp, 0);
 			break;
 		case 'S':
 			super_regs();
 			break;
+		case 'T':
+			backtrace(excp, 1);
+			break;
 		case 't':
-			backtrace(excp);
+			backtrace(excp, 0);
 			break;
 		case 'f':
 			cacheflush();
@@ -584,9 +598,11 @@ cmds(struct pt_regs *excp)
 #endif /* CONFIG_SMP */
 		case 'z':
 			bootcmds();
+#if 0
 		case 'T':
 			debug_trace();
 			break;
+#endif
 		case 'u':
 			dump_segments();
 			break;
@@ -803,7 +819,7 @@ bpt_cmds(void)
 			} else {
 				printf("Cleared breakpoint %x (%lx ", 
 					(bp - bpts) + 1, bp->address);
-				xmon_print_symbol("%s)\n", bp->address);
+				xmon_print_symbol(1, "%s)\n", bp->address);
 				bp->enabled = 0;
 			}
 		}
@@ -840,7 +856,7 @@ bpt_cmds(void)
 				if (bp->enabled) {
 					printf("%2x trap   %.16lx %8x  ",
 						bpnum, bp->address, bp->count);
-					xmon_print_symbol("%s\n", bp->address);
+					xmon_print_symbol(1, "%s\n", bp->address);
 				}
 			break;
 		}
@@ -867,7 +883,7 @@ bpt_cmds(void)
 		scanhex(&bp->count);
 		printf("Set breakpoint %2x trap   %.16lx %8x  ", (bp-bpts) + 1, 
 			bp->address, bp->count);
-		xmon_print_symbol("%s\n", bp->address);
+		xmon_print_symbol(1, "%s\n", bp->address);
 		break;
 	}
 }
@@ -898,7 +914,7 @@ const char *getvecname(unsigned long vec)
 }
 
 static void
-backtrace(struct pt_regs *excp)
+backtrace(struct pt_regs *excp, int use_kallsyms)
 {
 	unsigned long sp;
 	unsigned long lr;
@@ -950,7 +966,7 @@ backtrace(struct pt_regs *excp)
 			printf("exception: %lx %s regs %lx\n", regs.trap, getvecname(regs.trap), sp+112);
 			printf("                  %.16lx", regs.nip);
 			if (regs.nip & 0xffffffff00000000UL)
-				xmon_print_symbol("  %s", regs.nip);
+				xmon_print_symbol(use_kallsyms, "  %s", regs.nip);
 			printf("\n");
                         if (regs.gpr[1] < sp) {
                             printf("<Stack drops into userspace %.16lx>\n", regs.gpr[1]);
@@ -962,7 +978,7 @@ backtrace(struct pt_regs *excp)
 				break;
 		} else {
 			if (stack[2])
-				xmon_print_symbol("  %s", stack[2]);
+				xmon_print_symbol(use_kallsyms, "  %s", stack[2]);
 			printf("\n");
 		}
 		if (stack[0] && stack[0] <= sp) {
@@ -989,7 +1005,7 @@ getsp()
 spinlock_t exception_print_lock = SPIN_LOCK_UNLOCKED;
 
 void
-excprint(struct pt_regs *fp)
+excprint(struct pt_regs *fp, int use_kallsyms)
 {
 	unsigned long flags;
 
@@ -1001,10 +1017,10 @@ excprint(struct pt_regs *fp)
 
 	printf("Vector: %lx %s at [%lx]\n", fp->trap, getvecname(fp->trap), fp);
 	printf("    pc: %lx", fp->nip);
-	xmon_print_symbol(" (%s)\n", fp->nip);
+	xmon_print_symbol(use_kallsyms, " (%s)\n", fp->nip);
 
 	printf("    lr: %lx", fp->link);
-	xmon_print_symbol(" (%s)\n", fp->link);
+	xmon_print_symbol(use_kallsyms, " (%s)\n", fp->link);
 
 	printf("    sp: %lx\n", fp->gpr[1]);
 	printf("   msr: %lx\n", fp->msr);
@@ -1959,7 +1975,7 @@ symbol_lookup(void)
 	case 'a':
 		if (scanhex(&addr)) {
 			printf("%lx: ", addr);
-			xmon_print_symbol("%s\n", addr);
+			xmon_print_symbol(1, "%s\n", addr);
 		}
 		termch = 0;
 		break;
@@ -2029,6 +2045,7 @@ void __xmon_print_symbol(const char *fmt, unsigned long address)
 	}
 }
 
+#if 0
 static void debug_trace(void)
 {
         unsigned long val, cmd, on;
@@ -2077,6 +2094,7 @@ static void debug_trace(void)
 		cmd = skipbl();
 	}
 }
+#endif
 
 static void dump_slb(void)
 {

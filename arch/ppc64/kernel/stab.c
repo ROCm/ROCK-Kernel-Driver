@@ -196,7 +196,7 @@ int ste_allocate(unsigned long ea)
 	esid = GET_ESID(ea);
 	__ste_allocate(esid, vsid);
 	/* Order update */
-	asm volatile("sync":::"memory"); 
+	asm volatile("sync":::"memory");
 
 	return 0;
 }
@@ -270,10 +270,10 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 		/* Invalidate all entries. */
 		ste = stab;
 
-		/* Never flush the first entry. */ 
+		/* Never flush the first entry. */
 		ste += 1;
 		for (entry = 1;
-		     entry < (PAGE_SIZE / sizeof(STE)); 
+		     entry < (PAGE_SIZE / sizeof(STE));
 		     entry++, ste++) {
 			unsigned long ea;
 			ea = ste->dw0.dw0.esid << SID_SHIFT;

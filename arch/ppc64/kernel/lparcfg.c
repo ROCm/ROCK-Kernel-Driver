@@ -46,6 +46,8 @@ void log_plpar_hcall_return(unsigned long rc,char * tag)
 		printk("plpar-hcall (%s) failed; function not allowed\n",tag);
 	else if (rc == H_Authority)
 		printk("plpar-hcall (%s) failed; not authorized to this function\n",tag);
+	else if (rc == H_Parameter)
+		printk("plpar-hcall (%s) failed; Bad parameter(s)\n",tag);
 	else
 		printk("plpar-hcall (%s) failed with unexpected rc(0x%lx)\n",tag,rc);
 
@@ -245,29 +247,27 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
  *              XXXX - Active processors in Physical Processor Pool.
  *                  XXXX  - Processors active on platform. 
  */
-unsigned int h_get_ppp(unsigned long *entitled,unsigned long  *unallocated,unsigned long *aggregation,unsigned long *resource)
+static unsigned int h_get_ppp(unsigned long *entitled,unsigned long  *unallocated,unsigned long *aggregation,unsigned long *resource)
 {
 	unsigned long rc;
 	rc = plpar_hcall_4out(H_GET_PPP,0,0,0,0,entitled,unallocated,aggregation,resource);
 
 	log_plpar_hcall_return(rc,"H_GET_PPP");
 
-	return 0;
+	return rc;
 }
 
-unsigned int h_pic(unsigned long *pool_idle_time,unsigned long *num_procs)
+static void h_pic(unsigned long *pool_idle_time,unsigned long *num_procs)
 {
 	unsigned long rc;
 	unsigned long dummy;
 	rc = plpar_hcall(H_PIC,0,0,0,0,pool_idle_time,num_procs,&dummy);
 
 	log_plpar_hcall_return(rc,"H_PIC");
-
-	return 0;
 }
 
 /* prototyping h_purr functionality.  this may need to be moved into decrementer code. */
-unsigned int h_purr(unsigned long *purr)
+static void h_purr(unsigned long *purr)
 {
 	unsigned long rc;
 
@@ -275,7 +275,6 @@ unsigned int h_purr(unsigned long *purr)
 	rc = plpar_hcall(H_PURR, 0, 0, 0, 0,purr, &dummy, &dummy);
 
 	log_plpar_hcall_return(rc,"H_PURR");
-	return 0;
 }
 
 #define SPLPAR_CHARACTERISTICS_TOKEN 20
@@ -293,32 +292,39 @@ unsigned long parse_system_parameter_string(unsigned long n, char * buf)
 	unsigned long ret[2];
 
 	char * local_buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
-
-	{
-		spin_lock(&rtas_data_buf_lock);
-		memset(rtas_data_buf, 0, SPLPAR_MAXLENGTH); 
-		call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
-					NULL,
-					SPLPAR_CHARACTERISTICS_TOKEN,
-					__pa(rtas_data_buf),
-					SPLPAR_MAXLENGTH,
-					(void *)&ret);
-		memcpy(local_buffer,rtas_data_buf, SPLPAR_MAXLENGTH);
-		spin_unlock(&rtas_data_buf_lock);
+	if (!local_buffer) {
+		printk("%s %s kmalloc failure at line %d \n",__FILE__,__FUNCTION__,__LINE__);
+		return n;
 	}
+
+	spin_lock(&rtas_data_buf_lock);
+	memset(rtas_data_buf, 0, SPLPAR_MAXLENGTH); 
+	call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
+				NULL,
+				SPLPAR_CHARACTERISTICS_TOKEN,
+				__pa(rtas_data_buf),
+				SPLPAR_MAXLENGTH,
+				(void *)&ret);
+	memcpy(local_buffer,rtas_data_buf, SPLPAR_MAXLENGTH);
+	spin_unlock(&rtas_data_buf_lock);
 
 	if (call_status!=0) {
 		printk("%s %s Error calling get-system-parameter (0x%lx)\n",__FILE__,__FUNCTION__,call_status);
 	} else {
 		int splpar_strlen;
+		int idx,w_idx;
+		char * workbuffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
+		if (!workbuffer) {
+			printk("%s %s kmalloc failure at line %d \n",__FILE__,__FUNCTION__,__LINE__);
+			return n;
+		}
+
 #ifdef LPARCFG_DEBUG
 		printk("success calling get-system-parameter \n");
 #endif
 		splpar_strlen=local_buffer[0]*16+local_buffer[1];
 		local_buffer+=2; /* step over strlen value */
 
-		char * workbuffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
-		int idx,w_idx;
 		memset(workbuffer, 0, SPLPAR_MAXLENGTH);
 		w_idx=0; idx=0;
 		while ((*local_buffer) && (idx<splpar_strlen)) {
@@ -397,6 +403,8 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		unsigned long h_entitled,h_unallocated,h_aggregation,h_resource;
+		unsigned long pool_idle_time,pool_procs;
+		unsigned long purr;
 
 		h_get_ppp(&h_entitled,&h_unallocated,&h_aggregation,&h_resource);
 
@@ -410,6 +418,10 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R7=0x%lx\n", h_resource);
 #endif /* LPARCFG_DEBUG */
+
+		h_pic(&pool_idle_time,&pool_procs);
+
+		h_purr(&purr);
 
 		/* this call handles the ibm,get-system-parameter contents */
 		n = parse_system_parameter_string(n,buf);
@@ -450,8 +462,6 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 			      "unallocated_capacity=%ld\n",
 			      h_unallocated);
 
-		unsigned long pool_idle_time,pool_procs;
-		h_pic(&pool_idle_time,&pool_procs);
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
 			      "pool_idle_time=%ld\n",
 			      pool_idle_time);
@@ -460,8 +470,6 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 			      "pool_num_procs=%ld\n",
 			      pool_procs);
 
-		unsigned long purr;
-		h_purr(&purr);
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
 			      "purr=%ld\n",
 			      purr);
