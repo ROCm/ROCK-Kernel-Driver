@@ -195,6 +195,36 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 }
 
 /**
+ *	llc_build_and_send_ui_pkt - unitdata request interface for upper layers
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
+ *
+ *	Upper layers calls this function when upper layer wants to send data
+ *	using connection-less mode communication (UI pdu).
+ *
+ *	Accept data frame from network layer to be sent using connection-
+ *	less mode communication; timeout/retries handled by network layer;
+ *	package primitive as an event and send to SAP event handler
+ */
+void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
+			       u8 *dmac, u8 dsap)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
+
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_DATAUNIT_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
+	llc_sap_state_process(sap, skb);
+}
+
+/**
  *	llc_sap_rcv - sends received pdus to the sap state machine
  *	@sap: current sap component structure.
  *	@skb: received frame.
@@ -300,3 +330,4 @@ void llc_sap_close(struct llc_sap *sap)
 
 EXPORT_SYMBOL(llc_sap_open);
 EXPORT_SYMBOL(llc_sap_close);
+EXPORT_SYMBOL(llc_build_and_send_ui_pkt);
