@@ -32,10 +32,6 @@ int button_init (void);
 int button_add_callback (void (*callback) (void), int count);
 int button_del_callback (void (*callback) (void));
 static void button_consume_callbacks (int bpcount);
-#ifdef MODULE
-int init_module (void);
-void cleanup_module (void);
-#endif /* MODULE */
 
 #else /* Not compiling the driver itself */
 

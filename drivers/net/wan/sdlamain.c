@@ -177,10 +177,6 @@ static void dbg_kfree(void * v, int line) {
 extern void disable_irq(unsigned int);
 extern void enable_irq(unsigned int);
  
-/* Module entry points */
-int init_module (void);
-void cleanup_module (void);
-
 /* WAN link driver entry points */
 static int setup(struct wan_device* wandev, wandev_conf_t* conf);
 static int shutdown(struct wan_device* wandev);
@@ -246,11 +242,7 @@ static int wanpipe_bh_critical=0;
  * Context:	process
  */
  
-#ifdef MODULE
-int init_module (void)
-#else
 int wanpipe_init(void)
-#endif
 {
 	int cnt, err = 0;
 
@@ -313,7 +305,7 @@ int wanpipe_init(void)
  * o unregister all adapters from the WAN router
  * o release all remaining system resources
  */
-void cleanup_module (void)
+static void wanpipe_cleanup(void)
 {
 	int i;
 
@@ -329,6 +321,8 @@ void cleanup_module (void)
 	printk(KERN_INFO "\nwanpipe: WANPIPE Modules Unloaded.\n");
 }
 
+module_init(wanpipe_init);
+module_exit(wanpipe_cleanup);
 #endif
 
 /******* WAN Device Driver Entry Points *************************************/
