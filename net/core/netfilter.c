@@ -27,6 +27,7 @@
 #include <linux/icmp.h>
 #include <net/sock.h>
 #include <net/route.h>
+#include <net/xfrm.h>
 #include <linux/ip.h>
 
 /* In this code, we can be waiting indefinitely for userspace to
@@ -674,6 +675,28 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	return 0;
 }
 
+#ifdef CONFIG_XFRM
+inline int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb)
+{
+	skb->sp->decap_done = 1;
+	dst_release(skb->dst);
+	skb->dst = NULL;
+	nf_reset(skb);
+	return netif_rx(skb);
+}
+
+int nf_rcv_postxfrm_local(struct sk_buff *skb)
+{
+	__skb_push(skb, skb->data - skb->nh.raw);
+	/* Fix header len and checksum if last xfrm was transport mode */
+	if (!skb->sp->x[skb->sp->len - 1].xvec->props.mode) {
+		skb->nh.iph->tot_len = htons(skb->len);
+		ip_send_check(skb->nh.iph);
+	}
+	return nf_rcv_postxfrm_nonlocal(skb);
+}
+#endif
+
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 {
 	struct sk_buff *nskb;
@@ -837,3 +860,4 @@ EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_unregister_hook);
 EXPORT_SYMBOL(nf_unregister_queue_handler);
 EXPORT_SYMBOL(nf_unregister_sockopt);
+EXPORT_SYMBOL(nf_rcv_postxfrm_local);

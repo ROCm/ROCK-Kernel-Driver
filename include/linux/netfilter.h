@@ -138,12 +138,14 @@ void nf_log_packet(int pf,
 /* This is gross, but inline doesn't cut it for avoiding the function
    call in fast path: gcc doesn't inline (needs value tracking?). --RR */
 #ifdef CONFIG_NETFILTER_DEBUG
-#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
- nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN)
+#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
+(!(cond)								\
+ ? (okfn)(skb) 								\
+ : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
 #define NF_HOOK_THRESH nf_hook_slow
 #else
-#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
-(list_empty(&nf_hooks[(pf)][(hook)])					\
+#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
+(!(cond) || list_empty(&nf_hooks[(pf)][(hook)])				\
  ? (okfn)(skb)								\
  : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
 #define NF_HOOK_THRESH(pf, hook, skb, indev, outdev, okfn, thresh)	\
@@ -151,6 +153,8 @@ void nf_log_packet(int pf,
  ? (okfn)(skb)								\
  : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), (thresh)))
 #endif
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
+ NF_HOOK_COND((pf), (hook), (skb), (indev), (outdev), (okfn), 1)
 
 int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 		 struct net_device *indev, struct net_device *outdev,
@@ -193,6 +197,7 @@ extern void nf_invalidate_cache(int pf);
 
 #else /* !CONFIG_NETFILTER */
 #define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
+#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond) (okfn)(skb)
 #endif /*CONFIG_NETFILTER*/
 
 #endif /*__KERNEL__*/

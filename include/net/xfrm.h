@@ -536,6 +536,9 @@ struct sec_path
 {
 	atomic_t		refcnt;
 	int			len;
+#ifdef CONFIG_NETFILTER
+	int			decap_done;
+#endif
 	struct sec_decap_state	x[XFRM_MAX_DEPTH];
 };
 

@@ -133,6 +133,7 @@ int xfrm4_output(struct sk_buff **pskb)
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
+	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
 	err = NET_XMIT_BYPASS;
 
 out_exit:

@@ -466,6 +466,16 @@ config IP_NF_TARGET_MARK
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP_NF_TARGET_TTL
+	tristate  'TTL target support'
+	depends on IP_NF_MANGLE
+	  help
+	  This adds an iptables TTL manipulation target, which enables the user
+	  to set the TTL value of an IP packet or to increment / decrement it 
+	  by a given value.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 config IP_NF_TARGET_CLASSIFY
 	tristate "CLASSIFY target support"
 	depends on IP_NF_MANGLE
