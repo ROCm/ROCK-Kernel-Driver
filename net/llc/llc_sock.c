@@ -878,18 +878,22 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	if (!skb) /* shutdown */
 		goto out;
 	copied = skb->len;
-	if (copied > size) {
+	if (copied > size)
 		copied = size;
-		msg->msg_flags |= MSG_TRUNC;
-	}
 	rc = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	if (rc)
 		goto dgram_free;
+	if (skb->len > copied) {
+		skb_pull(skb, copied);
+		skb_queue_head(&sk->receive_queue, skb);
+	}
 	if (uaddr)
 		memcpy(uaddr, llc_ui_skb_cb(skb), sizeof(*uaddr));
 	msg->msg_namelen = sizeof(*uaddr);
+	if (!skb->list) {
 dgram_free:
-	kfree_skb(skb);
+		kfree_skb(skb);
+	}
 out:
 	release_sock(sk);
 	return rc ? : copied;
@@ -915,7 +919,7 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	int noblock = flags & MSG_DONTWAIT;
 	struct net_device *dev;
 	struct sk_buff *skb;
-	int rc = -EINVAL, size = 0;
+	int rc = -EINVAL, size = 0, copied = 0, hdrlen;
 
 	dprintk("%s: sending from %02X to %02X\n", __FUNCTION__, llc->laddr.lsap, llc->daddr.lsap);
 	lock_sock(sk);
@@ -943,20 +947,26 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 			goto release;
 	} else
 		dev = llc->dev;
-	size = dev->hard_header_len + len + llc_ui_header_len(sk, addr);
-	rc = -EMSGSIZE;
+	hdrlen = dev->hard_header_len + llc_ui_header_len(sk, addr);
+	size = hdrlen + len;
 	if (size > dev->mtu)
-		goto release;
+		size = dev->mtu;
+	copied = size - hdrlen;
 	skb = sock_alloc_send_skb(sk, size, noblock, &rc);
 	if (!skb)
 		goto release;
 	skb->sk	      = sk;
 	skb->dev      = dev;
 	skb->protocol = llc_proto_type(addr->sllc_arphrd);
-	skb_reserve(skb, dev->hard_header_len + llc_ui_header_len(sk, addr));
-	rc = memcpy_fromiovec(skb_put(skb, len), msg->msg_iov, len);
+	skb_reserve(skb, hdrlen); 
+	rc = memcpy_fromiovec(skb_put(skb, copied), msg->msg_iov, copied);
 	if (rc)
 		goto out;
+	if (sk->type == SOCK_DGRAM || addr->sllc_ua) {
+		llc_build_and_send_ui_pkt(llc->sap, skb, addr->sllc_dmac,
+					  addr->sllc_dsap);
+		goto out;
+	}
 	if (addr->sllc_test) {
 		llc_build_and_send_test_pkt(llc->sap, skb, addr->sllc_dmac,
 					    addr->sllc_dsap);
@@ -965,11 +975,6 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if (addr->sllc_xid) {
 		llc_build_and_send_xid_pkt(llc->sap, skb, addr->sllc_dmac,
 					   addr->sllc_dsap);
-		goto out;
-	}
-	if (sk->type == SOCK_DGRAM || addr->sllc_ua) {
-		llc_build_and_send_ui_pkt(llc->sap, skb, addr->sllc_dmac,
-					  addr->sllc_dsap);
 		goto out;
 	}
 	rc = -ENOPROTOOPT;
@@ -986,7 +991,7 @@ release:
 		dprintk("%s: failed sending from %02X to %02X: %d\n",
 			__FUNCTION__, llc->laddr.lsap, llc->daddr.lsap, rc);
 	release_sock(sk);
-	return rc ? : len;
+	return rc ? : copied;
 }
 
 /**
