@@ -66,7 +66,7 @@ SECTIONS
   __initcall_end = .;
   . = ALIGN(256);
   __per_cpu_start = .;
-  .date.percpu  : { *(.data.percpu) }
+  .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
