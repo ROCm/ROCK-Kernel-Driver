@@ -223,21 +223,8 @@
 #define B44_RX_SYM	0x05D0UL /* MIB RX Symbol Errors */
 #define B44_RX_PAUSE	0x05D4UL /* MIB RX Pause Packets */
 #define B44_RX_NPAUSE	0x05D8UL /* MIB RX Non-Pause Packets */
-#define B44_SBIPSFLAG	0x0F08UL /* SB Initiator Port OCP Slave Flag */
-#define  SBIPSFLAG_IMASK1	0x0000003f /* Which sbflags --> mips interrupt 1 */
-#define  SBIPSFLAG_ISHIFT1	0
-#define  SBIPSFLAG_IMASK2	0x00003f00 /* Which sbflags --> mips interrupt 2 */
-#define  SBIPSFLAG_ISHIFT2	8
-#define  SBIPSFLAG_IMASK3	0x003f0000 /* Which sbflags --> mips interrupt 3 */
-#define  SBIPSFLAG_ISHIFT3	16
-#define  SBIPSFLAG_IMASK4	0x3f000000 /* Which sbflags --> mips interrupt 4 */
-#define  SBIPSFLAG_ISHIFT4	24
-#define B44_SBTPSFLAG	0x0F18UL /* SB Target Port OCP Slave Flag */
-#define  SBTPS_NUM0_MASK	0x0000003f
-#define  SBTPS_F0EN0		0x00000040
-#define B44_SBADMATCH3	0x0F60UL /* SB Address Match 3 */
-#define B44_SBADMATCH2	0x0F68UL /* SB Address Match 2 */
-#define B44_SBADMATCH1	0x0F70UL /* SB Address Match 1 */
+
+/* Silicon backplane register definitions */
 #define B44_SBIMSTATE	0x0F90UL /* SB Initiator Agent State */
 #define  SBIMSTATE_PC		0x0000000f /* Pipe Count */
 #define  SBIMSTATE_AP_MASK	0x00000030 /* Arbitration Priority */
@@ -269,86 +256,6 @@
 #define  SBTMSHIGH_GCR		0x20000000 /* Gated Clock Request */
 #define  SBTMSHIGH_BISTF	0x40000000 /* BIST Failed */
 #define  SBTMSHIGH_BISTD	0x80000000 /* BIST Done */
-#define B44_SBBWA0	0x0FA0UL /* SB Bandwidth Allocation Table 0 */
-#define  SBBWA0_TAB0_MASK	0x0000ffff /* Lookup Table 0 */
-#define  SBBWA0_TAB0_SHIFT	0
-#define  SBBWA0_TAB1_MASK	0xffff0000 /* Lookup Table 0 */
-#define  SBBWA0_TAB1_SHIFT	16
-#define B44_SBIMCFGLOW	0x0FA8UL /* SB Initiator Configuration Low */
-#define  SBIMCFGLOW_STO_MASK	0x00000003 /* Service Timeout */
-#define  SBIMCFGLOW_RTO_MASK	0x00000030 /* Request Timeout */
-#define  SBIMCFGLOW_RTO_SHIFT	4
-#define  SBIMCFGLOW_CID_MASK	0x00ff0000 /* Connection ID */
-#define  SBIMCFGLOW_CID_SHIFT	16
-#define B44_SBIMCFGHIGH	0x0FACUL /* SB Initiator Configuration High */
-#define  SBIMCFGHIGH_IEM_MASK	0x0000000c /* Inband Error Mode */
-#define  SBIMCFGHIGH_TEM_MASK	0x00000030 /* Timeout Error Mode */
-#define  SBIMCFGHIGH_TEM_SHIFT	4
-#define  SBIMCFGHIGH_BEM_MASK	0x000000c0 /* Bus Error Mode */
-#define  SBIMCFGHIGH_BEM_SHIFT	6
-#define B44_SBADMATCH0	0x0FB0UL /* SB Address Match 0 */
-#define  SBADMATCH0_TYPE_MASK	0x00000003 /* Address Type */
-#define  SBADMATCH0_AD64	0x00000004 /* Reserved */
-#define  SBADMATCH0_AI0_MASK	0x000000f8 /* Type0 Size */
-#define  SBADMATCH0_AI0_SHIFT	3
-#define  SBADMATCH0_AI1_MASK	0x000001f8 /* Type1 Size */
-#define  SBADMATCH0_AI1_SHIFT	3
-#define  SBADMATCH0_AI2_MASK	0x000001f8 /* Type2 Size */
-#define  SBADMATCH0_AI2_SHIFT	3
-#define  SBADMATCH0_ADEN	0x00000400 /* Enable */
-#define  SBADMATCH0_ADNEG	0x00000800 /* Negative Decode */
-#define  SBADMATCH0_BS0_MASK	0xffffff00 /* Type0 Base Address */
-#define  SBADMATCH0_BS0_SHIFT	8
-#define  SBADMATCH0_BS1_MASK	0xfffff000 /* Type1 Base Address */
-#define  SBADMATCH0_BS1_SHIFT	12
-#define  SBADMATCH0_BS2_MASK	0xffff0000 /* Type2 Base Address */
-#define  SBADMATCH0_BS2_SHIFT	16
-#define B44_SBTMCFGLOW	0x0FB8UL /* SB Target Configuration Low */
-#define  SBTMCFGLOW_CD_MASK	0x000000ff /* Clock Divide Mask */
-#define  SBTMCFGLOW_CO_MASK	0x0000f800 /* Clock Offset Mask */
-#define  SBTMCFGLOW_CO_SHIFT	11
-#define  SBTMCFGLOW_IF_MASK	0x00fc0000 /* Interrupt Flags Mask */
-#define  SBTMCFGLOW_IF_SHIFT	18
-#define  SBTMCFGLOW_IM_MASK	0x03000000 /* Interrupt Mode Mask */
-#define  SBTMCFGLOW_IM_SHIFT	24
-#define B44_SBTMCFGHIGH	0x0FBCUL /* SB Target Configuration High */
-#define  SBTMCFGHIGH_BM_MASK	0x00000003 /* Busy Mode */
-#define  SBTMCFGHIGH_RM_MASK	0x0000000C /* Retry Mode */
-#define  SBTMCFGHIGH_RM_SHIFT	2
-#define  SBTMCFGHIGH_SM_MASK	0x00000030 /* Stop Mode */
-#define  SBTMCFGHIGH_SM_SHIFT	4
-#define  SBTMCFGHIGH_EM_MASK	0x00000300 /* Error Mode */
-#define  SBTMCFGHIGH_EM_SHIFT	8
-#define  SBTMCFGHIGH_IM_MASK	0x00000c00 /* Interrupt Mode */
-#define  SBTMCFGHIGH_IM_SHIFT	10
-#define B44_SBBCFG	0x0FC0UL /* SB Broadcast Configuration */
-#define  SBBCFG_LAT_MASK	0x00000003 /* SB Latency */
-#define  SBBCFG_MAX0_MASK	0x000f0000 /* MAX Counter 0 */
-#define  SBBCFG_MAX0_SHIFT	16
-#define  SBBCFG_MAX1_MASK	0x00f00000 /* MAX Counter 1 */
-#define  SBBCFG_MAX1_SHIFT	20
-#define B44_SBBSTATE	0x0FC8UL /* SB Broadcast State */
-#define  SBBSTATE_SRD		0x00000001 /* ST Reg Disable */
-#define  SBBSTATE_HRD		0x00000002 /* Hold Reg Disable */
-#define B44_SBACTCNFG	0x0FD8UL /* SB Activate Configuration */
-#define B44_SBFLAGST	0x0FE8UL /* SB Current SBFLAGS */
-#define B44_SBIDLOW	0x0FF8UL /* SB Identification Low */
-#define  SBIDLOW_CS_MASK	0x00000003 /* Config Space Mask */
-#define  SBIDLOW_AR_MASK	0x00000038 /* Num Address Ranges Supported */
-#define  SBIDLOW_AR_SHIFT	3
-#define  SBIDLOW_SYNCH		0x00000040 /* Sync */
-#define  SBIDLOW_INIT		0x00000080 /* Initiator */
-#define  SBIDLOW_MINLAT_MASK	0x00000f00 /* Minimum Backplane Latency */
-#define  SBIDLOW_MINLAT_SHIFT	8
-#define  SBIDLOW_MAXLAT_MASK	0x0000f000 /* Maximum Backplane Latency */
-#define  SBIDLOW_MAXLAT_SHIFT	12
-#define  SBIDLOW_FIRST		0x00010000 /* This Initiator is First */
-#define  SBIDLOW_CW_MASK	0x000c0000 /* Cycle Counter Width */
-#define  SBIDLOW_CW_SHIFT	18
-#define  SBIDLOW_TP_MASK	0x00f00000 /* Target Ports */
-#define  SBIDLOW_TP_SHIFT	20
-#define  SBIDLOW_IP_MASK	0x0f000000 /* Initiator Ports */
-#define  SBIDLOW_IP_SHIFT	24
 #define B44_SBIDHIGH	0x0FFCUL /* SB Identification High */
 #define  SBIDHIGH_RC_MASK	0x0000000f /* Revision Code */
 #define  SBIDHIGH_CC_MASK	0x0000fff0 /* Core Code */
@@ -356,23 +263,13 @@
 #define  SBIDHIGH_VC_MASK	0xffff0000 /* Vendor Code */
 #define  SBIDHIGH_VC_SHIFT	16
 
-#define  CORE_CODE_ILINE20	0x801
-#define  CORE_CODE_SDRAM	0x803
-#define  CORE_CODE_PCI		0x804
-#define  CORE_CODE_MIPS		0x805
-#define  CORE_CODE_ENET		0x806
-#define  CORE_CODE_CODEC	0x807
-#define  CORE_CODE_USB		0x808
-#define  CORE_CODE_ILINE100	0x80a
-#define  CORE_CODE_EXTIF	0x811
-
 /* SSB PCI config space registers.  */
 #define	SSB_BAR0_WIN		0x80
 #define	SSB_BAR1_WIN		0x84
 #define	SSB_SPROM_CONTROL	0x88
 #define	SSB_BAR1_CONTROL	0x8c
 
-/* SSB core and hsot control registers.  */
+/* SSB core and host control registers.  */
 #define SSB_CONTROL		0x0000UL
 #define SSB_ARBCONTROL		0x0010UL
 #define SSB_ISTAT		0x0020UL
@@ -537,7 +434,6 @@ struct b44 {
 	u32			tx_pending;
 	u32			pci_cfg_state[64 / sizeof(u32)];
 	u8			phy_addr;
-	u8			mdc_port;
 	u8			core_unit;
 
 	struct mii_if_info	mii_if;

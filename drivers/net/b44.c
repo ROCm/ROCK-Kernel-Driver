@@ -141,41 +141,8 @@ static int b44_wait_bit(struct b44 *bp, unsigned long reg,
  * interrupts disabled.
  */
 
-#define SBID_SDRAM		0
-#define SBID_PCI_MEM		1
-#define SBID_PCI_CFG		2
-#define SBID_PCI_DMA		3
-#define	SBID_SDRAM_SWAPPED	4
-#define SBID_ENUM		5
-#define SBID_REG_SDRAM		6
-#define SBID_REG_ILINE20	7
-#define SBID_REG_EMAC		8
-#define SBID_REG_CODEC		9
-#define SBID_REG_USB		10
-#define SBID_REG_PCI		11
-#define SBID_REG_MIPS		12
-#define SBID_REG_EXTIF		13
-#define	SBID_EXTIF		14
-#define	SBID_EJTAG		15
-#define	SBID_MAX		16
-
-static u32 ssb_get_addr(struct b44 *bp, u32 id, u32 instance)
-{
-	switch (id) {
-	case SBID_PCI_DMA:
-		return 0x40000000;
-	case SBID_ENUM:
-		return 0x18000000;
-	case SBID_REG_EMAC:
-		return 0x18000000;
-	case SBID_REG_CODEC:
-		return 0x18001000;
-	case SBID_REG_PCI:
-		return 0x18002000;
-	default:
-		return 0;
-	};
-}
+#define SB_PCI_DMA             0x40000000      /* Client Mode PCI memory access space (1 GB) */
+#define BCM4400_PCI_CORE_ADDR  0x18002000      /* Address of PCI core on BCM4400 cards */
 
 static u32 ssb_get_core_rev(struct b44 *bp)
 {
@@ -187,8 +154,7 @@ static u32 ssb_pci_setup(struct b44 *bp, u32 cores)
 	u32 bar_orig, pci_rev, val;
 
 	pci_read_config_dword(bp->pdev, SSB_BAR0_WIN, &bar_orig);
-	pci_write_config_dword(bp->pdev, SSB_BAR0_WIN,
-			       ssb_get_addr(bp, SBID_REG_PCI, 0));
+	pci_write_config_dword(bp->pdev, SSB_BAR0_WIN, BCM4400_PCI_CORE_ADDR);
 	pci_rev = ssb_get_core_rev(bp);
 
 	val = br32(bp, B44_SBINTVEC);
@@ -1687,7 +1653,6 @@ static int __devinit b44_get_invariants(struct b44 *bp)
 	bp->dev->dev_addr[5] = eeprom[82];
 
 	bp->phy_addr = eeprom[90] & 0x1f;
-	bp->mdc_port = (eeprom[90] >> 14) & 0x1;
 
 	/* With this, plus the rx_header prepended to the data by the
 	 * hardware, we'll land the ethernet header on a 2-byte boundary.
@@ -1697,7 +1662,7 @@ static int __devinit b44_get_invariants(struct b44 *bp)
 	bp->imask = IMASK_DEF;
 
 	bp->core_unit = ssb_core_unit(bp);
-	bp->dma_offset = ssb_get_addr(bp, SBID_PCI_DMA, 0);
+	bp->dma_offset = SB_PCI_DMA;
 
 	/* XXX - really required? 
 	   bp->flags |= B44_FLAG_BUGGY_TXPTR;
