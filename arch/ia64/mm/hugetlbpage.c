@@ -70,19 +70,16 @@ static struct page *alloc_fresh_huge_page(void)
 
 void free_huge_page(struct page *page);
 
-static struct page *alloc_hugetlb_page(struct vm_area_struct *vma, unsigned long addr)
+/* you must hold the htlbpage_lock spinlock before calling this */
+static struct page *__alloc_hugetlb_page(struct vm_area_struct *vma, unsigned long addr)
 {
 	int i;
 	struct page *page;
 
-	spin_lock(&htlbpage_lock);
 	page = dequeue_huge_page(vma, addr);
-	if (!page) {
-		spin_unlock(&htlbpage_lock);
+	if (!page)
 		return NULL;
-	}
 	htlbpagemem[page_zone(page)->zone_pgdat->node_id]--;
-	spin_unlock(&htlbpage_lock);
 	set_page_count(page, 1);
 	page->lru.prev = (void *)free_huge_page;
 	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
@@ -281,6 +278,17 @@ void free_huge_page(struct page *page)
 	enqueue_huge_page(page);
 	htlbpagemem[page_zone(page)->zone_pgdat->node_id]++;
 	spin_unlock(&htlbpage_lock);
+}
+
+static void __free_huge_page(struct page *page)
+{
+	BUG_ON(page_count(page));
+
+	INIT_LIST_HEAD(&page->lru);
+	page[1].mapping = NULL;
+
+	enqueue_huge_page(page);
+	htlbpagemem[page_zone(page)->zone_pgdat->node_id]++;
 }
 
 void huge_page_release(struct page *page)
@@ -484,14 +492,14 @@ int set_hugetlb_mem_size(int count)
 	}
 	/* Shrink the memory size. */
 	lcount = try_to_free_low(lcount);
+	spin_lock(&htlbpage_lock);
 	while (lcount++) {
-		page = alloc_hugetlb_page(NULL, 0);
+		page = __alloc_hugetlb_page(NULL, 0);
 		if (page == NULL)
 			break;
-		spin_lock(&htlbpage_lock);
 		update_and_free_page(page);
-		spin_unlock(&htlbpage_lock);
 	}
+	spin_unlock(&htlbpage_lock);
 out:
 	return (int)all_huge_pages();
 }
@@ -635,50 +643,77 @@ int arch_hugetlb_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	pte_t *pte;
 	struct page *page;
 	struct address_space *mapping;
-	int idx, ret = VM_FAULT_MINOR;
+	unsigned long idx;
+	int ret;
 
 	if (write_access && !(vma->vm_flags & VM_WRITE))
 		return VM_FAULT_SIGBUS;
 
 	spin_lock(&mm->page_table_lock);
 	pte = huge_pte_alloc(mm, addr & HPAGE_MASK);
-	if (!pte) {
-		ret = VM_FAULT_OOM;
-		goto out;
-	}
-	if (!pte_none(*pte))
-		goto out;
-	spin_unlock(&mm->page_table_lock);
 
-	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+	ret = VM_FAULT_OOM;
+	if (unlikely(!pte))
+		goto out;
+
+	ret = VM_FAULT_MINOR;
+	if (unlikely(!pte_none(*pte)))
+		goto out;
+
+	mapping = vma->vm_file->f_mapping;
 	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
-retry:
+ retry:
 	page = find_get_page(mapping, idx);
 	if (!page) {
-		page = alloc_hugetlb_page(vma, addr);
-		if (!page)
-			goto retry;
+		spin_lock(&htlbpage_lock);
+
+		/* Should do this at prefault time, but that gets us into
+		   trouble with freeing right now. We do a quick overcommit 
+		   check instead. */
+		ret = hugetlb_get_quota(mapping);
+		if (ret) {
+			spin_unlock(&htlbpage_lock);
+			ret = VM_FAULT_OOM;
+			goto out;
+		}
+		
+		page = __alloc_hugetlb_page(vma, addr);
+		if (!page) {
+			hugetlb_put_quota(mapping);
+			spin_unlock(&htlbpage_lock);
+			
+			/* Instead of OOMing here could just transparently use
+			   small pages. */
+			printk(KERN_INFO "%s[%d] ran out of huge pages. Killed.\n",
+				       current->comm, current->pid);
+			
+			ret = VM_FAULT_OOM;
+			goto out;
+		}
 		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-		if (!ret) {
+		if (likely(!ret))
 			unlock_page(page);
-		} else {
-			huge_page_release(page);	
+		else {        		
+			hugetlb_put_quota(mapping);
+			if (put_page_testzero(page))
+				__free_huge_page(page);
+			spin_unlock(&htlbpage_lock);
 			if (ret == -EEXIST)
 				goto retry;
-			else
-				return VM_FAULT_OOM;
+			ret = VM_FAULT_SIGBUS;
+			goto out;
 		}
-	}
+		spin_unlock(&htlbpage_lock);
+		ret = VM_FAULT_MAJOR; 
+	} else
+		ret = VM_FAULT_MINOR;
+		
+	set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
 
-	spin_lock(&mm->page_table_lock);
-	if (pte_none(*pte))
-		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
-	else
-		page_cache_release(page);
 out:
 	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_MINOR;
+	return ret;
 }
 
 int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
