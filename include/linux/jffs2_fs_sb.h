@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_sb.h,v 1.16 2001/09/18 20:15:18 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.16.2.1 2002/02/23 14:13:34 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
@@ -12,6 +12,7 @@
 #define INOCACHE_HASHSIZE 1
 
 #define JFFS2_SB_FLAG_RO 1
+#define JFFS2_SB_FLAG_MOUNTING 2
 
 /* A struct for the overall file system control.  Pointers to
    jffs2_sb_info structs are named `c' in the source code.  

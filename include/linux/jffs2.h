@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: jffs2.h,v 1.18 2001/03/25 22:36:12 dwmw2 Exp $
+ * $Id: jffs2.h,v 1.19 2001/10/09 13:20:23 dwmw2 Exp $
  *
  */
 
@@ -103,7 +103,7 @@ struct jffs2_unknown_node
 	__u16 nodetype;
 	__u32 totlen; /* So we can skip over nodes we don't grok */
 	__u32 hdr_crc;
-};
+} __attribute__((packed));
 
 struct jffs2_raw_dirent
 {
@@ -121,7 +121,7 @@ struct jffs2_raw_dirent
 	__u32 node_crc;
 	__u32 name_crc;
 	__u8 name[0];
-};
+} __attribute__((packed));
 
 /* The JFFS2 raw inode structure: Used for storage on physical media.  */
 /* The uid, gid, atime, mtime and ctime members could be longer, but 
@@ -153,7 +153,7 @@ struct jffs2_raw_inode
 	__u32 data_crc;   /* CRC for the (compressed) data.  */
 	__u32 node_crc;   /* CRC for the raw inode (excluding data)  */
 //	__u8 data[dsize];
-};
+} __attribute__((packed));
 
 union jffs2_node_union {
 	struct jffs2_raw_inode i;

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: scan.c,v 1.51 2001/09/19 00:06:35 dwmw2 Exp $
+ * $Id: scan.c,v 1.51.2.2 2002/02/23 13:34:31 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -61,6 +61,9 @@
 		 } \
 	} \
 } while(0)
+
+static uint32_t pseudo_random;
+static void jffs2_rotate_lists(struct jffs2_sb_info *c);
 
 static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 
@@ -142,6 +145,9 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 			c->nr_erasing_blocks++;
 		}
 	}
+	/* Rotate the lists by some number to ensure wear levelling */
+	jffs2_rotate_lists(c);
+
 	if (c->nr_erasing_blocks) {
 		if (!c->used_size && empty_blocks != c->nr_blocks) {
 			printk(KERN_NOTICE "Cowardly refusing to erase blocks on filesystem with no valid JFFS2 nodes\n");
@@ -444,6 +450,12 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 		*ofs += 4;
 		return 0;
 	}
+	/* There was a bug where we wrote hole nodes out with csize/dsize
+	   swapped. Deal with it */
+	if (ri.compr == JFFS2_COMPR_ZERO && !ri.dsize && ri.csize) {
+		ri.dsize = ri.csize;
+		ri.csize = 0;
+	}
 
 	if (ri.csize) {
 		/* Check data CRC too */
@@ -474,7 +486,7 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 			       *ofs, ri.data_crc, crc);
 			DIRTY_SPACE(PAD(ri.totlen));
 			*ofs += PAD(ri.totlen);
-			return -0;
+			return 0;
 		}
 	}
 
@@ -517,6 +529,8 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 
 	D1(printk(KERN_DEBUG "Node is ino #%u, version %d. Range 0x%x-0x%x\n", 
 		  ri.ino, ri.version, ri.offset, ri.offset+ri.dsize));
+
+	pseudo_random += ri.version;
 
 	for (tn_list = &ic->scan->tmpnodes; *tn_list; tn_list = &((*tn_list)->next)) {
 		if ((*tn_list)->version < ri.version)
@@ -613,6 +627,8 @@ static int jffs2_scan_dirent_node(struct jffs2_sb_info *c, struct jffs2_eraseblo
 		return 0;
 	}
 
+	pseudo_random += rd.version;
+
 	fd = jffs2_alloc_full_dirent(rd.nsize+1);
 	if (!fd) {
 		return -ENOMEM;
@@ -685,4 +701,46 @@ static int jffs2_scan_dirent_node(struct jffs2_sb_info *c, struct jffs2_eraseblo
 	} 
 	*ofs += PAD(rd.totlen);
 	return 0;
+}
+
+static int count_list(struct list_head *l)
+{
+	uint32_t count = 0;
+	struct list_head *tmp;
+
+	list_for_each(tmp, l) {
+		count++;
+	}
+	return count;
+}
+
+/* Note: This breaks if list_empty(head). I don't care. You
+   might, if you copy this code and use it elsewhere :) */
+static void rotate_list(struct list_head *head, uint32_t count)
+{
+	struct list_head *n = head->next;
+
+	list_del(head);
+	while(count--)
+		n = n->next;
+	list_add(head, n);
+}
+
+static void jffs2_rotate_lists(struct jffs2_sb_info *c)
+{
+	uint32_t x;
+
+	x = count_list(&c->clean_list);
+	if (x)
+		rotate_list((&c->clean_list), pseudo_random % x);
+
+	x = count_list(&c->dirty_list);
+	if (x)
+		rotate_list((&c->dirty_list), pseudo_random % x);
+
+	if (c->nr_erasing_blocks)
+		rotate_list((&c->erase_pending_list), pseudo_random % c->nr_erasing_blocks);
+
+	if (c->nr_free_blocks) /* Not that it should ever be zero */
+		rotate_list((&c->free_list), pseudo_random % c->nr_free_blocks);
 }
