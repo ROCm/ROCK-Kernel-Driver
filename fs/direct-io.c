@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/bio.h>
 #include <linux/wait.h>
@@ -39,13 +40,17 @@ struct dio {
 	struct bio_vec *bvec;		/* current bvec in that bio */
 	struct inode *inode;
 	int rw;
+	unsigned blkbits;		/* doesn't change */
 	sector_t block_in_file;		/* changes */
+	unsigned blocks_available;	/* At block_in_file.  changes */
 	sector_t final_block_in_request;/* doesn't change */
-	unsigned first_block_in_page;	/* doesn't change */
+	unsigned first_block_in_page;	/* doesn't change, Used only once */
 	int boundary;			/* prev block is at a boundary */
 	int reap_counter;		/* rate limit reaping */
-	get_block_t *get_block;
-	sector_t last_block_in_bio;
+	get_blocks_t *get_blocks;	/* block mapping function */
+	sector_t last_block_in_bio;	/* current final block in bio */
+	sector_t next_block_in_bio;	/* next block to be added to bio */
+	struct buffer_head map_bh;	/* last get_blocks() result */
 
 	/* Page fetching state */
 	int curr_page;			/* changes */
@@ -53,15 +58,16 @@ struct dio {
 	unsigned long curr_user_address;/* changes */
 
 	/* Page queue */
-	struct page *pages[DIO_PAGES];
-	unsigned head;
-	unsigned tail;
+	struct page *pages[DIO_PAGES];	/* page buffer */
+	unsigned head;			/* next page to process */
+	unsigned tail;			/* last valid page + 1 */
+	int page_errors;		/* errno from get_user_pages() */
 
 	/* BIO completion state */
-	atomic_t bio_count;
-	spinlock_t bio_list_lock;
+	atomic_t bio_count;		/* nr bios in flight */
+	spinlock_t bio_list_lock;	/* protects bio_list */
 	struct bio *bio_list;		/* singly linked via bi_private */
-	struct task_struct *waiter;
+	struct task_struct *waiter;	/* waiting task (NULL if none) */
 };
 
 /*
@@ -93,6 +99,21 @@ static int dio_refill_pages(struct dio *dio)
 		NULL);				/* vmas */
 	up_read(&current->mm->mmap_sem);
 
+	if (ret < 0 && dio->blocks_available && (dio->rw == WRITE)) {
+		/*
+		 * A memory fault, but the filesystem has some outstanding
+		 * mapped blocks.  We need to use those blocks up to avoid
+		 * leaking stale data in the file.
+		 */
+		if (dio->page_errors == 0)
+			dio->page_errors = ret;
+		dio->pages[0] = ZERO_PAGE(dio->cur_user_address);
+		dio->head = 0;
+		dio->tail = 1;
+		ret = 0;
+		goto out;
+	}
+
 	if (ret >= 0) {
 		dio->curr_user_address += ret * PAGE_SIZE;
 		dio->curr_page += ret;
@@ -100,6 +121,7 @@ static int dio_refill_pages(struct dio *dio)
 		dio->tail = ret;
 		ret = 0;
 	}
+out:
 	return ret;	
 }
 
@@ -115,11 +137,8 @@ static struct page *dio_get_page(struct dio *dio)
 		int ret;
 
 		ret = dio_refill_pages(dio);
-		if (ret) {
-			printk("%s: dio_refill_pages returns %d\n",
-				__FUNCTION__, ret);
+		if (ret)
 			return ERR_PTR(ret);
-		}
 		BUG_ON(dio_pages_present(dio) == 0);
 	}
 	return dio->pages[dio->head++];
@@ -140,8 +159,9 @@ static void dio_bio_end_io(struct bio *bio)
 	spin_lock_irqsave(&dio->bio_list_lock, flags);
 	bio->bi_private = dio->bio_list;
 	dio->bio_list = bio;
+	if (dio->waiter)
+		wake_up_process(dio->waiter);
 	spin_unlock_irqrestore(&dio->bio_list_lock, flags);
-	wake_up_process(dio->waiter);
 }
 
 static int
@@ -179,6 +199,7 @@ static void dio_bio_submit(struct dio *dio)
 
 	dio->bio = NULL;
 	dio->bvec = NULL;
+	dio->boundary = 0;
 }
 
 /*
@@ -202,10 +223,12 @@ static struct bio *dio_await_one(struct dio *dio)
 	while (dio->bio_list == NULL) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (dio->bio_list == NULL) {
+			dio->waiter = current;
 			spin_unlock_irqrestore(&dio->bio_list_lock, flags);
 			blk_run_queues();
 			schedule();
 			spin_lock_irqsave(&dio->bio_list_lock, flags);
+			dio->waiter = NULL;
 		}
 		set_current_state(TASK_RUNNING);
 	}
@@ -268,15 +291,12 @@ static int dio_bio_reap(struct dio *dio)
 		while (dio->bio_list) {
 			unsigned long flags;
 			struct bio *bio;
-			int ret2;
 
 			spin_lock_irqsave(&dio->bio_list_lock, flags);
 			bio = dio->bio_list;
 			dio->bio_list = bio->bi_private;
 			spin_unlock_irqrestore(&dio->bio_list_lock, flags);
-			ret2 = dio_bio_complete(dio, bio);
-			if (ret == 0)
-				ret = ret2;
+			ret = dio_bio_complete(dio, bio);
 		}
 		dio->reap_counter = 0;
 	}
@@ -284,13 +304,129 @@ static int dio_bio_reap(struct dio *dio)
 }
 
 /*
+ * Call into the fs to map some more disk blocks.  We record the current number
+ * of available blocks at dio->blocks_available.  These are in units of the
+ * fs blocksize, (1 << inode->i_blkbits).
+ *
+ * The fs is allowed to map lots of blocks at once.  If it wants to do that,
+ * it uses the passed inode-relative block number as the file offset, as usual.
+ *
+ * get_blocks() is passed the number of i_blkbits-sized blocks which direct_io
+ * has remaining to do.  The fs should not map more than this number of blocks.
+ *
+ * If the fs has mapped a lot of blocks, it should populate bh->b_size to
+ * indicate how much contiguous disk space has been made available at
+ * bh->b_blocknr.
+ *
+ * If *any* of the mapped blocks are new, then the fs must set buffer_new().
+ * This isn't very efficient...
+ *
+ * In the case of filesystem holes: the fs may return an arbitrarily-large
+ * hole by returning an appropriate value in b_size and by clearing
+ * buffer_mapped().  This code _should_ handle that case correctly, but it has
+ * only been tested against single-block holes (b_size == blocksize).
+ */
+static int get_more_blocks(struct dio *dio)
+{
+	int ret;
+	struct buffer_head *map_bh = &dio->map_bh;
+
+	if (dio->blocks_available)
+		return 0;
+
+	/*
+	 * If there was a memory error and we've overwritten all the
+	 * mapped blocks then we can now return that memory error
+	 */
+	if (dio->page_errors) {
+		ret = dio->page_errors;
+		goto out;
+	}
+
+	map_bh->b_state = 0;
+	map_bh->b_size = 0;
+	BUG_ON(dio->block_in_file >= dio->final_block_in_request);
+	ret = (*dio->get_blocks)(dio->inode, dio->block_in_file,
+			dio->final_block_in_request - dio->block_in_file,
+			map_bh, dio->rw == WRITE);
+	if (ret)
+		goto out;
+
+	if (buffer_mapped(map_bh)) {
+		BUG_ON(map_bh->b_size == 0);
+		BUG_ON((map_bh->b_size & ((1 << dio->blkbits) - 1)) != 0);
+
+		dio->blocks_available = map_bh->b_size >> dio->blkbits;
+
+		/* blockdevs do not set buffer_new */
+		if (buffer_new(map_bh)) {
+			sector_t block = map_bh->b_blocknr;
+			unsigned i;
+
+			for (i = 0; i < dio->blocks_available; i++)
+				unmap_underlying_metadata(map_bh->b_bdev,
+							block++);
+		}
+	} else {
+		BUG_ON(dio->rw != READ);
+		if (dio->bio)
+			dio_bio_submit(dio);
+	}
+	dio->next_block_in_bio = map_bh->b_blocknr;
+out:
+	return ret;
+}
+
+/*
+ * Check to see if we can continue to grow the BIO. If not, then send it.
+ */
+static void dio_prep_bio(struct dio *dio)
+{
+	if (dio->bio == NULL)
+		return;
+
+	if (dio->bio->bi_idx == dio->bio->bi_vcnt ||
+			dio->boundary ||
+			dio->last_block_in_bio != dio->next_block_in_bio - 1)
+		dio_bio_submit(dio);
+}
+
+/*
+ * There is no bio.  Make one now.
+ */
+static int dio_new_bio(struct dio *dio)
+{
+	sector_t sector;
+	int ret;
+
+	ret = dio_bio_reap(dio);
+	if (ret)
+		goto out;
+	sector = dio->next_block_in_bio << (dio->blkbits - 9);
+	ret = dio_bio_alloc(dio, dio->map_bh.b_bdev, sector,
+				DIO_BIO_MAX_SIZE / PAGE_SIZE);
+	dio->boundary = 0;
+out:
+	return ret;
+}
+
+/*
  * Walk the user pages, and the file, mapping blocks to disk and emitting BIOs.
+ *
+ * Direct IO against a blockdev is different from a file.  Because we can
+ * happily perform page-sized but 512-byte aligned IOs.  It is important that
+ * blockdev IO be able to have fine alignment and large sizes.
+ *
+ * So what we do is to permit the ->get_blocks function to populate bh.b_size
+ * with the size of IO which is permitted at this offset and this i_blkbits.
+ *
+ * For best results, the blockdev should be set up with 512-byte i_blkbits and
+ * it should set b_size to PAGE_SIZE or more inside get_blocks().  This gives
+ * fine alignment but still allows this function to work in PAGE_SIZE units.
  */
 int do_direct_IO(struct dio *dio)
 {
-	struct inode * const inode = dio->inode;
-	const unsigned blkbits = inode->i_blkbits;
-	const unsigned blocksize = 1 << blkbits;
+	const unsigned blkbits = dio->blkbits;
 	const unsigned blocks_per_page = PAGE_SIZE >> blkbits;
 	struct page *page;
 	unsigned block_in_page;
@@ -309,46 +445,35 @@ int do_direct_IO(struct dio *dio)
 		}
 
 		new_page = 1;
-		for ( ; block_in_page < blocks_per_page; block_in_page++) {
-			struct buffer_head map_bh;
+		while (block_in_page < blocks_per_page) {
 			struct bio *bio;
+			unsigned this_chunk_bytes;	/* # of bytes mapped */
+			unsigned this_chunk_blocks;	/* # of blocks */
+			unsigned u;
 
-			map_bh.b_state = 0;
-			ret = (*dio->get_block)(inode, dio->block_in_file,
-						&map_bh, dio->rw == WRITE);
-			if (ret) {
-				printk("%s: get_block returns %d\n",
-					__FUNCTION__, ret);
+			ret = get_more_blocks(dio);
+			if (ret)
 				goto fail_release;
+
+			/* Handle holes */
+			if (!buffer_mapped(&dio->map_bh)) {
+				char *kaddr = kmap_atomic(page, KM_USER0);
+				memset(kaddr + (block_in_page << blkbits),
+						0, 1 << blkbits);
+				flush_dcache_page(page);
+				kunmap_atomic(kaddr, KM_USER0);
+				dio->block_in_file++;
+				dio->next_block_in_bio++;
+				block_in_page++;
+				goto next_block;
 			}
-			/* blockdevs do not set buffer_new */
-			if (buffer_new(&map_bh))
-				unmap_underlying_metadata(map_bh.b_bdev,
-							map_bh.b_blocknr);
-			if (!buffer_mapped(&map_bh)) {
-				ret = -EINVAL;		/* A hole */
-				goto fail_release;
-			}
-			if (dio->bio) {
-				if (dio->bio->bi_idx == dio->bio->bi_vcnt ||
-						dio->boundary ||
-						dio->last_block_in_bio !=
-							map_bh.b_blocknr - 1) {
-					dio_bio_submit(dio);
-					dio->boundary = 0;
-				}
-			}
+
+			dio_prep_bio(dio);
 			if (dio->bio == NULL) {
-				ret = dio_bio_reap(dio);
-				if (ret)
-					goto fail_release;
-				ret = dio_bio_alloc(dio, map_bh.b_bdev,
-					map_bh.b_blocknr << (blkbits - 9),
-					DIO_BIO_MAX_SIZE / PAGE_SIZE);
+				ret = dio_new_bio(dio);
 				if (ret)
 					goto fail_release;
 				new_page = 1;
-				dio->boundary = 0;
 			}
 
 			bio = dio->bio;
@@ -357,17 +482,34 @@ int do_direct_IO(struct dio *dio)
 				page_cache_get(page);
 				dio->bvec->bv_page = page;
 				dio->bvec->bv_len = 0;
-				dio->bvec->bv_offset = block_in_page*blocksize;
+				dio->bvec->bv_offset = block_in_page << blkbits;
 				bio->bi_idx++;
+				new_page = 0;
 			}
-			new_page = 0;
-			dio->bvec->bv_len += blocksize;
-			bio->bi_size += blocksize;
-			dio->last_block_in_bio = map_bh.b_blocknr;
-			dio->boundary = buffer_boundary(&map_bh);
 
-			dio->block_in_file++;
-			if (dio->block_in_file >= dio->final_block_in_request)
+			/* Work out how much disk we can add to this page */
+			this_chunk_blocks = dio->blocks_available;
+			u = (PAGE_SIZE - dio->bvec->bv_len) >> blkbits;
+			if (this_chunk_blocks > u)
+				this_chunk_blocks = u;
+			u = dio->final_block_in_request - dio->block_in_file;
+			if (this_chunk_blocks > u)
+				this_chunk_blocks = u;
+			this_chunk_bytes = this_chunk_blocks << blkbits;
+			BUG_ON(this_chunk_bytes == 0);
+
+			dio->bvec->bv_len += this_chunk_bytes;
+			bio->bi_size += this_chunk_bytes;
+			dio->next_block_in_bio += this_chunk_blocks;
+			dio->last_block_in_bio = dio->next_block_in_bio - 1;
+			dio->boundary = buffer_boundary(&dio->map_bh);
+			dio->block_in_file += this_chunk_blocks;
+			block_in_page += this_chunk_blocks;
+			dio->blocks_available -= this_chunk_blocks;
+next_block:
+			if (dio->block_in_file > dio->final_block_in_request)
+				BUG();
+			if (dio->block_in_file == dio->final_block_in_request)
 				break;
 		}
 		block_in_page = 0;
@@ -381,11 +523,16 @@ out:
 	return ret;
 }
 
+/*
+ * The main direct-IO function.  This is a library function for use by
+ * filesystem drivers.
+ */
 int
 generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
-			size_t count, get_block_t get_block)
+			size_t count, get_blocks_t get_blocks)
 {
-	const unsigned blocksize_mask = (1 << inode->i_blkbits) - 1;
+	const unsigned blkbits = inode->i_blkbits;
+	const unsigned blocksize_mask = (1 << blkbits) - 1;
 	const unsigned long user_addr = (unsigned long)buf;
 	int ret;
 	int ret2;
@@ -403,16 +550,18 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	dio.bvec = NULL;
 	dio.inode = inode;
 	dio.rw = rw;
-	dio.block_in_file = offset >> inode->i_blkbits;
-	dio.final_block_in_request = (offset + count) >> inode->i_blkbits;
+	dio.blkbits = blkbits;
+	dio.block_in_file = offset >> blkbits;
+	dio.blocks_available = 0;
+	dio.final_block_in_request = (offset + count) >> blkbits;
 
 	/* Index into the first page of the first block */
-	dio.first_block_in_page = (user_addr & (PAGE_SIZE - 1))
-						>> inode->i_blkbits;
+	dio.first_block_in_page = (user_addr & (PAGE_SIZE - 1)) >> blkbits;
 	dio.boundary = 0;
 	dio.reap_counter = 0;
-	dio.get_block = get_block;
+	dio.get_blocks = get_blocks;
 	dio.last_block_in_bio = -1;
+	dio.next_block_in_bio = -1;
 
 	/* Page fetching state */
 	dio.curr_page = 0;
@@ -428,12 +577,13 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	/* Page queue */
 	dio.head = 0;
 	dio.tail = 0;
+	dio.page_errors = 0;
 
 	/* BIO completion state */
 	atomic_set(&dio.bio_count, 0);
 	spin_lock_init(&dio.bio_list_lock);
 	dio.bio_list = NULL;
-	dio.waiter = current;
+	dio.waiter = NULL;
 
 	ret = do_direct_IO(&dio);
 
@@ -445,8 +595,10 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	if (ret == 0)
 		ret = ret2;
 	if (ret == 0)
+		ret = dio.page_errors;
+	if (ret == 0)
 		ret = count - ((dio.final_block_in_request -
-				dio.block_in_file) << inode->i_blkbits);
+				dio.block_in_file) << blkbits);
 out:
 	return ret;
 }

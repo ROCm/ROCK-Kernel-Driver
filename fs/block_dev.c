@@ -24,14 +24,14 @@
 
 #include <asm/uaccess.h>
 
-static unsigned long max_block(struct block_device *bdev)
+static sector_t max_block(struct block_device *bdev)
 {
-	unsigned int retval = ~0U;
+	sector_t retval = ~0U;
 	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		unsigned int size = block_size(bdev);
-		unsigned int sizebits = blksize_bits(size);
+		sector_t size = block_size(bdev);
+		unsigned sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
 	return retval;
@@ -88,7 +88,9 @@ int sb_min_blocksize(struct super_block *sb, int size)
 	return sb_set_blocksize(sb, size);
 }
 
-static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
+static int
+blkdev_get_block(struct inode *inode, sector_t iblock,
+		struct buffer_head *bh, int create)
 {
 	if (iblock >= max_block(inode->i_bdev))
 		return -EIO;
@@ -100,11 +102,25 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 }
 
 static int
+blkdev_get_blocks(struct inode *inode, sector_t iblock,
+		unsigned long max_blocks, struct buffer_head *bh, int create)
+{
+	if ((iblock + max_blocks) >= max_block(inode->i_bdev))
+		return -EIO;
+
+	bh->b_bdev = inode->i_bdev;
+	bh->b_blocknr = iblock;
+	bh->b_size = max_blocks << inode->i_blkbits;
+	set_buffer_mapped(bh);
+	return 0;
+}
+
+static int
 blkdev_direct_IO(int rw, struct inode *inode, char *buf,
 			loff_t offset, size_t count)
 {
 	return generic_direct_IO(rw, inode, buf, offset,
-				count, blkdev_get_block);
+				count, blkdev_get_blocks);
 }
 
 static int blkdev_writepage(struct page * page)

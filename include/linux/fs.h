@@ -211,7 +211,11 @@ extern void mnt_init(unsigned long);
 extern void files_init(unsigned long);
 
 struct buffer_head;
-typedef int (get_block_t)(struct inode*,sector_t,struct buffer_head*,int);
+typedef int (get_block_t)(struct inode *inode, sector_t iblock,
+			struct buffer_head *bh_result, int create);
+typedef int (get_blocks_t)(struct inode *inode, sector_t iblock,
+			unsigned long max_blocks,
+			struct buffer_head *bh_result, int create);
 
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
@@ -1238,7 +1242,7 @@ extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, r
 ssize_t generic_file_direct_IO(int rw, struct inode *inode, char *buf,
 				loff_t offset, size_t count);
 int generic_direct_IO(int rw, struct inode *inode, char *buf,
-			loff_t offset, size_t count, get_block_t *get_block);
+			loff_t offset, size_t count, get_blocks_t *get_blocks);
 
 extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
