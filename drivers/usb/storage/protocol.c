@@ -233,7 +233,11 @@ void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
  ***********************************************************************/
 
 /* Copy a buffer of length buflen to/from the srb's transfer buffer.
- * Update the index and offset variables so that the next copy will
+ * (Note: for scatter-gather transfers (srb->use_sg > 0), srb->request_buffer
+ * points to a list of s-g entries and we ignore srb->request_bufflen.
+ * For non-scatter-gather transfers, srb->request_buffer points to the
+ * transfer buffer itself and srb->request_bufflen is the buffer's length.)
+ * Update the *index and *offset variables so that the next copy will
  * pick up from where this one left off. */
 
 unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
@@ -242,6 +246,8 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 {
 	unsigned int cnt;
 
+	/* If not using scatter-gather, just transfer the data directly.
+	 * Make certain it will fit in the available buffer space. */
 	if (srb->use_sg == 0) {
 		if (*offset >= srb->request_bufflen)
 			return 0;
@@ -254,11 +260,22 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 					*offset, cnt);
 		*offset += cnt;
 
+	/* Using scatter-gather.  We have to go through the list one entry
+	 * at a time.  Each s-g entry contains some number of pages, and
+	 * each page has to be kmap()'ed separately.  If the page is already
+	 * in kernel-addressable memory then kmap() will return its address.
+	 * If the page is not directly accessible -- such as a user buffer
+	 * located in high memory -- then kmap() will map it to a temporary
+	 * position in the kernel's virtual address space. */
 	} else {
 		struct scatterlist *sg =
 				(struct scatterlist *) srb->request_buffer
 				+ *index;
 
+		/* This loop handles a single s-g list entry, which may
+		 * include multiple pages.  Find the initial page structure
+		 * and the starting offset within the page, and update
+		 * the *offset and *index values for the next loop. */
 		cnt = 0;
 		while (cnt < buflen && *index < srb->use_sg) {
 			struct page *page = sg->page +
@@ -268,14 +285,21 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 			unsigned int sglen = sg->length - *offset;
 
 			if (sglen > buflen - cnt) {
+
+				/* Transfer ends within this s-g entry */
 				sglen = buflen - cnt;
 				*offset += sglen;
 			} else {
+
+				/* Transfer continues to next s-g entry */
 				*offset = 0;
-				++sg;
 				++*index;
+				++sg;
 			}
 
+			/* Transfer the data for all the pages in this
+			 * s-g entry.  For each page: call kmap(), do the
+			 * transfer, and call kunmap() immediately after. */
 			while (sglen > 0) {
 				unsigned int plen = min(sglen, (unsigned int)
 						PAGE_SIZE - poff);
@@ -286,6 +310,8 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 				else
 					memcpy(buffer + cnt, ptr + poff, plen);
 				kunmap(page);
+
+				/* Start at the beginning of the next page */
 				poff = 0;
 				++page;
 				cnt += plen;
@@ -293,11 +319,13 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 			}
 		}
 	}
+
+	/* Return the amount actually transferred */
 	return cnt;
 }
 
 /* Store the contents of buffer into srb's transfer buffer and set the
- * residue. */
+ * SCSI residue. */
 void usb_stor_set_xfer_buf(unsigned char *buffer,
 	unsigned int buflen, Scsi_Cmnd *srb)
 {

@@ -673,7 +673,11 @@ sddr09_read_data(struct us_data *us,
 	int result;
 
 	// Since we only read in one block at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
 
 	if (use_sg) {
 		len = min(sectors, (unsigned int) info->blocksize) *
@@ -738,6 +742,8 @@ sddr09_read_data(struct us_data *us,
 			if (result != USB_STOR_TRANSPORT_GOOD)
 				break;
 		}
+
+		// Store the data (s-g) or update the pointer (!s-g)
 		if (use_sg)
 			usb_stor_access_xfer_buf(buffer, len, us->srb,
 					&index, &offset, TO_XFER_BUF);
@@ -918,7 +924,10 @@ sddr09_write_data(struct us_data *us,
 
 	// Since we don't write the user data directly to the device,
 	// we have to create a bounce buffer if the transfer uses
-	// scatter-gather.
+	// scatter-gather.  We will move the data a piece at a time
+	// between the bounce buffer and the actual transfer buffer.
+	// If we're not using scatter-gather, we can simply update
+	// the transfer buffer pointer to get the same effect.
 
 	if (use_sg) {
 		len = min(sectors, (unsigned int) info->blocksize) *
@@ -944,6 +953,8 @@ sddr09_write_data(struct us_data *us,
 
 		pages = min(sectors, info->blocksize - page);
 		len = (pages << info->pageshift);
+
+		// Get the data from the transfer buffer (s-g)
 		if (use_sg)
 			usb_stor_access_xfer_buf(buffer, len, us->srb,
 					&index, &offset, FROM_XFER_BUF);
@@ -952,6 +963,8 @@ sddr09_write_data(struct us_data *us,
 				buffer, blockbuffer);
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			break;
+
+		// Update the transfer buffer pointer (!s-g)
 		if (!use_sg)
 			buffer += len;
 

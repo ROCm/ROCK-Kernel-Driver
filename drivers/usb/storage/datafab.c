@@ -116,7 +116,11 @@ static int datafab_read_data(struct us_data *us,
 	totallen = sectors * info->ssize;
 
 	// Since we don't read more than 64 KB at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
 
 	alloclen = min(totallen, 65536u);
 	if (use_sg) {
@@ -153,6 +157,7 @@ static int datafab_read_data(struct us_data *us,
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
+		// Store the data (s-g) or update the pointer (!s-g)
 		if (use_sg)
 			usb_stor_access_xfer_buf(buffer, len, us->srb,
 					 &sg_idx, &sg_offset, TO_XFER_BUF);
@@ -205,7 +210,11 @@ static int datafab_write_data(struct us_data *us,
 	totallen = sectors * info->ssize;
 
 	// Since we don't write more than 64 KB at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
 
 	alloclen = min(totallen, 65536u);
 	if (use_sg) {
@@ -221,6 +230,7 @@ static int datafab_write_data(struct us_data *us,
 		len = min(totallen, alloclen);
 		thistime = (len / info->ssize) & 0xff;
 
+		// Get the data from the transfer buffer (s-g)
 		if (use_sg)
 			usb_stor_access_xfer_buf(buffer, len, us->srb,
 					&sg_idx, &sg_offset, FROM_XFER_BUF);
@@ -259,6 +269,7 @@ static int datafab_write_data(struct us_data *us,
 			goto leave;
 		}
 
+		// Update the transfer buffer pointer (!s-g)
 		if (!use_sg)
 			buffer += len;
 

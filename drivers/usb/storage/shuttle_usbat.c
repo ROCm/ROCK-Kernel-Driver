@@ -568,6 +568,13 @@ int usbat_handle_read10(struct us_data *us,
 			srb->transfersize);
 	}
 
+	// Since we only read in one block at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
+
 	len = (65535/srb->transfersize) * srb->transfersize;
 	US_DEBUGP("Max read is %d bytes\n", len);
 	len = min(len, srb->request_bufflen);
@@ -614,8 +621,7 @@ int usbat_handle_read10(struct us_data *us,
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			break;
 
-		// Transfer the received data into the srb buffer
-
+		// Store the data (s-g) or update the pointer (!s-g)
 		if (srb->use_sg)
 			usb_stor_access_xfer_buf(buffer, len, srb,
 					 &sg_segment, &sg_offset, TO_XFER_BUF);
