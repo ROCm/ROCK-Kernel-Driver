@@ -1,7 +1,7 @@
 /*
  * Driver for Digigram VX soundcards
  *
- * hwdep device manager
+ * DSP firmware management
  *
  * Copyright (c) 2002 by Takashi Iwai <tiwai@suse.de>
  *
@@ -21,9 +21,88 @@
  */
 
 #include <sound/driver.h>
+#include <linux/firmware.h>
 #include <sound/core.h>
 #include <sound/hwdep.h>
 #include <sound/vx_core.h>
+
+#ifdef SND_VX_FW_LOADER
+
+int snd_vx_setup_firmware(vx_core_t *chip)
+{
+	static char *fw_files[VX_TYPE_NUMS][4] = {
+		[VX_TYPE_BOARD] = {
+			NULL, "x1_1_vx2.xlx", "bd56002.boot", "l_1_vx2.d56",
+		},
+		[VX_TYPE_V2] = {
+			NULL, "x1_2_v22.xlx", "bd563v2.boot", "l_1_v22.d56",
+		},
+		[VX_TYPE_MIC] = {
+			NULL, "x1_2_v22.xlx", "bd563v2.boot", "l_1_v22.d56",
+		},
+		[VX_TYPE_VXPOCKET] = {
+			"bx_1_vxp.b56", "x1_1_vxp.xlx", "bd563s3.boot", "l_1_vxp.d56"
+		},
+		[VX_TYPE_VXP440] = {
+			"bx_1_vp4.b56", "x1_1_vp4.xlx", "bd563s3.boot", "l_1_vp4.d56"
+		},
+	};
+
+	int i, err;
+
+	for (i = 0; i < 4; i++) {
+		char path[32];
+		const struct firmware *fw;
+		if (! fw_files[chip->type][i])
+			continue;
+		sprintf(path, "vx/%s", fw_files[chip->type][i]);
+		if (request_firmware(&fw, path, chip->dev)) {
+			snd_printk(KERN_ERR "vx: can't load firmware %s\n", path);
+			return -ENOENT;
+		}
+		err = chip->ops->load_dsp(chip, i, fw);
+		if (err < 0) {
+			release_firmware(fw);
+			return err;
+		}
+		if (i == 1)
+			chip->chip_status |= VX_STAT_XILINX_LOADED;
+#ifdef CONFIG_PM
+		chip->firmware[i] = fw;
+#else
+		release_firmware(fw);
+#endif
+	}
+
+	/* ok, we reached to the last one */
+	/* create the devices if not built yet */
+	if ((err = snd_vx_pcm_new(chip)) < 0)
+		return err;
+
+	if ((err = snd_vx_mixer_new(chip)) < 0)
+		return err;
+
+	if (chip->ops->add_controls)
+		if ((err = chip->ops->add_controls(chip)) < 0)
+			return err;
+
+	chip->chip_status |= VX_STAT_DEVICE_INIT;
+	chip->chip_status |= VX_STAT_CHIP_INIT;
+
+	return snd_card_register(chip->card);
+}
+
+/* exported */
+void snd_vx_free_firmware(vx_core_t *chip)
+{
+#ifdef CONFIG_PM
+	int i;
+	for (i = 0; i < 4; i++)
+		release_firmware(chip->firmware[i]);
+#endif
+}
+
+#else /* old style firmware loading */
 
 static int vx_hwdep_open(snd_hwdep_t *hw, struct file *file)
 {
@@ -58,19 +137,54 @@ static int vx_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
 	return 0;
 }
 
+static void free_fw(const struct firmware *fw)
+{
+	if (fw) {
+		vfree(fw->data);
+		kfree(fw);
+	}
+}
+
 static int vx_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 {
 	vx_core_t *vx = hw->private_data;
 	int index, err;
+	struct firmware *fw;
 
 	snd_assert(vx->ops->load_dsp, return -ENXIO);
-	err = vx->ops->load_dsp(vx, dsp);
-	if (err < 0)
-		return err;
+
+	fw = kmalloc(sizeof(*fw), GFP_KERNEL);
+	if (! fw) {
+		snd_printk(KERN_ERR "cannot allocate firmware\n");
+		return -ENOMEM;
+	}
+	fw->size = dsp->length;
+	fw->data = vmalloc(fw->size);
+	if (! fw->data) {
+		snd_printk(KERN_ERR "cannot allocate firmware image (length=%d)\n",
+			   (int)fw->size);
+		kfree(fw);
+		return -ENOMEM;
+	}
+	if (copy_from_user(fw->data, dsp->image, dsp->length)) {
+		free_fw(fw);
+		return -EFAULT;
+	}
 
 	index = dsp->index;
 	if (! vx_is_pcmcia(vx))
 		index++;
+	err = vx->ops->load_dsp(vx, index, fw);
+	if (err < 0) {
+		free_fw(fw);
+		return err;
+	}
+#ifdef CONFIG_PM
+	vx->firmware[index] = fw;
+#else
+	free_fw(fw);
+#endif
+
 	if (index == 1)
 		vx->chip_status |= VX_STAT_XILINX_LOADED;
 	if (index < 3)
@@ -100,7 +214,7 @@ static int vx_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 
 
 /* exported */
-int snd_vx_hwdep_new(vx_core_t *chip)
+int snd_vx_setup_firmware(vx_core_t *chip)
 {
 	int err;
 	snd_hwdep_t *hw;
@@ -118,5 +232,17 @@ int snd_vx_hwdep_new(vx_core_t *chip)
 	sprintf(hw->name, "VX Loader (%s)", chip->card->driver);
 	chip->hwdep = hw;
 
-	return 0;
+	return snd_card_register(chip->card);
 }
+
+/* exported */
+void snd_vx_free_firmware(vx_core_t *chip)
+{
+#ifdef CONFIG_PM
+	int i;
+	for (i = 0; i < 4; i++)
+		free_fw(chip->firmware[i]);
+#endif
+}
+
+#endif /* SND_VX_FW_LOADER */

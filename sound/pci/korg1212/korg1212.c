@@ -472,7 +472,8 @@ static char* channelName[] = {
                         "SPDIF-R",
 };
 
-u16 ClockSourceSelector[] = {0x8000,   // selects source as ADAT at 44.1 kHz
+static u16 ClockSourceSelector[] =
+                            {0x8000,   // selects source as ADAT at 44.1 kHz
                              0x0000,   // selects source as ADAT at 48 kHz
                              0x8001,   // selects source as S/PDIF at 44.1 kHz
                              0x0001,   // selects source as S/PDIF at 48 kHz
@@ -2411,14 +2412,17 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 	if (rc) K1212_DEBUG_PRINTK("K1212_DEBUG: Reboot Card - RC = %d [%s]\n", rc, stateName[korg1212->cardState]);
 #endif
 
+        if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, korg1212, &ops)) < 0) {
+                snd_korg1212_free(korg1212);
+                return err;
+        }
+        
 	snd_korg1212_EnableCardInterrupts(korg1212);
 
 	mdelay(CARD_BOOT_DELAY_IN_MS);
 
-        if (snd_korg1212_downloadDSPCode(korg1212)) {
-                snd_korg1212_free(korg1212);
+        if (snd_korg1212_downloadDSPCode(korg1212))
         	return -EBUSY;
-	}
 
 	printk(KERN_INFO "dspMemPhy       = %08x U[%08x]\n"
                "PlayDataPhy     = %08x L[%08x]\n"
@@ -2433,10 +2437,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
                korg1212->RoutingTablePhy, LowerWordSwap(korg1212->RoutingTablePhy),
                korg1212->AdatTimeCodePhy, LowerWordSwap(korg1212->AdatTimeCodePhy));
 
-        if ((err = snd_pcm_new(korg1212->card, "korg1212", 0, 1, 1, &korg1212->pcm)) < 0) {
-                snd_korg1212_free(korg1212);
+        if ((err = snd_pcm_new(korg1212->card, "korg1212", 0, 1, 1, &korg1212->pcm)) < 0)
                 return err;
-	}
 
 	korg1212->pcm->private_data = korg1212;
         korg1212->pcm->private_free = snd_korg1212_free_pcm;
@@ -2453,18 +2455,11 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
         for (i = 0; i < ARRAY_SIZE(snd_korg1212_controls); i++) {
                 err = snd_ctl_add(korg1212->card, snd_ctl_new1(&snd_korg1212_controls[i], korg1212));
-                if (err < 0) {
-			snd_korg1212_free(korg1212);
+                if (err < 0)
                         return err;
-		}
         }
 
         snd_korg1212_proc_init(korg1212);
-        
-        if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, korg1212, &ops)) < 0) {
-                snd_korg1212_free(korg1212);
-                return err;
-        }
         
 	snd_card_set_dev(card, &pci->dev);
 

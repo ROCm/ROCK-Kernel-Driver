@@ -94,7 +94,7 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 		bus->master = master;
 	}
 	strlcpy(bus->name, name, sizeof(bus->name));
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_BUS, bus, &ops)) < 0) {
 		snd_i2c_bus_free(bus);
 		return err;
 	}

@@ -1460,11 +1460,3 @@ snd_soundfont_remove_unlocked(snd_sf_list_t *sflist)
 	return 0;
 }
 
-/*
- * Return the used memory size (in words)
- */
-int
-snd_soundfont_mem_used(snd_sf_list_t *sflist)
-{
-	return sflist->mem_used;
-}

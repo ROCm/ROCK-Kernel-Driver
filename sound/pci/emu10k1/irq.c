@@ -112,8 +112,8 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			status &= ~(IPR_A_MIDITRANSBUFEMPTY2|IPR_A_MIDIRECVBUFEMPTY2);
 		}
 		if (status & IPR_INTERVALTIMER) {
-			if (emu->timer_interrupt)
-				emu->timer_interrupt(emu);
+			if (emu->timer)
+				snd_timer_interrupt(emu->timer, emu->timer->sticks);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_INTERVALTIMERENB);
 			status &= ~IPR_INTERVALTIMER;

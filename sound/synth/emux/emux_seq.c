@@ -197,8 +197,7 @@ free_port(void *private_data)
 #ifdef SNDRV_EMUX_USE_RAW_EFFECT
 		snd_emux_delete_effect(p);
 #endif
-		if (p->chset.channels)
-			kfree(p->chset.channels);
+		kfree(p->chset.channels);
 		kfree(p);
 	}
 }

@@ -497,10 +497,6 @@ int snd_pcm_suspend_all(snd_pcm_t *pcm);
 int snd_pcm_kernel_playback_ioctl(snd_pcm_substream_t *substream, unsigned int cmd, void *arg);
 int snd_pcm_kernel_capture_ioctl(snd_pcm_substream_t *substream, unsigned int cmd, void *arg);
 int snd_pcm_kernel_ioctl(snd_pcm_substream_t *substream, unsigned int cmd, void *arg);
-int snd_pcm_open(struct inode *inode, struct file *file);
-int snd_pcm_release(struct inode *inode, struct file *file);
-unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait);
-unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait);
 int snd_pcm_open_substream(snd_pcm_t *pcm, int stream, snd_pcm_substream_t **rsubstream);
 void snd_pcm_release_substream(snd_pcm_substream_t *substream);
 void snd_pcm_vma_notify_data(void *client, void *data);
@@ -709,6 +705,80 @@ static inline snd_pcm_sframes_t snd_pcm_capture_hw_avail(snd_pcm_runtime_t *runt
 	return runtime->buffer_size - snd_pcm_capture_avail(runtime);
 }
 
+/**
+ * snd_pcm_playback_ready - check whether the playback buffer is available
+ * @substream: the pcm substream instance
+ *
+ * Checks whether enough free space is available on the playback buffer.
+ *
+ * Returns non-zero if available, or zero if not.
+ */
+static inline int snd_pcm_playback_ready(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	return snd_pcm_playback_avail(runtime) >= runtime->control->avail_min;
+}
+
+/**
+ * snd_pcm_capture_ready - check whether the capture buffer is available
+ * @substream: the pcm substream instance
+ *
+ * Checks whether enough capture data is available on the capture buffer.
+ *
+ * Returns non-zero if available, or zero if not.
+ */
+static inline int snd_pcm_capture_ready(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	return snd_pcm_capture_avail(runtime) >= runtime->control->avail_min;
+}
+
+/**
+ * snd_pcm_playback_data - check whether any data exists on the playback buffer
+ * @substream: the pcm substream instance
+ *
+ * Checks whether any data exists on the playback buffer. If stop_threshold
+ * is bigger or equal to boundary, then this function returns always non-zero.
+ *
+ * Returns non-zero if exists, or zero if not.
+ */
+static inline int snd_pcm_playback_data(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	
+	if (runtime->stop_threshold >= runtime->boundary)
+		return 1;
+	return snd_pcm_playback_avail(runtime) < runtime->buffer_size;
+}
+
+/**
+ * snd_pcm_playback_empty - check whether the playback buffer is empty
+ * @substream: the pcm substream instance
+ *
+ * Checks whether the playback buffer is empty.
+ *
+ * Returns non-zero if empty, or zero if not.
+ */
+static inline int snd_pcm_playback_empty(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	return snd_pcm_playback_avail(runtime) >= runtime->buffer_size;
+}
+
+/**
+ * snd_pcm_capture_empty - check whether the capture buffer is empty
+ * @substream: the pcm substream instance
+ *
+ * Checks whether the capture buffer is empty.
+ *
+ * Returns non-zero if empty, or zero if not.
+ */
+static inline int snd_pcm_capture_empty(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	return snd_pcm_capture_avail(runtime) == 0;
+}
+
 static inline void snd_pcm_trigger_done(snd_pcm_substream_t *substream, 
 					snd_pcm_substream_t *master)
 {
@@ -772,12 +842,8 @@ void snd_interval_muldivk(const snd_interval_t *a, const snd_interval_t *b,
 void snd_interval_mulkdiv(const snd_interval_t *a, unsigned int k,
 			  const snd_interval_t *b, snd_interval_t *c);
 int snd_interval_list(snd_interval_t *i, unsigned int count, unsigned int *list, unsigned int mask);
-int snd_interval_step(snd_interval_t *i, unsigned int min, unsigned int step);
 int snd_interval_ratnum(snd_interval_t *i,
 			unsigned int rats_count, ratnum_t *rats,
-			unsigned int *nump, unsigned int *denp);
-int snd_interval_ratden(snd_interval_t *i,
-			unsigned int rats_count, ratden_t *rats,
 			unsigned int *nump, unsigned int *denp);
 
 void _snd_pcm_hw_params_any(snd_pcm_hw_params_t *params);
@@ -810,6 +876,7 @@ int snd_pcm_hw_param_set(snd_pcm_substream_t *pcm,
 int snd_pcm_hw_params_choose(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
 
 int snd_pcm_hw_refine(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
+int snd_pcm_hw_params(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
 
 int snd_pcm_hw_constraints_init(snd_pcm_substream_t *substream);
 int snd_pcm_hw_constraints_complete(snd_pcm_substream_t *substream);
@@ -860,9 +927,7 @@ int snd_pcm_format_physical_width(snd_pcm_format_t format);		/* in bits */
 const unsigned char *snd_pcm_format_silence_64(snd_pcm_format_t format);
 int snd_pcm_format_set_silence(snd_pcm_format_t format, void *buf, unsigned int frames);
 snd_pcm_format_t snd_pcm_build_linear_format(int width, int unsignd, int big_endian);
-ssize_t snd_pcm_format_size(snd_pcm_format_t format, size_t samples);
 const char *snd_pcm_format_name(snd_pcm_format_t format);
-const char *snd_pcm_subformat_name(snd_pcm_subformat_t subformat);
 
 void snd_pcm_set_ops(snd_pcm_t * pcm, int direction, snd_pcm_ops_t *ops);
 void snd_pcm_set_sync(snd_pcm_substream_t * substream);
@@ -875,13 +940,6 @@ int snd_pcm_capture_xrun_check(snd_pcm_substream_t *substream);
 int snd_pcm_playback_xrun_asap(snd_pcm_substream_t *substream);
 int snd_pcm_capture_xrun_asap(snd_pcm_substream_t *substream);
 void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t new_hw_ptr);
-int snd_pcm_playback_ready(snd_pcm_substream_t *substream);
-int snd_pcm_capture_ready(snd_pcm_substream_t *substream);
-long snd_pcm_playback_ready_jiffies(snd_pcm_substream_t *substream);
-long snd_pcm_capture_ready_jiffies(snd_pcm_substream_t *substream);
-int snd_pcm_playback_data(snd_pcm_substream_t *substream);
-int snd_pcm_playback_empty(snd_pcm_substream_t *substream);
-int snd_pcm_capture_empty(snd_pcm_substream_t *substream);
 void snd_pcm_tick_prepare(snd_pcm_substream_t *substream);
 void snd_pcm_tick_set(snd_pcm_substream_t *substream, unsigned long ticks);
 void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream);

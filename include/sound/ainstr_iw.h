@@ -351,8 +351,6 @@ typedef struct iwffff_info {
 
 #include "seq_instr.h"
 
-extern char *snd_seq_iwffff_id;
-
 typedef struct {
 	void *private_data;
 	int (*info)(void *private_data, iwffff_info_t *info);
