@@ -143,6 +143,7 @@ int
 ip_vs_null_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 		struct ip_vs_protocol *pp)
 {
+	/* we do not touch skb and do not need pskb ptr */
 	return NF_ACCEPT;
 }
 
@@ -214,8 +215,9 @@ ip_vs_bypass_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
  tx_error_icmp:
 	dst_link_failure(skb);
  tx_error:
+	kfree_skb(skb);
 	LeaveFunction(10);
-	return NF_DROP;
+	return NF_STOLEN;
 }
 
 
@@ -292,7 +294,8 @@ ip_vs_nat_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	dst_link_failure(skb);
   tx_error:
 	LeaveFunction(10);
-	return NF_DROP;
+	kfree_skb(skb);
+	return NF_STOLEN;
   tx_error_put:
 	ip_rt_put(rt);
 	goto tx_error;
@@ -375,8 +378,9 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 			skb_realloc_headroom(skb, max_headroom);
 		if (!new_skb) {
 			ip_rt_put(rt);
+			kfree_skb(skb);
 			IP_VS_ERR_RL("ip_vs_tunnel_xmit(): no memory\n");
-			return NF_DROP;
+			return NF_STOLEN;
 		}
 		kfree_skb(skb);
 		skb = new_skb;
@@ -429,8 +433,9 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
   tx_error_icmp:
 	dst_link_failure(skb);
   tx_error:
+	kfree_skb(skb);
 	LeaveFunction(10);
-	return NF_DROP;
+	return NF_STOLEN;
 }
 
 
@@ -488,8 +493,9 @@ ip_vs_dr_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
   tx_error_icmp:
 	dst_link_failure(skb);
   tx_error:
+	kfree_skb(skb);
 	LeaveFunction(10);
-	return NF_DROP;
+	return NF_STOLEN;
 }
 
 
@@ -515,6 +521,7 @@ ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 			rc = cp->packet_xmit(skb, cp, pp);
 		else
 			rc = NF_ACCEPT;
+		/* do not touch skb anymore */
 		atomic_inc(&cp->in_pkts);
 		__ip_vs_conn_put(cp);
 		goto out;
