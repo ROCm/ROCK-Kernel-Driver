@@ -236,9 +236,8 @@ void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,struct net_device *
 	struct rif_cache_s *entry;
 	unsigned char *olddata;
 	unsigned char mcast_func_addr[] = {0xC0,0x00,0x00,0x04,0x00,0x00};
-	unsigned long flags ; 
 	
-	spin_lock_irqsave(&rif_lock,flags);
+	spin_lock_bh(&rif_lock);
 
 	/*
 	 *	Broadcasts are single route as stated in RFC 1042 
@@ -308,7 +307,7 @@ printk("source routing for %02X:%02X:%02X:%02X:%02X:%02X\n",trh->daddr[0],
 	else 
 		slack = 18 - ((ntohs(trh->rcf) & TR_RCF_LEN_MASK)>>8);
 	olddata = skb->data;
-	spin_unlock_irqrestore(&rif_lock,flags);
+	spin_unlock_bh(&rif_lock);
 
 	skb_pull(skb, slack);
 	memmove(skb->data, olddata, sizeof(struct trh_hdr) - slack);
@@ -418,9 +417,8 @@ static void rif_check_expire(unsigned long dummy)
 {
 	int i;
 	unsigned long now=jiffies;
-	unsigned long flags ; 
 
-	spin_lock_irqsave(&rif_lock,flags);
+	spin_lock_bh(&rif_lock);
 	
 	for(i=0; i < RIF_TABLE_SIZE;i++) 
 	{
@@ -440,7 +438,7 @@ static void rif_check_expire(unsigned long dummy)
 		}
 	}
 	
-	spin_unlock_irqrestore(&rif_lock,flags);
+	spin_unlock_bh(&rif_lock);
 
 	/*
 	 *	Reset the timer
@@ -477,10 +475,7 @@ static struct rif_cache_s *rif_get_idx(loff_t pos)
 
 static void *rif_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&rif_lock, flags);
-	seq->private = (void *) flags;
+	spin_lock_bh(&rif_lock);
 
 	return *pos ? rif_get_idx(*pos - 1) : RIF_PROC_START;
 }
@@ -492,8 +487,7 @@ static void *rif_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void rif_seq_stop(struct seq_file *seq, void *v)
 {
-	unsigned long flags = (unsigned long) seq->private;
-	spin_lock_irqsave(&rif_lock, flags);
+	spin_unlock_bh(&rif_lock);
 }
 
 static int rif_seq_show(struct seq_file *seq, void *v)
