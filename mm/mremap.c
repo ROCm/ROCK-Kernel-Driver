@@ -227,6 +227,7 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	if (!move_page_tables(vma, new_addr, addr, old_len)) {
 		if (allocated_vma) {
 			*new_vma = *vma;
+			INIT_LIST_HEAD(&new_vma->shared);
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
 			new_vma->vm_pgoff += (addr - vma->vm_start) >> PAGE_SHIFT;

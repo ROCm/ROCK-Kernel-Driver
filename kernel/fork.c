@@ -246,6 +246,7 @@ static inline int dup_mmap(struct mm_struct * mm)
 		tmp->vm_mm = mm;
 		tmp->vm_next = NULL;
 		file = tmp->vm_file;
+		INIT_LIST_HEAD(&tmp->shared);
 		if (file) {
 			struct inode *inode = file->f_dentry->d_inode;
 			get_file(file);
