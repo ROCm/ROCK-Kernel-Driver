@@ -55,7 +55,7 @@ struct psmouse {
 	unsigned long out_of_sync;
 	enum psmouse_state state;
 	unsigned char nak;
-	char error;
+	unsigned char error;
 	char devname[64];
 	char phys[32];
 	unsigned long flags;
