@@ -209,7 +209,8 @@ static int isdn_rawip_setup(isdn_net_dev *p);
 static int isdn_ether_setup(isdn_net_dev *p);
 static int isdn_uihdlc_setup(isdn_net_dev *p);
 static int isdn_iptyp_setup(isdn_net_dev *p);
-static int isdn_other_setup(isdn_net_dev *p);
+
+static void isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
@@ -1198,60 +1199,6 @@ isdn_net_get_stats(struct net_device *dev)
 	return &lp->stats;
 }
 
-/*      This is simply a copy from std. eth.c EXCEPT we pull ETH_HLEN
- *      instead of dev->hard_header_len off. This is done because the
- *      lowlevel-driver has already pulled off its stuff when we get
- *      here and this routine only gets called with p_encap == ETHER.
- *      Determine the packet's protocol ID. The rule here is that we
- *      assume 802.3 if the type field is short enough to be a length.
- *      This is normal practice and works for any 'now in use' protocol.
- */
-
-static unsigned short
-isdn_net_type_trans(struct sk_buff *skb, struct net_device *dev)
-{
-	struct ethhdr *eth;
-	unsigned char *rawp;
-
-	skb->mac.raw = skb->data;
-	skb_pull(skb, ETH_HLEN);
-	eth = skb->mac.ethernet;
-
-	if (*eth->h_dest & 1) {
-		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)
-			skb->pkt_type = PACKET_BROADCAST;
-		else
-			skb->pkt_type = PACKET_MULTICAST;
-	}
-	/*
-	 *      This ALLMULTI check should be redundant by 1.4
-	 *      so don't forget to remove it.
-	 */
-
-	else if (dev->flags & (IFF_PROMISC /*| IFF_ALLMULTI*/)) {
-		if (memcmp(eth->h_dest, dev->dev_addr, ETH_ALEN))
-			skb->pkt_type = PACKET_OTHERHOST;
-	}
-	if (ntohs(eth->h_proto) >= 1536)
-		return eth->h_proto;
-
-	rawp = skb->data;
-
-	/*
-	 *      This is a magic hack to spot IPX packets. Older Novell breaks
-	 *      the protocol design and runs IPX over 802.3 without an 802.2 LLC
-	 *      layer. We look for FFFF which isn't a used 802.2 SSAP/DSAP. This
-	 *      won't work for fault tolerant netware but does for the rest.
-	 */
-	if (*(unsigned short *) rawp == 0xFFFF)
-		return htons(ETH_P_802_3);
-	/*
-	 *      Real 802.2 LLC
-	 */
-	return htons(ETH_P_802_2);
-}
-
-
 /*
  * Got a packet from ISDN-Channel.
  */
@@ -1280,11 +1227,8 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 	isdn_dumppkt("R:", skb->data, skb->len, 40);
 	switch (lp->p_encap) {
 		case ISDN_NET_ENCAP_ETHER:
-			/* Ethernet over ISDN */
-			olp->huptimer = 0;
-			lp->huptimer = 0;
-			skb->protocol = isdn_net_type_trans(skb, ndev);
-			break;
+			isdn_ether_receive(lp->netdev, olp, skb);
+			return;
 		case ISDN_NET_ENCAP_UIHDLC:
 			/* HDLC with UI-frame (for ispa with -h1 option) */
 			olp->huptimer = 0;
@@ -2624,7 +2568,74 @@ isdn_rawip_setup(isdn_net_dev *p)
 }
 
 // ISDN_NET_ENCAP_ETHER
+// Ethernet over ISDN
 // ======================================================================
+
+/*      This is simply a copy from std. eth.c EXCEPT we pull ETH_HLEN
+ *      instead of dev->hard_header_len off. This is done because the
+ *      lowlevel-driver has already pulled off its stuff when we get
+ *      here and this routine only gets called with p_encap == ETHER.
+ *      Determine the packet's protocol ID. The rule here is that we
+ *      assume 802.3 if the type field is short enough to be a length.
+ *      This is normal practice and works for any 'now in use' protocol.
+ *      FIXME
+ */
+
+static unsigned short
+isdn_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
+{
+	struct ethhdr *eth;
+	unsigned char *rawp;
+
+	skb->mac.raw = skb->data;
+	skb_pull(skb, ETH_HLEN);
+	eth = skb->mac.ethernet;
+
+	if (*eth->h_dest & 1) {
+		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)
+			skb->pkt_type = PACKET_BROADCAST;
+		else
+			skb->pkt_type = PACKET_MULTICAST;
+	}
+	/*
+	 *      This ALLMULTI check should be redundant by 1.4
+	 *      so don't forget to remove it.
+	 */
+
+	else if (dev->flags & (IFF_PROMISC /*| IFF_ALLMULTI*/)) {
+		if (memcmp(eth->h_dest, dev->dev_addr, ETH_ALEN))
+			skb->pkt_type = PACKET_OTHERHOST;
+	}
+	if (ntohs(eth->h_proto) >= 1536)
+		return eth->h_proto;
+
+	rawp = skb->data;
+
+	/*
+	 *      This is a magic hack to spot IPX packets. Older Novell breaks
+	 *      the protocol design and runs IPX over 802.3 without an 802.2 LLC
+	 *      layer. We look for FFFF which isn't a used 802.2 SSAP/DSAP. This
+	 *      won't work for fault tolerant netware but does for the rest.
+	 */
+	if (*(unsigned short *) rawp == 0xFFFF)
+		return htons(ETH_P_802_3);
+	/*
+	 *      Real 802.2 LLC
+	 */
+	return htons(ETH_P_802_2);
+}
+
+
+static void
+isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, 
+		   struct sk_buff *skb)
+{
+	isdn_net_local *lp = &p->local;
+
+	isdn_net_reset_huptimer(lp, olp);
+	skb->protocol = isdn_eth_type_trans(skb, &p->dev);
+	netif_rx(skb);
+}
 
 static int
 isdn_ether_setup(isdn_net_dev *p)

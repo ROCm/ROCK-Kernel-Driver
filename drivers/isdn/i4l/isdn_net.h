@@ -54,6 +54,13 @@ extern int isdn_net_dial_req(isdn_net_local *);
 extern void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
 
+static inline void
+isdn_net_reset_huptimer(isdn_net_local *lp, isdn_net_local *olp)
+{
+	olp->huptimer = 0;
+	lp->huptimer = 0;
+}
+
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 
 /*
