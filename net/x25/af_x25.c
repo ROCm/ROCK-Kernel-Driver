@@ -350,8 +350,11 @@ void x25_destroy_socket(struct sock *sk)
 		sk->sk_timer.function = x25_destroy_timer;
 		sk->sk_timer.data     = (unsigned long)sk;
 		add_timer(&sk->sk_timer);
-	} else
-		sk_free(sk);
+	} else {
+		/* drop last reference so sock_put will free */
+		__sock_put(sk);
+	}
+
 	release_sock(sk);
 	sock_put(sk);
 }
@@ -553,7 +556,7 @@ static int x25_release(struct socket *sock)
 		case X25_STATE_2:
 			x25_disconnect(sk, 0, 0, 0);
 			x25_destroy_socket(sk);
-			break;
+			goto out;
 
 		case X25_STATE_1:
 		case X25_STATE_3:
