@@ -92,14 +92,15 @@ static loff_t usbdev_lseek(struct file *file, loff_t offset, int orig)
 static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	struct dev_state *ps = (struct dev_state *)file->private_data;
+	struct usb_device *dev = ps->dev;
 	ssize_t ret = 0;
 	unsigned len;
 	loff_t pos;
 	int i;
 
 	pos = *ppos;
-	down_read(&ps->devsem);
-	if (!connected(ps->dev)) {
+	down(&dev->serialize);
+	if (!connected(dev)) {
 		ret = -ENODEV;
 		goto err;
 	} else if (pos < 0) {
@@ -111,7 +112,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 		len = sizeof(struct usb_device_descriptor) - pos;
 		if (len > nbytes)
 			len = nbytes;
-		if (copy_to_user(buf, ((char *)&ps->dev->descriptor) + pos, len)) {
+		if (copy_to_user(buf, ((char *)&dev->descriptor) + pos, len)) {
 			ret = -EFAULT;
 			goto err;
 		}
@@ -123,9 +124,9 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 	}
 
 	pos = sizeof(struct usb_device_descriptor);
-	for (i = 0; nbytes && i < ps->dev->descriptor.bNumConfigurations; i++) {
+	for (i = 0; nbytes && i < dev->descriptor.bNumConfigurations; i++) {
 		struct usb_config_descriptor *config =
-			(struct usb_config_descriptor *)ps->dev->rawdescriptors[i];
+			(struct usb_config_descriptor *)dev->rawdescriptors[i];
 		unsigned int length = le16_to_cpu(config->wTotalLength);
 
 		if (*ppos < pos + length) {
@@ -133,7 +134,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 			/* The descriptor may claim to be longer than it
 			 * really is.  Here is the actual allocated length. */
 			unsigned alloclen =
-				ps->dev->config[i].desc.wTotalLength;
+				dev->config[i].desc.wTotalLength;
 
 			len = length - (*ppos - pos);
 			if (len > nbytes)
@@ -143,7 +144,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 			if (alloclen > (*ppos - pos)) {
 				alloclen -= (*ppos - pos);
 				if (copy_to_user(buf,
-				    ps->dev->rawdescriptors[i] + (*ppos - pos),
+				    dev->rawdescriptors[i] + (*ppos - pos),
 				    min(len, alloclen))) {
 					ret = -EFAULT;
 					goto err;
@@ -160,7 +161,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 	}
 
 err:
-	up_read(&ps->devsem);
+	up(&dev->serialize);
 	return ret;
 }
 
@@ -521,7 +522,6 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	INIT_LIST_HEAD(&ps->async_pending);
 	INIT_LIST_HEAD(&ps->async_completed);
 	init_waitqueue_head(&ps->wait);
-	init_rwsem(&ps->devsem);
 	ps->discsignr = 0;
 	ps->disctask = current;
 	ps->disccontext = NULL;
@@ -538,19 +538,20 @@ static int usbdev_open(struct inode *inode, struct file *file)
 static int usbdev_release(struct inode *inode, struct file *file)
 {
 	struct dev_state *ps = (struct dev_state *)file->private_data;
+	struct usb_device *dev = ps->dev;
 	unsigned int i;
 
-	lock_kernel();
+	down(&dev->serialize);
 	list_del_init(&ps->list);
 
-	if (connected(ps->dev)) {
+	if (connected(dev)) {
 		for (i = 0; ps->ifclaimed && i < 8*sizeof(ps->ifclaimed); i++)
 			if (test_bit(i, &ps->ifclaimed))
 				releaseintf(ps, i);
 		destroy_all_async(ps);
 	}
-	unlock_kernel();
-	usb_put_dev(ps->dev);
+	up(&dev->serialize);
+	usb_put_dev(dev);
 	ps->dev = NULL;
 	kfree(ps);
         return 0;
@@ -1023,18 +1024,19 @@ static int proc_reapurb(struct dev_state *ps, void __user *arg)
         DECLARE_WAITQUEUE(wait, current);
 	struct async *as = NULL;
 	void __user *addr;
+	struct usb_device *dev = ps->dev;
 	int ret;
 
 	add_wait_queue(&ps->wait, &wait);
-	while (connected(ps->dev)) {
+	while (connected(dev)) {
 		__set_current_state(TASK_INTERRUPTIBLE);
 		if ((as = async_getcompleted(ps)))
 			break;
 		if (signal_pending(current))
 			break;
-		up_read(&ps->devsem);
+		up(&dev->serialize);
 		schedule();
-		down_read(&ps->devsem);
+		down(&dev->serialize);
 	}
 	remove_wait_queue(&ps->wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -1201,13 +1203,14 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct dev_state *ps = (struct dev_state *)file->private_data;
+	struct usb_device *dev = ps->dev;
 	int ret = -ENOTTY;
 
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EPERM;
-	down_read(&ps->devsem);
-	if (!connected(ps->dev)) {
-		up_read(&ps->devsem);
+	down(&dev->serialize);
+	if (!connected(dev)) {
+		up(&dev->serialize);
 		return -ENODEV;
 	}
 	switch (cmd) {
@@ -1289,7 +1292,7 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		ret = proc_ioctl(ps, (void __user *) arg);
 		break;
 	}
-	up_read(&ps->devsem);
+	up(&dev->serialize);
 	if (ret >= 0)
 		inode->i_atime = CURRENT_TIME;
 	return ret;
