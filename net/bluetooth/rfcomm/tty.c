@@ -853,20 +853,9 @@ static int rfcomm_tty_read_proc(char *buf, char **start, off_t offset, int len, 
 
 /* ---- TTY structure ---- */
 
-static struct tty_driver rfcomm_tty_driver = {
-	.owner			= THIS_MODULE,
+static struct tty_driver *rfcomm_tty_driver;
 
-	.magic			= TTY_DRIVER_MAGIC,
-	.driver_name		= "rfcomm",
-	.devfs_name		= "bluetooth/rfcomm/",
-	.name			= "rfcomm",
-	.major			= RFCOMM_TTY_MAJOR,
-	.minor_start		= RFCOMM_TTY_MINOR,
-	.num			= RFCOMM_TTY_PORTS,
-	.type			= TTY_DRIVER_TYPE_SERIAL,
-	.subtype		= SERIAL_TYPE_NORMAL,
-	.flags			= TTY_DRIVER_REAL_RAW,
-
+static struct tty_operations rfcomm_ops = {
 	.open			= rfcomm_tty_open,
 	.close			= rfcomm_tty_close,
 	.write			= rfcomm_tty_write,
@@ -878,8 +867,6 @@ static struct tty_driver rfcomm_tty_driver = {
 	.unthrottle		= rfcomm_tty_unthrottle,
 	.set_termios		= rfcomm_tty_set_termios,
 	.send_xchar		= rfcomm_tty_send_xchar,
-	.stop			= NULL,
-	.start			= NULL,
 	.hangup			= rfcomm_tty_hangup,
 	.wait_until_sent	= rfcomm_tty_wait_until_sent,
 	.read_proc		= rfcomm_tty_read_proc,
@@ -889,13 +876,27 @@ int rfcomm_init_ttys(void)
 {
 	int i;
 
-	/* Register the TTY driver */
-	rfcomm_tty_driver.init_termios = tty_std_termios;
-	rfcomm_tty_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	rfcomm_tty_driver.flags = TTY_DRIVER_REAL_RAW;
+	rfcomm_tty_driver = alloc_tty_driver(RFCOMM_TTY_PORTS);
+	if (!rfcomm_tty_driver)
+		return -1;
 
-	if (tty_register_driver(&rfcomm_tty_driver)) {
+	rfcomm_tty_driver->owner	= THIS_MODULE,
+	rfcomm_tty_driver->driver_name	= "rfcomm",
+	rfcomm_tty_driver->devfs_name	= "bluetooth/rfcomm/",
+	rfcomm_tty_driver->name		= "rfcomm",
+	rfcomm_tty_driver->major	= RFCOMM_TTY_MAJOR,
+	rfcomm_tty_driver->minor_start	= RFCOMM_TTY_MINOR,
+	rfcomm_tty_driver->type		= TTY_DRIVER_TYPE_SERIAL,
+	rfcomm_tty_driver->subtype	= SERIAL_TYPE_NORMAL,
+	rfcomm_tty_driver->flags	= TTY_DRIVER_REAL_RAW,
+	rfcomm_tty_driver->init_termios = tty_std_termios;
+	rfcomm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	rfcomm_tty_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(rfcomm_tty_driver, &rfcomm_ops);
+
+	if (tty_register_driver(rfcomm_tty_driver)) {
 		BT_ERR("Can't register RFCOMM TTY driver");
+		put_tty_driver(rfcomm_tty_driver);
 		return -1;
 	}
 
@@ -906,6 +907,6 @@ int rfcomm_init_ttys(void)
 
 void rfcomm_cleanup_ttys(void)
 {
-	tty_unregister_driver(&rfcomm_tty_driver);
-	return;
+	tty_unregister_driver(rfcomm_tty_driver);
+	put_tty_driver(rfcomm_tty_driver);
 }
