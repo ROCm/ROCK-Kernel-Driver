@@ -473,7 +473,6 @@ static struct pci_driver piix4_driver = {
 
 static int __init i2c_piix4_init(void)
 {
-	printk(KERN_INFO "i2c-piix4 version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&piix4_driver);
 }
 

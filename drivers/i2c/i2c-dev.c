@@ -505,8 +505,7 @@ static int __init i2c_dev_init(void)
 {
 	int res;
 
-	printk(KERN_INFO "i2c /dev entries driver module version %s (%s)\n",
-		I2C_VERSION, I2C_DATE);
+	printk(KERN_INFO "i2c /dev entries driver\n");
 
 	if (register_chrdev(I2C_MAJOR,"i2c",&i2cdev_fops)) {
 		printk(KERN_ERR "i2c-dev.o: unable to get major %d for i2c bus\n",

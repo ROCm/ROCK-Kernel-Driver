@@ -517,7 +517,6 @@ static struct pci_driver ali15x3_driver = {
 
 static int __init i2c_ali15x3_init(void)
 {
-	printk("i2c-ali15x3.o version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&ali15x3_driver);
 }
 

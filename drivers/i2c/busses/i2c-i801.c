@@ -616,7 +616,6 @@ static struct pci_driver i801_driver = {
 
 static int __init i2c_i801_init(void)
 {
-	printk(KERN_INFO "i2c-i801 version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&i801_driver);
 }
 

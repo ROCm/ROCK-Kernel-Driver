@@ -399,7 +399,6 @@ static struct pci_driver sis5595_driver = {
 
 static int __init i2c_sis5595_init(void)
 {
-	printk(KERN_INFO "i2c-sis5595 version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&sis5595_driver);
 }
 

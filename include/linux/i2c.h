@@ -28,9 +28,6 @@
 #ifndef _LINUX_I2C_H
 #define _LINUX_I2C_H
 
-#define I2C_DATE "20021208"
-#define I2C_VERSION "2.7.0"
-
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/i2c-id.h>

@@ -474,7 +474,6 @@ static struct pci_driver sis630_driver = {
 
 static int __init i2c_sis630_init(void)
 {
-	printk("i2c-sis630.o version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&sis630_driver);
 }
 

@@ -165,7 +165,6 @@ static struct pci_driver vt586b_driver = {
 
 static int __init i2c_vt586b_init(void)
 {
-	printk(KERN_INFO "i2c-via version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&vt586b_driver);
 }
 

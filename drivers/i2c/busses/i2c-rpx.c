@@ -78,7 +78,7 @@ static struct i2c_adapter rpx_ops = {
 
 int __init i2c_rpx_init(void)
 {
-	printk("i2c-rpx.o: i2c MPC8xx module version %s (%s)\n", I2C_VERSION, I2C_DATE);
+	printk(KERN_INFO "i2c-rpx: i2c MPC8xx driver\n");
 
 	/* reset hardware to sane state */
 	rpx_iic_init(&rpx_data);
