@@ -597,6 +597,22 @@ static int dummy_sem_semop (struct sem_array *sma,
 	return 0;
 }
 
+static int dummy_netlink_send (struct sk_buff *skb)
+{
+	if (current->euid == 0)
+		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
+	else
+		NETLINK_CB (skb).eff_cap = 0;
+	return 0;
+}
+
+static int dummy_netlink_recv (struct sk_buff *skb)
+{
+	if (!cap_raised (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
 #ifdef CONFIG_SECURITY_NETWORK
 static int dummy_unix_stream_connect (struct socket *sock,
 				      struct socket *other,
@@ -819,6 +835,8 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, sem_associate);
 	set_to_dummy_if_null(ops, sem_semctl);
 	set_to_dummy_if_null(ops, sem_semop);
+	set_to_dummy_if_null(ops, netlink_send);
+	set_to_dummy_if_null(ops, netlink_recv);
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
 #ifdef CONFIG_SECURITY_NETWORK

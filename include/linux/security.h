@@ -31,7 +31,8 @@
 #include <linux/shm.h>
 #include <linux/msg.h>
 #include <linux/sched.h>
-
+#include <linux/skbuff.h>
+#include <linux/netlink.h>
 
 /*
  * These functions are in security/capability.c and are used
@@ -47,6 +48,20 @@ extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_kmod_set_label (void);
 extern void cap_task_reparent_to_init (struct task_struct *p);
+
+static inline int cap_netlink_send (struct sk_buff *skb)
+{
+	NETLINK_CB (skb).eff_cap = current->cap_effective;
+	return 0;
+}
+
+static inline int cap_netlink_recv (struct sk_buff *skb)
+{
+	if (!cap_raised (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
 
 /*
  * Values used in the task_security_ops calls
@@ -64,11 +79,6 @@ extern void cap_task_reparent_to_init (struct task_struct *p);
 #define LSM_SETID_FS	8
 
 /* forward declares to avoid warnings */
-struct sock;
-struct socket;
-struct sockaddr;
-struct msghdr;
-struct sk_buff;
 struct nfsctl_arg;
 struct sched_param;
 struct swap_info_struct;
@@ -588,6 +598,21 @@ struct swap_info_struct;
  * 	is being reparented to the init task.
  *	@p contains the task_struct for the kernel thread.
  *
+ * Security hooks for Netlink messaging.
+ *
+ * @netlink_send:
+ *	Save security information for a netlink message so that permission
+ *	checking can be performed when the message is processed.  The security
+ *	information can be saved using the eff_cap field of the
+ *      netlink_skb_parms structure.
+ *	@skb contains the sk_buff structure for the netlink message.
+ *	Return 0 if the information was successfully saved.
+ * @netlink_recv:
+ *	Check permission before processing the received netlink message in
+ *	@skb.
+ *	@skb contains the sk_buff structure for the netlink message.
+ *	Return 0 if permission is granted.
+ *
  * Security hooks for Unix domain networking.
  *
  * @unix_stream_connect:
@@ -1076,6 +1101,9 @@ struct security_operations {
 	int (*sem_semctl) (struct sem_array * sma, int cmd);
 	int (*sem_semop) (struct sem_array * sma, 
 			  struct sembuf * sops, unsigned nsops, int alter);
+
+	int (*netlink_send) (struct sk_buff * skb);
+	int (*netlink_recv) (struct sk_buff * skb);
 
 	/* allow module stacking */
 	int (*register_security) (const char *name,
@@ -1701,6 +1729,16 @@ static inline int security_sem_semop (struct sem_array * sma,
 	return security_ops->sem_semop(sma, sops, nsops, alter);
 }
 
+static inline int security_netlink_send(struct sk_buff * skb)
+{
+	return security_ops->netlink_send(skb);
+}
+
+static inline int security_netlink_recv(struct sk_buff * skb)
+{
+	return security_ops->netlink_recv(skb);
+}
+
 /* prototypes */
 extern int security_scaffolding_startup	(void);
 extern int register_security	(struct security_operations *ops);
@@ -2260,6 +2298,21 @@ static inline int security_sem_semop (struct sem_array * sma,
 				      int alter)
 {
 	return 0;
+}
+
+/*
+ * The netlink capability defaults need to be used inline by default
+ * (rather than hooking into the capability module) to reduce overhead
+ * in the networking code.
+ */
+static inline int security_netlink_send (struct sk_buff *skb)
+{
+	return cap_netlink_send (skb);
+}
+
+static inline int security_netlink_recv (struct sk_buff *skb)
+{
+	return cap_netlink_recv (skb);
 }
 
 #endif	/* CONFIG_SECURITY */
