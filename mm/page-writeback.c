@@ -166,7 +166,6 @@ void balance_dirty_pages(struct address_space *mapping)
 	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
 		pdflush_operation(background_writeout, 0);
 }
-EXPORT_SYMBOL_GPL(balance_dirty_pages);
 
 /**
  * balance_dirty_pages_ratelimited - balance dirty memory state
@@ -200,6 +199,7 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	}
 	put_cpu();
 }
+EXPORT_SYMBOL_GPL(balance_dirty_pages_ratelimited);
 
 /*
  * writeback at least _min_pages, and keep writing until the amount of dirty
