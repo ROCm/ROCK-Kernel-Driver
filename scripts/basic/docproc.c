@@ -79,6 +79,7 @@ void exec_kernel_doc(char **svec)
 {
 	pid_t pid;
 	int ret;
+	char real_filename[PATH_MAX + 1];
 	/* Make sure output generated so far are flushed */
 	fflush(stdout);
 	switch(pid=fork()) {
@@ -86,8 +87,13 @@ void exec_kernel_doc(char **svec)
 			perror("fork");
 			exit(1);
 		case  0:
-			execvp(KERNELDOCPATH KERNELDOC, svec);
-			perror("exec " KERNELDOCPATH KERNELDOC);
+			memset(real_filename, 0, sizeof(real_filename));
+			strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
+			strncat(real_filename, KERNELDOCPATH KERNELDOC,
+					PATH_MAX - strlen(real_filename));
+			execvp(real_filename, svec);
+			fprintf(stderr, "exec ");
+			perror(real_filename);
 			exit(1);
 		default:
 			waitpid(pid, &ret ,0);
@@ -160,12 +166,17 @@ void find_export_symbols(char * filename)
 	struct symfile *sym;
 	char line[MAXLINESZ];
 	if (filename_exist(filename) == NULL) {
+		char real_filename[PATH_MAX + 1];
+		memset(real_filename, 0, sizeof(real_filename));
+		strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
+		strncat(real_filename, filename,
+				PATH_MAX - strlen(real_filename));
 		sym = add_new_file(filename);
-		fp = fopen(filename, "r");
+		fp = fopen(real_filename, "r");
 		if (fp == NULL)
 		{
 			fprintf(stderr, "docproc: ");
-			perror(filename);
+			perror(real_filename);
 		}
 		while(fgets(line, MAXLINESZ, fp)) {
 			char *p;

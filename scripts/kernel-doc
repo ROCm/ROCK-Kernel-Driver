@@ -1531,7 +1531,7 @@ sub process_state3_type($$) {
 }
 
 sub process_file($) {
-    my ($file) = @_;
+    my ($file) = "$ENV{'SRCTREE'}@_";
     my $identifier;
     my $func;
     my $initial_section_counter = $section_counter;

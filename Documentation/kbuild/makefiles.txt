@@ -997,6 +997,21 @@ When kbuild executes the following steps are followed (roughly):
 	option. When $(biarch) equals to y the expanded variables $(aflags-y)
 	and $(cflags-y) will be assigned the values -a32 and -m32.
 
+    cc-option-align
+	gcc version >= 3.0 shifted type of options used to speify
+	alignment of functions, loops etc. $(cc-option-align) whrn used
+	as prefix to the align options will select the right prefix:
+	gcc < 3.00
+		cc-option-align = -malign
+	gcc >= 3.00
+		cc-option-align = -falign
+	
+	Example:
+		CFLAGS += $(cc-option-align)-functions=4
+
+	In the above example the option -falign-functions=4 is used for
+	gcc >= 3.00. For gcc < 3.00 -malign-functions=4 is used.
+	
     cc-version
 	cc-version return a numerical version of the $(CC) compiler version.
 	The format is <major><minor> where both are two digits. So for example
