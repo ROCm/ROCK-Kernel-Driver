@@ -249,14 +249,37 @@ int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int
 	return copied;
 }
 
-int ptrace_setoptions(struct task_struct *child, long data)
+static int ptrace_setoptions(struct task_struct *child, long data)
 {
 	if (data & PTRACE_O_TRACESYSGOOD)
 		child->ptrace |= PT_TRACESYSGOOD;
 	else
 		child->ptrace &= ~PT_TRACESYSGOOD;
 
-	if ((data & PTRACE_O_TRACESYSGOOD) != data)
+	if (data & PTRACE_O_TRACEFORK)
+		child->ptrace |= PT_TRACE_FORK;
+	else
+		child->ptrace &= ~PT_TRACE_FORK;
+
+	if (data & PTRACE_O_TRACEVFORK)
+		child->ptrace |= PT_TRACE_VFORK;
+	else
+		child->ptrace &= ~PT_TRACE_VFORK;
+
+	if (data & PTRACE_O_TRACECLONE)
+		child->ptrace |= PT_TRACE_CLONE;
+	else
+		child->ptrace &= ~PT_TRACE_CLONE;
+
+	if (data & PTRACE_O_TRACEEXEC)
+		child->ptrace |= PT_TRACE_EXEC;
+	else
+		child->ptrace &= ~PT_TRACE_EXEC;
+
+	if ((data & (PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK
+		    | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE
+		    | PTRACE_O_TRACEEXEC))
+	    != data)
 		return -EINVAL;
 
 	return 0;
@@ -274,9 +297,23 @@ int ptrace_request(struct task_struct *child, long request,
 	case PTRACE_SETOPTIONS:
 		ret = ptrace_setoptions(child, data);
 		break;
+	case PTRACE_GETEVENTMSG:
+		ret = put_user(child->ptrace_message, (unsigned long *) data);
+		break;
 	default:
 		break;
 	}
 
 	return ret;
+}
+
+void ptrace_notify(int exit_code)
+{
+	BUG_ON (!(current->ptrace & PT_PTRACED));
+
+	/* Let the debugger run.  */
+	current->exit_code = exit_code;
+	set_current_state(TASK_STOPPED);
+	notify_parent(current, SIGCHLD);
+	schedule();
 }
