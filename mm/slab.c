@@ -1030,7 +1030,6 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	unsigned long flags, void (*ctor)(void*, kmem_cache_t *, unsigned long),
 	void (*dtor)(void*, kmem_cache_t *, unsigned long))
 {
-	const char *func_nm = KERN_ERR "kmem_create: ";
 	size_t left_over, align, slab_size;
 	kmem_cache_t *cachep = NULL;
 
@@ -1049,7 +1048,8 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	WARN_ON(strchr(name, ' '));	/* It confuses parsers */
 	if ((flags & SLAB_DEBUG_INITIAL) && !ctor) {
 		/* No constructor, but inital state check requested */
-		printk("%sNo con, but init state check requested - %s\n", func_nm, name);
+		printk(KERN_ERR "%s: No con, but init state check "
+				"requested - %s\n", __FUNCTION__, name);
 		flags &= ~SLAB_DEBUG_INITIAL;
 	}
 
@@ -1094,7 +1094,6 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	if (size & (BYTES_PER_WORD-1)) {
 		size += (BYTES_PER_WORD-1);
 		size &= ~(BYTES_PER_WORD-1);
-		printk("%sForcing size word alignment - %s\n", func_nm, name);
 	}
 	
 #if DEBUG
