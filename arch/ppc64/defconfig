@@ -1,8 +1,8 @@
 #
 # Automatically generated make config: don't edit
 #
-# CONFIG_UID16 is not set
-# CONFIG_RWSEM_GENERIC_SPINLOCK is not set
+CONFIG_MMU=y
+CONFIG_SWAP=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 CONFIG_GENERIC_ISA_DMA=y
 CONFIG_HAVE_DEC_LOCK=y
@@ -40,16 +40,11 @@ CONFIG_IRQ_ALL_CPUS=y
 CONFIG_NR_CPUS=32
 # CONFIG_HMT is not set
 # CONFIG_DISCONTIGMEM is not set
-# CONFIG_PREEMPT is not set
 # CONFIG_RTAS_FLASH is not set
 
 #
 # General setup
 #
-# CONFIG_ISA is not set
-# CONFIG_SBUS is not set
-# CONFIG_MCA is not set
-# CONFIG_EISA is not set
 CONFIG_PCI=y
 CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
@@ -57,8 +52,6 @@ CONFIG_BINFMT_ELF32=y
 # CONFIG_BINFMT_MISC is not set
 CONFIG_PCI_NAMES=y
 # CONFIG_HOTPLUG is not set
-# CONFIG_PCMCIA is not set
-# CONFIG_HOTPLUG_PCI is not set
 CONFIG_PROC_DEVICETREE=y
 # CONFIG_CMDLINE_BOOL is not set
 
@@ -76,18 +69,13 @@ CONFIG_PROC_DEVICETREE=y
 # Plug and Play configuration
 #
 # CONFIG_PNP is not set
-# CONFIG_ISAPNP is not set
-# CONFIG_PNPBIOS is not set
 
 #
 # Block devices
 #
 CONFIG_BLK_DEV_FD=y
-# CONFIG_BLK_DEV_XD is not set
-# CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set
-# CONFIG_CISS_SCSI_TAPE is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_UMEM is not set
 CONFIG_BLK_DEV_LOOP=y
@@ -100,7 +88,6 @@ CONFIG_BLK_DEV_INITRD=y
 # ATA/ATAPI/MFM/RLL support
 #
 # CONFIG_IDE is not set
-# CONFIG_BLK_DEV_HD is not set
 
 #
 # SCSI device support
@@ -111,7 +98,6 @@ CONFIG_SCSI=y
 # SCSI support type (disk, tape, CD-ROM)
 #
 CONFIG_BLK_DEV_SD=y
-CONFIG_SD_EXTRA_DEVS=40
 CONFIG_CHR_DEV_ST=y
 # CONFIG_CHR_DEV_OSST is not set
 CONFIG_BLK_DEV_SR=y
@@ -131,7 +117,6 @@ CONFIG_CHR_DEV_SG=y
 # SCSI low-level drivers
 #
 # CONFIG_BLK_DEV_3W_XXXX_RAID is not set
-# CONFIG_SCSI_7000FASST is not set
 # CONFIG_SCSI_ACARD is not set
 # CONFIG_SCSI_AACRAID is not set
 # CONFIG_SCSI_AIC7XXX is not set
@@ -144,33 +129,27 @@ CONFIG_CHR_DEV_SG=y
 # CONFIG_SCSI_BUSLOGIC is not set
 # CONFIG_SCSI_CPQFCTS is not set
 # CONFIG_SCSI_DMX3191D is not set
-# CONFIG_SCSI_DTC3280 is not set
 # CONFIG_SCSI_EATA is not set
 # CONFIG_SCSI_EATA_DMA is not set
 # CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_FUTURE_DOMAIN is not set
 # CONFIG_SCSI_GDTH is not set
 # CONFIG_SCSI_GENERIC_NCR5380 is not set
+# CONFIG_SCSI_GENERIC_NCR5380_MMIO is not set
 # CONFIG_SCSI_INITIO is not set
 # CONFIG_SCSI_INIA100 is not set
-# CONFIG_SCSI_NCR53C406A is not set
 # CONFIG_SCSI_NCR53C7xx is not set
 CONFIG_SCSI_SYM53C8XX_2=y
 CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE=0
 CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS=16
 CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
 # CONFIG_SCSI_SYM53C8XX_IOMAPPED is not set
-# CONFIG_SCSI_PAS16 is not set
 # CONFIG_SCSI_PCI2000 is not set
 # CONFIG_SCSI_PCI2220I is not set
-# CONFIG_SCSI_PSI240I is not set
-# CONFIG_SCSI_QLOGIC_FAS is not set
 # CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
-# CONFIG_SCSI_SYM53C416 is not set
 # CONFIG_SCSI_DC390T is not set
-# CONFIG_SCSI_T128 is not set
 # CONFIG_SCSI_U14_34F is not set
 # CONFIG_SCSI_NSP32 is not set
 # CONFIG_SCSI_DEBUG is not set
@@ -179,22 +158,11 @@ CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
 # Multi-device support (RAID and LVM)
 #
 # CONFIG_MD is not set
-# CONFIG_BLK_DEV_MD is not set
-# CONFIG_MD_LINEAR is not set
-# CONFIG_MD_RAID0 is not set
-# CONFIG_MD_RAID1 is not set
-# CONFIG_MD_RAID5 is not set
-# CONFIG_MD_MULTIPATH is not set
-# CONFIG_BLK_DEV_LVM is not set
 
 #
 # Fusion MPT device support
 #
 # CONFIG_FUSION is not set
-# CONFIG_FUSION_BOOT is not set
-# CONFIG_FUSION_ISENSE is not set
-# CONFIG_FUSION_CTL is not set
-# CONFIG_FUSION_LAN is not set
 
 #
 # IEEE 1394 (FireWire) support (EXPERIMENTAL)
@@ -205,11 +173,6 @@ CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
 # I2O device support
 #
 # CONFIG_I2O is not set
-# CONFIG_I2O_PCI is not set
-# CONFIG_I2O_BLOCK is not set
-# CONFIG_I2O_LAN is not set
-# CONFIG_I2O_SCSI is not set
-# CONFIG_I2O_PROC is not set
 
 #
 # Networking options
@@ -233,16 +196,13 @@ CONFIG_SYN_COOKIES=y
 CONFIG_IPV6=m
 
 #
-#    SCTP Configuration (EXPERIMENTAL)
+# SCTP Configuration (EXPERIMENTAL)
 #
-CONFIG_IPV6_SCTP__=m
+CONFIG_IPV6_SCTP__=y
 # CONFIG_IP_SCTP is not set
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
 # CONFIG_LLC is not set
-# CONFIG_IPX is not set
-# CONFIG_ATALK is not set
-# CONFIG_DEV_APPLETALK is not set
 # CONFIG_DECNET is not set
 # CONFIG_BRIDGE is not set
 # CONFIG_X25 is not set
@@ -277,23 +237,11 @@ CONFIG_NETDEVICES=y
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
-# CONFIG_MACE is not set
-# CONFIG_BMAC is not set
 # CONFIG_OAKNET is not set
-# CONFIG_SUNLANCE is not set
 # CONFIG_HAPPYMEAL is not set
-# CONFIG_SUNBMAC is not set
-# CONFIG_SUNQE is not set
 # CONFIG_SUNGEM is not set
 CONFIG_NET_VENDOR_3COM=y
-# CONFIG_EL1 is not set
-# CONFIG_EL2 is not set
-# CONFIG_ELPLUS is not set
-# CONFIG_EL16 is not set
-# CONFIG_ELMC is not set
-# CONFIG_ELMC_II is not set
 CONFIG_VORTEX=y
-# CONFIG_LANCE is not set
 # CONFIG_NET_VENDOR_SMC is not set
 # CONFIG_NET_VENDOR_RACAL is not set
 
@@ -302,34 +250,22 @@ CONFIG_VORTEX=y
 #
 # CONFIG_NET_TULIP is not set
 # CONFIG_HP100 is not set
-# CONFIG_NET_ISA is not set
 CONFIG_NET_PCI=y
 CONFIG_PCNET32=y
 # CONFIG_ADAPTEC_STARFIRE is not set
-# CONFIG_APRICOT is not set
-# CONFIG_CS89x0 is not set
 # CONFIG_DGRS is not set
 # CONFIG_EEPRO100 is not set
 CONFIG_E100=y
-# CONFIG_LNE390 is not set
 # CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
 # CONFIG_NE2K_PCI is not set
-# CONFIG_NE3210 is not set
-# CONFIG_ES3210 is not set
 # CONFIG_8139CP is not set
 # CONFIG_8139TOO is not set
-# CONFIG_8139TOO_PIO is not set
-# CONFIG_8139TOO_TUNE_TWISTER is not set
-# CONFIG_8139TOO_8129 is not set
-# CONFIG_8139_OLD_RX_RESET is not set
 # CONFIG_SIS900 is not set
 # CONFIG_EPIC100 is not set
 # CONFIG_SUNDANCE is not set
-# CONFIG_SUNDANCE_MMIO is not set
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
-# CONFIG_VIA_RHINE_MMIO is not set
 # CONFIG_NET_POCKET is not set
 
 #
@@ -340,7 +276,6 @@ CONFIG_ACENIC_OMIT_TIGON_I=y
 # CONFIG_DL2K is not set
 CONFIG_E1000=y
 # CONFIG_E1000_NAPI is not set
-# CONFIG_MYRI_SBUS is not set
 # CONFIG_NS83820 is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
@@ -348,7 +283,6 @@ CONFIG_E1000=y
 # CONFIG_TIGON3 is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
-# CONFIG_PLIP is not set
 # CONFIG_PPP is not set
 # CONFIG_SLIP is not set
 
@@ -389,8 +323,6 @@ CONFIG_E1000=y
 # Telephony Support
 #
 # CONFIG_PHONE is not set
-# CONFIG_PHONE_IXJ is not set
-# CONFIG_PHONE_IXJ_PCMCIA is not set
 
 #
 # Input device support
@@ -414,17 +346,10 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
 #
 # CONFIG_GAMEPORT is not set
 CONFIG_SOUND_GAMEPORT=y
-# CONFIG_GAMEPORT_NS558 is not set
-# CONFIG_GAMEPORT_L4 is not set
-# CONFIG_GAMEPORT_EMU10K1 is not set
-# CONFIG_GAMEPORT_VORTEX is not set
-# CONFIG_GAMEPORT_FM801 is not set
-# CONFIG_GAMEPORT_CS461x is not set
 CONFIG_SERIO=y
 CONFIG_SERIO_I8042=y
 # CONFIG_SERIO_SERPORT is not set
 # CONFIG_SERIO_CT82C710 is not set
-# CONFIG_SERIO_PARKBD is not set
 
 #
 # Input Device Drivers
@@ -437,34 +362,8 @@ CONFIG_KEYBOARD_ATKBD=y
 CONFIG_INPUT_MOUSE=y
 CONFIG_MOUSE_PS2=y
 # CONFIG_MOUSE_SERIAL is not set
-# CONFIG_MOUSE_INPORT is not set
-# CONFIG_MOUSE_LOGIBM is not set
-# CONFIG_MOUSE_PC110PAD is not set
 # CONFIG_INPUT_JOYSTICK is not set
-# CONFIG_JOYSTICK_ANALOG is not set
-# CONFIG_JOYSTICK_A3D is not set
-# CONFIG_JOYSTICK_ADI is not set
-# CONFIG_JOYSTICK_COBRA is not set
-# CONFIG_JOYSTICK_GF2K is not set
-# CONFIG_JOYSTICK_GRIP is not set
-# CONFIG_JOYSTICK_GRIP_MP is not set
-# CONFIG_JOYSTICK_GUILLEMOT is not set
-# CONFIG_JOYSTICK_INTERACT is not set
-# CONFIG_JOYSTICK_SIDEWINDER is not set
-# CONFIG_JOYSTICK_TMDC is not set
-# CONFIG_JOYSTICK_IFORCE is not set
-# CONFIG_JOYSTICK_WARRIOR is not set
-# CONFIG_JOYSTICK_MAGELLAN is not set
-# CONFIG_JOYSTICK_SPACEORB is not set
-# CONFIG_JOYSTICK_SPACEBALL is not set
-# CONFIG_JOYSTICK_STINGER is not set
-# CONFIG_JOYSTICK_TWIDDLER is not set
-# CONFIG_JOYSTICK_DB9 is not set
-# CONFIG_JOYSTICK_GAMECON is not set
-# CONFIG_JOYSTICK_TURBOGRAFX is not set
-# CONFIG_INPUT_JOYDUMP is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
-# CONFIG_TOUCHSCREEN_GUNZE is not set
 CONFIG_INPUT_MISC=y
 CONFIG_INPUT_PCSPKR=y
 # CONFIG_INPUT_UINPUT is not set
@@ -482,13 +381,7 @@ CONFIG_HW_CONSOLE=y
 #
 CONFIG_SERIAL_8250=y
 CONFIG_SERIAL_8250_CONSOLE=y
-# CONFIG_SERIAL_8250_CS is not set
 # CONFIG_SERIAL_8250_EXTENDED is not set
-# CONFIG_SERIAL_8250_MANY_PORTS is not set
-# CONFIG_SERIAL_8250_SHARE_IRQ is not set
-# CONFIG_SERIAL_8250_DETECT_IRQ is not set
-# CONFIG_SERIAL_8250_MULTIPORT is not set
-# CONFIG_SERIAL_8250_RSA is not set
 
 #
 # Non-8250 serial port support
@@ -527,7 +420,6 @@ CONFIG_HVC_CONSOLE=y
 # CONFIG_FTAPE is not set
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
-# CONFIG_SCx200_GPIO is not set
 CONFIG_RAW_DRIVER=y
 
 #
@@ -539,28 +431,24 @@ CONFIG_RAW_DRIVER=y
 # File systems
 #
 # CONFIG_QUOTA is not set
-# CONFIG_QFMT_V1 is not set
-# CONFIG_QFMT_V2 is not set
 CONFIG_AUTOFS_FS=y
 # CONFIG_AUTOFS4_FS is not set
 CONFIG_REISERFS_FS=y
 # CONFIG_REISERFS_CHECK is not set
 # CONFIG_REISERFS_PROC_INFO is not set
 # CONFIG_ADFS_FS is not set
-# CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
+# CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
 CONFIG_EXT3_FS=y
+# CONFIG_EXT3_FS_XATTR is not set
 CONFIG_JBD=y
 # CONFIG_JBD_DEBUG is not set
 CONFIG_FAT_FS=y
 CONFIG_MSDOS_FS=y
-# CONFIG_UMSDOS_FS is not set
 CONFIG_VFAT_FS=y
 # CONFIG_EFS_FS is not set
-# CONFIG_JFFS_FS is not set
-# CONFIG_JFFS2_FS is not set
 # CONFIG_CRAMFS is not set
 # CONFIG_TMPFS is not set
 CONFIG_RAMFS=y
@@ -568,28 +456,23 @@ CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
 # CONFIG_ZISOFS is not set
 CONFIG_JFS_FS=y
+# CONFIG_JFS_POSIX_ACL is not set
 # CONFIG_JFS_DEBUG is not set
 # CONFIG_JFS_STATISTICS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
-# CONFIG_NTFS_DEBUG is not set
-# CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
 CONFIG_PROC_FS=y
 # CONFIG_DEVFS_FS is not set
-# CONFIG_DEVFS_MOUNT is not set
-# CONFIG_DEVFS_DEBUG is not set
 CONFIG_DEVPTS_FS=y
 # CONFIG_QNX4FS_FS is not set
-# CONFIG_QNX4FS_RW is not set
 # CONFIG_ROMFS_FS is not set
 CONFIG_EXT2_FS=y
+# CONFIG_EXT2_FS_XATTR is not set
 # CONFIG_SYSV_FS is not set
 # CONFIG_UDF_FS is not set
-# CONFIG_UDF_RW is not set
 # CONFIG_UFS_FS is not set
-# CONFIG_UFS_FS_WRITE is not set
 CONFIG_XFS_FS=y
 # CONFIG_XFS_RT is not set
 # CONFIG_XFS_QUOTA is not set
@@ -602,7 +485,6 @@ CONFIG_XFS_FS=y
 CONFIG_NFS_FS=y
 CONFIG_NFS_V3=y
 CONFIG_NFS_V4=y
-# CONFIG_ROOT_NFS is not set
 CONFIG_NFSD=y
 CONFIG_NFSD_V3=y
 CONFIG_NFSD_V4=y
@@ -614,24 +496,14 @@ CONFIG_EXPORTFS=y
 CONFIG_CIFS=y
 # CONFIG_SMB_FS is not set
 # CONFIG_NCP_FS is not set
-# CONFIG_NCPFS_PACKET_SIGNING is not set
-# CONFIG_NCPFS_IOCTL_LOCKING is not set
-# CONFIG_NCPFS_STRONG is not set
-# CONFIG_NCPFS_NFS_NS is not set
-# CONFIG_NCPFS_OS2_NS is not set
-# CONFIG_NCPFS_SMALLDOS is not set
-# CONFIG_NCPFS_NLS is not set
-# CONFIG_NCPFS_EXTRAS is not set
 CONFIG_AFS_FS=y
 CONFIG_RXRPC=y
-# CONFIG_ZISOFS_FS is not set
 
 #
 # Partition Types
 #
 # CONFIG_PARTITION_ADVANCED is not set
 CONFIG_MSDOS_PARTITION=y
-# CONFIG_SMB_NLS is not set
 CONFIG_NLS=y
 
 #
@@ -688,10 +560,7 @@ CONFIG_DUMMY_CONSOLE=y
 # CONFIG_FB_CLGEN is not set
 # CONFIG_FB_PM2 is not set
 # CONFIG_FB_CYBER2000 is not set
-# CONFIG_FB_OF is not set
-# CONFIG_FB_CONTROL is not set
-# CONFIG_FB_PLATINUM is not set
-# CONFIG_FB_VALKYRIE is not set
+# CONFIG_FB_ATY is not set
 # CONFIG_FB_CT65550 is not set
 # CONFIG_FB_IMSTT is not set
 # CONFIG_FB_S3TRIO is not set
@@ -703,7 +572,6 @@ CONFIG_FB_MATROX_MYSTIQUE=y
 CONFIG_FB_MATROX_G450=y
 CONFIG_FB_MATROX_G100=y
 CONFIG_FB_MATROX_MULTIHEAD=y
-# CONFIG_FB_ATY is not set
 # CONFIG_FB_RADEON is not set
 # CONFIG_FB_ATY128 is not set
 # CONFIG_FB_SIS is not set
@@ -719,10 +587,10 @@ CONFIG_FBCON_CFB16=y
 CONFIG_FBCON_CFB24=y
 CONFIG_FBCON_CFB32=y
 CONFIG_FBCON_FONTWIDTH8_ONLY=y
+# CONFIG_FONT_SUN8x16 is not set
 CONFIG_FBCON_FONTS=y
 CONFIG_FONT_8x8=y
 CONFIG_FONT_8x16=y
-# CONFIG_FONT_SUN8x16 is not set
 # CONFIG_FONT_PEARL_8x8 is not set
 # CONFIG_FONT_ACORN_8x8 is not set
 # CONFIG_FONT_MINI_4x6 is not set
@@ -758,8 +626,11 @@ CONFIG_XMON_DEFAULT=y
 CONFIG_SECURITY_CAPABILITIES=y
 
 #
+# Cryptographic options
+#
+# CONFIG_CRYPTO is not set
+
+#
 # Library routines
 #
 CONFIG_CRC32=y
-# CONFIG_ZLIB_INFLATE is not set
-# CONFIG_ZLIB_DEFLATE is not set
