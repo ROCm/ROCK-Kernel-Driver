@@ -13,7 +13,7 @@
 
 #ifdef __KERNEL__
 
-#include <asm/compat.h>
+#include <linux/compat.h>
 
 typedef union sigval32 {
 	int sival_int;
@@ -30,7 +30,7 @@ typedef struct siginfo32 {
 
 		/* kill() */
 		struct {
-			__kernel_pid_t32 _pid;		/* sender's pid */
+			compat_pid_t _pid;		/* sender's pid */
 			unsigned int _uid;		/* sender's uid */
 		} _kill;
 
@@ -42,14 +42,14 @@ typedef struct siginfo32 {
 
 		/* POSIX.1b signals */
 		struct {
-			__kernel_pid_t32 _pid;		/* sender's pid */
+			compat_pid_t _pid;		/* sender's pid */
 			unsigned int _uid;		/* sender's uid */
 			sigval_t32 _sigval;
 		} _rt;
 
 		/* SIGCHLD */
 		struct {
-			__kernel_pid_t32 _pid;		/* which child */
+			compat_pid_t _pid;		/* which child */
 			unsigned int _uid;		/* sender's uid */
 			int _status;			/* exit code */
 			compat_clock_t _utime;

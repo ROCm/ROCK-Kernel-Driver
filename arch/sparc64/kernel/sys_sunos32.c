@@ -798,14 +798,14 @@ asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 }
 
 /* So stupid... */
-extern asmlinkage int sys32_wait4(__kernel_pid_t32 pid,
+extern asmlinkage int sys32_wait4(compat_pid_t pid,
 				  u32 stat_addr, int options, u32 ru);
 
-asmlinkage int sunos_wait4(__kernel_pid_t32 pid, u32 stat_addr, int options, u32 ru)
+asmlinkage int sunos_wait4(compat_pid_t pid, u32 stat_addr, int options, u32 ru)
 {
 	int ret;
 
-	ret = sys32_wait4((pid ? pid : ((__kernel_pid_t32)-1)),
+	ret = sys32_wait4((pid ? pid : ((compat_pid_t)-1)),
 			  stat_addr, options, ru);
 	return ret;
 }
@@ -931,11 +931,11 @@ struct msgbuf32 {
 struct ipc_perm32
 {
 	key_t    	  key;
-        __kernel_uid_t32  uid;
-        __kernel_gid_t32  gid;
-        __kernel_uid_t32  cuid;
-        __kernel_gid_t32  cgid;
-        __kernel_mode_t32 mode;
+        compat_uid_t  uid;
+        compat_gid_t  gid;
+        compat_uid_t  cuid;
+        compat_gid_t  cgid;
+        compat_mode_t mode;
         unsigned short  seq;
 };
 
@@ -952,8 +952,8 @@ struct msqid_ds32
         unsigned short msg_cbytes;
         unsigned short msg_qnum;  
         unsigned short msg_qbytes;
-        __kernel_ipc_pid_t32 msg_lspid;
-        __kernel_ipc_pid_t32 msg_lrpid;
+        compat_ipc_pid_t msg_lspid;
+        compat_ipc_pid_t msg_lrpid;
 };
 
 static inline int sunos_msqid_get(struct msqid_ds32 *user,
@@ -1084,8 +1084,8 @@ struct shmid_ds32 {
         compat_time_t         shm_atime;
         compat_time_t         shm_dtime;
         compat_time_t         shm_ctime;
-        __kernel_ipc_pid_t32    shm_cpid; 
-        __kernel_ipc_pid_t32    shm_lpid; 
+        compat_ipc_pid_t    shm_cpid; 
+        compat_ipc_pid_t    shm_lpid; 
         unsigned short          shm_nattch;
 };
                                                         
