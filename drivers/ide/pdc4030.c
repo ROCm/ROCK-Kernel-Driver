@@ -445,9 +445,9 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 
 /*
  * promise_write() transfers a block of one or more sectors of data to a
- * drive as part of a disk write operation. All but 4 sectors are transfered
+ * drive as part of a disk write operation. All but 4 sectors are transferred
  * in the first attempt, then the interface is polled (nicely!) for completion
- * before the final 4 sectors are transfered. There is no interrupt generated
+ * before the final 4 sectors are transferred. There is no interrupt generated
  * on writes (at least on the DC4030VL-2), we just have to poll for NOT BUSY.
  */
 static ide_startstop_t promise_write (ide_drive_t *drive)

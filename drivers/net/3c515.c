@@ -105,9 +105,9 @@ static int rx_nocopy, rx_copy, queued_packet;
 #define CORKSCREW_TOTAL_SIZE 0x20
 
 #ifdef DRIVER_DEBUG
-int corkscrew_debug = DRIVER_DEBUG;
+static int corkscrew_debug = DRIVER_DEBUG;
 #else
-int corkscrew_debug = 1;
+static int corkscrew_debug = 1;
 #endif
 
 #define CORKSCREW_ID 10
@@ -351,21 +351,20 @@ static struct media_table {
 	{ "Default", 0, 0xFF, XCVR_10baseT, 10000},
 };
 
-#ifdef __ISAPNP__
-struct corkscrew_isapnp_adapters_struct {
-	unsigned short vendor, function;
-	char *name;
-};
-struct corkscrew_isapnp_adapters_struct corkscrew_isapnp_adapters[] = {
-	{ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5051), "3Com Fast EtherLink ISA"},
-	{0, }
-};
-int corkscrew_isapnp_phys_addr[3] = {
-	0, 0, 0
+#ifdef CONFIG_ISAPNP
+static struct isapnp_device_id corkscrew_isapnp_adapters[] = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5051),
+		(long) "3Com Fast EtherLink ISA" },
+	{ }	/* terminate list */
 };
 
+MODULE_DEVICE_TABLE(isapnp, corkscrew_isapnp_adapters);
+
+static int corkscrew_isapnp_phys_addr[3];
+
 static int nopnp;
-#endif
+#endif /* CONFIG_ISAPNP */
 
 static int corkscrew_scan(struct net_device *dev);
 static struct net_device *corkscrew_found_device(struct net_device *dev,
@@ -443,12 +442,12 @@ static int corkscrew_scan(struct net_device *dev)
 {
 	int cards_found = 0;
 	static int ioaddr;
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 	short i;
 	static int pnp_cards = 0;
 #endif
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 	if(nopnp == 1)
 		goto no_pnp;
 	for(i=0; corkscrew_isapnp_adapters[i].vendor != 0; i++) {
@@ -506,17 +505,17 @@ static int corkscrew_scan(struct net_device *dev)
 		}
 	}
 no_pnp:
-#endif /* not __ISAPNP__ */
+#endif /* CONFIG_ISAPNP */
 
 	/* Check all locations on the ISA bus -- evil! */
 	for (ioaddr = 0x100; ioaddr < 0x400; ioaddr += 0x20) {
 		int irq;
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 		/* Make sure this was not already picked up by isapnp */
 		if(ioaddr == corkscrew_isapnp_phys_addr[0]) continue;
 		if(ioaddr == corkscrew_isapnp_phys_addr[1]) continue;
 		if(ioaddr == corkscrew_isapnp_phys_addr[2]) continue;
-#endif
+#endif /* CONFIG_ISAPNP */
 		if (check_region(ioaddr, CORKSCREW_TOTAL_SIZE))
 			continue;
 		/* Check the resource configuration for a matching ioaddr. */
@@ -1219,7 +1218,7 @@ static void corkscrew_interrupt(int irq, void *dev_id,
 #ifdef VORTEX_BUS_MASTER
 		if (status & DMADone) {
 			outw(0x1000, ioaddr + Wn7_MasterStatus);	/* Ack the event. */
-			dev_kfree_skb_irq(lp->tx_skb);	/* Release the transfered buffer */
+			dev_kfree_skb_irq(lp->tx_skb);	/* Release the transferred buffer */
 			netif_wake_queue(dev);
 		}
 #endif

@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.14 2000/12/09 04:15:24 anton Exp $ */
+/* $Id: pgalloc.h,v 1.15 2001/03/04 18:31:00 davem Exp $ */
 #ifndef _SPARC64_PGALLOC_H
 #define _SPARC64_PGALLOC_H
 
@@ -93,14 +93,14 @@ extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 
 #endif /* ! CONFIG_SMP */
 
-/* This will change for Cheetah and later chips. */
-#define VPTE_BASE	0xfffffffe00000000
+#define VPTE_BASE_SPITFIRE	0xfffffffe00000000
+#define VPTE_BASE_CHEETAH	0xffe0000000000000
 
 extern __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start,
 					  unsigned long end)
 {
 	/* Note the signed type.  */
-	long s = start, e = end;
+	long s = start, e = end, vpte_base;
 	if (s > e)
 		/* Nobody should call us with start below VM hole and end above.
 		   See if it is really true.  */
@@ -110,9 +110,12 @@ extern __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 	s &= PMD_MASK;
 	e = (e + PMD_SIZE - 1) & PMD_MASK;
 #endif
+	vpte_base = (tlb_type == spitfire ?
+		     VPTE_BASE_SPITFIRE :
+		     VPTE_BASE_CHEETAH);
 	flush_tlb_range(mm,
-			VPTE_BASE + (s >> (PAGE_SHIFT - 3)),
-			VPTE_BASE + (e >> (PAGE_SHIFT - 3)));
+			vpte_base + (s >> (PAGE_SHIFT - 3)),
+			vpte_base + (e >> (PAGE_SHIFT - 3)));
 }
 
 /* Page table allocation/freeing. */

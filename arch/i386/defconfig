@@ -529,13 +529,11 @@ CONFIG_DRM_TDFX=y
 CONFIG_DRM_RADEON=y
 # CONFIG_DRM_I810 is not set
 # CONFIG_DRM_MGA is not set
-CONFIG_PCMCIA_SERIAL=y
 
 #
-# PCMCIA character device support
+# PCMCIA character devices
 #
 # CONFIG_PCMCIA_SERIAL_CS is not set
-# CONFIG_PCMCIA_SERIAL_CB is not set
 
 #
 # Multimedia devices

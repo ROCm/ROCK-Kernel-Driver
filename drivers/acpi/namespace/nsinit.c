@@ -271,7 +271,7 @@ acpi_ns_init_one_device (
 	}
 
 	else {
-		/* Count of successfull INIs */
+		/* Count of successful INIs */
 
 		info->num_INI++;
 	}

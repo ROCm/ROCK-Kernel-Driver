@@ -71,49 +71,40 @@
  *	  into the kernel.
  *	- Better handling of multicast addresses.
  *
+ *	Fixes:
+ *	Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 11/01/2001
+ *	- fix dgrs_found_device wrt checking kmalloc return and
+ *	rollbacking the partial steps of the whole process when
+ *	one of the devices can't be allocated. Fix SET_MODULE_OWNER
+ *	on the loop to use devN instead of repeated calls to dev.
+ *
+ *	davej <davej@suse.de> - 9/2/2001
+ *	- Enable PCI device before reading ioaddr/irq
+ *
  */
 
-static char *version = "$Id: dgrs.c,v 1.13 2000/06/06 04:07:00 rick Exp $";
-
-#include <linux/version.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/byteorder.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
-#include <linux/types.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/byteorder.h>
+#include <asm/uaccess.h>
 
-/*
- *	API changed at linux version 2.1.0
- */
-#if LINUX_VERSION_CODE >= 0x20100
-	#include <asm/uaccess.h>
-	#define IOREMAP(ADDR, LEN)		ioremap(ADDR, LEN)
-	#define IOUNMAP(ADDR)			iounmap(ADDR)
-	#define COPY_FROM_USER(DST,SRC,LEN)	copy_from_user(DST,SRC,LEN)
-	#define COPY_TO_USER(DST,SRC,LEN)	copy_to_user(DST,SRC,LEN)
-#else
-	#include <linux/bios32.h>
-	#define IOREMAP(ADDR, LEN)		vremap(ADDR, LEN)
-	#define IOUNMAP(ADDR)			vfree(ADDR)
-	#define COPY_FROM_USER(DST,SRC,LEN)	memcpy_fromfs(DST,SRC,LEN)
-	#define COPY_TO_USER(DST,SRC,LEN)	memcpy_tofs(DST,SRC,LEN)
-#endif
+static char version[] __initdata =
+	"$Id: dgrs.c,v 1.13 2000/06/06 04:07:00 rick Exp $";
 
 /*
  *	DGRS include files
@@ -130,13 +121,11 @@ typedef unsigned int bool;
 #include "dgrs_asstruct.h"
 #include "dgrs_bcomm.h"
 
-#if LINUX_VERSION_CODE >= 0x20400
 static struct pci_device_id dgrs_pci_tbl[] __initdata = {
 	{ SE6_PCI_VENDOR_ID, SE6_PCI_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, dgrs_pci_tbl);
-#endif /* LINUX_VERSION_CODE >= 0x20400 */
 
 /*
  *	Firmware.  Compiled separately for local compilation,
@@ -178,19 +167,19 @@ MODULE_DEVICE_TABLE(pci, dgrs_pci_tbl);
  *	"Space.c" variables, now settable from module interface
  *	Use the name below, minus the "dgrs_" prefix.  See init_module().
  */
-int	dgrs_debug = 1;
-int	dgrs_dma = 1;
-int	dgrs_spantree = -1;
-int	dgrs_hashexpire = -1;
-uchar	dgrs_ipaddr[4] = { 0xff, 0xff, 0xff, 0xff};
-uchar	dgrs_iptrap[4] = { 0xff, 0xff, 0xff, 0xff};
-__u32	dgrs_ipxnet = -1;
-int	dgrs_nicmode = 0;
+static int	dgrs_debug = 1;
+static int	dgrs_dma = 1;
+static int	dgrs_spantree = -1;
+static int	dgrs_hashexpire = -1;
+static uchar	dgrs_ipaddr[4] = { 0xff, 0xff, 0xff, 0xff};
+static uchar	dgrs_iptrap[4] = { 0xff, 0xff, 0xff, 0xff};
+static __u32	dgrs_ipxnet = -1;
+static int	dgrs_nicmode = 0;
 
 /*
  *	Chain of device structures
  */
-static struct net_device *dgrs_root_dev = NULL;
+static struct net_device *dgrs_root_dev;
 
 /*
  *	Private per-board data structure (dev->priv)
@@ -316,7 +305,7 @@ check_board_dma(struct net_device *dev0)
 	/*
 	 *	Now map the DMA registers into our virtual space
 	 */
-	priv0->vplxdma = (ulong *) IOREMAP (priv0->plxdma, 256);
+	priv0->vplxdma = (ulong *) ioremap (priv0->plxdma, 256);
 	if (!priv0->vplxdma)
 	{
 		printk("%s: can't *remap() the DMA regs\n", dev0->name);
@@ -843,7 +832,7 @@ static int dgrs_ioctl(struct net_device *devN, struct ifreq *ifr, int cmd)
 	if (cmd != DGRSIOCTL)
 		return -EINVAL;
 
-	if(COPY_FROM_USER(&ioc, ifr->ifr_data, sizeof(DGRS_IOCTL)))
+	if(copy_from_user(&ioc, ifr->ifr_data, sizeof(DGRS_IOCTL)))
 		return -EFAULT;
 
 	switch (ioc.cmd)
@@ -851,7 +840,7 @@ static int dgrs_ioctl(struct net_device *devN, struct ifreq *ifr, int cmd)
 		case DGRS_GETMEM:
 			if (ioc.len != sizeof(ulong))
 				return -EINVAL;
-			if(COPY_TO_USER(ioc.data, &devN->mem_start, ioc.len))
+			if(copy_to_user(ioc.data, &devN->mem_start, ioc.len))
 				return -EFAULT;
 			return (0);
 		case DGRS_SETFILTER:
@@ -880,7 +869,7 @@ static int dgrs_ioctl(struct net_device *devN, struct ifreq *ifr, int cmd)
 	
 			if (ioc.len)
 			{
-				if(COPY_FROM_USER(S2HN(privN->bcomm->bc_filter_area),
+				if(copy_from_user(S2HN(privN->bcomm->bc_filter_area),
 					ioc.data, ioc.len))
 					return -EFAULT;
 				privN->bcomm->bc_filter_cmd = BC_FILTER_SET;
@@ -1003,7 +992,7 @@ dgrs_download(struct net_device *dev0)
 	/*
 	 * Map in the dual port memory
 	 */
-	priv0->vmem = IOREMAP(dev0->mem_start, 2048*1024);
+	priv0->vmem = ioremap(dev0->mem_start, 2048*1024);
 	if (!priv0->vmem)
 	{
 		printk("%s: cannot map in board memory\n", dev0->name);
@@ -1050,7 +1039,7 @@ dgrs_download(struct net_device *dev0)
 	memcpy(priv0->vmem, dgrs_code, dgrs_ncode);	/* Load code */
 	if (memcmp(priv0->vmem, dgrs_code, dgrs_ncode))
 	{
-		IOUNMAP(priv0->vmem);
+		iounmap(priv0->vmem);
 		priv0->vmem = NULL;
 		printk("%s: download compare failed\n", dev0->name);
 		return -ENXIO;
@@ -1249,13 +1238,17 @@ dgrs_found_device(
 )
 {
 	DGRS_PRIV	*priv;
-	struct net_device *dev;
+	struct net_device *dev, *aux;
 
 	/* Allocate and fill new device structure. */
 	int dev_size = sizeof(struct net_device) + sizeof(DGRS_PRIV);
-	int i;
+	int i, ret;
 
 	dev = (struct net_device *) kmalloc(dev_size, GFP_KERNEL);
+
+	if (!dev)
+		return -ENOMEM;
+
 	memset(dev, 0, dev_size);
 	dev->priv = ((void *)dev) + sizeof(struct net_device);
 	priv = (DGRS_PRIV *)dev->priv;
@@ -1274,10 +1267,11 @@ dgrs_found_device(
 	dev->init = dgrs_probe1;
 	SET_MODULE_OWNER(dev);
 	ether_setup(dev);
-	priv->next_dev = dgrs_root_dev;
-	dgrs_root_dev = dev;
 	if (register_netdev(dev) != 0)
 		return -EIO;
+
+	priv->next_dev = dgrs_root_dev;
+	dgrs_root_dev = dev;
 
 	if ( !dgrs_nicmode )
 		return (0);	/* Switch mode, we are done */
@@ -1295,6 +1289,9 @@ dgrs_found_device(
 			/* Allocate new dev and priv structures */
 		devN = (struct net_device *) kmalloc(dev_size, GFP_KERNEL);
 			/* Make it an exact copy of dev[0]... */
+		ret = -ENOMEM;
+		if (!devN) 
+			goto fail;
 		memcpy(devN, dev, dev_size);
 		devN->priv = ((void *)devN) + sizeof(struct net_device);
 		privN = (DGRS_PRIV *)devN->priv;
@@ -1305,17 +1302,29 @@ dgrs_found_device(
 		devN->irq = 0;
 			/* ... and base MAC address off address of 1st port */
 		devN->dev_addr[5] += i;
+		devN->init = dgrs_initclone;
+		SET_MODULE_OWNER(devN);
+		ether_setup(devN);
+		ret = -EIO;
+		if (register_netdev(devN)) {
+			kfree(devN);
+			goto fail;
+		}
 		privN->chan = i+1;
 		priv->devtbl[i] = devN;
-		devN->init = dgrs_initclone;
-		SET_MODULE_OWNER(dev);
-		ether_setup(devN);
 		privN->next_dev = dgrs_root_dev;
 		dgrs_root_dev = devN;
-		if (register_netdev(devN) != 0)
-			return -EIO;
 	}
-	return (0);
+	return 0;
+fail:	aux = priv->next_dev;
+	while (dgrs_root_dev != aux) {
+		struct net_device *d = dgrs_root_dev;
+		
+		dgrs_root_dev = ((DGRS_PRIV *)d->priv)->next_dev;
+		unregister_netdev(d);
+		kfree(d);
+	}
+	return ret;
 }
 
 /*
@@ -1341,6 +1350,17 @@ static int __init  dgrs_scan(void)
 
 		while ((pdev = pci_find_device(SE6_PCI_VENDOR_ID, SE6_PCI_DEVICE_ID, pdev)) != NULL)
 		{
+			/*
+			 * Get and check the bus-master and latency values.
+			 * Some PCI BIOSes fail to set the master-enable bit,
+			 * and the latency timer must be set to the maximum
+			 * value to avoid data corruption that occurs when the
+			 * timer expires during a transfer.  Yes, it's a bug.
+			 */
+			if (pci_enable_device(pdev))
+				continue;
+			pci_set_master(pdev);
+
 			plxreg = pci_resource_start (pdev, 0);
 			io = pci_resource_start (pdev, 1);
 			mem = pci_resource_start (pdev, 2);
@@ -1364,17 +1384,6 @@ static int __init  dgrs_scan(void)
 			pci_write_config_dword(pdev, 0x30, plxdma + 1);
 			pci_read_config_dword(pdev, 0x30, &plxdma);
 			plxdma &= ~15;
-
-			/*
-			 * Get and check the bus-master and latency values.
-			 * Some PCI BIOSes fail to set the master-enable bit,
-			 * and the latency timer must be set to the maximum
-			 * value to avoid data corruption that occurs when the
-			 * timer expires during a transfer.  Yes, it's a bug.
-			 */
-			if (pci_enable_device(pdev))
-				continue;
-			pci_set_master(pdev);
 
 			dgrs_found_device(io, mem, irq, plxreg, plxdma);
 
@@ -1470,8 +1479,8 @@ static int __init dgrs_init_module (void)
 
 	if (dgrs_debug)
 	{
-		printk("dgrs: SW=%s FW=Build %d %s\n",
-			version, dgrs_firmnum, dgrs_firmdate);
+		printk(KERN_INFO "dgrs: SW=%s FW=Build %d %s\nFW Version=%s\n",
+		       version, dgrs_firmnum, dgrs_firmdate, dgrs_firmver);
 	}
 
 	/*
@@ -1497,9 +1506,9 @@ static void __exit dgrs_cleanup_module (void)
 		proc_reset(priv->devtbl[0], 1);
 
 		if (priv->vmem)
-			IOUNMAP(priv->vmem);
+			iounmap(priv->vmem);
 		if (priv->vplxdma)
-			IOUNMAP((uchar *) priv->vplxdma);
+			iounmap((uchar *) priv->vplxdma);
 
 		release_region(dgrs_root_dev->base_addr, 256);
 

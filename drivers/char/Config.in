@@ -133,6 +133,7 @@ if [ "$CONFIG_WATCHDOG" != "n" ]; then
    fi
    tristate '  Berkshire Products PC Watchdog' CONFIG_PCWATCHDOG
    tristate '  Acquire SBC Watchdog Timer' CONFIG_ACQUIRE_WDT
+   tristate '  Advantech SBC Watchdog Timer' CONFIG_ADVANTECH_WDT
    tristate '  SBC-60XX Watchdog Timer' CONFIG_60XX_WDT
    tristate '  Mixcom Watchdog' CONFIG_MIXCOMWD 
    tristate '  Intel i810 TCO timer / Watchdog' CONFIG_I810_TCO
@@ -142,6 +143,7 @@ if [ "$CONFIG_WATCHDOG" != "n" ]; then
          tristate '  NetWinder WB83C977 watchdog' CONFIG_977_WATCHDOG
       fi
    fi
+   tristate '  ZF MachZ Watchdog' CONFIG_MACHZ_WDT
 fi
 endmenu
 
@@ -176,7 +178,7 @@ if [ "$CONFIG_FTAPE" != "n" ]; then
 fi
 endmenu
 
-tristate '/dev/agpgart (AGP Support)' CONFIG_AGP $CONFIG_DRM_AGP
+dep_tristate '/dev/agpgart (AGP Support)' CONFIG_AGP $CONFIG_DRM_AGP
 if [ "$CONFIG_AGP" != "n" ]; then
    bool '  Intel 440LX/BX/GX and I815/I840/I850 support' CONFIG_AGP_INTEL
    bool '  Intel I810/I815 (on-board) support' CONFIG_AGP_I810

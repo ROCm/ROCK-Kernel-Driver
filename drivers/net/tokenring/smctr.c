@@ -4383,7 +4383,7 @@ static int smctr_reset_adapter(struct net_device *dev)
         smctr_clear_trc_reset(ioaddr);
         mdelay(200); /* ~2 ms */
 
-        /* Remove any latched interrupts that occured prior to reseting the
+        /* Remove any latched interrupts that occurred prior to reseting the
          * adapter or possibily caused by line glitches due to the reset.
          */
         outb(tp->trc_mask | CSR_CLRTINT | CSR_CLRCBUSY, ioaddr + CSR);

@@ -169,7 +169,7 @@ static void i2c_stop(struct i2c_algo_bit_data *adap)
 /* returns:
  * 1 if the device acknowledged
  * 0 if the device did not ack
- * -ETIMEDOUT if an error occured (while raising the scl line)
+ * -ETIMEDOUT if an error occurred (while raising the scl line)
  */
 static int i2c_outb(struct i2c_adapter *i2c_adap, char c)
 {
@@ -421,7 +421,7 @@ static inline int readbytes(struct i2c_adapter *i2c_adap,char *buf,int count)
  * reads, writes as well as 10bit-addresses.
  * returns:
  *  0 everything went okay, the chip ack'ed
- * -x an error occured (like: -EREMOTEIO if the device did not answer, or
+ * -x an error occurred (like: -EREMOTEIO if the device did not answer, or
  *	-ETIMEDOUT, for example if the lines are stuck...) 
  */
 static inline int bit_doAddress(struct i2c_adapter *i2c_adap,
@@ -445,7 +445,7 @@ static inline int bit_doAddress(struct i2c_adapter *i2c_adap,
 		/* the remaining 8 bit address */
 		ret = i2c_outb(i2c_adap,msg->addr & 0x7f);
 		if (ret != 1) {
-			/* the chip did not ack / xmission error occured */
+			/* the chip did not ack / xmission error occurred */
 			printk("died at 2nd address code.\n");
 			return -EREMOTEIO;
 		}

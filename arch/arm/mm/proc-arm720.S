@@ -32,9 +32,9 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
-#include "../lib/constants.h"
 
 /*
  * Function: arm720_cache_clean_invalidate_all (void)

@@ -471,7 +471,7 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 		/* PCI board */
 		bp->bus_type = DFX_BUS_TYPE_PCI;
 		bp->pci_dev = pdev;
-		pdev->driver_data = dev;
+		pci_set_drvdata (pdev, dev);
 		pci_set_master (pdev);
 	}
 
@@ -3364,9 +3364,10 @@ static void __devexit dfx_remove_one_pci_or_eisa(struct pci_dev *pdev, struct ne
 
 static void __devexit dfx_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 
 	dfx_remove_one_pci_or_eisa(pdev, dev);
+	pci_set_drvdata(pdev, NULL);
 }
 
 static struct pci_device_id dfx_pci_tbl[] __devinitdata = {

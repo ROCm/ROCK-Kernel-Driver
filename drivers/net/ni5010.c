@@ -469,7 +469,7 @@ static void  ni5010_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         }
 
         if ((status & IS_DMA_INT) == 0) {
-                PRINTK((KERN_DEBUG "%s: DMA complete (???)\n", dev->name));
+                PRINTK((KERN_DEBUG "%s: DMA complete (?)\n", dev->name));
                 outb(0, IE_DMA_RST); /* Reset DMA int */
         }
 

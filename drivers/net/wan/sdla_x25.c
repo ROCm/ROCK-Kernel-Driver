@@ -929,7 +929,7 @@ static void wpx_isr (sdla_t* card)
  *
  * Notes:
  * 1. When allocating a socket buffer, if M-bit is set then more data is
- *    comming and we have to allocate buffer for the maximum IP packet size
+ *    coming and we have to allocate buffer for the maximum IP packet size
  *    expected on this channel.
  * 2. If something goes wrong and X.25 packet has to be dropped (e.g. no
  *    socket buffers available) the whole packet sequence must be discarded.
@@ -1001,7 +1001,7 @@ static void rx_intr (sdla_t* card)
 	memcpy(bufptr, rxmb->data, len);
 
 	if (qdm & 0x01)
-		return;		/* more data is comming */
+		return;		/* more data is coming */
 
 	dev->last_rx = jiffies;		/* timestamp */
 	chan->rx_skb = NULL;		/* dequeue packet */
@@ -1153,7 +1153,7 @@ static void poll_connecting (sdla_t* card)
 	{
 		wanpipe_set_state(card, WAN_CONNECTED);
 		x25_set_intr_mode(card, 0x83);	/* enable Rx interrupts */
-		status->imask &= ~0x2;		/* mask Tx interupts */
+		status->imask &= ~0x2;		/* mask Tx interrupts */
 	}
 	else if ((jiffies - card->state_tick) > CONNECT_TIMEOUT)
 	    disconnect(card);

@@ -1,4 +1,4 @@
-/* $Id: flash.c,v 1.22 2001/02/13 01:17:00 davem Exp $
+/* $Id: flash.c,v 1.23 2001/03/02 06:32:40 davem Exp $
  * flash.c: Allow mmap access to the OBP Flash, for OBP updates.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -106,12 +106,17 @@ flash_read(struct file * file, char * buf,
 	   size_t count, loff_t *ppos)
 {
 	unsigned long p = file->f_pos;
+	int i;
 	
 	if (count > flash.read_size - p)
 		count = flash.read_size - p;
 
-	if (copy_to_user(buf, flash.read_base + p, count) < 0)
-		return -EFAULT;
+	for (i = 0; i < count; i++) {
+		u8 data = readb(flash.read_base + p + i);
+		if (put_user(data, buf))
+			return -EFAULT;
+		buf++;
+	}
 
 	file->f_pos += count;
 	return count;

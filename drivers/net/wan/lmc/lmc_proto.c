@@ -43,7 +43,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-#include "../syncppp.h"
+#include <net/syncppp.h>
 #include <linux/inet.h>
 #include <linux/tqueue.h>
 #include <linux/proc_fs.h>
@@ -61,7 +61,6 @@
  * compiled without referencing any of the sync ppp routines.
  */
 #ifdef SPPPSTUB
-#define SYNC_PPP_init() (void)0
 #define SPPP_detach(d)	(void)0
 #define SPPP_open(d)	0
 #define SPPP_reopen(d)	(void)0
@@ -70,7 +69,6 @@
 #define SPPP_do_ioctl(d,i,c)	-EOPNOTSUPP
 #else
 #if LINUX_VERSION_CODE < 0x20363
-#define SYNC_PPP_init	sync_ppp_init
 #define SPPP_attach(x)	sppp_attach((struct ppp_device *)(x)->lmc_device)
 #define SPPP_detach(x)	sppp_detach((x)->lmc_device)
 #define SPPP_open(x)	sppp_open((x)->lmc_device)
@@ -78,7 +76,6 @@
 #define SPPP_close(x)	sppp_close((x)->lmc_device)
 #define SPPP_do_ioctl(x, y, z)	sppp_do_ioctl((x)->lmc_device, (y), (z))
 #else
-#define SYNC_PPP_init	sync_ppp_init
 #define SPPP_attach(x)	sppp_attach((x)->pd)
 #define SPPP_detach(x)	sppp_detach((x)->pd->dev)
 #define SPPP_open(x)	sppp_open((x)->pd->dev)
@@ -88,21 +85,19 @@
 #endif
 #endif
 
-static int lmc_first_ppp_load = 0;
-
 // init
 void lmc_proto_init(lmc_softc_t *sc) /*FOLD00*/
 {
     lmc_trace(sc->lmc_device, "lmc_proto_init in");
     switch(sc->if_type){
     case LMC_PPP:
-        if(lmc_first_ppp_load == 0)
-#ifndef MODULE
-            SYNC_PPP_init();
-#endif
         
 #if LINUX_VERSION_CODE >= 0x20363
         sc->pd = kmalloc(sizeof(struct ppp_device), GFP_KERNEL);
+	if (!sc->pd) {
+		printk("lmc_proto_init(): kmalloc failure!\n");
+		return;
+	}
         sc->pd->dev = sc->lmc_device;
 #endif
         sc->if_ptr = sc->pd;

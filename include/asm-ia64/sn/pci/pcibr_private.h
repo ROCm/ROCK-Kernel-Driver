@@ -328,7 +328,7 @@ struct pcibr_soft_s {
 #ifdef IRIX
 	toid_t                  bserr_toutid;	/* Timeout started by errintr */
 #endif
-	iopaddr_t               bserr_addr;	/* Address where error occured */
+	iopaddr_t               bserr_addr;	/* Address where error occurred */
 	bridgereg_t             bserr_intstat;	/* interrupts active at error time */
     } bs_errinfo;
 

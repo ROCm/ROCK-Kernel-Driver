@@ -840,7 +840,7 @@ L(getvmetype):
 #ifdef CONFIG_MVME16x
 	is_not_mvme16x(L(gvtdone))
 
-	/* Need to get the BRD_ID info to diferentiate between 162, 167,
+	/* Need to get the BRD_ID info to differentiate between 162, 167,
 	 * etc.  This is available as a BI_VME_BRDINFO tag with later
 	 * versions of VMELILO and TFTPLILO, otherwise we call the Bug.
 	 */

@@ -14,10 +14,8 @@ if [ "$CONFIG_ARCNET" != "n" ]; then
    dep_tristate 'ARCnet COM90xx (IO mapped) chipset driver' CONFIG_ARCNET_COM90xxIO $CONFIG_ARCNET
    dep_tristate 'ARCnet COM90xx (RIM I) chipset driver' CONFIG_ARCNET_RIM_I $CONFIG_ARCNET
    dep_tristate 'ARCnet COM20020 chipset driver' CONFIG_ARCNET_COM20020 $CONFIG_ARCNET
-   if [ "$CONFIG_ARCNET_COM20020" != "n" ]; then
-      dep_tristate '  Support for COM20020 on ISA' CONFIG_ARCNET_COM20020_ISA $CONFIG_ARCNET_COM20020 $CONFIG_ARCNET
-      dep_tristate '  Support for COM20020 on PCI' CONFIG_ARCNET_COM20020_PCI $CONFIG_ARCNET_COM20020 $CONFIG_ARCNET
-   fi
+   dep_tristate '  Support for COM20020 on ISA' CONFIG_ARCNET_COM20020_ISA $CONFIG_ARCNET_COM20020 $CONFIG_ISA
+   dep_tristate '  Support for COM20020 on PCI' CONFIG_ARCNET_COM20020_PCI $CONFIG_ARCNET_COM20020 $CONFIG_PCI
 fi
 
 endmenu

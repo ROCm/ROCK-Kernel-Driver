@@ -32,9 +32,8 @@ static int retries = 5;
 static int async = 1;
 static int tx_queue_len = 1;
 static int arlan_EEPROM_bad;
-static int arlan_entry_and_exit_debug;
 
-#ifdef ARLAN_DEBUGING
+#ifdef ARLAN_DEBUGGING
 
 static int arlan_entry_debug;
 static int arlan_exit_debug;
@@ -71,6 +70,7 @@ MODULE_PARM(arlan_entry_and_exit_debug, "i");
 MODULE_PARM(arlan_EEPROM_bad, "i");
 
 EXPORT_SYMBOL(arlan_device);
+EXPORT_SYMBOL(arlan_conf);
 EXPORT_SYMBOL(last_arlan);
 
 
@@ -114,7 +114,7 @@ extern inline long long arlan_time(void)
 	return ((long long) timev.tv_sec * 1000000 + timev.tv_usec);
 };
 
-#ifdef ARLAN_ENTRY_EXIT_DEBUGING
+#ifdef ARLAN_ENTRY_EXIT_DEBUGGING
 #define ARLAN_DEBUG_ENTRY(name) \
 	{\
 	struct timeval timev;\
@@ -694,7 +694,7 @@ static void arlan_registration_timer(unsigned long data)
 }
 
 
-#ifdef ARLAN_DEBUGING
+#ifdef ARLAN_DEBUGGING
 
 static void arlan_print_registers(struct net_device *dev, int line)
 {
@@ -1671,7 +1671,7 @@ static void arlan_rx_interrupt(struct net_device *dev, u_char rxStatus, u_short 
 					}
 					/* we reach here if multicast filtering is on and packet 
 					 * is multicast and not for receive */
-					goto end_of_interupt;
+					goto end_of_interrupt;
 				}
 			}
 #endif				// ARLAN_MULTICAST
@@ -1728,7 +1728,7 @@ static void arlan_rx_interrupt(struct net_device *dev, u_char rxStatus, u_short 
 		break;
 		
 		default:
-			printk(KERN_ERR "arlan intr: recieved unknown status\n");
+			printk(KERN_ERR "arlan intr: received unknown status\n");
 			priv->stats.rx_crc_errors++;
 			break;
 	}
@@ -1896,7 +1896,7 @@ static int arlan_close(struct net_device *dev)
 	return 0;
 }
 
-#ifdef ARLAN_DEBUGING
+#ifdef ARLAN_DEBUGGING
 static long alignLong(volatile u_char * ptr)
 {
 	long ret;

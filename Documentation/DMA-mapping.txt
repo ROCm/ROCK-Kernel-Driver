@@ -71,12 +71,35 @@ address during PCI bus mastering you might do something like:
 	if (! pci_dma_supported(pdev, 0x00ffffff))
 		goto ignore_this_device;
 
+When DMA is possible for a given mask, the PCI layer must be informed of the
+mask for later allocation operations on the device.  This is achieved by
+setting the dma_mask member of the pci_dev structure, like so:
+
+#define MY_HW_DMA_MASK 0x00ffffff
+
+	if (! pci_dma_supported(pdev, MY_HW_DMA_MASK))
+		goto ignore_this_device;
+
+	pdev->dma_mask = MY_HW_DMA_MASK;
+
+A helper function is provided which performs this common code sequence:
+
+	int pci_set_dma_mask(struct pci_dev *pdev, dma_addr_t device_mask)
+
+Unlike pci_dma_supported(), this returns -EIO when the PCI layer will not be
+able to DMA with addresses restricted by that mask, and returns 0 when DMA
+transfers are possible.  If the call succeeds, the dma_mask will have been
+updated so that your driver need not worry about it.
+
 There is a case which we are aware of at this time, which is worth
 mentioning in this documentation.  If your device supports multiple
 functions (for example a sound card provides playback and record
 functions) and the various different functions have _different_
 DMA addressing limitations, you may wish to probe each mask and
-only provide the functionality which the machine can handle.
+only provide the functionality which the machine can handle.  It
+is important that the last call to pci_set_dma_mask() be for the 
+most specific mask.
+
 Here is pseudo-code showing how this might be done:
 
 	#define PLAYBACK_ADDRESS_BITS	0xffffffff
@@ -86,14 +109,14 @@ Here is pseudo-code showing how this might be done:
 	struct pci_dev *pdev;
 
 	...
-	if (pci_dma_supported(pdev, PLAYBACK_ADDRESS_BITS)) {
+	if (pci_set_dma_mask(pdev, PLAYBACK_ADDRESS_BITS)) {
 		card->playback_enabled = 1;
 	} else {
 		card->playback_enabled = 0;
 		printk(KERN_WARN "%s: Playback disabled due to DMA limitations.\n",
 		       card->name);
 	}
-	if (pci_dma_supported(pdev, RECORD_ADDRESS_BITS)) {
+	if (pci_set_dma_mask(pdev, RECORD_ADDRESS_BITS)) {
 		card->record_enabled = 1;
 	} else {
 		card->record_enabled = 0;

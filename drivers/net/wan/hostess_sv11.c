@@ -34,7 +34,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>
-#include "syncppp.h"
+#include <net/syncppp.h>
 #include "z85230.h"
 
 static int dma;
@@ -59,7 +59,7 @@ static void hostess_input(struct z8530_channel *c, struct sk_buff *skb)
 {
 	/* Drop the CRC - its not a good idea to try and negotiate it ;) */
 	skb_trim(skb, skb->len-2);
-	skb->protocol=htons(ETH_P_WAN_PPP);
+	skb->protocol=__constant_htons(ETH_P_WAN_PPP);
 	skb->mac.raw=skb->data;
 	skb->dev=c->netdevice;
 	/*
@@ -67,6 +67,7 @@ static void hostess_input(struct z8530_channel *c, struct sk_buff *skb)
 	 *	it right now.
 	 */
 	netif_rx(skb);
+	c->netdevice->last_rx = jiffies;
 }
  
 /*

@@ -33,7 +33,7 @@
 #define SR_RX_INT_ENA   0x80    /* receiver interrupt enable bit */
 
 /* status register - input bits */
-#define SR_USR_RQ       0x20    /* user interupt request pending */
+#define SR_USR_RQ       0x20    /* user interrupt request pending */
 #define SR_TX_RDY       0x40    /* transmitter empty (ready) */
 #define SR_RX_RDY       0x80    /* receiver data ready */
 

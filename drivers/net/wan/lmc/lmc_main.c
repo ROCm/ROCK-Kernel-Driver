@@ -67,7 +67,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-#include "../syncppp.h"
+#include <net/syncppp.h>
 #include <linux/inet.h>
 
 #if LINUX_VERSION_CODE >= 0x20200
@@ -77,15 +77,7 @@
 #define ARPHRD_HDLC 513
 #endif
 
-#ifdef MODULE
-#ifdef MODVERSIONS
-#include <linux/modversions.h>
-#endif
 #include <linux/module.h>
-#else
-#define MOD_INC_USE_COUNT
-#define MOD_DEC_USE_COUNT
-#endif
 
 #define DRIVER_MAJOR_VERSION     1
 #define DRIVER_MINOR_VERSION    34
@@ -166,7 +158,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
 
     /*
      * Most functions mess with the structure
-     * Disable interupts while we do the polling
+     * Disable interrupts while we do the polling
      */
     spin_lock_irqsave(&sc->lmc_lock, flags);
 
@@ -546,7 +538,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                     udelay(50);
 
                     /*
-                     * Clear reset and activate programing lines
+                     * Clear reset and activate programming lines
                      * Reset: Input
                      * DP:    Input
                      * Clock: Output
@@ -584,7 +576,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                             sc->lmc_gpio |= LMC_GEP_DATA; /* Data is 1 */
                             break;
                         default:
-                            printk(KERN_WARNING "%s Bad data in xilinx programing data at %d, got %d wanted 0 or 1\n", dev->name, pos, data[pos]);
+                            printk(KERN_WARNING "%s Bad data in xilinx programming data at %d, got %d wanted 0 or 1\n", dev->name, pos, data[pos]);
                             sc->lmc_gpio |= LMC_GEP_DATA; /* Assume it's 1 */
                         }
                         sc->lmc_gpio &= ~LMC_GEP_CLK; /* Clock to zero */
@@ -598,13 +590,13 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                         udelay(1);
                     }
                     if((LMC_CSR_READ(sc, csr_gp) & LMC_GEP_INIT) == 0){
-                        printk(KERN_WARNING "%s: Reprograming FAILED. Needs to be reprogramed. (corrupted data)\n", dev->name);
+                        printk(KERN_WARNING "%s: Reprogramming FAILED. Needs to be reprogrammed. (corrupted data)\n", dev->name);
                     }
                     else if((LMC_CSR_READ(sc, csr_gp) & LMC_GEP_DP) == 0){
-                        printk(KERN_WARNING "%s: Reprograming FAILED. Needs to be reprogramed. (done)\n", dev->name);
+                        printk(KERN_WARNING "%s: Reprogramming FAILED. Needs to be reprogrammed. (done)\n", dev->name);
                     }
                     else {
-                        printk(KERN_DEBUG "%s: Done reprograming Xilinx, %d bits, good luck!\n", dev->name, pos);
+                        printk(KERN_DEBUG "%s: Done reprogramming Xilinx, %d bits, good luck!\n", dev->name, pos);
                     }
 
                     lmc_gpio_mkinput(sc, 0xff);
@@ -662,12 +654,13 @@ static void lmc_watchdog (unsigned long data) /*fold00*/
 
     if(sc->check != 0xBEAFCAFE){
         printk("LMC: Corrupt net_device stuct, breaking out\n");
+	spin_unlock_irqrestore(&sc->lmc_lock, flags);
         return;
     }
 
 
     /* Make sure the tx jabber and rx watchdog are off,
-     * and the transmit and recieve processes are running.
+     * and the transmit and receive processes are running.
      */
 
     LMC_CSR_WRITE (sc, csr_15, 0x00000011);
@@ -793,7 +786,7 @@ static void lmc_watchdog (unsigned long data) /*fold00*/
     if(sc->failed_recv_alloc == 1){
         /*
          * We failed to alloc mem in the
-         * interupt halder, go through the rings
+         * interrupt handler, go through the rings
          * and rebuild them
          */
         sc->failed_recv_alloc = 0;
@@ -1356,7 +1349,7 @@ static int lmc_ifdown (struct net_device *dev) /*fold00*/
     /* Stop Tx and Rx on the chip */
     csr6 = LMC_CSR_READ (sc, csr_command);
     csr6 &= ~LMC_DEC_ST;		/* Turn off the Transmission bit */
-    csr6 &= ~LMC_DEC_SR;		/* Turn off the Recieve bit */
+    csr6 &= ~LMC_DEC_SR;		/* Turn off the Receive bit */
     LMC_CSR_WRITE (sc, csr_command, csr6);
 
     dev->flags &= ~IFF_RUNNING;
@@ -1425,7 +1418,7 @@ static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*
     spin_lock(&sc->lmc_lock);
 
     /*
-     * Read the csr to find what interupts we have (if any)
+     * Read the csr to find what interrupts we have (if any)
      */
     csr = LMC_CSR_READ (sc, csr_status);
 
@@ -1441,7 +1434,7 @@ static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*
     /* always go through this loop at least once */
     while (csr & sc->lmc_intrmask) {
         /*
-         * Clear interupt bits, we handle all case below
+         * Clear interrupt bits, we handle all case below
          */
         LMC_CSR_WRITE (sc, csr_status, csr);
 
@@ -1464,7 +1457,7 @@ static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*
         }
         
         if (csr & TULIP_STS_RXINTR){
-            lmc_trace(dev, "rx interupt");
+            lmc_trace(dev, "rx interrupt");
             lmc_rx (dev);
             
         }
@@ -1588,7 +1581,7 @@ static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*
         
         /*
          * Get current csr status to make sure
-         * we've cleared all interupts
+         * we've cleared all interrupts
          */
         csr = LMC_CSR_READ (sc, csr_status);
     }				/* end interrupt loop */
@@ -1599,8 +1592,6 @@ lmc_int_fail_out:
     spin_unlock(&sc->lmc_lock);
 
     lmc_trace(dev, "lmc_interrupt out");
-
-    return;
 }
 
 static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00*/
@@ -1879,12 +1870,12 @@ static int lmc_rx (struct net_device *dev) /*fold00*/
                 sc->lmc_rxq[i] = nsb;
                 nsb->dev = dev;
                 sc->lmc_rxring[i].buffer1 = virt_to_bus (nsb->tail);
-                /* Transfered to 21140 below */
+                /* Transferred to 21140 below */
             }
             else {
                 /*
                  * We've run out of memory, stop trying to allocate
-                 * memory and exit the interupt handler
+                 * memory and exit the interrupt handler
                  *
                  * The chip may run out of receivers and stop
                  * in which care we'll try to allocate the buffer
@@ -2129,7 +2120,7 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
 
     lmc_trace(sc->lmc_device, "lmc_softreset in");
 
-    /* Initialize the recieve rings and buffers. */
+    /* Initialize the receive rings and buffers. */
     sc->lmc_txfull = 0;
     sc->lmc_next_rx = 0;
     sc->lmc_next_tx = 0;
@@ -2138,7 +2129,7 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
 
     /*
      * Setup each one of the receiver buffers
-     * allocate an skbuff for each one, setup the the descriptor table
+     * allocate an skbuff for each one, setup the descriptor table
      * and point each buffer at the next one
      */
 

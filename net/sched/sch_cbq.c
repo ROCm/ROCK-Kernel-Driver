@@ -506,7 +506,7 @@ static void cbq_ovl_classic(struct cbq_class *cl)
 			}
 		}
 
-		q->wd_expires = delay;
+		q->wd_expires = base_delay;
 	}
 }
 

@@ -177,7 +177,7 @@ acpi_ev_remove_sci_handler (void)
  * PARAMETERS:  Event       Event that generated an SCI.
  *
  * RETURN:      Number of SCI's for requested event since last time
- *              Sci_occured() was called for this event.
+ *              Sci_occurred() was called for this event.
  *
  * DESCRIPTION: Checks to see if SCI has been generated from requested source
  *              since the last time this function was called.

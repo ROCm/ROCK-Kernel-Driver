@@ -680,6 +680,18 @@ pci_set_master(struct pci_dev *dev)
 	pcibios_set_master(dev);
 }
 
+int
+pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask)
+{
+    if(! pci_dma_supported(dev, mask))
+        return -EIO;
+
+    dev->dma_mask = mask;
+
+    return 0;
+}
+    
+
 /*
  * Translate the low bits of the PCI base
  * to the resource type
@@ -1377,6 +1389,7 @@ EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_set_master);
+EXPORT_SYMBOL(pci_set_dma_mask);
 EXPORT_SYMBOL(pci_set_power_state);
 EXPORT_SYMBOL(pci_assign_resource);
 EXPORT_SYMBOL(pci_register_driver);

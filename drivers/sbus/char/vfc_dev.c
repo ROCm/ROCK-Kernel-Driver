@@ -362,7 +362,7 @@ static int vfc_set_control_ioctl(struct inode *inode, struct file *file,
 		vfc_capture_poll(dev);
 		break;
 	case DIAGMODE:
-		if(suser()) {
+		if(capable(CAP_SYS_ADMIN)) {
 			vfc_lock_device(dev);
 			dev->control_reg |= VFC_CONTROL_DIAGMODE;
 			sbus_writel(dev->control_reg, &dev->regs->control);

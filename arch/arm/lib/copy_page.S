@@ -11,7 +11,7 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
-#include "constants.h"
+#include <asm/constants.h>
 
 		.text
 		.align	5

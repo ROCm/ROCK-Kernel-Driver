@@ -14,8 +14,8 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/procinfo.h>
-#include "../lib/constants.h"
 
 /*
  * MEMC workhorse code.  It's both a horse which things it's a pig.

@@ -185,7 +185,7 @@ static const char *arlan_hardware_type_string(struct net_device *dev)
 			return "type A672T";
 	}
 }
-#ifdef ARLAN_DEBUGING
+#ifdef ARLAN_DEBUGGING
 static void arlan_print_diagnostic_info(struct net_device *dev)
 {
 	int i;
@@ -341,7 +341,7 @@ static int arlan_setup_card_by_book(struct net_device *dev)
 	DEBUGSHM(4, "arlan configuredStatus = %d \n", arlan->configuredStatusFlag, u_char);
 	DEBUGSHM(4, "arlan driver diagnostic: 0x%2x\n", arlan->diagnosticInfo, u_char);
 
-	/* issue nop command - no interupt */
+	/* issue nop command - no interrupt */
 	arlan_command(dev, ARLAN_COMMAND_NOOP);
 	if (arlan_command(dev, ARLAN_COMMAND_WAIT_NOW) != 0)
 		return -1;
@@ -818,7 +818,7 @@ static int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
 #define CTBLN(num,card,nam) \
         {num , #nam, &(arlan_conf[card].nam), \
          sizeof(int), 0600, NULL, &proc_dointvec}
-#ifdef ARLAN_DEBUGING
+#ifdef ARLAN_DEBUGGING
 
 #define ARLAN_PROC_DEBUG_ENTRIES	{48, "entry_exit_debug", &arlan_entry_and_exit_debug, \
                 sizeof(int), 0600, NULL, &proc_dointvec},\

@@ -11,7 +11,7 @@
  *   Little mods for all variable to reside either into rodata or bss segments
  *   by marking constant variables with 'const' and initializing all the others
  *   at run-time only.  This allows for the kernel uncompressor to run
- *   directly from Flash or ROM memory on embeded systems.
+ *   directly from Flash or ROM memory on embedded systems.
  */
 
 /*

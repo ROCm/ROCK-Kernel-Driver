@@ -395,7 +395,7 @@ typedef struct {
 /* OPEN Options (high-low) */
 #define WRAP_INTERFACE		0x0080	/* Inserting omitted for test
 					 * purposes; transmit data appears
-					 * as receive data. (usefull for
+					 * as receive data. (useful for
 					 * testing; change: CLOSE necessary)
 					 */
 #define DISABLE_HARD_ERROR	0x0040	/* On HARD_ERROR & TRANSMIT_BEACON

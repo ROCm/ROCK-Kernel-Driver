@@ -2140,7 +2140,7 @@ typedef union md_mb_ecc_config_u {
  * corresponds to the valid bit, and bit 1 of each two-bit field        *
  * corresponds to the overrun bit.                                      *
  * The rule for the valid bit is that it gets set whenever that error   *
- * occurs, regardless of whether a higher priority error has occured.   *
+ * occurs, regardless of whether a higher priority error has occurred.   *
  * The rule for the overrun bit is that it gets set whenever we are     *
  * unable to record the address information for this particular         *
  * error, due to a previous error of the same or higher priority.       *
@@ -2221,7 +2221,7 @@ typedef union md_mem_error_u {
  * corresponds to the valid bit, and bit 1 of each two-bit field        *
  * corresponds to the overrun bit.                                      *
  * The rule for the valid bit is that it gets set whenever that error   *
- * occurs, regardless of whether a higher priority error has occured.   *
+ * occurs, regardless of whether a higher priority error has occurred.  *
  * The rule for the overrun bit is that it gets set whenever we are     *
  * unable to record the address information for this particular         *
  * error, due to a previous error of the same or higher priority.       *

@@ -19,6 +19,8 @@
  *          Andrea Arcangeli
  */
 
+#undef DEBUG	/* undef for production */
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -42,13 +44,9 @@
 #include <asm/parport_gsc.h>
 
 
-#undef DEBUG	/* undef for production */
-
-#ifdef DEBUG
-#define DPRINTK  printk
-#else
-#define DPRINTK(stuff...)
-#endif
+MODULE_AUTHOR("Helge Deller <deller@gmx.de>");
+MODULE_DESCRIPTION("HP-PARISC PC-style parallel port driver");
+MODULE_SUPPORTED_DEVICE("integrated PC-style parallel port");
 
 
 /*
@@ -83,25 +81,18 @@ static int clear_epp_timeout(struct parport *pb)
 
 static void parport_gsc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	DPRINTK(__FILE__ ": got IRQ\n");
 	parport_generic_irq(irq, (struct parport *) dev_id, regs);
 }
 
 void parport_gsc_write_data(struct parport *p, unsigned char d)
 {
-	DPRINTK(__FILE__ ": write (0x%02x) %c \n", d, d);
 	parport_writeb (d, DATA (p));
 }
 
 unsigned char parport_gsc_read_data(struct parport *p)
 {
-#ifdef DEBUG
 	unsigned char c = parport_readb (DATA (p));
-	DPRINTK(__FILE__ ": read (0x%02x) %c\n", c,c);
 	return c;
-#else
-	return parport_readb (DATA (p));
-#endif
 }
 
 void parport_gsc_write_control(struct parport *p, unsigned char d)
@@ -113,8 +104,8 @@ void parport_gsc_write_control(struct parport *p, unsigned char d)
 
 	/* Take this out when drivers have adapted to the newer interface. */
 	if (d & 0x20) {
-		printk (KERN_DEBUG "%s (%s): use data_reverse for this!\n",
-			p->name, p->cad->name);
+		pr_debug("%s (%s): use data_reverse for this!\n",
+			    p->name, p->cad->name);
 		parport_gsc_data_reverse (p);
 	}
 
@@ -141,7 +132,7 @@ unsigned char parport_gsc_frob_control (struct parport *p, unsigned char mask,
 
 	/* Take this out when drivers have adapted to the newer interface. */
 	if (mask & 0x20) {
-		printk (KERN_DEBUG "%s (%s): use data_%s for this!\n",
+		pr_debug("%s (%s): use data_%s for this!\n",
 			p->name, p->cad->name,
 			(val & 0x20) ? "reverse" : "forward");
 		if (val & 0x20)
@@ -199,16 +190,12 @@ void parport_gsc_restore_state(struct parport *p, struct parport_state *s)
 
 void parport_gsc_inc_use_count(void)
 {
-#ifdef MODULE
 	MOD_INC_USE_COUNT;
-#endif
 }
 
 void parport_gsc_dec_use_count(void)
 {
-#ifdef MODULE
 	MOD_DEC_USE_COUNT;
-#endif
 }
 
 
@@ -360,8 +347,12 @@ struct parport *__devinit parport_gsc_probe_port (unsigned long base,
 	struct parport tmp;
 	struct parport *p = &tmp;
 
+#if 1
+#warning Take this out when region handling works again, <deller@gmx,de>
+#else
 	if (check_region(base, 3)) 
 	    return NULL;
+#endif
 	    
 	priv = kmalloc (sizeof (struct parport_gsc_private), GFP_KERNEL);
 	if (!priv) {
@@ -474,8 +465,7 @@ struct parport *__devinit parport_gsc_probe_port (unsigned long base,
 
 static int __initdata parport_count;
 
-static int __init 
-parport_init_chip(struct hp_device *d, struct pa_iodc_driver *dri)
+static int __init parport_init_chip(struct hp_device *d, struct pa_iodc_driver *dri)
 {
 	unsigned long port;
 	int irq;
@@ -515,32 +505,22 @@ static struct pa_iodc_driver parport_drivers_for[] __initdata = {
   { 0 }
 };
 
-int __init 
-parport_gsc_init ( void )
+int __init parport_gsc_init(void)
 {
 	parport_count = 0;
 	
 	register_driver(parport_drivers_for);
 
-	return parport_count;
+	return 0;
 }
 
-/* Exported symbols. */
-EXPORT_NO_SYMBOLS;
 
-
-#ifdef MODULE
-
-MODULE_AUTHOR("Helge Deller <deller@gmx.de>");
-MODULE_DESCRIPTION("HP-PARISC PC-style parallel port driver");
-MODULE_SUPPORTED_DEVICE("integrated PC-style parallel port");
-
-int init_module(void)
+static int __init parport_gsc_init_module(void)
 {	
-	return !parport_gsc_init ();
+	return !parport_gsc_init();
 }
 
-void cleanup_module(void)
+static void __exit parport_gsc_exit_module(void)
 {
 	struct parport *p = parport_enumerate(), *tmp;
 	while (p) {
@@ -569,4 +549,8 @@ void cleanup_module(void)
 		p = tmp;
 	}
 }
-#endif
+
+EXPORT_NO_SYMBOLS;
+
+module_init(parport_gsc_init_module);
+module_exit(parport_gsc_exit_module);

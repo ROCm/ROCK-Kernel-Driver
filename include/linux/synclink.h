@@ -6,7 +6,7 @@
  * Copyright (C) 1998-2000 by Microgate Corporation
  * 
  * Redistribution of this file is permitted under 
- * the terms of the GNU Public License (GPL)
+ * the terms of the GNU General Public License (GPL)
  */
 
 #ifndef _SYNCLINK_H_

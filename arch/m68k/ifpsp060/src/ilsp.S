@@ -514,7 +514,7 @@ _060LSP__imulu64_:
 #	fmovm.l		&0x0,-(%sp)		# save no fpregs
 # PROLOGUE END ##########################################################
 
-	mov.w		%cc,MUL64_CC(%a6)	# save incomming ccodes
+	mov.w		%cc,MUL64_CC(%a6)	# save incoming ccodes
 
 	mov.l		0x8(%a6),%d0		# store multiplier in d0
 	beq.w		mulu64_zero		# handle zero separately
@@ -625,7 +625,7 @@ _060LSP__imuls64_:
 #	fmovm.l		&0x0,-(%sp)		# save no fpregs
 # PROLOGUE END ##########################################################
 
-	mov.w		%cc,MUL64_CC(%a6)	# save incomming ccodes
+	mov.w		%cc,MUL64_CC(%a6)	# save incoming ccodes
 
 	mov.l		0x8(%a6),%d0		# store multiplier in d0
 	beq.b		mulu64_zero		# handle zero separately

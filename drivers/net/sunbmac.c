@@ -1,4 +1,4 @@
-/* $Id: sunbmac.c,v 1.23 2001/01/20 03:36:40 davem Exp $
+/* $Id: sunbmac.c,v 1.25 2001/02/18 08:10:21 davem Exp $
  * sunbmac.c: Driver for Sparc BigMAC 100baseT ethernet adapters.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -902,19 +902,15 @@ static void bigmac_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static int bigmac_open(struct net_device *dev)
 {
 	struct bigmac *bp = (struct bigmac *) dev->priv;
-	int res;
+	int ret;
 
-	if (request_irq(dev->irq, &bigmac_interrupt,
-			SA_SHIRQ, "BIG MAC", (void *) bp)) {
+	ret = request_irq(dev->irq, &bigmac_interrupt, SA_SHIRQ, dev->name, bp);
+	if (ret) {
 		printk(KERN_ERR "BIGMAC: Can't order irq %d to go.\n", dev->irq);
-		return -EAGAIN;
+		return ret;
 	}
 	init_timer(&bp->bigmac_timer);
-	res = bigmac_init(bp, 0);
-	if (!res) {
-		MOD_INC_USE_COUNT;
-	}
-	return res;
+	return bigmac_init(bp, 0);
 }
 
 static int bigmac_close(struct net_device *dev)
@@ -928,7 +924,6 @@ static int bigmac_close(struct net_device *dev)
 	bigmac_stop(bp);
 	bigmac_clean_rings(bp);
 	free_irq(dev->irq, (void *)bp);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1058,7 +1053,10 @@ static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec
 	int i;
 
 	/* Get a new device struct for this interface. */
-	dev = init_etherdev(0, sizeof(struct bigmac));
+	dev = init_etherdev(NULL, sizeof(struct bigmac));
+	if (!dev)
+		return -ENOMEM;
+	SET_MODULE_OWNER(dev);
 
 	if (version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
@@ -1075,7 +1073,7 @@ static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec
 	printk("\n");
 
 	/* Setup softc, with backpointers to QEC and BigMAC SBUS device structs. */
-	bp = (struct bigmac *) dev->priv;
+	bp = dev->priv;
 	bp->qec_sdev = qec_sdev;
 	bp->bigmac_sdev = qec_sdev->child;
 

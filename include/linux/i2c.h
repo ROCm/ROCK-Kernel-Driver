@@ -454,7 +454,7 @@ union i2c_smbus_data {
  *	corresponding header files.
  */
 				/* -> bit-adapter specific ioctls	*/
-#define I2C_RETRIES	0x0701	/* number times a device adress should	*/
+#define I2C_RETRIES	0x0701	/* number times a device address should	*/
 				/* be polled when not acknowledging 	*/
 #define I2C_TIMEOUT	0x0702	/* set timeout - call with int 		*/
 
@@ -471,7 +471,7 @@ union i2c_smbus_data {
 #define I2C_FUNCS	0x0705	/* Get the adapter functionality */
 #define I2C_RDWR	0x0707	/* Combined R/W transfer (one stop only)*/
 #if 0
-#define I2C_ACK_TEST	0x0710	/* See if a slave is at a specific adress */
+#define I2C_ACK_TEST	0x0710	/* See if a slave is at a specific address */
 #endif
 
 #define I2C_SMBUS	0x0720	/* SMBus-level access */

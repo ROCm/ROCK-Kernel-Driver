@@ -167,6 +167,7 @@ smb_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 	struct inode *newino, *inode = dentry->d_inode;
 	struct smb_cache_control ctl = *ctrl;
 	int valid = 0;
+	int hashed = 0;
 	ino_t ino = 0;
 
 	qname->hash = full_name_hash(qname->name, qname->len);
@@ -181,9 +182,11 @@ smb_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 		newdent = d_alloc(dentry, qname);
 		if (!newdent)
 			goto end_advance;
-	} else
+	} else {
+		hashed = 1;
 		memcpy((char *) newdent->d_name.name, qname->name,
 		       newdent->d_name.len);
+	}
 
 	if (!newdent->d_inode) {
 		smb_renew_times(newdent);
@@ -191,7 +194,9 @@ smb_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 		newino = smb_iget(inode->i_sb, entry);
 		if (newino) {
 			smb_new_dentry(newdent);
-			d_add(newdent, newino);
+			d_instantiate(newdent, newino);
+			if (!hashed)
+				d_rehash(newdent);
 		}
 	} else
 		smb_set_inode_attr(newdent->d_inode, entry);

@@ -29,13 +29,12 @@
 #include <linux/config.h>
 
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/errno.h>
 #include <asm/hardware.h>
 
-#include "../lib/constants.h"
-
 		.macro	zero_fp
-#ifdef CONFIG_FRAME_POINTER
+#ifndef CONFIG_NO_FRAME_POINTER
 		mov	fp, #0
 #endif
 		.endm

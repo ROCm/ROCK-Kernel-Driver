@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.23 2001/02/13 01:16:44 davem Exp $
+/* $Id: pci_sabre.c,v 1.25 2001/02/28 03:28:55 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -209,7 +209,7 @@
  * ---------------------------------------------------------
  */
 #define SABRE_CONFIG_BASE(PBM)	\
-	((PBM)->parent->config_space | (1UL << 24))
+	((PBM)->config_space | (1UL << 24))
 #define SABRE_CONFIG_ENCODE(BUS, DEVFN, REG)	\
 	(((unsigned long)(BUS)   << 16) |	\
 	 ((unsigned long)(DEVFN) << 8)  |	\
@@ -604,10 +604,11 @@ static int __init sabre_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 	return ret;
 }
 
-static unsigned int __init sabre_irq_build(struct pci_controller_info *p,
+static unsigned int __init sabre_irq_build(struct pci_pbm_info *pbm,
 					   struct pci_dev *pdev,
 					   unsigned int ino)
 {
+	struct pci_controller_info *p = pbm->parent;
 	struct ino_bucket *bucket;
 	unsigned long imap, iclr;
 	unsigned long imap_off, iclr_off;
@@ -961,6 +962,7 @@ static void sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define SABRE_PCIERR_INO	0x30
 static void __init sabre_register_error_handlers(struct pci_controller_info *p)
 {
+	struct pci_pbm_info *pbm = &p->pbm_A; /* arbitrary */
 	unsigned long base = p->controller_regs;
 	unsigned long irq, portid = p->portid;
 	u64 tmp;
@@ -973,7 +975,7 @@ static void __init sabre_register_error_handlers(struct pci_controller_info *p)
 		    (SABRE_UEAFSR_PDRD | SABRE_UEAFSR_PDWR |
 		     SABRE_UEAFSR_SDRD | SABRE_UEAFSR_SDWR |
 		     SABRE_UEAFSR_SDTE | SABRE_UEAFSR_PDTE));
-	irq = sabre_irq_build(p, NULL, (portid << 6) | SABRE_UE_INO);
+	irq = sabre_irq_build(pbm, NULL, (portid << 6) | SABRE_UE_INO);
 	if (request_irq(irq, sabre_ue_intr,
 			SA_SHIRQ, "SABRE UE", p) < 0) {
 		prom_printf("SABRE%d: Cannot register UE interrupt.\n",
@@ -984,7 +986,7 @@ static void __init sabre_register_error_handlers(struct pci_controller_info *p)
 	sabre_write(base + SABRE_CE_AFSR,
 		    (SABRE_CEAFSR_PDRD | SABRE_CEAFSR_PDWR |
 		     SABRE_CEAFSR_SDRD | SABRE_CEAFSR_SDWR));
-	irq = sabre_irq_build(p, NULL, (portid << 6) | SABRE_CE_INO);
+	irq = sabre_irq_build(pbm, NULL, (portid << 6) | SABRE_CE_INO);
 	if (request_irq(irq, sabre_ce_intr,
 			SA_SHIRQ, "SABRE CE", p) < 0) {
 		prom_printf("SABRE%d: Cannot register CE interrupt.\n",
@@ -992,7 +994,7 @@ static void __init sabre_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 
-	irq = sabre_irq_build(p, NULL, (portid << 6) | SABRE_PCIERR_INO);
+	irq = sabre_irq_build(pbm, NULL, (portid << 6) | SABRE_PCIERR_INO);
 	if (request_irq(irq, sabre_pcierr_intr,
 			SA_SHIRQ, "SABRE PCIERR", p) < 0) {
 		prom_printf("SABRE%d: Cannot register PciERR interrupt.\n",
@@ -1434,8 +1436,10 @@ void __init sabre_init(int pnode)
 		     SABRE_PCICTRL_ARBPARK | SABRE_PCICTRL_AEN));
 
 	/* Now map in PCI config space for entire SABRE. */
-	p->config_space = p->controller_regs + SABRE_CONFIGSPACE;
-	printk("SABRE: PCI config space at %016lx\n", p->config_space);
+	p->pbm_A.config_space = p->pbm_B.config_space =
+		(p->controller_regs + SABRE_CONFIGSPACE);
+	printk("SABRE: Shared PCI config space at %016lx\n",
+	       p->pbm_A.config_space);
 
 	err = prom_getproperty(pnode, "virtual-dma",
 			       (char *)&vdma[0], sizeof(vdma));

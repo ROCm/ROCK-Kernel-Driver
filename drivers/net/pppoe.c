@@ -737,7 +737,7 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		err = 0;
 		break;
 
-	default:
+	default:;
 	};
 
 	return err;

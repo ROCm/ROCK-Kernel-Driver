@@ -139,7 +139,7 @@ static struct override {
     int board;	/* Use NCR53c400, Ricoh, etc. extensions ? */
 } overrides 
 #ifdef GENERIC_NCR5380_OVERRIDE 
-    [] __initdata = GENERIC_NCR5380_OVERRIDE
+    [] __initdata = GENERIC_NCR5380_OVERRIDE;
 #else
     [1] __initdata = {{0,},};
 #endif
@@ -911,6 +911,64 @@ MODULE_PARM(ncr_5380, "i");
 MODULE_PARM(ncr_53c400, "i");
 MODULE_PARM(ncr_53c400a, "i");
 MODULE_PARM(dtc_3181e, "i");
+
+#else
+
+static int __init do_NCR5380_setup(char *str)
+{
+        int ints[10];
+
+        get_options(str, sizeof(ints)/sizeof(int), ints);
+        generic_NCR5380_setup(str,ints);
+
+        return 1;
+}
+
+static int __init do_NCR53C400_setup(char *str)
+{
+        int ints[10];
+
+        get_options(str, sizeof(ints)/sizeof(int), ints);
+        generic_NCR53C400_setup(str,ints);
+
+        return 1;
+}
+
+static int __init do_NCR53C400A_setup(char *str)
+{
+        int ints[10];
+
+        get_options(str, sizeof(ints)/sizeof(int), ints);
+        generic_NCR53C400A_setup(str,ints);
+
+        return 1;
+}
+
+static int __init do_DTC3181E_setup(char *str)
+{
+        int ints[10];
+
+        get_options(str, sizeof(ints)/sizeof(int), ints);
+        generic_DTC3181E_setup(str,ints);
+
+        return 1;
+}
+
+__setup("ncr5380=", do_NCR5380_setup);
+__setup("ncr53c400=", do_NCR53C400_setup);
+__setup("ncr53c400a=", do_NCR53C400A_setup);
+__setup("dtc3181e=", do_DTC3181E_setup);
+
+static struct isapnp_device_id id_table[] __devinitdata = {
+	{
+		ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('D','T','C'), ISAPNP_FUNCTION(0x436e), 
+		0
+	},
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
 
 #endif
 

@@ -9,7 +9,7 @@
  * (c) Copyright 1999, Thomas Davis, tadavis@lbl.gov
  *
  *	This software may be used and distributed according to the terms
- *	of the GNU Public License, incorporated herein by reference.
+ *	of the GNU General Public License, incorporated herein by reference.
  * 
  */
 

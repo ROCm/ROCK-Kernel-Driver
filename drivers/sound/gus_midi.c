@@ -15,7 +15,7 @@
  *		Added __init to gus_midi_init()
  */
 
-#include "linux/init.h"
+#include <linux/init.h>
 #include "sound_config.h"
 
 #include "gus.h"

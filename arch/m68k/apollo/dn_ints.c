@@ -24,7 +24,7 @@ void dn_process_int(int irq, struct pt_regs *fp) {
     dn_irqs[irq-160].handler(irq,dn_irqs[irq-160].dev_id,fp);
   }
   else {
-    printk("spurious irq %d occured\n",irq);
+    printk("spurious irq %d occurred\n",irq);
   }
 
   *(volatile unsigned char *)(pica)=0x20;

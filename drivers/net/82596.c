@@ -40,8 +40,6 @@
 
  */
 
-static const char *version = "82596.c $Revision: 1.4 $\n";
-
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -64,6 +62,9 @@ static const char *version = "82596.c $Revision: 1.4 $\n";
 #include <asm/dma.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
+
+static char version[] __initdata =
+	"82596.c $Revision: 1.4 $\n";
 
 /* DEBUG flags
  */
@@ -333,7 +334,7 @@ struct i596_private {
 	spinlock_t lock;
 };
 
-char init_setup[] =
+static char init_setup[] =
 {
 	0x8E,			/* length, prefetch on */
 	0xC8,			/* fifo to 8, monitor off */
@@ -1132,9 +1133,9 @@ int __init i82596_probe(struct net_device *dev)
 		/* this is easy the ethernet interface can only be at 0x300 */
 		/* first check nothing is already registered here */
 
-		if (check_region(ioaddr, I596_TOTAL_SIZE)) {
+		if (!request_region(ioaddr, I596_TOTAL_SIZE, dev->name)) {
 			printk("82596: IO address 0x%04x in use\n", ioaddr);
-			return -ENODEV;
+			return -EBUSY;
 		}
 
 		for (i = 0; i < 8; i++) {
@@ -1144,19 +1145,15 @@ int __init i82596_probe(struct net_device *dev)
 
 		/* checksum is a multiple of 0x100, got this wrong first time
 		   some machines have 0x100, some 0x200. The DOS driver doesn't
-		   even bother with the checksum */
+		   even bother with the checksum.
+		   Some other boards trip the checksum.. but then appear as
+		   ether address 0. Trap these - AC */
 
-		if (checksum % 0x100)
+		if ((checksum % 0x100) || 
+		    (memcmp(eth_addr, "\x00\x00\x49", 3) != 0)) {
+			release_region(ioaddr, I596_TOTAL_SIZE);
 			return -ENODEV;
-
-		/* Some other boards trip the checksum.. but then appear as
-		 * ether address 0. Trap these - AC */
-
-		if (memcmp(eth_addr, "\x00\x00\x49", 3) != 0)
-			return -ENODEV;
-
-		if (!request_region(ioaddr, I596_TOTAL_SIZE, "i596"))
-			return -ENODEV;
+		}
 
 		dev->base_addr = ioaddr;
 		dev->irq = 10;

@@ -65,9 +65,6 @@ MODULE_PARM (iucv, "1-" __MODULE_STRING (MAX_DEVICES) "s");
 MODULE_PARM_DESC (iucv,
 		  "Specify the userids associated with iucv0-iucv9:\n"
 		  "iucv=userid1,userid2,...,userid10\n");
-#ifdef MODVERSIONS
-#include <linux/modversions.h>
-#endif
 #else
 #define MOD_INC_USE_COUNT
 #define MOD_DEC_USE_COUNT

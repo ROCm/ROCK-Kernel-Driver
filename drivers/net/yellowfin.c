@@ -446,7 +446,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	np->chip_id = chip_idx;
 	np->drv_flags = drv_flags;
 
-	if (dev->mem_start && dev->mem_start != ~0)
+	if (dev->mem_start)
 		option = dev->mem_start;
 
 	/* The lower four bits are the media type. */

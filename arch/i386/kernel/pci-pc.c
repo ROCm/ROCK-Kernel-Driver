@@ -861,6 +861,8 @@ static void __init pci_fixup_serverworks(struct pci_dev *d)
 	}
 }
 
+#if 0
+/* Our bus code shouldnt need this fixup any more. Delete once verified */
 /*	
  * Compaq host bridges -- Find and scan all secondary buses.
  * This time registers 0xc8 and 0xc9.
@@ -878,6 +880,7 @@ static void __init pci_fixup_compaq(struct pci_dev *d)
 		printk("PCI: Compaq host bridge: last bus %02x\n", busno2);
 	}
 }
+#endif	
 
 static void __init pci_fixup_umc_ide(struct pci_dev *d)
 {
@@ -934,35 +937,75 @@ static void __init pci_fixup_latency(struct pci_dev *d)
 	pcibios_max_latency = 32;
 }
 
+static void __init pci_fixup_via_acpi(struct pci_dev *d)
+{
+	/*
+	 * VIA ACPI device: IRQ line in PCI config byte 0x42
+	 */
+	u8 irq;
+	pci_read_config_byte(d, 0x42, &irq);
+	irq &= 0x0f;
+	if (irq && (irq != 2))
+		d->irq = irq;
+}
+
+static void __init pci_fixup_piix4_acpi(struct pci_dev *d)
+{
+	/*
+	 * PIIX4 ACPI device: hardwired IRQ9
+	 */
+	d->irq = 9;
+}
+
 static void __init pci_fixup_vt8363(struct pci_dev *d)
 {
 	/*
-	 *  VIA VT8363 host bridge has broken feature 'PCI Master Read
-	 *  Caching'. It caches more than is good for it, sometimes
-	 *  serving the bus master with stale data. Some BIOSes enable
-	 *  it by default, so we disable it.
+	 * The VIA bridge will corrupt disks without these settings.
 	 */
 	u8 tmp;
+	pci_read_config_byte(d, 0x54, &tmp);
+	if(tmp & (1<<2)) {
+		printk("PCI: Bus master Pipeline request disabled\n");
+		pci_write_config_byte(d, 0x54, tmp & ~(1<<2));
+	}
 	pci_read_config_byte(d, 0x70, &tmp);
-	if(tmp & 4) {
-		printk("PCI: Bus master read caching disabled\n");
-		pci_write_config_byte(d, 0x70, tmp & ~4);
+	if(tmp & (1<<3)) {
+		printk("PCI: Disabled enhanced CPU to PCI writes\n");
+		pci_write_config_byte(d, 0x70, tmp & ~(1<<3));
+	}
+	pci_read_config_byte(d, 0x71, &tmp);
+	if(tmp & (1<<3)) {
+		printk("PCI: Bursting cornercase bug worked around\n");
+		pci_write_config_byte(d, 0x71, tmp | (1<<3));
+	}
+	pci_read_config_byte(d, 0x76, &tmp);
+	if(tmp & (1<<7)) {
+		printk("PCI: Post Write Fail set to Retry\n");
+		pci_write_config_byte(d, 0x76, tmp & ~(1<<7));
 	}
 }
 
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82454GX,	pci_fixup_i450gx },
+#if 0
+/* Until we get proper handling pray the BIOS gets it right */
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	PCI_DEVICE_ID_SERVERWORKS_HE,		pci_fixup_serverworks },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	PCI_DEVICE_ID_SERVERWORKS_LE,		pci_fixup_serverworks },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	PCI_DEVICE_ID_SERVERWORKS_CMIC_HE,	pci_fixup_serverworks },
+#endif	
+#if 0
+/* Our bus code shouldnt need this fixup any more. Delete once verified */
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_COMPAQ,	PCI_DEVICE_ID_COMPAQ_6010,	pci_fixup_compaq },
+#endif	
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_UMC,	PCI_DEVICE_ID_UMC_UM8886BF,	pci_fixup_umc_ide },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5513,		pci_fixup_ide_trash },
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pci_fixup_ide_bases },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		pci_fixup_latency },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_vt8363 },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	pci_fixup_via_acpi },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	pci_fixup_via_acpi },
+ 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_vt8363 },	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
 	{ 0 }
 };
 

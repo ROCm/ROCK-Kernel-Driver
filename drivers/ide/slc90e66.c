@@ -181,7 +181,7 @@ static byte slc90e66_dma_2_pio (byte xfer_rate) {
 
 /*
  *  Based on settings done by AMI BIOS
- *  (might be usefull if drive is not registered in CMOS for any reason).
+ *  (might be useful if drive is not registered in CMOS for any reason).
  */
 static void slc90e66_tune_drive (ide_drive_t *drive, byte pio)
 {

@@ -29,7 +29,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-#include "../syncppp.h"
+#include <net/syncppp.h>
 #include <linux/inet.h>
 
 #if LINUX_VERSION_CODE >= 0x20200

@@ -182,7 +182,8 @@ extern __inline__ long strnlen_user(const char *s, long n)
 #define __put_user_nocheck(x,ptr,size)					\
 ({									\
 	long __pu_err = 0;						\
-	__put_user_size((x),(ptr),(size),__pu_err);			\
+	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	__put_user_size((x),__pu_addr,(size),__pu_err);			\
 	__pu_err;							\
 })
 

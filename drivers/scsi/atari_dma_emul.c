@@ -131,7 +131,7 @@ static inline void set_restdata_reg(unsigned char *cur_addr)
  * 
  * 4. When this function is left, the address pointer (start_addr) is
  *    converted to a physical address. Because it points one byte
- *    further than the last transfered byte, it can point outside the
+ *    further than the last transferred byte, it can point outside the
  *    current page. If virt_to_phys() is called with this address we
  *    might get an access error. Therefore virt_to_phys() is called with
  *    start_addr - 1 if the count has reached zero. The result is

@@ -191,9 +191,11 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 {
 	uint32_t command;
 	u_long	 base;
+#ifdef MMAPIO
 	u_long	 start;
 	u_long	 base_page;
 	u_long	 base_offset;
+#endif
 	uint8_t *maddr;
 
 	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, 4);

@@ -81,7 +81,7 @@ fi
 
 mainmenu_option next_comment
 comment 'QoS and/or fair queueing'
-bool 'QoS and/or fair queueing (EXPERIMENTAL)' CONFIG_NET_SCHED
+bool 'QoS and/or fair queueing' CONFIG_NET_SCHED
 if [ "$CONFIG_NET_SCHED" = "y" ]; then
    source net/sched/Config.in
 fi

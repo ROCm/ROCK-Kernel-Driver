@@ -54,7 +54,7 @@ o  binutils               2.9.1.0.25              # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  modutils               2.4.2                   # insmod -V
 o  e2fsprogs              1.19                    # tune2fs
-o  reiserfsprogs          3.x.0b                  # reiserfsck 2>&1|grep reiserfsprogs
+o  reiserfsprogs          3.x.0d                  # reiserfsck 2>&1|grep reiserfsprogs
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
@@ -316,7 +316,7 @@ o  <ftp://download.sourceforge.net/pub/sourceforge/e2fsprogs/e2fsprogs-1.19.src.
 
 Reiserfsprogs
 -------------
-o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfs_utils-3.6.25-fsck-3.x.0b.tar.gz>
+o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.0d.tar.gz>
 
 LVM toolset
 -----------

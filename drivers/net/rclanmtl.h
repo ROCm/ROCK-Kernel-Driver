@@ -97,7 +97,7 @@ typedef void (*PFNWAITCALLBACK)(void);  /* void argument avoids compiler complai
 typedef void (*PFNTXCALLBACK)(U32  Status,
                               U16  PcktCount,
                               PU32 BufferContext,
-                              U16  AdaterID);
+                              struct net_device *);
 
  /* 
  ** type PFNRXCALLBACK 

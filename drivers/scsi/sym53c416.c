@@ -183,14 +183,10 @@
 #define sym53c416_base_2 sym53c416_2
 #define sym53c416_base_3 sym53c416_3
 
-static unsigned short sym53c416_base = 0;
-static unsigned int sym53c416_irq = 0;
-static unsigned short sym53c416_base_1 = 0;
-static unsigned int sym53c416_irq_1 = 0;
-static unsigned short sym53c416_base_2 = 0;
-static unsigned int sym53c416_irq_2 = 0;
-static unsigned short sym53c416_base_3 = 0;
-static unsigned int sym53c416_irq_3 = 0;
+static unsigned int sym53c416_base[2] = {0,0};
+static unsigned int sym53c416_base_1[2] = {0,0};
+static unsigned int sym53c416_base_2[2] = {0,0};
+static unsigned int sym53c416_base_3[2] = {0,0};
 
 #endif
 
@@ -636,26 +632,26 @@ int sym53c416_detect(Scsi_Host_Template *tpnt)
   ints[0] = 2;
   if(sym53c416_base)
     {
-    ints[1] = sym53c416_base;
-    ints[2] = sym53c416_irq;
+    ints[1] = sym53c416_base[0];
+    ints[2] = sym53c416_base[1];
     sym53c416_setup(NULL, ints);
     }
   if(sym53c416_base_1)
     {
-    ints[1] = sym53c416_base_1;
-    ints[2] = sym53c416_irq_1;
+    ints[1] = sym53c416_base_1[0];
+    ints[2] = sym53c416_base_1[1];
     sym53c416_setup(NULL, ints);
     }
   if(sym53c416_base_2)
     {
-    ints[1] = sym53c416_base_2;
-    ints[2] = sym53c416_irq_2;
+    ints[1] = sym53c416_base_2[0];
+    ints[2] = sym53c416_base_2[1];
     sym53c416_setup(NULL, ints);
     }
   if(sym53c416_base_3)
     {
-    ints[1] = sym53c416_base_3;
-    ints[2] = sym53c416_irq_3;
+    ints[1] = sym53c416_base_3[0];
+    ints[2] = sym53c416_base_3[1];
     sym53c416_setup(NULL, ints);
     }
 #endif

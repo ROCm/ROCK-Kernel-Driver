@@ -1,4 +1,4 @@
-/* $Id: pbm.h,v 1.23 2001/01/11 16:26:45 davem Exp $
+/* $Id: pbm.h,v 1.25 2001/02/28 03:28:55 davem Exp $
  * pbm.h: UltraSparc PCI controller software state.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -144,6 +144,9 @@ struct pci_pbm_info {
 	struct resource			io_space;
 	struct resource			mem_space;
 
+	/* Base of PCI Config space, can be per-PBM or shared. */
+	unsigned long			config_space;
+
 	/* State of 66MHz capabilities on this PBM. */
 	int				is_66mhz_capable;
 	int				all_devs_66mhz;
@@ -164,11 +167,8 @@ struct pci_controller_info {
 	/* List of all PCI controllers. */
 	struct pci_controller_info	*next;
 
-	/* Physical address base of controller registers
-	 * and PCI config space.
-	 */
+	/* Physical address base of controller registers. */
 	unsigned long			controller_regs;
-	unsigned long			config_space;
 
 	/* Opaque 32-bit system bus Port ID. */
 	u32				portid;
@@ -184,7 +184,7 @@ struct pci_controller_info {
 
 	/* Operations which are controller specific. */
 	void (*scan_bus)(struct pci_controller_info *);
-	unsigned int (*irq_build)(struct pci_controller_info *, struct pci_dev *, unsigned int);
+	unsigned int (*irq_build)(struct pci_pbm_info *, struct pci_dev *, unsigned int);
 	void (*base_address_update)(struct pci_dev *, int);
 	void (*resource_adjust)(struct pci_dev *, struct resource *, struct resource *);
 

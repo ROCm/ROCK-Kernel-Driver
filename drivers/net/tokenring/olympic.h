@@ -1,6 +1,6 @@
 /*
  *  olympic.h (c) 1999 Peter De Schrijver All Rights Reserved
- *                1999 Mike Phillips (phillim@amtrak.com)
+ *                1999 Mike Phillips (mikep@linuxtr.net)
  *
  *  Linux driver for IBM PCI tokenring cards based on the olympic and the PIT/PHY chipset.
  *
@@ -19,6 +19,7 @@
 #define BCTL 0x70
 #define BCTL_SOFTRESET (1<<15)
 #define BCTL_MIMREB (1<<6)
+#define BCTL_MODE_INDICATOR (1<<5)
 
 #define GPR 0x4a
 #define GPR_OPTI_BF (1<<6)
@@ -124,6 +125,9 @@
 #define TXSTATQCNT_2 0xe4
 #define TXCSA_1 0xc8
 #define TXCSA_2 0xe8
+/* Cardbus */
+#define FERMASK 0xf4
+#define FERMASK_INT_BIT (1<<15)
 
 #define OLYMPIC_IO_SPACE 256
 

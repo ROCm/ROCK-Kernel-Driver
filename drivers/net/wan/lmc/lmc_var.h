@@ -482,10 +482,10 @@ struct lmc___softc {
 
 #define TULIP_STS_NORMALINTR    0x00010000L /* (RW)  Normal Interrupt */
 #define TULIP_STS_ABNRMLINTR    0x00008000L /* (RW)  Abnormal Interrupt */
-#define TULIP_STS_ERI           0x00004000L /* (RW)  Early Receive Interupt */
+#define TULIP_STS_ERI           0x00004000L /* (RW)  Early Receive Interrupt */
 #define TULIP_STS_SYSERROR      0x00002000L /* (RW)  System Error */
 #define TULIP_STS_GTE           0x00000800L /* (RW)  General Pupose Timer Exp */
-#define TULIP_STS_ETI           0x00000400L /* (RW)  Early Transmit Interupt */
+#define TULIP_STS_ETI           0x00000400L /* (RW)  Early Transmit Interrupt */
 #define TULIP_STS_RXWT          0x00000200L /* (RW)  Receiver Watchdog Timeout */
 #define TULIP_STS_RXSTOPPED     0x00000100L /* (RW)  Receiver Process Stopped */
 #define TULIP_STS_RXNOBUF       0x00000080L /* (RW)  Receive Buf Unavail */

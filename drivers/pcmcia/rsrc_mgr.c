@@ -43,6 +43,7 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/timer.h>
+#include <linux/proc_fs.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 
@@ -251,7 +252,7 @@ static int do_mem_probe(u_long base, u_long num,
 	   base, base+num-1);
     bad = fail = 0;
     step = (num < 0x20000) ? 0x2000 : ((num>>4) & ~0x1fff);
-    for (i = base; i < base+num; i = j + step) {
+    for (i = j = base; i < base+num; i = j + step) {
 	if (!fail) {	
 	    for (j = i; j < base+num; j += step)
 		if ((check_mem_resource(j, step) == 0) && is_valid(j))

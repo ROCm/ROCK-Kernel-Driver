@@ -61,7 +61,7 @@ extern spinlock_t console_lock, timerlist_lock;
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
- * message out (timerlist_lock is aquired through the
+ * message out (timerlist_lock is acquired through the
  * console unblank code)
  */
 void bust_spinlocks(void)

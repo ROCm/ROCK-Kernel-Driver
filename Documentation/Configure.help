@@ -1989,6 +1989,40 @@ CONFIG_IP_NF_TARGET_MARK
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
 
+TCPMSS target support
+CONFIG_IP_NF_TARGET_TCPMSS
+  This option adds a `TCPMSS' target, which allows you to alter the
+  MSS value of TCP SYN packets, to control the maximum size for that
+  connection (usually limiting it to your outgoing interface's MTU
+  minus 40).
+
+  This is used to overcome criminally braindead ISPs or servers which
+  block ICMP Fragmentation Needed packets.  The symptoms of this
+  problem are that everything works fine from your Linux
+  firewall/router, but machines behind it can never exchange large
+  packets:
+	1) Web browsers connect, then hang with no data received.
+	2) Small mail works fine, but large emails hang.
+	3) ssh works fine, but scp hangs after initial handshaking.
+
+  Workaround: activate this option and add a rule to your firewall
+  configuration like:
+
+        iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN \
+		 -j TCPMSS --clamp-mss-to-pmtu
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+tcpmss match support
+CONFIG_IP_NF_MATCH_TCPMSS
+  This option adds a `tcpmss' match, which allows you to examine the
+  MSS value of TCP SYN packets, which control the maximum packet size
+  for that connection.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 LOG target support
 CONFIG_IP_NF_TARGET_LOG
   This option adds a `LOG' target, which allows you to create rules in
@@ -2018,6 +2052,73 @@ CONFIG_IP_NF_COMPAT_IPFWADM
 
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
+
+IP6 tables support (required for filtering/masq/NAT)
+CONFIG_IP6_NF_IPTABLES
+  ip6tables is a general, extensible packet identification framework.
+  Currently only the packet filtering and packet mangling subsystem
+  for IPv6 use this, but connection tracking is going to follow.
+  Say 'Y' or 'M' here if you want to use either of those.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+IPv6 limit match support
+CONFIG_IP6_NF_MATCH_LIMIT
+  limit matching allows you to control the rate at which a rule can be
+  matched: mainly useful in combination with the LOG target ("LOG
+  target support", below) and to avoid some Denial of Service attacks.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+MAC address match support
+CONFIG_IP6_NF_MATCH_MAC
+  mac matching allows you to match packets based on the source
+  ethernet address of the packet.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+netfilter mark match support
+CONFIG_IP6_NF_MATCH_MARK
+  Netfilter mark matching allows you to match packets based on the
+  `nfmark' value in the packet.  This can be set by the MARK target
+  (see below).
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Packet filtering
+CONFIG_IP6_NF_FILTER
+  Packet filtering defines a table `filter', which has a series of
+  rules for simple packet filtering at local input, forwarding and
+  local output.  See the man page for iptables(8).
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Packet mangling
+CONFIG_IP6_NF_MANGLE
+  This option adds a `mangle' table to iptables: see the man page for
+  iptables(8).  This table is used for various packet alterations
+  which can effect how the packet is routed.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+MARK target support
+CONFIG_IP6_NF_TARGET_MARK
+  This option adds a `MARK' target, which allows you to create rules
+  in the `mangle' table which alter the netfilter mark (nfmark) field
+  associated with the packet packet prior to routing. This can change
+  the routing method (see `IP: use netfilter MARK value as routing
+  key') and can also be used by other subsystems to change their
+  behavior.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 
 TCP Explicit Congestion Notification support
 CONFIG_INET_ECN

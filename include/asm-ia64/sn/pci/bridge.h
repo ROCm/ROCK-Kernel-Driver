@@ -373,7 +373,7 @@ typedef struct bridge_err_cmdword_s {
 				    ds:2,	/* Data size	  */
 				    gbr:1,	/* GBR enable	  */
 				    vbpm:1,	/* VBPM message	  */
-				    error:1,	/* Error occured  */
+				    error:1,	/* Error occurred  */
 				    barr:1,	/* Barrier op	  */
 				    rsvd:8;
 	} berr_st;
@@ -693,7 +693,7 @@ typedef volatile struct bridge_s {
 #define BRIDGE_INT_ADDR(x)	(BRIDGE_INT_ADDR0+(x)*BRIDGE_INT_ADDR_OFF)
 
 #define BRIDGE_INT_VIEW		0x000174	/* Interrupt view */
-#define BRIDGE_MULTIPLE_INT	0x00017c	/* Multiple interrupt occured */
+#define BRIDGE_MULTIPLE_INT	0x00017c	/* Multiple interrupt occurred */
 
 #define BRIDGE_FORCE_ALWAYS0	0x000184	/* Force an interrupt (always)*/
 #define BRIDGE_FORCE_ALWAYS_OFF 0x000008	/* Force Always offset */

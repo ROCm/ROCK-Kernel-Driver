@@ -1,4 +1,4 @@
-/* $Id: spitfire.h,v 1.10 2000/10/06 13:10:29 anton Exp $
+/* $Id: spitfire.h,v 1.11 2001/03/03 10:34:45 davem Exp $
  * spitfire.h: SpitFire/BlackBird/Cheetah inline MMU operations.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -28,6 +28,21 @@
 #define PHYS_WATCHPOINT		0x0000000000000040
 
 #ifndef __ASSEMBLY__
+
+enum ultra_tlb_layout {
+	spitfire = 0,
+	cheetah = 1
+};
+
+extern enum ultra_tlb_layout tlb_type;
+
+#define SPITFIRE_HIGHEST_LOCKED_TLBENT	(64 - 1)
+#define CHEETAH_HIGHEST_LOCKED_TLBENT	(16 - 1)
+
+#define sparc64_highest_locked_tlbent()	\
+	(tlb_type == spitfire ? \
+	 SPITFIRE_HIGHEST_LOCKED_TLBENT : \
+	 CHEETAH_HIGHEST_LOCKED_TLBENT)
 
 extern __inline__ unsigned long spitfire_get_isfsr(void)
 {
@@ -140,6 +155,10 @@ extern __inline__ unsigned long spitfire_get_dtlb_data(int entry)
 	__asm__ __volatile__("ldxa	[%1] %2, %0"
 			     : "=r" (data)
 			     : "r" (entry << 3), "i" (ASI_DTLB_DATA_ACCESS));
+
+	/* Clear TTE diag bits. */
+	data &= ~0x0003fe0000000000UL;
+
 	return data;
 }
 
@@ -168,6 +187,10 @@ extern __inline__ unsigned long spitfire_get_itlb_data(int entry)
 	__asm__ __volatile__("ldxa	[%1] %2, %0"
 			     : "=r" (data)
 			     : "r" (entry << 3), "i" (ASI_ITLB_DATA_ACCESS));
+
+	/* Clear TTE diag bits. */
+	data &= ~0x0003fe0000000000UL;
+
 	return data;
 }
 
@@ -275,6 +298,157 @@ extern __inline__ void spitfire_flush_itlb_nucleus_page(unsigned long page)
 	__asm__ __volatile__("stxa	%%g0, [%0] %1"
 			     : /* No outputs */
 			     : "r" (page | 0x20), "i" (ASI_IMMU_DEMAP));
+}
+
+/* Cheetah has "all non-locked" tlb flushes. */
+extern __inline__ void cheetah_flush_dtlb_all(void)
+{
+	__asm__ __volatile__("stxa	%%g0, [%0] %1"
+			     : /* No outputs */
+			     : "r" (0x80), "i" (ASI_DMMU_DEMAP));
+}
+
+extern __inline__ void cheetah_flush_itlb_all(void)
+{
+	__asm__ __volatile__("stxa	%%g0, [%0] %1"
+			     : /* No outputs */
+			     : "r" (0x80), "i" (ASI_IMMU_DEMAP));
+}
+
+/* Cheetah has a 4-tlb layout so direct access is a bit different.
+ * The first two TLBs are fully assosciative, hold 16 entries, and are
+ * used only for locked and >8K sized translations.  One exists for
+ * data accesses and one for instruction accesses.
+ *
+ * The third TLB is for data accesses to 8K non-locked translations, is
+ * 2 way assosciative, and holds 512 entries.  The fourth TLB is for
+ * instruction accesses to 8K non-locked translations, is 2 way
+ * assosciative, and holds 128 entries.
+ */
+extern __inline__ unsigned long cheetah_get_ldtlb_data(int entry)
+{
+	unsigned long data;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (data)
+			     : "r" ((0 << 16) | (entry << 3)),
+			     "i" (ASI_DTLB_DATA_ACCESS));
+
+	return data;
+}
+
+extern __inline__ unsigned long cheetah_get_litlb_data(int entry)
+{
+	unsigned long data;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (data)
+			     : "r" ((0 << 16) | (entry << 3)),
+			     "i" (ASI_ITLB_DATA_ACCESS));
+
+	return data;
+}
+
+extern __inline__ unsigned long cheetah_get_ldtlb_tag(int entry)
+{
+	unsigned long tag;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (tag)
+			     : "r" ((0 << 16) | (entry << 3)),
+			     "i" (ASI_DTLB_TAG_READ));
+
+	return tag;
+}
+
+extern __inline__ unsigned long cheetah_get_litlb_tag(int entry)
+{
+	unsigned long tag;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (tag)
+			     : "r" ((0 << 16) | (entry << 3)),
+			     "i" (ASI_ITLB_TAG_READ));
+
+	return tag;
+}
+
+extern __inline__ void cheetah_put_ldtlb_data(int entry, unsigned long data)
+{
+	__asm__ __volatile__("stxa	%0, [%1] %2"
+			     : /* No outputs */
+			     : "r" (data),
+			       "r" ((0 << 16) | (entry << 3)),
+			       "i" (ASI_DTLB_DATA_ACCESS));
+}
+
+extern __inline__ void cheetah_put_litlb_data(int entry, unsigned long data)
+{
+	__asm__ __volatile__("stxa	%0, [%1] %2"
+			     : /* No outputs */
+			     : "r" (data),
+			       "r" ((0 << 16) | (entry << 3)),
+			       "i" (ASI_ITLB_DATA_ACCESS));
+}
+
+extern __inline__ unsigned long cheetah_get_dtlb_data(int entry)
+{
+	unsigned long data;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (data)
+			     : "r" ((2 << 16) | (entry << 3)), "i" (ASI_DTLB_DATA_ACCESS));
+
+	return data;
+}
+
+extern __inline__ unsigned long cheetah_get_dtlb_tag(int entry)
+{
+	unsigned long tag;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (tag)
+			     : "r" ((2 << 16) | (entry << 3)), "i" (ASI_DTLB_TAG_READ));
+	return tag;
+}
+
+extern __inline__ void cheetah_put_dtlb_data(int entry, unsigned long data)
+{
+	__asm__ __volatile__("stxa	%0, [%1] %2"
+			     : /* No outputs */
+			     : "r" (data),
+			       "r" ((2 << 16) | (entry << 3)),
+			       "i" (ASI_DTLB_DATA_ACCESS));
+}
+
+extern __inline__ unsigned long cheetah_get_itlb_data(int entry)
+{
+	unsigned long data;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (data)
+			     : "r" ((2 << 16) | (entry << 3)),
+                               "i" (ASI_ITLB_DATA_ACCESS));
+
+	return data;
+}
+
+extern __inline__ unsigned long cheetah_get_itlb_tag(int entry)
+{
+	unsigned long tag;
+
+	__asm__ __volatile__("ldxa	[%1] %2, %0"
+			     : "=r" (tag)
+			     : "r" ((2 << 16) | (entry << 3)), "i" (ASI_ITLB_TAG_READ));
+	return tag;
+}
+
+extern __inline__ void cheetah_put_itlb_data(int entry, unsigned long data)
+{
+	__asm__ __volatile__("stxa	%0, [%1] %2"
+			     : /* No outputs */
+			     : "r" (data), "r" ((2 << 16) | (entry << 3)),
+			       "i" (ASI_ITLB_DATA_ACCESS));
 }
 
 #endif /* !(__ASSEMBLY__) */

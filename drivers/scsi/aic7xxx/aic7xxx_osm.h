@@ -574,6 +574,9 @@ ahc_delay(long usec)
 #endif
 #define mb() \
 	__asm__ __volatile__("mb": : :"memory")
+#elif defined(__sparc__)
+#define MMAPIO
+/* The default mb() define does what this driver wants. -DaveM */
 #endif
 
 static __inline uint8_t ahc_inb(struct ahc_softc * ahc, long port);

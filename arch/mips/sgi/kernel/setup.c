@@ -165,7 +165,7 @@ static unsigned long dosample(volatile unsigned char *tcwp,
         *tcwp = (SGINT_TCWORD_CNT2 | SGINT_TCWORD_CALL | SGINT_TCWORD_MSWST);
 
         /* Return the difference, this is how far the r4k counter increments
-         * for every 1/HZ seconds. We round off the the nearest 1 MHz of
+         * for every 1/HZ seconds. We round off the nearest 1 MHz of
 	 * master clock (= 1000000 / 100 / 2 = 5000 count).
          */
         return ((ct1 - ct0) / 5000) * 5000;

@@ -65,6 +65,8 @@
 **	Used by hosts.c and sym53c8xx.c with module configuration.
 */
 
+#if (LINUX_VERSION_CODE >= 0x020400) || defined(HOSTS_C) || defined(MODULE)
+
 #include <scsi/scsicam.h>
 
 int sym53c8xx_abort(Scsi_Cmnd *);
@@ -108,5 +110,7 @@ int sym53c8xx_release(struct Scsi_Host *);
 			0,	0,	DISABLE_CLUSTERING} 
  
 #endif /* LINUX_VERSION_CODE */
+
+#endif /* defined(HOSTS_C) || defined(MODULE) */ 
 
 #endif /* SYM53C8XX_H */

@@ -494,7 +494,7 @@ typedef union xbw0_cmdword_u {
 typedef union xbw0_status_u {
     xbowreg_t               statusword;
     struct {
-       uint32_t		mult_err:1,	/* Multiple error occured */
+       uint32_t		mult_err:1,	/* Multiple error occurred */
                                 connect_tout:1, /* Connection timeout   */
                                 xtalk_err:1,    /* Xtalk pkt with error bit */
                                 /* End of Xbridge only */
@@ -524,7 +524,7 @@ typedef union xbw0_status_u {
 				/* End of Xbridge only */
 				xtalk_err:1,	/* Xtalk pkt with error bit */
 				connect_tout:1, /* Connection timeout	*/
-				mult_err:1;	/* Multiple error occured */
+				mult_err:1;	/* Multiple error occurred */
     } xbw0_stfield;
 } xbw0_status_t;
 

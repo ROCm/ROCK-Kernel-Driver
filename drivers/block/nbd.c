@@ -18,6 +18,8 @@
  * 97-9-13 Cosmetic changes
  * 98-5-13 Attempt to make 64-bit-clean on 64-bit machines
  * 99-1-11 Attempt to make 64-bit-clean on 32-bit machines <ankry@mif.pg.gda.pl>
+ * 01-2-27 Fix to store proper blockcount for kernel (calculated using
+ *   BLOCK_SIZE_BITS, not device blocksize) <aga@permonline.ru>
  *
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 
@@ -413,16 +415,16 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 			nbd_blksize_bits[dev]++;
 			temp >>= 1;
 		}
-		nbd_sizes[dev] = nbd_bytesizes[dev] >> nbd_blksize_bits[dev];
-		nbd_bytesizes[dev] = nbd_sizes[dev] << nbd_blksize_bits[dev];
+		nbd_bytesizes[dev] &= ~(nbd_blksizes[dev]-1); 
+		nbd_sizes[dev] = nbd_bytesizes[dev] >> BLOCK_SIZE_BITS;
 		return 0;
 	case NBD_SET_SIZE:
-		nbd_sizes[dev] = arg >> nbd_blksize_bits[dev];
-		nbd_bytesizes[dev] = nbd_sizes[dev] << nbd_blksize_bits[dev];
+		nbd_bytesizes[dev] = arg & ~(nbd_blksizes[dev]-1); 
+		nbd_sizes[dev] = nbd_bytesizes[dev] >> BLOCK_SIZE_BITS;
 		return 0;
 	case NBD_SET_SIZE_BLOCKS:
-		nbd_sizes[dev] = arg;
-		nbd_bytesizes[dev] = ((u64) arg) << nbd_blksize_bits[dev];
+		nbd_bytesizes[dev] = ((u64) arg) << nbd_blksize_bits[dev]; 
+		nbd_sizes[dev] = nbd_bytesizes[dev] >> BLOCK_SIZE_BITS;
 		return 0;
 	case NBD_DO_IT:
 		if (!lo->file)
@@ -513,7 +515,7 @@ int nbd_init(void)
 		nbd_blksizes[i] = 1024;
 		nbd_blksize_bits[i] = 10;
 		nbd_bytesizes[i] = 0x7ffffc00; /* 2GB */
-		nbd_sizes[i] = nbd_bytesizes[i] >> nbd_blksize_bits[i];
+		nbd_sizes[i] = nbd_bytesizes[i] >> BLOCK_SIZE_BITS;
 		register_disk(NULL, MKDEV(MAJOR_NR,i), 1, &nbd_fops,
 				nbd_bytesizes[i]>>9);
 	}

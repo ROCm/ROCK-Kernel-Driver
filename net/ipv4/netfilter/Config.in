@@ -20,6 +20,7 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
   dep_tristate '  netfilter MARK match support' CONFIG_IP_NF_MATCH_MARK $CONFIG_IP_NF_IPTABLES
   dep_tristate '  Multiple port match support' CONFIG_IP_NF_MATCH_MULTIPORT $CONFIG_IP_NF_IPTABLES
   dep_tristate '  TOS match support' CONFIG_IP_NF_MATCH_TOS $CONFIG_IP_NF_IPTABLES
+  dep_tristate '  tcpmss match support' CONFIG_IP_NF_MATCH_TCPMSS $CONFIG_IP_NF_IPTABLES
   if [ "$CONFIG_IP_NF_CONNTRACK" != "n" ]; then
     dep_tristate '  Connection state match support' CONFIG_IP_NF_MATCH_STATE $CONFIG_IP_NF_CONNTRACK $CONFIG_IP_NF_IPTABLES 
   fi
@@ -45,7 +46,7 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
       # If they want FTP, set to $CONFIG_IP_NF_NAT (m or y), 
       # or $CONFIG_IP_NF_FTP (m or y), whichever is weaker.  Argh.
       if [ "$CONFIG_IP_NF_FTP" = "m" ]; then
-        define_tristate CONFIG_IP_NF_NAT_FTP m
+	define_tristate CONFIG_IP_NF_NAT_FTP m
       else
         if [ "$CONFIG_IP_NF_FTP" = "y" ]; then
           define_tristate CONFIG_IP_NF_NAT_FTP $CONFIG_IP_NF_NAT
@@ -60,6 +61,7 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
     dep_tristate '    MARK target support' CONFIG_IP_NF_TARGET_MARK $CONFIG_IP_NF_MANGLE
   fi
   dep_tristate '  LOG target support' CONFIG_IP_NF_TARGET_LOG $CONFIG_IP_NF_IPTABLES
+  dep_tristate '  TCPMSS target support' CONFIG_IP_NF_TARGET_TCPMSS $CONFIG_IP_NF_IPTABLES
 fi
 
 # Backwards compatibility modules: only if you don't build in the others.

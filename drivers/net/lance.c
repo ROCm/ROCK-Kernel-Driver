@@ -33,6 +33,9 @@
     
     Forward ported v1.14 to 2.1.129, merged the PCI and misc changes from
     the 2.1 version of the old driver - Alan Cox
+
+    Get rid of check_region, check kmalloc return in lance_probe1
+    Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 11/01/2001
 */
 
 static const char *version = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker@cesdis.gsfc.nasa.gov\n";
@@ -61,9 +64,9 @@ int lance_probe(struct net_device *dev);
 static int lance_probe1(struct net_device *dev, int ioaddr, int irq, int options);
 
 #ifdef LANCE_DEBUG
-int lance_debug = LANCE_DEBUG;
+static int lance_debug = LANCE_DEBUG;
 #else
-int lance_debug = 1;
+static int lance_debug = 1;
 #endif
 
 /*
@@ -295,6 +298,7 @@ static int irq[MAX_CARDS];
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(dma, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(lance_debug, "i");
 
 int init_module(void)
 {
@@ -352,17 +356,27 @@ int lance_probe(struct net_device *dev)
 
 	for (port = lance_portlist; *port; port++) {
 		int ioaddr = *port;
+		struct resource *r = request_region(ioaddr, LANCE_TOTAL_SIZE,
+							"lance-probe");
 
-		if ( check_region(ioaddr, LANCE_TOTAL_SIZE) == 0) {
+		if (r) {
 			/* Detect "normal" 0x57 0x57 and the NI6510EB 0x52 0x44
 			   signatures w/ minimal I/O reads */
 			char offset15, offset14 = inb(ioaddr + 14);
 			
 			if ((offset14 == 0x52 || offset14 == 0x57) &&
-				((offset15 = inb(ioaddr + 15)) == 0x57 || offset15 == 0x44)) {
+				((offset15 = inb(ioaddr + 15)) == 0x57 ||
+				 offset15 == 0x44)) {
 				result = lance_probe1(dev, ioaddr, 0, 0);
-				if ( !result ) return 0;
+				if (!result) {
+					struct lance_private *lp = dev->priv;
+					int ver = lp->chip_version;
+
+					r->name = chip_table[ver].name;
+					return 0;
+				}
 			}
+			release_resource(r);
 		}
 	}
 	return -ENODEV;
@@ -444,12 +458,10 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 		printk(" %2.2x", dev->dev_addr[i] = inb(ioaddr + i));
 
 	dev->base_addr = ioaddr;
-	request_region(ioaddr, LANCE_TOTAL_SIZE, chip_table[lance_version].name);
-
 	/* Make certain the data structures used by the LANCE are aligned and DMAble. */
 		
 	lp = (struct lance_private *)(((unsigned long)kmalloc(sizeof(*lp)+7,
-										   GFP_DMA | GFP_KERNEL)+7) & ~7);
+					   GFP_DMA | GFP_KERNEL)+7) & ~7);
 	if(lp==NULL)
 		return -ENODEV;
 	if (lance_debug > 6) printk(" (#0x%05lx)", (unsigned long)lp);
@@ -457,11 +469,15 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 	dev->priv = lp;
 	lp->name = chipname;
 	lp->rx_buffs = (unsigned long)kmalloc(PKT_BUF_SZ*RX_RING_SIZE,
-										  GFP_DMA | GFP_KERNEL);
-	if (lance_need_isa_bounce_buffers)
+						  GFP_DMA | GFP_KERNEL);
+	if (!lp->rx_buffs)
+		goto out_lp;
+	if (lance_need_isa_bounce_buffers) {
 		lp->tx_bounce_buffs = kmalloc(PKT_BUF_SZ*TX_RING_SIZE,
-									  GFP_DMA | GFP_KERNEL);
-	else
+						  GFP_DMA | GFP_KERNEL);
+		if (!lp->tx_bounce_buffs)
+			goto out_rx;
+	} else
 		lp->tx_bounce_buffs = NULL;
 
 	lp->chip_version = lance_version;
@@ -628,6 +644,9 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 	dev->watchdog_timeo = TX_TIMEOUT;
 
 	return 0;
+out_rx:	kfree((void*)lp->rx_buffs);
+out_lp:	kfree(lp);
+	return -ENOMEM;
 }
 
 static int

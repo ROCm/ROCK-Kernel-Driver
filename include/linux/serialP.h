@@ -52,6 +52,7 @@ struct serial_state {
 	struct termios		callout_termios;
 	int	io_type;
 	struct async_struct *info;
+	struct pci_dev	*dev;
 };
 
 struct async_struct {

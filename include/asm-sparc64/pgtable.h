@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.135 2000/11/08 04:49:24 davem Exp $
+/* $Id: pgtable.h,v 1.137 2001/03/02 03:12:01 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -70,7 +70,7 @@
 
 #endif /* !(__ASSEMBLY__) */
 
-/* SpitFire TTE bits. */
+/* Spitfire/Cheetah TTE bits. */
 #define _PAGE_VALID	0x8000000000000000	/* Valid TTE                          */
 #define _PAGE_R		0x8000000000000000	/* Used to keep ref bit up to date    */
 #define _PAGE_SZ4MB	0x6000000000000000	/* 4MB Page                           */
@@ -79,10 +79,10 @@
 #define _PAGE_SZ8K	0x0000000000000000	/* 8K Page                            */
 #define _PAGE_NFO	0x1000000000000000	/* No Fault Only                      */
 #define _PAGE_IE	0x0800000000000000	/* Invert Endianness                  */
-#define _PAGE_SOFT2	0x07FC000000000000	/* Second set of software bits        */
-#define _PAGE_DIAG	0x0003FE0000000000	/* Diagnostic TTE bits                */
-#define _PAGE_PADDR	0x000001FFFFFFE000	/* Physical Address bits [40:13]      */
-#define _PAGE_SOFT	0x0000000000001F80	/* First set of software bits         */
+#define _PAGE_SN	0x0000800000000000	/* Snoop                              */
+#define _PAGE_PADDR_SF	0x000001FFFFFFE000	/* (Spitfire) Phys Address [40:13]    */
+#define _PAGE_PADDR	0x000007FFFFFFE000	/* (Cheetah) Phys Address [42:13]     */
+#define _PAGE_SOFT	0x0000000000001F80	/* Software bits                      */
 #define _PAGE_L		0x0000000000000040	/* Locked TTE                         */
 #define _PAGE_CP	0x0000000000000020	/* Cacheable in Physical Cache        */
 #define _PAGE_CV	0x0000000000000010	/* Cacheable in Virtual Cache         */

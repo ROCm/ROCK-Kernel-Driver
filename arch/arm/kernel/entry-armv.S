@@ -17,19 +17,19 @@
 #include <linux/linkage.h>
 
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/errno.h>
 #include <asm/hardware.h>
 #include <asm/arch/irqs.h>
 #include <asm/proc-fns.h>
 
-#include "../lib/constants.h"
 
 #ifndef MODE_SVC
 #define MODE_SVC 0x13
 #endif
 
 		.macro	zero_fp
-#ifdef CONFIG_FRAME_POINTER
+#ifndef CONFIG_NO_FRAME_POINTER
 		mov	fp, #0
 #endif
 		.endm
@@ -611,9 +611,9 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 #else
 wfs_mask_data:	.word	0x0e200110			@ WFS/RFS
 		.word	0x0fef0fff
-		.word	0x0d0d0100			@ LDF [sp]/STF [sp]
-		.word	0x0d0b0100			@ LDF [fp]/STF [fp]
-		.word	0x0f0f0f00
+		.word	0x0d000100			@ LDF [sp]/STF [sp]
+		.word	0x0d000100			@ LDF [fp]/STF [fp]
+		.word	0x0f000f00
 
 /* We get here if an undefined instruction happens and the floating
  * point emulator is not present.  If the offending instruction was

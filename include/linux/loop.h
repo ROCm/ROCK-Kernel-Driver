@@ -46,7 +46,6 @@ struct loop_device {
 	void		*key_data; 
 	char		key_reserved[48]; /* for use by the filter modules */
 
-	int		lo_blksize;
 	int		old_gfp_mask;
 
 	spinlock_t		lo_lock;
@@ -71,12 +70,6 @@ extern inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
 
 	return lo->transfer(lo, cmd, rbuf, lbuf, size, rblock);
 }
-
-/*
- * used to throttle loop_thread so bdflush/kswapd doesn't go nuts
- */
-#define LOOP_MAX_BUFFERS	2048
-
 #endif /* __KERNEL__ */
 
 /*

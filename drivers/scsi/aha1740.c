@@ -319,11 +319,16 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 
     if(*cmd == REQUEST_SENSE)
     {
+#if 0
+	/* scsi_request_sense() provides a buffer of size 256,
+	   so there is no reason to expect equality */
+
 	if (bufflen != sizeof(SCpnt->sense_buffer))
 	{
 	    printk("Wrong buffer length supplied for request sense (%d)\n",
 		   bufflen);
 	}
+#endif	
 	SCpnt->result = 0;
 	done(SCpnt); 
 	return 0;
@@ -521,10 +526,10 @@ int aha1740_detect(Scsi_Host_Template * tpnt)
 	 * check/allocate region code, but this may change at some point,
 	 * so we go through the motions.
 	 */
-	if (check_region(slotbase, SLOTSIZE))  /* See if in use */
+	if (!request_region(slotbase, SLOTSIZE, "aha1740"))  /* See if in use */
 	    continue;
 	if (!aha1740_test_port(slotbase))
-	    continue;
+	    goto err_release;
 	aha1740_getconfig(slotbase,&irq_level,&translation);
 	if ((inb(G2STAT(slotbase)) &
 	     (G2STAT_MBXOUT|G2STAT_BUSY)) != G2STAT_MBXOUT)
@@ -538,15 +543,12 @@ int aha1740_detect(Scsi_Host_Template * tpnt)
 	DEB(printk("aha1740_detect: enable interrupt channel %d\n",irq_level));
 	if (request_irq(irq_level,aha1740_intr_handle,0,"aha1740",NULL)) {
 	    printk("Unable to allocate IRQ for adaptec controller.\n");
-	    continue;
+	    goto err_release;
 	}
 	shpnt = scsi_register(tpnt, sizeof(struct aha1740_hostdata));
 	if(shpnt == NULL)
-	{
-		free_irq(irq_level, NULL);
-		continue;
-	}
-	request_region(slotbase, SLOTSIZE, "aha1740");
+		goto err_free_irq;
+
 	shpnt->base = 0;
 	shpnt->io_port = slotbase;
 	shpnt->n_io_port = SLOTSIZE;
@@ -557,6 +559,12 @@ int aha1740_detect(Scsi_Host_Template * tpnt)
 	host->translation = translation;
 	aha_host[irq_level - 9] = shpnt;
 	count++;
+	continue;
+
+    err_free_irq:
+	free_irq(irq_level, aha1740_intr_handle);
+    err_release:
+	release_region(slotbase, SLOTSIZE);
     }
     return count;
 }

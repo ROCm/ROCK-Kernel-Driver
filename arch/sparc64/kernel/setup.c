@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.59 2001/02/13 01:16:44 davem Exp $
+/*  $Id: setup.c,v 1.62 2001/03/03 10:34:45 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -166,10 +166,14 @@ int prom_callback(long *args)
 					     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
 			/*
-			 * Locked down tlb entry 63.
+			 * Locked down tlb entry.
 			 */
 
-			tte = spitfire_get_dtlb_data(63);
+			if (tlb_type == spitfire)
+				tte = spitfire_get_dtlb_data(SPITFIRE_HIGHEST_LOCKED_TLBENT);
+			else if (tlb_type == cheetah)
+				tte = cheetah_get_ldtlb_data(CHEETAH_HIGHEST_LOCKED_TLBENT);
+
 			res = PROM_TRUE;
 			goto done;
 		}
@@ -253,7 +257,7 @@ int prom_callback(long *args)
 		unsigned long tte;
 
 		tte = args[3];
-		prom_printf("%lx ", (tte & _PAGE_SOFT2) >> 50);
+		prom_printf("%lx ", (tte & 0x07FC000000000000) >> 50);
 
 		args[2] = 2;
 		args[args[1] + 3] = 0;

@@ -1,4 +1,4 @@
-/* $Id: ebus.c,v 1.54 2001/02/13 01:16:44 davem Exp $
+/* $Id: ebus.c,v 1.57 2001/02/28 03:28:55 davem Exp $
  * ebus.c: PCI to EBus bridge device.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -159,7 +159,7 @@ void __init fill_ebus_child(int node, struct linux_prom_registers *preg,
 			struct pci_controller_info *p = pbm->parent;
 
 			if (ebus_intmap_match(dev->bus, preg, &irqs[i]) != -1) {
-				dev->irqs[i] = p->irq_build(p,
+				dev->irqs[i] = p->irq_build(pbm,
 							    dev->bus->self,
 							    irqs[i]);
 			} else {
@@ -222,7 +222,7 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 			struct pci_controller_info *p = pbm->parent;
 
 			if (ebus_intmap_match(dev->bus, &regs[0], &irqs[i]) != -1) {
-				dev->irqs[i] = p->irq_build(p,
+				dev->irqs[i] = p->irq_build(pbm,
 							    dev->bus->self,
 							    irqs[i]);
 			} else {

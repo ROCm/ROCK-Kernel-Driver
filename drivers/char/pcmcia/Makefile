@@ -16,6 +16,5 @@ obj-n		:=
 obj-		:=
 
 obj-$(CONFIG_PCMCIA_SERIAL_CS)	+= serial_cs.o
-obj-$(CONFIG_PCMCIA_SERIAL_CB)	+= serial_cb.o
 
 include $(TOPDIR)/Rules.make

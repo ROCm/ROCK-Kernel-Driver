@@ -53,8 +53,8 @@ static const char *version =
 #define WRD_COUNT 4
 
 int el2_probe(struct net_device *dev);
-int el2_pio_probe(struct net_device *dev);
-int el2_probe1(struct net_device *dev, int ioaddr);
+static int el2_pio_probe(struct net_device *dev);
+static int el2_probe1(struct net_device *dev, int ioaddr);
 
 /* A zero-terminated list of I/O addresses to be probed in PIO mode. */
 static unsigned int netcard_portlist[] __initdata =
@@ -115,7 +115,7 @@ el2_probe(struct net_device *dev)
 
 /*  Try all of the locations that aren't obviously empty.  This touches
     a lot of locations, and is much riskier than the code above. */
-int __init 
+static int __init 
 el2_pio_probe(struct net_device *dev)
 {
     int i;
@@ -136,13 +136,14 @@ el2_pio_probe(struct net_device *dev)
 /* Probe for the Etherlink II card at I/O port base IOADDR,
    returning non-zero on success.  If found, set the station
    address and memory parameters in DEVICE. */
-int __init 
+static int __init 
 el2_probe1(struct net_device *dev, int ioaddr)
 {
     int i, iobase_reg, membase_reg, saved_406, wordlength, retval;
     static unsigned version_printed;
     unsigned long vendor_id;
 
+    /* FIXME: code reads ioaddr + 0x400, we request ioaddr + 16 */
     if (!request_region(ioaddr, EL2_IO_EXTENT, dev->name))
 	return -EBUSY;
 
@@ -250,7 +251,8 @@ el2_probe1(struct net_device *dev, int ioaddr)
 	}
 #endif  /* EL2MEMTEST */
 
-	dev->mem_end = dev->rmem_end = dev->mem_start + EL2_MEMSIZE;
+	if (dev->mem_start)
+		dev->mem_end = dev->rmem_end = dev->mem_start + EL2_MEMSIZE;
 
 	if (wordlength) {	/* No Tx pages to skip over to get to Rx */
 		dev->rmem_start = dev->mem_start;

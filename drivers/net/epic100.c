@@ -401,7 +401,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	ep->rx_ring = (struct epic_rx_desc *)ring_space;
 	ep->rx_ring_dma = ring_dma;
 
-	if (dev->mem_start && dev->mem_start != ~0) {
+	if (dev->mem_start) {
 		option = dev->mem_start;
 		duplex = (dev->mem_start & 16) ? 1 : 0;
 	} else if (card_idx >= 0  &&  card_idx < MAX_UNITS) {

@@ -51,9 +51,9 @@ static unsigned char bridge_ula_lec[] = {0x01, 0x80, 0xc2, 0x00, 0x00};
 #define DPRINTK(format,args...)
 #endif
 
-struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
+extern struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
 	unsigned char *addr);
-void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
+extern void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
 
 
 #define DUMP_PACKETS 0 /* 0 = None,

@@ -3925,7 +3925,7 @@ pcibr_attach(devfs_handle_t xconn_vhdl)
      * above.
      *
      * Need to set the D_INTR_ISERR flag
-     * in the dev_desc used for alocating the
+     * in the dev_desc used for allocating the
      * error interrupt, so our interrupt will
      * be properly routed and prioritized.
      *
@@ -5540,7 +5540,7 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
     } else
 	xio_port = pcibr_dmamap->bd_xio_port;
 
-    /* If this DMA is to an addres that
+    /* If this DMA is to an address that
      * refers back to this Bridge chip,
      * reduce it back to the correct
      * PCI MEM address.
@@ -8540,7 +8540,7 @@ pcibr_pioerror(
 	 *
 	 * CAUTION: Resetting bit BRIDGE_IRR_PCI_GRP_CLR, acknowledges
 	 *      a group of interrupts. If while handling this error,
-	 *      some other error has occured, that would be
+	 *      some other error has occurred, that would be
 	 *      implicitly cleared by this write.
 	 *      Need a way to ensure we don't inadvertently clear some
 	 *      other errors.

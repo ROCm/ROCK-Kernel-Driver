@@ -16,8 +16,7 @@
 #include <linux/umsdos_fs.h>
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
-
-#include <asm/delay.h>
+#include <linux/delay.h>
 
 static void copy_entry(struct umsdos_dirent *p, struct umsdos_dirent *q)
 {

@@ -400,7 +400,6 @@ static inline long _exit(int exitcode)
 
 static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)
 {
-	extern long sys_wait4(int, int *, int, struct rusage *);
 	return sys_wait4((int)pid, wait_stat, options, NULL);
 }
 
@@ -412,7 +411,6 @@ static inline long delete_module(const char *name)
 
 static inline pid_t wait(int * wait_stat)
 {
-	extern long sys_wait4(int, int *, int, struct rusage *);
 	return sys_wait4(-1, wait_stat, 0, NULL);
 }
 

@@ -1,4 +1,4 @@
-/* $Id: sunlance.c,v 1.105 2000/10/22 16:08:38 davem Exp $
+/* $Id: sunlance.c,v 1.107 2001/02/18 08:10:21 davem Exp $
  * lance.c: Linux/Sparc/Lance driver
  *
  *	Written 1995, 1996 by Miguel de Icaza
@@ -965,9 +965,6 @@ static int lance_open(struct net_device *dev)
 		sbus_writew(LE_C0_INEA | LE_C0_TDMD, lp->lregs + RDP);
 	}
 
-	if (!status)
-		MOD_INC_USE_COUNT;
-
 	return status;
 }
 
@@ -981,7 +978,6 @@ static int lance_close(struct net_device *dev)
 	STOP_LANCE(lp);
 
 	free_irq(dev->irq, (void *) dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1467,6 +1463,7 @@ no_link_test:
 	}
 
 	lp->dev = dev;
+	SET_MODULE_OWNER(dev);
 	dev->open = &lance_open;
 	dev->stop = &lance_close;
 	dev->hard_start_xmit = &lance_start_xmit;

@@ -12,8 +12,8 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/procinfo.h>
-#include "../lib/constants.h"
 
 /*
  * Function: arm6_7_cache_clean_invalidate_all (void)
@@ -29,10 +29,10 @@ ENTRY(cpu_arm6_cache_clean_invalidate_all)
 ENTRY(cpu_arm7_cache_clean_invalidate_all)
 ENTRY(cpu_arm6_cache_clean_invalidate_range)
 ENTRY(cpu_arm7_cache_clean_invalidate_range)
-ENTRY(cpu_arm6_invalidate_icache_range)
-ENTRY(cpu_arm7_invalidate_icache_range)
-ENTRY(cpu_arm6_invalidate_icache_page)
-ENTRY(cpu_arm7_invalidate_icache_page)
+ENTRY(cpu_arm6_icache_invalidate_range)
+ENTRY(cpu_arm7_icache_invalidate_range)
+ENTRY(cpu_arm6_icache_invalidate_page)
+ENTRY(cpu_arm7_icache_invalidate_page)
 ENTRY(cpu_arm6_dcache_clean_range)
 ENTRY(cpu_arm7_dcache_clean_range)
 ENTRY(cpu_arm6_dcache_invalidate_range)
@@ -410,8 +410,8 @@ ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_dcache_clean_entry
 
 		/* icache */
-		.word	cpu_arm6_invalidate_icache_range
-		.word	cpu_arm6_invalidate_icache_page
+		.word	cpu_arm6_icache_invalidate_range
+		.word	cpu_arm6_icache_invalidate_page
 
 		/* tlb */
 		.word	cpu_arm6_tlb_invalidate_all
@@ -449,8 +449,8 @@ ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_dcache_clean_entry
 
 		/* icache */
-		.word	cpu_arm7_invalidate_icache_range
-		.word	cpu_arm7_invalidate_icache_page
+		.word	cpu_arm7_icache_invalidate_range
+		.word	cpu_arm7_icache_invalidate_page
 
 		/* tlb */
 		.word	cpu_arm7_tlb_invalidate_all

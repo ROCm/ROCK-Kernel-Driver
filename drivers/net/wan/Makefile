@@ -9,7 +9,7 @@ SUB_DIRS     :=
 
 O_TARGET := wan.o
 
-export-objs =	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o
+export-objs =	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc.o
 list-multi =	wanpipe.o cyclomx.o
 
 wanpipe-objs = sdlamain.o $(wanpipe-y)
@@ -32,6 +32,7 @@ obj-$(CONFIG_COMX_PROTO_PPP)	+=		syncppp.o	comx-proto-ppp.o
 obj-$(CONFIG_COMX_PROTO_LAPB)	+=				comx-proto-lapb.o
 obj-$(CONFIG_COMX_PROTO_FR)	+=				comx-proto-fr.o
 obj-$(CONFIG_COSA)		+=		syncppp.o	cosa.o
+obj-$(CONFIG_DSCC4)             +=				dscc4.o
 obj-$(CONFIG_LANMEDIA)		+=		syncppp.o
 obj-$(CONFIG_SYNCLINK_SYNCPPP)	+=		syncppp.o
 obj-$(CONFIG_X25_ASY)		+= x25_asy.o
@@ -48,6 +49,10 @@ obj-$(CONFIG_VENDOR_SANGOMA)	+= sdladrv.o wanpipe.o
 obj-$(CONFIG_CYCLADES_SYNC)	+= cycx_drv.o cyclomx.o
 obj-$(CONFIG_LAPBETHER)		+= lapbether.o
 obj-$(CONFIG_SBNI)		+= sbni.o
+obj-$(CONFIG_HDLC)		+= hdlc.o
+obj-$(CONFIG_HDLC_PPP)		+= syncppp.o
+obj-$(CONFIG_N2)		+= n2.o
+obj-$(CONFIG_C101)		+= c101.o
 
 include $(TOPDIR)/Rules.make
 

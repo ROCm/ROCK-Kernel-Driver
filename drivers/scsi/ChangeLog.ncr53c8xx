@@ -1,3 +1,35 @@
+Mon Feb 12 22:30 2001 Gerard Roudier (groudier@club-internet.fr)
+	* version ncr53c8xx-3.4.3
+	- Call pci_enable_device() as AC wants this to be done.
+	- Get both the BAR cookies actual and PCI BAR values.
+	  (see Changelog.sym53c8xx rev. 1.7.3 for details)
+	- Merge changes for linux-2.4 that declare the host template 
+	  in the driver object also when the driver is statically 
+	  linked with the kernel.
+
+Sun Sep 24 21:30 2000 Gerard Roudier (groudier@club-internet.fr)
+	* version ncr53c8xx-3.4.2
+	- See Changelog.sym53c8xx, driver version 1.7.2.
+
+Wed Jul 26 23:30 2000 Gerard Roudier (groudier@club-internet.fr)
+	* version ncr53c8xx-3.4.1
+	- Provide OpenFirmare path through the proc FS on PPC.
+	- Remove trailing argument #2 from a couple of #undefs.
+
+Sun Jul 09 16:30 2000 Gerard Roudier (groudier@club-internet.fr)
+	* version ncr53c8xx-3.4.0
+	- Remove the PROFILE C and SCRIPTS code.
+	  This facility was not this useful and thus was not longer 
+	  desirable given the increasing complexity of the driver code.
+	- Merges from FreeBSD sym-1.6.2 driver:
+	  * Clarify memory barriers needed by the driver for architectures 
+	    that implement a weak memory ordering.
+	- General cleanup:
+	  Move definitions for barriers and IO/MMIO operations to the 
+	  sym53c8xx_defs.h header files. They are now shared by the 
+	  both drivers.
+	  Use SCSI_NCR_IOMAPPED instead of NCR_IOMAPPED.
+
 Thu May 11   12:30 2000 Pam Delaney (pam.delaney@lsil.com)
 	* revision 3.3b
  

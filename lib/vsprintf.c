@@ -16,6 +16,12 @@
 
 #include <asm/div64.h>
 
+/**
+ * simple_strtoul - convert a string to an unsigned long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
 unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
 {
 	unsigned long result = 0,value;
@@ -41,6 +47,12 @@ unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
 	return result;
 }
 
+/**
+ * simple_strtol - convert a string to a signed long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
 long simple_strtol(const char *cp,char **endp,unsigned int base)
 {
 	if(*cp=='-')
@@ -48,6 +60,12 @@ long simple_strtol(const char *cp,char **endp,unsigned int base)
 	return simple_strtoul(cp,endp,base);
 }
 
+/**
+ * simple_strtoull - convert a string to an unsigned long long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
 unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
 {
 	unsigned long long result = 0,value;
@@ -73,6 +91,12 @@ unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
 	return result;
 }
 
+/**
+ * simple_strtoll - convert a string to a signed long long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
 long long simple_strtoll(const char *cp,char **endp,unsigned int base)
 {
 	if(*cp=='-')
@@ -163,9 +187,15 @@ static char * number(char * str, long long num, int base, int size, int precisio
 	return str;
 }
 
-/* Forward decl. needed for IP address printing stuff... */
-int sprintf(char * buf, const char *fmt, ...);
-
+/**
+ * vsprintf - Format a string and place it in a buffer
+ * @buf: The buffer to place the result into
+ * @fmt: The format string to use
+ * @args: Arguments for the format string
+ *
+ * Call this function if you are already dealing with a va_list.
+ * You probably want sprintf instead.
+ */
 int vsprintf(char *buf, const char *fmt, va_list args)
 {
 	int len;
@@ -343,6 +373,12 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 	return str-buf;
 }
 
+/**
+ * sprintf - Format a string and place it in a buffer
+ * @buf: The buffer to place the result into
+ * @fmt: The format string to use
+ * @args: Arguments for the format string
+ */
 int sprintf(char * buf, const char *fmt, ...)
 {
 	va_list args;

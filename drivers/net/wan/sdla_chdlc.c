@@ -932,7 +932,7 @@ static int if_send (struct sk_buff* skb, struct net_device* dev)
 
     	if(test_and_set_bit(0, (void*)&card->wandev.critical)) {
 	
-		printk(KERN_INFO "%s: Critical in if_send: %x\n",
+		printk(KERN_INFO "%s: Critical in if_send: %lx\n",
 					card->wandev.name,card->wandev.critical);
                 ++card->wandev.stats.tx_dropped;
 #ifdef LINUX_2_1
@@ -1497,7 +1497,7 @@ STATIC void wpc_isr (sdla_t* card)
 	 */
 	if(card->hw.type != SDLA_S514) {
 		if(test_and_set_bit(0, (void*)&card->wandev.critical)) {
-			printk(KERN_INFO "%s: Critical while in ISR: %x\n",
+			printk(KERN_INFO "%s: Critical while in ISR: %lx\n",
 				card->devname, card->wandev.critical);
 			card->in_isr = 0;
 			return;

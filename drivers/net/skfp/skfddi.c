@@ -182,12 +182,17 @@ extern void mac_clear_multicast(struct s_smc *smc);
 extern void enable_tx_irq(struct s_smc *smc, u_short queue);
 extern void mac_drv_clear_txd(struct s_smc *smc);
 
+static struct pci_device_id skfddi_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_SK, PCI_DEVICE_ID_SK_FP, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, skfddi_pci_tbl);
 
 // Define module-wide (static) variables
 
-static int num_boards = 0;	/* total number of adapters configured */
-static int num_fddi = 0;
-static int autoprobed = 0;
+static int num_boards;	/* total number of adapters configured */
+static int num_fddi;
+static int autoprobed;
 
 #ifdef MODULE
 int init_module(void);
@@ -195,7 +200,7 @@ void cleanup_module(void);
 static struct net_device *unlink_modules(struct net_device *p);
 static int loading_module = 1;
 #else
-static int loading_module = 0;
+static int loading_module;
 #endif				// MODULE
 
 #ifdef DRIVERDEBUG
@@ -1632,7 +1637,7 @@ void *mac_drv_get_space(struct s_smc *smc, unsigned int size)
  *	This function is called by the hardware dependent module.
  *	It allocates the memory for the RxD and TxD descriptors.
  *
- *	This memory must be non-cached, non-movable and non-swapable.
+ *	This memory must be non-cached, non-movable and non-swappable.
  *	This memory should start at a physical page boundary.
  * Args
  *	smc - A pointer to the SMT context struct.

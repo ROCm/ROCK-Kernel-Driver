@@ -1189,7 +1189,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr,
 	DECLARE_MUTEX_LOCKED(sem);
 	struct msp3400c *msp;
         struct i2c_client *c;
-	int              rev1,rev2,i;
+	int              rev1,rev2=0,i;
 
         client_template.adapter = adap;
         client_template.addr = addr;
@@ -1517,7 +1517,7 @@ static int msp_command(struct i2c_client *client,unsigned int cmd, void *arg)
 			 (int)msp3400c_read(client, I2C_MSP3400C_DFP, 0x1c));
 		break;
 #endif
-	default:
+	default:;
 		/* nothing */
 	}
 	return 0;

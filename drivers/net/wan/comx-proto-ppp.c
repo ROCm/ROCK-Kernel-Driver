@@ -44,7 +44,7 @@
 #include <asm/uaccess.h>
 #include <linux/init.h>
 
-#include	"syncppp.h"
+#include <net/syncppp.h>
 #include	"comx.h"
 
 MODULE_AUTHOR("Author: Gergely Madarasz <gorgo@itc.hu>");

@@ -22,7 +22,7 @@ endif
 .SUFFIXES= .l .y .c
 
 $(PROG): $(SRCS)
-	$(CC) $(AICASM_CFLAGS) $(SRCS) -o $(PROG)
+	$(HOSTCC) $(AICASM_CFLAGS) $(SRCS) -o $(PROG)
 
 clean:
 	rm -f $(CLEANFILES) $(PROG)

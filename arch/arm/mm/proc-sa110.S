@@ -19,9 +19,9 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
-#include "../lib/constants.h"
 
 /* This is the maximum size of an area which will be flushed.  If the area
  * is larger than this, then we flush the whole cache

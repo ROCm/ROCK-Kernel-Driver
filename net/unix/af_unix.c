@@ -1852,8 +1852,8 @@ struct net_proto_family unix_family_ops = {
 extern void unix_sysctl_register(void);
 extern void unix_sysctl_unregister(void);
 #else
-static inline unix_sysctl_register() {};
-static inline unix_sysctl_unregister() {};
+static inline void unix_sysctl_register(void) {}
+static inline void unix_sysctl_unregister(void) {}
 #endif
 
 static const char banner[] __initdata = KERN_INFO "NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.\n";

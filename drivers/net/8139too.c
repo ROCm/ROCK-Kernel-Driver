@@ -878,7 +878,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	init_waitqueue_head (&tp->thr_wait);
 	init_MUTEX_LOCKED (&tp->thr_exited);
 
-	pdev->driver_data = dev;
+	pci_set_drvdata(pdev, dev);
 
 	printk (KERN_INFO "%s: %s at 0x%lx, "
 		"%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x, "
@@ -959,7 +959,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 
 static void __devexit rtl8139_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	struct rtl8139_private *np;
 
 	DPRINTK ("ENTER\n");
@@ -986,7 +986,7 @@ static void __devexit rtl8139_remove_one (struct pci_dev *pdev)
 
 	kfree (dev);
 
-	pdev->driver_data = NULL;
+	pci_set_drvdata (pdev, NULL);
 
 	DPRINTK ("EXIT\n");
 }
@@ -1903,8 +1903,8 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 				     void *ioaddr,
 				     int status, int link_changed)
 {
-	printk (KERN_DEBUG "%s: Abnormal interrupt, status %8.8x.\n",
-		dev->name, status);
+	DPRINTK ("%s: Abnormal interrupt, status %8.8x.\n",
+		 dev->name, status);
 
 	assert (dev != NULL);
 	assert (tp != NULL);
@@ -2241,7 +2241,7 @@ static void rtl8139_set_rx_mode (struct net_device *dev)
 
 static void rtl8139_suspend (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	struct rtl8139_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	unsigned long flags;
@@ -2264,7 +2264,7 @@ static void rtl8139_suspend (struct pci_dev *pdev)
 
 static void rtl8139_resume (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 
 	netif_device_attach (dev);
 	rtl8139_hw_start (dev);

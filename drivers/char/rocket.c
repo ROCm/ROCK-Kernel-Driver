@@ -47,19 +47,6 @@
 #endif
 
 #define NEW_MODULES
-#ifdef LOCAL_ROCKET_H		/* We're building standalone */
-#define MODULE
-#endif
-
-#if defined(NEW_MODULES) && defined(LOCAL_ROCKET_H)
-#ifdef MODVERSIONS
-#include <linux/modversions.h>
-#endif
-#else /* !NEW_MODULES */
-#ifdef MODVERSIONS
-#define MODULE
-#endif
-#endif /* NEW_MODULES */
 
 #include <linux/module.h>
 #include <linux/errno.h>

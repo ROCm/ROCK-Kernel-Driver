@@ -128,6 +128,7 @@ static const int multicast_filter_limit = 32;
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 
 /* These identify the driver base version and may not be removed. */
 static char version1[] __devinitdata =
@@ -557,7 +558,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	np->drv_flags = via_rhine_chip_info[chip_id].drv_flags;
 	np->pdev = pdev;
 
-	if (dev->mem_start && dev->mem_start != ~0)
+	if (dev->mem_start)
 		option = dev->mem_start;
 
 	/* The lower four bits are the media type. */
@@ -582,7 +583,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->tx_timeout = via_rhine_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	
-	pdev->driver_data = dev;
+	pci_set_drvdata(pdev, dev);
 
 	if (np->drv_flags & CanHaveMII) {
 		int phy, phy_idx = 0;
@@ -970,7 +971,7 @@ static void via_rhine_timer(unsigned long data)
 
 static void via_rhine_tx_timeout (struct net_device *dev)
 {
-	struct netdev_private *np = (struct netdev_private *) dev->priv;
+	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 
 	printk (KERN_WARNING "%s: Transmit timed out, status %4.4x, PHY status "
@@ -1464,7 +1465,7 @@ static int via_rhine_close(struct net_device *dev)
 
 static void __devexit via_rhine_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	struct netdev_private *np = (struct netdev_private *)(dev->priv);
 	
 	unregister_netdev(dev);
@@ -1481,6 +1482,8 @@ static void __devexit via_rhine_remove_one (struct pci_dev *pdev)
 			    np->rx_ring, np->rx_ring_dma);
 
 	kfree(dev);
+
+	pci_set_drvdata(pdev, NULL);
 }
 
 

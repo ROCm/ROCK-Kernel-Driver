@@ -114,9 +114,11 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       tristate '    ICL EtherTeam 16i/32 support' CONFIG_ETH16I
       tristate '    NE2000/NE1000 support' CONFIG_NE2000
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
-	 tristate '    SEEQ8005 support (EXPERIMENTAL)' CONFIG_SEEQ8005
+	 dep_tristate '    SEEQ8005 support (EXPERIMENTAL)' CONFIG_SEEQ8005 $CONFIG_EXPERIMENTAL
       fi
-      tristate '    SK_G16 support' CONFIG_SK_G16
+      if [ "$CONFIG_OBSOLETE" = "y" ]; then
+         tristate '    SK_G16 support' CONFIG_SK_G16
+      fi
    fi
    if [ "$CONFIG_MCA" = "y" ]; then
       tristate '  SKnet MCA support' CONFIG_SKMC
@@ -191,14 +193,16 @@ endmenu
 
 bool 'FDDI driver support' CONFIG_FDDI
 if [ "$CONFIG_FDDI" = "y" ]; then
-   dep_tristate '  Digital DEFEA and DEFPA adapter support' CONFIG_DEFXX $CONFIG_PCI
+   if [ "$CONFIG_PCI" = "y" -o "$CONFIG_EISA" = "y" ]; then
+      tristate '  Digital DEFEA and DEFPA adapter support' CONFIG_DEFXX
+   fi
    tristate '  SysKonnect FDDI PCI support' CONFIG_SKFP
 fi
 
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    if [ "$CONFIG_INET" = "y" ]; then
       bool 'HIPPI driver support (EXPERIMENTAL)' CONFIG_HIPPI
-      if [ "$CONFIG_HIPPI" = "y" ]; then
+      if [ "$CONFIG_HIPPI" = "y" -a "$CONFIG_PCI" = "y" ]; then
          tristate '  Essential RoadRunner HIPPI PCI adapter support' CONFIG_ROADRUNNER
          if [ "$CONFIG_ROADRUNNER" != "n" ]; then
    	    bool '    Use large TX/RX rings' CONFIG_ROADRUNNER_LARGE_RINGS
@@ -259,7 +263,7 @@ if [ "$CONFIG_NET_FC" = "y" ]; then
 fi
 
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   tristate 'Red Creek Hardware VPN (EXPERIMENTAL)' CONFIG_RCPCI
+   dep_tristate 'Red Creek Hardware VPN (EXPERIMENTAL)' CONFIG_RCPCI $CONFIG_PCI
    tristate 'Traffic Shaper (EXPERIMENTAL)' CONFIG_SHAPER
 fi
 

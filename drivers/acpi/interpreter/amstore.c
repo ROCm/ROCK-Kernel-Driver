@@ -190,7 +190,7 @@ acpi_aml_exec_store (
  * FUNCTION:    Acpi_aml_store_object_to_index
  *
  * PARAMETERS:  *Val_desc           - Value to be stored
- *              *Node           - Named object to recieve the value
+ *              *Node           - Named object to receive the value
  *
  * RETURN:      Status
  *
@@ -390,7 +390,7 @@ acpi_aml_store_object_to_index (
  * FUNCTION:    Acpi_aml_store_object_to_node
  *
  * PARAMETERS:  *Source_desc           - Value to be stored
- *              *Node               - Named object to recieve the value
+ *              *Node               - Named object to receive the value
  *
  * RETURN:      Status
  *

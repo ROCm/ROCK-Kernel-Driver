@@ -23,6 +23,7 @@
 	This is a compatibility hardware problem.
 
 	Versions:
+	0.12c	fixing some problems with old cards (aris, 01/08/2001)
 	0.12b	misc fixes (aris, 06/26/2000)
 	0.12a   port of version 0.12a of 2.2.x kernels to 2.3.x
 		(aris (aris@conectiva.com.br), 05/19/2000)
@@ -96,7 +97,7 @@
 */
 
 static const char *version =
-	"eepro.c: v0.12b 04/26/2000 aris@conectiva.com.br\n";
+	"eepro.c: v0.12c 01/08/2000 aris@conectiva.com.br\n";
 
 #include <linux/module.h>
 
@@ -501,8 +502,10 @@ static unsigned eeprom_reg = EEPROM_REG_PRO;
 /* set diagnose flag */
 #define eepro_diag(ioaddr) outb(DIAGNOSE_CMD, ioaddr)
 
+#ifdef ANSWER_TX_AND_RX		/* experimental way of handling interrupts */
 /* ack for rx/tx int */
 #define eepro_ack_rxtx(ioaddr) outb (RX_INT | TX_INT, ioaddr + STATUS_REG)
+#endif
 
 /* ack for rx int */
 #define eepro_ack_rx(ioaddr) outb (RX_INT, ioaddr + STATUS_REG)
@@ -585,7 +588,7 @@ int __init eepro_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
-void printEEPROMInfo(short ioaddr, struct net_device *dev)
+static void printEEPROMInfo(short ioaddr, struct net_device *dev)
 {
 	unsigned short Word;
 	int i,j;
@@ -776,7 +779,8 @@ static int eepro_probe1(struct net_device *dev, short ioaddr)
 				}
 				if (dev->irq < 2) {
 					printk(" Duh! illegal interrupt vector stored in EEPROM.\n");
-						return -ENODEV;
+					kfree(dev->priv);
+					return -ENODEV;
 				} else 
 				
 				if (dev->irq==2)
@@ -950,6 +954,7 @@ static int eepro_open(struct net_device *dev)
 		|| (irq2dev_map[dev->irq] = dev) == 0) && 
 		(irq2dev_map[dev->irq]!=dev)) {
 		/* printk("%s: IRQ map wrong\n", dev->name); */
+	        free_irq(dev->irq, dev);
 		return -EAGAIN;
 	}
 #endif
@@ -1067,6 +1072,8 @@ static int eepro_open(struct net_device *dev)
 	}
 	
 	eepro_sel_reset(ioaddr);
+	SLOW_DOWN;
+	SLOW_DOWN;
 
 	lp->tx_start = lp->tx_end = XMT_LOWER_LIMIT << 8;
 	lp->tx_last = 0;
@@ -1162,9 +1169,11 @@ eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	while (((status = inb(ioaddr + STATUS_REG)) & 0x06) && (boguscount--))
 	{
 		switch (status & (RX_INT | TX_INT)) {
+#ifdef ANSWER_TX_AND_RX
 			case (RX_INT | TX_INT):
 				eepro_ack_rxtx(ioaddr);
 				break;
+#endif
 			case RX_INT:
 				eepro_ack_rx(ioaddr);
 				break;
@@ -1178,6 +1187,9 @@ eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 			/* Get the received packets */
 			eepro_rx(dev);
+#ifndef ANSWER_TX_AND_RX
+			continue;
+#endif
 		}
 		if (status & TX_INT) {
 			if (net_debug > 4)
@@ -1367,7 +1379,11 @@ set_multicast_list(struct net_device *dev)
 		/* Re-enable RX and TX interrupts */
 		eepro_en_int(ioaddr);
 	}
-	eepro_complete_selreset(ioaddr);
+	if (lp->eepro == LAN595FX_10ISA) {
+		eepro_complete_selreset(ioaddr);
+	}
+	else
+		eepro_en_rx(ioaddr);
 }
 
 /* The horrible routine to read a word from the serial EEPROM. */
@@ -1535,7 +1551,9 @@ hardware_send_packet(struct net_device *dev, void *buf, short length)
 			printk(KERN_DEBUG "%s: exiting hardware_send_packet routine.\n", dev->name);
 		return;
 	}
-	netif_stop_queue(dev);
+	if (lp->eepro == LAN595FX_10ISA)
+		netif_stop_queue(dev);
+
 	if (net_debug > 5)
 		printk(KERN_DEBUG "%s: exiting hardware_send_packet routine.\n", dev->name);
 }
@@ -1591,6 +1609,7 @@ eepro_rx(struct net_device *dev)
 	
 			skb->protocol = eth_type_trans(skb,dev);	
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
 		}
 		
@@ -1654,9 +1673,13 @@ eepro_transmit_interrupt(struct net_device *dev)
 		xmt_status = inw(ioaddr+IO_PORT);
 		
 		if ((xmt_status & TX_DONE_BIT) == 0) {
-			udelay(40);
-			boguscount--;
-			continue;
+			if (lp->eepro == LAN595FX_10ISA) {
+				udelay(40);
+				boguscount--;
+				continue;
+			}
+			else
+				break;
 		}
 
 		xmt_status = inw(ioaddr+IO_PORT); 
@@ -1723,9 +1746,11 @@ eepro_transmit_interrupt(struct net_device *dev)
 	 * interrupt again for tx. in other words: tx timeout what will take
 	 * a lot of time to happen, so we'll do a complete selreset.
 	 */
-	if (!boguscount)
+	if (!boguscount && lp->eepro == LAN595FX_10ISA)
 		eepro_complete_selreset(ioaddr);
 }
+
+#ifdef MODULE
 
 #define MAX_EEPRO 8
 static struct net_device dev_eepro[MAX_EEPRO];
@@ -1737,7 +1762,7 @@ static int mem[MAX_EEPRO] = {	/* Size of the rx buffer in KB */
 };
 static int autodetect;
 
-static int n_eepro = 0;
+static int n_eepro;
 /* For linux 2.1.xx */
 
 MODULE_AUTHOR("Pascal Dupuis <dupuis@lei.ucl.ac.be> for the 2.1 stuff (locking,...)");
@@ -1746,8 +1771,6 @@ MODULE_PARM(io, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(autodetect, "1-" __MODULE_STRING(1) "i");
-
-#ifdef MODULE
 
 int 
 init_module(void)

@@ -29,7 +29,7 @@
 #include <linux/etherdevice.h>
 
 
-//#define ARLAN_DEBUGING 1
+//#define ARLAN_DEBUGGING 1
 
 #define ARLAN_PROC_INTERFACE
 #define MAX_ARLANS 4 /* not more than 4 ! */
@@ -50,7 +50,6 @@ extern int	arlan_debug;
 extern char *	siteName;
 extern int	arlan_entry_debug;
 extern int	arlan_exit_debug;
-extern int	arlan_entry_and_exit_debug;
 extern int	testMemory;
 extern const char* arlan_version;
 extern int     arlan_command(struct net_device * dev, int command);
@@ -76,9 +75,9 @@ extern int     arlan_command(struct net_device * dev, int command);
 #define IFDEBUG( L ) if ( (L) & arlan_debug ) 
 #define ARLAN_FAKE_HDR_LEN 12 
 
-#ifdef ARLAN_DEBUGING
+#ifdef ARLAN_DEBUGGING
 	#define DEBUG 1
-	#define ARLAN_ENTRY_EXIT_DEBUGING 1
+	#define ARLAN_ENTRY_EXIT_DEBUGGING 1
 	#define ARLAN_DEBUG(a,b) printk(KERN_DEBUG a, b)
 #else
 	#define ARLAN_DEBUG(a,b) 
@@ -321,7 +320,7 @@ struct arlan_conf_stru {
       int tx_queue_len;
 };
 
-struct arlan_conf_stru arlan_conf[MAX_ARLANS];
+extern struct arlan_conf_stru arlan_conf[MAX_ARLANS];
 
 struct TxParam
 {

@@ -28,5 +28,9 @@
 /* max length of hostname */
 #define MAXHOSTNAMELEN  64
 
+#ifdef __KERNEL__
+# define CLOCKS_PER_SEC	HZ
+#endif
+
 #endif
 

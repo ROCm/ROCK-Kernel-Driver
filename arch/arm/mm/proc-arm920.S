@@ -25,9 +25,9 @@
 #include <linux/linkage.h>
 #include <linux/config.h>
 #include <asm/assembler.h>
+#include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
-#include "../lib/constants.h"
 
 /*
  * This is the maximum size of an area which will be invalidated

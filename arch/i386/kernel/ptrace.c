@@ -167,14 +167,16 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	if (request == PTRACE_ATTACH) {
 		if (child == current)
 			goto out_tsk;
-		if ((!child->dumpable ||
-		    (current->uid != child->euid) ||
+		if(((current->uid != child->euid) ||
 		    (current->uid != child->suid) ||
 		    (current->uid != child->uid) ||
 	 	    (current->gid != child->egid) ||
 	 	    (current->gid != child->sgid) ||
 	 	    (!cap_issubset(child->cap_permitted, current->cap_permitted)) ||
 	 	    (current->gid != child->gid)) && !capable(CAP_SYS_PTRACE))
+			goto out_tsk;
+		rmb();
+		if (!child->dumpable && !capable(CAP_SYS_PTRACE))
 			goto out_tsk;
 		/* the same process cannot be attached many times */
 		if (child->ptrace & PT_PTRACED)

@@ -54,7 +54,11 @@
  */
 
 #define VERSION(ver,rel,seq) (((ver)<<16) | ((rel)<<8) | (seq))
-#define BREAKPOINT() asm("   int $3");
+#if defined(__i386__)
+#  define BREAKPOINT() asm("   int $3");
+#else
+#  define BREAKPOINT() { }
+#endif
 
 #define MAX_ISA_DEVICES 10
 #define MAX_PCI_DEVICES 10
@@ -103,7 +107,7 @@
 #endif
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP
-#include "../net/wan/syncppp.h"
+#include <net/syncppp.h>
 #endif
 
 #include <asm/segment.h>
@@ -6994,7 +6998,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		status = info->rx_buffer_list[0].status;
 
 		if ( status & (BIT8 + BIT3 + BIT1) ) {
-			/* receive error has occured */
+			/* receive error has occurred */
 			rc = FALSE;
 		} else {
 			if ( memcmp( info->tx_buffer_list[0].virt_addr ,

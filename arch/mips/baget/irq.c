@@ -199,7 +199,7 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 			add_interrupt_randomness(irq);
 		__cli();
 	} else {
-		printk("do_IRQ: Unregistered IRQ (0x%X) occured\n", irq);
+		printk("do_IRQ: Unregistered IRQ (0x%X) occurred\n", irq);
 	}
 	unmask_irq(irq);
 	irq_exit(cpu);

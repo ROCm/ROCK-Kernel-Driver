@@ -28,7 +28,7 @@
 
 #ifdef CONFIG_CPU_32
 # define CPU_INCLUDE_NAME "asm/cpu-multi32.h"
-# ifdef CONFIG_CPU_ARM6
+# ifdef CONFIG_CPU_ARM610
 #  ifdef CPU_NAME
 #   undef  MULTI_CPU
 #   define MULTI_CPU
@@ -36,7 +36,7 @@
 #   define CPU_NAME arm6
 #  endif
 # endif
-# ifdef CONFIG_CPU_ARM7
+# ifdef CONFIG_CPU_ARM710
 #  ifdef CPU_NAME
 #   undef  MULTI_CPU
 #   define MULTI_CPU
@@ -44,7 +44,7 @@
 #   define CPU_NAME arm7
 #  endif
 # endif
-# ifdef CONFIG_CPU_ARM720
+# ifdef CONFIG_CPU_ARM720T
 #  ifdef CPU_NAME
 #   undef  MULTI_CPU
 #   define MULTI_CPU
@@ -52,7 +52,7 @@
 #   define CPU_NAME arm720
 #  endif
 # endif
-# ifdef CONFIG_CPU_ARM920
+# ifdef CONFIG_CPU_ARM920T
 #  ifdef CPU_NAME
 #   undef  MULTI_CPU
 #   define MULTI_CPU

@@ -1400,7 +1400,7 @@ void ide_timer_expiry (unsigned long data)
 
 	if ((handler = hwgroup->handler) == NULL) {
 		/*
-		 * Either a marginal timeout occured
+		 * Either a marginal timeout occurred
 		 * (got the interrupt just as timer expired),
 		 * or we were "sleeping" to give other devices a chance.
 		 * Either way, we don't really want to complain about anything.
@@ -2467,8 +2467,7 @@ int ide_wait_cmd_task (ide_drive_t *drive, byte *buf)
 void ide_delay_50ms (void)
 {
 #ifndef CONFIG_BLK_DEV_IDECS
-	unsigned long timeout = jiffies + ((HZ + 19)/20) + 1;
-	while (0 < (signed long)(timeout - jiffies));
+	mdelay(50);
 #else
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ/20);

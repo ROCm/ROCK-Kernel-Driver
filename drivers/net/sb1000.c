@@ -137,6 +137,14 @@ static inline int sb1000_set_PIDs(const int ioaddr[], const char* name,
 static inline int sb1000_rx(struct net_device *dev);
 static inline void sb1000_error_dpc(struct net_device *dev);
 
+static struct isapnp_device_id id_table[] = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('G','I','C'), ISAPNP_FUNCTION(0x1000), 0 },
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
+
 /* probe for SB1000 using Plug-n-Play mechanism */
 int
 sb1000_probe(struct net_device *dev)

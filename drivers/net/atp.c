@@ -536,7 +536,6 @@ static void tx_timeout(struct net_device *dev)
 	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
 	np->stats.tx_errors++;
-	return;
 }
 
 static int atp_send_packet(struct sk_buff *skb, struct net_device *dev)

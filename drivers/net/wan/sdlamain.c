@@ -635,7 +635,7 @@ static int ioctl (wan_device_t* wandev, unsigned cmd, unsigned long arg)
  * o verify user buffer
  * o copy adapter memory image to user buffer
  *
- * Note: when dumping memory, this routine switches curent dual-port memory
+ * Note: when dumping memory, this routine switches current dual-port memory
  *	 vector, so care must be taken to avoid racing conditions.
  */
 static int ioctl_dump (sdla_t* card, sdla_dump_t* u_dump)

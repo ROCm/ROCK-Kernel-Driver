@@ -382,7 +382,7 @@ extern char *bootdevice;
 void *boot_host;
 int boot_target;
 int boot_part;
-kdev_t boot_dev;
+extern kdev_t boot_dev;
 
 void __init
 pmac_init2(void)

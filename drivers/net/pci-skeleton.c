@@ -791,7 +791,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	tp->mmio_addr = ioaddr;
 	tp->lock = SPIN_LOCK_UNLOCKED;
 
-	pdev->driver_data = dev;
+	pci_set_drvdata(pdev, dev);
 
 	tp->phys[0] = 32;
 
@@ -842,7 +842,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 
 static void __devexit netdrv_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	struct netdrv_private *np;
 
 	DPRINTK ("ENTER\n");
@@ -869,7 +869,7 @@ static void __devexit netdrv_remove_one (struct pci_dev *pdev)
 
 	kfree (dev);
 
-	pdev->driver_data = NULL;
+	pci_set_drvdata (pdev, NULL);
 
 	pci_power_off (pdev, -1);
 
@@ -2077,7 +2077,7 @@ static void netdrv_set_rx_mode (struct net_device *dev)
 
 static void netdrv_suspend (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	struct netdrv_private *tp = (struct netdrv_private *) dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	unsigned long flags;
@@ -2102,7 +2102,7 @@ static void netdrv_suspend (struct pci_dev *pdev)
 
 static void netdrv_resume (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 
 	pci_power_on (pdev);
 	netif_device_attach (dev);

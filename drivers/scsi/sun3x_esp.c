@@ -103,7 +103,11 @@ int sun3x_esp_detect(Scsi_Host_Template *tpnt)
 					   sizeof (cmd_buffer));
 
 	esp->irq = 2;
-	request_irq(esp->irq, esp_intr, SA_INTERRUPT, "SUN3X SCSI", NULL);
+	if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
+			"SUN3X SCSI", NULL)) {
+		esp_deallocate(esp);
+		return 0;
+	}
 
 	esp->scsi_id = 7;
 	esp->diff = 0;

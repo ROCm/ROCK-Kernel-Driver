@@ -1,6 +1,6 @@
 /*
  *   olympic.c (c) 1999 Peter De Schrijver All Rights Reserved
- *		   1999 Mike Phillips (phillim@amtrak.com)
+ *		   1999 Mike Phillips (mikep@linuxtr.net)
  *
  *  Linux driver for IBM PCI tokenring cards based on the Pit/Pit-Phy/Olympic
  *  chipset. 
@@ -38,10 +38,11 @@
  *            Fixing the hardware descriptors was another matter,
  *            because they weren't going through read[wl](), there all
  *            the results had to be in memory in le32 values. kdaaker
- *
+ * 12/23/00 - Added minimal Cardbus support (Thanks Donald).
  *
  *  To Do:
- *
+ *           Complete full Cardbus / hot-swap support.
+ * 
  *  If Problems do Occur
  *  Most problems can be rectified by either closing and opening the interface
  *  (ifconfig down and up) or rmmod and insmod'ing the driver (a bit difficult
@@ -99,7 +100,7 @@
  */
 
 static char *version = 
-"Olympic.c v0.5.0 3/10/00 - Peter De Schrijver & Mike Phillips" ; 
+"Olympic.c v0.5.C 12/23/00 - Peter De Schrijver & Mike Phillips" ; 
 
 static struct pci_device_id olympic_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_IBM, PCI_DEVICE_ID_IBM_TR_WAKE, PCI_ANY_ID, PCI_ANY_ID, },
@@ -191,11 +192,9 @@ static int __init olympic_scan(struct net_device *dev)
 			if (pci_enable_device(pci_device))
 				continue;
 
-			/* These lines are needed by the PowerPC, it appears
-that these flags
-			 * are not being set properly for the PPC, this may
-well be fixed with
-			 * the new PCI code */			
+			/* These lines are needed by the PowerPC, it appears that these flags
+			 * are not being set properly for the PPC, this may well be fixed with
+			 * the new PCI code */ 
 			pci_read_config_word(pci_device, PCI_COMMAND, &pci_command);
 			pci_command |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
 			pci_write_config_word(pci_device, PCI_COMMAND,pci_command);
@@ -224,7 +223,7 @@ well be fixed with
 #endif
 			dev->irq=pci_device->irq;
 			dev->base_addr=pci_resource_start(pci_device, 0);
-			dev->init=&olympic_init;
+			dev->init=&olympic_init;	/* AKPM: Not needed */
 			olympic_priv->olympic_card_name = (char *)pci_device->resource[0].name ; 
 			olympic_priv->olympic_mmio = 
 				ioremap(pci_resource_start(pci_device,1),256);
@@ -240,7 +239,6 @@ well be fixed with
 			olympic_priv->olympic_message_level = message_level[card_no] ; 
 	
 			if(olympic_init(dev)==-1) {
-				unregister_netdevice(dev);
 				kfree(dev->priv);
 				return 0;
 			}				
@@ -287,6 +285,10 @@ static int __init olympic_init(struct net_device *dev)
 	}
 
 	spin_lock_init(&olympic_priv->olympic_lock) ; 
+
+	/* Needed for cardbus */
+	if(!(readl(olympic_mmio+BCTL) & BCTL_MODE_INDICATOR))
+		writel(readl(olympic_priv->olympic_mmio+FERMASK)|FERMASK_INT_BIT, olympic_mmio+FERMASK);
 
 #if OLYMPIC_DEBUG
 	printk("BCTL: %x\n",readl(olympic_mmio+BCTL));

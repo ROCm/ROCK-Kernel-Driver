@@ -690,19 +690,30 @@ int atari_scsi_detect (Scsi_Host_Template *host)
 		/* This int is actually "pseudo-slow", i.e. it acts like a slow
 		 * interrupt after having cleared the pending flag for the DMA
 		 * interrupt. */
-		request_irq(IRQ_TT_MFP_SCSI, scsi_tt_intr, IRQ_TYPE_SLOW,
-		            "SCSI NCR5380", scsi_tt_intr);
+		if (request_irq(IRQ_TT_MFP_SCSI, scsi_tt_intr, IRQ_TYPE_SLOW,
+				 "SCSI NCR5380", scsi_tt_intr)) {
+			printk(KERN_ERR "atari_scsi_detect: cannot allocate irq %d, aborting",IRQ_TT_MFP_SCSI);
+			scsi_unregister(atari_scsi_host);
+			atari_stram_free(atari_dma_buffer);
+			atari_dma_buffer = 0;
+			return 0;
+		}
 		tt_mfp.active_edge |= 0x80;		/* SCSI int on L->H */
 #ifdef REAL_DMA
 		tt_scsi_dma.dma_ctrl = 0;
 		atari_dma_residual = 0;
-#endif /* REAL_DMA */
-#ifdef REAL_DMA
 #ifdef CONFIG_TT_DMA_EMUL
 		if (MACH_IS_HADES) {
-			request_irq(IRQ_AUTO_2, hades_dma_emulator,
-				    IRQ_TYPE_PRIO, "Hades DMA emulator",
-				    hades_dma_emulator);
+			if (request_irq(IRQ_AUTO_2, hades_dma_emulator,
+					 IRQ_TYPE_PRIO, "Hades DMA emulator",
+					 hades_dma_emulator)) {
+				printk(KERN_ERR "atari_scsi_detect: cannot allocate irq %d, aborting (MACH_IS_HADES)",IRQ_AUTO_2);
+				free_irq(IRQ_TT_MFP_SCSI, scsi_tt_intr);
+				scsi_unregister(atari_scsi_host);
+				atari_stram_free(atari_dma_buffer);
+				atari_dma_buffer = 0;
+				return 0;
+			}
 		}
 #endif
 		if (MACH_IS_MEDUSA || MACH_IS_HADES) {
@@ -719,9 +730,8 @@ int atari_scsi_detect (Scsi_Host_Template *host)
 			 * the rest data bug is fixed, this can be lowered to 1.
 			 */
 			atari_read_overruns = 4;
-		}
-#endif
-		
+		}		
+#endif /*REAL_DMA*/
 	}
 	else { /* ! IS_A_TT */
 		

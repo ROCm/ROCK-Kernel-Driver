@@ -450,11 +450,12 @@ static int ipxitf_device_event(struct notifier_block *notifier,
 	spin_lock_bh(&ipx_interfaces_lock);
 	for (i = ipx_interfaces; i;) {
 		tmp = i->if_next;
-		if (i->if_dev == dev)
+		if (i->if_dev == dev) {
 			if (event == NETDEV_UP)
 				ipxitf_hold(i);
 			else
 				__ipxitf_put(i);
+		}
 		i = tmp;
 	}
 	spin_unlock_bh(&ipx_interfaces_lock);

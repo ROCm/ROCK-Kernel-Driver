@@ -1841,7 +1841,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 static int ymf_open(struct inode *inode, struct file *file)
 {
 	struct list_head *list;
-	ymfpci_t *unit;
+	ymfpci_t *unit = NULL;
 	int minor;
 	struct ymf_state *state;
 	int err;

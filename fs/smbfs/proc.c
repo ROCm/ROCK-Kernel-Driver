@@ -950,7 +950,10 @@ smb_proc_open(struct smb_sb_info *server, struct dentry *dentry, int wish)
 #if 0
 	/* FIXME: why is this code not in? below we fix it so that a caller
 	   wanting RO doesn't get RW. smb_revalidate_inode does some 
-	   optimization based on access mode. tail -f needs it to be correct. */
+	   optimization based on access mode. tail -f needs it to be correct.
+
+	   We must open rw since we don't do the open if called a second time
+	   with different 'wish'. Is that not supported by smb servers? */
 	if (!(wish & (O_WRONLY | O_RDWR)))
 		mode = read_only;
 #endif
@@ -989,8 +992,6 @@ smb_proc_open(struct smb_sb_info *server, struct dentry *dentry, int wish)
 	/* smb_vwv2 has mtime */
 	/* smb_vwv4 has size  */
 	ino->u.smbfs_i.access = (WVAL(server->packet, smb_vwv6) & SMB_ACCMASK);
-	if (!(wish & (O_WRONLY | O_RDWR)))
-		ino->u.smbfs_i.access = SMB_O_RDONLY;
 	ino->u.smbfs_i.open = server->generation;
 
 out:
@@ -1008,23 +1009,20 @@ smb_open(struct dentry *dentry, int wish)
 	int result;
 
 	result = -ENOENT;
-	if (!inode)
-	{
+	if (!inode) {
 		printk(KERN_ERR "smb_open: no inode for dentry %s/%s\n",
 		       DENTRY_PATH(dentry));
 		goto out;
 	}
 
-	if (!smb_is_open(inode))
-	{
+	if (!smb_is_open(inode)) {
 		struct smb_sb_info *server = SMB_SERVER(inode);
 		smb_lock_server(server);
 		result = 0;
 		if (!smb_is_open(inode))
 			result = smb_proc_open(server, dentry, wish);
 		smb_unlock_server(server);
-		if (result)
-		{
+		if (result) {
 			PARANOIA("%s/%s open failed, result=%d\n",
 				 DENTRY_PATH(dentry), result);
 			goto out;

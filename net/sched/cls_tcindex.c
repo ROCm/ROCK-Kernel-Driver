@@ -339,7 +339,7 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker)
 {
 	struct tcindex_data *p = PRIV(tp);
-	struct tcindex_filter *f;
+	struct tcindex_filter *f,*next;
 	int i;
 
 	DPRINTK("tcindex_walk(tp %p,walker %p),p %p\n",tp,walker,p);
@@ -361,7 +361,8 @@ static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker)
 	if (!p->h)
 		return;
 	for (i = 0; i < p->hash; i++) {
-		for (f = p->h[i]; f; f = f->next) {
+		for (f = p->h[i]; f; f = next) {
+			next = f->next;
 			if (walker->count >= walker->skip) {
 				if (walker->fn(tp,(unsigned long) &f->result,
 				    walker) < 0) {

@@ -287,7 +287,7 @@
 #define STS_LNF    0x00001000       /* Link Fail */
 #define STS_FD     0x00000800       /* Full-Duplex Short Frame Received */
 #define STS_TM     0x00000800       /* Timer Expired (DC21041) */
-#define STS_ETI    0x00000400       /* Early Transmit Interupt */
+#define STS_ETI    0x00000400       /* Early Transmit Interrupt */
 #define STS_AT     0x00000400       /* AUI/TP Pin */
 #define STS_RWT    0x00000200       /* Receive Watchdog Time-Out */
 #define STS_RPS    0x00000100       /* Receive Process Stopped */

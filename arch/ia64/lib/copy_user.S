@@ -16,7 +16,7 @@
  *	in2	number of bytes to copy
  *
  * Outputs: 
- * 	ret0	0 in case of sucess. The number of bytes NOT copied in
+ * 	ret0	0 in case of success. The number of bytes NOT copied in
  * 		case of error.
  *
  * Copyright (C) 2000 Hewlett-Packard Co

@@ -4,7 +4,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Mon Nov 20 22:59:11 2000
+# Last update: Fri Feb  9 22:27:32 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -48,13 +48,23 @@ accelent_l7200		ARCH_L7200_ACCELENT	ACCELENT_L7200		37
 netport			SA1100_NETPORT		NETPORT			38
 pangolin		SA1100_PANGOLIN		PANGOLIN		39
 yopy			SA1100_YOPY		YOPY			40
-sa1100			SA1100_SA1100		SA1100			41
-huw_webpanel		ARCH_HUW_WEBPANEL	HUW_WEBPANEL		42
+coolidge		SA1100_COOLIDGE		coolidge		41
+huw_webpanel		SA1100_HUW_WEBPANEL	HUW_WEBPANEL		42
 spotme			ARCH_SPOTME		SPOTME			43
 freebird		ARCH_FREEBIRD		FREEBIRD		44
 ti925			ARCH_TI925		TI925			45
 riscstation		ARCH_RISCSTATION	RISCSTATION		46
 cavy			SA1100_CAVY		CAVY			47
+jornada720		SA1100_JORNADA720	JORNADA720		48
+omnimeter		SA1100_OMNIMETER	OMNIMETER		49
+edb7211			ARCH_EDB7211		EDB7211			50
+citygo			SA1100_CITYGO		CITYGO			51
+pfs168			SA1100_PFS168		PFS168			52
+spot			SA1100_SPOT		SPOT			53
+flexanet		ARCH_FLEXANET		FLEXANET		54
+webpal			ARCH_WEBPAL		WEBPAL			55
+linpda			SA1100_LINPDA		LINPDA			56
+anakin			ARCH_ANAKIN		ANAKIN			57
 
 # The following are unallocated
 empeg			SA1100_EMPEG		EMPEG

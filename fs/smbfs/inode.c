@@ -161,17 +161,15 @@ smb_refresh_inode(struct dentry *dentry)
 	struct smb_fattr fattr;
 
 	error = smb_proc_getattr(dentry, &fattr);
-	if (!error)
-	{
+	if (!error) {
 		smb_renew_times(dentry);
 		/*
 		 * Check whether the type part of the mode changed,
 		 * and don't update the attributes if it did.
 		 */
-		if ((inode->i_mode & S_IFMT) == (fattr.f_mode & S_IFMT))
+		if ((inode->i_mode & S_IFMT) == (fattr.f_mode & S_IFMT)) {
 			smb_set_inode_attr(inode, &fattr);
-		else
-		{
+		} else {
 			/*
 			 * Big trouble! The inode has become a new object,
 			 * so any operations attempted on it are invalid.
@@ -212,18 +210,11 @@ smb_revalidate_inode(struct dentry *dentry)
 	struct smb_sb_info *s = server_from_dentry(dentry);
 	struct inode *inode = dentry->d_inode;
 	time_t last_time;
+	loff_t last_sz;
 	int error = 0;
 
 	DEBUG1("smb_revalidate_inode\n");
-	/*
-	 * If this is a file opened with write permissions,
-	 * the inode will be up-to-date.
-	 */
 	lock_kernel();
-	if (S_ISREG(inode->i_mode) && smb_is_open(inode)) {
-		if (inode->u.smbfs_i.access != SMB_O_RDONLY)
-			goto out;
-	}
 
 	/*
 	 * Check whether we've recently refreshed the inode.
@@ -236,11 +227,13 @@ smb_revalidate_inode(struct dentry *dentry)
 
 	/*
 	 * Save the last modified time, then refresh the inode.
-	 * (Note: a size change should have a different mtime.)
+	 * (Note: a size change should have a different mtime,
+	 *  or same mtime but different size.)
 	 */
 	last_time = inode->i_mtime;
+	last_sz   = inode->i_size;
 	error = smb_refresh_inode(dentry);
-	if (error || inode->i_mtime != last_time) {
+	if (error || inode->i_mtime != last_time || inode->i_size != last_sz) {
 		VERBOSE("%s/%s changed, old=%ld, new=%ld\n",
 			DENTRY_PATH(dentry),
 			(long) last_time, (long) inode->i_mtime);

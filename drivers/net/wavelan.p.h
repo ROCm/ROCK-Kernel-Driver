@@ -420,7 +420,8 @@
 #undef DEBUG_RX_INFO		/* header of the received packet */
 #undef DEBUG_RX_FAIL		/* Normal failure conditions */
 #define DEBUG_RX_ERROR		/* Unexpected conditions */
-#undef DEBUG_PACKET_DUMP	32	/* Dump packet on the screen. */
+
+#undef DEBUG_PACKET_DUMP	/* Dump packet on the screen if defined to 32. */
 #undef DEBUG_IOCTL_TRACE	/* misc. call by Linux */
 #undef DEBUG_IOCTL_INFO		/* various debugging info */
 #define DEBUG_IOCTL_ERROR	/* what's going wrong */

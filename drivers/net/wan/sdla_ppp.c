@@ -897,7 +897,7 @@ static int if_send (struct sk_buff *skb, struct net_device *dev)
 
     	if (test_and_set_bit(0, (void*)&card->wandev.critical)) {
 
-		printk(KERN_INFO "%s: Critical in if_send: %x\n",
+		printk(KERN_INFO "%s: Critical in if_send: %lx\n",
 				card->wandev.name,card->wandev.critical);
     		dev_kfree_skb(skb);
 
@@ -1686,8 +1686,6 @@ static void rx_intr(sdla_t *card)
 				card->devname);
 			++card->wandev.stats.rx_dropped;
 			++ppp_priv_area->rx_intr_stat.rx_intr_no_socket;
-			
-               		dev_kfree_skb(skb);
 		}
 
 	} else {
@@ -2589,8 +2587,6 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
     	}	
 
 	ppp_priv_area->udp_pkt_lgth = 0;
-	
-	return; 
 }
 
 /*=============================================================================
@@ -2753,7 +2749,7 @@ static int remove_route( sdla_t *card )
 			 card->devname, err);
 		return err;
 	}else
-		printk (KERN_INFO "%s: PPP Deleting dynamic route %s successfuly\n",
+		printk (KERN_INFO "%s: PPP Deleting dynamic route %s successfully\n",
 			card->devname, in_ntoa(ip_addr));
 
 	

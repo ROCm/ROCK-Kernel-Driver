@@ -73,8 +73,8 @@
 #error For now, COMX really needs the /proc filesystem
 #endif
 
+#include <net/syncppp.h>
 #include "comx.h"
-#include "syncppp.h"
 
 MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>");
 MODULE_DESCRIPTION("Common code for the COMX synchronous serial adapters");

@@ -648,7 +648,7 @@ typedef union md_pdir {
 #define MD_SDIR_MASK            0xffffffff
 
 /* When premium mode is on for probing but standard directory memory
-   is installed, the vaild directory bits depend on the phys. bank */
+   is installed, the valid directory bits depend on the phys. bank */
 #define MD_PDIR_PROBE_MASK(pb)  0xffffffffffffffff
 #define MD_SDIR_PROBE_MASK(pb)  (0xffff0000ffff << ((pb) ? 16 : 0))
 

@@ -1,3 +1,92 @@
+Sun Mar 4 18:30 2001 Gerard Roudier (groudier@club-internet.fr)
+	* version sym53c8xx-1.7.3a
+	- Fix an issue in the ncr_int_udc() (unexpected disconnect)
+	  handling. If the DSA didn't match a CCB, a bad write to 
+	  memory could happen.
+
+Mon Feb 12 22:30 2001 Gerard Roudier (groudier@club-internet.fr)
+	* version sym53c8xx-1.7.3
+	- Support for hppa.
+	  Tiny patch sent to me by Robert Hirst.
+	- Tiny patch for ia64 sent to me by Pamela Delaney.
+
+Tue Feb 6 13:30 2001 Gerard Roudier (groudier@club-internet.fr)
+	* version sym53c8xx-1.7.3-pre1
+	- Call pci_enable_device() as AC wants this to be done.
+	- Get both the BAR cookies used by CPU and actual PCI BAR 
+	  values used from SCRIPTS. Recent PCI chips are able to 
+	  access themselves using internal cycles, but they compare 
+	  BAR values to destination address to make decision.
+	  Earlier chips simply use PCI transactions to access IO 
+	  registers from SCRIPTS.
+	  The bus_dvma_to_mem() interface that reverses the actual 
+	  PCI BAR value from the BAR cookie is now useless.
+	  This point had been discussed at the list and the solution 
+	  got approved by PCI code maintainer (Martin Mares).
+	- Merge changes for linux-2.4 that declare the host template 
+	  in the driver object also when the driver is statically 
+	  linked with the kernel.
+	- Increase SCSI message size up to 12 bytes, given that 8 
+	  bytes was not enough for the PPR message (fix).
+	- Add field 'maxoffs_st' (max offset for ST data transfers).
+	  The C1010 supports offset 62 in DT mode but only 31 in 
+	  ST mode, to 2 different values for the max SCSI offset 
+	  are needed. Replace the obviously wrong masking of the 
+	  offset against 0x1f for ST mode by a lowering to 
+	  maxoffs_st of the SCSI offset in ST mode.
+	- Refine a work-around for the C1010-66. Revision 1 does 
+	  not requires extra cycles in DT DATA OUT phase.
+	- Add a missing endian-ization (abrt_tbl.addr).
+	- Minor clean-up in the np structure for fields accessed 
+	  from SCRIPTS that requires special alignments.
+
+Sun Sep 24 21:30 2000 Gerard Roudier (groudier@club-internet.fr)
+	* version sym53c8xx-1.7.2
+	- Remove the hack for PPC added in previous driver version.
+	- Add FE_DAC feature bit to distinguish between 64 bit PCI 
+	  addressing (FE_DAC) and 64 bit PCI interface (FE_64BIT).
+	- Get rid of the boot command line "ultra:" argument.
+	  This parameter wasn't that clever since we can use "sync:" 
+	  for Ultra/Ultra2 settings, and for Ultra3 we may want to 
+	  pass PPR options (for now only DT clocking).
+	- Add FE_VARCLK feature bit that indicates that SCSI clock 
+	  frequency may vary depending on board design and thus, 
+	  the driver should try to evaluate the SCSI clock.
+	- Simplify the way the driver determine the SCSI clock:
+	  ULTRA3 -> 160 MHz, ULTRA2 -> 80 MHz otherwise 40 MHz.
+	  Measure the SCSI clock frequency if FE_VARCLK is set.
+	- Remove FE_CLK80 feature bit that got useless.
+	- Add support for the SYM53C875A (Pamela Delaney).
+
+Wed Jul 26 23:30 2000 Gerard Roudier (groudier@club-internet.fr)
+	* version sym53c8xx-1.7.1
+	- Provide OpenFirmare path through the proc FS on PPC.
+	- Download of on-chip SRAM using memcpy_toio() doesn't work 
+	  on PPC. Restore previous method (MEMORY MOVE from SCRIPTS).
+	- Remove trailing argument #2 from a couple of #undefs.
+
+Sun Jul 09 16:30 2000 Gerard Roudier (groudier@club-internet.fr)
+	* version sym53c8xx-1.7.0
+	- Remove the PROFILE C and SCRIPTS code.
+	  This facility was not this useful and thus was not longer 
+	  desirable given the increasing complexity of the driver code.
+	- Merges from FreeBSD sym-1.6.2 driver:
+	  * Clarify memory barriers needed by the driver for architectures 
+	    that implement a weak memory ordering.
+	  * Simpler handling of illegal phases and data overrun from 
+	    SCRIPTS. These errors are now immediately reported to 
+	    the C code by an interrupt.
+	  * Sync the residual handling code with sym-1.6.2 and now 
+	    report `resid' to user for linux version >= 2.3.99 
+	- General cleanup:
+	  Move definitions for barriers and IO/MMIO operations to the 
+	  sym53c8xx_defs.h header files. They are now shared by the 
+	  both drivers.
+	  Remove unused options that claimed to optimize for the 896.
+	  If fact, they were not this clever. :)
+	  Use SCSI_NCR_IOMAPPED instead of NCR_IOMAPPED.
+	  Remove a couple of unused fields from data structures.
+
 Thu May 11 12:40 2000 Pam Delaney (pam.delaney@lsil.com)
 	* version sym53c8xx-1.6b
 	- Merged version.

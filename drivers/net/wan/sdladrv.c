@@ -195,6 +195,12 @@ static unsigned short checksum (unsigned char* buf, unsigned len);
  * Note: All data must be explicitly initialized!!!
  */
 
+static struct pci_device_id sdladrv_pci_tbl[] __initdata = {
+	{ V3_VENDOR_ID, V3_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, sdladrv_pci_tbl);
+
 /* private data */
 static char modname[]	= "sdladrv";
 static char fullname[]	= "SDLA Support Module";

@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.48 2000/11/06 06:59:04 davem Exp $
+/* $Id: ultra.S,v 1.49 2001/03/02 03:12:00 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -59,6 +59,7 @@ __flush_tlb_range_constant_time: /* %o0=ctx, %o1=start, %o3=end */
 /*IC5*/	rdpr		%pstate, %g1
 	wrpr		%g1, PSTATE_IE, %pstate
 	mov		TLB_TAG_ACCESS, %g3
+	/* XXX Spitfire dependency... */
 	mov		(62 << 3), %g2
 
 	/* Spitfire Errata #32 workaround. */
@@ -469,6 +470,7 @@ xcall_flush_tlb_all:
 	stx		%g0, [%g4 + %lo(errata32_hwbug)]
 
 2:	add		%g2, 1, %g2
+	/* XXX Spitfire dependency... */
 	cmp		%g2, 63
 	ble,pt		%icc, 1b
 	 sll		%g2, 3, %g3

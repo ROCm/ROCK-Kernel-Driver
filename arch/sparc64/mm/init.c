@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.162 2001/02/13 01:16:44 davem Exp $
+/*  $Id: init.c,v 1.164 2001/03/03 10:34:45 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -40,6 +40,8 @@ unsigned long *sparc64_valid_addr_bitmap;
 /* Ugly, but necessary... -DaveM */
 unsigned long phys_base;
 
+enum ultra_tlb_layout tlb_type = spitfire;
+
 /* get_new_mmu_context() uses "cache + 1".  */
 spinlock_t ctx_alloc_lock = SPIN_LOCK_UNLOCKED;
 unsigned long tlb_context_cache = CTX_FIRST_VERSION - 1;
@@ -57,17 +59,17 @@ int do_check_pgt_cache(int low, int high)
 {
         int freed = 0;
 
-	if(pgtable_cache_size > high) {
+	if (pgtable_cache_size > high) {
 		do {
 #ifdef CONFIG_SMP
-			if(pgd_quicklist)
+			if (pgd_quicklist)
 				free_pgd_slow(get_pgd_fast()), freed++;
 #endif
-			if(pte_quicklist[0])
+			if (pte_quicklist[0])
 				free_pte_slow(get_pte_fast(0)), freed++;
-			if(pte_quicklist[1])
+			if (pte_quicklist[1])
 				free_pte_slow(get_pte_fast(1)), freed++;
-		} while(pgtable_cache_size > low);
+		} while (pgtable_cache_size > low);
 	}
 #ifndef CONFIG_SMP 
         if (pgd_cache_size > high / 4) {
@@ -163,13 +165,12 @@ void show_mem(void)
 
 int mmu_info(char *buf)
 {
-	/* We'll do the rest later to make it nice... -DaveM */
-#if 0
-	if (this_is_cheetah)
-		sprintf(buf, "MMU Type\t: One bad ass cpu\n");
+	if (tlb_type == cheetah)
+		return sprintf(buf, "MMU Type\t: Cheetah\n");
+	else if (tlb_type == spitfire)
+		return sprintf(buf, "MMU Type\t: Spitfire\n");
 	else
-#endif
-	return sprintf(buf, "MMU Type\t: Spitfire\n");
+		return sprintf(buf, "MMU Type\t: ???\n");
 }
 
 struct linux_prom_translation {
@@ -231,6 +232,8 @@ static void inherit_prom_mappings(void)
 			for (vaddr = trans[i].virt;
 			     vaddr < trans[i].virt + trans[i].size;
 			     vaddr += PAGE_SIZE) {
+				unsigned long val;
+
 				pgdp = pgd_offset(&init_mm, vaddr);
 				if (pgd_none(*pgdp)) {
 					pmdp = __alloc_bootmem(PMD_TABLE_SIZE,
@@ -252,7 +255,14 @@ static void inherit_prom_mappings(void)
 					pmd_set(pmdp, ptep);
 				}
 				ptep = pte_offset(pmdp, vaddr);
-				set_pte (ptep, __pte(trans[i].data | _PAGE_MODIFIED));
+
+				val = trans[i].data;
+
+				/* Clear diag TTE bits. */
+				if (tlb_type == spitfire)
+					val &= ~0x0003fe0000000000UL;
+
+				set_pte (ptep, __pte(val | _PAGE_MODIFIED));
 				trans[i].data += PAGE_SIZE;
 			}
 		}
@@ -268,26 +278,59 @@ static void inherit_prom_mappings(void)
 			     : "r" (0),
 			     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-	phys_page = spitfire_get_dtlb_data(63) & _PAGE_PADDR;
+	switch (tlb_type) {
+	default:
+	case spitfire:
+		phys_page = spitfire_get_dtlb_data(sparc64_highest_locked_tlbent());
+		break;
+
+	case cheetah:
+		phys_page = cheetah_get_ldtlb_data(sparc64_highest_locked_tlbent());
+		break;
+	};
+
+	phys_page &= _PAGE_PADDR;
 	phys_page += ((unsigned long)&prom_boot_page -
 		      (unsigned long)&empty_zero_page);
 
-	/* Lock this into i/d tlb entry 59 */
-	__asm__ __volatile__(
-		"stxa	%%g0, [%2] %3\n\t"
-		"stxa	%0, [%1] %4\n\t"
-		"membar	#Sync\n\t"
-		"flush	%%g6\n\t"
-		"stxa	%%g0, [%2] %5\n\t"
-		"stxa	%0, [%1] %6\n\t"
-		"membar	#Sync\n\t"
-		"flush	%%g6"
-		: : "r" (phys_page | _PAGE_VALID | _PAGE_SZ8K | _PAGE_CP |
-			 _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W),
-		    "r" (59 << 3), "r" (TLB_TAG_ACCESS),
-		    "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS),
-		    "i" (ASI_IMMU), "i" (ASI_ITLB_DATA_ACCESS)
-		: "memory");
+	if (tlb_type == spitfire) {
+		/* Lock this into i/d tlb entry 59 */
+		__asm__ __volatile__(
+			"stxa	%%g0, [%2] %3\n\t"
+			"stxa	%0, [%1] %4\n\t"
+			"membar	#Sync\n\t"
+			"flush	%%g6\n\t"
+			"stxa	%%g0, [%2] %5\n\t"
+			"stxa	%0, [%1] %6\n\t"
+			"membar	#Sync\n\t"
+			"flush	%%g6"
+			: : "r" (phys_page | _PAGE_VALID | _PAGE_SZ8K | _PAGE_CP |
+				 _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W),
+			"r" (59 << 3), "r" (TLB_TAG_ACCESS),
+			"i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS),
+			"i" (ASI_IMMU), "i" (ASI_ITLB_DATA_ACCESS)
+			: "memory");
+	} else if (tlb_type == cheetah) {
+		/* Lock this into i/d tlb-0 entry 11 */
+		__asm__ __volatile__(
+			"stxa	%%g0, [%2] %3\n\t"
+			"stxa	%0, [%1] %4\n\t"
+			"membar	#Sync\n\t"
+			"flush	%%g6\n\t"
+			"stxa	%%g0, [%2] %5\n\t"
+			"stxa	%0, [%1] %6\n\t"
+			"membar	#Sync\n\t"
+			"flush	%%g6"
+			: : "r" (phys_page | _PAGE_VALID | _PAGE_SZ8K | _PAGE_CP |
+				 _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W),
+			"r" ((0 << 16) | (11 << 3)), "r" (TLB_TAG_ACCESS),
+			"i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS),
+			"i" (ASI_IMMU), "i" (ASI_ITLB_DATA_ACCESS)
+			: "memory");
+	} else {
+		/* Implement me :-) */
+		BUG();
+	}
 
 	tte_vaddr = (unsigned long) &empty_zero_page;
 
@@ -298,7 +341,12 @@ static void inherit_prom_mappings(void)
 			     : "r" (0),
 			     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-	kern_locked_tte_data = tte_data = spitfire_get_dtlb_data(63);
+	if (tlb_type == spitfire)
+		tte_data = spitfire_get_dtlb_data(sparc64_highest_locked_tlbent());
+	else
+		tte_data = cheetah_get_ldtlb_data(sparc64_highest_locked_tlbent());
+
+	kern_locked_tte_data = tte_data;
 
 	remap_func = (void *)  ((unsigned long) &prom_remap -
 				(unsigned long) &prom_boot_page);
@@ -311,7 +359,9 @@ static void inherit_prom_mappings(void)
 			     : "r" (0),
 			     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-	remap_func(spitfire_get_dtlb_data(63) & _PAGE_PADDR,
+	remap_func((tlb_type == spitfire ?
+		    (spitfire_get_dtlb_data(sparc64_highest_locked_tlbent()) & _PAGE_PADDR) :
+		    (cheetah_get_ldtlb_data(sparc64_highest_locked_tlbent()) & _PAGE_PADDR)),
 		   (unsigned long) &empty_zero_page,
 		   prom_get_mmu_ihandle());
 
@@ -320,8 +370,8 @@ static void inherit_prom_mappings(void)
 	spitfire_flush_itlb_nucleus_page(0x0);
 
 	/* Now lock us back into the TLBs via OBP. */
-	prom_dtlb_load(63, tte_data, tte_vaddr);
-	prom_itlb_load(63, tte_data, tte_vaddr);
+	prom_dtlb_load(sparc64_highest_locked_tlbent(), tte_data, tte_vaddr);
+	prom_itlb_load(sparc64_highest_locked_tlbent(), tte_data, tte_vaddr);
 
 	/* Re-read translations property. */
 	if ((n = prom_getproperty(node, "translations", (char *)trans, tsz)) == -1) {
@@ -372,26 +422,45 @@ static void __flush_nucleus_vptes(void)
 	int i;
 
 	/* Only DTLB must be checked for VPTE entries. */
-	for(i = 0; i < 63; i++) {
-		unsigned long tag;
+	if (tlb_type == spitfire) {
+		for (i = 0; i < 63; i++) {
+			unsigned long tag;
 
-		/* Spitfire Errata #32 workaround */
-		__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
-				     "flush	%%g6"
-				     : /* No outputs */
-				     : "r" (0),
-				     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
+			/* Spitfire Errata #32 workaround */
+			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
+					     "flush	%%g6"
+					     : /* No outputs */
+					     : "r" (0),
+					     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-		tag = spitfire_get_dtlb_tag(i);
-		if(((tag & ~(PAGE_MASK)) == 0) &&
-		   ((tag &  (PAGE_MASK)) >= prom_reserved_base)) {
-			__asm__ __volatile__("stxa %%g0, [%0] %1"
-					     : /* no outputs */
-					     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
-			membar("#Sync");
-			spitfire_put_dtlb_data(i, 0x0UL);
-			membar("#Sync");
+			tag = spitfire_get_dtlb_tag(i);
+			if (((tag & ~(PAGE_MASK)) == 0) &&
+			    ((tag &  (PAGE_MASK)) >= prom_reserved_base)) {
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : /* no outputs */
+						     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
+				membar("#Sync");
+				spitfire_put_dtlb_data(i, 0x0UL);
+				membar("#Sync");
+			}
 		}
+	} else if (tlb_type == cheetah) {
+		for (i = 0; i < 511; i++) {
+			unsigned long tag = cheetah_get_dtlb_tag(i);
+
+			if ((tag & ~PAGE_MASK) == 0 &&
+			    (tag & PAGE_MASK) >= prom_reserved_base) {
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : /* no outputs */
+						     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
+				membar("#Sync");
+				cheetah_put_dtlb_data(i, 0x0UL);
+				membar("#Sync");
+			}
+		}
+	} else {
+		/* Implement me :-) */
+		BUG();
 	}
 }
 
@@ -401,7 +470,7 @@ struct prom_tlb_entry {
 	unsigned long	tlb_tag;
 	unsigned long	tlb_data;
 };
-struct prom_tlb_entry prom_itlb[8], prom_dtlb[8];
+struct prom_tlb_entry prom_itlb[16], prom_dtlb[16];
 
 void prom_world(int enter)
 {
@@ -426,41 +495,56 @@ void prom_world(int enter)
 		__flush_nucleus_vptes();
 
 		/* Install PROM world. */
-		for (i = 0; i < 8; i++) {
+		for (i = 0; i < 16; i++) {
 			if (prom_dtlb[i].tlb_ent != -1) {
 				__asm__ __volatile__("stxa %0, [%1] %2"
 					: : "r" (prom_dtlb[i].tlb_tag), "r" (TLB_TAG_ACCESS),
 					"i" (ASI_DMMU));
 				membar("#Sync");
-				spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent,
-						       prom_dtlb[i].tlb_data);
+				if (tlb_type == spitfire)
+					spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent,
+							       prom_dtlb[i].tlb_data);
+				else if (tlb_type == cheetah)
+					cheetah_put_ldtlb_data(prom_dtlb[i].tlb_ent,
+							       prom_dtlb[i].tlb_data);
 				membar("#Sync");
 			}
-
 			if (prom_itlb[i].tlb_ent != -1) {
 				__asm__ __volatile__("stxa %0, [%1] %2"
-					: : "r" (prom_itlb[i].tlb_tag), "r" (TLB_TAG_ACCESS),
-					"i" (ASI_IMMU));
+						     : : "r" (prom_itlb[i].tlb_tag),
+						     "r" (TLB_TAG_ACCESS),
+						     "i" (ASI_IMMU));
 				membar("#Sync");
-				spitfire_put_itlb_data(prom_itlb[i].tlb_ent,
-						       prom_itlb[i].tlb_data);
+				if (tlb_type == spitfire)
+					spitfire_put_itlb_data(prom_itlb[i].tlb_ent,
+							       prom_itlb[i].tlb_data);
+				else if (tlb_type == cheetah)
+					cheetah_put_litlb_data(prom_itlb[i].tlb_ent,
+							       prom_itlb[i].tlb_data);
 				membar("#Sync");
 			}
 		}
 	} else {
-		for (i = 0; i < 8; i++) {
+		for (i = 0; i < 16; i++) {
 			if (prom_dtlb[i].tlb_ent != -1) {
 				__asm__ __volatile__("stxa %%g0, [%0] %1"
 					: : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
 				membar("#Sync");
-				spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent, 0x0UL);
+				if (tlb_type == spitfire)
+					spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent, 0x0UL);
+				else
+					cheetah_put_ldtlb_data(prom_dtlb[i].tlb_ent, 0x0UL);
 				membar("#Sync");
 			}
 			if (prom_itlb[i].tlb_ent != -1) {
 				__asm__ __volatile__("stxa %%g0, [%0] %1"
-					: : "r" (TLB_TAG_ACCESS), "i" (ASI_IMMU));
+						     : : "r" (TLB_TAG_ACCESS),
+						     "i" (ASI_IMMU));
 				membar("#Sync");
-				spitfire_put_itlb_data(prom_itlb[i].tlb_ent, 0x0UL);
+				if (tlb_type == spitfire)
+					spitfire_put_itlb_data(prom_itlb[i].tlb_ent, 0x0UL);
+				else
+					cheetah_put_litlb_data(prom_itlb[i].tlb_ent, 0x0UL);
 				membar("#Sync");
 			}
 		}
@@ -490,25 +574,14 @@ void inherit_locked_prom_mappings(int save_p)
 	 * UNDOCUMENTED!!!!!! Thanks S(t)un!
 	 */
 	if (save_p) {
-		for(i = 0; i < 8; i++) {
-			prom_dtlb[i].tlb_ent = -1;
+		for (i = 0; i < 16; i++) {
 			prom_itlb[i].tlb_ent = -1;
+			prom_dtlb[i].tlb_ent = -1;
 		}
 	}
-	for(i = 0; i < 63; i++) {
-		unsigned long data;
-
-
-		/* Spitfire Errata #32 workaround */
-		__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
-				     "flush	%%g6"
-				     : /* No outputs */
-				     : "r" (0),
-				     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
-
-		data = spitfire_get_dtlb_data(i);
-		if((data & (_PAGE_L|_PAGE_VALID)) == (_PAGE_L|_PAGE_VALID)) {
-			unsigned long tag;
+	if (tlb_type == spitfire) {
+		for (i = 0; i < SPITFIRE_HIGHEST_LOCKED_TLBENT; i++) {
+			unsigned long data;
 
 			/* Spitfire Errata #32 workaround */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
@@ -517,36 +590,37 @@ void inherit_locked_prom_mappings(int save_p)
 					     : "r" (0),
 					     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-			tag = spitfire_get_dtlb_tag(i);
-			if(save_p) {
-				prom_dtlb[dtlb_seen].tlb_ent = i;
-				prom_dtlb[dtlb_seen].tlb_tag = tag;
-				prom_dtlb[dtlb_seen].tlb_data = data;
+			data = spitfire_get_dtlb_data(i);
+			if ((data & (_PAGE_L|_PAGE_VALID)) == (_PAGE_L|_PAGE_VALID)) {
+				unsigned long tag;
+
+				/* Spitfire Errata #32 workaround */
+				__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
+						     "flush	%%g6"
+						     : /* No outputs */
+						     : "r" (0),
+						     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
+
+				tag = spitfire_get_dtlb_tag(i);
+				if (save_p) {
+					prom_dtlb[dtlb_seen].tlb_ent = i;
+					prom_dtlb[dtlb_seen].tlb_tag = tag;
+					prom_dtlb[dtlb_seen].tlb_data = data;
+				}
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
+				membar("#Sync");
+				spitfire_put_dtlb_data(i, 0x0UL);
+				membar("#Sync");
+
+				dtlb_seen++;
+				if (dtlb_seen > 15)
+					break;
 			}
-			__asm__ __volatile__("stxa %%g0, [%0] %1"
-					     : : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
-			membar("#Sync");
-			spitfire_put_dtlb_data(i, 0x0UL);
-			membar("#Sync");
-
-			dtlb_seen++;
-			if(dtlb_seen > 7)
-				break;
 		}
-	}
-	for(i = 0; i < 63; i++) {
-		unsigned long data;
 
-		/* Spitfire Errata #32 workaround */
-		__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
-				     "flush	%%g6"
-				     : /* No outputs */
-				     : "r" (0),
-				     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
-
-		data = spitfire_get_itlb_data(i);
-		if((data & (_PAGE_L|_PAGE_VALID)) == (_PAGE_L|_PAGE_VALID)) {
-			unsigned long tag;
+		for (i = 0; i < SPITFIRE_HIGHEST_LOCKED_TLBENT; i++) {
+			unsigned long data;
 
 			/* Spitfire Errata #32 workaround */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
@@ -555,22 +629,87 @@ void inherit_locked_prom_mappings(int save_p)
 					     : "r" (0),
 					     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-			tag = spitfire_get_itlb_tag(i);
-			if(save_p) {
-				prom_itlb[itlb_seen].tlb_ent = i;
-				prom_itlb[itlb_seen].tlb_tag = tag;
-				prom_itlb[itlb_seen].tlb_data = data;
-			}
-			__asm__ __volatile__("stxa %%g0, [%0] %1"
-					     : : "r" (TLB_TAG_ACCESS), "i" (ASI_IMMU));
-			membar("#Sync");
-			spitfire_put_itlb_data(i, 0x0UL);
-			membar("#Sync");
+			data = spitfire_get_itlb_data(i);
+			if ((data & (_PAGE_L|_PAGE_VALID)) == (_PAGE_L|_PAGE_VALID)) {
+				unsigned long tag;
 
-			itlb_seen++;
-			if(itlb_seen > 7)
-				break;
+				/* Spitfire Errata #32 workaround */
+				__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
+						     "flush	%%g6"
+						     : /* No outputs */
+						     : "r" (0),
+						     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
+
+				tag = spitfire_get_itlb_tag(i);
+				if (save_p) {
+					prom_itlb[itlb_seen].tlb_ent = i;
+					prom_itlb[itlb_seen].tlb_tag = tag;
+					prom_itlb[itlb_seen].tlb_data = data;
+				}
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : : "r" (TLB_TAG_ACCESS), "i" (ASI_IMMU));
+				membar("#Sync");
+				spitfire_put_itlb_data(i, 0x0UL);
+				membar("#Sync");
+
+				itlb_seen++;
+				if (itlb_seen > 15)
+					break;
+			}
 		}
+	} else if (tlb_type == cheetah) {
+		for (i = 0; i < CHEETAH_HIGHEST_LOCKED_TLBENT; i++) {
+			unsigned long data;
+
+			data = cheetah_get_ldtlb_data(i);
+			if ((data & (_PAGE_L|_PAGE_VALID)) == (_PAGE_L|_PAGE_VALID)) {
+				unsigned long tag;
+
+				tag = cheetah_get_ldtlb_tag(i);
+				if (save_p) {
+					prom_dtlb[dtlb_seen].tlb_ent = i;
+					prom_dtlb[dtlb_seen].tlb_tag = tag;
+					prom_dtlb[dtlb_seen].tlb_data = data;
+				}
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
+				membar("#Sync");
+				cheetah_put_ldtlb_data(i, 0x0UL);
+				membar("#Sync");
+
+				dtlb_seen++;
+				if (dtlb_seen > 15)
+					break;
+			}
+		}
+
+		for (i = 0; i < CHEETAH_HIGHEST_LOCKED_TLBENT; i++) {
+			unsigned long data;
+
+			data = cheetah_get_litlb_data(i);
+			if ((data & (_PAGE_L|_PAGE_VALID)) == (_PAGE_L|_PAGE_VALID)) {
+				unsigned long tag;
+
+				tag = cheetah_get_litlb_tag(i);
+				if (save_p) {
+					prom_itlb[itlb_seen].tlb_ent = i;
+					prom_itlb[itlb_seen].tlb_tag = tag;
+					prom_itlb[itlb_seen].tlb_data = data;
+				}
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : : "r" (TLB_TAG_ACCESS), "i" (ASI_IMMU));
+				membar("#Sync");
+				cheetah_put_litlb_data(i, 0x0UL);
+				membar("#Sync");
+
+				itlb_seen++;
+				if (itlb_seen > 15)
+					break;
+			}
+		}
+	} else {
+		/* Implement me :-) */
+		BUG();
 	}
 	if (save_p)
 		prom_ditlb_set = 1;
@@ -581,24 +720,33 @@ void prom_reload_locked(void)
 {
 	int i;
 
-	for (i = 0; i < 8; i++) {
+	for (i = 0; i < 16; i++) {
 		if (prom_dtlb[i].tlb_ent != -1) {
 			__asm__ __volatile__("stxa %0, [%1] %2"
 				: : "r" (prom_dtlb[i].tlb_tag), "r" (TLB_TAG_ACCESS),
 				"i" (ASI_DMMU));
 			membar("#Sync");
-			spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent,
-					       prom_dtlb[i].tlb_data);
+			if (tlb_type == spitfire)
+				spitfire_put_dtlb_data(prom_dtlb[i].tlb_ent,
+						       prom_dtlb[i].tlb_data);
+			else if (tlb_type == cheetah)
+				cheetah_put_ldtlb_data(prom_dtlb[i].tlb_ent,
+						      prom_dtlb[i].tlb_data);
 			membar("#Sync");
 		}
 
 		if (prom_itlb[i].tlb_ent != -1) {
 			__asm__ __volatile__("stxa %0, [%1] %2"
-				: : "r" (prom_itlb[i].tlb_tag), "r" (TLB_TAG_ACCESS),
-				"i" (ASI_IMMU));
+					     : : "r" (prom_itlb[i].tlb_tag),
+					     "r" (TLB_TAG_ACCESS),
+					     "i" (ASI_IMMU));
 			membar("#Sync");
-			spitfire_put_itlb_data(prom_itlb[i].tlb_ent,
-					       prom_itlb[i].tlb_data);
+			if (tlb_type == spitfire)
+				spitfire_put_itlb_data(prom_itlb[i].tlb_ent,
+						       prom_itlb[i].tlb_data);
+			else
+				cheetah_put_litlb_data(prom_itlb[i].tlb_ent,
+						       prom_itlb[i].tlb_data);
 			membar("#Sync");
 		}
 	}
@@ -621,7 +769,7 @@ void __flush_cache_all(void)
 	unsigned long va;
 
 	flushw_all();
-	for(va =  0; va < (PAGE_SIZE << 1); va += 32)
+	for (va =  0; va < (PAGE_SIZE << 1); va += 32)
 		spitfire_put_icache_tag(va, 0x0);
 }
 
@@ -636,38 +784,43 @@ void __flush_tlb_all(void)
 			     "wrpr	%0, %1, %%pstate"
 			     : "=r" (pstate)
 			     : "i" (PSTATE_IE));
-	for(i = 0; i < 64; i++) {
-		/* Spitfire Errata #32 workaround */
-		__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
-				     "flush	%%g6"
-				     : /* No outputs */
-				     : "r" (0),
-				     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
+	if (tlb_type == spitfire) {
+		for (i = 0; i < 64; i++) {
+			/* Spitfire Errata #32 workaround */
+			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
+					     "flush	%%g6"
+					     : /* No outputs */
+					     : "r" (0),
+					     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
-		if(!(spitfire_get_dtlb_data(i) & _PAGE_L)) {
-			__asm__ __volatile__("stxa %%g0, [%0] %1"
-					     : /* no outputs */
-					     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
-			membar("#Sync");
-			spitfire_put_dtlb_data(i, 0x0UL);
-			membar("#Sync");
+			if (!(spitfire_get_dtlb_data(i) & _PAGE_L)) {
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : /* no outputs */
+						     : "r" (TLB_TAG_ACCESS), "i" (ASI_DMMU));
+				membar("#Sync");
+				spitfire_put_dtlb_data(i, 0x0UL);
+				membar("#Sync");
+			}
+
+			/* Spitfire Errata #32 workaround */
+			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
+					     "flush	%%g6"
+					     : /* No outputs */
+					     : "r" (0),
+					     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
+
+			if (!(spitfire_get_itlb_data(i) & _PAGE_L)) {
+				__asm__ __volatile__("stxa %%g0, [%0] %1"
+						     : /* no outputs */
+						     : "r" (TLB_TAG_ACCESS), "i" (ASI_IMMU));
+				membar("#Sync");
+				spitfire_put_itlb_data(i, 0x0UL);
+				membar("#Sync");
+			}
 		}
-
-		/* Spitfire Errata #32 workaround */
-		__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
-				     "flush	%%g6"
-				     : /* No outputs */
-				     : "r" (0),
-				     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
-
-		if(!(spitfire_get_itlb_data(i) & _PAGE_L)) {
-			__asm__ __volatile__("stxa %%g0, [%0] %1"
-					     : /* no outputs */
-					     : "r" (TLB_TAG_ACCESS), "i" (ASI_IMMU));
-			membar("#Sync");
-			spitfire_put_itlb_data(i, 0x0UL);
-			membar("#Sync");
-		}
+	} else if (tlb_type == cheetah) {
+		cheetah_flush_dtlb_all();
+		cheetah_flush_itlb_all();
 	}
 	__asm__ __volatile__("wrpr	%0, 0, %%pstate"
 			     : : "r" (pstate));
@@ -709,7 +862,7 @@ void get_new_mmu_context(struct mm_struct *mm)
 			mmu_context_bmap[1] = 0;
 			mmu_context_bmap[2] = 0;
 			mmu_context_bmap[3] = 0;
-			for(i = 4; i < CTX_BMAP_SLOTS; i += 4) {
+			for (i = 4; i < CTX_BMAP_SLOTS; i += 4) {
 				mmu_context_bmap[i + 0] = 0;
 				mmu_context_bmap[i + 1] = 0;
 				mmu_context_bmap[i + 2] = 0;
@@ -740,7 +893,7 @@ pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long offset)
 	pmd_t *pmd;
 
 	pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
-	if(pmd) {
+	if (pmd) {
 		memset(pmd, 0, PAGE_SIZE);
 		pgd_set(pgd, pmd);
 		return pmd + offset;
@@ -798,31 +951,77 @@ void sparc_ultra_dump_itlb(void)
 {
         int slot;
 
-        printk ("Contents of itlb: ");
-	for (slot = 0; slot < 14; slot++) printk ("    ");
-	printk ("%2x:%016lx,%016lx\n", 0, spitfire_get_itlb_tag(0), spitfire_get_itlb_data(0));
-        for (slot = 1; slot < 64; slot+=3) {
-        	printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx %2x:%016lx,%016lx\n", 
-        		slot, spitfire_get_itlb_tag(slot), spitfire_get_itlb_data(slot),
-        		slot+1, spitfire_get_itlb_tag(slot+1), spitfire_get_itlb_data(slot+1),
-        		slot+2, spitfire_get_itlb_tag(slot+2), spitfire_get_itlb_data(slot+2));
-        }
+	if (tlb_type == spitfire) {
+		printk ("Contents of itlb: ");
+		for (slot = 0; slot < 14; slot++) printk ("    ");
+		printk ("%2x:%016lx,%016lx\n",
+			0,
+			spitfire_get_itlb_tag(0), spitfire_get_itlb_data(0));
+		for (slot = 1; slot < 64; slot+=3) {
+			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx %2x:%016lx,%016lx\n", 
+				slot,
+				spitfire_get_itlb_tag(slot), spitfire_get_itlb_data(slot),
+				slot+1,
+				spitfire_get_itlb_tag(slot+1), spitfire_get_itlb_data(slot+1),
+				slot+2,
+				spitfire_get_itlb_tag(slot+2), spitfire_get_itlb_data(slot+2));
+		}
+	} else if (tlb_type == cheetah) {
+		printk ("Contents of itlb0:\n");
+		for (slot = 0; slot < 16; slot+=2) {
+			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
+				slot,
+				cheetah_get_litlb_tag(slot), cheetah_get_litlb_data(slot),
+				slot+1,
+				cheetah_get_litlb_tag(slot+1), cheetah_get_litlb_data(slot+1));
+		}
+		printk ("Contents of itlb2:\n");
+		for (slot = 0; slot < 128; slot+=2) {
+			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
+				slot,
+				cheetah_get_itlb_tag(slot), cheetah_get_itlb_data(slot),
+				slot+1,
+				cheetah_get_itlb_tag(slot+1), cheetah_get_itlb_data(slot+1));
+		}
+	}
 }
 
 void sparc_ultra_dump_dtlb(void)
 {
         int slot;
 
-        printk ("Contents of dtlb: ");
-	for (slot = 0; slot < 14; slot++) printk ("    ");
-	printk ("%2x:%016lx,%016lx\n", 0, spitfire_get_dtlb_tag(0),
-		spitfire_get_dtlb_data(0));
-        for (slot = 1; slot < 64; slot+=3) {
-        	printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx %2x:%016lx,%016lx\n", 
-        		slot, spitfire_get_dtlb_tag(slot), spitfire_get_dtlb_data(slot),
-        		slot+1, spitfire_get_dtlb_tag(slot+1), spitfire_get_dtlb_data(slot+1),
-        		slot+2, spitfire_get_dtlb_tag(slot+2), spitfire_get_dtlb_data(slot+2));
-        }
+	if (tlb_type == spitfire) {
+		printk ("Contents of dtlb: ");
+		for (slot = 0; slot < 14; slot++) printk ("    ");
+		printk ("%2x:%016lx,%016lx\n", 0,
+			spitfire_get_dtlb_tag(0), spitfire_get_dtlb_data(0));
+		for (slot = 1; slot < 64; slot+=3) {
+			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx %2x:%016lx,%016lx\n", 
+				slot,
+				spitfire_get_dtlb_tag(slot), spitfire_get_dtlb_data(slot),
+				slot+1,
+				spitfire_get_dtlb_tag(slot+1), spitfire_get_dtlb_data(slot+1),
+				slot+2,
+				spitfire_get_dtlb_tag(slot+2), spitfire_get_dtlb_data(slot+2));
+		}
+	} else if (tlb_type == cheetah) {
+		printk ("Contents of dtlb0:\n");
+		for (slot = 0; slot < 16; slot+=2) {
+			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
+				slot,
+				cheetah_get_ldtlb_tag(slot), cheetah_get_ldtlb_data(slot),
+				slot+1,
+				cheetah_get_ldtlb_tag(slot+1), cheetah_get_ldtlb_data(slot+1));
+		}
+		printk ("Contents of dtlb2:\n");
+		for (slot = 0; slot < 512; slot+=2) {
+			printk ("%2x:%016lx,%016lx %2x:%016lx,%016lx\n",
+				slot,
+				cheetah_get_dtlb_tag(slot), cheetah_get_dtlb_data(slot),
+				slot+1,
+				cheetah_get_dtlb_tag(slot+1), cheetah_get_dtlb_data(slot+1));
+		}
+	}
 }
 
 extern unsigned long cmdline_memory_size;
@@ -959,20 +1158,7 @@ void __init paging_init(void)
 	pt  = phys_base | _PAGE_VALID | _PAGE_SZ4MB;
 	pt |= _PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W;
 	__save_and_cli(flags);
-	__asm__ __volatile__("
-	stxa	%1, [%0] %3
-	stxa	%2, [%5] %4
-	membar	#Sync
-	flush	%%g6
-	nop
-	nop
-	nop"
-	: /* No outputs */
-	: "r" (TLB_TAG_ACCESS), "r" (alias_base), "r" (pt),
-	  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" (61 << 3)
-	: "memory");
-	if (((unsigned long)&_end) >= KERNBASE + 0x340000) {
-		second_alias_page = alias_base + 0x400000;
+	if (tlb_type == spitfire) {
 		__asm__ __volatile__("
 		stxa	%1, [%0] %3
 		stxa	%2, [%5] %4
@@ -982,9 +1168,52 @@ void __init paging_init(void)
 		nop
 		nop"
 		: /* No outputs */
-		: "r" (TLB_TAG_ACCESS), "r" (second_alias_page), "r" (pt + 0x400000),
-		  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" (60 << 3)
+		: "r" (TLB_TAG_ACCESS), "r" (alias_base), "r" (pt),
+		  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" (61 << 3)
 		: "memory");
+		if (((unsigned long)&_end) >= KERNBASE + 0x340000) {
+			second_alias_page = alias_base + 0x400000;
+			__asm__ __volatile__("
+			stxa	%1, [%0] %3
+			stxa	%2, [%5] %4
+			membar	#Sync
+			flush	%%g6
+			nop
+			nop
+			nop"
+			: /* No outputs */
+			: "r" (TLB_TAG_ACCESS), "r" (second_alias_page), "r" (pt + 0x400000),
+			  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" (60 << 3)
+			: "memory");
+		}
+	} else if (tlb_type == cheetah) {
+		__asm__ __volatile__("
+		stxa	%1, [%0] %3
+		stxa	%2, [%5] %4
+		membar	#Sync
+		flush	%%g6
+		nop
+		nop
+		nop"
+		: /* No outputs */
+		: "r" (TLB_TAG_ACCESS), "r" (alias_base), "r" (pt),
+		  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" ((0<<16) | (13<<3))
+		: "memory");
+		if (((unsigned long)&_end) >= KERNBASE + 0x340000) {
+			second_alias_page = alias_base + 0x400000;
+			__asm__ __volatile__("
+			stxa	%1, [%0] %3
+			stxa	%2, [%5] %4
+			membar	#Sync
+			flush	%%g6
+			nop
+			nop
+			nop"
+			: /* No outputs */
+			: "r" (TLB_TAG_ACCESS), "r" (second_alias_page), "r" (pt + 0x400000),
+			  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" ((0<<16) | (12<<3))
+			: "memory");
+		}
 	}
 	__restore_flags(flags);
 	

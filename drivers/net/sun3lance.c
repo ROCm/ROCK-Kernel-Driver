@@ -148,9 +148,9 @@ struct lance_private {
      	int new_rx, new_tx;	/* The next free ring entry */
 	int old_tx, old_rx;     /* ring entry to be processed */
 	struct net_device_stats stats;
-/* These two must be ints for set_bit() */
-	int					tx_full;
-	int					lock;
+/* These two must be longs for set_bit() */
+	long					tx_full;
+	long					lock;
 };
 
 /* I/O register access macros */
@@ -303,8 +303,11 @@ static int __init lance_probe( struct net_device *dev)
 	}
 
 	init_etherdev( dev, sizeof(struct lance_private) );
-	if (!dev->priv)
+	if (!dev->priv) {
 		dev->priv = kmalloc( sizeof(struct lance_private), GFP_KERNEL );
+		if (!dev->priv)
+			return 0;
+	}
 	lp = (struct lance_private *)dev->priv;
 	MEM = (struct lance_memory *)sun3_dvma_malloc(sizeof(struct
 							     lance_memory)); 

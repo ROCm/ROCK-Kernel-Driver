@@ -109,7 +109,7 @@
  *	Transmit descriptor polling was not reenabled after SkGePortInit.
  *	
  *	Revision 1.16  1999/07/27 15:17:29  cgoos
- *	Added some "\n" in output strings (removed while debuging...).
+ *	Added some "\n" in output strings (removed while debugging...).
  *	
  *	Revision 1.15  1999/07/23 12:09:30  cgoos
  *	Performance optimization, rx checksumming, large frame support.
@@ -260,7 +260,7 @@ static const char SysKonnectBuildNumber[] =
 #define VER_STRING	"3.05"
 
 
-/* for debuging on x86 only */
+/* for debugging on x86 only */
 /* #define BREAKPOINT() asm(" int $3"); */
 
 /* use of a transmit complete interrupt */
@@ -517,6 +517,12 @@ SK_AC	*pAC;
 	
 } /* FreeResources */
 
+
+static struct pci_device_id skge_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_GE, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, skge_pci_tbl);
 
 MODULE_AUTHOR("Christoph Goos <cgoos@syskonnect.de>");
 MODULE_DESCRIPTION("SysKonnect SK-NET Gigabit Ethernet SK-98xx driver");
@@ -2616,7 +2622,7 @@ unsigned int	Flags;			/* for spin lock */
  * Description:
  *	This function is called if an ioctl is issued on the device.
  *	There are three subfunction for reading, writing and test-writing
- *	the private MIB data structure (usefull for SysKonnect-internal tools).
+ *	the private MIB data structure (useful for SysKonnect-internal tools).
  *
  * Returns:
  *	0, if everything is ok

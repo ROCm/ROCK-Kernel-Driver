@@ -20,7 +20,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include "../lib/constants.h"
+#include <asm/constants.h>
 
 /* This is the kernel's entry point into the floating point emulator.
 It is called from the kernel with code similar to this:

@@ -47,7 +47,9 @@
 #include "sound_config.h"
 #include "sound_firmware.h"
 #ifdef MSND_CLASSIC
+# ifndef __alpha__
 #  define SLOWIO
+# endif
 #endif
 #include "msnd.h"
 #ifdef MSND_CLASSIC
@@ -1403,7 +1405,6 @@ static int __init attach_multisound(void)
 	return 0;
 }
 
-#ifdef MODULE
 static void __exit unload_multisound(void)
 {
 	release_region(dev.io, dev.numio);
@@ -1412,7 +1413,6 @@ static void __exit unload_multisound(void)
 	unregister_sound_dsp(dev.dsp_minor);
 	msnd_unregister(&dev);
 }
-#endif
 
 #ifndef MSND_CLASSIC
 

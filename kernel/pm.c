@@ -25,7 +25,19 @@
 
 int pm_active;
 
-static spinlock_t pm_devs_lock = SPIN_LOCK_UNLOCKED;
+/*
+ *	Locking notes:
+ *		pm_devs_lock can be a semaphore providing pm ops are not called
+ *	from an interrupt handler (already a bad idea so no change here). Each
+ *	change must be protected so that an unlink of an entry doesnt clash
+ *	with a pm send - which is permitted to sleep in the current architecture
+ *
+ *	Module unloads clashing with pm events now work out safely, the module 
+ *	unload path will block until the event has been sent. It may well block
+ *	until a resume but that will be fine.
+ */
+ 
+static DECLARE_MUTEX(pm_devs_lock);
 static LIST_HEAD(pm_devs);
 
 /**
@@ -45,16 +57,14 @@ struct pm_dev *pm_register(pm_dev_t type,
 {
 	struct pm_dev *dev = kmalloc(sizeof(struct pm_dev), GFP_KERNEL);
 	if (dev) {
-		unsigned long flags;
-
 		memset(dev, 0, sizeof(*dev));
 		dev->type = type;
 		dev->id = id;
 		dev->callback = callback;
 
-		spin_lock_irqsave(&pm_devs_lock, flags);
+		down(&pm_devs_lock);
 		list_add(&dev->entry, &pm_devs);
-		spin_unlock_irqrestore(&pm_devs_lock, flags);
+		up(&pm_devs_lock);
 	}
 	return dev;
 }
@@ -70,12 +80,18 @@ struct pm_dev *pm_register(pm_dev_t type,
 void pm_unregister(struct pm_dev *dev)
 {
 	if (dev) {
-		unsigned long flags;
-
-		spin_lock_irqsave(&pm_devs_lock, flags);
+		down(&pm_devs_lock);
 		list_del(&dev->entry);
-		spin_unlock_irqrestore(&pm_devs_lock, flags);
+		up(&pm_devs_lock);
 
+		kfree(dev);
+	}
+}
+
+static void __pm_unregister(struct pm_dev *dev)
+{
+	if (dev) {
+		list_del(&dev->entry);
 		kfree(dev);
 	}
 }
@@ -97,13 +113,15 @@ void pm_unregister_all(pm_callback callback)
 	if (!callback)
 		return;
 
+	down(&pm_devs_lock);
 	entry = pm_devs.next;
 	while (entry != &pm_devs) {
 		struct pm_dev *dev = list_entry(entry, struct pm_dev, entry);
 		entry = entry->next;
 		if (dev->callback == callback)
-			pm_unregister(dev);
+			__pm_unregister(dev);
 	}
+	up(&pm_devs_lock);
 }
 
 /**
@@ -119,6 +137,13 @@ void pm_unregister_all(pm_callback callback)
  *
  *	BUGS: what stops two power management requests occuring in parallel
  *	and conflicting.
+ *
+ *	WARNING: Calling pm_send directly is not generally recommended, in
+ *	paticular there is no locking against the pm_dev going away. The
+ *	caller must maintain all needed locking or have 'inside knowledge'
+ *	on the safety. Also remember that this function is not locked against
+ *	pm_unregister. This means that you must handle SMP races on callback
+ *	execution and unload yourself.
  */
  
 int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
@@ -183,6 +208,12 @@ static void pm_undo_all(struct pm_dev *last)
  *	during the processing of this request are restored to their
  *	previous state.
  *
+ *	WARNING:  This function takes the pm_devs_lock. The lock is not dropped until
+ *	the callbacks have completed. This prevents races against pm locking
+ *	functions, races against module unload pm_unregister code. It does
+ *	mean however that you must not issue pm_ functions within the callback
+ *	or you will deadlock and users will hate you.
+ *
  *	Zero is returned on success. If a suspend fails then the status
  *	from the device that vetoes the suspend is returned.
  *
@@ -192,7 +223,10 @@ static void pm_undo_all(struct pm_dev *last)
  
 int pm_send_all(pm_request_t rqst, void *data)
 {
-	struct list_head *entry = pm_devs.next;
+	struct list_head *entry;
+	
+	down(&pm_devs_lock);
+	entry = pm_devs.next;
 	while (entry != &pm_devs) {
 		struct pm_dev *dev = list_entry(entry, struct pm_dev, entry);
 		if (dev->callback) {
@@ -203,11 +237,13 @@ int pm_send_all(pm_request_t rqst, void *data)
 				 */
 				if (rqst == PM_SUSPEND)
 					pm_undo_all(dev);
+				up(&pm_devs_lock);
 				return status;
 			}
 		}
 		entry = entry->next;
 	}
+	up(&pm_devs_lock);
 	return 0;
 }
 
@@ -222,6 +258,10 @@ int pm_send_all(pm_request_t rqst, void *data)
  *	of the list. 
  *
  *	To search from the beginning pass %NULL as the @from value.
+ *
+ *	The caller MUST hold the pm_devs_lock lock when calling this 
+ *	function. The instant that the lock is dropped all pointers returned
+ *	may become invalid.
  */
  
 struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from)

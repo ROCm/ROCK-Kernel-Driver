@@ -1647,7 +1647,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 #if 0 
 	/* Removed superuser check: Sysops can use the permissions on the device
 	   file to restrict access. Recommendation: Root only. (root.root 600) */
-	if (!suser ()) {
+	if (!capable(CAP_SYS_ADMIN)) {
 		return -EPERM;
 	}
 #endif

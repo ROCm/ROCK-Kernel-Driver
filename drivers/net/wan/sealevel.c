@@ -26,7 +26,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>
-#include "syncppp.h"
+#include <net/syncppp.h>
 #include "z85230.h"
 
 
@@ -67,6 +67,7 @@ static void sealevel_input(struct z8530_channel *c, struct sk_buff *skb)
 	 *	it right now.
 	 */
 	netif_rx(skb);
+	c->netdevice->last_rx = jiffies;
 }
  
 /*

@@ -164,21 +164,24 @@ static void figure_loop_size(struct loop_device *lo)
 					lo->lo_device);
 }
 
-static int lo_send(struct loop_device *lo, char *data, int len, loff_t pos)
+static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
+		   loff_t pos)
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
 	struct page *page;
-	char *kaddr;
+	char *kaddr, *data;
 	unsigned long index;
 	unsigned size, offset;
+	int len;
 
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & (PAGE_CACHE_SIZE - 1);
+	len = bh->b_size;
+	data = bh->b_data;
 	while (len > 0) {
-		int IV = index * (PAGE_CACHE_SIZE/lo->lo_blksize) + offset/lo->lo_blksize;
-		IV >>= 2;
+		int IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
 		size = PAGE_CACHE_SIZE - offset;
 		if (size > len)
 			size = len;
@@ -220,6 +223,7 @@ fail:
 struct lo_read_data {
 	struct loop_device *lo;
 	char *data;
+	int bsize;
 };
 
 static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
@@ -228,9 +232,7 @@ static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned l
 	unsigned long count = desc->count;
 	struct lo_read_data *p = (struct lo_read_data*)desc->buf;
 	struct loop_device *lo = p->lo;
-	int IV = page->index * (PAGE_CACHE_SIZE/lo->lo_blksize) + offset/lo->lo_blksize;
-
-	IV >>= 2;
+	int IV = page->index * (PAGE_CACHE_SIZE/p->bsize) + offset/p->bsize;
 
 	if (size > count)
 		size = count;
@@ -249,16 +251,18 @@ static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned l
 	return size;
 }
 
-static int lo_receive(struct loop_device *lo, char *data, int len, loff_t pos)
+static int lo_receive(struct loop_device *lo, struct buffer_head *bh, int bsize,
+		      loff_t pos)
 {
 	struct lo_read_data cookie;
 	read_descriptor_t desc;
 	struct file *file;
 
 	cookie.lo = lo;
-	cookie.data = data;
+	cookie.data = bh->b_data;
+	cookie.bsize = bsize;
 	desc.written = 0;
-	desc.count = len;
+	desc.count = bh->b_size;
 	desc.buf = (char*)&cookie;
 	desc.error = 0;
 	spin_lock_irq(&lo->lo_lock);
@@ -266,6 +270,32 @@ static int lo_receive(struct loop_device *lo, char *data, int len, loff_t pos)
 	spin_unlock_irq(&lo->lo_lock);
 	do_generic_file_read(file, &pos, &desc, lo_read_actor);
 	return desc.error;
+}
+
+static inline int loop_get_bs(struct loop_device *lo)
+{
+	int bs = 0;
+
+	if (blksize_size[MAJOR(lo->lo_device)])
+		bs = blksize_size[MAJOR(lo->lo_device)][MINOR(lo->lo_device)];
+	if (!bs)
+		bs = BLOCK_SIZE;	
+
+	return bs;
+}
+
+static inline unsigned long loop_get_iv(struct loop_device *lo,
+					unsigned long sector)
+{
+	int bs = loop_get_bs(lo);
+	unsigned long offset, IV;
+
+	IV = sector / (bs >> 9) + lo->lo_offset / bs;
+	offset = ((sector % (bs >> 9)) << 9) + lo->lo_offset % bs;
+	if (offset >= bs)
+		IV++;
+
+	return IV;
 }
 
 static int do_bh_filebacked(struct loop_device *lo, struct buffer_head *bh, int rw)
@@ -276,9 +306,9 @@ static int do_bh_filebacked(struct loop_device *lo, struct buffer_head *bh, int 
 	pos = ((loff_t) bh->b_rsector << 9) + lo->lo_offset;
 
 	if (rw == WRITE)
-		ret = lo_send(lo, bh->b_data, bh->b_size, pos);
+		ret = lo_send(lo, bh, loop_get_bs(lo), pos);
 	else
-		ret = lo_receive(lo, bh->b_data, bh->b_size, pos);
+		ret = lo_receive(lo, bh, loop_get_bs(lo), pos);
 
 	return ret;
 }
@@ -307,7 +337,6 @@ static void loop_add_bh(struct loop_device *lo, struct buffer_head *bh)
 		lo->lo_bh = lo->lo_bhtail = bh;
 	spin_unlock_irqrestore(&lo->lo_lock, flags);
 
-	atomic_inc(&lo->lo_pending);
 	up(&lo->lo_bh_mutex);
 }
 
@@ -368,7 +397,7 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 	memset(bh, 0, sizeof(*bh));
 
 	bh->b_size = rbh->b_size;
-	bh->b_dev = rbh->b_dev;
+	bh->b_dev = rbh->b_rdev;
 	spin_lock_irq(&lo->lo_lock);
 	bh->b_rdev = lo->lo_device;
 	spin_unlock_irq(&lo->lo_lock);
@@ -405,6 +434,7 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	spin_lock_irq(&lo->lo_lock);
 	if (lo->lo_state != Lo_bound)
 		goto inactive;
+	atomic_inc(&lo->lo_pending);
 	spin_unlock_irq(&lo->lo_lock);
 
 	if (rw == WRITE) {
@@ -421,9 +451,6 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	rbh = create_bounce(rw, rbh);
 #endif
 
-	if (lo->lo_blksize != rbh->b_size)
-		lo->lo_blksize = rbh->b_size;
-
 	/*
 	 * file backed, queue for loop_thread to handle
 	 */
@@ -439,9 +466,7 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	 */
 	bh = loop_get_buffer(lo, rbh);
 	bh->b_private = rbh;
-	IV = (bh->b_rsector / (lo->lo_blksize >> 9));
-	IV += lo->lo_offset / lo->lo_blksize;
-	IV >>= 2;
+	IV = loop_get_iv(lo, bh->b_rsector);
 	if (rw == WRITE) {
 		set_bit(BH_Dirty, &bh->b_state);
 		if (lo_do_transfer(lo, WRITE, bh->b_data, rbh->b_data, bh->b_size, IV))
@@ -452,6 +477,8 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	return 0;
 
 err:
+	if (atomic_dec_and_test(&lo->lo_pending))
+		up(&lo->lo_bh_mutex);
 	loop_put_buffer(bh);
 out:
 	buffer_IO_error(rbh);
@@ -475,11 +502,7 @@ static inline void loop_handle_bh(struct loop_device *lo,struct buffer_head *bh)
 		bh->b_end_io(bh, !ret);
 	} else {
 		struct buffer_head *rbh = bh->b_private;
-		unsigned long IV;
-
-		IV = (bh->b_rsector / (bh->b_size >> 9));
-		IV += lo->lo_offset / bh->b_size;
-		IV >>= 2;
+		unsigned long IV = loop_get_iv(lo, rbh->b_rsector);
 
 		ret = lo_do_transfer(lo, READ, bh->b_data, rbh->b_data,
 				     bh->b_size, IV);
@@ -525,16 +548,26 @@ static int loop_thread(void *data)
 
 	for (;;) {
 		down_interruptible(&lo->lo_bh_mutex);
+		/*
+		 * could be upped because of tear-down, not because of
+		 * pending work
+		 */
 		if (!atomic_read(&lo->lo_pending))
 			break;
 
 		bh = loop_get_bh(lo);
-		atomic_dec(&lo->lo_pending);
 		if (!bh) {
-			printk("missing bh\n");
+			printk("loop: missing bh\n");
 			continue;
 		}
 		loop_handle_bh(lo, bh);
+
+		/*
+		 * upped both for pending work and tear-down, lo_pending
+		 * will hit zero then
+		 */
+		if (atomic_dec_and_test(&lo->lo_pending))
+			break;
 	}
 
 	up(&lo->lo_sem);
@@ -595,7 +628,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	    || !(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
-	set_device_ro(dev, (lo_flags & LO_FLAGS_READ_ONLY)!=0);
+	set_device_ro(dev, (lo_flags & LO_FLAGS_READ_ONLY) != 0);
 
 	lo->lo_device = lo_device;
 	lo->lo_flags = lo_flags;
@@ -612,7 +645,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	if (!bs)
 		bs = BLOCK_SIZE;
 
-	lo->lo_blksize = bs;
 	set_blocksize(dev, bs);
 
 	lo->lo_bh = lo->lo_bhtail = NULL;

@@ -48,6 +48,11 @@
   I/O space and NuBus interrupts for these cards, but neglected to
   provide anything even remotely resembling a NuBus ROM.  Therefore we
   have to probe for them in a brain-damaged ISA-like fashion.
+
+  Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 11/01/2001
+  check kmalloc and release the allocated memory on failure in
+  mac89x0_probe and in init_module
+  use save_flags/restore_flags in net_get_stat, not just cli/sti
 */
 
 static char *version =
@@ -167,9 +172,9 @@ writereg(struct net_device *dev, int portno, int value)
    anywhere else until we have a really good reason to do so. */
 int __init mac89x0_probe(struct net_device *dev)
 {
-	static int once_is_enough = 0;
+	static int once_is_enough;
 	struct net_local *lp;
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	int i, slot;
 	unsigned rev_type = 0;
 	unsigned long ioaddr;
@@ -213,6 +218,8 @@ int __init mac89x0_probe(struct net_device *dev)
 	/* Initialize the net_device structure. */
 	if (dev->priv == NULL) {
 		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
+		if (!dev->priv)
+			return -ENOMEM;
                 memset(dev->priv, 0, sizeof(struct net_local));
         }
 	lp = (struct net_local *)dev->priv;
@@ -252,6 +259,8 @@ int __init mac89x0_probe(struct net_device *dev)
 	/* Try to read the MAC address */
 	if ((readreg(dev, PP_SelfST) & (EEPROM_PRESENT | EEPROM_OK)) == 0) {
 		printk("\nmac89x0: No EEPROM, giving up now.\n");
+		kfree(dev->priv);
+		dev->priv = NULL;
 		return -ENODEV;
         } else {
                 for (i = 0; i < ETH_ALEN; i += 2) {
@@ -558,12 +567,14 @@ static struct net_device_stats *
 net_get_stats(struct net_device *dev)
 {
 	struct net_local *lp = (struct net_local *)dev->priv;
+	unsigned long flags;
 
+	save_flags(flags);
 	cli();
 	/* Update the statistics from the device registers. */
 	lp->stats.rx_missed_errors += (readreg(dev, PP_RxMiss) >> 6);
 	lp->stats.collisions += (readreg(dev, PP_TxCol) >> 6);
-	sti();
+	restore_flags(flags);
 
 	return &lp->stats;
 }
@@ -621,16 +632,16 @@ EXPORT_NO_SYMBOLS;
 int
 init_module(void)
 {
-	struct net_local *lp;
-
 	net_debug = debug;
         dev_cs89x0.init = mac89x0_probe;
         dev_cs89x0.priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
+	if (!dev_cs89x0.priv)
+		return -ENOMEM;
 	memset(dev_cs89x0.priv, 0, sizeof(struct net_local));
-	lp = (struct net_local *)dev_cs89x0.priv;
 
         if (register_netdev(&dev_cs89x0) != 0) {
                 printk(KERN_WARNING "mac89x0.c: No card found\n");
+		kfree(dev_cs89x0.priv);
                 return -ENXIO;
         }
 	return 0;

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.63 2000/12/14 22:57:25 davem Exp $
+# $Id: Makefile,v 1.64 2001/02/28 05:59:45 davem Exp $
 # Makefile for the linux kernel.
 #
 # Note! Dependencies are done automagically by 'make dep', which also
@@ -27,7 +27,7 @@ obj-y		:= process.o setup.o cpu.o idprom.o \
 		   power.o sbus.o iommu_common.o sparc64_ksyms.o
 
 obj-$(CONFIG_PCI)	 += ebus.o pci_common.o pci_iommu.o \
-			    pci_psycho.o pci_sabre.o 
+			    pci_psycho.o pci_sabre.o pci_schizo.o
 obj-$(CONFIG_SMP)	 += smp.o trampoline.o
 obj-$(CONFIG_SPARC32_COMPAT) += sys32.o sys_sparc32.o signal32.o ioctl32.o
 obj-$(CONFIG_BINFMT_ELF32) += binfmt_elf32.o

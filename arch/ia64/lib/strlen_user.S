@@ -204,7 +204,7 @@ recover:
 	;;
 	sub ret0=ret0,tmp	// length=now - back -1
 	mov ar.pfs=saved_pfs	// because of ar.ec, restore no matter what
-	br.ret.sptk.few rp	// end of sucessful recovery code
+	br.ret.sptk.few rp	// end of successful recovery code
 
 	//
 	// We failed even on the normal load (called from exception handler)

@@ -810,6 +810,10 @@ qla1280_detect(Scsi_Host_Template *template)
 #endif
                 /* found a adapter */
 		host = scsi_register(template, sizeof(scsi_qla_host_t));
+                if (!host) { 
+			printk(KERN_WARNING "qla1280: Failed to register host, aborting.\n");
+                        return 0;
+                }
 		ha = (scsi_qla_host_t *) host->hostdata;
 		/* Clear our data area */
 		for( j =0, cp = (char *)ha;  j < sizeof(scsi_qla_host_t); j++)
@@ -1095,7 +1099,7 @@ qla1280_queuecommand(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
     CMD_HANDLE(cmd) = (unsigned char *)handle;
 
     /* Bookkeeping information */
-    sp->r_start = jiffies;       /* time the request was recieved */
+    sp->r_start = jiffies;       /* time the request was received */
     sp->u_start = 0;              
 
     /* add the command to our queue */

@@ -59,8 +59,8 @@
 
 #include "sonic.h"
 
-static int sonic_debug = 0;
-static int sonic_version_printed = 0;
+static int sonic_debug;
+static int sonic_version_printed;
 
 extern int macsonic_probe(struct net_device* dev);
 extern int mac_onboard_sonic_probe(struct net_device* dev);
@@ -272,7 +272,7 @@ int __init mac_onboard_sonic_ethernet_addr(struct net_device* dev)
 int __init mac_onboard_sonic_probe(struct net_device* dev)
 {
 	/* Bwahahaha */
-	static int once_is_more_than_enough = 0;
+	static int once_is_more_than_enough;
 	struct sonic_local* lp;
 	int i;
 	
@@ -438,7 +438,7 @@ int __init macsonic_ident(struct nubus_dev* ndev)
 
 int __init mac_nubus_sonic_probe(struct net_device* dev)
 {
-	static int slots = 0;
+	static int slots;
 	struct nubus_dev* ndev = NULL;
 	struct sonic_local* lp;
 	unsigned long base_addr, prom_addr;
@@ -567,11 +567,7 @@ int __init mac_nubus_sonic_probe(struct net_device* dev)
 
 #ifdef MODULE
 static char namespace[16] = "";
-static struct net_device dev_macsonic = {
-        NULL,
-        0, 0, 0, 0,
-        0, 0,
-        0, 0, 0, NULL, NULL };
+static struct net_device dev_macsonic;
 
 MODULE_PARM(sonic_debug, "i");
 

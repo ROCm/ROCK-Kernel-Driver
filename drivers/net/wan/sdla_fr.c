@@ -1654,7 +1654,7 @@ static void fr_isr (sdla_t* card)
 			++card->statistics.isr_intr_test;
 	    		break;	
 
-                case FR_INTR_DLC: /* Event interrupt occured */
+                case FR_INTR_DLC: /* Event interrupt occurred */
 			mbox->cmd.command = FR_READ_STATUS;
 			mbox->cmd.length = 0;
 			err = sdla_exec(mbox) ? mbox->cmd.result : CMD_TIMEOUT;
@@ -1691,7 +1691,7 @@ static void fr_isr (sdla_t* card)
 /*============================================================================
  * Receive interrupt handler.
  * When a receive interrupt occurs do the following:
- *	1- Find the structure for the dlci that the interrupt occured on
+ *	1- Find the structure for the dlci that the interrupt occurred on
  *      2- If it doesn't exist then print appropriate msg and goto step 8. 
  * 	3- If it exist then copy data to a skb.
  * 	4- If skb contains Sangoma UDP data then process them

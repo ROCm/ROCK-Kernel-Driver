@@ -152,6 +152,14 @@ extern inline void pci_dma_sync_sg(struct pci_dev *hwdev,
  */
 extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
 {
+        /*
+         * we fall back to GFP_DMA when the mask isn't all 1s,
+         * so we can't guarantee allocations that must be
+         * within a tighter range than GFP_DMA..
+         */
+        if(mask < 0x00ffffff)
+                return 0;
+
 	return 1;
 }
 

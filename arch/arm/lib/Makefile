@@ -54,9 +54,3 @@ ifneq ($(MACHINE),ebsa110)
 endif
 
 include $(TOPDIR)/Rules.make
-
-constants.h: getconsdata.o extractconstants.pl
-	$(PERL) extractconstants.pl $(OBJDUMP) > $@
-
-getconsdata.o: getconsdata.c
-	$(CC) $(CFLAGS) -c getconsdata.c

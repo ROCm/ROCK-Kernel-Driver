@@ -435,7 +435,7 @@ copy (out, in, offset, size)
   char ibuf [4096];
   int remaining, cur, count;
 
-  /* Go the the start of the ELF symbol table... */
+  /* Go to the start of the ELF symbol table... */
   if (lseek (in, offset, SEEK_SET) < 0)
     {
       perror ("copy: lseek");

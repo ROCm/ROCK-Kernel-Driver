@@ -90,15 +90,6 @@ static int bond_close(struct net_device *master)
 
 static void bond_set_multicast_list(struct net_device *master)
 {
-	bonding_t *bond = master->priv;
-	slave_t *slave;
-
-	for (slave = bond->next; slave != (slave_t*)bond; slave = slave->next) {
-		slave->dev->mc_list = master->mc_list;
-		slave->dev->mc_count = master->mc_count;
-		slave->dev->flags = master->flags;
-		slave->dev->set_multicast_list(slave->dev);
-	}
 }
 
 static int bond_enslave(struct net_device *master, struct net_device *dev)

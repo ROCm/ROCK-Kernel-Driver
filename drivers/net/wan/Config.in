@@ -33,6 +33,11 @@ if [ "$CONFIG_WAN" = "y" ]; then
       fi
       dep_tristate '    Support for Frame Relay on MultiGate boards' CONFIG_COMX_PROTO_FR $CONFIG_COMX
    fi
+#
+# The Etinc driver has not been tested as non-modular yet.
+#
+
+   dep_tristate '  Etinc PCISYNC serial board support (EXPERIMENTAL)' CONFIG_DSCC4 m
 
 #
 # Lan Media's board. Currently 1000, 1200, 5200, 5245
@@ -45,6 +50,18 @@ if [ "$CONFIG_WAN" = "y" ]; then
    dep_tristate '  Sealevel Systems 4021 support' CONFIG_SEALEVEL_4021 m
 
    dep_tristate '  SyncLink HDLC/SYNCPPP support' CONFIG_SYNCLINK_SYNCPPP m
+
+   tristate '  Generic HDLC driver' CONFIG_HDLC
+   if [ "$CONFIG_HDLC" != "n" ]; then
+      bool '    Synchronous Point-to-Point Protocol (PPP) support' CONFIG_HDLC_PPP
+      if [ "$CONFIG_LAPB" = "m" -a "$CONFIG_HDLC" = "m" -o "$CONFIG_LAPB" = "y" ]; then
+	 bool '    X.25 protocol support' CONFIG_HDLC_X25
+      else
+	 comment '    X.25/LAPB support is disabled'
+      fi
+      dep_tristate '    SDL RISCom/N2 support' CONFIG_N2 $CONFIG_HDLC
+      dep_tristate '    Moxa C101 support' CONFIG_C101 $CONFIG_HDLC
+   fi
 
    tristate '  Frame relay DLCI support' CONFIG_DLCI
    if [ "$CONFIG_DLCI" != "n" ]; then

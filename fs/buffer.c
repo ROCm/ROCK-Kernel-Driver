@@ -2750,7 +2750,7 @@ int kupdate(void *sem)
 
 	tsk->session = 1;
 	tsk->pgrp = 1;
-	strcpy(tsk->comm, "kupdate");
+	strcpy(tsk->comm, "kupdated");
 
 	/* sigstop and sigcont will stop and wakeup kupdate */
 	spin_lock_irq(&tsk->sigmask_lock);

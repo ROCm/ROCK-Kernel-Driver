@@ -1,9 +1,22 @@
 ChangeLog for smbfs.
 
+2001-03-06 Urban Widmark <urban@teststation.com>
+
+	* cache.c: d_add on hashed dentries corrupts d_hash list and
+	  causes loops in d_lookup. Inherited bug. :)
+	* inode.c: tail -f fix for non-readonly opened files
+	  (related to the smb_proc_open change).
+	* inode.c: tail -f fix for fast size changes with the same mtime.
+
+2001-03-02 Michael Kockelkorn <m.kockelkorn@biodata.com>
+
+	* proc.c: fix smb_proc_open to allow open being called more than once
+	  with different modes (O_RDONLY -> O_WRONLY) without closing.
+
 2001-02-10 Urban Widmark <urban@teststation.com>
 
-	* dir.c: replace non-bigmem safe cache with cache code from ncpfs
-	  and fix some other bigmem bugs in smbfs.
+	* dir.c, cache.c: replace non-bigmem safe cache with cache code
+	  from ncpfs and fix some other bigmem bugs in smbfs.
 	* inode.c: root dentry not properly initialized
 	* proc.c, sock.c: adjust max parameters & max data to follow max_xmit
 	  lots of servers were having find_next trouble with this.

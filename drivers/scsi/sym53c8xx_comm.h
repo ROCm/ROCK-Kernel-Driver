@@ -80,17 +80,6 @@
 
 /*==========================================================
 **
-**    Io mapped versus memory mapped.
-**
-**==========================================================
-*/
-
-#if defined(SCSI_NCR_IOMAPPED) || defined(SCSI_NCR_PCI_MEM_NOT_SUPPORTED)
-#define NCR_IOMAPPED
-#endif
-
-/*==========================================================
-**
 **	Miscallaneous defines.
 **
 **==========================================================
@@ -261,33 +250,6 @@ static inline struct xpt_quehead *xpt_remque_tail(struct xpt_quehead *head)
 
 /*==========================================================
 **
-**	On x86 architecture, write buffers management does 
-**	not reorder writes to memory. So, using compiler 
-**	optimization barriers is enough to guarantee some 
-**	ordering when the CPU is writing data accessed by 
-**	the NCR.
-**	On Alpha architecture, explicit memory barriers have 
-**	to be used.
-**	Other architectures are defaulted to mb() macro if  
-**	defined, otherwise use compiler barrier.
-**
-**==========================================================
-*/
-
-#if defined(__i386__)
-#define MEMORY_BARRIER()	barrier()
-#elif defined(__alpha__)
-#define MEMORY_BARRIER()	mb()
-#else
-#  ifdef mb
-#  define MEMORY_BARRIER()	mb()
-#  else
-#  define MEMORY_BARRIER()	barrier()
-#  endif
-#endif
-
-/*==========================================================
-**
 **	Simple Wrapper to kernel PCI bus interface.
 **
 **	This wrapper allows to get rid of old kernel PCI 
@@ -310,30 +272,42 @@ typedef struct pci_dev *pcidev_t;
 #define PciDeviceId(d)		(d)->device
 #define PciIrqLine(d)		(d)->irq
 
-#if LINUX_VERSION_CODE > LinuxVersionCode(2,3,12)
+static u_long __init
+pci_get_base_cookie(struct pci_dev *pdev, int index)
+{
+	u_long base;
 
-static int __init 
-pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
-{
-	*base = pdev->resource[index].start;
-	if ((pdev->resource[index].flags & 0x7) == 0x4)
-		++index;
-	return ++index;
-}
+#if LINUX_VERSION_CODE > LinuxVersionCode(2,3,12)
+	base = pdev->resource[index].start;
 #else
-static int __init 
+	base = pdev->base_address[index];
+#if BITS_PER_LONG > 32
+	if ((base & 0x7) == 0x4)
+		*base |= (((u_long)pdev->base_address[++index]) << 32);
+#endif
+#endif
+	return (base & ~0x7ul);
+}
+
+static int __init
 pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
 {
-	*base = pdev->base_address[index++];
-	if ((*base & 0x7) == 0x4) {
+	u32 tmp;
+#define PCI_BAR_OFFSET(index) (PCI_BASE_ADDRESS_0 + (index<<2))
+
+	pci_read_config_dword(pdev, PCI_BAR_OFFSET(index), &tmp);
+	*base = tmp;
+	++index;
+	if ((tmp & 0x7) == 0x4) {
 #if BITS_PER_LONG > 32
-		*base |= (((u_long)pdev->base_address[index]) << 32);
+		pci_read_config_dword(pdev, PCI_BAR_OFFSET(index), &tmp);
+		*base |= (((u_long)tmp) << 32);
 #endif
 		++index;
 	}
 	return index;
+#undef PCI_BAR_OFFSET
 }
-#endif
 
 #else	/* Incomplete emulation of current PCI code for pre-2.2 kernels */
 
@@ -413,8 +387,22 @@ pci_get_base_address(pcidev_t dev, int offset, u_long *base)
 	}
 	return offset;
 }
+static u_long __init
+pci_get_base_cookie(struct pci_dev *pdev, int offset)
+{
+	u_long base;
+
+	(void) pci_get_base_address(dev, offset, &base);
+
+	return base;
+}
 
 #endif	/* LINUX_VERSION_CODE >= LinuxVersionCode(2,2,0) */
+
+/* Does not make sense in earlier kernels */
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
+#define pci_enable_device(pdev)		(0)
+#endif
 
 /*==========================================================
 **
@@ -488,18 +476,14 @@ spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 
 #ifdef __sparc__
 #  include <asm/irq.h>
-#  define pcivtobus(p)			bus_dvma_to_mem(p)
 #  define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
 #elif defined(__alpha__)
-#  define pcivtobus(p)			((p) & 0xfffffffful)
 #  define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
 #else	/* others */
-#  define pcivtobus(p)			(p)
 #  define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
 #endif
 
-#if (defined(SCSI_NCR_NVRAM_SUPPORT) && !defined(NCR_IOMAPPED)) || \
-	(defined(__i386__) && !defined(SCSI_NCR_PCI_MEM_NOT_SUPPORTED))
+#ifndef SCSI_NCR_PCI_MEM_NOT_SUPPORTED
 static u_long __init remap_pci_mem(u_long base, u_long size)
 {
 	u_long page_base	= ((u_long) base) & PAGE_MASK;
@@ -1105,168 +1089,6 @@ static struct ncr_driver_setup
 #define initverbose (driver_setup.verbose)
 #define bootverbose (np->verbose)
 
-/*==========================================================
-**
-**	Big/Little endian support.
-**
-**	If the NCR uses big endian addressing mode over the 
-**	PCI, actual io register addresses for byte and word 
-**	accesses must be changed according to lane routing.
-**	Btw, ncr_offb() and ncr_offw() macros only apply to 
-**	constants and so donnot generate bloated code.
-**
-**	If the CPU and the NCR use same endian-ness adressing,
-**	no byte reordering is needed for script patching.
-**	Macro cpu_to_scr() is to be used for script patching.
-**	Macro scr_to_cpu() is to be used for getting a DWORD 
-**	from the script.
-**
-**==========================================================
-*/
-
-#if	defined(SCSI_NCR_BIG_ENDIAN)
-
-#define ncr_offb(o)	(((o)&~3)+((~((o)&3))&3))
-#define ncr_offw(o)	(((o)&~3)+((~((o)&3))&2))
-
-#else
-
-#define ncr_offb(o)	(o)
-#define ncr_offw(o)	(o)
-
-#endif
-
-#if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
-
-#define cpu_to_scr(dw)	cpu_to_le32(dw)
-#define scr_to_cpu(dw)	le32_to_cpu(dw)
-
-#elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
-
-#define cpu_to_scr(dw)	cpu_to_be32(dw)
-#define scr_to_cpu(dw)	be32_to_cpu(dw)
-
-#else
-
-#define cpu_to_scr(dw)	(dw)
-#define scr_to_cpu(dw)	(dw)
-
-#endif
-
-/*==========================================================
-**
-**	Access to the controller chip.
-**
-**	If NCR_IOMAPPED is defined, the driver will use 
-**	normal IOs instead of the MEMORY MAPPED IO method  
-**	recommended by PCI specifications.
-**	If all PCI bridges, host brigdes and architectures 
-**	would have been correctly designed for PCI, this 
-**	option would be useless.
-**
-**	If the CPU and the NCR use same endian-ness adressing,
-**	no byte reordering is needed for accessing chip io 
-**	registers. Functions suffixed by '_raw' are assumed 
-**	to access the chip over the PCI without doing byte 
-**	reordering. Functions suffixed by '_l2b' are 
-**	assumed to perform little-endian to big-endian byte 
-**	reordering, those suffixed by '_b2l' blah, blah,
-**	blah, ...
-**
-**==========================================================
-*/
-
-#if defined(NCR_IOMAPPED)
-
-/*
-**	IO mapped only input / ouput
-*/
-
-#define	INB_OFF(o)		inb (np->base_io + ncr_offb(o))
-#define	OUTB_OFF(o, val)	outb ((val), np->base_io + ncr_offb(o))
-
-#if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
-
-#define	INW_OFF(o)		inw_l2b (np->base_io + ncr_offw(o))
-#define	INL_OFF(o)		inl_l2b (np->base_io + (o))
-
-#define	OUTW_OFF(o, val)	outw_b2l ((val), np->base_io + ncr_offw(o))
-#define	OUTL_OFF(o, val)	outl_b2l ((val), np->base_io + (o))
-
-#elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
-
-#define	INW_OFF(o)		inw_b2l (np->base_io + ncr_offw(o))
-#define	INL_OFF(o)		inl_b2l (np->base_io + (o))
-
-#define	OUTW_OFF(o, val)	outw_l2b ((val), np->base_io + ncr_offw(o))
-#define	OUTL_OFF(o, val)	outl_l2b ((val), np->base_io + (o))
-
-#else
-
-#define	INW_OFF(o)		inw_raw (np->base_io + ncr_offw(o))
-#define	INL_OFF(o)		inl_raw (np->base_io + (o))
-
-#define	OUTW_OFF(o, val)	outw_raw ((val), np->base_io + ncr_offw(o))
-#define	OUTL_OFF(o, val)	outl_raw ((val), np->base_io + (o))
-
-#endif	/* ENDIANs */
-
-#else	/* defined NCR_IOMAPPED */
-
-/*
-**	MEMORY mapped IO input / output
-*/
-
-#define INB_OFF(o)		readb((char *)np->reg + ncr_offb(o))
-#define OUTB_OFF(o, val)	writeb((val), (char *)np->reg + ncr_offb(o))
-
-#if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
-
-#define INW_OFF(o)		readw_l2b((char *)np->reg + ncr_offw(o))
-#define INL_OFF(o)		readl_l2b((char *)np->reg + (o))
-
-#define OUTW_OFF(o, val)	writew_b2l((val), (char *)np->reg + ncr_offw(o))
-#define OUTL_OFF(o, val)	writel_b2l((val), (char *)np->reg + (o))
-
-#elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
-
-#define INW_OFF(o)		readw_b2l((char *)np->reg + ncr_offw(o))
-#define INL_OFF(o)		readl_b2l((char *)np->reg + (o))
-
-#define OUTW_OFF(o, val)	writew_l2b((val), (char *)np->reg + ncr_offw(o))
-#define OUTL_OFF(o, val)	writel_l2b((val), (char *)np->reg + (o))
-
-#else
-
-#define INW_OFF(o)		readw_raw((char *)np->reg + ncr_offw(o))
-#define INL_OFF(o)		readl_raw((char *)np->reg + (o))
-
-#define OUTW_OFF(o, val)	writew_raw((val), (char *)np->reg + ncr_offw(o))
-#define OUTL_OFF(o, val)	writel_raw((val), (char *)np->reg + (o))
-
-#endif
-
-#endif	/* defined NCR_IOMAPPED */
-
-#define INB(r)		INB_OFF (offsetof(struct ncr_reg,r))
-#define INW(r)		INW_OFF (offsetof(struct ncr_reg,r))
-#define INL(r)		INL_OFF (offsetof(struct ncr_reg,r))
-
-#define OUTB(r, val)	OUTB_OFF (offsetof(struct ncr_reg,r), (val))
-#define OUTW(r, val)	OUTW_OFF (offsetof(struct ncr_reg,r), (val))
-#define OUTL(r, val)	OUTL_OFF (offsetof(struct ncr_reg,r), (val))
-
-/*
-**	Set bit field ON, OFF 
-*/
-
-#define OUTONB(r, m)	OUTB(r, INB(r) | (m))
-#define OUTOFFB(r, m)	OUTB(r, INB(r) & ~(m))
-#define OUTONW(r, m)	OUTW(r, INW(r) | (m))
-#define OUTOFFW(r, m)	OUTW(r, INW(r) & ~(m))
-#define OUTONL(r, m)	OUTL(r, INL(r) | (m))
-#define OUTOFFL(r, m)	OUTL(r, INL(r) & ~(m))
-
 
 /*==========================================================
 **
@@ -1281,6 +1103,8 @@ typedef struct {
 	u_long	base;
 	u_long	base_2;
 	u_long	io_port;
+	u_long	base_c;
+	u_long	base_2_c;
 	int	irq;
 /* port and reg fields to use INB, OUTB macros */
 	u_long	base_io;
@@ -1546,10 +1370,10 @@ out:
 	return retv;
 }
 
-#undef SET_BIT 
-#undef CLR_BIT 
-#undef SET_CLK 
-#undef CLR_CLK 
+#undef SET_BIT
+#undef CLR_BIT
+#undef SET_CLK
+#undef CLR_CLK
 
 /*
  *  Try reading Symbios NVRAM.
@@ -1798,11 +1622,12 @@ static void __init ncr_get_nvram(ncr_device *devp, ncr_nvram *nvp)
 	/*
 	**    Get access to chip IO registers
 	*/
-#ifdef NCR_IOMAPPED
+#ifdef SCSI_NCR_IOMAPPED
 	request_region(devp->slot.io_port, 128, NAME53C8XX);
 	devp->slot.base_io = devp->slot.io_port;
 #else
-	devp->slot.reg = (struct ncr_reg *) remap_pci_mem(devp->slot.base, 128);
+	devp->slot.reg = 
+		(struct ncr_reg *) remap_pci_mem(devp->slot.base_c, 128);
 	if (!devp->slot.reg)
 		return;
 #endif
@@ -1824,7 +1649,7 @@ static void __init ncr_get_nvram(ncr_device *devp, ncr_nvram *nvp)
 	/*
 	** Release access to chip IO registers
 	*/
-#ifdef NCR_IOMAPPED
+#ifdef SCSI_NCR_IOMAPPED
 	release_region(devp->slot.base_io, 128);
 #else
 	unmap_pci_mem((u_long) devp->slot.reg, 128ul);
@@ -1991,7 +1816,7 @@ static int copy_info(struct info_str *info, char *fmt, ...)
 #define OPT_SCSI_PARITY		3
 #define OPT_DISCONNECTION	4
 #define OPT_SPECIAL_FEATURES	5
-#define OPT_ULTRA_SCSI		6
+#define OPT_UNUSED_1		6
 #define OPT_FORCE_SYNC_NEGO	7
 #define OPT_REVERSE_PROBE	8
 #define OPT_DEFAULT_SYNC	9
@@ -2103,9 +1928,6 @@ static int __init sym53c8xx__setup(char *str)
 			break;
 		case OPT_SPECIAL_FEATURES:
 			driver_setup.special_features = val;
-			break;
-		case OPT_ULTRA_SCSI:
-			driver_setup.ultra_scsi	= val;
 			break;
 		case OPT_FORCE_SYNC_NEGO:
 			driver_setup.force_sync_nego = val;
@@ -2248,11 +2070,10 @@ static int device_queue_depth(int unit, int target, int lun)
 static void __init ncr_print_driver_setup(void)
 {
 #define YesNo(y)	y ? 'y' : 'n'
-	printk (NAME53C8XX ": setup=disc:%c,specf:%d,ultra:%d,tags:%d,sync:%d,"
+	printk (NAME53C8XX ": setup=disc:%c,specf:%d,tags:%d,sync:%d,"
 		"burst:%d,wide:%c,diff:%d,revprob:%c,buschk:0x%x\n",
 		YesNo(driver_setup.disconnection),
 		driver_setup.special_features,
-		driver_setup.ultra_scsi,
 		driver_setup.default_tags,
 		driver_setup.default_sync,
 		driver_setup.burst_max,
@@ -2352,7 +2173,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	u_char pci_fix_up = driver_setup.pci_fix_up;
 	u_char revision;
 	u_int irq;
-	u_long base, base_2, io_port; 
+	u_long base, base_c, base_2, base_2_c, io_port; 
 	int i;
 	ncr_chip *chip;
 
@@ -2377,10 +2198,15 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	vendor_id = PciVendorId(pdev);
 	device_id = PciDeviceId(pdev);
 	irq	  = PciIrqLine(pdev);
-	i =	0;
-	i =	pci_get_base_address(pdev, i, &io_port);
-	i =	pci_get_base_address(pdev, i, &base);
-	(void)	pci_get_base_address(pdev, i, &base_2);
+
+	i = pci_get_base_address(pdev, 0, &io_port);
+	io_port = pci_get_base_cookie(pdev, 0);
+
+	base_c = pci_get_base_cookie(pdev, i);
+	i = pci_get_base_address(pdev, i, &base);
+
+	base_2_c = pci_get_base_cookie(pdev, i);
+	(void) pci_get_base_address(pdev, i, &base_2);
 
 	pci_read_config_word(pdev, PCI_COMMAND,		&command);
 	pci_read_config_byte(pdev, PCI_CLASS_REVISION,	&revision);
@@ -2438,7 +2264,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	**	This controller sets value 0x52414944 at RAM end - 16.
 	*/
 #if defined(__i386__) && !defined(SCSI_NCR_PCI_MEM_NOT_SUPPORTED)
-	if (chip && (base_2 & PCI_BASE_ADDRESS_MEM_MASK)) {
+	if (chip && (base_2_c & PCI_BASE_ADDRESS_MEM_MASK)) {
 		unsigned int ram_size, ram_val;
 		u_long ram_ptr;
 
@@ -2447,7 +2273,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		else
 			ram_size = 4096;
 
-		ram_ptr = remap_pci_mem(base_2 & PCI_BASE_ADDRESS_MEM_MASK,
+		ram_ptr = remap_pci_mem(base_2_c & PCI_BASE_ADDRESS_MEM_MASK,
 					ram_size);
 		if (ram_ptr) {
 			ram_val = readl_raw(ram_ptr + ram_size - 16);
@@ -2529,7 +2355,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	**    from attaching devices from the both drivers.
 	**    If you have a better idea, let me know.
 	*/
-/* #ifdef NCR_IOMAPPED */
+/* #ifdef SCSI_NCR_IOMAPPED */
 #if 1
 	if (!(command & PCI_COMMAND_IO)) { 
 		printk(NAME53C8XX ": I/O base address (0x%lx) disabled.\n",
@@ -2546,7 +2372,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	base	&= PCI_BASE_ADDRESS_MEM_MASK;
 	base_2	&= PCI_BASE_ADDRESS_MEM_MASK;
 
-/* #ifdef NCR_IOMAPPED */
+/* #ifdef SCSI_NCR_IOMAPPED */
 #if 1
 	if (io_port && check_region (io_port, 128)) {
 		printk(NAME53C8XX ": IO region 0x%lx[0..127] is in use\n",
@@ -2556,7 +2382,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	if (!io_port)
 		return -1;
 #endif
-#ifndef NCR_IOMAPPED
+#ifndef SCSI_NCR_IOMAPPED
 	if (!base) {
 		printk(NAME53C8XX ": MMIO base address disabled.\n");
 		return -1;
@@ -2602,14 +2428,6 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		if (driver_setup.special_features & 4)
 			chip->features &= ~FE_NOPM;
 	}
-	if (driver_setup.ultra_scsi < 2 && (chip->features & FE_ULTRA2)) {
-		chip->features |=  FE_ULTRA;
-		chip->features &= ~FE_ULTRA2;
-	}
-	if (driver_setup.ultra_scsi < 1)
-		chip->features &= ~FE_ULTRA;
-	if (!driver_setup.max_wide)
-		chip->features &= ~FE_WIDE;
 
 	/*
 	**	Some features are required to be enabled in order to 
@@ -2670,6 +2488,8 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	device->slot.device_fn	= PciDeviceFn(pdev);
 	device->slot.base	= base;
 	device->slot.base_2	= base_2;
+	device->slot.base_c	= base_c;
+	device->slot.base_2_c	= base_2_c;
 	device->slot.io_port	= io_port;
 	device->slot.irq	= irq;
 	device->attach_done	= 0;
@@ -2754,6 +2574,8 @@ sym53c8xx__detect(Scsi_Host_Template *tpnt, u_short ncr_chip_ids[], int chips)
 			++j;
 			continue;
 		}
+		if (pci_enable_device(pcidev)) /* @!*!$&*!%-*#;! */
+			continue;
 		/* Some HW as the HP LH4 may report twice PCI devices */
 		for (i = 0; i < count ; i++) {
 			if (devtbl[i].slot.bus	     == PciBusNumber(pcidev) && 

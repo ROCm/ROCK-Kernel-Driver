@@ -127,12 +127,12 @@ typedef struct {
 #define TCREG_POWC       0x4000	/* timer start out of window detect */
 #define TCREG_CRCI       0x2000	/* inhibit CRC generation           */
 #define TCREG_EXDIS      0x1000	/* disable excessive deferral timer */
-#define TCREG_EXD        0x0400	/* excessive deferral occured       */
-#define TCREG_DEF        0x0200	/* single deferral occured          */
+#define TCREG_EXD        0x0400	/* excessive deferral occurred       */
+#define TCREG_DEF        0x0200	/* single deferral occurred          */
 #define TCREG_NCRS       0x0100	/* no carrier detected              */
 #define TCREG_CRSL       0x0080	/* carrier lost                     */
-#define TCREG_EXC        0x0040	/* excessive collisions occured     */
-#define TCREG_OWC        0x0020	/* out of window collision occured  */
+#define TCREG_EXC        0x0040	/* excessive collisions occurred     */
+#define TCREG_OWC        0x0020	/* out of window collision occurred  */
 #define TCREG_PMB        0x0008	/* packet monitored bad             */
 #define TCREG_FU         0x0004	/* FIFO underrun                    */
 #define TCREG_BCM        0x0002	/* byte count mismatch of fragments */
@@ -141,7 +141,7 @@ typedef struct {
 /* Interrupt Mask Register */
 
 #define SONIC_IMREG      0x08
-#define IMREG_BREN       0x4000	/* interrupt when bus retry occured */
+#define IMREG_BREN       0x4000	/* interrupt when bus retry occurred */
 #define IMREG_HBLEN      0x2000	/* interrupt when heartbeat lost    */
 #define IMREG_LCDEN      0x1000	/* interrupt when CAM loaded        */
 #define IMREG_PINTEN     0x0800	/* interrupt when PINT in TDA set   */
@@ -160,7 +160,7 @@ typedef struct {
 /* Interrupt Status Register */
 
 #define SONIC_ISREG      0x0a
-#define ISREG_BR         0x4000	/* bus retry occured                */
+#define ISREG_BR         0x4000	/* bus retry occurred                */
 #define ISREG_HBL        0x2000	/* heartbeat lost                   */
 #define ISREG_LCD        0x1000	/* CAM loaded                       */
 #define ISREG_PINT       0x0800	/* PINT in TDA set                  */

@@ -41,6 +41,7 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
+#include <linux/proc_fs.h>
 
 #define IN_CARD_SERVICES
 #include <pcmcia/cs_types.h>

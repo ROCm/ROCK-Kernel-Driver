@@ -160,7 +160,7 @@ next1:
 			frag_to_free = tmp;
 			free_count = uspi->s_fpb;
 		}
-next2:
+next2:;
 	}
 	
 	if (free_count > 0)
@@ -261,7 +261,7 @@ static int ufs_trunc_indirect (struct inode * inode, unsigned offset, u32 * p)
 		}
 		inode->i_blocks -= uspi->s_nspb;
 		mark_inode_dirty(inode);
-next:
+next:;
 	}
 
 	if (free_count > 0) {

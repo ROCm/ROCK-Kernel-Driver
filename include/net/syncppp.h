@@ -89,7 +89,6 @@ void sppp_flush (struct net_device *dev);
 int sppp_open (struct net_device *dev);
 int sppp_reopen (struct net_device *dev);
 int sppp_close (struct net_device *dev);
-void sync_ppp_init (void);
 #endif
 
 #define SPPPIOCCISCO	(SIOCDEVPRIVATE)

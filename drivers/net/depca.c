@@ -226,11 +226,11 @@
       0.52    16-Oct-00   Fixes for 2.3 io memory accesses
                           Fix show-stopper (ints left masked) in depca_interrupt
 			   by <peterd@pnd-pc.demon.co.uk>
+      0.53    12-Jan-01	  Release resources on failure, bss tidbits
+      			   by acme@conectiva.com.br
 
     =========================================================================
 */
-
-static const char *version = "depca.c:v0.51 1999/6/27 davies@maniac.ultranet.com\n";
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -264,6 +264,9 @@ static const char *version = "depca.c:v0.51 1999/6/27 davies@maniac.ultranet.com
 #endif
 
 #include "depca.h"
+
+static char version[] __initdata =
+	"depca.c:v0.53 2001/1/12 davies@maniac.ultranet.com\n";
 
 #ifdef DEPCA_DEBUG
 static int depca_debug = DEPCA_DEBUG;
@@ -309,7 +312,7 @@ static int depca_debug = 1;
 #define DEPCA_RAM_BASE_ADDRESSES {0xc0000,0xd0000,0xe0000,0x00000}
 #define DEPCA_IO_PORTS {0x300, 0x200, 0}
 #define DEPCA_TOTAL_SIZE 0x10
-static short mem_chkd = 0;
+static short mem_chkd;
 
 /*
 ** Adapter ID for the MCA EtherWORKS DE210/212 adapter
@@ -480,8 +483,9 @@ static char   name[DEPCA_STRLEN];
 static int    num_depcas, num_eth;
 static int    mem;                       /* For loadable module assignment
                                               use insmod mem=0x????? .... */
-static char   *adapter_name = '\0';        /* If no PROM when loadable module
+static char   *adapter_name; /* = '\0';     If no PROM when loadable module
 					      use insmod adapter_name=DE??? ...
+					      bss initializes this to zero
 					   */
 /*
 ** Miscellaneous defines...
@@ -495,6 +499,8 @@ depca_probe(struct net_device *dev)
 {
   int tmp = num_depcas, status = -ENODEV;
   u_long iobase = dev->base_addr;
+
+  SET_MODULE_OWNER(dev);
 
   if ((iobase == 0) && loading_module){
     printk("Autoprobing is not supported when loading a module based driver.\n");
@@ -566,15 +572,14 @@ depca_hw_init(struct net_device *dev, u_long ioaddr, int mca_slot)
 
 	printk(", h/w address ");
 	status = get_hw_addr(dev);
-	for (i=0; i<ETH_ALEN - 1; i++) { /* get the ethernet address */
-		printk("%2.2x:", dev->dev_addr[i]);
-	}
-	printk("%2.2x", dev->dev_addr[i]);
-
 	if (status != 0) {
 		printk("      which has an Ethernet PROM CRC error.\n");
 		return -ENXIO;
 	}
+	for (i=0; i<ETH_ALEN - 1; i++) { /* get the ethernet address */
+		printk("%2.2x:", dev->dev_addr[i]);
+	}
+	printk("%2.2x", dev->dev_addr[i]);
 
 	/* Set up the maximum amount of network RAM(kB) */
 	netRAM = ((adapter != DEPCA) ? 64 : 48);
@@ -616,17 +621,19 @@ depca_hw_init(struct net_device *dev, u_long ioaddr, int mca_slot)
 	lp->mca_slot = mca_slot;
 	lp->lock = SPIN_LOCK_UNLOCKED;
  	sprintf(lp->adapter_name,"%s (%s)", name, dev->name);
+	status = -EBUSY;
 	if (!request_region(ioaddr, DEPCA_TOTAL_SIZE, lp->adapter_name)) {
 		printk(KERN_ERR "depca: I/O resource 0x%x @ 0x%lx busy\n",
 		       DEPCA_TOTAL_SIZE, ioaddr);
-		return -EBUSY;
+		goto out_priv;
 	}
 
 	/* Initialisation Block */
 	lp->sh_mem = ioremap(mem_start, mem_len);
+	status = -EIO;
 	if (lp->sh_mem == NULL) {
 		printk(KERN_ERR "depca: cannot remap ISA memory, aborting\n");
-		return -EIO;
+		goto out_region;
 	}
 	lp->device_ram_start = mem_start & LA_MASK;
 	
@@ -700,20 +707,21 @@ depca_hw_init(struct net_device *dev, u_long ioaddr, int mca_slot)
 		outw(INEA | INIT, DEPCA_DATA);
 	  
 		irqnum = autoirq_report(1);
+		status = -ENXIO;
 		if (!irqnum) {
 			printk(" and failed to detect IRQ line.\n");
-			status = -ENXIO;
+			goto out_region;
 		} else {
-			for (dev->irq=0,i=0; (depca_irq[i]) && (!dev->irq); i++) {
+			for (dev->irq=0,i=0; (depca_irq[i]) && (!dev->irq); i++)
 				if (irqnum == depca_irq[i]) {
 					dev->irq = irqnum;
 					printk(" and uses IRQ%d.\n", dev->irq);
 				}
-			}
 	      
+			status = -ENXIO;
 			if (!dev->irq) {
 				printk(" but incorrect IRQ line detected.\n");
-				status = -ENXIO;
+				goto out_region;
 			}
 		}
 #endif /* MODULE */
@@ -721,33 +729,30 @@ depca_hw_init(struct net_device *dev, u_long ioaddr, int mca_slot)
 		printk(" and assigned IRQ%d.\n", dev->irq);
 	}
 
-	if (!status) {
-		if (depca_debug > 1) {
-			printk(version);
-		}
-
-		/* The DEPCA-specific entries in the device structure. */
-		dev->open = &depca_open;
-		dev->hard_start_xmit = &depca_start_xmit;
-		dev->stop = &depca_close;
-		dev->get_stats = &depca_get_stats;
-		dev->set_multicast_list = &set_multicast_list;
-		dev->do_ioctl = &depca_ioctl;
-		dev->tx_timeout = depca_tx_timeout;
-		dev->watchdog_timeo = TX_TIMEOUT;
-
-		dev->mem_start = 0;
-
-		/* Fill in the generic field of the device structure. */
-		ether_setup(dev);
-	} else {          /* Incorrectly initialised hardware */
-		release_region(ioaddr, DEPCA_TOTAL_SIZE);
-		if (dev->priv) {
-			kfree(dev->priv);
-			dev->priv = NULL;
-		}
+	if (depca_debug > 1) {
+		printk(version);
 	}
 
+	/* The DEPCA-specific entries in the device structure. */
+	dev->open = &depca_open;
+	dev->hard_start_xmit = &depca_start_xmit;
+	dev->stop = &depca_close;
+	dev->get_stats = &depca_get_stats;
+	dev->set_multicast_list = &set_multicast_list;
+	dev->do_ioctl = &depca_ioctl;
+	dev->tx_timeout = depca_tx_timeout;
+	dev->watchdog_timeo = TX_TIMEOUT;
+
+	dev->mem_start = 0;
+
+	/* Fill in the generic field of the device structure. */
+	ether_setup(dev);
+	return 0;
+out_region:
+	release_region(ioaddr, DEPCA_TOTAL_SIZE);
+out_priv:
+	kfree(dev->priv);
+	dev->priv = NULL;
 	return status;
 }
 
@@ -794,9 +799,6 @@ depca_open(struct net_device *dev)
       printk("nicsr: 0x%02x\n",inb(DEPCA_NICSR));
     }
   }
-
-  MOD_INC_USE_COUNT;
-  
   return status;
 }
 
@@ -1120,9 +1122,6 @@ depca_close(struct net_device *dev)
   ** Free the associated irq
   */
   free_irq(dev->irq, dev);
-
-  MOD_DEC_USE_COUNT;
-
   return 0;
 }
 
@@ -1927,14 +1926,14 @@ static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
       tmp.addr[i] = dev->dev_addr[i];
     }
     ioc->len = ETH_ALEN;
-    if (verify_area(VERIFY_WRITE, (void *)ioc->data, ioc->len)) return -EFAULT;
-    copy_to_user(ioc->data, tmp.addr, ioc->len);
+    if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+      return -EFAULT;
     break;
 
   case DEPCA_SET_HWADDR:             /* Set the hardware address */
     if (!capable(CAP_NET_ADMIN)) return -EPERM;
-    if (verify_area(VERIFY_READ, (void *)ioc->data, ETH_ALEN)) return -EFAULT;
-    copy_from_user(tmp.addr,ioc->data,ETH_ALEN);
+    if (copy_from_user(tmp.addr, ioc->data, ETH_ALEN))
+      return -EFAULT;
     for (i=0; i<ETH_ALEN; i++) {
       dev->dev_addr[i] = tmp.addr[i];
     }
@@ -1982,14 +1981,14 @@ static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
   case DEPCA_GET_MCA:                /* Get the multicast address table */
     ioc->len = (HASH_TABLE_LEN >> 3);
-    if (verify_area(VERIFY_WRITE, ioc->data, ioc->len)) return -EFAULT;
-    copy_to_user(ioc->data, lp->init_block.mcast_table, ioc->len); 
+    if (copy_to_user(ioc->data, lp->init_block.mcast_table, ioc->len))
+      return -EFAULT;
     break;
 
   case DEPCA_SET_MCA:                /* Set a multicast address */
     if (!capable(CAP_NET_ADMIN)) return -EPERM;
-    if (verify_area(VERIFY_READ, ioc->data, ETH_ALEN*ioc->len)) return -EFAULT;
-    copy_from_user(tmp.addr, ioc->data, ETH_ALEN * ioc->len);
+    if (copy_from_user(tmp.addr, ioc->data, ETH_ALEN * ioc->len))
+      return -EFAULT;
     set_multicast_list(dev);
     break;
 
@@ -2006,11 +2005,8 @@ static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
   case DEPCA_GET_STATS:              /* Get the driver statistics */
     cli();
     ioc->len = sizeof(lp->pktStats);
-    if (verify_area(VERIFY_WRITE, ioc->data, ioc->len)) {
-	status = -EFAULT;
-    } else {
-	copy_to_user(ioc->data, &lp->pktStats, ioc->len); 
-    }
+    if (copy_to_user(ioc->data, &lp->pktStats, ioc->len))
+      status = -EFAULT;
     sti();
     break;
 
@@ -2028,8 +2024,8 @@ static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
     tmp.sval[i++] = inw(DEPCA_DATA);
     memcpy(&tmp.sval[i], &lp->init_block, sizeof(struct depca_init));
     ioc->len = i+sizeof(struct depca_init);
-    if (verify_area(VERIFY_WRITE, ioc->data, ioc->len)) return -EFAULT;
-    copy_to_user(ioc->data, tmp.addr, ioc->len);
+    if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+      return -EFAULT;
     break;
 
   default:
@@ -2040,13 +2036,7 @@ static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 }
 
 #ifdef MODULE
-static struct net_device thisDepca = {
-  "",  /* device name is inserted by /linux/drivers/net/net_init.c */
-  0, 0, 0, 0,
-  0x200, 7,    /* I/O address, IRQ */
-  0, 0, 0, NULL, depca_probe
-};
-
+static struct net_device thisDepca;
 static int irq=7;	/* EDIT THESE LINE FOR YOUR CONFIGURATION */
 static int io=0x200;    /* Or use the irq= io= options to insmod */
 MODULE_PARM(irq, "i");
@@ -2058,6 +2048,7 @@ init_module(void)
 {
   thisDepca.irq=irq;
   thisDepca.base_addr=io;
+  thisDepca.init = depca_probe;
 
   if (register_netdev(&thisDepca) != 0)
     return -EIO;

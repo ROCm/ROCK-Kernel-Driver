@@ -72,9 +72,9 @@ static int max_interrupt_work = 10;
 #include <asm/irq.h>
 
 #ifdef EL3_DEBUG
-int el3_debug = EL3_DEBUG;
+static int el3_debug = EL3_DEBUG;
 #else
-int el3_debug = 2;
+static int el3_debug = 2;
 #endif
 
 /* To minimize the size of the driver source I only define operating
@@ -158,7 +158,7 @@ struct el3_mca_adapters_struct {
 	int id;
 };
 
-struct el3_mca_adapters_struct el3_mca_adapters[] = {
+static struct el3_mca_adapters_struct el3_mca_adapters[] = {
 	{ "3Com 3c529 EtherLink III (10base2)", 0x627c },
 	{ "3Com 3c529 EtherLink III (10baseT)", 0x627d },
 	{ "3Com 3c529 EtherLink III (test mode)", 0x62db },
@@ -166,27 +166,36 @@ struct el3_mca_adapters_struct el3_mca_adapters[] = {
 	{ "3Com 3c529 EtherLink III (TP)", 0x62f7 },
 	{ NULL, 0 },
 };
-#endif
+#endif /* CONFIG_MCA */
 
-#ifdef __ISAPNP__
-struct el3_isapnp_adapters_struct {
-	unsigned short vendor, function;
-	char *name;
+#ifdef CONFIG_ISAPNP
+static struct isapnp_device_id el3_isapnp_adapters[] = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5090),
+		(long) "3Com Etherlink III (TP)" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5091),
+		(long) "3Com Etherlink III" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5094),
+		(long) "3Com Etherlink III (combo)" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5095),
+		(long) "3Com Etherlink III (TPO)" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5098),
+		(long) "3Com Etherlink III (TPC)" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('P', 'N', 'P'), ISAPNP_FUNCTION(0x80f8),
+		(long) "3Com Etherlink III compatible" },
+	{ }	/* terminate list */
 };
-static struct el3_isapnp_adapters_struct el3_isapnp_adapters[] = {
-	{ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5090), "3Com Etherlink III (TP)"},
-	{ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5091), "3Com Etherlink III"},
-	{ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5094), "3Com Etherlink III (combo)"},
-	{ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5095), "3Com Etherlink III (TPO)"},
-	{ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5098), "3Com Etherlink III (TPC)"},
-	{ISAPNP_VENDOR('P', 'N', 'P'), ISAPNP_FUNCTION(0x80f8), "3Com Etherlink III compatible"},
-	{0, }
-};
+
+MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);
+
 static u16 el3_isapnp_phys_addr[8][3];
-#endif /* CONFIG_ISAPNP */
-#ifdef __ISAPNP__
 static int nopnp;
-#endif
+#endif /* CONFIG_ISAPNP */
 
 int el3_probe(struct net_device *dev)
 {
@@ -196,9 +205,9 @@ int el3_probe(struct net_device *dev)
 	u16 phys_addr[3];
 	static int current_tag = 0;
 	int mca_slot = -1;
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 	static int pnp_cards = 0;
-#endif /* __ISAPNP__ */
+#endif /* CONFIG_ISAPNP */
 
 	if (dev) SET_MODULE_OWNER(dev);
 
@@ -294,7 +303,7 @@ int el3_probe(struct net_device *dev)
 	}
 #endif /* CONFIG_MCA */
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 	if (nopnp == 1)
 		goto no_pnp;
 
@@ -330,7 +339,7 @@ int el3_probe(struct net_device *dev)
 		}
 	}
 no_pnp:
-#endif /* __ISAPNP__ */
+#endif /* CONFIG_ISAPNP */
 
 	/* Select an open I/O location at 0x1*0 to do contention select. */
 	for ( ; id_port < 0x200; id_port += 0x10) {
@@ -376,7 +385,7 @@ no_pnp:
 		phys_addr[i] = htons(id_read_eeprom(i));
 	}
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 	if (nopnp == 0) {
 		/* The ISA PnP 3c509 cards respond to the ID sequence.
 		   This check is needed in order not to register them twice. */
@@ -396,7 +405,7 @@ no_pnp:
 			}
 		}
 	}
-#endif /* __ISAPNP__ */
+#endif /* CONFIG_ISAPNP */
 
 	{
 		unsigned int iobase = id_read_eeprom(8);
@@ -984,7 +993,7 @@ MODULE_PARM(debug,"i");
 MODULE_PARM(irq,"1-8i");
 MODULE_PARM(xcvr,"1-8i");
 MODULE_PARM(max_interrupt_work, "i");
-#ifdef __ISAPNP__
+#ifdef CONFIG_ISAPNP
 MODULE_PARM(nopnp, "i");
 #endif
 

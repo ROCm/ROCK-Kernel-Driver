@@ -1,4 +1,4 @@
-/* $Id: sunqe.c,v 1.47 2000/10/22 16:08:38 davem Exp $
+/* $Id: sunqe.c,v 1.50 2001/02/18 08:10:21 davem Exp $
  * sunqe.c: Sparc QuadEthernet 10baseT SBUS card driver.
  *          Once again I am out to prove that every ethernet
  *          controller out there can be most efficiently programmed
@@ -438,7 +438,7 @@ static void qe_rx(struct sunqe *qep)
 						 len, 0);
 				skb->protocol = eth_type_trans(skb, qep->dev);
 				netif_rx(skb);
-				dev->last_rx = jiffies;
+				qep->dev->last_rx = jiffies;
 				qep->net_stats.rx_packets++;
 				qep->net_stats.rx_bytes += len;
 			}
@@ -503,16 +503,11 @@ static void qec_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static int qe_open(struct net_device *dev)
 {
 	struct sunqe *qep = (struct sunqe *) dev->priv;
-	int res;
 
 	qep->mconfig = (MREGS_MCONFIG_TXENAB |
 			MREGS_MCONFIG_RXENAB |
 			MREGS_MCONFIG_MBAENAB);
-	res = qe_init(qep, 0);
-	if (!res)
-		MOD_INC_USE_COUNT;
-
-	return res;
+	return qe_init(qep, 0);
 }
 
 static int qe_close(struct net_device *dev)
@@ -520,7 +515,6 @@ static int qe_close(struct net_device *dev)
 	struct sunqe *qep = (struct sunqe *) dev->priv;
 
 	qe_stop(qep);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -882,6 +876,7 @@ static int __init qec_ether_init(struct net_device *dev, struct sbus_dev *sdev)
 	}
 
 	for (i = 0; i < 4; i++) {
+		SET_MODULE_OWNER(qe_devs[i]);
 		qe_devs[i]->open = qe_open;
 		qe_devs[i]->stop = qe_close;
 		qe_devs[i]->hard_start_xmit = qe_start_xmit;

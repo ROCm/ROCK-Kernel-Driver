@@ -1,4 +1,3 @@
-#define MAX_KMALLOC_MEM (512*1024)
 /*
    buz - Iomega Buz driver version 1.0
 
@@ -114,12 +113,12 @@
    or set in in a VIDIOCSFBUF ioctl
  */
 
-static unsigned long vidmem = 0;	/* Video memory base address */
+static unsigned long vidmem;	/* Video memory base address (default 0) */
 
 /* Special purposes only: */
 
-static int triton = 0;		/* 0=no, 1=yes */
-static int natoma = 0;		/* 0=no, 1=yes */
+static int triton;		/* 0=no (default), 1=yes */
+static int natoma;		/* 0=no (default), 1=yes */
 
 /*
    Number and size of grab buffers for Video 4 Linux
@@ -145,8 +144,8 @@ static int v4l_bufsize = 128;	/* Everybody should be able to work with this sett
    Default input and video norm at startup of the driver.
  */
 
-static int default_input = 0;	/* 0=Composite, 1=S-VHS */
-static int default_norm = 0;	/* 0=PAL, 1=NTSC */
+static int default_input;	/* 0=Composite (default), 1=S-VHS */
+static int default_norm;	/* 0=PAL (default), 1=NTSC */
 
 MODULE_PARM(vidmem, "i");
 MODULE_PARM(triton, "i");
@@ -174,7 +173,7 @@ static void zoran_feed_stat_com(struct zoran *zr);
  *   Allocate the V4L grab buffers
  *
  *   These have to be pysically contiguous.
- *   If v4l_bufsize <= MAX_KMALLOC_MEM we use kmalloc
+ *   If v4l_bufsize <= KMALLOC_MAXSIZE we use kmalloc
  */
 
 static int v4l_fbuffer_alloc(struct zoran *zr)
@@ -186,7 +185,7 @@ static int v4l_fbuffer_alloc(struct zoran *zr)
 		if (zr->v4l_gbuf[i].fbuffer)
 			printk(KERN_WARNING "%s: v4l_fbuffer_alloc: buffer %d allready allocated ?\n", zr->name, i);
 
-		if (v4l_bufsize <= MAX_KMALLOC_MEM) {
+		if (v4l_bufsize <= KMALLOC_MAXSIZE) {
 			/* Use kmalloc */
 
 			mem = (unsigned char *) kmalloc(v4l_bufsize, GFP_KERNEL);
@@ -231,7 +230,7 @@ static void v4l_fbuffer_free(struct zoran *zr)
 /*
  *   Allocate the MJPEG grab buffers.
  *
- *   If the requested buffer size is smaller than MAX_KMALLOC_MEM,
+ *   If the requested buffer size is smaller than KMALLOC_MAXSIZE,
  *   kmalloc is used to request a physically contiguous area,
  *   else we allocate the memory in framgents with get_free_page.
  *
@@ -240,7 +239,7 @@ static void v4l_fbuffer_free(struct zoran *zr)
  *   (RJ: This statement is from Dave Perks' original driver,
  *   I could never check it because I have a zr36067)
  *   The driver cares about this because it reduces the buffer
- *   size to MAX_KMALLOC_MEM in that case (which forces contiguous allocation).
+ *   size to KMALLOC_MAXSIZE in that case (which forces contiguous allocation).
  *
  *   RJ: The contents grab buffers needs never be accessed in the driver.
  *       Therefore there is no need to allocate them with vmalloc in order
@@ -260,7 +259,7 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 	/* Decide if we should alloc contiguous or fragmented memory */
 	/* This has to be identical in jpg_fbuffer_alloc and jpg_fbuffer_free */
 
-	alloc_contig = (zr->jpg_bufsize < MAX_KMALLOC_MEM);
+	alloc_contig = (zr->jpg_bufsize < KMALLOC_MAXSIZE);
 
 	for (i = 0; i < zr->jpg_nbufs; i++) {
 		if (zr->jpg_gbuf[i].frag_tab)
@@ -320,7 +319,7 @@ static void jpg_fbuffer_free(struct zoran *zr)
 	/* Decide if we should alloc contiguous or fragmented memory */
 	/* This has to be identical in jpg_fbuffer_alloc and jpg_fbuffer_free */
 
-	alloc_contig = (zr->jpg_bufsize < MAX_KMALLOC_MEM);
+	alloc_contig = (zr->jpg_bufsize < KMALLOC_MAXSIZE);
 
 	for (i = 0; i < zr->jpg_nbufs; i++) {
 		if (!zr->jpg_gbuf[i].frag_tab)
@@ -388,21 +387,16 @@ static void detach_inform(struct i2c_bus *bus, int id)
 	DEBUG(printk(BUZ_DEBUG "-%u: i2c detach %02x\n", zr->id, id));
 }
 
-static struct i2c_bus zoran_i2c_bus_template =
-{
-	"zr36057",
-	I2C_BUSID_BT848,
-	NULL,
+static struct i2c_bus zoran_i2c_bus_template = {
+	name:			"zr36057",
+	id:			I2C_BUSID_BT848,
+	bus_lock:		SPIN_LOCK_UNLOCKED,
 
-	SPIN_LOCK_UNLOCKED,
+	attach_inform:		attach_inform,
+	detach_inform:		detach_inform,
 
-	attach_inform,
-	detach_inform,
-
-	i2c_setlines,
-	i2c_getdataline,
-	NULL,
-	NULL,
+	i2c_setlines:		i2c_setlines,
+	i2c_getdataline:	i2c_getdataline,
 };
 
 
@@ -2267,7 +2261,6 @@ static int zoran_open(struct video_device *dev, int flags)
 		return -EBUSY;
 
 	}
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -2295,7 +2288,6 @@ static void zoran_close(struct video_device *dev)
 	jpg_fbuffer_free(zr);
 	zr->jpg_nbufs = 0;
 
-	MOD_DEC_USE_COUNT;
 	DEBUG(printk(KERN_INFO ": zoran_close done\n"));
 }
 
@@ -2580,7 +2572,7 @@ static int zoran_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 #endif
 #endif
 
-			/* Check for vaild parameters */
+			/* Check for valid parameters */
 			if (vw.width < BUZ_MIN_WIDTH || vw.height < BUZ_MIN_HEIGHT ||
 			    vw.width > BUZ_MAX_WIDTH || vw.height > BUZ_MAX_HEIGHT) {
 				return -EINVAL;
@@ -2842,8 +2834,8 @@ static int zoran_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 			/* br.size is limited by 1 page for the stat_com tables to a Maximum of 2 MB */
 			if (br.size > (512 * 1024))
 				br.size = (512 * 1024);		/* 512 K should be enough */
-			if (zr->need_contiguous && br.size > MAX_KMALLOC_MEM)
-				br.size = MAX_KMALLOC_MEM;
+			if (zr->need_contiguous && br.size > KMALLOC_MAXSIZE)
+				br.size = KMALLOC_MAXSIZE;
 
 			zr->jpg_nbufs = br.count;
 			zr->jpg_bufsize = br.size;
@@ -3029,6 +3021,7 @@ static int zoran_mmap(struct video_device *dev, const char *adr, unsigned long s
 
 static struct video_device zoran_template =
 {
+	owner:		THIS_MODULE,
 	name:		BUZ_NAME,
 	type:		VID_TYPE_CAPTURE | VID_TYPE_OVERLAY | VID_TYPE_CLIPPING | VID_TYPE_FRAMERAM |
 			VID_TYPE_SCALES | VID_TYPE_SUBCAPTURE,
@@ -3343,7 +3336,7 @@ static int find_zr36057(void)
 		zr->zr36057_mem = ioremap(zr->zr36057_adr, 0x1000);
 		if (!zr->zr36057_mem) {
 			printk(KERN_ERR "%s: ioremap failed\n", zr->name);
-			/* XXX handle error */
+			break;
 		}
 
 		/* set PCI latency timer */

@@ -78,8 +78,10 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	if (!dev)
 		return err;
 	lp = dev->priv = kmalloc(sizeof(struct arcnet_local), GFP_KERNEL);
-	if (!lp)
-		return -ENOMEM;
+	if (!lp) {
+		err = -ENOMEM;
+		goto out_dev;
+	}
 	memset(lp, 0, sizeof(struct arcnet_local));
 	pdev->driver_data = dev;
 
@@ -98,17 +100,30 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	if (check_region(ioaddr, ARCNET_TOTAL_SIZE)) {
 		BUGMSG(D_INIT, "IO region %xh-%xh already allocated.\n",
 		       ioaddr, ioaddr + ARCNET_TOTAL_SIZE - 1);
-		return -EBUSY;
+		err = -EBUSY;
+		goto out_priv;
 	}
 	if (ASTATUS() == 0xFF) {
 		BUGMSG(D_NORMAL, "IO address %Xh was reported by PCI BIOS, "
 		       "but seems empty!\n", ioaddr);
-		return -EIO;
+		err = -EIO;
+		goto out_priv;
 	}
-	if (com20020_check(dev))
-		return -EIO;
+	if (com20020_check(dev)) {
+		err = -EIO;
+		goto out_priv;
+	}
 
-	return com20020_found(dev, SA_SHIRQ);
+	if ((err = com20020_found(dev, SA_SHIRQ)) != 0)
+	        goto out_priv;
+
+	return 0;
+
+out_priv:
+	kfree(dev->priv);
+out_dev:
+	kfree(dev);
+	return err;
 }
 
 static void __devexit com20020pci_remove(struct pci_dev *pdev)

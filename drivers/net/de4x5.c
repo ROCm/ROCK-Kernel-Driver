@@ -929,8 +929,6 @@ static int     de4x5_rx_ovfc(struct net_device *dev);
 
 static int     autoconf_media(struct net_device *dev);
 static void    create_packet(struct net_device *dev, char *frame, int len);
-static void    de4x5_us_delay(u32 usec);
-static void    de4x5_ms_delay(u32 msec);
 static void    load_packet(struct net_device *dev, char *buf, u32 flags, struct sk_buff *skb);
 static int     dc21040_autoconf(struct net_device *dev);
 static int     dc21041_autoconf(struct net_device *dev);
@@ -1096,13 +1094,13 @@ static int (*dc_infoblock[])(struct net_device *dev, u_char, u_char *) = {
 #define RESET_DE4X5 {\
     int i;\
     i=inl(DE4X5_BMR);\
-    de4x5_ms_delay(1);\
+    mdelay(1);\
     outl(i | BMR_SWR, DE4X5_BMR);\
-    de4x5_ms_delay(1);\
+    mdelay(1);\
     outl(i, DE4X5_BMR);\
-    de4x5_ms_delay(1);\
-    for (i=0;i<5;i++) {inl(DE4X5_BMR); de4x5_ms_delay(1);}\
-    de4x5_ms_delay(1);\
+    mdelay(1);\
+    for (i=0;i<5;i++) {inl(DE4X5_BMR); mdelay(1);}\
+    mdelay(1);\
 }
 
 #define PHY_HARD_RESET {\
@@ -1146,7 +1144,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 	pcibios_write_config_byte(lp->bus_num, lp->device << 3, 
 				  PCI_CFDA_PSM, WAKEUP);
     }
-    de4x5_ms_delay(10);
+    mdelay(10);
 
     RESET_DE4X5;
     
@@ -1731,13 +1729,13 @@ de4x5_rx(struct net_device *dev)
 
 		    /* Push up the protocol stack */
 		    skb->protocol=eth_type_trans(skb,dev);
+		    de4x5_local_stats(dev, skb->data, pkt_len);
 		    netif_rx(skb);
 		    
 		    /* Update stats */
 		    dev->last_rx = jiffies;
 		    lp->stats.rx_packets++;
  		    lp->stats.rx_bytes += pkt_len;
-		    de4x5_local_stats(dev, skb->data, pkt_len);
 		}
 	    }
 	    
@@ -2302,6 +2300,9 @@ srom_search(struct pci_dev *dev)
 
     for (walk = walk->next; walk != &dev->bus_list; walk = walk->next) {
 	struct pci_dev *this_dev = pci_dev_b(walk);
+
+	/* Skip the pci_bus list entry */
+	if (list_entry(walk, struct pci_bus, devices) == dev->bus) continue;
 
 	pb = this_dev->bus->number;
 	vendor = this_dev->vendor;
@@ -3921,7 +3922,7 @@ reset_init_sia(struct net_device *dev, s32 csr13, s32 csr14, s32 csr15)
     outl(csr14, DE4X5_STRR);
     outl(csr13, DE4X5_SICR);
 
-    de4x5_ms_delay(10);
+    mdelay(10);
 
     return;
 }
@@ -3947,33 +3948,6 @@ create_packet(struct net_device *dev, char *frame, int len)
     
     return;
 }
-
-/*
-** Known delay in microseconds
-*/
-static void
-de4x5_us_delay(u32 usec)
-{
-    udelay(usec);
-    
-    return;
-}
-
-/*
-** Known delay in milliseconds, in millisecond steps.
-*/
-static void
-de4x5_ms_delay(u32 msec)
-{
-    u_int i;
-    
-    for (i=0; i<msec; i++) {
-	de4x5_us_delay(1000);
-    }
-    
-    return;
-}
-
 
 /*
 ** Look for a particular board name in the EISA configuration space
@@ -4367,7 +4341,7 @@ srom_address(u_int command, u_long addr, u_char offset)
     for (i=0; i<6; i++, a <<= 1) {
 	srom_latch(command | ((a & 0x80) ? DT_IN : 0), addr);
     }
-    de4x5_us_delay(1);
+    udelay(1);
     
     i = (getfrom_srom(addr) >> 3) & 0x01;
     
@@ -4401,7 +4375,7 @@ srom_busy(u_int command, u_long addr)
    sendto_srom((command & 0x0000ff00) | DT_CS, addr);
    
    while (!((getfrom_srom(addr) >> 3) & 0x01)) {
-       de4x5_ms_delay(1);
+       mdelay(1);
    }
    
    sendto_srom(command & 0x0000ff00, addr);
@@ -5332,7 +5306,7 @@ yawn(struct net_device *dev, int state)
 	switch(state) {
 	  case WAKEUP:
 	    outb(WAKEUP, PCI_CFPM);
-	    de4x5_ms_delay(10);
+	    mdelay(10);
 	    break;
 
 	  case SNOOZE:
@@ -5349,7 +5323,7 @@ yawn(struct net_device *dev, int state)
 	  case WAKEUP:
 	    pcibios_write_config_byte(lp->bus_num, lp->device << 3, 
 				      PCI_CFDA_PSM, WAKEUP);
-	    de4x5_ms_delay(10);
+	    mdelay(10);
 	    break;
 
 	  case SNOOZE:

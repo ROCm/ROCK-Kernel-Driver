@@ -119,7 +119,7 @@ MODULE_DEVICE_TABLE(pci, rcpci45_pci_table);
 
 static void __exit rcpci45_remove_one(struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	PDPA pDpa = dev->priv;
 
         if (!dev) {
@@ -139,6 +139,7 @@ static void __exit rcpci45_remove_one(struct pci_dev *pdev)
 	kfree(pDpa->pPab);
 	kfree(pDpa);
 	kfree(dev);
+	pci_set_drvdata(pdev, NULL);
 }
 
 static int RCinit(struct net_device *dev)
@@ -189,7 +190,7 @@ static int rcpci45_init_one(struct pci_dev *pdev,
     pci_start = pci_resource_start(pdev,0);
     pci_len = pci_resource_len(pdev,0);
 
-    pdev->driver_data = dev;
+    pci_set_drvdata(pdev, dev);
     
     pDpa = dev->priv;
     pDpa->id = card_idx;

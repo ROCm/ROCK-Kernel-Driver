@@ -320,7 +320,7 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 		goto err_out_region;
 	}
 
-	pci_dev->driver_data = net_dev;
+	pci_set_drvdata(pci_dev, net_dev);
 	pci_dev->dma_mask = SIS900_DMA_MASK;
 
 	/* The SiS900-specific entries in the device structure. */
@@ -1843,11 +1843,12 @@ static void sis900_reset(struct net_device *net_dev)
 
 static void __devexit sis900_remove(struct pci_dev *pci_dev)
 {
-	struct net_device *net_dev = pci_dev->driver_data;
+	struct net_device *net_dev = pci_get_drvdata(pci_dev);
 		
 	unregister_netdev(net_dev);
 	release_region(net_dev->base_addr, SIS900_TOTAL_SIZE);
 	kfree(net_dev);
+	pci_set_drvdata(pci_dev, NULL);
 }
 
 #define SIS900_MODULE_NAME "sis900"

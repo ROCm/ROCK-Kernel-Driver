@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.19 2001/02/13 01:16:44 davem Exp $
+/* $Id: pci_psycho.c,v 1.21 2001/02/28 03:28:55 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -72,7 +72,7 @@
  * ---------------------------------------------------------
  */
 #define PSYCHO_CONFIG_BASE(PBM)	\
-	((PBM)->parent->config_space | (1UL << 24))
+	((PBM)->config_space | (1UL << 24))
 #define PSYCHO_CONFIG_ENCODE(BUS, DEVFN, REG)	\
 	(((unsigned long)(BUS)   << 16) |	\
 	 ((unsigned long)(DEVFN) << 8)  |	\
@@ -376,10 +376,11 @@ static int __init psycho_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 	return ret;
 }
 
-static unsigned int __init psycho_irq_build(struct pci_controller_info *p,
+static unsigned int __init psycho_irq_build(struct pci_pbm_info *pbm,
 					    struct pci_dev *pdev,
 					    unsigned int ino)
 {
+	struct pci_controller_info *p = pbm->parent;
 	struct ino_bucket *bucket;
 	unsigned long imap, iclr;
 	unsigned long imap_off, iclr_off;
@@ -1002,12 +1003,13 @@ static void psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define PSYCHO_PCIERR_B_INO	0x31
 static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 {
+	struct pci_pbm_info *pbm = &p->pbm_A; /* arbitrary */
 	unsigned long base = p->controller_regs;
 	unsigned int irq, portid = p->portid;
 	u64 tmp;
 
 	/* Build IRQs and register handlers. */
-	irq = psycho_irq_build(p, NULL, (portid << 6) | PSYCHO_UE_INO);
+	irq = psycho_irq_build(pbm, NULL, (portid << 6) | PSYCHO_UE_INO);
 	if (request_irq(irq, psycho_ue_intr,
 			SA_SHIRQ, "PSYCHO UE", p) < 0) {
 		prom_printf("PSYCHO%d: Cannot register UE interrupt.\n",
@@ -1015,7 +1017,7 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 
-	irq = psycho_irq_build(p, NULL, (portid << 6) | PSYCHO_CE_INO);
+	irq = psycho_irq_build(pbm, NULL, (portid << 6) | PSYCHO_CE_INO);
 	if (request_irq(irq, psycho_ce_intr,
 			SA_SHIRQ, "PSYCHO CE", p) < 0) {
 		prom_printf("PSYCHO%d: Cannot register CE interrupt.\n",
@@ -1023,7 +1025,7 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 
-	irq = psycho_irq_build(p, NULL, (portid << 6) | PSYCHO_PCIERR_A_INO);
+	irq = psycho_irq_build(pbm, NULL, (portid << 6) | PSYCHO_PCIERR_A_INO);
 	if (request_irq(irq, psycho_pcierr_intr,
 			SA_SHIRQ, "PSYCHO PCIERR", &p->pbm_A) < 0) {
 		prom_printf("PSYCHO%d(PBMA): Cannot register PciERR interrupt.\n",
@@ -1031,7 +1033,7 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 
-	irq = psycho_irq_build(p, NULL, (portid << 6) | PSYCHO_PCIERR_B_INO);
+	irq = psycho_irq_build(pbm, NULL, (portid << 6) | PSYCHO_PCIERR_B_INO);
 	if (request_irq(irq, psycho_pcierr_intr,
 			SA_SHIRQ, "PSYCHO PCIERR", &p->pbm_B) < 0) {
 		prom_printf("PSYCHO%d(PBMB): Cannot register PciERR interrupt.\n",
@@ -1574,8 +1576,10 @@ void __init psycho_init(int node)
 	printk("PCI: Found PSYCHO, control regs at %016lx\n",
 	       p->controller_regs);
 
-	p->config_space = pr_regs[2].phys_addr + PSYCHO_CONFIGSPACE;
-	printk("PSYCHO: PCI config space at %016lx\n", p->config_space);
+	p->pbm_A.config_space = p->pbm_B.config_space =
+		(pr_regs[2].phys_addr + PSYCHO_CONFIGSPACE);
+	printk("PSYCHO: Shared PCI config space at %016lx\n",
+	       p->pbm_A.config_space);
 
 	/*
 	 * Psycho's PCI MEM space is mapped to a 2GB aligned area, so

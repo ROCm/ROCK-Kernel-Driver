@@ -85,6 +85,7 @@
 		1de1 3904  DC390F Ultra Wide SCSI Controller
 	0012  53c895a
 	0020  53c1010 Ultra3 SCSI Adapter
+	0021  53c1010 66MHz  Ultra3 SCSI Adapter
 	008f  53c875J
 		1092 8000  FirePort 40 SCSI Controller
 		1092 8760  FirePort 40 Dual SCSI Host Adapter
@@ -1259,7 +1260,7 @@
 109e  Brooktree Corporation
 	0350  Bt848 TV with DMA push
 	0351  Bt849A Video capture
-	036c  Bt879(??) Video Capture
+	036c  Bt879(?) Video Capture
 		13e9 0070  Win/TV (Video Section)
 	036e  Bt878
 		0070 13eb  WinTV/GO
@@ -3936,7 +3937,7 @@
 # 1507  HTEC Ltd
 # Commented out because there are no known HTEC chips and 1507 is already
 # used by mistake by Motorola (see vendor ID 1057)
-1507  Motorola ?? / HTEC
+1507  Motorola ? / HTEC
 	0001  MPC105 [Eagle]
 	0002  MPC106 [Grackle]
 	0003  MPC8240 [Kahlua]
@@ -4254,7 +4255,7 @@
 270b  Xantel Corporation
 270f  Chaintech Computer Co. Ltd
 2711  AVID Technology Inc.
-2a15  3D Vision(???)
+2a15  3D Vision(?)
 3000  Hansol Electronics Inc.
 3142  Post Impression Systems.
 3388  Hint Corp

@@ -84,7 +84,7 @@ extern void mackbd_leds(unsigned char leds);
 extern void mackbd_init_hw(void);
 extern unsigned char mackbd_sysrq_xlate[128];
 
-kdev_t boot_dev;
+extern kdev_t boot_dev;
 
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;

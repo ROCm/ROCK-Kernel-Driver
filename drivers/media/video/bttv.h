@@ -151,7 +151,7 @@ extern int bttv_handle_chipset(struct bttv *btv);
 
 /* returns card type + card ID (for bt878-based ones)
    for possible values see lines below beginning with #define BTTV_UNKNOWN
-   returns negative value if error ocurred 
+   returns negative value if error occurred 
 */
 extern int bttv_get_cardinfo(unsigned int card, int *type, int *cardid);
 
@@ -160,19 +160,19 @@ extern int bttv_get_id(unsigned int card);
 
 /* sets GPOE register (BT848_GPIO_OUT_EN) to new value:
    data | (current_GPOE_value & ~mask)
-   returns negative value if error ocurred
+   returns negative value if error occurred
 */
 extern int bttv_gpio_enable(unsigned int card,
 			    unsigned long mask, unsigned long data);
 
 /* fills data with GPDATA register contents
-   returns negative value if error ocurred
+   returns negative value if error occurred
 */
 extern int bttv_read_gpio(unsigned int card, unsigned long *data);
 
 /* sets GPDATA register to new value:
   (data & mask) | (current_GPDATA_value & ~mask)
-  returns negative value if error ocurred 
+  returns negative value if error occurred 
 */
 extern int bttv_write_gpio(unsigned int card,
 			   unsigned long mask, unsigned long data);
@@ -182,7 +182,7 @@ extern int bttv_write_gpio(unsigned int card,
    in interrupt handler if BT848_INT_GPINT bit is set - this queue is activated
    (wake_up_interruptible) and following call to the function bttv_read_gpio 
    should return new value of GPDATA,
-   returns NULL value if error ocurred or queue is not available
+   returns NULL value if error occurred or queue is not available
    WARNING: because there is no buffer for GPIO data, one MUST 
    process data ASAP
 */
@@ -190,6 +190,9 @@ extern wait_queue_head_t* bttv_get_gpio_queue(unsigned int card);
 
 /* i2c */
 #define I2C_CLIENTS_MAX 8
+extern struct i2c_algo_bit_data bttv_i2c_algo_template;
+extern struct i2c_adapter bttv_i2c_adap_template;
+extern struct i2c_client bttv_i2c_client_template;
 extern void bttv_bit_setscl(void *data, int state);
 extern void bttv_bit_setsda(void *data, int state);
 extern void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg);

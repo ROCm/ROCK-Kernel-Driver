@@ -95,9 +95,6 @@
 #define SCSI_NCR_DEBUG_INFO_SUPPORT
 #define SCSI_NCR_PCI_FIX_UP_SUPPORT
 #ifdef	SCSI_NCR_PROC_INFO_SUPPORT
-#	ifdef	CONFIG_SCSI_NCR53C8XX_PROFILE
-#		define	SCSI_NCR_PROFILE_SUPPORT
-#	endif
 #	define	SCSI_NCR_USER_COMMAND_SUPPORT
 #	define	SCSI_NCR_USER_INFO_SUPPORT
 #endif
@@ -141,18 +138,6 @@
  */
 #define	SCSI_NCR_SETUP_SPECIAL_FEATURES		(3)
 
-/*
- * For Ultra2 and Ultra3 SCSI support allow 80Mhz synchronous data transfers.
- * Value means:
- *  0 - Ultra speeds disabled
- *  1 - Ultra enabled  (Maximum 20Mtrans/sec)
- *  2 - Ultra2 enabled (Maximum 40Mtrans/sec)
- *  3 - Ultra3 enabled (Maximum 80Mtrans/sec)
- *
- * Use boot options sym53c8xx=ultra:3 to enable Ultra3 support.
- */
-
-#define SCSI_NCR_SETUP_ULTRA_SCSI		(3)
 #define SCSI_NCR_MAX_SYNC			(80)
 
 /*
@@ -183,14 +168,32 @@
 #endif
 
 /*
- * Use normal IO if configured. Forced for alpha and ppc.
+ * Use normal IO if configured. Forced for alpha and powerpc.
+ * Powerpc fails copying to on-chip RAM using memcpy_toio().
  */
 #if defined(CONFIG_SCSI_NCR53C8XX_IOMAPPED)
 #define	SCSI_NCR_IOMAPPED
-#elif defined(__alpha__) || defined(__powerpc__)
+#elif defined(__alpha__)
 #define	SCSI_NCR_IOMAPPED
+#elif defined(__powerpc__)
+#define	SCSI_NCR_IOMAPPED
+#define SCSI_NCR_PCI_MEM_NOT_SUPPORTED
 #elif defined(__sparc__)
 #undef SCSI_NCR_IOMAPPED
+#endif
+
+/*
+ * Should we enable DAC cycles on Sparc64 platform?
+ * Until further investigation we do not enable it
+ * at the moment.
+ * We may want to enable it for __ia64__ (untested)
+ */
+#if defined(__ia64__)
+#    if !defined(SCSI_NCR_USE_64BIT_DAC)
+#        define SCSI_NCR_USE_64BIT_DAC
+#    endif
+#else
+#    undef SCSI_NCR_USE_64BIT_DAC
 #endif
 
 /*
@@ -376,12 +379,11 @@
 #define ktime_add(a, o)		((a) + (u_long)(o))
 #define ktime_sub(a, o)		((a) - (u_long)(o))
 
+
 /*
-**	IO functions definition for big/little endian support.
-**	For now, the NCR is only supported in little endian addressing mode, 
-**	and big endian byte ordering is only supported for the PPC.
-**	MMIO is not used on PPC.
-*/
+ *  IO functions definition for big/little endian CPU support.
+ *  For now, the NCR is only supported in little endian addressing mode, 
+ */
 
 #ifdef	__BIG_ENDIAN
 
@@ -389,27 +391,34 @@
 #error	"BIG ENDIAN byte ordering needs kernel version >= 2.1.0"
 #endif
 
-#if defined(__powerpc__)
 #define	inw_l2b		inw
 #define	inl_l2b		inl
 #define	outw_b2l	outw
 #define	outl_b2l	outl
-#elif defined(__sparc__)
+
+#define	readb_raw	readb
+#define	writeb_raw	writeb
+
+#if defined(__hppa__)
+#define	readw_l2b(a)	le16_to_cpu(readw(a))
+#define	readl_l2b(a)	le32_to_cpu(readl(a))
+#define	writew_b2l(v,a)	writew(cpu_to_le16(v),a)
+#define	writel_b2l(v,a)	writel(cpu_to_le32(v),a)
+#else	/* Other bid-endian */
 #define	readw_l2b	readw
 #define	readl_l2b	readl
 #define	writew_b2l	writew
 #define	writel_b2l	writel
-#else
-#error	"Support for BIG ENDIAN is only available for PowerPC and SPARC"
 #endif
 
 #else	/* little endian */
 
-#if defined(__i386__)	/* i386 implements full FLAT memory/MMIO model */
 #define	inw_raw		inw
 #define	inl_raw		inl
 #define	outw_raw	outw
 #define	outl_raw	outl
+
+#if defined(__i386__)	/* i386 implements full FLAT memory/MMIO model */
 #define readb_raw(a)	(*(volatile unsigned char *) (a))
 #define readw_raw(a)	(*(volatile unsigned short *) (a))
 #define readl_raw(a)	(*(volatile unsigned int *) (a))
@@ -417,13 +426,11 @@
 #define writew_raw(b,a)	((*(volatile unsigned short *) (a)) = (b))
 #define writel_raw(b,a)	((*(volatile unsigned int *) (a)) = (b))
 
-#else	/* Other little-endian (for now alpha) */
-#define	inw_raw		inw
-#define	inl_raw		inl
-#define	outw_raw	outw
-#define	outl_raw	outl
+#else	/* Other little-endian */
+#define	readb_raw	readb
 #define	readw_raw	readw
 #define	readl_raw	readl
+#define	writeb_raw	writeb
 #define	writew_raw	writew
 #define	writel_raw	writel
 
@@ -433,6 +440,204 @@
 #ifdef	SCSI_NCR_BIG_ENDIAN
 #error	"The NCR in BIG ENDIAN addressing mode is not (yet) supported"
 #endif
+
+
+/*
+ *  IA32 architecture does not reorder STORES and prevents
+ *  LOADS from passing STORES. It is called `program order' 
+ *  by Intel and allows device drivers to deal with memory 
+ *  ordering by only ensuring that the code is not reordered  
+ *  by the compiler when ordering is required.
+ *  Other architectures implement a weaker ordering that 
+ *  requires memory barriers (and also IO barriers when they 
+ *  make sense) to be used.
+ *  We want to be paranoid for ppc and ia64. :)
+ */
+
+#if	defined	__i386__
+#define MEMORY_BARRIER()	do { ; } while(0)
+#elif	defined	__powerpc__
+#define MEMORY_BARRIER()	__asm__ volatile("eieio; sync" : : : "memory")
+#elif	defined	__ia64__
+#define MEMORY_BARRIER()	__asm__ volatile("mf.a; mf" : : : "memory")
+#else
+#define MEMORY_BARRIER()	mb()
+#endif
+
+
+/*
+ *  If the NCR uses big endian addressing mode over the 
+ *  PCI, actual io register addresses for byte and word 
+ *  accesses must be changed according to lane routing.
+ *  Btw, ncr_offb() and ncr_offw() macros only apply to 
+ *  constants and so donnot generate bloated code.
+ */
+
+#if	defined(SCSI_NCR_BIG_ENDIAN)
+
+#define ncr_offb(o)	(((o)&~3)+((~((o)&3))&3))
+#define ncr_offw(o)	(((o)&~3)+((~((o)&3))&2))
+
+#else
+
+#define ncr_offb(o)	(o)
+#define ncr_offw(o)	(o)
+
+#endif
+
+/*
+ *  If the CPU and the NCR use same endian-ness adressing,
+ *  no byte reordering is needed for script patching.
+ *  Macro cpu_to_scr() is to be used for script patching.
+ *  Macro scr_to_cpu() is to be used for getting a DWORD 
+ *  from the script.
+ */
+
+#if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
+
+#define cpu_to_scr(dw)	cpu_to_le32(dw)
+#define scr_to_cpu(dw)	le32_to_cpu(dw)
+
+#elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
+
+#define cpu_to_scr(dw)	cpu_to_be32(dw)
+#define scr_to_cpu(dw)	be32_to_cpu(dw)
+
+#else
+
+#define cpu_to_scr(dw)	(dw)
+#define scr_to_cpu(dw)	(dw)
+
+#endif
+
+/*
+ *  Access to the controller chip.
+ *
+ *  If SCSI_NCR_IOMAPPED is defined, the driver will use 
+ *  normal IOs instead of the MEMORY MAPPED IO method  
+ *  recommended by PCI specifications.
+ *  If all PCI bridges, host brigdes and architectures 
+ *  would have been correctly designed for PCI, this 
+ *  option would be useless.
+ *
+ *  If the CPU and the NCR use same endian-ness adressing,
+ *  no byte reordering is needed for accessing chip io 
+ *  registers. Functions suffixed by '_raw' are assumed 
+ *  to access the chip over the PCI without doing byte 
+ *  reordering. Functions suffixed by '_l2b' are 
+ *  assumed to perform little-endian to big-endian byte 
+ *  reordering, those suffixed by '_b2l' blah, blah,
+ *  blah, ...
+ */
+
+#if defined(SCSI_NCR_IOMAPPED)
+
+/*
+ *  IO mapped only input / ouput
+ */
+
+#define	INB_OFF(o)		inb (np->base_io + ncr_offb(o))
+#define	OUTB_OFF(o, val)	outb ((val), np->base_io + ncr_offb(o))
+
+#if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
+
+#define	INW_OFF(o)		inw_l2b (np->base_io + ncr_offw(o))
+#define	INL_OFF(o)		inl_l2b (np->base_io + (o))
+
+#define	OUTW_OFF(o, val)	outw_b2l ((val), np->base_io + ncr_offw(o))
+#define	OUTL_OFF(o, val)	outl_b2l ((val), np->base_io + (o))
+
+#elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
+
+#define	INW_OFF(o)		inw_b2l (np->base_io + ncr_offw(o))
+#define	INL_OFF(o)		inl_b2l (np->base_io + (o))
+
+#define	OUTW_OFF(o, val)	outw_l2b ((val), np->base_io + ncr_offw(o))
+#define	OUTL_OFF(o, val)	outl_l2b ((val), np->base_io + (o))
+
+#else
+
+#define	INW_OFF(o)		inw_raw (np->base_io + ncr_offw(o))
+#define	INL_OFF(o)		inl_raw (np->base_io + (o))
+
+#define	OUTW_OFF(o, val)	outw_raw ((val), np->base_io + ncr_offw(o))
+#define	OUTL_OFF(o, val)	outl_raw ((val), np->base_io + (o))
+
+#endif	/* ENDIANs */
+
+#else	/* defined SCSI_NCR_IOMAPPED */
+
+/*
+ *  MEMORY mapped IO input / output
+ */
+
+#define INB_OFF(o)		readb_raw((char *)np->reg + ncr_offb(o))
+#define OUTB_OFF(o, val)	writeb_raw((val), (char *)np->reg + ncr_offb(o))
+
+#if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
+
+#define INW_OFF(o)		readw_l2b((char *)np->reg + ncr_offw(o))
+#define INL_OFF(o)		readl_l2b((char *)np->reg + (o))
+
+#define OUTW_OFF(o, val)	writew_b2l((val), (char *)np->reg + ncr_offw(o))
+#define OUTL_OFF(o, val)	writel_b2l((val), (char *)np->reg + (o))
+
+#elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
+
+#define INW_OFF(o)		readw_b2l((char *)np->reg + ncr_offw(o))
+#define INL_OFF(o)		readl_b2l((char *)np->reg + (o))
+
+#define OUTW_OFF(o, val)	writew_l2b((val), (char *)np->reg + ncr_offw(o))
+#define OUTL_OFF(o, val)	writel_l2b((val), (char *)np->reg + (o))
+
+#else
+
+#define INW_OFF(o)		readw_raw((char *)np->reg + ncr_offw(o))
+#define INL_OFF(o)		readl_raw((char *)np->reg + (o))
+
+#define OUTW_OFF(o, val)	writew_raw((val), (char *)np->reg + ncr_offw(o))
+#define OUTL_OFF(o, val)	writel_raw((val), (char *)np->reg + (o))
+
+#endif
+
+#endif	/* defined SCSI_NCR_IOMAPPED */
+
+#define INB(r)		INB_OFF (offsetof(struct ncr_reg,r))
+#define INW(r)		INW_OFF (offsetof(struct ncr_reg,r))
+#define INL(r)		INL_OFF (offsetof(struct ncr_reg,r))
+
+#define OUTB(r, val)	OUTB_OFF (offsetof(struct ncr_reg,r), (val))
+#define OUTW(r, val)	OUTW_OFF (offsetof(struct ncr_reg,r), (val))
+#define OUTL(r, val)	OUTL_OFF (offsetof(struct ncr_reg,r), (val))
+
+/*
+ *  Set bit field ON, OFF 
+ */
+
+#define OUTONB(r, m)	OUTB(r, INB(r) | (m))
+#define OUTOFFB(r, m)	OUTB(r, INB(r) & ~(m))
+#define OUTONW(r, m)	OUTW(r, INW(r) | (m))
+#define OUTOFFW(r, m)	OUTW(r, INW(r) & ~(m))
+#define OUTONL(r, m)	OUTL(r, INL(r) | (m))
+#define OUTOFFL(r, m)	OUTL(r, INL(r) & ~(m))
+
+/*
+ *  We normally want the chip to have a consistent view
+ *  of driver internal data structures when we restart it.
+ *  Thus these macros.
+ */
+#define OUTL_DSP(v)				\
+	do {					\
+		MEMORY_BARRIER();		\
+		OUTL (nc_dsp, (v));		\
+	} while (0)
+
+#define OUTONB_STD()				\
+	do {					\
+		MEMORY_BARRIER();		\
+		OUTONB (nc_dcntl, (STD|NOCOM));	\
+	} while (0)
+
 
 /*
 **	NCR53C8XX Device Ids
@@ -486,6 +691,10 @@
 #define PCI_DEVICE_ID_NCR_53C895A 0x12
 #endif
 
+#ifndef PCI_DEVICE_ID_NCR_53C875A
+#define PCI_DEVICE_ID_NCR_53C875A 0x13
+#endif
+
 #ifndef PCI_DEVICE_ID_NCR_53C1510D
 #define PCI_DEVICE_ID_NCR_53C1510D 0xa
 #endif
@@ -525,15 +734,16 @@ typedef struct {
 #define FE_PFEN		(1<<12)   /* Prefetch enable */
 #define FE_LDSTR	(1<<13)   /* Load/Store supported */
 #define FE_RAM		(1<<14)   /* On chip RAM present */
-#define FE_CLK80	(1<<15)   /* Board clock is 80 MHz */
+#define FE_VARCLK	(1<<15)   /* SCSI lock may vary */
 #define FE_RAM8K	(1<<16)   /* On chip RAM sized 8Kb */
-#define FE_64BIT	(1<<17)   /* Supports 64-bit addressing */
+#define FE_64BIT	(1<<17)   /* Have a 64-bit PCI interface */
 #define FE_IO256	(1<<18)   /* Requires full 256 bytes in PCI space */
 #define FE_NOPM		(1<<19)   /* Scripts handles phase mismatch */
 #define FE_LEDC		(1<<20)   /* Hardware control of LED */
 #define FE_DIFF		(1<<21)   /* Support Differential SCSI */
 #define FE_ULTRA3	(1<<22)   /* Ultra-3 80Mtrans/sec */
 #define FE_66MHZ 	(1<<23)   /* 66MHz PCI Support */
+#define FE_DAC	 	(1<<24)   /* Support DAC cycles (64 bit addressing) */
 
 #define FE_CACHE_SET	(FE_ERL|FE_CLSE|FE_WRIE|FE_ERMP)
 #define FE_SCSI_SET	(FE_WIDE|FE_ULTRA|FE_ULTRA2|FE_DBLR|FE_QUAD|F_CLK80)
@@ -574,35 +784,23 @@ typedef struct {
  FE_WIDE|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|FE_RAM|FE_DIFF}	\
  ,									\
  {PCI_DEVICE_ID_NCR_53C860, 0xff, "860",  4,  8, 5,			\
- FE_ULTRA|FE_CLK80|FE_CACHE_SET|FE_BOF|FE_LDSTR|FE_PFEN}		\
+ FE_ULTRA|FE_CACHE_SET|FE_BOF|FE_LDSTR|FE_PFEN}				\
  ,									\
  {PCI_DEVICE_ID_NCR_53C875, 0x01, "875",  6, 16, 5,			\
- FE_WIDE|FE_ULTRA|FE_CLK80|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|\
- FE_RAM|FE_DIFF}							\
+ FE_WIDE|FE_ULTRA|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|		\
+ FE_RAM|FE_DIFF|FE_VARCLK}						\
  ,									\
- {PCI_DEVICE_ID_NCR_53C875, 0x0f, "875",  6, 16, 5,			\
+ {PCI_DEVICE_ID_NCR_53C875, 0xff, "875",  6, 16, 5,			\
  FE_WIDE|FE_ULTRA|FE_DBLR|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_DIFF}							\
- ,									\
- {PCI_DEVICE_ID_NCR_53C875, 0x1f, "876",  6, 16, 5,			\
- FE_WIDE|FE_ULTRA|FE_DBLR|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_DIFF}							\
- ,									\
- {PCI_DEVICE_ID_NCR_53C875, 0x2f, "875E",  6, 16, 5,			\
- FE_WIDE|FE_ULTRA|FE_DBLR|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_DIFF}							\
- ,									\
- {PCI_DEVICE_ID_NCR_53C875, 0xff, "876",  6, 16, 5,			\
- FE_WIDE|FE_ULTRA|FE_DBLR|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_DIFF}							\
+ FE_RAM|FE_DIFF|FE_VARCLK}						\
  ,									\
  {PCI_DEVICE_ID_NCR_53C875J,0xff, "875J", 6, 16, 5,			\
  FE_WIDE|FE_ULTRA|FE_DBLR|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM}								\
+ FE_RAM|FE_VARCLK}							\
  ,									\
  {PCI_DEVICE_ID_NCR_53C885, 0xff, "885",  6, 16, 5,			\
  FE_WIDE|FE_ULTRA|FE_DBLR|FE_CACHE0_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_DIFF}							\
+ FE_RAM|FE_DIFF|FE_VARCLK}						\
  ,									\
  {PCI_DEVICE_ID_NCR_53C895, 0xff, "895",  6, 31, 7,			\
  FE_WIDE|FE_ULTRA2|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
@@ -610,23 +808,28 @@ typedef struct {
  ,									\
  {PCI_DEVICE_ID_NCR_53C896, 0xff, "896",  6, 31, 7,			\
  FE_WIDE|FE_ULTRA2|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_RAM8K|FE_64BIT|FE_IO256|FE_NOPM|FE_LEDC}			\
+ FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC}		\
  ,									\
  {PCI_DEVICE_ID_NCR_53C895A, 0xff, "895a",  6, 31, 7,			\
  FE_WIDE|FE_ULTRA2|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_RAM8K|FE_64BIT|FE_IO256|FE_NOPM|FE_LEDC}			\
+ FE_RAM|FE_RAM8K|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC}			\
+ ,									\
+ {PCI_DEVICE_ID_NCR_53C875A, 0xff, "875a",  6, 31, 7,			\
+ FE_WIDE|FE_ULTRA|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
+ FE_RAM|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC}				\
  ,									\
  {PCI_DEVICE_ID_NCR_53C1510D, 0xff, "1510D",  7, 31, 7,			\
  FE_WIDE|FE_ULTRA2|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
  FE_RAM|FE_IO256}							\
  ,									\
- {PCI_DEVICE_ID_LSI_53C1010, 0xff, "1010",  6, 62, 7,			\
+ {PCI_DEVICE_ID_LSI_53C1010, 0xff, "1010-33",  6, 62, 7,		\
  FE_WIDE|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|		\
- FE_RAM|FE_RAM8K|FE_64BIT|FE_IO256|FE_NOPM|FE_LEDC|FE_ULTRA3}		\
+ FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_ULTRA3}	\
  ,									\
- {PCI_DEVICE_ID_LSI_53C1010_66, 0xff, "1010_66",  6, 62, 7,		\
+ {PCI_DEVICE_ID_LSI_53C1010_66, 0xff, "1010-66",  6, 62, 7,		\
  FE_WIDE|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|		\
- FE_RAM|FE_RAM8K|FE_64BIT|FE_IO256|FE_NOPM|FE_LEDC|FE_ULTRA3|FE_66MHZ}	\
+ FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_ULTRA3|	\
+ FE_66MHZ}								\
 }
 
 /*
@@ -662,7 +865,6 @@ struct ncr_driver_setup {
 	u_char	scsi_parity;
 	u_char	disconnection;
 	u_char	special_features;
-	u_char	ultra_scsi;
 	u_char	force_sync_nego;
 	u_char	reverse_probe;
 	u_char	pci_fix_up;
@@ -696,15 +898,14 @@ struct ncr_driver_setup {
 	SCSI_NCR_SETUP_SCSI_PARITY,		\
 	SCSI_NCR_SETUP_DISCONNECTION,		\
 	SCSI_NCR_SETUP_SPECIAL_FEATURES,	\
-	SCSI_NCR_SETUP_ULTRA_SCSI,		\
 	SCSI_NCR_SETUP_FORCE_SYNC_NEGO,		\
 	0,					\
 	0,					\
 	1,					\
-	1,					\
+	0,					\
 	SCSI_NCR_SETUP_DEFAULT_TAGS,		\
 	SCSI_NCR_SETUP_DEFAULT_SYNC,		\
-	0x0200,					\
+	0x00,					\
 	7,					\
 	SCSI_NCR_SETUP_LED_PIN,			\
 	1,					\
@@ -727,7 +928,6 @@ struct ncr_driver_setup {
 {						\
 	0,					\
 	1,					\
-	0,					\
 	0,					\
 	0,					\
 	0,					\

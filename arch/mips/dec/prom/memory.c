@@ -31,7 +31,7 @@ extern int (*rex_getbitmap)(memmap *);
 extern int (*prom_printf)(char *, ...);
 #endif
 
-volatile unsigned long mem_err = 0;	/* So we know an error occured */
+volatile unsigned long mem_err = 0;	/* So we know an error occurred */
 
 extern char _end;
 

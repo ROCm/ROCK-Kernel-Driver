@@ -102,7 +102,7 @@
 #include <asm/dma.h>
 #include <asm/byteorder.h>
 
-#include "syncppp.h"
+#include <net/syncppp.h>
 #include "cosa.h"
 
 /* Linux version stuff */
@@ -220,9 +220,9 @@ static int cosa_major = 117;
 
 #define COSA_MTU 2000	/* FIXME: I don't know this exactly */
 
-#undef DEBUG_DATA 1	/* Dump the data read or written to the channel */
-#undef DEBUG_IRQS 1	/* Print the message when the IRQ is received */
-#undef DEBUG_IO 1	/* Dump the I/O traffic */
+#undef DEBUG_DATA //1	/* Dump the data read or written to the channel */
+#undef DEBUG_IRQS //1	/* Print the message when the IRQ is received */
+#undef DEBUG_IO   //1	/* Dump the I/O traffic */
 
 #define TX_TIMEOUT	(5*HZ)
 
@@ -745,7 +745,7 @@ static int sppp_rx_done(struct channel_data *chan)
 	chan->stats.rx_bytes += chan->cosa->rxsize;
 	netif_rx(chan->rx_skb);
 	chan->rx_skb = 0;
-	chan->pppdev.dev->trans_start = jiffies;
+	chan->pppdev.dev->last_rx = jiffies;
 	return 0;
 }
 
@@ -836,7 +836,7 @@ static ssize_t cosa_read(struct file *file,
 	up(&chan->rsem);
 
 	if (copy_to_user(buf, kbuf, count)) {
-		kfree(buf);
+		kfree(kbuf);
 		return -EFAULT;
 	}
 	kfree(kbuf);
@@ -2011,7 +2011,7 @@ again:
 /* ---------- I/O debugging routines ---------- */
 /*
  * These routines can be used to monitor COSA/SRP I/O and to printk()
- * the data being transfered on the data and status I/O port in a
+ * the data being transferred on the data and status I/O port in a
  * readable way.
  */
 

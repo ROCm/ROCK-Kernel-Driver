@@ -103,16 +103,17 @@ static void BAD_SG_DMA(Scsi_Cmnd * SCpnt,
 
 /* Boards 3,4 slots are reserved for ISAPnP/MCA scans */
 
-static unsigned int bases[MAXBOARDS] = {0x330, 0x334, 0, 0};
+static unsigned int bases[MAXBOARDS] __initdata = {0x330, 0x334, 0, 0};
 
-/* set by aha1542_setup according to the command line */
+/* set by aha1542_setup according to the command line; they also may
+   be marked __initdata, but require zero initializers then */
 
 static int setup_called[MAXBOARDS];
 static int setup_buson[MAXBOARDS];
 static int setup_busoff[MAXBOARDS];
-static int setup_dmaspeed[MAXBOARDS] = { -1, -1, -1, -1 };
+static int setup_dmaspeed[MAXBOARDS] __initdata = { -1, -1, -1, -1 };
 
-static char *setup_str[MAXBOARDS];
+static char *setup_str[MAXBOARDS] __initdata;
 
 /*
  * LILO/Module params:  aha1542=<PORTBASE>[,<BUSON>,<BUSOFF>[,<DMASPEED>]]
@@ -132,12 +133,12 @@ static char *setup_str[MAXBOARDS];
  */
 
 #if defined(MODULE)
-int isapnp=0;
+int isapnp = 0;
 int aha1542[] = {0x330, 11, 4, -1};
 MODULE_PARM(aha1542, "1-4i");
 MODULE_PARM(isapnp, "i");
 
-static struct isapnp_device_id id_table[] __devinitdata = {
+static struct isapnp_device_id id_table[] __initdata = {
 	{
 		ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('A', 'D', 'P'), ISAPNP_FUNCTION(0x1542),
@@ -149,7 +150,7 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(isapnp, id_table);
 
 #else
-int isapnp=1;
+static int isapnp = 1;
 #endif
 
 #define BIOS_TRANSLATION_1632 0	/* Used by some old 1542A boards */
@@ -348,7 +349,7 @@ static int makecode(unsigned hosterr, unsigned scsierr)
 	return scsierr | (hosterr << 16);
 }
 
-static int aha1542_test_port(int bse, struct Scsi_Host *shpnt)
+static int __init aha1542_test_port(int bse, struct Scsi_Host *shpnt)
 {
 	unchar inquiry_cmd[] = {CMD_INQUIRY};
 	unchar inquiry_result[4];
@@ -595,7 +596,7 @@ static void aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	};
 }
 
-int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
 	unchar ahacmd = CMD_START_SCSI;
 	unchar direction;
@@ -777,7 +778,7 @@ static void internal_done(Scsi_Cmnd * SCpnt)
 	SCpnt->SCp.Status++;
 }
 
-int aha1542_command(Scsi_Cmnd * SCpnt)
+static int aha1542_command(Scsi_Cmnd * SCpnt)
 {
 	DEB(printk("aha1542_command: ..calling aha1542_queuecommand\n"));
 
@@ -816,7 +817,7 @@ fail:
 	aha1542_intr_reset(bse);
 }
 
-static int aha1542_getconfig(int base_io, unsigned char *irq_level, unsigned char *dma_chan, unsigned char *scsi_id)
+static int __init aha1542_getconfig(int base_io, unsigned char *irq_level, unsigned char *dma_chan, unsigned char *scsi_id)
 {
 	unchar inquiry_cmd[] = {CMD_RETCONF};
 	unchar inquiry_result[3];
@@ -920,7 +921,7 @@ fail:
 }
 
 /* Query the board to find out if it is a 1542 or a 1740, or whatever. */
-static int aha1542_query(int base_io, int *transl)
+static int __init aha1542_query(int base_io, int *transl)
 {
 	unchar inquiry_cmd[] = {CMD_INQUIRY};
 	unchar inquiry_result[4];
@@ -1034,7 +1035,7 @@ __setup("aha1542=",do_setup);
 #endif
 
 /* return non-zero on detection */
-int aha1542_detect(Scsi_Host_Template * tpnt)
+static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 {
 	unsigned char dma_chan;
 	unsigned char irq_level;
@@ -1052,7 +1053,7 @@ int aha1542_detect(Scsi_Host_Template * tpnt)
 
 #ifdef MODULE
 	bases[0] = aha1542[0];
-	setup_buson[0]=aha1542[1];
+	setup_buson[0] = aha1542[1];
 	setup_busoff[0] = aha1542[2];
 	{
 		int atbt = -1;
@@ -1344,7 +1345,7 @@ static int aha1542_restart(struct Scsi_Host *shost)
 	return 0;
 }
 
-int aha1542_abort(Scsi_Cmnd * SCpnt)
+static int aha1542_abort(Scsi_Cmnd * SCpnt)
 {
 
 	/*
@@ -1362,7 +1363,7 @@ int aha1542_abort(Scsi_Cmnd * SCpnt)
  * This is a device reset.  This is handled by sending a special command
  * to the device.
  */
-int aha1542_dev_reset(Scsi_Cmnd * SCpnt)
+static int aha1542_dev_reset(Scsi_Cmnd * SCpnt)
 {
 	unsigned long flags;
 	struct mailbox *mb;
@@ -1456,7 +1457,7 @@ int aha1542_dev_reset(Scsi_Cmnd * SCpnt)
 #endif				/* ERIC_neverdef */
 }
 
-int aha1542_bus_reset(Scsi_Cmnd * SCpnt)
+static int aha1542_bus_reset(Scsi_Cmnd * SCpnt)
 {
 	int i;
 
@@ -1520,7 +1521,7 @@ fail:
 	return FAILED;
 }
 
-int aha1542_host_reset(Scsi_Cmnd * SCpnt)
+static int aha1542_host_reset(Scsi_Cmnd * SCpnt)
 {
 	int i;
 
@@ -1593,7 +1594,7 @@ fail:
  * These are the old error handling routines.  They are only temporarily
  * here while we play with the new error handling code.
  */
-int aha1542_old_abort(Scsi_Cmnd * SCpnt)
+static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 {
 #if 0
 	unchar ahacmd = CMD_START_SCSI;
@@ -1666,7 +1667,7 @@ int aha1542_old_abort(Scsi_Cmnd * SCpnt)
    For a first go, we assume that the 1542 notifies us with all of the
    pending commands (it does implement soft reset, after all). */
 
-int aha1542_old_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+static int aha1542_old_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 {
 	unchar ahacmd = CMD_START_SCSI;
 	int i;
@@ -1779,7 +1780,7 @@ fail:
 
 #include "sd.h"
 
-int aha1542_biosparam(Scsi_Disk * disk, kdev_t dev, int *ip)
+static int aha1542_biosparam(Scsi_Disk * disk, kdev_t dev, int *ip)
 {
 	int translation_algorithm;
 	int size = disk->capacity;

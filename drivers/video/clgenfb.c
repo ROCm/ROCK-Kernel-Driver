@@ -1,7 +1,7 @@
 /*
  * drivers/video/clgenfb.c - driver for Cirrus Logic chipsets
  *
- * Copyright 1999,2000 Jeff Garzik <jgarzik@mandrakesoft.com>
+ * Copyright 1999-2001 Jeff Garzik <jgarzik@mandrakesoft.com>
  *
  * Contributors (thanks, all!)
  *

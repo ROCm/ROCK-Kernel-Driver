@@ -1820,7 +1820,7 @@ static int esp_do_data(struct NCR_ESP *esp, struct ESP_regs *eregs)
 		 * with ESP_CMD_DMA ...
 		 */
 
-		/* figure out how much needs to be transfered */
+		/* figure out how much needs to be transferred */
 		hmuch = SCptr->SCp.this_residual;
 		ESPDATA(("hmuch<%d> pio ", hmuch));
 		esp->current_transfer_size = hmuch;
@@ -1942,18 +1942,18 @@ static int esp_do_data(struct NCR_ESP *esp, struct ESP_regs *eregs)
 			/* check int. status */
 			if (esp->ireg & ESP_INTR_DC) {
 				/* disconnect */
-				ESPDATA(("disconnect; %d transfered ... ", i));
+				ESPDATA(("disconnect; %d transferred ... ", i));
 				break;
 			} else if (esp->ireg & ESP_INTR_FDONE) {
 				/* function done */
-				ESPDATA(("function done; %d transfered ... ", i));
+				ESPDATA(("function done; %d transferred ... ", i));
 				break;
 			}
 
 			/* XXX fixme: bail out on stall */
 			if (fifo_stuck > 10) {
 				/* we're stuck */
-				ESPDATA(("fifo stall; %d transfered ... ", i));
+				ESPDATA(("fifo stall; %d transferred ... ", i));
 				break;
 			}
 		}
@@ -1964,7 +1964,7 @@ static int esp_do_data(struct NCR_ESP *esp, struct ESP_regs *eregs)
 		if (thisphase == in_dataout)
 			hmuch += fifocnt; /* stuck?? adjust data pointer ...*/
 
-		/* tell do_data_finale how much was transfered */
+		/* tell do_data_finale how much was transferred */
 		esp->current_transfer_size -= hmuch;
 
 		/* still not completely sure on this one ... */		

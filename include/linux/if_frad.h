@@ -192,9 +192,9 @@ struct frad_local
 int register_frad(const char *name);
 int unregister_frad(const char *name);
 
-int (*dlci_ioctl_hook)(unsigned int, void *);
+extern int (*dlci_ioctl_hook)(unsigned int, void *);
 
-#endif __KERNEL__
+#endif /* __KERNEL__ */
 
 #endif /* CONFIG_DLCI || CONFIG_DLCI_MODULE */
 

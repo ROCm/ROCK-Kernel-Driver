@@ -342,7 +342,7 @@ static int load_aout_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 		error = bprm->file->f_op->read(bprm->file, (char *)text_addr,
 			  ex.a_text+ex.a_data, &pos);
-		if (error < 0) {
+		if ((signed long)error < 0) {
 			send_sig(SIGKILL, current, 0);
 			return error;
 		}

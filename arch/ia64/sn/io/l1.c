@@ -2788,7 +2788,7 @@ _elscuart_getc( l1sc_t *sc )
     while( (r = _elscuart_poll( sc )) == 0 );
 
     if( r < 0 ) {
-	/* some error occured */
+	/* some error occurred */
 	return r;
     }
 

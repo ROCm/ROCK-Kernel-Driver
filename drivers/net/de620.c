@@ -563,7 +563,6 @@ static int de620_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		printk(KERN_WARNING "%s: No tx-buffer available!\n", dev->name);
 		restore_flags(flags);
 		return 1;
-		break;
 	}
 	de620_write_block(dev, buffer, len);
 

@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.13 2001/02/13 01:16:44 davem Exp $
+/* $Id: pci_common.c,v 1.14 2001/02/28 03:28:55 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -560,19 +560,19 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 
 	/* Fully specified already? */
 	if (((prom_irq & PCI_IRQ_IGN) >> 6) == portid) {
-		pdev->irq = p->irq_build(p, pdev, prom_irq);
+		pdev->irq = p->irq_build(pbm, pdev, prom_irq);
 		goto have_irq;
 	}
 
 	/* An onboard device? (bit 5 set) */
 	if ((prom_irq & PCI_IRQ_INO) & 0x20) {
-		pdev->irq = p->irq_build(p, pdev, (portid << 6 | prom_irq));
+		pdev->irq = p->irq_build(pbm, pdev, (portid << 6 | prom_irq));
 		goto have_irq;
 	}
 
 	/* Can we find a matching entry in the interrupt-map? */
 	if (pci_intmap_match(pdev, &prom_irq)) {
-		pdev->irq = p->irq_build(p, pdev, (portid << 6) | prom_irq);
+		pdev->irq = p->irq_build(pbm, pdev, (portid << 6) | prom_irq);
 		goto have_irq;
 	}
 
@@ -609,7 +609,7 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 		}
 		slot = slot << 2;
 
-		pdev->irq = p->irq_build(p, pdev,
+		pdev->irq = p->irq_build(pbm, pdev,
 					 ((portid << 6) & PCI_IRQ_IGN) |
 					 (bus | slot | line));
 	}
@@ -632,16 +632,10 @@ void __init pci_fixup_irq(struct pci_pbm_info *pbm,
 		pci_fixup_irq(pbm, pci_bus_b(walk));
 }
 
-#undef DEBUG_BUSMASTERING
-
 static void pdev_setup_busmastering(struct pci_dev *pdev, int is_66mhz)
 {
 	u16 cmd;
 	u8 hdr_type, min_gnt, ltimer;
-
-#ifdef DEBUG_BUSMASTERING
-	printk("PCI: Checking DEV(%s), ", pdev->name);
-#endif
 
 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
 	cmd |= PCI_COMMAND_MASTER;
@@ -652,43 +646,28 @@ static void pdev_setup_busmastering(struct pci_dev *pdev, int is_66mhz)
 	 * mastering so we have nothing to do here.
 	 */
 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-	if ((cmd & PCI_COMMAND_MASTER) == 0) {
-#ifdef DEBUG_BUSMASTERING
-		printk("no bus mastering...\n");
-#endif
+	if ((cmd & PCI_COMMAND_MASTER) == 0)
 		return;
-	}
 
 	/* Set correct cache line size, 64-byte on all
 	 * Sparc64 PCI systems.  Note that the value is
 	 * measured in 32-bit words.
 	 */
-#ifdef DEBUG_BUSMASTERING
-	printk("set cachelinesize, ");
-#endif
 	pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
 			      64 / sizeof(u32));
 
 	pci_read_config_byte(pdev, PCI_HEADER_TYPE, &hdr_type);
 	hdr_type &= ~0x80;
-	if (hdr_type != PCI_HEADER_TYPE_NORMAL) {
-#ifdef DEBUG_BUSMASTERING
-		printk("hdr_type=%x, exit\n", hdr_type);
-#endif
+	if (hdr_type != PCI_HEADER_TYPE_NORMAL)
 		return;
-	}
 
 	/* If the latency timer is already programmed with a non-zero
 	 * value, assume whoever set it (OBP or whoever) knows what
 	 * they are doing.
 	 */
 	pci_read_config_byte(pdev, PCI_LATENCY_TIMER, &ltimer);
-	if (ltimer != 0) {
-#ifdef DEBUG_BUSMASTERING
-		printk("ltimer was %x, exit\n", ltimer);
-#endif
+	if (ltimer != 0)
 		return;
-	}
 
 	/* XXX Since I'm tipping off the min grant value to
 	 * XXX choose a suitable latency timer value, I also
@@ -738,9 +717,6 @@ static void pdev_setup_busmastering(struct pci_dev *pdev, int is_66mhz)
 	}
 
 	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, ltimer);
-#ifdef DEBUG_BUSMASTERING
-	printk("set ltimer to %x\n", ltimer);
-#endif
 }
 
 void pci_determine_66mhz_disposition(struct pci_pbm_info *pbm,

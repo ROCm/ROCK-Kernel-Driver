@@ -127,7 +127,7 @@ problems, email me idealy this:
 	- exact keypress/release sequence
 	- 'showkey -s' run on q40, non-X session
 	- 'showkey -s' run on a PC, non-X session
-	- AT codes as displayed by the q40 debuging ROM
+	- AT codes as displayed by the q40 debugging ROM
 btw if the showkey output from PC and Q40 doesn't differ then you have some
 classic configuration problem - don't send me anything in this case
 

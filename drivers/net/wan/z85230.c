@@ -42,14 +42,15 @@
 #include <linux/if_arp.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
+#include <linux/init.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #define RT_LOCK
 #define RT_UNLOCK
 #include <linux/spinlock.h>
 
+#include <net/syncppp.h>
 #include "z85230.h"
-#include "syncppp.h"
 
 
 static spinlock_t z8530_buffer_lock = SPIN_LOCK_UNLOCKED;
@@ -70,7 +71,7 @@ static spinlock_t z8530_buffer_lock = SPIN_LOCK_UNLOCKED;
  *	5uS delay rule.
  */
 
-extern __inline__ int z8530_read_port(unsigned long p)
+static inline int z8530_read_port(unsigned long p)
 {
 	u8 r=inb(Z8530_PORT_OF(p));
 	if(p&Z8530_PORT_SLEEP)	/* gcc should figure this out efficiently ! */
@@ -94,7 +95,7 @@ extern __inline__ int z8530_read_port(unsigned long p)
  */
 
 
-extern __inline__ void z8530_write_port(unsigned long p, u8 d)
+static inline void z8530_write_port(unsigned long p, u8 d)
 {
 	outb(d,Z8530_PORT_OF(p));
 	if(p&Z8530_PORT_SLEEP)
@@ -119,7 +120,7 @@ static void z8530_tx_done(struct z8530_channel *c);
  *	operation.
  */
  
-extern inline u8 read_zsreg(struct z8530_channel *c, u8 reg)
+static inline u8 read_zsreg(struct z8530_channel *c, u8 reg)
 {
 	u8 r;
 	unsigned long flags;
@@ -140,7 +141,7 @@ extern inline u8 read_zsreg(struct z8530_channel *c, u8 reg)
  *	have all the 5uS delays to worry about.
  */
 
-extern inline u8 read_zsdata(struct z8530_channel *c)
+static inline u8 read_zsdata(struct z8530_channel *c)
 {
 	u8 r;
 	r=z8530_read_port(c->dataio);
@@ -158,7 +159,7 @@ extern inline u8 read_zsdata(struct z8530_channel *c)
  *	being fast to access.
  */
  
-extern inline void write_zsreg(struct z8530_channel *c, u8 reg, u8 val)
+static inline void write_zsreg(struct z8530_channel *c, u8 reg, u8 val)
 {
 	unsigned long flags;
 	save_flags(flags);
@@ -177,7 +178,7 @@ extern inline void write_zsreg(struct z8530_channel *c, u8 reg, u8 val)
  *	Write directly to the control register on the Z8530
  */
 
-extern inline void write_zsctrl(struct z8530_channel *c, u8 val)
+static inline void write_zsctrl(struct z8530_channel *c, u8 val)
 {
 	z8530_write_port(c->ctrlio, val);
 }
@@ -191,7 +192,7 @@ extern inline void write_zsctrl(struct z8530_channel *c, u8 val)
  */
 
 
-extern inline void write_zsdata(struct z8530_channel *c, u8 val)
+static inline void write_zsdata(struct z8530_channel *c, u8 val)
 {
 	z8530_write_port(c->dataio, val);
 }
@@ -441,7 +442,7 @@ static void z8530_tx(struct z8530_channel *c)
  *	z8530_status - Handle a PIO status exception
  *	@chan: Z8530 channel to process
  *
- *	A status event occured in PIO synchronous mode. There are several
+ *	A status event occurred in PIO synchronous mode. There are several
  *	reasons the chip will bother us here. A transmit underrun means we
  *	failed to feed the chip fast enough and just broke a packet. A DCD
  *	change is a line up or down. We communicate that back to the protocol
@@ -555,7 +556,7 @@ static void z8530_dma_tx(struct z8530_channel *chan)
  *	z8530_dma_status - Handle a DMA status exception
  *	@chan: Z8530 channel to process
  *	
- *	A status event occured on the Z8530. We receive these for two reasons
+ *	A status event occurred on the Z8530. We receive these for two reasons
  *	when in DMA mode. Firstly if we finished a packet transfer we get one
  *	and kick the next packet out. Secondly we may see a DCD change and
  *	have to poke the protocol layer.
@@ -1654,7 +1655,7 @@ static void z8530_rx_done(struct z8530_channel *c)
  *	thing can only DMA within a 64K block not across the edges of it.
  */
  
-extern inline int spans_boundary(struct sk_buff *skb)
+static inline int spans_boundary(struct sk_buff *skb)
 {
 	unsigned long a=(unsigned long)skb->data;
 	a^=(a+skb->len);
@@ -1735,20 +1736,19 @@ struct net_device_stats *z8530_get_stats(struct z8530_channel *c)
 
 EXPORT_SYMBOL(z8530_get_stats);
 
-#ifdef MODULE
-
 /*
  *	Module support
  */
- 
-int init_module(void)
+static const char banner[] __initdata = KERN_INFO "Generic Z85C30/Z85230 interface driver v0.02\n";
+
+static int __init z85230_init_driver(void)
 {
-	printk(KERN_INFO "Generic Z85C30/Z85230 interface driver v0.02\n");
+	printk(banner);
 	return 0;
 }
+module_init(z85230_init_driver);
 
-void cleanup_module(void)
+static void __exit z85230_cleanup_driver(void)
 {
 }
-
-#endif
+module_exit(z85230_cleanup_driver);

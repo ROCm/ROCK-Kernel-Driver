@@ -64,7 +64,7 @@ extern struct ia64_boot_param {
 	} console_info;
 	__u16 num_pci_vectors;	/* number of ACPI derived PCI IRQ's*/
 	__u64 pci_vectors;	/* physical address of PCI data (pci_vector_struct)*/
-	__u64 fpswa;		/* physical address of the the fpswa interface */
+	__u64 fpswa;		/* physical address of the fpswa interface */
 	__u64 initrd_start;
 	__u64 initrd_size;
 } ia64_boot_param;

@@ -689,7 +689,7 @@ static void scc_isr(int irq, void *dev_id, struct pt_regs *regs)
 			break;
 		}
 
-		/* This looks wierd and it is. At least the BayCom USCC doesn't
+		/* This looks weird and it is. At least the BayCom USCC doesn't
 		 * use the Interrupt Daisy Chain, thus we'll have to start
 		 * all over again to be sure not to miss an interrupt from 
 		 * (any of) the other chip(s)...

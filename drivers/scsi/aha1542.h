@@ -130,16 +130,16 @@ struct ccb {			/* Command Control Block 5.3 */
 				/* REQUEST SENSE */
 };
 
-int aha1542_detect(Scsi_Host_Template *);
-int aha1542_command(Scsi_Cmnd *);
-int aha1542_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int aha1542_abort(Scsi_Cmnd * SCpnt);
-int aha1542_bus_reset(Scsi_Cmnd * SCpnt);
-int aha1542_dev_reset(Scsi_Cmnd * SCpnt);
-int aha1542_host_reset(Scsi_Cmnd * SCpnt);
-extern int aha1542_old_abort(Scsi_Cmnd * SCpnt);
-int aha1542_old_reset(Scsi_Cmnd *, unsigned int);
-int aha1542_biosparam(Disk *, kdev_t, int*);
+static int aha1542_detect(Scsi_Host_Template *);
+static int aha1542_command(Scsi_Cmnd *);
+static int aha1542_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int aha1542_abort(Scsi_Cmnd * SCpnt);
+static int aha1542_bus_reset(Scsi_Cmnd * SCpnt);
+static int aha1542_dev_reset(Scsi_Cmnd * SCpnt);
+static int aha1542_host_reset(Scsi_Cmnd * SCpnt);
+static int aha1542_old_abort(Scsi_Cmnd * SCpnt);
+static int aha1542_old_reset(Scsi_Cmnd *, unsigned int);
+static int aha1542_biosparam(Disk *, kdev_t, int*);
 
 #define AHA1542_MAILBOXES 8
 #define AHA1542_SCATTER 16
