@@ -1893,6 +1893,10 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		ret = restore_ia32_fpxstate(child, (struct ia32_user_fxsr_struct *) A(data));
 		break;
 
+	      case PTRACE_GETEVENTMSG:   
+		ret = put_user(child->ptrace_message, (unsigned int __user *) A(data));
+		break;
+
 	      case PTRACE_SYSCALL:	/* continue, stop after next syscall */
 	      case PTRACE_CONT:		/* restart after signal. */
 	      case PTRACE_KILL:
