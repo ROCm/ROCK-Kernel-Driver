@@ -108,7 +108,12 @@ int prom_callback(long *args)
 	 * case, the cpu is marked as in-interrupt. Drop IRQ locks.
 	 */
 	irq_exit();
-	save_and_cli(flags);
+
+	/* XXX Revisit the locking here someday.  This is a debugging
+	 * XXX feature so it isnt all that critical.  -DaveM
+	 */
+	local_irq_save(flags);
+
 	spin_unlock(&prom_entry_lock);
 	cons = console_drivers;
 	while (cons) {
@@ -301,7 +306,8 @@ int prom_callback(long *args)
 		register_console(cons);
 	}
 	spin_lock(&prom_entry_lock);
-	restore_flags(flags);
+	local_irq_restore(flags);
+
 	/*
 	 * Restore in-interrupt status for a resume from obp.
 	 */

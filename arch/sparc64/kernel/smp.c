@@ -1294,6 +1294,8 @@ report:
 }
 
 /* /proc/profile writes can call this, don't __init it please. */
+static spinlock_t prof_setup_lock = SPIN_LOCK_UNLOCKED;
+
 int setup_profiling_timer(unsigned int multiplier)
 {
 	unsigned long flags;
@@ -1302,11 +1304,11 @@ int setup_profiling_timer(unsigned int multiplier)
 	if ((!multiplier) || (timer_tick_offset / multiplier) < 1000)
 		return -EINVAL;
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&prof_setup_lock, flags);
 	for (i = 0; i < NR_CPUS; i++)
 		prof_multiplier(i) = multiplier;
 	current_tick_offset = (timer_tick_offset / multiplier);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&prof_setup_lock, flags);
 
 	return 0;
 }

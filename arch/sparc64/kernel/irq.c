@@ -1055,7 +1055,7 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 			     : /* no outputs */
 			     : "r" (pstate));
 
-	__sti();
+	local_irq_enable();
 }
 
 #ifdef CONFIG_SMP
