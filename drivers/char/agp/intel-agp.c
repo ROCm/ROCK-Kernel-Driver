@@ -1451,7 +1451,7 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	return -ENODEV;
 }
 
-static void __exit agp_intel_remove(struct pci_dev *pdev)
+static void __devexit agp_intel_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 

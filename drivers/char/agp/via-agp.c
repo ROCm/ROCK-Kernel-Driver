@@ -443,7 +443,7 @@ found:
 	return agp_add_bridge(bridge);
 }
 
-static void __exit agp_via_remove(struct pci_dev *pdev)
+static void __devexit agp_via_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
