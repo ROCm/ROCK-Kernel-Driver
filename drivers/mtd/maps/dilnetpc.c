@@ -14,7 +14,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: dilnetpc.c,v 1.14 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: dilnetpc.c,v 1.15 2004/10/21 08:31:32 dwmw2 Exp $
  *
  * The DIL/Net PC is a tiny embedded PC board made by SSV Embedded Systems
  * featuring the AMD Elan SC410 processor. There are two variants of this
@@ -413,7 +413,7 @@ static int __init init_dnpc(void)
 	}
 	simple_map_init(&dnpc_map);
 
-	printk("FLASH virtual address: 0x%lx\n", dnpc_map.virt);
+	printk("FLASH virtual address: 0x%p\n", dnpc_map.virt);
 
 	mymtd = do_map_probe("jedec_probe", &dnpc_map);
 
