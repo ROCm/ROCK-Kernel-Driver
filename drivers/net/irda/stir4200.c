@@ -705,7 +705,7 @@ static int receive_start(struct stir_cb *stir)
 static void receive_stop(struct stir_cb *stir)
 {
 	stir->receiving = 0;
-	usb_unlink_urb(stir->rx_urb);
+	usb_kill_urb(stir->rx_urb);
 
 	if (stir->rx_buff.in_frame) 
 		stir->stats.collisions++;
@@ -974,7 +974,7 @@ static int stir_net_close(struct net_device *netdev)
 	kfree(stir->fifo_status);
 
 	/* Mop up receive urb's */
-	usb_unlink_urb(stir->rx_urb);
+	usb_kill_urb(stir->rx_urb);
 	
 	kfree(stir->io_buf);
 	usb_free_urb(stir->rx_urb);

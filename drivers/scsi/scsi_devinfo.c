@@ -118,6 +118,7 @@ static struct {
 	 * Other types of devices that have special flags.
 	 * Note that all USB devices should have the BLIST_INQUIRY_36 flag.
 	 */
+	{"3PARdata", "VV", NULL, BLIST_REPORTLUN2},
 	{"ADAPTEC", "AACRAID", NULL, BLIST_FORCELUN},
 	{"ADAPTEC", "Adaptec 5400S", NULL, BLIST_FORCELUN},
 	{"AFT PRO", "-IX CF", "0.0>", BLIST_FORCELUN},

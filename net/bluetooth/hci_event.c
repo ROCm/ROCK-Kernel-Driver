@@ -491,8 +491,18 @@ static inline void hci_inquiry_result_evt(struct hci_dev *hdev, struct sk_buff *
 	BT_DBG("%s num_rsp %d", hdev->name, num_rsp);
 
 	hci_dev_lock(hdev);
-	for (; num_rsp; num_rsp--)
-		hci_inquiry_cache_update(hdev, info++);
+	for (; num_rsp; num_rsp--) {
+		struct inquiry_data data;
+		bacpy(&data.bdaddr, &info->bdaddr);
+		data.pscan_rep_mode	= info->pscan_rep_mode;
+		data.pscan_period_mode	= info->pscan_period_mode;
+		data.pscan_mode		= info->pscan_mode;
+		memcpy(data.dev_class, info->dev_class, 3);
+		data.clock_offset	= info->clock_offset;
+		data.rssi		= 0x00;
+		info++;
+		hci_inquiry_cache_update(hdev, &data);
+	}
 	hci_dev_unlock(hdev);
 }
 
@@ -506,15 +516,16 @@ static inline void hci_inquiry_result_with_rssi_evt(struct hci_dev *hdev, struct
 
 	hci_dev_lock(hdev);
 	for (; num_rsp; num_rsp--) {
-		struct inquiry_info tmp;
-		bacpy(&tmp.bdaddr, &info->bdaddr);
-		tmp.pscan_rep_mode    = info->pscan_rep_mode;
-		tmp.pscan_period_mode = info->pscan_period_mode;
-		tmp.pscan_mode        = 0x00;
-		memcpy(tmp.dev_class, &info->dev_class, 3);
-		tmp.clock_offset      = info->clock_offset;
+		struct inquiry_data data;
+		bacpy(&data.bdaddr, &info->bdaddr);
+		data.pscan_rep_mode	= info->pscan_rep_mode;
+		data.pscan_period_mode	= info->pscan_period_mode;
+		data.pscan_mode		= 0x00;
+		memcpy(data.dev_class, info->dev_class, 3);
+		data.clock_offset	= info->clock_offset;
+		data.rssi		= info->rssi;
 		info++;
-		hci_inquiry_cache_update(hdev, &tmp);
+		hci_inquiry_cache_update(hdev, &data);
 	}
 	hci_dev_unlock(hdev);
 }
@@ -544,6 +555,7 @@ static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *sk
 				return;
 			}
 		}
+		memcpy(conn->dev_class, ev->dev_class, 3);
 		conn->state = BT_CONNECT;
 		hci_dev_unlock(hdev);
 

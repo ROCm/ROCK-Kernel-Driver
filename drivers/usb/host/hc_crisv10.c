@@ -30,7 +30,7 @@
 #include <../drivers/usb/core/hcd.h>
 #include <../drivers/usb/core/usb.h>
 
-#include "usb-host.h"
+#include "hc_crisv10.h"
 
 #define ETRAX_USB_HC_IRQ USB_HC_IRQ_NBR
 #define ETRAX_USB_RX_IRQ USB_DMA_RX_IRQ_NBR

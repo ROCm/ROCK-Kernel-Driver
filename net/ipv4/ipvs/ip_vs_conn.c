@@ -453,7 +453,9 @@ int ip_vs_check_template(struct ip_vs_conn *ct)
 	 * Checking the dest server status.
 	 */
 	if ((dest == NULL) ||
-	    !(dest->flags & IP_VS_DEST_F_AVAILABLE)) {
+	    !(dest->flags & IP_VS_DEST_F_AVAILABLE) || 
+	    (sysctl_ip_vs_expire_quiescent_template && 
+	     (atomic_read(&dest->weight) == 0))) {
 		IP_VS_DBG(9, "check_template: dest not available for "
 			  "protocol %s s:%u.%u.%u.%u:%d v:%u.%u.%u.%u:%d "
 			  "-> d:%u.%u.%u.%u:%d\n",
