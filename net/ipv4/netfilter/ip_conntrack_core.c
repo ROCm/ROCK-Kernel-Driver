@@ -694,41 +694,48 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 			     struct ip_conntrack_expect *, tuple);
 	READ_UNLOCK(&ip_conntrack_expect_tuple_lock);
 
-	/* If master is not in hash table yet (ie. packet hasn't left
-	   this machine yet), how can other end know about expected?
-	   Hence these are not the droids you are looking for (if
-	   master ct never got confirmed, we'd hold a reference to it
-	   and weird things would happen to future packets). */
-	if (expected && !is_confirmed(expected->expectant))
-		expected = NULL;
-
-	/* Look up the conntrack helper for master connections only */
-	if (!expected)
-		conntrack->helper = ip_ct_find_helper(&repl_tuple);
-
-	/* If the expectation is dying, then this is a loser. */
-	if (expected
-	    && expected->expectant->helper->timeout
-	    && ! del_timer(&expected->timeout))
-		expected = NULL;
-
 	if (expected) {
+		/* If master is not in hash table yet (ie. packet hasn't left
+		   this machine yet), how can other end know about expected?
+		   Hence these are not the droids you are looking for (if
+		   master ct never got confirmed, we'd hold a reference to it
+		   and weird things would happen to future packets). */
+		if (!is_confirmed(expected->expectant)) {
+			conntrack->helper = ip_ct_find_helper(&repl_tuple);
+			goto end;
+		}
+
+		/* Expectation is dying... */
+		if (expected->expectant->helper->timeout
+		    && !del_timer(&expected->timeout))
+			goto end;	
+
 		DEBUGP("conntrack: expectation arrives ct=%p exp=%p\n",
 			conntrack, expected);
 		/* Welcome, Mr. Bond.  We've been expecting you... */
+		IP_NF_ASSERT(master_ct(conntrack));
 		__set_bit(IPS_EXPECTED_BIT, &conntrack->status);
 		conntrack->master = expected;
 		expected->sibling = conntrack;
 		LIST_DELETE(&ip_conntrack_expect_list, expected);
 		expected->expectant->expecting--;
 		nf_conntrack_get(&master_ct(conntrack)->infos[0]);
-	}
-	atomic_inc(&ip_conntrack_count);
+
+		/* this is a braindead... --pablo */
+		atomic_inc(&ip_conntrack_count);
+		WRITE_UNLOCK(&ip_conntrack_lock);
+
+		if (expected->expectfn)
+			expected->expectfn(conntrack);
+
+		goto ret;
+	} else 
+		conntrack->helper = ip_ct_find_helper(&repl_tuple);
+
+end:	atomic_inc(&ip_conntrack_count);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
-	if (expected && expected->expectfn)
-		expected->expectfn(conntrack);
-	return &conntrack->tuplehash[IP_CT_DIR_ORIGINAL];
+ret:	return &conntrack->tuplehash[IP_CT_DIR_ORIGINAL];
 }
 
 /* On success, returns conntrack ptr, sets skb->nfct and ctinfo */
