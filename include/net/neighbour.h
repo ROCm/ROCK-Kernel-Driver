@@ -174,6 +174,7 @@ struct neigh_table
 	kmem_cache_t		*kmem_cachep;
 	struct neigh_statistics	stats;
 	struct neighbour	**hash_buckets;
+	unsigned int		hash_mask;
 	struct pneigh_entry	**phash_buckets;
 };
 
