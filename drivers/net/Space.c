@@ -32,6 +32,7 @@
  */
 #include <linux/config.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/netlink.h>
@@ -358,39 +359,52 @@ static struct devprobe mips_probes[] __initdata = {
  * per bus interface. This drives the legacy devices only for now.
  */
  
-static int __init ethif_probe(struct net_device *dev)
+static int __init ethif_probe(void)
 {
-	unsigned long base_addr = dev->base_addr;
+	struct net_device *dev;
+	int err = -ENODEV;
+
+	dev = alloc_etherdev(0);
+	if (!dev)
+		return -ENOMEM;
+
+	netdev_boot_setup_check(dev);
 
 	/* 
 	 * Backwards compatibility - historically an I/O base of 1 was 
 	 * used to indicate not to probe for this ethN interface 
 	 */
-	if (base_addr == 1)
-		return 1;		/* ENXIO */
+	if (dev->base_addr == 1) {
+		free_netdev(dev);
+		return -ENXIO;
+	}
 
 	/* 
 	 * The arch specific probes are 1st so that any on-board ethernet
 	 * will be probed before other ISA/EISA/MCA/PCI bus cards.
 	 */
-	if (probe_list(dev, m68k_probes) == 0)
-		return 0;
-	if (probe_list(dev, mips_probes) == 0)
-		return 0;
-	if (probe_list(dev, eisa_probes) == 0)
-		return 0;
-	if (probe_list(dev, mca_probes) == 0)
-		return 0;
-	if (probe_list(dev, isa_probes) == 0) 
-		return 0;
-	if (probe_list(dev, parport_probes) == 0)
-		return 0;
-	return -ENODEV;
+	if (probe_list(dev, m68k_probes) == 0 ||
+	    probe_list(dev, mips_probes) == 0 ||
+	    probe_list(dev, eisa_probes) == 0 ||
+	    probe_list(dev, mca_probes) == 0 ||
+	    probe_list(dev, isa_probes) == 0 ||
+	    probe_list(dev, parport_probes) == 0) 
+		err = register_netdev(dev);
+
+	if (err)
+		free_netdev(dev);
+	return err;
+
 }
 
 /*  Statically configured drivers -- order matters here. */
-void probe_old_netdevs(void)
+void __init probe_old_netdevs(void)
 {
+	int num;
+
+	for (num = 0; num < 8; ++num)
+		if (ethif_probe())
+			break;
 #ifdef CONFIG_COPS
 	cops_probe(0);
 	cops_probe(1);
@@ -412,52 +426,6 @@ static struct net_device dev_ltpc = {
 #undef NEXT_DEV
 #define NEXT_DEV	(&dev_ltpc)
 #endif  /* LTPC */
-
-static struct net_device eth7_dev = {
-	.name		= "eth%d",
-	.next		= NEXT_DEV,
-	.init		= ethif_probe,
-};
-static struct net_device eth6_dev = {
-	.name		= "eth%d",
-	.next		= &eth7_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth5_dev = {
-	.name		= "eth%d",
-	.next		= &eth6_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth4_dev = {
-	.name		= "eth%d",
-	.next		= &eth5_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth3_dev = {
-	.name		= "eth%d",
-	.next		= &eth4_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth2_dev = {
-	.name		= "eth%d",
-	.next		= &eth3_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth1_dev = {
-	.name		= "eth%d",
-	.next		= &eth2_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth0_dev = {
-	.name		= "eth%d",
-	.next		= &eth1_dev,
-	.init		= ethif_probe,
-};
-
-#undef NEXT_DEV
-#define NEXT_DEV	(&eth0_dev)
-
-
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
