@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@
  *              child_node          - Previous child that was found.
  *                                    The NEXT child will be returned
  *
- * RETURN:      acpi_namespace_node - Pointer to the NEXT child or NULL if
+ * RETURN:      struct acpi_namespace_node - Pointer to the NEXT child or NULL if
  *                                    none is found.
  *
  * DESCRIPTION: Return the next peer node within the namespace.  If Handle
@@ -50,13 +50,13 @@
  *
  ******************************************************************************/
 
-acpi_namespace_node *
+struct acpi_namespace_node *
 acpi_ns_get_next_node (
-	acpi_object_type        type,
-	acpi_namespace_node     *parent_node,
-	acpi_namespace_node     *child_node)
+	acpi_object_type                type,
+	struct acpi_namespace_node      *parent_node,
+	struct acpi_namespace_node      *child_node)
 {
-	acpi_namespace_node     *next_node = NULL;
+	struct acpi_namespace_node      *next_node = NULL;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -136,19 +136,19 @@ acpi_ns_get_next_node (
 
 acpi_status
 acpi_ns_walk_namespace (
-	acpi_object_type        type,
-	acpi_handle             start_node,
-	u32                     max_depth,
-	u8                      unlock_before_callback,
-	acpi_walk_callback      user_function,
-	void                    *context,
-	void                    **return_value)
+	acpi_object_type                type,
+	acpi_handle                     start_node,
+	u32                             max_depth,
+	u8                              unlock_before_callback,
+	acpi_walk_callback              user_function,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_status             status;
-	acpi_namespace_node     *child_node;
-	acpi_namespace_node     *parent_node;
-	acpi_object_type        child_type;
-	u32                     level;
+	acpi_status                     status;
+	struct acpi_namespace_node      *child_node;
+	struct acpi_namespace_node      *parent_node;
+	acpi_object_type                child_type;
+	u32                             level;
 
 
 	ACPI_FUNCTION_TRACE ("ns_walk_namespace");

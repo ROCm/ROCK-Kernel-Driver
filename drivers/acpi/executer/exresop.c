@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,9 +50,9 @@
 
 acpi_status
 acpi_ex_check_object_type (
-	acpi_object_type        type_needed,
-	acpi_object_type        this_type,
-	void                    *object)
+	acpi_object_type                type_needed,
+	acpi_object_type                this_type,
+	void                            *object)
 {
 	ACPI_FUNCTION_NAME ("ex_check_object_type");
 
@@ -70,7 +70,7 @@ acpi_ex_check_object_type (
 		 * specification, a store to a constant is a noop.)
 		 */
 		if ((this_type == ACPI_TYPE_INTEGER) &&
-			(((acpi_operand_object *) object)->common.flags & AOPOBJ_AML_CONSTANT)) {
+			(((union acpi_operand_object *) object)->common.flags & AOPOBJ_AML_CONSTANT)) {
 			return (AE_OK);
 		}
 	}
@@ -111,18 +111,18 @@ acpi_ex_check_object_type (
 
 acpi_status
 acpi_ex_resolve_operands (
-	u16                     opcode,
-	acpi_operand_object     **stack_ptr,
-	acpi_walk_state         *walk_state)
+	u16                             opcode,
+	union acpi_operand_object       **stack_ptr,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status = AE_OK;
-	u8                      object_type;
-	void                    *temp_node;
-	u32                     arg_types;
-	const acpi_opcode_info  *op_info;
-	u32                     this_arg_type;
-	acpi_object_type        type_needed;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status = AE_OK;
+	u8                              object_type;
+	void                            *temp_node;
+	u32                             arg_types;
+	const struct acpi_opcode_info   *op_info;
+	u32                             this_arg_type;
+	acpi_object_type                type_needed;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ex_resolve_operands", opcode);
@@ -170,7 +170,7 @@ acpi_ex_resolve_operands (
 
 			/* Node */
 
-			object_type = ((acpi_namespace_node *) obj_desc)->type;
+			object_type = ((struct acpi_namespace_node *) obj_desc)->type;
 			break;
 
 

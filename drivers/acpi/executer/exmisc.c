@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,12 +50,12 @@
 
 acpi_status
 acpi_ex_get_object_reference (
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     **return_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       **return_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *reference_obj;
-	acpi_operand_object     *referenced_obj;
+	union acpi_operand_object       *reference_obj;
+	union acpi_operand_object       *referenced_obj;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_get_object_reference", obj_desc);
@@ -142,17 +142,17 @@ acpi_ex_get_object_reference (
 
 acpi_status
 acpi_ex_concat_template (
-	acpi_operand_object     *obj_desc1,
-	acpi_operand_object     *obj_desc2,
-	acpi_operand_object     **actual_return_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc1,
+	union acpi_operand_object       *obj_desc2,
+	union acpi_operand_object       **actual_return_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *return_desc;
-	u8                      *new_buf;
-	u8                      *end_tag1;
-	u8                      *end_tag2;
-	acpi_size               length1;
-	acpi_size               length2;
+	union acpi_operand_object       *return_desc;
+	u8                              *new_buf;
+	u8                              *end_tag1;
+	u8                              *end_tag2;
+	acpi_size                       length1;
+	acpi_size                       length2;
 
 
 	ACPI_FUNCTION_TRACE ("ex_concat_template");
@@ -215,16 +215,16 @@ acpi_ex_concat_template (
 
 acpi_status
 acpi_ex_do_concatenate (
-	acpi_operand_object     *obj_desc1,
-	acpi_operand_object     *obj_desc2,
-	acpi_operand_object     **actual_return_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc1,
+	union acpi_operand_object       *obj_desc2,
+	union acpi_operand_object       **actual_return_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	u32                     i;
-	acpi_integer            this_integer;
-	acpi_operand_object     *return_desc;
-	char                    *new_buf;
+	acpi_status                     status;
+	u32                             i;
+	acpi_integer                    this_integer;
+	union acpi_operand_object       *return_desc;
+	char                            *new_buf;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -363,9 +363,9 @@ cleanup:
 
 acpi_integer
 acpi_ex_do_math_op (
-	u16                     opcode,
-	acpi_integer            operand0,
-	acpi_integer            operand1)
+	u16                             opcode,
+	acpi_integer                    operand0,
+	acpi_integer                    operand1)
 {
 
 
@@ -449,9 +449,9 @@ acpi_ex_do_math_op (
 
 u8
 acpi_ex_do_logical_op (
-	u16                     opcode,
-	acpi_integer            operand0,
-	acpi_integer            operand1)
+	u16                             opcode,
+	acpi_integer                    operand0,
+	acpi_integer                    operand1)
 {
 
 

@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,10 +50,10 @@
 acpi_status
 acpi_ns_root_initialize (void)
 {
-	acpi_status                 status;
-	const acpi_predefined_names *init_val = NULL;
-	acpi_namespace_node         *new_node;
-	acpi_operand_object         *obj_desc;
+	acpi_status                         status;
+	const struct acpi_predefined_names *init_val = NULL;
+	struct acpi_namespace_node          *new_node;
+	union acpi_operand_object           *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ns_root_initialize");
@@ -232,26 +232,26 @@ unlock_and_exit:
 
 acpi_status
 acpi_ns_lookup (
-	acpi_generic_state      *scope_info,
-	char                    *pathname,
-	acpi_object_type        type,
-	acpi_interpreter_mode   interpreter_mode,
-	u32                     flags,
-	acpi_walk_state         *walk_state,
-	acpi_namespace_node     **return_node)
+	union acpi_generic_state        *scope_info,
+	char                            *pathname,
+	acpi_object_type                type,
+	acpi_interpreter_mode           interpreter_mode,
+	u32                             flags,
+	struct acpi_walk_state          *walk_state,
+	struct acpi_namespace_node      **return_node)
 {
-	acpi_status             status;
-	char                    *path = pathname;
-	acpi_namespace_node     *prefix_node;
-	acpi_namespace_node     *current_node = NULL;
-	acpi_namespace_node     *this_node = NULL;
-	u32                     num_segments;
-	u32                     num_carats;
-	acpi_name               simple_name;
-	acpi_object_type        type_to_check_for;
-	acpi_object_type        this_search_type;
-	u32                     search_parent_flag = ACPI_NS_SEARCH_PARENT;
-	u32                     local_flags = flags & ~(ACPI_NS_ERROR_IF_FOUND |
+	acpi_status                     status;
+	char                            *path = pathname;
+	struct acpi_namespace_node      *prefix_node;
+	struct acpi_namespace_node      *current_node = NULL;
+	struct acpi_namespace_node      *this_node = NULL;
+	u32                             num_segments;
+	u32                             num_carats;
+	acpi_name                       simple_name;
+	acpi_object_type                type_to_check_for;
+	acpi_object_type                this_search_type;
+	u32                             search_parent_flag = ACPI_NS_SEARCH_PARENT;
+	u32                             local_flags = flags & ~(ACPI_NS_ERROR_IF_FOUND |
 			   ACPI_NS_SEARCH_PARENT);
 
 

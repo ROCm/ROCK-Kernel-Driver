@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -44,13 +44,13 @@
  *
  ******************************************************************************/
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_arg (
-	acpi_parse_object       *op,
-	u32                     argn)
+	union acpi_parse_object         *op,
+	u32                             argn)
 {
-	acpi_parse_object       *arg = NULL;
-	const acpi_opcode_info  *op_info;
+	union acpi_parse_object         *arg = NULL;
+	const struct acpi_opcode_info   *op_info;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -100,11 +100,11 @@ acpi_ps_get_arg (
 
 void
 acpi_ps_append_arg (
-	acpi_parse_object       *op,
-	acpi_parse_object       *arg)
+	union acpi_parse_object         *op,
+	union acpi_parse_object         *arg)
 {
-	acpi_parse_object       *prev_arg;
-	const acpi_opcode_info  *op_info;
+	union acpi_parse_object         *prev_arg;
+	const struct acpi_opcode_info   *op_info;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -174,11 +174,11 @@ acpi_ps_append_arg (
  *
  ******************************************************************************/
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_child (
-	acpi_parse_object       *op)
+	union acpi_parse_object         *op)
 {
-	acpi_parse_object       *child = NULL;
+	union acpi_parse_object         *child = NULL;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -243,14 +243,14 @@ acpi_ps_get_child (
  *
  ******************************************************************************/
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_depth_next (
-	acpi_parse_object       *origin,
-	acpi_parse_object       *op)
+	union acpi_parse_object         *origin,
+	union acpi_parse_object         *op)
 {
-	acpi_parse_object       *next = NULL;
-	acpi_parse_object       *parent;
-	acpi_parse_object       *arg;
+	union acpi_parse_object         *next = NULL;
+	union acpi_parse_object         *parent;
+	union acpi_parse_object         *arg;
 
 
 	ACPI_FUNCTION_ENTRY ();

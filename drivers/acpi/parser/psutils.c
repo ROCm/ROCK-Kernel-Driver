@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -44,11 +44,11 @@
  *
  ******************************************************************************/
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_create_scope_op (
 	void)
 {
-	acpi_parse_object       *scope_op;
+	union acpi_parse_object         *scope_op;
 
 
 	scope_op = acpi_ps_alloc_op (AML_SCOPE_OP);
@@ -78,8 +78,8 @@ acpi_ps_create_scope_op (
 
 void
 acpi_ps_init_op (
-	acpi_parse_object       *op,
-	u16                     opcode)
+	union acpi_parse_object         *op,
+	u16                             opcode)
 {
 	ACPI_FUNCTION_ENTRY ();
 
@@ -106,14 +106,14 @@ acpi_ps_init_op (
  *
  ******************************************************************************/
 
-acpi_parse_object*
+union acpi_parse_object*
 acpi_ps_alloc_op (
-	u16                     opcode)
+	u16                             opcode)
 {
-	acpi_parse_object       *op = NULL;
-	u32                     size;
-	u8                      flags;
-	const acpi_opcode_info  *op_info;
+	union acpi_parse_object         *op = NULL;
+	u32                             size;
+	u8                              flags;
+	const struct acpi_opcode_info   *op_info;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -124,23 +124,23 @@ acpi_ps_alloc_op (
 	/* Allocate the minimum required size object */
 
 	if (op_info->flags & AML_DEFER) {
-		size = sizeof (acpi_parse_obj_named);
+		size = sizeof (struct acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_DEFERRED;
 	}
 	else if (op_info->flags & AML_NAMED) {
-		size = sizeof (acpi_parse_obj_named);
+		size = sizeof (struct acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_NAMED;
 	}
 	else if (opcode == AML_INT_BYTELIST_OP) {
-		size = sizeof (acpi_parse_obj_named);
+		size = sizeof (struct acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_BYTELIST;
 	}
 	else {
-		size = sizeof (acpi_parse_obj_common);
+		size = sizeof (struct acpi_parse_obj_common);
 		flags = ACPI_PARSEOP_GENERIC;
 	}
 
-	if (size == sizeof (acpi_parse_obj_common)) {
+	if (size == sizeof (struct acpi_parse_obj_common)) {
 		/*
 		 * The generic op is by far the most common (16 to 1)
 		 */
@@ -176,7 +176,7 @@ acpi_ps_alloc_op (
 
 void
 acpi_ps_free_op (
-	acpi_parse_object       *op)
+	union acpi_parse_object         *op)
 {
 	ACPI_FUNCTION_NAME ("ps_free_op");
 
@@ -233,7 +233,7 @@ acpi_ps_delete_parse_cache (
  */
 u8
 acpi_ps_is_leading_char (
-	u32                     c)
+	u32                             c)
 {
 	return ((u8) (c == '_' || (c >= 'A' && c <= 'Z')));
 }
@@ -244,7 +244,7 @@ acpi_ps_is_leading_char (
  */
 u8
 acpi_ps_is_prefix_char (
-	u32                     c)
+	u32                             c)
 {
 	return ((u8) (c == '\\' || c == '^'));
 }
@@ -255,7 +255,7 @@ acpi_ps_is_prefix_char (
  */
 u32
 acpi_ps_get_name (
-	acpi_parse_object       *op)
+	union acpi_parse_object         *op)
 {
 
 
@@ -276,8 +276,8 @@ acpi_ps_get_name (
  */
 void
 acpi_ps_set_name (
-	acpi_parse_object       *op,
-	u32                     name)
+	union acpi_parse_object         *op,
+	u32                             name)
 {
 
 	/* The "generic" object has no name associated with it */

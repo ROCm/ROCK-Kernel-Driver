@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -123,11 +123,11 @@ acpi_get_firmware_waking_vector (
 
 acpi_status
 acpi_enter_sleep_state_prep (
-	u8                  sleep_state)
+	u8                          sleep_state)
 {
-	acpi_status         status;
-	acpi_object_list    arg_list;
-	acpi_object         arg;
+	acpi_status                 status;
+	struct acpi_object_list     arg_list;
+	union acpi_object           arg;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state_prep");
@@ -181,14 +181,14 @@ acpi_enter_sleep_state_prep (
 
 acpi_status
 acpi_enter_sleep_state (
-	u8                      sleep_state)
+	u8                              sleep_state)
 {
-	u32                     PM1Acontrol;
-	u32                     PM1Bcontrol;
-	acpi_bit_register_info  *sleep_type_reg_info;
-	acpi_bit_register_info  *sleep_enable_reg_info;
-	u32                     in_value;
-	acpi_status             status;
+	u32                             PM1Acontrol;
+	u32                             PM1Bcontrol;
+	struct acpi_bit_register_info   *sleep_type_reg_info;
+	struct acpi_bit_register_info   *sleep_enable_reg_info;
+	u32                             in_value;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state");
@@ -330,11 +330,11 @@ acpi_enter_sleep_state (
 
 acpi_status
 acpi_leave_sleep_state (
-	u8                  sleep_state)
+	u8                          sleep_state)
 {
-	acpi_object_list    arg_list;
-	acpi_object         arg;
-	acpi_status         status;
+	struct acpi_object_list     arg_list;
+	union acpi_object           arg;
+	acpi_status                 status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_leave_sleep_state");

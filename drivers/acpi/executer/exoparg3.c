@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -71,11 +71,11 @@
 
 acpi_status
 acpi_ex_opcode_3A_0T_0R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_signal_fatal_info  *fatal;
-	acpi_status             status = AE_OK;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	struct acpi_signal_fatal_info   *fatal;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -91,7 +91,7 @@ acpi_ex_opcode_3A_0T_0R (
 			(u32) operand[2]->integer.value));
 
 
-		fatal = ACPI_MEM_ALLOCATE (sizeof (acpi_signal_fatal_info));
+		fatal = ACPI_MEM_ALLOCATE (sizeof (struct acpi_signal_fatal_info));
 		if (fatal) {
 			fatal->type     = (u32) operand[0]->integer.value;
 			fatal->code     = (u32) operand[1]->integer.value;
@@ -138,14 +138,14 @@ cleanup:
 
 acpi_status
 acpi_ex_opcode_3A_1T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *return_desc = NULL;
-	char                    *buffer;
-	acpi_status             status = AE_OK;
-	acpi_native_uint        index;
-	acpi_size               length;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *return_desc = NULL;
+	char                            *buffer;
+	acpi_status                     status = AE_OK;
+	acpi_native_uint                index;
+	acpi_size                       length;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));

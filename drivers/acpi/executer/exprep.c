@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,14 +50,14 @@
 
 static u32
 acpi_ex_decode_field_access (
-	acpi_operand_object     *obj_desc,
-	u8                      field_flags,
-	u32                     *return_byte_alignment)
+	union acpi_operand_object       *obj_desc,
+	u8                              field_flags,
+	u32                             *return_byte_alignment)
 {
-	u32                     access;
-	u8                      byte_alignment;
-	u8                      bit_length;
-/*    u32                     Length; */
+	u32                             access;
+	u8                              byte_alignment;
+	u8                              bit_length;
+/*    u32                             Length; */
 
 
 	ACPI_FUNCTION_NAME ("ex_decode_field_access");
@@ -171,15 +171,15 @@ acpi_ex_decode_field_access (
 
 acpi_status
 acpi_ex_prep_common_field_object (
-	acpi_operand_object     *obj_desc,
-	u8                      field_flags,
-	u8                      field_attribute,
-	u32                     field_bit_position,
-	u32                     field_bit_length)
+	union acpi_operand_object       *obj_desc,
+	u8                              field_flags,
+	u8                              field_attribute,
+	u32                             field_bit_position,
+	u32                             field_bit_length)
 {
-	u32                     access_bit_width;
-	u32                     byte_alignment;
-	u32                     nearest_byte_address;
+	u32                             access_bit_width;
+	u32                             byte_alignment;
+	u32                             nearest_byte_address;
 
 
 	ACPI_FUNCTION_TRACE ("ex_prep_common_field_object");
@@ -289,18 +289,18 @@ acpi_ex_prep_common_field_object (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Construct an acpi_operand_object of type def_field and
+ * DESCRIPTION: Construct an union acpi_operand_object of type def_field and
  *              connect it to the parent Node.
  *
  ******************************************************************************/
 
 acpi_status
 acpi_ex_prep_field_value (
-	acpi_create_field_info  *info)
+	struct acpi_create_field_info   *info)
 {
-	acpi_operand_object     *obj_desc;
-	u32                     type;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	u32                             type;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ex_prep_field_value");

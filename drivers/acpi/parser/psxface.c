@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -54,15 +54,15 @@
 
 acpi_status
 acpi_psx_execute (
-	acpi_namespace_node     *method_node,
-	acpi_operand_object     **params,
-	acpi_operand_object     **return_obj_desc)
+	struct acpi_namespace_node      *method_node,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **return_obj_desc)
 {
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
-	u32                     i;
-	acpi_parse_object       *op;
-	acpi_walk_state         *walk_state;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
+	u32                             i;
+	union acpi_parse_object         *op;
+	struct acpi_walk_state          *walk_state;
 
 
 	ACPI_FUNCTION_TRACE ("psx_execute");

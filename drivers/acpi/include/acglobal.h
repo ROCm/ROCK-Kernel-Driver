@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,12 +47,12 @@
 
 /* Runtime configuration of debug print levels */
 
-extern      u32                         acpi_dbg_level;
-extern      u32                         acpi_dbg_layer;
+extern      u32                                 acpi_dbg_level;
+extern      u32                                 acpi_dbg_layer;
 
 /* Procedure nesting level for debug output */
 
-extern      u32                         acpi_gbl_nesting_level;
+extern      u32                                 acpi_gbl_nesting_level;
 
 
 /*****************************************************************************
@@ -70,22 +70,22 @@ extern      u32                         acpi_gbl_nesting_level;
  * of each in the system.  Each global points to the actual table.
  *
  */
-ACPI_EXTERN u32                         acpi_gbl_table_flags;
-ACPI_EXTERN u32                         acpi_gbl_rsdt_table_count;
-ACPI_EXTERN rsdp_descriptor            *acpi_gbl_RSDP;
-ACPI_EXTERN xsdt_descriptor            *acpi_gbl_XSDT;
+ACPI_EXTERN u32                                 acpi_gbl_table_flags;
+ACPI_EXTERN u32                                 acpi_gbl_rsdt_table_count;
+ACPI_EXTERN struct rsdp_descriptor             *acpi_gbl_RSDP;
+ACPI_EXTERN XSDT_DESCRIPTOR            *acpi_gbl_XSDT;
 ACPI_EXTERN FADT_DESCRIPTOR            *acpi_gbl_FADT;
-ACPI_EXTERN acpi_table_header          *acpi_gbl_DSDT;
+ACPI_EXTERN struct acpi_table_header           *acpi_gbl_DSDT;
 ACPI_EXTERN FACS_DESCRIPTOR            *acpi_gbl_FACS;
-ACPI_EXTERN acpi_common_facs            acpi_gbl_common_fACS;
+ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
 
 /*
  * Handle both ACPI 1.0 and ACPI 2.0 Integer widths
  * If we are running a method that exists in a 32-bit ACPI table.
  * Use only 32 bits of the Integer for conversion.
  */
-ACPI_EXTERN u8                          acpi_gbl_integer_bit_width;
-ACPI_EXTERN u8                          acpi_gbl_integer_byte_width;
+ACPI_EXTERN u8                                  acpi_gbl_integer_bit_width;
+ACPI_EXTERN u8                                  acpi_gbl_integer_byte_width;
 
 /*
  * Since there may be multiple SSDTs and PSDTS, a single pointer is not
@@ -96,15 +96,15 @@ ACPI_EXTERN u8                          acpi_gbl_integer_byte_width;
 /*
  * ACPI Table info arrays
  */
-extern      acpi_table_desc             acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
-extern      ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES];
+extern      struct acpi_table_desc              acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
+extern      struct acpi_table_support           acpi_gbl_acpi_table_data[NUM_ACPI_TABLES];
 
 /*
  * Predefined mutex objects.  This array contains the
  * actual OS mutex handles, indexed by the local ACPI_MUTEX_HANDLEs.
  * (The table maps local handles to the real OS handles)
  */
-ACPI_EXTERN acpi_mutex_info             acpi_gbl_acpi_mutex_info [NUM_MTX];
+ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_acpi_mutex_info [NUM_MTX];
 
 
 /*****************************************************************************
@@ -114,35 +114,35 @@ ACPI_EXTERN acpi_mutex_info             acpi_gbl_acpi_mutex_info [NUM_MTX];
  ****************************************************************************/
 
 
-ACPI_EXTERN acpi_memory_list            acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
-ACPI_EXTERN acpi_object_notify_handler  acpi_gbl_drv_notify;
-ACPI_EXTERN acpi_object_notify_handler  acpi_gbl_sys_notify;
-ACPI_EXTERN acpi_init_handler           acpi_gbl_init_handler;
-ACPI_EXTERN acpi_walk_state            *acpi_gbl_breakpoint_walk;
-ACPI_EXTERN acpi_handle                 acpi_gbl_global_lock_semaphore;
+ACPI_EXTERN struct acpi_memory_list             acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
+ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_drv_notify;
+ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_sys_notify;
+ACPI_EXTERN acpi_init_handler                   acpi_gbl_init_handler;
+ACPI_EXTERN struct acpi_walk_state             *acpi_gbl_breakpoint_walk;
+ACPI_EXTERN acpi_handle                         acpi_gbl_global_lock_semaphore;
 
-ACPI_EXTERN u32                         acpi_gbl_global_lock_thread_count;
-ACPI_EXTERN u32                         acpi_gbl_original_mode;
-ACPI_EXTERN u32                         acpi_gbl_rsdp_original_location;
-ACPI_EXTERN u32                         acpi_gbl_ns_lookup_count;
-ACPI_EXTERN u32                         acpi_gbl_ps_find_count;
-ACPI_EXTERN u16                         acpi_gbl_pm1_enable_register_save;
-ACPI_EXTERN u16                         acpi_gbl_next_table_owner_id;
-ACPI_EXTERN u16                         acpi_gbl_next_method_owner_id;
-ACPI_EXTERN u16                         acpi_gbl_global_lock_handle;
-ACPI_EXTERN u8                          acpi_gbl_debugger_configuration;
-ACPI_EXTERN u8                          acpi_gbl_global_lock_acquired;
-ACPI_EXTERN u8                          acpi_gbl_step_to_next_call;
-ACPI_EXTERN u8                          acpi_gbl_acpi_hardware_present;
-ACPI_EXTERN u8                          acpi_gbl_global_lock_present;
-ACPI_EXTERN u8                          acpi_gbl_events_initialized;
+ACPI_EXTERN u32                                 acpi_gbl_global_lock_thread_count;
+ACPI_EXTERN u32                                 acpi_gbl_original_mode;
+ACPI_EXTERN u32                                 acpi_gbl_rsdp_original_location;
+ACPI_EXTERN u32                                 acpi_gbl_ns_lookup_count;
+ACPI_EXTERN u32                                 acpi_gbl_ps_find_count;
+ACPI_EXTERN u16                                 acpi_gbl_pm1_enable_register_save;
+ACPI_EXTERN u16                                 acpi_gbl_next_table_owner_id;
+ACPI_EXTERN u16                                 acpi_gbl_next_method_owner_id;
+ACPI_EXTERN u16                                 acpi_gbl_global_lock_handle;
+ACPI_EXTERN u8                                  acpi_gbl_debugger_configuration;
+ACPI_EXTERN u8                                  acpi_gbl_global_lock_acquired;
+ACPI_EXTERN u8                                  acpi_gbl_step_to_next_call;
+ACPI_EXTERN u8                                  acpi_gbl_acpi_hardware_present;
+ACPI_EXTERN u8                                  acpi_gbl_global_lock_present;
+ACPI_EXTERN u8                                  acpi_gbl_events_initialized;
 
-extern u8                               acpi_gbl_shutdown;
-extern u32                              acpi_gbl_startup_flags;
-extern const u8                         acpi_gbl_decode_to8bit[8];
-extern const char                      *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT];
-extern const acpi_opcode_info           acpi_gbl_aml_op_info[AML_NUM_OPCODES];
-extern const char                      *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
+extern u8                                       acpi_gbl_shutdown;
+extern u32                                      acpi_gbl_startup_flags;
+extern const u8                                 acpi_gbl_decode_to8bit[8];
+extern const char                              *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT];
+extern const struct acpi_opcode_info            acpi_gbl_aml_op_info[AML_NUM_OPCODES];
+extern const char                              *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
 
 
 /*****************************************************************************
@@ -159,19 +159,19 @@ extern const char                      *acpi_gbl_region_types[ACPI_NUM_PREDEFINE
 #define NUM_PREDEFINED_NAMES            9
 #endif
 
-ACPI_EXTERN acpi_namespace_node         acpi_gbl_root_node_struct;
-ACPI_EXTERN acpi_namespace_node        *acpi_gbl_root_node;
+ACPI_EXTERN struct acpi_namespace_node          acpi_gbl_root_node_struct;
+ACPI_EXTERN struct acpi_namespace_node         *acpi_gbl_root_node;
 
-extern const u8                         acpi_gbl_ns_properties[NUM_NS_TYPES];
-extern const acpi_predefined_names      acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
+extern const u8                                 acpi_gbl_ns_properties[NUM_NS_TYPES];
+extern const struct acpi_predefined_names       acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
 
 #ifdef ACPI_DEBUG_OUTPUT
-ACPI_EXTERN u32                         acpi_gbl_current_node_count;
-ACPI_EXTERN u32                         acpi_gbl_current_node_size;
-ACPI_EXTERN u32                         acpi_gbl_max_concurrent_node_count;
-ACPI_EXTERN acpi_size                   acpi_gbl_entry_stack_pointer;
-ACPI_EXTERN acpi_size                   acpi_gbl_lowest_stack_pointer;
-ACPI_EXTERN u32                         acpi_gbl_deepest_nesting;
+ACPI_EXTERN u32                                 acpi_gbl_current_node_count;
+ACPI_EXTERN u32                                 acpi_gbl_current_node_size;
+ACPI_EXTERN u32                                 acpi_gbl_max_concurrent_node_count;
+ACPI_EXTERN acpi_size                           acpi_gbl_entry_stack_pointer;
+ACPI_EXTERN acpi_size                           acpi_gbl_lowest_stack_pointer;
+ACPI_EXTERN u32                                 acpi_gbl_deepest_nesting;
 #endif
 
 /*****************************************************************************
@@ -181,11 +181,11 @@ ACPI_EXTERN u32                         acpi_gbl_deepest_nesting;
  ****************************************************************************/
 
 
-ACPI_EXTERN acpi_thread_state           *acpi_gbl_current_walk_list;
+ACPI_EXTERN struct acpi_thread_state            *acpi_gbl_current_walk_list;
 
 /* Control method single step flag */
 
-ACPI_EXTERN u8                          acpi_gbl_cm_single_step;
+ACPI_EXTERN u8                                  acpi_gbl_cm_single_step;
 
 
 /*****************************************************************************
@@ -194,7 +194,7 @@ ACPI_EXTERN u8                          acpi_gbl_cm_single_step;
  *
  ****************************************************************************/
 
-ACPI_EXTERN acpi_parse_object           *acpi_gbl_parsed_namespace_root;
+ACPI_EXTERN union acpi_parse_object             *acpi_gbl_parsed_namespace_root;
 
 /*****************************************************************************
  *
@@ -202,9 +202,9 @@ ACPI_EXTERN acpi_parse_object           *acpi_gbl_parsed_namespace_root;
  *
  ****************************************************************************/
 
-extern      acpi_bit_register_info      acpi_gbl_bit_register_info[ACPI_NUM_BITREG];
-ACPI_EXTERN u8                          acpi_gbl_sleep_type_a;
-ACPI_EXTERN u8                          acpi_gbl_sleep_type_b;
+extern      struct acpi_bit_register_info       acpi_gbl_bit_register_info[ACPI_NUM_BITREG];
+ACPI_EXTERN u8                                  acpi_gbl_sleep_type_a;
+ACPI_EXTERN u8                                  acpi_gbl_sleep_type_b;
 
 
 /*****************************************************************************
@@ -213,15 +213,15 @@ ACPI_EXTERN u8                          acpi_gbl_sleep_type_b;
  *
  ****************************************************************************/
 
-extern      acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS];
-ACPI_EXTERN acpi_fixed_event_handler    acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
+extern      struct acpi_fixed_event_info        acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS];
+ACPI_EXTERN struct acpi_fixed_event_handler     acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
 
-ACPI_EXTERN acpi_handle                 acpi_gbl_gpe_obj_handle;
-ACPI_EXTERN u32                         acpi_gbl_gpe_register_count;
-ACPI_EXTERN u32                         acpi_gbl_gpe_number_max;
-ACPI_EXTERN acpi_gpe_register_info     *acpi_gbl_gpe_register_info;
-ACPI_EXTERN acpi_gpe_number_info       *acpi_gbl_gpe_number_info;
-ACPI_EXTERN acpi_gpe_block_info         acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLOCKS];
+ACPI_EXTERN acpi_handle                         acpi_gbl_gpe_obj_handle;
+ACPI_EXTERN u32                                 acpi_gbl_gpe_register_count;
+ACPI_EXTERN u32                                 acpi_gbl_gpe_number_max;
+ACPI_EXTERN struct acpi_gpe_register_info      *acpi_gbl_gpe_register_info;
+ACPI_EXTERN struct acpi_gpe_number_info        *acpi_gbl_gpe_number_info;
+ACPI_EXTERN struct acpi_gpe_block_info          acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLOCKS];
 
 /*
  * GPE translation table
@@ -230,7 +230,7 @@ ACPI_EXTERN acpi_gpe_block_info         acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLO
  * This table is needed because the GPE numbers supported by block 1 do not
  * have to be contiguous with the GPE numbers supported by block 0.
  */
-ACPI_EXTERN acpi_gpe_index_info        *acpi_gbl_gpe_number_to_index;
+ACPI_EXTERN struct acpi_gpe_index_info         *acpi_gbl_gpe_number_to_index;
 
 
 /*****************************************************************************
@@ -240,57 +240,57 @@ ACPI_EXTERN acpi_gpe_index_info        *acpi_gbl_gpe_number_to_index;
  ****************************************************************************/
 
 
-ACPI_EXTERN u8                          acpi_gbl_db_output_flags;
+ACPI_EXTERN u8                                  acpi_gbl_db_output_flags;
 
 #ifdef ACPI_DISASSEMBLER
 
-ACPI_EXTERN u8                          acpi_gbl_db_opt_disasm;
-ACPI_EXTERN u8                          acpi_gbl_db_opt_verbose;
+ACPI_EXTERN u8                                  acpi_gbl_db_opt_disasm;
+ACPI_EXTERN u8                                  acpi_gbl_db_opt_verbose;
 #endif
 
 
 #ifdef ACPI_DEBUGGER
 
-extern      u8                          acpi_gbl_method_executing;
-extern      u8                          acpi_gbl_abort_method;
-extern      u8                          acpi_gbl_db_terminate_threads;
+extern      u8                                  acpi_gbl_method_executing;
+extern      u8                                  acpi_gbl_abort_method;
+extern      u8                                  acpi_gbl_db_terminate_threads;
 
-ACPI_EXTERN int                         optind;
-ACPI_EXTERN char                       *optarg;
+ACPI_EXTERN int                                 optind;
+ACPI_EXTERN char                               *optarg;
 
-ACPI_EXTERN u8                          acpi_gbl_db_opt_tables;
-ACPI_EXTERN u8                          acpi_gbl_db_opt_stats;
-ACPI_EXTERN u8                          acpi_gbl_db_opt_ini_methods;
+ACPI_EXTERN u8                                  acpi_gbl_db_opt_tables;
+ACPI_EXTERN u8                                  acpi_gbl_db_opt_stats;
+ACPI_EXTERN u8                                  acpi_gbl_db_opt_ini_methods;
 
 
-ACPI_EXTERN char                       *acpi_gbl_db_args[ACPI_DEBUGGER_MAX_ARGS];
-ACPI_EXTERN char                        acpi_gbl_db_line_buf[80];
-ACPI_EXTERN char                        acpi_gbl_db_parsed_buf[80];
-ACPI_EXTERN char                        acpi_gbl_db_scope_buf[40];
-ACPI_EXTERN char                        acpi_gbl_db_debug_filename[40];
-ACPI_EXTERN u8                          acpi_gbl_db_output_to_file;
-ACPI_EXTERN char                       *acpi_gbl_db_buffer;
-ACPI_EXTERN char                       *acpi_gbl_db_filename;
-ACPI_EXTERN u32                         acpi_gbl_db_debug_level;
-ACPI_EXTERN u32                         acpi_gbl_db_console_debug_level;
-ACPI_EXTERN acpi_table_header          *acpi_gbl_db_table_ptr;
-ACPI_EXTERN acpi_namespace_node        *acpi_gbl_db_scope_node;
+ACPI_EXTERN char                               *acpi_gbl_db_args[ACPI_DEBUGGER_MAX_ARGS];
+ACPI_EXTERN char                                acpi_gbl_db_line_buf[80];
+ACPI_EXTERN char                                acpi_gbl_db_parsed_buf[80];
+ACPI_EXTERN char                                acpi_gbl_db_scope_buf[40];
+ACPI_EXTERN char                                acpi_gbl_db_debug_filename[40];
+ACPI_EXTERN u8                                  acpi_gbl_db_output_to_file;
+ACPI_EXTERN char                               *acpi_gbl_db_buffer;
+ACPI_EXTERN char                               *acpi_gbl_db_filename;
+ACPI_EXTERN u32                                 acpi_gbl_db_debug_level;
+ACPI_EXTERN u32                                 acpi_gbl_db_console_debug_level;
+ACPI_EXTERN struct acpi_table_header           *acpi_gbl_db_table_ptr;
+ACPI_EXTERN struct acpi_namespace_node         *acpi_gbl_db_scope_node;
 
 /*
  * Statistic globals
  */
-ACPI_EXTERN u16                         acpi_gbl_obj_type_count[ACPI_TYPE_NS_NODE_MAX+1];
-ACPI_EXTERN u16                         acpi_gbl_node_type_count[ACPI_TYPE_NS_NODE_MAX+1];
-ACPI_EXTERN u16                         acpi_gbl_obj_type_count_misc;
-ACPI_EXTERN u16                         acpi_gbl_node_type_count_misc;
-ACPI_EXTERN u32                         acpi_gbl_num_nodes;
-ACPI_EXTERN u32                         acpi_gbl_num_objects;
+ACPI_EXTERN u16                                 acpi_gbl_obj_type_count[ACPI_TYPE_NS_NODE_MAX+1];
+ACPI_EXTERN u16                                 acpi_gbl_node_type_count[ACPI_TYPE_NS_NODE_MAX+1];
+ACPI_EXTERN u16                                 acpi_gbl_obj_type_count_misc;
+ACPI_EXTERN u16                                 acpi_gbl_node_type_count_misc;
+ACPI_EXTERN u32                                 acpi_gbl_num_nodes;
+ACPI_EXTERN u32                                 acpi_gbl_num_objects;
 
 
-ACPI_EXTERN u32                         acpi_gbl_size_of_parse_tree;
-ACPI_EXTERN u32                         acpi_gbl_size_of_method_trees;
-ACPI_EXTERN u32                         acpi_gbl_size_of_node_entries;
-ACPI_EXTERN u32                         acpi_gbl_size_of_acpi_objects;
+ACPI_EXTERN u32                                 acpi_gbl_size_of_parse_tree;
+ACPI_EXTERN u32                                 acpi_gbl_size_of_method_trees;
+ACPI_EXTERN u32                                 acpi_gbl_size_of_node_entries;
+ACPI_EXTERN u32                                 acpi_gbl_size_of_acpi_objects;
 
 #endif /* ACPI_DEBUGGER */
 

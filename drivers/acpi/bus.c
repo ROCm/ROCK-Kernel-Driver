@@ -540,8 +540,8 @@ static int __init
 acpi_bus_init_irq (void)
 {
 	acpi_status		status = AE_OK;
-	acpi_object		arg = {ACPI_TYPE_INTEGER};
-	acpi_object_list        arg_list = {1, &arg};
+	union acpi_object	arg = {ACPI_TYPE_INTEGER};
+	struct acpi_object_list	arg_list = {1, &arg};
 	char			*message = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_init_irq");
@@ -585,7 +585,7 @@ acpi_bus_init (void)
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	acpi_buffer		buffer = {sizeof(acpi_fadt), &acpi_fadt};
+	struct acpi_buffer	buffer = {sizeof(acpi_fadt), &acpi_fadt};
 
 	ACPI_FUNCTION_TRACE("acpi_bus_init");
 
