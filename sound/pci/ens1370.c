@@ -1392,33 +1392,6 @@ static int snd_ens1373_spdif_stream_put(snd_kcontrol_t * kcontrol,
 	return change;
 }
 
-static snd_kcontrol_new_t snd_ens1373_spdif_default __devinitdata =
-{
-	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	.info =		snd_ens1373_spdif_info,
-	.get =		snd_ens1373_spdif_default_get,
-	.put =		snd_ens1373_spdif_default_put,
-};
-
-static snd_kcontrol_new_t snd_ens1373_spdif_mask __devinitdata =
-{
-	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
-	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
-	.info =		snd_ens1373_spdif_info,
-	.get =		snd_ens1373_spdif_mask_get
-};
-
-static snd_kcontrol_new_t snd_ens1373_spdif_stream __devinitdata =
-{
-	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	.info =		snd_ens1373_spdif_info,
-	.get =		snd_ens1373_spdif_stream_get,
-	.put =		snd_ens1373_spdif_stream_put
-};
-
 #define ES1371_SPDIF(xname) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_es1371_spdif_info, \
   .get = snd_es1371_spdif_get, .put = snd_es1371_spdif_put }
@@ -1462,8 +1435,33 @@ static int snd_es1371_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	return change;
 }
 
-static snd_kcontrol_new_t snd_es1371_mixer_spdif __devinitdata =
-ES1371_SPDIF("IEC958 Playback Switch");
+
+/* spdif controls */
+static snd_kcontrol_new_t snd_es1371_mixer_spdif[] __devinitdata = {
+	ES1371_SPDIF("IEC958 Playback Switch"),
+	{
+		.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+		.info =		snd_ens1373_spdif_info,
+		.get =		snd_ens1373_spdif_default_get,
+		.put =		snd_ens1373_spdif_default_put,
+	},
+	{
+		.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
+		.info =		snd_ens1373_spdif_info,
+		.get =		snd_ens1373_spdif_mask_get
+	},
+	{
+		.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+		.info =		snd_ens1373_spdif_info,
+		.get =		snd_ens1373_spdif_stream_get,
+		.put =		snd_ens1373_spdif_stream_put
+	},
+};
+
 
 static int snd_es1373_rear_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
@@ -1512,6 +1510,56 @@ static snd_kcontrol_new_t snd_ens1373_rear __devinitdata =
 	.put =		snd_es1373_rear_put,
 };
 
+static int snd_es1373_line_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int snd_es1373_line_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	int val = 0;
+	
+	spin_lock_irq(&ensoniq->reg_lock);
+	if ((ensoniq->ctrl & ES_1371_GPIO_OUTM) >= 4)
+	    	val = 1;
+	ucontrol->value.integer.value[0] = val;
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return 0;
+}
+
+static int snd_es1373_line_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	int changed;
+	unsigned int ctrl;
+	
+	spin_lock_irq(&ensoniq->reg_lock);
+	ctrl = ensoniq->ctrl;
+	if (ucontrol->value.integer.value[0])
+		ensoniq->ctrl |= ES_1371_GPIO_OUT(4);	/* switch line-in -> rear out */
+	else
+		ensoniq->ctrl &= ~ES_1371_GPIO_OUT(4);
+	changed = (ctrl != ensoniq->ctrl);
+	if (changed)
+		outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return changed;
+}
+
+static snd_kcontrol_new_t snd_ens1373_line __devinitdata =
+{
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		"Line In->Rear Out Switch",
+	.info =		snd_es1373_line_info,
+	.get =		snd_es1373_line_get,
+	.put =		snd_es1373_line_put,
+};
+
 static void snd_ensoniq_mixer_free_ac97(ac97_t *ac97)
 {
 	ensoniq_t *ensoniq = snd_magic_cast(ensoniq_t, ac97->private_data, return);
@@ -1555,7 +1603,7 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 		    ensoniq->pci->device == es1371_spdif_present[idx].did &&
 		    ensoniq->rev == es1371_spdif_present[idx].rev) {
 		    	snd_kcontrol_t *kctl;
-			int index = 0; 
+			int i, index = 0; 
 
 			ensoniq->spdif_default = ensoniq->spdif_stream = SNDRV_PCM_DEFAULT_CON_SPDIF;
 			outl(ensoniq->spdif_default, ES_REG(ensoniq, CHANNEL_STATUS));
@@ -1563,29 +1611,31 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 		    	if (ensoniq->u.es1371.ac97->ext_id & AC97_EI_SPDIF)
 			    	index++;
 
-		    	kctl = snd_ctl_new1(&snd_es1371_mixer_spdif, ensoniq);
-			kctl->id.index = index;
-			snd_ctl_add(card, kctl);
-
-			kctl = snd_ctl_new1(&snd_ens1373_spdif_default, ensoniq);
-			kctl->id.index = index;
-			snd_ctl_add(card, kctl);
-
-			kctl = snd_ctl_new1(&snd_ens1373_spdif_mask, ensoniq);
-			kctl->id.index = index;
-			snd_ctl_add(card, kctl);
-
-			kctl = snd_ctl_new1(&snd_ens1373_spdif_stream, ensoniq);
-			kctl->id.index = index;
-			snd_ctl_add(card, kctl);
+			for (i = 0; i < (int)ARRAY_SIZE(snd_es1371_mixer_spdif); i++) {
+				kctl = snd_ctl_new1(&snd_es1371_mixer_spdif[i], ensoniq);
+				if (! kctl)
+					return -ENOMEM;
+				kctl->id.index = index;
+				if ((err = snd_ctl_add(card, kctl)) < 0)
+					return err;
+			}
 			break;
 		}
 	if (ensoniq->u.es1371.ac97->ext_id & AC97_EI_SDAC) {
 		/* mirror rear to front speakers */
 		ensoniq->cssr &= ~(ES_1373_REAR_BIT27|ES_1373_REAR_BIT24);
 		ensoniq->cssr |= ES_1373_REAR_BIT26;
-		snd_ctl_add(card, snd_ctl_new1(&snd_ens1373_rear, ensoniq));
+		err = snd_ctl_add(card, snd_ctl_new1(&snd_ens1373_rear, ensoniq));
+		if (err < 0)
+			return err;
 	}
+	if ((ensoniq->subsystem_vendor_id == 0x1274) &&
+	    (ensoniq->subsystem_device_id == 0x2000)) { /* GA-7DXR */
+		 err = snd_ctl_add(card, snd_ctl_new1(&snd_ens1373_line, ensoniq));
+		 if (err < 0)
+			 return err;
+	}
+
 	return 0;
 }
 
@@ -1675,8 +1725,11 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 	ak4531.private_free = snd_ensoniq_mixer_free_ak4531;
 	if ((err = snd_ak4531_mixer(card, &ak4531, &ensoniq->u.es1370.ak4531)) < 0)
 		return err;
-	for (idx = 0; idx < ES1370_CONTROLS; idx++)
-		snd_ctl_add(card, snd_ctl_new1(&snd_es1370_controls[idx], ensoniq));
+	for (idx = 0; idx < ES1370_CONTROLS; idx++) {
+		err = snd_ctl_add(card, snd_ctl_new1(&snd_es1370_controls[idx], ensoniq));
+		if (err < 0)
+			return err;
+	}
 	return 0;
 }
 
