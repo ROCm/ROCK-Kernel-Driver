@@ -308,39 +308,45 @@ static struct file_operations proc_bus_pci_operations = {
 /* iterator */
 static void *pci_seq_start(struct seq_file *m, loff_t *pos)
 {
-	struct list_head *p = &pci_devices;
+	struct pci_dev *dev = NULL;
 	loff_t n = *pos;
 
-	/* XXX: surely we need some locking for traversing the list? */
+	dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev);
 	while (n--) {
-		p = p->next;
-		if (p == &pci_devices)
-			return NULL;
+		dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev);
+		if (dev == NULL)
+			goto exit;
 	}
-	return p;
+exit:
+	return dev;
 }
+
 static void *pci_seq_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	struct list_head *p = v;
+	struct pci_dev *dev = v;
+
 	(*pos)++;
-	return p->next != &pci_devices ? (void *)p->next : NULL;
+	dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev);
+	return dev;
 }
+
 static void pci_seq_stop(struct seq_file *m, void *v)
 {
-	/* release whatever locks we need */
+	if (v) {
+		struct pci_dev *dev = v;
+		pci_put_dev(dev);
+	}
 }
 
 static int show_device(struct seq_file *m, void *v)
 {
-	struct list_head *p = v;
-	const struct pci_dev *dev;
+	const struct pci_dev *dev = v;
 	const struct pci_driver *drv;
 	int i;
 
-	if (p == &pci_devices)
+	if (dev == NULL)
 		return 0;
 
-	dev = pci_dev_g(p);
 	drv = pci_dev_driver(dev);
 	seq_printf(m, "%02x%02x\t%04x%04x\t%x",
 			dev->bus->number,
@@ -455,19 +461,18 @@ int pci_proc_detach_bus(struct pci_bus* bus)
  */
 static int show_dev_config(struct seq_file *m, void *v)
 {
-	struct list_head *p = v;
-	struct pci_dev *dev;
+	struct pci_dev *dev = v;
+	struct pci_dev *first_dev;
 	struct pci_driver *drv;
 	u32 class_rev;
 	unsigned char latency, min_gnt, max_lat, *class;
 	int reg;
 
-	if (p == &pci_devices) {
+	first_dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, NULL);
+	if (dev == first_dev)
 		seq_puts(m, "PCI devices found:\n");
-		return 0;
-	}
+	pci_put_dev(first_dev);
 
-	dev = pci_dev_g(p);
 	drv = pci_dev_driver(dev);
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
