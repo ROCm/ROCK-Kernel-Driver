@@ -206,6 +206,10 @@ static int file_capable (struct inode * inode, long block)
   struct super_block *s = th->t_super ;
   int len = th->t_blocks_allocated ;
 
+  /* we cannot restart while nested */
+  if (th->t_refcount > 1) {
+      return  ;
+  }
   pathrelse(path) ;
   reiserfs_update_sd(th, inode) ;
   journal_end(th, s, len) ;

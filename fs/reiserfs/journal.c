@@ -2157,6 +2157,9 @@ int journal_transaction_should_end(struct reiserfs_transaction_handle *th, int n
   time_t now = get_seconds() ;
   if (reiserfs_dont_log(th->t_super)) 
     return 0 ;
+  /* cannot restart while nested */
+  if (th->t_refcount > 1)
+    return 0 ;
   if ( SB_JOURNAL(th->t_super)->j_must_wait > 0 ||
        (SB_JOURNAL(th->t_super)->j_len_alloc + new_alloc) >= SB_JOURNAL_MAX_BATCH(th->t_super) || 
        atomic_read(&(SB_JOURNAL(th->t_super)->j_jlock)) ||
@@ -2212,6 +2215,9 @@ static int do_journal_begin_r(struct reiserfs_transaction_handle *th, struct sup
     return 0 ;
   }
   PROC_INFO_INC( p_s_sb, journal.journal_being );
+  /* set here for journal_join */
+  th->t_refcount = 1;
+  th->t_super = p_s_sb ;
 
 relock:
   lock_journal(p_s_sb) ;
@@ -2268,9 +2274,7 @@ relock:
   SB_JOURNAL(p_s_sb)->j_len_alloc += nblocks ;
   th->t_blocks_logged = 0 ;
   th->t_blocks_allocated = nblocks ;
-  th->t_super = p_s_sb ;
   th->t_trans_id = SB_JOURNAL(p_s_sb)->j_trans_id ;
-  th->t_caller = "Unknown" ;
   unlock_journal(p_s_sb) ;
   p_s_sb->s_dirt = 1; 
   return 0 ;
@@ -2278,11 +2282,47 @@ relock:
 
 
 static int journal_join(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
+  struct reiserfs_transaction_handle *cur_th = current->journal_info;
+
+  /* this keeps do_journal_end from NULLing out the current->journal_info
+  ** pointer
+  */
+  th->t_handle_save = cur_th ;
+  if (cur_th && cur_th->t_refcount > 1) {
+      BUG() ;
+  }
   return do_journal_begin_r(th, p_s_sb, nblocks, 1) ;
 }
 
 int journal_begin(struct reiserfs_transaction_handle *th, struct super_block  * p_s_sb, unsigned long nblocks) {
-  return do_journal_begin_r(th, p_s_sb, nblocks, 0) ;
+    struct reiserfs_transaction_handle *cur_th = current->journal_info ;
+    int ret ;
+
+    th->t_handle_save = NULL ;
+    if (cur_th) {
+	/* we are nesting into the current transaction */
+	if (cur_th->t_super == p_s_sb) {
+	      cur_th->t_refcount++ ;
+	      memcpy(th, cur_th, sizeof(*th));
+	      if (th->t_refcount <= 1)
+		      printk("BAD: refcount <= 1, but journal_info != 0\n");
+	      return 0;
+	} else {
+	    /* we've ended up with a handle from a different filesystem.
+	    ** save it and restore on journal_end.  This should never
+	    ** really happen...
+	    */
+	    reiserfs_warning("clm-2100: nesting info a different FS\n") ;
+	    th->t_handle_save = current->journal_info ;
+	    current->journal_info = th;
+	}
+    } else {
+	current->journal_info = th;
+    }
+    ret = do_journal_begin_r(th, p_s_sb, nblocks, 0) ;
+    if (current->journal_info != th)
+        BUG() ;
+    return ret ;
 }
 
 /* not used at all */
@@ -2422,7 +2462,26 @@ int journal_mark_dirty_nolog(struct reiserfs_transaction_handle *th, struct supe
 }
 
 int journal_end(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
-  return do_journal_end(th, p_s_sb, nblocks, 0) ;
+  if (!current->journal_info && th->t_refcount > 1)
+    printk("REISER-NESTING: th NULL, refcount %d\n", th->t_refcount);
+  if (th->t_refcount > 1) {
+    struct reiserfs_transaction_handle *cur_th = current->journal_info ;
+
+    /* we aren't allowed to close a nested transaction on a different
+    ** filesystem from the one in the task struct
+    */
+    if (cur_th->t_super != th->t_super)
+      BUG() ;
+
+    th->t_refcount--;
+    if (th != cur_th) {
+      memcpy(current->journal_info, th, sizeof(*th));
+      th->t_trans_id = 0;
+    }
+    return 0;
+  } else {
+    return do_journal_end(th, p_s_sb, nblocks, 0) ;
+  }
 }
 
 /* removes from the current transaction, relsing and descrementing any counters.  
@@ -2520,6 +2579,10 @@ static int can_dirty(struct reiserfs_journal_cnode *cn) {
 */
 int journal_end_sync(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
 
+  /* you can sync while nested, very, very bad */
+  if (th->t_refcount > 1) {
+    BUG() ;
+  }
   if (SB_JOURNAL(p_s_sb)->j_len == 0) {
     reiserfs_prepare_for_journal(p_s_sb, SB_BUFFER_WITH_SB(p_s_sb), 1) ;
     journal_mark_dirty(th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
@@ -2901,6 +2964,10 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   struct reiserfs_super_block *rs ; 
   int trans_half ;
 
+  if (th->t_refcount > 1)
+    BUG() ;
+
+  current->journal_info = th->t_handle_save;
   if (reiserfs_dont_log(th->t_super)) {
     return 0 ;
   }
@@ -2938,8 +3005,11 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   }
 
 #ifdef REISERFS_PREALLOCATE
+  /* quota ops might need to nest, setup the journal_info pointer for them */
+  current->journal_info = th ;
   reiserfs_discard_all_prealloc(th); /* it should not involve new blocks into
 				      * the transaction */
+  current->journal_info = th->t_handle_save ;
 #endif
   
   rs = SB_DISK_SUPER_BLOCK(p_s_sb) ;

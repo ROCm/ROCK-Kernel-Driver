@@ -157,13 +157,17 @@ struct reiserfs_list_bitmap {
 ** transaction handle which is passed around for all journal calls
 */
 struct reiserfs_transaction_handle {
-				/* ifdef it. -Hans */
-  char *t_caller ;              /* debugging use */
+  struct super_block *t_super ; /* super for this FS when journal_begin was
+				   called. saves calls to reiserfs_get_super
+				   also used by nested transactions to make
+				   sure they are nesting on the right FS
+				   _must_ be first in the handle
+				*/
+  int t_refcount;
   int t_blocks_logged ;         /* number of blocks this writer has logged */
   int t_blocks_allocated ;      /* number of blocks this writer allocated */
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
-  struct super_block *t_super ; /* super for this FS when journal_begin was 
-                                   called. saves calls to reiserfs_get_super */
+  void *t_handle_save ;		/* save existing current->journal_info */
   int displace_new_blocks:1;	/* if new block allocation occurres, that block
 				   should be displaced from others */
 

@@ -575,7 +575,6 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
 
     reiserfs_write_lock(dir->i_sb);
     journal_begin(&th, dir->i_sb, jbegin_count) ;
-    th.t_caller = "create" ;
     retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
     if (retval) {
         goto out_failed;
