@@ -193,7 +193,7 @@ found:
 	if(ids->seq > ids->seq_max)
 		ids->seq = 0;
 
-	new->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&new->lock);
 	new->deleted = 0;
 	rcu_read_lock();
 	spin_lock(&new->lock);

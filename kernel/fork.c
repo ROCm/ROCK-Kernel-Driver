@@ -293,8 +293,8 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	INIT_LIST_HEAD(&mm->mmlist);
 	mm->core_waiters = 0;
 	mm->nr_ptes = 0;
-	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
-	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
+	spin_lock_init(&mm->page_table_lock);
+	rwlock_init(&mm->ioctx_list_lock);
 	mm->ioctx_list = NULL;
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
@@ -494,7 +494,7 @@ static inline struct fs_struct *__copy_fs_struct(struct fs_struct *old)
 	/* We don't need to lock fs - think why ;-) */
 	if (fs) {
 		atomic_set(&fs->count, 1);
-		fs->lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&fs->lock);
 		fs->umask = old->umask;
 		read_lock(&old->lock);
 		fs->rootmnt = mntget(old->rootmnt);
@@ -576,7 +576,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 
 	atomic_set(&newf->count, 1);
 
-	newf->file_lock	    = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&newf->file_lock);
 	newf->next_fd	    = 0;
 	newf->max_fds	    = NR_OPEN_DEFAULT;
 	newf->max_fdset	    = __FD_SETSIZE;
