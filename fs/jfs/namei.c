@@ -78,7 +78,7 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 	 * search parent directory for entry/freespace
 	 * (dtSearch() returns parent directory page pinned)
 	 */
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&dname, dentry)))
 		goto out1;
 
 	/*
@@ -204,7 +204,7 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	 * search parent directory for entry/freespace
 	 * (dtSearch() returns parent directory page pinned)
 	 */
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&dname, dentry)))
 		goto out1;
 
 	/*
@@ -332,7 +332,7 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 		goto out;
 	}
 
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab))) {
+	if ((rc = get_UCSname(&dname, dentry))) {
 		goto out;
 	}
 
@@ -451,7 +451,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 
 	jfs_info("jfs_unlink: dip:0x%p name:%s", dip, dentry->d_name.name);
 
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&dname, dentry)))
 		goto out;
 
 	IWRITE_LOCK(ip);
@@ -786,7 +786,7 @@ int jfs_link(struct dentry *old_dentry,
 	/*
 	 * scan parent directory for entry/freespace
 	 */
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(ip->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&dname, dentry)))
 		goto out;
 
 	if ((rc = dtSearch(dir, &dname, &ino, &btstack, JFS_CREATE)))
@@ -866,7 +866,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 	 * (dtSearch() returns parent directory page pinned)
 	 */
 
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&dname, dentry)))
 		goto out1;
 
 	/*
@@ -1069,12 +1069,10 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	old_ip = old_dentry->d_inode;
 	new_ip = new_dentry->d_inode;
 
-	if ((rc = get_UCSname(&old_dname, old_dentry,
-			      JFS_SBI(old_dir->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&old_dname, old_dentry)))
 		goto out1;
 
-	if ((rc = get_UCSname(&new_dname, new_dentry,
-			      JFS_SBI(old_dir->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&new_dname, new_dentry)))
 		goto out2;
 
 	/*
@@ -1329,7 +1327,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 
 	jfs_info("jfs_mknod: %s", dentry->d_name.name);
 
-	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dir->i_sb)->nls_tab)))
+	if ((rc = get_UCSname(&dname, dentry)))
 		goto out;
 
 	ip = ialloc(dir, mode);
@@ -1411,8 +1409,7 @@ static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry, struc
 	else if (strcmp(name, "..") == 0)
 		inum = PARENT(dip);
 	else {
-		if ((rc =
-		     get_UCSname(&key, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
+		if ((rc = get_UCSname(&key, dentry)))
 			return ERR_PTR(rc);
 		rc = dtSearch(dip, &key, &inum, &btstack, JFS_LOOKUP);
 		free_UCSname(&key);
