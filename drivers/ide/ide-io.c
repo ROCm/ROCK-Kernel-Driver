@@ -947,8 +947,15 @@ repeat:
 	 * though that is 3 requests, it must be seen as a single transaction.
 	 * we must not preempt this drive until that is complete
 	 */
-	if (drive->doing_barrier)
+	if (drive->doing_barrier) {
+		/*
+		 * small race where queue could get replugged during
+		 * the 3-request flush cycle, just yank the plug since
+		 * we want it to finish asap
+		 */
+		blk_remove_plug(drive->queue);
 		return drive;
+	}
 
 	do {
 		if ((!drive->sleep || time_after_eq(jiffies, drive->sleep))
