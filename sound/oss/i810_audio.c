@@ -1449,6 +1449,7 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 	unsigned long flags;
 	unsigned int swptr;
 	int cnt;
+	int pending;
         DECLARE_WAITQUEUE(waita, current);
 
 #ifdef DEBUG2
@@ -1473,6 +1474,8 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
 	ret = 0;
+
+	pending = 0;
 
         add_wait_queue(&dmabuf->wait, &waita);
 	while (count > 0) {
@@ -1567,7 +1570,7 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
                         continue;
                 }
 		dmabuf->swptr = swptr;
-		dmabuf->count -= cnt;
+		pending = dmabuf->count -= cnt;
 		spin_unlock_irqrestore(&card->lock, flags);
 
 		count -= cnt;
@@ -1575,7 +1578,9 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		ret += cnt;
 	}
  done:
-	i810_update_lvi(state,1);
+	pending = dmabuf->dmasize - pending;
+	if (dmabuf->enable || pending >= dmabuf->userfragsize)
+		i810_update_lvi(state, 1);
         set_current_state(TASK_RUNNING);
         remove_wait_queue(&dmabuf->wait, &waita);
 
@@ -1592,6 +1597,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 	ssize_t ret;
 	unsigned long flags;
 	unsigned int swptr = 0;
+	int pending;
 	int cnt;
         DECLARE_WAITQUEUE(waita, current);
 
@@ -1616,6 +1622,8 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
 	ret = 0;
+
+	pending = 0;
 
         add_wait_queue(&dmabuf->wait, &waita);
 	while (count > 0) {
@@ -1709,7 +1717,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
                 }
 
 		dmabuf->swptr = swptr;
-		dmabuf->count += cnt;
+		pending = dmabuf->count += cnt;
 
 		count -= cnt;
 		buffer += cnt;
@@ -1717,7 +1725,8 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 		spin_unlock_irqrestore(&state->card->lock, flags);
 	}
 ret:
-	i810_update_lvi(state,0);
+	if (dmabuf->enable || pending >= dmabuf->userfragsize)
+		i810_update_lvi(state, 0);
         set_current_state(TASK_RUNNING);
         remove_wait_queue(&dmabuf->wait, &waita);
 
