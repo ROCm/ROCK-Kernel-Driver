@@ -214,58 +214,6 @@ free_initrd_mem (unsigned long start, unsigned long end)
 	}
 }
 
-void
-show_mem(void)
-{
-	int i, total = 0, reserved = 0;
-	int shared = 0, cached = 0;
-
-	printk("Mem-info:\n");
-	show_free_areas();
-
-#ifdef CONFIG_DISCONTIGMEM
-	{
-		pg_data_t *pgdat;
-
-		printk("Free swap:       %6dkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
-		for_each_pgdat(pgdat) {
-			printk("Node ID: %d\n", pgdat->node_id);
-			for(i = 0; i < pgdat->node_spanned_pages; i++) {
-				if (PageReserved(pgdat->node_mem_map+i))
-					reserved++;
-				else if (PageSwapCache(pgdat->node_mem_map+i))
-					cached++;
-				else if (page_count(pgdat->node_mem_map + i))
-					shared += page_count(pgdat->node_mem_map + i) - 1;
-			}
-			printk("\t%d pages of RAM\n", pgdat->node_spanned_pages);
-			printk("\t%d reserved pages\n", reserved);
-			printk("\t%d pages shared\n", shared);
-			printk("\t%d pages swap cached\n", cached);
-		}
-		printk("Total of %ld pages in page table cache\n", pgtable_cache_size);
-		printk("%d free buffer pages\n", nr_free_buffer_pages());
-	}
-#else /* !CONFIG_DISCONTIGMEM */
-	printk("Free swap:       %6dkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
-	i = max_mapnr;
-	while (i-- > 0) {
-		total++;
-		if (PageReserved(mem_map+i))
-			reserved++;
-		else if (PageSwapCache(mem_map+i))
-			cached++;
-		else if (page_count(mem_map + i))
-			shared += page_count(mem_map + i) - 1;
-	}
-	printk("%d pages of RAM\n", total);
-	printk("%d reserved pages\n", reserved);
-	printk("%d pages shared\n", shared);
-	printk("%d pages swap cached\n", cached);
-	printk("%ld pages in page table cache\n", pgtable_cache_size);
-#endif /* !CONFIG_DISCONTIGMEM */
-}
-
 /*
  * This is like put_dirty_page() but installs a clean page in the kernel's page table.
  */

@@ -145,14 +145,13 @@ hubii_eint_init(cnodeid_t cnode)
     /* Select a possible interrupt target where there is a free interrupt
      * bit and also reserve the interrupt bit for this IO error interrupt
      */
-    intr_cpu = intr_heuristic(hub_v,0,SGI_II_ERROR,0,hub_v,
-			      "HUB IO error interrupt",&bit);
+    intr_cpu = intr_heuristic(hub_v, SGI_II_ERROR, &bit);
     if (intr_cpu == CPU_NONE) {
-	printk("hubii_eint_init: intr_reserve_level failed, cnode %d", cnode);
+	printk("hubii_eint_init: intr_heuristic failed, cnode %d", cnode);
 	return;
     }
 	
-    rv = intr_connect_level(intr_cpu, SGI_II_ERROR, 0, NULL);
+    rv = intr_connect_level(intr_cpu, SGI_II_ERROR);
     request_irq(SGI_II_ERROR, hubii_eint_handler, SA_SHIRQ, "SN_hub_error", (void *)hub_v);
     irq_descp(bit)->status |= SN2_IRQ_PER_HUB;
     ASSERT_ALWAYS(rv >= 0);

@@ -1,5 +1,4 @@
-/* $Id: shub_intr.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -61,8 +60,7 @@ do_hub_intr_alloc(vertex_hdl_t dev,
 	xwidget_info_t	xwidget_info;
 	ilvl_t		intr_swlevel = 0;
 
-	cpu = intr_heuristic(dev, dev_desc, -1, 0, owner_dev, NULL, &vector);
-
+	cpu = intr_heuristic(dev, -1, &vector);
 	if (cpu == CPU_NONE) {
 		printk("Unable to allocate interrupt for 0x%p\n", (void *)owner_dev);
 		return(0);
@@ -150,10 +148,9 @@ hub_intr_connect(hub_intr_t intr_hdl,
 
 	ASSERT(intr_hdl->i_flags & HUB_INTR_IS_ALLOCED);
 
-	rv = intr_connect_level(cpu, vector, intr_hdl->i_swlevel, NULL);
-	if (rv < 0) {
+	rv = intr_connect_level(cpu, vector);
+	if (rv < 0)
 		return rv;
-	}
 
 	intr_hdl->i_xtalk_info.xi_setfunc = setfunc;
 	intr_hdl->i_xtalk_info.xi_sfarg = setfunc_arg;

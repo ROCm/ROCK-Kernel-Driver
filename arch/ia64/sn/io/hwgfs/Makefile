@@ -9,5 +9,4 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-obj-y				+= hcl.o labelcl.o hcl_util.o invent_stub.o \
-				   ramfs.o interface.o
+obj-y		+= hcl.o labelcl.o hcl_util.o ramfs.o interface.o
