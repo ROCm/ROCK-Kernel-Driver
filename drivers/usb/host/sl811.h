@@ -162,7 +162,7 @@ static inline struct sl811 *hcd_to_sl811(struct usb_hcd *hcd)
 }
 
 struct sl811h_ep {
-	struct list_head	queue;
+	struct usb_host_endpoint *hep;
 	struct usb_device	*udev;
 
 	u8			defctrl;
@@ -182,14 +182,6 @@ struct sl811h_ep {
 
 	/* async schedule */
 	struct list_head	schedule;
-};
-
-struct sl811h_req {
-	/* FIXME usbcore should maintain endpoints' urb queues
-	 * directly in 'struct usb_host_endpoint'
-	 */
-	struct urb		*urb;
-	struct list_head	queue;
 };
 
 /*-------------------------------------------------------------------------*/
