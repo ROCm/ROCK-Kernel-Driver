@@ -33,6 +33,7 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
+#include <asm/cputable.h>
 
 #include <asm/time.h>
 #include "iSeries_setup.h"
@@ -254,7 +255,7 @@ unsigned long iSeries_process_mainstore_vpd( struct MemoryBlock *mb_array, unsig
 {
 	unsigned long i;
 	unsigned long mem_blocks = 0;
-	if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p))
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
 		mem_blocks = iSeries_process_Regatta_mainstore_vpd( mb_array, max_entries );
 	else
 		mem_blocks = iSeries_process_Condor_mainstore_vpd( mb_array, max_entries );
@@ -311,7 +312,6 @@ iSeries_init_early(void)
 	ppc_md.setup_residual	 	= iSeries_setup_residual;
 	ppc_md.get_cpuinfo	 	= iSeries_get_cpuinfo;
 	ppc_md.init_IRQ		 	= iSeries_init_IRQ;
-	ppc_md.init_ras_IRQ		= NULL;
 	ppc_md.get_irq		 	= iSeries_get_irq;
 	ppc_md.init		 	= NULL;
 
