@@ -409,10 +409,9 @@ bad_block:	ext2_error(inode->i_sb, "ext2_xattr_list",
 			goto bad_block;
 
 		handler = ext2_xattr_handler(entry->e_name_index);
-		if (handler) {
+		if (handler)
 			size += handler->list(NULL, inode, entry->e_name,
-					      entry->e_name_len) + 1;
-		}
+					      entry->e_name_len);
 	}
 
 	if (ext2_xattr_cache_insert(bh))
@@ -433,11 +432,9 @@ bad_block:	ext2_error(inode->i_sb, "ext2_xattr_list",
 		struct ext2_xattr_handler *handler;
 		
 		handler = ext2_xattr_handler(entry->e_name_index);
-		if (handler) {
+		if (handler)
 			buf += handler->list(buf, inode, entry->e_name,
 					     entry->e_name_len);
-			*buf++ = '\0';
-		}
 	}
 	error = size;
 

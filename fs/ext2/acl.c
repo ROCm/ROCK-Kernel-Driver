@@ -421,26 +421,26 @@ static size_t
 ext2_xattr_list_acl_access(char *list, struct inode *inode,
 			   const char *name, int name_len)
 {
-	const size_t len = sizeof(XATTR_NAME_ACL_ACCESS)-1;
+	const size_t size = sizeof(XATTR_NAME_ACL_ACCESS);
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
 		return 0;
 	if (list)
-		memcpy(list, XATTR_NAME_ACL_ACCESS, len);
-	return len;
+		memcpy(list, XATTR_NAME_ACL_ACCESS, size);
+	return size;
 }
 
 static size_t
 ext2_xattr_list_acl_default(char *list, struct inode *inode,
 			    const char *name, int name_len)
 {
-	const size_t len = sizeof(XATTR_NAME_ACL_DEFAULT)-1;
+	const size_t size = sizeof(XATTR_NAME_ACL_DEFAULT);
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
 		return 0;
 	if (list)
-		memcpy(list, XATTR_NAME_ACL_DEFAULT, len);
-	return len;
+		memcpy(list, XATTR_NAME_ACL_DEFAULT, size);
+	return size;
 }
 
 static int

@@ -29,8 +29,9 @@ ext2_xattr_user_list(char *list, struct inode *inode,
 	if (list) {
 		memcpy(list, XATTR_USER_PREFIX, prefix_len);
 		memcpy(list+prefix_len, name, name_len);
+		list[prefix_len + name_len] = '\0';
 	}
-	return prefix_len + name_len;
+	return prefix_len + name_len + 1;
 }
 
 static int
