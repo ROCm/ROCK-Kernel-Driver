@@ -1014,8 +1014,8 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 	    ((asoc->rwnd - asoc->a_rwnd) >=
 		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu))) {
 		SCTP_DEBUG_PRINTK("%s: Sending window update SACK- asoc: %p "
-				  "rwnd: %u a_rwnd: %u\n",
-				  __FUNCTION__, asoc, asoc->rwnd, asoc->a_rwnd);
+				  "rwnd: %u a_rwnd: %u\n", __FUNCTION__,
+				  asoc, asoc->rwnd, asoc->a_rwnd);
 		sack = sctp_make_sack(asoc);
 		if (!sack)
 			return;

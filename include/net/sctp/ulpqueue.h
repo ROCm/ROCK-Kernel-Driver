@@ -66,6 +66,9 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *, struct sctp_chunk *, int);
 /* Add a new event for propogation to the ULP. */
 int sctp_ulpq_tail_event(struct sctp_ulpq *, struct sctp_ulpevent *ev);
 
+/* Renege previously received chunks.  */
+void sctp_ulpq_renege(struct sctp_ulpq *, struct sctp_chunk *, int);
+
 /* Perform partial delivery. */
 void sctp_ulpq_partial_delivery(struct sctp_ulpq *, struct sctp_chunk *, int);
 

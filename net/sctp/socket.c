@@ -2183,6 +2183,50 @@ static inline int sctp_getsockopt_get_local_addrs(struct sock *sk, int len,
 	return 0;
 }
 
+/*
+ *
+ * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ *
+ *   Applications that wish to use the sendto() system call may wish to
+ *   specify a default set of parameters that would normally be supplied
+ *   through the inclusion of ancillary data.  This socket option allows
+ *   such an application to set the default sctp_sndrcvinfo structure.
+ *   The application that wishes to use this socket option simply passes
+ *   in to this call the sctp_sndrcvinfo structure defined in Section
+ *   5.2.2) The input parameters accepted by this call include
+ *   sinfo_stream, sinfo_flags, sinfo_ppid, sinfo_context,
+ *   sinfo_timetolive.  The user must provide the sinfo_assoc_id field in
+ *   to this call if the caller is using the UDP model.
+ *
+ *   For getsockopt, it get the default sctp_sndrcvinfo structure.
+ */
+static inline int sctp_getsockopt_set_default_send_param(struct sock *sk,
+					int len, char *optval, int *optlen)
+{
+	struct sctp_sndrcvinfo info;
+	sctp_association_t *asoc;
+
+	if (len != sizeof(struct sctp_sndrcvinfo))
+		return -EINVAL;
+	if (copy_from_user(&info, optval, sizeof(struct sctp_sndrcvinfo)))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	info.sinfo_stream = asoc->defaults.stream;
+	info.sinfo_flags = asoc->defaults.flags;
+	info.sinfo_ppid = asoc->defaults.ppid;
+	info.sinfo_context = asoc->defaults.context;
+	info.sinfo_timetolive = asoc->defaults.timetolive;
+
+	if (copy_to_user(optval, &info, sizeof(struct sctp_sndrcvinfo)))
+		return -EFAULT;
+
+	return 0;
+}
+
 SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 				char *optval, int *optlen)
 {
@@ -2258,6 +2302,11 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_GET_LOCAL_ADDRS:
 		retval = sctp_getsockopt_get_local_addrs(sk, len, optval,
 							      optlen);
+		break;
+
+	case SCTP_SET_DEFAULT_SEND_PARAM:
+		retval = sctp_getsockopt_set_default_send_param(sk, len,
+							optval, optlen);
 		break;
 
 	default:

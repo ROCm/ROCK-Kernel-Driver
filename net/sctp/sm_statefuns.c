@@ -145,7 +145,7 @@ sctp_disposition_t sctp_sf_do_4_C(const sctp_endpoint_t *ep,
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
-	
+
 	SCTP_INC_STATS(SctpShutdowns);
 	SCTP_DEC_STATS(SctpCurrEstab);
 
@@ -682,7 +682,6 @@ sctp_disposition_t sctp_sf_do_5_1E_ca(const sctp_endpoint_t *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP, SCTP_ULPEVENT(ev));
 
 	return SCTP_DISPOSITION_CONSUME;
-
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
@@ -2274,7 +2273,6 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 	 * that the value in the Verification Tag field of the
 	 * received SCTP packet matches its own Tag.
 	 */
-
 	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
 				SCTP_NULL());
@@ -2339,21 +2337,29 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 		/* Even if we don't accept this chunk there is
 		 * memory pressure.
 		 */
-		sctp_add_cmd_sf(commands, SCTP_CMD_CHUNK_PD, SCTP_NULL());
+		sctp_add_cmd_sf(commands, SCTP_CMD_PART_DELIVER, SCTP_NULL());
 	}
 
+        /* Spill over rwnd a little bit.  Note: While allowed, this spill over
+	 * seems a bit troublesome in that frag_point varies based on
+	 * PMTU.  In cases, such as loopback, this might be a rather
+	 * large spill over.
+	 */
 	if (asoc->rwnd_over || (datalen > asoc->rwnd + asoc->frag_point)) {
-	
 
-		/* There is absolutely no room, but this is the most
-		 * important tsn that we are waiting on, try to 
-		 * to partial deliver or renege to make room. 
+		/* If this is the next TSN, consider reneging to make
+		 * room.   Note: Playing nice with a confused sender.  A
+		 * malicious sender can still eat up all our buffer
+		 * space and in the future we may want to detect and
+		 * do more drastic reneging. 
 		 */
-		if ((sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map) + 1) == tsn) {
-			deliver = SCTP_CMD_CHUNK_PD;
+		if (sctp_tsnmap_has_gap(&asoc->peer.tsn_map) &&
+		    (sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map) + 1) == tsn) {
+			SCTP_DEBUG_PRINTK("Reneging for tsn:%u\n", tsn);
+			deliver = SCTP_CMD_RENEGE;
 		} else {
 			SCTP_DEBUG_PRINTK("Discard tsn: %u len: %Zd, "
-					  "rwnd: %d\n", tsn, datalen, 
+					  "rwnd: %d\n", tsn, datalen,
 					  asoc->rwnd);
 			goto discard_force;
 		}
@@ -2379,21 +2385,23 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED, SCTP_NULL());
 		SCTP_INC_STATS(SctpAborteds);
-		SCTP_INC_STATS(SctpCurrEstab);
+		SCTP_DEC_STATS(SctpCurrEstab);
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
 	/* If definately accepting the DATA chunk, record its TSN, otherwise
-	 * wait for renege processing. 
+	 * wait for renege processing.
 	 */
-	if (deliver != SCTP_CMD_CHUNK_PD) {
+	if (SCTP_CMD_CHUNK_ULP == deliver)
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
 
-		if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-			SCTP_INC_STATS(SctpInUnorderChunks);
-		else
-			SCTP_INC_STATS(SctpInOrderChunks);
-	}
+	/* Note: Some chunks may get overcounted (if we drop) or overcounted
+	 * if we renege and the chunk arrives again.
+	 */
+	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
+		SCTP_INC_STATS(SctpInUnorderChunks);
+	else
+		SCTP_INC_STATS(SctpInOrderChunks);
 
 	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
 	 *
@@ -2592,7 +2600,7 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const sctp_endpoint_t *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED, SCTP_NULL());
 		SCTP_INC_STATS(SctpAborteds);
-		SCTP_INC_STATS(SctpCurrEstab);
+		SCTP_DEC_STATS(SctpCurrEstab);
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
