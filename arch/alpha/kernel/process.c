@@ -54,15 +54,21 @@ sys_sethae(unsigned long hae, unsigned long a1, unsigned long a2,
 	return 0;
 }
 
+void default_idle(void)
+{
+	barrier();
+}
+
 void
 cpu_idle(void)
 {
 	while (1) {
+		void (*idle)(void) = default_idle;
 		/* FIXME -- EV6 and LCA45 know how to power down
 		   the CPU.  */
 
 		while (!need_resched())
-			barrier();
+			idle();
 		schedule();
 	}
 }
