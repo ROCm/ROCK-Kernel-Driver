@@ -373,10 +373,9 @@ static int help(struct sk_buff **pskb,
 		goto out_update_nl;
 	}
 
-	DEBUGP("conntrack_ftp: match `%.*s' (%u bytes at %u)\n",
-	       (int)matchlen, data + matchoff,
-	       matchlen, ntohl(th->seq) + matchoff);
-
+	DEBUGP("conntrack_ftp: match `%s' (%u bytes at %u)\n",
+	       fb_ptr + matchoff, matchlen, ntohl(th->seq) + matchoff);
+			 
 	/* Allocate expectation which will be inserted */
 	exp = ip_conntrack_expect_alloc();
 	if (exp == NULL) {
