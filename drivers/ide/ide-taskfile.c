@@ -505,29 +505,18 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	u8 stat				= hwif->INB(IDE_STATUS_REG);
 	struct request *rq		= HWGROUP(drive)->rq;
 	char *pBuf			= NULL;
-	ide_startstop_t startstop	= ide_stopped;
 	unsigned int msect		= drive->mult_count;
 	unsigned int nsect;
 	unsigned long flags;
 
-	/*
-	 * (ks/hs): Handle last IRQ on multi-sector transfer,
-	 * occurs after all data was sent in this chunk
-	 */
-	if (rq->current_nr_sectors == 0) {
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT) || !rq->current_nr_sectors) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
 			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
 		}
-		if (!rq->bio)
+		/* Handle last IRQ, occurs after all data was sent. */
+		if (!rq->current_nr_sectors) {
 			DRIVER(drive)->end_request(drive, 1, 0);
-		return startstop;
-	}
-	/*
-	 * DON'T be lazy code the above and below togather !!!
-	 */
-	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
+			return ide_stopped;
 		}
 		/* no data yet, so wait for another interrupt */
 		if (HWGROUP(drive)->handler == NULL)
