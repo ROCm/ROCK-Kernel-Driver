@@ -230,4 +230,14 @@ config SENSORS_PCF8591
 	  This driver can also be built as a module.  If so, the module
 	  will be called pcf8591.
 
+config SENSORS_RTC8564
+	tristate "Epson 8564 RTC chip"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for the Epson 8564 RTC chip.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-rtc8564.
+
 endmenu
