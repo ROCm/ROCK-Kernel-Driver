@@ -1025,7 +1025,7 @@ pci_create_OF_bus_map(void)
 }
 #endif /* CONFIG_ALL_PPC */
 
-void __init
+static int __init
 pcibios_init(void)
 {
 	struct pci_controller *hose;
@@ -1070,7 +1070,11 @@ pcibios_init(void)
 	/* Call machine dependent post-init code */
 	if (ppc_md.pcibios_after_init)
 		ppc_md.pcibios_after_init();
+
+	return 0;
 }
+
+subsys_initcall(pcibios_init);
 
 unsigned char __init
 common_swizzle(struct pci_dev *dev, unsigned char *pinp)
