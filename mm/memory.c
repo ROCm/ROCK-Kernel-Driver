@@ -1223,6 +1223,12 @@ int vmtruncate(struct inode * inode, loff_t offset)
 
 	if (inode->i_size < offset)
 		goto do_expand;
+	/*
+	 * truncation of in-use swapfiles is disallowed - it would cause
+	 * subsequent swapout to scribble on the now-freed blocks.
+	 */
+	if (IS_SWAPFILE(inode))
+		goto out_busy;
 	i_size_write(inode, offset);
 	unmap_mapping_range(mapping, offset + PAGE_SIZE - 1, 0, 1);
 	truncate_inode_pages(mapping, offset);
@@ -1233,7 +1239,7 @@ do_expand:
 	if (limit != RLIM_INFINITY && offset > limit)
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)
-		goto out;
+		goto out_big;
 	i_size_write(inode, offset);
 
 out_truncate:
@@ -1242,8 +1248,10 @@ out_truncate:
 	return 0;
 out_sig:
 	send_sig(SIGXFSZ, current, 0);
-out:
+out_big:
 	return -EFBIG;
+out_busy:
+	return -ETXTBSY;
 }
 
 EXPORT_SYMBOL(vmtruncate);
