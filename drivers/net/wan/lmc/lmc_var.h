@@ -390,7 +390,7 @@ struct lmc___softc {
 	struct timer_list	timer;
 	lmc_ctl_t		ictl;
 	u_int32_t		TxDescriptControlInit;  
-	struct net_device		*next_module;   /* Link to the next module  */
+
 	int                     tx_TimeoutInd; /* additional driver state */
 	int                     tx_TimeoutDisplay;
 	unsigned int		lastlmc_taint_tx;
@@ -519,18 +519,7 @@ struct lmc___softc {
 #define TULIP_CMD_RECEIVEALL 0x40000000L
 #endif
 
-
-/* PCI register values */
-#define CORRECT_VENDOR_ID    0x1011
-#define CORRECT_DEV_ID       9
-
-#define PCI_VENDOR_LMC		0x1376
-#define PCI_PRODUCT_LMC_HSSI	0x0003
-#define PCI_PRODUCT_LMC_DS3	0x0004
-#define PCI_PRODUCT_LMC_SSI	0x0005
-#define PCI_PRODUCT_LMC_T1      0x0006
-
-/* Adapcter module number */
+/* Adapter module number */
 #define LMC_ADAP_HSSI           2
 #define LMC_ADAP_DS3            3
 #define LMC_ADAP_SSI            4
