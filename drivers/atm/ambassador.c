@@ -2261,7 +2261,7 @@ static int __devinit amb_probe(struct pci_dev *pci_dev, const struct pci_device_
 	int err;
 
 	// read resources from PCI configuration space
-	u8 irq = pci_dev->irq;
+	unsigned int irq = pci_dev->irq;
 
 	if (pci_dev->device == PCI_DEVICE_ID_MADGE_AMBASSADOR_BAD) {
 		PRINTK (KERN_ERR, "skipped broken (PLX rev 2) card");
