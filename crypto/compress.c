@@ -12,12 +12,10 @@
  *
  */
 #include <linux/types.h>
-#include <linux/list.h>
+#include <linux/crypto.h>
 #include <linux/errno.h>
-#include <linux/module.h>
 #include <asm/scatterlist.h>
 #include <linux/string.h>
-#include <linux/crypto.h>
 #include "internal.h"
 
 /*

@@ -12,12 +12,9 @@
  *
  */
 #include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/list.h>
-#include <linux/string.h>
-#include <linux/module.h>
-#include <linux/kmod.h>
 #include <linux/crypto.h>
+#include <linux/string.h>
+#include <linux/kmod.h>
 #include "internal.h"
 
 /*

@@ -14,12 +14,10 @@
  *
  */
 #include <linux/init.h>
-#include <linux/module.h>
+#include <linux/crypto.h>
 #include <linux/rwsem.h>
-#include <linux/list.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-#include <linux/crypto.h>
 #include "internal.h"
 
 static LIST_HEAD(crypto_alg_list);
