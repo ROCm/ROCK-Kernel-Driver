@@ -375,7 +375,6 @@ cifs_close(struct inode *inode, struct file *file)
 		info on this inode, much less write behind and read ahead */
 		CIFS_I(inode)->clientCanCacheRead = FALSE;
 		CIFS_I(inode)->clientCanCacheAll  = FALSE;
-		invalidate_remote_inode(inode);
 	}
 	if((rc ==0) && CIFS_I(inode)->write_behind_rc)
 		rc = CIFS_I(inode)->write_behind_rc;

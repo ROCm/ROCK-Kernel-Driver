@@ -244,6 +244,8 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		}
 
 		pdu_length = 4 + ntohl(smb_buffer->smb_buf_length);
+		/* Ony read pdu_length after below checks for too short (due
+		   to e.g. int overflow) and too long ie beyond end of buf */
 		cFYI(1, ("Peek length rcvd: %d with smb length: %d", length, pdu_length));
 
 		temp = (char *) smb_buffer;
@@ -264,8 +266,8 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 
 			} else if (temp[0] != (char) 0) {
 				cERROR(1,
-				       ("Unknown RFC 1001 frame received not 0x00 nor 0x85"));
-				cifs_dump_mem(" Received Data is: ", temp, length);
+				       ("Unknown RFC 1001 frame not 0x00 nor 0x85"));
+				cifs_dump_mem(" Received Data: ", temp, length);
 				cifs_reconnect(server);
 				csocket = server->ssocket;
 				continue;
@@ -293,8 +295,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					length = 0;
 					iov.iov_base = smb_buffer;
 					iov.iov_len = pdu_length;
-					for (total_read = 0; total_read < pdu_length; total_read += length) {	
-             /* Should improve check for buffer overflow with bad pdu_length */
+					for (total_read = 0; 
+					     total_read < pdu_length;
+					     total_read += length) {	
 						length = sock_recvmsg(csocket, &smb_msg, 
 							pdu_length - total_read, 0);
 						if (length == 0) {

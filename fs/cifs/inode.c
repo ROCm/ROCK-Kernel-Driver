@@ -560,6 +560,20 @@ cifs_revalidate(struct dentry *direntry)
 	char *full_path;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsInodeInfo *cifsInode;
+	loff_t local_size;
+        struct timespec local_mtime;	
+
+	if(direntry->d_inode == NULL)
+		return -ENOENT;
+
+	cifsInode = CIFS_I(direntry->d_inode);
+
+	if(cifsInode == NULL)
+		return -ENOENT;
+
+	/* no sense revalidating inode info on file that only we can write */
+	if(CIFS_I(direntry->d_inode)->clientCanCacheRead)
+		return rc;
 
 	xid = GetXid();
 
@@ -572,10 +586,6 @@ cifs_revalidate(struct dentry *direntry)
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
 
-
-	cifsInode = CIFS_I(direntry->d_inode);
-	/* BB add check - do not need to revalidate oplocked files */
-
 	if (time_before(jiffies, cifsInode->time + HZ) && lookupCacheEnabled) {
 	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
 			(direntry->d_inode->i_nlink == 1)) {  
@@ -587,7 +597,13 @@ cifs_revalidate(struct dentry *direntry)
 			cFYI(1,("Have to revalidate file due to hardlinks"));
 		}            
 	}
+	
+	/* save mtime and size */
+	local_mtime = direntry->d_inode->i_mtime;
+	local_size  = direntry->d_inode->i_size;
 
+	/* BB we need to write out dirty pages here if any before getting possibly 
+		stale time from server */
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
 		rc = cifs_get_inode_info_unix(&direntry->d_inode, full_path,
 					 direntry->d_sb);
@@ -607,8 +623,18 @@ cifs_revalidate(struct dentry *direntry)
 	}
 	/* should we remap certain errors, access denied?, to zero */
 
-	/* BB if not oplocked, invalidate inode pages if mtime has changed */
+	/* if not oplocked, we invalidate inode pages if mtime 
+	   or file size has changed on server */
 
+	if(timespec_equal(&local_mtime,&direntry->d_inode->i_mtime) && 
+		(local_size == direntry->d_inode->i_size)) {
+		cFYI(1,("inode unchanged on server"));
+	} else {
+		/* file has changed on server */
+		cFYI(1,("Server copy changed, invalidating remote inode "));
+		invalidate_remote_inode(direntry->d_inode);
+	}
+	
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);

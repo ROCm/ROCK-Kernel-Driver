@@ -63,7 +63,19 @@ domain to the proper network user.  The mount.cifs mount helper can be
 trivially built from Samba 3.0 or later source e.g. by executing:
 
 	gcc samba/source/client/mount.cifs.c -o mount.cifs
-	
+
+Note that when the mount.cifs utility is run suid (allowing user mounts), 
+in order to reduce risks, the "nosuid" mount flag is passed in on mount to
+disallow execution of an suid program mounted on the remote target.
+When mount is executed as root, nosuid is not passed in by default,
+and execution of suid programs on the remote target would be enabled
+by default. This can be changed, as with nfs and other filesystems, 
+by simply specifying "nosuid" among the mount options. For user mounts 
+though to be able to pass the suid flag to mount requires rebuilding 
+mount.cifs with the following flag: 
+ 
+        gcc samba/source/client/mount.cifs.c -DCIFS_ALLOW_USR_SUID -o mount.cifs
+
 There is a corresponding manual page for cifs mounting in the Samba 3.0 and
 later source tree in docs/manpages/mount.cifs.8 
 
@@ -173,6 +185,15 @@ A partial list of the supported mount options follows:
 		or password or domain. This option is less important
 		when the cifs mount helper cifs.mount (version 1.1 or later)
 		is used.
+  nosuid        Do not allow remote executables with the suid bit 
+		program to be executed.  This is only meaningful for mounts
+		to servers such as Samba which support the CIFS Unix Extensions.
+		If you do not trust the servers in your network (your mount
+		targets) it is recommended that you specify this option for
+		greater security.
+  suid          Allow remote files on this mountpoint with suid enabled to 
+		be executed (default for mounts when executed as root,
+		nosuid is default for user mounts).
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================
