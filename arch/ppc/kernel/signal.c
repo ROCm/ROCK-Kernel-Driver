@@ -241,12 +241,16 @@ save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
  * (except for MSR).
  */
 static int
-restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr)
+restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 {
+	unsigned long save_r2;
 #ifdef CONFIG_ALTIVEC
 	unsigned long msr;
 #endif
 
+	/* backup/restore the TLS as we don't want it to be modified */
+	if (!sig)
+		save_r2 = regs->gpr[2];
 	/* copy up to but not including MSR */
 	if (__copy_from_user(regs, &sr->mc_gregs, PT_MSR * sizeof(elf_greg_t)))
 		return 1;
@@ -254,6 +258,8 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr)
 	if (__copy_from_user(&regs->orig_gpr3, &sr->mc_gregs[PT_ORIG_R3],
 			     GP_REGS_SIZE - PT_ORIG_R3 * sizeof(elf_greg_t)))
 		return 1;
+	if (!sig)
+		regs->gpr[2] = save_r2;
 
 	/* force the process to reload the FP registers from
 	   current->thread when it next does FP instructions */
@@ -359,7 +365,7 @@ badframe:
 	force_sig(SIGSEGV, current);
 }
 
-static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs)
+static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs, int sig)
 {
 	sigset_t set;
 	struct mcontext *mcp;
@@ -368,7 +374,7 @@ static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs)
 	    || __get_user(mcp, &ucp->uc_regs))
 		return -EFAULT;
 	restore_sigmask(&set);
-	if (restore_user_regs(regs, mcp))
+	if (restore_user_regs(regs, mcp, sig))
 		return -EFAULT;
 
 	return 0;
@@ -376,9 +382,15 @@ static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs)
 
 int sys_swapcontext(struct ucontext __user *old_ctx,
 		    struct ucontext __user *new_ctx,
-		    int r5, int r6, int r7, int r8, struct pt_regs *regs)
+		    int ctx_size, int r6, int r7, int r8, struct pt_regs *regs)
 {
 	unsigned char tmp;
+
+	/* Context size is for future use. Right now, we only make sure
+	 * we are passed something we understand
+	 */
+	if (ctx_size < sizeof(struct ucontext))
+		return -EINVAL;
 
 	if (old_ctx != NULL) {
 		if (verify_area(VERIFY_WRITE, old_ctx, sizeof(*old_ctx))
@@ -406,7 +418,7 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 	 * or if another thread unmaps the region containing the context.
 	 * We kill the task with a SIGSEGV in this situation.
 	 */
-	if (do_setcontext(new_ctx, regs))
+	if (do_setcontext(new_ctx, regs, 0))
 		do_exit(SIGSEGV);
 	sigreturn_exit(regs);
 	/* doesn't actually return back to here */
@@ -425,7 +437,7 @@ int sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 		(regs->gpr[1] + __SIGNAL_FRAMESIZE + 16);
 	if (verify_area(VERIFY_READ, rt_sf, sizeof(struct rt_sigframe)))
 		goto bad;
-	if (do_setcontext(&rt_sf->uc, regs))
+	if (do_setcontext(&rt_sf->uc, regs, 1))
 		goto bad;
 
 	/*
@@ -484,7 +496,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	if (save_user_regs(regs, &frame->mctx, __NR_sigreturn))
 		goto badframe;
 
-	if (put_user(regs->gpr[1], (unsigned long *)newsp))
+	if (put_user(regs->gpr[1], (unsigned long __user *)newsp))
 		goto badframe;
 	regs->gpr[1] = newsp;
 	regs->gpr[3] = sig;
@@ -529,7 +541,7 @@ int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 
 	sr = (struct mcontext *) sigctx.regs;
 	if (verify_area(VERIFY_READ, sr, sizeof(*sr))
-	    || restore_user_regs(regs, sr))
+	    || restore_user_regs(regs, sr, 1))
 		goto badframe;
 
 	sigreturn_exit(regs);		/* doesn't return */
