@@ -80,9 +80,6 @@
 /*
  * Global page accounting.  One instance per CPU.  Only unsigned longs are
  * allowed.
- *
- * NOTE: if this structure is changed then mm/page_alloc.c and
- * arch/s390/appldata/appldata_mem.c must be updated accordingly
  */
 struct page_state {
 	unsigned long nr_dirty;		/* Dirty writeable pages */
