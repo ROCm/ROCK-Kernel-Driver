@@ -940,7 +940,8 @@ int sctp_outq_set_output_handlers(struct sctp_outq *,
 				  sctp_outq_ohandler_t build,
 				  sctp_outq_ohandler_force_t force);
 void sctp_outq_restart(struct sctp_outq *);
-void sctp_retransmit(struct sctp_outq *, struct sctp_transport *, __u8);
+void sctp_retransmit(struct sctp_outq *, struct sctp_transport *, 
+		     sctp_retransmit_reason_t);
 void sctp_retransmit_mark(struct sctp_outq *, struct sctp_transport *, __u8);
 
 

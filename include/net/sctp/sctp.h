@@ -168,7 +168,7 @@ extern void sctp_unhash_endpoint(sctp_endpoint_t *);
 extern void __sctp_unhash_endpoint(sctp_endpoint_t *);
 extern sctp_association_t *__sctp_lookup_association(const union sctp_addr *,
 						     const union sctp_addr *,
-						     sctp_transport_t **);
+						     struct sctp_transport **);
 
 /*
  * sctp_hashdriver.c

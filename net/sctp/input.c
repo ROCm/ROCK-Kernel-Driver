@@ -259,7 +259,7 @@ int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 /* Handle icmp frag needed error. */
 static inline void sctp_icmp_frag_needed(struct sock *sk,
 					 sctp_association_t *asoc,
-					 sctp_transport_t *transport,
+					 struct sctp_transport *transport,
 					 __u32 pmtu)
 {
 	if (!sock_owned_by_user(sk) && transport && (transport->pmtu != pmtu)) {
@@ -296,7 +296,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	struct sock *sk = NULL;
 	sctp_endpoint_t *ep = NULL;
 	sctp_association_t *asoc = NULL;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	int err;
 
 	if (skb->len < ((iph->ihl << 2) + 8)) {
