@@ -23,9 +23,9 @@
  */
 
 
-#include "acpi.h"
-#include "acnamesp.h"
-#include "acparser.h"
+#include <acpi/acpi.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acparser.h>
 
 
 #define _COMPONENT          ACPI_NAMESPACE
