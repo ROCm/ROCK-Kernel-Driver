@@ -1723,6 +1723,11 @@ static void ide_device_shutdown(struct device *dev)
 {
 	ide_drive_t *drive = container_of(dev, ide_drive_t, gendev);
 
+	if (system_state == SYSTEM_RESTART) {
+		ide_cacheflush_p(drive);
+		return;
+	}
+
 	printk("Shutdown: %s\n", drive->name);
 	dev->bus->suspend(dev, PM_SUSPEND_STANDBY);
 }
