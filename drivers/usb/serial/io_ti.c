@@ -468,7 +468,7 @@ static int TIIsTxActive (struct edgeport_port *port)
 {
 	int status;
 	struct out_endpoint_desc_block *oedb;
-	__u8 lsr;
+	__u8 *lsr;
 	int bytes_left = 0;
 
 	oedb = kmalloc (sizeof (* oedb), GFP_KERNEL);
@@ -477,6 +477,13 @@ static int TIIsTxActive (struct edgeport_port *port)
 		return -ENOMEM;
 	}
 
+	lsr = kmalloc (1, GFP_KERNEL);	/* Sigh, that's right, just one byte,
+					   as not all platforms can do DMA
+					   from stack */
+	if (!lsr) {
+		kfree(oedb);
+		return -ENOMEM;
+	}
 	/* Read the DMA Count Registers */
 	status = TIReadRam (port->port->serial->dev,
 			    port->dma_address,
@@ -492,7 +499,7 @@ static int TIIsTxActive (struct edgeport_port *port)
 	status = TIReadRam (port->port->serial->dev, 
 			    port->uart_base + UMPMEM_OFFS_UART_LSR,
 			    1,
-			    &lsr);
+			    lsr);
 
 	if (status)
 		goto exit_is_tx_active;
@@ -508,6 +515,9 @@ static int TIIsTxActive (struct edgeport_port *port)
 	/* We return Not Active if we get any kind of error */
 exit_is_tx_active:
 	dbg ("%s - return %d", __FUNCTION__, bytes_left );
+
+	kfree(lsr);
+	kfree(oedb);
 	return bytes_left;
 }
 
