@@ -1568,6 +1568,9 @@ static int __init pmz_console_setup(struct console *co, char *options)
 	int flow = 'n';
 	unsigned long pwr_delay;
 
+	if(!machine_is_compatible("MacRISC"))
+			return -ENODEV;
+
 	/*
 	 * XServe's default to 57600 bps
 	 */
