@@ -31,6 +31,8 @@ obj-$(CONFIG_PCMCIA_PXA2XX)                     += pxa2xx_core.o pxa2xx_cs.o
 obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
 obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
 obj-$(CONFIG_PCMCIA_AU1X00)			+= au1x00_ss.o
+obj-$(CONFIG_PCMCIA_VRC4171)			+= vrc4171_card.o
+obj-$(CONFIG_PCMCIA_VRC4173)			+= vrc4173_cardu.o
 
 sa11xx_core-y					+= soc_common.o sa11xx_base.o
 pxa2xx_core-y					+= soc_common.o pxa2xx_base.o

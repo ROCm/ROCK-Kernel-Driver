@@ -73,6 +73,21 @@ config OLIVETTI_M700
 config MACH_VR41XX
 	bool "Support for NEC VR41XX-based machines"
 
+config NEC_CMBVR4133
+	bool "Support for NEC CMB-VR4133"
+	depends on MACH_VR41XX
+	select CPU_VR41XX
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select PCI_VR41XX
+
+config ROCKHOPPER
+	bool "Support for Rockhopper baseboard"
+	depends on NEC_CMBVR4133
+	select I8259
+	select HAVE_STD_PC_SERIAL_PORT
+
 config CASIO_E55
 	bool "Support for CASIO CASSIOPEIA E-10/15/55/65"
 	depends on MACH_VR41XX
@@ -106,6 +121,10 @@ config TANBAC_TB0229
 	help
 	  The TANBAC TB0229 (VR4131DIMM) is a MIPS-based platform manufactured by TANBAC.
 	  Please refer to <http://www.tanbac.co.jp/> about VR4131DIMM.
+
+config TANBAC_TB0219
+	bool "Added TANBAC TB0219 Base board support"
+	depends on TANBAC_TB0229
 
 config VICTOR_MPC30X
 	bool "Support for Victor MP-C303/304"
