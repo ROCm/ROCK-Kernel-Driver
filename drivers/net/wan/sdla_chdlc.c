@@ -186,21 +186,22 @@ extern void enable_irq(unsigned int);
 
 /****** Function Prototypes *************************************************/
 /* WAN link driver entry points. These are called by the WAN router module. */
-static int update (wan_device_t* wandev);
-static int new_if (wan_device_t* wandev, netdevice_t* dev,
-	wanif_conf_t* conf);
+static int update(struct wan_device* wandev);
+static int new_if(struct wan_device* wandev, struct net_device* dev,
+		  wanif_conf_t* conf);
 
 /* Network device interface */
-static int if_init   (netdevice_t* dev);
-static int if_open   (netdevice_t* dev);
-static int if_close  (netdevice_t* dev);
-static int if_header (struct sk_buff* skb, netdevice_t* dev,
-	unsigned short type, void* daddr, void* saddr, unsigned len);
+static int if_init(struct net_device* dev);
+static int if_open(struct net_device* dev);
+static int if_close(struct net_device* dev);
+static int if_header(struct sk_buff* skb, struct net_device* dev,
+		     unsigned short type, void* daddr, void* saddr,
+		     unsigned len);
 
 static int if_rebuild_hdr (struct sk_buff *skb);
-static struct net_device_stats* if_stats (netdevice_t* dev);
+static struct net_device_stats* if_stats(struct net_device* dev);
   
-static int if_send (struct sk_buff* skb, netdevice_t* dev);
+static int if_send(struct sk_buff* skb, struct net_device* dev);
 
 /* CHDLC Firmware interface functions */
 static int chdlc_configure 	(sdla_t* card, void* data);
@@ -214,7 +215,7 @@ static int chdlc_error (sdla_t *card, int err, CHDLC_MAILBOX_STRUCT *mb);
 
 
 static int chdlc_disable_comm_shutdown (sdla_t *card);
-static void if_tx_timeout (netdevice_t *dev);
+static void if_tx_timeout(struct net_device *dev);
 
 /* Miscellaneous CHDLC Functions */
 static int set_chdlc_config (sdla_t* card);
@@ -230,8 +231,8 @@ static void port_set_state (sdla_t *card, int);
 static int config_chdlc (sdla_t *card);
 static void disable_comm (sdla_t *card);
 
-static void trigger_chdlc_poll (netdevice_t *);
-static void chdlc_poll (netdevice_t *);
+static void trigger_chdlc_poll(struct net_device *dev);
+static void chdlc_poll(struct net_device *dev);
 static void chdlc_poll_delay (unsigned long dev_ptr);
 
 
@@ -245,20 +246,20 @@ static void rx_intr (sdla_t* card);
 static void timer_intr(sdla_t *);
 
 /* Bottom half handlers */
-static void chdlc_work (netdevice_t *);
-static int chdlc_work_cleanup (netdevice_t *);
-static int bh_enqueue (netdevice_t *, struct sk_buff *);
+static void chdlc_work(struct net_device *dev);
+static int chdlc_work_cleanup(struct net_device *dev);
+static int bh_enqueue(struct net_device *dev, struct sk_buff *skb);
 
 /* Miscellaneous functions */
-static int chk_bcast_mcast_addr(sdla_t* card, netdevice_t* dev,
+static int chk_bcast_mcast_addr(sdla_t* card, struct net_device* dev,
 				struct sk_buff *skb);
 static int reply_udp( unsigned char *data, unsigned int mbox_len );
 static int intr_test( sdla_t* card);
 static int udp_pkt_type( struct sk_buff *skb , sdla_t* card);
 static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
-                                struct sk_buff *skb, netdevice_t* dev,
+                                struct sk_buff *skb, struct net_device* dev,
                                 chdlc_private_area_t* chdlc_priv_area);
-static int process_udp_mgmt_pkt(sdla_t* card, netdevice_t* dev,  
+static int process_udp_mgmt_pkt(sdla_t* card, struct net_device* dev,  
 				chdlc_private_area_t* chdlc_priv_area);
 static unsigned short calc_checksum (char *, int);
 static void s508_lock (sdla_t *card, unsigned long *smp_flags);
@@ -598,10 +599,10 @@ int wpc_init (sdla_t* card, wandev_conf_t* conf)
  * as to minimize the time that we are inside the interrupt handler.
  *
  */
-static int update (wan_device_t* wandev)
+static int update(struct wan_device* wandev)
 {
 	sdla_t* card = wandev->private;
- 	netdevice_t* dev;
+ 	struct net_device* dev;
         volatile chdlc_private_area_t* chdlc_priv_area;
         SHARED_MEMORY_INFO_STRUCT *flags;
 	unsigned long timeout;
@@ -666,7 +667,8 @@ static int update (wan_device_t* wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
+static int new_if(struct wan_device* wandev, struct net_device* dev,
+		  wanif_conf_t* conf)
 {
 	sdla_t* card = wandev->private;
 	chdlc_private_area_t* chdlc_priv_area;
@@ -897,11 +899,11 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
  * interface registration.  Returning anything but zero will fail interface
  * registration.
  */
-static int if_init (netdevice_t* dev)
-	{
+static int if_init(struct net_device* dev)
+{
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;
@@ -960,7 +962,7 @@ static int if_init (netdevice_t* dev)
  *
  * Return 0 if O.k. or errno.
  */
-static int if_open (netdevice_t* dev)
+static int if_open(struct net_device* dev)
 {
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
@@ -1013,7 +1015,7 @@ static int if_open (netdevice_t* dev)
  * o if this is the last close, then disable communications and interrupts.
  * o reset flags.
  */
-static int if_close (netdevice_t* dev)
+static int if_close(struct net_device* dev)
 {
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
@@ -1084,8 +1086,9 @@ static void disable_comm (sdla_t *card)
  *
  * Return:	media header length.
  */
-static int if_header (struct sk_buff* skb, netdevice_t* dev,
-	unsigned short type, void* daddr, void* saddr, unsigned len)
+static int if_header(struct sk_buff* skb, struct net_device* dev,
+		     unsigned short type, void* daddr, void* saddr,
+		     unsigned len)
 {
 	skb->protocol = htons(type);
 
@@ -1096,7 +1099,7 @@ static int if_header (struct sk_buff* skb, netdevice_t* dev,
 /*============================================================================
  * Handle transmit timeout event from netif watchdog
  */
-static void if_tx_timeout (netdevice_t *dev)
+static void if_tx_timeout(struct net_device *dev)
 {
     	chdlc_private_area_t* chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -1144,7 +1147,7 @@ static int if_rebuild_hdr (struct sk_buff *skb)
  * 2. Setting tbusy flag will inhibit further transmit requests from the
  *    protocol stack and can be used for flow control with protocol layer.
  */
-static int if_send (struct sk_buff* skb, netdevice_t* dev)
+static int if_send(struct sk_buff* skb, struct net_device* dev)
 {
 	chdlc_private_area_t *chdlc_priv_area = dev->priv;
 	sdla_t *card = chdlc_priv_area->card;
@@ -1278,7 +1281,7 @@ if_send_exit_crit:
  * multicast source IP address.
  */
 
-static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
+static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
 				struct sk_buff *skb)
 {
 	u32 src_ip_addr;
@@ -1421,7 +1424,7 @@ unsigned short calc_checksum (char *data, int len)
  * Get ethernet-style interface statistics.
  * Return a pointer to struct enet_statistics.
  */
-static struct net_device_stats* if_stats (netdevice_t* dev)
+static struct net_device_stats* if_stats(struct net_device* dev)
 {
 	sdla_t *my_card;
 	chdlc_private_area_t* chdlc_priv_area;
@@ -1710,7 +1713,7 @@ static int chdlc_error (sdla_t *card, int err, CHDLC_MAILBOX_STRUCT *mb)
  *       PREPROCESSOR STATEMENT ABOVE, UNLESS YOU KNOW WHAT YOU ARE
  *       DOING */
 
-static void chdlc_work (netdevice_t * dev)
+static void chdlc_work(struct net_device * dev)
 {
 	chdlc_private_area_t* chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -1751,7 +1754,7 @@ static void chdlc_work (netdevice_t * dev)
 	return;
 }
 
-static int chdlc_work_cleanup (netdevice_t *dev)
+static int chdlc_work_cleanup(struct net_device *dev)
 {
 	chdlc_private_area_t* chan = dev->priv;
 
@@ -1769,7 +1772,7 @@ static int chdlc_work_cleanup (netdevice_t *dev)
 
 
 
-static int bh_enqueue (netdevice_t *dev, struct sk_buff *skb)
+static int bh_enqueue(struct net_device *dev, struct sk_buff *skb)
 {
 	/* Check for full */
 	chdlc_private_area_t* chan = dev->priv;
@@ -1804,7 +1807,7 @@ static int bh_enqueue (netdevice_t *dev, struct sk_buff *skb)
  */
 static void wpc_isr (sdla_t* card)
 {
-	netdevice_t* dev;
+	struct net_device* dev;
 	SHARED_MEMORY_INFO_STRUCT* flags = NULL;
 	int i;
 	sdla_t *my_card;
@@ -1931,7 +1934,7 @@ isr_done:
  */
 static void rx_intr (sdla_t* card)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	chdlc_private_area_t *chdlc_priv_area;
 	SHARED_MEMORY_INFO_STRUCT *flags = card->u.c.flags;
 	CHDLC_DATA_RX_STATUS_EL_STRUCT *rxbuf = card->u.c.rxmb;
@@ -2083,7 +2086,7 @@ rx_exit:
  */
 void timer_intr(sdla_t *card)
 {
-        netdevice_t* dev;
+        struct net_device* dev;
         chdlc_private_area_t* chdlc_priv_area = NULL;
         SHARED_MEMORY_INFO_STRUCT* flags = NULL;
 
@@ -2172,7 +2175,7 @@ static int set_chdlc_config(sdla_t* card)
 		cfg.IP_netmask		= 0;
 		
 	}else if (card->wandev.dev){
-		netdevice_t * dev = card->wandev.dev;
+		struct net_device *dev = card->wandev.dev;
 		chdlc_private_area_t *chdlc_priv_area = dev->priv;
 		
                 struct in_device *in_dev = dev->ip_ptr;
@@ -2402,7 +2405,7 @@ static int process_chdlc_exception(sdla_t *card)
 
 static int configure_ip (sdla_t* card)
 {
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
         chdlc_private_area_t *chdlc_priv_area;
         char err;
 
@@ -2449,7 +2452,7 @@ static int configure_ip (sdla_t* card)
 
 static int unconfigure_ip (sdla_t* card)
 {
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	chdlc_private_area_t *chdlc_priv_area;
 
 	if (!dev)
@@ -2477,7 +2480,7 @@ static int unconfigure_ip (sdla_t* card)
 
 static void process_route (sdla_t *card)
 {
-        netdevice_t *dev = card->wandev.dev;
+        struct net_device *dev = card->wandev.dev;
         unsigned char port_num;
         chdlc_private_area_t *chdlc_priv_area = NULL;
 	u32 local_IP_addr = 0;
@@ -2658,8 +2661,8 @@ static void process_route (sdla_t *card)
  */
 
 static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
-                                struct sk_buff *skb, netdevice_t* dev,
-                                chdlc_private_area_t* chdlc_priv_area )
+			      struct sk_buff *skb, struct net_device* dev,
+			      chdlc_private_area_t* chdlc_priv_area)
 {
 	int udp_pkt_stored = 0;
 
@@ -2686,7 +2689,7 @@ static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
  * Process UDP management packet.
  */
 
-static int process_udp_mgmt_pkt(sdla_t* card, netdevice_t* dev,
+static int process_udp_mgmt_pkt(sdla_t* card, struct net_device* dev,
 				chdlc_private_area_t* chdlc_priv_area ) 
 {
 	unsigned char *buf;
@@ -3263,7 +3266,7 @@ static void port_set_state (sdla_t *card, int state)
 
                 card->wandev.state = card->u.c.state = state;
 		if (card->wandev.dev){
-			netdevice_t *dev = card->wandev.dev;
+			struct net_device *dev = card->wandev.dev;
 			chdlc_private_area_t *chdlc_priv_area = dev->priv;
 			chdlc_priv_area->common.state = state;
 		}
@@ -3293,7 +3296,7 @@ static void port_set_state (sdla_t *card, int state)
 
 static int config_chdlc (sdla_t *card)
 {
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	chdlc_private_area_t *chdlc_priv_area = dev->priv;
 	SHARED_MEMORY_INFO_STRUCT *flags = card->u.c.flags;
 
@@ -3417,7 +3420,7 @@ static int config_chdlc (sdla_t *card)
  *      the chldc_poll routine.  
  */
 
-static void chdlc_poll (netdevice_t *dev)
+static void chdlc_poll(struct net_device *dev)
 {
 	chdlc_private_area_t *chdlc_priv_area;
 	sdla_t *card;
@@ -3567,7 +3570,7 @@ static void chdlc_poll (netdevice_t *dev)
  *      a polling routine.
  *
  */	
-static void trigger_chdlc_poll (netdevice_t *dev)
+static void trigger_chdlc_poll(struct net_device *dev)
 {
 	chdlc_private_area_t *chdlc_priv_area;
 	sdla_t *card;
@@ -3592,7 +3595,7 @@ static void trigger_chdlc_poll (netdevice_t *dev)
 
 static void chdlc_poll_delay (unsigned long dev_ptr)
 {
-	netdevice_t *dev = (netdevice_t *)dev_ptr;
+	struct net_device *dev = (struct net_device *)dev_ptr;
 	trigger_chdlc_poll(dev);
 }
 

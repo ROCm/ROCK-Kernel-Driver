@@ -70,9 +70,9 @@ MODULE_PARM_DESC(cycx_debug, "cyclomx debug level");
 /* Function Prototypes */
 
 /* WAN link driver entry points */
-static int setup (wan_device_t *wandev, wandev_conf_t *conf);
-static int shutdown (wan_device_t *wandev);
-static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg);
+static int setup(struct wan_device *wandev, wandev_conf_t *conf);
+static int shutdown(struct wan_device *wandev);
+static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg);
 
 /* Miscellaneous functions */
 static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs);
@@ -122,7 +122,7 @@ int __init cyclomx_init (void)
 	/* Register adapters with WAN router */
 	for (cnt = 0; cnt < ncards; ++cnt) {
 		cycx_t *card = &card_array[cnt];
-		wan_device_t *wandev = &card->wandev;
+		struct wan_device *wandev = &card->wandev;
 
 		sprintf(card->devname, "%s%d", drvname, cnt + 1);
 		wandev->magic    = ROUTER_MAGIC;
@@ -181,7 +181,7 @@ static void __exit cyclomx_cleanup (void)
  * configuration structure is in kernel memory (including extended data, if
  * any).
  */
-static int setup (wan_device_t *wandev, wandev_conf_t *conf)
+static int setup(struct wan_device *wandev, wandev_conf_t *conf)
 {
 	int err = -EFAULT;
 	cycx_t *card;
@@ -273,7 +273,7 @@ out_irq:
  * This function is called by the router when device is being unregistered or
  * when it handles ROUTER_DOWN IOCTL.
  */
-static int shutdown (wan_device_t *wandev)
+static int shutdown(struct wan_device *wandev)
 {
 	int ret = -EFAULT;
 	cycx_t *card;
@@ -305,7 +305,7 @@ out:	return ret;
  *
  * no reserved ioctls for the cyclom 2x up to now
  */
-static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg)
+static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg)
 {
 	return -EINVAL;
 }

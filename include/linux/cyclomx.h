@@ -46,7 +46,7 @@
 typedef struct cycx {
 	char devname[WAN_DRVNAME_SZ+1];	/* card name */
 	cycxhw_t hw;			/* hardware configuration */
-	wan_device_t wandev;		/* WAN device data space */
+	struct wan_device wandev;	/* WAN device data space */
 	u32 open_cnt;			/* number of open interfaces */
 	u32 state_tick;			/* link state timestamp */
 	spinlock_t lock;

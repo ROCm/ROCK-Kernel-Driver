@@ -64,8 +64,6 @@
 #include <linux/sdlapci.h>
 #include <linux/if_wanpipe_common.h>
 
-#define netdevice_t struct net_device
-
 #include <asm/uaccess.h>	/* kernel <-> user copy */
 #include <linux/inetdevice.h>
 
@@ -184,9 +182,9 @@ int init_module (void);
 void cleanup_module (void);
 
 /* WAN link driver entry points */
-static int setup    (wan_device_t* wandev, wandev_conf_t* conf);
-static int shutdown (wan_device_t* wandev);
-static int ioctl    (wan_device_t* wandev, unsigned cmd, unsigned long arg);
+static int setup(struct wan_device* wandev, wandev_conf_t* conf);
+static int shutdown(struct wan_device* wandev);
+static int ioctl(struct wan_device* wandev, unsigned cmd, unsigned long arg);
 
 /* IOCTL handlers */
 static int ioctl_dump	(sdla_t* card, sdla_dump_t* u_dump);
@@ -279,7 +277,7 @@ int wanpipe_init(void)
 	/* Register adapters with WAN router */
 	for (cnt = 0; cnt < ncards; ++ cnt) {
 		sdla_t* card = &card_array[cnt];
-		wan_device_t* wandev = &card->wandev;
+		struct wan_device* wandev = &card->wandev;
 
 		card->next = NULL;
 		sprintf(card->devname, "%s%d", drvname, cnt + 1);
@@ -352,7 +350,7 @@ void cleanup_module (void)
  * any).
  */
  
-static int setup (wan_device_t* wandev, wandev_conf_t* conf)
+static int setup(struct wan_device* wandev, wandev_conf_t* conf)
 {
 	sdla_t* card;
 	int err = 0;
@@ -779,7 +777,7 @@ static int check_s514_conflicts(sdla_t* card,wandev_conf_t* conf, int *irq)
  * This function is called by the router when device is being unregistered or
  * when it handles ROUTER_DOWN IOCTL.
  */
-static int shutdown (wan_device_t* wandev)
+static int shutdown(struct wan_device* wandev)
 {
 	sdla_t *card;
 	int err=0;
@@ -888,7 +886,7 @@ static void release_hw (sdla_t *card)
  * This function is called when router handles one of the reserved user
  * IOCTLs.  Note that 'arg' stil points to user address space.
  */
-static int ioctl (wan_device_t* wandev, unsigned cmd, unsigned long arg)
+static int ioctl(struct wan_device* wandev, unsigned cmd, unsigned long arg)
 {
 	sdla_t* card;
 	int err;
@@ -1255,7 +1253,7 @@ void wanpipe_mark_bh (void)
 	}
 } 
 
-void wakeup_sk_bh (netdevice_t *dev)
+void wakeup_sk_bh(struct net_device *dev)
 {
 	wanpipe_common_t *chan = dev->priv;
 
@@ -1268,7 +1266,7 @@ void wakeup_sk_bh (netdevice_t *dev)
 	}
 }
 
-int change_dev_flags (netdevice_t *dev, unsigned flags)
+int change_dev_flags(struct net_device *dev, unsigned flags)
 {
 	struct ifreq if_info;
 	mm_segment_t fs = get_fs();
@@ -1285,7 +1283,7 @@ int change_dev_flags (netdevice_t *dev, unsigned flags)
 	return err;
 }
 
-unsigned long get_ip_address (netdevice_t *dev, int option)
+unsigned long get_ip_address(struct net_device *dev, int option)
 {
 	
 	struct in_ifaddr *ifaddr;
@@ -1323,7 +1321,7 @@ unsigned long get_ip_address (netdevice_t *dev, int option)
 	return 0;
 }	
 
-void add_gateway(sdla_t *card, netdevice_t *dev)
+void add_gateway(sdla_t *card, struct net_device *dev)
 {
 	mm_segment_t oldfs;
 	struct rtentry route;

@@ -96,7 +96,7 @@ static struct proc_dir_entry *proc_router;
  */
 static void *r_start(struct seq_file *m, loff_t *pos)
 {
-	wan_device_t *wandev;
+	struct wan_device *wandev;
 	loff_t l = *pos;
 
 	lock_kernel();
@@ -108,7 +108,7 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 }
 static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	wan_device_t *wandev = v;
+	struct wan_device *wandev = v;
 	(*pos)++;
 	return (v == (void *)1) ? router_devlist : wandev->next;
 }
@@ -119,7 +119,7 @@ static void r_stop(struct seq_file *m, void *v)
 
 static int config_show(struct seq_file *m, void *v)
 {
-	wan_device_t *p = v;
+	struct wan_device *p = v;
 	if (v == (void *)1) {
 		seq_puts(m, "Device name    | port |IRQ|DMA|  mem.addr  |");
 		seq_puts(m, "mem.size|option1|option2|option3|option4\n");
@@ -135,7 +135,7 @@ static int config_show(struct seq_file *m, void *v)
 
 static int status_show(struct seq_file *m, void *v)
 {
-	wan_device_t *p = v;
+	struct wan_device *p = v;
 	if (v == (void *)1) {
 		seq_puts(m, "Device name    |protocol|station|interface|");
 		seq_puts(m, "clocking|baud rate| MTU |ndev|link state\n");
@@ -221,7 +221,7 @@ static struct file_operations status_fops =
 
 static int wandev_show(struct seq_file *m, void *v)
 {
-	wan_device_t *wandev = v;
+	struct wan_device *wandev = v;
 
 	if (wandev->magic != ROUTER_MAGIC)
 		return 0;
@@ -339,7 +339,7 @@ void wanrouter_proc_cleanup (void)
  *	Add directory entry for WAN device.
  */
 
-int wanrouter_proc_add (wan_device_t* wandev)
+int wanrouter_proc_add(struct wan_device* wandev)
 {
 	if (wandev->magic != ROUTER_MAGIC)
 		return -EINVAL;
@@ -356,7 +356,7 @@ int wanrouter_proc_add (wan_device_t* wandev)
  *	Delete directory entry for WAN device.
  */
  
-int wanrouter_proc_delete(wan_device_t* wandev)
+int wanrouter_proc_delete(struct wan_device* wandev)
 {
 	if (wandev->magic != ROUTER_MAGIC)
 		return -EINVAL;
@@ -379,12 +379,12 @@ void wanrouter_proc_cleanup(void)
 {
 }
 
-int wanrouter_proc_add(wan_device_t *wandev)
+int wanrouter_proc_add(struct wan_device *wandev)
 {
 	return 0;
 }
 
-int wanrouter_proc_delete(wan_device_t *wandev)
+int wanrouter_proc_delete(struct wan_device *wandev)
 {
 	return 0;
 }
