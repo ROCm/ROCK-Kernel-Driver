@@ -116,12 +116,15 @@ extern void anna_init_irqs (void);
 
 
 /* Anna UART details (basically the same as the V850E/MA1, but 2 channels).  */
-#define NB85E_UART_NUM_CHANNELS		2
-#define NB85E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 2)
-#define NB85E_UART_CHIP_NAME 		"V850E2/NA85E2A"
+#define V850E_UART_NUM_CHANNELS		2
+#define V850E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 2)
+#define V850E_UART_CHIP_NAME 		"V850E2/NA85E2A"
+
+/* This is the UART channel that's actually connected on the board.  */
+#define V850E_UART_CONSOLE_CHANNEL	1
 
 /* This is a function that gets called before configuring the UART.  */
-#define NB85E_UART_PRE_CONFIGURE	anna_uart_pre_configure
+#define V850E_UART_PRE_CONFIGURE	anna_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void anna_uart_pre_configure (unsigned chan,
 				     unsigned cflags, unsigned baud);
@@ -130,9 +133,9 @@ extern void anna_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART, but only for channel 1. */
 
 /* CTS for UART channel 1 is pin P37 (bit 7 of port 3).  */
-#define NB85E_UART_CTS(chan)	((chan) == 1 ? !(ANNA_PORT_IO(3) & 0x80) : 1)
+#define V850E_UART_CTS(chan)	((chan) == 1 ? !(ANNA_PORT_IO(3) & 0x80) : 1)
 /* RTS for UART channel 1 is pin P07 (bit 7 of port 0).  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   if (chan == 1) {						      \
 		   unsigned old = ANNA_PORT_IO(0); 			      \

@@ -53,22 +53,10 @@ void __init mach_setup (char **cmdline)
 				"          NEC SolutionGear/Midas lab"
 				" RTE-MOTHER-A motherboard\n");
 	}
-
-#if defined (CONFIG_V850E_NB85E_UART_CONSOLE) && !defined (CONFIG_TIME_BOOTUP)
-	nb85e_uart_cons_init (0);
-#endif
+#endif /* CONFIG_RTE_MB_A_PCI */
 
 	mach_tick = led_tick;
 }
-
-#ifdef CONFIG_TIME_BOOTUP
-void initial_boot_done (void)
-{
-#ifdef CONFIG_V850E_NB85E_UART_CONSOLE
-	nb85e_uart_cons_init (0);
-#endif
-}
-#endif
 
 void machine_restart (char *__unused)
 {

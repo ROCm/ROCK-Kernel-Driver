@@ -98,8 +98,8 @@
 
 /* Override the basic MA uart pre-initialization so that we can
    initialize extra stuff.  */
-#undef NB85E_UART_PRE_CONFIGURE	/* should be defined by <asm/ma.h> */
-#define NB85E_UART_PRE_CONFIGURE	rte_ma1_cb_uart_pre_configure
+#undef V850E_UART_PRE_CONFIGURE	/* should be defined by <asm/ma.h> */
+#define V850E_UART_PRE_CONFIGURE	rte_ma1_cb_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void rte_ma1_cb_uart_pre_configure (unsigned chan,
 					   unsigned cflags, unsigned baud);
@@ -108,9 +108,9 @@ extern void rte_ma1_cb_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART, but only for channel 0. */
 
 /* CTS for UART channel 0 is pin P43 (bit 3 of port 4).  */
-#define NB85E_UART_CTS(chan)	((chan) == 0 ? !(MA_PORT4_IO & 0x8) : 1)
+#define V850E_UART_CTS(chan)	((chan) == 0 ? !(MA_PORT4_IO & 0x8) : 1)
 /* RTS for UART channel 0 is pin P42 (bit 2 of port 4).  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   if (chan == 0) {						      \
 		   unsigned old = MA_PORT4_IO; 				      \

@@ -110,12 +110,12 @@ extern void as85ep1_init_irqs (void);
 
 
 /* AS85EP1 UART details (basically the same as the V850E/MA1, but 2 channels).  */
-#define NB85E_UART_NUM_CHANNELS		2
-#define NB85E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 4)
-#define NB85E_UART_CHIP_NAME 		"V850E/NA85E"
+#define V850E_UART_NUM_CHANNELS		2
+#define V850E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 4)
+#define V850E_UART_CHIP_NAME 		"V850E/NA85E"
 
 /* This is a function that gets called before configuring the UART.  */
-#define NB85E_UART_PRE_CONFIGURE	as85ep1_uart_pre_configure
+#define V850E_UART_PRE_CONFIGURE	as85ep1_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void as85ep1_uart_pre_configure (unsigned chan,
 					unsigned cflags, unsigned baud);
@@ -124,9 +124,9 @@ extern void as85ep1_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART, but only for channel 1. */
 
 /* CTS for UART channel 1 is pin P54 (bit 4 of port 5).  */
-#define NB85E_UART_CTS(chan)   ((chan) == 1 ? !(AS85EP1_PORT_IO(5) & 0x10) : 1)
+#define V850E_UART_CTS(chan)   ((chan) == 1 ? !(AS85EP1_PORT_IO(5) & 0x10) : 1)
 /* RTS for UART channel 1 is pin P53 (bit 3 of port 5).  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   if (chan == 1) {						      \
 		   unsigned old = AS85EP1_PORT_IO(5); 			      \

@@ -51,18 +51,18 @@
 
 
 /* TEG UART details.  */
-#define NB85E_UART_BASE_ADDR(n)		(0xFFFFF600 + 0x10 * (n))
-#define NB85E_UART_ASIM_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0x0)
-#define NB85E_UART_ASIS_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0x2)
-#define NB85E_UART_ASIF_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0x4)
-#define NB85E_UART_CKSR_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0x6)
-#define NB85E_UART_BRGC_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0x8)
-#define NB85E_UART_TXB_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0xA)
-#define NB85E_UART_RXB_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0xC)
-#define NB85E_UART_NUM_CHANNELS		1
-#define NB85E_UART_BASE_FREQ		CPU_CLOCK_FREQ
+#define V850E_UART_BASE_ADDR(n)		(0xFFFFF600 + 0x10 * (n))
+#define V850E_UART_ASIM_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0x0)
+#define V850E_UART_ASIS_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0x2)
+#define V850E_UART_ASIF_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0x4)
+#define V850E_UART_CKSR_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0x6)
+#define V850E_UART_BRGC_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0x8)
+#define V850E_UART_TXB_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0xA)
+#define V850E_UART_RXB_ADDR(n)		(V850E_UART_BASE_ADDR(n) + 0xC)
+#define V850E_UART_NUM_CHANNELS		1
+#define V850E_UART_BASE_FREQ		CPU_CLOCK_FREQ
 /* This is a function that gets called before configuring the UART.  */
-#define NB85E_UART_PRE_CONFIGURE	teg_uart_pre_configure
+#define V850E_UART_PRE_CONFIGURE	teg_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void teg_uart_pre_configure (unsigned chan,
 				    unsigned cflags, unsigned baud);

@@ -89,8 +89,8 @@
 
 /* Override the basic TEG UART pre-initialization so that we can
    initialize extra stuff.  */
-#undef NB85E_UART_PRE_CONFIGURE	/* should be defined by <asm/teg.h> */
-#define NB85E_UART_PRE_CONFIGURE	rte_nb85e_cb_uart_pre_configure
+#undef V850E_UART_PRE_CONFIGURE	/* should be defined by <asm/teg.h> */
+#define V850E_UART_PRE_CONFIGURE	rte_nb85e_cb_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void rte_nb85e_cb_uart_pre_configure (unsigned chan,
 					     unsigned cflags, unsigned baud);
@@ -99,9 +99,9 @@ extern void rte_nb85e_cb_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART. */
 
 /* CTS is pin P00.  */
-#define NB85E_UART_CTS(chan)	(! (TEG_PORT0_IO & 0x1))
+#define V850E_UART_CTS(chan)	(! (TEG_PORT0_IO & 0x1))
 /* RTS is pin P02.  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   unsigned old = TEG_PORT0_IO;					      \
 	   TEG_PORT0_IO = val ? (old & ~0x4) : (old | 0x4);		      \

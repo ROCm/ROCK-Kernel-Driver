@@ -27,10 +27,10 @@
 
 
 /* MA series UART details.  */
-#define NB85E_UART_BASE_FREQ		CPU_CLOCK_FREQ
+#define V850E_UART_BASE_FREQ		CPU_CLOCK_FREQ
 
 /* This is a function that gets called before configuring the UART.  */
-#define NB85E_UART_PRE_CONFIGURE	ma_uart_pre_configure
+#define V850E_UART_PRE_CONFIGURE	ma_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void ma_uart_pre_configure (unsigned chan,
 				   unsigned cflags, unsigned baud);

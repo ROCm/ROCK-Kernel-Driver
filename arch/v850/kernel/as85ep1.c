@@ -95,10 +95,6 @@ void __init mach_early_init (void)
 
 void __init mach_setup (char **cmdline)
 {
-#ifdef CONFIG_V850E_NB85E_UART_CONSOLE
-	nb85e_uart_cons_init (1);
-#endif
-
 	AS85EP1_PORT_PMC (LEDS_PORT) = 0; /* Make the LEDs port an I/O port. */
 	AS85EP1_PORT_PM (LEDS_PORT) = 0; /* Make all the bits output pins.  */
 	mach_tick = as85ep1_led_tick;

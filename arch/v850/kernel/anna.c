@@ -63,10 +63,6 @@ void __init mach_early_init (void)
 
 void __init mach_setup (char **cmdline)
 {
-#ifdef CONFIG_V850E_NB85E_UART_CONSOLE
-	nb85e_uart_cons_init (1);
-#endif
-
 	ANNA_PORT_PM (LEDS_PORT) = 0;	/* Make all LED pins output pins.  */
 	mach_tick = anna_led_tick;
 }
