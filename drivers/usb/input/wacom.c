@@ -1,15 +1,14 @@
 /*
- * $Id: wacom.c,v 1.28 2001/09/25 10:12:07 vojtech Exp $
+ *  USB Wacom Graphire and Wacom Intuos tablet support
  *
- *  Copyright (c) 2000-2001 Vojtech Pavlik	<vojtech@ucw.cz>
+ *  Copyright (c) 2000-2002 Vojtech Pavlik	<vojtech@ucw.cz>
  *  Copyright (c) 2000 Andreas Bach Aaen	<abach@stofanet.dk>
  *  Copyright (c) 2000 Clifford Wolf		<clifford@clifford.at>
  *  Copyright (c) 2000 Sam Mosel		<sam.mosel@computer.org>
  *  Copyright (c) 2000 James E. Blair		<corvus@gnu.org>
  *  Copyright (c) 2000 Daniel Egger		<egger@suse.de>
  *  Copyright (c) 2001 Frederic Lepied		<flepied@mandrakesoft.com>
- *
- *  USB Wacom Graphire and Wacom Intuos tablet support
+ *  Copyright (c) 2002 Ping Cheng		<pingc@wacom.com>
  *
  *  ChangeLog:
  *      v0.1 (vp)  - Initial release
@@ -37,6 +36,18 @@
  *	v1.21 (vp) - Removed protocol descriptions
  *		   - Added MISC_SERIAL for tool serial numbers
  *	      (gb) - Identify version on module load.
+ *    v1.21.1 (fl) - added Graphire2 support
+ *    v1.21.2 (fl) - added Intuos2 support
+ *                 - added all the PL ids
+ *    v1.21.3 (fl) - added another eraser id from Neil Okamoto
+ *                 - added smooth filter for Graphire from Peri Hankey
+ *                 - added PenPartner support from Olaf van Es
+ *                 - new tool ids from Ole Martin Bjoerndalen
+ *	v1.29 (pc) - Add support for more tablets
+ *		   - Fix pressure reporting
+ *	v1.30 (vp) - Merge 2.4 and 2.5 drivers
+ *		   - Since 2.5 now has input_sync(), remove MSC_SERIAL abuse
+ *		   - Cleanups here and there
  */
 
 /*
@@ -44,19 +55,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -69,7 +67,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.21"
+#define DRIVER_VERSION "v1.30"
 #define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
 #define DRIVER_DESC "USB Wacom Graphire and Wacom Intuos tablet driver"
 #define DRIVER_LICENSE "GPL"
@@ -104,7 +102,6 @@ struct wacom {
 	struct wacom_features *features;
 	int tool[2];
 	int open;
-	int x, y;
 	__u32 serial[2];
 	char phys[32];
 };
@@ -114,29 +111,50 @@ static void wacom_pl_irq(struct urb *urb)
 	struct wacom *wacom = urb->context;
 	unsigned char *data = wacom->data;
 	struct input_dev *dev = &wacom->dev;
-	int prox;
+	int prox, pressure;
 
 	if (urb->status) return;
 
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
 
-	prox = data[1] & 0x20;
+	prox = data[1] & 0x40;
 	
 	input_report_key(dev, BTN_TOOL_PEN, prox);
 	
 	if (prox) {
-		int pressure = (data[4] & 0x04) >> 2 | ((__u32)(data[7] & 0x7f) << 1);
 
-		input_report_abs(dev, ABS_X, data[3] | ((__u32)data[2] << 8) | ((__u32)(data[1] & 0x03) << 16));
-		input_report_abs(dev, ABS_Y, data[6] | ((__u32)data[5] << 8) | ((__u32)(data[4] & 0x03) << 8));
-		input_report_abs(dev, ABS_PRESSURE, (data[7] & 0x80) ? (255 - pressure) : (pressure + 255));
+		pressure = (signed char)((data[7] << 1) | ((data[4] >> 2) & 1));
+		if (wacom->features->pressure_max > 255)
+			pressure = (pressure << 1) | ((data[4] >> 6) & 1);
+		pressure += (wacom->features->pressure_max + 1) / 2;
+
+		input_report_abs(dev, ABS_X, data[3] | ((__u32)data[2] << 7) | ((__u32)(data[1] & 0x03) << 14));
+		input_report_abs(dev, ABS_Y, data[6] | ((__u32)data[5] << 7) | ((__u32)(data[4] & 0x03) << 14));
+		input_report_abs(dev, ABS_PRESSURE, pressure);
+
 		input_report_key(dev, BTN_TOUCH, data[4] & 0x08);
 		input_report_key(dev, BTN_STYLUS, data[4] & 0x10);
 		input_report_key(dev, BTN_STYLUS2, data[4] & 0x20);
 	}
 	
-	input_event(dev, EV_MSC, MSC_SERIAL, 0);
+	input_sync(dev);
+}
+
+static void wacom_penpartner_irq(struct urb *urb)
+{
+	struct wacom *wacom = urb->context;
+	unsigned char *data = wacom->data;
+	struct input_dev *dev = &wacom->dev;
+
+	if (urb->status) return;
+
+	input_report_key(dev, BTN_TOOL_PEN, 1);
+	input_report_abs(dev, ABS_X, data[2] << 8 | data[1]);
+	input_report_abs(dev, ABS_Y, data[4] << 8 | data[3]);
+	input_report_abs(dev, ABS_PRESSURE, (signed char)data[6] + 127);
+	input_report_key(dev, BTN_TOUCH, ((signed char)data[6] > -80) && !(data[5] & 0x20));
+	input_report_key(dev, BTN_STYLUS, (data[5] & 0x40));
 	input_sync(dev);
 }
 
@@ -176,21 +194,19 @@ static void wacom_graphire_irq(struct urb *urb)
 			input_report_abs(dev, ABS_X, x);
 			input_report_abs(dev, ABS_Y, y);
 
-			input_event(dev, EV_MSC, MSC_SERIAL, data[1] & 0x01);
+			input_sync(dev);
 			return;
 	}
 
 	if (data[1] & 0x80) {
-		input_report_abs(dev, ABS_X, wacom->x = x);
-		input_report_abs(dev, ABS_Y, wacom->y = y);
+		input_report_abs(dev, ABS_X, x);
+		input_report_abs(dev, ABS_Y, y);
 	}
 
 	input_report_abs(dev, ABS_PRESSURE, data[6] | ((__u32)data[7] << 8));
 	input_report_key(dev, BTN_TOUCH, data[1] & 0x01);
 	input_report_key(dev, BTN_STYLUS, data[1] & 0x02);
 	input_report_key(dev, BTN_STYLUS2, data[1] & 0x04);
-
-	input_event(dev, EV_MSC, MSC_SERIAL, data[1] & 0x01);
 
 	input_sync(dev);
 }
@@ -221,27 +237,32 @@ static void wacom_intuos_irq(struct urb *urb)
 			case 0x832:
 			case 0x012: wacom->tool[idx] = BTN_TOOL_PENCIL;		break;	/* Inking pen */
 			case 0x822:
+			case 0x842:
+			case 0x852:
 			case 0x022: wacom->tool[idx] = BTN_TOOL_PEN;		break;	/* Pen */
 			case 0x812:
 			case 0x032: wacom->tool[idx] = BTN_TOOL_BRUSH;		break;	/* Stroke pen */
+			case 0x007:
 		        case 0x09c:
-			case 0x094: wacom->tool[idx] = BTN_TOOL_MOUSE;		break;	/* Mouse 4D */
+			case 0x094: wacom->tool[idx] = BTN_TOOL_MOUSE;		break;	/* Mouse 4D and 2D */
 			case 0x096: wacom->tool[idx] = BTN_TOOL_LENS;		break;	/* Lens cursor */
 			case 0x82a:
+			case 0x85a:
 		        case 0x91a:
 			case 0x0fa: wacom->tool[idx] = BTN_TOOL_RUBBER;		break;	/* Eraser */
 			case 0x112: wacom->tool[idx] = BTN_TOOL_AIRBRUSH;	break;	/* Airbrush */
 			default:    wacom->tool[idx] = BTN_TOOL_PEN;		break;	/* Unknown tool */
-		}	
+		}
 
 		input_report_key(dev, wacom->tool[idx], 1);
-		input_event(dev, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
+		input_report_abs(dev, ABS_SERIAL, wacom->serial[idx]);
+		input_sync(dev);
 		return;
 	}
 
 	if ((data[1] & 0xfe) == 0x80) {						/* Exit report */
 		input_report_key(dev, wacom->tool[idx], 0);
-		input_event(dev, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
+		input_sync(dev);
 		return;
 	}
 
@@ -274,11 +295,11 @@ static void wacom_intuos_irq(struct urb *urb)
 
 		} else {
 
-			input_report_key(dev, BTN_LEFT,   data[8] & 0x01);
-			input_report_key(dev, BTN_MIDDLE, data[8] & 0x02);
-			input_report_key(dev, BTN_RIGHT,  data[8] & 0x04);
-
 	 		if ((data[1] & 0x10) == 0) {				/* 4D mouse packets */
+
+				input_report_key(dev, BTN_LEFT,   data[8] & 0x01);
+				input_report_key(dev, BTN_MIDDLE, data[8] & 0x02);
+				input_report_key(dev, BTN_RIGHT,  data[8] & 0x04);
 
 				input_report_key(dev, BTN_SIDE,   data[8] & 0x20);
 				input_report_key(dev, BTN_EXTRA,  data[8] & 0x10);
@@ -286,49 +307,97 @@ static void wacom_intuos_irq(struct urb *urb)
 						 ((__u32)data[6] << 2) | ((data[7] >> 6) & 3) :
 						 -((__u32)data[6] << 2) | ((data[7] >> 6) & 3));
 
-			} else {						/* Lens cursor packets */
-
-				input_report_key(dev, BTN_SIDE,   data[8] & 0x10);
-				input_report_key(dev, BTN_EXTRA,  data[8] & 0x08);
+			} else {
+				if (wacom->tool[idx] == BTN_TOOL_MOUSE) {	/* 2D mouse packets */	
+					input_report_key(dev, BTN_LEFT,   data[8] & 0x04);
+					input_report_key(dev, BTN_MIDDLE, data[8] & 0x08);
+					input_report_key(dev, BTN_RIGHT,  data[8] & 0x10);
+					input_report_abs(dev, REL_WHEEL, 
+					    ((__u32)(data[8] & 0x01) - (__u32)((data[8] & 0x02) >> 1)));
+				}
+				else {     /* Lens cursor packets */
+					input_report_key(dev, BTN_LEFT,   data[8] & 0x01);
+					input_report_key(dev, BTN_MIDDLE, data[8] & 0x02);
+					input_report_key(dev, BTN_RIGHT,  data[8] & 0x04);
+					input_report_key(dev, BTN_SIDE,   data[8] & 0x10);
+					input_report_key(dev, BTN_EXTRA,  data[8] & 0x08);
+				}
 			}
 		}
 	}
 	
-	input_event(dev, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
-
 	input_sync(dev);
 }
 
 #define WACOM_INTUOS_TOOLS	(BIT(BTN_TOOL_BRUSH) | BIT(BTN_TOOL_PENCIL) | BIT(BTN_TOOL_AIRBRUSH) | BIT(BTN_TOOL_LENS))
 #define WACOM_INTUOS_BUTTONS	(BIT(BTN_SIDE) | BIT(BTN_EXTRA))
-#define WACOM_INTUOS_ABS	(BIT(ABS_TILT_X) | BIT(ABS_TILT_Y) | BIT(ABS_RZ) | BIT(ABS_THROTTLE))
+#define WACOM_INTUOS_ABS	(BIT(ABS_TILT_X) | BIT(ABS_TILT_Y) | BIT(ABS_RZ) | BIT(ABS_THROTTLE) | BIT(ABS_SERIAL))
 
 struct wacom_features wacom_features[] = {
-	{ "Wacom Graphire",      8, 10206,  7422,  511, 32, wacom_graphire_irq,
-		BIT(EV_REL), 0, BIT(REL_WHEEL), 0 },
-	{ "Wacom Intuos 4x5",   10, 12700, 10360, 1023, 15, wacom_intuos_irq,
+	{ "Wacom Penpartner",    7,   5040,  3780,  255, 32, wacom_penpartner_irq,
+		0, 0, 0, 0 },
+        { "Wacom Graphire",      8,  10206,  7422,  511, 32, wacom_graphire_irq,
+                BIT(EV_REL), 0, BIT(REL_WHEEL), 0 },
+	{ "Wacom Graphire2 4x5", 8,  10206,  7422,  511, 32, wacom_graphire_irq,
+ 		BIT(EV_REL), 0, BIT(REL_WHEEL), 0 },
+ 	{ "Wacom Graphire2 5x7", 8,  13918, 10206,  511, 32, wacom_graphire_irq,
+ 		BIT(EV_REL), 0, BIT(REL_WHEEL), 0 },
+  	{ "Wacom Intuos 4x5",   10,  12700, 10360, 1023, 15, wacom_intuos_irq,
+ 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
+ 	{ "Wacom Intuos 6x8",   10,  20600, 16450, 1023, 15, wacom_intuos_irq,
+ 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
+ 	{ "Wacom Intuos 9x12",  10,  30670, 24130, 1023, 15, wacom_intuos_irq,
+ 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
+ 	{ "Wacom Intuos 12x12", 10,  30670, 31040, 1023, 15, wacom_intuos_irq,
+ 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
+ 	{ "Wacom Intuos 12x18", 10,  45860, 31040, 1023, 15, wacom_intuos_irq,
+ 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
+ 	{ "Wacom PL400",         8,   5408,  4056,  255, 32, wacom_pl_irq,
+ 		0,  0, 0, 0 },
+ 	{ "Wacom PL500",         8,   6144,  4608,  255, 32, wacom_pl_irq,
+ 		0,  0, 0, 0 },
+ 	{ "Wacom PL600",         8,   6126,  4604,  255, 32, wacom_pl_irq,
+ 		0,  0, 0, 0 },
+ 	{ "Wacom PL600SX",       8,   6260,  5016,  255, 32, wacom_pl_irq,
+ 		0,  0, 0, 0 },
+ 	{ "Wacom PL550",         8,   6144,  4608,  511, 32, wacom_pl_irq,
+ 		0,  0, 0, 0 },
+ 	{ "Wacom PL800",         8,   7220,  5780,  511, 32, wacom_pl_irq,
+ 		0,  0, 0, 0 },
+	{ "Wacom Intuos2 4x5",   10, 12700, 10360, 1023, 15, wacom_intuos_irq,
 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
-	{ "Wacom Intuos 6x8",   10, 20320, 15040, 1023, 15, wacom_intuos_irq,
+	{ "Wacom Intuos2 6x8",   10, 20600, 16450, 1023, 15, wacom_intuos_irq,
 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
-	{ "Wacom Intuos 9x12",  10, 30480, 23060, 1023, 15, wacom_intuos_irq,
+	{ "Wacom Intuos2 9x12",  10, 30670, 24130, 1023, 15, wacom_intuos_irq,
 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
-	{ "Wacom Intuos 12x12", 10, 30480, 30480, 1023, 15, wacom_intuos_irq,
+	{ "Wacom Intuos2 12x12", 10, 30670, 31040, 1023, 15, wacom_intuos_irq,
 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
-	{ "Wacom Intuos 12x18", 10, 47720, 30480, 1023, 15, wacom_intuos_irq,
+	{ "Wacom Intuos2 12x18", 10, 45860, 31040, 1023, 15, wacom_intuos_irq,
 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
-	{ "Wacom PL500",        8,  12328, 9256,   511, 32, wacom_pl_irq,
-		0,  0, 0, 0 },
-	{ NULL , 0 }
+ 	{ }
 };
 
 struct usb_device_id wacom_ids[] = {
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x10), .driver_info = 0 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x20), .driver_info = 1 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x21), .driver_info = 2 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x22), .driver_info = 3 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x23), .driver_info = 4 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x24), .driver_info = 5 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x31), .driver_info = 6 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x00), driver_info: 0 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x10), driver_info: 1 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x11), driver_info: 2 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x12), driver_info: 3 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x20), driver_info: 4 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x21), driver_info: 5 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x22), driver_info: 6 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x23), driver_info: 7 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x24), driver_info: 8 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x30), driver_info: 9 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x31), driver_info: 10 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x32), driver_info: 11 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x33), driver_info: 12 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x34), driver_info: 13 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x35), driver_info: 14 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x41), driver_info: 15 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x42), driver_info: 16 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x43), driver_info: 17 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x44), driver_info: 18 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x45), driver_info: 19 },
 	{ }
 };
 
@@ -358,9 +427,10 @@ static void wacom_close(struct input_dev *dev)
 
 static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
-	struct usb_device *dev = interface_to_usbdev (intf);
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_endpoint_descriptor *endpoint;
 	struct wacom *wacom;
+	char rep_data[2] = {0x02, 0x02};
 	char path[64];
 
 	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL)))
@@ -382,13 +452,12 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	wacom->features = wacom_features + id->driver_info;
 
-	wacom->dev.evbit[0] |= BIT(EV_KEY) | BIT(EV_ABS) | BIT(EV_MSC) | wacom->features->evbit;
+	wacom->dev.evbit[0] |= BIT(EV_KEY) | BIT(EV_ABS) | wacom->features->evbit;
 	wacom->dev.absbit[0] |= BIT(ABS_X) | BIT(ABS_Y) | BIT(ABS_PRESSURE) | BIT(ABS_DISTANCE) | BIT(ABS_WHEEL) | wacom->features->absbit;
 	wacom->dev.relbit[0] |= wacom->features->relbit;
 	wacom->dev.keybit[LONG(BTN_LEFT)] |= BIT(BTN_LEFT) | BIT(BTN_RIGHT) | BIT(BTN_MIDDLE) | wacom->features->btnbit;
 	wacom->dev.keybit[LONG(BTN_DIGI)] |= BIT(BTN_TOOL_PEN) | BIT(BTN_TOOL_RUBBER) | BIT(BTN_TOOL_MOUSE) |
 		BIT(BTN_TOUCH) | BIT(BTN_STYLUS) | BIT(BTN_STYLUS2) | wacom->features->digibit;
-	wacom->dev.mscbit[0] |= BIT(MSC_SERIAL);
 
 	wacom->dev.absmax[ABS_X] = wacom->features->x_max;
 	wacom->dev.absmax[ABS_Y] = wacom->features->y_max;
@@ -435,9 +504,16 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	input_register_device(&wacom->dev);
 
+#if 0	/* Missing usb_set_report() */
+	usb_set_report(intf, 3, 2, rep_data, 2);
+	usb_set_report(intf, 3, 5, rep_data, 0);
+	usb_set_report(intf, 3, 6, rep_data, 0);
+#endif
+
 	printk(KERN_INFO "input: %s on %s\n", wacom->features->name, path);
 
 	dev_set_drvdata(&intf->dev, wacom);
+
 	return 0;
 }
 
