@@ -526,6 +526,7 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 		goto out_no_mem;
 
 	server->ops = mem;
+	smb_install_null_ops(server->ops);
 	server->mnt = mem + sizeof(struct smb_ops);
 
 	/* Setup NLS stuff */
