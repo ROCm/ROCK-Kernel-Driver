@@ -877,7 +877,6 @@ static struct crypto_alg alg = {
 	.cra_u              =   { .cipher = {
 	.cia_min_keysize    =   TF_MIN_KEY_SIZE,
 	.cia_max_keysize    =   TF_MAX_KEY_SIZE,
-	.cia_ivsize         =   TF_BLOCK_SIZE,
 	.cia_setkey         =   twofish_setkey,
 	.cia_encrypt        =   twofish_encrypt,
 	.cia_decrypt        =   twofish_decrypt } }

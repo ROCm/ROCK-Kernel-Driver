@@ -505,7 +505,10 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	}
 	esp->conf.key = x->ealg->alg_key;
 	esp->conf.key_len = (x->ealg->alg_key_len+7)/8;
-	esp->conf.tfm = crypto_alloc_tfm(x->ealg->alg_name, CRYPTO_TFM_MODE_CBC);
+	if (x->props.ealgo == SADB_EALG_NULL)
+		esp->conf.tfm = crypto_alloc_tfm(x->ealg->alg_name, CRYPTO_TFM_MODE_ECB);
+	else
+		esp->conf.tfm = crypto_alloc_tfm(x->ealg->alg_name, CRYPTO_TFM_MODE_CBC);
 	if (esp->conf.tfm == NULL)
 		goto error;
 	esp->conf.ivlen = crypto_tfm_alg_ivsize(esp->conf.tfm);
