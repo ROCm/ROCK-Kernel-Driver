@@ -137,6 +137,7 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp, int flags);
 static void addrconf_dad_timer(unsigned long data);
 static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_rs_timer(unsigned long data);
+static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
 
 static void inet6_prefix_notify(int event, struct inet6_dev *idev, 
@@ -2049,7 +2050,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		addrconf_del_timer(ifa);
 		write_unlock_bh(&idev->lock);
 
-		ipv6_ifa_notify(RTM_DELADDR, ifa);
+		__ipv6_ifa_notify(RTM_DELADDR, ifa);
 		in6_ifa_put(ifa);
 
 		write_lock_bh(&idev->lock);
@@ -2980,7 +2981,7 @@ static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
 				      .dumpit	= inet6_dump_fib, },
 };
 
-static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
+static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 {
 	inet6_ifa_notify(event ? : RTM_NEWADDR, ifp);
 
@@ -3003,6 +3004,16 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			dst_release(&ifp->rt->u.dst);
 		break;
 	}
+}
+
+static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
+{
+	read_lock_bh(&addrconf_lock);
+	if (ifp->idev->dead)
+		goto out;
+	__ipv6_ifa_notify(event, ifp);
+out:
+	read_unlock_bh(&addrconf_lock);
 }
 
 #ifdef CONFIG_SYSCTL
