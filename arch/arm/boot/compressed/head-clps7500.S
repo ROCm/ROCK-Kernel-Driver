@@ -34,7 +34,7 @@
 		mov	r0, #0x30
 		mcr	p15, 0, r0, c1, c0, 0
 		mov	r0, #0x13
-		msr	cpsr, r0
+		msr	cpsr_cxsf, r0
 		mov	r12, #0x03000000	@ point to LEDs
 		orr	r12, r12, #0x00020000
 		orr	r12, r12, #0xba00
@@ -71,7 +71,7 @@
 		/* Ensure all interrupts are off and MMU disabled */
 		mrs	r0, cpsr
 		orr	r0, r0, #0xc0
-		msr	cpsr, r0
+		msr	cpsr_cxsf, r0
 
 		adr	lr, 1b
 		orr	lr, lr, #0x10000000

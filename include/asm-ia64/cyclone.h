@@ -3,10 +3,10 @@
 
 #ifdef	CONFIG_IA64_CYCLONE
 extern int use_cyclone;
-extern int __init cyclone_setup(char*);
+extern void __init cyclone_setup(void);
 #else	/* CONFIG_IA64_CYCLONE */
 #define use_cyclone 0
-static inline void cyclone_setup(char* s)
+static inline void cyclone_setup(void)
 {
 	printk(KERN_ERR "Cyclone Counter: System not configured"
 					" w/ CONFIG_IA64_CYCLONE.\n");

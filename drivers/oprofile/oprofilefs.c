@@ -47,23 +47,7 @@ static struct super_operations s_ops = {
 
 ssize_t oprofilefs_str_to_user(char const * str, char __user * buf, size_t count, loff_t * offset)
 {
-	size_t len = strlen(str);
-
-	if (!count)
-		return 0;
-
-	if (*offset > len)
-		return 0;
-
-	if (count > len - *offset)
-		count = len - *offset;
-
-	if (copy_to_user(buf, str + *offset, count))
-		return -EFAULT;
-
-	*offset += count;
-
-	return count;
+	return simple_read_from_buffer(buf, count, offset, str, strlen(str));
 }
 
 
@@ -72,29 +56,10 @@ ssize_t oprofilefs_str_to_user(char const * str, char __user * buf, size_t count
 ssize_t oprofilefs_ulong_to_user(unsigned long val, char __user * buf, size_t count, loff_t * offset)
 {
 	char tmpbuf[TMPBUFSIZE];
-	size_t maxlen;
-
-	if (!count)
-		return 0;
-
-	spin_lock(&oprofilefs_lock);
-	maxlen = snprintf(tmpbuf, TMPBUFSIZE, "%lu\n", val);
-	spin_unlock(&oprofilefs_lock);
+	size_t maxlen = snprintf(tmpbuf, TMPBUFSIZE, "%lu\n", val);
 	if (maxlen > TMPBUFSIZE)
 		maxlen = TMPBUFSIZE;
-
-	if (*offset > maxlen)
-		return 0;
-
-	if (count > maxlen - *offset)
-		count = maxlen - *offset;
-
-	if (copy_to_user(buf, tmpbuf + *offset, count))
-		return -EFAULT;
-
-	*offset += count;
-
-	return count;
+	return simple_read_from_buffer(buf, count, offset, tmpbuf, maxlen);
 }
 
 

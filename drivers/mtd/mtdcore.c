@@ -1,12 +1,11 @@
 /*
- * $Id: mtdcore.c,v 1.42 2004/07/13 10:21:13 dwmw2 Exp $
+ * $Id: mtdcore.c,v 1.43 2004/07/23 15:20:46 dwmw2 Exp $
  *
  * Core registration and callback routines for MTD
  * drivers and users.
  *
  */
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
