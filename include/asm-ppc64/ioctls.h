@@ -95,6 +95,7 @@
 #define TIOCGSID	0x5429  /* Return the session ID of FD */
 #define TIOCGPTN	_IOR('T',0x30, unsigned int) /* Get Pty Number (of pty-mux device) */
 #define TIOCSPTLCK	_IOW('T',0x31, int)  /* Lock/unlock Pty */
+#define TIOCGDEV	_IOR('T',0x32, unsigned int) /* Get real dev no below /dev/console */
 
 #define TIOCSERCONFIG	0x5453
 #define TIOCSERGWILD	0x5454
