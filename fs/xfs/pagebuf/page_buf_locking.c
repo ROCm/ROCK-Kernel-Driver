@@ -113,7 +113,8 @@ pagebuf_lock(
 	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 
 	PB_TRACE(pb, PB_TRACE_REC(lock), 0);
-	pagebuf_run_queues(pb);
+	if (atomic_read(&pb->pb_io_remaining))
+		blk_run_queues();
 	down(&pb->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, PB_TRACE_REC(locked), 0);

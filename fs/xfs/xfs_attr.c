@@ -1718,6 +1718,7 @@ xfs_attr_node_get(xfs_da_args_t *args)
 	int i;
 
 	state = xfs_da_state_alloc();
+	state->holeok = 1;
 	state->args = args;
 	state->mp = args->dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;

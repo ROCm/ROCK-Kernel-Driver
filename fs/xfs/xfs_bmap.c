@@ -3810,7 +3810,7 @@ xfs_bmap_add_attrfork(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_DEV:
-		ip->i_d.di_forkoff = roundup(sizeof(dev_t), 8) >> 3;
+		ip->i_d.di_forkoff = roundup(sizeof(xfs_dev_t), 8) >> 3;
 		break;
 	case XFS_DINODE_FMT_UUID:
 		ip->i_d.di_forkoff = roundup(sizeof(uuid_t), 8) >> 3;
