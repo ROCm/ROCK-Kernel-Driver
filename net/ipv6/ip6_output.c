@@ -218,7 +218,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 		 */
 		head_room = opt->opt_nflen + opt->opt_flen;
 		seg_len += head_room;
-		head_room += sizeof(struct ipv6hdr) + ((dst->dev->hard_header_len + 15)&~15);
+		head_room += sizeof(struct ipv6hdr) + LL_RESERVED_SPACE(dst->dev);
 
 		if (skb_headroom(skb) < head_room) {
 			struct sk_buff *skb2 = skb_realloc_headroom(skb, head_room);
@@ -844,7 +844,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		mtu = inet->cork.fragsize;
 	}
 
-	hh_len = (rt->u.dst.dev->hard_header_len&~15) + 16;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
 	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
@@ -881,14 +881,14 @@ alloc_new_skb:
 			alloclen += sizeof(struct frag_hdr);
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk,
-						alloclen + hh_len + 15,
+						alloclen + hh_len,
 						(flags & MSG_DONTWAIT), &err);
 			} else {
 				skb = NULL;
 				if (atomic_read(&sk->sk_wmem_alloc) <=
 				    2 * sk->sk_sndbuf)
 					skb = sock_wmalloc(sk,
-							   alloclen + hh_len + 15, 1,
+							   alloclen + hh_len, 1,
 							   sk->sk_allocation);
 				if (unlikely(skb == NULL))
 					err = -ENOBUFS;
