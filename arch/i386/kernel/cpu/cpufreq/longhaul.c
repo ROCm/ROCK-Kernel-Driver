@@ -40,6 +40,8 @@
 #define dprintk(msg...) do { } while(0)
 #endif
 
+#define PFX "longhaul: "
+
 static unsigned int numscales=16, numvscales;
 static int minvid, maxvid;
 static int can_scale_voltage;
@@ -309,7 +311,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	dprintk (KERN_INFO "longhaul: FSB:%d Mult(x10):%d\n",
+	dprintk (KERN_INFO PFX "FSB:%d Mult(x10):%d\n",
 				fsb * 100, clock_ratio[clock_ratio_index]);
 
 	bits = clock_ratio_index;
@@ -356,7 +358,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 			if (i==32)
 				goto bad_voltage;
 
-			dprintk (KERN_INFO "longhaul: Desired vid index=%d\n", i);
+			dprintk (KERN_INFO PFX "Desired vid index=%d\n", i);
 #if 0
 			lo &= 0xfe0fffff;/* reset [24:20](voltage) to 0 */
 			lo |= (i<<20);   /* set voltage */
@@ -436,9 +438,9 @@ static int __init longhaul_get_ranges (void)
 
 	highest_speed = maxmult * fsb * 100;
 	lowest_speed = minmult * fsb * 100;
-	dprintk (KERN_INFO "longhaul: MinMult(x10)=%d MaxMult(x10)=%d\n",
+	dprintk (KERN_INFO PFX "MinMult(x10)=%d MaxMult(x10)=%d\n",
 		 minmult, maxmult);
-	dprintk (KERN_INFO "longhaul: Lowestspeed=%d Highestspeed=%d\n",
+	dprintk (KERN_INFO PFX "Lowestspeed=%d Highestspeed=%d\n",
 		 lowest_speed, highest_speed);
 
 	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
@@ -475,25 +477,25 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 	vrmrev = (lo & (1<<15))>>15;
 
 	if (minvid == 0 || maxvid == 0) {
-		printk ("longhaul: Bogus values Min:%d.%03d Max:%d.%03d. "
+		printk (KERN_INFO PFX "Bogus values Min:%d.%03d Max:%d.%03d. "
 					"Voltage scaling disabled.\n",
 					minvid/1000, minvid%1000, maxvid/1000, maxvid%1000);
 		return;
 	}
 
 	if (minvid == maxvid) {
-		printk ("longhaul: Claims to support voltage scaling but min & max are "
+		printk (KERN_INFO PFX "Claims to support voltage scaling but min & max are "
 				"both %d.%03d. Voltage scaling disabled\n",
 				maxvid/1000, maxvid%1000);
 		return;
 	}
 
 	if (vrmrev==0) {
-		dprintk (KERN_INFO "longhaul: VRM 8.5 : ");
+		dprintk (KERN_INFO PFX "VRM 8.5 : ");
 		memcpy (voltage_table, vrm85scales, sizeof(voltage_table));
 		numvscales = (voltage_table[maxvid]-voltage_table[minvid])/25;
 	} else {
-		dprintk (KERN_INFO "longhaul: Mobile VRM : ");
+		dprintk (KERN_INFO PFX "Mobile VRM : ");
 		memcpy (voltage_table, mobilevrmscales, sizeof(voltage_table));
 		numvscales = (voltage_table[maxvid]-voltage_table[minvid])/5;
 	}
@@ -574,7 +576,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 	}
 
-	printk (KERN_INFO "longhaul: VIA CPU detected. Longhaul version %d supported\n", longhaul);
+	printk (KERN_INFO PFX "VIA CPU detected. Longhaul version %d supported\n", longhaul);
 
 	if (longhaul==2 || longhaul==3) {
 		unsigned long lo, hi;
@@ -616,7 +618,7 @@ static int __init longhaul_init (void)
 	case 8:
 		return -ENODEV;
 	default:
-		printk (KERN_INFO "longhaul: Unknown VIA CPU. Contact davej@suse.de\n");
+		printk (KERN_INFO PFX "Unknown VIA CPU. Contact davej@suse.de\n");
 	}
 
 	return -ENODEV;
