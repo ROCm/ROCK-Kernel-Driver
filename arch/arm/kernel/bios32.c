@@ -22,9 +22,9 @@ static int debug_pci;
 
 void pcibios_report_status(u_int status_mask, int warn)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		u16 status;
 
 		/*
