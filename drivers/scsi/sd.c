@@ -87,6 +87,7 @@
  * Number of allowed retries
  */
 #define SD_MAX_RETRIES		5
+#define SD_PASSTHROUGH_RETRIES	1
 
 static void scsi_disk_release(struct kref *kref);
 
@@ -219,15 +220,14 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	struct gendisk *disk;
 	sector_t block;
 	struct scsi_device *sdp = SCpnt->device;
+	struct request *rq = SCpnt->request;
 
 	timeout = sdp->timeout;
 
 	/*
-	 * these are already setup, just copy cdb basically
+	 * SG_IO from block layer already setup, just copy cdb basically
 	 */
-	if (SCpnt->request->flags & REQ_BLOCK_PC) {
-		struct request *rq = SCpnt->request;
-
+	if (blk_pc_request(rq)) {
 		if (sizeof(rq->cmd) > sizeof(SCpnt->cmnd))
 			return 0;
 
@@ -244,26 +244,28 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 			timeout = rq->timeout;
 
 		SCpnt->transfersize = rq->data_len;
+		SCpnt->allowed = SD_PASSTHROUGH_RETRIES;
 		goto queue;
 	}
 
 	/*
 	 * we only do REQ_CMD and REQ_BLOCK_PC
 	 */
-	if (!(SCpnt->request->flags & REQ_CMD))
+	if (! blk_fs_request(rq))
 		return 0;
 
-	disk = SCpnt->request->rq_disk;
-	block = SCpnt->request->sector;
+	disk = rq->rq_disk;
+	block = rq->sector;
 	this_count = SCpnt->request_bufflen >> 9;
 
 	SCSI_LOG_HLQUEUE(1, printk("sd_init_command: disk=%s, block=%llu, "
-			    "count=%d\n", disk->disk_name, (unsigned long long)block, this_count));
+			    "count=%d\n", disk->disk_name,
+			 (unsigned long long)block, this_count));
 
 	if (!sdp || !scsi_device_online(sdp) ||
- 	    block + SCpnt->request->nr_sectors > get_capacity(disk)) {
+ 	    block + rq->nr_sectors > get_capacity(disk)) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
-				 SCpnt->request->nr_sectors));
+				 rq->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
 	}
@@ -291,7 +293,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	 * for this.
 	 */
 	if (sdp->sector_size == 1024) {
-		if ((block & 1) || (SCpnt->request->nr_sectors & 1)) {
+		if ((block & 1) || (rq->nr_sectors & 1)) {
 			printk(KERN_ERR "sd: Bad block number requested");
 			return 0;
 		} else {
@@ -300,7 +302,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 		}
 	}
 	if (sdp->sector_size == 2048) {
-		if ((block & 3) || (SCpnt->request->nr_sectors & 3)) {
+		if ((block & 3) || (rq->nr_sectors & 3)) {
 			printk(KERN_ERR "sd: Bad block number requested");
 			return 0;
 		} else {
@@ -309,7 +311,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 		}
 	}
 	if (sdp->sector_size == 4096) {
-		if ((block & 7) || (SCpnt->request->nr_sectors & 7)) {
+		if ((block & 7) || (rq->nr_sectors & 7)) {
 			printk(KERN_ERR "sd: Bad block number requested");
 			return 0;
 		} else {
@@ -317,25 +319,24 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 			this_count = this_count >> 3;
 		}
 	}
-	if (rq_data_dir(SCpnt->request) == WRITE) {
+	if (rq_data_dir(rq) == WRITE) {
 		if (!sdp->writeable) {
 			return 0;
 		}
 		SCpnt->cmnd[0] = WRITE_6;
 		SCpnt->sc_data_direction = DMA_TO_DEVICE;
-	} else if (rq_data_dir(SCpnt->request) == READ) {
+	} else if (rq_data_dir(rq) == READ) {
 		SCpnt->cmnd[0] = READ_6;
 		SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 	} else {
-		printk(KERN_ERR "sd: Unknown command %lx\n", 
-		       SCpnt->request->flags);
-/* overkill 	panic("Unknown sd command %lx\n", SCpnt->request->flags); */
+		printk(KERN_ERR "sd: Unknown command %lx\n", rq->flags);
+/* overkill 	panic("Unknown sd command %lx\n", rq->flags); */
 		return 0;
 	}
 
 	SCSI_LOG_HLQUEUE(2, printk("%s : %s %d/%ld 512 byte blocks.\n", 
-		disk->disk_name, (rq_data_dir(SCpnt->request) == WRITE) ? 
-		"writing" : "reading", this_count, SCpnt->request->nr_sectors));
+		disk->disk_name, (rq_data_dir(rq) == WRITE) ? 
+		"writing" : "reading", this_count, rq->nr_sectors));
 
 	SCpnt->cmnd[1] = 0;
 	
@@ -387,9 +388,9 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	 */
 	SCpnt->transfersize = sdp->sector_size;
 	SCpnt->underflow = this_count << 9;
+	SCpnt->allowed = SD_MAX_RETRIES;
 
 queue:
-	SCpnt->allowed = SD_MAX_RETRIES;
 	SCpnt->timeout_per_command = timeout;
 
 	/*
@@ -779,9 +780,15 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 	   unnecessary additional work such as memcpy's that could be avoided.
 	 */
 
-	/* An error occurred */
-	if (driver_byte(result) != 0 && 	/* An error occurred */
-	    (SCpnt->sense_buffer[0] & 0x7f) == 0x70) { /* Sense current */
+	/* 
+	 * If SG_IO from block layer then set good_bytes to stop retries;
+	 * else if errors, check them, and if necessary prepare for
+	 * (partial) retries.
+	 */
+	if (blk_pc_request(SCpnt->request))
+		good_bytes = this_count;
+	else if (driver_byte(result) != 0 &&
+	    (SCpnt->sense_buffer[0] & 0x7f) == 0x70) {
 		switch (SCpnt->sense_buffer[2]) {
 		case MEDIUM_ERROR:
 			if (!(SCpnt->sense_buffer[0] & 0x80))
