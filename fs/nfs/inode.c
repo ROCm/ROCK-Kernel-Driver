@@ -151,10 +151,6 @@ nfs_clear_inode(struct inode *inode)
 	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
-	/* Clean up the V4 state */
-	nfs4_put_state_owner(inode, nfsi->wo_owner);
-	nfs4_put_state_owner(inode, nfsi->ro_owner);
-	nfs4_put_state_owner(inode, nfsi->rw_owner);
 }
 
 void
@@ -891,7 +887,7 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
  * Ensure that mmap has a recent RPC credential for use when writing out
  * shared pages
  */
-static inline void
+void
 nfs_set_mmcred(struct inode *inode, struct rpc_cred *cred)
 {
 	struct rpc_cred **p = &NFS_I(inode)->mm_cred,
@@ -1573,9 +1569,7 @@ static struct file_system_type nfs4_fs_type = {
 
 #define nfs4_zero_state(nfsi) \
 	do { \
-		(nfsi)->wo_owner = NULL; \
-		(nfsi)->ro_owner = NULL; \
-		(nfsi)->rw_owner = NULL; \
+		INIT_LIST_HEAD(&(nfsi)->open_states); \
 	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)
 #define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)

@@ -42,8 +42,9 @@
 #include <linux/slab.h>
 #include <linux/nfs_fs.h>
 
-/* This protects most of the client-side state. */
-static spinlock_t               state_spinlock = SPIN_LOCK_UNLOCKED;
+#define OPENOWNER_POOL_SIZE	8
+
+static spinlock_t		state_spinlock = SPIN_LOCK_UNLOCKED;
 
 nfs4_stateid zero_stateid =
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -60,7 +61,7 @@ static LIST_HEAD(nfs4_clientid_list);
  * Since these are allocated/deallocated very rarely, we don't
  * bother putting them in a slab cache...
  */
-struct nfs4_client *
+static struct nfs4_client *
 nfs4_alloc_client(struct in_addr *addr)
 {
 	struct nfs4_client *clp;
@@ -70,6 +71,7 @@ nfs4_alloc_client(struct in_addr *addr)
 		memcpy(&clp->cl_addr, addr, sizeof(clp->cl_addr));
 		init_rwsem(&clp->cl_sem);
 		INIT_LIST_HEAD(&clp->cl_state_owners);
+		INIT_LIST_HEAD(&clp->cl_unused);
 		spin_lock_init(&clp->cl_lock);
 		atomic_set(&clp->cl_count, 1);
 		clp->cl_state = NFS4CLNT_NEW;
@@ -77,10 +79,19 @@ nfs4_alloc_client(struct in_addr *addr)
 	return clp;
 }
 
-void
+static void
 nfs4_free_client(struct nfs4_client *clp)
 {
-	BUG_ON(!clp);
+	struct nfs4_state_owner *sp;
+
+	while (!list_empty(&clp->cl_unused)) {
+		sp = list_entry(clp->cl_unused.next,
+				struct nfs4_state_owner,
+				so_list);
+		list_del(&sp->so_list);
+		kfree(sp);
+	}
+	BUG_ON(!list_empty(&clp->cl_state_owners));
 	kfree(clp);
 }
 
@@ -120,62 +131,210 @@ nfs4_put_client(struct nfs4_client *clp)
 static inline u32
 nfs4_alloc_lockowner_id(struct nfs4_client *clp)
 {
-	u32 res;
+	return clp->cl_lockowner_id ++;
+}
 
-	spin_lock(&state_spinlock);
-	res = clp->cl_lockowner_id ++;
-	spin_unlock(&state_spinlock);
-	return res;
+static struct nfs4_state_owner *
+nfs4_client_grab_unused(struct nfs4_client *clp, struct rpc_cred *cred)
+{
+	struct nfs4_state_owner *sp = NULL;
+
+	if (!list_empty(&clp->cl_unused)) {
+		sp = list_entry(clp->cl_unused.next, struct nfs4_state_owner, so_list);
+		atomic_inc(&sp->so_count);
+		sp->so_cred = cred;
+		list_move(&sp->so_list, &clp->cl_state_owners);
+		clp->cl_nunused--;
+	}
+	return sp;
 }
 
 /*
- * nfs4_get_state_owner(): this is called on the OPEN or CREATE path to
- * obtain a new state_owner.
- *
- * There are three state_owners (open_owner4 in rfc3010) per inode,
- * one for each possible combination of share lock access. Since
- * Linux does not support the deny access type, there are
- * three (not 9) referenced by the nfs_inode:
- *
- * O_WRONLY: inode->wo_owner
- * O_RDONLY: inode->ro_owner
- * O_RDWR:   inode->rw_owner
- *
- * We create a new state_owner the first time a file is OPENed with
- * one of the above shares. All other OPENs with a similar
- * share use the single stateid associated with the inode.
+ * nfs4_alloc_state_owner(): this is called on the OPEN or CREATE path to
+ * create a new state_owner.
  *
  */
-struct nfs4_state_owner *
-nfs4_get_state_owner(struct inode *dir)
+static struct nfs4_state_owner *
+nfs4_alloc_state_owner(void)
 {
-	struct nfs4_client *clp;
 	struct nfs4_state_owner *sp;
 
 	sp = kmalloc(sizeof(*sp),GFP_KERNEL);
 	if (!sp)
 		return NULL;
-	clp = (NFS_SB(dir->i_sb))->nfs4_state;
-	BUG_ON(!clp);
 	init_MUTEX(&sp->so_sema);
 	sp->so_seqid = 0;                 /* arbitrary */
-	memset(sp->so_stateid, 0, sizeof(nfs4_stateid));
-	sp->so_id = nfs4_alloc_lockowner_id(clp);
+	INIT_LIST_HEAD(&sp->so_states);
+	atomic_set(&sp->so_count, 1);
 	return sp;
 }
 
-/*
- * Called for each non-null inode state_owner in nfs_clear_inode, 
- * or if nfs4_do_open fails.
- */
-void
-nfs4_put_state_owner(struct inode *inode, struct nfs4_state_owner *sp)
+struct nfs4_state_owner *
+nfs4_get_state_owner(struct nfs_server *server, struct rpc_cred *cred)
 {
+	struct nfs4_client *clp = server->nfs4_state;
+	struct nfs4_state_owner *sp, *new;
+
+	get_rpccred(cred);
+	new = nfs4_alloc_state_owner();
+	spin_lock(&clp->cl_lock);
+	sp = nfs4_client_grab_unused(clp, cred);
+	if (sp == NULL && new != NULL) {
+		list_add(&new->so_list, &clp->cl_state_owners);
+		new->so_client = clp;
+		new->so_id = nfs4_alloc_lockowner_id(clp);
+		new->so_cred = cred;
+		sp = new;
+		new = NULL;
+	}
+	spin_unlock(&clp->cl_lock);
+	if (new)
+		kfree(new);
 	if (!sp)
+		put_rpccred(cred);
+	return sp;
+}
+
+void
+nfs4_put_state_owner(struct nfs4_state_owner *sp)
+{
+	struct nfs4_client *clp = sp->so_client;
+	struct rpc_cred *cred = sp->so_cred;
+
+	if (!atomic_dec_and_lock(&sp->so_count, &clp->cl_lock))
 		return;
-	if (sp->so_flags & O_ACCMODE)
-		nfs4_do_close(inode, sp);
-        kfree(sp);
+	if (clp->cl_nunused >= OPENOWNER_POOL_SIZE)
+		goto out_free;
+	list_move(&sp->so_list, &clp->cl_unused);
+	clp->cl_nunused++;
+	spin_unlock(&clp->cl_lock);
+	put_rpccred(cred);
+	cred = NULL;
+	return;
+out_free:
+	list_del(&sp->so_list);
+	spin_unlock(&clp->cl_lock);
+	put_rpccred(cred);
+	kfree(sp);
+}
+
+static struct nfs4_state *
+nfs4_alloc_open_state(void)
+{
+	struct nfs4_state *state;
+
+	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return NULL;
+	state->pid = current->pid;
+	state->state = 0;
+	memset(state->stateid, 0, sizeof(state->stateid));
+	atomic_set(&state->count, 1);
+	return state;
+}
+
+static struct nfs4_state *
+__nfs4_find_state_bypid(struct inode *inode, pid_t pid)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs4_state *state;
+
+	list_for_each_entry(state, &nfsi->open_states, inode_states) {
+		if (state->pid == pid) {
+			atomic_inc(&state->count);
+			return state;
+		}
+	}
+	return NULL;
+}
+
+static struct nfs4_state *
+__nfs4_find_state_byowner(struct inode *inode, struct nfs4_state_owner *owner)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs4_state *state;
+
+	list_for_each_entry(state, &nfsi->open_states, inode_states) {
+		if (state->owner == owner) {
+			atomic_inc(&state->count);
+			return state;
+		}
+	}
+	return NULL;
+}
+
+struct nfs4_state *
+nfs4_find_state_bypid(struct inode *inode, pid_t pid)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs4_state *state;
+
+	spin_lock(&inode->i_lock);
+	state = __nfs4_find_state_bypid(inode, pid);
+	/* Add the state to the tail of the inode's list */
+	if (state)
+		list_move_tail(&state->inode_states, &nfsi->open_states);
+	spin_unlock(&inode->i_lock);
+	return state;
+}
+
+static void
+nfs4_free_open_state(struct nfs4_state *state)
+{
+	kfree(state);
+}
+
+struct nfs4_state *
+nfs4_get_open_state(struct inode *inode, struct nfs4_state_owner *owner)
+{
+	struct nfs4_state *state, *new;
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	spin_lock(&inode->i_lock);
+	state = __nfs4_find_state_byowner(inode, owner);
+	spin_unlock(&inode->i_lock);
+	if (state)
+		goto out;
+	new = nfs4_alloc_open_state();
+	spin_lock(&inode->i_lock);
+	state = __nfs4_find_state_byowner(inode, owner);
+	if (state == NULL && new != NULL) {
+		state = new;
+		/* Caller *must* be holding owner->so_sem */
+		list_add(&state->open_states, &owner->so_states);
+		state->owner = owner;
+		atomic_inc(&owner->so_count);
+		list_add(&state->inode_states, &nfsi->open_states);
+		state->inode = inode;
+		atomic_inc(&inode->i_count);
+		spin_unlock(&inode->i_lock);
+	} else {
+		spin_unlock(&inode->i_lock);
+		if (new)
+			nfs4_free_open_state(new);
+	}
+out:
+	return state;
+}
+
+void
+nfs4_put_open_state(struct nfs4_state *state)
+{
+	struct inode *inode = state->inode;
+	struct nfs4_state_owner *owner = state->owner;
+
+	if (!atomic_dec_and_lock(&state->count, &inode->i_lock))
+		return;
+	list_del(&state->inode_states);
+	spin_unlock(&inode->i_lock);
+	down(&owner->so_sema);
+	list_del(&state->open_states);
+	if (state->state != 0)
+		nfs4_do_close(inode, state);
+	up(&owner->so_sema);
+	iput(inode);
+	nfs4_free_open_state(state);
+	nfs4_put_state_owner(owner);
 }
 
 /*
@@ -190,79 +349,6 @@ nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp)
 {
 	if (status == NFS_OK || seqid_mutating_err(status))
 		sp->so_seqid++;
-}
-
-/*
-* Called by nfs4_proc_open to set the appropriate stateid
-*/
-int
-nfs4_set_inode_share(struct inode * inode, struct nfs4_state_owner *sp, unsigned int open_flags)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	switch (open_flags & O_ACCMODE) {
-		case O_RDONLY:
-			if (!nfsi->ro_owner) {
-				nfsi->ro_owner = sp;
-				return 0;
-			}
-			break;
-		case O_WRONLY:
-			if (!nfsi->wo_owner) {
-				nfsi->wo_owner = sp;
-				return 0;
-			}
-			break;
-		case O_RDWR:
-			if (!nfsi->rw_owner) {
-				nfsi->rw_owner = sp;
-				return 0;
-			}
-	}
-	return -EBUSY;
-}
-
-/*
-* Boolean test to determine if an OPEN call goes on the wire.
-*
-* Called by nfs4_proc_open.
-*/
-int
-nfs4_test_state_owner(struct inode *inode, unsigned int open_flags)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	switch (open_flags & O_ACCMODE) {
-		case O_RDONLY:
-			if(nfsi->ro_owner)
-				return 0;
-			break;
-		case O_WRONLY:
-			if(nfsi->wo_owner)
-				return 0;
-			break;
-		case O_RDWR:
-			if(nfsi->rw_owner)
-				return 0;
-        }
-        return 1;
-}
-
-struct nfs4_state_owner *
-nfs4_get_inode_share(struct inode * inode, unsigned int open_flags)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	switch (open_flags & O_ACCMODE) {
-		case O_RDONLY:
-			return nfsi->ro_owner;
-		case O_WRONLY:
-			return nfsi->wo_owner;
-		case O_RDWR:
-			return nfsi->rw_owner;
-	}
-	/* Duh gcc warning if we don't... */
-	return NULL;
 }
 
 /*

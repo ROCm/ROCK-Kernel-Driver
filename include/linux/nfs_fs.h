@@ -27,7 +27,6 @@
 #include <linux/nfs2.h>
 #include <linux/nfs3.h>
 #include <linux/nfs4.h>
-#include <linux/nfs_page.h>
 #include <linux/nfs_xdr.h>
 
 /*
@@ -158,9 +157,7 @@ struct nfs_inode {
 
 #ifdef CONFIG_NFS_V4
         /* NFSv4 state */
-	struct nfs4_state_owner   *ro_owner;
-	struct nfs4_state_owner   *wo_owner;
-	struct nfs4_state_owner   *rw_owner;
+	struct list_head	open_states;
 #endif /* CONFIG_NFS_V4*/
 
 	struct inode		vfs_inode;
@@ -229,12 +226,6 @@ loff_t page_offset(struct page *page)
 	return ((loff_t)page->index) << PAGE_CACHE_SHIFT;
 }
 
-static inline
-loff_t req_offset(struct nfs_page *req)
-{
-	return (((loff_t)req->wb_index) << PAGE_CACHE_SHIFT) + req->wb_offset;
-}
-
 /*
  * linux/fs/nfs/inode.c
  */
@@ -244,6 +235,7 @@ extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int, struct nameidata *);
+extern void nfs_set_mmcred(struct inode *, struct rpc_cred *);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
@@ -494,29 +486,60 @@ struct nfs4_client {
 	struct rw_semaphore	cl_sem;
 
 	struct list_head	cl_state_owners;
+	struct list_head	cl_unused;
+	int			cl_nunused;
 	spinlock_t		cl_lock;
 	atomic_t		cl_count;
 };
 
 /*
-* The ->so_sema is held during all state_owner seqid-mutating operations:
-* OPEN, OPEN_DOWNGRADE, and CLOSE.
-* Its purpose is to properly serialize so_seqid, as mandated by
-* the protocol.
-*/
+ * NFS4 state_owners and lock_owners are simply labels for ordered
+ * sequences of RPC calls. Their sole purpose is to provide once-only
+ * semantics by allowing the server to identify replayed requests.
+ *
+ * The ->so_sema is held during all state_owner seqid-mutating operations:
+ * OPEN, OPEN_DOWNGRADE, and CLOSE. Its purpose is to properly serialize
+ * so_seqid.
+ */
 struct nfs4_state_owner {
 	struct list_head     so_list;	 /* per-clientid list of state_owners */
+	struct nfs4_client   *so_client;
 	u32                  so_id;      /* 32-bit identifier, unique */
 	struct semaphore     so_sema;
 	u32                  so_seqid;   /* protected by so_sema */
-	nfs4_stateid         so_stateid; /* protected by so_sema */
 	unsigned int         so_flags;   /* protected by so_sema */
+	atomic_t	     so_count;
+
+	struct rpc_cred	     *so_cred;	 /* Associated cred */
+	struct list_head     so_states;
+};
+
+/*
+ * struct nfs4_state maintains the client-side state for a given
+ * (state_owner,inode) tuple.
+ *
+ * In order to know when to OPEN_DOWNGRADE or CLOSE the state on the server,
+ * we need to know how many files are open for reading or writing on a
+ * given inode. This information too is stored here.
+ */
+struct nfs4_state {
+	struct list_head open_states;	/* List of states for the same state_owner */
+	struct list_head inode_states;	/* List of states for the same inode */
+
+	struct nfs4_state_owner *owner;	/* Pointer to the open owner */
+	struct inode *inode;		/* Pointer to the inode */
+	pid_t pid;			/* Thread that called OPEN */
+
+	nfs4_stateid stateid;
+
+	int state;			/* State on the server (R,W, or RW) */
+	atomic_t count;
 };
 
 
 /* nfs4proc.c */
 extern int nfs4_proc_renew(struct nfs_server *server);
-extern int nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp);
+extern int nfs4_do_close(struct inode *, struct nfs4_state *);
 
 /* nfs4renewd.c */
 extern int nfs4_init_renewd(struct nfs_server *server);
@@ -524,13 +547,11 @@ extern int nfs4_init_renewd(struct nfs_server *server);
 /* nfs4state.c */
 extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
-extern struct nfs4_state_owner * nfs4_get_state_owner(struct inode *inode);
-void nfs4_put_state_owner(struct inode *inode, struct nfs4_state_owner *sp);
-extern int nfs4_set_inode_share(struct inode * inode,
-                     struct nfs4_state_owner *sp, unsigned int flags);
+extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
+extern void nfs4_put_state_owner(struct nfs4_state_owner *);
+extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
+extern void nfs4_put_open_state(struct nfs4_state *);
 extern void nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp);
-extern int nfs4_test_state_owner(struct inode *inode, unsigned int open_flags);
-struct nfs4_state_owner * nfs4_get_inode_share(struct inode * inode, unsigned int open_flags);
 
 
 
@@ -561,6 +582,7 @@ destroy_nfsv4_state(struct nfs_server *server)
 #define create_nfsv4_state(server, data)  0
 #define destroy_nfsv4_state(server)       do { } while (0)
 #define nfs4_put_state_owner(inode, owner) do { } while (0)
+#define nfs4_put_open_state(state) do { } while (0)
 #endif
 
 #endif /* __KERNEL__ */

@@ -553,14 +553,17 @@ encode_open(struct xdr_stream *xdr, struct nfs_openargs *arg)
 	WRITE32(OP_OPEN);
 	WRITE32(arg->seqid);
 	switch (arg->share_access) {
-		case O_RDONLY:
+		case FMODE_READ:
 			WRITE32(NFS4_SHARE_ACCESS_READ);
 			break;
-		case O_WRONLY:
+		case FMODE_WRITE:
 			WRITE32(NFS4_SHARE_ACCESS_WRITE);
 			break;
-		case O_RDWR:
+		case FMODE_READ|FMODE_WRITE:
 			WRITE32(NFS4_SHARE_ACCESS_BOTH);
+			break;
+		default:
+			BUG();
 	}
 	WRITE32(0);                  /* for linux, share_deny = 0 always */
 	WRITE64(arg->clientid);

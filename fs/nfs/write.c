@@ -152,11 +152,6 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 		},
 	};
 
-	if (file)
-		wdata.cred = get_rpccred(nfs_file_cred(file));
-	if (!wdata.cred)
-		wdata.cred = get_rpccred(NFS_I(inode)->mm_cred);
-
 	dprintk("NFS:      nfs_writepage_sync(%s/%Ld %d@%Ld)\n",
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
@@ -167,7 +162,7 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 			wdata.args.count = count;
 		wdata.args.offset = page_offset(page) + wdata.args.pgbase;
 
-		result = NFS_PROTO(inode)->write(&wdata);
+		result = NFS_PROTO(inode)->write(&wdata, file);
 
 		if (result < 0) {
 			/* Must mark the page invalid after I/O error */
@@ -213,8 +208,6 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 	status = (IS_ERR(req)) ? PTR_ERR(req) : 0;
 	if (status < 0)
 		goto out;
-	if (!req->wb_cred)
-		req->wb_cred = get_rpccred(NFS_I(inode)->mm_cred);
 	nfs_unlock_request(req);
 	nfs_strategy(inode);
 	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
@@ -556,7 +549,7 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		}
 		spin_unlock(&nfs_wreq_lock);
 
-		new = nfs_create_request(nfs_file_cred(file), inode, page, offset, bytes);
+		new = nfs_create_request(file, inode, page, offset, bytes);
 		if (IS_ERR(new))
 			return new;
 		if (file) {
@@ -637,7 +630,6 @@ int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
 	struct inode	*inode = page->mapping->host;
-	struct rpc_cred	*cred = nfs_file_cred(file);
 	struct nfs_page	*req;
 	int		status = 0;
 	/*
@@ -650,7 +642,7 @@ nfs_flush_incompatible(struct file *file, struct page *page)
 	 */
 	req = nfs_find_request(inode, page->index);
 	if (req) {
-		if (req->wb_file != file || req->wb_cred != cred || req->wb_page != page)
+		if (!NFS_PROTO(inode)->request_compatible(req, file, page))
 			status = nfs_wb_page(inode, page);
 		nfs_release_request(req);
 	}

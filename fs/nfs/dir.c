@@ -785,6 +785,9 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 	struct inode *inode;
 	int error = -EACCES;
 
+	/* We may have been initialized further down */
+	if (dentry->d_inode)
+		return 0;
 	if (fhandle->size == 0 || !(fattr->valid & NFS_ATTR_FATTR)) {
 		struct inode *dir = dentry->d_parent->d_inode;
 		error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, fhandle, fattr);
@@ -813,8 +816,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		struct nameidata *nd)
 {
 	struct iattr attr;
-	struct nfs_fattr fattr;
-	struct nfs_fh fhandle;
+	struct inode *inode;
 	int error;
 	int open_flags = 0;
 
@@ -835,12 +837,15 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	 */
 	lock_kernel();
 	nfs_zap_caches(dir);
-	error = NFS_PROTO(dir)->create(dir, &dentry->d_name,
-					 &attr, open_flags, &fhandle, &fattr);
-	if (!error)
-		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	else
+	inode = NFS_PROTO(dir)->create(dir, &dentry->d_name, &attr, open_flags);
+	if (!IS_ERR(inode)) {
+		d_instantiate(dentry, inode);
+		nfs_renew_times(dentry);
+		error = 0;
+	} else {
+		error = PTR_ERR(inode);
 		d_drop(dentry);
+	}
 	unlock_kernel();
 	return error;
 }

@@ -553,13 +553,13 @@ process_cinfo(struct nfs4_change_info *info, struct nfs_fattr *fattr)
 	}
 }
 
-int
-nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
-		struct iattr *sattr, struct nfs_fattr *fattr,
-		struct nfs_fh *fhandle, struct nfs4_state_owner **spp)
+struct nfs4_state *
+nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *sattr, struct rpc_cred *cred)
 {
 	struct nfs4_state_owner  *sp;
+	struct nfs4_state     *state = NULL;
 	struct nfs_server       *server = NFS_SERVER(dir);
+	struct inode *inode = NULL;
 	struct nfs4_change_info d_cinfo;
 	int                     status;
 	struct nfs_fattr        d_attr = {
@@ -570,7 +570,7 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	};
 	struct nfs4_getattr     f_getattr = {
 		.gt_bmval       = nfs4_fattr_bitmap,
-		.gt_attrs       = (fattr == NULL ? &f_attr: fattr),
+		.gt_attrs       = &f_attr,
 	};
 	struct nfs4_getattr     d_getattr = {
 		.gt_bmval       = nfs4_fattr_bitmap,
@@ -578,7 +578,7 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	};
 	struct nfs_openargs o_arg = {
 		.fh             = NFS_FH(dir),
-		.share_access   = flags & O_ACCMODE,
+		.share_access   = flags & (FMODE_READ|FMODE_WRITE),
 		.clientid       = NFS_SERVER(dir)->nfs4_state->cl_clientid,
 		.opentype       = (flags & O_CREAT) ? NFS4_OPEN_CREATE : NFS4_OPEN_NOCREATE,
 		.createmode     = (flags & O_EXCL) ? NFS4_CREATE_EXCLUSIVE : NFS4_CREATE_UNCHECKED,
@@ -597,10 +597,11 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN],
 		.rpc_argp       = &o_arg,
 		.rpc_resp       = &o_res,
+		.rpc_cred	= cred,
 	};
 
 	status = -ENOMEM;
-	if (!(sp = nfs4_get_state_owner(dir))) {
+	if (!(sp = nfs4_get_state_owner(NFS_SERVER(dir), cred))) {
 		dprintk("nfs4_do_open: nfs4_get_state_owner failed!\n");
 		goto out;
 	}
@@ -624,11 +625,13 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	process_cinfo(&d_cinfo, &d_attr);
 	nfs_refresh_inode(dir, &d_attr);
 
-	if (fhandle) {
-		memset(fhandle, 0, sizeof(*fhandle));
-		fhandle->size = (o_res.fh.size < NFS_MAXFHSIZE ? o_res.fh.size : NFS_MAXFHSIZE);
-		memcpy(fhandle->data, o_res.fh.data, fhandle->size);
-	}
+	status = -ENOMEM;
+	inode = nfs_fhget(dir->i_sb, &o_res.fh, &f_attr);
+	if (!inode)
+		goto out_up;
+	state = nfs4_get_open_state(inode, sp);
+	if (!state)
+		goto out_up;
 
 	if(o_res.rflags & NFS4_OPEN_RESULT_CONFIRM) {
 		struct nfs_open_confirmargs oc_arg = {
@@ -642,6 +645,7 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 			.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_CONFIRM],
 			.rpc_argp       = &oc_arg,
 			.rpc_resp       = &oc_res,
+			.rpc_cred	= cred,
 		};
 
 		memcpy(oc_arg.stateid, o_res.stateid, sizeof(nfs4_stateid));
@@ -649,22 +653,32 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 		if (status)
 			goto out_up;
 		nfs4_increment_seqid(status, sp);
-		memcpy(sp->so_stateid, oc_res.stateid, sizeof(nfs4_stateid));
+		memcpy(state->stateid, oc_res.stateid, sizeof(state->stateid));
 	} else
-		memcpy(sp->so_stateid, o_res.stateid, sizeof(nfs4_stateid));
-	sp->so_flags = flags & O_ACCMODE;
+		memcpy(state->stateid, o_res.stateid, sizeof(state->stateid));
+	state->state |= flags & (FMODE_READ|FMODE_WRITE);
+	state->pid = current->pid;
+
+	up(&sp->so_sema);
+	nfs4_put_state_owner(sp);
+	iput(inode);
+	return state;
 
 out_up:
 	up(&sp->so_sema);
+	nfs4_put_state_owner(sp);
+	if (state)
+		nfs4_put_open_state(state);
+	if (inode)
+		iput(inode);
 out:
-	*spp = sp;
-	return status;
+	return ERR_PTR(status);
 }
 
 int
 nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
                 struct nfs_fh *fhandle, struct iattr *sattr,
-                struct nfs4_state_owner *sp)
+                struct nfs4_state *state)
 {
         struct nfs4_getattr     getattr = {
                 .gt_bmval       = nfs4_fattr_bitmap,
@@ -688,10 +702,10 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
 
         fattr->valid = 0;
 
-        if (sp)
-                memcpy(arg.stateid, sp->so_stateid, sizeof(nfs4_stateid));
+	if (state)
+		memcpy(arg.stateid, state->stateid, sizeof(arg.stateid));
         else
-                memcpy(arg.stateid, zero_stateid, sizeof(nfs4_stateid));
+		memcpy(arg.stateid, zero_stateid, sizeof(arg.stateid));
 
         return(rpc_call_sync(server->client, &msg, 0));
 }
@@ -704,10 +718,13 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
  * NFSv4 citizens - we do not indicate to the server to update the file's 
  * share state even when we are done with one of the three share 
  * stateid's in the inode.
+ *
+ * NOTE: Caller must be holding the sp->so_owner semaphore!
  */
 int
-nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp) 
+nfs4_do_close(struct inode *inode, struct nfs4_state *state) 
 {
+	struct nfs4_state_owner *sp = state->owner;
 	int status = 0;
 	struct nfs_closeargs arg = {
 		.fh		= NFS_FH(inode),
@@ -721,9 +738,8 @@ nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp)
 		.rpc_resp	= &res,
 	};
 
-        memcpy(arg.stateid, sp->so_stateid, sizeof(nfs4_stateid));
+	memcpy(arg.stateid, state->stateid, sizeof(arg.stateid));
 	/* Serialization for the sequence id */
-	down(&sp->so_sema);
 	arg.seqid = sp->so_seqid,
 	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
 
@@ -731,7 +747,6 @@ nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp)
 	 * the state_owner. we keep this around to process errors
 	 */
 	nfs4_increment_seqid(status, sp);
-	up(&sp->so_sema);
 
 	return status;
 }
@@ -837,7 +852,6 @@ no_setclientid:
 out_unlock:
 	up_write(&clp->cl_sem);
 	nfs4_put_client(clp);
-	server->nfs4_state = NULL;
 	return status;
 }
 
@@ -878,31 +892,29 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 {
 	struct inode *		inode = dentry->d_inode;
 	int			size_change = sattr->ia_valid & ATTR_SIZE;
-	struct nfs4_state_owner	*sp = NULL;
+	struct nfs4_state	*state = NULL;
 	int			status;
 
 	fattr->valid = 0;
 	
 	if (size_change) {
-		if (NFS_I(inode)->wo_owner) {
-			/* file is already open for O_WRONLY */
-			sp = NFS_I(inode)->wo_owner;
-			goto no_open;
-		}
-		status = nfs4_do_open(dentry->d_parent->d_inode, 
-				&dentry->d_name, O_WRONLY, NULL, fattr,
-				NULL, &sp);
-		if (status)
-			return status;
+		struct rpc_cred *cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
+		state = nfs4_do_open(dentry->d_parent->d_inode, 
+				&dentry->d_name, FMODE_WRITE, NULL, cred);
+		put_rpccred(cred);
+		if (IS_ERR(state))
+			return PTR_ERR(state);
 
-		if (fattr->fileid != NFS_FILEID(inode)) {
+		if (state->inode != inode) {
 			printk(KERN_WARNING "nfs: raced in setattr, returning -EIO\n");
+			nfs4_put_open_state(state);
 			return -EIO;
 		}
 	}
-no_open:
 	status = nfs4_do_setattr(NFS_SERVER(inode), fattr,
-			NFS_FH(inode), sattr, sp);
+			NFS_FH(inode), sattr, state);
+	if (state)
+		nfs4_put_open_state(state);
 	return status;
 }
 
@@ -1017,14 +1029,13 @@ nfs4_proc_readlink(struct inode *inode, struct page *page)
 }
 
 static int
-nfs4_proc_read(struct nfs_read_data *rdata)
+nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 {
 	int flags = rdata->flags;
 	struct inode *inode = rdata->inode;
 	struct nfs_fattr *fattr = rdata->res.fattr;
 	nfs4_stateid *stateid = &rdata->args.stateid;
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs4_state_owner	*sp;
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_READ],
 		.rpc_argp	= &rdata->args,
@@ -1040,13 +1051,12 @@ nfs4_proc_read(struct nfs_read_data *rdata)
 	/*
 	 * Try first to use O_RDONLY, then O_RDWR stateid.
 	 */
-	sp = nfs4_get_inode_share(inode, O_RDONLY);
-	if (!sp)
-		sp = nfs4_get_inode_share(inode, O_RDWR);
-	if (sp)
-		memcpy(stateid, sp->so_stateid, sizeof(nfs4_stateid));
-	else
-		memcpy(stateid, zero_stateid, sizeof(nfs4_stateid));
+	if (filp) {
+		struct nfs4_state *state;
+		state = (struct nfs4_state *)filp->private_data;
+		memcpy(stateid, state->stateid, sizeof(stateid));
+	} else
+		memcpy(stateid, zero_stateid, sizeof(stateid));
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
@@ -1061,14 +1071,13 @@ nfs4_proc_read(struct nfs_read_data *rdata)
 }
 
 static int
-nfs4_proc_write(struct nfs_write_data *wdata)
+nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 {
 	int rpcflags = wdata->flags;
 	struct inode *inode = wdata->inode;
 	struct nfs_fattr *fattr = wdata->res.fattr;
 	nfs4_stateid *stateid = &wdata->args.stateid;
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs4_state_owner *sp;
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_WRITE],
 		.rpc_argp	= &wdata->args,
@@ -1083,14 +1092,12 @@ nfs4_proc_write(struct nfs_write_data *wdata)
 	/*
 	 * Try first to use O_WRONLY, then O_RDWR stateid.
 	 */
-	sp = nfs4_get_inode_share(inode, O_WRONLY);
-	if (!sp)
-		sp = nfs4_get_inode_share(inode, O_RDWR);
-
-	if (sp)
-		memcpy(stateid, sp->so_stateid, sizeof(nfs4_stateid));
-	else
-		memcpy(stateid, zero_stateid, sizeof(nfs4_stateid));
+	if (filp) {
+		struct nfs4_state *state;
+		state = (struct nfs4_state *)filp->private_data;
+		memcpy(stateid, state->stateid, sizeof(stateid));
+	} else
+		memcpy(stateid, zero_stateid, sizeof(stateid));
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, rpcflags);
@@ -1113,24 +1120,33 @@ nfs4_proc_write(struct nfs_write_data *wdata)
  * opens the file O_RDONLY. This will all be resolved with the VFS changes.
  */
 
-static int
+static struct inode *
 nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
-                 int flags, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
+                 int flags)
 {
-	int                     oflags;
-	struct nfs4_state_owner   *sp = NULL;
-	int                     status;
+	struct inode *inode;
+	struct nfs4_state *state = NULL;
+	struct rpc_cred *cred;
 
-	oflags = O_RDONLY | O_CREAT | (flags & O_EXCL);
-	status = nfs4_do_open(dir, name, oflags, sattr, fattr, fhandle, &sp);
-	if (!status) {
+	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
+	state = nfs4_do_open(dir, name, flags, sattr, cred);
+	put_rpccred(cred);
+	if (!IS_ERR(state)) {
+		inode = igrab(state->inode);
 		if (flags & O_EXCL) {
-			status = nfs4_do_setattr(NFS_SERVER(dir), fattr,
-			                     fhandle, sattr, sp);
-		/* XXX should i bother closing the file? */
+			struct nfs_fattr fattr;
+			int status;
+			status = nfs4_do_setattr(NFS_SERVER(dir), &fattr,
+			                     NFS_FH(inode), sattr, state);
+			if (status != 0) {
+				iput(inode);
+				inode = ERR_PTR(status);
+			}
 		}
-	}
-	return status;
+		nfs4_put_open_state(state);
+	} else
+		inode = (struct inode *)state;
+	return inode;
 }
 
 static int
@@ -1447,7 +1463,6 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	};
 	struct inode *inode = data->inode;
 	struct nfs_page *req = nfs_list_entry(data->pages.next);
-	struct nfs4_state_owner	*sp;
 	int flags;
 
 	data->args.fh     = NFS_FH(inode);
@@ -1460,18 +1475,10 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	data->res.eof     = 0;
 	data->timestamp   = jiffies;
 
-	if(req->wb_file) {
-		unsigned int oflags = req->wb_file->f_flags;
-		sp = nfs4_get_inode_share(inode, oflags);
-	} else {
-		sp = nfs4_get_inode_share(inode, O_RDONLY);
-		if (!sp)
-			sp = nfs4_get_inode_share(inode, O_RDWR);
-	}
-	if (sp)
-		memcpy(data->args.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+	if (req->wb_state)
+		memcpy(data->args.stateid, req->wb_state->stateid, sizeof(data->args.stateid));
 	else
-		memcpy(data->args.stateid, zero_stateid, sizeof(nfs4_stateid));
+		memcpy(data->args.stateid, zero_stateid, sizeof(data->args.stateid));
 
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
@@ -1525,7 +1532,6 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	};
 	struct inode *inode = data->inode;
 	struct nfs_page *req = nfs_list_entry(data->pages.next);
-	struct nfs4_state_owner	*sp;
 	int stable;
 	int flags;
 	
@@ -1548,19 +1554,10 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	data->res.verf    = &data->verf;
 	data->timestamp   = jiffies;
 
-	if(req->wb_file) {
-		unsigned int oflags = req->wb_file->f_flags;
-		sp = nfs4_get_inode_share(inode, oflags);
-	} else {
-		sp = nfs4_get_inode_share(inode, O_WRONLY);
-		if (!sp)
-			sp = nfs4_get_inode_share(inode, O_RDWR);
-	}
-
-	if (sp)
-		memcpy(data->args.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+	if (req->wb_state)
+		memcpy(data->args.stateid, req->wb_state->stateid, sizeof(data->args.stateid));
 	else
-		memcpy(data->args.stateid, zero_stateid, sizeof(nfs4_stateid));
+		memcpy(data->args.stateid, zero_stateid, sizeof(data->args.stateid));
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
@@ -1674,48 +1671,99 @@ nfs4_proc_renew(struct nfs_server *server)
  * due to the lookup, potential create, and open VFS calls from sys_open()
  * placed on the wire.
  */
-int
+static int
 nfs4_proc_file_open(struct inode *inode, struct file *filp)
 {
 	struct dentry *dentry = filp->f_dentry;
 	struct inode *dir = dentry->d_parent->d_inode;
-	int flags, status = 0;
+	struct rpc_cred *cred;
+	struct nfs4_state *state;
+	int flags = filp->f_flags;
+	int status = 0;
 
 	dprintk("nfs4_proc_file_open: starting on (%.*s/%.*s)\n",
 	                       (int)dentry->d_parent->d_name.len,
 	                       dentry->d_parent->d_name.name,
 	                       (int)dentry->d_name.len, dentry->d_name.name);
 
+	if ((flags + 1) & O_ACCMODE)
+		flags++;
+
 	lock_kernel();
 
-	/* isn't this done in open_namei? */
-	if (!S_ISREG(inode->i_mode)) {
-		status = -EISDIR;
-		goto out;
-	}
-
-	flags = filp->f_flags & O_ACCMODE;
-
 /*
-* Got race??
 * We have already opened the file "O_EXCL" in nfs4_proc_create!!
 * This ugliness will go away with lookup-intent...
 */
-	while (!nfs4_get_inode_share(inode, flags)) {
-		struct nfs4_state_owner *sp = NULL;
-		status = nfs4_do_open(dir, &dentry->d_name, flags, NULL, NULL, NULL, &sp);
-		if (status) {
-			nfs4_put_state_owner(inode,sp);
-			break;
-		}
-		if (nfs4_set_inode_share(inode, sp, flags))
-			nfs4_put_state_owner(inode,sp);
+	cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
+	state = nfs4_do_open(dir, &dentry->d_name, flags, NULL, cred);
+	if (IS_ERR(state)) {
+		status = PTR_ERR(state);
+		state = NULL;
+	} else if (filp->f_mode & FMODE_WRITE)
+		nfs_set_mmcred(inode, cred);
+	if (inode != filp->f_dentry->d_inode) {
+		printk(KERN_WARNING "NFS: v4 raced in function %s\n", __FUNCTION__);
+		status = -EIO; /* ERACE actually */
+		nfs4_put_open_state(state);
+		state = NULL;
 	}
-out:
+	filp->private_data = state;
+	put_rpccred(cred);
 	unlock_kernel();
 	return status;
 }
 
+/*
+ * Release our state
+ */
+static int
+nfs4_proc_file_release(struct inode *inode, struct file *filp)
+{
+	struct nfs4_state *state = (struct nfs4_state *)filp->private_data;
+
+	if (state)
+		nfs4_put_open_state(state);
+	return 0;
+}
+
+/*
+ * Set up the nfspage struct with the right state info and credentials
+ */
+static void
+nfs4_request_init(struct nfs_page *req, struct file *filp)
+{
+	struct nfs4_state *state;
+
+	if (!filp) {
+		req->wb_cred = get_rpccred(NFS_I(req->wb_inode)->mm_cred);
+		req->wb_state = NULL;
+		return;
+	}
+	state = (struct nfs4_state *)filp->private_data;
+	req->wb_state = state;
+	req->wb_cred = get_rpccred(state->owner->so_cred);
+}
+
+
+static int
+nfs4_request_compatible(struct nfs_page *req, struct file *filp, struct page *page)
+{
+	struct nfs4_state *state = NULL;
+	struct rpc_cred *cred = NULL;
+
+	if (req->wb_file != filp)
+		return 0;
+	if (req->wb_page != page)
+		return 0;
+	state = (struct nfs4_state *)filp->private_data;
+	if (req->wb_state != state)
+		return 0;
+	cred = state->owner->so_cred;
+	if (req->wb_cred != cred)
+		return 0;
+	return 1;
+}
 
 struct nfs_rpc_ops	nfs_v4_clientops = {
 	.version	= 4,			/* protocol version */
@@ -1747,6 +1795,9 @@ struct nfs_rpc_ops	nfs_v4_clientops = {
 	.write_setup	= nfs4_proc_write_setup,
 	.commit_setup	= nfs4_proc_commit_setup,
 	.file_open      = nfs4_proc_file_open,
+	.file_release   = nfs4_proc_file_release,
+	.request_init	= nfs4_request_init,
+	.request_compatible = nfs4_request_compatible,
 };
 
 /*

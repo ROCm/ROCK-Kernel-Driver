@@ -89,9 +89,6 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 
 	dprintk("NFS: nfs_readpage_sync(%p)\n", page);
 
-	if (file)
-		rdata.cred = nfs_file_cred(file);
-
 	/*
 	 * This works now because the socket layer never tries to DMA
 	 * into this buffer directly.
@@ -110,7 +107,7 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 			rdata.args.count);
 
 		lock_kernel();
-		result = NFS_PROTO(inode)->read(&rdata);
+		result = NFS_PROTO(inode)->read(&rdata, file);
 		unlock_kernel();
 
 		/*
@@ -146,7 +143,7 @@ nfs_readpage_async(struct file *file, struct inode *inode, struct page *page)
 	LIST_HEAD(one_request);
 	struct nfs_page	*new;
 
-	new = nfs_create_request(nfs_file_cred(file), inode, page, 0, PAGE_CACHE_SIZE);
+	new = nfs_create_request(file, inode, page, 0, PAGE_CACHE_SIZE);
 	if (IS_ERR(new)) {
 		unlock_page(page);
 		return PTR_ERR(new);
@@ -363,8 +360,7 @@ readpage_async_filler(void *data, struct page *page)
 	struct nfs_page *new;
 
 	nfs_wb_page(inode, page);
-	new = nfs_create_request(nfs_file_cred(desc->filp), inode, page,
-				0, PAGE_CACHE_SIZE);
+	new = nfs_create_request(desc->filp, inode, page, 0, PAGE_CACHE_SIZE);
 	if (IS_ERR(new)) {
 			SetPageError(page);
 			unlock_page(page);

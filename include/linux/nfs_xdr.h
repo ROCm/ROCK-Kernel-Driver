@@ -620,6 +620,8 @@ struct nfs_write_data {
 #endif
 };
 
+struct nfs_page;
+
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
  */
@@ -635,12 +637,12 @@ struct nfs_rpc_ops {
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*access)  (struct inode *, struct rpc_cred *, int);
 	int	(*readlink)(struct inode *, struct page *);
-	int	(*read)    (struct nfs_read_data *);
-	int	(*write)   (struct nfs_write_data *);
+	int	(*read)    (struct nfs_read_data *, struct file *);
+	int	(*write)   (struct nfs_write_data *, struct file *);
 	int	(*commit)  (struct inode *, struct nfs_fattr *,
 			    unsigned long, unsigned int);
-	int	(*create)  (struct inode *, struct qstr *, struct iattr *,
-			    int, struct nfs_fh *, struct nfs_fattr *);
+	struct inode *	(*create)  (struct inode *, struct qstr *,
+			    struct iattr *, int);
 	int	(*remove)  (struct inode *, struct qstr *);
 	int	(*unlink_setup)  (struct rpc_message *,
 			    struct dentry *, struct qstr *);
@@ -669,6 +671,9 @@ struct nfs_rpc_ops {
 	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);
 	void	(*commit_setup) (struct nfs_write_data *, u64 start, u32 len, int how);
 	int	(*file_open)   (struct inode *, struct file *);
+	int	(*file_release) (struct inode *, struct file *);
+	void	(*request_init)(struct nfs_page *, struct file *);
+	int	(*request_compatible)(struct nfs_page *, struct file *, struct page *);
 };
 
 /*
