@@ -510,11 +510,11 @@ void arp_send(int type, int ptype, u32 dest_ip,
 	 */
 	
 	skb = alloc_skb(sizeof(struct arphdr)+ 2*(dev->addr_len+4)
-				+ dev->hard_header_len + 15, GFP_ATOMIC);
+				+ LL_RESERVED_SPACE(dev), GFP_ATOMIC);
 	if (skb == NULL)
 		return;
 
-	skb_reserve(skb, (dev->hard_header_len+15)&~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	skb->nh.raw = skb->data;
 	arp = (struct arphdr *) skb_put(skb,sizeof(struct arphdr) + 2*(dev->addr_len+4));
 	skb->dev = dev;

@@ -162,13 +162,13 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 	struct hh_cache *hh = dst->hh;
 	struct net_device *dev = dst->dev;
+	int hh_len = LL_RESERVED_SPACE(dev);
 
 	/* Be paranoid, rather than too clever. */
-	if (unlikely(skb_headroom(skb) < dev->hard_header_len
-		     && dev->hard_header)) {
+	if (unlikely(skb_headroom(skb) < hh_len && dev->hard_header)) {
 		struct sk_buff *skb2;
 
-		skb2 = skb_realloc_headroom(skb, (dev->hard_header_len&~15) + 16);
+		skb2 = skb_realloc_headroom(skb, LL_RESERVED_SPACE(dev));
 		if (skb2 == NULL) {
 			kfree_skb(skb);
 			return -ENOMEM;
@@ -572,7 +572,7 @@ slow_path:
 		 *	Allocate buffer.
 		 */
 
-		if ((skb2 = alloc_skb(len+hlen+rt->u.dst.dev->hard_header_len+16,GFP_ATOMIC)) == NULL) {
+		if ((skb2 = alloc_skb(len+hlen+LL_RESERVED_SPACE(rt->u.dst.dev), GFP_ATOMIC)) == NULL) {
 			NETDEBUG(printk(KERN_INFO "IP: frag: no memory for new fragment!\n"));
 			err = -ENOMEM;
 			goto fail;
@@ -583,7 +583,7 @@ slow_path:
 		 */
 
 		ip_copy_metadata(skb2, skb);
-		skb_reserve(skb2, (rt->u.dst.dev->hard_header_len&~15)+16);
+		skb_reserve(skb2, LL_RESERVED_SPACE(rt->u.dst.dev));
 		skb_put(skb2, len + hlen);
 		skb2->nh.raw = skb2->data;
 		skb2->h.raw = skb2->data + hlen;
@@ -771,7 +771,7 @@ int ip_append_data(struct sock *sk,
 		exthdrlen = 0;
 		mtu = inet->cork.fragsize;
 	}
-	hh_len = (rt->u.dst.dev->hard_header_len&~15) + 16;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
 	maxfraglen = ((mtu-fragheaderlen) & ~7) + fragheaderlen;
@@ -967,7 +967,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	if (!(rt->u.dst.dev->features&NETIF_F_SG))
 		return -EOPNOTSUPP;
 
-	hh_len = (rt->u.dst.dev->hard_header_len&~15)+16;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 	mtu = inet->cork.fragsize;
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);

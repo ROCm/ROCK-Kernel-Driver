@@ -656,7 +656,7 @@ static void __init ic_bootp_send_if(struct ic_device *d, unsigned long jiffies_d
 	struct net_device *dev = d->dev;
 	struct sk_buff *skb;
 	struct bootp_pkt *b;
-	int hh_len = (dev->hard_header_len + 15) & ~15;
+	int hh_len = LL_RESERVED_SPACE(dev);
 	struct iphdr *h;
 
 	/* Allocate packet */

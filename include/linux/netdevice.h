@@ -90,6 +90,11 @@ struct vlan_group;
 #define MAX_HEADER (LL_MAX_HEADER + 48)
 #endif
 
+/* Reserve 16byte aligned hard_header_len, but at least 16.
+ * Alternative is: dev->hard_header_len ? (dev->hard_header_len + 15)&~15 : 0
+ */
+#define LL_RESERVED_SPACE(dev) (((dev)->hard_header_len&~15) + 16)
+
 /*
  *	Network device statistics. Akin to the 2.0 ether stats but
  *	with byte counters.

@@ -616,7 +616,7 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
 	 */
-	max_headroom = (((tdev->hard_header_len+15)&~15)+sizeof(struct iphdr));
+	max_headroom = (LL_RESERVED_SPACE(tdev)+sizeof(struct iphdr));
 
 	if (skb_headroom(skb) < max_headroom || skb_cloned(skb) || skb_shared(skb)) {
 		struct sk_buff *new_skb = skb_realloc_headroom(skb, max_headroom);

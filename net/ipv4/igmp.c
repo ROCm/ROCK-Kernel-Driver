@@ -211,7 +211,7 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 		return -1;
 	}
 
-	skb=alloc_skb(IGMP_SIZE+dev->hard_header_len+15, GFP_ATOMIC);
+	skb=alloc_skb(IGMP_SIZE+LL_RESERVED_SPACE(dev), GFP_ATOMIC);
 	if (skb == NULL) {
 		ip_rt_put(rt);
 		return -1;
@@ -219,7 +219,7 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 
 	skb->dst = &rt->u.dst;
 
-	skb_reserve(skb, (dev->hard_header_len+15)&~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 
 	skb->nh.iph = iph = (struct iphdr *)skb_put(skb, sizeof(struct iphdr)+4);
 

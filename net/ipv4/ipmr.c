@@ -1178,7 +1178,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 		return;
 	}
 
-	encap += dev->hard_header_len;
+	encap += LL_RESERVED_SPACE(dev);
 
 	if (skb_headroom(skb) < encap || skb_cloned(skb) || !last)
 		skb2 = skb_realloc_headroom(skb, (encap + 15)&~15);
