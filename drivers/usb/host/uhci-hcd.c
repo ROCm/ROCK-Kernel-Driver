@@ -2442,6 +2442,7 @@ static int uhci_resume(struct usb_hcd *hcd)
 		reset_hc(uhci);
 		start_hc(uhci);
 	}
+	uhci->hcd.state = USB_STATE_READY;
 	return 0;
 }
 #endif
