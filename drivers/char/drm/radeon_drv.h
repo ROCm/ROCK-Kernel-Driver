@@ -714,6 +714,7 @@ do {									\
 			   n, __FUNCTION__ );				\
 	}								\
 	if ( dev_priv->ring.space <= (n) * sizeof(u32) ) {		\
+                COMMIT_RING();						\
 		radeon_wait_ring( dev_priv, (n) * sizeof(u32) );	\
 	}								\
 	_nr = n; dev_priv->ring.space -= (n) * sizeof(u32);		\
@@ -756,20 +757,25 @@ do {									\
 
 
 #define OUT_RING_USER_TABLE( tab, sz ) do {			\
-	if (write + (sz) > mask) {				\
-		int i;						\
-		for ( i = 0 ; i < (sz) ; i++ ) {		\
-			if (__get_user( tmp, &(tab)[i] ))	\
-				return -EFAULT;			\
-			OUT_RING( tmp );			\
-		}						\
-	}							\
-	else {							\
-		if (__copy_from_user( (int *)(ring+write), 	\
-				      (tab), (sz)*4 ))		\
+	int _size = (sz);					\
+	int *_tab = (tab);					\
+								\
+	if (write + _size > mask) {				\
+		int i = (mask+1) - write;			\
+		if (__copy_from_user( (int *)(ring+write),	\
+				      _tab, i*4 ))		\
 			return -EFAULT;				\
-		write += (sz);					\
+		write = 0;					\
+		_size -= i;					\
+		_tab += i;					\
 	}							\
+								\
+	if (_size && __copy_from_user( (int *)(ring+write),	\
+			               _tab, _size*4 ))		\
+		return -EFAULT;					\
+								\
+	write += _size;						\
+	write &= mask;						\
 } while (0)
 
 

@@ -1587,7 +1587,7 @@ static int radeon_emit_packets(
 {
 	int sz = packet[(int)header.packet.packet_id].len;
 	int reg = packet[(int)header.packet.packet_id].start;
-	int tmp, *data = (int *)cmdbuf->buf;
+	int *data = (int *)cmdbuf->buf;
 	RING_LOCALS;
    
 	if (sz * sizeof(int) > cmdbuf->bufsz) 
@@ -1610,7 +1610,7 @@ static inline int radeon_emit_scalars(
 	drm_radeon_cmd_buffer_t *cmdbuf )
 {
 	int sz = header.scalars.count;
-	int tmp, *data = (int *)cmdbuf->buf;
+	int *data = (int *)cmdbuf->buf;
 	int start = header.scalars.offset;
 	int stride = header.scalars.stride;
 	RING_LOCALS;
@@ -1632,7 +1632,7 @@ static inline int radeon_emit_vectors(
 	drm_radeon_cmd_buffer_t *cmdbuf )
 {
 	int sz = header.vectors.count;
-	int tmp, *data = (int *)cmdbuf->buf;
+	int *data = (int *)cmdbuf->buf;
 	int start = header.vectors.offset;
 	int stride = header.vectors.stride;
 	RING_LOCALS;
