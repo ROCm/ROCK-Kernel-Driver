@@ -914,8 +914,6 @@ int diFree(struct inode *ip)
 	u32 bitmap, mask;
 	struct inode *ipimap = JFS_SBI(ip->i_sb)->ipimap;
 	imap_t *imap = JFS_IP(ipimap)->i_imap;
-	s64 xaddr;
-	s64 xlen;
 	pxd_t freepxd;
 	tid_t tid;
 	struct inode *iplist[3];
@@ -1181,9 +1179,7 @@ int diFree(struct inode *ip)
 	 * invalidate any page of the inode extent freed from buffer cache;
 	 */
 	freepxd = iagp->inoext[extno];
-	xaddr = addressPXD(&iagp->inoext[extno]);
-	xlen = lengthPXD(&iagp->inoext[extno]);
-	invalidate_metapages(JFS_SBI(ip->i_sb)->direct_inode, xaddr, xlen);
+	invalidate_pxd_metapages(JFS_SBI(ip->i_sb)->direct_inode, freepxd);
 
 	/*
 	 *      update iag list(s) (careful update step 2)

@@ -672,17 +672,13 @@ int freeZeroLink(struct inode *ip)
 	 * free EA
 	 */
 	if (JFS_IP(ip)->ea.flag & DXD_EXTENT) {
-		s64 xaddr;
-		int xlen;
+		s64 xaddr = addressDXD(&JFS_IP(ip)->ea);
+		int xlen = lengthDXD(&JFS_IP(ip)->ea);
 		maplock_t maplock;	/* maplock for COMMIT_WMAP */
 		pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
 
 		/* free EA pages from cache */
-		xaddr = addressDXD(&JFS_IP(ip)->ea);
-		xlen = lengthDXD(&JFS_IP(ip)->ea);
-#ifdef _STILL_TO_PORT
-		bmExtentInvalidate(ip, xaddr, xlen);
-#endif
+		invalidate_dxd_metapages(ip, JFS_IP(ip)->ea);
 
 		/* free EA extent from working block map */
 		maplock.index = 1;
@@ -697,17 +693,12 @@ int freeZeroLink(struct inode *ip)
 	 * free ACL
 	 */
 	if (JFS_IP(ip)->acl.flag & DXD_EXTENT) {
-		s64 xaddr;
-		int xlen;
+		s64 xaddr = addressDXD(&JFS_IP(ip)->acl);
+		int xlen = lengthDXD(&JFS_IP(ip)->acl);
 		maplock_t maplock;	/* maplock for COMMIT_WMAP */
 		pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
 
-		/* free ACL pages from cache */
-		xaddr = addressDXD(&JFS_IP(ip)->acl);
-		xlen = lengthDXD(&JFS_IP(ip)->acl);
-#ifdef _STILL_TO_PORT
-		bmExtentInvalidate(ip, xaddr, xlen);
-#endif
+		invalidate_dxd_metapages(ip, JFS_IP(ip)->acl);
 
 		/* free ACL extent from working block map */
 		maplock.index = 1;
