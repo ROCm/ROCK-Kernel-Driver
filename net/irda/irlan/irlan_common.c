@@ -33,6 +33,7 @@
 #include <linux/proc_fs.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/rtnetlink.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -63,7 +64,8 @@
 /*
  *  Master structure
  */
-hashbin_t *irlan = NULL;
+static LIST_HEAD(irlans);
+
 static void *ckey;
 static void *skey;
 
@@ -124,12 +126,6 @@ int __init irlan_init(void)
 	__u16 hints;
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
-	/* Allocate master structure */
-	irlan = hashbin_new(HB_LOCK);	/* protect from /proc */
-	if (irlan == NULL) {
-		printk(KERN_WARNING "IrLAN: Can't allocate hashbin!\n");
-		return -ENOMEM;
-	}
 #ifdef CONFIG_PROC_FS
 	create_proc_info_entry("irlan", 0, proc_irda, irlan_proc_read);
 #endif /* CONFIG_PROC_FS */
@@ -158,6 +154,8 @@ int __init irlan_init(void)
 
 void __exit irlan_cleanup(void) 
 {
+	struct irlan_cb *self, *next;
+
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	irlmp_unregister_client(ckey);
@@ -166,10 +164,13 @@ void __exit irlan_cleanup(void)
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("irlan", proc_irda);
 #endif /* CONFIG_PROC_FS */
-	/*
-	 *  Delete hashbin and close all irlan client instances in it
-	 */
-	hashbin_delete(irlan, (FREE_FUNC) __irlan_close);
+
+	/* Cleanup any leftover network devices */
+	rtnl_lock();
+	list_for_each_entry_safe(self, next, &irlans, dev_list) {
+		__irlan_close(self);
+	}
+	rtnl_unlock();
 }
 
 /*
@@ -210,7 +211,6 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	struct irlan_cb *self;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
-	ASSERT(irlan != NULL, return NULL;);
 
 	/* 
 	 *  Initialize the irlan structure. 
@@ -243,7 +243,7 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	init_timer(&self->client.kick_timer);
 	init_waitqueue_head(&self->open_wait);	
 
-	hashbin_insert(irlan, (irda_queue_t *) self, daddr, NULL);
+	list_add_rcu(&self->dev_list, &irlans);
 	
 	skb_queue_head_init(&self->client.txq);
 	
@@ -258,8 +258,7 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
  * Function __irlan_close (self)
  *
  *    This function closes and deallocates the IrLAN client instances. Be 
- *    aware that other functions which calles client_close() must call 
- *    hashbin_remove() first!!!
+ *    aware that other functions which calles client_close()
  */
 static void __irlan_close(struct irlan_cb *self)
 {
@@ -267,6 +266,7 @@ static void __irlan_close(struct irlan_cb *self)
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	
+	ASSERT_RTNL();
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
 
@@ -283,10 +283,21 @@ static void __irlan_close(struct irlan_cb *self)
 	while ((skb = skb_dequeue(&self->client.txq)))
 		dev_kfree_skb(skb);
 
-	unregister_netdev(&self->dev);
+	unregister_netdevice(&self->dev);
 	
 	self->magic = 0;
 	kfree(self);
+}
+
+/* Find any instance of irlan, used for client discovery wakeup */
+struct irlan_cb *irlan_get_any(void)
+{
+	struct irlan_cb *self;
+
+	list_for_each_entry_rcu(self, &irlans, dev_list) {
+		return self;
+	}
+	return NULL;
 }
 
 /*
@@ -1086,18 +1097,16 @@ int irlan_extract_param(__u8 *buf, char *name, char *value, __u16 *len)
  */
 static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 {
- 	struct irlan_cb *self;
-	unsigned long flags;
-	ASSERT(irlan != NULL, return 0;);
+	struct irlan_cb *self;
      
 	len = 0;
 	
-	spin_lock_irqsave(&irlan->hb_spinlock, flags);
+	rcu_read_lock();
 
 	len += sprintf(buf+len, "IrLAN instances:\n");
 	
-	self = (struct irlan_cb *) hashbin_get_first(irlan);
-	while (self != NULL) {
+	list_for_each_entry_rcu(self, &irlans, dev_list) {
+
 		ASSERT(self->magic == IRLAN_MAGIC, break;);
 		
 		len += sprintf(buf+len, "ifname: %s,\n",
@@ -1126,10 +1135,8 @@ static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 			       netif_queue_stopped(&self->dev) ? "TRUE" : "FALSE");
 			
 		len += sprintf(buf+len, "\n");
-
-		self = (struct irlan_cb *) hashbin_get_next(irlan);
  	} 
-	spin_unlock_irqrestore(&irlan->hb_spinlock, flags);
+	rcu_read_unlock();
 
 	return len;
 }
