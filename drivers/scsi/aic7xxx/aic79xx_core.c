@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#161 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#163 $
  *
  * $FreeBSD$
  */
@@ -5168,7 +5168,7 @@ ahd_init_scbdata(struct ahd_softc *ahd)
 	scb_data->init_level++;
 
 	/* DMA tag for our S/G structures. */
-	if (ahd_dma_tag_create(ahd, ahd->parent_dmat, /*alignment*/1,
+	if (ahd_dma_tag_create(ahd, ahd->parent_dmat, /*alignment*/8,
 			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
 			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
@@ -6351,7 +6351,7 @@ ahd_default_config(struct ahd_softc *ahd)
 #else
 		tinfo->user.period = AHD_SYNCRATE_160;
 #endif
-		tinfo->user.offset= ~0;
+		tinfo->user.offset = MAX_OFFSET;
 		tinfo->user.ppr_options = MSG_EXT_PPR_RD_STRM
 					| MSG_EXT_PPR_WR_FLOW
 					| MSG_EXT_PPR_HOLD_MCS
@@ -8161,7 +8161,7 @@ ahd_loadseq(struct ahd_softc *ahd)
 	/* Start by aligning to the nearest cacheline. */
 	sg_prefetch_align = ahd->pci_cachesize;
 	if (sg_prefetch_align == 0)
-		sg_prefetch_cnt = 8;
+		sg_prefetch_align = 8;
 	/* Round down to the nearest power of 2. */
 	while (powerof2(sg_prefetch_align) == 0)
 		sg_prefetch_align--;

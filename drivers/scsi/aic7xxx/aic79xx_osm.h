@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#112 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#113 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -947,7 +947,7 @@ void ahd_power_state_change(struct ahd_softc *ahd,
  */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only support under 2.1.92 and above"
+#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
 #endif
 #include <linux/bios32.h>
 #endif

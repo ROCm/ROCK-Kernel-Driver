@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#79 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#81 $
  *
  * $FreeBSD$
  */
@@ -737,7 +737,7 @@ struct ahd_tmode_lstate;
 
 #define AHD_WIDTH_UNKNOWN	0xFF
 #define AHD_PERIOD_UNKNOWN	0xFF
-#define AHD_OFFSET_UNKNOWN	0x0
+#define AHD_OFFSET_UNKNOWN	0xFF
 #define AHD_PPR_OPTS_UNKNOWN	0xFF
 
 /*
