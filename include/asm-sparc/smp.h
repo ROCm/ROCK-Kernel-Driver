@@ -8,11 +8,13 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/cpumask.h>
 #include <asm/head.h>
 #include <asm/btfixup.h>
 
 #ifndef __ASSEMBLY__
+
+#include <linux/cpumask.h>
+
 /* PROM provided per-processor information we need
  * to start them all up.
  */
