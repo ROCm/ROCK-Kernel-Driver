@@ -121,22 +121,14 @@ xfs_attr_fetch(xfs_inode_t *ip, char *name, int namelen,
 	xfs_da_args_t   args;
 	int             error;
 
-	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
-		return(EIO);
-
 	if ((XFS_IFORK_Q(ip) == 0) ||
 	    (ip->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
 	     ip->i_d.di_anextents == 0))
 		return(ENOATTR);
 
-	if (!(flags & ATTR_KERNACCESS)) {
-		xfs_ilock(ip, XFS_ILOCK_SHARED);
-
-		if (!(flags & ATTR_SECURE) &&
-		    ((error = xfs_iaccess(ip, S_IRUSR, cred)))) {
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	if (!(flags & (ATTR_KERNACCESS|ATTR_SECURE))) {
+		if ((error = xfs_iaccess(ip, S_IRUSR, cred)))
 			return(XFS_ERROR(error));
-		}
 	}
 
 	/*
@@ -167,9 +159,6 @@ xfs_attr_fetch(xfs_inode_t *ip, char *name, int namelen,
 		error = xfs_attr_node_get(&args);
 	}
 
-	if (!(flags & ATTR_KERNACCESS))
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
 	/*
 	 * Return the number of bytes in the value to the caller.
 	 */
@@ -185,7 +174,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	     int flags, struct cred *cred)
 {
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
-	int		namelen;
+	int		error, namelen;
 
 	XFS_STATS_INC(xs_attr_get);
 
@@ -195,7 +184,13 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	if (namelen >= MAXNAMELEN)
 		return(EFAULT);		/* match IRIX behaviour */
 
-	return xfs_attr_fetch(ip, name, namelen, value, valuelenp, flags, cred);
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
+		return(EIO);
+
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	error = xfs_attr_fetch(ip, name, namelen, value, valuelenp, flags, cred);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	return(error);
 }
 
 /*ARGSUSED*/
@@ -718,16 +713,15 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	mp = dp->i_mount;
 	ASSERT(! XFS_NOT_DQATTACHED(mp, dp));
 
-	/* XXXsup - why on earth are we taking ILOCK_EXCL here??? */
-	xfs_ilock(dp, XFS_ILOCK_EXCL);
+	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if ((XFS_IFORK_Q(dp) == 0) ||
 	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) ||
 	    (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
 	     dp->i_d.di_anextents == 0)) {
-		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+		xfs_iunlock(dp, XFS_ILOCK_SHARED);
 		return(0);
 	}
-	xfs_iunlock(dp, XFS_ILOCK_EXCL);
+	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 
 	/*
 	 * Start our first transaction of the day.
