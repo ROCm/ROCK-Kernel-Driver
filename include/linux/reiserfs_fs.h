@@ -1631,28 +1631,42 @@ struct reiserfs_iget_args {
 /***************************************************************************/
 
 /*#ifdef __KERNEL__*/
+#define get_journal_desc_magic(bh) (bh->b_data + bh->b_size - 12)
+
+#define journal_trans_half(blocksize) \
+	((blocksize - sizeof (struct reiserfs_journal_desc) + sizeof (__u32) - 12) / sizeof (__u32))
 
 /* journal.c see journal.c for all the comments here */
-
-#define JOURNAL_TRANS_HALF 1018   /* must be correct to keep the desc and commit structs at 4k */
-
 
 /* first block written in a commit.  */
 struct reiserfs_journal_desc {
   __u32 j_trans_id ;			/* id of commit */
   __u32 j_len ;			/* length of commit. len +1 is the commit block */
   __u32 j_mount_id ;				/* mount id of this trans*/
-  __u32 j_realblock[JOURNAL_TRANS_HALF] ; /* real locations for each block */
-  char j_magic[12] ;
+  __u32 j_realblock[1] ; /* real locations for each block */
 } ;
+
+#define get_desc_trans_id(d)   le32_to_cpu((d)->j_trans_id)
+#define get_desc_trans_len(d)  le32_to_cpu((d)->j_len)
+#define get_desc_mount_id(d)   le32_to_cpu((d)->j_mount_id)
+
+#define set_desc_trans_id(d,val)       do { (d)->j_trans_id = cpu_to_le32 (val); } while (0)
+#define set_desc_trans_len(d,val)      do { (d)->j_len = cpu_to_le32 (val); } while (0)
+#define set_desc_mount_id(d,val)       do { (d)->j_mount_id = cpu_to_le32 (val); } while (0)
 
 /* last block written in a commit */
 struct reiserfs_journal_commit {
   __u32 j_trans_id ;			/* must match j_trans_id from the desc block */
   __u32 j_len ;			/* ditto */
-  __u32 j_realblock[JOURNAL_TRANS_HALF] ; /* real locations for each block */
-  char j_digest[16] ;			/* md5 sum of all the blocks involved, including desc and commit. not used, kill it */
+  __u32 j_realblock[1] ; /* real locations for each block */
 } ;
+
+#define get_commit_trans_id(c) le32_to_cpu((c)->j_trans_id)
+#define get_commit_trans_len(c)        le32_to_cpu((c)->j_len)
+#define get_commit_mount_id(c) le32_to_cpu((c)->j_mount_id)
+
+#define set_commit_trans_id(c,val)     do { (c)->j_trans_id = cpu_to_le32 (val); } while (0)
+#define set_commit_trans_len(c,val)    do { (c)->j_len = cpu_to_le32 (val); } while (0)
 
 /* this header block gets written whenever a transaction is considered fully flushed, and is more recent than the
 ** last fully flushed transaction.  fully flushed means all the log blocks and all the real blocks are on disk,

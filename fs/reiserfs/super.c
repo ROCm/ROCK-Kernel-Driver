@@ -23,9 +23,6 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 
-#define REISERFS_OLD_BLOCKSIZE 4096
-#define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
-
 static struct file_system_type reiserfs_fs_type;
 
 const char reiserfs_3_5_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
