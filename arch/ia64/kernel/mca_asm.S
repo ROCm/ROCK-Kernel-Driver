@@ -868,7 +868,7 @@ end_os_mca_restore:
 
 
 GLOBAL_ENTRY(ia64_monarch_init_handler)
-
+	.prologue
 	// stash the information the SAL passed to os
 	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
 	;;
@@ -907,6 +907,7 @@ IVirtual_Switch:
 	adds out0=16,sp				// out0 = pointer to pt_regs
 	;;
 	DO_SAVE_SWITCH_STACK
+	.body
 	adds out1=16,sp				// out0 = pointer to switch_stack
 
 	br.call.sptk.many rp=ia64_init_handler
