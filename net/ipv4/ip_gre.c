@@ -271,13 +271,17 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 	}
 
 	dev = alloc_netdev(sizeof(*t), name, ipgre_tunnel_setup);
+	if (!dev)
+	  return NULL;
+
+	dev->init = ipgre_tunnel_init;
+
 	if (register_netdevice(dev) < 0) {
 		kfree(dev);
 		goto failed;
 	}
 
 	nt = dev->priv;
-	dev->init = ipgre_tunnel_init;
 	nt->parms = *parms;
 
 	dev_hold(dev);
