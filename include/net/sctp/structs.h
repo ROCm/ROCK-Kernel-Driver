@@ -1315,6 +1315,9 @@ struct SCTP_association {
 
 	__u32 ctsn_ack_point;
 
+	/* Highest TSN that is acknowledged by incoming SACKs. */
+	__u32 highest_sacked;
+
 	/* The number of unacknowledged data chunks.  Reported through
 	 * the SCTP_STATUS sockopt.
 	 */

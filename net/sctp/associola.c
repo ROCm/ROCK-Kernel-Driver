@@ -207,6 +207,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->next_tsn = asoc->c.initial_tsn;
 
 	asoc->ctsn_ack_point = asoc->next_tsn - 1;
+	asoc->highest_sacked = asoc->ctsn_ack_point;
 
 	asoc->unack_data = 0;
 

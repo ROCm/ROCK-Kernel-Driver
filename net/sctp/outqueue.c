@@ -59,7 +59,8 @@ static int sctp_acked(sctp_sackhdr_t *sack, __u32 tsn);
 static void sctp_check_transmitted(sctp_outqueue_t *q,
 				   struct list_head *transmitted_queue,
 				   sctp_transport_t *transport,
-				   sctp_sackhdr_t *sack);
+				   sctp_sackhdr_t *sack,
+				   __u32 highest_new_tsn);
 
 /* Generate a new outqueue.  */
 sctp_outqueue_t *sctp_outqueue_new(sctp_association_t *asoc)
@@ -971,6 +972,36 @@ static void sctp_sack_update_unack_data(sctp_association_t *assoc,
 	assoc->unack_data = unack_data;
 }
 
+/* Return the highest new tsn that is acknowledged by the given SACK chunk. */
+static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
+				  sctp_association_t *asoc)
+{
+	struct list_head *ltransport, *lchunk;
+	sctp_transport_t *transport;
+	sctp_chunk_t *chunk;
+	__u32 highest_new_tsn, tsn;
+	struct list_head *transport_list = &asoc->peer.transport_addr_list;
+
+	highest_new_tsn = ntohl(sack->cum_tsn_ack);
+
+	list_for_each(ltransport, transport_list) {
+		transport = list_entry(ltransport, sctp_transport_t,
+				       transports);
+		list_for_each(lchunk, &transport->transmitted) {
+			chunk = list_entry(lchunk, sctp_chunk_t,
+					   transmitted_list);
+			tsn = ntohl(chunk->subh.data_hdr->tsn);
+
+			if (!chunk->tsn_gap_acked &&
+			    TSN_lt(highest_new_tsn, tsn) &&
+			    sctp_acked(sack, tsn))
+				highest_new_tsn = tsn;
+		}
+	}
+
+	return highest_new_tsn;
+} 
+
 /* This is where we REALLY process a SACK.
  *
  * Process the sack against the outqueue.  Mostly, this just frees
@@ -978,22 +1009,36 @@ static void sctp_sack_update_unack_data(sctp_association_t *assoc,
  */
 int sctp_sack_outqueue(sctp_outqueue_t *q, sctp_sackhdr_t *sack)
 {
+	sctp_association_t *asoc = q->asoc;
+	sctp_transport_t *transport;
 	sctp_chunk_t *tchunk;
 	struct list_head *lchunk, *transport_list, *pos;
-	__u32 tsn;
-	__u32 sack_ctsn;
-	__u32 ctsn;
-	sctp_transport_t *transport;
-	int outstanding;
+	sctp_sack_variable_t *frags = sack->variable;
+	__u32 sack_ctsn, ctsn, tsn;
+	__u32 highest_tsn, highest_new_tsn;
 	__u32 sack_a_rwnd;
+	int outstanding;
 
 	/* Grab the association's destination address list. */
-	transport_list = &q->asoc->peer.transport_addr_list;
+	transport_list = &asoc->peer.transport_addr_list;
+
+	sack_ctsn = ntohl(sack->cum_tsn_ack);
+
+	/* Get the highest TSN in the sack. */
+	highest_tsn = sack_ctsn + 
+		      ntohs(frags[ntohs(sack->num_gap_ack_blocks) - 1].gab.end);
+
+	if (TSN_lt(asoc->highest_sacked, highest_tsn)) {
+		highest_new_tsn = highest_tsn;
+		asoc->highest_sacked = highest_tsn;
+	} else {
+		highest_new_tsn = sctp_highest_new_tsn(sack, asoc);
+	}
 
 	/* Run through the retransmit queue.  Credit bytes received
 	 * and free those chunks that we can.
 	 */
-	sctp_check_transmitted(q, &q->retransmit, NULL, sack);
+	sctp_check_transmitted(q, &q->retransmit, NULL, sack, highest_new_tsn);
 
 	/* Run through the transmitted queue.
 	 * Credit bytes received and free those chunks which we can.
@@ -1003,23 +1048,22 @@ int sctp_sack_outqueue(sctp_outqueue_t *q, sctp_sackhdr_t *sack)
 	list_for_each(pos, transport_list) {
 		transport  = list_entry(pos, sctp_transport_t, transports);
 		sctp_check_transmitted(q, &transport->transmitted,
-				       transport, sack);
+				       transport, sack, highest_new_tsn);
 	}
 
 	/* Move the Cumulative TSN Ack Point if appropriate.  */
-	sack_ctsn = ntohl(sack->cum_tsn_ack);
-	if (TSN_lt(q->asoc->ctsn_ack_point, sack_ctsn))
-		q->asoc->ctsn_ack_point = sack_ctsn;
+	if (TSN_lt(asoc->ctsn_ack_point, sack_ctsn))
+		asoc->ctsn_ack_point = sack_ctsn;
 
 	/* Update unack_data field in the assoc. */
-	sctp_sack_update_unack_data(q->asoc, sack);
+	sctp_sack_update_unack_data(asoc, sack);
 
-	ctsn = q->asoc->ctsn_ack_point;
+	ctsn = asoc->ctsn_ack_point;
 
 	SCTP_DEBUG_PRINTK("%s: sack Cumulative TSN Ack is 0x%x.\n",
 			  __FUNCTION__, sack_ctsn);
 	SCTP_DEBUG_PRINTK("%s: Cumulative TSN Ack of association "
-			  "%p is 0x%x.\n", __FUNCTION__, q->asoc, ctsn);
+			  "%p is 0x%x.\n", __FUNCTION__, asoc, ctsn);
 
 	/* Throw away stuff rotting on the sack queue.  */
 	list_for_each(lchunk, &q->sacked) {
@@ -1045,7 +1089,7 @@ int sctp_sack_outqueue(sctp_outqueue_t *q, sctp_sackhdr_t *sack)
 		sack_a_rwnd = 0;
 	}
 
-	q->asoc->peer.rwnd = sack_a_rwnd;
+	asoc->peer.rwnd = sack_a_rwnd;
 
 	/* See if all chunks are acked.
 	 * Make sure the empty queue handler will get run later.
@@ -1092,7 +1136,8 @@ int sctp_outqueue_is_empty(const sctp_outqueue_t *q)
 static void sctp_check_transmitted(sctp_outqueue_t *q,
 				   struct list_head *transmitted_queue,
 				   sctp_transport_t *transport,
-				   sctp_sackhdr_t *sack)
+				   sctp_sackhdr_t *sack,
+				   __u32 highest_new_tsn_in_sack)
 {
 	struct list_head *lchunk;
 	sctp_chunk_t *tchunk;
@@ -1100,7 +1145,6 @@ static void sctp_check_transmitted(sctp_outqueue_t *q,
 	__u32 tsn;
 	__u32 sack_ctsn;
 	__u32 rtt;
-	__u32 highest_new_tsn_in_sack;
 	__u8 restart_timer = 0;
 	__u8 do_fast_retransmit = 0;
 	int bytes_acked = 0;
@@ -1121,7 +1165,6 @@ static void sctp_check_transmitted(sctp_outqueue_t *q,
 #endif /* SCTP_DEBUG */
 
 	sack_ctsn = ntohl(sack->cum_tsn_ack);
-	highest_new_tsn_in_sack = sack_ctsn;
 
 	INIT_LIST_HEAD(&tlist);
 
@@ -1194,10 +1237,6 @@ static void sctp_check_transmitted(sctp_outqueue_t *q,
 				if (!tchunk->tsn_gap_acked) {
 					tchunk->tsn_gap_acked = 1;
 					bytes_acked += sctp_data_size(tchunk);
-					if (TSN_lt(highest_new_tsn_in_sack,
-						   tsn)) {
-						highest_new_tsn_in_sack = tsn;
-					}
 				}
 				list_add_tail(lchunk, &tlist);
 			}
