@@ -10,6 +10,7 @@
 O_TARGET := mm.o
 
 obj-y	 := init.o pgtable.o fault.o ioremap.o extable.o pageattr.o 
+obj-$(CONFIG_DISCONTIGMEM)	+= discontig.o
 export-objs := pageattr.o
 
 include $(TOPDIR)/Rules.make

@@ -230,6 +230,7 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 	totalhigh_pages++;
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 void __init set_highmem_pages_init(int bad_ppro) 
 {
 	int pfn;
@@ -237,6 +238,9 @@ void __init set_highmem_pages_init(int bad_ppro)
 		one_highpage_init((struct page *)(mem_map + pfn), pfn, bad_ppro);
 	totalram_pages += totalhigh_pages;
 }
+#else
+extern void set_highmem_pages_init(int);
+#endif /* !CONFIG_DISCONTIGMEM */
 
 #else
 #define kmap_init() do { } while (0)
@@ -310,6 +314,7 @@ void __init zap_low_mappings (void)
 	flush_tlb_all();
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 void __init zone_sizes_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
@@ -330,6 +335,9 @@ void __init zone_sizes_init(void)
 	}
 	free_area_init(zones_size);	
 }
+#else
+extern void zone_sizes_init(void);
+#endif /* !CONFIG_DISCONTIGMEM */
 
 /*
  * paging_init() sets up the page tables - note that the first 8MB are
@@ -407,6 +415,7 @@ void __init test_wp_bit(void)
 	}
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 static void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
@@ -416,6 +425,11 @@ static void __init set_max_mapnr_init(void)
 	max_mapnr = num_physpages = max_low_pfn;
 #endif
 }
+#define __free_all_bootmem() free_all_bootmem()
+#else
+#define __free_all_bootmem() free_all_bootmem_node(NODE_DATA(0))
+extern void set_max_mapnr_init(void);
+#endif /* !CONFIG_DISCONTIGMEM */
 
 void __init mem_init(void)
 {
@@ -437,7 +451,7 @@ void __init mem_init(void)
 	memset(empty_zero_page, 0, PAGE_SIZE);
 
 	/* this will put all low memory onto the freelists */
-	totalram_pages += free_all_bootmem();
+	totalram_pages += __free_all_bootmem();
 
 	reservedpages = 0;
 	for (tmp = 0; tmp < max_low_pfn; tmp++)
