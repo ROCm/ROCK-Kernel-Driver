@@ -18,6 +18,7 @@
 #include <linux/buffer_head.h>
 #include <linux/root_dev.h>
 #include <linux/statfs.h>
+#include <linux/kdev_t.h>
 #include <asm/uaccess.h>
 #include "hostfs.h"
 #include "kern_util.h"
@@ -230,7 +231,7 @@ static int read_inode(struct inode *ino)
 	if(name == NULL)
 		goto out;
 
-	if(file_type(name, NULL) == OS_TYPE_SYMLINK){
+	if(file_type(name, NULL, NULL) == OS_TYPE_SYMLINK){
 		name = follow_link(name);
 		if(IS_ERR(name)){
 			err = PTR_ERR(name);
@@ -523,13 +524,17 @@ static struct address_space_operations hostfs_aops = {
 static int init_inode(struct inode *inode, struct dentry *dentry)
 {
 	char *name;
-	int type, err = -ENOMEM, rdev;
+	int type, err = -ENOMEM;
+	int maj, min;
+	dev_t rdev = 0;
 
 	if(dentry){
 		name = dentry_name(dentry, 0);
 		if(name == NULL)
 			goto out;
-		type = file_type(name, &rdev);
+		type = file_type(name, &maj, &min);
+		/*Reencode maj and min with the kernel encoding.*/
+		rdev = MKDEV(maj, min);
 		kfree(name);
 	}
 	else type = OS_TYPE_DIR;
