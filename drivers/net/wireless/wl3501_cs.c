@@ -1160,10 +1160,15 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 {
 	struct wl3501_md_ind sig;
 	struct sk_buff *skb;
+	unsigned char rssi;
 	u16 pkt_len;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 	this->start_seg = sig.data;
+	wl3501_get_from_wla(this,
+			    sig.data + offsetof(struct wl3501_rx_hdr, rssi),
+			    &rssi, sizeof(rssi));
+	this->rssi = rssi <= 63 ? (rssi * 100) / 64 : 255;
 
 	if (this->llc_type == 1) {
 		u16 tmp;
