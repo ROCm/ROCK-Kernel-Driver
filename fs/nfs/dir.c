@@ -566,6 +566,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 			goto out_valid;
 		shrink_dcache_parent(dentry);
 	}
+	d_drop(dentry);
 	unlock_kernel();
 	dput(parent);
 	return 0;
