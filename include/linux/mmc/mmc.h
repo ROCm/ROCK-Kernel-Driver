@@ -28,6 +28,16 @@ struct mmc_command {
 #define MMC_RSP_CRC	(1 << 3)		/* expect valid crc */
 #define MMC_RSP_BUSY	(1 << 4)		/* card may send busy */
 
+/*
+ * These are the response types, and correspond to valid bit
+ * patterns of the above flags.  One additional valid pattern
+ * is all zeros, which means we don't expect a response.
+ */
+#define MMC_RSP_R1	(MMC_RSP_SHORT|MMC_RSP_CRC)
+#define MMC_RSP_R1B	(MMC_RSP_SHORT|MMC_RSP_CRC|MMC_RSP_BUSY)
+#define MMC_RSP_R2	(MMC_RSP_LONG|MMC_RSP_CRC)
+#define MMC_RSP_R3	(MMC_RSP_SHORT)
+
 	unsigned int		retries;	/* max number of retries */
 	unsigned int		error;		/* command error */
 

@@ -213,7 +213,7 @@ int __mmc_claim_host(struct mmc_host *host, struct mmc_card *card)
 
 		cmd.opcode = MMC_SELECT_CARD;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R1;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 	}
@@ -431,7 +431,7 @@ static int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
 
 	cmd.opcode = MMC_SEND_OP_COND;
 	cmd.arg = ocr;
-	cmd.flags = MMC_RSP_SHORT;
+	cmd.flags = MMC_RSP_R3;
 
 	for (i = 100; i; i--) {
 		err = mmc_wait_for_cmd(host, &cmd, 0);
@@ -469,7 +469,7 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 		cmd.opcode = MMC_ALL_SEND_CID;
 		cmd.arg = 0;
-		cmd.flags = MMC_RSP_LONG | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R2;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err == MMC_ERR_TIMEOUT) {
@@ -498,7 +498,7 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 		cmd.opcode = MMC_SET_RELATIVE_ADDR;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R1;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE)
@@ -519,7 +519,7 @@ static void mmc_read_csds(struct mmc_host *host)
 
 		cmd.opcode = MMC_SEND_CSD;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_LONG | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R2;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE) {
@@ -567,7 +567,7 @@ static void mmc_check_cards(struct mmc_host *host)
 
 		cmd.opcode = MMC_SEND_STATUS;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R1;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err == MMC_ERR_NONE)
