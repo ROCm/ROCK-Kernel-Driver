@@ -167,7 +167,7 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 			 val14 = ctx->ctx_pmcs[14];
 			 check_case1 = 1;
 			 break;
-		case 14: val8  = ctx->ctx_pmcs[13];
+		case 14: val8  = ctx->ctx_pmcs[8];
 			 val13 = ctx->ctx_pmcs[13];
 			 val14 = *val;
 			 check_case1 = 1;
