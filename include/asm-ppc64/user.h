@@ -9,7 +9,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include <linux/ptrace.h>
+#include <asm/ptrace.h>
 #include <asm/page.h>
 
 /*

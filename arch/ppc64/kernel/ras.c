@@ -23,7 +23,6 @@
  * End Change Activity 
  */
 
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/threads.h>
 #include <linux/kernel_stat.h>

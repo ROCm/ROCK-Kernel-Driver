@@ -27,7 +27,6 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/types.h>
-#include <linux/ptrace.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
