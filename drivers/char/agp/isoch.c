@@ -40,7 +40,7 @@ static void agp_3_5_dev_list_sort(struct agp_3_5_dev *list, unsigned int ndevs)
 
 	INIT_LIST_HEAD(head);
 
-	for(pos = start; pos != head;) {
+	for (pos=start; pos!=head; ) {
 		cur = list_entry(pos, struct agp_3_5_dev, list);
 		dev = cur->dev;
 
@@ -91,7 +91,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 	 * We'll work with an array of isoch_data's (one for each
 	 * device in dev_list) throughout this function.
 	 */
-	if((master = kmalloc(ndevs * sizeof(*master), GFP_KERNEL)) == NULL) {
+	if ((master = kmalloc(ndevs * sizeof(*master), GFP_KERNEL)) == NULL) {
 		ret = -ENOMEM;
 		goto get_out;
 	}
@@ -151,7 +151,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 	}
 
 	/* Check if this configuration has any chance of working */
-	if(tot_bw > target.maxbw) {
+	if (tot_bw > target.maxbw) {
 		printk(KERN_ERR PFX "isochronous bandwidth required "
 			"by AGP 3.0 devices exceeds that which is supported by "
 			"the AGP 3.0 bridge!\n");
@@ -177,7 +177,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 	target.n = (tnistat >> 8) & 0xff;
 
 	/* Calculate the minimum ISOCH_N needed by each master */
-	for(cdev = 0; cdev < ndevs; cdev++) {
+	for (cdev=0; cdev<ndevs; cdev++) {
 		master[cdev].y = target.y;
 		master[cdev].n = master[cdev].maxbw / (master[cdev].y + 1);
 
@@ -186,7 +186,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 
 	/* Exit if the minimal ISOCH_N allocation among the masters is more
 	 * than the target can handle. */
-	if(tot_n > target.n) {
+	if (tot_n > target.n) {
 		printk(KERN_ERR PFX "number of isochronous "
 			"transactions per period required by AGP 3.0 devices "
 			"exceeds that which is supported by the AGP 3.0 "
@@ -204,7 +204,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 	 * Along the way, distribute the extra ISOCH_N capability calculated
 	 * above.
 	 */
-	for(cdev = 0; cdev < ndevs; cdev++) {
+	for (cdev=0; cdev<ndevs; cdev++) {
 		/*
 		 * This is a little subtle.  If ISOCH_Y > 64B, then ISOCH_Y
 		 * byte isochronous writes will be broken into 64B pieces.
@@ -213,13 +213,12 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 		 * many writes on the AGP bus).
 		 */
 		master[cdev].rq = master[cdev].n;
-		if(master[cdev].y > 0x1) {
+		if(master[cdev].y > 0x1)
 			master[cdev].rq *= (1 << (master[cdev].y - 1));
-		}
 
 		tot_rq += master[cdev].rq;
 
-		if(cdev == ndevs - 1)
+		if (cdev == ndevs-1)
 			master[cdev].n += rem;
 	}
 
@@ -230,7 +229,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 
 	/* Exit if the minimal RQ needs of the masters exceeds what the target
 	 * can provide. */
-	if(tot_rq > rq_isoch) {
+	if (tot_rq > rq_isoch) {
 		printk(KERN_ERR PFX "number of request queue slots "
 			"required by the isochronous bandwidth requested by "
 			"AGP 3.0 devices exceeds the number provided by the "
@@ -247,7 +246,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 
 	/* Distribute the extra RQ slots calculated above and write our
 	 * isochronous settings out to the actual devices. */
-	for(cdev = 0; cdev < ndevs; cdev++) {
+	for (cdev=0; cdev<ndevs; cdev++) {
 		cur = master[cdev].dev;
 		dev = cur->dev;
 
@@ -301,7 +300,7 @@ static void agp_3_5_nonisochronous_node_enable(struct agp_bridge_data *bridge,
 
 	rem = mrq + (trq % ndevs);
 
-	for(pos = head->next; cdev < ndevs; cdev++, pos = pos->next) {
+	for (pos=head->next; cdev<ndevs; cdev++, pos=pos->next) {
 		cur = list_entry(pos, struct agp_3_5_dev, list);
 
 		pci_read_config_dword(cur->dev, cur->capndx+AGPCMD, &mcmd);
@@ -332,7 +331,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 	 * Allocate a head for our AGP 3.0 device list (multiple AGP 3.0
 	 * devices are allowed behind a single bridge). 
 	 */
-	if((dev_list = kmalloc(sizeof(*dev_list), GFP_KERNEL)) == NULL) {
+	if ((dev_list = kmalloc(sizeof(*dev_list), GFP_KERNEL)) == NULL) {
 		ret = -ENOMEM;
 		goto get_out;
 	}
@@ -395,7 +394,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 		dev = cur->dev;
 		
 		pci_read_config_word(dev, PCI_STATUS, &mpstat);
-		if((mpstat & PCI_STATUS_CAP_LIST) == 0)
+		if ((mpstat & PCI_STATUS_CAP_LIST) == 0)
 			continue;
 
 		pci_read_config_byte(dev, PCI_CAPABILITY_LIST, &mcapndx);
@@ -408,7 +407,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 			while (((ncapid & 0xff) != 0x02) && (mcapndx != 0x00));
 		}
 
-		if(mcapndx == 0) {
+		if (mcapndx == 0) {
 			printk(KERN_ERR PFX "woah!  Non-AGP device "
 				"found on the secondary bus of an AGP 3.5 bridge!\n");
 			ret = -ENODEV;
@@ -416,7 +415,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 		}
 
 		mmajor = (ncapid >> AGP_MAJOR_VERSION_SHIFT) & 0xf;
-		if(mmajor < 3) {
+		if (mmajor < 3) {
 			printk(KERN_ERR PFX "woah!  AGP 2.0 device "
 				"found on the secondary bus of an AGP 3.5 "
 				"bridge operating with AGP 3.0 electricals!\n");
@@ -428,7 +427,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 
 		pci_read_config_dword(dev, cur->capndx+AGPSTAT, &mstatus);
 
-		if(((mstatus >> 3) & 0x1) == 0) {
+		if (((mstatus >> 3) & 0x1) == 0) {
 			printk(KERN_ERR PFX "woah!  AGP 3.x device "
 				"not operating in AGP 3.x mode found on the "
 				"secondary bus of an AGP 3.5 bridge operating "
@@ -442,7 +441,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 
 		/* figure the lesser rate */
 		tmp = mstatus & 0x7;
-		if(tmp < rate) 
+		if (tmp < rate) 
 			rate = tmp;
 			
 	}		
@@ -519,7 +518,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 
 free_and_exit:
 	/* Be sure to free the dev_list */
-	for(pos = head->next; pos != head;) {
+	for (pos=head->next; pos!=head; ) {
 		cur = list_entry(pos, struct agp_3_5_dev, list);
 
 		pos = pos->next;
