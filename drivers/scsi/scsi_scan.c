@@ -1733,7 +1733,6 @@ int scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->attached)
 		return -EINVAL;
 
-	devfs_remove(sdev->devfs_name);
 	scsi_device_unregister(sdev);
 
 	scsi_free_sdev(sdev);
