@@ -472,7 +472,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 			f->type_mask = uf.type_mask;
 			f->opcode    = uf.opcode;
 			*((u32 *) f->event_mask + 0) = uf.event_mask[0];
-			*((u32 *) f->event_mask + 1) = uf.event_mask[0];
+			*((u32 *) f->event_mask + 1) = uf.event_mask[1];
 		}
 		break; 
 
@@ -522,7 +522,7 @@ int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 			uf.type_mask = f->type_mask;
 			uf.opcode    = f->opcode;
 			uf.event_mask[0] = *((u32 *) f->event_mask + 0);
-			uf.event_mask[0] = *((u32 *) f->event_mask + 1);
+			uf.event_mask[1] = *((u32 *) f->event_mask + 1);
 		}
 
 		len = MIN(len, sizeof(uf));
