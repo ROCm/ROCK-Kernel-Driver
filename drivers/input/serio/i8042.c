@@ -16,10 +16,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/config.h>
-#include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/sysdev.h>
-#include <linux/pm.h>
 #include <linux/serio.h>
 #include <linux/err.h>
 
@@ -825,27 +822,6 @@ void i8042_controller_cleanup(void)
 
 
 /*
- * We need to reset the 8042 back to original mode on system shutdown,
- * because otherwise BIOSes will be confused.
- */
-
-static int i8042_notify_sys(struct notifier_block *this, unsigned long code,
-        		    void *unused)
-{
-        if (code == SYS_DOWN || code == SYS_HALT)
-        	i8042_controller_cleanup();
-        return NOTIFY_DONE;
-}
-
-static struct notifier_block i8042_notifier =
-{
-        i8042_notify_sys,
-        NULL,
-        0
-};
-
-
-/*
  * Here we try to restore the original BIOS settings
  */
 
@@ -903,6 +879,11 @@ static int i8042_resume(struct device *dev, u32 level)
 	return 0;
 
 }
+
+/*
+ * We need to reset the 8042 back to original mode on system shutdown,
+ * because otherwise BIOSes will be confused.
+ */
 
 static void i8042_shutdown(struct device *dev)
 {
@@ -1031,16 +1012,12 @@ int __init i8042_init(void)
 
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
-	register_reboot_notifier(&i8042_notifier);
-
 	return 0;
 }
 
 void __exit i8042_exit(void)
 {
 	int i;
-
-	unregister_reboot_notifier(&i8042_notifier);
 
 	i8042_controller_cleanup();
 
