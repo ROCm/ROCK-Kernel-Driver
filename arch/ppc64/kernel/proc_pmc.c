@@ -44,8 +44,6 @@
 
 static int proc_pmc_control_mode = 0;
 
-static struct proc_dir_entry *proc_ppc64_root = NULL;
-static struct proc_dir_entry *proc_ppc64_pmc_root = NULL;
 static struct proc_dir_entry *proc_ppc64_pmc_system_root = NULL;
 static struct proc_dir_entry *proc_ppc64_pmc_cpu_root[NR_CPUS] = {NULL, };
 

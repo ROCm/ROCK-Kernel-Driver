@@ -234,6 +234,10 @@ void __init
 chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	  unsigned long r6, unsigned long r7)
 {
+	struct device_node * dn;
+	char * hypertas;
+	unsigned int len;
+
 #if 0 /* PPPBBB remove this later... -Peter */
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* take care of initrd if we have one */
@@ -273,15 +277,12 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
          * using contents of device-tree/ibm,hypertas-functions.
          * Ultimately this functionality may be moved into prom.c prom_init().
          */
-	struct device_node * dn;
-	char * hypertas;
-	unsigned int len;
 	dn = of_find_node_by_path("/rtas");
 	cur_cpu_spec->firmware_features = 0;
 	hypertas = get_property(dn, "ibm,hypertas-functions", &len);
 	if (hypertas) {
 	    while (len > 0){
-		int i;
+		int i, hypertas_len;
 		/* check value against table of strings */
 		for(i=0; i < FIRMWARE_MAX_FEATURES ;i++) {
 		    if ((firmware_features_table[i].name) && (strcmp(firmware_features_table[i].name,hypertas))==0) {
@@ -290,7 +291,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 			break;
 		    } 
 		}
-		int hypertas_len = strlen(hypertas);
+		hypertas_len = strlen(hypertas);
 		len -= hypertas_len +1;
 		hypertas+= hypertas_len +1;
 	    }
@@ -324,6 +325,13 @@ chrp_progress(char *s, unsigned short hex)
 			max_width = 0x10;
 		display_character = rtas_token("display-character");
 		set_indicator = rtas_token("set-indicator");
+	}
+	if (display_character == RTAS_UNKNOWN_SERVICE) {
+		/* use hex display */
+		if (set_indicator == RTAS_UNKNOWN_SERVICE)
+			return;
+		rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
+		return;
 	}
 
 	if(display_character == RTAS_UNKNOWN_SERVICE) {
@@ -430,10 +438,10 @@ void __init pSeries_calibrate_decr(void)
 	ppc_proc_freq = processor_freq;
 	of_node_put(cpu);
 
-        printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
+	printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
 	       freq/1000000, freq%1000000);
 	printk("time_init: processor frequency   = %lu.%.6lu MHz\n",
-		processor_freq/1000000, processor_freq%1000000);
+	       processor_freq/1000000, processor_freq%1000000);
 
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_ticks_per_sec = tb_ticks_per_jiffy * HZ;

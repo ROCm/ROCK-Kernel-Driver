@@ -498,6 +498,12 @@ _STATIC(rtas_return_loc)
 	mfspr	r4,SPRG3	        /* Get PACA */
 	SET_REG_TO_CONST(r5, KERNELBASE)
         sub     r4,r4,r5                /* RELOC the PACA base pointer */
+
+	mfmsr   r6
+	li	r0,MSR_RI
+	andc	r6,r6,r0
+	sync	
+	mtmsrd  r6
         
         ld	r1,PACAR1(r4)           /* Restore our SP */
 	LOADADDR(r3,.rtas_restore_regs)
