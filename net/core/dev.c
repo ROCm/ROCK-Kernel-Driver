@@ -996,11 +996,29 @@ int dev_close(struct net_device *dev)
  *	The notifier passed is linked into the kernel structures and must
  *	not be reused until it has been unregistered. A negative errno code
  *	is returned on a failure.
+ *
+ * 	When registered all registration and up events are replayed
+ *	to the new notifier to allow device to have a race free 
+ *	view of the network device list.
  */
 
 int register_netdevice_notifier(struct notifier_block *nb)
 {
-	return notifier_chain_register(&netdev_chain, nb);
+	struct net_device *dev;
+	int err;
+
+	rtnl_lock();
+	err = notifier_chain_register(&netdev_chain, nb);
+	if (!err) {
+		for (dev = dev_base; dev; dev = dev->next) {
+			nb->notifier_call(nb, NETDEV_REGISTER, dev);
+
+			if (dev->flags & IFF_UP) 
+				nb->notifier_call(nb, NETDEV_UP, dev);
+		}
+	}
+	rtnl_unlock();
+	return err;
 }
 
 /**
