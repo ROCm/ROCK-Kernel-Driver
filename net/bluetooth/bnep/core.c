@@ -712,16 +712,12 @@ static int __init bnep_init_module(void)
 
 	bnep_sock_init();
 
-	bnep_crc32_init();
-
 	return 0;
 }
 
 static void __exit bnep_cleanup_module(void)
 {
 	bnep_sock_cleanup();
-
-	bnep_crc32_cleanup();
 }
 
 module_init(bnep_init_module);

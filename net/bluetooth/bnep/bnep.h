@@ -24,9 +24,8 @@
 #define _BNEP_H
 
 #include <linux/types.h>
+#include <linux/crc32.h>
 #include <net/bluetooth/bluetooth.h>
-
-#include "crc32.h"
 
 // Limits
 #define BNEP_MAX_PROTO_FILTERS     5
@@ -179,7 +178,7 @@ int bnep_sock_cleanup(void);
 
 static inline int bnep_mc_hash(__u8 *addr)
 {
-        return (bnep_crc32(~0, addr, ETH_ALEN) >> 26);
+        return (crc32_be(~0, addr, ETH_ALEN) >> 26);
 }
 
 #endif

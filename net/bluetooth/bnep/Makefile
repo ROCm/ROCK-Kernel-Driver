@@ -4,6 +4,6 @@
 
 obj-$(CONFIG_BT_BNEP) += bnep.o
 
-bnep-objs := core.o sock.o netdev.o crc32.o
+bnep-objs := core.o sock.o netdev.o
 
 include $(TOPDIR)/Rules.make
