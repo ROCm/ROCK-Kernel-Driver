@@ -6,6 +6,8 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/device.h>
+#include <linux/pci-dynids.h>
 #include "pci.h"
 
 /*
@@ -86,14 +88,14 @@ pci_device_probe_dynamic(struct pci_driver *drv,
 {		   
 	int error = -ENODEV;
 	struct list_head *pos;
-	struct dynid_attribute *dattr;
+	struct dynid *dynid;
 	
 	spin_lock(&drv->dynids.lock);
 	list_for_each(pos, &drv->dynids.list) {
-		dattr = list_entry(pos, struct dynid_attribute, node);
-		if (pci_match_one_device(dattr->id, pci_dev)) {
+		dynid = list_entry(pos, struct dynid, node);
+		if (pci_match_one_device(&dynid->id, pci_dev)) {
 			spin_unlock(&drv->dynids.lock);
-			error = drv->probe(pci_dev, dattr->id);
+			error = drv->probe(pci_dev, &dynid->id);
 			if (error >= 0) {
 				pci_dev->driver = drv;
 				return 0;
@@ -185,7 +187,6 @@ static int pci_device_resume(struct device * dev, u32 level)
 }
 
 /*
- * Attribute to force driver probe for devices
  * If __pci_device_probe() returns 0, it matched at least one previously
  * unclaimed device.  If it returns -ENODEV, it didn't match.  Both are
  * alright in this case, just keep searching for new devices.
@@ -207,32 +208,66 @@ probe_each_pci_dev(struct pci_driver *drv)
 	return error;
 }
 
-static ssize_t
-store_probe_it(struct device_driver *driver, const char *buf, size_t count)
+static inline void
+dynid_init(struct dynid *dynid)
 {
-	int error = 0;
-	struct pci_driver *drv = to_pci_driver(driver);
-	int writeone = 0;
-	if (!((sscanf(buf, "%d", &writeone) == 1) && writeone == 1))
-		return -EINVAL;
-	
-	if (get_driver(driver)) {
-		error = probe_each_pci_dev(drv);
-		put_driver(driver);
-	}
-	if (error < 0)
-		return error;
+	memset(dynid, 0, sizeof(*dynid));
+	INIT_LIST_HEAD(&dynid->node);
+}
+
+/**
+ * store_new_id
+ * @ pdrv
+ * @ buf
+ * @ count
+ *
+ * Adds a new dynamic pci device ID to this driver,
+ * and causes the driver to probe for all devices again.
+ */
+static inline ssize_t
+store_new_id(struct device_driver * driver, const char * buf, size_t count)
+{
+	struct dynid *dynid;
+	struct pci_driver *pdrv = to_pci_driver(driver);
+	__u32 vendor=PCI_ANY_ID, device=PCI_ANY_ID, subvendor=PCI_ANY_ID,
+		subdevice=PCI_ANY_ID, class=0, class_mask=0;
+	unsigned long driver_data=0;
+	int fields=0, error=0;
+
+	fields = sscanf(buf, "%x %x %x %x %x %x %lux",
+			&vendor, &device, &subvendor, &subdevice,
+			&class, &class_mask, &driver_data);
+	if (fields < 0) return -EINVAL;
+
+	dynid = kmalloc(sizeof(*dynid), GFP_KERNEL);
+	if (!dynid) return -ENOMEM;
+	dynid_init(dynid);
+
+	dynid->id.vendor = vendor;
+	dynid->id.device = device;
+	dynid->id.subvendor = subvendor;
+	dynid->id.subdevice = subdevice;
+	dynid->id.class = class;
+	dynid->id.class_mask = class_mask;
+	dynid->id.driver_data = pdrv->dynids.use_driver_data ? driver_data : 0UL;
+
+	spin_lock(&pdrv->dynids.lock);
+	list_add(&pdrv->dynids.list, &dynid->node);
+	spin_unlock(&pdrv->dynids.lock);
+
+        if (get_driver(&pdrv->driver)) {
+                error = probe_each_pci_dev(pdrv);
+                put_driver(&pdrv->driver);
+        }
+        if (error < 0)
+                return error;
+        return count;
+
+
 	return count;
 }
 
-static int
-probe_it_exists(struct device_driver *driver)
-{
-	struct pci_driver *pdrv = to_pci_driver(driver);
-	return pdrv->probe != NULL;
-}
-
-static DRIVER_ATTR_EXISTS(probe_it, S_IWUSR, NULL, store_probe_it, probe_it_exists);
+static DRIVER_ATTR(new_id, S_IWUSR, NULL, store_new_id);
 
 #define kobj_to_pci_driver(obj) container_of(obj, struct device_driver, kobj)
 #define attr_to_driver_attribute(obj) container_of(obj, struct driver_attribute, attr)
@@ -275,25 +310,19 @@ static struct sysfs_ops pci_driver_sysfs_ops = {
 static struct kobj_type pci_driver_kobj_type = {
 	.sysfs_ops     = &pci_driver_sysfs_ops,
 };
-static struct driver_attribute * driver_attrs[] = {
-	&driver_attr_probe_it,
-	NULL,
-};
 
-static void pci_populate_driver_dir(struct pci_driver * drv)
+static int
+pci_populate_driver_dir(struct pci_driver * drv)
 {
-	struct driver_attribute * attr;
-	int error = 0, i;
+	int error = 0;
 
-	for (i = 0; (attr = driver_attrs[i]) && !error; i++) {
-		if (!attr->exists || 
-		    (attr->exists && attr->exists(&drv->driver)))
-			error = sysfs_create_file(&drv->driver.kobj,&attr->attr);
-	}
+	if (drv->probe != NULL)
+		error = sysfs_create_file(&drv->driver.kobj,&driver_attr_new_id.attr);
+	return error;
 }
 
 static inline void
-pci_init_dynids(struct pci_dynamic_id_kobj *dynids)
+pci_init_dynids(struct pci_dynids *dynids)
 {
 	memset(dynids, 0, sizeof(*dynids));
 	spin_lock_init(&dynids->lock);
@@ -329,7 +358,6 @@ pci_register_driver(struct pci_driver *drv)
 
 	if (count >= 0) {
 		pci_populate_driver_dir(drv);
-		pci_register_dynids(drv);
 	}
 		
 	return count ? count : 1;
@@ -392,7 +420,7 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
 	const struct pci_device_id * ids = pci_drv->id_table;
 	const struct pci_device_id *found_id;
 	struct list_head *pos;
-	struct dynid_attribute *dattr;
+	struct dynid *dynid;
 
 	if (!ids)
 		return 0;
@@ -403,8 +431,8 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
 
 	spin_lock(&pci_drv->dynids.lock);
 	list_for_each(pos, &pci_drv->dynids.list) {
-		dattr = list_entry(pos, struct dynid_attribute, node);
-		if (pci_match_one_device(dattr->id, pci_dev)) {
+		dynid = list_entry(pos, struct dynid, node);
+		if (pci_match_one_device(&dynid->id, pci_dev)) {
 			spin_unlock(&pci_drv->dynids.lock);
 			return 1;
 		}
