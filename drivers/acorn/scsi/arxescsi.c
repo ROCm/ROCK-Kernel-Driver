@@ -29,6 +29,7 @@
 #include <linux/stat.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/dma.h>
 #include <asm/io.h>
@@ -238,10 +239,10 @@ static int
 arxescsi_proc_info(char *buffer, char **start, off_t offset, int length,
 		   int host_no, int inout)
 {
-	int pos, begin;
 	struct Scsi_Host *host;
 	struct arxescsi_info *info;
-	Scsi_Device *scd;
+	char *p = buffer;
+	int pos;
 
 	host = scsi_host_hn_get(host_no);
 	if (!host)
@@ -251,26 +252,13 @@ arxescsi_proc_info(char *buffer, char **start, off_t offset, int length,
 	if (inout == 1)
 		return -EINVAL;
 
-	begin = 0;
-	pos = sprintf(buffer, "ARXE 16-bit SCSI driver v%s\n", VERSION);
-	pos += fas216_print_host(&info->info, buffer + pos);
-	pos += fas216_print_stats(&info->info, buffer + pos);
+	p += sprintf(p, "ARXE 16-bit SCSI driver v%s\n", VERSION);
+	p += fas216_print_host(&info->info, p);
+	p += fas216_print_stats(&info->info, p);
+	p += fas216_print_devices(&info->info, p);
 
-	pos += sprintf (buffer+pos, "\nAttached devices:\n");
-
-	list_for_each_entry(scd, &host->my_devices, siblings) {
-		pos += fas216_print_device(&info->info, scd, buffer + pos);
-
-		if (pos + begin < offset) {
-			begin += pos;
-			pos = 0;
-		}
-		if (pos + begin > offset + length)
-			break;
-	}
-
-	*start = buffer + (offset - begin);
-	pos -= offset - begin;
+	*start = buffer + offset;
+	pos = p - buffer - offset;
 	if (pos > length)
 		pos = length;
 
@@ -397,7 +385,6 @@ static struct ecard_driver arxescsi_driver = {
 	.remove		= __devexit_p(arxescsi_remove),
 	.id_table	= arxescsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "arxescsi",
 	},
 };

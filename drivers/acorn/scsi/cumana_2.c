@@ -356,10 +356,10 @@ cumanascsi_2_set_proc_info(struct Scsi_Host *host, char *buffer, int length)
 int cumanascsi_2_proc_info (char *buffer, char **start, off_t offset,
 			    int length, int host_no, int inout)
 {
-	int pos, begin;
 	struct Scsi_Host *host;
 	struct cumanascsi2_info *info;
-	Scsi_Device *scd;
+	char *p = buffer;
+	int pos;
 
 	host = scsi_host_hn_get(host_no);
 	if (!host)
@@ -370,38 +370,16 @@ int cumanascsi_2_proc_info (char *buffer, char **start, off_t offset,
 
 	info = (struct cumanascsi2_info *)host->hostdata;
 
-	begin = 0;
-	pos = sprintf(buffer, "Cumana SCSI II driver v%s\n", VERSION);
-	pos += fas216_print_host(&info->info, buffer + pos);
-	pos += sprintf(buffer + pos, "Term    : o%s\n",
+	p += sprintf(p, "Cumana SCSI II driver v%s\n", VERSION);
+	p += fas216_print_host(&info->info, p);
+	p += sprintf(p, "Term    : o%s\n",
 			info->terms ? "n" : "ff");
 
-	pos += fas216_print_stats(&info->info, buffer + pos);
+	p += fas216_print_stats(&info->info, p);
+	p += fas216_print_devices(&info->info, p);
 
-	pos += sprintf(buffer+pos, "\nAttached devices:\n");
-
-	list_for_each_entry(scd, &host->my_devices, siblings) {
-		int len;
-
-		proc_print_scsidevice(scd, buffer, &len, pos);
-		pos += len;
-		pos += sprintf(buffer+pos, "Extensions: ");
-		if (scd->tagged_supported)
-			pos += sprintf(buffer+pos, "TAG %sabled [%d] ",
-				       scd->tagged_queue ? "en" : "dis",
-				       scd->current_tag);
-		pos += sprintf(buffer+pos, "\n");
-
-		if (pos + begin < offset) {
-			begin += pos;
-			pos = 0;
-		}
-		if (pos + begin > offset + length)
-			break;
-	}
-
-	*start = buffer + (offset - begin);
-	pos -= offset - begin;
+	*start = buffer + offset;
+	pos = p - buffer - offset;
 	if (pos > length)
 		pos = length;
 
@@ -572,7 +550,6 @@ static struct ecard_driver cumanascsi2_driver = {
 	.remove		= __devexit_p(cumanascsi2_remove),
 	.id_table	= cumanascsi2_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "cumanascsi2",
 	},
 };

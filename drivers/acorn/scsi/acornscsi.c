@@ -2934,23 +2934,21 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
     p += sprintf(p, "\nAttached devices:\n");
 
     list_for_each_entry(scd, &instance->my_devices, siblings) {
-	int len;
-
-	proc_print_scsidevice(scd, p, &len, 0);
-	p += len;
-
-	p += sprintf(p, "Extensions: ");
-
+	p += sprintf(p, "Device/Lun TaggedQ      Sync\n");
+	p += sprintf(p, "     %d/%d   ", scd->id, scd->lun);
 	if (scd->tagged_supported)
-	    p += sprintf(p, "TAG %sabled [%d] ",
-			  scd->tagged_queue ? "en" : "dis", scd->current_tag);
-	p += sprintf(p, "\nTransfers: ");
-	if (host->device[scd->id].sync_xfer & 15)
-	    p += sprintf(p, "sync, offset %d, %d ns\n",
-			  host->device[scd->id].sync_xfer & 15,
-			  acornscsi_getperiod(host->device[scd->id].sync_xfer));
+		p += sprintf(p, "%3sabled(%3d) ",
+			     scd->tagged_queue ? "en" : "dis",
+			     scd->current_tag);
 	else
-	    p += sprintf(p, "async\n");
+		p += sprintf(p, "unsupported  ");
+
+	if (host->device[scd->id].sync_xfer & 15)
+		p += sprintf(p, "offset %d, %d ns\n",
+			     host->device[scd->id].sync_xfer & 15,
+			     acornscsi_getperiod(host->device[scd->id].sync_xfer));
+	else
+		p += sprintf(p, "async\n");
 
 	pos = p - buffer;
 	if (pos + begin < offset) {
@@ -3106,7 +3104,6 @@ static struct ecard_driver acornscsi_driver = {
 	.remove		= __devexit_p(acornscsi_remove),
 	.id_table	= acornscsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "acornscsi",
 	},
 };
