@@ -55,7 +55,6 @@ static void ata_host_set_udma(struct ata_port *ap);
 static void ata_dev_set_pio(struct ata_port *ap, unsigned int device);
 static void ata_dev_set_udma(struct ata_port *ap, unsigned int device);
 static void ata_set_mode(struct ata_port *ap);
-static int ata_qc_issue_prot(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
 static struct workqueue_struct *ata_wq;
@@ -2369,7 +2368,7 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 	qc->ap->active_tag = qc->tag;
 	qc->flags |= ATA_QCFLAG_ACTIVE;
 
-	return ata_qc_issue_prot(qc);
+	return ap->ops->qc_issue(qc);
 
 err_out:
 	return -1;
@@ -2391,7 +2390,7 @@ err_out:
  *	Zero on success, negative on error.
  */
 
-static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
+int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 
@@ -3348,6 +3347,7 @@ EXPORT_SYMBOL_GPL(ata_std_bios_param);
 EXPORT_SYMBOL_GPL(ata_std_ports);
 EXPORT_SYMBOL_GPL(ata_device_add);
 EXPORT_SYMBOL_GPL(ata_qc_complete);
+EXPORT_SYMBOL_GPL(ata_qc_issue_prot);
 EXPORT_SYMBOL_GPL(ata_eng_timeout);
 EXPORT_SYMBOL_GPL(ata_tf_load_pio);
 EXPORT_SYMBOL_GPL(ata_tf_load_mmio);

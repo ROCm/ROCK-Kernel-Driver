@@ -115,6 +115,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.bmdma_setup            = pdc_dma_setup,
 	.bmdma_start            = pdc_dma_start,
 	.qc_prep		= pdc_qc_prep,
+	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc_interrupt,
 	.scr_read		= pdc_sata_scr_read,

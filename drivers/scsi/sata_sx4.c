@@ -201,6 +201,7 @@ static struct ata_port_operations pdc_20621_ops = {
 	.bmdma_setup            = pdc20621_dma_setup,
 	.bmdma_start            = pdc20621_dma_start,
 	.qc_prep		= pdc20621_qc_prep,
+	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc20621_interrupt,
 	.port_start		= pdc_port_start,

@@ -139,6 +139,7 @@ static struct ata_port_operations nv_ops = {
 	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
 	.qc_prep		= ata_qc_prep,
+	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
 	.irq_handler		= nv_interrupt,
 	.scr_read		= nv_scr_read,
