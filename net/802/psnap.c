@@ -56,12 +56,15 @@ static int snap_rcv(struct sk_buff *skb, struct net_device *dev,
 {
 	int rc = 1;
 	struct datalink_proto *proto = find_snap_client(skb->h.raw);
+	static struct packet_type snap_packet_type = {
+		.type = __constant_htons(ETH_P_SNAP),
+	};
 
 	if (proto) {
 		/* Pass the frame on. */
 		skb->h.raw  += 5;
 		skb_pull(skb, 5);
-		rc = proto->rcvfunc(skb, dev, pt);
+		rc = proto->rcvfunc(skb, dev, &snap_packet_type);
 	} else {
 		skb->sk = NULL;
 		kfree_skb(skb);
