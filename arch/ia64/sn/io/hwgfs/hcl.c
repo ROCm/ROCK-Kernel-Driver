@@ -750,7 +750,7 @@ hwgraph_inventory_remove(	vertex_hdl_t de,
  * "/" but rather it just stops right before /dev ..
  */
 int
-hwgraph_vertex_name_get(vertex_hdl_t vhdl, char *buf, uint buflen)
+hwgraph_vertex_name_get(vertex_hdl_t vhdl, char *buf, unsigned int buflen)
 {
 	char *locbuf;
 	int   pos;
@@ -785,7 +785,7 @@ hwgraph_vertex_name_get(vertex_hdl_t vhdl, char *buf, uint buflen)
 #define DEVNAME_UNKNOWN "UnknownDevice"
 
 char *
-vertex_to_name(vertex_hdl_t vhdl, char *buf, uint buflen)
+vertex_to_name(vertex_hdl_t vhdl, char *buf, unsigned int buflen)
 {
 	if (hwgraph_vertex_name_get(vhdl, buf, buflen) == GRAPH_SUCCESS)
 		return(buf);

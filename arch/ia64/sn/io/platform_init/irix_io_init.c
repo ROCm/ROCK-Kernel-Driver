@@ -26,12 +26,6 @@ extern vertex_hdl_t hwgraph_root;
 extern void io_module_init(void);
 extern int pci_bus_to_hcl_cvlink(void);
 
-/* #define DEBUG_IO_INIT 1 */
-#ifdef DEBUG_IO_INIT
-#define DBG(x...) printk(x)
-#else
-#define DBG(x...)
-#endif /* DEBUG_IO_INIT */
 
 /*
  * This routine is responsible for the setup of all the IRIX hwgraph style
