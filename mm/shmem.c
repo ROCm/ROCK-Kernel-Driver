@@ -51,11 +51,15 @@
 /* Keep swapped page count in private field of indirect struct page */
 #define nr_swapped		private
 
-/* Flag end-of-file treatment to shmem_getpage and shmem_swp_alloc */
+/* Flag allocation requirements to shmem_getpage and shmem_swp_alloc */
 enum sgp_type {
-	SGP_READ,	/* don't exceed i_size */
-	SGP_WRITE,	/* may exceed i_size */
+	SGP_READ,	/* don't exceed i_size, don't allocate page */
+	SGP_CACHE,	/* don't exceed i_size, may allocate page */
+	SGP_WRITE,	/* may exceed i_size, may allocate page */
 };
+
+static int shmem_getpage(struct inode *inode, unsigned long idx,
+			 struct page **pagep, enum sgp_type sgp);
 
 static inline struct page *shmem_dir_alloc(unsigned int gfp_mask)
 {
@@ -138,8 +142,7 @@ static void shmem_free_block(struct inode *inode)
  * @inode: inode to recalc
  *
  * We have to calculate the free blocks since the mm can drop
- * undirtied hole pages behind our back.  Later we should be
- * able to use the releasepage method to handle this better.
+ * undirtied hole pages behind our back.
  *
  * But normally   info->alloced == inode->i_mapping->nrpages + info->swapped
  * So mm freed is info->alloced - (inode->i_mapping->nrpages + info->swapped)
@@ -278,7 +281,7 @@ static void shmem_swp_set(struct shmem_inode_info *info, swp_entry_t *entry, uns
  *
  * @info:	info structure for the inode
  * @index:	index of the page to find
- * @sgp:	check and recheck i_size?
+ * @sgp:	check and recheck i_size? skip allocation?
  */
 static swp_entry_t *shmem_swp_alloc(struct shmem_inode_info *info, unsigned long index, enum sgp_type sgp)
 {
@@ -286,12 +289,15 @@ static swp_entry_t *shmem_swp_alloc(struct shmem_inode_info *info, unsigned long
 	struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
 	struct page *page = NULL;
 	swp_entry_t *entry;
+	static const swp_entry_t unswapped = {0};
 
 	if (sgp != SGP_WRITE &&
 	    ((loff_t) index << PAGE_CACHE_SHIFT) >= inode->i_size)
 		return ERR_PTR(-EINVAL);
 
 	while (!(entry = shmem_swp_entry(info, index, &page))) {
+		if (sgp == SGP_READ)
+			return (swp_entry_t *) &unswapped;
 		/*
 		 * Test free_blocks against 1 not 0, since we have 1 data
 		 * page (and perhaps indirect index pages) yet to allocate:
@@ -483,7 +489,6 @@ done2:
 
 static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 {
-	static struct page *shmem_holdpage(struct inode *, unsigned long);
 	struct inode *inode = dentry->d_inode;
 	struct page *page = NULL;
 	long change = 0;
@@ -508,8 +513,9 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 			 * it assigned to swap.
 			 */
 			if (attr->ia_size & (PAGE_CACHE_SIZE-1)) {
-				page = shmem_holdpage(inode,
-					attr->ia_size >> PAGE_CACHE_SHIFT);
+				(void) shmem_getpage(inode,
+					attr->ia_size>>PAGE_CACHE_SHIFT,
+						&page, SGP_READ);
 			}
 		}
 	}
@@ -812,6 +818,16 @@ repeat:
 		shmem_swp_unmap(entry);
 		spin_unlock(&info->lock);
 		swap_free(swap);
+	} else if (sgp == SGP_READ) {
+		shmem_swp_unmap(entry);
+		page = find_get_page(mapping, idx);
+		if (page && TestSetPageLocked(page)) {
+			spin_unlock(&info->lock);
+			wait_on_page_locked(page);
+			page_cache_release(page);
+			goto repeat;
+		}
+		spin_unlock(&info->lock);
 	} else {
 		shmem_swp_unmap(entry);
 		spin_unlock(&info->lock);
@@ -854,38 +870,12 @@ repeat:
 		SetPageUptodate(page);
 	}
 
-	/* We have the page */
-	unlock_page(page);
-	*pagep = page;
+	if (page) {
+		unlock_page(page);
+		*pagep = page;
+	} else
+		*pagep = ZERO_PAGE(0);
 	return 0;
-}
-
-static struct page *shmem_holdpage(struct inode *inode, unsigned long idx)
-{
-	struct shmem_inode_info *info = SHMEM_I(inode);
-	struct page *page;
-	swp_entry_t *entry;
-	swp_entry_t swap = {0};
-
-	/*
-	 * Somehow, it feels wrong for truncation down to cause any
-	 * allocation: so instead of a blind shmem_getpage, check that
-	 * the page has actually been instantiated before holding it.
-	 */
-	spin_lock(&info->lock);
-	page = find_get_page(inode->i_mapping, idx);
-	if (!page) {
-		entry = shmem_swp_entry(info, idx, NULL);
-		if (entry) {
-			swap = *entry;
-			shmem_swp_unmap(entry);
-		}
-	}
-	spin_unlock(&info->lock);
-	if (swap.val) {
-		(void) shmem_getpage(inode, idx, &page, SGP_READ);
-	}
-	return page;
 }
 
 struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
@@ -899,7 +889,7 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	idx += vma->vm_pgoff;
 	idx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
 
-	error = shmem_getpage(inode, idx, &page, SGP_READ);
+	error = shmem_getpage(inode, idx, &page, SGP_CACHE);
 	if (error)
 		return (error == -ENOMEM)? NOPAGE_OOM: NOPAGE_SIGBUS;
 
@@ -1191,7 +1181,8 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		}
 		nr -= offset;
 
-		if (!list_empty(&mapping->i_mmap_shared))
+		if (!list_empty(&mapping->i_mmap_shared) &&
+		    page != ZERO_PAGE(0))
 			flush_dcache_page(page);
 
 		/*
