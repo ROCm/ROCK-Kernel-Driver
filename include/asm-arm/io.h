@@ -176,7 +176,7 @@ extern void _memset_io(void __iomem *, int, size_t);
 				eth_copy_and_sum((s),__mem_pci(c),(l),(b))
 
 static inline int
-check_signature(unsigned long io_addr, const unsigned char *signature,
+check_signature(void __iomem *io_addr, const unsigned char *signature,
 		int length)
 {
 	int retval = 0;
@@ -226,23 +226,6 @@ out:
 #define isa_eth_io_copy_and_sum(a,b,c,d) \
 				eth_copy_and_sum((a),__mem_isa(b),(c),(d))
 
-static inline int
-isa_check_signature(unsigned long io_addr, const unsigned char *signature,
-		    int length)
-{
-	int retval = 0;
-	do {
-		if (isa_readb(io_addr) != *signature)
-			goto out;
-		io_addr++;
-		signature++;
-		length--;
-	} while (length);
-	retval = 1;
-out:
-	return retval;
-}
-
 #else	/* __mem_isa */
 
 #define isa_readb(addr)			(__readwrite_bug("isa_readb"),0)
@@ -257,8 +240,6 @@ out:
 
 #define isa_eth_io_copy_and_sum(a,b,c,d) \
 				__readwrite_bug("isa_eth_io_copy_and_sum")
-
-#define isa_check_signature(io,sig,len)	(0)
 
 #endif	/* __mem_isa */
 
