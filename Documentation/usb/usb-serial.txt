@@ -84,6 +84,9 @@ HandSpring Visor, Palm USB, and Clié USB driver
   necessary.  Some devices need this before they can talk to the USB port
   properly.
   
+  Devices that are not compiled into the kernel can be specified with module
+  parameters.  e.g. modprobe visor vendor=0x54c product=0x66
+  
   There is a webpage and mailing lists for this portion of the driver at:
   http://usbvisor.sourceforge.net/
 

@@ -161,16 +161,18 @@ static void qtd_copy_status (
 				usb_endpoint_halt (urb->dev,
 					usb_pipeendpoint (pipe),
 					usb_pipeout (pipe));
-			if (urb->dev->tt && !usb_pipeint (pipe)) {
+
+		/* if async CSPLIT failed, try cleaning out the TT buffer */
+		} else if (urb->dev->tt && !usb_pipeint (urb->pipe)
+				&& QTD_CERR(token) == 0) {
 #ifdef DEBUG
-				struct usb_device *tt = urb->dev->tt->hub;
-				dbg ("clear tt %s-%s p%d buffer, a%d ep%d",
-					tt->bus->bus_name, tt->devpath,
-    					urb->dev->ttport, urb->dev->devnum,
-    					usb_pipeendpoint (pipe));
+			struct usb_device *tt = urb->dev->tt->hub;
+			dev_dbg (&tt->dev,
+				"clear tt buffer port %d, a%d ep%d t%08x\n",
+				urb->dev->ttport, urb->dev->devnum,
+				usb_pipeendpoint (urb->pipe), token);
 #endif /* DEBUG */
-				usb_hub_tt_clear_buffer (urb->dev, pipe);
-			}
+			usb_hub_tt_clear_buffer (urb->dev, urb->pipe);
 		}
 	}
 }

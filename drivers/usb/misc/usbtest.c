@@ -695,8 +695,9 @@ error:
 			 */
 
 			/* unlink whatever's still pending */
-			for (i = 0; i < ctx->param->sglen; i++) {
-				struct urb	*u = ctx->urb [i];
+			for (i = 1; i < ctx->param->sglen; i++) {
+				struct urb	*u = ctx->urb [
+	(i + subcase->number) % ctx->param->sglen];
 
 				if (u == urb || !u->dev)
 					continue;
@@ -893,7 +894,8 @@ test_ctrl_queue (struct usbtest_dev *dev, struct usbtest_param *param)
 	/* FIXME  set timer and time out; provide a disconnect hook */
 
 	/* wait for the last one to complete */
-	wait_for_completion (&context.complete);
+	if (context.pending > 0)
+		wait_for_completion (&context.complete);
 
 cleanup:
 	for (i = 0; i < param->sglen; i++) {
@@ -1374,6 +1376,7 @@ static void usbtest_disconnect (struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 	info ("unbound %s", dev->id);
+	kfree (dev);
 }
 
 /* Basic testing only needs a device that can source or sink bulk traffic.

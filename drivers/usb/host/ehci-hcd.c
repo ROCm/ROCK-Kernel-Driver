@@ -331,7 +331,8 @@ static int ehci_start (struct usb_hcd *hcd)
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = (struct ehci_caps *) hcd->regs;
-	ehci->regs = (struct ehci_regs *) (hcd->regs + ehci->caps->length);
+	ehci->regs = (struct ehci_regs *) (hcd->regs +
+				readb (&ehci->caps->length));
 	dbg_hcs_params (ehci, "ehci_start");
 	dbg_hcc_params (ehci, "ehci_start");
 
@@ -496,7 +497,6 @@ done2:
 	 * Before this point the HC was idle/ready.  After, khubd
 	 * and device drivers may start it running.
 	 */
-	usb_connect (udev);
 	udev->speed = USB_SPEED_HIGH;
 	if (hcd_register_root (hcd) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
@@ -974,7 +974,7 @@ static const struct hc_driver ehci_driver = {
 /* EHCI spec says PCI is required. */
 
 /* PCI driver selection metadata; PCI hotplugging uses this */
-static struct pci_device_id __devinitdata pci_ids [] = { {
+static struct pci_device_id pci_ids [] = { {
 
 	/* handle any USB 2.0 EHCI controller */
 

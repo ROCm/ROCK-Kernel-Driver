@@ -1,7 +1,7 @@
 #ifndef PWC_IOCTL_H
 #define PWC_IOCTL_H
 
-/* (C) 2001-2002 Nemosoft Unv.    webcam@smcc.demon.nl
+/* (C) 2001-2003 Nemosoft Unv.    webcam@smcc.demon.nl
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by

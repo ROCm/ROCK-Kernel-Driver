@@ -397,7 +397,7 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 				if (status == 0)
 					break;
 			}
-		} while (status && --frame);
+		} while (status && frame--);
 		if (status)
 			goto done;
 		qh->start = frame;

@@ -1057,7 +1057,7 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
 	int err;
 
-	iface = &config->interface[fmt->iface];
+	iface = config->interface[fmt->iface];
 	alts = &iface->altsetting[fmt->altset_idx];
 	altsd = get_iface_desc(alts);
 	snd_assert(altsd->bAlternateSetting == fmt->altsetting, return -EINVAL);
@@ -2215,7 +2215,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 	config = dev->actconfig;
 
 	/* parse the interface's altsettings */
-	iface = &config->interface[iface_no];
+	iface = config->interface[iface_no];
 	for (i = 0; i < iface->num_altsetting; i++) {
 		alts = &iface->altsetting[i];
 		altsd = get_iface_desc(alts);
@@ -2386,7 +2386,7 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif)
 
 	/* find audiocontrol interface */
 	config = dev->actconfig;
-	host_iface = &config->interface[ctrlif].altsetting[0];
+	host_iface = &config->interface[ctrlif]->altsetting[0];
 	if (!(p1 = snd_usb_find_csint_desc(host_iface->extra, host_iface->extralen, NULL, HEADER))) {
 		snd_printk(KERN_ERR "cannot find HEADER\n");
 		return -EINVAL;
@@ -2408,7 +2408,7 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif)
 				   dev->devnum, ctrlif, j);
 			continue;
 		}
-		iface = &config->interface[j];
+		iface = config->interface[j];
 		if (usb_interface_claimed(iface)) {
 			snd_printdd(KERN_INFO "%d:%d:%d: skipping, already claimed\n", dev->devnum, ctrlif, j);
 			continue;
@@ -2524,7 +2524,7 @@ static int create_composite_quirk(snd_usb_audio_t *chip,
 	for (quirk = quirk->data; quirk->ifnum >= 0; ++quirk) {
 		if (quirk->ifnum >= get_cfg_desc(config)->bNumInterfaces)
 			continue;
-		iface = &config->interface[quirk->ifnum];
+		iface = config->interface[quirk->ifnum];
 		if (quirk->ifnum != probed_ifnum &&
 		    usb_interface_claimed(iface))
 			continue;
