@@ -1,5 +1,14 @@
 ChangeLog for smbfs.
 
+2001-08-23 Jochen Dolze <dolze@epcnet.de>
+
+	* proc.c: Correct rsize/wsize computation for readX/writeX
+
+2001-0?-?? Urban Widmark <urban@teststation.com>
+
+	* *.c: Add LFS
+	* *.c: Move to a "driver" style handling of different servertypes.
+	       (Not all operations are done this way. yet.)
 2001-12-31 René Scharfe <l.s.r@web.de>
 
 	* inode.c: added smb_show_options to show mount options in /proc/mounts
