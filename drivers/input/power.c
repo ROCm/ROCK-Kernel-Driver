@@ -172,3 +172,4 @@ module_exit(power_exit);
 
 MODULE_AUTHOR("James Simmons <jsimmons@transvirtual.com>");
 MODULE_DESCRIPTION("Input Power Management driver");
+MODULE_LICENSE("GPL");
