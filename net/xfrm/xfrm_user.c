@@ -260,7 +260,7 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	x1 = xfrm_state_lookup(&x->props.saddr, x->id.spi, x->id.proto, x->props.family);
+	x1 = xfrm_state_lookup(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
 	if (x1) {
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
