@@ -191,6 +191,7 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_symlink		__constant_htonl(NFSERR_SYMLINK)
 #define	nfserr_not_same		__constant_htonl(NFSERR_NOT_SAME)
 #define	nfserr_restorefh	__constant_htonl(NFSERR_RESTOREFH)
+#define	nfserr_attrnotsupp	__constant_htonl(NFSERR_ATTRNOTSUPP)
 #define	nfserr_bad_xdr		__constant_htonl(NFSERR_BAD_XDR)
 #define	nfserr_openmode		__constant_htonl(NFSERR_OPENMODE)
 

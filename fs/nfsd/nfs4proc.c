@@ -584,8 +584,9 @@ nfsd4_verify(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_ver
 
 	if ((verify->ve_bmval[0] & ~NFSD_SUPPORTED_ATTRS_WORD0)
 	    || (verify->ve_bmval[1] & ~NFSD_SUPPORTED_ATTRS_WORD1))
-		return nfserr_notsupp;
-	if (verify->ve_bmval[1] & NFSD_WRITEONLY_ATTRS_WORD1)
+		return nfserr_attrnotsupp;
+	if ((verify->ve_bmval[0] & FATTR4_WORD0_RDATTR_ERROR)
+	    || (verify->ve_bmval[1] & NFSD_WRITEONLY_ATTRS_WORD1))
 		return nfserr_inval;
 	if (verify->ve_attrlen & 3)
 		return nfserr_inval;
