@@ -445,10 +445,6 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index);
  * Prototypes for functions in scsi_lib.c
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
-extern Scsi_Cmnd *scsi_end_request(Scsi_Cmnd * SCpnt, int uptodate,
-				   int sectors);
-extern struct Scsi_Device_Template *scsi_get_request_dev(struct request *);
-extern int scsi_init_cmd_errh(Scsi_Cmnd * SCpnt);
 extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
 extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
