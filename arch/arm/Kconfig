@@ -613,17 +613,12 @@ source "drivers/pcmcia/Kconfig"
 comment "At least one math emulation must be selected"
 
 config FPE_NWFPE
-	tristate "NWFPE math emulation"
+	bool "NWFPE math emulation"
 	---help---
 	  Say Y to include the NWFPE floating point emulator in the kernel.
 	  This is necessary to run most binaries. Linux does not currently
 	  support floating point hardware so you need to say Y here even if
 	  your machine has an FPA or floating point co-processor podule.
-
-	  It is also possible to say M to build the emulator as a module
-	  (nwfpe) or indeed to leave it out altogether. However, unless you
-	  know what you are doing this can easily render your machine
-	  unbootable. Saying Y is the safe option.
 
 	  You may say N here if you are going to load the Acorn FPEmulator
 	  early in the bootup.
@@ -641,7 +636,7 @@ config FPE_NWFPE_XP
 	  You almost surely want to say N here.
 
 config FPE_FASTFPE
-	tristate "FastFPE math emulation (EXPERIMENTAL)"
+	bool "FastFPE math emulation (EXPERIMENTAL)"
 	depends on !CPU_26 && !CPU_32v3 && EXPERIMENTAL
 	---help---
 	  Say Y here to include the FAST floating point emulator in the kernel.
@@ -653,11 +648,6 @@ config FPE_FASTFPE
 	  for scientific calculations, but you have to check this for yourself.
 	  If you do not feel you need a faster FP emulation you should better
 	  choose NWFPE.
-
-	  It is also possible to say M to build the emulator as a module
-	  (fastfpe).  But keep in mind that you should only load the FP
-	  emulator early in the bootup.  You should never change from NWFPE to
-	  FASTFPE or vice versa in an active system!
 
 choice
 	prompt "Kernel core (/proc/kcore) format"
