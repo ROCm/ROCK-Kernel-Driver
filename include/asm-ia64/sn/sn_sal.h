@@ -16,6 +16,7 @@
 #include <asm/sal.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/arch.h>
+#include <asm/sn/geo.h>
 #include <asm/sn/nodepda.h>
 
 // SGI Specific Calls
