@@ -1254,12 +1254,6 @@ struct agp_device_ids intel_agp_device_ids[] __initdata =
 		.chipset_setup	= intel_830mp_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82845G_HB,
-		.chipset	= INTEL_I845_G,
-		.chipset_name	= "i845G",
-		.chipset_setup	= intel_830mp_setup
-	},
-	{
 		.device_id	= PCI_DEVICE_ID_INTEL_82840_HB,
 		.chipset	= INTEL_I840,
 		.chipset_name	= "i840",
@@ -1269,6 +1263,12 @@ struct agp_device_ids intel_agp_device_ids[] __initdata =
 		.device_id	= PCI_DEVICE_ID_INTEL_82845_HB,
 		.chipset	= INTEL_I845,
 		.chipset_name	= "i845",
+		.chipset_setup	= intel_845_setup
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_INTEL_82845G_HB,
+		.chipset	= INTEL_I845_G,
+		.chipset_name	= "i845G",
 		.chipset_setup	= intel_845_setup
 	},
 	{
