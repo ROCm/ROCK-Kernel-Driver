@@ -41,8 +41,6 @@ ACPI_MODULE_NAME		("pci_root")
 
 extern struct pci_ops *pci_root_ops;
 
-#define PREFIX			"ACPI: "
-
 static int acpi_pci_root_add (struct acpi_device *device);
 static int acpi_pci_root_remove (struct acpi_device *device, int type);
 

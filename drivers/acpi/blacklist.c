@@ -31,8 +31,6 @@
 #include <linux/acpi.h>
 #include "acpi_bus.h"
 
-#define	PREFIX			"ACPI: "
-
 enum acpi_blacklist_predicates
 {
         all_versions,

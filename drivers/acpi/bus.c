@@ -47,8 +47,6 @@ MODULE_AUTHOR("Paul Diefenbaugh");
 MODULE_DESCRIPTION(ACPI_BUS_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
-#define	PREFIX			"ACPI: "
-
 extern void eisa_set_level_irq(unsigned int irq);
 
 extern int			acpi_disabled;

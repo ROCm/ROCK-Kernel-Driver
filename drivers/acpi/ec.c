@@ -38,9 +38,6 @@
 #define _COMPONENT		ACPI_EC_COMPONENT
 ACPI_MODULE_NAME		("acpi_ec")
 
-#define PREFIX			"ACPI: "
-
-
 #define ACPI_EC_FLAG_OBF	0x01	/* Output buffer full */
 #define ACPI_EC_FLAG_IBF	0x02	/* Input buffer full */
 #define ACPI_EC_FLAG_SCI	0x20	/* EC-SCI occurred */

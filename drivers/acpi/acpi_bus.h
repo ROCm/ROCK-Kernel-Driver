@@ -35,6 +35,7 @@
 
 #include "include/acpi.h"
 
+#define PREFIX			"ACPI: "
 
 /* TBD: Make dynamic */
 #define ACPI_MAX_HANDLES	10

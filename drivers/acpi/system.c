@@ -53,8 +53,6 @@
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("acpi_system")
 
-#define PREFIX			"ACPI: "
-
 extern FADT_DESCRIPTOR		acpi_fadt;
 
 static int acpi_system_add (struct acpi_device *device);
