@@ -2759,7 +2759,6 @@ static void netdev_wait_allrefs(struct net_device *dev)
 
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(HZ / 4);
-		current->state = TASK_RUNNING;
 
 		if (time_after(jiffies, warning_time + 10 * HZ)) {
 			printk(KERN_EMERG "unregister_netdevice: "
