@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <linux/string.h>
 #include <linux/nvram.h>
 #include <linux/init.h>
 #include <linux/slab.h>
