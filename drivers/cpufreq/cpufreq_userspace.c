@@ -168,7 +168,7 @@ cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
 {
 	char buf[16], *p;
 	int cpu = (long) ctl->extra1;
-	int len, left = *lenp;
+	unsigned int len, left = *lenp;
 
 	if (!left || (filp->f_pos && !write) || !cpu_online(cpu)) {
 		*lenp = 0;
