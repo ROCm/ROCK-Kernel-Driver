@@ -925,7 +925,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 	bcc_ptr += CIFS_SESSION_KEY_SIZE;
 
 	if (ses->capabilities & CAP_UNICODE) {
-		if ((int) bcc_ptr % 2) {	/* must be word aligned for Unicode */
+		if ((long) bcc_ptr % 2) {	/* must be word aligned for Unicode */
 			*bcc_ptr = 0;
 			bcc_ptr++;
 		}
@@ -983,7 +983,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 		strcpy(bcc_ptr, CIFS_NETWORK_OPSYS);
 		bcc_ptr += strlen(CIFS_NETWORK_OPSYS) + 1;
 	}
-	BCC(smb_buffer) = (int) bcc_ptr - (int) pByteArea(smb_buffer);
+	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
 	smb_buffer->smb_buf_length += BCC(smb_buffer);
 	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
 
@@ -1011,7 +1011,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 					    pSMBr->resp.SecurityBlobLength;
 
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
-					if ((int) (bcc_ptr) % 2) {
+					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
 						     - 1) / 2;
@@ -1069,7 +1069,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 				} else {	/* ASCII */
 
 					len = strnlen(bcc_ptr, 1024);
-					if (((int) bcc_ptr + len) - (int)
+					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
 					    <= BCC(smb_buffer_response)) {
 						ses->serverOS = kcalloc(len + 1,GFP_KERNEL);
@@ -1176,7 +1176,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	bcc_ptr += SecurityBlobLength;
 
 	if (ses->capabilities & CAP_UNICODE) {
-		if ((int) bcc_ptr % 2) {	/* must be word aligned for Unicode strings */
+		if ((long) bcc_ptr % 2) {	/* must be word aligned for Unicode strings */
 			*bcc_ptr = 0;
 			bcc_ptr++;
 		}
@@ -1229,7 +1229,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		strcpy(bcc_ptr, CIFS_NETWORK_OPSYS);
 		bcc_ptr += strlen(CIFS_NETWORK_OPSYS) + 1;
 	}
-	BCC(smb_buffer) = (int) bcc_ptr - (int) pByteArea(smb_buffer);
+	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
 	smb_buffer->smb_buf_length += BCC(smb_buffer);
 	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
 
@@ -1265,7 +1265,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 				}
 
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
-					if ((int) (bcc_ptr) % 2) {
+					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
 						     - 1) / 2;
@@ -1328,7 +1328,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 				} else {	/* ASCII */
 
 					len = strnlen(bcc_ptr, 1024);
-					if (((int) bcc_ptr + len) - (int)
+					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
 					    <= BCC(smb_buffer_response)) {
 						ses->serverOS = kcalloc(len + 1, GFP_KERNEL);
@@ -1465,16 +1465,16 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 		SecurityBlob->DomainName.MaximumLength =
 		    cpu_to_le16(SecurityBlob->DomainName.Length);
 		SecurityBlob->DomainName.Buffer =
-		    cpu_to_le32((unsigned int) &SecurityBlob->
+		    cpu_to_le32((long) &SecurityBlob->
 				DomainString -
-				(unsigned int) &SecurityBlob->Signature);
+				(long) &SecurityBlob->Signature);
 		bcc_ptr += SecurityBlob->DomainName.Length;
 		SecurityBlobLength += SecurityBlob->DomainName.Length;
 		SecurityBlob->DomainName.Length =
 		    cpu_to_le16(SecurityBlob->DomainName.Length);
 	}
 	if (ses->capabilities & CAP_UNICODE) {
-		if ((int) bcc_ptr % 2) {
+		if ((long) bcc_ptr % 2) {
 			*bcc_ptr = 0;
 			bcc_ptr++;
 		}
@@ -1511,7 +1511,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	SecurityBlob->NegotiateFlags =
 	    cpu_to_le32(SecurityBlob->NegotiateFlags);
 	pSMB->req.SecurityBlobLength = cpu_to_le16(SecurityBlobLength);
-	BCC(smb_buffer) = (int) bcc_ptr - (int) pByteArea(smb_buffer);
+	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
 	smb_buffer->smb_buf_length += BCC(smb_buffer);
 	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
 
@@ -1564,7 +1564,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
                 if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
                     *pNTLMv2_flag = TRUE;
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
-					if ((int) (bcc_ptr) % 2) {
+					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
 						     - 1) / 2;
@@ -1650,7 +1650,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 				} else {	/* ASCII */
 
 					len = strnlen(bcc_ptr, 1024);
-					if (((int) bcc_ptr + len) - (int)
+					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
 					    <= BCC(smb_buffer_response)) {
 						ses->serverOS =
@@ -1846,7 +1846,7 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		   SecurityBlobLength += SecurityBlob->WorkstationName.Length;
 		   SecurityBlob->WorkstationName.Length = cpu_to_le16(SecurityBlob->WorkstationName.Length);  */
 
-		if ((int) bcc_ptr % 2) {
+		if ((long) bcc_ptr % 2) {
 			*bcc_ptr = 0;
 			bcc_ptr++;
 		}
@@ -1918,7 +1918,7 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	SecurityBlob->NegotiateFlags =
 	    cpu_to_le32(SecurityBlob->NegotiateFlags);
 	pSMB->req.SecurityBlobLength = cpu_to_le16(SecurityBlobLength);
-	BCC(smb_buffer) = (int) bcc_ptr - (int) pByteArea(smb_buffer);
+	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
 	smb_buffer->smb_buf_length += BCC(smb_buffer);
 	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
 
@@ -1959,7 +1959,7 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 				     ("\nNTLMSSP response to Authenticate "));
 
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
-					if ((int) (bcc_ptr) % 2) {
+					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
 						     - 1) / 2;
@@ -2037,8 +2037,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 				} else {	/* ASCII */
 
 					len = strnlen(bcc_ptr, 1024);
-					if (((int) bcc_ptr + len) - 
-                        (int) pByteArea(smb_buffer_response) 
+					if (((long) bcc_ptr + len) - 
+                        (long) pByteArea(smb_buffer_response) 
                             <= BCC(smb_buffer_response)) {
 						ses->serverOS = kcalloc(len + 1,GFP_KERNEL);
 						strncpy(ses->serverOS,bcc_ptr, len);
@@ -2142,7 +2142,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	strcpy(bcc_ptr, "?????");
 	bcc_ptr += strlen("?????");
 	bcc_ptr += 1;
-	BCC(smb_buffer) = (int) bcc_ptr - (int) pByteArea(smb_buffer);
+	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
 	smb_buffer->smb_buf_length += BCC(smb_buffer);
 	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
 
@@ -2159,8 +2159,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
         strncpy(tcon->treeName, tree, MAX_TREE_SIZE);
 		if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
 			length = UniStrnlen((wchar_t *) bcc_ptr, 512);
-			if (((int) bcc_ptr + (2 * length)) -
-			    (int) pByteArea(smb_buffer_response) <=
+			if (((long) bcc_ptr + (2 * length)) -
+			    (long) pByteArea(smb_buffer_response) <=
 			    BCC(smb_buffer_response)) {
 				tcon->nativeFileSystem =
 				    kcalloc(length + 2, GFP_KERNEL);
@@ -2175,8 +2175,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			/* else do not bother copying these informational fields */
 		} else {
 			length = strnlen(bcc_ptr, 1024);
-			if (((int) bcc_ptr + length) -
-			    (int) pByteArea(smb_buffer_response) <=
+			if (((long) bcc_ptr + length) -
+			    (long) pByteArea(smb_buffer_response) <=
 			    BCC(smb_buffer_response)) {
 				tcon->nativeFileSystem =
 				    kcalloc(length + 1, GFP_KERNEL);

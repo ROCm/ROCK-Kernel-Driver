@@ -572,9 +572,6 @@ fill_in_inode(struct inode *tmp_inode,
 	tmp_inode->i_size = pfindData->EndOfFile;
 	tmp_inode->i_blocks =
 	    do_div(pfindData->AllocationSize, tmp_inode->i_blksize);
-	cFYI(1,
-	     ("\nFinddata alloc size (from smb) %lld",
-	      pfindData->AllocationSize));
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
 		cFYI(1, ("\nServer inconsistency Error: it says allocation size less than end of file "));
 	cFYI(1,
@@ -652,10 +649,6 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	tmp_inode->i_size = pfindData->EndOfFile;
 	tmp_inode->i_blocks =
 	    do_div(pfindData->NumOfBytes, tmp_inode->i_blksize);
-	cFYI(0, ("\nFinddata alloc size (from smb) %lld", pfindData->NumOfBytes));	/* BB remove */
-	if (pfindData->NumOfBytes < pfindData->EndOfFile)
-		cFYI(0, ("\nServer inconsistency Error: it says allocation size less than end of file "));	/* BB remove */
-	cFYI(1, ("\nCIFS FFIRST: Size %ld and blocks %ld ", (unsigned long) tmp_inode->i_size, tmp_inode->i_blocks));	/* BB remove */
 	if (S_ISREG(tmp_inode->i_mode)) {
 		cFYI(1, (" File inode "));
 		tmp_inode->i_op = &cifs_file_inode_ops;
