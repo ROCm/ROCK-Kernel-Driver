@@ -91,9 +91,7 @@ unsigned int ExtendedCPDO(const unsigned int opcode, FPREG * rFd)
 {
 	FPA11 *fpa11 = GET_FPA11();
 	floatx80 rFm;
-	unsigned int Fm, opc;
-
-	//printk("ExtendedCPDO(0x%08x)\n",opcode);
+	unsigned int Fm, opc_mask_shift;
 
 	Fm = getFm(opcode);
 	if (CONSTANT_FM(opcode)) {
@@ -117,7 +115,7 @@ unsigned int ExtendedCPDO(const unsigned int opcode, FPREG * rFd)
 		}
 	}
 
-	opc = opcode & MASK_ARITHMETIC_OPCODE;
+	opc_mask_shift = (opcode & MASK_ARITHMETIC_OPCODE) >> 20;
 	if (!MONADIC_INSTRUCTION(opcode)) {
 		unsigned int Fn = getFn(opcode);
 		floatx80 rFn;
@@ -139,14 +137,14 @@ unsigned int ExtendedCPDO(const unsigned int opcode, FPREG * rFd)
 			return 0;
 		}
 
-		if (dyadic_extended[opc >> 20]) {
-			rFd->fExtended = dyadic_extended[opc >> 20](rFn, rFm);
+		if (dyadic_extended[opc_mask_shift]) {
+			rFd->fExtended = dyadic_extended[opc_mask_shift](rFn, rFm);
 		} else {
 			return 0;
 		}
 	} else {
-		if (monadic_extended[opc >> 20]) {
-			rFd->fExtended = monadic_extended[opc >> 20](rFm);
+		if (monadic_extended[opc_mask_shift]) {
+			rFd->fExtended = monadic_extended[opc_mask_shift](rFm);
 		} else {
 			return 0;
 		}

@@ -1,6 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.COM, 1998,1999
+    (c) Philip Blundell, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -88,7 +89,7 @@ unsigned int SingleCPDO(const unsigned int opcode, FPREG * rFd)
 {
 	FPA11 *fpa11 = GET_FPA11();
 	float32 rFm;
-	unsigned int Fm, opc;
+	unsigned int Fm, opc_mask_shift;
 
 	Fm = getFm(opcode);
 	if (CONSTANT_FM(opcode)) {
@@ -99,20 +100,21 @@ unsigned int SingleCPDO(const unsigned int opcode, FPREG * rFd)
 		return 0;
 	}
 
-	opc = opcode & MASK_ARITHMETIC_OPCODE;
+	opc_mask_shift = (opcode & MASK_ARITHMETIC_OPCODE) >> 20;
 	if (!MONADIC_INSTRUCTION(opcode)) {
 		unsigned int Fn = getFn(opcode);
 		float32 rFn;
 
-		if (fpa11->fType[Fn] == typeSingle && dyadic_single[opc >> 20]) {
+		if (fpa11->fType[Fn] == typeSingle &&
+		    dyadic_single[opc_mask_shift]) {
 			rFn = fpa11->fpreg[Fn].fSingle;
-			rFd->fSingle = dyadic_single[opc >> 20](rFn, rFm);
+			rFd->fSingle = dyadic_single[opc_mask_shift](rFn, rFm);
 		} else {
 			return 0;
 		}
 	} else {
-		if (monadic_single[opc >> 20]) {
-			rFd->fSingle = monadic_single[opc >> 20](rFm);
+		if (monadic_single[opc_mask_shift]) {
+			rFd->fSingle = monadic_single[opc_mask_shift](rFm);
 		} else {
 			return 0;
 		}

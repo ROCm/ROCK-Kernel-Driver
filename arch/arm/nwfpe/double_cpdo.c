@@ -104,9 +104,7 @@ unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rFd)
 {
 	FPA11 *fpa11 = GET_FPA11();
 	float64 rFm;
-	unsigned int Fm, opc;
-
-	//printk("DoubleCPDO(0x%08x)\n",opcode);
+	unsigned int Fm, opc_mask_shift;
 
 	Fm = getFm(opcode);
 	if (CONSTANT_FM(opcode)) {
@@ -126,7 +124,7 @@ unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rFd)
 		}
 	}
 
-	opc = opcode & MASK_ARITHMETIC_OPCODE;
+	opc_mask_shift = (opcode & MASK_ARITHMETIC_OPCODE) >> 20;
 	if (!MONADIC_INSTRUCTION(opcode)) {
 		unsigned int Fn = getFn(opcode);
 		float64 rFn;
@@ -144,14 +142,14 @@ unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rFd)
 			return 0;
 		}
 
-		if (dyadic_double[opc >> 20]) {
-			rFd->fDouble = dyadic_double[opc >> 20](rFn, rFm);
+		if (dyadic_double[opc_mask_shift]) {
+			rFd->fDouble = dyadic_double[opc_mask_shift](rFn, rFm);
 		} else {
 			return 0;
 		}
 	} else {
-		if (monadic_double[opc >> 20]) {
-			rFd->fDouble = monadic_double[opc >> 20](rFm);
+		if (monadic_double[opc_mask_shift]) {
+			rFd->fDouble = monadic_double[opc_mask_shift](rFm);
 		} else {
 			return 0;
 		}

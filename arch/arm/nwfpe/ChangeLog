@@ -2,6 +2,7 @@
 	* Reformat all but softfloat files to get a consistent coding style.
 	  Used "indent -kr -i8 -ts8 -sob -l132 -ss" and a few manual fixups.
 	* Removed dead code and fixed function protypes to match definitions.
+	* Consolidated use of (opcode && MASK_ARITHMETIC_OPCODE) >> 20.
 
 2002-01-19  Russell King <rmk@arm.linux.org.uk>
 
