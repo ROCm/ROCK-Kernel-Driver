@@ -85,7 +85,7 @@
 /*
 **	Name and version of the driver
 */
-#define SCSI_NCR_DRIVER_NAME	"sym53c8xx-1.7.3a-20010304"
+#define SCSI_NCR_DRIVER_NAME	"sym53c8xx-1.7.3c-20010512"
 
 #define SCSI_NCR_DEBUG_FLAGS	(0)
 
@@ -583,6 +583,9 @@ pci_get_base_cookie(struct pci_dev *pdev, int offset)
 /* Does not make sense in earlier kernels */
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
 #define pci_enable_device(pdev)		(0)
+#endif
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,4)
+#define	scsi_set_pci_device(inst, pdev)	(0)
 #endif
 
 /*==========================================================
@@ -3781,7 +3784,7 @@ static	struct scripth scripth0 __initdata = {
 		SIR_MSG_RECEIVED,
 
 }/*-------------------------< MSG_WEIRD_SEEN >------------------*/,{
-	SCR_LOAD_REL (scratcha1, 4),	/* DUMMY READ */
+	SCR_LOAD_REL (scratcha, 4),	/* DUMMY READ */
 		0,
 	SCR_INT,
 		SIR_MSG_WEIRD,
@@ -6591,7 +6594,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	**
 	**----------------------------------------------------
 	*/
-#if 0	/* This stuff was only usefull for linux-1.2.13 */
+#if 0	/* This stuff was only useful for linux-1.2.13 */
 	if (lp && !lp->numtags && cmd->device && cmd->device->tagged_queue) {
 		lp->numtags = tp->usrtags;
 		ncr_setup_tags (np, cp->target, cp->lun);
@@ -6991,22 +6994,26 @@ static void ncr_soft_reset(ncb_p np)
 	u_char istat;
 	int i;
 
+	if (!(np->features & FE_ISTAT1) || !(INB (nc_istat1) & SRUN))
+		goto do_chip_reset;
+
 	OUTB (nc_istat, CABRT);
-	for (i = 1000000 ; i ; --i) {
+	for (i = 100000 ; i ; --i) {
 		istat = INB (nc_istat);
 		if (istat & SIP) {
 			INW (nc_sist);
-			continue;
 		}
-		if (istat & DIP) {
-			OUTB (nc_istat, 0);
-			INB (nc_dstat);
-			break;
+		else if (istat & DIP) {
+			if (INB (nc_dstat) & ABRT);
+				break;
 		}
+		UDELAY(5);
 	}
+	OUTB (nc_istat, 0);
 	if (!i)
-		printk("%s: unable to abort current chip operation.\n",
-			ncr_name(np));
+		printk("%s: unable to abort current chip operation, "
+		       "ISTAT=0x%02x.\n", ncr_name(np), istat);
+do_chip_reset:
 	ncr_chip_reset(np);
 }
 
@@ -7419,10 +7426,10 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		/*
 		**	On standard INQUIRY response (EVPD and CmDt 
 		**	not set), setup logical unit according to 
-		**	announced capabilities (we need the 1rst 7 bytes).
+		**	announced capabilities (we need the 1rst 8 bytes).
 		*/
 		if (cmd->cmnd[0] == 0x12 && !(cmd->cmnd[1] & 0x3) &&
-		    cmd->cmnd[4] >= 7 && !cmd->use_sg) {
+		    cmd->request_bufflen - cp->resid > 7 && !cmd->use_sg) {
 			sync_scsi_data(np, cmd);	/* SYNC the data */
 			ncr_setup_lcb (np, cp->target, cp->lun,
 				       (char *) cmd->request_buffer);
@@ -7959,7 +7966,7 @@ static void ncr_getsync(ncb_p np, u_char sfac, u_char *fakp, u_char *scntl3p)
 	*/
 	fak = (kpc - 1) / div_10M[div] + 1;
 
-#if 0	/* This optimization does not seem very usefull */
+#if 0	/* This optimization does not seem very useful */
 
 	per = (fak * div_10M[div]) / clk;
 
@@ -8685,7 +8692,7 @@ static void ncr_timeout (ncb_p np)
 **		scntl3:	(see the manual)
 **
 **	current script command:
-**		dsp:	script adress (relative to start of script).
+**		dsp:	script address (relative to start of script).
 **		dbc:	first word of script command.
 **
 **	First 24 register of the chip:
@@ -9535,7 +9542,7 @@ static void ncr_int_ma (ncb_p np)
 
 #ifdef  SYM_DEBUG_PM_WITH_WSR
 		PRINT_ADDR(cp);
-		printf ("MA interrupt with WSR set - "
+		printk ("MA interrupt with WSR set - "
 			"pm->sg.addr=%x - pm->sg.size=%d\n",
 			pm->sg.addr, pm->sg.size);
 #endif
@@ -10167,14 +10174,16 @@ static void ncr_sir_task_recovery(ncb_p np, int num)
 				if (i >= MAX_START*2)
 					i = 0;
 			}
-			assert(k != -1);
-			if (k != 1) {
+			/*
+			**	If job removed, repair the start queue.
+			*/
+			if (k != -1) {
 				np->squeue[k] = np->squeue[i]; /* Idle task */
 				np->squeueput = k; /* Start queue pointer */
-				cp->host_status = HS_ABORTED;
-				cp->scsi_status = S_ILLEGAL;
-				ncr_complete(np, cp);
 			}
+			cp->host_status = HS_ABORTED;
+			cp->scsi_status = S_ILLEGAL;
+			ncr_complete(np, cp);
 		}
 		break;
 	/*
@@ -10730,7 +10739,7 @@ static void ncr_print_msg (ccb_p cp, char *label, u_char *msg)
 **	Was Sie schon immer ueber transfermode negotiation wissen wollten ...
 **
 **	We try to negotiate sync and wide transfer only after
-**	a successfull inquire command. We look at byte 7 of the
+**	a successful inquire command. We look at byte 7 of the
 **	inquire data to determine the capabilities of the target.
 **
 **	When we try to negotiate, we append the negotiation message
@@ -11571,7 +11580,7 @@ out_stuck:
 /*==========================================================
 **
 **
-**	Aquire a control block
+**	Acquire a control block
 **
 **
 **==========================================================
@@ -12223,6 +12232,7 @@ static int __init ncr_regtest (struct ncb* np)
 static int __init ncr_snooptest (struct ncb* np)
 {
 	u_int32	ncr_rd, ncr_wr, ncr_bk, host_rd, host_wr, pc;
+	u_char  dstat;
 	int	i, err=0;
 #ifndef SCSI_NCR_IOMAPPED
 	if (np->reg) {
@@ -12230,6 +12240,12 @@ static int __init ncr_snooptest (struct ncb* np)
             if (err) return (err);
 	}
 #endif
+restart_test:
+	/*
+	**	Enable Master Parity Checking as we intend 
+	**	to enable it for normal operations.
+	*/
+	OUTB (nc_ctest4, (np->rv_ctest4 & MPEE));
 	/*
 	**	init
 	*/
@@ -12252,6 +12268,27 @@ static int __init ncr_snooptest (struct ncb* np)
 	for (i=0; i<NCR_SNOOP_TIMEOUT; i++)
 		if (INB(nc_istat) & (INTF|SIP|DIP))
 			break;
+	if (i>=NCR_SNOOP_TIMEOUT) {
+		printk ("CACHE TEST FAILED: timeout.\n");
+		return (0x20);
+	};
+	/*
+	**	Check for fatal DMA errors.
+	*/
+	dstat = INB (nc_dstat);
+#if 1	/* Band aiding for broken hardwares that fail PCI parity */
+	if ((dstat & MDPE) && (np->rv_ctest4 & MPEE)) {
+		printk ("%s: PCI DATA PARITY ERROR DETECTED - "
+			"DISABLING MASTER DATA PARITY CHECKING.\n",
+			ncr_name(np));
+		np->rv_ctest4 &= ~MPEE;
+		goto restart_test;
+	}
+#endif
+	if (dstat & (MDPE|BF|IID)) {
+		printk ("CACHE TEST FAILED: DMA error (dstat=0x%02x).", dstat);
+		return (0x80);
+	}
 	/*
 	**	Save termination position.
 	*/
@@ -12262,14 +12299,6 @@ static int __init ncr_snooptest (struct ncb* np)
 	host_rd = scr_to_cpu(np->ncr_cache);
 	ncr_rd  = INL (nc_scratcha);
 	ncr_bk  = INL (nc_temp);
-
-	/*
-	**	check for timeout
-	*/
-	if (i>=NCR_SNOOP_TIMEOUT) {
-		printk ("CACHE TEST FAILED: timeout.\n");
-		return (0x20);
-	};
 	/*
 	**	Check termination position.
 	*/
@@ -14381,7 +14410,7 @@ sym_read_S24C16_nvram (ncr_slot *np, int offset, u_char *data, int len)
 	/* save current state of GPCNTL and GPREG */
 	old_gpreg	= INB (nc_gpreg);
 	old_gpcntl	= INB (nc_gpcntl);
-	gpcntl		= old_gpcntl & 0xfc;
+	gpcntl		= old_gpcntl & 0x1c;
 
 	/* set up GPREG & GPCNTL to set GPIO0 and GPIO1 in to known state */
 	OUTB (nc_gpreg,  old_gpreg);

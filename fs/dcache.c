@@ -562,7 +562,7 @@ void shrink_dcache_memory(int priority, unsigned int gfp_mask)
 	 * We should make sure we don't hold the superblock lock over
 	 * block allocations, but for now:
 	 */
-	if (!(gfp_mask & __GFP_IO))
+	if (!(gfp_mask & __GFP_FS))
 		return;
 
 	if (priority)

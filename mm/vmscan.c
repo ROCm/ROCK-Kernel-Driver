@@ -613,7 +613,7 @@ page_active:
 	 * loads, flush out the dirty pages before we have to wait on
 	 * IO.
 	 */
-	if ((CAN_DO_IO || CAN_DO_FS) && !launder_loop && free_shortage()) {
+	if (CAN_DO_IO && !launder_loop && free_shortage()) {
 		launder_loop = 1;
 		/* If we cleaned pages, never do synchronous IO. */
 		if (cleaned_pages)

@@ -78,6 +78,7 @@ extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
     reset:          BusLogic_ResetCommand,	  /* Reset Command Function */ \
     bios_param:     BusLogic_BIOSDiskParameters,  /* BIOS Disk Parameters   */ \
     unchecked_isa_dma: 1,			  /* Default Initial Value  */ \
+    max_sectors:    128,			  /* I/O queue len limit    */ \
     use_clustering: ENABLE_CLUSTERING }		  /* Enable Clustering	    */
 
 

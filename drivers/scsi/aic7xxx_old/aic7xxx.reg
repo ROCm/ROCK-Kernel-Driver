@@ -703,7 +703,12 @@ register INTSTAT {
 						 * it that it can fill the
 						 * message buffer.
 						 */
-	mask	TRACEPOINT	0xb0|SEQINT
+	mask	SEQ_SG_FIXUP	0xb0|SEQINT	/* need help with fixing up
+						 * the sg array pointer after
+						 * a phasemis with no valid
+						 * sg elements in the shadow
+						 * pipeline.
+						 */
 	mask	TRACEPOINT2	0xc0|SEQINT
 	mask	MSGIN_PHASEMIS	0xd0|SEQINT	/*
 						 * Target changed phase on us

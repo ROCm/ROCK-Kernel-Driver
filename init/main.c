@@ -538,8 +538,8 @@ asmlinkage void __init start_kernel(void)
 	trap_init();
 	init_IRQ();
 	sched_init();
-	time_init();
 	softirq_init();
+	time_init();
 
 	/*
 	 * HACK ALERT! This is early. We're enabling the console before

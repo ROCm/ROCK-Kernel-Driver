@@ -417,6 +417,9 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 		max_segments = 64;
 #endif
 
+	if ((req->nr_sectors + (bh->b_size >> 9)) > SHpnt->max_sectors)
+		return 0;
+
 	if (use_clustering) {
 		/* 
 		 * See if we can do this without creating another
@@ -472,6 +475,9 @@ __inline static int __scsi_front_merge_fn(request_queue_t * q,
 	if (max_segments > 64)
 		max_segments = 64;
 #endif
+
+	if ((req->nr_sectors + (bh->b_size >> 9)) > SHpnt->max_sectors)
+		return 0;
 
 	if (use_clustering) {
 		/* 
@@ -597,6 +603,13 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *SHpnt;
 
+	/*
+	 * First check if the either of the requests are re-queued
+	 * requests.  Can't merge them if they are.
+	 */
+	if (req->special || next->special)
+		return 0;
+
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
 
@@ -624,6 +637,10 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 		return 0;
 	}
 #endif
+
+	if ((req->nr_sectors + next->nr_sectors) > SHpnt->max_sectors)
+		return 0;
+
 	/*
 	 * The main question is whether the two segments at the boundaries
 	 * would be considered one or two.

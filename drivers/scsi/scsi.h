@@ -617,6 +617,9 @@ struct scsi_device {
 	unsigned remap:1;	/* support remapping  */
 	unsigned starved:1;	/* unable to process commands because
 				   host busy */
+
+	// Flag to allow revalidate to succeed in sd_open
+	int allow_revalidate;
 };
 
 
@@ -668,7 +671,7 @@ struct scsi_request {
 	unsigned short sr_use_sg;	/* Number of pieces of scatter-gather */
 	unsigned short sr_sglist_len;	/* size of malloc'd scatter-gather list */
 	unsigned sr_underflow;	/* Return error if less than
-				   this amount is transfered */
+				   this amount is transferred */
 };
 
 /*
@@ -756,7 +759,7 @@ struct scsi_cmnd {
 	void *buffer;		/* Data buffer */
 
 	unsigned underflow;	/* Return error if less than
-				   this amount is transfered */
+				   this amount is transferred */
 	unsigned old_underflow;	/* save underflow here when reusing the
 				 * command for error handling */
 

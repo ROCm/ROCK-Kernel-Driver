@@ -103,7 +103,7 @@
 /*
 **	Name and version of the driver
 */
-#define SCSI_NCR_DRIVER_NAME	"ncr53c8xx-3.4.3-20010212"
+#define SCSI_NCR_DRIVER_NAME	"ncr53c8xx-3.4.3b-20010512"
 
 #define SCSI_NCR_DEBUG_FLAGS	(0)
 
@@ -3082,7 +3082,7 @@ struct host_data {
 };
 
 /*
-**	Print something which allows to retrieve the controler type, unit,
+**	Print something which allows to retrieve the controller type, unit,
 **	target, lun concerned by a kernel message.
 */
 
@@ -4302,7 +4302,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	**
 	**----------------------------------------------------
 	*/
-#if 0	/* This stuff was only usefull for linux-1.2.13 */
+#if 0	/* This stuff was only useful for linux-1.2.13 */
 	if (lp && !lp->numtags && cmd->device && cmd->device->tagged_queue) {
 		lp->numtags = tp->usrtags;
 		ncr_setup_tags (np, cmd->target, cmd->lun);
@@ -5701,7 +5701,7 @@ static void ncr_getsync(ncb_p np, u_char sfac, u_char *fakp, u_char *scntl3p)
 	*/
 	fak = (kpc - 1) / div_10M[div] + 1;
 
-#if 0	/* This optimization does not seem very usefull */
+#if 0	/* This optimization does not seem very useful */
 
 	per = (fak * div_10M[div]) / clk;
 
@@ -6647,7 +6647,7 @@ static void ncr_int_ma (ncb_p np)
 			delta=(INB (nc_dfifo) - rest) & 0x7f;
 
 		/*
-		**	The data in the dma fifo has not been transfered to
+		**	The data in the dma fifo has not been transferred to
 		**	the target -> add the amount to the rest
 		**	and clear the data.
 		**	Check the sstat2 register in case of wide transfer.
@@ -7153,7 +7153,7 @@ void ncr_int_sir (ncb_p np)
 **	Was Sie schon immer ueber transfermode negotiation wissen wollten ...
 **
 **	We try to negotiate sync and wide transfer only after
-**	a successfull inquire command. We look at byte 7 of the
+**	a successful inquire command. We look at byte 7 of the
 **	inquire data to determine the capabilities of the target.
 **
 **	When we try to negotiate, we append the negotiation message
@@ -7550,7 +7550,7 @@ out:
 /*==========================================================
 **
 **
-**	Aquire a control block
+**	Acquire a control block
 **
 **
 **==========================================================

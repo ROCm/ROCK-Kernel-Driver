@@ -168,16 +168,17 @@
 #endif
 
 /*
- * Use normal IO if configured. Forced for alpha and powerpc.
- * Powerpc fails copying to on-chip RAM using memcpy_toio().
+ * Use normal IO if configured. Forced for alpha.
  */
 #if defined(CONFIG_SCSI_NCR53C8XX_IOMAPPED)
 #define	SCSI_NCR_IOMAPPED
 #elif defined(__alpha__)
 #define	SCSI_NCR_IOMAPPED
 #elif defined(__powerpc__)
+#if LINUX_VERSION_CODE <= LinuxVersionCode(2,4,3)
 #define	SCSI_NCR_IOMAPPED
 #define SCSI_NCR_PCI_MEM_NOT_SUPPORTED
+#endif
 #elif defined(__sparc__)
 #undef SCSI_NCR_IOMAPPED
 #endif
@@ -734,7 +735,7 @@ typedef struct {
 #define FE_PFEN		(1<<12)   /* Prefetch enable */
 #define FE_LDSTR	(1<<13)   /* Load/Store supported */
 #define FE_RAM		(1<<14)   /* On chip RAM present */
-#define FE_VARCLK	(1<<15)   /* SCSI lock may vary */
+#define FE_VARCLK	(1<<15)   /* SCSI clock may vary */
 #define FE_RAM8K	(1<<16)   /* On chip RAM sized 8Kb */
 #define FE_64BIT	(1<<17)   /* Have a 64-bit PCI interface */
 #define FE_IO256	(1<<18)   /* Requires full 256 bytes in PCI space */
@@ -744,6 +745,7 @@ typedef struct {
 #define FE_ULTRA3	(1<<22)   /* Ultra-3 80Mtrans/sec */
 #define FE_66MHZ 	(1<<23)   /* 66MHz PCI Support */
 #define FE_DAC	 	(1<<24)   /* Support DAC cycles (64 bit addressing) */
+#define FE_ISTAT1 	(1<<25)   /* Have ISTAT1, MBOX0, MBOX1 registers */
 
 #define FE_CACHE_SET	(FE_ERL|FE_CLSE|FE_WRIE|FE_ERMP)
 #define FE_SCSI_SET	(FE_WIDE|FE_ULTRA|FE_ULTRA2|FE_DBLR|FE_QUAD|F_CLK80)
@@ -808,7 +810,7 @@ typedef struct {
  ,									\
  {PCI_DEVICE_ID_NCR_53C896, 0xff, "896",  6, 31, 7,			\
  FE_WIDE|FE_ULTRA2|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
- FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC}		\
+ FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_ISTAT1}	\
  ,									\
  {PCI_DEVICE_ID_NCR_53C895A, 0xff, "895a",  6, 31, 7,			\
  FE_WIDE|FE_ULTRA2|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|	\
@@ -823,11 +825,11 @@ typedef struct {
  FE_RAM|FE_IO256}							\
  ,									\
  {PCI_DEVICE_ID_LSI_53C1010, 0xff, "1010-33",  6, 62, 7,		\
- FE_WIDE|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|		\
+ FE_WIDE|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|FE_ISTAT1|	\
  FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_ULTRA3}	\
  ,									\
  {PCI_DEVICE_ID_LSI_53C1010_66, 0xff, "1010-66",  6, 62, 7,		\
- FE_WIDE|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|		\
+ FE_WIDE|FE_QUAD|FE_CACHE_SET|FE_BOF|FE_DFS|FE_LDSTR|FE_PFEN|FE_ISTAT1|	\
  FE_RAM|FE_RAM8K|FE_64BIT|FE_DAC|FE_IO256|FE_NOPM|FE_LEDC|FE_ULTRA3|	\
  FE_66MHZ}								\
 }
@@ -1179,9 +1181,13 @@ struct ncr_reg {
         #define   SIP     0x02  /* sta: scsi-interrupt              */
         #define   DIP     0x01  /* sta: host/script interrupt       */
 
-/*15*/  u_char    nc_istat1;	/* 896 only */
-/*16*/  u_char    nc_mbox0;	/* 896 only */
-/*17*/  u_char    nc_mbox1;	/* 896 only */
+/*15*/  u_char    nc_istat1;	/* 896 and later cores only */
+        #define   FLSH    0x04  /* sta: chip is flushing            */
+        #define   SRUN    0x02  /* sta: scripts are running         */
+        #define   SIRQD   0x01  /* r/w: disable INT pin             */
+
+/*16*/  u_char    nc_mbox0;	/* 896 and later cores only */
+/*17*/  u_char    nc_mbox1;	/* 896 and later cores only */
 
 /*18*/	u_char	  nc_ctest0;
 /*19*/  u_char    nc_ctest1;

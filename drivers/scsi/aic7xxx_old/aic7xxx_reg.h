@@ -188,8 +188,8 @@
 #define		BRDRW           	0x04
 #define		BRDRW_ULTRA2    	0x02
 #define		BRDCTL1         	0x02
-#define		BRDCTL0         	0x01
 #define		BRDSTB_ULTRA2   	0x01
+#define		BRDCTL0         	0x01
 
 #define	SEECTL          		0x1e
 #define		EXTARBACK       	0x80
@@ -397,7 +397,7 @@
 #define		DATA_OVERRUN    	0xe1
 #define		MSGIN_PHASEMIS  	0xd1
 #define		TRACEPOINT2     	0xc1
-#define		TRACEPOINT      	0xb1
+#define		SEQ_SG_FIXUP    	0xb1
 #define		AWAITING_MSG    	0xa1
 #define		RESIDUAL        	0x81
 #define		BAD_STATUS      	0x71
@@ -465,8 +465,6 @@
 #define		TARGCRCENDEN    	0x08
 #define		TARGCRCCNTEN    	0x04
 
-#define	QOUTCNT         		0x9e
-
 #define	SCSIPHASE       		0x9e
 #define		SP_STATUS       	0x20
 #define		SP_COMMAND      	0x10
@@ -474,6 +472,8 @@
 #define		SP_MSG_OUT      	0x04
 #define		SP_DATA_IN      	0x02
 #define		SP_DATA_OUT     	0x01
+
+#define	QOUTCNT         		0x9e
 
 #define	SFUNCT          		0x9f
 #define		ALT_MODE        	0x80
@@ -595,8 +595,8 @@
 #define		RD_DFTHRSH_63   	0x03
 #define		RD_DFTHRSH_50   	0x02
 #define		RD_DFTHRSH_25   	0x01
-#define		RD_DFTHRSH_MIN  	0x00
 #define		WR_DFTHRSH_MIN  	0x00
+#define		RD_DFTHRSH_MIN  	0x00
 
 #define	SG_CACHEPTR     		0xfc
 #define		SG_USER_DATA    	0xfc
@@ -604,18 +604,18 @@
 #define		LAST_SEG_DONE   	0x01
 
 
-#define	CMD_GROUP_CODE_SHIFT	0x05
-#define	BUS_8_BIT	0x00
-#define	QOUTFIFO_OFFSET	0x01
-#define	CCSGRAM_MAXSEGS	0x10
 #define	CMD_GROUP2_BYTE_DELTA	0xfa
 #define	MAX_OFFSET_8BIT	0x0f
 #define	BUS_16_BIT	0x01
 #define	QINFIFO_OFFSET	0x02
 #define	CMD_GROUP5_BYTE_DELTA	0x0b
+#define	CMD_GROUP_CODE_SHIFT	0x05
 #define	MAX_OFFSET_ULTRA2	0x7f
 #define	MAX_OFFSET_16BIT	0x08
+#define	BUS_8_BIT	0x00
+#define	QOUTFIFO_OFFSET	0x01
 #define	UNTAGGEDSCB_OFFSET	0x00
+#define	CCSGRAM_MAXSEGS	0x10
 #define	SCB_LIST_NULL	0xff
 #define	SG_SIZEOF	0x08
 #define	CMD_GROUP4_BYTE_DELTA	0x04

@@ -22,6 +22,12 @@
  *	
  *	 Modified by Torben Mathiasen tmm@image.dk
  *       Resource allocation fixes in sd_init and cleanups.
+ *	
+ *	 Modified by Alex Davis <letmein@erols.com>
+ *       Fix problem where partition info not being read in sd_open.
+ *	
+ *	 Modified by Alex Davis <letmein@erols.com>
+ *       Fix problem where removable media could be ejected after sd_open.
  */
 
 #include <linux/config.h>
@@ -372,7 +378,8 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		   (SCpnt->request.cmd == WRITE) ? "writing" : "reading",
 				 this_count, SCpnt->request.nr_sectors));
 
-	SCpnt->cmnd[1] = (SCpnt->lun << 5) & 0xe0;
+	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
+			 ((SCpnt->lun << 5) & 0xe0) : 0;
 
 	if (((this_count > 0xff) || (block > 0x1fffff)) || SCpnt->device->ten) {
 		if (this_count > 0xffff)
@@ -424,7 +431,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 
 static int sd_open(struct inode *inode, struct file *filp)
 {
-	int target;
+	int target, retval = -ENXIO;
 	Scsi_Device * SDev;
 	target = DEVICE_NR(inode->i_rdev);
 
@@ -448,24 +455,40 @@ static int sd_open(struct inode *inode, struct file *filp)
 
 	while (rscsi_disks[target].device->busy)
 		barrier();
+	/*
+	 * The following code can sleep.
+	 * Module unloading must be prevented
+	 */
+	SDev = rscsi_disks[target].device;
+	if (SDev->host->hostt->module)
+		__MOD_INC_USE_COUNT(SDev->host->hostt->module);
+	if (sd_template.module)
+		__MOD_INC_USE_COUNT(sd_template.module);
+	SDev->access_count++;
+
 	if (rscsi_disks[target].device->removable) {
+		SDev->allow_revalidate = 1;
 		check_disk_change(inode->i_rdev);
+		SDev->allow_revalidate = 0;
 
 		/*
 		 * If the drive is empty, just let the open fail.
 		 */
-		if (!rscsi_disks[target].ready)
-			return -ENXIO;
+		if ((!rscsi_disks[target].ready) && !(filp->f_flags & O_NDELAY)) {
+			retval = -ENOMEDIUM;
+			goto error_out;
+		}
 
 		/*
 		 * Similarly, if the device has the write protect tab set,
 		 * have the open fail if the user expects to be able to write
 		 * to the thing.
 		 */
-		if ((rscsi_disks[target].write_prot) && (filp->f_mode & 2))
-			return -EROFS;
+		if ((rscsi_disks[target].write_prot) && (filp->f_mode & 2)) {
+			retval = -EROFS;
+			goto error_out;
+		}
 	}
-	SDev = rscsi_disks[target].device;
 	/*
 	 * It is possible that the disk changing stuff resulted in the device
 	 * being taken offline.  If this is the case, report this to the user,
@@ -473,26 +496,31 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * the open actually succeeded.
 	 */
 	if (!SDev->online) {
-		return -ENXIO;
+		goto error_out;
 	}
 	/*
 	 * See if we are requesting a non-existent partition.  Do this
 	 * after checking for disk change.
 	 */
-	if (sd_sizes[SD_PARTITION(inode->i_rdev)] == 0)
-		return -ENXIO;
+	if (sd_sizes[SD_PARTITION(inode->i_rdev)] == 0) {
+		goto error_out;
+	}
 
 	if (SDev->removable)
-		if (!SDev->access_count)
+		if (SDev->access_count==1)
 			if (scsi_block_when_processing_errors(SDev))
 				scsi_ioctl(SDev, SCSI_IOCTL_DOORLOCK, NULL);
 
-	SDev->access_count++;
-	if (SDev->host->hostt->module)
-		__MOD_INC_USE_COUNT(SDev->host->hostt->module);
-	if (sd_template.module)
-		__MOD_INC_USE_COUNT(sd_template.module);
+	
 	return 0;
+
+error_out:
+	SDev->access_count--;
+	if (SDev->host->hostt->module)
+		__MOD_DEC_USE_COUNT(SDev->host->hostt->module);
+	if (sd_template.module)
+		__MOD_DEC_USE_COUNT(sd_template.module);
+	return retval;	
 }
 
 static int sd_release(struct inode *inode, struct file *file)
@@ -746,7 +774,8 @@ static int sd_init_onedisk(int i)
 
 		while (retries < 3) {
 			cmd[0] = TEST_UNIT_READY;
-			cmd[1] = (rscsi_disks[i].device->lun << 5) & 0xe0;
+			cmd[1] = (rscsi_disks[i].device->scsi_level <= SCSI_2) ?
+				 ((rscsi_disks[i].device->lun << 5) & 0xe0) : 0;
 			memset((void *) &cmd[2], 0, 8);
 			SRpnt->sr_cmd_len = 0;
 			SRpnt->sr_sense_buffer[0] = 0;
@@ -787,7 +816,8 @@ static int sd_init_onedisk(int i)
 			if (!spintime) {
 				printk("%s: Spinning up disk...", nbuff);
 				cmd[0] = START_STOP;
-				cmd[1] = (rscsi_disks[i].device->lun << 5) & 0xe0;
+				cmd[1] = (rscsi_disks[i].device->scsi_level <= SCSI_2) ?
+				 	 ((rscsi_disks[i].device->lun << 5) & 0xe0) : 0;
 				cmd[1] |= 1;	/* Return immediately */
 				memset((void *) &cmd[2], 0, 8);
 				cmd[4] = 1;	/* Start spin cycle */
@@ -820,7 +850,8 @@ static int sd_init_onedisk(int i)
 	retries = 3;
 	do {
 		cmd[0] = READ_CAPACITY;
-		cmd[1] = (rscsi_disks[i].device->lun << 5) & 0xe0;
+		cmd[1] = (rscsi_disks[i].device->scsi_level <= SCSI_2) ?
+			 ((rscsi_disks[i].device->lun << 5) & 0xe0) : 0;
 		memset((void *) &cmd[2], 0, 8);
 		memset((void *) buffer, 0, 8);
 		SRpnt->sr_cmd_len = 0;
@@ -977,7 +1008,8 @@ static int sd_init_onedisk(int i)
 
 		memset((void *) &cmd[0], 0, 8);
 		cmd[0] = MODE_SENSE;
-		cmd[1] = (rscsi_disks[i].device->lun << 5) & 0xe0;
+		cmd[1] = (rscsi_disks[i].device->scsi_level <= SCSI_2) ?
+			 ((rscsi_disks[i].device->lun << 5) & 0xe0) : 0;
 		cmd[2] = 0x3f;	/* Get all pages */
 		cmd[4] = 8;     /* But we only want the 8 byte header */
 		SRpnt->sr_cmd_len = 0;
@@ -1183,16 +1215,9 @@ static void sd_finish()
 
 static int sd_detect(Scsi_Device * SDp)
 {
-	char nbuff[6];
 	if (SDp->type != TYPE_DISK && SDp->type != TYPE_MOD)
 		return 0;
-
-	sd_devname(sd_template.dev_noticed++, nbuff);
-	printk("Detected scsi %sdisk %s at scsi%d, channel %d, id %d, lun %d\n",
-	       SDp->removable ? "removable " : "",
-	       nbuff,
-	       SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
-
+	sd_template.dev_noticed++;
 	return 1;
 }
 
@@ -1201,6 +1226,7 @@ static int sd_attach(Scsi_Device * SDp)
         unsigned int devnum;
 	Scsi_Disk *dpnt;
 	int i;
+	char nbuff[6];
 
 	if (SDp->type != TYPE_DISK && SDp->type != TYPE_MOD)
 		return 0;
@@ -1224,10 +1250,15 @@ static int sd_attach(Scsi_Device * SDp)
         SD_GENDISK(i).de_arr[devnum] = SDp->de;
         if (SDp->removable)
 		SD_GENDISK(i).flags[devnum] |= GENHD_FL_REMOVABLE;
+	sd_devname(i, nbuff);
+	printk("Attached scsi %sdisk %s at scsi%d, channel %d, id %d, lun %d\n",
+	       SDp->removable ? "removable " : "",
+	       nbuff, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
 	return 0;
 }
 
 #define DEVICE_BUSY rscsi_disks[target].device->busy
+#define ALLOW_REVALIDATE rscsi_disks[target].device->allow_revalidate
 #define USAGE rscsi_disks[target].device->access_count
 #define CAPACITY rscsi_disks[target].capacity
 #define MAYBE_REINIT  sd_init_onedisk(target)
@@ -1248,7 +1279,7 @@ int revalidate_scsidisk(kdev_t dev, int maxusage)
 
 	target = DEVICE_NR(dev);
 
-	if (DEVICE_BUSY || USAGE > maxusage) {
+	if (DEVICE_BUSY || (ALLOW_REVALIDATE == 0 && USAGE > maxusage)) {
 		printk("Device busy for revalidation (usage=%d)\n", USAGE);
 		return -EBUSY;
 	}

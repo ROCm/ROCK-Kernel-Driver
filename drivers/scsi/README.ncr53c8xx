@@ -508,7 +508,7 @@ Available commands:
     clearprof
 
     The profile counters are automatically cleared when the amount of
-    data transfered reaches 1000 GB in order to avoid overflow.
+    data transferred reaches 1000 GB in order to avoid overflow.
     The "clearprof" command allows you to clear these counters at any time.
 
 
@@ -1042,7 +1042,7 @@ SCSI BUS bandwidth if the SCRIPTS execution lasts more than 4 micro-seconds.
 
 The use of IARB needs the SCSI_NCR_IARB_SUPPORT option to have been defined 
 at compile time and the 'iarb' boot option to have been set to a non zero 
-value at boot time. It is not that usefull for real work, but can be used 
+value at boot time. It is not that useful for real work, but can be used 
 to stress SCSI devices or for some applications that can gain advantage of 
 it. By the way, if you experience badnesses like 'unexpected disconnections', 
 'bad reselections', etc... when using IARB on heavy IO load, you should not 
@@ -1350,7 +1350,7 @@ Field C : SIST io register (SCSI Interrupt Status)
   Bit 0x04 : UDC  Undexpected Disconnection
              Indicates that the device released the SCSI BUS when the chip 
              was not expecting this to happen. A device may behave so to 
-             indicate the SCSI initiator that an error condition not reportable              using the SCSI protocol has occured.
+             indicate the SCSI initiator that an error condition not reportable              using the SCSI protocol has occurred.
   Bit 0x02 : RST  SCSI BUS Reset
              Generally SCSI targets donnot reset the SCSI BUS, although any 
              device on the BUS can reset it at any time.

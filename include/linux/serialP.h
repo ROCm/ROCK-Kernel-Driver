@@ -142,10 +142,6 @@ struct rs_multiport_struct {
  */
 struct pci_dev;
 struct pci_board {
-	unsigned short vendor;
-	unsigned short device;
-	unsigned short subvendor;
-	unsigned short subdevice;
 	int flags;
 	int num_ports;
 	int base_baud;

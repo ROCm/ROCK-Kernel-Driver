@@ -496,7 +496,7 @@ setspc:	xorb	%bh, %bh			# Set special mode
 	jnc	setbad
 	
 	addw	%bx, %bx
-	.word	0xa7ff, spec_inits		# JMP [BX+spec_inits]
+	jmp	*spec_inits(%bx)
 
 setmenu:
 	orb	%al, %al			# 80x25 is an exception
@@ -1008,7 +1008,7 @@ vesa_modes:
 vesa1:
 # gas version 2.9.1, using BFD version 2.9.1.0.23 buggers the next inst.
 # XXX:	lodsw	%gs:(%si), %ax			# Get next mode in the list
-	.byte	0x65, 0xAD			# %gs seg prefix + lodsw
+	gs; lodsw
 	cmpw	$0xffff, %ax			# End of the table?
 	jz	vesar
 	

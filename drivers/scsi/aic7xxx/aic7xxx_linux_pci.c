@@ -42,9 +42,13 @@ struct pci_device_id
 static int	ahc_linux_pci_dev_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+#include <linux/module.h>
+
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
-/* We do our own ID filtering.  So, grab all SCSI storage class devices. */
+/* We do our own ID filtering.  So we grab all Adaptec SCSI storage class
+ * devices here.
+ */
 static struct pci_device_id ahc_linux_pci_id_table[] = {
 	{
 		0x9004, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
@@ -56,6 +60,7 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	},
 	{ 0 }
 };
+MODULE_DEVICE_TABLE(pci,ahc_linux_pci_id_table);
 
 struct pci_driver aic7xxx_pci_driver = {
 	name:		"aic7xxx",

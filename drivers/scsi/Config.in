@@ -198,6 +198,30 @@ if [ "$CONFIG_MIPS_JAZZ" = "y" ]; then
    bool 'MIPS JAZZ FAS216 SCSI support' CONFIG_JAZZ_ESP
 fi
 
+if [ "$CONFIG_AMIGA" = "y" ]; then
+   dep_tristate 'A3000 WD33C93A support' CONFIG_A3000_SCSI $CONFIG_SCSI
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      bool 'A4000T SCSI support (EXPERIMENTAL)' CONFIG_A4000T_SCSI
+   fi
+fi
+if [ "$CONFIG_ZORRO" = "y" ]; then
+   dep_tristate 'A2091/A590 WD33C93A support' CONFIG_A2091_SCSI $CONFIG_SCSI
+   dep_tristate 'GVP Series II WD33C93A support' CONFIG_GVP11_SCSI $CONFIG_SCSI
+   dep_tristate 'CyberStorm SCSI support' CONFIG_CYBERSTORM_SCSI $CONFIG_SCSI
+   dep_tristate 'CyberStorm Mk II SCSI support' CONFIG_CYBERSTORMII_SCSI $CONFIG_SCSI
+   dep_tristate 'Blizzard 2060 SCSI support' CONFIG_BLZ2060_SCSI $CONFIG_SCSI
+   dep_tristate 'Blizzard 1230IV/1260 SCSI support' CONFIG_BLZ1230_SCSI $CONFIG_SCSI
+   dep_tristate 'Fastlane SCSI support' CONFIG_FASTLANE_SCSI $CONFIG_SCSI
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      bool 'A4091 SCSI support (EXPERIMENTAL)' CONFIG_A4091_SCSI
+      bool 'WarpEngine SCSI support (EXPERIMENTAL)' CONFIG_WARPENGINE_SCSI
+      bool 'Blizzard PowerUP 603e+ SCSI (EXPERIMENTAL)' CONFIG_BLZ603EPLUS_SCSI
+      dep_tristate 'BSC Oktagon SCSI support (EXPERIMENTAL)' CONFIG_OKTAGON_SCSI $CONFIG_SCSI
+#      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
+#      bool 'GVP Turbo 040/060 SCSI support (EXPERIMENTAL)' CONFIG_GVP_TURBO_SCSI
+   fi
+fi
+
 endmenu
 
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then

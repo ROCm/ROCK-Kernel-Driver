@@ -629,7 +629,7 @@ typedef struct _SCCB {
 #if (FW_TYPE==_UCB_MGR_)  
    #define  HBA_AUTO_SENSE_FAIL        0x1B  
    #define  HBA_TQ_REJECTED            0x1C  
-   #define  HBA_UNSUPORTED_MSG         0x1D  
+   #define  HBA_UNSUPPORTED_MSG         0x1D  
    #define  HBA_HW_ERROR               0x20  
    #define  HBA_ATN_NOT_RESPONDED      0x21  
    #define  HBA_SCSI_RESET_BY_ADAPTER  0x22

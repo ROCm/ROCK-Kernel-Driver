@@ -737,6 +737,7 @@ static void __init qpti_get_scsi_id(struct qlogicpti *qpti)
 			prom_getintdefault(qpti->sdev->bus->prom_node,
 					   "scsi-initiator-id", 7);
 	qpti->qhost->this_id = qpti->scsi_id;
+	qpti->qhost->max_sectors = 64;
 
 	printk("SCSI ID %d ", qpti->scsi_id);
 }

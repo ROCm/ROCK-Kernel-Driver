@@ -124,7 +124,9 @@ int sr_set_blocklength(int minor, int blocklength)
 #endif
 	memset(cmd, 0, MAX_COMMAND_SIZE);
 	cmd[0] = MODE_SELECT;
-	cmd[1] = (scsi_CDs[minor].device->lun << 5) | (1 << 4);
+	cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
+	         (scsi_CDs[minor].device->lun << 5) : 0;
+	cmd[1] |= (1 << 4);
 	cmd[4] = 12;
 	modesel = (struct ccs_modesel_head *) buffer;
 	memset(modesel, 0, sizeof(*modesel));
@@ -173,7 +175,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	case VENDOR_SCSI3:
 		memset(cmd, 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_TOC;
-		cmd[1] = (scsi_CDs[minor].device->lun << 5);
+		cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
+		         (scsi_CDs[minor].device->lun << 5) : 0;
 		cmd[8] = 12;
 		cmd[9] = 0x40;
 		rc = sr_do_ioctl(minor, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
@@ -198,7 +201,9 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			unsigned long min, sec, frame;
 			memset(cmd, 0, MAX_COMMAND_SIZE);
 			cmd[0] = 0xde;
-			cmd[1] = (scsi_CDs[minor].device->lun << 5) | 0x03;
+			cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
+			         (scsi_CDs[minor].device->lun << 5) : 0;
+			cmd[1] |= 0x03;
 			cmd[2] = 0xb0;
 			rc = sr_do_ioctl(minor, cmd, buffer, 0x16, 1, SCSI_DATA_READ, NULL);
 			if (rc != 0)
@@ -223,7 +228,9 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			 * where starts the last session ?) */
 			memset(cmd, 0, MAX_COMMAND_SIZE);
 			cmd[0] = 0xc7;
-			cmd[1] = (scsi_CDs[minor].device->lun << 5) | 3;
+			cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
+			         (scsi_CDs[minor].device->lun << 5) : 0;
+			cmd[1] |= 0x03;
 			rc = sr_do_ioctl(minor, cmd, buffer, 4, 1, SCSI_DATA_READ, NULL);
 			if (rc == -EINVAL) {
 				printk(KERN_INFO "sr%d: Hmm, seems the drive "
@@ -246,7 +253,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	case VENDOR_WRITER:
 		memset(cmd, 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_TOC;
-		cmd[1] = (scsi_CDs[minor].device->lun << 5);
+		cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
+		         (scsi_CDs[minor].device->lun << 5) : 0;
 		cmd[8] = 0x04;
 		cmd[9] = 0x40;
 		rc = sr_do_ioctl(minor, cmd, buffer, 0x04, 1, SCSI_DATA_READ, NULL);
@@ -259,7 +267,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			break;
 		}
 		cmd[0] = READ_TOC;	/* Read TOC */
-		cmd[1] = (scsi_CDs[minor].device->lun << 5);
+		cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
+		         (scsi_CDs[minor].device->lun << 5) : 0;
 		cmd[6] = rc & 0x7f;	/* number of last session */
 		cmd[8] = 0x0c;
 		cmd[9] = 0x40;

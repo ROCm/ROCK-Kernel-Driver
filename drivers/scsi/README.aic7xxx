@@ -14,50 +14,17 @@ linux-1.1.x and fairly stable since linux-1.2.x, and are also in FreeBSD
     Adaptec Cards
     ----------------------------
     AHA-274x
-    AHA-274xT               
-    AHA-2842
-    AHA-2910B               
-    AHA-2920C
-    AHA-2930
-    AHA-2930U
-    AHA-2930CU
-    AHA-2930U2
-    AHA-2940               
-    AHA-2940W              
-    AHA-2940U              
-    AHA-2940UW
-    AHA-2940UW-PRO
-    AHA-2940AU 
-    AHA-2940U2W
-    AHA-2940U2
-    AHA-2940U2B
-    AHA-2940U2BOEM
-    AHA-2944D              
-    AHA-2944WD
-    AHA-2944UD
-    AHA-2944UWD
-    AHA-2950U2
-    AHA-2950U2W
-    AHA-2950U2B
-    AHA-29160M
-    AHA-3940
-    AHA-3940U
-    AHA-3940W
-    AHA-3940UW
-    AHA-3940AUW
-    AHA-3940U2W
-    AHA-3950U2B
-    AHA-3950U2D
-    AHA-3960D
-    AHA-39160M
-    AHA-3985
-    AHA-3985U
-    AHA-3985W
-    AHA-3985UW
+    AHA-274xT
+    AHA-274xW
+    AHA-284x
+    AHA-284xW
+    All PCI based cards using any of the chipsets listed under motherboard
+    chipsets.  In general, this means *all* of the Adaptec SCSI controllers
+    except the ones specifically excluded later on in this document.
 
     Motherboard Chipsets
     ----------------------------
-    AIC-777x   
+    AIC-777x
     AIC-785x
     AIC-786x
     AIC-787x
@@ -71,15 +38,14 @@ linux-1.1.x and fairly stable since linux-1.2.x, and are also in FreeBSD
         SCSI-1/SCSI-2 50pin devices, transfer rates up to 20MB/s.
     U - Ultra SCSI, transfer rates up to 40MB/s.
     U2- Ultra 2 SCSI, transfer rates up to 80MB/s.
+    U3- Ultra 3 SCSI, transfer rates up to 160MB/s.
     D - Differential SCSI.
     T - Twin Channel SCSI. Up to 14 SCSI devices.
 
     AHA-274x - EISA SCSI controller
     AHA-284x - VLB SCSI controller
     AHA-29xx - PCI SCSI controller
-    AHA-394x - PCI controllers with two separate SCSI controllers on-board.
-    AHA-398x - PCI RAID controllers with three separate SCSI controllers
-               on-board.
+    AHA-39xx - PCI controllers with multiple separate SCSI channels on-board.
 
   Not Supported Devices
   ------------------------------
@@ -93,7 +59,7 @@ linux-1.1.x and fairly stable since linux-1.2.x, and are also in FreeBSD
 
     Motherboard Chipsets
     ----------------------------
-    AIC-7810
+    AIC-781x
 
     Bus Types
     ----------------------------

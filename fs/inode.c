@@ -692,7 +692,7 @@ void shrink_icache_memory(int priority, int gfp_mask)
 	 * want to recurse into the FS that called us
 	 * in clear_inode() and friends..
 	 */
-	if (!(gfp_mask & __GFP_IO))
+	if (!(gfp_mask & __GFP_FS))
 		return;
 
 	if (priority)

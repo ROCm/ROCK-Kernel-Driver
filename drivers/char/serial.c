@@ -59,8 +59,8 @@
  *
  */
 
-static char *serial_version = "5.05a";
-static char *serial_revdate = "2001-03-20";
+static char *serial_version = "5.05b";
+static char *serial_revdate = "2001-05-03";
 
 /*
  * Serial driver configuration section.  Here are the various options:
@@ -3917,14 +3917,14 @@ static void __devinit start_pci_pnp_board(struct pci_dev *dev,
 
        if (PREPARE_FUNC(dev) && (PREPARE_FUNC(dev))(dev) < 0) {
 	       printk("serial: PNP device '");
-	       printk_pnp_dev_id(board->vendor, board->device);
+	       printk_pnp_dev_id(dev->vendor, dev->device);
 	       printk("' prepare failed\n");
 	       return;
        }
 
        if (ACTIVATE_FUNC(dev) && (ACTIVATE_FUNC(dev))(dev) < 0) {
 	       printk("serial: PNP device '");
-	       printk_pnp_dev_id(board->vendor, board->device);
+	       printk_pnp_dev_id(dev->vendor, dev->device);
 	       printk("' activate failed\n");
 	       return;
        }
@@ -4112,7 +4112,7 @@ pci_inteli960ni_fn(struct pci_dev *dev,
 {
 	unsigned long oldval;
 	
-	if (!(board->subdevice & 0x1000))
+	if (!(pci_get_subdevice(dev) & 0x1000))
 		return(-1);
 
 	if (!enable) /* is there something to deinit? */
@@ -4178,7 +4178,7 @@ pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 	for (i=0; timedia_data[i].num; i++) {
 		ids = timedia_data[i].ids;
 		for (j=0; ids[j]; j++) {
-			if (pci_get_subvendor(dev) == ids[j]) {
+			if (pci_get_subdevice(dev) == ids[j]) {
 				board->num_ports = timedia_data[i].num;
 				return 0;
 			}
@@ -4187,409 +4187,195 @@ pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 	return 0;
 }
 
+static int
+#ifndef MODULE
+__devinit
+#endif
+pci_xircom_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+{
+	__set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ/10);
+	return 0;
+}
 
 /*
  * This is the configuration table for all of the PCI serial boards
- * which we support.
+ * which we support.  It is directly indexed by the pci_board_num_t enum
+ * value, which is encoded in the pci_device_id PCI probe table's
+ * driver_data member.
  */
+enum pci_board_num_t {
+	pbn_b0_1_115200,
+	pbn_default = 0,
+
+	pbn_b0_2_115200,
+	pbn_b0_4_115200,
+
+	pbn_b0_1_921600,
+	pbn_b0_2_921600,
+	pbn_b0_4_921600,
+
+	pbn_b0_bt_1_115200,
+	pbn_b0_bt_2_115200,
+	pbn_b0_bt_1_460800,
+	pbn_b0_bt_2_460800,
+
+	pbn_b1_1_115200,
+	pbn_b1_2_115200,
+	pbn_b1_4_115200,
+	pbn_b1_8_115200,
+
+	pbn_b1_2_921600,
+	pbn_b1_4_921600,
+	pbn_b1_8_921600,
+
+	pbn_b1_2_1382400,
+	pbn_b1_4_1382400,
+	pbn_b1_8_1382400,
+
+	pbn_b2_8_115200,
+	pbn_b2_4_460800,
+	pbn_b2_8_460800,
+	pbn_b2_16_460800,
+	pbn_b2_4_921600,
+	pbn_b2_8_921600,
+
+	pbn_b2_bt_1_115200,
+	pbn_b2_bt_2_115200,
+	pbn_b2_bt_4_115200,
+	pbn_b2_bt_2_921600,
+
+	pbn_panacom,
+	pbn_panacom2,
+	pbn_panacom4,
+	pbn_plx_romulus,
+	pbn_oxsemi,
+	pbn_timedia,
+	pbn_intel_i960,
+	pbn_sgi_ioc3,
+#ifdef CONFIG_DDB5074
+	pbn_nec_nile4,
+#endif
+#if 0
+	pbn_dci_pccom8,
+#endif
+	pbn_xircom_combo,
+
+	pbn_siig10x_0,
+	pbn_siig10x_1,
+	pbn_siig10x_2,
+	pbn_siig10x_4,
+	pbn_siig20x_0,
+	pbn_siig20x_2,
+	pbn_siig20x_4,
+	
+	pbn_computone_4,
+	pbn_computone_6,
+	pbn_computone_8,
+};
+
 static struct pci_board pci_boards[] __devinitdata = {
 	/*
-	 * Vendor ID, 	Device ID,
-	 * Subvendor ID,	Subdevice ID,
 	 * PCI Flags, Number of Ports, Base (Maximum) Baud Rate,
 	 * Offset to get to next UART's registers,
 	 * Register shift to use for memory-mapped I/O,
 	 * Initialization function, first UART offset
 	 */
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_232,
-		SPCI_FL_BASE1, 8, 1382400 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_232,
-		SPCI_FL_BASE1, 4, 1382400 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH2_232,
-		SPCI_FL_BASE1, 2, 1382400 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_232,
-		SPCI_FL_BASE1, 8, 1382400 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_232,
-		SPCI_FL_BASE1, 4, 1382400 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH2_232,
-		SPCI_FL_BASE1, 2, 1382400 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_485,
-		SPCI_FL_BASE1, 8, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_485_4_4,
-		SPCI_FL_BASE1, 8, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_485,
-		SPCI_FL_BASE1, 4, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_485_2_2,
-		SPCI_FL_BASE1, 4, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH2_485,
-		SPCI_FL_BASE1, 2, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_485_2_6,
-		SPCI_FL_BASE1, 8, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH081101V1,
-		SPCI_FL_BASE1, 8, 921600 },
-	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
-		PCI_SUBVENDOR_ID_CONNECT_TECH,
-		PCI_SUBDEVICE_ID_CONNECT_TECH_BH041101V1,
-		SPCI_FL_BASE1, 4, 921600 },
-	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_U530,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 1, 115200 },
-	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM2,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM422,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 115200 },
-	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM232,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_COMM4,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 115200 },
-	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_COMM8,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 8, 115200 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_GTEK_SERIAL2,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_SPCOM200,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600 },
-	/* VScom SPCOM800, from sl@s.pl */
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_SPCOM800, 
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 8, 921600 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_1077,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 4, 921600 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_KEYSPAN,
-		PCI_SUBDEVICE_ID_KEYSPAN_SX2,
-		SPCI_FL_BASE2, 2, 921600, /* IOMEM */
+
+	/* Generic serial board, pbn_b0_1_115200, pbn_default */
+	{ SPCI_FL_BASE0, 1, 115200 },		/* pbn_b0_1_115200,
+						   pbn_default */
+
+	{ SPCI_FL_BASE0, 2, 115200 },		/* pbn_b0_2_115200 */
+	{ SPCI_FL_BASE0, 4, 115200 },		/* pbn_b0_4_115200 */
+
+	{ SPCI_FL_BASE0, 1, 921600 },		/* pbn_b0_1_921600 */
+	{ SPCI_FL_BASE0, 2, 921600 },		/* pbn_b0_2_921600 */
+	{ SPCI_FL_BASE0, 4, 921600 },		/* pbn_b0_4_921600 */
+
+	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 115200 }, /* pbn_b0_bt_1_115200 */
+	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 115200 }, /* pbn_b0_bt_2_115200 */
+	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 460800 }, /* pbn_b0_bt_1_460800 */
+	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 460800 }, /* pbn_b0_bt_2_460800 */
+
+	{ SPCI_FL_BASE1, 1, 115200 },		/* pbn_b1_1_115200 */
+	{ SPCI_FL_BASE1, 2, 115200 },		/* pbn_b1_2_115200 */
+	{ SPCI_FL_BASE1, 4, 115200 },		/* pbn_b1_4_115200 */
+	{ SPCI_FL_BASE1, 8, 115200 },		/* pbn_b1_8_115200 */
+
+	{ SPCI_FL_BASE1, 2, 921600 },		/* pbn_b1_2_921600 */
+	{ SPCI_FL_BASE1, 4, 921600 },		/* pbn_b1_4_921600 */
+	{ SPCI_FL_BASE1, 8, 921600 },		/* pbn_b1_8_921600 */
+
+	{ SPCI_FL_BASE1, 2, 1382400 },		/* pbn_b1_2_1382400 */
+	{ SPCI_FL_BASE1, 4, 1382400 },		/* pbn_b1_4_1382400 */
+	{ SPCI_FL_BASE1, 8, 1382400 },		/* pbn_b1_8_1382400 */
+
+	{ SPCI_FL_BASE2, 8, 115200 },		/* pbn_b2_8_115200 */
+	{ SPCI_FL_BASE2, 4, 460800 },		/* pbn_b2_4_460800 */
+	{ SPCI_FL_BASE2, 8, 460800 },		/* pbn_b2_8_460800 */
+	{ SPCI_FL_BASE2, 16, 460800 },		/* pbn_b2_16_460800 */
+	{ SPCI_FL_BASE2, 4, 921600 },		/* pbn_b2_4_921600 */
+	{ SPCI_FL_BASE2, 8, 921600 },		/* pbn_b2_8_921600 */
+
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 1, 115200 }, /* pbn_b2_bt_1_115200 */
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 115200 }, /* pbn_b2_bt_2_115200 */
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 115200 }, /* pbn_b2_bt_4_115200 */
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600 }, /* pbn_b2_bt_2_921600 */
+
+	{ SPCI_FL_BASE2, 2, 921600, /* IOMEM */		   /* pbn_panacom */
 		0x400, 7, pci_plx9050_fn },
-	{	PCI_VENDOR_ID_PANACOM, PCI_DEVICE_ID_PANACOM_QUADMODEM,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 921600,
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,   /* pbn_panacom2 */
 		0x400, 7, pci_plx9050_fn },
-	{	PCI_VENDOR_ID_PANACOM, PCI_DEVICE_ID_PANACOM_DUALMODEM,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 921600,   /* pbn_panacom4 */
 		0x400, 7, pci_plx9050_fn },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
-		PCI_SUBDEVICE_ID_CHASE_PCIFAST4,
-		SPCI_FL_BASE2, 4, 460800 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
-		PCI_SUBDEVICE_ID_CHASE_PCIFAST8,
-		SPCI_FL_BASE2, 8, 460800 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
-		PCI_SUBDEVICE_ID_CHASE_PCIFAST16,
-		SPCI_FL_BASE2, 16, 460800 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
-		PCI_SUBDEVICE_ID_CHASE_PCIFAST16FMC,
-		SPCI_FL_BASE2, 16, 460800 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_CHASE_PCIRAS,
-		PCI_SUBDEVICE_ID_CHASE_PCIRAS4,
-		SPCI_FL_BASE2, 4, 460800 },
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
-		PCI_SUBVENDOR_ID_CHASE_PCIRAS,
-		PCI_SUBDEVICE_ID_CHASE_PCIRAS8,
-		SPCI_FL_BASE2, 8, 460800 },
-	/* Megawolf Romulus PCI Serial Card, from Mike Hudson */
-	/* (Exoray@isys.ca) */
-	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_ROMULUS,
-		0x10b5, 0x106a,
-		SPCI_FL_BASE2, 4, 921600,
+	{ SPCI_FL_BASE2, 4, 921600,			   /* pbn_plx_romulus */
 		0x20, 2, pci_plx9050_fn, 0x03 },
-	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_QSC100,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE1, 4, 115200 },
-	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_DSC100,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE1, 2, 115200 },
-	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_ESC100D,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE1, 8, 115200 },
-	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_ESC100M,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE1, 8, 115200 },
-	{	PCI_VENDOR_ID_SPECIALIX, PCI_DEVICE_ID_OXSEMI_16PCI954,
-		PCI_VENDOR_ID_SPECIALIX, PCI_SUBDEVICE_ID_SPECIALIX_SPEED4,
-		SPCI_FL_BASE0 , 4, 921600 },
-	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI954,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 , 4, 115200 },
-	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI952,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 , 2, 115200 },
 		/* This board uses the size of PCI Base region 0 to
 		 * signal now many ports are available */
-	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI95N,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_REGION_SZ_CAP, 32, 115200 },
-	{	PCI_VENDOR_ID_TIMEDIA, PCI_DEVICE_ID_TIMEDIA_1889,
-		PCI_VENDOR_ID_TIMEDIA, PCI_ANY_ID,
-		SPCI_FL_BASE_TABLE, 1, 921600,
+	{ SPCI_FL_BASE0 | SPCI_FL_REGION_SZ_CAP, 32, 115200 }, /* pbn_oxsemi */
+	{ SPCI_FL_BASE_TABLE, 1, 921600,		   /* pbn_timedia */
 		0, 0, pci_timedia_fn },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_DSERIAL,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUATRO_A,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUATRO_B,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PORT_PLUS,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 460800 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUAD_A,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 460800 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUAD_B,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 460800 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_SSERIAL,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 115200 },
-	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PORT_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 460800 },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 1, 460800,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 1, 460800,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 1, 460800,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 1, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 1, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2, 1, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_10x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_10x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_10x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_10x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_10x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_10x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 921600,
-		0, 0, pci_siig10x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_20x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_20x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_20x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_20x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_20x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_20x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_20x_550,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 4, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_20x_650,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 4, 921600,
-		0, 0, pci_siig20x_fn },
-	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_20x_850,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 4, 921600,
-		0, 0, pci_siig20x_fn },
-	/* Computone devices submitted by Doug McNash dmcnash@computone.com */
-	{	PCI_VENDOR_ID_COMPUTONE, PCI_DEVICE_ID_COMPUTONE_PG,
-		PCI_SUBVENDOR_ID_COMPUTONE, PCI_SUBDEVICE_ID_COMPUTONE_PG4,
-		SPCI_FL_BASE0, 4, 921600, /* IOMEM */
-		0x40, 2, NULL, 0x200 },
-	{	PCI_VENDOR_ID_COMPUTONE, PCI_DEVICE_ID_COMPUTONE_PG,
-		PCI_SUBVENDOR_ID_COMPUTONE, PCI_SUBDEVICE_ID_COMPUTONE_PG8,
-		SPCI_FL_BASE0, 8, 921600, /* IOMEM */
-		0x40, 2, NULL, 0x200 },
-	{	PCI_VENDOR_ID_COMPUTONE, PCI_DEVICE_ID_COMPUTONE_PG,
-		PCI_SUBVENDOR_ID_COMPUTONE, PCI_SUBDEVICE_ID_COMPUTONE_PG6,
-		SPCI_FL_BASE0, 6, 921600, /* IOMEM */
-		0x40, 2, NULL, 0x200 },
-	/* Digitan DS560-558, from jimd@esoft.com */
-	{	PCI_VENDOR_ID_ATT, PCI_DEVICE_ID_ATT_VENUS_MODEM,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE1, 1, 115200 },
-	/* 3Com US Robotics 56k Voice Internal PCI model 5610 */
-	{	PCI_VENDOR_ID_USR, 0x1008,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 115200 },
-	/* Titan Electronic cards */
-	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_100,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 921600 },
-	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_200,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 2, 921600 },
-	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_400,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 4, 921600 },
-	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_800B,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 4, 921600 },
 	/* EKF addition for i960 Boards form EKF with serial port */
-	{	PCI_VENDOR_ID_INTEL, 0x1960,
-		0xE4BF, PCI_ANY_ID,
-		SPCI_FL_BASE0, 32, 921600, /* max 256 ports */
+	{ SPCI_FL_BASE0, 32, 921600, /* max 256 ports */   /* pbn_intel_i960 */
 		8<<2, 2, pci_inteli960ni_fn, 0x10000},
-	/* RAStel 2 port modem, gerg@moreton.com.au */
-	{	PCI_VENDOR_ID_MORETON, PCI_DEVICE_ID_RASTEL_2PORT,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 115200 },
-	/*
-	 * Untested PCI modems, sent in from various folks...
-	 */
-	/* Elsa Model 56K PCI Modem, from Andreas Rath <arh@01019freenet.de> */
-	{	PCI_VENDOR_ID_ROCKWELL, 0x1004,
-		0x1048, 0x1500, 
-		SPCI_FL_BASE1, 1, 115200 },
-	{	PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC3,
-		0xFF00, 0, SPCI_FL_BASE0 | SPCI_FL_IRQRESOURCE,
+	{ SPCI_FL_BASE0 | SPCI_FL_IRQRESOURCE,		   /* pbn_sgi_ioc3 */
 		1, 458333, 0, 0, 0, 0x20178 },
-#if CONFIG_DDB5074
+#ifdef CONFIG_DDB5074
 	/*
 	 * NEC Vrc-5074 (Nile 4) builtin UART.
 	 * Conditionally compiled in since this is a motherboard device.
 	 */
-	{	PCI_VENDOR_ID_NEC, PCI_DEVICE_ID_NEC_NILE4,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE0, 1, 520833,
+	{ SPCI_FL_BASE0, 1, 520833,			   /* pbn_nec_nile4 */
 		64, 3, NULL, 0x300 },
 #endif
-#if 0	/* PCI_DEVICE_ID_DCI_PCCOM8 ? */
-	{	PCI_VENDOR_ID_DCI, PCI_DEVICE_ID_DCI_PCCOM8,
-		PCI_ANY_ID, PCI_ANY_ID,
-		SPCI_FL_BASE3, 8, 115200,
-		8 },
+#if 0	/* PCI_DEVICE_ID_DCI_PCCOM8 ? */		   /* pbn_dci_pccom8 */
+	{ SPCI_FL_BASE3, 8, 115200, 8 },
 #endif
-	/* Generic serial board */
-	{	0, 0,
-		0, 0,
-		SPCI_FL_BASE0, 1, 115200 },
+	{ SPCI_FL_BASE0, 1, 115200,			  /* pbn_xircom_combo */
+		0, 0, pci_xircom_fn },
+
+	{ SPCI_FL_BASE2, 1, 460800,			   /* pbn_siig10x_0 */
+		0, 0, pci_siig10x_fn },
+	{ SPCI_FL_BASE2, 1, 921600,			   /* pbn_siig10x_1 */
+		0, 0, pci_siig10x_fn },
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 2, 921600,   /* pbn_siig10x_2 */
+		0, 0, pci_siig10x_fn },
+	{ SPCI_FL_BASE2 | SPCI_FL_BASE_TABLE, 4, 921600,   /* pbn_siig10x_4 */
+		0, 0, pci_siig10x_fn },
+	{ SPCI_FL_BASE0, 1, 921600,			   /* pbn_siix20x_0 */
+		0, 0, pci_siig20x_fn },
+	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 921600,   /* pbn_siix20x_2 */
+		0, 0, pci_siig20x_fn },
+	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 4, 921600,   /* pbn_siix20x_4 */
+		0, 0, pci_siig20x_fn },
+
+	{ SPCI_FL_BASE0, 4, 921600, /* IOMEM */		   /* pbn_computone_4 */
+		0x40, 2, NULL, 0x200 },
+	{ SPCI_FL_BASE0, 6, 921600, /* IOMEM */		   /* pbn_computone_6 */
+		0x40, 2, NULL, 0x200 },
+	{ SPCI_FL_BASE0, 8, 921600, /* IOMEM */		   /* pbn_computone_8 */
+		0x40, 2, NULL, 0x200 },
 };
 
 /*
@@ -4597,7 +4383,7 @@ static struct pci_board pci_boards[] __devinitdata = {
  * guess what the configuration might be, based on the pitiful PCI
  * serial specs.  Returns 0 on success, 1 on failure.
  */
-static int _INLINE_ serial_pci_guess_board(struct pci_dev *dev,
+static int __devinit serial_pci_guess_board(struct pci_dev *dev,
 					   struct pci_board *board)
 {
 	int	num_iomem = 0, num_port = 0, first_port = -1;
@@ -4642,26 +4428,13 @@ static int __devinit serial_init_one(struct pci_dev *dev,
 	struct pci_board *board, tmp;
 	int rc;
 
-	for (board = pci_boards; board->vendor; board++) {
-		if (board->vendor != (unsigned short) PCI_ANY_ID &&
-		    dev->vendor != board->vendor)
-			continue;
-		if (board->device != (unsigned short) PCI_ANY_ID &&
-		    dev->device != board->device)
-			continue;
-		if (board->subvendor != (unsigned short) PCI_ANY_ID &&
-		    pci_get_subvendor(dev) != board->subvendor)
-			continue;
-		if (board->subdevice != (unsigned short) PCI_ANY_ID &&
-		    pci_get_subdevice(dev) != board->subdevice)
-			continue;
-		break;
-	}
+	board = &pci_boards[ent->driver_data];
 
 	rc = pci_enable_device(dev);
 	if (rc) return rc;
 
-	if (board->vendor == 0 && serial_pci_guess_board(dev, board))
+	if (ent->driver_data == pbn_default &&
+	    serial_pci_guess_board(dev, board))
 		return -ENODEV;
 	else if (serial_pci_guess_board(dev, &tmp) == 0) {
 		printk(KERN_INFO "Redundant entry in serial pci_table.  "
@@ -4711,6 +4484,364 @@ static void __devexit serial_remove_one(struct pci_dev *dev)
 
 
 static struct pci_device_id serial_pci_tbl[] __devinitdata = {
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_232, 0, 0,
+		pbn_b1_8_1382400 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_232, 0, 0,
+		pbn_b1_4_1382400 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH2_232, 0, 0,
+		pbn_b1_2_1382400 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_232, 0, 0,
+		pbn_b1_8_1382400 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_232, 0, 0,
+		pbn_b1_4_1382400 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH2_232, 0, 0,
+		pbn_b1_2_1382400 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_485, 0, 0,
+		pbn_b1_8_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_485_4_4, 0, 0,
+		pbn_b1_8_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_485, 0, 0,
+		pbn_b1_4_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH4_485_2_2, 0, 0,
+		pbn_b1_4_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH2_485, 0, 0,
+		pbn_b1_2_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_485_2_6, 0, 0,
+		pbn_b1_8_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH081101V1, 0, 0,
+		pbn_b1_8_921600 },
+	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V351,
+		PCI_SUBVENDOR_ID_CONNECT_TECH,
+		PCI_SUBDEVICE_ID_CONNECT_TECH_BH041101V1, 0, 0,
+		pbn_b1_4_921600 },
+
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_U530,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_bt_1_115200 },
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM2,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_bt_2_115200 },
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM422,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_bt_4_115200 },
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM232,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_bt_2_115200 },
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_COMM4,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_bt_4_115200 },
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_COMM8,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_8_115200 },
+
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_GTEK_SERIAL2,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b2_bt_2_115200 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_SPCOM200,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b2_bt_2_921600 },
+	/* VScom SPCOM800, from sl@s.pl */
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_SPCOM800, 
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_8_921600 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_1077,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_4_921600 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_KEYSPAN,
+		PCI_SUBDEVICE_ID_KEYSPAN_SX2, 0, 0,
+		pbn_panacom },
+	{	PCI_VENDOR_ID_PANACOM, PCI_DEVICE_ID_PANACOM_QUADMODEM,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_panacom4 },
+	{	PCI_VENDOR_ID_PANACOM, PCI_DEVICE_ID_PANACOM_DUALMODEM,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_panacom2 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
+		PCI_SUBDEVICE_ID_CHASE_PCIFAST4, 0, 0, 
+		pbn_b2_4_460800 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
+		PCI_SUBDEVICE_ID_CHASE_PCIFAST8, 0, 0, 
+		pbn_b2_8_460800 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
+		PCI_SUBDEVICE_ID_CHASE_PCIFAST16, 0, 0, 
+		pbn_b2_16_460800 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_CHASE_PCIFAST,
+		PCI_SUBDEVICE_ID_CHASE_PCIFAST16FMC, 0, 0, 
+		pbn_b2_16_460800 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_CHASE_PCIRAS,
+		PCI_SUBDEVICE_ID_CHASE_PCIRAS4, 0, 0, 
+		pbn_b2_4_460800 },
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+		PCI_SUBVENDOR_ID_CHASE_PCIRAS,
+		PCI_SUBDEVICE_ID_CHASE_PCIRAS8, 0, 0, 
+		pbn_b2_8_460800 },
+	/* Megawolf Romulus PCI Serial Card, from Mike Hudson */
+	/* (Exoray@isys.ca) */
+	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_ROMULUS,
+		0x10b5, 0x106a, 0, 0,
+		pbn_plx_romulus },
+	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_QSC100,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b1_4_115200 },
+	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_DSC100,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b1_2_115200 },
+	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_ESC100D,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b1_8_115200 },
+	{	PCI_VENDOR_ID_QUATECH, PCI_DEVICE_ID_QUATECH_ESC100M,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b1_8_115200 },
+	{	PCI_VENDOR_ID_SPECIALIX, PCI_DEVICE_ID_OXSEMI_16PCI954,
+		PCI_VENDOR_ID_SPECIALIX, PCI_SUBDEVICE_ID_SPECIALIX_SPEED4, 0, 0, 
+		pbn_b0_4_921600 },
+	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI954,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b0_4_115200 },
+	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI952,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b0_2_115200 },
+
+	/* Digitan DS560-558, from jimd@esoft.com */
+	{	PCI_VENDOR_ID_ATT, PCI_DEVICE_ID_ATT_VENUS_MODEM,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b1_1_115200 },
+
+	/* 3Com US Robotics 56k Voice Internal PCI model 5610 */
+	{	PCI_VENDOR_ID_USR, 0x1008,
+		PCI_ANY_ID, PCI_ANY_ID, },
+
+	/* Titan Electronic cards */
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_100,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b0_1_921600 },
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_200,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b0_2_921600 },
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_400,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b0_4_921600 },
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_800B,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b0_4_921600 },
+
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_1 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_1 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_1 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_10x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_10x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_10x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_10x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_4 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_10x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_4 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_10x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig10x_4 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_20x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_20x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_20x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_0 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_20x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_20x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S_20x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_2 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_20x_550,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_4 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_20x_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_4 },
+	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_4S_20x_850,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_siig20x_4 },
+
+	/* Computone devices submitted by Doug McNash dmcnash@computone.com */
+	{	PCI_VENDOR_ID_COMPUTONE, PCI_DEVICE_ID_COMPUTONE_PG,
+		PCI_SUBVENDOR_ID_COMPUTONE, PCI_SUBDEVICE_ID_COMPUTONE_PG4,
+		0, 0, pbn_computone_4 },
+	{	PCI_VENDOR_ID_COMPUTONE, PCI_DEVICE_ID_COMPUTONE_PG,
+		PCI_SUBVENDOR_ID_COMPUTONE, PCI_SUBDEVICE_ID_COMPUTONE_PG8,
+		0, 0, pbn_computone_8 },
+	{	PCI_VENDOR_ID_COMPUTONE, PCI_DEVICE_ID_COMPUTONE_PG,
+		PCI_SUBVENDOR_ID_COMPUTONE, PCI_SUBDEVICE_ID_COMPUTONE_PG6,
+		0, 0, pbn_computone_6 },
+
+	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI95N,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, pbn_oxsemi },
+	{	PCI_VENDOR_ID_TIMEDIA, PCI_DEVICE_ID_TIMEDIA_1889,
+		PCI_VENDOR_ID_TIMEDIA, PCI_ANY_ID, 0, 0, pbn_timedia },
+
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_DSERIAL,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_2_115200 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUATRO_A,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_2_115200 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUATRO_B,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_2_115200 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PORT_PLUS,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_2_460800 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUAD_A,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_2_460800 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUAD_B,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_2_460800 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_SSERIAL,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_1_115200 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PORT_650,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_1_460800 },
+
+	/* RAStel 2 port modem, gerg@moreton.com.au */
+	{	PCI_VENDOR_ID_MORETON, PCI_DEVICE_ID_RASTEL_2PORT,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b2_bt_2_115200 },
+
+	/* EKF addition for i960 Boards form EKF with serial port */
+	{	PCI_VENDOR_ID_INTEL, 0x1960,
+		0xE4BF, PCI_ANY_ID, 0, 0,
+		pbn_intel_i960 },
+
+	/* Xircom Cardbus/Ethernet combos */
+	{	PCI_VENDOR_ID_XIRCOM, PCI_DEVICE_ID_XIRCOM_X3201_MDM,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_xircom_combo },
+
+	/*
+	 * Untested PCI modems, sent in from various folks...
+	 */
+
+	/* Elsa Model 56K PCI Modem, from Andreas Rath <arh@01019freenet.de> */
+	{	PCI_VENDOR_ID_ROCKWELL, 0x1004,
+		0x1048, 0x1500, 0, 0,
+		pbn_b1_1_115200 },
+
+	{	PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC3,
+		0xFF00, 0, 0, 0,
+		pbn_sgi_ioc3 },
+
+#ifdef CONFIG_DDB5074
+	/*
+	 * NEC Vrc-5074 (Nile 4) builtin UART.
+	 * Conditionally compiled in since this is a motherboard device.
+	 */
+	{	PCI_VENDOR_ID_NEC, PCI_DEVICE_ID_NEC_NILE4,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_nec_nile4 },
+#endif
+
+#if 0	/* PCI_DEVICE_ID_DCI_PCCOM8 ? */
+	{	PCI_VENDOR_ID_DCI, PCI_DEVICE_ID_DCI_PCCOM8,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_dci_pccom8 },
+#endif
+
        { PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
 	 PCI_CLASS_COMMUNICATION_SERIAL << 8, 0xffff00, },
        { PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
@@ -4746,7 +4877,7 @@ static void __devinit probe_serial_pci(void)
 	 * not to attempt to unregister the driver later
 	 */
 	if (pci_module_init (&serial_pci_driver) != 0)
-		serial_pci_driver.name[0] = 0;
+		serial_pci_driver.name = "";
 
 #ifdef SERIAL_DEBUG_PCI
 	printk(KERN_DEBUG "Leaving probe_serial_pci() (probe finished)\n");
@@ -5153,11 +5284,9 @@ static void __devinit probe_serial_pnp(void)
 			       break;
 
 	       if (pnp_board->vendor) {
-		       board.vendor = pnp_board->vendor;
-		       board.device = pnp_board->device;
 		       /* Special case that's more efficient to hardcode */
-		       if ((board.vendor == ISAPNP_VENDOR('A', 'K', 'Y') &&
-			    board.device == ISAPNP_DEVICE(0x1021)))
+		       if ((pnp_board->vendor == ISAPNP_VENDOR('A', 'K', 'Y') &&
+			    pnp_board->device == ISAPNP_DEVICE(0x1021)))
 			       board.flags |= SPCI_FL_NO_SHIRQ;
 	       } else {
 		       if (serial_pnp_guess_board(dev, &board))

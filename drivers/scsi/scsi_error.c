@@ -427,7 +427,8 @@ STATIC int scsi_request_sense(Scsi_Cmnd * SCpnt)
 	memcpy((void *) SCpnt->cmnd, (void *) generic_sense,
 	       sizeof(generic_sense));
 
-	SCpnt->cmnd[1] = SCpnt->lun << 5;
+	if (SCpnt->device->scsi_level <= SCSI_2)
+		SCpnt->cmnd[1] = SCpnt->lun << 5;
 
 	scsi_result = (!SCpnt->host->hostt->unchecked_isa_dma)
 	    ? &scsi_result0[0] : kmalloc(512, GFP_ATOMIC | GFP_DMA);
@@ -496,7 +497,8 @@ STATIC int scsi_test_unit_ready(Scsi_Cmnd * SCpnt)
 	memcpy((void *) SCpnt->cmnd, (void *) tur_command,
 	       sizeof(tur_command));
 
-	SCpnt->cmnd[1] = SCpnt->lun << 5;
+	if (SCpnt->device->scsi_level <= SCSI_2)
+		SCpnt->cmnd[1] = SCpnt->lun << 5;
 
 	/*
 	 * Zero the sense buffer.  The SCSI spec mandates that any
@@ -1175,6 +1177,14 @@ STATIC int scsi_check_sense(Scsi_Cmnd * SCpnt)
 		 */
 		if (SCpnt->device->expecting_cc_ua) {
 			SCpnt->device->expecting_cc_ua = 0;
+			return NEEDS_RETRY;
+		}
+		/*
+		 * If the device is in the process of becoming ready, we 
+		 * should retry.
+		 */
+		if ((SCpnt->sense_buffer[12] == 0x04) &&
+			(SCpnt->sense_buffer[13] == 0x01)) {
 			return NEEDS_RETRY;
 		}
 		return SUCCESS;

@@ -237,6 +237,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j){
     retval->use_clustering = tpnt->use_clustering;   
 
     retval->select_queue_depths = tpnt->select_queue_depths;
+    retval->max_sectors = tpnt->max_sectors;
 
     if(!scsi_hostlist)
 	scsi_hostlist = retval;

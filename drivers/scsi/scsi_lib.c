@@ -377,12 +377,15 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 			nsect = bh->b_size >> 9;
 			blk_finished_io(nsect);
 			req->bh = bh->b_reqnext;
-			req->nr_sectors -= nsect;
-			req->sector += nsect;
 			bh->b_reqnext = NULL;
 			sectors -= nsect;
 			bh->b_end_io(bh, uptodate);
 			if ((bh = req->bh) != NULL) {
+				req->hard_sector += nsect;
+				req->hard_nr_sectors -= nsect;
+				req->sector += nsect;
+				req->nr_sectors -= nsect;
+
 				req->current_nr_sectors = bh->b_size >> 9;
 				if (req->nr_sectors < req->current_nr_sectors) {
 					req->nr_sectors = req->current_nr_sectors;

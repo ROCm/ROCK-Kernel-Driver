@@ -770,15 +770,19 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
       BusLogic_ModifyIOAddressRequest_T ModifyIOAddressRequest;
       unsigned char Bus = PCI_Device->bus->number;
       unsigned char Device = PCI_Device->devfn >> 3;
-      unsigned int IRQ_Channel = PCI_Device->irq;
-      unsigned long BaseAddress0 = pci_resource_start(PCI_Device, 0);
-      unsigned long BaseAddress1 = pci_resource_start(PCI_Device, 1);
-      BusLogic_IO_Address_T IO_Address = BaseAddress0;
-      BusLogic_PCI_Address_T PCI_Address = BaseAddress1;
+      unsigned int IRQ_Channel;
+      unsigned long BaseAddress0;
+      unsigned long BaseAddress1;
+      BusLogic_IO_Address_T IO_Address;
+      BusLogic_PCI_Address_T PCI_Address;
 
       if (pci_enable_device(PCI_Device))
       	continue;
       
+      IRQ_Channel = PCI_Device->irq;
+      IO_Address  = BaseAddress0 = pci_resource_start(PCI_Device, 0);
+      PCI_Address = BaseAddress1 = pci_resource_start(PCI_Device, 1);
+
       if (pci_resource_flags(PCI_Device, 0) & IORESOURCE_MEM)
 	{
 	  BusLogic_Error("BusLogic: Base Address0 0x%X not I/O for "
@@ -2547,7 +2551,7 @@ static void BusLogic_ReportTargetDeviceInfo(BusLogic_HostAdapter_T
 	  int SynchronousTransferRate = 0;
 	  if (BusLogic_FlashPointHostAdapterP(HostAdapter))
 	    {
-	      boolean WideTransfersActive;
+	      unsigned char WideTransfersActive;
 	      FlashPoint_InquireTargetInfo(
 		HostAdapter->CardHandle, TargetID,
 		&HostAdapter->SynchronousPeriod[TargetID],

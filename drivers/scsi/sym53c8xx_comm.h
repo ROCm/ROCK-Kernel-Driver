@@ -403,6 +403,9 @@ pci_get_base_cookie(struct pci_dev *pdev, int offset)
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
 #define pci_enable_device(pdev)		(0)
 #endif
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,4)
+#define	scsi_set_pci_device(inst, pdev)	(0)
+#endif
 
 /*==========================================================
 **
@@ -1311,7 +1314,7 @@ sym_read_S24C16_nvram (ncr_slot *np, int offset, u_char *data, int len)
 	/* save current state of GPCNTL and GPREG */
 	old_gpreg	= INB (nc_gpreg);
 	old_gpcntl	= INB (nc_gpcntl);
-	gpcntl		= old_gpcntl & 0xfc;
+	gpcntl		= old_gpcntl & 0x1c;
 
 	/* set up GPREG & GPCNTL to set GPIO0 and GPIO1 in to known state */
 	OUTB (nc_gpreg,  old_gpreg);
