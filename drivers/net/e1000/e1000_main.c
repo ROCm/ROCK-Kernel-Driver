@@ -914,8 +914,9 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	/* set the Receive Delay Timer Register */
 
+	E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
+
 	if(adapter->hw.mac_type >= e1000_82540) {
-		E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
 		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_abs_int_delay);
 
 		/* Set the interrupt throttling rate.  Value is calculated
@@ -923,9 +924,6 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 #define MAX_INTS_PER_SEC        8000
 #define DEFAULT_ITR             1000000000/(MAX_INTS_PER_SEC * 256)
 		E1000_WRITE_REG(&adapter->hw, ITR, DEFAULT_ITR);
-
-	} else {
-		E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
 	}
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
