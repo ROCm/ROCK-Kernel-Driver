@@ -95,8 +95,9 @@ static int lba_capacity_is_ok(struct hd_driveid *id)
  */
 static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq)
 {
-	char *buf = NULL;
 	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	char *buf = NULL;
 
 	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
 		if (drive->status & (ERR_STAT|DRQ_STAT))
@@ -106,7 +107,14 @@ static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq
 #if 0
 			printk("task_in_intr to Soon wait for next interrupt\n");
 #endif
-			ide_set_handler(drive, task_in_intr, WAIT_CMD, NULL);
+
+			/* FIXME: this locking should encompass the above register
+			 * file access too.
+			 */
+
+			spin_lock_irqsave(ch->lock, flags);
+			ata_set_handler(drive, task_in_intr, WAIT_CMD, NULL);
+			spin_unlock_irqrestore(ch->lock, flags);
 
 			return ide_started;
 		}
@@ -132,8 +140,14 @@ static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq
 			return ide_stopped;
 	}
 
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
 	/* still data left to transfer */
-	ide_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
+	ata_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_started;
 }
@@ -143,8 +157,9 @@ static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq
  */
 static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *rq)
 {
-	char *buf = NULL;
 	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	char *buf = NULL;
 
 	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat))
 		return ata_error(drive, rq, __FUNCTION__);
@@ -165,7 +180,13 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
 		rq->current_nr_sectors--;
 	}
 
-	ide_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
+	ata_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_started;
 }
@@ -175,16 +196,25 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
  */
 static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request *rq)
 {
-	char *buf = NULL;
-	unsigned int msect, nsect;
 	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	char *buf = NULL;
+	unsigned int msect;
+	unsigned int nsect;
 
 	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
 		if (drive->status & (ERR_STAT|DRQ_STAT))
 			return ata_error(drive, rq, __FUNCTION__);
 
+		/* FIXME: this locking should encompass the above register
+		 * file access too.
+		 */
+
+		spin_lock_irqsave(ch->lock, flags);
 		/* no data yet, so wait for another interrupt */
-		ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+		ata_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		return ide_started;
 	}
 
@@ -213,17 +243,24 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 		}
 	} while (msect);
 
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
 
+	spin_lock_irqsave(ch->lock, flags);
 	/*
 	 * more data left
 	 */
-	ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+	ata_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_started;
 }
 
 static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	int ok;
 	int mcount = drive->mult_count;
 	ide_startstop_t startstop;
@@ -255,8 +292,15 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 
 	if (!ok) {
 		/* no data yet, so wait for another interrupt */
-		if (!drive->channel->handler)
-			ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+		if (!ch->handler) {
+			/* FIXME: this locking should encompass the above register
+			 * file access too.
+			 */
+
+			spin_lock_irqsave(ch->lock, flags);
+			ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+			spin_unlock_irqrestore(ch->lock, flags);
+		}
 
 		return ide_started;
 	}
@@ -298,8 +342,15 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 	} while (mcount);
 
 	rq->errors = 0;
-	if (!drive->channel->handler)
-		ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+	if (!ch->handler) {
+		/* FIXME: this locking should encompass the above register
+		 * file access too.
+		 */
+
+		spin_lock_irqsave(ch->lock, flags);
+		ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+		spin_unlock_irqrestore(ch->lock, flags);
+	}
 
 	return ide_started;
 }

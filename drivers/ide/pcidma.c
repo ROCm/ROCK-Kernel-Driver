@@ -64,7 +64,7 @@ static int build_sglist(struct ata_device *drive, struct request *rq)
 	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
 
-	if (rq->flags & REQ_SPECIAL) {
+	if ((rq->flags & REQ_SPECIAL) && (drive->type == ATA_DISK)) {
 		struct ata_taskfile *args = rq->special;
 #if 1
 		unsigned char *virt_addr = rq->buffer;
@@ -388,7 +388,11 @@ int udma_new_table(struct ata_device *drive, struct request *rq)
 	return count;
 }
 
-/* Teardown mappings after DMA has completed.  */
+/*
+ * Teardown mappings after DMA has completed.
+ *
+ * Channel lock should be held.
+ */
 void udma_destroy_table(struct ata_channel *ch)
 {
 	pci_unmap_sg(ch->pci_dev, ch->sg_table, ch->sg_nents, ch->sg_dma_direction);
@@ -398,8 +402,9 @@ void udma_destroy_table(struct ata_channel *ch)
  * Prepare the channel for a DMA startfer. Please note that only the broken
  * Pacific Digital host chip needs the reques to be passed there to decide
  * about addressing modes.
+ *
+ * Channel lock should be held.
  */
-
 int udma_pci_start(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
@@ -414,6 +419,9 @@ int udma_pci_start(struct ata_device *drive, struct request *rq)
 	return 0;
 }
 
+/*
+ * Channel lock should be held.
+ */
 int udma_pci_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
@@ -431,6 +439,8 @@ int udma_pci_stop(struct ata_device *drive)
 
 /*
  * FIXME: This should be attached to a channel as we can see now!
+ *
+ * Channel lock should be held.
  */
 int udma_pci_irq_status(struct ata_device *drive)
 {
@@ -517,6 +527,8 @@ dma_alloc_failure:
  *
  * It's exported only for host chips which use it for fallback or (too) late
  * capability checking.
+ *
+ * Channel lock should be held.
  */
 int udma_pci_init(struct ata_device *drive, struct request *rq)
 {
@@ -534,7 +546,7 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	else
 		cmd = 0x00;
 
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);
+	ata_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);
 	if (drive->addressing)
 		outb(cmd ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
 	else

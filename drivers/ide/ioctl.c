@@ -47,15 +47,15 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 	u8 *argbuf = vals;
 	int argsize = 4;
 	struct ata_taskfile args;
-	struct request rq;
+	struct request req;
 
 	/* Second phase.
 	 */
 	if (copy_from_user(vals, (void *)arg, 4))
 		return -EFAULT;
 
-	memset(&rq, 0, sizeof(rq));
-	rq.flags = REQ_SPECIAL;
+	memset(&req, 0, sizeof(req));
+	req.flags = REQ_SPECIAL;
 
 	memset(&args, 0, sizeof(args));
 
@@ -85,9 +85,9 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 	 */
 	args.handler = ata_special_intr;
 
-	rq.buffer = argbuf + 4;
-	rq.special = &args;
-	err = ide_do_drive_cmd(drive, &rq, ide_wait);
+	req.buffer = argbuf + 4;
+	req.special = &args;
+	err = ide_do_drive_cmd(drive, &req, ide_wait);
 
 	argbuf[0] = drive->status;
 	argbuf[1] = args.taskfile.feature;

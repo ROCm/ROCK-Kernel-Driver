@@ -275,12 +275,8 @@ enum {
 
 #define ATM_ATMOPT_CLP	1	/* set CLP bit */
 
-
-typedef struct { unsigned long bits; } atm_vcc_flags_t;
-
-
 struct atm_vcc {
-	atm_vcc_flags_t flags;		/* VCC flags (ATM_VF_*) */
+	unsigned long	flags;		/* VCC flags (ATM_VF_*) */
 	unsigned char	family;		/* address family; 0 if unused */
 	short		vpi;		/* VPI and VCI (types must be equal */
 					/* with sockaddr) */
@@ -330,10 +326,6 @@ struct atm_dev_addr {
 	struct atm_dev_addr *next;	/* next address */
 };
 
-
-typedef struct { unsigned int bits; } atm_dev_flags_t;
-
-
 struct atm_dev {
 	const struct atmdev_ops *ops;	/* device operations; NULL if unused */
 	const struct atmphy_ops *phy;	/* PHY operations, may be undefined */
@@ -344,7 +336,7 @@ struct atm_dev {
 	struct atm_vcc	*last;		/* last VCC (or undefined) */
 	void		*dev_data;	/* per-device data */
 	void		*phy_data;	/* private PHY date */
-	atm_dev_flags_t flags;		/* device flags (ATM_DF_*) */
+	unsigned long	flags;		/* device flags (ATM_DF_*) */
 	struct atm_dev_addr *local;	/* local ATM addresses */
 	unsigned char	esi[ESI_LEN];	/* ESI ("MAC" addr) */
 	struct atm_cirange ci_range;	/* VPI/VCI range */
@@ -414,7 +406,7 @@ struct atm_skb_data {
 #define ATM_SKB(skb) (((struct atm_skb_data *) (skb)->cb))
 
 struct atm_dev *atm_dev_register(const char *type,const struct atmdev_ops *ops,
-    int number,atm_dev_flags_t *flags); /* number == -1: pick first available */
+    int number,unsigned long *flags); /* number == -1: pick first available */
 struct atm_dev *atm_find_dev(int number);
 void atm_dev_deregister(struct atm_dev *dev);
 void shutdown_atm_dev(struct atm_dev *dev);

@@ -213,6 +213,7 @@ void ide_setup_ports(hw_regs_t *hw,
 
 /* Currently only m68k, apus and m8xx need it */
 #ifdef ATA_ARCH_ACK_INTR
+extern int ide_irq_lock;
 # define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
 #else
 # define ide_ack_intr(hwif) (1)
@@ -603,11 +604,7 @@ extern int noautodma;
 extern int __ide_end_request(struct ata_device *, struct request *, int, unsigned int);
 extern int ide_end_request(struct ata_device *drive, struct request *, int);
 
-/*
- * This is used on exit from the driver, to designate the next irq handler
- * and also to start the safety timer.
- */
-extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
+extern void ata_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
 
 extern u8 ata_dump(struct ata_device *, struct request *, const char *);
