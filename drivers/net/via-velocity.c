@@ -996,6 +996,8 @@ static inline void velocity_give_many_rx_descs(struct velocity_info *vptr)
 	if (vptr->rd_filled < 4)
 		return;
 
+	wmb();
+
 	unusable = vptr->rd_filled | 0x0003;
 	dirty = vptr->rd_dirty - unusable + 1;
 	for (avail = vptr->rd_filled & 0xfffc; avail; avail--) {
