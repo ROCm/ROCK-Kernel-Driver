@@ -278,10 +278,8 @@ static int pci_controller_scan(int (*handler)(char *, int, int))
 				item_len++;
 			}
 
-			if (handler(namebuf, item_len, node)) {
+			if (handler(namebuf, item_len, node))
 				count++;
-				break;
-			}
 		}
 
 		node = prom_getsibling(node);
