@@ -165,18 +165,18 @@ int cmd640_vlb = 0;
 #define BRST		0x59
 
 /*
+ * Protects register file access from overlapping on primary and secondary
+ * channel, since those share hardware resources.
+ */
+static spinlock_t cmd640_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+
+/*
  * Registers and masks for easy access by drive index:
  */
 static u8 prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
 static u8 prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
 
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
-
-/*
- * Protects register file access from overlapping on primary and secondary
- * channel, since those share hardware resources.
- */
-static spinlock_t cmd640_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
 static u8 arttim_regs[4] = {ARTTIM0, ARTTIM1, ARTTIM23, ARTTIM23};
 static u8 drwtim_regs[4] = {DRWTIM0, DRWTIM1, DRWTIM23, DRWTIM23};
