@@ -50,7 +50,7 @@ hpsb_guid_t hpsb_guid_get_handle(u64 guid);
  * Note that the local GUID currently isn't collected, so this will always
  * return NULL.
  */
-struct hpsb_host *hpsb_get_host_by_ge(hpsb_guid_t handle);
+struct hpsb_host *hpsb_get_host_by_ne(hpsb_guid_t handle);
 
 /*
  * This will fill in the given, pre-initialised hpsb_packet with the current

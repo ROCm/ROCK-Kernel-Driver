@@ -36,14 +36,8 @@
  * . Async Stream Packets
  * . DMA error recovery
  *
- * Things to be fixed:
- * . Latency problems on UltraSPARC
- *
  * Known bugs:
- * . SelfID are sometimes not received properly 
- *   if card is initialized with no other nodes 
- *   on the bus
- * . Apple PowerBook detected but not working yet
+ * . Apple PowerBook detected but not working yet (still true?)
  */
 
 /* 
@@ -277,10 +271,7 @@ static int handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 	size_t size;
 	quadlet_t q0, q1;
 
-	/* SelfID handling seems much easier than for the aic5800 chip.
-	   All the self-id packets, including this devices own self-id,
-	   should be correctly arranged in the selfid buffer at this
-	   stage */
+	mdelay(10);
 
 	/* Check status of self-id reception */
 
@@ -320,7 +311,7 @@ static int handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 		}
 		
 		if (q0 == ~q1) {
-			PRINT(KERN_DEBUG, ohci->id, "SelfID packet 0x%x received", q0);
+			DBGMSG (ohci->id, "SelfID packet 0x%x received", q0);
 			hpsb_selfid_received(host, cpu_to_be32(q0));
 			if (((q0 & 0x3f000000) >> 24) == phyid)
 				DBGMSG (ohci->id, "SelfID for this node is 0x%08x", q0);
@@ -332,7 +323,7 @@ static int handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 		size -= 2;
 	}
 
-	PRINT(KERN_DEBUG, ohci->id, "SelfID complete");
+	DBGMSG(ohci->id, "SelfID complete");
 
 	hpsb_selfid_complete(host, phyid, isroot);
 	return 0;
@@ -346,10 +337,10 @@ static int ohci_soft_reset(struct ti_ohci *ohci) {
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		if (reg_read(ohci, OHCI1394_HCControlSet) & 0x00010000)
 			break;
-		mdelay(10);
+		mdelay(1);
 	}
 
-	PRINT(KERN_DEBUG, ohci->id, "Soft reset finished");
+	DBGMSG (ohci->id, "Soft reset finished");
 
 	return 0;
 }
@@ -458,40 +449,31 @@ static int get_nb_iso_ctx(struct ti_ohci *ohci, int reg)
 	return ctx;
 }
 
+static void ohci_init_config_rom(struct ti_ohci *ohci);
+
 /* Global initialization */
 static int ohci_initialize(struct hpsb_host *host)
 {
 	struct ti_ohci *ohci=host->hostdata;
 	int retval, i;
+	quadlet_t buf;
 
 	spin_lock_init(&ohci->phy_reg_lock);
 	spin_lock_init(&ohci->event_lock);
   
-	/*
-	 * Tip by James Goodwin <jamesg@Filanet.com>:
-	 * We need to add delays after the soft reset, setting LPS, and
-	 * enabling our link. This might fixes the self-id reception 
-	 * problem at initialization.
-	 */ 
-
 	/* Soft reset */
 	if ((retval = ohci_soft_reset(ohci)) < 0)
 		return retval;
 
-	/* 
-	 * Delay after soft reset to make sure everything has settled
-	 * down (sanity)
-	 */
-	mdelay(10);    
-  
+	/* Put some defaults to these undefined bus options */
+	buf = reg_read(ohci, OHCI1394_BusOptions);
+	buf |=  0x60000000; /* Enable CMC and ISC */
+	buf &= ~0x00ff0000; /* XXX: Set cyc_clk_acc to zero for now */
+	buf &= ~0x98000000; /* Disable PMC, IRMC and BMC */
+	reg_write(ohci, OHCI1394_BusOptions, buf);
+
 	/* Set Link Power Status (LPS) */
 	reg_write(ohci, OHCI1394_HCControlSet, 0x00080000);
-
-	/*
-	 * Delay after setting LPS in order to make sure link/phy
-	 * communication is established
-	 */
-	mdelay(10);   
 
 	/* Set the bus number */
 	reg_write(ohci, OHCI1394_NodeID, 0x0000ffc0);
@@ -515,13 +497,15 @@ static int ohci_initialize(struct hpsb_host *host)
 	/* enable self-id dma */
 	reg_write(ohci, OHCI1394_LinkControlSet, 0x00000200);
 
-	/* Set the configuration ROM mapping register */
+	/* Set the Config ROM mapping register */
 	reg_write(ohci, OHCI1394_ConfigROMmap, ohci->csr_config_rom_bus);
 
+	/* Initialize the Config ROM */
+	ohci_init_config_rom(ohci);
+
+	/* Now get our max packet size */
 	ohci->max_packet_size = 
 		1<<(((reg_read(ohci, OHCI1394_BusOptions)>>12)&0xf)+1);
-	PRINT(KERN_DEBUG, ohci->id, "Max packet size = %d bytes",
-	       ohci->max_packet_size);
 
 	/* Don't accept phy packets into AR request context */ 
 	reg_write(ohci, OHCI1394_LinkControlClear, 0x00000400);
@@ -621,6 +605,14 @@ static int ohci_initialize(struct hpsb_host *host)
 
 	/* Enable link */
 	reg_write(ohci, OHCI1394_HCControlSet, 0x00020000);
+
+	buf = reg_read(ohci, OHCI1394_Version);
+	PRINT(KERN_INFO, ohci->id, "OHCI-1394 %d.%d (PCI): IRQ=[%d]  MMIO=[%lx-%lx]"
+	      "  Max Packet=[%d]", ((((buf) >> 16) & 0xf) + (((buf) >> 20) & 0xf) * 10),
+	      ((((buf) >> 4) & 0xf) + ((buf) & 0xf) * 10), ohci->dev->irq,
+	      pci_resource_start(ohci->dev, 0),
+	      pci_resource_start(ohci->dev, 0) + pci_resource_len(ohci->dev, 0),
+	      ohci->max_packet_size);
 
 	return 1;
 }
@@ -884,7 +876,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 	switch (cmd) {
 	case RESET_BUS:
-		PRINT (KERN_DEBUG, ohci->id, "Resetting bus on request%s",
+		DBGMSG(ohci->id, "Bus reset requested%s",
 		       ((host->attempt_root || attempt_root) ? 
 		       " and attempting to become root" : ""));
 		set_phy_reg_mask (ohci, 1, 0x40 | ((host->attempt_root || attempt_root) ?
@@ -1076,10 +1068,13 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	struct hpsb_host *host = ohci->host;
 	int phyid = -1, isroot = 0, flags;
 
-	/* Read the interrupt event register */
+	/* Read the interrupt event register. We don't clear the bus reset
+	 * here. We wait till we get a selfid complete interrupt and clear
+	 * it then, and _only_ then.  */
 	spin_lock_irqsave(&ohci->event_lock, flags);
 	event = reg_read(ohci, OHCI1394_IntEventClear);
-	reg_write(ohci, OHCI1394_IntEventClear, event);
+	reg_write(ohci, OHCI1394_IntEventClear,
+		  event & ~(OHCI1394_selfIDComplete|OHCI1394_busReset));
 	spin_unlock_irqrestore(&ohci->event_lock, flags);
 
 	if (!event) return;
@@ -1093,15 +1088,12 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		return;
 	}
 
-	/* Someone wants a bus reset. Better watch what you wish for...
-	 *
-	 * XXX: Read 6.1.1 of the OHCI1394 spec. We need to take special
-	 * care with the BusReset Interrupt, before and until the SelfID
-	 * phase is over. This is why the SelfID phase sometimes fails for
-	 * this driver.  */
+	/* Someone wants a bus reset. Better watch what you wish for... */
 	if (event & OHCI1394_busReset) {
 		if (!host->in_bus_reset) {
-			PRINT(KERN_DEBUG, ohci->id, "Bus reset requested");
+			DBGMSG(ohci->id, "Bus reset requested%s",
+			      ((host->attempt_root || attempt_root) ?
+			      " and attempting to become root" : ""));
 			
 			/* Wait for the AT fifo to be flushed */
 			dma_trm_reset(ohci->at_req_context);
@@ -1112,7 +1104,8 @@ static void ohci_irq_handler(int irq, void *dev_id,
 			
 			ohci->NumBusResets++;
 		}
-		event &= ~OHCI1394_busReset;
+		/* Mask out everything except selfid */
+		event &= OHCI1394_selfIDComplete;
 	}
 
 	/* XXX: We need a way to also queue the OHCI1394_reqTxComplete,
@@ -1219,7 +1212,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 				phyid =  node_id & 0x0000003f;
 				isroot = (node_id & 0x40000000) != 0;
 
-				PRINT(KERN_DEBUG, ohci->id,
+				DBGMSG(ohci->id,
 				      "SelfID interrupt received "
 				      "(phyid %d, %s)", phyid, 
 				      (isroot ? "root" : "not root"));
@@ -1249,6 +1242,12 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		} else
 			PRINT(KERN_ERR, ohci->id, 
 			      "SelfID received outside of bus reset sequence");
+
+		/* Clear everything, it's a new day */
+		spin_lock_irqsave(&ohci->event_lock, flags);
+		reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
+		spin_unlock_irqrestore(&ohci->event_lock, flags);
+
 		event &= ~OHCI1394_selfIDComplete;
 	}
 	if (event & OHCI1394_phyRegRcvd) {
@@ -1260,6 +1259,9 @@ static void ohci_irq_handler(int irq, void *dev_id,
 			      "Physical register received outside of bus reset sequence");
 		event &= ~OHCI1394_phyRegRcvd;
 	}
+
+	/* Make sure we handle everything, just in case we accidentally
+	 * enabled an interrupt that we didn't write a handler for.  */
 	if (event)
 		PRINT(KERN_ERR, ohci->id, "Unhandled interrupt(s) 0x%08x\n",
 		      event);
@@ -1374,7 +1376,7 @@ static void dma_rcv_tasklet (unsigned long data)
 				spin_unlock_irqrestore(&d->lock, flags);
 				return;
 			}
-#if 0
+
 			if (le32_to_cpu(d->prg_cpu[(idx+1)%d->num_desc]->status)
 			    == d->buf_size) {
 				/* Other part of packet not written yet.
@@ -1387,7 +1389,7 @@ static void dma_rcv_tasklet (unsigned long data)
 				spin_unlock_irqrestore(&d->lock, flags);
 				return;
 			}
-#endif
+
 			split_left = length;
 			split_ptr = (char *)d->spb;
 			memcpy(split_ptr,buf_ptr,d->buf_size-offset);
@@ -1448,7 +1450,7 @@ static void dma_rcv_tasklet (unsigned long data)
 			hpsb_packet_received(ohci->host, d->spb, 
 					     length-4, ack);
 		}
-#if OHCI1394_DEBUG
+#ifdef OHCI1394_DEBUG
 		else
 			PRINT (KERN_DEBUG, ohci->id, "Got phy packet ctx=%d ... discarded",
 			       d->ctx);
@@ -1837,41 +1839,47 @@ struct config_rom_ptr {
 
 #define cf_put_keyval(cr, key, val) (((cr)->data++)[0] = cpu_to_be32((key) << 24) | (val))
 
-#define cf_put_crc16(cr, unit) \
-	(*(cr)->unitdir[unit].start = cpu_to_be32(((cr)->unitdir[unit].length << 16) | \
-	 ohci_crc16((cr)->unitdir[unit].start + 1, (cr)->unitdir[unit].length)))
+static inline void cf_put_crc16(struct config_rom_ptr *cr, int unit)
+{
+	*cr->unitdir[unit].start =
+		cpu_to_be32((cr->unitdir[unit].length << 16) |
+			    ohci_crc16(cr->unitdir[unit].start + 1,
+				       cr->unitdir[unit].length));
+}
 
-#define cf_unit_begin(cr, unit)					\
-do {								\
-	if ((cr)->unitdir[unit].refer != NULL) {		\
-		*(cr)->unitdir[unit].refer |=			\
-			(cr)->data - (cr)->unitdir[unit].refer;	\
-		cf_put_crc16(cr, (cr)->unitdir[unit].refunit);	\
-        }							\
-        (cr)->unitnum = (unit);					\
-        (cr)->unitdir[unit].start = (cr)->data++;		\
-} while (0)
+static inline void cf_unit_begin(struct config_rom_ptr *cr, int unit)
+{
+	if (cr->unitdir[unit].refer != NULL) {
+		*cr->unitdir[unit].refer |=
+			cr->data - cr->unitdir[unit].refer;
+		cf_put_crc16(cr, cr->unitdir[unit].refunit);
+	}
+	cr->unitnum = unit;
+	cr->unitdir[unit].start = cr->data++;
+}
 
-#define cf_put_refer(cr, key, unit)			\
-do {							\
-	(cr)->unitdir[unit].refer = (cr)->data;		\
-	(cr)->unitdir[unit].refunit = (cr)->unitnum;	\
-	((cr)->data++)[0] = cpu_to_be32((key) << 24);		\
-} while(0)
+static inline void cf_put_refer(struct config_rom_ptr *cr, char key, int unit)
+{
+	cr->unitdir[unit].refer = cr->data;
+	cr->unitdir[unit].refunit = cr->unitnum;
+	(cr->data++)[0] = cpu_to_be32(key << 24);
+}
 
-#define cf_unit_end(cr)						\
-do {								\
-	(cr)->unitdir[(cr)->unitnum].length = (cr)->data -	\
-		((cr)->unitdir[(cr)->unitnum].start + 1);	\
-	cf_put_crc16((cr), (cr)->unitnum);			\
-} while(0)
+static inline void cf_unit_end(struct config_rom_ptr *cr)
+{
+	cr->unitdir[cr->unitnum].length = cr->data -
+		(cr->unitdir[cr->unitnum].start + 1);
+	cf_put_crc16(cr, cr->unitnum);
+}
+
+/* End of NetBSD derived code.  */
 
 static void ohci_init_config_rom(struct ti_ohci *ohci)
 {
 	struct config_rom_ptr cr;
 
 	memset(&cr, 0, sizeof(cr));
-	memset (ohci->csr_config_rom_cpu, 0, sizeof (ohci->csr_config_rom_cpu));
+	memset(ohci->csr_config_rom_cpu, 0, sizeof (ohci->csr_config_rom_cpu));
 
 	cr.data = ohci->csr_config_rom_cpu;
 
@@ -1887,7 +1895,7 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 		reg_read(ohci, OHCI1394_GUIDLo));
 
 	/* IEEE P1212 suggests the initial ROM header CRC should only
-	 * cover the header itself (and not the entire ROM). Since we use
+	 * cover the header itself (and not the entire ROM). Since we do
 	 * this, then we can make our bus_info_len the same as the CRC
 	 * length.  */
 	ohci->csr_config_rom_cpu[0] |= cpu_to_be32(
@@ -1981,7 +1989,7 @@ int ohci_compare_swap(struct ti_ohci *ohci, quadlet_t *data,
 		if (reg_read(ohci, OHCI1394_CSRControl) & 0x80000000)
 			break;
 
-		mdelay(10);
+		mdelay(1);
 	}
 
 	*data = reg_read(ohci, OHCI1394_CSRData);
@@ -1998,29 +2006,15 @@ static quadlet_t ohci_hw_csr_reg(struct hpsb_host *host, int reg,
 	return data;
 }
 
-struct hpsb_host_template *get_ohci_template(void)
-{
-	static struct hpsb_host_template tmpl;
-	static int initialized = 0;
-
-	if (!initialized) {
-		memset (&tmpl, 0, sizeof (struct hpsb_host_template));
-
-		/* Initialize by field names so that a template structure
-		 * reorganization does not influence this code. */
-		tmpl.name = "ohci1394";
-
-		tmpl.initialize_host = ohci_initialize;
-		tmpl.release_host = ohci_remove;
-		tmpl.get_rom = get_ohci_rom;
-		tmpl.transmit_packet = ohci_transmit;
-		tmpl.devctl = ohci_devctl;
-		tmpl.hw_csr_reg = ohci_hw_csr_reg;
-		initialized = 1;
-	}
-
-	return &tmpl;
-}
+static struct hpsb_host_template ohci_template = {
+	name:			OHCI1394_DRIVER_NAME,
+	initialize_host:	ohci_initialize,
+	release_host:		ohci_remove,
+	get_rom:		get_ohci_rom,
+	transmit_packet:	ohci_transmit,
+	devctl:			ohci_devctl,
+	hw_csr_reg:		ohci_hw_csr_reg,
+};
 
 static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -2040,7 +2034,7 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
         }
         pci_set_master(dev);
 
-	host = hpsb_get_host(get_ohci_template(), sizeof (struct ti_ohci));
+	host = hpsb_get_host(&ohci_template, sizeof (struct ti_ohci));
 	if (!host) {
 		PRINT_G(KERN_ERR, "Out of memory trying to allocate host structure");
 		return -ENOMEM;
@@ -2053,8 +2047,6 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
 	host->pdev = dev;
 	ohci->host = host;
 	pci_set_drvdata(dev, ohci);
-
-	PRINT(KERN_INFO, ohci->id, "OHCI (PCI) IEEE-1394 Controller");
 
 	/* We don't want hardware swapping */
 	pci_write_config_dword(dev, OHCI1394_PCI_HCI_Control, 0);
@@ -2173,13 +2165,9 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
 	ohci->ISO_channel_usage = 0;
         spin_lock_init(&ohci->IR_channel_lock);
 
-	if (!request_irq(dev->irq, ohci_irq_handler, SA_SHIRQ,
+	if (request_irq(dev->irq, ohci_irq_handler, SA_SHIRQ,
 			 OHCI1394_DRIVER_NAME, ohci))
-		PRINT(KERN_DEBUG, ohci->id, "Allocated interrupt %d", dev->irq);
-	else
 		FAIL("Failed to allocate shared interrupt %d", dev->irq);
-
-	ohci_init_config_rom(ohci);
 
 	/* Tell the highlevel this host is ready */
 	highlevel_add_one_host (host);
@@ -2190,7 +2178,9 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
 
 static void remove_card(struct ti_ohci *ohci)
 {
-	/* Reset the board properly before leaving */
+	quadlet_t buf;
+
+	/* Soft reset before we start */
 	ohci_soft_reset(ohci);
 
 	/* Free AR dma */
@@ -2207,6 +2197,10 @@ static void remove_card(struct ti_ohci *ohci)
         /* Free IT dma */
         free_dma_trm_ctx(&ohci->it_context);
 
+	/* Disable all interrupts */
+	reg_write(ohci, OHCI1394_IntMaskClear, 0x80000000);
+	free_irq(ohci->dev->irq, ohci);
+
 	/* Free self-id buffer */
 	if (ohci->selfid_buf_cpu) {
 		pci_free_consistent(ohci->dev, OHCI1394_SI_DMA_BUF_SIZE, 
@@ -2222,9 +2216,15 @@ static void remove_card(struct ti_ohci *ohci)
 				    ohci->csr_config_rom_bus);
 		OHCI_DMA_FREE("consistent csr_config_rom");
 	}
-	
-	/* Free the IRQ */
-	free_irq(ohci->dev->irq, ohci);
+
+	/* Disable our bus options */
+	buf = reg_read(ohci, OHCI1394_BusOptions);
+	buf &= ~0xf8000000;
+	buf |=  0x00ff0000;
+	reg_write(ohci, OHCI1394_BusOptions, buf);
+
+	/* Clear LinkEnable and LPS */
+	reg_write(ohci, OHCI1394_HCControlClear, 0x000a0000);
 
 	if (ohci->registers)
 		iounmap(ohci->registers);
@@ -2398,7 +2398,7 @@ static void __devexit ohci1394_remove_one(struct pci_dev *pdev)
 }
 
 static struct pci_driver ohci1394_driver = {
-	name:		"ohci1394",
+	name:		OHCI1394_DRIVER_NAME,
 	id_table:	ohci1394_pci_tbl,
 	probe:		ohci1394_add_one,
 	remove:		ohci1394_remove_one,
@@ -2406,20 +2406,20 @@ static struct pci_driver ohci1394_driver = {
 
 static void __exit ohci1394_cleanup (void)
 {
-	hpsb_unregister_lowlevel(get_ohci_template());
+	hpsb_unregister_lowlevel(&ohci_template);
 	pci_unregister_driver(&ohci1394_driver);
 }
 
 static int __init ohci1394_init(void)
 {
 	int ret;
-	if (hpsb_register_lowlevel(get_ohci_template())) {
+	if (hpsb_register_lowlevel(&ohci_template)) {
 		PRINT_G(KERN_ERR, "Registering failed");
 		return -ENXIO;
 	}
 	if ((ret = pci_module_init(&ohci1394_driver))) {
 		PRINT_G(KERN_ERR, "PCI module init failed\n");
-		hpsb_unregister_lowlevel(get_ohci_template());
+		hpsb_unregister_lowlevel(&ohci_template);
 		return ret;
 	}
 	return ret;

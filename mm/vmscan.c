@@ -678,6 +678,13 @@ int page_launder(int gfp_mask, int sync)
 	return ret;
 }
 
+static inline void age_page_up(struct page *page)
+{
+	unsigned age = page->age + PAGE_AGE_ADV;
+	if (age > PAGE_AGE_MAX)
+		age = PAGE_AGE_MAX;
+	page->age = age;
+}
 
 
 /**
@@ -728,7 +735,7 @@ int refill_inactive_scan(zone_t *zone, unsigned int priority, int target)
 
 		/* Do aging on the pages. */
 		if (PageTestandClearReferenced(page)) {
-			age_page_up_nolock(page);
+			age_page_up(page);
 			page_active = 1;
 		} else {
 			age_page_down_ageonly(page);

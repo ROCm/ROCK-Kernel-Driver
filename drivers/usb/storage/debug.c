@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Debugging Functions Source Code File
  *
- * $Id: debug.c,v 1.4 2000/09/04 02:12:47 groovyjava Exp $
+ * $Id: debug.c,v 1.5 2001/06/27 23:20:45 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -302,12 +302,10 @@ void usb_stor_show_sense(
 	case 0x1C00: what="defect list not found"; break;
 	case 0x2400: what="invalid field in CDB"; break;
 	case 0x2703: what="associated write protect"; break;
-	case 0x2800: what="not ready to ready transition (media change?)";
-		break;
+	case 0x2800: what="not ready to ready transition"; break;
 	case 0x2903: what="bus device reset function occurred"; break;
 	case 0x2904: what="device internal reset"; break;
-	case 0x2B00: what="copy can't execute since host can't disconnect"; 
-									break;
+	case 0x2B00: what="copy can't execute / host can't disconnect"; break;
 	case 0x2C00: what="command sequence error"; break;
 	case 0x2C03: what="current program area is not empty"; break;
 	case 0x2C04: what="current program area is empty"; break;

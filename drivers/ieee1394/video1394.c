@@ -807,7 +807,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			   unsigned int cmd, unsigned long arg)
 {
 	struct video_card *video = NULL;
-	struct ti_ohci *ohci= video->ohci;
+	struct ti_ohci *ohci;
 	unsigned long flags;
 	struct list_head *lh;
 
@@ -818,6 +818,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			p = list_entry(lh, struct video_card, list);
 			if (p->id == MINOR(inode->i_rdev)) {
 				video = p;
+				ohci = video->ohci;
 				break;
 			}
 		}
@@ -1602,7 +1603,7 @@ static struct hpsb_highlevel_ops hl_ops = {
 
 MODULE_AUTHOR("Sebastien Rougeaux <sebastien.rougeaux@anu.edu.au>");
 MODULE_DESCRIPTION("driver for digital video on OHCI board");
-MODULE_SUPPORTED_DEVICE("video1394");
+MODULE_SUPPORTED_DEVICE(VIDEO1394_DRIVER_NAME);
 
 static void __exit video1394_exit_module (void)
 {

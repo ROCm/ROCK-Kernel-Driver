@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Transport Functions Header File
  *
- * $Id: transport.h,v 1.13 2000/10/03 01:06:07 mdharm Exp $
+ * $Id: transport.h,v 1.15 2001/03/17 20:06:23 jrmayfield Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -64,6 +64,14 @@
 #define US_PR_FREECOM   0xf1            /* Freecom */
 #endif
 
+#ifdef CONFIG_USB_STORAGE_DATAFAB
+#define US_PR_DATAFAB   0xf2            /* Datafab chipsets */
+#endif
+
+#ifdef CONFIG_USB_STORAGE_JUMPSHOT
+#define US_PR_JUMPSHOT  0xf3            /* Lexar Jumpshot */
+#endif
+
 /*
  * Bulk only data structures
  */
@@ -107,7 +115,7 @@ struct bulk_cs_wrap {
  * us_bulk_transfer() return codes
  */
 #define US_BULK_TRANSFER_GOOD		0  /* good transfer                 */
-#define US_BULK_TRANSFER_SHORT		1  /* transferred less than expected */
+#define US_BULK_TRANSFER_SHORT		1  /* transfered less than expected */
 #define US_BULK_TRANSFER_FAILED		2  /* transfer died in the middle   */
 #define US_BULK_TRANSFER_ABORTED	3  /* transfer canceled             */
 
@@ -143,4 +151,6 @@ extern int usb_stor_bulk_msg(struct us_data*, void*, int, unsigned int,
 		unsigned int*);
 extern int usb_stor_control_msg(struct us_data*, unsigned int, u8, u8,
 		u16, u16, void*, u16);
+extern void usb_stor_transfer(Scsi_Cmnd*, struct us_data*);
+extern int usb_stor_clear_halt(struct usb_device*, int );
 #endif

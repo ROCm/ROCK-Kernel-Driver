@@ -293,12 +293,13 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
 void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid)
 {
         if (host->in_bus_reset) {
-                HPSB_DEBUG("Including SelfID 0x%x", sid);
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+                HPSB_INFO("Including SelfID 0x%x", sid);
+#endif
                 host->topology_map[host->selfid_count++] = sid;
         } else {
-                /* FIXME - info on which host */
-                HPSB_NOTICE("Spurious SelfID packet (0x%08x) received from %s",
-			    sid, host->template->name);
+                HPSB_NOTICE("Spurious SelfID packet (0x%08x) received from bus %d",
+			    sid, (host->node_id & BUS_MASK) >> 6);
         }
 }
 

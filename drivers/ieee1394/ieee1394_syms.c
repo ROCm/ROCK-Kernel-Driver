@@ -76,5 +76,5 @@ EXPORT_SYMBOL(highlevel_remove_host);
 EXPORT_SYMBOL(highlevel_host_reset);
 EXPORT_SYMBOL(highlevel_add_one_host);
 EXPORT_SYMBOL(hpsb_guid_get_handle);
-EXPORT_SYMBOL(hpsb_get_host_by_ge);
+EXPORT_SYMBOL(hpsb_get_host_by_ne);
 EXPORT_SYMBOL(hpsb_guid_fill_packet);

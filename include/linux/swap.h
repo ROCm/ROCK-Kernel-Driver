@@ -100,8 +100,6 @@ struct zone_t;
 
 /* linux/mm/swap.c */
 extern int memory_pressure;
-extern void age_page_up(struct page *);
-extern void age_page_up_nolock(struct page *);
 extern void age_page_down(struct page *);
 extern void age_page_down_nolock(struct page *);
 extern void age_page_down_ageonly(struct page *);

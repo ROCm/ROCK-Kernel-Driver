@@ -87,8 +87,7 @@
 
 	LK1.3.3 (Ion Badulescu)
 	- Initialize the TxMode register properly
-	- Set the MII registers _after_ resetting it
-	- Don't dereference dev->priv after unregister_netdev() has freed it
+	- Don't dereference dev->priv after freeing it
 
 TODO:
 	- implement tx_timeout() properly
@@ -988,12 +987,12 @@ static void check_duplex(struct net_device *dev)
 	struct netdev_private *np = dev->priv;
 	u16 reg0;
 
+	mdio_write(dev, np->phys[0], MII_ADVERTISE, np->advertising);
 	mdio_write(dev, np->phys[0], MII_BMCR, BMCR_RESET);
 	udelay(500);
 	while (mdio_read(dev, np->phys[0], MII_BMCR) & BMCR_RESET);
 
 	reg0 = mdio_read(dev, np->phys[0], MII_BMCR);
-	mdio_write(dev, np->phys[0], MII_ADVERTISE, np->advertising);
 
 	if (np->autoneg) {
 		reg0 |= BMCR_ANENABLE | BMCR_ANRESTART;
@@ -1940,12 +1939,12 @@ static void __devexit starfire_remove_one (struct pci_dev *pdev)
 		pci_free_consistent(pdev, PAGE_SIZE,
 				    np->rx_ring, np->rx_ring_dma);
 
-	unregister_netdev(dev);			/* Will also free np!! */
+	unregister_netdev(dev);
 	iounmap((char *)dev->base_addr);
 	pci_release_regions(pdev);
 
 	pci_set_drvdata(pdev, NULL);
-	kfree(dev);
+	kfree(dev);			/* Will also free np!! */
 }
 
 

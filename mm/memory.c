@@ -619,9 +619,9 @@ int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
 			
 			if (TryLockPage(page)) {
 				while (j--) {
-					page = *(--ppage);
-					if (page)
-						UnlockPage(page);
+					struct page *tmp = *--ppage;
+					if (tmp)
+						UnlockPage(tmp);
 				}
 				goto retry;
 			}
@@ -862,7 +862,7 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 /*
  * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
  */
-static inline void break_cow(struct vm_area_struct * vma, struct page *	old_page, struct page * new_page, unsigned long address, 
+static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
 	flush_page_to_ram(new_page);
@@ -935,12 +935,14 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	/*
 	 * Ok, we need to copy. Oh, well..
 	 */
+	page_cache_get(old_page);
 	spin_unlock(&mm->page_table_lock);
 
 	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
 		goto no_mem;
 	copy_cow_page(old_page,new_page,address);
+	page_cache_release(old_page);
 
 	/*
 	 * Re-check the pte - we dropped the lock
@@ -949,7 +951,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (pte_same(*page_table, pte)) {
 		if (PageReserved(old_page))
 			++mm->rss;
-		break_cow(vma, old_page, new_page, address, page_table);
+		break_cow(vma, new_page, address, page_table);
 
 		/* Free the old page.. */
 		new_page = old_page;
@@ -961,6 +963,7 @@ bad_wp_page:
 	printk("do_wp_page: bogus page at address %08lx (page 0x%lx)\n",address,(unsigned long)old_page);
 	return -1;
 no_mem:
+	page_cache_release(old_page);
 	spin_lock(&mm->page_table_lock);
 	return -1;
 }

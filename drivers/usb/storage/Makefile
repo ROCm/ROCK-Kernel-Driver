@@ -19,6 +19,9 @@ usb-storage-obj-$(CONFIG_USB_STORAGE_FREECOM)	+= freecom.o
 usb-storage-obj-$(CONFIG_USB_STORAGE_SHUTTLE_SMARTMEDIA)   += shuttle_sm.o
 usb-storage-obj-$(CONFIG_USB_STORAGE_SHUTTLE_COMPACTFLASH) += shuttle_cf.o
 usb-storage-obj-$(CONFIG_USB_STORAGE_DPCM)	+= dpcm.o
+usb-storage-obj-$(CONFIG_USB_STORAGE_ISD200)	+= isd200.o
+usb-storage-obj-$(CONFIG_USB_STORAGE_DATAFAB)   += datafab.o
+usb-storage-obj-$(CONFIG_USB_STORAGE_JUMPSHOT)  += jumpshot.o
 
 usb-storage-objs :=	scsiglue.o protocol.o transport.o usb.o \
 			initializers.o $(usb-storage-obj-y)

@@ -1,9 +1,9 @@
 /* Driver for SCM Microsystems USB-ATAPI cable
  *
- * $Id: shuttle_usbat.c,v 1.11 2000/11/13 22:29:36 mdharm Exp $
+ * $Id: shuttle_usbat.c,v 1.14 2001/03/28 01:02:06 groovyjava Exp $
  *
  * Current development and maintenance by:
- *   (c) 2000 Robert Baruch (autophile@dol.net)
+ *   (c) 2000, 2001 Robert Baruch (autophile@starband.net)
  *
  * Many originally ATAPI devices were slightly modified to meet the USB
  * market by using some kind of translation from ATAPI to USB on the host,
@@ -18,8 +18,8 @@
  * as well. This driver is only guaranteed to work with the ATAPI
  * translation.
  *
- * The only peripheral that I know of (as of 8 Sep 2000) that uses this
- * device is the Hewlett-Packard 8200e/8210e CD-Writer Plus.
+ * The only peripheral that I know of (as of 27 Mar 2001) that uses this
+ * device is the Hewlett-Packard 8200e/8210e/8230e CD-Writer Plus.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -344,12 +344,14 @@ int usbat_wait_not_busy(struct us_data *us, int minutes) {
 
 		if (result!=USB_STOR_TRANSPORT_GOOD)
 			return result;
-		if (status&0x01) // check condition
+		if (status&0x01) { // check condition
+			result = usbat_read(us, USBAT_ATA, 0x10, &status);
 			return USB_STOR_TRANSPORT_FAILED;
+		}
 		if (status&0x20) // device fault
 			return USB_STOR_TRANSPORT_FAILED;
 
-		if ((status&0x80)!=0x80) { // not busy
+		if ((status&0x80)==0x00) { // not busy
 			US_DEBUGP("Waited not busy for %d steps\n", i);
 			return USB_STOR_TRANSPORT_GOOD;
 		}
@@ -971,6 +973,9 @@ int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
 		registers[i] = 0x10;
 		data[i] = (i-7 >= srb->cmd_len) ? 0 : srb->cmnd[i-7];
 	}
+
+	result = usbat_read(us, USBAT_ATA, 0x17, &status);
+	US_DEBUGP("Status = %02X\n", status);
 
 	if (srb->cmnd[0] == TEST_UNIT_READY)
 		transferred = 0;

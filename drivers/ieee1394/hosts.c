@@ -147,10 +147,6 @@ static void init_hosts(struct hpsb_host_template *tmpl)
         int count;
         struct hpsb_host *host;
 
-	/* PCI cards should register one host at a time */
-	if (tmpl->detect_hosts == NULL)
-		return;
-
         count = tmpl->detect_hosts(tmpl);
 
         for (host = tmpl->hosts; host != NULL; host = host->next) {
@@ -254,8 +250,13 @@ static int remove_template(struct hpsb_host_template *tmpl)
 int hpsb_register_lowlevel(struct hpsb_host_template *tmpl)
 {
         add_template(tmpl);
-        HPSB_DEBUG("Registered %s driver, initializing now", tmpl->name);
-        init_hosts(tmpl);
+
+	/* PCI cards should be smart and use the PCI detection layer, and
+	 * not this one shot deal. detect_hosts() will be obsoleted soon. */
+	if (tmpl->detect_hosts != NULL) {
+		HPSB_DEBUG("Registered %s driver, initializing now", tmpl->name);
+		init_hosts(tmpl);
+	}
 
         return 0;
 }

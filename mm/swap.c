@@ -74,31 +74,6 @@ pager_daemon_t pager_daemon = {
 	8,	/* do swap I/O in clusters of this size */
 };
 
-/**
- * age_page_{up,down} -	page aging helper functions
- * @page - the page we want to age
- * @nolock - are we already holding the pagelist_lru_lock?
- *
- * If the page is on one of the lists (active, inactive_dirty or
- * inactive_clean), we will grab the pagelist_lru_lock as needed.
- * If you're already holding the lock, call this function with the
- * nolock argument non-zero.
- */
-void age_page_up_nolock(struct page * page)
-{
-	/*
-	 * We're dealing with an inactive page, move the page
-	 * to the active list.
-	 */
-	if (!page->age)
-		activate_page_nolock(page);
-
-	/* The actual page aging bit */
-	page->age += PAGE_AGE_ADV;
-	if (page->age > PAGE_AGE_MAX)
-		page->age = PAGE_AGE_MAX;
-}
-
 /*
  * We use this (minimal) function in the case where we
  * know we can't deactivate the page (yet).
@@ -119,21 +94,6 @@ void age_page_down_nolock(struct page * page)
 	 */
 	if (!page->age)
 	       deactivate_page_nolock(page);
-}
-
-void age_page_up(struct page * page)
-{
-	/*
-	 * We're dealing with an inactive page, move the page
-	 * to the active list.
-	 */
-	if (!page->age)
-		activate_page(page);
-
-	/* The actual page aging bit */
-	page->age += PAGE_AGE_ADV;
-	if (page->age > PAGE_AGE_MAX)
-		page->age = PAGE_AGE_MAX;
 }
 
 void age_page_down(struct page * page)

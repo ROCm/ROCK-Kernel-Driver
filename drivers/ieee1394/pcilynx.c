@@ -58,6 +58,17 @@
 #define PRINTD(level, card, fmt, args...) do {} while (0)
 #endif
 
+static struct pci_device_id pcilynx_pci_tbl[] __devinitdata = {
+	{
+	  vendor: PCI_VENDOR_ID_TI,
+	  device: PCI_DEVICE_ID_TI_PCILYNX,
+	  subvendor: PCI_ANY_ID,
+	  subdevice: PCI_ANY_ID,
+	},
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, pcilynx_pci_tbl);
+
 static struct ti_lynx cards[MAX_PCILYNX_CARDS];
 static int num_of_cards = 0;
 

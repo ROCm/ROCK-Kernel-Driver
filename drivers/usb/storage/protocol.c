@@ -1,6 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: protocol.c,v 1.7 2000/11/13 22:28:33 mdharm Exp $
+ * $Id: protocol.c,v 1.10 2001/07/30 00:27:59 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -274,71 +274,67 @@ void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 
 void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
 {
+	int old_cmnd = 0;
+
 	/* This code supports devices which do not support {READ|WRITE}_6
 	 * Apparently, neither Windows or MacOS will use these commands,
 	 * so some devices do not support them
 	 */
 	if (us->flags & US_FL_MODE_XLATE) {
+		US_DEBUGP("Invoking Mode Translation\n");
+		/* save the old command for later */
+		old_cmnd = srb->cmnd[0];
 
-		/* translate READ_6 to READ_10 */
-		if (srb->cmnd[0] == 0x08) {
-
-			/* get the control */
-			srb->cmnd[9] = us->srb->cmnd[5];
-
-			/* get the length */
-			srb->cmnd[8] = us->srb->cmnd[6];
+		switch (srb->cmnd[0]) {
+		/* change READ_6/WRITE_6 to READ_10/WRITE_10 */
+		case WRITE_6:
+		case READ_6:
+			srb->cmd_len = 12;
+			srb->cmnd[11] = 0;
+			srb->cmnd[10] = 0;
+			srb->cmnd[9] = 0;
+			srb->cmnd[8] = srb->cmnd[4];
 			srb->cmnd[7] = 0;
-
-			/* set the reserved area to 0 */
-			srb->cmnd[6] = 0;	    
-
-			/* get LBA */
-			srb->cmnd[5] = us->srb->cmnd[3];
-			srb->cmnd[4] = us->srb->cmnd[2];
-			srb->cmnd[3] = 0;
+			srb->cmnd[6] = 0;
+			srb->cmnd[5] = srb->cmnd[3];
+			srb->cmnd[4] = srb->cmnd[2];
+			srb->cmnd[3] = srb->cmnd[1] & 0x1F;
 			srb->cmnd[2] = 0;
+			srb->cmnd[1] = srb->cmnd[1] & 0xE0;
+			srb->cmnd[0] = srb->cmnd[0] | 0x20;
+			break;
 
-			/* LUN and other info in cmnd[1] can stay */
-
-			/* fix command code */
-			srb->cmnd[0] = 0x28;
-
-			US_DEBUGP("Changing READ_6 to READ_10\n");
-			US_DEBUG(usb_stor_show_command(srb));
-		}
-
-		/* translate WRITE_6 to WRITE_10 */
-		if (srb->cmnd[0] == 0x0A) {
-
-			/* get the control */
-			srb->cmnd[9] = us->srb->cmnd[5];
-
-			/* get the length */
-			srb->cmnd[8] = us->srb->cmnd[4];
+		/* convert MODE_SELECT data here */
+		case MODE_SENSE:
+		case MODE_SELECT:
+			srb->cmd_len = 12;
+			srb->cmnd[11] = 0;
+			srb->cmnd[10] = 0;
+			srb->cmnd[9] = 0;
+			srb->cmnd[8] = srb->cmnd[4];
 			srb->cmnd[7] = 0;
-
-			/* set the reserved area to 0 */
-			srb->cmnd[6] = 0;	    
-
-			/* get LBA */
-			srb->cmnd[5] = us->srb->cmnd[3];
-			srb->cmnd[4] = us->srb->cmnd[2];
+			srb->cmnd[6] = 0;
+			srb->cmnd[5] = 0;
+			srb->cmnd[4] = 0;
 			srb->cmnd[3] = 0;
-			srb->cmnd[2] = 0;
-	    
-			/* LUN and other info in cmnd[1] can stay */
-
-			/* fix command code */
-			srb->cmnd[0] = 0x2A;
-
-			US_DEBUGP("Changing WRITE_6 to WRITE_10\n");
-			US_DEBUG(usb_stor_show_command(us->srb));
-		}
+			srb->cmnd[2] = srb->cmnd[2];
+			srb->cmnd[1] = srb->cmnd[1];
+			srb->cmnd[0] = srb->cmnd[0] | 0x40;
+			break;
+		} /* switch (srb->cmnd[0]) */
 	} /* if (us->flags & US_FL_MODE_XLATE) */
+
+	/* convert MODE_SELECT data here */
+	if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SELECT))
+		usb_stor_scsiSense6to10(srb);
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+
+	/* Fix the MODE_SENSE data if we translated the command */
+	if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SENSE)
+			&& (status_byte(srb->result) == GOOD))
+		usb_stor_scsiSense10to6(srb);
 
 	/* fix the INQUIRY data if necessary */
 	fix_inquiry_data(srb);

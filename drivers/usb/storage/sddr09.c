@@ -1,13 +1,13 @@
 /* Driver for SanDisk SDDR-09 SmartMedia reader
  *
- * $Id: sddr09.c,v 1.14 2000/11/21 02:58:26 mdharm Exp $
+ * $Id: sddr09.c,v 1.18 2001/06/11 02:54:25 mdharm Exp $
  *
  * SDDR09 driver v0.1:
  *
  * First release
  *
  * Current development and maintenance by:
- *   (c) 2000 Robert Baruch (autophile@dol.net)
+ *   (c) 2000, 2001 Robert Baruch (autophile@starband.net)
  *
  * The SanDisk SDDR-09 SmartMedia reader uses the Shuttle EUSB-01 chip.
  * This chip is a programmable USB controller. In the SDDR-09, it has
@@ -583,6 +583,10 @@ unsigned long sddr09_get_capacity(struct us_data *us,
 		*blocksize = 32;
 		return 0x04000000;
 
+	case 0x79: // 128MB
+		*blocksize = 32;
+		return 0x08000000;
+
 	default: // unknown
 		return 0;
 
@@ -691,10 +695,17 @@ int sddr09_read_map(struct us_data *us) {
 	for (i=0; i<numblocks; i++) {
 		ptr = sg[i>>11].address+(i<<6);
 		if (ptr[0]!=0xFF || ptr[1]!=0xFF || ptr[2]!=0xFF ||
-		    ptr[3]!=0xFF || ptr[4]!=0xFF || ptr[5]!=0xFF)
+		    ptr[3]!=0xFF || ptr[4]!=0xFF || ptr[5]!=0xFF) {
+			US_DEBUGP("PBA %04X has no logical mapping: reserved area = "
+			  "%02X%02X%02X%02X data status %02X block status %02X\n",
+			  i, ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5]);
 			continue;
-		if ((ptr[6]>>4)!=0x01)
+		}
+		if ((ptr[6]>>4)!=0x01) {
+			US_DEBUGP("PBA %04X has invalid address field %02X%02X/%02X%02X\n",
+			  i, ptr[6], ptr[7], ptr[11], ptr[12]);
 			continue;
+		}
 
 		/* ensure even parity */
 
@@ -711,21 +722,23 @@ int sddr09_read_map(struct us_data *us) {
 
 		lba = (lba&0x07FF)>>1;
 
-			/* Every 1024 physical blocks, the LBA numbers
+			/* Every 1024 physical blocks ("zone"), the LBA numbers
 			 * go back to zero, but are within a higher
-			 * block of LBA's. In other words, in blocks
-			 * 1024-2047 you will find LBA 0-1023 which are
-			 * really LBA 1024-2047.
+			 * block of LBA's. Also, there is a maximum of
+			 * 1000 LBA's per zone. In other words, in PBA
+			 * 1024-2047 you will find LBA 0-999 which are
+			 * really LBA 1000-1999. Yes, this wastes 24
+			 * physical blocks per zone. Go figure.
 			 */
 
-		lba += (i&~0x3FF);
+		lba += 1000*(i/0x400);
 
 		if (lba>=numblocks) {
 			US_DEBUGP("Bad LBA %04X for block %04X\n", lba, i);
 			continue;
 		}
 
-		if (lba<0x10)
+		if (lba<0x10 || (lba>=0x3E0 && lba<0x3EF))
 			US_DEBUGP("LBA %04X <-> PBA %04X\n", lba, i);
 
 		info->pba_to_lba[i] = lba;
@@ -812,8 +825,10 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 	unsigned char inquiry_response[36] = {
 		0x00, 0x80, 0x00, 0x02, 0x1F, 0x00, 0x00, 0x00
 	};
-	unsigned char mode_page_01[4] = { // write-protected for now
-		0x03, 0x00, 0x80, 0x00
+	unsigned char mode_page_01[16] = { // write-protected for now
+		0x03, 0x00, 0x80, 0x00,
+		0x01, 0x0A,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
 	unsigned char *ptr;
 	unsigned long capacity;
@@ -890,15 +905,45 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			// be a check for write-protect here
 
 		if ( (srb->cmnd[2] & 0x3F) == 0x01 ) {
-			if (ptr==NULL || srb->request_bufflen<4)
+
+			US_DEBUGP(
+			  "SDDR09: Dummy up request for mode page 1\n");
+
+			if (ptr==NULL || 
+			  srb->request_bufflen<sizeof(mode_page_01))
 				return USB_STOR_TRANSPORT_ERROR;
+
 			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
 			return USB_STOR_TRANSPORT_GOOD;
+
+		} else if ( (srb->cmnd[2] & 0x3F) == 0x3F ) {
+
+			US_DEBUGP(
+			  "SDDR09: Dummy up request for all mode pages\n");
+
+			if (ptr==NULL || 
+			  srb->request_bufflen<sizeof(mode_page_01))
+				return USB_STOR_TRANSPORT_ERROR;
+
+			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
+			return USB_STOR_TRANSPORT_GOOD;
+
 		}
 
 		// FIXME: sense buffer?
 
 		return USB_STOR_TRANSPORT_ERROR;
+	}
+
+	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {
+
+		US_DEBUGP(
+		  "SDDR09: %s medium removal. Not that I can do"
+		  " anything about it...\n",
+		  (srb->cmnd[4]&0x03) ? "Prevent" : "Allow");
+
+		return USB_STOR_TRANSPORT_GOOD;
+
 	}
 
 	if (srb->cmnd[0] == READ_10) {
@@ -919,6 +964,10 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			(info->capacity >> 
 				(info->pageshift + info->blockshift) ) ) {
 
+			US_DEBUGP("Error: Requested LBA %04X exceeds maximum "
+			  "block %04X\n", lba,
+			  (info->capacity >> (info->pageshift + info->blockshift))-1);
+
 			// FIXME: sense buffer?
 
 			return USB_STOR_TRANSPORT_ERROR;
@@ -933,6 +982,9 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		if (pba==0 && info->pba_to_lba[0] != lba) {
 
 			// FIXME: sense buffer?
+
+			US_DEBUGP("Error: Requested LBA %04X has no physical block "
+			  "mapping.\n", lba);
 
 			return USB_STOR_TRANSPORT_ERROR;
 		}
