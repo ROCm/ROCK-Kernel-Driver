@@ -196,6 +196,7 @@ EXPORT_SYMBOL(__invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 EXPORT_SYMBOL(truncate_inode_pages);
+EXPORT_SYMBOL(install_page);
 EXPORT_SYMBOL(fsync_bdev);
 EXPORT_SYMBOL(permission);
 EXPORT_SYMBOL(vfs_permission);
