@@ -2201,7 +2201,7 @@ static int happy_meal_open(struct net_device *dev)
 	 */
 	if ((hp->happy_flags & (HFLAG_QUATTRO|HFLAG_PCI)) != HFLAG_QUATTRO) {
 		if (request_irq(dev->irq, &happy_meal_interrupt,
-				SA_SHIRQ, "HAPPY MEAL", (void *)dev)) {
+				SA_SHIRQ, dev->name, (void *)dev)) {
 			HMD(("EAGAIN\n"));
 #ifdef __sparc__
 			printk(KERN_ERR "happy_meal(SBUS): Can't order irq %s to go.\n",
