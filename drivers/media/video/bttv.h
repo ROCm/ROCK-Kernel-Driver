@@ -325,8 +325,6 @@ void bttv_gpio_bits(struct bttv_core *core, u32 mask, u32 bits);
 /* ---------------------------------------------------------- */
 /* i2c                                                        */
 
-extern void bttv_bit_setscl(void *data, int state);
-extern void bttv_bit_setsda(void *data, int state);
 extern void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg);
 extern int bttv_I2CRead(struct bttv *btv, unsigned char addr, char *probe_for);
 extern int bttv_I2CWrite(struct bttv *btv, unsigned char addr, unsigned char b1,
