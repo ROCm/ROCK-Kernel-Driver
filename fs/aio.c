@@ -232,10 +232,12 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	if (aio_setup_ring(ctx) < 0)
 		goto out_freectx;
 
-	/* now link into global list.  kludge.  FIXME */
+	/* limit the number of system wide aios */
 	atomic_add(ctx->max_reqs, &aio_nr);	/* undone by __put_ioctx */
 	if (unlikely(atomic_read(&aio_nr) > aio_max_nr))
 		goto out_cleanup;
+
+	/* now link into global list.  kludge.  FIXME */
 	write_lock(&mm->ioctx_list_lock);
 	ctx->next = mm->ioctx_list;
 	mm->ioctx_list = ctx;
@@ -377,27 +379,36 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 {
 	struct kiocb *req = NULL;
 	struct aio_ring *ring;
+	int okay = 0;
 
 	req = kmem_cache_alloc(kiocb_cachep, GFP_KERNEL);
 	if (unlikely(!req))
 		return NULL;
+
+	req->ki_users = 1;
+	req->ki_key = 0;
+	req->ki_ctx = ctx;
+	req->ki_cancel = NULL;
+	req->ki_user_obj = NULL;
 
 	/* Check if the completion queue has enough free space to
 	 * accept an event from this io.
 	 */
 	spin_lock_irq(&ctx->ctx_lock);
 	ring = kmap_atomic(ctx->ring_info.ring_pages[0], KM_USER0);
-	if (likely(ctx->reqs_active < aio_ring_avail(&ctx->ring_info, ring))) {
+	if (ctx->reqs_active < aio_ring_avail(&ctx->ring_info, ring)) {
 		list_add(&req->ki_list, &ctx->active_reqs);
 		get_ioctx(ctx);
 		ctx->reqs_active++;
-		req->ki_user_obj = NULL;
-		req->ki_ctx = ctx;
-		req->ki_users = 1;
-	} else
-		kmem_cache_free(kiocb_cachep, req);
+		okay = 1;
+	}
 	kunmap_atomic(ring, KM_USER0);
 	spin_unlock_irq(&ctx->ctx_lock);
+
+	if (!okay) {
+		kmem_cache_free(kiocb_cachep, req);
+		req = NULL;
+	}
 
 	return req;
 }
@@ -540,7 +551,7 @@ int aio_complete(struct kiocb *iocb, long res, long res2)
 	 * case the usage count checks will have to move under ctx_lock
 	 * for all cases.
 	 */
-	if (ctx == &ctx->mm->default_kioctx) {
+	if (is_sync_kiocb(iocb)) {
 		int ret;
 
 		iocb->ki_user_data = res;
@@ -979,7 +990,7 @@ static int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 		ret = -EINVAL;
 	}
 
-	if (likely(EIOCBQUEUED == ret))
+	if (likely(-EIOCBQUEUED == ret))
 		return 0;
 	if (ret >= 0) {
 		aio_complete(req, ret, 0);

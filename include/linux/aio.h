@@ -42,6 +42,7 @@ struct kiocb {
 	long			private[KIOCB_PRIVATE_SIZE/sizeof(long)];
 };
 
+#define is_sync_kiocb(iocb)	((iocb)->ki_key == KIOCB_SYNC_KEY)
 #define init_sync_kiocb(x, filp)			\
 	do {						\
 		struct task_struct *tsk = current;	\
