@@ -104,8 +104,8 @@
 	return 0;							\
 } while (0)
 
-#define __HAVE_DMA_IRQ			1
-#define __HAVE_DMA_IRQ_BH		1
+#define __HAVE_IRQ			1
+#define __HAVE_IRQ_BH			1
 
 #define DRIVER_AGP_BUFFERS_MAP( dev )					\
 	((drm_gamma_private_t *)((dev)->dev_private))->buffers

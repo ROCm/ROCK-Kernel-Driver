@@ -45,7 +45,7 @@ static void r128_emit_clip_rects( drm_r128_private_t *dev_priv,
 	RING_LOCALS;
 	DRM_DEBUG( "    %s\n", __FUNCTION__ );
 
-	BEGIN_RING( 17 );
+	BEGIN_RING( (count < 3? count: 3) * 5 + 2 );
 
 	if ( count >= 1 ) {
 		OUT_RING( CCE_PACKET0( R128_AUX1_SC_LEFT, 3 ) );
@@ -1011,7 +1011,7 @@ static int r128_cce_dispatch_write_pixels( drm_device_t *dev,
 	DRM_DEBUG( "\n" );
 
 	count = depth->n;
-	if (count > 4096  || count <= 0)
+	if (count > 4096 || count <= 0)
 		return -EMSGSIZE;
 
 	xbuf_size = count * sizeof(*x);
@@ -1280,6 +1280,7 @@ int r128_cce_clear( DRM_IOCTL_ARGS )
 		sarea_priv->nbox = R128_NR_SAREA_CLIPRECTS;
 
 	r128_cce_dispatch_clear( dev, &clear );
+	COMMIT_RING();
 
 	/* Make sure we restore the 3D state next time.
 	 */
@@ -1315,8 +1316,10 @@ int r128_do_cleanup_pageflip( drm_device_t *dev )
 	R128_WRITE( R128_CRTC_OFFSET,      dev_priv->crtc_offset );
 	R128_WRITE( R128_CRTC_OFFSET_CNTL, dev_priv->crtc_offset_cntl );
 
-	if (dev_priv->current_page != 0)
+	if (dev_priv->current_page != 0) {
 		r128_cce_dispatch_flip( dev );
+		COMMIT_RING();
+	}
 
 	dev_priv->page_flipping = 0;
 	return 0;
@@ -1341,6 +1344,7 @@ int r128_cce_flip( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_flip( dev );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1362,6 +1366,7 @@ int r128_cce_swap( DRM_IOCTL_ARGS )
 	dev_priv->sarea_priv->dirty |= (R128_UPLOAD_CONTEXT |
 					R128_UPLOAD_MASKS);
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1421,6 +1426,7 @@ int r128_cce_vertex( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_vertex( dev, buf );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1492,6 +1498,7 @@ int r128_cce_indices( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_indices( dev, buf, elts.start, elts.end, count );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1501,6 +1508,7 @@ int r128_cce_blit( DRM_IOCTL_ARGS )
 	drm_device_dma_t *dma = dev->dma;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	drm_r128_blit_t blit;
+	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
@@ -1518,7 +1526,10 @@ int r128_cce_blit( DRM_IOCTL_ARGS )
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 
-	return r128_cce_dispatch_blit( filp, dev, &blit );
+	ret = r128_cce_dispatch_blit( filp, dev, &blit );
+
+	COMMIT_RING();
+	return ret;
 }
 
 int r128_cce_depth( DRM_IOCTL_ARGS )
@@ -1526,6 +1537,7 @@ int r128_cce_depth( DRM_IOCTL_ARGS )
 	DRM_DEVICE;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	drm_r128_depth_t depth;
+	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
@@ -1534,18 +1546,20 @@ int r128_cce_depth( DRM_IOCTL_ARGS )
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
+	ret = DRM_ERR(EINVAL);
 	switch ( depth.func ) {
 	case R128_WRITE_SPAN:
-		return r128_cce_dispatch_write_span( dev, &depth );
+		ret = r128_cce_dispatch_write_span( dev, &depth );
 	case R128_WRITE_PIXELS:
-		return r128_cce_dispatch_write_pixels( dev, &depth );
+		ret = r128_cce_dispatch_write_pixels( dev, &depth );
 	case R128_READ_SPAN:
-		return r128_cce_dispatch_read_span( dev, &depth );
+		ret = r128_cce_dispatch_read_span( dev, &depth );
 	case R128_READ_PIXELS:
-		return r128_cce_dispatch_read_pixels( dev, &depth );
+		ret = r128_cce_dispatch_read_pixels( dev, &depth );
 	}
 
-	return DRM_ERR(EINVAL);
+	COMMIT_RING();
+	return ret;
 }
 
 int r128_cce_stipple( DRM_IOCTL_ARGS )
@@ -1568,6 +1582,7 @@ int r128_cce_stipple( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_stipple( dev, mask );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1643,6 +1658,7 @@ int r128_cce_indirect( DRM_IOCTL_ARGS )
 	 */
 	r128_cce_dispatch_indirect( dev, buf, indirect.start, indirect.end );
 
+	COMMIT_RING();
 	return 0;
 }
 
