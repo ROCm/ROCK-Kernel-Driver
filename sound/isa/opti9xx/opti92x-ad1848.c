@@ -661,8 +661,6 @@ __skip_mpu:
 
 #ifdef OPTi93X
 
-#define chip_t opti93x_t
-
 static unsigned char snd_opti93x_default_image[32] =
 {
 	0x00,		/* 00/00 - l_mixout_outctrl */
@@ -1111,7 +1109,7 @@ static void snd_opti93x_overrange(opti93x_t *chip)
 
 irqreturn_t snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	opti93x_t *codec = snd_magic_cast(opti93x_t, dev_id, return IRQ_NONE);
+	opti93x_t *codec = dev_id;
 	unsigned char status;
 
 	status = snd_opti9xx_read(codec->chip, OPTi9XX_MC_REG(11));
@@ -1257,13 +1255,13 @@ static int snd_opti93x_free(opti93x_t *chip)
 	if (chip->irq >= 0) {
 	  free_irq(chip->irq, chip);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_opti93x_dev_free(snd_device_t *device)
 {
-	opti93x_t *chip = snd_magic_cast(opti93x_t, device->device_data, return -ENXIO);
+	opti93x_t *chip = device->device_data;
 	return snd_opti93x_free(chip);
 }
 
@@ -1288,7 +1286,7 @@ int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
 	opti93x_t *codec;
 
 	*rcodec = NULL;
-	codec = snd_magic_kcalloc(opti93x_t, 0, GFP_KERNEL);
+	codec = kcalloc(1, sizeof(*codec), GFP_KERNEL);
 	if (codec == NULL)
 		return -ENOMEM;
 	codec->irq = -1;
@@ -1368,7 +1366,7 @@ static snd_pcm_ops_t snd_opti93x_capture_ops = {
 
 static void snd_opti93x_pcm_free(snd_pcm_t *pcm)
 {
-	opti93x_t *codec = snd_magic_cast(opti93x_t, pcm->private_data, return);
+	opti93x_t *codec = pcm->private_data;
 	codec->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }

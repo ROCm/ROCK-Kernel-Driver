@@ -39,8 +39,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of AD1848/AD1847/CS4248");
 MODULE_LICENSE("GPL");
 
-#define chip_t ad1848_t
-
 #if 0
 #define SNDRV_DEBUG_MCE
 #endif
@@ -588,7 +586,7 @@ static int snd_ad1848_capture_prepare(snd_pcm_substream_t * substream)
 
 irqreturn_t snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, dev_id, return IRQ_NONE);
+	ad1848_t *chip = dev_id;
 
 	if ((chip->mode & AD1848_MODE_PLAY) && chip->playback_substream &&
 	    (chip->mode & AD1848_MODE_RUNNING))
@@ -649,7 +647,7 @@ static void snd_ad1848_thinkpad_twiddle(ad1848_t *chip, int on) {
 #ifdef CONFIG_PM
 static int snd_ad1848_suspend(snd_card_t *card, unsigned int state)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, card->pm_private_data, return -EINVAL);
+	ad1848_t *chip = card->pm_private_data;
 
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return 0;
@@ -666,7 +664,7 @@ static int snd_ad1848_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_ad1848_resume(snd_card_t *card, unsigned int state)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, card->pm_private_data, return -EINVAL);
+	ad1848_t *chip = card->pm_private_data;
 
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		return 0;
@@ -867,13 +865,13 @@ static int snd_ad1848_free(ad1848_t *chip)
 		snd_dma_disable(chip->dma);
 		free_dma(chip->dma);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_ad1848_dev_free(snd_device_t *device)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, device->device_data, return -ENXIO);
+	ad1848_t *chip = device->device_data;
 	return snd_ad1848_free(chip);
 }
 
@@ -901,7 +899,7 @@ int snd_ad1848_create(snd_card_t * card,
 	int err;
 
 	*rchip = NULL;
-	chip = snd_magic_kcalloc(ad1848_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);
@@ -977,7 +975,7 @@ static snd_pcm_ops_t snd_ad1848_capture_ops = {
 
 static void snd_ad1848_pcm_free(snd_pcm_t *pcm)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, pcm->private_data, return);
+	ad1848_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }

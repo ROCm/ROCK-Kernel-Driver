@@ -30,8 +30,6 @@
 #include <sound/opl3.h>
 #include <sound/snd_wavefront.h>
 
-#define chip_t cs4231_t
-
 MODULE_AUTHOR("Paul Barton-Davis <pbd@op.net>");
 MODULE_DESCRIPTION("Turtle Beach Wavefront");
 MODULE_LICENSE("GPL");

@@ -32,7 +32,7 @@
 
 irqreturn_t snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	snd_gus_card_t * gus = snd_magic_cast(snd_gus_card_t, dev_id, return IRQ_NONE);
+	snd_gus_card_t * gus = dev_id;
 	unsigned char status;
 	int loop = 100;
 	int handled = 0;
@@ -114,7 +114,7 @@ static void snd_gus_irq_info_read(snd_info_entry_t *entry,
 	snd_gus_voice_t *pvoice;
 	int idx;
 
-	gus = snd_magic_cast(snd_gus_card_t, entry->private_data, return);
+	gus = entry->private_data;
 	snd_iprintf(buffer, "midi out = %u\n", gus->gf1.interrupt_stat_midi_out);
 	snd_iprintf(buffer, "midi in = %u\n", gus->gf1.interrupt_stat_midi_in);
 	snd_iprintf(buffer, "timer1 = %u\n", gus->gf1.interrupt_stat_timer1);

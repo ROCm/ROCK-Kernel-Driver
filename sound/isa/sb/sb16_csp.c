@@ -33,8 +33,6 @@
 #include <sound/sb16_csp.h>
 #include <sound/initval.h>
 
-#define chip_t snd_sb_csp_t
-
 MODULE_AUTHOR("Uros Bizjak <uros@kss-loka.si>");
 MODULE_DESCRIPTION("ALSA driver for SB16 Creative Signal Processor");
 MODULE_LICENSE("GPL");
@@ -127,7 +125,7 @@ int snd_sb_csp_new(sb_t *chip, int device, snd_hwdep_t ** rhwdep)
 	if ((err = snd_hwdep_new(chip->card, "SB16-CSP", device, &hw)) < 0)
 		return err;
 
-	if ((p = snd_magic_kcalloc(snd_sb_csp_t, 0, GFP_KERNEL)) == NULL) {
+	if ((p = kcalloc(1, sizeof(*p), GFP_KERNEL)) == NULL) {
 		snd_device_free(chip->card, hw);
 		return -ENOMEM;
 	}
@@ -165,11 +163,11 @@ int snd_sb_csp_new(sb_t *chip, int device, snd_hwdep_t ** rhwdep)
  */
 static void snd_sb_csp_free(snd_hwdep_t *hwdep)
 {
-	snd_sb_csp_t *p = snd_magic_cast(snd_sb_csp_t, hwdep->private_data, return);
+	snd_sb_csp_t *p = hwdep->private_data;
 	if (p) {
 		if (p->running & SNDRV_SB_CSP_ST_RUNNING)
 			snd_sb_csp_stop(p);
-		snd_magic_kfree(p);
+		kfree(p);
 	}
 }
 
@@ -180,7 +178,7 @@ static void snd_sb_csp_free(snd_hwdep_t *hwdep)
  */
 static int snd_sb_csp_open(snd_hwdep_t * hw, struct file *file)
 {
-	snd_sb_csp_t *p = snd_magic_cast(snd_sb_csp_t, hw->private_data, return -ENXIO);
+	snd_sb_csp_t *p = hw->private_data;
 	return (snd_sb_csp_use(p));
 }
 
@@ -189,7 +187,7 @@ static int snd_sb_csp_open(snd_hwdep_t * hw, struct file *file)
  */
 static int snd_sb_csp_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	snd_sb_csp_t *p = snd_magic_cast(snd_sb_csp_t, hw->private_data, return -ENXIO);
+	snd_sb_csp_t *p = hw->private_data;
 	snd_sb_csp_info_t info;
 	snd_sb_csp_start_t start_info;
 	int err;
@@ -258,7 +256,7 @@ static int snd_sb_csp_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cm
  */
 static int snd_sb_csp_release(snd_hwdep_t * hw, struct file *file)
 {
-	snd_sb_csp_t *p = snd_magic_cast(snd_sb_csp_t, hw->private_data, return -ENXIO);
+	snd_sb_csp_t *p = hw->private_data;
 	return (snd_sb_csp_unuse(p));
 }
 
@@ -1110,7 +1108,7 @@ static int init_proc_entry(snd_sb_csp_t * p, int device)
 
 static void info_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	snd_sb_csp_t *p = snd_magic_cast(snd_sb_csp_t, entry->private_data, return);
+	snd_sb_csp_t *p = entry->private_data;
 
 	snd_iprintf(buffer, "Creative Signal Processor [v%d.%d]\n", (p->version >> 4), (p->version & 0x0f));
 	snd_iprintf(buffer, "State: %cx%c%c%c\n", ((p->running & SNDRV_SB_CSP_ST_QSOUND) ? 'Q' : '-'),

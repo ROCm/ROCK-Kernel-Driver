@@ -94,7 +94,7 @@ release_voice(snd_emux_voice_t *vp)
 	int dcysusv;
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, vp->hw, return);
+	hw = vp->hw;
 	dcysusv = 0x8000 | (unsigned char)vp->reg.parm.modrelease;
 	EMU8000_DCYSUS_WRITE(hw, vp->ch, dcysusv);
 	dcysusv = 0x8000 | (unsigned char)vp->reg.parm.volrelease;
@@ -109,7 +109,7 @@ terminate_voice(snd_emux_voice_t *vp)
 {
 	emu8000_t *hw; 
 
-	hw = snd_magic_cast(emu8000_t, vp->hw, return);
+	hw = vp->hw;
 	EMU8000_DCYSUSV_WRITE(hw, vp->ch, 0x807F);
 }
 
@@ -121,7 +121,7 @@ update_voice(snd_emux_voice_t *vp, int update)
 {
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, vp->hw, return);
+	hw = vp->hw;
 	if (update & SNDRV_EMUX_UPDATE_VOLUME)
 		set_volume(hw, vp);
 	if (update & SNDRV_EMUX_UPDATE_PITCH)
@@ -168,7 +168,7 @@ get_voice(snd_emux_t *emu, snd_emux_port_t *port)
 	} best[END];
 	struct best *bp;
 
-	hw = snd_magic_cast(emu8000_t, emu->hw, return NULL);
+	hw = emu->hw;
 
 	for (i = 0; i < END; i++) {
 		best[i].time = (unsigned int)(-1); /* XXX MAX_?INT really */;
@@ -235,7 +235,7 @@ start_voice(snd_emux_voice_t *vp)
 	snd_midi_channel_t *chan;
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, vp->hw, return -EINVAL);
+	hw = vp->hw;
 	ch = vp->ch;
 	chan = vp->chan;
 
@@ -313,7 +313,7 @@ trigger_voice(snd_emux_voice_t *vp)
 	unsigned int temp;
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, vp->hw, return);
+	hw = vp->hw;
 
 	/* set reverb and pitch target */
 	temp = vp->reg.parm.reverb;
@@ -333,7 +333,7 @@ reset_voice(snd_emux_t *emu, int ch)
 {
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, emu->hw, return);
+	hw = emu->hw;
 	EMU8000_DCYSUSV_WRITE(hw, ch, 0x807F);
 	snd_emu8000_tweak_voice(hw, ch);
 }
@@ -457,7 +457,7 @@ sysex(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_channel_set_t *c
 {
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, emu->hw, return);
+	hw = emu->hw;
 
 	switch (parsed) {
 	case SNDRV_MIDI_SYSEX_GS_CHORUS_MODE:
@@ -482,7 +482,7 @@ oss_ioctl(snd_emux_t *emu, int cmd, int p1, int p2)
 {
 	emu8000_t *hw;
 
-	hw = snd_magic_cast(emu8000_t, emu->hw, return -EINVAL);
+	hw = emu->hw;
 
 	switch (cmd) {
 	case _EMUX_OSS_REVERB_MODE:
@@ -526,7 +526,7 @@ static int
 load_fx(snd_emux_t *emu, int type, int mode, const void __user *buf, long len)
 {
 	emu8000_t *hw;
-	hw = snd_magic_cast(emu8000_t, emu->hw, return -EINVAL);
+	hw = emu->hw;
 
 	switch (type) {
 	case SNDRV_EMU8000_LOAD_CHORUS_FX:

@@ -30,8 +30,6 @@
 #include <sound/opl3.h>
 #include <sound/initval.h>
 
-#define chip_t cs4231_t
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");

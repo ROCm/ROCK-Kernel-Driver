@@ -30,8 +30,6 @@
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
 
-#define chip_t ad1816a_t
-
 #define PFX "ad1816a: "
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");

@@ -43,8 +43,6 @@
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
 
-#define chip_t cs4231_t
-
 #define PFX "azt2320: "
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");

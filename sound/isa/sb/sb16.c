@@ -37,8 +37,6 @@
 #define SNDRV_LEGACY_FIND_FREE_DMA
 #include <sound/initval.h>
 
-#define chip_t sb_t
-
 #ifdef SNDRV_SBAWE
 #define PFX "sbawe: "
 #else

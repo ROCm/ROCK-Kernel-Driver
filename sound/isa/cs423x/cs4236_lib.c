@@ -93,8 +93,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of CS4235/4236B/4237B/4238B/4239 chips");
 MODULE_LICENSE("GPL");
 
-#define chip_t cs4231_t
-
 /*
  *
  */

@@ -36,8 +36,6 @@
 
 #include <sound/sscape_ioctl.h>
 
-#define chip_t cs4231_t
-
 
 MODULE_AUTHOR("Chris Rankin");
 MODULE_DESCRIPTION("ENSONIQ SoundScape PnP driver");

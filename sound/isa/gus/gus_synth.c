@@ -134,7 +134,7 @@ static void snd_gus_synth_instr_notify(void *private_data,
 				       int what)
 {
 	unsigned int idx;
-	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return);
+	snd_gus_card_t *gus = private_data;
 	snd_gus_voice_t *pvoice;
 	unsigned long flags;
 	

@@ -155,7 +155,7 @@ snd_emu8000_sample_new(snd_emux_t *rec, snd_sf_sample_t *sp,
 	int  dram_offset, dram_start;
 	emu8000_t *emu;
 
-	emu = snd_magic_cast(emu8000_t, rec->hw, return -EINVAL);
+	emu = rec->hw;
 	snd_assert(sp != NULL, return -EINVAL);
 
 	if (sp->v.size == 0)

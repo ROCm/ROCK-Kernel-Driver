@@ -29,8 +29,6 @@
 #include <sound/initval.h>
 #include <sound/sb.h>
 
-#define chip_t sb_t
-
 #define PFX "es968: "
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
@@ -82,7 +80,7 @@ MODULE_DEVICE_TABLE(pnp_card, snd_es968_pnpids);
 static irqreturn_t snd_card_es968_interrupt(int irq, void *dev_id,
 					    struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
+	sb_t *chip = dev_id;
 
 	if (chip->open & SB_OPEN_PCM) {
 		return snd_sb8dsp_interrupt(chip);

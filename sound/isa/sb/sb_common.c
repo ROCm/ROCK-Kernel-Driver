@@ -33,8 +33,6 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#define chip_t sb_t
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ALSA lowlevel driver for Sound Blaster cards");
 MODULE_LICENSE("GPL");
@@ -197,13 +195,13 @@ static int snd_sbdsp_free(sb_t *chip)
 		free_dma(chip->dma16);
 	}
 #endif
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_sbdsp_dev_free(snd_device_t *device)
 {
-	sb_t *chip = snd_magic_cast(sb_t, device->device_data, return -ENXIO);
+	sb_t *chip = device->device_data;
 	return snd_sbdsp_free(chip);
 }
 
@@ -224,7 +222,7 @@ int snd_sbdsp_create(snd_card_t *card,
 
 	snd_assert(r_chip != NULL, return -EINVAL);
 	*r_chip = NULL;
-	chip = snd_magic_kcalloc(sb_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);

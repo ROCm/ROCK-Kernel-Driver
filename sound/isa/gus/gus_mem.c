@@ -297,7 +297,7 @@ static void snd_gf1_mem_info_read(snd_info_entry_t *entry,
 	unsigned int total, used;
 	int i;
 
-	gus = snd_magic_cast(snd_gus_card_t, entry->private_data, return);
+	gus = entry->private_data;
 	alloc = &gus->gf1.mem_alloc;
 	down(&alloc->memory_mutex);
 	snd_iprintf(buffer, "8-bit banks       : \n    ");

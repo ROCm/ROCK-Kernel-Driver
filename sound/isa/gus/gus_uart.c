@@ -95,7 +95,7 @@ static int snd_gf1_uart_output_open(snd_rawmidi_substream_t * substream)
 	unsigned long flags;
 	snd_gus_card_t *gus;
 
-	gus = snd_magic_cast(snd_gus_card_t, substream->rmidi->private_data, return -ENXIO);
+	gus = substream->rmidi->private_data;
 	spin_lock_irqsave(&gus->uart_cmd_lock, flags);
 	if (!(gus->gf1.uart_cmd & 0x80)) {	/* input active? */
 		snd_gf1_uart_reset(gus, 0);
@@ -115,7 +115,7 @@ static int snd_gf1_uart_input_open(snd_rawmidi_substream_t * substream)
 	snd_gus_card_t *gus;
 	int i;
 
-	gus = snd_magic_cast(snd_gus_card_t, substream->rmidi->private_data, return -ENXIO);
+	gus = substream->rmidi->private_data;
 	spin_lock_irqsave(&gus->uart_cmd_lock, flags);
 	if (gus->gf1.interrupt_handler_midi_out != snd_gf1_interrupt_midi_out) {
 		snd_gf1_uart_reset(gus, 0);
@@ -141,7 +141,7 @@ static int snd_gf1_uart_output_close(snd_rawmidi_substream_t * substream)
 	unsigned long flags;
 	snd_gus_card_t *gus;
 
-	gus = snd_magic_cast(snd_gus_card_t, substream->rmidi->private_data, return -ENXIO);
+	gus = substream->rmidi->private_data;
 	spin_lock_irqsave(&gus->uart_cmd_lock, flags);
 	if (gus->gf1.interrupt_handler_midi_in != snd_gf1_interrupt_midi_in)
 		snd_gf1_uart_reset(gus, 1);
@@ -156,7 +156,7 @@ static int snd_gf1_uart_input_close(snd_rawmidi_substream_t * substream)
 	unsigned long flags;
 	snd_gus_card_t *gus;
 
-	gus = snd_magic_cast(snd_gus_card_t, substream->rmidi->private_data, return -ENXIO);
+	gus = substream->rmidi->private_data;
 	spin_lock_irqsave(&gus->uart_cmd_lock, flags);
 	if (gus->gf1.interrupt_handler_midi_out != snd_gf1_interrupt_midi_out)
 		snd_gf1_uart_reset(gus, 1);
@@ -171,7 +171,7 @@ static void snd_gf1_uart_input_trigger(snd_rawmidi_substream_t * substream, int 
 	snd_gus_card_t *gus;
 	unsigned long flags;
 
-	gus = snd_magic_cast(snd_gus_card_t, substream->rmidi->private_data, return);
+	gus = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&gus->uart_cmd_lock, flags);
 	if (up) {
@@ -191,7 +191,7 @@ static void snd_gf1_uart_output_trigger(snd_rawmidi_substream_t * substream, int
 	char byte;
 	int timeout;
 
-	gus = snd_magic_cast(snd_gus_card_t, substream->rmidi->private_data, return);
+	gus = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&gus->uart_cmd_lock, flags);
 	if (up) {

@@ -385,7 +385,7 @@ static int __devinit snd_cmi8330_pnp(int dev, struct snd_cmi8330 *acard,
 
 static int snd_cmi8330_playback_open(snd_pcm_substream_t * substream)
 {
-	struct snd_cmi8330 *chip = (struct snd_cmi8330 *)_snd_pcm_substream_chip(substream);
+	struct snd_cmi8330 *chip = snd_pcm_substream_chip(substream);
 
 	/* replace the private_data and call the original open callback */
 	substream->private_data = chip->streams[SNDRV_PCM_STREAM_PLAYBACK].private_data;
@@ -394,7 +394,7 @@ static int snd_cmi8330_playback_open(snd_pcm_substream_t * substream)
 
 static int snd_cmi8330_capture_open(snd_pcm_substream_t * substream)
 {
-	struct snd_cmi8330 *chip = (struct snd_cmi8330 *)_snd_pcm_substream_chip(substream);
+	struct snd_cmi8330 *chip = snd_pcm_substream_chip(substream);
 
 	/* replace the private_data and call the original open callback */
 	substream->private_data = chip->streams[SNDRV_PCM_STREAM_CAPTURE].private_data;

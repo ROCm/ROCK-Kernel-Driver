@@ -157,8 +157,6 @@ struct _snd_es18xx {
 
 typedef struct _snd_es18xx es18xx_t;
 
-#define chip_t es18xx_t
-
 /* Lowlevel */
 
 #define DAC1 0x01
@@ -728,7 +726,7 @@ static int snd_es18xx_playback_trigger(snd_pcm_substream_t *substream,
 
 static irqreturn_t snd_es18xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, dev_id, return IRQ_NONE);
+	es18xx_t *chip = dev_id;
 	unsigned char status;
 
 	if (chip->caps & ES18XX_CONTROL) {
@@ -1027,7 +1025,7 @@ static int snd_es18xx_get_hw_switch(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 
 static void snd_es18xx_hwv_free(snd_kcontrol_t *kcontrol)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, _snd_kcontrol_chip(kcontrol), return);
+	es18xx_t *chip = snd_kcontrol_chip(kcontrol);
 	chip->master_volume = NULL;
 	chip->master_switch = NULL;
 	chip->hw_volume = NULL;
@@ -1561,7 +1559,7 @@ static snd_pcm_ops_t snd_es18xx_capture_ops = {
 
 static void snd_es18xx_pcm_free(snd_pcm_t *pcm)
 {
-	es18xx_t *codec = snd_magic_cast(es18xx_t, pcm->private_data, return);
+	es18xx_t *codec = pcm->private_data;
 	codec->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1611,7 +1609,7 @@ int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
 #ifdef CONFIG_PM
 static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, card->pm_private_data, return -EINVAL);
+	es18xx_t *chip = card->pm_private_data;
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -1627,7 +1625,7 @@ static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_es18xx_resume(snd_card_t *card, unsigned int state)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, card->pm_private_data, return -EINVAL);
+	es18xx_t *chip = card->pm_private_data;
 
 	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
@@ -1661,13 +1659,13 @@ static int snd_es18xx_free(es18xx_t *chip)
 		disable_dma(chip->dma2);
 		free_dma(chip->dma2);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_es18xx_dev_free(snd_device_t *device)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, device->device_data, return -ENXIO);
+	es18xx_t *chip = device->device_data;
 	return snd_es18xx_free(chip);
 }
 
@@ -1685,7 +1683,7 @@ static int __devinit snd_es18xx_new_device(snd_card_t * card,
 	int err;
 
 	*rchip = NULL;
-        chip = snd_magic_kcalloc(es18xx_t, 0, GFP_KERNEL);
+        chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);

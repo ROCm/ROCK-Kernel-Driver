@@ -33,8 +33,6 @@
 #include <sound/opl3.h>
 #include <sound/sb.h>
 
-#define chip_t sb_t
-
 #define PFX "dt019x: "
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");

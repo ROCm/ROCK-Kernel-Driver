@@ -23,8 +23,6 @@
 #include <sound/initval.h>
 #include <sound/pcm.h>
 
-#define chip_t emu8000_t
-
 /*
  * define the following if you want to use this pcm with non-interleaved mode
  */

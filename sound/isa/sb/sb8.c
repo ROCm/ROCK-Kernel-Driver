@@ -30,8 +30,6 @@
 #define SNDRV_LEGACY_AUTO_PROBE
 #include <sound/initval.h>
 
-#define chip_t sb_t
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Sound Blaster 1.0/2.0/Pro");
 MODULE_LICENSE("GPL");
@@ -73,7 +71,7 @@ static snd_card_t *snd_sb8_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
 static irqreturn_t snd_sb8_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
+	sb_t *chip = dev_id;
 
 	if (chip->open & SB_OPEN_PCM) {
 		return snd_sb8dsp_interrupt(chip);

@@ -131,7 +131,6 @@ MODULE_PARM_SYNTAX(opl3sa3_ymode, SNDRV_ENABLED ",allows:{{0,3}},dialog:list"); 
 #define OPL3SA2_PM_D3	(OPL3SA2_PM_ADOWN|OPL3SA2_PM_PSV|OPL3SA2_PM_PDN|OPL3SA2_PM_PDX)
 
 typedef struct snd_opl3sa2 opl3sa2_t;
-#define chip_t opl3sa2_t
 
 struct snd_opl3sa2 {
 	snd_card_t *card;
@@ -304,7 +303,7 @@ static int __init snd_opl3sa2_detect(opl3sa2_t *chip)
 static irqreturn_t snd_opl3sa2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned short status;
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, dev_id, return IRQ_NONE);
+	opl3sa2_t *chip = dev_id;
 	int handled = 0;
 
 	if (chip == NULL || chip->card == NULL)
@@ -496,7 +495,7 @@ OPL3SA2_DOUBLE("Tone Control - Treble", 0, 0x16, 0x16, 4, 0, 7, 0)
 
 static void snd_opl3sa2_master_free(snd_kcontrol_t *kcontrol)
 {
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, _snd_kcontrol_chip(kcontrol), return);
+	opl3sa2_t *chip = snd_kcontrol_chip(kcontrol);
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
 }
@@ -551,7 +550,7 @@ static int __init snd_opl3sa2_mixer(opl3sa2_t *chip)
 #ifdef CONFIG_PM
 static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
 {
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, card->pm_private_data, return -EINVAL);
+	opl3sa2_t *chip = card->pm_private_data;
 
 	snd_pcm_suspend_all(chip->cs4231->pcm); /* stop before saving regs */
 	chip->cs4231_suspend(chip->cs4231);
@@ -565,7 +564,7 @@ static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_opl3sa2_resume(snd_card_t *card, unsigned int state)
 {
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, card->pm_private_data, return -EINVAL);
+	opl3sa2_t *chip = card->pm_private_data;
 	int i;
 
 	/* power up */
@@ -656,13 +655,13 @@ static int snd_opl3sa2_free(opl3sa2_t *chip)
 		release_resource(chip->res_port);
 		kfree_nocheck(chip->res_port);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_opl3sa2_dev_free(snd_device_t *device)
 {
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, device->device_data, return -ENXIO);
+	opl3sa2_t *chip = device->device_data;
 	return snd_opl3sa2_free(chip);
 }
 
@@ -707,7 +706,7 @@ static int __devinit snd_opl3sa2_probe(int dev,
 		return -ENOMEM;
 	strcpy(card->driver, "OPL3SA2");
 	strcpy(card->shortname, "Yamaha OPL3-SA2");
-	chip = snd_magic_kcalloc(opl3sa2_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL) {
 		err = -ENOMEM;
 		goto __error;
