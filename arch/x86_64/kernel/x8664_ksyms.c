@@ -194,7 +194,9 @@ EXPORT_SYMBOL(atomic_dec_and_lock);
 
 EXPORT_SYMBOL(die_chain);
 
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);
+#endif
 
 extern void do_softirq_thunk(void);
 EXPORT_SYMBOL_NOVERS(do_softirq_thunk);
