@@ -1057,20 +1057,20 @@ struct ipr_error_table_t {
 };
 
 struct ipr_software_inq_lid_info {
-    u32  load_id;
-    u32  timestamp[3];
+	u32 load_id;
+	u32 timestamp[3];
 }__attribute__((packed, aligned (4)));
 
 struct ipr_ucode_image_header {
-    u32 header_length;
-    u32 lid_table_offset;
-    u8 major_release;
-    u8 card_type;
-    u8 minor_release[2];
-    u8 reserved[20];
-    char eyecatcher[16];
-    u32 num_lids;
-    struct ipr_software_inq_lid_info lid[1];
+	u32 header_length;
+	u32 lid_table_offset;
+	u8 major_release;
+	u8 card_type;
+	u8 minor_release[2];
+	u8 reserved[20];
+	char eyecatcher[16];
+	u32 num_lids;
+	struct ipr_software_inq_lid_info lid[1];
 }__attribute__((packed, aligned (4)));
 
 /*
