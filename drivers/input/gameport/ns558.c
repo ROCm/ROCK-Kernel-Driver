@@ -236,7 +236,7 @@ static void ns558_pnp_probe(struct pci_dev *dev)
 	port->gameport.id.version = 0x100;
 
 	sprintf(port->phys, "isapnp%d.%d/gameport0", PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	sprintf(port->name, "%s", dev->name[0] ? dev->name : "NS558 PnP Gameport");
+	sprintf(port->name, "%s", dev->dev.name[0] ? dev->dev.name : "NS558 PnP Gameport");
 
 	gameport_register_port(&port->gameport);
 
