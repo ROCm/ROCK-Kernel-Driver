@@ -405,22 +405,6 @@
 #define GPIO_C6		(1 << 22)
 #define GPIO_C7		(1 << 23)
 
-#define PA_DDR		__CCREG(0x1000)
-#define PA_DRR		__CCREG(0x1004)
-#define PA_DWR		__CCREG(0x1004)
-#define PA_SDR		__CCREG(0x1008)
-#define PA_SSR		__CCREG(0x100c)
-#define PB_DDR		__CCREG(0x1010)
-#define PB_DRR		__CCREG(0x1014)
-#define PB_DWR		__CCREG(0x1014)
-#define PB_SDR		__CCREG(0x1018)
-#define PB_SSR		__CCREG(0x101c)
-#define PC_DDR		__CCREG(0x1020)
-#define PC_DRR		__CCREG(0x1024)
-#define PC_DWR		__CCREG(0x1024)
-#define PC_SDR		__CCREG(0x1028)
-#define PC_SSR		__CCREG(0x102c)
-
 /*
  * Interrupt Controller
  *
