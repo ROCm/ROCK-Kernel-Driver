@@ -15,17 +15,6 @@
 
 #define BLOCKS(size) (((size) + 511) >> 9)
 
-/* HUH? */
-int hpfs_open(struct inode *i, struct file *f)
-{
-	lock_kernel();
-	hpfs_lock_inode(i);
-	hpfs_unlock_inode(i); /* make sure nobody is deleting the file */
-	unlock_kernel();
-	if (!i->i_nlink) return -ENOENT;
-	return 0;
-}
-
 int hpfs_file_release(struct inode *inode, struct file *file)
 {
 	lock_kernel();

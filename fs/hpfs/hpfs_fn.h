@@ -192,8 +192,6 @@ void hpfs_remove_fnode(struct super_block *, fnode_secno fno);
 
 void hpfs_lock_creation(struct super_block *);
 void hpfs_unlock_creation(struct super_block *);
-void hpfs_lock_inode(struct inode *);
-void hpfs_unlock_inode(struct inode *);
 void *hpfs_map_sector(struct super_block *, unsigned, struct buffer_head **, int);
 void *hpfs_get_sector(struct super_block *, unsigned, struct buffer_head **);
 void *hpfs_map_4sectors(struct super_block *, unsigned, struct quad_buffer_head *, int);

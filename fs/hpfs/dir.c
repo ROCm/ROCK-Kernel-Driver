@@ -35,19 +35,19 @@ loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
 
 	/*printk("dir lseek\n");*/
 	if (new_off == 0 || new_off == 1 || new_off == 11 || new_off == 12 || new_off == 13) goto ok;
-	hpfs_lock_inode(i);
+	down(&i->i_sem);
 	pos = ((loff_t) hpfs_de_as_down_as_possible(s, hpfs_inode->i_dno) << 4) + 1;
 	while (pos != new_off) {
 		if (map_pos_dirent(i, &pos, &qbh)) hpfs_brelse4(&qbh);
 		else goto fail;
 		if (pos == 12) goto fail;
 	}
-	hpfs_unlock_inode(i);
-	ok:
+	up(&i->i_sem);
+ok:
 	unlock_kernel();
 	return filp->f_pos = new_off;
-	fail:
-	hpfs_unlock_inode(i);
+fail:
+	up(&i->i_sem);
 	/*printk("illegal lseek: %016llx\n", new_off);*/
 	unlock_kernel();
 	return -ESPIPE;
@@ -109,8 +109,6 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		goto out;
 	}
 	
-	hpfs_lock_inode(inode);
-	
 	while (1) {
 		again:
 		/* This won't work when cycle is longer than number of dirents
@@ -118,31 +116,23 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		   maybe killall -9 ls helps */
 		if (hpfs_sb(inode->i_sb)->sb_chk)
 			if (hpfs_stop_cycles(inode->i_sb, filp->f_pos, &c1, &c2, "hpfs_readdir")) {
-				hpfs_unlock_inode(inode);
 				ret = -EFSERROR;
 				goto out;
 			}
-		if (filp->f_pos == 12) {
-			hpfs_unlock_inode(inode);
+		if (filp->f_pos == 12)
 			goto out;
-		}
 		if (filp->f_pos == 3 || filp->f_pos == 4 || filp->f_pos == 5) {
 			printk("HPFS: warning: pos==%d\n",(int)filp->f_pos);
-			hpfs_unlock_inode(inode);
 			goto out;
 		}
 		if (filp->f_pos == 0) {
-			if (filldir(dirent, ".", 1, filp->f_pos, inode->i_ino, DT_DIR) < 0) {
-				hpfs_unlock_inode(inode);
+			if (filldir(dirent, ".", 1, filp->f_pos, inode->i_ino, DT_DIR) < 0)
 				goto out;
-			}
 			filp->f_pos = 11;
 		}
 		if (filp->f_pos == 11) {
-			if (filldir(dirent, "..", 2, filp->f_pos, hpfs_inode->i_parent_dir, DT_DIR) < 0) {
-				hpfs_unlock_inode(inode);
+			if (filldir(dirent, "..", 2, filp->f_pos, hpfs_inode->i_parent_dir, DT_DIR) < 0)
 				goto out;
-			}
 			filp->f_pos = 1;
 		}
 		if (filp->f_pos == 1) {
@@ -151,13 +141,11 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			filp->f_version = inode->i_version;
 		}
 			/*if (filp->f_version != inode->i_version) {
-				hpfs_unlock_inode(inode);
 				ret = -ENOENT;
 				goto out;
 			}*/	
 			old_pos = filp->f_pos;
 			if (!(de = map_pos_dirent(inode, &filp->f_pos, &qbh))) {
-				hpfs_unlock_inode(inode);
 				ret = -EIOERROR;
 				goto out;
 			}
@@ -174,7 +162,6 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				filp->f_pos = old_pos;
 				if (tempname != (char *)de->name) kfree(tempname);
 				hpfs_brelse4(&qbh);
-				hpfs_unlock_inode(inode);
 				goto out;
 			}
 			if (tempname != (char *)de->name) kfree(tempname);
@@ -220,7 +207,6 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry, struct name
 		goto end_add;
 	}
 
-	hpfs_lock_inode(dir);
 	/*
 	 * '.' and '..' will never be passed here.
 	 */
@@ -312,7 +298,6 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry, struct name
 	 */
 
 	end:
-	hpfs_unlock_inode(dir);
 	end_add:
 	hpfs_set_dentry_operations(dentry);
 	unlock_kernel();
@@ -328,7 +313,6 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry, struct name
 	
 	/*bail:*/
 
-	hpfs_unlock_inode(dir);
 	unlock_kernel();
 	return ERR_PTR(-ENOENT);
 }

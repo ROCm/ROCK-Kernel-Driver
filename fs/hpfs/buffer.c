@@ -26,22 +26,6 @@ void hpfs_unlock_creation(struct super_block *s)
 	up(&hpfs_sb(s)->hpfs_creation_de);
 }
 
-void hpfs_lock_inode(struct inode *i)
-{
-	if (i) {
-		struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
-		down(&hpfs_inode->i_sem);
-	}
-}
-
-void hpfs_unlock_inode(struct inode *i)
-{
-	if (i) {
-		struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
-		up(&hpfs_inode->i_sem);
-	}
-}
-
 /* Map a sector into a buffer and return pointers to it and to the buffer. */
 
 void *hpfs_map_sector(struct super_block *s, unsigned secno, struct buffer_head **bhp,
