@@ -223,7 +223,8 @@ static void __init phys_pgd_init(pgd_t *pgd, unsigned long address, unsigned lon
 					set_pmd(pmd,  __pmd(0)); 
 				break;
 		}
-			pe = _PAGE_PSE | _KERNPG_TABLE | _PAGE_GLOBAL | paddr;
+			pe = _PAGE_NX|_PAGE_PSE | _KERNPG_TABLE | _PAGE_GLOBAL | paddr;
+			pe &= __supported_pte_mask;
 			set_pmd(pmd, __pmd(pe));
 		}
 		unmap_low_page(map);

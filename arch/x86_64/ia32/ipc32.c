@@ -8,6 +8,7 @@
 #include <linux/shm.h>
 #include <linux/slab.h>
 #include <linux/ipc.h>
+#include <linux/compat.h>
 #include <asm/mman.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -29,10 +30,10 @@ struct msgbuf32 {
 
 struct ipc_perm32 {
 	int key;
-	__kernel_uid_t32 uid;
-	__kernel_gid_t32 gid;
-	__kernel_uid_t32 cuid;
-	__kernel_gid_t32 cgid;
+	compat_uid_t uid;
+	compat_gid_t gid;
+	compat_uid_t cuid;
+	compat_gid_t cgid;
 	unsigned short mode;
 	unsigned short seq;
 };
@@ -53,8 +54,8 @@ struct ipc64_perm32 {
 
 struct semid_ds32 {
 	struct ipc_perm32 sem_perm;               /* permissions .. see ipc.h */
-	__kernel_time_t32 sem_otime;              /* last semop time */
-	__kernel_time_t32 sem_ctime;              /* last change time */
+	compat_time_t sem_otime;              /* last semop time */
+	compat_time_t sem_ctime;              /* last change time */
 	u32 sem_base;              /* ptr to first semaphore in array */
 	u32 sem_pending;          /* pending operations to be processed */
 	u32 sem_pending_last;    /* last pending operation */
@@ -64,9 +65,9 @@ struct semid_ds32 {
 
 struct semid64_ds32 {
 	struct ipc64_perm32 sem_perm;
-	__kernel_time_t32 sem_otime;
+	compat_time_t sem_otime;
 	unsigned int __unused1;
-	__kernel_time_t32 sem_ctime;
+	compat_time_t sem_ctime;
 	unsigned int __unused2;
 	unsigned int sem_nsems;
 	unsigned int __unused3;
@@ -77,9 +78,9 @@ struct msqid_ds32 {
 	struct ipc_perm32 msg_perm;
 	u32 msg_first;
 	u32 msg_last;
-	__kernel_time_t32 msg_stime;
-	__kernel_time_t32 msg_rtime;
-	__kernel_time_t32 msg_ctime;
+	compat_time_t msg_stime;
+	compat_time_t msg_rtime;
+	compat_time_t msg_ctime;
 	u32 wwait;
 	u32 rwait;
 	unsigned short msg_cbytes;
@@ -91,17 +92,17 @@ struct msqid_ds32 {
 
 struct msqid64_ds32 {
 	struct ipc64_perm32 msg_perm;
-	__kernel_time_t32 msg_stime;
+	compat_time_t msg_stime;
 	unsigned int __unused1;
-	__kernel_time_t32 msg_rtime;
+	compat_time_t msg_rtime;
 	unsigned int __unused2;
-	__kernel_time_t32 msg_ctime;
+	compat_time_t msg_ctime;
 	unsigned int __unused3;
 	unsigned int msg_cbytes;
 	unsigned int msg_qnum;
 	unsigned int msg_qbytes;
-	__kernel_pid_t32 msg_lspid;
-	__kernel_pid_t32 msg_lrpid;
+	compat_pid_t msg_lspid;
+	compat_pid_t msg_lrpid;
 	unsigned int __unused4;
 	unsigned int __unused5;
 };
@@ -109,9 +110,9 @@ struct msqid64_ds32 {
 struct shmid_ds32 {
 	struct ipc_perm32 shm_perm;
 	int shm_segsz;
-	__kernel_time_t32 shm_atime;
-	__kernel_time_t32 shm_dtime;
-	__kernel_time_t32 shm_ctime;
+	compat_time_t shm_atime;
+	compat_time_t shm_dtime;
+	compat_time_t shm_ctime;
 	__kernel_ipc_pid_t32 shm_cpid;
 	__kernel_ipc_pid_t32 shm_lpid;
 	unsigned short shm_nattch;
@@ -119,15 +120,15 @@ struct shmid_ds32 {
 
 struct shmid64_ds32 {
 	struct ipc64_perm32 shm_perm;
-	__kernel_size_t32 shm_segsz;
-	__kernel_time_t32 shm_atime;
+	compat_size_t shm_segsz;
+	compat_time_t shm_atime;
 	unsigned int __unused1;
-	__kernel_time_t32 shm_dtime;
+	compat_time_t shm_dtime;
 	unsigned int __unused2;
-	__kernel_time_t32 shm_ctime;
+	compat_time_t shm_ctime;
 	unsigned int __unused3;
-	__kernel_pid_t32 shm_cpid;
-	__kernel_pid_t32 shm_lpid;
+	compat_pid_t shm_cpid;
+	compat_pid_t shm_lpid;
 	unsigned int shm_nattch;
 	unsigned int __unused4;
 	unsigned int __unused5;
@@ -163,6 +164,7 @@ struct ipc_kludge {
 #define SEMOP		 1
 #define SEMGET		 2
 #define SEMCTL		 3
+#define TIMEDSEMOP	 4
 #define MSGSND		11
 #define MSGRCV		12
 #define MSGGET		13
@@ -622,7 +624,12 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 	switch (call) {
 	      case SEMOP:
 		/* struct sembuf is the same on 32 and 64bit :)) */
-		return sys_semop(first, (struct sembuf *)AA(ptr), second);
+		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second,
+				      NULL);
+	      case TIMEDSEMOP:
+		/* struct sembuf is the same on 32 and 64bit :)) */
+		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second,
+				      (const struct timespec *)AA(fifth));
 	      case SEMGET:
 		return sys_semget(first, second, third);
 	      case SEMCTL:
@@ -646,7 +653,6 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return sys_shmget(first, second, third);
 	      case SHMCTL:
 		return shmctl32(first, second, (void *)AA(ptr));
-
 	      default:
 		return -EINVAL;
 	}

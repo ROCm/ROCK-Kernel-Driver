@@ -29,6 +29,7 @@
 #define RSP 152
 #define SS 160
 #define ARGOFFSET R11
+#define SWFRAME ORIG_RAX
 
 	.macro SAVE_ARGS addskip=0,norcx=0 	
 	subq  $9*8+\addskip,%rsp
@@ -47,8 +48,11 @@
 	.endm
 
 #define ARG_SKIP 9*8
-	.macro RESTORE_ARGS skiprax=0,addskip=0,skiprcx=0
+	.macro RESTORE_ARGS skiprax=0,addskip=0,skiprcx=0,skipr11=0
+	.if \skipr11
+	.else
 	movq (%rsp),%r11
+	.endif
 	movq 1*8(%rsp),%r10
 	movq 2*8(%rsp),%r9
 	movq 3*8(%rsp),%r8

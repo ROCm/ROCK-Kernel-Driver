@@ -26,6 +26,7 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  . = ALIGN(64); 
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
@@ -79,6 +80,11 @@ SECTIONS
   . = ALIGN(4096); 
   .data.boot_pgt : { *(.data.boot_pgt) }
 
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
+	
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
   .init.text : { *(.init.text) }
@@ -87,6 +93,9 @@ SECTIONS
   __setup_start = .;
   .init.setup : { *(.init.setup) }
   __setup_end = .;
+  __start___param = .;
+  __param : { *(__param) }
+  __stop___param = .;
   __initcall_start = .;
   .initcall.init : {
 	*(.initcall1.init) 
@@ -104,6 +113,12 @@ SECTIONS
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
+
+  . = ALIGN(4096);
+  __nosave_begin = .;
+  .data_nosave : { *(.data.nosave) }
+  . = ALIGN(4096);
+  __nosave_end = .;
 
   _end = . ;
 

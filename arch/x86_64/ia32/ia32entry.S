@@ -1,7 +1,7 @@
 /*
  * Compatibility mode system call entry point for x86-64. 
  * 		
- * Copyright 2000,2001 Andi Kleen, SuSE Labs.
+ * Copyright 2000-2002 Andi Kleen, SuSE Labs.
  * 
  * $Id: ia32entry.S,v 1.31 2002/03/24 13:01:45 ak Exp $ 		
  */		 
@@ -9,10 +9,11 @@
 #include <asm/calling.h>
 #include <asm/offset.h>
 #include <asm/current.h>
-#include <linux/linkage.h>
 #include <asm/errno.h>
 #include <asm/ia32_unistd.h>	
 #include <asm/thread_info.h>	
+#include <asm/segment.h>
+#include <linux/linkage.h>
 
 	.macro IA32_ARG_FIXUP
 	movl	%edi,%r8d
@@ -23,12 +24,73 @@
 	.endm 
 
 /*
- * 32bit SYSCALL instruction entry. 	
+ * 32bit SYSCALL instruction entry. This is called from the 32bit vsyscall page.
+ *	
+ * Register setup:
+ *
+ * %eax	System call number.
+ * %ebx Arg1
+ * %ecx return EIP 
+ * %edx Arg3
+ * %esi Arg4
+ * %edi Arg5
+ * %ebp Arg2    [note: not saved in the stack frame, should not be touched]
+ * %esp user stack 
+ * 0(%esp) Arg6
+ * 	
+ * Interrupts off.
+ *	
+ * This is purely a fast path. For anything complicated we use the int 0x80
+ * path below.	Set up a complete hardware stack frame to share code
+ * with the int 0x80 path.	
  */ 	
 ENTRY(ia32_cstar_target)
-	movq $-ENOSYS,%rax
+	swapgs
+	movl	%esp,%r8d
+	movq	%gs:pda_kernelstack,%rsp
+	sti
+	SAVE_ARGS 8,1
+	movl 	%eax,%eax	/* zero extension */
+	movq	%rax,ORIG_RAX-ARGOFFSET(%rsp)
+	movq	%rcx,RIP-ARGOFFSET(%rsp)
+	movl	%ebp,%ecx
+	movq	$__USER32_CS,CS-ARGOFFSET(%rsp)
+	movq	$__USER32_DS,SS-ARGOFFSET(%rsp)
+	movq	%r11,EFLAGS-ARGOFFSET(%rsp)
+	movq	%r8,RSP-ARGOFFSET(%rsp)	
+	/* no need to do an access_ok check here because the 32bit
+	   user space cannot set r8 to a value > 4GB and the kernel has no
+	   memory mapping in the first 4GB. */
+	/* hardware stack frame is complete now */	
+1:	movl	(%r8),%ebp
+	.section __ex_table,"a"
+	.quad 1b,cstar_badarg
+	.previous	
+	GET_THREAD_INFO(%r10)
+	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
+	jc  ia32_tracesys
+	cmpl $IA32_NR_syscalls,%eax
+	jae  ia32_badsys
+	IA32_ARG_FIXUP
+	call *ia32_sys_call_table(,%rax,8)
+	.globl ia32_sysret
+cstar_sysret:	
+	movq %rax,RAX-ARGOFFSET(%rsp)
+	GET_THREAD_INFO(%r10)
+	cli
+	testl $_TIF_WORK_MASK,threadinfo_flags(%r10)
+	jnz int_ret_from_sys_call
+	RESTORE_ARGS 1,0,1,1	/* could avoid the stack restore here */
+	movl RIP-SWFRAME(%rsp),%ecx
+	movl RSP-SWFRAME(%rsp),%esp
+	movl EFLAGS-SWFRAME(%rsp),%r11d
+	swapgs
 	sysretl
 	
+cstar_badarg:
+	movq $-EFAULT,%rax
+	jmp cstar_sysret
+
 /* 
  * Emulated IA32 system calls via int 0x80. 
  *
@@ -121,7 +183,7 @@ ENTRY(ia32_ptregs_common)
 	.align 8
 	.globl ia32_sys_call_table
 ia32_sys_call_table:
-	.quad ni_syscall	/* 0  -  old "setup" system call*/
+	.quad sys_restart_syscall
 	.quad sys_exit
 	.quad stub32_fork
 	.quad sys_read
@@ -151,7 +213,7 @@ ia32_sys_call_table:
 	.quad sys_alarm		/* XXX sign extension??? */ 
 	.quad ni_syscall	/* (old)fstat */
 	.quad sys_pause
-	.quad sys32_utime	/* 30 */
+	.quad compat_sys_utime	/* 30 */
 	.quad ni_syscall	/* old stty syscall holder */
 	.quad ni_syscall	/* old gtty syscall holder */
 	.quad sys_access
@@ -164,7 +226,7 @@ ia32_sys_call_table:
 	.quad sys_rmdir		/* 40 */
 	.quad sys_dup
 	.quad sys32_pipe
-	.quad sys32_times
+	.quad compat_sys_times
 	.quad ni_syscall			/* old prof syscall holder */
 	.quad sys_brk		/* 45 */
 	.quad sys_setgid16
@@ -225,11 +287,11 @@ ia32_sys_call_table:
 	.quad sys_ioperm
 	.quad sys32_socketcall
 	.quad sys_syslog
-	.quad sys32_setitimer
-	.quad sys32_getitimer	/* 105 */
-	.quad sys32_newstat
-	.quad sys32_newlstat
-	.quad sys32_newfstat
+	.quad compat_sys_setitimer
+	.quad compat_sys_getitimer	/* 105 */
+	.quad compat_sys_newstat
+	.quad compat_sys_newlstat
+	.quad compat_sys_newfstat
 	.quad sys32_uname
 	.quad stub32_iopl		/* 110 */
 	.quad sys_vhangup
@@ -283,7 +345,7 @@ ia32_sys_call_table:
 	.quad sys_sched_get_priority_max
 	.quad sys_sched_get_priority_min  /* 160 */
 	.quad sys_sched_rr_get_interval
-	.quad sys32_nanosleep
+	.quad compat_sys_nanosleep
 	.quad sys_mremap
 	.quad sys_setresuid16
 	.quad sys_getresuid16	/* 165 */
@@ -361,7 +423,7 @@ ia32_sys_call_table:
 	.quad sys_fremovexattr
 	.quad sys_tkill		/* 238 */ 
 	.quad sys_sendfile64 
-	.quad sys_futex		/* 240 */
+	.quad sys32_futex		/* 240 */
         .quad sys32_sched_setaffinity
         .quad sys32_sched_getaffinity
 	.quad sys_set_thread_area
@@ -374,6 +436,14 @@ ia32_sys_call_table:
 	.quad sys_ni_syscall /* 250 alloc_huge_pages */
 	.quad sys_ni_syscall /* free_huge_pages */
 	.quad sys_exit_group /* exit_group */
+	.quad sys_lookup_dcookie
+	.quad sys_epoll_create
+	.quad sys_epoll_ctl
+	.quad sys_epoll_wait
+	.quad sys_remap_file_pages
+	.quad sys_set_tid_address
+	
+	/* don't forget to change IA32_NR_syscalls */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
 		.quad ni_syscall

@@ -19,8 +19,25 @@
 #define __PUSH(x) "pushq %%" __STR(x) "\n\t"
 #define __POP(x)  "popq  %%" __STR(x) "\n\t"
 
-/* frame pointer must be last for get_wchan */
+struct save_context_frame { 
+	unsigned long rbp; 
+	unsigned long rbx;
+	unsigned long rcx;
+	unsigned long rdx;	
+	unsigned long rsi;
+	unsigned long rdi; 
+	unsigned long rax;
+	unsigned long r15;
+	unsigned long r14;
+	unsigned long r13;
+	unsigned long r12;
+	unsigned long r11;
+	unsigned long r10;
+	unsigned long r9;
+	unsigned long r8; 
+}; 
 
+/* frame pointer must be last for get_wchan */
 /* It would be more efficient to let the compiler clobber most of these registers.
    Clobbering all is not possible because that lets reload freak out. Even just 
    clobbering six generates wrong code with gcc 3.1 for me so do it this way for now.
@@ -44,10 +61,11 @@
 	asm volatile(SAVE_CONTEXT						    \
 		     "movq %%rsp,%[prevrsp]\n\t"				    \
 		     "movq %[nextrsp],%%rsp\n\t"				    \
-		     "movq $1f,%[prevrip]\n\t"					    \
+		     "movq $thread_return,%[prevrip]\n\t"			   \
 		     "pushq %[nextrip]\n\t"					    \
 		     "jmp __switch_to\n\t"		\
-		     "1:\n\t"							    \
+		     ".globl thread_return\n"					\
+		     "thread_return:\n\t"					    \
 		     RESTORE_CONTEXT						    \
 		     :[prevrsp] "=m" (prev->thread.rsp), 			    \
 		      [prevrip] "=m" (prev->thread.rip)			    	    \
@@ -88,25 +106,31 @@ extern void load_gs_index(unsigned);
  * Clear and set 'TS' bit respectively
  */
 #define clts() __asm__ __volatile__ ("clts")
-#define read_cr0() ({ \
-	unsigned long __dummy; \
-	__asm__( \
-		"movq %%cr0,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
-#define write_cr0(x) \
-	__asm__("movq %0,%%cr0": :"r" (x));
 
-#define read_cr4() ({ \
-	unsigned long __dummy; \
-	__asm__( \
-		"movq %%cr4,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
-#define write_cr4(x) \
-	__asm__("movq %0,%%cr4": :"r" (x));
+static inline unsigned long read_cr0(void)
+{ 
+	unsigned long cr0;
+	asm volatile("movq %%cr0,%0" : "=r" (cr0));
+	return cr0;
+} 
+
+static inline void write_cr0(unsigned long val) 
+{ 
+	asm volatile("movq %0,%%cr0" :: "r" (val));
+} 
+
+static inline unsigned long read_cr4(void)
+{ 
+	unsigned long cr4;
+	asm("movq %%cr4,%0" : "=r" (cr4));
+	return cr4;
+} 
+
+static inline void write_cr4(unsigned long val)
+{ 
+	asm volatile("movq %0,%%cr4" :: "r" (val));
+} 
+
 #define stts() write_cr0(8 | read_cr0())
 
 #define wbinvd() \
@@ -209,7 +233,6 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define cmpxchg(ptr,o,n)\
 	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
 					(unsigned long)(n),sizeof(*(ptr))))
-
 
 #ifdef CONFIG_SMP
 #define smp_mb()	mb()

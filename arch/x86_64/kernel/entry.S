@@ -605,6 +605,9 @@ ENTRY(kernel_thread)
 	movq $-1, %rsi
 	movq %rsp, %rdx
 
+	xorl %r8d,%r8d
+	xorl %r9d,%r9d
+	
 	# clone now
 	call do_fork
 

@@ -18,11 +18,11 @@
 #include <linux/smp.h>
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
+#include <linux/interrupt.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
-#include <asm/hardirq.h>
 
 /*
  * the following functions deal with sending IPIs between CPUs.

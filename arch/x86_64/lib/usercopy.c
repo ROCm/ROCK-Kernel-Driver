@@ -30,7 +30,7 @@ do {									   \
 		"	jmp 2b\n"					   \
 		".previous\n"						   \
 		".section __ex_table,\"a\"\n"				   \
-		"	.align 4\n"					   \
+		"	.align 8\n"					   \
 		"	.quad 0b,3b\n"					   \
 		".previous"						   \
 		: "=r"(res), "=c"(count), "=&a" (__d0), "=&S" (__d1),	   \

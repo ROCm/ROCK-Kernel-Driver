@@ -330,6 +330,8 @@ void close_output_buffer_if_we_run_high(struct moveparams *mv)
 void check_cpu(void)
 {
 	int res = 0;
+        int tmp, flags;
+
 	asm volatile( " \n\
 	movl $3,%%edx		# at least 386 \n\
 	pushfl			# push EFLAGS \n\
@@ -395,6 +397,43 @@ void check_cpu(void)
 	}
 	if (res !=7)
 		error( "Sorry, your CPU is not capable of running 64-bit kernel." );
+        /* check required feature flags */ 
+        /* see http://www.x86-64.org/lists/discuss/msg02971.html */
+#define REQUIRED_MASK1 ((1<<0)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<8)|(1<<11)| \
+                                           (1<<13)|(1<<15)|(1<<24))
+        
+        asm("cpuid" : "=d" (flags), "=a" (tmp) : "1" (0x80000001) : "ebx", "ecx"); 
+        flags &= REQUIRED_MASK1;
+        flags ^= REQUIRED_MASK1; 
+        if (flags & (1<<0))
+                error("CPU misses x87"); 
+        if (flags & (1<<3)) 
+                error("CPU doesn't support page size extension (PSE)");
+        if (flags & (1<<4))
+                error("CPU misses an time stamp counter"); 
+        if (flags & (1<<5))
+                error("CPU misses AMD style MSRs"); 
+        if (flags & (1<<6))
+                error("CPU misses physical address extension (PAE)"); 
+        if (flags & (1<<8))
+                error("CPU misses cmpxchg8"); 
+        if (flags & (1<<11))
+                error("CPU doesn't support SYSCALL/SYSRET");
+        if (flags & (1<<13))
+                error("CPU doesn't support PGE"); 
+        if (flags & (1<<15))
+                error("CPU doesn't support CMOV"); 
+        if (flags & (1<<24))
+                error("CPU doesn't support FXSAVE/FXRSTOR"); 
+
+#define REQUIRED_MASK2 ((1<<25)|(1<<26))        
+        asm("cpuid" : "=d" (flags), "=a" (tmp) : "1" (1) : "ebx", "ecx"); 
+        flags &= REQUIRED_MASK2; 
+        flags ^= REQUIRED_MASK2; 
+        if (flags & (1<<25))
+                error("CPU doesn't support SSE1");
+        if (flags & (1<<26))
+                error("CPU doesn't support SSE2");
 }
 
 int decompress_kernel(struct moveparams *mv, void *rmode)

@@ -77,6 +77,9 @@ typedef struct {
 #define hardirq_endlock()	do { } while (0)
 
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
+#define nmi_enter()		(irq_enter())
+#define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
+
 
 #if CONFIG_PREEMPT
 # define in_atomic()   ((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())

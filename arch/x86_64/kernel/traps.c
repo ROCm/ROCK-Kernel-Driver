@@ -83,22 +83,18 @@ static int kstack_depth_to_print = 10;
 #include <linux/kallsyms.h> 
 int printk_address(unsigned long address)
 { 
-	unsigned long dummy; 
-	const char *modname, *secname, *symname;
-	unsigned long symstart; 
+	unsigned long offset = 0, symsize;
+	const char *symname;
+	char *modname;
 	char *delim = ":"; 
 
-	/* What a function call! */
-	if (!kallsyms_address_to_symbol(address, 
-					&modname, &dummy, &dummy, 
-					&secname, &dummy, &dummy,
-					&symname, &symstart, &dummy)) {
+	symname = kallsyms_lookup(address, &symsize, &offset, &modname); 
+	if (!symname) 
 		return printk("[<%016lx>]", address);
-	} 
-	if (!strcmp(modname, "kernel"))
+	if (!modname) 
 		modname = delim = ""; 		
         return printk("<%016lx>{%s%s%s%s%+ld}",
-		      address,delim,modname,delim,symname,address-symstart); 
+		      address,delim,modname,delim,symname,offset); 
 } 
 #else
 int printk_address(unsigned long address)
@@ -110,7 +106,8 @@ int printk_address(unsigned long address)
 
 #ifdef CONFIG_MODULES
 
-extern struct module kernel_module;
+/* FIXME: Accessed without a lock --RR */
+extern struct list_head modules;
 
 static inline int kernel_text_address(unsigned long addr)
 {
@@ -121,11 +118,11 @@ static inline int kernel_text_address(unsigned long addr)
        addr <= (unsigned long) &_etext)
        return 1;
 
-   for (mod = module_list; mod != &kernel_module; mod = mod->next) {
+   list_for_each_entry(mod, &modules, list) { 	
        /* mod_bound tests for addr being inside the vmalloc'ed
         * module area. Of course it'd be better to test only
         * for the .text subset... */
-       if (mod_bound(addr, 0, mod)) {
+       if (mod_bound((void *)addr, 0, mod)) {
            retval = 1;
            break;
        }
@@ -173,7 +170,7 @@ void show_trace(unsigned long *stack)
 	int i;
 
 	printk("\nCall Trace:");
-	i = 12; 
+	i = 0; 
 	
 	estack_end = in_exception_stack(cpu, (unsigned long)stack); 
 	if (estack_end) { 

@@ -6,12 +6,13 @@
  * of ugly preprocessor tricks. Talk about very very poor man's inheritance.
  */ 
 #include <linux/types.h>
+#include <linux/compat.h>
 #include <linux/config.h> 
 #include <linux/stddef.h>
-#include <linux/module.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/binfmts.h>
 #include <asm/segment.h> 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -19,14 +20,14 @@
 #include <asm/sigcontext32.h>
 #include <asm/fpu32.h>
 #include <asm/i387.h>
+#include <asm/uaccess.h>
+#include <asm/ia32.h>
 
 struct file;
 struct elf_phdr; 
 
 #define IA32_EMULATOR 1
 
-#define IA32_PAGE_OFFSET 0xffff0000
-#define IA32_STACK_TOP IA32_PAGE_OFFSET
 #define ELF_ET_DYN_BASE		(IA32_PAGE_OFFSET/3 + 0x1000000)
 
 #undef ELF_ARCH
@@ -53,11 +54,6 @@ struct elf_siginfo
 	int	si_errno;			/* errno */
 };
 
-struct timeval32
-{
-    int tv_sec, tv_usec;
-};
-
 #define jiffies_to_timeval(a,b) do { (b)->tv_usec = 0; (b)->tv_sec = (a)/HZ; }while(0)
 
 struct elf_prstatus
@@ -70,10 +66,10 @@ struct elf_prstatus
 	pid_t	pr_ppid;
 	pid_t	pr_pgrp;
 	pid_t	pr_sid;
-	struct timeval32 pr_utime;	/* User time */
-	struct timeval32 pr_stime;	/* System time */
-	struct timeval32 pr_cutime;	/* Cumulative user time */
-	struct timeval32 pr_cstime;	/* Cumulative system time */
+	struct compat_timeval pr_utime;	/* User time */
+	struct compat_timeval pr_stime;	/* System time */
+	struct compat_timeval pr_cutime;	/* Cumulative user time */
+	struct compat_timeval pr_cstime;	/* Cumulative system time */
 	elf_gregset_t pr_reg;	/* GP registers */
 	int pr_fpvalid;		/* True if math co-processor being used.  */
 };
@@ -123,14 +119,67 @@ struct elf_prpsinfo
 
 #define user user32
 
-#define dump_fpu dump_fpu_ia32
-
 #define __ASM_X86_64_ELF_H 1
-#include <asm/ia32.h>
+//#include <asm/ia32.h>
 #include <linux/elf.h>
 
 typedef struct user_i387_ia32_struct elf_fpregset_t;
 typedef struct user32_fxsr_struct elf_fpxregset_t;
+
+
+static inline void elf_core_copy_regs(elf_gregset_t *elfregs, struct pt_regs *regs)
+{
+	ELF_CORE_COPY_REGS((*elfregs), regs)
+}
+
+static inline int elf_core_copy_task_regs(struct task_struct *t, elf_gregset_t* elfregs)
+{	
+	struct pt_regs *pp = (struct pt_regs *)(t->thread.rsp0);
+	ELF_CORE_COPY_REGS((*elfregs), pp);
+	/* fix wrong segments */ 
+	(*elfregs)[7] = t->thread.ds; 
+	(*elfregs)[9] = t->thread.fsindex; 
+	(*elfregs)[10] = t->thread.gsindex; 
+	(*elfregs)[8] = t->thread.es; 	
+	return 1; 
+}
+
+static inline int 
+elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
+{
+	struct _fpstate_ia32 *fpstate = (void*)fpu; 
+	struct pt_regs *regs = (struct pt_regs *)(tsk->thread.rsp0); 
+	mm_segment_t oldfs = get_fs();
+	int ret;
+
+	if (!tsk->used_math) 
+		return 0;
+	--regs;
+	if (tsk == current)
+		unlazy_fpu(tsk);
+	set_fs(KERNEL_DS); 
+	ret = save_i387_ia32(tsk, fpstate, regs, 1);
+	/* Correct for i386 bug. It puts the fop into the upper 16bits of 
+	   the tag word (like FXSAVE), not into the fcs*/ 
+	fpstate->cssel |= fpstate->tag & 0xffff0000; 
+	set_fs(oldfs); 
+	return ret; 
+}
+
+#define ELF_CORE_COPY_XFPREGS 1
+static inline int 
+elf_core_copy_task_xfpregs(struct task_struct *t, elf_fpxregset_t *xfpu)
+{
+	struct pt_regs *regs = ((struct pt_regs *)(t->thread.rsp0))-1; 
+	if (!t->used_math) 
+		return 0;
+	if (t == current)
+		unlazy_fpu(t); 
+	memcpy(xfpu, &t->thread.i387.fxsave, sizeof(elf_fpxregset_t));
+	xfpu->fcs = regs->cs; 
+	xfpu->fos = t->thread.ds; /* right? */ 
+	return 1;
+}
 
 #undef elf_check_arch
 #define elf_check_arch(x) \
@@ -168,9 +217,9 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm);
 
 #undef start_thread
 #define start_thread(regs,new_rip,new_rsp) do { \
-	__asm__("movl %0,%%fs": :"r" (0)); \
-	__asm__("movl %0,%%es; movl %0,%%ds": :"r" (__USER32_DS)); \
-	wrmsrl(MSR_KERNEL_GS_BASE, 0); \
+	asm volatile("movl %0,%%fs" :: "r" (0)); \
+	asm volatile("movl %0,%%es; movl %0,%%ds": :"r" (__USER32_DS)); \
+	load_gs_index(0); \
 	(regs)->rip = (new_rip); \
 	(regs)->rsp = (new_rsp); \
 	(regs)->eflags = 0x200; \
@@ -181,6 +230,8 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm);
 
 
 #define elf_map elf32_map
+
+#include <linux/module.h>
 
 MODULE_DESCRIPTION("Binary format loader for compatibility with IA32 ELF binaries."); 
 MODULE_AUTHOR("Eric Youngdale, Andi Kleen");
@@ -245,7 +296,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;
-		mpnt->vm_page_prot = PAGE_COPY;
+		mpnt->vm_page_prot = PAGE_COPY_EXEC;
 		mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
@@ -287,23 +338,3 @@ elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	return(map_addr);
 }
 
-int dump_fpu_ia32(struct pt_regs *regs, elf_fpregset_t *fp)
-{
-	struct _fpstate_ia32 *fpu = (void*)fp; 
-	struct task_struct *tsk = current;
-	mm_segment_t oldfs = get_fs();
-	int ret;
-
-	if (!tsk->used_math) 
-		return 0;
-	if (!(test_thread_flag(TIF_IA32)))
-		BUG(); 
-	unlazy_fpu(tsk);
-	set_fs(KERNEL_DS); 
-	ret = save_i387_ia32(current, fpu, regs, 1);
-	/* Correct for i386 bug. It puts the fop into the upper 16bits of 
-	   the tag word (like FXSAVE), not into the fcs*/ 
-	fpu->cssel |= fpu->tag & 0xffff0000; 
-	set_fs(oldfs); 
-	return ret; 
-}

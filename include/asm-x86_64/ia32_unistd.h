@@ -6,6 +6,7 @@
  * this is for the kernel only.
  */
 
+#define __NR_ia32_restart_syscall 0
 #define __NR_ia32_exit		  1
 #define __NR_ia32_fork		  2
 #define __NR_ia32_read		  3
@@ -259,7 +260,13 @@
 #define __NR_ia32_alloc_hugepages		250
 #define __NR_ia32_free_hugepages		251
 #define __NR_ia32_exit_group		252
+#define __NR_ia32_lookup_dcookie	253
+#define __NR_ia32_sys_epoll_create	254
+#define __NR_ia32_sys_epoll_ctl	255
+#define __NR_ia32_sys_epoll_wait	256
+#define __NR_ia32_remap_file_pages	257
+#define __NR_ia32_set_tid_address	258
 
-#define IA32_NR_syscalls 260	/* must be > than biggest syscall! */	
+#define IA32_NR_syscalls 265	/* must be > than biggest syscall! */	
 
 #endif /* _ASM_X86_64_IA32_UNISTD_H_ */

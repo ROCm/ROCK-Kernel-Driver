@@ -10,32 +10,38 @@
  
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/module.h>
+#include <linux/err.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
-static struct vm_struct * modvmlist = NULL;
-
-void module_unmap (void * addr)
+/* FIXME: If module_region == mod->init_region, trim exception
+   table entries. */
+void module_free(struct module *mod, void *module_region)
 {
 	struct vm_struct **p, *tmp;
 	int i;
+	unsigned long addr = (unsigned long)module_region;
 
 	if (!addr)
 		return;
-	if ((PAGE_SIZE-1) & (unsigned long) addr) {
-		printk("Trying to unmap module with bad address (%p)\n", addr);
+	if ((PAGE_SIZE-1) & addr) {
+		printk("Trying to unmap module with bad address (%lx)\n", addr);
 		return;
 	}
-	for (p = &modvmlist ; (tmp = *p) ; p = &tmp->next) {
-		if (tmp->addr == addr) {
+	write_lock(&vmlist_lock); 
+	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
+		if ((unsigned long)tmp->addr == addr) {
 			*p = tmp->next;
+			write_unlock(&vmlist_lock); 
 			goto found;
 		}
 	}
-	printk("Trying to unmap nonexistent module vm area (%p)\n", addr);
+	write_unlock(&vmlist_lock); 
+	printk("Trying to unmap nonexistent module vm area (%lx)\n", addr);
 	return;
  found:
 	unmap_vm_area(tmp);
@@ -49,29 +55,31 @@ void module_unmap (void * addr)
 	kfree(tmp);					
 }
 
-void * module_map (unsigned long size)
+void * module_alloc (unsigned long size)
 {
 	struct vm_struct **p, *tmp, *area;
 	struct page **pages;
 	void * addr;
 	unsigned int nr_pages, array_size, i;
 
-	size = PAGE_ALIGN(size);
-	if (!size || size > MODULES_LEN)
+	if (!size)
 		return NULL;
+	size = PAGE_ALIGN(size);
+	if (size > MODULES_LEN)
+		return ERR_PTR(-ENOMEM);
 		
 	addr = (void *) MODULES_VADDR;
-	for (p = &modvmlist; (tmp = *p) ; p = &tmp->next) {
+	for (p = &vmlist; (tmp = *p) ; p = &tmp->next) {
 		if (size + (unsigned long) addr < (unsigned long) tmp->addr)
 			break;
 		addr = (void *) (tmp->size + (unsigned long) tmp->addr);
 	}
 	if ((unsigned long) addr + size >= MODULES_END)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	
 	area = (struct vm_struct *) kmalloc(sizeof(*area), GFP_KERNEL);
 	if (!area)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	area->size = size + PAGE_SIZE;
 	area->addr = addr;
 	area->next = *p;
@@ -96,11 +104,12 @@ void * module_map (unsigned long size)
 			goto fail;
 	}
 	
-	if (map_vm_area(area, PAGE_KERNEL, &pages)) {
+	if (map_vm_area(area, PAGE_KERNEL_EXECUTABLE, &pages)) {
 		unmap_vm_area(area);
 		goto fail;
 	}
 
+	memset(area->addr, 0, size);
 	return area->addr;
 
 fail:
@@ -113,6 +122,6 @@ fail:
 	}
 	kfree(area);
 
-	return NULL;
+	return ERR_PTR(-ENOMEM);
 }
 

@@ -178,19 +178,23 @@ extern void iounmap(void *addr);
 #define readb(addr) (*(volatile unsigned char *) __io_virt(addr))
 #define readw(addr) (*(volatile unsigned short *) __io_virt(addr))
 #define readl(addr) (*(volatile unsigned int *) __io_virt(addr))
+#define readq(addr) (*(volatile unsigned long *) __io_virt(addr))
 #define __raw_readb readb
 #define __raw_readw readw
 #define __raw_readl readl
+#define __raw_readq readq
 
 #define writeb(b,addr) (*(volatile unsigned char *) __io_virt(addr) = (b))
 #define writew(b,addr) (*(volatile unsigned short *) __io_virt(addr) = (b))
 #define writel(b,addr) (*(volatile unsigned int *) __io_virt(addr) = (b))
+#define writeq(b,addr) (*(volatile unsigned long *) __io_virt(addr) = (b))
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
+#define __raw_writeq writeq
 
-void *memcpy_fromio(void*,void*,unsigned); 
-void *memcpy_toio(void*,void*,unsigned); 
+void *memcpy_fromio(void*,const void*,unsigned); 
+void *memcpy_toio(void*,const void*,unsigned); 
 #define memset_io(a,b,c)	memset(__io_virt(a),(b),(c))
 
 /*
@@ -215,7 +219,7 @@ void *memcpy_toio(void*,void*,unsigned);
 
 
 /*
- * Again, i386 does not require mem IO specific function.
+ * Again, x86-64 does not require mem IO specific function.
  */
 
 #define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),__io_virt(b),(c),(d))

@@ -155,6 +155,8 @@ extern int io_apic_get_redir_entries (int ioapic);
 extern int io_apic_set_pci_routing (int ioapic, int pin, int irq);
 #endif
 
+extern int sis_apic_bug; /* dummy */ 
+
 
 #else  /* !CONFIG_X86_IO_APIC */
 #define io_apic_assign_pci_irqs 0

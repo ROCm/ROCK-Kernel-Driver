@@ -127,3 +127,24 @@ int dump_fpu( struct pt_regs *regs, struct user_i387_struct *fpu )
 	memcpy(fpu, &tsk->thread.i387.fxsave, sizeof(struct user_i387_struct)); 
 	return 1; 
 }
+
+int dump_task_fpu(struct task_struct *tsk, struct user_i387_struct *fpu)
+{
+	int fpvalid = tsk->used_math;
+
+	if (fpvalid) {
+		if (tsk == current)
+			unlazy_fpu(tsk);
+		memcpy(fpu, &tsk->thread.i387.fxsave, sizeof(struct user_i387_struct)); 	
+}
+	return fpvalid;
+}
+
+#ifdef CONFIG_SMP
+void dump_smp_unlazy_fpu(void)
+{
+	unlazy_fpu(current);
+	return;
+}
+#endif
+

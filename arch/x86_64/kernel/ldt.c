@@ -108,13 +108,12 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 }
 
 /*
- * No need to lock the MM as we are the last user
+ * 
+ * Don't touch the LDT register - we're already in the next thread.
  */
-void release_segments(struct mm_struct *mm)
+void destroy_context(struct mm_struct *mm)
 {
 	if (mm->context.size) {
-		if (mm == current->active_mm)
-			clear_LDT();
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
 		else
@@ -187,11 +186,6 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 		if (ldt_info.seg_not_present == 0)
 			goto out;
 	}
-
-	me->thread.fsindex = 0; 
-	me->thread.gsindex = 0; 
-	me->thread.gs = 0; 
-	me->thread.fs = 0; 
 
 	down(&mm->context.sem);
 	if (ldt_info.entry_number >= mm->context.size) {

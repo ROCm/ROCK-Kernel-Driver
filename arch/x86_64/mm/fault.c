@@ -300,6 +300,9 @@ vmalloc_fault:
 		pmd_t *pmd;
 		pte_t *pte; 
 
+		printk("vmalloc_fault err %lx addr %lx rip %lx\n", 
+		       error_code, address, regs->rip);
+
 		/*
 		 * x86-64 has the same kernel 3rd level pages for all CPUs.
 		 * But for vmalloc/modules the TLB synchronization works lazily,

@@ -245,7 +245,7 @@ static void iommu_full(struct pci_dev *dev, void *addr, size_t size, int dir)
 	
 	printk(KERN_ERR 
   "PCI-DMA: Error: ran out out IOMMU space for %p size %lu at device %s[%s]\n",
-	       addr,size, dev ? dev->name : "?", dev ? dev->slot_name : "?");
+	       addr,size, dev ? dev->dev.name : "?", dev ? dev->slot_name : "?");
 
 	if (size > PAGE_SIZE*EMERGENCY_PAGES) {
 		if (dir == PCI_DMA_FROMDEVICE || dir == PCI_DMA_BIDIRECTIONAL)
@@ -286,7 +286,7 @@ dma_addr_t pci_map_single(struct pci_dev *dev, void *addr, size_t size,int dir)
 	if (!need_iommu(dev, phys_mem, size))
 		return phys_mem; 
 
-	npages = round_up(size, PAGE_SIZE) >> PAGE_SHIFT;
+	npages = round_up(size + ((u64)addr & ~PAGE_MASK), PAGE_SIZE) >> PAGE_SHIFT;
 
 	iommu_page = alloc_iommu(npages); 
 	if (iommu_page == -1) {
@@ -328,7 +328,7 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 	    dma_addr > iommu_bus_base + iommu_size)
 		return;
 	iommu_page = (dma_addr - iommu_bus_base)>>PAGE_SHIFT;	
-	npages = round_up(size, PAGE_SIZE) >> PAGE_SHIFT;
+	npages = round_up(size + (dma_addr & ~PAGE_MASK), PAGE_SIZE) >> PAGE_SHIFT;
 	for (i = 0; i < npages; i++) { 
 		iommu_gatt_base[iommu_page + i] = 0; 
 #ifdef CONFIG_IOMMU_LEAK
