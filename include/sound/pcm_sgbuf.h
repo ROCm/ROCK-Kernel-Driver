@@ -61,7 +61,7 @@ int snd_pcm_sgbuf_free(snd_pcm_substream_t *substream);
 int snd_pcm_sgbuf_ops_copy_playback(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t hwoff, void *buf, snd_pcm_uframes_t count);
 int snd_pcm_sgbuf_ops_copy_capture(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t hwoff, void *buf, snd_pcm_uframes_t count);
 int snd_pcm_sgbuf_ops_silence(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t hwoff, snd_pcm_uframes_t count);
-void *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);
+struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);
 
 
 #endif /* __SOUND_PCM_SGBUF_H */

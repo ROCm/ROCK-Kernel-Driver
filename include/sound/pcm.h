@@ -96,7 +96,7 @@ typedef struct _snd_pcm_ops {
 		    void *buf, snd_pcm_uframes_t count);
 	int (*silence)(snd_pcm_substream_t *substream, int channel, 
 		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
-	void *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
+	struct page *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
 } snd_pcm_ops_t;
 
 /*
@@ -125,7 +125,7 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_DMA_TYPE_PCI		2	/* PCI continuous */
 #define SNDRV_PCM_DMA_TYPE_SBUS		3	/* SBUS continuous */
 
-/* If you change this don't forget to changed snd_pcm_rates table in pcm_lib.c */
+/* If you change this don't forget to change rates[] table in pcm_native.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
 #define SNDRV_PCM_RATE_8000		(1<<1)		/* 8000Hz */
 #define SNDRV_PCM_RATE_11025		(1<<2)		/* 11025Hz */

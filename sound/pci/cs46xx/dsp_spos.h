@@ -73,7 +73,10 @@ typedef enum  {
 #define SPDIFI_IP_OUTPUT_BUFFER1 0x0E00
 #define SPDIFO_IP_OUTPUT_BUFFER1 0x1000
 #define MIX_SAMPLE_BUF1          0x1400
-#define MIX_SAMPLE_BUF2          0x3000
+#define MIX_SAMPLE_BUF2          0x2D00
+#define MIX_SAMPLE_BUF3          0x2E00
+#define MIX_SAMPLE_BUF4          0x2F00
+#define MIX_SAMPLE_BUF5          0x3000
 
 /* Task stack address */
 #define HFG_STACK                0x066A
@@ -104,6 +107,8 @@ typedef enum  {
 #define OUTPUTSNOOPII_SCB_ADDR   0x150
 #define PCMSERIALIN_PCM_SCB_ADDR 0x160
 #define RECORD_MIXER_SCB_ADDR    0x170
+#define REAR_MIXER_SCB_ADDR      0x180
+#define SPDIF_MIXER_SCB_ADDR     0x190
 
 /* hyperforground SCB's*/
 #define HFG_TREE_SCB             0xBA0
@@ -123,6 +128,7 @@ typedef enum  {
 #define SCBfuncEntryPtr      0xA
 #define SRCCorPerGof         0x2
 #define SRCPhiIncr6Int26Frac 0xd
+#define SCBVolumeCtrl        0xe
 
 /* conf */
 #define UseASER1Input 1
@@ -178,6 +184,23 @@ typedef enum  {
 #define SP_SPDOUT_STATUS  0x804C
 #define SP_SPDOUT_CONTROL 0x804D
 #define SP_SPDOUT_CSUV    0x808E
+
+static inline void cs46xx_dsp_spos_update_scb (cs46xx_t * chip,dsp_scb_descriptor_t * scb) 
+{
+	/* update nextSCB and subListPtr in SCB */
+	snd_cs46xx_poke(chip,
+			(scb->address + SCBsubListPtr) << 2,
+			(scb->sub_list_ptr->address << 0x10) |
+			(scb->next_scb_ptr->address));	
+}
+
+static inline void cs46xx_dsp_scb_set_volume (cs46xx_t * chip,dsp_scb_descriptor_t * scb,
+					      u16 right,u16 left) {
+	unsigned int val = ((0xffff - right) << 16 | (0xffff - left));	
+
+	snd_cs46xx_poke(chip, (scb->address + SCBVolumeCtrl) << 2, val);
+	snd_cs46xx_poke(chip, (scb->address + SCBVolumeCtrl + 1) << 2, val);
+}
 
 #endif /* __DSP_SPOS_H__ */
 #endif /* CONFIG_SND_CS46XX_NEW_DSP  */

@@ -201,11 +201,16 @@ typedef struct {
 } viadev_t;
 
 
+/*
+ * allocate and initialize the descriptor buffers
+ * periods = number of periods
+ * fragsize = period size in bytes
+ */
 static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
-			   struct pci_dev *pci)
+			   struct pci_dev *pci,
+			   int periods, int fragsize)
 {
-	int i, idx, ofs, rest, fragsize;
-	snd_pcm_runtime_t *runtime = substream->runtime;
+	int i, idx, ofs, rest;
 	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 
 	if (! dev->table) {
@@ -223,10 +228,9 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 	}
 
 	/* fill the entries */
-	fragsize = snd_pcm_lib_period_bytes(substream);
 	idx = 0;
 	ofs = 0;
-	for (i = 0; i < runtime->periods; i++) {
+	for (i = 0; i < periods; i++) {
 		rest = fragsize;
 		/* fill descriptors for a period.
 		 * a period can be split to several descriptors if it's
@@ -241,7 +245,7 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 				r = rest;
 			rest -= r;
 			if (! rest) {
-				if (i == runtime->periods - 1)
+				if (i == periods - 1)
 					flag = VIA_TBL_BIT_EOL; /* buffer boundary */
 				else
 					flag = VIA_TBL_BIT_FLAG; /* period boundary */
@@ -472,18 +476,13 @@ static int snd_via82xx_trigger(via82xx_t *chip, viadev_t *viadev, int cmd)
 }
 
 
-static int snd_via82xx_setup_periods(via82xx_t *chip, viadev_t *viadev,
-				     snd_pcm_substream_t *substream)
+static int snd_via82xx_set_format(via82xx_t *chip, viadev_t *viadev,
+				  snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned long port = chip->port + viadev->reg_offset;
-	int err;
 
 	snd_via82xx_channel_reset(chip, viadev);
-
-	err = build_via_table(viadev, substream, chip->pci);
-	if (err < 0)
-		return err;
 
 	outl((u32)viadev->table_addr, port + VIA_REG_OFFSET_TABLE_PTR);
 	switch (chip->chip_type) {
@@ -583,11 +582,28 @@ static int snd_via82xx_capture_trigger(snd_pcm_substream_t * substream,
 static int snd_via82xx_hw_params(snd_pcm_substream_t * substream,
 				 snd_pcm_hw_params_t * hw_params)
 {
-	return snd_pcm_sgbuf_alloc(substream, params_buffer_bytes(hw_params));
+	via82xx_t *chip = snd_pcm_substream_chip(substream);
+	viadev_t *viadev = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? &chip->playback : &chip->capture;
+	int err;
+
+	err = snd_pcm_sgbuf_alloc(substream, params_buffer_bytes(hw_params));
+	if (err < 0)
+		return err;
+	err = build_via_table(viadev, substream, chip->pci,
+			      params_periods(hw_params),
+			      params_period_bytes(hw_params));
+	if (err < 0)
+		return err;
+	return err;
 }
 
 static int snd_via82xx_hw_free(snd_pcm_substream_t * substream)
 {
+	via82xx_t *chip = snd_pcm_substream_chip(substream);
+	viadev_t *viadev = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? &chip->playback : &chip->capture;
+
+	clean_via_table(viadev, substream, chip->pci);
+	snd_pcm_sgbuf_free(substream);
 	return 0;
 }
 
@@ -606,7 +622,7 @@ static int snd_via82xx_playback_prepare(snd_pcm_substream_t * substream)
 		tmp = inl(VIAREG(chip, PLAYBACK_STOP_IDX)) & ~0xfffff;
 		outl(tmp | (0xffff * runtime->rate)/(48000/16), VIAREG(chip, PLAYBACK_STOP_IDX));
 	}
-	return snd_via82xx_setup_periods(chip, &chip->playback, substream);
+	return snd_via82xx_set_format(chip, &chip->playback, substream);
 }
 
 static int snd_via82xx_capture_prepare(snd_pcm_substream_t * substream)
@@ -617,7 +633,7 @@ static int snd_via82xx_capture_prepare(snd_pcm_substream_t * substream)
 	snd_ac97_set_rate(chip->ac97, AC97_PCM_LR_ADC_RATE, runtime->rate);
 	if (chip->chip_type == TYPE_VIA8233)
 		outb(VIA_REG_CAPTURE_FIFO_ENABLE, VIAREG(chip, CAPTURE_FIFO));
-	return snd_via82xx_setup_periods(chip, &chip->capture, substream);
+	return snd_via82xx_set_format(chip, &chip->capture, substream);
 }
 
 static inline unsigned int snd_via82xx_cur_ptr(via82xx_t *chip, viadev_t *viadev)
@@ -761,20 +777,16 @@ static int snd_via82xx_capture_open(snd_pcm_substream_t * substream)
 static int snd_via82xx_playback_close(snd_pcm_substream_t * substream)
 {
 	via82xx_t *chip = snd_pcm_substream_chip(substream);
-
-	clean_via_table(&chip->playback, substream, chip->pci);
-	snd_pcm_sgbuf_delete(substream);
 	chip->playback.substream = NULL;
+	snd_pcm_sgbuf_delete(substream);
 	return 0;
 }
 
 static int snd_via82xx_capture_close(snd_pcm_substream_t * substream)
 {
 	via82xx_t *chip = snd_pcm_substream_chip(substream);
-
-	clean_via_table(&chip->capture, substream, chip->pci);
-	snd_pcm_sgbuf_delete(substream);
 	chip->capture.substream = NULL;
+	snd_pcm_sgbuf_delete(substream);
 	return 0;
 }
 

@@ -233,6 +233,7 @@ struct snd_stru_ali {
 	unsigned long	port;
 	unsigned char	revision;
 
+	unsigned int hw_initialized: 1;
 	struct resource *res_port;
 
 	struct pci_dev	*pci;
@@ -1965,7 +1966,8 @@ static void snd_ali_resume(struct pci_dev *dev)
 
 static int snd_ali_free(ali_t * codec)
 {
-	snd_ali_disable_address_interrupt(codec);
+	if (codec->hw_initialized)
+		snd_ali_disable_address_interrupt(codec);
 	if (codec->irq >= 0) {
 		synchronize_irq(codec->irq);
 		free_irq(codec->irq, (void *)codec);
@@ -2036,13 +2038,11 @@ static int __devinit snd_ali_resources(ali_t *codec)
 {
 	snd_ali_printk("resouces allocation ...\n");
 	if ((codec->res_port = request_region(codec->port, 0x100, "ALI 5451")) == NULL) {
-		snd_ali_free(codec);
 		snd_printk("Unalbe to request io ports.\n");
 		return -EBUSY;
 	}
 
 	if (request_irq(codec->pci->irq, snd_ali_card_interrupt, SA_INTERRUPT|SA_SHIRQ, "ALI 5451", (void *)codec)) {
-		snd_ali_free(codec);
 		snd_printk("Unable to request irq.\n");
 		return -EBUSY;
 	}
@@ -2112,6 +2112,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 	pci_set_master(pci);
 	
 	if (snd_ali_resources(codec)) {
+		snd_ali_free(codec);
 		return -EBUSY;
 	}
 
@@ -2156,7 +2157,6 @@ static int __devinit snd_ali_create(snd_card_t * card,
 
 	if ((err = snd_ali_chip_init(codec)) < 0) {
 		snd_printk("ali create: chip init error.\n");
-		snd_ali_free(codec);
 		return err;
 	}
 
@@ -2167,6 +2167,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 #endif
 
 	snd_ali_enable_address_interrupt(codec);
+	codec->hw_initialized = 1;
 
 	*r_ali = codec;
 	snd_ali_printk("created.\n");

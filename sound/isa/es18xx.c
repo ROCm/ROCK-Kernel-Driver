@@ -154,10 +154,10 @@ struct _snd_es18xx {
 #define ES18XX_PM	0x07
 #define ES18XX_PM_GPO0	0x01
 #define ES18XX_PM_GPO1	0x02
-#define ES18XX_PM_PDR	0x03
-#define ES18XX_PM_ANA	0x04
-#define ES18XX_PM_FM	0x06
-#define ES18XX_PM_SUS	0x08
+#define ES18XX_PM_PDR	0x04
+#define ES18XX_PM_ANA	0x08
+#define ES18XX_PM_FM	0x020
+#define ES18XX_PM_SUS	0x080
 
 typedef struct _snd_es18xx es18xx_t;
 

@@ -130,8 +130,9 @@ void snd_info_free_device(snd_info_entry_t * entry);
 int snd_info_store_text(snd_info_entry_t * entry);
 int snd_info_restore_text(snd_info_entry_t * entry);
 
+int snd_info_card_create(snd_card_t * card);
 int snd_info_card_register(snd_card_t * card);
-int snd_info_card_unregister(snd_card_t * card);
+int snd_info_card_free(snd_card_t * card);
 int snd_info_register(snd_info_entry_t * entry);
 int snd_info_unregister(snd_info_entry_t * entry);
 

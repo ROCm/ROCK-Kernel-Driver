@@ -1,7 +1,7 @@
 /*
  *   ALSA driver for ICEnsemble ICE1712 (Envy24)
  *
- *   AK4524 / AK4528 interface
+ *   AK4524 / AK4528 / AK4529 interface
  *
  *	Copyright (c) 2000 Jaroslav Kysela <perex@suse.cz>
  *
@@ -67,6 +67,7 @@ void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 
 	addr &= 0x07;
 	/* build I2C address + data byte */
+	/* assume C1=1, C0=0 */
 	addrdata = 0xa000 | (addr << 8) | data;
 	for (idx = 15; idx >= 0; idx--) {
 		tmp &= ~(ak->data_mask | ak->clk_mask);
@@ -80,11 +81,13 @@ void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 		udelay(1);
 	}
 
-	if ((addr != 0x04 && addr != 0x05) || (data & 0x80) == 0)
-		ak->images[chip][addr] = data;
-	else
-		ak->ipga_gain[chip][addr-4] = data;
-
+	if (ak->type == SND_AK4524) {
+		if ((addr != 0x04 && addr != 0x05) || (data & 0x80) == 0)
+			ak->images[chip][addr] = data;
+		else
+			ak->ipga_gain[chip][addr-4] = data;
+	}
+	
 	if (ak->cs_mask == ak->cs_addr) {
 		if (ak->cif) {
 			/* assert a cs pulse to trigger */
@@ -112,16 +115,26 @@ void snd_ice1712_ak4524_reset(ice1712_t *ice, int state)
 	unsigned char reg;
 	ak4524_t *ak = &ice->ak4524;
 	
-	for (chip = 0; chip < ak->num_dacs/2; chip++) {
-		snd_ice1712_ak4524_write(ice, chip, 0x01, state ? 0x00 : 0x03);
-		if (state)
-			continue;
-		for (reg = 0x04; reg < (ak->is_ak4528 ? 0x06 : 0x08); reg++)
-			snd_ice1712_ak4524_write(ice, chip, reg, ak->images[chip][reg]);
-		if (ak->is_ak4528)
-			continue;
-		for (reg = 0x04; reg < 0x06; reg++)
-			snd_ice1712_ak4524_write(ice, chip, reg, ak->ipga_gain[chip][reg-4]);
+	switch (ak->type) {
+	case SND_AK4524:
+	case SND_AK4528:
+		for (chip = 0; chip < ak->num_dacs/2; chip++) {
+			snd_ice1712_ak4524_write(ice, chip, 0x01, state ? 0x00 : 0x03);
+			if (state)
+				continue;
+			/* DAC volumes */
+			for (reg = 0x04; reg < (ak->type == SND_AK4528 ? 0x06 : 0x08); reg++)
+				snd_ice1712_ak4524_write(ice, chip, reg, ak->images[chip][reg]);
+			if (ak->type == SND_AK4528)
+				continue;
+			/* IPGA */
+			for (reg = 0x04; reg < 0x06; reg++)
+				snd_ice1712_ak4524_write(ice, chip, reg, ak->ipga_gain[chip][reg-4]);
+		}
+		break;
+	case SND_AK4529:
+		/* FIXME: needed for ak4529? */
+		break;
 	}
 }
 
@@ -130,7 +143,7 @@ void snd_ice1712_ak4524_reset(ice1712_t *ice, int state)
  */
 void __devinit snd_ice1712_ak4524_init(ice1712_t *ice)
 {
-	static unsigned char inits[] = {
+	static unsigned char inits_ak4524[] = {
 		0x00, 0x07, /* 0: all power up */
 		0x01, 0x00, /* 1: ADC/DAC reset */
 		0x02, 0x60, /* 2: 24bit I2S */
@@ -144,27 +157,67 @@ void __devinit snd_ice1712_ak4524_init(ice1712_t *ice)
 		0x07, 0x00, /* 7: DAC right muted */
 		0xff, 0xff
 	};
-	int chip, idx;
-	unsigned char *ptr, reg, data;
+	static unsigned char inits_ak4528[] = {
+		0x00, 0x07, /* 0: all power up */
+		0x01, 0x00, /* 1: ADC/DAC reset */
+		0x02, 0x60, /* 2: 24bit I2S */
+		0x03, 0x0d, /* 3: deemphasis off, turn LR highpass filters on */
+		0x01, 0x03, /* 1: ADC/DAC enable */
+		0x04, 0x00, /* 4: ADC left muted */
+		0x05, 0x00, /* 5: ADC right muted */
+		0xff, 0xff
+	};
+	static unsigned char inits_ak4529[] = {
+		0x09, 0x01, /* 9: ATS=0, RSTN=1 */
+		0x0a, 0x3f, /* A: all power up, no zero/overflow detection */
+		0x00, 0x08, /* 0: TDM=0, 24bit I2S, SMUTE=0 */
+		0x01, 0x00, /* 1: ACKS=0, ADC, loop off */
+		0x02, 0xff, /* 2: LOUT1 muted */
+		0x03, 0xff, /* 3: ROUT1 muted */
+		0x04, 0xff, /* 4: LOUT2 muted */
+		0x05, 0xff, /* 5: ROUT2 muted */
+		0x06, 0xff, /* 6: LOUT3 muted */
+		0x07, 0xff, /* 7: ROUT3 muted */
+		0x0b, 0xff, /* B: LOUT4 muted */
+		0x0c, 0xff, /* C: ROUT4 muted */
+		0x08, 0x55, /* 8: deemphasis all off */
+		0xff, 0xff
+	};
+	int chip, num_chips;
+	unsigned char *ptr, reg, data, *inits;
 	ak4524_t *ak = &ice->ak4524;
 
-	for (chip = idx = 0; chip < ak->num_dacs/2; chip++) {
+	switch (ak->type) {
+	case SND_AK4524:
+		inits = inits_ak4524;
+		num_chips = ak->num_dacs / 2;
+		break;
+	case SND_AK4528:
+		inits = inits_ak4528;
+		num_chips = ak->num_dacs / 2;
+		break;
+	case SND_AK4529:
+	default:
+		inits = inits_ak4529;
+		num_chips = 1;
+		break;
+	}
+
+	for (chip = 0; chip < num_chips; chip++) {
 		ptr = inits;
 		while (*ptr != 0xff) {
 			reg = *ptr++;
 			data = *ptr++;
-			if (ak->is_ak4528) {
-				if (reg > 5)
-					continue;
-				if (reg >= 4 && (data & 0x80))
-					continue;
-			}
-			if (reg == 0x03 && ak->is_ak4528)
-				data = 0x0d;	/* deemphasis off, turn LR highpass filters on */
 			snd_ice1712_ak4524_write(ice, chip, reg, data);
 		}
 	}
 }
+
+
+#define AK_GET_CHIP(val)		(((val) >> 8) & 0xff)
+#define AK_GET_ADDR(val)		((val) & 0xff)
+#define AK_GET_SHIFT(val)		(((val) >> 16) & 0xff)
+#define AK_COMPOSE(chip,addr,shift)	(((chip) << 8) | (addr) | ((shift) << 16))
 
 static int snd_ice1712_ak4524_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -178,8 +231,8 @@ static int snd_ice1712_ak4524_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem
 static int snd_ice1712_ak4524_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int chip = kcontrol->private_value / 8;
-	int addr = kcontrol->private_value % 8;
+	int chip = AK_GET_CHIP(kcontrol->private_value);
+	int addr = AK_GET_ADDR(kcontrol->private_value);
 	ucontrol->value.integer.value[0] = ice->ak4524.images[chip][addr];
 	return 0;
 }
@@ -187,8 +240,8 @@ static int snd_ice1712_ak4524_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 static int snd_ice1712_ak4524_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int chip = kcontrol->private_value / 8;
-	int addr = kcontrol->private_value % 8;
+	int chip = AK_GET_CHIP(kcontrol->private_value);
+	int addr = AK_GET_ADDR(kcontrol->private_value);
 	unsigned char nval = ucontrol->value.integer.value[0];
 	int change = ice->ak4524.images[chip][addr] != nval;
 	if (change)
@@ -208,8 +261,8 @@ static int snd_ice1712_ak4524_ipga_gain_info(snd_kcontrol_t *kcontrol, snd_ctl_e
 static int snd_ice1712_ak4524_ipga_gain_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int chip = kcontrol->private_value / 8;
-	int addr = kcontrol->private_value % 8;
+	int chip = AK_GET_CHIP(kcontrol->private_value);
+	int addr = AK_GET_ADDR(kcontrol->private_value);
 	ucontrol->value.integer.value[0] = ice->ak4524.ipga_gain[chip][addr-4] & 0x7f;
 	return 0;
 }
@@ -217,8 +270,8 @@ static int snd_ice1712_ak4524_ipga_gain_get(snd_kcontrol_t *kcontrol, snd_ctl_el
 static int snd_ice1712_ak4524_ipga_gain_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int chip = kcontrol->private_value / 8;
-	int addr = kcontrol->private_value % 8;
+	int chip = AK_GET_CHIP(kcontrol->private_value);
+	int addr = AK_GET_ADDR(kcontrol->private_value);
 	unsigned char nval = (ucontrol->value.integer.value[0] % 37) | 0x80;
 	int change = ice->ak4524.ipga_gain[chip][addr] != nval;
 	if (change)
@@ -243,21 +296,26 @@ static int snd_ice1712_ak4524_deemphasis_info(snd_kcontrol_t *kcontrol, snd_ctl_
 static int snd_ice1712_ak4524_deemphasis_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int chip = kcontrol->id.index;
-	ucontrol->value.enumerated.item[0] = ice->ak4524.images[chip][3] & 3;
+	int chip = AK_GET_CHIP(kcontrol->private_value);
+	int addr = AK_GET_ADDR(kcontrol->private_value);
+	int shift = AK_GET_SHIFT(kcontrol->private_value);
+	ucontrol->value.enumerated.item[0] = (ice->ak4524.images[chip][addr] >> shift) & 3;
 	return 0;
 }
 
 static int snd_ice1712_ak4524_deemphasis_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int chip = kcontrol->id.index;
-	unsigned char nval = ucontrol->value.enumerated.item[0];
+	int chip = AK_GET_CHIP(kcontrol->private_value);
+	int addr = AK_GET_ADDR(kcontrol->private_value);
+	int shift = AK_GET_SHIFT(kcontrol->private_value);
+	unsigned char nval = ucontrol->value.enumerated.item[0] & 3;
 	int change;
-	nval |= (nval & 3) | (ice->ak4524.images[chip][3] & ~3);
-	change = ice->ak4524.images[chip][3] != nval;
+	
+	nval = (nval << shift) | (ice->ak4524.images[chip][addr] & ~(3 << shift));
+	change = ice->ak4524.images[chip][addr] != nval;
 	if (change)
-		snd_ice1712_ak4524_write(ice, chip, 3, nval);
+		snd_ice1712_ak4524_write(ice, chip, addr, nval);
 	return change;
 }
 
@@ -280,15 +338,24 @@ int __devinit snd_ice1712_ak4524_build_controls(ice1712_t *ice)
 		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_ak4524_volume_get;
 		ctl.put = snd_ice1712_ak4524_volume_put;
-		if (ak->is_ak4528)
-			ctl.private_value = (idx / 2) * 8 + (idx % 2) + 4; /* register 4 & 5 */
-		else
-			ctl.private_value = (idx / 2) * 8 + (idx % 2) + 6; /* register 6 & 7 */
+		switch (ak->type) {
+		case SND_AK4524:
+			ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 6, 0); /* register 6 & 7 */
+			break;
+		case SND_AK4528:
+			ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 4, 0); /* register 4 & 5 */
+			break;
+		case SND_AK4529: {
+			int val = idx < 6 ? idx + 2 : (idx - 6) + 0xb; /* registers 2-7 and b,c */
+			ctl.private_value = AK_COMPOSE(0, val, 0);
+			break;
+		}
+		}
 		ctl.private_data = ice;
 		if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
 			return err;
 	}
-	for (idx = 0; idx < ak->num_adcs && !ak->is_ak4528; ++idx) {
+	for (idx = 0; idx < ak->num_adcs && ak->type == SND_AK4524; ++idx) {
 		snd_kcontrol_t ctl;
 		memset(&ctl, 0, sizeof(ctl));
 		strcpy(ctl.id.name, "ADC Volume");
@@ -298,7 +365,7 @@ int __devinit snd_ice1712_ak4524_build_controls(ice1712_t *ice)
 		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_ak4524_volume_get;
 		ctl.put = snd_ice1712_ak4524_volume_put;
-		ctl.private_value = (idx / 2) * 8 + (idx % 2) + 4; /* register 4 & 5 */
+		ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 4, 0); /* register 4 & 5 */
 		ctl.private_data = ice;
 		if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
 			return err;
@@ -310,7 +377,7 @@ int __devinit snd_ice1712_ak4524_build_controls(ice1712_t *ice)
 		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_ak4524_ipga_gain_get;
 		ctl.put = snd_ice1712_ak4524_ipga_gain_put;
-		ctl.private_value = (idx / 2) * 8 + (idx % 2) + 4; /* register 4 & 5 */
+		ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 4, 0); /* register 4 & 5 */
 		ctl.private_data = ice;
 		if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
 			return err;
@@ -325,6 +392,17 @@ int __devinit snd_ice1712_ak4524_build_controls(ice1712_t *ice)
 		ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 		ctl.get = snd_ice1712_ak4524_deemphasis_get;
 		ctl.put = snd_ice1712_ak4524_deemphasis_put;
+		switch (ak->type) {
+		case SND_AK4524:
+		case SND_AK4528:
+			ctl.private_value = AK_COMPOSE(idx, 3, 0); /* register 3 */
+			break;
+		case SND_AK4529: {
+			int shift = idx == 3 ? 6 : (2 - idx) * 2;
+			ctl.private_value = AK_COMPOSE(0, 8, shift); /* register 8 with shift */
+			break;
+		}
+		}
 		ctl.private_data = ice;
 		if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
 			return err;

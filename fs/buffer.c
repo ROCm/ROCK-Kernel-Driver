@@ -367,7 +367,7 @@ out:
  * succeeds, there is no need to take private_lock. (But if
  * private_lock is contended then so is mapping->page_lock).
  */
-struct buffer_head *
+static struct buffer_head *
 __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 {
 	struct inode *bd_inode = bdev->bd_inode;
@@ -1077,18 +1077,6 @@ grow_buffers(struct block_device *bdev, unsigned long block, int size)
 	return 1;
 }
 
-/*
- * __getblk will locate (and, if necessary, create) the buffer_head
- * which corresponds to the passed block_device, block and size. The
- * returned buffer has its reference count incremented.
- *
- * __getblk() cannot fail - it just keeps trying.  If you pass it an
- * illegal block number, __getblk() will happily return a buffer_head
- * which represents the non-existent block.  Very weird.
- *
- * __getblk() will lock up the machine if grow_dev_page's try_to_free_buffers()
- * attempt is failing.  FIXME, perhaps?
- */
 struct buffer_head *
 __getblk_slow(struct block_device *bdev, sector_t block, int size)
 {
@@ -1096,10 +1084,8 @@ __getblk_slow(struct block_device *bdev, sector_t block, int size)
 		struct buffer_head * bh;
 
 		bh = __find_get_block(bdev, block, size);
-		if (bh) {
-			touch_buffer(bh);
+		if (bh)
 			return bh;
-		}
 
 		if (!grow_buffers(bdev, block, size))
 			free_more_memory();
@@ -1182,21 +1168,8 @@ void __bforget(struct buffer_head *bh)
 	__brelse(bh);
 }
 
-/**
- *  __bread() - reads a specified block and returns the bh
- *  @block: number of block
- *  @size: size (in bytes) to read
- * 
- *  Reads a specified block, and returns buffer head that contains it.
- *  It returns NULL if the block was unreadable.
- */
-struct buffer_head *
-__bread_slow(struct block_device *bdev, sector_t block, int size)
+static struct buffer_head *__bread_slow(struct buffer_head *bh)
 {
-	struct buffer_head *bh = __getblk(bdev, block, size);
-
-	if (buffer_uptodate(bh))
-		return bh;
 	lock_buffer(bh);
 	if (buffer_uptodate(bh)) {
 		unlock_buffer(bh);
@@ -1260,9 +1233,6 @@ static void bh_lru_install(struct buffer_head *bh)
 	struct buffer_head *evictee = NULL;
 	struct bh_lru *lru;
 
-	if (bh == NULL)
-		return;
-
 	check_irqs_on();
 	bh_lru_lock();
 	lru = &per_cpu(bh_lrus, smp_processor_id());
@@ -1293,14 +1263,15 @@ static void bh_lru_install(struct buffer_head *bh)
 	}
 	bh_lru_unlock();
 
-	if (evictee) {
-		touch_buffer(evictee);
+	if (evictee)
 		__brelse(evictee);
-	}
 }
 
+/*
+ * Look up the bh in this cpu's LRU.  If it's there, move it to the head.
+ */
 static inline struct buffer_head *
-lookup_bh(struct block_device *bdev, sector_t block, int size)
+lookup_bh_lru(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *ret = NULL;
 	struct bh_lru *lru;
@@ -1330,44 +1301,65 @@ lookup_bh(struct block_device *bdev, sector_t block, int size)
 	return ret;
 }
 
+/*
+ * Perform a pagecache lookup for the matching buffer.  If it's there, refresh
+ * it in the LRU and mark it as accessed.  If it is not present then return
+ * NULL
+ */
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, int size)
 {
-	struct buffer_head *bh = lookup_bh(bdev, block, size);
+	struct buffer_head *bh = lookup_bh_lru(bdev, block, size);
 
 	if (bh == NULL) {
 		bh = __find_get_block_slow(bdev, block, size);
-		bh_lru_install(bh);
+		if (bh)
+			bh_lru_install(bh);
 	}
+	if (bh)
+		touch_buffer(bh);
 	return bh;
 }
 EXPORT_SYMBOL(__find_get_block);
 
+/*
+ * __getblk will locate (and, if necessary, create) the buffer_head
+ * which corresponds to the passed block_device, block and size. The
+ * returned buffer has its reference count incremented.
+ *
+ * __getblk() cannot fail - it just keeps trying.  If you pass it an
+ * illegal block number, __getblk() will happily return a buffer_head
+ * which represents the non-existent block.  Very weird.
+ *
+ * __getblk() will lock up the machine if grow_dev_page's try_to_free_buffers()
+ * attempt is failing.  FIXME, perhaps?
+ */
 struct buffer_head *
 __getblk(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __find_get_block(bdev, block, size);
 
-	if (bh == NULL) {
+	if (bh == NULL)
 		bh = __getblk_slow(bdev, block, size);
-		bh_lru_install(bh);
-	}
 	return bh;
 }
 EXPORT_SYMBOL(__getblk);
 
+/**
+ *  __bread() - reads a specified block and returns the bh
+ *  @block: number of block
+ *  @size: size (in bytes) to read
+ * 
+ *  Reads a specified block, and returns buffer head that contains it.
+ *  It returns NULL if the block was unreadable.
+ */
 struct buffer_head *
 __bread(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __getblk(bdev, block, size);
 
-	if (bh) {
-		if (buffer_uptodate(bh))
-			return bh;
-		__brelse(bh);
-	}
-	bh = __bread_slow(bdev, block, size);
-	bh_lru_install(bh);
+	if (!buffer_uptodate(bh))
+		bh = __bread_slow(bh);
 	return bh;
 }
 EXPORT_SYMBOL(__bread);
@@ -1565,7 +1557,7 @@ void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
 
-	old_bh = __find_get_block(bdev, block, 0);
+	old_bh = __find_get_block_slow(bdev, block, 0);
 	if (old_bh) {
 #if 0	/* This happens.  Later. */
 		if (buffer_dirty(old_bh))
