@@ -6,8 +6,6 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#undef SVWKS_DEBUG_DRIVE_INFO
-
 #define SVWKS_CSB5_REVISION_NEW	0x92 /* min PCI_REVISION_ID for UDMA5 (A2.0) */
 #define SVWKS_CSB6_REVISION	0xa0 /* min PCI_REVISION_ID for UDMA4 (A1.0) */
 
