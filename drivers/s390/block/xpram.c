@@ -48,12 +48,14 @@
 #define PRINT_WARN(x...)	printk(KERN_WARNING XPRAM_NAME " warning:" x)
 #define PRINT_ERR(x...)		printk(KERN_ERR XPRAM_NAME " error:" x)
 
+
+static struct sysdev_class xpram_sysclass = {
+	set_kset_name("xpram"),
+};
+
 static struct sys_device xpram_sys_device = {
-	.name = "S/390 expanded memory RAM disk",
-	.dev  = {
-		.name   = "S/390 expanded memory RAM disk",
-		.bus_id = "xpram",
-	},
+	.id	= 0,
+	.cls	= &xpram_sysclass,
 }; 
 
 typedef struct {
@@ -485,6 +487,7 @@ static void __exit xpram_exit(void)
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_remove("slram");
 	sys_device_unregister(&xpram_sys_device);
+	sysdev_class_unregister(&xpram_sys_class);
 }
 
 static int __init xpram_init(void)
@@ -502,9 +505,15 @@ static int __init xpram_init(void)
 	rc = xpram_setup_sizes(xpram_pages);
 	if (rc)
 		return rc;
-	rc = sys_device_register(&xpram_sys_device);
+	rc = sysdev_class_register(&xpram_sysclass);
 	if (rc)
 		return rc;
+
+	rc = sys_device_register(&xpram_sys_device);
+	if (rc) {
+		sysdev_class_unregister(&xpram_syclass);
+		return rc;
+	}
 	rc = xpram_setup_blkdev();
 	if (rc)
 		sys_device_unregister(&xpram_sys_device);
