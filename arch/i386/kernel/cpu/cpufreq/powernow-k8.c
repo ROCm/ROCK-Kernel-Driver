@@ -480,7 +480,7 @@ out:
 static int check_pst_table(struct powernow_k8_data *data, struct pst_s *pst, u8 maxvid)
 {
 	unsigned int j;
-	u8 lastfid = 0xFF;
+	u8 lastfid = 0xff;
 
 	for (j = 0; j < data->numps; j++) {
 		if (pst[j].vid > LEAST_VID) {
@@ -488,15 +488,11 @@ static int check_pst_table(struct powernow_k8_data *data, struct pst_s *pst, u8 
 			return -EINVAL;
 		}
 		if (pst[j].vid < data->rvo) {	/* vid + rvo >= 0 */
-			printk(KERN_ERR PFX
-			       "BIOS error - 0 vid exceeded with pstate %d\n",
-			       j);
+			printk(KERN_ERR BFX "0 vid exceeded with pstate %d\n", j);
 			return -ENODEV;
 		}
 		if (pst[j].vid < maxvid + data->rvo) {	/* vid + rvo >= maxvid */
-			printk(KERN_ERR PFX
-			       "BIOS error - maxvid exceeded with pstate %d\n",
-			       j);
+			printk(KERN_ERR BFX "maxvid exceeded with pstate %d\n", j);
 			return -ENODEV;
 		}
 		if ((pst[j].fid > MAX_FID)
