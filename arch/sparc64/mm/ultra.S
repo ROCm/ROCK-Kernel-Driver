@@ -418,9 +418,9 @@ flush_dcpage_cheetah: /* 9 insns */
 	sethi		%hi(PAGE_SIZE), %o4
 1:	subcc		%o4, (1 << 5), %o4
 	stxa		%g0, [%o0 + %o4] ASI_DCACHE_INVALIDATE
+	membar		#Sync
 	bne,pt		%icc, 1b
 	 nop
-	membar		#Sync
 	retl		/* I-cache flush never needed on Cheetah, see callers. */
 	 nop
 
@@ -588,9 +588,9 @@ xcall_flush_dcache_page_cheetah: /* %g1 == physical page address */
 	sethi		%hi(PAGE_SIZE), %g3
 1:	subcc		%g3, (1 << 5), %g3
 	stxa		%g0, [%g1 + %g3] ASI_DCACHE_INVALIDATE
+	membar		#Sync
 	bne,pt		%icc, 1b
 	 nop
-	membar		#Sync
 	retry
 	nop
 
