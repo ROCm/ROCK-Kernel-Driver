@@ -1674,6 +1674,7 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 	struct header_struct hdr;
 	struct ethhdr *eh;
 	int err;
+        struct ieee802_11_hdr hdr80211;
 
 	rxfid = hermes_read_regn(hw, RXFID);
 
@@ -1690,6 +1691,7 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 	
 	if (status & HERMES_RXSTAT_ERR) {
 		if (status & HERMES_RXSTAT_UNDECRYPTABLE) {
+                    if (dev->type != ARPHRD_ETHER) goto sniffing;
 			wstats->discard.code++;
 			DEBUG(1, "%s: Undecryptable frame on Rx. Frame dropped.\n",
 			       dev->name);
@@ -1700,7 +1702,7 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 		stats->rx_errors++;
 		goto drop;
 	}
-
+sniffing:
 	/* For now we ignore the 802.11 header completely, assuming
            that the card's firmware has handled anything vital */
 
@@ -1730,6 +1732,11 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 		stats->rx_errors++;
 		goto drop;
 	}
+
+	/* Now handle frame based on port# */
+	switch( HERMES_RXSTATUS_MACPORT_GET(status) )
+	{
+	case 0:
 
 	/* We need space for the packet data itself, plus an ethernet
 	   header, plus 2 bytes so we can align the IP header on a
@@ -1804,6 +1811,26 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 	stats->rx_bytes += length;
 
 	return;
+
+	case 7:
+        	if ( ! HERMES_RXSTATUS_ISFCSERR(status) ) {
+                   if (hermes_bap_pread(hw, IRQ_BAP, &hdr80211, sizeof(hdr80211), 
+                                       rxfid, HERMES_RX_80211HDR_OFF)) {
+                      stats->rx_errors++;
+                   }
+                   else {
+                        /* Copy to wlansnif skb */
+                        orinoco_int_rxmonitor( priv, rxfid, length, &desc, &hdr80211);
+                   }
+                } else {
+                        printk("Received monitor frame: FCSerr set\n");
+                }
+                break;
+	default:
+		printk("Received frame on unsupported port=%d\n",
+			HERMES_RXSTATUS_MACPORT_GET(status) );
+		break;
+	}
 
  drop:	
 	stats->rx_dropped++;
@@ -2446,6 +2473,24 @@ orinoco_xmit(struct sk_buff *skb, struct net_device *dev)
 	orinoco_unlock(priv, &flags);
 	return err;
 }
+
+//#define SET_MAC_ADDRESS
+#ifdef SET_MAC_ADDRESS
+static int
+orinoco_set_mac_address(struct net_device *dev, void *addr)
+{
+  struct orinoco_private *priv = dev->priv;
+  struct sockaddr *mac = addr;
+
+  /* Copy the address */
+  memcpy(dev->dev_addr, mac->sa_data, WLAN_ADDR_LEN);
+
+  /* Reconfig the beast */
+  orinoco_reset(priv);
+
+  return 0;
+}
+#endif	/* SET_MAC_ADDRESS */
 
 static void
 orinoco_tx_timeout(struct net_device *dev)
@@ -3599,6 +3644,173 @@ static int orinoco_ioctl_getspy(struct net_device *dev, struct iw_point *srq)
 	return 0;
 }
 
+/*----------------------------------------------------------------
+* orinoco_wlansniff
+*
+* Start or stop sniffing.
+*
+* Arguments:
+*	wlandev		wlan device structure
+*	msgp		ptr to msg buffer
+*
+* Returns: 
+*	0	success and done
+*	<0	success, but we're waiting for something to finish.
+*	>0	an error occurred while handling the message.
+* Side effects:
+*
+* Call context:
+*	process thread  (usually)
+*	interrupt
+----------------------------------------------------------------*/
+static int orinoco_wlansniff(struct net_device *dev, struct iwreq *wrq)
+{
+	struct orinoco_private *priv = dev->priv;
+
+	hermes_t		*hw = &(priv->hw);
+        hermes_response_t  resp;
+	int 			result = 0;
+	uint16_t			word;
+
+	int *parms = (int *) wrq->u.name;
+	int enable = parms[0] > 0;
+	unsigned long flags;
+
+	orinoco_lock(priv, &flags);
+
+	switch (enable)
+	{
+	case P80211ENUM_truth_false:
+		/* Confirm that we're in monitor mode */
+		if ( dev->type == ARPHRD_ETHER ) {
+			result = -EFAULT;
+		}
+		/* Disable monitor mode */
+	        word =	HERMES_CMD_MONITOR | (HERMES_MONITOR_DISABLE << 8);
+	        result = hermes_docmd_wait(hw, word, 0, &resp);
+
+		if ( result ) break;
+
+		/* Disable port 0 */
+		result = hermes_disable_port(hw, 0);
+		if ( result ) break;
+
+		/* Clear the driver state */
+		dev->type = ARPHRD_ETHER;
+
+		/* Restore the wepflags */   //Orinoco doesn't like this
+/*
+		result = hermes_write_wordrec(hw, USER_BAP,
+				HERMES_RID_CNF_PRISM2_WEP_ON, 
+				priv->presniff_wepflags);
+		if ( result ) break;
+
+*/
+		/* Set the port to its prior type and enable (if necessary) */
+		if (priv->presniff_port_type != 0 ) {
+			word = priv->presniff_port_type;
+			result = hermes_write_wordrec(hw, USER_BAP, 
+				HERMES_RID_CNF_PORTTYPE, word);
+		    if ( result ) break;
+
+			/* Enable the port */
+			result = hermes_enable_port(hw, 0);
+		    if ( result ) break;
+
+		}
+
+		break;
+	case P80211ENUM_truth_true:
+             /* Re-initialize the card before changing channel as advised at
+              * http://lists.samba.org/pipermail/wireless/2002-June/004491.html
+              * by Ian Goldberg.  Implementation by Pat Swieskowski.
+              */
+//		__orinoco_down(dev);
+                hermes_set_irqmask(hw, 0);
+		hermes_init(hw);
+//		_orinoco_up(dev);
+                hermes_set_irqmask(hw, ORINOCO_INTEN);
+/*
+		__orinoco_stop_irqs(priv);
+		hermes_reset(hw);
+		__orinoco_start_irqs(priv, HERMES_EV_RX | HERMES_EV_ALLOC |
+				   HERMES_EV_TX | HERMES_EV_TXEXC |
+				   HERMES_EV_WTERR | HERMES_EV_INFO |
+				   HERMES_EV_INFDROP);
+*/
+		/* Disable the port (if enabled), only check Port 0 */
+		if ( hw->port_enabled[0] ) {
+			/* Save macport 0 state */
+			result = hermes_read_wordrec(hw, USER_BAP,
+					HERMES_RID_CNF_PORTTYPE,
+					&(priv->presniff_port_type));
+		    if ( result ) break;
+
+			/* Save the wepflags state */
+			result = hermes_read_wordrec(hw, USER_BAP,
+					HERMES_RID_CNF_PRISM2_WEP_ON,
+					&(priv->presniff_wepflags));
+		    if ( result ) break;
+			result = hermes_disable_port(hw, 0);
+		    if ( result ) break;
+		}
+		else {
+			priv->presniff_port_type = 0;
+		}
+
+		/* Set the channel we wish to sniff  */
+		if (parms[1] > 0 && parms[1] < 15) {
+ 		  word = parms[1];
+		  result = hermes_write_wordrec(hw, USER_BAP, 
+				  HERMES_RID_CNF_CHANNEL, word);
+		} else {
+ 		  result = -EFAULT;
+		}
+
+		if ( result ) break;
+
+		/* Set the port type to pIbss */
+		word = HFA384x_PORTTYPE_IBSS;
+		result = hermes_write_wordrec(hw, USER_BAP, 
+				HERMES_RID_CNF_PORTTYPE, word);
+		if ( result ) break;
+
+/*
+  	        if ( (msg->keepwepflags.status == P80211ENUM_msgitem_status_data_ok) && 
+                     (msg->keepwepflags.data != P80211ENUM_truth_true)) {
+		  // Set the wepflags for no decryption   //Orinoco doesn't like this
+	          word = HFA384x_WEPFLAGS_DISABLE_TXCRYPT | 
+			     HFA384x_WEPFLAGS_DISABLE_RXCRYPT;
+		  result = hermes_write_wordrec(hw, USER_BAP, 
+				 HERMES_RID_CNF_PRISM2_WEP_ON, word); //won't work with the bits above
+                }
+		if ( result ) break;
+
+*/
+		/* Enable the port */
+		result = hermes_enable_port(hw, 0);
+		if ( result ) break;
+
+		/* Enable monitor mode */
+	        word =	HERMES_CMD_MONITOR | (HERMES_MONITOR_ENABLE << 8);
+	        result = hermes_docmd_wait(hw, word, 0, &resp);
+		if ( result ) break;
+
+		/* Set the driver state */
+		/* Do we want the prism2 header? */
+		if (parms[0] == 1)
+		  dev->type = ARPHRD_IEEE80211_PRISM;
+		else 
+		  dev->type = ARPHRD_IEEE80211;
+		break;
+	default:
+		result = -EFAULT;
+		break;
+	}
+	orinoco_unlock(priv, &flags);
+	return result;
+}
+
 static int
 orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -3831,6 +4043,9 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				{ SIOCIWFIRSTPRIV + 0x7, 0,
 				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 				  "get_ibssport" },
+				{ SIOCIWFIRSTPRIV + 0x8,
+				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+				  0, "monitor" },
 				{ SIOCIWLASTPRIV, 0, 0, "dump_recs" },
 			};
 
@@ -3919,6 +4134,16 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	case SIOCIWFIRSTPRIV + 0x7: /* get_ibssport */
 		err = orinoco_ioctl_getibssport(dev, wrq);
+		break;
+
+        case SIOCIWFIRSTPRIV + 0x8: /* set sniff (monitor) mode */ 
+		DEBUG(1, "%s: SIOCIWFIRSTPRIV + 0x8 (monitor)\n",
+		      dev->name);
+		if (! capable(CAP_NET_ADMIN)) {
+			err = -EPERM;
+			break;
+		}
+                err = orinoco_wlansniff(dev, wrq);
 		break;
 
 	case SIOCIWLASTPRIV:
@@ -4145,6 +4370,9 @@ struct net_device *alloc_orinocodev(int sizeof_card, int (*hard_reset)(struct or
 	dev->tx_timeout = orinoco_tx_timeout;
 	dev->watchdog_timeo = HZ; /* 1 second timeout */
 	dev->get_stats = orinoco_get_stats;
+#ifdef SET_MAC_ADDRESS
+        dev->set_mac_address = orinoco_set_mac_address;
+#endif	/* SET_MAC_ADDRESS */
 	dev->get_wireless_stats = orinoco_get_wireless_stats;
 	dev->do_ioctl = orinoco_ioctl;
 	dev->change_mtu = orinoco_change_mtu;
@@ -4168,6 +4396,197 @@ struct net_device *alloc_orinocodev(int sizeof_card, int (*hard_reset)(struct or
 
 	return dev;
 
+}
+
+/*----------------------------------------------------------------
+* orinoco_int_rxmonitor
+*
+* Helper function for int_rx.  Handles monitor frames.
+* Note that this function allocates space for the FCS and sets it
+* to 0xffffffff.  The hfa384x doesn't give us the FCS value but the
+* higher layers expect it.  0xffffffff is used as a flag to indicate
+* the FCS is bogus.
+*
+* Arguments:
+*	dev		wlan device structure
+*	rxfid		received FID
+*	rxdesc		rx descriptor read from card in int_rx
+*
+* Returns: 
+*	nothing
+*
+* Side effects:
+*	Allocates an skb and passes it up via the PF_PACKET interface.
+* Call context:
+*	interrupt
+----------------------------------------------------------------*/
+void orinoco_int_rxmonitor( struct orinoco_private *dev, uint16_t rxfid, int len,
+                            struct hermes_rx_descriptor *rxdesc, struct ieee802_11_hdr *hdr)
+{
+	hermes_t			*hw = &(dev->hw);
+	uint32_t				hdrlen = 0;
+	uint32_t				datalen = 0;
+	uint32_t				skblen = 0;
+	p80211msg_lnxind_wlansniffrm_t	*msg;
+	struct net_device_stats *stats = &dev->stats;
+
+
+	uint8_t				*datap;
+	uint16_t				fc;
+	struct sk_buff			*skb;
+
+	/* Don't forget the status, time, and data_len fields are in host order */
+	/* Figure out how big the frame is */
+	fc = le16_to_cpu(hdr->frame_ctl);
+	switch ( WLAN_GET_FC_FTYPE(fc) )
+	{
+	case WLAN_FTYPE_DATA:
+		if ( WLAN_GET_FC_TODS(fc) && WLAN_GET_FC_FROMDS(fc) ) {
+			hdrlen = WLAN_HDR_A4_LEN;
+		} else {
+			hdrlen = WLAN_HDR_A3_LEN;
+		}
+		datalen = len;
+		break;
+	case WLAN_FTYPE_MGMT:
+		hdrlen = WLAN_HDR_A3_LEN;
+		datalen = len;
+		break;
+	case WLAN_FTYPE_CTL:
+		switch ( WLAN_GET_FC_FSTYPE(fc) )
+		{
+		case WLAN_FSTYPE_PSPOLL:
+		case WLAN_FSTYPE_RTS:
+		case WLAN_FSTYPE_CFEND:
+		case WLAN_FSTYPE_CFENDCFACK:
+			hdrlen = 16;
+			break;
+		case WLAN_FSTYPE_CTS:
+		case WLAN_FSTYPE_ACK:
+			hdrlen = 10;
+			break;
+		}
+		datalen = 0;
+		break;
+	default:
+		printk("unknown frm: fc=0x%04x\n", fc);
+		return;
+	}
+
+	/* Allocate an ind message+framesize skb */
+	skblen = sizeof(p80211msg_lnxind_wlansniffrm_t) + 
+	  hdrlen + datalen;
+	
+	/* sanity check the length */
+	if ( skblen > 
+		(sizeof(p80211msg_lnxind_wlansniffrm_t) + 
+		WLAN_HDR_A4_LEN + WLAN_DATA_MAXLEN + WLAN_CRC_LEN) ) {
+		printk("overlen frm: len=%d\n", 
+			skblen - sizeof(p80211msg_lnxind_wlansniffrm_t));
+	}
+			
+	if ( (skb = dev_alloc_skb(skblen)) == NULL ) {
+		printk("alloc_skb failed trying to allocate %d bytes\n", skblen);
+		return;
+	}
+
+	/* only prepend the prism header if in the right mode */
+	if (dev->ndev->type != ARPHRD_IEEE80211_PRISM) {
+	  skb_put(skb, skblen - sizeof(p80211msg_lnxind_wlansniffrm_t));
+	  datap = skb->data;
+	} else {
+	  skb_put(skb, skblen);
+	  datap = skb->data + sizeof(p80211msg_lnxind_wlansniffrm_t);
+	  msg = (p80211msg_lnxind_wlansniffrm_t*)skb->data;
+	  
+	  /* Initialize the message members */
+	  msg->msgcode = DIDmsg_lnxind_wlansniffrm;
+	  msg->msglen = sizeof(p80211msg_lnxind_wlansniffrm_t);
+	  strcpy(msg->devname, dev->ndev->name);
+	  
+	  msg->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
+	  msg->hosttime.status = 0;
+	  msg->hosttime.len = 4;
+	  msg->hosttime.data = jiffies;
+	  
+	  msg->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
+	  msg->mactime.status = 0;
+	  msg->mactime.len = 4;
+	  msg->mactime.data = rxdesc->time;
+	  
+	  msg->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
+	  msg->channel.status = P80211ENUM_msgitem_status_no_value;
+	  msg->channel.len = 4;
+	  msg->channel.data = 0;
+
+	  msg->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
+	  msg->rssi.status = P80211ENUM_msgitem_status_no_value;
+	  msg->rssi.len = 4;
+	  msg->rssi.data = 0;
+	  
+	  msg->sq.did = DIDmsg_lnxind_wlansniffrm_sq;
+	  msg->sq.status = P80211ENUM_msgitem_status_no_value;
+	  msg->sq.len = 4;
+	  msg->sq.data = 0;
+	  
+	  msg->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
+	  msg->signal.status = 0;
+	  msg->signal.len = 4;
+	  msg->signal.data = rxdesc->signal;
+	  
+	  msg->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
+	  msg->noise.status = 0;
+	  msg->noise.len = 4;
+	  msg->noise.data = rxdesc->silence;
+
+	  msg->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
+	  msg->rate.status = 0;
+	  msg->rate.len = 4;
+	  msg->rate.data = rxdesc->rate / 5; /* set to 802.11 units */
+  
+	  msg->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
+	  msg->istx.status = 0;
+	  msg->istx.len = 4;
+	  msg->istx.data = P80211ENUM_truth_false;
+	  
+	  msg->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
+	  msg->frmlen.status = 0;
+	  msg->frmlen.len = 4;
+	  msg->frmlen.data = hdrlen + datalen;
+	}	  
+
+	/* Copy the 802.11 header to the skb (ctl frames may be less than a full header) */
+	memcpy( datap, &(hdr->frame_ctl), hdrlen);
+
+	/* If any, copy the data from the card to the skb */
+	if ( datalen > 0 )
+	{
+		hermes_bap_pread(hw, IRQ_BAP, datap + hdrlen, (datalen+1)&~1,
+				       rxfid, HERMES_RX_DATA_OFF);
+
+		/* check for unencrypted stuff if WEP bit set. */
+		if (*(datap+1) & 0x40) // wep set
+		  if ((*(datap+hdrlen) == 0xaa) && (*(datap+hdrlen+1) == 0xaa))
+		    *(datap+1) &= 0xbf; // clear wep; it's the 802.2 header!
+	}
+
+       /* pass it up via the PF_PACKET interface */
+       {
+	   skb->dev = dev->ndev;
+	   skb->dev->last_rx = jiffies;
+
+	   skb->mac.raw = skb->data ;
+	   skb->ip_summed = CHECKSUM_NONE;
+	   skb->pkt_type = PACKET_OTHERHOST;
+	   skb->protocol = htons(ETH_P_80211_RAW);  /* XXX ETH_P_802_2? */
+
+	   stats->rx_packets++;
+	   stats->rx_bytes += skb->len;
+
+	   netif_rx(skb);
+       }
+
+	return;
 }
 
 /********************************************************************/

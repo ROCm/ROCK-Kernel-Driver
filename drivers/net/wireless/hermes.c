@@ -183,6 +183,10 @@ int hermes_init(hermes_t *hw)
 	if (err)
 		return err;
 
+        for ( k = 0; k < HERMES_NUMPORTS_MAX; k++) {
+		hw->port_enabled[k] = 0;
+	}
+
 	reg = hermes_read_regn(hw, EVSTAT);
 	k = CMD_INIT_TIMEOUT;
 	while ( (! (reg & HERMES_EV_CMD)) && k) {

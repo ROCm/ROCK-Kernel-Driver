@@ -1098,8 +1098,15 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	/* try to do packet compression */
 	if ((ppp->xstate & SC_COMP_RUN) && ppp->xc_state != 0
 	    && proto != PPP_LCP && proto != PPP_CCP) {
-		new_skb = alloc_skb(ppp->dev->mtu + ppp->dev->hard_header_len,
-				    GFP_ATOMIC);
+                int new_skb_size = ppp->dev->mtu + ppp->dev->hard_header_len;
+                int compressor_skb_size = ppp->dev->mtu + PPP_HDRLEN;
+
+                if (ppp->xcomp->compress_proto == CI_MPPE) {
+                        /* CCP [must have] reduced MTU by MPPE_PAD. */
+                        new_skb_size += MPPE_PAD;
+                        compressor_skb_size += MPPE_PAD;
+                }
+                new_skb = alloc_skb(new_skb_size, GFP_ATOMIC);
 		if (new_skb == 0) {
 			printk(KERN_ERR "PPP: no memory (comp pkt)\n");
 			goto drop;
@@ -1111,15 +1118,27 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* compressor still expects A/C bytes in hdr */
 		len = ppp->xcomp->compress(ppp->xc_state, skb->data - 2,
 					   new_skb->data, skb->len + 2,
-					   ppp->dev->mtu + PPP_HDRLEN);
+                                           compressor_skb_size);
 		if (len > 0 && (ppp->flags & SC_CCP_UP)) {
 			kfree_skb(skb);
 			skb = new_skb;
 			skb_put(skb, len);
 			skb_pull(skb, 2);	/* pull off A/C bytes */
-		} else {
+                } else if (len == 0) {
 			/* didn't compress, or CCP not up yet */
 			kfree_skb(new_skb);
+                } else {
+                        /*
+                         * (len < 0)
+                         * MPPE requires that we do not send unencrypted
+                         * frames.  The compressor will return -1 if we
+                         * should drop the frame.  We cannot simply test
+                         * the compress_proto because MPPE and MPPC share
+                         * the same number.
+                         */
+                        printk(KERN_ERR "ppp: compressor dropped pkt\n");
+                        kfree_skb(new_skb);
+                        goto drop;
 		}
 	}
 
@@ -1628,7 +1647,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 		goto err;
 
 	if (proto == PPP_COMP) {
-		ns = dev_alloc_skb(ppp->mru + PPP_HDRLEN);
+		ns = dev_alloc_skb(ppp->mru + 128 + PPP_HDRLEN);
 		if (ns == 0) {
 			printk(KERN_ERR "ppp_decompress_frame: no memory\n");
 			goto err;

@@ -2460,6 +2460,12 @@ config PPP_BSDCOMP
 	  module; it is called bsd_comp and will show up in the directory
 	  modules once you have said "make modules". If unsure, say N.
 
+config PPP_MPPE
+       tristate "PPP MPPE compression (encryption)"
+       depends on PPP
+       ---help---
+         Support for the MPPE Encryption protocol.
+
 config PPPOE
 	tristate "PPP over Ethernet (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && PPP
