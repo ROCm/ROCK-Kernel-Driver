@@ -1233,7 +1233,7 @@ static ctl_table arlan_root_table[] =
 
 static struct ctl_table_header *arlan_device_sysctl_header;
 
-int init_arlan_proc(void)
+int __init init_arlan_proc(void)
 {
 
 	int i = 0;
@@ -1247,25 +1247,11 @@ int init_arlan_proc(void)
 
 	return 0;
 
-};
+}
 
-
-
-#ifdef MODULE
-
-int init_module(void)
-{
-
-	return init_arlan_proc();
-};
-
-void cleanup_module(void)
+void __exit cleanup_arlan_proc(void)
 {
 	unregister_sysctl_table(arlan_device_sysctl_header);
 	arlan_device_sysctl_header = NULL;
 
-	return;
-};
-
-#endif				// MODULE
-MODULE_LICENSE("GPL");
+}

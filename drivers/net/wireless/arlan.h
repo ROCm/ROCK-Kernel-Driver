@@ -39,9 +39,12 @@
 #define ARLAN_RCV_PROMISC 1
 #define ARLAN_RCV_CONTROL 2
 
-
 #ifdef CONFIG_PROC_FS
-extern int 	init_arlan_proc(void);
+extern int init_arlan_proc(void);
+extern void cleanup_arlan_proc(void);
+#else
+#define init_arlan_proc()	(0)
+#define cleanup_arlan_proc()	do { } while (0);
 #endif
 
 extern struct net_device *arlan_device[MAX_ARLANS];

@@ -91,11 +91,6 @@ MODULE_PARM_DESC(arlan_exit_debug, "(ignored)");
 MODULE_PARM_DESC(arlan_entry_and_exit_debug, "(ignored)");
 #endif
 
-EXPORT_SYMBOL(arlan_device);
-EXPORT_SYMBOL(arlan_conf);
-EXPORT_SYMBOL(last_arlan);
-
-
 //        #warning kernel 2.1.110 tested
 #define myATOMIC_INIT(a,b) atomic_set(&(a),b)
 
@@ -126,8 +121,6 @@ static  void	arlan_rx_interrupt		(struct net_device * dev, u_char rxStatus, u_sh
 static  void	arlan_process_interrupt		(struct net_device * dev);
 static	void	arlan_tx_timeout		(struct net_device *dev);
 int	arlan_command(struct net_device * dev, int command);
-
-EXPORT_SYMBOL(arlan_command);
 
 static inline long long arlan_time(void)
 {
@@ -1327,12 +1320,6 @@ static int arlan_open(struct net_device *dev)
 	mdelay(200);
 	add_timer(&priv->timer);
 
-#ifdef CONFIG_PROC_FS
-#ifndef MODULE
-	if (arlan_device[0])
-		init_arlan_proc();
-#endif
-#endif
 	ARLAN_DEBUG_EXIT("arlan_open");
 	return 0;
 }
@@ -2037,6 +2024,7 @@ int init_module(void)
 			arlan_probe_everywhere(arlan_device[i]);
 //		arlan_command(arlan_device[i], ARLAN_COMMAND_POWERDOWN );
 	}
+	init_arlan_proc();
 	printk(KERN_INFO "Arlan driver %s\n", arlan_version);
 	ARLAN_DEBUG_EXIT("init_module");
 	return 0;
@@ -2052,6 +2040,9 @@ void cleanup_module(void)
 
 	IFDEBUG(ARLAN_DEBUG_SHUTDOWN)
 		printk(KERN_INFO "arlan: unloading module\n");
+
+	cleanup_arlan_proc();
+
 	for (i = 0; i < MAX_ARLANS; i++)
 	{
 		if (arlan_device[i])
