@@ -30,6 +30,9 @@ static long    htlbzone_pages[MAX_NUMNODES];
 static struct list_head hugepage_freelists[MAX_NUMNODES];
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
+static int hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma, 
+			       unsigned long addr, int flush);
+
 static void enqueue_huge_page(struct page *page)
 {
 	list_add(&page->lru,
@@ -164,13 +167,12 @@ nomem:
 int
 follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		    struct page **pages, struct vm_area_struct **vmas,
-		    unsigned long *position, int *length, int i)
+		    unsigned long *position, int *length, int i, int write)
 {
 	unsigned long vpfn, vaddr = *position;
 	int remainder = *length;
 
-	WARN_ON(!is_vm_hugetlb_page(vma));
-
+	spin_lock(&mm->page_table_lock);
 	vpfn = vaddr/PAGE_SIZE;
 	while (vaddr < vma->vm_end && remainder) {
 
@@ -178,10 +180,22 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 			pte_t *pte;
 			struct page *page;
 
-			pte = huge_pte_offset(mm, vaddr);
-
-			if(!pte || pte_none(*pte))
-				return -EFAULT;
+			for (;;) { 
+				pte = huge_pte_offset(mm, vaddr);
+				if (pte && !pte_none(*pte))
+					break; 
+				if (!write) { 
+					spin_unlock(&mm->page_table_lock);
+					return -EFAULT;
+				}
+				switch (hugetlb_alloc_fault(mm, vma, vaddr, 0)) { 
+				case VM_FAULT_SIGBUS:
+					return -EFAULT;
+				case VM_FAULT_OOM:
+					return -ENOMEM; /* or better kill? */
+				} 
+				spin_lock(&mm->page_table_lock);
+			}
 
 			page = &pte_page(*pte)[vpfn % (HPAGE_SIZE/PAGE_SIZE)];
 
@@ -199,6 +213,8 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		--remainder;
 		++i;
 	}
+
+	spin_unlock(&mm->page_table_lock);
 
 	*length = remainder;
 	*position = vaddr;
@@ -337,7 +353,7 @@ zap_hugepage_range(struct vm_area_struct *vma,
 /* page_table_lock hold on entry. */
 static int 
 hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma, 
-			       unsigned long addr, int write_access)
+			       unsigned long addr, int flush)
 {
 		unsigned long idx;
 	int ret;
@@ -378,6 +394,7 @@ hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 			/* Instead of OOMing here could just transparently use
 			   small pages. */
 
+			if (flush) 
 			printk(KERN_INFO "%s[%d] ran out of huge pages. Killed.\n",
 			       current->comm, current->pid);
 			
@@ -404,7 +421,8 @@ hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma,
  flush:
 	/* Don't need to flush other CPUs. They will just do a page
 	   fault and flush it lazily. */
-	__flush_tlb_one(addr);
+	if (flush) 
+		__flush_tlb_one(addr);
 	
  out:
 	spin_unlock(&mm->page_table_lock);
@@ -423,11 +441,11 @@ int arch_hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	spin_lock(&mm->page_table_lock);	
 	pgd = pgd_offset(mm, address); 
 	if (pgd_none(*pgd)) 
-		return hugetlb_alloc_fault(mm, vma, address, write_access); 
+		return hugetlb_alloc_fault(mm, vma, address, 1); 
 
 	pmd = pmd_offset(pgd, address);
 	if (pmd_none(*pmd))
-		return hugetlb_alloc_fault(mm, vma, address, write_access); 
+		return hugetlb_alloc_fault(mm, vma, address, 1); 
 
 	BUG_ON(!pmd_large(*pmd)); 
 

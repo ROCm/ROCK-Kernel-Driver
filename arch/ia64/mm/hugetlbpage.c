@@ -184,25 +184,38 @@ nomem:
 int
 follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		    struct page **pages, struct vm_area_struct **vmas,
-		    unsigned long *st, int *length, int i)
+		    unsigned long *st, int *length, int i, int write)
 {
-	pte_t *ptep, pte;
+	pte_t *pte;
 	unsigned long start = *st;
 	unsigned long pstart;
 	int len = *length;
 	struct page *page;
 
+	spin_lock(&mm->page_table_lock);
 	do {
 		pstart = start & HPAGE_MASK;
-		ptep = huge_pte_offset(mm, start);
-		if (!ptep) 
-			return -EFAULT;
-		pte = *ptep;
-		if (pte_none(pte))
-			return -EFAULT;
+
+		for (;;) { 
+			pte = huge_pte_offset(mm, start);
+			if (pte && !pte_none(*pte))
+				break; 
+			if (!write) { 
+				spin_unlock(&mm->page_table_lock);
+				return -EFAULT;
+			}
+			spin_unlock(&mm->page_table_lock); 
+			switch (arch_hugetlb_fault(mm, vma, start, write)) { 
+			case VM_FAULT_SIGBUS:
+				return -EFAULT;
+			case VM_FAULT_OOM:
+				return -ENOMEM; /* or better kill? */
+			} 
+			spin_lock(&mm->page_table_lock);
+		}
 
 back1:
-		page = pte_page(pte);
+		page = pte_page(*pte);
 		if (pages) {
 			page += ((start & ~HPAGE_MASK) >> PAGE_SHIFT);
 			get_page(page);
@@ -219,6 +232,7 @@ back1:
 	} while (len && start < vma->vm_end);
 	*length = len;
 	*st = start;
+	spin_unlock(&mm->page_table_lock);
 	return i;
 }
 
@@ -622,6 +636,9 @@ int arch_hugetlb_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	struct page *page;
 	struct address_space *mapping;
 	int idx, ret = VM_FAULT_MINOR;
+
+	if (write_access && !(vma->vm_flags & VM_WRITE))
+		return VM_FAULT_SIGBUS;
 
 	spin_lock(&mm->page_table_lock);
 	pte = huge_pte_alloc(mm, addr & HPAGE_MASK);

@@ -381,7 +381,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 int
 follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		    struct page **pages, struct vm_area_struct **vmas,
-		    unsigned long *position, int *length, int i)
+		    unsigned long *position, int *length, int i, int write)
 {
 	unsigned long vpfn, vaddr = *position;
 	int remainder = *length;
