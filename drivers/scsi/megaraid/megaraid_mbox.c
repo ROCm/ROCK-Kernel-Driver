@@ -1713,7 +1713,9 @@ megaraid_queue_command(struct scsi_cmnd *scp, void (* done)(struct scsi_cmnd *))
 	scp->scsi_done	= done;
 	scp->result	= 0;
 
+#ifdef CONFIG_SMP
 	ASSERT(spin_is_locked(adapter->host_lock));
+#endif
 
 	spin_unlock(adapter->host_lock);
 
@@ -2404,7 +2406,9 @@ megaraid_mbox_runpendq(adapter_t *adapter)
 
 	while (!list_empty(&adapter->pend_list)) {
 
+#ifdef CONFIG_SMP
 		ASSERT(spin_is_locked(PENDING_LIST_LOCK(adapter)));
+#endif
 
 		scb = list_entry(adapter->pend_list.next, scb_t, list);
 
@@ -2962,7 +2966,9 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 	adapter		= SCP2ADAPTER(scp);
 	raid_dev	= ADAP2RAIDDEV(adapter);
 
+#ifdef CONFIG_SMP
 	ASSERT(spin_is_locked(adapter->host_lock));
+#endif
 
 	con_log(CL_ANN, (KERN_WARNING
 		"megaraid: aborting-%ld cmd=%x <c=%d t=%d l=%d>\n",
@@ -3111,7 +3117,9 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 	adapter		= SCP2ADAPTER(scp);
 	raid_dev	= ADAP2RAIDDEV(adapter);
 
+#ifdef CONFIG_SMP
 	ASSERT(spin_is_locked(adapter->host_lock));
+#endif
 
 	con_log(CL_ANN, (KERN_WARNING "megaraid: reseting the host...\n"));
 
@@ -3155,7 +3163,9 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 
 	for (i = 0; i < MBOX_RESET_WAIT && adapter->outstanding_cmds; i++) {
 
+#ifdef CONFIG_SMP
 		ASSERT(spin_is_locked(adapter->host_lock));
+#endif
 
 		megaraid_ack_sequence(adapter);
 
