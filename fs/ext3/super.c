@@ -32,6 +32,9 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/random.h>
+#include <linux/mount.h>
+#include <linux/namei.h>
+#include <linux/quotaops.h>
 #include <asm/uaccess.h>
 #include "xattr.h"
 #include "acl.h"
@@ -504,7 +507,43 @@ static void ext3_clear_inode(struct inode *inode)
 # define ext3_clear_inode NULL
 #endif
 
-static struct dquot_operations ext3_qops;
+#ifdef CONFIG_QUOTA
+
+#define QTYPE2NAME(t) ((t)==USRQUOTA?"user":"group")
+#define QTYPE2MOPT(on, t) ((t)==USRQUOTA?((on)##USRJQUOTA):((on)##GRPJQUOTA))
+
+static int ext3_dquot_initialize(struct inode *inode, int type);
+static int ext3_dquot_drop(struct inode *inode);
+static int ext3_write_dquot(struct dquot *dquot);
+static int ext3_mark_dquot_dirty(struct dquot *dquot);
+static int ext3_write_info(struct super_block *sb, int type);
+static int ext3_quota_on(struct super_block *sb, int type, int format_id, char *path);
+static int ext3_quota_on_mount(struct super_block *sb, int type);
+static int ext3_quota_off_mount(struct super_block *sb, int type);
+
+static struct dquot_operations ext3_quota_operations = {
+	.initialize	= ext3_dquot_initialize,
+	.drop		= ext3_dquot_drop,
+	.alloc_space	= dquot_alloc_space,
+	.alloc_inode	= dquot_alloc_inode,
+	.free_space	= dquot_free_space,
+	.free_inode	= dquot_free_inode,
+	.transfer	= dquot_transfer,
+	.write_dquot	= ext3_write_dquot,
+	.mark_dirty	= ext3_mark_dquot_dirty,
+	.write_info	= ext3_write_info
+};
+
+static struct quotactl_ops ext3_qctl_operations = {
+	.quota_on	= ext3_quota_on,
+	.quota_off	= vfs_quota_off,
+	.quota_sync	= vfs_quota_sync,
+	.get_info	= vfs_get_dqinfo,
+	.set_info	= vfs_set_dqinfo,
+	.get_dqblk	= vfs_get_dqblk,
+	.set_dqblk	= vfs_set_dqblk
+};
+#endif
 
 static struct super_operations ext3_sops = {
 	.alloc_inode	= ext3_alloc_inode,
@@ -536,6 +575,8 @@ enum {
 	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl, Opt_noload,
 	Opt_commit, Opt_journal_update, Opt_journal_inum,
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
+	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
+	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0,
 	Opt_ignore, Opt_err,
 };
 
@@ -571,6 +612,12 @@ static match_table_t tokens = {
 	{Opt_data_journal, "data=journal"},
 	{Opt_data_ordered, "data=ordered"},
 	{Opt_data_writeback, "data=writeback"},
+	{Opt_offusrjquota, "usrjquota="},
+	{Opt_usrjquota, "usrjquota=%s"},
+	{Opt_offgrpjquota, "grpjquota="},
+	{Opt_grpjquota, "grpjquota=%s"},
+	{Opt_jqfmt_vfsold, "jqfmt=vfsold"},
+	{Opt_jqfmt_vfsv0, "jqfmt=vfsv0"},
 	{Opt_ignore, "grpquota"},
 	{Opt_ignore, "noquota"},
 	{Opt_ignore, "quota"},
@@ -598,13 +645,17 @@ static unsigned long get_sb_block(void **data)
 	return sb_block;
 }
 
-static int parse_options (char * options, struct ext3_sb_info *sbi,
+static int parse_options (char * options, struct super_block *sb,
 			  unsigned long * inum, int is_remount)
 {
+	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	char * p;
 	substring_t args[MAX_OPT_ARGS];
 	int data_opt = 0;
 	int option;
+#ifdef CONFIG_QUOTA
+	int qtype;
+#endif
 
 	if (!options)
 		return 1;
@@ -763,6 +814,76 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 				sbi->s_mount_opt |= data_opt;
 			}
 			break;
+#ifdef CONFIG_QUOTA
+		case Opt_usrjquota:
+			qtype = USRQUOTA;
+			goto set_qf_name;
+		case Opt_grpjquota:
+			qtype = GRPQUOTA;
+set_qf_name:
+			if (sb_any_quota_enabled(sb)) {
+				printk(KERN_ERR
+					"EXT3-fs: Cannot change journalled "
+					"quota options when quota turned on.\n");
+				return 0;
+			}
+			if (sbi->s_qf_names[qtype]) {
+				printk(KERN_ERR
+					"EXT3-fs: %s quota file already "
+					"specified.\n", QTYPE2NAME(qtype));
+				return 0;
+			}
+			sbi->s_qf_names[qtype] = match_strdup(&args[0]);
+			if (!sbi->s_qf_names[qtype]) {
+				printk(KERN_ERR
+					"EXT3-fs: not enough memory for "
+					"storing quotafile name.\n");
+				return 0;
+			}
+			if (strchr(sbi->s_qf_names[qtype], '/')) {
+				printk(KERN_ERR
+					"EXT3-fs: quotafile must be on "
+					"filesystem root.\n");
+				kfree(sbi->s_qf_names[qtype]);
+				sbi->s_qf_names[qtype] = NULL;
+				return 0;
+			}
+			break;
+		case Opt_offusrjquota:
+			qtype = USRQUOTA;
+			goto clear_qf_name;
+		case Opt_offgrpjquota:
+			qtype = GRPQUOTA;
+clear_qf_name:
+			if (sb_any_quota_enabled(sb)) {
+				printk(KERN_ERR "EXT3-fs: Cannot change "
+					"journalled quota options when "
+					"quota turned on.\n");
+				return 0;
+			}
+			if (sbi->s_qf_names[qtype]) {
+				kfree(sbi->s_qf_names[qtype]);
+				sbi->s_qf_names[qtype] = NULL;
+			}
+			break;
+		case Opt_jqfmt_vfsold:
+			sbi->s_jquota_fmt = QFMT_VFS_OLD;
+			break;
+		case Opt_jqfmt_vfsv0:
+			sbi->s_jquota_fmt = QFMT_VFS_V0;
+			break;
+#else
+		case Opt_usrjquota:
+		case Opt_grpjquota:
+		case Opt_offusrjquota:
+		case Opt_offgrpjquota:
+		case Opt_jqfmt_vfsold:
+		case Opt_jqfmt_vfsv0:
+			printk(KERN_ERR
+				"EXT3-fs: journalled quota options not "
+				"supported.\n");
+			break;
+#endif
 		case Opt_abort:
 			set_opt(sbi->s_mount_opt, ABORT);
 			break;
@@ -775,6 +896,13 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 			return 0;
 		}
 	}
+#ifdef CONFIG_QUOTA
+	if (!sbi->s_jquota_fmt && (sbi->s_qf_names[0] || sbi->s_qf_names[1])) {
+		printk(KERN_ERR
+			"EXT3-fs: journalled quota format not specified.\n");
+		return 0;
+	}
+#endif
 
 	return 1;
 }
@@ -934,6 +1062,9 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 {
 	unsigned int s_flags = sb->s_flags;
 	int nr_orphans = 0, nr_truncates = 0;
+#ifdef CONFIG_QUOTA
+	int i;
+#endif
 	if (!es->s_last_orphan) {
 		jbd_debug(4, "no orphan inodes to clean up\n");
 		return;
@@ -953,6 +1084,20 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 		       sb->s_id);
 		sb->s_flags &= ~MS_RDONLY;
 	}
+#ifdef CONFIG_QUOTA
+	/* Needed for iput() to work correctly and not trash data */
+	sb->s_flags |= MS_ACTIVE;
+	/* Turn on quotas so that they are updated correctly */
+	for (i = 0; i < MAXQUOTAS; i++) {
+		if (EXT3_SB(sb)->s_qf_names[i]) {
+			int ret = ext3_quota_on_mount(sb, i);
+			if (ret < 0)
+				printk(KERN_ERR
+					"EXT3-fs: Cannot turn on journalled "
+					"quota: error %d\n", ret);
+		}
+	}
+#endif
 
 	while (es->s_last_orphan) {
 		struct inode *inode;
@@ -964,6 +1109,7 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 		}
 
 		list_add(&EXT3_I(inode)->i_orphan, &EXT3_SB(sb)->s_orphan);
+		DQUOT_INIT(inode);
 		if (inode->i_nlink) {
 			printk(KERN_DEBUG
 				"%s: truncating inode %ld to %Ld bytes\n",
@@ -991,6 +1137,13 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 	if (nr_truncates)
 		printk(KERN_INFO "EXT3-fs: %s: %d truncate%s cleaned up\n",
 		       sb->s_id, PLURAL(nr_truncates));
+#ifdef CONFIG_QUOTA
+	/* Turn quotas off */
+	for (i = 0; i < MAXQUOTAS; i++) {
+		if (sb_dqopt(sb)->files[i])
+			ext3_quota_off_mount(sb, i);
+	}
+#endif
 	sb->s_flags = s_flags; /* Restore MS_RDONLY status */
 }
 
@@ -1124,7 +1277,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
 	sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
 
-	if (!parse_options ((char *) data, sbi, &journal_inum, 0))
+	if (!parse_options ((char *) data, sb, &journal_inum, 0))
 		goto failed_mount;
 
 	sb->s_flags |= MS_ONE_SECOND;
@@ -1303,7 +1456,10 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_op = &ext3_sops;
 	sb->s_export_op = &ext3_export_ops;
-	sb->dq_op = &ext3_qops;
+#ifdef CONFIG_QUOTA
+	sb->s_qcop = &ext3_qctl_operations;
+	sb->dq_op = &ext3_quota_operations;
+#endif
 	INIT_LIST_HEAD(&sbi->s_orphan); /* unlinked but open files */
 
 	sb->s_root = 0;
@@ -1413,6 +1569,12 @@ failed_mount2:
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
 failed_mount:
+#ifdef CONFIG_QUOTA
+	for (i = 0; i < MAXQUOTAS; i++) {
+		if (sbi->s_qf_names[i])
+			kfree(sbi->s_qf_names[i]);
+	}
+#endif
 	ext3_blkdev_remove(sbi);
 	brelse(bh);
 out_fail:
@@ -1839,7 +2001,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 	/*
 	 * Allow the "check" option to be passed as a remount option.
 	 */
-	if (!parse_options(data, sbi, &tmp, 1))
+	if (!parse_options(data, sb, &tmp, 1))
 		return -EINVAL;
 
 	if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)
@@ -1959,70 +2121,152 @@ int ext3_statfs (struct super_block * sb, struct kstatfs * buf)
 
 #ifdef CONFIG_QUOTA
 
-/* Blocks: (2 data blocks) * (3 indirect + 1 descriptor + 1 bitmap) + superblock */
-#define EXT3_OLD_QFMT_BLOCKS 11
-/* Blocks: quota info + (4 pointer blocks + 1 entry block) * (3 indirect + 1 descriptor + 1 bitmap) + superblock */
-#define EXT3_V0_QFMT_BLOCKS 27
-
-static int (*old_write_dquot)(struct dquot *dquot);
-static void (*old_drop_dquot)(struct inode *inode);
-
-static int fmt_to_blocks(int fmt)
+static inline struct inode *dquot_to_inode(struct dquot *dquot)
 {
-	switch (fmt) {
-		case QFMT_VFS_OLD:
-			return  EXT3_OLD_QFMT_BLOCKS;
-		case QFMT_VFS_V0:
-			return EXT3_V0_QFMT_BLOCKS;
-	}
-	return EXT3_MAX_TRANS_DATA;
+	return sb_dqopt(dquot->dq_sb)->files[dquot->dq_type]->f_dentry->d_inode;
+}
+
+static int ext3_dquot_initialize(struct inode *inode, int type)
+{
+	handle_t *handle;
+	int ret, err;
+
+	/* We may create quota structure so we need to reserve enough blocks */
+	handle = ext3_journal_start(inode, 2*EXT3_QUOTA_INIT_BLOCKS);
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
+	ret = dquot_initialize(inode, type);
+	err = ext3_journal_stop(handle);
+	if (!ret)
+		ret = err;
+	return ret;
+}
+
+static int ext3_dquot_drop(struct inode *inode)
+{
+	handle_t *handle;
+	int ret, err;
+
+	/* We may delete quota structure so we need to reserve enough blocks */
+	handle = ext3_journal_start(inode, 2*EXT3_QUOTA_INIT_BLOCKS);
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
+	ret = dquot_drop(inode);
+	err = ext3_journal_stop(handle);
+	if (!ret)
+		ret = err;
+	return ret;
 }
 
 static int ext3_write_dquot(struct dquot *dquot)
 {
-	int nblocks;
-	int ret;
-	int err;
+	int ret, err;
 	handle_t *handle;
-	struct quota_info *dqopt = sb_dqopt(dquot->dq_sb);
-	struct inode *qinode;
 
-	nblocks = fmt_to_blocks(dqopt->info[dquot->dq_type].dqi_format->qf_fmt_id);
-	qinode = dqopt->files[dquot->dq_type]->f_dentry->d_inode;
-	handle = ext3_journal_start(qinode, nblocks);
-	if (IS_ERR(handle)) {
-		ret = PTR_ERR(handle);
-		goto out;
-	}
-	ret = old_write_dquot(dquot);
+	handle = ext3_journal_start(dquot_to_inode(dquot),
+					EXT3_QUOTA_TRANS_BLOCKS);
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
+	ret = dquot_commit(dquot);
 	err = ext3_journal_stop(handle);
-	if (ret == 0)
+	if (!ret)
 		ret = err;
-out:
 	return ret;
 }
 
-static void ext3_drop_dquot(struct inode *inode)
+static int ext3_mark_dquot_dirty(struct dquot * dquot)
 {
-	int nblocks, type;
-	struct quota_info *dqopt = sb_dqopt(inode->i_sb);
+	/* Are we journalling quotas? */
+	if (EXT3_SB(dquot->dq_sb)->s_qf_names[0] ||
+	    EXT3_SB(dquot->dq_sb)->s_qf_names[1])
+		return ext3_write_dquot(dquot);
+	else
+		return dquot_mark_dquot_dirty(dquot);
+}
+
+static int ext3_write_info(struct super_block *sb, int type)
+{
+	int ret, err;
 	handle_t *handle;
 
-	for (type = 0; type < MAXQUOTAS; type++) {
-		if (sb_has_quota_enabled(inode->i_sb, type))
-			break;
-	}
-	if (type < MAXQUOTAS)
-		nblocks = fmt_to_blocks(dqopt->info[type].dqi_format->qf_fmt_id);
-	else
-		nblocks = 0;	/* No quota => no drop */
-	handle = ext3_journal_start(inode, 2*nblocks);
+	/* Data block + inode block */
+	handle = ext3_journal_start(sb->s_root->d_inode, 2);
 	if (IS_ERR(handle))
-		return;
-	old_drop_dquot(inode);
-	ext3_journal_stop(handle);
-	return;
+		return PTR_ERR(handle);
+	ret = dquot_commit_info(sb, type);
+	err = ext3_journal_stop(handle);
+	if (!ret)
+		ret = err;
+	return ret;
 }
+
+/*
+ * Turn on quotas during mount time - we need to find
+ * the quota file and such...
+ */
+static int ext3_quota_on_mount(struct super_block *sb, int type)
+{
+	int err;
+	struct dentry *dentry;
+	struct qstr name = { .name = EXT3_SB(sb)->s_qf_names[type],
+			     .hash = 0,
+			     .len = strlen(EXT3_SB(sb)->s_qf_names[type])};
+
+	dentry = lookup_hash(&name, sb->s_root);
+	if (IS_ERR(dentry))
+		return PTR_ERR(dentry);
+	err = vfs_quota_on_mount(type, EXT3_SB(sb)->s_jquota_fmt, dentry);
+	if (err)
+		dput(dentry);
+	/* We keep the dentry reference if everything went ok - we drop it
+	 * on quota_off time */
+	return err;
+}
+
+/* Turn quotas off during mount time */
+static int ext3_quota_off_mount(struct super_block *sb, int type)
+{
+	int err;
+	struct dentry *dentry;
+
+	dentry = sb_dqopt(sb)->files[type]->f_dentry;
+	err = vfs_quota_off_mount(sb, type);
+	/* We invalidate dentry - it has at least wrong hash... */
+	d_invalidate(dentry);
+	dput(dentry);
+	return err;
+}
+
+/*
+ * Standard function to be called on quota_on
+ */
+static int ext3_quota_on(struct super_block *sb, int type, int format_id,
+			 char *path)
+{
+	int err;
+	struct nameidata nd;
+
+	/* Not journalling quota? */
+	if (!EXT3_SB(sb)->s_qf_names[0] && !EXT3_SB(sb)->s_qf_names[1])
+		return vfs_quota_on(sb, type, format_id, path);
+	err = path_lookup(path, LOOKUP_FOLLOW, &nd);
+	if (err)
+		return err;
+	/* Quotafile not on the same filesystem? */
+	if (nd.mnt->mnt_sb != sb)
+		return -EXDEV;
+	/* Quotafile not of fs root? */
+	if (nd.dentry->d_parent->d_inode != sb->s_root->d_inode)
+		printk(KERN_WARNING
+			"EXT3-fs: Quota file not on filesystem root. "
+			"Journalled quota will not work.\n");
+	if (!ext3_should_journal_data(nd.dentry->d_inode))
+		printk(KERN_WARNING "EXT3-fs: Quota file does not have "
+			"data-journalling. Journalled quota will not work.\n");
+	path_release(&nd);
+	return vfs_quota_on(sb, type, format_id, path);
+}
+
 #endif
 
 static struct super_block *ext3_get_sb(struct file_system_type *fs_type,
@@ -2047,13 +2291,6 @@ static int __init init_ext3_fs(void)
 	err = init_inodecache();
 	if (err)
 		goto out1;
-#ifdef CONFIG_QUOTA
-	init_dquot_operations(&ext3_qops);
-	old_write_dquot = ext3_qops.write_dquot;
-	old_drop_dquot = ext3_qops.drop;
-	ext3_qops.write_dquot = ext3_write_dquot;
-	ext3_qops.drop = ext3_drop_dquot;
-#endif
         err = register_filesystem(&ext3_fs_type);
 	if (err)
 		goto out;

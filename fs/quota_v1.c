@@ -60,7 +60,7 @@ static int v1_read_dqblk(struct dquot *dquot)
 	v1_disk2mem_dqblk(&dquot->dq_dqb, &dqblk);
 	if (dquot->dq_dqb.dqb_bhardlimit == 0 && dquot->dq_dqb.dqb_bsoftlimit == 0 &&
 	    dquot->dq_dqb.dqb_ihardlimit == 0 && dquot->dq_dqb.dqb_isoftlimit == 0)
-		dquot->dq_flags |= DQ_FAKE;
+		set_bit(DQ_FAKE_B, &dquot->dq_flags);
 	dqstats.reads++;
 
 	return 0;
@@ -80,12 +80,7 @@ static int v1_commit_dqblk(struct dquot *dquot)
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	/*
-	 * Note: clear the DQ_MOD flag unconditionally,
-	 * so we don't loop forever on failure.
-	 */
 	v1_mem2disk_dqblk(&dqblk, &dquot->dq_dqb);
-	dquot->dq_flags &= ~DQ_MOD;
 	if (dquot->dq_id == 0) {
 		dqblk.dqb_btime = sb_dqopt(dquot->dq_sb)->info[type].dqi_bgrace;
 		dqblk.dqb_itime = sb_dqopt(dquot->dq_sb)->info[type].dqi_igrace;

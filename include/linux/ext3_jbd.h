@@ -42,8 +42,9 @@
  * superblock only gets updated once, of course, so don't bother
  * counting that again for the quota updates. */
 
-#define EXT3_DATA_TRANS_BLOCKS		(3 * EXT3_SINGLEDATA_TRANS_BLOCKS + \
-					 EXT3_XATTR_TRANS_BLOCKS - 2)
+#define EXT3_DATA_TRANS_BLOCKS		(EXT3_SINGLEDATA_TRANS_BLOCKS + \
+					 EXT3_XATTR_TRANS_BLOCKS - 2 + \
+					 2*EXT3_QUOTA_TRANS_BLOCKS)
 
 extern int ext3_writepage_trans_blocks(struct inode *inode);
 
@@ -71,6 +72,19 @@ extern int ext3_writepage_trans_blocks(struct inode *inode);
 #define EXT3_RESERVE_TRANS_BLOCKS	12U
 
 #define EXT3_INDEX_EXTRA_TRANS_BLOCKS	8
+
+#ifdef CONFIG_QUOTA
+/* Amount of blocks needed for quota update - we know that the structure was
+ * allocated so we need to update only inode+data */
+#define EXT3_QUOTA_TRANS_BLOCKS 2
+/* Amount of blocks needed for quota insert/delete - we do some block writes
+ * but inode, sb and group updates are done only once */
+#define EXT3_QUOTA_INIT_BLOCKS (DQUOT_MAX_WRITES*\
+				(EXT3_SINGLEDATA_TRANS_BLOCKS-3)+3)
+#else
+#define EXT3_QUOTA_TRANS_BLOCKS 0
+#define EXT3_QUOTA_INIT_BLOCKS 0
+#endif
 
 int
 ext3_mark_iloc_dirty(handle_t *handle, 

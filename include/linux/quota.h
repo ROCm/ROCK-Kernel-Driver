@@ -138,6 +138,10 @@ struct if_dqinfo {
 #include <linux/dqblk_v1.h>
 #include <linux/dqblk_v2.h>
 
+/* Maximal numbers of writes for quota operation (insert/delete/update)
+ * (over all formats) - info block, 4 pointer blocks, data block */
+#define DQUOT_MAX_WRITES	6
+
 /*
  * Data for one user/group kept in memory
  */
@@ -168,22 +172,21 @@ struct mem_dqinfo {
 	} u;
 };
 
+struct super_block;
+
 #define DQF_MASK 0xffff		/* Mask for format specific flags */
 #define DQF_INFO_DIRTY_B 16
 #define DQF_ANY_DQUOT_DIRTY_B 17
 #define DQF_INFO_DIRTY (1 << DQF_INFO_DIRTY_B)	/* Is info dirty? */
 #define DQF_ANY_DQUOT_DIRTY (1 << DQF_ANY_DQUOT_DIRTY_B) /* Is any dquot dirty? */
 
-extern inline void mark_info_dirty(struct mem_dqinfo *info)
-{
-	set_bit(DQF_INFO_DIRTY_B, &info->dqi_flags);
-}
-
+extern void mark_info_dirty(struct super_block *sb, int type);
 #define info_dirty(info) test_bit(DQF_INFO_DIRTY_B, &(info)->dqi_flags)
 #define info_any_dquot_dirty(info) test_bit(DQF_ANY_DQUOT_DIRTY_B, &(info)->dqi_flags)
 #define info_any_dirty(info) (info_dirty(info) || info_any_dquot_dirty(info))
 
 #define sb_dqopt(sb) (&(sb)->s_dquot)
+#define sb_dqinfo(sb, type) (sb_dqopt(sb)->info+(type))
 
 struct dqstats {
 	int lookups;
@@ -200,15 +203,13 @@ extern struct dqstats dqstats;
 
 #define NR_DQHASH 43            /* Just an arbitrary number */
 
-#define DQ_MOD_B	0
-#define DQ_BLKS_B	1
-#define DQ_INODES_B	2
-#define DQ_FAKE_B	3
-
-#define DQ_MOD        (1 << DQ_MOD_B)	/* dquot modified since read */
-#define DQ_BLKS       (1 << DQ_BLKS_B)	/* uid/gid has been warned about blk limit */
-#define DQ_INODES     (1 << DQ_INODES_B)	/* uid/gid has been warned about inode limit */
-#define DQ_FAKE       (1 << DQ_FAKE_B)	/* no limits only usage */
+#define DQ_MOD_B	0	/* dquot modified since read */
+#define DQ_BLKS_B	1	/* uid/gid has been warned about blk limit */
+#define DQ_INODES_B	2	/* uid/gid has been warned about inode limit */
+#define DQ_FAKE_B	3	/* no limits only usage */
+#define DQ_READ_B	4	/* dquot was read into memory */
+#define DQ_ACTIVE_B	5	/* dquot is active (dquot_release not called) */
+#define DQ_WAITFREE_B	6	/* dquot being waited (by invalidate_dquots) */
 
 struct dquot {
 	struct list_head dq_hash;	/* Hash list in memory */
@@ -216,8 +217,7 @@ struct dquot {
 	struct list_head dq_free;	/* Free list element */
 	struct semaphore dq_lock;	/* dquot IO lock */
 	atomic_t dq_count;		/* Use count */
-
-	/* fields after this point are cleared when invalidating */
+	wait_queue_head_t dq_wait_unused;	/* Wait queue for dquot to become unused */
 	struct super_block *dq_sb;	/* superblock this applies to */
 	unsigned int dq_id;		/* ID this applies to (uid, gid) */
 	loff_t dq_off;			/* Offset of dquot on disk */
@@ -238,19 +238,22 @@ struct quota_format_ops {
 	int (*write_file_info)(struct super_block *sb, int type);	/* Write main info about file */
 	int (*free_file_info)(struct super_block *sb, int type);	/* Called on quotaoff() */
 	int (*read_dqblk)(struct dquot *dquot);		/* Read structure for one user */
-	int (*commit_dqblk)(struct dquot *dquot);	/* Write (or delete) structure for one user */
+	int (*commit_dqblk)(struct dquot *dquot);	/* Write structure for one user */
+	int (*release_dqblk)(struct dquot *dquot);	/* Called when last reference to dquot is being dropped */
 };
 
 /* Operations working with dquots */
 struct dquot_operations {
-	void (*initialize) (struct inode *, int);
-	void (*drop) (struct inode *);
+	int (*initialize) (struct inode *, int);
+	int (*drop) (struct inode *);
 	int (*alloc_space) (struct inode *, qsize_t, int);
 	int (*alloc_inode) (const struct inode *, unsigned long);
-	void (*free_space) (struct inode *, qsize_t);
-	void (*free_inode) (const struct inode *, unsigned long);
+	int (*free_space) (struct inode *, qsize_t);
+	int (*free_inode) (const struct inode *, unsigned long);
 	int (*transfer) (struct inode *, struct iattr *);
-	int (*write_dquot) (struct dquot *);
+	int (*write_dquot) (struct dquot *);		/* Ordinary dquot write */
+	int (*mark_dirty) (struct dquot *);		/* Dquot is marked dirty */
+	int (*write_info) (struct super_block *, int);	/* Write of quota "superblock" */
 };
 
 /* Operations handling requests from userspace */
@@ -289,10 +292,7 @@ struct quota_info {
 };
 
 /* Inline would be better but we need to dereference super_block which is not defined yet */
-#define mark_dquot_dirty(dquot) do {\
-	set_bit(DQF_ANY_DQUOT_DIRTY_B, &(sb_dqopt((dquot)->dq_sb)->info[(dquot)->dq_type].dqi_flags));\
-	set_bit(DQ_MOD_B, &(dquot)->dq_flags);\
-} while (0)
+int mark_dquot_dirty(struct dquot *dquot);
 
 #define dquot_dirty(dquot) test_bit(DQ_MOD_B, &(dquot)->dq_flags)
 
@@ -304,7 +304,6 @@ struct quota_info {
 
 int register_quota_format(struct quota_format_type *fmt);
 void unregister_quota_format(struct quota_format_type *fmt);
-void init_dquot_operations(struct dquot_operations *fsdqops);
 
 struct quota_module_name {
 	int qm_fmt_id;
