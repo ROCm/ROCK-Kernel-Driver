@@ -1294,6 +1294,9 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
 	sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
 
+	/* enable barriers by default */
+	set_opt(sbi->s_mount_opt, BARRIER);
+
 	if (!parse_options ((char *) data, sb, &journal_inum, 0))
 		goto failed_mount;
 
