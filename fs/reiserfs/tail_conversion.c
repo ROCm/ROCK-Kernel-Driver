@@ -34,6 +34,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 				       that will be inserted in the
 				       tree. */
 
+    BUG_ON (!th->t_trans_id);
 
     REISERFS_SB(sb)->s_direct2indirect ++;
 
@@ -183,6 +184,8 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     int tail_len, round_tail_len;
     loff_t pos, pos1; /* position of first byte of the tail */
     struct cpu_key key;
+
+    BUG_ON (!th->t_trans_id);
 
     REISERFS_SB(p_s_sb)->s_indirect2direct ++;
 

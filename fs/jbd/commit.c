@@ -658,6 +658,7 @@ wait_for_iobuf:
 
 			/* And try again, without the barrier */
 			clear_buffer_ordered(bh);
+			set_buffer_uptodate(bh);
 			set_buffer_dirty(bh);
 			ret = sync_dirty_buffer(bh);
 		}

@@ -509,10 +509,6 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 
 	// s2bytes
 	snum012[4] = op_unit_num (&vn->vn_vi[split_item_num]) - snum012[4] - bytes_to_r - bytes_to_l - bytes_to_S1new;
-
-	if (vn->vn_vi[split_item_num].vi_index != TYPE_DIRENTRY)
-	    reiserfs_warning (tb->tb_sb, "vs-8115: get_num_ver: not "
-			      "directory item");
     }
 
     /* now we know S2bytes, calculate S1bytes */
@@ -820,7 +816,7 @@ static int  get_empty_nodes(
     RFALSE (p_s_tb->FEB[p_s_tb->cur_blknum],
 	    "PAP-8141: busy slot for new buffer");
 
-    mark_buffer_journal_new(p_s_new_bh) ;
+    set_buffer_journal_new (p_s_new_bh);
     p_s_tb->FEB[p_s_tb->cur_blknum++] = p_s_new_bh;
   }
 
