@@ -23,6 +23,7 @@
 #include <linux/kobject.h>
 #include <net/sock.h>
 
+#if defined(CONFIG_KOBJECT_UEVENT) || defined(CONFIG_HOTPLUG)
 static char *action_to_string(enum kobject_action action)
 {
 	switch (action) {
@@ -42,6 +43,7 @@ static char *action_to_string(enum kobject_action action)
 		return NULL;
 	}
 }
+#endif
 
 #ifdef CONFIG_KOBJECT_UEVENT
 static struct sock *uevent_sock;
