@@ -547,6 +547,8 @@ struct input_absinfo {
 #define LED_SUSPEND		0x06
 #define LED_MUTE		0x07
 #define LED_MISC		0x08
+#define LED_MAIL		0x09
+#define LED_CHARGING		0x0a
 #define LED_MAX			0x0f
 
 /*
