@@ -762,8 +762,17 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 
 	for (i = open_files; i != 0; i--) {
 		struct file *f = *old_fds++;
-		if (f)
+		if (f) {
 			get_file(f);
+		} else {
+			/*
+			 * The fd may be claimed in the fd bitmap but not yet
+			 * instantiated in the files array if a sibling thread
+			 * is partway through open().  So make sure that this
+			 * fd is available to the new process.
+			 */
+			FD_CLR(open_files - i, newf->open_fds);
+		}
 		*new_fds++ = f;
 	}
 	spin_unlock(&oldf->file_lock);
