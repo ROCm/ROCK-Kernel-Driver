@@ -924,6 +924,7 @@
 	0180  Snipe chipset SCSI controller
 		1014 0241  iSeries 2757 DASD IOA
 		1014 0264  Quad Channel PCI-X U320 SCSI RAID Adapter (2780)
+		1014 02BD  Quad Channel PCI-X U320 DDR SCSI RAID Adapter (570F)
 	01a7  PCI-X to PCI-X Bridge
 	01bd  ServeRAID Controller
 		1014 01be  ServeRAID-4M
@@ -946,6 +947,8 @@
 	0266  PCI-X Dual Channel SCSI
 	0268  Gigabit Ethernet-SX Adapter (PCI-X)
 	0269  10/100/1000 Base-TX Ethernet Adapter (PCI-X)
+	028C  Citrine chipset SCSI controller
+		1014 02BE  Dual Channel PCI-X U320 DDR SCSI RAID Adapter (571B)
 	0302  XA-32 chipset [Summit]
 	ffff  MPIC-2 interrupt controller
 1015  LSI Logic Corp of Canada
@@ -2070,6 +2073,8 @@
 		1014 0242  iSeries 2872 DASD IOA
 		1014 0266  Dual Channel PCI-X U320 SCSI Adapter
 		1014 0278  Dual Channel PCI-X U320 SCSI RAID Adapter
+		1014 02D3  Dual Channel PCI-X U320 SCSI Adapter
+		1014 02D4  Dual Channel PCI-X U320 SCSI RAID Adapter
 	ba55  eXtremeRAID 1100 support Device
 	ba56  eXtremeRAID 2000/3000 support Device
 106a  Aten Research Inc
