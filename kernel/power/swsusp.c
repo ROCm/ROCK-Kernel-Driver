@@ -920,10 +920,10 @@ static int __init __read_suspend_image(struct block_device *bdev, union diskpage
 	else if (!memcmp("S2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else {
-		if (noresume)
-			return -EINVAL;
-		panic("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
-			name_resume, cur->swh.magic.magic);
+               if (!noresume)
+                       printk(KERN_ERR "%sUnable to find suspended-data signature (%.10s - misspelled?\nContinuing normal bootup.\n",
+                               name_resume, cur->swh.magic.magic);
+               return -EINVAL;
 	}
 	if (noresume) {
 		/* We don't do a sanity check here: we want to restore the swap
