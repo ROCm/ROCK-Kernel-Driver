@@ -33,6 +33,7 @@ obj-$(CONFIG_OAKNET) += oaknet.o 8390.o
 obj-$(CONFIG_DGRS) += dgrs.o
 obj-$(CONFIG_RCPCI) += rcpci.o
 obj-$(CONFIG_VORTEX) += 3c59x.o
+obj-$(CONFIG_TYPHOON) += typhoon.o
 obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
 obj-$(CONFIG_PCNET32) += pcnet32.o mii.o
 obj-$(CONFIG_EEPRO100) += eepro100.o mii.o
