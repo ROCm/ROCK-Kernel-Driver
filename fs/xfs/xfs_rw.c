@@ -149,6 +149,9 @@ xfs_do_force_shutdown(
 		xfs_cmn_err(XFS_PTAG_SHUTDOWN_CORRUPT, CE_ALERT, mp,
     "Corruption of in-memory data detected.  Shutting down filesystem: %s",
 			mp->m_fsname);
+		if (XFS_ERRLEVEL_HIGH <= xfs_error_level) {
+			xfs_stack_trace();
+		}
 	} else if (!(flags & XFS_FORCE_UMOUNT)) {
 		if (logerror) {
 			xfs_cmn_err(XFS_PTAG_SHUTDOWN_LOGERROR, CE_ALERT, mp,
