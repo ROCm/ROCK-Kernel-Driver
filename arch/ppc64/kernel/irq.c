@@ -376,10 +376,8 @@ static inline int handle_irq_event(int irq, struct pt_regs *regs,
 	int status = 0;
 	int retval = 0;
 
-#ifndef CONFIG_PPC_ISERIES
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
-#endif
 
 	do {
 		status |= action->flags;
@@ -388,9 +386,7 @@ static inline int handle_irq_event(int irq, struct pt_regs *regs,
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
-#ifndef CONFIG_PPC_ISERIES
 	local_irq_disable();
-#endif
 	return retval;
 }
 
