@@ -956,13 +956,20 @@ int __devinit __cpu_up(unsigned int cpu)
 	 * use this value that I found through experimentation.
 	 * -- Cort
 	 */
-	for (c = 5000; c && !cpu_callin_map[cpu]; c--)
-		udelay(100);
+	for (c = 50000; c && !cpu_callin_map[cpu]; c--) {
+		if (system_state == SYSTEM_BOOTING)
+			udelay(100);
+		else {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/5);
+		}
+	}
 
 	if (!cpu_callin_map[cpu]) {
 		printk("Processor %u is stuck.\n", cpu);
 		return -ENOENT;
-	}
+	} else
+		printk("Found processor %u with %d tries left\n", cpu, c);
 
 	printk("Processor %u found.\n", cpu);
 
