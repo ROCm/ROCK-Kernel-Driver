@@ -176,10 +176,12 @@ static struct Scsi_Device_Template st_template = {
 	.module =	THIS_MODULE,
 	.list =		LIST_HEAD_INIT(st_template.list),
 	.name =		"tape", 
-	.tag =		"st", 
 	.scsi_type =	TYPE_TAPE,
 	.attach =	st_attach, 
-	.detach =	st_detach
+	.detach =	st_detach,
+	.scsi_driverfs_driver = {
+		.name = "st",
+	},
 };
 
 static int st_compression(Scsi_Tape *, int);
@@ -991,9 +993,9 @@ static int st_open(struct inode *inode, struct file *filp)
 		DEB( printk(ST_DEB_MSG "%s: Device already in use.\n", name); )
 		return (-EBUSY);
 	}
-	if(!try_module_get(STp->device->host->hostt->module))
+
+	if(!scsi_device_get(STp->device))
 		return (-ENXIO);
-	STp->device->access_count++;
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
@@ -1038,8 +1040,7 @@ static int st_open(struct inode *inode, struct file *filp)
  err_out:
 	normalize_buffer(STp->buffer);
 	STp->in_use = 0;
-	STp->device->access_count--;
-	module_put(STp->device->host->hostt->module);
+	scsi_device_put(STp->device);
 	return retval;
 
 }
@@ -1172,8 +1173,7 @@ static int st_release(struct inode *inode, struct file *filp)
 	write_lock(&st_dev_arr_lock);
 	STp->in_use = 0;
 	write_unlock(&st_dev_arr_lock);
-	STp->device->access_count--;
-	module_put(STp->device->host->hostt->module);
+	scsi_device_put(STp->device);
 
 	return result;
 }
@@ -3826,7 +3826,7 @@ static int st_attach(Scsi_Device * SDp)
 	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
 		    SDp->sdev_driverfs_dev.name, name);
 	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_r[mode].bus = SDp->sdev_driverfs_dev.bus;
 	    tpnt->driverfs_dev_r[mode].driver_data =
 			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5));
 	    device_register(&tpnt->driverfs_dev_r[mode]);
@@ -3845,7 +3845,7 @@ static int st_attach(Scsi_Device * SDp)
 	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
 		    SDp->sdev_driverfs_dev.name, name);
 	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_n[mode].bus = SDp->sdev_driverfs_dev.bus;
 	    tpnt->driverfs_dev_n[mode].driver_data =
 			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128);
 	    device_register(&tpnt->driverfs_dev_n[mode]);

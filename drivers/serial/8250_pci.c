@@ -176,6 +176,7 @@ get_pci_port(struct pci_dev *dev, struct pci_board *board,
 		return 0;
 	}
 	req->io_type = SERIAL_IO_MEM;
+	req->iomap_base = port;
 	req->iomem_base = ioremap(port, board->uart_offset);
 	if (req->iomem_base == NULL)
 		return -ENOMEM;
@@ -262,12 +263,14 @@ static int __devinit pci_plx9050_fn(struct pci_dev *dev, int enable)
  * interface chip and different configuration methods:
  *     - 10x cards have control registers in IO and/or memory space;
  *     - 20x cards have control registers in standard PCI configuration space.
+ *
+ * Note: some SIIG cards are probed by the parport_serial object.
  */
 
 #define PCI_DEVICE_ID_SIIG_1S_10x (PCI_DEVICE_ID_SIIG_1S_10x_550 & 0xfffc)
 #define PCI_DEVICE_ID_SIIG_2S_10x (PCI_DEVICE_ID_SIIG_2S_10x_550 & 0xfff8)
 
-static int __devinit pci_siig10x_fn(struct pci_dev *dev, int enable)
+int pci_siig10x_fn(struct pci_dev *dev, int enable)
 {
 	u16 data, *p;
 
@@ -295,10 +298,12 @@ static int __devinit pci_siig10x_fn(struct pci_dev *dev, int enable)
 	return 0;
 }
 
+EXPORT_SYMBOL(pci_siig10x_fn);
+
 #define PCI_DEVICE_ID_SIIG_2S_20x (PCI_DEVICE_ID_SIIG_2S_20x_550 & 0xfffc)
 #define PCI_DEVICE_ID_SIIG_2S1P_20x (PCI_DEVICE_ID_SIIG_2S1P_20x_550 & 0xfffc)
 
-static int __devinit pci_siig20x_fn(struct pci_dev *dev, int enable)
+int pci_siig20x_fn(struct pci_dev *dev, int enable)
 {
 	u8 data;
 
@@ -317,6 +322,8 @@ static int __devinit pci_siig20x_fn(struct pci_dev *dev, int enable)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(pci_siig20x_fn);
 
 /* Added for EKF Intel i960 serial boards */
 static int __devinit pci_inteli960ni_fn(struct pci_dev *dev, int enable)

@@ -410,30 +410,30 @@ static void adv717x_dec_use(struct i2c_client *client)
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver i2c_driver_adv7175 = {
-	name:		"adv7175",		/* name */
-	id:		I2C_DRIVERID_ADV717x,	/* ID */
-	flags:		I2C_DF_NOTIFY, //I2C_ADV7175, I2C_ADV7175 + 3,
-	attach_adapter:	adv717x_probe,
-	detach_client:	adv717x_detach,
-	command:	adv717x_command,
-	inc_use:	&adv717x_inc_use,
-	dec_use:	&adv717x_dec_use
+	.name		= "adv7175",		/* name */
+	.id		= I2C_DRIVERID_ADV717x,	/* ID */
+	.flags		= I2C_DF_NOTIFY, //I2C_ADV7175, I2C_ADV7175 + 3,
+	.attach_adapter	= adv717x_probe,
+	.detach_client	= adv717x_detach,
+	.command	= adv717x_command,
+	.inc_use	= &adv717x_inc_use,
+	.dec_use	= &adv717x_dec_use
 };
 
 static struct i2c_driver i2c_driver_adv7176 = {
-	name:		"adv7176",		/* name */
-	id:		I2C_DRIVERID_ADV717x,	/* ID */
-	flags:		I2C_DF_NOTIFY, //I2C_ADV7176, I2C_ADV7176 + 3,
-	attach_adapter:	adv717x_probe,
-	detach_client:	adv717x_detach,
-	command:	adv717x_command,
-	inc_use:	&adv717x_inc_use,
-	dec_use:	&adv717x_dec_use
+	.name		= "adv7176",		/* name */
+	.id		= I2C_DRIVERID_ADV717x,	/* ID */
+	.flags		= I2C_DF_NOTIFY, //I2C_ADV7176, I2C_ADV7176 + 3,
+	.attach_adapter	= adv717x_probe,
+	.detach_client	= adv717x_detach,
+	.command	= adv717x_command,
+	.inc_use	= &adv717x_inc_use,
+	.dec_use	= &adv717x_dec_use
 };
 
 static struct i2c_client client_template = {
-	name:		"adv7175_client",
-	driver:		&i2c_driver_adv7175
+	.name		= "adv7175_client",
+	.driver		= &i2c_driver_adv7175
 };
 
 static int adv717x_init(void)

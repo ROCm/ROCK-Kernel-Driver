@@ -301,7 +301,8 @@ static void __devinit quirk_vt82c686_acpi(struct pci_dev *dev)
 
 
 #ifdef CONFIG_X86_IO_APIC 
-extern int nr_ioapics;
+
+#include <asm/io_apic.h>
 
 /*
  * VIA 686A/B: If an IO-APIC is active, we need to route all on-chip
@@ -561,7 +562,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 #ifdef CONFIG_X86_IO_APIC 
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686,	quirk_via_ioapic },
 	{ PCI_FIXUP_FINAL, 	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic },
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SIS,	PCI_ANY_ID,			quirk_ioapic_rmw },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_ANY_ID,			quirk_ioapic_rmw },
 #endif
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi },

@@ -272,20 +272,20 @@ static int tt_ioctl(struct inode *inode, struct file *file,
 static struct tt_device terratec_unit;
 
 static struct file_operations terratec_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		tt_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= tt_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device terratec_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"TerraTec ActiveRadio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_TERRATEC,
-	fops:           &terratec_fops,
+	.owner		= THIS_MODULE,
+	.name		= "TerraTec ActiveRadio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_TERRATEC,
+	.fops           = &terratec_fops,
 };
 
 static int __init terratec_init(void)

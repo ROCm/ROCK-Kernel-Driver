@@ -397,6 +397,7 @@ extern void do_SAK(struct tty_struct *tty);
 extern void disassociate_ctty(int priv);
 extern void tty_flip_buffer_push(struct tty_struct *tty);
 extern int tty_get_baud_rate(struct tty_struct *tty);
+extern int tty_termios_baud_rate(struct termios *termios);
 
 /* n_tty.c */
 extern struct tty_ldisc tty_ldisc_N_TTY;

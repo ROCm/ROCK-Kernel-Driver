@@ -885,20 +885,20 @@ static int qcam_read(struct file *file, char *buf,
 }
  
 static struct file_operations qcam_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:          qcam_ioctl,
-	read:		qcam_read,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl          = qcam_ioctl,
+	.read		= qcam_read,
+	.llseek         = no_llseek,
 };
 static struct video_device qcam_template=
 {
-	owner:		THIS_MODULE,
-	name:		"Connectix Quickcam",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_QCAM_BW,
-	fops:           &qcam_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Connectix Quickcam",
+	.type		= VID_TYPE_CAPTURE,
+	.hardware	= VID_HARDWARE_QCAM_BW,
+	.fops           = &qcam_fops,
 };
 
 #define MAX_CAMS 4

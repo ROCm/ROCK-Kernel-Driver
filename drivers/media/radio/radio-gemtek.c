@@ -229,20 +229,20 @@ static int gemtek_ioctl(struct inode *inode, struct file *file,
 static struct gemtek_device gemtek_unit;
 
 static struct file_operations gemtek_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		gemtek_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= gemtek_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device gemtek_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"GemTek radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_GEMTEK,
-	fops:           &gemtek_fops,
+	.owner		= THIS_MODULE,
+	.name		= "GemTek radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_GEMTEK,
+	.fops           = &gemtek_fops,
 };
 
 static int __init gemtek_init(void)

@@ -32,7 +32,7 @@
 #define AC97_PCM_FRONT_DAC_RATE   0x002C       /* PCM Front DAC Rate */
 #define AC97_PCM_SURR_DAC_RATE    0x002E       /* PCM Surround DAC Rate */
 #define AC97_PCM_LFE_DAC_RATE     0x0030       /* PCM LFE DAC Rate */
-#define AC97_PCM_LR_ADC_RATE      0x0032       /* PCM LR DAC Rate */
+#define AC97_PCM_LR_ADC_RATE      0x0032       /* PCM LR ADC Rate */
 #define AC97_PCM_MIC_ADC_RATE     0x0034       /* PCM MIC ADC Rate */
 #define AC97_CENTER_LFE_MASTER    0x0036       /* Center + LFE Master Volume */
 #define AC97_SURROUND_MASTER      0x0038       /* Surround (Rear) Master Volume */
@@ -142,6 +142,39 @@
 #define AC97_PWR_PR5              0x2000       /* Internal Clk disable */
 #define AC97_PWR_PR6              0x4000       /* HP amp powerdown */
 #define AC97_PWR_PR7              0x8000       /* Modem off - if supported */
+
+/* extended audio ID register bit defines */
+#define AC97_EXTID_VRA            0x0001
+#define AC97_EXTID_DRA            0x0002
+#define AC97_EXTID_SPDIF          0x0004
+#define AC97_EXTID_VRM            0x0008
+#define AC97_EXTID_DSA0           0x0010
+#define AC97_EXTID_DSA1           0x0020
+#define AC97_EXTID_CDAC           0x0040
+#define AC97_EXTID_SDAC           0x0080
+#define AC97_EXTID_LDAC           0x0100
+#define AC97_EXTID_AMAP           0x0200
+#define AC97_EXTID_REV0           0x0400
+#define AC97_EXTID_REV1           0x0800
+#define AC97_EXTID_ID0            0x4000
+#define AC97_EXTID_ID1            0x8000
+
+/* extended status register bit defines */
+#define AC97_EXTSTAT_VRA          0x0001
+#define AC97_EXTSTAT_DRA          0x0002
+#define AC97_EXTSTAT_SPDIF        0x0004
+#define AC97_EXTSTAT_VRM          0x0008
+#define AC97_EXTSTAT_SPSA0        0x0010
+#define AC97_EXTSTAT_SPSA1        0x0020
+#define AC97_EXTSTAT_CDAC         0x0040
+#define AC97_EXTSTAT_SDAC         0x0080
+#define AC97_EXTSTAT_LDAC         0x0100
+#define AC97_EXTSTAT_MADC         0x0200
+#define AC97_EXTSTAT_SPCV         0x0400
+#define AC97_EXTSTAT_PRI          0x0800
+#define AC97_EXTSTAT_PRJ          0x1000
+#define AC97_EXTSTAT_PRK          0x2000
+#define AC97_EXTSTAT_PRL          0x4000
 
 /* useful power states */
 #define AC97_PWR_D0               0x0000      /* everything on */

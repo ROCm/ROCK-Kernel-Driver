@@ -1113,12 +1113,12 @@ static int query_disk(struct aac_dev *dev, void *arg)
 	qd.locked = fsa_dev_ptr->locked[qd.cnum];
 	qd.deleted = fsa_dev_ptr->deleted[qd.cnum];
 
-	if (fsa_dev_ptr->devno[qd.cnum][0] == '\0')
+	if (fsa_dev_ptr->devname[qd.cnum][0] == '\0')
 		qd.unmapped = 1;
 	else
 		qd.unmapped = 0;
 
-	strncpy(dq.name, fsa_dev_ptr->devname[qd.cnum], 8);
+	strncpy(qd.name, fsa_dev_ptr->devname[qd.cnum], 8);
 
 	if (copy_to_user(arg, &qd, sizeof (struct aac_query_disk)))
 		return -EFAULT;
@@ -1170,7 +1170,7 @@ static int delete_disk(struct aac_dev *dev, void *arg)
 		 *	Mark the container as no longer being valid.
 		 */
 		fsa_dev_ptr->valid[dd.cnum] = 0;
-		fsa_dev_ptr->devno[dd.cnum][0] = '\0';
+		fsa_dev_ptr->devname[dd.cnum][0] = '\0';
 		return 0;
 	}
 }

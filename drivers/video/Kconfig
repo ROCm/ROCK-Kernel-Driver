@@ -867,6 +867,13 @@ config FB_TX3912
 
 	  Say Y here to enable kernel support for the on-board framebuffer.
 
+config FB_68328
+	bool "Motorola 68328 native frame buffer support"
+	depends on (M68328 || M68EZ328 || M68VZ328)
+	help
+	  Say Y here if you want to support the built-in frame buffer of
+	  the Motorola 68328 CPU family.
+
 config FB_VIRTUAL
 	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!) (EXPERIMENTAL)"
 	depends on FB && EXPERIMENTAL

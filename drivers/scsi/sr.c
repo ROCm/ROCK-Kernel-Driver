@@ -32,8 +32,6 @@
  *	check resource allocation in sr_init and some cleanups
  */
 
-#define MAJOR_NR SCSI_CDROM_MAJOR
-
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -57,6 +55,9 @@
 
 MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 
+
+#define SR_DISKS	(1 << KDEV_MINOR_BITS)
+
 #define MAX_RETRIES	3
 #define SR_TIMEOUT	(30 * HZ)
 #define SR_CAPABILITIES \
@@ -73,18 +74,24 @@ static struct Scsi_Device_Template sr_template = {
 	.module		= THIS_MODULE,
 	.list		= LIST_HEAD_INIT(sr_template.list),
 	.name		= "cdrom",
-	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
 	.attach		= sr_attach,
 	.detach		= sr_detach,
-	.init_command	= sr_init_command
+	.init_command	= sr_init_command,
+	.scsi_driverfs_driver = {
+		.name   = "sr",
+	},
 };
 
-static int sr_nr_dev;	/* XXX(hch) bad hack, we want a bitmap instead */
 static LIST_HEAD(sr_devlist);
 static spinlock_t sr_devlist_lock = SPIN_LOCK_UNLOCKED;
 
+static unsigned long sr_index_bits[SR_DISKS / BITS_PER_LONG];
+static spinlock_t sr_index_lock = SPIN_LOCK_UNLOCKED;
+
 static int sr_open(struct cdrom_device_info *, int);
+static void sr_release(struct cdrom_device_info *);
+
 static void get_sectorsize(struct scsi_cd *);
 static void get_capabilities(struct scsi_cd *);
 
@@ -120,16 +127,6 @@ static inline void sr_devlist_remove(Scsi_CD *cd)
 	spin_lock(&sr_devlist_lock);
 	list_del(&cd->list);
 	spin_unlock(&sr_devlist_lock);
-}
-
-static void sr_release(struct cdrom_device_info *cdi)
-{
-	struct scsi_cd *cd = cdi->handle;
-
-	if (cd->device->sector_size > 2048)
-		sr_set_blocklength(cd, 2048);
-	cd->device->access_count--;
-	module_put(cd->device->host->hostt->module);
 }
 
 static struct cdrom_device_ops sr_dops = {
@@ -458,43 +455,59 @@ struct block_device_operations sr_bdops =
 static int sr_open(struct cdrom_device_info *cdi, int purpose)
 {
 	struct scsi_cd *cd = cdi->handle;
+	struct scsi_device *sdev = cd->device;
+	int retval;
 
-	if (!cd->device)
-		return -ENXIO;	/* No such device */
+	retval = scsi_device_get(sdev);
+	if (retval)
+		return retval;
+	
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
 	 */
-	if (!scsi_block_when_processing_errors(cd->device)) {
-		return -ENXIO;
-	}
-	if(!try_module_get(cd->device->host->hostt->module))
-		return -ENXIO;
-	cd->device->access_count++;
+	retval = -ENXIO;
+	if (!scsi_block_when_processing_errors(sdev))
+		goto error_out;
 
-	/* If this device did not have media in the drive at boot time, then
+	/*
+	 * If this device did not have media in the drive at boot time, then
 	 * we would have been unable to get the sector size.  Check to see if
 	 * this is the case, and try again.
 	 */
-
 	if (cd->needs_sector_size)
 		get_sectorsize(cd);
-
 	return 0;
+
+error_out:
+	scsi_device_put(sdev);
+	return retval;	
+}
+
+static void sr_release(struct cdrom_device_info *cdi)
+{
+	struct scsi_cd *cd = cdi->handle;
+
+	if (cd->device->sector_size > 2048)
+		sr_set_blocklength(cd, 2048);
+
+	scsi_device_put(cd->device);
 }
 
 static int sr_attach(struct scsi_device *sdev)
 {
 	struct gendisk *disk;
 	struct scsi_cd *cd;
-	int minor;
+	int minor, error;
 
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
 		return 1;
 
-	if (scsi_slave_attach(sdev))
-		return 1;
+	error = scsi_slave_attach(sdev);
+	if (error)
+		return error;
 
+	error = -ENOMEM;
 	cd = kmalloc(sizeof(*cd), GFP_KERNEL);
 	if (!cd)
 		goto fail;
@@ -504,16 +517,17 @@ static int sr_attach(struct scsi_device *sdev)
 	if (!disk)
 		goto fail_free;
 
-	/*
-	 * XXX  This doesn't make us better than the previous code in the
-	 * XXX  end (not worse either, though..).
-	 * XXX  To properly support hotplugging we should have a bitmap and
-	 * XXX  use find_first_zero_bit on it.  This will happen at the
-	 * XXX  same time template->nr_* goes away.		--hch
-	 */
-	minor = sr_nr_dev++;
+	spin_lock(&sr_index_lock);
+	minor = find_first_zero_bit(sr_index_bits, SR_DISKS);
+	if (minor == SR_DISKS) {
+		spin_unlock(&sr_index_lock);
+		error = -EBUSY;
+		goto fail_put;
+	}
+	__set_bit(minor, sr_index_bits);
+	spin_unlock(&sr_index_lock);
 
-	disk->major = MAJOR_NR;
+	disk->major = SCSI_CDROM_MAJOR;
 	disk->first_minor = minor;
 	sprintf(disk->disk_name, "sr%d", minor);
 	disk->fops = &sr_bdops;
@@ -560,11 +574,13 @@ static int sr_attach(struct scsi_device *sdev)
 	    sdev->id, sdev->lun);
 	return 0;
 
+fail_put:
+	put_disk(disk);
 fail_free:
 	kfree(cd);
 fail:
 	scsi_slave_detach(sdev);
-	return 1;
+	return error;
 }
 
 
@@ -792,13 +808,15 @@ static void sr_detach(struct scsi_device * SDp)
 		return;
 
 	sr_devlist_remove(cd);
+	scsi_slave_detach(SDp);
 	del_gendisk(cd->disk);
+
+	spin_lock(&sr_index_lock);
+	clear_bit(cd->disk->first_minor, sr_index_bits);
+	spin_unlock(&sr_index_lock);
+
 	put_disk(cd->disk);
 	unregister_cdrom(&cd->cdi);
-
-	scsi_slave_detach(SDp);
-	sr_nr_dev--;
-
 	kfree(cd);
 }
 
@@ -806,7 +824,7 @@ static int __init init_sr(void)
 {
 	int rc;
 
-	rc = register_blkdev(MAJOR_NR, "sr", &sr_bdops);
+	rc = register_blkdev(SCSI_CDROM_MAJOR, "sr", &sr_bdops);
 	if (rc)
 		return rc;
 	return scsi_register_device(&sr_template);
@@ -815,7 +833,7 @@ static int __init init_sr(void)
 static void __exit exit_sr(void)
 {
 	scsi_unregister_device(&sr_template);
-	unregister_blkdev(MAJOR_NR, "sr");
+	unregister_blkdev(SCSI_CDROM_MAJOR, "sr");
 }
 
 module_init(init_sr);

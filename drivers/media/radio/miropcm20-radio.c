@@ -217,26 +217,25 @@ static int pcm20_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct pcm20_device pcm20_unit = {
-	freq:   87*16000,
-	muted:  1,
-	stereo: 0
+	.freq   = 87*16000,
+	.muted  = 1,
 };
 
 static struct file_operations pcm20_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		pcm20_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= pcm20_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device pcm20_radio = {
-	owner:		THIS_MODULE,
-	name:		"Miro PCM 20 radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_RTRACK,
-	fops:           &pcm20_fops,
-	priv:		&pcm20_unit
+	.owner		= THIS_MODULE,
+	.name		= "Miro PCM 20 radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_RTRACK,
+	.fops           = &pcm20_fops,
+	.priv		= &pcm20_unit
 };
 
 static int __init pcm20_init(void)

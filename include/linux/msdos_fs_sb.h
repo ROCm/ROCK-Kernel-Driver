@@ -8,7 +8,7 @@
 struct fat_mount_options {
 	uid_t fs_uid;
 	gid_t fs_gid;
-	unsigned short fs_umask;
+	unsigned short fs_fmask;
 	unsigned short fs_dmask;
 	unsigned short codepage;  /* Codepage for shortname conversions */
 	char *iocharset;          /* Charset used for filename input/display */

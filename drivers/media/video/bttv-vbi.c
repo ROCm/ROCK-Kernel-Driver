@@ -123,10 +123,10 @@ static void vbi_buffer_release(struct file *file, struct videobuf_buffer *vb)
 }
 
 struct videobuf_queue_ops bttv_vbi_qops = {
-	buf_setup:    vbi_buffer_setup,
-	buf_prepare:  vbi_buffer_prepare,
-	buf_queue:    vbi_buffer_queue,
-	buf_release:  vbi_buffer_release,
+	.buf_setup    = vbi_buffer_setup,
+	.buf_prepare  = vbi_buffer_prepare,
+	.buf_queue    = vbi_buffer_queue,
+	.buf_release  = vbi_buffer_release,
 };
 
 /* ----------------------------------------------------------------------- */

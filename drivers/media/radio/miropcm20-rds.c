@@ -105,10 +105,10 @@ static ssize_t rds_f_read(struct file *file, char *buffer, size_t length, loff_t
 }
 
 static struct file_operations rds_f_ops = {
-	owner:	THIS_MODULE,
-	read:    rds_f_read,
-	open:    rds_f_open,
-	release: rds_f_release
+	.owner		= THIS_MODULE,
+	.read		= rds_f_read,
+	.open		= rds_f_open,
+	.release	= rds_f_release
 };
 
 

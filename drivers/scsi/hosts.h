@@ -488,7 +488,7 @@ struct Scsi_Host
     /* 
      * Support for driverfs filesystem
      */
-    struct device host_driverfs_dev;
+    struct device *host_gendev;
 
     /*
      * We should ensure that this is aligned, both for better performance
@@ -499,6 +499,8 @@ struct Scsi_Host
         __attribute__ ((aligned (sizeof(unsigned long))));
 };
 
+#define	to_scsi_host(d)	d->class_data
+	
 /*
  * These two functions are used to allocate and free a pseudo device
  * which will connect to the host adapter itself rather than any
@@ -524,7 +526,7 @@ static inline void scsi_set_pci_device(struct Scsi_Host *shost,
                                        struct pci_dev *pdev)
 {
 	shost->pci_dev = pdev;
-	shost->host_driverfs_dev.parent=&pdev->dev;
+	shost->host_gendev = &pdev->dev;
 }
 
 
@@ -532,12 +534,13 @@ static inline void scsi_set_pci_device(struct Scsi_Host *shost,
  * Prototypes for functions/data in scsi_scan.c
  */
 extern void scsi_scan_host(struct Scsi_Host *);
+extern void scsi_forget_host(struct Scsi_Host *);
+
 
 struct Scsi_Device_Template
 {
     struct list_head list;
     const char * name;
-    const char * tag;
     struct module * module;	  /* Used for loadable modules */
     unsigned char scsi_type;
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
@@ -565,7 +568,7 @@ extern void scsi_unregister(struct Scsi_Host *);
 /*
  * HBA registration/unregistration.
  */
-extern int scsi_add_host(struct Scsi_Host *);
+extern int scsi_add_host(struct Scsi_Host *, struct device *);
 extern int scsi_remove_host(struct Scsi_Host *);
 
 /*
@@ -603,7 +606,15 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
                         break;
         return sdev;
 }
-    
+
+/*
+ * sysfs support
+ */
+extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
+extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
+
+extern struct device_class shost_devclass;
+
 #endif
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
