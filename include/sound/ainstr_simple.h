@@ -134,8 +134,6 @@ typedef struct simple_xinstrument {
 
 #include "seq_instr.h"
 
-extern char *snd_seq_simple_id;
-
 typedef struct {
 	void *private_data;
 	int (*info)(void *private_data, simple_instrument_info_t *info);

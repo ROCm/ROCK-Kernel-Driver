@@ -119,9 +119,8 @@ void snd_ad1848_out(ad1848_t *chip,
 #endif
 }
 
-void snd_ad1848_dout(ad1848_t *chip,
-		     unsigned char reg,
-		     unsigned char value)
+static void snd_ad1848_dout(ad1848_t *chip,
+			    unsigned char reg, unsigned char value)
 {
 	int timeout;
 
@@ -132,7 +131,7 @@ void snd_ad1848_dout(ad1848_t *chip,
 	mb();
 }
 
-unsigned char snd_ad1848_in(ad1848_t *chip, unsigned char reg)
+static unsigned char snd_ad1848_in(ad1848_t *chip, unsigned char reg)
 {
 	int timeout;
 
@@ -147,9 +146,9 @@ unsigned char snd_ad1848_in(ad1848_t *chip, unsigned char reg)
 	return inb(AD1848P(chip, REG));
 }
 
-#ifdef CONFIG_SND_DEBUG
+#if 0
 
-void snd_ad1848_debug(ad1848_t *chip)
+static void snd_ad1848_debug(ad1848_t *chip)
 {
 	printk("AD1848 REGS:      INDEX = 0x%02x  ", inb(AD1848P(chip, REGSEL)));
 	printk("                 STATUS = 0x%02x\n", inb(AD1848P(chip, STATUS)));
@@ -177,7 +176,7 @@ void snd_ad1848_debug(ad1848_t *chip)
  *  AD1848 detection / MCE routines
  */
 
-void snd_ad1848_mce_up(ad1848_t *chip)
+static void snd_ad1848_mce_up(ad1848_t *chip)
 {
 	unsigned long flags;
 	int timeout;
@@ -198,7 +197,7 @@ void snd_ad1848_mce_up(ad1848_t *chip)
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
-void snd_ad1848_mce_down(ad1848_t *chip)
+static void snd_ad1848_mce_down(ad1848_t *chip)
 {
 	unsigned long flags;
 	int timeout;
@@ -584,7 +583,7 @@ static int snd_ad1848_capture_prepare(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-irqreturn_t snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ad1848_t *chip = dev_id;
 
@@ -1264,12 +1263,7 @@ int snd_ad1848_mixer(ad1848_t *chip)
 	return 0;
 }
 
-EXPORT_SYMBOL(snd_ad1848_in);
 EXPORT_SYMBOL(snd_ad1848_out);
-EXPORT_SYMBOL(snd_ad1848_dout);
-EXPORT_SYMBOL(snd_ad1848_mce_up);
-EXPORT_SYMBOL(snd_ad1848_mce_down);
-EXPORT_SYMBOL(snd_ad1848_interrupt);
 EXPORT_SYMBOL(snd_ad1848_create);
 EXPORT_SYMBOL(snd_ad1848_pcm);
 EXPORT_SYMBOL(snd_ad1848_get_pcm_ops);

@@ -61,8 +61,8 @@ enum {
 };
 
 static struct pci_device_id snd_vx222_ids[] = {
-	{ 0x10b5, 0x9050, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VX_PCI_VX222_OLD, },   /* PLX */
-	{ 0x10b5, 0x9030, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VX_PCI_VX222_NEW, },   /* PLX */
+	{ 0x10b5, 0x9050, 0x1369, PCI_ANY_ID, 0, 0, VX_PCI_VX222_OLD, },   /* PLX */
+	{ 0x10b5, 0x9030, 0x1369, PCI_ANY_ID, 0, 0, VX_PCI_VX222_NEW, },   /* PLX */
 	{ 0, }
 };
 
@@ -116,6 +116,7 @@ static int snd_vx222_free(vx_core_t *chip)
 		free_irq(chip->irq, (void*)chip);
 	if (vx->port[0])
 		pci_release_regions(vx->pci);
+	pci_disable_device(vx->pci);
 	kfree(chip);
 	return 0;
 }
@@ -147,8 +148,10 @@ static int __devinit snd_vx222_create(snd_card_t *card, struct pci_dev *pci,
 	vx_ops = hw->type == VX_TYPE_BOARD ? &vx222_old_ops : &vx222_ops;
 	chip = snd_vx_create(card, hw, vx_ops,
 			     sizeof(struct snd_vx222) - sizeof(vx_core_t));
-	if (! chip)
+	if (! chip) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	vx = (struct snd_vx222 *)chip;
 	vx->pci = pci;
 

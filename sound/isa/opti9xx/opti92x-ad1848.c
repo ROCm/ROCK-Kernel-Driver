@@ -1095,7 +1095,7 @@ static void snd_opti93x_overrange(opti93x_t *chip)
 	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
-irqreturn_t snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	opti93x_t *codec = dev_id;
 	unsigned char status;
@@ -1263,9 +1263,9 @@ static const char *snd_opti93x_chip_id(opti93x_t *codec)
 	}
 }
 
-int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
-		       int dma1, int dma2,
-		       opti93x_t **rcodec)
+static int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
+			      int dma1, int dma2,
+			      opti93x_t **rcodec)
 {
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_opti93x_dev_free,
@@ -1359,7 +1359,7 @@ static void snd_opti93x_pcm_free(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-int snd_opti93x_pcm(opti93x_t *codec, int device, snd_pcm_t **rpcm)
+static int snd_opti93x_pcm(opti93x_t *codec, int device, snd_pcm_t **rpcm)
 {
 	int error;
 	snd_pcm_t *pcm;
@@ -1603,7 +1603,7 @@ OPTi93X_DOUBLE("Capture Volume", 0, OPTi93X_MIXOUT_LEFT, OPTi93X_MIXOUT_RIGHT, 0
 }
 };
                                         
-int snd_opti93x_mixer(opti93x_t *chip)
+static int snd_opti93x_mixer(opti93x_t *chip)
 {
 	snd_card_t *card;
 	snd_kcontrol_new_t knew;

@@ -164,16 +164,15 @@ sending the command above.
 
 The block and non-block options are used to change the behavior of
 opening the device file.
-As default, ALSA behaves as defined in POSIX, i.e. blocks the file
-when it's busy until the device becomes free (unless O_NONBLOCK is
-specified).  Some applications assume the non-block open behavior,
-which are actually implemented in some real OSS drivers.
+
+As default, ALSA behaves as original OSS drivers, i.e. does not block
+the file when it's busy. The -EBUSY error is returned in this case.
 
 This blocking behavior can be changed globally via nonblock_open
-module option of snd-pcm-oss.  For using the non-block mode as default
+module option of snd-pcm-oss.  For using the blocking mode as default
 for OSS devices, define like the following:
 
-	options snd-pcm-oss nonblock_open=1
+	options snd-pcm-oss nonblock_open=0
 
 The partial-frag and no-silence commands have been added recently.
 Both commands are for optimization use only.  The former command

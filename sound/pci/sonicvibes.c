@@ -357,8 +357,8 @@ static unsigned char snd_sonicvibes_in(sonicvibes_t * sonic, unsigned char reg)
 	return value;
 }
 
-#ifdef CONFIG_SND_DEBUG
-void snd_sonicvibes_debug(sonicvibes_t * sonic)
+#if 0
+static void snd_sonicvibes_debug(sonicvibes_t * sonic)
 {
 	printk("SV REGS:          INDEX = 0x%02x  ", inb(SV_REG(sonic, INDEX)));
 	printk("                 STATUS = 0x%02x\n", inb(SV_REG(sonic, STATUS)));
@@ -1185,6 +1185,7 @@ static int snd_sonicvibes_free(sonicvibes_t *sonic)
 		kfree_nocheck(sonic->res_dmac);
 	}
 	pci_release_regions(sonic->pci);
+	pci_disable_device(sonic->pci);
 	kfree(sonic);
 	return 0;
 }
@@ -1216,12 +1217,15 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
         if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
                 return -ENXIO;
         }
 
 	sonic = kcalloc(1, sizeof(*sonic), GFP_KERNEL);
-	if (sonic == NULL)
+	if (sonic == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&sonic->reg_lock);
 	sonic->card = card;
 	sonic->pci = pci;
@@ -1229,6 +1233,7 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "S3 SonicVibes")) < 0) {
 		kfree(sonic);
+		pci_disable_device(pci);
 		return err;
 	}
 

@@ -214,17 +214,17 @@ static struct pci_device_id snd_azf3328_ids[] = {
 
 MODULE_DEVICE_TABLE(pci, snd_azf3328_ids);
 
-void snd_azf3328_io2_write(azf3328_t *chip, int reg, unsigned char value)
+static void snd_azf3328_io2_write(azf3328_t *chip, int reg, unsigned char value)
 {
 	outb(value, chip->io2_port + reg);
 }
 
-unsigned char snd_azf3328_io2_read(azf3328_t *chip, int reg)
+static unsigned char snd_azf3328_io2_read(azf3328_t *chip, int reg)
 {
 	return inb(chip->io2_port + reg);
 }
 
-void snd_azf3328_mixer_write(azf3328_t *chip, int reg, unsigned long value, int type)
+static void snd_azf3328_mixer_write(azf3328_t *chip, int reg, unsigned long value, int type)
 {
 	switch(type) {
 	case WORD_VALUE:
@@ -239,26 +239,7 @@ void snd_azf3328_mixer_write(azf3328_t *chip, int reg, unsigned long value, int 
 	}
 }
 
-unsigned long snd_azf3328_mixer_read(azf3328_t *chip, int reg, int type)
-{
-	unsigned long res = 0;
-
-	switch(type) {
-	case WORD_VALUE:
-		res = (unsigned long)inw(chip->mixer_port + reg);
-		break;
-	case DWORD_VALUE:
-		res = (unsigned long)inl(chip->mixer_port + reg);
-		break;
-	case BYTE_VALUE:
-		res = (unsigned long)inb(chip->mixer_port + reg);
-		break;
-	}
-
-	return res;
-}
-
-void snd_azf3328_mixer_set_mute(azf3328_t *chip, int reg, int do_mute)
+static void snd_azf3328_mixer_set_mute(azf3328_t *chip, int reg, int do_mute)
 {
 	unsigned char oldval;
 
@@ -272,7 +253,7 @@ void snd_azf3328_mixer_set_mute(azf3328_t *chip, int reg, int do_mute)
 	outb(oldval, chip->mixer_port + reg + 1);
 }
 
-void snd_azf3328_mixer_write_volume_gradually(azf3328_t *chip, int reg, unsigned char dst_vol_left, unsigned char dst_vol_right, int chan_sel, int delay)
+static void snd_azf3328_mixer_write_volume_gradually(azf3328_t *chip, int reg, unsigned char dst_vol_left, unsigned char dst_vol_right, int chan_sel, int delay)
 {
 	unsigned char curr_vol_left = 0, curr_vol_right = 0;
 	int left_done = 0, right_done = 0;
@@ -1268,6 +1249,7 @@ static int snd_azf3328_free(azf3328_t *chip)
         if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 
         kfree(chip);
         return 0;
@@ -1317,8 +1299,10 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	chip->card = card;
 	chip->pci = pci;
@@ -1328,11 +1312,13 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	if ((err = pci_request_regions(pci, "Aztech AZF3328")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 

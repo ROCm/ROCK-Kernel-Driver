@@ -28,7 +28,7 @@
 /*
  *
  */
-unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
+static unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
 {
 	pdacf_t *chip = private_data;
 	unsigned long timeout;
@@ -60,7 +60,7 @@ unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
 	return res;
 }
 
-void pdacf_ak4117_write(void *private_data, unsigned char reg, unsigned char val)
+static void pdacf_ak4117_write(void *private_data, unsigned char reg, unsigned char val)
 {
 	pdacf_t *chip = private_data;
 	unsigned long timeout;

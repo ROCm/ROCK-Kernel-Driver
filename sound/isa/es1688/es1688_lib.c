@@ -70,7 +70,7 @@ static int snd_es1688_write(es1688_t *chip,
 	return snd_es1688_dsp_command(chip, data);
 }
 
-int snd_es1688_read(es1688_t *chip, unsigned char reg)
+static int snd_es1688_read(es1688_t *chip, unsigned char reg)
 {
 	/* Read a byte from an extended mode register of ES1688 */
 	if (!snd_es1688_dsp_command(chip, 0xc0))
@@ -89,7 +89,7 @@ void snd_es1688_mixer_write(es1688_t *chip,
 	udelay(10);
 }
 
-unsigned char snd_es1688_mixer_read(es1688_t *chip, unsigned char reg)
+static unsigned char snd_es1688_mixer_read(es1688_t *chip, unsigned char reg)
 {
 	unsigned char result;
 
@@ -479,7 +479,7 @@ static int snd_es1688_capture_trigger(snd_pcm_substream_t * substream,
 	return snd_es1688_trigger(chip, cmd, 0x0f);
 }
 
-irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	es1688_t *chip = dev_id;
 
@@ -1041,8 +1041,6 @@ int snd_es1688_mixer(es1688_t *chip)
 }
 
 EXPORT_SYMBOL(snd_es1688_mixer_write);
-EXPORT_SYMBOL(snd_es1688_mixer_read);
-EXPORT_SYMBOL(snd_es1688_interrupt);
 EXPORT_SYMBOL(snd_es1688_create);
 EXPORT_SYMBOL(snd_es1688_pcm);
 EXPORT_SYMBOL(snd_es1688_mixer);

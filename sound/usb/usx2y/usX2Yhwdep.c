@@ -95,20 +95,14 @@ static unsigned int snd_us428ctls_poll(snd_hwdep_t *hw, struct file *file, poll_
 {
 	unsigned int	mask = 0;
 	usX2Ydev_t	*us428 = (usX2Ydev_t*)hw->private_data;
-	static unsigned	LastN;
-
+	us428ctls_sharedmem_t *shm = us428->us428ctls_sharedmem;
 	if (us428->chip_status & USX2Y_STAT_CHIP_HUP)
 		return POLLHUP;
 
 	poll_wait(file, &us428->us428ctls_wait_queue_head, wait);
 
-	down(&us428->open_mutex);
-	if (us428->us428ctls_sharedmem
-	    && us428->us428ctls_sharedmem->CtlSnapShotLast != LastN) {
+	if (shm != NULL && shm->CtlSnapShotLast != shm->CtlSnapShotRed)
 		mask |= POLLIN;
-		LastN = us428->us428ctls_sharedmem->CtlSnapShotLast;
-	}
-	up(&us428->open_mutex);
 
 	return mask;
 }

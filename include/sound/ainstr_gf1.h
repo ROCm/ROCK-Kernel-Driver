@@ -203,8 +203,6 @@ typedef struct gf1_info {
 
 #include "seq_instr.h"
 
-extern char *snd_seq_gf1_id;
-
 typedef struct {
 	void *private_data;
 	int (*info)(void *private_data, gf1_info_t *info);

@@ -2386,6 +2386,7 @@ static int snd_m3_free(m3_t *chip)
 	if (chip->iobase)
 		pci_release_regions(chip->pci);
 
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2422,6 +2423,8 @@ static int m3_suspend(snd_card_t *card, unsigned int state)
 	/* power down apci registers */
 	snd_m3_outw(chip, 0xffff, 0x54);
 	snd_m3_outw(chip, 0xffff, 0x56);
+
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2434,6 +2437,7 @@ static int m3_resume(snd_card_t *card, unsigned int state)
 	if (chip->suspend_mem == NULL)
 		return 0;
 
+	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
 
 	/* first lets just bring everything back. .*/
@@ -2502,12 +2506,15 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	spin_lock_init(&chip->reg_lock);
 	switch (pci->device) {
@@ -2549,6 +2556,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->substreams = kmalloc(sizeof(m3_dma_t) * chip->num_substreams, GFP_KERNEL);
 	if (chip->substreams == NULL) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return -ENOMEM;
 	}
 	memset(chip->substreams, 0, sizeof(m3_dma_t) * chip->num_substreams);

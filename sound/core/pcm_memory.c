@@ -37,7 +37,7 @@ static int maximum_substreams = 4;
 module_param(maximum_substreams, int, 0444);
 MODULE_PARM_DESC(maximum_substreams, "Maximum substreams with preallocated DMA memory.");
 
-const static size_t snd_minimum_buffer = 16384;
+static const size_t snd_minimum_buffer = 16384;
 
 
 /*

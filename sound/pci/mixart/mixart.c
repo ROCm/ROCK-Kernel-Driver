@@ -1092,6 +1092,7 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 		mgr->bufferinfo.area = NULL;
 	}
 
+	pci_disable_device(mgr->pci);
 	kfree(mgr);
 	return 0;
 }
@@ -1292,14 +1293,17 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	/* check if we can restrict PCI DMA transfers to 32 bits */
 	if (pci_set_dma_mask(pci, 0xffffffff) < 0) {
 		snd_printk(KERN_ERR "architecture does not support 32bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	/*
 	 */
 	mgr = kcalloc(1, sizeof(*mgr), GFP_KERNEL);
-	if (! mgr)
+	if (! mgr) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	mgr->pci = pci;
 	mgr->irq = -1;
@@ -1307,6 +1311,7 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	/* resource assignment */
 	if ((err = pci_request_regions(pci, CARD_NAME)) < 0) {
 		kfree(mgr);
+		pci_disable_device(pci);
 		return err;
 	}
 	for (i = 0; i < 2; i++) {

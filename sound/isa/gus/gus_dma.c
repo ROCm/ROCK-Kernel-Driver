@@ -25,7 +25,7 @@
 #include <sound/core.h>
 #include <sound/gus.h>
 
-void snd_gf1_dma_ack(snd_gus_card_t * gus)
+static void snd_gf1_dma_ack(snd_gus_card_t * gus)
 {
 	unsigned long flags;
 
@@ -35,11 +35,11 @@ void snd_gf1_dma_ack(snd_gus_card_t * gus)
 	spin_unlock_irqrestore(&gus->reg_lock, flags);
 }
 
-void snd_gf1_dma_program(snd_gus_card_t * gus,
-			 unsigned int addr,
-			 unsigned long buf_addr,
-			 unsigned int count,
-			 unsigned int cmd)
+static void snd_gf1_dma_program(snd_gus_card_t * gus,
+				unsigned int addr,
+				unsigned long buf_addr,
+				unsigned int count,
+				unsigned int cmd)
 {
 	unsigned long flags;
 	unsigned int address;
