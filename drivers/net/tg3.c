@@ -845,6 +845,12 @@ static void tg3_frob_aux_power(struct tg3 *tp)
 
 static int tg3_setup_phy(struct tg3 *, int);
 
+#define RESET_KIND_SHUTDOWN	0
+#define RESET_KIND_INIT		1
+#define RESET_KIND_SUSPEND	2
+
+static void tg3_write_sig_post_reset(struct tg3 *, int);
+
 static int tg3_set_power_state(struct tg3 *tp, int state)
 {
 	u32 misc_host_ctrl;
@@ -1005,6 +1011,8 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 
 	/* Finally, set the new power state. */
 	pci_write_config_word(tp->pdev, pm + PCI_PM_CTRL, power_control);
+
+	tg3_write_sig_post_reset(tp, RESET_KIND_SHUTDOWN);
 
 	return 0;
 }
@@ -3538,6 +3546,82 @@ static void tg3_nvram_unlock(struct tg3 *tp)
 }
 
 /* tp->lock is held. */
+static void tg3_write_sig_pre_reset(struct tg3 *tp, int kind)
+{
+	tg3_write_mem(tp, NIC_SRAM_FIRMWARE_MBOX,
+		      NIC_SRAM_FIRMWARE_MBOX_MAGIC1);
+
+	if (tp->tg3_flags2 & TG3_FLG2_ASF_NEW_HANDSHAKE) {
+		switch (kind) {
+		case RESET_KIND_INIT:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_START);
+			break;
+
+		case RESET_KIND_SHUTDOWN:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_UNLOAD);
+			break;
+
+		case RESET_KIND_SUSPEND:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_SUSPEND);
+			break;
+
+		default:
+			break;
+		};
+	}
+}
+
+/* tp->lock is held. */
+static void tg3_write_sig_post_reset(struct tg3 *tp, int kind)
+{
+	if (tp->tg3_flags2 & TG3_FLG2_ASF_NEW_HANDSHAKE) {
+		switch (kind) {
+		case RESET_KIND_INIT:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_START_DONE);
+			break;
+
+		case RESET_KIND_SHUTDOWN:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_UNLOAD_DONE);
+			break;
+
+		default:
+			break;
+		};
+	}
+}
+
+/* tp->lock is held. */
+static void tg3_write_sig_legacy(struct tg3 *tp, int kind)
+{
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
+		switch (kind) {
+		case RESET_KIND_INIT:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_START);
+			break;
+
+		case RESET_KIND_SHUTDOWN:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_UNLOAD);
+			break;
+
+		case RESET_KIND_SUSPEND:
+			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
+				      DRV_STATE_SUSPEND);
+			break;
+
+		default:
+			break;
+		};
+	}
+}
+
+/* tp->lock is held. */
 static int tg3_chip_reset(struct tg3 *tp)
 {
 	u32 val;
@@ -3607,11 +3691,6 @@ static int tg3_chip_reset(struct tg3 *tp)
 		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
 	}
 
-	/* Prevent PXE from restarting.  */
-	tg3_write_mem(tp,
-		      NIC_SRAM_FIRMWARE_MBOX,
-		      NIC_SRAM_FIRMWARE_MBOX_MAGIC1);
-
 	if (tp->phy_id == PHY_ID_SERDES) {
 		tp->mac_mode = MAC_MODE_PORT_MODE_TBI;
 		tw32_f(MAC_MODE, tp->mac_mode);
@@ -3636,13 +3715,17 @@ static int tg3_chip_reset(struct tg3 *tp)
 
 	/* Reprobe ASF enable state.  */
 	tp->tg3_flags &= ~TG3_FLAG_ENABLE_ASF;
+	tp->tg3_flags2 &= ~TG3_FLG2_ASF_NEW_HANDSHAKE;
 	tg3_read_mem(tp, NIC_SRAM_DATA_SIG, &val);
 	if (val == NIC_SRAM_DATA_SIG_MAGIC) {
 		u32 nic_cfg;
 
 		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
-		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE)
+		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE) {
 			tp->tg3_flags |= TG3_FLAG_ENABLE_ASF;
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+				tp->tg3_flags2 |= TG3_FLG2_ASF_NEW_HANDSHAKE;
+		}
 	}
 
 	return 0;
@@ -3675,14 +3758,17 @@ static int tg3_halt(struct tg3 *tp)
 	int err;
 
 	tg3_stop_fw(tp);
+
+	tg3_write_sig_pre_reset(tp, RESET_KIND_SHUTDOWN);
+
 	tg3_abort_hw(tp);
 	err = tg3_chip_reset(tp);
+
+	tg3_write_sig_legacy(tp, RESET_KIND_SHUTDOWN);
+	tg3_write_sig_post_reset(tp, RESET_KIND_SHUTDOWN);
+
 	if (err)
 		return err;
-
-	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
-		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
-			      DRV_STATE_UNLOAD);
 
 	return 0;
 }
@@ -4642,6 +4728,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tg3_stop_fw(tp);
 
+	tg3_write_sig_pre_reset(tp, RESET_KIND_INIT);
+
 	if (tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) {
 		err = tg3_abort_hw(tp);
 		if (err)
@@ -4652,12 +4740,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	if (err)
 		return err;
 
-	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
-		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
-			      DRV_STATE_START);
-	else
-		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
-			      DRV_STATE_SUSPEND);
+	tg3_write_sig_legacy(tp, RESET_KIND_INIT);
 
 	/* This works around an issue with Athlon chipsets on
 	 * B3 tigon3 silicon.  This bit has no effect on any
@@ -5209,6 +5292,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 	default:
 		break;
 	};
+
+	tg3_write_sig_post_reset(tp, RESET_KIND_INIT);
 
 	if (tp->tg3_flags & TG3_FLAG_INIT_COMPLETE)
 		tg3_enable_ints(tp);
@@ -6803,8 +6888,11 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		    (nic_cfg & NIC_SRAM_DATA_CFG_EEPROM_WP))
 			tp->tg3_flags |= TG3_FLAG_EEPROM_WRITE_PROT;
 
-		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE)
+		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE) {
 			tp->tg3_flags |= TG3_FLAG_ENABLE_ASF;
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+				tp->tg3_flags2 |= TG3_FLG2_ASF_NEW_HANDSHAKE;
+		}
 		if (nic_cfg & NIC_SRAM_DATA_CFG_FIBER_WOL)
 			tp->tg3_flags |= TG3_FLAG_SERDES_WOL_CAP;
 	}
@@ -8018,7 +8106,8 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
 	    tp->pci_chip_rev_id == CHIPREV_ID_5705_A0 ||
-	    (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0) {
+	    ((tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0 &&
+	     GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5750)) {
 		tp->tg3_flags2 &= ~TG3_FLG2_TSO_CAPABLE;
 	} else {
 		tp->tg3_flags2 |= TG3_FLG2_TSO_CAPABLE;
