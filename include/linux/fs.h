@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/limits.h>
 #include <linux/ioctl.h>
 
 /*
@@ -199,7 +200,6 @@ extern int dir_notify_enable;
 #ifdef __KERNEL__
 
 #include <linux/linkage.h>
-#include <linux/limits.h>
 #include <linux/wait.h>
 #include <linux/types.h>
 #include <linux/kdev_t.h>
