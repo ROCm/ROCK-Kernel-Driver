@@ -14,9 +14,6 @@
 
 #define to_data(e) container_of(e,struct intf_data,kobj.entry)
 
-#define intf_from_data(d) container_of(d->kobj.subsys,struct device_interface, subsys);
-
-
 /**
  *	intf_dev_link - create sysfs symlink for interface.
  *	@data:	interface data descriptor.
@@ -61,15 +58,18 @@ static void intf_dev_unlink(struct intf_data * data)
 
 int interface_add_data(struct intf_data * data)
 {
-	struct device_interface * intf = intf_from_data(data);
+	struct device_interface * intf = data->intf;
 
-	data->intf_num = data->intf->devnum++;
-	data->kobj.subsys = &intf->subsys;
-	kobject_register(&data->kobj);
+	if (intf) {
+		data->intf_num = intf->devnum++;
+		data->kobj.subsys = &intf->subsys;
+		kobject_register(&data->kobj);
 
-	list_add_tail(&data->dev_entry,&data->dev->intf_list);
-	intf_dev_link(data);
-	return 0;
+		list_add_tail(&data->dev_entry,&data->dev->intf_list);
+		intf_dev_link(data);
+		return 0;
+	}
+	return -EINVAL;
 }
 
 
@@ -121,9 +121,9 @@ static int add(struct device_interface * intf, struct device * dev)
 
 static void del(struct intf_data * data)
 {
-	struct device_interface * intf = intf_from_data(data);
+	struct device_interface * intf = data->intf;
 
-	pr_debug(" -> %s ",data->intf->name);
+	pr_debug(" -> %s ",intf->name);
 	interface_remove_data(data);
 	if (intf->remove_device)
 		intf->remove_device(data);
