@@ -224,13 +224,19 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 }
 
 /**
- *	attach - add device to driver.
+ *	device_bind_driver - bind a driver to one device.
  *	@dev:	device.
- *	
- *	By this point, we know for sure what the driver is, so we 
- *	do the rest (which ain't that much).
+ *
+ *	Allow manual attachment of a driver to a deivce.
+ *	Caller must have already set @dev->driver.
+ *
+ *	Note that this does not modify the bus reference count 
+ *	nor take the bus's rwsem. Please verify those are accounted 
+ *	for before calling this. (It is ok to call with no other effort
+ *	from a driver's probe() method.)
  */
-static void attach(struct device * dev)
+
+void device_bind_driver(struct device * dev)
 {
 	pr_debug("bound device '%s' to driver '%s'\n",
 		 dev->bus_id,dev->driver->name);
@@ -259,14 +265,13 @@ static int bus_match(struct device * dev, struct device_driver * drv)
 	if (dev->bus->match(dev,drv)) {
 		dev->driver = drv;
 		if (drv->probe) {
-			if (!(error = drv->probe(dev)))
-				attach(dev);
-			else 
+			if ((error = drv->probe(dev))) {
 				dev->driver = NULL;
-		} else {
-			attach(dev);
-			error = 0;
+				return error;
+			}
 		}
+		device_bind_driver(dev);
+		error = 0;
 	}
 	return error;
 }
@@ -286,7 +291,7 @@ static int device_attach(struct device * dev)
 	int error = 0;
 
 	if (dev->driver) {
-		attach(dev);
+		device_bind_driver(dev);
 		return 0;
 	}
 
@@ -333,16 +338,18 @@ static int driver_attach(struct device_driver * drv)
 
 
 /**
- *	detach - do dirty work of detaching device from its driver.
+ *	device_release_driver - manually detach device from driver.
  *	@dev:	device.
- *	@drv:	its driver.
  *
- *	Note that calls to this function are serialized by taking the 
- *	bus's rwsem in both bus_remove_device() and bus_remove_driver().
+ *	Manually detach device from driver.
+ *	Note that this is called without incrementing the bus
+ *	reference count nor taking the bus's rwsem. Be sure that
+ *	those are accounted for before calling this function.
  */
 
-static void detach(struct device * dev, struct device_driver * drv)
+void device_release_driver(struct device * dev)
 {
+	struct device_driver * drv = dev->driver;
 	if (drv) {
 		sysfs_remove_link(&drv->kobj,dev->kobj.name);
 		list_del_init(&dev->driver_list);
@@ -351,17 +358,6 @@ static void detach(struct device * dev, struct device_driver * drv)
 			drv->remove(dev);
 		dev->driver = NULL;
 	}
-}
-
-
-/**
- *	device_detach - detach device from its driver.
- *	@dev:	device.
- */
-
-static void device_detach(struct device * dev)
-{
-	detach(dev,dev->driver);
 }
 
 
@@ -375,7 +371,7 @@ static void driver_detach(struct device_driver * drv)
 	struct list_head * entry, * next;
 	list_for_each_safe(entry,next,&drv->devices) {
 		struct device * dev = container_of(entry,struct device,driver_list);
-		detach(dev,drv);
+		device_release_driver(dev);
 	}
 	
 }
@@ -417,7 +413,7 @@ void bus_remove_device(struct device * dev)
 		sysfs_remove_link(&dev->bus->devices.kobj,dev->bus_id);
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
-		device_detach(dev);
+		device_release_driver(dev);
 		list_del_init(&dev->bus_list);
 		up_write(&dev->bus->subsys.rwsem);
 		put_bus(dev->bus);
@@ -533,6 +529,9 @@ core_initcall(bus_subsys_init);
 
 EXPORT_SYMBOL(bus_for_each_dev);
 EXPORT_SYMBOL(bus_for_each_drv);
+
+EXPORT_SYMBOL(device_bind_driver);
+EXPORT_SYMBOL(device_release_driver);
 
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);

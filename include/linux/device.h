@@ -306,6 +306,14 @@ extern void device_initialize(struct device * dev);
 extern int device_add(struct device * dev);
 extern void device_del(struct device * dev);
 
+/*
+ * Manual binding of a device to driver. See drivers/base/bus.c 
+ * for information on use.
+ */
+extern void device_bind_driver(struct device * dev);
+extern void device_release_driver(struct device * dev);
+
+
 /* driverfs interface for exporting device attributes */
 
 struct device_attribute {
