@@ -3380,6 +3380,8 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
 	  // Report Luns command
           if( pLoggedInPort->ScsiNexus.LunMasking == 1) 
 	  {
+	    if (Cmnd->lun > sizeof(pLoggedInPort->ScsiNexus.lun))
+		return NULL;
             // we KNOW all the valid LUNs... 0xFF is invalid!
             Cmnd->SCp.have_data_in = pLoggedInPort->ScsiNexus.lun[Cmnd->lun];
 	    if (pLoggedInPort->ScsiNexus.lun[Cmnd->lun] == 0xFF)
