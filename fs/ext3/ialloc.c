@@ -600,6 +600,7 @@ fail2:
 	inode->i_flags |= S_NOQUOTA;
 	inode->i_nlink = 0;
 	iput(inode);
+	brelse(bitmap_bh);
 	return ERR_PTR(err);
 }
 
