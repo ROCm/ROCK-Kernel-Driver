@@ -511,7 +511,7 @@ static int show_dev_config(struct seq_file *m, void *v)
 		seq_printf(m, "    %s", class);
 	else
 		seq_printf(m, "    Class %04x", class_rev >> 16);
-	seq_printf(m, ": %s (rev %d).\n", dev->name, class_rev & 0xff);
+	seq_printf(m, ": %s (rev %d).\n", dev->dev.name, class_rev & 0xff);
 
 	if (dev->irq)
 		seq_printf(m, "      IRQ %d.\n", dev->irq);

@@ -46,11 +46,11 @@ pci_claim_resource(struct pci_dev *dev, int resource)
 		if (err) {
 			printk(KERN_ERR "PCI: Address space collision on "
 			       "region %d of device %s [%lx:%lx]\n",
-			       resource, dev->name, res->start, res->end);
+			       resource, dev->dev.name, res->start, res->end);
 		}
 	} else {
 		printk(KERN_ERR "PCI: No parent found for region %d "
-		       "of device %s\n", resource, dev->name);
+		       "of device %s\n", resource, dev->dev.name);
 	}
 
 	return err;
@@ -155,7 +155,7 @@ pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 		if (!r_align) {
 			printk(KERN_WARNING "PCI: Ignore bogus resource %d "
 					    "[%lx:%lx] of %s\n",
-					    i, r->start, r->end, dev->name);
+					    i, r->start, r->end, dev->dev.name);
 			continue;
 		}
 		r_align = (i < PCI_BRIDGE_RESOURCES) ? r_align + 1 : r->start;
