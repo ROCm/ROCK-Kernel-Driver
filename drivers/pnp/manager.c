@@ -40,17 +40,20 @@ static int pnp_assign_port(struct pnp_dev *dev, struct pnp_port *rule, int idx)
 	if (!(dev->res.port_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
 
-	if (!rule->size)
-		return 1; /* skip disabled resource requests */
-
 	start = &dev->res.port_resource[idx].start;
 	end = &dev->res.port_resource[idx].end;
 	flags = &dev->res.port_resource[idx].flags;
 
 	/* set the initial values */
+	*flags = *flags | rule->flags | IORESOURCE_IO;
+
+	if (!rule->size) {
+		*flags |= IORESOURCE_DISABLED;
+		return 1; /* skip disabled resource requests */
+	}
+
 	*start = rule->min;
 	*end = *start + rule->size - 1;
-	*flags = *flags | rule->flags | IORESOURCE_IO;
 
 	/* run through until pnp_check_port is happy */
 	while (!pnp_check_port(dev, idx)) {
@@ -79,16 +82,11 @@ static int pnp_assign_mem(struct pnp_dev *dev, struct pnp_mem *rule, int idx)
 	if (!(dev->res.mem_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
 
-	if (!rule->size)
-		return 1; /* skip disabled resource requests */
-
 	start = &dev->res.mem_resource[idx].start;
 	end = &dev->res.mem_resource[idx].end;
 	flags = &dev->res.mem_resource[idx].flags;
 
 	/* set the initial values */
-	*start = rule->min;
-	*end = *start + rule->size -1;
 	*flags = *flags | rule->flags | IORESOURCE_MEM;
 
 	/* convert pnp flags to standard Linux flags */
@@ -100,6 +98,14 @@ static int pnp_assign_mem(struct pnp_dev *dev, struct pnp_mem *rule, int idx)
 		*flags |= IORESOURCE_RANGELENGTH;
 	if (rule->flags & IORESOURCE_MEM_SHADOWABLE)
 		*flags |= IORESOURCE_SHADOWABLE;
+
+	if (!rule->size) {
+		*flags |= IORESOURCE_DISABLED;
+		return 1; /* skip disabled resource requests */
+	}
+
+	*start = rule->min;
+	*end = *start + rule->size -1;
 
 	/* run through until pnp_check_mem is happy */
 	while (!pnp_check_mem(dev, idx)) {
@@ -134,15 +140,17 @@ static int pnp_assign_irq(struct pnp_dev * dev, struct pnp_irq *rule, int idx)
 	if (!(dev->res.irq_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
 
-	if (!rule->map)
-		return 1; /* skip disabled resource requests */
-
 	start = &dev->res.irq_resource[idx].start;
 	end = &dev->res.irq_resource[idx].end;
 	flags = &dev->res.irq_resource[idx].flags;
 
 	/* set the initial values */
 	*flags = *flags | rule->flags | IORESOURCE_IRQ;
+
+	if (!rule->map) {
+		*flags |= IORESOURCE_DISABLED;
+		return 1; /* skip disabled resource requests */
+	}
 
 	for (i = 0; i < 16; i++) {
 		if(rule->map & (1<<xtab[i])) {
@@ -177,15 +185,17 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 	if (!(dev->res.dma_resource[idx].flags & IORESOURCE_AUTO))
 		return 1;
 
-	if (!rule->map)
-		return 1; /* skip disabled resource requests */
-
 	start = &dev->res.dma_resource[idx].start;
 	end = &dev->res.dma_resource[idx].end;
 	flags = &dev->res.dma_resource[idx].flags;
 
 	/* set the initial values */
 	*flags = *flags | rule->flags | IORESOURCE_DMA;
+
+	if (!rule->map) {
+		*flags |= IORESOURCE_DISABLED;
+		return 1; /* skip disabled resource requests */
+	}
 
 	for (i = 0; i < 8; i++) {
 		if(rule->map & (1<<xtab[i])) {
