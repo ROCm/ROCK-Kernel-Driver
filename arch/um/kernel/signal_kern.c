@@ -42,7 +42,6 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 			  struct k_sigaction *ka, siginfo_t *info,
 			  sigset_t *oldset)
 {
-	void (*restorer)(void);
 	unsigned long sp;
 	int err;
 
@@ -75,20 +74,12 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	if (ka->sa.sa_flags & SA_RESTORER)
-		restorer = ka->sa.sa_restorer;
-	else restorer = NULL;
-
 	if(ka->sa.sa_flags & SA_SIGINFO)
-		err = setup_signal_stack_si(sp, signr,
-					    (unsigned long) ka->sa.sa_handler,
-					    restorer, regs, info, oldset);
+		err = setup_signal_stack_si(sp, signr, ka, regs, info, oldset);
 	else
-		err = setup_signal_stack_sc(sp, signr,
-					    (unsigned long) ka->sa.sa_handler,
-					    restorer, regs, oldset);
+		err = setup_signal_stack_sc(sp, signr, ka, regs, oldset);
 
-	if (!(ka->sa.sa_flags & SA_NODEFER)) {
+	if (!err && !(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked, &current->blocked, 
 			  &ka->sa.sa_mask);
@@ -106,9 +97,6 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 	struct k_sigaction ka_copy;
 	siginfo_t info;
 	int sig;
-
-	if (!oldset)
-		oldset = &current->blocked;
 
 	sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL);
 	if(sig > 0){
@@ -147,7 +135,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 int do_signal(void)
 {
-	return(kern_do_signal(&current->thread.regs, NULL));
+	return(kern_do_signal(&current->thread.regs, &current->blocked));
 }
 
 /*
