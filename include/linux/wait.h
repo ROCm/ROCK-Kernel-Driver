@@ -142,22 +142,10 @@ extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int
 void FASTCALL(__wake_up_bit(wait_queue_head_t *, void *, int));
 int FASTCALL(__wait_on_bit(wait_queue_head_t *, struct wait_bit_queue *, void *, int, int (*)(void *), unsigned));
 int FASTCALL(__wait_on_bit_lock(wait_queue_head_t *, struct wait_bit_queue *, void *, int, int (*)(void *), unsigned));
+void FASTCALL(wake_up_bit(void *, int));
+int FASTCALL(out_of_line_wait_on_bit(void *, int, int (*)(void *), unsigned));
+int FASTCALL(out_of_line_wait_on_bit_lock(void *, int, int (*)(void *), unsigned));
 wait_queue_head_t *FASTCALL(bit_waitqueue(void *, int));
-
-/**
- * wake_up_bit - wake up a waiter on a bit
- * @word: the word being waited on, a kernel virtual address
- * @bit: the bit of the word being waited on
- *
- * There is a standard hashed waitqueue table for generic use. This
- * is the part of the hashtable's accessor API that wakes up waiters
- * on a bit. For instance, if one were to have waiters on a bitflag,
- * one would call wake_up_bit() after clearing the bit.
- */
-static inline void wake_up_bit(void *word, int bit)
-{
-	__wake_up_bit(bit_waitqueue(word, bit), word, bit);
-}
 
 #define wake_up(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
 #define wake_up_nr(x, nr)		__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
@@ -379,14 +367,9 @@ int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 static inline int wait_on_bit(void *word, int bit,
 				int (*action)(void *), unsigned mode)
 {
-	DEFINE_WAIT_BIT(q, word, bit);
-	wait_queue_head_t *wqh;
-
-	if (!test_and_set_bit(bit, word))
+	if (!test_bit(bit, word))
 		return 0;
-
-	wqh = bit_waitqueue(word, bit);
-	return __wait_on_bit(wqh, &q, word, bit, action, mode);
+	return out_of_line_wait_on_bit(word, bit, action, mode);
 }
 
 /**
@@ -408,14 +391,9 @@ static inline int wait_on_bit(void *word, int bit,
 static inline int wait_on_bit_lock(void *word, int bit,
 				int (*action)(void *), unsigned mode)
 {
-	DEFINE_WAIT_BIT(q, word, bit);
-	wait_queue_head_t *wqh;
-
-	if (!test_bit(bit, word))
+	if (!test_and_set_bit(bit, word))
 		return 0;
-
-	wqh = bit_waitqueue(word, bit);
-	return __wait_on_bit_lock(wqh, &q, word, bit, action, mode);
+	return out_of_line_wait_on_bit_lock(word, bit, action, mode);
 }
 	
 #endif /* __KERNEL__ */

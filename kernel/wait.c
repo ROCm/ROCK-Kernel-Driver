@@ -164,23 +164,43 @@ __wait_on_bit(wait_queue_head_t *wq, struct wait_bit_queue *q,
 }
 EXPORT_SYMBOL(__wait_on_bit);
 
+int __sched fastcall out_of_line_wait_on_bit(void *word, int bit,
+					int (*action)(void *), unsigned mode)
+{
+	wait_queue_head_t *wq = bit_waitqueue(word, bit);
+	DEFINE_WAIT_BIT(wait, word, bit);
+
+	return __wait_on_bit(wq, &wait, word, bit, action, mode);
+}
+EXPORT_SYMBOL(out_of_line_wait_on_bit);
+
 int __sched fastcall
 __wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
 		void *word, int bit, int (*action)(void *), unsigned mode)
 {
 	int ret = 0;
 
-	while (test_and_set_bit(bit, word)) {
+	do {
 		prepare_to_wait_exclusive(wq, &q->wait, mode);
 		if (test_bit(bit, word)) {
 			if ((ret = (*action)(word)))
 				break;
 		}
-	}
+	} while (test_and_set_bit(bit, word));
 	finish_wait(wq, &q->wait);
 	return ret;
 }
 EXPORT_SYMBOL(__wait_on_bit_lock);
+
+int __sched fastcall out_of_line_wait_on_bit_lock(void *word, int bit,
+					int (*action)(void *), unsigned mode)
+{
+	wait_queue_head_t *wq = bit_waitqueue(word, bit);
+	DEFINE_WAIT_BIT(wait, word, bit);
+
+	return __wait_on_bit_lock(wq, &wait, word, bit, action, mode);
+}
+EXPORT_SYMBOL(out_of_line_wait_on_bit_lock);
 
 void fastcall __wake_up_bit(wait_queue_head_t *wq, void *word, int bit)
 {
@@ -189,6 +209,22 @@ void fastcall __wake_up_bit(wait_queue_head_t *wq, void *word, int bit)
 		__wake_up(wq, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE, 1, &key);
 }
 EXPORT_SYMBOL(__wake_up_bit);
+
+/**
+ * wake_up_bit - wake up a waiter on a bit
+ * @word: the word being waited on, a kernel virtual address
+ * @bit: the bit of the word being waited on
+ *
+ * There is a standard hashed waitqueue table for generic use. This
+ * is the part of the hashtable's accessor API that wakes up waiters
+ * on a bit. For instance, if one were to have waiters on a bitflag,
+ * one would call wake_up_bit() after clearing the bit.
+ */
+void fastcall wake_up_bit(void *word, int bit)
+{
+	__wake_up_bit(bit_waitqueue(word, bit), word, bit);
+}
+EXPORT_SYMBOL(wake_up_bit);
 
 fastcall wait_queue_head_t *bit_waitqueue(void *word, int bit)
 {
