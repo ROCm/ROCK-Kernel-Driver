@@ -34,7 +34,7 @@ config MODE_TT
 	help
 	This option controls whether tracing thread support is compiled
 	into UML.  Normally, this should be set to Y.  If you intend to
-	use only skas mode (and the host has the skas patch applied to it), 
+	use only skas mode (and the host has the skas patch applied to it),
 	then it is OK to say N here.
 
 config STATIC_LINK
@@ -45,7 +45,7 @@ config STATIC_LINK
 	If CONFIG_MODE_TT is disabled, then this option gives you the ability
 	to force a static link of UML.  Normally, if only skas mode is built
 	in to UML, it will be linked as a shared binary.  This is inconvenient
-	for use in a chroot jail.  So, if you intend to run UML inside a 
+	for use in a chroot jail.  So, if you intend to run UML inside a
 	chroot, and you disable CONFIG_MODE_TT, you probably want to say Y
 	here.
 
@@ -82,7 +82,7 @@ config HOSTFS
         For more information, see
         <http://user-mode-linux.sourceforge.net/hostfs.html>.
 
-        If you'd like to be able to work with files stored on the host, 
+        If you'd like to be able to work with files stored on the host,
         say Y or M here; otherwise say N.
 
 
@@ -101,10 +101,6 @@ config MCONSOLE
         distribution RPM package in 2.4.6 and later.
 
         It is safe to say 'Y' here.
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on MCONSOLE
 
 config HOST_2G_2G
 	bool "2G/2G host address space split"
@@ -140,11 +136,11 @@ config NEST_LEVEL
         in.  Normally, this is zero, meaning that it will run directly on the
         host.  Setting it to one will build a UML that can run inside a UML
         that is running on the host.  Generally, if you intend this UML to run
-        inside another UML, set CONFIG_NEST_LEVEL to one more than the host 
+        inside another UML, set CONFIG_NEST_LEVEL to one more than the host
         UML.
 
-        Note that if the hosting UML has its CONFIG_KERNEL_HALF_GIGS set to 
-        greater than one, then the guest UML should have its CONFIG_NEST_LEVEL 
+        Note that if the hosting UML has its CONFIG_KERNEL_HALF_GIGS set to
+        greater than one, then the guest UML should have its CONFIG_NEST_LEVEL
         set to the host's CONFIG_NEST_LEVEL + CONFIG_KERNEL_HALF_GIGS.
         Only change this if you are running nested UMLs.
 
@@ -213,59 +209,4 @@ source "drivers/md/Kconfig"
 
 source "drivers/mtd/Kconfig"
 
-
-menu "Kernel hacking"
-
-config DEBUG_SLAB
-	bool "Debug memory allocations"
-
-config DEBUG_SPINLOCK
-	bool "Debug spinlocks usage"
-
-config DEBUG_INFO
-	bool "Enable kernel debugging symbols"
-	help
-        When this is enabled, the User-Mode Linux binary will include
-        debugging symbols.  This enlarges the binary by a few megabytes,
-        but aids in tracking down kernel problems in UML.  It is required
-        if you intend to do any kernel development.
-
-        If you're truly short on disk space or don't expect to report any
-        bugs back to the UML developers, say N, otherwise say Y.
-
-config FRAME_POINTER
-	bool
-	default y if DEBUG_INFO
-
-config PT_PROXY
-	bool "Enable ptrace proxy"
-	depends on XTERM_CHAN && DEBUG_INFO
-
-config GPROF
-	bool "Enable gprof support"
-	depends on DEBUG_INFO
-	help
-        This allows profiling of a User-Mode Linux kernel with the gprof
-        utility.
-
-        See <http://user-mode-linux.sourceforge.net/gprof.html> for more
-        details.
-
-        If you're involved in UML kernel development and want to use gprof,
-        say Y.  If you're unsure, say N.
-
-config GCOV
-	bool "Enable gcov support"
-	depends on DEBUG_INFO
-	help
-        This option allows developers to retrieve coverage data from a UML
-        session.
-
-        See <http://user-mode-linux.sourceforge.net/gprof.html> for more
-        details.
-
-        If you're involved in UML kernel development and want to use gcov,
-        say Y.  If you're unsure, say N.
-
-endmenu
-
+source "arch/um/Kconfig.debug"

@@ -12,7 +12,7 @@ LINK-$(CONFIG_GPROF) += $(PROFILE)
 MODE_INCLUDE += -I$(TOPDIR)/$(ARCH_DIR)/kernel/skas/include
 
 LINK_SKAS = -Wl,-rpath,/lib 
-LD_SCRIPT_SKAS = dyn.lds.s
+LD_SCRIPT_SKAS = dyn.lds
 
 GEN_HEADERS += $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
 

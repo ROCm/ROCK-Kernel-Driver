@@ -381,7 +381,7 @@ config DDB5476
 	  evaluation board.
 
 	  Features : kernel debugging, serial terminal, NFS root fs, on-board
-	  ether port USB, AC97, PCI, PCI VGA card & framebuffer console, 
+	  ether port USB, AC97, PCI, PCI VGA card & framebuffer console,
 	  IDE controller, PS2 keyboard, PS2 mouse, etc.
 
 config DDB5477
@@ -400,7 +400,7 @@ config DDB5477_BUS_FREQUENCY
 	int "bus frequency (in kHZ, 0 for auto-detect)"
 	depends on DDB5477
 	default 0
-	
+
 config NEC_OSPREY
 	bool "Support for NEC Osprey board"
 	select DMA_NONCOHERENT
@@ -513,15 +513,15 @@ config SOC_AU1550
 
 endchoice
 
-choice  
+choice
         prompt "AMD/Alchemy Au1x00 board support"
         depends on SOC_AU1X00
 	help
 	  These are evaluation boards built by AMD/Alchemy to
 	  showcase their Au1X00 Internet Edge Processors. The SOC design
-	  is based on the MIPS32 architecture running at 266/400/500MHz 
-          with many integrated peripherals. Further information can be 
-          found at their website, <http://www.amd.com/>. Say Y here if you 
+	  is based on the MIPS32 architecture running at 266/400/500MHz
+          with many integrated peripherals. Further information can be
+          found at their website, <http://www.amd.com/>. Say Y here if you
           wish to build a kernel for this platform.
 
 config MIPS_PB1000
@@ -1091,7 +1091,6 @@ config TANBAC_TB0219
 
 endmenu
 
-
 menu "CPU selection"
 
 choice
@@ -1194,7 +1193,7 @@ config PAGE_SIZE_4KB
 	 This option select the standard 4kB Linux page size.  On some
 	 R3000-family processors this is the only available page size.  Using
 	 4kB page size will minimize memory consumption and is therefore
-	 recommended for low memory systems. 
+	 recommended for low memory systems.
 
 config PAGE_SIZE_8KB
 	bool "8kB"
@@ -1382,21 +1381,6 @@ config PREEMPT
 	  This allows applications to run more reliably even when the system is
 	  under load.
 
-config DEBUG_SPINLOCK
-	bool "Spinlock debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here and build SMP to catch missing spinlock initialization
-	  and certain other kinds of spinlock errors commonly made.  This is
-	  best used in conjunction with the NMI watchdog so that spinlock
-	  deadlocks are also debuggable.
-
-config DEBUG_SPINLOCK_SLEEP
-	bool "Sleep-inside-spinlock checking"
-	help
-	  If you say Y here, various routines which may sleep will become very
-	  noisy if they are called with a spinlock held.
-
 config RTC_DS1742
 	bool "DS1742 BRAM/RTC support"
 	depends on TOSHIBA_JMR3927 || TOSHIBA_RBTX4927
@@ -1562,7 +1546,7 @@ config EMBEDDED_RAMDISK_IMAGE
 	default "ramdisk.gz"
 	help
 	  This is the filename of the ramdisk image to be built into the
-	  kernel.  Relative pathnames are relative to arch/mips/ramdisk/.  
+	  kernel.  Relative pathnames are relative to arch/mips/ramdisk/.
 	  The ramdisk image is not part of the kernel distribution; you must
 	  provide one yourself.
 
@@ -1572,119 +1556,7 @@ source "drivers/Kconfig"
 
 source "fs/Kconfig"
 
-menu "Kernel hacking"
-
-config CROSSCOMPILE
-	bool "Are you using a crosscompiler"
-	help
-	  Say Y here if you are compiling the kernel on a different
-	  architecture than the one it is intended to run on.
-
-config CMDLINE
-	string "Default kernel command string"
-	default ""
-	help
-          On some platforms, there is currently no way for the boot loader to
-          pass arguments to the kernel. For these platforms, you can supply
-          some command-line options at build time by entering them here.  In
-          other cases you can specify kernel args so that you don't have
-	  to set them up in board prom initialization routines.
-
-config DEBUG_KERNEL
-	bool "Kernel debugging"
-
-config DEBUG_STACK_USAGE
-	bool "Enable stack utilization instrumentation"
-	depends on DEBUG_KERNEL
-	help
-	  Enables the display of the minimum amount of free stack which each
-	  task has ever had available in the sysrq-T and sysrq-P debug output.
-
-	  This option will slow down process creation somewhat.
-
-config DEBUG_SLAB
-	bool "Debug memory allocations"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to have the kernel do limited verification on memory
-	  allocation as well as poisoning memory on free to catch use of freed
-	  memory.
-
-config KGDB
-	bool "Remote GDB kernel debugging"
-	depends on DEBUG_KERNEL
-	select DEBUG_INFO
-	help
-	  If you say Y here, it will be possible to remotely debug the MIPS
-	  kernel using gdb. This enlarges your kernel image disk size by
-	  several megabytes and requires a machine with more than 16 MB,
-	  better 32 MB RAM to avoid excessive linking time. This is only
-	  useful for kernel hackers. If unsure, say N.
-
-config GDB_CONSOLE
-	bool "Console output to GDB"
-	depends on KGDB
-	help
-	  If you are using GDB for remote debugging over a serial port and
-	  would like kernel messages to be formatted into GDB $O packets so
-	  that GDB prints them as program output, say 'Y'.
-
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-
-config SB1XXX_CORELIS
-	bool "Corelis Debugger"
-	depends on SIBYTE_SB1xxx_SOC
-	select DEBUG_INFO
-	help
-	  Select compile flags that produce code that can be processed by the
-	  Corelis mksym utility and UDB Emulator.
-
-config RUNTIME_DEBUG
-	bool "Enable run-time debugging"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, some debugging macros will do run-time checking.
-	  If you say N here, those macros will mostly turn to no-ops.  See 
-	  include/asm-mips/debug.h for debuging macros.
-	  If unsure, say N.
-
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
-	  unless you really know what this hack does.
-
-config MIPS_UNCACHED
-	bool "Run uncached"
-	depends on DEBUG_KERNEL && !SMP && !SGI_IP27
-	help
-	  If you say Y here there kernel will disable all CPU caches.  This will
-	  reduce the system's performance dramatically but can help finding
-	  otherwise hard to track bugs.  It can also useful if you're doing
-	  hardware debugging with a logic analyzer and need to see all traffic
-	  on the bus.
-
-config DEBUG_HIGHMEM
-	bool "Highmem debugging"
-	depends on DEBUG_KERNEL && HIGHMEM
-
-endmenu
+source "arch/mips/Kconfig.debug"
 
 source "security/Kconfig"
 

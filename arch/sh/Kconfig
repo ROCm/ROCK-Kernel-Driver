@@ -194,7 +194,7 @@ endchoice
 
 choice
 	prompt "Processor subtype"
-	
+
 config CPU_SUBTYPE_SH7604
 	bool "SH7604"
 	depends on CPU_SH2
@@ -301,7 +301,7 @@ config MEMORY_START
 	---help---
 	  Computers built with Hitachi SuperH processors always
 	  map the ROM starting at address zero.  But the processor
-	  does not specify the range that RAM takes.  
+	  does not specify the range that RAM takes.
 
 	  The physical memory (RAM) start address will be automatically
 	  set to 08000000, unless you selected one of the following
@@ -339,7 +339,7 @@ config MEMORY_SET
 # If none of the above have set memory start/size, ask the user.
 config MEMORY_OVERRIDE
 	bool "Override default load address and memory size"
-	
+
 # XXX: break these out into the board-specific configs below
 config CF_ENABLER
 	bool "Compact Flash Enabler support"
@@ -522,7 +522,7 @@ config SH_STORE_QUEUES
 	help
 	  Selecting this option will enable an in-kernel API for manipulating
 	  the store queues integrated in the SH-4 processors.
-	
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -711,7 +711,6 @@ source "drivers/pci/hotplug/Kconfig"
 
 endmenu
 
-
 menu "Executable file formats"
 
 source "fs/Kconfig.binfmt"
@@ -742,161 +741,10 @@ source "fs/Kconfig"
 
 source "arch/sh/oprofile/Kconfig"
 
-menu "Kernel hacking"
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
-	  unless you really know what this hack does.
-
-config DEBUG_SPINLOCK
-	bool "Spinlock debugging"
-	help
-	  Say Y here and build SMP to catch missing spinlock initialization
-	  and certain other kinds of spinlock errors commonly made.  This is
-	  best used in conjunction with the NMI watchdog so that spinlock
-	  deadlocks are also debuggable.
-
-config DEBUG_INFO
-        bool "Compile the kernel with debug info"
-        help
-          If you say Y here the resulting kernel image will include
-          debugging info resulting in a larger kernel image.
-          Say Y here only if you plan to use gdb to debug the kernel.
-          If you don't debug the kernel, you can say N.
-
-config SH_STANDARD_BIOS
-	bool "Use LinuxSH standard BIOS"
-	help
-	  Say Y here if your target has the gdb-sh-stub
-	  package from www.m17n.org (or any conforming standard LinuxSH BIOS)
-	  in FLASH or EPROM.  The kernel will use standard BIOS calls during
-	  boot for various housekeeping tasks (including calls to read and
-	  write characters to a system console, get a MAC address from an
-	  on-board Ethernet interface, and shut down the hardware).  Note this
-	  does not work with machines with an existing operating system in
-	  mask ROM and no flash (WindowsCE machines fall in this category).
-	  If unsure, say N.
-
-config EARLY_SCIF_CONSOLE
-	bool "Use early SCIF console"
-	depends on CPU_SH4
-
-config EARLY_PRINTK
-	bool "Early printk support"
-	depends on SH_STANDARD_BIOS || EARLY_SCIF_CONSOLE
-	help
-	  Say Y here to redirect kernel printk messages to the serial port
-	  used by the SH-IPL bootloader, starting very early in the boot
-	  process and ending when the kernel's serial console is initialised.
-	  This option is only useful porting the kernel to a new machine,
-	  when the kernel may crash or hang before the serial console is
-	  initialised. If unsure, say N.
-
-config KGDB
-	bool "Include KGDB kernel debugger"
-	help
-	  Include in-kernel hooks for kgdb, the Linux kernel source level
-	  debugger.  See <http://kgdb.sourceforge.net/> for more information.
-	  Unless you are intending to debug the kernel, say N here.
-
-menu "KGDB configuration options"
-	depends on KGDB
-
-config MORE_COMPILE_OPTIONS
-	bool "Add any additional compile options"
-	help
-	  If you want to add additional CFLAGS to the kernel build, enable this
-	  option and then enter what you would like to add in the next question.
-	  Note however that -g is already appended with the selection of KGDB.
-
-config COMPILE_OPTIONS
-	string "Additional compile arguments"
-	depends on MORE_COMPILE_OPTIONS
-
-config KGDB_NMI
-	bool "Enter KGDB on NMI"
-	default n
-
-config KGDB_THREAD
-	bool "Include KGDB thread support"
-	default y
-
-config SH_KGDB_CONSOLE
-	bool "Console messages through GDB"
-	default n
-
-config KGDB_SYSRQ
-	bool "Allow SysRq 'G' to enter KGDB"
-	default y
-
-config KGDB_KERNEL_ASSERTS
-	bool "Include KGDB kernel assertions"
-	default n
-
-comment "Serial port setup"
-
-config KGDB_DEFPORT
-	int "Port number (ttySCn)"
-	default "1"
-
-config KGDB_DEFBAUD
-	int "Baud rate"
-	default "115200"
-
-choice
-	prompt "Parity"
-	depends on KGDB
-	default KGDB_DEFPARITY_N
-
-config KGDB_DEFPARITY_N
-	bool "None"
-
-config KGDB_DEFPARITY_E
-	bool "Even"
-
-config KGDB_DEFPARITY_O
-	bool "Odd"
-
-endchoice
-
-choice
-	prompt "Data bits"
-	depends on KGDB
-	default KGDB_DEFBITS_8
-
-config KGDB_DEFBITS_8
-	bool "8"
-
-config KGDB_DEFBITS_7
-	bool "7"
-
-endchoice
-
-endmenu
-
-config FRAME_POINTER
-	bool "Compile the kernel with frame pointers"
-	default y if KGDB
-	help
-	  If you say Y here the resulting kernel image will be slightly larger
-	  and slower, but it will give very useful debugging information.
-	  If you don't debug the kernel, you can say N, but we may not be able
-	  to solve problems without frame pointers.
-
-endmenu
+source "arch/sh/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
