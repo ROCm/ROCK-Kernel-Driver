@@ -52,21 +52,19 @@ config IDE
 
 	  If unsure, say Y.
 
+if IDE
+
 config IDE_MAX_HWIFS 
 	int "Max IDE interfaces"
-	depends on ALPHA && IDE
+	depends on ALPHA
 	default 4
 	help
 	  This is the maximum number of IDE hardware interfaces that will
 	  be supported by the driver. Make sure it is at least as high as
 	  the number of IDE interfaces in your system.
 
-menu "IDE, ATA and ATAPI Block devices"
-	depends on IDE!=n
-
 config BLK_DEV_IDE
 	tristate "Enhanced IDE/MFM/RLL disk/cdrom/tape/floppy support"
-	depends on IDE
 	---help---
 	  If you say Y here, you will use the full-featured IDE driver to
 	  control up to ten ATA/IDE interfaces, each being able to serve a
@@ -1131,6 +1129,6 @@ config DMA_NONPCI
 	depends on BLK_DEV_TIVO
 	default y
 
-endmenu
+endif
 
 endmenu
