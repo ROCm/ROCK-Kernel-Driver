@@ -391,7 +391,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	policy->cpu = cpu;
 	init_MUTEX_LOCKED(&policy->lock);
 	init_completion(&policy->kobj_unregister);
-	INIT_WORK(&policy->update, handle_update, (void *) cpu);
+	INIT_WORK(&policy->update, handle_update, (void *)(long)cpu);
 
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
@@ -504,7 +504,7 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 
 static void handle_update(void *data)
 {
-	unsigned int cpu = (unsigned int) data;
+	unsigned int cpu = (unsigned int)(long)data;
 	cpufreq_update_policy(cpu);
 }
 
