@@ -265,7 +265,7 @@ for(i=0;i<TYPE_1_IRQS;i++)
 return 0;
 }
 
-static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs);
+static irqreturn_t aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs);
 
 /* Main probing routine, also sets irq. */
 static int aurora_probe(void)
@@ -701,7 +701,7 @@ static void aurora_check_modem(struct Aurora_board const * bp, int chip)
 }
 
 /* The main interrupt processing routine */
-static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	unsigned char status;
 	unsigned char ack,chip/*,chip_id*/;
@@ -719,7 +719,7 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 /* old	bp = IRQ_to_board[irq&0x0f];*/
 	
 	if (!bp || !(bp->flags & AURORA_BOARD_ACTIVE))
-		return;
+		return IRQ_NONE;
 
 /*	The while() below takes care of this.
 	status = sbus_readb(&bp->r[0]->r[CD180_SRSR]);
@@ -727,7 +727,7 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	printk("mumu: %02x\n", status);
 #endif
 	if (!(status&SRSR_ANYINT))
-		return; * Nobody has anything to say, so exit *
+		return IRQ_NONE; * Nobody has anything to say, so exit *
 */
 	while ((loop++ < 48) &&
 	       (status = sbus_readb(&bp->r[0]->r[CD180_SRSR]) & SRSR_ANYINT)){
@@ -875,6 +875,8 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		}
 	}
 #endif
+
+	return IRQ_HANDLED;
 }
 
 #ifdef AURORA_INT_DEBUG
