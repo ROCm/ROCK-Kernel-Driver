@@ -3395,10 +3395,10 @@ static int idecd_ioctl (struct inode *inode, struct file *file,
 {
 	struct block_device *bdev = inode->i_bdev;
 	ide_drive_t *drive = bdev->bd_disk->private_data;
-	int err = generic_ide_ioctl(bdev, cmd, arg);
+	int err = generic_ide_ioctl(file, bdev, cmd, arg);
 	if (err == -EINVAL) {
 		struct cdrom_info *info = drive->driver_data;
-		err = cdrom_ioctl(&info->devinfo, inode, cmd, arg);
+		err = cdrom_ioctl(file, &info->devinfo, inode, cmd, arg);
 	}
 	return err;
 }

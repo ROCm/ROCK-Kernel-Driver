@@ -1194,7 +1194,7 @@ typedef struct ide_driver_s {
 
 #define DRIVER(drive)		((drive)->driver)
 
-extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
+extern int generic_ide_ioctl(struct file *, struct block_device *, unsigned, unsigned long);
 
 /*
  * ide_hwifs[] is the master data structure used to keep track

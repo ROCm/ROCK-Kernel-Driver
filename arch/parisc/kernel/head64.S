@@ -80,7 +80,8 @@ $bss_loop:
 
 	ldil		L%PA(pmd0),%r5
 	ldo		R%PA(pmd0)(%r5),%r5
-	ldo		_PAGE_TABLE(%r5),%r3
+	shrd		%r5,PxD_VALUE_SHIFT,%r3
+	ldo		(PxD_FLAG_PRESENT+PxD_FLAG_VALID)(%r3),%r3
 
 	ldil		L%PA(swapper_pg_dir),%r4
 	ldo		R%PA(swapper_pg_dir)(%r4),%r4
@@ -90,16 +91,17 @@ $bss_loop:
 
 	stw             %r3,ASM_PGD_ENTRY*ASM_PGD_ENTRY_SIZE(%r4)
 
-	ldo		_PAGE_TABLE(%r1),%r3
+	shrd		%r1,PxD_VALUE_SHIFT,%r3
+	ldo		(PxD_FLAG_PRESENT+PxD_FLAG_VALID)(%r3),%r3
 	ldo		ASM_PMD_ENTRY*ASM_PMD_ENTRY_SIZE(%r5),%r5
 	ldi		ASM_PT_INITIAL,%r1
 1:
 	stw		%r3,0(%r5)
-	ldo		ASM_PAGE_SIZE(%r3),%r3
+	ldo		(ASM_PAGE_SIZE >> PxD_VALUE_SHIFT)(%r3),%r3
 	addib,>		-1,%r1,1b
 	ldo		ASM_PMD_ENTRY_SIZE(%r5),%r5
 
-	ldo		_PAGE_KERNEL(%r0),%r3 /* Hardwired 0 phys addr start */
+	ldo             _PAGE_KERNEL(%r0),%r3 /* Hardwired 0 phys addr start */
 	ldil		L%PA(pg0),%r1
 	ldo		R%PA(pg0)(%r1),%r1
 
@@ -299,6 +301,7 @@ smp_slave_stext:
 	/*  Initialize the SP - monarch sets up smp_init_current_idle_task */
 	load32		PA(smp_init_current_idle_task),%sp
 	ldd		0(%sp),%sp	/* load task address */
+	tophys_r1	%sp
 	ldd		TASK_THREAD_INFO(%sp), %sp
 	mtctl           %sp,%cr30       /* store in cr30 */
 	ldo             THREAD_SZ_ALGN(%sp),%sp

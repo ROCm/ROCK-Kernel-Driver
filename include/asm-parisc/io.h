@@ -24,11 +24,6 @@ extern unsigned long parisc_vmerge_max_size;
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt
 
-/*
- * Change "struct page" to physical address.
- */
-#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
-
 /* Memory mapped IO */
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);

@@ -92,8 +92,7 @@
 #include <asm/cache.h>
 #include <asm/parisc-device.h>
 
-static char version[] __devinitdata =
-	"82596.c $Revision: 1.29 $\n";
+#define LASI_82596_DRIVER_VERSION "LASI 82596 driver - Revision: 1.30"
 
 /* DEBUG flags
  */
@@ -124,10 +123,10 @@ static char version[] __devinitdata =
 	do { dma_cache_sync((void *)addr, len, DMA_TO_DEVICE); } while (0)
 
 #define  CHECK_INV(addr,len) \
-	do { dma_cache_sync((void *)addr,len, DMA_FROM_DEVICE); } while(0)
+	do { dma_cache_sync((void *)addr, len, DMA_FROM_DEVICE); } while(0)
 
 #define  CHECK_WBACK_INV(addr,len) \
-	do { dma_cache_sync((void *)addr,len, DMA_BIDIRECTIONAL); } while (0)
+	do { dma_cache_sync((void *)addr, len, DMA_BIDIRECTIONAL); } while (0)
 
 
 #define PA_I82596_RESET		0	/* Offsets relative to LASI-LAN-Addr.*/
@@ -506,7 +505,7 @@ static void i596_display_data(struct net_device *dev)
 	rfd = lp->rfd_head;
 	printk("rfd_head = %p\n", rfd);
 	do {
-		printk ("   %p .stat %04x, .cmd %04x, b_next %08x, rbd %08x,"
+		printk("   %p .stat %04x, .cmd %04x, b_next %08x, rbd %08x,"
                         " count %04x\n",
 			rfd, rfd->stat, rfd->cmd, rfd->b_next, rfd->rbd,
 			rfd->count);
@@ -552,7 +551,7 @@ static inline void init_rx_bufs(struct net_device *dev)
 		struct sk_buff *skb = dev_alloc_skb(PKT_BUF_SZ + 4);
 
 		if (skb == NULL)
-			panic("82596: alloc_skb() failed");
+			panic("%s: alloc_skb() failed", __FILE__);
 		skb_reserve(skb, 2);
 		dma_addr = dma_map_single(lp->dev, skb->tail,PKT_BUF_SZ,
 					  DMA_FROM_DEVICE);
@@ -637,8 +636,8 @@ static int init_i596_mem(struct net_device *dev)
 
 	disable_irq(dev->irq);	/* disable IRQs from LAN */
 	DEB(DEB_INIT,
-		printk("RESET 82596 port: %08lX (with IRQ%d disabled)\n",
-		       dev->base_addr + PA_I82596_RESET,
+		printk("RESET 82596 port: %p (with IRQ %d disabled)\n",
+		       (void*)(dev->base_addr + PA_I82596_RESET),
 		       dev->irq));
 	
 	gsc_writel(0, (void*)(dev->base_addr + PA_I82596_RESET)); /* Hard Reset */
@@ -658,7 +657,7 @@ static int init_i596_mem(struct net_device *dev)
 	lp->cmd_head = NULL;
         lp->scb.cmd = I596_NULL;
 
-	DEB(DEB_INIT,printk("%s: starting i82596.\n", dev->name));
+	DEB(DEB_INIT, printk("%s: starting i82596.\n", dev->name));
 
 	CHECK_WBACK(&(lp->scp), sizeof(struct i596_scp));
 	CHECK_WBACK(&(lp->iscp), sizeof(struct i596_iscp));
@@ -667,9 +666,9 @@ static int init_i596_mem(struct net_device *dev)
 
 	CA(dev);
 
-	if (wait_istat(dev,lp,1000,"initialization timed out"))
+	if (wait_istat(dev, lp, 1000, "initialization timed out"))
 		goto failed;
-	DEB(DEB_INIT,printk("%s: i82596 initialization successful\n", dev->name));
+	DEB(DEB_INIT, printk("%s: i82596 initialization successful\n", dev->name));
 
 	/* Ensure rx frame/buffer descriptors are tidy */
 	rebuild_rx_bufs(dev);
@@ -679,30 +678,30 @@ static int init_i596_mem(struct net_device *dev)
 
 	enable_irq(dev->irq);	/* enable IRQs from LAN */
 
-	DEB(DEB_INIT,printk("%s: queuing CmdConfigure\n", dev->name));
+	DEB(DEB_INIT, printk("%s: queuing CmdConfigure\n", dev->name));
 	memcpy(lp->cf_cmd.i596_config, init_setup, 14);
 	lp->cf_cmd.cmd.command = CmdConfigure;
 	CHECK_WBACK(&(lp->cf_cmd), sizeof(struct cf_cmd));
 	i596_add_cmd(dev, &lp->cf_cmd.cmd);
 
-	DEB(DEB_INIT,printk("%s: queuing CmdSASetup\n", dev->name));
+	DEB(DEB_INIT, printk("%s: queuing CmdSASetup\n", dev->name));
 	memcpy(lp->sa_cmd.eth_addr, dev->dev_addr, 6);
 	lp->sa_cmd.cmd.command = CmdSASetup;
 	CHECK_WBACK(&(lp->sa_cmd), sizeof(struct sa_cmd));
 	i596_add_cmd(dev, &lp->sa_cmd.cmd);
 
-	DEB(DEB_INIT,printk("%s: queuing CmdTDR\n", dev->name));
+	DEB(DEB_INIT, printk("%s: queuing CmdTDR\n", dev->name));
 	lp->tdr_cmd.cmd.command = CmdTDR;
 	CHECK_WBACK(&(lp->tdr_cmd), sizeof(struct tdr_cmd));
 	i596_add_cmd(dev, &lp->tdr_cmd.cmd);
 
 	spin_lock_irqsave (&lp->lock, flags);
 
-	if (wait_cmd(dev,lp,1000,"timed out waiting to issue RX_START")) {
+	if (wait_cmd(dev, lp, 1000, "timed out waiting to issue RX_START")) {
 		spin_unlock_irqrestore (&lp->lock, flags);
 		goto failed;
 	}
-	DEB(DEB_INIT,printk("%s: Issuing RX_START\n", dev->name));
+	DEB(DEB_INIT, printk("%s: Issuing RX_START\n", dev->name));
 	lp->scb.command = RX_START;
 	lp->scb.rfd = WSWAPrfd(virt_to_dma(lp,lp->rfds));
 	CHECK_WBACK(&(lp->scb), sizeof(struct i596_scb));
@@ -711,9 +710,9 @@ static int init_i596_mem(struct net_device *dev)
 
 	spin_unlock_irqrestore (&lp->lock, flags);
 
-	if (wait_cmd(dev,lp,1000,"RX_START not processed"))
+	if (wait_cmd(dev, lp, 1000, "RX_START not processed"))
 		goto failed;
-	DEB(DEB_INIT,printk("%s: Receive unit started OK\n", dev->name));
+	DEB(DEB_INIT, printk("%s: Receive unit started OK\n", dev->name));
 
 	return 0;
 
@@ -731,7 +730,7 @@ static inline int i596_rx(struct net_device *dev)
 	struct i596_rbd *rbd;
 	int frames = 0;
 
-	DEB(DEB_RXFRAME,printk ("i596_rx(), rfd_head %p, rbd_head %p\n",
+	DEB(DEB_RXFRAME, printk("i596_rx(), rfd_head %p, rbd_head %p\n",
 			lp->rfd_head, lp->rbd_head));
 
 
@@ -794,7 +793,7 @@ static inline int i596_rx(struct net_device *dev)
 memory_squeeze:
 			if (skb == NULL) {
 				/* XXX tulip.c can defer packets here!! */
-				printk ("%s: i596_rx Memory squeeze, dropping packet.\n", dev->name);
+				printk("%s: i596_rx Memory squeeze, dropping packet.\n", dev->name);
 				lp->stats.rx_dropped++;
 			}
 			else {
@@ -863,7 +862,7 @@ memory_squeeze:
 		CHECK_INV(rfd, sizeof(struct i596_rfd));
 	}
 
-	DEB(DEB_RXFRAME,printk ("frames %d\n", frames));
+	DEB(DEB_RXFRAME, printk("frames %d\n", frames));
 
 	return 0;
 }
@@ -902,7 +901,7 @@ static inline void i596_cleanup_cmd(struct net_device *dev, struct i596_private 
 		CHECK_WBACK_INV(ptr, sizeof(struct i596_cmd));
 	}
 
-	wait_cmd(dev,lp,100,"i596_cleanup_cmd timed out");
+	wait_cmd(dev, lp, 100, "i596_cleanup_cmd timed out");
 	lp->scb.cmd = I596_NULL;
 	CHECK_WBACK(&(lp->scb), sizeof(struct i596_scb));
 }
@@ -912,11 +911,11 @@ static inline void i596_reset(struct net_device *dev, struct i596_private *lp)
 {
 	unsigned long flags;
 
-	DEB(DEB_RESET,printk("i596_reset\n"));
+	DEB(DEB_RESET, printk("i596_reset\n"));
 
 	spin_lock_irqsave (&lp->lock, flags);
 
-	wait_cmd(dev,lp,100,"i596_reset timed out");
+	wait_cmd(dev, lp, 100, "i596_reset timed out");
 
 	netif_stop_queue(dev);
 
@@ -926,7 +925,7 @@ static inline void i596_reset(struct net_device *dev, struct i596_private *lp)
 	CA(dev);
 
 	/* wait for shutdown */
-	wait_cmd(dev,lp,1000,"i596_reset 2 timed out");
+	wait_cmd(dev, lp, 1000, "i596_reset 2 timed out");
 	spin_unlock_irqrestore (&lp->lock, flags);
 
 	i596_cleanup_cmd(dev,lp);
@@ -942,7 +941,7 @@ static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd)
 	struct i596_private *lp = dev->priv;
 	unsigned long flags;
 
-	DEB(DEB_ADDCMD,printk("i596_add_cmd cmd_head %p\n", lp->cmd_head));
+	DEB(DEB_ADDCMD, printk("i596_add_cmd cmd_head %p\n", lp->cmd_head));
 
 	cmd->status = 0;
 	cmd->command |= (CMD_EOL | CMD_INTR);
@@ -958,7 +957,7 @@ static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd)
 		CHECK_WBACK(lp->cmd_tail, sizeof(struct i596_cmd));
 	} else {
 		lp->cmd_head = cmd;
-		wait_cmd(dev,lp,100,"i596_add_cmd timed out");
+		wait_cmd(dev, lp, 100, "i596_add_cmd timed out");
 		lp->scb.cmd = WSWAPcmd(virt_to_dma(lp,&cmd->status));
 		lp->scb.command = CUC_START;
 		CHECK_WBACK(&(lp->scb), sizeof(struct i596_scb));
@@ -1014,7 +1013,7 @@ static int i596_test(struct net_device *dev)
 
 static int i596_open(struct net_device *dev)
 {
-	DEB(DEB_OPEN,printk("%s: i596_open() irq %d.\n", dev->name, dev->irq));
+	DEB(DEB_OPEN, printk("%s: i596_open() irq %d.\n", dev->name, dev->irq));
 
 	if (request_irq(dev->irq, &i596_interrupt, 0, "i82596", dev)) {
 		printk("%s: IRQ %d not free\n", dev->name, dev->irq);
@@ -1044,19 +1043,19 @@ static void i596_tx_timeout (struct net_device *dev)
 	struct i596_private *lp = dev->priv;
 
 	/* Transmitter timeout, serious problems. */
-	DEB(DEB_ERRORS,printk("%s: transmit timed out, status resetting.\n",
+	DEB(DEB_ERRORS, printk("%s: transmit timed out, status resetting.\n",
 			dev->name));
 
 	lp->stats.tx_errors++;
 
 	/* Try to restart the adaptor */
 	if (lp->last_restart == lp->stats.tx_packets) {
-		DEB(DEB_ERRORS,printk ("Resetting board.\n"));
+		DEB(DEB_ERRORS, printk("Resetting board.\n"));
 		/* Shutdown and restart */
 		i596_reset (dev, lp);
 	} else {
 		/* Issue a channel attention signal */
-		DEB(DEB_ERRORS,printk ("Kicking board.\n"));
+		DEB(DEB_ERRORS, printk("Kicking board.\n"));
 		lp->scb.command = CUC_START | RX_START;
 		CHECK_WBACK_INV(&(lp->scb), sizeof(struct i596_scb));
 		CA (dev);
@@ -1076,7 +1075,7 @@ static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	short length = skb->len;
 	dev->trans_start = jiffies;
 
-	DEB(DEB_STARTTX,printk("%s: i596_start_xmit(%x,%p) called\n", dev->name,
+	DEB(DEB_STARTTX, printk("%s: i596_start_xmit(%x,%p) called\n", dev->name,
 				skb->len, skb->data));
 
 	if (length < ETH_ZLEN) {
@@ -1092,7 +1091,7 @@ static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tbd = lp->tbds + lp->next_tx_cmd;
 
 	if (tx_cmd->cmd.command) {
-		DEB(DEB_ERRORS,printk ("%s: xmit ring full, dropping packet.\n",
+		DEB(DEB_ERRORS, printk("%s: xmit ring full, dropping packet.\n",
 				dev->name));
 		lp->stats.tx_dropped++;
 
@@ -1156,28 +1155,28 @@ static int __devinit i82596_probe(struct net_device *dev,
 	/* This lot is ensure things have been cache line aligned. */
 	if (sizeof(struct i596_rfd) != 32) {
 	    printk("82596: sizeof(struct i596_rfd) = %d\n",
-			    sizeof(struct i596_rfd));
+			    (int)sizeof(struct i596_rfd));
 	    return -ENODEV;
 	}
 	if ((sizeof(struct i596_rbd) % 32) != 0) {
 	    printk("82596: sizeof(struct i596_rbd) = %d\n",
-			    sizeof(struct i596_rbd));
+			    (int)sizeof(struct i596_rbd));
 	    return -ENODEV;
 	}
 	if ((sizeof(struct tx_cmd) % 32) != 0) {
 	    printk("82596: sizeof(struct tx_cmd) = %d\n",
-			    sizeof(struct tx_cmd));
+			    (int)sizeof(struct tx_cmd));
 	    return -ENODEV;
 	}
 	if (sizeof(struct i596_tbd) != 32) {
 	    printk("82596: sizeof(struct i596_tbd) = %d\n",
-			    sizeof(struct i596_tbd));
+			    (int)sizeof(struct i596_tbd));
 	    return -ENODEV;
 	}
 #ifndef __LP64__
 	if (sizeof(struct i596_private) > 4096) {
 	    printk("82596: sizeof(struct i596_private) = %d\n",
-			    sizeof(struct i596_private));
+			    (int)sizeof(struct i596_private));
 	    return -ENODEV;
 	}
 #endif
@@ -1189,24 +1188,18 @@ static int __devinit i82596_probe(struct net_device *dev,
 		for (i=0; i < 6; i++) {
 			eth_addr[i] = gsc_readb(LAN_PROM_ADDR + i);
 		}
-		printk("82596.c: MAC of HP700 LAN read from EEPROM\n");
+		printk(KERN_INFO "%s: MAC of HP700 LAN read from EEPROM\n", __FILE__);
 	}
 
 	dev->mem_start = (unsigned long) dma_alloc_noncoherent(gen_dev, 
 		sizeof(struct i596_private), &dma_addr, GFP_KERNEL);
 	if (!dev->mem_start) {
-		printk("%s: Couldn't get shared memory\n", dev->name);
+		printk(KERN_ERR "%s: Couldn't get shared memory\n", __FILE__);
 		return -ENOMEM;
 	}
 
-	DEB(DEB_PROBE,printk("%s: 82596 at %#3lx,", dev->name, dev->base_addr));
-
 	for (i = 0; i < 6; i++)
-		DEB(DEB_PROBE,printk(" %2.2X", dev->dev_addr[i] = eth_addr[i]));
-
-	DEB(DEB_PROBE,printk(" IRQ %d.\n", dev->irq));
-
-	DEB(DEB_PROBE,printk(version));
+		dev->dev_addr[i] = eth_addr[i];
 
 	/* The 82596-specific entries in the device structure. */
 	dev->open = i596_open;
@@ -1220,9 +1213,6 @@ static int __devinit i82596_probe(struct net_device *dev,
 	dev->priv = (void *)(dev->mem_start);
 
 	lp = dev->priv;
-	DEB(DEB_INIT,printk ("%s: lp at 0x%08lx (%d bytes), lp->scb at 0x%08lx\n",
-		dev->name, (unsigned long)lp,
-		sizeof(struct i596_private), (unsigned long)&lp->scb));
 	memset(lp, 0, sizeof(struct i596_private));
 
 	lp->scb.command = 0;
@@ -1233,6 +1223,21 @@ static int __devinit i82596_probe(struct net_device *dev,
 	lp->dev = gen_dev;
 
 	CHECK_WBACK_INV(dev->mem_start, sizeof(struct i596_private));
+
+	i = register_netdev(dev);
+	if (i) {
+		lp = dev->priv;
+		dma_free_noncoherent(lp->dev, sizeof(struct i596_private), 
+				    (void *)dev->mem_start, lp->dma_addr);
+		return i;
+	};
+
+	DEB(DEB_PROBE, printk(KERN_INFO "%s: 82596 at %#3lx,", dev->name, dev->base_addr));
+	for (i = 0; i < 6; i++)
+		DEB(DEB_PROBE, printk(" %2.2X", dev->dev_addr[i]));
+	DEB(DEB_PROBE, printk(" IRQ %d.\n", dev->irq));
+	DEB(DEB_INIT, printk(KERN_INFO "%s: lp at 0x%p (%d bytes), lp->scb at 0x%p\n",
+		dev->name, lp, (int)sizeof(struct i596_private), &lp->scb));
 
 	return 0;
 }
@@ -1245,7 +1250,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned short status, ack_cmd = 0;
 
 	if (dev == NULL) {
-		printk("i596_interrupt(): irq %d for unknown device.\n", irq);
+		printk("%s: irq %d for unknown device.\n", __FUNCTION__, irq);
 		return IRQ_NONE;
 	}
 
@@ -1253,10 +1258,10 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_lock (&lp->lock);
 
-	wait_cmd(dev,lp,100,"i596 interrupt, timeout");
+	wait_cmd(dev, lp, 100, "i596 interrupt, timeout");
 	status = lp->scb.status;
 
-	DEB(DEB_INTS,printk("%s: i596 interrupt, IRQ %d, status %4.4x.\n",
+	DEB(DEB_INTS, printk("%s: i596 interrupt, IRQ %d, status %4.4x.\n",
 			dev->name, irq, status));
 
 	ack_cmd = status & 0xf000;
@@ -1271,9 +1276,9 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		struct i596_cmd *ptr;
 
 		if ((status & 0x8000))
-			DEB(DEB_INTS,printk("%s: i596 interrupt completed command.\n", dev->name));
+			DEB(DEB_INTS, printk("%s: i596 interrupt completed command.\n", dev->name));
 		if ((status & 0x2000))
-			DEB(DEB_INTS,printk("%s: i596 interrupt command unit inactive %x.\n", dev->name, status & 0x0700));
+			DEB(DEB_INTS, printk("%s: i596 interrupt command unit inactive %x.\n", dev->name, status & 0x0700));
 
 		while (lp->cmd_head != NULL) {
 			CHECK_INV(lp->cmd_head, sizeof(struct i596_cmd));
@@ -1282,7 +1287,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 			ptr = lp->cmd_head;
 
-			DEB(DEB_STATUS,printk("cmd_head->status = %04x, ->command = %04x\n",
+			DEB(DEB_STATUS, printk("cmd_head->status = %04x, ->command = %04x\n",
 				       lp->cmd_head->status, lp->cmd_head->command));
 			lp->cmd_head = ptr->v_next;
 			lp->cmd_backlog--;
@@ -1294,7 +1299,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				struct sk_buff *skb = tx_cmd->skb;
 
 				if ((ptr->status) & STAT_OK) {
-					DEB(DEB_TXADDR,print_eth(skb->data, "tx-done"));
+					DEB(DEB_TXADDR, print_eth(skb->data, "tx-done"));
 				} else {
 					lp->stats.tx_errors++;
 					if ((ptr->status) & 0x0020)
@@ -1319,7 +1324,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				unsigned short status = ((struct tdr_cmd *)ptr)->status;
 
 				if (status & 0x8000) {
-					DEB(DEB_ANY,printk("%s: link ok.\n", dev->name));
+					DEB(DEB_ANY, printk("%s: link ok.\n", dev->name));
 				} else {
 					if (status & 0x4000)
 						printk("%s: Transceiver problem.\n", dev->name);
@@ -1328,7 +1333,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 					if (status & 0x1000)
 						printk("%s: Short circuit.\n", dev->name);
 
-					DEB(DEB_TDR,printk("%s: Time %d.\n", dev->name, status & 0x07ff));
+					DEB(DEB_TDR, printk("%s: Time %d.\n", dev->name, status & 0x07ff));
 				}
 				break;
 			    }
@@ -1363,12 +1368,12 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if ((status & 0x1000) || (status & 0x4000)) {
 		if ((status & 0x4000))
-			DEB(DEB_INTS,printk("%s: i596 interrupt received a frame.\n", dev->name));
+			DEB(DEB_INTS, printk("%s: i596 interrupt received a frame.\n", dev->name));
 		i596_rx(dev);
 		/* Only RX_START if stopped - RGH 07-07-96 */
 		if (status & 0x1000) {
 			if (netif_running(dev)) {
-				DEB(DEB_ERRORS,printk("%s: i596 interrupt receive unit inactive, status 0x%x\n", dev->name, status));
+				DEB(DEB_ERRORS, printk("%s: i596 interrupt receive unit inactive, status 0x%x\n", dev->name, status));
 				ack_cmd |= RX_START;
 				lp->stats.rx_errors++;
 				lp->stats.rx_fifo_errors++;
@@ -1376,7 +1381,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-	wait_cmd(dev,lp,100,"i596 interrupt, timeout");
+	wait_cmd(dev, lp, 100, "i596 interrupt, timeout");
 	lp->scb.command = ack_cmd;
 	CHECK_WBACK(&lp->scb, sizeof(struct i596_scb));
 
@@ -1386,8 +1391,8 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	CA(dev);
 
-	wait_cmd(dev,lp,100,"i596 interrupt, exit timeout");
-	DEB(DEB_INTS,printk("%s: exiting interrupt.\n", dev->name));
+	wait_cmd(dev, lp, 100, "i596 interrupt, exit timeout");
+	DEB(DEB_INTS, printk("%s: exiting interrupt.\n", dev->name));
 
 	spin_unlock (&lp->lock);
 	return IRQ_HANDLED;
@@ -1400,18 +1405,18 @@ static int i596_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
-	DEB(DEB_INIT,printk("%s: Shutting down ethercard, status was %4.4x.\n",
+	DEB(DEB_INIT, printk("%s: Shutting down ethercard, status was %4.4x.\n",
 		       dev->name, lp->scb.status));
 
 	spin_lock_irqsave(&lp->lock, flags);
 
-	wait_cmd(dev,lp,100,"close1 timed out");
+	wait_cmd(dev, lp, 100, "close1 timed out");
 	lp->scb.command = CUC_ABORT | RX_ABORT;
 	CHECK_WBACK(&lp->scb, sizeof(struct i596_scb));
 
 	CA(dev);
 
-	wait_cmd(dev,lp,100,"close2 timed out");
+	wait_cmd(dev, lp, 100, "close2 timed out");
 	spin_unlock_irqrestore(&lp->lock, flags);
 	DEB(DEB_STRUCT,i596_display_data(dev));
 	i596_cleanup_cmd(dev,lp);
@@ -1443,7 +1448,9 @@ static void set_multicast_list(struct net_device *dev)
 	struct i596_private *lp = dev->priv;
 	int config = 0, cnt;
 
-	DEB(DEB_MULTI,printk("%s: set multicast list, %d entries, promisc %s, allmulti %s\n", dev->name, dev->mc_count, dev->flags & IFF_PROMISC ? "ON" : "OFF", dev->flags & IFF_ALLMULTI ? "ON" : "OFF"));
+	DEB(DEB_MULTI, printk("%s: set multicast list, %d entries, promisc %s, allmulti %s\n",
+		dev->name, dev->mc_count, dev->flags & IFF_PROMISC ? "ON" : "OFF",
+		dev->flags & IFF_ALLMULTI ? "ON" : "OFF"));
 
 	if ((dev->flags & IFF_PROMISC) && !(lp->cf_cmd.i596_config[8] & 0x01)) {
 		lp->cf_cmd.i596_config[8] |= 0x01;
@@ -1492,7 +1499,7 @@ static void set_multicast_list(struct net_device *dev)
 		for (dmi = dev->mc_list; cnt && dmi != NULL; dmi = dmi->next, cnt--, cp += 6) {
 			memcpy(cp, dmi->dmi_addr, 6);
 			if (i596_debug > 1)
-				DEB(DEB_MULTI,printk("%s: Adding address %02x:%02x:%02x:%02x:%02x:%02x\n",
+				DEB(DEB_MULTI, printk("%s: Adding address %02x:%02x:%02x:%02x:%02x:%02x\n",
 						dev->name, cp[0],cp[1],cp[2],cp[3],cp[4],cp[5]));
 		}
 		CHECK_WBACK_INV(&lp->mc_cmd, sizeof(struct mc_cmd));
@@ -1515,11 +1522,15 @@ lan_init_chip(struct parisc_device *dev)
 
 	if (num_drivers >= MAX_DRIVERS) {
 		/* max count of possible i82596 drivers reached */
-		return -ENODEV;
+		return -ENOMEM;
 	}
+
+	if (num_drivers == 0)
+		printk(KERN_INFO LASI_82596_DRIVER_VERSION "\n");
 	
 	if (!dev->irq) {
-		printk(KERN_ERR __FILE__ ": IRQ not found for i82596 at 0x%lx\n", dev->hpa);
+		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
+			__FILE__, dev->hpa);
 		return -ENODEV;
 	}
 
@@ -1538,15 +1549,6 @@ lan_init_chip(struct parisc_device *dev)
 		return -ENODEV;
 	}
 
-	retval = register_netdev(netdevice);
-	if (retval) {
-		struct i596_private *lp = netdevice->priv;
-		printk(KERN_WARNING __FILE__ ": register_netdevice ret'd %d\n", retval);
-		dma_free_noncoherent(lp->dev, sizeof(struct i596_private), 
-				    (void *)netdevice->mem_start, lp->dma_addr);
-		free_netdev(netdevice);
-		return -ENODEV;
-	};
 	if (dev->id.sversion == 0x72) {
 		((struct i596_private *)netdevice->priv)->options = OPT_SWAP_PORT;
 	}
@@ -1599,6 +1601,7 @@ static void __exit lasi_82596_exit(void)
 				       (void *)netdevice->mem_start, lp->dma_addr);
 		free_netdev(netdevice);
 	}
+	num_drivers = 0;
 
 	unregister_parisc_driver(&lan_driver);
 }

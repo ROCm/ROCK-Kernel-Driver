@@ -534,18 +534,14 @@ struct file_operations cifs_file_ops = {
 	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.sendfile = generic_file_sendfile,
-#ifdef CONFIG_CIFS_FCNTL
-	.fcntl = cifs_fcntl,
-#endif
+	.dir_notify = cifs_dir_notify,
 };
 
 struct file_operations cifs_dir_ops = {
 	.readdir = cifs_readdir,
 	.release = cifs_closedir,
 	.read    = generic_read_dir,
-#ifdef CONFIG_CIFS_FCNTL
-	.fcntl   = cifs_fcntl,
-#endif
+	.dir_notify = cifs_dir_notify,
 };
 
 static void
