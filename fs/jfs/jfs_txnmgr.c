@@ -1240,8 +1240,8 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	 * Ensure that inode isn't reused before
 	 * lazy commit thread finishes processing
 	 */
-	if (tblk->xflag & (COMMIT_CREATE | COMMIT_DELETE)) {
-		atomic_inc(&tblk->ip->i_count);
+	if (tblk->xflag & COMMIT_DELETE) {
+		atomic_inc(&tblk->u.ip->i_count);
 		/*
 		 * Avoid a rare deadlock
 		 *
@@ -1252,13 +1252,13 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		 * commit the transaction synchronously, so the last iput
 		 * will be done by the calling thread (or later)
 		 */
-		if (tblk->ip->i_state & I_LOCK)
+		if (tblk->u.ip->i_state & I_LOCK)
 			tblk->xflag &= ~COMMIT_LAZY;
 	}
 
 	ASSERT((!(tblk->xflag & COMMIT_DELETE)) ||
-	       ((tblk->ip->i_nlink == 0) &&
-		!test_cflag(COMMIT_Nolink, tblk->ip)));
+	       ((tblk->u.ip->i_nlink == 0) &&
+		!test_cflag(COMMIT_Nolink, tblk->u.ip)));
 
 	/*
 	 *      write COMMIT log record
@@ -2360,23 +2360,17 @@ static void txUpdateMap(struct tblock * tblk)
 	 * unlock mapper/write lock
 	 */
 	if (tblk->xflag & COMMIT_CREATE) {
-		ip = tblk->ip;
-
-		ASSERT(test_cflag(COMMIT_New, ip));
-		clear_cflag(COMMIT_New, ip);
-
-		diUpdatePMap(ipimap, ip->i_ino, FALSE, tblk);
+		diUpdatePMap(ipimap, tblk->ino, FALSE, tblk);
 		ipimap->i_state |= I_DIRTY;
 		/* update persistent block allocation map
 		 * for the allocation of inode extent;
 		 */
 		pxdlock.flag = mlckALLOCPXD;
-		pxdlock.pxd = JFS_IP(ip)->ixpxd;
+		pxdlock.pxd = tblk->u.ixpxd;
 		pxdlock.index = 1;
-		txAllocPMap(ip, (struct maplock *) & pxdlock, tblk);
-		iput(ip);
+		txAllocPMap(ipimap, (struct maplock *) & pxdlock, tblk);
 	} else if (tblk->xflag & COMMIT_DELETE) {
-		ip = tblk->ip;
+		ip = tblk->u.ip;
 		diUpdatePMap(ipimap, ip->i_ino, TRUE, tblk);
 		ipimap->i_state |= I_DIRTY;
 		iput(ip);

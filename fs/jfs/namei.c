@@ -104,7 +104,8 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
-	tblk->ip = ip;
+	tblk->ino = ip->i_ino;
+	tblk->u.ixpxd = JFS_IP(ip)->ixpxd;
 
 	iplist[0] = dip;
 	iplist[1] = ip;
@@ -230,7 +231,8 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
-	tblk->ip = ip;
+	tblk->ino = ip->i_ino;
+	tblk->u.ixpxd = JFS_IP(ip)->ixpxd;
 
 	iplist[0] = dip;
 	iplist[1] = ip;
@@ -346,7 +348,7 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_DELETE;
-	tblk->ip = ip;
+	tblk->u.ip = ip;
 
 	/*
 	 * delete the entry of target directory from parent directory
@@ -505,7 +507,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 		}
 		tblk = tid_to_tblock(tid);
 		tblk->xflag |= COMMIT_DELETE;
-		tblk->ip = ip;
+		tblk->u.ip = ip;
 	}
 
 	/*
@@ -889,7 +891,8 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
-	tblk->ip = ip;
+	tblk->ino = ip->i_ino;
+	tblk->u.ixpxd = JFS_IP(ip)->ixpxd;
 
 	/*
 	 * create entry for symbolic link in parent directory
@@ -1151,7 +1154,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			}
 			tblk = tid_to_tblock(tid);
 			tblk->xflag |= COMMIT_DELETE;
-			tblk->ip = new_ip;
+			tblk->u.ip = new_ip;
 		} else if (new_ip->i_nlink == 0) {
 			assert(!test_cflag(COMMIT_Nolink, new_ip));
 			/* free block resources */
@@ -1162,7 +1165,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			}
 			tblk = tid_to_tblock(tid);
 			tblk->xflag |= COMMIT_DELETE;
-			tblk->ip = new_ip;
+			tblk->u.ip = new_ip;
 		} else {
 			new_ip->i_ctime = CURRENT_TIME;
 			mark_inode_dirty(new_ip);
@@ -1347,7 +1350,8 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
-	tblk->ip = ip;
+	tblk->ino = ip->i_ino;
+	tblk->u.ixpxd = JFS_IP(ip)->ixpxd;
 
 	ino = ip->i_ino;
 	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
