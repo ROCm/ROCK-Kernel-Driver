@@ -20,6 +20,7 @@
 #include <linux/moduleloader.h>
 #include <linux/err.h>
 #include <linux/vmalloc.h>
+#include <asm/uaccess.h>
 
 /* FIXME: We don't do .init separately.  To do this, we'd need to have
    a separate r2 value in the init and core section, and stub between
@@ -382,7 +383,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
-	sort_ex_table(me->extable.entry,
-		      me->extable.entry + me->extable.num_entries);
+	sort_ex_table(me->extable,
+		      me->extable + me->num_exentries);
 	return 0;
 }
