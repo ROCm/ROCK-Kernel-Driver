@@ -50,9 +50,16 @@ static int __init tsc_setup(char *str)
 	tsc_disable = 1;
 	return 1;
 }
+#else
+#define tsc_disable 0
 
-__setup("notsc", tsc_setup);
+static int __init tsc_setup(char *str)
+{
+	printk("notsc: Kernel compiled with CONFIG_X86_TSC, cannot disable TSC.\n");
+	return 1;
+}
 #endif
+__setup("notsc", tsc_setup);
 
 int __init get_model_name(struct cpuinfo_x86 *c)
 {
@@ -303,10 +310,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	 */
 
 	/* TSC disabled? */
-#ifndef CONFIG_X86_TSC
 	if ( tsc_disable )
 		clear_bit(X86_FEATURE_TSC, c->x86_capability);
-#endif
 
 	/* FXSR disabled? */
 	if (disable_x86_fxsr) {
@@ -442,14 +447,12 @@ void __init cpu_init (void)
 
 	if (cpu_has_vme || cpu_has_tsc || cpu_has_de)
 		clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
-#ifndef CONFIG_X86_TSC
 	if (tsc_disable && cpu_has_tsc) {
 		printk(KERN_NOTICE "Disabling TSC...\n");
 		/**** FIX-HPA: DOES THIS REALLY BELONG HERE? ****/
 		clear_bit(X86_FEATURE_TSC, boot_cpu_data.x86_capability);
 		set_in_cr4(X86_CR4_TSD);
 	}
-#endif
 
 	/*
 	 * Initialize the per-CPU GDT with the boot GDT,
