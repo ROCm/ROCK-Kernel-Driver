@@ -913,10 +913,6 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
 		
 	return rc;
-
-
-
-	return rc;
 }
 
 int
