@@ -1793,19 +1793,16 @@ static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		data->phy_id = tp->phys[0] & 0x3f;
 		/* Fall Through */
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		spin_lock_irqsave (&tp->lock, flags);
 		data->val_out = mdio_read (dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		spin_unlock_irqrestore (&tp->lock, flags);
 		break;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable (CAP_NET_ADMIN)) {
 			rc = -EPERM;
 			break;

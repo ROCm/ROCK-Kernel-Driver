@@ -2334,17 +2334,14 @@ static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
 	case SIOCGMIIPHY:	/* Get the address of the PHY in use. */
-	case SIOCDEVPRIVATE:	/* binary compat, remove in 2.5 */
 		data->phy_id = phy;
 		/* Fall Through */
 
 	case SIOCGMIIREG:	/* Read the specified MII register. */
-	case SIOCDEVPRIVATE+1:	/* binary compat, remove in 2.5 */
 		data->val_out = mdio_read (dev, data->phy_id, data->reg_num);
 		break;
 
 	case SIOCSMIIREG:	/* Write the specified MII register */
-	case SIOCDEVPRIVATE+2:	/* binary compat, remove in 2.5 */
 		if (!capable (CAP_NET_ADMIN)) {
 			rc = -EPERM;
 			break;
