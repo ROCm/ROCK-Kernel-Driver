@@ -360,31 +360,7 @@ release_region:
 }
 
 #ifdef MODULE
-static void __exit ht6560b_release_hwif(ide_hwif_t *hwif)
-{
-	if (hwif->chipset != ide_ht6560b)
-		return;
-
-	hwif->chipset = ide_unknown;
-	hwif->tuneproc = NULL;
-	hwif->selectproc = NULL;
-	hwif->serialized = 0;
-	hwif->mate = NULL;
-	hwif->channel = 0;
-
-	hwif->drives[0].drive_data = 0;
-	hwif->drives[1].drive_data = 0;
-}
-
-static void __exit ht6560b_exit(void)
-{
-	ht6560b_release_hwif(&ide_hwifs[0]);
-	ht6560b_release_hwif(&ide_hwifs[1]);
-	release_region(HT_CONFIG_PORT, 1);
-}
-
 module_init(ht6560b_init);
-module_exit(ht6560b_exit);
 #endif
 
 MODULE_AUTHOR("See Local File");

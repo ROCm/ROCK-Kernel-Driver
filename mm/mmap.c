@@ -402,7 +402,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 		     struct rb_node *rb_parent, unsigned long addr, 
 		     unsigned long end, unsigned long vm_flags,
 		     struct file *file, unsigned long pgoff,
-		     anon_vma_t ** anon_vma_cache, struct vm_policy *policy)
+		     anon_vma_t ** anon_vma_cache, struct mempolicy *policy)
 {
 	struct inode *inode;
 	struct address_space *mapping;

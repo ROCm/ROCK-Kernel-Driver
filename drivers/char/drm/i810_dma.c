@@ -1273,7 +1273,7 @@ int i810_dma_mc(struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 
-	if (mc.idx >= dma->buf_count)
+	if ((unsigned long)mc.idx >= dma->buf_count)
 		return -EINVAL;
 
 	i810_dma_dispatch_mc(dev, dma->buflist[mc.idx], mc.used,
