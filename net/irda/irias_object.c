@@ -93,7 +93,10 @@ struct ias_object *irias_new_object( char *name, int id)
 	obj->name = strndup(name, IAS_MAX_CLASSNAME);
 	obj->id = id;
 
-	obj->attribs = hashbin_new(HB_LOCAL);
+	/* Locking notes : the attrib spinlock has lower precendence
+	 * than the objects spinlock. Never grap the objects spinlock
+	 * while holding any attrib spinlock (risk of deadlock). Jean II */
+	obj->attribs = hashbin_new(HB_LOCK);
 
 	return obj;
 }
@@ -211,7 +214,8 @@ struct ias_object *irias_find_object(char *name)
 {
 	ASSERT(name != NULL, return NULL;);
 
-	return hashbin_find(objects, 0, name);
+	/* Unsafe (locking), object might change */
+	return hashbin_lock_find(objects, 0, name);
 }
 
 /*
@@ -228,10 +232,11 @@ struct ias_attrib *irias_find_attrib(struct ias_object *obj, char *name)
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return NULL;);
 	ASSERT(name != NULL, return NULL;);
 
-	attrib = hashbin_find(obj->attribs, 0, name);
+	attrib = hashbin_lock_find(obj->attribs, 0, name);
 	if (attrib == NULL)
 		return NULL;
 
+	/* Unsafe (locking), attrib might change */
 	return attrib;
 }
 
@@ -267,26 +272,32 @@ int irias_object_change_attribute(char *obj_name, char *attrib_name,
 {
 	struct ias_object *obj;
 	struct ias_attrib *attrib;
+	unsigned long flags;
 
 	/* Find object */
-	obj = hashbin_find(objects, 0, obj_name);
+	obj = hashbin_lock_find(objects, 0, obj_name);
 	if (obj == NULL) {
 		WARNING("%s: Unable to find object: %s\n", __FUNCTION__,
 			obj_name);
 		return -1;
 	}
 
+	/* Slightly unsafe (obj might get removed under us) */
+	spin_lock_irqsave(&obj->attribs->hb_spinlock, flags);
+
 	/* Find attribute */
 	attrib = hashbin_find(obj->attribs, 0, attrib_name);
 	if (attrib == NULL) {
 		WARNING("%s: Unable to find attribute: %s\n", __FUNCTION__,
 			attrib_name);
+		spin_unlock_irqrestore(&obj->attribs->hb_spinlock, flags);
 		return -1;
 	}
 
 	if ( attrib->value->type != new_value->type) {
 		IRDA_DEBUG( 0, __FUNCTION__
 		       "(), changing value type not allowed!\n");
+		spin_unlock_irqrestore(&obj->attribs->hb_spinlock, flags);
 		return -1;
 	}
 
@@ -297,6 +308,7 @@ int irias_object_change_attribute(char *obj_name, char *attrib_name,
 	attrib->value = new_value;
 
 	/* Success */
+	spin_unlock_irqrestore(&obj->attribs->hb_spinlock, flags);
 	return 0;
 }
 

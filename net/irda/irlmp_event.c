@@ -207,6 +207,43 @@ void irlmp_idle_timer_expired(void *data)
 	irlmp_do_lap_event(self, LM_LAP_IDLE_TIMEOUT, NULL);
 }
 
+/*
+ * Send an event on all LSAPs attached to this LAP.
+ */
+static inline void
+irlmp_do_all_lsap_event(hashbin_t *	lsap_hashbin,
+			IRLMP_EVENT	event)
+{
+	struct lsap_cb *lsap;
+	struct lsap_cb *lsap_next;
+
+	/* Note : this function use the new hashbin_find_next()
+	 * function, instead of the old hashbin_get_next().
+	 * This make sure that we are always pointing one lsap
+	 * ahead, so that if the current lsap is removed as the
+	 * result of sending the event, we don't care.
+	 * Also, as we store the context ourselves, if an enumeration
+	 * of the same lsap hashbin happens as the result of sending the
+	 * event, we don't care.
+	 * The only problem is if the next lsap is removed. In that case,
+	 * hashbin_find_next() will return NULL and we will abort the
+	 * enumeration. - Jean II */
+
+	/* Also : we don't accept any skb in input. We can *NOT* pass
+	 * the same skb to multiple clients safely, we would need to
+	 * skb_clone() it. - Jean II */
+
+	lsap = (struct lsap_cb *) hashbin_get_first(lsap_hashbin);
+
+	while (NULL != hashbin_find_next(lsap_hashbin,
+					 (long) lsap,
+					 NULL,
+					 (void *) &lsap_next) ) {
+		irlmp_do_lsap_event(lsap, event, NULL);
+		lsap = lsap_next;
+	}
+}
+
 /*********************************************************************
  *
  *    LAP connection control states
@@ -274,9 +311,6 @@ static void irlmp_state_standby(struct lap_cb *self, IRLMP_EVENT event,
 static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 				  struct sk_buff *skb)
 {
-	struct lsap_cb *lsap;
-	struct lsap_cb *lsap_current;
-
 	IRDA_DEBUG(2, __FUNCTION__ "(), event=%s\n", irlmp_event[event]);
 
 	switch (event) {
@@ -290,11 +324,9 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 		/* Just accept connection TODO, this should be fixed */
 		irlap_connect_response(self->irlap, skb);
 
-		lsap = (struct lsap_cb *) hashbin_get_first(self->lsaps);
-		while (lsap != NULL) {
-			irlmp_do_lsap_event(lsap, LM_LAP_CONNECT_CONFIRM, NULL);
-			lsap = (struct lsap_cb*) hashbin_get_next(self->lsaps);
-		}
+		/* Tell LSAPs that they can start sending data */
+		irlmp_do_all_lsap_event(self->lsaps, LM_LAP_CONNECT_CONFIRM);
+
 		/* Note : by the time we get there (LAP retries and co),
 		 * the lsaps may already have gone. This avoid getting stuck
 		 * forever in LAP_ACTIVE state - Jean II */
@@ -310,11 +342,9 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 		/* For all lsap_ce E Associated do LS_Connect_confirm */
 		irlmp_next_lap_state(self, LAP_ACTIVE);
 
-		lsap = (struct lsap_cb *) hashbin_get_first(self->lsaps);
-		while (lsap != NULL) {
-			irlmp_do_lsap_event(lsap, LM_LAP_CONNECT_CONFIRM, NULL);
-			lsap = (struct lsap_cb*) hashbin_get_next(self->lsaps);
-		}
+		/* Tell LSAPs that they can start sending data */
+		irlmp_do_all_lsap_event(self->lsaps, LM_LAP_CONNECT_CONFIRM);
+
 		/* Note : by the time we get there (LAP retries and co),
 		 * the lsaps may already have gone. This avoid getting stuck
 		 * forever in LAP_ACTIVE state - Jean II */
@@ -328,18 +358,8 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 		irlmp_next_lap_state(self, LAP_STANDBY);
 
 		/* Send disconnect event to all LSAPs using this link */
-		lsap = (struct lsap_cb *) hashbin_get_first( self->lsaps);
-		while (lsap != NULL ) {
-			ASSERT(lsap->magic == LMP_LSAP_MAGIC, return;);
-
-			lsap_current = lsap;
-
-			/* Be sure to stay one item ahead */
-			lsap = (struct lsap_cb *) hashbin_get_next(self->lsaps);
-			irlmp_do_lsap_event(lsap_current,
-					    LM_LAP_DISCONNECT_INDICATION,
-					    NULL);
-		}
+		irlmp_do_all_lsap_event(self->lsaps,
+					LM_LAP_DISCONNECT_INDICATION);
 		break;
 	case LM_LAP_DISCONNECT_REQUEST:
 		IRDA_DEBUG(4, __FUNCTION__ "(), LM_LAP_DISCONNECT_REQUEST\n");
@@ -368,9 +388,6 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 			       struct sk_buff *skb)
 {
-	struct lsap_cb *lsap;
-	struct lsap_cb *lsap_current;
-
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
 	switch (event) {
@@ -383,22 +400,11 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 		 *  notify all LSAPs using this LAP, but that should be safe to
 		 *  do anyway.
 		 */
-		lsap = (struct lsap_cb *) hashbin_get_first(self->lsaps);
-		while (lsap != NULL) {
-			irlmp_do_lsap_event(lsap, LM_LAP_CONNECT_CONFIRM, NULL);
-			lsap = (struct lsap_cb*) hashbin_get_next(self->lsaps);
-		}
+		irlmp_do_all_lsap_event(self->lsaps, LM_LAP_CONNECT_CONFIRM);
 
 		/* Needed by connect indication */
-		lsap = (struct lsap_cb *) hashbin_get_first(irlmp->unconnected_lsaps);
-		while (lsap != NULL) {
-			lsap_current = lsap;
-
-			/* Be sure to stay one item ahead */
-			lsap = (struct lsap_cb*) hashbin_get_next(irlmp->unconnected_lsaps);
-			irlmp_do_lsap_event(lsap_current,
-					    LM_LAP_CONNECT_CONFIRM, NULL);
-		}
+		irlmp_do_all_lsap_event(irlmp->unconnected_lsaps,
+					LM_LAP_CONNECT_CONFIRM);
 		/* Keep state */
 		break;
 	case LM_LAP_DISCONNECT_REQUEST:
@@ -447,18 +453,8 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 		/*
 		 *  Inform all connected LSAP's using this link
 		 */
-		lsap = (struct lsap_cb *) hashbin_get_first(self->lsaps);
-		while (lsap != NULL ) {
-			ASSERT(lsap->magic == LMP_LSAP_MAGIC, return;);
-
-			lsap_current = lsap;
-
-			/* Be sure to stay one item ahead */
-			lsap = (struct lsap_cb *) hashbin_get_next(self->lsaps);
-			irlmp_do_lsap_event(lsap_current,
-					    LM_LAP_DISCONNECT_INDICATION,
-					    NULL);
-		}
+		irlmp_do_all_lsap_event(self->lsaps,
+					LM_LAP_DISCONNECT_INDICATION);
 
 		/* Force an expiry of the discovery log.
 		 * Now that the LAP is free, the system may attempt to

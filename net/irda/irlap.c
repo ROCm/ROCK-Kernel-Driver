@@ -80,7 +80,7 @@ int irlap_proc_read(char *, char **, off_t, int);
 int __init irlap_init(void)
 {
 	/* Allocate master array */
-	irlap = hashbin_new(HB_LOCAL);
+	irlap = hashbin_new(HB_LOCK);
 	if (irlap == NULL) {
 	        ERROR("%s: can't allocate irlap hashbin!\n", __FUNCTION__);
 		return -ENOMEM;
@@ -146,7 +146,7 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 	do {
 		get_random_bytes(&self->saddr, sizeof(self->saddr));
 	} while ((self->saddr == 0x0) || (self->saddr == BROADCAST) ||
-		 (hashbin_find(irlap, self->saddr, NULL)) );
+		 (hashbin_lock_find(irlap, self->saddr, NULL)) );
 	/* Copy to the driver */
 	memcpy(dev->dev_addr, &self->saddr, 4);
 
@@ -530,7 +530,8 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
 		self->discovery_log = NULL;
 	}
 
-	self->discovery_log= hashbin_new(HB_LOCAL);
+	/* All operations will occur at predictable time, no need to lock */
+	self->discovery_log= hashbin_new(HB_NOLOCK);
 
 	info.S = discovery->nslots; /* Number of slots */
 	info.s = 0; /* Current slot */
@@ -1092,15 +1093,14 @@ int irlap_proc_read(char *buf, char **start, off_t offset, int len)
 	unsigned long flags;
 	int i = 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&irlap->hb_spinlock, flags);
 
 	len = 0;
 
 	self = (struct irlap_cb *) hashbin_get_first(irlap);
 	while (self != NULL) {
-		ASSERT(self != NULL, return -ENODEV;);
-		ASSERT(self->magic == LAP_MAGIC, return -EBADR;);
+		ASSERT(self != NULL, break;);
+		ASSERT(self->magic == LAP_MAGIC, break;);
 
 		len += sprintf(buf+len, "irlap%d ", i++);
 		len += sprintf(buf+len, "state: %s\n",
@@ -1172,7 +1172,7 @@ int irlap_proc_read(char *buf, char **start, off_t offset, int len)
 
 		self = (struct irlap_cb *) hashbin_get_next(irlap);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irlap->hb_spinlock, flags);
 
 	return len;
 }
