@@ -439,6 +439,10 @@ copy_thread (int nr, unsigned long clone_flags,
 		ia32_save_state(p);
 		if (clone_flags & CLONE_SETTLS)
 			retval = ia32_clone_tls(p, child_ptregs);
+
+		/* Copy partially mapped page list */
+		if (!retval)
+			retval = ia32_copy_partial_page_list(p, clone_flags);
 	}
 #endif
 
@@ -672,6 +676,10 @@ flush_thread (void)
 	/* drop floating-point and debug-register state if it exists: */
 	current->thread.flags &= ~(IA64_THREAD_FPH_VALID | IA64_THREAD_DBG_VALID);
 	ia64_drop_fpu(current);
+#ifdef CONFIG_IA32_SUPPORT
+	if (IS_IA32_PROCESS(ia64_task_regs(current)))
+		ia32_drop_partial_page_list(current->thread.ppl);
+#endif
 }
 
 /*
@@ -690,6 +698,10 @@ exit_thread (void)
 	/* free debug register resources */
 	if (current->thread.flags & IA64_THREAD_DBG_VALID)
 		pfm_release_debug_registers(current);
+#endif
+#ifdef CONFIG_IA32_SUPPORT
+	if (IS_IA32_PROCESS(ia64_task_regs(current)))
+		ia32_drop_partial_page_list(current->thread.ppl);
 #endif
 }
 

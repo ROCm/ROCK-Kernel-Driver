@@ -9,6 +9,7 @@
 
 #include <linux/binfmts.h>
 #include <linux/compat.h>
+#include <linux/rbtree.h>
 
 #include <asm/processor.h>
 
@@ -21,6 +22,30 @@
 #define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
+
+/*
+ * partially mapped pages provide precise accounting of which 4k sub pages
+ * are mapped and which ones are not, thereby improving IA-32 compatibility.
+ */
+struct partial_page {
+	struct partial_page	*next; /* linked list, sorted by address */
+	struct rb_node		pp_rb;
+	/* 64K is the largest "normal" page supported by ia64 ABI. So 4K*32
+	 * should suffice.*/
+	unsigned int		bitmap;
+	unsigned int		base;
+};
+
+struct partial_page_list {
+	struct partial_page	*pp_head; /* list head, points to the lowest
+					   * addressed partial page */
+	struct rb_root		ppl_rb;
+	struct partial_page	*pp_hint; /* pp_hint->next is the last
+					   * accessed partial page */
+	atomic_t		pp_count; /* reference count */
+};
+
+struct partial_page_list* ia32_init_pp_list (void);
 
 /* sigcontext.h */
 /*

@@ -371,7 +371,7 @@ ia32_syscall_table:
 	data8 sys_sched_get_priority_min	 /* 160 */
 	data8 sys32_sched_rr_get_interval
 	data8 compat_sys_nanosleep
-	data8 sys_mremap
+	data8 sys32_mremap
 	data8 sys_setresuid	/* 16-bit version */
 	data8 sys32_getresuid16	/* 16-bit version */	  /* 165 */
 	data8 sys_ni_syscall	/* vm86 */

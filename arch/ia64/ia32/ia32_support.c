@@ -211,6 +211,8 @@ ia32_cpu_init (void)
 static int __init
 ia32_init (void)
 {
+	extern kmem_cache_t	*partial_page_cachep;
+
 	ia32_exec_domain.name = "Linux/x86";
 	ia32_exec_domain.handler = NULL;
 	ia32_exec_domain.pers_low = PER_LINUX32;
@@ -218,6 +220,12 @@ ia32_init (void)
 	ia32_exec_domain.signal_map = default_exec_domain.signal_map;
 	ia32_exec_domain.signal_invmap = default_exec_domain.signal_invmap;
 	register_exec_domain(&ia32_exec_domain);
+
+	partial_page_cachep = kmem_cache_create("partial_page_cache",
+			sizeof(struct partial_page), 0, 0, NULL, NULL);
+	if (!partial_page_cachep)
+		panic("Cannot create partial page SLAB cache");
+
 	return 0;
 }
 

@@ -18,6 +18,8 @@ extern void ia32_gdt_init (void);
 extern int ia32_exception (struct pt_regs *regs, unsigned long isr);
 extern int ia32_intercept (struct pt_regs *regs, unsigned long isr);
 extern int ia32_clone_tls (struct task_struct *child, struct pt_regs *childregs);
+extern int ia32_copy_partial_page_list (struct task_struct *, unsigned long);
+extern void ia32_drop_partial_page_list (struct partial_page_list *);
 
 # endif /* !CONFIG_IA32_SUPPORT */
 
