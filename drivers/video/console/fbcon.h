@@ -27,13 +27,12 @@ struct display {
     /* Filled in by the frame buffer device */
     u_short inverse;                /* != 0 text black on white as default */
     /* Filled in by the low-level console driver */
-    struct fb_info *fb_info;        /* frame buffer for this console */
-    int vrows;                      /* number of virtual rows */
     char fontname[40];              /* Font associated to this display */	
     u_char *fontdata;
     int userfont;                   /* != 0 if fontdata kmalloc()ed */
     u_short scrollmode;             /* Scroll Method */
     short yscroll;                  /* Hardware scrolling */
+    int vrows;                      /* number of virtual rows */
 };
 
 /* drivers/video/console/fbcon.c */

@@ -309,8 +309,8 @@ struct fb_image {
 #define FB_CUR_SETHOT   0x04
 #define FB_CUR_SETCMAP  0x08
 #define FB_CUR_SETSHAPE 0x10
-#define FB_CUR_SETDEST	0x20
-#define FB_CUR_SETSIZE	0x40
+#define FB_CUR_SETSIZE	0x20
+#define FB_CUR_SETDEST	0x40
 #define FB_CUR_SETALL   0xFF
 
 struct fbcurpos {

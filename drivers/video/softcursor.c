@@ -25,13 +25,43 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	unsigned int i, size, s_pitch, d_pitch;
 	static u8 src[64];
 	u8 *dst;
-			  
+
 	s_pitch = (cursor->image.width + 7)/8;
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
 	size = d_pitch * cursor->image.height + buf_align;
 	size &= ~buf_align;
 	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
 	info->cursor.image.data = dst;
+
+	info->cursor.enable = (cursor->set & FB_CUR_SETCUR) ? 1 : 0;
+
+	if (cursor->set & FB_CUR_SETPOS) {
+		info->cursor.image.dx = cursor->image.dx;
+		info->cursor.image.dy = cursor->image.dy;
+	}
+
+	if (cursor->set & FB_CUR_SETHOT)
+		info->cursor.hot = cursor->hot;
+
+	if (cursor->set & FB_CUR_SETCMAP) {
+		if (cursor->image.depth == 0) {
+			info->cursor.image.bg_color = cursor->image.bg_color;
+			info->cursor.image.fg_color = cursor->image.fg_color;
+		} else {
+			if (cursor->image.cmap.len)
+				fb_copy_cmap(&cursor->image.cmap, &info->cursor.image.cmap, 0);
+		}
+		info->cursor.image.depth = cursor->image.depth;
+	}
+
+	if (cursor->set & FB_CUR_SETSIZE) {
+		info->cursor.image.width = cursor->image.width;
+		info->cursor.image.height = cursor->image.height;
+		cursor->set |= FB_CUR_SETSHAPE;
+	}	
+
+	if (cursor->set & FB_CUR_SETSHAPE) {
+	}
 
 	if (cursor->enable) {
 		switch (cursor->rop) {
@@ -56,14 +86,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		move_buf_aligned(info, dst, cursor->dest, s_pitch, d_pitch, 
 			  	 cursor->image.height);
 	}
-
-	info->cursor.image.bg_color = cursor->image.bg_color;
-	info->cursor.image.fg_color = cursor->image.fg_color;
-	info->cursor.image.dx = cursor->image.dx;
-	info->cursor.image.dy = cursor->image.dy;
-	info->cursor.image.width = cursor->image.width;
-	info->cursor.image.height = cursor->image.height;
-	info->cursor.image.depth = cursor->image.depth;
 
 	info->fbops->fb_imageblit(info, &info->cursor.image);
 	return 0;
