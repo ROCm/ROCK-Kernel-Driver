@@ -18,18 +18,10 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
-#include <linux/console.h>
-#include <linux/selection.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 
 #include <asm/io.h>
-
-#include <video/fbcon.h>
-#include <video/fbcon-vga-planes.h>
-#include <video/fbcon-vga.h>
-#include <video/fbcon-cfb4.h>
-#include <video/fbcon-cfb8.h>
 #include "vga.h"
 
 #define GRAPHICS_ADDR_REG 0x3ce		/* Graphics address register. */
@@ -1058,8 +1050,6 @@ static struct fb_ops vga16fb_ops = {
 	.fb_set_var	= vga16fb_set_var,
 	.fb_check_var	= vga16fb_check_var,
 	.fb_set_par	= vga16fb_set_par,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap 	= gen_set_cmap,
 	.fb_setcolreg 	= vga16fb_setcolreg,
 	.fb_pan_display = vga16fb_pan_display,
 	.fb_blank 	= vga16fb_blank,
@@ -1070,16 +1060,11 @@ int vga16fb_setup(char *options)
 {
 	char *this_opt;
 	
-	vga16fb.fontname[0] = '\0';
-	
 	if (!options || !*options)
 		return 0;
 	
 	while ((this_opt = strsep(&options, ",")) != NULL) {
 		if (!*this_opt) continue;
-		
-		if (!strncmp(this_opt, "font:", 5))
-			strcpy(vga16fb.fontname, this_opt+5);
 	}
 	return 0;
 }
@@ -1109,24 +1094,14 @@ int __init vga16fb_init(void)
 	vga16fb_defined.green.length = i;
 	vga16fb_defined.blue.length  = i;	
 
-	/* XXX share VGA I/O region with vgacon and others */
-
-	disp.var = vga16fb_defined;
-
 	/* name should not depend on EGA/VGA */
-	strcpy(vga16fb.modename, "VGA16 VGA");
-	vga16fb.changevar = NULL;
+	strcpy(vga16fb_fix.id, "VGA16 VGA");
 	vga16fb.node = NODEV;
 	vga16fb.fbops = &vga16fb_ops;
 	vga16fb.var = vga16fb_defined;
 	vga16fb.fix = vga16fb_fix;
 	vga16fb.par = &vga16_par;
-	vga16fb.disp = &disp;
-	vga16fb.currcon = -1;
-	vga16fb.switch_con = gen_switch;
-	vga16fb.updatevar=&vga16fb_update_var;
 	vga16fb.flags=FBINFO_FLAG_DEFAULT;
-	vga16fb_set_disp(-1, &vga16fb);
 
 	if (register_framebuffer(&vga16fb) < 0) {
 		iounmap(vga16fb.screen_base);
@@ -1134,8 +1109,7 @@ int __init vga16fb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(vga16fb.node), vga16fb.modename);
-
+	       GET_FB_IDX(vga16fb.node), vga16fb.fix.id);
 	return 0;
 }
 

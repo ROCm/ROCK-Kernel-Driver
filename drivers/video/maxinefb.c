@@ -34,7 +34,6 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/fb.h>
-#include <video/fbcon.h>
 #include "maxinefb.h"
 
 /* bootinfo.h defines the machine type values, needed when checking */

@@ -181,8 +181,6 @@ int __init vesafb_setup(char *options)
 {
 	char *this_opt;
 	
-	fb_info.fontname[0] = '\0';
-	
 	if (!options || !*options)
 		return 0;
 	
@@ -203,8 +201,6 @@ int __init vesafb_setup(char *options)
 			pmi_setpal=1;
 		else if (! strcmp(this_opt, "mtrr"))
 			mtrr=1;
-		else if (!strncmp(this_opt, "font:", 5))
-			strcpy(fb_info.fontname, this_opt+5);
 	}
 	return 0;
 }

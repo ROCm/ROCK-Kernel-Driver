@@ -595,8 +595,6 @@ void __init macfb_setup(char *options, int *ints)
 {
 	char *this_opt;
 	
-	fb_info.fontname[0] = '\0';
-	
 	if (!options || !*options)
 		return;
 	
@@ -605,8 +603,6 @@ void __init macfb_setup(char *options, int *ints)
 		
 		if (! strcmp(this_opt, "inverse"))
 			inverse=1;
-		else if (!strncmp(this_opt, "font:", 5))
-			strcpy(fb_info.fontname, this_opt+5);
 		/* This means "turn on experimental CLUT code" */
 		else if (!strcmp(this_opt, "vidtest"))
 			vidtest=1;

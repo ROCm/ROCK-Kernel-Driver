@@ -24,7 +24,6 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/tty.h>
-#include <linux/console.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #ifdef CONFIG_KMOD
@@ -42,7 +41,10 @@
 #include <asm/pgtable.h>
 
 #include <linux/fb.h>
+#ifdef CONFIG_VT
+#include <linux/console.h>
 #include <video/fbcon.h>
+#endif
 
     /*
      *  Frame buffer device initialization and setup routines
@@ -356,11 +358,14 @@ static int num_pref_init_funcs __initdata = 0;
 
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
+
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 extern int fbcon_softback_size; 
 
 static int first_fb_vc;
 static int last_fb_vc = MAX_NR_CONSOLES-1;
 static int fbcon_is_default = 1;
+#endif
 
 #ifdef CONFIG_FB_OF
 static int ofonly __initdata = 0;
@@ -468,7 +473,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_ops *fb = info->fbops;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	struct fb_con2fbmap con2fb;
+#endif
 	struct fb_cmap cmap;
 	int i;
 	
@@ -481,13 +488,13 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		if (var.activate & FB_ACTIVATE_ALL) {
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+		if (var.activate & FB_ACTIVATE_ALL)
 			i = set_all_vcs(fbidx, fb, &var, info);
-			if (i) return i;
-		} else {
+		else 
+#endif
 			i = fb_set_var(&var, info);
-			if (i) return i;
-		}
+		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
@@ -511,7 +518,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return i;
-#ifdef CONFIG_VT
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
 			return -EFAULT;
@@ -540,7 +547,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		    for (i = 0; i < MAX_NR_CONSOLES; i++)
 			set_con2fb_map(i, con2fb.framebuffer);
 		return 0;
-#endif
+#endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
 		if (fb->fb_blank == NULL)
 			return -EINVAL;
@@ -737,10 +744,13 @@ static devfs_handle_t devfs_handle;
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-	int i, j;
-	char name_buf[8];
 	static int fb_ever_opened[FB_MAX];
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	static int first = 1;
+	int j;
+#endif
+	char name_buf[8];
+	int i;
 
 	if (num_registered_fb == FB_MAX)
 		return -ENXIO;
@@ -753,6 +763,7 @@ register_framebuffer(struct fb_info *fb_info)
 	registered_fb[i] = fb_info;
 	if (!fb_ever_opened[i]) {
 		struct module *owner = fb_info->fbops->owner;
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 		/*
 		 *  We assume initial frame buffer devices can be opened this
 		 *  many times
@@ -775,6 +786,15 @@ register_framebuffer(struct fb_info *fb_info)
 		first = 0;
 		take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
 	}
+#else
+		if (owner) {
+			__MOD_INC_USE_COUNT(owner);
+			if (fb_info->fbops->fb_open && fb_info->fbops->fb_open(fb_info,0))
+				__MOD_DEC_USE_COUNT(owner);
+		}
+		fb_ever_opened[i] = 1;
+	}
+#endif
 	sprintf (name_buf, "%d", i);
 	fb_info->devfs_handle =
 	    devfs_register (devfs_handle, name_buf, DEVFS_FL_DEFAULT,
@@ -801,9 +821,11 @@ unregister_framebuffer(struct fb_info *fb_info)
 	int i, j;
 
 	i = GET_FB_IDX(fb_info->node);
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	for (j = 0; j < MAX_NR_CONSOLES; j++)
 		if (con2fb_map[j] == i)
 			return -EBUSY;
+#endif
 	if (!registered_fb[i])
 		return -EINVAL;
 	devfs_unregister (fb_info->devfs_handle);
@@ -873,7 +895,8 @@ int __init video_setup(char *options)
 
     if (!options || !*options)
 	    return 0;
-	    
+	   
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE 
     if (!strncmp(options, "scrollback:", 11)) {
 	    options += 11;
 	    if (*options) {
@@ -910,6 +933,7 @@ int __init video_setup(char *options)
 		last_fb_vc = simple_strtoul(options, &options, 10) - 1;
 	    fbcon_is_default = 0;
     }
+#endif
 
 #ifdef CONFIG_FB_OF
     if (!strcmp(options, "ofonly")) {

@@ -18,6 +18,7 @@
 #define FBIOGETCMAP		0x4604
 #define FBIOPUTCMAP		0x4605
 #define FBIOPAN_DISPLAY		0x4606
+#define FBIO_CURSOR            _IOWR('F', 0x08, struct fbcursor)
 /* 0x4607-0x460B are defined below */
 /* #define FBIOGET_MONITORSPEC	0x460C */
 /* #define FBIOPUT_MONITORSPEC	0x460D */
@@ -258,6 +259,32 @@ struct fb_vblank {
 	__u32 reserved[4];		/* reserved for future compatibility */
 };
 
+/*
+ * hardware cursor control
+ */
+
+#define FB_CUR_SETCUR   0x01
+#define FB_CUR_SETPOS   0x02
+#define FB_CUR_SETHOT   0x04
+#define FB_CUR_SETCMAP  0x08
+#define FB_CUR_SETSHAPE 0x10
+#define FB_CUR_SETALL   0x1F
+
+struct fbcurpos {
+	__u16 x, y;
+};
+
+struct fbcursor {
+	__u16 set;		/* what to set */
+	__u16 enable;		/* cursor on/off */
+	struct fbcurpos pos;	/* cursor position */
+	struct fbcurpos hot;	/* cursor hot spot */
+	struct fb_cmap cmap;	/* color map info */
+	struct fbcurpos size;	/* cursor bit map size */
+	char *image;		/* cursor image bits */
+	char *mask;		/* cursor mask bits */
+};
+
 /* Internal HW accel */
 #define ROP_COPY 0
 #define ROP_XOR  1
@@ -324,6 +351,8 @@ struct fb_ops {
     int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* set the video mode according to par */
     int (*fb_set_par)(struct fb_info *info);
+    /* cursor control */
+    int (*fb_cursor)(struct fb_info *info, struct fbcursor *cursor);		
     /* set color register */
     int (*fb_setcolreg)(unsigned regno, unsigned red, unsigned green,
                         unsigned blue, unsigned transp, struct fb_info *info);
@@ -358,12 +387,12 @@ struct fb_info {
    struct fb_var_screeninfo var;        /* Current var */
    struct fb_fix_screeninfo fix;        /* Current fix */
    struct fb_monspecs monspecs;         /* Current Monitor specs */
+   struct fbcursor cursor;		/* Current cursor */	
    struct fb_cmap cmap;                 /* Current cmap */
    struct fb_ops *fbops;
    char *screen_base;                   /* Virtual address */
    struct vc_data *display_fg;		/* Console visible on this display */
    int currcon;				/* Current VC. */	
-   char fontname[40];			/* default font name */
    devfs_handle_t devfs_handle;         /* Devfs handle for new name         */
    devfs_handle_t devfs_lhandle;        /* Devfs handle for compat. symlink  */
    void *pseudo_palette;                /* Fake palette of 16 colors and 

@@ -243,6 +243,24 @@ static void cursor_timer_handler(unsigned long dev_addr)
       add_timer(&cursor_timer);
 }
 
+static int __init fbconsole_setup(char *options)
+{
+    char *this_opt;
+    int unit;
+
+    if (!options || !*options)
+            return 0;
+
+    while ((this_opt = strsep(&options, ",")) != NULL) {
+        if (!strncmp(this_opt, "font:", 5)) {
+                for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
+                		strcpy(fb_display[unit].fontname, this_opt+5);
+	}
+    }
+    return 0;
+}
+
+__setup("fbcon=", fbconsole_setup);
 
 /**
  *	PROC_CONSOLE - find the attached tty or visible console
@@ -653,8 +671,8 @@ static void fbcon_setup(int con, int init, int logo)
     }
 
     if (!p->fontdata) {
-        if (!info->fontname[0] ||
-	    !(font = fbcon_find_font(info->fontname)))
+        if (!p->fontname[0] ||
+	    !(font = fbcon_find_font(p->fontname)))
 	        font = fbcon_get_default_font(info->var.xres, info->var.yres);
         p->_fontwidth = font->width;
         p->_fontheight = font->height;
@@ -1605,7 +1623,6 @@ static int fbcon_switch(struct vc_data *conp)
     return 1;
 }
 
-
 static int fbcon_blank(struct vc_data *conp, int blank)
 {
     struct display *p = &fb_display[conp->vc_num];
@@ -1619,10 +1636,12 @@ static int fbcon_blank(struct vc_data *conp, int blank)
     if (!p->can_soft_blank) {
 	if (blank) {
 	    if (info->fix.visual == FB_VISUAL_MONO01) {
+		/*
 		if (info->screen_base)
 		    fb_memset255(info->screen_base,
 				 info->var.xres_virtual*info->var.yres_virtual*
 				 info->var.bits_per_pixel>>3);
+		*/
 	    } else {
 	    	unsigned short oldc;
 	    	u_int height;

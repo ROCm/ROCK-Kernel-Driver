@@ -5,6 +5,9 @@
 mainmenu_option next_comment
 comment 'Graphics support'
 
+source drivers/video/agp/Config.in
+source drivers/video/drm/Config.in
+
 bool 'Support for frame buffer devices ' CONFIG_FB
 
 if [ "$CONFIG_FB" = "y" ]; then

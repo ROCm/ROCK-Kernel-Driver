@@ -214,7 +214,6 @@ static struct fb_ops atyfb_ops = {
 	.fb_rasterimg	= atyfb_rasterimg,
 };
 
-static char fontname[40] __initdata = { 0 };
 static char curblink __initdata = 1;
 static char noaccel __initdata = 0;
 static u32 default_vram __initdata = 0;
@@ -1822,7 +1821,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	info->node = NODEV;
 	info->fbops = &atyfb_ops;
 	info->pseudo_palette = pseudo_palette;
-	strcpy(info->fontname, fontname);
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -2415,17 +2413,7 @@ int __init atyfb_setup(char *options)
 		return 0;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "font:", 5)) {
-			char *p;
-			int i;
-
-			p = this_opt + 5;
-			for (i = 0; i < sizeof(fontname) - 1; i++)
-				if (!*p || *p == ' ' || *p == ',')
-					break;
-			memcpy(fontname, this_opt + 5, i);
-			fontname[i] = 0;
-		} else if (!strncmp(this_opt, "noblink", 7)) {
+		if (!strncmp(this_opt, "noblink", 7)) {
 			curblink = 0;
 		} else if (!strncmp(this_opt, "noaccel", 7)) {
 			noaccel = 1;

@@ -18,17 +18,15 @@ if [ "$CONFIG_VT" != "n" ]; then
 #     fi
    fi
    tristate 'MDA text console (dual-headed) ' CONFIG_MDA_CONSOLE
-   if [ "$CONFIG_FB" = "y" ]; then
-      define_bool CONFIG_PCI_CONSOLE y
+   if [ "$CONFIG_SGI_IP22" = "y" ]; then
+      tristate 'SGI Newport Console support' CONFIG_SGI_NEWPORT_CONSOLE
+      if [ "$CONFIG_SGI_NEWPORT_CONSOLE" != "y" ]; then
+         define_bool CONFIG_DUMMY_CONSOLE y
+      else
+         define_bool CONFIG_FONT_8x16 y
+      fi
    fi
-#if [ "$CONFIG_SGI_IP22" = "y" ]; then
-#   tristate 'SGI Newport Console support' CONFIG_SGI_NEWPORT_CONSOLE
-#   if [ "$CONFIG_SGI_NEWPORT_CONSOLE" != "y" ]; then
-#      define_bool CONFIG_DUMMY_CONSOLE y
-#   else
-#      define_bool CONFIG_FONT_8x16 y
-#fi
-   if [ "$CONFIG_ARCH_PARISC" = "y" ]; then
+   if [ "$CONFIG_PARISC" = "y" ]; then
 #     bool 'IODC console' CONFIG_IODC_CONSOLE
       bool 'STI console' CONFIG_STI_CONSOLE
       if [ "$CONFIG_IODC_CONSOLE" = "n" ]; then
@@ -50,6 +48,7 @@ if [ "$CONFIG_VT" != "n" ]; then
       bool 'Framebuffer Console support' CONFIG_FRAMEBUFFER_CONSOLE
       if [ "$CONFIG_FRAMEBUFFER_CONSOLE" = "y" ]; then
          define_bool CONFIG_DUMMY_CONSOLE y	
+         define_bool CONFIG_PCI_CONSOLE y
          bool '  Advanced low level driver options' CONFIG_FBCON_ADVANCED
          if [ "$CONFIG_FBCON_ADVANCED" = "y" ]; then
             tristate '    Hardware acceleration support' CONFIG_FBCON_ACCEL

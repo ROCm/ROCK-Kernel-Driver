@@ -78,7 +78,6 @@ anakinfb_init(void)
 	fb_info.fbops = &anakinfb_ops;
 	fb_info.var = anakinfb_var;
 	fb_info.fix = anakinfb_fix;
-	strcpy(fb_info.fontname, "VGA8x16");
 	if (!(request_mem_region(VGA_START, VGA_SIZE, "vga")))
 		return -ENOMEM;
 	if (fb_info.screen_base = ioremap(VGA_START, VGA_SIZE)) {

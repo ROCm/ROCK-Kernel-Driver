@@ -9,6 +9,9 @@ export-objs    	:= fbmem.o fbcmap.o fbmon.o modedb.o fbgen.o cyber2000fb.o
 
 # Each configuration option enables a list of files.
 
+obj-$(CONFIG_AGP)		  += agp/
+obj-$(CONFIG_DRM) 		  += drm/
+
 # Add fbmon.o back into obj-$(CONFIG_FB) in 2.5.x
 obj-$(CONFIG_FB)                  += fbmem.o fbcmap.o modedb.o fbgen.o
 # Only include macmodes.o if we have FB support and are PPC
