@@ -350,7 +350,7 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 	 */
 	if (len != srb->request_bufflen) {
 		printk("USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
-		show_trace(NULL);
+		BUG();
 	}
 
 	return len;
