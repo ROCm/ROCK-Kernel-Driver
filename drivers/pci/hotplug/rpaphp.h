@@ -132,4 +132,6 @@ extern int rpaphp_get_power_status(struct slot *slot, u8 * value);
 extern int rpaphp_set_attention_status(struct slot *slot, u8 status);
 extern void rpaphp_sysfs_remove_attr_location(struct hotplug_slot *slot);
 	
+extern struct hotplug_slot *rpaphp_find_hotplug_slot(struct pci_dev *dev);
+
 #endif				/* _PPC64PHP_H */
