@@ -271,9 +271,9 @@ sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 	/* SCTP_STATE_CLOSED */ \
 	{.fn = sctp_sf_ootb, .name = "sctp_sf_ootb"}, \
 	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_ootb, .name = "sctp_sf_ootb"}, \
+	{.fn = sctp_sf_do_8_5_1_E_sa, .name = "sctp_sf_do_8_5_1_E_sa"}, \
 	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
+	{.fn = sctp_sf_do_8_5_1_E_sa, .name = "sctp_sf_do_8_5_1_E_sa"}, \
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_violation, .name = "sctp_sf_violation"}, \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \

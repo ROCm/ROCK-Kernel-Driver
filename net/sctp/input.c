@@ -522,9 +522,9 @@ void __sctp_unhash_established(sctp_association_t *asoc)
 }
 
 /* Look up an association. */
-sctp_association_t *__sctp_rcv_lookup_association(const sockaddr_storage_t *laddr,
-						  const sockaddr_storage_t *paddr,
-						  sctp_transport_t **transportp)
+sctp_association_t *__sctp_lookup_association(const sockaddr_storage_t *laddr,
+					      const sockaddr_storage_t *paddr,
+					      sctp_transport_t **transportp)
 {
 	sctp_hashbucket_t *head;
 	sctp_endpoint_common_t *epb;
@@ -557,6 +557,36 @@ hit:
 	return asoc;
 }
 
+/* Look up an association. BH-safe. */
+sctp_association_t *sctp_lookup_association(const sockaddr_storage_t *laddr,
+					    const sockaddr_storage_t *paddr,
+					    sctp_transport_t **transportp)
+{
+	sctp_association_t *asoc;
+
+	sctp_local_bh_disable();
+	asoc = __sctp_lookup_association(laddr, paddr, transportp);
+	sctp_local_bh_enable();
+	
+	return asoc;
+}
+
+/* Is there an association matching the given local and peer addresses? */
+int sctp_has_association(const sockaddr_storage_t *laddr,
+			 const sockaddr_storage_t *paddr)
+{
+	sctp_association_t *asoc;
+	sctp_transport_t *transport;
+
+	if ((asoc = sctp_lookup_association(laddr, paddr, &transport))) {
+		sock_put(asoc->base.sk);
+		sctp_association_put(asoc);
+		return 1;
+	}
+
+	return 0;
+}
+
 /*
  * SCTP Implementors Guide, 2.18 Handling of address
  * parameters within the INIT or INIT-ACK.
@@ -584,14 +614,20 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	struct sctphdr *sh = (struct sctphdr *) skb->h.raw;
 	sctp_chunkhdr_t *ch;
 	__u8 *ch_end, *data;
-	sctpParam_t parm;
+	sctp_paramhdr_t *parm;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
 
 	ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
 
-	if (SCTP_CID_INIT_ACK != ch->type)
+	/* If this is INIT/INIT-ACK look inside the chunk too. */
+	switch (ch->type) {
+	case SCTP_CID_INIT:
+	case SCTP_CID_INIT_ACK:
+		break;
+	default:
 		return NULL;
+	}
 
 	/*
 	 * This code will NOT touch anything inside the chunk--it is
@@ -609,26 +645,25 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	/* Find the start of the TLVs and the end of the chunk.  This is
 	 * the region we search for address parameters.
 	 */
-
 	data = skb->data + sizeof(sctp_init_chunk_t);
 
 	/* See sctp_process_init() for how to go thru TLVs. */
 	while (data < ch_end) {
-		parm.v  = data;
+		parm = (sctp_paramhdr_t *)data;
 
-		if (!parm.p->length)
+		if (!parm->length)
 			break;
 
-		data += WORD_ROUND(ntohs(parm.p->length));
+		data += WORD_ROUND(ntohs(parm->length));
 
 		/* Note: Ignoring hostname addresses. */
-		if ((SCTP_PARAM_IPV4_ADDRESS  != parm.p->type) &&
-		    (SCTP_PARAM_IPV6_ADDRESS != parm.p->type))
+		if ((SCTP_PARAM_IPV4_ADDRESS != parm->type) &&
+		    (SCTP_PARAM_IPV6_ADDRESS != parm->type))
 			continue;
 
-		sctp_param2sockaddr(paddr, parm, ntohs(sh->source));
-
-		asoc = __sctp_rcv_lookup_association(laddr, paddr, transportp);
+		sctp_param2sockaddr(paddr, (sctp_addr_param_t *)parm, 
+				    ntohs(sh->source));
+		asoc = __sctp_lookup_association(laddr, paddr, transportp);
 		if (asoc)
 			return asoc;
 	}
@@ -644,7 +679,7 @@ sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 {
 	sctp_association_t *asoc;
 
-	asoc = __sctp_rcv_lookup_association(laddr, paddr, transportp);
+	asoc = __sctp_lookup_association(laddr, paddr, transportp);
 
 	/* Further lookup for INIT-ACK packet.
 	 * SCTP Implementors Guide, 2.18 Handling of address

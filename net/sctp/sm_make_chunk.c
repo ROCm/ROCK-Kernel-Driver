@@ -1454,7 +1454,7 @@ int sctp_verify_init(const sctp_association_t *asoc,
 			return 0;
 
 	} /* for (loop through all parameters) */
-	 
+
 	return 1;
 }
 
@@ -1710,6 +1710,7 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 		       sctp_cid_t cid, int priority)
 {
 	sockaddr_storage_t addr;
+	sctp_addr_param_t *addrparm;
 	int j;
 	int i;
 	int retval = 1;
@@ -1721,24 +1722,23 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 	 */
 	switch (param.p->type) {
 	case SCTP_PARAM_IPV4_ADDRESS:
-		if (SCTP_CID_INIT != cid) {
-			sctp_param2sockaddr(&addr, param, asoc->peer.port);
-			scope = sctp_scope(peer_addr);
-			if (sctp_in_scope(&addr, scope))
-				sctp_assoc_add_peer(asoc, &addr, priority);
-		}
+		addrparm = (sctp_addr_param_t *)param.v;
+		sctp_param2sockaddr(&addr, addrparm, asoc->peer.port);
+		scope = sctp_scope(peer_addr);
+		if (sctp_in_scope(&addr, scope))
+			sctp_assoc_add_peer(asoc, &addr, priority);
 		break;
 
 	case SCTP_PARAM_IPV6_ADDRESS:
-		if (SCTP_CID_INIT != cid) {
-			if (PF_INET6 == asoc->base.sk->family) {
-				sctp_param2sockaddr(&addr, param,
-						    asoc->peer.port);
-				scope = sctp_scope(peer_addr);
-				if (sctp_in_scope(&addr, scope))
-					sctp_assoc_add_peer(asoc, &addr,
-							    priority);
-			}
+		/* Rethink this as we may need to keep for
+		 * restart considerations.
+		 */
+		if (PF_INET6 == asoc->base.sk->family) {
+			addrparm = (sctp_addr_param_t *)param.v;
+			sctp_param2sockaddr(&addr, addrparm, asoc->peer.port);
+			scope = sctp_scope(peer_addr);
+			if (sctp_in_scope(&addr, scope))
+				sctp_assoc_add_peer(asoc, &addr, priority);
 		}
 		break;
 
@@ -1833,8 +1833,7 @@ __u32 sctp_generate_tag(const sctp_endpoint_t *ep)
 /* Select an initial TSN to send during startup.  */
 __u32 sctp_generate_tsn(const sctp_endpoint_t *ep)
 {
-	/* I believe that this random number generator complies with RFC1750.  */
-  	__u32 retval;
+	__u32 retval;
 
 	get_random_bytes(&retval, sizeof(__u32));
 	return retval;
@@ -1845,26 +1844,27 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *ep)
  ********************************************************************/
 
 /* Convert from an SCTP IP parameter to a sockaddr_storage_t.  */
-void sctp_param2sockaddr(sockaddr_storage_t *addr, sctpParam_t param, __u16 port)
+void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *param,
+			 __u16 port)
 {
-	switch(param.p->type) {
+	switch(param->v4.param_hdr.type) {
 	case SCTP_PARAM_IPV4_ADDRESS:
 		addr->v4.sin_family = AF_INET;
 		addr->v4.sin_port = port;
-		addr->v4.sin_addr.s_addr = param.v4->addr.s_addr;
+		addr->v4.sin_addr.s_addr = param->v4.addr.s_addr;
 		break;
 
 	case SCTP_PARAM_IPV6_ADDRESS:
 		addr->v6.sin6_family = AF_INET6;
 		addr->v6.sin6_port = port;
 		addr->v6.sin6_flowinfo = 0; /* BUG */
-		addr->v6.sin6_addr = param.v6->addr;
+		addr->v6.sin6_addr = param->v6.addr;
 		addr->v6.sin6_scope_id = 0; /* BUG */
 		break;
 
 	default:
 		SCTP_DEBUG_PRINTK("Illegal address type %d\n",
-				  ntohs(param.p->type));
+				  ntohs(param->v4.param_hdr.type));
 		break;
 	};
 }
@@ -1904,11 +1904,9 @@ int ipver2af(__u8 ipver)
 	case 4:
 		family = AF_INET;
 		break;
-
 	case 6:
 		family = AF_INET6;
 		break;
-
 	default:
 		family = 0;
 		break;
@@ -1917,25 +1915,26 @@ int ipver2af(__u8 ipver)
 	return family;
 }
 
-/* Convert a sockaddr_in to  IP address in an SCTP para.  */
-/* Returns true if a valid conversion was possible.  */
-int sockaddr2sctp_addr(const sockaddr_storage_t *sa, sctpParam_t p)
+/* Convert a sockaddr_in to an IP address in an SCTP param.
+ * Returns len if a valid conversion was possible.  
+ */
+int sockaddr2sctp_addr(const sockaddr_storage_t *sa, sctp_addr_param_t *p)
 {
 	int len = 0;
 
 	switch (sa->v4.sin_family) {
 	case AF_INET:
-		p.p->type = SCTP_PARAM_IPV4_ADDRESS;
-		p.p->length = ntohs(sizeof(sctp_ipv4addr_param_t));
+		p->v4.param_hdr.type = SCTP_PARAM_IPV4_ADDRESS;
+		p->v4.param_hdr.length = ntohs(sizeof(sctp_ipv4addr_param_t));
 		len = sizeof(sctp_ipv4addr_param_t);
-		p.v4->addr.s_addr = sa->v4.sin_addr.s_addr;
+		p->v4.addr.s_addr = sa->v4.sin_addr.s_addr;
 		break;
 
 	case AF_INET6:
-		p.p->type = SCTP_PARAM_IPV6_ADDRESS;
-		p.p->length = ntohs(sizeof(sctp_ipv6addr_param_t));
+		p->v6.param_hdr.type = SCTP_PARAM_IPV6_ADDRESS;
+		p->v6.param_hdr.length = ntohs(sizeof(sctp_ipv6addr_param_t));
 		len = sizeof(sctp_ipv6addr_param_t);
-		p.v6->addr = *(&sa->v6.sin6_addr);
+		p->v6.addr = *(&sa->v6.sin6_addr);
 		break;
 
 	default:
