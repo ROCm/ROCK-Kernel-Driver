@@ -262,8 +262,8 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i = *(loff_t *) v;
 
 	/* autovector interrupts */
-	if (mach_default_handler) {
-		if (i < SYS_IRQS) {
+	if (i < SYS_IRQS) {
+		if (mach_default_handler) {
 			seq_printf(p, "auto %2d: %10u ", i,
 			               i ? kstat_cpu(0).irqs[i] : num_spurious);
 			seq_puts(p, "  ");
