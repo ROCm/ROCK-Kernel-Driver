@@ -103,8 +103,6 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <linux/skbuff.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/raw.h>
 #include <net/icmp.h>
@@ -1165,7 +1163,8 @@ extern void fib_proc_exit(void);
 extern int  ip_misc_proc_init(void);
 extern int  raw_proc_init(void);
 extern void raw_proc_exit(void);
-extern int  tcp_get_info(char *buffer, char **start, off_t offset, int length);
+extern int  tcp_proc_init(void);
+extern void tcp_proc_exit(void);
 extern int  udp_proc_init(void);
 extern void udp_proc_exit(void);
 
@@ -1175,7 +1174,7 @@ int __init ipv4_proc_init(void)
 
 	if (raw_proc_init())
 		goto out_raw;
-	if (!proc_net_create("tcp", 0, tcp_get_info))
+	if (tcp_proc_init())
 		goto out_tcp;
 	if (udp_proc_init())
 		goto out_udp;
@@ -1190,7 +1189,7 @@ out_misc:
 out_fib:
 	udp_proc_exit();
 out_udp:
-	proc_net_remove("tcp");
+	tcp_proc_exit();
 out_tcp:
 	raw_proc_exit();
 out_raw:
