@@ -684,9 +684,12 @@ struct ib_fmr {
 };
 
 struct ib_mad;
+struct ib_grh;
 
 enum ib_process_mad_flags {
-	IB_MAD_IGNORE_MKEY	= 1
+	IB_MAD_IGNORE_MKEY	= 1,
+	IB_MAD_IGNORE_BKEY	= 2,
+	IB_MAD_IGNORE_ALL	= IB_MAD_IGNORE_MKEY | IB_MAD_IGNORE_BKEY
 };
 
 enum ib_mad_result {
@@ -812,7 +815,8 @@ struct ib_device {
 	int                        (*process_mad)(struct ib_device *device,
 						  int process_mad_flags,
 						  u8 port_num,
-						  u16 source_lid,
+						  struct ib_wc *in_wc,
+						  struct ib_grh *in_grh,
 						  struct ib_mad *in_mad,
 						  struct ib_mad *out_mad);
 

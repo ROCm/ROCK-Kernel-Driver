@@ -315,8 +315,8 @@ static ssize_t show_pma_counter(struct ib_port *p, struct port_attribute *attr,
 
 	in_mad->data[41] = p->port_num;	/* PortSelect field */
 
-	if ((p->ibdev->process_mad(p->ibdev, IB_MAD_IGNORE_MKEY, p->port_num, 0xffff,
-				   in_mad, out_mad) &
+	if ((p->ibdev->process_mad(p->ibdev, IB_MAD_IGNORE_MKEY,
+		 p->port_num, NULL, NULL, in_mad, out_mad) &
 	     (IB_MAD_RESULT_SUCCESS | IB_MAD_RESULT_REPLY)) !=
 	    (IB_MAD_RESULT_SUCCESS | IB_MAD_RESULT_REPLY)) {
 		ret = -EINVAL;

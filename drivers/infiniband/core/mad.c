@@ -617,6 +617,23 @@ static void snoop_recv(struct ib_mad_qp_info *qp_info,
 	spin_unlock_irqrestore(&qp_info->snoop_lock, flags);
 }
 
+static void build_smp_wc(u64 wr_id, u16 slid, u16 pkey_index, u8 port_num,
+			 struct ib_wc *wc)
+{
+	memset(wc, 0, sizeof *wc);
+	wc->wr_id = wr_id;
+	wc->status = IB_WC_SUCCESS;
+	wc->opcode = IB_WC_RECV;
+	wc->pkey_index = pkey_index;
+	wc->byte_len = sizeof(struct ib_mad) + sizeof(struct ib_grh);
+	wc->src_qp = IB_QP0;
+	wc->qp_num = IB_QP0;
+	wc->slid = slid;
+	wc->sl = 0;
+	wc->dlid_path_bits = 0;
+	wc->port_num = port_num;
+}
+
 /*
  * Return 0 if SMP is to be sent
  * Return 1 if SMP was consumed locally (whether or not solicited)
@@ -634,6 +651,7 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 	struct ib_mad_agent_private *recv_mad_agent = NULL;
 	struct ib_device *device = mad_agent_priv->agent.device;
 	u8 port_num = mad_agent_priv->agent.port_num;
+	struct ib_wc mad_wc;
 
 	if (!smi_handle_dr_smp_send(smp, device->node_type, port_num)) {
 		ret = -EINVAL;
@@ -664,7 +682,12 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 		kfree(local);
 		goto out;
 	}
-	ret = device->process_mad(device, 0, port_num, smp->dr_slid,
+
+	build_smp_wc(send_wr->wr_id, smp->dr_slid, send_wr->wr.ud.pkey_index,
+		     send_wr->wr.ud.port_num, &mad_wc);
+
+	/* No GRH for DR SMP */
+	ret = device->process_mad(device, 0, port_num, &mad_wc, NULL,
 				  (struct ib_mad *)smp,
 				  (struct ib_mad *)&mad_priv->mad);
 	switch (ret)
@@ -1621,7 +1644,7 @@ local:
 
 		ret = port_priv->device->process_mad(port_priv->device, 0,
 						     port_priv->port_num,
-						     wc->slid,
+						     wc, &recv->grh,
 						     &recv->mad.mad,
 						     &response->mad.mad);
 		if (ret & IB_MAD_RESULT_SUCCESS) {
@@ -2049,19 +2072,10 @@ static void local_completions(void *data)
 			 * Defined behavior is to complete response
 			 * before request
 			 */
-			wc.wr_id = local->wr_id;
-			wc.status = IB_WC_SUCCESS;
-			wc.opcode = IB_WC_RECV;
-			wc.vendor_err = 0;
-			wc.byte_len = sizeof(struct ib_mad) +
-				      sizeof(struct ib_grh);
-			wc.src_qp = IB_QP0;
-			wc.wc_flags = 0;	/* No GRH */
-			wc.pkey_index = 0;
-			wc.slid = IB_LID_PERMISSIVE;
-			wc.sl = 0;
-			wc.dlid_path_bits = 0;
-			wc.qp_num = IB_QP0;
+			build_smp_wc(local->wr_id, IB_LID_PERMISSIVE,
+				     0 /* pkey index */,
+				     recv_mad_agent->agent.port_num, &wc);
+
 			local->mad_priv->header.recv_wc.wc = &wc;
 			local->mad_priv->header.recv_wc.mad_len =
 						sizeof(struct ib_mad);
