@@ -217,3 +217,7 @@ EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
 #include <linux/pm.h>
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
+
+#include <linux/reboot.h>
+EXPORT_SYMBOL(machine_power_off);
+EXPORT_SYMBOL(machine_restart);

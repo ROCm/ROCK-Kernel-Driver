@@ -261,6 +261,8 @@ void set_special_pids(pid_t session, pid_t pgrp)
 	write_unlock_irq(&tasklist_lock);
 }
 
+EXPORT_SYMBOL(set_special_pids);
+
 /*
  * Let kernel threads use this to say that they
  * allow a certain signal (since daemonize() will
@@ -1089,6 +1091,8 @@ end_wait4:
 	remove_wait_queue(&current->wait_chldexit,&wait);
 	return retval;
 }
+
+EXPORT_SYMBOL(sys_wait4);
 
 #if !defined(__alpha__) && !defined(__ia64__) && !defined(__arm__)
 
