@@ -92,12 +92,12 @@ static struct dongle_reg dongle = {
 	.owner = THIS_MODULE,
 };
 
-int __init act200l_init(void)
+static int __init act200l_init(void)
 {
 	return irda_device_register_dongle(&dongle);
 }
 
-void __exit act200l_cleanup(void)
+static void __exit act200l_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }

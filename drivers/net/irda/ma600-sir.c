@@ -66,13 +66,13 @@ static struct dongle_driver ma600 = {
 };
 
 
-int __init ma600_sir_init(void)
+static int __init ma600_sir_init(void)
 {
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 	return irda_register_dongle(&ma600);
 }
 
-void __exit ma600_sir_cleanup(void)
+static void __exit ma600_sir_cleanup(void)
 {
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 	irda_unregister_dongle(&ma600);

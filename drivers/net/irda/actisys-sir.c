@@ -89,7 +89,7 @@ static struct dongle_driver act220l_plus = {
 	.set_speed	= actisys_change_speed,
 };
 
-int __init actisys_sir_init(void)
+static int __init actisys_sir_init(void)
 {
 	int ret;
 
@@ -107,7 +107,7 @@ int __init actisys_sir_init(void)
 	return 0;
 }
 
-void __exit actisys_sir_cleanup(void)
+static void __exit actisys_sir_cleanup(void)
 {
 	/* We have to remove both dongles */
 	irda_unregister_dongle(&act220l_plus);

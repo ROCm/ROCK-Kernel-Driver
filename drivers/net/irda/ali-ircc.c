@@ -133,7 +133,7 @@ static void SetCOMInterrupts(struct ali_ircc_cb *self , unsigned char enable);
  *    Initialize chip. Find out whay kinds of chips we are dealing with
  *    and their configuation registers address
  */
-int __init ali_ircc_init(void)
+static int __init ali_ircc_init(void)
 {
 	ali_chip_t *chip;
 	chipio_t info;
