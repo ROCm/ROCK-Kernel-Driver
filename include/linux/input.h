@@ -752,25 +752,28 @@ struct ff_effect {
 #define init_input_dev(dev)	do { INIT_LIST_HEAD(&((dev)->h_list)); INIT_LIST_HEAD(&((dev)->node)); } while (0)
 
 #define SET_INPUT_KEYCODE(dev, scancode, val)			\
-	do {							\
+		({	unsigned __old;				\
 		switch (dev->keycodesize) {			\
 			case 1: {				\
 				u8 *k = (u8 *)dev->keycode;	\
+				__old = k[scancode];		\
 				k[scancode] = val;		\
 				break;				\
 			}					\
 			case 2: {				\
 				u16 *k = (u16 *)dev->keycode;	\
+				__old = k[scancode];		\
 				k[scancode] = val;		\
 				break;				\
 			}					\
-			case 4: {				\
+			default: {				\
 				u32 *k = (u32 *)dev->keycode;	\
+				__old = k[scancode];		\
 				k[scancode] = val;		\
 				break;				\
 			}					\
 		}						\
-	} while (0)
+		__old; })
 
 struct input_dev {
 
