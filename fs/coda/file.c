@@ -46,7 +46,7 @@ coda_file_read(struct file *coda_file, char __user *buf, size_t count, loff_t *p
 
 static ssize_t
 coda_file_sendfile(struct file *coda_file, loff_t *ppos, size_t count,
-		   read_actor_t actor, void __user *target)
+		   read_actor_t actor, void *target)
 {
 	struct coda_file_info *cfi;
 	struct file *host_file;
