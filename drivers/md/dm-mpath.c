@@ -92,6 +92,7 @@ struct mpath_io {
 #define MIN_IOS 256
 static kmem_cache_t *_details_cache;
 
+struct workqueue_struct *kmultipathd;
 static void dispatch_failed_ios(void *data);
 static void trigger_event(void *data);
 
@@ -566,7 +567,7 @@ static int do_end_io(struct multipath *m, struct bio *bio,
 		bio_list_add(&m->failed_ios, bio);
 		spin_unlock(&m->lock);
 
-		schedule_work(&m->dispatch_failed);
+		queue_work(kmultipathd, &m->dispatch_failed);
 		return 1;	/* io not complete */
 	}
 
@@ -685,6 +686,13 @@ int __init dm_multipath_init(void)
 		return r;
 	}
 
+	kmultipathd = create_workqueue("kmpathd");
+	if (!kmultipathd) {
+		dm_unregister_path_selectors();
+		dm_unregister_target(&multipath_target);
+		kmem_cache_destroy(_details_cache);
+	}
+
 	DMINFO("dm_multipath v0.2.0");
 	return r;
 }
@@ -693,6 +701,7 @@ void __exit dm_multipath_exit(void)
 {
 	int r;
 
+	destroy_workqueue(kmultipathd);
 	dm_unregister_path_selectors();
 	r = dm_unregister_target(&multipath_target);
 	if (r < 0)
