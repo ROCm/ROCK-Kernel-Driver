@@ -9,6 +9,7 @@
 #
 
 NM := $(CROSS_COMPILE)nm -B
+READELF := $(CROSS_COMPILE)readelf
 
 export AWK
 
@@ -71,15 +72,15 @@ boot := arch/ia64/hp/sim/boot
 
 .PHONY: boot compressed check
 
-all: compressed
+all: compressed unwcheck
 
 compressed: vmlinux.gz
 
 vmlinux.gz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-check: vmlinux
-	arch/ia64/scripts/unwcheck.sh $<
+unwcheck: vmlinux
+	-$(Q)READELF=$(READELF) $(srctree)/arch/ia64/scripts/unwcheck.py $<
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
@@ -88,7 +89,7 @@ CLEAN_FILES += include/asm-ia64/.offsets.h.stamp include/asm-ia64/offsets.h vmli
 
 prepare: include/asm-ia64/offsets.h
 
-arch/ia64/kernel/asm-offsets.s: include/asm include/linux/version.h
+arch/ia64/kernel/asm-offsets.s: include/asm include/linux/version.h include/config/MARKER
 
 include/asm-ia64/offsets.h: arch/ia64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
@@ -108,4 +109,5 @@ boot:	lib/lib.a vmlinux
 define archhelp
   echo '* compressed	- Build compressed kernel image'
   echo '  boot		- Build vmlinux and bootloader for Ski simulator'
+  echo '* unwcheck	- Check vmlinux for invalid unwind info'
 endef
