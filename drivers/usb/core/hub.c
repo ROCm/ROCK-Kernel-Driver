@@ -1299,33 +1299,15 @@ int usb_physical_reset_device(struct usb_device *dev)
 		kfree(descriptor);
 		usb_destroy_configuration(dev);
 
-		ret = usb_get_device_descriptor(dev, sizeof(dev->descriptor));
-		if (ret != sizeof(dev->descriptor)) {
-			if (ret < 0)
-				err("unable to get device %s descriptor "
-					"(error=%d)", dev->devpath, ret);
-			else
-				err("USB device %s descriptor short read "
-					"(expected %Zi, got %i)",
-					dev->devpath,
-					sizeof(dev->descriptor), ret);
+		/* FIXME Linux doesn't yet handle these "device morphed"
+		 * paths.  DFU variants need this to work ... and they
+		 * include the "config descriptors changed" case this
+		 * doesn't yet detect!
+		 */
+		dev->state = USB_STATE_NOTATTACHED;
+		dev_err(&dev->dev, "device morphed (DFU?), nyet supported\n");
 
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
-			return -EIO;
-		}
-
-		ret = usb_get_configuration(dev);
-		if (ret < 0) {
-			err("unable to get configuration (error=%d)", ret);
-			usb_destroy_configuration(dev);
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
-			return 1;
-		}
-
-		usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
-		return 1;
+		return -ENODEV;
 	}
 
 	kfree(descriptor);

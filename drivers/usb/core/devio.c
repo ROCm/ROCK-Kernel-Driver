@@ -430,6 +430,8 @@ static int findintfep(struct usb_device *dev, unsigned int ep)
 
 	if (ep & ~(USB_DIR_IN|0xf))
 		return -EINVAL;
+	if (!dev->actconfig)
+		return -ESRCH;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		iface = dev->actconfig->interface[i];
 		for (j = 0; j < iface->num_altsetting; j++) {
@@ -450,6 +452,8 @@ static int findintfif(struct usb_device *dev, unsigned int ifn)
 
 	if (ifn & ~0xff)
 		return -EINVAL;
+	if (!dev->actconfig)
+		return -ESRCH;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		if (dev->actconfig->interface[i]->
 				altsetting[0].desc.bInterfaceNumber == ifn)
@@ -766,10 +770,51 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 static int proc_setconfig(struct dev_state *ps, void __user *arg)
 {
 	unsigned int u;
+	int status = 0;
+ 	struct usb_host_config *actconfig;
 
 	if (get_user(u, (unsigned int __user *)arg))
 		return -EFAULT;
-	return usb_set_configuration(ps->dev, u);
+
+	down(&ps->dev->serialize);
+ 	actconfig = ps->dev->actconfig;
+ 
+ 	/* Don't touch the device if any interfaces are claimed.
+ 	 * It could interfere with other drivers' operations, and if
+	 * an interface is claimed by usbfs it could easily deadlock.
+	 */
+ 	if (actconfig) {
+ 		int i;
+ 
+ 		for (i = 0; i < actconfig->desc.bNumInterfaces; ++i) {
+ 			if (usb_interface_claimed(actconfig->interface[i])) {
+				dev_warn (&ps->dev->dev,
+					"usbfs: interface %d claimed "
+					"while '%s' sets config #%d\n",
+					actconfig->interface[i]
+						->cur_altsetting
+						->desc.bInterfaceNumber,
+					current->comm, u);
+#if 0	/* FIXME:  enable in 2.6.10 or so */
+ 				status = -EBUSY;
+				break;
+#endif
+			}
+ 		}
+ 	}
+
+	/* SET_CONFIGURATION is often abused as a "cheap" driver reset,
+	 * so avoid usb_set_configuration()'s kick to sysfs
+	 */
+	if (status == 0) {
+		if (actconfig && actconfig->desc.bConfigurationValue == u)
+			status = usb_reset_configuration(ps->dev);
+		else
+			status = usb_set_configuration(ps->dev, u);
+	}
+	up(&ps->dev->serialize);
+
+	return status;
 }
 
 static int proc_submiturb(struct dev_state *ps, void __user *arg)

@@ -1173,10 +1173,13 @@ int usb_new_device(struct usb_device *dev)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
 
+	down(&dev->serialize);
+
 	/* put device-specific files into sysfs */
 	err = device_add (&dev->dev);
 	if (err) {
 		dev_err(&dev->dev, "can't device_add, error %d\n", err);
+		up(&dev->serialize);
 		goto fail;
 	}
 	usb_create_driverfs_dev_files (dev);
@@ -1211,6 +1214,7 @@ int usb_new_device(struct usb_device *dev)
 			dev->descriptor.bNumConfigurations);
 	}
 	err = usb_set_configuration(dev, config);
+	up(&dev->serialize);
 	if (err) {
 		dev_err(&dev->dev, "can't set config #%d, error %d\n",
 			config, err);

@@ -1075,11 +1075,11 @@ int usb_reset_configuration(struct usb_device *dev)
 	return 0;
 }
 
-/**
+/*
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
- * Context: !in_interrupt ()
+ * Context: !in_interrupt(), caller holds dev->serialize
  *
  * This is used to enable non-default device modes.  Not all devices
  * use this kind of configurability; many devices only have one
@@ -1115,7 +1115,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	struct usb_host_config *cp = NULL;
 	
 	/* dev->serialize guards all config changes */
-	down(&dev->serialize);
 
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {
@@ -1191,7 +1190,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	}
 
 out:
-	up(&dev->serialize);
 	return ret;
 }
 
@@ -1300,6 +1298,5 @@ EXPORT_SYMBOL(usb_string);
 // synchronous calls that also maintain usbcore state
 EXPORT_SYMBOL(usb_clear_halt);
 EXPORT_SYMBOL(usb_reset_configuration);
-EXPORT_SYMBOL(usb_set_configuration);
 EXPORT_SYMBOL(usb_set_interface);
 

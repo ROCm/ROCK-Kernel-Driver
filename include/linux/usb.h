@@ -904,7 +904,6 @@ extern int usb_string(struct usb_device *dev, int index,
 /* wrappers that also update important state inside usbcore */
 extern int usb_clear_halt(struct usb_device *dev, int pipe);
 extern int usb_reset_configuration(struct usb_device *dev);
-extern int usb_set_configuration(struct usb_device *dev, int configuration);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 
 /*
