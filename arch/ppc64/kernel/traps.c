@@ -494,6 +494,18 @@ SingleStepException(struct pt_regs *regs)
 	_exception(SIGTRAP, &info, regs);	
 }
 
+/*
+ * After we have successfully emulated an instruction, we have to
+ * check if the instruction was being single-stepped, and if so,
+ * pretend we got a single-step exception.  This was pointed out
+ * by Kumar Gala.  -- paulus
+ */
+static inline void emulate_single_step(struct pt_regs *regs)
+{
+	if (regs->msr & MSR_SE)
+		SingleStepException(regs);
+}
+
 static void dummy_perf(struct pt_regs *regs)
 {
 }
@@ -515,10 +527,8 @@ AlignmentException(struct pt_regs *regs)
 	fixed = fix_alignment(regs);
 
 	if (fixed == 1) {
-		if (!user_mode(regs))
-			PPCDBG(PPCDBG_ALIGNFIXUP, "fix alignment at %lx\n",
-			       regs->nip);
 		regs->nip += 4;	/* skip over emulated instruction */
+		emulate_single_step(regs);
 		return;
 	}
 
@@ -549,10 +559,40 @@ AlignmentException(struct pt_regs *regs)
 void
 AltivecAssistException(struct pt_regs *regs)
 {
+	int err;
+	siginfo_t info;
+
+	if (!user_mode(regs)) {
+		printk(KERN_EMERG "VMX/Altivec assist exception in kernel mode"
+		       " at %lx\n", regs->nip);
+		die("Kernel VMX/Altivec assist exception", regs, SIGILL);
+	}
+
 	if (regs->msr & MSR_VEC)
 		giveup_altivec(current);
-	/* XXX quick hack for now: set the non-Java bit in the VSCR */
-	current->thread.vscr.u[3] |= 0x10000;
+
+	err = emulate_altivec(regs);
+	if (err == 0) {
+		regs->nip += 4;		/* skip emulated instruction */
+		emulate_single_step(regs);
+		return;
+	}
+
+	if (err == -EFAULT) {
+		/* got an error reading the instruction */
+		info.si_signo = SIGSEGV;
+		info.si_errno = 0;
+		info.si_code = SEGV_MAPERR;
+		info.si_addr = (void *) regs->nip;
+		force_sig_info(SIGSEGV, &info, current);
+	} else {
+		/* didn't recognize the instruction */
+		/* XXX quick hack for now: set the non-Java bit in the VSCR */
+		if (printk_ratelimit())
+			printk(KERN_ERR "Unrecognized altivec instruction "
+			       "in %s at %lx\n", current->comm, regs->nip);
+		current->thread.vscr.u[3] |= 0x10000;
+	}
 }
 #endif /* CONFIG_ALTIVEC */
 
