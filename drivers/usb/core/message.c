@@ -2,6 +2,14 @@
  * message.c - synchronous message handling
  */
 
+#include <linux/config.h>
+
+#ifdef CONFIG_USB_DEBUG
+	#define DEBUG
+#else
+	#undef DEBUG
+#endif
+
 #include <linux/pci.h>	/* for scatterlist macros */
 #include <linux/usb.h>
 #include <linux/module.h>
@@ -11,6 +19,7 @@
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
+#include "usb.h"
 
 struct usb_api_data {
 	wait_queue_head_t wqh;
@@ -757,6 +766,124 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 	usb_endpoint_running(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe));
 
 	return 0;
+}
+
+/**
+ * usb_disable_endpoint -- Disable an endpoint by address
+ * @dev: the device whose endpoint is being disabled
+ * @epaddr: the endpoint's address.  Endpoint number for output,
+ *	endpoint number + USB_DIR_IN for input
+ *
+ * Deallocates hcd/hardware state for this endpoint ... and nukes all
+ * pending urbs.
+ *
+ * If the HCD hasn't registered a disable() function, this marks the
+ * endpoint as halted and sets its maxpacket size to 0 to prevent
+ * further submissions.
+ */
+void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr)
+{
+	if (dev && dev->bus && dev->bus->op && dev->bus->op->disable)
+		dev->bus->op->disable(dev, epaddr);
+	else {
+		unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
+
+		if (usb_endpoint_out(epaddr)) {
+			usb_endpoint_halt(dev, epnum, 1);
+			dev->epmaxpacketout[epnum] = 0;
+		} else {
+			usb_endpoint_halt(dev, epnum, 0);
+			dev->epmaxpacketin[epnum] = 0;
+		}
+	}
+}
+
+/**
+ * usb_disable_interface -- Disable all endpoints for an interface
+ * @dev: the device whose interface is being disabled
+ * @intf: pointer to the interface descriptor
+ *
+ * Disables all the endpoints for the interface's current altsetting.
+ */
+void usb_disable_interface(struct usb_device *dev, struct usb_interface *intf)
+{
+	struct usb_host_interface *hintf =
+			&intf->altsetting[intf->act_altsetting];
+	int i;
+
+	for (i = 0; i < hintf->desc.bNumEndpoints; ++i) {
+		usb_disable_endpoint(dev,
+				hintf->endpoint[i].desc.bEndpointAddress);
+	}
+}
+
+/*
+ * usb_disable_device - Disable all the endpoints for a USB device
+ * @dev: the device whose endpoints are being disabled
+ * @skip_ep0: 0 to disable endpoint 0, 1 to skip it.
+ *
+ * Disables all the device's endpoints, potentially including endpoint 0.
+ * Deallocates hcd/hardware state for the endpoints ... and nukes all
+ * pending urbs.
+ */
+void usb_disable_device(struct usb_device *dev, int skip_ep0)
+{
+	int i;
+
+	dbg("nuking URBs for device %s", dev->dev.bus_id);
+	for (i = skip_ep0; i < 16; ++i) {
+		usb_disable_endpoint(dev, i);
+		usb_disable_endpoint(dev, i + USB_DIR_IN);
+	}
+}
+
+
+/*
+ * usb_enable_endpoint - Enable an endpoint for USB communications
+ * @dev: the device whose interface is being enabled
+ * @epd: pointer to the endpoint descriptor
+ *
+ * Marks the endpoint as running, resets its toggle, and stores
+ * its maxpacket value.  For control endpoints, both the input
+ * and output sides are handled.
+ */
+void usb_enable_endpoint(struct usb_device *dev,
+		struct usb_endpoint_descriptor *epd)
+{
+	int maxsize = epd->wMaxPacketSize;
+	unsigned int epaddr = epd->bEndpointAddress;
+	unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
+	int is_control = ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
+				USB_ENDPOINT_XFER_CONTROL);
+
+	if (usb_endpoint_out(epaddr) || is_control) {
+		usb_endpoint_running(dev, epnum, 1);
+		usb_settoggle(dev, epnum, 1, 0);
+		dev->epmaxpacketout[epnum] = maxsize;
+	}
+	if (!usb_endpoint_out(epaddr) || is_control) {
+		usb_endpoint_running(dev, epnum, 0);
+		usb_settoggle(dev, epnum, 0, 0);
+		dev->epmaxpacketin[epnum] = maxsize;
+	}
+}
+
+/*
+ * usb_enable_interface - Enable all the endpoints for an interface
+ * @dev: the device whose interface is being enabled
+ * @intf: pointer to the interface descriptor
+ *
+ * Enables all the endpoints for the interface's current altsetting.
+ */
+void usb_enable_interface(struct usb_device *dev,
+		struct usb_interface *intf)
+{
+	struct usb_host_interface *hintf =
+			&intf->altsetting[intf->act_altsetting];
+	int i;
+
+	for (i = 0; i < hintf->desc.bNumEndpoints; ++i)
+		usb_enable_endpoint(dev, &hintf->endpoint[i].desc);
 }
 
 /**
