@@ -120,10 +120,6 @@ mpc8540ads_setup_arch(void)
 	mpc85xx_setup_hose();
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 #ifdef CONFIG_SERIAL_8250
 	mpc85xx_early_serial_map();
 #endif

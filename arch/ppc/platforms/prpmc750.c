@@ -193,10 +193,6 @@ static void __init prpmc750_setup_arch(void)
 		ROOT_DEV = Root_SDA2;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	OpenPIC_InitSenses = prpmc750_openpic_initsenses;
 	OpenPIC_NumInitSenses = sizeof(prpmc750_openpic_initsenses);
 

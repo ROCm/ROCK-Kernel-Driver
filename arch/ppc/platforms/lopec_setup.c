@@ -313,9 +313,6 @@ lopec_setup_arch(void)
         	ROOT_DEV = Root_SDA1;
 #endif
 
-#ifdef CONFIG_VT
-	conswitchp = &dummy_con;
-#endif
 #ifdef CONFIG_PPCBUG_NVRAM
 	/* Read in NVRAM data */
 	init_prep_nvram();

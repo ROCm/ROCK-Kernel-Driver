@@ -324,10 +324,6 @@ mcpn765_setup_arch(void)
 		ROOT_DEV = Root_SDA2;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	if ( ppc_md.progress )
 		ppc_md.progress("mcpn765_setup_arch: find_bridges", 0);
 
