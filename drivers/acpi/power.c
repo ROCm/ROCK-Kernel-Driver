@@ -351,7 +351,7 @@ acpi_power_transition (
 
 	/*
 	 * First we reference all power resources required in the target list
-	 * (e.g. so the device doesn't loose power while transitioning).
+	 * (e.g. so the device doesn't lose power while transitioning).
 	 */
 	for (i=0; i<tl->count; i++) {
 		result = acpi_power_on(tl->handles[i]);

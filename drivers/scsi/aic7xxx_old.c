@@ -4609,8 +4609,8 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
          * handler do the rest.  We don't want to unpause the sequencer yet
          * though so we'll return early.  We also have to make sure that
          * we clear the SEQINT *BEFORE* we set the REQINIT handler active
-         * or else it's possible on VLB cards to loose the first REQINIT
-         * interrupt.  Edge triggered EISA cards could also loose this
+         * or else it's possible on VLB cards to lose the first REQINIT
+         * interrupt.  Edge triggered EISA cards could also lose this
          * interrupt, although PCI and level triggered cards should not
          * have this problem since they continually interrupt the kernel
          * until we take care of the situation.

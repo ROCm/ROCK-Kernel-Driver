@@ -710,7 +710,7 @@ static void irttp_run_tx_queue(struct tsap_cb *self)
 		 * The current skb has a reference to the socket that sent
 		 * it (skb->sk). When we pass it to IrLMP, the skb will be
 		 * stored in in IrLAP (self->wx_list). When we are within
-		 * IrLAP, we loose the notion of socket, so we should not
+		 * IrLAP, we lose the notion of socket, so we should not
 		 * have a reference to a socket. So, we drop it here.
 		 *
 		 * Why does it matter ?

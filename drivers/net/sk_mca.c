@@ -581,7 +581,7 @@ static u16 irqstart_handler(struct SKMCA_NETDEV *dev, u16 oldcsr0)
 	return GetLANCE(dev, LANCE_CSR0);
 }
 
-/* did we loose blocks due to a FIFO overrun ? */
+/* did we lose blocks due to a FIFO overrun ? */
 
 static u16 irqmiss_handler(struct SKMCA_NETDEV *dev, u16 oldcsr0)
 {

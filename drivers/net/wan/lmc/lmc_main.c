@@ -2149,7 +2149,7 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
         /* owned by 21140 */
         sc->lmc_rxring[i].status = 0x80000000;
 
-        /* used to be PKT_BUF_SZ now uses skb since we loose some to head room */
+        /* used to be PKT_BUF_SZ now uses skb since we lose some to head room */
         sc->lmc_rxring[i].length = skb->end - skb->data;
 
         /* use to be tail which is dumb since you're thinking why write

@@ -16,7 +16,7 @@ For a list of kernel command-line options read the documentation for the
 particular device drivers.
 
 The floppy imposes a very high interrupt load on the CPU, approx 30K/s.
-When something blocks interrupts (HD) it will loose some of them, so far 
+When something blocks interrupts (HD) it will lose some of them, so far 
 this is not known to have caused any data loss. On highly loaded systems
 it can make the floppy very slow or practically stop. Other Q40 OS' simply 
 poll the floppy for this reason - something that can't be done in Linux.

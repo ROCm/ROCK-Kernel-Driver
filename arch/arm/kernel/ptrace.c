@@ -435,7 +435,7 @@ void ptrace_set_bpt(struct task_struct *child)
 		 * be receiving a prefetch abort shortly.
 		 *
 		 * If we don't set this breakpoint here, then we can
-		 * loose control of the thread during single stepping.
+		 * lose control of the thread during single stepping.
 		 */
 		if (!alt || predicate(insn) != PREDICATE_ALWAYS)
 			add_breakpoint(child, dbg, pc + 4);

@@ -47,7 +47,7 @@
  * Tx direction
  * When the tx ring is full, the xmit routine issues a call to netdev_stop.
  * The device is supposed to be enabled again during an ALLS irq (we could
- * use HI but as it's easy to loose events, it's fscked).
+ * use HI but as it's easy to lose events, it's fscked).
  *
  * Rx direction
  * The received frames aren't supposed to span over multiple receiving areas.

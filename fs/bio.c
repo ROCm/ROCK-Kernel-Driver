@@ -383,7 +383,7 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 		return 0;
 
 	/*
-	 * we might loose a segment or two here, but rather that than
+	 * we might lose a segment or two here, but rather that than
 	 * make this too complex.
 	 */
 retry_segments:

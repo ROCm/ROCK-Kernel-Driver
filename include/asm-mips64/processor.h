@@ -256,7 +256,7 @@ extern inline unsigned long thread_saved_pc(struct thread_struct *t)
 do {									\
 	unsigned long __status;						\
 									\
-	/* New thread looses kernel privileges. */			\
+	/* New thread loses kernel privileges. */			\
 	__status = regs->cp0_status & ~(ST0_CU0|ST0_FR|ST0_KSU);	\
 	__status |= KSU_USER;						\
 	__status |= (current->thread.mflags & MF_32BIT) ? 0 : ST0_FR;	\

@@ -168,7 +168,7 @@ mentioned, or because too much time elapses from one read to another
 and too many events to store in the queue get generated. Note that
 high system load may contribute to space those reads even more.
 
-If time between reads is enough to fill the queue and loose an event,
+If time between reads is enough to fill the queue and lose an event,
 the driver will switch to startup mode and next time you read it,
 synthetic events (JS_EVENT_INIT) will be generated to inform you of
 the actual state of the joystick.

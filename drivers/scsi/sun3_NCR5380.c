@@ -2970,7 +2970,7 @@ static int NCR5380_reset( Scsi_Cmnd *cmd, unsigned int reset_flags)
      * on any queue, so they won't be retried ...
      *
      * Conclusion: either scsi.c disables timeout for all resetted commands
-     * immediately, or we loose!  As of linux-2.0.20 it doesn't.
+     * immediately, or we lose!  As of linux-2.0.20 it doesn't.
      */
 
     /* After the reset, there are no more connected or disconnected commands

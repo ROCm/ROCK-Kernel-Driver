@@ -1252,7 +1252,7 @@ static void adpt_i2o_post_wait_complete(u32 context, int status)
 		}
 	}
 	spin_unlock(&adpt_post_wait_lock);
-        // If this happens we loose commands that probably really completed
+        // If this happens we lose commands that probably really completed
 	printk(KERN_DEBUG"dpti: Could Not find task %d in wait queue\n",context);
 	printk(KERN_DEBUG"      Tasks in wait queue:\n");
 	for(p1 = adpt_post_wait_queue; p1; p1 = p1->next) {

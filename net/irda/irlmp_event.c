@@ -423,7 +423,7 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 			/* We don't want to change state just yet, because
 			 * we want to reflect accurately the real state of
 			 * the LAP, not the state we wish it was in,
-			 * so that we don't loose LM_LAP_CONNECT_REQUEST.
+			 * so that we don't lose LM_LAP_CONNECT_REQUEST.
 			 * In some cases, IrLAP won't close the LAP
 			 * immediately. For example, it might still be
 			 * retrying packets or waiting for the pf bit.

@@ -304,7 +304,7 @@ ether3_init_2(struct net_device *dev)
 	/*
 	 * There is a problem with the NQ8005 in that it occasionally loses the
 	 * last two bytes.  To get round this problem, we receive the CRC as
-	 * well.  That way, if we do loose the last two, then it doesn't matter.
+	 * well.  That way, if we do lose the last two, then it doesn't matter.
 	 */
 	ether3_outw(priv->regs.config1 | CFG1_TRANSEND, REG_CONFIG1);
 	ether3_outw((TX_END>>8) - 1, REG_BUFWIN);
