@@ -54,6 +54,7 @@ int smp_hw_index[NR_CPUS];
 struct thread_info *secondary_ti;
 
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(cpu_possible_map);
 
 /* SMP operations for this machine */
 static struct smp_ops_t *smp_ops;

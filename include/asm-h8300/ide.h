@@ -17,8 +17,8 @@
 /****************************************************************************/
 
 void h8300_ide_print_resource(char *name, hw_regs_t *hw);
-static inline int ide_default_irq(unsigned long base) { return 0; };
-static inline ide_ioreg_t ide_default_io_base(int index) { return 0; };
+static __inline__ int ide_default_irq(unsigned long base) { return 0; };
+static __inline__ unsigned long ide_default_io_base(int index) { return 0; };
 
 static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	 unsigned long ctrl_port, int *irq)

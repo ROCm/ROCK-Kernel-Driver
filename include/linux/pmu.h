@@ -226,7 +226,7 @@ struct pmu_battery_info
 	unsigned int	flags;
 	unsigned int	charge;		/* current charge */
 	unsigned int	max_charge;	/* maximum charge */
-	signed int	current;	/* current, positive if charging */
+	signed int	amperage;	/* current, positive if charging */
 	unsigned int	voltage;	/* voltage */
 	unsigned int	time_remaining;	/* remaining time */
 };
