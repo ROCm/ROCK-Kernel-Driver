@@ -1132,7 +1132,6 @@ static int flash_cursor(void);
 static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
 static u_long chipalloc(u_long size);
 static void chipfree(void);
-static char *strtoke(char *s,const char *ct);
 
 	/*
 	 * Hardware routines
@@ -1224,22 +1223,22 @@ int __init amifb_setup(char *options)
 	 * <H*> horizontal freq. in kHz
 	 */
 
-		if (!(p = strtoke(mcap_spec, ";")) || !*p)
+		if (!(p = strsep(&mcap_spec, ";")) || !*p)
 			goto cap_invalid;
 		vmin = simple_strtoul(p, NULL, 10);
 		if (vmin <= 0)
 			goto cap_invalid;
-		if (!(p = strtoke(NULL, ";")) || !*p)
+		if (!(p = strsep(&mcap_spec, ";")) || !*p)
 			goto cap_invalid;
 		vmax = simple_strtoul(p, NULL, 10);
 		if (vmax <= 0 || vmax <= vmin)
 			goto cap_invalid;
-		if (!(p = strtoke(NULL, ";")) || !*p)
+		if (!(p = strsep(&mcap_spec, ";")) || !*p)
 			goto cap_invalid;
 		hmin = 1000 * simple_strtoul(p, NULL, 10);
 		if (hmin <= 0)
 			goto cap_invalid;
-		if (!(p = strtoke(NULL, "")) || !*p)
+		if (!(p = strsep(&mcap_spec, "")) || !*p)
 			goto cap_invalid;
 		hmax = 1000 * simple_strtoul(p, NULL, 10);
 		if (hmax <= 0 || hmax <= hmin)
@@ -1913,29 +1912,6 @@ static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 		ami_reinit_copper();
 		do_vmode_full = 0;
 	}
-}
-
-	/*
-	 * A strtok which returns empty strings, too
-	 */
-
-static char __init *strtoke(char *s,const char *ct)
-{
-	char *sbegin, *send;
-	static char *ssave = NULL;
-
-	sbegin  = s ? s : ssave;
-	if (!sbegin)
-		return NULL;
-	if (*sbegin == '\0') {
-		ssave = NULL;
-		return NULL;
-	}
-	send = strpbrk(sbegin, ct);
-	if (send && *send != '\0')
-		*send++ = '\0';
-	ssave = send;
-	return sbegin;
 }
 
 /* --------------------------- Hardware routines --------------------------- */
