@@ -286,6 +286,7 @@ int pcmcia_register_driver(struct pcmcia_driver *driver)
 		return -EINVAL;
 
 	driver->drv.bus = &pcmcia_bus_type;
+	driver->drv.owner = driver->owner;
 
 	return driver_register(&driver->drv);
 }
