@@ -496,7 +496,7 @@ out:
 	return err;
 no_route:
 	kfree_skb(nskb);
-	IP_INC_STATS_BH(IpOutNoRoutes);
+	IP_INC_STATS_BH(OutNoRoutes);
 
 	/* FIXME: Returning the 'err' will effect all the associations
 	 * associated with a socket, although only one of the paths of the

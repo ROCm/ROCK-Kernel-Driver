@@ -111,7 +111,7 @@ extern int sysctl_ipv6_bindv6only;
 extern int sysctl_mld_max_msf;
 
 /* MIBs */
-DECLARE_SNMP_STAT(struct ipv6_mib, ipv6_statistics);
+DECLARE_SNMP_STAT(struct ipstats_mib, ipv6_statistics);
 #define IP6_INC_STATS(field)		SNMP_INC_STATS(ipv6_statistics, field)
 #define IP6_INC_STATS_BH(field)		SNMP_INC_STATS_BH(ipv6_statistics, field)
 #define IP6_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(ipv6_statistics, field)
