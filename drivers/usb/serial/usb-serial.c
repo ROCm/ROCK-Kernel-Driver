@@ -621,15 +621,12 @@ static void serial_throttle (struct tty_struct * tty)
 
 	if (!port->open_count) {
 		dbg ("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function */
 	if (port->serial->type->throttle)
 		port->serial->type->throttle(port);
-
-exit:
-	;
 }
 
 static void serial_unthrottle (struct tty_struct * tty)
@@ -640,15 +637,12 @@ static void serial_unthrottle (struct tty_struct * tty)
 
 	if (!port->open_count) {
 		dbg("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function */
 	if (port->serial->type->unthrottle)
 		port->serial->type->unthrottle(port);
-
-exit:
-	;
 }
 
 static int serial_ioctl (struct tty_struct *tty, struct file * file, unsigned int cmd, unsigned long arg)
@@ -681,15 +675,12 @@ static void serial_set_termios (struct tty_struct *tty, struct termios * old)
 
 	if (!port->open_count) {
 		dbg("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
 	if (port->serial->type->set_termios)
 		port->serial->type->set_termios(port, old);
-
-exit:
-	;
 }
 
 static void serial_break (struct tty_struct *tty, int break_state)
@@ -700,15 +691,12 @@ static void serial_break (struct tty_struct *tty, int break_state)
 
 	if (!port->open_count) {
 		dbg("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
 	if (port->serial->type->break_ctl)
 		port->serial->type->break_ctl(port, break_state);
-
-exit:
-	;
 }
 
 static int serial_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
