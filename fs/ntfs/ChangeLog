@@ -1,6 +1,43 @@
 ToDo:
 	- Find and fix bugs.
 	- Enable NFS exporting of NTFS.
+	- Implement aops->set_page_dirty() in order to take control of buffer
+	  dirtying. Not having it means if page_has_buffers(), all buffers
+	  will be dirtied with the page. And if not they won't be. That is
+	  fine for the moment but will break once we enable metadata updates.
+	- Implement sops->dirty_inode() to implement {a,m,c} time updates and
+	  such things.
+	- Implement sops->write_inode().
+	- In between ntfs_prepare/commit_write, need exclusion between
+	  simultaneous file extensions. Need perhaps an NInoResizeUnderway()
+	  flag which we can set in ntfs_prepare_write() and clear again in
+	  ntfs_commit_write(). Just have to be careful in readpage/writepage,
+	  as well as in truncate, that we play nice... We might need to have
+	  a data_size field in the ntfs_inode to store the real attribute
+	  length. Also need to be careful with initialized_size extention in
+	  ntfs_prepare_write. Basically, just be _very_ careful in this code...
+	  OTOH, perhaps i_sem, which is held accross generic_file_write is
+	  sufficient for synchronisation here. We then just need to make sure
+	  ntfs_readpage/writepage/truncate interoperate properly with us.
+
+2.1.0 - First steps towards write support: implement file overwrite.
+
+	- Add configuration option for developmental write support with an
+	  appropriately scary configuration help text.
+	- Initial implementation of fs/ntfs/aops.c::ntfs_writepage() and its
+	  helper fs/ntfs/aops.c::ntfs_write_block(). This enables mmap(2) based
+	  overwriting of existing files on ntfs. Note: Resident files are
+	  only written into memory, and not written out to disk at present, so
+	  avoid writing to files smaller than about 1kiB.
+	- Initial implementation of fs/ntfs/aops.c::ntfs_prepare_write(), its
+	  helper fs/ntfs/aops.c::ntfs_prepare_nonresident_write() and their
+	  counterparts, fs/ntfs/aops.c::ntfs_commit_write(), and
+	  fs/ntfs/aops.c::ntfs_commit_nonresident_write(), respectively. Also,
+	  add generic_file_write() to the ntfs file operations (fs/ntfs/file.c).
+	  This enables write(2) based overwriting of existing files on ntfs.
+	  Note: As with mmap(2) based overwriting, resident files are only
+	  written into memory, and not written out to disk at present, so avoid
+	  writing to files smaller than about 1kiB.
 
 2.0.25 - Small bug fixes and cleanups.
 

@@ -247,6 +247,11 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.0:
+	- Add configuration option for developmental write support.
+	- Initial implementation of file overwriting. (Writes to resident files
+	  are not written out to disk yet, so avoid writing to files smaller
+	  than about 1kiB.)
 2.0.25:
 	- Minor bugfixes in error code paths and small cleanups.
 2.0.24:
