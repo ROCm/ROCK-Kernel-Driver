@@ -237,8 +237,8 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	if (interp_aout) {
 		argv = sp + 2;
 		envp = argv + argc + 1;
-		__put_user((elf_addr_t)(long)argv, sp++);
-		__put_user((elf_addr_t)(long)envp, sp++);
+		__put_user((elf_addr_t)(unsigned long)argv, sp++);
+		__put_user((elf_addr_t)(unsigned long)envp, sp++);
 	} else {
 		argv = sp;
 		envp = argv + argc + 1;

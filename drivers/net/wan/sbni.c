@@ -1578,7 +1578,7 @@ calc_crc32( u32  crc,  u8  *p,  u32  len )
 	register u32  _crc;
 	_crc = crc;
 	
-	__asm __volatile (
+	__asm__ __volatile__ (
 		"xorl	%%ebx, %%ebx\n"
 		"movl	%2, %%esi\n" 
 		"movl	%3, %%ecx\n" 
