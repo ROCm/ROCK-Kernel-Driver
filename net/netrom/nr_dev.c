@@ -204,7 +204,7 @@ int nr_init(struct net_device *dev)
 	dev->stop		= nr_close;
 
 	dev->hard_header	= nr_header;
-	dev->hard_header_len	= AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN + NR_TRANSPORT_LEN;
+	dev->hard_header_len	= NR_NETWORK_LEN + NR_TRANSPORT_LEN;
 	dev->addr_len		= AX25_ADDR_LEN;
 	dev->type		= ARPHRD_NETROM;
 	dev->rebuild_header	= nr_rebuild_header;
