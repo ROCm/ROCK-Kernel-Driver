@@ -44,7 +44,6 @@
 #include <asm/time.h>
 
 extern unsigned long wall_jiffies;
-#define USEC_PER_SEC (1000000)
 
 void
 check_bugs(void)
