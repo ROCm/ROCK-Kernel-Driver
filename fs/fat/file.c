@@ -21,6 +21,7 @@ struct file_operations fat_file_operations = {
 	write:		fat_file_write,
 	mmap:		generic_file_mmap,
 	fsync:		file_fsync,
+	sendfile:	generic_file_sendfile,
 };
 
 struct inode_operations fat_file_inode_operations = {

@@ -307,7 +307,7 @@ static void do_mce_timer(void *data)
 } 
 
 static struct tq_struct mce_task = { 
-	routine: do_mce_timer	
+	.routine = do_mce_timer	
 };
 
 static void mce_timerfunc (unsigned long data)

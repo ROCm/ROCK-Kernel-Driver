@@ -21,8 +21,7 @@ typedef unsigned short	apm_eventinfo_t;
 
 #ifdef __KERNEL__
 
-#define APM_40		(GDT_ENTRY_APMBIOS_BASE * 8)
-#define APM_CS		(APM_BASE + 8)
+#define APM_CS		(GDT_ENTRY_APMBIOS_BASE * 8)
 #define APM_CS_16	(APM_CS + 8)
 #define APM_DS		(APM_CS_16 + 8)
 

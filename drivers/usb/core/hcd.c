@@ -454,7 +454,6 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	/* rh_timer protected by hcd_data_lock */
 	if (timer_pending (&hcd->rh_timer)
 			|| urb->status != -EINPROGRESS
-			|| !HCD_IS_RUNNING (hcd->state)
 			|| urb->transfer_buffer_length < len) {
 		dbg ("not queuing status urb, stat %d", urb->status);
 		return -EINVAL;
@@ -508,8 +507,12 @@ static void rh_report_status (unsigned long ptr)
 				BUG ();
 			}
 			spin_unlock_irqrestore (&hcd_data_lock, flags);
-		} else
+		} else {
 			spin_unlock_irqrestore (&urb->lock, flags);
+			spin_lock_irqsave (&hcd_data_lock, flags);
+			rh_status_urb (hcd, urb);
+			spin_unlock_irqrestore (&hcd_data_lock, flags);
+		}
 	} else {
 		/* this urb's been unlinked */
 		urb->hcpriv = 0;
@@ -1245,6 +1248,11 @@ struct usb_operations usb_hcd_operations = {
 	.submit_urb =		hcd_submit_urb,
 	.unlink_urb =		hcd_unlink_urb,
 	.deallocate =		hcd_free_dev,
+	.buffer_alloc =		hcd_buffer_alloc,
+	.buffer_free =		hcd_buffer_free,
+	.buffer_map =		hcd_buffer_map,
+	.buffer_dmasync =	hcd_buffer_dmasync,
+	.buffer_unmap =		hcd_buffer_unmap,
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 

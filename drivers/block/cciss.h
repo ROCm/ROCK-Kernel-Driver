@@ -81,7 +81,8 @@ struct ctlr_info
 	int			nr_frees; 
 
 	// Disk structures we need to pass back
-	struct gendisk   gendisk;
+	struct gendisk   gendisk[NWD];
+	char names[12 * NWD];
 	   // indexed by minor numbers
 	struct hd_struct hd[256];
 	int		 sizes[256];

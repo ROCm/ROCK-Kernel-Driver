@@ -151,6 +151,12 @@ if [ "$CONFIG_X86" = "y" -o "$CONFIG_IA64" = "y" ]; then
 fi
 tristate '/dev/nvram support' CONFIG_NVRAM
 tristate 'Enhanced Real Time Clock Support' CONFIG_RTC
+if [ "$CONFIG_RTC" != "y" ]; then
+   tristate 'Generic /dev/rtc emulation' CONFIG_GEN_RTC      
+   if [ "$CONFIG_GEN_RTC" != "n" ]; then
+      bool '   Extended RTC operation' CONFIG_GEN_RTC_X
+   fi
+fi
 if [ "$CONFIG_IA64" = "y" ]; then
    bool 'EFI Real Time Clock Services' CONFIG_EFI_RTC
 fi

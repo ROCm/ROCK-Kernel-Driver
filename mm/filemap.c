@@ -1109,7 +1109,7 @@ static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned
 	return written;
 }
 
-ssize_t generic_file_sendfile(struct file *in_file, struct file *out_file,
+ssize_t generic_file_sendfile(struct file *out_file, struct file *in_file,
 			      loff_t *ppos, size_t count)
 {
 	read_descriptor_t desc;
@@ -1812,9 +1812,8 @@ inline void remove_suid(struct dentry *dentry)
  * it for writing by marking it dirty.
  *							okir@monad.swb.de
  */
-ssize_t
-generic_file_write(struct file *file, const char *buf,
-		size_t count, loff_t *ppos)
+ssize_t generic_file_write_nolock(struct file *file, const char *buf,
+				  size_t count, loff_t *ppos)
 {
 	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
@@ -1829,18 +1828,15 @@ generic_file_write(struct file *file, const char *buf,
 	unsigned	bytes;
 	time_t		time_now;
 
-	if (unlikely((ssize_t) count < 0))
+	if (unlikely((ssize_t)count < 0))
 		return -EINVAL;
 
 	if (unlikely(!access_ok(VERIFY_READ, buf, count)))
 		return -EFAULT;
 
-	down(&inode->i_sem);
 	pos = *ppos;
-	if (unlikely(pos < 0)) {
-		err = -EINVAL;
-		goto out;
-	}
+	if (unlikely(pos < 0))
+		return -EINVAL;
 
 	if (unlikely(file->f_error)) {
 		err = file->f_error;
@@ -2037,6 +2033,18 @@ generic_file_write(struct file *file, const char *buf,
 out_status:	
 	err = written ? written : status;
 out:
+	return err;
+}
+
+ssize_t generic_file_write(struct file *file, const char *buf,
+			   size_t count, loff_t *ppos)
+{
+	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	int		err;
+
+	down(&inode->i_sem);
+	err = generic_file_write_nolock(file, buf, count, ppos);
 	up(&inode->i_sem);
+
 	return err;
 }
