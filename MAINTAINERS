@@ -113,6 +113,12 @@ M:	jgarzik@pobox.com
 W:	http://sourceforge.net/projects/gkernel/
 S:	Maintained
 
+8169 10/100/1000 GIGABIT ETHERNET DRIVER
+P:	Francois Romieu
+M:	romieu@fr.zoreil.com
+L:	netdev@oss.sgi.com
+S:	Maintained
+
 8250/16?50 (AND CLONE UARTS) SERIAL DRIVER
 P:	Russell King
 M:	rmk+serial@arm.linux.org.uk
