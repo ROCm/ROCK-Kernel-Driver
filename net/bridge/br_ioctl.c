@@ -38,11 +38,8 @@ static unsigned long timer_residue(const struct timer_list *timer)
 			     ? (timer->expires - jiffies) : 0);
 }
 
-static int br_ioctl_device(struct net_bridge *br,
-			   unsigned int cmd,
-			   unsigned long arg0,
-			   unsigned long arg1,
-			   unsigned long arg2)
+int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
+		   unsigned long arg0, unsigned long arg1, unsigned long arg2)
 {
 	if (br == NULL)
 		return -EINVAL;
@@ -54,6 +51,9 @@ static int br_ioctl_device(struct net_bridge *br,
 	{
 		struct net_device *dev;
 		int ret;
+
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 
 		dev = dev_get_by_index(arg0);
 		if (dev == NULL)
@@ -104,23 +104,27 @@ static int br_ioctl_device(struct net_bridge *br,
 
 	case BRCTL_GET_PORT_LIST:
 	{
-		int *indices;
+		int num = arg1 ? arg1 : 256;	/* compatiablity */
 		int ret = 0;
+		int *indices;
 
-		indices = kmalloc(256*sizeof(int), GFP_KERNEL);
+		indices = kmalloc(num*sizeof(int), GFP_KERNEL);
 		if (indices == NULL)
 			return -ENOMEM;
 
-		memset(indices, 0, 256*sizeof(int));
+		memset(indices, 0, num*sizeof(int));
 
-		br_get_port_ifindices(br, indices);
-		if (copy_to_user((void *)arg0, indices, 256*sizeof(int)))
+		br_get_port_ifindices(br, indices, num);
+		if (copy_to_user((void *)arg0, indices, num*sizeof(int)))
 			ret =  -EFAULT;
 		kfree(indices);
 		return ret;
 	}
 
 	case BRCTL_SET_BRIDGE_FORWARD_DELAY:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
 		spin_lock_bh(&br->lock);
 		br->bridge_forward_delay = user_to_ticks(arg0);
 		if (br_is_root_bridge(br))
@@ -129,6 +133,9 @@ static int br_ioctl_device(struct net_bridge *br,
 		return 0;
 
 	case BRCTL_SET_BRIDGE_HELLO_TIME:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
 		spin_lock_bh(&br->lock);
 		br->bridge_hello_time = user_to_ticks(arg0);
 		if (br_is_root_bridge(br))
@@ -137,6 +144,9 @@ static int br_ioctl_device(struct net_bridge *br,
 		return 0;
 
 	case BRCTL_SET_BRIDGE_MAX_AGE:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
 		spin_lock_bh(&br->lock);
 		br->bridge_max_age = user_to_ticks(arg0);
 		if (br_is_root_bridge(br))
@@ -145,10 +155,10 @@ static int br_ioctl_device(struct net_bridge *br,
 		return 0;
 
 	case BRCTL_SET_AGEING_TIME:
-		br->ageing_time = user_to_ticks(arg0);
-		return 0;
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 
-	case BRCTL_SET_GC_INTERVAL:	 /* no longer used */
+		br->ageing_time = user_to_ticks(arg0);
 		return 0;
 
 	case BRCTL_GET_PORT_INFO:
@@ -185,10 +195,16 @@ static int br_ioctl_device(struct net_bridge *br,
 	}
 
 	case BRCTL_SET_BRIDGE_STP_STATE:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
 		br->stp_enabled = arg0?1:0;
 		return 0;
 
 	case BRCTL_SET_BRIDGE_PRIORITY:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
 		spin_lock_bh(&br->lock);
 		br_stp_set_bridge_priority(br, arg0);
 		spin_unlock_bh(&br->lock);
@@ -198,6 +214,9 @@ static int br_ioctl_device(struct net_bridge *br,
 	{
 		struct net_bridge_port *p;
 		int ret = 0;
+
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 
 		spin_lock_bh(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL) 
@@ -212,6 +231,9 @@ static int br_ioctl_device(struct net_bridge *br,
 	{
 		struct net_bridge_port *p;
 		int ret = 0;
+
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 
 		spin_lock_bh(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL)
@@ -243,9 +265,6 @@ static int br_ioctl_deviceless(unsigned int cmd,
 		int *indices;
 		int ret = 0;
 
-		if (arg1 > 64)
-			arg1 = 64;
-
 		indices = kmalloc(arg1*sizeof(int), GFP_KERNEL);
 		if (indices == NULL)
 			return -ENOMEM;
@@ -264,6 +283,9 @@ static int br_ioctl_deviceless(unsigned int cmd,
 	case BRCTL_DEL_BRIDGE:
 	{
 		char buf[IFNAMSIZ];
+
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 
 		if (copy_from_user(buf, (void *)arg0, IFNAMSIZ))
 			return -EFAULT;
@@ -285,25 +307,8 @@ int br_ioctl_deviceless_stub(unsigned long arg)
 {
 	unsigned long i[3];
 
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
 	if (copy_from_user(i, (void *)arg, 3*sizeof(unsigned long)))
 		return -EFAULT;
 
 	return br_ioctl_deviceless(i[0], i[1], i[2]);
-}
-
-int br_ioctl(struct net_bridge *br, unsigned int cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2)
-{
-	int err;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
-	err = br_ioctl_deviceless(cmd, arg0, arg1);
-	if (err == -EOPNOTSUPP)
-		err = br_ioctl_device(br, cmd, arg0, arg1, arg2);
-
-	return err;
 }

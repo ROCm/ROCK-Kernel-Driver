@@ -387,7 +387,7 @@ enum register_offsets {
 	IntrStatus		= 0x10,
 	IntrMask		= 0x14,
 	IntrEnable		= 0x18,
-	IntrHoldoff		= 0x16, /* DP83816 only */
+	IntrHoldoff		= 0x1C, /* DP83816 only */
 	TxRingPtr		= 0x20,
 	TxConfig		= 0x24,
 	RxRingPtr		= 0x30,

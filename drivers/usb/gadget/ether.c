@@ -2374,9 +2374,7 @@ autoconf_fail:
 	/* one random address for the gadget device ... both of these could
 	 * reasonably come from an id prom or a module parameter.
 	 */
-	get_random_bytes (net->dev_addr, ETH_ALEN);
-	net->dev_addr [0] &= 0xfe;	// clear multicast bit
-	net->dev_addr [0] |= 0x02;	// set local assignment bit (IEEE802)
+	random_ether_addr(net->dev_addr);
 
 #ifdef	DEV_CONFIG_CDC
 	/* ... another address for the host, on the other end of the
@@ -2385,9 +2383,7 @@ autoconf_fail:
 	if (cdc) {
 		u8		node_id [ETH_ALEN];
 
-		get_random_bytes (node_id, sizeof node_id);
-		node_id [0] &= 0xfe;	// clear multicast bit
-		node_id [0] |= 0x02;    // set local assignment bit (IEEE802)
+		random_ether_addr(node_id);
 		snprintf (ethaddr, sizeof ethaddr, "%02X%02X%02X%02X%02X%02X",
 			node_id [0], node_id [1], node_id [2],
 			node_id [3], node_id [4], node_id [5]);

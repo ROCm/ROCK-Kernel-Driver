@@ -56,12 +56,14 @@ MODULE_ALIAS("vxfs"); /* makes mount -t vxfs autoload the module */
 
 static void		vxfs_put_super(struct super_block *);
 static int		vxfs_statfs(struct super_block *, struct kstatfs *);
+static int		vxfs_remount(struct super_block *, int *, char *);
 
 static struct super_operations vxfs_super_ops = {
 	.read_inode =		vxfs_read_inode,
 	.put_inode =		vxfs_put_inode,
 	.put_super =		vxfs_put_super,
 	.statfs =		vxfs_statfs,
+	.remount_fs =		vxfs_remount,
 };
 
 /**
@@ -118,6 +120,12 @@ vxfs_statfs(struct super_block *sbp, struct kstatfs *bufp)
 	bufp->f_ffree = infp->vsi_raw->vs_ifree;
 	bufp->f_namelen = VXFS_NAMELEN;
 
+	return 0;
+}
+
+static int vxfs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_RDONLY;
 	return 0;
 }
 

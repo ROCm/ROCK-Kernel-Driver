@@ -57,7 +57,8 @@ struct net_bridge_port
 	struct net_bridge		*br;
 	struct net_device		*dev;
 	struct list_head		list;
-	int				port_no;
+	__u8				port_no;
+	__u8				priority;
 
 	/* STP */
 	port_id				port_id;
@@ -69,7 +70,6 @@ struct net_bridge_port
 	port_id				designated_port;
 	unsigned			topology_change_ack:1;
 	unsigned			config_pending:1;
-	int				priority;
 
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
@@ -167,18 +167,18 @@ extern int br_del_if(struct net_bridge *br,
 extern int br_get_bridge_ifindices(int *indices,
 			    int num);
 extern void br_get_port_ifindices(struct net_bridge *br,
-			   int *ifindices);
+			   int *ifindices, int num);
 
 /* br_input.c */
 extern int br_handle_frame_finish(struct sk_buff *skb);
 extern int br_handle_frame(struct sk_buff *skb);
 
 /* br_ioctl.c */
-extern int br_ioctl(struct net_bridge *br,
-	     unsigned int cmd,
-	     unsigned long arg0,
-	     unsigned long arg1,
-	     unsigned long arg2);
+extern int br_ioctl_device(struct net_bridge *br,
+			   unsigned int cmd,
+			   unsigned long arg0,
+			   unsigned long arg1,
+			   unsigned long arg2);
 extern int br_ioctl_deviceless_stub(unsigned long arg);
 
 /* br_netfilter.c */

@@ -35,11 +35,12 @@
 #define HCIUARTGETPROTO	_IOR('U', 201, int)
 
 /* UART protocols */
-#define HCI_UART_MAX_PROTO	3
+#define HCI_UART_MAX_PROTO	4
 
 #define HCI_UART_H4	0
 #define HCI_UART_BCSP	1
-#define HCI_UART_NCSP	2
+#define HCI_UART_3WIRE	2
+#define HCI_UART_H4DS	3
 
 #ifdef __KERNEL__
 struct hci_uart;

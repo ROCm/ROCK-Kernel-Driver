@@ -61,6 +61,11 @@
 
 /* ----- HCI socket interface ----- */
 
+static inline int hci_test_bit(int nr, void *addr)
+{
+	return *((__u32 *) addr + (nr >> 5)) & ((__u32) 1 << (nr & 31));
+}
+
 /* Security filter */
 static struct hci_sec_filter hci_sec_filter = {
 	/* Packet types */
@@ -115,8 +120,8 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 
 		if (skb->pkt_type == HCI_EVENT_PKT) {
 			register int evt = (*(__u8 *)skb->data & HCI_FLT_EVENT_BITS);
-			
-			if (!test_bit(evt, flt->event_mask))
+
+			if (!hci_test_bit(evt, &flt->event_mask))
 				continue;
 
 			if (flt->opcode && ((evt == HCI_EV_CMD_COMPLETE && 
@@ -399,8 +404,8 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 		u16 ogf = hci_opcode_ogf(opcode);
 		u16 ocf = hci_opcode_ocf(opcode);
 
-		if (((ogf > HCI_SFLT_MAX_OGF) || 
-				!test_bit(ocf & HCI_FLT_OCF_BITS, hci_sec_filter.ocf_mask[ogf])) &&
+		if (((ogf > HCI_SFLT_MAX_OGF) ||
+				!hci_test_bit(ocf & HCI_FLT_OCF_BITS, &hci_sec_filter.ocf_mask[ogf])) &&
 		    			!capable(CAP_NET_RAW)) {
 			err = -EPERM;
 			goto drop;

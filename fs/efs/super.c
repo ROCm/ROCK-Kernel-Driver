@@ -77,12 +77,19 @@ void efs_put_super(struct super_block *s)
 	s->s_fs_info = NULL;
 }
 
+static int efs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_RDONLY;
+	return 0;
+}
+
 static struct super_operations efs_superblock_operations = {
 	.alloc_inode	= efs_alloc_inode,
 	.destroy_inode	= efs_destroy_inode,
 	.read_inode	= efs_read_inode,
 	.put_super	= efs_put_super,
 	.statfs		= efs_statfs,
+	.remount_fs	= efs_remount,
 };
 
 static int __init init_efs_fs(void) {

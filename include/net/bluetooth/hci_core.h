@@ -515,9 +515,9 @@ struct hci_pinfo {
 #define HCI_SFLT_MAX_OGF  5
 
 struct hci_sec_filter {
-	unsigned long type_mask;
-	unsigned long event_mask[2];
-	unsigned long ocf_mask[HCI_SFLT_MAX_OGF + 1][4];
+	__u32 type_mask;
+	__u32 event_mask[2];
+	__u32 ocf_mask[HCI_SFLT_MAX_OGF + 1][4];
 };
 
 /* ----- HCI requests ----- */

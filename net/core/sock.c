@@ -1138,7 +1138,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	atomic_set(&sk->sk_refcnt, 1);
 }
 
-void lock_sock(struct sock *sk)
+void fastcall lock_sock(struct sock *sk)
 {
 	might_sleep();
 	spin_lock_bh(&(sk->sk_lock.slock));
@@ -1150,7 +1150,7 @@ void lock_sock(struct sock *sk)
 
 EXPORT_SYMBOL(lock_sock);
 
-void release_sock(struct sock *sk)
+void fastcall release_sock(struct sock *sk)
 {
 	spin_lock_bh(&(sk->sk_lock.slock));
 	if (sk->sk_backlog.tail)

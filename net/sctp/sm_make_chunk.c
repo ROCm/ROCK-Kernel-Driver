@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 Intel Corp.
@@ -1817,10 +1817,23 @@ int sctp_process_init(struct sctp_association *asoc, sctp_cid_t cid,
 	/* Allocate storage for the negotiated streams if it is not a temporary 	 * association.
 	 */
 	if (!asoc->temp) {
+		sctp_assoc_t assoc_id;
+
 		asoc->ssnmap = sctp_ssnmap_new(asoc->c.sinit_max_instreams,
 					       asoc->c.sinit_num_ostreams, gfp);
 		if (!asoc->ssnmap)
-			goto nomem_ssnmap;
+			goto clean_up;
+
+		do {
+			if (unlikely(!idr_pre_get(&sctp_assocs_id, gfp)))
+				goto clean_up;
+			spin_lock_bh(&sctp_assocs_id_lock);
+			assoc_id = (sctp_assoc_t)idr_get_new(&sctp_assocs_id,
+							     (void *)asoc);
+			spin_unlock_bh(&sctp_assocs_id_lock);
+		} while (unlikely((int)assoc_id == -1));
+
+		asoc->assoc_id = assoc_id;
 	}
 
 	/* ADDIP Section 4.1 ASCONF Chunk Procedures
@@ -1836,7 +1849,6 @@ int sctp_process_init(struct sctp_association *asoc, sctp_cid_t cid,
 	asoc->peer.addip_serial = asoc->peer.i.initial_tsn - 1;
 	return 1;
 
-nomem_ssnmap:
 clean_up:
 	/* Release the transport structures. */
 	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {

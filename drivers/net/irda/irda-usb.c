@@ -62,7 +62,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/usb.h>
 
-#include <net/irda/irda-usb.h>
+#include "irda-usb.h"
 
 /*------------------------------------------------------------------*/
 

@@ -25,6 +25,7 @@
 #define _LINUX_ETHERDEVICE_H
 
 #include <linux/if_ether.h>
+#include <linux/random.h>
 
 #ifdef __KERNEL__
 extern int		eth_header(struct sk_buff *skb, struct net_device *dev,
@@ -40,7 +41,9 @@ extern int		eth_header_parse(struct sk_buff *skb,
 					 unsigned char *haddr);
 
 extern struct net_device *alloc_etherdev(int sizeof_priv);
-static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, int len, int base)
+static inline void eth_copy_and_sum (struct sk_buff *dest, 
+				     const unsigned char *src, 
+				     int len, int base)
 {
 	memcpy (dest->data, src, len);
 }
@@ -55,13 +58,26 @@ static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, i
  *
  * Return true if the address is valid.
  */
-static inline int is_valid_ether_addr( u8 *addr )
+static inline int is_valid_ether_addr( const u8 *addr )
 {
 	const char zaddr[6] = {0,};
 
 	return !(addr[0]&1) && memcmp( addr, zaddr, 6);
 }
 
+/**
+ * random_ether_addr - Generate software assigned random Ethernet address
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * Generate a random Ethernet address (MAC) that is not multicast
+ * and has the local assigned bit set.
+ */
+static inline void random_ether_addr(u8 *addr)
+{
+	get_random_bytes (addr, ETH_ALEN);
+	addr [0] &= 0xfe;	/* clear multicast bit */
+	addr [0] |= 0x02;	/* set local assignment bit (IEEE802) */
+}
 #endif
 
 #endif	/* _LINUX_ETHERDEVICE_H */

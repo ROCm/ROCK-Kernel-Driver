@@ -146,9 +146,10 @@ config CRYPTO_ARC4
 	help
 	  ARC4 cipher algorithm.
 
-	  This is a stream cipher using keys ranging from 8 bits to 2048
-	  bits in length.  ARC4 is commonly used in protocols such as WEP 
-	  and SSL.
+	  ARC4 is a stream cipher using keys ranging from 8 bits to 2048
+	  bits in length.  This algorithm is required for driver-based 
+	  WEP, but it should not be for other purposes because of the
+	  weakness of the algorithm.
 
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"

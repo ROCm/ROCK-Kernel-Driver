@@ -21,10 +21,6 @@ config NETDEVICES
 
 	  If unsure, say Y.
 
-if NETDEVICES
-	source "drivers/net/arcnet/Kconfig"
-endif
-
 config DUMMY
 	tristate "Dummy net driver support"
 	depends on NETDEVICES
@@ -154,6 +150,10 @@ config NET_SB1000
 	  <http://linuxpower.cx/~cable/>
 
 	  If you don't have this card, of course say N.
+
+if NETDEVICES
+	source "drivers/net/arcnet/Kconfig"
+endif
 
 #
 #	Ethernet
@@ -1178,6 +1178,17 @@ config IBMLANA
 	  boards with this driver should be possible, but has not been tested
 	  up to now due to lack of hardware.
 
+config IBMVETH
+	tristate "IBM LAN Virtual Ethernet support"
+	depends on NETDEVICES && NET_ETHERNET && PPC_PSERIES
+	---help---
+	  This driver supports virtual ethernet adapters on newer IBM iSeries
+	  and pSeries systems.
+
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>. The module will
+	  be called ibmveth.
+
 config NET_PCI
 	bool "EISA, VLB, PCI and on board controllers"
 	depends on NET_ETHERNET && (ISA || EISA || PCI)
@@ -1219,6 +1230,9 @@ config AMD8111_ETH
 	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/networking/net-modules.txt>. The module
 	  will be called amd8111e.
+config AMD8111E_NAPI
+	bool "Enable NAPI support"
+	depends on AMD8111_ETH
 
 config ADAPTEC_STARFIRE
 	tristate "Adaptec Starfire/DuraLAN support"
@@ -2105,6 +2119,17 @@ config S2IO_NAPI
 
 endmenu
 
+source "drivers/net/tokenring/Kconfig"
+
+source "drivers/net/wireless/Kconfig"
+
+source "drivers/net/pcmcia/Kconfig"
+
+source "drivers/net/wan/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+source "drivers/s390/net/Kconfig"
 
 config ISERIES_VETH
 	tristate "iSeries Virtual Ethernet driver support"
@@ -2171,17 +2196,6 @@ config HIPPI
 	  and have a HIPPI network card in your computer that you want to use
 	  under Linux, say Y here (you must also remember to enable the driver
 	  for your HIPPI card below). Most people will say N here.
-
-config IBMVETH
-	tristate "IBM LAN Virtual Ethernet support"
-	depends on NETDEVICES && NET_ETHERNET && PPC_PSERIES
-	---help---
-	  This driver supports virtual ethernet adapters on newer IBM iSeries
-	  and pSeries systems.
-
-	  To compile this driver as a module, choose M here and read
-	  <file:Documentation/networking/net-modules.txt>. The module will
-	  be called ibmveth.
 
 config ROADRUNNER
 	tristate "Essential RoadRunner HIPPI PCI adapter support (EXPERIMENTAL)"
@@ -2440,10 +2454,6 @@ config SLIP_MODE_SLIP6
 	  end of the link as well. It's good enough, for example, to run IP
 	  over the async ports of a Camtec JNT Pad. If unsure, say N.
 
-source "drivers/net/wireless/Kconfig"
-
-source "drivers/net/tokenring/Kconfig"
-
 config NET_FC
 	bool "Fibre Channel driver support"
 	depends on NETDEVICES && SCSI && PCI
@@ -2503,11 +2513,3 @@ config NETCONSOLE
 	---help---
 	If you want to log kernel messages over the network, enable this.
 	See Documentation/networking/netconsole.txt for details.
-
-source "drivers/net/wan/Kconfig"
-
-source "drivers/net/pcmcia/Kconfig"
-
-source "drivers/atm/Kconfig"
-
-source "drivers/s390/net/Kconfig"

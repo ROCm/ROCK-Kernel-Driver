@@ -206,11 +206,11 @@ static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
  
  	if (fs16_to_cpu(sbi, sbd->s_nfree) == 0xffff) {
  		sbi->s_type = FSTYPE_AFS;
+		sbi->s_forced_ro = 1;
  		if (!(sb->s_flags & MS_RDONLY)) {
  			printk("SysV FS: SCO EAFS on %s detected, " 
  				"forcing read-only mode.\n", 
  				sb->s_id);
- 			sb->s_flags |= MS_RDONLY;
  		}
  		return sbd->s_type;
  	}
@@ -234,7 +234,7 @@ static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
 	if (sbd->s_type >= 0x10) {
 		printk("SysV FS: can't handle long file names on %s, "
 		       "forcing read-only mode.\n", sb->s_id);
-		sb->s_flags |= MS_RDONLY;
+		sbi->s_forced_ro = 1;
 	}
 
 	sbi->s_type = FSTYPE_SYSV4;
@@ -335,9 +335,10 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 		printk("SysV FS: get root dentry failed\n");
 		return 0;
 	}
+	if (sbi->s_forced_ro)
+		sb->s_flags |= MS_RDONLY;
 	if (sbi->s_truncate)
 		sb->s_root->d_op = &sysv_dentry_operations;
-	sb->s_flags |= MS_RDONLY;
 	sb->s_dirt = 1;
 	return 1;
 }
@@ -481,6 +482,7 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 	    (fs32_to_cpu(sbi, v7i->i_size) & 017) != 0)
 		goto failed;
 	brelse(bh2);
+	bh2 = NULL;
 
 	sbi->s_bh1 = bh;
 	sbi->s_bh2 = bh;

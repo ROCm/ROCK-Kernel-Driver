@@ -73,8 +73,6 @@ extern void fp_init(union fp_state *);
  * This has a special calling convention; it doesn't
  * modify any of the usual registers, except for LR.
  */
-extern void __do_softirq(void);
-
 #define EXPORT_SYMBOL_ALIAS(sym,orig)		\
  const struct kernel_symbol __ksymtab_##sym	\
   __attribute__((section("__ksymtab"))) =	\
@@ -88,7 +86,6 @@ EXPORT_SYMBOL_ALIAS(kern_fp_enter,fp_enter);
 EXPORT_SYMBOL_ALIAS(fp_printk,printk);
 EXPORT_SYMBOL_ALIAS(fp_send_sig,send_sig);
 
-EXPORT_SYMBOL_NOVERS(__do_softirq);
 EXPORT_SYMBOL_NOVERS(__backtrace);
 
 	/* platform dependent support */

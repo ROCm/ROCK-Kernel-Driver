@@ -135,8 +135,14 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 	}
 
 	/* Otherwise this is a UDP-style socket. */
-	asoc = (struct sctp_association *)id;
-	if (!sctp_assoc_valid(sk, asoc))
+	if (!id || (id == (sctp_assoc_t)-1))
+		return NULL;
+
+	spin_lock_bh(&sctp_assocs_id_lock);
+	asoc = (struct sctp_association *)idr_find(&sctp_assocs_id, (int)id);
+	spin_unlock_bh(&sctp_assocs_id_lock);
+
+	if (!asoc || (asoc->base.sk != sk) || asoc->base.dead)
 		return NULL;
 
 	return asoc;
@@ -1010,7 +1016,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct list_head *pos;
 	int msg_flags = msg->msg_flags;
 
-	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %u)\n",
+	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %zu)\n",
 			  sk, msg, msg_len);
 
 	err = 0;
@@ -1066,7 +1072,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		associd = sinfo->sinfo_assoc_id;
 	}
 
-	SCTP_DEBUG_PRINTK("msg_len: %u, sinfo_flags: 0x%x\n",
+	SCTP_DEBUG_PRINTK("msg_len: %zu, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
 	/* MSG_EOF or MSG_ABORT cannot be set on a TCP-style socket. */
@@ -1432,7 +1438,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 	int err = 0;
 	int skb_len;
 
-	SCTP_DEBUG_PRINTK("sctp_recvmsg(%s: %p, %s: %p, %s: %d, %s: %d, %s: "
+	SCTP_DEBUG_PRINTK("sctp_recvmsg(%s: %p, %s: %p, %s: %zd, %s: %d, %s: "
 			  "0x%x, %s: %p)\n", "sk", sk, "msghdr", msg,
 			  "len", len, "knoblauch", noblock,
 			  "flags", flags, "addr_len", addr_len);
@@ -1498,8 +1504,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 		 * rwnd by that amount. If all the data in the skb is read,
 		 * rwnd is updated when the event is freed.
 		 */
-		sctp_assoc_rwnd_increase(event->sndrcvinfo.sinfo_assoc_id,
-					 copied);
+		sctp_assoc_rwnd_increase(event->asoc, copied);
 		goto out;
 	} else if ((event->msg_flags & MSG_NOTIFICATION) ||
 		   (event->msg_flags & MSG_EOR))
@@ -4233,7 +4238,7 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 	long current_timeo = *timeo_p;
 	DEFINE_WAIT(wait);
 
-	SCTP_DEBUG_PRINTK("wait_for_sndbuf: asoc=%p, timeo=%ld, msg_len=%u\n",
+	SCTP_DEBUG_PRINTK("wait_for_sndbuf: asoc=%p, timeo=%ld, msg_len=%zu\n",
 	                  asoc, (long)(*timeo_p), msg_len);
 
 	/* Increment the association's refcnt.  */
@@ -4477,7 +4482,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 */
 	sctp_skb_for_each(skb, &oldsk->sk_receive_queue, tmp) {
 		event = sctp_skb2event(skb);
-		if (event->sndrcvinfo.sinfo_assoc_id == assoc) {
+		if (event->asoc == assoc) {
 			__skb_unlink(skb, skb->list);
 			__skb_queue_tail(&newsk->sk_receive_queue, skb);
 		}
@@ -4506,7 +4511,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 		 */
 		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
 			event = sctp_skb2event(skb);
-			if (event->sndrcvinfo.sinfo_assoc_id == assoc) {
+			if (event->asoc == assoc) {
 				__skb_unlink(skb, skb->list);
 				__skb_queue_tail(queue, skb);
 			}

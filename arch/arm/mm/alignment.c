@@ -112,10 +112,10 @@ proc_alignment_read(char *page, char **start, off_t off, int count, int *eof,
 	return len;
 }
 
-static int proc_alignment_write(struct file *file, const char *buffer,
+static int proc_alignment_write(struct file *file, const char __user *buffer,
 			       unsigned long count, void *data)
 {
-	int mode;
+	char mode;
 
 	if (count > 0) {
 		if (get_user(mode, buffer))

@@ -47,7 +47,11 @@
 #define RTM_NEWPREFIX	(RTM_BASE+36)
 #define RTM_GETPREFIX	(RTM_BASE+38)
 
-#define	RTM_MAX		(RTM_BASE+39)
+#define	RTM_GETMULTICAST (RTM_BASE+42)
+
+#define	RTM_GETANYCAST	(RTM_BASE+46)
+
+#define	RTM_MAX		(RTM_BASE+47)
 
 /* 
    Generic structure for encapsulation of optional route information.
@@ -340,7 +344,8 @@ enum
 	IFA_LABEL,
 	IFA_BROADCAST,
 	IFA_ANYCAST,
-	IFA_CACHEINFO
+	IFA_CACHEINFO,
+	IFA_MULTICAST
 };
 
 #define IFA_MAX IFA_CACHEINFO

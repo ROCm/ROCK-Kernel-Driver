@@ -109,8 +109,7 @@ struct _urb *_urb_alloc(int isoc, int gfp)
 				sizeof(struct usb_iso_packet_descriptor) * isoc, gfp);
 	if (_urb) {
 		memset(_urb, 0, sizeof(*_urb));
-		_urb->urb.count = (atomic_t)ATOMIC_INIT(1);
-		spin_lock_init(&_urb->urb.lock);
+		usb_init_urb(&_urb->urb);
 	}
 	return _urb;
 }
@@ -341,6 +340,14 @@ static int hci_usb_flush(struct hci_dev *hdev)
 	return 0;
 }
 
+static inline void hci_usb_wait_for_urb(struct urb *urb)
+{
+	while (atomic_read(&urb->count) > 1) {
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout((5 * HZ + 999) / 1000);
+	}
+}
+
 static void hci_usb_unlink_urbs(struct hci_usb *husb)
 {
 	int i;
@@ -357,6 +364,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 			BT_DBG("%s unlinking _urb %p type %d urb %p", 
 					husb->hdev->name, _urb, _urb->type, urb);
 			usb_unlink_urb(urb);
+			hci_usb_wait_for_urb(urb);
 			_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 		}
 
@@ -699,10 +707,10 @@ static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs)
 	BT_DBG("%s urb %p type %d status %d count %d flags %x", hdev->name, urb,
 			_urb->type, urb->status, count, urb->transfer_flags);
 
-	if (!test_bit(HCI_RUNNING, &hdev->flags))
-		return;
-
 	read_lock(&husb->completion_lock);
+
+	if (!test_bit(HCI_RUNNING, &hdev->flags))
+		goto unlock;
 
 	if (urb->status || !count)
 		goto resubmit;
@@ -739,6 +747,7 @@ resubmit:
 	BT_DBG("%s urb %p type %d resubmit status %d", hdev->name, urb,
 			_urb->type, err);
 
+unlock:
 	read_unlock(&husb->completion_lock);
 }
 
