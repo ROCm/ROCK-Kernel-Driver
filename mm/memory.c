@@ -344,7 +344,7 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 			unsigned long pfn = pte_pfn(pte);
 
 			pte = ptep_get_and_clear(ptep);
-			tlb_remove_tlb_entry(tlb, pte, address+offset);
+			tlb_remove_tlb_entry(tlb, ptep, address+offset);
 			if (pfn_valid(pfn)) {
 				struct page *page = pfn_to_page(pfn);
 				if (!PageReserved(page)) {
