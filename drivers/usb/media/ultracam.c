@@ -600,8 +600,6 @@ static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id
 		return -ENODEV;
 	}
 
-	/* Code below may sleep, need to lock module while we are here */
-	MOD_INC_USE_COUNT;
 	uvd = usbvideo_AllocateDevice(cams);
 	if (uvd != NULL) {
 		/* Here uvd is a fully allocated uvd object */
@@ -631,7 +629,6 @@ static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id
 			uvd = NULL;
 		}
 	}
-	MOD_DEC_USE_COUNT;
 
 	if (uvd) {
 		usb_set_intfdata (intf, uvd);

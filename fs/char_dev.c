@@ -179,10 +179,10 @@ fail:
 	return PTR_ERR(cd);
 }
 
-int alloc_chrdev_region(dev_t *dev, unsigned count, char *name)
+int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count, char *name)
 {
 	struct char_device_struct *cd;
-	cd = __register_chrdev_region(0, 0, count, name);
+	cd = __register_chrdev_region(0, baseminor, count, name);
 	if (IS_ERR(cd))
 		return PTR_ERR(cd);
 	*dev = MKDEV(cd->major, cd->baseminor);

@@ -267,11 +267,8 @@ int irport_close(struct irport_cb *self)
 	self->dongle = NULL;
 	
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	if (self->netdev)
+		unregister_netdev(self->netdev);
 
 	/* Release the IO-port that this driver is using */
 	IRDA_DEBUG(0 , "%s(), Releasing Region %03x\n", 

@@ -1671,7 +1671,7 @@ asmlinkage long sys_unlink(const char __user * pathname)
 			goto slashes;
 		inode = dentry->d_inode;
 		if (inode)
-			inode = igrab(inode);
+			atomic_inc(&inode->i_count);
 		error = vfs_unlink(nd.dentry->d_inode, dentry);
 	exit2:
 		dput(dentry);

@@ -1276,7 +1276,7 @@ static inline void tcp_connect_init(struct sock *sk)
 	tp->rcv_ssthresh = tp->rcv_wnd;
 
 	sk->err = 0;
-	__clear_bit(SOCK_DONE, &sk->flags);
+	sock_reset_flag(sk, SOCK_DONE);
 	tp->snd_wnd = 0;
 	tcp_init_wl(tp, tp->write_seq, 0);
 	tp->snd_una = tp->write_seq;

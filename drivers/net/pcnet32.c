@@ -1002,7 +1002,9 @@ pcnet32_init_ring(struct net_device *dev)
 	    }
 	    skb_reserve (rx_skbuff, 2);
 	}
-        lp->rx_dma_addr[i] = pci_map_single(lp->pci_dev, rx_skbuff->tail, rx_skbuff->len, PCI_DMA_FROMDEVICE);
+
+	if (lp->rx_dma_addr[i] == NULL) 
+		lp->rx_dma_addr[i] = pci_map_single(lp->pci_dev, rx_skbuff->tail, rx_skbuff->len, PCI_DMA_FROMDEVICE);
 	lp->rx_ring[i].base = (u32)le32_to_cpu(lp->rx_dma_addr[i]);
 	lp->rx_ring[i].buf_length = le16_to_cpu(-PKT_BUF_SZ);
 	lp->rx_ring[i].status = le16_to_cpu(0x8000);
@@ -1037,7 +1039,7 @@ pcnet32_restart(struct net_device *dev, unsigned int csr0_bits)
     /* ReInit Ring */
     lp->a.write_csr (ioaddr, 0, 1);
     i = 0;
-    while (i++ < 100)
+    while (i++ < 1000)
 	if (lp->a.read_csr (ioaddr, 0) & 0x0100)
 	    break;
 
@@ -1128,6 +1130,7 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
     lp->tx_skbuff[entry] = skb;
     lp->tx_dma_addr[entry] = pci_map_single(lp->pci_dev, skb->data, skb->len, PCI_DMA_TODEVICE);
     lp->tx_ring[entry].base = (u32)le32_to_cpu(lp->tx_dma_addr[entry]);
+    wmb(); /* Make sure owner changes after all others are visible */
     lp->tx_ring[entry].status = le16_to_cpu(status);
 
     lp->cur_tx++;

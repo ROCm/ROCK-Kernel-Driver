@@ -442,7 +442,7 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 		if ((tp->rcv_nxt != tp->copied_seq) &&
 		    (tp->urg_seq != tp->copied_seq ||
 		     tp->rcv_nxt != tp->copied_seq + 1 ||
-		     test_bit(SOCK_URGINLINE, &sk->flags) || !tp->urg_data))
+		     sock_flag(sk, SOCK_URGINLINE) || !tp->urg_data))
 			mask |= POLLIN | POLLRDNORM;
 
 		if (!(sk->shutdown & SEND_SHUTDOWN)) {
@@ -498,7 +498,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		lock_sock(sk);
 		if ((1 << sk->state) & (TCPF_SYN_SENT | TCPF_SYN_RECV))
 			answ = 0;
-		else if (test_bit(SOCK_URGINLINE, &sk->flags) ||
+		else if (sock_flag(sk, SOCK_URGINLINE) ||
 			 !tp->urg_data ||
 			 before(tp->urg_seq, tp->copied_seq) ||
 			 !before(tp->urg_seq, tp->rcv_nxt)) {
@@ -1254,11 +1254,11 @@ static int tcp_recv_urg(struct sock *sk, long timeo,
 	struct tcp_opt *tp = tcp_sk(sk);
 
 	/* No URG data to read. */
-	if (test_bit(SOCK_URGINLINE, &sk->flags) || !tp->urg_data ||
-			tp->urg_data == TCP_URG_READ)
+	if (sock_flag(sk, SOCK_URGINLINE) || !tp->urg_data ||
+	    tp->urg_data == TCP_URG_READ)
 		return -EINVAL;	/* Yes this is right ! */
 
-	if (sk->state == TCP_CLOSE && !test_bit(SOCK_DONE, &sk->flags))
+	if (sk->state == TCP_CLOSE && !sock_flag(sk, SOCK_DONE))
 		return -ENOTCONN;
 
 	if (tp->urg_data & TCP_URG_VALID) {
@@ -1586,7 +1586,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			    (flags & MSG_PEEK))
 				break;
 		} else {
-			if (test_bit(SOCK_DONE, &sk->flags))
+			if (sock_flag(sk, SOCK_DONE))
 				break;
 
 			if (sk->err) {
@@ -1598,7 +1598,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				break;
 
 			if (sk->state == TCP_CLOSE) {
-				if (!test_bit(SOCK_DONE, &sk->flags)) {
+				if (!sock_flag(sk, SOCK_DONE)) {
 					/* This occurs when user tries to read
 					 * from never connected socket.
 					 */
@@ -1711,8 +1711,7 @@ do_prequeue:
 			u32 urg_offset = tp->urg_seq - *seq;
 			if (urg_offset < used) {
 				if (!urg_offset) {
-					if (!test_bit(SOCK_URGINLINE,
-								&sk->flags)) {
+					if (!sock_flag(sk, SOCK_URGINLINE)) {
 						++*seq;
 						offset++;
 						used--;
@@ -1836,7 +1835,7 @@ static int tcp_close_state(struct sock *sk)
 
 /*
  *	Shutdown the sending side of a connection. Much like close except
- *	that we don't receive shut down or set SOCK_DEAD in sk->flags.
+ *	that we don't receive shut down or set_sock_flag(sk, SOCK_DEAD).
  */
 
 void tcp_shutdown(struct sock *sk, int how)
@@ -1901,7 +1900,7 @@ static __inline__ void tcp_kill_sk_queues(struct sock *sk)
 void tcp_destroy_sock(struct sock *sk)
 {
 	BUG_TRAP(sk->state == TCP_CLOSE);
-	BUG_TRAP(test_bit(SOCK_DEAD, &sk->flags));
+	BUG_TRAP(sock_flag(sk, SOCK_DEAD));
 
 	/* It cannot be in hash table! */
 	BUG_TRAP(!sk->pprev);
@@ -1978,7 +1977,7 @@ void tcp_close(struct sock *sk, long timeout)
 		NET_INC_STATS_USER(TCPAbortOnClose);
 		tcp_set_state(sk, TCP_CLOSE);
 		tcp_send_active_reset(sk, GFP_KERNEL);
-	} else if (test_bit(SOCK_LINGER, &sk->flags) && !sk->lingertime) {
+	} else if (sock_flag(sk, SOCK_LINGER) && !sk->lingertime) {
 		/* Check zero linger _after_ checking for unread data. */
 		sk->prot->disconnect(sk, 0);
 		NET_INC_STATS_USER(TCPAbortOnData);
@@ -2144,7 +2143,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 		inet_reset_saddr(sk);
 
 	sk->shutdown = 0;
-	__clear_bit(SOCK_DONE, &sk->flags);
+	sock_reset_flag(sk, SOCK_DONE);
 	tp->srtt = 0;
 	if ((tp->write_seq += tp->max_window + 2) == 0)
 		tp->write_seq = 1;
@@ -2343,7 +2342,7 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			err = -EINVAL;
 		else {
 			tp->keepalive_time = val * HZ;
-			if (test_bit(SOCK_KEEPOPEN, &sk->flags) &&
+			if (sock_flag(sk, SOCK_KEEPOPEN) &&
 			    !((1 << sk->state) & (TCPF_CLOSE | TCPF_LISTEN))) {
 				__u32 elapsed = tcp_time_stamp - tp->rcv_tstamp;
 				if (tp->keepalive_time > elapsed)

@@ -1273,6 +1273,7 @@ static void pegasus_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver pegasus_driver = {
+	.owner = THIS_MODULE,
 	.name = driver_name,
 	.probe = pegasus_probe,
 	.disconnect = pegasus_disconnect,

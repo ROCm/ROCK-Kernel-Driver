@@ -170,11 +170,12 @@ int br_del_bridge(const char *name)
 	struct net_device *dev;
 	int ret = 0;
 
-	dev = dev_get_by_name(name);
+	rtnl_lock();
+	dev = __dev_get_by_name(name);
 	if (dev == NULL) 
-		return -ENXIO; 	/* Could not find device */
+		ret =  -ENXIO; 	/* Could not find device */
 
-	if (!(dev->priv_flags & IFF_EBRIDGE)) {
+	else if (!(dev->priv_flags & IFF_EBRIDGE)) {
 		/* Attempt to delete non bridge device! */
 		ret = -EPERM;
 	}
@@ -186,11 +187,10 @@ int br_del_bridge(const char *name)
 
 	else {
 		del_ifs((struct net_bridge *) dev->priv);
-	
-		unregister_netdev(dev);
+		unregister_netdevice(dev);
 	}
 
-	dev_put(dev);
+	rtnl_unlock();
 	return ret;
 }
 

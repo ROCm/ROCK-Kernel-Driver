@@ -1667,20 +1667,20 @@ static struct net_device sdla0 = {
 	.name = "sdla0",
 	.init = sdla_init
 };
+#endif /* MODULE */
 
-MODULE_LICENSE("GPL");
-
-int init_module(void)
+static int __init init_sdla(void)
 {
-	int result;
+	int result = 0;
 
 	sdla_c_setup();
-	if ((result = register_netdev(&sdla0)) != 0)
-		return result;
-	return 0;
+#ifdef MODULE
+	result = register_netdev(&sdla0);
+#endif
+	return result;
 }
 
-void cleanup_module(void)
+static void __exit exit_sdla(void)
 {
 	unregister_netdev(&sdla0);
 	if (sdla0.priv)
@@ -1688,4 +1688,8 @@ void cleanup_module(void)
 	if (sdla0.irq)
 		free_irq(sdla0.irq, &sdla0);
 }
-#endif /* MODULE */
+
+MODULE_LICENSE("GPL");
+
+module_init(init_sdla);
+module_exit(exit_sdla);

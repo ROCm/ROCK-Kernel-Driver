@@ -94,8 +94,6 @@ extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 extern int compat_sys_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 extern int (*handle_mathemu)(struct pt_regs *, struct fpustate *);
 extern long sparc32_open(const char * filename, int flags, int mode);
-extern int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *));
-extern int unregister_ioctl32_conversion(unsigned int cmd);
 extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space);
                 
 extern int __ashrdi3(int, int);
@@ -233,10 +231,6 @@ EXPORT_SYMBOL(pci_dma_sync_single);
 EXPORT_SYMBOL(pci_dma_sync_sg);
 EXPORT_SYMBOL(pci_dma_supported);
 #endif
-
-/* IOCTL32 emulation hooks. */
-EXPORT_SYMBOL(register_ioctl32_conversion);
-EXPORT_SYMBOL(unregister_ioctl32_conversion);
 
 /* I/O device mmaping on Sparc64. */
 EXPORT_SYMBOL(io_remap_page_range);

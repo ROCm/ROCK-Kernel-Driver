@@ -86,7 +86,7 @@ static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 
 	skb_set_owner_r(skbn, sk);
 	skb_queue_tail(&sk->receive_queue, skbn);
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->data_ready(sk, skbn->len);
 
 	return 0;
@@ -129,7 +129,7 @@ static int x25_state1_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 				       skb->len);
 				x25->calluserdata.cudlength = skb->len;
 			}
-			if (!test_bit(SOCK_DEAD, &sk->flags))
+			if (!sock_flag(sk, SOCK_DEAD))
 				sk->state_change(sk);
 			break;
 		}
@@ -277,9 +277,9 @@ static int x25_state3_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 			break;
 
 		case X25_INTERRUPT:
-			if (test_bit(SOCK_URGINLINE, &sk->flags)) {
-				queued = (sock_queue_rcv_skb(sk, skb) == 0);
-			} else {
+			if (sock_flag(sk, SOCK_URGINLINE))
+				queued = !sock_queue_rcv_skb(sk, skb);
+			else {
 				skb_set_owner_r(skb, sk);
 				skb_queue_tail(&x25->interrupt_in_queue, skb);
 				queued = 1;

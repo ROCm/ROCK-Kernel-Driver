@@ -75,7 +75,7 @@ static int ax25_std_state1_machine(ax25_cb *ax25, struct sk_buff *skb, int frame
 			if (ax25->sk != NULL) {
 				ax25->sk->state = TCP_ESTABLISHED;
 				/* For WAIT_SABM connections we will produce an accept ready socket here */
-				if (!test_bit(SOCK_DEAD, &ax25->sk->flags))
+				if (!sock_flag(ax25->sk, SOCK_DEAD))
 					ax25->sk->state_change(ax25->sk);
 			}
 		}

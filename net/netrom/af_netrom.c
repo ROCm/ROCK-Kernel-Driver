@@ -275,8 +275,9 @@ void nr_destroy_socket(struct sock *sk)
 	nr_clear_queues(sk);		/* Flush the queues */
 
 	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
-		if (skb->sk != sk) {			/* A pending connection */
-			__set_bit(SOCK_DEAD, &skb->sk->flags);	/* Queue the unaccepted socket for death */
+		if (skb->sk != sk) { /* A pending connection */
+			/* Queue the unaccepted socket for death */
+			sock_set_flag(skb->sk, SOCK_DEAD);
 			nr_start_heartbeat(skb->sk);
 			nr_sk(skb->sk)->state = NR_STATE_0;
 		}
@@ -535,8 +536,8 @@ static int nr_release(struct socket *sock)
 		sk->state    = TCP_CLOSE;
 		sk->shutdown |= SEND_SHUTDOWN;
 		sk->state_change(sk);
-		__set_bit(SOCK_DEAD, &sk->flags);
-		__set_bit(SOCK_DESTROY, &sk->flags);
+		sock_set_flag(sk, SOCK_DEAD);
+		sock_set_flag(sk, SOCK_DESTROY);
 		sk->socket   = NULL;
 		break;
 
@@ -950,7 +951,7 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 	nr_start_heartbeat(make);
 	nr_start_idletimer(make);
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->data_ready(sk, skb->len);
 
 	return 1;
