@@ -998,6 +998,7 @@ EXPORT_SYMBOL(save_match);
 static void ide_init_queue(ide_drive_t *drive)
 {
 	request_queue_t *q = &drive->queue;
+	ide_hwif_t *hwif = HWIF(drive);
 	int max_sectors = 256;
 
 	/*
@@ -1013,8 +1014,15 @@ static void ide_init_queue(ide_drive_t *drive)
 	drive->queue_setup = 1;
 	blk_queue_segment_boundary(q, 0xffff);
 
-	if (HWIF(drive)->rqsize)
-		max_sectors = HWIF(drive)->rqsize;
+	/*
+	 * use rqsize if specified, else set it to defaults for 28-bit or
+	 * 48-bit lba commands
+	 */
+	if (hwif->rqsize)
+		max_sectors = hwif->rqsize;
+	else
+		hwif->rqsize = hwif->addressing ? 256 : 65536;
+
 	blk_queue_max_sectors(q, max_sectors);
 
 	/* IDE DMA can do PRD_ENTRIES number of segments. */

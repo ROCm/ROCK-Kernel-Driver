@@ -664,20 +664,20 @@ err:
 
 ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive)
 {
-	u8 command = WIN_READDMA_QUEUED;
+	struct request *rq = hwgroup->rq;
+	u8 command;
 
-	if (drive->addressing == 1)
-		 command = WIN_READDMA_QUEUED_EXT;
+	command = rq_lba48(rq) ? WIN_READDMA_QUEUED_EXT : WIN_READDMA_QUEUED;
 
 	return ide_dma_queued_rw(drive, command);
 }
 
 ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive)
 {
-	u8 command = WIN_WRITEDMA_QUEUED;
+	struct request *rq = hwgroup->rq;
+	u8 command;
 
-	if (drive->addressing == 1)
-		 command = WIN_WRITEDMA_QUEUED_EXT;
+	command = rq_lba48(rq) ? WIN_WRITEDMA_QUEUED_EXT : WIN_WRITEDMA_QUEUED;
 
 	return ide_dma_queued_rw(drive, command);
 }
