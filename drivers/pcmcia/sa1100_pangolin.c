@@ -14,6 +14,12 @@
 #include <asm/irq.h>
 #include "sa1100_generic.h"
 
+#ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
+#define PANGOLIN_SOCK	1
+#else
+#define PANGOLIN_SOCK	0
+#endif
+
 static int pangolin_pcmcia_init(struct pcmcia_init *init){
   int res;
 
@@ -94,14 +100,14 @@ static int pangolin_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
   return 0;
 }
 
-static int pangolin_pcmcia_configure_socket(const struct pcmcia_configure
+static int pangolin_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
   unsigned long value, flags;
 
-  if(configure->sock>1) return -1;
+  if(sock>1) return -1;
 #ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
-  if(configure->sock==0) return 0;
+  if(sock==0) return 0;
 #endif
   local_irq_save(flags);
 
@@ -132,7 +138,7 @@ static int pangolin_pcmcia_configure_socket(const struct pcmcia_configure
   }
 #ifdef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
   /* reset & unreset request */
-  if(configure->sock==0) {
+  if(sock==0) {
 	if(configure->reset) {
 		GPSR |= GPIO_PCMCIA_RESET;
 	} else {

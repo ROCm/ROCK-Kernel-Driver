@@ -29,7 +29,7 @@ static int pfs168_pcmcia_init(struct pcmcia_init *init)
 }
 
 static int
-pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+pfs168_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
   unsigned int pa_dwr_mask = 0, pa_dwr_set = 0;
   int ret;
@@ -46,7 +46,7 @@ pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
    *
    */
 
-  switch (conf->sock) {
+  switch (sock) {
   case 0:
     pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3;
 
@@ -106,7 +106,7 @@ pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
     break;
   }
 
-  ret = sa1111_pcmcia_configure_socket(conf);
+  ret = sa1111_pcmcia_configure_socket(sock, conf);
   if (ret == 0) {
     unsigned long flags;
 

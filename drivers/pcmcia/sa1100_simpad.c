@@ -103,14 +103,14 @@ static int simpad_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
   return 0;
 }
 
-static int simpad_pcmcia_configure_socket(const struct pcmcia_configure
+static int simpad_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
   unsigned long value, flags;
 
-  if(configure->sock>1) return -1;
+  if(sock>1) return -1;
 
-  if(configure->sock==0) return 0;
+  if(sock==0) return 0;
 
   local_irq_save(flags);
 

@@ -57,16 +57,13 @@ int system3_pcmcia_shutdown(void)
 	return 0;
 }
 
-int system3_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+int system3_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
-	if (!conf)
-		return -1;
-
 	/* only CF ATM */
-	if (conf->sock == 0)
+	if (sock == 0)
 		return -1;
 
-	return sa1111_pcmcia_configure_socket( conf );
+	return sa1111_pcmcia_configure_socket(sock, conf);
 }
 
 static int system3_pcmcia_socket_state(struct pcmcia_state_array

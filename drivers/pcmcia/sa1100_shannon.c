@@ -107,9 +107,8 @@ static int shannon_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
 	return 0;
 }
 
-static int shannon_pcmcia_configure_socket(const struct pcmcia_configure *configure)
+static int shannon_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
-
 	switch (configure->vcc) {
 	case 0:	/* power off */
 		printk(KERN_WARNING __FUNCTION__"(): CS asked for 0V, still applying 3.3V..\n");

@@ -102,14 +102,14 @@ static int assabet_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
 }
 
 static int
-assabet_pcmcia_configure_socket(const struct pcmcia_configure *configure)
+assabet_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
 	unsigned int mask;
 
-	if (configure->sock > 1)
+	if (sock > 1)
 		return -1;
 
-	if (configure->sock == 0)
+	if (sock == 0)
 		return 0;
 
 	switch (configure->vcc) {

@@ -142,13 +142,12 @@ static int flexanet_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
 /*
  *
  */
-static int flexanet_pcmcia_configure_socket(const struct pcmcia_configure
+static int flexanet_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
   unsigned long value, flags, mask;
 
-
-  if (configure->sock > 1)
+  if (sock > 1)
     return -1;
 
   /* Ignore the VCC level since it is 3.3V and always on */
@@ -174,7 +173,7 @@ static int flexanet_pcmcia_configure_socket(const struct pcmcia_configure
   /* Reset the slot(s) using the controls in the BCR */
   mask = 0;
 
-  switch (configure->sock)
+  switch (sock)
   {
     case 0 : mask = FHH_BCR_CF1_RST; break;
     case 1 : mask = FHH_BCR_CF2_RST; break;

@@ -104,12 +104,12 @@ int sa1111_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
 	return ret;
 }
 
-int sa1111_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+int sa1111_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
 	unsigned int rst, flt, wait, pse, irq, pccr_mask, val;
 	unsigned long flags;
 
-	switch (conf->sock) {
+	switch (sock) {
 	case 0:
 		rst = PCCR_S0_RST;
 		flt = PCCR_S0_FLT;

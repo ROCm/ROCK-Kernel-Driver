@@ -37,8 +37,7 @@ struct pcmcia_state_array {
 };
 
 struct pcmcia_configure {
-  unsigned sock: 8,
-            vcc: 8,
+  unsigned  vcc: 8,
             vpp: 8,
          output: 1,
         speaker: 1,
@@ -56,7 +55,7 @@ struct pcmcia_low_level {
   int (*shutdown)(void);
   int (*socket_state)(struct pcmcia_state_array *);
   int (*get_irq_info)(struct pcmcia_irq_info *);
-  int (*configure_socket)(const struct pcmcia_configure *);
+  int (*configure_socket)(int sock, const struct pcmcia_configure *);
 
   /*
    * Enable card status IRQs on (re-)initialisation.  This can

@@ -113,9 +113,9 @@ static int yopy_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
 	return 0;
 }
 
-static int yopy_pcmcia_configure_socket(const struct pcmcia_configure *configure)
+static int yopy_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
-	if (configure->sock != 0)
+	if (sock != 0)
 		return -1;
 
 	switch (configure->vcc) {

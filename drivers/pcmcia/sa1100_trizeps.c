@@ -123,11 +123,11 @@ static int trizeps_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
  *
  *
  ******************************************************/
-static int trizeps_pcmcia_configure_socket(const struct pcmcia_configure *configure)
+static int trizeps_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
 	unsigned long flags;
 
-	if(configure->sock>1) return -1;
+	if(sock>1) return -1;
 
 	local_irq_save(flags);
 

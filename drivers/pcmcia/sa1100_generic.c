@@ -150,7 +150,6 @@ sa1100_pcmcia_config_skt(struct sa1100_pcmcia_socket *skt, socket_state_t *state
 	struct pcmcia_configure conf;
 	int ret;
 
-	conf.sock    = skt->nr;
 	conf.vcc     = state->Vcc;
 	conf.vpp     = state->Vpp;
 	conf.output  = state->flags & SS_OUTPUT_ENA ? 1 : 0;
@@ -158,7 +157,7 @@ sa1100_pcmcia_config_skt(struct sa1100_pcmcia_socket *skt, socket_state_t *state
 	conf.reset   = state->flags & SS_RESET ? 1 : 0;
 	conf.irq     = state->io_irq != 0;
 
-	ret = skt->ops->configure_socket(&conf);
+	ret = skt->ops->configure_socket(skt->nr, &conf);
 	if (ret == 0) {
 		/*
 		 * This really needs a better solution.  The IRQ

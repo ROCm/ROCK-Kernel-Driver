@@ -96,13 +96,13 @@ static int cerf_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
   return 0;
 }
 
-static int cerf_pcmcia_configure_socket(const struct pcmcia_configure
+static int cerf_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
-  if(configure->sock>1)
+  if (sock>1)
     return -1;
 
-  if (configure->sock != CERF_SOCKET)
+  if (sock != CERF_SOCKET)
     return 0;
 
   switch(configure->vcc){

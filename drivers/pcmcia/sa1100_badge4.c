@@ -96,11 +96,11 @@ static void complain_about_jumpering(const char *whom,
 }
 
 static int
-badge4_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+badge4_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
 	int ret;
 
-	switch (conf->sock) {
+	switch (sock) {
 	case 0:
 		if ((conf->vcc != 0) &&
 		    (conf->vcc != badge4_pcmvcc)) {
@@ -130,7 +130,7 @@ badge4_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 		return -1;
 	}
 
-	ret = sa1111_pcmcia_configure_socket(conf);
+	ret = sa1111_pcmcia_configure_socket(sock, conf);
 	if (ret == 0) {
 		unsigned long flags;
 		int need5V;

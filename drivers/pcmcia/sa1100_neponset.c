@@ -58,13 +58,13 @@ static int neponset_pcmcia_init(struct pcmcia_init *init)
 }
 
 static int
-neponset_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+neponset_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
 	unsigned int ncr_mask, pa_dwr_mask;
 	unsigned int ncr_set, pa_dwr_set;
 	int ret;
 
-	switch (conf->sock) {
+	switch (sock) {
 	case 0:
 		pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
 		ncr_mask = NCR_A0VPP | NCR_A1VPP;
@@ -113,7 +113,7 @@ neponset_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 		return -1;
 	}
 
-	ret = sa1111_pcmcia_configure_socket(conf);
+	ret = sa1111_pcmcia_configure_socket(sock, conf);
 	if (ret == 0) {
 		unsigned long flags;
 

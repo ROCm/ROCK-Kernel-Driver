@@ -49,15 +49,15 @@ static int jornada720_pcmcia_init(struct pcmcia_init *init)
 }
 
 static int
-jornada720_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+jornada720_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
   unsigned int pa_dwr_mask, pa_dwr_set;
   int ret;
 
 printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
-	       conf->sock, conf->vcc, conf->vpp);
+	       sock, conf->vcc, conf->vpp);
 
-  switch (conf->sock) {
+  switch (sock) {
   case 0:
     pa_dwr_mask = SOCKET0_POWER | SOCKET0_3V;
 

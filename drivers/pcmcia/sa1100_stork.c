@@ -135,21 +135,20 @@ static int stork_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
         return 0;
 }
 
-static int stork_pcmcia_configure_socket(const struct pcmcia_configure *configure)
+static int stork_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
-        int card = configure->sock;
 	unsigned long flags;
 
         int DETECT, RDY, POWER, RESET;
 
-        if (card > 1) return -1;
+        if (sock > 1) return -1;
 
 	printk(__FUNCTION__ ": socket=%d vcc=%d vpp=%d reset=%d\n", 
-                       card, configure->vcc, configure->vpp, configure->reset);
+                       sock, configure->vcc, configure->vpp, configure->reset);
 
 	local_irq_save(flags);
 
-        if (card == 0) {
+        if (sock == 0) {
     	    DETECT = GPIO_STORK_PCMCIA_A_CARD_DETECT;
     	    RDY = GPIO_STORK_PCMCIA_A_RDY;
     	    POWER = STORK_PCMCIA_A_POWER_ON;

@@ -117,9 +117,9 @@ static int h3600_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
 }
 
 static int
-h3600_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+h3600_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
-	if (conf->sock > 1)
+	if (sock > 1)
 		return -1;
 
 	if (conf->vcc != 0 && conf->vcc != 33 && conf->vcc != 50) {
