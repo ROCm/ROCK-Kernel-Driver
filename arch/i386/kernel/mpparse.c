@@ -830,7 +830,7 @@ void __init mp_register_lapic (
 	MP_processor_info(&processor);
 }
 
-#ifdef CONFIG_X86_IO_APIC
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 #define MP_ISA_BUS		0
 #define MP_MAX_IOAPIC_PIN	127
@@ -1019,10 +1019,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 	}
 }
 
-#ifdef	CONFIG_ACPI
-
-/* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
-
 extern FADT_DESCRIPTOR acpi_fadt;
 
 void __init mp_config_ioapic_for_sci(int irq)
@@ -1031,6 +1027,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 	int ioapic_pin;
 	struct acpi_table_madt *madt;
 	struct acpi_table_int_src_ovr *entry = NULL;
+	acpi_interrupt_flags flags;
 	void *madt_end;
 	acpi_status status;
 
@@ -1054,15 +1051,12 @@ void __init mp_config_ioapic_for_sci(int irq)
 				 * See the note at the end of ACPI 2.0b section
 				 * 5.2.10.8 for what this is about.
 				 */
-				if (entry->bus_irq != entry->global_irq) {
-					acpi_fadt.sci_int = entry->global_irq;
-					irq = entry->global_irq;
-					break;
-				}
-				else
-                			return;
+				flags = entry->flags;
+				acpi_fadt.sci_int = entry->global_irq;
+				irq = entry->global_irq;
+				break;
 			}
-
+			
                 	entry = (struct acpi_table_int_src_ovr *)
                 	        ((unsigned long) entry + entry->header.length);
         	}
@@ -1072,9 +1066,14 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 	ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
 
-	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 1, 1); // Active low, level triggered
+	if (flags.polarity == 0)
+		flags.polarity = 0x3;	/* Active low */ 
+	if (flags.trigger == 0) 
+		flags.trigger = 0x3;	/* Level-triggered */
+
+	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 
+				(flags.trigger >> 1) , (flags.polarity >> 1));
 }
-#endif	/* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -1154,5 +1153,5 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
-#endif	/* CONFIG_X86_IO_APIC */
+#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
 #endif /*CONFIG_ACPI_BOOT*/
