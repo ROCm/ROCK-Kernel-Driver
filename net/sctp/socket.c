@@ -2151,12 +2151,13 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 			sctp_endpoint_t *ep2;
 			ep2 = sctp_sk(sk2)->ep;
 
-			if (!sk_reuse || !sk2->reuse) {
-				if (sctp_bind_addr_has_addr(
-					&ep2->base.bind_addr, &tmpaddr)) {
-					goto found;
-				}
-			}
+			if (sk_reuse && sk2->reuse)
+				continue;
+			
+			if (sctp_bind_addr_match(&ep2->base.bind_addr, 
+						 &tmpaddr,
+						 sctp_sk(sk)))
+				goto found;
 		}
 
 	found:
