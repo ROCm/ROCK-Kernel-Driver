@@ -283,9 +283,8 @@ static char *usb_dump_interface(
 
 /* TBD:
  * 0. TBDs
- * 1. marking active config and ifaces (code lists all, but should mark
+ * 1. marking active interface altsettings (code lists all, but should mark
  *    which ones are active, if any)
- * 2. add <halted> status to each endpoint line
  */
 
 static char *usb_dump_config_descriptor(char *start, char *end, const struct usb_config_descriptor *desc, int active)

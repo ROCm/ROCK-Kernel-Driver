@@ -2044,8 +2044,6 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 				!= udev->descriptor.bMaxPacketSize0)) {
 		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
 		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
-		usb_endpoint_running(udev, 0, 1);
-		usb_endpoint_running(udev, 0, 0);
 		udev->epmaxpacketin [0] = udev->descriptor.bMaxPacketSize0;
 		udev->epmaxpacketout[0] = udev->descriptor.bMaxPacketSize0;
 	}

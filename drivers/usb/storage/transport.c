@@ -265,9 +265,7 @@ int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
 		USB_ENDPOINT_HALT, endp,
 		NULL, 0, 3*HZ);
 
-	/* reset the toggles and endpoint flags */
-	usb_endpoint_running(us->pusb_dev, usb_pipeendpoint(pipe),
-		usb_pipeout(pipe));
+	/* reset the endpoint toggle */
 	usb_settoggle(us->pusb_dev, usb_pipeendpoint(pipe),
 		usb_pipeout(pipe), 0);
 

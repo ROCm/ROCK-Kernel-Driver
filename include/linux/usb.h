@@ -294,8 +294,6 @@ struct usb_device {
 	struct semaphore serialize;
 
 	unsigned int toggle[2];		/* one bit for each endpoint ([0] = IN, [1] = OUT) */
-	unsigned int halted[2];		/* endpoint halts; one bit per endpoint # & direction; */
-					/* [0] = IN, [1] = OUT */
 	int epmaxpacketin[16];		/* INput endpoint specific maximums */
 	int epmaxpacketout[16];		/* OUTput endpoint specific maximums */
 
@@ -1083,10 +1081,6 @@ void usb_sg_wait (struct usb_sg_request *io);
 #define usb_gettoggle(dev, ep, out) (((dev)->toggle[out] >> (ep)) & 1)
 #define	usb_dotoggle(dev, ep, out)  ((dev)->toggle[out] ^= (1 << (ep)))
 #define usb_settoggle(dev, ep, out, bit) ((dev)->toggle[out] = ((dev)->toggle[out] & ~(1 << (ep))) | ((bit) << (ep)))
-
-/* Endpoint halt control/status ... likewise USE WITH CAUTION */
-#define usb_endpoint_running(dev, ep, out) ((dev)->halted[out] &= ~(1 << (ep)))
-#define usb_endpoint_halted(dev, ep, out) ((dev)->halted[out] & (1 << (ep)))
 
 
 static inline unsigned int __create_pipe(struct usb_device *dev, unsigned int endpoint)

@@ -1120,10 +1120,6 @@ static int uhci_result_common(struct uhci_hcd *uhci, struct urb *urb)
 
 td_error:
 	ret = uhci_map_status(status, uhci_packetout(td_token(td)));
-	if (ret == -EPIPE)
-		/* endpoint has stalled - mark it halted */
-		usb_endpoint_halt(urb->dev, uhci_endpoint(td_token(td)),
-	    			uhci_packetout(td_token(td)));
 
 err:
 	/* 
