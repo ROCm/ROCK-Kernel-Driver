@@ -149,7 +149,6 @@ void __init smp4d_callin(void)
 extern int cpu_idle(void *unused);
 extern void init_IRQ(void);
 extern void cpu_panic(void);
-extern int start_secondary(void *unused);
 
 /*
  *	Cycle through the processors asking the PROM to start each one.
