@@ -200,6 +200,13 @@ static irqreturn_t fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 }
 #endif
 
+static inline int fbcon_is_inactive(struct vc_data *vc, struct fb_info *info)
+{
+	return (info->state != FBINFO_STATE_RUNNING ||
+		vt_cons[vc->vc_num]->vc_mode != KD_TEXT ||
+		(console_blanked && info->fbops->fb_blank));
+}
+
 static inline int get_color(struct vc_data *vc, struct fb_info *info,
 	      u16 c, int is_fg)
 {
@@ -252,9 +259,8 @@ static void fb_flashcursor(void *private)
 	if (ops->currcon != -1)
 		vc = vc_cons[ops->currcon].d;
 
-	if (info->state != FBINFO_STATE_RUNNING ||
-	    !vc || !CON_IS_VISIBLE(vc) ||
-	    vt_cons[vc->vc_num]->vc_mode != KD_TEXT ||
+	if (!vc || !CON_IS_VISIBLE(vc) ||
+	    fbcon_is_inactive(vc, info) ||
  	    registered_fb[con2fb_map[vc->vc_num]] != info)
 		return;
 	acquire_console_sem();
@@ -988,12 +994,7 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 	struct display *p = &fb_display[vc->vc_num];
 	u_int y_break;
 
-	if (!info->fbops->fb_blank && console_blanked)
-		return;
-	if (info->state != FBINFO_STATE_RUNNING)
-		return;
-
-	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
+	if (fbcon_is_inactive(vc, info))
 		return;
 
 	if (!height || !width)
@@ -1018,18 +1019,10 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	struct display *p = &fb_display[vc->vc_num];
 	struct fbcon_ops *ops = info->fbcon_par;
 
-	if (!info->fbops->fb_blank && console_blanked)
-		return;
-
-	if (info->state != FBINFO_STATE_RUNNING)
-		return;
-
-	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
-		return;
-
-	ops->putcs(vc, info, s, count, real_y(p, ypos), xpos,
-		   get_color(vc, info, scr_readw(s), 1),
-		   get_color(vc, info, scr_readw(s), 0));
+	if (!fbcon_is_inactive(vc, info))
+		ops->putcs(vc, info, s, count, real_y(p, ypos), xpos,
+			   get_color(vc, info, scr_readw(s), 1),
+			   get_color(vc, info, scr_readw(s), 0));
 }
 
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
@@ -1045,7 +1038,8 @@ static void fbcon_clear_margins(struct vc_data *vc, int bottom_only)
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct fbcon_ops *ops = info->fbcon_par;
 
-	ops->clear_margins(vc, info, bottom_only);
+	if (!fbcon_is_inactive(vc, info))
+		ops->clear_margins(vc, info, bottom_only);
 }
 
 static void fbcon_cursor(struct vc_data *vc, int mode)
@@ -1056,7 +1050,7 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	int y = real_y(p, vc->vc_y);
  	int c = scr_readw((u16 *) vc->vc_pos);
 
-	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
+	if (fbcon_is_inactive(vc, info))
 		return;
 
 	ops->cursor_flash = 1;
@@ -1511,11 +1505,8 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 	struct fbcon_ops *ops = info->fbcon_par;
 	int scroll_partial = info->flags & FBINFO_PARTIAL_PAN_OK;
 
-	if (!info->fbops->fb_blank && console_blanked)
-		return 0;
-
-	if (!count || vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
-		return 0;
+	if (fbcon_is_inactive(vc, info))
+		return -EINVAL;
 
 	fbcon_cursor(vc, CM_ERASE);
 
@@ -1704,10 +1695,7 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 	
-	if (!info->fbops->fb_blank && console_blanked)
-		return;
-
-	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
+	if (fbcon_is_inactive(vc, info))
 		return;
 
 	if (!width || !height)
@@ -1999,8 +1987,8 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 		return 0;
 	}
 
-	ops->cursor_flash = (!blank);
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
+	ops->cursor_flash = (!blank);
 
 	if (!info->fbops->fb_blank) {
 		if (blank) {
@@ -2019,10 +2007,10 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 			} else
 				fbcon_clear(vc, 0, 0, height, vc->vc_cols);
 			vc->vc_video_erase_char = oldc;
-		} else
+ 		} else if (!fbcon_is_inactive(vc, info))
 			update_screen(vc->vc_num);
 	} else if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
-		retval = fb_blank(info, blank);
+ 		retval = info->fbops->fb_blank(blank, info);
 
 	return retval;
 }
@@ -2328,8 +2316,9 @@ static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 	int i, j, k, depth;
 	u8 val;
 
-	if (!info->fbops->fb_blank && console_blanked)
+	if (fbcon_is_inactive(vc, info))
 		return -EINVAL;
+
 	depth = fb_get_color_depth(info);
 	if (depth > 3) {
 		for (i = j = 0; i < 16; i++) {

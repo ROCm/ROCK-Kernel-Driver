@@ -743,33 +743,14 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 int
 fb_blank(struct fb_info *info, int blank)
 {	
-	/* ??? Variable sized stack allocation.  */
-	struct fb_cmap cmap;
-	u16 *black = NULL;
-	int err = 0;
+	int err = -EINVAL;
 	
 	/* Workaround for broken X servers */
 	if (blank > VESA_POWERDOWN)
 		blank = VESA_POWERDOWN;
 
-	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
-		return 0;
-
-	cmap = info->cmap;
-
-	if (blank) { 
-		black = kmalloc(sizeof(u16) * info->cmap.len, GFP_KERNEL);
-		if (black) {
-			memset(black, 0, info->cmap.len * sizeof(u16));
-			cmap.red = cmap.green = cmap.blue = black;
-			cmap.transp = info->cmap.transp ? black : NULL;
-			cmap.start = info->cmap.start;
-			cmap.len = info->cmap.len;
-		}
-	}
-
-	err = fb_set_cmap(&cmap, info);
-	kfree(black);
+	if (info->fbops->fb_blank)
+ 		err = info->fbops->fb_blank(blank, info);
 
 	return err;
 }
