@@ -1538,8 +1538,6 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		len = ETH_ZLEN;
 	}
 	
-	spin_lock_irq(&tp->lock);
-
 	if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
 		dma_addr_t mapping;
 		u32 status;
@@ -1560,16 +1558,20 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		dev->trans_start = jiffies;
 
 		tp->cur_tx++;
+		smp_wmb();
 	} else
 		goto err_drop;
 
-
 	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx) {
+		u32 dirty = tp->dirty_tx;
+	
 		netif_stop_queue(dev);
+		smp_rmb();
+		if (dirty != tp->dirty_tx)
+			netif_wake_queue(dev);
 	}
-out:
-	spin_unlock_irq(&tp->lock);
 
+out:
 	return 0;
 
 err_drop:
@@ -1590,6 +1592,7 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	assert(ioaddr != NULL);
 
 	dirty_tx = tp->dirty_tx;
+	smp_rmb();
 	tx_left = tp->cur_tx - dirty_tx;
 
 	while (tx_left > 0) {
@@ -1616,6 +1619,7 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	if (tp->dirty_tx != dirty_tx) {
 		tp->dirty_tx = dirty_tx;
+		smp_wmb();
 		if (netif_queue_stopped(dev))
 			netif_wake_queue(dev);
 	}
@@ -1777,11 +1781,8 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			rtl8169_rx_interrupt(dev, tp, ioaddr);
 		}
 		// Tx interrupt
-		if (status & (TxOK | TxErr)) {
-			spin_lock(&tp->lock);
+		if (status & (TxOK | TxErr))
 			rtl8169_tx_interrupt(dev, tp, ioaddr);
-			spin_unlock(&tp->lock);
-		}
 #endif
 
 		boguscnt--;
