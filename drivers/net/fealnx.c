@@ -539,6 +539,7 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 		goto err_out_unmap;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	/* read ethernet id */
 	for (i = 0; i < 6; ++i)

@@ -1586,6 +1586,7 @@ static void ns83820_run_bist(struct ns83820 *dev, const char *name, u32 enable, 
 	dprintk("%s: done %s in %d loops\n", dev->net_dev.name, name, loops);
 }
 
+#ifdef PHY_CODE_IS_FINISHED
 static void ns83820_mii_write_bit(struct ns83820 *dev, int bit)
 {
 	/* drive MDC low */
@@ -1758,6 +1759,7 @@ static void ns83820_probe_phy(struct ns83820 *dev)
 		dprintk("version: 0x%04x 0x%04x\n", a, b);
 	}
 }
+#endif
 
 static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
@@ -1788,7 +1790,8 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 
 	dev->ee.cache = &dev->MEAR_cache;
 	dev->ee.lock = &dev->misc_lock;
-	dev->net_dev.owner = THIS_MODULE;
+	SET_MODULE_OWNER(dev->net_dev);
+	SET_NETDEV_DEV(&dev->net_dev, &pci_dev->dev);
 	dev->net_dev.priv = dev;
 
 	INIT_WORK(&dev->tq_refill, queue_refill, dev);

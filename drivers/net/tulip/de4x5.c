@@ -1350,6 +1350,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     
     /* The DE4X5-specific entries in the device structure. */
     SET_MODULE_OWNER(dev);
+    SET_NETDEV_DEV(dev, &pdev->dev);
     dev->open = &de4x5_open;
     dev->hard_start_xmit = &de4x5_queue_pkt;
     dev->stop = &de4x5_close;

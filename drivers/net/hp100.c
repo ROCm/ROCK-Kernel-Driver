@@ -776,6 +776,7 @@ static int __init hp100_probe1(struct net_device *dev, int ioaddr,
 	hp100_clear_stats(lp, ioaddr);
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pci_dev->dev);
 	ether_setup(dev);
 
 	/* If busmaster mode is wanted, a dma-capable memory area is needed for

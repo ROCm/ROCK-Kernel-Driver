@@ -460,6 +460,7 @@ static int __init skge_probe (void)
 		dev->irq = pdev->irq;
 
 		SET_MODULE_OWNER(dev);
+		SET_NETDEV_DEV(dev, &pdev->dev);
 		dev->open =		&SkGeOpen;
 		dev->stop =		&SkGeClose;
 		dev->hard_start_xmit =	&SkGeXmit;

@@ -276,6 +276,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 		return -ENODEV;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	printk(KERN_INFO "%s: Xircom cardbus revision %i at irq %i \n", dev->name, chip_rev, pdev->irq);
 
 	private->dev = dev;

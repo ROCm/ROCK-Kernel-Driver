@@ -958,12 +958,15 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
  				INIT_RCU_HEAD(&rt->u.dst.rcu_head);
 				rt->u.dst.__use		= 1;
 				atomic_set(&rt->u.dst.__refcnt, 1);
+				rt->u.dst.child		= NULL;
 				if (rt->u.dst.dev)
 					dev_hold(rt->u.dst.dev);
+				rt->u.dst.obsolete	= 0;
 				rt->u.dst.lastuse	= jiffies;
+				rt->u.dst.path		= &rt->u.dst;
 				rt->u.dst.neighbour	= NULL;
 				rt->u.dst.hh		= NULL;
-				rt->u.dst.obsolete	= 0;
+				rt->u.dst.xfrm		= NULL;
 
 				rt->rt_flags		|= RTCF_REDIRECTED;
 
@@ -1150,7 +1153,7 @@ static __inline__ unsigned short guess_mtu(unsigned short old_mtu)
 {
 	int i;
 	
-	for (i = 0; i < sizeof(mtu_plateau) / sizeof(mtu_plateau[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(mtu_plateau); i++)
 		if (old_mtu > mtu_plateau[i])
 			return mtu_plateau[i];
 	return 68;

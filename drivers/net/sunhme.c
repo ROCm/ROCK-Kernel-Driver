@@ -3025,6 +3025,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	if (!dev)
 		goto err_out;
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (hme_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);

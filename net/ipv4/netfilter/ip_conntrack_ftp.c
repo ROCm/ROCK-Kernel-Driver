@@ -301,7 +301,7 @@ static int help(struct sk_buff *skb,
 	array[2] = (ntohl(ct->tuplehash[dir].tuple.src.ip) >> 8) & 0xFF;
 	array[3] = ntohl(ct->tuplehash[dir].tuple.src.ip) & 0xFF;
 
-	for (i = 0; i < sizeof(search) / sizeof(search[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(search); i++) {
 		if (search[i].dir != dir) continue;
 
 		found = find_pattern(ftp_buffer, skb->len - dataoff,

@@ -348,6 +348,7 @@ static int __devinit dmfe_init_one (struct pci_dev *pdev,
 	if (dev == NULL)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (pci_set_dma_mask(pdev, 0xffffffff)) {
 		printk(KERN_WARNING DRV_NAME ": 32-bit PCI DMA not available.\n");
