@@ -30,6 +30,8 @@
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <asm/topology.h>
+
 #include <linux/swapops.h>
 
 /*
@@ -667,8 +669,6 @@ try_to_free_pages(struct zone *classzone,
 	return 0;
 }
 
-DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
-
 static int check_classzone_need_balance(struct zone *classzone)
 {
 	struct zone *first_classzone;
@@ -707,20 +707,6 @@ static int kswapd_balance_pgdat(pg_data_t * pgdat)
 	return need_more_balance;
 }
 
-static void kswapd_balance(void)
-{
-	int need_more_balance;
-	pg_data_t * pgdat;
-
-	do {
-		need_more_balance = 0;
-		pgdat = pgdat_list;
-		do
-			need_more_balance |= kswapd_balance_pgdat(pgdat);
-		while ((pgdat = pgdat->pgdat_next));
-	} while (need_more_balance);
-}
-
 static int kswapd_can_sleep_pgdat(pg_data_t * pgdat)
 {
 	struct zone *zone;
@@ -728,24 +714,9 @@ static int kswapd_can_sleep_pgdat(pg_data_t * pgdat)
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {
 		zone = pgdat->node_zones + i;
-		if (!zone->need_balance)
-			continue;
-		return 0;
+		if (zone->need_balance)
+			return 0;
 	}
-
-	return 1;
-}
-
-static int kswapd_can_sleep(void)
-{
-	pg_data_t * pgdat;
-
-	pgdat = pgdat_list;
-	do {
-		if (kswapd_can_sleep_pgdat(pgdat))
-			continue;
-		return 0;
-	} while ((pgdat = pgdat->pgdat_next));
 
 	return 1;
 }
@@ -763,13 +734,15 @@ static int kswapd_can_sleep(void)
  * If there are applications that are active memory-allocators
  * (most normal use), this basically shouldn't matter.
  */
-int kswapd(void *unused)
+int kswapd(void *p)
 {
+	pg_data_t *pgdat = (pg_data_t*)p;
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
 
 	daemonize();
-	strcpy(tsk->comm, "kswapd");
+	set_cpus_allowed(tsk, __node_to_cpu_mask(pgdat->node_id));
+	sprintf(tsk->comm, "kswapd%d", pgdat->node_id);
 	sigfillset(&tsk->blocked);
 	
 	/*
@@ -793,30 +766,32 @@ int kswapd(void *unused)
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
 		__set_current_state(TASK_INTERRUPTIBLE);
-		add_wait_queue(&kswapd_wait, &wait);
+		add_wait_queue(&pgdat->kswapd_wait, &wait);
 
 		mb();
-		if (kswapd_can_sleep())
+		if (kswapd_can_sleep_pgdat(pgdat))
 			schedule();
 
 		__set_current_state(TASK_RUNNING);
-		remove_wait_queue(&kswapd_wait, &wait);
+		remove_wait_queue(&pgdat->kswapd_wait, &wait);
 
 		/*
 		 * If we actually get into a low-memory situation,
 		 * the processes needing more memory will wake us
 		 * up on a more timely basis.
 		 */
-		kswapd_balance();
+		kswapd_balance_pgdat(pgdat);
 		blk_run_queues();
 	}
 }
 
 static int __init kswapd_init(void)
 {
+	pg_data_t *pgdat;
 	printk("Starting kswapd\n");
 	swap_setup();
-	kernel_thread(kswapd, NULL, CLONE_KERNEL);
+	for_each_pgdat(pgdat)
+		kernel_thread(kswapd, pgdat, CLONE_KERNEL);
 	return 0;
 }
 

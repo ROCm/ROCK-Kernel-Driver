@@ -71,9 +71,11 @@ MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
 MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_enable, "Enable OPL3-SA soundcard.");
 MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
+#ifdef __ISAPNP__
 MODULE_PARM(snd_isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_isapnp, "ISA PnP detection for specified soundcard.");
 MODULE_PARM_SYNTAX(snd_isapnp, SNDRV_ISAPNP_DESC);
+#endif
 MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(snd_port, "Port # for OPL3-SA driver.");
 MODULE_PARM_SYNTAX(snd_port, SNDRV_ENABLED ",allows:{{0xf86},{0x370},{0x100}},dialog:list");

@@ -43,6 +43,4 @@
 #define __bus_to_virt__is_a_macro
 #define __bus_to_virt(x) ((unsigned long)(x) + PAGE_OFFSET - BUS_OFFSET)
 
-#define PHYS_TO_NID(addr)	(0)
-
 #endif

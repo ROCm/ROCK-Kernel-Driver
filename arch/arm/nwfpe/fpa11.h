@@ -80,8 +80,8 @@ typedef struct tagFPA11 {
 					   initialised. */
 } FPA11;
 
-extern void resetFPA11(void);
 extern void SetRoundingMode(const unsigned int);
 extern void SetRoundingPrecision(const unsigned int);
+extern void nwfpe_init(union fp_state *fp);
 
 #endif

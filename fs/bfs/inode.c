@@ -253,14 +253,14 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations bfs_sops = {
-	alloc_inode:	bfs_alloc_inode,
-	destroy_inode:	bfs_destroy_inode,
-	read_inode:	bfs_read_inode,
-	write_inode:	bfs_write_inode,
-	delete_inode:	bfs_delete_inode,
-	put_super:	bfs_put_super,
-	write_super:	bfs_write_super,
-	statfs:		bfs_statfs,
+	.alloc_inode	= bfs_alloc_inode,
+	.destroy_inode	= bfs_destroy_inode,
+	.read_inode	= bfs_read_inode,
+	.write_inode	= bfs_write_inode,
+	.delete_inode	= bfs_delete_inode,
+	.put_super	= bfs_put_super,
+	.write_super	= bfs_write_super,
+	.statfs		= bfs_statfs,
 };
 
 void dump_imap(const char *prefix, struct super_block * s)
@@ -381,11 +381,11 @@ static struct super_block *bfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type bfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"bfs",
-	get_sb:		bfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "bfs",
+	.get_sb		= bfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_bfs_fs(void)

@@ -228,7 +228,7 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 	sigemptyset(ign);
 	sigemptyset(catch);
 
-	spin_lock_irq(&p->sigmask_lock);
+	spin_lock_irq(&p->sig->siglock);
 	if (p->sig) {
 		k = p->sig->action;
 		for (i = 1; i <= _NSIG; ++i, ++k) {
@@ -238,7 +238,7 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 				sigaddset(catch, i);
 		}
 	}
-	spin_unlock_irq(&p->sigmask_lock);
+	spin_unlock_irq(&p->sig->siglock);
 }
 
 static inline char * task_sig(struct task_struct *p, char *buffer)

@@ -66,7 +66,6 @@ several floating point instructions.  */
 	.globl	nwfpe_enter
 nwfpe_enter:
 	mov	sl, sp
-	bl	FPA11_CheckInit		@ check to see if we are initialised
 
 	ldr	r5, [sp, #60]		@ get contents of PC
 	bic	r5, r5, #0xfc000003

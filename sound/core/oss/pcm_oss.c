@@ -267,8 +267,8 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	int err;
 	int direct;
 	int format, sformat, n;
-	unsigned int sformat_mask;
-	unsigned int mask;
+	snd_mask_t sformat_mask;
+	snd_mask_t mask;
 
 	if (atomic_read(&runtime->mmap_count)) {
 		direct = 1;
@@ -280,12 +280,13 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	_snd_pcm_hw_params_any(&sparams);
 	_snd_pcm_hw_param_setinteger(&sparams, SNDRV_PCM_HW_PARAM_PERIODS);
 	_snd_pcm_hw_param_min(&sparams, SNDRV_PCM_HW_PARAM_PERIODS, 2, 0);
+	snd_mask_none(&mask);
 	if (atomic_read(&runtime->mmap_count))
-		mask = 1 << SNDRV_PCM_ACCESS_MMAP_INTERLEAVED;
+		snd_mask_set(&mask, SNDRV_PCM_ACCESS_MMAP_INTERLEAVED);
 	else {
-		mask = 1 << SNDRV_PCM_ACCESS_RW_INTERLEAVED;
+		snd_mask_set(&mask, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
 		if (!direct)
-			mask |= 1 << SNDRV_PCM_ACCESS_RW_NONINTERLEAVED;
+			snd_mask_set(&mask, SNDRV_PCM_ACCESS_RW_NONINTERLEAVED);
 	}
 	err = snd_pcm_hw_param_mask(substream, &sparams, SNDRV_PCM_HW_PARAM_ACCESS, &mask);
 	if (err < 0) {
@@ -301,11 +302,11 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	if (direct)
 		sformat = format;
 	else
-		sformat = snd_pcm_plug_slave_format(format, sformat_mask);
+		sformat = snd_pcm_plug_slave_format(format, &sformat_mask);
 
-	if (sformat < 0 || !(sformat_mask & (1 << sformat))) {
+	if (sformat < 0 || !snd_mask_test(&sformat_mask, sformat)) {
 		for (sformat = 0; sformat <= SNDRV_PCM_FORMAT_LAST; sformat++) {
-			if ((sformat_mask & (1 << sformat)) &&
+			if (snd_mask_test(&sformat_mask, sformat) &&
 			    snd_pcm_oss_format_to(sformat) >= 0)
 				break;
 		}
@@ -935,7 +936,7 @@ static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
 	int direct;
 	snd_pcm_hw_params_t params;
 	unsigned int formats = 0;
-	unsigned int format_mask;
+	snd_mask_t format_mask;
 	int fmt;
 	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
 		return err;
@@ -955,7 +956,7 @@ static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
 	snd_assert(err >= 0, return err);
 	format_mask = *hw_param_mask(&params, SNDRV_PCM_HW_PARAM_FORMAT); 
 	for (fmt = 0; fmt < 32; ++fmt) {
-		if (format_mask & (1 << fmt)) {
+		if (snd_mask_test(&format_mask, fmt)) {
 			int f = snd_pcm_oss_format_to(fmt);
 			if (f >= 0)
 				formats |= f;

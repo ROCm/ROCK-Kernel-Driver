@@ -1,5 +1,5 @@
 /*
- *	i810-tco 0.04:	TCO timer driver for i8xx chipsets
+ *	i810-tco 0.05:	TCO timer driver for i8xx chipsets
  *
  *	(c) Copyright 2000 kernel concepts <nils@kernelconcepts.de>, All Rights Reserved.
  *				http://www.kernelconcepts.de
@@ -9,9 +9,9 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *	
- *	Neither kernel concepts nor Nils Faerber admit liability nor provide 
- *	warranty for any of this software. This material is provided 
- *	"AS-IS" and at no charge.	
+ *	Neither kernel concepts nor Nils Faerber admit liability nor provide
+ *	warranty for any of this software. This material is provided
+ *	"AS-IS" and at no charge.
  *
  *	(c) Copyright 2000	kernel concepts <nils@kernelconcepts.de>
  *				developed for
@@ -20,13 +20,8 @@
  *	TCO timer driver for i8xx chipsets
  *	based on softdog.c by Alan Cox <alan@redhat.com>
  *
- *	The TCO timer is implemented in the following I/O controller hubs:
- *	(See the intel documentation on http://developer.intel.com.)
- *	82801AA & 82801AB  chip : document number 290655-003, 290677-004,
- *	82801BA & 82801BAM chip : document number 290687-002, 298242-005,
- *	82801CA & 82801CAM chip : document number 290716-001, 290718-001
- *
- *	For history see i810-tco.c
+ *	For history and the complete list of supported I/O Controller Hub's
+ *	see i810-tco.c
  */
 
 

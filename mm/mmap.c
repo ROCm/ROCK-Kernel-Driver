@@ -553,6 +553,7 @@ munmap_back:
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
 	vma->vm_raend = 0;
+	INIT_LIST_HEAD(&vma->shared);
 
 	if (file) {
 		error = -EINVAL;
@@ -1052,6 +1053,8 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	/* most fields are the same, copy all, and then fixup */
 	*new = *vma;
 
+	INIT_LIST_HEAD(&new->shared);
+
 	if (new_below) {
 		new->vm_end = addr;
 		vma->vm_start = addr;
@@ -1215,6 +1218,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	vma->vm_pgoff = 0;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
+	INIT_LIST_HEAD(&vma->shared);
 
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 

@@ -429,7 +429,7 @@ DONE:
 /**********************************************************************
  *  kernel magic macros
  */
-__initcall(system3_init);
+arch_initcall(system3_init);
 
 MACHINE_START(PT_SYSTEM3, "PT System 3")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)

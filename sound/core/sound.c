@@ -501,6 +501,8 @@ EXPORT_SYMBOL(snd_printd);
 #ifdef CONFIG_SND_DEBUG_MEMORY
 EXPORT_SYMBOL(snd_wrapper_kmalloc);
 EXPORT_SYMBOL(snd_wrapper_kfree);
+EXPORT_SYMBOL(snd_wrapper_vmalloc);
+EXPORT_SYMBOL(snd_wrapper_vfree);
 #endif
 #ifdef HACK_PCI_ALLOC_CONSISTENT
 EXPORT_SYMBOL(snd_pci_hack_alloc_consistent);

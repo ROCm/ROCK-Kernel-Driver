@@ -184,6 +184,18 @@ char *snd_pcm_format_names[] = {
 	FORMAT(MPEG),
 	FORMAT(GSM),
 	FORMAT(SPECIAL),
+	FORMAT(S24_3LE),
+	FORMAT(S24_3BE),
+	FORMAT(U24_3LE),
+	FORMAT(U24_3BE),
+	FORMAT(S20_3LE),
+	FORMAT(S20_3BE),
+	FORMAT(U20_3LE),
+	FORMAT(U20_3BE),
+	FORMAT(S18_3LE),
+	FORMAT(S18_3BE),
+	FORMAT(U18_3LE),
+	FORMAT(U18_3BE),
 };
 
 char *snd_pcm_subformat_names[] = {
@@ -741,16 +753,15 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 		kfree(runtime);
 		return -ENOMEM;
 	}
+	memset((void*)runtime->status, 0, size);
 
 	size = PAGE_ALIGN(sizeof(snd_pcm_mmap_control_t));
 	runtime->control = snd_malloc_pages(size, GFP_KERNEL);
 	if (runtime->control == NULL) {
-		kfree((void *)runtime->status);
+		snd_free_pages((void*)runtime->status, PAGE_ALIGN(sizeof(snd_pcm_mmap_status_t)));
 		kfree(runtime);
 		return -ENOMEM;
 	}
-
-	memset((void*)runtime->status, 0, size);
 	memset((void*)runtime->control, 0, size);
 
 	init_waitqueue_head(&runtime->sleep);
@@ -828,8 +839,7 @@ int snd_pcm_dev_register(snd_device_t *device)
 	list_for_each(list, &snd_pcm_notify_list) {
 		snd_pcm_notify_t *notify;
 		notify = list_entry(list, snd_pcm_notify_t, list);
-		if (notify->n_register)
-			notify->n_register(-1 /* idx + SNDRV_MINOR_PCM */, pcm);
+		notify->n_register(-1 /* idx + SNDRV_MINOR_PCM */, pcm);
 	}
 	snd_pcm_lock(1);
 	return 0;
@@ -866,8 +876,7 @@ static int snd_pcm_dev_unregister(snd_device_t *device)
 	list_for_each(list, &snd_pcm_notify_list) {
 		snd_pcm_notify_t *notify;
 		notify = list_entry(list, snd_pcm_notify_t, list);
-		if (notify->n_unregister)
-			notify->n_unregister(-1 /* SNDRV_MINOR_PCM + idx */, pcm);
+		notify->n_unregister(-1 /* SNDRV_MINOR_PCM + idx */, pcm);
 	}
 	snd_pcm_devices[idx] = NULL;
 	snd_pcm_lock(1);

@@ -37,142 +37,13 @@ choice 'ARM system type' \
  	 SA1100-based		CONFIG_ARCH_SA1100 \
 	 Shark			CONFIG_ARCH_SHARK" RiscPC
 
-mainmenu_option next_comment
-comment 'Archimedes/A5000 Implementations'
-# These architectures will be combined.  However, until this
-# is complete...  Note that the ARC will take precedence over
-# A5K
-comment 'Archimedes/A5000 Implementations (select only ONE)'
-dep_bool '  Archimedes' CONFIG_ARCH_ARC $CONFIG_ARCH_ARCA5K
-dep_bool '  A5000' CONFIG_ARCH_A5K $CONFIG_ARCH_ARCA5K
-endmenu
-
-mainmenu_option next_comment
-comment 'Footbridge Implementations'
-dep_bool '  CATS' CONFIG_ARCH_CATS $CONFIG_ARCH_FOOTBRIDGE
-dep_bool '  Compaq Personal Server' CONFIG_ARCH_PERSONAL_SERVER $CONFIG_ARCH_FOOTBRIDGE
-dep_bool '  EBSA285 (addin mode)' CONFIG_ARCH_EBSA285_ADDIN $CONFIG_ARCH_FOOTBRIDGE
-dep_bool '  EBSA285 (host mode)' CONFIG_ARCH_EBSA285_HOST $CONFIG_ARCH_FOOTBRIDGE
-dep_bool '  NetWinder' CONFIG_ARCH_NETWINDER $CONFIG_ARCH_FOOTBRIDGE
-endmenu
-
-mainmenu_option next_comment
-comment 'SA11x0 Implementations'
-dep_bool '  Assabet' CONFIG_SA1100_ASSABET $CONFIG_ARCH_SA1100
-dep_bool '    Include support for Neponset' CONFIG_ASSABET_NEPONSET $CONFIG_SA1100_ASSABET
-dep_bool '  ADS Bitsy' CONFIG_SA1100_ADSBITSY $CONFIG_ARCH_SA1100
-dep_bool '  Brutus' CONFIG_SA1100_BRUTUS $CONFIG_ARCH_SA1100
-dep_bool '  CerfBoard' CONFIG_SA1100_CERF $CONFIG_ARCH_SA1100
-if [ "$CONFIG_SA1100_CERF" = "y" ]; then
-   choice 'Cerf Flash available'  \
-        "8MB    CONFIG_SA1100_CERF_FLASH_8MB \
-         16MB   CONFIG_SA1100_CERF_FLASH_16MB \
-         32MB   CONFIG_SA1100_CERF_FLASH_32MB" 8MB
-   bool 'Cerf w/CPLD support (CerfPDA)' CONFIG_SA1100_CERF_CPLD
-fi
-dep_bool '  Compaq iPAQ H3100' CONFIG_SA1100_H3100 $CONFIG_ARCH_SA1100
-dep_bool '  Compaq iPAQ H3600/H3700' CONFIG_SA1100_H3600 $CONFIG_ARCH_SA1100
-dep_bool '  Compaq iPAQ H3800' CONFIG_SA1100_H3800 $CONFIG_ARCH_SA1100
-if [ "$CONFIG_SA1100_H3100" = "y" -o "$CONFIG_SA1100_H3600" = "y" -o "$CONFIG_SA1100_H3800" = "y" ]; then
-  define_bool CONFIG_SA1100_H3XXX y
-else
-  define_bool CONFIG_SA1100_H3XXX n
-fi
-#dep_bool '  Empeg' CONFIG_SA1100_EMPEG $CONFIG_ARCH_SA1100
-dep_bool '  Extenex HandHeld Theater (Squashtail)' CONFIG_SA1100_EXTENEX1 $CONFIG_ARCH_SA1100
-if [ "$CONFIG_SA1100_EXTENEX1" = "y" ]; then
-   bool '    Support 16 MB of DRAM (not just 8)' CONFIG_SA1100_EXTENEX1_16MB
-fi
-dep_bool '  FlexaNet' CONFIG_SA1100_FLEXANET $CONFIG_ARCH_SA1100
-dep_bool '  FreeBird-v1.1' CONFIG_SA1100_FREEBIRD $CONFIG_ARCH_SA1100
-dep_bool '  GraphicsClient Plus' CONFIG_SA1100_GRAPHICSCLIENT $CONFIG_ARCH_SA1100
-dep_bool '  GraphicsMaster' CONFIG_SA1100_GRAPHICSMASTER $CONFIG_ARCH_SA1100
-dep_bool '  HP Labs BadgePAD 4' CONFIG_SA1100_BADGE4 $CONFIG_ARCH_SA1100
-dep_bool '  HP Jornada 720' CONFIG_SA1100_JORNADA720 $CONFIG_ARCH_SA1100
-dep_bool '  HuW WebPanel' CONFIG_SA1100_HUW_WEBPANEL $CONFIG_ARCH_SA1100
-dep_bool '  Itsy' CONFIG_SA1100_ITSY $CONFIG_ARCH_SA1100
-dep_bool '  LART' CONFIG_SA1100_LART $CONFIG_ARCH_SA1100
-dep_bool '  nanoEngine' CONFIG_SA1100_NANOENGINE $CONFIG_ARCH_SA1100
-dep_bool '  OmniMeter' CONFIG_SA1100_OMNIMETER $CONFIG_ARCH_SA1100
-dep_bool '  Pangolin' CONFIG_SA1100_PANGOLIN $CONFIG_ARCH_SA1100
-dep_bool '  PLEB' CONFIG_SA1100_PLEB $CONFIG_ARCH_SA1100
-dep_bool '  PT System 3' CONFIG_SA1100_PT_SYSTEM3 $CONFIG_ARCH_SA1100
-dep_bool '  Shannon' CONFIG_SA1100_SHANNON $CONFIG_ARCH_SA1100
-dep_bool '  Sherman' CONFIG_SA1100_SHERMAN $CONFIG_ARCH_SA1100
-dep_bool '  Simpad' CONFIG_SA1100_SIMPAD $CONFIG_ARCH_SA1100
-dep_bool '  Tulsa' CONFIG_SA1100_PFS168 $CONFIG_ARCH_SA1100
-dep_bool '  Victor' CONFIG_SA1100_VICTOR $CONFIG_ARCH_SA1100
-dep_bool '  XP860' CONFIG_SA1100_XP860 $CONFIG_ARCH_SA1100
-dep_bool '  Yopy' CONFIG_SA1100_YOPY $CONFIG_ARCH_SA1100
-dep_bool '  Stork' CONFIG_SA1100_STORK $CONFIG_ARCH_SA1100
-
-# Determine if SA1111 support is required
-if [ "$CONFIG_ASSABET_NEPONSET" = "y" -o \
-     "$CONFIG_SA1100_JORNADA720" = "y" -o \
-     "$CONFIG_SA1100_PFS168" = "y" -o \
-     "$CONFIG_SA1100_XP860" = "y" -o \
-     "$CONFIG_SA1100_GRAPHICSMASTER" = "y" -o \
-     "$CONFIG_SA1100_PT_SYSTEM3" = "y" -o \
-     "$CONFIG_SA1100_ADSBITSY" = "y" -o \
-     "$CONFIG_SA1100_BADGE4" = "y" ]; then
-   define_bool CONFIG_SA1111 y
-   define_int CONFIG_FORCE_MAX_ZONEORDER 9
-fi
-
-dep_tristate 'SA1100 USB function support' CONFIG_SA1100_USB $CONFIG_ARCH_SA1100
-dep_tristate '  Support for SA11x0 USB network link function' CONFIG_SA1100_USB_NETLINK $CONFIG_SA1100_USB
-dep_tristate '  Support for SA11x0 USB character device emulation' CONFIG_SA1100_USB_CHAR $CONFIG_SA1100_USB
-
-dep_tristate 'Compaq iPAQ Handheld sleeve support' CONFIG_H3600_SLEEVE $CONFIG_SA1100_H3600
-endmenu
-
-mainmenu_option next_comment
-comment 'Intel PXA250/210 Implementations'
-dep_bool '  Intel DBPXA250 Development Platform' CONFIG_ARCH_LUBBOCK $CONFIG_ARCH_PXA
-dep_bool '  Accelent Xscale IDP' CONFIG_ARCH_PXA_IDP $CONFIG_ARCH_PXA
-
-if [ "$CONFIG_ARCH_LUBBOCK" = "y" ]; then
-   define_bool CONFIG_SA1111 y
-fi
-endmenu
-
-mainmenu_option next_comment
-comment 'CLPS711X/EP721X Implementations'
-dep_bool '  AUTCPU12' CONFIG_ARCH_AUTCPU12 $CONFIG_ARCH_CLPS711X
-dep_bool '  CDB89712' CONFIG_ARCH_CDB89712 $CONFIG_ARCH_CLPS711X
-dep_bool '  CLEP7312' CONFIG_ARCH_CLEP7312 $CONFIG_ARCH_CLPS711X
-dep_bool '  EDB7211' CONFIG_ARCH_EDB7211 $CONFIG_ARCH_CLPS711X
-dep_bool '  P720T' CONFIG_ARCH_P720T $CONFIG_ARCH_CLPS711X
-dep_bool '  FORTUNET' CONFIG_ARCH_FORTUNET $CONFIG_ARCH_CLPS711X
-
-# XXX Maybe these should indicate register compatibility
-# instead of being mutually exclusive.
-if [ "$CONFIG_ARCH_EDB7211" = "y" ]; then
-   define_bool CONFIG_ARCH_EP7211 y
-else
-   define_bool CONFIG_ARCH_EP7211 n
-fi
-if [ "$CONFIG_ARCH_P720T" = "y" ]; then
-   define_bool CONFIG_ARCH_EP7212 y
-else
-   define_bool CONFIG_ARCH_EP7212 n
-fi
-
-if [ "$CONFIG_ARCH_EP7211" = "y" -o \
-     "$CONFIG_ARCH_EP7212" = "y" ]; then
-   bool '  EP72xx ROM boot' CONFIG_EP72XX_ROM_BOOT
-fi
-endmenu
-
-mainmenu_option next_comment
-comment 'IOP310 Implementation Options'
-dep_bool '  IQ80310' CONFIG_ARCH_IQ80310 $CONFIG_ARCH_IOP310
-comment 'IOP310 Chipset Features'
-dep_bool 'Support Intel 80312 Application Accelerator Unit (EXPERIMENTAL)' CONFIG_IOP310_AAU $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
-dep_bool 'Support Intel 80312 DMA (EXPERIMENTAL)' CONFIG_IOP310_DMA $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
-dep_bool 'Support Intel 80312 Messaging Unit (EXPERIMENTAL)' CONFIG_IOP310_MU $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
-dep_bool 'Support Intel 80312 Performance Monitor (EXPERIMENTAL)' CONFIG_IOP310_PMON $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
-endmenu
+source arch/arm/mach-arc/Config.in
+source arch/arm/mach-clps711x/Config.in
+source arch/arm/mach-epxa10db/Config.in
+source arch/arm/mach-footbridge/Config.in
+source arch/arm/mach-iop310/Config.in
+source arch/arm/mach-pxa/Config.in
+source arch/arm/mach-sa1100/Config.in
 
 # Definitions to make life easier
 if [ "$CONFIG_ARCH_ARCA5K" = "y" -o \
@@ -182,7 +53,8 @@ else
    define_bool CONFIG_ARCH_ACORN n
 fi
 
-# see Documentation/arm/ConfigVars for a description of these
+#####################################################################
+# Footbridge support
 if [ "$CONFIG_ARCH_CO285" = "y" -o \
      "$CONFIG_ARCH_FOOTBRIDGE" = "y" ]; then
    define_bool CONFIG_FOOTBRIDGE y
@@ -208,42 +80,31 @@ if [ "$CONFIG_ARCH_EBSA285_HOST" = "y" -o \
    define_bool CONFIG_ARCH_EBSA285 y
 fi
 
-# Figure out whether this system uses 26-bit or 32-bit CPUs.
-if [ "$CONFIG_ARCH_ARCA5K" = "y" ]; then
-   define_bool CONFIG_CPU_32 n
-   define_bool CONFIG_CPU_26 y
-   bool '2MB physical memory' CONFIG_PAGESIZE_16
-else
-   define_bool CONFIG_CPU_32 y
-   define_bool CONFIG_CPU_26 n
+#####################################################################
+# SA1111 support
+if [ "$CONFIG_ASSABET_NEPONSET" = "y" -o \
+     "$CONFIG_SA1100_ADSBITSY" = "y" -o \
+     "$CONFIG_SA1100_BADGE4" = "y" -o \
+     "$CONFIG_SA1100_CONSUS" = "y" -o \
+     "$CONFIG_SA1100_GRAPHICSMASTER" = "y" -o \
+     "$CONFIG_SA1100_JORNADA720" = "y" -o \
+     "$CONFIG_ARCH_LUBBOCK" = "y" -o \
+     "$CONFIG_SA1100_PFS168" = "y" -o \
+     "$CONFIG_SA1100_PT_SYSTEM3" = "y" -o \
+     "$CONFIG_SA1100_XP860" = "y" ]; then
+   define_bool CONFIG_SA1111 y
+   define_int CONFIG_FORCE_MAX_ZONEORDER 9
 fi
 
 comment 'Processor Type'
 
-# Firstly, figure out what processor architecture version we should be using.
-# This defines the compiler instruction set which depends on the machine type.
-
-if [ "$CONFIG_ARCH_RPC"        = "y" -o "$CONFIG_ARCH_CLPS7500" = "y" ]; then
-   define_bool CONFIG_CPU_32v3 y
+# Figure out whether this system uses 26-bit or 32-bit CPUs.
+if [ "$CONFIG_ARCH_ARCA5K" = "y" ]; then
+   define_bool CONFIG_CPU_32 n
+   define_bool CONFIG_CPU_26 y
 else
-   define_bool CONFIG_CPU_32v3 n
-fi
-if [ "$CONFIG_ARCH_EBSA110"    = "y" -o "$CONFIG_FOOTBRIDGE"    = "y" -o \
-     "$CONFIG_ARCH_TBOX"       = "y" -o "$CONFIG_ARCH_SHARK"    = "y" -o \
-     "$CONFIG_ARCH_NEXUSPCI"   = "y" -o "$CONFIG_ARCH_CLPS711X" = "y" -o \
-     "$CONFIG_ARCH_INTEGRATOR" = "y" -o "$CONFIG_ARCH_SA1100"   = "y" -o \
-     "$CONFIG_ARCH_L7200"      = "y" -o "$CONFIG_ARCH_ANAKIN"	= "y" -o \
-     "$CONFIG_ARCH_CAMELOT"    = "y" ]; then
-   define_bool CONFIG_CPU_32v4 y
-else
-   define_bool CONFIG_CPU_32v4 n
-fi
-if [ "$CONFIG_ARCH_IOP310" = "y" -o \
-     "$CONFIG_ARCH_ADIFCC" = "y" -o \
-     "$CONFIG_ARCH_PXA" = "y" ]; then
-   define_bool CONFIG_CPU_32v5 y
-else
-   define_bool CONFIG_CPU_32v5 n
+   define_bool CONFIG_CPU_32 y
+   define_bool CONFIG_CPU_26 n
 fi
 
 # Select CPU types depending on the architecture selected.  This selects
@@ -338,14 +199,30 @@ else
    define_bool CONFIG_CPU_XSCALE n
 fi
 
-#if [ "$CONFIG_CPU_XSCALE" = "y" ]; then
-#  bool 'Use XScale PMU as timer source' CONFIG_XSCALE_PMU_TIMER
-#fi
+# Figure out what processor architecture version we should be using.
+# This defines the compiler instruction set which depends on the machine type.
 
-if [ "$CONFIG_CPU_XSCALE" = "y" -a "$CONFIG_XSCALE_PMU_TIMER" != "y" ]; then
-   define_bool CONFIG_XSCALE_PMU y
+if [ "$CONFIG_ARCH_RPC"        = "y" -o "$CONFIG_ARCH_CLPS7500" = "y" ]; then
+   define_bool CONFIG_CPU_32v3 y
 else
-   define_bool CONFIG_XSCALE_PMU n
+   define_bool CONFIG_CPU_32v3 n
+fi
+if [ "$CONFIG_ARCH_EBSA110"    = "y" -o "$CONFIG_FOOTBRIDGE"    = "y" -o \
+     "$CONFIG_ARCH_TBOX"       = "y" -o "$CONFIG_ARCH_SHARK"    = "y" -o \
+     "$CONFIG_ARCH_NEXUSPCI"   = "y" -o "$CONFIG_ARCH_CLPS711X" = "y" -o \
+     "$CONFIG_ARCH_INTEGRATOR" = "y" -o "$CONFIG_ARCH_SA1100"   = "y" -o \
+     "$CONFIG_ARCH_L7200"      = "y" -o "$CONFIG_ARCH_ANAKIN"	= "y" -o \
+     "$CONFIG_ARCH_CAMELOT"    = "y" ]; then
+   define_bool CONFIG_CPU_32v4 y
+else
+   define_bool CONFIG_CPU_32v4 n
+fi
+if [ "$CONFIG_ARCH_IOP310" = "y" -o \
+     "$CONFIG_ARCH_ADIFCC" = "y" -o \
+     "$CONFIG_ARCH_PXA" = "y" ]; then
+   define_bool CONFIG_CPU_32v5 y
+else
+   define_bool CONFIG_CPU_32v5 n
 fi
 
 comment 'Processor Features'
@@ -370,6 +247,15 @@ if [ "$CONFIG_CPU_ARM926T" = "y" -o "$CONFIG_CPU_ARM1020" = "y" ]; then
 fi
 if [ "$CONFIG_CPU_ARM1020" = "y" ]; then
    bool 'Disable branch prediction' CONFIG_CPU_BPREDICT_DISABLE
+fi
+
+if [ "$CONFIG_CPU_XSCALE" = "y" ]; then
+#  bool 'Use XScale PMU as timer source' CONFIG_XSCALE_PMU_TIMER
+   if [ "$CONFIG_XSCALE_PMU_TIMER" != "y" ]; then
+      define_bool CONFIG_XSCALE_PMU y
+   else
+      define_bool CONFIG_XSCALE_PMU n
+   fi
 fi
 
 endmenu
@@ -494,9 +380,9 @@ if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
 	   "$CONFIG_ARCH_SHARK" = "y" -o      \
 	   "$CONFIG_ARCH_CO285" = "y" -o      \
 	   "$CONFIG_ARCH_SA1100" = "y" -o     \
-          "$CONFIG_ARCH_LUBBOCK" = "y" -o    \
+	   "$CONFIG_ARCH_LUBBOCK" = "y" -o    \
 	   "$CONFIG_ARCH_PXA_IDP" = "y" -o    \
-           "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
+	   "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
 	   "$CONFIG_ARCH_P720T" = "y" ]; then
          bool '  Timer LED' CONFIG_LEDS_TIMER
          bool '  CPU usage LED' CONFIG_LEDS_CPU
@@ -601,31 +487,6 @@ source fs/Config.in
 if [ "$CONFIG_VT" = "y" ]; then
    mainmenu_option next_comment
    comment 'Console drivers'
-   # Select the keyboard type for this architecture.
-   if [ "$CONFIG_FOOTBRIDGE_HOST" = "y" -o \
-        "$CONFIG_ARCH_CLPS7500" = "y" -o   \
-        "$CONFIG_ARCH_SHARK" = "y" ]; then
-      define_bool CONFIG_PC_KEYB y
-   fi
-   if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
-      define_bool CONFIG_KMI_KEYB y
-      define_bool CONFIG_KMI_MOUSE y
-   fi
-   if [ "$CONFIG_ARCH_L7200" = "y" ]; then
-      define_bool CONFIG_L7200_KEYB y
-   fi
-
-   # Do we use the PC-type keyboard map?
-   if [ "$CONFIG_FOOTBRIDGE_HOST" = "y" -o \
-        "$CONFIG_ARCH_SHARK" = "y" -o      \
-        "$CONFIG_ARCH_SA1100" = "y" -o     \
-        "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
-        "$CONFIG_ARCH_TBOX" = "y" -o       \
-        "$CONFIG_ARCH_CLPS7500" = "y" -o   \
-        "$CONFIG_ARCH_P720T" = "y" -o      \
-        "$CONFIG_ARCH_ANAKIN" = "y" ]; then
-      define_bool CONFIG_PC_KEYMAP y
-   fi
    if [ "$CONFIG_ARCH_ACORN" != "y" -a "$CONFIG_ARCH_EBSA110" != "y" ]; then
       bool 'VGA text console' CONFIG_VGA_CONSOLE
    fi

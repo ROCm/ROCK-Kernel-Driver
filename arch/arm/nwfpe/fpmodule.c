@@ -42,10 +42,8 @@
 #include "fpa11.inl"
 
 /* kernel symbols required for signal handling */
-typedef struct task_struct*	PTASK;
-
 #ifdef MODULE
-void fp_send_sig(unsigned long sig, PTASK p, int priv);
+void fp_send_sig(unsigned long sig, struct task_struct *p, int priv);
 #if LINUX_VERSION_CODE > 0x20115
 MODULE_AUTHOR("Scott Bambrough <scottb@rebel.com>");
 MODULE_DESCRIPTION("NWFPE floating point emulator");
@@ -63,9 +61,11 @@ void fp_setup(void);
 
 /* external declarations for saved kernel symbols */
 extern void (*kern_fp_enter)(void);
+extern void (*fp_init)(union fp_state *);
 
 /* Original value of fp_enter from kernel before patched by fpe_init. */ 
 static void (*orig_fp_enter)(void);
+static void (*orig_fp_init)(union fp_state *);
 
 /* forward declarations */
 extern void nwfpe_enter(void);
@@ -108,7 +108,9 @@ static int __init fpe_init(void)
 
   /* Save pointer to the old FP handler and then patch ourselves in */
   orig_fp_enter = kern_fp_enter;
+  orig_fp_init = fp_init;
   kern_fp_enter = nwfpe_enter;
+  fp_init = nwfpe_init;
 
   return 0;
 }
@@ -117,6 +119,7 @@ static void __exit fpe_exit(void)
 {
   /* Restore the values we saved earlier. */
   kern_fp_enter = orig_fp_enter;
+  fp_init = orig_fp_init;
 }
 
 /*

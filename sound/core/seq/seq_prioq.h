@@ -41,7 +41,7 @@ extern prioq_t *snd_seq_prioq_new(void);
 extern void snd_seq_prioq_delete(prioq_t **fifo);
 
 /* enqueue cell to prioq */
-extern void snd_seq_prioq_cell_in(prioq_t *f, snd_seq_event_cell_t *cell);
+extern int snd_seq_prioq_cell_in(prioq_t *f, snd_seq_event_cell_t *cell);
 
 /* dequeue cell from prioq */ 
 extern snd_seq_event_cell_t *snd_seq_prioq_cell_out(prioq_t *f);

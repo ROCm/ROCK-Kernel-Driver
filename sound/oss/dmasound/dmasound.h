@@ -166,6 +166,7 @@ struct sound_settings {
     int treble;
     int gain;
     int minDev;		/* minor device number currently open */
+    spinlock_t lock;
 };
 
 extern struct sound_settings dmasound;

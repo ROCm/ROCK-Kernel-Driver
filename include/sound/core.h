@@ -243,8 +243,10 @@ void snd_hidden_vfree(void *obj);
 #define kfree_nocheck(obj) snd_wrapper_kfree(obj)
 #define vmalloc(size) snd_hidden_vmalloc(size)
 #define vfree(obj) snd_hidden_vfree(obj)
+#define vfree_nocheck(obj) snd_wrapper_vfree(obj)
 #else
 #define kfree_nocheck(obj) kfree(obj)
+#define vfree_nocheck(obj) vfree(obj)
 #endif
 void *snd_kcalloc(size_t size, int flags);
 char *snd_kmalloc_strdup(const char *string, int flags);

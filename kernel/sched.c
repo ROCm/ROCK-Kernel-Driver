@@ -29,6 +29,7 @@
 #include <linux/security.h>
 #include <linux/notifier.h>
 #include <linux/delay.h>
+#include <linux/timer.h>
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -860,6 +861,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
 
+	run_local_timers();
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
@@ -1161,6 +1163,7 @@ void complete(struct completion *x)
 
 void wait_for_completion(struct completion *x)
 {
+	might_sleep();
 	spin_lock_irq(&x->wait.lock);
 	if (!x->done) {
 		DECLARE_WAITQUEUE(wait, current);
@@ -2101,10 +2104,7 @@ __init int migration_init(void)
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 #endif
 
-extern void init_timervecs(void);
-extern void timer_bh(void);
-extern void tqueue_bh(void);
-extern void immediate_bh(void);
+extern void init_timers(void);
 
 void __init sched_init(void)
 {
@@ -2140,10 +2140,7 @@ void __init sched_init(void)
 	set_task_cpu(current, smp_processor_id());
 	wake_up_process(current);
 
-	init_timervecs();
-	init_bh(TIMER_BH, timer_bh);
-	init_bh(TQUEUE_BH, tqueue_bh);
-	init_bh(IMMEDIATE_BH, immediate_bh);
+	init_timers();
 
 	/*
 	 * The boot idle thread does lazy MMU switching as well:
@@ -2162,7 +2159,7 @@ void __might_sleep(char *file, int line)
 		if (time_before(jiffies, prev_jiffy + HZ))
 			return;
 		prev_jiffy = jiffies;
-		printk("Sleeping function called from illegal"
+		printk(KERN_ERR "Debug: sleeping function called from illegal"
 				" context at %s:%d\n", file, line);
 		dump_stack();
 	}

@@ -8,9 +8,6 @@ umsdos-objs := dir.o  inode.o ioctl.o mangle.o namei.o rdir.o emd.o
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f core *.o *.a *.s
-
 p:
 	proto *.c >/usr/include/linux/umsdos_fs.p
 

@@ -5,8 +5,11 @@ CONFIG_SND_CS46XX
   Say 'Y' or 'M' to include support for Cirrus Logic CS4610 / CS4612 /
   CS4614 / CS4615 / CS4622 / CS4624 / CS4630 / CS4280 chips.
 
-CONFIG_SND_CS46XX_ACCEPT_VALID
-  Say 'Y' to allow sample resolution for mmap() transfers.
+CONFIG_SND_CS46XX_NEW_DSP
+  Say 'Y' to use a new DSP image for SPDIF and dual codecs.
+
+CONFIG_SND_CS4281
+  Say 'Y' or 'M' to include support for Cirrus Logic CS4281.
 
 CONFIG_SND_EMU10K1
   Say 'Y' or 'M' to include support for Sound Blaster PCI 512, Live!,
@@ -35,6 +38,8 @@ CONFIG_SND_HDSP
   soundcards.
 
 CONFIG_SND_TRIDENT
+  Say 'Y' or 'M' to include support for Trident 4D-Wave DX/NX and
+  SiS 7018 soundcards.
 
 CONFIG_SND_YMFPCI
   Say 'Y' or 'M' to include support for Yamaha PCI audio chips - 
@@ -71,7 +76,8 @@ CONFIG_SND_ICE1712
   Say 'Y' or 'M' to include support for ICE1712 (Envy24) based soundcards.
 
 CONFIG_SND_INTEL8X0
-  Say 'Y' or 'M' to include support for Intel8x0 based soundcards.
+  Say 'Y' or 'M' to include support for Intel8x0 based soundcards,
+  SiS 7012, AMD768/8111 and NVidia NForce chips.
 
 CONFIG_SND_SONICVIBES
   Say 'Y' or 'M' to include support for S3 SonicVibes based soundcards.

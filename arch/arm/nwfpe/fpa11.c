@@ -34,7 +34,7 @@ unsigned int EmulateCPDT(const unsigned int);
 unsigned int EmulateCPRT(const unsigned int);
 
 /* Reset the FPA11 chip.  Called to initialize and reset the emulator. */
-void resetFPA11(void)
+static void resetFPA11(void)
 {
   int i;
   FPA11 *fpa11 = GET_FPA11();
@@ -126,16 +126,14 @@ void SetRoundingPrecision(const unsigned int opcode)
   }
 }
 
-void FPA11_CheckInit(void)
+void nwfpe_init(union fp_state *fp)
 {
-  FPA11 *fpa11 = GET_FPA11();
-  if (unlikely(fpa11->initflag == 0))
-  {
-    resetFPA11();
-    SetRoundingMode(ROUND_TO_NEAREST);
-    SetRoundingPrecision(ROUND_EXTENDED);
-    fpa11->initflag = 1;
-  }
+  FPA11 *fpa11 = (FPA11 *)fp;
+  memset(fpa11, 0, sizeof(FPA11));
+  resetFPA11();
+  SetRoundingMode(ROUND_TO_NEAREST);
+  SetRoundingPrecision(ROUND_EXTENDED);
+  fpa11->initflag = 1;
 }
 
 /* Emulate the instruction in the opcode. */

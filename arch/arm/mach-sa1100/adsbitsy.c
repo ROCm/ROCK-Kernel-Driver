@@ -69,7 +69,7 @@ static int __init adsbitsy_init(void)
 	return 0;
 }
 
-__initcall(adsbitsy_init);
+arch_initcall(adsbitsy_init);
 
 static void __init adsbitsy_init_irq(void)
 {

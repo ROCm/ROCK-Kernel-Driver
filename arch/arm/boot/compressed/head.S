@@ -19,6 +19,13 @@
  */
 #ifdef DEBUG
 #if defined(CONFIG_DEBUG_DC21285_PORT)
+		.macro	loadsp, rb
+		mov	\rb, #0x42000000
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0x160]
+		.endm
+#elif defined(CONFIG_FOOTBRIDGE)
 		.macro	loadsp,	rb
 		mov	\rb, #0x7c000000
 		.endm
@@ -36,6 +43,14 @@
 #elif defined(CONFIG_ARCH_INTEGRATOR)
 		.macro	loadsp, rb
 		mov	\rb, #0x16000000
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3, #0]
+		.endm
+#elif defined(CONFIG_ARCH_PXA) /* Xscale-type */
+		.macro 	loadsp, rb
+		mov	\rb, #0x40000000
+		orr	\rb, \rb, #0x00100000
 		.endm
 		.macro	writeb, rb
 		strb	\rb, [r3, #0]

@@ -21,7 +21,6 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define	SLAB_ATOMIC		GFP_ATOMIC
 #define	SLAB_USER		GFP_USER
 #define	SLAB_KERNEL		GFP_KERNEL
-#define	SLAB_NFS		GFP_NFS
 #define	SLAB_DMA		GFP_DMA
 
 #define SLAB_LEVEL_MASK		(__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_HIGHIO|__GFP_FS)

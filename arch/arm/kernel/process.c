@@ -177,9 +177,9 @@ void show_regs(struct pt_regs * regs)
 		flags & PSR_Z_BIT ? 'Z' : 'z',
 		flags & PSR_C_BIT ? 'C' : 'c',
 		flags & PSR_V_BIT ? 'V' : 'v');
-	printk("  IRQs %s  FIQs %s  Mode %s%s  Segment %s\n",
-		interrupts_enabled(regs) ? "on" : "off",
-		fast_interrupts_enabled(regs) ? "on" : "off",
+	printk("  IRQs o%s  FIQs o%s  Mode %s%s  Segment %s\n",
+		interrupts_enabled(regs) ? "n" : "ff",
+		fast_interrupts_enabled(regs) ? "n" : "ff",
 		processor_modes[processor_mode(regs)],
 		thumb_mode(regs) ? " (T)" : "",
 		get_fs() == get_ds() ? "kernel" : "user");
@@ -293,15 +293,22 @@ void exit_thread(void)
 {
 }
 
+static void default_fp_init(union fp_state *fp)
+{
+	memset(fp, 0, sizeof(union fp_state));
+}
+
+void (*fp_init)(union fp_state *) = default_fp_init;
+
 void flush_thread(void)
 {
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = current;
 
-	memset(&tsk->thread.debug, 0, sizeof(struct debug_info));
-	memset(&thread->fpstate, 0, sizeof(union fp_state));
+	tsk->used_math = 0;
 
-	current->used_math = 0;
+	memset(&tsk->thread.debug, 0, sizeof(struct debug_info));
+	fp_init(&thread->fpstate);
 }
 
 void release_thread(struct task_struct *dead_task)

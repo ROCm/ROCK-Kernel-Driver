@@ -146,20 +146,15 @@ static inline int compare_timestamp_rel(snd_seq_event_t *a, snd_seq_event_t *b)
 }
 
 /* enqueue cell to prioq */
-void snd_seq_prioq_cell_in(prioq_t * f, snd_seq_event_cell_t * cell)
+int snd_seq_prioq_cell_in(prioq_t * f, snd_seq_event_cell_t * cell)
 {
 	snd_seq_event_cell_t *cur, *prev;
 	unsigned long flags;
+	int count;
 	int prior;
 
-	if (f == NULL) {
-		snd_printd("oops: snd_seq_prioq_cell_in() called with NULL prioq\n");
-		return;
-	}
-	if (cell == NULL) {
-		snd_printd("oops: snd_seq_prioq_cell_in() called with NULL cell\n");
-		return;
-	}
+	snd_assert(f, return -EINVAL);
+	snd_assert(cell, return -EINVAL);
 	
 	/* check flags */
 	prior = (cell->event.flags & SNDRV_SEQ_PRIORITY_MASK);
@@ -177,7 +172,7 @@ void snd_seq_prioq_cell_in(prioq_t * f, snd_seq_event_cell_t * cell)
 			cell->next = NULL;
 			f->cells++;
 			spin_unlock_irqrestore(&f->lock, flags);
-			return;
+			return 0;
 		}
 	}
 	/* traverse list of elements to find the place where the new cell is
@@ -186,6 +181,7 @@ void snd_seq_prioq_cell_in(prioq_t * f, snd_seq_event_cell_t * cell)
 	prev = NULL;		/* previous cell */
 	cur = f->head;		/* cursor */
 
+	count = 10000; /* FIXME: enough big, isn't it? */
 	while (cur != NULL) {
 		/* compare timestamps */
 		int rel = compare_timestamp_rel(&cell->event, &cur->event);
@@ -199,6 +195,11 @@ void snd_seq_prioq_cell_in(prioq_t * f, snd_seq_event_cell_t * cell)
 		/* move cursor to next cell */
 		prev = cur;
 		cur = cur->next;
+		if (! --count) {
+			spin_unlock_irqrestore(&f->lock, flags);
+			snd_printk(KERN_ERR "cannot find a pointer.. infinite loop?\n");
+			return -EINVAL;
+		}
 	}
 
 	/* insert it before cursor */
@@ -212,6 +213,7 @@ void snd_seq_prioq_cell_in(prioq_t * f, snd_seq_event_cell_t * cell)
 		f->tail = cell;
 	f->cells++;
 	spin_unlock_irqrestore(&f->lock, flags);
+	return 0;
 }
 
 /* dequeue cell from prioq */

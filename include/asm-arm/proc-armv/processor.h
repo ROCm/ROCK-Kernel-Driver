@@ -36,7 +36,9 @@
 		regs->ARM_cpsr = USR_MODE;				\
 	else								\
 		regs->ARM_cpsr = USR26_MODE;				\
-	regs->ARM_pc = pc;		/* pc */			\
+	if (elf_hwcap & HWCAP_THUMB && pc & 1)				\
+		regs->ARM_cpsr |= PSR_T_BIT;				\
+	regs->ARM_pc = pc & ~1;		/* pc */			\
 	regs->ARM_sp = sp;		/* sp */			\
 	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
 	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\

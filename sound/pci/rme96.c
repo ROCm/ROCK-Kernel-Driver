@@ -33,6 +33,7 @@
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/asoundef.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
@@ -436,7 +437,8 @@ static snd_pcm_hardware_t snd_rme96_playback_adat_info =
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
-	formats:             SNDRV_PCM_FMTBIT_S16_LE,
+	formats:	     (SNDRV_PCM_FMTBIT_S16_LE |
+			      SNDRV_PCM_FMTBIT_S32_LE),
 	rates:	             (SNDRV_PCM_RATE_44100 | 
 			      SNDRV_PCM_RATE_48000),
 	rate_min:            44100,
@@ -460,7 +462,8 @@ static snd_pcm_hardware_t snd_rme96_capture_adat_info =
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
-	formats:             SNDRV_PCM_FMTBIT_S16_LE,
+	formats:	     (SNDRV_PCM_FMTBIT_S16_LE |
+			      SNDRV_PCM_FMTBIT_S32_LE),
 	rates:	             (SNDRV_PCM_RATE_44100 | 
 			      SNDRV_PCM_RATE_48000),
 	rate_min:            44100,

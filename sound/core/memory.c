@@ -439,7 +439,7 @@ int copy_to_user_fromio(void *dst, unsigned long src, size_t count)
 		size_t c = count;
 		if (c > sizeof(buf))
 			c = sizeof(buf);
-		memcpy_fromio(buf, src, c);
+		memcpy_fromio(buf, (void*)src, c);
 		if (copy_to_user(dst, buf, c))
 			return -EFAULT;
 		count -= c;
@@ -462,7 +462,7 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
 			c = sizeof(buf);
 		if (copy_from_user(buf, src, c))
 			return -EFAULT;
-		memcpy_toio(dst, buf, c);
+		memcpy_toio((void*)dst, buf, c);
 		count -= c;
 		dst += c;
 		src += c;
@@ -484,7 +484,7 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
  */
 #ifdef __i386__
 #define get_phys_addr(x) virt_to_phys(x)
-#else /* ppc */
+#else /* ppc and x86-64 */
 #define get_phys_addr(x) virt_to_bus(x)
 #endif
 void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,

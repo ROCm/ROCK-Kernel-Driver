@@ -18,7 +18,7 @@ snd-es968-objs := es968.o
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS100) += snd-sb16-dsp.o snd-sb-common.o
 obj-$(CONFIG_SND_CMI8330) += snd-sb16-dsp.o snd-sb-common.o
-obj-$(CONFIG_SND_DT0197H) += snd-sb16-dsp.o snd-sb-common.o
+obj-$(CONFIG_SND_DT019X) += snd-sb16-dsp.o snd-sb-common.o
 obj-$(CONFIG_SND_SB8) += snd-sb8.o snd-sb8-dsp.o snd-sb-common.o
 obj-$(CONFIG_SND_SB16) += snd-sb16.o snd-sb16-dsp.o snd-sb-common.o
 obj-$(CONFIG_SND_SBAWE) += snd-sbawe.o snd-sb16-dsp.o snd-sb-common.o

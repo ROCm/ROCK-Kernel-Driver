@@ -456,16 +456,16 @@ err_out:
 /* Mapping from our types to the kernel */
 
 static struct address_space_operations romfs_aops = {
-	readpage: romfs_readpage
+	.readpage = romfs_readpage
 };
 
 static struct file_operations romfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	romfs_readdir,
+	.read		= generic_read_dir,
+	.readdir	= romfs_readdir,
 };
 
 static struct inode_operations romfs_dir_inode_operations = {
-	lookup:		romfs_lookup,
+	.lookup		= romfs_lookup,
 };
 
 static mode_t romfs_modemap[] =
@@ -590,10 +590,10 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations romfs_ops = {
-	alloc_inode:	romfs_alloc_inode,
-	destroy_inode:	romfs_destroy_inode,
-	read_inode:	romfs_read_inode,
-	statfs:		romfs_statfs,
+	.alloc_inode	= romfs_alloc_inode,
+	.destroy_inode	= romfs_destroy_inode,
+	.read_inode	= romfs_read_inode,
+	.statfs		= romfs_statfs,
 };
 
 static struct super_block *romfs_get_sb(struct file_system_type *fs_type,
@@ -603,11 +603,11 @@ static struct super_block *romfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type romfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"romfs",
-	get_sb:		romfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "romfs",
+	.get_sb		= romfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_romfs_fs(void)

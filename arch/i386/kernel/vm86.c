@@ -440,10 +440,10 @@ int handle_vm86_trap(struct kernel_vm86_regs * regs, long error_code, int trapno
 		return 1; /* we let this handle by the calling routine */
 	if (current->ptrace & PT_PTRACED) {
 		unsigned long flags;
-		spin_lock_irqsave(&current->sigmask_lock, flags);
+		spin_lock_irqsave(&current->sig->siglock, flags);
 		sigdelset(&current->blocked, SIGTRAP);
 		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sigmask_lock, flags);
+		spin_unlock_irqrestore(&current->sig->siglock, flags);
 	}
 	send_sig(SIGTRAP, current, 1);
 	current->thread.trap_no = trapno;

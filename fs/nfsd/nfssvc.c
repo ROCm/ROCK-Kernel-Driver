@@ -186,10 +186,10 @@ nfsd(struct svc_rqst *rqstp)
 	 */
 	for (;;) {
 		/* Block all but the shutdown signals */
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 
 		/*
 		 * Find a socket with data available and call its
@@ -211,10 +211,10 @@ nfsd(struct svc_rqst *rqstp)
 		 */
 		rqstp->rq_client = exp_getclient(&rqstp->rq_addr);
 		/* Process request with signals blocked.  */
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		siginitsetinv(&current->blocked, ALLOWED_SIGS);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 
 		svc_process(serv, rqstp);
 

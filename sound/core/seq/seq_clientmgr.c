@@ -37,6 +37,9 @@
 #include "seq_info.h"
 #include "seq_system.h"
 #include <sound/seq_device.h>
+#if defined(CONFIG_SND_BIT32_EMUL) || defined(CONFIG_SND_BIT32_EMUL_MODULE)
+#include "../ioctl32/ioctl32.h"
+#endif
 
 /* Client Manager
 
@@ -1018,6 +1021,13 @@ static ssize_t snd_seq_write(struct file *file, const char *buf, size_t count, l
 			event.data.ext.len = extlen | SNDRV_SEQ_EXT_USRPTR;
 			event.data.ext.ptr = (char*)buf + sizeof(snd_seq_event_t);
 			len += extlen; /* increment data length */
+		} else {
+#if defined(CONFIG_SND_BIT32_EMUL) || defined(CONFIG_SND_BIT32_EMUL_MODULE)
+			if (client->convert32 && snd_seq_ev_is_varusr(&event)) {
+				void *ptr = (void*)A(event.data.raw32.d[1]);
+				event.data.ext.ptr = ptr;
+			}
+#endif
 		}
 
 		/* ok, enqueue it */
@@ -1091,6 +1101,43 @@ static int snd_seq_ioctl_system_info(client_t *client, unsigned long arg)
 	return 0;
 }
 
+
+/* RUNNING_MODE ioctl() */
+static int snd_seq_ioctl_running_mode(client_t *client, unsigned long arg)
+{
+	struct sndrv_seq_running_info info;
+	client_t *cptr;
+	int err = 0;
+
+	if (copy_from_user(&info, (void*)arg, sizeof(info)))
+		return -EFAULT;
+
+	/* requested client number */
+	cptr = snd_seq_client_use_ptr(info.client);
+	if (cptr == NULL)
+		return -ENOENT;		/* don't change !!! */
+
+#ifdef SNDRV_BIG_ENDIAN
+	if (! info.big_endian) {
+		err = -EINVAL;
+		goto __err;
+	}
+#else
+	if (info.big_endian) {
+		err = -EINVAL;
+		goto __err;
+	}
+
+#endif
+	if (info.cpu_mode > sizeof(long)) {
+		err = -EINVAL;
+		goto __err;
+	}
+	cptr->convert32 = (info.cpu_mode < sizeof(long));
+ __err:
+	snd_seq_client_unlock(cptr);
+	return err;
+}
 
 /* CLIENT_INFO ioctl() */
 static void get_client_info(client_t *cptr, snd_seq_client_info_t *info)
@@ -2042,6 +2089,7 @@ static struct seq_ioctl_table {
 	int (*func)(client_t *client, unsigned long arg);
 } ioctl_tables[] = {
 	{ SNDRV_SEQ_IOCTL_SYSTEM_INFO, snd_seq_ioctl_system_info },
+	{ SNDRV_SEQ_IOCTL_RUNNING_MODE, snd_seq_ioctl_running_mode },
 	{ SNDRV_SEQ_IOCTL_GET_CLIENT_INFO, snd_seq_ioctl_get_client_info },
 	{ SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, snd_seq_ioctl_set_client_info },
 	{ SNDRV_SEQ_IOCTL_CREATE_PORT, snd_seq_ioctl_create_port },

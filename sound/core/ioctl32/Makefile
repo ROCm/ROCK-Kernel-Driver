@@ -4,7 +4,7 @@
 #
 
 snd-ioctl32-objs := ioctl32.o pcm32.o rawmidi32.o timer32.o hwdep32.o
-ifeq ($(CONFIG_SND_SEQUENCER),y)
+ifneq ($(CONFIG_SND_SEQUENCER),n)
   snd-ioctl32-objs += seq32.o
 endif
 

@@ -310,7 +310,7 @@ static ssize_t pid_maps_read(struct file * file, char * buf,
 }
 
 static struct file_operations proc_maps_operations = {
-	read:		pid_maps_read,
+	.read		= pid_maps_read,
 };
 
 extern struct seq_operations mounts_op;
@@ -347,10 +347,10 @@ static int mounts_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_mounts_operations = {
-	open:		mounts_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	mounts_release,
+	.open		= mounts_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= mounts_release,
 };
 
 #define PROC_BLOCK_SIZE	(3*1024)		/* 4K page size but our output routines use some slack for overruns */
@@ -390,7 +390,7 @@ static ssize_t proc_info_read(struct file * file, char * buf,
 }
 
 static struct file_operations proc_info_file_operations = {
-	read:		proc_info_read,
+	.read		= proc_info_read,
 };
 
 #define MAY_PTRACE(p) \
@@ -509,13 +509,13 @@ static ssize_t mem_write(struct file * file, const char * buf,
 #endif
 
 static struct file_operations proc_mem_operations = {
-	read:		mem_read,
-	write:		mem_write,
-	open:		mem_open,
+	.read		= mem_read,
+	.write		= mem_write,
+	.open		= mem_open,
 };
 
 static struct inode_operations proc_mem_inode_operations = {
-	permission:	proc_permission,
+	.permission	= proc_permission,
 };
 
 static int proc_pid_follow_link(struct dentry *dentry, struct nameidata *nd)
@@ -587,8 +587,8 @@ out:
 }
 
 static struct inode_operations proc_pid_link_inode_operations = {
-	readlink:	proc_pid_readlink,
-	follow_link:	proc_pid_follow_link
+	.readlink	= proc_pid_readlink,
+	.follow_link	= proc_pid_follow_link
 };
 
 #define NUMBUF 10
@@ -823,21 +823,21 @@ static int pid_delete_dentry(struct dentry * dentry)
 
 static struct dentry_operations pid_fd_dentry_operations =
 {
-	d_revalidate:	pid_fd_revalidate,
-	d_delete:	pid_delete_dentry,
+	.d_revalidate	= pid_fd_revalidate,
+	.d_delete	= pid_delete_dentry,
 };
 
 static struct dentry_operations pid_dentry_operations =
 {
-	d_revalidate:	pid_revalidate,
-	d_delete:	pid_delete_dentry,
+	.d_revalidate	= pid_revalidate,
+	.d_delete	= pid_delete_dentry,
 };
 
 static struct dentry_operations pid_base_dentry_operations =
 {
-	d_revalidate:	pid_revalidate,
-	d_iput:		pid_base_iput,
-	d_delete:	pid_delete_dentry,
+	.d_revalidate	= pid_revalidate,
+	.d_iput		= pid_base_iput,
+	.d_delete	= pid_delete_dentry,
 };
 
 /* Lookups */
@@ -918,16 +918,16 @@ out:
 }
 
 static struct file_operations proc_fd_operations = {
-	read:		generic_read_dir,
-	readdir:	proc_readfd,
+	.read		= generic_read_dir,
+	.readdir	= proc_readfd,
 };
 
 /*
  * proc directories can do almost nothing..
  */
 static struct inode_operations proc_fd_inode_operations = {
-	lookup:		proc_lookupfd,
-	permission:	proc_permission,
+	.lookup		= proc_lookupfd,
+	.permission	= proc_permission,
 };
 
 /* SMP-safe */
@@ -1032,12 +1032,12 @@ out:
 }
 
 static struct file_operations proc_base_operations = {
-	read:		generic_read_dir,
-	readdir:	proc_base_readdir,
+	.read		= generic_read_dir,
+	.readdir	= proc_base_readdir,
 };
 
 static struct inode_operations proc_base_inode_operations = {
-	lookup:		proc_base_lookup,
+	.lookup		= proc_base_lookup,
 };
 
 /*
@@ -1058,8 +1058,8 @@ static int proc_self_follow_link(struct dentry *dentry, struct nameidata *nd)
 }	
 
 static struct inode_operations proc_self_inode_operations = {
-	readlink:	proc_self_readlink,
-	follow_link:	proc_self_follow_link,
+	.readlink	= proc_self_readlink,
+	.follow_link	= proc_self_follow_link,
 };
 
 /* SMP-safe */

@@ -42,14 +42,14 @@
  */
  
 struct file_operations ufs_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	mmap:		generic_file_mmap,
-	open:           generic_file_open,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.mmap		= generic_file_mmap,
+	.open           = generic_file_open,
+	.sendfile	= generic_file_sendfile,
 };
 
 struct inode_operations ufs_file_inode_operations = {
-	truncate:	ufs_truncate,
+	.truncate	= ufs_truncate,
 };
