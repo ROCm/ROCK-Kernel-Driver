@@ -593,6 +593,9 @@ e1000_set_ringparam(struct net_device *netdev,
 	tx_old = adapter->tx_ring;
 	rx_old = adapter->rx_ring;
 
+	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending)) 
+		return -EINVAL;
+
 	if(netif_running(adapter->netdev))
 		e1000_down(adapter);
 
