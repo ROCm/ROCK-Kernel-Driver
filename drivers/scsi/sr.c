@@ -524,7 +524,6 @@ static int sr_probe(struct device *dev)
 	sprintf(cd->cdi.name, "sr%d", minor);
 
 	sdev->sector_size = 2048;	/* A guess, just in case */
-	sdev->remap = 1;
 
 	/* FIXME: need to handle a get_capabilities failure properly ?? */
 	get_capabilities(cd);

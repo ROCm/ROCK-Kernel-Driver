@@ -817,22 +817,6 @@ static const char *AM53C974_info(struct Scsi_Host *instance)
 	return (info);
 }
 
-/************************************************************************** 
-* Function : int AM53C974_command (Scsi_Cmnd *SCpnt)                      *
-*                                                                         *
-* Purpose : the unqueued SCSI command function, replaced by the           *
-*           AM53C974_queue_command function                               *
-*                                                                         *
-* Inputs : SCpnt - pointer to command structure                           *
-*                                                                         *
-* Returns :status, see hosts.h for details                                *
-***************************************************************************/
-static int AM53C974_command(Scsi_Cmnd * SCpnt)
-{
-	DEB(printk("AM53C974_command called\n"));
-	return 0;
-}
-
 /**************************************************************************
 * Function : void initialize_SCp(Scsi_Cmnd *cmd)                          *
 *                                                                         *
@@ -2466,7 +2450,6 @@ static Scsi_Host_Template driver_template = {
 	.detect         	= AM53C974_pci_detect,
 	.release        	= AM53C974_release,	
 	.info			= AM53C974_info,
-	.command		= AM53C974_command,
 	.queuecommand		= AM53C974_queue_command,
 	.abort			= AM53C974_abort,
 	.reset			= AM53C974_reset,

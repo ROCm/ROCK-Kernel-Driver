@@ -643,6 +643,18 @@ static int ultrastor_detect(Scsi_Host_Template * tpnt)
 	return ultrastor_14f_detect(tpnt) || ultrastor_24f_detect(tpnt);
 }
 
+static int ultrastor_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static const char *ultrastor_info(struct Scsi_Host * shpnt)
 {
     static char buf[64];
@@ -1177,6 +1189,7 @@ MODULE_LICENSE("GPL");
 static Scsi_Host_Template driver_template = {
 	.name              = "UltraStor 14F/24F/34F",
 	.detect            = ultrastor_detect,
+	.release	   = ultrastor_release,
 	.info              = ultrastor_info,
 	.queuecommand      = ultrastor_queuecommand,
 	.eh_abort_handler  = ultrastor_abort,

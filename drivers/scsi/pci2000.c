@@ -612,41 +612,6 @@ finished:;
 	return 0;
 	}
 /****************************************************************
- *	Name:	internal_done :LOCAL
- *
- *	Description:	Done handler for non-queued commands
- *
- *	Parameters:		SCpnt - Pointer to SCSI command structure.
- *
- *	Returns:		Nothing.
- *
- ****************************************************************/
-static void internal_done (Scsi_Cmnd * SCpnt)
-	{
-	SCpnt->SCp.Status++;
-	}
-/****************************************************************
- *	Name:	Pci2000_Command
- *
- *	Description:	Process a command from the SCSI manager.
- *
- *	Parameters:		SCpnt - Pointer to SCSI command structure.
- *
- *	Returns:		Status code.
- *
- ****************************************************************/
-int Pci2000_Command (Scsi_Cmnd *SCpnt)
-	{
-	DEB(printk("pci2000_command: ..calling pci2000_queuecommand\n"));
-
-	Pci2000_QueueCommand (SCpnt, internal_done);
-
-    SCpnt->SCp.Status = 0;
-	while (!SCpnt->SCp.Status)
-		barrier ();
-	return SCpnt->result;
-	}
-/****************************************************************
  *	Name:	Pci2000_Detect
  *
  *	Description:	Detect and initialize our boards.
@@ -856,7 +821,6 @@ static Scsi_Host_Template driver_template = {
 	.name		= "PCI-2000 SCSI Intelligent Disk Controller",
 	.detect		= Pci2000_Detect,
 	.release	= Pci2000_Release,
-	.command	= Pci2000_Command,
 	.queuecommand	= Pci2000_QueueCommand,
 	.abort		= Pci2000_Abort,
 	.reset		= Pci2000_Reset,
