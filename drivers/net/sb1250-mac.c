@@ -2544,7 +2544,7 @@ static int sbmac_close(struct net_device *dev)
 	spin_unlock_irqrestore(&sc->sbm_lock, flags);
 	
 	/* Make sure there is no irq-handler running on a different CPU. */
-	synchronize_irq();
+	synchronize_irq(dev->irq);
 	
 	free_irq(dev->irq, dev);
 	

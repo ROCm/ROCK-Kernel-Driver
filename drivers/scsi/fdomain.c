@@ -2042,7 +2042,7 @@ int fdomain_16x0_release(struct Scsi_Host *shpnt)
 		free_irq(shpnt->irq, shpnt);
 	if (shpnt->io_port && shpnt->n_io_port)
 		release_region(shpnt->io_port, shpnt->n_io_port);
-
+	return 0;
 }
 
 MODULE_LICENSE("GPL");

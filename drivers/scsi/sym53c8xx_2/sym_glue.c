@@ -2708,7 +2708,7 @@ static u_short sym_chip_ids[] __initdata	= {
  *  differ and attach them using the order in the NVRAM.
  *
  *  If no NVRAM is found or data appears invalid attach boards in 
- *  the the order they are detected.
+ *  the order they are detected.
  */
 int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 {

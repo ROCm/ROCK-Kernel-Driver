@@ -19,31 +19,27 @@
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
 #include <linux/init.h>
+#include <linux/mm_inline.h>
 #include <linux/prefetch.h>
 
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
 /*
- * Move an inactive page to the active list.
- */
-static inline void activate_page_nolock(struct page * page)
-{
-	if (PageLRU(page) && !PageActive(page)) {
-		del_page_from_inactive_list(page);
-		add_page_to_active_list(page);
-		KERNEL_STAT_INC(pgactivate);
-	}
-}
-
-/*
  * FIXME: speed this up?
  */
-void activate_page(struct page * page)
+void activate_page(struct page *page)
 {
-	spin_lock_irq(&_pagemap_lru_lock);
-	activate_page_nolock(page);
-	spin_unlock_irq(&_pagemap_lru_lock);
+	struct zone *zone = page_zone(page);
+
+	spin_lock_irq(&zone->lru_lock);
+	if (PageLRU(page) && !PageActive(page)) {
+		del_page_from_inactive_list(zone, page);
+		SetPageActive(page);
+		add_page_to_active_list(zone, page);
+		KERNEL_STAT_INC(pgactivate);
+	}
+	spin_unlock_irq(&zone->lru_lock);
 }
 
 /**
@@ -77,17 +73,14 @@ void lru_add_drain(void)
 void __page_cache_release(struct page *page)
 {
 	unsigned long flags;
+	struct zone *zone = page_zone(page);
 
-	spin_lock_irqsave(&_pagemap_lru_lock, flags);
-	if (TestClearPageLRU(page)) {
-		if (PageActive(page))
-			del_page_from_active_list(page);
-		else
-			del_page_from_inactive_list(page);
-	}
+	spin_lock_irqsave(&zone->lru_lock, flags);
+	if (TestClearPageLRU(page))
+		del_page_from_lru(zone, page);
 	if (page_count(page) != 0)
 		page = NULL;
-	spin_unlock_irqrestore(&_pagemap_lru_lock, flags);
+	spin_unlock_irqrestore(&zone->lru_lock, flags);
 	if (page)
 		__free_pages_ok(page, 0);
 }
@@ -97,7 +90,7 @@ void __page_cache_release(struct page *page)
  * pagevec's pages.  If it fell to zero then remove the page from the LRU and
  * free it.
  *
- * Avoid taking pagemap_lru_lock if possible, but if it is taken, retain it
+ * Avoid taking zone->lru_lock if possible, but if it is taken, retain it
  * for the remainder of the operation.
  *
  * The locking in this function is against shrink_cache(): we recheck the
@@ -109,32 +102,31 @@ void __page_cache_release(struct page *page)
 void __pagevec_release(struct pagevec *pvec)
 {
 	int i;
-	int lock_held = 0;
 	struct pagevec pages_to_free;
+	struct zone *zone = NULL;
 
 	pagevec_init(&pages_to_free);
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
+		struct zone *pagezone;
 
 		if (PageReserved(page) || !put_page_testzero(page))
 			continue;
 
-		if (!lock_held) {
-			spin_lock_irq(&_pagemap_lru_lock);
-			lock_held = 1;
+		pagezone = page_zone(page);
+		if (pagezone != zone) {
+			if (zone)
+				spin_unlock_irq(&zone->lru_lock);
+			zone = pagezone;
+			spin_lock_irq(&zone->lru_lock);
 		}
-
-		if (TestClearPageLRU(page)) {
-			if (PageActive(page))
-				del_page_from_active_list(page);
-			else
-				del_page_from_inactive_list(page);
-		}
+		if (TestClearPageLRU(page))
+			del_page_from_lru(zone, page);
 		if (page_count(page) == 0)
 			pagevec_add(&pages_to_free, page);
 	}
-	if (lock_held)
-		spin_unlock_irq(&_pagemap_lru_lock);
+	if (zone)
+		spin_unlock_irq(&zone->lru_lock);
 
 	pagevec_free(&pages_to_free);
 	pagevec_init(pvec);
@@ -169,24 +161,27 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 void pagevec_deactivate_inactive(struct pagevec *pvec)
 {
 	int i;
-	int lock_held = 0;
+	struct zone *zone = NULL;
 
 	if (pagevec_count(pvec) == 0)
 		return;
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
+		struct zone *pagezone = page_zone(page);
 
-		if (!lock_held) {
+		if (pagezone != zone) {
 			if (PageActive(page) || !PageLRU(page))
 				continue;
-			spin_lock_irq(&_pagemap_lru_lock);
-			lock_held = 1;
+			if (zone)
+				spin_unlock_irq(&zone->lru_lock);
+			zone = pagezone;
+			spin_lock_irq(&zone->lru_lock);
 		}
 		if (!PageActive(page) && PageLRU(page))
-			list_move(&page->lru, &inactive_list);
+			list_move(&page->lru, &pagezone->inactive_list);
 	}
-	if (lock_held)
-		spin_unlock_irq(&_pagemap_lru_lock);
+	if (zone)
+		spin_unlock_irq(&zone->lru_lock);
 	__pagevec_release(pvec);
 }
 
@@ -197,16 +192,24 @@ void pagevec_deactivate_inactive(struct pagevec *pvec)
 void __pagevec_lru_add(struct pagevec *pvec)
 {
 	int i;
+	struct zone *zone = NULL;
 
-	spin_lock_irq(&_pagemap_lru_lock);
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
+		struct zone *pagezone = page_zone(page);
 
+		if (pagezone != zone) {
+			if (zone)
+				spin_unlock_irq(&zone->lru_lock);
+			zone = pagezone;
+			spin_lock_irq(&zone->lru_lock);
+		}
 		if (TestSetPageLRU(page))
 			BUG();
-		add_page_to_inactive_list(page);
+		add_page_to_inactive_list(zone, page);
 	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	if (zone)
+		spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(pvec);
 }
 
@@ -217,19 +220,24 @@ void __pagevec_lru_add(struct pagevec *pvec)
 void __pagevec_lru_del(struct pagevec *pvec)
 {
 	int i;
+	struct zone *zone = NULL;
 
-	spin_lock_irq(&_pagemap_lru_lock);
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
+		struct zone *pagezone = page_zone(page);
 
+		if (pagezone != zone) {
+			if (zone)
+				spin_unlock_irq(&zone->lru_lock);
+			zone = pagezone;
+			spin_lock_irq(&zone->lru_lock);
+		}
 		if (!TestClearPageLRU(page))
 			BUG();
-		if (PageActive(page))
-			del_page_from_active_list(page);
-		else
-			del_page_from_inactive_list(page);
+		del_page_from_lru(zone, page);
 	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	if (zone)
+		spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(pvec);
 }
 

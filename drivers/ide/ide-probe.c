@@ -555,6 +555,7 @@ static void probe_hwif (ide_hwif_t *hwif)
 	 */
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
+		drive->dn = ((hwif->channel ? 2 : 0) + unit);
 		(void) probe_for_drive (drive);
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
@@ -585,6 +586,17 @@ static void probe_hwif (ide_hwif_t *hwif)
 			if (hwif->tuneproc != NULL && drive->autotune == 1)
 				/* auto-tune PIO mode */
 				hwif->tuneproc(drive, 255);
+
+			if ((drive->autotune != 2) && hwif->dmaproc != NULL) {
+				/*
+				 * Force DMAing for the beginning of the check.
+				 * Some chipsets appear to do interesting
+				 * things, if not checked and cleared.
+				 *   PARANOIA!!!
+				 */
+				hwif->dmaproc(ide_dma_off_quietly, drive);
+				hwif->dmaproc(ide_dma_check, drive);
+			}
 		}
 	}
 }
@@ -852,14 +864,12 @@ static void init_gendisk (ide_hwif_t *hwif)
 		gd[unit].nr_real = 1;
 		gd[unit].fops = ide_fops;
 		hwif->gd[unit] = gd + unit;
-		add_gendisk(gd + unit);
 	}
 
 	for (unit = 0; unit < units; ++unit) {
 #if 1
 		char name[64];
 		ide_add_generic_settings(hwif->drives + unit);
-		hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
 		sprintf (name, "host%d/bus%d/target%d/lun%d",
 			(hwif->channel && hwif->mate) ?
 			hwif->mate->index : hwif->index,
@@ -871,7 +881,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 			char name[64];
 
 			ide_add_generic_settings(hwif->drives + unit);
-			hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
 			sprintf (name, "host%d/bus%d/target%d/lun%d",
 				 (hwif->channel && hwif->mate) ? hwif->mate->index : hwif->index,
 				 hwif->channel, unit, hwif->drives[unit].lun);
@@ -997,6 +1006,15 @@ int ideprobe_init (void)
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (probe[index])
 			hwif_init(&ide_hwifs[index]);
+	for (index = 0; index < MAX_HWIFS; ++index)
+		if (probe[index]) {
+			ide_hwif_t *hwif = &ide_hwifs[index];
+			int unit;
+			if (!hwif->present)
+				continue;
+			for (unit = 0; unit < MAX_DRIVES; ++unit)
+				ata_attach(&hwif->drives[unit]);
+		}
 	if (!ide_probe)
 		ide_probe = &ideprobe_module;
 	MOD_DEC_USE_COUNT;

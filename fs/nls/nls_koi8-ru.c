@@ -52,10 +52,10 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 }
 
 static struct nls_table table = {
-	charset:	"koi8-ru",
-	uni2char:	uni2char,
-	char2uni:	char2uni,
-	owner:		THIS_MODULE,
+	.charset	= "koi8-ru",
+	.uni2char	= uni2char,
+	.char2uni	= char2uni,
+	.owner		= THIS_MODULE,
 };
 
 static int __init init_nls_koi8_ru(void)

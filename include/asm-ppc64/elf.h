@@ -31,13 +31,11 @@ typedef elf_greg_t32 elf_gregset_t32[ELF_NGREG];
   typedef elf_greg_t64 elf_greg_t;
   typedef elf_gregset_t64 elf_gregset_t;
 # define elf_addr_t unsigned long
-# define elf_caddr_t char *
 #else
   /* Assumption: ELF_ARCH == EM_PPC and ELF_CLASS == ELFCLASS32 */
   typedef elf_greg_t32 elf_greg_t;
   typedef elf_gregset_t32 elf_gregset_t;
 # define elf_addr_t u32
-# define elf_caddr_t u32
 #endif
 
 typedef double elf_fpreg_t;
@@ -122,19 +120,14 @@ extern int ucache_bsize;
  * - for compatibility with glibc ARCH_DLINFO must always be defined on PPC,
  *   even if DLINFO_ARCH_ITEMS goes to zero or is undefined.
  */
-#define DLINFO_ARCH_ITEMS	3
 #define ARCH_DLINFO							\
 do {									\
-	sp -= DLINFO_ARCH_ITEMS * 2;					\
-	NEW_AUX_ENT(0, AT_DCACHEBSIZE, dcache_bsize);			\
-	NEW_AUX_ENT(1, AT_ICACHEBSIZE, icache_bsize);			\
-	NEW_AUX_ENT(2, AT_UCACHEBSIZE, ucache_bsize);			\
-	/*								\
-	 * Now handle glibc compatibility.				\
-	 */								\
-	sp -= 2*2;							\
-	NEW_AUX_ENT(0, AT_IGNOREPPC, AT_IGNOREPPC);			\
-	NEW_AUX_ENT(1, AT_IGNOREPPC, AT_IGNOREPPC);			\
+	NEW_AUX_ENT(AT_DCACHEBSIZE, dcache_bsize);			\
+	NEW_AUX_ENT(AT_ICACHEBSIZE, icache_bsize);			\
+	NEW_AUX_ENT(AT_UCACHEBSIZE, ucache_bsize);			\
+	/* Now handle glibc compatibility. */				\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
  } while (0)
 
 #endif /* __PPC64_ELF_H */

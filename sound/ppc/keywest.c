@@ -40,11 +40,11 @@ static int keywest_attach_adapter(struct i2c_adapter *adapter);
 static int keywest_detach_client(struct i2c_client *client);
 
 struct i2c_driver keywest_driver = {  
-	name: "PMac Keywest Audio",
-	id: I2C_DRIVERID_KEYWEST,
-	flags: I2C_DF_NOTIFY,
-	attach_adapter: &keywest_attach_adapter,
-	detach_client: &keywest_detach_client,
+	.name = "PMac Keywest Audio",
+	.id = I2C_DRIVERID_KEYWEST,
+	.flags = I2C_DF_NOTIFY,
+	.attach_adapter = &keywest_attach_adapter,
+	.detach_client = &keywest_detach_client,
 };
 
 

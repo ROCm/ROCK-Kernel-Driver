@@ -197,22 +197,22 @@ static int daca_put_amp(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol
 }
 
 static snd_kcontrol_new_t daca_mixers[] = {
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Deemphasis Switch",
-	  info: daca_info_deemphasis,
-	  get: daca_get_deemphasis,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Deemphasis Switch",
+	  .info = daca_info_deemphasis,
+	  .get = daca_get_deemphasis,
 	  put: daca_put_deemphasis
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Master Playback Volume",
-	  info: daca_info_volume,
-	  get: daca_get_volume,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Master Playback Volume",
+	  .info = daca_info_volume,
+	  .get = daca_get_volume,
 	  put: daca_put_volume
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Power Amplifier Switch",
-	  info: daca_info_amp,
-	  get: daca_get_amp,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Power Amplifier Switch",
+	  .info = daca_info_amp,
+	  .get = daca_get_amp,
 	  put: daca_put_amp
 	},
 };

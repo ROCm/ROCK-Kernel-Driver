@@ -27,6 +27,7 @@
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
@@ -41,7 +42,8 @@
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-
+#include <asm/pgalloc.h>
+#include <asm/tlb.h>
 
 #define LOAD_INT(x) ((x) >> FSHIFT)
 #define LOAD_FRAC(x) LOAD_INT(((x) & (FIXED_1-1)) * 100)
@@ -134,8 +136,20 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	struct sysinfo i;
 	int len, committed;
 	struct page_state ps;
+	int cpu;
+	unsigned long inactive;
+	unsigned long active;
+	unsigned long flushes = 0;
+	unsigned long non_flushes = 0;
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		flushes += mmu_gathers[cpu].flushes;
+		non_flushes += mmu_gathers[cpu].avoided_flushes;
+	}
 
 	get_page_state(&ps);
+	get_zone_counts(&active, &inactive);
+
 /*
  * display in kilobytes.
  */
@@ -165,14 +179,16 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Writeback:    %8lu kB\n"
 		"Committed_AS: %8u kB\n"
 		"PageTables:   %8lu kB\n"
-		"ReverseMaps:  %8lu\n",
+		"ReverseMaps:  %8lu\n"
+		"TLB flushes:  %8lu\n"
+		"non flushes:  %8lu\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
 		K(ps.nr_pagecache-swapper_space.nrpages),
 		K(swapper_space.nrpages),
-		K(ps.nr_active),
-		K(ps.nr_inactive),
+		K(active),
+		K(inactive),
 		K(i.totalhigh),
 		K(i.freehigh),
 		K(i.totalram-i.totalhigh),
@@ -183,7 +199,9 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_writeback),
 		K(committed),
 		K(ps.nr_page_table_pages),
-		ps.nr_reverse_maps
+		ps.nr_reverse_maps,
+		flushes,
+		non_flushes
 		);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);

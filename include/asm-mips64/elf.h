@@ -31,7 +31,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 									\
 	if (__h->e_machine != EM_MIPS)					\
 		__res = 0;						\
-	if (sizeof(elf_caddr_t) == 8 &&					\
+	if (sizeof(elf_addr_t) == 8 &&					\
 	    __h->e_ident[EI_CLASS] == ELFCLASS32)			\
 	        __res = 0;						\
 									\
