@@ -17,6 +17,8 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+/* Purpose: Prevent PCMCIA cards from using motherboard resources. */
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -43,9 +45,17 @@ ACPI_MODULE_NAME		("acpi_motherboard")
 	(((len) > 0) && ((base) > 0) && ((base) + (len) < IO_SPACE_LIMIT) \
 	&& ((base) + (len) > PCIBIOS_MIN_IO))
 
+/*
+ * Clearing the flag (IORESOURCE_BUSY) allows drivers to use
+ * the io ports if they really know they can use it, while
+ * still preventing hotplug PCI devices from using it. 
+ */
+
 static acpi_status
 acpi_reserve_io_ranges (struct acpi_resource *res, void *data)
 {
+	struct resource *requested_res = NULL;
+
 	ACPI_FUNCTION_TRACE("acpi_reserve_io_ranges");
 
 	if (res->id == ACPI_RSTYPE_IO) {
@@ -57,23 +67,25 @@ acpi_reserve_io_ranges (struct acpi_resource *res, void *data)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Motherboard resources 0x%08x - 0x%08x\n",
 				io_res->min_base_address, 
 				io_res->min_base_address + io_res->range_length));
-			request_region(io_res->min_base_address, 
+			requested_res = request_region(io_res->min_base_address, 
 				io_res->range_length, "motherboard");
 		}
-	}else if (res->id == ACPI_RSTYPE_FIXED_IO) {
+	} else if (res->id == ACPI_RSTYPE_FIXED_IO) {
 		struct acpi_resource_fixed_io *fixed_io_res = &res->data.fixed_io;
 
 		if (IS_RESERVED_ADDR(fixed_io_res->base_address, fixed_io_res->range_length)) {
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Motherboard resources 0x%08x - 0x%08x\n",
 				fixed_io_res->base_address, 
 				fixed_io_res->base_address + fixed_io_res->range_length));
-			request_region(fixed_io_res->base_address, 
+			requested_res = request_region(fixed_io_res->base_address, 
 				fixed_io_res->range_length, "motherboard");
 		}
-	}else {
+	} else {
 		/* Memory mapped IO? */
 	}
 
+	if (requested_res)
+		requested_res->flags &= ~IORESOURCE_BUSY;
 	return AE_OK;
 }
 
