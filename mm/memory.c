@@ -1795,9 +1795,10 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		if (unlikely(anon_vma_prepare(vma)))
 			goto no_mem;
-		page = alloc_page_vma(GFP_HIGHZERO, vma, addr);
+		page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
 		if (!page)
 			goto no_mem;
+		clear_user_highpage(page, addr);
 
 		spin_lock(&mm->page_table_lock);
 		page_table = pte_offset_map(pmd, addr);
