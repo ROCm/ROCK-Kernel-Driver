@@ -440,8 +440,14 @@ static int usb_stor_control_thread(void * __us)
 		/* Most USB devices can't handle START_STOP.  But we
 		 * need something for media-change, so we'll use TUR
 		 * instead.
+		 *
+		 * We specifically allow this command through if either:
+		 * (a) it's a load/eject command (cmnd[4] & 2)
+		 * (b) it's a multi-target unit (i.e. legacy SCSI adaptor)
 		 */
-		else if (us->srb->cmnd[0] == START_STOP) {
+		else if (us->srb->cmnd[0] == START_STOP &&
+				!(us->srb->cmnd[4] & 2) &&
+				!(us->flags & US_FL_SCM_MULT_TARG)) {
 			unsigned char saved_cdb[16]; /* largest SCSI-III cmd */
 			__u8 old_cmd_len;
 

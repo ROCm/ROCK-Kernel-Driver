@@ -57,7 +57,7 @@ static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 			strcat(buf, tmp);
 		}
 		dbg ("%s: %s portroute %s", 
-			ehci->hcd.self.bus_name, label,
+			hcd_to_bus (&ehci->hcd)->bus_name, label,
 			buf);
 	}
 }
@@ -122,7 +122,8 @@ dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 	}
 }
 
-static int dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+static int __attribute__((__unused__))
+dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 {
 	return snprintf (buf, len,
 		"%s%sstatus %04x%s%s%s%s%s%s%s%s%s%s",
@@ -140,7 +141,8 @@ static int dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 		);
 }
 
-static int dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+static int __attribute__((__unused__))
+dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
 {
 	return snprintf (buf, len,
 		"%s%sintrenable %02x%s%s%s%s%s%s",
@@ -213,19 +215,19 @@ dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 static inline int __attribute__((__unused__))
 dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
-{}
+{ return 0; }
 
 static inline int __attribute__((__unused__))
 dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
-{}
+{ return 0; }
 
 static inline int __attribute__((__unused__))
 dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
-{}
+{ return 0; }
 
 static inline int __attribute__((__unused__))
 dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
-{}
+{ return 0; }
 
 #endif	/* DEBUG */
 
@@ -248,7 +250,16 @@ dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
 	dbg ("%s", _buf); \
 }
 
-#ifdef DEBUG
+/*-------------------------------------------------------------------------*/
+
+#ifdef STUB_DEBUG_FILES
+
+static inline void create_debug_files (struct ehci_hcd *bus) { }
+static inline void remove_debug_files (struct ehci_hcd *bus) { }
+
+#else
+
+/* troubleshooting help: expose state in driverfs */
 
 #define speed_char(info1) ({ char tmp; \
 		switch (info1 & (3 << 12)) { \
@@ -257,6 +268,49 @@ dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
 		case 2 << 12: tmp = 'h'; break; \
 		default: tmp = '?'; break; \
 		}; tmp; })
+
+static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
+{
+	u32			scratch;
+	struct list_head	*entry;
+	struct ehci_qtd		*td;
+	unsigned		temp;
+	unsigned		size = *sizep;
+	char			*next = *nextp;
+
+	scratch = cpu_to_le32p (&qh->hw_info1);
+	temp = snprintf (next, size, "qh/%p dev%d %cs ep%d %08x %08x",
+			qh, scratch & 0x007f,
+			speed_char (scratch),
+			(scratch >> 8) & 0x000f,
+			scratch, cpu_to_le32p (&qh->hw_info2));
+	size -= temp;
+	next += temp;
+
+	list_for_each (entry, &qh->qtd_list) {
+		td = list_entry (entry, struct ehci_qtd,
+				qtd_list);
+		scratch = cpu_to_le32p (&td->hw_token);
+		temp = snprintf (next, size,
+				"\n\ttd/%p %s len=%d %08x urb %p",
+				td, ({ char *tmp;
+				 switch ((scratch>>8)&0x03) {
+				 case 0: tmp = "out"; break;
+				 case 1: tmp = "in"; break;
+				 case 2: tmp = "setup"; break;
+				 default: tmp = "?"; break;
+				 } tmp;}),
+				(scratch >> 16) & 0x7fff,
+				scratch,
+				td->urb);
+		size -= temp;
+		next += temp;
+	}
+
+	temp = snprintf (next, size, "\n");
+	*sizep = size - temp;
+	*nextp = next + temp;
+}
 
 static ssize_t
 show_async (struct device *dev, char *buf, size_t count, loff_t off)
@@ -284,49 +338,21 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 	if (ehci->async) {
 		qh = ehci->async;
 		do {
-			u32			scratch;
-			struct list_head	*entry;
-			struct ehci_qtd		*td;
-
-			scratch = cpu_to_le32p (&qh->hw_info1);
-			temp = snprintf (next, size, "qh %p dev%d %cs ep%d",
-					qh, scratch & 0x007f,
-					speed_char (scratch),
-					(scratch >> 8) & 0x000f);
-			size -= temp;
-			next += temp;
-
-			list_for_each (entry, &qh->qtd_list) {
-				td = list_entry (entry, struct ehci_qtd,
-						qtd_list);
-				scratch = cpu_to_le32p (&td->hw_token);
-				temp = snprintf (next, size,
-						", td %p len=%d tok %04x %s",
-						td, scratch >> 16,
-						scratch & 0xffff,
-						({ char *tmp;
-						 switch ((scratch>>8)&0x03) {
-						 case 0: tmp = "out"; break;
-						 case 1: tmp = "in"; break;
-						 case 2: tmp = "setup"; break;
-						 default: tmp = "?"; break;
-						 } tmp;})
-						);
-				size -= temp;
-				next += temp;
-			}
-
-			temp = snprintf (next, size, "\n");
-			size -= temp;
-			next += temp;
-
+			qh_lines (qh, &next, &size);
 		} while ((qh = qh->qh_next.qh) != ehci->async);
+	}
+	if (ehci->reclaim) {
+		temp = snprintf (next, size, "\nreclaim =\n");
+		size -= temp;
+		next += temp;
+
+		qh_lines (ehci->reclaim, &next, &size);
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
 	return count - size;
 }
-static DEVICE_ATTR (async, S_IRUSR, show_async, NULL);
+static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 
 #define DBG_SCHED_LIMIT 64
 
@@ -373,7 +399,7 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 		do {
 			switch (tag) {
 			case Q_TYPE_QH:
-				temp = snprintf (next, size, " intr-%d %p",
+				temp = snprintf (next, size, " qh%d/%p",
 						p.qh->period, p.qh);
 				size -= temp;
 				next += temp;
@@ -387,12 +413,14 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 							&p.qh->hw_info1);
 
 					temp = snprintf (next, size,
-						" (%cs dev%d ep%d)",
+						" (%cs dev%d ep%d [%d/%d] %d)",
 						speed_char (scratch),
 						scratch & 0x007f,
-						(scratch >> 8) & 0x000f);
+						(scratch >> 8) & 0x000f,
+						p.qh->usecs, p.qh->c_usecs,
+						scratch >> 16);
 
-					/* FIXME TDs too */
+					/* FIXME TD info too */
 
 					if (seen_count < DBG_SCHED_LIMIT)
 						seen [seen_count++].qh = p.qh;
@@ -434,7 +462,7 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 
 	return count - size;
 }
-static DEVICE_ATTR (periodic, S_IRUSR, show_periodic, NULL);
+static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
 
 #undef DBG_SCHED_LIMIT
 
@@ -522,7 +550,7 @@ show_registers (struct device *dev, char *buf, size_t count, loff_t off)
 
 	return count - size;
 }
-static DEVICE_ATTR (registers, S_IRUSR, show_registers, NULL);
+static DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
 
 static inline void create_debug_files (struct ehci_hcd *bus)
 {
@@ -538,14 +566,5 @@ static inline void remove_debug_files (struct ehci_hcd *bus)
 	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_registers);
 }
 
-#else /* DEBUG */
+#endif /* STUB_DEBUG_FILES */
 
-static inline void create_debug_files (struct ehci_hcd *bus)
-{
-}
-
-static inline void remove_debug_files (struct ehci_hcd *bus)
-{
-}
-
-#endif /* DEBUG */

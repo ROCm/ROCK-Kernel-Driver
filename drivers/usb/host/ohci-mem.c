@@ -5,7 +5,6 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-mem.c,v 1.3 2002/03/22 16:04:54 dbrownell Exp $
  */
 
 /*-------------------------------------------------------------------------*/
@@ -52,13 +51,6 @@ dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
 	return scan->virt;
 }
 
-static struct ed *
-dma_to_ed (struct ohci_hcd *hc, dma_addr_t ed_dma)
-{
-	return (struct ed *) dma_to_ed_td(&(hc->ed_hash [ED_HASH_FUNC(ed_dma)]),
-				      ed_dma);
-}
-
 static struct td *
 dma_to_td (struct ohci_hcd *hc, dma_addr_t td_dma)
 {
@@ -98,13 +90,6 @@ hash_add_ed_td (
 }
 
 static inline int
-hash_add_ed (struct ohci_hcd *hc, struct ed *ed, int mem_flags)
-{
-	return hash_add_ed_td (&(hc->ed_hash [ED_HASH_FUNC (ed->dma)]),
-			ed, ed->dma, mem_flags);
-}
-
-static inline int
 hash_add_td (struct ohci_hcd *hc, struct td *td, int mem_flags)
 {
 	return hash_add_ed_td (&(hc->td_hash [TD_HASH_FUNC (td->td_dma)]),
@@ -136,12 +121,6 @@ hash_free_ed_td (struct hash_list_t *entry, void *virt)
 			prev->next = scan->next;
 		kfree(scan);
 	}
-}
-
-static inline void
-hash_free_ed (struct ohci_hcd *hc, struct ed * ed)
-{
-	hash_free_ed_td (&(hc->ed_hash[ED_HASH_FUNC(ed->dma)]), ed);
 }
 
 static inline void
@@ -223,11 +202,6 @@ ed_alloc (struct ohci_hcd *hc, int mem_flags)
 		memset (ed, 0, sizeof (*ed));
 		INIT_LIST_HEAD (&ed->td_list);
 		ed->dma = dma;
-		/* hash it for later reverse mapping */
-		if (!hash_add_ed (hc, ed, mem_flags)) {
-			pci_pool_free (hc->ed_cache, ed, dma);
-			return NULL;
-		}
 	}
 	return ed;
 }
@@ -235,7 +209,6 @@ ed_alloc (struct ohci_hcd *hc, int mem_flags)
 static void
 ed_free (struct ohci_hcd *hc, struct ed *ed)
 {
-	hash_free_ed (hc, ed);
 	pci_pool_free (hc->ed_cache, ed, ed->dma);
 }
 

@@ -72,37 +72,6 @@ static void urb_print (struct urb * urb, char * str, int small)
 #endif
 }
 
-static inline struct ed *
-dma_to_ed (struct ohci_hcd *hc, dma_addr_t ed_dma);
-
-/* print non-empty branches of the periodic ed tree */
-static void __attribute__ ((unused))
-ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
-{
-	int i, j;
-	u32 *ed_p;
-	int printed = 0;
-
-	for (i= 0; i < 32; i++) {
-		j = 5;
-		ed_p = &(ohci->hcca->int_table [i]);
-		if (*ed_p == 0)
-			continue;
-		printed = 1;
-		printk (KERN_DEBUG "%s, ohci %s frame %2d:",
-				label, ohci->hcd.self.bus_name, i);
-		while (*ed_p != 0 && j--) {
-			struct ed *ed = dma_to_ed (ohci, le32_to_cpup(ed_p));
-			printk (" %p/%08x;", ed, ed->hwINFO);
-			ed_p = &ed->hwNextED;
-		}
-		printk ("\n");
-	}
-	if (!printed)
-		printk (KERN_DEBUG "%s, ohci %s, empty periodic schedule\n",
-				label, ohci->hcd.self.bus_name);
-}
-
 static void ohci_dump_intr_mask (char *label, __u32 mask)
 {
 	dbg ("%s: 0x%08x%s%s%s%s%s%s%s%s%s",
@@ -239,7 +208,8 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 	if (verbose)
 		ohci_dump_periodic (controller, "hcca");
 #endif
-	dbg ("hcca frame #%04x", controller->hcca->frame_no);
+	if (controller->hcca)
+		dbg ("hcca frame #%04x", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
 }
 
@@ -316,8 +286,9 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	case ED_IN: type = "-IN"; break;
 	/* else from TDs ... control */
 	}
-	dbg ("  info %08x MAX=%d%s%s%s EP=%d%s DEV=%d", le32_to_cpu (tmp),
-		0x0fff & (le32_to_cpu (tmp) >> 16),
+	dbg ("  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d", le32_to_cpu (tmp),
+		0x03ff & (le32_to_cpu (tmp) >> 16),
+		(tmp & ED_DEQUEUE) ? " DQ" : "",
 		(tmp & ED_ISO) ? " ISO" : "",
 		(tmp & ED_SKIP) ? " SKIP" : "",
 		(tmp & ED_LOWSPEED) ? " LOW" : "",
@@ -344,5 +315,222 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	}
 }
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,32)
+#	define DRIVERFS_DEBUG_FILES
 #endif
+
+#endif /* DEBUG */
+
+/*-------------------------------------------------------------------------*/
+
+#ifdef DRIVERFS_DEBUG_FILES
+
+static ssize_t
+show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
+{
+	unsigned		temp, size = count;
+
+	if (!ed)
+		return 0;
+
+	/* print first --> last */
+	while (ed->ed_prev)
+		ed = ed->ed_prev;
+
+	/* dump a snapshot of the bulk or control schedule */
+	while (ed) {
+		u32			info = ed->hwINFO;
+		u32			scratch = cpu_to_le32p (&ed->hwINFO);
+		struct list_head	*entry;
+		struct td		*td;
+
+		temp = snprintf (buf, size,
+			"ed/%p %cs dev%d ep%d-%s max %d %08x%s%s %s",
+			ed,
+			(info & ED_LOWSPEED) ? 'l' : 'f',
+			scratch & 0x7f,
+			(scratch >> 7) & 0xf,
+			(info & ED_IN) ? "in" : "out",
+			0x03ff & (scratch >> 16),
+			scratch,
+			(info & ED_SKIP) ? " s" : "",
+			(ed->hwHeadP & ED_H) ? " H" : "",
+			(ed->hwHeadP & ED_C) ? data1 : data0);
+		size -= temp;
+		buf += temp;
+
+		list_for_each (entry, &ed->td_list) {
+			u32		cbp, be;
+
+			td = list_entry (entry, struct td, td_list);
+			scratch = cpu_to_le32p (&td->hwINFO);
+			cbp = le32_to_cpup (&td->hwCBP);
+			be = le32_to_cpup (&td->hwBE);
+			temp = snprintf (buf, size,
+					"\n\ttd %p %s %d cc=%x urb %p (%08x)",
+					td,
+					({ char *pid;
+					switch (scratch & TD_DP) {
+					case TD_DP_SETUP: pid = "setup"; break;
+					case TD_DP_IN: pid = "in"; break;
+					case TD_DP_OUT: pid = "out"; break;
+					default: pid = "(?)"; break;
+					 } pid;}),
+					cbp ? (be + 1 - cbp) : 0,
+					TD_CC_GET (scratch), td->urb, scratch);
+			size -= temp;
+			buf += temp;
+		}
+
+		temp = snprintf (buf, size, "\n");
+		size -= temp;
+		buf += temp;
+
+		ed = ed->ed_next;
+	}
+	return count - size;
+}
+
+static ssize_t
+show_async (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct pci_dev		*pdev;
+	struct ohci_hcd		*ohci;
+	size_t			temp;
+	unsigned long		flags;
+
+	if (off != 0)
+		return 0;
+	pdev = container_of (dev, struct pci_dev, dev);
+	ohci = container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
+
+	/* display control and bulk lists together, for simplicity */
+	spin_lock_irqsave (&ohci->lock, flags);
+	temp = show_list (ohci, buf, count, ohci->ed_controltail);
+	count = show_list (ohci, buf + temp, count - temp, ohci->ed_bulktail);
+	spin_unlock_irqrestore (&ohci->lock, flags);
+
+	return temp + count;
+}
+static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
+
+
+#define DBG_SCHED_LIMIT 64
+
+static ssize_t
+show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct pci_dev		*pdev;
+	struct ohci_hcd		*ohci;
+	struct ed		**seen, *ed;
+	unsigned long		flags;
+	unsigned		temp, size, seen_count;
+	char			*next;
+	unsigned		i;
+
+	if (off != 0)
+		return 0;
+	if (!(seen = kmalloc (DBG_SCHED_LIMIT * sizeof *seen, SLAB_ATOMIC)))
+		return 0;
+	seen_count = 0;
+
+	pdev = container_of (dev, struct pci_dev, dev);
+	ohci = container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
+	next = buf;
+	size = count;
+
+	temp = snprintf (next, size, "size = %d\n", NUM_INTS);
+	size -= temp;
+	next += temp;
+
+	/* dump a snapshot of the periodic schedule (and load) */
+	spin_lock_irqsave (&ohci->lock, flags);
+	for (i = 0; i < NUM_INTS; i++) {
+		if (!(ed = ohci->periodic [i]))
+			continue;
+
+		temp = snprintf (next, size, "%2d [%3d]:", i, ohci->load [i]);
+		size -= temp;
+		next += temp;
+
+		do {
+			temp = snprintf (next, size, " ed%d/%p",
+				ed->interval, ed);
+			size -= temp;
+			next += temp;
+			for (temp = 0; temp < seen_count; temp++) {
+				if (seen [temp] == ed)
+					break;
+			}
+
+			/* show more info the first time around */
+			if (temp == seen_count) {
+				u32	info = ed->hwINFO;
+				u32	scratch = cpu_to_le32p (&ed->hwINFO);
+
+				temp = snprintf (next, size,
+					" (%cs dev%d%s ep%d-%s"
+					" max %d %08x%s%s)",
+					(info & ED_LOWSPEED) ? 'l' : 'f',
+					scratch & 0x7f,
+					(info & ED_ISO) ? " iso" : "",
+					(scratch >> 7) & 0xf,
+					(info & ED_IN) ? "in" : "out",
+					0x03ff & (scratch >> 16),
+					scratch,
+					(info & ED_SKIP) ? " s" : "",
+					(ed->hwHeadP & ED_H) ? " H" : "");
+				size -= temp;
+				next += temp;
+
+				// FIXME some TD info too
+
+				if (seen_count < DBG_SCHED_LIMIT)
+					seen [seen_count++] = ed;
+
+				ed = ed->ed_next;
+
+			} else {
+				/* we've seen it and what's after */
+				temp = 0;
+				ed = 0;
+			}
+
+		} while (ed);
+
+		temp = snprintf (next, size, "\n");
+		size -= temp;
+		next += temp;
+	}
+	spin_unlock_irqrestore (&ohci->lock, flags);
+	kfree (seen);
+
+	return count - size;
+}
+static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
+
+#undef DBG_SCHED_LIMIT
+
+static inline void create_debug_files (struct ohci_hcd *bus)
+{
+	device_create_file (&bus->hcd.pdev->dev, &dev_attr_async);
+	device_create_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+	// registers
+	dbg ("%s: created debug files", bus->hcd.self.bus_name);
+}
+
+static inline void remove_debug_files (struct ohci_hcd *bus)
+{
+	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_async);
+	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+}
+
+#else /* empty stubs for creating those files */
+
+static inline void create_debug_files (struct ohci_hcd *bus) { }
+static inline void remove_debug_files (struct ohci_hcd *bus) { }
+
+#endif /* DRIVERFS_DEBUG_FILES */
+
+/*-------------------------------------------------------------------------*/
 

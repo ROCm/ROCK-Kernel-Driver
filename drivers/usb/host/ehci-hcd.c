@@ -38,7 +38,12 @@
 #endif
 
 #include <linux/usb.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
+#include "../hcd.h"
+#else
 #include "../core/hcd.h"
+#endif
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -87,7 +92,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Aug-06"
+#define DRIVER_VERSION "2002-Aug-28"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -103,6 +108,8 @@
 #define	EHCI_TUNE_RL_TT		0
 #define	EHCI_TUNE_MULT_HS	1	/* 1-3 transactions/uframe; 4.10.3 */
 #define	EHCI_TUNE_MULT_TT	1
+
+#define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -232,6 +239,19 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 static void ehci_tasklet (unsigned long param);
 
+static void ehci_irq (struct usb_hcd *hcd);
+
+static void ehci_watchdog (unsigned long param)
+{
+	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
+	unsigned long		flags;
+
+	/* guard against lost IAA, which wedges everything */
+	spin_lock_irqsave (&ehci->lock, flags);
+	ehci_irq (&ehci->hcd);
+	spin_unlock_irqrestore (&ehci->lock, flags);
+}
+
 /* EHCI 0.96 (and later) section 5.1 says how to kick BIOS/SMM/...
  * off the controller (maybe it can boot from highspeed USB disks).
  */
@@ -267,6 +287,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			temp;
 	struct usb_device	*udev;
+	struct usb_bus		*bus;
 	int			retval;
 	u32			hcc_params;
 	u8                      tempbyte;
@@ -372,15 +393,18 @@ static int ehci_start (struct usb_hcd *hcd)
 	ehci->tasklet.func = ehci_tasklet;
 	ehci->tasklet.data = (unsigned long) ehci;
 
+	init_timer (&ehci->watchdog);
+	ehci->watchdog.function = ehci_watchdog;
+	ehci->watchdog.data = (unsigned long) ehci;
+
 	/* wire up the root hub */
-	hcd->self.root_hub = udev = usb_alloc_dev (NULL, &hcd->self);
+	bus = hcd_to_bus (hcd);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
 	if (!udev) {
 done2:
 		ehci_mem_cleanup (ehci);
 		return -ENOMEM;
 	}
-
-	create_debug_files (ehci);
 
 	/*
 	 * Start, enabling full USB 2.0 functionality ... usb 1.1 devices
@@ -394,7 +418,7 @@ done2:
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
 	temp = readw (&ehci->caps->hci_version);
-	info ("USB %x.%x support enabled, EHCI rev %x.%2x",
+	info ("USB %x.%x support enabled, EHCI rev %x.%02x",
 	      ((tempbyte & 0xf0)>>4),
 	      (tempbyte & 0x0f),
 	       temp >> 8,
@@ -409,15 +433,21 @@ done2:
 	 */
 	usb_connect (udev);
 	udev->speed = USB_SPEED_HIGH;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
+	if (usb_new_device (udev) != 0) {
+#else
 	if (usb_register_root_hub (udev, &ehci->hcd.pdev->dev) != 0) {
+#endif
 		if (hcd->state == USB_STATE_RUNNING)
 			ehci_ready (ehci);
 		ehci_reset (ehci);
-		hcd->self.root_hub = 0;
+		bus->root_hub = 0;
 		usb_free_dev (udev); 
 		retval = -ENODEV;
 		goto done2;
 	}
+
+	create_debug_files (ehci);
 
 	return 0;
 }
@@ -428,12 +458,19 @@ static void ehci_stop (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
-	dbg ("%s: stop", hcd->self.bus_name);
+	dbg ("%s: stop", hcd_to_bus (hcd)->bus_name);
 
 	/* no more interrupts ... */
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
+	if (in_interrupt ())		/* should not happen!! */
+		err ("stopped %s!", RUN_CONTEXT);
+	else
+		del_timer_sync (&ehci->watchdog);
 	ehci_reset (ehci);
+
+	/* let companion controllers work when we aren't */
+	writel (0, &ehci->regs->configured_flag);
 
 	remove_debug_files (ehci);
 
@@ -463,7 +500,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 	int			ports;
 	int			i;
 
-	dbg ("%s: suspend to %d", hcd->self.bus_name, state);
+	dbg ("%s: suspend to %d", hcd_to_bus (hcd)->bus_name, state);
 
 	ports = HCS_N_PORTS (ehci->hcs_params);
 
@@ -480,7 +517,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 		if ((temp & PORT_PE) == 0
 				|| (temp & PORT_OWNER) != 0)
 			continue;
-dbg ("%s: suspend port %d", hcd->self.bus_name, i);
+dbg ("%s: suspend port %d", hcd_to_bus (hcd)->bus_name, i);
 		temp |= PORT_SUSPEND;
 		writel (temp, &ehci->regs->port_status [i]);
 	}
@@ -502,7 +539,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	int			ports;
 	int			i;
 
-	dbg ("%s: resume", hcd->self.bus_name);
+	dbg ("%s: resume", hcd_to_bus (hcd)->bus_name);
 
 	ports = HCS_N_PORTS (ehci->hcs_params);
 
@@ -522,7 +559,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 		if ((temp & PORT_PE) == 0
 				|| (temp & PORT_SUSPEND) != 0)
 			continue;
-dbg ("%s: resume port %d", hcd->self.bus_name, i);
+dbg ("%s: resume port %d", hcd_to_bus (hcd)->bus_name, i);
 		temp |= PORT_RESUME;
 		writel (temp, &ehci->regs->port_status [i]);
 		readl (&ehci->regs->command);	/* unblock posted writes */
@@ -546,12 +583,17 @@ dbg ("%s: resume port %d", hcd->self.bus_name, i);
 static void ehci_tasklet (unsigned long param)
 {
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
+	unsigned long		flags;
+
+	spin_lock_irqsave (&ehci->lock, flags);
 
 	if (ehci->reclaim_ready)
-		end_unlink_async (ehci);
-	scan_async (ehci);
+		flags = end_unlink_async (ehci, flags);
+	flags = scan_async (ehci, flags);
 	if (ehci->next_uframe != -1)
-		scan_periodic (ehci);
+		flags = scan_periodic (ehci, flags);
+
+	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -564,7 +606,7 @@ static void ehci_irq (struct usb_hcd *hcd)
 
 	/* e.g. cardbus physical eject */
 	if (status == ~(u32) 0) {
-		dbg ("%s: device removed!", hcd->self.bus_name);
+		dbg ("%s: device removed!", hcd_to_bus (hcd)->bus_name);
 		goto dead;
 	}
 
@@ -597,7 +639,7 @@ static void ehci_irq (struct usb_hcd *hcd)
 	/* PCI errors [4.15.2.4] */
 	if (unlikely ((status & STS_FATAL) != 0)) {
 		err ("%s: fatal error, state %x",
-			hcd->self.bus_name, hcd->state);
+			hcd_to_bus (hcd)->bus_name, hcd->state);
 dead:
 		ehci_reset (ehci);
 		/* generic layer kills/unlinks all urbs, then
@@ -673,7 +715,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	unsigned long		flags;
 
 	dbg ("%s urb_dequeue %p qh %p state %d",
-		hcd->self.bus_name, urb, qh, qh->qh_state);
+		hcd_to_bus (hcd)->bus_name, urb, qh, qh->qh_state);
 
 	switch (usb_pipetype (urb->pipe)) {
 	// case PIPE_CONTROL:
@@ -681,7 +723,13 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	default:
 		spin_lock_irqsave (&ehci->lock, flags);
 		if (ehci->reclaim) {
-			dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
+			dbg ("dq %p: reclaim = %p, %s",
+				qh, ehci->reclaim, RUN_CONTEXT);
+			if (qh == ehci->reclaim) {
+				/* unlinking qh for another queued urb? */
+				spin_unlock_irqrestore (&ehci->lock, flags);
+				return 0;
+			}
 			if (in_interrupt ()) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
 				return -EAGAIN;
@@ -702,19 +750,19 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		break;
 
 	case PIPE_INTERRUPT:
+		spin_lock_irqsave (&ehci->lock, flags);
 		if (qh->qh_state == QH_STATE_LINKED) {
 			/* messy, can spin or block a microframe ... */
-			intr_deschedule (ehci, qh, 1);
+			flags = intr_deschedule (ehci, qh, 1, flags);
 			/* qh_state == IDLE */
 		}
-		qh_completions (ehci, qh);
+		flags = qh_completions (ehci, qh, flags);
 
 		/* reschedule QH iff another request is queued */
 		if (!list_empty (&qh->qtd_list)
 				&& HCD_IS_RUNNING (ehci->hcd.state)) {
 			int status;
 
-			spin_lock_irqsave (&ehci->lock, flags);
 			status = qh_schedule (ehci, qh);
 			spin_unlock_irqrestore (&ehci->lock, flags);
 
@@ -726,7 +774,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 			}
 			return status;
 		}
-
+		spin_unlock_irqrestore (&ehci->lock, flags);
 		break;
 
 	case PIPE_ISOCHRONOUS:
@@ -754,7 +802,8 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	/* ASSERT:  no requests/urbs are still linked (so no TDs) */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	dbg ("%s: free_config devnum %d", hcd->self.bus_name, udev->devnum);
+	dbg ("%s: free_config devnum %d",
+		hcd_to_bus (hcd)->bus_name, udev->devnum);
 
 	spin_lock_irqsave (&ehci->lock, flags);
 	for (i = 0; i < 32; i++) {
@@ -775,7 +824,8 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 				why = 0;
 			if (why) {
 				err ("dev %s-%s ep %d-%s error: %s",
-					hcd->self.bus_name, udev->devpath,
+					hcd_to_bus (hcd)->bus_name,
+					udev->devpath,
 					i & 0xf, (i & 0x10) ? "IN" : "OUT",
 					why);
 				BUG ();
@@ -805,8 +855,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 				start_unlink_async (ehci, qh);
 			while (qh->qh_state != QH_STATE_IDLE
 					&& ehci->hcd.state != USB_STATE_HALT) {
-				spin_unlock_irqrestore (&ehci->lock,
-					flags);
+				spin_unlock_irqrestore (&ehci->lock, flags);
 				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
