@@ -631,79 +631,72 @@ inet6_unregister_protosw(struct inet_protosw *p)
 	inet_unregister_protosw(p);
 }
 
-static int __init init_ipv6_mibs(void)
+int
+snmp6_mib_init(void *ptr[2], size_t mibsize)
 {
 	int i;
- 
-	ipv6_statistics[0] = kmalloc_percpu(sizeof (struct ipv6_mib),
-						GFP_KERNEL);
-	if (!ipv6_statistics[0])
-		goto err_ip_mib0;
-	ipv6_statistics[1] = kmalloc_percpu(sizeof (struct ipv6_mib),
-						GFP_KERNEL);
-	if (!ipv6_statistics[1])
-		goto err_ip_mib1;
-	
-	icmpv6_statistics[0] = kmalloc_percpu(sizeof (struct icmpv6_mib),
-						GFP_KERNEL);
-	if (!icmpv6_statistics[0])
-		goto err_icmp_mib0;
-	icmpv6_statistics[1] = kmalloc_percpu(sizeof (struct icmpv6_mib),
-						GFP_KERNEL);
-	if (!icmpv6_statistics[1])
-		goto err_icmp_mib1;
-	
-	udp_stats_in6[0] = kmalloc_percpu(sizeof (struct udp_mib),
-						GFP_KERNEL);
-	if (!udp_stats_in6[0])
-		goto err_udp_mib0;
-	udp_stats_in6[1] = kmalloc_percpu(sizeof (struct udp_mib),
-						GFP_KERNEL);
-	if (!udp_stats_in6[1])
-		goto err_udp_mib1;
 
-	/* Zero all percpu versions of the mibs */
+	if (ptr == NULL)
+		return -EINVAL;
+
+	ptr[0] = kmalloc_percpu(mibsize, GFP_KERNEL);
+	if (!ptr[0])
+		goto err0;
+
+	ptr[1] = kmalloc_percpu(mibsize, GFP_KERNEL);
+	if (!ptr[1])
+		goto err1;
+
+	/* Zero percpu version of the mibs */
 	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_possible(i)) {
-		memset(per_cpu_ptr(ipv6_statistics[0], i), 0,
-				sizeof (struct ipv6_mib));
-		memset(per_cpu_ptr(ipv6_statistics[1], i), 0,
-				sizeof (struct ipv6_mib));
-		memset(per_cpu_ptr(icmpv6_statistics[0], i), 0,
-				sizeof (struct icmpv6_mib));
-		memset(per_cpu_ptr(icmpv6_statistics[1], i), 0,
-				sizeof (struct icmpv6_mib));
-		memset(per_cpu_ptr(udp_stats_in6[0], i), 0,
-				sizeof (struct udp_mib));
-		memset(per_cpu_ptr(udp_stats_in6[1], i), 0,
-				sizeof (struct udp_mib));
+			memset(per_cpu_ptr(ptr[0], i), 0, mibsize);
+			memset(per_cpu_ptr(ptr[1], i), 0, mibsize);
 		}
 	}
 	return 0;
 
-err_udp_mib1:
-	kfree_percpu(udp_stats_in6[0]);
-err_udp_mib0:
-	kfree_percpu(icmpv6_statistics[1]);
-err_icmp_mib1:
-	kfree_percpu(icmpv6_statistics[0]);
-err_icmp_mib0:
-	kfree_percpu(ipv6_statistics[1]);
-err_ip_mib1:
-	kfree_percpu(ipv6_statistics[0]);
-err_ip_mib0:
+err1:
+	kfree_percpu(ptr[0]);
+	ptr[0] = NULL;
+err0:
+	return -ENOMEM;
+}
+
+void
+snmp6_mib_free(void *ptr[2])
+{
+	if (ptr == NULL)
+		return;
+	kfree_percpu(ptr[0]);
+	kfree_percpu(ptr[1]);
+	ptr[0] = ptr[1] = NULL;
+}
+
+static int __init init_ipv6_mibs(void)
+{
+	if (snmp6_mib_init((void **)ipv6_statistics, sizeof (struct ipv6_mib)) < 0)
+		goto err_ip_mib;
+	if (snmp6_mib_init((void **)icmpv6_statistics, sizeof (struct icmpv6_mib)) < 0)
+		goto err_icmp_mib;
+	if (snmp6_mib_init((void **)udp_stats_in6, sizeof (struct udp_mib)) < 0)
+		goto err_udp_mib;
+	return 0;
+
+err_udp_mib:
+	snmp6_mib_free((void **)icmpv6_statistics);
+err_icmp_mib:
+	snmp6_mib_free((void **)ipv6_statistics);
+err_ip_mib:
 	return -ENOMEM;
 	
 }
 
 static void cleanup_ipv6_mibs(void)
 {
-	kfree_percpu(ipv6_statistics[0]);
-	kfree_percpu(ipv6_statistics[1]);
-	kfree_percpu(icmpv6_statistics[0]);
-	kfree_percpu(icmpv6_statistics[1]);
-	kfree_percpu(udp_stats_in6[0]);
-	kfree_percpu(udp_stats_in6[1]);
+	snmp6_mib_free((void **)ipv6_statistics);
+	snmp6_mib_free((void **)icmpv6_statistics);
+	snmp6_mib_free((void **)udp_stats_in6);
 }
 
 extern int ipv6_misc_proc_init(void);

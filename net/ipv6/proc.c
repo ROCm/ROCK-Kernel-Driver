@@ -10,12 +10,14 @@
  * Version:	$Id: proc.c,v 1.17 2002/02/01 22:01:04 davem Exp $
  *
  * Authors:	David S. Miller (davem@caip.rutgers.edu)
+ * 		YOSHIFUJI Hideaki <yoshfuji@linux-ipv6.org>
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/socket.h>
 #include <linux/net.h>
@@ -53,14 +55,16 @@ static int sockstat6_seq_show(struct seq_file *seq, void *v)
 }
 
 
-static struct snmp6_item
+struct snmp6_item
 {
 	char *name;
-	void **mib;
 	int   offset;
-} snmp6_list[] = {
+};
+#define SNMP6_SENTINEL	{ .name = NULL, .offset = 0 }
+
+static struct snmp6_item snmp6_ipv6_list[] = {
 /* ipv6 mib according to draft-ietf-ipngwg-ipv6-mib-04 */
-#define SNMP6_GEN(x) { #x , (void **)ipv6_statistics, offsetof(struct ipv6_mib, x) }
+#define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct ipv6_mib, x) }
 	SNMP6_GEN(Ip6InReceives),
 	SNMP6_GEN(Ip6InHdrErrors),
 	SNMP6_GEN(Ip6InTooBigErrors),
@@ -84,6 +88,10 @@ static struct snmp6_item
 	SNMP6_GEN(Ip6InMcastPkts),
 	SNMP6_GEN(Ip6OutMcastPkts),
 #undef SNMP6_GEN
+	SNMP6_SENTINEL
+};
+
+static struct snmp6_item snmp6_icmp6_list[] = {
 /* icmpv6 mib according to draft-ietf-ipngwg-ipv6-icmp-mib-02
 
    Exceptions:  {In|Out}AdminProhibs are removed, because I see
@@ -94,7 +102,7 @@ static struct snmp6_item
 		OutRouterAdvertisements too.
 		OutGroupMembQueries too.
  */
-#define SNMP6_GEN(x) { #x , (void **)icmpv6_statistics, offsetof(struct icmpv6_mib, x) }
+#define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct icmpv6_mib, x) }
 	SNMP6_GEN(Icmp6InMsgs),
 	SNMP6_GEN(Icmp6InErrors),
 	SNMP6_GEN(Icmp6InDestUnreachs),
@@ -124,12 +132,17 @@ static struct snmp6_item
 	SNMP6_GEN(Icmp6OutGroupMembResponses),
 	SNMP6_GEN(Icmp6OutGroupMembReductions),
 #undef SNMP6_GEN
-#define SNMP6_GEN(x) { "Udp6" #x , (void **)udp_stats_in6, offsetof(struct udp_mib, Udp##x) }
+	SNMP6_SENTINEL
+};
+
+static struct snmp6_item snmp6_udp6_list[] = {
+#define SNMP6_GEN(x) { .name = "Udp6" #x , .offset = offsetof(struct udp_mib, Udp##x) }
 	SNMP6_GEN(InDatagrams),
 	SNMP6_GEN(NoPorts),
 	SNMP6_GEN(InErrors),
-	SNMP6_GEN(OutDatagrams)
+	SNMP6_GEN(OutDatagrams),
 #undef SNMP6_GEN
+	SNMP6_SENTINEL
 };
 
 static unsigned long
@@ -151,17 +164,22 @@ fold_field(void *mib[], int offt)
         return res;
 }
 
-static int snmp6_seq_show(struct seq_file *seq, void *v)
+static inline void
+snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp6_item *itemlist)
 {
 	int i;
-
-	for (i=0; i<sizeof(snmp6_list)/sizeof(snmp6_list[0]); i++)
-		seq_printf(seq, "%-32s\t%lu\n", snmp6_list[i].name,
-			       fold_field(snmp6_list[i].mib, snmp6_list[i].offset));
-
-	return 0;
+	for (i=0; itemlist[i].name; i++)
+		seq_printf(seq, "%-32s\t%lu\n", itemlist[i].name, 
+				fold_field(mib, itemlist[i].offset));
 }
 
+static int snmp6_seq_show(struct seq_file *seq, void *v)
+{
+	snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipv6_list);
+	snmp6_seq_show_item(seq, (void **)icmpv6_statistics, snmp6_icmp6_list);
+	snmp6_seq_show_item(seq, (void **)udp_stats_in6, snmp6_udp6_list);
+	return 0;
+}
 
 static int sockstat6_seq_open(struct inode *inode, struct file *file)
 {
