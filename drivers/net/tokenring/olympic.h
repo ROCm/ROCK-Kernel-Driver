@@ -91,6 +91,7 @@
 #define TIMER 0x50
 
 #define CLKCTL 0x74
+#define CLKCTL_PAUSE (1<<15) 
 
 #define PM_CON 0x4
 
