@@ -404,7 +404,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 	struct inode *bd_inode = bdev->bd_inode;
 	struct address_space *bd_mapping = bd_inode->i_mapping;
 	struct buffer_head *ret = NULL;
-	unsigned long index;
+	pgoff_t index;
 	struct buffer_head *bh;
 	struct buffer_head *head;
 	struct page *page;
@@ -1093,7 +1093,7 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
  */ 
 static void
 init_page_buffers(struct page *page, struct block_device *bdev,
-			int block, int size)
+			sector_t block, int size)
 {
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh = head;
@@ -1121,8 +1121,8 @@ init_page_buffers(struct page *page, struct block_device *bdev,
  * This is user purely for blockdev mappings.
  */
 static struct page *
-grow_dev_page(struct block_device *bdev, unsigned long block,
-			unsigned long index, int size)
+grow_dev_page(struct block_device *bdev, sector_t block,
+		pgoff_t index, int size)
 {
 	struct inode *inode = bdev->bd_inode;
 	struct page *page;
@@ -1178,10 +1178,10 @@ failed:
  * grow_dev_page() will go BUG() if this happens.
  */
 static inline int
-grow_buffers(struct block_device *bdev, unsigned long block, int size)
+grow_buffers(struct block_device *bdev, sector_t block, int size)
 {
 	struct page *page;
-	unsigned long index;
+	pgoff_t index;
 	int sizebits;
 
 	/* Size must be multiple of hard sectorsize */
@@ -1738,8 +1738,8 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 			get_block_t *get_block, struct writeback_control *wbc)
 {
 	int err;
-	unsigned long block;
-	unsigned long last_block;
+	sector_t block;
+	sector_t last_block;
 	struct buffer_head *bh, *head;
 	int nr_underway = 0;
 
@@ -2207,7 +2207,7 @@ int cont_prepare_write(struct page *page, unsigned offset,
 	struct address_space *mapping = page->mapping;
 	struct inode *inode = mapping->host;
 	struct page *new_page;
-	unsigned long pgpos;
+	pgoff_t pgpos;
 	long status;
 	unsigned zerofrom;
 	unsigned blocksize = 1 << inode->i_blkbits;
@@ -2512,9 +2512,11 @@ EXPORT_SYMBOL(nobh_truncate_page);
 int block_truncate_page(struct address_space *mapping,
 			loff_t from, get_block_t *get_block)
 {
-	unsigned long index = from >> PAGE_CACHE_SHIFT;
+	pgoff_t index = from >> PAGE_CACHE_SHIFT;
 	unsigned offset = from & (PAGE_CACHE_SIZE-1);
-	unsigned blocksize, iblock, length, pos;
+	unsigned blocksize;
+	pgoff_t iblock;
+	unsigned length, pos;
 	struct inode *inode = mapping->host;
 	struct page *page;
 	struct buffer_head *bh;
@@ -2594,7 +2596,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 {
 	struct inode * const inode = page->mapping->host;
 	loff_t i_size = i_size_read(inode);
-	const unsigned long end_index = i_size >> PAGE_CACHE_SHIFT;
+	const pgoff_t end_index = i_size >> PAGE_CACHE_SHIFT;
 	unsigned offset;
 	void *kaddr;
 
