@@ -262,7 +262,7 @@ static int context_struct_compute_av(struct context *scontext,
 	 * pair.
 	 */
 	if (tclass == SECCLASS_PROCESS &&
-	    avd->allowed && PROCESS__TRANSITION &&
+	    (avd->allowed & PROCESS__TRANSITION) &&
 	    scontext->role != tcontext->role) {
 		for (ra = policydb.role_allow; ra; ra = ra->next) {
 			if (scontext->role == ra->role &&
