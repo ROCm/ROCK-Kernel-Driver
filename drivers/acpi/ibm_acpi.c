@@ -1168,7 +1168,7 @@ static int set_ibm_param(const char *val, struct kernel_param *kp)
 #define IBM_PARAM(feature) \
 	module_param_call(feature, set_ibm_param, NULL, NULL, 0)
 
-static void __exit acpi_ibm_exit(void)
+static void acpi_ibm_exit(void)
 {
 	int i;
 
