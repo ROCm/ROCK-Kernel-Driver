@@ -146,13 +146,13 @@ void platform_device_unregister(struct platform_device * pdev)
 	int i;
 
 	if (pdev) {
-		device_unregister(&pdev->dev);
-
 		for (i = 0; i < pdev->num_resources; i++) {
 			struct resource *r = &pdev->resource[i];
 			if (r->flags & (IORESOURCE_MEM|IORESOURCE_IO))
 				release_resource(r);
 		}
+
+		device_unregister(&pdev->dev);
 	}
 }
 
