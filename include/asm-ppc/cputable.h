@@ -75,6 +75,7 @@ extern struct cpu_spec		*cur_cpu_spec[];
 #define CPU_FTR_DUAL_PLL_750FX		0x00004000
 #define CPU_FTR_NO_DPM			0x00008000
 #define CPU_FTR_HAS_HIGH_BATS		0x00010000
+#define CPU_FTR_NEED_COHERENT           0x00020000
 
 #ifdef __ASSEMBLY__
 
