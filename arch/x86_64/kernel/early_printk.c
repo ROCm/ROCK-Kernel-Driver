@@ -99,18 +99,17 @@ static void early_serial_write(struct console *con, const char *s, unsigned n)
 
 #define DEFAULT_BAUD 9600
 
-static __init void early_serial_init(char *opt)
+static __init void early_serial_init(char *s)
 {
 	unsigned char c; 
 	unsigned divisor;
 	unsigned baud = DEFAULT_BAUD;
-	char *s, *e;
+	char *e;
 
-	if (*opt == ',') 
-		++opt;
+	if (*s == ',')
+		++s;
 
-	s = strsep(&opt, ","); 
-	if (s != NULL) { 
+	if (*s) {
 		unsigned port; 
 		if (!strncmp(s,"0x",2)) {
 			early_serial_base = simple_strtoul(s, &e, 16);
@@ -124,6 +123,9 @@ static __init void early_serial_init(char *opt)
 				port = 0;
 			early_serial_base = bases[port];
 		}
+		s += strcspn(s, ",");
+		if (*s == ',')
+			s++;
 	}
 
 	outb(0x3, early_serial_base + LCR);	/* 8n1 */
@@ -131,8 +133,7 @@ static __init void early_serial_init(char *opt)
 	outb(0, early_serial_base + FCR);	/* no fifo */
 	outb(0x3, early_serial_base + MCR);	/* DTR + RTS */
 
-	s = strsep(&opt, ","); 
-	if (s != NULL) { 
+	if (*s) {
 		baud = simple_strtoul(s, &e, 0); 
 		if (baud == 0 || s == e) 
 			baud = DEFAULT_BAUD;

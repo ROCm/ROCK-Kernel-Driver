@@ -186,10 +186,30 @@ extern void iounmap(void *addr);
 #define __raw_readl readl
 #define __raw_readq readq
 
-#define writeb(b,addr) (*(volatile unsigned char *) (addr) = (b))
-#define writew(b,addr) (*(volatile unsigned short *) (addr) = (b))
+#ifdef CONFIG_UNORDERED_IO
+static inline void __writel(u32 val, void *addr)
+{
+	volatile u32 *target = addr;
+	asm volatile("movnti %1,%0"
+		     : "=m" (*target)
+		     : "r" (val) : "memory");
+}
+
+static inline void __writeq(u64 val, void *addr)
+{
+	volatile u64 *target = addr;
+	asm volatile("movnti %1,%0"
+		     : "=m" (*target)
+		     : "r" (val) : "memory");
+}
+#define writeq(val,addr) __writeq((val),(void *)(addr))
+#define writel(val,addr) __writel((val),(void *)(addr))
+#else
 #define writel(b,addr) (*(volatile unsigned int *) (addr) = (b))
 #define writeq(b,addr) (*(volatile unsigned long *) (addr) = (b))
+#endif
+#define writeb(b,addr) (*(volatile unsigned char *) (addr) = (b))
+#define writew(b,addr) (*(volatile unsigned short *) (addr) = (b))
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
@@ -299,11 +319,8 @@ out:
 
 #define flush_write_buffers() 
 
-/* Disable vmerge for now. Need to fix the block layer code
-   to check for non iommu addresses first.
-   When the IOMMU is force it is safe to enable. */
-extern int iommu_merge;
-#define BIO_VMERGE_BOUNDARY (iommu_merge ? 4096 : 0)
+extern int iommu_bio_merge;
+#define BIO_VMERGE_BOUNDARY iommu_bio_merge
 
 #endif /* __KERNEL__ */
 

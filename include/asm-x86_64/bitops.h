@@ -25,10 +25,10 @@
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(long nr, volatile void * addr)
+static __inline__ void set_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
-		"btsq %1,%0"
+		"btsl %1,%0"
 		:"=m" (ADDR)
 		:"dIr" (nr) : "memory");
 }
@@ -254,128 +254,37 @@ static __inline__ int variable_test_bit(int nr, volatile const void * addr)
 
 #undef ADDR
 
-/**
- * find_first_zero_bit - find the first zero bit in a memory region
- * @addr: The address to start the search at
- * @size: The maximum size to search
- *
- * Returns the bit-number of the first zero bit, not the number of the byte
- * containing a bit.
- */
-static __inline__ int find_first_zero_bit(const unsigned long * addr, unsigned size)
-{
-	int d0, d1, d2;
-	int res;
+extern long find_first_zero_bit(const unsigned long * addr, unsigned long size);
+extern long find_next_zero_bit (const unsigned long * addr, long size, long offset);
+extern long find_first_bit(const unsigned long * addr, unsigned long size);
+extern long find_next_bit(const unsigned long * addr, long size, long offset);
 
-	if (!size)
-		return 0;
-	__asm__ __volatile__(
-		"movl $-1,%%eax\n\t"
-		"xorl %%edx,%%edx\n\t"
-		"repe; scasl\n\t"
-		"je 1f\n\t"
-		"xorl -4(%%rdi),%%eax\n\t"
-		"subq $4,%%rdi\n\t"
-		"bsfl %%eax,%%edx\n"
-		"1:\tsubq %%rbx,%%rdi\n\t"
-		"shlq $3,%%rdi\n\t"
-		"addq %%rdi,%%rdx"
-		:"=d" (res), "=&c" (d0), "=&D" (d1), "=&a" (d2)
-		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
-	return res;
+/* return index of first bet set in val or max when no bit is set */
+static inline unsigned long __scanbit(unsigned long val, unsigned long max)
+{
+	asm("bsfq %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max));
+	return val;
 }
 
-/**
- * find_next_zero_bit - find the first zero bit in a memory region
- * @addr: The address to base the search on
- * @offset: The bitnumber to start searching at
- * @size: The maximum size to search
- */
-static __inline__ int find_next_zero_bit (const unsigned long * addr, int size, int offset)
-{
-	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
-	unsigned long set = 0;
-	unsigned long res, bit = offset&63;
+#define find_first_bit(addr,size) \
+((__builtin_constant_p(size) && size <= BITS_PER_LONG ? \
+  (__scanbit(*(unsigned long *)addr,(size))) : \
+  find_first_bit(addr,size)))
+
+#define find_next_bit(addr,size,off) \
+((__builtin_constant_p(size) && size <= BITS_PER_LONG ? 	  \
+  ((off) + (__scanbit((*(unsigned long *)addr) >> (off),(size)-(off)))) : \
+	find_next_bit(addr,size,off)))
+
+#define find_first_zero_bit(addr,size) \
+((__builtin_constant_p(size) && size <= BITS_PER_LONG ? \
+  (__scanbit(~*(unsigned long *)addr,(size))) : \
+  	find_first_zero_bit(addr,size)))
 	
-	if (bit) {
-		/*
-		 * Look for zero in first word
-		 */
-		__asm__("bsfq %1,%0\n\t"
-			"cmoveq %2,%0"
-			: "=r" (set)
-			: "r" (~(*p >> bit)), "r"(64L));
-		if (set < (64 - bit))
-			return set + offset;
-		set = 64 - bit;
-		p++;
-	}
-	/*
-	 * No zero yet, search remaining full words for a zero
-	 */
-	res = find_first_zero_bit ((const unsigned long *)p, size - 64 * (p - (unsigned long *) addr));
-	return (offset + set + res);
-}
-
-
-/**
- * find_first_bit - find the first set bit in a memory region
- * @addr: The address to start the search at
- * @size: The maximum size to search
- *
- * Returns the bit-number of the first set bit, not the number of the byte
- * containing a bit.
- */
-static __inline__ int find_first_bit(const unsigned long * addr, unsigned size)
-{
-	int d0, d1;
-	int res;
-
-	/* This looks at memory. Mark it volatile to tell gcc not to move it around */
-	__asm__ __volatile__(
-		"xorl %%eax,%%eax\n\t"
-		"repe; scasl\n\t"
-		"jz 1f\n\t"
-		"leaq -4(%%rdi),%%rdi\n\t"
-		"bsfl (%%rdi),%%eax\n"
-		"1:\tsubq %%rbx,%%rdi\n\t"
-		"shll $3,%%edi\n\t"
-		"addl %%edi,%%eax"
-		:"=a" (res), "=&c" (d0), "=&D" (d1)
-		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
-	return res;
-}
-
-/**
- * find_next_bit - find the first set bit in a memory region
- * @addr: The address to base the search on
- * @offset: The bitnumber to start searching at
- * @size: The maximum size to search
- */
-static __inline__ int find_next_bit(const unsigned long * addr, int size, int offset)
-{
-	const unsigned long * p = addr + (offset >> 6);
-	unsigned long set = 0, bit = offset & 63, res;
-	
-	if (bit) {
-		/*
-		 * Look for nonzero in the first 64 bits:
-		 */
-		__asm__("bsfq %1,%0\n\t"
-			"cmoveq %2,%0\n\t"
-			: "=r" (set)
-			: "r" (*p >> bit), "r" (64L));
-		if (set < (64 - bit))
-			return set + offset;
-		set = 64 - bit;
-		p++;
-	}
-	/*
-	 * No set bit yet, search remaining full words for a bit
-	 */
-	res = find_first_bit (p, size - 64 * (p - addr));
-	return (offset + set + res);
-}
+#define find_next_zero_bit(addr,size,off) \
+((__builtin_constant_p(size) && size <= BITS_PER_LONG ? 	  \
+  ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off)),(size)-(off)))) : \
+	find_next_zero_bit(addr,size,off)))
 
 /* 
  * Find string of zero bits in a bitmap. -1 when not found.

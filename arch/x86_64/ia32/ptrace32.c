@@ -249,8 +249,8 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_GETFPREGS:
 	case PTRACE_SETFPXREGS:
 	case PTRACE_GETFPXREGS:
+	case PTRACE_GETEVENTMSG:
 		break;
-		
 	} 
 
 	child = find_target(request, pid, &ret);
@@ -362,6 +362,10 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		ret = 0; 
 		break;
 	}
+
+	case PTRACE_GETEVENTMSG:
+		ret = put_user(child->ptrace_message,(unsigned int __user *)(u64)data);
+		break;
 
 	default:
 		ret = -EINVAL;

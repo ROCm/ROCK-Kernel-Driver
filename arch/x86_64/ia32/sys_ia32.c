@@ -1125,7 +1125,7 @@ long sys32_ustat(unsigned dev, struct ustat32 __user *u32p)
 } 
 
 asmlinkage long sys32_execve(char __user *name, compat_uptr_t __user *argv,
-			     compat_uptr_t __user *envp, struct pt_regs regs)
+			     compat_uptr_t __user *envp, struct pt_regs *regs)
 {
 	long error;
 	char * filename;
@@ -1134,20 +1134,21 @@ asmlinkage long sys32_execve(char __user *name, compat_uptr_t __user *argv,
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		return error;
-	error = compat_do_execve(filename, argv, envp, &regs);
+	error = compat_do_execve(filename, argv, envp, regs);
 	if (error == 0)
 		current->ptrace &= ~PT_DTRACE;
 	putname(filename);
 	return error;
 }
 
-asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp, struct pt_regs regs)
+asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp,
+			    struct pt_regs *regs)
 {
-	void __user *parent_tid = (void __user *)regs.rdx;
-	void __user *child_tid = (void __user *)regs.rdi; 
+	void __user *parent_tid = (void __user *)regs->rdx;
+	void __user *child_tid = (void __user *)regs->rdi;
 	if (!newsp)
-		newsp = regs.rsp;
-        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
+		newsp = regs->rsp;
+        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0,
 		    parent_tid, child_tid);
 }
 
@@ -1336,6 +1337,12 @@ long sys32_quotactl(void)
 	} 
 	return -ENOSYS;
 } 
+
+long sys32_lookup_dcookie(u32 addr_low, u32 addr_high,
+			  char __user * buf, size_t len)
+{
+	return sys_lookup_dcookie(((u64)addr_high << 32) | addr_low, buf, len);
+}
 
 cond_syscall(sys32_ipc)
 

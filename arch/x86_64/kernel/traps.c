@@ -352,7 +352,7 @@ void __die(const char * str, struct pt_regs * regs, long err)
 #ifdef CONFIG_DEBUG_PAGEALLOC
 	printk("DEBUG_PAGEALLOC");
 #endif
-		printk("\n");
+	printk("\n");
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
 	/* Executive summary in case the oops scrolled away */
@@ -513,7 +513,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_no = 13;
 		force_sig(SIGSEGV, tsk);
-	return;
+		return;
 	} 
 
 	/* kernel gp */
@@ -670,7 +670,6 @@ clear_dr7:
 	return regs;
 
 clear_TF_reenable:
-	printk("clear_tf_reenable\n");
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 
 clear_TF:
@@ -681,16 +680,43 @@ clear_TF:
 	return regs;	
 }
 
+static int kernel_math_error(struct pt_regs *regs, char *str)
+{
+	const struct exception_table_entry *fixup;
+	fixup = search_exception_tables(regs->rip);
+	if (fixup) {
+		regs->rip = fixup->fixup;
+		return 1;
+	}
+	notify_die(DIE_GPF, str, regs, 0, 16, SIGFPE);
+#if 0
+	/* This should be a die, but warn only for now */
+	die(str, regs, 0);
+#else
+	printk(KERN_DEBUG "%s: %s at ", current->comm, str);
+	printk_address(regs->rip);
+	printk("\n");
+#endif
+	return 0;
+}
+
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
  * the correct behaviour even in the presence of the asynchronous
  * IRQ13 behaviour
  */
-void math_error(void __user *rip)
+asmlinkage void do_coprocessor_error(struct pt_regs *regs)
 {
+	void __user *rip = (void __user *)(regs->rip);
 	struct task_struct * task;
 	siginfo_t info;
 	unsigned short cwd, swd;
+
+	conditional_sti(regs);
+	if ((regs->cs & 3) == 0 &&
+	    kernel_math_error(regs, "kernel x87 math error"))
+		return;
+
 	/*
 	 * Save the info for the exception handler and clear the error.
 	 */
@@ -740,22 +766,22 @@ void math_error(void __user *rip)
 	force_sig_info(SIGFPE, &info, task);
 }
 
-asmlinkage void do_coprocessor_error(struct pt_regs * regs)
-{
-	conditional_sti(regs);
-	math_error((void __user *)regs->rip);
-}
-
 asmlinkage void bad_intr(void)
 {
 	printk("bad interrupt"); 
 }
 
-static inline void simd_math_error(void __user *rip)
+asmlinkage void do_simd_coprocessor_error(struct pt_regs *regs)
 {
+	void __user *rip = (void __user *)(regs->rip);
 	struct task_struct * task;
 	siginfo_t info;
 	unsigned short mxcsr;
+
+	conditional_sti(regs);
+	if ((regs->cs & 3) == 0 &&
+        	kernel_math_error(regs, "simd math error"))
+		return;
 
 	/*
 	 * Save the info for the exception handler and clear the error.
@@ -797,12 +823,6 @@ static inline void simd_math_error(void __user *rip)
 			break;
 	}
 	force_sig_info(SIGFPE, &info, task);
-}
-
-asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs)
-{
-	conditional_sti(regs);
-		simd_math_error((void __user *)regs->rip);
 }
 
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs)
