@@ -197,62 +197,24 @@ static void ps_tq_int( void *data);
 static void (* ps_continuation)(void);
 static int (* ps_ready)(void);
 static unsigned long ps_timeout;
-static int ps_tq_active = 0;
-static int ps_nice = 0;
-
-static spinlock_t ps_spinlock __attribute__((unused)) = SPIN_LOCK_UNLOCKED;
 
 static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
 
-static void ps_set_intr(void (*continuation)(void), 
-			int (*ready)(void),
-			int timeout, int nice)
+static void ps_set_intr(void)
 {
-	unsigned long	flags;
-
-	spin_lock_irqsave(&ps_spinlock,flags);
-
-	ps_continuation = continuation;
-	ps_ready = ready;
-	ps_timeout = jiffies + timeout;
-	ps_nice = nice;
-
-	if (!ps_tq_active) {
-		ps_tq_active = 1;
-		if (!ps_nice)
-			schedule_work(&ps_tq);
-		else
-			schedule_delayed_work(&ps_tq, ps_nice-1);
-	}
-	spin_unlock_irqrestore(&ps_spinlock,flags);
+	if (!nice)
+		schedule_work(&ps_tq);
+	else
+		schedule_delayed_work(&ps_tq, nice-1);
 }
 
 static void ps_tq_int(void *data)
 {
-	void (*con)(void);
-	unsigned long flags;
-
-	spin_lock_irqsave(&ps_spinlock,flags);
-
-	con = ps_continuation;
-	ps_tq_active = 0;
-
-	if (!con) {
-		spin_unlock_irqrestore(&ps_spinlock,flags);
-		return;
-	}
 	if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
-		ps_continuation = NULL;
-		spin_unlock_irqrestore(&ps_spinlock,flags);
-		con();
+		ps_continuation();
 		return;
 	}
-	ps_tq_active = 1;
-	if (!ps_nice)
-		schedule_work(&ps_tq);
-	else
-		schedule_delayed_work(&ps_tq, ps_nice-1);
-	spin_unlock_irqrestore(&ps_spinlock,flags);
+	ps_set_intr();
 }
 
 #define PD_BITS    4
@@ -858,13 +820,14 @@ static inline void next_request(int success)
 
 static void do_pd_read(void)
 {
-	ps_set_intr(do_pd_read_start, 0, 0, nice);
+	ps_continuation = do_pd_read_start;
+	ps_ready = 0;
+	ps_timeout = jiffies;
+	ps_set_intr();
 }
 
 static void do_pd_read_start(void)
 {
-	pd_busy = 1;
-
 	pi_connect(pd_current->pi);
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_read") & STAT_ERR) {
 		pi_disconnect(pd_current->pi);
@@ -877,7 +840,10 @@ static void do_pd_read_start(void)
 		return;
 	}
 	pd_ide_command(pd_current, IDE_READ, pd_block, pd_run);
-	ps_set_intr(do_pd_read_drq, pd_ready, PD_TMO, nice);
+	ps_continuation = do_pd_read_drq;
+	ps_ready = pd_ready;
+	ps_timeout = jiffies + PD_TMO;
+	ps_set_intr();
 }
 
 static void do_pd_read_drq(void)
@@ -903,13 +869,14 @@ static void do_pd_read_drq(void)
 
 static void do_pd_write(void)
 {
-	ps_set_intr(do_pd_write_start, 0, 0, nice);
+	ps_continuation = do_pd_write_start;
+	ps_ready = 0;
+	ps_timeout = jiffies;
+	ps_set_intr();
 }
 
 static void do_pd_write_start(void)
 {
-	pd_busy = 1;
-
 	pi_connect(pd_current->pi);
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_write") & STAT_ERR) {
 		pi_disconnect(pd_current->pi);
@@ -937,7 +904,10 @@ static void do_pd_write_start(void)
 		if (pd_next_buf())
 			break;
 	}
-	ps_set_intr(do_pd_write_done, pd_ready, PD_TMO, nice);
+	ps_continuation = do_pd_write_done;
+	ps_ready = pd_ready;
+	ps_timeout = jiffies + PD_TMO;
+	ps_set_intr();
 }
 
 static void do_pd_write_done(void)
