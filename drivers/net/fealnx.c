@@ -84,6 +84,7 @@ static int full_duplex[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 #include <linux/mii.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
+#include <linux/delay.h>
 
 #include <asm/processor.h>	/* Processor type for cache alignment. */
 #include <asm/bitops.h>
@@ -715,6 +716,7 @@ err_out_res:
 	return err;
 }
 
+
 static void __devexit fealnx_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
@@ -735,43 +737,6 @@ static void __devexit fealnx_remove_one(struct pci_dev *pdev)
 		pci_set_drvdata(pdev, NULL);
 	} else
 		printk(KERN_ERR "fealnx: remove for unknown device\n");
-}
-
-unsigned int m80x_read_tick(void)
-/* function: Reads the Timer tick count register which decrements by 2 from  */
-/*           65536 to 0 every 1/36.414 of a second. Each 2 decrements of the */
-/*           count represents 838 nsec's.                                    */
-/* input   : none.                                                           */
-/* output  : none.                                                           */
-{
-	unsigned char tmp;
-	int value;
-
-	writeb((char) 0x06, 0x43);	// Command 8254 to latch T0's count
-
-	// now read the count.
-	tmp = (unsigned char) readb(0x40);
-	value = ((int) tmp) << 8;
-	tmp = (unsigned char) readb(0x40);
-	value |= (((int) tmp) & 0xff);
-	return (value);
-}
-
-
-void m80x_delay(unsigned int interval)
-/* function: to wait for a specified time.                                   */
-/* input   : interval ... the specified time.                                */
-/* output  : none.                                                           */
-{
-	unsigned int interval1, interval2, i = 0;
-
-	interval1 = m80x_read_tick();	// get initial value
-	do {
-		interval2 = m80x_read_tick();
-		if (interval1 < interval2)
-			interval1 = interval2;
-		++i;
-	} while (((interval1 - interval2) < (ushort) interval) && (i < 65535));
 }
 
 
@@ -813,7 +778,7 @@ static ulong m80x_send_cmd_to_phy(long miiport, int opcode, int phyad, int regad
 		/* high MDC */
 		miir |= MASK_MIIR_MII_MDC;
 		writel(miir, miiport);
-		m80x_delay(30);
+		udelay(30);
 
 		/* next */
 		mask >>= 1;
@@ -848,7 +813,7 @@ static int mdio_read(struct net_device *dev, int phyad, int regad)
 		/* high MDC, and wait */
 		miir |= MASK_MIIR_MII_MDC;
 		writel(miir, miiport);
-		m80x_delay((int) 30);
+		udelay(30);
 
 		/* next */
 		mask >>= 1;
@@ -1025,8 +990,7 @@ static void getlinkstatus(struct net_device *dev)
 				np->linkok = 1;
 				return;
 			}
-			// delay
-			m80x_delay(100);
+			udelay(100);
 		}
 	} else {
 		for (i = 0; i < DelayTime; ++i) {
@@ -1034,8 +998,7 @@ static void getlinkstatus(struct net_device *dev)
 				np->linkok = 1;
 				return;
 			}
-			// delay
-			m80x_delay(100);
+			udelay(100);
 		}
 	}
 }
