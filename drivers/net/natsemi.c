@@ -108,6 +108,10 @@
 	version 1.0.14:
 		* Cleanup some messages and autoneg in ethtool (Tim Hockin)
 
+	version 1.0.15:
+		* Get rid of cable_magic flag
+		* use new (National provided) solution for cable magic issue
+
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
 	* support for an external PHY
@@ -146,8 +150,8 @@
 #include <asm/uaccess.h>
 
 #define DRV_NAME	"natsemi"
-#define DRV_VERSION	"1.07+LK1.0.14"
-#define DRV_RELDATE	"Nov 27, 2001"
+#define DRV_VERSION	"1.07+LK1.0.15"
+#define DRV_RELDATE	"Jul 23, 2002"
 
 /* Updated to recommendations in pci-skeleton v2.03. */
 
@@ -204,7 +208,7 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
    There are no ill effects from too-large receive rings. */
 #define TX_RING_SIZE	16
 #define TX_QUEUE_LEN	10 /* Limit ring entries actually used, min 4. */
-#define RX_RING_SIZE	64
+#define RX_RING_SIZE	32
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
@@ -403,14 +407,12 @@ enum register_offsets {
 	SDCFG			= 0xF8
 };
 /* the values for the 'magic' registers above (PGSEL=1) */
-#ifdef CONFIG_NATSEMI_CABLE_MAGIC
-#define PMDCSR_VAL	0x1898
-#else
-#define PMDCSR_VAL	0x189C
-#endif
+#define PMDCSR_VAL	0x189c	/* enable preferred adaptation circuitry */
 #define TSTDAT_VAL	0x0
 #define DSPCFG_VAL	0x5040
-#define SDCFG_VAL	0x008c
+#define SDCFG_VAL	0x008c	/* set voltage thresholds for Signal Detect */
+#define DSPCFG_LOCK	0x20	/* coefficient lock bit in DSPCFG */
+#define TSTDAT_FIXED	0xe8	/* magic number for bad coefficients */
 
 /* misc PCI space registers */
 enum pci_register_offsets {
@@ -640,6 +642,8 @@ struct netdev_private {
 	u32 SavedClkRun;
 	/* silicon revision */
 	u32 srr;
+	/* expected DSPCFG value */
+	u16 dspcfg;
 	/* MII transceiver section. */
 	u16 advertising; /* NWay media advertisement */
 	unsigned int iosize;
@@ -654,6 +658,8 @@ static void natsemi_reset(struct net_device *dev);
 static void natsemi_reload_eeprom(struct net_device *dev);
 static void natsemi_stop_rxtx(struct net_device *dev);
 static int netdev_open(struct net_device *dev);
+static void do_cable_magic(struct net_device *dev);
+static void undo_cable_magic(struct net_device *dev);
 static void check_link(struct net_device *dev);
 static void netdev_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
@@ -1082,6 +1088,54 @@ static int netdev_open(struct net_device *dev)
 	return 0;
 }
 
+static void do_cable_magic(struct net_device *dev)
+{
+	/*
+	 * 100 MBit links with short cables can trip an issue with the chip.
+	 * The problem manifests as lots of CRC errors and/or flickering
+	 * activity LED while idle.  This process is based on instructions
+	 * from engineers at National.
+	 */
+	if (readl(dev->base_addr + ChipConfig) & CfgSpeed100) {
+		u16 data;
+
+		writew(1, dev->base_addr + PGSEL);
+		/*
+		 * coefficient visibility should already be enabled via
+		 * DSPCFG | 0x1000
+		 */
+		data = readw(dev->base_addr + TSTDAT) & 0xff;
+		/*
+		 * the value must be negative, and within certain values
+		 * (these values all come from National)
+		 */
+		if (!(data & 0x80) || ((data >= 0xd8) && (data <= 0xff))) {
+			struct netdev_private *np = dev->priv;
+
+			/* the bug has been triggered - fix the coefficient */
+			writew(TSTDAT_FIXED, dev->base_addr + TSTDAT);
+			/* lock the value */
+			data = readw(dev->base_addr + DSPCFG);
+			np->dspcfg = data | DSPCFG_LOCK;
+			writew(np->dspcfg, dev->base_addr + DSPCFG);
+		}
+		writew(0, dev->base_addr + PGSEL);
+	}
+}
+
+static void undo_cable_magic(struct net_device *dev)
+{
+	u16 data;
+	struct netdev_private *np = dev->priv;
+
+	writew(1, dev->base_addr + PGSEL);
+	/* make sure the lock bit is clear */
+	data = readw(dev->base_addr + DSPCFG);
+	np->dspcfg = data & ~DSPCFG_LOCK;
+	writew(np->dspcfg, dev->base_addr + DSPCFG);
+	writew(0, dev->base_addr + PGSEL);
+}
+
 static void check_link(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
@@ -1095,6 +1149,7 @@ static void check_link(struct net_device *dev)
 				printk(KERN_NOTICE "%s: link down.\n", 
 					dev->name);
 			netif_carrier_off(dev);
+			undo_cable_magic(dev);
 		}
 		return;
 	}
@@ -1102,6 +1157,7 @@ static void check_link(struct net_device *dev)
 		if (netif_msg_link(np))
 			printk(KERN_NOTICE "%s: link up.\n", dev->name);
 		netif_carrier_on(dev);
+		do_cable_magic(dev);
 	}
 
 	duplex = np->full_duplex || (chipcfg & CfgFullDuplex ? 1 : 0);
@@ -1155,6 +1211,7 @@ static void init_registers(struct net_device *dev)
 	writew(DSPCFG_VAL, ioaddr + DSPCFG);
 	writew(SDCFG_VAL, ioaddr + SDCFG);
 	writew(0, ioaddr + PGSEL);
+	np->dspcfg = DSPCFG_VAL;
 
 	/* Enable PHY Specific event based interrupts.  Link state change
 	   and Auto-Negotiation Completion are among the affected.
@@ -1217,8 +1274,10 @@ static void init_registers(struct net_device *dev)
 	writel(StatsClear, ioaddr + StatsCtrl); /* Clear Stats */
 }
 
-/* 
- * The frequency on this has been increased because of a nasty little problem.
+/*
+ * Purpose:
+ * check for sudden death of the NIC:
+ *
  * It seems that a reference set for this chip went out with incorrect info,
  * and there exist boards that aren't quite right.  An unexpected voltage drop
  * can cause the PHY to get itself in a weird state (basically reset..).
@@ -1240,12 +1299,15 @@ static void netdev_timer(unsigned long data)
 			   dev->name);
 	}
 
+	spin_lock_irq(&np->lock);
+
 	/* check for a nasty random phy-reset - use dspcfg as a flag */
 	writew(1, ioaddr+PGSEL);
 	dspcfg = readw(ioaddr+DSPCFG);
 	writew(0, ioaddr+PGSEL);
-	if (dspcfg != DSPCFG_VAL) {
+	if (dspcfg != np->dspcfg) {
 		if (!netif_queue_stopped(dev)) {
+			spin_unlock_irq(&np->lock);
 			if (netif_msg_hw(np))
 				printk(KERN_NOTICE "%s: possible phy reset: "
 					"re-initializing\n", dev->name);
@@ -1257,10 +1319,10 @@ static void netdev_timer(unsigned long data)
 		} else {
 			/* hurry back */
 			next_tick = HZ;
+			spin_unlock_irq(&np->lock);
 		}
 	} else {
 		/* init_registers() calls check_link() for the above case */
-		spin_lock_irq(&np->lock);
 		check_link(dev);
 		spin_unlock_irq(&np->lock);
 	}
