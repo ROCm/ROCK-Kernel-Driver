@@ -182,9 +182,9 @@ static void mark_offset_tsc(void)
 	if (lost >= 2) {
 		jiffies += lost-1;
 
-		/* sanity check to ensure we're not always loosing ticks */
+		/* sanity check to ensure we're not always losing ticks */
 		if (lost_count++ > 100) {
-			printk(KERN_WARNING "Loosing too many ticks!\n");
+			printk(KERN_WARNING "Losing too many ticks!\n");
 			printk(KERN_WARNING "TSC cannot be used as a timesource."
 					" (Are you running with SpeedStep?)\n");
 			printk(KERN_WARNING "Falling back to a sane timesource.\n");
