@@ -1354,38 +1354,38 @@ typedef struct smb_com_transaction2_fnext_rsp_parms {
 
 typedef struct smb_com_transaction2_qfsi_req {
 	struct smb_hdr hdr;	/* wct = 14+ */
-	__u16 TotalParameterCount;
-	__u16 TotalDataCount;
-	__u16 MaxParameterCount;
-	__u16 MaxDataCount;
+	__le16 TotalParameterCount;
+	__le16 TotalDataCount;
+	__le16 MaxParameterCount;
+	__le16 MaxDataCount;
 	__u8 MaxSetupCount;
 	__u8 Reserved;
-	__u16 Flags;
-	__u32 Timeout;
+	__le16 Flags;
+	__le32 Timeout;
 	__u16 Reserved2;
-	__u16 ParameterCount;
-	__u16 ParameterOffset;
-	__u16 DataCount;
-	__u16 DataOffset;
+	__le16 ParameterCount;
+	__le16 ParameterOffset;
+	__le16 DataCount;
+	__le16 DataOffset;
 	__u8 SetupCount;
 	__u8 Reserved3;
-	__u16 SubCommand;	/* one setup word */
-	__u16 ByteCount;
+	__le16 SubCommand;	/* one setup word */
+	__le16 ByteCount;
 	__u8 Pad;
-	__u16 InformationLevel;
+	__le16 InformationLevel;
 } TRANSACTION2_QFSI_REQ;
 
 typedef struct smb_com_transaction_qfsi_rsp {
 	struct smb_hdr hdr;	/* wct = 10 + SetupCount */
-	__u16 TotalParameterCount;
-	__u16 TotalDataCount;
+	__le16 TotalParameterCount;
+	__le16 TotalDataCount;
 	__u16 Reserved;
-	__u16 ParameterCount;
-	__u16 ParameterOffset;
-	__u16 ParameterDisplacement;
-	__u16 DataCount;
-	__u16 DataOffset;
-	__u16 DataDisplacement;
+	__le16 ParameterCount;
+	__le16 ParameterOffset;
+	__le16 ParameterDisplacement;
+	__le16 DataCount;
+	__le16 DataOffset;
+	__le16 DataDisplacement;
 	__u8 SetupCount;
 	__u8 Reserved1;		/* should be zero setup words following */
 	__u16 ByteCount;
@@ -1531,16 +1531,16 @@ struct aliasInfo92 {
 };
 
 typedef struct {
-	__u64 TotalAllocationUnits;
-	__u64 FreeAllocationUnits;
-	__u32 SectorsPerAllocationUnit;
-	__u32 BytesPerSector;
+	__le64 TotalAllocationUnits;
+	__le64 FreeAllocationUnits;
+	__le32 SectorsPerAllocationUnit;
+	__le32 BytesPerSector;
 } FILE_SYSTEM_INFO;		/* size info, level 0x103 */
 
 typedef struct {
-	__u16 MajorVersionNumber;
-	__u16 MinorVersionNumber;
-	__u64 Capability;
+	__le16 MajorVersionNumber;
+	__le16 MinorVersionNumber;
+	__le64 Capability;
 } FILE_SYSTEM_UNIX_INFO;	/* Unix extensions info, level 0x200 */
 /* Linux/Unix extensions capability flags */
 #define CIFS_UNIX_FCNTL_CAP             0x00000001 /* support for fcntl locks */

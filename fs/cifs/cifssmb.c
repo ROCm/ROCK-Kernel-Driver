@@ -2229,6 +2229,7 @@ CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 	FILE_SYSTEM_INFO *response_data;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In QFSInfo"));
 QFSInfoRetry:
@@ -2237,7 +2238,7 @@ QFSInfoRetry:
 	if (rc)
 		return rc;
 
-	pSMB->TotalParameterCount = 2;	/* level */
+	params = 2;	/* level */
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
@@ -2246,8 +2247,8 @@ QFSInfoRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(offsetof(
         struct smb_com_transaction2_qfsi_req, InformationLevel) - 4);
@@ -2257,25 +2258,25 @@ QFSInfoRetry:
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_FS_INFORMATION);
 	pSMB->InformationLevel = cpu_to_le16(SMB_QUERY_FS_SIZE_INFO);
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cERROR(1, ("Send error in QFSInfo = %d", rc));
 	} else {		/* decode response */
-		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
 		cFYI(1,
 		     ("Decoding qfsinfo response.  BCC: %d  Offset %d",
-		      pSMBr->ByteCount, pSMBr->DataOffset));
-		if ((pSMBr->ByteCount < 24) || (pSMBr->DataOffset > 512))	/* BB also check enough total bytes returned */
+		      pSMBr->ByteCount, data_offset));
+		if ((pSMBr->ByteCount < 24) || (data_offset > 512))	/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
 			response_data =
 			    (FILE_SYSTEM_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
-				 pSMBr->DataOffset);
+				 data_offset);
 			FSData->f_bsize =
 			    le32_to_cpu(response_data->BytesPerSector) *
 			    le32_to_cpu(response_data->
@@ -2310,6 +2311,7 @@ CIFSSMBQFSAttributeInfo(const int xid, struct cifsTconInfo *tcon,
 	FILE_SYSTEM_ATTRIBUTE_INFO *response_data;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In QFSAttributeInfo"));
 QFSAttributeRetry:
@@ -2318,7 +2320,7 @@ QFSAttributeRetry:
 	if (rc)
 		return rc;
 
-	pSMB->TotalParameterCount = 2;	/* level */
+	params = 2;	/* level */
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
@@ -2327,8 +2329,8 @@ QFSAttributeRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(offsetof(
         struct smb_com_transaction2_qfsi_req, InformationLevel) - 4);
@@ -2338,22 +2340,22 @@ QFSAttributeRetry:
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_FS_INFORMATION);
 	pSMB->InformationLevel = cpu_to_le16(SMB_QUERY_FS_ATTRIBUTE_INFO);
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cERROR(1, ("Send error in QFSAttributeInfo = %d", rc));
 	} else {		/* decode response */
-		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		if ((pSMBr->ByteCount < 13) || (pSMBr->DataOffset > 512)) {	/* BB also check enough bytes returned */
+		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {	/* BB also check enough bytes returned */
 			rc = -EIO;	/* bad smb */
 		} else {
 			response_data =
 			    (FILE_SYSTEM_ATTRIBUTE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
-				 pSMBr->DataOffset);
+				 data_offset);
 			response_data->Attributes = le32_to_cpu(response_data->Attributes);
 			response_data->MaxPathNameComponentLength = 
 				le32_to_cpu(response_data->MaxPathNameComponentLength);
@@ -2382,6 +2384,7 @@ CIFSSMBQFSDeviceInfo(const int xid, struct cifsTconInfo *tcon,
 	FILE_SYSTEM_DEVICE_INFO *response_data;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In QFSDeviceInfo"));
 QFSDeviceRetry:
@@ -2390,7 +2393,7 @@ QFSDeviceRetry:
 	if (rc)
 		return rc;
 
-	pSMB->TotalParameterCount = 2;	/* level */
+	params = 2;	/* level */
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
@@ -2399,8 +2402,8 @@ QFSDeviceRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(offsetof(
         struct smb_com_transaction2_qfsi_req, InformationLevel) - 4);
@@ -2411,23 +2414,23 @@ QFSDeviceRetry:
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_FS_INFORMATION);
 	pSMB->InformationLevel = cpu_to_le16(SMB_QUERY_FS_DEVICE_INFO);
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Send error in QFSDeviceInfo = %d", rc));
 	} else {		/* decode response */
-		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
 		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO))
-                 || (pSMBr->DataOffset > 512))
+                 || (data_offset > 512))
 			rc = -EIO;	/* bad smb */
 		else {
 			response_data =
 			    (FILE_SYSTEM_DEVICE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
-				 pSMBr->DataOffset);
+				 data_offset);
 			response_data->DeviceType = 
 				le32_to_cpu(response_data->DeviceType);
 			response_data->DeviceCharacteristics = 
@@ -2455,6 +2458,7 @@ CIFSSMBQFSUnixInfo(const int xid, struct cifsTconInfo *tcon,
 	FILE_SYSTEM_UNIX_INFO *response_data;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In QFSUnixInfo"));
 QFSUnixRetry:
@@ -2463,7 +2467,7 @@ QFSUnixRetry:
 	if (rc)
 		return rc;
 
-	pSMB->ParameterCount = 2;	/* level */
+	params = 2;	/* level */
 	pSMB->TotalDataCount = 0;
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
@@ -2474,8 +2478,8 @@ QFSUnixRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ByteCount = pSMB->ParameterCount + 1 /* pad */ ;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	byte_count = params + 1 /* pad */ ;
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(offsetof(struct 
         smb_com_transaction2_qfsi_req, InformationLevel) - 4);
@@ -2483,22 +2487,22 @@ QFSUnixRetry:
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_FS_INFORMATION);
 	pSMB->InformationLevel = cpu_to_le16(SMB_QUERY_CIFS_UNIX_INFO);
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cERROR(1, ("Send error in QFSUnixInfo = %d", rc));
 	} else {		/* decode response */
-		pSMBr->DataOffset = cpu_to_le16(pSMBr->DataOffset);
-		if ((pSMBr->ByteCount < 13) || (pSMBr->DataOffset > 512)) {
+		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {
 			rc = -EIO;	/* bad smb */
 		} else {
 			response_data =
 			    (FILE_SYSTEM_UNIX_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
-				 pSMBr->DataOffset);
+				 data_offset);
 			response_data->MajorVersionNumber =
 				le16_to_cpu(response_data->MajorVersionNumber);
 			response_data->MinorVersionNumber =
