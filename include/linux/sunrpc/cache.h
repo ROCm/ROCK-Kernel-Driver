@@ -233,7 +233,6 @@ RTN *FNAME ARGS										\
 	new = kmalloc(sizeof(*new), GFP_KERNEL);					\
 	if (new) {									\
 		cache_init(&new->MEMBER);						\
-		cache_get(&new->MEMBER);						\
 		goto retry;								\
 	}										\
 	return NULL;									\

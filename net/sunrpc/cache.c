@@ -38,7 +38,7 @@ void cache_init(struct cache_head *h)
 	time_t now = get_seconds();
 	h->next = NULL;
 	h->flags = 0;
-	atomic_set(&h->refcnt, 0);
+	atomic_set(&h->refcnt, 1);
 	h->expiry_time = now + CACHE_NEW_EXPIRY;
 	h->last_refresh = now;
 }

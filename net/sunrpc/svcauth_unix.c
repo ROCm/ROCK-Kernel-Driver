@@ -55,12 +55,10 @@ struct auth_domain *unix_domain_find(char *name)
 	if (new == NULL)
 		return NULL;
 	cache_init(&new->h.h);
-	atomic_inc(&new->h.h.refcnt);
 	new->h.name = strdup(name);
 	new->h.flavour = RPC_AUTH_UNIX;
 	new->addr_changes = 0;
 	new->h.h.expiry_time = NEVER;
-	new->h.h.flags = 0;
 
 	rv = auth_domain_lookup(&new->h, 2);
 	if (rv == &new->h) {
