@@ -138,6 +138,21 @@ create_elf_tables(char *p, int argc, int envc,
 	} else
 		u_platform = p;
 
+#if defined(__i386__) && defined(CONFIG_SMP)
+	/*
+	 * In some cases (e.g. Hyper-Threading), we want to avoid L1 evictions
+	 * by the processes running on the same package. One thing we can do
+	 * is to shuffle the initial stack for them.
+	 *
+	 * The conditionals here are unneeded, but kept in to make the
+	 * code behaviour the same as pre change unless we have hyperthreaded
+	 * processors. This should be cleaned up before 2.6
+	 */
+	 
+	if(smp_num_siblings > 1)
+		u_platform = u_platform - ((current->pid % 64) << 7);
+#endif	
+
 	/*
 	 * Force 16 byte _final_ alignment here for generality.
 	 */
@@ -552,7 +567,6 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		/* Executables without an interpreter also need a personality  */
 		SET_PERSONALITY(elf_ex, ibcs2_interpreter);
 	}
-
 
 	/* OK, we are done with that, now set up the arg stuff,
 	   and then start this sucker up */
