@@ -5,38 +5,38 @@
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This abstraction carries sctp events to the ULP (sockets).
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Sridhar Samudrala     <sri@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -131,7 +131,7 @@ int sctp_ulpqueue_tail_data(sctp_ulpqueue_t *ulpq, sctp_chunk_t *chunk,
 			    int priority)
 {
 	struct sk_buff_head temp;
-	sctp_data_chunk_t *hdr;	
+	sctp_data_chunk_t *hdr;
 	sctp_ulpevent_t *event;
 
 	hdr = (sctp_data_chunk_t *) chunk->chunk_hdr;
@@ -157,7 +157,7 @@ int sctp_ulpqueue_tail_data(sctp_ulpqueue_t *ulpq, sctp_chunk_t *chunk,
 
 		event = sctp_ulpqueue_order(ulpq, event);
 	}
-	
+
 	/* Send event to the ULP.  */
 	if (event)
 		sctp_ulpqueue_tail_event(ulpq, event);
@@ -449,7 +449,7 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq,
 
 	/* Check if this message needs ordering.  */
 	if (SCTP_DATA_UNORDERED & event->chunk_flags)
-		return event;	       
+		return event;
 
 	/* Note: The stream ID must be verified before this routine.  */
 	sid = event->sndrcvinfo.sinfo_stream;

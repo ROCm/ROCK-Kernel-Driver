@@ -435,6 +435,7 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    if [ "$CONFIG_HIGHMEM" = "y" ]; then
       bool '  Highmem debugging' CONFIG_DEBUG_HIGHMEM
    fi
+   bool '  Load all symbols for debugging/kksymoops' CONFIG_KALLSYMS
 fi
 
 if [ "$CONFIG_X86_LOCAL_APIC" = "y" ]; then

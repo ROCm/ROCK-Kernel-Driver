@@ -152,7 +152,13 @@ typedef struct task_struct task_t;
 
 extern void sched_init(void);
 extern void init_idle(task_t *idle, int cpu);
+
 extern void show_state(void);
+extern void show_trace(unsigned long *stack);
+extern void show_stack(unsigned long *stack);
+extern void show_regs(struct pt_regs *);
+
+
 extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);

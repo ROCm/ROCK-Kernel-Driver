@@ -50,3 +50,13 @@ extern void interface_remove(struct device_class *, struct device *);
 
 extern int driver_attach(struct device_driver * drv);
 extern void driver_detach(struct device_driver * drv);
+
+#ifdef CONFIG_HOTPLUG
+extern int dev_hotplug(struct device *dev, const char *action);
+#else
+static inline int dev_hotplug(struct device *dev, const char *action)
+{
+	return 0;
+}
+#endif
+

@@ -946,6 +946,11 @@ CONFIG_DEBUG_BUGVERBOSE
   of the BUG call as well as the EIP and oops trace.  This aids
   debugging but costs about 70-100K of memory.
 
+CONFIG_KALLSYMS
+  Say Y here to let the kernel print out symbolic crash information and
+  symbolic stack backtraces. This increases the size of the kernel
+  somewhat, as all symbols have to be loaded into the kernel image.
+
 CONFIG_DEBUG_OBSOLETE
   Say Y here if you want to reduce the chances of the tree compiling,
   and are prepared to dig into driver internals to fix compile errors.

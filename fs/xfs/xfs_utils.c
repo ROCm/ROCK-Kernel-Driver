@@ -64,52 +64,27 @@ xfs_get_dir_entry(
 	return 0;
 }
 
-/*
- * Wrapper around xfs_dir_lookup.
- *
- * If DLF_IGET is set, then this routine will also return the inode.
- * Note that the inode will not be locked. Note, however, that the
- * vnode will have an additional reference in this case.
- */
 int
 xfs_dir_lookup_int(
 	bhv_desc_t		*dir_bdp,
-	int			flags,
+	uint			lock_mode,
 	struct dentry		*dentry,
 	xfs_ino_t		*inum,
 	xfs_inode_t		**ipp)
 {
 	vnode_t		*dir_vp;
 	xfs_inode_t	*dp;
-	char		*name = (char *) dentry->d_name.name;
-	int		name_len = dentry->d_name.len;
 	int		error;
-	int		do_iget;
-	uint		lock_mode;
-	bhv_desc_t	*bdp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_dir_lookup_int",
 		       (inst_t *)__return_address);
 
-	do_iget = flags & DLF_IGET;
-	error = 0;
-
-	if (flags & DLF_LOCK_SHARED) {
-		lock_mode = XFS_ILOCK_SHARED;
-	} else {
-		lock_mode = XFS_ILOCK_EXCL;
-	}
-
 	dp = XFS_BHVTOI(dir_bdp);
-	bdp = NULL;
 
-	/*
-	 * If all else fails, call the directory code.
-	 */
-
-	error = XFS_DIR_LOOKUP(dp->i_mount, NULL, dp, name, name_len, inum);
-	if (!error && do_iget) {
+	error = XFS_DIR_LOOKUP(dp->i_mount, NULL, dp,
+			(char *)dentry->d_name.name, dentry->d_name.len, inum);
+	if (!error) {
 		/*
 		 * Unlock the directory. We do this because we can't
 		 * hold the directory lock while doing the vn_get()
@@ -119,22 +94,12 @@ xfs_dir_lookup_int(
 		 * reservation in the inactive routine.
 		 */
 		xfs_iunlock(dp, lock_mode);
-
-		if (bdp) {
-			VN_RELE(BHV_TO_VNODE(bdp));
-			bdp = NULL;
-		}
-
 		error = xfs_iget(dp->i_mount, NULL, *inum, 0, ipp, 0);
-
 		xfs_ilock(dp, lock_mode);
 
 		if (error) {
 			*ipp = NULL;
-			return error;
-		}
-
-		if ((*ipp)->i_d.di_mode == 0) {
+		} else if ((*ipp)->i_d.di_mode == 0) {
 			/*
 			 * The inode has been freed.  Something is
 			 * wrong so just get out of here.
@@ -144,19 +109,7 @@ xfs_dir_lookup_int(
 			*ipp = NULL;
 			xfs_ilock(dp, lock_mode);
 			error = XFS_ERROR(ENOENT);
-		} else {
-			bdp = XFS_ITOBHV(*ipp);
-			bdp = NULL;
 		}
-	}
-	if (bdp) {
-		/* The only time we should get here is if the dir_lookup
-		 * failed.
-		 */
-		ASSERT(error);
-		xfs_iunlock(dp, lock_mode);
-		VN_RELE(BHV_TO_VNODE(bdp));
-		xfs_ilock(dp, lock_mode);
 	}
 	return error;
 }

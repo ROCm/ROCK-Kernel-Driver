@@ -71,10 +71,6 @@ struct llc_sap *llc_sap_alloc(void)
 		sap->state = LLC_SAP_STATE_ACTIVE;
 		memcpy(sap->laddr.mac, llc_main_station.mac_sa, ETH_ALEN);
 		spin_lock_init(&sap->sk_list.lock);
-		INIT_LIST_HEAD(&sap->sk_list.list);
-		skb_queue_head_init(&sap->mac_pdu_q);
-		sap->llc_ind_prim.data = &sap->llc_ind_data_prim;
-		sap->llc_cfm_prim.data = &sap->llc_cfm_data_prim;
 	}
 	return sap;
 }
@@ -88,12 +84,10 @@ struct llc_sap *llc_sap_alloc(void)
  */
 void llc_free_sap(struct llc_sap *sap)
 {
-	struct llc_station *station = sap->parent_station;
-
 	llc_rtn_all_conns(sap);
-	spin_lock_bh(&station->sap_list.lock);
+	write_lock_bh(&sap->station->sap_list.lock);
 	list_del(&sap->node);
-	spin_unlock_bh(&station->sap_list.lock);
+	write_unlock_bh(&sap->station->sap_list.lock);
 	kfree(sap);
 }
 
@@ -105,9 +99,9 @@ void llc_free_sap(struct llc_sap *sap)
  */
 void llc_sap_save(struct llc_sap *sap)
 {
-	spin_lock_bh(&llc_main_station.sap_list.lock);
+	write_lock_bh(&llc_main_station.sap_list.lock);
 	list_add_tail(&sap->node, &llc_main_station.sap_list.list);
-	spin_unlock_bh(&llc_main_station.sap_list.lock);
+	write_unlock_bh(&llc_main_station.sap_list.lock);
 }
 
 /**
@@ -122,7 +116,7 @@ struct llc_sap *llc_sap_find(u8 sap_value)
 	struct llc_sap* sap = NULL;
 	struct list_head *entry;
 
-	spin_lock_bh(&llc_main_station.sap_list.lock);
+	read_lock_bh(&llc_main_station.sap_list.lock);
 	list_for_each(entry, &llc_main_station.sap_list.list) {
 		sap = list_entry(entry, struct llc_sap, node);
 		if (sap->laddr.lsap == sap_value)
@@ -130,7 +124,7 @@ struct llc_sap *llc_sap_find(u8 sap_value)
 	}
 	if (entry == &llc_main_station.sap_list.list) /* not found */
 		sap = NULL;
-	spin_unlock_bh(&llc_main_station.sap_list.lock);
+	read_unlock_bh(&llc_main_station.sap_list.lock);
 	return sap;
 }
 
@@ -328,20 +322,18 @@ void llc_sk_reset(struct sock *sk)
 static int llc_rtn_all_conns(struct llc_sap *sap)
 {
 	int rc = 0;
-	struct list_head *entry, *tmp;
+	struct sock *sk;
 
-	spin_lock_bh(&sap->sk_list.lock);
-	if (list_empty(&sap->sk_list.list))
-		goto out;
-	list_for_each_safe(entry, tmp, &sap->sk_list.list) {
-		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+	write_lock_bh(&sap->sk_list.lock);
 
-		llc->state = LLC_CONN_STATE_TEMP;
-		if (llc_send_disc(llc->sk))
+	for (sk = sap->sk_list.list; sk; sk = sk->next) {
+		llc_sk(sk)->state = LLC_CONN_STATE_TEMP;
+
+		if (llc_send_disc(sk))
 			rc = 1;
 	}
-out:
-	spin_unlock_bh(&sap->sk_list.lock);
+
+	write_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
 
@@ -564,19 +556,19 @@ static char *llc_conn_state_names[] = {
 
 static int llc_proc_get_info(char *bf, char **start, off_t offset, int length)
 {
-	struct llc_opt *llc;
-	struct list_head *sap_entry, *llc_entry;
+	struct list_head *sap_entry;
+	struct sock *sk;
 	off_t begin = 0, pos = 0;
 	int len = 0;
 
-	spin_lock_bh(&llc_main_station.sap_list.lock);
+	read_lock_bh(&llc_main_station.sap_list.lock);
 	list_for_each(sap_entry, &llc_main_station.sap_list.list) {
 		struct llc_sap *sap = list_entry(sap_entry, struct llc_sap,
 						 node);
 
 		len += sprintf(bf + len, "lsap=%02X\n", sap->laddr.lsap);
-		spin_lock_bh(&sap->sk_list.lock);
-		if (list_empty(&sap->sk_list.list)) {
+		read_lock_bh(&sap->sk_list.lock);
+		if (!sap->sk_list.list) {
 			len += sprintf(bf + len, "no connections\n");
 			goto unlock;
 		}
@@ -584,8 +576,9 @@ static int llc_proc_get_info(char *bf, char **start, off_t offset, int length)
 					 "dsap state      retr txw rxw "
 					 "pf ff sf df rs cs "
 					 "tack tpfc trs tbs blog busr\n");
-		list_for_each(llc_entry, &sap->sk_list.list) {
-			llc = list_entry(llc_entry, struct llc_opt, node);
+		for (sk = sap->sk_list.list; sk; sk = sk->next) {
+			struct llc_opt *llc = llc_sk(sk);
+
 			len += sprintf(bf + len, " %02X  %-10s %3d  %3d %3d "
 						 "%2d %2d %2d "
 						 "%2d %2d %2d "
@@ -600,11 +593,10 @@ static int llc_proc_get_info(char *bf, char **start, off_t offset, int length)
 				       timer_pending(&llc->pf_cycle_timer.timer),
 				       timer_pending(&llc->rej_sent_timer.timer),
 				       timer_pending(&llc->busy_state_timer.timer),
-				       !!llc->sk->backlog.tail,
-				       llc->sk->lock.users);
+				       !!sk->backlog.tail, sk->lock.users);
 		}
 unlock:	
-		spin_unlock_bh(&sap->sk_list.lock);
+		read_unlock_bh(&sap->sk_list.lock);
 		pos = begin + len;
 		if (pos < offset) {
 			len = 0; /* Keep dumping into the buffer start */
@@ -613,7 +605,7 @@ unlock:
 		if (pos > offset + length) /* We have dumped enough */
 			break;
 	}
-	spin_unlock_bh(&llc_main_station.sap_list.lock);
+	read_unlock_bh(&llc_main_station.sap_list.lock);
 
 	/* The data in question runs from begin to begin + len */
 	*start = bf + (offset - begin); /* Start of wanted data */
@@ -634,8 +626,8 @@ static struct packet_type llc_tr_packet_type = {
 };
 
 static char llc_banner[] __initdata =
-		KERN_INFO "LLC 2.0 by Procom, 1997, Arnaldo C. Melo, 2001\n"
-		KERN_INFO "NET4.0 IEEE 802.2 extended support\n";
+		KERN_INFO "LLC 2.0 by Procom, 1997, Arnaldo C. Melo, 2001, 2002\n"
+		KERN_INFO "NET 4.0 IEEE 802.2 extended support\n";
 static char llc_error_msg[] __initdata =
 		KERN_ERR "LLC install NOT successful.\n";
 
@@ -669,7 +661,7 @@ static int __init llc_init(void)
 	llc_main_station.maximum_retry	= 1;
 	llc_main_station.state		= LLC_STATION_STATE_DOWN;
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
-	ev->data.a.ev	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
+	ev->prim_type	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, skb);
 	proc_net_create("802.2", 0, llc_proc_get_info);
 	llc_ui_init();
@@ -695,5 +687,5 @@ module_init(llc_init);
 module_exit(llc_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001");
+MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001, 2002");
 MODULE_DESCRIPTION("LLC 2.0, NET4.0 IEEE 802.2 extended support");

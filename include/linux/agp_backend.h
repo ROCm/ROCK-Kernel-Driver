@@ -66,6 +66,7 @@ enum chipset_type {
 	AMD_IRONGATE,
 	AMD_761,
 	AMD_762,
+	AMD_8151,
 	ALI_M1541,
 	ALI_M1621,
 	ALI_M1631,
@@ -161,7 +162,7 @@ extern agp_memory *agp_allocate_memory(size_t, u32);
  * 
  */
 
-extern void agp_copy_info(agp_kern_info *);
+extern int agp_copy_info(agp_kern_info *);
 
 /*
  * agp_copy_info :
@@ -257,7 +258,7 @@ typedef struct {
 	void       (*enable)(u32);
 	int        (*acquire)(void);
 	void       (*release)(void);
-	void       (*copy_info)(agp_kern_info *);
+	int        (*copy_info)(agp_kern_info *);
 } drm_agp_t;
 
 extern const drm_agp_t *drm_agp_p;

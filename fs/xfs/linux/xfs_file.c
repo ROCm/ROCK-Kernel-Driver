@@ -40,70 +40,76 @@ static struct vm_operations_struct linvfs_file_vm_ops;
 
 
 STATIC ssize_t
-linvfs_read(
-	struct file	*filp,
-	char		*buf,
-	size_t		size,
-	loff_t		*offset)
+linvfs_readv(
+	struct file		*filp,
+	const struct iovec	*iovp,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
 {
-	vnode_t		*vp;
-	int		error;
+	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	int			error;
 
-	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
-	ASSERT(vp);
+	VOP_READ(vp, filp, iovp, nr_segs, ppos, NULL, error);
 
-	VOP_READ(vp, filp, buf, size, offset, NULL, error);
+	return error;
+}
 
-	return(error);
+
+STATIC ssize_t
+linvfs_writev(
+	struct file		*filp,
+	const struct iovec	*iovp,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
+{
+	struct inode		*inode = filp->f_dentry->d_inode;
+	vnode_t			*vp = LINVFS_GET_VP(inode);
+	int			error = filp->f_error;
+
+	if (unlikely(error)) {
+		filp->f_error = 0;
+		return error;
+	}
+
+	/*
+	 * We allow multiple direct writers in, there is no
+	 * potential call to vmtruncate in that path.
+	 */
+	if (filp->f_flags & O_DIRECT) {
+		VOP_WRITE(vp, filp, iovp, nr_segs, ppos, NULL, error);
+	} else {
+		down(&inode->i_sem);
+		VOP_WRITE(vp, filp, iovp, nr_segs, ppos, NULL, error);
+		up(&inode->i_sem);
+	}
+
+	return error;
+}
+
+
+STATIC ssize_t
+linvfs_read(
+	struct file		*filp,
+	char			*buf,
+	size_t			count,
+	loff_t			*ppos)
+{
+	struct iovec		iov = {buf, count};
+
+	return linvfs_readv(filp, &iov, 1, ppos);
 }
 
 
 STATIC ssize_t
 linvfs_write(
-	struct file	*file,
-	const char	*buf,
-	size_t		count,
-	loff_t		*ppos)
+	struct file		*file,
+	const char		*buf,
+	size_t			count,
+	loff_t			*ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode;
-	loff_t		pos;
-	vnode_t		*vp;
-	int		err;	/* Use negative errors in this f'n */
+	struct iovec		iov = {(void *)buf, count};
 
-	if ((ssize_t) count < 0)
-		return -EINVAL;
-
-	if (!access_ok(VERIFY_READ, buf, count))
-		return -EFAULT;
-
-	pos = *ppos;
-	err = -EINVAL;
-	if (pos < 0)
-		goto out;
-
-	err = file->f_error;
-	if (err) {
-		file->f_error = 0;
-		goto out;
-	}
-
-	vp = LINVFS_GET_VP(inode);
-	ASSERT(vp);
-
-	/* We allow multiple direct writers in, there is no
-	 * potential call to vmtruncate in that path.
-	 */
-	if (!(file->f_flags & O_DIRECT))
-		down(&inode->i_sem);
-
-	VOP_WRITE(vp, file, buf, count, &pos, NULL, err);
-	*ppos = pos;
-
-	if (!(file->f_flags & O_DIRECT))
-		up(&inode->i_sem);
-out:
-
-	return(err);
+	return linvfs_writev(file, &iov, 1, ppos);
 }
 
 
@@ -312,6 +318,8 @@ struct file_operations linvfs_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= linvfs_read,
 	.write		= linvfs_write,
+	.readv		= linvfs_readv,
+	.writev		= linvfs_writev,
 	.ioctl		= linvfs_ioctl,
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,

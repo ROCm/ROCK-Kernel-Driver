@@ -490,7 +490,6 @@ xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 void		xfs_inode_lock_init(xfs_inode_t *, struct vnode *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			 uint, xfs_inode_t **, xfs_daddr_t);
-int		xfs_vn_iget(vfs_t *, struct vnode *, xfs_ino_t);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_iput_new(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);

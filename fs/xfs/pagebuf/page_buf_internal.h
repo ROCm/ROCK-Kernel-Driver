@@ -151,18 +151,6 @@ extern struct pbstats pbstats;
 
 #define PB_STATS_INC(count)	( count ++ )
 
-#undef assert
-#ifdef PAGEBUF_DEBUG
-# define assert(expr) \
-	if (!(expr)) {						\
-		printk("Assertion failed: %s\n%s::%s line %d\n",\
-		#expr,__FILE__,__FUNCTION__,__LINE__);		\
-		BUG();						\
-	}
-#else
-# define assert(x)	do { } while (0)
-#endif
-
 #ifndef STATIC
 # define STATIC static
 #endif

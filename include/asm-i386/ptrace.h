@@ -57,7 +57,6 @@ struct pt_regs {
 #ifdef __KERNEL__
 #define user_mode(regs) ((VM_MASK & (regs)->eflags) || (3 & (regs)->xcs))
 #define instruction_pointer(regs) ((regs)->eip)
-extern void show_regs(struct pt_regs *);
 #endif
 
 #endif

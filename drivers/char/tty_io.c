@@ -121,6 +121,8 @@ extern struct tty_driver ptm_driver[];	/* Unix98 pty masters; for /dev/ptmx */
 extern struct tty_driver pts_driver[];	/* Unix98 pty slaves;  for /dev/ptmx */
 #endif
 
+extern void disable_early_printk(void);
+
 /*
  * redirect is the pseudo-tty that console output
  * is redirected to if asked by TIOCCONS.
@@ -2185,6 +2187,9 @@ void __init console_init(void)
 	 * set up the console device so that later boot sequences can 
 	 * inform about problems etc..
 	 */
+#ifdef CONFIG_EARLY_PRINTK
+	disable_early_printk();
+#endif
 #ifdef CONFIG_VT
 	con_init();
 #endif

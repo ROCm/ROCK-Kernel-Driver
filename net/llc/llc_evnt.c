@@ -29,7 +29,7 @@ int llc_stat_ev_enable_with_dup_addr_check(struct llc_station *station,
 	struct llc_station_state_ev *ev = llc_station_ev(skb);	
 	
 	return ev->type == LLC_STATION_EV_TYPE_SIMPLE &&
-	       ev->data.a.ev ==
+	       ev->prim_type ==
 	       		      LLC_STATION_EV_ENABLE_WITH_DUP_ADDR_CHECK ? 0 : 1;
 }
 
@@ -39,7 +39,7 @@ int llc_stat_ev_enable_without_dup_addr_check(struct llc_station *station,
 	struct llc_station_state_ev *ev = llc_station_ev(skb);	
 	
 	return ev->type == LLC_STATION_EV_TYPE_SIMPLE &&
-	       ev->data.a.ev ==
+	       ev->prim_type ==
 			LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK ? 0 : 1;
 }
 
@@ -120,6 +120,6 @@ int llc_stat_ev_disable_req(struct llc_station *station, struct sk_buff *skb)
 	struct llc_station_state_ev *ev = llc_station_ev(skb);
 
 	return ev->type == LLC_STATION_EV_TYPE_PRIM &&
-	       ev->data.prim.prim == LLC_DISABLE_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_REQ ? 0 : 1;
+	       ev->prim == LLC_DISABLE_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
 }

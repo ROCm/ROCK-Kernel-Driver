@@ -200,6 +200,9 @@ int device_register(struct device *dev)
 	if (platform_notify)
 		platform_notify(dev);
 
+	/* notify userspace of device entry */
+	dev_hotplug(dev, "add");
+
  register_done:
 	if (error) {
 		spin_lock(&device_lock);
@@ -254,6 +257,9 @@ void put_device(struct device * dev)
 	 */
 	if (platform_notify_remove)
 		platform_notify_remove(dev);
+
+	/* notify userspace that this device is about to disappear */
+	dev_hotplug (dev, "remove");
 
 	device_detach(dev);
 	bus_remove_device(dev);

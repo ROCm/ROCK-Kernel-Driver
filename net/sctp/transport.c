@@ -4,45 +4,45 @@
  * Copyright (c) 2001 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * This module provides the abstraction for an SCTP tranport representing
- * a remote transport address.  For local transport addresses, we just use 
+ * a remote transport address.  For local transport addresses, we just use
  * sockaddr_storage_t.
  *
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Hui Huang             <hui.huang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -215,7 +215,7 @@ void sctp_transport_put(sctp_transport_t *transport)
 		sctp_transport_destroy(transport);
 }
 
-/* Update transport's RTO based on the newly calculated RTT. */ 
+/* Update transport's RTO based on the newly calculated RTT. */
 void sctp_transport_update_rto(sctp_transport_t *tp, __u32 rtt)
 {
 	sctp_protocol_t *proto = sctp_get_protocol();
@@ -263,7 +263,7 @@ void sctp_transport_update_rto(sctp_transport_t *tp, __u32 rtt)
 	 * seconds then it is rounded up to RTO.Min seconds.
 	 */
 	if (tp->rto < tp->asoc->rto_min)
-		tp->rto = tp->asoc->rto_min; 
+		tp->rto = tp->asoc->rto_min;
 
 	/* 6.3.1 C7) A maximum value may be placed on RTO provided it is
 	 * at least RTO.max seconds.
@@ -381,13 +381,13 @@ void sctp_transport_lower_cwnd(sctp_transport_t *transport,
 		break;
 
 	case SCTP_LOWER_CWND_FAST_RTX:
-		/* RFC 2960 7.2.4 Adjust the ssthresh and cwnd of the 
-		 * destination address(es) to which the missing DATA chunks 
-		 * were last sent, according to the formula described in 
+		/* RFC 2960 7.2.4 Adjust the ssthresh and cwnd of the
+		 * destination address(es) to which the missing DATA chunks
+		 * were last sent, according to the formula described in
 		 * Section 7.2.3.
 	 	 *
-	 	 * RFC 2960 7.2.3, sctpimpguide-05 2.9.2 Upon detection of 
-		 * packet losses from SACK (see Section 7.2.4), An endpoint 
+	 	 * RFC 2960 7.2.3, sctpimpguide-05 2.9.2 Upon detection of
+		 * packet losses from SACK (see Section 7.2.4), An endpoint
 		 * should do the following:
 		 *      ssthresh = max(cwnd/2, 2*MTU)
 		 *      cwnd = ssthresh

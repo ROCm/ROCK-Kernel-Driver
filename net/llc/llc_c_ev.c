@@ -101,48 +101,48 @@ int llc_conn_ev_conn_req(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	return ev->data.prim.prim == LLC_CONN_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_REQ ? 0 : 1;
+	return ev->prim == LLC_CONN_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
 }
 
 int llc_conn_ev_conn_resp(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	return ev->data.prim.prim == LLC_CONN_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_RESP ? 0 : 1;
+	return ev->prim == LLC_CONN_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_RESP ? 0 : 1;
 }
 
 int llc_conn_ev_data_req(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	return ev->data.prim.prim == LLC_DATA_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_REQ ? 0 : 1;
+	return ev->prim == LLC_DATA_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
 }
 
 int llc_conn_ev_disc_req(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	return ev->data.prim.prim == LLC_DISC_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_REQ ? 0 : 1;
+	return ev->prim == LLC_DISC_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
 }
 
 int llc_conn_ev_rst_req(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	return ev->data.prim.prim == LLC_RESET_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_REQ ? 0 : 1;
+	return ev->prim == LLC_RESET_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
 }
 
 int llc_conn_ev_rst_resp(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	return ev->data.prim.prim == LLC_RESET_PRIM &&
-	       ev->data.prim.type == LLC_PRIM_TYPE_RESP ? 0 : 1;
+	return ev->prim == LLC_RESET_PRIM &&
+	       ev->prim_type == LLC_PRIM_TYPE_RESP ? 0 : 1;
 }
 
 int llc_conn_ev_local_busy_detected(struct sock *sk, struct sk_buff *skb)
@@ -150,7 +150,7 @@ int llc_conn_ev_local_busy_detected(struct sock *sk, struct sk_buff *skb)
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 	return ev->type == LLC_CONN_EV_TYPE_SIMPLE &&
-	       ev->data.a.ev == LLC_CONN_EV_LOCAL_BUSY_DETECTED ? 0 : 1;
+	       ev->prim_type == LLC_CONN_EV_LOCAL_BUSY_DETECTED ? 0 : 1;
 }
 
 int llc_conn_ev_local_busy_cleared(struct sock *sk, struct sk_buff *skb)
@@ -158,7 +158,7 @@ int llc_conn_ev_local_busy_cleared(struct sock *sk, struct sk_buff *skb)
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 	return ev->type == LLC_CONN_EV_TYPE_SIMPLE &&
-	       ev->data.a.ev == LLC_CONN_EV_LOCAL_BUSY_CLEARED ? 0 : 1;
+	       ev->prim_type == LLC_CONN_EV_LOCAL_BUSY_CLEARED ? 0 : 1;
 }
 
 int llc_conn_ev_rx_bad_pdu(struct sock *sk, struct sk_buff *skb)
@@ -666,7 +666,7 @@ int llc_conn_ev_tx_buffer_full(struct sock *sk, struct sk_buff *skb)
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 	return ev->type == LLC_CONN_EV_TYPE_SIMPLE &&
-	       ev->data.a.ev == LLC_CONN_EV_TX_BUFF_FULL ? 0 : 1;
+	       ev->prim_type == LLC_CONN_EV_TX_BUFF_FULL ? 0 : 1;
 }
 
 /* Event qualifier functions

@@ -37,9 +37,6 @@
 #define ITRACE(ip)	vn_trace_ref(XFS_ITOV(ip), __FILE__, __LINE__, \
 				(inst_t *)__return_address)
 
-#define DLF_IGET	0x01	/* get entry inode if name lookup succeeds */
-#define DLF_LOCK_SHARED 0x02	/* directory locked shared */
-
 struct bhv_desc;
 struct cred;
 struct vnode;
@@ -63,7 +60,7 @@ xfs_get_dir_entry(
 extern int
 xfs_dir_lookup_int(
 	struct bhv_desc		*dir_bdp,
-	int			flags,
+	uint			lock_mode,
 	struct dentry		*dentry,
 	xfs_ino_t		*inum,
 	struct xfs_inode	**ipp);

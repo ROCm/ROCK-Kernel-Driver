@@ -1583,7 +1583,6 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	spin_lock_irq(q->queue_lock);
 again:
-	req = NULL;
 	insert_here = NULL;
 
 	if (blk_queue_empty(q)) {
@@ -1593,10 +1592,13 @@ again:
 	if (barrier)
 		goto get_rq;
 
-	el_ret = elv_merge(q, &req, bio);
+	el_ret = elv_merge(q, &insert_here, bio);
 	switch (el_ret) {
 		case ELEVATOR_BACK_MERGE:
+			req = list_entry_rq(insert_here);
+
 			BUG_ON(!rq_mergeable(req));
+
 			if (!q->back_merge_fn(q, req, bio)) {
 				insert_here = &req->queuelist;
 				break;
@@ -1611,7 +1613,10 @@ again:
 			goto out;
 
 		case ELEVATOR_FRONT_MERGE:
+			req = list_entry_rq(insert_here);
+
 			BUG_ON(!rq_mergeable(req));
+
 			if (!q->front_merge_fn(q, req, bio)) {
 				insert_here = req->queuelist.prev;
 				break;
@@ -1638,13 +1643,6 @@ again:
 		 * elevator says don't/can't merge. get new request
 		 */
 		case ELEVATOR_NO_MERGE:
-			/*
-			 * use elevator hints as to where to insert the
-			 * request. if no hints, just add it to the back
-			 * of the queue
-			 */
-			if (req)
-				insert_here = &req->queuelist;
 			break;
 
 		default:

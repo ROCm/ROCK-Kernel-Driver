@@ -1459,10 +1459,8 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 		break;
 	}
 
-out:
-	if (error) {
-		locks_free_lock(file_lock);
-	}
+ out:
+	locks_free_lock(file_lock);
 	return error;
 }
 
@@ -1601,11 +1599,8 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 		break;
 	}
 
-
 out:
-	if (error) {
-		locks_free_lock(file_lock);
-	}
+	locks_free_lock(file_lock);
 	return error;
 }
 #endif /* BITS_PER_LONG == 32 */

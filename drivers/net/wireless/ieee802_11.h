@@ -3,8 +3,8 @@
 
 #define IEEE802_11_DATA_LEN		2304
 /* Actually, the standard seems to be inconsistent about what the
-   maximum frame size really is.  S6.2.1.1.2 says 2304 octets, but the
-   figure in section 7.1.2 says 2312 octects. */
+   maximum frame size really is.  Section 6.2.1.1.2 says 2304 octets,
+   but the figure in Section 7.1.2 says 2312 octects. */
 #define IEEE802_11_HLEN			30
 #define IEEE802_11_FRAME_LEN		(IEEE802_11_DATA_LEN + IEEE802_11_HLEN)
 

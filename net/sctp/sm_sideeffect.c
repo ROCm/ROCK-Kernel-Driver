@@ -1,39 +1,39 @@
-/* SCTP kernel reference Implementation 
+/* SCTP kernel reference Implementation
  * Copyright (c) 1999 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 International Business Machines Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * These functions work with the state functions in sctp_sm_statefuns.c
  * to implement that state operations.  These functions implement the
  * steps which require modifying existing data structures.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
  *    Jon Grimm             <jgrimm@austin.ibm.com>
@@ -119,7 +119,7 @@ int sctp_do_sm(sctp_event_t event_type, sctp_subtype_t subtype,
 	       int priority)
 {
 	sctp_cmd_seq_t commands;
-	sctp_sm_table_entry_t *state_fn;        
+	sctp_sm_table_entry_t *state_fn;
 	sctp_disposition_t status;
 	int error = 0;
 	typedef const char *(printfn_t)(sctp_subtype_t);
@@ -253,6 +253,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	sctp_chunk_t *new_obj;
 	sctp_chunk_t *chunk;
 	sctp_packet_t *packet;
+	struct list_head *pos;
 	struct timer_list *timer;
 	unsigned long timeout;
 	sctp_transport_t *t;
@@ -336,9 +337,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_PEER_INIT:
 			/* Process a unified INIT from the peer.  */
-			sctp_cmd_process_init(commands,
-					      asoc, chunk, command->obj.ptr,
-					      priority);
+			sctp_cmd_process_init(commands, asoc, chunk,
+					      command->obj.ptr, priority);
 			break;
 
 		case SCTP_CMD_GEN_COOKIE_ECHO:
@@ -462,6 +462,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_INIT_RESTART:
+
 			/* Do the needed accounting and updates
 			 * associated with restarting an initialization
 			 * timer.
@@ -472,6 +473,15 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			    asoc->max_init_timeo) {
 				asoc->timeouts[command->obj.to] =
 					asoc->max_init_timeo;
+			}
+
+			/* If we've sent any data bundled with
+			 * COOKIE-ECHO we need to resend.
+			 */
+			list_for_each(pos, &asoc->peer.transport_addr_list) {
+				t = list_entry(pos, sctp_transport_t,
+					       transports);
+				sctp_retransmit_mark(&asoc->outqueue, t, 0);
 			}
 
 			sctp_add_cmd_sf(commands,
@@ -602,7 +612,7 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 {
 	sctp_chunk_t *repl;
 	sctp_transport_t *transport;
-			
+
 	/* Our previously transmitted packet ran into some congestion
 	 * so we should take action by reducing cwnd and ssthresh
 	 * and then ACK our peer that we we've done so by
@@ -716,7 +726,7 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		error = sctp_push_outqueue(&asoc->outqueue, sack);
 
 		/* Stop the SACK timer.  */
-		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP, 
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
 				SCTP_TO(SCTP_EVENT_TIMEOUT_SACK));
 	}
 
@@ -785,7 +795,7 @@ void sctp_generate_t3_rtx_event(unsigned long peer)
 		if (!mod_timer(&transport->T3_rtx_timer, jiffies + (HZ/20)))
 			sctp_transport_hold(transport);
 		goto out_unlock;
-	} 
+	}
 
 	/* Is this transport really dead and just waiting around for
 	 * the timer to let go of the reference?
@@ -867,6 +877,14 @@ void sctp_generate_t2_shutdown_event(unsigned long data)
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T2_SHUTDOWN);
 }
 
+void sctp_generate_t5_shutdown_guard_event(unsigned long data)
+{
+        sctp_association_t *asoc = (sctp_association_t *)data;
+        sctp_generate_timeout_event(asoc,
+				    SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD);
+
+} /* sctp_generate_t5_shutdown_guard_event() */
+
 void sctp_generate_autoclose_event(unsigned long data)
 {
 	sctp_association_t *asoc = (sctp_association_t *) data;
@@ -890,7 +908,7 @@ void sctp_generate_heartbeat_event(unsigned long data)
 		if (!mod_timer(&transport->hb_timer, jiffies + (HZ/20)))
 			sctp_transport_hold(transport);
 		goto out_unlock;
-	} 
+	}
 
 	/* Is this structure just waiting around for us to actually
 	 * get destroyed?
@@ -932,6 +950,7 @@ sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES] = {
 	sctp_generate_t2_shutdown_event,
 	NULL,
 	NULL,
+	sctp_generate_t5_shutdown_guard_event,
 	sctp_generate_heartbeat_event,
 	sctp_generate_sack_event,
 	sctp_generate_autoclose_event,
@@ -1022,6 +1041,9 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 	if (event)
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
 				SCTP_ULPEVENT(event));
+
+	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
+			SCTP_STATE(SCTP_STATE_CLOSED));
 
 	/* FIXME:  We need to handle data that could not be sent or was not
 	 * acked, if the user has enabled SEND_FAILED notifications.

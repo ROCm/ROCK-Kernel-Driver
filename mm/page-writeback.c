@@ -601,3 +601,4 @@ int test_clear_page_dirty(struct page *page)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(test_clear_page_dirty);

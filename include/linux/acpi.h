@@ -228,6 +228,26 @@ enum acpi_interrupt_id {
 	ACPI_INTERRUPT_COUNT
 };
 
+#define	ACPI_SPACE_MEM		0
+
+struct acpi_gen_regaddr {
+	u8  space_id;
+	u8  bit_width;
+	u8  bit_offset;
+	u8  resv;
+	u32 addrl;
+	u32 addrh;
+} __attribute__ ((packed));
+
+struct acpi_table_hpet {
+	struct acpi_table_header header;
+	u32 id;
+	struct acpi_gen_regaddr addr;
+	u8 number;
+	u16 min_tick;
+	u8 page_protect;
+} __attribute__ ((packed));
+
 /*
  * System Resource Affinity Table (SRAT)
  *   see http://www.microsoft.com/hwdev/design/srat.htm
@@ -333,6 +353,7 @@ enum acpi_table_id {
 	ACPI_SRAT,
 	ACPI_SSDT,
 	ACPI_SPMI,
+	ACPI_HPET,
 	ACPI_TABLE_COUNT
 };
 

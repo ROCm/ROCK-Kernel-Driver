@@ -49,6 +49,7 @@ void agp_free_key(int key);
 /* chipset specific init routines. */
 int __init ali_generic_setup (struct pci_dev *pdev);
 int __init amd_irongate_setup (struct pci_dev *pdev);
+int __init amd_8151_setup (struct pci_dev *pdev);
 int __init hp_zx1_setup (struct pci_dev *pdev);
 int __init intel_i460_setup (struct pci_dev *pdev);
 int __init intel_generic_setup (struct pci_dev *pdev);
@@ -318,6 +319,22 @@ struct agp_bridge_data {
 #define AMD_ATTBASE	0x04	/* In mmio region (32-bit register) */
 #define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
 #define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
+
+#define AMD_8151_APSIZE	0xb4
+#define AMD_8151_GARTBLOCK	0xb8
+
+#define AMD_X86_64_GARTAPERTURECTL	0x90
+#define AMD_X86_64_GARTAPERTUREBASE	0x94
+#define AMD_X86_64_GARTTABLEBASE	0x98
+#define AMD_X86_64_GARTCACHECTL		0x9c
+#define AMD_X86_64_GARTEN	1<<0
+
+#define AMD_8151_VMAPERTURE		0x10
+#define AMD_8151_AGP_CTL		0xb0
+#define AMD_8151_APERTURESIZE	0xb4
+#define AMD_8151_GARTPTR		0xb8
+#define AMD_8151_GTLBEN	1<<7
+#define AMD_8151_APEREN	1<<8
 
 /* ALi registers */
 #define ALI_APBASE			0x10

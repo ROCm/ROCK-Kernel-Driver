@@ -33,6 +33,7 @@
 #define __XFS_SUPPORT_TIME_H__
 
 #include <linux/sched.h>
+#include <linux/time.h>
 
 static inline void delay(long ticks)
 {
@@ -42,8 +43,11 @@ static inline void delay(long ticks)
 
 static inline void nanotime(struct timespec *tvp)
 {
-	tvp->tv_sec = xtime.tv_sec;
-	tvp->tv_nsec = xtime.tv_nsec;
+	struct timeval tv;
+
+	do_gettimeofday(&tv);
+	tvp->tv_sec = tv.tv_sec;
+	tvp->tv_nsec = tv.tv_usec * 1000;
 }
 
 #endif /* __XFS_SUPPORT_TIME_H__ */
