@@ -657,6 +657,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	}
 	vol->mftmirr_lcn = ll;
 	ntfs_debug("vol->mftmirr_lcn = 0x%Lx", (long long)vol->mftmirr_lcn);
+#ifdef NTFS_RW
 	/*
 	 * Work out the size of the mft mirror in number of mft records. If the
 	 * cluster size is less than or equal to the size taken by four mft
@@ -671,6 +672,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		vol->mftmirr_size = vol->cluster_size >>
 				vol->mft_record_size_bits;
 	ntfs_debug("vol->mftmirr_size = %i", vol->mftmirr_size);
+#endif /* NTFS_RW */
 	vol->serial_no = le64_to_cpu(b->volume_serial_number);
 	ntfs_debug("vol->serial_no = 0x%Lx",
 			(unsigned long long)vol->serial_no);
@@ -704,11 +706,172 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	ntfs_debug("vol->mft_zone_start = 0x%Lx",
 			(long long)vol->mft_zone_start);
 	ntfs_debug("vol->mft_zone_end = 0x%Lx", (long long)vol->mft_zone_end);
-	/* And another misplaced defaults setting. */
-	if (!vol->on_errors)
-		vol->on_errors = ON_ERRORS_PANIC;
 	return TRUE;
 }
+
+#ifdef NTFS_RW
+
+/**
+ * load_and_init_mft_mirror - load and setup the mft mirror inode for a volume
+ * @vol:	ntfs super block describing device whose mft mirror to load
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
+{
+	struct inode *tmp_ino;
+	ntfs_inode *tmp_ni;
+
+	/* Get mft mirror inode. */
+	tmp_ino = ntfs_iget(vol->sb, FILE_MFTMirr);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
+			iput(tmp_ino);
+		ntfs_error(vol->sb, "Failed to load $MFTMirr.");
+		return FALSE;
+	}
+	/*
+	 * Re-initialize some specifics about $MFTMirr's inode as
+	 * ntfs_read_inode() will have set up the default ones.
+	 */
+	/* Set uid and gid to root. */
+	tmp_ino->i_uid = tmp_ino->i_gid = 0;
+	/* Regular file.  No access for anyone. */
+	tmp_ino->i_mode = S_IFREG;
+	/* No VFS initiated operations allowed for $MFTMirr. */
+	tmp_ino->i_op = &ntfs_empty_inode_ops;
+	tmp_ino->i_fop = &ntfs_empty_file_ops;
+	/* Put back our special address space operations. */
+	tmp_ino->i_mapping->a_ops = &ntfs_mft_aops;
+	tmp_ni = NTFS_I(tmp_ino);
+	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
+	NInoSetMstProtected(tmp_ni);
+	/*
+	 * Set up our little cheat allowing us to reuse the async io
+	 * completion handler for directories.
+	 */
+	tmp_ni->itype.index.block_size = vol->mft_record_size;
+	tmp_ni->itype.index.block_size_bits = vol->mft_record_size_bits;
+	vol->mftmirr_ino = tmp_ino;
+	return TRUE;
+}
+
+/**
+ * check_mft_mirror - compare contents of the mft mirror with the mft
+ * @vol:	ntfs super block describing device whose mft mirror to check
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL check_mft_mirror(ntfs_volume *vol)
+{
+	unsigned long index;
+	struct super_block *sb = vol->sb;
+	ntfs_inode *mirr_ni;
+	struct page *mft_page, *mirr_page;
+	u8 *kmft, *kmirr;
+	run_list_element *rl, rl2[2];
+	int mrecs_per_page, i;
+
+	/* Compare contents of $MFT and $MFTMirr. */
+	mrecs_per_page = PAGE_CACHE_SIZE / vol->mft_record_size;
+	BUG_ON(!mrecs_per_page);
+	BUG_ON(!vol->mftmirr_size);
+	mft_page = mirr_page = NULL;
+	kmft = kmirr = NULL;
+	index = i = 0;
+	do {
+		u32 bytes;
+
+		/* Switch pages if necessary. */
+		if (!(i % mrecs_per_page)) {
+			if (index) {
+				ntfs_unmap_page(mft_page);
+				ntfs_unmap_page(mirr_page);
+			}
+			/* Get the $MFT page. */
+			mft_page = ntfs_map_page(vol->mft_ino->i_mapping,
+					index);
+			if (IS_ERR(mft_page)) {
+				ntfs_error(sb, "Failed to read $MFT.");
+				return FALSE;
+			}
+			kmft = page_address(mft_page);
+			/* Get the $MFTMirr page. */
+			mirr_page = ntfs_map_page(vol->mftmirr_ino->i_mapping,
+					index);
+			if (IS_ERR(mirr_page)) {
+				ntfs_error(sb, "Failed to read $MFTMirr.");
+				goto mft_unmap_out;
+			}
+			kmirr = page_address(mirr_page);
+			++index;
+		}
+		/* Make sure the record is ok. */
+		if (is_baad_recordp(kmft)) {
+			ntfs_error(sb, "Incomplete multi sector transfer "
+					"detected in mft record %i.", i);
+mm_unmap_out:
+			ntfs_unmap_page(mirr_page);
+mft_unmap_out:
+			ntfs_unmap_page(mft_page);
+			return FALSE;
+		}
+		if (is_baad_recordp(kmirr)) {
+			ntfs_error(sb, "Incomplete multi sector transfer "
+					"detected in mft mirror record %i.", i);
+			goto mm_unmap_out;
+		}
+		/* Get the amount of data in the current record. */
+		bytes = le32_to_cpu(((MFT_RECORD*)kmft)->bytes_in_use);
+		if (!bytes || bytes > vol->mft_record_size) {
+			bytes = le32_to_cpu(((MFT_RECORD*)kmirr)->bytes_in_use);
+			if (!bytes || bytes > vol->mft_record_size)
+				bytes = vol->mft_record_size;
+		}
+		/* Compare the two records. */
+		if (memcmp(kmft, kmirr, bytes)) {
+			ntfs_error(sb, "$MFT and $MFTMirr (record %i) do not "
+					"match. Run ntfsfix or chkdsk.", i);
+			goto mm_unmap_out;
+		}
+		kmft += vol->mft_record_size;
+		kmirr += vol->mft_record_size;
+	} while (++i < vol->mftmirr_size);
+	/* Release the last pages. */
+	ntfs_unmap_page(mft_page);
+	ntfs_unmap_page(mirr_page);
+
+	/* Construct the mft mirror run list by hand. */
+	rl2[0].vcn = 0;
+	rl2[0].lcn = vol->mftmirr_lcn;
+	rl2[0].length = (vol->mftmirr_size * vol->mft_record_size +
+			vol->cluster_size - 1) / vol->cluster_size;
+	rl2[1].vcn = rl2[0].length;
+	rl2[1].lcn = LCN_ENOENT;
+	rl2[1].length = 0;
+	/*
+	 * Because we have just read all of the mft mirror, we know we have
+	 * mapped the full run list for it.
+	 */
+	mirr_ni = NTFS_I(vol->mftmirr_ino);
+	down_read(&mirr_ni->run_list.lock);
+	rl = mirr_ni->run_list.rl;
+	/* Compare the two run lists.  They must be identical. */
+	i = 0;
+	do {
+		if (rl2[i].vcn != rl[i].vcn || rl2[i].lcn != rl[i].lcn ||
+				rl2[i].length != rl[i].length) {
+			ntfs_error(sb, "$MFTMirr location mismatch. "
+					"Run chkdsk.");
+			up_read(&mirr_ni->run_list.lock);
+			return FALSE;
+		}
+	} while (rl2[i++].length);
+	up_read(&mirr_ni->run_list.lock);
+	return TRUE;
+}
+
+#endif /* NTFS_RW */
 
 /**
  * load_and_init_upcase - load the upcase table for an ntfs volume
@@ -830,28 +993,44 @@ static BOOL load_system_files(ntfs_volume *vol)
 	attr_search_context *ctx;
 
 	ntfs_debug("Entering.");
+#ifdef NTFS_RW
+	/* Get mft mirror inode compare the contents of $MFT and $MFTMirr. */
+	if (!load_and_init_mft_mirror(vol) || !check_mft_mirror(vol)) {
+		static const char *es1 = "Failed to load $MFTMirr";
+		static const char *es2 = "$MFTMirr does not match $MFT";
+		static const char *es3 = ".  Run ntfsfix and/or chkdsk.";
 
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						!vol->mftmirr_ino ? es1 : es2,
+						es3);
+				goto iput_mirr_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s",
+					!vol->mftmirr_ino ? es1 : es2, es3);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s",
+					!vol->mftmirr_ino ? es1 : es2, es3);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
+	}
+#endif /* NTFS_RW */
 	/* Get mft bitmap attribute inode. */
 	vol->mftbmp_ino = ntfs_attr_iget(vol->mft_ino, AT_BITMAP, NULL, 0);
 	if (IS_ERR(vol->mftbmp_ino)) {
 		ntfs_error(sb, "Failed to load $MFT/$BITMAP attribute.");
-		return FALSE;
-	}
-
-	/* Get mft mirror inode. */
-	vol->mftmirr_ino = ntfs_iget(sb, FILE_MFTMirr);
-	if (IS_ERR(vol->mftmirr_ino) || is_bad_inode(vol->mftmirr_ino)) {
-		if (!IS_ERR(vol->mftmirr_ino))
-			iput(vol->mftmirr_ino);
-		ntfs_error(sb, "Failed to load $MFTMirr.");
-		goto iput_mftbmp_err_out;
-	}
-	// FIXME: Compare mftmirr with mft and repair if appropriate and not
-	// a read-only mount.
-
-	/* Read upcase table and setup vol->upcase and vol->upcase_len. */
-	if (!load_and_init_upcase(vol))
 		goto iput_mirr_err_out;
+	}
+	/* Read upcase table and setup @vol->upcase and @vol->upcase_len. */
+	if (!load_and_init_upcase(vol))
+		goto iput_mftbmp_err_out;
 	/*
 	 * Get the cluster allocation bitmap inode and verify the size, no
 	 * need for any locking at this stage as we are already running
@@ -988,10 +1167,13 @@ iput_vol_err_out:
 	iput(vol->vol_ino);
 iput_lcnbmp_err_out:
 	iput(vol->lcnbmp_ino);
-iput_mirr_err_out:
-	iput(vol->mftmirr_ino);
 iput_mftbmp_err_out:
 	iput(vol->mftbmp_ino);
+iput_mirr_err_out:
+#ifdef NTFS_RW
+	if (vol->mftmirr_ino)
+		iput(vol->mftmirr_ino);
+#endif /* NTFS_RW */
 	return FALSE;
 }
 
@@ -1029,8 +1211,12 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	vol->lcnbmp_ino = NULL;
 	up_write(&vol->lcnbmp_lock);
 
-	iput(vol->mftmirr_ino);
-	vol->mftmirr_ino = NULL;
+#ifdef NTFS_RW
+	if (vol->mftmirr_ino) {
+		iput(vol->mftmirr_ino);
+		vol->mftmirr_ino = NULL;
+	}
+#endif /* NTFS_RW */
 
 	down_write(&vol->mftbmp_lock);
 	iput(vol->mftbmp_ino);
@@ -1356,7 +1542,7 @@ struct super_operations ntfs_sops = {
 	//					   disk. */
 	//.write_super_lockfs	= NULL,		/* ? */
 	//.unlockfs	= NULL,			/* ? */
-#endif
+#endif /* NTFS_RW */
 	.put_super	= ntfs_put_super,	/* Syscall: umount. */
 	.statfs		= ntfs_statfs,		/* Syscall: statfs */
 	.remount_fs	= ntfs_remount,		/* Syscall: mount -o remount. */
@@ -1450,7 +1636,9 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->mft_ino = NULL;
 	vol->mftbmp_ino = NULL;
 	init_rwsem(&vol->mftbmp_lock);
+#ifdef NTFS_RW
 	vol->mftmirr_ino = NULL;
+#endif /* NTFS_RW */
 	vol->lcnbmp_ino = NULL;
 	init_rwsem(&vol->lcnbmp_lock);
 	vol->vol_ino = NULL;
@@ -1627,8 +1815,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->root_ino = NULL;
 	iput(vol->lcnbmp_ino);
 	vol->lcnbmp_ino = NULL;
+#ifdef NTFS_RW
 	iput(vol->mftmirr_ino);
 	vol->mftmirr_ino = NULL;
+#endif /* NTFS_RW */
 	iput(vol->mftbmp_ino);
 	vol->mftbmp_ino = NULL;
 	vol->upcase_len = 0;

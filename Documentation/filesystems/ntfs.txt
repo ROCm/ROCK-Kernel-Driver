@@ -71,6 +71,7 @@ Features
   compatibility, we implement access to files using their short file names if
   they exist. The driver will not create short file names however, and a rename
   will discard any existing short file name.
+- The new driver supports exporting of mounted NTFS volumes via NFS.
 
 
 Supported mount options

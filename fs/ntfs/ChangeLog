@@ -37,6 +37,8 @@ ToDo:
 	  fs/ntfs/inode.h so they can be used elsewhere.
 	- Determine the mft mirror size as the number of mirrored mft records
 	  and store it in ntfs_volume->mftmirr_size (fs/ntfs/super.c).
+	- Load the mft mirror at mount time and compare the mft records stored
+	  in it to the ones in the mft (fs/ntfs/super.c).
 
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 

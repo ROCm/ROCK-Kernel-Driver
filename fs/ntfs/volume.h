@@ -45,7 +45,7 @@ typedef struct {
 	LCN nr_blocks;			/* Number of NTFS_BLOCK_SIZE bytes
 					   sized blocks on the device. */
 	/* Configuration provided by user at mount time. */
-	unsigned long flags;		/* Miscellaneous flags, see above. */
+	unsigned long flags;		/* Miscellaneous flags, see below. */
 	uid_t uid;			/* uid that files will be mounted as. */
 	gid_t gid;			/* gid that files will be mounted as. */
 	mode_t fmask;			/* The mask for file permissions. */
@@ -83,15 +83,17 @@ typedef struct {
 	unsigned long nr_mft_records;	/* Number of mft records == number of
 					   bits in mft bitmap. */
 
+#ifdef NTFS_RW
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
 	int mftmirr_size;		/* Size of mft mirror in mft records. */
+#endif /* NTFS_RW */
 
 	struct inode *lcnbmp_ino;	/* The VFS inode of $Bitmap. */
 	struct rw_semaphore lcnbmp_lock; /* Lock for serializing accesses to the
 					    cluster bitmap ($Bitmap/$DATA). */
 
 	struct inode *vol_ino;		/* The VFS inode of $Volume. */
-	VOLUME_FLAGS vol_flags;		/* Volume flags (VOLUME_*). */
+	VOLUME_FLAGS vol_flags;		/* Volume flags. */
 	u8 major_ver;			/* Ntfs major version of volume. */
 	u8 minor_ver;			/* Ntfs minor version of volume. */
 
