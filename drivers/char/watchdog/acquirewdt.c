@@ -79,10 +79,8 @@ static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	if(count)
-	{
-		if (!nowayout)
-		{
+	if(count) {
+		if (!nowayout) {
 			size_t i;
 
 			expect_close = 0;
@@ -111,9 +109,11 @@ static ssize_t acq_read(struct file *file, char *buf, size_t count, loff_t *ppos
 static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
-	static struct watchdog_info ident=
+	static struct watchdog_info ident =
 	{
-		WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE, 1, "Acquire WDT"
+		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "Acquire WDT"
 	};
 	
 	switch(cmd)
@@ -205,9 +205,9 @@ static struct file_operations acq_fops = {
 
 static struct miscdevice acq_miscdev=
 {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&acq_fops
+	.minor = WATCHDOG_MINOR,
+	.name = "watchdog",
+	.fops = &acq_fops
 };
 
 
@@ -216,11 +216,11 @@ static struct miscdevice acq_miscdev=
  *	turn the timebomb registers off. 
  */
  
-static struct notifier_block acq_notifier=
+static struct notifier_block acq_notifier =
 {
-	acq_notify_sys,
-	NULL,
-	0
+	.notifier_call = acq_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static int __init acq_init(void)
