@@ -58,8 +58,6 @@
 #include <asm/kgdb.h>
 
 #include "mcpn765.h"
-#include "mcpn765_serial.h"
-
 
 static u_char mcpn765_openpic_initsenses[] __initdata = {
 	(IRQ_SENSE_EDGE  | IRQ_POLARITY_POSITIVE),/* 16: i8259 cascade */

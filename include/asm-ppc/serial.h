@@ -17,7 +17,7 @@
 #elif defined(CONFIG_LOPEC)
 #include <platforms/lopec_serial.h>
 #elif defined(CONFIG_MCPN765)
-#include <platforms/mcpn765_serial.h>
+#include <platforms/mcpn765.h>
 #elif defined(CONFIG_MVME5100)
 #include <platforms/mvme5100_serial.h>
 #elif defined(CONFIG_PRPMC750)
