@@ -101,10 +101,18 @@
 /* Global registers */
 
 enum global_control_bits {
-	CHANNEL_IDX = 0x0000003f, OVERRUN_IE = 0x00000400,
-	UNDERRUN_IE = 0x00000800, ENDLP_IE   = 0x00001000,
-	MIDLP_IE    = 0x00002000, ETOG_IE    = 0x00004000,
-	EDROP_IE    = 0x00008000, BANK_B_EN  = 0x00010000
+	CHANNEL_IDX	= 0x0000003f,
+	OVERRUN_IE	= 0x00000400,	/* interrupt enable: capture overrun */
+	UNDERRUN_IE	= 0x00000800,	/* interrupt enable: playback underrun */
+	ENDLP_IE	= 0x00001000,	/* interrupt enable: end of buffer */
+	MIDLP_IE	= 0x00002000,	/* interrupt enable: middle buffer */
+	ETOG_IE		= 0x00004000,	/* interrupt enable: envelope toggling */
+	EDROP_IE	= 0x00008000,	/* interrupt enable: envelope drop */
+	BANK_B_EN	= 0x00010000,	/* SiS: enable bank B (64 channels) */
+	PCMIN_B_MIX	= 0x00020000,	/* SiS: PCM IN B mixing enable */
+	I2S_OUT_ASSIGN	= 0x00040000,	/* SiS: I2S Out contains surround PCM */
+	SPDIF_OUT_ASSIGN= 0x00080000,	/* SiS: 0=S/PDIF L/R | 1=PCM Out FIFO */
+	MAIN_OUT_ASSIGN = 0x00100000,	/* SiS: 0=PCM Out FIFO | 1=MMC Out buffer */
 };
 
 enum miscint_bits {
@@ -422,6 +430,8 @@ struct _snd_trident {
         
         int ChanPCM;			/* max number of PCM channels */
 	int ChanPCMcnt;			/* actual number of PCM channels */
+
+	int ac97_detect;		/* 1 = AC97 in detection phase */
 
 	struct _snd_4dwave synth;	/* synth specific variables */
 

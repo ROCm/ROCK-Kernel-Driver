@@ -735,12 +735,14 @@ static int snd_cs4281_trigger(snd_pcm_substream_t *substream, int cmd)
 		dma->valFCR &= ~BA0_FCR_FEN;
 		break;
 	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
 		snd_cs4281_pokeBA0(chip, dma->regDMR, dma->valDMR & ~BA0_DMR_DMA);
 		dma->valDMR |= BA0_DMR_DMA;
 		dma->valDCR &= ~BA0_DCR_MSK;
 		dma->valFCR |= BA0_FCR_FEN;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
 		dma->valDMR &= ~(BA0_DMR_DMA|BA0_DMR_POLL);
 		dma->valDCR |= BA0_DCR_MSK;
 		dma->valFCR &= ~BA0_FCR_FEN;
@@ -900,6 +902,7 @@ static snd_pcm_hardware_t snd_cs4281_playback =
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE |
+				 SNDRV_PCM_INFO_RESUME |
 				 SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
 				SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_S16_LE |
@@ -925,6 +928,7 @@ static snd_pcm_hardware_t snd_cs4281_capture =
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE |
+				 SNDRV_PCM_INFO_RESUME |
 				 SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
 				SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_S16_LE |
@@ -1804,7 +1808,7 @@ static int snd_cs4281_midi_output_open(snd_rawmidi_substream_t * substream)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->uartm |= CS4281_MODE_OUTPUT;
 	chip->midcr |= BA0_MIDCR_TXE;
-	chip->midi_input = substream;
+	chip->midi_output = substream;
 	if (!(chip->uartm & CS4281_MODE_INPUT)) {
 		snd_cs4281_midi_reset(chip);
 	} else {

@@ -576,8 +576,11 @@ cs46xx_dsp_create_pcm_reader_scb(cs46xx_t * chip,char * scb_name,
 	return scb;
 }
 
+#define GOF_PER_SEC 200
+
 dsp_scb_descriptor_t * 
 cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
+			       int rate,
                                u16 src_buffer_addr,
                                u16 src_delay_buffer_addr,u32 dest,
                                dsp_scb_descriptor_t * parent_scb,
@@ -586,45 +589,81 @@ cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
 
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * scb;
-    
-	src_task_scb_t src_task_scb = {
-		0x0028,0x00c8,
-		0x5555,0x0000,
-		0x0000,0x0000,
-		src_buffer_addr,1,
-		0x0028,0x00c8,
-		RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_32,  
-		0x0000,src_delay_buffer_addr,                  
-		0x0,                                            
-		0x80,(src_delay_buffer_addr + (24 * 4)),
-		0,0, /* next_scb, sub_list_ptr */
-		0,0, /* entry, this_spb */
-		RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_8,
-		src_buffer_addr << 0x10,
-		0x04000000,
-		{ 
-			0x8000,0x8000,
-			0xffff,0xffff
-		}
-	};
+	unsigned int tmp1, tmp2;
+	unsigned int phiIncr;
+	unsigned int correctionPerGOF, correctionPerSec;
 
-	if (ins->s16_up == NULL) {
-		ins->s16_up =  cs46xx_dsp_lookup_symbol (chip,"S16_UPSRC",
-							 SYMBOL_CODE);
-    
+	snd_printdd( "dsp_spos: setting %s rate to %u\n",scb_name,rate);
+
+	/*
+	 *  Compute the values used to drive the actual sample rate conversion.
+	 *  The following formulas are being computed, using inline assembly
+	 *  since we need to use 64 bit arithmetic to compute the values:
+	 *
+	 *  phiIncr = floor((Fs,in * 2^26) / Fs,out)
+	 *  correctionPerGOF = floor((Fs,in * 2^26 - Fs,out * phiIncr) /
+	 *                                   GOF_PER_SEC)
+	 *  ulCorrectionPerSec = Fs,in * 2^26 - Fs,out * phiIncr -M
+	 *                       GOF_PER_SEC * correctionPerGOF
+	 *
+	 *  i.e.
+	 *
+	 *  phiIncr:other = dividend:remainder((Fs,in * 2^26) / Fs,out)
+	 *  correctionPerGOF:correctionPerSec =
+	 *      dividend:remainder(ulOther / GOF_PER_SEC)
+	 */
+	tmp1 = rate << 16;
+	phiIncr = tmp1 / 48000;
+	tmp1 -= phiIncr * 48000;
+	tmp1 <<= 10;
+	phiIncr <<= 10;
+	tmp2 = tmp1 / 48000;
+	phiIncr += tmp2;
+	tmp1 -= tmp2 * 48000;
+	correctionPerGOF = tmp1 / GOF_PER_SEC;
+	tmp1 -= correctionPerGOF * GOF_PER_SEC;
+	correctionPerSec = tmp1;
+
+	{
+		src_task_scb_t src_task_scb = {
+			0x0028,0x00c8,
+			0x5555,0x0000,
+			0x0000,0x0000,
+			src_buffer_addr,1,
+			correctionPerGOF,correctionPerSec,
+			RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_32,  
+			0x0000,src_delay_buffer_addr,                  
+			0x0,                                            
+			0x080,(src_delay_buffer_addr + (24 * 4)),
+			0,0, /* next_scb, sub_list_ptr */
+			0,0, /* entry, this_spb */
+			RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_8,
+			src_buffer_addr << 0x10,
+			phiIncr,
+			{ 
+				0xffff - ins->dac_volume_right,0xffff - ins->dac_volume_left,
+				0xffff - ins->dac_volume_right,0xffff - ins->dac_volume_left
+			}
+		};
+		
 		if (ins->s16_up == NULL) {
-			snd_printk (KERN_ERR "dsp_spos: symbol S16_UPSRC not found\n");
-			return NULL;
-		}    
+			ins->s16_up =  cs46xx_dsp_lookup_symbol (chip,"S16_UPSRC",
+								 SYMBOL_CODE);
+			
+			if (ins->s16_up == NULL) {
+				snd_printk (KERN_ERR "dsp_spos: symbol S16_UPSRC not found\n");
+				return NULL;
+			}    
+		}
+		
+		/* clear buffers */
+		_dsp_clear_sample_buffer (chip,src_buffer_addr,8);
+		_dsp_clear_sample_buffer (chip,src_delay_buffer_addr,32);
+		
+		scb = _dsp_create_generic_scb(chip,scb_name,(u32 *)&src_task_scb,
+					      dest,ins->s16_up,parent_scb,
+					      scb_child_type);
 	}
-
-	/* clear buffers */
-	_dsp_clear_sample_buffer (chip,src_buffer_addr,8);
-	_dsp_clear_sample_buffer (chip,src_delay_buffer_addr,32);
-
-	scb = _dsp_create_generic_scb(chip,scb_name,(u32 *)&src_task_scb,
-				      dest,ins->s16_up,parent_scb,
-				      scb_child_type);
 
 	return scb;
 }
@@ -658,7 +697,7 @@ cs46xx_dsp_create_mix_only_scb(cs46xx_t * chip,char * scb_name,
 		/* D */ 0,
 		{
 			/* E */ 0x8000,0x8000,
-			/* F */ 0xffff,0xffff
+			/* F */ 0x8000,0x8000
 		}
 	};
 
@@ -796,7 +835,7 @@ cs46xx_dsp_create_pcm_serial_input_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 
 		RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_16,
 		0,
-		0,input_scb->address, 
+		0,input_scb->address,
 		{
 			0x8000,0x8000,
 			0x8000,0x8000
@@ -830,7 +869,7 @@ cs46xx_dsp_create_asynch_fg_tx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		0,0x2aab,           /* Const 1/3 */
     
 		{
-			0,                /* Define the unused elements */
+			0,         /* Define the unused elements */
 			0,
 			0
 		},
@@ -846,7 +885,7 @@ cs46xx_dsp_create_asynch_fg_tx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		   rate etc  */
 		0x18000000,                     /* Phi increment for approx 32k operation */
 		0x8000,0x8000,                  /* Volume controls are unused at this time */
-		0xffff,0xffff
+		0x8000,0x8000
 	};
   
 	scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&asynch_fg_tx_scb,
@@ -864,7 +903,7 @@ cs46xx_dsp_create_asynch_fg_rx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
                                    dsp_scb_descriptor_t * parent_scb,
                                    int scb_child_type)
 {
-
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * scb;
 
 	asynch_fg_rx_scb_t asynch_fg_rx_scb = {
@@ -893,9 +932,9 @@ cs46xx_dsp_create_asynch_fg_rx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		   rate etc  */
 		0x18000000,         
 
-		/* Mute stream */
-		0x8000,0x8000,       
-		0xffff,0xffff
+		/* Set IEC958 input volume */
+		0xffff - ins->spdif_input_volume_right,0xffff - ins->spdif_input_volume_left,
+		0xffff - ins->spdif_input_volume_right,0xffff - ins->spdif_input_volume_left,
 	};
 
 	scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&asynch_fg_rx_scb,
@@ -1007,7 +1046,7 @@ dsp_scb_descriptor_t *  cs46xx_dsp_create_magic_snoop_scb(cs46xx_t * chip,char *
 		/* C */ snoop_buffer_address  << 0x10,
 		/* D */ 0,
 		/* E */ { 0x8000,0x8000,
-			  /* F */   0xffff,0xffff
+	        /* F */   0xffff,0xffff
 		}
 	};
 
@@ -1093,6 +1132,8 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * src_scb = NULL,* pcm_scb, * mixer_scb = NULL;
+	dsp_scb_descriptor_t * src_parent_scb = NULL;
+
 	/*dsp_scb_descriptor_t * pcm_parent_scb;*/
 	char scb_name[DSP_MAX_SCB_NAME];
 	int i,pcm_index = -1, insert_point, src_index = -1;
@@ -1116,10 +1157,13 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	case DSP_IEC958_CHANNEL:
 		snd_assert (ins->asynch_tx_scb != NULL, return NULL);
 		mixer_scb = ins->asynch_tx_scb;
-		if (ins->spdif_status_out & DSP_SPDIF_STATUS_AC3_MODE) {
-			snd_printdd ("IEC958 opened in AC3 mode\n");
-			/*src_scb = ins->asynch_tx_scb;
-			  ins->asynch_tx_scb->ref_count ++;*/
+
+		/* if sample rate is set to 48khz we pass
+		   the Sample Rate Converted (which could
+		   alter the raw data stream ...) */
+		if (sample_rate == 48000) {
+			snd_printdd ("IEC958 pass through\n");
+			src_parent_scb = ins->asynch_tx_scb;
 		}
 		break;
 	default:
@@ -1156,8 +1200,6 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	}
 
 	if (src_scb == NULL) {
-		dsp_scb_descriptor_t * src_parent_scb;
-
 		if (ins->nsrc_scb >= DSP_MAX_SRC_NR) {
 			snd_printk(KERN_ERR "dsp_spos: to many SRC instances\n!");
 			return NULL;
@@ -1174,18 +1216,21 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 		snd_assert (src_index != -1,return NULL);
 
 		/* we need to create a new SRC SCB */
-		if (mixer_scb->sub_list_ptr == ins->the_null_scb) {
-			src_parent_scb = mixer_scb;
-			insert_point = SCB_ON_PARENT_SUBLIST_SCB;
-		} else {
-			src_parent_scb = find_next_free_scb(chip,mixer_scb->sub_list_ptr);
-			insert_point = SCB_ON_PARENT_NEXT_SCB;
-		}
+		if (src_parent_scb == NULL) {
+			if (mixer_scb->sub_list_ptr == ins->the_null_scb) {
+				src_parent_scb = mixer_scb;
+				insert_point = SCB_ON_PARENT_SUBLIST_SCB;
+			} else {
+				src_parent_scb = find_next_free_scb(chip,mixer_scb->sub_list_ptr);
+				insert_point = SCB_ON_PARENT_NEXT_SCB;
+			}
+		} else insert_point = SCB_ON_PARENT_NEXT_SCB;
 
 		snprintf (scb_name,DSP_MAX_SCB_NAME,"SrcTask_SCB%d",src_index);
 
 		snd_printdd( "dsp_spos: creating SRC \"%s\"\n",scb_name);
 		src_scb = cs46xx_dsp_create_src_task_scb(chip,scb_name,
+							 sample_rate,
 							 src_output_buffer_addr[src_index],
 							 src_delay_buffer_addr[src_index],
 							 /* 0x400 - 0x600 source SCBs */
@@ -1198,9 +1243,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 			return NULL;
 		}
 
-		if (pcm_channel_id != DSP_IEC958_CHANNEL ||
-		    !(ins->spdif_status_out & DSP_SPDIF_STATUS_AC3_MODE))
-			cs46xx_dsp_set_src_sample_rate(chip,src_scb,sample_rate);
+		/* cs46xx_dsp_set_src_sample_rate(chip,src_scb,sample_rate); */
 
 		ins->nsrc_scb ++;
 	} 
@@ -1226,6 +1269,19 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 		return NULL;
 	}
 
+	if (pcm_channel_id == DSP_IEC958_CHANNEL && sample_rate == 48000) {
+		snd_assert (ins->spdif_pcm_input_scb == NULL);
+		
+		/* a hack to make the skip the SRC and pass the stream 
+		   directly to the SPDIF task */
+		ins->spdif_pcm_input_scb = 
+			cs46xx_dsp_create_pcm_serial_input_scb(chip,"PCMSerialInput_PCM",
+							       PCMSERIALINII_SCB_ADDR,
+							       pcm_scb,
+							       ins->asynch_tx_scb,
+							       SCB_ON_PARENT_SUBLIST_SCB);		
+	}
+	
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	ins->pcm_channels[pcm_index].sample_rate = sample_rate;
 	ins->pcm_channels[pcm_index].pcm_reader_scb = pcm_scb;
@@ -1236,7 +1292,6 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	ins->pcm_channels[pcm_index].active = 1;
 	ins->pcm_channels[pcm_index].pcm_slot = pcm_index;
 	ins->pcm_channels[pcm_index].mixer_scb = mixer_scb;
-	ins->pcm_channels[pcm_index].pcm_channel_id = pcm_channel_id;
 	ins->npcm_channels ++;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
@@ -1416,65 +1471,6 @@ int cs46xx_dsp_pcm_link (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel)
 	return 0;
 }
 
-
-#define GOF_PER_SEC 200
-  
-void cs46xx_dsp_set_src_sample_rate(cs46xx_t *chip,dsp_scb_descriptor_t * src, u32 rate)
-{
-	unsigned long flags;
-	unsigned int tmp1, tmp2;
-	unsigned int phiIncr;
-	unsigned int correctionPerGOF, correctionPerSec;
-
-	snd_printdd( "dsp_spos: setting SRC rate to %u\n",rate);
-	/*
-	 *  Compute the values used to drive the actual sample rate conversion.
-	 *  The following formulas are being computed, using inline assembly
-	 *  since we need to use 64 bit arithmetic to compute the values:
-	 *
-	 *  phiIncr = floor((Fs,in * 2^26) / Fs,out)
-	 *  correctionPerGOF = floor((Fs,in * 2^26 - Fs,out * phiIncr) /
-	 *                                   GOF_PER_SEC)
-	 *  ulCorrectionPerSec = Fs,in * 2^26 - Fs,out * phiIncr -M
-	 *                       GOF_PER_SEC * correctionPerGOF
-	 *
-	 *  i.e.
-	 *
-	 *  phiIncr:other = dividend:remainder((Fs,in * 2^26) / Fs,out)
-	 *  correctionPerGOF:correctionPerSec =
-	 *      dividend:remainder(ulOther / GOF_PER_SEC)
-	 */
-	tmp1 = rate << 16;
-	phiIncr = tmp1 / 48000;
-	tmp1 -= phiIncr * 48000;
-	tmp1 <<= 10;
-	phiIncr <<= 10;
-	tmp2 = tmp1 / 48000;
-	phiIncr += tmp2;
-	tmp1 -= tmp2 * 48000;
-	correctionPerGOF = tmp1 / GOF_PER_SEC;
-	tmp1 -= correctionPerGOF * GOF_PER_SEC;
-	correctionPerSec = tmp1;
-
-	/*
-	 *  Fill in the SampleRateConverter control block.
-	 */
-	spin_lock_irqsave(&chip->reg_lock, flags);
-
-	/* mute SCB */
-	/* cs46xx_dsp_scb_set_volume (chip,src,0,0); */
-
-	snd_cs46xx_poke(chip, (src->address + SRCCorPerGof) << 2,
-	  ((correctionPerSec << 16) & 0xFFFF0000) | (correctionPerGOF & 0xFFFF));
-
-	snd_cs46xx_poke(chip, (src->address + SRCPhiIncr6Int26Frac) << 2, phiIncr);
-
-	/* raise volume */
-	/* cs46xx_dsp_scb_set_volume (chip,src,0x7fff,0x7fff); */
-	
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
-}
-
 dsp_scb_descriptor_t * cs46xx_add_record_source (cs46xx_t *chip,dsp_scb_descriptor_t * source,
                                                  u16 addr,char * scb_name)
 {
@@ -1641,9 +1637,8 @@ int cs46xx_iec958_pre_open (cs46xx_t *chip)
 								SCB_ON_PARENT_NEXT_SCB);
 
 
-	if (ins->spdif_status_out & DSP_SPDIF_STATUS_AC3_MODE) 
-		/* set left (13), right validity bit (12) , and non-audio(1) and profsional bit (0) */
-		cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x00000000 | (1 << 13) | (1 << 12) | (1 << 1) | 1);
+	/* set spdif channel status value for streaming */
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_stream);
 
 	ins->spdif_status_out  |= DSP_SPDIF_STATUS_PLAYBACK_OPEN;
 
@@ -1659,13 +1654,22 @@ int cs46xx_iec958_post_close (cs46xx_t *chip)
 	ins->spdif_status_out  &= ~DSP_SPDIF_STATUS_PLAYBACK_OPEN;
 
 	/* restore settings */
-	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x00000000 | (1 << 13) | (1 << 12));
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_default);
 	
 	/* deallocate stuff */
+	if (ins->spdif_pcm_input_scb != NULL) {
+		cs46xx_dsp_remove_scb (chip,ins->spdif_pcm_input_scb);
+		ins->spdif_pcm_input_scb = NULL;
+	}
+
 	cs46xx_dsp_remove_scb (chip,ins->asynch_tx_scb);
 	ins->asynch_tx_scb = NULL;
 
+	/* clear buffer to prevent any undesired noise */
+	_dsp_clear_sample_buffer(chip,SPDIFO_IP_OUTPUT_BUFFER1,256);
+
 	/* restore state */
+
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_OUTPUT_ENABLED ) {
 		cs46xx_dsp_enable_spdif_out (chip);
 	}

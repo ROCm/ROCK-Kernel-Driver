@@ -31,6 +31,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
+#include <sound/asoundef.h>
 #include <sound/cs46xx.h>
 
 #include "cs46xx_lib.h"
@@ -261,6 +262,15 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 	ins->dac_volume_left = 0x8000;
 	ins->spdif_input_volume_right = 0x8000;
 	ins->spdif_input_volume_left = 0x8000;
+
+	/* set left and right validity bits and
+	   default channel status */
+	ins->spdif_csuv_default = 
+		ins->spdif_csuv_stream =  
+	 /* byte 0 */  (_wrap_all_bits(  (SNDRV_PCM_DEFAULT_CON_SPDIF        & 0xff)) << 24) |
+	 /* byte 1 */  (_wrap_all_bits( ((SNDRV_PCM_DEFAULT_CON_SPDIF >> 16) & 0xff)) << 16) |
+	 /* byte 3 */   _wrap_all_bits(  (SNDRV_PCM_DEFAULT_CON_SPDIF >> 24) & 0xff) |
+	 /* left and right validity bits */ (1 << 13) | (1 << 12);
 
 	return ins;
 }
@@ -605,7 +615,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 	snd_iprintf(buffer,"\nMIX_SAMPLE_BUF1:\n");
 
 	col = 0;
-	for (i = MIX_SAMPLE_BUF1;i < MIX_SAMPLE_BUF1 + 0x30; i += sizeof(u32),col ++) {
+	for (i = MIX_SAMPLE_BUF1;i < MIX_SAMPLE_BUF1 + 0x40; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
@@ -618,14 +628,14 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 		snd_iprintf(buffer,"%08X ",readl(dst + i));
 	}
 
-	snd_iprintf(buffer,"\n\n");
+	snd_iprintf(buffer,"\nSRC_TASK_SCB1:\n");
 	col = 0;
-	for (i = SPDIFI_IP_OUTPUT_BUFFER1;i < SPDIFI_IP_OUTPUT_BUFFER1 + 0x40; i += sizeof(u32),col ++) {
+	for (i = 0x2580 ; i < 0x2580 + 0x40 ; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
 		}
-
+		
 		if (col == 0) {
 			snd_iprintf(buffer, "%04X ",i);
 		}
@@ -636,7 +646,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 	snd_iprintf(buffer,"\nSPDIFO_BUFFER:\n");
 	col = 0;
-	for (i = SPDIFO_IP_OUTPUT_BUFFER1;i < SPDIFO_IP_OUTPUT_BUFFER1 + 0x40; i += sizeof(u32),col ++) {
+	for (i = SPDIFO_IP_OUTPUT_BUFFER1;i < SPDIFO_IP_OUTPUT_BUFFER1 + 0x30; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
@@ -695,7 +705,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 		snd_iprintf(buffer,"%08X ",readl(dst + i));
 	}
-
+#if 0
 	snd_iprintf(buffer,"\nWRITE_BACK_BUF1: \n");
 	col = 0;
 	for (i = WRITE_BACK_BUF1;i < WRITE_BACK_BUF1 + 0x40; i += sizeof(u32),col ++) {
@@ -710,7 +720,22 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 		snd_iprintf(buffer,"%08X ",readl(dst + i));
 	}
+#endif
 
+	snd_iprintf(buffer,"\nSPDIFI_IP_OUTPUT_BUFFER1: \n");
+	col = 0;
+	for (i = SPDIFI_IP_OUTPUT_BUFFER1;i < SPDIFI_IP_OUTPUT_BUFFER1 + 0x80; i += sizeof(u32),col ++) {
+		if (col == 4) {
+			snd_iprintf(buffer,"\n");
+			col = 0;
+		}
+
+		if (col == 0) {
+			snd_iprintf(buffer, "%04X ",i);
+		}
+		
+		snd_iprintf(buffer,"%08X ",readl(dst + i));
+	}
 	snd_iprintf(buffer,"\n");
 }
 
@@ -1346,6 +1371,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 	/* SPDIF input sampel rate converter */
 	src_task_scb = cs46xx_dsp_create_src_task_scb(chip,"SrcTaskSCB_SPDIFI",
+						      48000,
 						      SRC_OUTPUT_BUF1,
 						      SRC_DELAY_BUF1,SRCTASK_SCB_ADDR,
 						      master_mix_scb,
@@ -1549,7 +1575,7 @@ int cs46xx_dsp_enable_spdif_hw (cs46xx_t *chip)
 	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CONTROL, 0x80000000);
 
 	/* right and left validate bit */
-	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x00000000 | (1 << 13) | (1 << 12));
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_default);
 
 	/* monitor state */
 	ins->spdif_status_out |= DSP_SPDIF_STATUS_HW_ENABLED;
@@ -1587,16 +1613,14 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 	cs46xx_poke_via_dsp (chip,SP_SPDIN_FIFOPTR, 0x0);
 	cs46xx_src_link(chip,ins->spdif_in_src);
 
-	/* restore SPDIF input volume */
-	cs46xx_dsp_scb_set_volume (chip,ins->spdif_in_src,
-				   ins->spdif_input_volume_right,
-				   ins->spdif_input_volume_left);
+	/* unmute SRC volume */
+	cs46xx_dsp_scb_set_volume (chip,ins->spdif_in_src,0x7fff,0x7fff);
 
 	spin_unlock_irq(&chip->reg_lock);
 
 	/* set SPDIF input sample rate and unmute
 	   NOTE: only 48khz support for SPDIF input this time */
-	cs46xx_dsp_set_src_sample_rate(chip,ins->spdif_in_src,48000);
+	/* cs46xx_dsp_set_src_sample_rate(chip,ins->spdif_in_src,48000); */
 
 	/* monitor state */
 	ins->spdif_status_in = 1;
@@ -1725,39 +1749,47 @@ int cs46xx_poke_via_dsp (cs46xx_t *chip,u32 address,u32 data)
 	return 0;
 }
 
-int cs46xx_dsp_set_dac_volume (cs46xx_t * chip,u16 right,u16 left)
+int cs46xx_dsp_set_dac_volume (cs46xx_t * chip,u16 left,u16 right)
 {
-	int i;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+	dsp_scb_descriptor_t * scb; 
 
 	down(&chip->spos_mutex);
-
-	ins->dac_volume_right = right;
-	ins->dac_volume_left = left;
-
-	for (i = 0; i < DSP_MAX_PCM_CHANNELS; ++i) {
-		if (ins->pcm_channels[i].active &&
-		    !ins->pcm_channels[i].unlinked) {
-			cs46xx_dsp_scb_set_volume (chip,ins->pcm_channels[i].pcm_reader_scb,
-						   right,left);
-			
-		}
+	
+	/* main output */
+	scb = ins->master_mix_scb->sub_list_ptr;
+	while (scb != ins->the_null_scb) {
+		cs46xx_dsp_scb_set_volume (chip,scb,left,right);
+		scb = scb->next_scb_ptr;
 	}
+
+	/* rear output */
+	scb = ins->rear_mix_scb->sub_list_ptr;
+	while (scb != ins->the_null_scb) {
+		cs46xx_dsp_scb_set_volume (chip,scb,left,right);
+		scb = scb->next_scb_ptr;
+	}
+
+	ins->dac_volume_left = left;
+	ins->dac_volume_right = right;
 
 	up(&chip->spos_mutex);
 
 	return 0;
 }
 
-int cs46xx_dsp_set_iec958_volume (cs46xx_t * chip,u16 right,u16 left) {
+int cs46xx_dsp_set_iec958_volume (cs46xx_t * chip,u16 left,u16 right) {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
 	down(&chip->spos_mutex);
-	cs46xx_dsp_scb_set_volume (chip,ins->spdif_in_src,
-				   right,left);
 
-	ins->spdif_input_volume_right = right;
+	if (ins->asynch_rx_scb != NULL)
+		cs46xx_dsp_scb_set_volume (chip,ins->asynch_rx_scb,
+					   left,right);
+
 	ins->spdif_input_volume_left = left;
+	ins->spdif_input_volume_right = right;
+
 	up(&chip->spos_mutex);
 
 	return 0;
