@@ -93,7 +93,11 @@ static int		mcfrs_serial_refcount;
 
 #define _INLINE_ inline
 
+#ifdef CONFIG_M5282
+#define	IRQBASE	77
+#else
 #define	IRQBASE	73
+#endif
 
 /*
  *	Configuration table, UARTs to look for at startup.
@@ -412,13 +416,6 @@ void mcfrs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		receive_chars(info, regs, isr);
 	if (isr & MCFUART_UIR_TXREADY)
 		transmit_chars(info);
-#if 0
-	if (isr & MCFUART_UIR_DELTABREAK) {
-		printk("%s(%d): delta break!\n", __FILE__, __LINE__);
-		receive_chars(info, regs, isr);
-	}
-#endif
-
 	return;
 }
 
@@ -737,7 +734,7 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 
 #if 0
 	printk("%s(%d): mcfrs_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		__FILE__, __LINE__, tty, from_user, buf, count);
+		__FILE__, __LINE__, (int)tty, from_user, (int)buf, count);
 #endif
 
 	if (serial_paranoia_check(info, tty->name, "mcfrs_write"))
@@ -791,7 +788,7 @@ static int mcfrs_write_room(struct tty_struct *tty)
 {
 	struct mcf_serial *info = (struct mcf_serial *)tty->driver_data;
 	int	ret;
-				
+
 	if (serial_paranoia_check(info, tty->name, "mcfrs_write_room"))
 		return 0;
 	ret = SERIAL_XMIT_SIZE - info->xmit_cnt - 1;
@@ -803,7 +800,7 @@ static int mcfrs_write_room(struct tty_struct *tty)
 static int mcfrs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct mcf_serial *info = (struct mcf_serial *)tty->driver_data;
-				
+
 	if (serial_paranoia_check(info, tty->name, "mcfrs_chars_in_buffer"))
 		return 0;
 	return info->xmit_cnt;
@@ -813,7 +810,7 @@ static void mcfrs_flush_buffer(struct tty_struct *tty)
 {
 	struct mcf_serial	*info = (struct mcf_serial *)tty->driver_data;
 	unsigned long		flags;
-				
+
 	if (serial_paranoia_check(info, tty->name, "mcfrs_flush_buffer"))
 		return;
 
@@ -1467,7 +1464,7 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
  */
 static void mcfrs_irqinit(struct mcf_serial *info)
 {
-#ifdef CONFIG_M5272
+#if defined(CONFIG_M5272)
 	volatile unsigned long	*icrp;
 	volatile unsigned long	*portp;
 	volatile unsigned char	*uartp;
@@ -1493,6 +1490,19 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 	*portp = (*portp & ~0x000000ff) | 0x00000055;
 	portp = (volatile unsigned long *) (MCF_MBAR + MCFSIM_PDCNT);
 	*portp = (*portp & ~0x000003fc) | 0x000002a8;
+#elif defined(CONFIG_M5282)
+	volatile unsigned char *icrp, *uartp;
+	volatile unsigned long *imrp;
+
+	uartp = (volatile unsigned char *) info->addr;
+
+	icrp = (volatile unsigned char *) (MCF_MBAR + MCFICM_INTC0 +
+		MCFINTC_ICR0 + MCFINT_UART0 + info->line);
+	*icrp = 0x33; /* UART0 with level 6, priority 3 */
+
+	imrp = (volatile unsigned long *) (MCF_MBAR + MCFICM_INTC0 +
+		MCFINTC_IMRL);
+	*imrp &= ~((1 << (info->irq - 64)) | 1);
 #else
 	volatile unsigned char	*icrp, *uartp;
 
