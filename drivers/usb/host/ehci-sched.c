@@ -490,33 +490,6 @@ done:
 	return status;
 }
 
-static unsigned
-intr_complete (
-	struct ehci_hcd	*ehci,
-	unsigned	frame,
-	struct ehci_qh	*qh,
-	struct pt_regs	*regs
-) {
-	unsigned	count;
-
-	/* nothing to report? */
-	if (likely ((qh->hw_token & __constant_cpu_to_le32 (QTD_STS_ACTIVE))
-			!= 0))
-		return 0;
-	if (unlikely (list_empty (&qh->qtd_list))) {
-		dbg ("intr qh %p no TDs?", qh);
-		return 0;
-	}
-	
-	/* handle any completions */
-	count = qh_completions (ehci, qh, regs);
-
-	if (unlikely (list_empty (&qh->qtd_list)))
-		intr_deschedule (ehci, qh, 0);
-
-	return count;
-}
-
 /*-------------------------------------------------------------------------*/
 
 static inline struct ehci_iso_stream *
@@ -718,7 +691,8 @@ itd_sched_init (
 
 		trans = EHCI_ISOC_ACTIVE;
 		trans |= buf & 0x0fff;
-		if (unlikely ((i + 1) == urb->number_of_packets))
+		if (unlikely (((i + 1) == urb->number_of_packets))
+				&& !(urb->transfer_flags & URB_NO_INTERRUPT))
 			trans |= EHCI_ITD_IOC;
 		trans |= length << 16;
 		uframe->transaction = cpu_to_le32 (trans);
@@ -809,7 +783,10 @@ itd_urb_transaction (
  * periodic schedule slots.  (Affected by TUNE_FLS, which defaults to
  * "as small as possible" to be cache-friendlier.)  That limits the size
  * transfers you can stream reliably; avoid more than 64 msec per urb.
- * Also avoid queue depths of less than the system's worst irq latency.
+ * Also avoid queue depths of less than ehci's worst irq latency (affected
+ * by the per-urb URB_NO_INTERRUPT hint, the log2_irq_thresh module parameter,
+ * and other factors); or more than about 230 msec total (for portability,
+ * given EHCI_TUNE_FLS and the slop).  Or, write a smarter scheduler!
  */
 
 #define SCHEDULE_SLOP	10	/* frames */
@@ -1233,7 +1210,7 @@ static void
 scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	unsigned	frame, clock, now_uframe, mod;
-	unsigned	count = 0;
+	unsigned	modified;
 
 	mod = ehci->periodic_size << 3;
 
@@ -1244,47 +1221,50 @@ scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 	 */
 	now_uframe = ehci->next_uframe;
 	if (HCD_IS_RUNNING (ehci->hcd.state))
-		clock = readl (&ehci->regs->frame_index) % mod;
+		clock = readl (&ehci->regs->frame_index);
 	else
 		clock = now_uframe + mod - 1;
+	clock %= mod;
 
 	for (;;) {
 		union ehci_shadow	q, *q_p;
 		u32			type, *hw_p;
 		unsigned		uframes;
 
+		/* don't scan past the live uframe */
 		frame = now_uframe >> 3;
-restart:
-		/* scan schedule to _before_ current frame index */
-		if ((frame == (clock >> 3))
-				&& HCD_IS_RUNNING (ehci->hcd.state))
+		if (frame == (clock >> 3))
 			uframes = now_uframe & 0x07;
-		else
+		else {
+			/* safe to scan the whole frame at once */
+			now_uframe |= 0x07;
 			uframes = 8;
+		}
 
+restart:
+		/* scan each element in frame's queue for completions */
 		q_p = &ehci->pshadow [frame];
 		hw_p = &ehci->periodic [frame];
 		q.ptr = q_p->ptr;
 		type = Q_NEXT_TYPE (*hw_p);
+		modified = 0;
 
-		/* scan each element in frame's queue for completions */
 		while (q.ptr != 0) {
-			int			last;
 			unsigned		uf;
 			union ehci_shadow	temp;
 
 			switch (type) {
 			case Q_TYPE_QH:
-				last = (q.qh->hw_next == EHCI_LIST_END);
-				temp = q.qh->qh_next;
+				/* handle any completions */
+				temp.qh = qh_get (q.qh);
 				type = Q_NEXT_TYPE (q.qh->hw_next);
-				count += intr_complete (ehci, frame,
-						qh_get (q.qh), regs);
-				qh_put (ehci, q.qh);
-				q = temp;
+				q = q.qh->qh_next;
+				modified = qh_completions (ehci, temp.qh, regs);
+				if (unlikely (list_empty (&temp.qh->qtd_list)))
+					intr_deschedule (ehci, temp.qh, 0);
+				qh_put (ehci, temp.qh);
 				break;
 			case Q_TYPE_FSTN:
-				last = (q.fstn->hw_next == EHCI_LIST_END);
 				/* for "save place" FSTNs, look at QH entries
 				 * in the previous frame for completions.
 				 */
@@ -1295,8 +1275,6 @@ restart:
 				q = q.fstn->fstn_next;
 				break;
 			case Q_TYPE_ITD:
-				last = (q.itd->hw_next == EHCI_LIST_END);
-
 				/* skip itds for later in the frame */
 				rmb ();
 				for (uf = uframes; uf < 8; uf++) {
@@ -1317,31 +1295,24 @@ restart:
 				 */
 				*q_p = q.itd->itd_next;
 				*hw_p = q.itd->hw_next;
+				type = Q_NEXT_TYPE (q.itd->hw_next);
 				wmb();
-
-				/* always rescan here; simpler */
-				count += itd_complete (ehci, q.itd, regs);
-				goto restart;
+				modified = itd_complete (ehci, q.itd, regs);
+				q = *q_p;
+				break;
 #ifdef have_split_iso
 			case Q_TYPE_SITD:
-				last = (q.sitd->hw_next == EHCI_LIST_END);
-				sitd_complete (ehci, q.sitd);
-				type = Q_NEXT_TYPE (q.sitd->hw_next);
-
-				// FIXME unlink SITD after split completes
-				q = q.sitd->sitd_next;
-				break;
+				// nyet!
 #endif /* have_split_iso */
 			default:
 				dbg ("corrupt type %d frame %d shadow %p",
 					type, frame, q.ptr);
 				// BUG ();
-				last = 1;
 				q.ptr = 0;
 			}
 
-			/* did completion remove an interior q entry? */
-			if (unlikely (q.ptr == 0 && !last))
+			/* assume completion callbacks modify the queue */
+			if (unlikely (modified))
 				goto restart;
 		}
 
@@ -1368,9 +1339,6 @@ restart:
 			/* rescan the rest of this frame, then ... */
 			clock = now;
 		} else {
-			/* FIXME sometimes we can scan the next frame
-			 * right away, not always inching up on it ...
-			 */
 			now_uframe++;
 			now_uframe %= mod;
 		}

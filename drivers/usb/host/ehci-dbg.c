@@ -367,7 +367,7 @@ static void qh_lines (
 			scratch, cpu_to_le32p (&qh->hw_info2),
 			cpu_to_le32p (&qh->hw_token), mark,
 			(__constant_cpu_to_le32 (QTD_TOGGLE) & qh->hw_token)
-				? "data0" : "data1",
+				? "data1" : "data0",
 			(cpu_to_le32p (&qh->hw_alt_next) >> 1) & 0x0f);
 	size -= temp;
 	next += temp;
