@@ -45,9 +45,6 @@
 
 #define RUN_AT(t) (jiffies + (t))
 
-/* Transmition state */
-#define XMIT_RUNNING 0
-
 /* Effect status */
 #define EFFECT_STARTED 0     /* Effect is going to play after some time
 				(ff_replay.delay) */
