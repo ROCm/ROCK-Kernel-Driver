@@ -377,6 +377,7 @@ static void snd_wavefront_midi_output_trigger(snd_rawmidi_substream_t * substrea
 	if (up) {
 		if ((midi->mode[mpu] & MPU401_MODE_OUTPUT_TRIGGER) == 0) {
 			if (!midi->istimer) {
+				init_timer(&midi->timer);
 				midi->timer.function = snd_wavefront_midi_output_timer;
 				midi->timer.data = (unsigned long) substream->rmidi->card->private_data;
 				midi->timer.expires = 1 + jiffies;

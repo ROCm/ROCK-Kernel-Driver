@@ -4148,6 +4148,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	}
 	memset(card, 0, sizeof(*card));
 
+	init_timer(&card->timer);
 	card->iobase = iobase;
 	card->pci_dev = pci_dev;
 	card->pci_id = pci_id->device;

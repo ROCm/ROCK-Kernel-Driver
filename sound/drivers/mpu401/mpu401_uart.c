@@ -103,6 +103,7 @@ static void snd_mpu401_uart_add_timer (mpu401_t *mpu, int input)
 
 	spin_lock_irqsave (&mpu->timer_lock, flags);
 	if (mpu->timer_invoked == 0) {
+		init_timer(&mpu->timer);
 		mpu->timer.data = (unsigned long)mpu;
 		mpu->timer.function = snd_mpu401_uart_timer;
 		mpu->timer.expires = 1 + jiffies;

@@ -314,6 +314,7 @@ static int snd_card_dummy_playback_open(snd_pcm_substream_t * substream)
 		snd_magic_kfree(dpcm);
 		return -ENOMEM;
 	}
+	init_timer(&dpcm->timer);
 	dpcm->timer.data = (unsigned long) dpcm;
 	dpcm->timer.function = snd_card_dummy_pcm_timer_function;
 	spin_lock_init(&dpcm->lock);
