@@ -6032,6 +6032,7 @@ static void tg3_set_msglevel(struct net_device *dev, u32 value)
 	tp->msg_enable = value;
 }
   
+#if TG3_TSO_SUPPORT != 0
 static int tg3_set_tso(struct net_device *dev, u32 value)
 {
 	struct tg3 *tp = dev->priv;
@@ -6043,6 +6044,7 @@ static int tg3_set_tso(struct net_device *dev, u32 value)
 	}
 	return ethtool_op_set_tso(dev, value);
 }
+#endif
   
 static int tg3_nway_reset(struct net_device *dev)
 {
@@ -6281,8 +6283,10 @@ static struct ethtool_ops tg3_ethtool_ops = {
 	.set_tx_csum		= tg3_set_tx_csum,
 	.get_sg			= ethtool_op_get_sg,
 	.set_sg			= ethtool_op_set_sg,
+#if TG3_TSO_SUPPORT != 0
 	.get_tso		= ethtool_op_get_tso,
 	.set_tso		= tg3_set_tso,
+#endif
 };
 
 /* Chips other than 5700/5701 use the NVRAM for fetching info. */
