@@ -49,14 +49,10 @@ extern void get_dir_ent(paddr_t paddr, int *state,
 #endif
 
 /* intr.c */
-extern int intr_reserve_level(cpuid_t cpu, int level, int err, vertex_hdl_t owner_dev, char *name);
 extern void intr_unreserve_level(cpuid_t cpu, int level);
-extern int intr_connect_level(cpuid_t cpu, int bit, ilvl_t mask_no, 
-			intr_func_t intr_prefunc);
+extern int intr_connect_level(cpuid_t cpu, int bit);
 extern int intr_disconnect_level(cpuid_t cpu, int bit);
-extern cpuid_t intr_heuristic(vertex_hdl_t dev, device_desc_t dev_desc,
-			      int req_bit,int intr_resflags,vertex_hdl_t owner_dev,
-			      char *intr_name,int *resp_bit);
+extern cpuid_t intr_heuristic(vertex_hdl_t dev, int req_bit, int *resp_bit);
 extern void intr_block_bit(cpuid_t cpu, int bit);
 extern void intr_unblock_bit(cpuid_t cpu, int bit);
 extern void setrtvector(intr_func_t);

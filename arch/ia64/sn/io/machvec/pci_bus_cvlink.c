@@ -438,14 +438,18 @@ sn_pci_fixup(int arg)
 		extern void register_sn_procfs(void);
 #endif
 		extern void irix_io_init(void);
+		extern void sn_init_cpei_timer(void);
 		
 		init_hcl();
 		irix_io_init();
 		
 		for (cnode = 0; cnode < numnodes; cnode++) {
-			extern void intr_init_vecblk(nodepda_t *npda, cnodeid_t, int);
-			intr_init_vecblk(NODEPDA(cnode), cnode, 0);
+			extern void intr_init_vecblk(cnodeid_t);
+			intr_init_vecblk(cnode);
 		} 
+
+		sn_init_cpei_timer();
+
 #ifdef CONFIG_PROC_FS
 		register_sn_procfs();
 #endif
