@@ -1171,38 +1171,52 @@ void __init
 prep_pcibios_fixup(void)
 {
         struct pci_dev *dev = NULL;
+	int irq;
+	int have_openpic = (OpenPIC_Addr != NULL);
 
 	prep_route_pci_interrupts();
 
 	printk("Setting PCI interrupts for a \"%s\"\n", Motherboard_map_name);
-	if (OpenPIC_Addr) {
-		/* PCI interrupts are controlled by the OpenPIC */
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-			if (dev->bus->number == 0) {
-                       		dev->irq = openpic_to_irq(Motherboard_map[PCI_SLOT(dev->devfn)]);
-				pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-			} else {
-				if (Motherboard_non0 != NULL)
-					Motherboard_non0(dev);
-			}
-		}
 
-		/* Setup the Winbond or Via PIB */
-		prep_pib_init();
-
-		return;
-	}
-
-	dev = NULL;
+	/* Iterate through all the PCI devices, setting the IRQ */
 	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/*
-		 * Use our old hard-coded kludge to figure out what
-		 * irq this device uses.  This is necessary on things
-		 * without residual data. -- Cort
+		 * If we have residual data, then this is easy: query the
+		 * residual data for the IRQ line allocated to the device.
+		 * This works the same whether we have an OpenPic or not.
 		 */
-		unsigned char d = PCI_SLOT(dev->devfn);
-		dev->irq = Motherboard_routes[Motherboard_map[d]];
+		if (have_residual_data) {
+			irq = residual_pcidev_irq(dev);
+			dev->irq = have_openpic ? openpic_to_irq(irq) : irq;
+		}
+		/*
+		 * If we don't have residual data, then we need to use
+		 * tables to determine the IRQ.  The table organisation
+		 * is different depending on whether there is an OpenPIC
+		 * or not.  The tables are only used for bus 0, so check
+		 * this first.
+		 */
+		else if (dev->bus->number == 0) {
+			irq = Motherboard_map[PCI_SLOT(dev->devfn)];
+			dev->irq = have_openpic ? openpic_to_irq(irq)
+						: Motherboard_routes[irq];
+		}
+		/*
+		 * Finally, if we don't have residual data and the bus is
+		 * non-zero, use the callback (if provided)
+		 */
+		else {
+			if (Motherboard_non0 != NULL)
+				Motherboard_non0(dev);
+
+			continue;
+		}
+
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 	}
+
+	/* Setup the Winbond or Via PIB */
+	prep_pib_init();
 }
 
 static void __init

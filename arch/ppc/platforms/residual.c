@@ -827,6 +827,66 @@ PPC_DEVICE __init *residual_find_device_id(unsigned long BusMask,
 	return NULL;
 }
 
+static int __init
+residual_scan_pcibridge(PnP_TAG_PACKET * pkt, struct pci_dev *dev)
+{
+	int irq = -1;
+
+#define data pkt->L4_Pack.L4_Data.L4_PPCPack.PPCData
+	if (dev->bus->number == data[16]) {
+		int i, size;
+
+		size = 3 + ld_le16((u_short *) (&pkt->L4_Pack.Count0));
+		for (i = 20; i < size - 4; i += 12) {
+			unsigned char pin;
+			int line_irq;
+
+			if (dev->devfn != data[i + 1])
+				continue;
+
+			pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
+			if (pin) {
+				line_irq = ld_le16((unsigned short *)
+						(&data[i + 4 + 2 * (pin - 1)]));
+				irq = (line_irq == 0xffff) ? 0
+							   : line_irq & 0x7fff;
+			} else
+				irq = 0;
+
+			break;
+		}
+	}
+#undef data
+
+	return irq;
+}
+
+int __init
+residual_pcidev_irq(struct pci_dev *dev)
+{
+	int i = 0;
+	int irq = -1;
+	PPC_DEVICE *bridge;
+
+	while ((bridge = residual_find_device
+	       (-1, NULL, BridgeController, PCIBridge, -1, i++))) {
+
+		PnP_TAG_PACKET *pkt;
+		if (bridge->AllocatedOffset) {
+			pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+					   bridge->AllocatedOffset, 3, 0);
+			if (!pkt)
+				continue;
+
+			irq = residual_scan_pcibridge(pkt, dev);
+			if (irq != -1)
+				break;
+		}
+	}
+
+	return (irq < 0) ? 0 : irq;
+}
+
 PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
 				unsigned packet_tag,
 				int n)
