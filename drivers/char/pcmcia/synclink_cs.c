@@ -3131,9 +3131,18 @@ void mgslpc_remove_device(MGSLPC_INFO *remove_info)
 	}
 }
 
+static struct pcmcia_driver mgslpc_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "synclink_cs",
+	},
+	.attach		= mgslpc_attach,
+	.detach		= mgslpc_detach,
+};
+
 static int __init synclink_cs_init(void)
 {
-    servinfo_t serv;
+    int error;
 
     if (break_on_load) {
 	    mgslpc_get_text_ptr();
@@ -3142,13 +3151,9 @@ static int __init synclink_cs_init(void)
 
     printk("%s %s\n", driver_name, driver_version);
 
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	    printk(KERN_NOTICE "synclink_cs: Card Services release "
-		   "does not match!\n");
-	    return -1;
-    }
-    register_pccard_driver(&dev_info, &mgslpc_attach, &mgslpc_detach);
+    error = pcmcia_register_driver(&mgslpc_driver);
+    if (error)
+	    return error;
 
     /* Initialize the tty_driver structure */
 	
@@ -3217,7 +3222,9 @@ static void __exit synclink_cs_exit(void)
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
 
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&mgslpc_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
 			mgslpc_release((u_long)dev_list);

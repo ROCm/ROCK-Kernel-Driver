@@ -431,22 +431,20 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 
-	rt = ip6_dst_alloc();
-	if (!rt) 
-		return;
-
 	/* for anycast or proxy, solicited_addr != src_addr */
 	ifp = ipv6_get_ifaddr(solicited_addr, dev);
  	if (ifp) {
 		src_addr = solicited_addr;
 		in6_ifa_put(ifp);
 	} else {
-		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0)) {
-			dst_free(dst);
+		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0))
 			return;
-		}
 		src_addr = &tmpaddr;
 	}
+
+	rt = ip6_dst_alloc();
+	if (!rt) 
+		return;
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
 	ndisc_rt_init(rt, dev, neigh);	

@@ -61,8 +61,6 @@ static void proc_delete_inode(struct inode *inode)
 	struct proc_dir_entry *de;
 	struct task_struct *tsk;
 
-	inode->i_state = I_CLEAR;
-
 	/* Let go of any associated process */
 	tsk = PROC_I(inode)->task;
 	if (tsk)
@@ -75,6 +73,7 @@ static void proc_delete_inode(struct inode *inode)
 			module_put(de->owner);
 		de_put(de);
 	}
+	clear_inode(inode);
 }
 
 struct vfsmount *proc_mnt;

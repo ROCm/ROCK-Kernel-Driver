@@ -1,10 +1,7 @@
 #
 # Makefile for the memory technology device drivers.
 #
-# Based on:
-# $Id: Makefile,v 1.66 2002/04/23 13:52:14 mag Exp $
-
-obj-y           += chips/ maps/ devices/ nand/
+# $Id: Makefile.common,v 1.2 2003/05/23 11:38:29 dwmw2 Exp $
 
 #                       *** BIG UGLY NOTE ***
 #
@@ -27,14 +24,18 @@ obj-$(CONFIG_MTD)		+= mtdcore.o
 obj-$(CONFIG_MTD_CONCAT)	+= mtdconcat.o
 obj-$(CONFIG_MTD_PARTITIONS)	+= mtdpart.o
 obj-$(CONFIG_MTD_REDBOOT_PARTS) += redboot.o
-obj-$(CONFIG_MTD_CMDLINE_PARTS) += cmdline.o
+obj-$(CONFIG_MTD_CMDLINE_PARTS) += cmdlinepart.o
 obj-$(CONFIG_MTD_AFS_PARTS)	+= afs.o
 
 # 'Users' - code which presents functionality to userspace.
 obj-$(CONFIG_MTD_CHAR)		+= mtdchar.o
-obj-$(CONFIG_MTD_BLOCK)		+= mtdblock.o
-obj-$(CONFIG_MTD_BLOCK_RO)	+= mtdblock_ro.o
-obj-$(CONFIG_FTL)		+= ftl.o
-obj-$(CONFIG_NFTL)		+= nftl.o
+obj-$(CONFIG_MTD_BLOCK)		+= mtdblock.o mtd_blkdevs.o
+obj-$(CONFIG_MTD_BLOCK_RO)	+= mtdblock_ro.o mtd_blkdevs.o
+obj-$(CONFIG_FTL)		+= ftl.o mtd_blkdevs.o
+obj-$(CONFIG_NFTL)		+= nftl.o mtd_blkdevs.o
+obj-$(CONFIG_INFTL)		+= inftl.o mtd_blkdevs.o
 
-nftl-objs	:= nftlcore.o nftlmount.o
+nftl-objs		:= nftlcore.o nftlmount.o
+inftl-objs		:= inftlcore.o inftlmount.o
+
+obj-y		+= chips/ maps/ devices/ nand/

@@ -2,13 +2,16 @@
  * Routines common to all CFI-type probes.
  * (C) 2001, 2001 Red Hat, Inc.
  * GPL'd
- * $Id: gen_probe.c,v 1.5 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: gen_probe.c,v 1.11 2003/05/21 15:15:05 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/module.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/cfi.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/gen_probe.h>
 
 static struct mtd_info *check_cmd_set(struct map_info *, int);
@@ -38,7 +41,7 @@ struct mtd_info *mtd_do_chip_probe(struct map_info *map, struct chip_probe *cp)
 	if (mtd)
 		return mtd;
 
-	printk(KERN_WARNING"cfi_probe: No supported Vendor Command Set found\n");
+	printk(KERN_WARNING"gen_probe: No supported Vendor Command Set found\n");
 	
 	kfree(cfi->cfiq);
 	kfree(cfi);
@@ -57,6 +60,7 @@ struct cfi_private *genprobe_ident_chips(struct map_info *map, struct chip_probe
 	int i;
 
 	memset(&cfi, 0, sizeof(cfi));
+	memset(&chip[0], 0, sizeof(chip));
 
 	/* Call the probetype-specific code with all permutations of 
 	   interleave and device type, etc. */
@@ -106,6 +110,12 @@ struct cfi_private *genprobe_ident_chips(struct map_info *map, struct chip_probe
 	 * Now probe for other chips, checking sensibly for aliases while
 	 * we're at it. The new_chip probe above should have let the first
 	 * chip in read mode.
+	 *
+	 * NOTE: Here, we're checking if there is room for another chip
+	 *       the same size within the mapping. Therefore, 
+	 *       base + chipsize <= map->size is the correct thing to do, 
+	 *       because, base + chipsize would be the  _first_ byte of the
+	 *       next chip, not the one we're currently pondering.
 	 */
 
 	for (base = (1<<cfi.chipshift); base + (1<<cfi.chipshift) <= map->size;
@@ -224,6 +234,41 @@ static int genprobe_new_chip(struct map_info *map, struct chip_probe *cp,
 		break;
 #endif /* CFIDEV_BUSWIDTH_4 */
 
+#ifdef CFIDEV_BUSWIDTH_8
+	case CFIDEV_BUSWIDTH_8:
+#if defined(CFIDEV_INTERLEAVE_2) && defined(SOMEONE_ACTUALLY_MAKES_THESE)
+                cfi->interleave = CFIDEV_INTERLEAVE_2;
+
+                cfi->device_type = CFI_DEVICETYPE_X32;
+		if (cp->probe_chip(map, 0, NULL, cfi))
+			return 1;
+#endif /* CFIDEV_INTERLEAVE_2 */
+#ifdef CFIDEV_INTERLEAVE_4
+		cfi->interleave = CFIDEV_INTERLEAVE_4;
+
+#ifdef SOMEONE_ACTUALLY_MAKES_THESE
+		cfi->device_type = CFI_DEVICETYPE_X32;
+		if (cp->probe_chip(map, 0, NULL, cfi))
+			return 1;
+#endif
+		cfi->device_type = CFI_DEVICETYPE_X16;
+		if (cp->probe_chip(map, 0, NULL, cfi))
+			return 1;
+#endif /* CFIDEV_INTERLEAVE_4 */
+#ifdef CFIDEV_INTERLEAVE_8
+		cfi->interleave = CFIDEV_INTERLEAVE_8;
+
+		cfi->device_type = CFI_DEVICETYPE_X16;
+		if (cp->probe_chip(map, 0, NULL, cfi))
+			return 1;
+
+		cfi->device_type = CFI_DEVICETYPE_X8;
+		if (cp->probe_chip(map, 0, NULL, cfi))
+			return 1;
+#endif /* CFIDEV_INTERLEAVE_8 */
+		break;
+#endif /* CFIDEV_BUSWIDTH_8 */
+
 	default:
 		printk(KERN_WARNING "genprobe_new_chip called with unsupported buswidth %d\n", map->buswidth);
 		return 0;
@@ -288,6 +333,10 @@ static struct mtd_info *check_cmd_set(struct map_info *map, int primary)
 #ifdef CONFIG_MTD_CFI_AMDSTD
 	case 0x0002:
 		return cfi_cmdset_0002(map, primary);
+#endif
+#ifdef CONFIG_MTD_CFI_STAA
+        case 0x0020:
+		return cfi_cmdset_0020(map, primary);
 #endif
 	}
 

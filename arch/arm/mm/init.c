@@ -47,7 +47,7 @@
 
 #define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(pte_t))
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;

@@ -619,7 +619,10 @@ do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 	if (!oldset)
 		oldset = &current->blocked;
 
+	/* This lets the debugger run, ... */
 	signr = get_signal_to_deliver(&info, regs, NULL);
+	/* ... so re-check the single stepping. */
+	single_stepping |= ptrace_cancel_bpt(current);
 
 	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */

@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: sc520cdp.c,v 1.9 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: sc520cdp.c,v 1.15 2003/05/21 12:45:20 dwmw2 Exp $
  *
  *
  * The SC520CDP is an evaluation board for the Elan SC520 processor available
@@ -25,13 +25,15 @@
  * For details see http://www.amd.com/products/epd/desiging/evalboards/18.elansc520/520_cdp_brief/index.html
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
-
+#include <linux/mtd/concat.h>
 
 /*
 ** The Embedded Systems BIOS decodes the first FLASH starting at
@@ -83,94 +85,32 @@
 #define WINDOW_SIZE_1	0x00800000
 #define WINDOW_SIZE_2	0x00080000
 
-static __u8 sc520cdp_read8(struct map_info *map, unsigned long ofs)
-{
-	return readb(map->map_priv_1 + ofs);
-}
-
-static __u16 sc520cdp_read16(struct map_info *map, unsigned long ofs)
-{
-	return readw(map->map_priv_1 + ofs);
-}
-
-static __u32 sc520cdp_read32(struct map_info *map, unsigned long ofs)
-{
-	return readl(map->map_priv_1 + ofs);
-}
-
-static void sc520cdp_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, (void *)(map->map_priv_1 + from), len);
-}
-
-static void sc520cdp_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	writeb(d, map->map_priv_1 + adr);
-}
-
-static void sc520cdp_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	writew(d, map->map_priv_1 + adr);
-}
-
-static void sc520cdp_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	writel(d, map->map_priv_1 + adr);
-}
-
-static void sc520cdp_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio((void *)(map->map_priv_1 + to), from, len);
-}
 
 static struct map_info sc520cdp_map[] = {
 	{
-		.name		= "SC520CDP Flash Bank #0",
-		.size		= WINDOW_SIZE_0,
-		.buswidth	= 4,
-		.read8		= sc520cdp_read8,
-		.read16		= sc520cdp_read16,
-		.read32		= sc520cdp_read32,
-		.copy_from	= sc520cdp_copy_from,
-		.write8		= sc520cdp_write8,
-		.write16	= sc520cdp_write16,
-		.write32	= sc520cdp_write32,
-		.copy_to	= sc520cdp_copy_to,
-		.map_priv_2	= WINDOW_ADDR_0
+		.name = "SC520CDP Flash Bank #0",
+		.size = WINDOW_SIZE_0,
+		.buswidth = 4,
+		.phys = WINDOW_ADDR_0
 	},
 	{
-		.name		= "SC520CDP Flash Bank #1",
-		.size		= WINDOW_SIZE_1,
-		.buswidth	= 4,
-		.read8		= sc520cdp_read8,
-		.read16		= sc520cdp_read16,
-		.read32		= sc520cdp_read32,
-		.copy_from	= sc520cdp_copy_from,
-		.write8		= sc520cdp_write8,
-		.write16	= sc520cdp_write16,
-		.write32	= sc520cdp_write32,
-		.copy_to	= sc520cdp_copy_to,
-		.map_priv_2	= WINDOW_ADDR_1
+		.name = "SC520CDP Flash Bank #1",
+		.size = WINDOW_SIZE_1,
+		.buswidth = 4,
+		.phys = WINDOW_ADDR_1
 	},
 	{
-		.name		= "SC520CDP DIL Flash",
-		.size		= WINDOW_SIZE_2,
-		.buswidth	= 1,
-		.read8		= sc520cdp_read8,
-		.read16		= sc520cdp_read16,
-		.read32		= sc520cdp_read32,
-		.copy_from	= sc520cdp_copy_from,
-		.write8		= sc520cdp_write8,
-		.write16	= sc520cdp_write16,
-		.write32	= sc520cdp_write32,
-		.copy_to	= sc520cdp_copy_to,
-		.map_priv_2	= WINDOW_ADDR_2
+		.name = "SC520CDP DIL Flash",
+		.size = WINDOW_SIZE_2,
+		.buswidth = 1,
+		.phys = WINDOW_ADDR_2
 	},
 };
 
 #define NUM_FLASH_BANKS	(sizeof(sc520cdp_map)/sizeof(struct map_info))
 
 static struct mtd_info *mymtd[NUM_FLASH_BANKS];
+static struct mtd_info *merged_mtd;
 
 #ifdef REPROGRAM_PAR
 
@@ -253,9 +193,9 @@ static void sc520cdp_setup_par(void)
 	/* map in SC520's MMCR area */
 	mmcr = (unsigned long *)ioremap_nocache(SC520_MMCR_BASE, SC520_MMCR_EXTENT);
 	if(!mmcr) { /* ioremap_nocache failed: skip the PAR reprogramming */
-		/* force map_priv_2 fields to BIOS defaults: */
+		/* force physical address fields to BIOS defaults: */
 		for(i = 0; i < NUM_FLASH_BANKS; i++)
-			sc520cdp_map[i].map_priv_2 = par_table[i].default_address;
+			sc520cdp_map[i].phys = par_table[i].default_address;
 		return;
 	}
 
@@ -280,7 +220,7 @@ static void sc520cdp_setup_par(void)
 				sc520cdp_map[i].name);
 			printk(KERN_NOTICE "Trying default address 0x%lx\n",
 				par_table[i].default_address);
-			sc520cdp_map[i].map_priv_2 = par_table[i].default_address;
+			sc520cdp_map[i].phys = par_table[i].default_address;
 		}
 	}
 	iounmap((void *)mmcr);
@@ -298,28 +238,40 @@ static int __init init_sc520cdp(void)
 #endif
 
 	for (i = 0; i < NUM_FLASH_BANKS; i++) {
-		printk(KERN_NOTICE "SC520 CDP flash device: %lx at %lx\n", sc520cdp_map[i].size, sc520cdp_map[i].map_priv_2);
-		sc520cdp_map[i].map_priv_1 = (unsigned long)ioremap_nocache(sc520cdp_map[i].map_priv_2, sc520cdp_map[i].size);
+		printk(KERN_NOTICE "SC520 CDP flash device: 0x%lx at 0x%lx\n",
+		       sc520cdp_map[i].size, sc520cdp_map[i].phys);
 
-		if (!sc520cdp_map[i].map_priv_1) {
+		sc520cdp_map[i].virt = (unsigned long)ioremap_nocache(sc520cdp_map[i].phys, sc520cdp_map[i].size);
+
+		if (!sc520cdp_map[i].virt) {
 			printk("Failed to ioremap_nocache\n");
 			return -EIO;
 		}
+
+		simple_map_init(&sc520cdp_map[i]);
+
 		mymtd[i] = do_map_probe("cfi_probe", &sc520cdp_map[i]);
 		if(!mymtd[i])
-			mymtd[i] = do_map_probe("jedec", &sc520cdp_map[i]);
+			mymtd[i] = do_map_probe("jedec_probe", &sc520cdp_map[i]);
 		if(!mymtd[i])
 			mymtd[i] = do_map_probe("map_rom", &sc520cdp_map[i]);
 
 		if (mymtd[i]) {
-			mymtd[i]->module = THIS_MODULE;
-			add_mtd_device(mymtd[i]);
+			mymtd[i]->owner = THIS_MODULE;
 			++devices_found;
 		}
 		else {
-			iounmap((void *)sc520cdp_map[i].map_priv_1);
+			iounmap((void *)sc520cdp_map[i].virt);
 		}
 	}
+	if(devices_found >= 2) {
+		/* Combine the two flash banks into a single MTD device & register it: */
+		merged_mtd = mtd_concat_create(mymtd, 2, "SC520CDP Flash Banks #0 and #1");
+		if(merged_mtd)
+			add_mtd_device(merged_mtd);
+	}
+	if(devices_found == 3) /* register the third (DIL-Flash) device */
+		add_mtd_device(mymtd[2]);
 	return(devices_found ? 0 : -ENXIO);
 }
 
@@ -327,14 +279,19 @@ static void __exit cleanup_sc520cdp(void)
 {
 	int i;
 	
+	if (merged_mtd) {
+		del_mtd_device(merged_mtd);
+		mtd_concat_destroy(merged_mtd);
+	}
+	if (mymtd[2])
+		del_mtd_device(mymtd[2]);
+
 	for (i = 0; i < NUM_FLASH_BANKS; i++) {
-		if (mymtd[i]) {
-			del_mtd_device(mymtd[i]);
+		if (mymtd[i])
 			map_destroy(mymtd[i]);
-		}
-		if (sc520cdp_map[i].map_priv_1) {
-			iounmap((void *)sc520cdp_map[i].map_priv_1);
-			sc520cdp_map[i].map_priv_1 = 0;
+		if (sc520cdp_map[i].virt) {
+			iounmap((void *)sc520cdp_map[i].virt);
+			sc520cdp_map[i].virt = 0;
 		}
 	}
 }
