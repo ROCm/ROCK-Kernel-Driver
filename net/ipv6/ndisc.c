@@ -439,7 +439,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		src_addr = solicited_addr;
 		in6_ifa_put(ifp);
 	} else {
-		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0))
+		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr))
 			return;
 		src_addr = &tmpaddr;
 	}

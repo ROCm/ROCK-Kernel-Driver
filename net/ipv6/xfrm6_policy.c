@@ -25,8 +25,8 @@ static struct xfrm_type_map xfrm6_type_map = { .lock = RW_LOCK_UNLOCKED };
 int xfrm6_dst_lookup(struct xfrm_dst **dst, struct flowi *fl)
 {
 	int err = 0;
-	*dst = (struct xfrm_dst*)ip6_route_output(NULL, fl);
-	if (!*dst)
+	err = ip6_dst_lookup(NULL, (struct dst_entry **)dst, fl);
+	if (err)
 		err = -ENETUNREACH;
 	return err;
 }
@@ -282,14 +282,20 @@ void __exit xfrm6_policy_fini(void)
 	xfrm_policy_unregister_afinfo(&xfrm6_policy_afinfo);
 }
 
+/* XXX: xfrm6_tunnel.c */
+extern int ip6ip6_init(void);
+extern void ip6ip6_fini(void);
+
 void __init xfrm6_init(void)
 {
 	xfrm6_policy_init();
 	xfrm6_state_init();
+	ip6ip6_init(); /* XXX: xfrm6_tunnel.c */
 }
 
 void __exit xfrm6_fini(void)
 {
+	ip6ip6_fini(); /* XXX: xfrm6_tunnel.c */
 	//xfrm6_input_fini();
 	xfrm6_policy_fini();
 	xfrm6_state_fini();

@@ -244,7 +244,7 @@ int datagram_recv_ctl(struct sock *sk, struct msghdr *msg, struct sk_buff *skb)
 	}
 	if (np->rxopt.bits.authhdr && opt->auth) {
 		u8 *ptr = skb->nh.raw + opt->auth;
-		put_cmsg(msg, SOL_IPV6, IPV6_AUTHHDR, (ptr[1]+1)<<2, ptr);
+		put_cmsg(msg, SOL_IPV6, IPV6_AUTHHDR, (ptr[1]+2)<<2, ptr);
 	}
 	if (np->rxopt.bits.dstopts && opt->dst1) {
 		u8 *ptr = skb->nh.raw + opt->dst1;
