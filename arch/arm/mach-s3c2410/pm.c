@@ -59,16 +59,6 @@ extern void arm920_flush_kern_cache_all(void);
 
 #define PFX "s3c24xx-pm: "
 
-/* sleep save info */
-
-struct sleep_save {
-	unsigned long	reg;
-	unsigned long	val;
-};
-
-#define SAVE_ITEM(x) \
-	{ .reg = (x) }
-
 static struct sleep_save core_save[] = {
 	SAVE_ITEM(S3C2410_LOCKTIME),
 	SAVE_ITEM(S3C2410_CLKCON),
@@ -81,21 +71,32 @@ static struct sleep_save core_save[] = {
 	 * wrong here, as we modify the refresh and both pll settings.
 	 */
 
-	SAVE_ITEM(S3C2410_REFRESH),
+	SAVE_ITEM(S3C2410_BWSCON),
+	SAVE_ITEM(S3C2410_BANKCON0),
+	SAVE_ITEM(S3C2410_BANKCON1),
+	SAVE_ITEM(S3C2410_BANKCON2),
+	SAVE_ITEM(S3C2410_BANKCON3),
+	SAVE_ITEM(S3C2410_BANKCON4),
+	SAVE_ITEM(S3C2410_BANKCON5),
+
+	SAVE_ITEM(S3C2410_CLKDIVN),
 	SAVE_ITEM(S3C2410_MPLLCON),
 	SAVE_ITEM(S3C2410_UPLLCON),
-	SAVE_ITEM(S3C2410_CLKDIVN),
 	SAVE_ITEM(S3C2410_CLKSLOW),
+	SAVE_ITEM(S3C2410_REFRESH),
 };
 
 /* this lot should be really saved by the IRQ code */
 static struct sleep_save irq_save[] = {
-	SAVE_ITEM(S3C2410_EINTMASK),
-	SAVE_ITEM(S3C2410_INTMSK),
+	SAVE_ITEM(S3C2410_EXTINT0),
+	SAVE_ITEM(S3C2410_EXTINT1),
+	SAVE_ITEM(S3C2410_EXTINT2),
 	SAVE_ITEM(S3C2410_EINFLT0),
 	SAVE_ITEM(S3C2410_EINFLT1),
 	SAVE_ITEM(S3C2410_EINFLT2),
-	SAVE_ITEM(S3C2410_EINFLT3)
+	SAVE_ITEM(S3C2410_EINFLT3),
+	SAVE_ITEM(S3C2410_EINTMASK),
+	SAVE_ITEM(S3C2410_INTMSK)
 };
 
 static struct sleep_save gpio_save[] = {
@@ -129,6 +130,8 @@ static struct sleep_save gpio_save[] = {
 	SAVE_ITEM(S3C2410_GPHCON),
 	SAVE_ITEM(S3C2410_GPHDAT),
 	SAVE_ITEM(S3C2410_GPHUP),
+
+	SAVE_ITEM(S3C2410_DCLKCON),
 };
 
 #ifdef CONFIG_S3C2410_PM_DEBUG
@@ -384,7 +387,7 @@ static struct sleep_save uart_save[] = {};
 
 /* helper functions to save and restore register state */
 
-static void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
+void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
 		ptr->val = __raw_readl(ptr->reg);
@@ -400,12 +403,27 @@ static void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
  * restore the UARTs state yet
 */
 
-static void s3c2410_pm_do_restore(struct sleep_save *ptr, int count)
+void s3c2410_pm_do_restore(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
 		printk(KERN_DEBUG "restore %08lx (restore %08lx, was %08x)\n",
 		       ptr->reg, ptr->val, __raw_readl(ptr->reg));
 
+		__raw_writel(ptr->val, ptr->reg);
+	}
+}
+
+/* s3c2410_pm_do_restore_core
+ *
+ * similar to s3c2410_pm_do_restore_core
+ *
+ * WARNING: Do not put any debug in here that may effect memory or use
+ * peripherals, as things may be changing!
+*/
+
+static void s3c2410_pm_do_restore_core(struct sleep_save *ptr, int count)
+{
+	for (; count > 0; count--, ptr++) {
 		__raw_writel(ptr->val, ptr->reg);
 	}
 }
@@ -578,7 +596,7 @@ static int s3c2410_pm_enter(suspend_state_t state)
 
 	/* restore the system state */
 
-	s3c2410_pm_do_restore(core_save, ARRAY_SIZE(core_save));
+	s3c2410_pm_do_restore_core(core_save, ARRAY_SIZE(core_save));
 	s3c2410_pm_do_restore(gpio_save, ARRAY_SIZE(gpio_save));
 	s3c2410_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
 	s3c2410_pm_do_restore(uart_save, ARRAY_SIZE(uart_save));

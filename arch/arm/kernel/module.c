@@ -9,6 +9,7 @@
  *
  * Module allocation method suggested by Andi Kleen.
  */
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/elf.h>
@@ -18,6 +19,18 @@
 #include <linux/string.h>
 
 #include <asm/pgtable.h>
+
+#ifdef CONFIG_XIP_KERNEL
+/*
+ * The XIP kernel text is mapped in the module area for modules and
+ * some other stuff to work without any indirect relocations.
+ * MODULE_START is redefined here and not in asm/memory.h to avoid
+ * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+ */
+extern void _etext;
+#undef MODULE_START
+#define MODULE_START	(((unsigned long)&_etext + ~PGDIR_MASK) & PGDIR_MASK)
+#endif
 
 void *module_alloc(unsigned long size)
 {

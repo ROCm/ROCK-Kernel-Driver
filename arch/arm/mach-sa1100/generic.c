@@ -270,6 +270,19 @@ static struct platform_device sa11x0pcmcia_device = {
 	.id		= -1,
 };
 
+static struct platform_device sa11x0mtd_device = {
+	.name		= "flash",
+	.id		= -1,
+};
+
+void sa11x0_set_flash_data(struct flash_platform_data *flash,
+			   struct resource *res, int nr)
+{
+	sa11x0mtd_device.dev.platform_data = flash;
+	sa11x0mtd_device.resource = res;
+	sa11x0mtd_device.num_resources = nr;
+}
+
 static struct platform_device *sa11x0_devices[] __initdata = {
 	&sa11x0udc_device,
 	&sa11x0uart1_device,
@@ -278,6 +291,7 @@ static struct platform_device *sa11x0_devices[] __initdata = {
 	&sa11x0ssp_device,
 	&sa11x0pcmcia_device,
 	&sa11x0fb_device,
+	&sa11x0mtd_device,
 };
 
 static int __init sa1100_init(void)

@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR)
+AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 
 # Object file lists.
 

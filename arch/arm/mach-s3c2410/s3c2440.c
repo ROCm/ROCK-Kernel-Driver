@@ -13,6 +13,7 @@
  *	24-Aug-2004 BJD  Start of s3c2440 support
  *	12-Oct-2004 BJD	 Moved clock info out to clock.c
  *	01-Nov-2004 BJD  Fixed clock build code
+ *	09-Nov-2004 BJD  Added sysdev for power management
 */
 
 #include <linux/kernel.h>
@@ -22,6 +23,7 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/sysdev.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -34,10 +36,15 @@
 
 #include <asm/arch/regs-clock.h>
 #include <asm/arch/regs-serial.h>
+#include <asm/arch/regs-gpio.h>
+#include <asm/arch/regs-gpioj.h>
+#include <asm/arch/regs-dsc.h>
 
 #include "s3c2440.h"
 #include "clock.h"
+#include "devs.h"
 #include "cpu.h"
+#include "pm.h"
 
 int s3c2440_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
 
@@ -136,6 +143,43 @@ static struct clk s3c2440_clk_ac97 = {
 	.ctrlbit	= S3C2440_CLKCON_CAMERA
 };
 
+#ifdef CONFIG_PM
+
+struct sleep_save s3c2440_sleep[] = {
+	SAVE_ITEM(S3C2440_DSC0),
+	SAVE_ITEM(S3C2440_DSC1),
+	SAVE_ITEM(S3C2440_GPJDAT),
+	SAVE_ITEM(S3C2440_GPJCON),
+	SAVE_ITEM(S3C2440_GPJUP)
+};
+
+static int s3c2440_suspend(struct sys_device *dev, u32 state)
+{
+	s3c2410_pm_do_save(s3c2440_sleep, ARRAY_SIZE(s3c2440_sleep));
+	return 0;
+}
+
+static int s3c2440_resume(struct sys_device *dev)
+{
+	s3c2410_pm_do_restore(s3c2440_sleep, ARRAY_SIZE(s3c2440_sleep));
+	return 0;
+}
+
+#else
+#define s3c2440_suspend NULL
+#define s3c2440_resume  NULL
+#endif
+
+static struct sysdev_class s3c2440_sysclass = {
+	set_kset_name("s3c2440-core"),
+	.suspend	= s3c2440_suspend,
+	.resume		= s3c2440_resume
+};
+
+static struct sys_device s3c2440_sysdev = {
+	.cls		= &s3c2440_sysclass,
+};
+
 void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 {
 	unsigned long clkdiv;
@@ -202,15 +246,22 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	clk_disable(&s3c2440_clk_cam);
 }
 
-
-
 int __init s3c2440_init(void)
 {
 	int ret;
 
 	printk("S3C2440: Initialising architecture\n");
 
-	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
+	ret = sysdev_class_register(&s3c2440_sysclass);
+	if (ret == 0)
+		ret = sysdev_register(&s3c2440_sysdev);
+
+	if (ret != 0)
+		printk(KERN_ERR "failed to register sysdev for s3c2440\n");
+
+	if (ret != 0)
+		ret = platform_add_devices(uart_devices,
+					   ARRAY_SIZE(uart_devices));
+
 	return ret;
 }
-
