@@ -7,6 +7,7 @@
  */
 
 #include <linux/vmalloc.h>
+#include <linux/slab.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
@@ -27,7 +28,7 @@ vertex_hdl_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 
 extern void register_pcibr_intr(int irq, pcibr_intr_t intr);
 
-void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
+static void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
 extern int cbrick_type_get_nasid(nasid_t);
 extern void ioconfig_bus_new_entries(void);
 extern void ioconfig_get_busnum(char *, int *);
@@ -42,7 +43,7 @@ extern int isIO9(int);
  * Init the provider asic for a given device
  */
 
-static void
+static inline void __init
 set_pci_provider(struct sn_device_sysdata *device_sysdata)
 {
 	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
@@ -74,7 +75,7 @@ pci_bus_cvlink_init(void)
  * pci_bus_to_vertex() - Given a logical Linux Bus Number returns the associated 
  *	pci bus vertex from the SGI IO Infrastructure.
  */
-vertex_hdl_t
+static inline vertex_hdl_t
 pci_bus_to_vertex(unsigned char busnum)
 {
 
@@ -162,7 +163,7 @@ struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
  * on the in use pin.  This will prevent the race condition between PIO read responses and 
  * DMA writes.
  */
-void
+static void
 sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot)
 {
 	nasid_t nasid; 
@@ -182,8 +183,8 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	if (flush_nasid_list[nasid].widget_p == NULL) {
 		flush_nasid_list[nasid].widget_p = (struct sn_flush_device_list **)kmalloc((HUB_WIDGET_ID_MAX+1) *
 			sizeof(struct sn_flush_device_list *), GFP_KERNEL);
-		if (flush_nasid_list[nasid].widget_p <= 0) {
-			printk("sn_dma_flush_init: Cannot allocate memory for nasid list\n");
+		if (!flush_nasid_list[nasid].widget_p) {
+			printk(KERN_WARNING "sn_dma_flush_init: Cannot allocate memory for nasid list\n");
 			return;
 		}
 		memset(flush_nasid_list[nasid].widget_p, 0, (HUB_WIDGET_ID_MAX+1) * sizeof(struct sn_flush_device_list *));
@@ -213,8 +214,8 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	if (flush_nasid_list[nasid].widget_p[wid_num] == NULL) {
 		flush_nasid_list[nasid].widget_p[wid_num] = (struct sn_flush_device_list *)kmalloc(
 			DEV_PER_WIDGET * sizeof (struct sn_flush_device_list), GFP_KERNEL);
-		if (flush_nasid_list[nasid].widget_p[wid_num] <= 0) {
-			printk("sn_dma_flush_init: Cannot allocate memory for nasid sub-list\n");
+		if (!flush_nasid_list[nasid].widget_p[wid_num]) {
+			printk(KERN_WARNING "sn_dma_flush_init: Cannot allocate memory for nasid sub-list\n");
 			return;
 		}
 		memset(flush_nasid_list[nasid].widget_p[wid_num], 0, 
@@ -306,7 +307,7 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
  *
  *	Other platform specific fixup can also be done here.
  */
-void
+static void __init
 sn_pci_fixup(int arg)
 {
 	struct list_head *ln;
@@ -353,6 +354,11 @@ sn_pci_fixup(int arg)
 		pci_bus = pci_bus_b(ln);
 		widget_sysdata = kmalloc(sizeof(struct sn_widget_sysdata), 
 					GFP_KERNEL);
+		if (!widget_sysdata) {
+			printk(KERN_WARNING "sn_pci_fixup(): Unable to "
+			       "allocate memory for widget_sysdata\n");
+			return;
+		}			
 		widget_sysdata->vhdl = pci_bus_to_vertex(pci_bus->number);
 		pci_bus->sysdata = (void *)widget_sysdata;
 	}
@@ -390,8 +396,8 @@ sn_pci_fixup(int arg)
 
 		device_sysdata = kmalloc(sizeof(struct sn_device_sysdata),
 					 GFP_KERNEL);
-		if (device_sysdata <= 0) {
-			printk("sn_pci_fixup: Cannot allocate memory for device sysdata\n");
+		if (!device_sysdata) {
+			printk(KERN_WARNING "sn_pci_fixup: Cannot allocate memory for device sysdata\n");
 			return;
 		}
 
