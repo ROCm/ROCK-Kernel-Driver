@@ -249,10 +249,14 @@ void hpfs_write_inode(struct inode *i)
 		hpfs_inode->i_rddir_off = NULL;
 	}
 	hpfs_lock_iget(i->i_sb, 1);
-	parent = iget(i->i_sb, hpfs_inode->i_parent_dir);
+	parent = iget_locked(i->i_sb, hpfs_inode->i_parent_dir);
 	if (parent) {
-		hpfs_unlock_iget(i->i_sb);
 		hpfs_inode->i_dirty = 0;
+		if (parent->i_state & I_NEW) {
+			hpfs_read_inode(parent);
+			unlock_new_inode(parent);
+		}
+		hpfs_unlock_iget(i->i_sb);
 		hpfs_lock_inode(parent);
 		hpfs_write_inode_nolock(i);
 		hpfs_unlock_inode(parent);

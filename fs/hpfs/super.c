@@ -614,7 +614,13 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	brelse(bh0);
 
 	hpfs_lock_iget(s, 1);
-	root = iget(s, sbi->sb_root);
+	root = iget_locked(s, sbi->sb_root);
+	if (!root) {
+		hpfs_unlock_iget(s);
+		goto bail0;
+	}
+	hpfs_read_inode(root);
+	unlock_new_inode(root);
 	hpfs_unlock_iget(s);
 	s->s_root = d_alloc_root(root);
 	if (!s->s_root) {
