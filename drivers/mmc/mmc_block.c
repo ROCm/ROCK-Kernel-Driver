@@ -334,11 +334,11 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 		sprintf(md->disk->disk_name, "mmcblk%d", devidx);
 		sprintf(md->disk->devfs_name, "mmc/blk%d", devidx);
 
-		md->block_bits = md->queue.card->csd.read_blkbits;
+		md->block_bits = card->csd.read_blkbits;
 
 		blk_queue_max_sectors(md->queue.queue, maxsectors);
 		blk_queue_hardsect_size(md->queue.queue, 1 << md->block_bits);
-		set_capacity(md->disk, md->queue.card->csd.capacity);
+		set_capacity(md->disk, card->csd.capacity);
 	}
  out:
 	return md;
@@ -440,7 +440,7 @@ static int mmc_blk_resume(struct mmc_card *card)
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 
 	if (md) {
-		mmc_blk_set_blksize(md, md->queue.card);
+		mmc_blk_set_blksize(md, card);
 		blk_start_queue(md->queue.queue);
 	}
 	return 0;
