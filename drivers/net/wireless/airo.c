@@ -5982,7 +5982,6 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  *
  * TODO :
  *	o Check if work in Ad-Hoc mode (otherwise, use SPY, as in wvlan_cs)
- *	o Find the noise level
  *
  * Jean
  */
@@ -6006,8 +6005,13 @@ struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
 		local->wstats.qual.level = 0x100 - local->rssi[status_rid.sigQuality].rssidBm;
 	else
 		local->wstats.qual.level = (status_rid.normalizedSignalStrength + 321) / 2;
-	local->wstats.qual.noise = 0;
-	local->wstats.qual.updated = 3;
+	if (status_rid.len >= 124) {
+		local->wstats.qual.noise = 256 - status_rid.noisedBm;
+		local->wstats.qual.updated = 7;
+	} else {
+		local->wstats.qual.noise = 0;
+		local->wstats.qual.updated = 3;
+	}
 
 	/* Packets discarded in the wireless adapter due to wireless
 	 * specific problems */
