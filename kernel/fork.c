@@ -633,6 +633,7 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	atomic_set(&sig->count, 1);
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
+	sig->group_exit_task = NULL;
 	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);

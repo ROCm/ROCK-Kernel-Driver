@@ -49,7 +49,7 @@ static struct dentry * __unhash_process(struct task_struct *p)
 	return proc_dentry;
 }
 
-static void release_task(struct task_struct * p)
+void release_task(struct task_struct * p)
 {
 	struct dentry *proc_dentry;
 

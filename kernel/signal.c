@@ -273,6 +273,15 @@ void __exit_sighand(struct task_struct *tsk)
 		kmem_cache_free(sigact_cachep, sig);
 	} else {
 		struct task_struct *leader = tsk->group_leader;
+
+		/*
+		 * If there is any task waiting for the group exit
+		 * then notify it:
+		 */
+		if (sig->group_exit_task && atomic_read(&sig->count) <= 2) {
+			wake_up_process(sig->group_exit_task);
+			sig->group_exit_task = NULL;
+		}
 		/*
 		 * If we are the last non-leader member of the thread
 		 * group, and the leader is zombie, then notify the
@@ -283,6 +292,7 @@ void __exit_sighand(struct task_struct *tsk)
 		 */
 		if (atomic_read(&sig->count) == 1 &&
 					leader->state == TASK_ZOMBIE) {
+
 			__remove_thread_group(tsk, sig);
 			spin_unlock(&sig->siglock);
 			do_notify_parent(leader, leader->exit_signal);

@@ -222,6 +222,8 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
+
+	struct task_struct	*group_exit_task;
 };
 
 /*
@@ -552,6 +554,7 @@ extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t 
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
+extern void release_task(struct task_struct * p);
 extern int send_sig_info(int, struct siginfo *, struct task_struct *);
 extern int force_sig_info(int, struct siginfo *, struct task_struct *);
 extern int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp);
