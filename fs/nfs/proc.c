@@ -63,12 +63,12 @@ nfs_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	dprintk("%s: call getattr\n", __FUNCTION__);
 	fattr->valid = 0;
 	status = rpc_call(server->client_sys, NFSPROC_GETATTR, fhandle, fattr, 0);
-	dprintk("%s: reply getattr %d\n", __FUNCTION__, status);
+	dprintk("%s: reply getattr: %d\n", __FUNCTION__, status);
 	if (status)
 		return status;
 	dprintk("%s: call statfs\n", __FUNCTION__);
 	status = rpc_call(server->client_sys, NFSPROC_STATFS, fhandle, &fsinfo, 0);
-	dprintk("%s: reply statfs %d\n", __FUNCTION__, status);
+	dprintk("%s: reply statfs: %d\n", __FUNCTION__, status);
 	if (status)
 		return status;
 	info->rtmax  = NFS_MAXDATA;
@@ -96,7 +96,7 @@ nfs_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle,
 	fattr->valid = 0;
 	status = rpc_call(server->client, NFSPROC_GETATTR,
 				fhandle, fattr, 0);
-	dprintk("NFS reply getattr\n");
+	dprintk("NFS reply getattr: %d\n", status);
 	return status;
 }
 
@@ -114,7 +114,7 @@ nfs_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	dprintk("NFS call  setattr\n");
 	fattr->valid = 0;
 	status = rpc_call(NFS_CLIENT(inode), NFSPROC_SETATTR, &arg, fattr, 0);
-	dprintk("NFS reply setattr\n");
+	dprintk("NFS reply setattr: %d\n", status);
 	return status;
 }
 
@@ -213,15 +213,15 @@ static int nfs_proc_write(struct nfs_write_data *wdata)
 }
 
 static struct inode *
-nfs_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
+nfs_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		int flags)
 {
 	struct nfs_fh		fhandle;
 	struct nfs_fattr	fattr;
 	struct nfs_createargs	arg = {
 		.fh		= NFS_FH(dir),
-		.name		= name->name,
-		.len		= name->len,
+		.name		= dentry->d_name.name,
+		.len		= dentry->d_name.len,
 		.sattr		= sattr
 	};
 	struct nfs_diropok	res = {
@@ -231,7 +231,7 @@ nfs_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	int			status;
 
 	fattr.valid = 0;
-	dprintk("NFS call  create %s\n", name->name);
+	dprintk("NFS call  create %s\n", dentry->d_name.name);
 	status = rpc_call(NFS_CLIENT(dir), NFSPROC_CREATE, &arg, &res, 0);
 	dprintk("NFS reply create: %d\n", status);
 	if (status == 0) {

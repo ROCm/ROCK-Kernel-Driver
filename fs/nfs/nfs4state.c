@@ -445,7 +445,7 @@ nfs4_get_open_state(struct inode *inode, struct nfs4_state_owner *owner)
 		state->owner = owner;
 		atomic_inc(&owner->so_count);
 		list_add(&state->inode_states, &nfsi->open_states);
-		state->inode = inode;
+		state->inode = igrab(inode);
 		spin_unlock(&inode->i_lock);
 	} else {
 		spin_unlock(&inode->i_lock);
@@ -471,6 +471,7 @@ void nfs4_put_open_state(struct nfs4_state *state)
 		list_del(&state->inode_states);
 	spin_unlock(&inode->i_lock);
 	list_del(&state->open_states);
+	iput(inode);
 	BUG_ON (state->state != 0);
 	nfs4_free_open_state(state);
 	nfs4_put_state_owner(owner);
@@ -486,7 +487,6 @@ void nfs4_close_state(struct nfs4_state *state, mode_t mode)
 	struct nfs4_state_owner *owner = state->owner;
 	struct nfs4_client *clp = owner->so_client;
 	int newstate;
-	int status = 0;
 
 	atomic_inc(&owner->so_count);
 	down_read(&clp->cl_sem);
@@ -508,10 +508,8 @@ void nfs4_close_state(struct nfs4_state *state, mode_t mode)
 			newstate |= FMODE_WRITE;
 		if (state->state == newstate)
 			goto out;
-		if (newstate != 0)
-			status = nfs4_do_downgrade(inode, state, newstate);
-		else
-			status = nfs4_do_close(inode, state);
+		if (nfs4_do_close(inode, state, newstate) == -EINPROGRESS)
+			return;
 	}
 out:
 	nfs4_put_open_state(state);

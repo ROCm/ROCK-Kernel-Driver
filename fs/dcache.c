@@ -784,6 +784,54 @@ void d_instantiate(struct dentry *entry, struct inode * inode)
 }
 
 /**
+ * d_instantiate_unique - instantiate a non-aliased dentry
+ * @entry: dentry to instantiate
+ * @inode: inode to attach to this dentry
+ *
+ * Fill in inode information in the entry. On success, it returns NULL.
+ * If an unhashed alias of "entry" already exists, then we return the
+ * aliased dentry instead.
+ *
+ * Note that in order to avoid conflicts with rename() etc, the caller
+ * had better be holding the parent directory semaphore.
+ */
+struct dentry *d_instantiate_unique(struct dentry *entry, struct inode *inode)
+{
+	struct dentry *alias;
+	int len = entry->d_name.len;
+	const char *name = entry->d_name.name;
+	unsigned int hash = entry->d_name.hash;
+
+	BUG_ON(!list_empty(&entry->d_alias));
+	spin_lock(&dcache_lock);
+	if (!inode)
+		goto do_negative;
+	list_for_each_entry(alias, &inode->i_dentry, d_alias) {
+		struct qstr *qstr = &alias->d_name;
+
+		if (qstr->hash != hash)
+			continue;
+		if (alias->d_parent != entry->d_parent)
+			continue;
+		if (qstr->len != len)
+			continue;
+		if (memcmp(qstr->name, name, len))
+			continue;
+		dget_locked(alias);
+		spin_unlock(&dcache_lock);
+		BUG_ON(!d_unhashed(alias));
+		return alias;
+	}
+	list_add(&entry->d_alias, &inode->i_dentry);
+do_negative:
+	entry->d_inode = inode;
+	spin_unlock(&dcache_lock);
+	security_d_instantiate(entry, inode);
+	return NULL;
+}
+EXPORT_SYMBOL(d_instantiate_unique);
+
+/**
  * d_alloc_root - allocate root dentry
  * @root_inode: inode to allocate the root for
  *

@@ -30,6 +30,7 @@
 #include <linux/nfs_xdr.h>
 #include <linux/rwsem.h>
 #include <linux/workqueue.h>
+#include <linux/mempool.h>
 
 /*
  * Enable debugging support for nfs client.
@@ -201,6 +202,7 @@ struct nfs_inode {
 #define NFS_INO_INVALID_ATTR	0x0008		/* cached attrs are invalid */
 #define NFS_INO_INVALID_DATA	0x0010		/* cached data is invalid */
 #define NFS_INO_INVALID_ATIME	0x0020		/* cached atime is invalid */
+#define NFS_INO_INVALID_ACCESS	0x0040		/* cached access cred invalid */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -239,7 +241,7 @@ static inline int nfs_caches_unstable(struct inode *inode)
 static inline void NFS_CACHEINV(struct inode *inode)
 {
 	if (!nfs_caches_unstable(inode))
-		NFS_FLAGS(inode) |= NFS_INO_INVALID_ATTR;
+		NFS_FLAGS(inode) |= NFS_INO_INVALID_ATTR | NFS_INO_INVALID_ACCESS;
 }
 
 static inline int nfs_server_capable(struct inode *inode, int cap)
@@ -424,6 +426,44 @@ static inline int nfs_wb_page(struct inode *inode, struct page* page)
 	return nfs_wb_page_priority(inode, page, 0);
 }
 
+/*
+ * Allocate and free nfs_write_data structures
+ */
+extern mempool_t *nfs_wdata_mempool;
+extern mempool_t *nfs_commit_mempool;
+
+static inline struct nfs_write_data *nfs_writedata_alloc(void)
+{
+	struct nfs_write_data *p = mempool_alloc(nfs_wdata_mempool, SLAB_NOFS);
+	if (p) {
+		memset(p, 0, sizeof(*p));
+		INIT_LIST_HEAD(&p->pages);
+	}
+	return p;
+}
+
+static inline void nfs_writedata_free(struct nfs_write_data *p)
+{
+	mempool_free(p, nfs_wdata_mempool);
+}
+
+extern void  nfs_writedata_release(struct rpc_task *task);
+
+static inline struct nfs_write_data *nfs_commit_alloc(void)
+{
+	struct nfs_write_data *p = mempool_alloc(nfs_commit_mempool, SLAB_NOFS);
+	if (p) {
+		memset(p, 0, sizeof(*p));
+		INIT_LIST_HEAD(&p->pages);
+	}
+	return p;
+}
+
+static inline void nfs_commit_free(struct nfs_write_data *p)
+{
+	mempool_free(p, nfs_commit_mempool);
+}
+
 /* Hack for future NFS swap support */
 #ifndef IS_SWAPFILE
 # define IS_SWAPFILE(inode)	(0)
@@ -437,6 +477,26 @@ extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
 extern int  nfs_pagein_list(struct list_head *, int);
 extern void nfs_readpage_result(struct rpc_task *);
+
+/*
+ * Allocate and free nfs_read_data structures
+ */
+extern mempool_t *nfs_rdata_mempool;
+
+static inline struct nfs_read_data *nfs_readdata_alloc(void)
+{
+	struct nfs_read_data *p = mempool_alloc(nfs_rdata_mempool, SLAB_NOFS);
+	if (p)
+		memset(p, 0, sizeof(*p));
+	return p;
+}
+
+static inline void nfs_readdata_free(struct nfs_read_data *p)
+{
+	mempool_free(p, nfs_rdata_mempool);
+}
+
+extern void  nfs_readdata_release(struct rpc_task *task);
 
 /*
  * linux/fs/mount_clnt.c
@@ -651,8 +711,7 @@ extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
 extern int nfs4_open_reclaim(struct nfs4_state_owner *, struct nfs4_state *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_proc_renew(struct nfs4_client *);
-extern int nfs4_do_close(struct inode *, struct nfs4_state *);
-extern int nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode);
+extern int nfs4_do_close(struct inode *inode, struct nfs4_state *state, mode_t mode);
 extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
 extern struct inode *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int);

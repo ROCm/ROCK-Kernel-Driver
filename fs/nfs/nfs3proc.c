@@ -80,10 +80,10 @@ nfs3_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	dprintk("%s: call  fsinfo\n", __FUNCTION__);
 	info->fattr->valid = 0;
 	status = rpc_call(server->client_sys, NFS3PROC_FSINFO, fhandle, info, 0);
-	dprintk("%s: reply fsinfo %d\n", __FUNCTION__, status);
+	dprintk("%s: reply fsinfo: %d\n", __FUNCTION__, status);
 	if (!(info->fattr->valid & NFS_ATTR_FATTR)) {
 		status = rpc_call(server->client_sys, NFS3PROC_GETATTR, fhandle, info->fattr, 0);
-		dprintk("%s: reply getattr %d\n", __FUNCTION__, status);
+		dprintk("%s: reply getattr: %d\n", __FUNCTION__, status);
 	}
 	return status;
 }
@@ -101,7 +101,7 @@ nfs3_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle,
 	fattr->valid = 0;
 	status = rpc_call(server->client, NFS3PROC_GETATTR,
 			  fhandle, fattr, 0);
-	dprintk("NFS reply getattr\n");
+	dprintk("NFS reply getattr: %d\n", status);
 	return status;
 }
 
@@ -119,7 +119,7 @@ nfs3_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	dprintk("NFS call  setattr\n");
 	fattr->valid = 0;
 	status = rpc_call(NFS_CLIENT(inode), NFS3PROC_SETATTR, &arg, fattr, 0);
-	dprintk("NFS reply setattr\n");
+	dprintk("NFS reply setattr: %d\n", status);
 	return status;
 }
 
@@ -198,7 +198,7 @@ static int nfs3_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 		if (res.access & (NFS3_ACCESS_LOOKUP|NFS3_ACCESS_EXECUTE))
 			entry->mask |= MAY_EXEC;
 	}
-	dprintk("NFS reply access, status = %d\n", status);
+	dprintk("NFS reply access: %d\n", status);
 	return status;
 }
 
@@ -296,7 +296,7 @@ static int nfs3_proc_commit(struct nfs_write_data *cdata)
  * For now, we don't implement O_EXCL.
  */
 static struct inode *
-nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
+nfs3_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		 int flags)
 {
 	struct nfs_fh		fhandle;
@@ -304,8 +304,8 @@ nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	struct nfs_fattr	dir_attr;
 	struct nfs3_createargs	arg = {
 		.fh		= NFS_FH(dir),
-		.name		= name->name,
-		.len		= name->len,
+		.name		= dentry->d_name.name,
+		.len		= dentry->d_name.len,
 		.sattr		= sattr,
 	};
 	struct nfs3_diropres	res = {
@@ -315,7 +315,7 @@ nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	};
 	int			status;
 
-	dprintk("NFS call  create %s\n", name->name);
+	dprintk("NFS call  create %s\n", dentry->d_name.name);
 	arg.createmode = NFS3_CREATE_UNCHECKED;
 	if (flags & O_EXCL) {
 		arg.createmode  = NFS3_CREATE_EXCLUSIVE;
@@ -353,7 +353,7 @@ exit:
 	if (status != 0)
 		goto out;
 	if (fhandle.size == 0 || !(fattr.valid & NFS_ATTR_FATTR)) {
-		status = nfs3_proc_lookup(dir, name, &fhandle, &fattr);
+		status = nfs3_proc_lookup(dir, &dentry->d_name, &fhandle, &fattr);
 		if (status != 0)
 			goto out;
 	}
