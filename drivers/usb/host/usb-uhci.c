@@ -2977,6 +2977,7 @@ _static int __devinit alloc_uhci (struct pci_dev *dev, int irq, unsigned int io_
 
 	s->bus = bus;
 	bus->hcpriv = s;
+	bus->bus_name = dev->slot_name;
 
 	/* UHCI specs says devices must have 2 ports, but goes on to say */
 	/* they may have more but give no way to determine how many they */

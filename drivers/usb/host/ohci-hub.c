@@ -41,7 +41,7 @@ static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
 #define dbg_port(hc,label,num,value) \
 	dbg ("%s: %s roothub.portstatus [%d] " \
 		"= 0x%08x%s%s%s%s%s%s%s%s%s%s%s%s", \
-		hc->hcd.bus_name, label, num, temp, \
+		hc->hcd.self.bus_name, label, num, temp, \
 		(temp & RH_PS_PRSC) ? " PRSC" : "", \
 		(temp & RH_PS_OCIC) ? " OCIC" : "", \
 		(temp & RH_PS_PSSC) ? " PSSC" : "", \
@@ -71,7 +71,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 
 	ports = roothub_a (ohci) & RH_A_NDP; 
 	if (ports > MAX_ROOT_PORTS) {
-		err ("%s: bogus NDP=%d", hcd->bus_name, ports);
+		err ("%s: bogus NDP=%d", hcd->self.bus_name, ports);
 		err ("rereads as NDP=%d",
 			readl (&ohci->regs->roothub.a) & RH_A_NDP);
 		/* retry later; "should not happen" */

@@ -655,7 +655,6 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
         struct catc *catc = dev->priv;
         u32 cmd;
-	char tmp[40];
         
         if (get_user(cmd, (u32 *)useraddr))
                 return -EFAULT;
@@ -666,8 +665,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
                 struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
                 strncpy(info.driver, SHORT_DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
                 strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
-		sprintf(tmp, "usb%d:%d", catc->usbdev->bus->busnum, catc->usbdev->devnum);
-                strncpy(info.bus_info, tmp,ETHTOOL_BUSINFO_LEN);
+		usb_make_path (catc->usbdev, info.bus_info, sizeof info.bus_info);
                 if (copy_to_user(useraddr, &info, sizeof(info)))
                         return -EFAULT;
                 return 0;
@@ -909,9 +907,9 @@ static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const str
 		f5u011_rxmode(catc, catc->rxmode);
 	}
 	dbg("Init done.");
-	printk(KERN_INFO "%s: %s USB Ethernet at usb%d:%d.%d, ",
+	printk(KERN_INFO "%s: %s USB Ethernet at usb-%s-%s/%d, ",
 	       netdev->name, (catc->is_f5u011) ? "Belkin F5U011" : "CATC EL1210A NetMate",
-	       usbdev->bus->busnum, usbdev->devnum, ifnum);
+	       usbdev->bus->bus_name, usbdev->devpath, ifnum);
 	for (i = 0; i < 5; i++) printk("%2.2x:", netdev->dev_addr[i]);
 	printk("%2.2x.\n", netdev->dev_addr[i]);
 	return catc;

@@ -310,7 +310,7 @@ static int rh_string (
 
 	// serial number
 	} else if (id == 1) {
-		strcpy (buf, hcd->bus_name);
+		strcpy (buf, hcd->self.bus_name);
 
 	// product description
 	} else if (id == 2) {
@@ -406,7 +406,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 	case DeviceOutRequest | USB_REQ_SET_ADDRESS:
 		// wValue == urb->dev->devaddr
 		dbg ("%s root hub device address %d",
-			hcd->bus_name, wValue);
+			hcd->self.bus_name, wValue);
 		break;
 
 	/* INTERFACE REQUESTS (no defined feature/status flags) */
@@ -520,7 +520,7 @@ static void rh_report_status (unsigned long ptr)
 					&& rh_status_urb (hcd, urb) != 0) {
 				/* another driver snuck in? */
 				dbg ("%s, can't resubmit roothub status urb?",
-					hcd->bus_name);
+					hcd->self.bus_name);
 				spin_unlock_irqrestore (&hcd_data_lock, flags);
 				BUG ();
 			}
@@ -1051,8 +1051,7 @@ clean_2:
 	usb_init_bus (&hcd->self);
 	hcd->self.op = &hcd_operations;
 	hcd->self.hcpriv = (void *) hcd;
-	hcd->bus = &hcd->self;
-	hcd->bus_name = dev->slot_name;
+	hcd->self.bus_name = dev->slot_name;
 	hcd->product_desc = dev->name;
 
 	INIT_LIST_HEAD (&hcd->dev_list);
@@ -1089,16 +1088,15 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	hcd = pci_get_drvdata(dev);
 	if (!hcd)
 		return;
-	info ("remove: %s, state %x", hcd->bus_name, hcd->state);
+	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
 	if (in_interrupt ()) BUG ();
 
-	hub = hcd->bus->root_hub;
+	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;
 
-	dbg ("%s: roothub graceful disconnect", hcd->bus_name);
+	dbg ("%s: roothub graceful disconnect", hcd->self.bus_name);
 	usb_disconnect (&hub);
-	// usb_disconnect (&hcd->bus->root_hub);
 
 	hcd->driver->stop (hcd);
 	hcd->state = USB_STATE_HALT;
@@ -1113,10 +1111,9 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 			pci_resource_len (dev, hcd->region));
 	}
 
-	usb_deregister_bus (hcd->bus);
+	usb_deregister_bus (&hcd->self);
 	if (atomic_read (&hcd->self.refcnt) != 1)
-		err ("usb_hcd_pci_remove %s, count != 1", hcd->bus_name);
-	hcd->bus = NULL;
+		err ("usb_hcd_pci_remove %s, count != 1", hcd->self.bus_name);
 
 	hcd->driver->hcd_free (hcd);
 }
@@ -1164,7 +1161,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	int			retval;
 
 	hcd = pci_get_drvdata(dev);
-	info ("suspend %s to state %d", hcd->bus_name, state);
+	info ("suspend %s to state %d", hcd->self.bus_name, state);
 
 	pci_save_state (dev, hcd->pci_state);
 
@@ -1193,12 +1190,12 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	int			retval;
 
 	hcd = pci_get_drvdata(dev);
-	info ("resume %s", hcd->bus_name);
+	info ("resume %s", hcd->self.bus_name);
 
 	/* guard against multiple resumes (APM bug?) */
 	atomic_inc (&hcd->resume_count);
 	if (atomic_read (&hcd->resume_count) != 1) {
-		err ("concurrent PCI resumes for %s", hcd->bus_name);
+		err ("concurrent PCI resumes for %s", hcd->self.bus_name);
 		retval = 0;
 		goto done;
 	}
@@ -1215,7 +1212,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 
 	retval = hcd->driver->resume (hcd);
 	if (!HCD_IS_RUNNING (hcd->state)) {
-		dbg ("resume %s failure, retval %d", hcd->bus_name, retval);
+		dbg ("resume %s failure, retval %d", hcd->self.bus_name, retval);
 		hc_died (hcd);
 // FIXME:  recover, reset etc.
 	} else {
@@ -1290,7 +1287,7 @@ static void hc_died (struct usb_hcd *hcd)
 		list_for_each (urblist, &dev->urb_list) {
 			urb = list_entry (urblist, struct urb, urb_list);
 			dbg ("shutdown %s urb %p pipe %x, current status %d",
-				hcd->bus_name, urb, urb->pipe, urb->status);
+				hcd->self.bus_name, urb, urb->pipe, urb->status);
 			if (urb->status == -EINPROGRESS)
 				urb->status = -ESHUTDOWN;
 		}
@@ -1534,7 +1531,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	 * since we report some queuing/setup errors ourselves
 	 */
 	urb = usb_get_urb (urb);
-	if (urb->dev == hcd->bus->root_hub)
+	if (urb->dev == hcd->self.root_hub)
 		status = rh_urb_enqueue (hcd, urb);
 	else
 		status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
@@ -1686,7 +1683,7 @@ if (retval && urb->status == -ENOENT) err ("whoa! retval %d", retval);
 			&& HCD_IS_RUNNING (hcd->state)
 			&& !retval) {
 		dbg ("%s: wait for giveback urb %p",
-			hcd->bus_name, urb);
+			hcd->self.bus_name, urb);
 		wait_for_completion (&splice.done);
 	} else if ((urb->transfer_flags & USB_ASYNC_UNLINK) && retval == 0) {
 		return -EINPROGRESS;
@@ -1698,7 +1695,7 @@ done:
 bye:
 	if (retval)
 		dbg ("%s: hcd_unlink_urb fail %d",
-		    hcd ? hcd->bus_name : "(no bus?)",
+		    hcd ? hcd->self.bus_name : "(no bus?)",
 		    retval);
 	return retval;
 }
@@ -1731,7 +1728,7 @@ static int hcd_free_dev (struct usb_device *udev)
 	/* device driver problem with refcounts? */
 	if (!list_empty (&dev->urb_list)) {
 		dbg ("free busy dev, %s devnum %d (bug!)",
-			hcd->bus_name, udev->devnum);
+			hcd->self.bus_name, udev->devnum);
 		return -EINVAL;
 	}
 

@@ -733,7 +733,7 @@ submit_async (
 		epnum |= 0x10;
 
 	vdbg ("%s: submit_async urb %p len %d ep %d-%s qtd %p [qh %p]",
-		ehci->hcd.bus_name, urb, urb->transfer_buffer_length,
+		ehci->hcd.self.bus_name, urb, urb->transfer_buffer_length,
 		epnum & 0x0f, (epnum & 0x10) ? "in" : "out",
 		qtd, dev ? dev->ep [epnum] : (void *)~0);
 
