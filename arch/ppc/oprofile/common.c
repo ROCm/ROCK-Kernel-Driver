@@ -124,7 +124,7 @@ static struct oprofile_operations oprof_ppc32_ops = {
 	.cpu_type	= NULL		/* To be filled in below. */
 };
 
-void __init oprofile_arch_init(struct oprofile_operations *ops)
+int __init oprofile_arch_init(struct oprofile_operations *ops)
 {
 	char *name;
 	int cpu_id = smp_processor_id();
@@ -132,14 +132,13 @@ void __init oprofile_arch_init(struct oprofile_operations *ops)
 #ifdef CONFIG_FSL_BOOKE
 	model = &op_model_fsl_booke;
 #else
-	printk(KERN_ERR "oprofile enabled on unsupported processor!\n");
-	return;
+	return -ENODEV;
 #endif
 
 	name = kmalloc(32, GFP_KERNEL);
 
 	if (NULL == name)
-		return;
+		return -ENOMEM;
 
 	sprintf(name, "ppc/%s", cur_cpu_spec[cpu_id]->cpu_name);
 
@@ -151,6 +150,8 @@ void __init oprofile_arch_init(struct oprofile_operations *ops)
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
 	       oprof_ppc32_ops.cpu_type);
+
+	return 0;
 }
 
 void oprofile_arch_exit(void)
