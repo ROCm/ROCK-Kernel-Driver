@@ -55,12 +55,18 @@ struct dvb_adapter {
 struct dvb_device {
 	struct list_head list_head;
 	struct file_operations *fops;
+ 
+ 
+ 
 	struct dvb_adapter *adapter;
 	int type;
 	u32 id;
 
-	int users;
+	/* in theory, 'users' can vanish now,
+	   but I don't want to change too much now... */
+	int readers;
 	int writers;
+	int users;
 
         /* don't really need those !? -- FIXME: use video_usercopy  */
         int (*kernel_ioctl)(struct inode *inode, struct file *file,
