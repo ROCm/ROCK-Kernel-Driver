@@ -173,7 +173,7 @@ static inline void nsp32_index_write4(unsigned int  base,
 
 /*==============================================*/
 
-static inline unsigned char nsp32_mmio_index_read1(unsigned int base,
+static inline unsigned char nsp32_mmio_index_read1(unsigned long base,
 						   unsigned int reg)
 {
 	volatile unsigned short *index_ptr, *data_ptr;
@@ -185,7 +185,7 @@ static inline unsigned char nsp32_mmio_index_read1(unsigned int base,
 	return readb(data_ptr);
 }
 
-static inline void nsp32_mmio_index_write1(unsigned int  base,
+static inline void nsp32_mmio_index_write1(unsigned long base,
 					   unsigned int  reg,
 					   unsigned char val)
 {
@@ -198,8 +198,8 @@ static inline void nsp32_mmio_index_write1(unsigned int  base,
 	writeb(val, data_ptr );
 }
 
-static inline unsigned short nsp32_mmio_index_read2(unsigned int base,
-						    unsigned int reg)
+static inline unsigned short nsp32_mmio_index_read2(unsigned long base,
+						    unsigned int  reg)
 {
 	volatile unsigned short *index_ptr, *data_ptr;
 
@@ -210,7 +210,7 @@ static inline unsigned short nsp32_mmio_index_read2(unsigned int base,
 	return le16_to_cpu(readw(data_ptr));
 }
 
-static inline void nsp32_mmio_index_write2(unsigned int   base,
+static inline void nsp32_mmio_index_write2(unsigned long  base,
 					   unsigned int   reg,
 					   unsigned short val)
 {
