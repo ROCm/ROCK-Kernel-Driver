@@ -507,6 +507,13 @@ acpi_numa_arch_fixup (void)
 }
 #endif /* CONFIG_ACPI_NUMA */
 
+unsigned int
+acpi_register_gsi (u32 gsi, int polarity, int trigger)
+{
+	return acpi_register_irq(gsi, polarity, trigger);
+}
+EXPORT_SYMBOL(acpi_register_gsi);
+
 static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
@@ -663,12 +670,5 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 			(trigger == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 }
 EXPORT_SYMBOL(acpi_register_irq);
-
-unsigned int
-acpi_register_gsi (u32 gsi, int polarity, int trigger)
-{
-	return acpi_register_irq(gsi, polarity, trigger);
-}
-EXPORT_SYMBOL(acpi_register_gsi);
 
 #endif /* CONFIG_ACPI_BOOT */
