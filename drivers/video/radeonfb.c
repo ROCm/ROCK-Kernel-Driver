@@ -1432,7 +1432,7 @@ static int radeonfb_check_var (struct fb_var_screeninfo *var, struct fb_info *in
 			den = 1;
 			v.red.offset = 10;
 			v.green.offset = 5;
-			v.red.offset = 0;
+			v.blue.offset = 0;
 			v.red.length = v.green.length = v.blue.length = 5;
 			v.transp.offset = v.transp.length = 0;
 			break;

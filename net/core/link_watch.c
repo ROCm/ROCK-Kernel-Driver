@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/if.h>
+#include <net/sock.h>
 #include <linux/rtnetlink.h>
 #include <linux/jiffies.h>
 #include <linux/spinlock.h>
@@ -91,9 +92,11 @@ static void linkwatch_event(void *dummy)
 	linkwatch_nextevent = jiffies + HZ;
 	clear_bit(LW_RUNNING, &linkwatch_flags);
 
-	rtnl_lock();
+	rtnl_shlock();
+	rtnl_exlock();
 	linkwatch_run_queue();
-	rtnl_unlock();
+	rtnl_exunlock();
+	rtnl_shunlock();
 }
 
 

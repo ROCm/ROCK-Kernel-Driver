@@ -595,10 +595,10 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 
 	head_copy_len = skb_headroom(skb);
 	head_copy_off = 0;
-	if (newheadroom < head_copy_len) {
-		head_copy_off = head_copy_len - newheadroom;
+	if (newheadroom <= head_copy_len)
 		head_copy_len = newheadroom;
-	}
+	else
+		head_copy_off = newheadroom - head_copy_len;
 
 	/* Copy the linear header and data. */
 	if (skb_copy_bits(skb, -head_copy_len, n->head + head_copy_off,
