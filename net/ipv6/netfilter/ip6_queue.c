@@ -584,15 +584,14 @@ static struct notifier_block ipq_nl_notifier = {
 	.notifier_call	= ipq_rcv_nl_event,
 };
 
-static int sysctl_maxlen = IPQ_QMAX_DEFAULT;
 static struct ctl_table_header *ipq_sysctl_header;
 
 static ctl_table ipq_table[] = {
 	{
 		.ctl_name	= NET_IPQ_QMAX,
 		.procname	= NET_IPQ_QMAX_NAME,
-		.data		= &sysctl_maxlen,
-		.maxlen		= sizeof(sysctl_maxlen),
+		.data		= &queue_maxlen,
+		.maxlen		= sizeof(queue_maxlen),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
