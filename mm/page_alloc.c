@@ -600,7 +600,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 {
 	const int wait = gfp_mask & __GFP_WAIT;
 	unsigned long min;
-	struct zone **zones;
+	struct zone **zones, *z;
 	struct page *page;
 	struct reclaim_state reclaim_state;
 	struct task_struct *p = current;
@@ -611,72 +611,56 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	might_sleep_if(wait);
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
-	if (zones[0] == NULL)     /* no zones in the zonelist */
+
+	if (unlikely(zones[0] == NULL)) {
+		/* Should this ever happen?? */
 		return NULL;
+	}
 
 	alloc_type = zone_idx(zones[0]);
 
 	/* Go through the zonelist once, looking for a zone with enough free */
-	for (i = 0; zones[i] != NULL; i++) {
-		struct zone *z = zones[i];
+	for (i = 0; (z = zones[i]) != NULL; i++) {
+		min = z->pages_low + (1<<order) + z->protection[alloc_type];
 
-		min = (1<<order) + z->protection[alloc_type];
+		if (z->free_pages < min)
+			continue;
 
-		/*
-		 * We let real-time tasks dip their real-time paws a little
-		 * deeper into reserves.
-		 */
-		if (rt_task(p))
-			min -= z->pages_low >> 1;
-
-		if (z->free_pages >= min ||
-				(!wait && z->free_pages >= z->pages_high)) {
-			page = buffered_rmqueue(z, order, gfp_mask);
-			if (page) {
-				zone_statistics(zonelist, z);
-				goto got_pg;
-			}
-		}
+		page = buffered_rmqueue(z, order, gfp_mask);
+		if (page)
+			goto got_pg;
 	}
 
-	/* we're somewhat low on memory, failed to find what we needed */
-	for (i = 0; zones[i] != NULL; i++)
-		wakeup_kswapd(zones[i]);
+	for (i = 0; (z = zones[i]) != NULL; i++)
+		wakeup_kswapd(z);
 
-	/* Go through the zonelist again, taking __GFP_HIGH into account */
-	for (i = 0; zones[i] != NULL; i++) {
-		struct zone *z = zones[i];
-
-		min = (1<<order) + z->protection[alloc_type];
-
+	/*
+	 * Go through the zonelist again. Let __GFP_HIGH and allocations
+	 * coming from realtime tasks to go deeper into reserves
+	 */
+	for (i = 0; (z = zones[i]) != NULL; i++) {
+		min = z->pages_min;
 		if (gfp_mask & __GFP_HIGH)
-			min -= z->pages_low >> 2;
-		if (rt_task(p))
-			min -= z->pages_low >> 1;
+			min -= min>>1;
+		if (unlikely(rt_task(p)) && !in_interrupt())
+			min -= min>>2;
+		min += (1<<order) + z->protection[alloc_type];
 
-		if (z->free_pages >= min ||
-				(!wait && z->free_pages >= z->pages_high)) {
-			page = buffered_rmqueue(z, order, gfp_mask);
-			if (page) {
-				zone_statistics(zonelist, z);
-				goto got_pg;
-			}
-		}
+		if (z->free_pages < min)
+			continue;
+
+		page = buffered_rmqueue(z, order, gfp_mask);
+		if (page)
+			goto got_pg;
 	}
 
-	/* here we're in the low on memory slow path */
-
-rebalance:
+	/* This allocation should allow future memory freeing. */
 	if ((p->flags & (PF_MEMALLOC | PF_MEMDIE)) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
-		for (i = 0; zones[i] != NULL; i++) {
-			struct zone *z = zones[i];
-
+		for (i = 0; (z = zones[i]) != NULL; i++) {
 			page = buffered_rmqueue(z, order, gfp_mask);
-			if (page) {
-				zone_statistics(zonelist, z);
+			if (page)
 				goto got_pg;
-			}
 		}
 		goto nopage;
 	}
@@ -685,6 +669,8 @@ rebalance:
 	if (!wait)
 		goto nopage;
 
+rebalance:
+	/* We now go into synchronous reclaim */
 	p->flags |= PF_MEMALLOC;
 	reclaim_state.reclaimed_slab = 0;
 	p->reclaim_state = &reclaim_state;
@@ -695,27 +681,28 @@ rebalance:
 	p->flags &= ~PF_MEMALLOC;
 
 	/* go through the zonelist yet one more time */
-	for (i = 0; zones[i] != NULL; i++) {
-		struct zone *z = zones[i];
+	for (i = 0; (z = zones[i]) != NULL; i++) {
+		min = z->pages_min;
+		if (gfp_mask & __GFP_HIGH)
+			min -= min>>1;
+		if (unlikely(rt_task(p)) && !in_interrupt())
+			min -= min>>2;
+		min += (1<<order) + z->protection[alloc_type];
 
-		min = (1UL << order) + z->protection[alloc_type];
+		if (z->free_pages < min)
+			continue;
 
-		if (z->free_pages >= min ||
-				(!wait && z->free_pages >= z->pages_high)) {
-			page = buffered_rmqueue(z, order, gfp_mask);
-			if (page) {
- 				zone_statistics(zonelist, z);
-				goto got_pg;
-			}
-		}
+		page = buffered_rmqueue(z, order, gfp_mask);
+		if (page)
+			goto got_pg;
 	}
 
 	/*
 	 * Don't let big-order allocations loop unless the caller explicitly
 	 * requests that.  Wait for some write requests to complete then retry.
 	 *
-	 * In this implementation, __GFP_REPEAT means __GFP_NOFAIL, but that
-	 * may not be true in other implementations.
+	 * In this implementation, __GFP_REPEAT means __GFP_NOFAIL for order
+	 * <= 3, but that may not be true in other implementations.
 	 */
 	do_retry = 0;
 	if (!(gfp_mask & __GFP_NORETRY)) {
@@ -738,6 +725,7 @@ nopage:
 	}
 	return NULL;
 got_pg:
+	zone_statistics(zonelist, z);
 	kernel_map_pages(page, 1 << order, 1);
 	return page;
 }
@@ -1857,11 +1845,11 @@ static void setup_per_zone_protection(void)
 				 * We never protect zones that don't have memory
 				 * in them (j>max_zone) or zones that aren't in
 				 * the zonelists for a certain type of
-				 * allocation (j>i).  We have to assign these to
-				 * zero because the lower zones take
+				 * allocation (j>=i).  We have to assign these
+				 * to zero because the lower zones take
 				 * contributions from the higher zones.
 				 */
-				if (j > max_zone || j > i) {
+				if (j > max_zone || j >= i) {
 					zone->protection[i] = 0;
 					continue;
 				}
@@ -1870,7 +1858,6 @@ static void setup_per_zone_protection(void)
 				 */
 				zone->protection[i] = higherzone_val(zone,
 								max_zone, i);
-				zone->protection[i] += zone->pages_low;
 			}
 		}
 	}
