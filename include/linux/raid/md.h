@@ -76,6 +76,7 @@ extern void md_handle_safemode(mddev_t *mddev);
 extern void md_done_sync(mddev_t *mddev, int blocks, int ok);
 extern void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors);
 extern void md_error (mddev_t *mddev, mdk_rdev_t *rdev);
+extern void md_unplug_mddev(mddev_t *mddev);
 
 extern void md_print_devices (void);
 

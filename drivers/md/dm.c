@@ -584,7 +584,6 @@ static void dm_unplug_all(request_queue_t *q)
 	struct dm_table *map = dm_get_table(md);
 
 	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
-
 	if (map) {
 		dm_table_unplug_all(md->map);
 		dm_table_put(map);

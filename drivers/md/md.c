@@ -160,13 +160,10 @@ static int md_fail_request (request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
-static void md_unplug_all(request_queue_t *q)
+void md_unplug_mddev(mddev_t *mddev)
 {
-	mddev_t *mddev = q->queuedata;
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
-
-	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
 
 	/*
 	 * this list iteration is done without any locking in md?!
@@ -179,7 +176,14 @@ static void md_unplug_all(request_queue_t *q)
 			r_queue->unplug_fn(r_queue);
 		}
 	}
+}
 
+static void md_unplug_all(request_queue_t *q)
+{
+	mddev_t *mddev = q->queuedata;
+
+	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
+	md_unplug_mddev(mddev);
 }
 
 static inline mddev_t *mddev_get(mddev_t *mddev)
@@ -2742,7 +2746,7 @@ int md_thread(void * arg)
 		run = thread->run;
 		if (run) {
 			run(thread->mddev);
-			blk_run_queue(thread->mddev->queue);
+			md_unplug_mddev(thread->mddev);
 		}
 		if (signal_pending(current))
 			flush_signals(current);
@@ -3310,7 +3314,7 @@ static void md_do_sync(mddev_t *mddev)
 		    test_bit(MD_RECOVERY_ERR, &mddev->recovery))
 			break;
 
-		blk_run_queue(mddev->queue);
+		md_unplug_mddev(mddev);
 
 	repeat:
 		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {

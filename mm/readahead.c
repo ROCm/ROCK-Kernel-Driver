@@ -15,9 +15,10 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 
-static void default_unplug_io_fn(struct backing_dev_info *bdi)
+void default_unplug_io_fn(struct backing_dev_info *bdi)
 {
 }
+EXPORT_SYMBOL(default_unplug_io_fn);
 
 struct backing_dev_info default_backing_dev_info = {
 	.ra_pages	= (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,

@@ -249,7 +249,7 @@ static struct stripe_head *get_active_stripe(raid5_conf_t *conf, unsigned long s
 				break;
 			if (!sh) {
 				conf->inactive_blocked = 1;
-				blk_run_queue(conf->mddev->queue);
+				md_unplug_mddev(conf->mddev);
 				wait_event_lock_irq(conf->wait_for_stripe,
 						    !list_empty(&conf->inactive_list) &&
 						    (atomic_read(&conf->active_stripes) < (NR_STRIPES *3/4)
