@@ -87,9 +87,7 @@ endif
 
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
-SUBDIRS += arch/i386/lib
-
-LIBS := arch/i386/lib/lib.a $(LIBS) arch/i386/lib/lib.a
+libs-y 					+= arch/i386/lib/
 
 core-y					+= arch/i386/kernel/ arch/i386/mm/
 
