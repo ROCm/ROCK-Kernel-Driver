@@ -153,8 +153,12 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 	unsigned long linear_pgoff;
 	unsigned long end = start + size;
 	struct vm_area_struct *vma;
-	int err = -EINVAL;
+	int err;
 
+	err = -EPERM;
+	if (!can_do_mlock())
+		return err;
+	err = -EINVAL;
 	if (__prot)
 		return err;
 	/*
