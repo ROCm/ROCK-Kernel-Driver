@@ -328,11 +328,11 @@ sn_pci_fixup(int arg)
 #ifdef CONFIG_PROC_FS
 		extern void register_sn_procfs(void);
 #endif
-		extern void irix_io_init(void);
+		extern void sgi_master_io_infr_init(void);
 		extern void sn_init_cpei_timer(void);
 		
 		init_hcl();
-		irix_io_init();
+		sgi_master_io_infr_init();
 		
 		for (cnode = 0; cnode < numnodes; cnode++) {
 			extern void intr_init_vecblk(cnodeid_t);
