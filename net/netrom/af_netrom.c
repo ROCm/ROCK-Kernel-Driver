@@ -269,7 +269,7 @@ void nr_destroy_socket(struct sock *sk)
 	    atomic_read(&sk->sk_rmem_alloc)) {
 		/* Defer: outstanding buffers */
 		init_timer(&sk->sk_timer);
-		sk->sk_timer.expires  = jiffies + 10 * HZ;
+		sk->sk_timer.expires  = jiffies + 2 * HZ;
 		sk->sk_timer.function = nr_destroy_timer;
 		sk->sk_timer.data     = (unsigned long)sk;
 		add_timer(&sk->sk_timer);
