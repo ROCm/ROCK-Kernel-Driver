@@ -210,6 +210,18 @@ static struct file_operations proc_partitions_operations = {
 	release:	seq_release,
 };
 
+extern struct seq_operations partitions_op;
+static int partitions_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &partitions_op);
+}
+static struct file_operations proc_partitions_operations = {
+	open:		partitions_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
+
 #ifdef CONFIG_MODULES
 extern struct seq_operations modules_op;
 static int modules_open(struct inode *inode, struct file *file)

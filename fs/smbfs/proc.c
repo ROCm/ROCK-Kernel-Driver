@@ -1898,7 +1898,10 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 	__u16 bcc;
 	__u16 count;
 	char status[SMB_STATUS_SIZE];
-	static struct qstr mask = { "*.*", 3, 0 };
+	static struct qstr mask = {
+		name:	"*.*",
+		len:	3,
+	};
 	unsigned char *last_status;
 
 	VERBOSE("%s/%s\n", DENTRY_PATH(dir));
@@ -2164,7 +2167,10 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 	int ff_dir_handle = 0;
 	int loop_count = 0;
 	int mask_len, i, result;
-	static struct qstr star = { "*", 1, 0 };
+	static struct qstr star = {
+		name:	"*",
+		len:	1,
+	};
 
 	/*
 	 * use info level 1 for older servers that don't do 260

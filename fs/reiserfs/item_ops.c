@@ -111,18 +111,18 @@ static void sd_print_vi (struct virtual_item * vi)
 }
 
 struct item_operations stat_data_ops = {
-    sd_bytes_number,
-    sd_decrement_key,
-    sd_is_left_mergeable,
-    sd_print_item,
-    sd_check_item,
+	bytes_number:		sd_bytes_number,
+	decrement_key:		sd_decrement_key,
+	is_left_mergeable:	sd_is_left_mergeable,
+	print_item:		sd_print_item,
+	check_item:		sd_check_item,
 
-    sd_create_vi,
-    sd_check_left,
-    sd_check_right,
-    sd_part_size,
-    sd_unit_num,
-    sd_print_vi
+	create_vi:		sd_create_vi,
+	check_left:		sd_check_left,
+	check_right:		sd_check_right,
+	part_size:		sd_part_size,
+	unit_num:		sd_unit_num,
+	print_vi:		sd_print_vi
 };
 
 
@@ -214,18 +214,18 @@ static void direct_print_vi (struct virtual_item * vi)
 }
 
 struct item_operations direct_ops = {
-    direct_bytes_number,
-    direct_decrement_key,
-    direct_is_left_mergeable,
-    direct_print_item,
-    direct_check_item,
+	bytes_number:		direct_bytes_number,
+	decrement_key:		direct_decrement_key,
+	is_left_mergeable:	direct_is_left_mergeable,
+	print_item:		direct_print_item,
+	check_item:		direct_check_item,
 
-    direct_create_vi,
-    direct_check_left,
-    direct_check_right,
-    direct_part_size,
-    direct_unit_num,
-    direct_print_vi
+	create_vi:		direct_create_vi,
+	check_left:		direct_check_left,
+	check_right:		direct_check_right,
+	part_size:		direct_part_size,
+	unit_num:		direct_unit_num,
+	print_vi:		direct_print_vi
 };
 
 
@@ -368,18 +368,18 @@ static void indirect_print_vi (struct virtual_item * vi)
 }
 
 struct item_operations indirect_ops = {
-    indirect_bytes_number,
-    indirect_decrement_key,
-    indirect_is_left_mergeable,
-    indirect_print_item,
-    indirect_check_item,
+	bytes_number:		indirect_bytes_number,
+	decrement_key:		indirect_decrement_key,
+	is_left_mergeable:	indirect_is_left_mergeable,
+	print_item:		indirect_print_item,
+	check_item:		indirect_check_item,
 
-    indirect_create_vi,
-    indirect_check_left,
-    indirect_check_right,
-    indirect_part_size,
-    indirect_unit_num,
-    indirect_print_vi
+	create_vi:		indirect_create_vi,
+	check_left:		indirect_check_left,
+	check_right:		indirect_check_right,
+	part_size:		indirect_part_size,
+	unit_num:		indirect_unit_num,
+	print_vi:		indirect_print_vi
 };
 
 
@@ -669,18 +669,18 @@ static void direntry_print_vi (struct virtual_item * vi)
 }
 
 struct item_operations direntry_ops = {
-    direntry_bytes_number,
-    direntry_decrement_key,
-    direntry_is_left_mergeable,
-    direntry_print_item,
-    direntry_check_item,
+	bytes_number:		direntry_bytes_number,
+	decrement_key:		direntry_decrement_key,
+	is_left_mergeable:	direntry_is_left_mergeable,
+	print_item:		direntry_print_item,
+	check_item:		direntry_check_item,
 
-    direntry_create_vi,
-    direntry_check_left,
-    direntry_check_right,
-    direntry_part_size,
-    direntry_unit_num,
-    direntry_print_vi
+	create_vi:		direntry_create_vi,
+	check_left:		direntry_check_left,
+	check_right:		direntry_check_right,
+	part_size:		direntry_part_size,
+	unit_num:		direntry_unit_num,
+	print_vi:		direntry_print_vi
 };
 
 

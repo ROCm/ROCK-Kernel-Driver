@@ -1268,13 +1268,13 @@ __initcall(dquot_init);
  * Definitions of diskquota operations.
  */
 struct dquot_operations dquot_operations = {
-	dquot_initialize,		/* mandatory */
-	dquot_drop,			/* mandatory */
-	dquot_alloc_block,
-	dquot_alloc_inode,
-	dquot_free_block,
-	dquot_free_inode,
-	dquot_transfer
+	initialize:	dquot_initialize,		/* mandatory */
+	drop:		dquot_drop,			/* mandatory */
+	alloc_block:	dquot_alloc_block,
+	alloc_inode:	dquot_alloc_inode,
+	free_block:	dquot_free_block,
+	free_inode:	dquot_free_inode,
+	transfer:	dquot_transfer
 };
 
 static inline void set_enable_flags(struct quota_mount_options *dqopt, short type)

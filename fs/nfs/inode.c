@@ -72,7 +72,9 @@ static struct super_operations nfs_sops = {
 /*
  * RPC cruft for NFS
  */
-struct rpc_stat			nfs_rpcstat = { &nfs_program };
+struct rpc_stat			nfs_rpcstat = {
+	program:		&nfs_program
+};
 static struct rpc_version *	nfs_version[] = {
 	NULL,
 	NULL,
@@ -83,11 +85,11 @@ static struct rpc_version *	nfs_version[] = {
 };
 
 struct rpc_program		nfs_program = {
-	"nfs",
-	NFS_PROGRAM,
-	sizeof(nfs_version) / sizeof(nfs_version[0]),
-	nfs_version,
-	&nfs_rpcstat,
+	name:			"nfs",
+	number:			NFS_PROGRAM,
+	nrvers:			sizeof(nfs_version) / sizeof(nfs_version[0]),
+	version:		nfs_version,
+	stats:			&nfs_rpcstat,
 };
 
 static inline unsigned long
@@ -633,7 +635,10 @@ nfs_fhget(struct dentry *dentry, struct nfs_fh *fhandle,
 static struct inode *
 __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 {
-	struct nfs_find_desc desc = { fh, fattr };
+	struct nfs_find_desc desc = {
+		fh:	fh,
+		fattr:	fattr
+	};
 	struct inode *inode = NULL;
 	unsigned long ino;
 
