@@ -60,6 +60,8 @@ struct cpuinfo_x86 {
 	int	x86_cache_alignment;
 	int	x86_tlbsize;	/* number of 4K pages in DTLB/ITLB combined(in pages)*/
         __u8    x86_virt_bits, x86_phys_bits;
+	__u8	x86_num_cores;
+	__u8	x86_apicid;
         __u32   x86_power; 	
 	unsigned long loops_per_jiffy;
 } ____cacheline_aligned;
