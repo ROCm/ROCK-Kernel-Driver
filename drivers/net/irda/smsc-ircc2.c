@@ -375,7 +375,7 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 		goto err_out;
 		
 	err = -ENOMEM;
-	if (dev_count>DIM(dev_self)) {
+	if (dev_count > DIM(dev_self)) {
 	        WARNING("%s(), too many devices!\n", __FUNCTION__);
 		goto err_out1;
 	}
@@ -407,8 +407,12 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 		
 	smsc_ircc_init_chip(self);
 	
-	if(ircc_transceiver > 0 && ircc_transceiver < SMSC_IRCC2_C_NUMBER_OF_TRANSCEIVERS) self->transceiver = ircc_transceiver;
-	else smsc_ircc_probe_transceiver(self);
+	if(ircc_transceiver > 0  && 
+	   ircc_transceiver < SMSC_IRCC2_C_NUMBER_OF_TRANSCEIVERS)
+		self->transceiver = ircc_transceiver;
+	else
+		smsc_ircc_probe_transceiver(self);
+
 
 	err = smsc_ircc_setup_netdev(self);
 	if(err) 
