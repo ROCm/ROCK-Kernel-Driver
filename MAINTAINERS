@@ -1945,8 +1945,8 @@ L:	ultralinux@vger.kernel.org
 S:	Maintained
 
 SPARC (sparc32):
-P:	Keith M. Wesolowski
-M:	wesolows@foobazco.org
+P:	William L. Irwin
+M:	wli@holomorphy.com
 L:	sparclinux@vger.kernel.org
 S:	Maintained
 
