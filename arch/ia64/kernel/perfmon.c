@@ -267,8 +267,6 @@ typedef struct pfm_context {
 	unsigned long		ctx_saved_cpus_allowed;	/* copy of the task cpus_allowed (system wide) */
 	unsigned int		ctx_cpu;		/* CPU used by system wide session */
 
-	atomic_t		ctx_saving_in_progress;	/* flag indicating actual save in progress */
-	atomic_t		ctx_is_busy;		/* context accessed by overflow handler */
 	atomic_t		ctx_last_cpu;		/* CPU id of current or last CPU used */
 } pfm_context_t;
 
@@ -439,9 +437,6 @@ static struct {
  * forward declarations
  */
 static void pfm_reset_pmu(struct task_struct *);
-#ifdef CONFIG_SMP
-static void pfm_fetch_regs(int cpu, struct task_struct *task, pfm_context_t *ctx);
-#endif
 static void pfm_lazy_save_regs (struct task_struct *ta);
 
 #if   defined(CONFIG_ITANIUM)
@@ -490,6 +485,19 @@ pfm_set_psr_l(unsigned long val)
 	__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(val): "memory");
 }
 
+static inline void
+pfm_freeze_pmu(void)
+{
+	ia64_set_pmc(0,1UL);
+	ia64_srlz_d();
+}
+
+static inline void
+pfm_unfreeze_pmu(void)
+{
+	ia64_set_pmc(0,0UL);
+	ia64_srlz_d();
+}
 
 static inline unsigned long
 pfm_read_soft_counter(pfm_context_t *ctx, int i)
@@ -1230,10 +1238,6 @@ pfm_context_create(struct task_struct *task, pfm_context_t *ctx, void *req, int 
 
 	atomic_set(&ctx->ctx_last_cpu,-1); /* SMP only, means no CPU */
 
-	/* may be redudant with memset() but at least it's easier to remember */
-	atomic_set(&ctx->ctx_saving_in_progress, 0); 
-	atomic_set(&ctx->ctx_is_busy, 0); 
-
 	sema_init(&ctx->ctx_restart_sem, 0); /* init this semaphore to locked */
 
 	if (__copy_to_user(req, &tmp, sizeof(tmp))) {
@@ -1667,25 +1671,6 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 			val = ia64_get_pmd(cnum);
 			DBprintk(("reading pmd[%u]=0x%lx from hw\n", cnum, val));
 		} else {
-#ifdef CONFIG_SMP
-			int cpu;
-			/*
-			 * for SMP system, the context may still be live on another
-			 * CPU so we need to fetch it before proceeding with the read
-			 * This call we only be made once for the whole loop because
-			 * of ctx_last_cpu becoming == -1.
-			 *
-			 * We cannot reuse ctx_last_cpu as it may change before we get to the
-			 * actual IPI call. In this case, we will do the call for nothing but
-			 * there is no way around it. The receiving side will simply do nothing.
-			 */
-			cpu = atomic_read(&ctx->ctx_last_cpu);
-			if (cpu != -1) {
-				DBprintk(("must fetch on CPU%d for [%d]\n", cpu, task->pid));
-				pfm_fetch_regs(cpu, task, ctx);
-			}
-#endif
-			/* context has been saved */
 			val = th->pmd[cnum];
 		}
 		if (PMD_IS_COUNTING(cnum)) {
@@ -1862,8 +1847,7 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		}
 
 		/* simply unfreeze */
-		ia64_set_pmc(0, 0);
-		ia64_srlz_d();
+		pfm_unfreeze_pmu();
 
 		return 0;
 	} 
@@ -2416,8 +2400,7 @@ pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	atomic_set(&ctx->ctx_last_cpu, smp_processor_id());
 
 	/* simply unfreeze */
-	ia64_set_pmc(0, 0);
-	ia64_srlz_d();
+	pfm_unfreeze_pmu();
 
 	return 0;
 }
@@ -2665,8 +2648,7 @@ non_blocking:
 			ctx->ctx_psb->psb_index = 0;
 		}
 
-		ia64_set_pmc(0, 0);
-		ia64_srlz_d();
+		pfm_unfreeze_pmu();
 
 		/* state restored, can go back to work (user mode) */
 	}
@@ -3073,19 +3055,6 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 			       "no PFM context\n", task->pid);
 			return;
 		}
-#ifdef CONFIG_SMP
-		/*
-		 * Because an IPI has higher priority than the PMU overflow interrupt, it is 
-		 * possible that the handler be interrupted by a request from another CPU to fetch 
-		 * the PMU state of the currently active context. The task may have just been 
-		 * migrated to another CPU which is trying to restore the context. If there was
-		 * a pending overflow interrupt when the task left this CPU, it is possible for
-		 * the handler to get interrupt by the IPI. In which case, we fetch request
-		 * MUST be postponed until the interrupt handler is done. The ctx_is_busy
-		 * flag indicates such a condition. The other CPU must busy wait until it's cleared.
-		 */
-		atomic_set(&ctx->ctx_is_busy, 1);
-#endif
 
 		/* 
 		 * assume PMC[0].fr = 1 at this point 
@@ -3099,12 +3068,6 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 		ia64_set_pmc(0, pmc0);
 		ia64_srlz_d();
 
-#ifdef CONFIG_SMP
-		/*
-		 * announce that we are doing with the context
-		 */
-		atomic_set(&ctx->ctx_is_busy, 0);
-#endif
 	} else {
 		pfm_stats[smp_processor_id()].pfm_spurious_ovfl_intr_count++;
 	}
@@ -3222,9 +3185,12 @@ void
 pfm_save_regs (struct task_struct *task)
 {
 	pfm_context_t *ctx;
+	unsigned long mask;
 	u64 psr;
+	int i;
 
 	ctx = task->thread.pfm_context;
+
 
 	/*
 	 * save current PSR: needed because we modify it
@@ -3238,13 +3204,44 @@ pfm_save_regs (struct task_struct *task)
 	 * We do not need to set psr.sp because, it is irrelevant in kernel.
 	 * It will be restored from ipsr when going back to user level
 	 */
-	__asm__ __volatile__ ("rum psr.up;;"::: "memory");
+	pfm_clear_psr_up();
 	ia64_srlz_i();
 
 	ctx->ctx_saved_psr = psr;
 
-	//ctx->ctx_last_cpu  = smp_processor_id();
+#ifdef CONFIG_SMP
+	/*
+	 * We do not use a lazy scheme in SMP because
+	 * of the new scheduler which masks interrupts
+	 * during low-level context switch. So we save
+	 * all the PMD register we use and restore on
+	 * ctxsw in.
+	 *
+	 * release ownership of this PMU.
+	 * must be done before we save the registers.
+	 */
+	SET_PMU_OWNER(NULL);
 
+	/*
+	 * save PMDs
+	 */
+	ia64_srlz_d();
+
+	mask = ctx->ctx_used_pmds[0];
+	for (i=0; mask; i++, mask>>=1) {
+		if (mask & 0x1) task->thread.pmd[i] =ia64_get_pmd(i);
+	}
+
+	/* 
+	 * save pmc0 
+	 */
+	task->thread.pmc[0] = ia64_get_pmc(0);
+
+	/* 
+	 * force a full reload 
+	 */
+	atomic_set(&ctx->ctx_last_cpu, -1);
+#endif
 }
 
 static void
@@ -3259,26 +3256,6 @@ pfm_lazy_save_regs (struct task_struct *task)
 
 	t   = &task->thread;
 	ctx = task->thread.pfm_context;
-
-#ifdef CONFIG_SMP
-	/* 
-	 * announce we are saving this PMU state
-	 * This will cause other CPU, to wait until we're done
-	 * before using the context.h
-	 *
-	 * must be an atomic operation
-	 */
-	atomic_set(&ctx->ctx_saving_in_progress, 1);
-
-	 /*
-	  * if owner is NULL, it means that the other CPU won the race
-	  * and the IPI has caused the context to be saved in pfm_handle_fectch_regs()
-	  * instead of here. We have nothing to do
-	  *
-	  * note that this is safe, because the other CPU NEVER modifies saving_in_progress.
-	  */
-	if (PMU_OWNER() == NULL) goto do_nothing;
-#endif
 
 	/*
 	 * do not own the PMU
@@ -3301,145 +3278,7 @@ pfm_lazy_save_regs (struct task_struct *task)
 
 	/* not owned by this CPU */
 	atomic_set(&ctx->ctx_last_cpu, -1);
-
-#ifdef CONFIG_SMP
-do_nothing:
-#endif
-	/*
-	 * declare we are done saving this context
-	 *
-	 * must be an atomic operation
-	 */
-	atomic_set(&ctx->ctx_saving_in_progress,0);
-
 }
-
-#ifdef CONFIG_SMP
-/*
- * Handles request coming from other CPUs
- */
-static void 
-pfm_handle_fetch_regs(void *info)
-{
-	pfm_smp_ipi_arg_t *arg = info;
-	struct thread_struct *t;
-	pfm_context_t *ctx;
-	unsigned long mask;
-	int i;
-
-	ctx = arg->task->thread.pfm_context;
-	t   = &arg->task->thread;
-
-	DBprintk(("task=%d owner=%d saving=%d\n", 
-		  arg->task->pid,
-		  PMU_OWNER() ? PMU_OWNER()->pid: -1,
-		  atomic_read(&ctx->ctx_saving_in_progress)));
-
-	/* must wait until not busy before retrying whole request */
-	if (atomic_read(&ctx->ctx_is_busy)) {
-		arg->retval = 2;
-		return;
-	}
-
-	/* must wait if saving was interrupted */
-	if (atomic_read(&ctx->ctx_saving_in_progress)) {
-		arg->retval = 1;
-		return;
-	}
-
-	/* can proceed, done with context */
-	if (PMU_OWNER() != arg->task) {
-		arg->retval = 0;
-		return;
-	}
-
-	DBprintk(("saving state for [%d] used_pmcs=0x%lx reload_pmcs=0x%lx used_pmds=0x%lx\n", 
-		arg->task->pid,
-		ctx->ctx_used_pmcs[0],
-		ctx->ctx_reload_pmcs[0],
-		ctx->ctx_used_pmds[0]));
-
-	/*
-	 * XXX: will be replaced with pure assembly call
-	 */
-	SET_PMU_OWNER(NULL);
-
-	ia64_srlz_d();
-
-	/*
-	 * XXX needs further optimization.
-	 */
-	mask = ctx->ctx_used_pmds[0];
-	for (i=0; mask; i++, mask>>=1) {
-		if (mask & 0x1) t->pmd[i] = ia64_get_pmd(i);
-	}
-
-	/* save pmc0 */
-	t->pmc[0] = ia64_get_pmc(0);
-
-	/* not owned by this CPU */
-	atomic_set(&ctx->ctx_last_cpu, -1);
-
-	/* can proceed */
-	arg->retval = 0;
-}
-
-/*
- * Function call to fetch PMU state from another CPU identified by 'cpu'.
- * If the context is being saved on the remote CPU, then we busy wait until
- * the saving is done and then we return. In this case, non IPI is sent.
- * Otherwise, we send an IPI to the remote CPU, potentially interrupting 
- * pfm_lazy_save_regs() over there.
- *
- * If the retval==1, then it means that we interrupted remote save and that we must
- * wait until the saving is over before proceeding.
- * Otherwise, we did the saving on the remote CPU, and it was done by the time we got there.
- * in either case, we can proceed.
- */
-static void
-pfm_fetch_regs(int cpu, struct task_struct *task, pfm_context_t *ctx)
-{
-	pfm_smp_ipi_arg_t  arg;
-	int ret;
-
-	arg.task   = task;
-	arg.retval = -1;
-
-	if (atomic_read(&ctx->ctx_is_busy)) {
-must_wait_busy:
-		while (atomic_read(&ctx->ctx_is_busy));
-	}
-
-	if (atomic_read(&ctx->ctx_saving_in_progress)) {
-		DBprintk(("no IPI, must wait for [%d] to be saved on [%d]\n", task->pid, cpu));
-must_wait_saving:
-		/* busy wait */
-		while (atomic_read(&ctx->ctx_saving_in_progress));
-		DBprintk(("done saving for [%d] on [%d]\n", task->pid, cpu));
-		return;
-	}
-	DBprintk(("calling CPU %d from CPU %d\n", cpu, smp_processor_id()));
-
-	if (cpu == -1) {
-		printk("refusing to use -1 for [%d]\n", task->pid);
-		return;
-	}
-
-	/* will send IPI to other CPU and wait for completion of remote call */
-	if ((ret=smp_call_function_single(cpu, pfm_handle_fetch_regs, &arg, 0, 1))) {
-		printk(KERN_ERR "perfmon: remote CPU call from %d to %d error %d\n",
-		       smp_processor_id(), cpu, ret);
-		return;
-	}
-	/*
-	 * we must wait until saving is over on the other CPU
-	 * This is the case, where we interrupted the saving which started just at the time we sent the
-	 * IPI.
-	 */
-	if (arg.retval == 1) goto must_wait_saving;
-	if (arg.retval == 2) goto must_wait_busy;
-}
-#endif /* CONFIG_SMP */
 
 void
 pfm_load_regs (struct task_struct *task)
@@ -3450,13 +3289,15 @@ pfm_load_regs (struct task_struct *task)
 	unsigned long mask;
 	u64 psr;
 	int i;
-#ifdef CONFIG_SMP
-	int cpu;
-#endif
 
 	owner = PMU_OWNER();
 	ctx   = task->thread.pfm_context;
 	t     = &task->thread;
+
+	if (ctx == NULL) {
+		printk("perfmon: pfm_load_regs: null ctx for [%d]\n", task->pid);
+		return;
+	}
 
 	/*
 	 * we restore ALL the debug registers to avoid picking up 
@@ -3483,6 +3324,7 @@ pfm_load_regs (struct task_struct *task)
 
 	/*
 	 * if we were the last user, then nothing to do except restore psr
+	 * this path cannot be used in SMP
 	 */
 	if (owner == task) {
 		if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
@@ -3490,31 +3332,18 @@ pfm_load_regs (struct task_struct *task)
 				atomic_read(&ctx->ctx_last_cpu), task->pid));
 
 		psr = ctx->ctx_saved_psr;
-		__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(psr): "memory");
+		pfm_set_psr_l(psr);
 
 		return;
 	}
-	DBprintk(("load_regs: must reload for [%d] owner=%d\n", 
-		task->pid, owner ? owner->pid : -1 ));
+
 	/*
 	 * someone else is still using the PMU, first push it out and
 	 * then we'll be able to install our stuff !
+	 *
+	 * not possible in SMP
 	 */
 	if (owner) pfm_lazy_save_regs(owner);
-
-#ifdef CONFIG_SMP
-	/* 
-	 * check if context on another CPU (-1 means saved)
-	 * We MUST use the variable, as last_cpu may change behind our 
-	 * back. If it changes to -1 (not on a CPU anymore), then in cpu
-	 * we have the last CPU the context was on. We may be sending the 
-	 * IPI for nothing, but we have no way of verifying this. 
-	 */
-	cpu = atomic_read(&ctx->ctx_last_cpu);
-	if (cpu != -1) {
-		pfm_fetch_regs(cpu, task, ctx);
-	}
-#endif
 
 	/*
 	 * To avoid leaking information to the user level when psr.sp=0,
@@ -3552,8 +3381,7 @@ pfm_load_regs (struct task_struct *task)
 	 * fl_frozen==1 when we are in blocking mode waiting for restart
 	 */
 	if (ctx->ctx_fl_frozen == 0) {
-		ia64_set_pmc(0, 0);
-		ia64_srlz_d();
+		pfm_unfreeze_pmu();
 	}
 	atomic_set(&ctx->ctx_last_cpu, smp_processor_id());
 
@@ -3563,8 +3391,7 @@ pfm_load_regs (struct task_struct *task)
 	 * restore the psr we changed in pfm_save_regs()
 	 */
 	psr = ctx->ctx_saved_psr;
-	__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(psr): "memory");
-
+	pfm_set_psr_l(psr);
 }
 
 /*
@@ -3583,7 +3410,7 @@ pfm_reset_pmu(struct task_struct *task)
 	}
 
 	/* Let's make sure the PMU is frozen */
-	ia64_set_pmc(0,1);
+	pfm_freeze_pmu();
 
 	/*
 	 * install reset values for PMC. We skip PMC0 (done above)
@@ -3750,8 +3577,7 @@ pfm_flush_regs (struct task_struct *task)
 	 * This destroys the overflow information. This is required to make sure
 	 * next process does not start with monitoring on if not requested
 	 */
-	ia64_set_pmc(0, 1);
-	ia64_srlz_d();
+	pfm_freeze_pmu();
 
 	/*
 	 * We don't need to restore psr, because we are on our way out
@@ -4433,8 +4259,7 @@ pfm_init_percpu(void)
 		if (PMD_IS_IMPL(i) == 0) continue;
 		ia64_set_pmd(i, 0UL);
 	}
-	ia64_set_pmc(0,1UL);
-	ia64_srlz_d();
+	pfm_freeze_pmu();
 }
 
 #else /* !CONFIG_PERFMON */
