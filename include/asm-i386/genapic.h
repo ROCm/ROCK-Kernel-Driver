@@ -32,6 +32,7 @@ struct genapic {
 	int no_balance_irq;
 	void (*init_apic_ldr)(void);
 	unsigned long (*ioapic_phys_id_map)(unsigned long map); 
+	void (*enable_apic_mode)(void);
 
 	void (*clustered_apic_check)(void);
 	int (*multi_timer_check)(int apic, int irq);
@@ -43,7 +44,7 @@ struct genapic {
 			   struct mpc_config_translation *t); 
 	void (*setup_portio_remap)(void); 
 	int (*check_phys_apicid_present)(int boot_cpu_physical_apicid);
-
+	
 	/* mpparse */
 	void (*mpc_oem_bus_info)(struct mpc_config_bus *, char *, 
 				 struct mpc_config_translation *);
@@ -82,6 +83,7 @@ struct genapic {
 	APICFUNC(check_apicid_present), \
 	APICFUNC(init_apic_ldr), \
 	APICFUNC(ioapic_phys_id_map), \
+	APICFUNC(enable_apic_mode),	\
 	APICFUNC(clustered_apic_check), \
 	APICFUNC(multi_timer_check), \
 	APICFUNC(apicid_to_node), \
