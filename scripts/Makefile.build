@@ -14,8 +14,13 @@ include $(obj)/Makefile
 
 include scripts/Makefile.lib
 
-# Do not include host-progs rules unles needed
 ifdef host-progs
+$(warning kbuild: $(obj)/Makefile - Usage of host-progs is deprecated. Please replace with hostprogs-y!)
+hostprogs-y += $(host-progs)
+endif
+
+# Do not include host rules unles needed
+ifneq ($(hostprogs-y)$(hostprogs-m),)
 include scripts/Makefile.host
 endif
 

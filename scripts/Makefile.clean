@@ -29,8 +29,10 @@ subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 # Add subdir path
 
 subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
-__clean-files	:= $(extra-y) $(EXTRA_TARGETS) $(always) $(host-progs) \
-		   $(targets) $(clean-files)
+__clean-files	:= $(extra-y) $(EXTRA_TARGETS) $(always) \
+		   $(targets) $(clean-files)             \
+		   $(host-progs)                         \
+		   $(hostprogs-y) $(hostprogs-m) $(hostprogs-)
 __clean-files   := $(wildcard                                               \
                    $(addprefix $(obj)/, $(filter-out /%, $(__clean-files))) \
 		   $(filter /%, $(__clean-files)))
