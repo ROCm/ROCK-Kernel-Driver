@@ -602,10 +602,19 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 
 static int __init belkin_sa_init (void)
 {
-	usb_serial_register (&belkin_device);
-	usb_register (&belkin_driver);
+	int retval;
+	retval = usb_serial_register(&belkin_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&belkin_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&belkin_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 
