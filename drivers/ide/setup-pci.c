@@ -389,7 +389,7 @@ static int ide_pci_check_iomem(struct pci_dev *dev, ide_pci_device_t *d, int bar
 	ulong flags = pci_resource_flags(dev, bar);
 	
 	/* Unconfigured ? */
-	if(pci_resource_len(dev, bar) == 0)
+	if (!flags || pci_resource_len(dev, bar) == 0)
 		return 0;
 
 	/* I/O space */		
@@ -422,10 +422,8 @@ static ide_hwif_t *ide_hwif_configure(struct pci_dev *dev, ide_pci_device_t *d, 
 	unsigned long ctl = 0, base = 0;
 	ide_hwif_t *hwif;
 	
-	if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE ||
-	    ((dev->class & ~(0xfa))) ||
-	    (dev->class & (port ? 4 : 1)) != 0) 
-	{    
+	if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE)
+	{
 	    	/*  Possibly we should fail if these checks report true */
 	    	ide_pci_check_iomem(dev, d, 2*port);
 	    	ide_pci_check_iomem(dev, d, 2*port+1);
