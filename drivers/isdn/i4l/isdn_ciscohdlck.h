@@ -14,6 +14,7 @@
 int  isdn_ciscohdlck_setup(isdn_net_dev *p);
 void isdn_ciscohdlck_connected(isdn_net_local *lp);
 void isdn_ciscohdlck_disconnected(isdn_net_local *lp);
-void isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb);
+void isdn_ciscohdlck_receive(isdn_net_dev *p, isdn_net_local *olp,
+			     struct sk_buff *skb);
 
 #endif

@@ -15,6 +15,7 @@
 
 #include "isdn_common.h"
 #include "isdn_net.h"
+#include "isdn_ciscohdlck.h"
 
 #include <linux/inetdevice.h>
 
@@ -37,7 +38,7 @@ isdn_net_ciscohdlck_alloc_skb(isdn_net_local *lp, int len)
 }
 
 /* cisco hdlck device private ioctls */
-int
+static int
 isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
@@ -323,9 +324,11 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 	}
 }
 
-void
-isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
+void 
+isdn_ciscohdlck_receive(isdn_net_dev *idev, isdn_net_local *olp,
+			struct sk_buff *skb)
 {
+	isdn_net_local *lp = &idev->local;
 	unsigned char *p;
  	u8 addr;
  	u8 ctrl;
@@ -340,14 +343,10 @@ isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 	p += get_u16(p, &type);
 	skb_pull(skb, 4);
 	
-	if (addr != CISCO_ADDR_UNICAST && addr != CISCO_ADDR_BROADCAST) {
-		printk(KERN_WARNING "%s: Unknown Cisco addr 0x%02x\n",
-		       lp->name, addr);
-		goto out_free;
-	}
-	if (ctrl != CISCO_CTRL) {
-		printk(KERN_WARNING "%s: Unknown Cisco ctrl 0x%02x\n",
-		       lp->name, ctrl);
+	if ((addr != CISCO_ADDR_UNICAST && addr != CISCO_ADDR_BROADCAST) ||
+	    ctrl != CISCO_CTRL) {
+		printk(KERN_DEBUG "%s: Unknown Cisco header %#02x %#02x\n",
+		       lp->name, addr, ctrl);
 		goto out_free;
 	}
 
@@ -362,6 +361,7 @@ isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 		goto out_free;
 	default:
 		/* no special cisco protocol */
+		isdn_net_reset_huptimer(lp, olp);
 		skb->protocol = htons(type);
 		netif_rx(skb);
 		return;
@@ -388,16 +388,11 @@ isdn_ciscohdlck_header(struct sk_buff *skb, struct net_device *dev,
 int
 isdn_ciscohdlck_setup(isdn_net_dev *p)
 {
-	isdn_net_local *lp = &p->local;
-
 	p->dev.hard_header = isdn_ciscohdlck_header;
 	p->dev.hard_header_cache = NULL;
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
-		p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
-	else
-		p->dev.do_ioctl = NULL;
+	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
 
 	return 0;
 }

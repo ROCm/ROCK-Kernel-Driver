@@ -1238,12 +1238,9 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 			isdn_rawip_receive(lp->netdev, olp, skb);
 			break;
 		case ISDN_NET_ENCAP_CISCOHDLCK:
-			isdn_ciscohdlck_receive(lp, skb);
-			return;
 		case ISDN_NET_ENCAP_CISCOHDLC:
-			/* CISCO-HDLC IP with type field and  fake I-frame-header */
-			skb_pull(skb, 2);
-			/* Fall through */
+			isdn_ciscohdlck_receive(lp->netdev, olp, skb);
+			return;
 		case ISDN_NET_ENCAP_IPTYP:
 			/* IP with type field */
 			olp->huptimer = 0;
@@ -2645,7 +2642,6 @@ isdn_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	return htons(ETH_P_802_2);
 }
 
-
 static void
 isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, 
 		   struct sk_buff *skb)
@@ -2653,7 +2649,7 @@ isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp,
 	isdn_net_local *lp = &p->local;
 
 	isdn_net_reset_huptimer(lp, olp);
-	skb->protocol = isdn_eth_type_trans(skb, &p->dev);
+	skb->protocol = isdn_eth_type_trans(skb, skb->dev);
 	netif_rx(skb);
 }
 
