@@ -799,8 +799,8 @@ void qword_addhex(char **bpp, int *lp, char *buf, int blen)
 		len -= 2;
 		while (blen && len >= 2) {
 			unsigned char c = *buf++;
-			*bp++ = '0' + ((c&0xf0)>>4) + (c>=0xa0)*('a'-'0');
-			*bp++ = '0' + (c&0x0f) + ((c&0x0f)>=0x0a)*('a'-'0');
+			*bp++ = '0' + ((c&0xf0)>>4) + (c>=0xa0)*('a'-'9'-1);
+			*bp++ = '0' + (c&0x0f) + ((c&0x0f)>=0x0a)*('a'-'9'-1);
 			len -= 2;
 			blen--;
 		}
@@ -902,7 +902,7 @@ int qword_get(char **bpp, char *dest, int bufsize)
 		}
 	} else {
 		/* text with \nnn octal quoting */
-		while (*bp != ' ' && *bp && len < bufsize-1) {
+		while (*bp != ' ' && *bp != '\n' && *bp && len < bufsize-1) {
 			if (*bp == '\\' &&
 			    isodigit(bp[1]) && (bp[1] <= '3') &&
 			    isodigit(bp[2]) &&
@@ -918,11 +918,12 @@ int qword_get(char **bpp, char *dest, int bufsize)
 				len++;
 			}
 		}
-		*dest = '\0';
 	}
 
+	if (*bp != ' ' && *bp != '\n' && *bp != '\0')
+		return -1;
+	while (*bp == ' ') bp++;
 	*bpp = bp;
-	if (*bp == ' ' || *bp == '\n' || *bp == '\0')
-		return len;
-	return -1;
+	*dest = '\0';
+	return len;
 }
