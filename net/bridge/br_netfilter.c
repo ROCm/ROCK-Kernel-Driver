@@ -180,7 +180,7 @@ static int br_nf_pre_routing_finish(struct sk_buff *skb)
 			struct rtable *rt;
 			struct flowi fl = { .nl_u = 
 			{ .ip4_u = { .daddr = iph->daddr, .saddr = 0 ,
-				     .tos = iph->tos} }, .proto = 0};
+				     .tos = RT_TOS(iph->tos)} }, .proto = 0};
 
 			if (!ip_route_output_key(&rt, &fl)) {
 				/* Bridged-and-DNAT'ed traffic doesn't
