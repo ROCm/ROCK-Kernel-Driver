@@ -62,8 +62,13 @@ contains:
 			deregistration of the driver or when it's manually pulled
 			out of a hot-pluggable slot). This function always gets
 			called from process context, so it can sleep.
-	suspend,	Power management hooks -- called when the device goes to
-	resume		sleep or is resumed.
+	save_state	Save a device's state before it's suspend.
+	suspend		Put device into low power state.
+	resume		Wake device from low power state.
+	enable_wake	Enable device to generate wake events from a low power state.
+
+			(Please see Documentation/power/pci.txt for descriptions
+			of PCI Power Management and the related functions)
 
 The ID table is an array of struct pci_device_id ending with a all-zero entry.
 Each entry consists of:

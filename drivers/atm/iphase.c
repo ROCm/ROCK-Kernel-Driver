@@ -63,7 +63,6 @@
 #include <asm/uaccess.h>  
 #include <asm/string.h>  
 #include <asm/byteorder.h>  
-#include <math.h>  
 #include <linux/vmalloc.h>  
 #include "iphase.h"		  
 #include "suni.h"		  

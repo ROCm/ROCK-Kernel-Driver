@@ -478,6 +478,7 @@ struct pci_driver {
 	const struct pci_device_id *id_table;	/* NULL if wants all devices */
 	int  (*probe)  (struct pci_dev *dev, const struct pci_device_id *id);	/* New device inserted */
 	void (*remove) (struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
+	int  (*save_state) (struct pci_dev *dev, u32 state);    /* Save Device Context */
 	int  (*suspend)(struct pci_dev *dev, u32 state);	/* Device suspended */
 	int  (*resume) (struct pci_dev *dev);	                /* Device woken up */
 	int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);   /* Enable wake event */
@@ -646,6 +647,12 @@ static inline void pci_unregister_driver(struct pci_driver *drv) { }
 static inline int scsi_to_pci_dma_dir(unsigned char scsi_dir) { return scsi_dir; }
 static inline int pci_find_capability (struct pci_dev *dev, int cap) {return 0; }
 static inline const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev) { return NULL; }
+
+/* Power management related routines */
+static inline int pci_save_state(struct pci_dev *dev, u32 *buffer) { return 0; }
+static inline int pci_restore_state(struct pci_dev *dev, u32 *buffer) { return 0; }
+static inline int pci_set_power_state(struct pci_dev *dev, int state) { return 0; }
+static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { return 0; }
 
 #define pci_for_each_dev(dev) \
 	for(dev = NULL; 0; )

@@ -1993,6 +1993,13 @@ S: 1805 Marquette
 S: Richardson, Texas 75081
 S: USA
 
+N: Patrick Mochel
+E: mochel@transmeta.com
+D: PCI Power Management, ACPI work
+S: 3940 Freedom Circle
+S: Santa Clara, CA 95054
+S: USA
+
 N: Eberhard Moenkeberg
 E: emoenke@gwdg.de
 D: CDROM driver "sbpcd" (Matsushita/Panasonic/Soundblaster)

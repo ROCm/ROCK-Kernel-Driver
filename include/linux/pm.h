@@ -34,6 +34,8 @@ enum
 	PM_SUSPEND, /* enter D1-D3 */
 	PM_RESUME,  /* enter D0 */
 
+	PM_SAVE_STATE,  /* save device's state */
+
 	/* enable wake-on */
 	PM_SET_WAKEUP,
 

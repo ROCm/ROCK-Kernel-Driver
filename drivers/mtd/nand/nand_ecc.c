@@ -4,7 +4,7 @@
  *  Copyright (C) 2000 Steven J. Hill (sjhill@cotw.com)
  *                     Toshiba America Electronics Components, Inc.
  *
- * $Id: nand_ecc.c,v 1.4 2001/01/03 20:02:20 mgadbois Exp $
+ * $Id: nand_ecc.c,v 1.6 2001/06/28 10:52:26 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,11 +15,13 @@
  */
 
 #include <linux/types.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 
 /*
  * Pre-calculated 256-way 1 byte column parity
  */
-const u_char nand_ecc_precalc_table[] = {
+static const u_char nand_ecc_precalc_table[] = {
 	0x00, 0x55, 0x56, 0x03, 0x59, 0x0c, 0x0f, 0x5a, 0x5a, 0x0f, 0x0c, 0x59, 0x03, 0x56, 0x55, 0x00,
 	0x65, 0x30, 0x33, 0x66, 0x3c, 0x69, 0x6a, 0x3f, 0x3f, 0x6a, 0x69, 0x3c, 0x66, 0x33, 0x30, 0x65,
 	0x66, 0x33, 0x30, 0x65, 0x3f, 0x6a, 0x69, 0x3c, 0x3c, 0x69, 0x6a, 0x3f, 0x65, 0x30, 0x33, 0x66,
@@ -42,7 +44,7 @@ const u_char nand_ecc_precalc_table[] = {
 /*
  * Creates non-inverted ECC code from line parity
  */
-void nand_trans_result(u_char reg2, u_char reg3,
+static void nand_trans_result(u_char reg2, u_char reg3,
 	u_char *ecc_code)
 {
 	u_char a, b, i, tmp1, tmp2;
@@ -202,3 +204,6 @@ int nand_correct_data (u_char *dat, u_char *read_ecc, u_char *calc_ecc)
 	/* Should never happen */
 	return -1;
 }
+
+EXPORT_SYMBOL(nand_calculate_ecc);
+EXPORT_SYMBOL(nand_correct_data);

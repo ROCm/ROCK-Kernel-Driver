@@ -2633,7 +2633,7 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 		return -EINVAL;
 
 	if (sk->state == WANSOCK_CONNECTED)
-		return EISCONN;	/* No reconnect on a seqpacket socket */
+		return -EISCONN;	/* No reconnect on a seqpacket socket */
 
 	if (sk->state != WAN_DISCONNECTED){
 		printk(KERN_INFO "wansock: Trying to connect on channel NON DISCONNECT\n");

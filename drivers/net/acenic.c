@@ -157,6 +157,9 @@ MODULE_DEVICE_TABLE(pci, acenic_pci_tbl);
 #define __devinit	__init
 #endif
 
+#ifndef min
+#define min(a,b)	(((a)<(b))?(a):(b))
+#endif
 
 #ifndef SMP_CACHE_BYTES
 #define SMP_CACHE_BYTES	L1_CACHE_BYTES
@@ -259,6 +262,11 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
 #define ace_mark_net_bh()			{do{} while(0);}
 #define ace_if_down(dev)			{do{} while(0);}
 #endif
+
+#ifndef pci_set_dma_mask
+#define pci_set_dma_mask(dev, mask)		dev->dma_mask = mask;
+#endif
+
 
 #if (LINUX_VERSION_CODE >= 0x02031b)
 #define NEW_NETINIT
@@ -510,7 +518,7 @@ static int tx_ratio[ACE_MAX_MOD_PARMS];
 static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 static char version[] __initdata = 
-  "acenic.c: v0.80 03/08/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
+  "acenic.c: v0.81 04/20/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
 static struct net_device *root_dev;
@@ -740,7 +748,8 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 }
 
 
-MODULE_AUTHOR("Jes Sorensen <jes@linuxcare.com>");
+#ifdef MODULE
+MODULE_AUTHOR("Jes Sorensen <jes@trained-monkey.org>");
 MODULE_DESCRIPTION("AceNIC/3C985/GA620 Gigabit Ethernet driver");
 MODULE_PARM(link, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(trace, "1-" __MODULE_STRING(8) "i");
@@ -748,12 +757,7 @@ MODULE_PARM(tx_coal_tick, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(max_tx_desc, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(rx_coal_tick, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(max_rx_desc, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM_DESC(link, "Acenic/3C985/NetGear link state");
-MODULE_PARM_DESC(trace, "Acenic/3C985/NetGear firmware trace level");
-MODULE_PARM_DESC(tx_coal_tick, "Acenic/3C985/NetGear maximum clock ticks to wait for packets");
-MODULE_PARM_DESC(max_tx_desc, "Acenic/3C985/NetGear maximum number of transmit descriptors");
-MODULE_PARM_DESC(rx_coal_tick, "Acenic/3C985/NetGear maximum clock ticks to wait for packets");
-MODULE_PARM_DESC(max_rx_desc, "Acenic/3C985/NetGear maximum number of receive descriptors");
+#endif
 
 
 static void __exit ace_module_cleanup(void)
@@ -1040,7 +1044,7 @@ static int __init ace_init(struct net_device *dev)
 	u32 tig_ver, mac1, mac2, tmp, pci_state;
 	int board_idx, ecode = 0;
 	short i;
-	unsigned char cache;
+	unsigned char cache_size;
 
 	ap = dev->priv;
 	regs = ap->regs;
@@ -1173,13 +1177,18 @@ static int __init ace_init(struct net_device *dev)
 	 * Ie. having two NICs in the machine, one will have the cache
 	 * line set at boot time, the other will not.
 	 */
-	pci_read_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE, &cache);
-	if ((cache << 2) != SMP_CACHE_BYTES) {
+	pci_read_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE, &cache_size);
+	cache_size <<= 2;
+	if (cache_size != SMP_CACHE_BYTES) {
 		printk(KERN_INFO "  PCI cache line size set incorrectly "
-		       "(%i bytes) by BIOS/FW, correcting to %i\n",
-		       (cache << 2), SMP_CACHE_BYTES);
-		pci_write_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE,
-				      SMP_CACHE_BYTES >> 2);
+		       "(%i bytes) by BIOS/FW, ", cache_size);
+		if (cache_size > SMP_CACHE_BYTES)
+			printk("expecting %i\n", SMP_CACHE_BYTES);
+		else {
+			printk("correcting to %i\n", SMP_CACHE_BYTES);
+			pci_write_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE,
+					      SMP_CACHE_BYTES >> 2);
+		}
 	}
 
 	pci_state = readl(&regs->PciState);
@@ -1188,6 +1197,12 @@ static int __init ace_init(struct net_device *dev)
 	       	(pci_state & PCI_32BIT) ? 32 : 64,
 		(pci_state & PCI_66MHZ) ? 66 : 33, 
 		ap->pci_latency);
+
+	/*
+	 * Make sure to enable the 64 bit DMA mask if we're in a 64bit slot
+	 */
+	if (!(pci_state & PCI_32BIT))
+		pci_set_dma_mask(ap->pdev, (dma_addr_t)~0ULL);
 
 	/*
 	 * Set the max DMA transfer size. Seems that for most systems
@@ -1214,21 +1229,10 @@ static int __init ace_init(struct net_device *dev)
 				printk(KERN_INFO "  Disabling PCI memory "
 				       "write and invalidate\n");
 			}
-#ifdef __alpha__
-			/* This maximizes throughput on my alpha. */
-			tmp |= DMA_WRITE_MAX_128;
-#endif
 		} else if (ap->pci_command & PCI_COMMAND_INVALIDATE) {
 			printk(KERN_INFO "  PCI memory write & invalidate "
 			       "enabled by BIOS, enabling counter measures\n");
 
-#ifdef __alpha__
-			/* All the docs sy MUST NOT. Well, I did.
-			 * Nothing terrible happens, if we load wrong size.
-			 * Bit w&i still works better!
-			 */
-			tmp |= DMA_WRITE_MAX_128;
-#else
 			switch(SMP_CACHE_BYTES) {
 			case 16:
 				tmp |= DMA_WRITE_MAX_16;
@@ -1239,6 +1243,9 @@ static int __init ace_init(struct net_device *dev)
 			case 64:
 				tmp |= DMA_WRITE_MAX_64;
 				break;
+			case 128:
+				tmp |= DMA_WRITE_MAX_128;
+				break;
 			default:
 				printk(KERN_INFO "  Cache line size %i not "
 				       "supported, PCI write and invalidate "
@@ -1247,7 +1254,6 @@ static int __init ace_init(struct net_device *dev)
 				pci_write_config_word(ap->pdev, PCI_COMMAND,
 						      ap->pci_command);
 			}
-#endif
 		}
 	}
 
@@ -1263,12 +1269,19 @@ static int __init ace_init(struct net_device *dev)
 	 * set will give the PCI controller proper hints about
 	 * prefetching.
 	 */
-	tmp = tmp & ~DMA_READ_WRITE_MASK;
+	tmp &= ~DMA_READ_WRITE_MASK;
 	tmp |= DMA_READ_MAX_64;
 	tmp |= DMA_WRITE_MAX_64;
 #endif
 #ifdef __alpha__
+	tmp &= ~DMA_READ_WRITE_MASK;
 	tmp |= DMA_READ_MAX_128;
+	/*
+	 * All the docs sy MUST NOT. Well, I did.
+	 * Nothing terrible happens, if we load wrong size.
+	 * Bit w&i still works better!
+	 */
+	tmp |= DMA_WRITE_MAX_128;
 #endif
 	writel(tmp, &regs->PciState);
 
@@ -3322,6 +3335,6 @@ static int __init read_eeprom_byte(struct net_device *dev,
 
 /*
  * Local variables:
- * compile-command: "gcc -D__KERNEL__ -DMODULE -I../../include -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe -fno-strength-reduce -DMODVERSIONS -include ../../include/linux/modversions.h   -c -o acenic.o acenic.c"
+ * compile-command: "gcc -D__SMP__ -D__KERNEL__ -DMODULE -I../../include -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe -fno-strength-reduce -DMODVERSIONS -include ../../include/linux/modversions.h   -c -o acenic.o acenic.c"
  * End:
  */

@@ -47,7 +47,6 @@ extern struct address_space_operations vxfs_immed_aops;
 extern struct inode_operations vxfs_immed_symlink_iops;
 
 static struct file_operations vxfs_file_operations = {
-	.llseek =		generic_file_llseek,
 	.read =			generic_file_read,
 	.mmap =			generic_file_mmap,
 };

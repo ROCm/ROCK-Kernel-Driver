@@ -275,8 +275,9 @@ pci_set_power_state(struct pci_dev *dev, int state)
 		else if (state == 2 && !(pmc & PCI_PM_CAP_D2)) return -EIO;
 	}
 
-	/* If we're in D3, force entire word to 0, since we can't access the
-	 * PCI config space for the device
+	/* If we're in D3, force entire word to 0.
+	 * This doesn't affect PME_Status, disables PME_En, and
+	 * sets PowerState to 0.
 	 */
 	if (dev->current_state == 3)
 		pmcsr = 0;
@@ -369,10 +370,8 @@ pci_enable_device(struct pci_dev *dev)
  * @dev: PCI device to be disabled
  *
  * Signal to the system that the PCI device is not in use by the system
- * anymore.  Currently this only involves disabling PCI busmastering,
- * if active.
+ * anymore.  This only involves disabling PCI bus-mastering, if active.
  */
-
 void
 pci_disable_device(struct pci_dev *dev)
 {
@@ -405,18 +404,23 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable)
 
 	/* find PCI PM capability in list */
 	pm = pci_find_capability(dev, PCI_CAP_ID_PM);
-	if (!pm) return -EIO; /* this device cannot poweroff - up to bridge to cut power */
 
-	/* make sure device supports wake events (from any state) */
+	/* If device doesn't support PM Capabilities, but request is to disable
+	 * wake events, it's a nop; otherwise fail */
+	if (!pm) 
+		return enable ? -EIO : 0; 
+
+	/* Check device's ability to generate PME# */
 	pci_read_config_word(dev,pm+PCI_PM_PMC,&value);
 
-	if (!(value & PCI_PM_CAP_PME_MASK)) return -EINVAL; /* doesn't support wake events */
+	value &= PCI_PM_CAP_PME_MASK;
+	value >>= ffs(value);   /* First bit of mask */
 
-	/* 
-	 * XXX - We're assuming that device can generate wake events from whatever 
-	 * state it may be entering. 
-	 * We're not actually checking what state we're going into to.
-	 */
+	/* Check if it can generate PME# from requested state. */
+	if (!value || !(value & (1 << state))) 
+		return enable ? -EINVAL : 0;
+
+	/* Enable PME# Generation */
 	pci_read_config_word(dev, pm + PCI_PM_CTRL, &value);
 
 	if (enable) value |= PCI_PM_CTRL_PME_STATUS;
@@ -1385,6 +1389,18 @@ struct pci_bus * __init pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata
  * easily implement them (ie just have a suspend function that calls
  * the pci_set_power_state() function).
  */
+
+static int pci_pm_save_state_device(struct pci_dev *dev, u32 state)
+{
+	int error = 0;
+	if (dev) {
+		struct pci_driver *driver = dev->driver;
+		if (driver && driver->save_state) 
+			error = driver->save_state(dev,state);
+	}
+	return error;
+}
+
 static int pci_pm_suspend_device(struct pci_dev *dev, u32 state)
 {
 	int error = 0;
@@ -1407,7 +1423,21 @@ static int pci_pm_resume_device(struct pci_dev *dev)
 	return error;
 }
 
-/* take care to suspend/resume bridges only once */
+static int pci_pm_save_state_bus(struct pci_bus *bus, u32 state)
+{
+	struct list_head *list;
+	int error = 0;
+
+	list_for_each(list, &bus->children) {
+		error = pci_pm_save_state_bus(pci_bus_b(list),state);
+		if (error) return error;
+	}
+	list_for_each(list, &bus->devices) {
+		error = pci_pm_save_state_device(pci_dev_b(list),state);
+		if (error) return error;
+	}
+	return 0;
+}
 
 static int pci_pm_suspend_bus(struct pci_bus *bus, u32 state)
 {
@@ -1435,6 +1465,21 @@ static int pci_pm_resume_bus(struct pci_bus *bus)
 	list_for_each(list, &bus->children)
 		pci_pm_resume_bus(pci_bus_b(list));
 	return 0;
+}
+
+static int pci_pm_save_state(u32 state)
+{
+	struct list_head *list;
+	struct pci_bus *bus;
+	int error = 0;
+
+	list_for_each(list, &pci_root_buses) {
+		bus = pci_bus_b(list);
+		error = pci_pm_save_state_bus(bus,state);
+		if (!error)
+			error = pci_pm_save_state_device(bus->self,state);
+	}
+	return error;
 }
 
 static int pci_pm_suspend(u32 state)
@@ -1466,15 +1511,23 @@ static int pci_pm_resume(void)
 static int 
 pci_pm_callback(struct pm_dev *pm_device, pm_request_t rqst, void *data)
 {
+	int error = 0;
+
 	switch (rqst) {
+	case PM_SAVE_STATE:
+		error = pci_pm_save_state((u32)data);
+		break;
 	case PM_SUSPEND:
-		return pci_pm_suspend((u32)data);
+		error = pci_pm_suspend((u32)data);
+		break;
 	case PM_RESUME:
-		return pci_pm_resume();
+		error = pci_pm_resume();
+		break;
 	default: break;
 	}
-	return 0;
+	return error;
 }
+
 #endif
 
 /*

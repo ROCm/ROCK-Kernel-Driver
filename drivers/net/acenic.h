@@ -207,8 +207,8 @@ typedef struct {
 /*
  * udelay() values for when clocking the eeprom
  */
-#define ACE_SHORT_DELAY		1
-#define ACE_LONG_DELAY		2
+#define ACE_SHORT_DELAY		2
+#define ACE_LONG_DELAY		4
 
 
 /*

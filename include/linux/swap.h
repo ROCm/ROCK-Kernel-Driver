@@ -205,16 +205,6 @@ extern spinlock_t pagemap_lru_lock;
 	page->zone->inactive_dirty_pages++; \
 }
 
-/* Like the above, but add us after the bookmark. */
-#define add_page_to_inactive_dirty_list_marker(page) { \
-	DEBUG_ADD_PAGE \
-	ZERO_PAGE_BUG \
-	SetPageInactiveDirty(page); \
-	list_add(&(page)->lru, marker_lru); \
-	nr_inactive_dirty_pages++; \
-	page->zone->inactive_dirty_pages++; \
-}
-
 #define add_page_to_inactive_clean_list(page) { \
 	DEBUG_ADD_PAGE \
 	ZERO_PAGE_BUG \

@@ -3,7 +3,7 @@
                                       
                       Understanding the Linux Kernel.
                                       
-              Juan-Mariano de Goyeneche < jmseyas@dit.upm.es>
+               Juan-Mariano de Goyeneche <jmseyas@dit.upm.es>
                                       
 /*
  * The latest version of this document may be found at:
@@ -41,7 +41,7 @@
        
      * Title: "The Linux Kernel"
        Author: David A. Rusling.
-       URL: http://sunsite.unc.edu/linux/LDP/tlk/tlk.html
+       URL: http://www.linuxdoc.org/LDP/tlk/tlk.html
        Keywords: everything!, book.
        Description: On line, 200 pages book describing most aspects of
        the Linux Kernel. Probably, the first reference for beginners.
@@ -57,7 +57,7 @@
        
      * Title: "The Linux Kernel Hackers' Guide"
        Author: Michael K.Johnson and others.
-       URL: http://khg.redhat.com/HyperNews/get/khg.html
+       URL: http://www.linuxdoc.org/LDP/khg/HyperNews/get/khg.html
        Keywords: everything!
        Description: No more Postscript book-like version. Only HTML now.
        Many people have contributed. The interface is similar to web
@@ -99,15 +99,15 @@
        Author: Richard Gooch.
        URL: http://www.atnf.csiro.au/~rgooch/linux/vfs.txt
        Keywords: VFS, File System, mounting filesystems, opening files,
-       dentries,
-       dcache. Description: Brief introduction to the Linux Virtual File
-       System. What is it, how it works, operations taken when opening a
-       file or mounting a file system and description of important data
+       dentries, dcache.
+       Description: Brief introduction to the Linux Virtual File System.
+       What is it, how it works, operations taken when opening a file or
+       mounting a file system and description of important data
        structures explaining the purpose of each of their entries.
        
      * Title: "The Linux RAID-1, 4, 5 Code"
        Author: Ingo Molnar, Gadi Oxman and Miguel de Icaza.
-       URL: http://www.ssc.com/lj/issue44/2391.html
+       URL: http://www2.linuxjournal.com/lj-issues/issue44/2391.html
        Keywords: RAID, MD driver.
        Description: Linux Journal Kernel Korner article. Here is it's
        abstract: "A description of the implementation of the RAID-1,
@@ -117,7 +117,7 @@
        
      * Title: "Dynamic Kernels: Modularized Device Drivers"
        Author: Alessandro Rubini.
-       URL: http://www.ssc.com/lj/issue23/1219.html
+       URL: http://www2.linuxjournal.com/lj-issues/issue23/1219.html
        Keywords: device driver, module, loading/unloading modules,
        allocating resources.
        Description: Linux Journal Kernel Korner article. Here is it's
@@ -132,8 +132,8 @@
        Author: Alessandro Rubini.
        URL: http://www2.linuxjournal.com/lj-issues/issue24/1220.html
        Keywords: character driver, init_module, clean_up module,
-       autodetection,
-       mayor number, minor number, file operations, open(), close().
+       autodetection, mayor number, minor number, file operations,
+       open(), close().
        Description: Linux Journal Kernel Korner article. Here is it's
        abstract: "This article, the second of four, introduces part of
        the actual code to create custom module implementing a character
@@ -152,7 +152,7 @@
        
      * Title: "Dissecting Interrupts and Browsing DMA"
        Author: Alessandro Rubini and Georg v. Zezschwitz.
-       URL: http://www.ssc.com/lj/issue26/interrupt.html
+       URL: http://www2.linuxjournal.com/lj-issues/issue26/1222.html
        Keywords: interrupts, irqs, DMA, bottom halves, task queues.
        Description: Linux Journal Kernel Korner article. Here is it's
        abstract: "This is the fourth in a series of articles about
@@ -187,26 +187,9 @@
        simple---most of the complexity (other than talking to the
        hardware) involves managing network packets in memory".
        
-     * Title: "An Introduction to the Linux 1.3.x Networking Code"
-       Author: Vipul Gupta.
-       URL: http://anchor.cs.binghamton.edu/courses/cs628/linux-net.html
-       Keywords: files, sk_buffs.
-       Description: A short description of files under the net/
-       directory. Each file has a one or two lines paragraph description.
-       sk_buffs explained, too, with some beautiful pictures. A little
-       bit outdated.
-       
-     * Title: "Linux ioctl() Primer"
-       Author: Vipul Gupta.
-       URL: http://anchor.cs.binghamton.edu/courses/cs628/ioctl.html
-       Keywords: ioctl, socket.
-       Description: Little description and examples on the use and
-       implementation of the ioctl() system call. A little bit biased
-       towards sockets.
-       
      * Title: "Writing Linux Device Drivers"
        Author: Michael K. Johnson.
-       URL: http://www.redhat.com/~johnsonm/devices.html
+       URL: http://people.redhat.com/johnsonm/devices.html
        Keywords: files, VFS, file operations, kernel interface, character
        vs block devices, I/O access, hardware interrupts, DMA, access to
        user memory, memory allocation, timers.
@@ -241,7 +224,7 @@
        URL:
        ftp://ftp.llp.fu-berlin.de/pub/linux/LINUX-LAB/whitepapers/drivers
        .ps.gz
-       Keywords: character device drivers, I/O, signals, DMA, accesing
+       Keywords: character device drivers, I/O, signals, DMA, accessing
        ports in user space, kernel environment.
        Description: 68 pages paper on writing character drivers. A little
        bit old (1.993, 1.994) although still useful.
@@ -260,24 +243,17 @@
        Notes: This paper was first published in the Proceedings of the
        First Dutch International Symposium on Linux, ISBN 90-367-0385-9.
        
-     * Title: "The Second Extended Filesystem"
-       Author: Matthew Wilcox.
-       URL: http://pocket.fluff.org/~mrw/linux/ext2.txt
-       Keywords: ext2, filesystem.
-       Description: Description of ext2's blocks, directories, inodes...
-       Notes: Seems to be DOWN. Anyone knows another link for it?
-       
      * Title: "Analysis of the Ext2fs structure"
        Author: Louis-Dominique Dubeau.
        URL: http://step.polymtl.ca/~ldd/ext2fs/ext2fs_toc.html
        Keywords: ext2, filesystem, ext2fs.
        Description: Description of ext2's blocks, directories, inodes,
-       bitmaps, invariants ...
+       bitmaps, invariants...
        
      * Title: "Journaling the Linux ext2fs Filesystem"
        Author: Stephen C. Tweedie.
        URL:
-       ftp://ftp.uk.linux.org:/pub/linux/sct/fs/jfs/journal-design.ps.gz
+       ftp://ftp.uk.linux.org/pub/linux/sct/fs/jfs/journal-design.ps.gz
        Keywords: ext3, journaling.
        Description: Excellent 8-pages paper explaining the journaling
        capabilities added to ext2 by the author, showing different
@@ -291,13 +267,13 @@
        Description: Kernel functions/structures/variables which changed
        from 2.0.x to 2.2.x.
        
-     * Title: "Kernel API changes from 2.2 to 2.3"
+     * Title: "Kernel API changes from 2.2 to 2.4"
        Author: Richard Gooch.
        URL:
-       http://www.atnf.csiro.au/~rgooch/linux/docs/porting-to-2.3.html
-       Keywords: 2.3, changes.
+       http://www.atnf.csiro.au/~rgooch/linux/docs/porting-to-2.4.html
+       Keywords: 2.4, changes.
        Description: Kernel functions/structures/variables which changed
-       from 2.2.x to 2.3.x.
+       from 2.2.x to 2.4.x.
        
      * Title: "Linux Kernel Module Programming Guide"
        Author: Ori Pomerantz.
@@ -333,7 +309,9 @@
        
      * Title: "The Kernel Hacking HOWTO"
        Author: Various Talented People, and Rusty.
-       URL: http://www.samba.org/~netfilter/kernel-hacking-HOWTO.html
+       URL:
+       http://www.lisoleg.net/doc/Kernel-Hacking-HOWTO/kernel-hacking-HOW
+       TO.html
        Keywords: HOWTO, kernel contexts, deadlock, locking, modules,
        symbols, return conventions.
        Description: From the Introduction: "Please understand that I
@@ -345,7 +323,7 @@
        routines. This document assumes familiarity with C, and an
        understanding of what the kernel is, and how it is used. It was
        originally written for the 2.3 kernels, but nearly all of it
-       applies to 2.2 too; 2.0 is slightly different. ".
+       applies to 2.2 too; 2.0 is slightly different".
        
      * Title: "ALSA 0.5.0 Developer documentation"
        Author: Stephan 'Jumpy' Bartels .
@@ -476,22 +454,102 @@
        URL: http://www.linux-mag.com/2000-03/gear_01.html
        Keywords: PCI, bus, bus-mastering.
        Description: The title says it all.
-
+       
      * Title: "Linux 2.4 Kernel Internals"
-       Author: Tigran Aivazian.
+       Author: Tigran Aivazian and Christoph Hellwig.
        URL: http://www.moses.uklinux.net/patches/lki.html
-       Keywords: Linux, kernel, VFS, SMP boot
-       Description: A little book used for a short training course
-       I gave on this subject at VERITAS. Covers building the kernel
-       image, booting (including SMP), process management, VFS and more.
+       Keywords: Linux, kernel, booting, SMB boot, VFS, page cache.
+       Description: A little book used for a short training course.
+       Covers building the kernel image, booting (including SMP bootup),
+       process management, VFS and more.
+       
+     * Title: "Linux IP Networking. A Guide to the Implementation and
+       Modification of the Linux Protocol Stack."
+       Author: Glenn Herrin.
+       URL:
+       http://kernelnewbies.org/documents/ipnetworking/linuxipnetworking.
+       html
+       Keywords: network, networking, protocol, IP, UDP, TCP, connection,
+       socket, receiving, transmitting, forwarding, routing, packets,
+       modules, /proc, sk_buff, FIB, tags.
+       Description: Excellent paper devoted to the Linux IP Networking,
+       explaining anything from the kernel's to the user space
+       configuration tools' code. Very good to get a general overview of
+       the kernel networking implementation and understand all steps
+       packets follow from the time they are received at the network
+       device till they are delivered to applications. The studied kernel
+       code is from 2.2.14 version. Provides code for a working packet
+       dropper example.
+       
+     * Title: "Get those boards talking under Linux."
+       Author: Alex Ivchenko.
+       URL: http://www.ednmag.com/ednmag/reg/2000/06222000/13df2.htm
+       Keywords: data-acquisition boards, drivers, modules, interrupts,
+       memory allocation.
+       Description: Article written for people wishing to make their data
+       acquisition boards work on their GNU/Linux machines. Gives a basic
+       overview on writting drivers, from the naming of functions to
+       interrupt handling.
+       Notes: Two-parts article. Part II is at
+       http://www.ednmag.com/ednmag/reg/2000/07062000/14df.htm
+       
+     * Title: "Linux PCMCIA Programmer's Guide"
+       Author: David Hinds.
+       URL: http://pcmcia-cs.sourceforge.net/ftp/doc/PCMCIA-PROG.html
+       Keywords: PCMCIA.
+       Description: "This document describes how to write kernel device
+       drivers for the Linux PCMCIA Card Services interface. It also
+       describes how to write user-mode utilities for communicating with
+       Card Services.
+       
+     * Title: "The Linux Kernel NFSD Implementation"
+       Author: Neil Brown.
+       URL:
+       http://www.cse.unsw.edu.au/~neilb/oss/linux-commentary/nfsd.html
+       Keywords: knfsd, nfsd, NFS, RPC, lockd, mountd, statd.
+       Description: The title says it all.
+       Notes: Covers knfsd's version 1.4.7 (patch against 2.2.7 kernel).
+       
+     * Title: "A Linux vm README"
+       Author: Kanoj Sarcar.
+       URL: http://reality.sgi.com/kanoj_engr/vm229.html
+       Keywords: virtual memory, mm, pgd, vma, page, page flags, page
+       cache, swap cache, kswapd.
+       Description: Telegraphic, short descriptions and definitions
+       relating the Linux virtual memory implementation.
+       
+     * Title: "(nearly) Complete Linux Loadable Kernel Modules. The
+       definitive guide for hackers, virus coders and system
+       administrators."
+       Author: pragmatic/THC.
+       URL: http://packetstorm.securify.com/groups/thc/LKM_HACKING.html
+       Keywords: syscalls, intercept, hide, abuse, symbol table.
+       Description: Interesting paper on how to abuse the Linux kernel in
+       order to intercept and modify syscalls, make
+       files/directories/processes invisible, become root, hijack ttys,
+       write kernel modules based virus... and solutions for admins to
+       avoid all those abuses.
+       Notes: For 2.0.x kernels. Gives guidances to port it to 2.2.x
+       kernels. Also available in txt format at
+       http://www.blacknemesis.org/hacking/txt/cllkm.txt
        
      BOOKS: (Not on-line)
    
      * Title: "Linux Device Drivers"
        Author: Alessandro Rubini.
-       Publisher: O'Reilly &Associates.
+       Publisher: O'Reilly & Associates.
        Date: 1998.
+       Pages: 439.
        ISBN: 1-56592-292-1
+       
+     * Title: "Linux Device Drivers, 2nd Edition"
+       Author: Alessandro Rubini and Jonathan Corbet.
+       Publisher: O'Reilly & Associates.
+       Date: 2001.
+       Pages: 586.
+       ISBN: 0-59600-008-1
+       Notes: Further information in
+       http://www.oreilly.com/catalog/linuxdrive2/
        
      * Title: "Linux Kernel Internals"
        Author: Michael Beck.
@@ -580,8 +638,26 @@
        Notes: Though not being directly about Linux, Linux aims to be
        POSIX. Good reference.
        
+     * Title: "Understanding the Linux Kernel"
+       Author: Daniel P. Bovet and Marco Cesati.
+       Publisher: O'Reilly & Associates, Inc..
+       Date: 2000.
+       Pages: 702.
+       ISBN: 0-596-00002-2
+       Notes: Further information in
+       http://www.oreilly.com/catalog/linuxkernel/
+       
      MISCELLANEOUS:
    
+     * Name: linux/Documentation
+       Author: Many.
+       URL: Just look inside your kernel sources.
+       Keywords: anything, DocBook.
+       Description: Documentation that comes with the kernel sources,
+       inside the Documentation directory. Some pages from this document
+       (including this document itself) have been moved there, and might
+       be more up to date than the web version.
+       
      * Name: "Linux Source Driver"
        URL: http://lsd.linux.cz
        Keywords: Browsing source code.
@@ -592,6 +668,16 @@
        you can search Linux kernel (fulltext, macros, types, functions
        and variables) and LSD can generate patches for you on the fly
        (files, directories or kernel)".
+       
+     * Name: "Linux Kernel Source Reference"
+       Author: Thomas Graichen.
+       URL: http://innominate.org/~graichen/projects/lksr/
+       Keywords: CVS, web, cvsweb, browsing source code.
+       Description: Web interface to a CVS server with the kernel
+       sources. "Here you can have a look at any file of the Linux kernel
+       sources of any version starting from 1.0 up to the (daily updated)
+       current version available. Also you can check the differences
+       between two versions of a file".
        
      * Name: "Cross-Referencing Linux"
        URL: http://lxr.linux.no/source/
@@ -608,7 +694,7 @@
        produced during the week. Published every Thursday.
        
      * Name: "Kernel Traffic"
-       URL: http://kt.zork.net
+       URL: http://kt.zork.net/kernel-traffic/
        Keywords: linux-kernel mailing list, weekly kernel news.
        Description: Weekly newsletter covering the most relevant
        discussions of the linux-kernel mailing list.
@@ -622,10 +708,7 @@
        too.
        
      * Name: "New linux-kernel Mailing List FAQ"
-       URL: Original site:
-       http://www.altern.org/andrebalsa/doc/lkml-faq.html
-       URL: U.S. mirror site:
-       http://www.ececs.uc.edu/~rreilova/linux/lkml-faq.html
+       URL: http://www.tux.org/lkml/
        Keywords: linux-kernel mailing list FAQ.
        Description: linux-kernel is a mailing list for developers to
        communicate. This FAQ builds on the previous linux-kernel mailing
@@ -636,34 +719,34 @@
        
      * Name: "Linux Virtual File System"
        Author: Peter J. Braam.
-       URL: http://www.coda.cs.cmu.edu/doc/talks/linuxvfs
+       URL: http://www.coda.cs.cmu.edu/doc/talks/linuxvfs/
        Keywords: slides, VFS, inode, superblock, dentry, dcache.
        Description: Set of slides, presumably from a presentation on the
        Linux VFS layer. Covers version 2.1.x, with dentries and the
        dcache.
        
-     * Name: "Gary's Enciclopedia - The Linux Kernel"
+     * Name: "Gary's Encyclopedia - The Linux Kernel"
        Author: Gary (I suppose...).
        URL: http://members.aa.net/~swear/pedia/kernel.html
        Keywords: links, not found here?.
-       Description: Gary's Enciclopedia exists to allow the rapid finding
+       Description: Gary's Encyclopedia exists to allow the rapid finding
        of documentation and other information of interest to GNU/Linux
        users. It has about 4000 links to external pages in 150 major
        categories. This link is for kernel-specific links, documents,
-       sites... Look there if you could not find here whar you were
+       sites... Look there if you could not find here what you were
        looking for.
        
      * Name: "The home page of Linux-MM"
        Author: The Linux-MM team.
-       URL: http://www.linux.eu.org/Linux-MM/
+       URL: http://linux-mm.org/
        Keywords: memory management, Linux-MM, mm patches, TODO, docs,
        mailing list.
-       Description: Site devoted to Linux Memory Mangement development.
+       Description: Site devoted to Linux Memory Management development.
        Memory related patches, HOWTOs, links, mm developers... Don't miss
        it if you are interested in memory management development!
        
      * Name: "Kernel Newbies IRC Channel"
-       URL: http://www.surriel.com/kernelnewbies.shtml
+       URL: http://www.kernelnewbies.org
        Keywords: IRC, newbies, channel, asking doubts.
        Description: #kernelnewbies on irc.openprojects.net. From the web
        page: "#kernelnewbies is an IRC network dedicated to the 'newbie'
@@ -672,7 +755,8 @@
        professional kernel hackers that want to help less seasoned kernel
        people. [...] #kernelnewbies is on the Open Projects IRC Network,
        try irc.openprojects.net or irc.<country>.openprojects.net as your
-       server and then /join #kernelnewbies".
+       server and then /join #kernelnewbies". It also hosts articles,
+       documents, FAQs...
        
      * Name: "linux-kernel mailing list archives and search engines"
        URL: http://www.uwsg.indiana.edu/hypermail/linux/kernel/index.html
@@ -683,4 +767,4 @@
        you have a better/another one, please let me know.
      _________________________________________________________________
    
-   Document last updated on Thu Jun 1 21:58:18 CEST 2000DATE$
+   Document last updated on Thu Jun 28 15:09:39 CEST 2001
