@@ -130,7 +130,7 @@ do_settimeofday (struct timeval *tv)
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
 		if (update_wall_time_hook)
-			(*update_wall_time_hook)();
+			(*reset_wall_time_hook)();
 
 	}
 	write_sequnlock_irq(&xtime_lock);
