@@ -168,9 +168,5 @@ EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #endif
 
-#ifdef CONFIG_DEBUG_BUGVERBOSE
-EXPORT_SYMBOL(do_BUG);
-#endif
-
 extern int is_sony_vaio_laptop;
 EXPORT_SYMBOL(is_sony_vaio_laptop);

@@ -237,6 +237,41 @@ bad:
 	printk("\n");
 }	
 
+static void handle_BUG(struct pt_regs *regs)
+{
+	unsigned short ud2;
+	unsigned short line;
+	char *file;
+	char c;
+	unsigned long eip;
+
+	if (regs->xcs & 3)
+		goto no_bug;		/* Not in kernel */
+
+	eip = regs->eip;
+
+	if (eip < PAGE_OFFSET)
+		goto no_bug;
+	if (__get_user(ud2, (unsigned short *)eip))
+		goto no_bug;
+	if (ud2 != 0x0b0f)
+		goto no_bug;
+	if (__get_user(line, (unsigned short *)(eip + 2)))
+		goto bug;
+	if (__get_user(file, (char **)(eip + 4)) ||
+		(unsigned long)file < PAGE_OFFSET || __get_user(c, file))
+		file = "<bad filename>";
+
+	printk("kernel BUG at %s:%d!\n", file, line);
+
+no_bug:
+	return;
+
+	/* Here we know it was a BUG but file-n-line is unavailable */
+bug:
+	printk("Kernel BUG\n");
+}
+
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * regs, long err)
@@ -244,6 +279,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	console_verbose();
 	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
+	handle_BUG(regs);
 	printk("%s: %04lx\n", str, err & 0xffff);
 	show_registers(regs);
 	bust_spinlocks(0);
