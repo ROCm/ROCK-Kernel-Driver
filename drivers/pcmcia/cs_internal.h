@@ -21,14 +21,6 @@
 
 #include <linux/config.h>
 
-#define ERASEQ_MAGIC	0xFA67
-typedef struct eraseq_t {
-    u_short		eraseq_magic;
-    client_handle_t	handle;
-    int			count;
-    eraseq_entry_t	*entry;
-} eraseq_t;
-
 #define CLIENT_MAGIC 	0x51E6
 typedef struct client_t {
     u_short		client_magic;
@@ -42,9 +34,6 @@ typedef struct client_t {
 			 event_callback_args_t *);
     event_callback_args_t event_callback_args;
     struct client_t 	*next;
-    u_int		mtd_count;
-    wait_queue_head_t	mtd_req;
-    erase_busy_t	erase_busy;
 } client_t;
 
 /* Flags in client state */
@@ -167,17 +156,8 @@ int replace_cis(client_handle_t handle, cisdump_t *cis);
 int read_tuple(client_handle_t handle, cisdata_t code, void *parse);
 
 /* In bulkmem.c */
-int get_first_region(client_handle_t handle, region_info_t *rgn);
-int get_next_region(client_handle_t handle, region_info_t *rgn);
-int register_mtd(client_handle_t handle, mtd_reg_t *reg);
-int register_erase_queue(client_handle_t *handle, eraseq_hdr_t *header);
-int deregister_erase_queue(eraseq_handle_t eraseq);
-int check_erase_queue(eraseq_handle_t eraseq);
-int open_memory(client_handle_t *handle, open_mem_t *open);
-int close_memory(memory_handle_t handle);
-int read_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
-int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
-int copy_memory(memory_handle_t handle, copy_op_t *req);
+int pcmcia_get_first_region(client_handle_t handle, region_info_t *rgn);
+int pcmcia_get_next_region(client_handle_t handle, region_info_t *rgn);
 
 /* In rsrc_mgr */
 void pcmcia_validate_mem(struct pcmcia_socket *s);

@@ -249,7 +249,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	/* base address = 0, map = 0 */
 	socket->cis_mem.flags = 0;
 	socket->cis_mem.speed = cis_speed;
-	socket->erase_busy.next = socket->erase_busy.prev = &socket->erase_busy;
+
 	INIT_LIST_HEAD(&socket->cis_cache);
 	spin_lock_init(&socket->lock);
 
@@ -895,7 +895,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 {
     client_t **client;
     struct pcmcia_socket *s;
-    memory_handle_t region;
     u_long flags;
     int i;
     
@@ -912,14 +911,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	if (handle->state & CLIENT_WIN_REQ(i))
 	    return CS_IN_USE;
 
-    /* Disconnect all MTD links */
-    if (handle->mtd_count) {
-	for (region = s->a_region; region; region = region->info.next)
-	    if (region->mtd == handle) region->mtd = NULL;
-	for (region = s->c_region; region; region = region->info.next)
-	    if (region->mtd == handle) region->mtd = NULL;
-    }
-    
     if ((handle->state & CLIENT_STALE) ||
 	(handle->Attributes & INFO_MASTER_CLIENT)) {
 	spin_lock_irqsave(&s->lock, flags);
@@ -936,7 +927,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	spin_unlock_irqrestore(&s->lock, flags);
     } else {
 	handle->state = CLIENT_UNBOUND;
-	handle->mtd_count = 0;
 	handle->event_handler = NULL;
     }
 
@@ -2099,11 +2089,7 @@ int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
 /* in alpha order */
 EXPORT_SYMBOL(pcmcia_access_configuration_register);
 EXPORT_SYMBOL(pcmcia_adjust_resource_info);
-EXPORT_SYMBOL(pcmcia_check_erase_queue);
-EXPORT_SYMBOL(pcmcia_close_memory);
-EXPORT_SYMBOL(pcmcia_copy_memory);
 EXPORT_SYMBOL(pcmcia_deregister_client);
-EXPORT_SYMBOL(pcmcia_deregister_erase_queue);
 EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_first_client);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
@@ -2122,12 +2108,8 @@ EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);
 EXPORT_SYMBOL(pcmcia_modify_window);
-EXPORT_SYMBOL(pcmcia_open_memory);
 EXPORT_SYMBOL(pcmcia_parse_tuple);
-EXPORT_SYMBOL(pcmcia_read_memory);
 EXPORT_SYMBOL(pcmcia_register_client);
-EXPORT_SYMBOL(pcmcia_register_erase_queue);
-EXPORT_SYMBOL(pcmcia_register_mtd);
 EXPORT_SYMBOL(pcmcia_release_configuration);
 EXPORT_SYMBOL(pcmcia_release_io);
 EXPORT_SYMBOL(pcmcia_release_irq);
@@ -2142,10 +2124,8 @@ EXPORT_SYMBOL(pcmcia_resume_card);
 EXPORT_SYMBOL(pcmcia_set_event_mask);
 EXPORT_SYMBOL(pcmcia_suspend_card);
 EXPORT_SYMBOL(pcmcia_validate_cis);
-EXPORT_SYMBOL(pcmcia_write_memory);
 
 EXPORT_SYMBOL(dead_socket);
-EXPORT_SYMBOL(MTDHelperEntry);
 EXPORT_SYMBOL(pcmcia_parse_events);
 
 struct class pcmcia_socket_class = {

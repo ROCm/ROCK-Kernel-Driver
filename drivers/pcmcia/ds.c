@@ -167,9 +167,6 @@ static int pcmcia_bind_device(bind_req_t *req)
 	client->Socket = s;
 	client->Function = req->Function;
 	client->state = CLIENT_UNBOUND;
-	client->erase_busy.next = &client->erase_busy;
-	client->erase_busy.prev = &client->erase_busy;
-	init_waitqueue_head(&client->mtd_req);
 	client->next = s->clients;
 	s->clients = client;
 	ds_dbg(1, "%s: bind_device(): client 0x%p, dev %s\n",
