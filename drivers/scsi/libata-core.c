@@ -118,7 +118,7 @@ static const char *ata_thr_state_name(unsigned int thr_state)
 static void msleep(unsigned long msecs)
 {
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(msecs));
+	schedule_timeout(msecs_to_jiffies(msecs) + 1);
 }
 
 /**
