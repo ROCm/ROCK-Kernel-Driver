@@ -309,34 +309,6 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	return 0;
 }
 
-int br_get_bridge_ifindices(int *indices, int num)
-{
-	struct net_device *dev;
-	int i = 0;
-
-	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev && i < num; dev = dev->next) {
-		if (dev->priv_flags & IFF_EBRIDGE) 
-			indices[i++] = dev->ifindex;
-	}
-	read_unlock(&dev_base_lock);
-
-	return i;
-}
-
-void br_get_port_ifindices(struct net_bridge *br, int *ifindices, int num)
-{
-	struct net_bridge_port *p;
-
-	rcu_read_lock();
-	list_for_each_entry_rcu(p, &br->port_list, list) {
-		if (p->port_no < num)
-			ifindices[p->port_no] = p->dev->ifindex;
-	}
-	rcu_read_unlock();
-}
-
-
 void __exit br_cleanup_bridges(void)
 {
 	struct net_device *dev, *nxt;

@@ -168,22 +168,14 @@ extern int br_add_if(struct net_bridge *br,
 	      struct net_device *dev);
 extern int br_del_if(struct net_bridge *br,
 	      struct net_device *dev);
-extern int br_get_bridge_ifindices(int *indices,
-			    int num);
-extern void br_get_port_ifindices(struct net_bridge *br,
-			   int *ifindices, int num);
 
 /* br_input.c */
 extern int br_handle_frame_finish(struct sk_buff *skb);
 extern int br_handle_frame(struct sk_buff *skb);
 
 /* br_ioctl.c */
-extern int br_ioctl_device(struct net_bridge *br,
-			   unsigned int cmd,
-			   unsigned long arg0,
-			   unsigned long arg1,
-			   unsigned long arg2);
 extern int br_ioctl_deviceless_stub(unsigned long arg);
+extern int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 
 /* br_netfilter.c */
 extern int br_netfilter_init(void);
