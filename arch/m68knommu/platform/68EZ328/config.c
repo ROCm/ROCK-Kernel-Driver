@@ -126,6 +126,4 @@ void config_BSP(char *command, int len)
   mach_hwclk           = NULL;
   mach_set_clock_mmss  = NULL;
   mach_reset           = BSP_reset;
-
-  config_M68328_irq();
 }
