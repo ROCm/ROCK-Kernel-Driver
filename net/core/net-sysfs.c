@@ -15,6 +15,11 @@
 #define to_class_dev(obj) container_of(obj,struct class_device,kobj)
 #define to_net_dev(class) container_of(class, struct net_device, class_dev)
 
+static inline int dev_isalive(const struct net_device *dev) 
+{
+	return dev->reg_state == NETREG_REGISTERED;
+}
+
 /* use same locking rules as GIF* ioctl's */
 static ssize_t netdev_show(const struct class_device *cd, char *buf,
 			   ssize_t (*format)(const struct net_device *, char *))
@@ -23,7 +28,7 @@ static ssize_t netdev_show(const struct class_device *cd, char *buf,
 	ssize_t ret = -EINVAL;
 
 	read_lock(&dev_base_lock);
-	if (!net->deadbeaf)
+	if (dev_isalive(net))
 		ret = (*format)(net, buf);
 	read_unlock(&dev_base_lock);
 
@@ -60,7 +65,7 @@ static ssize_t netdev_store(struct class_device *dev,
 		goto err;
 
 	rtnl_lock();
-	if (!net->deadbeaf) {
+	if (dev_isalive(net)) {
 		if ((ret = (*set)(net, new)) == 0)
 			ret = len;
 	}
@@ -97,17 +102,17 @@ static ssize_t format_addr(char *buf, const unsigned char *addr, int len)
 static ssize_t show_address(struct class_device *dev, char *buf)
 {
 	struct net_device *net = to_net_dev(dev);
-	if (net->deadbeaf)
-		return -EINVAL;
-	return format_addr(buf, net->dev_addr, net->addr_len);
+	if (dev_isalive(net))
+	    return format_addr(buf, net->dev_addr, net->addr_len);
+	return -EINVAL;
 }
 
 static ssize_t show_broadcast(struct class_device *dev, char *buf)
 {
 	struct net_device *net = to_net_dev(dev);
-	if (net->deadbeaf)
-		return -EINVAL;
-	return format_addr(buf, net->broadcast, net->addr_len);
+	if (dev_isalive(net))
+		return format_addr(buf, net->broadcast, net->addr_len);
+	return -EINVAL;
 }
 
 static CLASS_DEVICE_ATTR(address, S_IRUGO, show_address, NULL);
@@ -152,15 +157,11 @@ static int change_tx_queue_len(struct net_device *net, unsigned long new_len)
 
 static ssize_t store_tx_queue_len(struct class_device *dev, const char *buf, size_t len)
 {
-	return netdev_store(dev, buf,len, change_tx_queue_len);
+	return netdev_store(dev, buf, len, change_tx_queue_len);
 }
 
 static CLASS_DEVICE_ATTR(tx_queue_len, S_IRUGO | S_IWUSR, show_tx_queue_len, 
 			 store_tx_queue_len);
-
-static struct class net_class = {
-	.name = "net",
-};
 
 
 static struct class_device_attribute *net_class_attributes[] = {
@@ -263,7 +264,7 @@ netstat_attr_show(struct kobject *kobj, struct attribute *attr, char *buf)
 	ssize_t ret = -EINVAL;
 	
 	read_lock(&dev_base_lock);
-	if (!dev->deadbeaf && entry->show && dev->get_stats &&
+	if (dev_isalive(dev) && entry->show && dev->get_stats &&
 	    (stats = (*dev->get_stats)(dev)))
 		ret = entry->show(stats, buf);
 	read_unlock(&dev_base_lock);
@@ -277,6 +278,35 @@ static struct sysfs_ops netstat_sysfs_ops = {
 static struct kobj_type netstat_ktype = {
 	.sysfs_ops	= &netstat_sysfs_ops,
 	.default_attrs  = default_attrs,
+};
+
+#ifdef CONFIG_HOTPLUG
+static int netdev_hotplug(struct class_device *cd, char **envp,
+			  int num_envp, char *buf, int size)
+{
+	struct net_device *dev = to_net_dev(cd);
+	int i = 0;
+	int n;
+
+	/* pass interface in env to hotplug. */
+	envp[i++] = buf;
+	n = snprintf(buf, size, "INTERFACE=%s", dev->name) + 1;
+	buf += n;
+	size -= n;
+
+	if ((size <= 0) || (i >= num_envp))
+		return -ENOMEM;
+
+	envp[i] = 0;
+	return 0;
+}
+#endif
+
+static struct class net_class = {
+	.name = "net",
+#ifdef CONFIG_HOTPLUG
+	.hotplug = netdev_hotplug,
+#endif
 };
 
 /* Create sysfs entries for network device. */
