@@ -1,6 +1,7 @@
 #ifndef __LINUX_VIDEODEV_H
 #define __LINUX_VIDEODEV_H
 
+#include <linux/compiler.h>
 #include <linux/types.h>
 #include <linux/version.h>
 
