@@ -8,14 +8,8 @@ O_TARGET	:= inputdrv.o
 
 # Objects that export symbols.
 
+mod-subdirs	:= joystick
 export-objs	:= input.o
-
-# Object file lists.
-
-obj-y	:=
-obj-m	:=
-obj-n	:=
-obj-	:=
 
 # Each configuration option enables a list of files.
 
@@ -24,6 +18,12 @@ obj-$(CONFIG_INPUT_KEYBDEV)	+= keybdev.o
 obj-$(CONFIG_INPUT_MOUSEDEV)	+= mousedev.o
 obj-$(CONFIG_INPUT_JOYDEV)	+= joydev.o
 obj-$(CONFIG_INPUT_EVDEV)	+= evdev.o
+
+subdir-$(CONFIG_INPUT_JOYSTICK)	+= joystick
+
+ifeq ($(CONFIG_INPUT_JOYSTICK),y)
+	obj-y += joystick/joydrv.o
+endif
 
 # The global Rules.make.
 

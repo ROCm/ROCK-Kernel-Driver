@@ -70,7 +70,7 @@ int gameport_open(struct gameport *gameport, struct gameport_dev *dev, int mode)
 void gameport_close(struct gameport *gameport);
 void gameport_rescan(struct gameport *gameport);
 
-#if defined(CONFIG_INPUT_GAMEPORT) || defined(CONFIG_INPUT_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 void gameport_register_port(struct gameport *gameport);
 void gameport_unregister_port(struct gameport *gameport);
 #else

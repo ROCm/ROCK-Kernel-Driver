@@ -1,18 +1,25 @@
 #
-# Input core configuration
+# Input device configuration
 #
 
 mainmenu_option next_comment
-comment 'Input core support'
+comment 'Input device support'
 
 tristate 'Input core support' CONFIG_INPUT
-dep_tristate '  Keyboard support' CONFIG_INPUT_KEYBDEV $CONFIG_INPUT
-dep_tristate '  Mouse support' CONFIG_INPUT_MOUSEDEV $CONFIG_INPUT
+dep_tristate '  Keyboard interface' CONFIG_INPUT_KEYBDEV $CONFIG_INPUT
+dep_tristate '  Mouse interface' CONFIG_INPUT_MOUSEDEV $CONFIG_INPUT
 if [ "$CONFIG_INPUT_MOUSEDEV" != "n" ]; then
    int '   Horizontal screen resolution' CONFIG_INPUT_MOUSEDEV_SCREEN_X 1024
    int '   Vertical screen resolution' CONFIG_INPUT_MOUSEDEV_SCREEN_Y 768
 fi
-dep_tristate '  Joystick support' CONFIG_INPUT_JOYDEV $CONFIG_INPUT
-dep_tristate '  Event interface support' CONFIG_INPUT_EVDEV $CONFIG_INPUT
+dep_tristate '  Joystick interface' CONFIG_INPUT_JOYDEV $CONFIG_INPUT
+dep_tristate '  Event interface' CONFIG_INPUT_EVDEV $CONFIG_INPUT
+
+source drivers/input/gameport/Config.in
+source drivers/input/serio/Config.in
+
+if [ "$CONFIG_INPUT" != "n" ]; then
+   source drivers/input/joystick/Config.in
+fi
 
 endmenu

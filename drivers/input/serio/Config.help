@@ -1,0 +1,26 @@
+CONFIG_SERIO
+  Say Yes here if you have any input device that uses serial I/O to
+  communicate with the system. This includes the 
+		* standard AT keyboard and PS/2 mouse *
+  as well as serial mice, Sun keyboards, some joysticks and 6dof
+  devices and more.
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called serio.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SERIO_SERPORT
+  Say Y here if you plan to use an input device (mouse, joystick,
+  tablet, 6dof) that communicates over the RS232 serial (COM) port.
+ 
+  More information is available: <file:Documentation/input/input.txt>
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called serport.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.

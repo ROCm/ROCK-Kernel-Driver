@@ -25,7 +25,7 @@ export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
 			misc.o pty.o random.o selection.o serial.o \
 			sonypi.o tty_io.o tty_ioctl.o generic_serial.o
 
-mod-subdirs	:=	joystick ftape drm pcmcia
+mod-subdirs	:=	ftape drm pcmcia
 
 list-multi	:=	
 
@@ -166,15 +166,10 @@ obj-$(CONFIG_BVME6000_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_SERIAL_TX3912) += generic_serial.o serial_tx3912.o
 
 subdir-$(CONFIG_RIO) += rio
-subdir-$(CONFIG_INPUT) += joystick
 
 obj-$(CONFIG_ATIXL_BUSMOUSE) += atixlmouse.o
 obj-$(CONFIG_LOGIBUSMOUSE) += logibusmouse.o
 obj-$(CONFIG_PRINTER) += lp.o
-
-ifeq ($(CONFIG_INPUT),y)
-obj-y += joystick/js.o
-endif
 
 obj-$(CONFIG_BUSMOUSE) += busmouse.o
 obj-$(CONFIG_DTLK) += dtlk.o

@@ -1,0 +1,62 @@
+CONFIG_GAMEPORT
+  Gameport support is for the standard 15-pin PC gameport. If you
+  have a joystick, gamepad, gameport card, a soundcard with a gameport
+  or anything else that uses the gameport, say Y or M here and also to
+  at least one of the hardware specific drivers.
+
+  For Ensoniq AudioPCI (ES1370), AudioPCI 97 (ES1371), ESS Solo1,
+  S3 SonicVibes, Trident 4DWave, SiS7018, and ALi 5451 gameport
+  support is provided by the sound drivers, so you won't need any
+  from the below listed modules. You still need to say Y here.
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called gameport.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GAMEPORT_NS558
+  Say Y here if you have an ISA or PnP gameport.
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ns558.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GAMEPORT_L4
+  Say Y here if you have a PDPI Lightning 4 gamecard.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called lightning.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GAMEPORT_EMU10K1
+  Say Y here if you have a SoundBlaster Live! or SoundBlaster
+  Audigy card and want to use its gameport.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called emu10k1-gp.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GAMEPORT_PCIGAME
+  Say Y here if you have an Aureal Vortex 1 or 2 or a Trident
+  4DWave NX or DX card and want to use its gameport.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pcigame.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GAMEPORT_CS461X
+  Say Y here if you have a Cirrus CS461x aka "Crystal SoundFusion"
+  PCI audio accelerator and want to use its gameport.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cs461x.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.

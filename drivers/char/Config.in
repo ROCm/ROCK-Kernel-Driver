@@ -127,8 +127,6 @@ if [ "$CONFIG_MOUSE" != "n" ]; then
 fi
 endmenu
 
-source drivers/char/joystick/Config.in
-
 tristate 'QIC-02 tape support' CONFIG_QIC02_TAPE
 if [ "$CONFIG_QIC02_TAPE" != "n" ]; then
    bool '  Do you want runtime configuration for QIC-02' CONFIG_QIC02_DYNCONF

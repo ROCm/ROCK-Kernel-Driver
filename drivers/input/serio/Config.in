@@ -1,0 +1,7 @@
+#
+# Input core configuration
+#
+
+tristate 'Serial i/o support' CONFIG_SERIO
+
+dep_tristate '  Serial port line discipline' CONFIG_SERIO_SERPORT $CONFIG_SERIO 
