@@ -1,5 +1,5 @@
 /*
- * Intel ia32e AGPGART routines.
+ * Intel MCH AGPGART routines.
  */
 
 #include <linux/module.h>
@@ -535,7 +535,7 @@ static int find_i830(u16 device)
 	return 1;
 }
 
-static int __devinit agp_ia32e_probe(struct pci_dev *pdev,
+static int __devinit agp_intelmch_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
@@ -611,7 +611,7 @@ static int __devinit agp_ia32e_probe(struct pci_dev *pdev,
 	return agp_add_bridge(bridge);
 }
 
-static void __devexit agp_ia32e_remove(struct pci_dev *pdev)
+static void __devexit agp_intelmch_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
@@ -619,12 +619,12 @@ static void __devexit agp_ia32e_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
-static int agp_ia32e_suspend(struct pci_dev *dev, u32 state)
+static int agp_intelmch_suspend(struct pci_dev *dev, u32 state)
 {
 	return 0;
 }
 
-static int agp_ia32e_resume(struct pci_dev *pdev)
+static int agp_intelmch_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
@@ -634,7 +634,7 @@ static int agp_ia32e_resume(struct pci_dev *pdev)
 	return 0;
 }
 
-static struct pci_device_id agp_ia32e_pci_table[] = {
+static struct pci_device_id agp_intelmch_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
@@ -646,20 +646,20 @@ static struct pci_device_id agp_ia32e_pci_table[] = {
 	{ }
 };
 
-MODULE_DEVICE_TABLE(pci, agp_ia32e_pci_table);
+MODULE_DEVICE_TABLE(pci, agp_intelmch_pci_table);
 
-static struct pci_driver agp_ia32e_pci_driver = {
-	.name		= "agpgart-ia32e",
-	.id_table	= agp_ia32e_pci_table,
-	.probe		= agp_ia32e_probe,
-	.remove		= agp_ia32e_remove,
-	.suspend	= agp_ia32e_suspend,
-	.resume		= agp_ia32e_resume,
+static struct pci_driver agp_intelmch_pci_driver = {
+	.name		= "agpgart-intel-mch",
+	.id_table	= agp_intelmch_pci_table,
+	.probe		= agp_intelmch_probe,
+	.remove		= agp_intelmch_remove,
+	.suspend	= agp_intelmch_suspend,
+	.resume		= agp_intelmch_resume,
 };
 
 /* intel_agp_init() must not be declared static for explicit
    early initialization to work (ie i810fb) */
-int __init agp_ia32e_init(void)
+int __init agp_intelmch_init(void)
 {
 	static int agp_initialised=0;
 
@@ -667,16 +667,16 @@ int __init agp_ia32e_init(void)
 		return 0;
 	agp_initialised=1;
 
-	return pci_module_init(&agp_ia32e_pci_driver);
+	return pci_module_init(&agp_intelmch_pci_driver);
 }
 
-static void __exit agp_ia32e_cleanup(void)
+static void __exit agp_intelmch_cleanup(void)
 {
-	pci_unregister_driver(&agp_ia32e_pci_driver);
+	pci_unregister_driver(&agp_intelmch_pci_driver);
 }
 
-module_init(agp_ia32e_init);
-module_exit(agp_ia32e_cleanup);
+module_init(agp_intelmch_init);
+module_exit(agp_intelmch_cleanup);
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");
