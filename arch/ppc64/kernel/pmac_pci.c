@@ -663,7 +663,7 @@ void __init pmac_pcibios_fixup(void)
 {
 	struct pci_dev *dev = NULL;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+	for_each_pci_dev(dev)
 		pci_read_irq_line(dev);
 
 	pci_fix_bus_sysdata();
