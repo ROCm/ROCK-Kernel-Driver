@@ -254,6 +254,12 @@ static int longhaul_version;
 static struct cpufreq_frequency_table *longhaul_table;
 
 
+static unsigned int calc_speed (int mult, int fsb)
+{
+	return ((mult/10)*fsb) + ((mult%10)*(fsb/2));
+}
+
+
 static unsigned int longhaul_get_cpu_fsb (void)
 {
 	unsigned long lo, hi;
@@ -292,7 +298,7 @@ static int longhaul_get_cpu_mult (void)
 
 static void longhaul_setstate (unsigned int clock_ratio_index)
 {
-	int vidindex, i;
+	int vidindex, i, speed, mult;
 	struct cpufreq_freqs freqs;
 	union msr_longhaul longhaul;
 	union msr_bcr2 bcr2;
@@ -300,18 +306,19 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	if (clock_ratio[clock_ratio_index] == -1)
 		return;
 
-	if (((clock_ratio[clock_ratio_index] * fsb * 100) > highest_speed) ||
-	    ((clock_ratio[clock_ratio_index] * fsb * 100) < lowest_speed))
+	mult = clock_ratio[clock_ratio_index];
+	speed = calc_speed (mult, fsb);
+	if ((speed > highest_speed) || (speed < lowest_speed))
 		return;
 
-	freqs.old = longhaul_get_cpu_mult() * longhaul_get_cpu_fsb() * 100;
-	freqs.new = clock_ratio[clock_ratio_index] * fsb * 100;
+	freqs.old = calc_speed (longhaul_get_cpu_mult(), fsb);
+	freqs.new = speed;
 	freqs.cpu = 0; /* longhaul.c is UP only driver */
-	
+
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	dprintk (KERN_INFO PFX "FSB:%d Mult(x10):%d\n",
-				fsb * 100, clock_ratio[clock_ratio_index]);
+	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb,
+				mult/10, mult%10);
 
 	switch (longhaul_version) {
 	case 1:
@@ -432,11 +439,11 @@ static int __init longhaul_get_ranges (void)
 		break;
 	}
 
-	highest_speed = maxmult * fsb * 100;
-	lowest_speed = minmult * fsb * 100;
-	dprintk (KERN_INFO PFX "MinMult(x10)=%d MaxMult(x10)=%d\n",
-		 minmult, maxmult);
-	dprintk (KERN_INFO PFX "Lowestspeed=%d Highestspeed=%d\n",
+	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
+		 minmult/10, minmult%10, maxmult/10, maxmult%10);
+	highest_speed = calc_speed (maxmult, fsb);
+	lowest_speed = calc_speed (minmult,fsb);
+	dprintk (KERN_INFO PFX "Lowestspeed=%dMHz Highestspeed=%dMHz\n",
 		 lowest_speed, highest_speed);
 
 	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
@@ -448,7 +455,7 @@ static int __init longhaul_get_ranges (void)
 			continue;
 		if (((unsigned int)clock_ratio[j] > maxmult) || ((unsigned int)clock_ratio[j] < minmult))
 			continue;
-		longhaul_table[k].frequency= clock_ratio[j] * fsb * 100;
+		longhaul_table[k].frequency = calc_speed (clock_ratio[j], fsb);
 		longhaul_table[k].index	= (j << 8);
 		k++;
 	}
@@ -588,8 +595,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 
  	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-
-	policy->cur = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
+	policy->cur = calc_speed (longhaul_get_cpu_mult(), fsb);
 
 	return cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
 }
