@@ -756,12 +756,6 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 
 	BUG_ON(rq->nr_sectors > 127);
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "%s: %sing: LBAsect=%lu, sectors=%lu\n",
-			  drive->name, rq_data_dir(rq) ? "writ" : "read",
-			  block, rq->nr_sectors);
-#endif
-
 #ifndef CONFIG_IDE_TASKFILE_IO
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);

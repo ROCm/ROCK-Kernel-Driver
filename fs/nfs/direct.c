@@ -475,7 +475,7 @@ nfs_file_direct_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t 
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	struct iovec iov = {
-		.iov_base = buf,
+		.iov_base = (char *)buf,
 		.iov_len = count,
 	};
 

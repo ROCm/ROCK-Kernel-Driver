@@ -2251,7 +2251,12 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 		return -EINVAL;
 	}
 
-	rdev->sb_offset = calc_dev_sboffset(rdev->bdev);
+	if (mddev->persistent)
+		rdev->sb_offset = calc_dev_sboffset(rdev->bdev);
+	else
+		rdev->sb_offset =
+			rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
+
 	size = calc_dev_size(rdev, mddev->chunk_size);
 	rdev->size = size;
 
@@ -2372,6 +2377,103 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 	return 0;
 }
 
+/*
+ * update_array_info is used to change the configuration of an
+ * on-line array.
+ * The version, ctime,level,size,raid_disks,not_persistent, layout,chunk_size
+ * fields in the info are checked against the array.
+ * Any differences that cannot be handled will cause an error.
+ * Normally, only one change can be managed at a time.
+ */
+static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
+{
+	int rv = 0;
+	int cnt = 0;
+
+	if (mddev->major_version != info->major_version ||
+	    mddev->minor_version != info->minor_version ||
+/*	    mddev->patch_version != info->patch_version || */
+	    mddev->ctime         != info->ctime         ||
+	    mddev->level         != info->level         ||
+	    mddev->layout        != info->layout        ||
+	    !mddev->persistent	 != info->not_persistent||
+	    mddev->chunk_size    != info->chunk_size    )
+		return -EINVAL;
+	/* Check there is only one change */
+	if (mddev->size != info->size) cnt++;
+	if (mddev->raid_disks != info->raid_disks) cnt++;
+	if (cnt == 0) return 0;
+	if (cnt > 1) return -EINVAL;
+
+	if (mddev->size != info->size) {
+		mdk_rdev_t * rdev;
+		struct list_head *tmp;
+		if (mddev->pers->resize == NULL)
+			return -EINVAL;
+		/* The "size" is the amount of each device that is used.
+		 * This can only make sense for arrays with redundancy.
+		 * linear and raid0 always use whatever space is available
+		 * We can only consider changing the size of no resync
+		 * or reconstruction is happening, and if the new size
+		 * is acceptable. It must fit before the sb_offset or,
+		 * if that is <data_offset, it must fit before the
+		 * size of each device.
+		 * If size is zero, we find the largest size that fits.
+		 */
+		if (mddev->sync_thread)
+			return -EBUSY;
+		ITERATE_RDEV(mddev,rdev,tmp) {
+			sector_t avail;
+			int fit = (info->size == 0);
+			if (rdev->sb_offset > rdev->data_offset)
+				avail = (rdev->sb_offset*2) - rdev->data_offset;
+			else
+				avail = get_capacity(rdev->bdev->bd_disk)
+					- rdev->data_offset;
+			if (fit && (info->size == 0 || info->size > avail/2))
+				info->size = avail/2;
+			if (avail < ((sector_t)info->size << 1))
+				return -ENOSPC;
+		}
+		rv = mddev->pers->resize(mddev, (sector_t)info->size *2);
+		if (!rv) {
+			struct block_device *bdev;
+
+			bdev = bdget_disk(mddev->gendisk, 0);
+			if (bdev) {
+				down(&bdev->bd_inode->i_sem);
+				i_size_write(bdev->bd_inode, mddev->array_size << 10);
+				up(&bdev->bd_inode->i_sem);
+				bdput(bdev);
+			}
+		}
+	}
+	if (mddev->raid_disks    != info->raid_disks) {
+		/* change the number of raid disks */
+		if (mddev->pers->reshape == NULL)
+			return -EINVAL;
+		if (info->raid_disks <= 0 ||
+		    info->raid_disks >= mddev->max_disks)
+			return -EINVAL;
+		if (mddev->sync_thread)
+			return -EBUSY;
+		rv = mddev->pers->reshape(mddev, info->raid_disks);
+		if (!rv) {
+			struct block_device *bdev;
+
+			bdev = bdget_disk(mddev->gendisk, 0);
+			if (bdev) {
+				down(&bdev->bd_inode->i_sem);
+				i_size_write(bdev->bd_inode, mddev->array_size << 10);
+				up(&bdev->bd_inode->i_sem);
+				bdput(bdev);
+			}
+		}
+	}
+	md_update_sb(mddev);
+	return rv;
+}
+
 static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 {
 	mdk_rdev_t *rdev;
@@ -2464,21 +2566,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	switch (cmd)
 	{
 		case SET_ARRAY_INFO:
-
-			if (!list_empty(&mddev->disks)) {
-				printk(KERN_WARNING 
-					"md: array %s already has disks!\n",
-					mdname(mddev));
-				err = -EBUSY;
-				goto abort_unlock;
-			}
-			if (mddev->raid_disks) {
-				printk(KERN_WARNING 
-					"md: array %s already initialised!\n",
-					mdname(mddev));
-				err = -EBUSY;
-				goto abort_unlock;
-			}
 			{
 				mdu_array_info_t info;
 				if (!arg)
@@ -2487,10 +2574,33 @@ static int md_ioctl(struct inode *inode, struct file *file,
 					err = -EFAULT;
 					goto abort_unlock;
 				}
+				if (mddev->pers) {
+					err = update_array_info(mddev, &info);
+					if (err) {
+						printk(KERN_WARNING "md: couldn't update"
+						       " array info. %d\n", err);
+						goto abort_unlock;
+					}
+					goto done_unlock;
+				}
+				if (!list_empty(&mddev->disks)) {
+					printk(KERN_WARNING
+					       "md: array %s already has disks!\n",
+					       mdname(mddev));
+					err = -EBUSY;
+					goto abort_unlock;
+				}
+				if (mddev->raid_disks) {
+					printk(KERN_WARNING
+					       "md: array %s already initialised!\n",
+					       mdname(mddev));
+					err = -EBUSY;
+					goto abort_unlock;
+				}
 				err = set_array_info(mddev, &info);
 				if (err) {
 					printk(KERN_WARNING "md: couldn't set"
-						" array info. %d\n", err);
+					       " array info. %d\n", err);
 					goto abort_unlock;
 				}
 			}
@@ -3279,7 +3389,7 @@ static void md_do_sync(mddev_t *mddev)
 		j += sectors;
 		if (j>1) mddev->curr_resync = j;
 
-		if (last_check + window > j)
+		if (last_check + window > j || j == max_sectors)
 			continue;
 
 		last_check = j;
@@ -3445,8 +3555,8 @@ void md_check_recovery(mddev_t *mddev)
 			if (rdev->raid_disk >= 0 &&
 			    rdev->faulty &&
 			    atomic_read(&rdev->nr_pending)==0) {
-				mddev->pers->hot_remove_disk(mddev, rdev->raid_disk);
-				rdev->raid_disk = -1;
+				if (mddev->pers->hot_remove_disk(mddev, rdev->raid_disk)==0)
+					rdev->raid_disk = -1;
 			}
 			if (!rdev->faulty && rdev->raid_disk >= 0 && !rdev->in_sync)
 				spares++;

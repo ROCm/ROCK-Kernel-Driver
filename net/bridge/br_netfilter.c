@@ -165,7 +165,7 @@ static int br_nf_pre_routing_finish_bridge(struct sk_buff *skb)
 		skb_pull(skb, VLAN_HLEN);
 		skb->nh.raw += VLAN_HLEN;
 	}
-	skb->dst->output(skb);
+	skb->dst->output(&skb);
 	return 0;
 }
 

@@ -1325,7 +1325,7 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int phy_addr;
 	struct netdev_private *np = dev->priv;
-	struct mii_data *miidata = (struct mii_data *) &rq->ifr_data;
+	struct mii_data *miidata = (struct mii_data *) &rq->ifr_ifru;
 	
 	struct netdev_desc *desc;
 	int i;

@@ -1778,7 +1778,7 @@ static int netdrv_close (struct net_device *dev)
 static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdrv_private *tp = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	unsigned long flags;
 	int rc = 0;
 

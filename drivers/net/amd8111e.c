@@ -1694,7 +1694,7 @@ static int amd8111e_ethtool_ioctl(struct net_device* dev, void __user *useraddr)
 }
 static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
+	struct mii_ioctl_data *data = if_mii(ifr);
 	struct amd8111e_priv *lp = netdev_priv(dev);
 	int err;
 	u32 mii_regval;

@@ -389,7 +389,7 @@ nfsd4_create(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_cre
 		break;
 
 	default:
-		BUG();
+		status = nfserr_badtype;
 	}
 
 	if (!status) {

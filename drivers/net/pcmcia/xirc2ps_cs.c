@@ -1681,7 +1681,7 @@ do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
     local_info_t *local = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
-    u16 *data = (u16 *)&rq->ifr_data;
+    u16 *data = (u16 *)&rq->ifr_ifru;
 
     DEBUG(1, "%s: ioctl(%-.6s, %#04x) %04x %04x %04x %04x\n",
 	  dev->name, rq->ifr_ifrn.ifrn_name, cmd,

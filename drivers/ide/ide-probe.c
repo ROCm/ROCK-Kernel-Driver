@@ -241,17 +241,6 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	drive->media = ide_disk;
 	printk("%s DISK drive\n", (drive->is_flash) ? "CFA" : "ATA" );
 	QUIRK_LIST(drive);
-
-	/* Initialize queue depth settings */
-	drive->queue_depth = 1;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
-	drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
-#else
-	drive->queue_depth = drive->id->queue_depth + 1;
-#endif
-	if (drive->queue_depth < 1 || drive->queue_depth > IDE_MAX_TAG)
-		drive->queue_depth = IDE_MAX_TAG;
-
 	return;
 
 err_misc:
@@ -646,8 +635,6 @@ static void hwif_register (ide_hwif_t *hwif)
 	device_register(&hwif->gendev);
 }
 
-//EXPORT_SYMBOL(hwif_register);
-
 #ifdef CONFIG_PPC
 static int wait_hwif_ready(ide_hwif_t *hwif)
 {
@@ -690,7 +677,7 @@ static int wait_hwif_ready(ide_hwif_t *hwif)
  * This routine only knows how to look for drive units 0 and 1
  * on an interface, so any setting of MAX_DRIVES > 2 won't work here.
  */
-void probe_hwif (ide_hwif_t *hwif)
+static void probe_hwif(ide_hwif_t *hwif)
 {
 	unsigned int unit;
 	unsigned long flags;
@@ -834,9 +821,7 @@ void probe_hwif (ide_hwif_t *hwif)
 	}
 }
 
-EXPORT_SYMBOL(probe_hwif);
-
-int hwif_init (ide_hwif_t *hwif);
+static int hwif_init(ide_hwif_t *hwif);
 int probe_hwif_init (ide_hwif_t *hwif)
 {
 	probe_hwif(hwif);
@@ -871,7 +856,7 @@ EXPORT_SYMBOL(probe_hwif_init);
  *
  * This routine detects and reports such situations, but does not fix them.
  */
-void save_match (ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
+static void save_match(ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
 {
 	ide_hwif_t *m = *match;
 
@@ -884,7 +869,6 @@ void save_match (ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
 	if (!m || m->irq != hwif->irq) /* don't undo a prior perfect match */
 		*match = new;
 }
-EXPORT_SYMBOL(save_match);
 #endif /* MAX_HWIFS > 1 */
 
 /*
@@ -1231,9 +1215,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 			THIS_MODULE, ata_probe, ata_lock, hwif);
 }
 
-EXPORT_SYMBOL(init_gendisk);
-
-int hwif_init (ide_hwif_t *hwif)
+static int hwif_init(ide_hwif_t *hwif)
 {
 	int old_irq, unit;
 
@@ -1300,8 +1282,6 @@ out:
 	unregister_blkdev(hwif->major, hwif->name);
 	return 0;
 }
-
-EXPORT_SYMBOL(hwif_init);
 
 int ideprobe_init (void)
 {

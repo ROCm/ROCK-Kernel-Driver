@@ -1103,7 +1103,7 @@ static int bond_check_dev_link(struct bonding *bond, struct net_device *slave_de
 
 		/* Yes, the mii is overlaid on the ifreq.ifr_ifru */
 		strncpy(ifr.ifr_name, slave_dev->name, IFNAMSIZ);
-		mii = (struct mii_ioctl_data *)&ifr.ifr_data;
+		mii = if_mii(&ifr);
 		if (IOCTL(slave_dev, &ifr, SIOCGMIIPHY) == 0) {
 			mii->reg_num = MII_BMSR;
 			if (IOCTL(slave_dev, &ifr, SIOCGMIIREG) == 0) {
@@ -3682,7 +3682,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 	case SIOCETHTOOL:
 		return bond_ethtool_ioctl(bond_dev, ifr);
 	case SIOCGMIIPHY:
-		mii = (struct mii_ioctl_data *)&ifr->ifr_data;
+		mii = if_mii(ifr);
 		if (!mii) {
 			return -EINVAL;
 		}
@@ -3693,7 +3693,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		 * We do this again just in case we were called by SIOCGMIIREG
 		 * instead of SIOCGMIIPHY.
 		 */
-		mii = (struct mii_ioctl_data *)&ifr->ifr_data;
+		mii = if_mii(ifr);
 		if (!mii) {
 			return -EINVAL;
 		}

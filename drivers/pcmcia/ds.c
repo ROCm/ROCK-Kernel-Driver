@@ -797,7 +797,7 @@ out:
 
 /*====================================================================*/
 
-static ssize_t ds_read(struct file *file, char *buf,
+static ssize_t ds_read(struct file *file, char __user *buf,
 		       size_t count, loff_t *ppos)
 {
     struct pcmcia_bus_socket *s;
@@ -819,14 +819,14 @@ static ssize_t ds_read(struct file *file, char *buf,
 
     ret = wait_event_interruptible(s->queue, !queue_empty(user));
     if (ret == 0)
-	ret = put_user(get_queued_event(user), (int *)buf) ? -EFAULT : 4;
+	ret = put_user(get_queued_event(user), (int __user *)buf) ? -EFAULT : 4;
 
     return ret;
 } /* ds_read */
 
 /*====================================================================*/
 
-static ssize_t ds_write(struct file *file, const char *buf,
+static ssize_t ds_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
     struct pcmcia_bus_socket *s;
@@ -849,7 +849,7 @@ static ssize_t ds_write(struct file *file, const char *buf,
 
     if (s->req_pending) {
 	s->req_pending--;
-	get_user(s->req_result, (int *)buf);
+	get_user(s->req_result, (int __user *)buf);
 	if ((s->req_result != 0) || (s->req_pending == 0))
 	    wake_up_interruptible(&s->request);
     } else
@@ -888,6 +888,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
     struct pcmcia_bus_socket *s;
+    void __user *uarg = (char __user *)arg;
     u_int size;
     int ret, err;
     ds_ioctl_arg_t buf;
@@ -911,14 +912,14 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	return -EPERM;
 	
     if (cmd & IOC_IN) {
-	err = verify_area(VERIFY_READ, (char *)arg, size);
+	err = verify_area(VERIFY_READ, uarg, size);
 	if (err) {
 	    ds_dbg(3, "ds_ioctl(): verify_read = %d\n", err);
 	    return err;
 	}
     }
     if (cmd & IOC_OUT) {
-	err = verify_area(VERIFY_WRITE, (char *)arg, size);
+	err = verify_area(VERIFY_WRITE, uarg, size);
 	if (err) {
 	    ds_dbg(3, "ds_ioctl(): verify_write = %d\n", err);
 	    return err;
@@ -927,7 +928,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     
     err = ret = 0;
     
-    if (cmd & IOC_IN) __copy_from_user((char *)&buf, (char *)arg, size);
+    if (cmd & IOC_IN) __copy_from_user((char *)&buf, uarg, size);
     
     switch (cmd) {
     case DS_ADJUST_RESOURCE_INFO:
@@ -1042,7 +1043,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	}
     }
 
-    if (cmd & IOC_OUT) __copy_to_user((char *)arg, (char *)&buf, size);
+    if (cmd & IOC_OUT) __copy_to_user(uarg, (char *)&buf, size);
 
     return err;
 } /* ds_ioctl */

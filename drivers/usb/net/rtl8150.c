@@ -856,7 +856,7 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 	int res;
 
 	dev = netdev->priv;
-	data = (u16 *) & rq->ifr_data;
+	data = (u16 *) & rq->ifr_ifru;
 	res = 0;
 
 	switch (cmd) {

@@ -1659,7 +1659,6 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
 	int i;
 	long ioaddr = dev->base_addr;
@@ -1672,7 +1671,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	else {
 		spin_lock_irq(&np->lock);
-		rc = generic_mii_ioctl(&np->mii_if, data, cmd, NULL);
+		rc = generic_mii_ioctl(&np->mii_if, if_mii(rq), cmd, NULL);
 		spin_unlock_irq(&np->lock);
 	}
 	switch (cmd) {

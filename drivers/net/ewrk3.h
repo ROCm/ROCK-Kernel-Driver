@@ -296,7 +296,7 @@
 struct ewrk3_ioctl {
 	unsigned short cmd;                /* Command to run */
 	unsigned short len;                /* Length of the data buffer */
-	unsigned char  *data;              /* Pointer to the data buffer */
+	unsigned char  __user *data;       /* Pointer to the data buffer */
 };
 
 /* 
