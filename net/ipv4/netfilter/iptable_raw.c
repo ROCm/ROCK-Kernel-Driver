@@ -54,7 +54,9 @@ static struct
 		     },
 		     .target = { 
 			  .target = { 
-				  .u.target_size = IPT_ALIGN(sizeof(struct ipt_standard_target)),
+				  .u = {
+					  .target_size = IPT_ALIGN(sizeof(struct ipt_standard_target)),
+				  },
 			  },
 			  .verdict = -NF_ACCEPT - 1,
 		     },
@@ -68,7 +70,9 @@ static struct
 		     },
 		     .target = {
 			     .target = {
-				     .u.target_size = IPT_ALIGN(sizeof(struct ipt_standard_target)),
+				     .u = {
+					     .target_size = IPT_ALIGN(sizeof(struct ipt_standard_target)),
+				     },
 			     },
 			     .verdict = -NF_ACCEPT - 1,
 		     },
@@ -82,9 +86,11 @@ static struct
 		},
 		.target = {
 			.target = {
-				.u.user = {
-					.target_size = IPT_ALIGN(sizeof(struct ipt_error_target)), 
-					.name = IPT_ERROR_TARGET,
+				.u = {
+					.user = {
+						.target_size = IPT_ALIGN(sizeof(struct ipt_error_target)), 
+						.name = IPT_ERROR_TARGET,
+					},
 				},
 			},
 			.errorname = "ERROR",
