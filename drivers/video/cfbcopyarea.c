@@ -40,10 +40,10 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 {
 	int x2, y2, lineincr, shift, shift_right, shift_left, old_dx, old_dy;
 	int j, linesize = p->fix.line_length, bpl = sizeof(unsigned long);
-	unsigned long start_index, end_index, start_mask, end_mask, last;
+	unsigned long start_index, end_index, start_mask, end_mask, last, tmp;
 	unsigned long *dst = NULL, *src = NULL;
 	char *src1, *dst1;
-	int tmp, height;
+	int height;
 
 	/* clip the destination */
 	old_dx = area->dx;

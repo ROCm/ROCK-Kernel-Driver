@@ -481,11 +481,14 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		i = var.activate & FB_ACTIVATE_ALL
-			    ? set_all_vcs(fbidx, fb, &var, info)
-			    : fb->fb_set_var(&var, PROC_CONSOLE(info), info);
-		if (i)
-			return i;
+		if (var.activate & FB_ACTIVATE_ALL) {
+			i = set_all_vcs(fbidx, fb, &var, info);
+			if (i) return i;
+		} else {
+			i = fb->fb_set_var(&var, PROC_CONSOLE(info), info);
+			if (i) return i;
+			gen_set_disp(PROC_CONSOLE(info), info);
+		}
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
@@ -494,11 +497,11 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb->fb_set_cmap(&cmap, 0, PROC_CONSOLE(info), info));
+		return (fb_set_cmap(&cmap, 0, info));
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb->fb_get_cmap(&cmap, 0, PROC_CONSOLE(info), info));
+		fb_copy_cmap(&info->cmap, &cmap, 0);
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;

@@ -31,8 +31,6 @@
 #include <linux/fb.h>
 #include <asm/types.h>
 
-#include <video/fbcon.h>
-
 #define DEBUG
 
 #ifdef DEBUG

@@ -180,6 +180,13 @@ static const char __init *vgacon_startup(void)
 #endif
 	}
 
+	/* VGA16 modes are not handled by VGACON */
+	if ((ORIG_VIDEO_MODE == 0x0D) || /* 320x200/4 */
+	    (ORIG_VIDEO_MODE == 0x0E) || /* 640x200/4 */
+	    (ORIG_VIDEO_MODE == 0x10) || /* 640x350/4 */
+	    (ORIG_VIDEO_MODE == 0x12) || /* 640x480/4 */
+	    (ORIG_VIDEO_MODE == 0x6A))   /* 800x600/4, 0x6A is very common */
+		goto no_vga;
 
 	vga_video_num_lines = ORIG_VIDEO_LINES;
 	vga_video_num_columns = ORIG_VIDEO_COLS;

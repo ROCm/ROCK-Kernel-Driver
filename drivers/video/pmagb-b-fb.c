@@ -39,8 +39,6 @@
 #include <asm/dec/tc.h>
 #include "pmagb-b-fb.h"
 
-#include <video/fbcon.h>
-
 struct pmagb_b_ramdac_regs {
 	unsigned char addr_low;
 	unsigned char pad0[3];
@@ -55,7 +53,6 @@ struct pmagb_b_ramdac_regs {
  * Max 3 TURBOchannel slots -> max 3 PMAGB-B :)
  */
 static struct fb_info pmagbb_fb_info[3];
-static struct display pmagbb_disp[3];
 
 static struct fb_var_screeninfo pmagbbfb_defined = {
 	.xres =		1280,
@@ -115,8 +112,6 @@ static int pmagbbfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 static struct fb_ops pmagbbfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= pmagbbfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -127,7 +122,6 @@ int __init pmagbbfb_init_one(int slot)
 {
 	unsigned long base_addr = get_tc_base_addr(slot);
 	struct fb_info *info = &pmagbb_fb_info[slot];
-	struct display *disp = &pmagbb_disp[slot];
 
 	printk("PMAGB-BA framebuffer in slot %d\n", slot);
 	/*
@@ -144,21 +138,16 @@ int __init pmagbbfb_init_one(int slot)
 	/*
 	 *      Let there be consoles..
 	 */
-	strcpy(info->modename, pmagbbfb_fix.id);
-	info->changevar = NULL;
 	info->node = NODEV;
 	info->fbops = &pmagbbfb_ops;
 	info->var = pmagbbfb_defined;
 	info->fix = pmagbbfb_fix;
 	info->screen_base = pmagbbfb_fix.smem_start; 
-	info->disp = &disp;
 	info->currcon = -1;
-	info->switch_con = gen_switch;
 	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
-	gen_set_disp(-1, info);
 
 	if (register_framebuffer(info) < 0)
 		return 1;
