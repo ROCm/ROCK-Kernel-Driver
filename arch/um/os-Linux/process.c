@@ -17,9 +17,12 @@
 #define ARBITRARY_ADDR -1
 #define FAILURE_PID    -1
 
+#define STAT_PATH_LEN sizeof("/proc/#######/stat\0")
+#define COMM_SCANF "%*[^)])"
+
 unsigned long os_process_pc(int pid)
 {
-	char proc_stat[sizeof("/proc/#####/stat\0")], buf[256];
+	char proc_stat[STAT_PATH_LEN], buf[256];
 	unsigned long pc;
 	int fd, err;
 
@@ -39,9 +42,9 @@ unsigned long os_process_pc(int pid)
 	}
 	os_close_file(fd);
 	pc = ARBITRARY_ADDR;
-	if(sscanf(buf, "%*d %*s %*c %*d %*d %*d %*d %*d %*d %*d %*d "
+	if(sscanf(buf, "%*d " COMM_SCANF " %*c %*d %*d %*d %*d %*d %*d %*d %*d "
 		  "%*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d "
-		  "%*d %*d %*d %*d %ld", &pc) != 1){
+		  "%*d %*d %*d %*d %lu", &pc) != 1){
 		printk("os_process_pc - couldn't find pc in '%s'\n", buf);
 	}
 	return(pc);
@@ -49,7 +52,7 @@ unsigned long os_process_pc(int pid)
 
 int os_process_parent(int pid)
 {
-	char stat[sizeof("/proc/nnnnn/stat\0")];
+	char stat[STAT_PATH_LEN];
 	char data[256];
 	int parent, n, fd;
 
@@ -71,8 +74,7 @@ int os_process_parent(int pid)
 	}
 
 	parent = FAILURE_PID;
-	/* XXX This will break if there is a space in the command */
-	n = sscanf(data, "%*d %*s %*c %d", &parent);
+	n = sscanf(data, "%*d " COMM_SCANF " %*c %d", &parent);
 	if(n != 1)
 		printk("Failed to scan '%s'\n", data);
 
