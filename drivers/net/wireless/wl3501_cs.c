@@ -1518,10 +1518,14 @@ static int wl3501_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	rc = wl3501_send_pkt(this, skb->data, skb->len);
 	if (enabled)
 		wl3501_unblock_interrupt(this);
-	if (rc)
+	if (rc) {
+		++this->stats.tx_dropped;
 		netif_stop_queue(dev);
-	else
+	} else {
+		++this->stats.tx_packets;
+		this->stats.tx_bytes += skb->len;
 		kfree_skb(skb);
+	}
 	spin_unlock_irqrestore(&this->lock, flags);
 	return rc;
 }
