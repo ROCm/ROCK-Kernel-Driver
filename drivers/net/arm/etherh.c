@@ -523,16 +523,30 @@ static int __init etherh_addr(char *addr, struct expansion_card *ec)
 	struct in_chunk_dir cd;
 	char *s;
 	
-	if (ecard_readchunk(&cd, ec, 0xf5, 0) && (s = strchr(cd.d.string, '('))) {
+	if (!ecard_readchunk(&cd, ec, 0xf5, 0)) {
+		printk(KERN_ERR "%s: unable to read podule description string\n",
+		       ec->dev.bus_id);
+		goto no_addr;
+	}
+
+	s = strchr(cd.d.string, '(');
+	if (s) {
 		int i;
+
 		for (i = 0; i < 6; i++) {
 			addr[i] = simple_strtoul(s + 1, &s, 0x10);
 			if (*s != (i == 5? ')' : ':'))
 				break;
 		}
+
 		if (i == 6)
 			return 0;
 	}
+
+	printk(KERN_ERR "%s: unable to parse MAC address: %s\n",
+	       ec->dev.bus_id, cd.d.string);
+
+ no_addr:
 	return -ENODEV;
 }
 
