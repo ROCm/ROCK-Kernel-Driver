@@ -412,7 +412,7 @@ struct _snd_ensoniq {
 #endif
 };
 
-static void snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static struct pci_device_id snd_audiopci_ids[] __devinitdata = {
 #ifdef CHIP1370
@@ -2231,17 +2231,17 @@ static int __devinit snd_ensoniq_midi(ensoniq_t * ensoniq, int device, snd_rawmi
  *  Interrupt handler
  */
 
-static void snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ensoniq_t *ensoniq = snd_magic_cast(ensoniq_t, dev_id, return);
 	unsigned int status, sctrl;
 
 	if (ensoniq == NULL)
-		return;
+		return IRQ_NONE;
 
 	status = inl(ES_REG(ensoniq, STATUS));
 	if (!(status & ES_INTR))
-		return;
+		return IRQ_NONE;
 
 	spin_lock(&ensoniq->reg_lock);
 	sctrl = ensoniq->sctrl;
@@ -2263,6 +2263,7 @@ static void snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		snd_pcm_period_elapsed(ensoniq->capture_substream);
 	if ((status & ES_DAC1) && ensoniq->playback1_substream)
 		snd_pcm_period_elapsed(ensoniq->playback1_substream);
+	return IRQ_HANDLED;
 }
 
 static int __devinit snd_audiopci_probe(struct pci_dev *pci,
