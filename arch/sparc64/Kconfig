@@ -16,6 +16,7 @@ menu "General setup"
 
 config BBC_I2C
 	tristate "UltraSPARC-III bootbus i2c controller driver"
+	depends on PCI
 	help
 	  The BBC devices on the UltraSPARC III have two I2C controllers.  The
 	  first I2C controller connects mainly to configuration PROMs (NVRAM,
