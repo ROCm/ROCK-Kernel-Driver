@@ -85,8 +85,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.09"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.09"
+#define MPT_LINUX_VERSION_COMMON	"3.01.10"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.10"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -523,6 +523,7 @@ typedef struct _MPT_IOCTL {
 	u8			 target;	/* target for reset */
 	void 			*tmPtr;
 	struct timer_list	 TMtimer;	/* timer function for this adapter */
+	struct semaphore	 sem_ioc;
 } MPT_IOCTL;
 
 /*
@@ -676,6 +677,7 @@ typedef struct _MPT_ADAPTER
 	u8			 reload_fw;	/* Force a FW Reload on next reset */
 	u8			 pad1[5];
 	struct list_head	 list; 
+	struct net_device	*netdev;
 } MPT_ADAPTER;
 
 
