@@ -166,11 +166,11 @@ static sctp_xmit_t sctp_packet_bundle_sack(struct sctp_packet *pkt,
 	/* If sending DATA and haven't aleady bundled a SACK, try to
 	 * bundle one in to the packet.
 	 */
-	if (sctp_chunk_is_data(chunk) && !pkt->has_sack && 
+	if (sctp_chunk_is_data(chunk) && !pkt->has_sack &&
 	    !pkt->has_cookie_echo) {
 		struct sctp_association *asoc;
 		asoc = pkt->transport->asoc;
-			
+
 		if (asoc->a_rwnd > asoc->rwnd) {
 			struct sctp_chunk *sack;
 			asoc->a_rwnd = asoc->rwnd;
@@ -205,7 +205,7 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 
 	if (retval != SCTP_XMIT_OK)
 		goto finish;
-		
+
 	pmtu  = ((packet->transport->asoc) ?
 		 (packet->transport->asoc->pmtu) :
 		 (packet->transport->pmtu));
@@ -259,7 +259,7 @@ append:
 			goto finish;
 	} else if (SCTP_CID_COOKIE_ECHO == chunk->chunk_hdr->type)
 		packet->has_cookie_echo = 1;
-	else if (SCTP_CID_SACK == chunk->chunk_hdr->type) 
+	else if (SCTP_CID_SACK == chunk->chunk_hdr->type)
 		packet->has_sack = 1;
 
 	/* It is OK to send this chunk.  */
@@ -276,8 +276,8 @@ finish:
  */
 int sctp_packet_transmit(struct sctp_packet *packet)
 {
-	struct sctp_transport *transport = packet->transport;
-	struct sctp_association *asoc = transport->asoc;
+	struct sctp_transport *tp = packet->transport;
+	struct sctp_association *asoc = tp->asoc;
 	struct sctphdr *sh;
 	__u32 crc32;
 	struct sk_buff *nskb;
@@ -310,6 +310,32 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 * destination IP address.
 	 */
 	skb_set_owner_w(nskb, sk);
+
+	/* Build the SCTP header.  */
+	sh = (struct sctphdr *)skb_push(nskb, sizeof(struct sctphdr));
+	sh->source = htons(packet->source_port);
+	sh->dest   = htons(packet->destination_port);
+
+	/* From 6.8 Adler-32 Checksum Calculation:
+	 * After the packet is constructed (containing the SCTP common
+	 * header and one or more control or DATA chunks), the
+	 * transmitter shall:
+	 *
+	 * 1) Fill in the proper Verification Tag in the SCTP common
+	 *    header and initialize the checksum field to 0's.
+	 */
+	sh->vtag     = htonl(packet->vtag);
+	sh->checksum = 0;
+
+
+	/* 2) Calculate the Adler-32 checksum of the whole packet,
+	 *    including the SCTP common header and all the
+	 *    chunks.
+	 *
+	 * Note: Adler-32 is no longer applicable, as has been replaced
+	 * by CRC32-C as described in <draft-ietf-tsvwg-sctpcsum-02.txt>.
+	 */
+	crc32 = sctp_start_cksum((__u8 *)sh, sizeof(struct sctphdr));
 
 	/**
 	 * 6.10 Bundling
@@ -344,16 +370,20 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 			 * for a given destination transport address.
 			 */
 			if ((1 == chunk->num_times_sent) &&
-			    (!transport->rto_pending)) {
+			    (!tp->rto_pending)) {
 				chunk->rtt_in_progress = 1;
-				transport->rto_pending = 1;
+				tp->rto_pending = 1;
 			}
 			has_data = 1;
 		}
-		memcpy(skb_put(nskb, chunk->skb->len),
-		       chunk->skb->data, chunk->skb->len);
 		padding = WORD_ROUND(chunk->skb->len) - chunk->skb->len;
-		memset(skb_put(nskb, padding), 0, padding);
+		if (padding)
+			memset(skb_put(chunk->skb, padding), 0, padding);      
+
+		crc32 = sctp_update_copy_cksum(skb_put(nskb, chunk->skb->len),
+					       chunk->skb->data, 
+					       chunk->skb->len, crc32);
+		
 		SCTP_DEBUG_PRINTK("%s %p[%s] %s 0x%x, %s %d, %s %d, %s %d, "
 				  "%s %d\n",
 				  "*** Chunk", chunk,
@@ -376,30 +406,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 			sctp_free_chunk(chunk);
 	}
 
-	/* Build the SCTP header.  */
-	sh = (struct sctphdr *)skb_push(nskb, sizeof(struct sctphdr));
-	sh->source = htons(packet->source_port);
-	sh->dest   = htons(packet->destination_port);
-
-	/* From 6.8 Adler-32 Checksum Calculation:
-	 * After the packet is constructed (containing the SCTP common
-	 * header and one or more control or DATA chunks), the
-	 * transmitter shall:
-	 *
-	 * 1) Fill in the proper Verification Tag in the SCTP common
-	 *    header and initialize the checksum field to 0's.
-	 */
-	sh->vtag     = htonl(packet->vtag);
-	sh->checksum = 0;
-
-	/* 2) Calculate the Adler-32 checksum of the whole packet,
-	 *    including the SCTP common header and all the
-	 *    chunks.
-	 *
-	 * Note: Adler-32 is no longer applicable, as has been replaced
-	 * by CRC32-C as described in <draft-ietf-tsvwg-sctpcsum-02.txt>.
-	 */
-	crc32 = sctp_start_cksum((__u8 *)sh, nskb->len);
+	/* Perform final transformation on checksum. */
 	crc32 = sctp_end_cksum(crc32);
 
 	/* 3) Put the resultant value into the checksum field in the
@@ -431,18 +438,18 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 */
 
 	/* Dump that on IP!  */
-	if (asoc && asoc->peer.last_sent_to != transport) {
+	if (asoc && asoc->peer.last_sent_to != tp) {
 		/* Considering the multiple CPU scenario, this is a
 		 * "correcter" place for last_sent_to.  --xguo
 		 */
-		asoc->peer.last_sent_to = transport;
+		asoc->peer.last_sent_to = tp;
 	}
 
 	if (has_data) {
 		struct timer_list *timer;
 		unsigned long timeout;
 
-		transport->last_time_used = jiffies;
+		tp->last_time_used = jiffies;
 
 		/* Restart the AUTOCLOSE timer when sending data. */
 		if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
@@ -455,21 +462,21 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 		}
 	}
 
-	dst = transport->dst;
+	dst = tp->dst;
 	/* The 'obsolete' field of dst is set to 2 when a dst is freed. */
 	if (!dst || (dst->obsolete > 1)) {
 		dst_release(dst);
-		sctp_transport_route(transport, NULL, sctp_sk(sk));
+		sctp_transport_route(tp, NULL, sctp_sk(sk));
 		sctp_assoc_sync_pmtu(asoc);
 	}
 
-	nskb->dst = dst_clone(transport->dst);
+	nskb->dst = dst_clone(tp->dst);
 	if (!nskb->dst)
 		goto no_route;
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);
-	(*transport->af_specific->sctp_xmit)(nskb, transport, packet->ipfragok);
+	(*tp->af_specific->sctp_xmit)(nskb, tp, packet->ipfragok);
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;
@@ -596,7 +603,7 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 * if any previously transmitted data on the connection remains
 	 * unacknowledged.
 	 */
-	if (!sp->nodelay && SCTP_IP_OVERHEAD == packet->size && 
+	if (!sp->nodelay && SCTP_IP_OVERHEAD == packet->size &&
 	    q->outstanding_bytes && SCTP_STATE_ESTABLISHED == asoc->state) {
 		unsigned len = datasize + q->out_qlen;
 

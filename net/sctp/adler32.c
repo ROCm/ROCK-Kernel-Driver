@@ -2,43 +2,43 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2003 International Business Machines, Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * This file has direct heritage from the SCTP user-level reference 
+ *
+ * This file has direct heritage from the SCTP user-level reference
  * implementation by R. Stewart, et al.  These functions implement the
- * Adler-32 algorithm as specified by RFC 2960. 
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ * Adler-32 algorithm as specified by RFC 2960.
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    Randall Stewart <rstewar1@email.mot.com>
  *    Ken Morneau     <kmorneau@cisco.com>
  *    Qiaobing Xie    <qxie1@email.mot.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -65,7 +65,7 @@
  * tad, but I have commented the original lines below
  */
 
-#include <linux/types.h> 
+#include <linux/types.h>
 #include <net/sctp/sctp.h>
 
 #define BASE 65521 /* largest prime smaller than 65536 */
@@ -111,7 +111,7 @@ unsigned long update_adler32(unsigned long adler,
 		 * This would then be (2 * BASE) - 2, which
 		 * will still only do one subtract. On Intel
 		 * this is much better to do this way and
-		 * avoid the divide. Have not -pg'd on 
+		 * avoid the divide. Have not -pg'd on
 		 * sparc.
 		 */
 		if (s2 >= BASE) {
@@ -135,7 +135,7 @@ __u32 sctp_start_cksum(__u8 *ptr, __u16 count)
 	__u32 zero = 0L;
 
 	/* Calculate the CRC up to the checksum field. */
-	adler = update_adler32(adler, ptr, 
+	adler = update_adler32(adler, ptr,
 			       sizeof(struct sctphdr) - sizeof(__u32));
 	/* Skip over the checksum field. */
 	adler = update_adler32(adler, (unsigned char *) &zero,
@@ -152,6 +152,15 @@ __u32 sctp_start_cksum(__u8 *ptr, __u16 count)
 __u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 adler)
 {
 	adler = update_adler32(adler, ptr, count);
+
+	return adler;
+}
+
+__u32 sctp_update_copy_cksum(__u8 *to, __u8 *from, __u16 count, __u32 adler)
+{
+	/* Its not worth it to try harder.  Adler32 is obsolescent. */
+	adler = update_adler32(adler, from, count);
+	memcpy(to, from, count);
 
 	return adler;
 }
