@@ -459,6 +459,8 @@ cifs_closedir(struct inode *inode, struct file *file)
 
 	xid = GetXid();
 
+/* BB add code to close search if not end of search BB */
+
 	if (pSMBFileStruct) {
 		cFYI(1, ("Freeing private data in close dir"));
 		kfree(file->private_data);
@@ -1696,23 +1698,25 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 	xid = GetXid();
 
+	if(file->f_dentry == NULL) {
+		rc = -EIO;
+		FreeXid(xid);
+		return rc;
+	}
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
 	bufsize = pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
 	if(bufsize > CIFS_MAX_MSGSIZE) {
+		rc = -EIO;
 		FreeXid(xid);
-		return -EIO;
+		return rc;
 	}
 	data = kmalloc(bufsize, GFP_KERNEL);
 	pfindData = (FILE_DIRECTORY_INFO *) data;
 	if(data == NULL) {
+		rc = -ENOMEM;
 		FreeXid(xid);
-		return -ENOMEM;
-	}
-	if(file->f_dentry == NULL) {
-		kfree(data);
-		FreeXid(xid);
-		return -EIO;
+		return rc;
 	}
 	down(&file->f_dentry->d_sb->s_vfs_rename_sem);
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
@@ -1746,8 +1750,8 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		if (file->private_data != NULL) {
 			cifsFile =
 				(struct cifsFileInfo *) file->private_data;
-			if (cifsFile->endOfSearch) {
-				if(cifsFile->emptyDir) {
+			if (cifsFile->srch_inf.endOfSearch) {
+				if(cifsFile->srch_inf.emptyDir) {
 					cFYI(1, ("End of search, empty dir"));
 					rc = 0;
 					break;
@@ -1934,13 +1938,13 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				/* if(pfindData > lastFindData) rc = -EIO; break; */
 			}	/* end for loop */
 			if ((findParms.EndofSearch != 0) && cifsFile) {
-				cifsFile->endOfSearch = TRUE;
+				cifsFile->srch_inf.endOfSearch = TRUE;
 				if(findParms.SearchCount == cpu_to_le16(2))
-					cifsFile->emptyDir = TRUE;
+					cifsFile->srch_inf.emptyDir = TRUE;
 			}
 		} else {
 			if (cifsFile)
-				cifsFile->endOfSearch = TRUE;
+				cifsFile->srch_inf.endOfSearch = TRUE;
 			/* unless parent directory gone do not return error */
 			rc = 0;
 		}
@@ -1953,7 +1957,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			      file->f_pos));
 		} else {
 			cifsFile = (struct cifsFileInfo *) file->private_data;
-			if (cifsFile->endOfSearch) {
+			if (cifsFile->srch_inf.endOfSearch) {
 				rc = 0;
 				cFYI(1, ("End of search "));
 				break;
@@ -2133,10 +2137,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	/* BB also should check to ensure pointer not beyond end of SMB */
 				} /* end for loop */
 				if (findNextParms.EndofSearch != 0) {
-					cifsFile->endOfSearch = TRUE;
+					cifsFile->srch_inf.endOfSearch = TRUE;
 				}
 			} else {
-				cifsFile->endOfSearch = TRUE;
+				cifsFile->srch_inf.endOfSearch = TRUE;
 				rc = 0;	/* unless parent directory disappeared - do not
 				return error here (eg Access Denied or no more files) */
 			}

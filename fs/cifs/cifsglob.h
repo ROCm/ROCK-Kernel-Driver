@@ -240,6 +240,17 @@ struct cifsLockInfo {
 /*
  * One of these for each open instance of a file
  */
+struct cifs_search_info {
+	loff_t index_of_last_entry;
+	__u16 entries_in_buffer;
+	unsigned info_level;
+	char * start_of_network_buffer;
+	char * start_of_search_entries;
+	unsigned endOfSearch:1;
+	unsigned emptyDir:1;
+	unsigned unicode:1;
+};
+
 struct cifsFileInfo {
 	struct list_head tlist;	/* pointer to next fid owned by tcon */
 	struct list_head flist;	/* next fid (file instance) for this inode */
@@ -250,17 +261,13 @@ struct cifsFileInfo {
 	/* lock scope id (0 if none) */
 	struct file * pfile; /* needed for writepage */
 	struct inode * pInode; /* needed for oplock break */
-	unsigned endOfSearch:1;	/* we have reached end of search */
 	unsigned closePend:1;	/* file is marked to close */
-	unsigned emptyDir:1;
 	unsigned invalidHandle:1;  /* file closed via session abend */
 	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
 	char * search_resume_name; /* BB removeme BB */
 	unsigned int resume_name_length;  /* BB removeme BB */
 	__u32    resume_key;              /* BB removeme BB */
-	loff_t   index_of_last_entry_in_buf;
-	int 	entries_in_buffer;
-	unsigned   info_level;
+	struct cifs_search_info srch_inf;
 };
 
 /*

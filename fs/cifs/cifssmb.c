@@ -1946,27 +1946,19 @@ int
 CIFSFindFirst2(const int xid, struct cifsTconInfo *tcon,
 	      const char *searchName, 
 	      const struct nls_table *nls_codepage,
-	      char ** ppfindData /* first search entries */,
-	      char ** ppbuf /* beginning of smb response */,
-	      int  *searchCount, __u16 *searchHandle,
-	      int *pUnicodeFlag, int *pEndOfSearchFlag,
-	      int *level)
+	      __u16 *	pnetfid,
+	      struct cifs_search_info * psrch_inf)
 {
 /* level 257 SMB_ */
 	TRANSACTION2_FFIRST_REQ *pSMB = NULL;
 	TRANSACTION2_FFIRST_RSP *pSMBr = NULL;
 	T2_FFIRST_RSP_PARMS * parms;
 	int rc = 0;
-	int bytes_returned;
+	int bytes_returned = 0;
 	int name_len;
 	__u16 params, byte_count;
 
 	cFYI(1, ("In FindFirst2"));
-
-	if(ppbuf)
-		*ppbuf = NULL;
-	else
-		return -EINVAL;
 
 findFirst2Retry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
@@ -1976,15 +1968,20 @@ findFirst2Retry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
-				  /* find define for this maxpathcomponent */
-				  , nls_codepage);
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName,searchName,
+				 PATH_MAX, nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
-	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		pSMB->FileName[name_len] = 0; /* null terminate just in case */
+		pSMB->FileName[name_len+1] = 0;
+	} else {	/* BB add check for overrun of SMB buf BB */
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
+/* BB fix here and in unicode clause above ie
+		if(name_len > buffersize-header)
+			free buffer exit; BB */
 		strncpy(pSMB->FileName, searchName, name_len);
+		pSMB->FileName[name_len] = 0; /* just in case */
 	}
 
 	params = 12 + name_len /* includes null */ ;
@@ -2001,28 +1998,30 @@ findFirst2Retry:
 	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(offsetof(struct 
-        smb_com_transaction2_ffirst_req, SearchAttributes) - 4);
+	  smb_com_transaction2_ffirst_req, SearchAttributes) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
-	pSMB->SetupCount = 1;	/* one byte no need to make endian neutral */
+	pSMB->SetupCount = 1;	/* one byte, no need to make endian neutral */
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_FIND_FIRST);
 	pSMB->SearchAttributes =
 	    cpu_to_le16(ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM |
 			ATTR_DIRECTORY);
-	pSMB->SearchCount = cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_DIRECTORY_INFO));	/* should this be shrunk even more ? */
-	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
+	pSMB->SearchCount= cpu_to_le16(CIFS_MAX_MSGSIZE/sizeof(FILE_UNIX_INFO));
+	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | 
+		CIFS_SEARCH_RETURN_RESUME);
 
 	/* test for Unix extensions */
 	if (tcon->ses->capabilities & CAP_UNIX) {
 		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
-		*level = SMB_FIND_FILE_UNIX;
+		psrch_inf->info_level = SMB_FIND_FILE_UNIX;
 	} else {
 		pSMB->InformationLevel =
 		    cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
-		*level = SMB_FIND_FILE_DIRECTORY_INFO;
+		psrch_inf->info_level = SMB_FIND_FILE_DIRECTORY_INFO;
 	}
-	pSMB->SearchStorageType = 0;	/* BB what should we set this to? It is not clear if it matters BB */
+	/* BB what should we set StorageType to? Does it matter? BB */
+	pSMB->SearchStorageType = 0;
 	pSMB->hdr.smb_buf_length += byte_count;
 	pSMB->ByteCount = cpu_to_le16(byte_count);
 
@@ -2045,26 +2044,148 @@ findFirst2Retry:
 		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
 		if(rc == 0) {
 			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
-				*pUnicodeFlag = TRUE;
+				psrch_inf->unicode = TRUE;
 			else
-				*pUnicodeFlag = FALSE;
+				psrch_inf->unicode = FALSE;
 
-			if(ppfindData)
-				*ppfindData = (char *) &pSMBr->hdr.Protocol + 
+			psrch_inf->start_of_network_buffer = (char *)pSMBr;
+			psrch_inf->start_of_search_entries = 
+				(char *) &pSMBr->hdr.Protocol + 
 					le16_to_cpu(pSMBr->t2.DataOffset);
 
 			parms = (T2_FFIRST_RSP_PARMS *)((char *) &pSMBr->hdr.Protocol +
 			       le16_to_cpu(pSMBr->t2.ParameterOffset));
 
-			*pEndOfSearchFlag = parms->EndofSearch;
-			*searchCount  = parms->SearchCount;
-			*searchHandle = parms->SearchHandle;
-		}
+			if(parms->EndofSearch)
+				psrch_inf->endOfSearch = TRUE;
+			else
+				psrch_inf->endOfSearch = FALSE;
 
+			psrch_inf->entries_in_buffer  = le16_to_cpu(parms->SearchCount);
+			psrch_inf->index_of_last_entry += 
+				psrch_inf->entries_in_buffer;
+			*pnetfid = parms->SearchHandle;
+		} else {
+			if(pSMB)
+				cifs_buf_release(pSMB);
+		}
 	}
 
 	return rc;
 }
+
+int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
+            __u16 searchHandle, struct cifs_search_info * psrch_inf)
+{
+	TRANSACTION2_FNEXT_REQ *pSMB = NULL;
+	TRANSACTION2_FNEXT_RSP *pSMBr = NULL;
+	T2_FNEXT_RSP_PARMS * parms;
+	char *response_data;
+	int rc = 0;
+	int bytes_returned;
+	__u16 params, byte_count;
+
+        cFYI(1, ("In FindNext"));
+
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+		(void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	params = 14;    /* includes 2 bytes of null string, converted to LE below */
+	byte_count = 0;
+	pSMB->TotalDataCount = 0;       /* no EAs */
+	pSMB->MaxParameterCount = cpu_to_le16(8);
+	pSMB->MaxDataCount =
+            cpu_to_le16((tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFF00);
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	pSMB->ParameterOffset =  cpu_to_le16(
+	      offsetof(struct smb_com_transaction2_fnext_req,SearchHandle) - 4);
+	pSMB->DataCount = 0;
+	pSMB->DataOffset = 0;
+	pSMB->SetupCount = 1;
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_FIND_NEXT);
+	pSMB->SearchHandle = searchHandle;      /* always kept as le */
+	pSMB->SearchCount =
+		cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_UNIX_INFO));
+	/* test for Unix extensions */
+	if (tcon->ses->capabilities & CAP_UNIX) {
+		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
+		psrch_inf->info_level = SMB_FIND_FILE_UNIX;
+	} else {
+		pSMB->InformationLevel =
+		   cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
+		psrch_inf->info_level = SMB_FIND_FILE_DIRECTORY_INFO;
+	}
+	pSMB->ResumeKey = 0;  /* BB fixme add resume_key BB */
+	pSMB->SearchFlags =
+	      cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
+	/* BB fixme check to make sure we do not cross end of smb with long resume name */
+
+/*	if(name_len < CIFS_MAX_MSGSIZE) {
+		memcpy(pSMB->ResumeFileName, resume_file_name, name_len);
+		byte_count += name_len; */ /* BB fixme - add resume file name processing BB */
+/*	} 
+	params += name_len; */
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
+                                                                                              
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			(struct smb_hdr *) pSMBr, &bytes_returned, 0);
+                                                                                              
+	if (rc) {
+		if (rc == -EBADF)
+			rc = 0; /* search probably was closed at end of search above */
+		else
+			cFYI(1, ("FindNext returned = %d", rc));
+	} else {                /* decode response */
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+		
+		if(rc == 0) {
+			/* BB fixme add lock for file (srch_info) struct here */
+			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
+				psrch_inf->unicode = TRUE;
+			else
+				psrch_inf->unicode = FALSE;
+			response_data = (char *)&pSMBr->hdr.Protocol +
+				le16_to_cpu(pSMBr->t2.DataOffset);
+			parms = (T2_FNEXT_RSP_PARMS *)response_data;
+			cifs_buf_release(psrch_inf->start_of_network_buffer);
+			psrch_inf->start_of_search_entries = response_data;
+			psrch_inf->start_of_network_buffer = (char *)pSMB;
+			if(parms->EndofSearch)
+				psrch_inf->endOfSearch = TRUE;
+			else
+				psrch_inf->endOfSearch = FALSE;
+                                                                                              
+			psrch_inf->entries_in_buffer  = le16_to_cpu(parms->SearchCount);
+			psrch_inf->index_of_last_entry +=
+				psrch_inf->entries_in_buffer;
+			/* BB fixme add unlock here */
+		}
+
+	}
+
+	/* BB On error, should we leave previous search buf (and count and
+	last entry fields) intact or free the previous one? */
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+	since file handle passed in no longer valid */
+
+	if ((rc != 0) && pSMB)
+		cifs_buf_release(pSMB);
+                                                                                              
+	return rc;
+}
+
 #endif /* CIFS_EXPERIMENTAL */
 
 int
@@ -2102,8 +2223,8 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset =  cpu_to_le16(offsetof(
-        struct smb_com_transaction2_fnext_req,SearchHandle) - 4);
+	pSMB->ParameterOffset =  cpu_to_le16(
+           offsetof(struct smb_com_transaction2_fnext_req,SearchHandle) - 4);
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
 	pSMB->SetupCount = 1;
@@ -2112,7 +2233,7 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	pSMB->SearchHandle = searchHandle;	/* always kept as le */
 	findParms->SearchCount = 0;	/* set to zero in case of error */
 	pSMB->SearchCount =
-	    cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_DIRECTORY_INFO));
+	    cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_UNIX_INFO));
 	/* test for Unix extensions */
 	if (tcon->ses->capabilities & CAP_UNIX) {
 		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
