@@ -16,6 +16,8 @@
 #include <linux/file.h>
 #include "autofs_i.h"
 
+static spinlock_t waitq_lock = SPIN_LOCK_UNLOCKED;
+
 /* We make this a static variable rather than a part of the superblock; it
    is better if we don't reassign numbers easily even across filesystems */
 static autofs_wqt_t autofs4_next_wait_queue = 1;
@@ -37,7 +39,7 @@ void autofs4_catatonic_mode(struct autofs_sb_info *sbi)
 		wq->status = -ENOENT; /* Magic is gone - report failure */
 		kfree(wq->name);
 		wq->name = NULL;
-		wake_up(&wq->queue);
+		wake_up_interruptible(&wq->queue);
 		wq = nwq;
 	}
 	if (sbi->pipe) {
@@ -138,12 +140,14 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 	if ( name->len > NAME_MAX )
 		return -ENOENT;
 
+	spin_lock(&waitq_lock);
 	for ( wq = sbi->queues ; wq ; wq = wq->next ) {
 		if ( wq->hash == name->hash &&
 		     wq->len == name->len &&
 		     wq->name && !memcmp(wq->name,name->name,name->len) )
 			break;
 	}
+	spin_unlock(&waitq_lock);
 	
 	if ( !wq ) {
 		/* Create a new wait queue */
@@ -156,21 +160,24 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 			kfree(wq);
 			return -ENOMEM;
 		}
+
+		spin_lock(&waitq_lock);
 		wq->wait_queue_token = autofs4_next_wait_queue;
 		if (++autofs4_next_wait_queue == 0)
 			autofs4_next_wait_queue = 1;
+		wq->next = sbi->queues;
+		sbi->queues = wq;
+		spin_unlock(&waitq_lock);
 		init_waitqueue_head(&wq->queue);
 		wq->hash = name->hash;
 		wq->len = name->len;
 		wq->status = -EINTR; /* Status return if interrupted */
 		memcpy(wq->name, name->name, name->len);
-		wq->next = sbi->queues;
-		sbi->queues = wq;
 
 		DPRINTK(("autofs4_wait: new wait id = 0x%08lx, name = %.*s, nfy=%d\n",
 			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));
 		/* autofs4_notify_daemon() may block */
-		wq->wait_ctr = 2;
+		atomic_set(&wq->wait_ctr, 2);
 		if (notify != NFY_NONE) {
 			autofs4_notify_daemon(sbi,wq, 
 					notify == NFY_MOUNT ?
@@ -178,7 +185,7 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 						  autofs_ptype_expire_multi);
 		}
 	} else {
-		wq->wait_ctr++;
+		atomic_inc(&wq->wait_ctr);
 		DPRINTK(("autofs4_wait: existing wait id = 0x%08lx, name = %.*s, nfy=%d\n",
 			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));
 	}
@@ -205,7 +212,7 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
 
-		interruptible_sleep_on(&wq->queue);
+		wait_event_interruptible(wq->queue, wq->name == NULL);
 
 		spin_lock_irqsave(&current->sighand->siglock, irqflags);
 		current->blocked = oldset;
@@ -217,7 +224,7 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 
 	status = wq->status;
 
-	if (--wq->wait_ctr == 0)	/* Are we the last process to need status? */
+	if (atomic_dec_and_test(&wq->wait_ctr))	/* Are we the last process to need status? */
 		kfree(wq);
 
 	return status;
@@ -228,23 +235,28 @@ int autofs4_wait_release(struct autofs_sb_info *sbi, autofs_wqt_t wait_queue_tok
 {
 	struct autofs_wait_queue *wq, **wql;
 
+	spin_lock(&waitq_lock);
 	for ( wql = &sbi->queues ; (wq = *wql) ; wql = &wq->next ) {
 		if ( wq->wait_queue_token == wait_queue_token )
 			break;
 	}
-	if ( !wq )
+
+	if ( !wq ) {
+		spin_unlock(&waitq_lock);
 		return -EINVAL;
+	}
 
 	*wql = wq->next;	/* Unlink from chain */
+	spin_unlock(&waitq_lock);
 	kfree(wq->name);
 	wq->name = NULL;	/* Do not wait on this queue */
 
 	wq->status = status;
 
-	if (--wq->wait_ctr == 0)	/* Is anyone still waiting for this guy? */
+	if (atomic_dec_and_test(&wq->wait_ctr))	/* Is anyone still waiting for this guy? */
 		kfree(wq);
 	else
-		wake_up(&wq->queue);
+		wake_up_interruptible(&wq->queue);
 
 	return 0;
 }

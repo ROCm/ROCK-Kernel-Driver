@@ -82,7 +82,7 @@ struct autofs_wait_queue {
 	char *name;
 	/* This is for status reporting upon return */
 	int status;
-	int wait_ctr;
+	atomic_t wait_ctr;
 };
 
 #define AUTOFS_SBI_MAGIC 0x6d4a556d
