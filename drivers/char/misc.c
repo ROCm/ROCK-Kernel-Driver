@@ -166,8 +166,8 @@ static struct file_operations misc_fops = {
  
 int misc_register(struct miscdevice * misc)
 {
-	static devfs_handle_t devfs_handle, dir;
 	struct miscdevice *c;
+	char buf[256];
 	
 	if (misc->next || misc->prev)
 		return -EBUSY;
@@ -195,14 +195,16 @@ int misc_register(struct miscdevice * misc)
 	}
 	if (misc->minor < DYNAMIC_MINORS)
 		misc_minors[misc->minor >> 3] |= 1 << (misc->minor & 7);
-	if (!devfs_handle)
-		devfs_handle = devfs_mk_dir("misc");
-	dir = strchr (misc->name, '/') ? NULL : devfs_handle;
-	misc->devfs_handle =
-		devfs_register (dir, misc->name, DEVFS_FL_NONE,
-				MISC_MAJOR, misc->minor,
-				S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-				misc->fops, NULL);
+
+
+	/* yuck, yet another stupid special-casing.  We should rather
+	   add ->devfs_name to avoid this mess. */
+	snprintf(buf, sizeof(buf), strchr(misc->name, '/') ?
+			"%s" : "misc/%s", misc->name);
+	misc->devfs_handle = devfs_register(NULL, buf, 0,
+			MISC_MAJOR, misc->minor,
+			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
+			misc->fops, NULL);
 
 	/*
 	 * Add it to the front, so that later devices can "override"
