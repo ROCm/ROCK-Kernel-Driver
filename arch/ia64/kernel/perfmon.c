@@ -2286,7 +2286,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	 * if ((mm->total_vm << PAGE_SHIFT) + len> task->rlim[RLIMIT_AS].rlim_cur)
 	 * 	return -ENOMEM;
 	 */
-	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -EAGAIN;
+	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -ENOMEM;
 
 	/*
 	 * We do the easy to undo allocations first.
