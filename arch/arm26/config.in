@@ -1,0 +1,151 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+mainmenu_name "Linux Kernel Configuration"
+
+define_bool CONFIG_ARM y
+define_bool CONFIG_EISA n
+define_bool CONFIG_SBUS n
+define_bool CONFIG_MCA n
+define_bool CONFIG_UID16 y
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_GENERIC_BUST_SPINLOCK n
+define_bool CONFIG_GENERIC_ISA_DMA n
+
+source init/Config.in
+
+mainmenu_option next_comment
+comment 'System Type'
+
+define_bool CONFIG_ARCH_ARCA5K
+bool '  Archimedes' CONFIG_ARCH_ARC
+bool '  A5000' CONFIG_ARCH_A5K
+
+# Definitions to make life easier
+define_bool CONFIG_ARCH_ACORN y
+define_bool CONFIG_CPU_32 n
+define_bool CONFIG_CPU_26 y
+bool '2MB physical memory' CONFIG_PAGESIZE_16
+
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+
+define_bool CONFIG_FIQ y
+
+# Compressed boot loader in ROM.  Yes, we really want to ask about
+# TEXT and BSS so we preserve their values in the config files.
+bool 'Compressed boot loader in ROM/flash' CONFIG_ZBOOT_ROM
+hex 'Compressed ROM boot loader base address' CONFIG_ZBOOT_ROM_TEXT 0
+hex 'Compressed ROM boot loader BSS address' CONFIG_ZBOOT_ROM_BSS 0
+
+comment 'At least one math emulation must be selected'
+define_bool CONFIG_FPE_NWFPE y
+choice 'Kernel core (/proc/kcore) format' \
+	"ELF		CONFIG_KCORE_ELF	\
+	 A.OUT		CONFIG_KCORE_AOUT" ELF
+tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+string 'Default kernel command string' CONFIG_CMDLINE ""
+
+define_bool CONFIG_ALIGNMENT_TRAP n
+endmenu
+
+source drivers/parport/Config.in
+source drivers/pnp/Config.in
+source drivers/block/Config.in
+source drivers/md/Config.in
+source drivers/acorn/block/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+
+   mainmenu_option next_comment
+   comment 'Network device support'
+
+   bool 'Network device support' CONFIG_NETDEVICES
+   if [ "$CONFIG_NETDEVICES" = "y" ]; then
+      source drivers/net/Config.in
+   fi
+   endmenu
+fi
+
+mainmenu_option next_comment
+comment 'ATA/ATAPI/MFM/RLL support'
+
+tristate 'ATA/ATAPI/MFM/RLL support' CONFIG_IDE
+
+if [ "$CONFIG_IDE" != "n" ]; then
+  source drivers/ide/Config.in
+else
+  define_bool CONFIG_BLK_DEV_HD n
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'SCSI support'
+
+tristate 'SCSI support' CONFIG_SCSI
+endmenu
+
+source drivers/isdn/Config.in
+
+#
+# input before char - char/joystick depends on it. As does USB.
+#
+source drivers/input/Config.in
+
+source drivers/char/Config.in
+if [ "$CONFIG_BUSMOUSE" = "y" ]; then
+   define_bool CONFIG_KBDMOUSE y
+fi
+
+source drivers/media/Config.in
+
+source fs/Config.in
+
+if [ "$CONFIG_VT" = "y" ]; then
+   mainmenu_option next_comment
+   comment 'Console drivers'
+   source drivers/video/Config.in
+   endmenu
+fi
+
+mainmenu_option next_comment
+comment 'Sound'
+
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+   source sound/Config.in
+fi
+endmenu
+
+source drivers/misc/Config.in
+source drivers/usb/Config.in
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+# Always compile kernel with framepointer (until 2.4 real comes out)
+# Bug reports aren't much use without this.
+bool 'Compile kernel without frame pointer' CONFIG_NO_FRAME_POINTER
+bool 'Verbose user fault messages' CONFIG_DEBUG_USER
+bool 'Include debugging information in kernel binary' CONFIG_DEBUG_INFO
+
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+dep_bool '  Debug memory allocations' CONFIG_DEBUG_SLAB $CONFIG_DEBUG_KERNEL
+dep_bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ $CONFIG_DEBUG_KERNEL
+dep_bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK $CONFIG_DEBUG_KERNEL
+dep_bool '  Wait queue debugging' CONFIG_DEBUG_WAITQ $CONFIG_DEBUG_KERNEL
+dep_bool '  Verbose BUG() reporting (adds 70K)' CONFIG_DEBUG_BUGVERBOSE $CONFIG_DEBUG_KERNEL
+dep_bool '  Verbose kernel error messages' CONFIG_DEBUG_ERRORS $CONFIG_DEBUG_KERNEL
+# These options are only for real kernel hackers who want to get their hands dirty. 
+dep_bool '  Kernel low-level debugging functions' CONFIG_DEBUG_LL $CONFIG_DEBUG_KERNEL
+endmenu
+
+source security/Config.in
+source lib/Config.in
