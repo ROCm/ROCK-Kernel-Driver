@@ -120,8 +120,7 @@ static int match(const struct sk_buff *skb,
                  const struct net_device *out,
                  const void *matchinfo,
 		 int offset,
-		 const void *hdr,
-		 int datalen,
+		 unsigned int protoff,
 		 int *hotdrop)
 {
 	const struct ip6t_policy_info *info = matchinfo;
