@@ -2476,6 +2476,13 @@ config SHAPER
 	  To compile this driver as a module, choose M here: the module
 	  will be called shaper.  If unsure, say N.
 
+config NETCONSOLE
+	tristate "Network console logging support (EXPERIMENTAL)"
+	depends on NETDEVICES && EXPERIMENTAL
+	---help---
+	If you want to log kernel messages over the network, enable this.
+	See Documentation/networking/netconsole.txt for details.
+
 source "drivers/net/wan/Kconfig"
 
 source "drivers/net/pcmcia/Kconfig"

@@ -442,6 +442,9 @@ static int __init mac8390_initdev(struct net_device * dev, struct nubus_dev * nd
 	/* Now fill in our stuff */
 	dev->open = &mac8390_open;
 	dev->stop = &mac8390_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 
 	/* GAR, ei_status is actually a macro even though it looks global */
 	ei_status.name = cardname[type];
