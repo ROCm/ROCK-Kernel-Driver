@@ -52,7 +52,7 @@ static char vlan_buggyright[] = "David S. Miller <davem@redhat.com>";
 static int vlan_device_event(struct notifier_block *, unsigned long, void *);
 
 struct notifier_block vlan_notifier_block = {
-	notifier_call: vlan_device_event,
+	.notifier_call = vlan_device_event,
 };
 
 /* These may be changed at run-time through IOCTLs */
@@ -64,11 +64,11 @@ unsigned short vlan_name_type = VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD;
 unsigned short vlan_default_dev_flags = 1;
 
 static struct packet_type vlan_packet_type = {
-	type: __constant_htons(ETH_P_8021Q),
-	dev:  NULL,
-	func: vlan_skb_recv, /* VLAN receive method */
-	data: (void *)(-1),  /* Set here '(void *)1' when this code can SHARE SKBs */
-	next: NULL
+	.type = __constant_htons(ETH_P_8021Q),
+	.dev =NULL,
+	.func = vlan_skb_recv, /* VLAN receive method */
+	.data = (void *)(-1),  /* Set here '(void *)1' when this code can SHARE SKBs */
+	.next = NULL
 };
 
 /* End of global variables definitions. */

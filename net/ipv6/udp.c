@@ -905,10 +905,10 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 }
 
 static struct inet6_protocol udpv6_protocol = {
-	handler:	udpv6_rcv,
-	err_handler:	udpv6_err,
-	protocol:	IPPROTO_UDP,
-	name:		"UDPv6",
+	.handler =	udpv6_rcv,
+	.err_handler =	udpv6_err,
+	.protocol =	IPPROTO_UDP,
+	.name =		"UDPv6",
 };
 
 #define LINE_LEN 190
@@ -987,32 +987,32 @@ out:
 }
 
 struct proto udpv6_prot = {
-	name:		"UDP",
-	close:		udpv6_close,
-	connect:	udpv6_connect,
-	disconnect:	udp_disconnect,
-	ioctl:		udp_ioctl,
-	destroy:	inet6_destroy_sock,
-	setsockopt:	ipv6_setsockopt,
-	getsockopt:	ipv6_getsockopt,
-	sendmsg:	udpv6_sendmsg,
-	recvmsg:	udpv6_recvmsg,
-	backlog_rcv:	udpv6_queue_rcv_skb,
-	hash:		udp_v6_hash,
-	unhash:		udp_v6_unhash,
-	get_port:	udp_v6_get_port,
+	.name =		"UDP",
+	.close =	udpv6_close,
+	.connect =	udpv6_connect,
+	.disconnect =	udp_disconnect,
+	.ioctl =	udp_ioctl,
+	.destroy =	inet6_destroy_sock,
+	.setsockopt =	ipv6_setsockopt,
+	.getsockopt =	ipv6_getsockopt,
+	.sendmsg =	udpv6_sendmsg,
+	.recvmsg =	udpv6_recvmsg,
+	.backlog_rcv =	udpv6_queue_rcv_skb,
+	.hash =		udp_v6_hash,
+	.unhash =	udp_v6_unhash,
+	.get_port =	udp_v6_get_port,
 };
 
 extern struct proto_ops inet6_dgram_ops;
 
 static struct inet_protosw udpv6_protosw = {
-	type:        SOCK_DGRAM,
-	protocol:    IPPROTO_UDP,
-	prot:        &udpv6_prot,
-	ops:         &inet6_dgram_ops,
-	capability:  -1,
-	no_check:    UDP_CSUM_DEFAULT,
-	flags:       INET_PROTOSW_PERMANENT,
+	.type =      SOCK_DGRAM,
+	.protocol =  IPPROTO_UDP,
+	.prot =      &udpv6_prot,
+	.ops =       &inet6_dgram_ops,
+	.capability =-1,
+	.no_check =  UDP_CSUM_DEFAULT,
+	.flags =     INET_PROTOSW_PERMANENT,
 };
 
 

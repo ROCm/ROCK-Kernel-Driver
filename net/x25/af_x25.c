@@ -1278,29 +1278,29 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 } 
 
 struct net_proto_family x25_family_ops = {
-	family:		AF_X25,
-	create:		x25_create,
+	.family =	AF_X25,
+	.create =	x25_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(x25_proto_ops) = {
-	family:		AF_X25,
+	.family =	AF_X25,
 
-	release:	x25_release,
-	bind:		x25_bind,
-	connect:	x25_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		x25_accept,
-	getname:	x25_getname,
-	poll:		datagram_poll,
-	ioctl:		x25_ioctl,
-	listen:		x25_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	x25_setsockopt,
-	getsockopt:	x25_getsockopt,
-	sendmsg:	x25_sendmsg,
-	recvmsg:	x25_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	x25_release,
+	.bind =		x25_bind,
+	.connect =	x25_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	x25_accept,
+	.getname =	x25_getname,
+	.poll =		datagram_poll,
+	.ioctl =	x25_ioctl,
+	.listen =	x25_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	x25_setsockopt,
+	.getsockopt =	x25_getsockopt,
+	.sendmsg =	x25_sendmsg,
+	.recvmsg =	x25_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
@@ -1308,12 +1308,12 @@ SOCKOPS_WRAP(x25_proto, AF_X25);
 
 
 static struct packet_type x25_packet_type = {
-	type:		__constant_htons(ETH_P_X25),
-	func:		x25_lapb_receive_frame,
+	.type =		__constant_htons(ETH_P_X25),
+	.func =		x25_lapb_receive_frame,
 };
 
 struct notifier_block x25_dev_notifier = {
-	notifier_call:	x25_device_event,
+	.notifier_call =x25_device_event,
 };
 
 void x25_kill_by_neigh(struct x25_neigh *neigh)

@@ -972,50 +972,50 @@ static int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 }
 
 struct proto_ops inet_stream_ops = {
-	family:		PF_INET,
+	.family =	PF_INET,
 
-	release:	inet_release,
-	bind:		inet_bind,
-	connect:	inet_stream_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		inet_accept,
-	getname:	inet_getname,
-	poll:		tcp_poll,
-	ioctl:		inet_ioctl,
-	listen:		inet_listen,
-	shutdown:	inet_shutdown,
-	setsockopt:	inet_setsockopt,
-	getsockopt:	inet_getsockopt,
-	sendmsg:	inet_sendmsg,
-	recvmsg:	inet_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	tcp_sendpage
+	.release =	inet_release,
+	.bind =		inet_bind,
+	.connect =	inet_stream_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	inet_accept,
+	.getname =	inet_getname,
+	.poll =		tcp_poll,
+	.ioctl =	inet_ioctl,
+	.listen =	inet_listen,
+	.shutdown =	inet_shutdown,
+	.setsockopt =	inet_setsockopt,
+	.getsockopt =	inet_getsockopt,
+	.sendmsg =	inet_sendmsg,
+	.recvmsg =	inet_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	tcp_sendpage
 };
 
 struct proto_ops inet_dgram_ops = {
-	family:		PF_INET,
+	.family =	PF_INET,
 
-	release:	inet_release,
-	bind:		inet_bind,
-	connect:	inet_dgram_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	inet_getname,
-	poll:		datagram_poll,
-	ioctl:		inet_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	inet_shutdown,
-	setsockopt:	inet_setsockopt,
-	getsockopt:	inet_getsockopt,
-	sendmsg:	inet_sendmsg,
-	recvmsg:	inet_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	inet_release,
+	.bind =		inet_bind,
+	.connect =	inet_dgram_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	inet_getname,
+	.poll =		datagram_poll,
+	.ioctl =	inet_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	inet_shutdown,
+	.setsockopt =	inet_setsockopt,
+	.getsockopt =	inet_getsockopt,
+	.sendmsg =	inet_sendmsg,
+	.recvmsg =	inet_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 struct net_proto_family inet_family_ops = {
-	family:	 PF_INET,
-	create:	 inet_create,
+	.family = PF_INET,
+	.create = inet_create,
 };
 
 
@@ -1028,34 +1028,34 @@ extern void tcp_v4_init(struct net_proto_family *);
 static struct inet_protosw inetsw_array[] =
 {
         {
-                type:        SOCK_STREAM,
-                protocol:    IPPROTO_TCP,
-                prot:        &tcp_prot,
-                ops:         &inet_stream_ops,
-                capability:  -1,
-                no_check:    0,
-                flags:       INET_PROTOSW_PERMANENT,
+                .type =       SOCK_STREAM,
+                .protocol =   IPPROTO_TCP,
+                .prot =       &tcp_prot,
+                .ops =        &inet_stream_ops,
+                .capability = -1,
+                .no_check =   0,
+                .flags =      INET_PROTOSW_PERMANENT,
         },
 
         {
-                type:        SOCK_DGRAM,
-                protocol:    IPPROTO_UDP,
-                prot:        &udp_prot,
-                ops:         &inet_dgram_ops,
-                capability:  -1,
-                no_check:    UDP_CSUM_DEFAULT,
-                flags:       INET_PROTOSW_PERMANENT,
+                .type =       SOCK_DGRAM,
+                .protocol =   IPPROTO_UDP,
+                .prot =       &udp_prot,
+                .ops =        &inet_dgram_ops,
+                .capability = -1,
+                .no_check =   UDP_CSUM_DEFAULT,
+                .flags =      INET_PROTOSW_PERMANENT,
        },
         
 
        {
-               type:        SOCK_RAW,
-               protocol:    IPPROTO_IP,	/* wild card */
-               prot:        &raw_prot,
-               ops:         &inet_dgram_ops,
-               capability:  CAP_NET_RAW,
-               no_check:    UDP_CSUM_DEFAULT,
-               flags:       INET_PROTOSW_REUSE,
+               .type =       SOCK_RAW,
+               .protocol =   IPPROTO_IP,	/* wild card */
+               .prot =       &raw_prot,
+               .ops =        &inet_dgram_ops,
+               .capability = CAP_NET_RAW,
+               .no_check =   UDP_CSUM_DEFAULT,
+               .flags =      INET_PROTOSW_REUSE,
        }
 };
 

@@ -112,18 +112,18 @@ static ssize_t sock_sendpage(struct file *file, struct page *page,
  */
 
 static struct file_operations socket_file_ops = {
-	llseek:		no_llseek,
-	read:		sock_read,
-	write:		sock_write,
-	poll:		sock_poll,
-	ioctl:		sock_ioctl,
-	mmap:		sock_mmap,
-	open:		sock_no_open,	/* special open code to disallow open via /proc */
-	release:	sock_close,
-	fasync:		sock_fasync,
-	readv:		sock_readv,
-	writev:		sock_writev,
-	sendpage:	sock_sendpage
+	.llseek =	no_llseek,
+	.read =		sock_read,
+	.write =	sock_write,
+	.poll =		sock_poll,
+	.ioctl =	sock_ioctl,
+	.mmap =		sock_mmap,
+	.open =		sock_no_open,	/* special open code to disallow open via /proc */
+	.release =	sock_close,
+	.fasync =	sock_fasync,
+	.readv =	sock_readv,
+	.writev =	sock_writev,
+	.sendpage =	sock_sendpage
 };
 
 /*
@@ -312,9 +312,9 @@ static int init_inodecache(void)
 }
 
 static struct super_operations sockfs_ops = {
-	alloc_inode:	sock_alloc_inode,
-	destroy_inode:	sock_destroy_inode,
-	statfs:		simple_statfs,
+	.alloc_inode =	sock_alloc_inode,
+	.destroy_inode =sock_destroy_inode,
+	.statfs =	simple_statfs,
 };
 
 static struct super_block *sockfs_get_sb(struct file_system_type *fs_type,
@@ -326,16 +326,16 @@ static struct super_block *sockfs_get_sb(struct file_system_type *fs_type,
 static struct vfsmount *sock_mnt;
 
 static struct file_system_type sock_fs_type = {
-	name:		"sockfs",
-	get_sb:		sockfs_get_sb,
-	kill_sb:	kill_anon_super,
+	.name =		"sockfs",
+	.get_sb =	sockfs_get_sb,
+	.kill_sb =	kill_anon_super,
 };
 static int sockfs_delete_dentry(struct dentry *dentry)
 {
 	return 1;
 }
 static struct dentry_operations sockfs_dentry_operations = {
-	d_delete:	sockfs_delete_dentry,
+	.d_delete =	sockfs_delete_dentry,
 };
 
 /*

@@ -20,6 +20,20 @@ CONFIG_NET_SCH_CBQ
   whenever you want).  If you want to compile it as a module, say M
   here and read <file:Documentation/modules.txt>.
 
+CONFIG_NET_SCH_HTB
+  Say Y here if you want to use the Hierarchical Token Buckets (HTB)
+  packet scheduling algorithm for some of your network devices. See
+  URL http://luxik.cdi.cz/~devik/qos/htb/ for complete manual and
+  in-depth articles.
+
+  HTB is very similar to the CBQ regarding its goals however is has 
+  different properties and different algorithm.
+
+  This code is also available as a module called sch_htb.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
 CONFIG_NET_SCH_CSZ
   Say Y here if you want to use the Clark-Shenker-Zhang (CSZ) packet
   scheduling algorithm for some of your network devices.  At the

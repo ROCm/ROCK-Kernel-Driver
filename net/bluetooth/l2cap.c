@@ -64,7 +64,7 @@
 static struct proto_ops l2cap_sock_ops;
 
 struct bluez_sock_list l2cap_sk_list = {
-	lock: RW_LOCK_UNLOCKED
+	.lock = RW_LOCK_UNLOCKED
 };
 
 static int l2cap_conn_del(struct hci_conn *conn, int err);
@@ -1973,38 +1973,38 @@ static int l2cap_read_proc(char *buf, char **start, off_t offset, int count, int
 }
 
 static struct proto_ops l2cap_sock_ops = {
-	family:		PF_BLUETOOTH,
-	release:	l2cap_sock_release,
-	bind:		l2cap_sock_bind,
-	connect:	l2cap_sock_connect,
-	listen:		l2cap_sock_listen,
-	accept:		l2cap_sock_accept,
-	getname:	l2cap_sock_getname,
-	sendmsg:	l2cap_sock_sendmsg,
-	recvmsg:	bluez_sock_recvmsg,
-	poll:		bluez_sock_poll,
-	socketpair:	sock_no_socketpair,
-	ioctl:		sock_no_ioctl,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	l2cap_sock_setsockopt,
-	getsockopt:	l2cap_sock_getsockopt,
-	mmap:		sock_no_mmap
+	.family =	PF_BLUETOOTH,
+	.release =	l2cap_sock_release,
+	.bind =		l2cap_sock_bind,
+	.connect =	l2cap_sock_connect,
+	.listen =	l2cap_sock_listen,
+	.accept =	l2cap_sock_accept,
+	.getname =	l2cap_sock_getname,
+	.sendmsg =	l2cap_sock_sendmsg,
+	.recvmsg =	bluez_sock_recvmsg,
+	.poll =		bluez_sock_poll,
+	.socketpair =	sock_no_socketpair,
+	.ioctl =	sock_no_ioctl,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	l2cap_sock_setsockopt,
+	.getsockopt =	l2cap_sock_getsockopt,
+	.mmap =		sock_no_mmap
 };
 
 static struct net_proto_family l2cap_sock_family_ops = {
-	family:		PF_BLUETOOTH,
-	create:		l2cap_sock_create
+	.family =	PF_BLUETOOTH,
+	.create =	l2cap_sock_create
 };
 
 static struct hci_proto l2cap_hci_proto = {
-	name:		"L2CAP",
-	id:		HCI_PROTO_L2CAP,
-	connect_ind:	l2cap_connect_ind,
-	connect_cfm:	l2cap_connect_cfm,
-	disconn_ind:	l2cap_disconn_ind,
-	recv_acldata:	l2cap_recv_acldata,
-	auth_cfm:	l2cap_auth_cfm,
-	encrypt_cfm:	l2cap_encrypt_cfm
+	.name =		"L2CAP",
+	.id =		HCI_PROTO_L2CAP,
+	.connect_ind =	l2cap_connect_ind,
+	.connect_cfm =	l2cap_connect_cfm,
+	.disconn_ind =	l2cap_disconn_ind,
+	.recv_acldata =	l2cap_recv_acldata,
+	.auth_cfm =	l2cap_auth_cfm,
+	.encrypt_cfm =	l2cap_encrypt_cfm
 };
 
 int __init l2cap_init(void)

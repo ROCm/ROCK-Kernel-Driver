@@ -248,6 +248,48 @@ struct tc_gred_sopt
        __u8            grio;
 };
 
+/* HTB section */
+#define TC_HTB_NUMPRIO		8
+#define TC_HTB_MAXDEPTH		8
+#define TC_HTB_PROTOVER		3 /* the same as HTB and TC's major */
+
+struct tc_htb_opt
+{
+	struct tc_ratespec 	rate;
+	struct tc_ratespec 	ceil;
+	__u32	buffer;
+	__u32	cbuffer;
+	__u32	quantum;
+	__u32	level;		/* out only */
+	__u32	prio;
+};
+struct tc_htb_glob
+{
+	__u32 version;		/* to match HTB/TC */
+    	__u32 rate2quantum;	/* bps->quantum divisor */
+    	__u32 defcls;		/* default class number */
+	__u32 debug;		/* debug flags */
+
+	/* stats */
+	__u32 direct_pkts; /* count of non shapped packets */
+};
+enum
+{
+	TCA_HTB_UNSPEC,
+	TCA_HTB_PARMS,
+	TCA_HTB_INIT,
+	TCA_HTB_CTAB,
+	TCA_HTB_RTAB,
+};
+struct tc_htb_xstats
+{
+	__u32 lends;
+	__u32 borrows;
+	__u32 giants;	/* too big packets (rate will not be accurate) */
+	__u32 tokens;
+	__u32 ctokens;
+};
+
 /* CBQ section */
 
 #define TC_CBQ_MAXPRIO		8

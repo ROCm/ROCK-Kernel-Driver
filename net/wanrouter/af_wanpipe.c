@@ -2697,22 +2697,22 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 
 #ifdef LINUX_2_4
 struct proto_ops wanpipe_ops = {
-	family: 	PF_WANPIPE,
+	.family = 	PF_WANPIPE,
 
-	release: 	wanpipe_release,
-	bind: 		wanpipe_bind,
-	connect: 	wanpipe_connect,
-	socketpair: 	sock_no_socketpair,
-	accept: 	wanpipe_accept,
-	getname: 	wanpipe_getname, 
-	poll: 		wanpipe_poll,
-	ioctl: 		wanpipe_ioctl,
-	listen: 	wanpipe_listen, 
-	shutdown: 	sock_no_shutdown,
-	setsockopt: 	sock_no_setsockopt,
-	getsockopt: 	sock_no_getsockopt,
-	sendmsg: 	wanpipe_sendmsg,
-	recvmsg: 	wanpipe_recvmsg
+	.release = 	wanpipe_release,
+	.bind = 		wanpipe_bind,
+	.connect = 	wanpipe_connect,
+	.socketpair = 	sock_no_socketpair,
+	.accept = 	wanpipe_accept,
+	.getname = 	wanpipe_getname, 
+	.poll = 		wanpipe_poll,
+	.ioctl = 		wanpipe_ioctl,
+	.listen = 	wanpipe_listen, 
+	.shutdown = 	sock_no_shutdown,
+	.setsockopt = 	sock_no_setsockopt,
+	.getsockopt = 	sock_no_getsockopt,
+	.sendmsg = 	wanpipe_sendmsg,
+	.recvmsg = 	wanpipe_recvmsg
 };
 #else
 struct proto_ops wanpipe_ops = {
@@ -2739,12 +2739,12 @@ struct proto_ops wanpipe_ops = {
 
 
 static struct net_proto_family wanpipe_family_ops = {
-	family:	PF_WANPIPE,
-	create:	wanpipe_create,
+	.family =PF_WANPIPE,
+	.create =wanpipe_create,
 };
 
 struct notifier_block wanpipe_netdev_notifier = {
-	notifier_call:	wanpipe_notifier,
+	.notifier_call =wanpipe_notifier,
 };
 
 

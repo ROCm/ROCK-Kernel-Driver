@@ -160,14 +160,14 @@ static int netlink_ioctl(struct inode *inode, struct file *file,
 
 
 static struct file_operations netlink_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		netlink_read,
-	write:		netlink_write,
-	poll:		netlink_poll,
-	ioctl:		netlink_ioctl,
-	open:		netlink_open,
-	release:	netlink_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		netlink_read,
+	.write =	netlink_write,
+	.poll =		netlink_poll,
+	.ioctl =	netlink_ioctl,
+	.open =		netlink_open,
+	.release =	netlink_release,
 };
 
 static devfs_handle_t devfs_handle;
