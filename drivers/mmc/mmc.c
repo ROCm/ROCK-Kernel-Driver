@@ -270,8 +270,7 @@ static inline void mmc_delay(unsigned int ms)
 		yield();
 		mdelay(ms);
 	} else {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(ms * HZ / 1000);
+		msleep_interruptible (ms);
 	}
 }
 
