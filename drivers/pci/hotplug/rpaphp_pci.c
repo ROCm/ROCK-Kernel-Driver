@@ -175,6 +175,7 @@ static void rpaphp_fixup_new_pci_devices(struct pci_bus *bus)
 			pci_read_irq_line(dev);
 			for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 				struct resource *r = &dev->resource[i];
+
 				if (r->parent || !r->start || !r->flags)
 					continue;
 				rpaphp_claim_resource(dev, i);
@@ -256,8 +257,9 @@ static struct pci_dev *rpaphp_config_pci_adapter(struct slot *slot)
 			goto exit;
 		}
 
+		eeh_add_device_early(slot->dn->child);
 		dev = rpaphp_pci_config_dn(slot->dn, pci_bus);
-		eeh_add_device(dev);
+		eeh_add_device_late(dev);
 	} else {
 		/* slot is not enabled */
 		err("slot doesn't have pci_dev structure\n");
