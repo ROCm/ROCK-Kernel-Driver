@@ -73,8 +73,13 @@ register_sn_serial_numbers(void) {
 	}
 }
 
-// Disable forced interrupts, but leave the code in, just in case.
-int sn_force_interrupt_flag = 0;
+/*
+ * Enable forced interrupt by default.
+ * When set, the sn interrupt handler writes the force interrupt register on
+ * the bridge chip.  The hardware will then send an interrupt message if the
+ * interrupt line is active.  This mimics a level sensitive interrupt.
+ */
+int sn_force_interrupt_flag = 1;
 
 static int
 sn_force_interrupt_read_proc(char *page, char **start, off_t off,
