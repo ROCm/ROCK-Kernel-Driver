@@ -318,6 +318,7 @@ EXPORT_SYMBOL(xfrm_policy_insert);
 EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
 EXPORT_SYMBOL(xfrm_policy_byid);
+EXPORT_SYMBOL(xfrm_policy_list);
 
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
