@@ -729,8 +729,7 @@ static void restart_on_error(void)
 		       res_reg[1]);
 	}
 
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(2 * HZ);
+	msleep(2000);
 
 	sony_get_toc();
 }
@@ -960,8 +959,7 @@ retry_cd_operation:
 	if (((result_buffer[0] & 0xf0) == 0x20)
 	    && (num_retries < MAX_CDU31A_RETRIES)) {
 		num_retries++;
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ / 10);	/* Wait .1 seconds on retries */
+		msleep(100):
 		goto retry_cd_operation;
 	}
 
