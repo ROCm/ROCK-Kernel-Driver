@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/stringify.h>
 #include <linux/delay.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -51,6 +52,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
 #include <asm/sections.h>
+#include <asm/machdep.h>
 #include "open_pic.h"
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
@@ -179,7 +181,6 @@ extern void enter_prom(void *dummy,...);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
 
-extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
 
 #ifdef CONFIG_HMT
@@ -1067,6 +1068,10 @@ prom_hold_cpus(unsigned long mem)
 
 			if (*acknowledge == cpuid) {
 				prom_print(RELOC("ok\n"));
+				/* We have to get every CPU out of OF,
+				 * even if we never start it. */
+				if (cpuid >= NR_CPUS)
+					goto next;
 #ifdef CONFIG_SMP
 				/* Set the number of active processors. */
 				_systemcfg->processorCount++;
@@ -1093,9 +1098,12 @@ prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 		}
 
+	next:
 		/* Init paca for secondary threads.   They start later. */
 		for (i=1; i < cpu_threads; i++) {
 			cpuid++;
+			if (cpuid >= NR_CPUS)
+				continue;
 			_xPaca[cpuid].xHwProcNum = interrupt_server[i];
 			prom_print_hex(interrupt_server[i]);
 			prom_print(RELOC(" : preparing thread ... "));
@@ -1140,7 +1148,11 @@ prom_hold_cpus(unsigned long mem)
 		prom_print(RELOC("Processor is not HMT capable\n"));
 	}
 #endif
-	
+
+	if (cpuid >= NR_CPUS)
+		prom_print(RELOC("WARNING: maximum CPUs (" __stringify(NR_CPUS)
+				 ") exceeded: ignoring extras\n"));
+
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_hold_cpus: end...\n"));
 #endif
@@ -1491,10 +1503,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
 			  RELOC("bootargs"), p, sizeof(cmd_line));
 		if (p != NULL && p[0] != 0)
-			strncpy(RELOC(cmd_line), p, sizeof(cmd_line));
+			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
 	}
-	RELOC(cmd_line[sizeof(cmd_line) - 1]) = 0;
-
 
 	mem = prom_initialize_lmb(mem);
 

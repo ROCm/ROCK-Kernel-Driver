@@ -63,20 +63,21 @@
  */
 
 #include <linux/module.h>
-#include <linux/pci.h>
-#include <asm/vio.h>
 #include "ibmvscsi.h"
 
+#include "../scsi.h"
+
 MODULE_DESCRIPTION("IBM Virtual SCSI");
-MODULE_AUTHOR("Colin DeVilbiss");
+MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
 
-/* data structures */
-struct srp_event_struct; /* a unit of work for the hosting partition */
- 
-/* ------------------------------------------------------------
- * Data Structures
- */
+MODULE_PARM(max_id, "i");
+MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
+MODULE_PARM(max_channel, "i");
+MODULE_PARM_DESC(max_channel, "Largest channel value");
+
+static int max_id = 32;       /* Somewhat arbitrary default values */
+static int max_channel = 2;   
 
 /* ------------------------------------------------------------
  * Routines for the event pool and event structs
@@ -100,7 +101,7 @@ static int initialize_event_pool(struct event_pool *pool, int size, struct ibmvs
 		return -ENOMEM;
 	memset(pool->events, 0x00, pool->size * sizeof(*pool->events));
 
-	pool->iu_storage = dma_alloc_consistent(hostdata->dmadev, pool->size * sizeof(*pool->iu_storage), &pool->iu_token);
+	pool->iu_storage = dma_alloc_coherent(hostdata->dev, pool->size * sizeof(*pool->iu_storage), &pool->iu_token, 0);
 	if(!pool->iu_storage) {
 		kfree(pool->events);
 		return -ENOMEM;
@@ -134,7 +135,7 @@ static void release_event_pool(struct event_pool *pool, struct ibmvscsi_host_dat
 	if(in_use)
 		printk(KERN_WARNING "releasing event pool with %d events still in use?\n", in_use);
 	kfree(pool->events);
-	dma_free_consistent(hostdata->dmadev, pool->size * sizeof(*pool->iu_storage), pool->iu_storage, pool->iu_token);
+	dma_free_coherent(hostdata->dev, pool->size * sizeof(*pool->iu_storage), pool->iu_storage, pool->iu_token);
 }
 
 /**
@@ -209,7 +210,7 @@ struct srp_event_struct *ibmvscsi_get_event_struct(struct event_pool *pool)
  *
  * Returns the initialized event, and NULL if there are no free events
 */
-static struct srp_event_struct *evt_struct_for(struct event_pool *pool, union VIOSRP_IU *evt, Scsi_Cmnd *cmnd, void (*done)(struct srp_event_struct *))
+static struct srp_event_struct *evt_struct_for(struct event_pool *pool, union VIOSRP_IU *evt, struct scsi_cmnd *cmnd, void (*done)(struct srp_event_struct *))
 {
 	struct srp_event_struct *evt_struct = ibmvscsi_get_event_struct(pool);
 	if(!evt_struct)
@@ -229,45 +230,45 @@ static struct srp_event_struct *evt_struct_for(struct event_pool *pool, union VI
 /**
  * unmap_direct_data: - Unmap address pointed by SRP_CMD
  * @cmd:	SRP_CMD whose additional_data member will be unmapped
- * @dma_dev:	dma device for which the memory is mapped
+ * @dev:	device for which the memory is mapped
  *
 */
-static void unmap_direct_data(struct SRP_CMD *cmd, struct dma_dev *dmadev)
+static void unmap_direct_data(struct SRP_CMD *cmd, struct device *dev)
 {
 	struct memory_descriptor *data = (struct memory_descriptor *)cmd->additional_data;
-	dma_unmap_single(dmadev, data->virtual_address, data->length, PCI_DMA_BIDIRECTIONAL);
+	dma_unmap_single(dev, data->virtual_address, data->length, PCI_DMA_BIDIRECTIONAL);
 }
 
 /**
  * unmap_direct_data: - Unmap array of address pointed by SRP_CMD
  * @cmd:	SRP_CMD whose additional_data member will be unmapped
- * @dma_dev:	dma device for which the memory is mapped
+ * @dev:	device for which the memory is mapped
  *
 */
-static void unmap_indirect_data(struct SRP_CMD *cmd, struct dma_dev *dmadev)
+static void unmap_indirect_data(struct SRP_CMD *cmd, struct device *dev)
 {
 	struct indirect_descriptor *indirect = (struct indirect_descriptor *)cmd->additional_data;
 	int i, num_mapped = indirect->head.length / sizeof(indirect->list[0]);
 	for(i = 0; i < num_mapped; ++i) {
 		struct memory_descriptor *data = &indirect->list[i];
-		dma_unmap_single(dmadev, data->virtual_address, data->length, PCI_DMA_BIDIRECTIONAL);
+		dma_unmap_single(dev, data->virtual_address, data->length, PCI_DMA_BIDIRECTIONAL);
 	}
 }
 
 /**
  * unmap_direct_data: - Unmap data pointed in SRP_CMD based on the format
  * @cmd:	SRP_CMD whose additional_data member will be unmapped
- * @dmadev:	dma device for which the memory is mapped
+ * @dev:	device for which the memory is mapped
  *
 */
-static void unmap_cmd_data(struct SRP_CMD *cmd, struct dma_dev *dmadev)
+static void unmap_cmd_data(struct SRP_CMD *cmd, struct device *dev)
 {
 	if(cmd->data_out_format == SRP_NO_BUFFER && cmd->data_in_format == SRP_NO_BUFFER)
 		return;
 	else if(cmd->data_out_format == SRP_DIRECT_BUFFER || cmd->data_in_format == SRP_DIRECT_BUFFER)
-		unmap_direct_data(cmd, dmadev);
+		unmap_direct_data(cmd, dev);
 	else
-		unmap_indirect_data(cmd, dmadev);
+		unmap_indirect_data(cmd, dev);
 }
 
 /* ------------------------------------------------------------
@@ -278,26 +279,17 @@ static void unmap_cmd_data(struct SRP_CMD *cmd, struct dma_dev *dmadev)
  * ibmvscsi_send_srp_event: - Transforms event to u64 array and calls send_crq()
  * @evt_struct:	evt_struct to be sent
  * @hostdata:	ibmvscsi_host_data of host
- * @pending:    This came off the pending queue.  If can't be sent, put it back
- *              at the head.
  *
  * Returns the value returned from ibmvscsi_send_crq(). (Zero for success)
 */
-static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct, struct ibmvscsi_host_data *hostdata, int pending)
+static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct, struct ibmvscsi_host_data *hostdata)
 {
 	u64 *crq_as_u64 = (u64*)&evt_struct->crq;
 
 	/* If we have exhausted our request limit, just queue this request */
 	if (atomic_dec_return(&hostdata->request_limit) < 0) {
 		atomic_inc(&hostdata->request_limit);
-		spin_lock(&hostdata->lock);
-		if (pending) {
-			list_add(&evt_struct->list, &hostdata->queued);
-		} else {
-			list_add_tail(&evt_struct->list, &hostdata->queued);
-		}
-		spin_unlock(&hostdata->lock);
-		return 0;
+		return SCSI_MLQUEUE_HOST_BUSY;
 	} else {
 		/* Add this to the sent list.  We need to do this before we actually send 
 		 * in case it comes back REALLY fast
@@ -311,43 +303,17 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct, struct i
 			list_del(&evt_struct->list);
 			spin_unlock(&hostdata->lock);
 
-			Scsi_Cmnd *cmnd = evt_struct->cmnd;
+			struct scsi_cmnd *cmnd = evt_struct->cmnd;
 			printk(KERN_ERR "ibmvscsi: failed to send event struct\n");
-			unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dmadev);
+			unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dev);
 			ibmvscsi_free_event_struct(&hostdata->pool, evt_struct);
 			cmnd->result = DID_ERROR << 16;
 			cmnd->host_scribble = NULL;
 			evt_struct->cmnd_done(cmnd);
-			return -1;
+			return SCSI_MLQUEUE_HOST_BUSY;
 		}
 	}
 	return 0;
-}
-
-/**
- * ibmvscsi_send_pending: - Send events from the pending queue
- * @hostdata:	ibmvscsi_host_data of host
- *
-*/
-static void ibmvscsi_send_pending(struct ibmvscsi_host_data *hostdata) {
-	struct srp_event_struct *evt_struct;
-	do {
-		spin_lock(&hostdata->lock);
-		if (list_empty(&hostdata->queued)) {
-			spin_unlock(&hostdata->lock);
-			return;
-		}
-		
-		evt_struct = list_entry(hostdata->queued.next,
-					struct srp_event_struct,
-					list);
-
-		list_del(hostdata->queued.next);
-
-		spin_unlock(&hostdata->lock);
-		
-		ibmvscsi_send_srp_event(evt_struct, hostdata, 1);
-	} while (atomic_read(&hostdata->request_limit));
 }
 
 /**
@@ -403,37 +369,6 @@ void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq, struct ibmvscsi_host_data *host
 }
 
 /**
- * ibmvscsi_task: - Process srps asynchronously
- * @data:	ibmvscsi_host_data of host
- *
-*/
-static void ibmvscsi_task(unsigned long data) 
-{
-	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)data;
-	struct VIOSRP_CRQ *crq;
-	int done = 0;
-
-	while (!done)
-	{
-		/* Pull all the valid messages off the CRQ */
-		while((crq = crq_queue_next_crq(&hostdata->queue)) != NULL) {
-			ibmvscsi_handle_crq(crq, hostdata);
-			crq->valid = 0x00;
-		}
-
-		ibmvscsi_enable_interrupts((void*)hostdata->dmadev);
-		if ((crq = crq_queue_next_crq(&hostdata->queue)) != NULL) {
-			ibmvscsi_disable_interrupts((void*)hostdata->dmadev);
-			ibmvscsi_handle_crq(crq, hostdata);
-			crq->valid = 0x00;
-		} else {
-			done = 1;
-		}
-	}
-}
-
-
-/**
  * handle_cmd_rsp: -  Handle responses fom commands
  * @evt_struct:	srp_event_struct to be handled
  *
@@ -443,13 +378,13 @@ static void ibmvscsi_task(unsigned long data)
 static void handle_cmd_rsp(struct srp_event_struct *evt_struct)
 {
 	struct SRP_RSP *rsp = &evt_struct->evt->srp.rsp;
-	Scsi_Cmnd *cmnd = (Scsi_Cmnd *) evt_struct->cmnd;
+	struct scsi_cmnd *cmnd = (struct scsi_cmnd *) evt_struct->cmnd;
 	
 	if (cmnd) {
 		cmnd->result |= rsp->status;
 		if(status_byte(cmnd->result) == CHECK_CONDITION)
 			memcpy(cmnd->sense_buffer, rsp->sense_and_response_data, rsp->sense_data_list_length);
-		unmap_cmd_data(&evt_struct->cmd, evt_struct->hostdata->dmadev);
+		unmap_cmd_data(&evt_struct->cmd, evt_struct->hostdata->dev);
 
 		if(rsp->dounder)
 			cmnd->resid = rsp->data_out_residual_count;
@@ -465,8 +400,6 @@ static void handle_cmd_rsp(struct srp_event_struct *evt_struct)
 		cmnd->host_scribble = NULL;
 	}
 
-	ibmvscsi_send_pending(evt_struct->hostdata);
-	
 	ibmvscsi_free_event_struct(&evt_struct->hostdata->pool, evt_struct);
 }
 
@@ -478,12 +411,12 @@ static void handle_cmd_rsp(struct srp_event_struct *evt_struct)
  * map_sg_data: - Maps dma for a scatterlist and initializes decriptor fields
  * @cmd:	Scsi_Cmnd with the scatterlist
  * @srp_cmd:	SRP_CMD that contains the memory descriptor
- * @dmadev:	dma device for which to map dma memory
+ * @dev:	device for which to map dma memory
  *
  * Called by map_data_for_srp_cmd() when building srp cmd from scsi cmd.
  * Returns 1 on success.
 */
-static int map_sg_data(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct dma_dev *dmadev)
+static int map_sg_data(struct scsi_cmnd *cmd, struct SRP_CMD *srp_cmd, struct device *dev)
 {
 	
 	int i, sg_mapped;
@@ -491,7 +424,7 @@ static int map_sg_data(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct dma_dev *
 	struct scatterlist *sg = cmd->request_buffer;
 	struct memory_descriptor *data = (struct memory_descriptor *)srp_cmd->additional_data;
 	struct indirect_descriptor *indirect = (struct indirect_descriptor *)data;
-	sg_mapped = dma_map_sg(dmadev, sg, cmd->use_sg, PCI_DMA_BIDIRECTIONAL);
+	sg_mapped = dma_map_sg(dev, sg, cmd->use_sg, PCI_DMA_BIDIRECTIONAL);
 
 	/* special case; we can use a single direct descriptor */
 	if(sg_mapped == 1)
@@ -537,19 +470,19 @@ static int map_sg_data(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct dma_dev *
 
 /**
  * map_sg_data: - Maps memory and initializes memory decriptor fields
- * @cmd:	Scsi_Cmnd with the memory to be mapped
+ * @cmd:	struct scsi_cmnd with the memory to be mapped
  * @srp_cmd:	SRP_CMD that contains the memory descriptor
- * @dmadev:	dma device for which to map dma memory
+ * @dev:	device for which to map dma memory
  *
  * Called by map_data_for_srp_cmd() when building srp cmd from scsi cmd.
  * Returns 1 on success.
 */
-static int map_single_data(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct dma_dev *dmadev)
+static int map_single_data(struct scsi_cmnd *cmd, struct SRP_CMD *srp_cmd, struct device *dev)
 {
 	struct memory_descriptor *data = (struct memory_descriptor *)srp_cmd->additional_data;
 
 	data->virtual_address = (u64)(unsigned long)dma_map_single(
-		dmadev, cmd->request_buffer, cmd->request_bufflen,
+		dev, cmd->request_buffer, cmd->request_bufflen,
 		PCI_DMA_BIDIRECTIONAL);
 	if(data->virtual_address == 0xFFFFFFFF) {
 		printk(KERN_ERR "Unable to map request_buffer for command!\n");
@@ -568,14 +501,14 @@ static int map_single_data(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct dma_d
 
 /**
  * map_data_for_srp_cmd: - Calls functions to map data for srp cmds
- * @cmd:	Scsi_Cmnd with the memory to be mapped
+ * @cmd:	struct scsi_cmnd with the memory to be mapped
  * @srp_cmd:	SRP_CMD that contains the memory descriptor
- * @dmadev:	dma device for which to map dma memory
+ * @dev:	dma device for which to map dma memory
  *
  * Called by scsi_cmd_to_srp_cmd() when converting scsi cmds to srp cmds 
  * Returns 1 on success.
 */
-static int map_data_for_srp_cmd(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct dma_dev *dmadev)
+static int map_data_for_srp_cmd(struct scsi_cmnd *cmd, struct SRP_CMD *srp_cmd, struct device *dev)
 {
 	switch(cmd->sc_data_direction) {
 	case SCSI_DATA_READ:
@@ -594,8 +527,8 @@ static int map_data_for_srp_cmd(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct 
 	if(!cmd->request_buffer)
 		return 1;
 	if(cmd->use_sg)
-		return map_sg_data(cmd, srp_cmd, dmadev);
-	return map_single_data(cmd, srp_cmd, dmadev);
+		return map_sg_data(cmd, srp_cmd, dev);
+	return map_single_data(cmd, srp_cmd, dev);
 }
 
 /**
@@ -610,13 +543,13 @@ static inline u16 lun_from_dev(Scsi_Device *dev)
 
 /**
  * scsi_cmd_to_srp_cmd: - Initializes srp cmd with data from scsi cmd
- * @cmd:	source Scsi_Cmnd
+ * @cmd:	source struct scsi_cmnd
  * @srp_cmd:	target SRP_CMD
  * @hostdata:	ibmvscsi_host_data of host
  *
  * Returns 1 on success.
 */
-static int scsi_cmd_to_srp_cmd(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct ibmvscsi_host_data *hostdata)
+static int scsi_cmd_to_srp_cmd(struct scsi_cmnd *cmd, struct SRP_CMD *srp_cmd, struct ibmvscsi_host_data *hostdata)
 {
 	u16 lun = lun_from_dev(cmd->device);
 	memset(srp_cmd, 0x00, sizeof(*srp_cmd));
@@ -625,18 +558,18 @@ static int scsi_cmd_to_srp_cmd(Scsi_Cmnd *cmd, struct SRP_CMD *srp_cmd, struct i
 	memcpy(srp_cmd->cdb, cmd->cmnd, sizeof(cmd->cmnd));
 	srp_cmd->lun = ((u64)lun) << 48;
 
-	return map_data_for_srp_cmd(cmd, srp_cmd, hostdata->dmadev);
+	return map_data_for_srp_cmd(cmd, srp_cmd, hostdata->dev);
 }
 
 /**
  * scsi_cmd_to_event_struct: - Initializes a srp_event_struct with data form scsi cmd
- * @cmd:	Source Scsi_Cmnd
+ * @cmd:	Source struct scsi_cmnd
  * @done:	Callback function to be called when cmd is completed
  * @hostdata:	ibmvscsi_host_data of host
  *
  * Returns the srp_event_struct to be used or NULL if not successful.
 */
-static struct srp_event_struct *scsi_cmd_to_event_struct(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd*), struct ibmvscsi_host_data *hostdata)
+static struct srp_event_struct *scsi_cmd_to_event_struct(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd*), struct ibmvscsi_host_data *hostdata)
 {
 	struct SRP_CMD srp_cmd;
 	struct srp_event_struct *evt_struct;
@@ -661,26 +594,26 @@ static struct srp_event_struct *scsi_cmd_to_event_struct(Scsi_Cmnd *cmd, void (*
 
 /**
  * ibmvscsi_queue: - The queuecommand function of the scsi template 
- * @cmd:	Scsi_Cmnd to be executed
+ * @cmd:	struct scsi_cmnd to be executed
  * @done:	Callback function to be called when cmd is completed
  *
  * Always returns zero
 */
-static int ibmvscsi_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int ibmvscsi_queue(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)&cmd->device->host->hostdata;
 	struct srp_event_struct *evt_struct = scsi_cmd_to_event_struct(cmd, done, hostdata);
 
 	if (!evt_struct) {
-		printk(KERN_ERR "ibmvscsi: unable to convert Scsi_Cmnd to LpEvent\n");
+		printk(KERN_ERR "ibmvscsi: unable to convert struct scsi_cmnd to LpEvent\n");
 		cmd->result = DID_ERROR << 16;
 		done(cmd);
-		return 0;
+		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	evt_struct->crq.format = VIOSRP_SRP_FORMAT;
 
-	return ibmvscsi_send_srp_event(evt_struct, hostdata, 0);
+	return ibmvscsi_send_srp_event(evt_struct, hostdata);
 }
 
 /* ------------------------------------------------------------
@@ -689,147 +622,13 @@ static int ibmvscsi_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 static void error_cleanup(struct ibmvscsi_host_data *hostdata) {
 	struct Scsi_Host *host = hostdata->host;
 	release_event_pool(&hostdata->pool, hostdata);
-	release_crq_queue(&hostdata->queue, hostdata);
+	ibmvscsi_release_crq_queue(&hostdata->queue, hostdata);
 	memset(hostdata, 0xff, sizeof(*hostdata));
 	scsi_host_put(host);
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 /**
- * Initiate a scan of our devices asynchronously.
- */
-static void ibmvscsi_scan_task(unsigned long data) 
-{
-	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)data;
-	
-	scsi_scan_host(hostdata->host);
-}
-#endif
-
-/**
- * report_luns_rsp: - Handle response to our report_luns request
- * @evt_struct:	srp_event_struct with the response
- *
- * Used as a "done" callback by when sending report_luns_login. Gets called
- * by ibmvscsi_handle_crq()
-*/
-static void report_luns_rsp(Scsi_Cmnd* cmnd)
-{
-	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)&cmnd->device->host->hostdata;
-	struct srp_event_struct *evt_struct = 	(struct srp_event_struct *)cmnd->host_scribble;
-
-	u64 *report_luns_data = (u64*)evt_struct->cmnd->request_buffer;
-	u32 max_lun_index;
-	int i;
-	
-	max_lun_index = ((report_luns_data[0] >> 32) / sizeof(u64))+ 1;
-	printk(KERN_INFO "ibmvscsi: %d devices attached\n", max_lun_index - 1);
-	for(i = 1; i < max_lun_index; ++i) {
-		u16 lun_level = report_luns_data[i] >> 48;
-		u8 target = (lun_level >> 8) & 0x3F;
-		u8 bus = (lun_level >> 5) & 0x7;
-		u8 lun = (lun_level >> 0) & 0x1F;
-		if(hostdata->host->max_id < target)
-			hostdata->host->max_id = target;
-		if(hostdata->host->max_lun < lun)
-			hostdata->host->max_lun = lun;
-		if(hostdata->host->max_channel < bus)
-			hostdata->host->max_channel = bus;
-	}
-	++hostdata->host->max_id;
-	++hostdata->host->max_lun;
-
-	/* Free the report luns stuff.  I am not proud of this, but
-	 * this takes advantage of the fact that cmnd is the first
-	 * area of the internal_report_luns area below.
-	 */
-	kfree(evt_struct->cmnd);
-
-	/* We now know enough to register our adapter */
-#if LINUX_VERSION_CODE >= 0x020600
-	if (!scsi_add_host(hostdata->host, &hostdata->dmadev->dev)) {
-		SCHEDULE_BOTTOM_HALF(&hostdata->scan_task);
-	} else {
-		/* Couldn't add host.  bail */
-		printk(KERN_ERR"ibmvscsi: Unable to add host\n");
-		error_cleanup(hostdata);
-	}
-#else
-	up(&hostdata->waitsem);
-#endif
-	
-}
-
-/**
- * set_host_limits: - Get host limits from server and set the values in host
- * @host:	Scsi_Host to set the host limits
- *
-*/
-static void send_report_luns(struct ibmvscsi_host_data *hostdata)
-{
-	struct srp_event_struct *evt;
-/**
- * struct Internal_Report_Luns
- * contains all the things we need to manufacture a report
- * luns request and send it down through our infrastructure
- */
-	struct {
-		Scsi_Cmnd cmnd;
-		Scsi_Device dev;
-		u64 report_luns_data[64];
-	} *internal_report_luns = kmalloc(sizeof(*internal_report_luns), GFP_ATOMIC);
-	
-	struct report_luns_cdb {
-		u8 opcode;
-		u8 reserved1[1];
-		u8 report;
-		u8 reserved2[3];
-		u32 length PACKED;
-		u8 reserved3[1];
-		u8 control;
-	} *cdb; 
-
-	if (internal_report_luns == NULL) {
-		printk(KERN_ERR"couldn't allocate report_luns buffer\n");
-		return;
-	}
-
-	memset(internal_report_luns,0x00,sizeof(*internal_report_luns));
-	/* Note this means id/channel/lun of 0, which is what we want */
-	internal_report_luns->cmnd.use_sg = 0;
-	internal_report_luns->cmnd.request_buffer = (void *)internal_report_luns->report_luns_data;
-	internal_report_luns->cmnd.request_bufflen = sizeof(internal_report_luns->report_luns_data);
-	internal_report_luns->cmnd.sc_data_direction = SCSI_DATA_READ;
-	internal_report_luns->cmnd.device = &internal_report_luns->dev;
-
-	internal_report_luns->dev.host = hostdata->host;
-
-	cdb = (struct report_luns_cdb *)&internal_report_luns->cmnd.cmnd;
-
-	cdb->opcode = 0xA0; /* REPORT_LUNS */
-	cdb->length = sizeof(internal_report_luns->report_luns_data);
-
-	evt = scsi_cmd_to_event_struct(&internal_report_luns->cmnd, report_luns_rsp, hostdata);
-	if(!evt) {
-		printk(KERN_ERR "couldn't allocate evt struct for host limits\n");
-		kfree(internal_report_luns);
-		error_cleanup(hostdata);
-		return;
-	}
-
-	evt->evt->srp.cmd.lun = 0;
-
-	if(ibmvscsi_send_srp_event(evt, hostdata, 0) != 0) {
-		printk(KERN_ERR "ibmvscsi: failed to send event struct for host limits\n");
-		unmap_cmd_data(&evt->evt->srp.cmd, hostdata->dmadev);
-		kfree(internal_report_luns);
-		error_cleanup(hostdata);
-		return;
-	}
-}
-
-/**
- * login_rsp: - Handle response to login request
+ * login_rsp: - Handle response to SRP login request
  * @evt_struct:	srp_event_struct with the response
  *
  * Used as a "done" callback by when sending srp_login. Gets called
@@ -851,14 +650,18 @@ static void login_rsp(struct srp_event_struct *evt_struct)
 		return;
 	}
 	
-	printk(KERN_INFO "ibmvscsi: SRP_LOGIN succeeded, sending REPORT_LUNS\n");
+	printk(KERN_INFO "ibmvscsi: SRP_LOGIN succeeded\n");
 	
 	/* Now we know what the real request-limit is */
 	atomic_set(&hostdata->request_limit, evt_struct->evt->srp.login_rsp.request_limit_delta);
 	
 	ibmvscsi_free_event_struct(&evt_struct->hostdata->pool, evt_struct);
 
-	send_report_luns(hostdata);
+	hostdata->host->can_queue = evt_struct->evt->srp.login_rsp.request_limit_delta;
+
+	/* Now allow commands (such the queued up scans) to go */
+	scsi_unblock_requests(hostdata->host);
+
 	return;
 }
 
@@ -891,46 +694,8 @@ static int send_srp_login(struct ibmvscsi_host_data *hostdata)
 	evt_struct->crq.format = VIOSRP_SRP_FORMAT;
 	
 	printk(KERN_INFO "Sending SRP login: req 0x%p\n", &req);
-	return ibmvscsi_send_srp_event(evt_struct, hostdata, 0);
+	return ibmvscsi_send_srp_event(evt_struct, hostdata);
 };
-
-/**
- * ibmvscsi_info: - The info function in the scsi template.
- * @host:	Host to display information
- *
- * Returns string with information
-*/
-static const char *ibmvscsi_info(struct Scsi_Host *host)
-{
-	return "SCSI host adapter emulator for RPA/iSeries Virtual I/O";
-}
-
-/**
- * ibmvscsi_bios: - The bios_param function in the scsi template.
- * @disk:	Disk to fill data
- * @dev:	kdev_t of the device
- * @param:	Array of ints to be filled by function
- *
- * Returns zero.
-*/
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
-static int ibmvscsi_bios(Scsi_Disk *disk, kdev_t dev, int *parm)
-{
-	off_t capacity = disk->capacity;
-#else
-static int ibmvscsi_bios(struct scsi_device *sdev, struct block_device *bdev, sector_t capacity, int parm[3])
-{
-#endif
-	parm[0] = 255;
-	parm[1] = 63;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	parm[2] = capacity / (parm[0] * parm[1]);
-#else
-	sector_div(capacity, 255*63);
-#endif
-	parm[2] = capacity;
-	return 0;
-}
 
 /**
  * ibmvscsi_abort: Abort the command.  We can only handle commands not sent
@@ -939,18 +704,21 @@ static int ibmvscsi_bios(struct scsi_device *sdev, struct block_device *bdev, se
  * Note that we could send an abort task_management command over to the 
  * server.  That gets horribly confusing, because we then have to block
  * here until the response comes back, and various done() routines may
- * get called in the mean time. yuck.
+ * get called in the mean time. yuck.  That is probably the next functional
+ * enhancement to be done.
+ *
  */
-int ibmvscsi_abort(Scsi_Cmnd *cmd)
+int ibmvscsi_abort(struct scsi_cmnd *cmd)
 {
+#if 0
 	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)&cmd->device->host->hostdata;
 	struct srp_event_struct *tmp_evt;
 	struct list_head	*pos, *next;
 
 	/* First see if this command is in our pending list */
 	spin_lock(&hostdata->lock);
-	if(!list_empty(&hostdata->queued)) {
-		list_for_each_safe(pos, next, &hostdata->queued) {
+	if(!list_empty(&hostdata->sent)) {
+		list_for_each_safe(pos, next, &hostdata->sent) {
 			tmp_evt = list_entry(pos, struct srp_event_struct, list);
 			
 			if (tmp_evt->cmnd == cmd) {
@@ -962,6 +730,7 @@ int ibmvscsi_abort(Scsi_Cmnd *cmd)
 		}
 	}
 	spin_unlock(&hostdata->lock);
+#endif
 	return FALSE;
 }
 
@@ -969,33 +738,26 @@ int ibmvscsi_abort(Scsi_Cmnd *cmd)
  * SCSI driver registration
  */
 static Scsi_Host_Template driver_template = {
-	.name = "ibmvscsi",
+	.name = "SCSI host adapter emulator for RPA/iSeries Virtual I/O",
 	.proc_name = "ibmvscsi",
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	.use_new_eh_code = 1,
-	.detect = ibmvscsi_detect,
-	.release = ibmvscsi_release,
-#endif
-	.info = ibmvscsi_info,
 	.queuecommand = ibmvscsi_queue,
-	.bios_param = ibmvscsi_bios,
 	.eh_abort_handler = ibmvscsi_abort,
-	.can_queue = 10,
+	.can_queue = 1, /* Updated after SRP_LOGIN */
 	.this_id = -1,
-	.sg_tablesize = SG_TABLESIZE,
-	.cmd_per_lun = 1,
+	.sg_tablesize = MAX_INDIRECT_BUFS,
+	.cmd_per_lun = 1, 
 	.use_clustering = DISABLE_CLUSTERING,
 	.emulated = 1
 };
 
 /**
- * Called by vio bus code for each adapter
+ * Called by bus code for each adapter
  */
-struct ibmvscsi_host_data *ibmvscsi_probe_generic(struct dma_dev *dev, const dma_device_id *id)
+struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev)
 {
 	struct ibmvscsi_host_data *hostdata;
 	struct Scsi_Host *host;
-
+	
 	host = scsi_host_alloc(&driver_template, sizeof(*hostdata));
 	if(!host) {
 		printk(KERN_ERR "ibmvscsi: couldn't allocate host data\n");
@@ -1004,18 +766,12 @@ struct ibmvscsi_host_data *ibmvscsi_probe_generic(struct dma_dev *dev, const dma
 	
 	hostdata = (struct ibmvscsi_host_data *)host->hostdata;
 	memset(hostdata, 0x00, sizeof(*hostdata));
-	INIT_LIST_HEAD(&hostdata->queued);
 	INIT_LIST_HEAD(&hostdata->sent);
-	init_MUTEX_LOCKED(&hostdata->waitsem);
+	INIT_WORK(&hostdata->srp_task, (void *)ibmvscsi_task, hostdata);
 	hostdata->host = host;
-	hostdata->dmadev = dev;
-	INIT_BOTTOM_HALF(&hostdata->srp_task, (void *)ibmvscsi_task, (unsigned long)hostdata);
-#if LINUX_VERSION_CODE >= 0x020600
-	INIT_BOTTOM_HALF(&hostdata->scan_task, (void *)ibmvscsi_scan_task, (unsigned long)hostdata);
-	hostdata->srp_workqueue = create_workqueue("ibmvscsi");
-#endif
-
-	if(initialize_crq_queue(&hostdata->queue, hostdata) != 0) {
+	hostdata->dev = dev;
+	
+	if(ibmvscsi_init_crq_queue(&hostdata->queue, hostdata) != 0) {
 		printk(KERN_ERR "ibmvscsi: couldn't initialize crq\n");
 		goto init_crq_failed;
 	}
@@ -1027,54 +783,57 @@ struct ibmvscsi_host_data *ibmvscsi_probe_generic(struct dma_dev *dev, const dma
 		printk(KERN_ERR "ibmvscsi: couldn't initialize event pool\n");
 		goto init_pool_failed;
 	}
-
-	/* Now kick off the interaction with the server.  This involves two 
-	 * asynchronous steps (SRP_LOGIN followed by REPORT_LUNS so we know how
-	 * many devices/busses etc. we have
-	 */
-	if (send_srp_login(hostdata) == 0) {
-#if LINUX_VERSION_CODE < 0x020600
-	    /* For the 2.4 kernel we have to wait until we have figured
-	     * out busses etc before we return, because as soon as we
-	     * return a scan is going to start
-	     */
-	    down(&hostdata->waitsem);
-#endif
-	    return hostdata;
+	
+	host->max_lun = 8;
+	host->max_id = max_id;
+	host->max_channel = max_channel;
+	
+	/* Block requests until we get the SRP login back */
+	scsi_block_requests(host);
+	
+	if (!scsi_add_host(hostdata->host, hostdata->dev)) {
+		
+		/* Now kick off the interaction with the server.  This involves two 
+		 * asynchronous steps (SRP_LOGIN followed by REPORT_LUNS so we know how
+		 * many devices/busses etc. we have
+		 */
+		if (send_srp_login(hostdata) == 0) {
+			scsi_scan_host(host);
+			return hostdata;
+		}
 	}
 	
 	printk(KERN_ERR "ibmvscsi: couldn't SRP_LOGIN to remote host\n");
-
+	
 	release_event_pool(&hostdata->pool, hostdata);
-init_pool_failed:
-	release_crq_queue(&hostdata->queue, hostdata);
-init_crq_failed:
+ init_pool_failed:
+	ibmvscsi_release_crq_queue(&hostdata->queue, hostdata);
+ init_crq_failed:
 	scsi_host_put(host);
-scsi_host_alloc_failed:
+ scsi_host_alloc_failed:
 	return NULL;
 }
 
-int ibmvscsi_remove_generic(struct ibmvscsi_host_data *hostdata)
+int ibmvscsi_remove(struct ibmvscsi_host_data *hostdata)
 {
 	/* send an SRP_I_LOGOUT */
 	printk("ibmvscsi: release called\n");
 	
 	release_event_pool(&hostdata->pool, hostdata);
-	release_crq_queue(&hostdata->queue, hostdata);
+	ibmvscsi_release_crq_queue(&hostdata->queue, hostdata);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	hostdata->srp_workqueue = create_workqueue("ibmvscsi");
-
-	/* Note that in 2.4 this is taken care of by scsi_module.c */
 	scsi_host_put(hostdata->host);
-#endif
 	return 0;
 }
 
-/* Use old model if we are on 2.4 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#include "scsi_module.c"
-#else
+int __init ibmvscsi_module_init(void)
+{
+	return ibmvscsi_register_driver();
+}
+
+void __exit ibmvscsi_module_exit(void)
+{
+	ibmvscsi_unregister_driver();
+}	
 module_init(ibmvscsi_module_init);
 module_exit(ibmvscsi_module_exit);
-#endif

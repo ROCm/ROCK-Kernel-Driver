@@ -18,13 +18,11 @@
 #include <asm/mmu_context.h>
 #include <asm/paca.h>
 #include <asm/naca.h>
-#include <asm/pmc.h>
 #include <asm/cputable.h>
 
-
-int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
-void make_slbe(unsigned long esid, unsigned long vsid, int large,
-	       int kernel_segment);
+static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
+static void make_slbe(unsigned long esid, unsigned long vsid, int large,
+		      int kernel_segment);
 
 /*
  * Build an entry for the base kernel segment and put it into
@@ -70,7 +68,7 @@ DEFINE_PER_CPU(long, stab_cache[NR_STAB_CACHE_ENTRIES]);
 /*
  * Create a segment table entry for the given esid/vsid pair.
  */
-int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
+static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 {
 	unsigned long entry, group, old_esid, castout_entry, i;
 	unsigned int global_entry;
@@ -89,7 +87,7 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 				ste->dw0.dw0.kp = 1;
 				asm volatile("eieio":::"memory");
 				ste->dw0.dw0.v = 1;
-				return(global_entry | entry);
+				return (global_entry | entry);
 			}
 		}
 		/* Now search the secondary group. */
@@ -145,7 +143,7 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
 {
 	unsigned char stab_entry; 
-	unsigned long *offset;
+	unsigned long offset;
 	int region_id = REGION_ID(esid << SID_SHIFT);
 
 	stab_entry = make_ste(get_paca()->xStab_data.virt, esid, vsid);
@@ -153,11 +151,12 @@ static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
 	if (region_id != USER_REGION_ID)
 		return;
 
-	offset = &__get_cpu_var(stab_cache_ptr);
-	if (*offset < NR_STAB_CACHE_ENTRIES) {
-		__get_cpu_var(stab_cache[*offset]) = stab_entry;
-	}
-	(*offset)++;
+	offset = __get_cpu_var(stab_cache_ptr);
+	if (offset < NR_STAB_CACHE_ENTRIES)
+		__get_cpu_var(stab_cache[offset++]) = stab_entry;
+	else
+		offset = NR_STAB_CACHE_ENTRIES+1;
+	__get_cpu_var(stab_cache_ptr) = offset;
 }
 
 /*
@@ -243,20 +242,18 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
 	STE *stab = (STE *) get_paca()->xStab_data.virt;
 	STE *ste;
-	unsigned long *offset = &__get_cpu_var(stab_cache_ptr);
+	unsigned long offset = __get_cpu_var(stab_cache_ptr);
 
 	/* Force previous translations to complete. DRENG */
 	asm volatile("isync" : : : "memory");
 
-	if (*offset <= NR_STAB_CACHE_ENTRIES) {
+	if (offset <= NR_STAB_CACHE_ENTRIES) {
 		int i;
 
-		for (i = 0; i < *offset; i++) {
+		for (i = 0; i < offset; i++) {
 			ste = stab + __get_cpu_var(stab_cache[i]);
 			ste->dw0.dw0.v = 0;
 		}
-
-		asm volatile("sync; slbia; sync":::"memory");
 	} else {
 		unsigned long entry;
 
@@ -274,11 +271,11 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 				ste->dw0.dw0.v = 0;
 			}
 		}
-
-		asm volatile("sync; slbia; sync":::"memory");
 	}
 
-	*offset = 0;
+	asm volatile("sync; slbia; sync":::"memory");
+
+	__get_cpu_var(stab_cache_ptr) = 0;
 
 	preload_stab(tsk, mm);
 }
@@ -293,8 +290,8 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
  * NOTE: A context syncronising instruction is required before and after
  * this, in the common case we use exception entry and rfid.
  */
-void make_slbe(unsigned long esid, unsigned long vsid, int large,
-	       int kernel_segment)
+static void make_slbe(unsigned long esid, unsigned long vsid, int large,
+		      int kernel_segment)
 {
 	unsigned long entry, castout_entry;
 	union {
@@ -351,7 +348,7 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large,
 
 	/*
 	 * No need for an isync before or after this slbmte. The exception
-         * we enter with and the rfid we exit with are context synchronizing.
+	 * we enter with and the rfid we exit with are context synchronizing.
 	 */
 	asm volatile("slbmte  %0,%1" : : "r" (vsid_data), "r" (esid_data)); 
 }
@@ -361,7 +358,7 @@ static inline void __slb_allocate(unsigned long esid, unsigned long vsid,
 {
 	int large = 0;
 	int region_id = REGION_ID(esid << SID_SHIFT);
-	unsigned long *offset;
+	unsigned long offset;
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE) {
 		if (region_id == KERNEL_REGION_ID)
@@ -375,11 +372,12 @@ static inline void __slb_allocate(unsigned long esid, unsigned long vsid,
 	if (region_id != USER_REGION_ID)
 		return;
 
-	offset = &__get_cpu_var(stab_cache_ptr);
-	if (*offset < NR_STAB_CACHE_ENTRIES) {
-		__get_cpu_var(stab_cache[*offset]) = esid;
-	}
-	(*offset)++;
+	offset = __get_cpu_var(stab_cache_ptr);
+	if (offset < NR_STAB_CACHE_ENTRIES)
+		__get_cpu_var(stab_cache[offset++]) = esid;
+	else
+		offset = NR_STAB_CACHE_ENTRIES+1;
+	__get_cpu_var(stab_cache_ptr) = offset;
 }
 
 /*
@@ -458,9 +456,9 @@ static void preload_slb(struct task_struct *tsk, struct mm_struct *mm)
 /* Flush all user entries from the segment table of the current processor. */
 void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 {
-	unsigned long *offset = &__get_cpu_var(stab_cache_ptr);
+	unsigned long offset = __get_cpu_var(stab_cache_ptr);
 
-	if (*offset <= NR_STAB_CACHE_ENTRIES) {
+	if (offset <= NR_STAB_CACHE_ENTRIES) {
 		int i;
 		union {
 			unsigned long word0;
@@ -468,7 +466,7 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		} esid_data;
 
 		asm volatile("isync" : : : "memory");
-		for (i = 0; i < *offset; i++) {
+		for (i = 0; i < offset; i++) {
 			esid_data.word0 = 0;
 			esid_data.data.esid = __get_cpu_var(stab_cache[i]);
 			asm volatile("slbie %0" : : "r" (esid_data));
@@ -478,7 +476,7 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		asm volatile("isync; slbia; isync" : : : "memory");
 	}
 
-	*offset = 0;
+	__get_cpu_var(stab_cache_ptr) = 0;
 
 	preload_slb(tsk, mm);
 }

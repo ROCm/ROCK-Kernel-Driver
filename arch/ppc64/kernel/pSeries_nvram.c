@@ -41,6 +41,7 @@ static ssize_t pSeries_nvram_read(char *buf, size_t count, loff_t *index)
 	unsigned long flags;
 	char *p = buf;
 
+
 	if (nvram_size == 0 || nvram_fetch == RTAS_UNKNOWN_SERVICE)
 		return -ENODEV;
 

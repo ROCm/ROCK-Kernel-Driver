@@ -24,6 +24,17 @@ do { \
 
 extern void preempt_schedule(void);
 
+#define preempt_check_resched() \
+do { \
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
+		preempt_schedule(); \
+} while (0)
+#else
+#define preempt_check_resched()		do { } while (0)
+#endif
+
+#if defined(CONFIG_PREEMPT) || defined(CONFIG_DEBUG_SPINLOCK_SLEEP)
+
 #define preempt_disable() \
 do { \
 	inc_preempt_count(); \
@@ -34,12 +45,6 @@ do { \
 do { \
 	barrier(); \
 	dec_preempt_count(); \
-} while (0)
-
-#define preempt_check_resched() \
-do { \
-	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
-		preempt_schedule(); \
 } while (0)
 
 #define preempt_enable() \

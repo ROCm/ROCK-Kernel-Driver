@@ -27,37 +27,44 @@
  * hypervisor system or a converged hypervisor system.
  */
 
-#include <linux/module.h>
-#include <linux/pci.h>
 #include <asm/vio.h>
 #include <asm/pci_dma.h>
 #include <asm/hvcall.h>
 #include "ibmvscsi.h"
 
-/* data structures */
-struct vio_driver;         /* VIO interface driver data */
-
-/* global variables */
-irqreturn_t ibmvscsi_handle_event(int irq, void *dev_instance, struct pt_regs *regs);
-static struct vio_driver ibmvscsi_driver;
-
-
 /* ------------------------------------------------------------
  * Routines for managing the command/response queue
  */
-/* zero on success, non-zero on failure */
+/**
+ * ibmvscsi_handle_event: - Interrupt handler for crq events
+ * @irq:	number of irq to handle, not used
+ * @dev_instance: ibmvscsi_host_data of host that received interrupt
+ * @regs:	pt_regs with registers
+ *
+ * Disables interrupts and schedules srp_task
+ * Always returns IRQ_HANDLED
+ */
+irqreturn_t ibmvscsi_handle_event(int irq, void *dev_instance, struct pt_regs *regs)
+{
+	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)dev_instance;
+	vio_disable_interrupts(to_vio_dev(hostdata->dev));
+	schedule_work(&hostdata->srp_task);
+	return IRQ_HANDLED;
+}
+
 /**
  * initialize_crq_queue: - Initializes and registers CRQ with hypervisor
  * @queue:	crq_queue to initialize and register
- * @host_data:	ibmvscsi_host_data of host
+ * @hostdata:	ibmvscsi_host_data of host
  *
  * Allocates a page for messages, maps it for dma, and registers
  * the crq with the hypervisor.
  * Returns zero on success.
-*/
-int initialize_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
+ */
+int ibmvscsi_init_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
 {
 	int rc;
+	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
 
 	queue->msgs = (struct VIOSRP_CRQ *)get_zeroed_page(GFP_KERNEL);
 
@@ -65,22 +72,21 @@ int initialize_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hos
 		goto malloc_failed;
 	queue->size = PAGE_SIZE / sizeof(*queue->msgs);
 
-	if((queue->msg_token = dma_map_single(hostdata->dmadev, queue->msgs, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL)) == NO_TCE)
+	if((queue->msg_token = dma_map_single(hostdata->dev, queue->msgs, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL)) == NO_TCE)
 		goto map_failed;
 
-	rc = plpar_hcall_norets(H_REG_CRQ, hostdata->dmadev->unit_address, queue->msg_token, PAGE_SIZE);
+	rc = plpar_hcall_norets(H_REG_CRQ, vdev->unit_address, queue->msg_token, PAGE_SIZE);
 	if (rc != 0) {
 		printk(KERN_WARNING "ibmvscsi: couldn't register crq--rc 0x%x\n", rc);
 		goto reg_crq_failed;
 	}
 
-	//if(request_irq(hostdata->dmadev->irq, &ibmvscsi_handle_event, SA_INTERRUPT, "ibmvscsi", (void *)hostdata) != 0) {
-	if(request_irq(hostdata->dmadev->irq, &ibmvscsi_handle_event, 0, "ibmvscsi", (void *)hostdata) != 0) {
-		printk(KERN_ERR "ibmvscsi: couldn't register irq 0x%x\n", hostdata->dmadev->irq);
+	if(request_irq(vdev->irq, &ibmvscsi_handle_event, 0, "ibmvscsi", (void *)hostdata) != 0) {
+		printk(KERN_ERR "ibmvscsi: couldn't register irq 0x%x\n", vdev->irq);
 		goto req_irq_failed;
 	}
 	
-	rc = ibmvscsi_enable_interrupts(hostdata->dmadev);
+	rc = vio_enable_interrupts(vdev);
 	if (rc != 0) {
 		printk(KERN_ERR "ibmvscsi:  Error %d enabling interrupts!!!\n",rc);
 		goto req_irq_failed;
@@ -92,9 +98,9 @@ int initialize_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hos
 	return 0;
 
 req_irq_failed:
-	plpar_hcall_norets(H_FREE_CRQ, hostdata->dmadev->unit_address);
+	plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
 reg_crq_failed:
-	dma_unmap_single(hostdata->dmadev, queue->msg_token, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL);
+	dma_unmap_single(hostdata->dev, queue->msg_token, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL);
 map_failed:
 	free_page((unsigned long)queue->msgs);
 malloc_failed:
@@ -108,12 +114,13 @@ malloc_failed:
  *
  * Frees irq, deallocates a page for messages, unmaps dma, and unregisters
  * the crq with the hypervisor.
-*/
-void release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
+ */
+void ibmvscsi_release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
 {
-	free_irq(hostdata->dmadev->irq, (void *)hostdata);
-	plpar_hcall_norets(H_FREE_CRQ, hostdata->dmadev->unit_address);
-	dma_unmap_single(hostdata->dmadev, queue->msg_token, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL);
+	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
+	free_irq(vdev->irq, (void *)hostdata);
+	plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
+	dma_unmap_single(hostdata->dev, queue->msg_token, queue->size * sizeof(*queue->msgs), PCI_DMA_BIDIRECTIONAL);
 	free_page((unsigned long)queue->msgs);
 }
 
@@ -123,8 +130,8 @@ void release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostd
  *
  * Returns pointer to next entry in queue, or NULL if there are no new 
  * entried in the CRQ.
-*/
-struct VIOSRP_CRQ *crq_queue_next_crq(struct crq_queue *queue)
+ */
+static struct VIOSRP_CRQ *crq_queue_next_crq(struct crq_queue *queue)
 {
 	struct VIOSRP_CRQ *crq;
 	unsigned long flags;
@@ -142,133 +149,110 @@ struct VIOSRP_CRQ *crq_queue_next_crq(struct crq_queue *queue)
 	return crq;
 }
 
-
-/* ------------------------------------------------------------
- * Routines for direct interpartition interaction
- */
 /**
- * ibmvscsi_send_crq: - Sends message in crq to hypervisor
- * @hostdata:	ibmvscsi_host_data of host to send
- * @word1:	First u64 parameter
- * @word2:	Second u64 parameter
- *
- * Returns zero on success, or error returned by plpar_hcall
-*/
+ * ibmvscsi_send_crq: - Send a CRQ
+ * @hostdata:	the adapter
+ * @word1:	the first 64 bits of the data
+ * @word2:	the second 64 bits of the data
+ */
 int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
 {
-	return plpar_hcall_norets(H_SEND_CRQ, hostdata->dmadev->unit_address, word1, word2);
+	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
+
+	return plpar_hcall_norets(H_SEND_CRQ, vdev->unit_address, word1, word2);
 }
 
 /**
- * ibmvscsi_handle_event: - Interrupt handler for crq events
- * @irq:	number of irq to handle, not used
- * @dev_instance: ibmvscsi_host_data of host that received interrupt
- * @regs:	pt_regs with registers
- *
- * Disables interrupts and schedules srp_task
- * Always returns IRQ_HANDLED
-*/
-irqreturn_t ibmvscsi_handle_event(int irq, void *dev_instance, struct pt_regs *regs)
-{
-	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)dev_instance;
-	ibmvscsi_disable_interrupts(hostdata->dmadev);
-	SCHEDULE_BOTTOM_HALF_QUEUE(hostdata->srp_workqueue,&hostdata->srp_task);
-	return IRQ_HANDLED;
-}
-
-
-/* ------------------------------------------------------------
- * Routines for driver initialization
+ * ibmvscsi_task: - Process srps asynchronously
+ * @data:	ibmvscsi_host_data of host
  */
-/**
- * ibmvscsi_handle_event: - Detects the number of hosts in device
- * @host_template:	Scsi_Host_Template for the driver
- *
- * Registers the driver in the vio infrastructure.
- * Returns number of hosts found.
-*/
-static atomic_t ibmvscsi_host_count;
-int ibmvscsi_detect(Scsi_Host_Template * host_template)
+void ibmvscsi_task(unsigned long data) 
 {
-	int host_count;
-	ibmvscsi_driver.driver_data = (unsigned long)host_template;
-	host_count = vio_register_driver(&ibmvscsi_driver);
-	atomic_set(&ibmvscsi_host_count, host_count);
-	
-	return host_count;
-}
+	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)data;
+	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
+	struct VIOSRP_CRQ *crq;
+	int done = 0;
 
-/* All we do on release (called by the older SCSI infrastructure) is
- * decrement a counter.  When the counter goes to zero, we call
- * vio_unregister_driver, which will actually drive the remove of all
- * the adapters
- */
-int ibmvscsi_release(struct Scsi_Host *host)
-{
-	if (atomic_dec_return(&ibmvscsi_host_count) == 0) {
-		vio_unregister_driver(&ibmvscsi_driver);
+	while (!done)
+	{
+		/* Pull all the valid messages off the CRQ */
+		while((crq = crq_queue_next_crq(&hostdata->queue)) != NULL) {
+			ibmvscsi_handle_crq(crq, hostdata);
+			crq->valid = 0x00;
+		}
+
+		vio_enable_interrupts(vdev);
+		if ((crq = crq_queue_next_crq(&hostdata->queue)) != NULL) {
+			vio_disable_interrupts(vdev);
+			ibmvscsi_handle_crq(crq, hostdata);
+			crq->valid = 0x00;
+		} else {
+			done = 1;
+		}
 	}
-
-
-	return 0;
 }
 
-int ibmvscsi_enable_interrupts(struct dma_dev *dev)
-{
-	return vio_enable_interrupts(dev);
-}
-
-int ibmvscsi_disable_interrupts(struct dma_dev *dev)
-{
-	return vio_disable_interrupts(dev);
-}
-
-/* ------------------------------------------------------------
- * Routines to complete Linux SCSI Host support
+/**
+ * rpa_device_table: Used by vio.c to match devices in the device tree we 
+ * support.
  */
-/* ------------------------------------------------------------
- * VIO interface support
- */
-static struct vio_device_id ibmvscsi_device_table[] __devinitdata = {
+static struct vio_device_id rpa_device_table[] __devinitdata = {
     { "scsi-3", "IBM,v-scsi" }, /* Note: This entry can go away when all the firmware is up to date */ 
     { "vscsi",  "IBM,v-scsi" },
     { 0,}
 };
                                                                                 
-static int ibmvscsi_probe(struct dma_dev *dev, const dma_device_id *id) 
+/**
+ * rpa_probe: The callback from the virtual I/O bus code.
+ * @vdev     : The vio specific device structure
+ * @id       : the device id..we don't currently use it
+ */
+static int rpa_probe(struct vio_dev *vdev, const struct vio_device_id *id) 
 {
-	struct ibmvscsi_host_data *hostdata;
-	hostdata = ibmvscsi_probe_generic(dev,id);
+	struct ibmvscsi_host_data *hostdata = ibmvscsi_probe(&vdev->dev);
 	if (hostdata) {
-		dev->driver_data = hostdata;
+		vdev->driver_data = hostdata;
 		return 0;
 	} else {
 		return -1;
 	}
 }
 
-static int ibmvscsi_remove(struct dma_dev *dev)
+/**
+ * rpa_remove: The callback from the virtual I/O bus code to remove a device
+ * @vdev     : The vio specific device structure
+ */
+static int rpa_remove(struct vio_dev *vdev)
 {
-	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)dev->driver_data;
-	return ibmvscsi_remove_generic(hostdata);
-	
+	int rc;
+	struct ibmvscsi_host_data *hostdata = (struct ibmvscsi_host_data *)vdev->driver_data;
+	rc = ibmvscsi_remove(hostdata);
+	return rc;
 }
-MODULE_DEVICE_TABLE(vio, ibmvscsi_device_table);
-    
-char ibmvscsi_driver_name[] = "ibmvscsi";                                                                            
+
+MODULE_DEVICE_TABLE(vio, rpa_device_table);
+char rpa_driver_name[] = "ibmvscsi";                                                                            
 static struct vio_driver ibmvscsi_driver = {
-	.name		= ibmvscsi_driver_name,
-	.id_table	= ibmvscsi_device_table,
-	.probe		= ibmvscsi_probe,
-	.remove		= ibmvscsi_remove
+	.name		= rpa_driver_name,
+	.id_table	= rpa_device_table,
+	.probe		= rpa_probe,
+	.remove		= rpa_remove
 };
 
-int __init ibmvscsi_module_init(void)
+/**
+ * ibmvscsi_register_driver:  the call back from the generic ibmvscsi code at startup
+ * time.
+ */
+int ibmvscsi_register_driver(void)
 {
 	return vio_register_driver(&ibmvscsi_driver);
 }
 
-void __exit ibmvscsi_module_exit(void)
+/**
+ * ibmvscsi_unregister_driver:  the call back from the generic ibmvscsi code at shutdown
+ * time.
+ */
+void ibmvscsi_unregister_driver(void)
 {
 	vio_unregister_driver(&ibmvscsi_driver);
 }	

@@ -690,7 +690,7 @@ void sched_fork(task_t *p)
 	INIT_LIST_HEAD(&p->run_list);
 	p->array = NULL;
 	spin_lock_init(&p->switch_lock);
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) || defined(CONFIG_DEBUG_SPINLOCK_SLEEP)
 	/*
 	 * During context-switch we hold precisely one spinlock, which
 	 * schedule_tail drops. (in the common case it's this_rq()->lock,
@@ -2624,7 +2624,7 @@ void __init init_idle(task_t *idle, int cpu)
 	local_irq_restore(flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) || defined(CONFIG_DEBUG_SPINLOCK_SLEEP)
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
 #else
 	idle->thread_info->preempt_count = 0;

@@ -272,15 +272,6 @@ static inline int ibmveth_is_replenishing_needed(struct ibmveth_adapter *adapter
 /* replenish tasklet routine */
 static void ibmveth_replenish_task(struct ibmveth_adapter *adapter) 
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&adapter->lock, flags);
-
-	if(!ibmveth_is_replenishing_needed(adapter)) {
-		spin_unlock_irqrestore(&adapter->lock, flags);
-		return;
-	}
-
 	adapter->replenish_task_cycles++;
 
 	ibmveth_replenish_buffer_pool(adapter, &adapter->rx_buff_pool[0]);
@@ -289,21 +280,15 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
 
-	spin_unlock_irqrestore(&adapter->lock, flags);
-
+	atomic_inc(&adapter->not_replenishing);
+	ibmveth_assert(atomic_read(&adapter->not_replenishing) == 1);
 }
 
 /* kick the replenish tasklet if we need replenishing and it isn't already running */
 static inline void ibmveth_schedule_replenishing(struct ibmveth_adapter *adapter)
 {
-	unsigned long flags;
-	int replenish;
-
-	spin_lock_irqsave(&adapter->lock, flags);
-	replenish = ibmveth_is_replenishing_needed(adapter);
-	spin_unlock_irqrestore(&adapter->lock, flags);
-
-	if(replenish) {	
+	if(ibmveth_is_replenishing_needed(adapter) && 
+	   (atomic_dec_if_positive(&adapter->not_replenishing) == 0)) {	
 		SCHEDULE_BOTTOM_HALF(&adapter->replenish_task);
 	}
 }
@@ -966,7 +951,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	adapter->filter_list_dma = NO_TCE;
 	adapter->rx_queue.queue_dma = NO_TCE;
 
-	spin_lock_init(&adapter->lock);
+	atomic_set(&adapter->not_replenishing, 1);
 
 	ibmveth_debug_printk("registering netdev...\n");
 

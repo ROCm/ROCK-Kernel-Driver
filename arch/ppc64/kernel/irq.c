@@ -737,6 +737,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	irq_desc_t *desc = get_irq_desc(irq);
 	struct hw_irq_stat *hwstat;
 	unsigned long *per_cpus;
+	irqreturn_t action_ret;
 
 	/* Statistics. */
 	hwstat = get_irq_stat(desc);	/* same cache line as desc */
@@ -745,6 +746,14 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	if (per_cpus)
 		per_cpus[cpu]++;
 
+	if (desc->status & IRQ_PER_CPU) {
+		/* no locking required for CPU-local interrupts: */
+		ack_irq(irq);
+		action_ret = handle_irq_event(irq, regs, desc->action);
+		desc->handler->end(irq);
+		return;
+	}
+
 	spin_lock(&desc->lock);
 	ack_irq(irq);	
 	/*
@@ -752,8 +761,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	   WAITING is used by probe to mark irqs that are being tested
 	   */
 	status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
-	if (!(status & IRQ_PER_CPU))
-		status |= IRQ_PENDING; /* we _want_ to handle it */
+	status |= IRQ_PENDING; /* we _want_ to handle it */
 
 	/*
 	 * If the IRQ is disabled for whatever reason, we cannot
@@ -776,8 +784,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 			goto out;
 		}
 		status &= ~IRQ_PENDING; /* we commit to handling */
-		if (!(status & IRQ_PER_CPU))
-			status |= IRQ_INPROGRESS; /* we are handling it */
+		status |= IRQ_INPROGRESS; /* we are handling it */
 	}
 	desc->status = status;
 
@@ -801,8 +808,6 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	 * SMP environment.
 	 */
 	for (;;) {
-		irqreturn_t action_ret;
-
 		spin_unlock(&desc->lock);
 		action_ret = handle_irq_event(irq, regs, action);
 		spin_lock(&desc->lock);
@@ -834,6 +839,21 @@ int do_IRQ(struct pt_regs *regs)
 	struct ItLpQueue *lpq;
 
 	irq_enter();
+
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+	/* Debugging check for stack overflow: is there less than 8KB free? */
+	{
+		long sp;
+
+		sp = (unsigned long)_get_SP() & (THREAD_SIZE-1);
+
+		if (unlikely(sp < (sizeof(struct thread_info) + 8192))) {
+			printk("do_IRQ: stack overflow: %ld\n",
+				sp - sizeof(struct thread_info));
+			dump_stack();
+		}
+	}
+#endif
 
 	lpaca = get_paca();
 #ifdef CONFIG_SMP

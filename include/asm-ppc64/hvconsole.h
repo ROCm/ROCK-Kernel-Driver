@@ -22,9 +22,13 @@
 #ifndef _PPC64_HVCONSOLE_H
 #define _PPC64_HVCONSOLE_H
 
+#define MAX_NR_HVC_CONSOLES	4
+
 extern int hvc_get_chars(int index, char *buf, int count);
 extern int hvc_put_chars(int index, const char *buf, int count);
-extern int hvc_count(int *start_termno);
+extern int hvc_find_vterms(void);
+
+extern int hvc_instantiate(void);
 
 #endif /* _PPC64_HVCONSOLE_H */
 

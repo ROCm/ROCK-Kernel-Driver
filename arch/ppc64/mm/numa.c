@@ -100,6 +100,8 @@ static int __init parse_numa_properties(void)
 		if (numa_domain >= MAX_NUMNODES)
 			BUG();
 
+		node_set_online(numa_domain);
+
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
@@ -201,7 +203,7 @@ err:
 	return -1;
 }
 
-void setup_nonnuma(void)
+static void __init setup_nonnuma(void)
 {
 	unsigned long i;
 

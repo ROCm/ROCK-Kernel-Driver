@@ -27,23 +27,18 @@
 #include <linux/tty_flip.h>
 #include <linux/sched.h>
 #include <linux/kbd_kern.h>
-#include <asm/uaccess.h>
 #include <linux/spinlock.h>
 #include <linux/cpumask.h>
-
-extern int hvc_count(int *);
-extern int hvc_get_chars(int index, char *buf, int count);
-extern int hvc_put_chars(int index, const char *buf, int count);
+#include <asm/uaccess.h>
+#include <asm/hvconsole.h>
 
 #define HVC_MAJOR	229
 #define HVC_MINOR	0
 
-#define MAX_NR_HVC_CONSOLES	4
-
 #define TIMEOUT		((HZ + 99) / 100)
 
 static struct tty_driver *hvc_driver;
-static int hvc_offset;
+static int count;
 #ifdef CONFIG_MAGIC_SYSRQ
 static int sysrq_pressed;
 #endif
@@ -51,6 +46,10 @@ static int sysrq_pressed;
 #define N_OUTBUF	16
 
 #define __ALIGNED__	__attribute__((__aligned__(8)))
+
+/* This driver speaks only in "indexes", i.e. logical consoles starting at 0.
+ * The ppc64 backend converts those indexes (e.g. hvc0) to whatever the
+ * ultimate "vterm number" that the platform understands. */
 
 struct hvc_struct {
 	spinlock_t lock;
@@ -112,7 +111,7 @@ static void hvc_push(struct hvc_struct *hp)
 {
 	int n;
 
-	n = hvc_put_chars(hp->index + hvc_offset, hp->outbuf, hp->n_outbuf);
+	n = hvc_put_chars(hp->index, hp->outbuf, hp->n_outbuf);
 	if (n <= 0) {
 		if (n == 0)
 			return;
@@ -192,7 +191,7 @@ static void hvc_poll(int index)
 		for (;;) {
 			if (TTY_FLIPBUF_SIZE - tty->flip.count < sizeof(buf))
 				break;
-			n = hvc_get_chars(index + hvc_offset, buf, sizeof(buf));
+			n = hvc_get_chars(index, buf, sizeof(buf));
 			if (n <= 0)
 				break;
 			for (i = 0; i < n; ++i) {
@@ -258,13 +257,7 @@ static struct tty_operations hvc_ops = {
 
 int __init hvc_init(void)
 {
-	int num = hvc_count(&hvc_offset);
-	int i;
-
-	if (num > MAX_NR_HVC_CONSOLES)
-		num = MAX_NR_HVC_CONSOLES;
-
-	hvc_driver = alloc_tty_driver(num);
+	hvc_driver = alloc_tty_driver(count);
 	if (!hvc_driver)
 		return -ENOMEM;
 
@@ -278,20 +271,20 @@ int __init hvc_init(void)
 	hvc_driver->init_termios = tty_std_termios;
 	hvc_driver->flags = TTY_DRIVER_REAL_RAW;
 	tty_set_operations(hvc_driver, &hvc_ops);
-	for (i = 0; i < num; i++) {
-		hvc_struct[i].lock = SPIN_LOCK_UNLOCKED;
-		hvc_struct[i].index = i;
-	}
 
 	if (tty_register_driver(hvc_driver))
 		panic("Couldn't register hvc console driver\n");
 
-	if (num > 0)
+	if (count > 0)
 		kernel_thread(khvcd, NULL, CLONE_KERNEL);
+	else
+		printk(KERN_WARNING "no virtual consoles found\n");
 
 	return 0;
 }
 device_initcall(hvc_init);
+
+/***** console (not tty) code: *****/
 
 void hvc_console_print(struct console *co, const char *b, unsigned count)
 {
@@ -311,7 +304,7 @@ void hvc_console_print(struct console *co, const char *b, unsigned count)
 				--count;
 			}
 		} else {
-			r = hvc_put_chars(co->index + hvc_offset, c, i);
+			r = hvc_put_chars(co->index, c, i);
 			if (r < 0) {
 				/* throw away chars on error */
 				i = 0;
@@ -333,7 +326,7 @@ static struct tty_driver *hvc_console_device(struct console *c, int *index)
 static int __init hvc_console_setup(struct console *co, char *options)
 {
 	if (co->index < 0 || co->index >= MAX_NR_HVC_CONSOLES
-	    || co->index >= hvc_count(&hvc_offset))
+	    || co->index >= count)
 		return -1;
 	return 0;
 }
@@ -347,8 +340,26 @@ struct console hvc_con_driver = {
 	.index		= -1,
 };
 
+/* hvc_instantiate - called once per discovered vterm by hvc_find_vterms */
+int hvc_instantiate(void)
+{
+	struct hvc_struct *hvc;
+
+	if (count >= MAX_NR_HVC_CONSOLES)
+		return -1;
+
+	hvc = &hvc_struct[count];
+	hvc->lock = SPIN_LOCK_UNLOCKED;
+	hvc->index = count;
+
+	count++;
+
+	return 0;
+}
+
 static int __init hvc_console_init(void)
 {
+	hvc_find_vterms(); /* populate hvc_struct[] early */
 	register_console(&hvc_con_driver);
 	return 0;
 }

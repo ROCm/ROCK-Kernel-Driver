@@ -80,7 +80,7 @@ unsigned long decr_overclock_proc0_set = 0;
 
 int powersave_nap;
 
-char saved_command_line[256];
+char saved_command_line[COMMAND_LINE_SIZE];
 unsigned char aux_device_present;
 
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
@@ -155,7 +155,7 @@ void __init disable_early_printk(void)
 void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_PPC_PSERIES
+#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
 	unsigned int ret, i;
 #endif
 
@@ -233,8 +233,8 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 				systemcfg->processorCount++;
 			}
 		}
-	}
 #endif /* CONFIG_SMP */
+	}
 #endif /* CONFIG_PPC_PSERIES */
 
 #ifdef CONFIG_PPC_PMAC
@@ -477,7 +477,7 @@ static int __init set_preferred_console(void)
 	char *name;
 
 	/* The user has requested a console so this is already set up. */
-	if (strstr(cmd_line, "console="))
+	if (strstr(saved_command_line, "console="))
 		return -EBUSY;
 
 	prom_stdout = find_path_device(of_stdout_device);
@@ -536,7 +536,7 @@ int parse_bootinfo(void)
 	for ( ; rec->tag != BI_LAST ; rec = bi_rec_next(rec) ) {
 		switch (rec->tag) {
 		case BI_CMD_LINE:
-			memcpy(cmd_line, (void *)rec->data, rec->size);
+			strlcpy(cmd_line, (void *)rec->data, sizeof(cmd_line));
 			break;
 		case BI_SYSMAP:
 			sysmap = __va(rec->data[0]);
@@ -619,7 +619,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = klimit;
 	
 	/* Save unparsed command line copy for /proc/cmdline */
-	strcpy(saved_command_line, cmd_line);
+	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
 	*cmdline_p = cmd_line;
 
 	/* set up the bootmem stuff with available memory */

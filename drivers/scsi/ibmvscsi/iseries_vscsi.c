@@ -3,6 +3,7 @@
  * (C) Copyright IBM Corporation 1994, 2003
  * Authors: Colin DeVilbiss (devilbis@us.ibm.com)
  *          Santiago Leon (santil@us.ibm.com)
+ *          Dave Boutcher (sleddog@us.ibm.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,57 +34,29 @@
 #include <asm/iSeries/HvLpConfig.h>
 #include "ibmvscsi.h"
 
-
 /* global variables */
-extern struct dma_dev *iSeries_pci_dev;
-static void ibmvscsi_handle_event(struct HvLpEvent *lpevt);
-static int open_event_path(void);
+extern struct device *iSeries_vio_dev;
 struct ibmvscsi_host_data *single_host_data = NULL; 
 
 /* ------------------------------------------------------------
  * Routines for managing the command/response queue
  */
-/* these routines should all be no-ops under iSeries; just succeed and end */
-
-int initialize_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
-{
-	return 0;
-}
-
-void release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
-{
-}
-
-struct VIOSRP_CRQ *crq_queue_next_crq(struct crq_queue *queue)
-{
-	return NULL;
-}
 
 /* ------------------------------------------------------------
  * Routines for direct interpartition interaction
  */
-int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
+struct VIOSRPLpEvent {
+    struct HvLpEvent lpevt;	/* 0x00-0x17          */
+    u32 reserved1;		/* 0x18-0x1B; unused  */
+    u16 version;		/* 0x1C-0x1D; unused  */
+    u16 subtype_rc;		/* 0x1E-0x1F; unused  */
+    struct VIOSRP_CRQ crq;	/* 0x20-0x3F          */
+};
+
+void ibmvscsi_task(unsigned long data) 
 {
-	single_host_data = hostdata;
-	return HvCallEvent_signalLpEventFast(
-		viopath_hostLp,
-		HvLpEvent_Type_VirtualIo,
-		viomajorsubtype_scsi,
-		HvLpEvent_AckInd_NoAck,
-		HvLpEvent_AckType_ImmediateAck,
-		viopath_sourceinst(viopath_hostLp),
-		viopath_targetinst(viopath_hostLp),
-		0,
-		VIOVERSION << 16, word1, word2, 0, 0);
 }
 
-struct VIOSRPLpEvent {
-	struct HvLpEvent lpevt;	// 0x00-0x17
-	u32 reserved1;		// 0x18-0x1B; unused
-	u16 version;		// 0x1C-0x1D; unused
-	u16 subtype_rc;		// 0x1E-0x1F; unused
-	struct VIOSRP_CRQ crq;	// 0x20-0x3F
-};
 static void ibmvscsi_handle_event(struct HvLpEvent *lpevt)
 {
 	struct VIOSRPLpEvent *evt = (struct VIOSRPLpEvent *)lpevt;
@@ -104,10 +77,9 @@ static void ibmvscsi_handle_event(struct HvLpEvent *lpevt)
 /* ------------------------------------------------------------
  * Routines for driver initialization
  */
-static int open_event_path(void)
+int ibmvscsi_init_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
 {
 	int rc;
-//	viopath_capability_mask mask = viopath_get_capabilities();
 
 	rc = viopath_open(viopath_hostLp, viomajorsubtype_scsi, 0);
 	if (rc < 0) {
@@ -120,83 +92,60 @@ static int open_event_path(void)
 		printk("vio_setHandler failed with rc %d in open_event_path\n", rc);
 		goto vio_setHandler_failed;
 	}
-	return 1;
+	return 0;
 
 vio_setHandler_failed:
 	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
 		IBMVSCSI_MAX_REQUESTS);
 viopath_open_failed:
-	return 0;
+	return -1;
 }
 
-int ibmvscsi_detect(Scsi_Host_Template * host_template)
+void ibmvscsi_release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
 {
-	struct dma_dev *dma_dev;
-
-	if(!open_event_path()) {
-		printk("ibmvscsi: couldn't open vio event path\n");
-		return 0;
-	}
-	dma_dev = iSeries_pci_dev;
-	if(!dma_dev) {
-		printk("ibmvscsi: couldn't find a device to open\n");
-		vio_clearHandler(viomajorsubtype_scsi);
-		return 0;
-	}
-
-	single_host_data = ibmvscsi_probe_generic(dma_dev, NULL);
-
-	return 1;
-}
-
-int ibmvscsi_release(struct Scsi_Host *host)
-{
-	struct ibmvscsi_host_data *hostdata = *(struct ibmvscsi_host_data **)&host->hostdata;
-	/* send an SRP_I_LOGOUT */
-	printk("ibmvscsi: release called\n");
-
-	ibmvscsi_remove_generic(hostdata);
-	single_host_data = NULL;
-
 	vio_clearHandler(viomajorsubtype_scsi);
 	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
 		IBMVSCSI_MAX_REQUESTS);
-	return 0;
 }
-/* ------------------------------------------------------------
- * Routines to complete Linux SCSI Host support
+
+/**
+ * ibmvscsi_send_crq: - Send a CRQ
+ * @hostdata:	the adapter
+ * @word1:	the first 64 bits of the data
+ * @word2:	the second 64 bits of the data
  */
-
-int ibmvscsi_enable_interrupts(struct dma_dev *dev)
+int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
 {
-	/*we're not disabling interrupt in iSeries*/
-	return 0;
-}
-
-int ibmvscsi_disable_interrupts(struct dma_dev *dev)
-{
-	/*we're not disabling interrupt in iSeries*/
-	return 0;
-}
-
-/**
- * iSeries_vscsi_init: - Init function for module
- *
-*/
-int __init ibmvscsi_module_init(void)
-{
-	printk(KERN_DEBUG "Loading iSeries_vscsi module\n");
-	inter_module_register("vscsi_ref", THIS_MODULE, NULL);
-	return 0;
+	single_host_data = hostdata;
+	return HvCallEvent_signalLpEventFast(
+		viopath_hostLp,
+		HvLpEvent_Type_VirtualIo,
+		viomajorsubtype_scsi,
+		HvLpEvent_AckInd_NoAck,
+		HvLpEvent_AckType_ImmediateAck,
+		viopath_sourceinst(viopath_hostLp),
+		viopath_targetinst(viopath_hostLp),
+		0,
+		VIOVERSION << 16, word1, word2, 0, 0);
 }
 
 /**
- * iSeries_vscsi_exit: - Exit function for module
- *
-*/
-void __exit ibmvscsi_module_exit(void)
+ * ibmvscsi_register_driver:  the call back from the generic ibmvscsi code at startup
+ * time.
+ */
+int ibmvscsi_register_driver(void)
 {
-	printk(KERN_DEBUG "Unloading iSeries_vscsi module\n");
-	inter_module_unregister("vscsi_ref");
+	single_host_data = ibmvscsi_probe(iSeries_vio_dev);
+	return (single_host_data == NULL);
 }
+
+/**
+ * ibmvscsi_unregister_driver:  the call back from the generic ibmvscsi code at shutdown
+ * time.
+ */
+void ibmvscsi_unregister_driver(void)
+{
+	ibmvscsi_remove(single_host_data);
+}	
+
 

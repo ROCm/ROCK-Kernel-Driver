@@ -73,11 +73,13 @@ static struct iSeries_Device_Node iSeries_pci_dev_node = {
 };
 
 static struct pci_dev    iSeries_veth_dev_st = {
-	.sysdata = &iSeries_veth_dev_node
+	.sysdata = &iSeries_veth_dev_node,
+	.dev.bus_id  = "lpbus"
 };
 static struct pci_dev    iSeries_pci_dev_st  = {
 	.dev.bus = &pci_bus_type,
-	.sysdata = &iSeries_pci_dev_node
+	.sysdata = &iSeries_pci_dev_node,
+	.dev.bus_id  = "lpbus"
 };
 
 struct pci_dev  * iSeries_veth_dev = &iSeries_veth_dev_st;

@@ -247,10 +247,8 @@ void eeh_init(void)
 {
 	struct device_node *phb;
 	struct eeh_early_enable_info info;
-
-	extern char cmd_line[];	/* Very early cmd line parse.  Cheap, but works. */
-	char *eeh_force_off = strstr(cmd_line, "eeh-force-off");
-	char *eeh_force_on = strstr(cmd_line, "eeh-force-on");
+	char *eeh_force_off = strstr(saved_command_line, "eeh-force-off");
+	char *eeh_force_on = strstr(saved_command_line, "eeh-force-on");
 
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");

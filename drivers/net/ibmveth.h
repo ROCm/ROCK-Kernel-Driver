@@ -112,7 +112,7 @@ struct ibmveth_adapter {
     dma_addr_t filter_list_dma;
     struct ibmveth_buff_pool rx_buff_pool[IbmVethNumBufferPools];
     struct ibmveth_rx_q rx_queue;
-    spinlock_t lock;
+    atomic_t not_replenishing;
 
     /* helper tasks */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)

@@ -28,7 +28,6 @@
 
 #ifdef CONFIG_SMP
 
-extern void smp_message_pass(int target, int msg, unsigned long data, int wait);
 extern void smp_send_debugger_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);

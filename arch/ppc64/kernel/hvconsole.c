@@ -24,11 +24,17 @@
 #include <asm/prom.h>
 #include <asm/hvconsole.h>
 
+/* map console index (e.g. 0) to vterm number (e.g. 0x30000000) */
+static int vtermnos[MAX_NR_HVC_CONSOLES];
+
 int hvc_get_chars(int index, char *buf, int count)
 {
 	unsigned long got;
 
-	if (plpar_hcall(H_GET_TERM_CHAR, index, 0, 0, 0, &got,
+	if (index > MAX_NR_HVC_CONSOLES)
+		return -1;
+
+	if (plpar_hcall(H_GET_TERM_CHAR, vtermnos[index], 0, 0, 0, &got,
 		(unsigned long *)buf, (unsigned long *)buf+1) == H_Success) {
 		/*
 		 * Work around a HV bug where it gives us a null
@@ -55,7 +61,10 @@ int hvc_put_chars(int index, const char *buf, int count)
 	unsigned long *lbuf = (unsigned long *) buf;
 	long ret;
 
-	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, index, count, lbuf[0],
+	if (index > MAX_NR_HVC_CONSOLES)
+		return -1;
+
+	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, vtermnos[index], count, lbuf[0],
 				 lbuf[1]);
 	if (ret == H_Success)
 		return count;
@@ -64,25 +73,28 @@ int hvc_put_chars(int index, const char *buf, int count)
 	return -1;
 }
 
-/* return the number of client vterms present */
-/* XXX this requires an interface change to handle multiple discontiguous
- * vterms */
-int hvc_count(int *start_termno)
+int hvc_find_vterms(void)
 {
 	struct device_node *vty;
-	int num_found = 0;
+	int count = 0;
 
-	/* consider only the first vty node.
-	 * we should _always_ be able to find one. */
-	vty = of_find_node_by_name(NULL, "vty");
-	if (vty && device_is_compatible(vty, "hvterm1")) {
-		u32 *termno = (u32 *)get_property(vty, "reg", 0);
+	for (vty = of_find_node_by_name(NULL, "vty"); vty != NULL;
+			vty = of_find_node_by_name(vty, "vty")) {
+		u32 *vtermno;
 
-		if (termno && start_termno)
-			*start_termno = *termno;
-		num_found = 1;
-		of_node_put(vty);
+		vtermno = (u32 *)get_property(vty, "reg", NULL);
+		if (!vtermno)
+			continue;
+
+		if (count >= MAX_NR_HVC_CONSOLES)
+			break;
+
+		if (device_is_compatible(vty, "hvterm1")) {
+			vtermnos[count] = *vtermno;
+			hvc_instantiate();
+			count++;
+		}
 	}
 
-	return num_found;
+	return count;
 }

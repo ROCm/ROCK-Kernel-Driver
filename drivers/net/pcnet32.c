@@ -1698,9 +1698,9 @@ static int pcnet32_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static void pcnet32_watchdog(struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
-    unsigned long flags;
+    unsigned long flags;  
 
-    spin_lock_irqsave(&lp->lock, flags);
+    spin_lock_irqsave(&lp->lock, flags);	
 
     /* Print the link status if it has changed */
     if (lp->mii)
@@ -1709,7 +1709,6 @@ static void pcnet32_watchdog(struct net_device *dev)
     mod_timer (&(lp->watchdog_timer), PCNET32_WATCHDOG_TIMEOUT);
 
     spin_unlock_irqrestore(&lp->lock, flags);
-
 }
 
 static struct pci_driver pcnet32_driver = {
