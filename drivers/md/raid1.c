@@ -293,7 +293,7 @@ static void end_request(struct bio *bio)
 		 * oops, read error:
 		 */
 		printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
-			bdev_partition_name(bio->bi_bdev), r1_bio->sector);
+			bdev_partition_name(conf->mirrors[mirror].bdev), r1_bio->sector);
 		reschedule_retry(r1_bio);
 		return;
 	}
