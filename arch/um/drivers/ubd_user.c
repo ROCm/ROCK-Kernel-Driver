@@ -350,6 +350,7 @@ int start_io_thread(unsigned long sp, int *fd_out)
 		    NULL);
 	if(pid < 0){
 		printk("start_io_thread - clone failed : errno = %d\n", errno);
+		err = -errno;
 		goto out_close;
 	}
 
