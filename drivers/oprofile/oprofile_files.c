@@ -21,9 +21,7 @@ unsigned long fs_buffer_watershed = 32768; /* FIXME: tune */
  
 static ssize_t cpu_type_read(struct file * file, char * buf, size_t count, loff_t * offset)
 {
-	unsigned long cpu_type = oprofile_cpu_type;
-
-	return oprofilefs_ulong_to_user(&cpu_type, buf, count, offset);
+	return oprofilefs_str_to_user(oprofile_ops->cpu_type, buf, count, offset);
 }
  
  

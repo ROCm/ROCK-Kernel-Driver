@@ -217,7 +217,7 @@ struct oprofile_operations nmi_ops = {
 
 #if !defined(CONFIG_X86_64)
 
-static int __init p4_init(enum oprofile_cpu * cpu)
+static int __init p4_init(void)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
@@ -225,18 +225,18 @@ static int __init p4_init(enum oprofile_cpu * cpu)
 		return 0;
 
 #ifndef CONFIG_SMP
-	*cpu = OPROFILE_CPU_P4;
+	nmi_ops.cpu_type = "i386/p4";
 	model = &op_p4_spec;
 	return 1;
 #else
 	switch (smp_num_siblings) {
 		case 1:
-			*cpu = OPROFILE_CPU_P4;
+			nmi_ops.cpu_type = "i386/p4";
 			model = &op_p4_spec;
 			return 1;
 
 		case 2:
-			*cpu = OPROFILE_CPU_P4_HT2;
+			nmi_ops.cpu_type = "i386/p4-ht";
 			model = &op_p4_ht2_spec;
 			return 1;
 	}
@@ -248,16 +248,16 @@ static int __init p4_init(enum oprofile_cpu * cpu)
 }
 
 
-static int __init ppro_init(enum oprofile_cpu * cpu)
+static int __init ppro_init(void)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
 	if (cpu_model > 5) {
-		*cpu = OPROFILE_CPU_PIII;
+		nmi_ops.cpu_type = "i386/piii";
 	} else if (cpu_model > 2) {
-		*cpu = OPROFILE_CPU_PII;
+		nmi_ops.cpu_type = "i386/pii";
 	} else {
-		*cpu = OPROFILE_CPU_PPRO;
+		nmi_ops.cpu_type = "i386/ppro";
 	}
 
 	model = &op_ppro_spec;
@@ -266,7 +266,7 @@ static int __init ppro_init(enum oprofile_cpu * cpu)
 
 #endif /* !CONFIG_X86_64 */
  
-int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
+int __init nmi_init(struct oprofile_operations ** ops)
 {
 	__u8 vendor = current_cpu_data.x86_vendor;
 	__u8 family = current_cpu_data.x86;
@@ -280,7 +280,7 @@ int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
 			if (family < 6)
 				return 0;
 			model = &op_athlon_spec;
-			*cpu = OPROFILE_CPU_ATHLON;
+			nmi_ops.cpu_type = "i386/athlon";
 			break;
  
 #if !defined(CONFIG_X86_64)
@@ -288,13 +288,13 @@ int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
 			switch (family) {
 				/* Pentium IV */
 				case 0xf:
-					if (!p4_init(cpu))
+					if (!p4_init())
 						return 0;
 					break;
 
 				/* A P6-class processor */
 				case 6:
-					if (!ppro_init(cpu))
+					if (!ppro_init())
 						return 0;
 					break;
 

@@ -44,13 +44,13 @@ static void timer_stop(void)
 
 static struct oprofile_operations timer_ops = {
 	.start	= timer_start,
-	.stop	= timer_stop
+	.stop	= timer_stop,
+	.cpu_type = "timer"
 };
 
  
-void __init timer_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
+void __init timer_init(struct oprofile_operations ** ops)
 {
 	*ops = &timer_ops;
-	*cpu = OPROFILE_CPU_TIMER;
 	printk(KERN_INFO "oprofile: using timer interrupt.\n");
 }

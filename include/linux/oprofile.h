@@ -21,24 +21,6 @@ struct super_block;
 struct dentry;
 struct file_operations;
  
-/* This is duplicated from user-space so
- * must be kept in sync :(
- */
-enum oprofile_cpu {
-	OPROFILE_CPU_PPRO,
-	OPROFILE_CPU_PII,
-	OPROFILE_CPU_PIII,
-	OPROFILE_CPU_ATHLON,
-	OPROFILE_CPU_TIMER,
-	OPROFILE_UNUSED1, /* 2.4's RTC mode */
-	OPROFILE_CPU_P4,
-	OPROFILE_CPU_IA64,
-	OPROFILE_CPU_IA64_1,
-	OPROFILE_CPU_IA64_2,
-	OPROFILE_CPU_HAMMER,
-	OPROFILE_CPU_P4_HT2
-};
-
 /* Operations structure to be filled in */
 struct oprofile_operations {
 	/* create any necessary configuration files in the oprofile fs.
@@ -52,14 +34,16 @@ struct oprofile_operations {
 	int (*start)(void);
 	/* Stop delivering interrupts. */
 	void (*stop)(void);
+	/* CPU identification string. */
+	char * cpu_type;
 };
 
 /**
  * One-time initialisation. *ops must be set to a filled-in
- * operations structure. oprofile_cpu_type must be set.
+ * operations structure.
  * Return 0 on success.
  */
-int oprofile_arch_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu);
+int oprofile_arch_init(struct oprofile_operations ** ops);
  
 /**
  * Add a sample. This may be called from any context. Pass
@@ -89,6 +73,12 @@ int oprofilefs_create_ro_atomic(struct super_block * sb, struct dentry * root,
 /** create a directory */
 struct dentry * oprofilefs_mkdir(struct super_block * sb, struct dentry * root,
 	char const * name);
+
+/**
+ * Write the given asciz string to the given user buffer @buf, updating *offset
+ * appropriately. Returns bytes written or -EFAULT.
+ */
+ssize_t oprofilefs_str_to_user(char const * str, char * buf, size_t count, loff_t * offset);
 
 /**
  * Convert an unsigned long value into ASCII and copy it to the user buffer @buf,

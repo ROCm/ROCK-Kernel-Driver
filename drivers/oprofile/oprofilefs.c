@@ -44,6 +44,29 @@ static struct super_operations s_ops = {
 	.drop_inode 	= generic_delete_inode,
 };
 
+
+ssize_t oprofilefs_str_to_user(char const * str, char * buf, size_t count, loff_t * offset)
+{
+	size_t len = strlen(str);
+
+	if (!count)
+		return 0;
+
+	if (*offset > len)
+		return 0;
+
+	if (count > len - *offset)
+		count = len - *offset;
+
+	if (copy_to_user(buf, str + *offset, count))
+		return -EFAULT;
+
+	*offset += count;
+
+	return count;
+}
+
+
 #define TMPBUFSIZE 50
 
 ssize_t oprofilefs_ulong_to_user(unsigned long * val, char * buf, size_t count, loff_t * offset)
