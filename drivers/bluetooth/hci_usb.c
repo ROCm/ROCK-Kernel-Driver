@@ -1013,4 +1013,5 @@ module_exit(hci_usb_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");

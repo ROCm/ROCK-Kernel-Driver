@@ -306,4 +306,5 @@ module_exit(bcm203x_cleanup);
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Broadcom Blutonium firmware driver ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");

@@ -5,7 +5,7 @@
 	Clément Moreau <clement.moreau@inventel.fr>
 	David Libault  <david.libault@inventel.fr>
 
-   Copyright (C) 2002 Maxim Krasnyanskiy <maxk@qualcomm.com>
+   Copyright (C) 2002 Maxim Krasnyansky <maxk@qualcomm.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 2 as
@@ -702,7 +702,8 @@ static void __exit bnep_cleanup_module(void)
 module_init(bnep_init_module);
 module_exit(bnep_cleanup_module);
 
+MODULE_AUTHOR("David Libault <david.libault@inventel.fr>, Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth BNEP ver " VERSION);
-MODULE_AUTHOR("David Libault <david.libault@inventel.fr>, Maxim Krasnyanskiy <maxk@qualcomm.com>");
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("bt-proto-4");
