@@ -7474,6 +7474,18 @@ CONFIG_NET_PCMCIA_RADIO
   location). You also want to check out the PCMCIA-HOWTO, available
   from http://www.linuxdoc.org/docs.html#howto .
 
+Hermes (AT&T/Lucent/Orinoco/3com) wireless support
+CONFIG_PCMCIA_HERMES
+  A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
+  as the Lucent/Orinoco cards and the Cabletron RoamAbout. It should
+  also be usable on Prism II based cards such as the Farallon Skyline
+  and the 3Com AirConnect.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file Documentation/Changes for
+  location). You also want to check out the PCMCIA-HOWTO, available
+  from http://www.linuxdoc.org/docs.html#howto .
+
 Aviator/Raytheon 2.4MHz wireless support
 CONFIG_PCMCIA_RAYCS
   Say Y here if you intend to attach an Aviator/Raytheon PCMCIA

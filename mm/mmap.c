@@ -177,7 +177,7 @@ out:
  * internally. Essentially, translate the "PROT_xxx" and "MAP_xxx" bits
  * into "VM_xxx".
  */
-static inline unsigned long vm_flags(unsigned long prot, unsigned long flags)
+static inline unsigned long calc_vm_flags(unsigned long prot, unsigned long flags)
 {
 #define _trans(x,bit1,bit2) \
 ((bit1==bit2)?(x&bit1):(x&bit1)?bit2:0)
@@ -200,11 +200,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 {
 	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma;
+	unsigned int vm_flags;
 	int correct_wcount = 0;
 	int error;
-
-	if (file && (!file->f_op || !file->f_op->mmap))
-		return -ENODEV;
 
 	if ((len = PAGE_ALIGN(len)) == 0)
 		return addr;
@@ -220,19 +218,36 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	if (mm->map_count > MAX_MAP_COUNT)
 		return -ENOMEM;
 
-	/* mlock MCL_FUTURE? */
-	if (mm->def_flags & VM_LOCKED) {
-		unsigned long locked = mm->locked_vm << PAGE_SHIFT;
-		locked += len;
-		if (locked > current->rlim[RLIMIT_MEMLOCK].rlim_cur)
-			return -EAGAIN;
+	/* Obtain the address to map to. we verify (or select) it and ensure
+	 * that it represents a valid section of the address space.
+	 */
+	if (flags & MAP_FIXED) {
+		if (addr & ~PAGE_MASK)
+			return -EINVAL;
+	} else {
+		addr = get_unmapped_area(addr, len);
+		if (!addr)
+			return -ENOMEM;
 	}
 
 	/* Do simple checking here so the lower-level routines won't have
 	 * to. we assume access permissions have been handled by the open
 	 * of the memory object, so we don't do any here.
 	 */
-	if (file != NULL) {
+	vm_flags = calc_vm_flags(prot,flags) | mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
+
+	/* mlock MCL_FUTURE? */
+	if (vm_flags & VM_LOCKED) {
+		unsigned long locked = mm->locked_vm << PAGE_SHIFT;
+		locked += len;
+		if (locked > current->rlim[RLIMIT_MEMLOCK].rlim_cur)
+			return -EAGAIN;
+	}
+
+	if (file) {
+		if (!file->f_op || !file->f_op->mmap)
+			return -ENODEV;
+
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
 			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))
@@ -246,6 +261,10 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 			if (locks_verify_locked(file->f_dentry->d_inode))
 				return -EAGAIN;
 
+			vm_flags |= VM_SHARED | VM_MAYSHARE;
+			if (!(file->f_mode & FMODE_WRITE))
+				vm_flags &= ~(VM_MAYWRITE | VM_SHARED);
+
 			/* fall through */
 		case MAP_PRIVATE:
 			if (!(file->f_mode & FMODE_READ))
@@ -255,18 +274,43 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 		default:
 			return -EINVAL;
 		}
+	} else {
+		vm_flags |= VM_SHARED | VM_MAYSHARE;
+		switch (flags & MAP_TYPE) {
+		default:
+			return -EINVAL;
+		case MAP_PRIVATE:
+			vm_flags &= ~(VM_SHARED | VM_MAYSHARE);
+			/* fall through */
+		case MAP_SHARED:
+			break;
+		}
 	}
 
-	/* Obtain the address to map to. we verify (or select) it and ensure
-	 * that it represents a valid section of the address space.
-	 */
-	if (flags & MAP_FIXED) {
-		if (addr & ~PAGE_MASK)
-			return -EINVAL;
-	} else {
-		addr = get_unmapped_area(addr, len);
-		if (!addr)
-			return -ENOMEM;
+	/* Clear old maps */
+	error = -ENOMEM;
+	if (do_munmap(mm, addr, len))
+		return -ENOMEM;
+
+	/* Check against address space limit. */
+	if ((mm->total_vm << PAGE_SHIFT) + len
+	    > current->rlim[RLIMIT_AS].rlim_cur)
+		return -ENOMEM;
+
+	/* Private writable mapping? Check memory availability.. */
+	if ((vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE &&
+	    !(flags & MAP_NORESERVE)				 &&
+	    !vm_enough_memory(len >> PAGE_SHIFT))
+		return -ENOMEM;
+
+	/* Can we just expand an old anonymous mapping? */
+	if (addr && !file && !(vm_flags & VM_SHARED)) {
+		struct vm_area_struct * vma = find_vma(mm, addr-1);
+		if (vma && vma->vm_end == addr && !vma->vm_file && 
+		    vma->vm_flags == vm_flags) {
+			vma->vm_end = addr + len;
+			goto out;
+		}
 	}
 
 	/* Determine the object being mapped and call the appropriate
@@ -280,58 +324,16 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	vma->vm_mm = mm;
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
-	vma->vm_flags = vm_flags(prot,flags) | mm->def_flags;
-
-	if (file) {
-		VM_ClearReadHint(vma);
-		vma->vm_raend = 0;
-
-		if (file->f_mode & FMODE_READ)
-			vma->vm_flags |= VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
-		if (flags & MAP_SHARED) {
-			vma->vm_flags |= VM_SHARED | VM_MAYSHARE;
-
-			/* This looks strange, but when we don't have the file open
-			 * for writing, we can demote the shared mapping to a simpler
-			 * private mapping. That also takes care of a security hole
-			 * with ptrace() writing to a shared mapping without write
-			 * permissions.
-			 *
-			 * We leave the VM_MAYSHARE bit on, just to get correct output
-			 * from /proc/xxx/maps..
-			 */
-			if (!(file->f_mode & FMODE_WRITE))
-				vma->vm_flags &= ~(VM_MAYWRITE | VM_SHARED);
-		}
-	} else {
-		vma->vm_flags |= VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
-		if (flags & MAP_SHARED)
-			vma->vm_flags |= VM_SHARED | VM_MAYSHARE;
-	}
-	vma->vm_page_prot = protection_map[vma->vm_flags & 0x0f];
+	vma->vm_flags = vm_flags;
+	vma->vm_page_prot = protection_map[vm_flags & 0x0f];
 	vma->vm_ops = NULL;
 	vma->vm_pgoff = pgoff;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
-
-	/* Clear old maps */
-	error = -ENOMEM;
-	if (do_munmap(mm, addr, len))
-		goto free_vma;
-
-	/* Check against address space limit. */
-	if ((mm->total_vm << PAGE_SHIFT) + len
-	    > current->rlim[RLIMIT_AS].rlim_cur)
-		goto free_vma;
-
-	/* Private writable mapping? Check memory availability.. */
-	if ((vma->vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE &&
-	    !(flags & MAP_NORESERVE)				 &&
-	    !vm_enough_memory(len >> PAGE_SHIFT))
-		goto free_vma;
+	vma->vm_raend = 0;
 
 	if (file) {
-		if (vma->vm_flags & VM_DENYWRITE) {
+		if (vm_flags & VM_DENYWRITE) {
 			error = deny_write_access(file);
 			if (error)
 				goto free_vma;
@@ -353,15 +355,15 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	 * Answer: Yes, several device drivers can do it in their
 	 *         f_op->mmap method. -DaveM
 	 */
-	flags = vma->vm_flags;
 	addr = vma->vm_start;
 
 	insert_vm_struct(mm, vma);
 	if (correct_wcount)
 		atomic_inc(&file->f_dentry->d_inode->i_writecount);
-	
+
+out:	
 	mm->total_vm += len >> PAGE_SHIFT;
-	if (flags & VM_LOCKED) {
+	if (vm_flags & VM_LOCKED) {
 		mm->locked_vm += len >> PAGE_SHIFT;
 		make_pages_present(addr, addr + len);
 	}
@@ -825,12 +827,11 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (!vm_enough_memory(len >> PAGE_SHIFT))
 		return -ENOMEM;
 
-	flags = vm_flags(PROT_READ|PROT_WRITE|PROT_EXEC,
+	flags = calc_vm_flags(PROT_READ|PROT_WRITE|PROT_EXEC,
 				MAP_FIXED|MAP_PRIVATE) | mm->def_flags;
 
 	flags |= VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 	
-
 	/* Can we just expand an old anonymous mapping? */
 	if (addr) {
 		struct vm_area_struct * vma = find_vma(mm, addr-1);
@@ -840,7 +841,6 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 			goto out;
 		}
 	}	
-
 
 	/*
 	 * create a vma struct for an anonymous mapping
@@ -889,8 +889,8 @@ void exit_mmap(struct mm_struct * mm)
 	spin_lock(&mm->page_table_lock);
 	mpnt = mm->mmap;
 	mm->mmap = mm->mmap_avl = mm->mmap_cache = NULL;
-	spin_unlock(&mm->page_table_lock);
 	mm->rss = 0;
+	spin_unlock(&mm->page_table_lock);
 	mm->total_vm = 0;
 	mm->locked_vm = 0;
 

@@ -204,7 +204,6 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
 		if (bprm->page[i]) {
-			current->mm->rss++;
 			put_dirty_page(current,bprm->page[i],stack_base);
 		}
 		stack_base += PAGE_SIZE;

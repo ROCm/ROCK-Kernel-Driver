@@ -374,7 +374,6 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	spin_unlock(&mm->page_table_lock);
 	/*
 	 * Update rss for the mm_struct (not necessarily current->mm)
 	 * Notice that rss is an unsigned long.
@@ -383,6 +382,7 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
 		mm->rss -= freed;
 	else
 		mm->rss = 0;
+	spin_unlock(&mm->page_table_lock);
 }
 
 
@@ -792,6 +792,8 @@ int remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long 
  *  - flush the old one
  *  - update the page tables
  *  - inform the TLB about the new one
+ *
+ * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
  */
 static inline void establish_pte(struct vm_area_struct * vma, unsigned long address, pte_t *page_table, pte_t entry)
 {
@@ -800,6 +802,9 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 	update_mmu_cache(vma, address, entry);
 }
 
+/*
+ * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
+ */
 static inline void break_cow(struct vm_area_struct * vma, struct page *	old_page, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
@@ -1024,25 +1029,26 @@ void swapin_readahead(swp_entry_t entry)
 }
 
 /*
- * We hold the mm semaphore and the page_table_lock on entry
- * and exit.
+ * We hold the mm semaphore and the page_table_lock on entry and exit.
  */
 static int do_swap_page(struct mm_struct * mm,
 	struct vm_area_struct * vma, unsigned long address,
 	pte_t * page_table, swp_entry_t entry, int write_access)
 {
-	struct page *page = lookup_swap_cache(entry);
+	struct page *page;
 	pte_t pte;
 
+	spin_unlock(&mm->page_table_lock);
+	page = lookup_swap_cache(entry);
 	if (!page) {
-		spin_unlock(&mm->page_table_lock);
 		lock_kernel();
 		swapin_readahead(entry);
 		page = read_swap_cache(entry);
 		unlock_kernel();
-		spin_lock(&mm->page_table_lock);
-		if (!page)
+		if (!page) {
+			spin_lock(&mm->page_table_lock);
 			return -1;
+		}
 
 		flush_page_to_ram(page);
 		flush_icache_page(vma, page);
@@ -1053,13 +1059,13 @@ static int do_swap_page(struct mm_struct * mm,
 	 * Must lock page before transferring our swap count to already
 	 * obtained page count.
 	 */
-	spin_unlock(&mm->page_table_lock);
 	lock_page(page);
-	spin_lock(&mm->page_table_lock);
 
 	/*
-	 * Back out if somebody else faulted in this pte while we slept.
+	 * Back out if somebody else faulted in this pte while we
+	 * released the page table lock.
 	 */
+	spin_lock(&mm->page_table_lock);
 	if (pte_present(*page_table)) {
 		UnlockPage(page);
 		page_cache_release(page);

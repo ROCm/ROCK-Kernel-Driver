@@ -307,6 +307,8 @@ struct tty_struct {
 	struct semaphore atomic_read;
 	struct semaphore atomic_write;
 	spinlock_t read_lock;
+	/* If the tty has a pending do_SAK, queue it here - akpm */
+	struct tq_struct SAK_tq;
 };
 
 /* tty magic number */

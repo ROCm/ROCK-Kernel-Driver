@@ -293,8 +293,8 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		"page %u %u\n"
                 "swap %u %u\n"
 		"intr %u",
-			kstat.pgpgin,
-			kstat.pgpgout,
+			kstat.pgpgin >> 1,
+			kstat.pgpgout >> 1,
 			kstat.pswpin,
 			kstat.pswpout,
 			sum

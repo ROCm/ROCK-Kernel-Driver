@@ -2331,6 +2331,13 @@ ohci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	unsigned long mem_resource, mem_len;
 	void *mem_base;
 
+	/* blacklisted hardware? */
+	if (id->driver_data) {
+		info ("%s (%s): %s", dev->slot_name,
+			dev->name, (char *) id->driver_data);
+		return -ENODEV;
+	}
+
 	if (pci_enable_device(dev) < 0)
 		return -ENODEV;
 	
@@ -2495,6 +2502,20 @@ ohci_pci_resume (struct pci_dev *dev)
 /*-------------------------------------------------------------------------*/
 
 static const struct pci_device_id __devinitdata ohci_pci_ids [] = { {
+
+	/*
+	 * AMD-756 [Viper] USB has a serious erratum when used with
+	 * lowspeed devices like mice; oopses have been seen.  The
+	 * vendor workaround needs an NDA ... for now, blacklist it.
+	 */
+	vendor:		0x1022,
+	device:		0x740c,
+	subvendor:	PCI_ANY_ID,
+	subdevice:	PCI_ANY_ID,
+
+	driver_data:	(unsigned long) "blacklisted, erratum #4",
+
+} , {
 
 	/* handle any USB OHCI controller */
 	class: 		((PCI_CLASS_SERIAL_USB << 8) | 0x10),

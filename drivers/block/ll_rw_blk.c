@@ -954,6 +954,8 @@ void generic_make_request (int rw, struct buffer_head * bh)
  */
 void submit_bh(int rw, struct buffer_head * bh)
 {
+	int count = bh->b_size >> 9;
+
 	if (!test_bit(BH_Lock, &bh->b_state))
 		BUG();
 
@@ -964,16 +966,16 @@ void submit_bh(int rw, struct buffer_head * bh)
 	 * further remap this.
 	 */
 	bh->b_rdev = bh->b_dev;
-	bh->b_rsector = bh->b_blocknr * (bh->b_size >> 9);
+	bh->b_rsector = bh->b_blocknr * count;
 
 	generic_make_request(rw, bh);
 
 	switch (rw) {
 		case WRITE:
-			kstat.pgpgout++;
+			kstat.pgpgout += count;
 			break;
 		default:
-			kstat.pgpgin++;
+			kstat.pgpgin += count;
 			break;
 	}
 }

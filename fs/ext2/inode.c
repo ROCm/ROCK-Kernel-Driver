@@ -1047,6 +1047,7 @@ void ext2_read_inode (struct inode * inode)
 		inode->i_size |= ((__u64)le32_to_cpu(raw_inode->i_size_high)) << 32;
 	}
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
+	inode->u.ext2_i.i_prealloc_count = 0;
 	inode->u.ext2_i.i_block_group = block_group;
 
 	/*

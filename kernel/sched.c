@@ -82,6 +82,8 @@ struct task_struct * init_tasks[NR_CPUS] = {&init_task, };
  *
  * If both locks are to be concurrently held, the runqueue_lock
  * nests inside the tasklist_lock.
+ *
+ * task->alloc_lock nests inside tasklist_lock.
  */
 spinlock_t runqueue_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;  /* inner */
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;	/* outer */

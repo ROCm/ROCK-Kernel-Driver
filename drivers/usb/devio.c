@@ -838,7 +838,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		}
 		if (totlen > 32768) {
 			kfree(isopkt);
-			return -ENOMEM;
+			return -EINVAL;
 		}
 		uurb.buffer_length = totlen;
 		break;

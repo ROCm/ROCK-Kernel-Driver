@@ -48,6 +48,7 @@ out_unlock:
 	UnlockPage(page);
 	page_cache_release(page);
 out:
+	return;
 }
 
 /*

@@ -264,8 +264,8 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 			belkin_sa_close (&serial->port[i], NULL);
 		}
 		/* My special items, the standard routines free my urbs */
-		if (serial->port->private)
-			kfree(serial->port->private);
+		if (serial->port[i].private)
+			kfree(serial->port[i].private);
 	}
 }
 

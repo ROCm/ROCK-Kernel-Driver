@@ -60,6 +60,9 @@
  *
  * Reduced memory usage for older ARM systems
  *      -- Russell King <rmk@arm.linux.org.uk>
+ *
+ * Move do_SAK() into process context.  Less stack use in devfs functions.
+ * alloc_tty_struct() always uses kmalloc() -- Andrew Morton <andrewm@uow.edu.eu> 17Mar01
  */
 
 #include <linux/config.h>
@@ -159,26 +162,19 @@ extern void sci_console_init(void);
 #define MAX(a,b)	((a) < (b) ? (b) : (a))
 #endif
 
-static inline struct tty_struct *alloc_tty_struct(void)
+static struct tty_struct *alloc_tty_struct(void)
 {
 	struct tty_struct *tty;
 
-	if (PAGE_SIZE > 8192) {
-		tty = kmalloc(sizeof(struct tty_struct), GFP_KERNEL);
-		if (tty)
-			memset(tty, 0, sizeof(struct tty_struct));
-	} else
-		tty = (struct tty_struct *)get_zeroed_page(GFP_KERNEL);
-
+	tty = kmalloc(sizeof(struct tty_struct), GFP_KERNEL);
+	if (tty)
+		memset(tty, 0, sizeof(struct tty_struct));
 	return tty;
 }
 
 static inline void free_tty_struct(struct tty_struct *tty)
 {
-	if (PAGE_SIZE > 8192)
-		kfree(tty);
-	else
-		free_page((unsigned long) tty);
+	kfree(tty);
 }
 
 /*
@@ -1814,12 +1810,16 @@ int tty_ioctl(struct inode * inode, struct file * file,
  * Now, if it would be correct ;-/ The current code has a nasty hole -
  * it doesn't catch files in flight. We may send the descriptor to ourselves
  * via AF_UNIX socket, close it and later fetch from socket. FIXME.
+ *
+ * Nasty bug: do_SAK is being called in interrupt context.  This can
+ * deadlock.  We punt it up to process context.  AKPM - 16Mar2001
  */
-void do_SAK( struct tty_struct *tty)
+static void __do_SAK(void *arg)
 {
 #ifdef TTY_SOFT_SAK
 	tty_hangup(tty);
 #else
+	struct tty_struct *tty = arg;
 	struct task_struct *p;
 	int session;
 	int		i;
@@ -1842,7 +1842,6 @@ void do_SAK( struct tty_struct *tty)
 		task_lock(p);
 		if (p->files) {
 			read_lock(&p->files->file_lock);
-			/* FIXME: p->files could change */
 			for (i=0; i < p->files->max_fds; i++) {
 				filp = fcheck_files(p->files, i);
 				if (filp && (filp->f_op == &tty_fops) &&
@@ -1857,6 +1856,19 @@ void do_SAK( struct tty_struct *tty)
 	}
 	read_unlock(&tasklist_lock);
 #endif
+}
+
+/*
+ * The tq handling here is a little racy - tty->SAK_tq may already be queued.
+ * But there's no mechanism to fix that without futzing with tqueue_lock.
+ * Fortunately we don't need to worry, because if ->SAK_tq is already queued,
+ * the values which we write to it will be identical to the values which it
+ * already has. --akpm
+ */
+void do_SAK(struct tty_struct *tty)
+{
+	PREPARE_TQUEUE(&tty->SAK_tq, __do_SAK, tty);
+	schedule_task(&tty->SAK_tq);
 }
 
 /*
@@ -1973,6 +1985,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 	sema_init(&tty->atomic_write, 1);
 	spin_lock_init(&tty->read_lock);
 	INIT_LIST_HEAD(&tty->tty_files);
+	INIT_TQUEUE(&tty->SAK_tq, 0, 0);
 }
 
 /*
@@ -1986,17 +1999,15 @@ void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 /*
  * Register a tty device described by <driver>, with minor number <minor>.
  */
-void tty_register_devfs (struct tty_driver *driver, unsigned int flags,
-			 unsigned int minor)
+void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned minor)
 {
 #ifdef CONFIG_DEVFS_FS
 	umode_t mode = S_IFCHR | S_IRUSR | S_IWUSR;
-	struct tty_struct tty;
+	kdev_t device = MKDEV (driver->major, minor);
+	int idx = minor - driver->minor_start;
 	char buf[32];
 
-	tty.driver = *driver;
-	tty.device = MKDEV (driver->major, minor);
-	switch (tty.device) {
+	switch (device) {
 		case TTY_DEV:
 		case PTMX_DEV:
 			mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
@@ -2017,7 +2028,8 @@ void tty_register_devfs (struct tty_driver *driver, unsigned int flags,
 	     (driver->major < UNIX98_PTY_SLAVE_MAJOR + UNIX98_NR_MAJORS) )
 		flags |= DEVFS_FL_CURRENT_OWNER;
 #  endif
-	devfs_register (NULL, tty_name (&tty, buf), flags | DEVFS_FL_DEFAULT,
+	sprintf(buf, driver->name, idx + driver->name_base);
+	devfs_register (NULL, buf, flags | DEVFS_FL_DEFAULT,
 			driver->major, minor, mode, &tty_fops, NULL);
 #endif /* CONFIG_DEVFS_FS */
 }
@@ -2026,14 +2038,11 @@ void tty_unregister_devfs (struct tty_driver *driver, unsigned minor)
 {
 #ifdef CONFIG_DEVFS_FS
 	void * handle;
-	struct tty_struct tty;
+	int idx = minor - driver->minor_start;
 	char buf[32];
 
-	tty.driver = *driver;
-	tty.device = MKDEV(driver->major, minor);
-	
-	handle = devfs_find_handle (NULL, tty_name (&tty, buf),
-				    driver->major, minor,
+	sprintf(buf, driver->name, idx + driver->name_base);
+	handle = devfs_find_handle (NULL, buf, driver->major, minor,
 				    DEVFS_SPECIAL_CHR, 0);
 	devfs_unregister (handle);
 #endif /* CONFIG_DEVFS_FS */
@@ -2218,9 +2227,6 @@ static struct tty_driver dev_console_driver;
  */
 void __init tty_init(void)
 {
-	if (sizeof(struct tty_struct) > PAGE_SIZE)
-		panic("size of tty structure > PAGE_SIZE!");
-
 	/*
 	 * dev_tty_driver and dev_console_driver are actually magic
 	 * devices which get redirected at open time.  Nevertheless,

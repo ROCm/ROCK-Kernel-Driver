@@ -77,8 +77,8 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     */
     index = inode->i_size >> PAGE_CACHE_SHIFT ;
     page = grab_cache_page(inode->i_mapping, index) ;
-    retval = PTR_ERR(page) ;
-    if (IS_ERR(page)) {
+    retval = -ENOMEM;
+    if (!page) {
         goto out ;
     }
     retval = reiserfs_prepare_write(NULL, page, write_from, blocksize) ;

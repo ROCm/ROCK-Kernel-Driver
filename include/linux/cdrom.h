@@ -524,10 +524,12 @@ struct dvd_layer {
 	__u32 end_sector_l0;
 };
 
+#define DVD_LAYERS	4
+
 struct dvd_physical {
 	__u8 type;
 	__u8 layer_num;
-	struct dvd_layer layer[4];
+	struct dvd_layer layer[DVD_LAYERS];
 };
 
 struct dvd_copyright {

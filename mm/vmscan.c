@@ -25,16 +25,15 @@
 #include <asm/pgalloc.h>
 
 /*
- * The swap-out functions return 1 if they successfully
- * threw something out, and we got a free page. It returns
- * zero if it couldn't do anything, and any other value
- * indicates it decreased rss, but the page was shared.
+ * The swap-out function returns 1 if it successfully
+ * scanned all the pages it was asked to (`count').
+ * It returns zero if it couldn't do anything,
  *
- * NOTE! If it sleeps, it *must* return 1 to make sure we
- * don't continue with the swap-out. Otherwise we may be
- * using a process that no longer actually exists (it might
- * have died while we slept).
+ * rss may decrease because pages are shared, but this
+ * doesn't count as having freed a page.
  */
+
+/* mm->page_table_lock is held. mmap_sem is not held */
 static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page)
 {
 	pte_t pte;
@@ -129,6 +128,7 @@ out_unlock_restore:
 	return;
 }
 
+/* mm->page_table_lock is held. mmap_sem is not held */
 static int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end, int count)
 {
 	pte_t * pte;
@@ -165,6 +165,7 @@ static int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_
 	return count;
 }
 
+/* mm->page_table_lock is held. mmap_sem is not held */
 static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end, int count)
 {
 	pmd_t * pmd;
@@ -194,6 +195,7 @@ static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vm
 	return count;
 }
 
+/* mm->page_table_lock is held. mmap_sem is not held */
 static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address, int count)
 {
 	pgd_t *pgdir;
@@ -218,6 +220,9 @@ static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsi
 	return count;
 }
 
+/*
+ * Returns non-zero if we scanned all `count' pages
+ */
 static int swap_out_mm(struct mm_struct * mm, int count)
 {
 	unsigned long address;

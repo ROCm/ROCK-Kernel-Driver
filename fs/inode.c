@@ -133,7 +133,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 
 	if (sb) {
 		/* Don't do this for I_DIRTY_PAGES - that doesn't actually dirty the inode itself */
-		if (flags & (I_DIRTY | I_DIRTY_SYNC)) {
+		if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
 			if (sb->s_op && sb->s_op->dirty_inode)
 				sb->s_op->dirty_inode(inode);
 		}

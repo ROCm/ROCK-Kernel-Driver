@@ -1880,8 +1880,8 @@ int block_truncate_page(struct address_space *mapping, loff_t from, get_block_t 
 	iblock = index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
 	
 	page = grab_cache_page(mapping, index);
-	err = PTR_ERR(page);
-	if (IS_ERR(page))
+	err = -ENOMEM;
+	if (!page)
 		goto out;
 
 	if (!page->buffers)

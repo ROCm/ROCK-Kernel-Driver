@@ -42,6 +42,25 @@ struct tq_struct {
 	void *data;			/* argument to function */
 };
 
+/*
+ * Emit code to initialise a tq_struct's routine and data pointers
+ */
+#define PREPARE_TQUEUE(_tq, _routine, _data)			\
+	do {							\
+		(_tq)->routine = _routine;			\
+		(_tq)->data = _data;				\
+	} while (0)
+
+/*
+ * Emit code to initialise all of a tq_struct
+ */
+#define INIT_TQUEUE(_tq, _routine, _data)			\
+	do {							\
+		INIT_LIST_HEAD(&(_tq)->list);			\
+		(_tq)->sync = 0;				\
+		PREPARE_TQUEUE((_tq), (_routine), (_data));	\
+	} while (0)
+
 typedef struct list_head task_queue;
 
 #define DECLARE_TASK_QUEUE(q)	LIST_HEAD(q)

@@ -321,6 +321,7 @@ struct uhci {
 	spinlock_t framelist_lock;
 	struct uhci_framelist *fl;		/* Frame list */
 	int fsbr;				/* Full speed bandwidth reclamation */
+	int is_suspended;
 
 	spinlock_t qh_remove_lock;
 	struct list_head qh_remove_list;

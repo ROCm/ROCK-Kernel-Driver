@@ -476,8 +476,8 @@ static int convert_tail_for_hole(struct inode *inode,
     index = tail_offset >> PAGE_CACHE_SHIFT ;
     if (index != hole_page->index) {
 	tail_page = grab_cache_page(inode->i_mapping, index) ;
-	retval = PTR_ERR(tail_page) ;
-	if (IS_ERR(tail_page)) {
+	retval = -ENOMEM;
+	if (!tail_page) {
 	    goto out ;
 	}
     } else {
@@ -1487,8 +1487,8 @@ static int grab_tail_page(struct inode *p_s_inode,
         return -ENOENT ;
     }
     page = grab_cache_page(p_s_inode->i_mapping, index) ;
-    error = PTR_ERR(page) ;
-    if (IS_ERR(page)) {
+    error = -ENOMEM ;
+    if (!page) {
         goto out ;
     }
     /* start within the page of the last block in the file */

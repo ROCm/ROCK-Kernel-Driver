@@ -252,6 +252,8 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
 /*
  * This routine is used to map in a page into an address space: needed by
  * execve() for the initial stack and environment pages.
+ *
+ * tsk->mmap_sem is held for writing.
  */
 void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address)
 {
@@ -275,6 +277,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	flush_dcache_page(page);
 	flush_page_to_ram(page);
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));
+	tsk->mm->rss++;
 	spin_unlock(&tsk->mm->page_table_lock);
 
 	/* no need for flush_tlb */
@@ -322,7 +325,6 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			current->mm->rss++;
 			put_dirty_page(current,page,stack_base);
 		}
 		stack_base += PAGE_SIZE;

@@ -209,6 +209,7 @@ bad_count:
  * share this swap entry, so be cautious and let do_wp_page work out
  * what to do if a write is requested later.
  */
+/* tasklist_lock and vma->vm_mm->page_table_lock are held */
 static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
 	pte_t *dir, swp_entry_t entry, struct page* page)
 {
@@ -234,6 +235,7 @@ static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
 	++vma->vm_mm->rss;
 }
 
+/* tasklist_lock and vma->vm_mm->page_table_lock are held */
 static inline void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	unsigned long address, unsigned long size, unsigned long offset,
 	swp_entry_t entry, struct page* page)
@@ -261,6 +263,7 @@ static inline void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	} while (address && (address < end));
 }
 
+/* tasklist_lock and vma->vm_mm->page_table_lock are held */
 static inline void unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	unsigned long address, unsigned long size,
 	swp_entry_t entry, struct page* page)
@@ -291,6 +294,7 @@ static inline void unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	} while (address && (address < end));
 }
 
+/* tasklist_lock and vma->vm_mm->page_table_lock are held */
 static void unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
 			swp_entry_t entry, struct page* page)
 {

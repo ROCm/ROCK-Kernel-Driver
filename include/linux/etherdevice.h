@@ -45,6 +45,14 @@ static __inline__ void eth_copy_and_sum (struct sk_buff *dest, unsigned char *sr
 	memcpy (dest->data, src, len);
 }
 
+/* Check that the ethernet address (MAC) is not 00:00:00:00:00:00 and is not
+ * a multicast address.  Return true if the address is valid.
+ */
+static __inline__ int is_valid_ether_addr( u8 *addr )
+{
+	return !(addr[0]&1) && memcmp( addr, "\0\0\0\0\0\0", 6);
+}
+
 #endif
 
 #endif	/* _LINUX_ETHERDEVICE_H */

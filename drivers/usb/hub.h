@@ -108,6 +108,8 @@ struct usb_hub {
 	int nports;
 
 	struct usb_hub_descriptor *descriptor;
+
+	struct semaphore khubd_sem;
 };
 
 #endif

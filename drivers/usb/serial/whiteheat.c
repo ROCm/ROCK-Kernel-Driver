@@ -1,7 +1,7 @@
 /*
  * USB ConnectTech WhiteHEAT driver
  *
- *	Copyright (C) 1999, 2000
+ *	Copyright (C) 1999 - 2001
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -11,6 +11,11 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * 2001_Mar_19 gkh
+ *	Fixed MOD_INC and MOD_DEC logic, the ability to open a port more 
+ *	than once, and the got the proper usb_device_id table entries so
+ *	the driver works again.
+ *
  * (11/01/2000) Adam J. Richter
  *	usb_device_id table support
  * 
@@ -93,7 +98,7 @@ static __devinitdata struct usb_device_id id_table_std [] = {
 };
 
 static __devinitdata struct usb_device_id id_table_prerenumeration [] = {
-	{ USB_DEVICE(CONNECT_TECH_VENDOR_ID, CONNECT_TECH_WHITE_HEAT_ID) },
+	{ USB_DEVICE(CONNECT_TECH_VENDOR_ID, CONNECT_TECH_FAKE_WHITE_HEAT_ID) },
 	{ }						/* Terminating entry */
 };
 
@@ -289,43 +294,44 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" - port %d", port->number);
 
-	if (port->active) {
-		dbg (__FUNCTION__ " - device already open");
-		return -EINVAL;
-	}
-	port->active = 1;
+	++port->open_count;
+	MOD_INC_USE_COUNT;
+	
+	if (!port->active) {
+		port->active = 1;
 
-	/* set up some stuff for our command port */
-	command_port = &port->serial->port[COMMAND_PORT];
-	if (command_port->private == NULL) {
-		info = (struct whiteheat_private *)kmalloc (sizeof(struct whiteheat_private), GFP_KERNEL);
-		if (info == NULL) {
-			err(__FUNCTION__ " - out of memory");
-			return -ENOMEM;
+		/* set up some stuff for our command port */
+		command_port = &port->serial->port[COMMAND_PORT];
+		if (command_port->private == NULL) {
+			info = (struct whiteheat_private *)kmalloc (sizeof(struct whiteheat_private), GFP_KERNEL);
+			if (info == NULL) {
+				err(__FUNCTION__ " - out of memory");
+				return -ENOMEM;
+			}
+			
+			init_waitqueue_head(&info->wait_command);
+			command_port->private = info;
+			command_port->write_urb->complete = command_port_write_callback;
+			command_port->read_urb->complete = command_port_read_callback;
+			command_port->read_urb->dev = port->serial->dev;
+			command_port->tty = port->tty;		/* need this to "fake" our our sanity check macros */
+			usb_submit_urb (command_port->read_urb);
 		}
 		
-		init_waitqueue_head(&info->wait_command);
-		command_port->private = info;
-		command_port->write_urb->complete = command_port_write_callback;
-		command_port->read_urb->complete = command_port_read_callback;
-		command_port->read_urb->dev = port->serial->dev;
-		command_port->tty = port->tty;		/* need this to "fake" our our sanity check macros */
-		usb_submit_urb (command_port->read_urb);
-	}
+		/* Start reading from the device */
+		port->read_urb->dev = port->serial->dev;
+		result = usb_submit_urb(port->read_urb);
+		if (result)
+			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	
-	/* Start reading from the device */
-	port->read_urb->dev = port->serial->dev;
-	result = usb_submit_urb(port->read_urb);
-	if (result)
-		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-
-	/* send an open port command */
-	/* firmware uses 1 based port numbering */
-	open_command.port = port->number - port->serial->minor + 1;
-	whiteheat_send_cmd (port->serial, WHITEHEAT_OPEN, (__u8 *)&open_command, sizeof(open_command));
-
-	/* Need to do device specific setup here (control lines, baud rate, etc.) */
-	/* FIXME!!! */
+		/* send an open port command */
+		/* firmware uses 1 based port numbering */
+		open_command.port = port->number - port->serial->minor + 1;
+		whiteheat_send_cmd (port->serial, WHITEHEAT_OPEN, (__u8 *)&open_command, sizeof(open_command));
+	
+		/* Need to do device specific setup here (control lines, baud rate, etc.) */
+		/* FIXME!!! */
+	}
 
 	dbg(__FUNCTION__ " - exit");
 	
@@ -339,18 +345,23 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	/* send a close command to the port */
-	/* firmware uses 1 based port numbering */
-	close_command.port = port->number - port->serial->minor + 1;
-	whiteheat_send_cmd (port->serial, WHITEHEAT_CLOSE, (__u8 *)&close_command, sizeof(close_command));
+	--port->open_count;
 
-	/* Need to change the control lines here */
-	/* FIXME */
+	if (port->open_count <= 0) {
+		/* send a close command to the port */
+		/* firmware uses 1 based port numbering */
+		close_command.port = port->number - port->serial->minor + 1;
+		whiteheat_send_cmd (port->serial, WHITEHEAT_CLOSE, (__u8 *)&close_command, sizeof(close_command));
 	
-	/* shutdown our bulk reads and writes */
-	usb_unlink_urb (port->write_urb);
-	usb_unlink_urb (port->read_urb);
-	port->active = 0;
+		/* Need to change the control lines here */
+		/* FIXME */
+		
+		/* shutdown our bulk reads and writes */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->read_urb);
+		port->active = 0;
+	}
+	MOD_DEC_USE_COUNT;
 }
 
 
@@ -548,8 +559,16 @@ static int  whiteheat_startup (struct usb_serial *serial)
 static void whiteheat_shutdown (struct usb_serial *serial)
 {
 	struct usb_serial_port 		*command_port;
+	int i;
 
 	dbg(__FUNCTION__);
+
+	/* stop reads and writes on all ports */
+	for (i=0; i < serial->num_ports; ++i) {
+		while (serial->port[i].open_count > 0) {
+			whiteheat_close (&serial->port[i], NULL);
+		}
+	}
 
 	/* free up our private data for our command port */
 	command_port = &serial->port[COMMAND_PORT];

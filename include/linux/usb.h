@@ -555,11 +555,17 @@ struct usb_operations {
 	int (*unlink_urb) (struct urb* purb);
 };
 
+#define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
+
 /*
  * Allocated per bus we have
  */
 struct usb_bus {
 	int busnum;			/* Bus number (in order of reg) */
+
+#ifdef DEVNUM_ROUND_ROBIN
+	int devnum_next;                /* Next open device number in round-robin allocation */
+#endif /* DEVNUM_ROUND_ROBIN */
 
 	struct usb_devmap devmap;       /* Device map */
 	struct usb_operations *op;      /* Operations (specific to the HC) */

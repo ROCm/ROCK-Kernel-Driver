@@ -291,6 +291,7 @@ static void *hub_probe(struct usb_device *dev, unsigned int i,
 
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->dev = dev;
+	init_MUTEX(&hub->khubd_sem);
 
 	/* Record the new hub's existence */
 	spin_lock_irqsave(&hub_event_lock, flags);
@@ -333,6 +334,9 @@ static void hub_disconnect(struct usb_device *dev, void *ptr)
 	INIT_LIST_HEAD(&hub->hub_list);
 
 	spin_unlock_irqrestore(&hub_event_lock, flags);
+
+	down(&hub->khubd_sem); /* Wait for khubd to leave this hub alone. */
+	up(&hub->khubd_sem);
 
 	if (hub->urb) {
 		usb_unlink_urb(hub->urb);
@@ -545,6 +549,13 @@ static void usb_hub_port_connect_change(struct usb_device *hub, int port,
 		return;
 	}
 
+	/* Some low speed devices have problems with the quick delay, so */
+	/*  be a bit pessimistic with those devices. RHbug #23670 */
+	if (portstatus & USB_PORT_STAT_LOW_SPEED) {
+		wait_ms(400);
+		delay = HUB_LONG_RESET_TIME;
+	}
+
 	down(&usb_address0_sem);
 
 	tempstr = kmalloc(1024, GFP_KERNEL);
@@ -639,7 +650,7 @@ static void usb_hub_events(void)
 		spin_lock_irqsave(&hub_event_lock, flags);
 
 		if (list_empty(&hub_event_list))
-			goto he_unlock;
+			break;
 
 		/* Grab the next entry from the beginning of the list */
 		tmp = hub_event_list.next;
@@ -650,6 +661,7 @@ static void usb_hub_events(void)
 		list_del(tmp);
 		INIT_LIST_HEAD(tmp);
 
+		down(&hub->khubd_sem); /* never blocks, we were on list */
 		spin_unlock_irqrestore(&hub_event_lock, flags);
 
 		if (hub->error) {
@@ -658,6 +670,7 @@ static void usb_hub_events(void)
 			if (usb_hub_reset(hub)) {
 				err("error resetting hub %d - disconnecting", dev->devnum);
 				usb_hub_disconnect(dev);
+				up(&hub->khubd_sem);
 				continue;
 			}
 
@@ -733,9 +746,9 @@ static void usb_hub_events(void)
                         	usb_hub_power_on(hub);
 			}
 		}
+		up(&hub->khubd_sem);
         } /* end while (1) */
 
-he_unlock:
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 }
 

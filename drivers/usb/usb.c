@@ -39,11 +39,6 @@
 #endif
 #include <linux/usb.h>
 
-#define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
-#ifdef DEVNUM_ROUND_ROBIN
-static int devnum_next = 1;
-#endif
-
 static const int usb_bandwidth_option =
 #ifdef CONFIG_USB_BANDWIDTH
 				1;
@@ -366,6 +361,10 @@ struct usb_bus *usb_alloc_bus(struct usb_operations *op)
 		return NULL;
 
 	memset(&bus->devmap, 0, sizeof(struct usb_devmap));
+
+#ifdef DEVNUM_ROUND_ROBIN
+	bus->devnum_next = 1;
+#endif /* DEVNUM_ROUND_ROBIN */
 
 	bus->op = op;
 	bus->root_hub = NULL;
@@ -1707,14 +1706,12 @@ void usb_connect(struct usb_device *dev)
 #ifndef DEVNUM_ROUND_ROBIN
 	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, 1);
 #else	/* round_robin alloc of devnums */
-	/* Try to allocate the next devnum beginning at devnum_next. */
-	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, devnum_next);
+	/* Try to allocate the next devnum beginning at bus->devnum_next. */
+	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, dev->bus->devnum_next);
 	if (devnum >= 128)
 		devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, 1);
 
-	devnum_next = devnum + 1;
-	if (devnum_next >= 128)
-		devnum_next = 1;
+	dev->bus->devnum_next = ( devnum >= 127 ? 1 : devnum + 1);
 #endif	/* round_robin alloc of devnums */
 
 	if (devnum < 128) {

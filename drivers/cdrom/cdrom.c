@@ -1171,42 +1171,50 @@ static int dvd_do_auth(struct cdrom_device_info *cdi, dvd_authinfo *ai)
 
 static int dvd_read_physical(struct cdrom_device_info *cdi, dvd_struct *s)
 {
-	int ret, i;
-	u_char buf[4 + 4 * 20], *base;
+	unsigned char buf[20], *base;
 	struct dvd_layer *layer;
 	struct cdrom_generic_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
+	int ret, layer_num = s->physical.layer_num;
+
+	if (layer_num >= DVD_LAYERS)
+		return -EINVAL;
 
 	init_cdrom_command(&cgc, buf, sizeof(buf), CGC_DATA_READ);
 	cgc.cmd[0] = GPCMD_READ_DVD_STRUCTURE;
-	cgc.cmd[6] = s->physical.layer_num;
+	cgc.cmd[6] = layer_num;
 	cgc.cmd[7] = s->type;
 	cgc.cmd[9] = cgc.buflen & 0xff;
+
+	/*
+	 * refrain from reporting errors on non-existing layers (mainly)
+	 */
+	cgc.quiet = 1;
 
 	if ((ret = cdo->generic_packet(cdi, &cgc)))
 		return ret;
 
 	base = &buf[4];
-	layer = &s->physical.layer[0];
+	layer = &s->physical.layer[layer_num];
 
-	/* place the data... really ugly, but at least we won't have to
-	   worry about endianess in userspace or here. */
-	for (i = 0; i < 4; ++i, base += 20, ++layer) {
-		memset(layer, 0, sizeof(*layer));
-		layer->book_version = base[0] & 0xf;
-		layer->book_type = base[0] >> 4;
-		layer->min_rate = base[1] & 0xf;
-		layer->disc_size = base[1] >> 4;
-		layer->layer_type = base[2] & 0xf;
-		layer->track_path = (base[2] >> 4) & 1;
-		layer->nlayers = (base[2] >> 5) & 3;
-		layer->track_density = base[3] & 0xf;
-		layer->linear_density = base[3] >> 4;
-		layer->start_sector = base[5] << 16 | base[6] << 8 | base[7];
-		layer->end_sector = base[9] << 16 | base[10] << 8 | base[11];
-		layer->end_sector_l0 = base[13] << 16 | base[14] << 8 | base[15];
-		layer->bca = base[16] >> 7;
-	}
+	/*
+	 * place the data... really ugly, but at least we won't have to
+	 * worry about endianess in userspace.
+	 */
+	memset(layer, 0, sizeof(*layer));
+	layer->book_version = base[0] & 0xf;
+	layer->book_type = base[0] >> 4;
+	layer->min_rate = base[1] & 0xf;
+	layer->disc_size = base[1] >> 4;
+	layer->layer_type = base[2] & 0xf;
+	layer->track_path = (base[2] >> 4) & 1;
+	layer->nlayers = (base[2] >> 5) & 3;
+	layer->track_density = base[3] & 0xf;
+	layer->linear_density = base[3] >> 4;
+	layer->start_sector = base[5] << 16 | base[6] << 8 | base[7];
+	layer->end_sector = base[9] << 16 | base[10] << 8 | base[11];
+	layer->end_sector_l0 = base[13] << 16 | base[14] << 8 | base[15];
+	layer->bca = base[16] >> 7;
 
 	return 0;
 }
@@ -1985,7 +1993,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		}
 	case CDROMREADAUDIO: {
 		struct cdrom_read_audio ra;
-		int lba;
+		int lba, nr;
 
 		IOCTL_IN(arg, struct cdrom_read_audio, ra);
 
@@ -2002,7 +2010,19 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		if (lba < 0 || ra.nframes <= 0)
 			return -EINVAL;
 
-		if ((cgc.buffer = (char *) kmalloc(CD_FRAMESIZE_RAW, GFP_KERNEL)) == NULL)
+		/*
+		 * start with will ra.nframes size, back down if alloc fails
+		 */
+		nr = ra.nframes;
+		do {
+			cgc.buffer = kmalloc(CD_FRAMESIZE_RAW * nr, GFP_KERNEL);
+			if (cgc.buffer)
+				break;
+
+			nr >>= 1;
+		} while (nr);
+
+		if (!nr)
 			return -ENOMEM;
 
 		if (!access_ok(VERIFY_WRITE, ra.buf, ra.nframes*CD_FRAMESIZE_RAW)) {
@@ -2011,12 +2031,16 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		}
 		cgc.data_direction = CGC_DATA_READ;
 		while (ra.nframes > 0) {
-			ret = cdrom_read_block(cdi, &cgc, lba, 1, 1, CD_FRAMESIZE_RAW);
-			if (ret) break;
+			if (nr > ra.nframes)
+				nr = ra.nframes;
+
+			ret = cdrom_read_block(cdi, &cgc, lba, nr, 1, CD_FRAMESIZE_RAW);
+			if (ret)
+				break;
 			__copy_to_user(ra.buf, cgc.buffer, CD_FRAMESIZE_RAW);
-			ra.buf += CD_FRAMESIZE_RAW;
-			ra.nframes--;
-			lba++;
+			ra.buf += CD_FRAMESIZE_RAW * nr;
+			ra.nframes -= nr;
+			lba += nr;
 		}
 		kfree(cgc.buffer);
 		return ret;

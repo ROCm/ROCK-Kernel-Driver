@@ -66,6 +66,10 @@ static int uhci_get_current_frame_number(struct usb_device *dev);
 static int uhci_unlink_generic(struct urb *urb);
 static int uhci_unlink_urb(struct urb *urb);
 
+static int  ports_active(struct uhci *uhci);
+static void suspend_hc(struct uhci *uhci);
+static void wakeup_hc(struct uhci *uhci);
+
 #define min(a,b) (((a)<(b))?(a):(b))
 
 /* If a transfer is still active after this much time, turn off FSBR */
@@ -1767,6 +1771,10 @@ static void rh_int_timer_do(unsigned long ptr)
 	}
 	nested_unlock(&uhci->urblist_lock, flags);
 
+	/* enter global suspend if nothing connected */
+	if (!uhci->is_suspended && !ports_active(uhci))
+		suspend_hc(uhci);
+
 	rh_init_int_timer(urb);
 }
 
@@ -2037,17 +2045,19 @@ static void uhci_interrupt(int irq, void *__uhci, struct pt_regs *regs)
 		return;
 	outw(status, io_addr + USBSTS);
 
-	if (status & ~(USBSTS_USBINT | USBSTS_ERROR)) {
-		if (status & USBSTS_RD)
-			printk(KERN_INFO "uhci: resume detected, not implemented\n");
+	if (status & ~(USBSTS_USBINT | USBSTS_ERROR | USBSTS_RD)) {
 		if (status & USBSTS_HSE)
 			printk(KERN_ERR "uhci: host system error, PCI problems?\n");
 		if (status & USBSTS_HCPE)
 			printk(KERN_ERR "uhci: host controller process error. something bad happened\n");
-		if (status & USBSTS_HCH) {
+		if ((status & USBSTS_HCH) && !uhci->is_suspended) {
 			printk(KERN_ERR "uhci: host controller halted. very bad\n");
 			/* FIXME: Reset the controller, fix the offending TD */
 		}
+	}
+
+	if (status & USBSTS_RD) {
+		wakeup_hc(uhci);
 	}
 
 	uhci_free_pending_qhs(uhci);
@@ -2093,6 +2103,49 @@ static void reset_hc(struct uhci *uhci)
 	wait_ms(50);
 	outw(0, io_addr + USBCMD);
 	wait_ms(10);
+}
+
+static void suspend_hc(struct uhci *uhci)
+{
+	unsigned int io_addr = uhci->io_addr;
+
+	dbg("suspend_hc");
+
+	outw(USBCMD_EGSM, io_addr + USBCMD);
+
+	uhci->is_suspended = 1;
+}
+
+static void wakeup_hc(struct uhci *uhci)
+{
+	unsigned int io_addr = uhci->io_addr;
+	unsigned int status;
+
+	dbg("wakeup_hc");
+
+	outw(0, io_addr + USBCMD);
+	
+	/* wait for EOP to be sent */
+	status = inw(io_addr + USBCMD);
+	while (status & USBCMD_FGR)
+		status = inw(io_addr + USBCMD);
+
+	uhci->is_suspended = 0;
+
+	/* Run and mark it configured with a 64-byte max packet */
+	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
+}
+
+static int ports_active(struct uhci *uhci)
+{
+	unsigned int io_addr = uhci->io_addr;
+	int connection = 0;
+	int i;
+
+	for (i = 0; i < uhci->rh.numports; i++)
+		connection |= (inw(io_addr + USBPORTSC1 + i * 2) & 0x1);
+
+	return connection;
 }
 
 static void start_hc(struct uhci *uhci)

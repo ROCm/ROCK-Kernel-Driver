@@ -26,6 +26,7 @@ if [ "$CONFIG_NET_PCMCIA" = "y" ]; then
    bool '  Pcmcia Wireless LAN' CONFIG_NET_PCMCIA_RADIO
    if [ "$CONFIG_NET_PCMCIA_RADIO" = "y" ]; then
       dep_tristate '    Aviator/Raytheon 2.4MHz wireless support' CONFIG_PCMCIA_RAYCS $CONFIG_PCMCIA
+      dep_tristate '    Hermes (AT&T/Lucent/Orinoco/3com) wireless support' CONFIG_PCMCIA_HERMES $CONFIG_PCMCIA
       dep_tristate '    Xircom Netwave AirSurfer wireless support' CONFIG_PCMCIA_NETWAVE $CONFIG_PCMCIA
       dep_tristate '    AT&T/Lucent Wavelan wireless support' CONFIG_PCMCIA_WAVELAN $CONFIG_PCMCIA
       dep_tristate '    Aironet 4500/4800 PCMCIA support' CONFIG_AIRONET4500_CS $CONFIG_AIRONET4500 $CONFIG_PCMCIA

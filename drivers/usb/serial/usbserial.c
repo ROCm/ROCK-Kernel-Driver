@@ -827,14 +827,14 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 		spin_lock_irqsave (&port->port_lock, flags);
 		count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
-		usb_serial_debug_data (__FILE__, __FUNCTION__, count, buf);
-
 		if (from_user) {
 			copy_from_user(port->write_urb->transfer_buffer, buf, count);
 		}
 		else {
 			memcpy (port->write_urb->transfer_buffer, buf, count);
 		}  
+
+		usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
 
 		/* set up our urb */
 		FILL_BULK_URB(port->write_urb, serial->dev, 

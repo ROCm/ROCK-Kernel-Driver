@@ -21,20 +21,8 @@ struct mts_transfer_context
 	void* data;
 	unsigned data_length;
 	int data_pipe;
+	int fragment;
 
-	enum {
-		mts_con_none,
-		mts_con_command,
-		mts_con_data,
-		mts_con_status,
-		mts_con_error,
-		mts_con_done
-	}
-	state;
-
-	atomic_t do_abort; /* when != 0 URB completion routines will
-			      return straightaway */
-	
 	u8 status; /* status returned from ep_response after command completion */
 };
 
@@ -44,18 +32,18 @@ struct mts_desc {
 	struct mts_desc *prev;
 
 	struct usb_device *usb_dev;
-	
+
 	int interface;
 
 	/* Endpoint addresses */
 	u8 ep_out;
 	u8 ep_response;
 	u8 ep_image;
-	
+
 	struct Scsi_Host * host;
 	Scsi_Host_Template ctempl;
 	int host_number;
-	
+
 	struct semaphore lock;
 
 	struct urb urb;
@@ -68,5 +56,5 @@ struct mts_desc {
 #define MTS_EP_IMAGE	0x3
 #define MTS_EP_TOTAL	0x3
 
-#define MTS_SCSI_ERR_MASK ~0x3fu 
+#define MTS_SCSI_ERR_MASK ~0x3fu
 
