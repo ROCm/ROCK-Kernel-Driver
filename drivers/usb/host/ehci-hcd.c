@@ -426,8 +426,11 @@ static int ehci_start (struct usb_hcd *hcd)
 	 */
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
+#if 0
+// this is deeply broken on almost all architectures
 		if (!pci_set_dma_mask (ehci->hcd.pdev, 0xffffffffffffffffULL))
 			ehci_info (ehci, "enabled 64bit PCI DMA\n");
+#endif
 	}
 
 	/* help hc dma work well with cachelines */
