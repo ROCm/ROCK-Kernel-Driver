@@ -264,16 +264,10 @@
  * undef  : traditional save_flags; cli; restore_flags;
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
-# include <linux/init.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,30)
-# include <linux/spinlock.h>
-#else
-# include <asm/spinlock.h>
-#endif
-#endif
+#include <linux/init.h>
+#include <linux/spinlock.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,99) && defined(MODULE)
+#if defined(MODULE)
 static struct pci_device_id tmscsim_pci_tbl[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_AMD,
@@ -287,9 +281,7 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 #endif
 	
 #define USE_SPINLOCKS 1
-#define NEW_PCI 1
 
-#define DC390_AFLAGS 
 #define DC390_IFLAGS unsigned long iflags
 #define DC390_DFLAGS unsigned long dflags
 spinlock_t dc390_drvlock = SPIN_LOCK_UNLOCKED;
@@ -299,11 +291,6 @@ spinlock_t dc390_drvlock = SPIN_LOCK_UNLOCKED;
 #define DC390_UNLOCK_DRV spin_unlock_irqrestore (&dc390_drvlock, dflags)
 #define DC390_LOCK_DRV_NI spin_lock (&dc390_drvlock)
 #define DC390_UNLOCK_DRV_NI spin_unlock (&dc390_drvlock)
-#define DC390_LOCK_ACB /* DC390_LOCK_IO */
-#define DC390_UNLOCK_ACB /* DC390_UNLOCK_IO */
-#define DC390_LOCK_ACB_NI /* spin_lock (&(pACB->lock)) */
-#define DC390_UNLOCK_ACB_NI /* spin_unlock (&(pACB->lock)) */
-#define DC390_LOCKA_INIT /* DC390_LOCKA_INIT */
 
 /* These macros are used for uniform access to 2.0.x and 2.1.x PCI config space*/
 
@@ -365,10 +352,6 @@ void   dc390_updateDCB (PACB pACB, PDCB pDCB);
 static int DC390_release(struct Scsi_Host *host);
 static int dc390_shutdown (struct Scsi_Host *host);
 
-
-//static PSHT	dc390_pSHT_start = NULL;
-//static PSH	dc390_pSH_start = NULL;
-//static PSH	dc390_pSH_current = NULL;
 static PACB	dc390_pACB_start= NULL;
 static PACB	dc390_pACB_current = NULL;
 static ULONG	dc390_lastabortedpid = 0;
@@ -378,12 +361,9 @@ static UCHAR	dc390_adapterCnt = 0;
 /* Startup values, to be overriden on the commandline */
 int tmscsim[] = {-2, -2, -2, -2, -2, -2};
 
-# if defined(MODULE) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
+#if defined(MODULE)
 MODULE_PARM(tmscsim, "1-6i");
 MODULE_PARM_DESC(tmscsim, "Host SCSI ID, Speed (0=10MHz), Device Flags, Adapter Flags, Max Tags (log2(tags)-1), DelayReset (s)");
-# endif
-
-#if defined(MODULE) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 MODULE_AUTHOR("C.L. Huang / Kurt Garloff");
 MODULE_DESCRIPTION("SCSI host adapter driver for Tekram DC390 and other AMD53C974A based PCI SCSI adapters");
 MODULE_LICENSE("GPL");
@@ -451,13 +431,6 @@ static char*  dc390_adapname = "DC390";
 UCHAR  dc390_eepromBuf[MAX_ADAPTER_NUM][EE_LEN];
 UCHAR  dc390_clock_period1[] = {4, 5, 6, 7, 8, 10, 13, 20};
 UCHAR  dc390_clock_speed[] = {100,80,67,57,50, 40, 31, 20};
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,30)
-struct proc_dir_entry	DC390_proc_scsi_tmscsim ={
-       PROC_SCSI_DC390T, 7 ,"tmscsim",
-       S_IFDIR | S_IRUGO | S_IXUGO, 2
-       };
-#endif
 
 /***********************************************************************
  * Functions for access to DC390 EEPROM
@@ -553,7 +526,6 @@ static void __init dc390_fill_with_defaults (void)
 /* Override defaults on cmdline:
  * tmscsim: AdaptID, MaxSpeed (Index), DevMode (Bitmapped), AdaptMode (Bitmapped)
  */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,13)
 int __init dc390_setup (char *str)
 {	
 	int ints[8];
@@ -573,24 +545,6 @@ int __init dc390_setup (char *str)
 #ifndef MODULE
 __setup("tmscsim=", dc390_setup);
 #endif
-
-#else
-void __init dc390_setup (char *str, int *ints)
-{
-	int i, im;
-	im = ints[0];
-	if (im > 6)
-	{
-		printk (KERN_NOTICE "DC390: ignore extra params!\n");
-		im = 6;
-	}
-	for (i = 0; i < im; i++)
-		tmscsim[i] = ints[i+1];
-	/* dc390_checkparams (); */
-}
-#endif
-
-
 
 static void __init dc390_EEpromOutDI( PDEVDECL, PUCHAR regval, UCHAR Carry )
 {
@@ -864,16 +818,6 @@ static __inline__ void dc390_Waiting_to_Going ( PDCB pDCB, PSRB pSRB )
 	dc390_Going_append (pDCB, pSRB);
 }
 
-/* 2.0 timer compatibility */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,30)
- static inline int timer_pending(struct timer_list * timer)
- {
-	return timer->prev != NULL;
- }
- #define time_after(a,b)         ((long)(b) - (long)(a) < 0)
- #define time_before(a,b)        time_after(b,a)
-#endif
-
 void DC390_waiting_timed_out (unsigned long ptr);
 /* Sets the timer to wake us up */
 static void dc390_waiting_timer (PACB pACB, unsigned long to)
@@ -931,12 +875,9 @@ void DC390_waiting_timed_out (unsigned long ptr)
 {
 	PACB pACB = (PACB)ptr;
 	DC390_IFLAGS;
-	DC390_AFLAGS;
 	DEBUG0(printk ("DC390: Debug: Waiting queue woken up by timer!\n"));
 	DC390_LOCK_IO(pACB->pScsiHost);
-	DC390_LOCK_ACB;
 	dc390_Waiting_process (pACB);
-	DC390_UNLOCK_ACB;
 	DC390_UNLOCK_IO(pACB->pScsiHost);
 }
 
@@ -1110,14 +1051,10 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     PDCB   pDCB;
     PSRB   pSRB;
     PACB   pACB = (PACB) cmd->device->host->hostdata;
-    DC390_AFLAGS;
-
 
     DEBUG0(/*  if(pACB->scan_devices) */	\
 	printk(KERN_INFO "DC390: Queue Cmd=%02x,Tgt=%d,LUN=%d (pid=%li), buffer=%p\n",\
 	       cmd->cmnd[0],cmd->device->id,cmd->device->lun,cmd->pid, cmd->buffer));
-
-    DC390_LOCK_ACB;
 
     /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
      * commands and alloc a DCB for the device if not yet there. DCB will
@@ -1175,15 +1112,12 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     } else
 	    dc390_SendSRB(pACB, pSRB);
 
-    DC390_UNLOCK_ACB;
     DEBUG1(printk (KERN_DEBUG " ... command (pid %li) queued successfully.\n", cmd->pid));
     return(0);
 
  requeue:
-    DC390_UNLOCK_ACB;
     return 1;
  fail:
-    DC390_UNLOCK_ACB;
     cmd->result = DID_BAD_TARGET << 16;
     done(cmd);
     return 0;
@@ -1386,9 +1320,6 @@ int DC390_abort (Scsi_Cmnd *cmd)
     int   status;
     //ULONG sbac;
     PACB  pACB = (PACB) cmd->device->host->hostdata;
-    DC390_AFLAGS;
-
-    DC390_LOCK_ACB;
 
     printk ("DC390: Abort command (pid %li, Device %02i-%02i)\n",
 	    cmd->pid, cmd->device->id, cmd->device->lun);
@@ -1505,7 +1436,6 @@ ABO_X:
     }
 #endif
     dc390_lastabortedpid = cmd->pid;
-    DC390_UNLOCK_ACB;
     //do_DC390_Interrupt (pACB->IRQLevel, 0, 0);
 #ifndef USE_NEW_EH	
     if (status == SCSI_ABORT_SUCCESS) cmd->scsi_done(cmd);
@@ -1592,11 +1522,9 @@ int DC390_reset (Scsi_Cmnd *cmd)
 {
     UCHAR   bval;
     PACB    pACB = (PACB) cmd->device->host->hostdata;
-    DC390_AFLAGS;
 
     printk(KERN_INFO "DC390: RESET ... ");
 
-    DC390_LOCK_ACB;
     if (timer_pending (&pACB->Waiting_Timer)) del_timer (&pACB->Waiting_Timer);
     bval = DC390_read8 (CtrlReg1);
     bval |= DIS_INT_ON_SCSI_RST;
@@ -1625,7 +1553,6 @@ int DC390_reset (Scsi_Cmnd *cmd)
     dc390_Waiting_process( pACB );
 
     printk("done\n");
-    DC390_UNLOCK_ACB;
     return( SCSI_RESET_SUCCESS );
 }
 
@@ -1792,7 +1719,6 @@ void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
 {
     PACB    pACB;
     UCHAR   i;
-    DC390_AFLAGS;
 
     psh->can_queue = MAX_CMD_QUEUE;
     psh->cmd_per_lun = MAX_CMD_PER_LUN;
@@ -1800,11 +1726,7 @@ void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
     psh->io_port = io_port;
     psh->n_io_port = 0x80;
     psh->irq = Irq;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,50)
     psh->base = io_port;
-#else
-    psh->base = (char*)io_port;
-#endif	
     psh->unique_id = io_port;
     psh->dma_channel = -1;
     psh->last_reset = jiffies;
@@ -1958,8 +1880,7 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, PDEVDECL, UCH
 {
     PSH   psh;
     PACB  pACB;
-    DC390_AFLAGS;
-    
+
     if (dc390_CheckEEpromCheckSum (PDEV, index))
     {
 	int speed;
@@ -1985,21 +1906,6 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, PDEVDECL, UCH
 	
     scsi_set_device(psh, &pdev->dev);
     pACB = (PACB) psh->hostdata;
-    DC390_LOCKA_INIT;
-    DC390_LOCK_ACB;
-
-#if 0
-    if( !dc390_pSH_start )
-    {
-        dc390_pSH_start = psh;
-        dc390_pSH_current = psh;
-    }
-    else
-    {
-        dc390_pSH_current->next = psh;
-        dc390_pSH_current = psh;
-    }
-#endif
 
     DEBUG0(printk(KERN_INFO "DC390: pSH = %8x, Index %02i\n", (UINT) psh, index));
 
@@ -2013,58 +1919,14 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, PDEVDECL, UCH
 		      (UINT) pACB, (UINT) pACB->DCBmap, (UINT) pACB->SRB_array));
 	DEBUG0(printk("DC390: ACB size= %4x, DCB size= %4x, SRB size= %4x\n",\
 		      sizeof(DC390_ACB), sizeof(DC390_DCB), sizeof(DC390_SRB) ));
-
-	DC390_UNLOCK_ACB;
         return (0);
     }
     else
     {
-	//dc390_pSH_start = NULL;
 	scsi_unregister( psh );
-	DC390_UNLOCK_ACB;
 	return( -1 );
     }
 }
-
-
-/***********************************************************************
- * Function : int DC390_detect(Scsi_Host_Template *psht)
- *
- * Purpose : detects and initializes AMD53C974 SCSI chips
- *	     that were autoprobed, overridden on the LILO command line,
- *	     or specified at compile time.
- *
- * Inputs : psht - template for this SCSI adapter
- *
- * Returns : number of host adapters detected
- *
- ***********************************************************************/
-
-#ifndef NEW_PCI
-/* Acc. to PCI 2.1 spec it's up to the driver to enable Bus mastering:
- * We use pci_set_master () for 2.1.x and this func for 2.0.x:	*/
-static void __init dc390_set_master (PDEVDECL)
-{
-	USHORT cmd;
-	UCHAR lat;
-	
-	PCI_READ_CONFIG_WORD (PDEV, PCI_COMMAND, &cmd);
-	
-        if (! (cmd & PCI_COMMAND_MASTER)) {	
-		printk("PCI: Enabling bus mastering for device %02x:%02x\n",
-		       PCI_BUS_DEV);
-		cmd |= PCI_COMMAND_MASTER;
-		PCI_WRITE_CONFIG_WORD(PDEV, PCI_COMMAND, cmd);
-	}
-	PCI_READ_CONFIG_BYTE (PDEV, PCI_LATENCY_TIMER, &lat);
-	if (lat < 16 /* || lat == 255 */) {
-		printk("PCI: Setting latency timer of device %02x:%02x from %i to 64\n",
-		       PCI_BUS_DEV, lat);
-		PCI_WRITE_CONFIG_BYTE(PDEV, PCI_LATENCY_TIMER, 64);
-	}
-	
-}
-#endif /* ! NEW_PCI */
 
 static void __init dc390_set_pci_cfg (PDEVDECL)
 {
@@ -2074,7 +1936,6 @@ static void __init dc390_set_pci_cfg (PDEVDECL)
 	PCI_WRITE_CONFIG_WORD (PDEV, PCI_COMMAND, cmd);
 	PCI_WRITE_CONFIG_WORD (PDEV, PCI_STATUS, (PCI_STATUS_SIG_SYSTEM_ERROR | PCI_STATUS_DETECTED_PARITY));
 }
-	
 
 int __init DC390_detect (Scsi_Host_Template *psht)
 {
@@ -2082,7 +1943,6 @@ int __init DC390_detect (Scsi_Host_Template *psht)
     UCHAR   irq;
     ULONG   io_port;
 
-    //dc390_pSHT_start = psht;
     dc390_pACB_start = NULL;
 
     if ( PCI_PRESENT )
@@ -2109,11 +1969,8 @@ int __init DC390_detect (Scsi_Host_Template *psht)
 	printk (KERN_ERR "DC390: No PCI BIOS found!\n");
    
     if (dc390_adapterCnt)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,30)
 	psht->proc_name = "tmscsim";
-#else
-	psht->proc_dir = &DC390_proc_scsi_tmscsim;
-#endif
+
     printk(KERN_INFO "DC390: %i adapters found\n", dc390_adapterCnt);
     return( dc390_adapterCnt );
 }
@@ -2152,7 +2009,6 @@ int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
   char *pos = buffer;
   PACB pACB;
   PDCB pDCB;
-  DC390_AFLAGS;
 
   pACB = dc390_pACB_start;
 
@@ -2170,8 +2026,6 @@ int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
    
   SPRINTF("Tekram DC390/AM53C974 PCI SCSI Host Adapter, ");
   SPRINTF("Driver Version %s\n", DC390_VERSION);
-
-  DC390_LOCK_ACB;
 
   SPRINTF("SCSI Host Nr %i, ", shpnt->host_no);
   SPRINTF("%s Adapter Nr %i\n", dc390_adapname, pACB->AdapterIndex);
@@ -2254,8 +2108,6 @@ int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
     SPRINTF("\n");
 #endif
   
-
-  DC390_UNLOCK_ACB;
   *start = buffer + offset;
 
   if (pos - buffer < offset)
@@ -2318,11 +2170,10 @@ void dc390_freeDCBs (struct Scsi_Host *host)
 
 int DC390_release (struct Scsi_Host *host)
 {
-    DC390_AFLAGS DC390_IFLAGS;
+    DC390_IFLAGS;
     PACB pACB = (PACB)(host->hostdata);
 
     DC390_LOCK_IO(host);
-    DC390_LOCK_ACB;
 
     /* TO DO: We should check for outstanding commands first. */
     dc390_shutdown (host);
@@ -2335,7 +2186,6 @@ int DC390_release (struct Scsi_Host *host)
 
     release_region(host->io_port,host->n_io_port);
     dc390_freeDCBs (host);
-    DC390_UNLOCK_ACB;
     DC390_UNLOCK_IO(host);
     scsi_unregister(host);
     return( 1 );

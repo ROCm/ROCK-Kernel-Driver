@@ -227,7 +227,7 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 #if DMA_INT
     UCHAR  dstatus;
 #endif
-    DC390_AFLAGS DC390_IFLAGS; //DC390_DFLAGS
+    DC390_IFLAGS;
 
     pACB = (PACB)dev_id;
     for (pACB2 = dc390_pACB_start; (pACB2 && pACB2 != pACB); pACB2 = pACB2->pNextACB);
@@ -237,26 +237,21 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_NONE;
     }
     
-    //DC390_LOCK_DRV;
-
     sstatus = DC390_read8 (Scsi_Status);
     if( !(sstatus & INTERRUPT) )
-	{ /*DC390_UNLOCK_DRV;*/ return IRQ_NONE; };
+	return IRQ_NONE;
 
     DEBUG1(printk (KERN_DEBUG "sstatus=%02x,", sstatus));
 
 #if DMA_INT
     DC390_LOCK_IO(pACB->pScsiHost);
-    DC390_LOCK_ACB;
     dstatus = dc390_dma_intr (pACB);
-    DC390_UNLOCK_ACB;
     DC390_UNLOCK_IO(pACB->pScsiHost);
 
     DEBUG1(printk (KERN_DEBUG "dstatus=%02x,", dstatus));
     if (! (dstatus & SCSI_INTERRUPT))
       {
 	DEBUG0(printk (KERN_WARNING "DC390 Int w/o SCSI actions (only DMA?)\n"));
-	//DC390_UNLOCK_DRV;
 	return IRQ_NONE;
       };
 #else
@@ -266,8 +261,6 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 #endif
 
     DC390_LOCK_IO(pACB->pScsiHost);
-    DC390_LOCK_ACB;
-    //DC390_UNLOCK_DRV_NI; /* Allow _other_ CPUs to process IRQ (useful for shared IRQs) */
 
     istate = DC390_read8 (Intern_State);
     istatus = DC390_read8 (INT_Status); /* This clears Scsi_Status, Intern_State and INT_Status ! */
@@ -339,10 +332,7 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     }
 
  unlock:
-    //DC390_LOCK_DRV_NI;
-    DC390_UNLOCK_ACB;
     DC390_UNLOCK_IO(pACB->pScsiHost);
-    //DC390_UNLOCK_DRV; /* Restore initial flags */
     return IRQ_HANDLED;
 }
 
@@ -1620,18 +1610,14 @@ ckc_e:
 	  pACB->scan_devices = 0;
      };
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,30)
     pcmd->resid = pcmd->request_bufflen - pSRB->TotalXferredLen;
-#endif
 
     if (!DCB_removed) dc390_Going_remove (pDCB, pSRB);
     /* Add to free list */
     dc390_Free_insert (pACB, pSRB);
 
     DEBUG0(printk (KERN_DEBUG "DC390: SRBdone: done pid %li\n", pcmd->pid));
-    DC390_UNLOCK_ACB_NI;
     pcmd->scsi_done (pcmd);
-    DC390_LOCK_ACB_NI;
 
     dc390_Waiting_process (pACB);
     return;
@@ -1668,9 +1654,7 @@ dc390_DoingSRB_Done( PACB pACB, PSCSICMD cmd )
 /*	    ReleaseSRB( pDCB, pSRB ); */
 
 	    DEBUG0(printk (KERN_DEBUG "DC390: DoingSRB_Done: done pid %li\n", pcmd->pid));
-	    DC390_UNLOCK_ACB_NI;
 	    pcmd->scsi_done( pcmd );
-	    DC390_LOCK_ACB_NI;
 #endif	
 	    psrb  = psrb2;
 	}
