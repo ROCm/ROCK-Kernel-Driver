@@ -1072,13 +1072,7 @@ static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					if (txstatus & 0x0008) ep->stats.tx_carrier_errors++;
 					if (txstatus & 0x0040) ep->stats.tx_window_errors++;
 					if (txstatus & 0x0010) ep->stats.tx_fifo_errors++;
-#ifdef ETHER_STATS
-					if (txstatus & 0x1000) ep->stats.collisions16++;
-#endif
 				} else {
-#ifdef ETHER_STATS
-					if ((txstatus & 0x0002) != 0) ep->stats.tx_deferred++;
-#endif
 					ep->stats.collisions += (txstatus >> 8) & 15;
 					ep->stats.tx_packets++;
 					ep->stats.tx_bytes += ep->tx_skbuff[entry]->len;

@@ -809,13 +809,8 @@ tx_error (struct net_device *dev, int tx_status)
 		/* Let TxStartThresh stay default value */
 	}
 	/* Maximum Collisions */
-#ifdef ETHER_STATS	
-	if (tx_status & 0x08) 
-		np->stats.collisions16++;
-#else
 	if (tx_status & 0x08) 
 		np->stats.collisions++;
-#endif
 	/* Restart the Tx */
 	writel (readw (dev->base_addr + MACCtrl) | TxEnable, ioaddr + MACCtrl);
 }

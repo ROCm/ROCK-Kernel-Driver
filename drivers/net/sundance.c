@@ -1112,13 +1112,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 					np->stats.tx_errors++;
 					if (tx_status & 0x10)
 						np->stats.tx_fifo_errors++;
-#ifdef ETHER_STATS
-					if (tx_status & 0x08)
-						np->stats.collisions16++;
-#else
 					if (tx_status & 0x08)
 						np->stats.collisions++;
-#endif
 					if (tx_status & 0x02)
 						np->stats.tx_window_errors++;
 					/* This reset has not been verified!. */
