@@ -1,7 +1,7 @@
 /*****************************************************************************/
 
 /*
- *	crt0_ram.S -- startup code for MCF5282 ColdFire based boards.
+ *	crt0_ram.S -- startup code for senTec COBRA5282 ColdFire based boards.
  *
  *	(C) Copyright 2003, Greg Ungerer (gerg@snapgear.com).
  */
