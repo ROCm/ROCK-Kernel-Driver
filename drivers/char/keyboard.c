@@ -35,7 +35,6 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 
-#include <linux/console_struct.h>
 #include <linux/kbd_kern.h>
 #include <linux/kbd_diacr.h>
 #include <linux/vt_kern.h>

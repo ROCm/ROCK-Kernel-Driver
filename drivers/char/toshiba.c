@@ -210,7 +210,7 @@ static int tosh_emulate_fan(SMMRegisters *regs)
 /*
  * Put the laptop into System Management Mode
  */
-static int tosh_smm(SMMRegisters *regs)
+int tosh_smm(SMMRegisters *regs)
 {
 	int eax;
 

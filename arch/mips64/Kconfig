@@ -585,30 +585,7 @@ source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
 
-
-menu "Console drivers"
-	depends on VT
-
 source "drivers/video/Kconfig"
-
-config SGI_NEWPORT_CONSOLE
-	tristate "SGI Newport Console support"
-	depends on SGI_IP22
-	help
-	  Say Y here if you want the console on the Newport aka XL graphics
-	  card of your Indy.  Most people say Y here.
-
-config DUMMY_CONSOLE
-	bool
-	depends on SGI_IP22 && SGI_NEWPORT_CONSOLE!=y
-	default y
-
-config FONT_8x16
-	bool
-	depends on SGI_IP22 && SGI_NEWPORT_CONSOLE=y
-	default y
-
-endmenu
 
 config KCORE_ELF
 	bool
