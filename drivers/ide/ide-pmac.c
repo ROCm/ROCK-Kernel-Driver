@@ -1126,7 +1126,7 @@ pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, in
 		udelay(1);
 
 	/* Build sglist */
-	if (rq->flags & REQ_DRIVE_ACB) {
+	if (rq->flags & REQ_SPECIAL) {
 		pmac_ide[ix].sg_nents = i = pmac_raw_build_sglist(ix, rq);
 	} else {
 		pmac_ide[ix].sg_nents = i = pmac_ide_build_sglist(ix, rq);
@@ -1437,10 +1437,11 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 	if (drive->type != ATA_DISK)
 		return 0;
 	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
-	if ((rq->flags & REQ_DRIVE_ACB) &&
+	if ((rq->flags & REQ_SPECIAL) &&
 		(drive->addressing == 1)) {
 		struct ata_taskfile *args = rq->special;
-		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+		/* FIXME: this is never reached */
+		OUT_BYTE(args->cmd, IDE_COMMAND_REG);
 	} else if (drive->addressing) {
 		OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
 	} else {

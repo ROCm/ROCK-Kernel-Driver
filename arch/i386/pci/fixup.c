@@ -3,6 +3,7 @@
  */
 
 #include <linux/pci.h>
+#include <linux/init.h>
 #include "pci.h"
 
 

@@ -390,8 +390,7 @@ void prune_icache(int goal)
 		if (atomic_read(&inode->i_count))
 			continue;
 		list_del(tmp);
-		list_del(&inode->i_hash);
-		INIT_LIST_HEAD(&inode->i_hash);
+		list_del_init(&inode->i_hash);
 		list_add(tmp, freeable);
 		inode->i_state |= I_FREEING;
 		count++;
@@ -777,8 +776,7 @@ void __insert_inode_hash(struct inode *inode, unsigned long hashval)
 void remove_inode_hash(struct inode *inode)
 {
 	spin_lock(&inode_lock);
-	list_del(&inode->i_hash);
-	INIT_LIST_HEAD(&inode->i_hash);
+	list_del_init(&inode->i_hash);
 	spin_unlock(&inode_lock);
 }
 
@@ -786,10 +784,8 @@ void generic_delete_inode(struct inode *inode)
 {
 	struct super_operations *op = inode->i_sb->s_op;
 
-	list_del(&inode->i_hash);
-	INIT_LIST_HEAD(&inode->i_hash);
-	list_del(&inode->i_list);
-	INIT_LIST_HEAD(&inode->i_list);
+	list_del_init(&inode->i_hash);
+	list_del_init(&inode->i_list);
 	inode->i_state|=I_FREEING;
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
