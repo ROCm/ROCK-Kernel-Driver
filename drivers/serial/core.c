@@ -301,17 +301,69 @@ uart_get_baud_rate(struct uart_port *port, struct tty_struct *tty)
 }
 
 static inline
-unsigned int uart_calculate_quot(struct uart_info *info, unsigned int baud)
+unsigned int uart_calculate_quot(struct uart_port *port, unsigned int baud)
 {
-	struct uart_port *port = info->port;
 	unsigned int quot;
 
-	/* Old HI/VHI/custom speed handling */
-	if (baud == 38400 &&
-	    ((port->flags & UPF_SPD_MASK) == UPF_SPD_CUST))
+	/*
+	 * Old custom speed handling.
+	 */
+	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
 		quot = port->custom_divisor;
 	else
 		quot = port->uartclk / (16 * baud);
+
+	return quot;
+}
+
+/**
+ *	uart_get_divisor - return uart clock divisor
+ *	@port: uart_port structure describing the port.
+ *	@tty: desired tty settings
+ *	@old_termios: the original port settings, or NULL
+ *
+ *	Calculate the uart clock divisor for the port.  If the
+ *	divisor is invalid, try the old termios setting.  If
+ *	the divisor is still invalid, we try 9600 baud.
+ *
+ *	Update the @termios structure to reflect the baud rate
+ *	we're actually going to be using.
+ *
+ *	If 9600 baud fails, we return a zero divisor.
+ */
+static unsigned int
+uart_get_divisor(struct uart_port *port, struct tty_struct *tty,
+		 struct termios *old_termios)
+{
+	unsigned int quot, try;
+
+	for (try = 0; try < 3; try ++) {
+		unsigned int baud;
+
+		/* Determine divisor based on baud rate */
+		baud = uart_get_baud_rate(port, tty);
+		quot = uart_calculate_quot(port, baud);
+		if (quot)
+			break;
+
+		/*
+		 * Oops, the quotient was zero.  Try again with
+		 * the old baud rate if possible.
+		 */
+		tty->termios->c_cflag &= ~CBAUD;
+		if (old_termios) {
+			tty->termios->c_cflag |=
+				 (old_termios->c_cflag & CBAUD);
+			old_termios = NULL;
+			continue;
+		}
+
+		/*
+		 * As a last resort, if the quotient is zero,
+		 * default to 9600 bps
+		 */
+		tty->termios->c_cflag |= B9600;
+	}
 
 	return quot;
 }
@@ -355,33 +407,7 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	if (cflag & PARENB)
 		bits++;
 
-	for (try = 0; try < 3; try ++) {
-		unsigned int baud;
-
-		/* Determine divisor based on baud rate */
-		baud = uart_get_baud_rate(port, info->tty);
-		quot = uart_calculate_quot(info, baud);
-		if (quot)
-			break;
-
-		/*
-		 * Oops, the quotient was zero.  Try again with
-		 * the old baud rate if possible.
-		 */
-		info->tty->termios->c_cflag &= ~CBAUD;
-		if (old_termios) {
-			info->tty->termios->c_cflag |=
-				 (old_termios->c_cflag & CBAUD);
-			old_termios = NULL;
-			continue;
-		}
-
-		/*
-		 * As a last resort, if the quotient is zero,
-		 * default to 9600 bps
-		 */
-		info->tty->termios->c_cflag |= B9600;
-	}
+	quot = uart_get_divisor(port, tty, old_termios);
 
 	/*
 	 * The total number of bits to be transmitted in the fifo.
