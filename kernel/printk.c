@@ -638,7 +638,7 @@ void register_console(struct console * console)
 	}
 	if (console->flags & CON_PRINTBUFFER) {
 		/*
-		 * release_cosole_sem() will print out the buffered messages for us.
+		 * release_console_sem() will print out the buffered messages for us.
 		 */
 		spin_lock_irqsave(&logbuf_lock, flags);
 		con_start = log_start;
