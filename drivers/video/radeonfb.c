@@ -1432,23 +1432,6 @@ static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp
         return;
 }
                         
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-        if (con != info->currcon)
-                return;
-                
-        if (fb_display[con].cmap.len)
-                fb_set_cmap(&fb_display[con].cmap, 1, info);
-        else {
-                int size = fb_display[con].var.bits_per_pixel == 8 ? 256 : 32;
-                fb_set_cmap(fb_default_cmap(size), 1, info);
-        }
-}
-
-
-
 static int radeonfb_do_maximize(struct radeonfb_info *rinfo,
                                 struct fb_var_screeninfo *var,
                                 struct fb_var_screeninfo *v,

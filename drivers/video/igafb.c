@@ -382,20 +382,6 @@ static int igafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *fb_info)
-{
-	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
-
-        if (con != fb_info->currcon)
-                return;
-        if (fb_display[con].cmap.len)
-                fb_set_cmap(&fb_display[con].cmap, 1,
-                            &info->fb_info);
-        else
-                fb_set_cmap(fb_default_cmap(info->video_cmap_len), 1, 
-			    &info->fb_info);
-}
-
 static int igafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
                            struct fb_info *fb_info)
 {

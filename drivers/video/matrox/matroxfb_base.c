@@ -656,17 +656,6 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-static void do_install_cmap(WPMINFO struct display* dsp)
-{
-	DBG("do_install_cmap")
-
-	if (dsp->cmap.len)
-		fb_set_cmap(&dsp->cmap, 1, &ACCESS_FBINFO(fbcon));
-	else
-		fb_set_cmap(fb_default_cmap(ACCESS_FBINFO(curr.cmap_len)),
-			    1, &ACCESS_FBINFO(fbcon));
-}
-
 static int matroxfb_get_fix(struct fb_fix_screeninfo *fix, int con,
 			 struct fb_info *info)
 {
@@ -880,7 +869,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
 			matrox_cfbX_init(PMINFO display);
-			do_install_cmap(PMINFO display);
+			do_install_cmap(ACCESS_FBINFO(fbcon.currcon),&ACCESS_FBINFO(fbcon));
 #if defined(CONFIG_FB_COMPAT_XPMAC)
 			if (console_fb_info == &ACCESS_FBINFO(fbcon)) {
 				int vmode, cmode;
@@ -1175,7 +1164,7 @@ static int matroxfb_blank(int blank, struct fb_info *info)
 	DBG("matroxfb_blank")
 
 	if (ACCESS_FBINFO(dead))
-		return;
+		return 1;
 
 	switch (blank) {
 		case 1:  seq = 0x20; crtc = 0x00; break; /* works ??? */

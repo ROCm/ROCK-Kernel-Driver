@@ -635,7 +635,6 @@ static int sis_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 static int sisfb_do_set_var (struct fb_var_screeninfo *var, int isactive,
 			     struct fb_info *info);
 static void sisfb_set_disp (int con, struct fb_var_screeninfo *var);
-static void sisfb_do_install_cmap (int con, struct fb_info *info);
 
 /* Chip-dependent Routines */
 #ifdef CONFIG_FB_SIS_300

@@ -331,7 +331,6 @@ static void retz3fb_get_par(struct fb_info *info, struct retz3fb_par *par);
 static void retz3fb_set_par(struct fb_info *info, struct retz3fb_par *par);
 static int do_fb_set_var(struct fb_info *info,
 			 struct fb_var_screeninfo *var, int isactive);
-static void do_install_cmap(int con, struct fb_info *info);
 static void retz3fb_set_disp(int con, struct fb_info *info);
 static int get_video_mode(const char *name);
 
@@ -1096,18 +1095,6 @@ static int do_fb_set_var(struct fb_info *info,
 	retz3_set_video(info, var, &zinfo->current_par);
 
 	return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, info);
 }
 
 /*

@@ -2092,7 +2092,7 @@ int __init pm2fb_init(void){
 	fbgen_get_var(&fb_info.disp.var, -1, &fb_info.gen.info);
 	fbgen_do_set_var(&fb_info.disp.var, 1, &fb_info.gen);
 	fbgen_set_disp(-1, &fb_info.gen);
-	fbgen_install_cmap(0, &fb_info.gen);
+	do_install_cmap(0, &fb_info.gen.info);
 	if (register_framebuffer(&fb_info.gen.info)<0) {
 		printk(KERN_ERR "pm2fb: unable to register.\n");
 		MOD_DEC_USE_COUNT;

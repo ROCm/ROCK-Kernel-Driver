@@ -1188,7 +1188,7 @@ static int riva_getcolreg(unsigned regno, unsigned *red, unsigned *green,
  * rivafb_set_cmap()
  * fbcmap.c:fb_set_cmap()
  *	fbgen.c:fbgen_get_cmap()
- *	fbgen.c:fbgen_install_cmap()
+ *	fbgen.c:do_install_cmap()
  *		fbgen.c:fbgen_set_var()
  *		fbgen.c:fbgen_switch()
  *		fbgen.c:fbgen_blank()

@@ -304,7 +304,6 @@ static int Cyber_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 static void cyberfb_get_par(struct cyberfb_par *par);
 static void cyberfb_set_par(struct cyberfb_par *par);
 static int do_fb_set_var(struct fb_var_screeninfo *var, int isactive);
-static void do_install_cmap(int con, struct fb_info *info);
 static void cyberfb_set_disp(int con, struct fb_info *info);
 static int get_video_mode(const char *name);
 
@@ -796,25 +795,6 @@ static int do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 	cyber_set_video(var);
 	DPRINTK("EXIT\n");
 	return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	DPRINTK("ENTER\n");
-	if (con != info->currcon) {
-		DPRINTK("EXIT - Not current console\n");
-		return;
-	}
-	if (fb_display[con].cmap.len) {
-		DPRINTK("Use console cmap\n");
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	} else {
-		DPRINTK("Use default cmap\n");
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			    1, info);
-	}
-	DPRINTK("EXIT\n");
 }
 
 /*

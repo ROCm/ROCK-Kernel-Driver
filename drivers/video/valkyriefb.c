@@ -160,7 +160,6 @@ static struct fb_ops valkyriefb_ops = {
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,
 			     u_int *blue, u_int *transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 
 static int valkyrie_get_fix(struct fb_fix_screeninfo *fix, int con,
 			 struct fb_info *info)
@@ -392,19 +391,6 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	}
 
 	return 0;
-}
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len) {
-		fb_set_cmap(&fb_display[con].cmap, 1, info); 
-	}
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, info); 
-	}
 }
 
 #ifdef CONFIG_FB_COMPAT_XPMAC

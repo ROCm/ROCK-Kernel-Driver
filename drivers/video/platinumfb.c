@@ -143,8 +143,6 @@ static void platinum_set_dispsw(struct display *disp,
 				int accel);
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			      u_int *transp, struct fb_info *fb);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 /*
  * Interface used by the world
@@ -426,18 +424,6 @@ static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 #endif
 	}
 	return 0;
-}
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info); 
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, info); 
-	}
 }
 
 static inline int platinum_vram_reqd(int video_mode, int color_mode)

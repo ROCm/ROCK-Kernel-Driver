@@ -382,8 +382,6 @@ static int  tdfxfb_setcolreg(u_int regno,
 			     u_int blue,
 			     u_int transp, 
 			     struct fb_info* fb);
-static void  tdfxfb_install_cmap(struct display *d, 
-				 struct fb_info *info);
 static int tdfxfb_pan_display(struct fb_var_screeninfo* var, 
 			      int con,
 			      struct fb_info* fb);
@@ -431,8 +429,6 @@ static int  tdfxfb_getcolreg(u_int regno,
 			     u_int* blue,
 			     u_int* transp, 
 			     struct fb_info* fb);
-static void  tdfxfb_install_cmap(struct display *d, 
-				 struct fb_info *info);
 
 static void tdfxfb_hwcursor_init(void);
 static void tdfxfb_createcursorshape(struct display* p);
@@ -1821,7 +1817,7 @@ static int tdfxfb_set_var(struct fb_var_screeninfo *var,
       if(oldbpp != var->bits_per_pixel || con < 0) {
 	 if((err = fb_alloc_cmap(&display->cmap, 0, 0)))
 	   return err;
-	 tdfxfb_install_cmap(display, &(info->fb_info));
+	 do_install_cmap(con, &(info->fb_info));
       }
    }
   
@@ -2156,7 +2152,7 @@ static int tdfxfb_switch_con(int con,
 		     par.bpp,
 		     par.accel_flags & FB_ACCELF_TEXT);
    
-   tdfxfb_install_cmap(&fb_display[con], fb);
+   do_install_cmap(con, fb);
    tdfxfb_updatevar(con, fb);
    
    return 1;
@@ -2285,18 +2281,6 @@ static int tdfxfb_setcolreg(unsigned        regno,
       break;
    }
    return 0;
-}
-
-static void tdfxfb_install_cmap(struct display *d,struct fb_info *info) 
-{
-   struct fb_info_tdfx* i = (struct fb_info_tdfx*)info;
-
-   if(d->cmap.len) {
-      fb_set_cmap(&(d->cmap), 1, info);
-   } else {
-      fb_set_cmap(fb_default_cmap(i->current_par.cmap_len), 1, 
-		  info);
-   }
 }
 
 static void tdfxfb_createcursorshape(struct display* p) 

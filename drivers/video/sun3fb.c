@@ -98,7 +98,6 @@ static int sun3fbcon_updatevar(int con, struct fb_info *info);
 
 static int sun3fb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			    u_int *transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 
 static struct fb_ops sun3fb_ops = {
 	owner:		THIS_MODULE,
@@ -451,22 +450,6 @@ static int sun3fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	fb->color_map CM(regno, 1) = green;
 	fb->color_map CM(regno, 2) = blue;
 	return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	struct fb_info_sbusfb *fb = sbusfbinfo(info);
-	
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			    1, info);
-	if (fb->loadcmap)
-		(*fb->loadcmap)(fb, &fb_display[con], 0, 256);
 }
 
 static int sun3fb_set_font(struct display *p, int width, int height)

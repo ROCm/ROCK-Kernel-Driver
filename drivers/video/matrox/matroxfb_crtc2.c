@@ -84,13 +84,6 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 #undef m2info
 }
 
-static void do_install_cmap(struct matroxfb_dh_fb_info* m2info, struct display* p) {
-	if (p->cmap.len)
-		fb_set_cmap(&p->cmap, 1, &m2info->fbcon);
-	else
-		fb_set_cmap(fb_default_cmap(16), 1, &m2info->fbcon);
-}
-
 static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		struct my_timming* mt,
 		struct display* p,
@@ -446,7 +439,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}
 		matroxfb_dh_cfbX_init(m2info, p);
-		do_install_cmap(m2info, p);
+		do_install_cmap(ACCESS_FBINFO(fbcon.currcon), &ACCESS_FBINFO(fbcon));
 	}
 	return 0;
 #undef m2info

@@ -238,7 +238,6 @@ static int sstfbcon_switch(int con, struct fb_info *info);
 static int sstfbcon_updatevar(int con, struct fb_info *info);
 
 /* Internal routines */
-static void sstfb_install_cmap(int con, struct fb_info *info);
 static int sstfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                            u_int *transp, struct fb_info *info);
 
@@ -497,26 +496,6 @@ static inline void dac_i_write(u8 reg,u8 val)
 	r_dprintk("sst_dac_write_i(%#x, %#x)\n", reg, val);
 	sst_dac_write(DACREG_ADDR_I, reg);
 	sst_dac_write(DACREG_DATA_I, val);
-}
-
-/*
- *
- *  Internal routines
- *
- */
-
-static void sstfb_install_cmap(int con, struct fb_info *info)
-{
-	f_dprintk("sstfb_install_cmap(con: %d)\n",con);
-	f_ddprintk("currcon: %d\n", info->currcon);
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(
-			fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			1, info);
 }
 
 static int sstfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
@@ -872,7 +851,7 @@ static int sstfb_set_var(struct fb_var_screeninfo *var,
 	if (old_bpp != var->bits_per_pixel) {
 	    if ((err = fb_alloc_cmap(&display->cmap, 0, 0)))
 		return err;
-	    sstfb_install_cmap(con, info);
+	    do_install_cmap(con, info);
 	}
 
 	return 0;
@@ -1864,7 +1843,7 @@ static int sstfbcon_switch(int con, struct fb_info *info)
 	if (memcmp(&par,&(sst_info->current_par),sizeof(par))) {
 		sstfb_set_par(&par, sst_info);
 	}
-	sstfb_install_cmap(con, info);
+	do_install_cmap(con, info);
 	return 0;
 #undef sst_info
 }

@@ -72,8 +72,6 @@ static int tx3912fbcon_updatevar(int con, struct fb_info *info);
  */
 static int tx3912fb_getcolreg(u_int regno, u_int *red, u_int *green,
 			u_int *blue, u_int *transp, struct fb_info *info);
-static void tx3912fb_install_cmap(int con, struct fb_info *info);
-
 
 /*
  * Frame buffer operations structure used by console driver
@@ -283,7 +281,7 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 		if (oldbpp != var->bits_per_pixel) {
 			if ((err = fb_alloc_cmap(&display->cmap, 0, 0)))
 				return err;
-			tx3912fb_install_cmap(con, info);
+			do_install_cmap(con, info);
 		}
 	}
 
@@ -429,7 +427,7 @@ static int tx3912fbcon_switch(int con, struct fb_info *info)
 	info->currcon = con;
 
 	/* Install new colormap */
-	tx3912fb_install_cmap(con, info);
+	do_install_cmap(con, info);
 	return 0;
 }
 
@@ -499,20 +497,6 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	palette[regno].blue = blue;
 
 	return 0;
-}
-
-/*
- * Install the color map
- */
-static void tx3912fb_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1 << fb_display[con].var.bits_per_pixel), 1, info);
 }
 
 MODULE_LICENSE("GPL");

@@ -353,7 +353,6 @@ static void aty128_set_dispsw(struct display *disp,
 			struct fb_info_aty128 *info, int bpp, int accel);
 static int aty128_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 				u_int *transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 static int aty128_encode_var(struct fb_var_screeninfo *var,
                              const struct aty128fb_par *par,
                              const struct fb_info_aty128 *info);
@@ -2283,22 +2282,6 @@ aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	}
     return 0;
 }
-
-
-static void
-do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != info->currcon)
-	return;
-
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, info);
-    else {
-	int size = (fb_display[con].var.bits_per_pixel <= 8) ? 256 : 16;
-	fb_set_cmap(fb_default_cmap(size), 1, info);
-    }
-}
-
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 static int backlight_conv[] = {

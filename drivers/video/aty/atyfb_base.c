@@ -1,4 +1,3 @@
-
 /*
  *  ATI Frame Buffer Device Driver Core
  *
@@ -206,7 +205,6 @@ static void atyfb_set_dispsw(struct display *disp, struct fb_info_aty *info,
 			     int bpp, int accel);
 static int atyfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			 u_int *transp, struct fb_info *fb);
-static void do_install_cmap(int con, struct fb_info *info);
 #ifdef CONFIG_PPC
 static int read_aty_sense(const struct fb_info_aty *info);
 #endif
@@ -2767,20 +2765,6 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	    }
     return 0;
 }
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != info->currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, info);
-    else {
-	int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-	fb_set_cmap(fb_default_cmap(size), 1, info);
-    }
-}
-
 
     /*
      *  Update the `var' structure (called by fbcon.c)

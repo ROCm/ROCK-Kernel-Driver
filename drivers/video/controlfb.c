@@ -184,7 +184,6 @@ static void control_cfb32_revc(struct display *p, int xx, int yy);
 
 /******************** Prototypes for internal functions **********************/
 
-static void do_install_cmap(struct display *disp, struct fb_info *info);
 static void set_control_clock(unsigned char *params);
 static int init_control(struct fb_info_control *p);
 static void control_set_hardware(struct fb_info_control *p,
@@ -330,7 +329,7 @@ static int control_set_var(struct fb_var_screeninfo *var, int con,
 		if(depthchange) {
 			if((err = fb_alloc_cmap(&disp->cmap, 0, 0)))
 				return err;
-			do_install_cmap(disp, info);
+			do_install_cmap(con, info);
 		}
 	}
 
@@ -473,7 +472,7 @@ static int controlfb_switch(int con, struct fb_info *info)
 	control_var_to_par(&fb_display[con].var, &par, info);
 	control_set_hardware(p, &par);
 	control_set_dispsw(&fb_display[con], par.cmode, p);
-	do_install_cmap(&fb_display[con], info);
+	do_install_cmap(con, info);
 
 	return 1;
 }
@@ -580,19 +579,6 @@ static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		}
 	return 0;
 }
-
-static void do_install_cmap(struct display *disp, struct fb_info *info)
-{
-	if (disp->cmap.len)
-		fb_set_cmap(&disp->cmap, 1, controlfb_setcolreg,
-			    info);
-	else {
-		int size = disp->var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, controlfb_setcolreg,
-			    info);
-	}
-}
-
 
 static void set_control_clock(unsigned char *params)
 {

@@ -395,16 +395,6 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(video_cmap_len), 1, info); 
-}
-
 static int vesafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info)
 {

@@ -2398,20 +2398,6 @@ do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 	return 0;
 }
 
-/* Functions for handling colormap */
-
-static void
-do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, info);		
-}
-
 static int
 atafb_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
 {

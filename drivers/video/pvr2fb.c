@@ -228,7 +228,6 @@ static int pvr2fbcon_updatevar(int con, struct fb_info *info);
 	 * Internal/hardware-specific routines
 	 */
 
-static void do_install_cmap(int con, struct fb_info *info);
 static u_long get_line_length(int xres_virtual, int bpp);
 static void set_color_bitfields(struct fb_var_screeninfo *var);
 static int pvr2_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
@@ -518,19 +517,6 @@ static int pvr2fbcon_updatevar(int con, struct fb_info *info)
 static int pvr2fb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
-}
-
-/* Setup the colormap */
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-                            1, info);
 }
 
 static inline u_long get_line_length(int xres_virtual, int bpp)

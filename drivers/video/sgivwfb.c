@@ -132,7 +132,6 @@ static void sgivwfb_encode_fix(struct fb_fix_screeninfo *fix,
 			       struct fb_var_screeninfo *var);
 static int sgivwfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			     u_int *transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 
 static unsigned long get_line_length(int xres_virtual, int bpp)
 {
@@ -552,17 +551,6 @@ static int sgivwfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
   regs->cmap[regno] = (red << 24) | (green << 16) | (blue << 8);
   cmap_fifo--;			/* assume FIFO is filling up */
   return 0;
-}
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != info->currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, info);
-    else
-	fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), 1,
-		    info);
 }
 
 /* ---------------------------------------------------- */

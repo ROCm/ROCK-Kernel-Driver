@@ -350,7 +350,6 @@ static void Cyber_blank(int blank);
 static void virgefb_get_par(struct virgefb_par *par);
 static void virgefb_set_par(struct virgefb_par *par);
 static int do_fb_set_var(struct fb_var_screeninfo *var, int isactive);
-static void do_install_cmap(int con, struct fb_info *info);
 static void virgefb_set_disp(int con, struct fb_info *info);
 static int get_video_mode(const char *name);
 
@@ -871,18 +870,6 @@ static int do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 
 	virge_set_video(var);
 	return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			    1, info);
 }
 
 /*

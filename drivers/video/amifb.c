@@ -1127,7 +1127,6 @@ static int amifbcon_updatevar(int con, struct fb_info *info);
 	 * Internal routines
 	 */
 
-static void do_install_cmap(int con, struct fb_info *info);
 static int flash_cursor(void);
 static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
 static u_long chipalloc(u_long size);
@@ -1847,21 +1846,6 @@ static int amifb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
 	return 0;
-}
-
-	/*
-	 * Set the colormap
-	 */
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != info->currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, info);
 }
 
 static int flash_cursor(void)

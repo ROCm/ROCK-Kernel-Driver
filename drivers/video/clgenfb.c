@@ -2816,7 +2816,7 @@ int __init clgenfb_init(void)
 
 	disp.var = clgenfb_default;
 	fbgen_set_disp (-1, &fb_info->gen);
-	fbgen_install_cmap (0, &fb_info->gen);
+	do_install_cmap (0, &fb_info->gen.info);
 
 	err = register_framebuffer (&fb_info->gen.info);
 	if (err) {

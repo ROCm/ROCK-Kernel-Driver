@@ -208,8 +208,6 @@ static int fm2fbcon_updatevar(int con, struct fb_info *info);
 
 static int fm2fb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			   u_int *transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 static struct fb_ops fm2fb_ops = {
 	owner:		THIS_MODULE,
@@ -515,17 +513,6 @@ static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     fbcon_cfb32_cmap[regno] = (red << 16) | (green << 8) | blue;
 #endif
     return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != info->currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, info);
-    else
-	fb_set_cmap(fb_default_cmap(256), 1, info);
 }
 
 MODULE_LICENSE("GPL");

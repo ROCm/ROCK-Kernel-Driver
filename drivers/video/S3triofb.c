@@ -127,8 +127,6 @@ static void Trio_MoveCursor(u_short x, u_short y);
 
 static int s3trio_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                          u_int *transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 static struct fb_ops s3trio_ops = {
 	owner:		THIS_MODULE,
@@ -681,18 +679,6 @@ static int s3trio_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     mem_out8((blue & 0xff) >> 2,s3trio_base+0x1008000 + 0x3c9);
 
     return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != info->currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, &fb_info);
-    else
-	fb_set_cmap(fb_default_cmap(fb_display[con].var.bits_per_pixel), 1,
-		    &fb_info);
 }
 
 static void Trio_WaitQueue(u_short fifo) {

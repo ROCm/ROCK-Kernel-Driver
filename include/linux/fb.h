@@ -465,7 +465,7 @@ extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
 extern int fbgen_do_set_var(struct fb_var_screeninfo *var, int isactive,
 			    struct fb_info_gen *info);
 extern void fbgen_set_disp(int con, struct fb_info_gen *info);
-extern void fbgen_install_cmap(int con, struct fb_info_gen *info);
+extern void do_install_cmap(int con, struct fb_info *info);
 extern int fbgen_update_var(int con, struct fb_info *info);
 extern int gen_update_var(int con, struct fb_info *info);
 extern int fbgen_switch(int con, struct fb_info *info);

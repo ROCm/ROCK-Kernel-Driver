@@ -361,7 +361,7 @@ int __init hitfb_init(void)
     fb_info.disp.var.activate = FB_ACTIVATE_NOW;
     fbgen_do_set_var(&fb_info.disp.var, 1, &fb_info.gen);
     fbgen_set_disp(-1, &fb_info.gen);
-    fbgen_install_cmap(0, &fb_info.gen);
+    do_install_cmap(0, &fb_info.gen);
     
     if(register_framebuffer(&fb_info.gen.info)<0) return -EINVAL;
     
