@@ -243,14 +243,14 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): .hdepend prepare include/config/MARKER
+$(SUBDIRS): .hdepend prepare
 	@$(MAKE) -C $@
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
 
 .PHONY: prepare
-prepare: include/linux/version.h include/asm
+prepare: include/linux/version.h include/asm include/config/MARKER
 
 # Single targets
 # ---------------------------------------------------------------------------

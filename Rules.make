@@ -48,12 +48,9 @@ subdir-		+= $(__subdir-)
 obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
 obj-m		:= $(filter-out %/, $(obj-m))
 
-# If a dir is selected in $(subdir-y) and also mentioned in $(mod-subdirs),
-# add it to $(subdir-m)
+# Subdirectories we need to descend into
 
-both-m          := $(filter $(mod-subdirs), $(subdir-y))
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-subdir-ymn	:= $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 
 # export.o is never a composite object, since $(export-objs) has a
 # fixed meaning (== objects which EXPORT_SYMBOL())
@@ -85,6 +82,8 @@ subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
 real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
 
+# Only build module versions for files which are selected to be built
+export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
 # We're called for one of three purposes:
 # o fastdep: build module version files (.ver) for $(export-objs) in
@@ -102,7 +101,18 @@ ifeq ($(MAKECMDGOALS),fastdep)
 # Module versions
 # ===========================================================================
 
-ifneq "$(strip $(export-objs))" ""
+ifeq ($(strip $(export-objs)),)
+
+# If we don't export any symbols in this dir, just descend
+# ---------------------------------------------------------------------------
+
+fastdep: sub_dirs
+	@echo -n
+
+else
+
+# This sets version suffixes on exported symbols
+# ---------------------------------------------------------------------------
 
 MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
 
@@ -136,24 +146,9 @@ $(MODVERDIR)/%.ver: %.c FORCE
 
 targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
-fastdep: $(targets)
-ifneq ($(export-objs),)
+fastdep: $(targets) sub_dirs
 	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
 	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
-endif
-
-# Descending when making module versions
-# ---------------------------------------------------------------------------
-
-fastdep-list := $(addprefix _sfdep_,$(subdir-ymn))
-
-.PHONY: fastdep $(fastdep-list)
-
-fastdep: $(fastdep-list)
-
-$(fastdep-list):
-	@$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
-
 
 endif # export-objs 
 
@@ -164,11 +159,9 @@ ifeq ($(MAKECMDGOALS),modules_install)
 # Installing modules
 # ==========================================================================
 
-modinst-list := $(addprefix _modinst_,$(subdir-ym))
+.PHONY: modules_install
 
-.PHONY: modules_install _modinst_ $(modinst-list)
-
-modules_install: $(modinst-list)
+modules_install: sub_dirs
 ifneq ($(obj-m),)
 	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
 	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
@@ -176,10 +169,6 @@ ifneq ($(obj-m),)
 else
 	@echo -n
 endif
-
-$(modinst-list):
-	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
-
 
 else # ! modules_install
 
@@ -357,24 +346,22 @@ $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
 
 targets += $(host-progs-single) $(host-progs-multi-objs) $(host-progs-multi) 
 
-# Descending when building
-# ---------------------------------------------------------------------------
-
-subdir-list := $(addprefix _subdir_,$(subdir-ym))
-
-.PHONY: sub_dirs $(subdir-list)
-
-sub_dirs: $(subdir-list)
-
-$(subdir-list):
-	@$(MAKE) -C $(patsubst _subdir_%,%,$@)
-
 endif # ! modules_install
 endif # ! fastdep
 
 # ===========================================================================
 # Generic stuff
 # ===========================================================================
+
+# Descending
+# ---------------------------------------------------------------------------
+
+.PHONY: sub_dirs $(subdir-ym)
+
+sub_dirs: $(subdir-ym)
+
+$(subdir-ym):
+	@$(MAKE) -C $@ $(MAKECMDGOALS)
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
