@@ -41,47 +41,53 @@ static const char *sct_quadro_subtypes[] =
 #define wordout(addr,val) outw(val,addr)
 #define wordin(addr) inw(addr)
 
-static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+static inline u8
+readreg(struct IsdnCardState *cs, u8 off)
 {
-	register u_char ret;
+	u8 ret;
 	unsigned long flags;
+
 	spin_lock_irqsave(&bkm_a8_lock, flags);
-	wordout(ale, off);
-	ret = wordin(adr) & 0xFF;
+	wordout(cs->hw.ax.base, off);
+	ret = wordin(cs->hw.ax.data_adr) & 0xFF;
 	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 	return (ret);
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-	int i;
-	wordout(ale, off);
-	for (i = 0; i < size; i++)
-		data[i] = wordin(adr) & 0xFF;
-}
-
-
-static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+writereg(struct IsdnCardState *cs, u8 off, u8 data)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&bkm_a8_lock, flags);
-	wordout(ale, off);
-	wordout(adr, data);
+	wordout(cs->hw.ax.base, off);
+	wordout(cs->hw.ax.data_adr, data);
 	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 }
 
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+readfifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 {
-	/* fifo write without cli because it's allready done  */
 	int i;
-	wordout(ale, off);
+	unsigned long flags;
+
+	spin_lock_irqsave(&bkm_a8_lock, flags);
+	wordout(cs->hw.ax.base, off);
 	for (i = 0; i < size; i++)
-		wordout(adr, data[i]);
+		data[i] = wordin(cs->hw.ax.data_adr) & 0xFF;
+	spin_unlock_irqrestore(&bkm_a8_lock, flags);
+}
+
+static inline void
+writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
+{
+	int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&bkm_a8_lock, flags);
+	wordout(cs->hw.ax.base, off);
+	for (i = 0; i < size; i++)
+		wordout(cs->hw.ax.data_adr, data[i]);
+	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 }
 
 /* Interface functions */
@@ -89,25 +95,25 @@ writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int siz
 static u_char
 ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	return (readreg(cs->hw.ax.base, cs->hw.ax.data_adr, offset | 0x80));
+	return readreg(cs, offset | 0x80);
 }
 
 static void
 WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, offset | 0x80, value);
+	writereg(cs, offset | 0x80, value);
 }
 
 static void
 ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	readfifo(cs->hw.ax.base, cs->hw.ax.data_adr, 0x80, data, size);
+	readfifo(cs, 0x80, data, size);
 }
 
 static void
 WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	writefifo(cs->hw.ax.base, cs->hw.ax.data_adr, 0x80, data, size);
+	writefifo(cs, 0x80, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
@@ -120,13 +126,13 @@ static struct dc_hw_ops isac_ops = {
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
-	return (readreg(cs->hw.ax.base, cs->hw.ax.data_adr, offset + (hscx ? 0x40 : 0)));
+	return readreg(cs, offset + (hscx ? 0x40 : 0));
 }
 
 static void
 WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
-	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, offset + (hscx ? 0x40 : 0), value);
+	writereg(cs, offset + (hscx ? 0x40 : 0), value);
 }
 
 static struct bc_hw_ops hscx_ops = {
@@ -139,22 +145,21 @@ static void
 set_ipac_active(struct IsdnCardState *cs, u_int active)
 {
 	/* set irq mask */
-	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK,
-		active ? 0xc0 : 0xff);
+	writereg(cs, IPAC_MASK, active ? 0xc0 : 0xff);
 }
 
 /*
  * fast interrupt HSCX stuff goes here
  */
 
-#define READHSCX(cs, nr, reg) readreg(cs->hw.ax.base, \
-	cs->hw.ax.data_adr, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.ax.base, \
-	cs->hw.ax.data_adr, reg + (nr ? 0x40 : 0), data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.ax.base, \
-	cs->hw.ax.data_adr, (nr ? 0x40 : 0), ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.ax.base, \
-	cs->hw.ax.data_adr, (nr ? 0x40 : 0), ptr, cnt)
+#define READHSCX(cs, nr, reg) readreg(cs, \
+	reg + (nr ? 0x40 : 0))
+#define WRITEHSCX(cs, nr, reg, data) writereg(cs, \
+	reg + (nr ? 0x40 : 0), data)
+#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs, \
+	(nr ? 0x40 : 0), ptr, cnt)
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs, \
+	(nr ? 0x40 : 0), ptr, cnt)
 
 #include "hscx_irq.c"
 
@@ -165,14 +170,14 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 	u_char ista, val, icnt = 5;
 
 	spin_lock(&cs->lock);
-	ista = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ISTA);
+	ista = readreg(cs, IPAC_ISTA);
 	if (!(ista & 0x3f)) /* not this IPAC */
 		goto unlock;
       Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, HSCX_ISTA + 0x40);
+		val = readreg(cs, HSCX_ISTA + 0x40);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -184,7 +189,7 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		}
 	}
 	if (ista & 0x20) {
-		val = 0xfe & readreg(cs->hw.ax.base, cs->hw.ax.data_adr, ISAC_ISTA | 0x80);
+		val = 0xfe & readreg(cs, ISAC_ISTA | 0x80);
 		if (val) {
 			isac_interrupt(cs, val);
 		}
@@ -193,7 +198,7 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ISTA);
+	ista = readreg(cs, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPAC;
@@ -202,8 +207,8 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "HiSax: %s (%s) IRQ LOOP\n",
 		       CardType[cs->typ],
 		       sct_quadro_subtypes[cs->subtyp]);
-	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xFF);
-	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xC0);
+	writereg(cs, IPAC_MASK, 0xFF);
+	writereg(cs, IPAC_MASK, 0xC0);
  unlock:
 	spin_unlock(&cs->lock);
 }
@@ -402,15 +407,6 @@ setup_sct_quadro(struct IsdnCard *card)
 				return(0);
 			if (sct_alloc_io(pci_ioaddr5, 64))
 				return(0);
-			/* disable all IPAC */
-			writereg(pci_ioaddr5, pci_ioaddr5 + 4,
-				IPAC_MASK, 0xFF);
-			writereg(pci_ioaddr4 + 0x08, pci_ioaddr4 + 0x0c,
-				IPAC_MASK, 0xFF);
-			writereg(pci_ioaddr3 + 0x10, pci_ioaddr3 + 0x14,
-				IPAC_MASK, 0xFF);
-			writereg(pci_ioaddr2 + 0x20, pci_ioaddr2 + 0x24,
-				IPAC_MASK, 0xFF);
 			break;
 		case 2:
 			cs->hw.ax.base = pci_ioaddr4 + 0x08;
@@ -428,8 +424,8 @@ setup_sct_quadro(struct IsdnCard *card)
 				return(0);
 			break;
 	}	
-	/* For isac and hscx data path */
 	cs->hw.ax.data_adr = cs->hw.ax.base + 4;
+	writereg(cs, IPAC_MASK, 0xFF);
 
 	printk(KERN_INFO "HiSax: %s (%s) configured at 0x%.4lX, 0x%.4lX, 0x%.4lX and IRQ %d\n",
 	       CardType[card->typ],
@@ -450,7 +446,7 @@ setup_sct_quadro(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",
 		CardType[card->typ],
 		sct_quadro_subtypes[cs->subtyp],
-		readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ID));
+		readreg(cs, IPAC_ID));
 	return (1);
 #else
 	printk(KERN_ERR "HiSax: bkm_a8 only supported on PCI Systems\n");

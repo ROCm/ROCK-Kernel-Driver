@@ -47,31 +47,21 @@ static spinlock_t niccy_lock = SPIN_LOCK_UNLOCKED;
 #define PCI_IRQ_DISABLE		0xff0000
 #define PCI_IRQ_ASSERT		0x800000
 
-static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+static inline u8
+readreg(unsigned int ale, unsigned int adr, u8 off)
 {
-	register u_char ret;
+	u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&niccy_lock, flags);
 	byteout(ale, off);
 	ret = bytein(adr);
 	spin_unlock_irqrestore(&niccy_lock, flags);
-	return (ret);
+	return ret;
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-
-	byteout(ale, off);
-	insb(adr, data, size);
-}
-
-
-static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+writereg(unsigned int ale, unsigned int adr, u8 off, u8 data)
 {
 	unsigned long flags;
 
@@ -82,11 +72,25 @@ writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 }
 
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+readfifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
 {
-	/* fifo write without cli because it's allready done  */
+	unsigned long flags;
+
+	spin_lock_irqsave(&niccy_lock, flags);
+	byteout(ale, off);
+	insb(adr, data, size);
+	spin_unlock_irqrestore(&niccy_lock, flags);
+}
+
+static inline void
+writefifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&niccy_lock, flags);
 	byteout(ale, off);
 	outsb(adr, data, size);
+	spin_unlock_irqrestore(&niccy_lock, flags);
 }
 
 /* Interface functions */

@@ -32,46 +32,50 @@ static spinlock_t saphir_lock = SPIN_LOCK_UNLOCKED;
 #define SPARE_REG	4
 #define RESET_REG	5
 
-static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+static inline u8
+readreg(struct IsdnCardState *cs, unsigned int adr, u8 off)
 {
-	register u_char ret;
+	u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&saphir_lock, flags);
-	byteout(ale, off);
+	byteout(cs->hw.saphir.ale, off);
 	ret = bytein(adr);
 	spin_unlock_irqrestore(&saphir_lock, flags);
-	return (ret);
+	return ret;
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-
-	byteout(ale, off);
-	insb(adr, data, size);
-}
-
-
-static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&saphir_lock, flags);
-	byteout(ale, off);
+	byteout(cs->hw.saphir.ale, off);
 	byteout(adr, data);
 	spin_unlock_irqrestore(&saphir_lock, flags);
 }
 
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 *data, int size)
 {
-	/* fifo write without cli because it's allready done  */
-	byteout(ale, off);
+	unsigned long flags;
+
+	spin_lock_irqsave(&saphir_lock, flags);
+	byteout(cs->hw.saphir.ale, off);
+	insb(adr, data, size);
+	spin_unlock_irqrestore(&saphir_lock, flags);
+}
+
+static inline void
+writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 *data, int size)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&saphir_lock, flags);
+	byteout(cs->hw.saphir.ale, off);
 	outsb(adr, data, size);
+	spin_unlock_irqrestore(&saphir_lock, flags);
 }
 
 /* Interface functions */
@@ -79,25 +83,25 @@ writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int siz
 static u_char
 ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	return (readreg(cs->hw.saphir.ale, cs->hw.saphir.isac, offset));
+	return readreg(cs, cs->hw.saphir.isac, offset);
 }
 
 static void
 WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.isac, offset, value);
+	writereg(cs, cs->hw.saphir.isac, offset, value);
 }
 
 static void
 ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	readfifo(cs->hw.saphir.ale, cs->hw.saphir.isac, 0, data, size);
+	readfifo(cs, cs->hw.saphir.isac, 0, data, size);
 }
 
 static void
 WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	writefifo(cs->hw.saphir.ale, cs->hw.saphir.isac, 0, data, size);
+	writefifo(cs, cs->hw.saphir.isac, 0, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
@@ -110,15 +114,13 @@ static struct dc_hw_ops isac_ops = {
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
-	return (readreg(cs->hw.saphir.ale, cs->hw.saphir.hscx,
-		offset + (hscx ? 0x40 : 0)));
+	return readreg(cs, cs->hw.saphir.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
 WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx,
-		offset + (hscx ? 0x40 : 0), value);
+	writereg(cs, cs->hw.saphir.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
 static struct bc_hw_ops hscx_ops = {
@@ -126,15 +128,15 @@ static struct bc_hw_ops hscx_ops = {
 	.write_reg = WriteHSCX,
 };
 
-#define READHSCX(cs, nr, reg) readreg(cs->hw.saphir.ale, \
+#define READHSCX(cs, nr, reg) readreg(cs, \
 		cs->hw.saphir.hscx, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.saphir.ale, \
+#define WRITEHSCX(cs, nr, reg, data) writereg(cs, \
 		cs->hw.saphir.hscx, reg + (nr ? 0x40 : 0), data)
 
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.saphir.ale, \
+#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs, \
 		cs->hw.saphir.hscx, (nr ? 0x40 : 0), ptr, cnt)
 
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.saphir.ale, \
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs, \
 		cs->hw.saphir.hscx, (nr ? 0x40 : 0), ptr, cnt)
 
 #include "hscx_irq.c"
@@ -146,21 +148,21 @@ saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 
 	spin_lock(&cs->lock);
-	val = readreg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
+	val = readreg(cs, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readreg(cs->hw.saphir.ale, cs->hw.saphir.isac, ISAC_ISTA);
+	val = readreg(cs, cs->hw.saphir.isac, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = readreg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
+	val = readreg(cs, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readreg(cs->hw.saphir.ale, cs->hw.saphir.isac, ISAC_ISTA);
+	val = readreg(cs, cs->hw.saphir.isac, ISAC_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
@@ -171,12 +173,12 @@ saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
 	else
 		printk(KERN_WARNING "saphir: Spurious timer!\n");
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK, 0xFF);
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.isac, ISAC_MASK, 0);
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK, 0);
-	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0);
+	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK, 0xFF);
+	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0xFF);
+	writereg(cs, cs->hw.saphir.isac, ISAC_MASK, 0xFF);
+	writereg(cs, cs->hw.saphir.isac, ISAC_MASK, 0);
+	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK, 0);
+	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0);
 	spin_unlock(&cs->lock);
 }
 

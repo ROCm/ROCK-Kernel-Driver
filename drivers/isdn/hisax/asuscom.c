@@ -43,46 +43,51 @@ static spinlock_t asuscom_lock = SPIN_LOCK_UNLOCKED;
 /* CARD_ADR (Write) */
 #define ASUS_RESET      0x80	/* Bit 7 Reset-Leitung */
 
-static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+static inline u8
+readreg(struct IsdnCardState *cs, unsigned int adr, u8 off)
 {
-	register u_char ret;
+	u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&asuscom_lock, flags);
-	byteout(ale, off);
+	byteout(cs->hw.asus.adr, off);
 	ret = bytein(adr);
 	spin_unlock_irqrestore(&asuscom_lock, flags);
-	return (ret);
+	return ret;
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-
-	byteout(ale, off);
-	insb(adr, data, size);
-}
-
-
-static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&asuscom_lock, flags);
-	byteout(ale, off);
+	byteout(cs->hw.asus.adr, off);
+	insb(adr, data, size);
+	spin_unlock_irqrestore(&asuscom_lock, flags);
+}
+
+
+static inline void
+writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&asuscom_lock, flags);
+	byteout(cs->hw.asus.adr, off);
 	byteout(adr, data);
 	spin_unlock_irqrestore(&asuscom_lock, flags);
 }
 
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
-	/* fifo write without cli because it's allready done  */
-	byteout(ale, off);
+	unsigned long flags;
+
+	spin_lock_irqsave(&asuscom_lock, flags);
+	byteout(cs->hw.asus.adr, off);
 	outsb(adr, data, size);
+	spin_unlock_irqrestore(&asuscom_lock, flags);
 }
 
 /* Interface functions */
@@ -90,25 +95,25 @@ writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int siz
 static u_char
 ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	return (readreg(cs->hw.asus.adr, cs->hw.asus.isac, offset));
+	return readreg(cs, cs->hw.asus.isac, offset);
 }
 
 static void
 WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	writereg(cs->hw.asus.adr, cs->hw.asus.isac, offset, value);
+	writereg(cs, cs->hw.asus.isac, offset, value);
 }
 
 static void
 ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	readfifo(cs->hw.asus.adr, cs->hw.asus.isac, 0, data, size);
+	readfifo(cs, cs->hw.asus.isac, 0, data, size);
 }
 
 static void
 WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	writefifo(cs->hw.asus.adr, cs->hw.asus.isac, 0, data, size);
+	writefifo(cs, cs->hw.asus.isac, 0, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
@@ -121,25 +126,25 @@ static struct dc_hw_ops isac_ops = {
 static u_char
 ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
 {
-	return (readreg(cs->hw.asus.adr, cs->hw.asus.isac, offset|0x80));
+	return readreg(cs, cs->hw.asus.isac, offset|0x80);
 }
 
 static void
 WriteISAC_IPAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	writereg(cs->hw.asus.adr, cs->hw.asus.isac, offset|0x80, value);
+	writereg(cs, cs->hw.asus.isac, offset|0x80, value);
 }
 
 static void
 ReadISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 {
-	readfifo(cs->hw.asus.adr, cs->hw.asus.isac, 0x80, data, size);
+	readfifo(cs, cs->hw.asus.isac, 0x80, data, size);
 }
 
 static void
 WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 {
-	writefifo(cs->hw.asus.adr, cs->hw.asus.isac, 0x80, data, size);
+	writefifo(cs, cs->hw.asus.isac, 0x80, data, size);
 }
 
 static struct dc_hw_ops ipac_dc_ops = {
@@ -152,15 +157,13 @@ static struct dc_hw_ops ipac_dc_ops = {
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
-	return (readreg(cs->hw.asus.adr,
-			cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0)));
+	return readreg(cs, cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
 WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
-	writereg(cs->hw.asus.adr,
-		 cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0), value);
+	writereg(cs, cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
 static struct bc_hw_ops hscx_ops = {
@@ -172,15 +175,15 @@ static struct bc_hw_ops hscx_ops = {
  * fast interrupt HSCX stuff goes here
  */
 
-#define READHSCX(cs, nr, reg) readreg(cs->hw.asus.adr, \
+#define READHSCX(cs, nr, reg) readreg(cs, \
 		cs->hw.asus.hscx, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.asus.adr, \
+#define WRITEHSCX(cs, nr, reg, data) writereg(cs, \
 		cs->hw.asus.hscx, reg + (nr ? 0x40 : 0), data)
 
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.asus.adr, \
+#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs, \
 		cs->hw.asus.hscx, (nr ? 0x40 : 0), ptr, cnt)
 
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.asus.adr, \
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs, \
 		cs->hw.asus.hscx, (nr ? 0x40 : 0), ptr, cnt)
 
 #include "hscx_irq.c"
@@ -192,32 +195,32 @@ asuscom_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 
 	spin_lock(&cs->lock);
-	val = readreg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
+	val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readreg(cs->hw.asus.adr, cs->hw.asus.isac, ISAC_ISTA);
+	val = readreg(cs, cs->hw.asus.isac, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = readreg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
+	val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readreg(cs->hw.asus.adr, cs->hw.asus.isac, ISAC_ISTA);
+	val = readreg(cs, cs->hw.asus.isac, ISAC_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
 		goto Start_ISAC;
 	}
-	writereg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_MASK, 0xFF);
-	writereg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs->hw.asus.adr, cs->hw.asus.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.asus.adr, cs->hw.asus.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_MASK, 0x0);
-	writereg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_MASK + 0x40, 0x0);
+	writereg(cs, cs->hw.asus.hscx, HSCX_MASK, 0xFF);
+	writereg(cs, cs->hw.asus.hscx, HSCX_MASK + 0x40, 0xFF);
+	writereg(cs, cs->hw.asus.isac, ISAC_MASK, 0xFF);
+	writereg(cs, cs->hw.asus.isac, ISAC_MASK, 0x0);
+	writereg(cs, cs->hw.asus.hscx, HSCX_MASK, 0x0);
+	writereg(cs, cs->hw.asus.hscx, HSCX_MASK + 0x40, 0x0);
 	spin_unlock(&cs->lock);
 }
 
@@ -231,12 +234,12 @@ asuscom_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "ISDNLink: Spurious interrupt!\n");
 		return;
 	}
-	ista = readreg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_ISTA);
+	ista = readreg(cs, cs->hw.asus.isac, IPAC_ISTA);
 Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = readreg(cs->hw.asus.adr, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
+		val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -247,7 +250,7 @@ Start_IPAC:
 			hscx_int_main(cs, val);
 	}
 	if (ista & 0x20) {
-		val = 0xfe & readreg(cs->hw.asus.adr, cs->hw.asus.isac, ISAC_ISTA | 0x80);
+		val = 0xfe & readreg(cs, cs->hw.asus.isac, ISAC_ISTA | 0x80);
 		if (val) {
 			isac_interrupt(cs, val);
 		}
@@ -256,15 +259,15 @@ Start_IPAC:
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista  = readreg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_ISTA);
+	ista  = readreg(cs, cs->hw.asus.isac, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPAC;
 	}
 	if (!icnt)
 		printk(KERN_WARNING "ASUS IRQ LOOP\n");
-	writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xFF);
-	writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xC0);
+	writereg(cs, cs->hw.asus.isac, IPAC_MASK, 0xFF);
+	writereg(cs, cs->hw.asus.isac, IPAC_MASK, 0xC0);
 }
 
 void
@@ -280,23 +283,23 @@ static void
 reset_asuscom(struct IsdnCardState *cs)
 {
 	if (cs->subtyp == ASUS_IPAC)
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_POTA2, 0x20);
+		writereg(cs, cs->hw.asus.isac, IPAC_POTA2, 0x20);
 	else
 		byteout(cs->hw.asus.adr, ASUS_RESET);	/* Reset On */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	if (cs->subtyp == ASUS_IPAC)
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_POTA2, 0x0);
+		writereg(cs, cs->hw.asus.isac, IPAC_POTA2, 0x0);
 	else
 		byteout(cs->hw.asus.adr, 0);	/* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	if (cs->subtyp == ASUS_IPAC) {
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_CONF, 0x0);
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_ACFG, 0xff);
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_AOE, 0x0);
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xc0);
-		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_PCFG, 0x12);
+		writereg(cs, cs->hw.asus.isac, IPAC_CONF, 0x0);
+		writereg(cs, cs->hw.asus.isac, IPAC_ACFG, 0xff);
+		writereg(cs, cs->hw.asus.isac, IPAC_AOE, 0x0);
+		writereg(cs, cs->hw.asus.isac, IPAC_MASK, 0xc0);
+		writereg(cs, cs->hw.asus.isac, IPAC_PCFG, 0x12);
 	}
 }
 
@@ -410,11 +413,10 @@ setup_asuscom(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Asus_card_msg;
-	val = readreg(cs->hw.asus.cfg_reg + ASUS_IPAC_ALE, 
-		cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
+	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
+	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
 	if ((val == 1) || (val == 2)) {
 		cs->subtyp = ASUS_IPAC;
-		cs->hw.asus.adr  = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);

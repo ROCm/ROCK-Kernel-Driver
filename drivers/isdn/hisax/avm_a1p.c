@@ -59,53 +59,75 @@
 static const char *avm_revision = "$Revision: 2.7.6.2 $";
 static spinlock_t avm_a1p_lock = SPIN_LOCK_UNLOCKED;
 
-static inline u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static inline u8
+readreg(struct IsdnCardState *cs, int offset, u8 adr)
 {
 	unsigned long flags;
-        u_char ret;
+        u8 ret;
 
-        offset -= 0x20;
 	spin_lock_irqsave(&avm_a1p_lock, flags);
-        byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_REG_OFFSET+offset);
-	ret = bytein(cs->hw.avm.cfg_reg+DATAREG_OFFSET);
+        byteout(cs->hw.avm.cfg_reg + ADDRREG_OFFSET, offset + adr - 0x20);
+	ret = bytein(cs->hw.avm.cfg_reg + DATAREG_OFFSET);
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 	return ret;
 }
 
 static inline void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+writereg(struct IsdnCardState *cs, int offset, u8 adr, u8 value)
 {
 	unsigned long flags;
 
-        offset -= 0x20;
-
 	spin_lock_irqsave(&avm_a1p_lock, flags);
-        byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_REG_OFFSET+offset);
+        byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET, offset + adr - 0x20);
 	byteout(cs->hw.avm.cfg_reg+DATAREG_OFFSET, value);
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static inline void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+readfifo(struct IsdnCardState *cs, int offset, u8 *data, int size)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&avm_a1p_lock, flags);
-	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_FIFO_OFFSET);
-	insb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
+        byteout(cs->hw.avm.cfg_reg + ADDRREG_OFFSET, offset);
+	insb(cs->hw.avm.cfg_reg + DATAREG_OFFSET, data, size);
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
+	return;
+}
+
+static inline void
+writefifo(struct IsdnCardState *cs, int offset, u8 *data, int size)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&avm_a1p_lock, flags);
+	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET, offset);
+	outsb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
+}
+
+static inline u_char
+ReadISAC(struct IsdnCardState *cs, u_char adr)
+{
+	return readreg(cs, ISAC_REG_OFFSET, adr);
+}
+
+static inline void
+WriteISAC(struct IsdnCardState *cs, u_char adr, u_char value)
+{
+	writereg(cs, ISAC_REG_OFFSET, adr, value);
+}
+
+static inline void
+ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+{
+	readfifo(cs, ISAC_FIFO_OFFSET, data, size);
 }
 
 static inline void
 WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
-	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_FIFO_OFFSET);
-	outsb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
+	writefifo(cs, ISAC_FIFO_OFFSET, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
@@ -116,57 +138,27 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static inline u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+ReadHSCX(struct IsdnCardState *cs, int hscx, u_char adr)
 {
-	u_char ret;
-	unsigned long flags;
-
-        offset -= 0x20;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
-	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
-			HSCX_REG_OFFSET+hscx*HSCX_CH_DIFF+offset);
-	ret = bytein(cs->hw.avm.cfg_reg+DATAREG_OFFSET);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
-	return ret;
+	return readreg(cs, HSCX_REG_OFFSET + hscx*HSCX_CH_DIFF, adr);
 }
 
 static inline void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u_char adr, u_char value)
 {
-	unsigned long flags;
-
-        offset -= 0x20;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
-	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
-			HSCX_REG_OFFSET+hscx*HSCX_CH_DIFF+offset);
-	byteout(cs->hw.avm.cfg_reg+DATAREG_OFFSET, value);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
+	writereg(cs, HSCX_REG_OFFSET + hscx*HSCX_CH_DIFF, adr, value);
 }
 
 static inline void
 ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
-	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
-			HSCX_FIFO_OFFSET+hscx*HSCX_CH_DIFF);
-	insb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
+	return readfifo(cs, HSCX_FIFO_OFFSET + hscx*HSCX_CH_DIFF, data, size);
 }
 
 static inline void
 WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
-	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
-			HSCX_FIFO_OFFSET+hscx*HSCX_CH_DIFF);
-	outsb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
+	writefifo(cs, HSCX_FIFO_OFFSET + hscx*HSCX_CH_DIFF, data, size);
 }
 
 static struct bc_hw_ops hscx_ops = {
