@@ -333,8 +333,10 @@ sbni_pci_probe( struct net_device  *dev )
 			release_region( pci_ioaddr, SBNI_IO_EXTENT );
 			return  -EIO;
 		}
-		if( sbni_probe1( dev, pci_ioaddr, pci_irq_line ) )
+		if( sbni_probe1( dev, pci_ioaddr, pci_irq_line ) ) {
+			SET_NETDEV_DEV(dev, &pdev->dev);
 			return  0;
+		}
 	}
 	return  -ENODEV;
 }

@@ -426,6 +426,7 @@ __again:
 			}
 
 			SET_MODULE_OWNER(dev);
+			SET_NETDEV_DEV(dev, &idev->dev);
 			pnp_cards++;
 
 			netdev_boot_setup_check(dev);

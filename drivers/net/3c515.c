@@ -538,6 +538,7 @@ static struct net_device *corkscrew_scan(int unit)
 		     		inl(ioaddr + 0x2002), inw(ioaddr + 0x2000));
 			/* irq = inw(ioaddr + 0x2002) & 15; */ /* Use the irq from isapnp */
 			corkscrew_setup(dev, ioaddr, idev, cards_found++);
+			SET_NETDEV_DEV(dev, &idev->dev);
 			pnp_cards++;
 			err = register_netdev(dev);
 			if (!err)

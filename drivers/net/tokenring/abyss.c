@@ -167,6 +167,7 @@ static int __devinit abyss_attach(struct pci_dev *pdev, const struct pci_device_
 	dev->stop = abyss_close;
 
 	pci_set_drvdata(pdev, dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	ret = register_netdev(dev);
 	if (ret)
