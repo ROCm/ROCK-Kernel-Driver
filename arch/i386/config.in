@@ -192,7 +192,10 @@ dep_bool 'check for P4 thermal throttling interrupt.' CONFIG_X86_MCE_P4THERMAL $
 
 bool 'CPU Frequency scaling' CONFIG_CPU_FREQ
 if [ "$CONFIG_CPU_FREQ" = "y" ]; then
-   define_bool CONFIG_CPU_FREQ_26_API y
+   bool ' /proc/sys/cpu/ interface (2.4.)' CONFIG_CPU_FREQ_24_API
+   if [ "$CONFIG_CPU_FREQ_24_API" = "n" ]; then
+       define_bool CONFIG_CPU_FREQ_26_API y
+   fi
    tristate ' AMD Mobile K6-2/K6-3 PowerNow!' CONFIG_X86_POWERNOW_K6
    if [ "$CONFIG_MELAN" = "y" ]; then
        tristate ' AMD Elan' CONFIG_ELAN_CPUFREQ
@@ -200,7 +203,9 @@ if [ "$CONFIG_CPU_FREQ" = "y" ]; then
    tristate ' VIA Cyrix III Longhaul' CONFIG_X86_LONGHAUL
    tristate ' Intel Speedstep' CONFIG_X86_SPEEDSTEP
    tristate ' Intel Pentium 4 clock modulation' CONFIG_X86_P4_CLOCKMOD
-   tristate ' Transmeta LongRun' CONFIG_X86_LONGRUN
+   if [ "$CONFIG_CPU_FREQ_24_API" = "n" ]; then
+       tristate ' Transmeta LongRun' CONFIG_X86_LONGRUN
+   fi
 fi
 
 tristate 'Toshiba Laptop support' CONFIG_TOSHIBA

@@ -28,6 +28,9 @@
 #include <linux/proc_fs.h>
 #endif
 
+#ifdef CONFIG_CPU_FREQ_24_API
+#include <linux/sysctl.h>
+#endif
 
 
 /**
@@ -63,6 +66,16 @@ static struct cpufreq_policy default_policy = {
 	.max    = 0,
 	.policy = 0,
 };
+
+
+#ifdef CONFIG_CPU_FREQ_24_API
+/**
+ * A few values needed by the 2.4.-compatible API
+ */
+static unsigned int     cpu_max_freq;
+static unsigned int     cpu_min_freq;
+static unsigned int     cpu_cur_freq[NR_CPUS];
+#endif
 
 
 
@@ -327,6 +340,389 @@ static void cpufreq_proc_exit (void)
 
 
 /*********************************************************************
+ *                        2.4. COMPATIBLE API                        *
+ *********************************************************************/
+
+#ifdef CONFIG_CPU_FREQ_24_API
+/* NOTE #1: when you use this API, you may not use any other calls,
+ * except cpufreq_[un]register_notifier, of course.
+ */
+
+/** 
+ * cpufreq_set - set the CPU frequency
+ * @freq: target frequency in kHz
+ * @cpu: CPU for which the frequency is to be set
+ *
+ * Sets the CPU frequency to freq.
+ */
+int cpufreq_set(unsigned int freq, unsigned int cpu)
+{
+	struct cpufreq_policy policy;
+	down(&cpufreq_driver_sem);
+	if (!cpufreq_driver || !cpu_max_freq) {
+		up(&cpufreq_driver_sem);
+		return -EINVAL;
+	}
+
+	policy.min = freq;
+	policy.max = freq;
+	policy.policy = CPUFREQ_POLICY_POWERSAVE;
+	policy.cpu = cpu;
+	
+	up(&cpufreq_driver_sem);
+
+	return cpufreq_set_policy(&policy);
+}
+EXPORT_SYMBOL_GPL(cpufreq_set);
+
+
+/** 
+ * cpufreq_setmax - set the CPU to the maximum frequency
+ * @cpu - affected cpu;
+ *
+ * Sets the CPU frequency to the maximum frequency supported by
+ * this CPU.
+ */
+int cpufreq_setmax(unsigned int cpu)
+{
+	if (!cpu_online(cpu) && (cpu != CPUFREQ_ALL_CPUS))
+		return -EINVAL;
+	return cpufreq_set(cpu_max_freq, cpu);
+}
+EXPORT_SYMBOL_GPL(cpufreq_setmax);
+
+
+/** 
+ * cpufreq_get - get the current CPU frequency (in kHz)
+ * @cpu: CPU number - currently without effect.
+ *
+ * Get the CPU current (static) CPU frequency
+ */
+unsigned int cpufreq_get(unsigned int cpu)
+{
+	if (!cpu_online(cpu))
+		return -EINVAL;
+	return cpu_cur_freq[cpu];
+}
+EXPORT_SYMBOL(cpufreq_get);
+
+
+#ifdef CONFIG_SYSCTL
+
+
+/*********************** cpufreq_sysctl interface ********************/
+static int
+cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
+		void *buffer, size_t *lenp)
+{
+	char buf[16], *p;
+	int cpu = (int) ctl->extra1;
+	int len, left = *lenp;
+
+	if (!left || (filp->f_pos && !write) || !cpu_online(cpu)) {
+		*lenp = 0;
+		return 0;
+	}
+
+	if (write) {
+		unsigned int freq;
+
+		len = left;
+		if (left > sizeof(buf))
+			left = sizeof(buf);
+		if (copy_from_user(buf, buffer, left))
+			return -EFAULT;
+		buf[sizeof(buf) - 1] = '\0';
+
+		freq = simple_strtoul(buf, &p, 0);
+		cpufreq_set(freq, cpu);
+	} else {
+		len = sprintf(buf, "%d\n", cpufreq_get(cpu));
+		if (len > left)
+			len = left;
+		if (copy_to_user(buffer, buf, len))
+			return -EFAULT;
+	}
+
+	*lenp = len;
+	filp->f_pos += len;
+	return 0;
+}
+
+static int
+cpufreq_sysctl(ctl_table *table, int *name, int nlen,
+	       void *oldval, size_t *oldlenp,
+	       void *newval, size_t newlen, void **context)
+{
+	int cpu = (int) table->extra1;
+
+	if (!cpu_online(cpu))
+		return -EINVAL;
+
+	if (oldval && oldlenp) {
+		size_t oldlen;
+
+		if (get_user(oldlen, oldlenp))
+			return -EFAULT;
+
+		if (oldlen != sizeof(unsigned int))
+			return -EINVAL;
+
+		if (put_user(cpufreq_get(cpu), (unsigned int *)oldval) ||
+		    put_user(sizeof(unsigned int), oldlenp))
+			return -EFAULT;
+	}
+	if (newval && newlen) {
+		unsigned int freq;
+
+		if (newlen != sizeof(unsigned int))
+			return -EINVAL;
+
+		if (get_user(freq, (unsigned int *)newval))
+			return -EFAULT;
+
+		cpufreq_set(freq, cpu);
+	}
+	return 1;
+}
+
+/* ctl_table ctl_cpu_vars_{0,1,...,(NR_CPUS-1)} */
+/* due to NR_CPUS tweaking, a lot of if/endifs are required, sorry */
+        CTL_TABLE_CPU_VARS(0);
+#if NR_CPUS > 1
+	CTL_TABLE_CPU_VARS(1);
+#endif
+#if NR_CPUS > 2
+	CTL_TABLE_CPU_VARS(2);
+#endif
+#if NR_CPUS > 3
+	CTL_TABLE_CPU_VARS(3);
+#endif
+#if NR_CPUS > 4
+	CTL_TABLE_CPU_VARS(4);
+#endif
+#if NR_CPUS > 5
+	CTL_TABLE_CPU_VARS(5);
+#endif
+#if NR_CPUS > 6
+	CTL_TABLE_CPU_VARS(6);
+#endif
+#if NR_CPUS > 7
+	CTL_TABLE_CPU_VARS(7);
+#endif
+#if NR_CPUS > 8
+	CTL_TABLE_CPU_VARS(8);
+#endif
+#if NR_CPUS > 9
+	CTL_TABLE_CPU_VARS(9);
+#endif
+#if NR_CPUS > 10
+	CTL_TABLE_CPU_VARS(10);
+#endif
+#if NR_CPUS > 11
+	CTL_TABLE_CPU_VARS(11);
+#endif
+#if NR_CPUS > 12
+	CTL_TABLE_CPU_VARS(12);
+#endif
+#if NR_CPUS > 13
+	CTL_TABLE_CPU_VARS(13);
+#endif
+#if NR_CPUS > 14
+	CTL_TABLE_CPU_VARS(14);
+#endif
+#if NR_CPUS > 15
+	CTL_TABLE_CPU_VARS(15);
+#endif
+#if NR_CPUS > 16
+	CTL_TABLE_CPU_VARS(16);
+#endif
+#if NR_CPUS > 17
+	CTL_TABLE_CPU_VARS(17);
+#endif
+#if NR_CPUS > 18
+	CTL_TABLE_CPU_VARS(18);
+#endif
+#if NR_CPUS > 19
+	CTL_TABLE_CPU_VARS(19);
+#endif
+#if NR_CPUS > 20
+	CTL_TABLE_CPU_VARS(20);
+#endif
+#if NR_CPUS > 21
+	CTL_TABLE_CPU_VARS(21);
+#endif
+#if NR_CPUS > 22
+	CTL_TABLE_CPU_VARS(22);
+#endif
+#if NR_CPUS > 23
+	CTL_TABLE_CPU_VARS(23);
+#endif
+#if NR_CPUS > 24
+	CTL_TABLE_CPU_VARS(24);
+#endif
+#if NR_CPUS > 25
+	CTL_TABLE_CPU_VARS(25);
+#endif
+#if NR_CPUS > 26
+	CTL_TABLE_CPU_VARS(26);
+#endif
+#if NR_CPUS > 27
+	CTL_TABLE_CPU_VARS(27);
+#endif
+#if NR_CPUS > 28
+	CTL_TABLE_CPU_VARS(28);
+#endif
+#if NR_CPUS > 29
+	CTL_TABLE_CPU_VARS(29);
+#endif
+#if NR_CPUS > 30
+	CTL_TABLE_CPU_VARS(30);
+#endif
+#if NR_CPUS > 31
+	CTL_TABLE_CPU_VARS(31);
+#endif
+#if NR_CPUS > 32
+#error please extend CPU enumeration
+#endif
+
+/* due to NR_CPUS tweaking, a lot of if/endifs are required, sorry */
+static ctl_table ctl_cpu_table[NR_CPUS + 1] = {
+	CPU_ENUM(0),
+#if NR_CPUS > 1
+	CPU_ENUM(1),
+#endif
+#if NR_CPUS > 2
+	CPU_ENUM(2),
+#endif
+#if NR_CPUS > 3
+	CPU_ENUM(3),
+#endif
+#if NR_CPUS > 4
+	CPU_ENUM(4),
+#endif
+#if NR_CPUS > 5
+	CPU_ENUM(5),
+#endif
+#if NR_CPUS > 6
+	CPU_ENUM(6),
+#endif
+#if NR_CPUS > 7
+	CPU_ENUM(7),
+#endif
+#if NR_CPUS > 8
+	CPU_ENUM(8),
+#endif
+#if NR_CPUS > 9
+	CPU_ENUM(9),
+#endif
+#if NR_CPUS > 10
+	CPU_ENUM(10),
+#endif
+#if NR_CPUS > 11
+	CPU_ENUM(11),
+#endif
+#if NR_CPUS > 12
+	CPU_ENUM(12),
+#endif
+#if NR_CPUS > 13
+	CPU_ENUM(13),
+#endif
+#if NR_CPUS > 14
+	CPU_ENUM(14),
+#endif
+#if NR_CPUS > 15
+	CPU_ENUM(15),
+#endif
+#if NR_CPUS > 16
+	CPU_ENUM(16),
+#endif
+#if NR_CPUS > 17
+	CPU_ENUM(17),
+#endif
+#if NR_CPUS > 18
+	CPU_ENUM(18),
+#endif
+#if NR_CPUS > 19
+	CPU_ENUM(19),
+#endif
+#if NR_CPUS > 20
+	CPU_ENUM(20),
+#endif
+#if NR_CPUS > 21
+	CPU_ENUM(21),
+#endif
+#if NR_CPUS > 22
+	CPU_ENUM(22),
+#endif
+#if NR_CPUS > 23
+	CPU_ENUM(23),
+#endif
+#if NR_CPUS > 24
+	CPU_ENUM(24),
+#endif
+#if NR_CPUS > 25
+	CPU_ENUM(25),
+#endif
+#if NR_CPUS > 26
+	CPU_ENUM(26),
+#endif
+#if NR_CPUS > 27
+	CPU_ENUM(27),
+#endif
+#if NR_CPUS > 28
+	CPU_ENUM(28),
+#endif
+#if NR_CPUS > 29
+	CPU_ENUM(29),
+#endif
+#if NR_CPUS > 30
+	CPU_ENUM(30),
+#endif
+#if NR_CPUS > 31
+	CPU_ENUM(31),
+#endif
+#if NR_CPUS > 32
+#error please extend CPU enumeration
+#endif
+	{
+		ctl_name:	0,
+	}
+};
+
+static ctl_table ctl_cpu[2] = {
+	{
+		ctl_name:	CTL_CPU,
+		procname:	"cpu",
+		mode:		0555,
+		child:		ctl_cpu_table,
+	},
+	{
+		ctl_name:	0,
+	}
+};
+
+struct ctl_table_header *cpufreq_sysctl_table;
+
+static inline void cpufreq_sysctl_init(void)
+{
+	cpufreq_sysctl_table = register_sysctl_table(ctl_cpu, 0);
+}
+
+static inline void cpufreq_sysctl_exit(void)
+{
+	unregister_sysctl_table(cpufreq_sysctl_table);
+}
+
+#else
+#define cpufreq_sysctl_init()
+#define cpufreq_sysctl_exit()
+#endif /* CONFIG_SYSCTL */
+#endif /* CONFIG_CPU_FREQ_24_API */
+
+
+
+/*********************************************************************
  *                     NOTIFIER LISTS INTERFACE                      *
  *********************************************************************/
 
@@ -484,6 +880,14 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 		cpufreq_driver->policy[policy->cpu].policy = policy->policy;
 	}
 	
+#ifdef CONFIG_CPU_FREQ_24_API
+	if (policy->cpu == CPUFREQ_ALL_CPUS) {
+		for (i=0;i<NR_CPUS;i++)
+			cpu_cur_freq[i] = policy->max;
+	} else
+		cpu_cur_freq[policy->cpu] = policy->max;
+#endif
+
 	cpufreq_driver->setpolicy(policy);
 	
 	up(&cpufreq_driver_sem);
@@ -592,6 +996,20 @@ int cpufreq_register(struct cpufreq_driver *driver_data)
 	cpufreq_proc_init();
 #endif
 
+#ifdef CONFIG_CPU_FREQ_24_API
+	down(&cpufreq_driver_sem);
+	cpu_min_freq          = driver_data->cpu_min_freq;
+	cpu_max_freq          = driver_data->policy[0].max_cpu_freq;
+	{
+		unsigned int i;
+		for (i=0; i<NR_CPUS; i++) {
+			cpu_cur_freq[i] = driver_data->cpu_cur_freq[i];
+		}
+	}
+	up(&cpufreq_driver_sem);
+
+	cpufreq_sysctl_init();
+#endif
 	if (ret) {
 		down(&cpufreq_driver_sem);
 		cpufreq_driver = NULL;
@@ -626,6 +1044,10 @@ int cpufreq_unregister(void)
 
 #ifdef CONFIG_CPU_FREQ_26_API
 	cpufreq_proc_exit();
+#endif
+
+#ifdef CONFIG_CPU_FREQ_24_API
+	cpufreq_sysctl_exit();
 #endif
 
 	return 0;
@@ -666,6 +1088,10 @@ int cpufreq_restore(void)
 
 #ifdef CONFIG_CPU_FREQ_26_API
 		cpufreq_set_policy(&policy);
+#endif
+
+#ifdef CONFIG_CPU_FREQ_24_API
+		cpufreq_set(cpu_cur_freq[i], i);
 #endif
 	}
 

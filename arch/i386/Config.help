@@ -850,6 +850,19 @@ CONFIG_CPU_FREQ
 
   If in doubt, say N.
 
+CONFIG_CPU_FREQ_24_API
+  This enables the /proc/sys/cpu/ sysctl interface for controlling
+  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. Note
+  that some drivers do not support this interface or offer less
+  functionality. 
+
+  If you say N here, you'll be able to control CPUFreq using the
+  new /proc/cpufreq interface.
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
 CONFIG_X86_POWERNOW_K6
   This adds the CPUFreq driver for mobile AMD K6-2+ and mobile
   AMD K6-3+ processors.
