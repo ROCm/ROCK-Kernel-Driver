@@ -163,7 +163,7 @@ static void do_powersaver(union msr_longhaul *longhaul,
  * longhaul_set_cpu_frequency()
  * @clock_ratio_index : bitpattern of the new multiplier.
  *
- * Sets a new clock ratio, and -if applicable- a new Front Side Bus
+ * Sets a new clock ratio.
  */
 
 static void longhaul_setstate(unsigned int clock_ratio_index)
@@ -172,6 +172,11 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	struct cpufreq_freqs freqs;
 	union msr_longhaul longhaul;
 	union msr_bcr2 bcr2;
+	static unsigned int old_ratio=-1;
+
+	if (old_ratio == clock_ratio_index)
+		return;
+	oldratio = clock_ratio_index;
 
 	mult = clock_ratio[clock_ratio_index];
 	if (mult == -1)
@@ -562,7 +567,7 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 		break;
 	}
 
-	printk (KERN_INFO PFX "VIA %s CPU detected.", cpuname);
+	printk (KERN_INFO PFX "VIA %s CPU detected.  ", cpuname);
 	switch (longhaul_version) {
 	case TYPE_LONGHAUL_V1:
 	case TYPE_LONGHAUL_V2:
