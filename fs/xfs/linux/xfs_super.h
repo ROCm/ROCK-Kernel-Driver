@@ -99,6 +99,7 @@
 #define LINVFS_SET_VFS(s, vfsp) \
 	((s)->s_fs_info = vfsp)
 
+struct xfs_inode;
 struct xfs_mount;
 struct pb_target;
 struct block_device;
@@ -106,6 +107,9 @@ struct block_device;
 extern __uint64_t xfs_max_file_offset(unsigned int);
 
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
+
+extern void xfs_flush_inode(struct xfs_inode *);
+extern void xfs_flush_device(struct xfs_inode *);
 
 extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
 				struct block_device **);

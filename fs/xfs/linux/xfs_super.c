@@ -241,6 +241,23 @@ xfs_initialize_vnode(
 	}
 }
 
+void
+xfs_flush_inode(
+	xfs_inode_t	*ip)
+{
+	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
+
+	filemap_fdatawrite(inode->i_mapping);
+}
+
+void
+xfs_flush_device(
+	xfs_inode_t	*ip)
+{
+	sync_blockdev(XFS_ITOV(ip)->v_vfsp->vfs_super->s_bdev);
+	xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
+}
+
 int
 xfs_blkdev_get(
 	xfs_mount_t		*mp,
