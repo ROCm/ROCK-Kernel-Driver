@@ -216,11 +216,6 @@ static struct notifier_block *netdev_chain;
  */
 DEFINE_PER_CPU(struct softnet_data, softnet_data) = { 0, };
 
-#ifdef CONFIG_NET_FASTROUTE
-int netdev_fastroute;
-int netdev_fastroute_obstacles;
-#endif
-
 #ifdef CONFIG_SYSFS
 extern int netdev_sysfs_init(void);
 extern int netdev_register_sysfs(struct net_device *);
@@ -278,12 +273,6 @@ void dev_add_pack(struct packet_type *pt)
 	int hash;
 
 	spin_lock_bh(&ptype_lock);
-#ifdef CONFIG_NET_FASTROUTE
-	if (pt->af_packet_priv) {
-		netdev_fastroute_obstacles++;
-		dev_clear_fastroute(pt->dev);
-	}
-#endif
 	if (pt->type == htons(ETH_P_ALL)) {
 		netdev_nit++;
 		list_add_rcu(&pt->list, &ptype_all);
@@ -326,10 +315,6 @@ void __dev_remove_pack(struct packet_type *pt)
 
 	list_for_each_entry(pt1, head, list) {
 		if (pt == pt1) {
-#ifdef CONFIG_NET_FASTROUTE
-			if (pt->af_packet_priv)
-				netdev_fastroute_obstacles--;
-#endif
 			list_del_rcu(&pt->list);
 			goto out;
 		}
@@ -971,39 +956,6 @@ int dev_open(struct net_device *dev)
 	return ret;
 }
 
-#ifdef CONFIG_NET_FASTROUTE
-
-static void dev_do_clear_fastroute(struct net_device *dev)
-{
-	if (dev->accept_fastpath) {
-		int i;
-
-		for (i = 0; i <= NETDEV_FASTROUTE_HMASK; i++) {
-			struct dst_entry *dst;
-
-			write_lock_irq(&dev->fastpath_lock);
-			dst = dev->fastpath[i];
-			dev->fastpath[i] = NULL;
-			write_unlock_irq(&dev->fastpath_lock);
-
-			dst_release(dst);
-		}
-	}
-}
-
-void dev_clear_fastroute(struct net_device *dev)
-{
-	if (dev) {
-		dev_do_clear_fastroute(dev);
-	} else {
-		read_lock(&dev_base_lock);
-		for (dev = dev_base; dev; dev = dev->next)
-			dev_do_clear_fastroute(dev);
-		read_unlock(&dev_base_lock);
-	}
-}
-#endif
-
 /**
  *	dev_close - shutdown an interface.
  *	@dev: device to shutdown
@@ -1056,9 +1008,6 @@ int dev_close(struct net_device *dev)
 	 */
 
 	dev->flags &= ~IFF_UP;
-#ifdef CONFIG_NET_FASTROUTE
-	dev_clear_fastroute(dev);
-#endif
 
 	/*
 	 * Tell people we are down
@@ -1827,13 +1776,6 @@ int netif_receive_skb(struct sk_buff *skb)
 
 	__get_cpu_var(netdev_rx_stat).total++;
 
-#ifdef CONFIG_NET_FASTROUTE
-	if (skb->pkt_type == PACKET_FASTROUTE) {
-		__get_cpu_var(netdev_rx_stat).fastroute_deferred_out++;
-		return dev_queue_xmit(skb);
-	}
-#endif
-
 	skb->h.raw = skb->nh.raw = skb->data;
 	skb->mac_len = skb->nh.raw - skb->mac.raw;
 
@@ -2373,13 +2315,6 @@ void dev_set_promiscuity(struct net_device *dev, int inc)
 	if ((dev->promiscuity += inc) == 0)
 		dev->flags &= ~IFF_PROMISC;
 	if (dev->flags ^ old_flags) {
-#ifdef CONFIG_NET_FASTROUTE
-		if (dev->flags & IFF_PROMISC) {
-			netdev_fastroute_obstacles++;
-			dev_clear_fastroute(dev);
-		} else
-			netdev_fastroute_obstacles--;
-#endif
 		dev_mc_upload(dev);
 		printk(KERN_INFO "device %s %s promiscuous mode\n",
 		       dev->name, (dev->flags & IFF_PROMISC) ? "entered" :
@@ -2932,10 +2867,6 @@ int register_netdevice(struct net_device *dev)
 	spin_lock_init(&dev->ingress_lock);
 #endif
 
-#ifdef CONFIG_NET_FASTROUTE
-	dev->fastpath_lock = RW_LOCK_UNLOCKED;
-#endif
-
 	ret = alloc_divert_blk(dev);
 	if (ret)
 		goto out;
@@ -3254,10 +3185,6 @@ int unregister_netdevice(struct net_device *dev)
 
 	synchronize_net();
 
-#ifdef CONFIG_NET_FASTROUTE
-	dev_clear_fastroute(dev);
-#endif
-
 	/* Shutdown queueing discipline. */
 	dev_shutdown(dev);
 
@@ -3459,10 +3386,6 @@ EXPORT_SYMBOL(netdev_dropping);
 EXPORT_SYMBOL(netdev_fc_xoff);
 EXPORT_SYMBOL(netdev_register_fc);
 EXPORT_SYMBOL(netdev_unregister_fc);
-#endif
-#ifdef CONFIG_NET_FASTROUTE
-EXPORT_SYMBOL(netdev_fastroute);
-EXPORT_SYMBOL(netdev_fastroute_obstacles);
 #endif
 
 #ifdef CONFIG_NET_CLS_ACT
