@@ -211,11 +211,6 @@ static int llc_seq_core_open(struct inode *inode, struct file *file)
 	return seq_open(file, &llc_seq_core_ops);
 }
 
-static int llc_proc_perms(struct inode* inode, int op)
-{
-	return 0;
-}
-
 static struct file_operations llc_seq_socket_fops = {
 	.open		= llc_seq_socket_open,
 	.read		= seq_read,
@@ -230,10 +225,6 @@ static struct file_operations llc_seq_core_fops = {
 	.release	= seq_release,
 };
 
-static struct inode_operations llc_seq_inode = {
-	.permission	= llc_proc_perms,
-};
-
 static struct proc_dir_entry *llc_proc_dir;
 
 int __init llc_proc_init(void)
@@ -245,19 +236,17 @@ int __init llc_proc_init(void)
 	if (!llc_proc_dir)
 		goto out;
 
-	p = create_proc_entry("socket", 0, llc_proc_dir);
+	p = create_proc_entry("socket", S_IRUGO, llc_proc_dir);
 	if (!p)
 		goto out_socket;
 
 	p->proc_fops = &llc_seq_socket_fops;
-	p->proc_iops = &llc_seq_inode;
 
-	p = create_proc_entry("core", 0, llc_proc_dir);
+	p = create_proc_entry("core", S_IRUGO, llc_proc_dir);
 	if (!p)
 		goto out_core;
 
 	p->proc_fops = &llc_seq_core_fops;
-	p->proc_iops = &llc_seq_inode;
 
 	rc = 0;
 out:
