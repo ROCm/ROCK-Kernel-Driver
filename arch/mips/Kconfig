@@ -428,6 +428,8 @@ config SGI_IP22
 config SGI_IP27
 	bool "Support for SGI IP27 (Origin200/2000)"
 	depends on MIPS64
+	select ARC
+	select ARC64
 	select DMA_IP27
 	select HW_HAS_PCI
 	select PCI_DOMAINS

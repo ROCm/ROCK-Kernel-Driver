@@ -3,18 +3,20 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000 by Ralf Baechle
+ * Copyright (C) 2000, 05 by Ralf Baechle (ralf@linux-mips.org)
  * Copyright (C) 2000 by Silicon Graphics, Inc.
  * Copyright (C) 2004 by Christoph Hellwig
  *
  * On SGI IP27 the ARC memory configuration data is completly bogus but
  * alternate easier to use mechanisms are available.
  */
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
 #include <linux/module.h>
+#include <linux/nodemask.h>
 #include <linux/swap.h>
 #include <linux/bootmem.h>
 #include <asm/page.h>
