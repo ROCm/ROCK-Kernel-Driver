@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.elf.h 1.14 08/21/01 16:07:48 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef __PPC_ELF_H
 #define __PPC_ELF_H
@@ -100,12 +100,13 @@ extern int ucache_bsize;
  */
 #define ARCH_DLINFO							\
 do {									\
+	/* Handle glibc compatibility. */				\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
+	/* Cache size items */						\
 	NEW_AUX_ENT(AT_DCACHEBSIZE, dcache_bsize);			\
 	NEW_AUX_ENT(AT_ICACHEBSIZE, icache_bsize);			\
 	NEW_AUX_ENT(AT_UCACHEBSIZE, ucache_bsize);			\
-	/* Now handle glibc compatibility. */				\
-	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
-	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
  } while (0)
 
 #endif /* __KERNEL__ */
