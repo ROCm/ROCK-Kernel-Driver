@@ -105,13 +105,6 @@
 #include <net/syncppp.h>
 #include "cosa.h"
 
-/* Linux version stuff */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-typedef struct wait_queue *wait_queue_head_t;
-#define DECLARE_WAITQUEUE(wait, current) \
-	struct wait_queue wait = { current, NULL }
-#endif
-
 /* Maximum length of the identification string. */
 #define COSA_MAX_ID_STRING	128
 
