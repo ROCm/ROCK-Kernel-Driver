@@ -5,7 +5,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1998-2003 by David Mosberger-Tang <davidm@hpl.hp.com>
+# Copyright (C) 1998-2004 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
 NM := $(CROSS_COMPILE)nm -B
@@ -26,9 +26,8 @@ CFLAGS_KERNEL	:= -mconstant-gp
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f2 -d'.')
 
-GAS_STATUS=$(shell $(srctree)/arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
-
-CPPFLAGS	+= $(shell $(srctree)/arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP))
+GAS_STATUS	= $(shell $(srctree)/arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
+CPPFLAGS += $(shell $(srctree)/arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP) $(READELF))
 
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\

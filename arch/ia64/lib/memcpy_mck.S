@@ -155,7 +155,7 @@ GLOBAL_ENTRY(__copy_user)
 	mov	ar.ec=2
 (p10)	br.dpnt.few .aligned_src_tail
 	;;
-//	.align 32
+	TEXT_ALIGN(32)
 1:
 EX(.ex_handler, (p16)	ld8	r34=[src0],16)
 EK(.ex_handler, (p16)	ld8	r38=[src1],16)
@@ -312,7 +312,7 @@ EK(.ex_handler,	(p[D])	st8 [dst1] = t15, 4*8)
 (p7)	mov	ar.lc = r21
 (p8)	mov	ar.lc = r0
 	;;
-//	.align 32
+	TEXT_ALIGN(32)
 1:	lfetch.fault	  [src_pre_mem], 128
 	lfetch.fault.excl [dst_pre_mem], 128
 	br.cloop.dptk.few 1b
@@ -518,7 +518,7 @@ EK(.ex_handler,  (p17)	st8	[dst1]=r39,8);						\
 		 shrp	r21=r22,r38,shift;	/* speculative work */			\
 		 br.sptk.few .unaligned_src_tail /* branch out of jump table */		\
 		 ;;
-//	.align 32
+	TEXT_ALIGN(32)
 .jump_table:
 	COPYU(8)	// unaligned cases
 .jmp1:

@@ -2,7 +2,7 @@
 #define _ASM_IA64_ASMMACRO_H
 
 /*
- * Copyright (C) 2000-2001, 2003 Hewlett-Packard Co
+ * Copyright (C) 2000-2001, 2003-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -87,6 +87,17 @@ name:
   }
 #else
 # define FSYS_RETURN	br.ret.sptk.many b6
+#endif
+
+/*
+ * Up until early 2004, use of .align within a function caused bad unwind info.
+ * TEXT_ALIGN(n) expands into ".align n" if a fixed GAS is available or into nothing
+ * otherwise.
+ */
+#ifdef HAVE_WORKING_TEXT_ALIGN
+# define TEXT_ALIGN(n)	.align n
+#else
+# define TEXT_ALIGN(n)
 #endif
 
 #endif /* _ASM_IA64_ASMMACRO_H */
