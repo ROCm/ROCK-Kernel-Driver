@@ -325,11 +325,21 @@ static void __wait_on_locked(struct list_head *head)
  * writeback and wait upon the filesystem's dirty inodes.  The caller will
  * do this in two passes - one to write, and one to wait.  WB_SYNC_HOLD is
  * used to park the written inodes on sb->s_dirty for the wait pass.
+ *
+ * A finite limit is set on the number of pages which will be written.
+ * To prevent infinite livelock of sys_sync().
  */
 void sync_inodes_sb(struct super_block *sb, int wait)
 {
+	struct page_state ps;
+	int nr_to_write;
+
+	get_page_state(&ps);
+	nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
+
 	spin_lock(&inode_lock);
-	sync_sb_inodes(sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD, NULL, NULL);
+	sync_sb_inodes(sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
+				&nr_to_write, NULL);
 	if (wait)
 		__wait_on_locked(&sb->s_locked_inodes);
 	spin_unlock(&inode_lock);
