@@ -90,7 +90,7 @@
 
 #define UDSL_NUMBER_RCV_URBS		1
 #define UDSL_NUMBER_SND_URBS		1
-#define UDSL_RECEIVE_BUFFER_SIZE	64*53
+#define UDSL_RCV_BUFFER_SIZE		64*53
 /* max should be (1500 IP mtu + 2 ppp bytes + 32 * 5 cellheader overhead) for
  * PPPoA and (1500 + 14 + 32*5 cellheader overhead) for PPPoE */
 #define UDSL_MAX_AAL5_MRU		2048
@@ -312,7 +312,7 @@ static void udsl_process_receive (unsigned long data)
 					   instance->usb_dev,
 					   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 					   (unsigned char *) rcv->skb->data,
-					   UDSL_RECEIVE_BUFFER_SIZE,
+					   UDSL_RCV_BUFFER_SIZE,
 					   udsl_complete_receive,
 					   rcv);
 			if (!usb_submit_urb (urb, GFP_ATOMIC))
@@ -355,7 +355,7 @@ static void udsl_fire_receivers (struct udsl_instance_data *instance)
 				   instance->usb_dev,
 				   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 				   (unsigned char *) rcv->skb->data,
-				   UDSL_RECEIVE_BUFFER_SIZE,
+				   UDSL_RCV_BUFFER_SIZE,
 				   udsl_complete_receive,
 				   rcv);
 
@@ -809,7 +809,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
 		struct udsl_receiver *rcv = &(instance->all_receivers[i]);
 
-		if (!(rcv->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE))) {
+		if (!(rcv->skb = dev_alloc_skb (UDSL_RCV_BUFFER_SIZE))) {
 			PDEBUG ("No memory for skb %d!\n", i);
 			err = -ENOMEM;
 			goto fail_urbs;
@@ -825,7 +825,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 		list_add (&rcv->list, &instance->spare_receivers);
 
-		PDEBUG ("skb->truesize = %d (asked for %d)\n", rcv->skb->truesize, UDSL_RECEIVE_BUFFER_SIZE);
+		PDEBUG ("skb->truesize = %d (asked for %d)\n", rcv->skb->truesize, UDSL_RCV_BUFFER_SIZE);
 	}
 
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
