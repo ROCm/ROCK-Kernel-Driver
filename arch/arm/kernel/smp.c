@@ -17,16 +17,16 @@
 #include <linux/profile.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
+#include <linux/cpu.h>
+#include <linux/smp.h>
 #include <linux/seq_file.h>
 
 #include <asm/atomic.h>
+#include <asm/cacheflush.h>
 #include <asm/cpu.h>
 #include <asm/processor.h>
-#include <asm/smp.h>
-#include <asm/ptrace.h>
-
-#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+#include <asm/ptrace.h>
 
 /*
  * bitmask of present and online CPUs.
