@@ -112,6 +112,17 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
 }
 EXPORT_SYMBOL(pcmcia_get_status);
 
+int pcmcia_access_configuration_register(client_handle_t handle,
+					 conf_reg_t *reg)
+{
+	struct pcmcia_socket *s;
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	return pccard_access_configuration_register(s, handle->Function, reg);
+}
+EXPORT_SYMBOL(pcmcia_access_configuration_register);
+
 #ifdef CONFIG_PCMCIA_OBSOLETE
 
 int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)

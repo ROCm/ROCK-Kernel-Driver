@@ -846,23 +846,18 @@ static void release_io_space(struct pcmcia_socket *s, ioaddr_t base,
     
 ======================================================================*/
 
-int pcmcia_access_configuration_register(client_handle_t handle,
+int pccard_access_configuration_register(struct pcmcia_socket *s,
+					 unsigned int function,
 					 conf_reg_t *reg)
 {
-    struct pcmcia_socket *s;
     config_t *c;
     int addr;
     u_char val;
-    
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
-    if (handle->Function == BIND_FN_ALL) {
-	if (reg->Function >= s->functions)
-	    return CS_BAD_ARGS;
-	c = &s->config[reg->Function];
-    } else
-	c = CONFIG(handle);
+
+    if (!s || !s->config)
+	return CS_NO_CARD;    
+
+    c = &s->config[function];
 
     if (c == NULL)
 	return CS_NO_CARD;
@@ -887,7 +882,7 @@ int pcmcia_access_configuration_register(client_handle_t handle,
     }
     return CS_SUCCESS;
 } /* access_configuration_register */
-
+EXPORT_SYMBOL(pccard_access_configuration_register);
 
 /*====================================================================*/
 
@@ -2056,7 +2051,6 @@ EXPORT_SYMBOL(pcmcia_set_event_mask);
     
 ======================================================================*/
 /* in alpha order */
-EXPORT_SYMBOL(pcmcia_access_configuration_register);
 EXPORT_SYMBOL(pcmcia_deregister_client);
 EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);

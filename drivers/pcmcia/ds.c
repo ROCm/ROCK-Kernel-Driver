@@ -991,7 +991,11 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     case DS_ACCESS_CONFIGURATION_REGISTER:
 	if ((buf.conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN))
 	    return -EPERM;
-	ret = pcmcia_access_configuration_register(s->handle, &buf.conf_reg);
+	if (buf.conf_reg.Function && 
+	   (buf.conf_reg.Function >= s->parent->functions))
+	    ret = CS_BAD_ARGS;
+	else
+	    ret = pccard_access_configuration_register(s->parent, buf.conf_reg.Function, &buf.conf_reg);
 	break;
     case DS_GET_FIRST_REGION:
         ret = pcmcia_get_first_region(s->handle, &buf.region);

@@ -175,6 +175,7 @@ int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx,
 int pccard_get_configuration_info(struct pcmcia_socket *s, unsigned int function, config_info_t *config);
 int pccard_reset_card(struct pcmcia_socket *skt);
 int pccard_get_status(struct pcmcia_socket *s, unsigned int function, cs_status_t *status);
+int pccard_access_configuration_register(struct pcmcia_socket *s, unsigned int function, conf_reg_t *reg);
 
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 
