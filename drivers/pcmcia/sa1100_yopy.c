@@ -40,6 +40,8 @@ static int yopy_pcmcia_init(struct pcmcia_init *init)
 {
 	int i, res;
 
+	init->socket_irq[0] = IRQ_CF_IREQ;
+
 	pcmcia_power(0);
 	pcmcia_reset(1);
 
@@ -97,16 +99,6 @@ static void yopy_pcmcia_socket_state(int sock, struct pcmcia_state_array *state)
 	}
 }
 
-static int yopy_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
-{
-	if (info->sock != 0)
-		return -1;
-
-	info->irq = IRQ_CF_IREQ;
-
-	return 0;
-}
-
 static int yopy_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
 	if (sock != 0)
@@ -159,7 +151,6 @@ static struct pcmcia_low_level yopy_pcmcia_ops = {
 	.init			= yopy_pcmcia_init,
 	.shutdown		= yopy_pcmcia_shutdown,
 	.socket_state		= yopy_pcmcia_socket_state,
-	.get_irq_info		= yopy_pcmcia_get_irq_info,
 	.configure_socket	= yopy_pcmcia_configure_socket,
 
 	.socket_init		= yopy_pcmcia_socket_init,

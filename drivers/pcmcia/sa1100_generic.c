@@ -945,6 +945,8 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
 	pcmcia_init.handler = sa1100_pcmcia_interrupt;
+	pcmcia_init.socket_irq[0] = NO_IRQ;
+	pcmcia_init.socket_irq[1] = NO_IRQ;
 	ret = ops->init(&pcmcia_init);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to initialize kernel PCMCIA service (%d).\n", ret);
@@ -961,22 +963,16 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 	 */
 	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
-		struct pcmcia_irq_info irq_info;
 
 		if (!request_mem_region(_PCMCIA(i), PCMCIASp, "PCMCIA")) {
 			ret = -EBUSY;
 			goto out_err;
 		}
 
-		irq_info.sock = i;
-		irq_info.irq  = -1;
-		ret = ops->get_irq_info(&irq_info);
-		if (ret < 0)
-			printk(KERN_ERR "Unable to get IRQ for socket %u (%d)\n", i, ret);
 
 		skt->nr		= i;
 		skt->ops	= ops;
-		skt->irq        = irq_info.irq;
+		skt->irq	= pcmcia_init.socket_irq[i];
 		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
 		skt->speed_attr = SA1100_PCMCIA_5V_MEM_ACCESS;
 		skt->speed_mem  = SA1100_PCMCIA_5V_MEM_ACCESS;

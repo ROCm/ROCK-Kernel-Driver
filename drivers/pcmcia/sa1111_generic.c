@@ -38,6 +38,11 @@ int sa1111_pcmcia_init(struct pcmcia_init *init)
 {
 	int i, ret;
 
+	if (init->socket_irq[0] == NO_IRQ)
+		init->socket_irq[0] = IRQ_S0_READY_NINT;
+	if (init->socket_irq[1] == NO_IRQ)
+		init->socket_irq[1] = IRQ_S1_READY_NINT;
+
 	for (i = ret = 0; i < ARRAY_SIZE(irqs); i++) {
 		ret = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
 				  irqs[i].str, NULL);
@@ -91,19 +96,6 @@ void sa1111_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 		state->vs_Xv  = status & PCSR_S1_VS2    ? 0 : 1;
 		break;
 	}
-}
-
-int sa1111_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
-{
-	int ret = 0;
-
-	switch (info->sock) {
-	case 0:	info->irq = IRQ_S0_READY_NINT;	break;
-	case 1: info->irq = IRQ_S1_READY_NINT;	break;
-	default: ret = 1;
-	}
-
-	return ret;
 }
 
 int sa1111_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)

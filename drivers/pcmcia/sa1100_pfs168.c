@@ -125,7 +125,6 @@ static struct pcmcia_low_level pfs168_pcmcia_ops = {
   .init			= pfs168_pcmcia_init,
   .shutdown		= sa1111_pcmcia_shutdown,
   .socket_state		= sa1111_pcmcia_socket_state,
-  .get_irq_info		= sa1111_pcmcia_get_irq_info,
   .configure_socket	= pfs168_pcmcia_configure_socket,
 
   .socket_init		= sa1111_pcmcia_socket_init,

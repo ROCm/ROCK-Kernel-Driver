@@ -37,14 +37,16 @@ static int shannon_pcmcia_init(struct pcmcia_init *init)
 	/* Set transition detect */
 	set_irq_type(SHANNON_IRQ_GPIO_RDY_0, IRQT_FALLING);
 	set_irq_type(SHANNON_IRQ_GPIO_RDY_1, IRQT_FALLING);
+	init->socket_irq[0] = SHANNON_IRQ_GPIO_RDY_0;
+	init->socket_irq[1] = SHANNON_IRQ_GPIO_RDY_1;
 
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
 		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
 				  irqs[i].str, NULL);
 		if (res)
 			goto irq_err;
+		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
 	}
 
 	return 2;
@@ -97,17 +99,6 @@ static void shannon_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 	}
 }
 
-static int shannon_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
-{
-	if (info->sock == 0)
-		info->irq = SHANNON_IRQ_GPIO_RDY_0;
-	else if (info->sock == 1)
-		info->irq = SHANNON_IRQ_GPIO_RDY_1;
-	else return -1;
-	
-	return 0;
-}
-
 static int shannon_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
 	switch (configure->vcc) {
@@ -156,7 +147,6 @@ static struct pcmcia_low_level shannon_pcmcia_ops = {
 	.init			= shannon_pcmcia_init,
 	.shutdown		= shannon_pcmcia_shutdown,
 	.socket_state		= shannon_pcmcia_socket_state,
-	.get_irq_info		= shannon_pcmcia_get_irq_info,
 	.configure_socket	= shannon_pcmcia_configure_socket,
 
 	.socket_init		= shannon_pcmcia_socket_init,

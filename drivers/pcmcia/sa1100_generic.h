@@ -18,7 +18,8 @@
 #define SA1100_PCMCIA_MAX_SOCK   (2)
 
 struct pcmcia_init {
-  void (*handler)(int irq, void *dev, struct pt_regs *regs);
+	void (*handler)(int irq, void *dev, struct pt_regs *regs);
+	int	socket_irq[SA1100_PCMCIA_MAX_SOCK];
 };
 
 struct pcmcia_state {
@@ -40,18 +41,12 @@ struct pcmcia_configure {
             irq: 1;
 };
 
-struct pcmcia_irq_info {
-  unsigned int sock;
-  unsigned int irq;
-};
-
 struct pcmcia_low_level {
   struct module *owner;
 
   int (*init)(struct pcmcia_init *);
   int (*shutdown)(void);
   void (*socket_state)(int sock, struct pcmcia_state *);
-  int (*get_irq_info)(struct pcmcia_irq_info *);
   int (*configure_socket)(int sock, const struct pcmcia_configure *);
 
   /*

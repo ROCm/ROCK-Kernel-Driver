@@ -30,6 +30,8 @@ static int pangolin_pcmcia_init(struct pcmcia_init *init){
   GPCR = GPIO_PCMCIA_BUS_ON;
 #endif
 
+  init->socket_irq[PANGOLIN_SOCK] = IRQ_PCMCIA_IRQ;
+
   /* Set transition detect */
   set_irq_type(IRQ_PCMCIA_CD, IRQT_NOEDGE);
   set_irq_type(IRQ_PCMCIA_IRQ, IRQT_FALLING);
@@ -72,19 +74,6 @@ static void pangolin_pcmcia_socket_state(int sock, struct pcmcia_state *state)
     state->vs_3v=1;  /* Can only apply 3.3V on Pangolin. */
     state->vs_Xv=0;
   }
-}
-
-static int pangolin_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  if(info->sock>1) return -1;
-#ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
-  if(info->sock==1)
-	info->irq=IRQ_PCMCIA_IRQ;
-#else
-  if(info->sock==0)
-        info->irq=IRQ_PCMCIA_IRQ;
-#endif
-  return 0;
 }
 
 static int pangolin_pcmcia_configure_socket(int sock, const struct pcmcia_configure
@@ -157,11 +146,10 @@ static struct pcmcia_low_level pangolin_pcmcia_ops = {
   .init			= pangolin_pcmcia_init,
   .shutdown		= pangolin_pcmcia_shutdown,
   .socket_state		= pangolin_pcmcia_socket_state,
-  .get_irq_info		= pangolin_pcmcia_get_irq_info,
   .configure_socket	= pangolin_pcmcia_configure_socket,
 
   .socket_init		= pangolin_pcmcia_socket_init,
-  socket_suspend,	pangolin_pcmcia_socket_suspend,
+  .socket_suspend	= pangolin_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_pangolin_init(struct device *dev)

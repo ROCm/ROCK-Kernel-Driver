@@ -49,14 +49,16 @@ static int stork_pcmcia_init(struct pcmcia_init *init)
 	/* Set transition detect */
 	set_irq_type(IRQ_GPIO_STORK_PCMCIA_A_RDY, IRQT_FALLING);
 	set_irq_type(IRQ_GPIO_STORK_PCMCIA_B_RDY, IRQT_FALLING);
+	init->socket_irq[0] = IRQ_GPIO_STORK_PCMCIA_A_RDY;
+	init->socket_irq[1] = IRQ_GPIO_STORK_PCMCIA_B_RDY;
 
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
 		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
 				  irqs[i].str, NULL);
 		if (res)
 			goto irq_err;
+		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
 	}
 
         return 2;
@@ -117,22 +119,6 @@ static void stork_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 		state->vs_Xv=0;
 		break;
 	}
-}
-
-static int stork_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
-{
-
-        switch (info->sock) {
-        case 0:
-                info->irq=IRQ_GPIO_STORK_PCMCIA_A_RDY;
-                break;
-        case 1:
-                info->irq=IRQ_GPIO_STORK_PCMCIA_B_RDY;
-                break;
-        default:
-                return -1;
-        }
-        return 0;
 }
 
 static int stork_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
@@ -231,7 +217,6 @@ static struct pcmcia_low_level stork_pcmcia_ops = {
 	.init			= stork_pcmcia_init,
 	.shutdown		= stork_pcmcia_shutdown,
 	.socket_state		= stork_pcmcia_socket_state,
-	.get_irq_info		= stork_pcmcia_get_irq_info,
 	.configure_socket	= stork_pcmcia_configure_socket,
 
 	.socket_init		= stork_pcmcia_socket_init,

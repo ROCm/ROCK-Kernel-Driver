@@ -53,6 +53,9 @@ static int h3600_pcmcia_init(struct pcmcia_init *init)
 			free_irq(irqs[i].irq, NULL);
 	}
 
+	init->socket_irq[0] = IRQ_GPIO_H3600_PCMCIA_IRQ0;
+	init->socket_irq[1] = IRQ_GPIO_H3600_PCMCIA_IRQ1;
+
 	return res ? res : 2;
 }
 
@@ -99,21 +102,6 @@ static void h3600_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 		state->vs_Xv = 0;
 		break;
 	}
-}
-
-static int h3600_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
-{
-	switch (info->sock) {
-	case 0:
-		info->irq = IRQ_GPIO_H3600_PCMCIA_IRQ0;
-		break;
-	case 1:
-		info->irq = IRQ_GPIO_H3600_PCMCIA_IRQ1;
-		break;
-	default:
-		return -1;
-	}
-	return 0;
 }
 
 static int
@@ -192,7 +180,6 @@ struct pcmcia_low_level h3600_pcmcia_ops = {
 	.init			= h3600_pcmcia_init,
 	.shutdown		= h3600_pcmcia_shutdown,
 	.socket_state		= h3600_pcmcia_socket_state,
-	.get_irq_info		= h3600_pcmcia_get_irq_info,
 	.configure_socket	= h3600_pcmcia_configure_socket,
 
 	.socket_init		= h3600_pcmcia_socket_init,

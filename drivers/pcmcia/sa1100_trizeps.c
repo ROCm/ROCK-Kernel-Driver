@@ -31,6 +31,8 @@ static int trizeps_pcmcia_init(struct pcmcia_init *init)
 {
 	int res;
 
+	init->socket_irq[0] = TRIZEPS_IRQ_PCMCIA_IRQ0;
+
 	/* Enable CF bus: */
 	TRIZEPS_BCR_clear(TRIZEPS_BCR1, TRIZEPS_nPCM_ENA_REG);
 
@@ -94,24 +96,6 @@ static void trizeps_pcmcia_socket_state(int sock, struct pcmcia_state *state_arr
 		state->vs_3v  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS1) == 0) ? 1 : 0; //VS1=0 -> vs_3v=1
 		state->vs_Xv  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS2) == 0) ? 1 : 0; //VS2=0 -> vs_Xv=1
 	}
-}
-
-/**
- *
- *
- ******************************************************/
-static int trizeps_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-	switch (info->sock) {
-	case 0:
-		info->irq=TRIZEPS_IRQ_PCMCIA_IRQ0;
-		break;
-	case 1:
-		// MFTB2 use only one Slot
-	default:
-		return -1;
-	}
-	return 0;
 }
 
 /**
@@ -192,7 +176,6 @@ struct pcmcia_low_level trizeps_pcmcia_ops = {
 	.init			= trizeps_pcmcia_init,
 	.shutdown		= trizeps_pcmcia_shutdown,
 	.socket_state		= trizeps_pcmcia_socket_state,
-	.get_irq_info		= trizeps_pcmcia_get_irq_info,
 	.configure_socket	= trizeps_pcmcia_configure_socket,
 	.socket_init		= trizeps_pcmcia_socket_init,
 	.socket_suspend		= trizeps_pcmcia_socket_suspend,

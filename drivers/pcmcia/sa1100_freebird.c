@@ -49,6 +49,8 @@ static int freebird_pcmcia_init(struct pcmcia_init *init){
       goto irq_err;
   }
 
+  init->socket_irq[0] = IRQ_GPIO_FREEBIRD_CF_IRQ;
+
   /* There's only one slot, but it's "Slot 1": */
   return 2;
 
@@ -91,16 +93,6 @@ static void freebird_pcmcia_socket_state(int sock, struct pcmcia_state *state)
     state->vs_3v  = 1;  /* Can only apply 3.3V on Assabet. */
     state->vs_Xv  = 0;
   }
-}
-
-static int freebird_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  if(info->sock>1) return -1;
-
-  if(info->sock==0)
-    info->irq=IRQ_GPIO_FREEBIRD_CF_IRQ;
-
-  return 0;
 }
 
 static int freebird_pcmcia_configure_socket(int sock, const struct pcmcia_configure
@@ -171,7 +163,6 @@ static struct pcmcia_low_level freebird_pcmcia_ops = {
   .init			= freebird_pcmcia_init,
   .shutdown		= freebird_pcmcia_shutdown,
   .socket_state		= freebird_pcmcia_socket_state,
-  .get_irq_info		= freebird_pcmcia_get_irq_info,
   .configure_socket	= freebird_pcmcia_configure_socket,
 
   .socket_init		= freebird_pcmcia_socket_init,

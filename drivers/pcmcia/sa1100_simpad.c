@@ -32,11 +32,14 @@ static int simpad_pcmcia_init(struct pcmcia_init *init){
   /* Set transition detect */
   set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );
   set_irq_type( IRQ_GPIO_CF_IRQ, IRQT_FALLING );
+  init->socket_irq[1] = IRQ_GPIO_CF_IRQ;
 
   /* Register interrupts */
   irq = IRQ_GPIO_CF_CD;
   res = request_irq( irq, init->handler, SA_INTERRUPT, "CF_CD", NULL );
   if( res < 0 ) goto irq_err;
+
+  set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );
 
   /* There's only one slot, but it's "Slot 1": */
   return 2;
@@ -80,16 +83,6 @@ static void simpad_pcmcia_socket_state(int sock, struct pcmcia_state *state)
       state->vs_Xv=0;
     }
   }
-}
-
-static int simpad_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  if(info->sock>1) return -1;
-
-  if(info->sock==1)
-    info->irq=IRQ_GPIO_CF_IRQ;
-
-  return 0;
 }
 
 static int simpad_pcmcia_configure_socket(int sock, const struct pcmcia_configure
@@ -152,7 +145,6 @@ static struct pcmcia_low_level simpad_pcmcia_ops = {
   .init			= simpad_pcmcia_init,
   .shutdown		= simpad_pcmcia_shutdown,
   .socket_state		= simpad_pcmcia_socket_state,
-  .get_irq_info		= simpad_pcmcia_get_irq_info,
   .configure_socket	= simpad_pcmcia_configure_socket,
 
   .socket_init		= simpad_pcmcia_socket_init,

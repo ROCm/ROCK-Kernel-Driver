@@ -46,6 +46,8 @@ static int cerf_pcmcia_init(struct pcmcia_init *init)
       goto irq_err;
   }
 
+  init->socket_irq[CERF_SOCKET] = IRQ_GPIO_CF_IRQ;
+
   return 2;
 
  irq_err:
@@ -81,16 +83,6 @@ static void cerf_pcmcia_socket_state(int sock, struct pcmcia_state *state)
     state->vs_3v=1;
     state->vs_Xv=0;
   }
-}
-
-static int cerf_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  if(info->sock>1) return -1;
-
-  if (info->sock == CERF_SOCKET)
-    info->irq=IRQ_GPIO_CF_IRQ;
-
-  return 0;
 }
 
 static int cerf_pcmcia_configure_socket(int sock, const struct pcmcia_configure
@@ -162,7 +154,6 @@ static struct pcmcia_low_level cerf_pcmcia_ops = {
   .init			= cerf_pcmcia_init,
   .shutdown		= cerf_pcmcia_shutdown,
   .socket_state		= cerf_pcmcia_socket_state,
-  .get_irq_info		= cerf_pcmcia_get_irq_info,
   .configure_socket	= cerf_pcmcia_configure_socket,
 
   .socket_init		= cerf_pcmcia_socket_init,

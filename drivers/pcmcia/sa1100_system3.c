@@ -50,6 +50,9 @@
 
 int system3_pcmcia_init(struct pcmcia_init *init)
 {
+	init->socket_irq[0] = IRQ_S0_READY_NINT;
+	init->socket_irq[1] = IRQ_S1_READY_NINT;
+
 	/* Don't need no CD and BVD* interrupts */
 	return 2;
 }
@@ -105,7 +108,6 @@ struct pcmcia_low_level system3_pcmcia_ops = {
 	.init			= system3_pcmcia_init,
 	.shutdown		= system3_pcmcia_shutdown,
 	.socket_state		= system3_pcmcia_socket_state,
-	.get_irq_info		= sa1111_pcmcia_get_irq_info,
 	.configure_socket	= system3_pcmcia_configure_socket,
 
 	.socket_init		= sa1111_pcmcia_socket_init,

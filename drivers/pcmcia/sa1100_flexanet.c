@@ -54,6 +54,9 @@ static int flexanet_pcmcia_init(struct pcmcia_init *init)
       break;
   }
 
+  init->socket_irq[0] = IRQ_GPIO_CF1_IRQ;
+  init->socket_irq[1] = IRQ_GPIO_CF2_IRQ;
+
   /* If we failed, then free all interrupts requested thus far. */
   if (res < 0) {
     printk(KERN_ERR "%s: request for IRQ%d failed: %d\n",
@@ -114,25 +117,6 @@ static void flexanet_pcmcia_socket_state(int sock, struct pcmcia_state *state)
     state->vs_Xv  = 0;
     break;
   }
-}
-
-
-/*
- * Return the IRQ information for a given socket number (the IRQ number)
- *
- */
-static int flexanet_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  /* check the socket index */
-  if (info->sock > 1)
-    return -1;
-
-  if (info->sock == 0)
-    info->irq = IRQ_GPIO_CF1_IRQ;
-  else if (info->sock == 1)
-    info->irq = IRQ_GPIO_CF2_IRQ;
-
-  return 0;
 }
 
 
@@ -222,7 +206,6 @@ static struct pcmcia_low_level flexanet_pcmcia_ops = {
   .init			= flexanet_pcmcia_init,
   .shutdown		= flexanet_pcmcia_shutdown,
   .socket_state		= flexanet_pcmcia_socket_state,
-  .get_irq_info		= flexanet_pcmcia_get_irq_info,
   .configure_socket	= flexanet_pcmcia_configure_socket,
 
   .socket_init		= flexanet_pcmcia_socket_init,
