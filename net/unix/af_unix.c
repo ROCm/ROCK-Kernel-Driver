@@ -1850,15 +1850,22 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCINQ:
 		{
 			struct sk_buff *skb;
+
 			if (sk->sk_state == TCP_LISTEN) {
 				err = -EINVAL;
 				break;
 			}
 
 			spin_lock(&sk->sk_receive_queue.lock);
-			skb = skb_peek(&sk->sk_receive_queue);
-			if (skb)
-				amount=skb->len;
+			if (sk->sk_type == SOCK_STREAM ||
+			    sk->sk_type == SOCK_SEQPACKET) {
+				skb_queue_walk(&sk->sk_receive_queue, skb)
+					amount += skb->len;
+			} else {
+				skb = skb_peek(&sk->sk_receive_queue);
+				if (skb)
+					amount=skb->len;
+			}
 			spin_unlock(&sk->sk_receive_queue.lock);
 			err = put_user(amount, (int __user *)arg);
 			break;

@@ -684,7 +684,7 @@ fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 
 		list_for_each_entry(fa, &f->fn_alias, fa_list) {
 			if (i < s_i)
-				continue;
+				goto next;
 
 			if (fib_dump_info(skb, NETLINK_CB(cb->skb).pid,
 					  cb->nlh->nlmsg_seq,
@@ -699,7 +699,7 @@ fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 				cb->args[3] = i;
 				return -1;
 			}
-
+		next:
 			i++;
 		}
 	}
