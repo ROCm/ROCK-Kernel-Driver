@@ -366,12 +366,14 @@ static void udpv6_close(struct sock *sk, long timeout)
  * 	return it, otherwise we block.
  */
 
-static int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len,
+static int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk, 
+		  struct msghdr *msg, size_t len,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
   	struct sk_buff *skb;
-  	int copied, err;
+	size_t copied;
+  	int err;
 
   	if (addr_len)
   		*addr_len=sizeof(struct sockaddr_in6);
@@ -774,7 +776,8 @@ out:
 	return err;
 }
 
-static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len)
+static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, 
+		  struct msghdr *msg, size_t len)
 {
 	struct ipv6_txoptions opt_space;
 	struct udp_opt *up = udp_sk(sk);
@@ -841,7 +844,7 @@ do_udp_sendmsg:
 	/* Rough check on arithmetic overflow,
 	   better check is made in ip6_build_xmit
 	   */
-	if (len < 0 || len > INT_MAX - sizeof(struct udphdr))
+	if (len > INT_MAX - sizeof(struct udphdr))
 		return -EMSGSIZE;
 	
 	if (up->pending) {

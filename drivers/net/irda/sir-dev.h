@@ -179,6 +179,7 @@ struct sir_dev {
 
 	struct sir_fsm fsm;
 	atomic_t enable_rx;
+	int raw_tx;
 	spinlock_t tx_lock;
 
 	u32 new_speed;

@@ -349,7 +349,7 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 		    vaddr, (unsigned long)SRMMU_NOCACHE_VADDR);
 		BUG();
 	}
-	if (vaddr+size >= srmmu_nocache_end) {
+	if (vaddr+size > srmmu_nocache_end) {
 		printk("Vaddr %lx is bigger than nocache end 0x%lx\n",
 		    vaddr, srmmu_nocache_end);
 		BUG();
@@ -1071,7 +1071,7 @@ void __init srmmu_early_allocate_ptable_skeleton(unsigned long start, unsigned l
 		}
 		if (start > (0xffffffffUL - SRMMU_PMD_SIZE_SOFT))
 			break;
-		start = (start + SRMMU_PMD_SIZE) & SRMMU_PMD_MASK;
+		start = (start + SRMMU_PMD_SIZE_SOFT) & SRMMU_PMD_MASK_SOFT;
 	}
 }
 
@@ -1101,7 +1101,7 @@ void __init srmmu_allocate_ptable_skeleton(unsigned long start, unsigned long en
 		}
 		if (start > (0xffffffffUL - SRMMU_PMD_SIZE_SOFT))
 			break;
-		start = (start + SRMMU_PMD_SIZE) & SRMMU_PMD_MASK;
+		start = (start + SRMMU_PMD_SIZE_SOFT) & SRMMU_PMD_MASK_SOFT;
 	}
 }
 
