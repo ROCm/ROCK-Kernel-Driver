@@ -1098,7 +1098,7 @@ static int __init __read_suspend_image(struct block_device *bdev, union diskpage
 	return 0;
 }
 
-static int read_suspend_image(const char * specialfile, int noresume)
+static int __init read_suspend_image(const char * specialfile, int noresume)
 {
 	union diskpage *cur;
 	unsigned long scratch_page = 0;
