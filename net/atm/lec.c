@@ -784,16 +784,20 @@ lecd_attach(struct atm_vcc *vcc, int arg)
                 size = sizeof(struct lec_priv);
 #ifdef CONFIG_TR
                 if (is_trdev)
-                        dev_lec[i] = init_trdev(NULL, size);
+                        dev_lec[i] = alloc_trdev(size);
                 else
 #endif
-                dev_lec[i] = init_etherdev(NULL, size);
+                dev_lec[i] = alloc_etherdev(size);
                 if (!dev_lec[i])
                         return -ENOMEM;
+                snprintf(dev_lec[i]->name, IFNAMSIZ, "lec%d", i);
+                if (register_netdev(dev_lec[i])) {
+                        kfree(dev_lec[i]);
+                        return -EINVAL;
+                }
 
                 priv = dev_lec[i]->priv;
                 priv->is_trdev = is_trdev;
-                sprintf(dev_lec[i]->name, "lec%d", i);
                 lec_init(dev_lec[i]);
         } else {
                 priv = dev_lec[i]->priv;
