@@ -21,7 +21,7 @@
  *                              merged HAL layer (patches from Brian)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.11 2003/04/30 14:53:11 perex Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.12 2003/08/13 13:14:31 tiwai Exp $ */
 
 /***************************************************************************************************
 *
@@ -965,6 +965,8 @@ static int __init sa11xx_uda1341_init(void)
 	sa11xx_uda1341 = snd_magic_kcalloc(sa11xx_uda1341_t, 0, GFP_KERNEL);
 	if (sa11xx_uda1341 == NULL)
 		return -ENOMEM;	
+	spin_lock_init(&chip->s[0].dma_lock);
+	spin_lock_init(&chip->s[1].dma_lock);
          
 	card->private_data = (void *)sa11xx_uda1341;
 	card->private_free = snd_sa11xx_uda1341_free;

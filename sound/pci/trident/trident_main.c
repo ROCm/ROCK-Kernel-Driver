@@ -3538,13 +3538,13 @@ int __devinit snd_trident_create(snd_card_t * card,
 	trident->port = pci_resource_start(pci, 0);
 
 	if ((trident->res_port = request_region(trident->port, 0x100, "Trident Audio")) == NULL) {
-		snd_trident_free(trident);
 		snd_printk("unable to grab I/O region 0x%lx-0x%lx\n", trident->port, trident->port + 0x100 - 1);
+		snd_trident_free(trident);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_trident_interrupt, SA_INTERRUPT|SA_SHIRQ, "Trident Audio", (void *) trident)) {
-		snd_trident_free(trident);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_trident_free(trident);
 		return -EBUSY;
 	}
 	trident->irq = pci->irq;

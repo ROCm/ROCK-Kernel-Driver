@@ -293,8 +293,8 @@ static int __init snd_gusmax_probe(int dev)
 		return err;
 	}
 	if (!gus->max_flag) {
-		snd_card_free(card);
 		printk(KERN_ERR "GUS MAX soundcard was not detected at 0x%lx\n", gus->gf1.port);
+		snd_card_free(card);
 		return -ENODEV;
 	}
 

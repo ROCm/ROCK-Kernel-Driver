@@ -523,6 +523,19 @@ static void iaputword(intel8x0_t *chip, u32 offset, u16 val)
 /*
  * access to AC97 codec via normal i/o (for ICH and SIS7012)
  */
+
+/* return the GLOB_STA bit for the corresponding codec */
+static unsigned int get_ich_codec_bit(intel8x0_t *chip, unsigned int codec)
+{
+	static unsigned int codec_bit[3] = {
+		ICH_PCR, ICH_SCR, ICH_TCR
+	};
+	snd_assert(codec < 3, return ICH_PCR);
+	if (chip->device_type == DEVICE_INTEL_ICH4)
+		codec = chip->ac97_sdin[codec];
+	return codec_bit[codec];
+}
+
 static int snd_intel8x0_codec_semaphore(intel8x0_t *chip, unsigned int codec)
 {
 	int time;
@@ -534,19 +547,7 @@ static int snd_intel8x0_codec_semaphore(intel8x0_t *chip, unsigned int codec)
 		/* so we check any */
 		codec = ICH_PCR | ICH_SCR | ICH_TCR;
 	} else {
-		if (chip->device_type == DEVICE_INTEL_ICH4) {
-			switch (chip->ac97_sdin[codec]) {
-			case 0: codec = ICH_PCR; break;
-			case 1: codec = ICH_SCR; break;
-			case 2: codec = ICH_TCR; break;
-			}
-		} else {
-			switch (codec) {
-			case 0: codec = ICH_PCR; break;
-			case 1: codec = ICH_SCR; break;
-			case 2: codec = ICH_TCR; break;
-			}
-		}
+		codec = get_ich_codec_bit(chip, codec);
 	}
 
 	/* codec ready ? */
@@ -1555,13 +1556,98 @@ static struct _ac97_rate_regs ali_ac97_rate_regs[] __devinitdata = {
 };
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
-	{ 0x1028, 0x0126, "Dell Optiplex GX260", AC97_TUNE_HP_ONLY },
-	{ 0x1734, 0x0088, "Fujitsu-Siemens D1522", AC97_TUNE_HP_ONLY },
-	{ 0x10f1, 0x2665, "Fujitsu-Siemens Celcius", AC97_TUNE_HP_ONLY },
-	{ 0x110a, 0x0056, "Fujitsu-Siemens Scenic", AC97_TUNE_HP_ONLY },
-	{ 0x8086, 0x4d44, "Intel D850EMV2", AC97_TUNE_HP_ONLY },
-	/* { 0x4144, 0x5360, "AMD64 Motherboard", AC97_TUNE_HP_ONLY }, */ /* FIXME: this seems invalid */
-	{ 0x1043, 0x80b0, "ASUS P4PE Mobo", AC97_TUNE_SWAP_SURROUND },
+	{
+		.vendor = 0x1028,
+		.device = 0x0126,
+		.name = "Dell Optiplex GX260",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1043,
+		.device =0x80b0,
+		.name = "ASUS P4PE Mobo",
+		.type = AC97_TUNE_SWAP_SURROUND
+	},
+ 	{
+		.vendor = 0x1043,
+		.device = 0x80f3,
+		.name = "ASUS ICH5/AD1985",
+		.type = AC97_TUNE_AD_SHARING
+	},
+	{
+		.vendor = 0x10f1,
+		.device = 0x2665,
+		.name = "Fujitsu-Siemens Celcius",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x110a,
+		.device = 0x0056,
+		.name = "Fujitsu-Siemens Scenic",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x11d4,
+		.device = 0x5375,
+		.name = "ADI AD1985 (discrete)",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1734,
+		.device = 0x0088,
+		.name = "Fujitsu-Siemens D1522",
+		.type = AC97_TUNE_HP_ONLY
+	},
+#if 0
+	/* FIXME: this seems invalid */
+	{
+		.vendor = 0x4144,
+		.device = 0x5360,
+		.type = "AMD64 Motherboard",
+		.name = AC97_TUNE_HP_ONLY
+	},
+#endif
+	{
+		.vendor = 0x8086,
+		.device = 0x2000,
+		.mask = 0xfff0,
+		.name = "Intel ICH5/AD1985 (discrete)",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x4000,
+		.mask = 0xfff0,
+		.name = "Intel ICH5/AD1985",
+		.type = AC97_TUNE_AD_SHARING
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x4d44,
+		.name = "Intel D850EMV2",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x6000,
+		.mask = 0xfff0,
+		.name = "Intel ICH5/AD1985",
+		.type = AC97_TUNE_AD_SHARING
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0xe000,
+		.mask = 0xfff0,
+		.name = "Intel ICH5/AD1985",
+		.type = AC97_TUNE_AD_SHARING
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0xa000,
+		.mask = 0xfff0,
+		.name = "Intel ICH5/AD1985 (discrete)",
+		.type = AC97_TUNE_HP_ONLY
+	},
 	{ } /* terminator */
 };
 
@@ -1646,9 +1732,14 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		}
 	}
 	ac97.pci = chip->pci;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0)
+	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
+		/* clear the cold-reset bit for the next chance */
+		if (chip->device_type != DEVICE_ALI)
+			iputdword(chip, ICHREG(GLOB_CNT), igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_AC97COLD);
 		return err;
+	}
 	chip->ac97[0] = x97;
+	/* tune up the primary codec */
 	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks);
 	/* the following three entries are common among all devices */
 	chip->ichd[ICHD_PCMOUT].ac97 = x97;
@@ -1801,7 +1892,7 @@ static void do_ali_reset(intel8x0_t *chip)
 	schedule_timeout(1);\
 } while (0)
 
-static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
+static int snd_intel8x0_ich_chip_init(intel8x0_t *chip, int probing)
 {
 	unsigned long end_time;
 	unsigned int cnt, status, nstatus;
@@ -1830,49 +1921,55 @@ static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
 	return -EIO;
 
       __ok:
-	/* wait for any codec ready status.
-	 * Once it becomes ready it should remain ready
-	 * as long as we do not disable the ac97 link.
- 	 */
-	end_time = jiffies + HZ;
-	do {
-		status = igetdword(chip, ICHREG(GLOB_STA)) & (ICH_PCR | ICH_SCR | ICH_TCR);
-		if (status)
-			goto __ok1;
-		do_delay(chip);
-	} while (time_after_eq(end_time, jiffies));
-	snd_printk(KERN_ERR "codec_ready: codec is not ready [0x%x]\n", igetdword(chip, ICHREG(GLOB_STA)));
-	return -EIO;
-
-      __ok1:
-      	if (status == (ICH_PCR | ICH_SCR | ICH_TCR))
-      		goto __ok3;
-	/* wait for other codecs ready status. No secondary codecs? , ok */
-	end_time = jiffies + HZ / 4;
-	do {
-		nstatus = igetdword(chip, ICHREG(GLOB_STA)) & (ICH_PCR | ICH_SCR | ICH_TCR);
-		if (nstatus != status) {
-			status = nstatus;
-			goto __ok2;
+	if (probing) {
+		/* wait for any codec ready status.
+		 * Once it becomes ready it should remain ready
+		 * as long as we do not disable the ac97 link.
+		 */
+		end_time = jiffies + HZ;
+		do {
+			status = igetdword(chip, ICHREG(GLOB_STA)) & (ICH_PCR | ICH_SCR | ICH_TCR);
+			if (status)
+				break;
+			do_delay(chip);
+		} while (time_after_eq(end_time, jiffies));
+		if (! status) {
+			/* no codec is found */
+			snd_printk(KERN_ERR "codec_ready: codec is not ready [0x%x]\n", igetdword(chip, ICHREG(GLOB_STA)));
+			return -EIO;
 		}
-		do_delay(chip);
-	} while (time_after_eq(end_time, jiffies));
 
-      __ok2:
-      	if (status == (ICH_PCR | ICH_SCR | ICH_TCR))
-      		goto __ok3;
-	/* wait for other codecs ready status. No other secondary codecs? , ok */
-	/* end_time is not initialized here */
-	do {
-		nstatus = igetdword(chip, ICHREG(GLOB_STA)) & (ICH_PCR | ICH_SCR | ICH_TCR);
-		if (nstatus != status) {
-			status = nstatus;
-			goto __ok2;
+		if (chip->device_type == DEVICE_INTEL_ICH4)
+			/* ICH4 can have three codecs */
+			nstatus = ICH_PCR | ICH_SCR | ICH_TCR;
+		else
+			/* others up to two codecs */
+			nstatus = ICH_PCR | ICH_SCR;
+
+		/* wait for other codecs ready status. */
+		end_time = jiffies + HZ / 4;
+		while (status != nstatus && time_after_eq(end_time, jiffies)) {
+			do_delay(chip);
+			status |= igetdword(chip, ICHREG(GLOB_STA)) & nstatus;
 		}
-		do_delay(chip);
-	} while (time_after_eq(end_time, jiffies));
 
-      __ok3:      
+	} else {
+		/* resume phase */
+		int i;
+		status = 0;
+		for (i = 0; i < 3; i++)
+			if (chip->ac97[i])
+				status |= get_ich_codec_bit(chip, i);
+		/* wait until all the probed codecs are ready */
+		end_time = jiffies + HZ;
+		do {
+			nstatus = igetdword(chip, ICHREG(GLOB_STA)) & (ICH_PCR | ICH_SCR | ICH_TCR);
+			if (status == nstatus)
+				break;
+			do_delay(chip);
+		} while (time_after_eq(end_time, jiffies));
+	}
+
 	if (chip->device_type == DEVICE_SIS) {
 		/* unmute the output on SIS7012 */
 		iputword(chip, 0x4c, igetword(chip, 0x4c) | 1);
@@ -1887,7 +1984,7 @@ static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
       	return 0;
 }
 
-static int snd_intel8x0_ali_chip_init(intel8x0_t *chip)
+static int snd_intel8x0_ali_chip_init(intel8x0_t *chip, int probing)
 {
 	u32 reg;
 	int i = 0;
@@ -1906,7 +2003,8 @@ static int snd_intel8x0_ali_chip_init(intel8x0_t *chip)
 		do_delay(chip);
 	}
 	snd_printk(KERN_ERR "AC'97 reset failed.\n");
-	return -EIO;
+	if (probing)
+		return -EIO;
 
  __ok:
 	for (i = 0; i < HZ / 2; i++) {
@@ -1921,17 +2019,17 @@ static int snd_intel8x0_ali_chip_init(intel8x0_t *chip)
 	return 0;
 }
 
-static int snd_intel8x0_chip_init(intel8x0_t *chip)
+static int snd_intel8x0_chip_init(intel8x0_t *chip, int probing)
 {
 	unsigned int i;
 	int err;
 	
 	if (chip->device_type != DEVICE_ALI) {
-		if ((err = snd_intel8x0_ich_chip_init(chip)) < 0)
+		if ((err = snd_intel8x0_ich_chip_init(chip, probing)) < 0)
 			return err;
 		iagetword(chip, 0);	/* clear semaphore flag */
 	} else {
-		if ((err = snd_intel8x0_ali_chip_init(chip)) < 0)
+		if ((err = snd_intel8x0_ali_chip_init(chip, probing)) < 0)
 			return err;
 	}
 
@@ -2019,7 +2117,7 @@ static void intel8x0_resume(intel8x0_t *chip)
 
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
-	snd_intel8x0_chip_init(chip);
+	snd_intel8x0_chip_init(chip, 0);
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_resume(chip->ac97[i]);
@@ -2377,7 +2475,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->int_sta_reg = device_type == DEVICE_ALI ? ICH_REG_ALI_INTERRUPTSR : ICH_REG_GLOB_STA;
 	chip->int_sta_mask = int_sta_masks;
 
-	if ((err = snd_intel8x0_chip_init(chip)) < 0) {
+	if ((err = snd_intel8x0_chip_init(chip, 1)) < 0) {
 		snd_intel8x0_free(chip);
 		return err;
 	}

@@ -438,7 +438,7 @@
   // chip-specific constructor
   // (see "Management of Cards and Components")
   static int __devinit snd_mychip_create(snd_card_t *card,
-                                         struct pci_device *pci,
+                                         struct pci_dev *pci,
                                          mychip_t **rchip)
   {
           mychip_t *chip;
@@ -1915,7 +1915,7 @@
   };
 
   /* open callback */
-  static int snd_mychip_pcm_open(snd_pcm_substream_t *subs)
+  static int snd_mychip_pcm_open(snd_pcm_substream_t *substream)
   {
           mychip_t *chip = snd_pcm_substream_chip(substream);
           snd_pcm_runtime_t *runtime = substream->runtime;
@@ -2716,7 +2716,7 @@ struct _snd_pcm_runtime {
           <informalexample>
             <programlisting>
 <![CDATA[
-  static int snd_xxx_open(snd_pcm_substream_t *subs);
+  static int snd_xxx_open(snd_pcm_substream_t *substream);
 ]]>
             </programlisting>
           </informalexample>
@@ -2767,7 +2767,7 @@ struct _snd_pcm_runtime {
           <informalexample>
             <programlisting>
 <![CDATA[
-  static int snd_xxx_close(snd_pcm_substream_t *subs);
+  static int snd_xxx_close(snd_pcm_substream_t *substream);
 ]]>
             </programlisting>
           </informalexample>
