@@ -501,7 +501,6 @@ write_try_string:
 int property_release (struct inode *inode, struct file *filp)
 {
 	openprom_property *op = (openprom_property *)filp->private_data;
-	unsigned long flags;
 	int error;
 	u32 node;
 	
