@@ -135,7 +135,7 @@ thread(void *unused)
 	init_timer(&wakeup_timer);
 
 	sigfillset(&current->blocked);
-	current->tty = NULL;	/* get rid of controlling tty */
+	current->signal->tty = NULL;
 
 	printk(KERN_NOTICE "Voyager starting monitor thread\n");
 
