@@ -270,9 +270,8 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 	struct buffer_head	*root_bh = NULL;
 	struct buffer_head	*boot_bh;
 	struct inode		*root_inode = NULL;
-	kdev_t			 dev = sb->s_dev;
 	s32			 root_block;
-	int			 blocks, size, blocksize;
+	int			 size, blocksize;
 	u32			 chksum;
 	int			 num_bm;
 	int			 i, j;
@@ -308,12 +307,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 	 * blocks, we will have to change it.
 	 */
 
-	blocks = blk_size[major(dev)] ? blk_size[major(dev)][minor(dev)] : 0;
-	if (!blocks) {
-		printk(KERN_ERR "AFFS: Could not determine device size\n");
-		goto out_error;
-	}
-	size = (BLOCK_SIZE / 512) * blocks;
+	size = sb->s_bdev->bd_inode->i_size >> 9;
 	pr_debug("AFFS: initial blksize=%d, blocks=%d\n", 512, blocks);
 
 	affs_set_blocksize(sb, PAGE_SIZE);

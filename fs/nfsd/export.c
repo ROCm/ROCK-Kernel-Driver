@@ -375,7 +375,6 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	struct nameidata	nd;
 	struct inode		*inode;
 	struct svc_fh		fh;
-	kdev_t			dev;
 	int			err;
 
 	err = -EPERM;
@@ -386,11 +385,10 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 		return err;
 	}
 	inode = nd.dentry->d_inode;
-	dev = inode->i_dev;
 
-	dprintk("nfsd: exp_rootfh(%s [%p] %s:%02x:%02x/%ld)\n",
+	dprintk("nfsd: exp_rootfh(%s [%p] %s:%s/%ld)\n",
 		 path, nd.dentry, clp->cl_ident,
-		 major(dev), minor(dev), (long) inode->i_ino);
+		 inode->i_sb->s_id, inode->i_ino);
 	exp = exp_parent(clp, inode->i_sb, nd.dentry);
 	if (!exp) {
 		dprintk("nfsd: exp_rootfh export not found.\n");

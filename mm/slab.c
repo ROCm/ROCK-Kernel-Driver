@@ -75,6 +75,7 @@
 #include	<linux/interrupt.h>
 #include	<linux/init.h>
 #include	<linux/compiler.h>
+#include	<linux/seq_file.h>
 #include	<asm/uaccess.h>
 
 /*
@@ -1869,31 +1870,56 @@ out:
 }
 
 #ifdef CONFIG_PROC_FS
-/* /proc/slabinfo
- *	cache-name num-active-objs total-objs
- *	obj-size num-active-slabs total-slabs
- *	num-pages-per-slab
- */
-#define FIXUP(t)				\
-	do {					\
-		if (len <= off) {		\
-			off -= len;		\
-			len = 0;		\
-		} else {			\
-			if (len-off > count)	\
-				goto t;		\
-		}				\
-	} while (0)
 
-static int proc_getdata (char*page, char**start, off_t off, int count)
+static void *s_start(struct seq_file *m, loff_t *pos)
 {
+	loff_t n = *pos;
 	struct list_head *p;
-	int len = 0;
 
-	/* Output format version, so at least we can change it without _too_
-	 * many complaints.
-	 */
-	len += sprintf(page+len, "slabinfo - version: 1.1"
+	down(&cache_chain_sem);
+	if (!n)
+		return (void *)1;
+	p = &cache_cache.next;
+	while (--n) {
+		p = p->next;
+		if (p == &cache_cache.next)
+			return NULL;
+	}
+	return list_entry(p, kmem_cache_t, next);
+}
+
+static void *s_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	kmem_cache_t *cachep = p;
+	++*pos;
+	if (p == (void *)1)
+		return &cache_cache;
+	cachep = list_entry(cachep->next.next, kmem_cache_t, next);
+	return cachep == &cache_cache ? NULL : cachep;
+}
+
+static void s_stop(struct seq_file *m, void *p)
+{
+	up(&cache_chain_sem);
+}
+
+static int s_show(struct seq_file *m, void *p)
+{
+	kmem_cache_t *cachep = p;
+	struct list_head *q;
+	slab_t		*slabp;
+	unsigned long	active_objs;
+	unsigned long	num_objs;
+	unsigned long	active_slabs = 0;
+	unsigned long	num_slabs;
+	const char *name; 
+
+	if (p == (void*)1) {
+		/*
+		 * Output format version, so at least we can change it
+		 * without _too_ many complaints.
+		 */
+		seq_puts(m, "slabinfo - version: 1.1"
 #if STATS
 				" (statistics)"
 #endif
@@ -1901,116 +1927,89 @@ static int proc_getdata (char*page, char**start, off_t off, int count)
 				" (SMP)"
 #endif
 				"\n");
-	FIXUP(got_data);
+		return 0;
+	}
 
-	down(&cache_chain_sem);
-	p = &cache_cache.next;
-	do {
-		kmem_cache_t	*cachep;
-		struct list_head *q;
-		slab_t		*slabp;
-		unsigned long	active_objs;
-		unsigned long	num_objs;
-		unsigned long	active_slabs = 0;
-		unsigned long	num_slabs;
-		const char *name; 
-		cachep = list_entry(p, kmem_cache_t, next);
+	spin_lock_irq(&cachep->spinlock);
+	active_objs = 0;
+	num_slabs = 0;
+	list_for_each(q,&cachep->slabs_full) {
+		slabp = list_entry(q, slab_t, list);
+		if (slabp->inuse != cachep->num)
+			BUG();
+		active_objs += cachep->num;
+		active_slabs++;
+	}
+	list_for_each(q,&cachep->slabs_partial) {
+		slabp = list_entry(q, slab_t, list);
+		if (slabp->inuse == cachep->num || !slabp->inuse)
+			BUG();
+		active_objs += slabp->inuse;
+		active_slabs++;
+	}
+	list_for_each(q,&cachep->slabs_free) {
+		slabp = list_entry(q, slab_t, list);
+		if (slabp->inuse)
+			BUG();
+		num_slabs++;
+	}
+	num_slabs+=active_slabs;
+	num_objs = num_slabs*cachep->num;
 
-		spin_lock_irq(&cachep->spinlock);
-		active_objs = 0;
-		num_slabs = 0;
-		list_for_each(q,&cachep->slabs_full) {
-			slabp = list_entry(q, slab_t, list);
-			if (slabp->inuse != cachep->num)
-				BUG();
-			active_objs += cachep->num;
-			active_slabs++;
-		}
-		list_for_each(q,&cachep->slabs_partial) {
-			slabp = list_entry(q, slab_t, list);
-			if (slabp->inuse == cachep->num || !slabp->inuse)
-				BUG();
-			active_objs += slabp->inuse;
-			active_slabs++;
-		}
-		list_for_each(q,&cachep->slabs_free) {
-			slabp = list_entry(q, slab_t, list);
-			if (slabp->inuse)
-				BUG();
-			num_slabs++;
-		}
-		num_slabs+=active_slabs;
-		num_objs = num_slabs*cachep->num;
+	name = cachep->name; 
+	{
+	char tmp; 
+	if (__get_user(tmp, name)) 
+		name = "broken"; 
+	} 	
 
-		name = cachep->name; 
-		{
-		char tmp; 
-		if (__get_user(tmp, name)) 
-			name = "broken"; 
-		} 	
-
-		len += sprintf(page+len, "%-17s %6lu %6lu %6u %4lu %4lu %4u",
-			name, active_objs, num_objs, cachep->objsize,
-			active_slabs, num_slabs, (1<<cachep->gfporder));
+	seq_printf(m, "%-17s %6lu %6lu %6u %4lu %4lu %4u",
+		name, active_objs, num_objs, cachep->objsize,
+		active_slabs, num_slabs, (1<<cachep->gfporder));
 
 #if STATS
-		{
-			unsigned long errors = cachep->errors;
-			unsigned long high = cachep->high_mark;
-			unsigned long grown = cachep->grown;
-			unsigned long reaped = cachep->reaped;
-			unsigned long allocs = cachep->num_allocations;
+	{
+		unsigned long errors = cachep->errors;
+		unsigned long high = cachep->high_mark;
+		unsigned long grown = cachep->grown;
+		unsigned long reaped = cachep->reaped;
+		unsigned long allocs = cachep->num_allocations;
 
-			len += sprintf(page+len, " : %6lu %7lu %5lu %4lu %4lu",
-					high, allocs, grown, reaped, errors);
-		}
+		seq_printf(m, " : %6lu %7lu %5lu %4lu %4lu",
+				high, allocs, grown, reaped, errors);
+	}
 #endif
 #ifdef CONFIG_SMP
-		{
-			unsigned int batchcount = cachep->batchcount;
-			unsigned int limit;
+	{
+		unsigned int batchcount = cachep->batchcount;
+		unsigned int limit;
 
-			if (cc_data(cachep))
-				limit = cc_data(cachep)->limit;
-			 else
-				limit = 0;
-			len += sprintf(page+len, " : %4u %4u",
-					limit, batchcount);
-		}
+		if (cc_data(cachep))
+			limit = cc_data(cachep)->limit;
+		 else
+			limit = 0;
+		seq_printf(m, " : %4u %4u", limit, batchcount);
+	}
 #endif
 #if STATS && defined(CONFIG_SMP)
-		{
-			unsigned long allochit = atomic_read(&cachep->allochit);
-			unsigned long allocmiss = atomic_read(&cachep->allocmiss);
-			unsigned long freehit = atomic_read(&cachep->freehit);
-			unsigned long freemiss = atomic_read(&cachep->freemiss);
-			len += sprintf(page+len, " : %6lu %6lu %6lu %6lu",
-					allochit, allocmiss, freehit, freemiss);
-		}
+	{
+		unsigned long allochit = atomic_read(&cachep->allochit);
+		unsigned long allocmiss = atomic_read(&cachep->allocmiss);
+		unsigned long freehit = atomic_read(&cachep->freehit);
+		unsigned long freemiss = atomic_read(&cachep->freemiss);
+		seq_printf(m, " : %6lu %6lu %6lu %6lu",
+				allochit, allocmiss, freehit, freemiss);
+	}
 #endif
-		len += sprintf(page+len,"\n");
-		spin_unlock_irq(&cachep->spinlock);
-		FIXUP(got_data_up);
-		p = cachep->next.next;
-	} while (p != &cache_cache.next);
-got_data_up:
-	up(&cache_chain_sem);
-
-got_data:
-	*start = page+off;
-	return len;
+	spin_unlock_irq(&cachep->spinlock);
+	seq_putc(m, '\n');
+	return 0;
 }
 
 /**
- * slabinfo_read_proc - generates /proc/slabinfo
- * @page: scratch area, one page long
- * @start: pointer to the pointer to the output buffer
- * @off: offset within /proc/slabinfo the caller is interested in
- * @count: requested len in bytes
- * @eof: eof marker
- * @data: unused
+ * slabinfo_op - iterator that generates /proc/slabinfo
  *
- * The contents of the buffer are
+ * Output layout:
  * cache-name
  * num-active-objs
  * total-objs
@@ -2020,28 +2019,24 @@ got_data:
  * num-pages-per-slab
  * + further values on SMP and with statistics enabled
  */
-int slabinfo_read_proc (char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = proc_getdata(page, start, off, count);
-	len -= (*start-page);
-	if (len <= count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
+
+struct seq_operations slabinfo_op = {
+	start:	s_start,
+	next:	s_next,
+	stop:	s_stop,
+	show:	s_show
+};
 
 #define MAX_SLABINFO_WRITE 128
 /**
- * slabinfo_write_proc - SMP tuning for the slab allocator
+ * slabinfo_write - SMP tuning for the slab allocator
  * @file: unused
  * @buffer: user buffer
  * @count: data len
  * @data: unused
  */
-int slabinfo_write_proc (struct file *file, const char *buffer,
-				unsigned long count, void *data)
+ssize_t slabinfo_write(struct file *file, const char *buffer,
+				size_t count, loff_t *ppos)
 {
 #ifdef CONFIG_SMP
 	char kbuf[MAX_SLABINFO_WRITE+1], *tmp;

@@ -1075,84 +1075,67 @@ free_module(struct module *mod, int tag_freed)
 /*
  * Called by the /proc file system to return a current list of modules.
  */
-
-int get_module_list(char *p)
+static void *m_start(struct seq_file *m, loff_t *pos)
 {
-	size_t left = PAGE_SIZE;
-	struct module *mod;
-	char tmpstr[64];
-	struct module_ref *ref;
-
-	for (mod = module_list; mod != &kernel_module; mod = mod->next) {
-		long len;
-		const char *q;
-
-#define safe_copy_str(str, len)						\
-		do {							\
-			if (left < len)					\
-				goto fini;				\
-			memcpy(p, str, len); p += len, left -= len;	\
-		} while (0)
-#define safe_copy_cstr(str)	safe_copy_str(str, sizeof(str)-1)
-
-		len = strlen(mod->name);
-		safe_copy_str(mod->name, len);
-
-		if ((len = 20 - len) > 0) {
-			if (left < len)
-				goto fini;
-			memset(p, ' ', len);
-			p += len;
-			left -= len;
-		}
-
-		len = sprintf(tmpstr, "%8lu", mod->size);
-		safe_copy_str(tmpstr, len);
-
-		if (mod->flags & MOD_RUNNING) {
-			len = sprintf(tmpstr, "%4ld",
-				      (mod_member_present(mod, can_unload)
-				       && mod->can_unload
-				       ? -1L : (long)atomic_read(&mod->uc.usecount)));
-			safe_copy_str(tmpstr, len);
-		}
-
-		if (mod->flags & MOD_DELETED)
-			safe_copy_cstr(" (deleted)");
-		else if (mod->flags & MOD_RUNNING) {
-			if (mod->flags & MOD_AUTOCLEAN)
-				safe_copy_cstr(" (autoclean)");
-			if (!(mod->flags & MOD_USED_ONCE))
-				safe_copy_cstr(" (unused)");
-		}
-		else if (mod->flags & MOD_INITIALIZING)
-			safe_copy_cstr(" (initializing)");
-		else
-			safe_copy_cstr(" (uninitialized)");
-
-		if ((ref = mod->refs) != NULL) {
-			safe_copy_cstr(" [");
-			while (1) {
-				q = ref->ref->name;
-				len = strlen(q);
-				safe_copy_str(q, len);
-
-				if ((ref = ref->next_ref) != NULL)
-					safe_copy_cstr(" ");
-				else
-					break;
-			}
-			safe_copy_cstr("]");
-		}
-		safe_copy_cstr("\n");
-
-#undef safe_copy_str
-#undef safe_copy_cstr
-	}
-
-fini:
-	return PAGE_SIZE - left;
+	struct module *v;
+	loff_t n = *pos;
+	lock_kernel();
+	for (v = module_list; v && n--; v = v->next)
+		;
+	return v;
 }
+static void *m_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	struct module *v = p;
+	(*pos)++;
+	return v->next;
+}
+static void m_stop(struct seq_file *m, void *p)
+{
+	unlock_kernel();
+}
+static int m_show(struct seq_file *m, void *p)
+{
+	struct module *mod = p;
+	struct module_ref *ref = mod->refs;
+
+	if (mod == &kernel_module)
+		return 0;
+
+	seq_printf(m, "%-20s%8lu", mod->name, mod->size);
+	if (mod->flags & MOD_RUNNING)
+		seq_printf(m, "%4ld",
+			      (mod_member_present(mod, can_unload)
+			       && mod->can_unload
+			       ? -1L : (long)atomic_read(&mod->uc.usecount)));
+
+	if (mod->flags & MOD_DELETED)
+		seq_puts(m, " (deleted)");
+	else if (mod->flags & MOD_RUNNING) {
+		if (mod->flags & MOD_AUTOCLEAN)
+			seq_puts(m, " (autoclean)");
+		if (!(mod->flags & MOD_USED_ONCE))
+			seq_puts(m, " (unused)");
+	} else if (mod->flags & MOD_INITIALIZING)
+		seq_puts(m, " (initializing)");
+	else
+		seq_puts(m, " (uninitialized)");
+	if (ref) {
+		char c;
+		seq_putc(m, ' ');
+		for (c = '[' ; ref; c = ' ', ref = ref->next_ref)
+			seq_printf(m, "%c%s", c, ref->ref->name);
+		seq_putc(m, ']');
+	}
+	seq_putc(m, '\n');
+	return 0;
+}
+struct seq_operations modules_op = {
+	start:	m_start,
+	next:	m_next,
+	stop:	m_stop,
+	show:	m_show
+};
 
 /*
  * Called by the /proc file system to return a current list of ksyms.

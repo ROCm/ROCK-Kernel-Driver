@@ -289,7 +289,7 @@ static void write_dquot(struct dquot *dquot)
 					sizeof(struct dqblk), &offset);
 	if (ret != sizeof(struct dqblk))
 		printk(KERN_WARNING "VFS: dquota write failed on dev %s\n",
-			kdevname(dquot->dq_sb->s_dev));
+			dquot->dq_sb->s_id);
 
 	set_fs(fs);
 	up(sem);
@@ -440,7 +440,7 @@ static void dqput(struct dquot *dquot)
 	if (!dquot->dq_count) {
 		printk("VFS: dqput: trying to free free dquot\n");
 		printk("VFS: device %s, dquot of %s %d\n",
-			kdevname(dquot->dq_sb->s_dev),
+			dquot->dq_sb->s_id,
 			quotatypes[dquot->dq_type],
 			dquot->dq_id);
 		return;
@@ -715,7 +715,7 @@ static void print_warning(struct dquot *dquot, const char warntype)
 	if (!need_print_warning(dquot, flag))
 		return;
 	dquot->dq_flags |= flag;
-	tty_write_message(current->tty, (char *)bdevname(dquot->dq_sb->s_dev));
+	tty_write_message(current->tty, dquot->dq_sb->s_id);
 	if (warntype == ISOFTWARN || warntype == BSOFTWARN)
 		tty_write_message(current->tty, ": warning, ");
 	else
