@@ -2697,11 +2697,11 @@ static u16 transmit_allocate(struct airo_info *ai, int lenPayload, int raw)
 	if (down_interruptible(&ai->sem))
 		return ERROR;
 	if (issuecommand(ai, &cmd, &rsp) != SUCCESS) {
-		txFid = 0;
+		txFid = ERROR;
 		goto done;
 	}
 	if ( (rsp.status & 0xFF00) != 0) {
-		txFid = 0;
+		txFid = ERROR;
 		goto done;
 	}
 	/* wait for the allocate event/indication
