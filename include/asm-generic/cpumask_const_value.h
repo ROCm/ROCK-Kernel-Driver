@@ -3,7 +3,7 @@
 
 typedef const cpumask_t cpumask_const_t;
 
-#define mk_cpumask_const(map)		((cpumask_const_t)(map))
+#define mk_cpumask_const(map)		(map)
 #define cpu_isset_const(cpu, map)	cpu_isset(cpu, map)
 #define cpus_and_const(dst,src1,src2)	cpus_and(dst, src1, src2)
 #define cpus_or_const(dst,src1,src2)	cpus_or(dst, src1, src2)

@@ -53,18 +53,18 @@ extern cpumask_t cpu_online_map;
 static inline int next_online_cpu(int cpu, cpumask_t map)
 {
 	do
-		cpu = next_cpu_const(cpu, map);
+		cpu = next_cpu_const(cpu, mk_cpumask_const(map));
 	while (cpu < NR_CPUS && !cpu_online(cpu));
 	return cpu;
 }
 
 #define for_each_cpu(cpu, map)						\
-	for (cpu = first_cpu_const(map);				\
+	for (cpu = first_cpu_const(mk_cpumask_const(map));		\
 		cpu < NR_CPUS;						\
-		cpu = next_cpu_const(cpu,map))
+		cpu = next_cpu_const(cpu,mk_cpumask_const(map)))
 
 #define for_each_online_cpu(cpu, map)					\
-	for (cpu = first_cpu_const(map);				\
+	for (cpu = first_cpu_const(mk_cpumask_const(map));		\
 		cpu < NR_CPUS;						\
 		cpu = next_online_cpu(cpu,map))
 
