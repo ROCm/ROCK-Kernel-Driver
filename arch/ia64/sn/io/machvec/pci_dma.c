@@ -138,6 +138,8 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	if (!(cpuaddr = (void *)__get_free_pages(GFP_ATOMIC, get_order(size))))
 		return NULL;
 
+	memset(cpuaddr, 0x0, size);
+
 	/* physical addr. of the memory we just got */
 	phys_addr = __pa(cpuaddr);
 
@@ -154,7 +156,8 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 		*dma_handle = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
 					  PCIIO_DMA_CMD | PCIIO_DMA_A64);
 	else {
-		dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_CMD);
+		dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_CMD | 
+					     MINIMAL_ATE_FLAG(phys_addr, size));
 		if (dma_map) {
 			*dma_handle = (dma_addr_t)
 				pcibr_dmamap_addr(dma_map, phys_addr, size);
@@ -391,7 +394,8 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	 * let's use the PMU instead.
 	 */
 	dma_map = NULL;
-	dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_DATA);
+	dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_DATA | 
+				     MINIMAL_ATE_FLAG(phys_addr, size));
 
 	if (!dma_map) {
 		printk(KERN_ERR "pci_map_single: Unable to allocate anymore "

@@ -286,6 +286,12 @@ extern void *		pcibr_bridge_ptr_get(vertex_hdl_t, int);
 
 typedef int		pcibr_device_flags_t;
 
+#define MINIMAL_ATES_REQUIRED(addr, size) \
+	(IOPG(IOPGOFF(addr) + (size) - 1) == IOPG((size) - 1))
+
+#define MINIMAL_ATE_FLAG(addr, size) \
+	(MINIMAL_ATES_REQUIRED((u_long)addr, size) ? PCIBR_NO_ATE_ROUNDUP : 0)
+
 /*
  * Set bits in the Bridge Device(x) register for this device.
  * "flags" are defined above. NOTE: this includes turning
