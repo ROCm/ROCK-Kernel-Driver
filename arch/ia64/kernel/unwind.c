@@ -1910,7 +1910,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 				   __FUNCTION__, ip);
 			return -1;
 		}
-		if (ip < GATE_ADDR)
+		if (ip < FIXADDR_USER_END)
 			return 0;
 	}
 	unw_get_ip(info, &ip);
