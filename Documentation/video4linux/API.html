@@ -105,7 +105,7 @@ call <b>VIDIOCGWIN</b> to check if the nearest match was suitable. The
 <TR><TD><b>height</b><TD>The height of the image capture.</TD>
 <TR><TD><b>chromakey</b><TD>A host order RGB32 value for the chroma key.</TD>
 <TR><TD><b>flags</b><TD>Additional capture flags.</TD>
-<TR><TD><b>clips</b><TD>A list of clipping rectangles. <em>(Set only)</em)</TD>
+<TR><TD><b>clips</b><TD>A list of clipping rectangles. <em>(Set only)</em></TD>
 <TR><TD><b>clipcount</b><TD>The number of clipping rectangles. <em>(Set only)</em></TD>
 </TABLE>
 <P>
@@ -120,6 +120,7 @@ fields available to the user.
 </TABLE>
 <P>
 Merely setting the window does not enable capturing. Overlay capturing
+(i.e. PCI-PCI transfer to the frame buffer of the video card)
 is activated by passing the <b>VIDIOCCAPTURE</b> ioctl a value of 1, and
 disabled by passing it a value of 0. 
 <P>
@@ -310,9 +311,10 @@ The following decoding modes are defined
 </TABLE>
 <P>
 <H3>Reading Images</H3>
-Each call to the <b>read</b> syscall returns the next available image from
-the device. It is up to the caller to set the format and then to pass a 
-suitable size buffer and length to the function. Not all devices will support
+Each call to the <b>read</b> syscall returns the next available image
+from the device. It is up to the caller to set format and size (using
+the VIDIOCSPICT and VIDIOCSWIN ioctls) and then to pass a suitable
+size buffer and length to the function. Not all devices will support
 read operations.
 <P>
 A second way to handle image capture is via the mmap interface if supported.
@@ -329,16 +331,39 @@ The video_mbuf structure contains the following fields
 <TR><TD><b>offsets</b><TD>The offset of each frame</TD>
 </TABLE>
 <P>
-Once the mmap has been made the VIDIOCMCAPTURE ioctl sets the image size
-you wish to use (which should match or be below the initial query size).
-Having done so it will begin capturing to the memory mapped buffer. Whenever
-a buffer is "used" by the program it should called VIDIOCSYNC to free this
-frame up and continue. <em>to add:</em>VIDIOCSYNC takes the frame number
-you are freeing as its argument. When the buffer is unmapped or all the
-buffers are full capture ceases. While capturing to memory the driver will
-make a "best effort" attempt to capture to screen as well if requested. This
-normally means all frames that "miss" memory mapped capture will go to the
-display.
+Once the mmap has been made the VIDIOCMCAPTURE ioctl starts the
+capture to a frame using the format and image size specified in the
+video_mmap (which should match or be below the initial query size).
+When the VIDIOCMCAPTURE ioctl returns the frame is <em>not</em>
+captured yet, the driver just instructed the hardware to start the
+capture.  The application has to use the VIDIOCSYNC ioctl to wait
+until the capture of a frame is finished.  VIDIOCSYNC takes the frame
+number you want to wait for as argument.
+<p>
+It is allowed to call VIDIOCMCAPTURE multiple times (with different
+frame numbers in video_mmap->frame of course) and thus have multiple
+outstanding capture requests.  A simple way do to double-buffering
+using this feature looks like this:
+<pre>
+/* setup everything */
+VIDIOCMCAPTURE(0)
+while (whatever) {
+   VIDIOCMCAPTURE(1)
+   VIDIOCSYNC(0)
+   /* process frame 0 while the hardware captures frame 1 */
+   VIDIOCMCAPTURE(0)
+   VIDIOCSYNC(1)
+   /* process frame 1 while the hardware captures frame 0 */
+}
+</pre>
+Note that you are <em>not</em> limited to only two frames.  The API
+allows up to 32 frames, the VIDIOCGMBUF ioctl returns the number of
+frames the driver granted.  Thus it is possible to build deeper queues
+to avoid loosing frames on load peaks.
+<p>
+While capturing to memory the driver will make a "best effort" attempt
+to capture to screen as well if requested. This normally means all
+frames that "miss" memory mapped capture will go to the display.
 <P>
 A final ioctl exists to allow a device to obtain related devices if a
 driver has multiple components (for example video0 may not be associated
