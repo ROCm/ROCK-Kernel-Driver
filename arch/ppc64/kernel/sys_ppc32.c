@@ -4285,6 +4285,32 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 	return ret;
 }
 
+int sys32_olduname(struct oldold_utsname * name)
+{
+	int error;
+	
+	if (!name)
+		return -EFAULT;
+	if (!access_ok(VERIFY_WRITE,name,sizeof(struct oldold_utsname)))
+		return -EFAULT;
+  
+	down_read(&uts_sem);
+	error = __copy_to_user(&name->sysname,&system_utsname.sysname,__OLD_UTS_LEN);
+	error -= __put_user(0,name->sysname+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->nodename,&system_utsname.nodename,__OLD_UTS_LEN);
+	error -= __put_user(0,name->nodename+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->release,&system_utsname.release,__OLD_UTS_LEN);
+	error -= __put_user(0,name->release+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->version,&system_utsname.version,__OLD_UTS_LEN);
+	error -= __put_user(0,name->version+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->machine,&system_utsname.machine,__OLD_UTS_LEN);
+	error = __put_user(0,name->machine+__OLD_UTS_LEN);
+	up_read(&uts_sem);
+
+	error = error ? -EFAULT : 0;
+	
+	return error;
+}
 extern unsigned long sys_mmap(unsigned long addr, size_t len,
 			      unsigned long prot, unsigned long flags,
 			      unsigned long fd, off_t offset);

@@ -564,7 +564,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* old mpx syscall */
 	.llong .sys32_setpgid
 	.llong .sys_ni_syscall		/* old ulimit syscall */
-	.llong .sys_olduname
+	.llong .sys32_olduname
 	.llong .sys32_umask		/* 60 */
 	.llong .sys_chroot
 	.llong .sys_ustat
@@ -770,7 +770,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_lseek
 	.llong .sys_getpid		/* 20 */
 	.llong .sys_mount
-	.llong .sys_oldumount
+	.llong .sys_ni_syscall		/* old umount syscall */
 	.llong .sys_setuid
 	.llong .sys_getuid
 	.llong .ppc64_sys_stime		/* 25 */
@@ -807,7 +807,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* old mpx syscall */
 	.llong .sys_setpgid
 	.llong .sys_ni_syscall		/* old ulimit syscall */
-	.llong .sys_olduname
+	.llong .sys_ni_syscall		/* old uname syscall */
 	.llong .sys_umask		/* 60 */
 	.llong .sys_chroot
 	.llong .sys_ustat
@@ -824,7 +824,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_sigpending
 	.llong .sys_sethostname
 	.llong .sys_setrlimit		/* 75 */
-	.llong .sys_old_getrlimit
+	.llong .sys_ni_syscall		/* old getrlimit syscall */
 	.llong .sys_getrusage
 	.llong .sys_gettimeofday
 	.llong .sys_settimeofday
@@ -837,7 +837,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_uselib
 	.llong .sys_swapon
 	.llong .sys_reboot
-	.llong .old_readdir
+	.llong .sys_ni_syscall		/* old readdir syscall */
 	.llong .sys_mmap		/* 90 */
 	.llong .sys_munmap
 	.llong .sys_truncate
@@ -946,8 +946,8 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* 195 - 32bit only stat64 */
 	.llong .sys_ni_syscall		/* 32bit only lstat64 */
 	.llong .sys_ni_syscall		/* 32bit only fstat64 */
-	.llong .sys_pciconfig_read
-	.llong .sys_pciconfig_write
+	.llong .sys_ni_syscall		/* 32bit only pciconfig_read */
+	.llong .sys_ni_syscall		/* 32bit only pciconfig_write */
 	.llong .sys_ni_syscall		/* 200 - reserved - sys_pciconfig_iobase */
 	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
 	.llong .sys_getdents64
