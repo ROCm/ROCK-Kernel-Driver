@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#104 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#105 $
  *
  * $FreeBSD$
  */
@@ -2772,9 +2772,12 @@ reswitch:
 			 */
 			if (ahc->msgout_len != 0) {
 #ifdef AHC_DEBUG
-				if ((ahc_debug & AHC_SHOW_MESSAGES) != 0)
+				if ((ahc_debug & AHC_SHOW_MESSAGES) != 0) {
+					ahc_print_devinfo(ahc, &devinfo);
 					printf("Asserting ATN for response\n");
+				}
 #endif
+				ahc_assert_atn(ahc);
 			}
 		} else 
 			ahc->msgin_index++;
