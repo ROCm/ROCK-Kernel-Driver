@@ -359,7 +359,8 @@ bad_area_nosemaphore:
 			return;
 
 		tsk->thread.cr2 = address;
-		tsk->thread.error_code = error_code;
+		/* Kernel addresses are always protection faults */
+		tsk->thread.error_code = error_code | (address >= TASK_SIZE);
 		tsk->thread.trap_no = 14;
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;

@@ -493,25 +493,6 @@ bailout:
 	return retval;
 }
 
-static void __serial_close(struct usb_serial_port *port, struct file *filp)
-{
-	if (!port->open_count) {
-		dbg ("%s - port not opened", __FUNCTION__);
-		return;
-	}
-
-	--port->open_count;
-	if (port->open_count <= 0) {
-		/* only call the device specific close if this 
-		 * port is being closed by the last owner */
-		port->serial->type->close(port, filp);
-		port->open_count = 0;
-	}
-
-	module_put(port->serial->type->owner);
-	kobject_put(&port->serial->kobj);
-}
-
 static void serial_close(struct tty_struct *tty, struct file * filp)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
@@ -522,12 +503,22 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	/* if disconnect beat us to the punch here, there's nothing to do */
-	if (tty && tty->driver_data) {
-		__serial_close(port, filp);
-		tty->driver_data = NULL;
+	--port->open_count;
+	if (port->open_count <= 0) {
+		/* only call the device specific close if this 
+		 * port is being closed by the last owner */
+		port->serial->type->close(port, filp);
+		port->open_count = 0;
+
+		if (port->tty) {
+			if (port->tty->driver_data)
+				port->tty->driver_data = NULL;
+			port->tty = NULL;
+		}
 	}
-	port->tty = NULL;
+
+	module_put(port->serial->type->owner);
+	kobject_put(&port->serial->kobj);
 }
 
 static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
@@ -848,19 +839,6 @@ static void destroy_serial (struct kobject *kobj)
 	dbg ("%s - %s", __FUNCTION__, kobj->name);
 
 	serial = to_usb_serial(kobj);
-
-	/* fail all future close/read/write/ioctl/etc calls */
-	for (i = 0; i < serial->num_ports; ++i) {
-		port = serial->port[i];
-		if (port->tty != NULL) {
-			port->tty->driver_data = NULL;
-			while (port->open_count > 0) {
-				__serial_close(port, NULL);
-			}
-			port->tty = NULL;
-		}
-	}
-
 	serial_shutdown (serial);
 
 	/* return the minor range that this device had */
@@ -1242,7 +1220,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	/* register all of the individual ports with the driver core */
 	for (i = 0; i < num_ports; ++i) {
 		port = serial->port[i];
-		port->dev.parent = &serial->dev->dev;
+		port->dev.parent = &interface->dev;
 		port->dev.driver = NULL;
 		port->dev.bus = &usb_serial_bus_type;
 		port->dev.release = &port_release;

@@ -222,7 +222,7 @@ static __inline__ void __tcp_v6_hash(struct sock *sk)
 		write_lock(lock);
 	}
 
-	sk_add_node(sk, list);
+	__sk_add_node(sk, list);
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock(lock);
 }
