@@ -212,20 +212,19 @@ static int iop_alive(volatile struct mac_iop *iop)
 static struct iop_msg *iop_alloc_msg(void)
 {
 	int i;
-	ulong cpu_flags;
+	unsigned long flags;
 
-	save_flags(cpu_flags);
-	cli();
+	local_irq_save(flags);
 
 	for (i = 0 ; i < NUM_IOP_MSGS ; i++) {
 		if (iop_msg_pool[i].status == IOP_MSGSTATUS_UNUSED) {
 			iop_msg_pool[i].status = IOP_MSGSTATUS_WAITING;
-			restore_flags(cpu_flags);
+			local_irq_restore(flags);
 			return &iop_msg_pool[i];
 		}
 	}
 
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 	return NULL;
 }
 

@@ -181,11 +181,10 @@ int __init mac_parse_bootinfo(const struct bi_record *record)
 
 static void mac_cache_card_flush(int writeback)
 {
-	unsigned long cpu_flags;
-	save_flags(cpu_flags);
-	cli();
+	unsigned long flags;
+	local_irq_save(flags);
 	via_flush_cache();
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 }
 
 void __init config_mac(void)
