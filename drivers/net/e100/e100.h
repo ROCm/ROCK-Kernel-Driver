@@ -128,12 +128,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define E100_DEFAULT_TCB   MAX_TCB
 #define E100_MIN_TCB       2*TX_FRAME_CNT + 3	/* make room for at least 2 interrupts */
 
-#ifdef __ia64__
- /* We can't use too many DMAble buffers on IA64 machines with >4 GB mem */
-#define E100_MAX_TCB       64
-#else
 #define E100_MAX_TCB       1024
-#endif /*  __ia64__ */
 
 #define E100_DEFAULT_RFD   MAX_RFD
 #define E100_MIN_RFD       8

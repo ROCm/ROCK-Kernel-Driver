@@ -69,6 +69,10 @@ ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED
 AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
 TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*******************************************************************************
+
+Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
+
 *******************************************************************************/
 
 /**********************************************************************
@@ -162,7 +166,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.21"
+#define E100_VERSION  "2.0.22-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -525,6 +529,7 @@ e100_dis_intr(struct e100_private *bdp)
 {
 	/* Disable interrupts on our PCI board by setting the mask bit */
 	writeb(SCB_INT_MASK, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 }
 
 /**
@@ -545,6 +550,7 @@ e100_trigger_SWI(struct e100_private *bdp)
 {
 	/* Trigger interrupt on our PCI board by asserting SWI bit */
 	writeb(SCB_SOFT_INT, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 }
 
 static int __devinit
@@ -2053,10 +2059,8 @@ e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
 				    (data_sz + bdp->rfd_size),
 				    PCI_DMA_FROMDEVICE);
 
-		// we unmap using DMA_TODEVICE to avoid another memcpy from the 
-		// bounce buffer
 		pci_unmap_single(bdp->pdev, rx_struct->dma_addr,
-				 sizeof (rfd_t), PCI_DMA_TODEVICE);
+				 sizeof (rfd_t), PCI_DMA_FROMDEVICE);
 
 		list_add(&(rx_struct->list_elem), &(bdp->rx_struct_pool));
 
@@ -2427,6 +2431,7 @@ e100_selftest(struct e100_private *bdp, u32 *st_timeout, u32 *st_result)
 
 	/* Do the port command */
 	writel(selftest_cmd, &bdp->scb->scb_port);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 
 	/* Wait at least 10 milliseconds for the self-test to complete */
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -2434,8 +2439,6 @@ e100_selftest(struct e100_private *bdp, u32 *st_timeout, u32 *st_result)
 
 	/* disable interrupts since the're now enabled */
 	e100_dis_intr(bdp);
-
-	rmb();
 
 	/* if The First Self Test DWORD Still Zero, We've timed out. If the
 	 * second DWORD is not zero then we have an error. */
@@ -2803,6 +2806,7 @@ e100_sw_reset(struct e100_private *bdp, u32 reset_cmd)
 {
 	/* Do  a selective reset first to avoid a potential PCI hang */
 	writel(PORT_SELECTIVE_RESET, &bdp->scb->scb_port);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 
 	/* wait for the reset to take effect */
 	udelay(20);
