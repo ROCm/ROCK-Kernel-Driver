@@ -17,11 +17,16 @@ iocharset=name	Character set to use for converting from Unicode to
 		translations.  This requires CONFIG_NLS_UTF8 to be set
 		in the kernel .config file.
 
+resize=value	Resize the volume to <value> blocks.  JFS only supports
+		growing a volume, not shrinking it.  This option is only
+		valid during a remount, when the volume is mounted
+		read-write.  The resize keyword with no value will grow
+		the volume to the full size of the partition.
+
 JFS TODO list:
 
 Plans for our near term development items
 
-   - implement online resize for extending JFS volumes
    - enhance support for logfile on dedicated partition
    - get access control list functionality operational
    - get extended attributes functionality operational

@@ -172,8 +172,6 @@ static int lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd,
 
 static int lmNextPage(log_t * log);
 static int lmLogFileSystem(log_t * log, char *uuid, int activate);
-static int lmLogInit(log_t * log);
-static int lmLogShutdown(log_t * log);
 
 static int lbmLogInit(log_t * log);
 static void lbmLogShutdown(log_t * log);
@@ -1037,7 +1035,7 @@ int lmLogSync(log_t * log, int nosyncwait)
 	 * by setting syncbarrier flag.
 	 */
 	if (written > LOGSYNC_BARRIER(logsize) && logsize > 32 * LOGPSIZE) {
-		log->syncbarrier = 1;
+		set_bit(log_SYNCBARRIER, &log->flag);
 		jFYI(1, ("log barrier on: lsn=0x%x syncpt=0x%x\n", lsn,
 			 log->syncpt));
 	}
@@ -1068,6 +1066,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	if (!(log = kmalloc(sizeof(log_t), GFP_KERNEL)))
 		return ENOMEM;
 	memset(log, 0, sizeof(log_t));
+	init_waitqueue_head(&log->syncwait);
 
 	log->sb = sb;		/* This should be a list */
 
@@ -1080,7 +1079,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * file system to log have 1-to-1 relationship;
 	 */
 
-	log->flag = JFS_INLINELOG;
+	set_bit(log_INLINELOG, &log->flag);
 	log->bdev = sb->s_bdev;
 	log->base = addressPXD(&JFS_SBI(sb)->logpxd);
 	log->size = lengthPXD(&JFS_SBI(sb)->logpxd) >>
@@ -1175,7 +1174,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
  *			
  * serialization: single first open thread
  */
-static int lmLogInit(log_t * log)
+int lmLogInit(log_t * log)
 {
 	int rc = 0;
 	lrd_t lrd;
@@ -1203,7 +1202,7 @@ static int lmLogInit(log_t * log)
 	 */
 
 
-	if (!(log->flag & JFS_INLINELOG))
+	if (!test_bit(log_INLINELOG, &log->flag))
 		log->l2bsize = 12;	/* XXX kludge alert XXX */
 	if ((rc = lbmRead(log, 1, &bpsuper)))
 		goto errout10;
@@ -1224,7 +1223,7 @@ static int lmLogInit(log_t * log)
 	}
 
 	/* initialize log inode from log superblock */
-	if (log->flag & JFS_INLINELOG) {
+	if (test_bit(log_INLINELOG,&log->flag)) {
 		if (log->size != le32_to_cpu(logsuper->size)) {
 			rc = EINVAL;
 			goto errout20;
@@ -1244,10 +1243,6 @@ static int lmLogInit(log_t * log)
 		      log, (unsigned long long) log->base, log->size));
 	}
 
-	log->flag |= JFS_GROUPCOMMIT;
-/*
-	log->flag |= JFS_LAZYCOMMIT;
-*/
 	log->page = le32_to_cpu(logsuper->end) / LOGPSIZE;
 	log->eor = le32_to_cpu(logsuper->end) - (LOGPSIZE * log->page);
 
@@ -1309,7 +1304,6 @@ static int lmLogInit(log_t * log)
 	log->syncpt = lsn;
 	log->sync = log->syncpt;
 	log->nextsync = LOGSYNC_DELTA(log->logsize);
-	init_waitqueue_head(&log->syncwait);
 
 	jFYI(1, ("lmLogInit: lsn:0x%x syncpt:0x%x sync:0x%x\n",
 		 log->lsn, log->syncpt, log->sync));
@@ -1377,7 +1371,7 @@ int lmLogClose(struct super_block *sb, log_t * log)
 
 	jFYI(1, ("lmLogClose: log:0x%p\n", log));
 
-	if (!(log->flag & JFS_INLINELOG))
+	if (!test_bit(log_INLINELOG, &log->flag))
 		goto externalLog;
 	
 	/*
@@ -1445,7 +1439,7 @@ void lmLogWait(log_t *log)
  *			
  * serialization: single last close thread
  */
-static int lmLogShutdown(log_t * log)
+int lmLogShutdown(log_t * log)
 {
 	int rc;
 	lrd_t lrd;
@@ -1524,8 +1518,6 @@ static int lmLogShutdown(log_t * log)
  *
  * RETURN:	0	- success
  *		errors returned by vms_iowait().
- *			
- * serialization: IWRITE_LOCK(log inode) held on entry/exit
  */
 static int lmLogFileSystem(log_t * log, char *uuid, int activate)
 {
@@ -1577,37 +1569,6 @@ static int lmLogFileSystem(log_t * log, char *uuid, int activate)
 
 	return rc;
 }
-
-
-/*
- *	lmLogQuiesce()
- */
-int lmLogQuiesce(log_t * log)
-{
-	int rc;
-
-	rc = lmLogShutdown(log);
-
-	return rc;
-}
-
-
-/*
- *	lmLogResume()
- */
-int lmLogResume(log_t * log, struct super_block *sb)
-{
-	struct jfs_sb_info *sbi = JFS_SBI(sb);
-	int rc;
-
-	log->base = addressPXD(&sbi->logpxd);
-	log->size =
-	    (lengthPXD(&sbi->logpxd) << sb->s_blocksize_bits) >> L2LOGPSIZE;
-	rc = lmLogInit(log);
-
-	return rc;
-}
-
 
 /*
  *		log buffer manager (lbm)
@@ -2192,42 +2153,40 @@ int jfsIOWait(void *arg)
 	return 0;
 }
 
-
-#ifdef _STILL_TO_PORT
 /*
  * NAME:	lmLogFormat()/jfs_logform()
  *
- * FUNCTION:	format file system log (ref. jfs_logform()).
+ * FUNCTION:	format file system log
  *
  * PARAMETERS:
- *	log	- log inode (with common mount inode base);
- *	logAddress - start address of log space in FS block;
+ *      log	- volume log
+ *	logAddress - start address of log space in FS block
  *	logSize	- length of log space in FS block;
  *
- * RETURN:	0 -	success
- *		-1 -	i/o error
+ * RETURN:	0	- success
+ *		-EIO	- i/o error
+ *
+ * XXX: We're synchronously writing one page at a time.  This needs to
+ *	be improved by writing multiple pages at once.
  */
-int lmLogFormat(inode_t * ipmnt, s64 logAddress, int logSize)
+int lmLogFormat(log_t *log, s64 logAddress, int logSize)
 {
-	int rc = 0;
-	cbuf_t *bp;
+	int rc = -EIO;
+	struct jfs_sb_info *sbi = JFS_SBI(log->sb);
 	logsuper_t *logsuper;
 	logpage_t *lp;
 	int lspn;		/* log sequence page number */
 	struct lrd *lrd_ptr;
-	int npbperpage, npages;
+	int npages = 0;
+	lbuf_t *bp;
 
 	jFYI(0, ("lmLogFormat: logAddress:%Ld logSize:%d\n",
-		 logAddress, logSize));
+		 (long long)logAddress, logSize));
 
-	/* allocate a JFS buffer */
-	bp = rawAllocate();
+	/* allocate a log buffer */
+	bp = lbmAllocate(log, 1);
 
-	/* map the logical block address to physical block address */
-	bp->cm_blkno = logAddress << ipmnt->i_l2bfactor;
-
-	npbperpage = LOGPSIZE >> ipmnt->i_l2pbsize;
-	npages = logSize / (LOGPSIZE >> ipmnt->i_l2bsize);
+	npages = logSize >> sbi->l2nbperpage;
 
 	/*
 	 *      log space:
@@ -2241,20 +2200,22 @@ int lmLogFormat(inode_t * ipmnt, s64 logAddress, int logSize)
 	/*
 	 *      init log superblock: log page 1
 	 */
-	logsuper = (logsuper_t *) bp->cm_cdata;
+	logsuper = (logsuper_t *) bp->l_ldata;
 
 	logsuper->magic = cpu_to_le32(LOGMAGIC);
 	logsuper->version = cpu_to_le32(LOGVERSION);
 	logsuper->state = cpu_to_le32(LOGREDONE);
-	logsuper->flag = cpu_to_le32(ipmnt->i_mntflag);	/* ? */
+	logsuper->flag = cpu_to_le32(sbi->mntflag);	/* ? */
 	logsuper->size = cpu_to_le32(npages);
-	logsuper->bsize = cpu_to_le32(ipmnt->i_bsize);
-	logsuper->l2bsize = cpu_to_le32(ipmnt->i_l2bsize);
-	logsuper->end =
-	    cpu_to_le32(2 * LOGPSIZE + LOGPHDRSIZE + LOGRDSIZE);
+	logsuper->bsize = cpu_to_le32(sbi->bsize);
+	logsuper->l2bsize = cpu_to_le32(sbi->l2bsize);
+	logsuper->end = cpu_to_le32(2 * LOGPSIZE + LOGPHDRSIZE + LOGRDSIZE);
 
-	bp->cm_blkno += npbperpage;
-	rawWrite(ipmnt, bp, 0);
+	bp->l_flag = lbmWRITE | lbmSYNC | lbmDIRECT;
+	bp->l_blkno = logAddress + sbi->nbperpage;
+	lbmStartIO(bp);
+	if ((rc = lbmIOWait(bp, 0)))
+		goto exit;
 
 	/*
 	 *      init pages 2 to npages-1 as log data pages:
@@ -2270,7 +2231,6 @@ int lmLogFormat(inode_t * ipmnt, s64 logAddress, int logSize)
 	 * a circular file for the log records;
 	 * lpsn grows by 1 monotonically as each log page is written
 	 * to the circular file of the log;
-	 * Since the AIX DUMMY log record is dropped for this XJFS,
 	 * and setLogpage() will not reset the page number even if
 	 * the eor is equal to LOGPHDRSIZE. In order for binary search
 	 * still work in find log end process, we have to simulate the
@@ -2279,8 +2239,7 @@ int lmLogFormat(inode_t * ipmnt, s64 logAddress, int logSize)
 	 * the succeeding log pages will have ascending order of
 	 * the lspn starting from 0, ... (N-2)
 	 */
-	lp = (logpage_t *) bp->cm_cdata;
-
+	lp = (logpage_t *) bp->l_ldata;
 	/*
 	 * initialize 1st log page to be written: lpsn = N - 1,
 	 * write a SYNCPT log record is written to this page
@@ -2295,8 +2254,11 @@ int lmLogFormat(inode_t * ipmnt, s64 logAddress, int logSize)
 	lrd_ptr->length = 0;
 	lrd_ptr->log.syncpt.sync = 0;
 
-	bp->cm_blkno += npbperpage;
-	rawWrite(ipmnt, bp, 0);
+	bp->l_blkno += sbi->nbperpage;
+	bp->l_flag = lbmWRITE | lbmSYNC | lbmDIRECT;
+	lbmStartIO(bp);
+	if ((rc = lbmIOWait(bp, 0)))
+		goto exit;
 
 	/*
 	 *      initialize succeeding log pages: lpsn = 0, 1, ..., (N-2)
@@ -2305,20 +2267,23 @@ int lmLogFormat(inode_t * ipmnt, s64 logAddress, int logSize)
 		lp->h.page = lp->t.page = cpu_to_le32(lspn);
 		lp->h.eor = lp->t.eor = cpu_to_le16(LOGPHDRSIZE);
 
-		bp->cm_blkno += npbperpage;
-		rawWrite(ipmnt, bp, 0);
+		bp->l_blkno += sbi->nbperpage;
+		bp->l_flag = lbmWRITE | lbmSYNC | lbmDIRECT;
+		lbmStartIO(bp);
+		if ((rc = lbmIOWait(bp, 0)))
+			goto exit;
 	}
 
+	rc = 0;
+exit:
 	/*
 	 *      finalize log
 	 */
 	/* release the buffer */
-	rawRelease(bp);
+	lbmFree(bp);
 
 	return rc;
 }
-#endif				/* _STILL_TO_PORT */
-
 
 #ifdef CONFIG_JFS_STATISTICS
 int jfs_lmstats_read(char *buffer, char **start, off_t offset, int length,
