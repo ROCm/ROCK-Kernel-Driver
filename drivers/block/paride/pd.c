@@ -309,7 +309,6 @@ static char pd_scratch[512];	/* scratch block buffer */
 
 static struct pd_unit *pd_current; /* current request's drive */
 static int pd_retries = 0;	/* i/o error retry count */
-static int pd_busy = 0;		/* request being processed ? */
 static struct request *pd_req;	/* current request */
 static int pd_block;		/* address of next requested block */
 static int pd_count;		/* number of blocks still to do */
@@ -763,13 +762,11 @@ repeat:
 	pd_buf = pd_req->buffer;
 	pd_retries = 0;
 
-	pd_busy = 1;
 	if (pd_cmd == READ)
 		pi_do_claimed(pd_current->pi, do_pd_read);
 	else if (pd_cmd == WRITE)
 		pi_do_claimed(pd_current->pi, do_pd_write);
 	else {
-		pd_busy = 0;
 		end_request(pd_req, 0);
 		goto repeat;
 	}
@@ -777,7 +774,7 @@ repeat:
 
 static void do_pd_request(request_queue_t * q)
 {
-	if (pd_busy)
+	if (pd_req)
 		return;
 	do_pd_request1(q);
 }
@@ -808,7 +805,6 @@ static inline void next_request(int success)
 
 	spin_lock_irqsave(&pd_lock, saved_flags);
 	end_request(pd_req, success);
-	pd_busy = 0;
 	do_pd_request1(pd_queue);
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 }
