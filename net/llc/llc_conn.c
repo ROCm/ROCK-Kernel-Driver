@@ -71,6 +71,12 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+	/*
+	 * We have to hold the skb, because llc_conn_service will kfree it in
+	 * the sending path and we need to look at the skb->cb, where we encode
+	 * llc_conn_state_ev.
+	 */
+	skb_get(skb);
 	ev->ind_prim = ev->cfm_prim = 0;
 	rc = llc_conn_service(sk, skb); /* sending event to state machine */
 	if (rc) {
@@ -81,10 +87,10 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	if (!ev->ind_prim && !ev->cfm_prim) {   /* indicate or confirm not required */
 		if (!skb->list)
 			goto out_kfree_skb;
-		goto out;
+		goto out_skb_put;
 	}
 
-	if (ev->ind_prim && ev->cfm_prim)
+	if (ev->ind_prim && ev->cfm_prim) /* Paranoia */
 		skb_get(skb);
 
 	switch (ev->ind_prim) {
@@ -180,11 +186,12 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 					__FUNCTION__, ev->cfm_prim);
 			break;
 		}
-		goto out; /* No confirmation */
+		goto out_skb_put; /* No confirmation */
 	}
 out_kfree_skb:
 	kfree_skb(skb);
-out:
+out_skb_put:
+	kfree_skb(skb);
 	return rc;
 }
 
@@ -226,25 +233,29 @@ void llc_conn_resend_i_pdu_as_cmd(struct sock *sk, u8 nr, u8 first_p_bit)
 	struct sk_buff *skb;
 	struct llc_pdu_sn *pdu;
 	u16 nbr_unack_pdus;
+	struct llc_opt *llc;
 	u8 howmany_resend = 0;
 
 	llc_conn_remove_acked_pdus(sk, nr, &nbr_unack_pdus);
 	if (!nbr_unack_pdus)
 		goto out;
-	/* process unack PDUs only if unack queue is not empty; remove
+	/*
+	 * Process unack PDUs only if unack queue is not empty; remove
 	 * appropriate PDUs, fix them up, and put them on mac_pdu_q.
 	 */
-	while ((skb = skb_dequeue(&llc_sk(sk)->pdu_unack_q)) != NULL) {
-		pdu = (struct llc_pdu_sn *)skb->nh.raw;
+	llc = llc_sk(sk);
+
+	while ((skb = skb_dequeue(&llc->pdu_unack_q)) != NULL) {
+		pdu = llc_pdu_sn_hdr(skb);
 		llc_pdu_set_cmd_rsp(skb, LLC_PDU_CMD);
 		llc_pdu_set_pf_bit(skb, first_p_bit);
 		skb_queue_tail(&sk->write_queue, skb);
 		first_p_bit = 0;
-		llc_sk(sk)->vS = LLC_I_GET_NS(pdu);
+		llc->vS = LLC_I_GET_NS(pdu);
 		howmany_resend++;
 	}
 	if (howmany_resend > 0)
-		llc_sk(sk)->vS = (llc_sk(sk)->vS + 1) % LLC_2_SEQ_NBR_MODULO;
+		llc->vS = (llc->vS + 1) % LLC_2_SEQ_NBR_MODULO;
 	/* any PDUs to re-send are queued up; start sending to MAC */
 	llc_conn_send_pdus(sk);
 out:;
@@ -263,27 +274,29 @@ out:;
 void llc_conn_resend_i_pdu_as_rsp(struct sock *sk, u8 nr, u8 first_f_bit)
 {
 	struct sk_buff *skb;
-	struct llc_pdu_sn *pdu;
 	u16 nbr_unack_pdus;
+	struct llc_opt *llc = llc_sk(sk);
 	u8 howmany_resend = 0;
 
 	llc_conn_remove_acked_pdus(sk, nr, &nbr_unack_pdus);
 	if (!nbr_unack_pdus)
 		goto out;
-	/* process unack PDUs only if unack queue is not empty; remove
+	/*
+	 * Process unack PDUs only if unack queue is not empty; remove
 	 * appropriate PDUs, fix them up, and put them on mac_pdu_q
 	 */
-	while ((skb = skb_dequeue(&llc_sk(sk)->pdu_unack_q)) != NULL) {
-		pdu = (struct llc_pdu_sn *)skb->nh.raw;
+	while ((skb = skb_dequeue(&llc->pdu_unack_q)) != NULL) {
+		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
+
 		llc_pdu_set_cmd_rsp(skb, LLC_PDU_RSP);
 		llc_pdu_set_pf_bit(skb, first_f_bit);
 		skb_queue_tail(&sk->write_queue, skb);
 		first_f_bit = 0;
-		llc_sk(sk)->vS = LLC_I_GET_NS(pdu);
+		llc->vS = LLC_I_GET_NS(pdu);
 		howmany_resend++;
 	}
 	if (howmany_resend > 0)
-		llc_sk(sk)->vS = (llc_sk(sk)->vS + 1) % LLC_2_SEQ_NBR_MODULO;
+		llc->vS = (llc->vS + 1) % LLC_2_SEQ_NBR_MODULO;
 	/* any PDUs to re-send are queued up; start sending to MAC */
 	llc_conn_send_pdus(sk);
 out:;
@@ -304,25 +317,26 @@ int llc_conn_remove_acked_pdus(struct sock *sk, u8 nr, u16 *how_many_unacked)
 	struct sk_buff *skb;
 	struct llc_pdu_sn *pdu;
 	int nbr_acked = 0;
-	int q_len = skb_queue_len(&llc_sk(sk)->pdu_unack_q);
+	struct llc_opt *llc = llc_sk(sk);
+	int q_len = skb_queue_len(&llc->pdu_unack_q);
 
 	if (!q_len)
 		goto out;
-	skb = skb_peek(&llc_sk(sk)->pdu_unack_q);
-	pdu = (struct llc_pdu_sn *)skb->nh.raw;
+	skb = skb_peek(&llc->pdu_unack_q);
+	pdu = llc_pdu_sn_hdr(skb);
 
 	/* finding position of last acked pdu in queue */
 	pdu_pos = ((int)LLC_2_SEQ_NBR_MODULO + (int)nr -
 			(int)LLC_I_GET_NS(pdu)) % LLC_2_SEQ_NBR_MODULO;
 
 	for (i = 0; i < pdu_pos && i < q_len; i++) {
-		skb = skb_dequeue(&llc_sk(sk)->pdu_unack_q);
+		skb = skb_dequeue(&llc->pdu_unack_q);
 		if (skb)
 			kfree_skb(skb);
 		nbr_acked++;
 	}
 out:
-	*how_many_unacked = skb_queue_len(&llc_sk(sk)->pdu_unack_q);
+	*how_many_unacked = skb_queue_len(&llc->pdu_unack_q);
 	return nbr_acked;
 }
 
@@ -337,7 +351,7 @@ static void llc_conn_send_pdus(struct sock *sk)
 	struct sk_buff *skb;
 
 	while ((skb = skb_dequeue(&sk->write_queue)) != NULL) {
-		struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
+		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
 		if (!LLC_PDU_TYPE_IS_I(pdu) &&
 		    !(skb->dev->flags & IFF_LOOPBACK)) {
