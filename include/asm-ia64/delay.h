@@ -74,7 +74,7 @@ __delay (unsigned long loops)
 		return;
 
 	while (loops--)
-		ia64_nop(0);
+		barrier();
 }
 
 static __inline__ void
