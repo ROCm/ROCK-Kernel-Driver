@@ -594,7 +594,6 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
-extern unsigned long get_page_cache_size(void);
 extern unsigned int nr_used_zone_pages(void);
 
 #ifdef CONFIG_MMU

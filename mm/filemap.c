@@ -88,7 +88,7 @@ void __remove_from_page_cache(struct page *page)
 	page->mapping = NULL;
 
 	mapping->nrpages--;
-	dec_page_state(nr_pagecache);
+	pagecache_acct(-1);
 }
 
 void remove_from_page_cache(struct page *page)
