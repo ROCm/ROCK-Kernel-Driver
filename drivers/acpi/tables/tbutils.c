@@ -133,7 +133,7 @@ acpi_tb_validate_table_header (
 
 	/* Ensure that the signature is 4 ASCII characters */
 
-	ACPI_MOVE_UNALIGNED32_TO_32 (&signature, table_header->signature);
+	ACPI_MOVE_32_TO_32 (&signature, table_header->signature);
 	if (!acpi_ut_valid_acpi_name (signature)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Table signature at %p [%p] has invalid characters\n",

@@ -181,7 +181,15 @@ struct smart_battery_description_table
 	u32                             critical_level;
 };
 
-
+struct hpet_description_table
+{
+	struct acpi_table_header        header;
+	u32                             hardware_id;
+	u32                             base_address[3];
+	u8                              hpet_number;
+	u16                             clock_tick;
+	u8                              attributes;
+};
 #pragma pack()
 
 

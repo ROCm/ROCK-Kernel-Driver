@@ -98,7 +98,7 @@ acpi_ns_build_external_path (
 
 		/* Put the name into the buffer */
 
-		ACPI_MOVE_UNALIGNED32_TO_32 ((name_buffer + index), &parent_node->name);
+		ACPI_MOVE_32_TO_32 ((name_buffer + index), &parent_node->name);
 		parent_node = acpi_ns_get_parent_node (parent_node);
 
 		/* Prefix name with the path separator */
