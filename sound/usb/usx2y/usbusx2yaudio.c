@@ -126,7 +126,7 @@ static int usX2Y_urb_capt_retire(snd_usX2Y_substream_t *subs)
  * a temporary buffer and urb points to that.
  */
 static int usX2Y_urb_play_prepare(snd_usX2Y_substream_t *subs,
-				  struct usb_iso_packet_descriptor *packet,
+				  struct urb *cap_urb,
 				  struct urb *urb)
 {
 	int count, counts, pack;
@@ -136,7 +136,8 @@ static int usX2Y_urb_play_prepare(snd_usX2Y_substream_t *subs,
 	count = 0;
 	for (pack = 0; pack < NRPACKS; pack++) {
 		/* calculate the size of a packet */
-		count += (counts = packet[pack].actual_length / usX2Y->stride);
+		counts = cap_urb->iso_frame_desc[pack].actual_length / usX2Y->stride;
+		count += counts;
 		if (counts < 43 || counts > 50) {
 			snd_printk("should not be here with counts=%i\n", counts);
 			return -EPIPE;
@@ -254,7 +255,7 @@ static inline void usX2Y_usbframe_complete(snd_usX2Y_substream_t *capsubs, snd_u
 			if (NULL == urb)
 				urb = playbacksubs->urb[playbacksubs->next_urb_complete + 1];
 			if (urb && 0 == usX2Y_urb_play_prepare(playbacksubs,
-							       capsubs->completed_urb->iso_frame_desc,
+							       capsubs->completed_urb,
 							       urb)) {
 				if (usX2Y_urb_submit(playbacksubs, urb, frame) < 0)
 					return;
