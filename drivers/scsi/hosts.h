@@ -605,8 +605,8 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
 	list_for_each_entry (sdev, &shost->my_devices, siblings)
                 if (sdev->channel == channel && sdev->id == pun
                    && sdev->lun ==lun)
-                        break;
-        return sdev;
+                        return sdev;
+        return NULL;
 }
 
 /*
