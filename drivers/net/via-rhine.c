@@ -748,6 +748,8 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	}
 #endif /* USE_MMIO */
 	dev->base_addr = ioaddr;
+	rp = netdev_priv(dev);
+	rp->quirks = quirks;
 
 	rhine_power_init(dev);
 
@@ -792,10 +794,8 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 
 	dev->irq = pdev->irq;
 
-	rp = netdev_priv(dev);
 	spin_lock_init(&rp->lock);
 	rp->pdev = pdev;
-	rp->quirks = quirks;
 	rp->mii_if.dev = dev;
 	rp->mii_if.mdio_read = mdio_read;
 	rp->mii_if.mdio_write = mdio_write;

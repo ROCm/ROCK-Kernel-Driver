@@ -522,8 +522,6 @@ cheetah_tlb_fixup:
 	/* Patch copy/page operations to cheetah optimized versions. */
 	call	cheetah_patch_copyops
 	 nop
-	call	cheetah_patch_pgcopyops
-	 nop
 	call	cheetah_patch_cachetlbops
 	 nop
 

@@ -214,25 +214,25 @@ static inline int scsi_status_is_good(int status)
  */
 
 struct ccs_modesel_head {
-	u8 _r1;			/* reserved */
-	u8 medium;		/* device-specific medium type */
-	u8 _r2;			/* reserved */
-	u8 block_desc_length;	/* block descriptor length */
-	u8 density;		/* device-specific density code */
-	u8 number_blocks_hi;	/* number of blocks in this block desc */
-	u8 number_blocks_med;
-	u8 number_blocks_lo;
-	u8 _r3;
-	u8 block_length_hi;	/* block length for blocks in this desc */
-	u8 block_length_med;
-	u8 block_length_lo;
+	__u8 _r1;			/* reserved */
+	__u8 medium;		/* device-specific medium type */
+	__u8 _r2;			/* reserved */
+	__u8 block_desc_length;	/* block descriptor length */
+	__u8 density;		/* device-specific density code */
+	__u8 number_blocks_hi;	/* number of blocks in this block desc */
+	__u8 number_blocks_med;
+	__u8 number_blocks_lo;
+	__u8 _r3;
+	__u8 block_length_hi;	/* block length for blocks in this desc */
+	__u8 block_length_med;
+	__u8 block_length_lo;
 };
 
 /*
  * ScsiLun: 8 byte LUN.
  */
 struct scsi_lun {
-	u8 scsi_lun[8];
+	__u8 scsi_lun[8];
 };
 
 /*

@@ -37,8 +37,6 @@
 #include <asm/spitfire.h>
 #include <asm/sections.h>
 
-DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
-
 extern void device_scan(void);
 
 struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
@@ -250,87 +248,6 @@ void flush_dcache_page(struct page *page)
 
 out:
 	put_cpu();
-}
-
-/* When shared+writable mmaps of files go away, we lose all dirty
- * page state, so we have to deal with D-cache aliasing here.
- *
- * This code relies on the fact that flush_cache_range() is always
- * called for an area composed by a single VMA.  It also assumes that
- * the MM's page_table_lock is held.
- */
-static inline void flush_cache_pte_range(struct mm_struct *mm, pmd_t *pmd, unsigned long address, unsigned long size)
-{
-	unsigned long offset;
-	pte_t *ptep;
-
-	if (pmd_none(*pmd))
-		return;
-	ptep = pte_offset_map(pmd, address);
-	offset = address & ~PMD_MASK;
-	if (offset + size > PMD_SIZE)
-		size = PMD_SIZE - offset;
-	size &= PAGE_MASK;
-	for (offset = 0; offset < size; ptep++, offset += PAGE_SIZE) {
-		pte_t pte = *ptep;
-
-		if (pte_none(pte))
-			continue;
-
-		if (pte_present(pte) && pte_dirty(pte)) {
-			struct page *page;
-			unsigned long pgaddr, uaddr;
-			unsigned long pfn = pte_pfn(pte);
-
-			if (!pfn_valid(pfn))
-				continue;
-			page = pfn_to_page(pfn);
-			if (PageReserved(page) || !page_mapping(page))
-				continue;
-			pgaddr = (unsigned long) page_address(page);
-			uaddr = address + offset;
-			if ((pgaddr ^ uaddr) & (1 << 13))
-				flush_dcache_page_all(mm, page);
-		}
-	}
-	pte_unmap(ptep - 1);
-}
-
-static inline void flush_cache_pmd_range(struct mm_struct *mm, pgd_t *dir, unsigned long address, unsigned long size)
-{
-	pmd_t *pmd;
-	unsigned long end;
-
-	if (pgd_none(*dir))
-		return;
-	pmd = pmd_offset(dir, address);
-	end = address + size;
-	if (end > ((address + PGDIR_SIZE) & PGDIR_MASK))
-		end = ((address + PGDIR_SIZE) & PGDIR_MASK);
-	do {
-		flush_cache_pte_range(mm, pmd, address, end - address);
-		address = (address + PMD_SIZE) & PMD_MASK;
-		pmd++;
-	} while (address < end);
-}
-
-void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
-{
-	struct mm_struct *mm = vma->vm_mm;
-	pgd_t *dir = pgd_offset(mm, start);
-
-	if (mm == current->mm)
-		flushw_user();
-
-	if (vma->vm_file == NULL ||
-	    ((vma->vm_flags & (VM_SHARED|VM_WRITE)) != (VM_SHARED|VM_WRITE)))
-		return;
-
-	do {
-		flush_cache_pmd_range(mm, dir, start, end - start);
-		start = (start + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (start && (start < end));
 }
 
 void flush_icache_range(unsigned long start, unsigned long end)
@@ -1173,7 +1090,7 @@ struct pgtable_cache_struct pgt_quicklists;
 #else
 #define DC_ALIAS_SHIFT	0
 #endif
-pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+pte_t *__pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	struct page *page;
 	unsigned long color;

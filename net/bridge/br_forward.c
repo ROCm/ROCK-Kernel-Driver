@@ -23,7 +23,6 @@ static inline int should_deliver(const struct net_bridge_port *p,
 				 const struct sk_buff *skb)
 {
 	if (skb->dev == p->dev ||
-	    skb->len > p->dev->mtu ||
 	    p->state != BR_STATE_FORWARDING)
 		return 0;
 
@@ -32,13 +31,17 @@ static inline int should_deliver(const struct net_bridge_port *p,
 
 int br_dev_queue_push_xmit(struct sk_buff *skb)
 {
+	if (skb->len > skb->dev->mtu) 
+		kfree_skb(skb);
+	else {
 #ifdef CONFIG_BRIDGE_NETFILTER
-	/* ip_refrag calls ip_fragment, which doesn't copy the MAC header. */
-	nf_bridge_maybe_copy_header(skb);
+		/* ip_refrag calls ip_fragment, doesn't copy the MAC header. */
+		nf_bridge_maybe_copy_header(skb);
 #endif
-	skb_push(skb, ETH_HLEN);
+		skb_push(skb, ETH_HLEN);
 
-	dev_queue_xmit(skb);
+		dev_queue_xmit(skb);
+	}
 
 	return 0;
 }

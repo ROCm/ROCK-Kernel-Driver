@@ -45,24 +45,24 @@
 U3memcpy:	/* %o0=dst, %o1=src, %o2=len */
 	mov		%o0, %g5
 	cmp		%o2, 0
-	be,pn		%XCC, out
+	be,pn		%XCC, 85f
 	 or		%o0, %o1, %o3
 	cmp		%o2, 16
-	bleu,a,pn	%XCC, small_copy
+	bleu,a,pn	%XCC, 70f
 	 or		%o3, %o2, %o3
 
 	cmp		%o2, 256
-	blu,pt		%XCC, medium_copy
+	blu,pt		%XCC, 80f
 	 andcc		%o3, 0x7, %g0
 
-	ba,pt		%xcc, enter
+	ba,pt		%xcc, 1f
 	 andcc		%o0, 0x3f, %g2
 
 	/* Here len >= 256 and condition codes reflect execution
 	 * of "andcc %o0, 0x7, %g2", done by caller.
 	 */
 	.align		64
-enter:
+1:
 	/* Is 'dst' already aligned on an 64-byte boundary? */
 	be,pt		%XCC, 2f
 
@@ -85,21 +85,12 @@ enter:
 
 2:	VISEntryHalf
 	and		%o1, 0x7, %g1
-	ba,pt		%xcc, begin
+	ba,pt		%xcc, 1f
 	 alignaddr	%o1, %g0, %o1
 
 	.align		64
-begin:
-#ifdef __KERNEL__
-	.globl		U3memcpy_nop_1_6
-U3memcpy_nop_1_6:
-	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g3
-	sethi		%uhi(DCU_PE), %o3
-	sllx		%o3, 32, %o3
-	or		%g3, %o3, %o3
-	stxa		%o3, [%g0] ASI_DCU_CONTROL_REG	! Enable P-cache
-	membar		#Sync
-#endif
+1:
+	membar		#StoreLoad | #StoreStore | #LoadStore
 	prefetch	[%o1 + 0x000], #one_read
 	prefetch	[%o1 + 0x040], #one_read
 	andn		%o2, (0x40 - 1), %o4
@@ -127,11 +118,11 @@ U3memcpy_nop_1_6:
 
 	sub		%o4, 0x80, %o4
 	add		%o1, 0x40, %o1
-	ba,pt		%xcc, loop
+	ba,pt		%xcc, 1f
 	 srl		%o4, 6, %o3
 
 	.align		64
-loop:
+1:
 	ldd		[%o1 + 0x008], %f2
 	faligndata	%f12, %f14, %f28
 	ldd		[%o1 + 0x010], %f4
@@ -154,11 +145,10 @@ loop:
 	faligndata	%f10, %f12, %f26
 	subcc		%o3, 0x01, %o3
 	add		%o1, 0x40, %o1
-	bg,pt		%XCC, loop
+	bg,pt		%XCC, 1b
 	 add		%o0, 0x40, %o0
 
 	/* Finally we copy the last full 64-byte block. */
-loopfini:
 	ldd		[%o1 + 0x008], %f2
 	faligndata	%f12, %f14, %f28
 	ldd		[%o1 + 0x010], %f4
@@ -184,13 +174,6 @@ loopfini:
 	stda		%f16, [%o0] ASI_BLK_P
 	add		%o0, 0x40, %o0
 	add		%o1, 0x40, %o1
-#ifdef __KERNEL__
-	.globl		U3memcpy_nop_2_3
-U3memcpy_nop_2_3:
-	mov		PRIMARY_CONTEXT, %o3
-	stxa		%g0, [%o3] ASI_DMMU		! Flush P-cache
-	stxa		%g3, [%g0] ASI_DCU_CONTROL_REG	! Disable P-cache
-#endif
 	membar		#Sync
 
 	/* Now we copy the (len modulo 64) bytes at the end.
@@ -199,12 +182,11 @@ U3memcpy_nop_2_3:
 	 * Also notice how this code is careful not to perform a
 	 * load past the end of the src buffer.
 	 */
-loopend:
 	and		%o2, 0x3f, %o2
 	andcc		%o2, 0x38, %g2
-	be,pn		%XCC, endcruft
+	be,pn		%XCC, 2f
 	 subcc		%g2, 0x8, %g2
-	be,pn		%XCC, endcruft
+	be,pn		%XCC, 2f
 	 cmp		%g1, 0
 
 	be,a,pt		%XCC, 1f
@@ -216,7 +198,7 @@ loopend:
 	subcc		%g2, 0x8, %g2
 	faligndata	%f0, %f2, %f8
 	std		%f8, [%o0 + 0x00]
-	be,pn		%XCC, endcruft
+	be,pn		%XCC, 2f
 	 add		%o0, 0x8, %o0
 	ldd		[%o1 + 0x08], %f0
 	add		%o1, 0x8, %o1
@@ -231,15 +213,15 @@ loopend:
 	 * Note that %g1 is (src & 0x3) saved above before the
 	 * alignaddr was performed.
 	 */
-endcruft:
+2:
 	cmp		%o2, 0
 	add		%o1, %g1, %o1
 	VISExitHalf
-	be,pn		%XCC, out
+	be,pn		%XCC, 85f
 	 sub		%o0, %o1, %o3
 
 	andcc		%g1, 0x7, %g0
-	bne,pn		%icc, small_copy_unaligned
+	bne,pn		%icc, 90f
 	 andcc		%o2, 0x8, %g0
 	be,pt		%icc, 1f
 	 nop
@@ -262,17 +244,16 @@ endcruft:
 	add		%o1, 0x2, %o1
 
 1:	andcc		%o2, 0x1, %g0
-	be,pt		%icc, out
+	be,pt		%icc, 85f
 	 nop
 	ldub		[%o1], %o5
-	ba,pt		%xcc, out
+	ba,pt		%xcc, 85f
 	 stb		%o5, [%o1 + %o3]
 
-medium_copy: /* 16 < len <= 64 */
-	bne,pn		%XCC, small_copy_unaligned
+70: /* 16 < len <= 64 */
+	bne,pn		%XCC, 90f
 	 sub		%o0, %o1, %o3
 
-medium_copy_aligned:
 	andn		%o2, 0x7, %o4
 	and		%o2, 0x7, %o2
 1:	subcc		%o4, 0x8, %o4
@@ -288,32 +269,32 @@ medium_copy_aligned:
 	stw		%o5, [%o1 + %o3]
 	add		%o1, 0x4, %o1
 1:	cmp		%o2, 0
-	be,pt		%XCC, out
+	be,pt		%XCC, 85f
 	 nop
-	ba,pt		%xcc, small_copy_unaligned
+	ba,pt		%xcc, 90f
 	 nop
 
-small_copy: /* 0 < len <= 16 */
+80: /* 0 < len <= 16 */
 	andcc		%o3, 0x3, %g0
-	bne,pn		%XCC, small_copy_unaligned
+	bne,pn		%XCC, 90f
 	 sub		%o0, %o1, %o3
 
-small_copy_aligned:
+1:
 	subcc		%o2, 4, %o2
 	lduw		[%o1], %g1
 	stw		%g1, [%o1 + %o3]
-	bgu,pt		%XCC, small_copy_aligned
+	bgu,pt		%XCC, 1b
 	 add		%o1, 4, %o1
 
-out:	retl
+85:	retl
 	 mov		%g5, %o0
 
 	.align	32
-small_copy_unaligned:
+90:
 	subcc		%o2, 1, %o2
 	ldub		[%o1], %g1
 	stb		%g1, [%o1 + %o3]
-	bgu,pt		%XCC, small_copy_unaligned
+	bgu,pt		%XCC, 90b
 	 add		%o1, 1, %o1
 	retl
 	 mov		%g5, %o0

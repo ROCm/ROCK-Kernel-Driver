@@ -270,6 +270,16 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 
 EXPORT_SYMBOL(vfs_write);
 
+static inline loff_t file_pos_read(struct file *file)
+{
+	return file->f_pos;
+}
+
+static inline void file_pos_write(struct file *file, loff_t pos)
+{
+	file->f_pos = pos;
+}
+
 asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 {
 	struct file *file;
@@ -278,7 +288,9 @@ asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		ret = vfs_read(file, buf, count, &file->f_pos);
+		loff_t pos = file_pos_read(file);
+		ret = vfs_read(file, buf, count, &pos);
+		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
 	}
 
@@ -294,7 +306,9 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t co
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		ret = vfs_write(file, buf, count, &file->f_pos);
+		loff_t pos = file_pos_read(file);
+		ret = vfs_write(file, buf, count, &pos);
+		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
 	}
 
@@ -520,7 +534,9 @@ sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		ret = vfs_readv(file, vec, vlen, &file->f_pos);
+		loff_t pos = file_pos_read(file);
+		ret = vfs_readv(file, vec, vlen, &pos);
+		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
 	}
 
@@ -536,7 +552,9 @@ sys_writev(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		ret = vfs_writev(file, vec, vlen, &file->f_pos);
+		loff_t pos = file_pos_read(file);
+		ret = vfs_writev(file, vec, vlen, &pos);
+		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
 	}
 

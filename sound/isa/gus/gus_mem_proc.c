@@ -33,7 +33,8 @@ typedef struct gus_proc_private {
 } gus_proc_private_t;
 
 static long snd_gf1_mem_proc_dump(snd_info_entry_t *entry, void *file_private_data,
-			          struct file *file, char __user *buf, long count)
+			          struct file *file, char __user *buf,
+			          unsigned long count, unsigned long pos)
 {
 	long size;
 	gus_proc_private_t *priv = snd_magic_cast(gus_proc_private_t, entry->private_data, return -ENXIO);
@@ -41,12 +42,11 @@ static long snd_gf1_mem_proc_dump(snd_info_entry_t *entry, void *file_private_da
 	int err;
 
 	size = count;
-	if (file->f_pos + size > priv->size)
-		size = (long)priv->size - file->f_pos;
+	if (pos + size > priv->size)
+		size = (long)priv->size - pos;
 	if (size > 0) {
-		if ((err = snd_gus_dram_read(gus, buf, file->f_pos, size, priv->rom)) < 0)
+		if ((err = snd_gus_dram_read(gus, buf, pos, size, priv->rom)) < 0)
 			return err;
-		file->f_pos += size;
 		return size;
 	}
 	return 0;

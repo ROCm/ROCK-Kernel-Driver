@@ -175,6 +175,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 		current_thread_info()->kernel_cntd0 += (unsigned int)(__tmp);\
 		current_thread_info()->kernel_cntd1 += ((__tmp) >> 32);	\
 	}								\
+	flush_tlb_pending();						\
 	save_and_clear_fpu();						\
 	/* If you are tempted to conditionalize the following */	\
 	/* so that ASI is only written if it changes, think again. */	\

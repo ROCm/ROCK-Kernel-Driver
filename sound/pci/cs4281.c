@@ -1185,35 +1185,35 @@ static void snd_cs4281_proc_read(snd_info_entry_t *entry,
 }
 
 static long snd_cs4281_BA0_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char __user *buf, long count)
+				struct file *file, char __user *buf,
+				unsigned long count, unsigned long pos)
 {
 	long size;
 	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return -ENXIO);
 	
 	size = count;
-	if (file->f_pos + size > CS4281_BA0_SIZE)
-		size = (long)CS4281_BA0_SIZE - file->f_pos;
+	if (pos + size > CS4281_BA0_SIZE)
+		size = (long)CS4281_BA0_SIZE - pos;
 	if (size > 0) {
-		if (copy_to_user_fromio(buf, chip->ba0 + file->f_pos, size))
+		if (copy_to_user_fromio(buf, chip->ba0 + pos, size))
 			return -EFAULT;
-		file->f_pos += size;
 	}
 	return size;
 }
 
 static long snd_cs4281_BA1_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char __user *buf, long count)
+				struct file *file, char __user *buf,
+				unsigned long count, unsigned long pos)
 {
 	long size;
 	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return -ENXIO);
 	
 	size = count;
-	if (file->f_pos + size > CS4281_BA1_SIZE)
-		size = (long)CS4281_BA1_SIZE - file->f_pos;
+	if (pos + size > CS4281_BA1_SIZE)
+		size = (long)CS4281_BA1_SIZE - pos;
 	if (size > 0) {
-		if (copy_to_user_fromio(buf, chip->ba1 + file->f_pos, size))
+		if (copy_to_user_fromio(buf, chip->ba1 + pos, size))
 			return -EFAULT;
-		file->f_pos += size;
 	}
 	return size;
 }
