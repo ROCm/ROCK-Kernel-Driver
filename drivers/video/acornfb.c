@@ -1415,7 +1415,7 @@ acornfb_init(void)
 		fb_info.monspecs.vfmin, fb_info.monspecs.vfmax,
 		fb_info.monspecs.dpms ? ", DPMS" : "");
 
-	if (fb_set_var(&fb_info.var, &fb_info))
+	if (fb_set_var(&fb_info, &fb_info.var))
 		printk(KERN_ERR "Acornfb: unable to set display parameters\n");
 
 	if (register_framebuffer(&fb_info) < 0)
