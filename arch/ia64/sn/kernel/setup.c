@@ -287,6 +287,12 @@ sn_setup(char **cmdline_p)
 	 */
 	sn_cpu_init();
 
+	/*
+	 * Setup hubinfo stuff. Has to happen AFTER sn_cpu_init(),
+	 * because it uses the cnode to nasid tables.
+	 */
+	init_platform_hubinfo(nodepdaindr);
+
 #ifdef CONFIG_SMP
 	init_smp_config();
 #endif

@@ -184,13 +184,9 @@ typedef enum {
 typedef int             error_handler_f(void *, int, ioerror_mode_t, ioerror_t *);
 typedef void           *error_handler_arg_t;
 
-extern void             sn_ioerror_dump(char *, int, int, ioerror_t *);
-
 #ifdef	ERROR_DEBUG
-#define	IOERROR_DUMP(x, y, z, t)	sn_ioerror_dump((x), (y), (z), (t))
 #define	IOERR_PRINTF(x)	(x)
 #else
-#define	IOERROR_DUMP(x, y, z, t)
 #define	IOERR_PRINTF(x)
 #endif				/* ERROR_DEBUG */
 

@@ -29,7 +29,6 @@
 #define GRPRINTF(x)
 #endif
 
-extern char arg_maxnodes[];
 void mark_cpuvertex_as_cpu(vertex_hdl_t vhdl, cpuid_t cpuid);
 
 
@@ -159,7 +158,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
                                 printk(KERN_WARNING  "klhwg_add_xbow: Check for "
                                         "working routers and router links!");
 
-                        panic("klhwg_add_xbow: Failed to add "
+                        printk("klhwg_add_xbow: Failed to add "
                                 "edge: vertex 0x%p to vertex 0x%p,"
                                 "error %d\n",
                                 (void *)hubv, (void *)xbow_v, err);
@@ -346,7 +345,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 
 	/* We don't know what to do with multiple router components */
 	if (brd->brd_numcompts != 1) {
-		panic("klhwg_connect_one_router: %d cmpts on router\n",
+		printk("klhwg_connect_one_router: %d cmpts on router\n",
 			brd->brd_numcompts);
 		return;
 	}

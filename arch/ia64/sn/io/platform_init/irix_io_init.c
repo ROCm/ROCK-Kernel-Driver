@@ -26,6 +26,8 @@ extern vertex_hdl_t hwgraph_root;
 extern void io_module_init(void);
 extern int pci_bus_to_hcl_cvlink(void);
 
+nasid_t master_baseio_nasid;
+nasid_t master_nasid = INVALID_NASID;           /* This is the partition master nasid */
 
 /*
  * This routine is responsible for the setup of all the IRIX hwgraph style
