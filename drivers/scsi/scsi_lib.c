@@ -356,7 +356,6 @@ static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 	struct scsi_device *sdev, *sdev2;
 	struct Scsi_Host *shost;
 	unsigned long flags;
-	int all_clear;
 
 	ASSERT_LOCK(q->queue_lock, 0);
 
@@ -383,11 +382,6 @@ static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		__elv_add_request(q, cmd->request, 0, 0);
 	}
 
-	/*
-	 * Just hit the requeue function for the queue.
-	 */
-	__blk_run_queue(q);
-
 	sdev = q->queuedata;
 	shost = sdev->host;
 
@@ -412,31 +406,24 @@ static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		}
 	}
 
-	/*
-	 * Now see whether there are other devices on the bus which
-	 * might be starved.  If so, hit the request function.  If we
-	 * don't find any, then it is safe to reset the flag.  If we
-	 * find any device that it is starved, it isn't safe to reset the
-	 * flag as the queue function releases the lock and thus some
-	 * other device might have become starved along the way.
-	 */
-	all_clear = 1;
-	if (shost->some_device_starved) {
-		list_for_each_entry(sdev, &shost->my_devices, siblings) {
-			if (shost->can_queue > 0 &&
-			    shost->host_busy >= shost->can_queue)
-				break;
-			if (shost->host_blocked || shost->host_self_blocked)
-				break;
-			if (sdev->device_blocked || !sdev->starved)
-				continue;
-			__blk_run_queue(sdev->request_queue);
-			all_clear = 0;
-		}
-
-		if (sdev == NULL && all_clear)
-			shost->some_device_starved = 0;
+	while (!list_empty(&shost->starved_list) &&
+	       !shost->host_blocked && !shost->host_self_blocked &&
+		!((shost->can_queue > 0) &&
+		  (shost->host_busy >= shost->can_queue))) {
+		/*
+		 * As long as shost is accepting commands and we have
+		 * starved queues, call __blk_run_queue. scsi_request_fn
+		 * drops the queue_lock and can add us back to the
+		 * starved_list.
+		 */
+		sdev2 = list_entry(shost->starved_list.next,
+					  struct scsi_device, starved_entry);
+		list_del_init(&sdev2->starved_entry);
+		__blk_run_queue(sdev2->request_queue);
 	}
+
+	__blk_run_queue(q);
+
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
@@ -1115,23 +1102,16 @@ static void scsi_request_fn(request_queue_t *q)
 		 */
 		if (sdev->device_blocked)
 			break;
+
+		if (!list_empty(&sdev->starved_entry))
+			break;
+
 		if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
 		    shost->host_blocked || shost->host_self_blocked) {
-			/*
-			 * If we are unable to process any commands at all for
-			 * this device, then we consider it to be starved.
-			 * What this means is that there are no outstanding
-			 * commands for this device and hence we need a
-			 * little help getting it started again
-			 * once the host isn't quite so busy.
-			 */
-			if (sdev->device_busy == 0) {
-				sdev->starved = 1;
-				shost->some_device_starved = 1;
-			}
+			list_add_tail(&sdev->starved_entry,
+				      &shost->starved_list);
 			break;
-		} else
-			sdev->starved = 0;
+		}
 
 		/*
 		 * If we couldn't find a request that could be queued, then we

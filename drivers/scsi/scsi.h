@@ -555,6 +555,7 @@ struct scsi_device {
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
 	spinlock_t list_lock;
 	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
+	struct list_head starved_entry;
         Scsi_Cmnd *current_cmnd;	/* currently active command */
 	unsigned short queue_depth;	/* How deep of a queue we want */
 	unsigned short last_queue_full_depth; /* These two are used by */
@@ -615,8 +616,6 @@ struct scsi_device {
 					 * because we did a bus reset. */
 	unsigned ten:1;		/* support ten byte read / write */
 	unsigned remap:1;	/* support remapping  */
-	unsigned starved:1;	/* unable to process commands because
-				   host busy */
 //	unsigned sync:1;	/* Sync transfer state, managed by host */
 //	unsigned wide:1;	/* WIDE transfer state, managed by host */
 

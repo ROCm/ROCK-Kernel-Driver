@@ -400,6 +400,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	INIT_LIST_HEAD(&sdev->siblings);
 	INIT_LIST_HEAD(&sdev->same_target_siblings);
 	INIT_LIST_HEAD(&sdev->cmd_list);
+	INIT_LIST_HEAD(&sdev->starved_entry);
 	spin_lock_init(&sdev->list_lock);
 
 	/*

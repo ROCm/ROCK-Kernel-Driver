@@ -383,6 +383,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	scsi_assign_lock(shost, &shost->default_lock);
 	INIT_LIST_HEAD(&shost->my_devices);
 	INIT_LIST_HEAD(&shost->eh_cmd_q);
+	INIT_LIST_HEAD(&shost->starved_list);
 
 	init_waitqueue_head(&shost->host_wait);
 	shost->dma_channel = 0xff;
