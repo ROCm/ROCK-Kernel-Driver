@@ -414,14 +414,16 @@ static inline int locks_overlap(struct file_lock *fl1, struct file_lock *fl2)
 }
 
 /*
- * Check whether two locks have the same owner.  The apparently superfluous
- * check for fl_pid enables us to distinguish between locks set by lockd.
+ * Check whether two locks have the same owner.
  */
 static inline int
 posix_same_owner(struct file_lock *fl1, struct file_lock *fl2)
 {
-	return (fl1->fl_owner == fl2->fl_owner) &&
-		(fl1->fl_pid == fl2->fl_pid);
+	/* FIXME: Replace this sort of thing with struct file_lock_operations */
+	if ((fl1->fl_type | fl2->fl_type) & FL_LOCKD)
+		return fl1->fl_owner == fl2->fl_owner &&
+			fl1->fl_pid == fl2->fl_pid;
+	return fl1->fl_owner == fl2->fl_owner;
 }
 
 /* Remove waiter from blocker's block list.
@@ -631,24 +633,15 @@ int posix_locks_deadlock(struct file_lock *caller_fl,
 				struct file_lock *block_fl)
 {
 	struct list_head *tmp;
-	fl_owner_t caller_owner, blocked_owner;
-	unsigned int	 caller_pid, blocked_pid;
-
-	caller_owner = caller_fl->fl_owner;
-	caller_pid = caller_fl->fl_pid;
-	blocked_owner = block_fl->fl_owner;
-	blocked_pid = block_fl->fl_pid;
 
 next_task:
-	if (caller_owner == blocked_owner && caller_pid == blocked_pid)
+	if (posix_same_owner(caller_fl, block_fl))
 		return 1;
 	list_for_each(tmp, &blocked_list) {
 		struct file_lock *fl = list_entry(tmp, struct file_lock, fl_link);
-		if ((fl->fl_owner == blocked_owner)
-		    && (fl->fl_pid == blocked_pid)) {
+		if (posix_same_owner(fl, block_fl)) {
 			fl = fl->fl_next;
-			blocked_owner = fl->fl_owner;
-			blocked_pid = fl->fl_pid;
+			block_fl = fl;
 			goto next_task;
 		}
 	}
@@ -1684,7 +1677,7 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock_kernel();
 	while (*before != NULL) {
 		struct file_lock *fl = *before;
-		if (IS_POSIX(fl) && (fl->fl_owner == owner)) {
+		if (IS_POSIX(fl) && posix_same_owner(fl, &lock)) {
 			locks_delete_lock(before);
 			continue;
 		}
