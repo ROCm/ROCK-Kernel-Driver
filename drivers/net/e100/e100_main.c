@@ -2130,7 +2130,8 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 
 		if ((ip->protocol == IPPROTO_TCP) ||
 		    (ip->protocol == IPPROTO_UDP)) {
-			tcb->tcbu.ipcb.ip_activation_high =
+
+			tcb->tcbu.ipcb.ip_activation_high |=
 				IPCB_HARDWAREPARSING_ENABLE;
 			tcb->tcbu.ipcb.ip_schedule |=
 				IPCB_TCPUDP_CHECKSUM_ENABLE;
