@@ -477,8 +477,8 @@ static struct rif_cache_s *rif_get_idx(loff_t pos)
 	struct rif_cache_s *entry;
 	loff_t off = 0;
 
-	for(i=0;i < RIF_TABLE_SIZE;i++) 
-		for(entry=rif_table[i];entry;entry=entry->next) {
+	for(i = 0; i < RIF_TABLE_SIZE; i++) 
+		for(entry = rif_table[i]; entry; entry = entry->next) {
 			if (off == pos)
 				return entry;
 			++off;
@@ -496,7 +496,26 @@ static void *rif_seq_start(struct seq_file *seq, loff_t *pos)
 
 static void *rif_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return rif_get_idx(*pos++);
+	int i;
+	struct rif_cache_s *ent = v;
+
+	++*pos;
+
+	if (v == RIF_PROC_START) {
+		i = -1;
+		goto scan;
+	}
+
+	if (ent->next) 
+		return ent->next;
+
+	i = rif_hash(ent->addr);
+ scan:
+	while (++i < RIF_TABLE_SIZE) {
+		if ((ent = rif_table[i]) != NULL)
+			return ent;
+	}
+	return NULL;
 }
 
 static void rif_seq_stop(struct seq_file *seq, void *v)
