@@ -601,7 +601,10 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 		struct page *page = pfn_to_page(pfn);
 		if (!PageReserved(page)
 		    && !test_bit(PG_arch_1, &page->flags)) {
-			__flush_dcache_icache((void *) address);
+			if (vma->vm_mm == current->active_mm)
+				__flush_dcache_icache((void *) address);
+			else
+				__flush_dcache_icache_phys(pfn << PAGE_SHIFT);
 			set_bit(PG_arch_1, &page->flags);
 		}
 	}
