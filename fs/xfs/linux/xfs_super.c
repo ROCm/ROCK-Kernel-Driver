@@ -488,7 +488,7 @@ linvfs_start_syncd(
 	pid = kernel_thread(xfssyncd, (void *) vfsp,
 			CLONE_VM | CLONE_FS | CLONE_FILES);
 	if (pid < 0)
-		return pid;
+		return -pid;
 	wait_event(vfsp->vfs_wait_sync_task, vfsp->vfs_sync_task);
 	return 0;
 }
@@ -758,7 +758,7 @@ linvfs_fill_super(
 	struct vfs		*vfsp = vfs_allocate();
 	struct xfs_mount_args	*args = xfs_args_allocate(sb);
 	struct kstatfs		statvfs;
-	int			error;
+	int			error, error2;
 
 	vfsp->vfs_super = sb;
 	LINVFS_SET_VFS(sb, vfsp);
@@ -799,11 +799,15 @@ linvfs_fill_super(
 		goto fail_unmount;
 
 	sb->s_root = d_alloc_root(LINVFS_GET_IP(rootvp));
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		error = ENOMEM;
 		goto fail_vnrele;
-	if (is_bad_inode(sb->s_root->d_inode))
+	}
+	if (is_bad_inode(sb->s_root->d_inode)) {
+		error = EINVAL;
 		goto fail_vnrele;
-	if (linvfs_start_syncd(vfsp))
+	}
+	if ((error = linvfs_start_syncd(vfsp)))
 		goto fail_vnrele;
 	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
@@ -819,7 +823,7 @@ fail_vnrele:
 	}
 
 fail_unmount:
-	VFS_UNMOUNT(vfsp, 0, NULL, error);
+	VFS_UNMOUNT(vfsp, 0, NULL, error2);
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
