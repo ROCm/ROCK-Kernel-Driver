@@ -6,6 +6,7 @@
 #include <linux/dnotify.h>
 #include <linux/kobject.h>
 #include <asm/uaccess.h>
+#include <asm/semaphore.h>
 
 #include "sysfs.h"
 
@@ -53,6 +54,7 @@ struct sysfs_buffer {
 	loff_t			pos;
 	char			* page;
 	struct sysfs_ops	* ops;
+	struct semaphore	sem;
 };
 
 
@@ -106,6 +108,9 @@ static int flush_read_buffer(struct sysfs_buffer * buffer, char __user * buf,
 {
 	int error;
 
+	if (*ppos > buffer->count)
+		return 0;
+
 	if (count > (buffer->count - *ppos))
 		count = buffer->count - *ppos;
 
@@ -140,13 +145,17 @@ sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	struct sysfs_buffer * buffer = file->private_data;
 	ssize_t retval = 0;
 
-	if (!*ppos) {
+	down(&buffer->sem);
+	if ((!*ppos) || (!buffer->page)) {
 		if ((retval = fill_read_buffer(file->f_dentry,buffer)))
-			return retval;
+			goto out;
 	}
 	pr_debug("%s: count = %d, ppos = %lld, buf = %s\n",
 		 __FUNCTION__,count,*ppos,buffer->page);
-	return flush_read_buffer(buffer,buf,count,ppos);
+	retval = flush_read_buffer(buffer,buf,count,ppos);
+out:
+	up(&buffer->sem);
+	return retval;
 }
 
 
@@ -220,11 +229,13 @@ sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t
 {
 	struct sysfs_buffer * buffer = file->private_data;
 
+	down(&buffer->sem);
 	count = fill_write_buffer(buffer,buf,count);
 	if (count > 0)
 		count = flush_write_buffer(file->f_dentry,buffer,count);
 	if (count > 0)
 		*ppos += count;
+	up(&buffer->sem);
 	return count;
 }
 
@@ -287,6 +298,7 @@ static int check_perm(struct inode * inode, struct file * file)
 	buffer = kmalloc(sizeof(struct sysfs_buffer),GFP_KERNEL);
 	if (buffer) {
 		memset(buffer,0,sizeof(struct sysfs_buffer));
+		init_MUTEX(&buffer->sem);
 		buffer->ops = ops;
 		file->private_data = buffer;
 	} else
