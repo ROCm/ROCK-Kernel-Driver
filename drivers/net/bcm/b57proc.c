@@ -21,7 +21,8 @@ static struct proc_dir_entry *bcm5700_procfs_dir;
 
 extern char bcm5700_driver[], bcm5700_version[];
 
-extern unsigned long bcm5700_crc_count(PUM_DEVICE_BLOCK pUmDevice);
+extern uint64_t bcm5700_crc_count(PUM_DEVICE_BLOCK pUmDevice);
+extern uint64_t bcm5700_rx_err_count(PUM_DEVICE_BLOCK pUmDevice);
 
 static char *na_str = "n/a";
 static char *pause_str = "pause ";
@@ -81,7 +82,7 @@ b57_get_speed_adv(PUM_DEVICE_BLOCK pUmDevice, char *str)
 		strcpy(str, na_str);
 		return;
 	}
-	if (pDevice->EnableTbi) {
+	if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 		strcpy(str, "1000full");
 		return;
 	}
@@ -116,7 +117,7 @@ b57_get_fc_adv(PUM_DEVICE_BLOCK pUmDevice, char *str)
 		return;
 	}
 	str[0] = 0;
-	if (pDevice->EnableTbi) {
+	if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 		if(pDevice->DisableAutoNeg == FALSE ||
 			pDevice->RequestedLineSpeed == LM_LINE_SPEED_AUTO) {
 			if (pDevice->FlowControlCap &
@@ -277,7 +278,7 @@ bcm5700_read_pfs(char *page, char **start, off_t off, int count,
 		rx_jabber_errors = 0;
 	}
 	else {
-		rx_crc_errors = bcm5700_crc_count(pUmDevice);
+		rx_crc_errors = (unsigned long) bcm5700_crc_count(pUmDevice);
 		rx_align_errors = MM_GETSTATS(pStats->dot3StatsAlignmentErrors);
 		rx_runt_errors = MM_GETSTATS(pStats->etherStatsUndersizePkts);
 		rx_frag_errors = MM_GETSTATS(pStats->etherStatsFragments);
@@ -285,8 +286,7 @@ bcm5700_read_pfs(char *page, char **start, off_t off, int count,
 		rx_overrun_errors = MM_GETSTATS(pStats->nicNoMoreRxBDs);
 		rx_jabber_errors = MM_GETSTATS(pStats->etherStatsJabbers);
 	}
-	rx_mac_errors = rx_crc_errors + rx_align_errors + rx_runt_errors +
-		rx_frag_errors + rx_long_errors + rx_jabber_errors;
+	rx_mac_errors = (unsigned long) bcm5700_rx_err_count(pUmDevice);
 	len += sprintf(page+len, "Rx_Errors\t\t\t%lu\n",
 		((pStats == 0) ? 0 :
 		rx_mac_errors + rx_overrun_errors + pUmDevice->rx_misc_errors));
@@ -364,7 +364,7 @@ bcm5700_read_pfs(char *page, char **start, off_t off, int count,
 
 #ifdef BCM_NIC_SEND_BD
 	len += sprintf(page+len, "NIC_Tx_BDs\t\t\t%s\n",
-		pDevice->NicSendBd ? on_str : off_str);
+		(pDevice->Flags & NIC_SEND_BD_FLAG) ? on_str : off_str);
 #endif
 	len += sprintf(page+len, "Tx_Desc_Count\t\t\t%u\n",
 		pDevice->TxPacketDescCnt);
@@ -406,7 +406,7 @@ bcm5700_read_pfs(char *page, char **start, off_t off, int count,
 		pUmDevice->rx_good_chksum_count);
 	len += sprintf(page+len, "Rx_Bad_Chksum_Packets\t\t%u\n",
 		pUmDevice->rx_bad_chksum_count);
-	if (!pDevice->EnableTbi) {
+	if (!(pDevice->TbiFlags & ENABLE_TBI_FLAG)) {
 		LM_UINT32 value32;
 		unsigned long flags;
 
@@ -433,6 +433,9 @@ bcm5700_read_pfs(char *page, char **start, off_t off, int count,
 		len += sprintf(page+len, "Phy_Register_0x10\t\t0x%x\n", value32);
         	LM_ReadPhy(pDevice, 0x19, &value32);
 		len += sprintf(page+len, "Phy_Register_0x19\t\t0x%x\n", value32);
+        	LM_WritePhy(pDevice, 0x18, 0x0007);
+        	LM_ReadPhy(pDevice, 0x18, &value32);
+		len += sprintf(page+len, "Phy_Register_0x18_00\t\t0x%x\n", value32);
 		BCM5700_PHY_UNLOCK(pUmDevice, flags);
 	}
 #endif

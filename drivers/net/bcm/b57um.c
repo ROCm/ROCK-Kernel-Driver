@@ -1,6 +1,6 @@
 /******************************************************************************/
 /*                                                                            */
-/* Broadcom BCM5700 Linux Network Driver, Copyright (c) 2000 - 2003 Broadcom  */
+/* Broadcom BCM5700 Linux Network Driver, Copyright (c) 2000 - 2004 Broadcom  */
 /* Corporation.                                                               */
 /* All rights reserved.                                                       */
 /*                                                                            */
@@ -12,8 +12,8 @@
 
 
 char bcm5700_driver[] = "bcm5700";
-char bcm5700_version[] = "7.1.22";
-char bcm5700_date[] = "(01/07/04)";
+char bcm5700_version[] = "7.2.24";
+char bcm5700_date[] = "(04/23/04)";
 
 #define B57UM
 #include "mm.h"
@@ -109,14 +109,16 @@ static int enable_wol[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 #ifdef BCM_TSO
 static int enable_tso[MAX_UNITS] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 #endif
-
 #ifdef BCM_NIC_SEND_BD
 static int nic_tx_bd[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 #endif
-
 #ifdef BCM_ASF
 static int vlan_tag_mode[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 #endif
+#ifdef INCLUDE_5750_A0_FIX
+static int shasta_smp_fix[MAX_UNITS] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+#endif
+static int delay_link[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
@@ -225,8 +227,8 @@ static inline void *pci_alloc_consistent(struct pci_dev *pdev, size_t size,
 
 #if (LINUX_VERSION_CODE >= 0x020409) && defined(RED_HAT_LINUX_KERNEL)
 
-#define BCM_32BIT_DMA_MASK ((u64) 0x00000000ffffffff)
-#define BCM_64BIT_DMA_MASK ((u64) 0xffffffffffffffff)
+#define BCM_32BIT_DMA_MASK ((u64) 0x00000000ffffffffULL)
+#define BCM_64BIT_DMA_MASK ((u64) 0xffffffffffffffffULL)
 
 #else
 /* pci_set_dma_mask is using dma_addr_t */
@@ -238,8 +240,8 @@ static inline void *pci_alloc_consistent(struct pci_dev *pdev, size_t size,
 
 #else /* (LINUX_VERSION_CODE < 0x02040d) */
 
-#define BCM_32BIT_DMA_MASK ((u64) 0x00000000ffffffff)
-#define BCM_64BIT_DMA_MASK ((u64) 0xffffffffffffffff)
+#define BCM_32BIT_DMA_MASK ((u64) 0x00000000ffffffffULL)
+#define BCM_64BIT_DMA_MASK ((u64) 0xffffffffffffffffULL)
 #endif
 
 #if (LINUX_VERSION_CODE < 0x020329)
@@ -260,7 +262,7 @@ pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask)
 #endif
 
 #if (LINUX_VERSION_CODE < 0x020547)
-#define pci_set_consistent_dma_mask(pdev, mask)
+#define pci_set_consistent_dma_mask(pdev, mask) (0)
 #endif
 
 #if (LINUX_VERSION_CODE < 0x020402)
@@ -377,6 +379,10 @@ MODULE_PARM(nic_tx_bd, "1-" __MODULE_STRING(MAX_UNITS) "i");
 #ifdef BCM_ASF
 MODULE_PARM(vlan_tag_mode, "1-" __MODULE_STRING(MAX_UNITS) "i");
 #endif
+#ifdef INCLUDE_5750_A0_FIX
+MODULE_PARM(shasta_smp_fix, "1-" __MODULE_STRING(MAX_UNITS) "i");
+#endif
+MODULE_PARM(delay_link, "1-" __MODULE_STRING(MAX_UNITS) "i");
 #endif
 
 #define RUN_AT(x) (jiffies + (x))
@@ -545,7 +551,7 @@ typedef enum {
 	TC998SX,
 	TC999T,
 	NC6770,
-	NC1020,
+	NC7722,
 	NC7760,
 	NC7761,
 	NC7770,
@@ -555,6 +561,7 @@ typedef enum {
 	NC7772,
 	NC7782,
 	NC7783,
+	NC320T,
 	BCM5704CIOBE,
 	BCM5704,
 	BCM5704S,
@@ -563,7 +570,12 @@ typedef enum {
 	BCM5705F,
 	BCM5901,
 	BCM5782,
-	BCM5788
+	BCM5788,
+	BCM5750,
+	BCM5750M,
+	BCM5720,
+	BCM5751,
+	BCM5721,
 } board_t;
 
 
@@ -602,7 +614,7 @@ static struct {
 	{ "3Com 3C998-SX Dual Port 1000-SX PCI-X Server NIC" },
 	{ "3Com 3C999-T Quad Port 10/100/1000 PCI-X Server NIC" },
 	{ "HP NC6770 Gigabit Server Adapter" },
-	{ "NC1020 HP ProLiant Gigabit Server Adapter 32 PCI" },
+	{ "HP NC7722 Gigabit Server Adapter" },
 	{ "HP NC7760 Gigabit Server Adapter" },
 	{ "HP NC7761 Gigabit Server Adapter" },
 	{ "HP NC7770 Gigabit Server Adapter" },
@@ -612,6 +624,7 @@ static struct {
 	{ "HP NC7772 Gigabit Server Adapter" },
 	{ "HP NC7782 Gigabit Server Adapter" },
 	{ "HP NC7783 Gigabit Server Adapter" },
+	{ "HP ProLiant NC 320T PCI Express Gigabit Server Adapter" },
 	{ "Broadcom BCM5704 CIOB-E 1000Base-T" },
 	{ "Broadcom BCM5704 1000Base-T" },
 	{ "Broadcom BCM5704 1000Base-SX" },
@@ -620,7 +633,12 @@ static struct {
 	{ "Broadcom 570x 10/100 Integrated Controller" },
 	{ "Broadcom BCM5901 100Base-TX" },
 	{ "Broadcom NetXtreme Gigabit Ethernet for hp" },
-	{ "Broadcom BCM5788 1000Base-T" },
+	{ "Broadcom BCM5788 NetLink 1000Base-T" },
+	{ "Broadcom BCM5750 1000Base-T PCI" },
+	{ "Broadcom BCM5750M 1000Base-T PCI" },
+	{ "Broadcom BCM5720 1000Base-T PCI" },
+	{ "Broadcom BCM5751 1000Base-T PCI Express" },
+	{ "Broadcom BCM5721 1000Base-T PCI Express" },
 	{ 0 },
 	};
 
@@ -694,7 +712,7 @@ static struct pci_device_id bcm5700_pci_tbl[] __devinitdata = {
 	{0x14e4, 0x1653, 0x0e11, 0x00e3, 0, 0, NC7761 },
 	{0x14e4, 0x1653, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705 },
 	{0x14e4, 0x1654, 0x0e11, 0x00e3, 0, 0, NC7761 },
-	{0x14e4, 0x1654, 0x103c, 0x3100, 0, 0, NC1020 },
+	{0x14e4, 0x1654, 0x103c, 0x3100, 0, 0, NC7722 },
 	{0x14e4, 0x1654, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705 },
 	{0x14e4, 0x165d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705M },
 	{0x14e4, 0x165e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705M },
@@ -703,6 +721,12 @@ static struct pci_device_id bcm5700_pci_tbl[] __devinitdata = {
 	{0x14e4, 0x169c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5788 },
 	{0x14e4, 0x170d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5901 },
 	{0x14e4, 0x170e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5901 },
+	{0x14e4, 0x1676, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5750 },
+	{0x14e4, 0x167c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5750M },
+	{0x14e4, 0x1677, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5751 },
+	{0x14e4, 0x1658, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5720 },
+	{0x14e4, 0x1659, 0x103c, 0x7031, 0, 0, NC320T },
+	{0x14e4, 0x1659, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5721 },
 	{0,}
 };
 
@@ -755,7 +779,12 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 
 	if (pci_set_dma_mask(pdev, BCM_64BIT_DMA_MASK) == 0) {
 		pUmDevice->using_dac = 1;
-		pci_set_consistent_dma_mask(pdev, BCM_64BIT_DMA_MASK);
+		if (pci_set_consistent_dma_mask(pdev, BCM_64BIT_DMA_MASK) != 0)
+		{
+			printk(KERN_ERR "pci_set_consistent_dma_mask failed\n");
+			pci_release_regions(pdev);
+			goto err_out;
+		}
 	}
 	else if (pci_set_dma_mask(pdev, BCM_32BIT_DMA_MASK) == 0) {
 		pUmDevice->using_dac = 0;
@@ -780,6 +809,7 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 	spin_lock_init(&pUmDevice->phy_lock);
 
 	pDevice = (PLM_DEVICE_BLOCK) pUmDevice;
+	pDevice->Flags = 0;
 	pDevice->FunctNum = PCI_FUNC(pUmDevice->pdev->devfn);
 
 #if T3_JUMBO_RCV_RCB_ENTRY_COUNT
@@ -793,7 +823,7 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 		pci_find_device(0x8086, 0x2448, NULL)) {
 
 		/* Found ICH, ICH0, or ICH2 */
-		pDevice->UndiFix = 1;
+		pDevice->Flags |= UNDI_FIX_FLAG;
 	}
 
 	if (LM_GetAdapterInfo(pDevice) != LM_STATUS_SUCCESS) {
@@ -802,7 +832,7 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 		goto err_out_unmap;
 	}
 
-	if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) {
+	if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId)) {
 		if (dev->mtu > 1500) {
 			dev->mtu = 1500;
 			printk(KERN_WARNING "%s-%d: Jumbo mtu sizes not supported, using mtu=1500\n", bcm5700_driver, pUmDevice->index);
@@ -813,8 +843,8 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 		/* AMD762 writes I/O out of order */
 		/* Setting bit 1 in 762's register 0x4C still doesn't work */
 		/* in all cases */
-		pDevice->FlushPostedWrites = TRUE;
-		pDevice->NicSendBd = FALSE;
+		pDevice->Flags |= FLUSH_POSTED_WRITE_FLAG;
+		pDevice->Flags &= ~NIC_SEND_BD_FLAG;
 	}
 	pUmDevice->do_global_lock = 0;
 	if (T3_ASIC_REV(pUmDevice->lm_dev.ChipRevId) == T3_ASIC_REV_5700) {
@@ -822,6 +852,20 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 		/* accesses on certain machines. */
 		pUmDevice->do_global_lock = 1;
 	}
+#ifdef INCLUDE_5750_A0_FIX
+	if ((pDevice->Flags & PCI_EXPRESS_FLAG) &&
+		(pDevice->ChipRevId == T3_CHIP_ID_5750_A0))
+	{
+		if (shasta_smp_fix[pUmDevice->index]) {
+			pUmDevice->do_global_lock = 1;
+			pDevice->Flags |= (FLUSH_POSTED_WRITE_FLAG |
+					REG_RD_BACK_FLAG);
+		}
+		else {
+			pDevice->Flags &= ~REG_RD_BACK_FLAG;
+		}
+	}
+#endif
 	if ((T3_ASIC_REV(pUmDevice->lm_dev.ChipRevId) == T3_ASIC_REV_5701) &&
 		((pDevice->PciState & T3_PCI_STATE_NOT_PCI_X_BUS) == 0)) {
 
@@ -966,28 +1010,30 @@ bcm5700_init_one(struct pci_dev *pdev,
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5411_PHY_ID)
 		printk("Broadcom BCM5411 Copper ");
 	else if (((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5701_PHY_ID) &&
-		!pDevice->EnableTbi) {
+		!(pDevice->TbiFlags & ENABLE_TBI_FLAG)) {
 		printk("Broadcom BCM5701 Integrated Copper ");
 	}
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5703_PHY_ID) {
 		printk("Broadcom BCM5703 Integrated ");
-		if (pDevice->EnableTbi)
+		if (pDevice->TbiFlags & ENABLE_TBI_FLAG)
 			printk("SerDes ");
 		else
 			printk("Copper ");
 	}
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5704_PHY_ID) {
 		printk("Broadcom BCM5704 Integrated ");
-		if (pDevice->EnableTbi)
+		if (pDevice->TbiFlags & ENABLE_TBI_FLAG)
 			printk("SerDes ");
 		else
 			printk("Copper ");
 	}
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5705_PHY_ID)
 		printk("Broadcom BCM5705 Integrated Copper ");
+	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5750_PHY_ID)
+		printk("Broadcom BCM5750 Integrated Copper ");
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM8002_PHY_ID)
 		printk("Broadcom BCM8002 SerDes ");
-	else if (pDevice->EnableTbi) {
+	else if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 		if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5703) {
 			printk("Broadcom BCM5703 Integrated SerDes ");
 		}
@@ -1007,7 +1053,7 @@ bcm5700_init_one(struct pci_dev *pdev,
 #if (LINUX_VERSION_CODE >= 0x20400)
 	if (scatter_gather[board_idx]) {
 		dev->features |= NETIF_F_SG;
-		if (pUmDevice->using_dac && !pDevice->Bcm5788)
+		if (pUmDevice->using_dac && !(pDevice->Flags & BCM5788_FLAG))
 			dev->features |= NETIF_F_HIGHDMA;
 	}
 	if ((pDevice->TaskOffloadCap & LM_TASK_OFFLOAD_TX_TCP_CHECKSUM) &&
@@ -1132,7 +1178,8 @@ bcm5700_open(struct net_device *dev)
 #endif
 
 #if INCLUDE_TBI_SUPPORT
-	if (pDevice->EnableTbi && pDevice->PollTbiLink) {
+	if ((pDevice->TbiFlags & ENABLE_TBI_FLAG) &&
+		(pDevice->TbiFlags & TBI_POLLING_FLAGS)) {
 		pUmDevice->poll_tbi_interval = HZ / pUmDevice->timer_interval;
 		if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5703) {
 			pUmDevice->poll_tbi_interval /= 4;
@@ -1143,10 +1190,12 @@ bcm5700_open(struct net_device *dev)
 
 	pUmDevice->asf_heartbeat = (120 * HZ) / pUmDevice->timer_interval;
 
+	pUmDevice->stats_interval = HZ / pUmDevice->timer_interval;
+
 	/* Sometimes we get spurious ints. after reset when link is down. */
 	/* This field tells the isr to service the int. even if there is */
 	/* no status block update. */
-	if (pDevice->LedMode != LED_MODE_LINK10) {
+	if (pDevice->LedCtrl != LED_CTRL_PHY_MODE_2) {
 		pUmDevice->adapter_just_inited = (3 * HZ) /
 			pUmDevice->timer_interval;
 	}
@@ -1169,7 +1218,7 @@ bcm5700_open(struct net_device *dev)
 	bcm5700_set_vlan_mode(pUmDevice);
 	bcm5700_init_counters(pUmDevice);
 
-	if (pDevice->UndiFix) {
+	if (pDevice->Flags & UNDI_FIX_FLAG) {
 		printk(KERN_INFO "%s: Using indirect register access\n", dev->name);
 	}
 
@@ -1219,14 +1268,20 @@ bcm5700_timer(unsigned long data)
 		return;
 	}
 
-	if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) &&
-		(pDevice->LinkStatus == LM_STATUS_LINK_ACTIVE)) {
+	if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId) &&
+		(pDevice->LinkStatus == LM_STATUS_LINK_ACTIVE) &&
+		(--pUmDevice->stats_interval <= 0)) {
 
+		BCM5700_LOCK(pUmDevice, flags);
 		LM_GetStats(pDevice);
+		BCM5700_UNLOCK(pUmDevice, flags);
+		pUmDevice->stats_interval = HZ / pUmDevice->timer_interval;
 	}
 
 #if INCLUDE_TBI_SUPPORT
-	if(pDevice->PollTbiLink && (--pUmDevice->poll_tbi_expiry <= 0)) {
+	if ((pDevice->TbiFlags & TBI_POLLING_FLAGS) &&
+		(--pUmDevice->poll_tbi_expiry <= 0)) {
+
 		BCM5700_PHY_LOCK(pUmDevice, flags);
 		value32 = REG_RD(pDevice, MacCtrl.Status);
 		if (((pDevice->LinkStatus == LM_STATUS_LINK_ACTIVE) &&
@@ -1260,7 +1315,7 @@ bcm5700_timer(unsigned long data)
 		pUmDevice->crc_counter_expiry--;
 
 	if (!pUmDevice->interrupt) {
-		if (!pDevice->UseTaggedStatus) {
+		if (!(pDevice->Flags & USE_TAGGED_STATUS_FLAG)) {
 			BCM5700_LOCK(pUmDevice, flags);
 			if (pDevice->pStatusBlkVirt->Status & STATUS_BLOCK_UPDATED) {
 				/* This will generate an interrupt */
@@ -1317,7 +1372,7 @@ bcm5700_timer(unsigned long data)
 	}
 
 #ifdef BCM_ASF
-	if (pDevice->EnableAsf) {
+	if (pDevice->AsfFlags & ASF_ENABLED) {
 		pUmDevice->asf_heartbeat--;
 		if (pUmDevice->asf_heartbeat == 0) {
 			MEM_WR_OFFSET(pDevice, T3_CMD_MAILBOX,
@@ -1339,10 +1394,10 @@ bcm5700_timer(unsigned long data)
 STATIC int
 bcm5700_init_counters(PUM_DEVICE_BLOCK pUmDevice)
 {
-	PLM_DEVICE_BLOCK pDevice = &pUmDevice->lm_dev;
-
 #ifdef BCM_INT_COAL
 #ifndef BCM_NAPI_RXPOLL
+	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
+
 	pUmDevice->rx_curr_coalesce_frames = pDevice->RxMaxCoalescedFrames;
 	pUmDevice->rx_curr_coalesce_ticks = pDevice->RxCoalescingTicks;
 	pUmDevice->tx_curr_coalesce_frames = pDevice->TxMaxCoalescedFrames;
@@ -1350,7 +1405,7 @@ bcm5700_init_counters(PUM_DEVICE_BLOCK pUmDevice)
 	pUmDevice->tx_last_cnt = 0;
 #endif
 #endif
-	pDevice->PhyCrcCount = 0;
+	pUmDevice->phy_crc_count = 0;
 #if TIGON3_DEBUG
 	pUmDevice->tx_zc_count = 0;
 	pUmDevice->tx_chksum_count = 0;
@@ -1468,6 +1523,7 @@ bcm5700_reset(struct net_device *dev)
 	bcm5700_intr_off(pUmDevice);
 	BCM5700_PHY_LOCK(pUmDevice, flags);
 	LM_ResetAdapter(pDevice);	
+	pDevice->InitDone = TRUE;
 	bcm5700_set_vlan_mode(pUmDevice);
 	bcm5700_init_counters(pUmDevice);
 	if (memcmp(dev->dev_addr, pDevice->NodeAddress, 6)) {
@@ -1487,7 +1543,7 @@ bcm5700_set_vlan_mode(UM_DEVICE_BLOCK *pUmDevice)
 	int vlan_tag_mode = pUmDevice->vlan_tag_mode;
 
 	if (vlan_tag_mode == VLAN_TAG_MODE_AUTO_STRIP) {
-		if (pDevice->EnableAsf) {
+	        if (pDevice->AsfFlags & ASF_ENABLED) {
 			vlan_tag_mode = VLAN_TAG_MODE_FORCED_STRIP;
 		}
 		else {
@@ -1519,6 +1575,10 @@ bcm5700_vlan_rx_register(struct net_device *dev, struct vlan_group *vlgrp)
 	PUM_DEVICE_BLOCK pUmDevice = (PUM_DEVICE_BLOCK) dev->priv;
 
 	bcm5700_intr_off(pUmDevice);
+#ifdef BCM_NAPI_RXPOLL
+	while (pUmDevice->lm_dev.RxPoll)
+		yield();
+#endif
 	pUmDevice->vlgrp = vlgrp;
 	bcm5700_set_vlan_mode(pUmDevice);
 	bcm5700_intr_on(pUmDevice);
@@ -1530,6 +1590,10 @@ bcm5700_vlan_rx_kill_vid(struct net_device *dev, uint16_t vid)
 	PUM_DEVICE_BLOCK pUmDevice = (PUM_DEVICE_BLOCK) dev->priv;
 
 	bcm5700_intr_off(pUmDevice);
+#ifdef BCM_NAPI_RXPOLL
+	while (pUmDevice->lm_dev.RxPoll)
+		yield();
+#endif
 	if (pUmDevice->vlgrp) {
 		pUmDevice->vlgrp->vlan_devices[vid] = NULL;
 	}
@@ -1652,20 +1716,26 @@ bcm5700_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 		ip_tcp_len = (skb->nh.iph->ihl << 2) + sizeof(struct tcphdr);
 		skb->nh.iph->check = 0;
-		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
-			skb->nh.iph->daddr, 0, IPPROTO_TCP, 0);
+
+		if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750) {
+			skb->h.th->check = 0;
+			pPacket->Flags &= ~SND_BD_FLAG_TCP_UDP_CKSUM;
+		}
+		else {
+			skb->h.th->check = ~csum_tcpudp_magic(
+				skb->nh.iph->saddr, skb->nh.iph->daddr,
+				0, IPPROTO_TCP, 0);
+		}
 
 		skb->nh.iph->tot_len = htons(mss + ip_tcp_len + tcp_opt_len);
 		tcp_seg_flags = 0;
-		if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) {
-			if (tcp_opt_len || (skb->nh.iph->ihl > 5)) {
+		if (tcp_opt_len || (skb->nh.iph->ihl > 5)) {
+			if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId)) {
 				tcp_seg_flags =
 					((skb->nh.iph->ihl - 5) +
 					(tcp_opt_len >> 2)) << 11;
 			}
-		}
-		else {
-			if (tcp_opt_len || (skb->nh.iph->ihl > 5)) {
+			else {
 				pPacket->Flags |=
 					((skb->nh.iph->ihl - 5) +
 					(tcp_opt_len >> 2)) << 12;
@@ -1697,10 +1767,13 @@ bcm5700_poll(struct net_device *dev, int *budget)
 	int work_done;
 	UM_DEVICE_BLOCK *pUmDevice = (UM_DEVICE_BLOCK *) dev->priv;
 	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
+	unsigned long flags = 0;
+	LM_UINT32 tag;
 
 	if (orig_budget > dev->quota)
 		orig_budget = dev->quota;
 
+	BCM5700_LOCK(pUmDevice, flags);
 	work_done = LM_ServiceRxPoll(pDevice, orig_budget);
 	*budget -= work_done;
 	dev->quota -= work_done;
@@ -1708,16 +1781,27 @@ bcm5700_poll(struct net_device *dev, int *budget)
 	if (QQ_GetEntryCnt(&pUmDevice->rx_out_of_buf_q.Container)) {
 		replenish_rx_buffers(pUmDevice, 0);
 	}
+	BCM5700_UNLOCK(pUmDevice, flags);
 	if (work_done) {
 		MM_IndicateRxPackets(pDevice);
+		BCM5700_LOCK(pUmDevice, flags);
 		LM_QueueRxPackets(pDevice);
+		BCM5700_UNLOCK(pUmDevice, flags);
 	}
 	if ((work_done < orig_budget) || atomic_read(&pUmDevice->intr_sem) ||
 		pUmDevice->suspended) {
 
 		netif_rx_complete(dev);
+		BCM5700_LOCK(pUmDevice, flags);
 		REG_WR(pDevice, Grc.Mode, pDevice->GrcMode);
 		pDevice->RxPoll = FALSE;
+		if (pDevice->RxPoll) {
+			BCM5700_UNLOCK(pUmDevice, flags);
+			return 0;
+		}
+		/* Take care of possible missed rx interrupts */
+		REG_RD_BACK(pDevice, Grc.Mode);	/* flush the register write */
+		tag = pDevice->pStatusBlkVirt->StatusTag;
 		if ((pDevice->pStatusBlkVirt->Status & STATUS_BLOCK_UPDATED) ||
 			(pDevice->pStatusBlkVirt->Idx[0].RcvProdIdx !=
 			pDevice->RcvRetConIdx)) {
@@ -1726,6 +1810,26 @@ bcm5700_poll(struct net_device *dev, int *budget)
 				pDevice->CoalesceMode | HOST_COALESCE_ENABLE |
 				HOST_COALESCE_NOW);
 		}
+		/* If a new status block is pending in the WDMA state machine */
+		/* before the register write to enable the rx interrupt,      */
+		/* the new status block may DMA with no interrupt. In this    */
+		/* scenario, the tag read above will be older than the tag in */
+		/* the pending status block and writing the older tag will    */
+		/* cause interrupt to be generated.                           */
+		else if (pDevice->Flags & USE_TAGGED_STATUS_FLAG) {
+			MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low,
+				tag << 24);
+			/* Make sure we service tx in case some tx interrupts */
+			/* are cleared */
+			if (atomic_read(&pDevice->SendBdLeft) <
+				(T3_SEND_RCB_ENTRY_COUNT / 2)) {
+				REG_WR(pDevice, HostCoalesce.Mode,
+					pDevice->CoalesceMode |
+					HOST_COALESCE_ENABLE |
+					HOST_COALESCE_NOW);
+			}
+		}
+		BCM5700_UNLOCK(pUmDevice, flags);
 		return 0;
 	}
 	return 1;
@@ -1750,13 +1854,19 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		return IRQ_RETVAL(handled);
 	}
 
+	bcm5700_intr_lock(pUmDevice);
 	if (atomic_read(&pUmDevice->intr_sem)) {
 		MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low, 1);
+#ifdef INCLUDE_5750_A0_FIX
+		if (pDevice->Flags & FLUSH_POSTED_WRITE_FLAG) {
+			MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
+		}
+#endif
+		bcm5700_intr_unlock(pUmDevice);
 		handled = 0;
 		return IRQ_RETVAL(handled);
 	}
 
-	bcm5700_intr_lock(pUmDevice);
 	if (test_and_set_bit(0, (void*)&pUmDevice->interrupt)) {
 		printk(KERN_ERR "%s: Duplicate entry of the interrupt handler by "
 			   "processor %d.\n",
@@ -1767,14 +1877,11 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	}
 
 	if ((pDevice->pStatusBlkVirt->Status & STATUS_BLOCK_UPDATED) ||
-#ifdef NICE_SUPPORT
-		pUmDevice->adapter_just_inited || pUmDevice->intr_test)
-#else
-		pUmDevice->adapter_just_inited)
-#endif
+		pUmDevice->adapter_just_inited || pUmDevice->intr_test ||
+		(pUmDevice->spurious_int > 100))
 	{
 
-#ifdef NICE_SUPPORT
+		pUmDevice->spurious_int = 0;
 		if (pUmDevice->intr_test) {
 			if (!(REG_RD(pDevice, PciCfg.PciState) &
 				T3_PCI_STATE_INTERRUPT_NOT_ACTIVE)) {
@@ -1782,14 +1889,18 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			}
 			pUmDevice->intr_test = 0;
 		}
-#endif
 #ifdef BCM_NAPI_RXPOLL
 		max_intr_loop = 1;
 #else
 		max_intr_loop = 50;
 #endif
-		if (pDevice->UseTaggedStatus) {
+		if (pDevice->Flags & USE_TAGGED_STATUS_FLAG) {
 			MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low, 1);
+#ifdef INCLUDE_5750_A0_FIX
+			if (pDevice->Flags & FLUSH_POSTED_WRITE_FLAG) {
+				MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
+			}
+#endif
 			oldtag = pDevice->pStatusBlkVirt->StatusTag;
 
 			for (i = 0; ; i++) {
@@ -1802,8 +1913,16 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					MB_REG_WR(pDevice,
 						Mailbox.Interrupt[0].Low,
 						oldtag << 24);
+#ifdef INCLUDE_5750_A0_FIX
+					if (pDevice->Flags &
+						FLUSH_POSTED_WRITE_FLAG) {
+
+						MB_REG_RD(pDevice,
+						Mailbox.Interrupt[0].Low);
+					}
+#endif
 					pDevice->LastTag = oldtag;
-					if (pDevice->UndiFix) {
+					if (pDevice->Flags & UNDI_FIX_FLAG) {
 						REG_WR(pDevice, Grc.LocalCtrl,
 						pDevice->GrcLocalCtrl | 0x2);
 					}
@@ -1828,13 +1947,14 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			}
 			while ((pDevice->pStatusBlkVirt->Status &
 				STATUS_BLOCK_UPDATED) && (i < max_intr_loop));
-			if (pDevice->UndiFix) {
+			if (pDevice->Flags & UNDI_FIX_FLAG) {
 				REG_WR(pDevice, Grc.LocalCtrl,
 					pDevice->GrcLocalCtrl | 0x2);
 			}
 		}
 	}
 	else {
+		pUmDevice->spurious_int++;
 		handled = 0;
 	}
 #ifdef BCM_TASKLET
@@ -1888,6 +2008,7 @@ STATIC void
 bcm5700_tasklet(unsigned long data)
 {
 	PUM_DEVICE_BLOCK pUmDevice = (PUM_DEVICE_BLOCK)data;
+	unsigned long flags = 0;
 
 	/* RH 7.2 Beta 3 tasklets are reentrant */
 	if (test_and_set_bit(0, &pUmDevice->tasklet_busy)) {
@@ -1896,8 +2017,11 @@ bcm5700_tasklet(unsigned long data)
 	}
 
 	pUmDevice->tasklet_pending = 0;
-	if (pUmDevice->opened && !pUmDevice->suspended)
+	if (pUmDevice->opened && !pUmDevice->suspended) {
+		BCM5700_LOCK(pUmDevice, flags);
 		replenish_rx_buffers(pUmDevice, 0);
+		BCM5700_UNLOCK(pUmDevice, flags);
+	}
 
 	clear_bit(0, &pUmDevice->tasklet_busy);
 }
@@ -1927,7 +2051,14 @@ bcm5700_close(struct net_device *dev)
 #if (LINUX_VERSION_CODE < 0x020300)
 	MOD_DEC_USE_COUNT;
 #endif
-	LM_SetPowerState(pDevice, LM_POWER_STATE_D3);
+#ifdef INCLUDE_5750_A0_FIX
+	if (!((pDevice->Flags & PCI_EXPRESS_FLAG) &&
+		(pDevice->ChipRevId == T3_CHIP_ID_5750_A0)))
+#endif
+	{
+
+		LM_SetPowerState(pDevice, LM_POWER_STATE_D3);
+	}
 	bcm5700_freemem(dev);
 
 	return 0;
@@ -1997,7 +2128,7 @@ bcm5700_freemem2(UM_DEVICE_BLOCK *pUmDevice, int index)
 }
 #endif
 
-unsigned long
+uint64_t
 bcm5700_crc_count(PUM_DEVICE_BLOCK pUmDevice)
 {
 	PLM_DEVICE_BLOCK pDevice = &pUmDevice->lm_dev;
@@ -2007,7 +2138,7 @@ bcm5700_crc_count(PUM_DEVICE_BLOCK pUmDevice)
 
 	if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5700 ||
 		T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5701) &&
-		!pDevice->EnableTbi) { 
+		!(pDevice->TbiFlags & ENABLE_TBI_FLAG)) {
 
 		if (!pUmDevice->opened || !pDevice->InitDone ||
 			pUmDevice->adapter_just_inited) {
@@ -2017,7 +2148,7 @@ bcm5700_crc_count(PUM_DEVICE_BLOCK pUmDevice)
 
 		/* regulate MDIO access during run time */
 		if (pUmDevice->crc_counter_expiry > 0)
-			return pDevice->PhyCrcCount;
+			return pUmDevice->phy_crc_count;
 
 		pUmDevice->crc_counter_expiry = (5 * HZ) /
 			pUmDevice->timer_interval;
@@ -2030,15 +2161,31 @@ bcm5700_crc_count(PUM_DEVICE_BLOCK pUmDevice)
 		BCM5700_PHY_UNLOCK(pUmDevice, flags);
 		/* Sometimes data on the MDIO bus can be corrupted */
 		if (Value32 != 0xffff)
-			pDevice->PhyCrcCount += Value32;
-		return pDevice->PhyCrcCount;
+			pUmDevice->phy_crc_count += Value32;
+		return pUmDevice->phy_crc_count;
 	}
 	else if (pStats == 0) {
 		return 0;
 	}
 	else {
-		return (MM_GETSTATS(pStats->dot3StatsFCSErrors));
+		return (MM_GETSTATS64(pStats->dot3StatsFCSErrors));
 	}
+}
+
+uint64_t
+bcm5700_rx_err_count(UM_DEVICE_BLOCK *pUmDevice)
+{
+	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
+	T3_STATS_BLOCK *pStats = (T3_STATS_BLOCK *) pDevice->pStatsBlkVirt;
+
+	if (pStats == 0)
+		return 0;
+	return (bcm5700_crc_count(pUmDevice) +
+		MM_GETSTATS64(pStats->dot3StatsAlignmentErrors) +
+		MM_GETSTATS64(pStats->etherStatsUndersizePkts) +
+		MM_GETSTATS64(pStats->etherStatsFragments) +
+		MM_GETSTATS64(pStats->dot3StatsFramesTooLong) +
+		MM_GETSTATS64(pStats->etherStatsJabbers));
 }
 
 STATIC struct net_device_stats *
@@ -2076,14 +2223,10 @@ bcm5700_get_stats(struct net_device *dev)
 	p_netstats->rx_over_errors = MM_GETSTATS(pStats->nicNoMoreRxBDs);
 	p_netstats->rx_frame_errors =
 		MM_GETSTATS(pStats->dot3StatsAlignmentErrors);
-	p_netstats->rx_crc_errors = bcm5700_crc_count(pUmDevice);
-	p_netstats->rx_errors =
-		p_netstats->rx_length_errors +
-		p_netstats->rx_over_errors +
-		p_netstats->rx_frame_errors +
-		p_netstats->rx_crc_errors +
-		MM_GETSTATS(pStats->etherStatsFragments) +
-		MM_GETSTATS(pStats->etherStatsJabbers);
+	p_netstats->rx_crc_errors = (unsigned long)
+		bcm5700_crc_count(pUmDevice);
+	p_netstats->rx_errors = (unsigned long)
+		bcm5700_rx_err_count(pUmDevice);
 	
 	p_netstats->tx_aborted_errors = MM_GETSTATS(pStats->ifOutDiscards);
 	p_netstats->tx_carrier_errors =
@@ -2092,11 +2235,73 @@ bcm5700_get_stats(struct net_device *dev)
 	return p_netstats;
 }
 
+void
+b57_suspend_chip(UM_DEVICE_BLOCK *pUmDevice)
+{
+	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
+
+	if (pUmDevice->opened) {
+		bcm5700_intr_off(pUmDevice);
+		netif_carrier_off(pUmDevice->dev);
+		netif_stop_queue(pUmDevice->dev);
+#ifdef BCM_TASKLET
+		tasklet_kill(&pUmDevice->tasklet);
+#endif
+#ifdef BCM_NAPI_RXPOLL
+		while (pDevice->RxPoll)
+			yield();
+#endif
+	}
+	pUmDevice->suspended = 1;
+	LM_ShutdownChip(pDevice, LM_SUSPEND_RESET);
+}
+
+void
+b57_resume_chip(UM_DEVICE_BLOCK *pUmDevice)
+{
+	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
+
+	if (pUmDevice->suspended) {
+		pUmDevice->suspended = 0;
+		if (pUmDevice->opened) {
+			bcm5700_reset(pUmDevice->dev);
+		}
+		else {
+			LM_ShutdownChip(pDevice, LM_SHUTDOWN_RESET);
+		}
+	}
+}
+
+/* Returns 0 on failure, 1 on success */
+int
+b57_test_intr(UM_DEVICE_BLOCK *pUmDevice)
+{
+	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
+	int j;
+
+	if (!pUmDevice->opened)
+		return 0;
+	pUmDevice->intr_test_result = 0;
+	pUmDevice->intr_test = 1;
+	REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+		GRC_MISC_LOCAL_CTRL_SET_INT);
+	for (j = 0; j < 10; j++) {
+		if (pUmDevice->intr_test_result)
+			break;
+		REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+			GRC_MISC_LOCAL_CTRL_SET_INT);
+		MM_Sleep(pDevice, 1);
+	}
+	return pUmDevice->intr_test_result;
+}
+
 #ifdef SIOCETHTOOL
 
 #ifdef ETHTOOL_GSTRINGS
 
-#define ETH_NUM_STATS 26
+#define ETH_NUM_STATS 30
+#define RX_CRC_IDX 5
+#define RX_MAC_ERR_IDX 14
 
 struct {
 	char string[ETH_GSTRING_LEN];
@@ -2106,20 +2311,24 @@ struct {
 	{ "rx_broadcast_packets" },
 	{ "rx_bytes" },
 	{ "rx_fragments" },
-	{ "rx_crc_errors" },
+	{ "rx_crc_errors" },	/* this needs to be calculated */
 	{ "rx_align_errors" },
 	{ "rx_xon_frames" },
 	{ "rx_xoff_frames" },
 	{ "rx_long_frames" },
 	{ "rx_short_frames" },
+	{ "rx_jabber" },
 	{ "rx_discards" },
 	{ "rx_errors" },
+	{ "rx_mac_errors" },	/* this needs to be calculated */
 	{ "tx_unicast_packets" },
 	{ "tx_multicast_packets" },
 	{ "tx_broadcast_packets" },
 	{ "tx_bytes" },
-	{ "tx_collisions" },
 	{ "tx_deferred" },
+	{ "tx_single_collisions" },
+	{ "tx_multi_collisions" },
+	{ "tx_total_collisions" },
 	{ "tx_excess_collisions" },
 	{ "tx_late_collisions" },
 	{ "tx_xon_frames" },
@@ -2143,20 +2352,24 @@ unsigned long bcm5700_stats_offset_arr[ETH_NUM_STATS] = {
 	STATS_OFFSET(ifHCInBroadcastPkts),
 	STATS_OFFSET(ifHCInOctets),
 	STATS_OFFSET(etherStatsFragments),
-	STATS_OFFSET(dot3StatsFCSErrors),
+	0,
 	STATS_OFFSET(dot3StatsAlignmentErrors),
 	STATS_OFFSET(xonPauseFramesReceived),
 	STATS_OFFSET(xoffPauseFramesReceived),
 	STATS_OFFSET(dot3StatsFramesTooLong),
 	STATS_OFFSET(etherStatsUndersizePkts),
+	STATS_OFFSET(etherStatsJabbers),
 	STATS_OFFSET(ifInDiscards),
 	STATS_OFFSET(ifInErrors),
+	0,
 	STATS_OFFSET(ifHCOutUcastPkts),
 	STATS_OFFSET(ifHCOutMulticastPkts),
 	STATS_OFFSET(ifHCOutBroadcastPkts),
 	STATS_OFFSET(ifHCOutOctets),
-	STATS_OFFSET(etherStatsCollisions),
 	STATS_OFFSET(dot3StatsDeferredTransmissions),
+	STATS_OFFSET(dot3StatsSingleCollisionFrames),
+	STATS_OFFSET(dot3StatsMultipleCollisionFrames),
+	STATS_OFFSET(etherStatsCollisions),
 	STATS_OFFSET(dot3StatsExcessiveCollisions),
 	STATS_OFFSET(dot3StatsLateCollisions),
 	STATS_OFFSET(outXonSent),
@@ -2167,6 +2380,26 @@ unsigned long bcm5700_stats_offset_arr[ETH_NUM_STATS] = {
 };
 
 #endif /* ETHTOOL_GSTRINGS */
+
+#ifdef ETHTOOL_TEST
+#define ETH_NUM_TESTS 6
+struct {
+	char string[ETH_GSTRING_LEN];
+} bcm5700_tests_str_arr[ETH_NUM_STATS] = {
+	{ "register test (offline)" },
+	{ "memory test (offline)" },
+	{ "loopback test (offline)" },
+	{ "nvram test (online)" },
+	{ "interrupt test (online)" },
+	{ "link test (online)" },
+};
+
+extern LM_STATUS b57_test_registers(UM_DEVICE_BLOCK *pUmDevice);
+extern LM_STATUS b57_test_memory(UM_DEVICE_BLOCK *pUmDevice);
+extern LM_STATUS b57_test_nvram(UM_DEVICE_BLOCK *pUmDevice);
+extern LM_STATUS b57_test_link(UM_DEVICE_BLOCK *pUmDevice);
+extern LM_STATUS b57_test_loopback(UM_DEVICE_BLOCK *pUmDevice);
+#endif
 
 static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
@@ -2206,13 +2439,16 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 #ifdef ETHTOOL_GSTATS
 		info.n_stats = ETH_NUM_STATS;
 #endif
+#ifdef ETHTOOL_TEST
+		info.testinfo_len = ETH_NUM_TESTS;
+#endif
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
 #endif
         case ETHTOOL_GSET: {
-		if (pDevice->EnableTbi) {
+		if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 			ethcmd.supported =
 				(SUPPORTED_1000baseT_Full |
 				SUPPORTED_Autoneg);
@@ -2252,7 +2488,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		if (pDevice->DisableAutoNeg == FALSE) {
 			ethcmd.autoneg = AUTONEG_ENABLE;
 			ethcmd.advertising = ADVERTISED_Autoneg;
-			if (pDevice->EnableTbi) {
+			if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 				ethcmd.advertising |=
 					ADVERTISED_1000baseT_Full |
 					ADVERTISED_FIBRE;
@@ -2322,7 +2558,8 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		}
 		else {
 			if (ethcmd.speed == SPEED_1000) {
-				if (!pDevice->EnableTbi || pDevice->No1000)
+				if (!(pDevice->TbiFlags & ENABLE_TBI_FLAG) ||
+					(pDevice->PhyFlags & PHY_NO_GIGABIT))
 					return -EINVAL;
 
 				pDevice->RequestedLineSpeed =
@@ -2363,7 +2600,8 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	case ETHTOOL_GWOL: {
 		struct ethtool_wolinfo wol = {ETHTOOL_GWOL};
 
-		if (pDevice->EnableTbi && !pDevice->FiberWolCapable) {
+		if ((pDevice->TbiFlags & ENABLE_TBI_FLAG) &&
+			!(pDevice->Flags & FIBER_WOL_CAPABLE_FLAG)) {
 			wol.supported = 0;
 			wol.wolopts = 0;
 		}
@@ -2388,7 +2626,8 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 			return -EPERM;
 		if (copy_from_user(&wol, useraddr, sizeof(wol)))
 			return -EFAULT;
-		if (pDevice->EnableTbi && !pDevice->FiberWolCapable &&
+		if ((pDevice->TbiFlags & ENABLE_TBI_FLAG) &&
+			!(pDevice->Flags & FIBER_WOL_CAPABLE_FLAG) &&
 			wol.wolopts) {
 			return -EINVAL;
 		}
@@ -2412,7 +2651,11 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	case ETHTOOL_GLINK: {
 		struct ethtool_value edata = {ETHTOOL_GLINK};
 
-		if (pUmDevice->delayed_link_ind > 0)
+		/* workaround for DHCP using ifup script */
+		/* ifup only waits for 5 seconds for link up */
+		/* NIC may take more than 5 seconds to establish link */
+		if ((pUmDevice->delayed_link_ind > 0) &&
+			delay_link[pUmDevice->index])
 			return -EOPNOTSUPP;
 
 		if (pDevice->LinkStatus == LM_STATUS_LINK_ACTIVE) {
@@ -2437,7 +2680,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 			return -EINVAL;
 		}
 		BCM5700_PHY_LOCK(pUmDevice, flags);
-		if (pDevice->EnableTbi) {
+		if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 			pDevice->RequestedLineSpeed = LM_LINE_SPEED_1000MBPS;
 			pDevice->DisableAutoNeg = TRUE;
 			LM_SetupPhy(pDevice);
@@ -2580,7 +2823,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (pDevice->UndiFix)
+		if (pDevice->Flags & UNDI_FIX_FLAG)
 			return -EOPNOTSUPP;
 		if (copy_from_user(&eregs, useraddr, sizeof(eregs)))
 			return -EFAULT;
@@ -2612,7 +2855,8 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	case ETHTOOL_GPAUSEPARAM: {
 		struct ethtool_pauseparam epause = { ETHTOOL_GPAUSEPARAM };
 
-		epause.autoneg = !pDevice->DisableAutoNeg;
+		epause.autoneg = (pDevice->FlowControlCap &
+			LM_FLOW_CONTROL_AUTO_PAUSE) != 0;
 		epause.rx_pause = 
 			(pDevice->FlowControlCap &
 			LM_FLOW_CONTROL_RECEIVE_PAUSE) != 0;
@@ -2789,16 +3033,33 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 		if (copy_from_user(&egstr, useraddr, sizeof(egstr)))
 			return -EFAULT;
-		if (egstr.string_set != ETH_SS_STATS)
-			return -EINVAL;
-		egstr.len = ETH_NUM_STATS;
-		if (copy_to_user(useraddr, &egstr, sizeof(egstr)))
-			return -EFAULT;
-		if (copy_to_user(useraddr + sizeof(egstr), 
-			bcm5700_stats_str_arr, sizeof(bcm5700_stats_str_arr)))
-			return -EFAULT;
-		return 0;
-	}
+		switch(egstr.string_set) {
+#ifdef ETHTOOL_GSTATS
+		case ETH_SS_STATS:
+			egstr.len = ETH_NUM_STATS;
+			if (copy_to_user(useraddr, &egstr, sizeof(egstr)))
+				return -EFAULT;
+			if (copy_to_user(useraddr + sizeof(egstr), 
+				bcm5700_stats_str_arr,
+				sizeof(bcm5700_stats_str_arr)))
+				return -EFAULT;
+			return 0;
+#endif
+#ifdef ETHTOOL_TEST
+		case ETH_SS_TEST:
+			egstr.len = ETH_NUM_TESTS;
+			if (copy_to_user(useraddr, &egstr, sizeof(egstr)))
+				return -EFAULT;
+			if (copy_to_user(useraddr + sizeof(egstr), 
+				bcm5700_tests_str_arr,
+				sizeof(bcm5700_tests_str_arr)))
+				return -EFAULT;
+			return 0;
+#endif
+		default:
+			return -EOPNOTSUPP;
+		}
+		}
 #endif
 #ifdef ETHTOOL_GSTATS
 	case ETHTOOL_GSTATS: {
@@ -2808,22 +3069,102 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		uint64_t *pStats =
 			(uint64_t *) pDevice->pStatsBlkVirt;
 
-		if (copy_to_user(useraddr, &estats, sizeof(estats)))
-			return -EFAULT;
-
 		estats.n_stats = ETH_NUM_STATS;
 		if (pStats == 0) {
 			memset(stats, 0, sizeof(stats));
 		}
 		else {
+
 			for (i = 0; i < ETH_NUM_STATS; i++) {
-				stats[i] = SWAP_DWORD_64(*(pStats +
-					bcm5700_stats_offset_arr[i]));
+				if (bcm5700_stats_offset_arr[i] != 0) {
+					stats[i] = SWAP_DWORD_64(*(pStats +
+						bcm5700_stats_offset_arr[i]));
+				}
+				else if (i == RX_CRC_IDX) {
+					stats[i] = 
+						bcm5700_crc_count(pUmDevice);
+				}
+				else if (i == RX_MAC_ERR_IDX) {
+					stats[i] = 
+						bcm5700_rx_err_count(pUmDevice);
+				}
 			}
 		}
-		if (copy_to_user(useraddr + sizeof(estats), &stats,
-			sizeof(stats)))
+		if (copy_to_user(useraddr, &estats, sizeof(estats))) {
 			return -EFAULT;
+		}
+		if (copy_to_user(useraddr + sizeof(estats), &stats,
+			sizeof(stats))) {
+			return -EFAULT;
+		}
+		return 0;
+	}
+#endif
+#ifdef ETHTOOL_TEST
+	case ETHTOOL_TEST: {
+		struct ethtool_test etest;
+		uint64_t tests[ETH_NUM_TESTS] = {0, 0, 0, 0, 0, 0};
+		LM_POWER_STATE old_power_level;
+
+		if (copy_from_user(&etest, useraddr, sizeof(etest)))
+			return -EFAULT;
+
+		etest.len = ETH_NUM_TESTS;
+		old_power_level = pDevice->PowerLevel;
+		if (old_power_level != LM_POWER_STATE_D0) {
+			LM_SetPowerState(pDevice, LM_POWER_STATE_D0);
+			LM_SwitchClocks(pDevice);
+		}
+		if (etest.flags & ETH_TEST_FL_OFFLINE) {
+			b57_suspend_chip(pUmDevice);
+			LM_HaltCpu(pDevice,T3_RX_CPU_ID);
+			if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId)) {
+				LM_HaltCpu(pDevice,T3_TX_CPU_ID);
+			}
+			if (b57_test_registers(pUmDevice) == 0) {
+				etest.flags |= ETH_TEST_FL_FAILED;
+				tests[0] = 1;
+			}
+			if (b57_test_memory(pUmDevice) == 0) {
+				etest.flags |= ETH_TEST_FL_FAILED;
+				tests[1] = 1;
+			}
+			if (b57_test_loopback(pUmDevice) == 0) {
+				etest.flags |= ETH_TEST_FL_FAILED;
+				tests[2] = 1;
+			}
+			b57_resume_chip(pUmDevice);
+			/* wait for link to come up for the link test */
+			MM_Sleep(pDevice, 4000);
+			if ((pDevice->LinkStatus != LM_STATUS_LINK_ACTIVE) &&
+				!(pDevice->TbiFlags & ENABLE_TBI_FLAG)) {
+
+				/* wait a little longer for linkup on copper */
+				MM_Sleep(pDevice, 3000);
+			}
+		}
+		if (b57_test_nvram(pUmDevice) == 0) {
+			etest.flags |= ETH_TEST_FL_FAILED;
+			tests[3] = 1;
+		}
+		if (b57_test_intr(pUmDevice) == 0) {
+			etest.flags |= ETH_TEST_FL_FAILED;
+			tests[4] = 1;
+		}
+		if (b57_test_link(pUmDevice) == 0) {
+			etest.flags |= ETH_TEST_FL_FAILED;
+			tests[5] = 1;
+		}
+		if (old_power_level != LM_POWER_STATE_D0) {
+			LM_SetPowerState(pDevice, old_power_level);
+		}
+		if (copy_to_user(useraddr, &etest, sizeof(etest))) {
+			return -EFAULT;
+		}
+		if (copy_to_user(useraddr + sizeof(etest), tests,
+			sizeof(tests))) {
+			return -EFAULT;
+		}
 		return 0;
 	}
 #endif
@@ -2888,10 +3229,14 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCGMIIREG:
 #endif
 	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
-		if (pDevice->EnableTbi)
+		if (pDevice->TbiFlags & ENABLE_TBI_FLAG)
 			return -EOPNOTSUPP;
 
-		if (pUmDevice->delayed_link_ind > 0) {
+		/* workaround for DHCP using ifup script */
+		/* ifup only waits for 5 seconds for link up */
+		/* NIC may take more than 5 seconds to establish link */
+		if ((pUmDevice->delayed_link_ind > 0) &&
+			delay_link[pUmDevice->index]) {
 			return -EOPNOTSUPP;
 		}
 
@@ -2908,7 +3253,7 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (pDevice->EnableTbi)
+		if (pDevice->TbiFlags & ENABLE_TBI_FLAG)
 			return -EOPNOTSUPP;
 
 		BCM5700_PHY_LOCK(pUmDevice, flags);
@@ -2961,8 +3306,6 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			return 0;
 		}
 		else {
-			int j;
-
 			if (!pUmDevice->opened)
 				return -EINVAL;
 
@@ -2975,26 +3318,11 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				return -EINTR;
 
 			case NICE_CMD_DIAG_SUSPEND:
-				bcm5700_intr_off(pUmDevice);
-				pUmDevice->suspended = 1;
-				netif_carrier_off(dev);
-				netif_stop_queue(dev);
-#ifdef BCM_TASKLET
-				tasklet_kill(&pUmDevice->tasklet);
-#endif
-#ifdef BCM_NAPI_RXPOLL
-				while (pDevice->RxPoll)
-					yield();
-#endif
-				LM_Abort(pDevice);
-				LM_ResetChip(pDevice);
+				b57_suspend_chip(pUmDevice);
 				return 0;
 
 			case NICE_CMD_DIAG_RESUME:
-				if (pUmDevice->suspended) {
-					pUmDevice->suspended = 0;
-					bcm5700_reset(dev);
-				}
+				b57_resume_chip(pUmDevice);
 				return 0;
 
 			case NICE_CMD_REG_READ:
@@ -3022,7 +3350,7 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			case NICE_CMD_REG_READ_DIRECT:
 			case NICE_CMD_REG_WRITE_DIRECT:
 				if ((nrq->nrq_offset >= 0x10000) ||
-					pDevice->UndiFix) {
+					(pDevice->Flags & UNDI_FIX_FLAG)) {
 					return -EINVAL;
 				}
 
@@ -3127,7 +3455,7 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 					return -EINVAL;
 				}
 
-				if (pDevice->EnableTbi) {
+				if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
 					if (nrq->nrq_speed != 1000)
 						return -EINVAL;
 				}
@@ -3155,21 +3483,8 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				return 0;
 
 			case NICE_CMD_INTERRUPT_TEST:
-				pUmDevice->intr_test_result = 0;
-				pUmDevice->intr_test = 1;
-				REG_WR(pDevice, Grc.LocalCtrl,
-					pDevice->GrcLocalCtrl |
-					GRC_MISC_LOCAL_CTRL_SET_INT);
-				for (j = 0; j < 10; j++) {
-					if (pUmDevice->intr_test_result)
-						break;
-					REG_WR(pDevice, Grc.LocalCtrl,
-						pDevice->GrcLocalCtrl |
-						GRC_MISC_LOCAL_CTRL_SET_INT);
-					MM_Sleep(pDevice, 1);
-				}
 				nrq->nrq_intr_test_result =
-					pUmDevice->intr_test_result;
+					b57_test_intr(pUmDevice);
 				return 0;
 
 			case NICE_CMD_KMALLOC_PHYS: {
@@ -3241,7 +3556,10 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				return 0;
 			}
 			case NICE_CMD_SET_WRITE_PROTECT:
-				pDevice->EepromWp = nrq->nrq_write_protect;
+				if (nrq->nrq_write_protect)
+					pDevice->Flags |= EEPROM_WP_FLAG;
+				else
+					pDevice->Flags &= ~EEPROM_WP_FLAG;
 				return 0;
 			case NICE_CMD_GET_STATS_BLOCK: {
 				PT3_STATS_BLOCK pStats =
@@ -3791,20 +4109,22 @@ MM_GetConfig(PLM_DEVICE_BLOCK pDevice)
 
 		if (line_speed[index] == 1000) {
 			pDevice->RequestedLineSpeed = LM_LINE_SPEED_1000MBPS;
-			if (pDevice->No1000) {
+			if (pDevice->PhyFlags & PHY_NO_GIGABIT) {
 				pDevice->RequestedLineSpeed =
 					LM_LINE_SPEED_100MBPS;
 				printk(KERN_WARNING "%s-%d: Invalid line_speed parameter (1000), using 100\n", bcm5700_driver, index);
 			}
 			else {
-				if (pDevice->EnableTbi && !full_duplex[index]) {
+				if ((pDevice->TbiFlags & ENABLE_TBI_FLAG) &&
+					!full_duplex[index]) {
 
 					printk(KERN_WARNING "%s-%d: Invalid full_duplex parameter (0) for fiber, using 1\n", bcm5700_driver, index);
 					pDevice->RequestedDuplexMode =
 						LM_DUPLEX_MODE_FULL;
 				}
 
-				if (!pDevice->EnableTbi && !auto_speed[index]) {
+				if ((pDevice->TbiFlags & ENABLE_TBI_FLAG) &&
+					!auto_speed[index]) {
 					printk(KERN_WARNING "%s-%d: Invalid auto_speed parameter (0) for copper, using 1\n", bcm5700_driver, index);
 					pDevice->DisableAutoNeg = FALSE;
 				}
@@ -3854,11 +4174,12 @@ MM_GetConfig(PLM_DEVICE_BLOCK pDevice)
 		pDevice->RxMtu = dev->mtu + 14;
 	}
 
-	if (T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5700) {
-		pDevice->UseTaggedStatus = TRUE;
+	if ((T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5700) &&
+		!(pDevice->Flags & BCM5788_FLAG)) {
+		pDevice->Flags |= USE_TAGGED_STATUS_FLAG;
 		pUmDevice->timer_interval = HZ;
 		if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5703) &&
-			pDevice->EnableTbi) {
+			(pDevice->TbiFlags & ENABLE_TBI_FLAG)) {
 			pUmDevice->timer_interval = HZ/4;
 		}
 	}
@@ -3909,17 +4230,24 @@ MM_GetConfig(PLM_DEVICE_BLOCK pDevice)
 			rx_coalesce_ticks[index] = RX_COAL_TK;
 			rx_max_coalesce_frames[index] = RX_COAL_FM;
 		}
-		pDevice->RxCoalescingTicks = rx_coalesce_ticks[index];
-		pUmDevice->rx_curr_coalesce_ticks = pDevice->RxCoalescingTicks;
+		pDevice->RxCoalescingTicks = pUmDevice->rx_curr_coalesce_ticks =
+			rx_coalesce_ticks[index];
+#ifdef BCM_NAPI_RXPOLL
+		pDevice->RxCoalescingTicksDuringInt = rx_coalesce_ticks[index];
+#endif
 
 		bcm5700_validate_param_range(pUmDevice,
 			&rx_max_coalesce_frames[index],
 			"rx_max_coalesce_frames", 0,
 			MAX_RX_MAX_COALESCED_FRAMES, RX_COAL_FM);
 
-		pDevice->RxMaxCoalescedFrames = rx_max_coalesce_frames[index];
-		pUmDevice->rx_curr_coalesce_frames =
-			pDevice->RxMaxCoalescedFrames;
+		pDevice->RxMaxCoalescedFrames =
+			pUmDevice->rx_curr_coalesce_frames =
+			rx_max_coalesce_frames[index];
+#ifdef BCM_NAPI_RXPOLL
+		pDevice->RxMaxCoalescedFramesDuringInt =
+			rx_max_coalesce_frames[index];
+#endif
 
 		bcm5700_validate_param_range(pUmDevice,
 			&tx_coalesce_ticks[index], "tx_coalesce_ticks", 0,
@@ -3971,23 +4299,26 @@ MM_GetConfig(PLM_DEVICE_BLOCK pDevice)
 #ifdef BCM_NIC_SEND_BD
 	bcm5700_validate_param_range(pUmDevice, &nic_tx_bd[index], "nic_tx_bd",
 		0, 1, 0);
-	pDevice->NicSendBd = nic_tx_bd[index];
-	if ((pDevice->EnablePciXFix) ||
+	if (nic_tx_bd[index])
+		pDevice->Flags |= NIC_SEND_BD_FLAG;
+	if ((pDevice->Flags & ENABLE_PCIX_FIX_FLAG) ||
 		(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)) {
-		if (pDevice->NicSendBd) {
-			pDevice->NicSendBd = FALSE;
+		if (pDevice->Flags & NIC_SEND_BD_FLAG) {
+			pDevice->Flags &= ~NIC_SEND_BD_FLAG;
 			printk(KERN_WARNING "%s-%d: Nic Send BDs not available on this NIC or not possible on this system\n", bcm5700_driver, index);
 		}
 	}
 #endif
 #if INCLUDE_TBI_SUPPORT
-	pDevice->PollTbiLink = TRUE;
-	if (((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5704) ||
-	    (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5703))
-		 && pDevice->EnableTbi)
-	{
-		/* just poll since we have hardware autoneg. in 5704 */
-		pDevice->NoTbiInterrupt = TRUE;
+	if (pDevice->TbiFlags & ENABLE_TBI_FLAG) {
+		if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5704) ||
+			(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5703)) {
+			/* just poll since we have hardware autoneg. in 5704 */
+			pDevice->TbiFlags |= TBI_PURE_POLLING_FLAG;
+		}
+		else {
+			pDevice->TbiFlags |= TBI_POLLING_INTR_FLAG;
+		}
 	}
 #endif
 	bcm5700_validate_param_range(pUmDevice, &scatter_gather[index],
@@ -4013,7 +4344,7 @@ MM_GetConfig(PLM_DEVICE_BLOCK pDevice)
 			pDevice->TaskToOffload |=
 				LM_TASK_OFFLOAD_TX_TCP_CHECKSUM |
 				LM_TASK_OFFLOAD_TX_UDP_CHECKSUM;
-			pDevice->NoTxPseudoHdrChksum = TRUE;
+			pDevice->Flags |= NO_TX_PSEUDO_HDR_CSUM_FLAG;
 		}
 	}
 #ifdef BCM_TSO
@@ -4040,6 +4371,8 @@ MM_GetConfig(PLM_DEVICE_BLOCK pDevice)
 #else
 	pUmDevice->vlan_tag_mode = VLAN_TAG_MODE_NORMAL_STRIP;
 #endif
+	bcm5700_validate_param_range(pUmDevice, &delay_link[index],
+		"delay_link", 0, 1, 0);
 	return LM_STATUS_SUCCESS;
 }
 
@@ -4425,6 +4758,10 @@ bcm5700_shutdown(UM_DEVICE_BLOCK *pUmDevice)
 	netif_carrier_off(pUmDevice->dev);
 #ifdef BCM_TASKLET
 	tasklet_kill(&pUmDevice->tasklet);
+#endif
+#ifdef BCM_NAPI_RXPOLL
+	while (pDevice->RxPoll)
+		yield();
 #endif
 	LM_Halt(pDevice);
 	pDevice->InitDone = 0;

@@ -71,11 +71,9 @@
 #define T3_NIC_DATA_SIG                    0x4b657654
 
 #define T3_NIC_DATA_NIC_CFG_ADDR           0x0b58
-#define T3_NIC_CFG_LED_MODE_UNKNOWN        BIT_NONE
-#define T3_NIC_CFG_LED_MODE_TRIPLE_SPEED   BIT_2
-#define T3_NIC_CFG_LED_MODE_LINK_SPEED     BIT_3
-#define T3_NIC_CFG_LED_MODE_OPEN_DRAIN     BIT_2
-#define T3_NIC_CFG_LED_MODE_OUTPUT         BIT_3
+#define T3_NIC_CFG_LED_MAC_MODE            BIT_NONE
+#define T3_NIC_CFG_LED_PHY_MODE_1          BIT_2
+#define T3_NIC_CFG_LED_PHY_MODE_2          BIT_3
 #define T3_NIC_CFG_LED_MODE_MASK           (BIT_2 | BIT_3)
 #define T3_NIC_CFG_PHY_TYPE_UNKNOWN         BIT_NONE
 #define T3_NIC_CFG_PHY_TYPE_COPPER          BIT_4
@@ -107,7 +105,9 @@
 
 #define T3_DRV_STATE_MAILBOX                0x0c04
 #define T3_DRV_STATE_START                  0x01
+#define T3_DRV_STATE_START_DONE             0x80000001
 #define T3_DRV_STATE_UNLOAD                 0x02
+#define T3_DRV_STATE_UNLOAD_DONE            0x80000002
 #define T3_DRV_STATE_WOL                    0x03
 #define T3_DRV_STATE_SUSPEND                0x04
 
@@ -122,6 +122,14 @@
 #define DRV_DOWN_STATE_SHUTDOWN             0x1
 
 #define DRV_WOL_SET_MAGIC_PKT               BIT_2
+
+#define T3_NIC_DATA_NIC_CFG_ADDR2           0x0d38 /* bit 2-3 are same as in */
+                                                   /* 0xb58 */
+#define T3_SHASTA_EXT_LED_MODE_MASK         (BIT_15 | BIT_16)
+#define T3_SHASTA_EXT_LED_LEGACY_MODE       BIT_NONE
+#define T3_SHASTA_EXT_LED_SHARED_TRAFFIC_LINK_MODE       BIT_15
+#define T3_SHASTA_EXT_LED_MAC_MODE          BIT_16
+#define T3_SHASTA_EXT_LED_WIRELESS_COMBO_MODE       (BIT_15 | BIT_16)
 
 /******************************************************************************/
 /* Hardware constants. */
@@ -203,11 +211,12 @@
 
 #ifdef BCM_NAPI_RXPOLL
 #define DEFAULT_RX_COALESCING_TICKS_DURING_INT          18
+#define DEFAULT_RX_MAX_COALESCED_FRAMES_DURING_INT      6
 #else
 #define DEFAULT_RX_COALESCING_TICKS_DURING_INT          25
+#define DEFAULT_RX_MAX_COALESCED_FRAMES_DURING_INT      2
 #endif
 #define DEFAULT_TX_COALESCING_TICKS_DURING_INT          25
-#define DEFAULT_RX_MAX_COALESCED_FRAMES_DURING_INT      2
 #define ADAPTIVE_LO_RX_MAX_COALESCED_FRAMES_DURING_INT  1
 #define ADAPTIVE_HI_RX_MAX_COALESCED_FRAMES_DURING_INT  5
 #define DEFAULT_TX_MAX_COALESCED_FRAMES_DURING_INT      5
@@ -222,11 +231,6 @@
 /* Receive BD Replenish thresholds. */
 #define DEFAULT_RCV_STD_BD_REPLENISH_THRESHOLD      4
 #define DEFAULT_RCV_JUMBO_BD_REPLENISH_THRESHOLD    4
-
-#define SPLIT_MODE_DISABLE                          0
-#define SPLIT_MODE_ENABLE                           1
-
-#define SPLIT_MODE_5704_MAX_REQ                     3
 
 /* Maximum physical fragment size. */
 #define MAX_FRAGMENT_SIZE                   (64 * 1024)
@@ -365,6 +369,9 @@ typedef struct T3_FWIMG_INFO
 #define T3_CHIP_ID_5705_A2                  0x3002
 #define T3_CHIP_ID_5705_A3                  0x3003
 
+#define T3_CHIP_ID_5750_A0                  0x4000
+#define T3_CHIP_ID_5750_A1                  0x4001
+
 /* Chip Id. */
 #define T3_ASIC_REV(_ChipRevId)             ((_ChipRevId) >> 12)
 #define T3_ASIC_REV_5700                    0x07
@@ -372,6 +379,11 @@ typedef struct T3_FWIMG_INFO
 #define T3_ASIC_REV_5703                    0x01
 #define T3_ASIC_REV_5704                    0x02
 #define T3_ASIC_REV_5705                    0x03
+#define T3_ASIC_REV_5750                    0x04
+
+#define T3_ASIC_5705_OR_5750(_ChipRevId)              \
+    ((T3_ASIC_REV(_ChipRevId) == T3_ASIC_REV_5705) || \
+    (T3_ASIC_REV(_ChipRevId) == T3_ASIC_REV_5750))
 
 /* Chip id and revision. */
 #define T3_CHIP_REV(_ChipRevId)             ((_ChipRevId) >> 8)
@@ -425,6 +437,8 @@ typedef struct T3_FWIMG_INFO
 #define T3_PM_PME_ENABLE                    BIT_8
 #define T3_PM_PME_ASSERTED                  BIT_15
 
+#define T3_MSI_CAPABILITY_ID_REG            0x58
+#define T3_MSI_NEXT_CAPABILITY_PTR          0x59
 
 /* PCI state register. */
 #define T3_PCI_STATE_REG                    0x70
@@ -485,6 +499,10 @@ typedef struct T3_FWIMG_INFO
 #define T3_SSID_COMPAQ_NC7780                       0x0085
 #define T3_SSID_COMPAQ_NC7780_2                     0x0099
 
+#define T3_PCIE_CAPABILITY_ID_REG           0xD0
+#define T3_PCIE_CAPABILITY_ID               0x10
+
+#define T3_PCIE_CAPABILITY_REG              0xD2
 
 /******************************************************************************/
 /* MII registers. */
@@ -565,6 +583,7 @@ typedef struct T3_FWIMG_INFO
 #define PHY_BCM5703_PHY_ID                          0x60008160
 #define PHY_BCM5704_PHY_ID                          0x60008190
 #define PHY_BCM5705_PHY_ID                          0x600081a0
+#define PHY_BCM5750_PHY_ID                          0x60008180
 #define PHY_BCM8002_PHY_ID                          0x60010140
 
 #define PHY_BCM5401_B0_REV                          0x1
@@ -585,6 +604,7 @@ typedef struct T3_FWIMG_INFO
                             (((x) & PHY_ID_MASK) != PHY_BCM5703_PHY_ID) && \
                             (((x) & PHY_ID_MASK) != PHY_BCM5704_PHY_ID) && \
                             (((x) & PHY_ID_MASK) != PHY_BCM5705_PHY_ID) && \
+                            (((x) & PHY_ID_MASK) != PHY_BCM5750_PHY_ID) && \
                             (((x) & PHY_ID_MASK) != PHY_BCM8002_PHY_ID))
 
 
@@ -1337,17 +1357,38 @@ typedef struct {
     #define MISC_HOST_CTRL_ENABLE_TAGGED_STATUS_MODE        BIT_9
 
     T3_32BIT_REGISTER DmaReadWriteCtrl;
+    #define DMA_CTRL_WRITE_CMD                      0x70000000
+    #define DMA_CTRL_WRITE_BOUNDARY_64_PCIE         0x10000000
+    #define DMA_CTRL_WRITE_BOUNDARY_128_PCIE        0x30000000
+    #define DMA_CTRL_WRITE_BOUNDARY_DISABLE_PCIE    0x70000000
+    #define DMA_CTRL_READ_CMD                       0x06000000
+
     #define DMA_CTRL_WRITE_BOUNDARY_MASK            (BIT_11 | BIT_12 | BIT_13)
     #define DMA_CTRL_WRITE_BOUNDARY_DISABLE         0
     #define DMA_CTRL_WRITE_BOUNDARY_16              BIT_11
+    #define DMA_CTRL_WRITE_BOUNDARY_128_PCIX        BIT_11
     #define DMA_CTRL_WRITE_BOUNDARY_32              BIT_12
+    #define DMA_CTRL_WRITE_BOUNDARY_256_PCIX        BIT_12
     #define DMA_CTRL_WRITE_BOUNDARY_64              (BIT_12 | BIT_11)
+    #define DMA_CTRL_WRITE_BOUNDARY_384_PCIX        (BIT_12 | BIT_11)
     #define DMA_CTRL_WRITE_BOUNDARY_128             BIT_13
     #define DMA_CTRL_WRITE_BOUNDARY_256             (BIT_13 | BIT_11)
     #define DMA_CTRL_WRITE_BOUNDARY_512             (BIT_13 | BIT_12)
     #define DMA_CTRL_WRITE_BOUNDARY_1024            (BIT_13 | BIT_12 | BIT_11)
     #define DMA_CTRL_WRITE_ONE_DMA_AT_ONCE          BIT_14
 
+    #define DMA_CTRL_READ_BOUNDARY_MASK             (BIT_10 | BIT_9 | BIT_8)
+    #define DMA_CTRL_READ_BOUNDARY_DISABLE          0
+    #define DMA_CTRL_READ_BOUNDARY_16               BIT_8
+    #define DMA_CTRL_READ_BOUNDARY_128_PCIX         BIT_8
+    #define DMA_CTRL_READ_BOUNDARY_32               BIT_9
+    #define DMA_CTRL_READ_BOUNDARY_256_PCIX         BIT_9
+    #define DMA_CTRL_READ_BOUNDARY_64               (BIT_9 | BIT_8)
+    #define DMA_CTRL_READ_BOUNDARY_384_PCIX         (BIT_9 | BIT_8)
+    #define DMA_CTRL_READ_BOUNDARY_128              BIT_10
+    #define DMA_CTRL_READ_BOUNDARY_256              (BIT_10 | BIT_8)
+    #define DMA_CTRL_READ_BOUNDARY_512              (BIT_10 | BIT_9)
+    #define DMA_CTRL_READ_BOUNDARY_1024             (BIT_10 | BIT_9 | BIT_8)
 
     T3_32BIT_REGISTER PciState;
     #define T3_PCI_STATE_FORCE_PCI_RESET                    BIT_0
@@ -1484,6 +1525,9 @@ typedef struct {
     #define LED_CTRL_MAC_MODE                           BIT_NONE
     #define LED_CTRL_PHY_MODE_1                         BIT_11
     #define LED_CTRL_PHY_MODE_2                         BIT_12
+    #define LED_CTRL_SHASTA_MAC_MODE                    BIT_13
+    #define LED_CTRL_SHARED_TRAFFIC_LINK                BIT_14
+    #define LED_CTRL_WIRELESS_COMBO                     BIT_15
     #define LED_CTRL_BLINK_RATE_MASK                    0x7ff80000
     #define LED_CTRL_OVERRIDE_BLINK_PERIOD              BIT_19
     #define LED_CTRL_OVERRIDE_BLINK_RATE                BIT_31
@@ -1545,6 +1589,7 @@ typedef struct {
     /* MI Status. */
     T3_32BIT_REGISTER MiStatus;
     #define MI_STATUS_ENABLE_LINK_STATUS_ATTN           BIT_0
+    #define MI_STATUS_10MBPS                            BIT_1
 
     /* MI Mode. */
     T3_32BIT_REGISTER MiMode;
@@ -2211,8 +2256,8 @@ typedef struct {
     #define DMA_READ_MODE_FIFO_UNDERRUN_ATTN_ENABLE     BIT_7
     #define DMA_READ_MODE_FIFO_OVERREAD_ATTN_ENABLE     BIT_8
     #define DMA_READ_MODE_LONG_READ_ATTN_ENABLE         BIT_9
-    #define DMA_READ_MODE_SPLIT_ENABLE                  BIT_11
-    #define DMA_READ_MODE_SPLIT_RESET                   BIT_12
+    #define DMA_READ_MODE_MULTI_SPLIT_ENABLE            BIT_11
+    #define DMA_READ_MODE_MULTI_SPLIT_RESET             BIT_12
     #define DMA_READ_MODE_FIFO_SIZE_128                 BIT_17
     #define DMA_READ_MODE_FIFO_LONG_BURST               (BIT_16 | BIT_17)
 
@@ -2645,8 +2690,12 @@ typedef struct
     #define SW_ARB_REQ2                                 BIT_14
     #define SW_ARB_REQ3                                 BIT_15
 
+    T3_32BIT_REGISTER NvmAccess;
+    #define ACCESS_EN                                   BIT_0
+    #define ACCESS_WR_EN                                BIT_1
+
     /* Unused space. */
-    LM_UINT8 Unused[988];
+    LM_UINT8 Unused[984];
 } T3_NVRAM, *PT3_NVRAM;
 
 
@@ -2894,14 +2943,14 @@ typedef struct _LM_PACKET {
 
 #if INCLUDE_TCP_SEG_SUPPORT
             LM_UINT32 MaxSegmentSize;
-            LM_UINT32 LastFragmentChksum;
 #endif
         } Tx;
 
         /* Receive info. */
         struct {
             /* This descriptor belongs to either Std, Mini, or Jumbo ring. */
-            T3_RCV_PROD_RING RcvProdRing;
+            LM_UINT16 RcvProdRing;
+            LM_UINT16 RcvRingProdIdx;
 
             /* Receive buffer size */
             LM_UINT32 RxBufferSize;
@@ -2937,8 +2986,52 @@ typedef struct _LM_DEVICE_BLOCK {
     LM_UINT32 GrcMode;
 
     LM_UINT32 PowerLevel;
-    LM_UINT32 MiniPci;
-    LM_UINT32 Bcm5788;
+
+    LM_UINT32 Flags;
+
+    #define MINI_PCI_FLAG              0x1
+    #define PCI_EXPRESS_FLAG           0x2
+    #define BCM5788_FLAG               0x4
+    #define FIBER_WOL_CAPABLE_FLAG     0x8
+    #define WOL_LIMIT_10MBPS_FLAG      0x10
+    #define ENABLE_MWI_FLAG            0x20
+    #define USE_TAGGED_STATUS_FLAG     0x40
+
+    /* NIC will not compute the pseudo header checksum.  The driver or OS */
+    /* must seed the checksum field with the pseudo checksum. */
+    #define NO_TX_PSEUDO_HDR_CSUM_FLAG 0x80
+
+    /* The receive checksum in the BD does not include the pseudo checksum. */
+    /* The OS or the driver must calculate the pseudo checksum and add it to */
+    /* the checksum in the BD. */
+    #define NO_RX_PSEUDO_HDR_CSUM_FLAG 0x100
+
+    #define ENABLE_PCIX_FIX_FLAG       0x200
+
+    #define TX_4G_WORKAROUND_FLAG      0x400
+    #define UNDI_FIX_FLAG              0x800
+    #define FLUSH_POSTED_WRITE_FLAG    0x1000
+    #define REG_RD_BACK_FLAG           0x2000
+
+    /* Use NIC or Host based send BD. */
+    #define NIC_SEND_BD_FLAG           0x4000
+
+    /* Athlon fix. */
+    #define DELAY_PCI_GRANT_FLAG       0x8000
+
+    /* Enable OneDmaAtOnce */
+    #define ONE_DMA_AT_ONCE_FLAG       0x10000
+
+    /* Enable PCI-X multi split */
+    #define MULTI_SPLIT_ENABLE_FLAG    0x20000
+
+    #define RX_BD_LIMIT_64_FLAG        0x40000
+
+    #define DMA_WR_MODE_RX_ACCELERATE_FLAG 0x80000
+
+    /* write protect */
+    #define EEPROM_WP_FLAG             0x100000
+    #define FLASH_DETECTED_FLAG        0x200000
 
     /* Rx info */
     LM_UINT32 RxStdDescCnt;
@@ -2951,6 +3044,11 @@ typedef struct _LM_DEVICE_BLOCK {
     LM_UINT32 RxPacketDescCnt;
     LM_RX_PACKET_Q RxPacketFreeQ;
     LM_RX_PACKET_Q RxPacketReceivedQ;
+
+    LM_PACKET *RxStdRing[T3_STD_RCV_RCB_ENTRY_COUNT];
+#if T3_JUMBO_RCV_RCB_ENTRY_COUNT
+    LM_PACKET *RxJumboRing[T3_JUMBO_RCV_RCB_ENTRY_COUNT];
+#endif
 
     /* Receive info. */
     PT3_RCV_BD pRcvRetBdVirt;
@@ -2997,7 +3095,6 @@ typedef struct _LM_DEVICE_BLOCK {
 
     /* Tx info. */
     LM_TX_PACKET_Q TxPacketFreeQ;
-    LM_TX_PACKET_Q TxPacketActiveQ;
     LM_TX_PACKET_Q TxPacketXmittedQ;
 
     /* Pointers to SendBd. */
@@ -3012,6 +3109,7 @@ typedef struct _LM_DEVICE_BLOCK {
     MM_ATOMIC_T SendBdLeft;
 
     T3_SND_BD ShadowSendBd[T3_SEND_RCB_ENTRY_COUNT];
+    LM_PACKET *SendRing[T3_SEND_RCB_ENTRY_COUNT];
 
     /* Counters. */
     LM_RX_COUNTERS RxCounters;
@@ -3050,9 +3148,6 @@ typedef struct _LM_DEVICE_BLOCK {
     /* Task offload selected. */
     LM_TASK_OFFLOAD TaskToOffload;
 
-    LM_UINT32 FiberWolCapable;
-    LM_UINT32 WolLimit10;
-
     /* Wake up capability. */
     LM_WAKE_UP_MODE WakeUpModeCap;
 
@@ -3063,22 +3158,8 @@ typedef struct _LM_DEVICE_BLOCK {
     LM_FLOW_CONTROL FlowControlCap;
     LM_FLOW_CONTROL FlowControl;
 
-    /* Enable or disable PCI MWI. */
-    LM_UINT32 EnableMWI;
-
-    /* Enable 5701 tagged status mode. */
-    LM_UINT32 UseTaggedStatus;
-
+    /* interrupt status tag */
     LM_UINT32 LastTag;
-
-    /* NIC will not compute the pseudo header checksum.  The driver or OS */
-    /* must seed the checksum field with the pseudo checksum. */
-    LM_UINT32 NoTxPseudoHdrChksum;
-
-    /* The receive checksum in the BD does not include the pseudo checksum. */
-    /* The OS or the driver must calculate the pseudo checksum and add it to */
-    /* the checksum in the BD. */
-    LM_UINT32 NoRxPseudoHdrChksum;
 
     /* Current node address. */
     LM_UINT8 NodeAddress[8];
@@ -3097,13 +3178,6 @@ typedef struct _LM_DEVICE_BLOCK {
     LM_UINT8 IntPin;
     LM_UINT8 CacheLineSize;
     LM_UINT8 PciRevId;
-#if PCIX_TARGET_WORKAROUND
-    LM_UINT32 EnablePciXFix;
-#endif
-    LM_UINT32 Tx4GWorkaround;
-    LM_UINT32 UndiFix;
-    LM_UINT32 FlushPostedWrites;
-    LM_UINT32 RegReadBack;
     LM_UINT32 PciCommandStatusWords;
     LM_UINT32 ChipRevId;
     LM_UINT16 SubsystemVendorId;
@@ -3139,18 +3213,7 @@ typedef struct _LM_DEVICE_BLOCK {
     #define T3_LINK_CHNG_MODE_USE_STATUS_REG            1
     #define T3_LINK_CHNG_MODE_USE_STATUS_BLOCK          2
 
-    /* LED mode. */
-    LM_UINT32 LedMode;
-
-    #define LED_MODE_AUTO                               0
-
-    /* 5700/01 LED mode. */
-    #define LED_MODE_THREE_LINK                         1
-    #define LED_MODE_LINK10                             2
-
-    /* 5703/02/04 LED mode. */
-    #define LED_MODE_OPEN_DRAIN                         1
-    #define LED_MODE_OUTPUT                             2
+    LM_UINT32 LedCtrl;
 
     /* WOL Speed */
     LM_UINT32 WolSpeed;
@@ -3164,6 +3227,8 @@ typedef struct _LM_DEVICE_BLOCK {
     #define PHY_CHECK_TAPS_AFTER_RESET                  0x08
     #define PHY_5704_A0_FIX                             0x10
     #define PHY_ETHERNET_WIRESPEED                      0x20
+    #define PHY_5705_5750_FIX                           0x40
+    #define PHY_NO_GIGABIT                              0x80
 
     LM_UINT32 RestoreOnWakeUp;
     LM_LINE_SPEED WakeUpRequestedLineSpeed;
@@ -3177,7 +3242,6 @@ typedef struct _LM_DEVICE_BLOCK {
     LM_STATUS LinkStatus;
     LM_UINT32 advertising;
     LM_UINT32 advertising1000;
-    LM_UINT32 No1000;
 
     LM_UINT32 LoopBackMode;
 
@@ -3191,20 +3255,15 @@ typedef struct _LM_DEVICE_BLOCK {
 
     LM_UINT32 MulticastHash[4];
 
-    /* Use NIC or Host based send BD. */
-    LM_UINT32 NicSendBd;
+    LM_UINT32 AsfFlags;
 
-    LM_UINT32 EnableAsf;
-
-    /* Athlon fix. */
-    LM_UINT32 DelayPciGrant;
-
-    /* Enable OneDmaAtOnce */
-    LM_UINT32 OneDmaAtOnce;
+#define ASF_ENABLED         1
+#define ASF_NEW_HANDSHAKE   2 /* if set, this bit implies ASF enabled as well */
 
     /* Split Mode flags */
-    LM_UINT32 SplitModeEnable;
     LM_UINT32 SplitModeMaxReq;
+
+    #define SPLIT_MODE_5704_MAX_REQ                     3
 
     /* Init flag. */
     LM_BOOL InitDone;
@@ -3216,32 +3275,31 @@ typedef struct _LM_DEVICE_BLOCK {
     /* LM_ResetAdapter routine. */
     LM_BOOL QueueRxPackets;
     LM_BOOL QueueAgain;
-    LM_BOOL RxBDLimit64;
 
     LM_UINT32 MbufBase;
     LM_UINT32 MbufSize;
 
-    /* TRUE if we have a SERDES PHY. */
-    LM_UINT32 EnableTbi;
-
-    LM_UINT32 EepromWp;
     LM_UINT32 NvramSize;
-    LM_UINT32 Flash;
 
 #if INCLUDE_TBI_SUPPORT
     /* Autoneg state info. */
     AN_STATE_INFO AnInfo;
-    LM_UINT32 PollTbiLink;
-    LM_UINT32 NoTbiInterrupt;
+
+    LM_UINT32 TbiFlags;
+    /* set if we have a SERDES PHY. */
+    #define ENABLE_TBI_FLAG            0x1
+    #define TBI_POLLING_INTR_FLAG      0x2
+    #define TBI_PURE_POLLING_FLAG      0x4
+    #define TBI_POLLING_FLAGS   (TBI_POLLING_INTR_FLAG | TBI_PURE_POLLING_FLAG)
+
     LM_UINT32 IgnoreTbiLinkChange;
 #endif
 #ifdef BCM_NAPI_RXPOLL
-    LM_UINT32 RxPoll;
+    volatile LM_UINT32 RxPoll;
 #endif
     char PartNo[24];
     char BootCodeVer[16];
     char BusSpeedStr[24];
-    unsigned long PhyCrcCount;
 
 } LM_DEVICE_BLOCK;
 
@@ -3458,6 +3516,8 @@ LM_STATUS LM_LoadFirmware(PLM_DEVICE_BLOCK pDevice,
 /* MAC register access. */
 LM_UINT32 LM_RegRd(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register);
 
+LM_VOID LM_RegRdBack(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register);
+
 LM_VOID LM_RegWr(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register,
     LM_UINT32 Value32, LM_UINT32 ReadBack);
 
@@ -3472,18 +3532,21 @@ LM_VOID LM_MemWrInd(PLM_DEVICE_BLOCK pDevice, LM_UINT32 MemAddr,
     LM_UINT32 Value32);
 
 #define MB_REG_WR(pDevice, OffsetName, Value32)                               \
-    ((pDevice)->UndiFix) ?                                                    \
+    ((pDevice)->Flags & UNDI_FIX_FLAG) ?                                      \
         LM_RegWrInd(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName)+0x5600,     \
             Value32) :                                                        \
         (void) MM_MEMWRITEL(&((pDevice)->pMemView->OffsetName), Value32)
 
 #define MB_REG_RD(pDevice, OffsetName)                                        \
-    (((pDevice)->UndiFix) ?                                                   \
+    (((pDevice)->Flags & UNDI_FIX_FLAG) ?                                     \
         LM_RegRdInd(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName)+0x5600) :   \
         MM_MEMREADL(&((pDevice)->pMemView->OffsetName)))
 
 #define REG_RD(pDevice, OffsetName)                                         \
     LM_RegRd(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName))
+
+#define REG_RD_BACK(pDevice, OffsetName)                                    \
+    LM_RegRdBack(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName))
 
 #define REG_WR(pDevice, OffsetName, Value32)                                \
     LM_RegWr(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName), Value32, TRUE)

@@ -110,9 +110,15 @@ struct ethtool_eeprom {
 #define BCM_WOL 1
 #define BCM_TASKLET 1
 
+#define INCLUDE_5750_A0_FIX 1
+
 #if HAVE_NETIF_RECEIVE_SKB
 #define BCM_NAPI_RXPOLL 1
 #undef BCM_TASKLET
+#endif
+
+#if defined(CONFIG_PPC64)
+#define BCM_DISCONNECT_AT_CACHELINE 1
 #endif
 
 #ifdef BCM_SMALL_DRV
@@ -122,6 +128,7 @@ struct ethtool_eeprom {
 #undef ETHTOOL_GREGS
 #undef ETHTOOL_GPAUSEPARAM
 #undef ETHTOOL_GRXCSUM
+#undef ETHTOOL_TEST
 #undef BCM_INT_COAL
 #undef BCM_NIC_SEND_BD
 #undef BCM_WOL
@@ -313,6 +320,7 @@ typedef struct _UM_DEVICE_BLOCK {
 	int poll_tbi_interval;
 	int poll_tbi_expiry;
 	int asf_heartbeat;
+	int stats_interval;
 	int tx_full;
 	int tx_queued;
 	int line_speed;		/* in Mbps, 0 if link is down */
@@ -337,9 +345,9 @@ typedef struct _UM_DEVICE_BLOCK {
 #ifdef NICE_SUPPORT
 	void (*nice_rx)( struct sk_buff*, void* );
 	void* nice_ctx;
+#endif /* NICE_SUPPORT */
 	int intr_test;
 	int intr_test_result;
-#endif /* NICE_SUPPORT */
 #ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
 #endif
@@ -372,6 +380,8 @@ typedef struct _UM_DEVICE_BLOCK {
 	unsigned long tso_pkt_count;
 #endif
 	unsigned long rx_misc_errors;
+	uint64_t phy_crc_count;
+	unsigned int spurious_int;
 } UM_DEVICE_BLOCK, *PUM_DEVICE_BLOCK;
 
 typedef struct _UM_PACKET {
@@ -532,12 +542,16 @@ static inline void MM_MapTxDma(PLM_DEVICE_BLOCK pDevice,
 
 #define MM_UINT_PTR(_ptr)   ((unsigned long) (_ptr))
 
+#define MM_GETSTATS64(_Ctr) \
+	(uint64_t) (_Ctr).Low + ((uint64_t) (_Ctr).High << 32)
+
+#define MM_GETSTATS32(_Ctr) \
+	(uint32_t) (_Ctr).Low
+
 #if (BITS_PER_LONG == 64)
-#define MM_GETSTATS(_Ctr) \
-	(unsigned long) (_Ctr).Low + ((unsigned long) (_Ctr).High << 32)
+#define MM_GETSTATS(_Ctr) (unsigned long) MM_GETSTATS64(_Ctr)
 #else
-#define MM_GETSTATS(_Ctr) \
-	(unsigned long) (_Ctr).Low
+#define MM_GETSTATS(_Ctr) (unsigned long) MM_GETSTATS32(_Ctr)
 #endif
 
 

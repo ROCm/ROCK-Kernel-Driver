@@ -2076,11 +2076,12 @@ config NET_BCM44
 	depends on PCI
 	help
 	  This driver supports Broadcom based 10/100 Mbit Ethernet cards.
-
+ 
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
 	  recommended.  The module will be called bcm4400.
+
 endmenu
 
 #
