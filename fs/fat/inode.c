@@ -1245,7 +1245,7 @@ retry:
 	lock_kernel();
 	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
 		printk(KERN_ERR "FAT: unable to read inode block "
-		       "for updating (i_pos %lld)", i_pos);
+		       "for updating (i_pos %lld)\n", i_pos);
 		unlock_kernel();
 		return /* -EIO */;
 	}
