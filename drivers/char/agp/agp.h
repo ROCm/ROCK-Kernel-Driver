@@ -46,7 +46,7 @@ static void __attribute__((unused)) global_cache_flush(void)
 		panic(PFX "timed out waiting for the other CPUs!\n");
 }
 #else
-static inline void global_cache_flush(void)
+static void global_cache_flush(void)
 {
 	flush_agp_cache();
 }
