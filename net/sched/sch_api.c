@@ -985,6 +985,8 @@ static int tc_fill_tclass(struct sk_buff *skb, struct Qdisc *q,
 	struct tcmsg *tcm;
 	struct nlmsghdr  *nlh;
 	unsigned char	 *b = skb->tail;
+	struct gnet_dump d;
+	struct Qdisc_class_ops *cl_ops = q->ops->cl_ops;
 
 	nlh = NLMSG_PUT(skb, pid, seq, event, sizeof(*tcm));
 	nlh->nlmsg_flags = flags;
@@ -995,8 +997,19 @@ static int tc_fill_tclass(struct sk_buff *skb, struct Qdisc *q,
 	tcm->tcm_handle = q->handle;
 	tcm->tcm_info = 0;
 	RTA_PUT(skb, TCA_KIND, IFNAMSIZ, q->ops->id);
-	if (q->ops->cl_ops->dump && q->ops->cl_ops->dump(q, cl, skb, tcm) < 0)
+	if (cl_ops->dump && cl_ops->dump(q, cl, skb, tcm) < 0)
 		goto rtattr_failure;
+
+	if (gnet_stats_start_copy_compat(skb, TCA_STATS2, TCA_STATS,
+			TCA_XSTATS, q->stats_lock, &d) < 0)
+		goto rtattr_failure;
+
+	if (cl_ops->dump_stats && cl_ops->dump_stats(q, cl, &d) < 0)
+		goto rtattr_failure;
+
+	if (gnet_stats_finish_copy(&d) < 0)
+		goto rtattr_failure;
+
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
 
