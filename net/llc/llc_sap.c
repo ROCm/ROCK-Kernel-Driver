@@ -315,9 +315,3 @@ void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
 	} else
 		kfree_skb(skb);
 }
-
-EXPORT_SYMBOL(llc_save_primitive);
-EXPORT_SYMBOL(llc_build_and_send_test_pkt);
-EXPORT_SYMBOL(llc_build_and_send_ui_pkt);
-EXPORT_SYMBOL(llc_build_and_send_xid_pkt);
-EXPORT_SYMBOL(llc_sap_handler);
