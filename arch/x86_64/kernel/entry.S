@@ -573,6 +573,7 @@ ENTRY(spurious_interrupt)
 	.endm
 
 	/* error code is on the stack already */
+	/* handle NMI like exceptions that can happen everywhere */
 	.macro paranoidentry sym
 	SAVE_ALL
 	cld
@@ -867,6 +868,7 @@ ENTRY(coprocessor_segment_overrun)
 ENTRY(reserved)
 	zeroentry do_reserved
 
+	/* runs on exception stack */
 ENTRY(double_fault)
 	paranoidentry do_double_fault
 	jmp paranoid_stack_switch
@@ -877,6 +879,7 @@ ENTRY(invalid_TSS)
 ENTRY(segment_not_present)
 	errorentry do_segment_not_present
 
+	/* runs on exception stack */
 ENTRY(stack_segment)
 	paranoidentry do_stack_segment
 	jmp paranoid_stack_switch

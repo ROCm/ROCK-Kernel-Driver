@@ -78,23 +78,14 @@ __initcall(init_syscall32);
 
 void __init syscall32_cpu_init(void)
 {
-	if (use_sysenter < 0) {
-		/* Both AMD64 and IA32e claim to support syscall and sysenter
- 		   in CPUID.  But AMD64 doesn't support sysexit in long mode,
- 		   and IA32e doesn't support syscall for 32-bit programs.
- 		   Furthermore, syscall32_cpu_init is called before
- 		   check_bugs, so cpuid needs to be called manually.  */
- 		char vendor[12];
- 		int eax;
- 		cpuid (0, &eax, (int *) &vendor[0], (int *) &vendor[8],
- 		       (int *) &vendor[4]);
- 		use_sysenter = memcmp (vendor, "GenuineIntel", 12) == 0;
- 	}
- 	if (use_sysenter) {
- 		wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
- 		wrmsr(MSR_IA32_SYSENTER_ESP, 0, 0);
- 		wrmsrl(MSR_IA32_SYSENTER_EIP, ia32_sysenter_target);
- 	} else {
- 		wrmsrl(MSR_CSTAR, ia32_cstar_target);
-	}
+	if (use_sysenter < 0)
+ 		use_sysenter = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL);
+
+	/* Load these always in case some future AMD CPU supports
+	   SYSENTER from compat mode too. */
+	wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
+	wrmsr(MSR_IA32_SYSENTER_ESP, 0, 0);
+	wrmsrl(MSR_IA32_SYSENTER_EIP, ia32_sysenter_target);
+
+	wrmsrl(MSR_CSTAR, ia32_cstar_target);
 }

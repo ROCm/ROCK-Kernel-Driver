@@ -331,6 +331,11 @@ config PCI_DIRECT
 	depends on PCI
 	default y
 
+config PCI_MMCONFIG 
+	bool "Support mmconfig PCI config space access" 
+	depends on PCI
+	select ACPI_BOOT
+
 # the drivers/pci/msi.c code needs to be fixed first before enabling
 config PCI_USE_VECTOR
 	bool "Vector-based interrupt indexing"

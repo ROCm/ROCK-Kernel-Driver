@@ -101,7 +101,7 @@ static void oct5066_copy_from(struct map_info *map, void *to, unsigned long from
 		
 		spin_lock(&oct5066_spin);
 		oct5066_page(map, from);
-		memcpy_fromio(to, (char *)iomapadr + from, thislen);
+		memcpy_fromio(to, iomapadr + from, thislen);
 		spin_unlock(&oct5066_spin);
 		to += thislen;
 		from += thislen;
@@ -142,7 +142,7 @@ static void oct5066_copy_to(struct map_info *map, unsigned long to, const void *
 		
 		spin_lock(&oct5066_spin);
 		oct5066_page(map, to);
-		memcpy_toio((char *)iomapadr + to, from, thislen);
+		memcpy_toio(iomapadr + to, from, thislen);
 		spin_unlock(&oct5066_spin);
 		to += thislen;
 		from += thislen;

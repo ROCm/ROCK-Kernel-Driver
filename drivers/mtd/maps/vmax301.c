@@ -92,7 +92,7 @@ static void vmax301_copy_from(struct map_info *map, void *to, unsigned long from
 			thislen = WINDOW_LENGTH-(from & WINDOW_MASK);
 		spin_lock(&vmax301_spin);
 		vmax301_page(map, from);
-		memcpy_fromio(to, (char *)map->map_priv_2 + from, thislen);
+		memcpy_fromio(to, map->map_priv_2 + from, thislen);
 		spin_unlock(&vmax301_spin);
 		to += thislen;
 		from += thislen;
@@ -133,7 +133,7 @@ static void vmax301_copy_to(struct map_info *map, unsigned long to, const void *
 
 		spin_lock(&vmax301_spin);
 		vmax301_page(map, to);
-		memcpy_toio((char *)map->map_priv_2 + to, from, thislen);
+		memcpy_toio(map->map_priv_2 + to, from, thislen);
 		spin_unlock(&vmax301_spin);		
 		to += thislen;
 		from += thislen;

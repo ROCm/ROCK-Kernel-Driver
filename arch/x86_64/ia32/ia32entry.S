@@ -58,6 +58,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_STARTPROC
 	swapgs
 	movq	%gs:pda_kernelstack, %rsp
+	addq	$(PDA_STACKOFFSET),%rsp	
 	sti	
  	movl	%ebp,%ebp		/* zero extension */
 	pushq	$__USER32_DS
