@@ -252,8 +252,7 @@ nfs_pagein_list(struct list_head *head, int rpages)
 void
 nfs_readpage_result(struct rpc_task *task)
 {
-	struct nfs_read_data	*data = (struct nfs_read_data *) task->tk_calldata;
-	struct nfs_fattr	*fattr = &data->fattr;
+	struct nfs_read_data *data = (struct nfs_read_data *)task->tk_calldata;
 	unsigned int count = data->res.count;
 
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",

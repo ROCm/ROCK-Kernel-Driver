@@ -47,11 +47,6 @@ config ISAPNP
 	  Say Y here if you would like support for ISA Plug and Play devices.
 	  Some information is in <file:Documentation/isapnp.txt>.
 
-	  This support is also available as a module called isapnp ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
 	  If unsure, say Y.
 
 config PNPBIOS

@@ -44,8 +44,34 @@ config IP_NF_IRC
 	  chats.  Note that you do NOT need this extension to get files or
 	  have others initiate chats, or everything else in IRC.
 
-	  If you want to compile it as a module, say 'M' here and read
-	  Documentation/modules.txt.  If unsure, say 'N'.
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+
+config IP_NF_TFTP
+	tristate "TFTP prtocol support"
+	depends on IP_NF_CONNTRACK
+	help
+	  TFTP connection tracking helper, this is required depending
+	  on how restrictive your ruleset is.
+	  If you are using a tftp client behind -j SNAT or -j MASQUERADING
+	  you will need this.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+
+config IP_NF_AMANDA
+	tristate "Amanda backup protocol support"
+	depends on IP_NF_CONNTRACK
+	help
+	  If you are running the Amanda backup package (http://www.amanda.org/)
+	  on this machine or machines that will be MASQUERADED through this
+	  machine, then you may want to enable this feature.  This allows the
+	  connection tracking and natting code to allow the sub-channels that
+	  Amanda requires for communication of the backup data, messages and
+	  index.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
 
 config IP_NF_QUEUE
 	tristate "Userspace queueing via NETLINK (EXPERIMENTAL)"
@@ -379,6 +405,18 @@ config IP_NF_NAT_FTP
 	depends on IP_NF_IPTABLES!=n && IP_NF_CONNTRACK!=n && IP_NF_NAT!=n
 	default IP_NF_NAT if IP_NF_FTP=y
 	default m if IP_NF_FTP=m
+
+config IP_NF_NAT_TFTP
+	tristate
+	depends on IP_NF_IPTABLES!=n && IP_NF_CONNTRACK!=n && IP_NF_NAT!=n
+	default IP_NF_NAT if IP_NF_TFTP=y
+	default m if IP_NF_TFTP=m
+
+config IP_NF_NAT_AMANDA
+	tristate
+	depends on IP_NF_IPTABLES!=n && IP_NF_CONNTRACK!=n && IP_NF_NAT!=n
+	default IP_NF_NAT if IP_NF_TFTP=y
+	default m if IP_NF_TFTP=m
 
 config IP_NF_MANGLE
 	tristate "Packet mangling"

@@ -36,7 +36,6 @@
 static void *videomemory;
 static u_long videomemorysize = VIDEOMEMSIZE;
 MODULE_PARM(videomemorysize, "l");
-static const char *mode_option __initdata = NULL;
 
 static struct fb_info fb_info;
 static u32 vfb_pseudo_palette[17];
@@ -430,7 +429,7 @@ int __init vfb_init(void)
 	fb_info.node = NODEV;
 	fb_info.fbops = &vfb_ops;
 
-	retval = fb_find_mode(&fb_info.var, &fb_info, mode_option,
+	retval = fb_find_mode(&fb_info.var, &fb_info, NULL,
 			      NULL, 0, NULL, 8);
 
 	if (!retval || (retval == 4))

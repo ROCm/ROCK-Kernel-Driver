@@ -8,6 +8,7 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 #include <asm/prom.h>
 #include <linux/adb.h>
 #include <asm/io.h>

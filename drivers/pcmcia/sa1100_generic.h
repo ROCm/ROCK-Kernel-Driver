@@ -1,74 +1,23 @@
+#include "sa11xx_core.h"
+
 /*
- * linux/include/asm/arch/pcmcia.h
- *
- * Copyright (C) 2000 John G Dorsey <john+@cs.cmu.edu>
- *
- * This file contains definitions for the low-level SA-1100 kernel PCMCIA
- * interface. Please see linux/Documentation/arm/SA1100/PCMCIA for details.
+ * Declaration for all machine specific init/exit functions.
  */
-#ifndef _ASM_ARCH_PCMCIA
-#define _ASM_ARCH_PCMCIA
-
-/* Ideally, we'd support up to MAX_SOCK sockets, but the SA-1100 only
- * has support for two. This shows up in lots of hardwired ways, such
- * as the fact that MECR only has enough bits to configure two sockets.
- * Since it's so entrenched in the hardware, limiting the software
- * in this way doesn't seem too terrible.
- */
-#define SA1100_PCMCIA_MAX_SOCK   (2)
-
-struct pcmcia_init {
-	int	socket_irq[SA1100_PCMCIA_MAX_SOCK];
-};
-
-struct pcmcia_state {
-  unsigned detect: 1,
-            ready: 1,
-             bvd1: 1,
-             bvd2: 1,
-           wrprot: 1,
-            vs_3v: 1,
-            vs_Xv: 1;
-};
-
-struct pcmcia_configure {
-  unsigned  vcc: 8,
-            vpp: 8,
-         output: 1,
-        speaker: 1,
-          reset: 1,
-            irq: 1;
-};
-
-struct pcmcia_low_level {
-  struct module *owner;
-
-  int (*init)(struct pcmcia_init *);
-  int (*shutdown)(void);
-  void (*socket_state)(int sock, struct pcmcia_state *);
-  int (*configure_socket)(int sock, const struct pcmcia_configure *);
-
-  /*
-   * Enable card status IRQs on (re-)initialisation.  This can
-   * be called at initialisation, power management event, or
-   * pcmcia event.
-   */
-  int (*socket_init)(int sock);
-
-  /*
-   * Disable card status IRQs and PCMCIA bus on suspend.
-   */
-  int (*socket_suspend)(int sock);
-
-  /*
-   * Calculate MECR timing clock wait states
-   */
-  unsigned int (*socket_get_timing)(unsigned int sock,
-		unsigned int cpu_speed, unsigned int cmd_time);
-};
-
-extern int sa1100_register_pcmcia(struct pcmcia_low_level *, struct device *);
-extern void sa1100_unregister_pcmcia(struct pcmcia_low_level *, struct device *);
-extern void sa1100_pcmcia_interrupt(int, void *, struct pt_regs *);
-
-#endif
+extern int pcmcia_adsbitsy_init(struct device *);
+extern int pcmcia_assabet_init(struct device *);
+extern int pcmcia_badge4_init(struct device *);
+extern int pcmcia_cerf_init(struct device *);
+extern int pcmcia_flexanet_init(struct device *);
+extern int pcmcia_freebird_init(struct device *);
+extern int pcmcia_gcplus_init(struct device *);
+extern int pcmcia_graphicsmaster_init(struct device *);
+extern int pcmcia_h3600_init(struct device *);
+extern int pcmcia_pangolin_init(struct device *);
+extern int pcmcia_pfs168_init(struct device *);
+extern int pcmcia_shannon_init(struct device *);
+extern int pcmcia_simpad_init(struct device *);
+extern int pcmcia_stork_init(struct device *);
+extern int pcmcia_system3_init(struct device *);
+extern int pcmcia_trizeps_init(struct device *);
+extern int pcmcia_xp860_init(struct device *);
+extern int pcmcia_yopy_init(struct device *);

@@ -37,7 +37,6 @@
 #include <asm/irq.h>
 #include <asm/hardware/sa1111.h>
 
-#include "sa1100_generic.h"
 #include "sa1111_generic.h"
 
 #define DEBUG 0
@@ -48,34 +47,24 @@
 #	define DPRINTK( x, args... )	/* nix */
 #endif
 
-int system3_pcmcia_init(struct pcmcia_init *init)
+static int system3_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
-	init->socket_irq[0] = IRQ_S0_READY_NINT;
-	init->socket_irq[1] = IRQ_S1_READY_NINT;
+	skt->irq = skt->nr ? IRQ_S1_READY_NINT : IRQ_S0_READY_NINT;
 
 	/* Don't need no CD and BVD* interrupts */
-	return 2;
-}
-
-int system3_pcmcia_shutdown(void)
-{
 	return 0;
 }
 
-int system3_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
+void system3_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 {
-	/* only CF ATM */
-	if (sock == 0)
-		return -1;
-
-	return sa1111_pcmcia_configure_socket(sock, conf);
 }
 
-static void system3_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+static void
+system3_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
 {
 	unsigned long status = PCSR;
 
-	switch (sock) {
+	switch (skt->nr) {
 #if 0 /* PCMCIA socket not yet connected */
 	case 0:
 		state->detect = status & PCSR_S0_DETECT ? 0 : 1;
@@ -100,15 +89,15 @@ static void system3_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 	}
 
 	DPRINTK("Sock %d PCSR=0x%08lx, Sx_RDY_nIREQ=%d\n",
-		sock, status, state->ready);
+		skt->nr, status, state->ready);
 }
 
 struct pcmcia_low_level system3_pcmcia_ops = {
 	.owner			= THIS_MODULE,
-	.init			= system3_pcmcia_init,
-	.shutdown		= system3_pcmcia_shutdown,
+	.init			= system3_pcmcia_hw_init,
+	.shutdown		= system3_pcmcia_hw_shutdown,
 	.socket_state		= system3_pcmcia_socket_state,
-	.configure_socket	= system3_pcmcia_configure_socket,
+	.configure_socket	= sa1111_pcmcia_configure_socket,
 
 	.socket_init		= sa1111_pcmcia_socket_init,
 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
@@ -119,12 +108,8 @@ int __init pcmcia_system3_init(struct device *dev)
 	int ret = -ENODEV;
 
 	if (machine_is_pt_system3())
-		ret = sa1100_register_pcmcia(&system3_pcmcia_ops, dev);
+		/* only CF ATM */
+		ret = sa11xx_drv_pcmcia_probe(dev, &system3_pcmcia_ops, 1, 1);
 
 	return ret;
-}
-
-void __exit pcmcia_system3_exit(struct device *dev)
-{
-	sa1100_unregister_pcmcia(&system3_pcmcia_ops, dev);
 }

@@ -34,8 +34,8 @@
 #ifndef __R128_DRV_H__
 #define __R128_DRV_H__
 
-#define GET_RING_HEAD(ring)		DRM_READ32(  (volatile u32 *) (ring)->head )
-#define SET_RING_HEAD(ring,val)		DRM_WRITE32( (volatile u32 *) (ring)->head, (val) )
+#define GET_RING_HEAD(ring)		DRM_READ32(  (ring)->ring_rptr, 0 ) /* (ring)->head */
+#define SET_RING_HEAD(ring,val)		DRM_WRITE32( (ring)->ring_rptr, 0, (val) ) /* (ring)->head */
 
 typedef struct drm_r128_freelist {
    	unsigned int age;
@@ -56,6 +56,7 @@ typedef struct drm_r128_ring_buffer {
 	int space;
 
 	int high_mark;
+	drm_local_map_t *ring_rptr;
 } drm_r128_ring_buffer_t;
 
 typedef struct drm_r128_private {
@@ -98,13 +99,13 @@ typedef struct drm_r128_private {
 	u32 depth_pitch_offset_c;
 	u32 span_pitch_offset_c;
 
-	drm_map_t *sarea;
-	drm_map_t *fb;
-	drm_map_t *mmio;
-	drm_map_t *cce_ring;
-	drm_map_t *ring_rptr;
-	drm_map_t *buffers;
-	drm_map_t *agp_textures;
+	drm_local_map_t *sarea;
+	drm_local_map_t *fb;
+	drm_local_map_t *mmio;
+	drm_local_map_t *cce_ring;
+	drm_local_map_t *ring_rptr;
+	drm_local_map_t *buffers;
+	drm_local_map_t *agp_textures;
 } drm_r128_private_t;
 
 typedef struct drm_r128_buf_priv {
@@ -370,15 +371,10 @@ extern int r128_cce_indirect( DRM_IOCTL_ARGS );
 
 #define R128_PERFORMANCE_BOXES		0
 
-
-#define R128_BASE(reg)		((unsigned long)(dev_priv->mmio->handle))
-#define R128_ADDR(reg)		(R128_BASE( reg ) + reg)
-
-#define R128_READ(reg)		DRM_READ32(  (volatile u32 *) R128_ADDR(reg) )
-#define R128_WRITE(reg,val)	DRM_WRITE32( (volatile u32 *) R128_ADDR(reg), (val) )
-
-#define R128_READ8(reg)		DRM_READ8(  (volatile u8 *) R128_ADDR(reg) )
-#define R128_WRITE8(reg,val)	DRM_WRITE8( (volatile u8 *) R128_ADDR(reg), (val) )
+#define R128_READ(reg)		DRM_READ32(  dev_priv->mmio, (reg) )
+#define R128_WRITE(reg,val)	DRM_WRITE32( dev_priv->mmio, (reg), (val) )
+#define R128_READ8(reg)		DRM_READ8(   dev_priv->mmio, (reg) )
+#define R128_WRITE8(reg,val)	DRM_WRITE8(  dev_priv->mmio, (reg), (val) )
 
 #define R128_WRITE_PLL(addr,val)					\
 do {									\
@@ -402,15 +398,6 @@ extern int R128_READ_PLL(drm_device_t *dev, int addr);
 /* ================================================================
  * Misc helper macros
  */
-
-#define LOCK_TEST_WITH_RETURN( dev )					\
-do {									\
-	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != DRM_CURRENTPID ) {			\
-		DRM_ERROR( "%s called without lock held\n", __FUNCTION__ );	\
-		return DRM_ERR(EINVAL);				\
-	}								\
-} while (0)
 
 #define RING_SPACE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
@@ -453,7 +440,7 @@ do {									\
 #if defined(__powerpc__)
 #define r128_flush_write_combine()	(void) GET_RING_HEAD( &dev_priv->ring )
 #else
-#define r128_flush_write_combine()	DRM_WRITEMEMORYBARRIER()
+#define r128_flush_write_combine()	DRM_WRITEMEMORYBARRIER(dev_priv->ring_rptr)
 #endif
 
 

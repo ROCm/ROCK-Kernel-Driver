@@ -80,6 +80,7 @@ tty3270_init(void)
 
 	/* Initialize for tty driver */
 	td->magic = TTY_DRIVER_MAGIC;
+	td->owner = THIS_MODULE;
 	td->driver_name = "tty3270";
 	td->name = "tty3270";
 	td->major = IBM_TTY3270_MAJOR;
@@ -189,7 +190,6 @@ tty3270_open(struct tty_struct *tty, struct file *filp)
 		return -ENODEV;
 	}
 
-	tub_inc_use_count();
 	if ((rc = tty3270_wait(tubp, &flags)) != 0)
 		goto do_fail;
 	if (tubp->lnopen > 0) {
@@ -231,7 +231,6 @@ do_fail:
 	tty3270_aid_fini(tubp);
 	tty3270_rcl_fini(tubp);
 	TUBUNLOCK(tubp->irq, flags);
-	tub_dec_use_count();
 	return rc;
 }
 
@@ -253,7 +252,6 @@ tty3270_close(struct tty_struct *tty, struct file *filp)
 	tty3270_rcl_fini(tubp);
 	tty3270_scl_fini(tubp);
 do_return:
-	tub_dec_use_count();
 	TUBUNLOCK(tubp->irq, flags);
 }
 

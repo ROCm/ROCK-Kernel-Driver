@@ -1,6 +1,7 @@
+#include <linux/init.h>
 #include <asm/timer.h>
 
-static int init_none(void)
+static int __init init_none(char* override)
 {
 	return 0;
 }

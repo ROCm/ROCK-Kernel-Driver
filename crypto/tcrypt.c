@@ -48,7 +48,7 @@ static char *tvmem;
 
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
-	"twofish", "serpent", "sha384", "sha512", "md4", "aes",
+	"twofish", "serpent", "sha384", "sha512", "md4", "aes", "deflate",
 	 NULL
 };
 
@@ -2193,6 +2193,86 @@ out:
 }
 
 static void
+test_deflate(void)
+{
+	unsigned int i;
+	char result[COMP_BUF_SIZE];
+	struct crypto_tfm *tfm;
+	struct comp_testvec *tv;
+	unsigned int tsize;
+
+	printk("\ntesting deflate compression\n");
+
+	tsize = sizeof (deflate_comp_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, deflate_comp_tv_template, tsize);
+	tv = (void *) tvmem;
+
+	tfm = crypto_alloc_tfm("deflate", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for deflate\n");
+		return;
+	}
+
+	for (i = 0; i < DEFLATE_COMP_TEST_VECTORS; i++) {
+		int ilen, ret, dlen = COMP_BUF_SIZE;
+		
+		printk("test %u:\n", i + 1);
+		memset(result, 0, sizeof (result));
+
+		ilen = tv[i].inlen;
+		ret = crypto_comp_compress(tfm, tv[i].input,
+		                           ilen, result, &dlen);
+		if (ret) {
+			printk("fail: ret=%d\n", ret);
+			continue;
+		}
+		hexdump(result, dlen);
+		printk("%s (ratio %d:%d)\n",
+		       memcmp(result, tv[i].output, dlen) ? "fail" : "pass",
+		       ilen, dlen);
+	}
+
+	printk("\ntesting deflate decompression\n");
+
+	tsize = sizeof (deflate_decomp_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		goto out;
+	}
+
+	memcpy(tvmem, deflate_decomp_tv_template, tsize);
+	tv = (void *) tvmem;
+
+	for (i = 0; i < DEFLATE_DECOMP_TEST_VECTORS; i++) {
+		int ilen, ret, dlen = COMP_BUF_SIZE;
+		
+		printk("test %u:\n", i + 1);
+		memset(result, 0, sizeof (result));
+
+		ilen = tv[i].inlen;
+		ret = crypto_comp_decompress(tfm, tv[i].input,
+		                             ilen, result, &dlen);
+		if (ret) {
+			printk("fail: ret=%d\n", ret);
+			continue;
+		}
+		hexdump(result, dlen);
+		printk("%s (ratio %d:%d)\n",
+		       memcmp(result, tv[i].output, dlen) ? "fail" : "pass",
+		       ilen, dlen);
+	}
+out:
+	crypto_free_tfm(tfm);
+}
+
+static void
 test_available(void)
 {
 	char **name = check;
@@ -2223,6 +2303,7 @@ do_test(void)
 		test_aes();
 		test_sha384();
 		test_sha512();
+		test_deflate();
 #ifdef CONFIG_CRYPTO_HMAC
 		test_hmac_md5();
 		test_hmac_sha1();
@@ -2276,6 +2357,10 @@ do_test(void)
 		
 	case 12:
 		test_sha512();
+		break;
+
+	case 13:
+		test_deflate();
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC

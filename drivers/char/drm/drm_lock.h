@@ -78,7 +78,7 @@ int DRM(lock_transfer)(drm_device_t *dev,
 {
 	unsigned int old, new, prev;
 
-	dev->lock.pid = 0;
+	dev->lock.filp = 0;
 	do {
 		old  = *lock;
 		new  = context | _DRM_LOCK_HELD;
@@ -91,19 +91,17 @@ int DRM(lock_free)(drm_device_t *dev,
 		   __volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
-	pid_t        pid = dev->lock.pid;
 
-	dev->lock.pid = 0;
+	dev->lock.filp = 0;
 	do {
 		old  = *lock;
 		new  = 0;
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
 	if (_DRM_LOCK_IS_HELD(old) && _DRM_LOCKING_CONTEXT(old) != context) {
-		DRM_ERROR("%d freed heavyweight lock held by %d (pid %d)\n",
+		DRM_ERROR("%d freed heavyweight lock held by %d\n",
 			  context,
-			  _DRM_LOCKING_CONTEXT(old),
-			  pid);
+			  _DRM_LOCKING_CONTEXT(old));
 		return 1;
 	}
 	wake_up_interruptible(&dev->lock.lock_queue);

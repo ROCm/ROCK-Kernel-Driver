@@ -207,6 +207,12 @@ running once the system is up.
 
 	chandev=	[HW,NET] Generic channel device initialisation
  
+ 	clock=		[BUGS=IA-32, HW] gettimeofday timesource override. 
+			Forces specified timesource (if avaliable) to be used
+			when calculating gettimeofday(). If specicified timesource
+			is not avalible, it defaults to PIT. 
+			Format: { pit | tsc | cyclone | ... }
+			
 	cm206=		[HW,CD]
 			Format: { auto | [<io>,][<irq>] }
 
@@ -389,6 +395,10 @@ running once the system is up.
 			Format: <full_path>
 			Run specified binary instead of /sbin/init as init
 			process.
+
+	initcall_debug	[KNL] Trace initcalls as they are executed.  Useful
+			for working out where the kernel is dying during
+			startup.
 
 	initrd=		[BOOT] Specify the location of the initial ramdisk
 

@@ -113,10 +113,13 @@ struct pt_regs * save_v86_state(struct kernel_vm86_regs * regs)
 		printk("vm86: could not access userspace vm86_info\n");
 		do_exit(SIGSEGV);
 	}
-	tss = init_tss + smp_processor_id();
+
+	tss = init_tss + get_cpu();
 	current->thread.esp0 = current->thread.saved_esp0;
 	load_esp0(tss, current->thread.esp0);
 	current->thread.saved_esp0 = 0;
+	put_cpu();
+
 	loadsegment(fs, current->thread.saved_fs);
 	loadsegment(gs, current->thread.saved_gs);
 	ret = KVM86->regs32;
@@ -289,9 +292,10 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	asm volatile("movl %%fs,%0":"=m" (tsk->thread.saved_fs));
 	asm volatile("movl %%gs,%0":"=m" (tsk->thread.saved_gs));
 
-	tss = init_tss + smp_processor_id();
+	tss = init_tss + get_cpu();
 	tss->esp0 = tsk->thread.esp0 = (unsigned long) &info->VM86_TSS_ESP0;
 	disable_sysenter(tss);
+	put_cpu();
 
 	tsk->thread.screen_bitmap = info->screen_bitmap;
 	if (info->flags & VM86_SCREEN_BITMAP)

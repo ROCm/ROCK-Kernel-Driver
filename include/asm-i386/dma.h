@@ -239,7 +239,7 @@ static __inline__ void set_dma_addr(unsigned int dmanr, unsigned int a)
 }
 
 
-/* Set transfer size (max 64k for DMA1..3, 128k for DMA5..7) for
+/* Set transfer size (max 64k for DMA0..3, 128k for DMA5..7) for
  * a specific DMA channel.
  * You must ensure the parameters are valid.
  * NOTE: from a manual: "the number of transfers is one more

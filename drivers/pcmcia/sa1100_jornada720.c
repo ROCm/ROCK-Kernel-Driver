@@ -15,7 +15,6 @@
 #include <asm/hardware/sa1111.h>
 #include <asm/mach-types.h>
 
-#include "sa1100_generic.h"
 #include "sa1111_generic.h"
 
 #define SOCKET0_POWER   GPIO_GPIO0
@@ -24,7 +23,7 @@
 #warning *** Does SOCKET1_3V actually do anything?
 #define SOCKET1_3V	GPIO_GPIO3
 
-static int jornada720_pcmcia_init(struct pcmcia_init *init)
+static int jornada720_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
   /*
    * What is all this crap for?
@@ -46,23 +45,23 @@ static int jornada720_pcmcia_init(struct pcmcia_init *init)
   PC_SDR = 0;
   PC_SSR = 0;
 
-  return sa1111_pcmcia_init(init);
+  return sa1111_pcmcia_hw_init(skt);
 }
 
 static int
-jornada720_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
+jornada720_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
 {
   unsigned int pa_dwr_mask, pa_dwr_set;
   int ret;
 
 printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
-	       sock, conf->vcc, conf->vpp);
+	skt->nr, state->Vcc, state->Vpp);
 
-  switch (sock) {
+  switch (skt->nr) {
   case 0:
     pa_dwr_mask = SOCKET0_POWER | SOCKET0_3V;
 
-    switch (conf->vcc) {
+    switch (state->Vcc) {
     default:
     case 0:	pa_dwr_set = 0;					break;
     case 33:	pa_dwr_set = SOCKET0_POWER | SOCKET0_3V;	break;
@@ -73,7 +72,7 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
   case 1:
     pa_dwr_mask = SOCKET1_POWER;
 
-    switch (conf->vcc) {
+    switch (state->Vcc) {
     default:
     case 0:	pa_dwr_set = 0;					break;
     case 33:	pa_dwr_set = SOCKET1_POWER;			break;
@@ -85,13 +84,13 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
     return -1;
   }
 
-  if (conf->vpp != conf->vcc && conf->vpp != 0) {
+  if (state->Vpp != state->Vcc && state->Vpp != 0) {
     printk(KERN_ERR "%s(): slot cannot support VPP %u\n",
-	   __FUNCTION__, conf->vpp);
+	   __FUNCTION__, state->Vpp);
     return -1;
   }
 
-  ret = sa1111_pcmcia_configure_socket(sock, conf);
+  ret = sa1111_pcmcia_configure_socket(skt, state);
   if (ret == 0) {
     unsigned long flags;
 
@@ -105,8 +104,8 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
 
 static struct pcmcia_low_level jornada720_pcmcia_ops = {
   .owner		= THIS_MODULE,
-  .init			= jornada720_pcmcia_init,
-  .shutdown		= sa1111_pcmcia_shutdown,
+  .hw_init		= jornada720_pcmcia_hw_init,
+  .hw_shutdown		= sa1111_pcmcia_hw_shutdown,
   .socket_state		= sa1111_pcmcia_socket_state,
   .configure_socket	= jornada720_pcmcia_configure_socket,
 
@@ -119,12 +118,7 @@ int __init pcmcia_jornada720_init(struct device *dev)
 	int ret = -ENODEV;
 
 	if (machine_is_jornada720())
-		ret = sa1100_register_pcmcia(&jornada720_pcmcia_ops, dev);
+		ret = sa11xx_drv_pcmcia_probe(dev, &jornada720_pcmcia_ops, 0, 2);
 
 	return ret;
-}
-
-void __devexit pcmcia_jornada720_exit(struct device *dev)
-{
-	sa1100_unregister_pcmcia(&jornada720_pcmcia_ops, dev);
 }

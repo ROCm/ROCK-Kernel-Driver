@@ -145,7 +145,7 @@ void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
  *    Remote device with IrLAN server support discovered
  *
  */
-void irlan_client_discovery_indication(discovery_t *discovery,
+void irlan_client_discovery_indication(discinfo_t *discovery,
 				       DISCOVERY_MODE mode,
 				       void *priv) 
 {

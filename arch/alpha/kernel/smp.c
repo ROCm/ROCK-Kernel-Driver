@@ -35,7 +35,6 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
 

@@ -17,7 +17,8 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static inline int zap_pte(struct mm_struct *mm, pte_t *ptep)
+static inline int zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
+			unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 
@@ -26,6 +27,7 @@ static inline int zap_pte(struct mm_struct *mm, pte_t *ptep)
 	if (pte_present(pte)) {
 		unsigned long pfn = pte_pfn(pte);
 
+		flush_cache_page(vma, addr);
 		pte = ptep_get_and_clear(ptep);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
@@ -54,7 +56,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long addr, struct page *page, pgprot_t prot)
 {
 	int err = -ENOMEM, flush;
-	pte_t *pte, entry;
+	pte_t *pte;
 	pgd_t *pgd;
 	pmd_t *pmd;
 	struct pte_chain *pte_chain;
@@ -73,13 +75,12 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte)
 		goto err_unlock;
 
-	flush = zap_pte(mm, pte);
+	flush = zap_pte(mm, vma, addr, pte);
 
 	mm->rss++;
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);
-	entry = mk_pte(page, prot);
-	set_pte(pte, entry);
+	set_pte(pte, mk_pte(page, prot));
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
 	if (flush)

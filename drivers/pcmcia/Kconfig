@@ -82,10 +82,22 @@ config HD64465_PCMCIA
 config PCMCIA_SA1100
 	tristate "SA1100 support"
 	depends on ARM && ARCH_SA1100 && PCMCIA
+	help
+	  Say Y here to include support for SA11x0-based PCMCIA or CF
+	  sockets, found on HP iPAQs, Yopy, and other StrongARM(R)/
+	  Xscale(R) embedded machines.
+
+	  This driver is also available as a module called sa1100_cs.
 
 config PCMCIA_SA1111
 	tristate "SA1111 support"
-	depends on PCMCIA_SA1100 && SA1111
+	depends on ARM && ARCH_SA1100 && SA1111 && PCMCIA
+	help
+	  Say Y  here to include support for SA1111-based PCMCIA or CF
+	  sockets, found on the Jornada 720, Graphicsmaster and other
+	  StrongARM(R)/Xscale(R) embedded machines.
+
+	  This driver is also available as a module called sa1111_cs.
 
 config PCMCIA_PROBE
 	bool

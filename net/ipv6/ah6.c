@@ -199,7 +199,7 @@ int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 		}
 	}
 
-	nexthdr = ah->nexthdr;
+	nexthdr = ((struct ipv6hdr*)tmp_hdr)->nexthdr = ah->nexthdr;
 	skb->nh.raw = skb_pull(skb, (ah->hdrlen+2)<<2);
 	memcpy(skb->nh.raw, tmp_hdr, hdr_len);
 	skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
@@ -287,7 +287,7 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	
 	x->props.header_len = XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV);
 	if (x->props.mode)
-		x->props.header_len += 20;
+		x->props.header_len += sizeof(struct ipv6hdr);
 	x->data = ahp;
 
 	return 0;
@@ -330,6 +330,7 @@ static struct xfrm_type ah6_type =
 static struct inet6_protocol ah6_protocol = {
 	.handler	=	xfrm6_rcv,
 	.err_handler	=	ah6_err,
+	.no_policy	=	1,
 };
 
 int __init ah6_init(void)

@@ -194,7 +194,6 @@ static inline int try_inc_mod_count(struct module *mod)
 #define spin_unlock_bh(lock) do {spin_unlock(lock);end_bh_atomic();} while(0)
 #else
 #include <linux/interrupt.h>
-#include <asm/softirq.h>
 #include <linux/spinlock.h>
 #endif
 

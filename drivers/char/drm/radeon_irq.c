@@ -61,7 +61,11 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 	   (drm_radeon_private_t *)dev->dev_private;
    	u32 stat;
 
-	stat = RADEON_READ(RADEON_GEN_INT_STATUS);
+	/* Only consider the bits we're interested in - others could be used
+	 * outside the DRM
+	 */
+	stat = RADEON_READ(RADEON_GEN_INT_STATUS)
+	     & (RADEON_SW_INT_TEST | RADEON_CRTC_VBLANK_STAT);
 	if (!stat)
 		return;
 
@@ -77,15 +81,14 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 		DRM(vbl_send_signals)( dev );
 	}
 
-	/* Acknowledge all the bits in GEN_INT_STATUS -- seem to get
-	 * more than we asked for...
-	 */
+	/* Acknowledge interrupts we handle */
 	RADEON_WRITE(RADEON_GEN_INT_STATUS, stat);
 }
 
 static __inline__ void radeon_acknowledge_irqs(drm_radeon_private_t *dev_priv)
 {
-	u32 tmp = RADEON_READ( RADEON_GEN_INT_STATUS );
+	u32 tmp = RADEON_READ( RADEON_GEN_INT_STATUS )
+		& (RADEON_SW_INT_TEST_ACK | RADEON_CRTC_VBLANK_STAT);
 	if (tmp)
 		RADEON_WRITE( RADEON_GEN_INT_STATUS, tmp );
 }
@@ -176,7 +179,7 @@ int radeon_irq_emit( DRM_IOCTL_ARGS )
 	drm_radeon_irq_emit_t emit;
 	int result;
 
-	LOCK_TEST_WITH_RETURN( dev );
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );

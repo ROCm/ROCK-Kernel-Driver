@@ -33,6 +33,7 @@
 #include <linux/mount.h>
 #include <linux/writeback.h>
 #include <linux/vfs.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 
 /* This magic number is used in glibc for posix shared memory */
@@ -486,6 +487,16 @@ done1:
 	}
 done2:
 	BUG_ON(info->swapped > info->next_index);
+	if (inode->i_mapping->nrpages) {
+		/*
+		 * Call truncate_inode_pages again: racing shmem_unuse_inode
+		 * may have swizzled a page in from swap since vmtruncate or
+		 * generic_delete_inode did it, before we lowered next_index.
+		 */
+		spin_unlock(&info->lock);
+		truncate_inode_pages(inode->i_mapping, inode->i_size);
+		spin_lock(&info->lock);
+	}
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
@@ -828,8 +839,7 @@ repeat:
 			SetPageUptodate(filepage);
 			set_page_dirty(filepage);
 			swap_free(swap);
-		} else if (!(error = move_from_swap_cache(
-				swappage, idx, mapping))) {
+		} else if (move_from_swap_cache(swappage, idx, mapping) == 0) {
 			shmem_swp_set(info, entry, 0);
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
@@ -840,8 +850,8 @@ repeat:
 			spin_unlock(&info->lock);
 			unlock_page(swappage);
 			page_cache_release(swappage);
-			if (error != -EEXIST)
-				goto failed;
+			/* let kswapd refresh zone for GFP_ATOMICs */
+			blk_congestion_wait(WRITE, HZ/50);
 			goto repeat;
 		}
 	} else if (sgp == SGP_READ && !filepage) {
@@ -887,15 +897,16 @@ repeat:
 				swap = *entry;
 				shmem_swp_unmap(entry);
 			}
-			if (error || swap.val ||
-			    (error = add_to_page_cache_lru(
-					filepage, mapping, idx, GFP_ATOMIC))) {
+			if (error || swap.val || 0 != add_to_page_cache_lru(
+					filepage, mapping, idx, GFP_ATOMIC)) {
 				spin_unlock(&info->lock);
 				page_cache_release(filepage);
 				shmem_free_block(inode);
 				filepage = NULL;
-				if (error != -EEXIST)
+				if (error)
 					goto failed;
+				/* let kswapd refresh zone for GFP_ATOMICs */
+				blk_congestion_wait(WRITE, HZ / 50);
 				goto repeat;
 			}
 		}

@@ -926,11 +926,11 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 	RADEON_WRITE( RADEON_SCRATCH_UMSK, 0x7 );
 
 	/* Writeback doesn't seem to work everywhere, test it first */
-	DRM_WRITE32( &dev_priv->scratch[1], 0 );
+	DRM_WRITE32( dev_priv->ring_rptr, RADEON_SCRATCHOFF(1), 0 );
 	RADEON_WRITE( RADEON_SCRATCH_REG1, 0xdeadbeef );
 
 	for ( tmp = 0 ; tmp < dev_priv->usec_timeout ; tmp++ ) {
-		if ( DRM_READ32( &dev_priv->scratch[1] ) == 0xdeadbeef )
+		if ( DRM_READ32( dev_priv->ring_rptr, RADEON_SCRATCHOFF(1) ) == 0xdeadbeef )
 			break;
 		DRM_UDELAY( 1 );
 	}
@@ -1217,6 +1217,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		(dev_priv->ring.size / sizeof(u32)) - 1;
 
 	dev_priv->ring.high_mark = RADEON_RING_HIGH_MARK;
+	dev_priv->ring.ring_rptr = dev_priv->ring_rptr;
 
 #if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
@@ -1322,7 +1323,7 @@ int radeon_cp_start( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "\n" );
 
-	LOCK_TEST_WITH_RETURN( dev );
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	if ( dev_priv->cp_running ) {
 		DRM_DEBUG( "%s while CP running\n", __FUNCTION__ );
@@ -1350,9 +1351,12 @@ int radeon_cp_stop( DRM_IOCTL_ARGS )
 	int ret;
 	DRM_DEBUG( "\n" );
 
-	LOCK_TEST_WITH_RETURN( dev );
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( stop, (drm_radeon_cp_stop_t *)data, sizeof(stop) );
+
+	if (!dev_priv->cp_running)
+		return 0;
 
 	/* Flush any pending CP commands.  This ensures any outstanding
 	 * commands are exectuted by the engine before we turn it off.
@@ -1381,6 +1385,39 @@ int radeon_cp_stop( DRM_IOCTL_ARGS )
 	return 0;
 }
 
+
+void radeon_do_release( drm_device_t *dev )
+{
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	int ret;
+
+	if (dev_priv) {
+		if (dev_priv->cp_running) {
+			/* Stop the cp */
+			while ((ret = radeon_do_cp_idle( dev_priv )) != 0) {
+				DRM_DEBUG("radeon_do_cp_idle %d\n", ret);
+#ifdef __linux__
+				schedule();
+#else
+				tsleep(&ret, PZERO, "rdnrel", 1);
+#endif
+			}
+			radeon_do_cp_stop( dev_priv );
+			radeon_do_engine_reset( dev );
+		}
+
+		/* Disable *all* interrupts */
+		RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
+
+		/* Free memory heap structures */
+		radeon_mem_takedown( &(dev_priv->agp_heap) );
+		radeon_mem_takedown( &(dev_priv->fb_heap) );
+
+		/* deallocate kernel resources */
+		radeon_do_cleanup_cp( dev );
+	}
+}
+
 /* Just reset the CP ring.  Called as part of an X Server engine reset.
  */
 int radeon_cp_reset( DRM_IOCTL_ARGS )
@@ -1389,7 +1426,7 @@ int radeon_cp_reset( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "\n" );
 
-	LOCK_TEST_WITH_RETURN( dev );
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	if ( !dev_priv ) {
 		DRM_DEBUG( "%s called before init done\n", __FUNCTION__ );
@@ -1410,10 +1447,7 @@ int radeon_cp_idle( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "\n" );
 
-	LOCK_TEST_WITH_RETURN( dev );
-
-/* 	if (dev->irq)  */
-/* 		radeon_emit_and_wait_irq( dev ); */
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	return radeon_do_cp_idle( dev_priv );
 }
@@ -1423,7 +1457,7 @@ int radeon_engine_reset( DRM_IOCTL_ARGS )
 	DRM_DEVICE;
 	DRM_DEBUG( "\n" );
 
-	LOCK_TEST_WITH_RETURN( dev );
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	return radeon_do_engine_reset( dev );
 }
@@ -1482,7 +1516,7 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 		for ( i = start ; i < dma->buf_count ; i++ ) {
 			buf = dma->buflist[i];
 			buf_priv = buf->dev_private;
-			if ( buf->pid == 0 || (buf->pending && 
+			if ( buf->filp == 0 || (buf->pending && 
 					       buf_priv->age <= done_age) ) {
 				dev_priv->stats.requested_bufs++;
 				buf->pending = 0;
@@ -1509,7 +1543,7 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 	drm_buf_t *buf;
 	int i, t;
 	int start;
-	u32 done_age = DRM_READ32(&dev_priv->scratch[1]);
+	u32 done_age = DRM_READ32(dev_priv->ring_rptr, RADEON_SCRATCHOFF(1));
 
 	if ( ++dev_priv->last_buf >= dma->buf_count )
 		dev_priv->last_buf = 0;
@@ -1521,7 +1555,7 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 		for ( i = start ; i < dma->buf_count ; i++ ) {
 			buf = dma->buflist[i];
 			buf_priv = buf->dev_private;
-			if ( buf->pid == 0 || (buf->pending && 
+			if ( buf->filp == 0 || (buf->pending && 
 					       buf_priv->age <= done_age) ) {
 				dev_priv->stats.requested_bufs++;
 				buf->pending = 0;
@@ -1586,7 +1620,7 @@ int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n )
 	return DRM_ERR(EBUSY);
 }
 
-static int radeon_cp_get_buffers( drm_device_t *dev, drm_dma_t *d )
+static int radeon_cp_get_buffers( DRMFILE filp, drm_device_t *dev, drm_dma_t *d )
 {
 	int i;
 	drm_buf_t *buf;
@@ -1595,7 +1629,7 @@ static int radeon_cp_get_buffers( drm_device_t *dev, drm_dma_t *d )
 		buf = radeon_freelist_get( dev );
 		if ( !buf ) return DRM_ERR(EBUSY); /* NOTE: broken client */
 
-		buf->pid = DRM_CURRENTPID;
+		buf->filp = filp;
 
 		if ( DRM_COPY_TO_USER( &d->request_indices[i], &buf->idx,
 				   sizeof(buf->idx) ) )
@@ -1616,7 +1650,7 @@ int radeon_cp_buffers( DRM_IOCTL_ARGS )
 	int ret = 0;
 	drm_dma_t d;
 
-	LOCK_TEST_WITH_RETURN( dev );
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( d, (drm_dma_t *)data, sizeof(d) );
 
@@ -1639,7 +1673,7 @@ int radeon_cp_buffers( DRM_IOCTL_ARGS )
 	d.granted_count = 0;
 
 	if ( d.request_count ) {
-		ret = radeon_cp_get_buffers( dev, &d );
+		ret = radeon_cp_get_buffers( filp, dev, &d );
 	}
 
 	DRM_COPY_TO_USER_IOCTL( (drm_dma_t *)data, d, sizeof(d) );

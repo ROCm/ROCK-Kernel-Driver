@@ -225,11 +225,6 @@ static int to_cycles(int ns)
 	return 2*(ns-14)/cycle_time;
 }
 
-static int to_ns(int cycles)
-{
-    return (cycles*cycle_time)/2 + 14;
-}
-
 /*====================================================================*/
 
 static volatile u_int irq_hits;
@@ -384,6 +379,8 @@ static struct device_driver tcic_driver = {
 	.name = "tcic-pcmcia",
 	.bus = &platform_bus_type,
 	.devclass = &pcmcia_socket_class,
+	.suspend = pcmcia_socket_dev_suspend,
+	.resume = pcmcia_socket_dev_resume,
 };
 
 static struct platform_device tcic_device = {

@@ -33,7 +33,6 @@
 #include <asm/timer.h>
 #include <asm/smp.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/starfire.h>
 #include <asm/uaccess.h>
 #include <asm/cache.h>
@@ -356,7 +355,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	}	
 	if (action == NULL)
 	    action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
-						 GFP_KERNEL);
+						 GFP_ATOMIC);
 	
 	if (!action) { 
 		spin_unlock_irqrestore(&irq_action_lock, flags);
@@ -376,7 +375,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 				goto free_and_ebusy;
 			}
 			if ((bucket->flags & IBF_MULTI) == 0) {
-				vector = kmalloc(sizeof(void *) * 4, GFP_KERNEL);
+				vector = kmalloc(sizeof(void *) * 4, GFP_ATOMIC);
 				if (vector == NULL)
 					goto free_and_enomem;
 
@@ -900,7 +899,7 @@ int request_fast_irq(unsigned int irq,
 	}
 	if (action == NULL)
 		action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
-						     GFP_KERNEL);
+						     GFP_ATOMIC);
 	if (!action) {
 		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return -ENOMEM;

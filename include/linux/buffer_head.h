@@ -60,6 +60,12 @@ struct buffer_head {
 	struct list_head b_assoc_buffers; /* associated with another mapping */
 };
 
+/*
+ * Debug
+ */
+
+void __buffer_error(char *file, int line);
+#define buffer_error() __buffer_error(__FILE__, __LINE__)
 
 /*
  * macro tricks to expand the set_buffer_foo(), clear_buffer_foo()
@@ -183,7 +189,8 @@ extern int buffer_heads_over_limit;
  */
 int try_to_release_page(struct page * page, int gfp_mask);
 int block_invalidatepage(struct page *page, unsigned long offset);
-int block_write_full_page(struct page *page, get_block_t *get_block, struct writeback_control *wbc);
+int block_write_full_page(struct page *page, get_block_t *get_block,
+				struct writeback_control *wbc);
 int block_read_full_page(struct page*, get_block_t*);
 int block_prepare_write(struct page*, unsigned, unsigned, get_block_t*);
 int cont_prepare_write(struct page*, unsigned, unsigned, get_block_t*,
@@ -232,12 +239,14 @@ static inline void bforget(struct buffer_head *bh)
 		__bforget(bh);
 }
 
-static inline struct buffer_head *sb_bread(struct super_block *sb, sector_t block)
+static inline struct buffer_head *
+sb_bread(struct super_block *sb, sector_t block)
 {
 	return __bread(sb->s_bdev, block, sb->s_blocksize);
 }
 
-static inline struct buffer_head *sb_getblk(struct super_block *sb, sector_t block)
+static inline struct buffer_head *
+sb_getblk(struct super_block *sb, sector_t block)
 {
 	return __getblk(sb->s_bdev, block, sb->s_blocksize);
 }
@@ -256,9 +265,14 @@ map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
 	bh->b_blocknr = block;
 }
 
+/*
+ * Calling wait_on_buffer() for a zero-ref buffer is illegal, so we call into
+ * __wait_on_buffer() just to trip a debug check.  Because debug code in inline
+ * functions is bloaty.
+ */
 static inline void wait_on_buffer(struct buffer_head *bh)
 {
-	if (buffer_locked(bh))
+	if (buffer_locked(bh) || atomic_read(&bh->b_count) == 0)
 		__wait_on_buffer(bh);
 }
 
@@ -267,12 +281,5 @@ static inline void lock_buffer(struct buffer_head *bh)
 	while (test_set_buffer_locked(bh))
 		__wait_on_buffer(bh);
 }
-
-/*
- * Debug
- */
-
-void __buffer_error(char *file, int line);
-#define buffer_error() __buffer_error(__FILE__, __LINE__)
 
 #endif /* _LINUX_BUFFER_HEAD_H */

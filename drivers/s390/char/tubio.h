@@ -421,8 +421,6 @@ extern inline tub_t *TTY2TUB(struct tty_struct *tty)
 	return tubp;
 }
 
-extern void tub_inc_use_count(void);
-extern void tub_dec_use_count(void);
 extern int tub3270_movedata(bcb_t *, bcb_t *, int);
 #if 0
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))

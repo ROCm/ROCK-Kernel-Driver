@@ -15,9 +15,6 @@
  * Andi Kleen - Fix a few bad bugs and races.
  */
 
-#include <linux/config.h>
-#if defined(CONFIG_FILTER)
-
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/sched.h>
@@ -495,4 +492,3 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 
 	return (err);
 }
-#endif /* CONFIG_FILTER */

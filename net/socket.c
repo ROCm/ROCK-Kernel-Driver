@@ -55,6 +55,7 @@
  *	This module is effectively the top level interface to the BSD socket
  *	paradigm. 
  *
+ *	Based upon Swansea University Computer Society NET3.039
  */
 
 #include <linux/config.h>
@@ -1692,6 +1693,8 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 
 	cmsg_ptr = (unsigned long)msg_sys.msg_control;
 	msg_sys.msg_flags = 0;
+	if (MSG_CMSG_COMPAT & flags)
+		msg_sys.msg_flags = MSG_CMSG_COMPAT;
 	
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;
@@ -1709,7 +1712,8 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	if (err)
 		goto out_freeiov;
 	if (MSG_CMSG_COMPAT & flags)
-		err = put_compat_msg_controllen(&msg_sys, msg_compat, cmsg_ptr);
+		err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
+				 &msg_compat->msg_controllen);
 	else
 		err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
 				 &msg->msg_controllen);
@@ -1870,9 +1874,6 @@ extern void wanrouter_init(void);
 void __init sock_init(void)
 {
 	int i;
-
-	printk(KERN_INFO "Linux NET4.0 for Linux 2.4\n");
-	printk(KERN_INFO "Based upon Swansea University Computer Society NET3.039\n");
 
 	/*
 	 *	Initialize all address (protocol) families. 

@@ -8,6 +8,7 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
+#include <linux/string.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -244,8 +245,13 @@ static struct notifier_block time_cpufreq_notifier_block = {
 #endif
 
 
-static int init_tsc(void)
+static int __init init_tsc(char* override)
 {
+
+	/* check clock override */
+	if (override[0] && strncmp(override,"tsc",3))
+			return -ENODEV;
+
 	/*
 	 * If we have APM enabled or the CPU clock speed is variable
 	 * (CPU stops clock on HLT or slows clock to save power)

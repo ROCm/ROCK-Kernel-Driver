@@ -468,10 +468,13 @@ pcnet32_probe_vlbus(void)
     
     /* search for PCnet32 VLB cards at known addresses */
     for (port = pcnet32_portlist; (ioaddr = *port); port++) {
-	if (!check_region(ioaddr, PCNET32_TOTAL_SIZE)) {
-	    /* check if there is really a pcnet chip on that ioaddr */
-	    if ((inb(ioaddr + 14) == 0x57) && (inb(ioaddr + 15) == 0x57))
-		pcnet32_probe1(ioaddr, 0, 0, NULL);
+	if (request_region(ioaddr, PCNET32_TOTAL_SIZE, "pcnet32_probe_vlbus")) {
+		/* check if there is really a pcnet chip on that ioaddr */
+		if ((inb(ioaddr + 14) == 0x57) && (inb(ioaddr + 15) == 0x57)) {
+			pcnet32_probe1(ioaddr, 0, 0, NULL);
+		} else {
+			release_region(ioaddr, PCNET32_TOTAL_SIZE);
+		}
 	}
     }
 }
@@ -499,6 +502,10 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
     if (!pci_dma_supported(pdev, PCNET32_DMA_MASK)) {
 	printk(KERN_ERR PFX "architecture does not support 32bit PCI busmaster DMA\n");
 	return -ENODEV;
+    }
+    if (request_region(ioaddr, PCNET32_TOTAL_SIZE, "pcnet32_probe_pci") == NULL) {
+	    printk(KERN_ERR PFX "io address range already allocated\n");
+	    return -EBUSY;
     }
 
     return pcnet32_probe1(ioaddr, pdev->irq, 1, pdev);
@@ -533,15 +540,19 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	pcnet32_dwio_reset(ioaddr);
 	if (pcnet32_dwio_read_csr(ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
 	    a = &pcnet32_dwio;
-	} else
-	    return -ENODEV;
+	} else {
+		release_region(ioaddr, PCNET32_TOTAL_SIZE);
+		return -ENODEV;
+	}
     }
 
     chip_version = a->read_csr(ioaddr, 88) | (a->read_csr(ioaddr,89) << 16);
     if (pcnet32_debug > 2)
 	printk(KERN_INFO "  PCnet chip version is %#x.\n", chip_version);
-    if ((chip_version & 0xfff) != 0x003)
-	return -ENODEV;
+    if ((chip_version & 0xfff) != 0x003) {
+	    release_region(ioaddr, PCNET32_TOTAL_SIZE);
+	    return -ENODEV;
+    }
     
     /* initialize variables */
     fdx = mii = fset = dxsuflo = ltint = 0;
@@ -603,6 +614,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     default:
 	printk(KERN_INFO PFX "PCnet version %#x, no PCnet32 chip.\n",
 			chip_version);
+	release_region(ioaddr, PCNET32_TOTAL_SIZE);
 	return -ENODEV;
     }
 
@@ -622,8 +634,10 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     }
     
     dev = alloc_etherdev(0);
-    if(!dev)
-	return -ENOMEM;
+    if(!dev) {
+	    release_region(ioaddr, PCNET32_TOTAL_SIZE);
+	    return -ENOMEM;
+    }
 
     printk(KERN_INFO PFX "%s at %#3lx,", chipname, ioaddr);
 
@@ -691,9 +705,6 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     }
 
     dev->base_addr = ioaddr;
-    if (request_region(ioaddr, PCNET32_TOTAL_SIZE, chipname) == NULL)
-	return -EBUSY;
-    
     /* pci_alloc_consistent returns page-aligned memory, so we do not have to check the alignment */
     if ((lp = pci_alloc_consistent(pdev, sizeof(*lp), &lp_dma_addr)) == NULL) {
 	release_region(ioaddr, PCNET32_TOTAL_SIZE);

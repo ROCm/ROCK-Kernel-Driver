@@ -2262,7 +2262,7 @@ config PPP_MULTILINK
 
 config PPP_FILTER
 	bool "PPP filtering"
-	depends on PPP && FILTER
+	depends on PPP
 	help
 	  Say Y here if you want to be able to filter the packets passing over
 	  PPP interfaces.  This allows you to control which packets count as

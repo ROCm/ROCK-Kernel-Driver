@@ -298,6 +298,7 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 		goto error;
 
 	switch (opcode) {
+	case SEND_DIAGNOSTIC:
 	case FORMAT_UNIT:
 		timeout = FORMAT_UNIT_TIMEOUT;
 		retries = 1;

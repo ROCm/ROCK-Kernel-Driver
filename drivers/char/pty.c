@@ -362,6 +362,7 @@ int __init pty_init(void)
 		init_waitqueue_head(&pty_state[i].open_wait);
 	memset(&pty_driver, 0, sizeof(struct tty_driver));
 	pty_driver.magic = TTY_DRIVER_MAGIC;
+	pty_driver.owner = THIS_MODULE;
 	pty_driver.driver_name = "pty_master";
 #ifdef CONFIG_DEVFS_FS
 	pty_driver.name = "pty/m%d";

@@ -810,7 +810,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 			       cmd->device->host->host_no, (int) cmd->device->channel,
 			       (int) cmd->device->id, (int) cmd->device->lun);
 			print_command(cmd->data_cmnd);
-			print_sense("sd", cmd);
+			print_sense("", cmd);
 			cmd = scsi_end_request(cmd, 0, block_sectors, 1);
 			return;
 		default:
@@ -830,7 +830,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		struct Scsi_Device_Template *sdt;
 
 		sdt = scsi_get_request_dev(cmd->request);
-		printk("SCSI %s error : host %d channel %d id %d lun %d return code = %x\n",
+		printk("SCSI %s error : <%d %d %d %d> return code = 0x%x\n",
 		       (sdt ? sdt->name : "device"),
 		       cmd->device->host->host_no,
 		       cmd->device->channel,
@@ -838,7 +838,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		       cmd->device->lun, result);
 
 		if (driver_byte(result) & DRIVER_SENSE)
-			print_sense("sd", cmd);
+			print_sense("", cmd);
 		/*
 		 * Mark a single buffer as not uptodate.  Queue the remainder.
 		 * We sometimes get this cruft in the event that a medium error
@@ -1072,14 +1072,6 @@ static void scsi_request_fn(request_queue_t *q)
 		if (shost->in_recovery || blk_queue_plugged(q))
 			return;
 
-		/*
-		 * get next queueable request.  We do this early to make sure
-		 * that the request is fully prepared even if we cannot 
-		 * accept it.  If there is no request, we'll detect this
-		 * lower down.
-		 */
-		req = elv_next_request(q);
-
 		if (sdev->device_busy >= sdev->queue_depth)
 			break;
 
@@ -1134,11 +1126,12 @@ static void scsi_request_fn(request_queue_t *q)
 			sdev->starved = 0;
 
 		/*
-		 * If we couldn't find a request that could be queued, then we
-		 * can also quit.
+		 * get next queueable request.  We do this early to make sure
+		 * that the request is fully prepared even if we cannot 
+		 * accept it.  If there is no request, we'll detect this
+		 * lower down.
 		 */
-		if (blk_queue_empty(q))
-			break;
+		req = elv_next_request(q);
 
 		if (!req) {
 			/* If the device is busy, a returning I/O

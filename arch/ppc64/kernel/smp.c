@@ -34,7 +34,6 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
