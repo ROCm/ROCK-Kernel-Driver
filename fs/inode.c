@@ -101,14 +101,6 @@ static struct inode *alloc_inode(struct super_block *sb)
 	if (inode) {
 		struct address_space * const mapping = &inode->i_data;
 
-		inode->i_security = NULL;
-		if (security_ops->inode_alloc_security(inode)) {
-			if (inode->i_sb->s_op->destroy_inode)
-				inode->i_sb->s_op->destroy_inode(inode);
-			else
-				kmem_cache_free(inode_cachep, (inode));
-			return NULL;
-		}
 		inode->i_sb = sb;
 		inode->i_dev = sb->s_dev;
 		inode->i_blkbits = sb->s_blocksize_bits;
@@ -127,6 +119,14 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
 		inode->i_cdev = NULL;
+		inode->i_security = NULL;
+		if (security_ops->inode_alloc_security(inode)) {
+			if (inode->i_sb->s_op->destroy_inode)
+				inode->i_sb->s_op->destroy_inode(inode);
+			else
+				kmem_cache_free(inode_cachep, (inode));
+			return NULL;
+		}
 
 		mapping->a_ops = &empty_aops;
  		mapping->host = inode;
