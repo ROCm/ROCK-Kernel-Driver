@@ -154,4 +154,9 @@ extern void put_device(struct device * dev);
 extern int register_sys_device(struct device * dev);
 extern void unregister_sys_device(struct device * dev);
 
+/* drivers/base/power.c */
+extern int device_suspend(u32 state, u32 level);
+extern void device_resume(u32 level);
+extern void device_shutdown(void);
+
 #endif /* _DEVICE_H_ */
