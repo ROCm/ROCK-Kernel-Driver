@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.49 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.53 $"
 
 #include "zfcp_ext.h"
 
@@ -4717,14 +4717,14 @@ zfcp_fsf_req_sbal_get(struct zfcp_adapter *adapter, int req_flags,
 		      unsigned long *lock_flags)
 {
         int condition;
-        unsigned long timeout = ZFCP_SBAL_TIMEOUT;
         struct zfcp_qdio_queue *req_queue = &adapter->request_queue;
 
         if (unlikely(req_flags & ZFCP_WAIT_FOR_SBAL)) {
-                ZFCP_WAIT_EVENT_TIMEOUT(adapter->request_wq, timeout,
-                                        (condition =
-                                         (zfcp_fsf_req_create_sbal_check)
-                                         (lock_flags, req_queue, 1)));
+                wait_event_interruptible_timeout(adapter->request_wq,
+						 (condition =
+						  zfcp_fsf_req_create_sbal_check
+						  (lock_flags, req_queue, 1)),
+						 ZFCP_SBAL_TIMEOUT);
                 if (!condition) {
                         return -EIO;
 		}
@@ -4788,6 +4788,7 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter, u32 fsf_cmd, int req_flags,
 
 	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
 		write_unlock_irqrestore(&req_queue->queue_lock, *lock_flags);
+		ret = -EIO;
 		goto failed_sbals;
 	}
 

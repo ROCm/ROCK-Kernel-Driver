@@ -149,7 +149,7 @@ static struct net_device *new_bridge_dev(const char *name)
 
 	br->lock = SPIN_LOCK_UNLOCKED;
 	INIT_LIST_HEAD(&br->port_list);
-	br->hash_lock = RW_LOCK_UNLOCKED;
+	br->hash_lock = SPIN_LOCK_UNLOCKED;
 
 	br->bridge_id.prio[0] = 0x80;
 	br->bridge_id.prio[1] = 0x00;
@@ -295,6 +295,7 @@ int br_del_bridge(const char *name)
 	return ret;
 }
 
+/* Mtu of the bridge pseudo-device 1500 or the minimum of the ports */
 int br_min_mtu(const struct net_bridge *br)
 {
 	const struct net_bridge_port *p;
@@ -343,11 +344,12 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 
 		spin_lock_bh(&br->lock);
 		br_stp_recalculate_bridge_id(br);
-		if ((br->dev->flags & IFF_UP) && (dev->flags & IFF_UP))
+		if ((br->dev->flags & IFF_UP) 
+		    && (dev->flags & IFF_UP) && netif_carrier_ok(dev))
 			br_stp_enable_port(p);
 		spin_unlock_bh(&br->lock);
 
-		br->dev->mtu = br_min_mtu(br);
+		dev_set_mtu(br->dev, br_min_mtu(br));
 	}
 
 	return err;

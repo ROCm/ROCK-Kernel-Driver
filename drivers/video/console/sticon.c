@@ -85,11 +85,6 @@ static int sticon_set_palette(struct vc_data *c, unsigned char *table)
     return -EINVAL;
 }
 
-static int sticon_font_op(struct vc_data *c, struct console_font_op *op)
-{
-    return -ENOSYS;
-}
-
 static void sticon_putc(struct vc_data *conp, int c, int ypos, int xpos)
 {
     int unit = conp->vc_num;
@@ -366,7 +361,6 @@ static struct consw sti_con = {
 	.con_bmove		= sticon_bmove,
 	.con_switch		= sticon_switch,
 	.con_blank		= sticon_blank,
-	.con_font_op		= sticon_font_op,
 	.con_set_palette	= sticon_set_palette,
 	.con_scrolldelta	= sticon_scrolldelta,
 	.con_set_origin		= sticon_set_origin,

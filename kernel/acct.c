@@ -398,7 +398,7 @@ static void do_acct_process(long exitcode, struct file *file)
 	 */
 	memset((caddr_t)&ac, 0, sizeof(acct_t));
 
-	ac.ac_version = ACCT_VERSION;
+	ac.ac_version = ACCT_VERSION | ACCT_BYTEORDER;
 	strlcpy(ac.ac_comm, current->comm, sizeof(ac.ac_comm));
 
 	elapsed = jiffies_64_to_AHZ(get_jiffies_64() - current->start_time);
@@ -441,8 +441,7 @@ static void do_acct_process(long exitcode, struct file *file)
 		old_encode_dev(tty_devnum(current->signal->tty)) : 0;
 	read_unlock(&tasklist_lock);
 
-	/* ABYTESEX is always set to allow byte order detection */
-	ac.ac_flag = ABYTESEX;
+	ac.ac_flag = 0;
 	if (current->flags & PF_FORKNOEXEC)
 		ac.ac_flag |= AFORK;
 	if (current->flags & PF_SUPERPRIV)

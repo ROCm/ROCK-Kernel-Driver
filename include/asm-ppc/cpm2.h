@@ -99,18 +99,21 @@
  */
 #define NUM_CPM_HOST_PAGES	2
 
+static inline long IS_DPERR(const uint offset)
+{
+	return (uint)offset > (uint)-1000L;
+}
 
 /* Export the base address of the communication processor registers
  * and dual port ram.
  */
 extern		cpm_cpm2_t	*cpmp;	 /* Pointer to comm processor */
-extern void *cpm2_dpalloc(uint size, uint align);
-extern int cpm2_dpfree(void *addr);
-extern void *cpm2_dpalloc_fixed(void *addr, uint size, uint allign);
-extern void cpm2_dpdump(void);
-extern unsigned int cpm2_dpram_offset(void *addr);
-extern void *cpm2_dpram_addr(int offset);
-extern void cpm2_setbrg(uint brg, uint rate);
+extern uint cpm_dpalloc(uint size, uint align);
+extern int cpm_dpfree(uint offset);
+extern uint cpm_dpalloc_fixed(uint offset, uint size, uint align);
+extern void cpm_dpdump(void);
+extern void *cpm_dpram_addr(uint offset);
+extern void cpm_setbrg(uint brg, uint rate);
 extern void cpm2_fastbrg(uint brg, uint rate, int div16);
 
 /* Buffer descriptors used by many of the CPM protocols.

@@ -645,8 +645,8 @@ static void ip6fl_fl_seq_show(struct seq_file *seq, struct ip6_flowlabel *fl)
 static int ip6fl_seq_show(struct seq_file *seq, void *v)
 {
 	if (v == SEQ_START_TOKEN)
-		seq_printf(seq, "Label S Owner  Users  Linger Expires  "
-				"Dst                              Opt\n");
+		seq_puts(seq, "Label S Owner  Users  Linger Expires  "
+			      "Dst                              Opt\n");
 	else
 		ip6fl_fl_seq_show(seq, v);
 	return 0;

@@ -31,10 +31,7 @@ static inline void pte_free(struct page *page)
         __free_page(page);
 }
 
-static inline void __pte_free_tlb(struct mmu_gather *tlb, struct page *page)
-{
-	tlb_remove_page(tlb, page);
-}
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 					  unsigned long address)

@@ -2,6 +2,7 @@
 #define _MOTOROLA_PGALLOC_H
 
 #include <asm/tlb.h>
+#include <asm/tlbflush.h>
 
 extern pmd_t *get_pointer_table(void);
 extern int free_pointer_table(pmd_t *);

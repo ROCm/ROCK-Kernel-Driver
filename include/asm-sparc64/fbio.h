@@ -1,6 +1,8 @@
 #ifndef __LINUX_FBIO_H
 #define __LINUX_FBIO_H
 
+#include <linux/compiler.h>
+
 /* Constants used for fbio SunOS compatibility */
 /* (C) 1996 Miguel de Icaza */
 
@@ -56,9 +58,9 @@ struct  fbtype {
 struct  fbcmap {
         int             index;          /* first element (0 origin) */
         int             count;
-        unsigned char   *red;
-        unsigned char   *green;
-        unsigned char   *blue;
+        unsigned char   __user *red;
+        unsigned char   __user *green;
+        unsigned char   __user *blue;
 };
 
 #ifdef __KERNEL__

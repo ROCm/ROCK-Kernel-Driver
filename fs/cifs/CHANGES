@@ -1,3 +1,21 @@
+Version 1.22
+------------
+Add config option to enable XATTR (extended attribute) support, mapping
+xattr names in the "user." namespace space to SMB/CIFS EAs.
+
+Version 1.21
+------------
+Add new mount parm to control whether mode check (vfs_permission) is done on
+the client.  If Unix extensions are enabled and the uids on the client
+and server do not match, client permission checks are meaningless on
+server uids that do not exist on the client (this does not affect the
+normal ACL check which occurs on the server).  Fix default uid
+on mknod to match create and mkdir. Add optional mount parm to allow
+override of the default uid behavior (in which the server sets the uid
+and gid of newly created files). Normally for network filesystem mounts
+user want the server to set the uid/gid on newly created files (rather than 
+using uid of the client processes you would in a local filesystem).
+
 Version 1.20
 ------------
 Make transaction counts more consistent. Merge /proc/fs/cifs/SimultaneousOps

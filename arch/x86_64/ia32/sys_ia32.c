@@ -885,7 +885,7 @@ sys32_sysctl(struct sysctl_ia32 __user *args32)
 	oldvalp = (void *) A(a32.oldval);
 	newvalp = (void *) A(a32.newval);
 
-	if ((oldvalp && get_user(oldlen, (int *) A(a32.oldlenp)))
+	if ((oldvalp && get_user(oldlen, (int __user *)compat_ptr(a32.oldlenp)))
 	    || !access_ok(VERIFY_WRITE, namep, 0)
 	    || !access_ok(VERIFY_WRITE, oldvalp, 0)
 	    || !access_ok(VERIFY_WRITE, newvalp, 0))
@@ -897,7 +897,7 @@ sys32_sysctl(struct sysctl_ia32 __user *args32)
 	unlock_kernel();
 	set_fs(old_fs);
 
-	if (oldvalp && put_user (oldlen, (int *) A(a32.oldlenp)))
+	if (oldvalp && put_user (oldlen, (int __user *)compat_ptr(a32.oldlenp)))
 		return -EFAULT;
 
 	return ret;

@@ -237,7 +237,7 @@ extern inline void * bus_to_virt(unsigned long address)
 {
 #ifndef CONFIG_APUS
         if (address == 0)
-		return 0;
+		return NULL;
         return (void *)(address - PCI_DRAM_OFFSET + KERNELBASE);
 #else
 	return (void*) mm_ptov (address);

@@ -480,12 +480,20 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 		d_instantiate(direntry, newinode);
 		if(direntry->d_inode)
 			direntry->d_inode->i_nlink = 2;
-		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
-			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-				(__u64)-1,  
-				(__u64)-1,
-				0 /* dev_t */,
-				cifs_sb->local_nls);
+		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+						(__u64)current->euid,  
+						(__u64)current->egid,
+						0 /* dev_t */,
+						cifs_sb->local_nls);
+			} else {
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+						(__u64)-1,  
+						(__u64)-1,
+						0 /* dev_t */,
+						cifs_sb->local_nls);
+			}
 		else { /* BB to be implemented via Windows secrty descriptors*/
 		/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
 		}

@@ -12,6 +12,7 @@
 
 #include <stdarg.h>
 
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -28,6 +29,7 @@
 #include <linux/config.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
+#include <linux/compat.h>
 #include <linux/init.h>
 
 #include <asm/oplib.h>
@@ -588,10 +590,13 @@ asmlinkage long sparc_do_fork(unsigned long clone_flags,
 
 	clone_flags &= ~CLONE_IDLETASK;
 
+#ifdef CONFIG_COMPAT
 	if (test_thread_flag(TIF_32BIT)) {
 		parent_tid_ptr = compat_ptr(regs->u_regs[UREG_I2]);
 		child_tid_ptr = compat_ptr(regs->u_regs[UREG_I4]);
-	} else {
+	} else
+#endif
+	{
 		parent_tid_ptr = (int __user *) regs->u_regs[UREG_I2];
 		child_tid_ptr = (int __user *) regs->u_regs[UREG_I4];
 	}

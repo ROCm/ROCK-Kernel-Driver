@@ -24,8 +24,8 @@
 #include <platforms/sbs8260.h>
 #endif
 
-#ifdef CONFIG_RPX6
-#include <platforms/rpxsuper.h>
+#ifdef CONFIG_RPX8260
+#include <platforms/rpx8260.h>
 #endif
 
 #ifdef CONFIG_WILLOW

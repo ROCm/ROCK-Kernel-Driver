@@ -545,6 +545,8 @@ void __init do_init_bootmem(void)
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
 
+	max_pfn = max_low_pfn;
+
 	/* add all physical memory to the bootmem map. Also find the first */
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
@@ -629,7 +631,6 @@ void __init mem_init(void)
 
 	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
-	max_pfn = max_low_pfn;
 
 #ifdef CONFIG_DISCONTIGMEM
 {
@@ -654,7 +655,7 @@ void __init mem_init(void)
 
 	totalram_pages += free_all_bootmem();
 
-	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
+	for (addr = KERNELBASE; addr < (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
 		if (!PageReserved(virt_to_page(addr)))
 			continue;
@@ -764,8 +765,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	void *pgdir;
 	pte_t *ptep;
 	int local = 0;
-	int cpu;
 	cpumask_t tmp;
+	unsigned long flags;
 
 	/* handle i-cache coherency */
 	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE) &&
@@ -795,14 +796,14 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 
 	vsid = get_vsid(vma->vm_mm->context.id, ea);
 
-	cpu = get_cpu();
-	tmp = cpumask_of_cpu(cpu);
+	local_irq_save(flags);
+	tmp = cpumask_of_cpu(smp_processor_id());
 	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
 		local = 1;
 
 	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
 		    0x300, local);
-	put_cpu();
+	local_irq_restore(flags);
 }
 
 void * reserve_phb_iospace(unsigned long size)

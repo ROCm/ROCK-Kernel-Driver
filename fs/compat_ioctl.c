@@ -851,7 +851,7 @@ struct fb_cmap32 {
 
 static int fb_getput_cmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct fb_cmap __user *cmap;
+	struct fb_cmap_user __user *cmap;
 	struct fb_cmap32 __user *cmap32;
 	__u32 data;
 	int err;

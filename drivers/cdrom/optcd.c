@@ -964,7 +964,7 @@ static int update_toc(void)
 #endif /* MULTISESSION */
 	if (disk_info.multi)
 		printk(KERN_WARNING "optcd: Multisession support experimental, "
-			"see linux/Documentation/cdrom/optcd\n");
+			"see Documentation/cdrom/optcd\n");
 
 	DEBUG((DEBUG_TOC, "exiting update_toc"));
 

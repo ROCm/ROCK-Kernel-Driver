@@ -452,11 +452,11 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	IP6_INC_STATS(OutRequests);
+	IP6_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
 	if (!err) {
-		ICMP6_INC_STATS(idev, Icmp6OutNeighborAdvertisements);
-		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTNEIGHBORADVERTISEMENTS);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTMSGS);
 	}
 
 	if (likely(idev != NULL))
@@ -536,11 +536,11 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	/* send it! */
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	IP6_INC_STATS(OutRequests);
+	IP6_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
 	if (!err) {
-		ICMP6_INC_STATS(idev, Icmp6OutNeighborSolicits);
-		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTNEIGHBORSOLICITS);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTMSGS);
 	}
 
 	if (likely(idev != NULL))
@@ -609,11 +609,11 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	/* send it! */
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	IP6_INC_STATS(OutRequests);	
+	IP6_INC_STATS(IPSTATS_MIB_OUTREQUESTS);	
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
 	if (!err) {
-		ICMP6_INC_STATS(idev, Icmp6OutRouterSolicits);
-		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTROUTERSOLICITS);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTMSGS);
 	}
 
 	if (likely(idev != NULL))
@@ -1335,11 +1335,11 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	buff->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	IP6_INC_STATS(OutRequests);
+	IP6_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, buff, NULL, dst->dev, dst_output);
 	if (!err) {
-		ICMP6_INC_STATS(idev, Icmp6OutRedirects);
-		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTREDIRECTS);
+		ICMP6_INC_STATS(idev, ICMP6_MIB_OUTMSGS);
 	}
 
 	if (likely(idev != NULL))

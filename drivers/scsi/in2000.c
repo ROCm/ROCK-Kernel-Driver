@@ -184,7 +184,7 @@
 static char *setup_args[] = { "", "", "", "", "", "", "", "", "" };
 
 /* filled in by 'insmod' */
-static char *setup_strings = 0;
+static char *setup_strings;
 
 MODULE_PARM(setup_strings, "s");
 
@@ -468,7 +468,7 @@ static void in2000_execute(struct Scsi_Host *instance)
 	 */
 
 	cmd = (Scsi_Cmnd *) hostdata->input_Q;
-	prev = 0;
+	prev = NULL;
 	while (cmd) {
 		if (!(hostdata->busy[cmd->device->id] & (1 << cmd->device->lun)))
 			break;
@@ -1702,7 +1702,7 @@ static int in2000_abort(Scsi_Cmnd * cmd)
  */
 
 	tmp = (Scsi_Cmnd *) hostdata->input_Q;
-	prev = 0;
+	prev = NULL;
 	while (tmp) {
 		if (tmp == cmd) {
 			if (prev)
@@ -1923,7 +1923,7 @@ static int __init in2000_detect(Scsi_Host_Template * tpnt)
  */
 
 	if (!done_setup && setup_strings)
-		in2000_setup(setup_strings, 0);
+		in2000_setup(setup_strings, NULL);
 
 	detect_count = 0;
 	for (bios = 0; bios_tab[bios]; bios++) {

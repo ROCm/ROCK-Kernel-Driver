@@ -420,6 +420,7 @@ struct tcp_opt {
 		__u32	cnt;		/* increase cwnd by 1 after this number of ACKs */
 		__u32 	last_max_cwnd;	/* last maximium snd_cwnd */
 		__u32	last_cwnd;	/* the last snd_cwnd */
+		__u32   last_stamp;     /* time when updated last_cwnd */
 	} bictcp;
 };
 

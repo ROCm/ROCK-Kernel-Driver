@@ -868,7 +868,7 @@ static void __sym_eh_done(struct scsi_cmnd *cmd, int timed_out)
 	}
 
 	/* Revert everything */
-	SYM_UCMD_PTR(cmd)->eh_wait = 0;
+	SYM_UCMD_PTR(cmd)->eh_wait = NULL;
 	cmd->scsi_done = ep->old_done;
 
 	/* Wake up the eh thread if it wants to sleep */
@@ -965,7 +965,7 @@ prepare:
 
 	/* On error, restore everything and cross fingers :) */
 	if (sts) {
-		SYM_UCMD_PTR(cmd)->eh_wait = 0;
+		SYM_UCMD_PTR(cmd)->eh_wait = NULL;
 		cmd->scsi_done = ep->old_done;
 		to_do = SYM_EH_DO_IGNORE;
 	}
@@ -1568,7 +1568,7 @@ static int sym53c8xx_proc_info(struct Scsi_Host *host, char *buffer,
 			char **start, off_t offset, int length, int func)
 {
 	struct host_data *host_data;
-	struct sym_hcb *np = 0;
+	struct sym_hcb *np = NULL;
 	int retv;
 
 	host_data = (struct host_data *) host->hostdata;
@@ -1915,7 +1915,7 @@ static inline void sym_get_nvram(struct sym_device *devp, struct sym_nvram *nvp)
 static struct sym_driver_setup
 	sym_driver_safe_setup __initdata = SYM_LINUX_DRIVER_SAFE_SETUP;
 #ifdef	MODULE
-char *sym53c8xx = 0;	/* command line passed by insmod */
+char *sym53c8xx;	/* command line passed by insmod */
 MODULE_PARM(sym53c8xx, "s");
 #endif
 

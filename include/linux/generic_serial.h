@@ -88,8 +88,8 @@ void gs_close(struct tty_struct *tty, struct file *filp);
 void gs_set_termios (struct tty_struct * tty, 
                      struct termios * old_termios);
 int  gs_init_port(struct gs_port *port);
-int  gs_setserial(struct gs_port *port, struct serial_struct *sp);
-int  gs_getserial(struct gs_port *port, struct serial_struct *sp);
+int  gs_setserial(struct gs_port *port, struct serial_struct __user *sp);
+int  gs_getserial(struct gs_port *port, struct serial_struct __user *sp);
 void gs_got_break(struct gs_port *port);
 
 extern int gs_debug;

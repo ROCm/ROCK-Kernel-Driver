@@ -1380,7 +1380,7 @@ static void __devinit *aligned_kmalloc (int size, int flags, int alignment)
 
 	if (alignment <= 0x10) {
 		t = kmalloc (size, flags);
-		if ((unsigned int)t & (alignment-1)) {
+		if ((unsigned long)t & (alignment-1)) {
 			printk ("Kmalloc doesn't align things correctly! %p\n", t);
 			kfree (t);
 			return aligned_kmalloc (size, flags, alignment * 4);

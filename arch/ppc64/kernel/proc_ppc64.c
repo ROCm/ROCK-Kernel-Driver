@@ -84,7 +84,7 @@ static int __init proc_ppc64_create(void)
 {
 	struct proc_dir_entry *root;
 
-	root = proc_mkdir("ppc64", 0);
+	root = proc_mkdir("ppc64", NULL);
 	if (!root)
 		return 1;
 
@@ -94,7 +94,7 @@ static int __init proc_ppc64_create(void)
 	if (!proc_mkdir("rtas", root))
 		return 1;
 
-	if (!proc_symlink("rtas", 0, "ppc64/rtas"))
+	if (!proc_symlink("rtas", NULL, "ppc64/rtas"))
 		return 1;
 
 	return 0;
@@ -161,21 +161,10 @@ static loff_t page_map_seek( struct file *file, loff_t off, int whence)
 	return (file->f_pos = new);
 }
 
-static ssize_t page_map_read( struct file *file, char *buf, size_t nbytes, loff_t *ppos)
+static ssize_t page_map_read( struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
-	unsigned pos = *ppos;
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
-
-	if ( pos >= dp->size )
-		return 0;
-	if ( nbytes >= dp->size )
-		nbytes = dp->size;
-	if ( pos + nbytes > dp->size )
-		nbytes = dp->size - pos;
-
-	copy_to_user( buf, (char *)dp->data + pos, nbytes );
-	*ppos = pos + nbytes;
-	return nbytes;
+	return simple_read_from_buffer(buf, nbytes, ppos, dp->data, dp->size);
 }
 
 static int page_map_mmap( struct file *file, struct vm_area_struct *vma )

@@ -266,7 +266,7 @@ kill:
 	}
 
 	if (paws_reject)
-		NET_INC_STATS_BH(PAWSEstabRejected);
+		NET_INC_STATS_BH(LINUX_MIB_PAWSESTABREJECTED);
 
 	if(!th->rst) {
 		/* In this case we must reset the TIMEWAIT timer.
@@ -462,7 +462,7 @@ rescan:
 	}
 
 	tcp_tw_count -= killed;
-	NET_ADD_STATS_BH(TimeWaited, killed);
+	NET_ADD_STATS_BH(LINUX_MIB_TIMEWAITED, killed);
 
 	return ret;
 }
@@ -672,7 +672,7 @@ void tcp_twcal_tick(unsigned long dummy)
 out:
 	if ((tcp_tw_count -= killed) == 0)
 		del_timer(&tcp_tw_timer);
-	NET_ADD_STATS_BH(TimeWaitKilled, killed);
+	NET_ADD_STATS_BH(LINUX_MIB_TIMEWAITKILLED, killed);
 	spin_unlock(&tw_death_lock);
 }
 
@@ -767,9 +767,6 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newtp->snd_cwnd = 2;
 		newtp->snd_cwnd_cnt = 0;
 
-		newtp->bictcp.cnt = 0;
-		newtp->bictcp.last_max_cwnd = newtp->bictcp.last_cwnd = 0;
-
 		newtp->frto_counter = 0;
 		newtp->frto_highmark = 0;
 
@@ -845,7 +842,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			newsk->sk_no_largesend = 1;
 
 		tcp_vegas_init(newtp);
-		TCP_INC_STATS_BH(TcpPassiveOpens);
+		TCP_INC_STATS_BH(TCP_MIB_PASSIVEOPENS);
 	}
 	return newsk;
 }
@@ -976,7 +973,7 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 		if (!(flg & TCP_FLAG_RST))
 			req->class->send_ack(skb, req);
 		if (paws_reject)
-			NET_INC_STATS_BH(PAWSEstabRejected);
+			NET_INC_STATS_BH(LINUX_MIB_PAWSESTABREJECTED);
 		return NULL;
 	}
 
@@ -1033,7 +1030,7 @@ listen_overflow:
 	}
 
 embryonic_reset:
-	NET_INC_STATS_BH(EmbryonicRsts);
+	NET_INC_STATS_BH(LINUX_MIB_EMBRYONICRSTS);
 	if (!(flg & TCP_FLAG_RST))
 		req->class->send_reset(skb);
 

@@ -563,7 +563,7 @@ static inline unsigned safe_shift(unsigned d, int n)
 	return n < 0 ? d >> -n : d << n;
 }
 
-static void __init fb_set_logocmap(struct fb_info *info,
+static void fb_set_logocmap(struct fb_info *info,
 				   const struct linux_logo *logo)
 {
 	struct fb_cmap palette_cmap;
@@ -593,11 +593,11 @@ static void __init fb_set_logocmap(struct fb_info *info,
 			palette_cmap.blue[j] = clut[2] << 8 | clut[2];
 			clut += 3;
 		}
-		fb_set_cmap(&palette_cmap, 1, info);
+		fb_set_cmap(&palette_cmap, info);
 	}
 }
 
-static void  __init fb_set_logo_truepalette(struct fb_info *info,
+static void  fb_set_logo_truepalette(struct fb_info *info,
 					    const struct linux_logo *logo,
 					    u32 *palette)
 {
@@ -627,7 +627,7 @@ static void  __init fb_set_logo_truepalette(struct fb_info *info,
 	}
 }
 
-static void __init fb_set_logo_directpalette(struct fb_info *info,
+static void fb_set_logo_directpalette(struct fb_info *info,
 					     const struct linux_logo *logo,
 					     u32 *palette)
 {
@@ -642,7 +642,7 @@ static void __init fb_set_logo_directpalette(struct fb_info *info,
 		palette[i] = i << redshift | i << greenshift | i << blueshift;
 }
 
-static void __init fb_set_logo(struct fb_info *info,
+static void fb_set_logo(struct fb_info *info,
 			       const struct linux_logo *logo, u8 *dst,
 			       int depth)
 {
@@ -938,53 +938,93 @@ fb_load_cursor_image(struct fb_info *info)
 }
 
 int
-fb_cursor(struct fb_info *info, struct fb_cursor __user *sprite)
+fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 {
+	struct fb_cursor_user cursor_user;
 	struct fb_cursor cursor;
-	int err;
+	char *data = NULL, *mask = NULL;
+	u16 *red = NULL, *green = NULL, *blue = NULL, *transp = NULL;
+	int err = -EINVAL;
 	
-	if (copy_from_user(&cursor, sprite, sizeof(struct fb_cursor)))
+	if (copy_from_user(&cursor_user, sprite, sizeof(struct fb_cursor_user)))
 		return -EFAULT;
+
+	memcpy(&cursor, &cursor_user, sizeof(cursor));
+	cursor.mask = NULL;
+	cursor.image.data = NULL;
+	cursor.image.cmap.red = NULL;
+	cursor.image.cmap.green = NULL;
+	cursor.image.cmap.blue = NULL;
+	cursor.image.cmap.transp = NULL;
 
 	if (cursor.set & FB_CUR_SETCUR)
 		info->cursor.enable = 1;
 	
 	if (cursor.set & FB_CUR_SETCMAP) {
-		err = fb_copy_cmap(&cursor.image.cmap, &sprite->image.cmap, 1);
-		if (err)
-			return err;
+		unsigned len = cursor.image.cmap.len;
+		if ((int)len <= 0)
+			goto out;
+		len *= 2;
+		err = -ENOMEM;
+		red = kmalloc(len, GFP_USER);
+		green = kmalloc(len, GFP_USER);
+		blue = kmalloc(len, GFP_USER);
+		if (!red || !green || !blue)
+			goto out;
+		if (cursor_user.image.cmap.transp) {
+			transp = kmalloc(len, GFP_USER);
+			if (!transp)
+				goto out;
+		}
+		err = -EFAULT;
+		if (copy_from_user(red, cursor_user.image.cmap.red, len))
+			goto out;
+		if (copy_from_user(green, cursor_user.image.cmap.green, len))
+			goto out;
+		if (copy_from_user(blue, cursor_user.image.cmap.blue, len))
+			goto out;
+		if (transp) {
+			if (copy_from_user(transp,
+					   cursor_user.image.cmap.transp, len))
+				goto out;
+		}
+		cursor.image.cmap.red = red;
+		cursor.image.cmap.green = green;
+		cursor.image.cmap.blue = blue;
+		cursor.image.cmap.transp = transp;
 	}
 	
 	if (cursor.set & FB_CUR_SETSHAPE) {
 		int size = ((cursor.image.width + 7) >> 3) * cursor.image.height;		
-		char *data, *mask;
 
 		if ((cursor.image.height != info->cursor.image.height) ||
 		    (cursor.image.width != info->cursor.image.width))
 			cursor.set |= FB_CUR_SETSIZE;
 		
-		data = kmalloc(size, GFP_KERNEL);
-		if (!data)
-			return -ENOMEM;
+		err = -ENOMEM;
+		data = kmalloc(size, GFP_USER);
+		mask = kmalloc(size, GFP_USER);
+		if (!mask || !data)
+			goto out;
 		
-		mask = kmalloc(size, GFP_KERNEL);
-		if (!mask) {
-			kfree(data);
-			return -ENOMEM;
-		}
+		err = -EFAULT;
+		if (copy_from_user(data, cursor_user.image.data, size) ||
+		    copy_from_user(mask, cursor_user.mask, size))
+			goto out;
 		
-		if (copy_from_user(data, cursor.image.data, size) ||
-		    copy_from_user(mask, cursor.mask, size)) {
-			kfree(data);
-			kfree(mask);
-			return -EFAULT;
-		}
 		cursor.image.data = data;
 		cursor.mask = mask;
 	}
 	info->cursor.set = cursor.set;
 	info->cursor.rop = cursor.rop;
 	err = info->fbops->fb_cursor(info, &cursor);
+out:
+	kfree(data);
+	kfree(mask);
+	kfree(red);
+	kfree(green);
+	kfree(blue);
+	kfree(transp);
 	return err;
 }
 
@@ -1033,7 +1073,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			fb_pan_display(info, &info->var);
 
-			fb_set_cmap(&info->cmap, 1, info);
+			fb_set_cmap(&info->cmap, info);
 
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
 				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
@@ -1062,7 +1102,7 @@ fb_blank(struct fb_info *info, int blank)
 		cmap.len = info->cmap.len;
 	} else
 		cmap = info->cmap;
-	return fb_set_cmap(&cmap, 1, info);
+	return fb_set_cmap(&cmap, info);
 }
 
 static int 
@@ -1077,7 +1117,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	struct fb_con2fbmap con2fb;
 #endif
-	struct fb_cmap cmap;
+	struct fb_cmap_user cmap;
 	void __user *argp = (void __user *)arg;
 	int i;
 	
@@ -1105,11 +1145,11 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
-		return (fb_set_cmap(&cmap, 0, info));
+		return (fb_set_user_cmap(&cmap, info));
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
-		return (fb_copy_cmap(&info->cmap, &cmap, 2));
+		return fb_cmap_to_user(&info->cmap, &cmap);
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;

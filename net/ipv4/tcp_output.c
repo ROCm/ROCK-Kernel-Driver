@@ -168,6 +168,14 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
 	tp->rcv_wnd = new_win;
 	tp->rcv_wup = tp->rcv_nxt;
 
+	/* Make sure we do not exceed the maximum possible
+	 * scaled window.
+	 */
+	if (!tp->rcv_wscale)
+		new_win = min(new_win, MAX_TCP_WINDOW);
+	else
+		new_win = min(new_win, (65535U << tp->rcv_wscale));
+
 	/* RFC1323 scaling applied */
 	new_win >>= tp->rcv_wscale;
 
@@ -291,7 +299,7 @@ int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 		if (skb->len != tcp_header_size)
 			tcp_event_data_sent(tp, skb, sk);
 
-		TCP_INC_STATS(TcpOutSegs);
+		TCP_INC_STATS(TCP_MIB_OUTSEGS);
 
 		err = tp->af_specific->queue_xmit(skb, 0);
 		if (err <= 0)
@@ -916,7 +924,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 
 	if (err == 0) {
 		/* Update global TCP statistics. */
-		TCP_INC_STATS(TcpRetransSegs);
+		TCP_INC_STATS(TCP_MIB_RETRANSSEGS);
 
 #if FASTRETRANS_DEBUG > 0
 		if (TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_RETRANS) {
@@ -968,9 +976,9 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 					if (tcp_retransmit_skb(sk, skb))
 						return;
 					if (tp->ca_state != TCP_CA_Loss)
-						NET_INC_STATS_BH(TCPFastRetrans);
+						NET_INC_STATS_BH(LINUX_MIB_TCPFASTRETRANS);
 					else
-						NET_INC_STATS_BH(TCPSlowStartRetrans);
+						NET_INC_STATS_BH(LINUX_MIB_TCPSLOWSTARTRETRANS);
 
 					if (skb ==
 					    skb_peek(&sk->sk_write_queue))
@@ -1022,7 +1030,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 		if (skb == skb_peek(&sk->sk_write_queue))
 			tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 
-		NET_INC_STATS_BH(TCPForwardRetrans);
+		NET_INC_STATS_BH(LINUX_MIB_TCPFORWARDRETRANS);
 	}
 }
 
@@ -1082,7 +1090,7 @@ void tcp_send_active_reset(struct sock *sk, int priority)
 	/* NOTE: No TCP options attached and we never retransmit this. */
 	skb = alloc_skb(MAX_TCP_HEADER, priority);
 	if (!skb) {
-		NET_INC_STATS(TCPAbortFailed);
+		NET_INC_STATS(LINUX_MIB_TCPABORTFAILED);
 		return;
 	}
 
@@ -1097,7 +1105,7 @@ void tcp_send_active_reset(struct sock *sk, int priority)
 	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq;
 	TCP_SKB_CB(skb)->when = tcp_time_stamp;
 	if (tcp_transmit_skb(sk, skb))
-		NET_INC_STATS(TCPAbortFailed);
+		NET_INC_STATS(LINUX_MIB_TCPABORTFAILED);
 }
 
 /* WARNING: This routine must only be called when we have already sent
@@ -1197,7 +1205,7 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 
 	skb->csum = 0;
 	th->doff = (tcp_header_size >> 2);
-	TCP_INC_STATS(TcpOutSegs);
+	TCP_INC_STATS(TCP_MIB_OUTSEGS);
 	return skb;
 }
 
@@ -1285,7 +1293,7 @@ int tcp_connect(struct sock *sk)
 	sk_charge_skb(sk, buff);
 	tp->packets_out++;
 	tcp_transmit_skb(sk, skb_clone(buff, GFP_KERNEL));
-	TCP_INC_STATS(TcpActiveOpens);
+	TCP_INC_STATS(TCP_MIB_ACTIVEOPENS);
 
 	/* Timer for repeating the SYN until an answer. */
 	tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);

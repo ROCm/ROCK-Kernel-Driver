@@ -109,6 +109,8 @@ source "net/ipv4/Kconfig"
 config IPV6
 	tristate "The IPv6 protocol (EXPERIMENTAL)"
 	depends on INET && EXPERIMENTAL
+	select CRYPTO if IPV6_PRIVACY
+	select CRYPTO_MD5 if IPV6_PRIVACY
 	---help---
 	  This is experimental support for the IP version 6 (formerly called
 	  IPng "IP next generation").  You will still be able to do

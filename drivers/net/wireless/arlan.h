@@ -52,7 +52,6 @@ extern int	arlan_debug;
 extern int	arlan_entry_debug;
 extern int	arlan_exit_debug;
 extern int	testMemory;
-extern const char* arlan_version;
 extern int     arlan_command(struct net_device * dev, int command);
  
 #define SIDUNKNOWN -1

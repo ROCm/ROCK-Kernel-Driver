@@ -117,7 +117,7 @@ Here are the installation steps in detail:
 
 	Then notify /sbin/init that /etc/inittab has changed, by issuing
 	the telinit command with the q operand:
-		cd /usr/src/linux/Documentation/s390
+		cd Documentation/s390
 		sh config3270.sh
 		sh /tmp/mkdev3270
 		telinit q

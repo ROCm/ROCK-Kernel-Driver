@@ -6,8 +6,8 @@
  * Copyright (c) 2001 Dan Malek <dan@embeddededge.com>
  */
 #ifdef __KERNEL__
-#ifndef __ASM_PLATFORMS_RPXSUPER_H__
-#define __ASM_PLATFORMS_RPXSUPER_H__
+#ifndef __ASM_PLATFORMS_RPX8260_H__
+#define __ASM_PLATFORMS_RPX8260_H__
 
 /* A Board Information structure that is given to a program when
  * prom starts it up.
@@ -64,9 +64,11 @@ extern volatile u_char *rpx6_csr_addr;
 #define BCSR4_EN_MII		((u_char)0x40)		/* Enable PHY */
 #define BCSR4_MII_READ		((u_char)0x04)
 #define BCSR4_MII_MDC		((u_char)0x02)
-#define BCSR4_MII_MDIO		((u_char)0x02)
+#define BCSR4_MII_MDIO		((u_char)0x01)
 #define BCSR13_FETH_IRQMASK	((u_char)0xf0)
 #define BCSR15_FETH_IRQ		((u_char)0x20)
 
-#endif /* __ASM_PLATFORMS_RPXSUPER_H__ */
+#define PHY_INTERRUPT	SIU_INT_IRQ7
+
+#endif /* __ASM_PLATFORMS_RPX8260_H__ */
 #endif /* __KERNEL__ */

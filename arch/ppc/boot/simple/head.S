@@ -57,7 +57,7 @@ start_:
 	isync
 #endif
 
-#if defined(CONFIG_MBX) || defined(CONFIG_RPX6) || defined(CONFIG_PPC_PREP)
+#if defined(CONFIG_MBX) || defined(CONFIG_RPX8260) || defined(CONFIG_PPC_PREP)
 	mr	r29,r3	/* On the MBX860, r3 is the board info pointer.
 			 * On the RPXSUPER, r3 points to the NVRAM
 			 * configuration keys.
@@ -129,7 +129,7 @@ haveOF:
 	mr	r3, r29
 #endif
 
-#if defined(CONFIG_MBX) || defined(CONFIG_RPX6) || defined(CONFIG_PPC_PREP)
+#if defined(CONFIG_MBX) || defined(CONFIG_RPX8260) || defined(CONFIG_PPC_PREP)
 	mr	r4,r29	/* put the board info pointer where the relocate
 			 * routine will find it
 			 */

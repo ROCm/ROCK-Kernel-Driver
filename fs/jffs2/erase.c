@@ -402,7 +402,7 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 			goto bad2;
 		}
 		if (retlen != sizeof(marker)) {
-			printk(KERN_WARNING "Short write to newly-erased block at 0x%08x: Wanted %d, got %zd\n",
+			printk(KERN_WARNING "Short write to newly-erased block at 0x%08x: Wanted %zd, got %zd\n",
 			       jeb->offset, sizeof(marker), retlen);
 			goto bad2;
 		}

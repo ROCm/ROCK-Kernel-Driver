@@ -529,6 +529,23 @@ static void sctp_cmd_hb_timers_stop(sctp_cmd_seq_t *cmds,
 	}
 }
 
+/* Helper function to stop any pending T3-RTX timers */
+static void sctp_cmd_t3_rtx_timers_stop(sctp_cmd_seq_t *cmds,
+				        struct sctp_association *asoc)
+{
+	struct sctp_transport *t;
+	struct list_head *pos;
+
+	list_for_each(pos, &asoc->peer.transport_addr_list) {
+		t = list_entry(pos, struct sctp_transport, transports);
+		if (timer_pending(&t->T3_rtx_timer) &&
+		    del_timer(&t->T3_rtx_timer)) {
+			sctp_transport_put(t);
+		}
+	}
+}
+
+
 /* Helper function to update the heartbeat timer. */
 static void sctp_cmd_hb_timer_update(sctp_cmd_seq_t *cmds,
 				     struct sctp_association *asoc,
@@ -744,6 +761,26 @@ static void sctp_cmd_process_fwdtsn(struct sctp_ulpq *ulpq,
 	/* Walk through all the skipped SSNs */
 	sctp_walk_fwdtsn(skip, chunk) {
 		sctp_ulpq_skip(ulpq, ntohs(skip->stream), ntohs(skip->ssn));
+	}
+
+	return;
+}
+
+/* Helper function to remove the association non-primary peer 
+ * transports.
+ */ 
+static void sctp_cmd_del_non_primary(struct sctp_association *asoc)
+{
+	struct sctp_transport *t;
+	struct list_head *pos;
+	struct list_head *temp;
+
+	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
+		t = list_entry(pos, struct sctp_transport, transports);
+		if (!sctp_cmp_addr_exact(&t->ipaddr,
+		                         &asoc->peer.primary_addr)) {
+			sctp_assoc_del_peer(asoc, &t->ipaddr);
+		}
 	}
 
 	return;
@@ -1048,6 +1085,27 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			if (cmd->obj.ptr)
 				sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
 						SCTP_CHUNK(cmd->obj.ptr));
+
+			/* FIXME - Eventually come up with a cleaner way to
+			 * enabling COOKIE-ECHO + DATA bundling during 
+			 * multihoming stale cookie scenarios, the following 
+			 * command plays with asoc->peer.retran_path to 
+			 * avoid the problem of sending the COOKIE-ECHO and 
+			 * DATA in different paths, which could result 
+			 * in the association being ABORTed if the DATA chunk 
+			 * is processed first by the server.  Checking the
+			 * init error counter simply causes this command
+			 * to be executed only during failed attempts of
+			 * association establishment.
+			 */
+			if ((asoc->peer.retran_path != 
+			     asoc->peer.primary_path) && 
+			    (asoc->counters[SCTP_COUNTER_INIT_ERROR] > 0)) {
+				sctp_add_cmd_sf(commands, 
+				                SCTP_CMD_FORCE_PRIM_RETRAN,
+						SCTP_NULL());
+			}
+
 			break;
 
 		case SCTP_CMD_GEN_SHUTDOWN:
@@ -1281,6 +1339,19 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 		case SCTP_CMD_CLEAR_INIT_TAG:
 			asoc->peer.i.init_tag = 0;
+			break;
+		case SCTP_CMD_DEL_NON_PRIMARY:
+			sctp_cmd_del_non_primary(asoc);
+			break;
+		case SCTP_CMD_T3_RTX_TIMERS_STOP:
+			sctp_cmd_t3_rtx_timers_stop(commands, asoc);
+			break;
+		case SCTP_CMD_FORCE_PRIM_RETRAN:
+			t = asoc->peer.retran_path;
+			asoc->peer.retran_path = asoc->peer.primary_path;
+			error = sctp_outq_uncork(&asoc->outqueue);
+			local_cork = 0;
+			asoc->peer.retran_path = t;
 			break;
 		default:
 			printk(KERN_WARNING "Impossible command: %u, %p\n",

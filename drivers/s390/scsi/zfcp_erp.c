@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.56 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.60 $"
 
 #include "zfcp_ext.h"
 
@@ -436,8 +436,8 @@ zfcp_els_handler(unsigned long data)
 	int retval = 0;
 
 	if (send_els->status != 0) {
-		ZFCP_LOG_NORMAL("ELS request timed out, physical port reopen "
-				"of port 0x%016Lx on adapter %s failed\n",
+		ZFCP_LOG_NORMAL("ELS request timed out, force physical port "
+				"reopen of port 0x%016Lx on adapter %s\n",
 				port->wwpn, zfcp_get_busid_by_port(port));
 		debug_text_event(port->adapter->erp_dbf, 3, "forcreop");
 		retval = zfcp_erp_port_forced_reopen(port, 0);
@@ -2187,11 +2187,6 @@ zfcp_erp_adapter_strategy(struct zfcp_erp_action *erp_action)
 		ZFCP_LOG_INFO("Waiting to allow the adapter %s "
 			      "to recover itself\n",
 			      zfcp_get_busid_by_adapter(adapter));
-		/*
-		 * SUGGESTION: substitute by
-		 * timeout = ZFCP_TYPE2_RECOVERY_TIME;
-		 * __ZFCP_WAIT_EVENT_TIMEOUT(timeout, 0);
-		 */
 		timeout = ZFCP_TYPE2_RECOVERY_TIME;
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(timeout);

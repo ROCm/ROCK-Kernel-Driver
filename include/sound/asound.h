@@ -33,12 +33,14 @@
 #include <linux/time.h>
 #include <asm/byteorder.h>
 
-#if  __LITTLE_ENDIAN == 1234
+#ifdef  __LITTLE_ENDIAN
 #define SNDRV_LITTLE_ENDIAN
-#elif __BIG_ENDIAN == 4321
+#else
+#ifdef __BIG_ENDIAN
 #define SNDRV_BIG_ENDIAN
 #else
 #error "Unsupported endian..."
+#endif
 #endif
 
 #else /* !__KERNEL__ */

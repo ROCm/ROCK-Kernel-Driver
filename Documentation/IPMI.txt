@@ -442,6 +442,7 @@ used to control it:
 
   modprobe ipmi_watchdog timeout=<t> pretimeout=<t> action=<action type>
       preaction=<preaction type> preop=<preop type> start_now=x
+      nowayout=x
 
 The timeout is the number of seconds to the action, and the pretimeout
 is the amount of seconds before the reset that the pre-timeout panic will
@@ -472,6 +473,10 @@ the device, as well.
 If start_now is set to 1, the watchdog timer will start running as
 soon as the driver is loaded.
 
+If nowayout is set to 1, the watchdog timer will not stop when the
+watchdog device is closed.  The default value of nowayout is true
+if the CONFIG_WATCHDOG_NOWAYOUT option is enabled, or false if not.
+
 When compiled into the kernel, the kernel command line is available
 for configuring the watchdog:
 
@@ -480,6 +485,7 @@ for configuring the watchdog:
 	ipmi_watchdog.preaction=<preaction type>
 	ipmi_watchdog.preop=<preop type>
 	ipmi_watchdog.start_now=x
+	ipmi_watchdog.nowayout=x
 
 The options are the same as the module parameter options.
 

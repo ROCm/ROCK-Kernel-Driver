@@ -204,6 +204,7 @@ out:
 	return;
 
 expired:
+	read_unlock(&xp->lock);
 	km_policy_expired(xp, dir, 1);
 	xfrm_policy_delete(xp, dir);
 	xfrm_pol_put(xp);

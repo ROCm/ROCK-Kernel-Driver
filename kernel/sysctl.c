@@ -113,7 +113,7 @@ extern int sysctl_hz_timer;
 #if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
 extern unsigned long powersave_nap;
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp);
+		  void __user *buffer, size_t *lenp);
 #endif
 
 #ifdef CONFIG_BSD_PROCESS_ACCT
@@ -1436,7 +1436,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 			      int write, void *data),
 		  void *data)
 {
-#define TMPBUFLEN 20
+#define TMPBUFLEN 21
 	int *i, vleft, first=1, neg, val;
 	unsigned long lval;
 	size_t left, len;
@@ -1676,7 +1676,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 				     unsigned long convmul,
 				     unsigned long convdiv)
 {
-#define TMPBUFLEN 20
+#define TMPBUFLEN 21
 	unsigned long *i, *min, *max, val;
 	int vleft, first=1, neg;
 	size_t len, left;

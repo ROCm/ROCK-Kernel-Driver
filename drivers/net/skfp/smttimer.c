@@ -30,9 +30,9 @@ static void timer_done(struct s_smc *smc, int restart);
 
 void smt_timer_init(struct s_smc *smc)
 {
-	smc->t.st_queue = 0 ;
+	smc->t.st_queue = NULL;
 	smc->t.st_fast.tm_active = FALSE ;
-	smc->t.st_fast.tm_next = 0 ;
+	smc->t.st_fast.tm_next = NULL;
 	hwt_init(smc) ;
 }
 
@@ -75,7 +75,7 @@ void smt_timer_start(struct s_smc *smc, struct smt_timer *timer, u_long time,
 	timer->tm_active = TRUE ;
 	if (!smc->t.st_queue) {
 		smc->t.st_queue = timer ;
-		timer->tm_next = 0 ;
+		timer->tm_next = NULL;
 		timer->tm_delta = time ;
 		hwt_start(smc,time) ;
 		return ;
@@ -141,7 +141,7 @@ static void timer_done(struct s_smc *smc, int restart)
 			done = 1 ;
 		}
 	}
-	*last = 0 ;
+	*last = NULL;
 	next = smc->t.st_queue ;
 	smc->t.st_queue = tm ;
 

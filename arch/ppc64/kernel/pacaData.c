@@ -29,8 +29,10 @@ extern unsigned long __toc_start;
 
 /* Stack space used when we detect a bad kernel stack pointer, and
  * early in SMP boots before relocation is enabled.
+ *
+ * ABI requires stack to be 128-byte aligned
  */
-char emergency_stack[PAGE_SIZE * NR_CPUS];
+char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
 
 /* The Paca is an array with one entry per processor.  Each contains an 
  * ItLpPaca, which contains the information shared between the 
@@ -55,7 +57,6 @@ char emergency_stack[PAGE_SIZE * NR_CPUS];
 	.stab_addr = (asrv),		/* Virt pointer to segment table */ \
 	.emergency_sp = &emergency_stack[((number)+1) * PAGE_SIZE],	    \
 	.cpu_start = (start),		/* Processor start */		    \
-	.stab_next_rr = 1,						    \
 	.lppaca = {							    \
 		.xDesc = 0xd397d781,	/* "LpPa" */			    \
 		.xSize = sizeof(struct ItLpPaca),			    \

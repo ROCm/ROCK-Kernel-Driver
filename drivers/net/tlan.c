@@ -212,7 +212,7 @@ MODULE_PARM_DESC(bbuf, "ThunderLAN use big buffer (0-1)");
 /* Define this to enable Link beat monitoring */
 #undef MONITOR
 
-/* Turn on debugging. See linux/Documentation/networking/tlan.txt for details */
+/* Turn on debugging. See Documentation/networking/tlan.txt for details */
 static  int		debug;
 
 static	int		bbuf;
@@ -225,7 +225,7 @@ static  int tlan_have_eisa;
 
 const char *media[] = {
 	"10BaseT-HD ", "10BaseT-FD ","100baseTx-HD ", 
-	"100baseTx-FD", "100baseT4", 0
+	"100baseTx-FD", "100baseT4", NULL
 };
 
 int media_map[] = { 0x0020, 0x0040, 0x0080, 0x0100, 0x0200,};

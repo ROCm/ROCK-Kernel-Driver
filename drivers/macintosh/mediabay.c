@@ -435,6 +435,7 @@ int __pmac check_media_bay(struct device_node *which_bay, int what)
 #endif /* CONFIG_BLK_DEV_IDE */
 	return -ENODEV;
 }
+EXPORT_SYMBOL(check_media_bay);
 
 int __pmac check_media_bay_by_base(unsigned long base, int what)
 {
@@ -686,15 +687,13 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 
 	/* Force an immediate detect */
 	set_mb_power(bay, 0);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MS_TO_HZ(MB_POWER_DELAY));
+	msleep(MB_POWER_DELAY);
 	bay->content_id = MB_NO;
 	bay->last_value = bay->ops->content(bay);
 	bay->value_count = MS_TO_HZ(MB_STABLE_DELAY);
 	bay->state = mb_empty;
 	do {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
+		msleep(MB_POLL_DELAY);
 		media_bay_step(i);
 	} while((bay->state != mb_empty) &&
 		(bay->state != mb_up));
@@ -719,8 +718,7 @@ static int __pmac media_bay_suspend(struct macio_dev *mdev, u32 state)
 		bay->sleeping = 1;
 		set_mb_power(bay, 0);
 		up(&bay->lock);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
+		msleep(MB_POLL_DELAY);
 		mdev->ofdev.dev.power_state = state;
 	}
 	return 0;
@@ -740,8 +738,7 @@ static int __pmac media_bay_resume(struct macio_dev *mdev)
 	       	/* Force MB power to 0 */
 		down(&bay->lock);
 	       	set_mb_power(bay, 0);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MS_TO_HZ(MB_POWER_DELAY));
+		msleep(MB_POWER_DELAY);
 	       	if (bay->ops->content(bay) != bay->content_id) {
 			printk("mediabay%d: content changed during sleep...\n", bay->index);
 			up(&bay->lock);
@@ -755,8 +752,7 @@ static int __pmac media_bay_resume(struct macio_dev *mdev)
 	       	bay->cd_retry = 0;
 #endif
 	       	do {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
+			msleep(MB_POLL_DELAY);
 	       		media_bay_step(bay->index);
 	       	} while((bay->state != mb_empty) &&
 	       		(bay->state != mb_up));

@@ -185,9 +185,9 @@ extern void ia64_elf_core_copy_regs (struct pt_regs *src, elf_gregset_t dst);
 #define AT_SYSINFO_EHDR	33
 
 #ifdef __KERNEL__
-struct elf64_hdr;
-extern void ia64_set_personality (struct elf64_hdr *elf_ex, int ibcs2_interpreter);
-#define SET_PERSONALITY(ex, ibcs2)	ia64_set_personality(&(ex), ibcs2)
+#define SET_PERSONALITY(ex, ibcs2)	set_personality(PER_LINUX)
+#define elf_read_implies_exec(ex, have_pt_gnu_stack)					\
+	(!(have_pt_gnu_stack) && ((ex).e_flags & EF_IA_64_LINUX_EXECUTABLE_STACK) != 0)
 
 struct task_struct;
 

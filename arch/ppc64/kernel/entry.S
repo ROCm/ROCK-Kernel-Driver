@@ -132,7 +132,7 @@ system_call:			/* label this so stack traces look sane */
  */
 	ld	r11,.SYS_CALL_TABLE@toc(2)
 	andi.	r10,r10,_TIF_32BIT
-	beq-	15f
+	beq	15f
 	ld	r11,.SYS_CALL_TABLE32@toc(2)
 	clrldi	r3,r3,32
 	clrldi	r4,r4,32
@@ -143,8 +143,8 @@ system_call:			/* label this so stack traces look sane */
 15:
 	slwi	r0,r0,3
 	ldx	r10,r11,r0	/* Fetch system call handler [ptr] */
-	mtlr	r10
-	blrl			/* Call handler */
+	mtctr   r10
+	bctrl			/* Call handler */
 
 syscall_exit:
 #ifdef SHOW_SYSCALLS
@@ -182,7 +182,7 @@ syscall_exit_trace_cont:
 	stdcx.	r0,0,r1			/* to clear the reservation */
 	andi.	r6,r8,MSR_PR
 	ld	r4,_LINK(r1)
-	beq	1f			/* only restore r13 if */
+	beq-	1f			/* only restore r13 if */
 	ld	r13,GPR13(r1)		/* returning to usermode */
 1:	ld	r2,GPR2(r1)
 	ld	r1,GPR1(r1)

@@ -25,6 +25,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
 #include <linux/in.h>
@@ -44,16 +45,17 @@
  * First port is set to the default port.
  */
 static int ports[IP_VS_APP_MAX_PORTS] = {21, 0};
+static int ports_c;
+module_param_array(ports, int, ports_c, 0);
 
 /*
  *	Debug level
  */
 #ifdef CONFIG_IP_VS_DEBUG
 static int debug=0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 #endif
 
-MODULE_PARM(ports, "1-" __MODULE_STRING(IP_VS_APP_MAX_PORTS) "i");
 
 /*	Dummy variable */
 static int ip_vs_ftp_pasv;
@@ -279,7 +281,7 @@ static int ip_vs_ftp_in(struct ip_vs_app *app, struct ip_vs_conn *cp,
 	while (data <= data_limit - 6) {
 		if (strnicmp(data, "PASV\r\n", 6) == 0) {
 			/* Passive mode on */
-			IP_VS_DBG(1-debug, "got PASV at %d of %d\n",
+			IP_VS_DBG(1-debug, "got PASV at %zd of %zd\n",
 				  data - data_start,
 				  data_limit - data_start);
 			cp->app_data = &ip_vs_ftp_pasv;

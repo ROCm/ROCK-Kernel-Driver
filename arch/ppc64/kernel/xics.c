@@ -190,7 +190,7 @@ static void pSeriesLP_xirr_info_set(int n_cpu, int value)
 		      val64); 
 }
 
-static void pSeriesLP_cppr_info(int n_cpu, u8 value)
+void pSeriesLP_cppr_info(int n_cpu, u8 value)
 {
 	unsigned long lpar_rc;
 
@@ -475,7 +475,7 @@ void xics_init_IRQ(void)
 		while (1);
 	}
 nextnode:
-	ireg = (uint *)get_property(np, "ibm,interrupt-server-ranges", 0);
+	ireg = (uint *)get_property(np, "ibm,interrupt-server-ranges", NULL);
 	if (ireg) {
 		/*
 		 * set node starting index for this node
@@ -532,7 +532,7 @@ nextnode:
 		xics_irq_8259_cascade_real = -1;
 		xics_irq_8259_cascade = -1;
 	} else {
-		ireg = (uint *) get_property(np, "interrupts", 0);
+		ireg = (uint *) get_property(np, "interrupts", NULL);
 		if (!ireg) {
 			printk(KERN_WARNING "Can't find ISA Interrupts Property\n");
 			udbg_printf("Can't find ISA Interrupts Property\n");
@@ -589,7 +589,7 @@ static int __init xics_setup_i8259(void)
 	if (naca->interrupt_controller == IC_PPC_XIC &&
 	    xics_irq_8259_cascade != -1) {
 		if (request_irq(irq_offset_up(xics_irq_8259_cascade),
-				no_action, 0, "8259 cascade", 0))
+				no_action, 0, "8259 cascade", NULL))
 			printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
 		i8259_init();
 	}
@@ -604,7 +604,7 @@ void xics_request_IPIs(void)
 
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(irq_offset_up(XICS_IPI), xics_ipi_action, SA_INTERRUPT,
-		    "IPI", 0);
+		    "IPI", NULL);
 	get_irq_desc(irq_offset_up(XICS_IPI))->status |= IRQ_PER_CPU;
 }
 #endif
@@ -657,9 +657,7 @@ void xics_migrate_irqs_away(void)
 	int set_indicator = rtas_token("set-indicator");
 	const unsigned int giqs = 9005UL; /* Global Interrupt Queue Server */
 	int status = 0;
-	unsigned int irq, cpu = smp_processor_id();
-	int xics_status[2];
-	unsigned long flags;
+	unsigned int irq, virq, cpu = smp_processor_id();
 
 	BUG_ON(set_indicator == RTAS_UNKNOWN_SERVICE);
 
@@ -676,12 +674,20 @@ void xics_migrate_irqs_away(void)
 	ops->cppr_info(cpu, DEFAULT_PRIORITY);
 	iosync();
 
-	printk(KERN_WARNING "HOTPLUG: Migrating IRQs away\n");
-	for_each_irq(irq) {
-		irq_desc_t *desc = get_irq_desc(irq);
+	for_each_irq(virq) {
+		irq_desc_t *desc;
+		int xics_status[2];
+		unsigned long flags;
+
+		/* We cant set affinity on ISA interrupts */
+		if (virq < irq_offset_value())
+			continue;
+
+		desc = get_irq_desc(virq);
+		irq = virt_irq_to_real(irq_offset_down(virq));
 
 		/* We need to get IPIs still. */
-		if (irq_offset_down(irq) == XICS_IPI)
+		if (irq == XICS_IPI || irq == NO_IRQ)
 			continue;
 
 		/* We only need to migrate enabled IRQS */
@@ -696,7 +702,7 @@ void xics_migrate_irqs_away(void)
 		if (status) {
 			printk(KERN_ERR "migrate_irqs_away: irq=%d "
 					"ibm,get-xive returns %d\n",
-					irq, status);
+					virq, status);
 			goto unlock;
 		}
 
@@ -709,21 +715,20 @@ void xics_migrate_irqs_away(void)
 			goto unlock;
 
 		printk(KERN_WARNING "IRQ %d affinity broken off cpu %u\n",
-		       irq, cpu);
+		       virq, cpu);
 
 		/* Reset affinity to all cpus */
 		xics_status[0] = default_distrib_server;
 
-		status = rtas_call(ibm_set_xive, 3, 1, NULL,
-				irq, xics_status[0], xics_status[1]);
+		status = rtas_call(ibm_set_xive, 3, 1, NULL, irq,
+				xics_status[0], xics_status[1]);
 		if (status)
 			printk(KERN_ERR "migrate_irqs_away irq=%d "
 					"ibm,set-xive returns %d\n",
-					irq, status);
+					virq, status);
 
 unlock:
 		spin_unlock_irqrestore(&desc->lock, flags);
 	}
-
 }
 #endif

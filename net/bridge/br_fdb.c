@@ -73,9 +73,9 @@ static __inline__ int br_mac_hash(const unsigned char *mac)
 
 static __inline__ void fdb_delete(struct net_bridge_fdb_entry *f)
 {
-	hlist_del(&f->hlist);
+	hlist_del_rcu(&f->hlist);
 	if (!f->is_static)
-		list_del(&f->age_list);
+		list_del(&f->u.age_list);
 
 	br_fdb_put(f);
 }
@@ -85,7 +85,7 @@ void br_fdb_changeaddr(struct net_bridge_port *p, const unsigned char *newaddr)
 	struct net_bridge *br = p->br;
 	int i;
 	
-	write_lock_bh(&br->hash_lock);
+	spin_lock_bh(&br->hash_lock);
 
 	/* Search all chains since old address/hash is unknown */
 	for (i = 0; i < BR_HASH_SIZE; i++) {
@@ -117,7 +117,7 @@ void br_fdb_changeaddr(struct net_bridge_port *p, const unsigned char *newaddr)
 	fdb_insert(br, p, newaddr, 1);
 
 
-	write_unlock_bh(&br->hash_lock);
+	spin_unlock_bh(&br->hash_lock);
 }
 
 void br_fdb_cleanup(unsigned long _data)
@@ -126,13 +126,15 @@ void br_fdb_cleanup(unsigned long _data)
 	struct list_head *l, *n;
 	unsigned long delay;
 
-	write_lock_bh(&br->hash_lock);
+	spin_lock_bh(&br->hash_lock);
 	delay = hold_time(br);
 
 	list_for_each_safe(l, n, &br->age_list) {
-		struct net_bridge_fdb_entry *f
-			= list_entry(l, struct net_bridge_fdb_entry, age_list);
-		unsigned long expires = f->ageing_timer + delay;
+		struct net_bridge_fdb_entry *f;
+		unsigned long expires;
+
+		f = list_entry(l, struct net_bridge_fdb_entry, u.age_list);
+		expires = f->ageing_timer + delay;
 
 		if (time_before_eq(expires, jiffies)) {
 			WARN_ON(f->is_static);
@@ -144,14 +146,14 @@ void br_fdb_cleanup(unsigned long _data)
 			break;
 		}
 	}
-	write_unlock_bh(&br->hash_lock);
+	spin_unlock_bh(&br->hash_lock);
 }
 
 void br_fdb_delete_by_port(struct net_bridge *br, struct net_bridge_port *p)
 {
 	int i;
 
-	write_lock_bh(&br->hash_lock);
+	spin_lock_bh(&br->hash_lock);
 	for (i = 0; i < BR_HASH_SIZE; i++) {
 		struct hlist_node *h, *g;
 		
@@ -182,37 +184,53 @@ void br_fdb_delete_by_port(struct net_bridge *br, struct net_bridge_port *p)
 		skip_delete: ;
 		}
 	}
-	write_unlock_bh(&br->hash_lock);
+	spin_unlock_bh(&br->hash_lock);
 }
 
-struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br, unsigned char *addr)
+/* No locking or refcounting, assumes caller has no preempt (rcu_read_lock) */
+struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
+					  const unsigned char *addr)
 {
 	struct hlist_node *h;
+	struct net_bridge_fdb_entry *fdb;
 
-	read_lock_bh(&br->hash_lock);
-		
-	hlist_for_each(h, &br->hash[br_mac_hash(addr)]) {
-		struct net_bridge_fdb_entry *fdb
-			= hlist_entry(h, struct net_bridge_fdb_entry, hlist);
-
+	hlist_for_each_entry_rcu(fdb, h, &br->hash[br_mac_hash(addr)], hlist) {
 		if (!memcmp(fdb->addr.addr, addr, ETH_ALEN)) {
-			if (has_expired(br, fdb))
-				goto ret_null;
-
-			atomic_inc(&fdb->use_count);
-			read_unlock_bh(&br->hash_lock);
+			if (unlikely(has_expired(br, fdb)))
+				break;
 			return fdb;
 		}
 	}
- ret_null:
-	read_unlock_bh(&br->hash_lock);
+
 	return NULL;
 }
 
+/* Interface used by ATM hook that keeps a ref count */
+struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br, 
+					unsigned char *addr)
+{
+	struct net_bridge_fdb_entry *fdb;
+
+	rcu_read_lock();
+	fdb = __br_fdb_get(br, addr);
+	if (fdb) 
+		atomic_inc(&fdb->use_count);
+	rcu_read_unlock();
+	return fdb;
+}
+
+static void fdb_rcu_free(struct rcu_head *head)
+{
+	struct net_bridge_fdb_entry *ent
+		= container_of(head, struct net_bridge_fdb_entry, u.rcu);
+	kmem_cache_free(br_fdb_cache, ent);
+}
+
+/* Set entry up for deletion with RCU  */
 void br_fdb_put(struct net_bridge_fdb_entry *ent)
 {
 	if (atomic_dec_and_test(&ent->use_count))
-		kmem_cache_free(br_fdb_cache, ent);
+		call_rcu(&ent->u.rcu, fdb_rcu_free);
 }
 
 /*
@@ -229,9 +247,9 @@ int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 
 	memset(buf, 0, maxnum*sizeof(struct __fdb_entry));
 
-	read_lock_bh(&br->hash_lock);
+	rcu_read_lock();
 	for (i = 0; i < BR_HASH_SIZE; i++) {
-		hlist_for_each_entry(f, h, &br->hash[i], hlist) {
+		hlist_for_each_entry_rcu(f, h, &br->hash[i], hlist) {
 			if (num >= maxnum)
 				goto out;
 
@@ -255,7 +273,7 @@ int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 	}
 
  out:
-	read_unlock_bh(&br->hash_lock);
+	rcu_read_unlock();
 
 	return num;
 }
@@ -298,7 +316,7 @@ static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 				return 0;
 
 			/* move to end of age list */
-			list_del(&fdb->age_list);
+			list_del(&fdb->u.age_list);
 			goto update;
 		}
 	}
@@ -309,7 +327,7 @@ static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 
 	memcpy(fdb->addr.addr, addr, ETH_ALEN);
 	atomic_set(&fdb->use_count, 1);
-	hlist_add_head(&fdb->hlist, &br->hash[hash]);
+	hlist_add_head_rcu(&fdb->hlist, &br->hash[hash]);
 
 	if (!timer_pending(&br->gc_timer)) {
 		br->gc_timer.expires = jiffies + hold_time(br);
@@ -322,7 +340,7 @@ static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	fdb->is_static = is_local;
 	fdb->ageing_timer = jiffies;
 	if (!is_local) 
-		list_add_tail(&fdb->age_list, &br->age_list);
+		list_add_tail(&fdb->u.age_list, &br->age_list);
 
 	return 0;
 }
@@ -332,8 +350,8 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 {
 	int ret;
 
-	write_lock_bh(&br->hash_lock);
+	spin_lock_bh(&br->hash_lock);
 	ret = fdb_insert(br, source, addr, is_local);
-	write_unlock_bh(&br->hash_lock);
+	spin_unlock_bh(&br->hash_lock);
 	return ret;
 }

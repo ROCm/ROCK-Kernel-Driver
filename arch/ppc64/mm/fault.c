@@ -93,13 +93,15 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	unsigned long is_write = error_code & 0x02000000;
 	unsigned long trap = TRAP(regs);
 
-	if (trap == 0x300 || trap == 0x380) {
+	BUG_ON((trap == 0x380) || (trap == 0x480));
+
+	if (trap == 0x300) {
 		if (debugger_fault_handler(regs))
 			return 0;
 	}
 
 	/* On a kernel SLB miss we can only check for a valid exception entry */
-	if (!user_mode(regs) && (trap == 0x380 || address >= TASK_SIZE))
+	if (!user_mode(regs) && (address >= TASK_SIZE))
 		return SIGSEGV;
 
 	if (error_code & 0x00400000) {

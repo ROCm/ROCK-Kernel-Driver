@@ -254,11 +254,11 @@ rh_info_t *rh_create(unsigned int alignment)
 
 	/* Alignment must be a power of two */
 	if ((alignment & (alignment - 1)) != 0)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (info == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	info->alignment = alignment;
 
@@ -366,7 +366,7 @@ void *rh_detach_region(rh_info_t * info, void *start, int size)
 
 	/* Validate size */
 	if (size <= 0)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
 	/* The region must be aligned */
 	s = (unsigned long)start;
@@ -380,7 +380,7 @@ void *rh_detach_region(rh_info_t * info, void *start, int size)
 	e = e & ~m;
 
 	if (assure_empty(info, 1) < 0)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	blk = NULL;
 	list_for_each(l, &info->free_list) {
@@ -394,7 +394,7 @@ void *rh_detach_region(rh_info_t * info, void *start, int size)
 	}
 
 	if (blk == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	/* Perfect fit */
 	if (bs == s && be == e) {
@@ -434,13 +434,13 @@ void *rh_alloc(rh_info_t * info, int size, const char *owner)
 
 	/* Validate size */
 	if (size <= 0)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
 	/* Align to configured alignment */
 	size = (size + (info->alignment - 1)) & ~(info->alignment - 1);
 
 	if (assure_empty(info, 1) < 0)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	blk = NULL;
 	list_for_each(l, &info->free_list) {
@@ -451,7 +451,7 @@ void *rh_alloc(rh_info_t * info, int size, const char *owner)
 	}
 
 	if (blk == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	/* Just fits */
 	if (blk->size == size) {
@@ -490,7 +490,7 @@ void *rh_alloc_fixed(rh_info_t * info, void *start, int size, const char *owner)
 
 	/* Validate size */
 	if (size <= 0)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
 	/* The region must be aligned */
 	s = (unsigned long)start;
@@ -504,7 +504,7 @@ void *rh_alloc_fixed(rh_info_t * info, void *start, int size, const char *owner)
 	e = e & ~m;
 
 	if (assure_empty(info, 2) < 0)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	blk = NULL;
 	list_for_each(l, &info->free_list) {
@@ -517,7 +517,7 @@ void *rh_alloc_fixed(rh_info_t * info, void *start, int size, const char *owner)
 	}
 
 	if (blk == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	/* Perfect fit */
 	if (bs == s && be == e) {

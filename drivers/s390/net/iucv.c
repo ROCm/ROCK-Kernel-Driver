@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.38 2004/07/09 15:59:53 mschwide Exp $
+ * $Id: iucv.c,v 1.39 2004/07/12 06:54:14 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.38 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.39 $
  *
  */
 
@@ -354,7 +354,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.38 $";
+	char vbuf[] = "$Revision: 1.39 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -874,9 +874,6 @@ iucv_register_program (__u8 pgmname[16],
 		iucv_remove_handler(new_handler);
 		kfree(new_handler);
 		switch(rc) {
-		case -ENODEV:
-			err = "No CPU can be reserved";
-			break;
 		case 0x03:
 			err = "Directory error";
 			break;

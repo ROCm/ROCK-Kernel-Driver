@@ -34,7 +34,8 @@
 	((addr) <= current->thread.fs.seg				    \
 	 && ((size) == 0 || (size) - 1 <= current->thread.fs.seg - (addr)))
 
-#define access_ok(type, addr, size) __access_ok((unsigned long)(addr),(size))
+#define access_ok(type, addr, size) \
+	(__chk_user_ptr(addr),__access_ok((unsigned long)(addr),(size)))
 
 extern inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
@@ -105,6 +106,7 @@ extern long __put_user_bad(void);
 #define __put_user_nocheck(x,ptr,size)			\
 ({							\
 	long __pu_err;					\
+	__chk_user_ptr(ptr);				\
 	__put_user_size((x),(ptr),(size),__pu_err);	\
 	__pu_err;					\
 })
@@ -112,7 +114,7 @@ extern long __put_user_bad(void);
 #define __put_user_check(x,ptr,size)				\
 ({								\
 	long __pu_err = -EFAULT;				\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);			\
+	__typeof__(*(ptr)) __user *__pu_addr = (ptr);		\
 	if (access_ok(VERIFY_WRITE,__pu_addr,size))		\
 		__put_user_size((x),__pu_addr,(size),__pu_err);	\
 	__pu_err;						\
@@ -179,6 +181,7 @@ do {							\
 #define __get_user_nocheck(x, ptr, size)			\
 ({								\
 	long __gu_err, __gu_val;				\
+	__chk_user_ptr(ptr);					\
 	__get_user_size(__gu_val, (ptr), (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
@@ -188,6 +191,7 @@ do {							\
 ({								\
 	long __gu_err;						\
 	long long __gu_val;					\
+	__chk_user_ptr(ptr);					\
 	__get_user_size64(__gu_val, (ptr), (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
@@ -196,7 +200,7 @@ do {							\
 #define __get_user_check(x, ptr, size)					\
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
-	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
+	const __typeof__(*(ptr)) __user *__gu_addr = (ptr);		\
 	if (access_ok(VERIFY_READ, __gu_addr, (size)))			\
 		__get_user_size(__gu_val, __gu_addr, (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
@@ -207,7 +211,7 @@ do {							\
 ({									  \
 	long __gu_err = -EFAULT;					  \
 	long long __gu_val = 0;						  \
-	const __typeof__(*(ptr)) *__gu_addr = (ptr);			  \
+	const __typeof__(*(ptr)) __user *__gu_addr = (ptr);		  \
 	if (access_ok(VERIFY_READ, __gu_addr, (size)))			  \
 		__get_user_size64(__gu_val, __gu_addr, (size), __gu_err); \
 	(x) = (__typeof__(*(ptr)))__gu_val;				  \

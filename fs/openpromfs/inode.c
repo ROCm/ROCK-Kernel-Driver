@@ -64,7 +64,7 @@ static int openpromfs_readdir(struct file *, void *, filldir_t);
 static struct dentry *openpromfs_lookup(struct inode *, struct dentry *dentry, struct nameidata *nd);
 static int openpromfs_unlink (struct inode *, struct dentry *dentry);
 
-static ssize_t nodenum_read(struct file *file, char *buf,
+static ssize_t nodenum_read(struct file *file, char __user *buf,
 			    size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
@@ -83,7 +83,7 @@ static ssize_t nodenum_read(struct file *file, char *buf,
 	return count;
 }
 
-static ssize_t property_read(struct file *filp, char *buf,
+static ssize_t property_read(struct file *filp, char __user *buf,
 			     size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
@@ -101,7 +101,7 @@ static ssize_t property_read(struct file *filp, char *buf,
 		i = ((u32)(long)inode->u.generic_ip) >> 16;
 		if ((u16)((long)inode->u.generic_ip) == aliases) {
 			if (i >= aliases_nodes)
-				p = 0;
+				p = NULL;
 			else
 				p = alias_names [i];
 		} else
@@ -135,7 +135,7 @@ static ssize_t property_read(struct file *filp, char *buf,
 			return -EIO;
 		op->value [k] = 0;
 		if (k) {
-			for (s = 0, p = op->value; p < op->value + k; p++) {
+			for (s = NULL, p = op->value; p < op->value + k; p++) {
 				if ((*p >= ' ' && *p <= '~') || *p == '\n') {
 					op->flag |= OPP_STRING;
 					s = p;
@@ -318,7 +318,7 @@ static ssize_t property_read(struct file *filp, char *buf,
 	return count;
 }
 
-static ssize_t property_write(struct file *filp, const char *buf,
+static ssize_t property_write(struct file *filp, const char __user *buf,
 			      size_t count, loff_t *ppos)
 {
 	int i, j, k;
@@ -330,7 +330,7 @@ static ssize_t property_write(struct file *filp, const char *buf,
 	if (filp->f_pos >= 0xffffff || count >= 0xffffff)
 		return -EINVAL;
 	if (!filp->private_data) {
-		i = property_read (filp, NULL, 0, 0);
+		i = property_read (filp, NULL, 0, NULL);
 		if (i)
 			return i;
 	}
@@ -416,7 +416,7 @@ static ssize_t property_write(struct file *filp, const char *buf,
 			mask &= mask2;
 			if (mask) {
 				*first &= ~mask;
-				*first |= simple_strtoul (tmp, 0, 16);
+				*first |= simple_strtoul (tmp, NULL, 16);
 				op->flag |= OPP_DIRTY;
 			}
 		} else {
@@ -433,7 +433,7 @@ static ssize_t property_write(struct file *filp, const char *buf,
 						for (j = 0; j < first_off; j++)
 							mask >>= 1;
 						*q &= ~mask;
-						*q |= simple_strtoul (tmp,0,16);
+						*q |= simple_strtoul (tmp,NULL,16);
 					}
 					buf += 9;
 				} else if ((q == last - 1) && last_cnt
@@ -445,14 +445,14 @@ static ssize_t property_write(struct file *filp, const char *buf,
 					for (j = 0; j < 8 - last_cnt; j++)
 						mask <<= 1;
 					*q &= ~mask;
-					*q |= simple_strtoul (tmp, 0, 16);
+					*q |= simple_strtoul (tmp, NULL, 16);
 					buf += last_cnt;
 				} else {
 					char tchars[17]; /* XXX yuck... */
 
 					if (copy_from_user(tchars, buf, 16))
 						return -EFAULT;
-					*q = simple_strtoul (tchars, 0, 16);
+					*q = simple_strtoul (tchars, NULL, 16);
 					buf += 9;
 				}
 			}

@@ -37,6 +37,7 @@
 #include <linux/init.h> 
 #include <linux/hdreg.h>
 #include <linux/spinlock.h>
+#include <linux/compat.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
@@ -555,12 +556,12 @@ static void unregister_cciss_ioctl32(void)
 int cciss_ioctl32_passthru(unsigned int fd, unsigned cmd, unsigned long arg,
 	struct file *file)
 {
-	IOCTL32_Command_struct *arg32 =
-		(IOCTL32_Command_struct *) arg;
+	IOCTL32_Command_struct __user *arg32 =
+		(IOCTL32_Command_struct __user *) arg;
 	IOCTL_Command_struct arg64;
-	mm_segment_t old_fs;
+	IOCTL_Command_struct __user *p = compat_alloc_user_space(sizeof(arg64));
 	int err;
-	unsigned long cp;
+	u32 cp;
 
 	err = 0;
 	err |= copy_from_user(&arg64.LUN_info, &arg32->LUN_info, sizeof(arg64.LUN_info));
@@ -568,31 +569,30 @@ int cciss_ioctl32_passthru(unsigned int fd, unsigned cmd, unsigned long arg,
 	err |= copy_from_user(&arg64.error_info, &arg32->error_info, sizeof(arg64.error_info));
 	err |= get_user(arg64.buf_size, &arg32->buf_size);
 	err |= get_user(cp, &arg32->buf);
-	arg64.buf = (BYTE *)cp;
+	arg64.buf = compat_ptr(cp);
+	err |= copy_to_user(p, &arg64, sizeof(arg64));
 
 	if (err)
 		return -EFAULT;
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_ioctl(fd, CCISS_PASSTHRU, (unsigned long) &arg64);
-	set_fs(old_fs);
+	err = sys_ioctl(fd, CCISS_PASSTHRU, (unsigned long) p);
 	if (err)
 		return err;
-	err |= copy_to_user(&arg32->error_info, &arg64.error_info, sizeof(&arg32->error_info));
+	err |= copy_in_user(&arg32->error_info, &p->error_info, sizeof(&arg32->error_info));
 	if (err)
 		return -EFAULT;
 	return err;
 }
+
 int cciss_ioctl32_big_passthru(unsigned int fd, unsigned cmd, unsigned long arg,
 	struct file *file)
 {
-	BIG_IOCTL32_Command_struct *arg32 =
-		(BIG_IOCTL32_Command_struct *) arg;
+	BIG_IOCTL32_Command_struct __user *arg32 =
+		(BIG_IOCTL32_Command_struct __user *) arg;
 	BIG_IOCTL_Command_struct arg64;
-	mm_segment_t old_fs;
+	BIG_IOCTL_Command_struct __user *p = compat_alloc_user_space(sizeof(arg64));
 	int err;
-	unsigned long cp;
+	u32 cp;
 
 	err = 0;
 	err |= copy_from_user(&arg64.LUN_info, &arg32->LUN_info, sizeof(arg64.LUN_info));
@@ -601,18 +601,16 @@ int cciss_ioctl32_big_passthru(unsigned int fd, unsigned cmd, unsigned long arg,
 	err |= get_user(arg64.buf_size, &arg32->buf_size);
 	err |= get_user(arg64.malloc_size, &arg32->malloc_size);
 	err |= get_user(cp, &arg32->buf);
-	arg64.buf = (BYTE *)cp;
+	arg64.buf = compat_ptr(cp);
+	err |= copy_to_user(p, &arg64, sizeof(arg64));
 
 	if (err)
 		 return -EFAULT;
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_ioctl(fd, CCISS_BIG_PASSTHRU, (unsigned long) &arg64);
-	set_fs(old_fs);
+	err = sys_ioctl(fd, CCISS_BIG_PASSTHRU, (unsigned long) p);
 	if (err)
 		return err;
-	err |= copy_to_user(&arg32->error_info, &arg64.error_info, sizeof(&arg32->error_info));
+	err |= copy_in_user(&arg32->error_info, &p->error_info, sizeof(&arg32->error_info));
 	if (err)
 		return -EFAULT;
 	return err;

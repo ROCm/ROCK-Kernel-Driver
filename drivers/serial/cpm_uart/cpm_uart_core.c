@@ -64,8 +64,9 @@ int cpm_uart_nr;
 /**************************************************************/
 
 static int  cpm_uart_tx_pump(struct uart_port *port);
-static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval);
-static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int sbits, u16 sval);
+static void cpm_uart_init_smc(struct uart_cpm_port *pinfo);
+static void cpm_uart_init_scc(struct uart_cpm_port *pinfo);
+static void cpm_uart_initbd(struct uart_cpm_port *pinfo);
 
 /**************************************************************/
 
@@ -132,10 +133,6 @@ static void cpm_uart_start_tx(struct uart_port *port, unsigned int tty_start)
 	volatile scc_t *sccp = pinfo->sccp;
 
 	pr_debug("CPM uart[%d]:start tx\n", port->line);
-
-	/* if in the middle of discarding return */
-	if (IS_DISCARDING(pinfo))
-		return;
 
 	if (IS_SMC(pinfo)) {
 		if (smcp->smc_smcm & SMCM_TX)
@@ -362,6 +359,7 @@ static irqreturn_t cpm_uart_int(int irq, void *data, struct pt_regs *regs)
 static int cpm_uart_startup(struct uart_port *port)
 {
 	int retval;
+	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
 
 	pr_debug("CPM uart[%d]:startup\n", port->line);
 
@@ -369,6 +367,14 @@ static int cpm_uart_startup(struct uart_port *port)
 	retval = request_irq(port->irq, cpm_uart_int, 0, "cpm_uart", port);
 	if (retval)
 		return retval;
+
+	/* Startup rx-int */
+	if (IS_SMC(pinfo)) {
+		pinfo->smcp->smc_smcm |= SMCM_RX;
+		pinfo->smcp->smc_smcmr |= SMCMR_REN;
+	} else {
+		pinfo->sccp->scc_sccm |= UART_SCCM_RX;
+	}
 
 	return 0;
 }
@@ -400,7 +406,8 @@ static void cpm_uart_shutdown(struct uart_port *port)
 		}
 
 		/* Shut them really down and reinit buffer descriptors */
-		cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
+		cpm_line_cr_cmd(line, CPM_CR_STOP_TX);
+		cpm_uart_initbd(pinfo);
 	}
 }
 
@@ -409,56 +416,13 @@ static void cpm_uart_set_termios(struct uart_port *port,
 {
 	int baud;
 	unsigned long flags;
-	u16 cval, scval;
+	u16 cval, scval, prev_mode;
 	int bits, sbits;
 	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
-	int line = pinfo - cpm_uart_ports;
-	volatile cbd_t *bdp;
+	volatile smc_t *smcp = pinfo->smcp;
+	volatile scc_t *sccp = pinfo->sccp;
 
 	pr_debug("CPM uart[%d]:set_termios\n", port->line);
-
-	spin_lock_irqsave(&port->lock, flags);
-	/* disable uart interrupts */
-	if (IS_SMC(pinfo))
-		pinfo->smcp->smc_smcm &= ~(SMCM_RX | SMCM_TX);
-	else
-		pinfo->sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
-	pinfo->flags |= FLAG_DISCARDING;
-	spin_unlock_irqrestore(&port->lock, flags);
-
-	/* if previous configuration exists wait for tx to finish */
-	if (pinfo->baud != 0 && pinfo->bits != 0) {
-
-		/* point to the last txed bd */
-		bdp = pinfo->tx_cur;
-		if (bdp == pinfo->tx_bd_base)
-			bdp = pinfo->tx_bd_base + (pinfo->tx_nrfifos - 1);
-		else
-			bdp--;
-
-		/* wait for it to be transmitted */
-		while ((bdp->cbd_sc & BD_SC_READY) != 0)
-			schedule();
-
-		/* and delay for the hw fifo to drain */
-		udelay((3 * 1000000 * pinfo->bits) / pinfo->baud);
-	}
-
-	spin_lock_irqsave(&port->lock, flags);
-
-	/* Send the CPM an initialize command. */
-	cpm_line_cr_cmd(line, CPM_CR_STOP_TX);
-
-	/* Stop uart */
-	if (IS_SMC(pinfo))
-		pinfo->smcp->smc_smcmr &= ~(SMCMR_REN | SMCMR_TEN);
-	else
-		pinfo->sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
-
-	/* Send the CPM an initialize command. */
-	cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
-
-	spin_unlock_irqrestore(&port->lock, flags);
 
 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
 
@@ -541,24 +505,24 @@ static void cpm_uart_set_termios(struct uart_port *port,
 	
 	spin_lock_irqsave(&port->lock, flags);
 
-	cpm_set_brg(pinfo->brg - 1, baud);
-
 	/* Start bit has not been added (so don't, because we would just
 	 * subtract it later), and we need to add one for the number of
 	 * stops bits (there is always at least one).
 	 */
 	bits++;
+	if (IS_SMC(pinfo)) {
+		/* Set the mode register.  We want to keep a copy of the
+		 * enables, because we want to put them back if they were
+		 * present.
+		 */
+		prev_mode = smcp->smc_smcmr;
+		smcp->smc_smcmr = smcr_mk_clen(bits) | cval | SMCMR_SM_UART;
+		smcp->smc_smcmr |= (prev_mode & (SMCMR_REN | SMCMR_TEN));
+	} else {
+		sccp->scc_psmr = (sbits << 12) | scval;
+	}
 
-	/* re-init */
-	if (IS_SMC(pinfo))
-		cpm_uart_init_smc(pinfo, bits, cval);
-	else
-		cpm_uart_init_scc(pinfo, sbits, scval);
-
-	pinfo->baud = baud;
-	pinfo->bits = bits;
-
-	pinfo->flags &= ~FLAG_DISCARDING;
+	cpm_set_brg(pinfo->brg - 1, baud);
 	spin_unlock_irqrestore(&port->lock, flags);
 
 }
@@ -661,44 +625,58 @@ static int cpm_uart_tx_pump(struct uart_port *port)
 	return 1;
 }
 
-static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int bits, u16 scval)
+/*
+ * init buffer descriptors
+ */
+static void cpm_uart_initbd(struct uart_cpm_port *pinfo)
 {
-	int line = pinfo - cpm_uart_ports;
-	volatile scc_t *scp;
-	volatile scc_uart_t *sup;
+	int i;
 	u8 *mem_addr;
 	volatile cbd_t *bdp;
-	int i;
 
-	pr_debug("CPM uart[%d]:init_scc\n", pinfo->port.line);
-
-	scp = pinfo->sccp;
-	sup = pinfo->sccup;
+	pr_debug("CPM uart[%d]:initbd\n", pinfo->port.line);
 
 	/* Set the physical address of the host memory
 	 * buffers in the buffer descriptors, and the
 	 * virtual address for us to work with.
 	 */
-	pinfo->rx_cur = pinfo->rx_bd_base;
 	mem_addr = pinfo->mem_addr;
-	for (bdp = pinfo->rx_bd_base, i = 0; i < pinfo->rx_nrfifos; i++, bdp++) {
+	bdp = pinfo->rx_cur = pinfo->rx_bd_base;
+	for (i = 0; i < (pinfo->rx_nrfifos - 1); i++, bdp++) {
 		bdp->cbd_bufaddr = virt_to_bus(mem_addr);
-		bdp->cbd_sc = BD_SC_EMPTY | BD_SC_INTRPT | (i < (pinfo->rx_nrfifos - 1) ? 0 : BD_SC_WRAP);
+		bdp->cbd_sc = BD_SC_EMPTY | BD_SC_INTRPT;
 		mem_addr += pinfo->rx_fifosize;
 	}
+	
+	bdp->cbd_bufaddr = virt_to_bus(mem_addr);
+	bdp->cbd_sc = BD_SC_WRAP | BD_SC_EMPTY | BD_SC_INTRPT;
 
 	/* Set the physical address of the host memory
 	 * buffers in the buffer descriptors, and the
 	 * virtual address for us to work with.
 	 */
 	mem_addr = pinfo->mem_addr + L1_CACHE_ALIGN(pinfo->rx_nrfifos * pinfo->rx_fifosize);
-	pinfo->tx_cur = pinfo->tx_bd_base;
-	for (bdp = pinfo->tx_bd_base, i = 0; i < pinfo->tx_nrfifos; i++, bdp++) {
+	bdp = pinfo->tx_cur = pinfo->tx_bd_base;
+	for (i = 0; i < (pinfo->tx_nrfifos - 1); i++, bdp++) {
 		bdp->cbd_bufaddr = virt_to_bus(mem_addr);
-		bdp->cbd_sc = BD_SC_INTRPT | (i < (pinfo->tx_nrfifos - 1) ? 0 : BD_SC_WRAP);
+		bdp->cbd_sc = BD_SC_INTRPT;
 		mem_addr += pinfo->tx_fifosize;
-		bdp++;
 	}
+	
+	bdp->cbd_bufaddr = virt_to_bus(mem_addr);
+	bdp->cbd_sc = BD_SC_WRAP | BD_SC_INTRPT;
+}
+
+static void cpm_uart_init_scc(struct uart_cpm_port *pinfo)
+{
+	int line = pinfo - cpm_uart_ports;
+	volatile scc_t *scp;
+	volatile scc_uart_t *sup;
+
+	pr_debug("CPM uart[%d]:init_scc\n", pinfo->port.line);
+
+	scp = pinfo->sccp;
+	sup = pinfo->sccup;
 
 	/* Store address */
 	pinfo->sccup->scc_genscc.scc_rbase = (unsigned char *)pinfo->rx_bd_base - DPRAM_BASE;
@@ -742,51 +720,24 @@ static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int bits, u16 scval)
 	    (SCC_GSMRL_MODE_UART | SCC_GSMRL_TDCR_16 | SCC_GSMRL_RDCR_16);
 
 	/* Enable rx interrupts  and clear all pending events.  */
-	scp->scc_sccm = UART_SCCM_RX;
+	scp->scc_sccm = 0;
 	scp->scc_scce = 0xffff;
 	scp->scc_dsr = 0x7e7e;
-	scp->scc_psmr = (bits << 12) | scval;
+	scp->scc_psmr = 0x3000;
 
 	scp->scc_gsmrl |= (SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 }
 
-static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval)
+static void cpm_uart_init_smc(struct uart_cpm_port *pinfo)
 {
 	int line = pinfo - cpm_uart_ports;
 	volatile smc_t *sp;
 	volatile smc_uart_t *up;
-	volatile u8 *mem_addr;
-	volatile cbd_t *bdp;
-	int i;
 
 	pr_debug("CPM uart[%d]:init_smc\n", pinfo->port.line);
 
 	sp = pinfo->smcp;
 	up = pinfo->smcup;
-
-	/* Set the physical address of the host memory
-	 * buffers in the buffer descriptors, and the
-	 * virtual address for us to work with.
-	 */
-	mem_addr = pinfo->mem_addr;
-	pinfo->rx_cur = pinfo->rx_bd_base;
-	for (bdp = pinfo->rx_bd_base, i = 0; i < pinfo->rx_nrfifos; i++, bdp++) {
-		bdp->cbd_bufaddr = virt_to_bus(mem_addr);
-		bdp->cbd_sc = BD_SC_EMPTY | BD_SC_INTRPT | (i < (pinfo->rx_nrfifos - 1) ? 0 : BD_SC_WRAP);
-		mem_addr += pinfo->rx_fifosize;
-	}
-
-	/* Set the physical address of the host memory
-	 * buffers in the buffer descriptors, and the
-	 * virtual address for us to work with.
-	 */
-	mem_addr = pinfo->mem_addr + L1_CACHE_ALIGN(pinfo->rx_nrfifos * pinfo->rx_fifosize);
-	pinfo->tx_cur = pinfo->tx_bd_base;
-	for (bdp = pinfo->tx_bd_base, i = 0; i < pinfo->tx_nrfifos; i++, bdp++) {
-		bdp->cbd_bufaddr = virt_to_bus(mem_addr);
-		bdp->cbd_sc = BD_SC_INTRPT | (i < (pinfo->tx_nrfifos - 1) ? 0 : BD_SC_WRAP);
-		mem_addr += pinfo->tx_fifosize;
-	}
 
 	/* Store address */
 	pinfo->smcup->smc_rbase = (u_char *)pinfo->rx_bd_base - DPRAM_BASE;
@@ -804,11 +755,13 @@ static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval)
 
 	cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
 
-	/* Set UART mode, according to the parameters */
-	sp->smc_smcmr = smcr_mk_clen(bits) | cval | SMCMR_SM_UART;
+	/* Set UART mode, 8 bit, no parity, one stop.
+	 * Enable receive and transmit.
+	 */
+	sp->smc_smcmr = smcr_mk_clen(9) | SMCMR_SM_UART;
 
 	/* Enable only rx interrupts clear all pending events. */
-	sp->smc_smcm = SMCM_RX;
+	sp->smc_smcm = 0;
 	sp->smc_smce = 0xff;
 
 	sp->smc_smcmr |= (SMCMR_REN | SMCMR_TEN);
@@ -836,9 +789,20 @@ static int cpm_uart_request_port(struct uart_port *port)
 	if (pinfo->set_lineif)
 		pinfo->set_lineif(pinfo);
 
+	if (IS_SMC(pinfo)) {
+		pinfo->smcp->smc_smcm &= ~(SMCM_RX | SMCM_TX);
+		pinfo->smcp->smc_smcmr &= ~(SMCMR_REN | SMCMR_TEN);
+	} else {
+		pinfo->sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
+		pinfo->sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+	}
+
 	ret = cpm_uart_allocbuf(pinfo, 0);
+
 	if (ret)
 		return ret;
+
+	cpm_uart_initbd(pinfo);
 
 	return 0;
 }
@@ -975,9 +939,6 @@ static void cpm_uart_console_write(struct console *co, const char *s,
 	volatile cbd_t *bdp, *bdbase;
 	volatile unsigned char *cp;
 
-	if (IS_DISCARDING(pinfo))
-		return;
-
 	/* Get the address of the host memory buffer.
 	 */
 	bdp = pinfo->tx_cur;
@@ -1085,9 +1046,25 @@ static int __init cpm_uart_console_setup(struct console *co, char *options)
 	if (pinfo->set_lineif)
 		pinfo->set_lineif(pinfo);
 
+	if (IS_SMC(pinfo)) {
+		pinfo->smcp->smc_smcm &= ~(SMCM_RX | SMCM_TX);
+		pinfo->smcp->smc_smcmr &= ~(SMCMR_REN | SMCMR_TEN);
+	} else {
+		pinfo->sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
+		pinfo->sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+	}
+
 	ret = cpm_uart_allocbuf(pinfo, 1);
+
 	if (ret)
 		return ret;
+
+	cpm_uart_initbd(pinfo);
+
+	if (IS_SMC(pinfo))
+		cpm_uart_init_smc(pinfo);
+	else
+		cpm_uart_init_scc(pinfo);
 
 	uart_set_options(port, co, baud, parity, bits, flow);
 

@@ -1566,10 +1566,10 @@ sisfb_do_install_cmap(int con, struct fb_info *info)
         if(con != ivideo->currcon) return;
 
         if(fb_display[con].cmap.len) {
-		fb_set_cmap(&fb_display[con].cmap, 1, sisfb_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, sisfb_setcolreg, info);
         } else {
 		int size = sisfb_get_cmap_len(&fb_display[con].var);
-		fb_set_cmap(fb_default_cmap(size), 1, sisfb_setcolreg, info);
+		fb_set_cmap(fb_default_cmap(size), sisfb_setcolreg, info);
 	}
 }
 

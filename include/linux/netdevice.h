@@ -472,12 +472,6 @@ struct net_device
 	/* bridge stuff */
 	struct net_bridge_port	*br_port;
 
-#ifdef CONFIG_NET_FASTROUTE
-#define NETDEV_FASTROUTE_HMASK 0xF
-	/* Semi-private data. Keep it at the end of device struct. */
-	rwlock_t		fastpath_lock;
-	struct dst_entry	*fastpath[NETDEV_FASTROUTE_HMASK+1];
-#endif
 #ifdef CONFIG_NET_DIVERT
 	/* this will get initialized at each interface type init routine */
 	struct divert_blk	*divert;
@@ -947,11 +941,6 @@ extern unsigned long	netdev_fc_xoff;
 extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
 extern int skb_checksum_help(struct sk_buff **pskb, int inward);
-#ifdef CONFIG_NET_FASTROUTE
-extern int		netdev_fastroute;
-extern int		netdev_fastroute_obstacles;
-extern void		dev_clear_fastroute(struct net_device *dev);
-#endif
 
 #ifdef CONFIG_SYSCTL
 extern char *net_sysctl_strdup(const char *s);

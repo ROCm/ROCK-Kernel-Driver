@@ -1,6 +1,6 @@
 /*
  * Lec arp cache
- * Marko Kiiskila carnil@cs.tut.fi
+ * Marko Kiiskila mkiiskila@yahoo.com
  *
  */
 #ifndef _LEC_ARP_H

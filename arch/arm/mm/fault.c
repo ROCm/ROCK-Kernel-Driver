@@ -129,7 +129,7 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 	si.si_signo = SIGSEGV;
 	si.si_errno = 0;
 	si.si_code = code;
-	si.si_addr = (void *)addr;
+	si.si_addr = (void __user *)addr;
 	force_sig_info(SIGSEGV, &si, tsk);
 }
 

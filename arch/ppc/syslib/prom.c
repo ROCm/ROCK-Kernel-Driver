@@ -126,7 +126,7 @@ finish_device_tree(void)
 
 	/* All newworld pmac machines and CHRPs now use the interrupt tree */
 	for (np = allnodes; np != NULL; np = np->allnext) {
-		if (get_property(np, "interrupt-parent", 0)) {
+		if (get_property(np, "interrupt-parent", NULL)) {
 			use_of_interrupt_tree = 1;
 			break;
 		}
@@ -181,8 +181,8 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	struct device_node *child;
 	int *ip;
 
-	np->name = get_property(np, "name", 0);
-	np->type = get_property(np, "device_type", 0);
+	np->name = get_property(np, "name", NULL);
+	np->type = get_property(np, "device_type", NULL);
 
 	if (!np->name)
 		np->name = "<NULL>";
@@ -197,10 +197,10 @@ finish_node(struct device_node *np, unsigned long mem_start,
 		mem_start = finish_node_interrupts(np, mem_start);
 
 	/* Look for #address-cells and #size-cells properties. */
-	ip = (int *) get_property(np, "#address-cells", 0);
+	ip = (int *) get_property(np, "#address-cells", NULL);
 	if (ip != NULL)
 		naddrc = *ip;
-	ip = (int *) get_property(np, "#size-cells", 0);
+	ip = (int *) get_property(np, "#size-cells", NULL);
 	if (ip != NULL)
 		nsizec = *ip;
 
@@ -501,7 +501,7 @@ prom_n_addr_cells(struct device_node* np)
 	do {
 		if (np->parent)
 			np = np->parent;
-		ip = (int *) get_property(np, "#address-cells", 0);
+		ip = (int *) get_property(np, "#address-cells", NULL);
 		if (ip != NULL)
 			return *ip;
 	} while (np->parent);
@@ -516,7 +516,7 @@ prom_n_size_cells(struct device_node* np)
 	do {
 		if (np->parent)
 			np = np->parent;
-		ip = (int *) get_property(np, "#size-cells", 0);
+		ip = (int *) get_property(np, "#size-cells", NULL);
 		if (ip != NULL)
 			return *ip;
 	} while (np->parent);
@@ -836,7 +836,7 @@ find_devices(const char *name)
 			prevp = &np->next;
 		}
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -855,7 +855,7 @@ find_type_devices(const char *type)
 			prevp = &np->next;
 		}
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -872,7 +872,7 @@ find_all_nodes(void)
 		*prevp = np;
 		prevp = &np->next;
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -934,7 +934,7 @@ find_compatible_devices(const char *type, const char *compat)
 			prevp = &np->next;
 		}
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -1159,7 +1159,7 @@ get_property(struct device_node *np, const char *name, int *lenp)
 				*lenp = pp->length;
 			return pp->value;
 		}
-	return 0;
+	return NULL;
 }
 
 /*

@@ -267,6 +267,12 @@ found_middle:
 	return result + generic_ffs_for_find_next_bit(tmp);
 }
 
+/*
+ * find_first_bit - find the first set bit in a memory region
+ */
+#define find_first_bit(addr, size) \
+	find_next_bit((addr), (size), 0)
+
 
 #define ffs(x) generic_ffs (x)
 #define fls(x) generic_fls (x)

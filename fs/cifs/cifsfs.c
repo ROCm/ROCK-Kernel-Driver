@@ -41,8 +41,6 @@
 #include "cifs_fs_sb.h"
 #include <linux/mm.h>
 #define CIFS_MAGIC_NUMBER 0xFF534D42	/* the first four bytes of SMB PDUs */
-/* BB when mempool_resize is added back in, we will resize pool on new mount */
-#define CIFS_MIN_RCV_POOL 11 /* enough for progress to five servers */
 
 #ifdef CONFIG_CIFS_QUOTA
 static struct quotactl_ops cifs_quotactl_ops;
@@ -192,15 +190,11 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 
 static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
-        struct cifs_sb_info *cifs_sb;
+	struct cifs_sb_info *cifs_sb;
 
-        cifs_sb = CIFS_SB(inode->i_sb);
+	cifs_sb = CIFS_SB(inode->i_sb);
 
-        if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
-		/* the server supports the Unix-like mode bits and does its
-		own permission checks, and therefore we do not allow the file
-		mode to be overriden on these mounts - so do not do perm
-		check on client side */
+	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NO_PERM) {
 		return 0;
 	} else /* file mode might have been restricted at mount time 
 		on the client (above and beyond ACL on servers) for  
@@ -746,6 +740,7 @@ init_cifs(void)
  */
 	atomic_set(&sesInfoAllocCount, 0);
 	atomic_set(&tconInfoAllocCount, 0);
+	atomic_set(&tcpSesAllocCount,0);
 	atomic_set(&tcpSesReconnectCount, 0);
 	atomic_set(&tconInfoReconnectCount, 0);
 

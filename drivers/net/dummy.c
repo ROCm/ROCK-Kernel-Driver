@@ -57,13 +57,6 @@ static void set_multicast_list(struct net_device *dev)
 {
 }
 
-#ifdef CONFIG_NET_FASTROUTE
-static int dummy_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
-{
-	return -1;
-}
-#endif
-
 static void __init dummy_setup(struct net_device *dev)
 {
 	/* Initialize the device structure. */
@@ -71,9 +64,6 @@ static void __init dummy_setup(struct net_device *dev)
 	dev->hard_start_xmit = dummy_xmit;
 	dev->set_multicast_list = set_multicast_list;
 	dev->set_mac_address = dummy_set_address;
-#ifdef CONFIG_NET_FASTROUTE
-	dev->accept_fastpath = dummy_accept_fastpath;
-#endif
 
 	/* Fill in device structure with ethernet-generic values. */
 	ether_setup(dev);

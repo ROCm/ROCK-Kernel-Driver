@@ -209,14 +209,6 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	tlbwe	r4,r0,PPC44x_TLB_XLAT	/* Load the translation fields */
 	tlbwe	r5,r0,PPC44x_TLB_ATTRIB	/* Load the attrib/access fields */
 
-	ori	r3,r3,PPC44x_TLB_TS	/* Translation state 1 */
-
-        li      r0,1			/* TLB slot 1 */
-
-	tlbwe	r3,r0,PPC44x_TLB_PAGEID	/* Load the pageid fields */
-	tlbwe	r4,r0,PPC44x_TLB_XLAT	/* Load the translation fields */
-	tlbwe	r5,r0,PPC44x_TLB_ATTRIB	/* Load the attrib/access fields */
-
 	/* Force context change */
 	isync
 #endif /* CONFIG_SERIAL_TEXT_DEBUG */

@@ -65,7 +65,7 @@
 #define URB_ZERO_PACKET 0
 #endif
 
-#define VERSION "2.6"
+#define VERSION "2.7"
 
 static struct usb_driver hci_usb_driver; 
 
@@ -76,14 +76,15 @@ static struct usb_device_id bluetooth_ids[] = {
 	/* AVM BlueFRITZ! USB v2.0 */
 	{ USB_DEVICE(0x057c, 0x3800) },
 
-	/* Ericsson with non-standard id */
-	{ USB_DEVICE(0x0bdb, 0x1002) },
-
-	/* ALPS Module with non-standard id */
-	{ USB_DEVICE(0x044e, 0x3002) },
-
 	/* Bluetooth Ultraport Module from IBM */
 	{ USB_DEVICE(0x04bf, 0x030a) },
+
+	/* ALPS Modules with non-standard id */
+	{ USB_DEVICE(0x044e, 0x3001) },
+	{ USB_DEVICE(0x044e, 0x3002) },
+
+	/* Ericsson with non-standard id */
+	{ USB_DEVICE(0x0bdb, 0x1002) },
 
 	{ }	/* Terminating entry */
 };
@@ -96,6 +97,9 @@ static struct usb_device_id blacklist_ids[] = {
 
 	/* Broadcom BCM2035 */
 	{ USB_DEVICE(0x0a5c, 0x200a), .driver_info = HCI_RESET },
+
+	/* ISSC Bluetooth Adapter v3.1 */
+	{ USB_DEVICE(0x1131, 0x1001), .driver_info = HCI_RESET },
 
 	/* Digianswer device */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
@@ -338,17 +342,9 @@ static int hci_usb_flush(struct hci_dev *hdev)
 
 	BT_DBG("%s", hdev->name);
 
-	for (i=0; i < 4; i++)
+	for (i = 0; i < 4; i++)
 		skb_queue_purge(&husb->transmit_q[i]);
 	return 0;
-}
-
-static inline void hci_usb_wait_for_urb(struct urb *urb)
-{
-	while (atomic_read(&urb->kref.refcount) > 1) {
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((5 * HZ + 999) / 1000);
-	}
 }
 
 static void hci_usb_unlink_urbs(struct hci_usb *husb)
@@ -357,7 +353,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 
 	BT_DBG("%s", husb->hdev->name);
 
-	for (i=0; i < 4; i++) {
+	for (i = 0; i < 4; i++) {
 		struct _urb *_urb;
 		struct urb *urb;
 
@@ -366,8 +362,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 			urb = &_urb->urb;
 			BT_DBG("%s unlinking _urb %p type %d urb %p", 
 					husb->hdev->name, _urb, _urb->type, urb);
-			usb_unlink_urb(urb);
-			hci_usb_wait_for_urb(urb);
+			usb_kill_urb(urb);
 			_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 		}
 

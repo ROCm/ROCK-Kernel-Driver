@@ -517,11 +517,6 @@ static int mdacon_blank(struct vc_data *c, int blank, int mode_switch)
 	}
 }
 
-static int mdacon_font_op(struct vc_data *c, struct console_font_op *op)
-{
-	return -ENOSYS;
-}
-
 static int mdacon_scrolldelta(struct vc_data *c, int lines)
 {
 	return 0;
@@ -594,7 +589,6 @@ const struct consw mda_con = {
 	.con_bmove =		mdacon_bmove,
 	.con_switch =		mdacon_switch,
 	.con_blank =		mdacon_blank,
-	.con_font_op =		mdacon_font_op,
 	.con_set_palette =	mdacon_set_palette,
 	.con_scrolldelta =	mdacon_scrolldelta,
 	.con_build_attr =	mdacon_build_attr,

@@ -1,6 +1,5 @@
 #include <linux/config.h>
 #include <linux/module.h>
-#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ah.h>
@@ -73,9 +72,9 @@ static int ah_output(struct sk_buff **pskb)
 	iph->tos = top_iph->tos;
 	iph->ttl = top_iph->ttl;
 	iph->frag_off = top_iph->frag_off;
-	iph->daddr = top_iph->daddr;
 
 	if (top_iph->ihl != 5) {
+		iph->daddr = top_iph->daddr;
 		memcpy(iph+1, top_iph+1, top_iph->ihl*4 - sizeof(struct iphdr));
 		err = ip_clear_mutable_options(top_iph, &top_iph->daddr);
 		if (err)
@@ -104,9 +103,10 @@ static int ah_output(struct sk_buff **pskb)
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;
 	top_iph->frag_off = iph->frag_off;
-	top_iph->daddr = iph->daddr;
-	if (top_iph->ihl != 5)
+	if (top_iph->ihl != 5) {
+		top_iph->daddr = iph->daddr;
 		memcpy(top_iph+1, iph+1, top_iph->ihl*4 - sizeof(struct iphdr));
+	}
 
 	ip_send_check(top_iph);
 

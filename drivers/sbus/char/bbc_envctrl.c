@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <asm/oplib.h>
 #include <asm/ebus.h>
 #define __KERNEL_SYSCALLS__
@@ -622,9 +623,7 @@ void bbc_envctrl_cleanup(void)
 			read_unlock(&tasklist_lock);
 			if (!found)
 				break;
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ);
-			current->state = TASK_RUNNING;
+			msleep(1000);
 		}
 		kenvctrld_task = NULL;
 	}

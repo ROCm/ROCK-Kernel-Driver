@@ -58,6 +58,8 @@ tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 
+CHECK		:= $(CHECK) -D__arm__=1
+
 #Default value
 DATAADDR	:= .
 

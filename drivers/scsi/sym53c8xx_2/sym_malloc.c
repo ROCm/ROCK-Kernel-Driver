@@ -83,7 +83,7 @@ static void *___sym_malloc(m_pool_p mp, int size)
 	m_link_p h = mp->h;
 
 	if (size > SYM_MEM_CLUSTER_SIZE)
-		return 0;
+		return NULL;
 
 	while (size > s) {
 		s <<= 1;
@@ -95,7 +95,7 @@ static void *___sym_malloc(m_pool_p mp, int size)
 		if (s == SYM_MEM_CLUSTER_SIZE) {
 			h[j].next = (m_link_p) M_GET_MEM_CLUSTER();
 			if (h[j].next)
-				h[j].next->next = 0;
+				h[j].next->next = NULL;
 			break;
 		}
 		++j;
@@ -108,7 +108,7 @@ static void *___sym_malloc(m_pool_p mp, int size)
 			j -= 1;
 			s >>= 1;
 			h[j].next = (m_link_p) (a+s);
-			h[j].next->next = 0;
+			h[j].next->next = NULL;
 		}
 	}
 #ifdef DEBUG
@@ -225,10 +225,10 @@ static void ___mp0_free_mem_cluster(m_pool_p mp, m_addr_t m)
 
 #ifdef	SYM_MEM_FREE_UNUSED
 static struct sym_m_pool mp0 =
-	{0, ___mp0_get_mem_cluster, ___mp0_free_mem_cluster};
+	{NULL, ___mp0_get_mem_cluster, ___mp0_free_mem_cluster};
 #else
 static struct sym_m_pool mp0 =
-	{0, ___mp0_get_mem_cluster};
+	{NULL, ___mp0_get_mem_cluster};
 #endif
 
 /*
@@ -310,7 +310,7 @@ static __inline m_pool_p ___get_dma_pool(m_pool_ident_t dev_dmat)
 /* Create a new memory DMAable pool (when fetch failed) */
 static m_pool_p ___cre_dma_pool(m_pool_ident_t dev_dmat)
 {
-	m_pool_p mp = 0;
+	m_pool_p mp = NULL;
 
 	mp = __sym_calloc(&mp0, sizeof(*mp), "MPOOL");
 	if (mp) {
@@ -327,7 +327,7 @@ static m_pool_p ___cre_dma_pool(m_pool_ident_t dev_dmat)
 	}
 	if (mp)
 		__sym_mfree(&mp0, mp, sizeof(*mp), "MPOOL");
-	return 0;
+	return NULL;
 }
 
 #ifdef	SYM_MEM_FREE_UNUSED
@@ -352,7 +352,7 @@ static void ___del_dma_pool(m_pool_p p)
 void *__sym_calloc_dma_unlocked(m_pool_ident_t dev_dmat, int size, char *name)
 {
 	m_pool_p mp;
-	void *m = 0;
+	void *m = NULL;
 
 	mp = ___get_dma_pool(dev_dmat);
 	if (!mp)
@@ -392,7 +392,7 @@ u32 __vtobus_unlocked(m_pool_ident_t dev_dmat, void *m)
 {
 	m_pool_p mp;
 	int hc = VTOB_HASH_CODE(m);
-	m_vtob_p vp = 0;
+	m_vtob_p vp = NULL;
 	m_addr_t a = ((m_addr_t) m) & ~SYM_MEM_CLUSTER_MASK;
 
 	mp = ___get_dma_pool(dev_dmat);

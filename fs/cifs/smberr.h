@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/smberr.h
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (c) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   See Error Codes section of the SNIA CIFS Specification 
@@ -60,6 +60,7 @@
 #define ERRinvparm   87
 #define ERRdiskfull  112
 #define ERRinvname   123
+#define ERRinvlevel  124
 #define ERRdirnotempty 145
 #define ERRnotlocked   158
 #define ERRalreadyexists 183

@@ -64,17 +64,20 @@ struct tc_u_knode
 	struct tc_u_hnode	*ht_up;
 #ifdef CONFIG_NET_CLS_ACT
 	struct tc_action	*action;
-#ifdef CONFIG_NET_CLS_IND
-	char                     indev[IFNAMSIZ];
-#endif
 #else
 #ifdef CONFIG_NET_CLS_POLICE
 	struct tcf_police	*police;
 #endif
 #endif
+#ifdef CONFIG_NET_CLS_IND
+	char                     indev[IFNAMSIZ];
+#endif
 	u8			fshift;
 	struct tcf_result	res;
 	struct tc_u_hnode	*ht_down;
+#ifdef CONFIG_CLS_U32_PERF
+	struct tc_u32_pcnt	*pf;
+#endif
 	struct tc_u32_sel	sel;
 };
 
@@ -120,6 +123,9 @@ static int u32_classify(struct sk_buff *skb, struct tcf_proto *tp, struct tcf_re
 	int sdepth = 0;
 	int off2 = 0;
 	int sel = 0;
+#ifdef CONFIG_CLS_U32_PERF
+	int j;
+#endif
 	int i;
 
 next_ht:
@@ -130,7 +136,8 @@ next_knode:
 		struct tc_u32_key *key = n->sel.keys;
 
 #ifdef CONFIG_CLS_U32_PERF
-		n->sel.rcnt +=1;
+		n->pf->rcnt +=1;
+		j = 0;
 #endif
 		for (i = n->sel.nkeys; i>0; i--, key++) {
 
@@ -139,7 +146,8 @@ next_knode:
 				goto next_knode;
 			}
 #ifdef CONFIG_CLS_U32_PERF
-			key->kcnt +=1;
+			n->pf->kcnts[j] +=1;
+			j++;
 #endif
 		}
 		if (n->ht_down == NULL) {
@@ -147,7 +155,6 @@ check_terminal:
 			if (n->sel.flags&TC_U32_TERMINAL) {
 
 				*res = n->res;
-#ifdef CONFIG_NET_CLS_ACT
 #ifdef CONFIG_NET_CLS_IND
 				/* yes, i know it sucks but the feature is 
 				** optional dammit! - JHS */
@@ -164,8 +171,9 @@ check_terminal:
 				}
 #endif
 #ifdef CONFIG_CLS_U32_PERF
-		n->sel.rhit +=1;
+				n->pf->rhit +=1;
 #endif
+#ifdef CONFIG_NET_CLS_ACT
 				if (n->action) {
 					int pol_res = tcf_action_exec(skb, n->action);
 					if (skb->tc_classid > 0) {
@@ -358,6 +366,10 @@ static int u32_destroy_key(struct tcf_proto *tp, struct tc_u_knode *n)
 #endif
 	if (n->ht_down)
 		n->ht_down->refcnt--;
+#ifdef CONFIG_CLS_U32_PERF
+	if (n && (NULL != n->pf))
+		kfree(n->pf);
+#endif
 	kfree(n);
 	return 0;
 }
@@ -571,18 +583,6 @@ static int u32_set_parms(struct Qdisc *q, unsigned long base,
 		tcf_action_destroy(act, TCA_ACT_UNBIND);
 	}
 
-#ifdef CONFIG_NET_CLS_IND
-	n->indev[0] = 0;
-	if(tb[TCA_U32_INDEV-1]) {
-		struct rtattr *input_dev = tb[TCA_U32_INDEV-1];
-		if (RTA_PAYLOAD(input_dev) >= IFNAMSIZ) {
-			printk("cls_u32: bad indev name %s\n",(char*)RTA_DATA(input_dev));
-			/* should we clear state first? */
-			return  -EINVAL;
-		}
-		sprintf(n->indev, "%s", (char*)RTA_DATA(input_dev));
-	}
-#endif
 
 #else
 #ifdef CONFIG_NET_CLS_POLICE
@@ -594,6 +594,19 @@ static int u32_set_parms(struct Qdisc *q, unsigned long base,
 		tcf_police_release(police, TCA_ACT_UNBIND);
 	}
 #endif
+#endif
+#ifdef CONFIG_NET_CLS_IND
+	n->indev[0] = 0;
+	if(tb[TCA_U32_INDEV-1]) {
+		struct rtattr *input_dev = tb[TCA_U32_INDEV-1];
+		if (RTA_PAYLOAD(input_dev) >= IFNAMSIZ) {
+			printk("cls_u32: bad indev name %s\n",(char*)RTA_DATA(input_dev));
+			/* should we clear state first? */
+			return  -EINVAL;
+		}
+		sprintf(n->indev, "%s", (char*)RTA_DATA(input_dev));
+		printk("got IND %s\n",n->indev);
+	}
 #endif
 
 	return 0;
@@ -682,17 +695,20 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 
 	s = RTA_DATA(tb[TCA_U32_SEL-1]);
 
-#ifdef CONFIG_CLS_U32_PERF
-	if (RTA_PAYLOAD(tb[TCA_U32_SEL-1]) < 
-		(s->nkeys*sizeof(struct tc_u32_key)) + sizeof(struct tc_u32_sel)) {
-			printk("Please upgrade your iproute2 tools or compile proper options in!\n");
-			return -EINVAL;
-}
-#endif
 	n = kmalloc(sizeof(*n) + s->nkeys*sizeof(struct tc_u32_key), GFP_KERNEL);
 	if (n == NULL)
 		return -ENOBUFS;
+
 	memset(n, 0, sizeof(*n) + s->nkeys*sizeof(struct tc_u32_key));
+#ifdef CONFIG_CLS_U32_PERF
+	n->pf = kmalloc(sizeof(struct tc_u32_pcnt) + s->nkeys*sizeof(__u64), GFP_KERNEL);
+	if (n->pf == NULL) {
+		kfree(n);
+		return -ENOBUFS;
+	}
+	memset(n->pf, 0, sizeof(struct tc_u32_pcnt) + s->nkeys*sizeof(__u64));
+#endif
+
 	memcpy(&n->sel, s, sizeof(*s) + s->nkeys*sizeof(struct tc_u32_key));
 	n->ht_up = ht;
 	n->handle = handle;
@@ -721,6 +737,10 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 		*arg = (unsigned long)n;
 		return 0;
 	}
+#ifdef CONFIG_CLS_U32_PERF
+	if (n && (NULL != n->pf))
+		kfree(n->pf);
+#endif
 	kfree(n);
 	return err;
 }
@@ -812,13 +832,6 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 
 			p_rta->rta_len = skb->tail - (u8*)p_rta;
 		}
-#ifdef CONFIG_NET_CLS_IND
-		if(strlen(n->indev)) {
-			struct rtattr * p_rta = (struct rtattr*)skb->tail;
-			RTA_PUT(skb, TCA_U32_INDEV, IFNAMSIZ, n->indev);
-			p_rta->rta_len = skb->tail - (u8*)p_rta;
-		}
-#endif
 
 #else
 #ifdef CONFIG_NET_CLS_POLICE
@@ -834,13 +847,28 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 		}
 #endif
 #endif
+
+#ifdef CONFIG_NET_CLS_IND
+		if(strlen(n->indev)) {
+			struct rtattr * p_rta = (struct rtattr*)skb->tail;
+			RTA_PUT(skb, TCA_U32_INDEV, IFNAMSIZ, n->indev);
+			p_rta->rta_len = skb->tail - (u8*)p_rta;
+		}
+#endif
+#ifdef CONFIG_CLS_U32_PERF
+		RTA_PUT(skb, TCA_U32_PCNT, 
+		sizeof(struct tc_u32_pcnt) + n->sel.nkeys*sizeof(__u64),
+			n->pf);
+#endif
 	}
 
 	rta->rta_len = skb->tail - b;
 #ifdef CONFIG_NET_CLS_ACT
-	if (TC_U32_KEY(n->handle) && n->action && n->action->type == TCA_OLD_COMPAT) {
-		if (tcf_action_copy_stats(skb,n->action))
-			goto rtattr_failure;
+	if (TC_U32_KEY(n->handle) != 0) {
+		if (TC_U32_KEY(n->handle) && n->action && n->action->type == TCA_OLD_COMPAT) {
+			if (tcf_action_copy_stats(skb,n->action))
+				goto rtattr_failure;
+		}
 	}
 #else
 #ifdef CONFIG_NET_CLS_POLICE
@@ -875,6 +903,19 @@ static struct tcf_proto_ops cls_u32_ops = {
 
 static int __init init_u32(void)
 {
+	printk("u32 classifier\n");
+#ifdef CONFIG_CLS_U32_PERF
+	printk("    Perfomance counters on\n");
+#endif
+#ifdef CONFIG_NET_CLS_POLICE
+	printk("    OLD policer on \n");
+#endif
+#ifdef CONFIG_NET_CLS_IND
+	printk("    input device check on \n");
+#endif
+#ifdef CONFIG_NET_CLS_ACT
+	printk("    Actions configured \n");
+#endif
 	return register_tcf_proto_ops(&cls_u32_ops);
 }
 
