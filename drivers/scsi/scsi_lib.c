@@ -362,6 +362,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 	struct request *req;
 	struct buffer_head *bh;
         Scsi_Device * SDpnt;
+	int nsect;
 
 	ASSERT_LOCK(&io_request_lock, 0);
 
@@ -373,11 +374,13 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 	}
 	do {
 		if ((bh = req->bh) != NULL) {
+			nsect = bh->b_size >> 9;
+			blk_finished_io(nsect);
 			req->bh = bh->b_reqnext;
-			req->nr_sectors -= bh->b_size >> 9;
-			req->sector += bh->b_size >> 9;
+			req->nr_sectors -= nsect;
+			req->sector += nsect;
 			bh->b_reqnext = NULL;
-			sectors -= bh->b_size >> 9;
+			sectors -= nsect;
 			bh->b_end_io(bh, uptodate);
 			if ((bh = req->bh) != NULL) {
 				req->current_nr_sectors = bh->b_size >> 9;

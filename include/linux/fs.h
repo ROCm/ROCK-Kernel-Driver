@@ -825,20 +825,17 @@ struct super_operations {
 extern void __mark_inode_dirty(struct inode *, int);
 static inline void mark_inode_dirty(struct inode *inode)
 {
-	if ((inode->i_state & I_DIRTY) != I_DIRTY)
-		__mark_inode_dirty(inode, I_DIRTY);
+	__mark_inode_dirty(inode, I_DIRTY);
 }
 
 static inline void mark_inode_dirty_sync(struct inode *inode)
 {
-	if (!(inode->i_state & I_DIRTY_SYNC))
-		__mark_inode_dirty(inode, I_DIRTY_SYNC);
+	__mark_inode_dirty(inode, I_DIRTY_SYNC);
 }
 
 static inline void mark_inode_dirty_pages(struct inode *inode)
 {
-	if (inode && !(inode->i_state & I_DIRTY_PAGES))
-		__mark_inode_dirty(inode, I_DIRTY_PAGES);
+	__mark_inode_dirty(inode, I_DIRTY_PAGES);
 }
 
 struct dquot_operations {

@@ -134,11 +134,16 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block * sb = inode->i_sb;
+
 	if (sb) {
 		/* Don't do this for I_DIRTY_PAGES - that doesn't actually dirty the inode itself */
 		if (flags & (I_DIRTY | I_DIRTY_SYNC)) {
 			if (sb->s_op && sb->s_op->dirty_inode)
 				sb->s_op->dirty_inode(inode);
+		}
+		/* avoid the locking if we can */
+		if ((inode->i_state & flags) != flags) {
+			return ;
 		}
 		spin_lock(&inode_lock);
 		if ((inode->i_state & flags) != flags) {

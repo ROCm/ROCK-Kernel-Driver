@@ -19,6 +19,7 @@
 #include <linux/config.h>
 #include <linux/locks.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 
@@ -118,6 +119,19 @@ int * max_readahead[MAX_BLKDEV];
  */
 int * max_sectors[MAX_BLKDEV];
 
+/*
+ * queued sectors for all devices, used to make sure we don't fill all
+ * of memory with locked buffers
+ */
+atomic_t queued_sectors;
+
+/*
+ * high and low watermark for above
+ */
+static int high_queued_sectors, low_queued_sectors;
+static int batch_requests, queue_nr_requests;
+static DECLARE_WAIT_QUEUE_HEAD(blk_buffers_wait);
+
 static inline int get_max_sectors(kdev_t dev)
 {
 	if (!max_sectors[MAJOR(dev)])
@@ -185,7 +199,7 @@ static int __blk_cleanup_queue(struct list_head *head)
  **/
 void blk_cleanup_queue(request_queue_t * q)
 {
-	int count = QUEUE_NR_REQUESTS;
+	int count = queue_nr_requests;
 
 	count -= __blk_cleanup_queue(&q->request_freelist[READ]);
 	count -= __blk_cleanup_queue(&q->request_freelist[WRITE]);
@@ -385,7 +399,7 @@ static void blk_init_free_list(request_queue_t *q)
 	/*
 	 * Divide requests in half between read and write
 	 */
-	for (i = 0; i < QUEUE_NR_REQUESTS; i++) {
+	for (i = 0; i < queue_nr_requests; i++) {
 		rq = kmem_cache_alloc(request_cachep, SLAB_KERNEL);
 		memset(rq, 0, sizeof(struct request));
 		rq->rq_status = RQ_INACTIVE;
@@ -559,14 +573,12 @@ inline void drive_stat_acct (kdev_t dev, int rw,
 
 /*
  * add-request adds a request to the linked list.
- * It disables interrupts (acquires the request spinlock) so that it can muck
- * with the request-lists in peace. Thus it should be called with no spinlocks
- * held.
+ * io_request_lock is held and interrupts disabled, as we muck with the
+ * request queue list.
  *
  * By this point, req->cmd is always either READ/WRITE, never READA,
  * which is important for drive_stat_acct() above.
  */
-
 static inline void add_request(request_queue_t * q, struct request * req,
 			       struct list_head *insert_here)
 {
@@ -622,9 +634,17 @@ void inline blkdev_release_request(struct request *req)
 	req->q = NULL;
 
 	/*
-	 * Request may not have originated from ll_rw_blk
+	 * Request may not have originated from ll_rw_blk. if not,
+	 * asumme it has free buffers and check waiters
 	 */
 	if (q) {
+		/*
+		 * we've released enough buffers to start I/O again
+		 */
+		if (waitqueue_active(&blk_buffers_wait)
+		    && atomic_read(&queued_sectors) < low_queued_sectors)
+			wake_up(&blk_buffers_wait);
+
 		if (!list_empty(&q->request_freelist[rw])) {
 			blk_refill_freelist(q, rw);
 			list_add(&req->table, &q->request_freelist[rw]);
@@ -637,7 +657,7 @@ void inline blkdev_release_request(struct request *req)
 		 */
 		list_add(&req->table, &q->pending_freelist[rw]);
 
-		if (++q->pending_free[rw] >= (QUEUE_NR_REQUESTS >> 4)) {
+		if (++q->pending_free[rw] >= batch_requests) {
 			int wake_up = q->pending_free[rw];
 			blk_refill_freelist(q, rw);
 			wake_up_nr(&q->wait_for_request, wake_up);
@@ -669,7 +689,7 @@ static void attempt_merge(request_queue_t * q,
 	 * will have been updated to the appropriate number,
 	 * and we shouldn't do it here too.
 	 */
-	if(!q->merge_requests_fn(q, req, next, max_segments))
+	if (!q->merge_requests_fn(q, req, next, max_segments))
 		return;
 
 	q->elevator.elevator_merge_req_fn(req, next);
@@ -755,13 +775,13 @@ static int __make_request(request_queue_t * q, int rw,
 	max_sectors = get_max_sectors(bh->b_rdev);
 
 again:
+	head = &q->queue_head;
 	/*
 	 * Now we acquire the request spinlock, we have to be mega careful
 	 * not to schedule or do something nonatomic
 	 */
 	spin_lock_irq(&io_request_lock);
 
-	head = &q->queue_head;
 	insert_here = head->prev;
 	if (list_empty(head)) {
 		q->plug_device_fn(q, bh->b_rdev); /* is atomic */
@@ -780,6 +800,7 @@ again:
 			req->bhtail->b_reqnext = bh;
 			req->bhtail = bh;
 			req->nr_sectors = req->hard_nr_sectors += count;
+			blk_started_io(count);
 			drive_stat_acct(req->rq_dev, req->cmd, count, 0);
 			attempt_back_merge(q, req, max_sectors, max_segments);
 			goto out;
@@ -794,6 +815,7 @@ again:
 			req->current_nr_sectors = count;
 			req->sector = req->hard_sector = sector;
 			req->nr_sectors = req->hard_nr_sectors += count;
+			blk_started_io(count);
 			drive_stat_acct(req->rq_dev, req->cmd, count, 0);
 			attempt_front_merge(q, head, req, max_sectors, max_segments);
 			goto out;
@@ -817,10 +839,9 @@ again:
 	}
 		
 	/*
-	 * Grab a free request from the freelist. Read first try their
-	 * own queue - if that is empty, we steal from the write list.
-	 * Writes must block if the write list is empty, and read aheads
-	 * are not crucial.
+	 * Grab a free request from the freelist - if that is empty, check
+	 * if we are doing read ahead and abort instead of blocking for
+	 * a free slot.
 	 */
 get_rq:
 	if (freereq) {
@@ -849,6 +870,7 @@ get_rq:
 	req->bh = bh;
 	req->bhtail = bh;
 	req->rq_dev = bh->b_rdev;
+	blk_started_io(count);
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -901,13 +923,13 @@ void generic_make_request (int rw, struct buffer_head * bh)
 	int major = MAJOR(bh->b_rdev);
 	request_queue_t *q;
 
-	if (!bh->b_end_io) BUG();
+	if (!bh->b_end_io)
+		BUG();
+
 	if (blk_size[major]) {
 		unsigned long maxsector = (blk_size[major][MINOR(bh->b_rdev)] << 1) + 1;
-		unsigned int sector, count;
-
-		count = bh->b_size >> 9;
-		sector = bh->b_rsector;
+		unsigned long sector = bh->b_rsector;
+		unsigned int count = bh->b_size >> 9;
 
 		if (maxsector < count || maxsector - count < sector) {
 			bh->b_state &= (1 << BH_Lock) | (1 << BH_Mapped);
@@ -918,7 +940,7 @@ void generic_make_request (int rw, struct buffer_head * bh)
 				   when mounting a device. */
 				printk(KERN_INFO
 				       "attempt to access beyond end of device\n");
-				printk(KERN_INFO "%s: rw=%d, want=%d, limit=%d\n",
+				printk(KERN_INFO "%s: rw=%d, want=%ld, limit=%d\n",
 				       kdevname(bh->b_rdev), rw,
 				       (sector + count)>>1,
 				       blk_size[major][MINOR(bh->b_rdev)]);
@@ -945,14 +967,13 @@ void generic_make_request (int rw, struct buffer_head * bh)
 			buffer_IO_error(bh);
 			break;
 		}
-	}
-	while (q->make_request_fn(q, rw, bh));
+	} while (q->make_request_fn(q, rw, bh));
 }
 
 
 /**
  * submit_bh: submit a buffer_head to the block device later for I/O
- * @rw: whether to %READ or %WRITE, or mayve to %READA (read ahead)
+ * @rw: whether to %READ or %WRITE, or maybe to %READA (read ahead)
  * @bh: The &struct buffer_head which describes the I/O
  *
  * submit_bh() is very similar in purpose to generic_make_request(), and
@@ -975,7 +996,7 @@ void submit_bh(int rw, struct buffer_head * bh)
 	 * further remap this.
 	 */
 	bh->b_rdev = bh->b_dev;
-	bh->b_rsector = bh->b_blocknr * (bh->b_size>>9);
+	bh->b_rsector = bh->b_blocknr * (bh->b_size >> 9);
 
 	generic_make_request(rw, bh);
 
@@ -1050,8 +1071,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 
 	/* Verify requested block sizes. */
 	for (i = 0; i < nr; i++) {
-		struct buffer_head *bh;
-		bh = bhs[i];
+		struct buffer_head *bh = bhs[i];
 		if (bh->b_size % correct_size) {
 			printk(KERN_NOTICE "ll_rw_block: device %s: "
 			       "only %d-char blocks implemented (%u)\n",
@@ -1068,8 +1088,17 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	}
 
 	for (i = 0; i < nr; i++) {
-		struct buffer_head *bh;
-		bh = bhs[i];
+		struct buffer_head *bh = bhs[i];
+
+		/*
+		 * don't lock any more buffers if we are above the high
+		 * water mark. instead start I/O on the queued stuff.
+		 */
+		if (atomic_read(&queued_sectors) >= high_queued_sectors) {
+			run_task_queue(&tq_disk);
+			wait_event(blk_buffers_wait,
+			 atomic_read(&queued_sectors) < low_queued_sectors);
+		}
 
 		/* Only one thread can actually submit the I/O. */
 		if (test_and_set_bit(BH_Lock, &bh->b_state))
@@ -1132,6 +1161,7 @@ int end_that_request_first (struct request *req, int uptodate, char *name)
 
 	if ((bh = req->bh) != NULL) {
 		nsect = bh->b_size >> 9;
+		blk_finished_io(nsect);
 		req->bh = bh->b_reqnext;
 		bh->b_reqnext = NULL;
 		bh->b_end_io(bh, uptodate);
@@ -1161,9 +1191,12 @@ void end_that_request_last(struct request *req)
 	blkdev_release_request(req);
 }
 
+#define MB(kb)	((kb) << 10)
+
 int __init blk_dev_init(void)
 {
 	struct blk_dev_struct *dev;
+	int total_ram;
 
 	request_cachep = kmem_cache_create("blkdev_requests",
 					   sizeof(struct request),
@@ -1178,6 +1211,51 @@ int __init blk_dev_init(void)
 	memset(ro_bits,0,sizeof(ro_bits));
 	memset(max_readahead, 0, sizeof(max_readahead));
 	memset(max_sectors, 0, sizeof(max_sectors));
+
+	atomic_set(&queued_sectors, 0);
+	total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
+
+	/*
+	 * Try to keep 128MB max hysteris. If not possible,
+	 * use half of RAM
+	 */
+	high_queued_sectors = (total_ram * 2) / 3;
+	low_queued_sectors = high_queued_sectors - MB(128);
+	if (low_queued_sectors < 0)
+		low_queued_sectors = total_ram / 2;
+
+	/*
+	 * for big RAM machines (>= 384MB), use more for I/O
+	 */
+	if (total_ram >= MB(384)) {
+		high_queued_sectors = (total_ram * 4) / 5;
+		low_queued_sectors = high_queued_sectors - MB(128);
+	}
+
+	/*
+	 * make it sectors (512b)
+	 */
+	high_queued_sectors <<= 1;
+	low_queued_sectors <<= 1;
+
+	/*
+	 * Scale free request slots per queue too
+	 */
+	total_ram = (total_ram + MB(32) - 1) & ~(MB(32) - 1);
+	if ((queue_nr_requests = total_ram >> 9) > QUEUE_NR_REQUESTS)
+		queue_nr_requests = QUEUE_NR_REQUESTS;
+
+	/*
+	 * adjust batch frees according to queue length, with upper limit
+	 */
+	if ((batch_requests = queue_nr_requests >> 3) > 32)
+		batch_requests = 32;
+
+	printk("block: queued sectors max/low %dkB/%dkB, %d slots per queue\n",
+						high_queued_sectors / 2,
+						low_queued_sectors / 2,
+						queue_nr_requests);
+
 #ifdef CONFIG_AMIGA_Z2RAM
 	z2_init();
 #endif
@@ -1300,3 +1378,4 @@ EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(generic_make_request);
 EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
+EXPORT_SYMBOL(queued_sectors);

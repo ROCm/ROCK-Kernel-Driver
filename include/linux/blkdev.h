@@ -64,9 +64,10 @@ typedef void (plug_device_fn) (request_queue_t *q, kdev_t device);
 typedef void (unplug_device_fn) (void *q);
 
 /*
- * Default nr free requests per queue
+ * Default nr free requests per queue, ll_rw_blk will scale it down
+ * according to available RAM at init time
  */
-#define QUEUE_NR_REQUESTS	512
+#define QUEUE_NR_REQUESTS	8192
 
 struct request_queue
 {
@@ -176,6 +177,8 @@ extern int * max_sectors[MAX_BLKDEV];
 
 extern int * max_segments[MAX_BLKDEV];
 
+extern atomic_t queued_sectors;
+
 #define MAX_SEGMENTS 128
 #define MAX_SECTORS (MAX_SEGMENTS*8)
 
@@ -203,5 +206,14 @@ static inline int get_hardsect_size(kdev_t dev)
 		return 512;
 }
 
+#define blk_finished_io(nsects)				\
+	atomic_sub(nsects, &queued_sectors);		\
+	if (atomic_read(&queued_sectors) < 0) {		\
+		printk("block: queued_sectors < 0\n");	\
+		atomic_set(&queued_sectors, 0);		\
+	}
+
+#define blk_started_io(nsects)				\
+	atomic_add(nsects, &queued_sectors);
 
 #endif

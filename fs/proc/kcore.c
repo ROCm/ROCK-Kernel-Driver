@@ -17,6 +17,7 @@
 #include <linux/elf.h>
 #include <linux/elfcore.h>
 #include <linux/vmalloc.h>
+#include <linux/highmem.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 

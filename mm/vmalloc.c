@@ -9,6 +9,7 @@
 #include <linux/malloc.h>
 #include <linux/vmalloc.h>
 #include <linux/spinlock.h>
+#include <linux/highmem.h>
 #include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>

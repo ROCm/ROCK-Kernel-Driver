@@ -23,6 +23,7 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+#include <linux/highmem.h>
 
 #ifdef CONFIG_MCA
 #include <linux/mca.h>
