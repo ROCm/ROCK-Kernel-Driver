@@ -101,9 +101,4 @@ extern u_long timer_physaddr;
 
 #define isaIO2mem(x) (((((x) & 0x3f8)  << 7) | (((x) & 0xfc00) >> 6) | ((x) & 0x7)) + 0x40000 + IO_BASE)
 
-#define inb(addr) (*((volatile unsigned char *)(addr)))
-#define outb(val,addr) (*((volatile unsigned char *)(addr)) = (val))
-#define inw(addr) (*((volatile unsigned short *)(addr)))
-#define outw(val,addr) (*((volatile unsigned short *)(addr)) = (val))
-
 #endif
