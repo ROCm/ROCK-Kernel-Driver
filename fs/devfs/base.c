@@ -2350,7 +2350,6 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, st
 	revalidation  */
     up (&dir->i_sem);
     wait_for_devfsd_finished (fs_info);  /*  If I'm not devfsd, must wait  */
-    down (&dir->i_sem);      /*  Grab it again because them's the rules  */
     de = lookup_info->de;
     /*  If someone else has been so kind as to make the inode, we go home
 	early  */
@@ -2381,6 +2380,7 @@ out:
     wake_up (&lookup_info->wait_queue);
     put_devfs_lookup_struct(lookup_info);
     write_unlock (&parent->u.dir.lock);
+    down (&dir->i_sem);      /*  Grab it again because them's the rules  */
     devfs_put (de);
     return retval;
 }   /*  End Function devfs_lookup  */
