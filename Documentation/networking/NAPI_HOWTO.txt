@@ -746,4 +746,4 @@ Lennert Buytenhek <buytenh@gnu.org>
 Andrew Morton  <akpm@zip.com.au>
 Manfred Spraul <manfred@colorfullife.com>
 Donald Becker <becker@scyld.com>
-Jeff Garzik <jgarzik@mandrakesoft.com>
+Jeff Garzik <jgarzik@pobox.com>

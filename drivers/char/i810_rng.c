@@ -1,7 +1,7 @@
 /*
 
 	Hardware driver for Intel i810 Random Number Generator (RNG)
-	Copyright 2000,2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2000,2001 Jeff Garzik <jgarzik@pobox.com>
 	Copyright 2000,2001 Philipp Rumpf <prumpf@mandrakesoft.com>
 
 	Driver Web site:  http://sourceforge.net/projects/gkernel/

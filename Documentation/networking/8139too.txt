@@ -2,7 +2,7 @@
 		"8139too" Fast Ethernet driver for Linux
 	 RTL-8139, -8129, and -8130 10/100 Fast Ethernet adapters
 
-	Copyright 2000,2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2000,2001 Jeff Garzik <jgarzik@pobox.com>
 
                 http://sourceforge.net/projects/gkernel/
 

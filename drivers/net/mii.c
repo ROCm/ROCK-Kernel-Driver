@@ -2,7 +2,7 @@
 
 	mii.c: MII interface library
 
-	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
+	Maintained by Jeff Garzik <jgarzik@pobox.com>
 	Copyright 2001,2002 Jeff Garzik
 
 	Various code came from myson803.c and other files by
@@ -336,7 +336,7 @@ int generic_mii_ioctl(struct mii_if_info *mii_if,
 	return rc;
 }
 
-MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_AUTHOR ("Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION ("MII hardware support library");
 MODULE_LICENSE("GPL");
 

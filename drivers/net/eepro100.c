@@ -17,7 +17,7 @@
 	1998 Apr - 2000 Feb  Andrey V. Savochkin <saw@saw.sw.com.sg>
 		Serious fixes for multicast filter list setting, TX timeout routine;
 		RX ring refilling logic;  other stuff
-	2000 Feb  Jeff Garzik <jgarzik@mandrakesoft.com>
+	2000 Feb  Jeff Garzik <jgarzik@pobox.com>
 		Convert to new PCI driver interface
 	2000 Mar 24  Dragan Stancevic <visitor@valinux.com>
 		Disabled FC and ER, to avoid lockups when when we get FCP interrupts.
