@@ -72,4 +72,13 @@ extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl
 				   read-only. */
 
 
+/*
+ * Tell the writeback paths that they are being called for a "data integrity"
+ * operation such as fsync().
+ */
+static inline int called_for_sync(void)
+{
+	return current->flags & PF_SYNC;
+}
+
 #endif		/* WRITEBACK_H */

@@ -501,7 +501,6 @@ inline void nfsd_dosync(struct file *filp, struct dentry *dp,
 	struct inode *inode = dp->d_inode;
 	int (*fsync) (struct file *, struct dentry *, int);
 
-	filemap_fdatawait(inode->i_mapping);
 	filemap_fdatawrite(inode->i_mapping);
 	if (fop && (fsync = fop->fsync))
 		fsync(filp, dp, 0);

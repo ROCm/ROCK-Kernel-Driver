@@ -464,31 +464,38 @@ int fail_writepage(struct page *page)
 			SetPageReferenced(page);
 	}
 
-	/* Set the page dirty again, unlock */
-	set_page_dirty(page);
 	unlock_page(page);
-	return 0;
+	return -EAGAIN;		/* It will be set dirty again */
 }
 EXPORT_SYMBOL(fail_writepage);
 
 /**
- *  filemap_fdatawrite - walk the list of dirty pages of the given address space
- *                      and writepage() all of them.
+ * filemap_fdatawrite - start writeback against all of a mapping's dirty pages
+ * @mapping: address space structure to write
  *
- *  @mapping: address space structure to write
+ * This is a "data integrity" operation, as opposed to a regular memory
+ * cleansing writeback.  The difference between these two operations is that
+ * if a dirty page/buffer is encountered, it must be waited upon, and not just
+ * skipped over.
  *
+ * The PF_SYNC flag is set across this operation and the various functions
+ * which care about this distinction must use called_for_sync() to find out
+ * which behaviour they should implement.
  */
 int filemap_fdatawrite(struct address_space *mapping)
 {
-	return do_writepages(mapping, NULL);
+	int ret;
+
+	current->flags |= PF_SYNC;
+	ret = do_writepages(mapping, NULL);
+	current->flags &= ~PF_SYNC;
+	return ret;
 }
 
 /**
- *      filemap_fdatawait - walk the list of locked pages of the given address space
- *     	and wait for all of them.
- * 
- *      @mapping: address space structure to wait for
- *
+ * filemap_fdatawait - walk the list of locked pages of the given address
+ *                     space and wait for all of them.
+ * @mapping: address space structure to wait for
  */
 int filemap_fdatawait(struct address_space * mapping)
 {
@@ -497,8 +504,9 @@ int filemap_fdatawait(struct address_space * mapping)
 	write_lock(&mapping->page_lock);
 
         while (!list_empty(&mapping->locked_pages)) {
-		struct page *page = list_entry(mapping->locked_pages.next, struct page, list);
+		struct page *page;
 
+		page = list_entry(mapping->locked_pages.next,struct page,list);
 		list_del(&page->list);
 		if (PageDirty(page))
 			list_add(&page->list, &mapping->dirty_pages);

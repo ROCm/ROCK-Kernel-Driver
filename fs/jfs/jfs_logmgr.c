@@ -965,9 +965,6 @@ int lmLogSync(log_t * log, int nosyncwait)
 		 * We need to make sure all of the "written" metapages
 		 * actually make it to disk
 		 */
-		filemap_fdatawait(sbi->ipbmap->i_mapping);
-		filemap_fdatawait(sbi->ipimap->i_mapping);
-		filemap_fdatawait(sbi->direct_inode->i_mapping);
 		filemap_fdatawrite(sbi->ipbmap->i_mapping);
 		filemap_fdatawrite(sbi->ipimap->i_mapping);
 		filemap_fdatawrite(sbi->direct_inode->i_mapping);

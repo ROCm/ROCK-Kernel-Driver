@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/prefetch.h>
 #include <linux/mpage.h>
+#include <linux/writeback.h>
 #include <linux/pagevec.h>
 
 /*
@@ -530,6 +531,7 @@ mpage_writepages(struct address_space *mapping,
 	sector_t last_block_in_bio = 0;
 	int ret = 0;
 	int done = 0;
+	int sync = called_for_sync();
 	struct pagevec pvec;
 	int (*writepage)(struct page *);
 
@@ -546,7 +548,7 @@ mpage_writepages(struct address_space *mapping,
 		struct page *page = list_entry(mapping->io_pages.prev,
 					struct page, list);
 		list_del(&page->list);
-		if (PageWriteback(page)) {
+		if (PageWriteback(page) && !sync) {
 			if (PageDirty(page)) {
 				list_add(&page->list, &mapping->dirty_pages);
 				continue;
@@ -565,6 +567,9 @@ mpage_writepages(struct address_space *mapping,
 
 		lock_page(page);
 
+		if (sync)
+			wait_on_page_writeback(page);
+
 		if (page->mapping && !PageWriteback(page) &&
 					TestClearPageDirty(page)) {
 			if (writepage) {
@@ -578,6 +583,10 @@ mpage_writepages(struct address_space *mapping,
 				if (!pagevec_add(&pvec, page))
 					pagevec_deactivate_inactive(&pvec);
 				page = NULL;
+			}
+			if (ret == -EAGAIN && page) {
+				__set_page_dirty_nobuffers(page);
+				ret = 0;
 			}
 			if (ret || (nr_to_write && --(*nr_to_write) <= 0))
 				done = 1;

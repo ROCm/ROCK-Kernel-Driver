@@ -1344,10 +1344,11 @@ out_fail:
 
 	/*
 	 * We have to fail this writepage to avoid cross-fs transactions.
-	 * Put the page back on mapping->dirty_pages, but leave its buffer's
-	 * dirty state as-is.
+	 * Return EAGAIN so the caller will the page back on
+	 * mapping->dirty_pages.  The page's buffers' dirty state will be left
+	 * as-is.
 	 */
-	__set_page_dirty_nobuffers(page);
+	ret = -EAGAIN;
 	unlock_page(page);
 	return ret;
 }
@@ -1405,9 +1406,9 @@ ext3_writepages(struct address_space *mapping, int *nr_to_write)
 }
 
 struct address_space_operations ext3_writeback_aops = {
-	.readpage	= ext3_readpage,		/* BKL not held.  Don't need */
-	.readpages	= ext3_readpages,		/* BKL not held.  Don't need */
-	.writepage	= ext3_writepage,		/* BKL not held.  We take it */
+	.readpage	= ext3_readpage,	/* BKL not held.  Don't need */
+	.readpages	= ext3_readpages,	/* BKL not held.  Don't need */
+	.writepage	= ext3_writepage,	/* BKL not held.  We take it */
 	.writepages	= ext3_writepages,	/* BKL not held.  Don't need */
 	.sync_page	= block_sync_page,
 	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */

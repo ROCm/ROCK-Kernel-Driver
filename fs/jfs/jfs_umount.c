@@ -112,7 +112,6 @@ int jfs_umount(struct super_block *sb)
 	 * Make sure all metadata makes it to disk before we mark
 	 * the superblock as clean
 	 */
-	filemap_fdatawait(sbi->direct_inode->i_mapping);
 	filemap_fdatawrite(sbi->direct_inode->i_mapping);
 	filemap_fdatawait(sbi->direct_inode->i_mapping);
 
@@ -159,7 +158,6 @@ int jfs_umount_rw(struct super_block *sb)
 	 */
 	dbSync(sbi->ipbmap);
 	diSync(sbi->ipimap);
-	filemap_fdatawait(sbi->direct_inode->i_mapping);
 	filemap_fdatawrite(sbi->direct_inode->i_mapping);
 	filemap_fdatawait(sbi->direct_inode->i_mapping);
 

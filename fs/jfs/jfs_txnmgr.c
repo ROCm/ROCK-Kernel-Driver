@@ -1165,7 +1165,6 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		 *
 		 * if ((!S_ISDIR(ip->i_mode))
 		 *    && (tblk->flag & COMMIT_DELETE) == 0) {
-		 *	filemap_fdatawait(ip->i_mapping);
 		 *	filemap_fdatawrite(ip->i_mapping);
 		 *	filemap_fdatawait(ip->i_mapping);
 		 * }
