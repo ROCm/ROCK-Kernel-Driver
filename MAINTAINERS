@@ -461,7 +461,7 @@ S:	Maintained
 CYCLADES 2X SYNC CARD DRIVER
 P:	Arnaldo Carvalho de Melo
 M:	acme@conectiva.com.br
-W:	http://www.conectiva.com.br/~acme
+W:	http://advogato.org/person/acme
 L:	cycsyn-devel@bazar.conectiva.com.br
 S:	Maintained
 
@@ -2152,6 +2152,12 @@ WD7000 SCSI DRIVER
 P:	Miroslav Zagorac
 M:	zaga@fly.cc.fer.hr
 L:	linux-scsi@vger.kernel.org
+S:	Maintained
+
+WL3501 WIRELESS PCMCIA CARD DRIVER
+P:	Arnaldo Carvalho de Melo
+M:	acme@conectiva.com.br
+W:	http://advogato.org/person/acme
 S:	Maintained
 
 X.25 NETWORK LAYER
