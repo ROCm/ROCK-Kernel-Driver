@@ -51,7 +51,6 @@
 
 /* for the tty_struct subtype field */
 #define A2232_TTY_SUBTYPE_NORMAL	1
-#define A2232_TTY_SUBTYPE_CALLOUT	2
 
 /* A2232 port structure to keep track of the
    status of every single line used */
