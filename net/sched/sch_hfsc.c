@@ -1653,11 +1653,6 @@ hfsc_dump_qdisc(struct Qdisc *sch, struct sk_buff *skb)
 
 	qopt.defcls = q->defcls;
 	RTA_PUT(skb, TCA_OPTIONS, sizeof(qopt), &qopt);
-
-	sch->stats.qlen = sch->q.qlen;
-	if (qdisc_copy_stats(skb, &sch->stats, sch->stats_lock) < 0)
-		goto rtattr_failure;
-
 	return skb->len;
 
  rtattr_failure:
