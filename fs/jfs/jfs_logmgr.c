@@ -1595,7 +1595,7 @@ static int lmLogFileSystem(log_t * log, dev_t fsdev, int activate)
 		return rc;
 
 	logsuper = (logsuper_t *) bpsuper->l_ldata;
-	bit = MINOR(fsdev);
+	bit = minor(fsdev);
 	word = bit / 32;
 	bit -= 32 * word;
 	if (activate)
