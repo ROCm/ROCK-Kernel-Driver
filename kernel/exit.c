@@ -949,9 +949,10 @@ static int eligible_child(pid_t pid, int options, task_t *p)
 
 static int wait_noreap_copyout(task_t *p, pid_t pid, uid_t uid,
 			       int why, int status,
-			       struct siginfo __user *infop)
+			       struct siginfo __user *infop,
+			       struct rusage __user *rusagep)
 {
-	int retval = getrusage(p, RUSAGE_BOTH, &infop->si_rusage);
+	int retval = rusagep ? getrusage(p, RUSAGE_BOTH, rusagep) : 0;
 	put_task_struct(p);
 	if (!retval)
 		retval = put_user(SIGCHLD, &infop->si_signo);
@@ -1003,7 +1004,8 @@ static int wait_task_zombie(task_t *p, int noreap,
 			why = (exit_code & 0x80) ? CLD_DUMPED : CLD_KILLED;
 			status = exit_code & 0x7f;
 		}
-		return wait_noreap_copyout(p, pid, uid, why, status, infop);
+		return wait_noreap_copyout(p, pid, uid, why,
+					   status, infop, ru);
 	}
 
 	/*
@@ -1161,7 +1163,7 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader, int noreap,
 			goto bail_ref;
 		return wait_noreap_copyout(p, pid, uid,
 					   why, (exit_code << 8) | 0x7f,
-					   infop);
+					   infop, ru);
 	}
 
 	write_lock_irq(&tasklist_lock);
@@ -1304,7 +1306,7 @@ check_continued:
 					read_unlock(&tasklist_lock);
 					retval = wait_noreap_copyout(p, pid,
 							uid, CLD_CONTINUED,
-							SIGCONT, infop);
+							SIGCONT, infop, ru);
 					BUG_ON(retval == 0);
 					goto end;
 				}
@@ -1371,7 +1373,8 @@ end:
 }
 
 asmlinkage long sys_waitid(int which, pid_t pid,
-			   struct siginfo __user *infop, int options)
+			   struct siginfo __user *infop, int options,
+			   struct rusage __user *ru)
 {
 	if (options & ~(WNOHANG|WNOWAIT|WEXITED|WSTOPPED|WCONTINUED))
 		return -EINVAL;
@@ -1395,7 +1398,7 @@ asmlinkage long sys_waitid(int which, pid_t pid,
 		return -EINVAL;
 	}
 
-	return do_wait(pid, options, infop, NULL, &infop->si_rusage);
+	return do_wait(pid, options, infop, NULL, ru);
 }
 
 asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
