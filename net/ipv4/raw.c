@@ -555,9 +555,11 @@ int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	}
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
+	if (flags & MSG_TRUNC)
+		copied = skb->len;
 done:
 	skb_free_datagram(sk, skb);
-out:	return err ? : copied;
+out:	return err ? err : copied;
 }
 
 static int raw_init(struct sock *sk)

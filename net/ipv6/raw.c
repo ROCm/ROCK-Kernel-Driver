@@ -419,7 +419,10 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 
 	if (np->rxopt.all)
 		datagram_recv_ctl(sk, msg, skb);
+
 	err = copied;
+	if (flags & MSG_TRUNC)
+		err = skb->len;
 
 out_free:
 	skb_free_datagram(sk, skb);
