@@ -4189,6 +4189,30 @@ static int __devinit cpu_to_node_group(int cpu)
 }
 #endif
 
+#if defined(CONFIG_SCHED_SMT) && defined(CONFIG_NUMA)
+/*
+ * The domains setup code relies on siblings not spanning
+ * multiple nodes. Make sure the architecture has a proper
+ * siblings map:
+ */
+static void check_sibling_maps(void)
+{
+	int i, j;
+
+	for_each_online_cpu(i) {
+		for_each_cpu_mask(j, cpu_sibling_map[i]) {
+			if (cpu_to_node(i) != cpu_to_node(j)) {
+				printk(KERN_INFO "warning: CPU %d siblings map "
+					"to different node - isolating "
+					"them.\n", i);
+				cpu_sibling_map[i] = cpumask_of_cpu(i);
+				break;
+			}
+		}
+	}
+}
+#endif
+
 /*
  * Set up scheduler domains and groups.  Callers must hold the hotplug lock.
  */
@@ -4197,6 +4221,9 @@ static void __devinit arch_init_sched_domains(void)
 	int i;
 	cpumask_t cpu_default_map;
 
+#if defined(CONFIG_SCHED_SMT) && defined(CONFIG_NUMA)
+	check_sibling_maps();
+#endif
 	/*
 	 * Setup mask for cpus without special case scheduling requirements.
 	 * For now this just excludes isolated cpus, but could be used to
@@ -4319,7 +4346,7 @@ static void __devinit arch_destroy_sched_domains(void)
 
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
-#undef SCHED_DOMAIN_DEBUG
+#define SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
 static void sched_domain_debug(void)
 {
