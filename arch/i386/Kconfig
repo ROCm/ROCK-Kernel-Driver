@@ -120,7 +120,7 @@ config M386
 	  - "Pentium-Pro" for the Intel Pentium Pro.
 	  - "Pentium-II" for the Intel Pentium II or pre-Coppermine Celeron.
 	  - "Pentium-III" for the Intel Pentium III or Coppermine Celeron.
-	  - "Pentium-4" for the Intel Pentium 4.
+	  - "Pentium-4" for the Intel Pentium 4 or P4-based Celeron.
 	  - "K6" for the AMD K6, K6-II and K6-III (aka K6-3D).
 	  - "Athlon" for the AMD K7 family (Athlon/Duron/Thunderbird).
 	  - "Crusoe" for the Transmeta Crusoe series.
@@ -183,11 +183,13 @@ config MPENTIUMIII
 	  extensions.
 
 config MPENTIUM4
-	bool "Pentium-4"
+	bool "Pentium-4/Celeron(P4-based)"
 	help
-	  Select this for Intel Pentium 4 chips.  Presently these are
-	  treated almost like Pentium IIIs, but with a different cache
-	  shift.
+	  Select this for Intel Pentium 4 chips.  This includes both
+	  the Pentium 4 and P4-based Celeron chips.  This option
+	  enables compile flags optimized for the chip, uses the
+	  correct cache shift, and applies any applicable Pentium III
+	  optimizations.
 
 config MK6
 	bool "K6/K6-II/K6-III"
