@@ -469,6 +469,7 @@ struct net_device
 
 	/* class/net/name entry */
 	struct class_device	class_dev;
+	struct net_device_stats* (*last_stats)(struct net_device *);
 };
 
 #define SET_MODULE_OWNER(dev) do { } while (0)
