@@ -41,11 +41,6 @@ static inline void crypto_yield(struct crypto_tfm *tfm)
 		cond_resched();
 }
 
-static inline u32 crypto_cipher_flags(u32 flags)
-{
-	return flags & (CRYPTO_TFM_MODE_MASK|CRYPTO_TFM_REQ_WEAK_KEY);
-}
-
 static inline void *crypto_tfm_ctx(struct crypto_tfm *tfm)
 {
 	return (void *)&tfm[1];
