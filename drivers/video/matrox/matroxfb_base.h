@@ -541,6 +541,7 @@ struct matrox_fb_info {
 		int		memtype;
 		int		g450dac;
 		int		dfp_type;
+		int		dualhead;
 		unsigned int	fbResource;
 			      } devflags;
 	struct display_switch	dispsw;

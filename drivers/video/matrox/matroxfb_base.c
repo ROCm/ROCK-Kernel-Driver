@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2001/11/29
+ * Version: 1.64 2002/06/10
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -1392,10 +1392,10 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_VIDEO64BIT		0x0001
 #define	DEVF_SWAPS		0x0002
 #define DEVF_SRCORG		0x0004
-#define DEVF_BOTHDACS		0x0008	/* put CRTC1 on both outputs by default */
+#define DEVF_DUALHEAD		0x0008
 #define DEVF_CROSS4MB		0x0010
 #define DEVF_TEXT4B		0x0020
-#define DEVF_DDC_8_2		0x0040
+/* #define DEVF_recycled	0x0040	*/
 /* #define DEVF_recycled	0x0080	*/
 #define DEVF_SUPPORT32MB	0x0100
 #define DEVF_ANY_VXRES		0x0200
@@ -1405,14 +1405,14 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_PANELLINK_CAPABLE	0x2000
 #define DEVF_G450DAC		0x4000
 
-#define DEVF_GCORE	(DEVF_VIDEO64BIT | DEVF_SWAPS | DEVF_CROSS4MB | DEVF_DDC_8_2)
-#define DEVF_G2CORE	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_MAVEN_CAPABLE | DEVF_PANELLINK_CAPABLE | DEVF_SRCORG)
+#define DEVF_GCORE	(DEVF_VIDEO64BIT | DEVF_SWAPS | DEVF_CROSS4MB)
+#define DEVF_G2CORE	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_MAVEN_CAPABLE | DEVF_PANELLINK_CAPABLE | DEVF_SRCORG | DEVF_DUALHEAD)
 #define DEVF_G100	(DEVF_GCORE) /* no doc, no vxres... */
 #define DEVF_G200	(DEVF_G2CORE)
 #define DEVF_G400	(DEVF_G2CORE | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2)
 /* if you'll find how to drive DFP... */
-#define DEVF_G450	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2 | DEVF_G450DAC | DEVF_SRCORG)
-#define DEVF_G550	(DEVF_G450 | DEVF_BOTHDACS)
+#define DEVF_G450	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2 | DEVF_G450DAC | DEVF_SRCORG | DEVF_DUALHEAD)
+#define DEVF_G550	(DEVF_G450)
 
 static struct board {
 	unsigned short vendor, device, rev, svid, sid;
@@ -1611,12 +1611,12 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	ACCESS_FBINFO(devflags.precise_width) = !(b->flags & DEVF_ANY_VXRES);
 	ACCESS_FBINFO(devflags.crtc2) = b->flags & DEVF_CRTC2;
 	ACCESS_FBINFO(devflags.maven_capable) = b->flags & DEVF_MAVEN_CAPABLE;
+	ACCESS_FBINFO(devflags.dualhead) = (b->flags & DEVF_DUALHEAD) != 0;
 	if (b->flags & DEVF_PANELLINK_CAPABLE) {
 		ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_DFP;
 		if (dfp)
 			ACCESS_FBINFO(output.ph) |= MATROXFB_OUTPUT_CONN_DFP;
-	}
-	if (b->flags & DEVF_BOTHDACS) {
+	} else if (b->flags & DEVF_DUALHEAD) {
 #ifdef CONFIG_FB_MATROX_G450	
 		ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
 		ACCESS_FBINFO(output.ph) |= MATROXFB_OUTPUT_CONN_SECONDARY;
