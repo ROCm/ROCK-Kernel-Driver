@@ -8,11 +8,9 @@
 # Copyright (C) 1998 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
-THIS	= arch/$(ARCH)/boot
+LINKFLAGS = -static -T $(src)/bootloader.lds
 
-LINKFLAGS = -static -T $(THIS)/bootloader.lds
-
-OBJS	= $(THIS)/bootloader.o
+OBJS	= $(obj)/bootloader.o
 
 targets-$(CONFIG_IA64_HP_SIM)	+= bootloader
 targets-$(CONFIG_IA64_GENERIC)	+= bootloader

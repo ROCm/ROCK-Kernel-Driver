@@ -2,8 +2,6 @@
 # Makefile for ia64-specific library routines..
 #
 
-THIS = arch/$(ARCH)/lib
-
 L_TARGET = lib.a
 
 export-objs := swiotlb.o
@@ -34,26 +32,26 @@ AFLAGS___udivsi3.o	= -DUNSIGNED
 AFLAGS___modsi3.o	=	     -DMODULO
 AFLAGS___umodsi3.o	= -DUNSIGNED -DMODULO
 
-$(THIS)/__divdi3.o: $(THIS)/idiv64.S
+$(obj)/__divdi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-$(THIS)/__udivdi3.o: $(THIS)/idiv64.S
+$(obj)/__udivdi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-$(THIS)/__moddi3.o: $(THIS)/idiv64.S
+$(obj)/__moddi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-$(THIS)/__umoddi3.o: $(THIS)/idiv64.S
+$(obj)/__umoddi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-$(THIS)/__divsi3.o: $(THIS)/idiv32.S
+$(obj)/__divsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
 
-$(THIS)/__udivsi3.o: $(THIS)/idiv32.S
+$(obj)/__udivsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
 
-$(THIS)/__modsi3.o: $(THIS)/idiv32.S
+$(obj)/__modsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
 
-$(THIS)/__umodsi3.o: $(THIS)/idiv32.S
+$(obj)/__umodsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
