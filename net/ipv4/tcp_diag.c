@@ -66,7 +66,8 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 	r->tcpdiag_retrans = 0;
 
 	r->id.tcpdiag_if = sk->bound_dev_if;
-	*((struct sock **)&r->id.tcpdiag_cookie) = sk;
+	r->id.tcpdiag_cookie[0] = (u32)(unsigned long)sk;
+	r->id.tcpdiag_cookie[1] = (u32)(((unsigned long)sk >> 31) >> 1);
 
 	if (r->tcpdiag_state == TCP_TIME_WAIT) {
 		struct tcp_tw_bucket *tw = (struct tcp_tw_bucket*)sk;
@@ -237,7 +238,8 @@ static int tcpdiag_get_exact(struct sk_buff *in_skb, struct nlmsghdr *nlh)
 	err = -ESTALE;
 	if ((req->id.tcpdiag_cookie[0] != TCPDIAG_NOCOOKIE ||
 	     req->id.tcpdiag_cookie[1] != TCPDIAG_NOCOOKIE) &&
-	    sk != *((struct sock **)&req->id.tcpdiag_cookie[0]))
+	    ((u32)(unsigned long)sk != req->id.tcpdiag_cookie[0] ||
+	     (u32)((((unsigned long)sk) >> 31) >> 1) != req->id.tcpdiag_cookie[1]))
 		goto out;
 
 	err = -ENOMEM;
