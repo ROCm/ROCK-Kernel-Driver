@@ -24,35 +24,45 @@ CROSS32_COMPILE =
 #CROSS32_COMPILE = /usr/local/ppc/bin/powerpc-linux-
 
 BOOTCC		:= $(CROSS32_COMPILE)gcc
-BOOTCFLAGS	:= $(HOSTCFLAGS) -Iinclude
-BOOTLD		:= $(CROSS32_COMPILE)ld
+HOSTCC		:= gcc
+BOOTCFLAGS	:= $(HOSTCFLAGS) -Iinclude -fno-builtin 
 BOOTAS		:= $(CROSS32_COMPILE)as
-BOOTAFLAGS	:= -D__ASSEMBLY__ $(HOSTCFLAGS)
+BOOTAFLAGS	:= -D__ASSEMBLY__ $(BOOTCFLAGS) -traditional
+BOOTLD		:= $(CROSS32_COMPILE)ld
+BOOTLFLAGS	:= -Ttext 0x00400000 -e _start -T $(obj)/zImage.lds
+BOOTOBJCOPY	:= $(CROSS32_COMPILE)objcopy
+OBJCOPYFLAGS    := contents,alloc,load,readonly,data
 
-CFLAGS		:= $(CPPFLAGS) -O -fno-builtin -DSTDC_HEADERS
-LD_ARGS		:= -Ttext 0x00400000 -e _start
-OBJCOPYFLAGS	:= -S -O binary
-
-obj-boot := start.o main.o zlib.o imagesize.o no_initrd.o
-OBJS     := crt0.o start.o main.o zlib.o imagesize.o image.o
-obj-boot := $(addprefix $(obj)/,$(obj-boot))
-OBJS     := $(addprefix $(obj)/,$(OBJS))
-targets  += $(obj-boot) $(addprefix $(obj)/,image.c image.o)
+src-boot := crt0.S string.S prom.c main.c zlib.c imagesize.c
+src-boot := $(addprefix $(obj)/, $(src-boot))
+obj-boot := $(addsuffix .o, $(basename $(src-boot)))
 
 quiet_cmd_bootcc = BOOTCC  $@
       cmd_bootcc = $(BOOTCC) -Wp,-MD,$(depfile) $(BOOTCFLAGS) -c -o $@ $<
-$(obj-boot): %.o: %.c FORCE
-	$(call if_changed_dep,bootcc)
 
 quiet_cmd_bootas = BOOTAS  $@
-      cmd_bootas = $(BOOTCC) -Wp,-MD,$(depfile) $(BOOTAFLAGS) -traditional \
-						-c -o $@ $<
-$(obj)/crt0.o: %.o: %.S FORCE
+      cmd_bootas = $(BOOTCC) -Wp,-MD,$(depfile) $(BOOTAFLAGS) -c -o $@ $<
+
+$(patsubst %.c,%.o, $(filter %.c, $(src-boot))): %.o: %.c
+	$(call if_changed_dep,bootcc)
+$(patsubst %.S,%.o, $(filter %.S, $(src-boot))): %.o: %.S
 	$(call if_changed_dep,bootas)
 
-host-progs		:= piggyback addnote addSystemMap addRamDisk
-HOSTCFLAGS_piggyback.o	:= -DKERNELBASE=$(KERNELBASE)
-EXTRA_TARGETS 		+= zImage zImage.initrd vmlinux.bin vmlinux.gz \
+#-----------------------------------------------------------
+# ELF sections within the zImage bootloader/wrapper
+#-----------------------------------------------------------
+required := vmlinux .config System.map
+initrd   := initrd
+
+obj-sec = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.o, $(section)))
+src-sec = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.c, $(section)))
+gz-sec  = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.gz, $(section)))
+
+host-progs		:= piggy addnote addSystemMap addRamDisk
+EXTRA_TARGETS 		+= zImage zImage.initrd imagesize.c \
+			   $(patsubst $(obj)/%,%, $(call obj-sec, $(required) $(initrd))) \
+			   $(patsubst $(obj)/%,%, $(call src-sec, $(required) $(initrd))) \
+			   $(patsubst $(obj)/%,%, $(call gz-sec, $(required) $(initrd))) \
 			   vmlinux.sm vmlinux.initrd vmlinux.sminitrd \
 			   sysmap.o initrd.o
 
@@ -69,42 +79,48 @@ $(obj)/vmlinux.initrd: vmlinux $(obj)/addRamDisk $(obj)/ramdisk.image.gz System.
 $(obj)/vmlinux.sminitrd: $(obj)/vmlinux.sm $(obj)/addRamDisk $(obj)/ramdisk.image.gz FORCE
 	$(call if_changed,ramdisk)
 
+$(obj)/sysmap.o: System.map $(obj)/piggyback
+	$(call if_changed,piggy)
+
+addsection = $(BOOTOBJCOPY) $(1) \
+		--add-section=.kernel:$(strip $(patsubst $(obj)/kernel-%.o,%, $(1)))=$(patsubst %.o,%.gz, $(1)) \
+		--set-section-flags=.kernel:$(strip $(patsubst $(obj)/kernel-%.o,%, $(1)))=$(OBJCOPYFLAGS)
+
+quiet_cmd_addnote = ADDNOTE $@ 
+      cmd_addnote = $(BOOTLD) $(BOOTLFLAGS) -o $@ $(obj-boot) && $(obj)/addnote $@
 
 quiet_cmd_piggy = PIGGY   $@
       cmd_piggy = $(obj)/piggyback $(@:.o=) < $< | $(BOOTAS) -o $@
 
-$(obj)/image.o: $(obj)/vmlinux.gz $(obj)/piggyback FORCE
-	$(call if_changed,piggy)
-
-$(obj)/sysmap.o: System.map $(obj)/piggyback FORCE
-	$(call if_changed,piggy)
-
-$(obj)/initrd.o: $(obj)/ramdisk.image.gz $(obj)/piggyback FORCE
-	$(call if_changed,piggy)
-
-quiet_cmd_addnote = ADDNOTE $@ 
-      cmd_addnote = $(BOOTLD) $(LD_ARGS) -T $(obj)/zImage.lds -o $@ $(OBJS) $<\
-		    && $(obj)/addnote $@
-
-$(obj)/zImage: $(obj)/no_initrd.o $(OBJS) $(obj)/addnote FORCE
-	$(call if_changed,addnote)
-
-$(obj)/zImage.initrd: $(obj)/initrd.o $(OBJS) $(obj)/addnote FORCE
-	$(call if_changed,addnote)
-
-$(obj)/vmlinux.bin: vmlinux FORCE
-	$(call if_changed,objcopy)
-
-$(obj)/vmlinux.gz: $(obj)/vmlinux.bin FORCE
+$(call gz-sec, $(required)): $(obj)/kernel-%.gz: %
 	$(call if_changed,gzip)
+
+$(obj)/kernel-initrd.gz: $(obj)/ramdisk.image.gz
+	cp -f $(obj)/ramdisk.image.gz $@
+
+$(call src-sec, $(required) $(initrd)): $(obj)/kernel-%.c: $(obj)/kernel-%.gz
+	touch $@
+
+$(call obj-sec, $(required) $(initrd)): $(obj)/kernel-%.o: $(obj)/kernel-%.c
+	$(call if_changed_dep,bootcc)
+	$(call addsection, $@)
+
+$(obj)/zImage: obj-boot += $(call obj-sec, $(required))
+$(obj)/zImage: $(call obj-sec, $(required)) $(obj-boot) $(obj)/addnote FORCE
+	$(call if_changed,addnote)
+
+$(obj)/zImage.initrd: obj-boot += $(call obj-sec, $(required) $(initrd))
+$(obj)/zImage.initrd: $(call obj-sec, $(required) $(initrd)) $(obj-boot) $(obj)/addnote FORCE
+	$(call if_changed,addnote)
 
 $(obj)/imagesize.c: vmlinux
 	@echo Generating $@
 	ls -l vmlinux | \
 	awk '{printf "/* generated -- do not edit! */\n" \
-		"int uncompressed_size = %d;\n", $$5}' > $(obj)/imagesize.c
+		"unsigned long vmlinux_filesize = %d;\n", $$5}' > $(obj)/imagesize.c
 	$(CROSS_COMPILE)nm -n vmlinux | tail -1 | \
-	awk '{printf "long vmlinux_end = 0x%s;\n", substr($$1,8)}' \
+	awk '{printf "unsigned long vmlinux_memsize = 0x%s;\n", substr($$1,8)}' \
 		>> $(obj)/imagesize.c
 
-clean-files :=  $(targets)
+
+clean-files := $(patsubst $(obj)/%,%, $(obj-boot))

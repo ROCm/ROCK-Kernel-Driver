@@ -239,22 +239,30 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 /*
  * Set up a thread for executing a new program
  */
-void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
+void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
 {
-	/* NIP is *really* a pointer to the function descriptor for
+	unsigned long entry, toc, load_addr = regs->gpr[2];
+
+	/* fdptr is a relocated pointer to the function descriptor for
          * the elf _start routine.  The first entry in the function
          * descriptor is the entry address of _start and the second
          * entry is the TOC value we need to use.
          */
-	unsigned long *entry = (unsigned long *)nip;
-	unsigned long *toc   = entry + 1;
-
 	set_fs(USER_DS);
-	memset(regs->gpr, 0, sizeof(regs->gpr));
-	memset(&regs->ctr, 0, 4 * sizeof(regs->ctr));
-	__get_user(regs->nip, entry);
+	__get_user(entry, (unsigned long *)fdptr);
+	__get_user(toc, (unsigned long *)fdptr+1);
+
+	/* Check whether the e_entry function descriptor entries
+	 * need to be relocated before we can use them.
+	 */
+	if ( load_addr != 0 ) {
+		entry += load_addr;
+		toc   += load_addr;
+	}
+
+	regs->nip = entry;
 	regs->gpr[1] = sp;
-	__get_user(regs->gpr[2], toc);
+	regs->gpr[2] = toc;
 	regs->msr = MSR_USER64;
 	if (last_task_used_math == current)
 		last_task_used_math = 0;

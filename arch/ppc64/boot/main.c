@@ -1,7 +1,7 @@
 /*
  * Copyright (C) Paul Mackerras 1997.
  *
- * Updates for PPC64 by Todd Inglett & Dave Engebretsen.
+ * Updates for PPC64 by Todd Inglett, Dave Engebretsen & Peter Bergner.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -9,30 +9,30 @@
  * 2 of the License, or (at your option) any later version.
  */
 #define __KERNEL__
+#include "ppc32-types.h"
 #include "zlib.h"
+#include <linux/elf.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/bootinfo.h>
-
-#undef DEBUG
 
 void memmove(void *dst, void *im, int len);
 
 extern void *finddevice(const char *);
 extern int getprop(void *, const char *, void *, int);
+extern void printk(char *fmt, ...);
 extern void printf(const char *fmt, ...);
 extern int sprintf(char *buf, const char *fmt, ...);
 void gunzip(void *, int, unsigned char *, int *);
 void *claim(unsigned int, unsigned int, unsigned int);
-void flush_cache(void *, int);
+void flush_cache(void *, unsigned long);
 void pause(void);
+extern void exit(void);
+
 static struct bi_record *make_bi_recs(unsigned long);
 
 #define RAM_START	0x00000000
 #define RAM_END		(64<<20)
-
-#define BOOT_START	((unsigned long)_start)
-#define BOOT_END	((unsigned long)_end)
 
 /* Value picked to match that used by yaboot */
 #define PROG_START	0x01400000
@@ -42,18 +42,26 @@ char *begin_avail, *end_avail;
 char *avail_high;
 unsigned int heap_use;
 unsigned int heap_max;
-unsigned long initrd_start = 0;
-unsigned long initrd_size = 0;
 
 extern char _end[];
-extern char image_data[];
-extern int image_len;
-extern char initrd_data[];
-extern int initrd_len;
-extern char sysmap_data[];
-extern int sysmap_len;
-extern int uncompressed_size;
-extern long vmlinux_end;
+extern char _vmlinux_start[];
+extern char _vmlinux_end[];
+extern char _sysmap_start[];
+extern char _sysmap_end[];
+extern char _initrd_start[];
+extern char _initrd_end[];
+extern unsigned long vmlinux_filesize;
+extern unsigned long vmlinux_memsize;
+
+struct addr_range {
+	unsigned long addr;
+	unsigned long size;
+	unsigned long memsize;
+};
+struct addr_range vmlinux = {0, 0, 0};
+struct addr_range vmlinuz = {0, 0, 0};
+struct addr_range sysmap  = {0, 0, 0};
+struct addr_range initrd  = {0, 0, 0};
 
 static char scratch[128<<10];	/* 128kB of scratch space for gunzip */
 
@@ -62,66 +70,130 @@ typedef void (*kernel_entry_t)( unsigned long,
                                 void *,
 				struct bi_record *);
 
+
+int (*prom)(void *);
+
+void *chosen_handle;
+void *stdin;
+void *stdout;
+void *stderr;
+
+
 void
-chrpboot(unsigned long a1, unsigned long a2, void *prom)
+start(unsigned long a1, unsigned long a2, void *promptr)
 {
-	unsigned len;
-	void *dst = (void *)-1;
-	unsigned long claim_addr;
-	unsigned char *im;
+	unsigned long i, claim_addr, claim_size;
 	extern char _start;
 	struct bi_record *bi_recs;
 	kernel_entry_t kernel_entry;
-    
-	printf("chrpboot starting: loaded at 0x%x\n\r", (unsigned)&_start);
+	Elf64_Ehdr *elf64;
+	Elf64_Phdr *elf64ph;
 
-	if (initrd_len) {
-		initrd_size = initrd_len;
-		initrd_start = (RAM_END - initrd_size) & ~0xFFF;
-		a1 = a2 = 0;
-		claim(initrd_start, RAM_END - initrd_start, 0);
+	prom = (int (*)(void *)) promptr;
+	chosen_handle = finddevice("/chosen");
+	if (chosen_handle == (void *) -1)
+		exit();
+	if (getprop(chosen_handle, "stdout", &stdout, sizeof(stdout)) != 4)
+		exit();
+	stderr = stdout;
+	if (getprop(chosen_handle, "stdin", &stdin, sizeof(stdin)) != 4)
+		exit();
+
+	printf("zImage starting: loaded at 0x%x\n\r", (unsigned)&_start);
+
+#if 0
+	sysmap.size = (unsigned long)(_sysmap_end - _sysmap_start);
+	sysmap.memsize = sysmap.size;
+	if ( sysmap.size > 0 ) {
+		sysmap.addr = (RAM_END - sysmap.size) & ~0xFFF;
+		claim(sysmap.addr, RAM_END - sysmap.addr, 0);
 		printf("initial ramdisk moving 0x%lx <- 0x%lx (%lx bytes)\n\r",
-		       initrd_start, (unsigned long)initrd_data, initrd_size);
-		memcpy((void *)initrd_start, (void *)initrd_data, initrd_size);
+		       sysmap.addr, (unsigned long)_sysmap_start, sysmap.size);
+		memcpy((void *)sysmap.addr, (void *)_sysmap_start, sysmap.size);
+	}
+#endif
+
+	initrd.size = (unsigned long)(_initrd_end - _initrd_start);
+	initrd.memsize = initrd.size;
+	if ( initrd.size > 0 ) {
+		initrd.addr = (RAM_END - initrd.size) & ~0xFFF;
+		a1 = a2 = 0;
+		claim(initrd.addr, RAM_END - initrd.addr, 0);
+		printf("initial ramdisk moving 0x%lx <- 0x%lx (%lx bytes)\n\r",
+		       initrd.addr, (unsigned long)_initrd_start, initrd.size);
+		memcpy((void *)initrd.addr, (void *)_initrd_start, initrd.size);
 	}
 
-	im = image_data;
-	len = image_len;
-	uncompressed_size = PAGE_ALIGN(uncompressed_size);
+	vmlinuz.addr = (unsigned long)_vmlinux_start;
+	vmlinuz.size = (unsigned long)(_vmlinux_end - _vmlinux_start);
+	vmlinux.addr = (unsigned long)(void *)-1;
+	vmlinux.size = PAGE_ALIGN(vmlinux_filesize);
+	vmlinux.memsize = vmlinux_memsize;
 
+	claim_size = vmlinux.memsize /* PPPBBB: + fudge for bi_recs */;
 	for(claim_addr = PROG_START; 
 	    claim_addr <= PROG_START * 8; 
 	    claim_addr += 0x100000) {
 #ifdef DEBUG
 		printf("    trying: 0x%08lx\n\r", claim_addr);
 #endif
-		dst = claim(claim_addr, uncompressed_size, 0);
-		if (dst != (void *)-1) break;
+		vmlinux.addr = (unsigned long)claim(claim_addr, claim_size, 0);
+		if ((void *)vmlinux.addr != (void *)-1) break;
 	}
-	if (dst == (void *)-1) {
+	if ((void *)vmlinux.addr == (void *)-1) {
 		printf("claim error, can't allocate kernel memory\n\r");
-		return;
+		exit();
 	}
 
-	if (im[0] == 0x1f && im[1] == 0x8b) {
+	/* PPPBBB: should kernel always be gziped? */
+	if (*(unsigned short *)vmlinuz.addr == 0x1f8b) {
 		avail_ram = scratch;
 		begin_avail = avail_high = avail_ram;
 		end_avail = scratch + sizeof(scratch);
-		printf("gunzipping (0x%x <- 0x%x:0x%0x)...",
-		       (unsigned)dst, (unsigned)im, (unsigned)im+len);
-		gunzip(dst, uncompressed_size, im, &len);
-		printf("done %u bytes\n\r", len);
+		printf("gunzipping (0x%lx <- 0x%lx:0x%0lx)...",
+		       vmlinux.addr, vmlinuz.addr, vmlinuz.addr+vmlinuz.size);
+		gunzip((void *)vmlinux.addr, vmlinux.size,
+			(unsigned char *)vmlinuz.addr, (int *)&vmlinuz.size);
+		printf("done %lu bytes\n\r", vmlinuz.size);
 		printf("%u bytes of heap consumed, max in use %u\n\r",
 		       (unsigned)(avail_high - begin_avail), heap_max);
 	} else {
-		memmove(dst, im, len);
+		memmove((void *)vmlinux.addr,(void *)vmlinuz.addr,vmlinuz.size);
 	}
 
-	flush_cache(dst, len);
+	/* Skip over the ELF header */
+	elf64 = (Elf64_Ehdr *)vmlinux.addr;
+	if ( elf64->e_ident[EI_MAG0]  != ELFMAG0	||
+	     elf64->e_ident[EI_MAG1]  != ELFMAG1	||
+	     elf64->e_ident[EI_MAG2]  != ELFMAG2	||
+	     elf64->e_ident[EI_MAG3]  != ELFMAG3	||
+	     elf64->e_ident[EI_CLASS] != ELFCLASS64	||
+	     elf64->e_ident[EI_DATA]  != ELFDATA2MSB	||
+	     elf64->e_type            != ET_EXEC	||
+	     elf64->e_machine         != EM_PPC64 )
+	{
+		printf("Error: not a valid PPC64 ELF file!\n\r");
+		exit();
+	}
 
-	bi_recs = make_bi_recs((unsigned long)dst + vmlinux_end);
+	elf64ph = (Elf64_Phdr *)((unsigned long)elf64 +
+				(unsigned long)elf64->e_phoff);
+	for(i=0; i < (unsigned int)elf64->e_phnum ;i++,elf64ph++) {
+		if (elf64ph->p_type == PT_LOAD && elf64ph->p_offset != 0)
+			break;
+	}
+#ifdef DEBUG
+	printf("... skipping 0x%lx bytes of ELF header\n\r",
+			(unsigned long)elf64ph->p_offset);
+#endif
+	vmlinux.addr += (unsigned long)elf64ph->p_offset;
+	vmlinux.size -= (unsigned long)elf64ph->p_offset;
 
-	kernel_entry = (kernel_entry_t)dst;
+	flush_cache((void *)vmlinux.addr, vmlinux.memsize);
+
+	bi_recs = make_bi_recs(vmlinux.addr + vmlinux.memsize);
+
+	kernel_entry = (kernel_entry_t)vmlinux.addr;
 #ifdef DEBUG
 	printf( "kernel:\n\r"
 		"        entry addr = 0x%lx\n\r"
@@ -135,9 +207,9 @@ chrpboot(unsigned long a1, unsigned long a2, void *prom)
 
 	kernel_entry( a1, a2, prom, bi_recs );
 
-	printf("returned?\n\r");
+	printf("Error: Linux kernel returned to zImage bootloader!\n\r");
 
-	pause();
+	exit();
 }
 
 static struct bi_record *
@@ -162,21 +234,19 @@ make_bi_recs(unsigned long addr)
 	rec->data[0] = PLATFORM_PSERIES;
 	rec->data[1] = 1;
 
-	if ( initrd_size > 0 ) {
+	if ( initrd.size > 0 ) {
 		rec = bi_rec_alloc(rec, 2);
 		rec->tag = BI_INITRD;
-		rec->data[0] = initrd_start;
-		rec->data[1] = initrd_size;
+		rec->data[0] = initrd.addr;
+		rec->data[1] = initrd.size;
 	}
 
-#if 0
-	if ( sysmap_len > 0 ) {
+	if ( sysmap.size > 0 ) {
 		rec = bi_rec_alloc(rec, 2);
 		rec->tag = BI_SYSMAP;
-		rec->data[0] = (unsigned long)sysmap_data;
-		rec->data[1] = sysmap_len;
+		rec->data[0] = (unsigned long)sysmap.addr;
+		rec->data[1] = (unsigned long)sysmap.size;
 	}
-#endif
 
 	rec = bi_rec_alloc(rec, 1);
 	rec->tag = BI_LAST;
