@@ -272,7 +272,7 @@ static void report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
 
 static int noirqdebug;
 
-static int __init noirqdebug_setup(char *str)
+int __init noirqdebug_setup(char *str)
 {
 	noirqdebug = 1;
 	printk("IRQ lockup detection disabled\n");
@@ -997,13 +997,15 @@ static int irq_affinity_read_proc(char *page, char **start, off_t off,
 	return len;
 }
 
+int no_irq_affinity;
+
 static int irq_affinity_write_proc(struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (long)data, full_count = count, err;
 	cpumask_t new_value, tmp;
 
-	if (!irq_desc[irq].handler->set_affinity)
+	if (!irq_desc[irq].handler->set_affinity || no_irq_affinity)
 		return -EIO;
 
 	err = cpumask_parse(buffer, count, new_value);

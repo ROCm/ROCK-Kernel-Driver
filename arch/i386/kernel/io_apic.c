@@ -573,6 +573,8 @@ static int balanced_irq(void *unused)
 	}
 
 	for ( ; ; ) {
+		if (irqbalance_disabled)
+			return 0;
 		set_current_state(TASK_INTERRUPTIBLE);
 		time_remaining = schedule_timeout(time_remaining);
 		if (time_after(jiffies,
@@ -639,7 +641,7 @@ failed:
 	return 0;
 }
 
-static int __init irqbalance_disable(char *str)
+int __init irqbalance_disable(char *str)
 {
 	irqbalance_disabled = 1;
 	return 0;
@@ -649,6 +651,8 @@ __setup("noirqbalance", irqbalance_disable);
 
 static inline void move_irq(int irq)
 {
+	if (irqbalance_disabled)
+		return; 
 	/* note - we hold the desc->lock */
 	if (unlikely(!cpus_empty(pending_irq_balance_cpumask[irq]))) {
 		set_ioapic_affinity_irq(irq, pending_irq_balance_cpumask[irq]);

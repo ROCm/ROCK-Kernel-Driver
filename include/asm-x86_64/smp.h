@@ -110,9 +110,13 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 
 #endif
 #define INT_DELIVERY_MODE 1     /* logical delivery */
-#define TARGET_CPUS 1
 
 #ifndef ASSEMBLY
+#ifdef CONFIG_SMP
+#define TARGET_CPUS cpu_online_map
+#else
+#define TARGET_CPUS cpumask_of_cpu(0)
+#endif
 static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
 {
 	return cpus_addr(cpumask)[0];
