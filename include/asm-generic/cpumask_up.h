@@ -33,6 +33,7 @@
 
 #define cpus_equal(map1, map2)		(cpus_coerce(map1) == cpus_coerce(map2))
 #define cpus_empty(map)			(cpus_coerce(map) == 0UL)
+#define cpus_addr(map)			(&(map))
 #define cpus_weight(map)		(cpus_coerce(map) ? 1UL : 0UL)
 #define cpus_shift_right(d, s, n)	do { cpus_coerce(d) = 0UL; } while (0)
 #define cpus_shift_left(d, s, n)	do { cpus_coerce(d) = 0UL; } while (0)

@@ -35,4 +35,16 @@ static inline int next_online_cpu(int cpu, cpumask_t map)
 		cpu < NR_CPUS;						\
 		cpu = next_online_cpu(cpu,map))
 
+extern int __mask_snprintf_len(char *buf, unsigned int buflen,
+		const unsigned long *maskp, unsigned int maskbytes);
+
+#define cpumask_snprintf(buf, buflen, map)				\
+	__mask_snprintf_len(buf, buflen, cpus_addr(map), sizeof(map))
+
+extern int __mask_parse_len(const char __user *ubuf, unsigned int ubuflen,
+	unsigned long *maskp, unsigned int maskbytes);
+
+#define cpumask_parse(buf, buflen, map)					\
+	__mask_parse_len(buf, buflen, cpus_addr(map), sizeof(map))
+
 #endif /* __LINUX_CPUMASK_H */

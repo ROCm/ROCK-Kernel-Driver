@@ -252,9 +252,11 @@ static int
 irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	if (count - len < 2)
 		return -EINVAL;
-	return sprintf (page, "%016lx\n", irq_affinity[(long)data]);
+	len += sprintf(page + len, "\n");
+	return len;
 }
 
 static unsigned int
@@ -331,10 +333,11 @@ static int
 prof_cpu_mask_read_proc(char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	unsigned long *mask = (unsigned long *) data;
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+	if (count - len < 2)
 		return -EINVAL;
-	return sprintf (page, "%016lx\n", *mask);
+	len += sprintf(page + len, "\n");
+	return len;
 }
 
 static int

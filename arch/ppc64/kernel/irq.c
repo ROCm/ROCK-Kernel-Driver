@@ -654,65 +654,14 @@ cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_NONE };
 #endif /* CONFIG_IRQ_ALL_CPUS */
 
-#define HEX_DIGITS (2*sizeof(cpumask_t))
-
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int k, len;
-	cpumask_t tmp = irq_affinity[(long)data];
-
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	if (count - len < 2)
 		return -EINVAL;
-
-	for (k = 0; k < sizeof(cpumask_t) / sizeof(u16); ++k) {
-		int j = sprintf(page, "%04hx", (u16)cpus_coerce(tmp));
-		len += j;
-		page += j;
-		cpus_shift_right(tmp, tmp, 16);
-	}
-	len += sprintf(page, "\n");
+	len += sprintf(page + len, "\n");
 	return len;
-}
-
-static unsigned int parse_hex_value (const char *buffer,
-		unsigned long count, cpumask_t *ret)
-{
-	unsigned char hexnum[HEX_DIGITS];
-	cpumask_t value = CPU_MASK_NONE;
-	int i;
-
-	if (!count)
-		return -EINVAL;
-	if (count > HEX_DIGITS)
-		count = HEX_DIGITS;
-	if (copy_from_user(hexnum, buffer, count))
-		return -EFAULT;
-
-	/*
-	 * Parse the first HEX_DIGITS characters as a hex string, any non-hex char
-	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
-	 */
-
-	for (i = 0; i < count; i++) {
-		unsigned int c = hexnum[i];
-		int k;
-
-		switch (c) {
-			case '0' ... '9': c -= '0'; break;
-			case 'a' ... 'f': c -= 'a'-10; break;
-			case 'A' ... 'F': c -= 'A'-10; break;
-		default:
-			goto out;
-		}
-		cpus_shift_left(value, value, 4);
-		for (k = 0; k < 4; ++k)
-			if (test_bit(k, (unsigned long *)&c))
-				cpu_set(k, value);
-	}
-out:
-	*ret = value;
-	return 0;
 }
 
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
@@ -724,7 +673,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	err = cpumask_parse(buffer, count, new_value);
 	if (err)
 		return err;
 
@@ -746,10 +695,11 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	unsigned long *mask = (unsigned long *) data;
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+	if (count - len < 2)
 		return -EINVAL;
-	return sprintf (page, "%08lx\n", *mask);
+	len += sprintf(page + len, "\n");
+	return len;
 }
 
 static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
@@ -759,7 +709,7 @@ static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffe
 	unsigned long full_count = count, err;
 	cpumask_t new_value;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	err = cpumask_parse(buffer, count, new_value);
 	if (err)
 		return err;
 
