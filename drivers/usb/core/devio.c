@@ -597,33 +597,31 @@ static int proc_bulk(struct dev_state *ps, void *arg)
 	if (!usb_maxpacket(dev, pipe, !(bulk.ep & USB_DIR_IN)))
 		return -EINVAL;
 	len1 = bulk.len;
-	if (len1 > PAGE_SIZE)
-		return -EINVAL;
-	if (!(tbuf = (unsigned char *)__get_free_page(GFP_KERNEL)))
+	if (!(tbuf = kmalloc(len1, GFP_KERNEL)))
 		return -ENOMEM;
 	tmo = (bulk.timeout * HZ + 999) / 1000;
 	if (bulk.ep & 0x80) {
 		if (len1 && !access_ok(VERIFY_WRITE, bulk.data, len1)) {
-			free_page((unsigned long)tbuf);
+			kfree(tbuf);
 			return -EINVAL;
 		}
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
 		if (!i && len2) {
 			if (copy_to_user(bulk.data, tbuf, len2)) {
-				free_page((unsigned long)tbuf);
+				kfree(tbuf);
 				return -EFAULT;
 			}
 		}
 	} else {
 		if (len1) {
 			if (copy_from_user(tbuf, bulk.data, len1)) {
-				free_page((unsigned long)tbuf);
+				kfree(tbuf);
 				return -EFAULT;
 			}
 		}
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
 	}
-	free_page((unsigned long)tbuf);
+	kfree(tbuf);
 	if (i < 0) {
 		printk(KERN_WARNING "usbfs: USBDEVFS_BULK failed dev %d ep 0x%x len %u ret %d\n", 
 		       dev->devnum, bulk.ep, bulk.len, i);
