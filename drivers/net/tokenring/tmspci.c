@@ -253,7 +253,7 @@ static int __init tms_pci_init (void)
 	return 0;
 }
 
-static void __exit tms_pci_rmmod (void)
+static void __devexit tms_pci_rmmod (void)
 {
 	pci_unregister_driver (&tms_pci_driver);
 }
