@@ -10,6 +10,11 @@
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/mmu_context.h>
+#ifdef CONFIG_X86_LOCAL_APIC
+#include <asm/mpspec.h>
+#include <asm/apic.h>
+#include <mach_apic.h>
+#endif
 
 #include "cpu.h"
 
@@ -323,6 +328,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
+	c->x86_num_cores = 1;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	if (!have_cpuid_p()) {
@@ -429,6 +435,48 @@ void __init dodgy_tsc(void)
 	if (( boot_cpu_data.x86_vendor == X86_VENDOR_CYRIX ) ||
 	    ( boot_cpu_data.x86_vendor == X86_VENDOR_NSC   ))
 		cpu_devs[X86_VENDOR_CYRIX]->c_init(&boot_cpu_data);
+}
+
+void __init detect_ht(struct cpuinfo_x86 *c)
+{
+	u32 	eax, ebx, ecx, edx;
+	int 	index_lsb, index_msb, tmp;
+	int 	cpu = smp_processor_id();
+
+	if (!cpu_has(c, X86_FEATURE_HT))
+		return;
+
+	cpuid(1, &eax, &ebx, &ecx, &edx);
+	smp_num_siblings = (ebx & 0xff0000) >> 16;
+
+	if (smp_num_siblings == 1) {
+		printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
+	} else if (smp_num_siblings > 1 ) {
+		index_lsb = 0;
+		index_msb = 31;
+
+		if (smp_num_siblings > NR_CPUS) {
+			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
+			smp_num_siblings = 1;
+			return;
+		}
+		tmp = smp_num_siblings;
+		while ((tmp & 1) == 0) {
+			tmp >>=1 ;
+			index_lsb++;
+		}
+		tmp = smp_num_siblings;
+		while ((tmp & 0x80000000 ) == 0) {
+			tmp <<=1 ;
+			index_msb--;
+		}
+		if (index_lsb != index_msb )
+			index_msb++;
+		phys_proc_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
+
+		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
+		       phys_proc_id[cpu]);
+	}
 }
 
 void __init print_cpu_info(struct cpuinfo_x86 *c)
