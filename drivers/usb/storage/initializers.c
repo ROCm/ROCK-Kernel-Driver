@@ -39,6 +39,8 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
+
+#include "usb.h"
 #include "initializers.h"
 #include "debug.h"
 #include "transport.h"

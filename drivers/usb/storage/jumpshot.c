@@ -54,9 +54,9 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
+#include "usb.h"
 #include "transport.h"
 #include "protocol.h"
-#include "usb.h"
 #include "debug.h"
 #include "jumpshot.h"
 

@@ -47,8 +47,9 @@
 #include <linux/highmem.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
-#include "protocol.h"
+
 #include "usb.h"
+#include "protocol.h"
 #include "debug.h"
 #include "scsiglue.h"
 #include "transport.h"

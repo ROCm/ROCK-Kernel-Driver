@@ -53,10 +53,9 @@
 #include <scsi/scsi_devinfo.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_eh.h>
-#include <scsi/scsi_host.h>
 
-#include "scsiglue.h"
 #include "usb.h"
+#include "scsiglue.h"
 #include "debug.h"
 #include "transport.h"
 #include "protocol.h"
@@ -83,7 +82,7 @@ static int slave_alloc (struct scsi_device *sdev)
 
 static int slave_configure(struct scsi_device *sdev)
 {
-	struct us_data *us = (struct us_data *) sdev->host->hostdata[0];
+	struct us_data *us = host_to_us(sdev->host);
 
 	/* Scatter-gather buffers (all but the last) must have a length
 	 * divisible by the bulk maxpacket size.  Otherwise a data packet
@@ -167,10 +166,9 @@ static int slave_configure(struct scsi_device *sdev)
 static int queuecommand(struct scsi_cmnd *srb,
 			void (*done)(struct scsi_cmnd *))
 {
-	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	struct us_data *us = host_to_us(srb->device->host);
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
-	srb->host_scribble = (unsigned char *)us;
 
 	/* check for state-transition errors */
 	if (us->srb != NULL) {
@@ -201,10 +199,9 @@ static int queuecommand(struct scsi_cmnd *srb,
 
 /* Command timeout and abort */
 /* This is always called with scsi_lock(srb->host) held */
-static int command_abort(struct scsi_cmnd *srb )
+static int command_abort(struct scsi_cmnd *srb)
 {
-	struct Scsi_Host *host = srb->device->host;
-	struct us_data *us = (struct us_data *) host->hostdata[0];
+	struct us_data *us = host_to_us(srb->device->host);
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
 
@@ -224,13 +221,13 @@ static int command_abort(struct scsi_cmnd *srb )
 		set_bit(US_FLIDX_ABORTING, &us->flags);
 		usb_stor_stop_transport(us);
 	}
-	scsi_unlock(host);
+	scsi_unlock(us_to_host(us));
 
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
 
 	/* Reacquire the lock and allow USB transfers to resume */
-	scsi_lock(host);
+	scsi_lock(us_to_host(us));
 	clear_bit(US_FLIDX_ABORTING, &us->flags);
 	clear_bit(US_FLIDX_TIMED_OUT, &us->flags);
 	return SUCCESS;
@@ -241,12 +238,12 @@ static int command_abort(struct scsi_cmnd *srb )
 /* This is always called with scsi_lock(srb->host) held */
 static int device_reset(struct scsi_cmnd *srb)
 {
-	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	struct us_data *us = host_to_us(srb->device->host);
 	int result;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
 
-	scsi_unlock(srb->device->host);
+	scsi_unlock(us_to_host(us));
 
 	/* lock the device pointers and do the reset */
 	down(&(us->dev_semaphore));
@@ -258,7 +255,7 @@ static int device_reset(struct scsi_cmnd *srb)
 	up(&(us->dev_semaphore));
 
 	/* lock the host for the return */
-	scsi_lock(srb->device->host);
+	scsi_lock(us_to_host(us));
 	return result;
 }
 
@@ -268,12 +265,12 @@ static int device_reset(struct scsi_cmnd *srb)
 /* This is always called with scsi_lock(srb->host) held */
 static int bus_reset(struct scsi_cmnd *srb)
 {
-	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	struct us_data *us = host_to_us(srb->device->host);
 	int result, rc;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
 
-	scsi_unlock(srb->device->host);
+	scsi_unlock(us_to_host(us));
 
 	/* The USB subsystem doesn't handle synchronisation between
 	 * a device's several drivers. Therefore we reset only devices
@@ -301,7 +298,7 @@ static int bus_reset(struct scsi_cmnd *srb)
 	up(&(us->dev_semaphore));
 
 	/* lock the host for the return */
-	scsi_lock(srb->device->host);
+	scsi_lock(us_to_host(us));
 	return result < 0 ? FAILED : SUCCESS;
 }
 
@@ -311,11 +308,12 @@ static int bus_reset(struct scsi_cmnd *srb)
 void usb_stor_report_device_reset(struct us_data *us)
 {
 	int i;
+	struct Scsi_Host *host = us_to_host(us);
 
-	scsi_report_device_reset(us->host, 0, 0);
+	scsi_report_device_reset(host, 0, 0);
 	if (us->flags & US_FL_SCM_MULT_TARG) {
-		for (i = 1; i < us->host->max_id; ++i)
-			scsi_report_device_reset(us->host, 0, i);
+		for (i = 1; i < host->max_id; ++i)
+			scsi_report_device_reset(host, 0, i);
 	}
 }
 
@@ -330,20 +328,18 @@ void usb_stor_report_device_reset(struct us_data *us)
 #define DO_FLAG(a) \
 	do { if (us->flags & US_FL_##a) pos += sprintf(pos, " " #a); } while(0)
 
-static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off_t offset,
-		int length, int inout)
+static int proc_info (struct Scsi_Host *host, char *buffer,
+		char **start, off_t offset, int length, int inout)
 {
-	struct us_data *us;
+	struct us_data *us = host_to_us(host);
 	char *pos = buffer;
 
 	/* if someone is sending us data, just throw it away */
 	if (inout)
 		return length;
 
-	us = (struct us_data*)hostptr->hostdata[0];
-
 	/* print the controller name */
-	SPRINTF("   Host scsi%d: usb-storage\n", hostptr->host_no);
+	SPRINTF("   Host scsi%d: usb-storage\n", host->host_no);
 
 	/* print product, vendor, and serial number strings */
 	SPRINTF("       Vendor: %s\n", us->vendor);
@@ -362,6 +358,7 @@ static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off
 		DO_FLAG(SCM_MULT_TARG);
 		DO_FLAG(FIX_INQUIRY);
 		DO_FLAG(FIX_CAPACITY);
+		DO_FLAG(IGNORE_RESIDUE);
 
 		*(pos++) = '\n';
 	}

@@ -51,6 +51,9 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/suspend.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/slab.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -88,10 +91,6 @@
 #include "jumpshot.h"
 #endif
 
-
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/slab.h>
 
 /* Some informational data */
 MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
@@ -285,7 +284,7 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 static int usb_stor_control_thread(void * __us)
 {
 	struct us_data *us = (struct us_data *)__us;
-	struct Scsi_Host *host = us->host;
+	struct Scsi_Host *host = us_to_host(us);
 
 	lock_kernel();
 
@@ -788,20 +787,6 @@ static int usb_stor_acquire_resources(struct us_data *us)
 
 	up(&us->dev_semaphore);
 
-	/*
-	 * Since this is a new device, we need to register a SCSI
-	 * host definition with the higher SCSI layers.
-	 */
-	us->host = scsi_host_alloc(&usb_stor_host_template, sizeof(us));
-	if (!us->host) {
-		printk(KERN_WARNING USB_STORAGE
-			"Unable to allocate the scsi host\n");
-		return -EBUSY;
-	}
-
-	/* Set the hostdata to prepare for scanning */
-	us->host->hostdata[0] = (unsigned long) us;
-
 	/* Start up our control thread */
 	p = kernel_thread(usb_stor_control_thread, us, CLONE_VM);
 	if (p < 0) {
@@ -841,9 +826,9 @@ void usb_stor_release_resources(struct us_data *us)
 		 * Enqueue the command, wake up the thread, and wait for 
 		 * notification that it has exited.
 		 */
-		scsi_lock(us->host);
+		scsi_lock(us_to_host(us));
 		us->srb = NULL;
-		scsi_unlock(us->host);
+		scsi_unlock(us_to_host(us));
 		up(&us->dev_semaphore);
 
 		up(&us->sema);
@@ -856,15 +841,9 @@ void usb_stor_release_resources(struct us_data *us)
 		us->extra_destructor(us->extra);
 	}
 
-	/* Finish the host removal sequence */
-	if (us->host)
-		scsi_host_put(us->host);
-
 	/* Free the extra data and the URB */
-	if (us->extra)
-		kfree(us->extra);
-	if (us->current_urb)
-		usb_free_urb(us->current_urb);
+	kfree(us->extra);
+	usb_free_urb(us->current_urb);
 
 }
 
@@ -883,9 +862,6 @@ static void dissociate_dev(struct us_data *us)
 
 	/* Remove our private data from the interface */
 	usb_set_intfdata(us->pusb_intf, NULL);
-
-	/* Free the structure itself */
-	kfree(us);
 }
 
 /* Thread to carry out delayed SCSI-device scanning */
@@ -920,7 +896,7 @@ retry:
 
 	/* If the device is still connected, perform the scanning */
 	if (!test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
-		scsi_scan_host(us->host);
+		scsi_scan_host(us_to_host(us));
 		printk(KERN_DEBUG "usb-storage: device scan complete\n");
 	}
 
@@ -932,18 +908,25 @@ retry:
 static int storage_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
+	struct Scsi_Host *host;
 	struct us_data *us;
 	const int id_index = id - storage_usb_ids; 
 	int result;
 
 	US_DEBUGP("USB Mass Storage device detected\n");
 
-	/* Allocate the us_data structure and initialize the mutexes */
-	us = (struct us_data *) kmalloc(sizeof(*us), GFP_KERNEL);
-	if (!us) {
-		printk(KERN_WARNING USB_STORAGE "Out of memory\n");
+	/*
+	 * Ask the SCSI layer to allocate a host structure, with extra
+	 * space at the end for our private us_data structure.
+	 */
+	host = scsi_host_alloc(&usb_stor_host_template, sizeof(*us));
+	if (!host) {
+		printk(KERN_WARNING USB_STORAGE
+			"Unable to allocate the scsi host\n");
 		return -ENOMEM;
 	}
+
+	us = host_to_us(host);
 	memset(us, 0, sizeof(struct us_data));
 	init_MUTEX(&(us->dev_semaphore));
 	init_MUTEX_LOCKED(&(us->sema));
@@ -1003,7 +986,7 @@ static int storage_probe(struct usb_interface *intf,
 	result = usb_stor_acquire_resources(us);
 	if (result)
 		goto BadDevice;
-	result = scsi_add_host(us->host, &intf->dev);
+	result = scsi_add_host(host, &intf->dev);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
@@ -1015,7 +998,7 @@ static int storage_probe(struct usb_interface *intf,
 	if (result < 0) {
 		printk(KERN_WARNING USB_STORAGE 
 		       "Unable to start the device-scanning thread\n");
-		scsi_remove_host(us->host);
+		scsi_remove_host(host);
 		goto BadDevice;
 	}
 
@@ -1026,6 +1009,7 @@ BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
 	usb_stor_release_resources(us);
 	dissociate_dev(us);
+	scsi_host_put(host);
 	return result;
 }
 
@@ -1050,11 +1034,15 @@ static void storage_disconnect(struct usb_interface *intf)
 	/* Wait for the current command to finish, then remove the host */
 	down(&us->dev_semaphore);
 	up(&us->dev_semaphore);
-	scsi_remove_host(us->host);
+	scsi_remove_host(us_to_host(us));
 
 	/* Wait for everything to become idle and release all our resources */
 	usb_stor_release_resources(us);
 	dissociate_dev(us);
+
+	/* Drop our reference to the host; the SCSI core will free it
+	 * (and "us" along with it) when the refcount becomes 0. */
+	scsi_host_put(us_to_host(us));
 }
 
 /***********************************************************************

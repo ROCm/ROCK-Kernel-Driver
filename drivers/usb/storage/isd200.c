@@ -54,9 +54,9 @@
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
 
+#include "usb.h"
 #include "transport.h"
 #include "protocol.h"
-#include "usb.h"
 #include "debug.h"
 #include "scsiglue.h"
 #include "isd200.h"
