@@ -20,7 +20,7 @@
 
 #define DRIVER_VERSION "USBLCD Driver Version 1.01"
 
-#define USBLCD_MINOR		132
+#define USBLCD_MINOR		144
 
 #define IOCTL_GET_HARD_VERSION	1
 #define IOCTL_GET_DRV_VERSION	2
