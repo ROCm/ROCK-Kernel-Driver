@@ -2376,17 +2376,17 @@ static int __init decnet_init(void)
 
 	dn_register_sysctl();
 
-	/*
-	 * Prevent DECnet module unloading until its fixed properly.
-	 * Requires an audit of the code to check for memory leaks and
-	 * initialisation problems etc.
-	 */
-	try_module_get(THIS_MODULE);
-
 	return 0;
 
 }
+module_init(decnet_init);
 
+/*
+ * Prevent DECnet module unloading until its fixed properly.
+ * Requires an audit of the code to check for memory leaks and
+ * initialisation problems etc.
+ */
+#if 0
 static void __exit decnet_exit(void)
 {
 	sock_unregister(AF_DECnet);
@@ -2405,6 +2405,5 @@ static void __exit decnet_exit(void)
 
 	kmem_cache_destroy(dn_sk_cachep);
 }
-
-module_init(decnet_init);
 module_exit(decnet_exit);
+#endif
