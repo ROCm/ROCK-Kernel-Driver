@@ -1797,7 +1797,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 	 *      advantage of new APIC bus architecture.
 	 */
 
-	if (!physids_empty(apic_id_map))
+	if (physids_empty(apic_id_map))
 		apic_id_map = phys_cpu_present_map;
 
 	spin_lock_irqsave(&ioapic_lock, flags);
