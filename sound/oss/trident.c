@@ -206,7 +206,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
+#if defined(CONFIG_ALPHA_NAUTILUS) || defined(CONFIG_ALPHA_GENERIC)
 #include <asm/hwrpb.h>
 #endif
 
@@ -4284,7 +4284,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 		if(card->revision == ALI_5451_V02)
 			ali_close_multi_channels();
 		/* edited by HMSEO for GT sound */
-#if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
+#if defined(CONFIG_ALPHA_NAUTILUS) || defined(CONFIG_ALPHA_GENERIC)
 		{
 			u16 ac97_data;
 			extern struct hwrpb_struct *hwrpb;
