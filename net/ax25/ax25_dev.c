@@ -42,7 +42,7 @@
 #include <linux/init.h>
 
 ax25_dev *ax25_dev_list;
-spinlock_t ax25_dev_lock;
+spinlock_t ax25_dev_lock = SPIN_LOCK_UNLOCKED;
 
 ax25_dev *ax25_dev_ax25dev(struct net_device *dev)
 {
