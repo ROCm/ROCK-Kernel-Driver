@@ -73,7 +73,7 @@ static void bad_page(const char *function, struct page *page)
 {
 	printk("Bad page state at %s (in process '%s', page %p)\n", function, current->comm, page);
 	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
-		page->flags, page->mapping,
+		(unsigned long)page->flags, page->mapping,
 		page_mapped(page), page_count(page));
 	printk("Backtrace:\n");
 	dump_stack();

@@ -2885,7 +2885,8 @@ void ptrinfo(unsigned long addr)
 #endif
 
 	page = virt_to_page((void*)addr);
-	printk("struct page at %p, flags %lxh.\n", page, page->flags);
+	printk("struct page at %p, flags %08lx\n",
+			page, (unsigned long)page->flags);
 	if (PageSlab(page)) {
 		kmem_cache_t *c;
 		struct slab *s;
