@@ -29,7 +29,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include "drmP.h"
 #include <linux/wrapper.h>

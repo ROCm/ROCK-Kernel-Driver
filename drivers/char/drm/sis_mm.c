@@ -28,7 +28,6 @@
  * 
  */
 
-#define __NO_VERSION__
 #include "sis.h"
 #include <linux/sisfb.h>
 #include "drmP.h"
