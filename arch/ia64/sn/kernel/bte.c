@@ -1,18 +1,49 @@
 /*
- * This file is subject to the terms and conditions of the GNU General Public
- * License.  See the file "COPYING" in the main directory of this archive
- * for more details.
+ *
+ *
+ * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
- * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
+ * This program is free software; you can redistribute it and/or modify it 
+ * under the terms of version 2 of the GNU General Public License 
+ * as published by the Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it would be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ * 
+ * Further, this software is distributed without any warranty that it is 
+ * free of the rightful claim of any third person regarding infringement 
+ * or the like.  Any license provided herein, whether implied or 
+ * otherwise, applies only to this software file.  Patent licenses, if 
+ * any, provided herein do not apply to combinations of this program with 
+ * other software, or any other product whatsoever.
+ * 
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write the Free Software 
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ * 
+ * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
+ * Mountain View, CA  94043, or:
+ * 
+ * http://www.sgi.com 
+ * 
+ * For further information regarding this notice, see: 
+ * 
+ * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
+#include <linux/config.h>
 #include <asm/sn/nodepda.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/pda.h>
+#ifdef CONFIG_IA64_SGI_SN2
+#include <asm/sn/sn2/shubio.h>
+#endif
 #include <asm/nodedata.h>
 
+#include <linux/bootmem.h>
 #include <linux/string.h>
 #include <linux/sched.h>
 
@@ -26,11 +57,15 @@ int bte_offsets[] = { IIO_IBLS0, IIO_IBLS1 };
  * Initialize the nodepda structure with BTE base addresses and
  * spinlocks.
  *
+ * NOTE: The kernel parameter btetest will cause the initialization
+ * code to reserve blocks of physically contiguous memory to be
+ * used by the bte test module.
  */
 void
-bte_init_node(nodepda_t * mynodepda, cnodeid_t cNode)
+bte_init_node(nodepda_t * mynodepda, cnodeid_t cnode)
 {
 	int i;
+
 
 	/*
 	 * Indicate that all the block transfer engines on this node
@@ -39,26 +74,75 @@ bte_init_node(nodepda_t * mynodepda, cnodeid_t cNode)
 	for (i = 0; i < BTES_PER_NODE; i++) {
 #ifdef CONFIG_IA64_SGI_SN2
 		/* >>> Don't know why the 0x1800000L is here.  Robin */
-		mynodepda->node_bte_info[i].bte_base_addr =
+		mynodepda->bte_if[i].bte_base_addr =
 		    (char *)LOCAL_MMR_ADDR(bte_offsets[i] | 0x1800000L);
+
 #elif CONFIG_IA64_SGI_SN1
-		mynodepda->node_bte_info[i].bte_base_addr =
+		mynodepda->bte_if[i].bte_base_addr =
 		    (char *)LOCAL_HUB_ADDR(bte_offsets[i]);
 #else
 #error BTE Not defined for this hardware platform.
 #endif
 
+		/*
+		 * Initialize the notification and spinlock
+		 * so the first transfer can occur.
+		 */
+		mynodepda->bte_if[i].most_rcnt_na =
+		    &(mynodepda->bte_if[i].notify);
+		mynodepda->bte_if[i].notify = 0L;
 #ifdef CONFIG_IA64_SGI_BTE_LOCKING
-		/* Initialize the notification and spinlock */
-		/* so the first transfer can occur. */
-		mynodepda->node_bte_info[i].mostRecentNotification =
-		    &(mynodepda->node_bte_info[i].notify);
-		mynodepda->node_bte_info[i].notify = 0L;
-		spin_lock_init(&mynodepda->node_bte_info[i].spinlock);
+		spin_lock_init(&mynodepda->bte_if[i].spinlock);
 #endif				/* CONFIG_IA64_SGI_BTE_LOCKING */
 
+		mynodepda->bte_if[i].bte_test_buf =
+			alloc_bootmem_node(NODE_DATA(cnode), BTE_MAX_XFER);
+	}
+
+}
+
+
+/*
+ * bte_reset_nasid(nasid_t)
+ *
+ * Does a soft reset of the BTEs on the specified nasid.
+ * This is followed by a one-line transfer from each of the
+ * virtual interfaces.
+ */
+void
+bte_reset_nasid(nasid_t n)
+{
+	ii_ibcr_u_t	ibcr;
+
+	ibcr.ii_ibcr_regval  = REMOTE_HUB_L(n, IIO_IBCR);
+	ibcr.ii_ibcr_fld_s.i_soft_reset = 1;
+	REMOTE_HUB_S(n, IIO_IBCR, ibcr.ii_ibcr_regval);
+
+	/* One line transfer on virtual interface 0 */
+	REMOTE_HUB_S(n, IIO_IBLS_0, IBLS_BUSY | 1);
+	REMOTE_HUB_S(n, IIO_IBSA_0, TO_PHYS(__pa(&nodepda->bte_cleanup)));
+	REMOTE_HUB_S(n, IIO_IBDA_0,
+		     TO_PHYS(__pa(&nodepda->bte_cleanup[4*L1_CACHE_BYTES])));
+	REMOTE_HUB_S(n, IIO_IBNA_0,
+		     TO_PHYS(__pa(&nodepda->bte_cleanup[4*L1_CACHE_BYTES])));
+	REMOTE_HUB_S(n, IIO_IBCT_0, BTE_NOTIFY);
+	while (REMOTE_HUB_L(n, IIO_IBLS0)) {
+		/* >>> Need some way out in case of hang... */
+	}
+
+	/* One line transfer on virtual interface 1 */
+	REMOTE_HUB_S(n, IIO_IBLS_1, IBLS_BUSY | 1);
+	REMOTE_HUB_S(n, IIO_IBSA_1, TO_PHYS(__pa(nodepda->bte_cleanup)));
+	REMOTE_HUB_S(n, IIO_IBDA_1,
+		     TO_PHYS(__pa(nodepda->bte_cleanup[4 * L1_CACHE_BYTES])));
+	REMOTE_HUB_S(n, IIO_IBNA_1,
+		     TO_PHYS(__pa(nodepda->bte_cleanup[5 * L1_CACHE_BYTES])));
+	REMOTE_HUB_S(n, IIO_IBCT_1, BTE_NOTIFY);
+	while (REMOTE_HUB_L(n, IIO_IBLS1)) {
+		/* >>> Need some way out in case of hang... */
 	}
 }
+
 
 /*
  * bte_init_cpu()
@@ -70,14 +154,8 @@ bte_init_node(nodepda_t * mynodepda, cnodeid_t cNode)
 void
 bte_init_cpu(void)
 {
-	/* Called by setup.c as each cpu is being added to the nodepda */
-	if (local_node_data->active_cpu_count & 0x1) {
-		pda.cpubte[0] = &(nodepda->node_bte_info[0]);
-		pda.cpubte[1] = &(nodepda->node_bte_info[1]);
-	} else {
-		pda.cpubte[0] = &(nodepda->node_bte_info[1]);
-		pda.cpubte[1] = &(nodepda->node_bte_info[0]);
-	}
+	pda->cpu_bte_if[0] = &(nodepda->bte_if[1]);
+	pda->cpu_bte_if[1] = &(nodepda->bte_if[0]);
 }
 
 
@@ -93,14 +171,12 @@ bte_init_cpu(void)
  *   len - number of bytes to transfer from source to dest.
  *   mode - hardware defined.  See reference information
  *          for IBCT0/1 in the SGI documentation.
- *   bteBlock - kernel virtual address of a temporary
- *              buffer used during unaligned transfers.
  *
  * NOTE: If the source, dest, and len are all cache line aligned,
  * then it would be _FAR_ preferrable to use bte_copy instead.
  */
 bte_result_t
-bte_unaligned_copy(u64 src, u64 dest, u64 len, u64 mode, char *bteBlock)
+bte_unaligned_copy(u64 src, u64 dest, u64 len, u64 mode)
 {
 	int destFirstCacheOffset;
 	u64 headBteSource;
@@ -113,10 +189,18 @@ bte_unaligned_copy(u64 src, u64 dest, u64 len, u64 mode, char *bteBlock)
 	u64 footBcopyDest;
 	u64 footBcopyLen;
 	bte_result_t rv;
+	char *bteBlock;
 
 	if (len == 0) {
 		return (BTE_SUCCESS);
 	}
+
+#ifdef CONFIG_IA64_SGI_BTE_LOCKING
+#error bte_unaligned_copy() assumes single BTE selection in bte_copy().
+#else
+	/* temporary buffer used during unaligned transfers */
+	bteBlock = pda->cpu_bte_if[0]->bte_test_buf;
+#endif
 
 	headBcopySrcOffset = src & L1_CACHE_MASK;
 	destFirstCacheOffset = dest & L1_CACHE_MASK;

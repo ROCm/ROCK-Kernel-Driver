@@ -15,15 +15,8 @@
 #include <linux/module.h>
 
 #include <asm/machvec.h>
-
-/*
- * other stuff (more to be added later, cleanup then)
- */
-EXPORT_SYMBOL(sn1_pci_map_sg);
-EXPORT_SYMBOL(sn1_pci_unmap_sg);
-EXPORT_SYMBOL(sn1_pci_alloc_consistent);
-EXPORT_SYMBOL(sn1_pci_free_consistent);
-EXPORT_SYMBOL(sn1_dma_address);
+#include <asm/sn/intr.h>
+#include <asm/sn/arch.h>
 
 #include <linux/mm.h>
 #include <linux/devfs_fs_kernel.h>
@@ -52,13 +45,39 @@ EXPORT_SYMBOL(pciio_info_slot_get);
 EXPORT_SYMBOL(hwgraph_edge_add);
 EXPORT_SYMBOL(pciio_info_master_get);
 EXPORT_SYMBOL(pciio_info_get);
+
 #ifdef CONFIG_IA64_SGI_SN_DEBUG
 EXPORT_SYMBOL(__pa_debug);
 EXPORT_SYMBOL(__va_debug);
 #endif
 
+/* Support IPIs for loaded modules. */
+EXPORT_SYMBOL(sn_send_IPI_phys);
+
+/* symbols referenced by partitioning modules */
+#include <asm/sn/bte_copy.h>
+EXPORT_SYMBOL(bte_unaligned_copy);
+#include <asm/sal.h>
+EXPORT_SYMBOL(ia64_sal);
+
+#ifdef CONFIG_IA64_SGI_SN2
+#include <asm/sn/sn_sal.h>
+EXPORT_SYMBOL(sal_lock);
+EXPORT_SYMBOL(sn_partid);
+EXPORT_SYMBOL(sn_local_partid);
+EXPORT_SYMBOL(sn_system_serial_number_string);
+EXPORT_SYMBOL(sn_partition_serial_number);
+#endif
+
 /* added by tduffy 04.08.01 to fix depmod issues */
 #include <linux/mmzone.h>
-EXPORT_SYMBOL(sn1_pci_unmap_single);
-EXPORT_SYMBOL(sn1_pci_map_single);
-EXPORT_SYMBOL(sn1_pci_dma_sync_single);
+
+#ifdef BUS_INT_WAR
+extern void sn_add_polled_interrupt(int, int);
+extern void sn_delete_polled_interrupt(int);
+EXPORT_SYMBOL(sn_add_polled_interrupt);
+EXPORT_SYMBOL(sn_delete_polled_interrupt);
+#endif
+
+extern nasid_t master_nasid;
+EXPORT_SYMBOL(master_nasid);

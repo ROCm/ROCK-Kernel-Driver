@@ -240,6 +240,7 @@ synergy_perf_append(uint64_t modesel)
 	synergy_perf_t	*p;
 	int		checked = 0;
 	int		err = 0;
+	unsigned long	flags;
 
 	/* bit 45 is enable */
 	modesel |= (1UL << 45);
@@ -279,7 +280,7 @@ synergy_perf_append(uint64_t modesel)
 			memset(p, 0, sizeof(synergy_perf_t));
 			p->modesel = modesel;
 
-			spin_lock_irq(&npdap->synergy_perf_lock);
+			spin_lock_irqsave(&npdap->synergy_perf_lock, flags);
 			if (npdap->synergy_perf_data == NULL) {
 				/* circular list */
 				p->next = p;
@@ -290,7 +291,7 @@ synergy_perf_append(uint64_t modesel)
 				p->next = npdap->synergy_perf_data->next;
 				npdap->synergy_perf_data->next = p;
 			}
-			spin_unlock_irq(&npdap->synergy_perf_lock);
+			spin_unlock_irqrestore(&npdap->synergy_perf_lock, flags);
 		}
 	}
 

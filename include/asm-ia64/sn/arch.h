@@ -33,6 +33,7 @@ typedef u64	shubreg_t;
 typedef u64	hubreg_t;
 typedef u64	mmr_t;
 typedef u64	nic_t;
+typedef char cnodeid_t;
 
 #define CNODE_TO_CPU_BASE(_cnode)	(NODEPDA(_cnode)->node_first_cpu)
 
@@ -43,6 +44,7 @@ typedef u64	nic_t;
 #define INVALID_NASID		((nasid_t)-1)
 #define INVALID_CNODEID		((cnodeid_t)-1)
 #define INVALID_PNODEID		((pnodeid_t)-1)
+#define INVALID_SLAB            (slabid_t)-1
 #define INVALID_MODULE		((moduleid_t)-1)
 #define	INVALID_PARTID		((partid_t)-1)
 

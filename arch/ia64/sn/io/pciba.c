@@ -210,31 +210,31 @@ static void dump_allocations(struct list_head * dalp);
 
 /* file operations for each type of node */
 static struct file_operations rom_fops = {
-	.owner =	THIS_MODULE,
-	.mmap =		rom_mmap,
-	.open =		generic_open,
-	.release =	rom_release
+	owner:		THIS_MODULE,
+	mmap:		rom_mmap,
+	open:		generic_open,
+	release:	rom_release
 };
  
 
 static struct file_operations base_fops = {
-	.owner =	THIS_MODULE,
-	.mmap =		base_mmap,
-	.open =		generic_open
+	owner:		THIS_MODULE,
+	mmap:		base_mmap,
+	open:		generic_open
 };
 
 
 static struct file_operations config_fops = {
-	.owner =	THIS_MODULE,
-	.ioctl =	config_ioctl,
-	.open =		generic_open
+	owner:		THIS_MODULE,
+	ioctl:		config_ioctl,
+	open:		generic_open
 };	
 
 static struct file_operations dma_fops = {
-	.owner =	THIS_MODULE,
-	.ioctl =	dma_ioctl,
-	.mmap =		dma_mmap,
-	.open =		generic_open
+	owner:		THIS_MODULE,
+	ioctl:		dma_ioctl,
+	mmap:		dma_mmap,
+	open:		generic_open
 };	
 
 
@@ -346,9 +346,6 @@ register_with_devfs(void)
 
 	return success;
 }
-
-#endif /* CONFIG_IA64_SGI_SN1 */
-
 
 static void __exit
 unregister_with_devfs(void)

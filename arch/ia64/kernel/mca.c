@@ -69,10 +69,10 @@ u64				ia64_mca_stackframe[32];
 u64				ia64_mca_bspstore[1024];
 u64				ia64_init_stack[KERNEL_STACK_SIZE] __attribute__((aligned(16)));
 u64				ia64_mca_sal_data_area[1356];
-u64				ia64_mca_min_state_save_info;
 u64				ia64_tlb_functional;
 u64				ia64_os_mca_recovery_successful;
-
+/* TODO: need to assign min-state structure to UC memory */
+u64				ia64_mca_min_state_save_info[MIN_STATE_AREA_SIZE] __attribute__((aligned(512)));
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
@@ -116,7 +116,7 @@ static struct irqaction mca_cpe_irqaction = {
  *  Outputs :   platform error status
  */
 int
-ia64_mca_log_sal_error_record(int sal_info_type)
+ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 {
 	int platform_err = 0;
 
@@ -131,7 +131,10 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	 */
 
 	platform_err = ia64_log_print(sal_info_type, (prfunc_t)printk);
-	ia64_sal_clear_state_info(sal_info_type);
+	/* temporary: only clear SAL logs on hardware-corrected errors
+		or if we're logging an error after an MCA-initiated reboot */
+	if ((sal_info_type > 1) || (called_from_init))
+		ia64_sal_clear_state_info(sal_info_type);
 
 	return platform_err;
 }
@@ -152,7 +155,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	IA64_MCA_DEBUG("ia64_mca_cpe_int_handler: received interrupt. vector = %#x\n", cpe_irq);
 
 	/* Get the CMC error record and log it */
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE, 0);
 }
 
 /*
@@ -199,13 +202,15 @@ ia64_mca_init_platform (void)
  *
  *  Outputs :   None
  */
-void
+int
 ia64_mca_check_errors (void)
 {
 	/*
 	 *  If there is an MCA error record pending, get it and log it.
 	 */
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA, 1);
+
+	return 0;
 }
 
 device_initcall(ia64_mca_check_errors);
@@ -237,49 +242,26 @@ ia64_mca_register_cpev (int cpev)
 
 #endif /* PLATFORM_MCA_HANDLERS */
 
-static char *min_state_labels[] = {
-	"nat",
-	"r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8",
-	"r9", "r10","r11", "r12","r13","r14", "r15",
-	"b0r16","b0r17", "b0r18", "b0r19", "b0r20",
-	"b0r21", "b0r22","b0r23", "b0r24", "b0r25",
-	"b0r26", "b0r27", "b0r28","b0r29", "b0r30", "b0r31",
-	"r16", "r17", "r18","r19", "r20", "r21","r22",
-	"r23", "r24","r25", "r26", "r27","r28", "r29", "r30","r31",
-	"preds", "br0", "rsc",
-	"iip", "ipsr", "ifs",
-	"xip", "xpsr", "xfs"
-};
-
-int ia64_pmss_dump_bank0=0;  /* dump bank 0 ? */
-
 /*
  * routine to process and prepare to dump min_state_save
  * information for debugging purposes.
  *
  */
 void
-ia64_process_min_state_save (pal_min_state_area_t *pmss, struct pt_regs *ptregs)
+ia64_process_min_state_save (pal_min_state_area_t *pmss)
 {
-	int i, max=57;
-	u64 *tpmss_ptr=(u64 *)pmss;
+	int i, max = MIN_STATE_AREA_SIZE;
+	u64 *tpmss_ptr = (u64 *)pmss;
+	u64 *return_min_state_ptr = ia64_mca_min_state_save_info;
 
 	/* dump out the min_state_area information */
 
 	for (i=0;i<max;i++) {
 
-		if(!ia64_pmss_dump_bank0) {
-			if(strncmp("B0",min_state_labels[i],2)==0) {
-				tpmss_ptr++;  /* skip to next entry */
-				continue;
-			}
-		}
+		/* copy min-state register info for eventual return to PAL */
+		*return_min_state_ptr++ = *tpmss_ptr;
 
-		printk("%5s=0x%16.16lx ",min_state_labels[i],*tpmss_ptr++);
-
-		if (((i+1)%3)==0 || ((!strcmp("GR16",min_state_labels[i]))
-				     && !ia64_pmss_dump_bank0))
-			printk("\n");
+		tpmss_ptr++;  /* skip to next entry */
 	}
 }
 
@@ -525,19 +507,17 @@ ia64_mca_init(void)
 	ia64_log_init(SAL_INFO_TYPE_CMC);
 	ia64_log_init(SAL_INFO_TYPE_CPE);
 
-	/* Zero the min state save info */
-	ia64_mca_min_state_save_info = 0;
-
 #if defined(MCA_TEST)
 	mca_test();
 #endif /* #if defined(MCA_TEST) */
 
 	printk("Mca related initialization done\n");
 
-#if 0   // Too early in initialization -- error log is lost
+	/* commented out because this is done elsewhere */
+#if 0
 	/* Do post-failure MCA error logging */
 	ia64_mca_check_errors();
-#endif  // Too early in initialization -- error log is lost
+#endif
 }
 
 /*
@@ -632,7 +612,6 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 	int cpu = 0;
 
 	/* Mask all interrupts */
-#warning XXX fix me: this used to be: save_and_cli(flags);
 	local_irq_save(flags);
 
 #ifdef CONFIG_SMP
@@ -709,8 +688,8 @@ ia64_return_to_sal_check(void)
 	ia64_os_to_sal_handoff_state.imots_context = IA64_MCA_SAME_CONTEXT;
 
 	/* Register pointer to new min state values */
-	/* NOTE: need to do something with this during recovery phase */
-	ia64_os_to_sal_handoff_state.imots_new_min_state = &ia64_mca_min_state_save_info;
+	ia64_os_to_sal_handoff_state.imots_new_min_state =
+		ia64_mca_min_state_save_info;
 }
 
 /*
@@ -735,7 +714,7 @@ ia64_mca_ucmc_handler(void)
 	int platform_err = 0;
 
 	/* Get the MCA error record and log it */
-	platform_err = ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
+	platform_err = ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA, 0);
 
 	/*
 	 *  Do Platform-specific mca error handling if required.
@@ -775,7 +754,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 		       cmc_irq, smp_processor_id());
 
 	/* Get the CMC error record and log it */
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CMC);
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CMC, 0);
 }
 
 /*
@@ -845,8 +824,7 @@ ia64_init_handler (struct pt_regs *regs)
 	plog_ptr=(ia64_err_rec_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT);
 	proc_ptr = &plog_ptr->proc_err;
 
-	ia64_process_min_state_save(&proc_ptr->processor_static_info.min_state_area,
-				    regs);
+	ia64_process_min_state_save(&proc_ptr->processor_static_info.min_state_area);
 
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
 	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
@@ -1676,6 +1654,9 @@ ia64_log_proc_dev_err_info_print (sal_log_processor_info_t  *slpi,
 	/* Print processor static info if any */
 	if (slpi->valid.psi_static_struct) {
 		spsi = (sal_processor_static_info_t *)p_data;
+
+		/* copy interrupted context PAL min-state info */
+		ia64_process_min_state_save(&spsi->min_state_area);
 
 		/* Print branch register contents if valid */
 		if (spsi->valid.br)

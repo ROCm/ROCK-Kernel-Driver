@@ -1,7 +1,7 @@
 /*
  * Kernel support for the ptrace() and syscall tracing interfaces.
  *
- * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from the x86 and Alpha versions.  Most of the code in here
@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/ptrace.h>
@@ -460,6 +461,60 @@ user_flushrs (struct task_struct *task, struct pt_regs *pt)
 	pt->loadrs = 0;
 }
 
+static inline void
+sync_user_rbs_one_thread (struct task_struct *p, int make_writable)
+{
+	struct switch_stack *sw;
+	unsigned long urbs_end;
+	struct pt_regs *pt;
+
+	sw = (struct switch_stack *) (p->thread.ksp + 16);
+	pt = ia64_task_regs(p);
+	urbs_end = ia64_get_user_rbs_end(p, pt, NULL);
+	ia64_sync_user_rbs(p, sw, pt->ar_bspstore, urbs_end);
+	if (make_writable)
+		user_flushrs(p, pt);
+}
+
+struct task_list {
+	struct task_list *next;
+	struct task_struct *task;
+};
+
+#ifdef CONFIG_SMP
+
+static inline void
+collect_task (struct task_list **listp, struct task_struct *p, int make_writable)
+{
+	struct task_list *e;
+
+	e = kmalloc(sizeof(*e), GFP_KERNEL);
+	if (!e)
+		/* oops, can't collect more: finish at least what we collected so far... */
+		return;
+
+	get_task_struct(p);
+	e->task = p;
+	e->next = *listp;
+	*listp = e;
+}
+
+static inline struct task_list *
+finish_task (struct task_list *list, int make_writable)
+{
+	struct task_list *next = list->next;
+
+	sync_user_rbs_one_thread(list->task, make_writable);
+	put_task_struct(list->task);
+	kfree(list);
+	return next;
+}
+
+#else
+# define collect_task(list, p, make_writable)	sync_user_rbs_one_thread(p, make_writable)
+# define finish_task(list, make_writable)	(NULL)
+#endif
+
 /*
  * Synchronize the RSE backing store of CHILD and all tasks that share the address space
  * with it.  CHILD_URBS_END is the address of the end of the register backing store of
@@ -473,7 +528,6 @@ static void
 threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, int make_writable)
 {
 	struct switch_stack *sw;
-	unsigned long urbs_end;
 	struct task_struct *g, *p;
 	struct mm_struct *mm;
 	struct pt_regs *pt;
@@ -493,20 +547,27 @@ threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, 
 		if (make_writable)
 			user_flushrs(child, pt);
 	} else {
+		/*
+		 * Note: we can't call ia64_sync_user_rbs() while holding the
+		 * tasklist_lock because that may cause a dead-lock: ia64_sync_user_rbs()
+		 * may indirectly call tlb_flush_all(), which triggers an IPI.
+		 * Furthermore, tasklist_lock is acquired by fork() with interrupts
+		 * disabled, so with the right timing, the IPI never completes, hence
+		 * tasklist_lock never gets released, hence fork() never completes...
+		 */
+		struct task_list *list = NULL;
+
 		read_lock(&tasklist_lock);
 		{
 			do_each_thread(g, p) {
-				if (p->mm == mm && p->state != TASK_RUNNING) {
-					sw = (struct switch_stack *) (p->thread.ksp + 16);
-					pt = ia64_task_regs(p);
-					urbs_end = ia64_get_user_rbs_end(p, pt, NULL);
-					ia64_sync_user_rbs(p, sw, pt->ar_bspstore, urbs_end);
-					if (make_writable)
-						user_flushrs(p, pt);
-				}
+				if (p->mm == mm && p->state != TASK_RUNNING)
+					collect_task(&list, p, make_writable);
 			} while_each_thread(g, p);
 		}
 		read_unlock(&tasklist_lock);
+
+		while (list)
+			list = finish_task(list, make_writable);
 	}
 	child->thread.flags |= IA64_THREAD_KRBS_SYNCED;	/* set the flag in the child thread only */
 }

@@ -1,26 +1,52 @@
 /*
- * This file is subject to the terms and conditions of the GNU General Public
- * License.  See the file "COPYING" in the main directory of this archive
- * for more details.
+ *
+ *
+ * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
- * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
+ * This program is free software; you can redistribute it and/or modify it 
+ * under the terms of version 2 of the GNU General Public License 
+ * as published by the Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it would be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ * 
+ * Further, this software is distributed without any warranty that it is 
+ * free of the rightful claim of any third person regarding infringement 
+ * or the like.  Any license provided herein, whether implied or 
+ * otherwise, applies only to this software file.  Patent licenses, if 
+ * any, provided herein do not apply to combinations of this program with 
+ * other software, or any other product whatsoever.
+ * 
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write the Free Software 
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ * 
+ * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
+ * Mountain View, CA  94043, or:
+ * 
+ * http://www.sgi.com 
+ * 
+ * For further information regarding this notice, see: 
+ * 
+ * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
+
 
 #ifndef _ASM_IA64_SN_BTE_H
 #define _ASM_IA64_SN_BTE_H
 
-#ident "$Revision: $"
+#ident "$Revision: 1.1 $"
 
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <asm/sn/io.h>
 
-#define L1_CACHE_MASK (L1_CACHE_BYTES - 1)	/* Mask to retrieve
-						 * the offset into this
-						 * cache line.*/
-
 /* BTE status register only supports 16 bits for length field */
-#define BTE_LEN_MASK ((1 << 16) - 1)
+#define BTE_LEN_BITS (16)
+#define BTE_LEN_MASK ((1 << BTE_LEN_BITS) - 1)
+#define BTE_MAX_XFER ((1 << BTE_LEN_BITS) * L1_CACHE_BYTES)
+
 
 /*
  * Constants used in determining the best and worst case transfer
@@ -68,13 +94,14 @@ typedef struct bteinfo_s {
 	u64 volatile notify ____cacheline_aligned;
 	char *bte_base_addr ____cacheline_aligned;
 	spinlock_t spinlock;
-	u64 idealTransferTimeout;
-	u64 idealTransferTimeoutReached;
-	u64 mostRecentSrc;
-	u64 mostRecentDest;
-	u64 mostRecentLen;
-	u64 mostRecentMode;
-	u64 volatile *mostRecentNotification;
+	u64 ideal_xfr_tmo;	/* Time out */
+	u64 ideal_xfr_tmo_cnt;
+	/* u64 most_recent_src;
+	 * u64 most_recent_dest;
+	 * u64 most_recent_len;
+	 * u64 most_recent_mode; */
+	u64 volatile *most_rcnt_na;
+	void *bte_test_buf;
 } bteinfo_t;
 
 /* Possible results from bte_copy and bte_unaligned_copy */
@@ -84,5 +111,7 @@ typedef enum {
 	BTEFAIL_ERROR,		/* Generic error */
 	BTEFAIL_DIR		/* Diretory error */
 } bte_result_t;
+
+void bte_reset_nasid(nasid_t);
 
 #endif				/* _ASM_IA64_SN_BTE_H */

@@ -14,7 +14,7 @@
  */
 #include <linux/types.h>
 
-#include <asm/system.h>
+#include <asm/intrinsics.h>
 
 /*
  * On IA-64, counter must always be volatile to ensure that that the
