@@ -825,6 +825,7 @@ __init int sctp_init(void)
 
 	sctp_get_local_addr_list(&sctp_proto);
 
+	__unsafe(THIS_MODULE);
 	return 0;
 
 err_ctl_sock_init:

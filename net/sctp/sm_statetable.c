@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  *
@@ -293,19 +293,19 @@ sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 	/* SCTP_STATE_CLOSED */ \
 	{.fn = sctp_sf_tabort_8_4_8, .name = "sctp_sf_tabort_8_4_8"}, \
 	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
 	/* SCTP_STATE_COOKIE_ECHOED */ \
 	{.fn = sctp_sf_cookie_echoed_err, .name = "sctp_sf_cookie_echoed_err"}, \
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_operr_notify, .name = "sctp_sf_operr_notify"}, \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_operr_notify, .name = "sctp_sf_operr_notify"}, \
 	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
 	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_operr_notify, .name = "sctp_sf_operr_notify"}, \
 	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
 } /* TYPE_SCTP_ERROR */
 
 #define TYPE_SCTP_COOKIE_ECHO { \
@@ -504,26 +504,6 @@ chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 	{.fn = sctp_sf_unk_chunk, .name = "sctp_sf_unk_chunk"},
 };	/* chunk unknown */
 
-#define TYPE_SCTP_PRIMITIVE_INITIALIZE  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_INITIALIZE */
 
 #define TYPE_SCTP_PRIMITIVE_ASSOCIATE  { \
 	/* SCTP_STATE_EMPTY */ \
@@ -619,90 +599,6 @@ chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 	{.fn = sctp_sf_error_shutdown, .name = "sctp_sf_error_shutdown"}, \
 } /* TYPE_SCTP_PRIMITIVE_SEND */
 
-#define TYPE_SCTP_PRIMITIVE_SETPRIMARY  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_SETPRIMARY */
-
-#define TYPE_SCTP_PRIMITIVE_RECEIVE  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_RECEIVE */
-
-#define TYPE_SCTP_PRIMITIVE_STATUS  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_STATUS */
-
-#define TYPE_SCTP_PRIMITIVE_CHANGEHEARTBEAT  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_CHANGEHEARTBEAT */
-
 #define TYPE_SCTP_PRIMITIVE_REQUESTHEARTBEAT  { \
 	/* SCTP_STATE_EMPTY */ \
 	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
@@ -731,152 +627,16 @@ chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 } /* TYPE_SCTP_PRIMITIVE_REQUESTHEARTBEAT */
 
-#define TYPE_SCTP_PRIMITIVE_GETSRTTREPORT  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_GETSRTTREPORT */
-
-#define TYPE_SCTP_PRIMITIVE_SETFAILURETHRESHOLD  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_SETFAILURETHRESHOLD */
-
-#define TYPE_SCTP_PRIMITIVE_SETPROTOPARAMETERS  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_SETPROTOPARAMETERS */
-
-#define TYPE_SCTP_PRIMITIVE_RECEIVE_UNSENT  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_RECEIVE_UNSENT */
-
-#define TYPE_SCTP_PRIMITIVE_RECEIVE_UNACKED  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_RECEIVE_UNACKED */
-
-#define TYPE_SCTP_PRIMITIVE_DESTROY  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-} /* TYPE_SCTP_PRIMITIVE_DESTROY */
 
 /* The primary index for this table is the primitive type.
  * The secondary index for this table is the state.
  */
 sctp_sm_table_entry_t primitive_event_table[SCTP_NUM_PRIMITIVE_TYPES][SCTP_STATE_NUM_STATES] = {
-	TYPE_SCTP_PRIMITIVE_INITIALIZE,
 	TYPE_SCTP_PRIMITIVE_ASSOCIATE,
 	TYPE_SCTP_PRIMITIVE_SHUTDOWN,
 	TYPE_SCTP_PRIMITIVE_ABORT,
 	TYPE_SCTP_PRIMITIVE_SEND,
-	TYPE_SCTP_PRIMITIVE_SETPRIMARY,
-	TYPE_SCTP_PRIMITIVE_RECEIVE,
-	TYPE_SCTP_PRIMITIVE_STATUS,
-	TYPE_SCTP_PRIMITIVE_CHANGEHEARTBEAT,
 	TYPE_SCTP_PRIMITIVE_REQUESTHEARTBEAT,
-	TYPE_SCTP_PRIMITIVE_GETSRTTREPORT,
-	TYPE_SCTP_PRIMITIVE_SETFAILURETHRESHOLD,
-	TYPE_SCTP_PRIMITIVE_SETPROTOPARAMETERS,
-	TYPE_SCTP_PRIMITIVE_RECEIVE_UNSENT,
-	TYPE_SCTP_PRIMITIVE_RECEIVE_UNACKED,
-	TYPE_SCTP_PRIMITIVE_DESTROY,
 };
 
 #define TYPE_SCTP_OTHER_NO_PENDING_TSN  { \
@@ -902,30 +662,8 @@ sctp_sm_table_entry_t primitive_event_table[SCTP_NUM_PRIMITIVE_TYPES][SCTP_STATE
 	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
 }
 
-#define TYPE_SCTP_OTHER_ICMP_UNREACHFRAG  { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-}
-
 sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_OTHER_NO_PENDING_TSN,
-	TYPE_SCTP_OTHER_ICMP_UNREACHFRAG,
 };
 
 #define TYPE_SCTP_EVENT_TIMEOUT_NONE { \
@@ -1033,27 +771,6 @@ sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STA
 	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 }
 
-#define TYPE_SCTP_EVENT_TIMEOUT_T4_RTO { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-}
-
 #define TYPE_SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD { \
 	/* SCTP_STATE_EMPTY */ \
 	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
@@ -1145,7 +862,6 @@ sctp_sm_table_entry_t timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM
 	TYPE_SCTP_EVENT_TIMEOUT_T1_INIT,
 	TYPE_SCTP_EVENT_TIMEOUT_T2_SHUTDOWN,
 	TYPE_SCTP_EVENT_TIMEOUT_T3_RTX,
-	TYPE_SCTP_EVENT_TIMEOUT_T4_RTO,
 	TYPE_SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD,
 	TYPE_SCTP_EVENT_TIMEOUT_HEARTBEAT,
 	TYPE_SCTP_EVENT_TIMEOUT_SACK,

@@ -966,7 +966,6 @@ sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES] = {
 	sctp_generate_t1_init_event,
 	sctp_generate_t2_shutdown_event,
 	NULL,
-	NULL,
 	sctp_generate_t5_shutdown_guard_event,
 	sctp_generate_heartbeat_event,
 	sctp_generate_sack_event,

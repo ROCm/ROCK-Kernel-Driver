@@ -148,22 +148,11 @@ const char *sctp_status_tbl[] = {
 
 /* Printable forms of primitives */
 static const char *sctp_primitive_tbl[SCTP_NUM_PRIMITIVE_TYPES] = {
-	"PRIMITIVE_INITIALIZE",
 	"PRIMITIVE_ASSOCIATE",
 	"PRIMITIVE_SHUTDOWN",
 	"PRIMITIVE_ABORT",
 	"PRIMITIVE_SEND",
-	"PRIMITIVE_SETPRIMARY",
-	"PRIMITIVE_RECEIVE",
-	"PRIMITIVE_STATUS",
-	"PRIMITIVE_CHANGEHEARTBEAT",
 	"PRIMITIVE_REQUESTHEARTBEAT",
-	"PRIMITIVE_GETSRTTREPORT",
-	"PRIMITIVE_SETFAILURETHRESHOLD",
-	"PRIMITIVE_SETPROTOPARAMETERS",
-	"PRIMITIVE_RECEIVE_UNSENT",
-	"PRIMITIVE_RECEIVE_UNACKED",
-	"PRIMITIVE_DESTROY"
 };
 
 /* Lookup primitive debug name. */
@@ -178,7 +167,6 @@ const char *sctp_pname(const sctp_subtype_t id)
 
 static const char *sctp_other_tbl[] = {
 	"NO_PENDING_TSN",
-	"ICMP_UNREACHFRAG"
 };
 
 /* Lookup "other" debug name. */
@@ -197,7 +185,6 @@ static const char *sctp_timer_tbl[] = {
 	"TIMEOUT_T1_INIT",
 	"TIMEOUT_T2_SHUTDOWN",
 	"TIMEOUT_T3_RTX",
-	"TIMEOUT_T4_RTO",
 	"TIMEOUT_T5_SHUTDOWN_GUARD",
 	"TIMEOUT_HEARTBEAT",
 	"TIMEOUT_SACK",
