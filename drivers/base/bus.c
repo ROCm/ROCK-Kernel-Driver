@@ -175,6 +175,7 @@ int bus_for_each_dev(struct bus_type * bus, struct device * start,
 			break;
 	}
 	up_read(&bus->subsys.rwsem);
+	put_bus(bus);
 	return error;
 }
 
@@ -218,6 +219,7 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 			break;
 	}
 	up_read(&bus->subsys.rwsem);
+	put_bus(bus);
 	return error;
 }
 
