@@ -181,17 +181,16 @@ inline int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 			      const char *routine)
 {
 #ifdef TTY_PARANOIA_CHECK
-	static const char badmagic[] = KERN_WARNING
-		"Warning: bad magic number for tty struct (%s) in %s\n";
-	static const char badtty[] = KERN_WARNING
-		"Warning: null TTY for (%s) in %s\n";
-
 	if (!tty) {
-		printk(badtty, cdevname(inode->i_rdev), routine);
+		printk(KERN_WARNING
+			"null TTY for (%d:%d) in %s\n",
+			imajor(inode), iminor(inode), routine);
 		return 1;
 	}
 	if (tty->magic != TTY_MAGIC) {
-		printk(badmagic, cdevname(inode->i_rdev), routine);
+		printk(KERN_WARNING
+			"bad magic number for tty struct (%d:%d) in %s\n",
+			imajor(inode), iminor(inode), routine);
 		return 1;
 	}
 #endif
