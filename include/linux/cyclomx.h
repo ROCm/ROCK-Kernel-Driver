@@ -6,7 +6,7 @@
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2000 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2003 Arnaldo Carvalho de Melo
 *
 * Based on wanpipe.h by Gene Kozin <genek@compuserve.com>
 *
@@ -62,7 +62,7 @@ struct cycx_device {
 			u32 hi_pvc;
 			u32 lo_svc;
 			u32 hi_svc;
-			TX25Stats stats;
+			struct cycx_x25_stats stats;
 			spinlock_t lock;
 			u32 connection_keys;
 		} x;
