@@ -73,7 +73,7 @@ struct rt_sigframe {
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4,
+long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, int p3, int p4,
 		       int p6, int p7, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
@@ -103,7 +103,7 @@ long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4,
 	}
 }
 
-long sys_sigaltstack(const stack_t *uss, stack_t *uoss, unsigned long r5,
+long sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss, unsigned long r5,
 		     unsigned long r6, unsigned long r7, unsigned long r8,
 		     struct pt_regs *regs)
 {
@@ -115,7 +115,7 @@ long sys_sigaltstack(const stack_t *uss, stack_t *uoss, unsigned long r5,
  * Set up the sigcontext for the signal frame.
  */
 
-static long setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
+static long setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 		 int signr, sigset_t *set, unsigned long handler)
 {
 	/* When CONFIG_ALTIVEC is set, we _always_ setup v_regs even if the
@@ -127,7 +127,7 @@ static long setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 	 * v_regs pointer or not
 	 */
 #ifdef CONFIG_ALTIVEC
-	elf_vrreg_t *v_regs = (elf_vrreg_t *)(((unsigned long)sc->vmx_reserve) & ~0xful);
+	elf_vrreg_t __user *v_regs = (elf_vrreg_t __user *)(((unsigned long)sc->vmx_reserve) & ~0xful);
 #endif
 	long err = 0;
 
@@ -174,10 +174,10 @@ static long setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
  */
 
 static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
-			      struct sigcontext *sc)
+			      struct sigcontext __user *sc)
 {
 #ifdef CONFIG_ALTIVEC
-	elf_vrreg_t *v_regs;
+	elf_vrreg_t __user *v_regs;
 #endif
 	unsigned long err = 0;
 	unsigned long save_r13;
@@ -230,7 +230,7 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 /*
  * Allocate space for the signal frame
  */
-static inline void * get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
+static inline void __user * get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 				  size_t frame_size)
 {
         unsigned long newsp;
@@ -243,13 +243,13 @@ static inline void * get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 			newsp = (current->sas_ss_sp + current->sas_ss_size);
 	}
 
-        return (void *)((newsp - frame_size) & -8ul);
+        return (void __user *)((newsp - frame_size) & -8ul);
 }
 
 /*
  * Setup the trampoline code on the stack
  */
-static long setup_trampoline(unsigned int syscall, unsigned int *tramp)
+static long setup_trampoline(unsigned int syscall, unsigned int __user *tramp)
 {
 	int i;
 	long err = 0;
@@ -346,7 +346,7 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		     unsigned long r6, unsigned long r7, unsigned long r8,
 		     struct pt_regs *regs)
 {
-	struct ucontext *uc = (struct ucontext *)regs->gpr[1];
+	struct ucontext __user *uc = (struct ucontext __user *)regs->gpr[1];
 	sigset_t set;
 
 	/* Always make any pending restarted system calls return -EINTR */
@@ -385,7 +385,7 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	 * entry is the TOC value we need to use.
 	 */
 	func_descr_t *funct_desc_ptr;
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	unsigned long newsp = 0;
 	long err = 0;
 
