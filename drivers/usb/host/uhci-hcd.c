@@ -2261,6 +2261,11 @@ static int uhci_start(struct usb_hcd *hcd)
 		uhci->fl->frame[i] = cpu_to_le32(uhci->skelqh[irq]->dma_handle);
 	}
 
+	/*
+	 * Some architectures require a full mb() to enforce completion of
+	 * the memory writes above before the I/O transfers in start_hc().
+	 */
+	mb();
 	start_hc(uhci);
 
 	init_stall_timer(hcd);
