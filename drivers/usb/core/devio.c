@@ -892,7 +892,6 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		free_async(as);
 		return -ENOMEM;
 	}
-        as->urb->next = NULL;
         as->urb->dev = ps->dev;
         as->urb->pipe = (uurb.type << 30) | __create_pipe(ps->dev, uurb.endpoint & 0xf) | (uurb.endpoint & USB_DIR_IN);
         as->urb->transfer_flags = uurb.flags;
