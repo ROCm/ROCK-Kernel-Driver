@@ -475,11 +475,6 @@ static int ipip_rcv(struct sk_buff *skb)
 		goto out;
 
 	iph = skb->nh.iph;
-	skb->mac.raw = skb->nh.raw;
-	skb->nh.raw = skb->data;
-	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	skb->protocol = htons(ETH_P_IP);
-	skb->pkt_type = PACKET_HOST;
 
 	read_lock(&ipip_lock);
 	if ((tunnel = ipip_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
@@ -487,6 +482,12 @@ static int ipip_rcv(struct sk_buff *skb)
 			kfree_skb(skb);
 			return 0;
 		}
+
+		skb->mac.raw = skb->nh.raw;
+		skb->nh.raw = skb->data;
+		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
+		skb->protocol = htons(ETH_P_IP);
+		skb->pkt_type = PACKET_HOST;
 
 		tunnel->stat.rx_packets++;
 		tunnel->stat.rx_bytes += skb->len;
