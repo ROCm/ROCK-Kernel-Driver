@@ -139,34 +139,7 @@ extern __inline__ void start_thread(struct pt_regs * regs, unsigned long pc,
 #define release_thread(tsk)		do { } while(0)
 extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-#define get_wchan(__TSK) \
-({	extern void scheduling_functions_start_here(void); \
-	extern void scheduling_functions_end_here(void); \
-	unsigned long pc, fp, bias = 0; \
-	unsigned long task_base = (unsigned long) (__TSK); \
-        unsigned long __ret = 0; \
-	struct reg_window *rw; \
-	int count = 0; \
-	if (!(__TSK) || (__TSK) == current || \
-            (__TSK)->state == TASK_RUNNING) \
-		goto __out; \
-	fp = (__TSK)->thread_info->ksp + bias; \
-	do { \
-		/* Bogus frame pointer? */ \
-		if (fp < (task_base + sizeof(struct task_struct)) || \
-		    fp >= (task_base + (2 * PAGE_SIZE))) \
-			break; \
-		rw = (struct reg_window *) fp; \
-		pc = rw->ins[7]; \
-		if (pc < ((unsigned long) scheduling_functions_start_here) || \
-                    pc >= ((unsigned long) scheduling_functions_end_here)) { \
-			__ret = pc; \
-			goto __out; \
-		} \
-		fp = rw->ins[6] + bias; \
-	} while (++count < 16); \
-__out:	__ret; \
-})
+extern unsigned long get_wchan(struct task_struct *);
 
 #define KSTK_EIP(tsk)  ((tsk)->thread.kregs->pc)
 #define KSTK_ESP(tsk)  ((tsk)->thread.kregs->u_regs[UREG_FP])

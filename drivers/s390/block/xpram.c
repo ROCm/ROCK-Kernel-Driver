@@ -65,7 +65,6 @@ static int xpram_sizes[XPRAM_MAX_DEVS];
 static struct gendisk *xpram_disks[XPRAM_MAX_DEVS];
 static unsigned long xpram_pages;
 static int xpram_devs;
-static devfs_handle_t xpram_devfs_handle;
 
 /*
  * Parameter parsing functions.
@@ -437,11 +436,7 @@ static int __init xpram_setup_blkdev(void)
 		goto out;
 	}
 
-	xpram_devfs_handle = devfs_mk_dir (NULL, "slram", NULL);
-	devfs_register_series (xpram_devfs_handle, "%u", xpram_devs,
-			       DEVFS_FL_DEFAULT, XPRAM_MAJOR, 0,
-			       S_IFBLK | S_IRUSR | S_IWUSR,
-			       &xpram_devops, NULL);
+	devfs_mk_dir (NULL, "slram", NULL);
 
 	/*
 	 * Assign the other needed values: make request function, sizes and
@@ -456,6 +451,7 @@ static int __init xpram_setup_blkdev(void)
 	offset = 0;
 	for (i = 0; i < xpram_devs; i++) {
 		struct gendisk *disk = xpram_disks[i];
+		char name[16];
 		xpram_devices[i].size = xpram_sizes[i] / 4;
 		xpram_devices[i].offset = offset;
 		offset += xpram_devices[i].size;
@@ -467,6 +463,11 @@ static int __init xpram_setup_blkdev(void)
 		sprintf(disk->disk_name, "slram%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
 		add_disk(disk);
+		sprintf(name, "slram/%d", i);
+		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       disk->major, disk->first_minor,
+			       S_IFBLK | S_IRUSR | S_IWUSR,
+			       disk->fops, NULL);
 	}
 
 	return 0;
@@ -485,9 +486,10 @@ static void __exit xpram_exit(void)
 	for (i = 0; i < xpram_devs; i++) {
 		del_gendisk(xpram_disks[i]);
 		put_disk(xpram_disks[i]);
+		devfs_remove("slram/%d", i);
 	}
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
-	devfs_unregister(xpram_devfs_handle);
+	devfs_remove("slram");
 	sys_device_unregister(&xpram_sys_device);
 }
 

@@ -25,7 +25,7 @@ sys_call_table32:
 /*15*/	.word sys32_chmod, sys32_lchown16, sparc_brk, sys_perfctr, sys32_lseek
 /*20*/	.word sys_getpid, sys_capget, sys_capset, sys32_setuid16, sys32_getuid16
 /*25*/	.word sys_time, sys_ptrace, sys_alarm, sys32_sigaltstack, sys32_pause
-/*30*/	.word sys32_utime, sys_lchown, sys_fchown, sys_access, sys_nice
+/*30*/	.word compat_sys_utime, sys_lchown, sys_fchown, sys_access, sys_nice
 	.word sys_chown, sys_sync, sys_kill, sys32_newstat, sys32_sendfile
 /*40*/	.word sys32_newlstat, sys_dup, sys_pipe, sys32_times, sys_getuid
 	.word sys_umount, sys32_setgid16, sys32_getgid16, sys_signal, sys32_geteuid16
@@ -35,8 +35,8 @@ sys_call_table32:
 	.word sys_msync, sys_vfork, sys32_pread64, sys32_pwrite64, sys_geteuid
 /*70*/	.word sys_getegid, sys32_mmap, sys_setreuid, sys_munmap, sys_mprotect
 	.word sys_madvise, sys_vhangup, sys32_truncate64, sys_mincore, sys32_getgroups16
-/*80*/	.word sys32_setgroups16, sys_getpgrp, sys_setgroups, sys32_setitimer, sys32_ftruncate64
-	.word sys_swapon, sys32_getitimer, sys_setuid, sys_sethostname, sys_setgid
+/*80*/	.word sys32_setgroups16, sys_getpgrp, sys_setgroups, compat_sys_setitimer, sys32_ftruncate64
+	.word sys_swapon, compat_sys_getitimer, sys_setuid, sys_sethostname, sys_setgid
 /*90*/	.word sys_dup2, sys_setfsuid, sys32_fcntl, sys32_select, sys_setfsgid
 	.word sys_fsync, sys_setpriority32, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
 /*100*/ .word sys_getpriority, sys32_rt_sigreturn, sys32_rt_sigaction, sys32_rt_sigprocmask, sys32_rt_sigpending
@@ -68,7 +68,7 @@ sys_call_table32:
 /*230*/	.word sys32_select, sys_time, sys_nis_syscall, sys_stime, sys_alloc_hugepages
 	.word sys_free_hugepages, sys_llseek, sys_mlock, sys_munlock, sys_mlockall
 /*240*/	.word sys_munlockall, sys_sched_setparam, sys_sched_getparam, sys_sched_setscheduler, sys_sched_getscheduler
-	.word sys_sched_yield, sys_sched_get_priority_max, sys_sched_get_priority_min, sys32_sched_rr_get_interval, sys32_nanosleep
+	.word sys_sched_yield, sys_sched_get_priority_max, sys_sched_get_priority_min, sys32_sched_rr_get_interval, compat_sys_nanosleep
 /*250*/	.word sys32_mremap, sys32_sysctl, sys_getsid, sys_fdatasync, sys32_nfsservctl
 	.word sys_aplib
 
@@ -166,8 +166,8 @@ sunos_sys_table:
 	.word sys_mprotect, sys_madvise, sys_vhangup
 	.word sunos_nosys, sys_mincore, sys32_getgroups16
 	.word sys32_setgroups16, sys_getpgrp, sunos_setpgrp
-	.word sys32_setitimer, sunos_nosys, sys_swapon
-	.word sys32_getitimer, sys_gethostname, sys_sethostname
+	.word compat_sys_setitimer, sunos_nosys, sys_swapon
+	.word compat_sys_getitimer, sys_gethostname, sys_sethostname
 	.word sunos_getdtablesize, sys_dup2, sunos_nop
 	.word sys32_fcntl, sunos_select, sunos_nop
 	.word sys_fsync, sys_setpriority32, sunos_socket

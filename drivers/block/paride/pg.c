@@ -281,8 +281,6 @@ void pg_init_units( void )
 	}
 } 
 
-static devfs_handle_t devfs_handle;
-
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
 #define	RR(c,r)		(pi_read_regr(PI,c,r))
 
@@ -644,10 +642,15 @@ static int __init pg_init(void)
 		  if (PG.present) pi_release(PI);
 		return -1;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "pg", NULL);
-	devfs_register_series (devfs_handle, "%u", 4, DEVFS_FL_DEFAULT,
-			       major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
+	devfs_mk_dir (NULL, "pg", NULL);
+	for (unit=0; unit<PG_UNITS; unit++)
+		if (PG.present) {
+			char name[16];
+			sprintf(name, "pg/%u", unit);
+			devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       major, unit, S_IFCHR | S_IRUSR | S_IWUSR,
 			       &pg_fops, NULL);
+		}
 	return 0;
 }
 
@@ -655,7 +658,11 @@ static void __exit pg_exit(void)
 {
 	int unit;
 
-	devfs_unregister (devfs_handle);
+	for (unit=0; unit<PG_UNITS; unit++)
+		if (PG.present)
+			devfs_remove("pg/%u", unit);
+
+	devfs_remove ("pg");
 	unregister_chrdev(major,name);
 
 	for (unit=0;unit<PG_UNITS;unit++)

@@ -4,7 +4,7 @@
  *
  *	Authors:
  *	Lennert Buytenhek               <buytenh@gnu.org>
- *	Bart De Schuymer		<bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer		<bdschuym@pandora.be>
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -58,7 +58,7 @@ static struct rtable __fake_rtable = {
 			.__refcnt		= ATOMIC_INIT(1),
 			.dev			= &__fake_net_device,
 			.path			= &__fake_rtable.u.dst,
-			.metrics		= {[RTAX_MTU] = 1500},
+			.metrics		= {[RTAX_MTU - 1] = 1500},
 		}
 	},
 
@@ -328,10 +328,7 @@ static int br_nf_forward_finish(struct sk_buff *skb)
 /* This is the 'purely bridged' case.  We pass the packet to
  * netfilter with indev and outdev set to the bridge device,
  * but we are still able to filter on the 'real' indev/outdev
- * because another bit of the bridge-nf patch overloads the
- * '-i' and '-o' iptables interface checks to take
- * skb->phys{in,out}dev into account as well (so both the real
- * device and the bridge device will match).
+ * because of the ipt_physdev.c module.
  */
 static unsigned int br_nf_forward(unsigned int hook, struct sk_buff **pskb,
    const struct net_device *in, const struct net_device *out,
@@ -379,11 +376,10 @@ static int br_nf_local_out_finish(struct sk_buff *skb)
 /* This function sees both locally originated IP packets and forwarded
  * IP packets (in both cases the destination device is a bridge
  * device). It also sees bridged-and-DNAT'ed packets.
- * For the sake of interface transparency (i.e. properly
- * overloading the '-o' option), we steal packets destined to
- * a bridge device away from the PF_INET/FORWARD and PF_INET/OUTPUT hook
- * functions, and give them back later, when we have determined the real
- * output device. This is done in here.
+ * To be able to filter on the physical bridge devices (with the ipt_physdev.c
+ * module), we steal packets destined to a bridge device away from the
+ * PF_INET/FORWARD and PF_INET/OUTPUT hook functions, and give them back later,
+ * when we have determined the real output device. This is done in here.
  *
  * If (nf_bridge->mask & BRNF_BRIDGED_DNAT) then the packet is bridged
  * and we fake the PF_BRIDGE/FORWARD hook. The function br_nf_forward()

@@ -408,14 +408,6 @@ typedef struct isdn_devt {
 	struct task_struct *profd;                   /* For iprofd                 */
 	struct semaphore  sem;                       /* serialize list access*/
 	unsigned long     global_features;
-#ifdef CONFIG_DEVFS_FS
-	devfs_handle_t devfs_handle_isdninfo;
-	devfs_handle_t devfs_handle_isdnctrl;
-	devfs_handle_t devfs_handle_isdnctrlX[ISDN_MAX_CHANNELS];
-#ifdef CONFIG_ISDN_PPP
-	devfs_handle_t devfs_handle_ipppX[ISDN_MAX_CHANNELS];
-#endif
-#endif /* CONFIG_DEVFS_FS */
 } isdn_dev;
 
 extern isdn_dev *dev;

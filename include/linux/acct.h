@@ -76,6 +76,7 @@ struct acct
 #include <linux/config.h>
 
 #ifdef CONFIG_BSD_PROCESS_ACCT
+struct super_block;
 extern void acct_auto_close(struct super_block *sb);
 extern int acct_process(long exitcode);
 #else

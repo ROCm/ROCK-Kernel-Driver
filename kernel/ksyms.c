@@ -54,6 +54,7 @@
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
 #include <linux/mount.h>
+#include <linux/ptrace.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -589,5 +590,6 @@ EXPORT_SYMBOL(__per_cpu_offset);
 
 /* debug */
 EXPORT_SYMBOL(dump_stack);
+EXPORT_SYMBOL(ptrace_notify);
 
 EXPORT_SYMBOL(current_kernel_time); 

@@ -281,10 +281,6 @@ free_nodes(void)
 }
 #endif
 
-
-static devfs_handle_t pciba_devfs_handle;
-
-
 #if !defined(CONFIG_IA64_SGI_SN1)
 
 static status __init
@@ -296,25 +292,24 @@ register_with_devfs(void)
 
 	TRACE();
 
-	pciba_devfs_handle = devfs_mk_dir(NULL, "pci", NULL);
-	if (pciba_devfs_handle == NULL)
+	if (!devfs_mk_dir(NULL, "pci", NULL))
 		return failure;
 
 	/* FIXME: don't forget /dev/pci/mem & /dev/pci/io */
 
 	pci_for_each_dev(dev) {
-		sprintf(devfs_path, "%02x/%02x.%x",
+		sprintf(devfs_path, "pci/%02x/%02x.%x",
 			dev->bus->number,
 			PCI_SLOT(dev->devfn),
 			PCI_FUNC(dev->devfn));
     
 		device_dir_handle =
-			devfs_mk_dir(pciba_devfs_handle, devfs_path, NULL);
+			devfs_mk_dir(NULL, devfs_path, NULL);
 		if (device_dir_handle == NULL)
 			return failure;
 
 		if (register_pci_device(device_dir_handle, dev) == failure) {
-			devfs_unregister(pciba_devfs_handle);
+			devfs_remove("pci");
 			return failure;
 		}
 	}
@@ -344,7 +339,7 @@ register_with_devfs(void)
 			return failure;
 	
 		if (register_pci_device(device_dir_handle, dev) == failure) {
-			devfs_unregister(pciba_devfs_handle);
+			devfs_remove("pci");
 			return failure;
 		}
 	}

@@ -814,8 +814,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 	return rtn;
 }
 
-devfs_handle_t scsi_devfs_handle;
-
 /*
  * scsi_do_cmd sends all the commands out to the low-level driver.  It
  * handles the specifics required for each low level driver - ie queued
@@ -2160,7 +2158,7 @@ static int __init init_scsi(void)
 	}
 
 	scsi_init_procfs();
-	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
+	devfs_mk_dir(NULL, "scsi", NULL);
 	scsi_host_init();
 	scsi_dev_info_list_init(scsi_dev_flags);
 	scsi_sysfs_register();
@@ -2174,7 +2172,7 @@ static void __exit exit_scsi(void)
 
 	scsi_sysfs_unregister();
 	scsi_dev_info_list_delete();
-	devfs_unregister(scsi_devfs_handle);
+	devfs_remove("scsi");
 	scsi_exit_procfs();
 
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {

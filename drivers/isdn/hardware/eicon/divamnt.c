@@ -51,8 +51,6 @@ static char *DRIVERNAME =
 static char *DRIVERLNAME = "diva_mnt";
 char *DRIVERRELEASE = "2.0";
 
-static devfs_handle_t devfs_handle;
-
 static wait_queue_head_t msgwaitq;
 static DECLARE_MUTEX(opened_sem);
 static int opened;
@@ -412,8 +410,7 @@ static struct file_operations divas_maint_fops = {
 
 static void divas_maint_unregister_chrdev(void)
 {
-	if (devfs_handle)
-		devfs_unregister(devfs_handle);
+	devfs_remove("DivasMAINT");
 	unregister_chrdev(major, "DivasMAINT");
 }
 
@@ -425,10 +422,9 @@ static int DIVA_INIT_FUNCTION divas_maint_register_chrdev(void)
 		       DRIVERLNAME);
 		return (0);
 	}
-	devfs_handle =
-	    devfs_register(NULL, "DivasMAINT", DEVFS_FL_DEFAULT, major, 0,
-			   S_IFCHR | S_IRUSR | S_IWUSR, &divas_maint_fops,
-			   NULL);
+	devfs_register(NULL, "DivasMAINT", DEVFS_FL_DEFAULT, major, 0,
+		       S_IFCHR | S_IRUSR | S_IWUSR, &divas_maint_fops,
+		       NULL);
 
 	return (1);
 }

@@ -63,19 +63,19 @@ int tapechar_major = TAPECHAR_MAJOR;
 devfs_handle_t
 tapechar_mkdevfstree (tape_dev_t* td) {
     devfs_handle_t rc=NULL;
-    rc=td->char_data.devfs_char_dir=devfs_mk_dir (td->devfs_dir, "char", td);
+    char name[32];
+    sprintf (name, "tape/%04x/char", td->devinfo.devno);
+    rc = devfs_mk_dir (NULL, name, NULL);
     if (rc==NULL) goto out_undo;
-    rc=td->char_data.devfs_nonrewinding=devfs_register(td->char_data.devfs_char_dir, 
-						    "nonrewinding",
-						    DEVFS_FL_DEFAULT,tapechar_major, 
-						    TAPECHAR_NOREW_MINOR(td->first_minor), 
-						    TAPECHAR_DEVFSMODE, &tape_fops, td);
+    sprintf (name, "tape/%04x/char/nonrewinding", td->devinfo.devno);
+    rc = devfs_register(NULL. name.  DEVFS_FL_DEFAULT,tapechar_major, 
+			TAPECHAR_NOREW_MINOR(td->first_minor), 
+			TAPECHAR_DEVFSMODE, &tape_fops, td);
     if (rc==NULL) goto out_undo;
-    rc=td->char_data.devfs_rewinding=devfs_register(td->char_data.devfs_char_dir, 
-						 "rewinding",
-						 DEVFS_FL_DEFAULT, tapechar_major, 
-						 TAPECHAR_REW_MINOR(td->first_minor),
-						 TAPECHAR_DEVFSMODE, &tape_fops, td);
+    sprintf (name, "tape/%04x/char/rewinding", td->devinfo.devno);
+    rc = devfs_register(NULL. name, DEVFS_FL_DEFAULT, tapechar_major, 
+			TAPECHAR_REW_MINOR(td->first_minor),
+			TAPECHAR_DEVFSMODE, &tape_fops, td);
     if (rc==NULL) goto out_undo;
     goto out;
  out_undo:
@@ -90,12 +90,9 @@ tapechar_mkdevfstree (tape_dev_t* td) {
 
 void
 tapechar_rmdevfstree (tape_dev_t* td) {
-    if (td->char_data.devfs_nonrewinding) 
-	    devfs_unregister(td->char_data.devfs_nonrewinding);
-    if (td->char_data.devfs_rewinding)
-	    devfs_unregister(td->char_data.devfs_rewinding);
-    if (td->char_data.devfs_char_dir)
-	    devfs_unregister(td->char_data.devfs_char_dir);
+    devfs_remove("tape/%04x/char/nonrewinding", td->devinfo.devno);
+    devfs_remove("tape/%04x/char/rewinding", td->devinfo.devno);
+    devfs_remove("tape/%04x/char", td->devinfo.devno);
 }
 #endif
 

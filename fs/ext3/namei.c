@@ -992,13 +992,13 @@ struct dentry *ext3_get_parent(struct dentry *child)
 
 #define S_SHIFT 12
 static unsigned char ext3_type_by_mode[S_IFMT >> S_SHIFT] = {
-	[S_IFREG >> S_SHIFT]	EXT3_FT_REG_FILE,
-	[S_IFDIR >> S_SHIFT]	EXT3_FT_DIR,
-	[S_IFCHR >> S_SHIFT]	EXT3_FT_CHRDEV,
-	[S_IFBLK >> S_SHIFT]	EXT3_FT_BLKDEV,
-	[S_IFIFO >> S_SHIFT]	EXT3_FT_FIFO,
-	[S_IFSOCK >> S_SHIFT]	EXT3_FT_SOCK,
-	[S_IFLNK >> S_SHIFT]	EXT3_FT_SYMLINK,
+	[S_IFREG >> S_SHIFT]	= EXT3_FT_REG_FILE,
+	[S_IFDIR >> S_SHIFT]	= EXT3_FT_DIR,
+	[S_IFCHR >> S_SHIFT]	= EXT3_FT_CHRDEV,
+	[S_IFBLK >> S_SHIFT]	= EXT3_FT_BLKDEV,
+	[S_IFIFO >> S_SHIFT]	= EXT3_FT_FIFO,
+	[S_IFSOCK >> S_SHIFT]	= EXT3_FT_SOCK,
+	[S_IFLNK >> S_SHIFT]	= EXT3_FT_SYMLINK,
 };
 
 static inline void ext3_set_de_type(struct super_block *sb,

@@ -105,7 +105,6 @@ static mdk_thread_t *md_recovery_thread;
 sector_t md_size[MAX_MD_DEVS];
 
 static struct block_device_operations md_fops;
-static devfs_handle_t devfs_handle;
 
 static struct gendisk *disks[MAX_MD_DEVS];
 
@@ -3102,15 +3101,14 @@ int __init md_init(void)
 		printk(KERN_ALERT "md: Unable to get major %d for md\n", MAJOR_NR);
 		return (-1);
 	}
-	devfs_handle = devfs_mk_dir (NULL, "md", NULL);
+	devfs_mk_dir (NULL, "md", NULL);
 	blk_register_region(MKDEV(MAJOR_NR, 0), MAX_MD_DEVS, THIS_MODULE,
 				md_probe, NULL, NULL);
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {
-		char devname[128];
-		sprintf (devname, "%u", minor);
-		devfs_register (devfs_handle,
-			devname, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
-			S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
+		char name[16];
+		sprintf(name, "md/%d", minor);
+		devfs_register(NULL, name, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
+			       S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
 	}
 
 	md_recovery_thread = md_register_thread(md_do_recovery, NULL, name);
@@ -3176,7 +3174,9 @@ static __exit void md_exit(void)
 	int i;
 	blk_unregister_region(MKDEV(MAJOR_NR,0), MAX_MD_DEVS);
 	md_unregister_thread(md_recovery_thread);
-	devfs_unregister(devfs_handle);
+	for (i=0; i < MAX_MD_DEVS; i++)
+		devfs_remove("md/%d", i);
+	devfs_remove("md");
 
 	unregister_blkdev(MAJOR_NR,"md");
 	unregister_reboot_notifier(&md_notifier);

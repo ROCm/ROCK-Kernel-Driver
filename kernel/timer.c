@@ -1020,31 +1020,39 @@ asmlinkage long sys_gettid(void)
 	return current->pid;
 }
 
-asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
+long do_nanosleep(struct timespec *t)
 {
-	struct timespec t;
 	unsigned long expire;
 
-	if(copy_from_user(&t, rqtp, sizeof(struct timespec)))
-		return -EFAULT;
-
-	if (t.tv_nsec >= 1000000000L || t.tv_nsec < 0 || t.tv_sec < 0)
+	if ((t->tv_nsec >= 1000000000L) || (t->tv_nsec < 0) || (t->tv_sec < 0))
 		return -EINVAL;
 
-	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);
+	expire = timespec_to_jiffies(t) + (t->tv_sec || t->tv_nsec);
 
 	current->state = TASK_INTERRUPTIBLE;
 	expire = schedule_timeout(expire);
 
 	if (expire) {
-		if (rmtp) {
-			jiffies_to_timespec(expire, &t);
-			if (copy_to_user(rmtp, &t, sizeof(struct timespec)))
-				return -EFAULT;
-		}
+		jiffies_to_timespec(expire, t);
 		return -EINTR;
 	}
 	return 0;
+}
+
+asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
+{
+	struct timespec t;
+	long ret;
+
+	if (copy_from_user(&t, rqtp, sizeof(t)))
+		return -EFAULT;
+
+	ret = do_nanosleep(&t);
+	if (rmtp && (ret == -EINTR)) {
+		if (copy_to_user(rmtp, &t, sizeof(t)))
+			return -EFAULT;
+	}
+	return ret;
 }
 
 /*

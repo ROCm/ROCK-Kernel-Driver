@@ -2346,11 +2346,9 @@ EXPORT_SYMBOL(ide_fops);
 /*
  * Probe module
  */
-devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(ide_probe);
-EXPORT_SYMBOL(ide_devfs_handle);
 
 struct bus_type ide_bus_type = {
 	.name		= "ide",
@@ -2364,7 +2362,7 @@ int __init ide_init (void)
 	static char banner_printed;
 	if (!banner_printed) {
 		printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
-		ide_devfs_handle = devfs_mk_dir(NULL, "ide", NULL);
+		devfs_mk_dir(NULL, "ide", NULL);
 		system_bus_speed = ide_system_bus_speed();
 		banner_printed = 1;
 	}
@@ -2420,7 +2418,7 @@ void cleanup_module (void)
 #ifdef CONFIG_PROC_FS
 	proc_ide_destroy();
 #endif
-	devfs_unregister (ide_devfs_handle);
+	devfs_remove("ide");
 
 	bus_unregister(&ide_bus_type);
 }

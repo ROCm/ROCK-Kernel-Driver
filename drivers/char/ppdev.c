@@ -749,8 +749,6 @@ static struct file_operations pp_fops = {
 	.release	= pp_release,
 };
 
-static devfs_handle_t devfs_handle;
-
 static int __init ppdev_init (void)
 {
 	if (register_chrdev (PP_MAJOR, CHRDEV, &pp_fops)) {
@@ -758,11 +756,13 @@ static int __init ppdev_init (void)
 			PP_MAJOR);
 		return -EIO;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "parports", NULL);
-	devfs_register_series (devfs_handle, "%u", PARPORT_MAX,
-			       DEVFS_FL_DEFAULT, PP_MAJOR, 0,
-			       S_IFCHR | S_IRUGO | S_IWUGO,
-			       &pp_fops, NULL);
+	devfs_mk_dir (NULL, "parports", NULL);
+	for (i = 0; i < PARPORT_MAX; i++) {
+		char name[16];
+		sprintf(name, "parports/%d", i);
+		devfs_register(NULL, name, DEVFS_FL_DEFAULT, PP_MAJOR, i,
+			       S_IFCHR | S_IRUGO | S_IWUGO, &pp_fops, NULL);
+	}
 
 	printk (KERN_INFO PP_VERSION "\n");
 	return 0;
@@ -770,8 +770,11 @@ static int __init ppdev_init (void)
 
 static void __exit ppdev_cleanup (void)
 {
+	int i;
 	/* Clean up all parport stuff */
-	devfs_unregister (devfs_handle);
+	for (i = 0; i < PARPORT_MAX; i++)
+		devfs_remove("parports/%d", i);
+	devfs_remove("parports");
 	unregister_chrdev (PP_MAJOR, CHRDEV);
 }
 

@@ -2294,7 +2294,7 @@ int nobh_prepare_write(struct page *page, unsigned from, unsigned to,
 			bh->b_page = page;
 			bh->b_blocknr = map_bh.b_blocknr;
 			bh->b_size = blocksize;
-			bh->b_data = (char *)block_start;
+			bh->b_data = (char *)(long)block_start;
 			bh->b_bdev = map_bh.b_bdev;
 			bh->b_private = NULL;
 			read_bh[nr_reads++] = bh;

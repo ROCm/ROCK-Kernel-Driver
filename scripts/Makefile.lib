@@ -43,6 +43,7 @@ __obj-m = $(filter-out export.o,$(obj-m))
 multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
 multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
 multi-used   := $(multi-used-y) $(multi-used-m)
+single-used-m := $(filter-out $(multi-used-m),$(obj-m))
 
 # Build list of the parts of our composite objects, our composite
 # objects depend on those (obviously)
@@ -92,12 +93,14 @@ host-cshobjs	:= $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
 # Add subdir path
 
 EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
+build-targets	:= $(addprefix $(obj)/,$(build-targets))
 obj-y		:= $(addprefix $(obj)/,$(obj-y))
 obj-m		:= $(addprefix $(obj)/,$(obj-m))
 export-objs	:= $(addprefix $(obj)/,$(export-objs))
 subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))
 real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
 real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
+single-used-m	:= $(addprefix $(obj)/,$(single-used-m))
 multi-used-y	:= $(addprefix $(obj)/,$(multi-used-y))
 multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
 multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
@@ -128,6 +131,12 @@ modname_flags  = $(if $(filter 1,$(words $(modname))),-DKBUILD_MODNAME=$(subst $
 c_flags        = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	         $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
 	         $(basename_flags) $(modname_flags) $(export_flags) 
+a_flags        = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS)\
+		 $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+hostc_flags    = -Wp,-MD,$(depfile) $(HOSTCFLAGS) $(HOST_EXTRACFLAGS)\
+		 $(HOSTCFLAGS_$(*F).o)
+hostcxx_flags  = -Wp,-MD,$(depfile) $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS)\
+		 $(HOSTCXXFLAGS_$(*F).o)
 
 # Finds the multi-part object the current object will be linked into
 modname-multi = $(sort $(foreach m,$(multi-used),\
@@ -139,7 +148,7 @@ modname-multi = $(sort $(foreach m,$(multi-used),\
 quiet_cmd_shipped = SHIPPED $@
 cmd_shipped = cat $< > $@
 
-%:: %_shipped
+$(obj)/%:: $(src)/%_shipped
 	$(call cmd,shipped)
 
 # Commands useful for building a boot image
@@ -236,4 +245,4 @@ endef
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
 
-descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
+descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)

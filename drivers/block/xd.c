@@ -146,8 +146,6 @@ static int nodma = XD_DONT_USE_DMA;
 
 static struct request_queue xd_queue;
 
-static devfs_handle_t devfs_handle = NULL;
-
 /* xd_init: register the block device number and set up pointer tables */
 static int __init xd_init(void)
 {
@@ -178,7 +176,7 @@ static int __init xd_init(void)
 		printk("xd: Unable to get major number %d\n",MAJOR_NR);
 		goto out1;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "xd", NULL);
+	devfs_mk_dir(NULL, "xd", NULL);
 	blk_init_queue(&xd_queue, do_xd_request, &xd_lock);
 	if (xd_detect(&controller,&address)) {
 
@@ -246,6 +244,7 @@ out4:
 out3:
 	release_region(xd_iobase,4);
 out2:
+	devfs_remove("xd");
 	blk_cleanup_queue(&xd_queue);
 	unregister_blkdev(MAJOR_NR, "xd");
 out1:
@@ -1055,7 +1054,7 @@ void cleanup_module(void)
 	}
 	blk_cleanup_queue(&xd_queue);
 	release_region(xd_iobase,4);
-	devfs_unregister (devfs_handle);
+	devfs_remove("xd");
 	if (xd_drives) {
 		free_irq(xd_irq, NULL);
 		free_dma(xd_dma);

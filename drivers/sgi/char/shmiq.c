@@ -465,15 +465,15 @@ static struct file_operations shmiq_fops =
 void
 shmiq_init (void)
 {
+	static char names[3] = { "shmiq", "qcntl0", "qcntl1" };
+	int i;
 	printk ("SHMIQ setup\n");
 	register_chrdev(SHMIQ_MAJOR, "shmiq", &shmiq_fops);
-	devfs_register (NULL, "shmiq", DEVFS_FL_DEFAULT,
-			SHMIQ_MAJOR, 0, S_IFCHR | S_IRUSR | S_IWUSR,
+	for (i = 0; i < 3; i++) {
+		devfs_register (NULL, names[i], DEVFS_FL_DEFAULT,
+			SHMIQ_MAJOR, i, S_IFCHR | S_IRUSR | S_IWUSR,
 			&shmiq_fops, NULL);
-	devfs_register_series (NULL, "qcntl%u", 2, DEVFS_FL_DEFAULT,
-			       SHMIQ_MAJOR, 1,
-			       S_IFCHR | S_IRUSR | S_IWUSR,
-			       &shmiq_fops, NULL);
+	}
 }
 
 EXPORT_SYMBOL(shmiq_init);

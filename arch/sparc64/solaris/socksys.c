@@ -171,8 +171,6 @@ static struct file_operations socksys_fops = {
 	.release =	socksys_release,
 };
 
-static devfs_handle_t devfs_handle;
-
 int __init
 init_socksys(void)
 {
@@ -193,10 +191,10 @@ init_socksys(void)
 		printk ("Couldn't create socket\n");
 		return ret;
 	}
-	devfs_handle = devfs_register (NULL, "socksys", DEVFS_FL_DEFAULT,
-				       30, 0,
-				       S_IFCHR | S_IRUSR | S_IWUSR,
-				       &socksys_fops, NULL);
+	devfs_register (NULL, "socksys", DEVFS_FL_DEFAULT,
+		       30, 0,
+		       S_IFCHR | S_IRUSR | S_IWUSR,
+		       &socksys_fops, NULL);
 	file = fcheck(ret);
 	/* N.B. Is this valid? Suppose the f_ops are in a module ... */
 	socksys_file_ops = *file->f_op;
@@ -212,5 +210,5 @@ cleanup_socksys(void)
 {
 	if (unregister_chrdev(30, "socksys"))
 		printk ("Couldn't unregister socksys character device\n");
-	devfs_unregister (devfs_handle);
+	devfs_remove ("socksys");
 }

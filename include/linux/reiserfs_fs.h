@@ -2062,12 +2062,12 @@ extern inline int reiserfs_new_form_blocknrs (struct tree_balance * tb,
 					      b_blocknr_t *new_blocknrs, int amount_needed)
 {
     reiserfs_blocknr_hint_t hint = {
-	th:tb->transaction_handle,
-	path: tb->tb_path,
-	inode: NULL,
-	key: tb->key,
-	block: 0,
-	formatted_node:1
+	.th = tb->transaction_handle,
+	.path = tb->tb_path,
+	.inode = NULL,
+	.key = tb->key,
+	.block = 0,
+	.formatted_node = 1
     };
     return reiserfs_allocate_blocknrs(&hint, new_blocknrs, amount_needed, 0);
 }
@@ -2077,12 +2077,12 @@ extern inline int reiserfs_new_unf_blocknrs (struct reiserfs_transaction_handle 
 					     struct path * path, long block)
 {
     reiserfs_blocknr_hint_t hint = {
-	th: th,
-	path: path,
-	inode: NULL,
-	block: block,
-	formatted_node: 0,
-	preallocate: 0
+	.th = th,
+	.path = path,
+	.inode = NULL,
+	.block = block,
+	.formatted_node = 0,
+	.preallocate = 0
     };
     return reiserfs_allocate_blocknrs(&hint, new_blocknrs, 1, 0);
 }
@@ -2094,12 +2094,12 @@ extern inline int reiserfs_new_unf_blocknrs2(struct reiserfs_transaction_handle 
 					     struct path * path, long block)
 {
     reiserfs_blocknr_hint_t hint = {
-	th: th,
-	path: path,
-	inode: inode,
-	block: block,
-	formatted_node: 0,
-	preallocate: 1
+	.th = th,
+	.path = path,
+	.inode = inode,
+	.block = block,
+	.formatted_node = 0,
+	.preallocate = 1
     };
     return reiserfs_allocate_blocknrs(&hint, new_blocknrs, 1, 0);
 }

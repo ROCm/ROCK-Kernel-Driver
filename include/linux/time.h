@@ -138,6 +138,8 @@ struct timespec current_kernel_time(void);
 #ifdef __KERNEL__
 extern void do_gettimeofday(struct timeval *tv);
 extern void do_settimeofday(struct timeval *tv);
+extern long do_nanosleep(struct timespec *t);
+extern long do_utimes(char * filename, struct timeval * times);
 #endif
 
 #define FD_SETSIZE		__FD_SETSIZE

@@ -175,7 +175,7 @@ do_sys_recv: /* sys_recv(int, void *, size_t, unsigned int) */
 	 lduwa		[%o1 + 0x4] %asi, %o1
 	nop
 	nop
-do_sys_sendto: /* sys32_sendto(int, u32, __kernel_size_t32, unsigned int, u32, int) */
+do_sys_sendto: /* sys32_sendto(int, u32, compat_size_t, unsigned int, u32, int) */
 	ldswa		[%o1 + 0x0] %asi, %o0
 	sethi		%hi(sys32_sendto), %g1
 	lduwa		[%o1 + 0x8] %asi, %o2
@@ -184,7 +184,7 @@ do_sys_sendto: /* sys32_sendto(int, u32, __kernel_size_t32, unsigned int, u32, i
 	ldswa		[%o1 + 0x14] %asi, %o5
 	jmpl		%g1 + %lo(sys32_sendto), %g0
 	 lduwa		[%o1 + 0x4] %asi, %o1
-do_sys_recvfrom: /* sys32_recvfrom(int, u32, __kernel_size_t32, unsigned int, u32, u32) */
+do_sys_recvfrom: /* sys32_recvfrom(int, u32, compat_size_t, unsigned int, u32, u32) */
 	ldswa		[%o1 + 0x0] %asi, %o0
 	sethi		%hi(sys32_recvfrom), %g1
 	lduwa		[%o1 + 0x8] %asi, %o2

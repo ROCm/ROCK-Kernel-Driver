@@ -1629,7 +1629,6 @@ static ssize_t sound_copy_translate_read(const u_char *userPtr,
 
 static int mixer_open(struct inode *inode, struct file *file)
 {
-	MOD_INC_USE_COUNT;
 	mixer.busy = 1;
 	return 0;
 }
@@ -1638,7 +1637,6 @@ static int mixer_open(struct inode *inode, struct file *file)
 static int mixer_release(struct inode *inode, struct file *file)
 {
 	mixer.busy = 0;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -2050,7 +2048,6 @@ static int sq_open(struct inode *inode, struct file *file)
 {
 	int rc = 0;
 
-	MOD_INC_USE_COUNT;
 	if (file->f_mode & FMODE_WRITE) {
 		if (sq.busy) {
 			rc = -EBUSY;
@@ -2131,7 +2128,6 @@ err_out_nobusy:
 		WAKE_UP(read_sq.open_queue);
 	}
 err_out:
-	MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -2183,7 +2179,6 @@ static int sq_release(struct inode *inode, struct file *file)
 
 	sq_release_read_buffers();
 	sq_release_buffers();
-	MOD_DEC_USE_COUNT;
 
 	if (file->f_mode & FMODE_READ) {
 		read_sq.busy = 0;
@@ -2372,7 +2367,6 @@ static int state_open(struct inode *inode, struct file *file)
 	if (state.busy)
 		return -EBUSY;
 
-	MOD_INC_USE_COUNT;
 	state.ptr = 0;
 	state.busy = 1;
 
@@ -2428,7 +2422,6 @@ static int state_open(struct inode *inode, struct file *file)
 static int state_release(struct inode *inode, struct file *file)
 {
 	state.busy = 0;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

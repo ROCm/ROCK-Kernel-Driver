@@ -128,7 +128,6 @@ struct vfc_dev {
 	volatile struct vfc_regs *regs;
 	struct vfc_regs *phys_regs;
 	unsigned int control_reg;
-	devfs_handle_t de;
 	struct semaphore device_lock_sem;
 	struct timer_list poll_timer;
 	wait_queue_head_t poll_wait;

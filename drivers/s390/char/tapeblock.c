@@ -48,11 +48,14 @@ static request_queue_t* tapeblock_getqueue (kdev_t kdev);
 devfs_handle_t
 tapeblock_mkdevfstree (tape_dev_t* td) {
     devfs_handle_t rc=NULL;
-    rc=td->blk_data.devfs_block_dir=devfs_mk_dir (td->devfs_dir, "block", td);
+    char name[32];
+    sprintf (name, "tape/%04x/block", td->devinfo.devno);
+    rc = devfs_mk_dir (NULL, name, NULL);
     if (rc==NULL) goto out_undo;
-    rc=td->blk_data.devfs_disc=devfs_register(td->blk_data.devfs_block_dir, "disc",DEVFS_FL_DEFAULT,
-				    tapeblock_major, td->first_minor,
-				    TAPEBLOCK_DEVFSMODE, &tapeblock_fops, td);
+    sprintf (name, "tape/%04x/block/disc", td->devinfo.devno);
+    rc = devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			tapeblock_major, td->first_minor,
+			TAPEBLOCK_DEVFSMODE, &tapeblock_fops, td);
     if (rc==NULL) goto out_undo;
     goto out;
  out_undo:
@@ -63,10 +66,8 @@ tapeblock_mkdevfstree (tape_dev_t* td) {
 
 void
 tapeblock_rmdevfstree (tape_dev_t* td) {
-    if (td->blk_data.devfs_disc)
-            devfs_unregister(td->blk_data.devfs_disc);
-    if (td->blk_data.devfs_block_dir)
-            devfs_unregister(td->blk_data.devfs_block_dir);
+    devfs_remove("tape/%04x/block/disc", td->devinfo.devno);
+    devfs_remove("tape/%04x/block", td->devinfo.devno);
 }
 #endif
 

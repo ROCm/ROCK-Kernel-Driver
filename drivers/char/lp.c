@@ -141,8 +141,6 @@
 /* ROUND_UP macro from fs/select.c */
 #define ROUND_UP(x,y) (((x)+(y)-1)/(y))
 
-static devfs_handle_t devfs_handle = NULL;
-
 struct lp_struct lp_table[LP_NO];
 
 static unsigned int lp_count = 0;
@@ -792,7 +790,7 @@ static int __init lp_setup (char *str)
 
 static int lp_register(int nr, struct parport *port)
 {
-	char name[8];
+	char name[16];
 
 	lp_table[nr].dev = parport_register_device(port, "lp", 
 						   lp_preempt, NULL, NULL, 0,
@@ -804,8 +802,8 @@ static int lp_register(int nr, struct parport *port)
 	if (reset)
 		lp_reset(nr);
 
-	sprintf (name, "%d", nr);
-	devfs_register (devfs_handle, name,
+	sprintf (name, "printers/%d", nr);
+	devfs_register (NULL, name,
 			DEVFS_FL_DEFAULT, LP_MAJOR, nr,
 			S_IFCHR | S_IRUGO | S_IWUGO,
 			&lp_fops, NULL);
@@ -908,7 +906,7 @@ int __init lp_init (void)
 		return -EIO;
 	}
 
-	devfs_handle = devfs_mk_dir (NULL, "printers", NULL);
+	devfs_mk_dir (NULL, "printers", NULL);
 
 	if (parport_register_driver (&lp_driver)) {
 		printk (KERN_ERR "lp: unable to register with parport\n");
@@ -964,13 +962,14 @@ static void lp_cleanup_module (void)
 	unregister_console (&lpcons);
 #endif
 
-	devfs_unregister (devfs_handle);
 	unregister_chrdev(LP_MAJOR, "lp");
 	for (offset = 0; offset < LP_NO; offset++) {
 		if (lp_table[offset].dev == NULL)
 			continue;
 		parport_unregister_device(lp_table[offset].dev);
+		devfs_remove("printers/%d", offset);
 	}
+	devfs_remove("printers");
 }
 
 __setup("lp=", lp_setup);

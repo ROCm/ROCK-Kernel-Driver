@@ -183,11 +183,6 @@ typedef struct _tape_frontend_t {
 
 typedef struct _tape_char_front_data_t{
 	int     block_size;               /* block size of tape */
-#ifdef CONFIG_DEVFS_FS
-	devfs_handle_t devfs_char_dir;    /* tape/DEVNO/char dir */
-	devfs_handle_t devfs_nonrewinding;/* tape/DEVNO/char/nonrewinding */
-	devfs_handle_t devfs_rewinding;   /* tape/DEVNO/char/rewinding */
-#endif /* CONFIG_DEVFS_FS */
 } tape_char_data_t;
 
 /* Block Frontend Data */
@@ -199,10 +194,6 @@ typedef struct _tape_blk_front_data_t{
 	long position;
 	atomic_t bh_scheduled;
 	struct tq_struct bh_tq;
-#ifdef CONFIG_DEVFS_FS
-	devfs_handle_t devfs_block_dir;    /* tape/DEVNO/block dir */
-	devfs_handle_t devfs_disc;         /* tape/DEVNO/block/disc */
-#endif /* CONFIG_DEVFS_FS */
 } tape_blk_data_t;
 
 /* Tape Info */
@@ -220,9 +211,6 @@ typedef struct _tape_dev_t {
 	tape_ccw_req_t* treq;          /* Active Tape request */
 	tape_op_t last_op;             /* Last Tape operation */
 	void*  next;                   /* ptr to next tape_dev */
-#ifdef CONFIG_DEVFS_FS
-	devfs_handle_t devfs_dir;      /* toplevel devfs dir */
-#endif /* CONFIG_DEVFS_FS */
 	tape_char_data_t  char_data;   /* Character dev frontend data */
 	tape_blk_data_t   blk_data;    /* Block dev frontend data */
 } tape_dev_t  __attribute__ ((aligned(8)));

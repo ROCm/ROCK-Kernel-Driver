@@ -5637,8 +5637,6 @@ static int __init config_spea(void)
  *  Called once at boot or load time.
  */
 
-static devfs_handle_t devfs_handle;
-
 /* FIXME: cleanups after failed allocations are too ugly for words */
 #ifdef MODULE
 int __init __sbpcd_init(void)
@@ -5808,7 +5806,7 @@ int __init sbpcd_init(void)
 	}
 	blk_init_queue(&sbpcd_queue, do_sbpcd_request, &sbpcd_lock);
 
-	devfs_handle = devfs_mk_dir (NULL, "sbp", NULL);
+	devfs_mk_dir (NULL, "sbp", NULL);
 
 	for (j=0;j<NR_SBPCD;j++)
 	{
@@ -5902,12 +5900,12 @@ void sbpcd_exit(void)
 	}
 	release_region(CDo_command,4);
 	blk_cleanup_queue(&sbpcd_queue);
-	devfs_unregister (devfs_handle);
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		if (D_S[j].drv_id==-1) continue;
 		del_gendisk(D_S[j].disk);
 		put_disk(D_S[j].disk);
+		devfs_remove("sbp/c0t%d", j);
 		vfree(D_S[j].sbp_buf);
 		if (D_S[j].sbp_audsiz>0) vfree(D_S[j].aud_buf);
 		if ((unregister_cdrom(D_S[j].sbpcd_infop) == -EINVAL))
@@ -5917,6 +5915,7 @@ void sbpcd_exit(void)
 		}
 		vfree(D_S[j].sbpcd_infop);
 	}
+	devfs_remove("sbp");
 	msg(DBG_INF, "%s module released.\n", major_name);
 }
 

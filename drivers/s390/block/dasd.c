@@ -194,7 +194,6 @@ dasd_find_disc(dasd_device_t * device)
 /*
  * SECTION: Operations on the device structure.
  */
-static devfs_handle_t dasd_devfs_handle;
 static wait_queue_head_t dasd_init_waitq;
 
 /*
@@ -2189,8 +2188,7 @@ dasd_exit(void)
 	dasd_ioctl_exit();
 	dasd_gendisk_exit();
 	dasd_devmap_exit();
-	if (dasd_devfs_handle)
-		devfs_unregister(dasd_devfs_handle);
+	devfs_remove("dasd");
 	if (dasd_debug_area != NULL) {
 		debug_unregister(dasd_debug_area);
 		dasd_debug_area = NULL;
@@ -2237,8 +2235,7 @@ dasd_init(void)
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");
 
-	dasd_devfs_handle = devfs_mk_dir(NULL, "dasd", NULL);
-	if (dasd_devfs_handle < 0) {
+	if (!devfs_mk_dir(NULL, "dasd", NULL)) {
 		DBF_EVENT(DBF_ALERT, "%s", "no devfs");
 		rc = -ENOSYS;
 		goto failed;

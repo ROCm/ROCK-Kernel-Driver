@@ -195,6 +195,7 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 	if (!new_efivar->entry) return 1;
 
 
+	new_efivar->entry->owner = THIS_MODULE;
 	new_efivar->entry->data = new_efivar;
 	new_efivar->entry->read_proc = efivar_read;
 	new_efivar->entry->write_proc = efivar_write;
@@ -224,7 +225,6 @@ efivar_read(char *page, char **start, off_t off, int count, int *eof, void *data
 	if (!page || !data) return -EINVAL;
 
 	spin_lock(&efivars_lock);
-	MOD_INC_USE_COUNT;
 
 	memcpy(var_data, &efi_var->var, len);
 
@@ -235,7 +235,6 @@ efivar_read(char *page, char **start, off_t off, int count, int *eof, void *data
 					    &var_data->DataSize,
 					    var_data->Data);
 
-	MOD_DEC_USE_COUNT;
 	spin_unlock(&efivars_lock);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
@@ -269,15 +268,10 @@ efivar_write(struct file *file, const char *buffer,
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	MOD_INC_USE_COUNT;
-
 	var_data = kmalloc(size, GFP_KERNEL);
-	if (!var_data) {
-		MOD_DEC_USE_COUNT;
+	if (!var_data)
 		return -ENOMEM;
-	}
 	if (copy_from_user(var_data, buffer, size)) {
-		MOD_DEC_USE_COUNT;
                 kfree(var_data);
 		return -EFAULT;
 	}
@@ -313,7 +307,6 @@ efivar_write(struct file *file, const char *buffer,
 	if (status != EFI_SUCCESS) {
 		printk(KERN_WARNING "set_variable() failed: status=%lx\n", status);
 		kfree(var_data);
-		MOD_DEC_USE_COUNT;
 		spin_unlock(&efivars_lock);
 		return -EIO;
 	}
@@ -335,7 +328,6 @@ efivar_write(struct file *file, const char *buffer,
 	}
 
 	kfree(var_data);
-	MOD_DEC_USE_COUNT;
 	spin_unlock(&efivars_lock);
 	return size;
 }

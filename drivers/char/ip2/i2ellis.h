@@ -405,12 +405,6 @@ typedef struct _i2eBordStr
 
 	struct timer_list  SendPendingTimer;   // Used by iiSendPending
 	unsigned int	SendPendingRetry;
-
-#ifdef	CONFIG_DEVFS_FS
-	/* Device handles into devfs */
-	devfs_handle_t	devfs_ipl_handle;
-	devfs_handle_t	devfs_stat_handle;
-#endif
 } i2eBordStr, *i2eBordStrPtr;
 
 //-------------------------------------------------------------------
