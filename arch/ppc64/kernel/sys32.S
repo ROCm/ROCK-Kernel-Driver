@@ -40,14 +40,14 @@ _GLOBAL(sys32_recvfrom)
 	clrldi		r8, r8, 32	/* int *addr_len parm */
 	b		.sys_recvfrom
 
-_GLOBAL(sys32_getsockopt)
-	clrldi		r7, r7, 32	/* int *optlen parm */
-	b		.sys_getsockopt
-
 _GLOBAL(ppc32_mmap2)
 	clrldi		r7, r7, 32	/* unsigned long fd parm */
 	clrldi		r8, r8, 32	/* unsigned long pgoff */
 	b		.sys32_mmap2
+
+_GLOBAL(ppc32_remap_file_pages)
+	clrldi		r7, r7, 32
+	b		.sys_remap_file_pages
 
 _GLOBAL(sys32_socketcall)	/* r3=call, r4=args */
 	cmpwi		r3, 1

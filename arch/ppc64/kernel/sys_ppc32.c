@@ -51,6 +51,9 @@
 #include <linux/highmem.h>
 #include <linux/highuid.h>
 #include <linux/mman.h>
+#include <linux/ipv6.h>
+#include <linux/in.h>
+#include <linux/icmpv6.h>
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
 
@@ -83,10 +86,10 @@ asmlinkage long sys32_utime(char * filename, struct utimbuf32 *times)
 	
 	if (!times)
 		return sys_utime(filename, NULL);
-	if (get_user(t.actime, &times->actime) || __get_user(t.modtime, &times->modtime))
+	if (get_user(t.actime, &times->actime) ||
+	    __get_user(t.modtime, &times->modtime))
 		return -EFAULT;
 	filenam = getname(filename);
-
 	ret = PTR_ERR(filenam);
 	if (!IS_ERR(filenam)) {
 		old_fs = get_fs();
@@ -99,47 +102,57 @@ asmlinkage long sys32_utime(char * filename, struct utimbuf32 *times)
 	return ret;
 }
 
-
-
 struct iovec32 { u32 iov_base; __kernel_size_t32 iov_len; };
 
-typedef ssize_t (*IO_fn_t)(struct file *, char *, size_t, loff_t *);
+typedef ssize_t (*io_fn_t)(struct file *, char *, size_t, loff_t *);
+typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
 
 static long do_readv_writev32(int type, struct file *file,
 			      const struct iovec32 *vector, u32 count)
 {
-	unsigned long tot_len;
+	__kernel_ssize_t32 tot_len;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack, *ivp;
 	struct inode *inode;
 	long retval, i;
-	IO_fn_t fn;
+	io_fn_t fn;
+	iov_fn_t fnv;
 
 	/* First get the "struct iovec" from user memory and
 	 * verify all the pointers
 	 */
+	retval = 0;
 	if (!count)
-		return 0;
-	if(verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
-		return -EFAULT;
+		goto out_nofree;
+	retval = -EFAULT;
+	if (verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
+		goto out_nofree;
+	retval = -EINVAL;
 	if (count > UIO_MAXIOV)
-		return -EINVAL;
+		goto out_nofree;
 	if (count > UIO_FASTIOV) {
+		retval = -ENOMEM;
 		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
-			return -ENOMEM;
+			goto out_nofree;
 	}
 
 	tot_len = 0;
 	i = count;
 	ivp = iov;
+	retval = -EINVAL;
 	while(i > 0) {
-		u32 len;
+		__kernel_ssize_t32 tmp = tot_len;
+		__kernel_ssize_t32 len;
 		u32 buf;
 
 		__get_user(len, &vector->iov_len);
 		__get_user(buf, &vector->iov_base);
+		if (len < 0)	/* size_t not fittina an ssize_t32 .. */
+			goto out;
 		tot_len += len;
+		if (tot_len < tmp) /* maths overflow on the ssize_t32 */
+			goto out;
 		ivp->iov_base = (void *)A(buf);
 		ivp->iov_len = (__kernel_size_t) len;
 		vector++;
@@ -152,33 +165,19 @@ static long do_readv_writev32(int type, struct file *file,
 	retval = locks_verify_area((type == VERIFY_WRITE
 				    ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
 				   inode, file, file->f_pos, tot_len);
-	if (retval) {
-		if (iov != iovstack)
-			kfree(iov);
-		return retval;
-	}
+	if (retval)
+		goto out;
 
-	/* Then do the actual IO.  Note that sockets need to be handled
-	 * specially as they have atomicity guarantees and can handle
-	 * iovec's natively
-	 */
-	if (inode->i_sock) {
-		int err;
-		err = sock_readv_writev(type, inode, file, iov, count, tot_len);
-		if (iov != iovstack)
-			kfree(iov);
-		return err;
-	}
-
-	if (!file->f_op) {
-		if (iov != iovstack)
-			kfree(iov);
-		return -EINVAL;
-	}
 	/* VERIFY_WRITE actually means a read, as we write to user space */
-	fn = file->f_op->read;
-	if (type == VERIFY_READ)
-		fn = (IO_fn_t) file->f_op->write;		
+	fnv = (type == VERIFY_WRITE ? file->f_op->readv : file->f_op->writev);
+	if (fnv) {
+		retval = fnv(file, iov, count, &file->f_pos);
+		goto out;
+	}
+
+	fn = (type == VERIFY_WRITE ? file->f_op->read :
+	      (io_fn_t) file->f_op->write);
+
 	ivp = iov;
 	while (count > 0) {
 		void * base;
@@ -190,21 +189,27 @@ static long do_readv_writev32(int type, struct file *file,
 		count--;
 		nr = fn(file, base, len, &file->f_pos);
 		if (nr < 0) {
-			if (retval)
-				break;
-			retval = nr;
+			if (!retval)
+				retval = nr;
 			break;
 		}
 		retval += nr;
 		if (nr != len)
 			break;
 	}
+out:
 	if (iov != iovstack)
 		kfree(iov);
+out_nofree:
+	/* VERIFY_WRITE actually means a read, as we write to user space */
+	if ((retval + (type == VERIFY_WRITE)) > 0)
+		dnotify_parent(file->f_dentry,
+			(type == VERIFY_WRITE) ? DN_MODIFY : DN_ACCESS);
+
 	return retval;
 }
 
-asmlinkage long sys32_readv(u32 fd, struct iovec32 *vector, u32 count)
+asmlinkage long sys32_readv(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
 	long ret = -EBADF;
@@ -222,7 +227,7 @@ bad_file:
 	return ret;
 }
 
-asmlinkage long sys32_writev(u32 fd, struct iovec32 *vector, u32 count)
+asmlinkage long sys32_writev(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
 	int ret = -EBADF;
@@ -289,7 +294,7 @@ asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg
 	}
 }
 
-struct ncp_mount_data32 {
+struct ncp_mount_data32_v3 {
         int version;
         unsigned int ncp_fd;
         __kernel_uid_t32 mounted_uid;
@@ -304,18 +309,69 @@ struct ncp_mount_data32 {
         __kernel_mode_t32 dir_mode;
 };
 
+struct ncp_mount_data32_v4 {
+	int version;
+	/* all members below are "long" in ABI ... i.e. 32bit on sparc32, while 64bits on sparc64 */
+	unsigned int flags;
+	unsigned int mounted_uid;
+	int wdog_pid;
+
+	unsigned int ncp_fd;
+	unsigned int time_out;
+	unsigned int retry_count;
+
+	unsigned int uid;
+	unsigned int gid;
+	unsigned int file_mode;
+	unsigned int dir_mode;
+};
+
 static void *do_ncp_super_data_conv(void *raw_data)
 {
-	struct ncp_mount_data *n = (struct ncp_mount_data *)raw_data;
-	struct ncp_mount_data32 *n32 = (struct ncp_mount_data32 *)raw_data;
+	switch (*(int*)raw_data) {
+		case NCP_MOUNT_VERSION:
+			{
+				struct ncp_mount_data news, *n = &news; 
+				struct ncp_mount_data32_v3 *n32 = (struct ncp_mount_data32_v3 *)raw_data;
 
-	n->dir_mode = n32->dir_mode;
-	n->file_mode = n32->file_mode;
-	n->gid = n32->gid;
-	n->uid = n32->uid;
-	memmove (n->mounted_vol, n32->mounted_vol, (sizeof (n32->mounted_vol) + 3 * sizeof (unsigned int)));
-	n->wdog_pid = n32->wdog_pid;
-	n->mounted_uid = n32->mounted_uid;
+				n->version = n32->version;
+				n->ncp_fd = n32->ncp_fd;
+				n->mounted_uid = n32->mounted_uid;
+				n->wdog_pid = n32->wdog_pid;
+				memmove (n->mounted_vol, n32->mounted_vol, sizeof (n32->mounted_vol));
+				n->time_out = n32->time_out;
+				n->retry_count = n32->retry_count;
+				n->flags = n32->flags;
+				n->uid = n32->uid;
+				n->gid = n32->gid;
+				n->file_mode = n32->file_mode;
+				n->dir_mode = n32->dir_mode;
+				memcpy(raw_data, n, sizeof(*n)); 
+			}
+			break;
+		case NCP_MOUNT_VERSION_V4:
+			{
+				struct ncp_mount_data_v4 news, *n = &news; 
+				struct ncp_mount_data32_v4 *n32 = (struct ncp_mount_data32_v4 *)raw_data;
+
+				n->version = n32->version;
+				n->flags = n32->flags;
+				n->mounted_uid = n32->mounted_uid;
+				n->wdog_pid = n32->wdog_pid;
+				n->ncp_fd = n32->ncp_fd;
+				n->time_out = n32->time_out;
+				n->retry_count = n32->retry_count;
+				n->uid = n32->uid;
+				n->gid = n32->gid;
+				n->file_mode = n32->file_mode;
+				n->dir_mode = n32->dir_mode;
+				memcpy(raw_data, n, sizeof(*n)); 
+			}
+			break;
+		default:
+			/* do not touch unknown structures */
+			break;
+	}
 	return raw_data;
 }
 
@@ -330,7 +386,7 @@ struct smb_mount_data32 {
 
 static void *do_smb_super_data_conv(void *raw_data)
 {
-	struct smb_mount_data *s = (struct smb_mount_data *)raw_data;
+	struct smb_mount_data news, *s = &news;
 	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
 
 	if (s32->version != SMB_MOUNT_OLDVERSION)
@@ -341,6 +397,7 @@ static void *do_smb_super_data_conv(void *raw_data)
 	s->gid = s32->gid;
 	s->file_mode = s32->file_mode;
 	s->dir_mode = s32->dir_mode;
+	memcpy(raw_data, s, sizeof(struct smb_mount_data)); 
 out:
 	return raw_data;
 }
@@ -2805,46 +2862,146 @@ asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset
 
 extern asmlinkage int sys_setsockopt(int fd, int level, int optname, char *optval, int optlen);
 
+static int do_set_attach_filter(int fd, int level, int optname,
+				char *optval, int optlen)
+{
+	struct sock_fprog32 {
+		__u16 len;
+		__u32 filter;
+	} *fprog32 = (struct sock_fprog32 *)optval;
+	struct sock_fprog kfprog;
+	struct sock_filter *kfilter;
+	unsigned int fsize;
+	mm_segment_t old_fs;
+	__u32 uptr;
+	int ret;
+
+	if (get_user(kfprog.len, &fprog32->len) ||
+	    __get_user(uptr, &fprog32->filter))
+		return -EFAULT;
+
+	kfprog.filter = (struct sock_filter *)A(uptr);
+	fsize = kfprog.len * sizeof(struct sock_filter);
+
+	kfilter = (struct sock_filter *)kmalloc(fsize, GFP_KERNEL);
+	if (kfilter == NULL)
+		return -ENOMEM;
+
+	if (copy_from_user(kfilter, kfprog.filter, fsize)) {
+		kfree(kfilter);
+		return -EFAULT;
+	}
+
+	kfprog.filter = kfilter;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_setsockopt(fd, level, optname,
+			     (char *)&kfprog, sizeof(kfprog));
+	set_fs(old_fs);
+
+	kfree(kfilter);
+
+	return ret;
+}
+
+static int do_set_icmpv6_filter(int fd, int level, int optname,
+				char *optval, int optlen)
+{
+	struct icmp6_filter kfilter;
+	mm_segment_t old_fs;
+	int ret, i;
+
+	if (copy_from_user(&kfilter, optval, sizeof(kfilter)))
+		return -EFAULT;
+
+
+	for (i = 0; i < 8; i += 2) {
+		u32 tmp = kfilter.data[i];
+
+		kfilter.data[i] = kfilter.data[i + 1];
+		kfilter.data[i + 1] = tmp;
+	}
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_setsockopt(fd, level, optname,
+			     (char *) &kfilter, sizeof(kfilter));
+	set_fs(old_fs);
+
+	return ret;
+}
+
+static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int optlen)
+{
+	struct timeval32 *up = (struct timeval32 *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int err;
+
+	if (optlen < sizeof(*up))
+		return -EINVAL;
+	if (get_user(ktime.tv_sec, &up->tv_sec) ||
+	    __get_user(ktime.tv_usec, &up->tv_usec))
+		return -EFAULT;
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_setsockopt(fd, level, optname, (char *) &ktime, sizeof(ktime));
+	set_fs(old_fs);
+
+	return err;
+}
+
 asmlinkage long sys32_setsockopt(int fd, int level, int optname, char* optval, int optlen)
 {
-	if (optname == SO_ATTACH_FILTER) {
-		struct sock_fprog32 {
-			__u16 len;
-			__u32 filter;
-		} *fprog32 = (struct sock_fprog32 *)optval;
-		struct sock_fprog kfprog;
-		struct sock_filter *kfilter;
-		unsigned int fsize;
-		mm_segment_t old_fs;
-		__u32 uptr;
-		int ret;
+	if (optname == SO_ATTACH_FILTER)
+		return do_set_attach_filter(fd, level, optname,
+					    optval, optlen);
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_set_sock_timeout(fd, level, optname, optval, optlen);
+	if (level == SOL_ICMPV6 && optname == ICMPV6_FILTER)
+		return do_set_icmpv6_filter(fd, level, optname,
+					    optval, optlen);
 
-		if (get_user(kfprog.len, &fprog32->len) ||
-		    __get_user(uptr, &fprog32->filter))
-			return -EFAULT;
-		kfprog.filter = (struct sock_filter *)A(uptr);
-		fsize = kfprog.len * sizeof(struct sock_filter);
-		kfilter = (struct sock_filter *)kmalloc(fsize, GFP_KERNEL);
-		if (kfilter == NULL)
-			return -ENOMEM;
-		if (copy_from_user(kfilter, kfprog.filter, fsize)) {
-			kfree(kfilter);
-			return -EFAULT;
-		}
-		kfprog.filter = kfilter;
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_setsockopt(fd, level, optname,
-				     (char *)&kfprog, sizeof(kfprog));
-		set_fs(old_fs);
-		kfree(kfilter);
-		return ret;
-	}
 	return sys_setsockopt(fd, level, optname, optval, optlen);
 }
 
+extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
+				      char *optval, int *optlen);
 
+static int do_get_sock_timeout(int fd, int level, int optname, char *optval, int *optlen)
+{
+	struct timeval32 *up = (struct timeval32 *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int len, err;
 
+	if (get_user(len, optlen))
+		return -EFAULT;
+	if (len < sizeof(*up))
+		return -EINVAL;
+	len = sizeof(ktime);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_getsockopt(fd, level, optname, (char *) &ktime, &len);
+	set_fs(old_fs);
+
+	if (!err) {
+		if (put_user(sizeof(*up), optlen) ||
+		    put_user(ktime.tv_sec, &up->tv_sec) ||
+		    __put_user(ktime.tv_usec, &up->tv_usec))
+			err = -EFAULT;
+	}
+	return err;
+}
+
+asmlinkage int sys32_getsockopt(int fd, int level, int optname,
+				char *optval, int *optlen)
+{
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_get_sock_timeout(fd, level, optname, optval, optlen);
+	return sys_getsockopt(fd, level, optname, optval, optlen);
+}
 
 #define MAX_SOCK_ADDR	128		/* 108 for Unix domain -  16 for IP, 16 for IPX, 24 for IPv6, about 80 for AX.25 */
 #define __CMSG32_NXTHDR(ctl, len, cmsg, cmsglen) __cmsg32_nxthdr((ctl),(len),(cmsg),(cmsglen))
@@ -4174,17 +4331,12 @@ asmlinkage int sys32_ftruncate64(unsigned int fd, u32 reg4, unsigned long high, 
 		return sys_ftruncate(fd, (high << 32) | low);
 }
 
-
-
 asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-     	if (cmd >= F_GETLK64 && cmd <= F_SETLKW64)
+	if (cmd >= F_GETLK64 && cmd <= F_SETLKW64)
 		return sys_fcntl(fd, cmd + F_GETLK - F_GETLK64, arg);
 	return sys32_fcntl(fd, cmd, arg);
 }
-
-
-
 
 struct __sysctl_args32 {
 	u32 name;

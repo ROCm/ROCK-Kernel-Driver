@@ -741,8 +741,13 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
 	.llong .sys_ni_syscall		/* reserved for free_hugepages */
 	.llong .sys_exit_group
+	.llong .sys_lookup_dcookie	/* 245 */
+	.llong .sys_epoll_create
+	.llong .sys_epoll_ctl
+	.llong .sys_epoll_wait
+	.llong .ppc32_remap_file_pages
 
-	.rept NR_syscalls-234
+	.rept NR_syscalls-239
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -984,7 +989,12 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
 	.llong .sys_ni_syscall		/* reserved for free_hugepages */
 	.llong .sys_exit_group
+	.llong .sys_lookup_dcookie	/* 245 */
+	.llong .sys_epoll_create
+	.llong .sys_epoll_ctl
+	.llong .sys_epoll_wait
+	.llong .sys_remap_file_pages
 
-	.rept NR_syscalls-234
+	.rept NR_syscalls-239
 		.llong .sys_ni_syscall
 	.endr
