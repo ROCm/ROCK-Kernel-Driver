@@ -409,6 +409,7 @@ _pagebuf_lookup_pages(
 				 * In this case page->private holds a bitmap
 				 * of uptodate sectors within the page
 				 */
+				ASSERT(blocksize < PAGE_CACHE_SIZE);
 				range = (offset + nbytes) >> sectorshift;
 				for (j = offset >> sectorshift; j < range; j++)
 					if (!test_bit(j, &page->private))
