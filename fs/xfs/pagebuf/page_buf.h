@@ -386,6 +386,4 @@ static __inline__ void pagebuf_run_task_queue(page_buf_t *pb)
 	blk_run_queues();
 }
 
-extern struct workqueue_struct *pagebuf_workqueue;
-
 #endif /* __PAGE_BUF_H__ */

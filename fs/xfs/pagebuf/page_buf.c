@@ -120,6 +120,8 @@ pb_trace_func(
 STATIC kmem_cache_t *pagebuf_cache;
 STATIC pagebuf_daemon_t *pb_daemon;
 STATIC void pagebuf_daemon_wakeup(int);
+STATIC struct workqueue_struct *pagebuf_workqueue;
+
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -136,11 +138,6 @@ pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
  */
 
 struct pbstats pbstats;
-
-/*
- * Queue for delayed I/O completion.
- */
-struct workqueue_struct *pagebuf_workqueue;
 
 /*
  * Pagebuf allocation / freeing.
