@@ -48,7 +48,7 @@ static char *tvmem;
 
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
-	"twofish",
+	"twofish", "serpent",
 	 NULL
 };
 
@@ -1884,6 +1884,105 @@ out:
 	crypto_free_tfm(tfm);
 }
 
+void
+test_serpent(void)
+{
+	unsigned int ret, i, tsize;
+	u8 *p, *q, *key;
+	struct crypto_tfm *tfm;
+	struct serpent_tv *serp_tv;
+	struct scatterlist sg[1];
+
+	printk("\ntesting serpent encryption\n");
+
+	tfm = crypto_alloc_tfm("serpent", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for serpent (default ecb)\n");
+		return;
+	}
+
+	tsize = sizeof (serpent_enc_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, serpent_enc_tv_template, tsize);
+	serp_tv = (void *) tvmem;
+	for (i = 0; i < SERPENT_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n", i + 1, serp_tv[i].keylen * 8);
+		key = serp_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, serp_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!serp_tv[i].fail)
+				goto out;
+		}
+
+		p = serp_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = sizeof(serp_tv[i].plaintext);
+		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		if (ret) {
+			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, sizeof(serp_tv[i].result));
+
+		printk("%s\n", memcmp(q, serp_tv[i].result,
+			sizeof(serp_tv[i].result)) ? "fail" : "pass");
+	}
+
+	printk("\ntesting serpent decryption\n");
+
+	tsize = sizeof (serpent_dec_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, serpent_dec_tv_template, tsize);
+	serp_tv = (void *) tvmem;
+	for (i = 0; i < SERPENT_DEC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n", i + 1, serp_tv[i].keylen * 8);
+		key = serp_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, serp_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!serp_tv[i].fail)
+				goto out;
+		}
+
+		p = serp_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = sizeof(serp_tv[i].plaintext);
+		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		if (ret) {
+			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, sizeof(serp_tv[i].result));
+
+		printk("%s\n", memcmp(q, serp_tv[i].result,
+			sizeof(serp_tv[i].result)) ? "fail" : "pass");
+	}
+
+out:
+	crypto_free_tfm(tfm);
+}
+
 static void
 test_available(void)
 {
@@ -1911,6 +2010,7 @@ do_test(void)
 		test_sha256();
 		test_blowfish();
 		test_twofish();
+		test_serpent();
 #ifdef CONFIG_CRYPTO_HMAC
 		test_hmac_md5();
 		test_hmac_sha1();
@@ -1948,6 +2048,10 @@ do_test(void)
 
 	case 8:
 		test_twofish();
+		break;
+
+	case 9:
+		test_serpent();
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC
