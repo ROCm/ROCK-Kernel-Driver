@@ -497,6 +497,7 @@ extern void hpte_init_iSeries(void);
 #define IM_REGION_SUBSET	0x2
 #define IM_REGION_EXISTS	0x4
 #define IM_REGION_OVERLAP	0x8
+#define IM_REGION_SUPERSET	0x10
 
 extern struct vm_struct * im_get_free_area(unsigned long size);
 extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
