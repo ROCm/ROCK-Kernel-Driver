@@ -485,7 +485,8 @@ out:
 	err = -EINVAL;
 	spin_lock_bh(&x1->lock);
 	if (likely(x1->km.state == XFRM_STATE_VALID)) {
-		memcpy(x1->encap, x->encap, sizeof(*x1->encap));
+		if (x->encap && x1->encap)
+			memcpy(x1->encap, x->encap, sizeof(*x1->encap));
 		memcpy(&x1->lft, &x->lft, sizeof(x1->lft));
 		x1->km.dying = 0;
 		err = 0;

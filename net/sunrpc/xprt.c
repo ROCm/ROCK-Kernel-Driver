@@ -579,8 +579,8 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 #ifdef RPC_PROFILE
 	/* Profile only reads for now */
 	if (copied > 1024) {
-		static unsigned long	nextstat = 0;
-		static unsigned long	pkt_rtt = 0, pkt_len = 0, pkt_cnt = 0;
+		static unsigned long	nextstat;
+		static unsigned long	pkt_rtt, pkt_len, pkt_cnt;
 
 		pkt_cnt++;
 		pkt_len += req->rq_slen + copied;

@@ -62,7 +62,7 @@
 #define SNMP_TRAP_PORT 162
 #define NOCT1(n) (u_int8_t )((n) & 0xff)
 
-static int debug = 0;
+static int debug;
 static spinlock_t snmp_lock = SPIN_LOCK_UNLOCKED;
 
 /* 

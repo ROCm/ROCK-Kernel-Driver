@@ -1779,7 +1779,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 		/* old structure? */
 		if (cmd == SIOCAX25GETINFOOLD) {
-			static int warned = 0;
+			static int warned;
 			if (!warned) {
 				printk(KERN_INFO "%s uses old SIOCAX25GETINFO\n",
 					current->comm);

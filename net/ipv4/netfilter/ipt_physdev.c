@@ -17,7 +17,7 @@ match(const struct sk_buff *skb,
       int *hotdrop)
 {
 	int i;
-	static const char nulldevname[IFNAMSIZ] = { 0 };
+	static const char nulldevname[IFNAMSIZ];
 	const struct ipt_physdev_info *info = matchinfo;
 	unsigned long ret;
 	const char *indev, *outdev;

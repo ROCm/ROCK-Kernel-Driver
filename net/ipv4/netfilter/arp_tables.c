@@ -246,7 +246,7 @@ unsigned int arpt_do_table(struct sk_buff **pskb,
 			   struct arpt_table *table,
 			   void *userdata)
 {
-	static const char nulldevname[IFNAMSIZ] = { 0 };
+	static const char nulldevname[IFNAMSIZ];
 	unsigned int verdict = NF_DROP;
 	struct arphdr *arp;
 	int hotdrop = 0;

@@ -70,7 +70,7 @@ static struct rtable __fake_rtable = {
 /* PF_BRIDGE/PRE_ROUTING *********************************************/
 static void __br_dnat_complain(void)
 {
-	static unsigned long last_complaint = 0;
+	static unsigned long last_complaint;
 
 	if (jiffies - last_complaint >= 5 * HZ) {
 		printk(KERN_WARNING "Performing cross-bridge DNAT requires IP "

@@ -1,6 +1,7 @@
 /* Kernel module to match AH parameters. */
 #include <linux/module.h>
 #include <linux/skbuff.h>
+#include <linux/ip.h>
 
 #include <linux/netfilter_ipv4/ipt_ah.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
@@ -12,10 +13,6 @@ MODULE_LICENSE("GPL");
 #else
 #define duprintf(format, args...)
 #endif
-
-struct ahhdr {
-	__u32   spi;
-};
 
 /* Returns 1 if the spi is matched by the range, 0 otherwise */
 static inline int
@@ -37,7 +34,7 @@ match(const struct sk_buff *skb,
       int offset,
       int *hotdrop)
 {
-	struct ahhdr ah;
+	struct ip_auth_hdr ah;
 	const struct ipt_ah *ahinfo = matchinfo;
 
 	/* Must not be a fragment. */
