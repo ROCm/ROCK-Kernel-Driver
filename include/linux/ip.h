@@ -89,6 +89,9 @@
 #define	IPOPT_TS_PRESPEC	3		/* specified modules only */
 
 #ifdef __KERNEL__
+#include <linux/types.h>
+#include <net/sock.h>
+#include <linux/igmp.h>
 
 struct ip_options {
   __u32		faddr;				/* Saved first hop address */
@@ -111,6 +114,37 @@ struct ip_options {
 };
 
 #define optlength(opt) (sizeof(struct ip_options) + opt->optlen)
+
+struct inet_opt {
+	int			ttl;		/* TTL setting */
+	int			tos;		/* TOS */
+	unsigned	   	cmsg_flags;
+	struct ip_options	*opt;
+	unsigned char		hdrincl;	/* Include headers ? */
+	__u8			mc_ttl;		/* Multicasting TTL */
+	__u8			mc_loop;	/* Loopback */
+	unsigned		recverr : 1,
+				freebind : 1;
+	__u16			id;		/* ID counter for DF pkts */
+	__u8			pmtudisc;
+	int			mc_index;	/* Multicast device index */
+	__u32			mc_addr;
+	struct ip_mc_socklist	*mc_list;	/* Group array */
+};
+
+struct ipv6_pinfo;
+
+/* WARNING: don't change the layout of the members in inet_sock! */
+struct inet_sock {
+	struct sock	  sk;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	struct ipv6_pinfo *pinet6;
+#endif
+	struct inet_opt   inet;
+};
+
+#define inet_sk(__sk) (&((struct inet_sock *)__sk)->inet)
+
 #endif
 
 struct iphdr {

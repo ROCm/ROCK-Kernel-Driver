@@ -5,7 +5,7 @@
  *
  *		The User Datagram Protocol (UDP).
  *
- * Version:	$Id: udp.c,v 1.101 2002/01/12 07:39:45 davem Exp $
+ * Version:	$Id: udp.c,v 1.102 2002/02/01 22:01:04 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -84,7 +84,7 @@
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <net/snmp.h>
-#include <net/ip.h>
+#include <net/tcp.h>
 #include <net/protocol.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
@@ -293,6 +293,7 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 
 void udp_err(struct sk_buff *skb, u32 info)
 {
+	struct inet_opt *inet;
 	struct iphdr *iph = (struct iphdr*)skb->data;
 	struct udphdr *uh = (struct udphdr*)(skb->data+(iph->ihl<<2));
 	int type = skb->h.icmph->type;
@@ -309,6 +310,7 @@ void udp_err(struct sk_buff *skb, u32 info)
 
 	err = 0;
 	harderr = 0;
+	inet = inet_sk(sk);
 
 	switch (type) {
 	default:
@@ -323,7 +325,7 @@ void udp_err(struct sk_buff *skb, u32 info)
 		break;
 	case ICMP_DEST_UNREACH:
 		if (code == ICMP_FRAG_NEEDED) { /* Path MTU discovery */
-			if (sk->protinfo.af_inet.pmtudisc != IP_PMTUDISC_DONT) {
+			if (inet->pmtudisc != IP_PMTUDISC_DONT) {
 				err = EMSGSIZE;
 				harderr = 1;
 				break;
@@ -342,7 +344,7 @@ void udp_err(struct sk_buff *skb, u32 info)
 	 *      RFC1122: OK.  Passes ICMP errors back to application, as per 
 	 *	4.1.3.3.
 	 */
-	if (!sk->protinfo.af_inet.recverr) {
+	if (!inet->recverr) {
 		if (!harderr || sk->state != TCP_ESTABLISHED)
 			goto out;
 	} else {
@@ -415,6 +417,7 @@ static int udp_getfrag_nosum(const void *p, char * to, unsigned int offset, unsi
 
 int udp_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	int ulen = len + sizeof(struct udphdr);
 	struct ipcm_cookie ipc;
 	struct udpfakehdr ufh;
@@ -487,7 +490,7 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		connected = 0;
 	}
 	if (!ipc.opt)
-		ipc.opt = sk->protinfo.af_inet.opt;
+		ipc.opt = inet->opt;
 
 	ufh.saddr = ipc.addr;
 	ipc.addr = daddr = ufh.daddr;
@@ -498,7 +501,7 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		daddr = ipc.opt->faddr;
 		connected = 0;
 	}
-	tos = RT_TOS(sk->protinfo.af_inet.tos);
+	tos = RT_TOS(inet->tos);
 	if (sk->localroute || (msg->msg_flags&MSG_DONTROUTE) || 
 	    (ipc.opt && ipc.opt->is_strictroute)) {
 		tos |= RTO_ONLINK;
@@ -507,9 +510,9 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 
 	if (MULTICAST(daddr)) {
 		if (!ipc.oif)
-			ipc.oif = sk->protinfo.af_inet.mc_index;
+			ipc.oif = inet->mc_index;
 		if (!ufh.saddr)
-			ufh.saddr = sk->protinfo.af_inet.mc_addr;
+			ufh.saddr = inet->mc_addr;
 		connected = 0;
 	}
 
@@ -627,6 +630,7 @@ static __inline__ int udp_checksum_complete(struct sk_buff *skb)
 int udp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		int noblock, int flags, int *addr_len)
 {
+	struct inet_opt *inet = inet_sk(sk);
   	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
   	struct sk_buff *skb;
   	int copied, err;
@@ -678,7 +682,7 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		sin->sin_addr.s_addr = skb->nh.iph->saddr;
 		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
   	}
-	if (sk->protinfo.af_inet.cmsg_flags)
+	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
 	err = copied;
   
@@ -710,6 +714,7 @@ csum_copy_err:
 
 int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;
 	struct rtable *rt;
 	int err;
@@ -738,7 +743,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	sk->daddr = rt->rt_dst;
 	sk->dport = usin->sin_port;
 	sk->state = TCP_ESTABLISHED;
-	sk->protinfo.af_inet.id = jiffies;
+	inet->id = jiffies;
 
 	sk_dst_set(sk, &rt->u.dst);
 	return(0);
@@ -758,8 +763,12 @@ int udp_disconnect(struct sock *sk, int flags)
 		sk->rcv_saddr = 0;
 		sk->saddr = 0;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		memset(&sk->net_pinfo.af_inet6.saddr, 0, 16);
-		memset(&sk->net_pinfo.af_inet6.rcv_saddr, 0, 16);
+		if (sk->family == PF_INET6) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
+
+			memset(&np->saddr, 0, 16);
+			memset(&np->rcv_saddr, 0, 16);
+		}
 #endif
 	}
 	if (!(sk->userlocks&SOCK_BINDPORT_LOCK)) {

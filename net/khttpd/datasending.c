@@ -171,8 +171,10 @@ int DataSending(const int CPUNR)
 			if  (CurrentRequest->sock->sk->state == TCP_ESTABLISHED ||
 			     CurrentRequest->sock->sk->state == TCP_CLOSE_WAIT)
 			{
-				CurrentRequest->sock->sk->tp_pinfo.af_tcp.nonagle = 0;
-				tcp_push_pending_frames(CurrentRequest->sock->sk,&(CurrentRequest->sock->sk->tp_pinfo.af_tcp));
+				struct tcp_opt *tp =
+					       tcp_sk(CurrentRequest->sock->sk);
+				tp->nonagle = 0;
+				tcp_push_pending_frames(CurrentRequest->sock->sk, tp);
 			}
 			release_sock(CurrentRequest->sock->sk);
 

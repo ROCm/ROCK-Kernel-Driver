@@ -5,7 +5,7 @@
  *
  *		RAW - implementation of IP "raw" sockets.
  *
- * Version:	$Id: raw.c,v 1.63 2001/07/10 04:29:01 davem Exp $
+ * Version:	$Id: raw.c,v 1.64 2002/02/01 22:01:04 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -55,7 +55,7 @@
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/mroute.h>
-#include <net/ip.h>
+#include <net/tcp.h>
 #include <net/protocol.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
@@ -122,7 +122,7 @@ static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 
 	type = skb->h.icmph->type;
 	if (type < 32) {
-		__u32 data = sk->tp_pinfo.tp_raw4.filter.data;
+		__u32 data = raw4_sk(sk)->filter.data;
 
 		return ((1 << type) & data) != 0;
 	}
@@ -176,6 +176,7 @@ out:
 
 void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
 	int err = 0;
@@ -186,7 +187,7 @@ void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 	   2. Socket is connected (otherwise the error indication
 	      is useless without ip_recverr and error is hard.
 	 */
-	if (!sk->protinfo.af_inet.recverr && sk->state != TCP_ESTABLISHED)
+	if (!inet->recverr && sk->state != TCP_ESTABLISHED)
 		return;
 
 	switch (type) {
@@ -207,22 +208,21 @@ void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 		err = icmp_err_convert[code].errno;
 		harderr = icmp_err_convert[code].fatal;
 		if (code == ICMP_FRAG_NEEDED) {
-			harderr = sk->protinfo.af_inet.pmtudisc !=
-					IP_PMTUDISC_DONT;
+			harderr = inet->pmtudisc != IP_PMTUDISC_DONT;
 			err = EMSGSIZE;
 		}
 	}
 
-	if (sk->protinfo.af_inet.recverr) {
+	if (inet->recverr) {
 		struct iphdr *iph = (struct iphdr*)skb->data;
 		u8 *payload = skb->data + (iph->ihl << 2);
 
-		if (sk->protinfo.af_inet.hdrincl)
+		if (inet->hdrincl)
 			payload = skb->data;
 		ip_icmp_error(sk, skb, err, 0, info, payload);
 	}
 
-	if (sk->protinfo.af_inet.recverr || harderr) {
+	if (inet->recverr || harderr) {
 		sk->err = err;
 		sk->error_report(sk);
 	}
@@ -304,6 +304,7 @@ static int raw_getrawfrag(const void *p, char *to, unsigned int offset,
 
 static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
 	struct rawfakehdr rfh;
 	struct rtable *rt = NULL;
@@ -382,14 +383,14 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 	ipc.addr = daddr;
 
 	if (!ipc.opt)
-		ipc.opt = sk->protinfo.af_inet.opt;
+		ipc.opt = inet->opt;
 
 	if (ipc.opt) {
 		err = -EINVAL;
 		/* Linux does not mangle headers on raw sockets,
 		 * so that IP options + IP_HDRINCL is non-sense.
 		 */
-		if (sk->protinfo.af_inet.hdrincl)
+		if (inet->hdrincl)
 			goto done;
 		if (ipc.opt->srr) {
 			if (!daddr)
@@ -397,15 +398,15 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 			daddr = ipc.opt->faddr;
 		}
 	}
-	tos = RT_TOS(sk->protinfo.af_inet.tos) | sk->localroute;
+	tos = RT_TOS(inet->tos) | sk->localroute;
 	if (msg->msg_flags & MSG_DONTROUTE)
 		tos |= RTO_ONLINK;
 
 	if (MULTICAST(daddr)) {
 		if (!ipc.oif)
-			ipc.oif = sk->protinfo.af_inet.mc_index;
+			ipc.oif = inet->mc_index;
 		if (!rfh.saddr)
-			rfh.saddr = sk->protinfo.af_inet.mc_addr;
+			rfh.saddr = inet->mc_addr;
 	}
 
 	err = ip_route_output(&rt, daddr, rfh.saddr, tos, ipc.oif);
@@ -426,7 +427,7 @@ back_from_confirm:
 	rfh.dst		= &rt->u.dst;
 	if (!ipc.addr)
 		ipc.addr = rt->rt_dst;
-	err = ip_build_xmit(sk, sk->protinfo.af_inet.hdrincl ? raw_getrawfrag :
+	err = ip_build_xmit(sk, inet->hdrincl ? raw_getrawfrag :
 		       	    raw_getfrag, &rfh, len, &ipc, rt, msg->msg_flags);
 
 done:
@@ -484,6 +485,7 @@ out:	return ret;
 int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		int noblock, int flags, int *addr_len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	int copied = 0;
 	int err = -EOPNOTSUPP;
 	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
@@ -522,7 +524,7 @@ int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		sin->sin_addr.s_addr = skb->nh.iph->saddr;
 		memset(&sin->sin_zero, 0, sizeof(sin->sin_zero));
 	}
-	if (sk->protinfo.af_inet.cmsg_flags)
+	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
 done:
 	skb_free_datagram(sk, skb);
@@ -531,7 +533,7 @@ out:	return err ? : copied;
 
 static int raw_init(struct sock *sk)
 {
-	struct raw_opt *tp = &(sk->tp_pinfo.tp_raw4);
+	struct raw_opt *tp = raw4_sk(sk);
 	if (sk->num == IPPROTO_ICMP)
 		memset(&tp->filter, 0, sizeof(tp->filter));
 	return 0;
@@ -541,7 +543,7 @@ static int raw_seticmpfilter(struct sock *sk, char *optval, int optlen)
 {
 	if (optlen > sizeof(struct icmp_filter))
 		optlen = sizeof(struct icmp_filter);
-	if (copy_from_user(&sk->tp_pinfo.tp_raw4.filter, optval, optlen))
+	if (copy_from_user(&raw4_sk(sk)->filter, optval, optlen))
 		return -EFAULT;
 	return 0;
 }
@@ -559,7 +561,7 @@ static int raw_geticmpfilter(struct sock *sk, char *optval, int *optlen)
 		len = sizeof(struct icmp_filter);
 	ret = -EFAULT;
 	if (put_user(len, optlen) ||
-	    copy_to_user(optval, &sk->tp_pinfo.tp_raw4.filter, len))
+	    copy_to_user(optval, &raw4_sk(sk)->filter, len))
 		goto out;
 	ret = 0;
 out:	return ret;

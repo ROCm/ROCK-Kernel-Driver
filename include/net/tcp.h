@@ -29,6 +29,9 @@
 #include <linux/slab.h>
 #include <net/checksum.h>
 #include <net/sock.h>
+#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
+#include <linux/ipv6.h>
+#endif
 
 /* This is for all connections with a full identity, no wildcards.
  * New scheme, half the table is for TIME_WAIT, the other half is
@@ -133,6 +136,9 @@ extern struct tcp_hashinfo {
 #define tcp_lhash_users	(tcp_hashinfo.__tcp_lhash_users)
 #define tcp_lhash_wait	(tcp_hashinfo.__tcp_lhash_wait)
 #define tcp_portalloc_lock (tcp_hashinfo.__tcp_portalloc_lock)
+
+/* SLAB cache for TCP socks */
+extern kmem_cache_t *tcp_sk_cachep;
 
 extern kmem_cache_t *tcp_bucket_cachep;
 extern struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
@@ -242,11 +248,11 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #endif /* 64-bit arch */
 
-#define TCP_IPV6_MATCH(__sk, __saddr, __daddr, __ports, __dif)			   \
-	(((*((__u32 *)&((__sk)->dport)))== (__ports))   			&& \
-	 ((__sk)->family		== AF_INET6)				&& \
-	 !ipv6_addr_cmp(&(__sk)->net_pinfo.af_inet6.daddr, (__saddr))		&& \
-	 !ipv6_addr_cmp(&(__sk)->net_pinfo.af_inet6.rcv_saddr, (__daddr))	&& \
+#define TCP_IPV6_MATCH(__sk, __saddr, __daddr, __ports, __dif)	   \
+	(((*((__u32 *)&((__sk)->dport)))== (__ports))   	&& \
+	 ((__sk)->family		== AF_INET6)		&& \
+	 !ipv6_addr_cmp(&inet6_sk(__sk)->daddr, (__saddr))	&& \
+	 !ipv6_addr_cmp(&inet6_sk(__sk)->rcv_saddr, (__daddr))	&& \
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 
 /* These can have wildcards, don't try too hard. */
@@ -824,7 +830,7 @@ extern const char timer_bug_msg[];
 
 static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	
 	switch (what) {
 	case TCP_TIME_RETRANS:
@@ -859,7 +865,7 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
  */
 static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long when)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 
 	if (when > TCP_RTO_MAX) {
 #ifdef TCP_DEBUG
@@ -895,7 +901,7 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 
 static __inline__ unsigned int tcp_current_mss(struct sock *sk)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
 	int mss_now = tp->mss_cache; 
 
@@ -918,7 +924,7 @@ static __inline__ unsigned int tcp_current_mss(struct sock *sk)
 
 static inline void tcp_initialize_rcv_mss(struct sock *sk)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	unsigned int hint = min(tp->advmss, tp->mss_cache);
 
 	hint = min(hint, tp->rcv_wnd/2);
@@ -1321,7 +1327,7 @@ static __inline__ void tcp_prequeue_init(struct tcp_opt *tp)
  */
 static __inline__ int tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 
 	if (tp->ucopy.task) {
 		__skb_queue_tail(&tp->ucopy.prequeue, skb);
@@ -1572,7 +1578,7 @@ static inline int tcp_acceptq_is_full(struct sock *sk)
 static inline void tcp_acceptq_queue(struct sock *sk, struct open_request *req,
 					 struct sock *child)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 
 	req->sk = child;
 	tcp_acceptq_added(sk);
@@ -1598,7 +1604,7 @@ struct tcp_listen_opt
 static inline void
 tcp_synq_removed(struct sock *sk, struct open_request *req)
 {
-	struct tcp_listen_opt *lopt = sk->tp_pinfo.af_tcp.listen_opt;
+	struct tcp_listen_opt *lopt = tcp_sk(sk)->listen_opt;
 
 	if (--lopt->qlen == 0)
 		tcp_delete_keepalive_timer(sk);
@@ -1608,7 +1614,7 @@ tcp_synq_removed(struct sock *sk, struct open_request *req)
 
 static inline void tcp_synq_added(struct sock *sk)
 {
-	struct tcp_listen_opt *lopt = sk->tp_pinfo.af_tcp.listen_opt;
+	struct tcp_listen_opt *lopt = tcp_sk(sk)->listen_opt;
 
 	if (lopt->qlen++ == 0)
 		tcp_reset_keepalive_timer(sk, TCP_TIMEOUT_INIT);
@@ -1617,17 +1623,17 @@ static inline void tcp_synq_added(struct sock *sk)
 
 static inline int tcp_synq_len(struct sock *sk)
 {
-	return sk->tp_pinfo.af_tcp.listen_opt->qlen;
+	return tcp_sk(sk)->listen_opt->qlen;
 }
 
 static inline int tcp_synq_young(struct sock *sk)
 {
-	return sk->tp_pinfo.af_tcp.listen_opt->qlen_young;
+	return tcp_sk(sk)->listen_opt->qlen_young;
 }
 
 static inline int tcp_synq_is_full(struct sock *sk)
 {
-	return tcp_synq_len(sk)>>sk->tp_pinfo.af_tcp.listen_opt->max_qlen_log;
+	return tcp_synq_len(sk) >> tcp_sk(sk)->listen_opt->max_qlen_log;
 }
 
 static inline void tcp_synq_unlink(struct tcp_opt *tp, struct open_request *req,
@@ -1641,7 +1647,7 @@ static inline void tcp_synq_unlink(struct tcp_opt *tp, struct open_request *req,
 static inline void tcp_synq_drop(struct sock *sk, struct open_request *req,
 				     struct open_request **prev)
 {
-	tcp_synq_unlink(&sk->tp_pinfo.af_tcp, req, prev);
+	tcp_synq_unlink(tcp_sk(sk), req, prev);
 	tcp_synq_removed(sk, req);
 	tcp_openreq_free(req);
 }
@@ -1667,7 +1673,7 @@ static __inline__ void tcp_openreq_init(struct open_request *req,
 
 static inline void tcp_free_skb(struct sock *sk, struct sk_buff *skb)
 {
-	sk->tp_pinfo.af_tcp.queue_shrunk = 1;
+	tcp_sk(sk)->queue_shrunk = 1;
 	sk->wmem_queued -= skb->truesize;
 	sk->forward_alloc += skb->truesize;
 	__kfree_skb(skb);

@@ -42,6 +42,7 @@ Return value:
 
 int AcceptConnections(const int CPUNR, struct socket *Socket)
 {
+	struct tcp_opt *tp;
 	struct http_request *NewRequest;
 	struct socket *NewSock;
 	int count = 0;
@@ -57,13 +58,14 @@ int AcceptConnections(const int CPUNR, struct socket *Socket)
 	
 	if (Socket==NULL) return 0;
 	
+	tp = tcp_sk(Socket->sk);
 	/* 
 	   Quick test to see if there are connections on the queue.
 	   This is cheaper than accept() itself because this saves us
 	   the allocation of a new socket. (Which doesn't seem to be 
 	   used anyway)
 	*/
-   	if (Socket->sk->tp_pinfo.af_tcp.accept_queue==NULL)
+   	if (tp->accept_queue==NULL)
 	{
 		return 0;
 	}

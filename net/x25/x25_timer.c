@@ -32,6 +32,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
@@ -59,59 +60,69 @@ void x25_stop_heartbeat(struct sock *sk)
 
 void x25_start_t2timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.x25->timer);
+	x25_cb *x25 = x25_sk(sk);
 
-	sk->protinfo.x25->timer.data     = (unsigned long)sk;
-	sk->protinfo.x25->timer.function = &x25_timer_expiry;
-	sk->protinfo.x25->timer.expires  = jiffies + sk->protinfo.x25->t2;
+	del_timer(&x25->timer);
 
-	add_timer(&sk->protinfo.x25->timer);
+	x25->timer.data     = (unsigned long)sk;
+	x25->timer.function = &x25_timer_expiry;
+	x25->timer.expires  = jiffies + x25->t2;
+
+	add_timer(&x25->timer);
 }
 
 void x25_start_t21timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.x25->timer);
+	x25_cb *x25 = x25_sk(sk);
 
-	sk->protinfo.x25->timer.data     = (unsigned long)sk;
-	sk->protinfo.x25->timer.function = &x25_timer_expiry;
-	sk->protinfo.x25->timer.expires  = jiffies + sk->protinfo.x25->t21;
+	del_timer(&x25->timer);
 
-	add_timer(&sk->protinfo.x25->timer);
+	x25->timer.data     = (unsigned long)sk;
+	x25->timer.function = &x25_timer_expiry;
+	x25->timer.expires  = jiffies + x25->t21;
+
+	add_timer(&x25->timer);
 }
 
 void x25_start_t22timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.x25->timer);
+	x25_cb *x25 = x25_sk(sk);
 
-	sk->protinfo.x25->timer.data     = (unsigned long)sk;
-	sk->protinfo.x25->timer.function = &x25_timer_expiry;
-	sk->protinfo.x25->timer.expires  = jiffies + sk->protinfo.x25->t22;
+	del_timer(&x25->timer);
 
-	add_timer(&sk->protinfo.x25->timer);
+	x25->timer.data     = (unsigned long)sk;
+	x25->timer.function = &x25_timer_expiry;
+	x25->timer.expires  = jiffies + x25->t22;
+
+	add_timer(&x25->timer);
 }
 
 void x25_start_t23timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.x25->timer);
+	x25_cb *x25 = x25_sk(sk);
 
-	sk->protinfo.x25->timer.data     = (unsigned long)sk;
-	sk->protinfo.x25->timer.function = &x25_timer_expiry;
-	sk->protinfo.x25->timer.expires  = jiffies + sk->protinfo.x25->t23;
+	del_timer(&x25->timer);
 
-	add_timer(&sk->protinfo.x25->timer);
+	x25->timer.data     = (unsigned long)sk;
+	x25->timer.function = &x25_timer_expiry;
+	x25->timer.expires  = jiffies + x25->t23;
+
+	add_timer(&x25->timer);
 }
 
 void x25_stop_timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.x25->timer);
+	del_timer(&x25_sk(sk)->timer);
 }
 
 unsigned long x25_display_timer(struct sock *sk)
 {
-	if (!timer_pending(&sk->protinfo.x25->timer))
+	x25_cb *x25 = x25_sk(sk);
+
+	if (!timer_pending(&x25->timer))
 		return 0;
 
-	return sk->protinfo.x25->timer.expires - jiffies;
+	return x25->timer.expires - jiffies;
 }
 
 static void x25_heartbeat_expiry(unsigned long param)
@@ -123,7 +134,7 @@ static void x25_heartbeat_expiry(unsigned long param)
 		goto restart_heartbeat;
 	}
 
-	switch (sk->protinfo.x25->state) {
+	switch (x25_sk(sk)->state) {
 
 		case X25_STATE_0:
 			/* Magic here: If we listen() and a new link dies before it
@@ -153,11 +164,13 @@ static void x25_heartbeat_expiry(unsigned long param)
  */
 static inline void x25_do_timer_expiry(struct sock * sk)
 {
-	switch (sk->protinfo.x25->state) {
+	x25_cb *x25 = x25_sk(sk);
+
+	switch (x25->state) {
 
 		case X25_STATE_3:	/* T2 */
-			if (sk->protinfo.x25->condition & X25_COND_ACK_PENDING) {
-				sk->protinfo.x25->condition &= ~X25_COND_ACK_PENDING;
+			if (x25->condition & X25_COND_ACK_PENDING) {
+				x25->condition &= ~X25_COND_ACK_PENDING;
 				x25_enquiry_response(sk);
 			}
 			break;
@@ -165,7 +178,7 @@ static inline void x25_do_timer_expiry(struct sock * sk)
 		case X25_STATE_1:	/* T21 */
 		case X25_STATE_4:	/* T22 */
 			x25_write_internal(sk, X25_CLEAR_REQUEST);
-			sk->protinfo.x25->state = X25_STATE_2;
+			x25->state = X25_STATE_2;
 			x25_start_t23timer(sk);
 			break;
 
@@ -181,7 +194,7 @@ static void x25_timer_expiry(unsigned long param)
 
 	bh_lock_sock(sk);
 	if (sk->lock.users) { /* can currently only occur in state 3 */
-		if (sk->protinfo.x25->state == X25_STATE_3) {
+		if (x25_sk(sk)->state == X25_STATE_3) {
 			x25_start_t2timer(sk);
 		}
 	} else {

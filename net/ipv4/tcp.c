@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.215 2001/10/31 08:17:58 davem Exp $
+ * Version:	$Id: tcp.c,v 1.216 2002/02/01 22:01:04 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -363,7 +363,7 @@ void tcp_rfree(struct sk_buff *skb)
  */
 static __inline__ unsigned int tcp_listen_poll(struct sock *sk, poll_table *wait)
 {
-	return sk->tp_pinfo.af_tcp.accept_queue ? (POLLIN | POLLRDNORM) : 0;
+	return tcp_sk(sk)->accept_queue ? (POLLIN | POLLRDNORM) : 0;
 }
 
 /*
@@ -377,7 +377,7 @@ unsigned int tcp_poll(struct file * file, struct socket *sock, poll_table *wait)
 {
 	unsigned int mask;
 	struct sock *sk = sock->sk;
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 
 	poll_wait(file, sk->sleep, wait);
 	if (sk->state == TCP_LISTEN)
@@ -477,7 +477,7 @@ void tcp_write_space(struct sock *sk)
 
 int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int answ;
 
 	switch(cmd) {
@@ -524,7 +524,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 int tcp_listen_start(struct sock *sk)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt;
 
 	sk->max_ack_backlog = 0;
@@ -576,7 +576,7 @@ int tcp_listen_start(struct sock *sk)
 
 static void tcp_listen_stop (struct sock *sk)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt = tp->listen_opt;
 	struct open_request *acc_req = tp->accept_queue;
 	struct open_request *req;
@@ -647,6 +647,7 @@ static void tcp_listen_stop (struct sock *sk)
  */
 static int wait_for_tcp_connect(struct sock * sk, int flags, long *timeo_p)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
 
@@ -663,7 +664,7 @@ static int wait_for_tcp_connect(struct sock * sk, int flags, long *timeo_p)
 
 		__set_task_state(tsk, TASK_INTERRUPTIBLE);
 		add_wait_queue(sk->sleep, &wait);
-		sk->tp_pinfo.af_tcp.write_pending++;
+		tp->write_pending++;
 
 		release_sock(sk);
 		*timeo_p = schedule_timeout(*timeo_p);
@@ -671,7 +672,7 @@ static int wait_for_tcp_connect(struct sock * sk, int flags, long *timeo_p)
 
 		__set_task_state(tsk, TASK_RUNNING);
 		remove_wait_queue(sk->sleep, &wait);
-		sk->tp_pinfo.af_tcp.write_pending--;
+		tp->write_pending--;
 	}
 	return 0;
 }
@@ -686,6 +687,7 @@ static inline int tcp_memory_free(struct sock *sk)
  */
 static int wait_for_tcp_memory(struct sock * sk, long *timeo)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
 	int err = 0;
 	long vm_wait = 0;
 	long current_timeo = *timeo;
@@ -711,12 +713,12 @@ static int wait_for_tcp_memory(struct sock * sk, long *timeo)
 			break;
 
 		set_bit(SOCK_NOSPACE, &sk->socket->flags);
-		sk->tp_pinfo.af_tcp.write_pending++;
+		tp->write_pending++;
 		release_sock(sk);
 		if (!tcp_memory_free(sk) || vm_wait)
 			current_timeo = schedule_timeout(current_timeo);
 		lock_sock(sk);
-		sk->tp_pinfo.af_tcp.write_pending--;
+		tp->write_pending--;
 
 		if (vm_wait) {
 			vm_wait -= current_timeo;
@@ -825,7 +827,7 @@ static int tcp_error(struct sock *sk, int flags, int err)
 
 ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffset, size_t psize, int flags)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int mss_now;
 	int err;
 	ssize_t copied;
@@ -950,8 +952,8 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset, size_t 
 	return res;
 }
 
-#define TCP_PAGE(sk)	(sk->tp_pinfo.af_tcp.sndmsg_page)
-#define TCP_OFF(sk)	(sk->tp_pinfo.af_tcp.sndmsg_off)
+#define TCP_PAGE(sk)	(tcp_sk(sk)->sndmsg_page)
+#define TCP_OFF(sk)	(tcp_sk(sk)->sndmsg_off)
 
 static inline int
 tcp_copy_to_page(struct sock *sk, char *from, struct sk_buff *skb,
@@ -1008,14 +1010,12 @@ static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 int tcp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 {
 	struct iovec *iov;
-	struct tcp_opt *tp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct sk_buff *skb;
 	int iovlen, flags;
 	int mss_now;
 	int err, copied;
 	long timeo;
-
-	tp = &(sk->tp_pinfo.af_tcp);
 
 	lock_sock(sk);
 	TCP_CHECK_TIMER(sk);
@@ -1216,7 +1216,7 @@ static int tcp_recv_urg(struct sock * sk, long timeo,
 			struct msghdr *msg, int len, int flags, 
 			int *addr_len)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 
 	/* No URG data to read. */
 	if (sk->urginline || !tp->urg_data || tp->urg_data == TCP_URG_READ)
@@ -1277,7 +1277,7 @@ static inline void tcp_eat_skb(struct sock *sk, struct sk_buff * skb)
  */
 static void cleanup_rbuf(struct sock *sk, int copied)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int time_to_ack = 0;
 
 #if TCP_DEBUG
@@ -1362,7 +1362,7 @@ static long tcp_data_wait(struct sock *sk, long timeo)
 static void tcp_prequeue_process(struct sock *sk)
 {
 	struct sk_buff *skb;
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 
 	net_statistics[smp_processor_id()*2+1].TCPPrequeued += skb_queue_len(&tp->ucopy.prequeue);
 
@@ -1387,7 +1387,7 @@ static void tcp_prequeue_process(struct sock *sk)
 int tcp_recvmsg(struct sock *sk, struct msghdr *msg,
 		int len, int nonblock, int flags, int *addr_len)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int copied = 0;
 	u32 peek_seq;
 	u32 *seq;
@@ -1936,7 +1936,7 @@ adjudge_to_death:
 	 */
 
 	if (sk->state == TCP_FIN_WAIT2) {
-		struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+		struct tcp_opt *tp = tcp_sk(sk);
 		if (tp->linger2 < 0) {
 			tcp_set_state(sk, TCP_CLOSE);
 			tcp_send_active_reset(sk, GFP_ATOMIC);
@@ -1988,7 +1988,7 @@ extern __inline__ int tcp_need_reset(int state)
 
 int tcp_disconnect(struct sock *sk, int flags)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	int old_state;
 	int err = 0;
 
@@ -2021,8 +2021,12 @@ int tcp_disconnect(struct sock *sk, int flags)
 		sk->rcv_saddr = 0;
 		sk->saddr = 0;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		memset(&sk->net_pinfo.af_inet6.saddr, 0, 16);
-		memset(&sk->net_pinfo.af_inet6.rcv_saddr, 0, 16);
+		if (sk->family == PF_INET6) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
+
+			memset(&np->saddr, 0, 16);
+			memset(&np->rcv_saddr, 0, 16);
+		}
 #endif
 	}
 
@@ -2057,6 +2061,7 @@ int tcp_disconnect(struct sock *sk, int flags)
  */
 static int wait_for_connect(struct sock * sk, long timeo)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
 	DECLARE_WAITQUEUE(wait, current);
 	int err;
 
@@ -2078,11 +2083,11 @@ static int wait_for_connect(struct sock * sk, long timeo)
 	for (;;) {
 		current->state = TASK_INTERRUPTIBLE;
 		release_sock(sk);
-		if (sk->tp_pinfo.af_tcp.accept_queue == NULL)
+		if (tp->accept_queue == NULL)
 			timeo = schedule_timeout(timeo);
 		lock_sock(sk);
 		err = 0;
-		if (sk->tp_pinfo.af_tcp.accept_queue)
+		if (tp->accept_queue)
 			break;
 		err = -EINVAL;
 		if (sk->state != TCP_LISTEN)
@@ -2105,7 +2110,7 @@ static int wait_for_connect(struct sock * sk, long timeo)
 
 struct sock *tcp_accept(struct sock *sk, int flags, int *err)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct open_request *req;
 	struct sock *newsk;
 	int error;
@@ -2157,7 +2162,7 @@ out:
 int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval, 
 		   int optlen)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int val;
 	int err = 0;
 
@@ -2316,7 +2321,7 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 		   int *optlen)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int val, len;
 
 	if(level != SOL_TCP)

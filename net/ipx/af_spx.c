@@ -20,6 +20,8 @@
  *				Added spx_datagram_poll() so that select()
  *				works now on SPX sockets.  Added updating
  *				of the alloc count to follow rmt_seq.
+ *	Arnaldo C. Melo :	Use a private slabcache for the old tp_pinfo
+ *				struct sock member, use spx_sk and ipx_sk
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -34,6 +36,7 @@
 #include <linux/module.h>
 #include <net/ipx.h>
 #include <net/spx.h>
+#include <net/tcp.h>
 #include <net/sock.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
@@ -60,7 +63,7 @@ extern void ipx_remove_socket(struct sock *sk);
 static unsigned int spx_datagram_poll(struct file * file, struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
-	struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+	struct spx_opt *pdata = spx_sk(sk);
 	unsigned int mask;
 
 	poll_wait(file, sk->sleep, wait);
@@ -95,7 +98,7 @@ static unsigned int spx_datagram_poll(struct file * file, struct socket *sock, p
 /* Create the SPX specific data */
 static int spx_sock_init(struct sock *sk)
 {
-        struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+        struct spx_opt *pdata = spx_sk(sk);
 
         pdata->state            = SPX_CLOSED;
         pdata->sequence         = 0;
@@ -159,7 +162,7 @@ static int spx_create(struct socket *sock, int protocol)
 
 void spx_close_socket(struct sock *sk)
 {
-	struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+	struct spx_opt *pdata = spx_sk(sk);
 
 	pdata->state	= SPX_CLOSED;
 	sk->state 	= TCP_CLOSE;
@@ -169,7 +172,7 @@ void spx_close_socket(struct sock *sk)
 
 void spx_destroy_socket(struct sock *sk)
 {
-	struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+	struct spx_opt *pdata = spx_sk(sk);
 	struct sk_buff *skb;
 
         ipx_remove_socket(sk);
@@ -190,7 +193,7 @@ void spx_destroy_socket(struct sock *sk)
 static int spx_release(struct socket *sock)
 {
  	struct sock *sk = sock->sk;
-	struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+	struct spx_opt *pdata = spx_sk(sk);
 
 	if(sk == NULL)
 		return (0);
@@ -285,7 +288,7 @@ static int spx_accept(struct socket *sock, struct socket *newsock, int flags)
         sk->ack_backlog--;
         newsock->sk 	= newsk;
 	newsk->state 	= TCP_ESTABLISHED;
-	newsk->protinfo.af_ipx.dest_addr = newsk->tp_pinfo.af_spx.dest_addr;
+	ipx_sk(newsk)->dest_addr = spx_sk(newsk)->dest_addr;
 
 	return (0);
 }
@@ -295,7 +298,7 @@ static int spx_connect(struct socket *sock, struct sockaddr *uaddr,
                 int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
-        struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+        struct spx_opt *pdata = spx_sk(sk);
         struct sockaddr_ipx src;
 	struct sk_buff *skb;
 	int size, err;
@@ -313,7 +316,7 @@ static int spx_connect(struct socket *sock, struct sockaddr *uaddr,
         if(err)
                 return (err);
 
-        pdata->dest_addr = sk->protinfo.af_ipx.dest_addr;
+        pdata->dest_addr = ipx_sk(sk)->dest_addr;
 	pdata->state	 = SPX_CONNECTING;
 	sock->state	 = SS_CONNECTING;
         sk->state	 = TCP_SYN_SENT;
@@ -423,7 +426,7 @@ static int spx_route_skb(struct spx_opt *pdata, struct sk_buff *skb, int type)
 /* SPX packet transmit engine */
 static int spx_transmit(struct sock *sk, struct sk_buff *skb, int type, int len)
 {
-        struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+        struct spx_opt *pdata = spx_sk(sk);
         struct ipxspxhdr *ipxh;
 	unsigned long flags;
 	int err;
@@ -520,7 +523,7 @@ static int spx_transmit(struct sock *sk, struct sk_buff *skb, int type, int len)
 static void spx_watchdog(unsigned long data)
 {
 	struct sock *sk = (struct sock*)data;
-        struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+        struct spx_opt *pdata = spx_sk(sk);
 
         del_timer(&pdata->watchdog);
 	if(pdata->state == SPX_CLOSED)
@@ -541,7 +544,7 @@ static void spx_watchdog(unsigned long data)
 static void spx_retransmit(unsigned long data)
 {
 	struct sock *sk = (struct sock*)data;
-        struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+        struct spx_opt *pdata = spx_sk(sk);
 	struct sk_buff *skb;
 	unsigned long flags;
 	int err;
@@ -614,7 +617,7 @@ void spx_rcv(struct sock *sk, int bytes)
 {
 	struct sk_buff *skb;
 	struct ipxspxhdr *ipxh;
-	struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+	struct spx_opt *pdata = spx_sk(sk);
 
 	skb = skb_dequeue(&sk->receive_queue);
 	if(skb == NULL)
@@ -736,7 +739,7 @@ static int spx_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if(flags&~MSG_DONTWAIT)
                 return (-EINVAL);
 
-	offset	= ipx_if_offset(sk->tp_pinfo.af_spx.dest_addr.net);
+	offset	= ipx_if_offset(spx_sk(sk)->dest_addr.net);
         size 	= offset + sizeof(struct ipxspxhdr) + len;
 
 	cli();
@@ -770,7 +773,7 @@ static int spx_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	struct sk_buff *skb;
 	struct ipxspxhdr *ispxh;
 	struct sock *sk = sock->sk;
-	struct spx_opt *pdata = &sk->tp_pinfo.af_spx;
+	struct spx_opt *pdata = spx_sk(sk);
 	struct sockaddr_ipx *sipx = (struct sockaddr_ipx *)msg->msg_name;
 	int copied, err;
 
@@ -906,8 +909,10 @@ static struct proto_ops SOCKOPS_WRAPPED(spx_ops) = {
 SOCKOPS_WRAP(spx, PF_IPX);
 
 static struct net_proto_family spx_family_ops = {
-	family:		PF_IPX,
-	create:		spx_create,
+	family:	 PF_IPX,
+	create:	 spx_create,
+	sk_size: sizeof(struct sock) + sizeof(struct ipx_opt) +
+		 sizeof(struct spx_opt),
 };
 
 static char banner[] __initdata = KERN_INFO "NET4: Sequenced Packet eXchange (SPX) 0.02 for Linux NET4.0\n";
@@ -917,6 +922,16 @@ static int __init spx_proto_init(void)
 	int error;
 
 	connids = (__u16)jiffies;	/* initalize random */
+
+        /* allocate our sock slab cache */
+
+        spx_family_ops.sk_cachep = kmem_cache_create("spx_sock",
+                                                      spx_family_ops.sk_size,
+                                                      0, SLAB_HWCACHE_ALIGN,
+                                                      0, 0);
+        if (!spx_family_ops.sk_cachep)
+                printk(KERN_CRIT __FUNCTION__
+                        ": Cannot create spx_sock SLAB cache!\n");
 
 	error = ipx_register_spx(&ipx_operations, &spx_family_ops);
         if (error)

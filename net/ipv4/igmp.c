@@ -8,7 +8,7 @@
  *	the older version didn't come out right using gcc 2.5.8, the newer one
  *	seems to fall out with gcc 2.6.2.
  *
- *	Version: $Id: igmp.c,v 1.46 2001/07/27 09:27:29 davem Exp $
+ *	Version: $Id: igmp.c,v 1.47 2002/02/01 22:01:03 davem Exp $
  *
  *	Authors:
  *		Alan Cox <Alan.Cox@linux.org>
@@ -644,6 +644,7 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 	u32 addr = imr->imr_multiaddr.s_addr;
 	struct ip_mc_socklist *iml, *i;
 	struct in_device *in_dev;
+	struct inet_opt *inet = inet_sk(sk);
 	int count = 0;
 
 	if (!MULTICAST(addr))
@@ -668,7 +669,7 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 	iml = (struct ip_mc_socklist *)sock_kmalloc(sk, sizeof(*iml), GFP_KERNEL);
 
 	err = -EADDRINUSE;
-	for (i=sk->protinfo.af_inet.mc_list; i; i=i->next) {
+	for (i = inet->mc_list; i; i = i->next) {
 		if (memcmp(&i->multi, imr, sizeof(*imr)) == 0) {
 			/* New style additions are reference counted */
 			if (imr->imr_address.s_addr == 0) {
@@ -683,9 +684,9 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 	if (iml == NULL || count >= sysctl_igmp_max_memberships)
 		goto done;
 	memcpy(&iml->multi, imr, sizeof(*imr));
-	iml->next = sk->protinfo.af_inet.mc_list;
+	iml->next = inet->mc_list;
 	iml->count = 1;
-	sk->protinfo.af_inet.mc_list = iml;
+	inet->mc_list = iml;
 	ip_mc_inc_group(in_dev, addr);
 	iml = NULL;
 	err = 0;
@@ -703,10 +704,11 @@ done:
 
 int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct ip_mc_socklist *iml, **imlp;
 
 	rtnl_lock();
-	for (imlp=&sk->protinfo.af_inet.mc_list; (iml=*imlp)!=NULL; imlp=&iml->next) {
+	for (imlp = &inet->mc_list; (iml = *imlp) != NULL; imlp = &iml->next) {
 		if (iml->multi.imr_multiaddr.s_addr==imr->imr_multiaddr.s_addr &&
 		    iml->multi.imr_address.s_addr==imr->imr_address.s_addr &&
 		    (!imr->imr_ifindex || iml->multi.imr_ifindex==imr->imr_ifindex)) {
@@ -738,15 +740,16 @@ int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 
 void ip_mc_drop_socket(struct sock *sk)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct ip_mc_socklist *iml;
 
-	if (sk->protinfo.af_inet.mc_list == NULL)
+	if (inet->mc_list == NULL)
 		return;
 
 	rtnl_lock();
-	while ((iml=sk->protinfo.af_inet.mc_list) != NULL) {
+	while ((iml = inet->mc_list) != NULL) {
 		struct in_device *in_dev;
-		sk->protinfo.af_inet.mc_list = iml->next;
+		inet->mc_list = iml->next;
 
 		if ((in_dev = inetdev_by_index(iml->multi.imr_ifindex)) != NULL) {
 			ip_mc_dec_group(in_dev, iml->multi.imr_multiaddr.s_addr);

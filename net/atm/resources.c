@@ -2,6 +2,11 @@
 
 /* Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA */
 
+/* Fixes
+ * Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 2002/01 - don't free the whole struct sock on sk->destruct time,
+ * 	     use the default destruct function initialized by sock_init_data */
+
 
 #include <linux/config.h>
 #include <linux/ctype.h>
@@ -138,28 +143,19 @@ void shutdown_atm_dev(struct atm_dev *dev)
 	atm_dev_deregister(dev);
 }
 
-
-/* Handler for sk->destruct, invoked by sk_free() */
-static void atm_free_sock(struct sock *sk)
-{
-	kfree(sk->protinfo.af_atm);
-}
-
-
 struct sock *alloc_atm_vcc_sk(int family)
 {
 	struct sock *sk;
 	struct atm_vcc *vcc;
 
-	sk = sk_alloc(family, GFP_KERNEL, 1);
+	sk = sk_alloc(family, GFP_KERNEL, 1, NULL);
 	if (!sk) return NULL;
-	vcc = sk->protinfo.af_atm = kmalloc(sizeof(*vcc),GFP_KERNEL);
+	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
 	if (!vcc) {
 		sk_free(sk);
 		return NULL;
 	}
 	sock_init_data(NULL,sk);
-	sk->destruct = atm_free_sock;
 	memset(vcc,0,sizeof(*vcc));
 	vcc->sk = sk;
 	if (nodev_vccs) nodev_vccs->prev = vcc;
@@ -185,7 +181,7 @@ static void unlink_vcc(struct atm_vcc *vcc,struct atm_dev *hold_dev)
 
 void free_atm_vcc_sk(struct sock *sk)
 {
-	unlink_vcc(sk->protinfo.af_atm,NULL);
+	unlink_vcc(atm_sk(sk), NULL);
 	sk_free(sk);
 }
 

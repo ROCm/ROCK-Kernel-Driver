@@ -9,7 +9,7 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  * 
- *  $Id: syncookies.c,v 1.17 2001/10/26 14:55:41 davem Exp $
+ *  $Id: syncookies.c,v 1.18 2002/02/01 22:01:04 davem Exp $
  *
  *  Missing: IPv6 support. 
  */
@@ -48,11 +48,12 @@ static __u16 const msstab[] = {
  */
 __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, __u16 *mssp)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
 	int mssind;
 	const __u16 mss = *mssp;
 
 	
-	sk->tp_pinfo.af_tcp.last_synq_overflow = jiffies;
+	tp->last_synq_overflow = jiffies;
 
 	/* XXX sort msstab[] by probability?  Binary search? */
 	for (mssind = 0; mss > msstab[mssind + 1]; mssind++)
@@ -98,7 +99,7 @@ static inline struct sock *get_cookie_sock(struct sock *sk, struct sk_buff *skb,
 					   struct open_request *req,
 					   struct dst_entry *dst)
 {
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct sock *child;
 
 	child = tp->af_specific->syn_recv_sock(sk, skb, req, dst);
@@ -113,6 +114,7 @@ static inline struct sock *get_cookie_sock(struct sock *sk, struct sk_buff *skb,
 struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 			     struct ip_options *opt)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
 	__u32 cookie = ntohl(skb->h.th->ack_seq) - 1; 
 	struct sock *ret = sk;
 	struct open_request *req; 
@@ -123,7 +125,7 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	if (!sysctl_tcp_syncookies || !skb->h.th->ack)
 		goto out;
 
-  	if (time_after(jiffies, sk->tp_pinfo.af_tcp.last_synq_overflow + TCP_TIMEOUT_INIT) ||
+  	if (time_after(jiffies, tp->last_synq_overflow + TCP_TIMEOUT_INIT) ||
 	    (mss = cookie_check(skb, cookie)) == 0) {
 	 	NET_INC_STATS_BH(SyncookiesFailed);
 		goto out;

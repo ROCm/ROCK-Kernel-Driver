@@ -74,6 +74,8 @@ typedef struct {
 	struct sock		*sk;		/* Backlink to socket */
 } nr_cb;
 
+#define nr_sk(__sk) ((nr_cb *)(__sk)->protinfo)
+
 struct nr_neigh {
 	struct nr_neigh *next;
 	ax25_address    callsign;

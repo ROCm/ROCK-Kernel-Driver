@@ -113,6 +113,7 @@ Version 0.0.6    2.1.110   07-aug-98   Eduardo Marcelo Serrat
 #include <linux/route.h>
 #include <linux/netfilter.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <asm/ioctls.h>
 #include <linux/mm.h>
@@ -472,14 +473,17 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	struct sock *sk;
 	struct dn_scp *scp;
 
-	if  ((sk = sk_alloc(PF_DECnet, gfp, 1)) == NULL) 
+	if  ((sk = sk_alloc(PF_DECnet, gfp, 1, NULL)) == NULL) 
 		goto no_sock;
+	scp = kmalloc(sizeof(*scp), gfp);
+	if (!scp)
+		goto free_sock;
 
 	if (sock) {
 			sock->ops = &dn_proto_ops;
 	}
 	sock_init_data(sock,sk);
-	scp = DN_SK(sk);
+	DN_SK(sk) = scp;
 
 	sk->backlog_rcv = dn_nsp_backlog_rcv;
 	sk->destruct    = dn_destruct;
@@ -540,6 +544,8 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	MOD_INC_USE_COUNT;
 
 	return sk;
+free_sock:
+	sk_free(sk);
 no_sock:
 	return NULL;
 }

@@ -1,7 +1,7 @@
 /*
  * tcp_diag.c	Module for monitoring TCP sockets.
  *
- * Version:	$Id: tcp_diag.c,v 1.2 2001/11/05 09:42:22 davem Exp $
+ * Version:	$Id: tcp_diag.c,v 1.3 2002/02/01 22:01:04 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -44,7 +44,7 @@ static struct sock *tcpnl;
 static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 			int ext, u32 pid, u32 seq)
 {
-	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcpdiagmsg *r;
 	struct nlmsghdr  *nlh;
 	struct tcp_info  *info = NULL;
@@ -96,8 +96,10 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 
 #ifdef CONFIG_IPV6
 	if (r->tcpdiag_family == AF_INET6) {
-		memcpy(r->id.tcpdiag_src, &sk->net_pinfo.af_inet6.rcv_saddr, 16);
-		memcpy(r->id.tcpdiag_dst, &sk->net_pinfo.af_inet6.daddr, 16);
+		struct ipv6_pinfo *np = inet6_sk(sk);
+
+		memcpy(r->id.tcpdiag_src, &np->rcv_saddr, 16);
+		memcpy(r->id.tcpdiag_dst, &np->daddr, 16);
 	}
 #endif
 
@@ -329,10 +331,12 @@ int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
 
 #ifdef CONFIG_IPV6
 			if (sk->family == AF_INET6) {
+				struct ipv6_pinfo *np = inet6_sk(sk);
+
 				if (op->code == TCPDIAG_BC_S_COND)
-					addr = (u32*)&sk->net_pinfo.af_inet6.rcv_saddr;
+					addr = (u32*)&np->rcv_saddr;
 				else
-					addr = (u32*)&sk->net_pinfo.af_inet6.daddr;
+					addr = (u32*)&np->daddr;
 			} else
 #endif
 			{
@@ -441,7 +445,7 @@ int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 			goto skip_listen_ht;
 		tcp_listen_lock();
 		for (i = s_i; i < TCP_LHTABLE_SIZE; i++) {
-			struct sock *sk = tcp_listening_hash[i];
+			struct sock *sk;
 
 			if (i > s_i)
 				s_num = 0;

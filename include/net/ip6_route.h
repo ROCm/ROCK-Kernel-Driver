@@ -11,6 +11,8 @@
 
 #include <net/flow.h>
 #include <net/ip6_fib.h>
+#include <linux/tcp.h>
+#include <linux/ip.h>
 
 struct pol_chain {
 	int			type;
@@ -97,7 +99,7 @@ extern rwlock_t rt6_lock;
 static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
 				     struct in6_addr *daddr)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct rt6_info *rt = (struct rt6_info *) dst;
 
 	write_lock(&sk->dst_lock);

@@ -34,6 +34,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
@@ -45,11 +46,13 @@
  */
 void x25_clear_queues(struct sock *sk)
 {
+	x25_cb *x25 = x25_sk(sk);
+
 	skb_queue_purge(&sk->write_queue);
-	skb_queue_purge(&sk->protinfo.x25->ack_queue);
-	skb_queue_purge(&sk->protinfo.x25->interrupt_in_queue);
-	skb_queue_purge(&sk->protinfo.x25->interrupt_out_queue);
-	skb_queue_purge(&sk->protinfo.x25->fragment_queue);
+	skb_queue_purge(&x25->ack_queue);
+	skb_queue_purge(&x25->interrupt_in_queue);
+	skb_queue_purge(&x25->interrupt_out_queue);
+	skb_queue_purge(&x25->fragment_queue);
 }
 
 
@@ -61,19 +64,17 @@ void x25_clear_queues(struct sock *sk)
 void x25_frames_acked(struct sock *sk, unsigned short nr)
 {
 	struct sk_buff *skb;
-	int modulus = sk->protinfo.x25->neighbour->extended ? X25_EMODULUS :
-							      X25_SMODULUS;
+	x25_cb *x25 = x25_sk(sk);
+	int modulus = x25->neighbour->extended ? X25_EMODULUS : X25_SMODULUS;
 
 	/*
 	 * Remove all the ack-ed frames from the ack queue.
 	 */
-	if (sk->protinfo.x25->va != nr)
-		while (skb_peek(&sk->protinfo.x25->ack_queue) != NULL &&
-		       sk->protinfo.x25->va != nr) {
-			skb = skb_dequeue(&sk->protinfo.x25->ack_queue);
+	if (x25->va != nr)
+		while (skb_peek(&x25->ack_queue) && x25->va != nr) {
+			skb = skb_dequeue(&x25->ack_queue);
 			kfree_skb(skb);
-			sk->protinfo.x25->va = (sk->protinfo.x25->va + 1) %
-						modulus;
+			x25->va = (x25->va + 1) % modulus;
 		}
 }
 
@@ -86,7 +87,7 @@ void x25_requeue_frames(struct sock *sk)
 	 * up by x25_kick. This arrangement handles the possibility of an empty
 	 * output queue.
 	 */
-	while ((skb = skb_dequeue(&sk->protinfo.x25->ack_queue)) != NULL) {
+	while ((skb = skb_dequeue(&x25_sk(sk)->ack_queue)) != NULL) {
 		if (skb_prev == NULL)
 			skb_queue_head(&sk->write_queue, skb);
 		else
@@ -101,16 +102,16 @@ void x25_requeue_frames(struct sock *sk)
  */
 int x25_validate_nr(struct sock *sk, unsigned short nr)
 {
-	unsigned short vc = sk->protinfo.x25->va;
-	int modulus = sk->protinfo.x25->neighbour->extended ? X25_EMODULUS :
-							      X25_SMODULUS;
+	x25_cb *x25 = x25_sk(sk);
+	unsigned short vc = x25->va;
+	int modulus = x25->neighbour->extended ? X25_EMODULUS : X25_SMODULUS;
 
-	while (vc != sk->protinfo.x25->vs) {
+	while (vc != x25->vs) {
 		if (nr == vc) return 1;
 		vc = (vc + 1) % modulus;
 	}
 
-	return nr == sk->protinfo.x25->vs ? 1 : 0;
+	return nr == x25->vs ? 1 : 0;
 }
 
 /* 
@@ -119,6 +120,7 @@ int x25_validate_nr(struct sock *sk, unsigned short nr)
  */
 void x25_write_internal(struct sock *sk, int frametype)
 {
+	x25_cb *x25 = x25_sk(sk);
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 	unsigned char  facilities[X25_MAX_FAC_LEN];
@@ -172,10 +174,10 @@ void x25_write_internal(struct sock *sk, int frametype)
 	 */
 	dptr = skb_put(skb, 2);
 
-	lci1 = (sk->protinfo.x25->lci >> 8) & 0x0F;
-	lci2 = (sk->protinfo.x25->lci >> 0) & 0xFF;
+	lci1 = (x25->lci >> 8) & 0x0F;
+	lci2 = (x25->lci >> 0) & 0xFF;
 
-	if (sk->protinfo.x25->neighbour->extended) {
+	if (x25->neighbour->extended) {
 		*dptr++ = lci1 | X25_GFI_EXTSEQ;
 		*dptr++ = lci2;
 	} else {
@@ -191,27 +193,34 @@ void x25_write_internal(struct sock *sk, int frametype)
 		case X25_CALL_REQUEST:
 			dptr    = skb_put(skb, 1);
 			*dptr++ = X25_CALL_REQUEST;
-			len     = x25_addr_aton(addresses, &sk->protinfo.x25->dest_addr, &sk->protinfo.x25->source_addr);
+			len     = x25_addr_aton(addresses, &x25->dest_addr,
+						&x25->source_addr);
 			dptr    = skb_put(skb, len);
 			memcpy(dptr, addresses, len);
-			len     = x25_create_facilities(facilities, &sk->protinfo.x25->facilities, sk->protinfo.x25->neighbour->global_facil_mask);
+			len     = x25_create_facilities(facilities,
+							&x25->facilities,
+					     x25->neighbour->global_facil_mask);
 			dptr    = skb_put(skb, len);
 			memcpy(dptr, facilities, len);
-			dptr = skb_put(skb, sk->protinfo.x25->calluserdata.cudlength);
-			memcpy(dptr, sk->protinfo.x25->calluserdata.cuddata, sk->protinfo.x25->calluserdata.cudlength);
-			sk->protinfo.x25->calluserdata.cudlength = 0;
+			dptr = skb_put(skb, x25->calluserdata.cudlength);
+			memcpy(dptr, x25->calluserdata.cuddata,
+			       x25->calluserdata.cudlength);
+			x25->calluserdata.cudlength = 0;
 			break;
 
 		case X25_CALL_ACCEPTED:
 			dptr    = skb_put(skb, 2);
 			*dptr++ = X25_CALL_ACCEPTED;
 			*dptr++ = 0x00;		/* Address lengths */
-			len     = x25_create_facilities(facilities, &sk->protinfo.x25->facilities, sk->protinfo.x25->vc_facil_mask);
+			len     = x25_create_facilities(facilities,
+							&x25->facilities,
+							x25->vc_facil_mask);
 			dptr    = skb_put(skb, len);
 			memcpy(dptr, facilities, len);
-			dptr = skb_put(skb, sk->protinfo.x25->calluserdata.cudlength);
-			memcpy(dptr, sk->protinfo.x25->calluserdata.cuddata, sk->protinfo.x25->calluserdata.cudlength);
-			sk->protinfo.x25->calluserdata.cudlength = 0;
+			dptr = skb_put(skb, x25->calluserdata.cudlength);
+			memcpy(dptr, x25->calluserdata.cuddata,
+			       x25->calluserdata.cudlength);
+			x25->calluserdata.cudlength = 0;
 			break;
 
 		case X25_CLEAR_REQUEST:
@@ -225,14 +234,14 @@ void x25_write_internal(struct sock *sk, int frametype)
 		case X25_RR:
 		case X25_RNR:
 		case X25_REJ:
-			if (sk->protinfo.x25->neighbour->extended) {
+			if (x25->neighbour->extended) {
 				dptr     = skb_put(skb, 2);
 				*dptr++  = frametype;
-				*dptr++  = (sk->protinfo.x25->vr << 1) & 0xFE;
+				*dptr++  = (x25->vr << 1) & 0xFE;
 			} else {
 				dptr     = skb_put(skb, 1);
 				*dptr    = frametype;
-				*dptr++ |= (sk->protinfo.x25->vr << 5) & 0xE0;
+				*dptr++ |= (x25->vr << 5) & 0xE0;
 			}
 			break;
 
@@ -244,7 +253,7 @@ void x25_write_internal(struct sock *sk, int frametype)
 			break;
 	}
 
-	x25_transmit_link(skb, sk->protinfo.x25->neighbour);
+	x25_transmit_link(skb, x25->neighbour);
 }
 
 /*
@@ -253,6 +262,7 @@ void x25_write_internal(struct sock *sk, int frametype)
 int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
 	       int *d, int *m)
 {
+	x25_cb *x25 = x25_sk(sk);
 	unsigned char *frame = skb->data;
 
 	*ns = *nr = *q = *d = *m = 0;
@@ -274,7 +284,7 @@ int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
 			return frame[2];
 	}
 
-	if (sk->protinfo.x25->neighbour->extended) {
+	if (x25->neighbour->extended) {
 		if (frame[2] == X25_RR  ||
 		    frame[2] == X25_RNR ||
 		    frame[2] == X25_REJ) {
@@ -290,7 +300,7 @@ int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
 		}
 	}
 
-	if (sk->protinfo.x25->neighbour->extended) {
+	if (x25->neighbour->extended) {
 		if ((frame[2] & 0x01) == X25_DATA) {
 			*q  = (frame[0] & X25_Q_BIT) == X25_Q_BIT;
 			*d  = (frame[0] & X25_D_BIT) == X25_D_BIT;
@@ -319,14 +329,16 @@ int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
 void x25_disconnect(struct sock *sk, int reason, unsigned char cause,
 		    unsigned char diagnostic)
 {
+	x25_cb *x25 = x25_sk(sk);
+
 	x25_clear_queues(sk);
 	x25_stop_timer(sk);
 
-	sk->protinfo.x25->lci   = 0;
-	sk->protinfo.x25->state = X25_STATE_0;
+	x25->lci   = 0;
+	x25->state = X25_STATE_0;
 
-	sk->protinfo.x25->causediag.cause      = cause;
-	sk->protinfo.x25->causediag.diagnostic = diagnostic;
+	x25->causediag.cause      = cause;
+	x25->causediag.diagnostic = diagnostic;
 
 	sk->state     = TCP_CLOSE;
 	sk->err       = reason;
@@ -344,11 +356,13 @@ void x25_disconnect(struct sock *sk, int reason, unsigned char cause,
  */
 void x25_check_rbuf(struct sock *sk)
 {
+	x25_cb *x25 = x25_sk(sk);
+
 	if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
-	    (sk->protinfo.x25->condition & X25_COND_OWN_RX_BUSY)) {
-		sk->protinfo.x25->condition &= ~X25_COND_OWN_RX_BUSY;
-		sk->protinfo.x25->condition &= ~X25_COND_ACK_PENDING;
-		sk->protinfo.x25->vl         = sk->protinfo.x25->vr;
+	    (x25->condition & X25_COND_OWN_RX_BUSY)) {
+		x25->condition &= ~X25_COND_OWN_RX_BUSY;
+		x25->condition &= ~X25_COND_ACK_PENDING;
+		x25->vl         = x25->vr;
 		x25_write_internal(sk, X25_RR);
 		x25_stop_timer(sk);
 	}

@@ -9,8 +9,6 @@ typedef unsigned short dn_address;
 #define dn_ntohs(x) le16_to_cpu((unsigned short)(x))
 #define dn_htons(x) cpu_to_le16((unsigned short)(x))
 
-#define DN_SK(sk) (&sk->protinfo.dn)
-
 struct dn_scp                                   /* Session Control Port */
 {
         unsigned char           state;
@@ -134,6 +132,8 @@ struct dn_scp                                   /* Session Control Port */
 	void (*delack_fxn)(struct sock *sk);
 
 };
+
+#define DN_SK(__sk) ((struct dn_scp *)(__sk)->protinfo)
 
 /*
  * src,dst : Source and Destination DECnet addresses

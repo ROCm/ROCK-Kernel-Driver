@@ -33,6 +33,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/inet.h>
+#include <linux/tcp.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/poll.h>

@@ -5,7 +5,7 @@
  *
  *		PACKET - implements raw packet sockets.
  *
- * Version:	$Id: af_packet.c,v 1.59 2001/12/21 04:56:17 davem Exp $
+ * Version:	$Id: af_packet.c,v 1.61 2002/02/08 03:57:19 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -199,6 +199,8 @@ struct packet_opt
 #endif
 };
 
+#define pkt_sk(__sk) ((struct packet_opt *)(__sk)->protinfo)
+
 void packet_sock_destruct(struct sock *sk)
 {
 	BUG_TRAP(atomic_read(&sk->rmem_alloc)==0);
@@ -209,8 +211,8 @@ void packet_sock_destruct(struct sock *sk)
 		return;
 	}
 
-	if (sk->protinfo.destruct_hook)
-		kfree(sk->protinfo.destruct_hook);
+	if (pkt_sk(sk))
+		kfree(pkt_sk(sk));
 	atomic_dec(&packet_socks_nr);
 #ifdef PACKET_REFCNT_DEBUG
 	printk(KERN_DEBUG "PACKET socket %p is free, %d are alive\n", sk, atomic_read(&packet_socks_nr));
@@ -413,7 +415,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 		goto drop;
 
 	sk = (struct sock *) pt->data;
-	po = sk->protinfo.af_packet;
+	po = pkt_sk(sk);
 
 	skb->dev = dev;
 
@@ -528,7 +530,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 		goto drop;
 
 	sk = (struct sock *) pt->data;
-	po = sk->protinfo.af_packet;
+	po = pkt_sk(sk);
 
 	if (dev->hard_header) {
 		if (sk->type != SOCK_DGRAM)
@@ -676,7 +678,7 @@ static int packet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	 */
 	 
 	if (saddr == NULL) {
-		ifindex	= sk->protinfo.af_packet->ifindex;
+		ifindex	= pkt_sk(sk)->ifindex;
 		proto	= sk->num;
 		addr	= NULL;
 	} else {
@@ -761,6 +763,7 @@ out:
 static int packet_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
+	struct packet_opt *po = pkt_sk(sk);
 	struct sock **skp;
 
 	if (!sk)
@@ -780,12 +783,12 @@ static int packet_release(struct socket *sock)
 	 *	Unhook packet receive handler.
 	 */
 
-	if (sk->protinfo.af_packet->running) {
+	if (po->running) {
 		/*
 		 *	Remove the protocol hook
 		 */
-		dev_remove_pack(&sk->protinfo.af_packet->prot_hook);
-		sk->protinfo.af_packet->running = 0;
+		dev_remove_pack(&po->prot_hook);
+		po->running = 0;
 		__sock_put(sk);
 	}
 
@@ -794,7 +797,7 @@ static int packet_release(struct socket *sock)
 #endif
 
 #ifdef CONFIG_PACKET_MMAP
-	if (sk->protinfo.af_packet->pg_vec) {
+	if (po->pg_vec) {
 		struct tpacket_req req;
 		memset(&req, 0, sizeof(req));
 		packet_set_ring(sk, &req, 1);
@@ -822,46 +825,47 @@ static int packet_release(struct socket *sock)
 
 static int packet_do_bind(struct sock *sk, struct net_device *dev, int protocol)
 {
+	struct packet_opt *po = pkt_sk(sk);
 	/*
 	 *	Detach an existing hook if present.
 	 */
 
 	lock_sock(sk);
 
-	spin_lock(&sk->protinfo.af_packet->bind_lock);
-	if (sk->protinfo.af_packet->running) {
-		dev_remove_pack(&sk->protinfo.af_packet->prot_hook);
+	spin_lock(&po->bind_lock);
+	if (po->running) {
+		dev_remove_pack(&po->prot_hook);
 		__sock_put(sk);
-		sk->protinfo.af_packet->running = 0;
+		po->running = 0;
 	}
 
 	sk->num = protocol;
-	sk->protinfo.af_packet->prot_hook.type = protocol;
-	sk->protinfo.af_packet->prot_hook.dev = dev;
+	po->prot_hook.type = protocol;
+	po->prot_hook.dev = dev;
 
-	sk->protinfo.af_packet->ifindex = dev ? dev->ifindex : 0;
+	po->ifindex = dev ? dev->ifindex : 0;
 
 	if (protocol == 0)
 		goto out_unlock;
 
 	if (dev) {
 		if (dev->flags&IFF_UP) {
-			dev_add_pack(&sk->protinfo.af_packet->prot_hook);
+			dev_add_pack(&po->prot_hook);
 			sock_hold(sk);
-			sk->protinfo.af_packet->running = 1;
+			po->running = 1;
 		} else {
 			sk->err = ENETDOWN;
 			if (!sk->dead)
 				sk->error_report(sk);
 		}
 	} else {
-		dev_add_pack(&sk->protinfo.af_packet->prot_hook);
+		dev_add_pack(&po->prot_hook);
 		sock_hold(sk);
-		sk->protinfo.af_packet->running = 1;
+		po->running = 1;
 	}
 
 out_unlock:
-	spin_unlock(&sk->protinfo.af_packet->bind_lock);
+	spin_unlock(&po->bind_lock);
 	release_sock(sk);
 	return 0;
 }
@@ -936,6 +940,7 @@ out:
 static int packet_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
+	struct packet_opt *po;
 	int err;
 
 	if (!capable(CAP_NET_RAW))
@@ -951,7 +956,7 @@ static int packet_create(struct socket *sock, int protocol)
 	MOD_INC_USE_COUNT;
 
 	err = -ENOBUFS;
-	sk = sk_alloc(PF_PACKET, GFP_KERNEL, 1);
+	sk = sk_alloc(PF_PACKET, GFP_KERNEL, 1, NULL);
 	if (sk == NULL)
 		goto out;
 
@@ -962,10 +967,10 @@ static int packet_create(struct socket *sock, int protocol)
 #endif
 	sock_init_data(sock,sk);
 
-	sk->protinfo.af_packet = kmalloc(sizeof(struct packet_opt), GFP_KERNEL);
-	if (sk->protinfo.af_packet == NULL)
+	po = pkt_sk(sk) = kmalloc(sizeof(*po), GFP_KERNEL);
+	if (!po)
 		goto out_free;
-	memset(sk->protinfo.af_packet, 0, sizeof(struct packet_opt));
+	memset(po, 0, sizeof(*po));
 	sk->family = PF_PACKET;
 	sk->num = protocol;
 
@@ -976,19 +981,19 @@ static int packet_create(struct socket *sock, int protocol)
 	 *	Attach a protocol block
 	 */
 
-	spin_lock_init(&sk->protinfo.af_packet->bind_lock);
-	sk->protinfo.af_packet->prot_hook.func = packet_rcv;
+	spin_lock_init(&po->bind_lock);
+	po->prot_hook.func = packet_rcv;
 #ifdef CONFIG_SOCK_PACKET
 	if (sock->type == SOCK_PACKET)
-		sk->protinfo.af_packet->prot_hook.func = packet_rcv_spkt;
+		po->prot_hook.func = packet_rcv_spkt;
 #endif
-	sk->protinfo.af_packet->prot_hook.data = (void *)sk;
+	po->prot_hook.data = (void *)sk;
 
 	if (protocol) {
-		sk->protinfo.af_packet->prot_hook.type = protocol;
-		dev_add_pack(&sk->protinfo.af_packet->prot_hook);
+		po->prot_hook.type = protocol;
+		dev_add_pack(&po->prot_hook);
 		sock_hold(sk);
-		sk->protinfo.af_packet->running = 1;
+		po->running = 1;
 	}
 
 	write_lock_bh(&packet_sklist_lock);
@@ -1023,7 +1028,7 @@ static int packet_recvmsg(struct socket *sock, struct msghdr *msg, int len,
 
 #if 0
 	/* What error should we return now? EUNATTACH? */
-	if (sk->protinfo.af_packet->ifindex < 0)
+	if (pkt_sk(sk)->ifindex < 0)
 		return -ENODEV;
 #endif
 
@@ -1101,7 +1106,7 @@ static int packet_getname_spkt(struct socket *sock, struct sockaddr *uaddr,
 		return -EOPNOTSUPP;
 
 	uaddr->sa_family = AF_PACKET;
-	dev = dev_get_by_index(sk->protinfo.af_packet->ifindex);
+	dev = dev_get_by_index(pkt_sk(sk)->ifindex);
 	if (dev) {
 		strncpy(uaddr->sa_data, dev->name, 15);
 		dev_put(dev);
@@ -1118,15 +1123,16 @@ static int packet_getname(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct net_device *dev;
 	struct sock *sk = sock->sk;
+	struct packet_opt *po = pkt_sk(sk);
 	struct sockaddr_ll *sll = (struct sockaddr_ll*)uaddr;
 
 	if (peer)
 		return -EOPNOTSUPP;
 
 	sll->sll_family = AF_PACKET;
-	sll->sll_ifindex = sk->protinfo.af_packet->ifindex;
+	sll->sll_ifindex = po->ifindex;
 	sll->sll_protocol = sk->num;
-	dev = dev_get_by_index(sk->protinfo.af_packet->ifindex);
+	dev = dev_get_by_index(po->ifindex);
 	if (dev) {
 		sll->sll_hatype = dev->type;
 		sll->sll_halen = dev->addr_len;
@@ -1171,6 +1177,7 @@ static void packet_dev_mclist(struct net_device *dev, struct packet_mclist *i, i
 
 static int packet_mc_add(struct sock *sk, struct packet_mreq *mreq)
 {
+	struct packet_opt *po = pkt_sk(sk);
 	struct packet_mclist *ml, *i;
 	struct net_device *dev;
 	int err;
@@ -1192,7 +1199,7 @@ static int packet_mc_add(struct sock *sk, struct packet_mreq *mreq)
 		goto done;
 
 	err = 0;
-	for (ml=sk->protinfo.af_packet->mclist; ml; ml=ml->next) {
+	for (ml = po->mclist; ml; ml = ml->next) {
 		if (ml->ifindex == mreq->mr_ifindex &&
 		    ml->type == mreq->mr_type &&
 		    ml->alen == mreq->mr_alen &&
@@ -1209,8 +1216,8 @@ static int packet_mc_add(struct sock *sk, struct packet_mreq *mreq)
 	i->alen = mreq->mr_alen;
 	memcpy(i->addr, mreq->mr_address, i->alen);
 	i->count = 1;
-	i->next = sk->protinfo.af_packet->mclist;
-	sk->protinfo.af_packet->mclist = i;
+	i->next = po->mclist;
+	po->mclist = i;
 	packet_dev_mc(dev, i, +1);
 
 done:
@@ -1224,7 +1231,7 @@ static int packet_mc_drop(struct sock *sk, struct packet_mreq *mreq)
 
 	rtnl_lock();
 
-	for (mlp=&sk->protinfo.af_packet->mclist; (ml=*mlp)!=NULL; mlp=&ml->next) {
+	for (mlp = &pkt_sk(sk)->mclist; (ml = *mlp) != NULL; mlp = &ml->next) {
 		if (ml->ifindex == mreq->mr_ifindex &&
 		    ml->type == mreq->mr_type &&
 		    ml->alen == mreq->mr_alen &&
@@ -1249,15 +1256,17 @@ static int packet_mc_drop(struct sock *sk, struct packet_mreq *mreq)
 
 static void packet_flush_mclist(struct sock *sk)
 {
+	struct packet_opt *po = pkt_sk(sk);
 	struct packet_mclist *ml;
 
-	if (sk->protinfo.af_packet->mclist == NULL)
+	if (!po->mclist)
 		return;
 
 	rtnl_lock();
-	while ((ml=sk->protinfo.af_packet->mclist) != NULL) {
+	while ((ml = po->mclist) != NULL) {
 		struct net_device *dev;
-		sk->protinfo.af_packet->mclist = ml->next;
+
+		po->mclist = ml->next;
 		if ((dev = dev_get_by_index(ml->ifindex)) != NULL) {
 			packet_dev_mc(dev, ml, -1);
 			dev_put(dev);
@@ -1314,7 +1323,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, char *optval, int
 		if (copy_from_user(&val,optval,sizeof(val)))
 			return -EFAULT;
 
-		sk->protinfo.af_packet->copy_thresh = val;
+		pkt_sk(sk)->copy_thresh = val;
 		return 0;
 	}
 #endif
@@ -1328,6 +1337,7 @@ int packet_getsockopt(struct socket *sock, int level, int optname,
 {
 	int len;
 	struct sock *sk = sock->sk;
+	struct packet_opt *po = pkt_sk(sk);
 
 	if (level != SOL_PACKET)
 		return -ENOPROTOOPT;
@@ -1346,8 +1356,8 @@ int packet_getsockopt(struct socket *sock, int level, int optname,
 		if (len > sizeof(struct tpacket_stats))
 			len = sizeof(struct tpacket_stats);
 		spin_lock_bh(&sk->receive_queue.lock);
-		st = sk->protinfo.af_packet->stats;
-		memset(&sk->protinfo.af_packet->stats, 0, sizeof(st));
+		st = po->stats;
+		memset(&po->stats, 0, sizeof(st));
 		spin_unlock_bh(&sk->receive_queue.lock);
 		st.tp_packets += st.tp_drops;
 
@@ -1368,12 +1378,11 @@ int packet_getsockopt(struct socket *sock, int level, int optname,
 static int packet_notifier(struct notifier_block *this, unsigned long msg, void *data)
 {
 	struct sock *sk;
-	struct packet_opt *po;
 	struct net_device *dev = (struct net_device*)data;
 
 	read_lock(&packet_sklist_lock);
 	for (sk = packet_sklist; sk; sk = sk->next) {
-		po = sk->protinfo.af_packet;
+		struct packet_opt *po = pkt_sk(sk);
 
 		switch (msg) {
 		case NETDEV_DOWN:
@@ -1552,7 +1561,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 unsigned int packet_poll(struct file * file, struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
-	struct packet_opt *po = sk->protinfo.af_packet;
+	struct packet_opt *po = pkt_sk(sk);
 	unsigned int mask = datagram_poll(file, sock, wait);
 
 	spin_lock_bh(&sk->receive_queue.lock);
@@ -1579,7 +1588,7 @@ static void packet_mm_open(struct vm_area_struct *vma)
 	struct sock *sk = sock->sk;
 	
 	if (sk)
-		atomic_inc(&sk->protinfo.af_packet->mapped);
+		atomic_inc(&pkt_sk(sk)->mapped);
 }
 
 static void packet_mm_close(struct vm_area_struct *vma)
@@ -1590,7 +1599,7 @@ static void packet_mm_close(struct vm_area_struct *vma)
 	struct sock *sk = sock->sk;
 	
 	if (sk)
-		atomic_dec(&sk->protinfo.af_packet->mapped);
+		atomic_dec(&pkt_sk(sk)->mapped);
 }
 
 static struct vm_operations_struct packet_mmap_ops = {
@@ -1620,7 +1629,7 @@ static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing
 {
 	unsigned long *pg_vec = NULL;
 	struct tpacket_hdr **io_vec = NULL;
-	struct packet_opt *po = sk->protinfo.af_packet;
+	struct packet_opt *po = pkt_sk(sk);
 	int order = 0;
 	int err = 0;
 
@@ -1742,7 +1751,7 @@ out:
 static int packet_mmap(struct file *file, struct socket *sock, struct vm_area_struct *vma)
 {
 	struct sock *sk = sock->sk;
-	struct packet_opt *po = sk->protinfo.af_packet;
+	struct packet_opt *po = pkt_sk(sk);
 	unsigned long size;
 	unsigned long start;
 	int err = -EINVAL;
@@ -1846,13 +1855,15 @@ static int packet_read_proc(char *buffer, char **start, off_t offset,
 	read_lock(&packet_sklist_lock);
 
 	for (s = packet_sklist; s; s = s->next) {
+		struct packet_opt *po = pkt_sk(s);
+
 		len+=sprintf(buffer+len,"%p %-6d %-4d %04x   %-5d %1d %-6u %-6u %-6lu",
 			     s,
 			     atomic_read(&s->refcnt),
 			     s->type,
 			     ntohs(s->num),
-			     s->protinfo.af_packet->ifindex,
-			     s->protinfo.af_packet->running,
+			     po->ifindex,
+			     po->running,
 			     atomic_read(&s->rmem_alloc),
 			     sock_i_uid(s),
 			     sock_i_ino(s)

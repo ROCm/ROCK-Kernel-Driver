@@ -122,9 +122,9 @@ void bluez_sock_unlink(struct bluez_sock_list *l, struct sock *sk)
 	write_unlock(&l->lock);
 }
 
-struct net_proto_family bluez_sock_family_ops =
-{
-	PF_BLUETOOTH, bluez_sock_create
+struct net_proto_family bluez_sock_family_ops = {
+	family:	PF_BLUETOOTH,
+	create:	bluez_sock_create,
 };
 
 int bluez_init(void)

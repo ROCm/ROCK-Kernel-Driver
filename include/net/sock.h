@@ -24,6 +24,11 @@
  *		Alan Cox	:	Eliminate low level recv/recvfrom
  *		David S. Miller	:	New socket lookup architecture.
  *              Steve Whitehouse:       Default routines for sock_ops
+ *              Arnaldo C. Melo :	removed net_pinfo, tp_pinfo and made
+ *              			protinfo be just a void pointer, as the
+ *              			protocol specific parts were moved to
+ *              			respective headers and ipv4/v6, etc now
+ *              			use private slabcaches for its socks
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -36,68 +41,9 @@
 #include <linux/config.h>
 #include <linux/timer.h>
 #include <linux/cache.h>
-#include <linux/in.h>		/* struct sockaddr_in */
-
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-#include <linux/in6.h>		/* struct sockaddr_in6 */
-#include <linux/ipv6.h>		/* dest_cache, inet6_options */
-#include <linux/icmpv6.h>
-#include <net/if_inet6.h>	/* struct ipv6_mc_socklist */
-#endif
-
-#if defined(CONFIG_INET) || defined (CONFIG_INET_MODULE)
-#include <linux/icmp.h>
-#endif
-#include <linux/tcp.h>		/* struct tcphdr */
 
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>	/* struct sk_buff */
-#include <net/protocol.h>		/* struct inet_protocol */
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
-#include <net/x25.h>
-#endif
-#if defined(CONFIG_WAN_ROUTER) || defined(CONFIG_WAN_ROUTER_MODULE)
-#include <linux/if_wanpipe.h>
-#endif
-
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-#include <net/ax25.h>
-#if defined(CONFIG_NETROM) || defined(CONFIG_NETROM_MODULE)
-#include <net/netrom.h>
-#endif
-#if defined(CONFIG_ROSE) || defined(CONFIG_ROSE_MODULE)
-#include <net/rose.h>
-#endif
-#endif
-
-#if defined(CONFIG_PPPOE) || defined(CONFIG_PPPOE_MODULE)
-#include <linux/if_pppox.h>
-#include <linux/ppp_channel.h>   /* struct ppp_channel */
-#endif
-
-#if defined(CONFIG_IPX) || defined(CONFIG_IPX_MODULE)
-#if defined(CONFIG_SPX) || defined(CONFIG_SPX_MODULE)
-#include <net/spx.h>
-#else
-#include <net/ipx.h>
-#endif /* CONFIG_SPX */
-#endif /* CONFIG_IPX */
-
-#if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE)
-#include <linux/atalk.h>
-#endif
-
-#if defined(CONFIG_DECNET) || defined(CONFIG_DECNET_MODULE)
-#include <net/dn.h>
-#endif
-
-#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-#include <net/irda/irda.h>
-#endif
-
-#if defined(CONFIG_ATM) || defined(CONFIG_ATM_MODULE)
-struct atm_vcc;
-#endif
 
 #ifdef CONFIG_FILTER
 #include <linux/filter.h>
@@ -106,362 +52,10 @@ struct atm_vcc;
 #include <asm/atomic.h>
 #include <net/dst.h>
 
-#include <linux/fs.h>	/* just for inode - yeuch.*/
-
-
-/* The AF_UNIX specific socket options */
-struct unix_opt {
-	struct unix_address	*addr;
-	struct dentry *		dentry;
-	struct vfsmount *	mnt;
-	struct semaphore	readsem;
-	struct sock *		other;
-	struct sock **		list;
-	struct sock *		gc_tree;
-	atomic_t		inflight;
-	rwlock_t		lock;
-	wait_queue_head_t	peer_wait;
-};
-
-
-/* Once the IPX ncpd patches are in these are going into protinfo. */
-#if defined(CONFIG_IPX) || defined(CONFIG_IPX_MODULE)
-struct ipx_opt {
-	ipx_address		dest_addr;
-	ipx_interface		*intrfc;
-	unsigned short		port;
-#ifdef CONFIG_IPX_INTERN
-	unsigned char           node[IPX_NODE_LEN];
-#endif
-	unsigned short		type;
-/* 
- * To handle special ncp connection-handling sockets for mars_nwe,
- * the connection number must be stored in the socket.
- */
-	unsigned short		ipx_ncp_conn;
-};
-#endif
-
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-struct ipv6_pinfo {
-	struct in6_addr 	saddr;
-	struct in6_addr 	rcv_saddr;
-	struct in6_addr		daddr;
-	struct in6_addr		*daddr_cache;
-
-	__u32			flow_label;
-	__u32			frag_size;
-	int			hop_limit;
-	int			mcast_hops;
-	int			mcast_oif;
-
-	/* pktoption flags */
-	union {
-		struct {
-			__u8	srcrt:2,
-			        rxinfo:1,
-				rxhlim:1,
-				hopopts:1,
-				dstopts:1,
-                                authhdr:1,
-                                rxflow:1;
-		} bits;
-		__u8		all;
-	} rxopt;
-
-	/* sockopt flags */
-	__u8			mc_loop:1,
-	                        recverr:1,
-	                        sndflow:1,
-	                        pmtudisc:2;
-
-	struct ipv6_mc_socklist	*ipv6_mc_list;
-	struct ipv6_fl_socklist *ipv6_fl_list;
-	__u32			dst_cookie;
-
-	struct ipv6_txoptions	*opt;
-	struct sk_buff		*pktoptions;
-};
-
-struct raw6_opt {
-	__u32			checksum;	/* perform checksum */
-	__u32			offset;		/* checksum offset  */
-
-	struct icmp6_filter	filter;
-};
-
-#endif /* IPV6 */
-
-#if defined(CONFIG_INET) || defined(CONFIG_INET_MODULE)
-struct raw_opt {
-	struct icmp_filter	filter;
-};
-#endif
-
-#if defined(CONFIG_INET) || defined (CONFIG_INET_MODULE)
-struct inet_opt
-{
-	int			ttl;			/* TTL setting */
-	int			tos;			/* TOS */
-	unsigned	   	cmsg_flags;
-	struct ip_options	*opt;
-	unsigned char		hdrincl;		/* Include headers ? */
-	__u8			mc_ttl;			/* Multicasting TTL */
-	__u8			mc_loop;		/* Loopback */
-	unsigned		recverr : 1,
-				freebind : 1;
-	__u16			id;			/* ID counter for DF pkts */
-	__u8			pmtudisc;
-	int			mc_index;		/* Multicast device index */
-	__u32			mc_addr;
-	struct ip_mc_socklist	*mc_list;		/* Group array */
-};
-#endif
-
-#if defined(CONFIG_PPPOE) || defined (CONFIG_PPPOE_MODULE)
-struct pppoe_opt
-{
-	struct net_device      *dev;	  /* device associated with socket*/
-	struct pppoe_addr	pa;	  /* what this socket is bound to*/
-	struct sockaddr_pppox	relay;	  /* what socket data will be
-					     relayed to (PPPoE relaying) */
-};
-
-struct pppox_opt
-{
-	struct ppp_channel	chan;
-	struct sock		*sk;
-	struct pppox_opt	*next;	  /* for hash table */
-	union {
-		struct pppoe_opt pppoe;
-	} proto;
-};
-#define pppoe_dev	proto.pppoe.dev
-#define pppoe_pa	proto.pppoe.pa
-#define pppoe_relay	proto.pppoe.relay
-#endif
-
-/* This defines a selective acknowledgement block. */
-struct tcp_sack_block {
-	__u32	start_seq;
-	__u32	end_seq;
-};
-
-struct tcp_opt {
-	int	tcp_header_len;	/* Bytes of tcp header to send		*/
-
-/*
- *	Header prediction flags
- *	0x5?10 << 16 + snd_wnd in net byte order
- */
-	__u32	pred_flags;
-
-/*
- *	RFC793 variables by their proper names. This means you can
- *	read the code and the spec side by side (and laugh ...)
- *	See RFC793 and RFC1122. The RFC writes these in capitals.
- */
- 	__u32	rcv_nxt;	/* What we want to receive next 	*/
- 	__u32	snd_nxt;	/* Next sequence we send		*/
-
- 	__u32	snd_una;	/* First byte we want an ack for	*/
- 	__u32	snd_sml;	/* Last byte of the most recently transmitted small packet */
-	__u32	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
-	__u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
-
-	/* Delayed ACK control data */
-	struct {
-		__u8	pending;	/* ACK is pending */
-		__u8	quick;		/* Scheduled number of quick acks	*/
-		__u8	pingpong;	/* The session is interactive		*/
-		__u8	blocked;	/* Delayed ACK was blocked by socket lock*/
-		__u32	ato;		/* Predicted tick of soft clock		*/
-		unsigned long timeout;	/* Currently scheduled timeout		*/
-		__u32	lrcvtime;	/* timestamp of last received data packet*/
-		__u16	last_seg_size;	/* Size of last incoming segment	*/
-		__u16	rcv_mss;	/* MSS used for delayed ACK decisions	*/ 
-	} ack;
-
-	/* Data for direct copy to user */
-	struct {
-		struct sk_buff_head	prequeue;
-		int			memory;
-		struct task_struct	*task;
-		struct iovec		*iov;
-		int			len;
-	} ucopy;
-
-	__u32	snd_wl1;	/* Sequence for window update		*/
-	__u32	snd_wnd;	/* The window we expect to receive	*/
-	__u32	max_window;	/* Maximal window ever seen from peer	*/
-	__u32	pmtu_cookie;	/* Last pmtu seen by socket		*/
-	__u16	mss_cache;	/* Cached effective mss, not including SACKS */
-	__u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
-	__u16	ext_header_len;	/* Network protocol overhead (IP/IPv6 options) */
-	__u8	ca_state;	/* State of fast-retransmit machine 	*/
-	__u8	retransmits;	/* Number of unrecovered RTO timeouts.	*/
-
-	__u8	reordering;	/* Packet reordering metric.		*/
-	__u8	queue_shrunk;	/* Write queue has been shrunk recently.*/
-	__u8	defer_accept;	/* User waits for some data after accept() */
-
-/* RTT measurement */
-	__u8	backoff;	/* backoff				*/
-	__u32	srtt;		/* smothed round trip time << 3		*/
-	__u32	mdev;		/* medium deviation			*/
-	__u32	mdev_max;	/* maximal mdev for the last rtt period	*/
-	__u32	rttvar;		/* smoothed mdev_max			*/
-	__u32	rtt_seq;	/* sequence number to update rttvar	*/
-	__u32	rto;		/* retransmit timeout			*/
-
-	__u32	packets_out;	/* Packets which are "in flight"	*/
-	__u32	left_out;	/* Packets which leaved network		*/
-	__u32	retrans_out;	/* Retransmitted packets out		*/
-
-
-/*
- *	Slow start and congestion control (see also Nagle, and Karn & Partridge)
- */
- 	__u32	snd_ssthresh;	/* Slow start size threshold		*/
- 	__u32	snd_cwnd;	/* Sending congestion window		*/
- 	__u16	snd_cwnd_cnt;	/* Linear increase counter		*/
-	__u16	snd_cwnd_clamp; /* Do not allow snd_cwnd to grow above this */
-	__u32	snd_cwnd_used;
-	__u32	snd_cwnd_stamp;
-
-	/* Two commonly used timers in both sender and receiver paths. */
-	unsigned long		timeout;
- 	struct timer_list	retransmit_timer;	/* Resend (no ack)	*/
- 	struct timer_list	delack_timer;		/* Ack delay 		*/
-
-	struct sk_buff_head	out_of_order_queue; /* Out of order segments go here */
-
-	struct tcp_func		*af_specific;	/* Operations which are AF_INET{4,6} specific	*/
-	struct sk_buff		*send_head;	/* Front of stuff to transmit			*/
-	struct page		*sndmsg_page;	/* Cached page for sendmsg			*/
-	u32			sndmsg_off;	/* Cached offset for sendmsg			*/
-
- 	__u32	rcv_wnd;	/* Current receiver window		*/
-	__u32	rcv_wup;	/* rcv_nxt on last window update sent	*/
-	__u32	write_seq;	/* Tail(+1) of data held in tcp send buffer */
-	__u32	pushed_seq;	/* Last pushed seq, required to talk to windows */
-	__u32	copied_seq;	/* Head of yet unread data		*/
-/*
- *      Options received (usually on last packet, some only on SYN packets).
- */
-	char	tstamp_ok,	/* TIMESTAMP seen on SYN packet		*/
-		wscale_ok,	/* Wscale seen on SYN packet		*/
-		sack_ok;	/* SACK seen on SYN packet		*/
-	char	saw_tstamp;	/* Saw TIMESTAMP on last packet		*/
-        __u8	snd_wscale;	/* Window scaling received from sender	*/
-        __u8	rcv_wscale;	/* Window scaling to send to receiver	*/
-	__u8	nonagle;	/* Disable Nagle algorithm?             */
-	__u8	keepalive_probes; /* num of allowed keep alive probes	*/
-
-/*	PAWS/RTTM data	*/
-        __u32	rcv_tsval;	/* Time stamp value             	*/
-        __u32	rcv_tsecr;	/* Time stamp echo reply        	*/
-        __u32	ts_recent;	/* Time stamp to echo next		*/
-        long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
-
-/*	SACKs data	*/
-	__u16	user_mss;  	/* mss requested by user in ioctl */
-	__u8	dsack;		/* D-SACK is scheduled			*/
-	__u8	eff_sacks;	/* Size of SACK array to send with next packet */
-	struct tcp_sack_block duplicate_sack[1]; /* D-SACK block */
-	struct tcp_sack_block selective_acks[4]; /* The SACKS themselves*/
-
-	__u32	window_clamp;	/* Maximal window to advertise		*/
-	__u32	rcv_ssthresh;	/* Current window clamp			*/
-	__u8	probes_out;	/* unanswered 0 window probes		*/
-	__u8	num_sacks;	/* Number of SACK blocks		*/
-	__u16	advmss;		/* Advertised MSS			*/
-
-	__u8	syn_retries;	/* num of allowed syn retries */
-	__u8	ecn_flags;	/* ECN status bits.			*/
-	__u16	prior_ssthresh; /* ssthresh saved at recovery start	*/
-	__u32	lost_out;	/* Lost packets				*/
-	__u32	sacked_out;	/* SACK'd packets			*/
-	__u32	fackets_out;	/* FACK'd packets			*/
-	__u32	high_seq;	/* snd_nxt at onset of congestion	*/
-
-	__u32	retrans_stamp;	/* Timestamp of the last retransmit,
-				 * also used in SYN-SENT to remember stamp of
-				 * the first SYN. */
-	__u32	undo_marker;	/* tracking retrans started here. */
-	int	undo_retrans;	/* number of undoable retransmissions. */
-	__u32	urg_seq;	/* Seq of received urgent pointer */
-	__u16	urg_data;	/* Saved octet of OOB data and control flags */
-	__u8	pending;	/* Scheduled timer event	*/
-	__u8	urg_mode;	/* In urgent mode		*/
-	__u32	snd_up;		/* Urgent pointer		*/
-
-	/* The syn_wait_lock is necessary only to avoid tcp_get_info having
-	 * to grab the main lock sock while browsing the listening hash
-	 * (otherwise it's deadlock prone).
-	 * This lock is acquired in read mode only from tcp_get_info() and
-	 * it's acquired in write mode _only_ from code that is actively
-	 * changing the syn_wait_queue. All readers that are holding
-	 * the master sock lock don't need to grab this lock in read mode
-	 * too as the syn_wait_queue writes are always protected from
-	 * the main sock lock.
-	 */
-	rwlock_t		syn_wait_lock;
-	struct tcp_listen_opt	*listen_opt;
-
-	/* FIFO of established children */
-	struct open_request	*accept_queue;
-	struct open_request	*accept_queue_tail;
-
-	int			write_pending;	/* A write to socket waits to start. */
-
-	unsigned int		keepalive_time;	  /* time before keep alive takes place */
-	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
-	int			linger2;
-
-	unsigned long last_synq_overflow; 
-};
-
- 	
 /*
  * This structure really needs to be cleaned up.
  * Most of it is for TCP, and not used by any of
  * the other protocols.
- */
-
-/*
- * The idea is to start moving to a newer struct gradualy
- * 
- * IMHO the newer struct should have the following format:
- * 
- *	struct sock {
- *		sockmem [mem, proto, callbacks]
- *
- *		union or struct {
- *			ax25;
- *		} ll_pinfo;
- *	
- *		union {
- *			ipv4;
- *			ipv6;
- *			ipx;
- *			netrom;
- *			rose;
- * 			x25;
- *		} net_pinfo;
- *
- *		union {
- *			tcp;
- *			udp;
- *			spx;
- *			netrom;
- *		} tp_pinfo;
- *
- *	}
- *
- * The idea failed because IPv6 transition asssumes dual IP/IPv6 sockets.
- * So, net_pinfo is IPv6 are really, and protinfo unifies all another
- * private areas.
  */
 
 /* Define this to get the sk->debug debugging facility. */
@@ -569,26 +163,6 @@ struct sock {
 
 	struct proto		*prot;
 
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-	union {
-		struct ipv6_pinfo	af_inet6;
-	} net_pinfo;
-#endif
-
-	union {
-		struct tcp_opt		af_tcp;
-#if defined(CONFIG_INET) || defined (CONFIG_INET_MODULE)
-		struct raw_opt		tp_raw4;
-#endif
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-		struct raw6_opt		tp_raw;
-#endif /* CONFIG_IPV6 */
-#if defined(CONFIG_SPX) || defined (CONFIG_SPX_MODULE)
-		struct spx_opt		af_spx;
-#endif /* CONFIG_SPX */
-
-	} tp_pinfo;
-
 	int			err, err_soft;	/* Soft holds errors that don't
 						   cause failure but are the cause
 						   of a persistent failure not just
@@ -612,54 +186,13 @@ struct sock {
 	/* This is where all the private (optional) areas that don't
 	 * overlap will eventually live. 
 	 */
-	union {
-		void *destruct_hook;
-	  	struct unix_opt	af_unix;
-#if defined(CONFIG_INET) || defined (CONFIG_INET_MODULE)
-		struct inet_opt af_inet;
-#endif
-#if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE)
-		struct atalk_sock	af_at;
-#endif
-#if defined(CONFIG_IPX) || defined(CONFIG_IPX_MODULE)
-		struct ipx_opt		af_ipx;
-#endif
-#if defined (CONFIG_DECNET) || defined(CONFIG_DECNET_MODULE)
-		struct dn_scp           dn;
-#endif
-#if defined (CONFIG_PACKET) || defined(CONFIG_PACKET_MODULE)
-		struct packet_opt	*af_packet;
-#endif
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
-		x25_cb			*x25;
-#endif
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-		ax25_cb			*ax25;
-#endif
-#if defined(CONFIG_NETROM) || defined(CONFIG_NETROM_MODULE)
-		nr_cb			*nr;
-#endif
-#if defined(CONFIG_ROSE) || defined(CONFIG_ROSE_MODULE)
-		rose_cb			*rose;
-#endif
-#if defined(CONFIG_PPPOE) || defined(CONFIG_PPPOE_MODULE)
-		struct pppox_opt	*pppox;
-#endif
-		struct netlink_opt	*af_netlink;
-#if defined(CONFIG_ECONET) || defined(CONFIG_ECONET_MODULE)
-		struct econet_opt	*af_econet;
-#endif
-#if defined(CONFIG_ATM) || defined(CONFIG_ATM_MODULE)
-		struct atm_vcc		*af_atm;
-#endif
-#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-		struct irda_sock        *irda;
-#endif
-#if defined(CONFIG_WAN_ROUTER) || defined(CONFIG_WAN_ROUTER_MODULE)
-               struct wanpipe_opt      *af_wanpipe;
-#endif
-	} protinfo;  		
+	void *protinfo;
 
+	/* The slabcache this instance was allocated from, it is sk_cachep for most
+	 * protocols, but a private slab for protocols such as IPv4, IPv6, SPX
+	 * and Unix.
+	 */
+	kmem_cache_t *slab;
 
 	/* This part is used for the timeout functions. */
 	struct timer_list	timer;		/* This is the sock cleanup timer. */
@@ -768,6 +301,8 @@ static __inline__ void sock_prot_dec_use(struct proto *prot)
 #define SOCK_BINDADDR_LOCK	4
 #define SOCK_BINDPORT_LOCK	8
 
+#include <linux/fs.h>	/* just for inode - yeuch.*/
+
 
 /* Used by processes to "lock" a socket state, so that
  * interrupts and bottom half handlers won't change it
@@ -805,7 +340,8 @@ do {	spin_lock_bh(&((__sk)->lock.slock)); \
 #define bh_lock_sock(__sk)	spin_lock(&((__sk)->lock.slock))
 #define bh_unlock_sock(__sk)	spin_unlock(&((__sk)->lock.slock))
 
-extern struct sock *		sk_alloc(int family, int priority, int zero_it);
+extern struct sock *		sk_alloc(int family, int priority, int zero_it,
+					 kmem_cache_t *slab);
 extern void			sk_free(struct sock *sk);
 
 extern struct sk_buff		*sock_wmalloc(struct sock *sk,

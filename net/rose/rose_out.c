@@ -42,38 +42,41 @@
  */
 static void rose_send_iframe(struct sock *sk, struct sk_buff *skb)
 {
+	rose_cb *rose = rose_sk(sk);
+
 	if (skb == NULL)
 		return;
 
-	skb->data[2] |= (sk->protinfo.rose->vr << 5) & 0xE0;
-	skb->data[2] |= (sk->protinfo.rose->vs << 1) & 0x0E;
+	skb->data[2] |= (rose->vr << 5) & 0xE0;
+	skb->data[2] |= (rose->vs << 1) & 0x0E;
 
 	rose_start_idletimer(sk);
 
-	rose_transmit_link(skb, sk->protinfo.rose->neighbour);	
+	rose_transmit_link(skb, rose->neighbour);	
 }
 
 void rose_kick(struct sock *sk)
 {
+	rose_cb *rose = rose_sk(sk);
 	struct sk_buff *skb, *skbn;
 	unsigned short start, end;
 
-	if (sk->protinfo.rose->state != ROSE_STATE_3)
+	if (rose->state != ROSE_STATE_3)
 		return;
 
-	if (sk->protinfo.rose->condition & ROSE_COND_PEER_RX_BUSY)
+	if (rose->condition & ROSE_COND_PEER_RX_BUSY)
 		return;
 
 	if (skb_peek(&sk->write_queue) == NULL)
 		return;
 
-	start = (skb_peek(&sk->protinfo.rose->ack_queue) == NULL) ? sk->protinfo.rose->va : sk->protinfo.rose->vs;
-	end   = (sk->protinfo.rose->va + sysctl_rose_window_size) % ROSE_MODULUS;
+	start = (skb_peek(&rose->ack_queue) == NULL) ? rose->va : rose->vs;
+	end   = (rose->va + sysctl_rose_window_size) % ROSE_MODULUS;
 
 	if (start == end)
 		return;
 
-	sk->protinfo.rose->vs = start;
+	rose->vs = start;
 
 	/*
 	 * Transmit data until either we're out of data to send or
@@ -95,17 +98,17 @@ void rose_kick(struct sock *sk)
 		 */
 		rose_send_iframe(sk, skbn);
 
-		sk->protinfo.rose->vs = (sk->protinfo.rose->vs + 1) % ROSE_MODULUS;
+		rose->vs = (rose->vs + 1) % ROSE_MODULUS;
 
 		/*
 		 * Requeue the original data frame.
 		 */
-		skb_queue_tail(&sk->protinfo.rose->ack_queue, skb);
+		skb_queue_tail(&rose->ack_queue, skb);
 
-	} while (sk->protinfo.rose->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
+	} while (rose->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
 
-	sk->protinfo.rose->vl         = sk->protinfo.rose->vr;
-	sk->protinfo.rose->condition &= ~ROSE_COND_ACK_PENDING;
+	rose->vl         = rose->vr;
+	rose->condition &= ~ROSE_COND_ACK_PENDING;
 
 	rose_stop_timer(sk);
 }
@@ -117,13 +120,15 @@ void rose_kick(struct sock *sk)
 
 void rose_enquiry_response(struct sock *sk)
 {
-	if (sk->protinfo.rose->condition & ROSE_COND_OWN_RX_BUSY)
+	rose_cb *rose = rose_sk(sk);
+
+	if (rose->condition & ROSE_COND_OWN_RX_BUSY)
 		rose_write_internal(sk, ROSE_RNR);
 	else
 		rose_write_internal(sk, ROSE_RR);
 
-	sk->protinfo.rose->vl         = sk->protinfo.rose->vr;
-	sk->protinfo.rose->condition &= ~ROSE_COND_ACK_PENDING;
+	rose->vl         = rose->vr;
+	rose->condition &= ~ROSE_COND_ACK_PENDING;
 
 	rose_stop_timer(sk);
 }

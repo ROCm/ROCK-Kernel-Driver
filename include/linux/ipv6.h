@@ -101,6 +101,10 @@ struct ipv6hdr {
 };
 
 #ifdef __KERNEL__
+#include <linux/in6.h>          /* struct sockaddr_in6 */
+#include <linux/icmpv6.h>
+#include <net/if_inet6.h>       /* struct ipv6_mc_socklist */
+#include <linux/tcp.h>
 
 /* 
    This structure contains results of exthdrs parsing
@@ -118,6 +122,79 @@ struct inet6_skb_parm
 	__u16			dst1;
 };
 
+struct ipv6_pinfo {
+	struct in6_addr 	saddr;
+	struct in6_addr 	rcv_saddr;
+	struct in6_addr		daddr;
+	struct in6_addr		*daddr_cache;
+
+	__u32			flow_label;
+	__u32			frag_size;
+	int			hop_limit;
+	int			mcast_hops;
+	int			mcast_oif;
+
+	/* pktoption flags */
+	union {
+		struct {
+			__u8	srcrt:2,
+			        rxinfo:1,
+				rxhlim:1,
+				hopopts:1,
+				dstopts:1,
+                                authhdr:1,
+                                rxflow:1;
+		} bits;
+		__u8		all;
+	} rxopt;
+
+	/* sockopt flags */
+	__u8			mc_loop:1,
+	                        recverr:1,
+	                        sndflow:1,
+	                        pmtudisc:2;
+
+	struct ipv6_mc_socklist	*ipv6_mc_list;
+	struct ipv6_fl_socklist *ipv6_fl_list;
+	__u32			dst_cookie;
+
+	struct ipv6_txoptions	*opt;
+	struct sk_buff		*pktoptions;
+};
+
+struct raw6_opt {
+	__u32			checksum;	/* perform checksum */
+	__u32			offset;		/* checksum offset  */
+
+	struct icmp6_filter	filter;
+};
+
+/* WARNING: don't change the layout of the members in {raw,udp,tcp}6_sock! */
+struct raw6_sock {
+	struct sock	  sk;
+	struct ipv6_pinfo *pinet6;
+	struct inet_opt   inet;
+	struct raw6_opt   raw6;
+	struct ipv6_pinfo inet6;
+};
+
+struct udp6_sock {
+	struct sock	  sk;
+	struct ipv6_pinfo *pinet6;
+	struct inet_opt   inet;
+	struct ipv6_pinfo inet6;
+};
+
+struct tcp6_sock {
+	struct sock	  sk;
+	struct ipv6_pinfo *pinet6;
+	struct inet_opt   inet;
+	struct tcp_opt	  tcp;
+	struct ipv6_pinfo inet6;
+};
+
+#define inet6_sk(__sk) ((struct raw6_sock *)__sk)->pinet6
+#define raw6_sk(__sk) (&((struct raw6_sock *)__sk)->raw6)
 #endif
 
 #endif

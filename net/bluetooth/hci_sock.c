@@ -453,7 +453,7 @@ static int hci_sock_create(struct socket *sock, int protocol)
 
 	sock->ops = &hci_sock_ops;
 
-	if (!(sk = sk_alloc(PF_BLUETOOTH, GFP_KERNEL, 1)))
+	if (!(sk = sk_alloc(PF_BLUETOOTH, GFP_KERNEL, 1, NULL)))
 		return -ENOMEM;
 
 	sock->state = SS_UNCONNECTED;
@@ -519,7 +519,7 @@ static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, 
 
 struct net_proto_family hci_sock_family_ops = {
 	family: PF_BLUETOOTH,
-	create: hci_sock_create
+	create: hci_sock_create,
 };
 
 struct notifier_block hci_sock_nblock = {

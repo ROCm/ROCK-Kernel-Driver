@@ -86,6 +86,22 @@ struct ipx_cb {
 		int index;
 	} last_hop;
 };
+
+struct ipx_opt {
+	ipx_address	dest_addr;
+	ipx_interface	*intrfc;
+	unsigned short	port;
+#ifdef CONFIG_IPX_INTERN
+	unsigned char	node[IPX_NODE_LEN];
+#endif
+	unsigned short	type;
+	/* To handle special ncp connection-handling sockets for mars_nwe,
+ 	 * the connection number must be stored in the socket. */
+	unsigned short	ipx_ncp_conn;
+};
+
+#define ipx_sk(__sk) ((struct ipx_opt *)(__sk)->protinfo)
+#define IPX_SKB_CB(__skb) ((struct ipx_cb *)&((__skb)->cb[0]))
 #endif
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000
 #define IPX_MAX_EPHEMERAL_SOCKET	0x7fff

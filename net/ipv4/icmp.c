@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.83 2001/12/13 09:00:19 davem Exp $
+ *	Version: $Id: icmp.c,v 1.85 2002/02/01 22:01:03 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -338,6 +338,7 @@ static int icmp_glue_bits(const void *p, char *to, unsigned int offset, unsigned
 static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 {
 	struct sock *sk=icmp_socket->sk;
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
 	struct rtable *rt = (struct rtable*)skb->dst;
 	u32 daddr;
@@ -352,7 +353,7 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 	icmp_param->csum=0;
 	icmp_out_count(icmp_param->data.icmph.type);
 
-	sk->protinfo.af_inet.tos = skb->nh.iph->tos;
+	inet->tos = skb->nh.iph->tos;
 	daddr = ipc.addr = rt->rt_src;
 	ipc.opt = NULL;
 	if (icmp_param->replyopts.optlen) {
@@ -496,7 +497,7 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	icmp_param.skb=skb_in;
 	icmp_param.offset=skb_in->nh.raw - skb_in->data;
 	icmp_out_count(icmp_param.data.icmph.type);
-	icmp_socket->sk->protinfo.af_inet.tos = tos;
+	inet_sk(icmp_socket->sk)->tos = tos;
 	ipc.addr = iph->saddr;
 	ipc.opt = &icmp_param.replyopts;
 	if (icmp_param.replyopts.srr) {
@@ -978,14 +979,16 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1] = {
 
 void __init icmp_init(struct net_proto_family *ops)
 {
+	struct inet_opt *inet;
 	int err = sock_create(PF_INET, SOCK_RAW, IPPROTO_ICMP, &icmp_socket);
 
 	if (err < 0)
 		panic("Failed to create the ICMP control socket.\n");
 	icmp_socket->sk->allocation=GFP_ATOMIC;
 	icmp_socket->sk->sndbuf = SK_WMEM_MAX*2;
-	icmp_socket->sk->protinfo.af_inet.ttl = MAXTTL;
-	icmp_socket->sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_DONT;
+	inet	       = inet_sk(icmp_socket->sk);
+	inet->ttl      = MAXTTL;
+	inet->pmtudisc = IP_PMTUDISC_DONT;
 
 	/* Unhash it so that IP input processing does not even
 	 * see it, we do not wish this socket to see incoming

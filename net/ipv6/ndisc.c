@@ -1211,6 +1211,7 @@ int ndisc_rcv(struct sk_buff *skb)
 
 int __init ndisc_init(struct net_proto_family *ops)
 {
+	struct ipv6_pinfo *np;
 	struct sock *sk;
         int err;
 
@@ -1224,10 +1225,11 @@ int __init ndisc_init(struct net_proto_family *ops)
 	}
 
 	sk = ndisc_socket->sk;
+	np = inet6_sk(sk);
 	sk->allocation = GFP_ATOMIC;
-	sk->net_pinfo.af_inet6.hop_limit = 255;
+	np->hop_limit = 255;
 	/* Do not loopback ndisc messages */
-	sk->net_pinfo.af_inet6.mc_loop = 0;
+	np->mc_loop = 0;
 	sk->prot->unhash(sk);
 
         /*

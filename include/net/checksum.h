@@ -29,6 +29,7 @@
 #include <asm/types.h>
 #include <asm/byteorder.h>
 #include <net/ip.h>
+#include <linux/in6.h>
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
 
