@@ -203,7 +203,28 @@ enum wl3501_status {
 #define IW_REG_DOMAIN_MKK1	0x41	/* Channel 1-14		Japan  */
 #define IW_REG_DOMAIN_ISRAEL	0x50	/* Channel 3 - 9	Israel */
 
-#define WL3501_ESSID_MAX_LEN (IW_ESSID_MAX_SIZE + 2)
+enum iw_mgmt_info_element_ids {
+	IW_MGMT_INFO_ELEMENT_SSID,		  /* Service Set Identity */
+	IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+	IW_MGMT_INFO_ELEMENT_FH_PARAMETER_SET,
+	IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+	IW_MGMT_INFO_ELEMENT_CS_PARAMETER_SET,
+	IW_MGMT_INFO_ELEMENT_CS_TIM,		  /* Traffic Information Map */
+	IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
+	/* 7-15: Reserved, unused */
+	IW_MGMT_INFO_ELEMENT_CHALLENGE_TEXT = 16,
+	/* 17-31 Reserved for challenge text extension */
+	/* 32-255 Reserved, unused */
+};
+
+/* FIXME: check if it need to be bigger */
+#define IW_MGMT_INFO_ELEMENT_MAX_DATA IW_ESSID_MAX_SIZE
+
+struct iw_mgmt_info_element {
+	enum iw_mgmt_info_element_ids id;
+	u8			      len;
+	u8			      data[IW_MGMT_INFO_ELEMENT_MAX_DATA];
+} __attribute__ ((packed));
 
 struct wl3501_tx_hdr {
 	u16	tx_cnt;
@@ -244,19 +265,19 @@ struct wl3501_rx_hdr {
 };
 
 struct wl3501_start_req {
-	u16	next_blk;
-	u8	sig_id;
-	u8	bss_type;
-	u16	beacon_period;
-	u16	dtim_period;
-	u16	probe_delay;
-	u16	cap_info;
-	char	ssid[WL3501_ESSID_MAX_LEN];
-	u8	bss_basic_rate_set[10];
-	u8	operational_rate_set[10];
-	u8	cf_pset[8];
-	u8	phy_pset[3];
-	u8	ibss_pset[4];
+	u16			    next_blk;
+	u8			    sig_id;
+	u8			    bss_type;
+	u16			    beacon_period;
+	u16			    dtim_period;
+	u16			    probe_delay;
+	u16			    cap_info;
+	struct iw_mgmt_info_element ssid;
+	u8			    bss_basic_rate_set[10];
+	u8			    operational_rate_set[10];
+	u8			    cf_pset[8];
+	u8			    phy_pset[3];
+	u8			    ibss_pset[4];
 };
 
 struct wl3501_assoc_req {
@@ -317,25 +338,25 @@ struct wl3501_get_confirm {
 };
 
 struct wl3501_join_req {
-	u16	next_blk;
-	u8	sig_id;
-	u8	reserved;
-	u8	operational_rate_set[10];
-	u16	reserved2;
-	u16	timeout;
-	u16	probe_delay;
-	u8	timestamp[8];
-	u8	local_time[8];
-	u16	beacon_period;
-	u16	dtim_period;
-	u16	cap_info;
-	u8	bss_type;
-	u8	bssid[ETH_ALEN];
-	char	ssid[WL3501_ESSID_MAX_LEN];
-	u8	phy_pset[3];
-	u8	cf_pset[8];
-	u8	ibss_pset[4];
-	u8	bss_basic_rate_set[10];
+	u16			    next_blk;
+	u8			    sig_id;
+	u8			    reserved;
+	u8			    operational_rate_set[10];
+	u16			    reserved2;
+	u16			    timeout;
+	u16			    probe_delay;
+	u8			    timestamp[8];
+	u8			    local_time[8];
+	u16			    beacon_period;
+	u16			    dtim_period;
+	u16			    cap_info;
+	u8			    bss_type;
+	u8			    bssid[ETH_ALEN];
+	struct iw_mgmt_info_element ssid;
+	u8			    phy_pset[3];
+	u8			    cf_pset[8];
+	u8			    ibss_pset[4];
+	u8			    bss_basic_rate_set[10];
 };
 
 struct wl3501_join_confirm {
@@ -361,36 +382,36 @@ struct wl3501_pwr_mgmt_confirm {
 };
 
 struct wl3501_scan_req {
-	u16			next_blk;
-	u8			sig_id;
-	u8			bss_type;
-	u16			probe_delay;
-	u16			min_chan_time;
-	u16			max_chan_time;
-	u8			chan_list[14];
-	u8			bssid[ETH_ALEN];
-	char			ssid[WL3501_ESSID_MAX_LEN];
-	enum wl3501_scan_type	scan_type;
+	u16			    next_blk;
+	u8			    sig_id;
+	u8			    bss_type;
+	u16			    probe_delay;
+	u16			    min_chan_time;
+	u16			    max_chan_time;
+	u8			    chan_list[14];
+	u8			    bssid[ETH_ALEN];
+	struct iw_mgmt_info_element ssid;
+	enum wl3501_scan_type	    scan_type;
 };
 
 struct wl3501_scan_confirm {
-	u16	next_blk;
-	u8	sig_id;
-	u8	reserved;
-	u16	status;
-	char	timestamp[8];
-	char	localtime[8];
-	u16	beacon_period;
-	u16	dtim_period;
-	u16	cap_info;
-	u8	bss_type;
-	u8	bssid[ETH_ALEN];
-	char	ssid[WL3501_ESSID_MAX_LEN];
-	u8	phy_pset[3];
-	u8	cf_pset[8];
-	u8	ibss_pset[4];
-	u8	bss_basic_rate_set[10];
-	u8	rssi;
+	u16			    next_blk;
+	u8			    sig_id;
+	u8			    reserved;
+	u16			    status;
+	char			    timestamp[8];
+	char			    localtime[8];
+	u16			    beacon_period;
+	u16			    dtim_period;
+	u16			    cap_info;
+	u8			    bss_type;
+	u8			    bssid[ETH_ALEN];
+	struct iw_mgmt_info_element ssid;
+	u8			    phy_pset[3];
+	u8			    cf_pset[8];
+	u8			    ibss_pset[4];
+	u8			    bss_basic_rate_set[10];
+	u8			    rssi;
 };
 
 struct wl3501_start_confirm {
@@ -527,10 +548,10 @@ struct wl3501_card {
 	u16				esbq_confirm_start;
 	u16				esbq_confirm_end;
 	u16				esbq_confirm;
-	u8				essid[WL3501_ESSID_MAX_LEN];
+	struct iw_mgmt_info_element	essid;
+	struct iw_mgmt_info_element	keep_essid;
 	u8				bssid[ETH_ALEN];
 	int				net_type;
-	u8				keep_essid[WL3501_ESSID_MAX_LEN];
 	char				nick[32];
 	char				card_name[32];
 	char				firmware_date[32];

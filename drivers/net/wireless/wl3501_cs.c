@@ -220,6 +220,23 @@ static int iw_default_channel(int reg_domain)
 	return rc;
 }
 
+static void iw_set_mgmt_info_element(enum iw_mgmt_info_element_ids id,
+				     struct iw_mgmt_info_element *element,
+				     void *value, int len)
+{
+	int real_len = min_t(int, len, sizeof(element->data));
+
+	element->id  = id;
+	element->len = real_len;
+	memcpy(element->data, value, real_len);
+}
+
+static void iw_copy_mgmt_info_element(struct iw_mgmt_info_element *to,
+				      struct iw_mgmt_info_element *from)
+{
+	iw_set_mgmt_info_element(from->id, to, from->data, from->len);
+}
+
 /*
  * A linked list of "instances" of the wl24 device.  Each actual PCMCIA card
  * corresponds to one device instance, and is described by one dev_link_t
@@ -654,8 +671,8 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.cap_info		= wl3501_fw_cap_info(this),
 	};
 
-	memcpy(sig.ssid, this->essid, WL3501_ESSID_MAX_LEN);
-	memcpy(this->keep_essid, this->essid, WL3501_ESSID_MAX_LEN);
+	iw_copy_mgmt_info_element(&sig.ssid, &this->essid);
+	iw_copy_mgmt_info_element(&this->keep_essid, &this->essid);
 	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
@@ -674,15 +691,15 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 		    (this->net_type == IW_MODE_ADHOC &&
 		     (sig.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
 		    this->net_type == IW_MODE_AUTO) {
-			if (!this->essid[1])
+			if (!this->essid.len)
 				matchflag = 1;
-			else if (this->essid[1] == 3 &&
-				 !strncmp((char *)&this->essid[2], "ANY", 3))
+			else if (this->essid.len == 3 &&
+				 !strncmp(this->essid.data, "ANY", 3))
 				matchflag = 1;
-			else if (this->essid[1] != sig.ssid[1])
+			else if (this->essid.len != sig.ssid.len)
 				matchflag = 0;
-			else if (memcmp(&this->essid[2], &sig.ssid[2],
-					this->essid[1]))
+			else if (memcmp(this->essid.data, sig.ssid.data,
+					this->essid.len))
 				matchflag = 0;
 			else
 				matchflag = 1;
@@ -895,16 +912,17 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 				memcpy(this->bssid,
 				       this->bss_set[i].bssid, ETH_ALEN);
 				this->chan = this->bss_set[i].phy_pset[2];
-				memcpy(this->keep_essid, this->bss_set[i].ssid,
-				       WL3501_ESSID_MAX_LEN);
+				iw_copy_mgmt_info_element(&this->keep_essid,
+							&this->bss_set[i].ssid);
 				wl3501_mgmt_auth(this);
 			}
 		} else {
 			const int i = this->join_sta_bss;
-			memcpy(this->bssid, this->bss_set[i].bssid, ETH_ALEN);
+
+			memcpy(&this->bssid, &this->bss_set[i].bssid, ETH_ALEN);
 			this->chan = this->bss_set[i].phy_pset[2];
-			memcpy(this->keep_essid,
-			       this->bss_set[i].ssid, WL3501_ESSID_MAX_LEN);
+			iw_copy_mgmt_info_element(&this->keep_essid,
+						  &this->bss_set[i].ssid);
 			wl3501_online(dev);
 		}
 	} else {
@@ -1696,8 +1714,9 @@ static int wl3501_set_essid(struct net_device *dev,
 	int rc = 0;
 
 	if (wrqu->data.flags) {
-		strlcpy(this->essid + 2, extra, min_t(u16, wrqu->data.length,
-						      IW_ESSID_MAX_SIZE));
+		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
+					 &this->essid,
+					 extra, wrqu->data.length);
 		rc = wl3501_reset(dev);
 	}
 	return rc;
@@ -1712,8 +1731,8 @@ static int wl3501_get_essid(struct net_device *dev,
 
 	spin_lock_irqsave(&this->lock, flags);
 	wrqu->essid.flags  = 1;
-	wrqu->essid.length = IW_ESSID_MAX_SIZE;
-	strlcpy(extra, this->essid + 2, IW_ESSID_MAX_SIZE);
+	wrqu->essid.length = this->essid.len;
+	strlcpy(extra, this->essid.data, this->essid.len);
 	spin_unlock_irqrestore(&this->lock, flags);
 	return 0;
 }
@@ -2118,11 +2137,8 @@ static void wl3501_config(dev_link_t *link)
 	this->bss_cnt		= 0;
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;
-	this->essid[0]		= 0;
-	this->essid[1]		= 3;
-	this->essid[2]		= 'A';
-	this->essid[3]		= 'N';
-	this->essid[4]		= 'Y';
+	iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID, &this->essid,
+				 "ANY", 3);
 	this->card_name[0]	= '\0';
 	this->firmware_date[0]	= '\0';
 	this->rssi		= 255;
