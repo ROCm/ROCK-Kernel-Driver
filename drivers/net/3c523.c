@@ -1120,8 +1120,11 @@ static int elmc_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 	netif_stop_queue(dev);
 
-	memcpy((char *) p->xmit_cbuffs[p->xmit_count], (char *) (skb->data), skb->len);
 	len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
+	
+	if (len != skb->len)
+		memset((char *) p->xmit_cbuffs[p->xmit_count], 0, ETH_ZLEN);
+	memcpy((char *) p->xmit_cbuffs[p->xmit_count], (char *) (skb->data), skb->len);
 
 #if (NUM_XMIT_BUFFS == 1)
 #ifdef NO_NOPCOMMANDS
