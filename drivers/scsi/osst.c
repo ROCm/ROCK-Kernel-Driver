@@ -125,8 +125,8 @@ static int debugging = 1;
 #define OSST_TIMEOUT (200 * HZ)
 #define OSST_LONG_TIMEOUT (1800 * HZ)
 
-#define TAPE_NR(x) (MINOR(x) & ~(128 | ST_MODE_MASK))
-#define TAPE_MODE(x) ((MINOR(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
+#define TAPE_NR(x) (minor(x) & ~(128 | ST_MODE_MASK))
+#define TAPE_MODE(x) ((minor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
 
 /* Internal ioctl to set both density (uppermost 8 bits) and blocksize (lower
    24 bits) */
@@ -4021,7 +4021,7 @@ os_bypass:
 		if (cmd_in == MTOFFL || cmd_in == MTUNLOAD)
 			STp->rew_at_close = 0;
 		else if (cmd_in == MTLOAD) {
-/*      		STp->rew_at_close = (MINOR(inode->i_rdev) & 0x80) == 0;  FIXME */
+/*      		STp->rew_at_close = (minor(inode->i_rdev) & 0x80) == 0;  FIXME */
 			for (i=0; i < ST_NBR_PARTITIONS; i++) {
 			    STp->ps[i].rw = ST_IDLE;
 			    STp->ps[i].last_block_valid = FALSE;/* FIXME - where else is this field maintained? */
@@ -4103,7 +4103,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 		return (-EBUSY);
 	}
 	STp->in_use       = 1;
-	STp->rew_at_close = (MINOR(inode->i_rdev) & 0x80) == 0;
+	STp->rew_at_close = (minor(inode->i_rdev) & 0x80) == 0;
 
 	if (STp->device->host->hostt->module)
 		 __MOD_INC_USE_COUNT(STp->device->host->hostt->module);
@@ -4124,7 +4124,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	flags = filp->f_flags;
 	STp->write_prot = ((flags & O_ACCMODE) == O_RDONLY);
 
-	STp->raw = (MINOR(inode->i_rdev) & 0x40) != 0;
+	STp->raw = (minor(inode->i_rdev) & 0x40) != 0;
 
 	/* Allocate a buffer for this user */
 	need_dma_buffer = STp->restr_dma;
@@ -5407,7 +5407,7 @@ static int osst_attach(Scsi_Device * SDp)
 #endif
 
 	tpnt->device = SDp;
-	tpnt->devt = MKDEV(MAJOR_NR, i);
+	tpnt->devt = mk_kdev(MAJOR_NR, i);
 	tpnt->dirty = 0;
 	tpnt->in_use = 0;
 	tpnt->drv_buffer = 1;  /* Try buffering if no mode sense */
