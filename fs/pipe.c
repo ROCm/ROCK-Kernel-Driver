@@ -235,6 +235,12 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	down(PIPE_SEM(*inode));
 	info = inode->i_pipe;
 
+	if (!PIPE_READERS(*inode)) {
+		send_sig(SIGPIPE, current, 0);
+		ret = -EPIPE;
+		goto out;
+	}
+
 	/* We try to merge small writes */
 	if (info->nrbufs && total_len < PAGE_SIZE) {
 		int lastbuf = (info->curbuf + info->nrbufs - 1) & (PIPE_BUFFERS-1);
@@ -398,13 +404,18 @@ pipe_poll(struct file *filp, poll_table *wait)
 
 	/* Reading only -- no need for acquiring the semaphore.  */
 	nrbufs = info->nrbufs;
-	mask = (nrbufs > 0) ? POLLIN | POLLRDNORM : 0;
-	mask |= (nrbufs < PIPE_BUFFERS) ? POLLOUT | POLLWRNORM : 0;
+	mask = 0;
+	if (filp->f_mode & FMODE_READ) {
+		mask = (nrbufs > 0) ? POLLIN | POLLRDNORM : 0;
+		if (!PIPE_WRITERS(*inode) && filp->f_version != PIPE_WCOUNTER(*inode))
+			mask |= POLLHUP;
+	}
 
-	if (!PIPE_WRITERS(*inode) && filp->f_version != PIPE_WCOUNTER(*inode))
-		mask |= POLLHUP;
-	if (!PIPE_READERS(*inode))
-		mask |= POLLERR;
+	if (filp->f_mode & FMODE_WRITE) {
+		mask |= (nrbufs < PIPE_BUFFERS) ? POLLOUT | POLLWRNORM : 0;
+		if (!PIPE_READERS(*inode))
+			mask |= POLLERR;
+	}
 
 	return mask;
 }
