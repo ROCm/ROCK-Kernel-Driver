@@ -1,5 +1,5 @@
 # drivers/mtd/nand/Kconfig
-# $Id: Kconfig,v 1.4 2003/05/28 10:04:23 dwmw2 Exp $
+# $Id: Kconfig,v 1.14 2004/07/13 00:14:35 dbrown Exp $
 
 menu "NAND Flash Device Drivers"
 	depends on MTD!=n
@@ -9,7 +9,7 @@ config MTD_NAND
 	depends on MTD
 	help
 	  This enables support for accessing all type of NAND flash
-	  devices with an 8-bit data bus interface. For further information see
+	  devices. For further information see
 	  <http://www.linux-mtd.infradead.org/tech/nand.html>.
 
 config MTD_NAND_VERIFY_WRITE
@@ -42,10 +42,73 @@ config MTD_NAND_SPIA
 	help
 	  If you had to ask, you don't have one. Say 'N'.
 
+config MTD_NAND_TOTO
+	tristate "NAND Flash device on TOTO board"
+	depends on ARM && ARCH_OMAP && MTD_NAND
+	help
+	  Support for NAND flash on Texas Instruments Toto platform.
+
 config MTD_NAND_IDS
 	tristate
 	default y if MTD_NAND = y || MTD_DOC2000 = y || MTD_DOC2001 = y || MTD_DOC2001PLUS = y
 	default m if MTD_NAND = m || MTD_DOC2000 = m || MTD_DOC2001 = m || MTD_DOC2001PLUS = m
-	
-endmenu
 
+config MTD_NAND_TX4925NDFMC
+	tristate "SmartMedia Card on Toshiba RBTX4925 reference board"
+	depends on TOSHIBA_RBTX4925 && MTD_NAND && TOSHIBA_RBTX4925_MPLEX_NAND
+	help
+	  This enables the driver for the NAND flash device found on the
+	  Toshiba RBTX4925 reference board, which is a SmartMediaCard.
+
+config MTD_NAND_TX4938NDFMC
+	tristate "NAND Flash device on Toshiba RBTX4938 reference board"
+	depends on TOSHIBA_RBTX4938 && MTD_NAND && TOSHIBA_RBTX4938_MPLEX_NAND 
+	help
+	  This enables the driver for the NAND flash device found on the
+	  Toshiba RBTX4938 reference board.
+
+config MTD_NAND_AU1550
+	tristate "Au1550 NAND support"
+	depends on SOC_AU1550 && MTD_NAND
+	help
+	  This enables the driver for the NAND flash controller on the
+	  AMD/Alchemy 1550 SOC.
+
+config MTD_NAND_PPCHAMELEONEVB
+	tristate "NAND Flash device on PPChameleonEVB board"
+	depends on PPCHAMELEONEVB && MTD_NAND
+	help
+	  This enables the NAND flash driver on the PPChameleon EVB Board.	
+
+config MTD_NAND_DISKONCHIP
+	tristate "DiskOnChip 2000 and Millennium (NAND reimplementation) (EXPERIMENTAL)"
+	depends on MTD_NAND && EXPERIMENTAL
+	help
+	  This is a reimplementation of M-Systems DiskOnChip 2000 and
+	  Millennium as a standard NAND device driver, as opposed to the
+	  earlier self-contained MTD device drivers.
+	  This should enable, among other things, proper JFFS2 operation on
+	  these devices.
+
+config MTD_NAND_DISKONCHIP_BBTWRITE
+	bool "Allow BBT writes on DiskOnChip Millennium and 2000TSOP"
+	depends on MTD_NAND_DISKONCHIP
+	help
+	  On DiskOnChip devices shipped with the INFTL filesystem (Millennium
+	  and 2000 TSOP/Alon), Linux reserves some space at the end of the
+	  device for the Bad Block Table (BBT).  If you have existing INFTL
+	  data on your device (created by non-Linux tools such as M-Systems'
+	  DOS drivers), your data might overlap the area Linux wants to use for
+	  the BBT.  If this is a concern for you, leave this option disabled and
+	  Linux will not write BBT data into this area.
+	  The downside of leaving this option disabled is that if bad blocks
+	  are detected by Linux, they will not be recorded in the BBT, which
+	  could cause future problems.
+	  Once you enable this option, new filesystems (INFTL or others, created
+	  in Linux or other operating systems) will not use the reserved area.
+	  The only reason not to enable this option is to prevent damage to
+	  preexisting filesystems.
+	  Even if you leave this disabled, you can enable BBT writes at module
+	  load time (assuming you build diskonchip as a module) with the module
+	  parameter "inftl_bbt_write=1".
+endmenu

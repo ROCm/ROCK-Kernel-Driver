@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/nand/autcpu12.c
  *       Copyright (c) 2001 Thomas Gleixner (gleixner@autronix.de)
  *
- * $Id: edb7312.c,v 1.5 2003/04/20 07:24:40 gleixner Exp $
+ * $Id: edb7312.c,v 1.8 2004/07/12 15:03:26 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,6 +20,7 @@
 
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
@@ -83,7 +84,7 @@ static struct mtd_partition partition_info[] = {
 /* 
  *	hardware specific access to control-lines
  */
-static void ep7312_hwcontrol(int cmd) 
+static void ep7312_hwcontrol(struct mtd_info *mtd, int cmd) 
 {
 	switch(cmd) {
 		
@@ -113,10 +114,13 @@ static void ep7312_hwcontrol(int cmd)
 /*
  *	read device ready pin
  */
-static int ep7312_device_ready(void)
+static int ep7312_device_ready(struct mtd_info *mtd)
 {
 	return 1;
 }
+#ifdef CONFIG_MTD_PARTITIONS
+const char *part_probes[] = { "cmdlinepart", NULL };
+#endif
 
 /*
  * Main initialization routine
@@ -171,7 +175,7 @@ static int __init ep7312_init (void)
 	this->chip_delay = 15;
 	
 	/* Scan to find existence of the device */
-	if (nand_scan (ep7312_mtd)) {
+	if (nand_scan (ep7312_mtd, 1)) {
 		iounmap((void *)ep7312_fio_base);
 		kfree (ep7312_mtd);
 		return -ENXIO;
@@ -186,16 +190,16 @@ static int __init ep7312_init (void)
 		return -ENOMEM;
 	}
 	
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-	mtd_parts_nb = parse_cmdline_partitions(ep7312_mtd, &mtd_parts, 
-						"edb7312-nand");
+#ifdef CONFIG_PARTITIONS
+	ep7312_mtd->name = "edb7312-nand";
+	mtd_parts_nb = parse_mtd_partitions(ep7312_mtd, part_probes,
+					    &mtd_parts, 0);
 	if (mtd_parts_nb > 0)
-	  part_type = "command line";
+		part_type = "command line";
 	else
-	  mtd_parts_nb = 0;
+		mtd_parts_nb = 0;
 #endif
-	if (mtd_parts_nb == 0)
-	{
+	if (mtd_parts_nb == 0) {
 		mtd_parts = partition_info;
 		mtd_parts_nb = NUM_PARTITIONS;
 		part_type = "static";
