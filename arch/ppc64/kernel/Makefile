@@ -57,3 +57,4 @@ endif
 obj-$(CONFIG_ALTIVEC)		+= vecemu.o vector.o
 
 CFLAGS_ioctl32.o += -Ifs/
+CFLAGS_process.o += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'

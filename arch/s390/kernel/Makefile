@@ -29,3 +29,5 @@ obj-$(CONFIG_VIRT_TIMER)	+= vtime.o
 # This is just to get the dependencies...
 #
 binfmt_elf32.o:	$(TOPDIR)/fs/binfmt_elf.c
+
+CFLAGS_process.o += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'

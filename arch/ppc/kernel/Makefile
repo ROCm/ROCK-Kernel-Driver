@@ -29,3 +29,4 @@ ifdef CONFIG_MATH_EMULATION
 obj-$(CONFIG_8xx)		+= softemu8xx.o
 endif
 
+CFLAGS_process.o += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'

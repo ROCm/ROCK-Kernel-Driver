@@ -69,3 +69,6 @@ $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
 SYSCFLAGS_vsyscall-syms.o = -r
 $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds $(obj)/vsyscall-sysenter.o FORCE
 	$(call if_changed,syscall)
+
+CFLAGS_process.o += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'
+CFLAGS_traps.o   += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'
