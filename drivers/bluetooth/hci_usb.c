@@ -70,6 +70,9 @@
 static struct usb_driver hci_usb_driver; 
 
 static struct usb_device_id bluetooth_ids[] = {
+	/* Digianswer device */
+	{ USB_DEVICE(0x08fd, 0x0001), driver_info: HCI_DIGIANSWER },
+
 	/* Generic Bluetooth USB device */
 	{ USB_DEVICE_INFO(HCI_DEV_CLASS, HCI_DEV_SUBCLASS, HCI_DEV_PROTOCOL) },
 
@@ -426,7 +429,7 @@ static inline int hci_usb_send_ctrl(struct hci_usb *husb, struct sk_buff *skb)
 	} else
 		dr = (void *) _urb->urb.setup_packet;
 
-	dr->bRequestType = HCI_CTRL_REQ;
+	dr->bRequestType = husb->ctrl_req;
 	dr->bRequest = 0;
 	dr->wIndex   = 0;
 	dr->wValue   = 0;
@@ -871,6 +874,11 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	husb->bulk_out_ep = bulk_out_ep[0];
 	husb->bulk_in_ep  = bulk_in_ep[0];
 	husb->intr_in_ep  = intr_in_ep[0];
+
+	if (id->driver_info & HCI_DIGIANSWER)
+		husb->ctrl_req = HCI_DIGI_REQ;
+	else
+		husb->ctrl_req = HCI_CTRL_REQ;
 
 #ifdef CONFIG_BT_USB_SCO
 	if (isoc_iface) {
