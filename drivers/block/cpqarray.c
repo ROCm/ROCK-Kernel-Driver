@@ -521,6 +521,10 @@ static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	int i;
 
 	c->pci_dev = pdev;
+	if (pci_enable_device(pdev)) {
+		printk(KERN_ERR "cpqarray: Unable to Enable PCI device\n");
+		return -1;
+	}
 	vendor_id = pdev->vendor;
 	device_id = pdev->device;
 	irq = pdev->irq;
@@ -528,11 +532,6 @@ static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	for(i=0; i<6; i++)
 		addr[i] = pci_resource_start(pdev, i);
 
-	if (pci_enable_device(pdev))
-	{
-		printk(KERN_ERR "cpqarray: Unable to Enable PCI device\n");
-		return -1;
-	}
 	if (pci_set_dma_mask(pdev, CPQARRAY_DMA_MASK) != 0)
 	{
 		printk(KERN_ERR "cpqarray: Unable to set DMA mask\n");
