@@ -284,6 +284,12 @@ static inline dma_addr_t virt_to_whatever(struct net_device *dev, u32 * ptr)
 	return ((u_long) ptr) + lp->whatever_offset;
 }
 
+static inline u_int pdl_map_data(struct hp100_private *lp, void *data)
+{
+	return pci_map_single(lp->pci_dev, data, 
+			      MAX_ETHER_SIZE, PCI_DMA_FROMDEVICE);
+}
+
 /* TODO: This function should not really be needed in a good design... */
 static void wait(void)
 {
@@ -1273,7 +1279,8 @@ static int hp100_build_rx_pdl(hp100_ring_t * ringptr,
 		/* Conversion to new PCI API : map skbuf data to PCI bus.
 		 * Doc says it's OK for EISA as well - Jean II */
 		ringptr->pdl[0] = 0x00020000;	/* Write PDH */
-		ringptr->pdl[3] = ((u_int) pci_map_single(((struct hp100_private *) (dev->priv))->pci_dev, ringptr->skb->data, MAX_ETHER_SIZE, PCI_DMA_FROMDEVICE));
+		ringptr->pdl[3] = pdl_map_data(netdev_priv(dev), 
+					       ringptr->skb->data);
 		ringptr->pdl[4] = MAX_ETHER_SIZE;	/* Length of Data */
 
 #ifdef HP100_DEBUG_BM
