@@ -365,7 +365,7 @@ static int powernow_acpi_init(void)
 		vid = pc.bits.vid;
 		fid = pc.bits.fid;
 
-		powernow_table[i].frequency = (fsb * fid_codes[fid]);
+		powernow_table[i].frequency = fsb * fid_codes[fid] / 10;
 		powernow_table[i].index = fid; /* lower 8 bits */
 		powernow_table[i].index |= (vid << 8); /* upper 8 bits */
 
