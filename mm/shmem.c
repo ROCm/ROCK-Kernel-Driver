@@ -49,10 +49,7 @@
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <asm/pgtable.h>
-
-#ifdef CONFIG_TMPFS_POSIX_ACL
 #include <linux/mem_acl.h>
-#endif
 
 /* This magic number is used in glibc for posix shared memory */
 #define TMPFS_MAGIC	0x01021994
