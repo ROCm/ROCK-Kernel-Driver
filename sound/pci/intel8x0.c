@@ -41,6 +41,9 @@
 #include <sound/mpu401.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+/* for 440MX workaround */
+#include <asm/pgtable.h>
+#include <asm/cacheflush.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,i845,MX440; SiS 7012; Ali 5455");
@@ -401,6 +404,7 @@ struct _snd_intel8x0 {
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
+	int fix_nocache: 1; /* workaround for 440MX */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
@@ -721,6 +725,23 @@ static void snd_intel8x0_setup_periods(intel8x0_t *chip, ichdev_t *ichdev)
 	iputbyte(chip, port + ichdev->roff_sr, ICH_FIFOE | ICH_BCIS | ICH_LVBCI);
 }
 
+#ifdef __i386__
+/*
+ * Intel 82443MX running a 100MHz processor system bus has a hardware bug,
+ * which aborts PCI busmaster for audio transfer.  A workaround is to set
+ * the pages as non-cached.  For details, see the errata in
+ *	http://www.intel.com/design/chipsets/specupdt/245051.htm
+ */
+static void fill_nocache(void *buf, int size, int nocache)
+{
+	size = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	change_page_attr(virt_to_page(buf), size, nocache ? PAGE_KERNEL_NOCACHE : PAGE_KERNEL);
+	global_flush_tlb();
+}
+#else
+#define fill_nocache(buf,size,nocache)
+#endif
+
 /*
  *  Interrupt handler
  */
@@ -888,11 +909,17 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	size_t size = params_buffer_bytes(hw_params);
 	int err;
 
+	if (chip->fix_nocache && runtime->dma_area && runtime->dma_bytes < size)
+		fill_nocache(runtime->dma_area, runtime->dma_bytes, 0); /* clear */
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (err < 0)
 		return err;
+	if (chip->fix_nocache && err > 0)
+		fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
 	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
@@ -911,12 +938,15 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 
 static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 {
+	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
 
 	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
 	}
+	if (chip->fix_nocache && substream->runtime->dma_area)
+		fill_nocache(substream->runtime->dma_area, substream->runtime->dma_bytes, 0);
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -2067,8 +2097,11 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	if (chip->bdbars)
+	if (chip->bdbars) {
+		if (chip->fix_nocache)
+			fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 0);
 		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
+	}
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
 	if (chip->remap_bmaddr)
@@ -2357,6 +2390,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	snd_intel8x0_proc_init(chip);
 	sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
 	sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
+	if (pci->vendor == PCI_VENDOR_ID_INTEL &&
+	    pci->device == PCI_DEVICE_ID_INTEL_440MX)
+		chip->fix_nocache = 1; /* enable workaround */
 	if (device_type == DEVICE_ALI) {
 		/* ALI5455 has no ac97 region */
 		chip->bmaddr = pci_resource_start(pci, 0);
@@ -2465,6 +2501,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	}
 	/* tables must be aligned to 8 bytes here, but the kernel pages
 	   are much bigger, so we don't care (on i386) */
+	/* workaround for 440MX */
+	if (chip->fix_nocache)
+		fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 1);
 	int_sta_masks = 0;
 	for (i = 0; i < chip->bdbars_count; i++) {
 		ichdev = &chip->ichd[i];
