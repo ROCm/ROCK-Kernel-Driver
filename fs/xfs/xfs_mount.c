@@ -278,17 +278,22 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-#if !XFS_BIG_BLKNOS
+	ASSERT(PAGE_SHIFT >= sbp->sb_blocklog);
+	ASSERT(sbp->sb_blocklog >= BBSHIFT);
+
+#if XFS_BIG_BLKNOS     /* Limited by ULONG_MAX of page cache index */
 	if (unlikely(
-	    (sbp->sb_dblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> UINT_MAX ||
-	    (sbp->sb_rblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> UINT_MAX)) {
+	    (sbp->sb_dblocks >> (PAGE_SHIFT - sbp->sb_blocklog)) > ULONG_MAX ||
+	    (sbp->sb_rblocks >> (PAGE_SHIFT - sbp->sb_blocklog)) > ULONG_MAX)) {
+#else                  /* Limited by UINT_MAX of sectors */
+	if (unlikely(
+	    (sbp->sb_dblocks << (sbp->sb_blocklog - BBSHIFT)) > UINT_MAX ||
+	    (sbp->sb_rblocks << (sbp->sb_blocklog - BBSHIFT)) > UINT_MAX)) {
+#endif
 		cmn_err(CE_WARN,
 	"XFS: File system is too large to be mounted on this system.");
 		return XFS_ERROR(E2BIG);
 	}
-#endif
 
 	if (unlikely(sbp->sb_inprogress)) {
 		cmn_err(CE_WARN, "XFS: file system busy");
