@@ -354,7 +354,7 @@ _GLOBAL(_nmask_and_or_msr)
  * Flush MMU TLB
  */
 _GLOBAL(_tlbia)
-#if defined(CONFIG_40x) && defined(CONFIG_PIN_TLB)
+#if defined(CONFIG_40x)
 	/* This needs to be coordinated with other pinning functions since
 	 * we don't keep a memory location of number of entries to reduce
 	 * cache pollution during these operations.
@@ -367,7 +367,7 @@ _GLOBAL(_tlbia)
 	cmpwi	0, r3, 61		/* reserve last two entries */
 	ble	1b
 	isync
-#else
+#else /* ! defined(CONFIG_40x) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -401,7 +401,7 @@ _GLOBAL(_tlbia)
 	tlbia
 	sync
 #endif /* CONFIG_SMP */
-#endif /* defined(CONFIG_40x) && defined(CONFIG_PIN_TLB) */
+#endif /* ! defined(CONFIG_40x) */
 	blr	
 
 /*
@@ -412,7 +412,7 @@ _GLOBAL(_tlbie)
 	tlbsx.	r3, 0, r3
 	bne	10f
 	sync
-	/* There are only 64 TLB entries, so r3 < 64, which means bit 25, is clear.
+	/* There are only 64 TLB entries, so r3 < 64, which means bit 25 is clear.
 	 * Since 25 is the V bit in the TLB_TAG, loading this value will invalidate
 	 * the TLB entry. */
 	tlbwe	r3, r3, TLB_TAG
