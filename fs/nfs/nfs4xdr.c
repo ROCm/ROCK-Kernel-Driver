@@ -205,7 +205,7 @@ struct compound_hdr {
 
 #define RESERVE_SPACE(nbytes)	do {				\
 	p = xdr_reserve_space(xdr, nbytes);			\
-	if (!p) printk("RESERVE_SPACE(%d) failed in function %s\n", nbytes, __FUNCTION__); \
+	if (!p) printk("RESERVE_SPACE(%d) failed in function %s\n", (int) (nbytes), __FUNCTION__); \
 	BUG_ON(!p);						\
 } while (0)
 
