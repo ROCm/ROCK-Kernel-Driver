@@ -1013,9 +1013,8 @@ dir_err_out:
  * Convert the Unicode @name to the loaded NLS and pass it to the @filldir
  * callback.
  *
- * If @index_type is INDEX_TYPE_ALLOCATION, @ia_page is the locked page
- * containing the index allocation block containing the index entry @ie.
- * Otherwise, @ia_page is NULL.
+ * If @ia_page is not NULL it is the locked page containing the index
+ * allocation block containing the index entry @ie.
  *
  * Note, we drop (and then reacquire) the page lock on @ia_page across the
  * @filldir() call otherwise we would deadlock with NFSd when it calls ->lookup
@@ -1023,7 +1022,7 @@ dir_err_out:
  * retake the lock if we are returning a non-zero value as ntfs_readdir()
  * would need to drop the lock immediately anyway.
  */
-static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
+static inline int ntfs_filldir(ntfs_volume *vol, loff_t fpos,
 		ntfs_inode *ndir, struct page *ia_page, INDEX_ENTRY *ie,
 		u8 *name, void *dirent, filldir_t filldir)
 {
@@ -1066,9 +1065,9 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 	if (ia_page)
 		unlock_page(ia_page);
 	ntfs_debug("Calling filldir for %s with len %i, fpos 0x%llx, inode "
-			"0x%lx, DT_%s.", name, name_len, *fpos, mref,
+			"0x%lx, DT_%s.", name, name_len, fpos, mref,
 			dt_type == DT_DIR ? "DIR" : "REG");
-	rc = filldir(dirent, name, name_len, *fpos, mref, dt_type);
+	rc = filldir(dirent, name, name_len, fpos, mref, dt_type);
 	/* Relock the page but not if we are aborting ->readdir. */
 	if (!rc && ia_page)
 		lock_page(ia_page);
@@ -1226,7 +1225,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		/* Advance the position even if going to skip the entry. */
 		fpos = (u8*)ie - (u8*)ir;
 		/* Submit the name to the filldir callback. */
-		rc = ntfs_filldir(vol, &fpos, ndir, NULL, ie, name, dirent,
+		rc = ntfs_filldir(vol, fpos, ndir, NULL, ie, name, dirent,
 				filldir);
 		if (rc) {
 			kfree(ir);
@@ -1412,7 +1411,7 @@ find_next_index_buffer:
 		 * before returning, unless a non-zero value is returned in
 		 * which case the page is left unlocked.
 		 */
-		rc = ntfs_filldir(vol, &fpos, ndir, ia_page, ie, name, dirent,
+		rc = ntfs_filldir(vol, fpos, ndir, ia_page, ie, name, dirent,
 				filldir);
 		if (rc) {
 			/* @ia_page is already unlocked in this case. */
