@@ -81,9 +81,12 @@ struct superio_device {
 	|| ((x)->device == PCI_DEVICE_ID_NS_87560_LIO) \
 	|| ((x)->device == PCI_DEVICE_ID_NS_87560_USB) ) )
 
+struct hwif_s;
+
 extern void superio_inform_irq(int irq);
 extern void superio_serial_init(void);		/* called by rs_init() */
 extern int superio_fixup_irq(struct pci_dev *pcidev); /* called by iosapic */
-extern int superio_get_ide_irq(void);
+extern void superio_fixup_pci(struct pci_dev *pdev);
+extern void superio_ide_init_iops (struct hwif_s *hwif);
 
 #endif /* _PARISC_SUPERIO_H */

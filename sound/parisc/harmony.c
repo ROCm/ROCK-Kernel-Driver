@@ -358,7 +358,7 @@ static void snd_harmony_enable_interrupts(snd_card_harmony_t *chip)
  * The interrupt routine must provide adresse of next physical pages 
  * used by harmony
  */
-void snd_card_harmony_interrupt(int irq, void *dev, struct pt_regs *regs)
+static int snd_card_harmony_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
 	snd_card_harmony_t *harmony = (snd_card_harmony_t *)dev;
 	u32 dstatus = 0;
@@ -414,6 +414,8 @@ void snd_card_harmony_interrupt(int irq, void *dev, struct pt_regs *regs)
 		}
 	}
 	snd_harmony_enable_interrupts(harmony);
+
+	return IRQ_HANDLED;
 }
 
 /* 

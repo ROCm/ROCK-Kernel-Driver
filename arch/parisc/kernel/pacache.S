@@ -221,6 +221,7 @@ flush_instruction_cache_local:
 	LDREG           ICACHE_STRIDE(%r1),%arg1
 	LDREG           ICACHE_COUNT(%r1),%arg2
 	LDREG           ICACHE_LOOP(%r1),%arg3
+	rsm             PSW_SM_I,%r22		/* No mmgt ops during loop*/
 	ADDIB=          -1,%arg3,fioneloop      /* Preadjust and test */
 	movb,<,n        %arg3,%r31,fisync       /* If loop < 0, do sync */
 
@@ -237,6 +238,7 @@ fioneloop:                                      /* Loop if LOOP = 1 */
 
 fisync:
 	sync
+	mtsm	%r22
 	bv      %r0(%r2)
 	nop
 	.exit

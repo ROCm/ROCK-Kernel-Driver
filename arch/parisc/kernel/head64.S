@@ -165,9 +165,9 @@ common_stext:
 #endif /* CONFIG_SMP */
 
 	/* Save the rfi target address */
-	ldo		-THREAD_SZ_ALGN(%sp), %r1
-	ldd		TI_TASK(%r1), %r1
-	std		%r11,  TASK_PT_GR11(%r1)
+	ldd		TI_TASK-THREAD_SZ_ALGN(%sp), %r10
+	tophys_r1	%r10
+	std		%r11,  TASK_PT_GR11(%r10)
 
 #ifndef CONFIG_PDC_NARROW
 	/* Switch to wide mode; Superdome doesn't support narrow PDC
@@ -197,9 +197,9 @@ common_stext:
 
 stext_pdc_ret:
 	/* restore rfi target address*/
-	ldo		-THREAD_SZ_ALGN(%sp), %r1
-	ldd		TI_TASK(%r1), %r1
-	ldd		TASK_PT_GR11(%r1), %r11
+	ldd		TI_TASK-THREAD_SZ_ALGN(%sp), %r10
+	tophys_r1	%r10
+	ldd		TASK_PT_GR11(%r10), %r11
 
 	/* PARANOID: clear user scratch/user space SR's */
 	mtsp	%r0,%sr0
@@ -302,6 +302,7 @@ smp_slave_stext:
 	/*  Initialize the SP - monarch sets up smp_init_current_idle_task */
 	load32		PA(smp_init_current_idle_task),%sp
 	ldd		0(%sp),%sp	/* load task address */
+	ldd		TASK_THREAD_INFO(%sp), %sp
 	mtctl           %sp,%cr30       /* store in cr30 */
 	ldo             THREAD_SZ_ALGN(%sp),%sp
 	tophys_r1       %sp
