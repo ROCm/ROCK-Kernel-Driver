@@ -2691,38 +2691,33 @@ no_packet:
 	return NULL;
 }
 
-static inline int sctp_verify_addr(struct sock *sk, struct sockaddr *addr, int addrlen)
+/* Verify that this is a valid address. */
+static int sctp_verify_addr(struct sock *sk, struct sockaddr *addr, int len)
 {
-	union sctp_addr *sa;
+	struct sctp_func *af;
 
-	if (addrlen < sizeof (struct sockaddr))
+	/* Check minimum size.  */
+	if (len < sizeof (struct sockaddr))
 		return -EINVAL;
 
-	sa = (union sctp_addr *)addr;
-	switch (sa->sa.sa_family) {
-	case AF_INET:
-		if (addrlen < sizeof(struct sockaddr_in))
-			return -EINVAL;
-		break;
-
-	case AF_INET6:
-		if (PF_INET == sk->family)
-			return -EINVAL;
-		SCTP_V6(
-			if (addrlen < sizeof(struct sockaddr_in6))
-				return -EINVAL;
-			break;
-		);
-
-	default:
-		return -EINVAL;
-	};
-
-	/* Disallow any illegal addresses to be used as destinations.  */
-	if (!sctp_addr_is_valid(sa))
+	/* Do we support this address family in general? */
+	af = sctp_get_af_specific(addr->sa_family);
+	if (!af)
 		return -EINVAL;
 
-	return 0;
+	/* Does this PF support this AF? */
+	if (!sctp_sk(sk)->pf->af_supported(addr->sa_family))
+		return -EINVAL;
+     
+	/* Verify the minimum for this AF sockaddr. */
+	if (len < af->sockaddr_len)
+		return -EINVAL;
+
+	/* Is this a valid SCTP address?  */
+	if (!af->addr_valid((union sctp_addr *)addr)) 
+		return -EINVAL;
+
+	return 0;	
 }
 
 /* Get the sndbuf space available at the time on the association.  */

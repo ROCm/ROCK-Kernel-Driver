@@ -2,7 +2,7 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001 International Business Machines Corp.
+ * Copyright (c) 2001-2002 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -257,6 +257,8 @@ typedef struct sctp_func {
 	void            (*from_skb)     (union sctp_addr *,
 					 struct sk_buff *skb,
 					 int saddr);
+	int             (*addr_valid)   (union sctp_addr *);
+	sctp_scope_t    (*scope) (union sctp_addr *);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
@@ -269,13 +271,14 @@ sctp_func_t *sctp_get_af_specific(sa_family_t);
 typedef struct sctp_pf {
 	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
 	void (*skb_msgname)(struct sk_buff *, char *, int *);
+	int  (*af_supported)(sa_family_t);
 } sctp_pf_t;
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
 	SCTP_SOCKET_UDP = 0,
-       SCTP_SOCKET_UDP_HIGH_BANDWIDTH,
-       SCTP_SOCKET_TCP
+	SCTP_SOCKET_UDP_HIGH_BANDWIDTH,
+	SCTP_SOCKET_TCP
 } sctp_socket_type_t;
 
 /* Per socket SCTP information. */
@@ -505,7 +508,7 @@ void  *sctp_addto_chunk(sctp_chunk_t *chunk, int len, const void *data);
 int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data);
 sctp_chunk_t *sctp_chunkify(struct sk_buff *, const sctp_association_t *,
 			    struct sock *);
-void sctp_init_addrs(sctp_chunk_t *chunk);
+void sctp_init_addrs(sctp_chunk_t *, union sctp_addr *, union sctp_addr *);
 const union sctp_addr *sctp_source(const sctp_chunk_t *chunk);
 
 /* This is a structure for holding either an IPv6 or an IPv4 address.  */
