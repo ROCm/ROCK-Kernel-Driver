@@ -19,6 +19,27 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.8-WIP
+
+	- Use get_bh() instead of manual atomic_inc() in fs/ntfs/compress.c.
+	- Modify fs/ntfs/time.c::ntfs2utc(), get_current_ntfs_time(), and
+	  utc2ntfs() to work with struct timespec instead of time_t on the
+	  Linux UTC time side thus preserving the full precision of the NTFS
+	  time and only loosing up to 99 nano-seconds in the Linux UTC time.
+	- Move fs/ntfs/time.c to fs/ntfs/time.h and make the time functions
+	  static inline.
+	- Remove unused ntfs_dirty_inode().
+	- Cleanup super operations declaration in fs/ntfs/super.c.
+	- Wrap flush_dcache_mft_record_page() in #ifdef NTFS_RW.
+	- Add NInoTestSetFoo() and NInoTestClearFoo() macro magic to
+	  fs/ntfs/inode.h and use it to declare NInoTest{Set,Clear}Dirty.
+	- Move typedefs for ntfs_attr and test_t from fs/ntfs/inode.c to
+	  fs/ntfs/inode.h so they can be used elsewhere.
+	- Determine the mft mirror size as the number of mirrored mft records
+	  and store it in ntfs_volume->mftmirr_size (fs/ntfs/super.c).
+	- Load the mft mirror at mount time and compare the mft records stored
+	  in it to the ones in the mft (fs/ntfs/super.c).
+
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 
 	- Set i_generation in the VFS inode from the seq_no of the NTFS inode.
