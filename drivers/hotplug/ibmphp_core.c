@@ -686,9 +686,10 @@ static int validate (struct slot *slot_cur, int opn)
 int ibmphp_update_slot_info (struct slot *slot_cur)
 {
 	struct hotplug_slot_info *info;
-	char buffer[10];
+	char buffer[30];
 	int rc;
-//	u8 bus_speed;
+	u8 bus_speed;
+	u8 mode;
 
 	info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
 	if (!info) {
@@ -696,7 +697,7 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
 		return -ENOMEM;
 	}
         
-	snprintf (buffer, 10, "%d", slot_cur->number);
+	strncpy (buffer, slot_cur->hotplug_slot->name, 30);
 	info->power_status = SLOT_PWRGD (slot_cur->status);
 	info->attention_status = SLOT_ATTN (slot_cur->status, slot_cur->ext_status);
 	info->latch_status = SLOT_LATCH (slot_cur->status);
@@ -707,21 +708,33 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
                 info->adapter_status = 1;
 //		get_max_adapter_speed_1 (slot_cur->hotplug_slot, &info->max_adapter_speed_status, 0);
 	}
-	/* !!!!!!!!!TO DO: THIS NEEDS TO CHANGE!!!!!!!!!!!!! */
-/*	bus_speed = slot_cur->bus_on->current_speed;
-	bus_speed &= 0x0f;
-                        
-	if (slot_cur->bus_on->current_bus_mode == BUS_MODE_PCIX)
-		bus_speed |= 0x80;
-	else if (slot_cur->bus_on->current_bus_mode == BUS_MODE_PCI)
-		bus_speed |= 0x40;
-	else
-		bus_speed |= 0x20;
+
+	bus_speed = slot_cur->bus_on->current_speed;
+	mode = slot_cur->bus_on->current_bus_mode;
+
+	switch (bus_speed) {
+	case BUS_SPEED_33:
+		break;
+	case BUS_SPEED_66:
+		if (mode == BUS_MODE_PCIX) 
+			bus_speed += 0x01;
+		else if (mode == BUS_MODE_PCI)
+			;
+		else
+			bus_speed = PCI_SPEED_UNKNOWN;
+		break;
+	case BUS_SPEED_100:
+	case BUS_SPEED_133:
+		bus_speed += 0x01;
+		break;
+	default:
+		bus_speed = PCI_SPEED_UNKNOWN;
+	}
 
 	info->cur_bus_speed_status = bus_speed;
 	info->max_bus_speed_status = slot_cur->hotplug_slot->info->max_bus_speed_status;
 	// To do: bus_names 
-*/	
+	
 	rc = pci_hp_change_slot_info (buffer, info);
 	kfree (info);
 	return rc;
@@ -989,7 +1002,7 @@ static u8 bus_structure_fixup (u8 busno)
 	struct pci_dev *dev;
 	u16 l;
 
-	if (!find_bus (busno) || !(ibmphp_find_same_bus_num (busno)))
+	if (find_bus (busno) || !(ibmphp_find_same_bus_num (busno)))
 		return 1;
 
 	bus = kmalloc (sizeof (*bus), GFP_KERNEL);
