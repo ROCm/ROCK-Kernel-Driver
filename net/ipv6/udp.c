@@ -592,7 +592,7 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
 					return s;
 			}
-			if(!inet6_mc_check(s, loc_addr))
+			if(!inet6_mc_check(s, loc_addr, rmt_addr))
 				continue;
 			return s;
 		}

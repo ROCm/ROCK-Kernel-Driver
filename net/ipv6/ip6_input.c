@@ -217,7 +217,7 @@ int ip6_mc_input(struct sk_buff *skb)
 	IP6_INC_STATS_BH(Ip6InMcastPkts);
 
 	hdr = skb->nh.ipv6h;
-	if (ipv6_chk_mcast_addr(skb->dev, &hdr->daddr))
+	if (ipv6_chk_mcast_addr(skb->dev, &hdr->daddr, &hdr->saddr))
 		deliver = 1;
 
 	/*
