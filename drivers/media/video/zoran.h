@@ -32,10 +32,6 @@
 
 #include <linux/config.h>
 
-#if LINUX_VERSION_CODE < 0x20212
-typedef struct wait_queue *wait_queue_head_t;
-#endif
-
 /* The Buz only supports a maximum width of 720, but some V4L
    applications (e.g. xawtv are more happy with 768).
    If XAWTV_HACK is defined, we try to fake a device with bigger width */

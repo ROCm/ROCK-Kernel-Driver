@@ -943,7 +943,6 @@ long zoran_write(struct video_device* dev, const char* buf, unsigned long count,
 	return -EINVAL;
 }
 
-#if LINUX_VERSION_CODE >= 0x020100
 static
 unsigned int zoran_poll(struct video_device *dev, struct file *file, poll_table *wait)
 {
@@ -964,7 +963,6 @@ unsigned int zoran_poll(struct video_device *dev, struct file *file, poll_table 
 
 	return mask;
 }
-#endif
 
 /* append a new clipregion to the vector of video_clips */
 static
@@ -1745,7 +1743,6 @@ out:
 	return count;
 }
 
-#if LINUX_VERSION_CODE >= 0x020100
 static
 unsigned int vbi_poll(struct video_device *dev, struct file *file, poll_table *wait)
 {
@@ -1766,7 +1763,6 @@ unsigned int vbi_poll(struct video_device *dev, struct file *file, poll_table *w
 
 	return mask;
 }
-#endif
 
 static
 int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
