@@ -66,6 +66,7 @@ union powernow_acpi_control_t {
 };
 #endif
 
+#ifdef CONFIG_CPU_FREQ_DEBUG
 /* divide by 1000 to get VID. */
 static int mobile_vid_table[32] = {
     2000, 1950, 1900, 1850, 1800, 1750, 1700, 1650,
@@ -73,6 +74,7 @@ static int mobile_vid_table[32] = {
     1275, 1250, 1225, 1200, 1175, 1150, 1125, 1100,
     1075, 1050, 1024, 1000, 975, 950, 925, 0,
 };
+#endif
 
 /* divide by 10 to get FID. */
 static int fid_codes[32] = {
