@@ -1210,6 +1210,9 @@ checkstack:
 	$(OBJDUMP) -d vmlinux $$(find . -name '*.ko') | \
 	$(PERL) $(src)/scripts/checkstack.pl $(ARCH)
 
+kernelrelease:
+	@echo $(KERNELRELEASE)
+
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
 
