@@ -2219,15 +2219,6 @@ static struct pci_device_id serial_pci_tbl[] = {
 		pbn_b0_1_115200 },
 
 	/*
-	 * Broadcom CardBus EDGE modem.
-	 */
-
-	{
-		PCI_VENDOR_ID_BROADCOM, 0x4333,
-		PCI_ANY_ID, PCI_ANY_ID,	0, 0,
-		pbn_b0_1_115200 },
-
-	/*
 	 * These entries match devices with class COMMUNICATION_SERIAL,
 	 * COMMUNICATION_MODEM or COMMUNICATION_MULTISERIAL
 	 */
