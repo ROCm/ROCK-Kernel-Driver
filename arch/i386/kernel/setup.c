@@ -1168,7 +1168,7 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
  */
 static void __init register_memory(void)
 {
-	long long gapsize;
+	unsigned long gapsize;
 	unsigned long long last;
 	int	      i;
 
@@ -1191,13 +1191,21 @@ static void __init register_memory(void)
 	while (--i >= 0) {
 		unsigned long long start = e820.map[i].addr;
 		unsigned long long end = start + e820.map[i].size;
-		long long gap = last - end;
 
-		if (gap > gapsize) {
-			gapsize = gap;
-			pci_mem_start = ((unsigned long) end + 0xfffff) & ~0xfffff;
+		/*
+		 * Since "last" is at most 4GB, we know we'll
+		 * fit in 32 bits if this condition is true
+		 */
+		if (last > end) {
+			unsigned long gap = last - end;
+
+			if (gap > gapsize) {
+				gapsize = gap;
+				pci_mem_start = ((unsigned long) end + 0xfffff) & ~0xfffff;
+			}
 		}
-		last = start;
+		if (start < last)
+			last = start;
 	}
 	printk("Allocating PCI resources starting at %08lx\n", pci_mem_start);
 }
