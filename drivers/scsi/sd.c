@@ -52,6 +52,9 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsicam.h>
 
+#include "scsi_logging.h"
+
+
 /*
  * Remaining dev_t-handling stuff
  */
@@ -1502,7 +1505,8 @@ static int sd_synchronize_cache(struct scsi_disk *sdkp, int verbose)
 			printk("FAILED\n  No memory for request\n");
 		return 0;
 	}
-		
+
+	SRpnt->sr_data_direction = SCSI_DATA_NONE;
 
 	for(retries = 3; retries > 0; --retries) {
 		unsigned char cmd[10] = { 0 };

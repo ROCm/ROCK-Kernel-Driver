@@ -52,6 +52,7 @@
 #include <linux/version.h>
 #endif
 
+#include "scsi_logging.h"
 #include "scsi_debug.h"
 
 static const char * scsi_debug_version_str = "Version: 1.69 (20030329)";
@@ -865,7 +866,7 @@ static int resp_report_luns(unsigned char * cmd, unsigned char * buff,
 static void timer_intr_handler(unsigned long indx)
 {
 	struct sdebug_queued_cmd * sqcp;
-	unsigned int iflags;
+	unsigned long iflags;
 
 	if (indx >= SCSI_DEBUG_CANQUEUE) {
 		printk(KERN_ERR "scsi_debug:timer_intr_handler: indx too "

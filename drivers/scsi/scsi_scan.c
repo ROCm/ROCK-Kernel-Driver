@@ -33,9 +33,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
-#ifdef CONFIG_KMOD
-#include <linux/kmod.h>
-#endif
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 /*
  * Flags for SCSI devices that need special treatment
@@ -429,7 +429,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 
 	sdev->request_queue->queuedata = sdev;
 	scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-	init_waitqueue_head(&sdev->scpnt_wait);
 
 	if (shost->hostt->slave_alloc) {
 		if (shost->hostt->slave_alloc(sdev))

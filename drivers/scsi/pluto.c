@@ -246,11 +246,6 @@ int __init pluto_detect(Scsi_Host_Template *tpnt)
 				host->max_channel = inq->channels;
 				host->irq = fc->irq;
 
-#ifdef __sparc_v9__
-				host->unchecked_isa_dma = 1;
-#endif
-
-
 				fc->channels = inq->channels + 1;
 				fc->targets = inq->targets;
 				fc->ages = ages;

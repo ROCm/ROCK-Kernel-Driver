@@ -56,6 +56,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 /*
  * Definitions and constants.
@@ -115,11 +118,6 @@ static const char * const spaces = "                "; /* 16 of them */
 
 static unsigned scsi_default_dev_flags;
 LIST_HEAD(scsi_dev_info_list);
-
-/* 
- * Function prototypes.
- */
-extern void scsi_times_out(struct scsi_cmnd *cmd);
 
 MODULE_PARM(scsi_logging_level, "i");
 MODULE_PARM_DESC(scsi_logging_level, "SCSI logging level; should be zero or nonzero");
@@ -534,7 +532,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 
 	cmd->request = sreq->sr_request;
 	memcpy(cmd->data_cmnd, sreq->sr_cmnd, sizeof(cmd->data_cmnd));
-	cmd->reset_chain = NULL;
 	cmd->serial_number = 0;
 	cmd->serial_number_at_timeout = 0;
 	cmd->bufflen = sreq->sr_bufflen;

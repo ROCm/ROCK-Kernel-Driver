@@ -32,19 +32,19 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/completion.h>
-
-#define __KERNEL_SYSCALLS__
-
 #include <linux/unistd.h>
 #include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"
+
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 static LIST_HEAD(scsi_host_list);
 static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
@@ -423,8 +423,14 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	shost->use_clustering = shost_tp->use_clustering;
 	if (!blk_nohighio)
 		shost->highmem_io = shost_tp->highmem_io;
-
-	shost->max_sectors = shost_tp->max_sectors;
+	if (!shost_tp->max_sectors) {
+		/*
+		 * Driver imposes no hard sector transfer limit.
+		 * start at machine infinity initially.
+		 */
+		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
+	} else
+		shost->max_sectors = shost_tp->max_sectors;
 	shost->use_blk_tcq = shost_tp->use_blk_tcq;
 
 	spin_lock(&scsi_host_list_lock);

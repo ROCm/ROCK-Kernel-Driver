@@ -677,11 +677,6 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
         scsi_release_request(ScsiPassThruReq); // "de-allocate"
         ScsiPassThruReq = NULL;
 
-        // if (!SDpnt->was_reset && SDpnt->scsi_request_fn)
-        //  (*SDpnt->scsi_request_fn)();
-
-        wake_up(&SDpnt->scpnt_wait);
-
 	// need to pass data back to user (space)?
 	if( (vendor_cmd->rw_flag == VENDOR_READ_OPCODE) &&
 	     vendor_cmd->len )
@@ -1656,10 +1651,6 @@ return -ENOTSUPP;
   scsi_put_command(SCpnt);
   SCpnt = NULL;
 
-  // if (!SDpnt->was_reset && SDpnt->scsi_request_fn)
-  // 	(*SDpnt->scsi_request_fn)();
-
-  wake_up(&SDpnt->scpnt_wait);
   // printk("   LEAVING cpqfcTS_TargetDeviceReset() - return SUCCESS \n");
   return SUCCESS;
 }

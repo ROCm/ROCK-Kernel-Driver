@@ -3213,6 +3213,7 @@ static void BusLogic_ProcessCompletedCCBs(BusLogic_HostAdapter_T *HostAdapter)
 	    Place CCB back on the Host Adapter's free list.
 	  */
 	  BusLogic_DeallocateCCB(CCB);
+#if 0	/* this needs to be redone different for new EH */
 	  /*
 	    Bus Device Reset CCBs have the Command field non-NULL only when a
 	    Bus Device Reset was requested for a Command that did not have a
@@ -3228,6 +3229,7 @@ static void BusLogic_ProcessCompletedCCBs(BusLogic_HostAdapter_T *HostAdapter)
 	      Command->scsi_done(Command);
 	      Command = NextCommand;
 	    }
+#endif
 	  /*
 	    Iterate over the CCBs for this Host Adapter performing completion
 	    processing for any CCBs marked as Reset for this Target.
@@ -3948,6 +3950,7 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
       {
 	Command = CCB->Command;
 	BusLogic_DeallocateCCB(CCB);
+#if 0	/* this needs to be redone different for new EH */
 	while (Command != NULL)
 	  {
 	    SCSI_Command_T *NextCommand = Command->reset_chain;
@@ -3956,6 +3959,7 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
 	    Command->scsi_done(Command);
 	    Command = NextCommand;
 	  }
+#endif
       }
   for (TargetID = 0; TargetID < HostAdapter->MaxTargetDevices; TargetID++)
     {
@@ -3967,7 +3971,7 @@ Done:
   return Result;
 }
 
-
+#if 0	/* old-style EH code references a dead struct scsi_cmnd member */
 /*
   BusLogic_SendBusDeviceReset sends a Bus Device Reset to the Target
   Device associated with Command.
@@ -4204,6 +4208,7 @@ int BusLogic_ResetCommand(SCSI_Command_T *Command, unsigned int ResetFlags)
     }
   return SCSI_RESET_PUNT;
 }
+#endif
 
 
 /*
