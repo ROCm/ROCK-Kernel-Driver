@@ -720,7 +720,7 @@ static int pccardd(void *__skt)
 
 		schedule();
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		if (!skt->thread)
 			break;

@@ -2883,7 +2883,7 @@ static int airo_thread(void *data) {
 
 		/* make swsusp happy with our thread */
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		if (test_bit(JOB_DIE, &ai->flags))
 			break;
