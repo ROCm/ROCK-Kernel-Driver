@@ -71,15 +71,8 @@ struct switch_stack {
 #define instruction_pointer(regs) ((regs)->pc)
 extern void show_regs(struct pt_regs *);
 
-/*
- * TODO: if kernel-only threads do not have a dummy pt_regs structure at the
- * top of the stack, this would cause kernel stack corruption.  Either check
- * first that we're not dealing with a kernel thread or change the kernel
- * stacks to allocate a dummy pt_regs structure.
- */
-
-#define alpha_task_regs(task)	((struct pt_regs *) \
-			((long) task->thread_info + PAGE_SIZE) - 1)
+#define alpha_task_regs(task) \
+  ((struct pt_regs *) ((long) (task)->thread_info + 2*PAGE_SIZE) - 1)
 
 #define force_successful_syscall_return() (alpha_task_regs(current)->r0 = 0)
 
