@@ -97,7 +97,7 @@ static int __init hp_zx1_ioc_shared(void)
 		default:
 			printk(KERN_ERR PFX "Invalid IOTLB page size "
 			       "configuration 0x%x\n", hp->io_tlb_ps);
-			hp->gatt = 0;
+			hp->gatt = NULL;
 			hp->gatt_entries = 0;
 			return -ENODEV;
 	}
@@ -115,7 +115,7 @@ static int __init hp_zx1_ioc_shared(void)
 
 	if (hp->gatt[0] != HP_ZX1_SBA_IOMMU_COOKIE) {
 		/* Normal case when no AGP device in system */
-	    	hp->gatt = 0;
+	    	hp->gatt = NULL;
 		hp->gatt_entries = 0;
 		printk(KERN_ERR PFX "No reserved IO PDIR entry found; "
 		       "GART disabled\n");
@@ -294,7 +294,7 @@ hp_zx1_create_gatt_table (void)
 		if (!hp->io_pdir) {
 			printk(KERN_ERR PFX "Couldn't allocate contiguous "
 				"memory for I/O PDIR\n");
-			hp->gatt = 0;
+			hp->gatt = NULL;
 			hp->gatt_entries = 0;
 			return -ENOMEM;
 		}

@@ -215,7 +215,7 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 
 	down_write(&current->mm->mmap_sem);
 	{
-		ret = do_mmap(0, PAGE_START(start), PAGE_SIZE, prot | PROT_WRITE,
+		ret = do_mmap(NULL, PAGE_START(start), PAGE_SIZE, prot | PROT_WRITE,
 			      flags | MAP_FIXED | MAP_ANONYMOUS, 0);
 	}
 	up_write(&current->mm->mmap_sem);
@@ -266,9 +266,9 @@ ia32_init_pp_list(void)
 
 	if ((p = kmalloc(sizeof(*p), GFP_KERNEL)) == NULL)
 		return p;
-	p->pp_head = 0;
+	p->pp_head = NULL;
 	p->ppl_rb = RB_ROOT;
-	p->pp_hint = 0;
+	p->pp_hint = NULL;
 	atomic_set(&p->pp_count, 1);
 	return p;
 }
@@ -825,7 +825,7 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 		if (!(flags & MAP_ANONYMOUS) && is_congruent)
 			ret = do_mmap(file, pstart, pend - pstart, prot, flags | MAP_FIXED, poff);
 		else
-			ret = do_mmap(0, pstart, pend - pstart,
+			ret = do_mmap(NULL, pstart, pend - pstart,
 				      prot | ((flags & MAP_ANONYMOUS) ? 0 : PROT_WRITE),
 				      flags | MAP_FIXED | MAP_ANONYMOUS, 0);
 	}

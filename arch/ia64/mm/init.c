@@ -67,9 +67,9 @@ check_pgt_cache (void)
 	if (pgtable_cache_size > (u64) high) {
 		do {
 			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(0));
+				free_page((unsigned long)pgd_alloc_one_fast(NULL));
 			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
+				free_page((unsigned long)pmd_alloc_one_fast(NULL, 0));
 		} while (pgtable_cache_size > (u64) low);
 	}
 	preempt_enable();

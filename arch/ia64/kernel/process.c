@@ -74,12 +74,12 @@ void
 show_stack (struct task_struct *task, unsigned long *sp)
 {
 	if (!task)
-		unw_init_running(ia64_do_show_stack, 0);
+		unw_init_running(ia64_do_show_stack, NULL);
 	else {
 		struct unw_frame_info info;
 
 		unw_init_from_blocked_task(&info, task);
-		ia64_do_show_stack(&info, 0);
+		ia64_do_show_stack(&info, NULL);
 	}
 }
 
@@ -751,7 +751,7 @@ cpu_halt (void)
 void
 machine_restart (char *restart_cmd)
 {
-	(*efi.reset_system)(EFI_RESET_WARM, 0, 0, 0);
+	(*efi.reset_system)(EFI_RESET_WARM, 0, 0, NULL);
 }
 
 EXPORT_SYMBOL(machine_restart);

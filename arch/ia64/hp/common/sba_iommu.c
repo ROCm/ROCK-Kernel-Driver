@@ -1153,7 +1153,7 @@ sba_fill_pdir(
 {
 	struct scatterlist *dma_sg = startsg;	/* pointer to current DMA */
 	int n_mappings = 0;
-	u64 *pdirp = 0;
+	u64 *pdirp = NULL;
 	unsigned long dma_offset = 0;
 
 	dma_sg--;
@@ -1875,7 +1875,7 @@ ioc_proc_init(void)
 {
 	struct proc_dir_entry *dir, *entry;
 
-	dir = proc_mkdir("bus/mckinley", 0);
+	dir = proc_mkdir("bus/mckinley", NULL);
 	if (!dir)
 		return;
 

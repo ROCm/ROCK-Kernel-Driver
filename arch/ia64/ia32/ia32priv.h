@@ -361,7 +361,7 @@ void ia64_elf32_init(struct pt_regs *regs);
 /* This macro yields a string that ld.so will use to load
    implementation specific libraries for optimization.  Not terribly
    relevant until we have real hardware to play with... */
-#define ELF_PLATFORM	0
+#define ELF_PLATFORM	NULL
 
 #ifdef __KERNEL__
 # define SET_PERSONALITY(EX,IBCS2)				\

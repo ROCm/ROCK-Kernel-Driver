@@ -260,7 +260,7 @@ ia64_rt_sigreturn (struct sigscratch *scr)
 	 * It is more difficult to avoid calling this function than to
 	 * call it and ignore errors.
 	 */
-	do_sigaltstack(&sc->sc_stack, 0, scr->pt.r12);
+	do_sigaltstack(&sc->sc_stack, NULL, scr->pt.r12);
 	return retval;
 
   give_sigsegv:

@@ -869,7 +869,7 @@ emulate_store_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 	 *
 	 * extract the value to be stored
 	 */
-	getreg(ld.imm, &r2, 0, regs);
+	getreg(ld.imm, &r2, NULL, regs);
 
 	/*
 	 * we rely on the macros in unaligned.h for now i.e.,

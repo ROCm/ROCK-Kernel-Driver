@@ -262,7 +262,7 @@ struct thread_struct {
 				.fdr =		0,			\
 				.old_k1 =	0,			\
 				.old_iob =	0,			\
-				.ppl =		0,
+				.ppl =		NULL,
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */

@@ -225,7 +225,7 @@ smp_send_reschedule (int cpu)
 void
 smp_flush_tlb_all (void)
 {
-	on_each_cpu((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
+	on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
 }
 EXPORT_SYMBOL(smp_flush_tlb_all);
 
