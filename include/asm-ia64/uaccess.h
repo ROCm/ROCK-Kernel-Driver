@@ -28,7 +28,7 @@
  *
  * Based on <asm-alpha/uaccess.h>.
  *
- * Copyright (C) 1998, 1999, 2001-2003 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -283,24 +283,23 @@ extern unsigned long __strnlen_user (const char *, long);
 	__su_ret;						\
 })
 
+/* Generic code can't deal with the location-relative format that we use for compactness.  */
 #define ARCH_HAS_SORT_EXTABLE
 #define ARCH_HAS_SEARCH_EXTABLE
 
 struct exception_table_entry {
-	int addr;	/* gp-relative address of insn this fixup is for */
-	int cont;	/* gp-relative continuation address; if bit 2 is set, r9 is set to 0 */
+	int addr;	/* location-relative address of insn this fixup is for */
+	int cont;	/* location-relative continuation addr.; if bit 2 is set, r9 is set to 0 */
 };
 
 extern void handle_exception (struct pt_regs *regs, const struct exception_table_entry *e);
 extern const struct exception_table_entry *search_exception_tables (unsigned long addr);
 
-# define SEARCH_EXCEPTION_TABLE(regs) search_exception_tables(regs->cr_iip + ia64_psr(regs)->ri)
-
 static inline int
 done_with_exception (struct pt_regs *regs)
 {
 	const struct exception_table_entry *e;
-	e = SEARCH_EXCEPTION_TABLE(regs);
+	e = search_exception_tables(regs->cr_iip + ia64_psr(regs)->ri);
 	if (e) {
 		handle_exception(regs, e);
 		return 1;

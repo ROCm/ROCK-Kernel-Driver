@@ -131,7 +131,7 @@ static const char loopback [] = "loop input to output";
  * DMA channels to manage their FIFOs.  It supports high speed.
  * Those endpoints can be arranged in any desired configuration.
  */
-#ifdef	CONFIG_USB_ZERO_NET2280
+#if defined(CONFIG_USB_GADGET_NET2280) || defined(CONFIG_USB_GADGET_DUMMY_HCD)
 #define CHIP			"net2280"
 #define DRIVER_VERSION_NUM	0x0101
 static const char EP_OUT_NAME [] = "ep-a";
@@ -154,7 +154,7 @@ static const char EP_IN_NAME [] = "ep-b";
  * can't use altsettings or reset the interfaces independently.
  * So stick to a single interface.
  */
-#ifdef	CONFIG_USB_ZERO_PXA2XX
+#ifdef	CONFIG_USB_GADGET_PXA2XX
 #define CHIP			"pxa2xx"
 #define DRIVER_VERSION_NUM	0x0103
 static const char EP_OUT_NAME [] = "ep12out-bulk";
@@ -176,7 +176,7 @@ static const char EP_IN_NAME [] = "ep11in-bulk";
  * in special situations.  So this is a case of "choose it right
  * during enumeration" ...
  */
-#ifdef	CONFIG_USB_ZERO_SA1100
+#ifdef	CONFIG_USB_GADGET_SA1100
 #define CHIP			"sa1100"
 #define DRIVER_VERSION_NUM	0x0105
 static const char EP_OUT_NAME [] = "ep1out-bulk";
@@ -192,7 +192,7 @@ static const char EP_IN_NAME [] = "ep2in-bulk";
  *
  * This has three semi-configurable full speed bulk/interrupt endpoints.
  */
-#ifdef	CONFIG_USB_ZERO_GOKU
+#ifdef	CONFIG_USB_GADGET_GOKU
 #define CHIP			"goku"
 #define DRIVER_VERSION_NUM	0x0106
 static const char EP_OUT_NAME [] = "ep1-bulk";
@@ -936,7 +936,7 @@ zero_set_config (struct zero_dev *dev, unsigned number, int gfp_flags)
 	if (number == dev->config)
 		return 0;
 
-#ifdef CONFIG_USB_ZERO_SA1100
+#ifdef CONFIG_USB_GADGET_SA1100
 	if (dev->config) {
 		/* tx fifo is full, but we can't clear it...*/
 		INFO (dev, "can't change configurations\n");

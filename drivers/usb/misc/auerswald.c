@@ -1927,7 +1927,6 @@ static int auerswald_probe (struct usb_interface *intf,
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
 	pauerswald_t cp = NULL;
-	DECLARE_WAIT_QUEUE_HEAD (wqh);
 	unsigned int u = 0;
 	char *pbuf;
 	int ret;
@@ -1975,7 +1974,8 @@ static int auerswald_probe (struct usb_interface *intf,
 	dbg ("Version is %X", cp->version);
 
 	/* allow some time to settle the device */
-	sleep_on_timeout (&wqh, HZ / 3 );
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ/3);
 
 	/* Try to get a suitable textual description of the device */
 	/* Device name:*/

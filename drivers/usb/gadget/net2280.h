@@ -520,6 +520,7 @@ struct net2280_ep {
 	unsigned				num : 8,
 						fifo_size : 12,
 						in_fifo_validate : 1,
+						out_overflow : 1,
 						stopped : 1,
 						is_in : 1,
 						is_iso : 1;
@@ -529,6 +530,7 @@ static inline void allow_status (struct net2280_ep *ep)
 {
 	/* ep0 only */
 	writel (  (1 << CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE)
+		| (1 << CLEAR_NAK_OUT_PACKETS)
 		| (1 << CLEAR_NAK_OUT_PACKETS_MODE)
 		, &ep->regs->ep_rsp);
 	ep->stopped = 1;
@@ -546,7 +548,6 @@ struct net2280_request {
 	dma_addr_t			td_dma;
 	struct list_head		queue;
 	unsigned			mapped : 1,
-					dma_done : 1,
 					valid : 1;
 };
 
@@ -559,8 +560,7 @@ struct net2280 {
 	unsigned			enabled : 1,
 					protocol_stall : 1,
 					got_irq : 1,
-					region : 1,
-					selfpowered : 1;
+					region : 1;
 	u16				chiprev;
 
 	/* pci state used to access those endpoints */
