@@ -106,10 +106,6 @@ struct machdep_calls {
 	 */
 	long	 	(*feature_call)(unsigned int feature, ...);
 
-#ifdef CONFIG_SMP
-	/* functions for dealing with other cpus */
-	struct smp_ops_t smp_ops;
-#endif /* CONFIG_SMP */
 };
 
 extern struct machdep_calls ppc_md;
