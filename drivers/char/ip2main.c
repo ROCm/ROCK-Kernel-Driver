@@ -281,8 +281,8 @@ static void ip2_interrupt_bh(i2eBordStrPtr pB);
 static void ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static void ip2_poll(unsigned long arg);
 static inline void service_all_boards(void);
-static inline void do_input(i2ChanStrPtr pCh);
-static inline void do_status(i2ChanStrPtr pCh);
+static void do_input(void *p);
+static void do_status(void *p);
 
 static void ip2_wait_until_sent(PTTY,int);
 
@@ -1422,9 +1422,9 @@ ip2_poll(unsigned long arg)
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, ITRC_RETURN, 0 );
 }
 
-static inline void 
-do_input( i2ChanStrPtr pCh )
+static void do_input(void *p)
 {
+	i2ChanStrPtr pCh = p;
 	unsigned long flags;
 
 	ip2trace(CHANN, ITRC_INPUT, 21, 0 );
@@ -1445,8 +1445,7 @@ do_input( i2ChanStrPtr pCh )
 }
 
 // code duplicated from n_tty (ldisc)
-static inline void 
-isig(int sig, struct tty_struct *tty, int flush)
+static inline void  isig(int sig, struct tty_struct *tty, int flush)
 {
 	if (tty->pgrp > 0)
 		kill_pg(tty->pgrp, sig, 1);
@@ -1457,9 +1456,9 @@ isig(int sig, struct tty_struct *tty, int flush)
 	}
 }
 
-static inline void
-do_status( i2ChanStrPtr pCh )
+static void do_status(void *p)
 {
+	i2ChanStrPtr pCh = p;
 	int status;
 
 	status =  i2GetStatus( pCh, (I2_BRK|I2_PAR|I2_FRA|I2_OVR) );
