@@ -29,6 +29,35 @@
 #include <linux/pci.h>
 #include "rpaphp.h"
 
+static ssize_t removable_read_file (struct hotplug_slot *php_slot, char *buf)
+{
+	u8 value;
+	int retval = -ENOENT;
+	struct slot *slot = (struct slot *)php_slot->private;
+
+	if (!slot)
+		return retval;
+
+	value = slot->removable;
+	retval = sprintf (buf, "%d\n", value);
+	return retval;
+}
+
+static struct hotplug_slot_attribute hotplug_slot_attr_removable = {
+	.attr = {.name = "phy_removable", .mode = S_IFREG | S_IRUGO},
+	.show = removable_read_file,
+};
+
+static void rpaphp_sysfs_add_attr_removable (struct hotplug_slot *slot)
+{
+	sysfs_create_file(&slot->kobj, &hotplug_slot_attr_removable.attr);
+}
+
+static void rpaphp_sysfs_remove_attr_removable (struct hotplug_slot *slot)
+{
+	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_removable.attr);
+}
+
 static ssize_t location_read_file (struct hotplug_slot *php_slot, char *buf)
 {
         char *value;
@@ -53,7 +82,7 @@ static void rpaphp_sysfs_add_attr_location (struct hotplug_slot *slot)
 	sysfs_create_file(&slot->kobj, &hotplug_slot_attr_location.attr);
 }
 
-void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
+static void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
 {
 	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_location.attr);
 }
@@ -68,6 +97,17 @@ static void rpaphp_release_slot(struct hotplug_slot *hotplug_slot)
 
 void dealloc_slot_struct(struct slot *slot)
 {
+	struct list_head *ln, *n;
+
+	if (slot->dev_type == PCI_DEV) {
+		list_for_each_safe (ln, n, &slot->dev.pci_funcs) {
+			struct rpaphp_pci_func *func;
+
+			func = list_entry(ln, struct rpaphp_pci_func, sibling);
+			kfree(func);
+		}
+	}
+
 	kfree(slot->hotplug_slot->info);
 	kfree(slot->hotplug_slot->name);
 	kfree(slot->hotplug_slot);
@@ -86,7 +126,7 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 	memset(slot, 0, sizeof (struct slot));
 	slot->hotplug_slot = kmalloc(sizeof (struct hotplug_slot), GFP_KERNEL);
 	if (!slot->hotplug_slot)
-		goto error_slot;
+		goto error_slot;	
 	memset(slot->hotplug_slot, 0, sizeof (struct hotplug_slot));
 	slot->hotplug_slot->info = kmalloc(sizeof (struct hotplug_slot_info),
 					   GFP_KERNEL);
@@ -95,7 +135,7 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 	memset(slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
 	slot->hotplug_slot->name = kmalloc(BUS_ID_SIZE + 1, GFP_KERNEL);
 	if (!slot->hotplug_slot->name)
-		goto error_info;
+		goto error_info;	
 	slot->location = kmalloc(strlen(drc_name) + 1, GFP_KERNEL);
 	if (!slot->location)
 		goto error_name;
@@ -107,9 +147,8 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 	slot->hotplug_slot->private = slot;
 	slot->hotplug_slot->ops = &rpaphp_hotplug_slot_ops;
 	slot->hotplug_slot->release = &rpaphp_release_slot;
-	slot->hotplug_slot->info->cur_bus_speed = PCI_SPEED_UNKNOWN;
-
-	return slot;
+	
+	return (slot);
 
 error_name:
 	kfree(slot->hotplug_slot->name);
@@ -123,15 +162,56 @@ error_nomem:
 	return NULL;
 }
 
+static int is_registered(struct slot *slot)
+{
+	struct slot             *tmp_slot;
+
+	list_for_each_entry(tmp_slot, &rpaphp_slot_head, rpaphp_slot_list) {
+		if (!strcmp(tmp_slot->name, slot->name))
+			return 1;
+	}	
+	return 0;
+}
+
+int deregister_slot(struct slot *slot)
+{
+	int retval = 0;
+	struct hotplug_slot *php_slot = slot->hotplug_slot;
+
+	 dbg("%s - Entry: deregistering slot=%s\n",
+		__FUNCTION__, slot->name);
+
+	list_del(&slot->rpaphp_slot_list);
+	
+	/* remove "phy_location" file */
+	rpaphp_sysfs_remove_attr_location(php_slot);
+
+	/* remove "phy_removable" file */
+	rpaphp_sysfs_remove_attr_removable(php_slot);
+
+	retval = pci_hp_deregister(php_slot);
+	if (retval)
+		err("Problem unregistering a slot %s\n", slot->name);
+	else
+		num_slots--;
+
+	dbg("%s - Exit: rc[%d]\n", __FUNCTION__, retval);
+	return retval;
+}
+
 int register_slot(struct slot *slot)
 {
 	int retval;
-	char *vio_uni_addr = NULL;
 
-	dbg("%s registering slot:path[%s] index[%x], name[%s] pdomain[%x] type[%d]\n",
-		__FUNCTION__, slot->dn->full_name, slot->index, slot->name,
+	dbg("%s registering slot:path[%s] index[%x], name[%s] pdomain[%x] type[%d]\n", 
+		__FUNCTION__, slot->dn->full_name, slot->index, slot->name, 
 		slot->power_domain, slot->type);
-
+	/* should not try to register the same slot twice */
+	if (is_registered(slot)) { /* should't be here */
+		err("register_slot: slot[%s] is already registered\n", slot->name);
+		rpaphp_release_slot(slot->hotplug_slot);
+		return 1;
+	}	
 	retval = pci_hp_register(slot->hotplug_slot);
 	if (retval) {
 		err("pci_hp_register failed with error %d\n", retval);
@@ -142,30 +222,40 @@ int register_slot(struct slot *slot)
 	/* create "phy_locatoin" file */
 	rpaphp_sysfs_add_attr_location(slot->hotplug_slot);	
 
+	/* create "phy_removable" file */
+	rpaphp_sysfs_add_attr_removable(slot->hotplug_slot);	
+
 	/* add slot to our internal list */
 	dbg("%s adding slot[%s] to rpaphp_slot_list\n",
 	    __FUNCTION__, slot->name);
 
 	list_add(&slot->rpaphp_slot_list, &rpaphp_slot_head);
 
-	if (vio_uni_addr)
-		info("Slot [%s](vio_uni_addr=%s) registered\n",
-		     slot->name, vio_uni_addr);
+	if (slot->dev_type == VIO_DEV)
+		info("Slot [%s](VIO location=%s) registered\n",
+		     slot->name, slot->location);
 	else
-		info("Slot [%s](bus_id=%s) registered\n",
-		     slot->name, pci_name(slot->bridge));
+		info("Slot [%s](PCI location=%s) registered\n",
+		     slot->name, slot->location);
 	num_slots++;
 	return 0;
 }
 
 int rpaphp_get_power_status(struct slot *slot, u8 * value)
 {
-	int rc;
-
-	rc = rtas_get_power_level(slot->power_domain, (int *) value);
-	if (rc)
-		err("failed to get power-level for slot(%s), rc=0x%x\n",
-		    slot->name, rc);
+	int rc = 0;
+	
+	if (slot->type == EMBEDDED) {
+		dbg("%s set to POWER_ON for EMBEDDED slot %s\n",
+			__FUNCTION__, slot->location);
+		*value = POWER_ON;
+	}
+	else {
+		rc = rtas_get_power_level(slot->power_domain, (int *) value);
+		if (rc)
+			err("failed to get power-level for slot(%s), rc=0x%x\n",
+		    		slot->location, rc);
+	}
 
 	return rc;
 }
@@ -177,8 +267,8 @@ int rpaphp_set_attention_status(struct slot *slot, u8 status)
 	/* status: LED_OFF or LED_ON */
 	rc = rtas_set_indicator(DR_INDICATOR, slot->index, status);
 	if (rc)
-		err("slot(%s) set attention-status(%d) failed! rc=0x%x\n",
-		    slot->name, status, rc);
+		err("slot(name=%s location=%s index=0x%x) set attention-status(%d) failed! rc=0x%x\n",
+		    slot->name, slot->location, slot->index, status, rc);
 
 	return rc;
 }

@@ -263,6 +263,7 @@ int shpchp_save_config(struct controller *ctrl, int busnumber, int num_ctlr_slot
 				new_slot->function = (u8) function;
 				new_slot->is_a_board = 1;
 				new_slot->switch_save = 0x10;
+				new_slot->pwr_save = 1;
 				/* In case of unsupported board */
 				new_slot->status = DevError;
 				new_slot->pci_dev = pci_find_slot(new_slot->bus,
