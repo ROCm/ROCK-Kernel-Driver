@@ -301,6 +301,30 @@ sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 	return asoc;
 }
 
+/* Look for any peeled off association from the endpoint that matches the
+ * given peer address.
+ */
+int sctp_endpoint_is_peeled_off(sctp_endpoint_t *ep,
+				const union sctp_addr *paddr)
+{
+	struct list_head *pos;
+	struct sockaddr_storage_list *addr;
+	sctp_bind_addr_t *bp;
+
+	sctp_read_lock(&ep->base.addr_lock);
+	bp = &ep->base.bind_addr;
+	list_for_each(pos, &bp->address_list) {
+		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		if (sctp_has_association(&addr->a, paddr)) {
+			sctp_read_unlock(&ep->base.addr_lock);
+			return 1;
+		}
+	}
+	sctp_read_unlock(&ep->base.addr_lock);
+
+	return 0;
+}
+
 /* Do delayed input processing.  This is scheduled by sctp_rcv().
  * This may be called on BH or task time.
  */

@@ -91,7 +91,7 @@ static inline void sctp_sk_addr_set(struct sock *,
 				    union sctp_addr *saveaddr);
 static inline void sctp_sk_addr_restore(struct sock *,
 					const union sctp_addr *);
-static inline int sctp_sendmsg_verify_name(struct sock *, struct msghdr *);
+static inline int sctp_verify_addr(struct sock *, struct sockaddr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
 static int sctp_do_bind(struct sock *, union sctp_addr *, int);
@@ -777,7 +777,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	 * For a peeled-off socket, msg_name is ignored.
 	 */
 	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sp->type) && msg->msg_name) {
-		err = sctp_sendmsg_verify_name(sk, msg);
+		err = sctp_verify_addr(sk, (struct sockaddr *)msg->msg_name,
+				       msg->msg_namelen);
 		if (err)
 			return err;
 
@@ -826,28 +827,14 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		/* Look for a matching association on the endpoint. */
 		asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
 		if (!asoc) {
-			struct list_head *pos;
-			struct sockaddr_storage_list *addr;
-			sctp_bind_addr_t *bp = &ep->base.bind_addr;
-
-			sctp_read_lock(&ep->base.addr_lock);
-
-			/* If we could not find a matching association on
-			 * the endpoint, make sure that there is no peeled-
-			 * off association.
-			 */ 
-			list_for_each(pos, &bp->address_list) {
-				addr = list_entry(pos,
-						  struct sockaddr_storage_list,
-						  list);
-				if (sctp_has_association(&addr->a, &to)) {
-					err = -EINVAL;
-					sctp_read_unlock(&ep->base.addr_lock);
-					goto out_unlock;
-				}
+			/* If we could not find a matching association on the
+			 * endpoint, make sure that there is no peeled-off 
+			 * association on another socket.
+			 */
+			if (sctp_endpoint_is_peeled_off(ep, &to)) {
+				err = -EADDRNOTAVAIL;
+				goto out_unlock;
 			}
-
-			sctp_read_unlock(&ep->base.addr_lock);
 		}
 	} else {
 		/* For a peeled-off socket, ignore any associd specified by
@@ -1420,11 +1407,107 @@ out_nounlock:
 	return retval;
 }
 
-/* FIXME: Write comments. */
+/* API 3.1.6 connect() - UDP Style Syntax
+ *
+ * An application may use the connect() call in the UDP model to initiate an
+ * association without sending data.
+ *
+ * The syntax is:
+ *
+ * ret = connect(int sd, const struct sockaddr *nam, socklen_t len);
+ *
+ * sd: the socket descriptor to have a new association added to.
+ *
+ * nam: the address structure (either struct sockaddr_in or struct
+ *    sockaddr_in6 defined in RFC2553 [7]).
+ *
+ * len: the size of the address.
+ */
 SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 			     int addr_len)
 {
-	return -EOPNOTSUPP; /* STUB */
+	sctp_opt_t *sp;
+	sctp_endpoint_t *ep;
+	sctp_association_t *asoc;
+	sctp_transport_t *transport;
+	union sctp_addr to;
+	sctp_scope_t scope;
+	int err = 0;
+
+	sctp_lock_sock(sk);
+
+	SCTP_DEBUG_PRINTK("%s - sk: %p, sockaddr: %p, addr_len: %d)\n",
+			  __FUNCTION__, sk, uaddr, addr_len);
+
+	sp = sctp_sk(sk);
+	ep = sp->ep;
+
+	/* connect() cannot be done on a peeled-off socket. */ 
+	if (SCTP_SOCKET_UDP_HIGH_BANDWIDTH == sp->type) {
+		err = -EISCONN;
+		goto out_unlock;
+	}
+
+	err = sctp_verify_addr(sk, uaddr, addr_len);
+	if (err)
+		goto out_unlock;	
+
+	memcpy(&to, uaddr, addr_len);
+	to.v4.sin_port = ntohs(to.v4.sin_port);
+
+	asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
+	if (asoc) {
+		if (asoc->state >= SCTP_STATE_ESTABLISHED)
+			err = -EISCONN;	
+		else
+			err = -EALREADY;
+		goto out_unlock;
+	}
+
+	/* If we could not find a matching association on the endpoint,
+	 * make sure that there is no peeled-off association matching the
+	 * peer address even on another socket.
+	 */
+	if (sctp_endpoint_is_peeled_off(ep, &to)) {
+		err = -EADDRNOTAVAIL;
+		goto out_unlock;
+	}
+
+	/* If a bind() or sctp_bindx() is not called prior to a connect()
+	 * call, the system picks an ephemeral port and will choose an address
+	 * set equivalent to binding with a wildcard address.
+	 */
+	if (!ep->base.bind_addr.port) {
+		if (sctp_autobind(sk)) {
+			err = -EAGAIN;
+			goto out_unlock;
+		}
+	}
+
+	scope = sctp_scope(&to);
+	asoc = sctp_association_new(ep, sk, scope, GFP_KERNEL);
+	if (!asoc) {
+		err = -ENOMEM;
+		goto out_unlock;
+  	}
+
+	/* Prime the peer's transport structures.  */
+	transport = sctp_assoc_add_peer(asoc, &to, GFP_KERNEL);
+
+	err = sctp_primitive_ASSOCIATE(asoc, NULL);
+	if (err < 0)
+		sctp_association_free(asoc); 
+
+	/* FIXME: Currently we support only non-blocking connect().
+	 * To support blocking connect(), we need to wait for the association
+	 * to be ESTABLISHED before returning.
+	 */ 
+	err = -EINPROGRESS;
+
+out_unlock:
+	sctp_release_sock(sk);
+
+	return err;
 }
 
 /* FIXME: Write comments. */
@@ -2608,17 +2691,17 @@ no_packet:
 	return NULL;
 }
 
-static inline int sctp_sendmsg_verify_name(struct sock *sk, struct msghdr *msg)
+static inline int sctp_verify_addr(struct sock *sk, struct sockaddr *addr, int addrlen)
 {
 	union sctp_addr *sa;
 
-	if (msg->msg_namelen < sizeof (struct sockaddr))
+	if (addrlen < sizeof (struct sockaddr))
 		return -EINVAL;
 
-	sa = (union sctp_addr *) msg->msg_name;
+	sa = (union sctp_addr *)addr;
 	switch (sa->sa.sa_family) {
 	case AF_INET:
-		if (msg->msg_namelen < sizeof(struct sockaddr_in))
+		if (addrlen < sizeof(struct sockaddr_in))
 			return -EINVAL;
 		break;
 
@@ -2626,7 +2709,7 @@ static inline int sctp_sendmsg_verify_name(struct sock *sk, struct msghdr *msg)
 		if (PF_INET == sk->family)
 			return -EINVAL;
 		SCTP_V6(
-			if (msg->msg_namelen < sizeof(struct sockaddr_in6))
+			if (addrlen < sizeof(struct sockaddr_in6))
 				return -EINVAL;
 			break;
 		);

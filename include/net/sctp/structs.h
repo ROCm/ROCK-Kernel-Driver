@@ -1060,6 +1060,7 @@ void sctp_endpoint_add_asoc(sctp_endpoint_t *, sctp_association_t *asoc);
 sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 					       const union sctp_addr *paddr,
 					       sctp_transport_t **);
+int sctp_endpoint_is_peeled_off(sctp_endpoint_t *, const union sctp_addr *);
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
 					const union sctp_addr *);
 
