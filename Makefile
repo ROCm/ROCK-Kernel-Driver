@@ -166,6 +166,15 @@ noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    help tags TAGS sgmldocs psdocs pdfdocs htmldocs \
 		    checkconfig checkhelp checkincludes
 
+# Helpers built in scripts/
+# ---------------------------------------------------------------------------
+
+scripts/docproc scripts/fixdep scripts/split-include : scripts ;
+
+.PHONY: scripts
+scripts:
+	@$(MAKE) -C scripts
+
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # Here goes the main Makefile
@@ -356,15 +365,6 @@ include/linux/version.h: Makefile
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
 	) > $@.tmp
 	@$(update-if-changed)
-
-# Helpers built in scripts/
-# ---------------------------------------------------------------------------
-
-scripts/fixdep scripts/split-include : scripts ;
-
-.PHONY: scripts
-scripts:
-	@$(MAKE) -C scripts
 
 # Generate module versions
 # ---------------------------------------------------------------------------
