@@ -742,7 +742,6 @@ static void __exit soc_cleanup(void)
 	
 	for_each_soc(s) {
 		irq = s->port[0].fc.irq;
-		disable_irq (irq);
 		free_irq (irq, s);
 
 		fcp_release(&(s->port[0].fc), 2);

@@ -2210,7 +2210,6 @@ static int cs4231_attach(struct sparcaudio_driver *drv,
         /* Attach the interrupt handler to the audio interrupt. */
         cs4231_chip->irq = sdev->irqs[0];
         request_irq(cs4231_chip->irq, cs4231_interrupt, SA_SHIRQ, "cs4231", drv);
-        enable_irq(cs4231_chip->irq);
 
         cs4231_chip->nirqs = 1;
         cs4231_enable_interrupts(drv);
@@ -2224,7 +2223,6 @@ static int cs4231_attach(struct sparcaudio_driver *drv,
         if (err < 0) {
                 printk(KERN_ERR "cs4231: unable to register\n");
                 cs4231_disable_interrupts(drv);
-                disable_irq(cs4231_chip->irq);
                 free_irq(cs4231_chip->irq, drv);
                 sbus_iounmap(cs4231_chip->regs, cs4231_chip->regs_size);
                 kfree(drv->private);
@@ -2312,9 +2310,7 @@ static int eb4231_attach(struct sparcaudio_driver *drv,
         bail:
                 printk(KERN_ERR "cs4231: unable to register\n");
                 cs4231_disable_interrupts(drv);
-                disable_irq(cs4231_chip->irq);
                 free_irq(cs4231_chip->irq, drv);
-                disable_irq(cs4231_chip->irq2);
                 free_irq(cs4231_chip->irq2, drv);
                 kfree(drv->private);
                 return -EIO;
@@ -2371,7 +2367,6 @@ static void __exit cs4231_detach(struct sparcaudio_driver *drv)
 
 	cs4231_disable_interrupts(drv);
 	unregister_sparcaudio_driver(drv, 1);
-	disable_irq(cs4231_chip->irq);
 	free_irq(cs4231_chip->irq, drv);
 	if (!(cs4231_chip->status & CS_STATUS_IS_EBUS)) {
 		sbus_iounmap(cs4231_chip->regs, cs4231_chip->regs_size);
@@ -2380,7 +2375,6 @@ static void __exit cs4231_detach(struct sparcaudio_driver *drv)
 		iounmap(cs4231_chip->regs);
 		iounmap(cs4231_chip->eb2p);
 		iounmap(cs4231_chip->eb2c);
-		disable_irq(cs4231_chip->irq2);
 		free_irq(cs4231_chip->irq2, drv);
 #endif
 	}

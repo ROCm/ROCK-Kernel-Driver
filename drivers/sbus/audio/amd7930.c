@@ -1619,7 +1619,6 @@ static int amd7930_attach(struct sparcaudio_driver *drv, int node,
 	info->irq = irq.pri;
 	request_irq(info->irq, amd7930_interrupt,
 		    SA_INTERRUPT, "amd7930", drv);
-	enable_irq(info->irq);
 	amd7930_enable_ints(info);
 
 	/* Initalize the local copy of the MAP registers. */
@@ -1644,7 +1643,6 @@ static int amd7930_attach(struct sparcaudio_driver *drv, int node,
 	err = register_sparcaudio_driver(drv, 1);
 	if (err < 0) {
 		printk(KERN_ERR "amd7930: unable to register\n");
-		disable_irq(info->irq);
 		free_irq(info->irq, drv);
 		sbus_iounmap(info->regs, info->regs_size);
 		kfree(drv->private);
@@ -1666,7 +1664,6 @@ static void __exit amd7930_detach(struct sparcaudio_driver *drv)
 
 	unregister_sparcaudio_driver(drv, 1);
 	amd7930_idle(info);
-	disable_irq(info->irq);
 	free_irq(info->irq, drv);
 	sbus_iounmap(info->regs, info->regs_size);
 	kfree(drv->private);

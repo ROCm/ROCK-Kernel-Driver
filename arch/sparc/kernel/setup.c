@@ -47,8 +47,6 @@
 #include <asm/hardirq.h>
 #include <asm/machines.h>
 
-#undef PROM_DEBUG_CONSOLE
-
 struct screen_info screen_info = {
 	0, 0,			/* orig-x, orig-y */
 	0,			/* unused */
@@ -134,6 +132,19 @@ void kernel_enter_debugger(void)
 	}
 }
 
+static void
+prom_console_write(struct console *con, const char *s, unsigned n)
+{
+	prom_printf("%s", s);
+}
+
+static struct console prom_debug_console = {
+	name:		"debug",
+	write:		prom_console_write,
+	flags:		CON_PRINTBUFFER,
+	index:		-1,
+};
+
 int obp_system_intr(void)
 {
 	if (boot_flags & BOOTME_KGDB) {
@@ -165,6 +176,10 @@ static void __init process_switch(char c)
 	case 'h':
 		prom_printf("boot_flags_init: Halt!\n");
 		prom_halt();
+		break;
+	case 'p':
+		/* Use PROM debug console. */
+		register_console(&prom_debug_console);
 		break;
 	default:
 		printk("Unknown boot switch (-%c)\n", c);
@@ -280,21 +295,6 @@ struct tt_entry *sparc_ttable;
 
 struct pt_regs fake_swapper_regs;
 
-#ifdef PROM_DEBUG_CONSOLE
-static void
-prom_console_write(struct console *con, const char *s, unsigned n)
-{
-	prom_printf("%s", s);
-}
-
-static struct console prom_console = {
-	name:		"debug",
-	write:		prom_console_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
-};
-#endif
-
 extern void paging_init(void);
 
 void __init setup_arch(char **cmdline_p)
@@ -348,9 +348,6 @@ void __init setup_arch(char **cmdline_p)
 		printk("UNKNOWN!\n");
 		break;
 	};
-#ifdef PROM_DEBUG_CONSOLE
-	register_console(&prom_console);
-#endif
 
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
@@ -381,7 +378,7 @@ void __init setup_arch(char **cmdline_p)
 	if (!root_flags)
 		root_mountflags &= ~MS_RDONLY;
 	ROOT_DEV = to_kdev_t(root_dev);
-#ifdef CONFIG_BLK_DEV_RAM
+#ifdef CONFIG_BLK_DEV_INITRD
 	rd_image_start = ram_flags & RAMDISK_IMAGE_START_MASK;
 	rd_prompt = ((ram_flags & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((ram_flags & RAMDISK_LOAD_FLAG) != 0);	
