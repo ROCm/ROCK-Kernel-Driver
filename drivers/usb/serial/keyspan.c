@@ -28,6 +28,14 @@
 
   Change History
 
+    Wed Apr 25 12:00:00 PST 2002 (Keyspan)
+      Started with Hugh Blemings' code dated Jan 17, 2002.  All adapters
+      now supported (including QI and QW).  Modified port open, port
+      close, and send setup() logic to fix various data and endpoint
+      synchronization bugs and device LED status bugs.  Changed keyspan_
+      write_room() to accurately return transmit buffer availability.
+      Changed forwardingLength from 1 to 16 for all adapters.
+
     Fri Oct 12 16:45:00 EST 2001
       Preliminary USA-19QI and USA-28 support (both test OK for me, YMMV)
 
@@ -98,7 +106,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1.2"
+#define DRIVER_VERSION "v1.1.3"
 #define DRIVER_AUTHOR "Hugh Blemings <hugh@misc.nu"
 #define DRIVER_DESC "Keyspan USB to Serial Converter Driver"
 
@@ -423,9 +431,10 @@ static void	usa26_indat_callback(struct urb *urb)
 				
 		/* Resubmit urb so we continue receiving */
 	urb->dev = port->serial->dev;
-	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
-		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
-	}
+	if (port->open_count)
+		if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
+			dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
+		}
 	return;
 }
 
@@ -461,7 +470,7 @@ static void	usa26_outcont_callback(struct urb *urb)
 
 	if (p_priv->resend_cont) {
 		dbg ("%s - sending setup", __FUNCTION__); 
-		keyspan_usa26_send_setup(port->serial, port, 0);
+		keyspan_usa26_send_setup(port->serial, port, p_priv->resend_cont - 1);
 	}
 }
 
@@ -519,12 +528,12 @@ static void	usa26_instat_callback(struct urb *urb)
 		/*	wake_up_interruptible(&p_priv->open_wait); */
 	}
 	
-exit:
 	/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
 	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
 	}
+exit:
 }
 
 static void	usa26_glocont_callback(struct urb *urb)
@@ -572,9 +581,10 @@ static void     usa28_indat_callback(struct urb *urb)
 
 		/* Resubmit urb so we continue receiving */
 		urb->dev = port->serial->dev;
-		if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
-			dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
-		}
+		if (port->open_count)
+			if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
+				dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
+			}
 		p_priv->in_flip ^= 1;
 
 		urb = p_priv->in_urbs[p_priv->in_flip];
@@ -596,7 +606,7 @@ static void	usa28_outcont_callback(struct urb *urb)
 
 	if (p_priv->resend_cont) {
 		dbg ("%s - sending setup", __FUNCTION__);
-		keyspan_usa28_send_setup(port->serial, port, 0);
+		keyspan_usa28_send_setup(port->serial, port, p_priv->resend_cont - 1);
 	}
 }
 
@@ -653,12 +663,12 @@ static void	usa28_instat_callback(struct urb *urb)
 		/*	wake_up_interruptible(&p_priv->open_wait); */
 	}
 
-exit:	
 		/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
 	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
 	}
+exit:	
 }
 
 static void	usa28_glocont_callback(struct urb *urb)
@@ -683,7 +693,7 @@ static void	usa49_glocont_callback(struct urb *urb)
 
 		if (p_priv->resend_cont) {
 			dbg ("%s - sending setup", __FUNCTION__); 
-			keyspan_usa49_send_setup(serial, port, 0);
+			keyspan_usa49_send_setup(serial, port, p_priv->resend_cont - 1);
 			break;
 		}
 	}
@@ -745,13 +755,13 @@ static void	usa49_instat_callback(struct urb *urb)
 		/*	wake_up_interruptible(&p_priv->open_wait); */
 	}
 
-exit:	
 		/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
 
 	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
 	}
+exit:	
 }
 
 static void	usa49_inack_callback(struct urb *urb)
@@ -805,9 +815,10 @@ static void	usa49_indat_callback(struct urb *urb)
 				
 		/* Resubmit urb so we continue receiving */
 	urb->dev = port->serial->dev;
-	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
-		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
-	}
+	if (port->open_count)
+		if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
+			dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
+		}
 }
 
 /* not used, usa-49 doesn't have per-port control endpoints */
@@ -820,9 +831,27 @@ static void	usa49_outcont_callback(struct urb *urb)
 
 static int keyspan_write_room (struct usb_serial_port *port)
 {
-	dbg("%s", __FUNCTION__);
-	return (32);
+	struct keyspan_port_private	*p_priv;
+	const struct keyspan_device_details	*d_details;
+	int				flip;
+	struct urb			*this_urb;
 
+	dbg("%s", __FUNCTION__);
+	p_priv = (struct keyspan_port_private *)(port->private);
+	d_details = p_priv->device_details;
+
+	flip = p_priv->out_flip;
+
+	/* Check both endpoints to see if any are available. */
+	if ((this_urb = p_priv->out_urbs[flip]) != 0) {
+		if (this_urb->status != -EINPROGRESS)
+			return (63);
+		flip = (flip + 1) & d_details->outdat_endp_flip;        
+		if ((this_urb = p_priv->out_urbs[flip]) != 0) 
+			if (this_urb->status != -EINPROGRESS)
+				return (63);
+	}
+	return (0);
 }
 
 
@@ -873,7 +902,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 		if ((urb = p_priv->out_urbs[i]) == NULL)
 			continue;
 		urb->dev = serial->dev;
-		usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe), 0);
+		/* usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe), 0); */
 	}
 
 	keyspan_send_setup(port, 1);
@@ -909,8 +938,12 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	p_priv->rts_state = 0;
 	p_priv->dtr_state = 0;
 	
-	if (serial->dev)
-		keyspan_send_setup(port, 1);
+	if (serial->dev) {
+		keyspan_send_setup(port, 2);
+		/* pilot-xfer seems to work best with this delay */
+		mdelay(100);
+		keyspan_set_termios(port, NULL);
+	}
 
 	/*while (p_priv->outcont_urb->status == -EINPROGRESS) {
 		dbg("%s - urb in progress", __FUNCTION__);
@@ -922,7 +955,7 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	if (serial->dev) {
 		/* Stop reading/writing urbs */
 		stop_urb(p_priv->inack_urb);
-		stop_urb(p_priv->outcont_urb);
+		/* stop_urb(p_priv->outcont_urb); */
 		for (i = 0; i < 2; i++) {
 			stop_urb(p_priv->in_urbs[i]);
 			stop_urb(p_priv->out_urbs[i]);
@@ -1365,7 +1398,10 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 		return -1;
 	}
 
-	p_priv->resend_cont = 1;
+	/* Save reset port val for resend.
+	Don't overwrite resend for close condition. */
+	if (p_priv->resend_cont != 3)
+		p_priv->resend_cont = reset_port + 1;
 	if (this_urb->status == -EINPROGRESS) {
 		/*  dbg ("%s - already writing", __FUNCTION__); */
 		return(-1);
@@ -1414,12 +1450,26 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 	msg.ctsFlowControl = (p_priv->flow_control == flow_cts);
 	msg.xonFlowControl = 0;
 	msg.setFlowControl = 0xff;
-	
-	msg.forwardingLength = 1;
+	msg.forwardingLength = 16;
 	msg.xonChar = 17;
 	msg.xoffChar = 19;
 
-	if (reset_port) {
+	/* Opening port */
+	if (reset_port == 1) {
+		msg._txOn = 1;
+		msg._txOff = 0;
+		msg.txFlush = 0;
+		msg.txBreak = 0;
+		msg.rxOn = 1;
+		msg.rxOff = 0;
+		msg.rxFlush = 1;
+		msg.rxForward = 0;
+		msg.returnStatus = 0;
+		msg.resetDataToggle = 0xff;
+	}
+
+	/* Closing port */
+	else if (reset_port == 2) {
 		msg._txOn = 0;
 		msg._txOff = 1;
 		msg.txFlush = 0;
@@ -1429,14 +1479,16 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 		msg.rxFlush = 1;
 		msg.rxForward = 0;
 		msg.returnStatus = 0;
-		msg.resetDataToggle = 0xff;
+		msg.resetDataToggle = 0;
 	}
+
+	/* Sending intermediate configs */
 	else {
 		msg._txOn = (! p_priv->break_on);
 		msg._txOff = 0;
 		msg.txFlush = 0;
 		msg.txBreak = (p_priv->break_on);
-		msg.rxOn = 1;
+		msg.rxOn = 0;
 		msg.rxOff = 0;
 		msg.rxFlush = 0;
 		msg.rxForward = 0;
@@ -1496,7 +1548,10 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 		return -1;
 	}
 
-	p_priv->resend_cont = 1;
+	/* Save reset port val for resend.
+	   Don't overwrite resend for close condition. */
+	if (p_priv->resend_cont != 3)
+		p_priv->resend_cont = reset_port + 1;
 	if (this_urb->status == -EINPROGRESS) {
 		dbg ("%s already writing", __FUNCTION__);
 		return(-1);
@@ -1522,7 +1577,7 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 	msg.rts = p_priv->rts_state;
 	msg.dtr = p_priv->dtr_state;
 
-	msg.forwardingLength = 1;
+	msg.forwardingLength = 16;
 	msg.forwardMs = 10;
 	msg.breakThreshold = 45;
 	msg.xonChar = 17;
@@ -1530,8 +1585,22 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 
 	/*msg.returnStatus = 1;
 	msg.resetDataToggle = 0xff;*/
-
-	if (reset_port) {
+	/* Opening port */
+	if (reset_port == 1) {
+		msg._txOn = 1;
+		msg._txOff = 0;
+		msg.txFlush = 0;
+		msg.txForceXoff = 0;
+		msg.txBreak = 0;
+		msg.rxOn = 1;
+		msg.rxOff = 0;
+		msg.rxFlush = 1;
+		msg.rxForward = 0;
+		msg.returnStatus = 0;
+		msg.resetDataToggle = 0xff;
+	}
+	/* Closing port */
+	else if (reset_port == 2) {
 		msg._txOn = 0;
 		msg._txOff = 1;
 		msg.txFlush = 0;
@@ -1542,15 +1611,16 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 		msg.rxFlush = 1;
 		msg.rxForward = 0;
 		msg.returnStatus = 0;
-		msg.resetDataToggle = 0xff;
+		msg.resetDataToggle = 0;
 	}
+	/* Sending intermediate configs */
 	else {
 		msg._txOn = (! p_priv->break_on);
 		msg._txOff = 0;
 		msg.txFlush = 0;
 		msg.txForceXoff = 0;
 		msg.txBreak = (p_priv->break_on);
-		msg.rxOn = 1;
+		msg.rxOn = 0;
 		msg.rxOff = 0;
 		msg.rxFlush = 0;
 		msg.rxForward = 0;
@@ -1610,7 +1680,10 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 		return -1;
 	}
 
-	p_priv->resend_cont = 1;
+	/* Save reset port val for resend.
+	   Don't overwrite resend for close condition. */
+	if (p_priv->resend_cont != 3)
+		p_priv->resend_cont = reset_port + 1;
 	if (this_urb->status == -EINPROGRESS) {
 		/*  dbg ("%s - already writing", __FUNCTION__); */
 		return(-1);
@@ -1663,11 +1736,27 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 	msg.xonFlowControl = 0;
 	msg.setFlowControl = 0xff;
 	
-	msg.forwardingLength = 1;
+	msg.forwardingLength = 16;
 	msg.xonChar = 17;
 	msg.xoffChar = 19;
 
-	if (reset_port) {
+	/* Opening port */ 
+	if (reset_port == 1) {
+		msg._txOn = 1;
+		msg._txOff = 0;
+		msg.txFlush = 0;
+		msg.txBreak = 0;
+		msg.rxOn = 1;
+		msg.rxOff = 0;
+		msg.rxFlush = 1;
+		msg.rxForward = 0;
+		msg.returnStatus = 0;
+		msg.resetDataToggle = 0xff;
+		msg.enablePort = 1;
+		msg.disablePort = 0;
+	}
+	/* Closing port */
+	else if (reset_port == 2) {
 		msg._txOn = 0;
 		msg._txOff = 1;
 		msg.txFlush = 0;
@@ -1677,23 +1766,23 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 		msg.rxFlush = 1;
 		msg.rxForward = 0;
 		msg.returnStatus = 0;
-		msg.resetDataToggle = 0xff;
+		msg.resetDataToggle = 0;
 		msg.enablePort = 0;
-		msg.disablePort = 0xff;
-	
+		msg.disablePort = 1;
 	}
+	/* Sending intermediate configs */
 	else {
 		msg._txOn = (! p_priv->break_on);
 		msg._txOff = 0;
 		msg.txFlush = 0;
 		msg.txBreak = (p_priv->break_on);
-		msg.rxOn = 1;
+		msg.rxOn = 0;
 		msg.rxOff = 0;
 		msg.rxFlush = 0;
 		msg.rxForward = 0;
 		msg.returnStatus = 0;
 		msg.resetDataToggle = 0x0;
-		msg.enablePort = 0xff;
+		msg.enablePort = 0;
 		msg.disablePort = 0;
 	}
 
