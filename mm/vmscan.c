@@ -290,6 +290,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 
 	pagevec_init(&pvec);
 
+	lru_add_drain();
 	spin_lock_irq(&_pagemap_lru_lock);
 	while (max_scan > 0 && nr_pages > 0) {
 		struct page *page;
@@ -380,6 +381,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 	struct page *page;
 	struct pagevec pvec;
 
+	lru_add_drain();
 	spin_lock_irq(&_pagemap_lru_lock);
 	while (nr_pages && !list_empty(&active_list)) {
 		page = list_entry(active_list.prev, struct page, lru);

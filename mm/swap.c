@@ -50,14 +50,25 @@ void activate_page(struct page * page)
  * lru_cache_add: add a page to the page lists
  * @page: the page to add
  */
-void lru_cache_add(struct page * page)
+static struct pagevec lru_add_pvecs[NR_CPUS];
+
+void lru_cache_add(struct page *page)
 {
-	if (!PageLRU(page)) {
-		spin_lock_irq(&_pagemap_lru_lock);
-		if (!TestSetPageLRU(page))
-			add_page_to_inactive_list(page);
-		spin_unlock_irq(&_pagemap_lru_lock);
-	}
+	struct pagevec *pvec = &lru_add_pvecs[get_cpu()];
+
+	page_cache_get(page);
+	if (!pagevec_add(pvec, page))
+		__pagevec_lru_add(pvec);
+	put_cpu();
+}
+
+void lru_add_drain(void)
+{
+	struct pagevec *pvec = &lru_add_pvecs[get_cpu()];
+
+	if (pagevec_count(pvec))
+		__pagevec_lru_add(pvec);
+	put_cpu();
 }
 
 /*
