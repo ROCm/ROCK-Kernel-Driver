@@ -185,6 +185,7 @@ linux_gateway_entry:
 
 	/* Are we being ptraced? */
 	mfctl	%cr30, %r1
+	LDREG	TI_TASK(%r1),%r1
 	LDREG	TASK_PTRACE(%r1), %r1
 	bb,<,n	%r1,31,.Ltracesys
 	
