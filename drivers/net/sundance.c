@@ -146,18 +146,21 @@ static char *media[MAX_UNITS];
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
-#include <linux/ethtool.h>
-#include <linux/mii.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-#ifndef _LOCAL_CRC32
+#ifndef _COMPAT_WITH_OLD_KERNEL
 #include <linux/crc32.h>
+#include <linux/ethtool.h>
+#include <linux/mii.h>
 #else
 #include "crc32.h"
+#include "ethtool.h"
+#include "mii.h"
+#include "compat.h"
 #endif
 
 /* These identify the driver base version and may not be removed. */
