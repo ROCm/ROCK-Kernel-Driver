@@ -24,6 +24,7 @@ obj-$(CONFIG_USB_PRINTER)	+= class/
 
 obj-$(CONFIG_USB_STORAGE)	+= storage/
 
+obj-$(CONFIG_USB_AIPTEK)	+= input/
 obj-$(CONFIG_USB_HID)		+= input/
 obj-$(CONFIG_USB_KBD)		+= input/
 obj-$(CONFIG_USB_MOUSE)		+= input/

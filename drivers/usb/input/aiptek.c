@@ -210,9 +210,15 @@ aiptek_command(struct usb_device *dev, unsigned int ifnum,
 	buf[1] = command;
 	buf[2] = data;
 
+	/* 
+	 * FIXME, either remove this call, or talk the maintainer into 
+	 * adding it back into the core.
+	 */
+#if 0
 	if (usb_set_report(dev, ifnum, 3, 2, buf, 3) != 3) {
 		dbg("aiptek_command: 0x%x 0x%x\n", command, data);
 	}
+#endif
 }
 
 static void*
