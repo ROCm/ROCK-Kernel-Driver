@@ -657,15 +657,15 @@ struct parameters {
 ** DESC_ALIGN. ALIGN aligns the start address of the private memory area
 ** and hence the RX descriptor ring's first entry. 
 */
-#define ALIGN4      ((u_long)4 - 1)     /* 1 longword align */
-#define ALIGN8      ((u_long)8 - 1)     /* 2 longword align */
-#define ALIGN16     ((u_long)16 - 1)    /* 4 longword align */
-#define ALIGN32     ((u_long)32 - 1)    /* 8 longword align */
-#define ALIGN64     ((u_long)64 - 1)    /* 16 longword align */
-#define ALIGN128    ((u_long)128 - 1)   /* 32 longword align */
+#define DE4X5_ALIGN4      ((u_long)4 - 1)     /* 1 longword align */
+#define DE4X5_ALIGN8      ((u_long)8 - 1)     /* 2 longword align */
+#define DE4X5_ALIGN16     ((u_long)16 - 1)    /* 4 longword align */
+#define DE4X5_ALIGN32     ((u_long)32 - 1)    /* 8 longword align */
+#define DE4X5_ALIGN64     ((u_long)64 - 1)    /* 16 longword align */
+#define DE4X5_ALIGN128    ((u_long)128 - 1)   /* 32 longword align */
 
-#define ALIGN         ALIGN32           /* Keep the DC21040 happy... */
-#define CACHE_ALIGN   CAL_16LONG
+#define DE4X5_ALIGN         DE4X5_ALIGN32           /* Keep the DC21040 happy... */
+#define DE4X5_CACHE_ALIGN   CAL_16LONG
 #define DESC_SKIP_LEN DSL_0             /* Must agree with DESC_ALIGN */
 /*#define DESC_ALIGN    u32 dummy[4];  / * Must agree with DESC_SKIP_LEN */
 #define DESC_ALIGN
@@ -1202,7 +1202,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 	** Reserve a section of kernel memory for the adapter
 	** private area and the TX/RX descriptor rings.
 	*/
-	dev->priv = (void *) kmalloc(sizeof(struct de4x5_private) + ALIGN, 
+	dev->priv = (void *) kmalloc(sizeof(struct de4x5_private) + DE4X5_ALIGN, 
 				     GFP_KERNEL);
 	if (dev->priv == NULL) {
 	    return -ENOMEM;
@@ -1212,7 +1212,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 	** Align to a longword boundary
 	*/
 	tmp = dev->priv;
-	dev->priv = (void *)(((u_long)dev->priv + ALIGN) & ~ALIGN);
+	dev->priv = (void *)(((u_long)dev->priv + DE4X5_ALIGN) & ~DE4X5_ALIGN);
 	lp = (struct de4x5_private *)dev->priv;
 	memset(dev->priv, 0, sizeof(struct de4x5_private));
 	lp->bus = bus.bus;
@@ -1248,7 +1248,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 
 	lp->dma_size = (NUM_RX_DESC + NUM_TX_DESC) * sizeof(struct de4x5_desc);
 #if defined(__alpha__) || defined(__powerpc__) || defined(__sparc_v9__) || defined(DE4X5_DO_MEMCPY)
-	lp->dma_size += RX_BUFF_SZ * NUM_RX_DESC + ALIGN;
+	lp->dma_size += RX_BUFF_SZ * NUM_RX_DESC + DE4X5_ALIGN;
 #endif
 	lp->rx_ring = pci_alloc_consistent(pdev, lp->dma_size, &lp->dma_rings);
 	if (lp->rx_ring == NULL) {
@@ -1278,9 +1278,9 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 
 		dma_rx_bufs = lp->dma_rings + (NUM_RX_DESC + NUM_TX_DESC)
 		      	* sizeof(struct de4x5_desc);
-		dma_rx_bufs = (dma_rx_bufs + ALIGN) & ~ALIGN;
+		dma_rx_bufs = (dma_rx_bufs + DE4X5_ALIGN) & ~DE4X5_ALIGN;
 		lp->rx_bufs = (char *)(((long)(lp->rx_ring + NUM_RX_DESC
-		      	+ NUM_TX_DESC) + ALIGN) & ~ALIGN);
+		      	+ NUM_TX_DESC) + DE4X5_ALIGN) & ~DE4X5_ALIGN);
 		for (i=0; i<NUM_RX_DESC; i++) {
 	    		lp->rx_ring[i].status = 0;
 	    		lp->rx_ring[i].des1 = cpu_to_le32(RX_BUFF_SZ);
@@ -1489,7 +1489,7 @@ de4x5_sw_reset(struct net_device *dev)
     ** Fasternet chips and 4 longwords for all others: DMA errors result
     ** without these values. Cache align 16 long.
     */
-    bmr = (lp->chipset==DC21140 ? PBL_8 : PBL_4) | DESC_SKIP_LEN | CACHE_ALIGN;
+    bmr = (lp->chipset==DC21140 ? PBL_8 : PBL_4) | DESC_SKIP_LEN | DE4X5_CACHE_ALIGN;
     bmr |= ((lp->chipset & ~0x00ff)==DC2114x ? BMR_RML : 0);
     outl(bmr, DE4X5_BMR);
 
@@ -3638,12 +3638,12 @@ de4x5_alloc_rx_buff(struct net_device *dev, int index, int len)
     struct sk_buff *ret;
     u_long i=0, tmp;
 
-    p = dev_alloc_skb(IEEE802_3_SZ + ALIGN + 2);
+    p = dev_alloc_skb(IEEE802_3_SZ + DE4X5_ALIGN + 2);
     if (!p) return NULL;
 
     p->dev = dev;
     tmp = virt_to_bus(p->data);
-    i = ((tmp + ALIGN) & ~ALIGN) - tmp;
+    i = ((tmp + DE4X5_ALIGN) & ~DE4X5_ALIGN) - tmp;
     skb_reserve(p, i);
     lp->rx_ring[index].buf = cpu_to_le32(tmp + i);
 
