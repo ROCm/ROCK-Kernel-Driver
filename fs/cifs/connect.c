@@ -1512,6 +1512,8 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	int remaining_words = 0;
 	int bytes_returned = 0;
 	int len;
+	__u32 capabilities;
+	__u16 count;
 
 	cFYI(1, ("In sesssetup "));
 	if(ses == NULL)
@@ -1536,22 +1538,20 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
 		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
-	pSMB->req_no_secext.Capabilities =
-	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS;
+	capabilities = CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS;
 	if (ses->capabilities & CAP_UNICODE) {
 		smb_buffer->Flags2 |= SMBFLG2_UNICODE;
-		pSMB->req_no_secext.Capabilities |= CAP_UNICODE;
+		capabilities |= CAP_UNICODE;
 	}
 	if (ses->capabilities & CAP_STATUS32) {
 		smb_buffer->Flags2 |= SMBFLG2_ERR_STATUS;
-		pSMB->req_no_secext.Capabilities |= CAP_STATUS32;
+		capabilities |= CAP_STATUS32;
 	}
 	if (ses->capabilities & CAP_DFS) {
 		smb_buffer->Flags2 |= SMBFLG2_DFS;
-		pSMB->req_no_secext.Capabilities |= CAP_DFS;
+		capabilities |= CAP_DFS;
 	}
-	pSMB->req_no_secext.Capabilities =
-	    cpu_to_le32(pSMB->req_no_secext.Capabilities);
+	pSMB->req_no_secext.Capabilities = cpu_to_le32(capabilities);
 	/* pSMB->req_no_secext.CaseInsensitivePasswordLength =
 	   CIFS_SESSION_KEY_SIZE; */
 	pSMB->req_no_secext.CaseInsensitivePasswordLength = 0;
@@ -1623,9 +1623,9 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		strcpy(bcc_ptr, CIFS_NETWORK_OPSYS);
 		bcc_ptr += strlen(CIFS_NETWORK_OPSYS) + 1;
 	}
-	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
-	smb_buffer->smb_buf_length += BCC(smb_buffer);
-	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
+	count = (long) bcc_ptr - (long) pByteArea(smb_buffer);
+	smb_buffer->smb_buf_length += count;
+	pSMB->req_no_secext.ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response,
 			 &bytes_returned, 1);
@@ -1633,8 +1633,8 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 /* rc = map_smb_to_linux_error(smb_buffer_response); now done in SendReceive */
 	} else if ((smb_buffer_response->WordCount == 3)
 		   || (smb_buffer_response->WordCount == 4)) {
-		pSMBr->resp.Action = le16_to_cpu(pSMBr->resp.Action);
-		if (pSMBr->resp.Action & GUEST_LOGIN)
+		__u16 action = le16_to_cpu(pSMBr->resp.Action);
+		if (action & GUEST_LOGIN)
 			cFYI(1, (" Guest login"));	/* do we want to mark SesInfo struct ? */
 		ses->Suid = smb_buffer_response->Uid;	/* UID left in wire format (le) */
 		cFYI(1, ("UID = %d ", ses->Suid));
@@ -1764,6 +1764,8 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	int remaining_words = 0;
 	int bytes_returned = 0;
 	int len;
+	__u32 capabilities;
+	__u16 count;
 
 	cFYI(1, ("In spnego sesssetup "));
 	if(ses == NULL)
@@ -1789,22 +1791,21 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
 		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
-	pSMB->req.Capabilities =
-	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
+	capabilities = CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
 	    CAP_EXTENDED_SECURITY;
 	if (ses->capabilities & CAP_UNICODE) {
 		smb_buffer->Flags2 |= SMBFLG2_UNICODE;
-		pSMB->req.Capabilities |= CAP_UNICODE;
+		capabilities |= CAP_UNICODE;
 	}
 	if (ses->capabilities & CAP_STATUS32) {
 		smb_buffer->Flags2 |= SMBFLG2_ERR_STATUS;
-		pSMB->req.Capabilities |= CAP_STATUS32;
+		capabilities |= CAP_STATUS32;
 	}
 	if (ses->capabilities & CAP_DFS) {
 		smb_buffer->Flags2 |= SMBFLG2_DFS;
-		pSMB->req.Capabilities |= CAP_DFS;
+		capabilities |= CAP_DFS;
 	}
-	pSMB->req.Capabilities = cpu_to_le32(pSMB->req.Capabilities);
+	pSMB->req.Capabilities = cpu_to_le32(capabilities);
 
 	pSMB->req.SecurityBlobLength = cpu_to_le16(SecurityBlobLength);
 	bcc_ptr = pByteArea(smb_buffer);
@@ -1865,9 +1866,9 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		strcpy(bcc_ptr, CIFS_NETWORK_OPSYS);
 		bcc_ptr += strlen(CIFS_NETWORK_OPSYS) + 1;
 	}
-	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
-	smb_buffer->smb_buf_length += BCC(smb_buffer);
-	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
+	count = (long) bcc_ptr - (long) pByteArea(smb_buffer);
+	smb_buffer->smb_buf_length += count;
+	pSMB->req.ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response,
 			 &bytes_returned, 1);
@@ -1875,10 +1876,10 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 /*    rc = map_smb_to_linux_error(smb_buffer_response);  *//* done in SendReceive now */
 	} else if ((smb_buffer_response->WordCount == 3)
 		   || (smb_buffer_response->WordCount == 4)) {
-		pSMBr->resp.Action = le16_to_cpu(pSMBr->resp.Action);
-		pSMBr->resp.SecurityBlobLength =
+		__u16 action = le16_to_cpu(pSMBr->resp.Action);
+		__u16 blob_len =
 		    le16_to_cpu(pSMBr->resp.SecurityBlobLength);
-		if (pSMBr->resp.Action & GUEST_LOGIN)
+		if (action & GUEST_LOGIN)
 			cFYI(1, (" Guest login"));	/* BB do we want to set anything in SesInfo struct ? */
 		if (ses) {
 			ses->Suid = smb_buffer_response->Uid;	/* UID left in wire format (le) */
@@ -1889,14 +1890,14 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 			if ((pSMBr->resp.hdr.WordCount == 3)
 			    || ((pSMBr->resp.hdr.WordCount == 4)
-				&& (pSMBr->resp.SecurityBlobLength <
+				&& (blob_len <
 				    pSMBr->resp.ByteCount))) {
 				if (pSMBr->resp.hdr.WordCount == 4) {
 					bcc_ptr +=
-					    pSMBr->resp.SecurityBlobLength;
+					    blob_len;
 					cFYI(1,
 					     ("Security Blob Length %d ",
-					      pSMBr->resp.SecurityBlobLength));
+					      blob_len));
 				}
 
 				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
@@ -2029,6 +2030,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	int SecurityBlobLength = sizeof (NEGOTIATE_MESSAGE);
 	PNEGOTIATE_MESSAGE SecurityBlob;
 	PCHALLENGE_MESSAGE SecurityBlob2;
+	__u32 negotiate_flags, capabilities;
+	__u16 count;
 
 	cFYI(1, ("In NTLMSSP sesssetup (negotiate) "));
 	if(ses == NULL)
@@ -2056,35 +2059,34 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
 		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
-	pSMB->req.Capabilities =
-	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
+	capabilities = CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
 	    CAP_EXTENDED_SECURITY;
 	if (ses->capabilities & CAP_UNICODE) {
 		smb_buffer->Flags2 |= SMBFLG2_UNICODE;
-		pSMB->req.Capabilities |= CAP_UNICODE;
+		capabilities |= CAP_UNICODE;
 	}
 	if (ses->capabilities & CAP_STATUS32) {
 		smb_buffer->Flags2 |= SMBFLG2_ERR_STATUS;
-		pSMB->req.Capabilities |= CAP_STATUS32;
+		capabilities |= CAP_STATUS32;
 	}
 	if (ses->capabilities & CAP_DFS) {
 		smb_buffer->Flags2 |= SMBFLG2_DFS;
-		pSMB->req.Capabilities |= CAP_DFS;
+		capabilities |= CAP_DFS;
 	}
-	pSMB->req.Capabilities = cpu_to_le32(pSMB->req.Capabilities);
+	pSMB->req.Capabilities = cpu_to_le32(capabilities);
 
 	bcc_ptr = (char *) &pSMB->req.SecurityBlob;
 	SecurityBlob = (PNEGOTIATE_MESSAGE) bcc_ptr;
 	strncpy(SecurityBlob->Signature, NTLMSSP_SIGNATURE, 8);
 	SecurityBlob->MessageType = NtLmNegotiate;
-	SecurityBlob->NegotiateFlags =
+	negotiate_flags =
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_NEGOTIATE_OEM |
 	    NTLMSSP_REQUEST_TARGET | NTLMSSP_NEGOTIATE_NTLM | 0x80000000 |
 	    /* NTLMSSP_NEGOTIATE_ALWAYS_SIGN | */ NTLMSSP_NEGOTIATE_128;
 	if(sign_CIFS_PDUs)
-		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_SIGN;
+		negotiate_flags |= NTLMSSP_NEGOTIATE_SIGN;
 	if(ntlmv2_support)
-		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
+		negotiate_flags |= NTLMSSP_NEGOTIATE_NTLMV2;
 	/* setup pointers to domain name and workstation name */
 	bcc_ptr += SecurityBlobLength;
 
@@ -2097,20 +2099,20 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 		SecurityBlob->DomainName.Length = 0;
 		SecurityBlob->DomainName.MaximumLength = 0;
 	} else {
-		SecurityBlob->NegotiateFlags |=
-		    NTLMSSP_NEGOTIATE_DOMAIN_SUPPLIED;
+		__u16 len;
+		negotiate_flags |= NTLMSSP_NEGOTIATE_DOMAIN_SUPPLIED;
 		strncpy(bcc_ptr, domain, 63);
-		SecurityBlob->DomainName.Length = strnlen(domain, 64);
+		len = strnlen(domain, 64);
 		SecurityBlob->DomainName.MaximumLength =
-		    cpu_to_le16(SecurityBlob->DomainName.Length);
+		    cpu_to_le16(len);
 		SecurityBlob->DomainName.Buffer =
 		    cpu_to_le32((long) &SecurityBlob->
 				DomainString -
 				(long) &SecurityBlob->Signature);
-		bcc_ptr += SecurityBlob->DomainName.Length;
-		SecurityBlobLength += SecurityBlob->DomainName.Length;
+		bcc_ptr += len;
+		SecurityBlobLength += len;
 		SecurityBlob->DomainName.Length =
-		    cpu_to_le16(SecurityBlob->DomainName.Length);
+		    cpu_to_le16(len);
 	}
 	if (ses->capabilities & CAP_UNICODE) {
 		if ((long) bcc_ptr % 2) {
@@ -2147,12 +2149,11 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 		bcc_ptr++;	/* empty domain field */
 		*bcc_ptr = 0;
 	}
-	SecurityBlob->NegotiateFlags =
-	    cpu_to_le32(SecurityBlob->NegotiateFlags);
+	SecurityBlob->NegotiateFlags = cpu_to_le32(negotiate_flags);
 	pSMB->req.SecurityBlobLength = cpu_to_le16(SecurityBlobLength);
-	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
-	smb_buffer->smb_buf_length += BCC(smb_buffer);
-	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
+	count = (long) bcc_ptr - (long) pByteArea(smb_buffer);
+	smb_buffer->smb_buf_length += count;
+	pSMB->req.ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response,
 			 &bytes_returned, 1);
@@ -2165,10 +2166,10 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 /*    rc = map_smb_to_linux_error(smb_buffer_response);  *//* done in SendReceive now */
 	} else if ((smb_buffer_response->WordCount == 3)
 		   || (smb_buffer_response->WordCount == 4)) {
-		pSMBr->resp.Action = le16_to_cpu(pSMBr->resp.Action);
-		pSMBr->resp.SecurityBlobLength =
-		    le16_to_cpu(pSMBr->resp.SecurityBlobLength);
-		if (pSMBr->resp.Action & GUEST_LOGIN)
+		__u16 action = le16_to_cpu(pSMBr->resp.Action);
+		__u16 blob_len = le16_to_cpu(pSMBr->resp.SecurityBlobLength);
+
+		if (action & GUEST_LOGIN)
 			cFYI(1, (" Guest login"));	
         /* Do we want to set anything in SesInfo struct when guest login? */
 
@@ -2185,14 +2186,14 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 			cFYI(1, ("UID = %d ", ses->Suid));
 			if ((pSMBr->resp.hdr.WordCount == 3)
 			    || ((pSMBr->resp.hdr.WordCount == 4)
-				&& (pSMBr->resp.SecurityBlobLength <
+				&& (blob_len <
 				    pSMBr->resp.ByteCount))) {
+
 				if (pSMBr->resp.hdr.WordCount == 4) {
-					bcc_ptr +=
-					    pSMBr->resp.SecurityBlobLength;
+					bcc_ptr += blob_len;
 					cFYI(1,
 					     ("Security Blob Length %d ",
-					      pSMBr->resp.SecurityBlobLength));
+					      blob_len));
 				}
 
 				cFYI(1, ("NTLMSSP Challenge rcvd "));
@@ -2353,7 +2354,6 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 
 	return rc;
 }
-
 static int
 CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		char *ntlm_session_key, int ntlmv2_flag,
@@ -2372,6 +2372,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	int len;
 	int SecurityBlobLength = sizeof (AUTHENTICATE_MESSAGE);
 	PAUTHENTICATE_MESSAGE SecurityBlob;
+	__u32 negotiate_flags, capabilities;
+	__u16 count;
 
 	cFYI(1, ("In NTLMSSPSessSetup (Authenticate)"));
 	if(ses == NULL)
@@ -2400,36 +2402,35 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
 		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
-	pSMB->req.Capabilities =
-	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
+	capabilities = CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
 	    CAP_EXTENDED_SECURITY;
 	if (ses->capabilities & CAP_UNICODE) {
 		smb_buffer->Flags2 |= SMBFLG2_UNICODE;
-		pSMB->req.Capabilities |= CAP_UNICODE;
+		capabilities |= CAP_UNICODE;
 	}
 	if (ses->capabilities & CAP_STATUS32) {
 		smb_buffer->Flags2 |= SMBFLG2_ERR_STATUS;
-		pSMB->req.Capabilities |= CAP_STATUS32;
+		capabilities |= CAP_STATUS32;
 	}
 	if (ses->capabilities & CAP_DFS) {
 		smb_buffer->Flags2 |= SMBFLG2_DFS;
-		pSMB->req.Capabilities |= CAP_DFS;
+		capabilities |= CAP_DFS;
 	}
-	pSMB->req.Capabilities = cpu_to_le32(pSMB->req.Capabilities);
+	pSMB->req.Capabilities = cpu_to_le32(capabilities);
 
 	bcc_ptr = (char *) &pSMB->req.SecurityBlob;
 	SecurityBlob = (PAUTHENTICATE_MESSAGE) bcc_ptr;
 	strncpy(SecurityBlob->Signature, NTLMSSP_SIGNATURE, 8);
 	SecurityBlob->MessageType = NtLmAuthenticate;
 	bcc_ptr += SecurityBlobLength;
-	SecurityBlob->NegotiateFlags =
+	negotiate_flags = 
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_REQUEST_TARGET |
 	    NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_TARGET_INFO |
 	    0x80000000 | NTLMSSP_NEGOTIATE_128;
 	if(sign_CIFS_PDUs)
-		SecurityBlob->NegotiateFlags |= /* NTLMSSP_NEGOTIATE_ALWAYS_SIGN |*/ NTLMSSP_NEGOTIATE_SIGN;
+		negotiate_flags |= /* NTLMSSP_NEGOTIATE_ALWAYS_SIGN |*/ NTLMSSP_NEGOTIATE_SIGN;
 	if(ntlmv2_flag)
-		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
+		negotiate_flags |= NTLMSSP_NEGOTIATE_NTLMV2;
 
 /* setup pointers to domain name and workstation name */
 
@@ -2460,36 +2461,36 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 			SecurityBlob->DomainName.Length = 0;
 			SecurityBlob->DomainName.MaximumLength = 0;
 		} else {
-			SecurityBlob->DomainName.Length =
+			__u16 len =
 			    cifs_strtoUCS((wchar_t *) bcc_ptr, domain, 64,
 					  nls_codepage);
-			SecurityBlob->DomainName.Length *= 2;
+			len *= 2;
 			SecurityBlob->DomainName.MaximumLength =
-			    cpu_to_le16(SecurityBlob->DomainName.Length);
+			    cpu_to_le16(len);
 			SecurityBlob->DomainName.Buffer =
 			    cpu_to_le32(SecurityBlobLength);
-			bcc_ptr += SecurityBlob->DomainName.Length;
-			SecurityBlobLength += SecurityBlob->DomainName.Length;
+			bcc_ptr += len;
+			SecurityBlobLength += len;
 			SecurityBlob->DomainName.Length =
-			    cpu_to_le16(SecurityBlob->DomainName.Length);
+			    cpu_to_le16(len);
 		}
 		if (user == NULL) {
 			SecurityBlob->UserName.Buffer = 0;
 			SecurityBlob->UserName.Length = 0;
 			SecurityBlob->UserName.MaximumLength = 0;
 		} else {
-			SecurityBlob->UserName.Length =
+			__u16 len =
 			    cifs_strtoUCS((wchar_t *) bcc_ptr, user, 64,
 					  nls_codepage);
-			SecurityBlob->UserName.Length *= 2;
+			len *= 2;
 			SecurityBlob->UserName.MaximumLength =
-			    cpu_to_le16(SecurityBlob->UserName.Length);
+			    cpu_to_le16(len);
 			SecurityBlob->UserName.Buffer =
 			    cpu_to_le32(SecurityBlobLength);
-			bcc_ptr += SecurityBlob->UserName.Length;
-			SecurityBlobLength += SecurityBlob->UserName.Length;
+			bcc_ptr += len;
+			SecurityBlobLength += len;
 			SecurityBlob->UserName.Length =
-			    cpu_to_le16(SecurityBlob->UserName.Length);
+			    cpu_to_le16(len);
 		}
 
 		/* SecurityBlob->WorkstationName.Length = cifs_strtoUCS((wchar_t *) bcc_ptr, "AMACHINE",64, nls_codepage);
@@ -2529,34 +2530,33 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 			SecurityBlob->DomainName.Length = 0;
 			SecurityBlob->DomainName.MaximumLength = 0;
 		} else {
-			SecurityBlob->NegotiateFlags |=
-			    NTLMSSP_NEGOTIATE_DOMAIN_SUPPLIED;
+			__u16 len;
+			negotiate_flags |= NTLMSSP_NEGOTIATE_DOMAIN_SUPPLIED;
 			strncpy(bcc_ptr, domain, 63);
-			SecurityBlob->DomainName.Length = strnlen(domain, 64);
+			len = strnlen(domain, 64);
 			SecurityBlob->DomainName.MaximumLength =
-			    cpu_to_le16(SecurityBlob->DomainName.Length);
+			    cpu_to_le16(len);
 			SecurityBlob->DomainName.Buffer =
 			    cpu_to_le32(SecurityBlobLength);
-			bcc_ptr += SecurityBlob->DomainName.Length;
-			SecurityBlobLength += SecurityBlob->DomainName.Length;
-			SecurityBlob->DomainName.Length =
-			    cpu_to_le16(SecurityBlob->DomainName.Length);
+			bcc_ptr += len;
+			SecurityBlobLength += len;
+			SecurityBlob->DomainName.Length = cpu_to_le16(len);
 		}
 		if (user == NULL) {
 			SecurityBlob->UserName.Buffer = 0;
 			SecurityBlob->UserName.Length = 0;
 			SecurityBlob->UserName.MaximumLength = 0;
 		} else {
+			__u16 len;
 			strncpy(bcc_ptr, user, 63);
-			SecurityBlob->UserName.Length = strnlen(user, 64);
+			len = strnlen(user, 64);
 			SecurityBlob->UserName.MaximumLength =
-			    cpu_to_le16(SecurityBlob->UserName.Length);
+			    cpu_to_le16(len);
 			SecurityBlob->UserName.Buffer =
 			    cpu_to_le32(SecurityBlobLength);
-			bcc_ptr += SecurityBlob->UserName.Length;
-			SecurityBlobLength += SecurityBlob->UserName.Length;
-			SecurityBlob->UserName.Length =
-			    cpu_to_le16(SecurityBlob->UserName.Length);
+			bcc_ptr += len;
+			SecurityBlobLength += len;
+			SecurityBlob->UserName.Length = cpu_to_le16(len);
 		}
 		/* BB fill in our workstation name if known BB */
 
@@ -2569,12 +2569,11 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		bcc_ptr++;	/* null domain */
 		*bcc_ptr = 0;
 	}
-	SecurityBlob->NegotiateFlags =
-	    cpu_to_le32(SecurityBlob->NegotiateFlags);
+	SecurityBlob->NegotiateFlags = cpu_to_le32(negotiate_flags);
 	pSMB->req.SecurityBlobLength = cpu_to_le16(SecurityBlobLength);
-	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
-	smb_buffer->smb_buf_length += BCC(smb_buffer);
-	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
+	count = (long) bcc_ptr - (long) pByteArea(smb_buffer);
+	smb_buffer->smb_buf_length += count;
+	pSMB->req.ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response,
 			 &bytes_returned, 1);
@@ -2582,10 +2581,10 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 /*    rc = map_smb_to_linux_error(smb_buffer_response);  *//* done in SendReceive now */
 	} else if ((smb_buffer_response->WordCount == 3)
 		   || (smb_buffer_response->WordCount == 4)) {
-		pSMBr->resp.Action = le16_to_cpu(pSMBr->resp.Action);
-		pSMBr->resp.SecurityBlobLength =
+		__u16 action = le16_to_cpu(pSMBr->resp.Action);
+		__u16 blob_len =
 		    le16_to_cpu(pSMBr->resp.SecurityBlobLength);
-		if (pSMBr->resp.Action & GUEST_LOGIN)
+		if (action & GUEST_LOGIN)
 			cFYI(1, (" Guest login"));	/* BB do we want to set anything in SesInfo struct ? */
 /*        if(SecurityBlob2->MessageType != NtLm??){                               
                  cFYI("Unexpected message type on auth response is %d ")); 
@@ -2599,14 +2598,14 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
             /* response can have either 3 or 4 word count - Samba sends 3 */
 			if ((pSMBr->resp.hdr.WordCount == 3)
 			    || ((pSMBr->resp.hdr.WordCount == 4)
-				&& (pSMBr->resp.SecurityBlobLength <
+				&& (blob_len <
 				    pSMBr->resp.ByteCount))) {
 				if (pSMBr->resp.hdr.WordCount == 4) {
 					bcc_ptr +=
-					    pSMBr->resp.SecurityBlobLength;
+					    blob_len;
 					cFYI(1,
 					     ("Security Blob Length %d ",
-					      pSMBr->resp.SecurityBlobLength));
+					      blob_len));
 				}
 
 				cFYI(1,

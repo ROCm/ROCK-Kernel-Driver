@@ -436,15 +436,15 @@ typedef union smb_com_session_setup_andx {
 		struct smb_hdr hdr;	/* wct = 12 */
 		__u8 AndXCommand;
 		__u8 AndXReserved;
-		__u16 AndXOffset;
-		__u16 MaxBufferSize;
-		__u16 MaxMpxCount;
-		__u16 VcNumber;
+		__le16 AndXOffset;
+		__le16 MaxBufferSize;
+		__le16 MaxMpxCount;
+		__le16 VcNumber;
 		__u32 SessionKey;
-		__u16 SecurityBlobLength;
+		__le16 SecurityBlobLength;
 		__u32 Reserved;
-		__u32 Capabilities;	/* see below */
-		__u16 ByteCount;
+		__le32 Capabilities;	/* see below */
+		__le16 ByteCount;
 		unsigned char SecurityBlob[1];	/* followed by */
 		/* STRING NativeOS */
 		/* STRING NativeLanMan */
@@ -454,16 +454,16 @@ typedef union smb_com_session_setup_andx {
 		struct smb_hdr hdr;	/* wct = 13 */
 		__u8 AndXCommand;
 		__u8 AndXReserved;
-		__u16 AndXOffset;
-		__u16 MaxBufferSize;
-		__u16 MaxMpxCount;
-		__u16 VcNumber;
+		__le16 AndXOffset;
+		__le16 MaxBufferSize;
+		__le16 MaxMpxCount;
+		__le16 VcNumber;
 		__u32 SessionKey;
-		__u16 CaseInsensitivePasswordLength;	/* ASCII password length */
-		__u16 CaseSensitivePasswordLength;	/* Unicode password length */
+		__le16 CaseInsensitivePasswordLength;	/* ASCII password length */
+		__le16 CaseSensitivePasswordLength;	/* Unicode password length */
 		__u32 Reserved;	/* see below */
-		__u32 Capabilities;
-		__u16 ByteCount;
+		__le32 Capabilities;
+		__le16 ByteCount;
 		unsigned char CaseInsensitivePassword[1];	/* followed by: */
 		/* unsigned char * CaseSensitivePassword; */
 		/* STRING AccountName */
@@ -476,9 +476,9 @@ typedef union smb_com_session_setup_andx {
 		struct smb_hdr hdr;	/* wct = 4 */
 		__u8 AndXCommand;
 		__u8 AndXReserved;
-		__u16 AndXOffset;
-		__u16 Action;	/* see below */
-		__u16 SecurityBlobLength;
+		__le16 AndXOffset;
+		__le16 Action;	/* see below */
+		__le16 SecurityBlobLength;
 		__u16 ByteCount;
 		unsigned char SecurityBlob[1];	/* followed by */
 /*      unsigned char  * NativeOS;      */
@@ -490,14 +490,14 @@ typedef union smb_com_session_setup_andx {
 		struct smb_hdr hdr;	/* wct = 10 */
 		__u8 AndXCommand;
 		__u8 AndXReserved;
-		__u16 AndXOffset;
-		__u16 MaxBufferSize;
-		__u16 MaxMpxCount;
-		__u16 VcNumber;
+		__le16 AndXOffset;
+		__le16 MaxBufferSize;
+		__le16 MaxMpxCount;
+		__le16 VcNumber;
 		__u32 SessionKey;
-		__u16 PassswordLength;
+		__le16 PassswordLength;
 		__u32 Reserved;
-		__u16 ByteCount;
+		__le16 ByteCount;
 		unsigned char AccountPassword[1];	/* followed by */
 		/* STRING AccountName */
 		/* STRING PrimaryDomain */
@@ -509,8 +509,8 @@ typedef union smb_com_session_setup_andx {
 		struct smb_hdr hdr;	/* wct = 3 */
 		__u8 AndXCommand;
 		__u8 AndXReserved;
-		__u16 AndXOffset;
-		__u16 Action;	/* see below */
+		__le16 AndXOffset;
+		__le16 Action;	/* see below */
 		__u16 ByteCount;
 		unsigned char NativeOS[1];	/* followed by */
 /*	unsigned char * NativeLanMan; */
