@@ -257,7 +257,7 @@ dma_pool_destroy (struct dma_pool *pool)
 /**
  * dma_pool_alloc - get a block of consistent memory
  * @pool: dma pool that will produce the block
- * @mem_flags: SLAB_KERNEL or SLAB_ATOMIC
+ * @mem_flags: GFP_* bitmask
  * @handle: pointer to dma address of block
  *
  * This returns the kernel virtual address of a currently unused block,
@@ -295,7 +295,7 @@ restart:
 		}
 	}
 	if (!(page = pool_alloc_page (pool, SLAB_ATOMIC))) {
-		if (mem_flags == SLAB_KERNEL) {
+		if (mem_flags & __GFP_WAIT) {
 			DECLARE_WAITQUEUE (wait, current);
 
 			current->state = TASK_INTERRUPTIBLE;
@@ -409,7 +409,7 @@ dma_pool_free (struct dma_pool *pool, void *vaddr, dma_addr_t dma)
 	/*
 	 * Resist a temptation to do
 	 *    if (!is_page_busy(bpp, page->bitmap)) pool_free_page(pool, page);
-	 * it is not interrupt safe. Better have empty pages hang around.
+	 * Better have a few empty pages hang around.
 	 */
 	spin_unlock_irqrestore (&pool->lock, flags);
 }
