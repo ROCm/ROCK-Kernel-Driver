@@ -52,6 +52,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
 #include <asm/sections.h>
+#include <asm/machdep.h>
 #include "open_pic.h"
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
@@ -185,7 +186,6 @@ extern void enter_prom(void *dummy,...);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
 
-extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
 unsigned long _get_PIR(void);
 
@@ -1512,10 +1512,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
 			  RELOC("bootargs"), p, sizeof(cmd_line));
 		if (p != NULL && p[0] != 0)
-			strncpy(RELOC(cmd_line), p, sizeof(cmd_line));
+			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
 	}
-	RELOC(cmd_line[sizeof(cmd_line) - 1]) = 0;
-
 
 	mem = prom_initialize_lmb(mem);
 

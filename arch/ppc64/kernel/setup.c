@@ -477,7 +477,7 @@ static int __init set_preferred_console(void)
 	char *name;
 
 	/* The user has requested a console so this is already set up. */
-	if (strstr(cmd_line, "console="))
+	if (strstr(saved_command_line, "console="))
 		return -EBUSY;
 
 	prom_stdout = find_path_device(of_stdout_device);

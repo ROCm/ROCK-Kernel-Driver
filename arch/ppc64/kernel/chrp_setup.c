@@ -129,7 +129,6 @@ void __init chrp_request_regions(void)
 void __init
 chrp_setup_arch(void)
 {
-	extern char cmd_line[];
 	struct device_node *root;
 	unsigned int *opprop;
 	
