@@ -20,7 +20,6 @@
 #include <linux/pci.h>
 #include <asm/byteorder.h>
 #include <asm/system.h>
-#include <asm/hdreg.h>
 #include <asm/io.h>
 #include <asm/semaphore.h>
 

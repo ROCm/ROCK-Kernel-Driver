@@ -4,6 +4,8 @@
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
 
+#warning this file is obsolete, please do not use it
+
 #ifndef _H8300_HDREG_H
 #define _H8300_HDREG_H
 

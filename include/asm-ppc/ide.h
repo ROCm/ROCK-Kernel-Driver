@@ -19,8 +19,6 @@
 #define MAX_HWIFS	8
 #endif
 
-#include <asm/hdreg.h>
-
 #include <linux/config.h>
 #include <linux/hdreg.h>
 #include <linux/ioport.h>
