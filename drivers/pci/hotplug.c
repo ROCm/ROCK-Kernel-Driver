@@ -188,7 +188,7 @@ static void pci_destroy_dev(struct pci_dev *dev)
 	spin_unlock(&pci_bus_lock);
 
 	pci_free_resources(dev);
-	pci_put_dev(dev);
+	pci_dev_put(dev);
 }
 
 /**

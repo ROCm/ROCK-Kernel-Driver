@@ -334,7 +334,7 @@ static void pci_seq_stop(struct seq_file *m, void *v)
 {
 	if (v) {
 		struct pci_dev *dev = v;
-		pci_put_dev(dev);
+		pci_dev_put(dev);
 	}
 }
 
@@ -471,7 +471,7 @@ static int show_dev_config(struct seq_file *m, void *v)
 	first_dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, NULL);
 	if (dev == first_dev)
 		seq_puts(m, "PCI devices found:\n");
-	pci_put_dev(first_dev);
+	pci_dev_put(first_dev);
 
 	drv = pci_dev_driver(dev);
 

@@ -205,8 +205,8 @@ pci_get_subsys(unsigned int vendor, unsigned int device,
 	}
 	dev = NULL;
 exit:
-	pci_put_dev(from);
-	dev = pci_get_dev(dev);
+	pci_dev_put(from);
+	dev = pci_dev_get(dev);
 	spin_unlock(&pci_bus_lock);
 	return dev;
 }

@@ -138,10 +138,10 @@ static int pci_device_probe(struct device * dev)
 
 	drv = to_pci_driver(dev->driver);
 	pci_dev = to_pci_dev(dev);
-	pci_get_dev(pci_dev);
+	pci_dev_get(pci_dev);
 	error = __pci_device_probe(drv, pci_dev);
 	if (error)
-		pci_put_dev(pci_dev);
+		pci_dev_put(pci_dev);
 
 	return error;
 }
@@ -156,7 +156,7 @@ static int pci_device_remove(struct device * dev)
 			drv->remove(pci_dev);
 		pci_dev->driver = NULL;
 	}
-	pci_put_dev(pci_dev);
+	pci_dev_put(pci_dev);
 	return 0;
 }
 
@@ -448,18 +448,18 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
 }
 
 /**
- * pci_get_dev - increments the reference count of the pci device structure
+ * pci_dev_get - increments the reference count of the pci device structure
  * @dev: the device being referenced
  *
  * Each live reference to a device should be refcounted.
  *
  * Drivers for PCI devices should normally record such references in
  * their probe() methods, when they bind to a device, and release
- * them by calling pci_put_dev(), in their disconnect() methods.
+ * them by calling pci_dev_put(), in their disconnect() methods.
  *
  * A pointer to the device with the incremented reference counter is returned.
  */
-struct pci_dev *pci_get_dev (struct pci_dev *dev)
+struct pci_dev *pci_dev_get(struct pci_dev *dev)
 {
 	struct device *tmp;
 
@@ -474,13 +474,13 @@ struct pci_dev *pci_get_dev (struct pci_dev *dev)
 }
 
 /**
- * pci_put_dev - release a use of the pci device structure
+ * pci_dev_put - release a use of the pci device structure
  * @dev: device that's been disconnected
  *
  * Must be called when a user of a device is finished with it.  When the last
  * user of the device calls this function, the memory of the device is freed.
  */
-void pci_put_dev(struct pci_dev *dev)
+void pci_dev_put(struct pci_dev *dev)
 {
 	if (dev)
 		put_device(&dev->dev);
@@ -504,5 +504,5 @@ EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);
 EXPORT_SYMBOL(pci_dev_driver);
 EXPORT_SYMBOL(pci_bus_type);
-EXPORT_SYMBOL(pci_get_dev);
-EXPORT_SYMBOL(pci_put_dev);
+EXPORT_SYMBOL(pci_dev_get);
+EXPORT_SYMBOL(pci_dev_put);
