@@ -174,27 +174,30 @@ struct mthca_adapter {
 
 struct mthca_init_hca_param {
 	u64 qpc_base;
-	u8  log_num_qps;
 	u64 eec_base;
-	u8  log_num_eecs;
 	u64 srqc_base;
-	u8  log_num_srqs;
 	u64 cqc_base;
-	u8  log_num_cqs;
 	u64 eqpc_base;
 	u64 eeec_base;
 	u64 eqc_base;
-	u8  log_num_eqs;
 	u64 rdb_base;
 	u64 mc_base;
-	u16 log_mc_entry_sz;
-	u16 mc_hash_sz;
-	u8  log_mc_table_sz;
 	u64 mpt_base;
-	u8  mtt_seg_sz;
-	u8  log_mpt_sz;
 	u64 mtt_base;
 	u64 uar_scratch_base;
+	u64 uarc_base;
+	u16 log_mc_entry_sz;
+	u16 mc_hash_sz;
+	u8  log_num_qps;
+	u8  log_num_eecs;
+	u8  log_num_srqs;
+	u8  log_num_cqs;
+	u8  log_num_eqs;
+	u8  log_mc_table_sz;
+	u8  mtt_seg_sz;
+	u8  log_mpt_sz;
+	u8  log_uar_sz;
+	u8  log_uarc_sz;
 };
 
 struct mthca_init_ib_param {
@@ -238,6 +241,13 @@ int mthca_INIT_IB(struct mthca_dev *dev,
 		  int port, u8 *status);
 int mthca_CLOSE_IB(struct mthca_dev *dev, int port, u8 *status);
 int mthca_CLOSE_HCA(struct mthca_dev *dev, int panic, u8 *status);
+int mthca_MAP_ICM(struct mthca_dev *dev, struct mthca_icm *icm, u64 virt, u8 *status);
+int mthca_MAP_ICM_page(struct mthca_dev *dev, u64 dma_addr, u64 virt, u8 *status);
+int mthca_UNMAP_ICM(struct mthca_dev *dev, u64 virt, u32 page_count, u8 *status);
+int mthca_MAP_ICM_AUX(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status);
+int mthca_UNMAP_ICM_AUX(struct mthca_dev *dev, u8 *status);
+int mthca_SET_ICM_SIZE(struct mthca_dev *dev, u64 icm_size, u64 *aux_pages,
+		       u8 *status);
 int mthca_SW2HW_MPT(struct mthca_dev *dev, void *mpt_entry,
 		    int mpt_index, u8 *status);
 int mthca_HW2SW_MPT(struct mthca_dev *dev, void *mpt_entry,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -50,7 +50,7 @@ struct mthca_profile {
 	int uarc_size;
 };
 
-int mthca_make_profile(struct mthca_dev *mdev,
+u64 mthca_make_profile(struct mthca_dev *mdev,
 		       struct mthca_profile *request,
 		       struct mthca_dev_lim *dev_lim,
 		       struct mthca_init_hca_param *init_hca);

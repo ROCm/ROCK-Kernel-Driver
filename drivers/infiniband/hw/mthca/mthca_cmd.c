@@ -509,7 +509,8 @@ int mthca_SYS_DIS(struct mthca_dev *dev, u8 *status)
 	return mthca_cmd(dev, 0, 0, 0, CMD_SYS_DIS, HZ, status);
 }
 
-int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
+static int mthca_map_cmd(struct mthca_dev *dev, u16 op, struct mthca_icm *icm,
+			 u64 virt, u8 *status)
 {
 	u32 *inbox;
 	dma_addr_t indma;
@@ -518,12 +519,17 @@ int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
 	int nent = 0;
 	int i;
 	int err = 0;
-	int ts = 0;
+	int ts = 0, tc = 0;
 
 	inbox = pci_alloc_consistent(dev->pdev, PAGE_SIZE, &indma);
+	if (!inbox)
+		return -ENOMEM;
+
 	memset(inbox, 0, PAGE_SIZE);
 
-	for (mthca_icm_first(icm, &iter); !mthca_icm_last(&iter); mthca_icm_next(&iter)) {
+	for (mthca_icm_first(icm, &iter);
+	     !mthca_icm_last(&iter);
+	     mthca_icm_next(&iter)) {
 		/*
 		 * We have to pass pages that are aligned to their
 		 * size, so find the least significant 1 in the
@@ -538,13 +544,20 @@ int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
 			goto out;
 		}
 		for (i = 0; i < mthca_icm_size(&iter) / (1 << lg); ++i, ++nent) {
+			if (virt != -1) {
+				*((__be64 *) (inbox + nent * 4)) =
+					cpu_to_be64(virt);
+				virt += 1 << lg;
+			}
+
 			*((__be64 *) (inbox + nent * 4 + 2)) =
 				cpu_to_be64((mthca_icm_addr(&iter) +
-					     (i << lg)) |
-					    (lg - 12));
+					     (i << lg)) | (lg - 12));
 			ts += 1 << (lg - 10);
+			++tc;
+
 			if (nent == PAGE_SIZE / 16) {
-				err = mthca_cmd(dev, indma, nent, 0, CMD_MAP_FA,
+				err = mthca_cmd(dev, indma, nent, 0, op,
 						CMD_TIME_CLASS_B, status);
 				if (err || *status)
 					goto out;
@@ -553,16 +566,31 @@ int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
 		}
 	}
 
-	if (nent) {
-		err = mthca_cmd(dev, indma, nent, 0, CMD_MAP_FA,
+	if (nent)
+		err = mthca_cmd(dev, indma, nent, 0, op,
 				CMD_TIME_CLASS_B, status);
-	}
 
-	mthca_dbg(dev, "Mapped %d KB of host memory for FW.\n", ts);
+	switch (op) {
+	case CMD_MAP_FA:
+		mthca_dbg(dev, "Mapped %d chunks/%d KB for FW.\n", tc, ts);
+		break;
+	case CMD_MAP_ICM_AUX:
+		mthca_dbg(dev, "Mapped %d chunks/%d KB for ICM aux.\n", tc, ts);
+		break;
+	case CMD_MAP_ICM:
+		mthca_dbg(dev, "Mapped %d chunks/%d KB at %llx for ICM.\n",
+			  tc, ts, (unsigned long long) virt - (ts << 10));
+		break;
+	}
 
 out:
 	pci_free_consistent(dev->pdev, PAGE_SIZE, inbox, indma);
 	return err;
+}
+
+int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
+{
+	return mthca_map_cmd(dev, CMD_MAP_FA, icm, -1, status);
 }
 
 int mthca_UNMAP_FA(struct mthca_dev *dev, u8 *status)
@@ -1068,8 +1096,11 @@ int mthca_INIT_HCA(struct mthca_dev *dev,
 #define  INIT_HCA_MTT_BASE_OFFSET        (INIT_HCA_TPT_OFFSET + 0x10)
 #define INIT_HCA_UAR_OFFSET              0x120
 #define  INIT_HCA_UAR_BASE_OFFSET        (INIT_HCA_UAR_OFFSET + 0x00)
+#define  INIT_HCA_UARC_SZ_OFFSET         (INIT_HCA_UAR_OFFSET + 0x09)
+#define  INIT_HCA_LOG_UAR_SZ_OFFSET      (INIT_HCA_UAR_OFFSET + 0x0a)
 #define  INIT_HCA_UAR_PAGE_SZ_OFFSET     (INIT_HCA_UAR_OFFSET + 0x0b)
 #define  INIT_HCA_UAR_SCATCH_BASE_OFFSET (INIT_HCA_UAR_OFFSET + 0x10)
+#define  INIT_HCA_UAR_CTX_BASE_OFFSET    (INIT_HCA_UAR_OFFSET + 0x18)
 
 	inbox = pci_alloc_consistent(dev->pdev, INIT_HCA_IN_SIZE, &indma);
 	if (!inbox)
@@ -1117,7 +1148,8 @@ int mthca_INIT_HCA(struct mthca_dev *dev,
 	/* TPT attributes */
 
 	MTHCA_PUT(inbox, param->mpt_base,   INIT_HCA_MPT_BASE_OFFSET);
-	MTHCA_PUT(inbox, param->mtt_seg_sz, INIT_HCA_MTT_SEG_SZ_OFFSET);
+	if (dev->hca_type != ARBEL_NATIVE)
+		MTHCA_PUT(inbox, param->mtt_seg_sz, INIT_HCA_MTT_SEG_SZ_OFFSET);
 	MTHCA_PUT(inbox, param->log_mpt_sz, INIT_HCA_LOG_MPT_SZ_OFFSET);
 	MTHCA_PUT(inbox, param->mtt_base,   INIT_HCA_MTT_BASE_OFFSET);
 
@@ -1125,7 +1157,14 @@ int mthca_INIT_HCA(struct mthca_dev *dev,
 	{
 		u8 uar_page_sz = PAGE_SHIFT - 12;
 		MTHCA_PUT(inbox, uar_page_sz, INIT_HCA_UAR_PAGE_SZ_OFFSET);
-		MTHCA_PUT(inbox, param->uar_scratch_base, INIT_HCA_UAR_SCATCH_BASE_OFFSET);
+	}
+
+	MTHCA_PUT(inbox, param->uar_scratch_base, INIT_HCA_UAR_SCATCH_BASE_OFFSET);
+
+	if (dev->hca_type == ARBEL_NATIVE) {
+		MTHCA_PUT(inbox, param->log_uarc_sz, INIT_HCA_UARC_SZ_OFFSET);
+		MTHCA_PUT(inbox, param->log_uar_sz,  INIT_HCA_LOG_UAR_SZ_OFFSET);
+		MTHCA_PUT(inbox, param->uarc_base,   INIT_HCA_UAR_CTX_BASE_OFFSET);
 	}
 
 	err = mthca_cmd(dev, indma, 0, 0, CMD_INIT_HCA,
@@ -1197,6 +1236,68 @@ int mthca_CLOSE_IB(struct mthca_dev *dev, int port, u8 *status)
 int mthca_CLOSE_HCA(struct mthca_dev *dev, int panic, u8 *status)
 {
 	return mthca_cmd(dev, 0, 0, panic, CMD_CLOSE_HCA, HZ, status);
+}
+
+int mthca_MAP_ICM(struct mthca_dev *dev, struct mthca_icm *icm, u64 virt, u8 *status)
+{
+	return mthca_map_cmd(dev, CMD_MAP_ICM, icm, virt, status);
+}
+
+int mthca_MAP_ICM_page(struct mthca_dev *dev, u64 dma_addr, u64 virt, u8 *status)
+{
+	u64 *inbox;
+	dma_addr_t indma;
+	int err;
+
+	inbox = pci_alloc_consistent(dev->pdev, 16, &indma);
+	if (!inbox)
+		return -ENOMEM;
+
+	inbox[0] = cpu_to_be64(virt);
+	inbox[1] = cpu_to_be64(dma_addr | (PAGE_SHIFT - 12));
+
+	err = mthca_cmd(dev, indma, 1, 0, CMD_MAP_ICM, CMD_TIME_CLASS_B, status);
+
+	pci_free_consistent(dev->pdev, 16, inbox, indma);
+
+	if (!err)
+		mthca_dbg(dev, "Mapped page at %llx for ICM.\n",
+			  (unsigned long long) virt);
+
+	return err;
+}
+
+int mthca_UNMAP_ICM(struct mthca_dev *dev, u64 virt, u32 page_count, u8 *status)
+{
+	return mthca_cmd(dev, virt, page_count, 0, CMD_UNMAP_ICM, CMD_TIME_CLASS_B, status);
+}
+
+int mthca_MAP_ICM_AUX(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
+{
+	return mthca_map_cmd(dev, CMD_MAP_ICM_AUX, icm, -1, status);
+}
+
+int mthca_UNMAP_ICM_AUX(struct mthca_dev *dev, u8 *status)
+{
+	return mthca_cmd(dev, 0, 0, 0, CMD_UNMAP_ICM_AUX, CMD_TIME_CLASS_B, status);
+}
+
+int mthca_SET_ICM_SIZE(struct mthca_dev *dev, u64 icm_size, u64 *aux_pages,
+		       u8 *status)
+{
+	int ret = mthca_cmd_imm(dev, icm_size, aux_pages, 0, 0, CMD_SET_ICM_SIZE,
+				CMD_TIME_CLASS_A, status);
+
+	if (ret || status)
+		return ret;
+
+	/*
+	 * Arbel page size is always 4 KB; round up number of system
+	 * pages needed.
+	 */
+	*aux_pages = (*aux_pages + (1 << (PAGE_SHIFT - 12)) - 1) >> (PAGE_SHIFT - 12);
+
+	return 0;
 }
 
 int mthca_SW2HW_MPT(struct mthca_dev *dev, void *mpt_entry,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -34,6 +34,16 @@
 
 #include "mthca_memfree.h"
 #include "mthca_dev.h"
+#include "mthca_cmd.h"
+
+/*
+ * We allocate in as big chunks as we can, up to a maximum of 256 KB
+ * per chunk.
+ */
+enum {
+	MTHCA_ICM_ALLOC_SIZE   = 1 << 18,
+	MTHCA_TABLE_CHUNK_SIZE = 1 << 18
+};
 
 void mthca_free_icm(struct mthca_dev *dev, struct mthca_icm *icm)
 {
@@ -71,11 +81,7 @@ struct mthca_icm *mthca_alloc_icm(struct mthca_dev *dev, int npages,
 
 	INIT_LIST_HEAD(&icm->chunk_list);
 
-	/*
-	 * We allocate in as big chunks as we can, up to a maximum of
-	 * 256 KB per chunk.
-	 */
-	cur_order = get_order(1 << 18);
+	cur_order = get_order(MTHCA_ICM_ALLOC_SIZE);
 
 	while (npages > 0) {
 		if (!chunk) {
@@ -130,4 +136,71 @@ struct mthca_icm *mthca_alloc_icm(struct mthca_dev *dev, int npages,
 fail:
 	mthca_free_icm(dev, icm);
 	return NULL;
+}
+
+struct mthca_icm_table *mthca_alloc_icm_table(struct mthca_dev *dev,
+					      u64 virt, unsigned size,
+					      unsigned reserved,
+					      int use_lowmem)
+{
+	struct mthca_icm_table *table;
+	int num_icm;
+	int i;
+	u8 status;
+
+	num_icm = size / MTHCA_TABLE_CHUNK_SIZE;
+
+	table = kmalloc(sizeof *table + num_icm * sizeof *table->icm, GFP_KERNEL);
+	if (!table)
+		return NULL;
+
+	table->virt    = virt;
+	table->num_icm = num_icm;
+	init_MUTEX(&table->sem);
+
+	for (i = 0; i < num_icm; ++i)
+		table->icm[i] = NULL;
+
+	for (i = 0; i < (reserved + MTHCA_TABLE_CHUNK_SIZE - 1) / MTHCA_TABLE_CHUNK_SIZE; ++i) {
+		table->icm[i] = mthca_alloc_icm(dev, MTHCA_TABLE_CHUNK_SIZE >> PAGE_SHIFT,
+						(use_lowmem ? GFP_KERNEL : GFP_HIGHUSER) |
+						__GFP_NOWARN);
+		if (!table->icm[i])
+			goto err;
+		if (mthca_MAP_ICM(dev, table->icm[i], virt + i * MTHCA_TABLE_CHUNK_SIZE,
+				  &status) || status) {
+			mthca_free_icm(dev, table->icm[i]);
+			table->icm[i] = NULL;
+			goto err;
+		}
+	}
+
+	return table;
+
+err:
+	for (i = 0; i < num_icm; ++i)
+		if (table->icm[i]) {
+			mthca_UNMAP_ICM(dev, virt + i * MTHCA_TABLE_CHUNK_SIZE,
+					MTHCA_TABLE_CHUNK_SIZE >> 12, &status);
+			mthca_free_icm(dev, table->icm[i]);
+		}
+
+	kfree(table);
+
+	return NULL;
+}
+
+void mthca_free_icm_table(struct mthca_dev *dev, struct mthca_icm_table *table)
+{
+	int i;
+	u8 status;
+
+	for (i = 0; i < table->num_icm; ++i)
+		if (table->icm[i]) {
+			mthca_UNMAP_ICM(dev, table->virt + i * MTHCA_TABLE_CHUNK_SIZE,
+					MTHCA_TABLE_CHUNK_SIZE >> 12, &status);
+			mthca_free_icm(dev, table->icm[i]);
+		}
+
+	kfree(table);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -153,10 +153,12 @@ struct mthca_pd_table {
 };
 
 struct mthca_mr_table {
-	struct mthca_alloc mpt_alloc;
-	int                max_mtt_order;
-	unsigned long    **mtt_buddy;
-	u64                mtt_base;
+	struct mthca_alloc      mpt_alloc;
+	int                     max_mtt_order;
+	unsigned long         **mtt_buddy;
+	u64                     mtt_base;
+	struct mthca_icm_table *mtt_table;
+	struct mthca_icm_table *mpt_table;
 };
 
 struct mthca_eq_table {
@@ -164,23 +166,29 @@ struct mthca_eq_table {
 	void __iomem      *clr_int;
 	u32                clr_mask;
 	struct mthca_eq    eq[MTHCA_NUM_EQ];
+	u64                icm_virt;
+	struct page       *icm_page;
+	dma_addr_t         icm_dma;
 	int                have_irq;
 	u8                 inta_pin;
 };
 
 struct mthca_cq_table {
-	struct mthca_alloc alloc;
-	spinlock_t         lock;
-	struct mthca_array cq;
+	struct mthca_alloc 	alloc;
+	spinlock_t         	lock;
+	struct mthca_array      cq;
+	struct mthca_icm_table *table;
 };
 
 struct mthca_qp_table {
-	struct mthca_alloc alloc;
-	u32                rdb_base;
-	int                rdb_shift;
-	int                sqp_start;
-	spinlock_t         lock;
-	struct mthca_array qp;
+	struct mthca_alloc     	alloc;
+	u32                    	rdb_base;
+	int                    	rdb_shift;
+	int                    	sqp_start;
+	spinlock_t             	lock;
+	struct mthca_array     	qp;
+	struct mthca_icm_table *qp_table;
+	struct mthca_icm_table *eqp_table;
 };
 
 struct mthca_av_table {
@@ -216,7 +224,8 @@ struct mthca_dev {
 			u64 clr_int_base;
 			u64 eq_arm_base;
 			u64 eq_set_ci_base;
-			struct mthca_icm *icm;
+			struct mthca_icm *fw_icm;
+			struct mthca_icm *aux_icm;
 			u16 fw_pages;
 		}        arbel;
 	}                fw;
@@ -328,6 +337,9 @@ int mthca_mr_alloc_phys(struct mthca_dev *dev, u32 pd,
 			int list_len, u64 iova, u64 total_size,
 			u32 access, struct mthca_mr *mr);
 void mthca_free_mr(struct mthca_dev *dev, struct mthca_mr *mr);
+
+int mthca_map_eq_icm(struct mthca_dev *dev, u64 icm_virt);
+void mthca_unmap_eq_icm(struct mthca_dev *dev);
 
 int mthca_poll_cq(struct ib_cq *ibcq, int num_entries,
 		  struct ib_wc *entry);

@@ -574,6 +574,50 @@ static void mthca_free_irqs(struct mthca_dev *dev)
 				 dev->eq_table.eq + i);
 }
 
+int __devinit mthca_map_eq_icm(struct mthca_dev *dev, u64 icm_virt)
+{
+	int ret;
+	u8 status;
+
+	/*
+	 * We assume that mapping one page is enough for the whole EQ
+	 * context table.  This is fine with all current HCAs, because
+	 * we only use 32 EQs and each EQ uses 32 bytes of context
+	 * memory, or 1 KB total.
+	 */
+	dev->eq_table.icm_virt = icm_virt;
+	dev->eq_table.icm_page = alloc_page(GFP_HIGHUSER);
+	if (!dev->eq_table.icm_page)
+		return -ENOMEM;
+	dev->eq_table.icm_dma  = pci_map_page(dev->pdev, dev->eq_table.icm_page, 0,
+					      PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
+	if (pci_dma_mapping_error(dev->eq_table.icm_dma)) {
+		__free_page(dev->eq_table.icm_page);
+		return -ENOMEM;
+	}
+
+	ret = mthca_MAP_ICM_page(dev, dev->eq_table.icm_dma, icm_virt, &status);
+	if (!ret && status)
+		ret = -EINVAL;
+	if (ret) {
+		pci_unmap_page(dev->pdev, dev->eq_table.icm_dma, PAGE_SIZE,
+			       PCI_DMA_BIDIRECTIONAL);
+		__free_page(dev->eq_table.icm_page);
+	}
+
+	return ret;
+}
+
+void __devexit mthca_unmap_eq_icm(struct mthca_dev *dev)
+{
+	u8 status;
+
+	mthca_UNMAP_ICM(dev, dev->eq_table.icm_virt, PAGE_SIZE / 4096, &status);
+	pci_unmap_page(dev->pdev, dev->eq_table.icm_dma, PAGE_SIZE,
+		       PCI_DMA_BIDIRECTIONAL);
+	__free_page(dev->eq_table.icm_page);
+}
+
 int __devinit mthca_init_eq_table(struct mthca_dev *dev)
 {
 	int err;
