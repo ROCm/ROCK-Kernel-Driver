@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.27.2.3 2004/05/21 05:21:35 braunu Exp $
+ * $Id: iucv.c,v 1.27.2.4 2004/07/01 14:35:37 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.27.2.3 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.27.2.4 $
  *
  */
 
@@ -352,7 +352,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.27.2.3 $";
+	char vbuf[] = "$Revision: 1.27.2.4 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -2368,7 +2368,8 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 					iucv_debug(2,
 						   "found a matching handler");
 					break;
-				}
+				} else
+					h = NULL;
 			}
 			spin_unlock_irqrestore (&iucv_lock, flags);
 			if (h) {

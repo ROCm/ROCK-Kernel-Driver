@@ -18,6 +18,8 @@
 
 #include <asm/uaccess.h>
 
+#define TAPE_DBF_AREA	tape_core_dbf
+
 #include "tape.h"
 #include "tape_std.h"
 #include "tape_class.h"

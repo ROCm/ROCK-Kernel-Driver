@@ -22,6 +22,8 @@
 #include <asm/ebcdic.h>
 #include <asm/tape390.h>
 
+#define TAPE_DBF_AREA	tape_core_dbf
+
 #include "tape.h"
 #include "tape_std.h"
 

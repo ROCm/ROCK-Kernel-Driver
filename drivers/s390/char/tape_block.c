@@ -19,6 +19,8 @@
 
 #include <asm/debug.h>
 
+#define TAPE_DBF_AREA	tape_core_dbf
+
 #include "tape.h"
 
 #define PRINTK_HEADER "TAPE_BLOCK: "

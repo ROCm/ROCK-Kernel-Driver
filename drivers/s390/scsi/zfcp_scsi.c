@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.59.2.4 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.59.2.5 $"
 
 #include "zfcp_ext.h"
 
@@ -435,8 +435,8 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	       scpnt->cmnd,
 	       min(scpnt->cmd_len, (unsigned char) ZFCP_ABORT_DBF_LENGTH));
 
-	ZFCP_LOG_DEBUG("aborting scsi_cmnd=%p on adapter %s\n",
-		       scpnt, zfcp_get_busid_by_adapter(adapter));
+	ZFCP_LOG_INFO("aborting scsi_cmnd=%p on adapter %s\n",
+		      scpnt, zfcp_get_busid_by_adapter(adapter));
 
 	spin_unlock_irq(scsi_host->host_lock);
 

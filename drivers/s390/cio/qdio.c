@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.79.2.1 $"
+#define VERSION_QDIO_C "$Revision: 1.79.2.2 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -354,7 +354,8 @@ qdio_stop_polling(struct qdio_q *q)
 		 SLSB_P_INPUT_NOT_INIT);
 	/* 
 	 * we don't issue this SYNC_MEMORY, as we trust Rick T and
-	 * moreover will not use the PROCESSING state, so q->polling was 0
+	 * moreover will not use the PROCESSING state under VM, so
+	 * q->polling was 0 anyway
 	 */
 	/*SYNC_MEMORY;*/
 	if (q->slsb.acc.val[gsf]!=SLSB_P_INPUT_PRIMED)
@@ -732,6 +733,9 @@ qdio_get_inbound_buffer_frontier(struct qdio_q *q)
 	volatile char *slsb;
 	int first_not_to_check;
 	char dbf_text[15];
+#ifdef QDIO_USE_PROCESSING_STATE
+	int last_position=-1;
+#endif /* QDIO_USE_PROCESSING_STATE */
 
 	QDIO_DBF_TEXT4(0,trace,"getibfro");
 	QDIO_DBF_HEX4(0,trace,&q,sizeof(void*));
@@ -774,8 +778,14 @@ check_next:
 		if (q->siga_sync) {
 			set_slsb(&slsb[f_mod_no],SLSB_P_INPUT_NOT_INIT);
 		} else {
-			set_slsb(&slsb[f_mod_no],SLSB_P_INPUT_PROCESSING);
+			/* set the previous buffer to NOT_INIT. The current
+			 * buffer will be set to PROCESSING at the end of
+			 * this function to avoid further interrupts. */
+			if (last_position>=0)
+				set_slsb(&slsb[last_position],
+					 SLSB_P_INPUT_NOT_INIT);
 			atomic_set(&q->polling,1);
+			last_position=f_mod_no;
 		}
 #else /* QDIO_USE_PROCESSING_STATE */
 		set_slsb(&slsb[f_mod_no],SLSB_P_INPUT_NOT_INIT);
@@ -814,6 +824,10 @@ check_next:
 		f_mod_no=(f_mod_no+1)&(QDIO_MAX_BUFFERS_PER_Q-1);
 		atomic_dec(&q->number_of_buffers_used);
 
+#ifdef QDIO_USE_PROCESSING_STATE
+		last_position=-1;
+#endif /* QDIO_USE_PROCESSING_STATE */
+
 		break;
 
 	/* everything else means frontier not changed (HALTED or so) */
@@ -822,6 +836,11 @@ check_next:
 	}
 out:
 	q->first_to_check=f_mod_no;
+
+#ifdef QDIO_USE_PROCESSING_STATE
+	if (last_position>=0)
+		set_slsb(&slsb[last_position],SLSB_P_INPUT_PROCESSING);
+#endif /* QDIO_USE_PROCESSING_STATE */
 
 	QDIO_DBF_HEX4(0,trace,&q->first_to_check,sizeof(int));
 
@@ -1160,7 +1179,7 @@ qdio_inbound_processing(struct qdio_q *q)
 
 #ifdef QDIO_USE_PROCESSING_STATE
 static inline int
-tiqdio_do_inbound_checks(struct qdio_q *q, int q_laps)
+tiqdio_reset_processing_state(struct qdio_q *q, int q_laps)
 {
 	if (!q) {
 		tiqdio_sched_tl();
@@ -1247,7 +1266,7 @@ again:
 	do {
 		int ret;
 
-		ret = tiqdio_do_inbound_checks(q, q_laps);
+		ret = tiqdio_reset_processing_state(q, q_laps);
 		switch (ret) {
 		case 0:
 			return;

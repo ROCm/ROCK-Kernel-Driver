@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.71.2.3 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.71.2.4 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -68,7 +68,7 @@
 /********************* GENERAL DEFINES *********************************/
 
 /* zfcp version number, it consists of major, minor, and patch-level number */
-#define ZFCP_VERSION		"4.0.0"
+#define ZFCP_VERSION		"4.0.1"
 
 static inline void *
 zfcp_sg_to_address(struct scatterlist *list)
