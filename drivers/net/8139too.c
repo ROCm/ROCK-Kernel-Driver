@@ -514,42 +514,35 @@ enum chip_flags {
 const static struct {
 	const char *name;
 	u8 version; /* from RTL8139C docs */
-	u32 RxConfigMask; /* should clear the bits supported by this chip */
 	u32 flags;
 } rtl_chip_info[] = {
 	{ "RTL-8139",
 	  0x40,
-	  0xf0fe0040, /* XXX copied from RTL8139A, verify */
 	  HasHltClk,
 	},
 
 	{ "RTL-8139 rev K",
 	  0x60,
-	  0xf0fe0040,
 	  HasHltClk,
 	},
 
 	{ "RTL-8139A",
 	  0x70,
-	  0xf0fe0040,
 	  HasHltClk, /* XXX undocumented? */
 	},
 
 	{ "RTL-8139B",
 	  0x78,
-	  0xf0fc0040,
 	  HasLWake,
 	},
 
 	{ "RTL-8130",
 	  0x7C,
-	  0xf0fe0040, /* XXX copied from RTL8139A, verify */
 	  HasLWake,
 	},
 
 	{ "RTL-8139C",
 	  0x74,
-	  0xf0fc0040, /* XXX copied from RTL8139B, verify */
 	  HasLWake,
 	},
 
