@@ -235,10 +235,9 @@ static int capifs_parse_options(char *options, struct capifs_sb_info *sbi)
 	unsigned int maxncci = 512;
 	char *this_char, *value;
 
-	this_char = NULL;
-	if ( options )
-		this_char = strtok(options,",");
-	for ( ; this_char; this_char = strtok(NULL,",")) {
+	while ((this_char = strsep(&options,",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr(this_char,'=')) != NULL)
 			*value++ = 0;
 		if (!strcmp(this_char,"uid")) {
