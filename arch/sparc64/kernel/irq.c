@@ -20,7 +20,6 @@
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-#include <linux/kbd_ll.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
