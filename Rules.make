@@ -53,7 +53,9 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 # Common rules
 #
 
-c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F)))
+# export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
+
+c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
 cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
 
@@ -311,11 +313,8 @@ endif # CONFIG_MODVERSIONS
 
 ifneq "$(strip $(export-objs))" ""
 
-cmd_cc_o_c_export = $(CC) $(c_flags) -DEXPORT_SYMTAB -c -o $@ $<
-
 $(export-objs): $(TOPDIR)/include/linux/modversions.h
-$(export-objs): %.o: %.c dummy
-	$(call if_changed,cmd_cc_o_c_export)
+$(export-objs): export_flags := -DEXPORT_SYMTAB
 
 endif
 
