@@ -1056,7 +1056,7 @@ static struct acpi_pci_driver acpi_pci_hp_driver = {
  * acpiphp_glue_init - initializes all PCI hotplug - ACPI glue data structures
  *
  */
-int acpiphp_glue_init (void)
+int __init acpiphp_glue_init(void)
 {
 	int num;
 
@@ -1077,7 +1077,7 @@ int acpiphp_glue_init (void)
  *
  * This function frees all data allocated in acpiphp_glue_init()
  */
-void acpiphp_glue_exit (void)
+void __exit acpiphp_glue_exit(void)
 {
 	struct list_head *l1, *l2, *n1, *n2;
 	struct acpiphp_bridge *bridge;
@@ -1124,7 +1124,7 @@ void acpiphp_glue_exit (void)
 /**
  * acpiphp_get_num_slots - count number of slots in a system
  */
-int acpiphp_get_num_slots (void)
+int __init acpiphp_get_num_slots(void)
 {
 	struct list_head *node;
 	struct acpiphp_bridge *bridge;
