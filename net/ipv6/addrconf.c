@@ -1299,7 +1299,6 @@ static struct inet6_dev *addrconf_add_dev(struct net_device *dev)
 void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 {
 	struct prefix_info *pinfo;
-	struct rt6_info *rt;
 	__u32 valid_lft;
 	__u32 prefered_lft;
 	int addr_type;
@@ -1355,23 +1354,26 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	else
 		rt_expires = jiffies + valid_lft * HZ;
 
-	rt = rt6_lookup(&pinfo->prefix, NULL, dev->ifindex, 1);
+	if (pinfo->onlink) {
+		struct rt6_info *rt;
+		rt = rt6_lookup(&pinfo->prefix, NULL, dev->ifindex, 1);
 
-	if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
-		if (rt->rt6i_flags&RTF_EXPIRES) {
-			if (pinfo->onlink == 0 || valid_lft == 0) {
-				ip6_del_rt(rt, NULL, NULL);
-				rt = NULL;
-			} else {
-				rt->rt6i_expires = rt_expires;
+		if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
+			if (rt->rt6i_flags&RTF_EXPIRES) {
+				if (valid_lft == 0) {
+					ip6_del_rt(rt, NULL, NULL);
+					rt = NULL;
+				} else {
+					rt->rt6i_expires = rt_expires;
+				}
 			}
+		} else if (valid_lft) {
+			addrconf_prefix_route(&pinfo->prefix, pinfo->prefix_len,
+					      dev, rt_expires, RTF_ADDRCONF|RTF_EXPIRES);
 		}
-	} else if (pinfo->onlink && valid_lft) {
-		addrconf_prefix_route(&pinfo->prefix, pinfo->prefix_len,
-				      dev, rt_expires, RTF_ADDRCONF|RTF_EXPIRES);
+		if (rt)
+			dst_release(&rt->u.dst);
 	}
-	if (rt)
-		dst_release(&rt->u.dst);
 
 	/* Try to figure out our local address for this prefix */
 
