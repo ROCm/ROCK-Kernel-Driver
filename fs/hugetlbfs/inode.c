@@ -189,7 +189,7 @@ void truncate_hugepages(struct address_space *mapping, loff_t lstart)
 
 static void hugetlbfs_delete_inode(struct inode *inode)
 {
-	list_del_init(&inode->i_hash);
+	hlist_del_init(&inode->i_hash);
 	list_del_init(&inode->i_list);
 	inode->i_state |= I_FREEING;
 	inodes_stat.nr_inodes--;
@@ -208,7 +208,7 @@ static void hugetlbfs_forget_inode(struct inode *inode)
 {
 	struct super_block *super_block = inode->i_sb;
 
-	if (list_empty(&inode->i_hash))
+	if (hlist_unhashed(&inode->i_hash))
 		goto out_truncate;
 
 	if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
@@ -223,7 +223,7 @@ static void hugetlbfs_forget_inode(struct inode *inode)
 
 	/* write_inode_now() ? */
 	inodes_stat.nr_unused--;
-	list_del_init(&inode->i_hash);
+	hlist_del_init(&inode->i_hash);
 out_truncate:
 	list_del_init(&inode->i_list);
 	inode->i_state |= I_FREEING;

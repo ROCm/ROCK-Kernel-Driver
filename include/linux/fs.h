@@ -354,7 +354,7 @@ struct block_device {
 };
 
 struct inode {
-	struct list_head	i_hash;
+	struct hlist_node	i_hash;
 	struct list_head	i_list;
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
@@ -602,7 +602,7 @@ struct super_block {
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */
-	struct list_head	s_anon;		/* anonymous dentries for (nfs) exporting */
+	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;

@@ -47,16 +47,8 @@ static kmem_cache_t *dentry_cache;
 
 static unsigned int d_hash_mask;
 static unsigned int d_hash_shift;
-static struct list_head *dentry_hashtable;
+static struct hlist_head *dentry_hashtable;
 static LIST_HEAD(dentry_unused);
-static int max_dentries;
-static void * hashtable_end;
-
-static inline int is_bucket(void * addr)
-{
-	return ((addr < (void *)dentry_hashtable)
-			|| (addr > hashtable_end) ? 0 : 1);
-}	
 
 /* Statistics gathering. */
 struct dentry_stat_t dentry_stat = {
@@ -292,6 +284,7 @@ struct dentry * d_find_alias(struct inode *inode)
 	while (next != head) {
 		tmp = next;
 		next = tmp->next;
+		prefetch(next);
 		alias = list_entry(tmp, struct dentry, d_alias);
  		if (!d_unhashed(alias)) {
 			if (alias->d_flags & DCACHE_DISCONNECTED)
@@ -378,6 +371,7 @@ static void prune_dcache(int count)
 		if (tmp == &dentry_unused)
 			break;
 		list_del_init(tmp);
+		prefetch(dentry_unused.prev);
  		dentry_stat.nr_unused--;
 		dentry = list_entry(tmp, struct dentry, d_lru);
 
@@ -603,15 +597,15 @@ void shrink_dcache_parent(struct dentry * parent)
  * done under dcache_lock.
  *
  */
-void shrink_dcache_anon(struct list_head *head)
+void shrink_dcache_anon(struct hlist_head *head)
 {
-	struct list_head *lp;
+	struct hlist_node *lp;
 	int found;
 	do {
 		found = 0;
 		spin_lock(&dcache_lock);
-		list_for_each(lp, head) {
-			struct dentry *this = list_entry(lp, struct dentry, d_hash);
+		hlist_for_each(lp, head) {
+			struct dentry *this = hlist_entry(lp, struct dentry, d_hash);
 			list_del(&this->d_lru);
 
 			/* don't add non zero d_count dentries 
@@ -727,7 +721,7 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 	dentry->d_mounted = 0;
 	dentry->d_cookie = NULL;
 	dentry->d_bucket = NULL;
-	INIT_LIST_HEAD(&dentry->d_hash);
+	INIT_HLIST_NODE(&dentry->d_hash);
 	INIT_LIST_HEAD(&dentry->d_lru);
 	INIT_LIST_HEAD(&dentry->d_subdirs);
 	INIT_LIST_HEAD(&dentry->d_alias);
@@ -797,7 +791,7 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	return res;
 }
 
-static inline struct list_head * d_hash(struct dentry * parent, unsigned long hash)
+static inline struct hlist_head * d_hash(struct dentry * parent, unsigned long hash)
 {
 	hash += (unsigned long) parent / L1_CACHE_BYTES;
 	hash = hash ^ (hash >> D_HASHBITS);
@@ -860,7 +854,7 @@ struct dentry * d_alloc_anon(struct inode *inode)
 			res->d_flags |= DCACHE_DISCONNECTED;
 			res->d_vfs_flags &= ~DCACHE_UNHASHED;
 			list_add(&res->d_alias, &inode->i_dentry);
-			list_add(&res->d_hash, &inode->i_sb->s_anon);
+			hlist_add_head(&res->d_hash, &inode->i_sb->s_anon);
 			spin_unlock(&res->d_lock);
 		}
 		inode = NULL; /* don't drop reference */
@@ -947,32 +941,26 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 	unsigned int len = name->len;
 	unsigned int hash = name->hash;
 	const unsigned char *str = name->name;
-	struct list_head *head = d_hash(parent,hash);
+	struct hlist_head *head = d_hash(parent,hash);
 	struct dentry *found = NULL;
-	struct list_head *tmp;
-	int lookup_count = 0;
+	struct hlist_node *node;
 
 	rcu_read_lock();
 	
-	/* lookup is terminated when flow reaches any bucket head */
-	for(tmp = head->next; !is_bucket(tmp); tmp = tmp->next) {
+	hlist_for_each (node, head) { 
 		struct dentry *dentry; 
 		unsigned long move_count;
 		struct qstr * qstr;
 		
+		prefetch(node->next);
+
 		smp_read_barrier_depends();
-		dentry = list_entry(tmp, struct dentry, d_hash);
+		dentry = hlist_entry(node, struct dentry, d_hash);
 
 		/* if lookup ends up in a different bucket 
 		 * due to concurrent rename, fail it
 		 */
 		if (unlikely(dentry->d_bucket != head))
-			break;
-
-		/* to avoid race if dentry keep coming back to original
-		 * bucket due to double moves
-		 */
-		if (unlikely(++lookup_count > max_dentries))
 			break;
 
 		/*
@@ -1034,7 +1022,8 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 	unsigned long dent_addr = (unsigned long) dentry;
 	unsigned long min_addr = PAGE_OFFSET;
 	unsigned long align_mask = 0x0F;
-	struct list_head *base, *lhp;
+	struct hlist_head *base;
+	struct hlist_node *lhp;
 
 	if (dent_addr < min_addr)
 		goto out;
@@ -1050,12 +1039,13 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 		goto out;
 
 	spin_lock(&dcache_lock);
-	lhp = base = d_hash(dparent, dentry->d_name.hash);
-	while ((lhp = lhp->next) != base) {
+	base = d_hash(dparent, dentry->d_name.hash);
+	hlist_for_each(lhp,base) { 
+		prefetch(lhp->next);
 		/* read_barrier_depends() not required for d_hash list
 		 * as it is parsed under dcache_lock
 		 */
-		if (dentry == list_entry(lhp, struct dentry, d_hash)) {
+		if (dentry == hlist_entry(lhp, struct dentry, d_hash)) {
 			__dget_locked(dentry);
 			spin_unlock(&dcache_lock);
 			return 1;
@@ -1116,12 +1106,11 @@ void d_delete(struct dentry * dentry)
  
 void d_rehash(struct dentry * entry)
 {
-	struct list_head *list = d_hash(entry->d_parent, entry->d_name.hash);
+	struct hlist_head *list = d_hash(entry->d_parent, entry->d_name.hash);
 	spin_lock(&dcache_lock);
- 	if (!list_empty(&entry->d_hash) && !d_unhashed(entry)) BUG();
  	entry->d_vfs_flags &= ~DCACHE_UNHASHED;
 	entry->d_bucket = list;
- 	list_add_rcu(&entry->d_hash, list);
+ 	hlist_add_head_rcu(&entry->d_hash, list);
 	spin_unlock(&dcache_lock);
 }
 
@@ -1174,10 +1163,6 @@ static inline void switch_names(struct dentry * dentry, struct dentry * target)
  * We could be nicer about the deleted file, and let it show
  * up under the name it got deleted rather than the name that
  * deleted it.
- *
- * Careful with the hash switch. The hash switch depends on
- * the fact that any list-entry can be a head of the list.
- * Think about it.
  */
  
 /**
@@ -1200,8 +1185,8 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	/* Move the dentry to the target hash queue, if on different bucket */
 	if (dentry->d_bucket != target->d_bucket) {
 		dentry->d_bucket = target->d_bucket;
-		list_del_rcu(&dentry->d_hash);
-		list_add_rcu(&dentry->d_hash, &target->d_hash);
+		hlist_del_rcu(&dentry->d_hash);
+		hlist_add_head_rcu(&dentry->d_hash, target->d_bucket);
 	}
 
 	/* Unhash the target: dput() will then get rid of it */
@@ -1284,6 +1269,7 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 			continue;
 		}
 		parent = dentry->d_parent;
+		prefetch(parent);
 		namelen = dentry->d_name.len;
 		buflen -= namelen + 1;
 		if (buflen < 0)
@@ -1503,7 +1489,7 @@ out:
 
 static void __init dcache_init(unsigned long mempages)
 {
-	struct list_head *d;
+	struct hlist_head *d;
 	unsigned long order;
 	unsigned int nr_hash;
 	int i;
@@ -1524,15 +1510,12 @@ static void __init dcache_init(unsigned long mempages)
 	if (!dentry_cache)
 		panic("Cannot create dentry cache");
 	
-	/* approximate maximum number of dentries in one hash bucket */
-	max_dentries = (mempages * (PAGE_SIZE / sizeof(struct dentry)));
-
 	set_shrinker(DEFAULT_SEEKS, shrink_dcache_memory);
 
 #if PAGE_SHIFT < 13
 	mempages >>= (13 - PAGE_SHIFT);
 #endif
-	mempages *= sizeof(struct list_head);
+	mempages *= sizeof(struct hlist_head);
 	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
 		;
 
@@ -1540,7 +1523,7 @@ static void __init dcache_init(unsigned long mempages)
 		unsigned long tmp;
 
 		nr_hash = (1UL << order) * PAGE_SIZE /
-			sizeof(struct list_head);
+			sizeof(struct hlist_head);
 		d_hash_mask = (nr_hash - 1);
 
 		tmp = nr_hash;
@@ -1548,7 +1531,7 @@ static void __init dcache_init(unsigned long mempages)
 		while ((tmp >>= 1UL) != 0UL)
 			d_hash_shift++;
 
-		dentry_hashtable = (struct list_head *)
+		dentry_hashtable = (struct hlist_head *)
 			__get_free_pages(GFP_ATOMIC, order);
 	} while (dentry_hashtable == NULL && --order >= 0);
 
@@ -1558,12 +1541,10 @@ static void __init dcache_init(unsigned long mempages)
 	if (!dentry_hashtable)
 		panic("Failed to allocate dcache hash table\n");
 
-	hashtable_end = dentry_hashtable + nr_hash;
-
 	d = dentry_hashtable;
 	i = nr_hash;
 	do {
-		INIT_LIST_HEAD(d);
+		INIT_HLIST_HEAD(d);
 		d++;
 		i--;
 	} while (i);
