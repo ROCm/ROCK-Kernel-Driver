@@ -2724,8 +2724,8 @@ out_error:
 struct epoll_event32
 {
 	u32 events;
-	u64 data;
-} __attribute__((packed));
+	u32 data[2];
+}; 
 
 asmlinkage long
 sys32_epoll_ctl(int epfd, int op, int fd, struct epoll_event32 *event)
@@ -2740,10 +2740,10 @@ sys32_epoll_ctl(int epfd, int op, int fd, struct epoll_event32 *event)
 		return error;
 
 	__get_user(event64.events, &event->events);
-	__get_user(data_halfword, (u32*)(&event->data));
+	__get_user(data_halfword, &event->data[0]);
 	event64.data = data_halfword;
-	__get_user(data_halfword, ((u32*)(&event->data) + 1));
- 	event64.data |= ((u64)data_halfword) << 32;
+	__get_user(data_halfword, &event->data[1]);
+ 	event64.data |= (u64)data_halfword << 32;
 
 	set_fs(KERNEL_DS);
 	error = sys_epoll_ctl(epfd, op, fd, &event64);
@@ -2758,8 +2758,9 @@ sys32_epoll_wait(int epfd, struct epoll_event32 *events, int maxevents,
 {
 	struct epoll_event *events64 = NULL;
 	mm_segment_t old_fs = get_fs();
-	int error;
+	int error, numevents, size;
 	int evt_idx;
+	int do_free_pages = 0;
 
 	if (maxevents <= 0) {
 		return -EINVAL;
@@ -2770,43 +2771,44 @@ sys32_epoll_wait(int epfd, struct epoll_event32 *events, int maxevents,
 				 maxevents * sizeof(struct epoll_event32))))
 		return error;
 
-	/* Allocate the space needed for the intermediate copy */
-	events64 = kmalloc(maxevents * sizeof(struct epoll_event), GFP_KERNEL);
+	/* 
+ 	 * Allocate space for the intermediate copy.  If the space needed 
+	 * is large enough to cause kmalloc to fail, then try again with
+	 * __get_free_pages.
+	 */
+	size = maxevents * sizeof(struct epoll_event);
+	events64 = kmalloc(size, GFP_KERNEL);
 	if (events64 == NULL) {
-		return -ENOMEM;
-	}
-
-	/* Expand the 32-bit structures into the 64-bit structures */
-	for (evt_idx = 0; evt_idx < maxevents; evt_idx++) {
-		u32 data_halfword;
-		__get_user(events64[evt_idx].events, &events[evt_idx].events);
-		__get_user(data_halfword, (u32*)(&events[evt_idx].data));
-		events64[evt_idx].data = data_halfword;
-		__get_user(data_halfword, ((u32*)(&events[evt_idx].data) + 1));
-		events64[evt_idx].data |= ((u64)data_halfword) << 32;
+		events64 = __get_free_pages(GFP_KERNEL, get_order(size));
+		if (events64 == NULL) 
+			return -ENOMEM;
+		do_free_pages = 1;
 	}
 
 	/* Do the system call */
 	set_fs(KERNEL_DS); /* copy_to/from_user should work on kernel mem*/
-	error = sys_epoll_wait(epfd, events64, maxevents, timeout);
+	numevents = sys_epoll_wait(epfd, events64, maxevents, timeout);
 	set_fs(old_fs);
 
 	/* Don't modify userspace memory if we're returning an error */
-	if (!error) {
+	if (numevents > 0) {
 		/* Translate the 64-bit structures back into the 32-bit
 		   structures */
-		for (evt_idx = 0; evt_idx < maxevents; evt_idx++) {
+		for (evt_idx = 0; evt_idx < numevents; evt_idx++) {
 			__put_user(events64[evt_idx].events,
 				   &events[evt_idx].events);
-			__put_user((u32)(events64[evt_idx].data),
-				   (u32*)(&events[evt_idx].data));
+			__put_user((u32)events64[evt_idx].data,
+				   &events[evt_idx].data[0]);
 			__put_user((u32)(events64[evt_idx].data >> 32),
-				   ((u32*)(&events[evt_idx].data) + 1));
+				   &events[evt_idx].data[1]);
 		}
 	}
 
-	kfree(events64);
-	return error;
+	if (do_free_pages)
+		free_pages(events64, get_order(size));
+	else
+		kfree(events64);
+	return numevents;
 }
 
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
