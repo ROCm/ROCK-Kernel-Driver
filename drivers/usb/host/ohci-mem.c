@@ -31,6 +31,8 @@ static struct usb_hcd *ohci_hcd_alloc (void)
 	if (ohci != 0) {
 		memset (ohci, 0, sizeof (struct ohci_hcd));
 		ohci->hcd.product_desc = "OHCI Host Controller";
+		spin_lock_init (&ohci->lock);
+		INIT_LIST_HEAD (&ohci->pending);
 		return &ohci->hcd;
 	}
 	return 0;

@@ -118,18 +118,11 @@
 /* For initializing controller (mask in an HCFS mode too) */
 #define	OHCI_CONTROL_INIT 	OHCI_CTRL_CBSR
 
-#define OHCI_UNLINK_TIMEOUT	 (HZ / 10)
-
 /*-------------------------------------------------------------------------*/
 
 static const char	hcd_name [] = "ohci_hcd";
 
 #include "ohci.h"
-
-static inline void disable (struct ohci_hcd *ohci)
-{
-	ohci->hcd.state = USB_STATE_HALT;
-}
 
 #include "ohci-hub.c"
 #include "ohci-dbg.c"
@@ -206,8 +199,7 @@ static int ohci_urb_enqueue (
 	if (!urb_priv)
 		return -ENOMEM;
 	memset (urb_priv, 0, sizeof (urb_priv_t) + size * sizeof (struct td *));
-	
-	/* fill the private part of the URB */
+	INIT_LIST_HEAD (&urb_priv->pending);
 	urb_priv->length = size;
 	urb_priv->ed = ed;	
 
@@ -397,6 +389,16 @@ static int hc_reset (struct ohci_hcd *ohci)
 {
 	u32 temp;
 
+	/* boot firmware should have set this up (5.1.1.3.1) */
+	if (!ohci->fminterval) {
+		temp = readl (&ohci->regs->fminterval);
+		if (temp & 0x3fff0000)
+			ohci->fminterval = temp;
+		else
+			ohci->fminterval = DEFAULT_FMINTERVAL;
+		/* also: power/overcurrent flags in roothub.a */
+	}
+
 	/* SMM owns the HC?  not for long!
 	 * On PA-RISC, PDC can leave IR set incorrectly; ignore it there.
 	 */
@@ -413,7 +415,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 		writel (OHCI_INTR_OC, &ohci->regs->intrenable);
 		writel (OHCI_OCR, &ohci->regs->cmdstatus);
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-			wait_ms (10);
+			msec_delay (10);
 			if (--temp == 0) {
 				ohci_err (ohci, "USB HC TakeOver failed!\n");
 				return -1;
@@ -430,9 +432,12 @@ static int hc_reset (struct ohci_hcd *ohci)
 
   	/* Reset USB (needed by some controllers); RemoteWakeupConnected
 	 * saved if boot firmware (BIOS/SMM/...) told us it's connected
+	 * (for OHCI integrated on mainboard, it normally is)
 	 */
 	ohci->hc_control = readl (&ohci->regs->control);
 	ohci->hc_control &= OHCI_CTRL_RWC;	/* hcfs 0 = RESET */
+	if (ohci->hc_control)
+		ohci->hcd.can_wakeup = 1;
 	writel (ohci->hc_control, &ohci->regs->control);
 	if (power_switching) {
 		unsigned ports = roothub_a (ohci) & RH_A_NDP; 
@@ -444,7 +449,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	}
 	// flush those pci writes
 	(void) readl (&ohci->regs->control);
-	wait_ms (50);
+	msec_delay (50);
 
 	/* HC Reset requires max 10 us delay */
 	writel (OHCI_HCR,  &ohci->regs->cmdstatus);
@@ -473,9 +478,6 @@ static int hc_reset (struct ohci_hcd *ohci)
 
 /*-------------------------------------------------------------------------*/
 
-#define	FI		0x2edf		/* 12000 bits per frame (-1) */
-#define LSTHRESH	0x628		/* lowspeed bit threshold */
-
 /* Start an OHCI controller, set the BUS operational
  * enable interrupts 
  * connect the virtual root hub
@@ -486,7 +488,6 @@ static int hc_start (struct ohci_hcd *ohci)
   	struct usb_device	*udev;
   	struct usb_bus		*bus;
 
-	spin_lock_init (&ohci->lock);
 	disable (ohci);
 
 	/* Tell the controller where the control and bulk lists are
@@ -497,12 +498,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	/* a reset clears this */
 	writel ((u32) ohci->hcca_dma, &ohci->regs->hcca);
 
-	/* force default fmInterval (we won't adjust it); init thresholds
-	 * for last FS and LS packets, reserve 90% for periodic.
-	 */
-	writel ((((6 * (FI - 210)) / 7) << 16) | FI, &ohci->regs->fminterval);
-	writel (((9 * FI) / 10) & 0x3fff, &ohci->regs->periodicstart);
-	writel (LSTHRESH, &ohci->regs->lsthresh);
+	periodic_reinit (ohci);
 
 	/* some OHCI implementations are finicky about how they init.
 	 * bogus values here mean not even enumeration could work.
@@ -551,9 +547,14 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
 	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
+	bus = hcd_to_bus (&ohci->hcd);
+
+	if (bus->root_hub) {
+		ohci->hcd.state = USB_STATE_RUNNING;
+		return 0;
+	}
  
 	/* connect the virtual root hub */
-	bus = hcd_to_bus (&ohci->hcd);
 	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
 	ohci->hcd.state = USB_STATE_RUNNING;
 	if (!udev) {
@@ -670,22 +671,68 @@ static void ohci_stop (struct usb_hcd *hcd)
 
 /*-------------------------------------------------------------------------*/
 
-// FIXME:  this restart logic should be generic,
-// and handle full hcd state cleanup
-
-/* controller died; cleanup debris, then restart */
 /* must not be called from interrupt context */
 
 #ifdef CONFIG_PM
+
+static void mark_children_gone (struct usb_device *dev)
+{
+	unsigned i;
+
+	for (i = 0; i < dev->maxchild; i++) {
+		if (dev->children [i] == 0)
+			continue;
+		dev->children [i]->state = USB_STATE_NOTATTACHED;
+		mark_children_gone (dev->children [i]);
+	}
+}
+
 static int hc_restart (struct ohci_hcd *ohci)
 {
 	int temp;
 	int i;
+	struct urb_priv *priv;
 
+	/* mark any devices gone, so they do nothing till khubd disconnects.
+	 * recycle any "live" eds/tds (and urbs) right away.
+	 * later, khubd disconnect processing will recycle the other state,
+	 * (either as disconnect/reconnect, or maybe someday as a reset).
+	 */ 
+	spin_lock_irq(&ohci->lock);
 	disable (ohci);
-	if (hcd_to_bus (&ohci->hcd)->root_hub)
-		usb_disconnect (&hcd_to_bus (&ohci->hcd)->root_hub);
-	
+	mark_children_gone (ohci->hcd.self.root_hub);
+	if (!list_empty (&ohci->pending))
+		ohci_dbg(ohci, "abort schedule...\n");
+	list_for_each_entry (priv, &ohci->pending, pending) {
+		struct urb	*urb = priv->td[0]->urb;
+		struct ed	*ed = priv->ed;
+
+		switch (ed->state) {
+		case ED_OPER:
+			ed->state = ED_UNLINK;
+			ed->hwINFO |= ED_DEQUEUE;
+			ed_deschedule (ohci, ed);
+
+			ed->ed_next = ohci->ed_rm_list;
+			ed->ed_prev = 0;
+			ohci->ed_rm_list = ed;
+			/* FALLTHROUGH */
+		case ED_UNLINK:
+			break;
+		default:
+			ohci_dbg(ohci, "bogus ed %p state %d\n",
+					ed, ed->state);
+		}
+
+		spin_lock (&urb->lock);
+		urb->status = -ESHUTDOWN;
+		spin_unlock (&urb->lock);
+	}
+	finish_unlinks (ohci, 0, 0);
+	spin_unlock_irq(&ohci->lock);
+
+	/* paranoia, in case that didn't work: */
+
 	/* empty the interrupt branches */
 	for (i = 0; i < NUM_INTS; i++) ohci->load [i] = 0;
 	for (i = 0; i < NUM_INTS; i++) ohci->hcca->int_table [i] = 0;
@@ -700,8 +747,20 @@ static int hc_restart (struct ohci_hcd *ohci)
 	if ((temp = hc_reset (ohci)) < 0 || (temp = hc_start (ohci)) < 0) {
 		ohci_err (ohci, "can't restart, %d\n", temp);
 		return temp;
-	} else
+	} else {
+		/* here we "know" root ports should always stay powered,
+		 * and that if we try to turn them back on the root hub
+		 * will respond to CSC processing.
+		 */
+		i = roothub_a (ohci) & RH_A_NDP;
+		while (i--)
+			writel (RH_PS_PSS,
+				&ohci->regs->roothub.portstatus [temp]);
+		ohci->hcd.self.root_hub->dev.power.power_state = 0;
+		ohci->hcd.state = USB_STATE_RUNNING;
 		ohci_dbg (ohci, "restart complete\n");
+		ohci_dump (ohci, 1);
+	}
 	return 0;
 }
 #endif

@@ -22,6 +22,7 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 		}
 	}
 
+	list_del (&urb_priv->pending);
 	kfree (urb_priv);
 }
 
@@ -419,7 +420,7 @@ static struct ed *ed_get (
 	}
 
 	/* NOTE: only ep0 currently needs this "re"init logic, during
-	 * enumeration (after set_address, or if ep0 maxpacket >8).
+	 * enumeration (after set_address).
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;
@@ -593,6 +594,7 @@ static void td_submit_urb (
 	}
 
 	urb_priv->td_cnt = 0;
+	list_add (&urb_priv->pending, &ohci->pending);
 
 	if (data_len)
 		data = urb->transfer_dma;
