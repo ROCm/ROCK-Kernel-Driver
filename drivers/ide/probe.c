@@ -8,22 +8,11 @@
  *
  *  See linux/MAINTAINERS for address of current maintainer.
  *
- * This is the IDE probe module, as evolved from hd.c and ide.c.
- *
- * Version 1.00		move drive probing code from ide.c to ide-probe.c
- * Version 1.01		fix compilation problem for m68k
- * Version 1.02		increase WAIT_PIDENTIFY to avoid CD-ROM locking at boot
- *			 by Andrea Arcangeli
- * Version 1.03		fix for (hwif->chipset == ide_4drives)
- * Version 1.04		fixed buggy treatments of known flash memory cards
- *
- * Version 1.05		fix for (hwif->chipset == ide_pdc4030)
- *			added ide6/7/8/9
- *			allowed for secondary flash card to be detectable
- *			 with new flag : drive->ata_flash : 1;
- * Version 1.06		stream line request queue and prep for cascade project.
- * Version 1.07		max_sect <= 255; slower disks would get behind and
- *			then fall over when they get to 256.	Paul G.
+ */
+
+/*
+ * This is roughly the code related to device detection and
+ * device id handling.
  */
 
 #include <linux/config.h>
@@ -48,6 +37,366 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
+
+extern struct ata_device * get_info_ptr(kdev_t);
+
+
+/*
+ * This is called from the partition-table code in pt/msdos.c.
+ *
+ * It has two tasks:
+ *
+ * (I) to handle Ontrack DiskManager by offsetting everything by 63 sectors,
+ *  or to handle EZdrive by remapping sector 0 to sector 1.
+ *
+ * (II) to invent a translated geometry.
+ *
+ * Part (I) is suppressed if the user specifies the "noremap" option
+ * on the command line.
+ *
+ * Part (II) is suppressed if the user specifies an explicit geometry.
+ *
+ * The ptheads parameter is either 0 or tells about the number of
+ * heads shown by the end of the first nonempty partition.
+ * If this is either 16, 32, 64, 128, 240 or 255 we'll believe it.
+ *
+ * The xparm parameter has the following meaning:
+ *	 0 = convert to CHS with fewer than 1024 cyls
+ *	     using the same method as Ontrack DiskManager.
+ *	 1 = same as "0", plus offset everything by 63 sectors.
+ *	-1 = similar to "0", plus redirect sector 0 to sector 1.
+ *	 2 = convert to a CHS geometry with "ptheads" heads.
+ *
+ * Returns 0 if the translation was not possible, if the device was not
+ * an IDE disk drive, or if a geometry was "forced" on the commandline.
+ * Returns 1 if the geometry translation was successful.
+ */
+int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
+{
+	struct ata_device *drive;
+	const char *msg1 = "";
+	int heads = 0;
+	int c, h, s;
+	int transl = 1;		/* try translation */
+	int ret = 0;
+
+	drive = get_info_ptr(i_rdev);
+	if (!drive)
+		return 0;
+
+	/* remap? */
+	if (drive->remap_0_to_1 != 2) {
+		if (xparm == 1) {		/* DM */
+			drive->sect0 = 63;
+			msg1 = " [remap +63]";
+			ret = 1;
+		} else if (xparm == -1) {	/* EZ-Drive */
+			if (drive->remap_0_to_1 == 0) {
+				drive->remap_0_to_1 = 1;
+				msg1 = " [remap 0->1]";
+				ret = 1;
+			}
+		}
+	}
+
+	/* There used to be code here that assigned drive->id->CHS
+	   to drive->CHS and that to drive->bios_CHS. However, some disks have
+	   id->C/H/S = 4092/16/63 but are larger than 2.1 GB.  In such cases
+	   that code was wrong.  Moreover, there seems to be no reason to do
+	   any of these things. */
+
+	/* translate? */
+	if (drive->forced_geom)
+		transl = 0;
+
+	/* does ptheads look reasonable? */
+	if (ptheads == 32 || ptheads == 64 || ptheads == 128 ||
+	    ptheads == 240 || ptheads == 255)
+		heads = ptheads;
+
+	if (xparm == 2) {
+		if (!heads ||
+		   (drive->bios_head >= heads && drive->bios_sect == 63))
+			transl = 0;
+	}
+	if (xparm == -1) {
+		if (drive->bios_head > 16)
+			transl = 0;     /* we already have a translation */
+	}
+
+	if (transl) {
+		static const u8 dm_head_vals[] = {4, 8, 16, 32, 64, 128, 255, 0};
+		const u8 *headp = dm_head_vals;
+		unsigned long total;
+
+		/*
+		 * If heads is nonzero: find a translation with this many heads
+		 * and S=63.  Otherwise: find out how OnTrack Disk Manager
+		 * would translate the disk.
+		 *
+		 * The specs say: take geometry as obtained from Identify,
+		 * compute total capacity C*H*S from that, and truncate to
+		 * 1024*255*63. Now take S=63, H the first in the sequence 4,
+		 * 8, 16, 32, 64, 128, 255 such that 63*H*1024 >= total.
+		 * [Please tell aeb@cwi.nl in case this computes a geometry
+		 * different from what OnTrack uses.]
+		 */
+
+		total = ata_capacity(drive);
+
+		s = 63;
+
+		if (heads) {
+			h = heads;
+			c = total / (63 * heads);
+		} else {
+			while (63 * headp[0] * 1024 < total && headp[1] != 0)
+				headp++;
+			h = headp[0];
+			c = total / (63 * headp[0]);
+		}
+
+		drive->bios_cyl = c;
+		drive->bios_head = h;
+		drive->bios_sect = s;
+		ret = 1;
+	}
+
+	drive->part[0].nr_sects = ata_capacity(drive);
+
+	if (ret)
+		printk("%s%s [%d/%d/%d]", msg, msg1,
+		       drive->bios_cyl, drive->bios_head, drive->bios_sect);
+	return ret;
+}
+
+/*
+ * hd_driveid data come as little endian, it needs to be converted on big
+ * endian machines.
+ */
+void ata_fix_driveid(struct hd_driveid *id)
+{
+#ifndef __LITTLE_ENDIAN
+# ifdef __BIG_ENDIAN
+	int i;
+	u16 *stringcast;
+
+	id->config         = __le16_to_cpu(id->config);
+	id->cyls           = __le16_to_cpu(id->cyls);
+	id->reserved2      = __le16_to_cpu(id->reserved2);
+	id->heads          = __le16_to_cpu(id->heads);
+	id->track_bytes    = __le16_to_cpu(id->track_bytes);
+	id->sector_bytes   = __le16_to_cpu(id->sector_bytes);
+	id->sectors        = __le16_to_cpu(id->sectors);
+	id->vendor0        = __le16_to_cpu(id->vendor0);
+	id->vendor1        = __le16_to_cpu(id->vendor1);
+	id->vendor2        = __le16_to_cpu(id->vendor2);
+	stringcast = (u16 *)&id->serial_no[0];
+	for (i = 0; i < (20/2); i++)
+		stringcast[i] = __le16_to_cpu(stringcast[i]);
+	id->buf_type       = __le16_to_cpu(id->buf_type);
+	id->buf_size       = __le16_to_cpu(id->buf_size);
+	id->ecc_bytes      = __le16_to_cpu(id->ecc_bytes);
+	stringcast = (u16 *)&id->fw_rev[0];
+	for (i = 0; i < (8/2); i++)
+		stringcast[i] = __le16_to_cpu(stringcast[i]);
+	stringcast = (u16 *)&id->model[0];
+	for (i = 0; i < (40/2); i++)
+		stringcast[i] = __le16_to_cpu(stringcast[i]);
+	id->dword_io       = __le16_to_cpu(id->dword_io);
+	id->reserved50     = __le16_to_cpu(id->reserved50);
+	id->field_valid    = __le16_to_cpu(id->field_valid);
+	id->cur_cyls       = __le16_to_cpu(id->cur_cyls);
+	id->cur_heads      = __le16_to_cpu(id->cur_heads);
+	id->cur_sectors    = __le16_to_cpu(id->cur_sectors);
+	id->cur_capacity0  = __le16_to_cpu(id->cur_capacity0);
+	id->cur_capacity1  = __le16_to_cpu(id->cur_capacity1);
+	id->lba_capacity   = __le32_to_cpu(id->lba_capacity);
+	id->dma_1word      = __le16_to_cpu(id->dma_1word);
+	id->dma_mword      = __le16_to_cpu(id->dma_mword);
+	id->eide_pio_modes = __le16_to_cpu(id->eide_pio_modes);
+	id->eide_dma_min   = __le16_to_cpu(id->eide_dma_min);
+	id->eide_dma_time  = __le16_to_cpu(id->eide_dma_time);
+	id->eide_pio       = __le16_to_cpu(id->eide_pio);
+	id->eide_pio_iordy = __le16_to_cpu(id->eide_pio_iordy);
+	for (i = 0; i < 2; ++i)
+		id->words69_70[i] = __le16_to_cpu(id->words69_70[i]);
+	for (i = 0; i < 4; ++i)
+		id->words71_74[i] = __le16_to_cpu(id->words71_74[i]);
+	id->queue_depth	   = __le16_to_cpu(id->queue_depth);
+	for (i = 0; i < 4; ++i)
+		id->words76_79[i] = __le16_to_cpu(id->words76_79[i]);
+	id->major_rev_num  = __le16_to_cpu(id->major_rev_num);
+	id->minor_rev_num  = __le16_to_cpu(id->minor_rev_num);
+	id->command_set_1  = __le16_to_cpu(id->command_set_1);
+	id->command_set_2  = __le16_to_cpu(id->command_set_2);
+	id->cfsse          = __le16_to_cpu(id->cfsse);
+	id->cfs_enable_1   = __le16_to_cpu(id->cfs_enable_1);
+	id->cfs_enable_2   = __le16_to_cpu(id->cfs_enable_2);
+	id->csf_default    = __le16_to_cpu(id->csf_default);
+	id->dma_ultra      = __le16_to_cpu(id->dma_ultra);
+	id->word89         = __le16_to_cpu(id->word89);
+	id->word90         = __le16_to_cpu(id->word90);
+	id->CurAPMvalues   = __le16_to_cpu(id->CurAPMvalues);
+	id->word92         = __le16_to_cpu(id->word92);
+	id->hw_config      = __le16_to_cpu(id->hw_config);
+	id->acoustic       = __le16_to_cpu(id->acoustic);
+	for (i = 0; i < 5; i++)
+		id->words95_99[i]  = __le16_to_cpu(id->words95_99[i]);
+	id->lba_capacity_2 = __le64_to_cpu(id->lba_capacity_2);
+	for (i = 0; i < 22; i++)
+		id->words104_125[i]   = __le16_to_cpu(id->words104_125[i]);
+	id->last_lun       = __le16_to_cpu(id->last_lun);
+	id->word127        = __le16_to_cpu(id->word127);
+	id->dlf            = __le16_to_cpu(id->dlf);
+	id->csfo           = __le16_to_cpu(id->csfo);
+	for (i = 0; i < 26; i++)
+		id->words130_155[i] = __le16_to_cpu(id->words130_155[i]);
+	id->word156        = __le16_to_cpu(id->word156);
+	for (i = 0; i < 3; i++)
+		id->words157_159[i] = __le16_to_cpu(id->words157_159[i]);
+	id->cfa_power      = __le16_to_cpu(id->cfa_power);
+	for (i = 0; i < 14; i++)
+		id->words161_175[i] = __le16_to_cpu(id->words161_175[i]);
+	for (i = 0; i < 31; i++)
+		id->words176_205[i] = __le16_to_cpu(id->words176_205[i]);
+	for (i = 0; i < 48; i++)
+		id->words206_254[i] = __le16_to_cpu(id->words206_254[i]);
+	id->integrity_word  = __le16_to_cpu(id->integrity_word);
+# else
+#  error "Please fix <asm/byteorder.h>"
+# endif
+#endif
+}
+
+/*
+ *  All hosts that use the 80c ribbon must use this!
+ */
+byte eighty_ninty_three(struct ata_device *drive)
+{
+	return ((u8) ((drive->channel->udma_four) &&
+#ifndef CONFIG_IDEDMA_IVB
+		(drive->id->hw_config & 0x4000) &&
+#endif
+		(drive->id->hw_config & 0x6000)) ? 1 : 0);
+}
+
+/*
+ * Similar to ide_wait_stat(), except it never calls ide_error internally.
+ * This is a kludge to handle the new ide_config_drive_speed() function,
+ * and should not otherwise be used anywhere.  Eventually, the tuneproc's
+ * should be updated to return ide_startstop_t, in which case we can get
+ * rid of this abomination again.  :)   -ml
+ *
+ * It is gone..........
+ *
+ * const char *msg == consider adding for verbose errors.
+ */
+int ide_config_drive_speed(struct ata_device *drive, byte speed)
+{
+	struct ata_channel *hwif = drive->channel;
+	int i;
+	int error = 1;
+	u8 stat;
+
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
+	u8 unit = (drive->select.b.unit & 0x01);
+	outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
+#endif
+
+	/*
+	 * Don't use ide_wait_cmd here - it will attempt to set_geometry and
+	 * recalibrate, but for some reason these don't work at this point
+	 * (lost interrupt).
+	 */
+        /*
+         * Select the drive, and issue the SETFEATURES command
+         */
+	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
+	udelay(1);
+	SELECT_DRIVE(drive->channel, drive);
+	SELECT_MASK(drive->channel, drive, 0);
+	udelay(1);
+	if (IDE_CONTROL_REG)
+		OUT_BYTE(drive->ctl | 2, IDE_CONTROL_REG);
+	OUT_BYTE(speed, IDE_NSECTOR_REG);
+	OUT_BYTE(SETFEATURES_XFER, IDE_FEATURE_REG);
+	OUT_BYTE(WIN_SETFEATURES, IDE_COMMAND_REG);
+	if ((IDE_CONTROL_REG) && (drive->quirk_list == 2))
+		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);
+	udelay(1);
+
+	/*
+	 * Wait for drive to become non-BUSY
+	 */
+	if ((stat = GET_STAT()) & BUSY_STAT) {
+		unsigned long flags, timeout;
+		__save_flags(flags);	/* local CPU only */
+		ide__sti();		/* local CPU only -- for jiffies */
+		timeout = jiffies + WAIT_CMD;
+		while ((stat = GET_STAT()) & BUSY_STAT) {
+			if (time_after(jiffies, timeout))
+				break;
+		}
+		__restore_flags(flags); /* local CPU only */
+	}
+
+	/*
+	 * Allow status to settle, then read it again.
+	 * A few rare drives vastly violate the 400ns spec here,
+	 * so we'll wait up to 10usec for a "good" status
+	 * rather than expensively fail things immediately.
+	 * This fix courtesy of Matthew Faupel & Niccolo Rigacci.
+	 */
+	for (i = 0; i < 10; i++) {
+		udelay(1);
+		if (OK_STAT((stat = GET_STAT()), DRIVE_READY, BUSY_STAT|DRQ_STAT|ERR_STAT)) {
+			error = 0;
+			break;
+		}
+	}
+
+	SELECT_MASK(drive->channel, drive, 0);
+
+	enable_irq(hwif->irq);
+
+	if (error) {
+		ide_dump_status(drive, NULL, "set_drive_speed_status", stat);
+		return error;
+	}
+
+	drive->id->dma_ultra &= ~0xFF00;
+	drive->id->dma_mword &= ~0x0F00;
+	drive->id->dma_1word &= ~0x0F00;
+
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
+	if (speed > XFER_PIO_4) {
+		outb(inb(hwif->dma_base+2)|(1<<(5+unit)), hwif->dma_base+2);
+	} else {
+		outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
+	}
+#endif
+
+	switch(speed) {
+		case XFER_UDMA_7:   drive->id->dma_ultra |= 0x8080; break;
+		case XFER_UDMA_6:   drive->id->dma_ultra |= 0x4040; break;
+		case XFER_UDMA_5:   drive->id->dma_ultra |= 0x2020; break;
+		case XFER_UDMA_4:   drive->id->dma_ultra |= 0x1010; break;
+		case XFER_UDMA_3:   drive->id->dma_ultra |= 0x0808; break;
+		case XFER_UDMA_2:   drive->id->dma_ultra |= 0x0404; break;
+		case XFER_UDMA_1:   drive->id->dma_ultra |= 0x0202; break;
+		case XFER_UDMA_0:   drive->id->dma_ultra |= 0x0101; break;
+		case XFER_MW_DMA_2: drive->id->dma_mword |= 0x0404; break;
+		case XFER_MW_DMA_1: drive->id->dma_mword |= 0x0202; break;
+		case XFER_MW_DMA_0: drive->id->dma_mword |= 0x0101; break;
+		case XFER_SW_DMA_2: drive->id->dma_1word |= 0x0404; break;
+		case XFER_SW_DMA_1: drive->id->dma_1word |= 0x0202; break;
+		case XFER_SW_DMA_0: drive->id->dma_1word |= 0x0101; break;
+		default: break;
+	}
+	return error;
+}
+
 static inline void do_identify(struct ata_device *drive, u8 cmd)
 {
 	int bswap = 1;
@@ -70,7 +419,7 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 
 	ata_read(drive, id, SECTOR_WORDS);
 	ide__sti();	/* local CPU only */
-	ide_fix_driveid(id);
+	ata_fix_driveid(id);
 
 	if (id->word156 == 0x4d42) {
 		printk("%s: drive->id->word156 == 0x%04x \n", drive->name, drive->id->word156);
@@ -115,7 +464,7 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 	 * Check for an ATAPI device:
 	 */
 	if (cmd == WIN_PIDENTIFY) {
-		byte type = (id->config >> 8) & 0x1f;
+		u8 type = (id->config >> 8) & 0x1f;
 		printk("ATAPI ");
 #ifdef CONFIG_BLK_DEV_PDC4030
 		if (drive->channel->unit == 1 && drive->channel->chipset == ide_pdc4030) {
@@ -307,14 +656,13 @@ out:
 
 
 /*
- * do_probe() has the difficult job of finding a drive if it exists,
- * without getting hung up if it doesn't exist, without trampling on
- * ethernet cards, and without leaving any IRQs dangling to haunt us later.
+ * This has the difficult job of finding a drive if it exists, without getting
+ * hung up if it doesn't exist, without trampling on ethernet cards, and
+ * without leaving any IRQs dangling to haunt us later.
  *
- * If a drive is "known" to exist (from CMOS or kernel parameters),
- * but does not respond right away, the probe will "hang in there"
- * for the maximum wait time (about 30 seconds), otherwise it will
- * exit much more quickly.
+ * If a drive is "known" to exist (from CMOS or kernel parameters), but does
+ * not respond right away, the probe will "hang in there" for the maximum wait
+ * time (about 30 seconds), otherwise it will exit much more quickly.
  *
  * Returns:	0  device was identified
  *		1  device timed-out (no response to identify request)
@@ -322,7 +670,7 @@ out:
  *		3  bad status from device (possible for ATAPI drives)
  *		4  probe was not attempted because failure was obvious
  */
-static int do_probe(struct ata_device *drive, byte cmd)
+static int do_probe(struct ata_device *drive, u8 cmd)
 {
 	int rc;
 	struct ata_channel *hwif = drive->channel;
@@ -372,70 +720,17 @@ static int do_probe(struct ata_device *drive, byte cmd)
 	if (drive->select.b.unit != 0) {
 		SELECT_DRIVE(hwif,&hwif->drives[0]);	/* exit with drive0 selected */
 		mdelay(50);
-		(void) GET_STAT();		/* ensure drive irq is clear */
+		GET_STAT();		/* ensure drive irq is clear */
 	}
+
 	return rc;
 }
 
-static void enable_nest(struct ata_device *drive)
-{
-	unsigned long timeout;
-
-	printk("%s: enabling %s -- ", drive->channel->name, drive->id->model);
-	SELECT_DRIVE(drive->channel, drive);
-	mdelay(50);
-	OUT_BYTE(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
-	timeout = jiffies + WAIT_WORSTCASE;
-	do {
-		if (time_after(jiffies, timeout)) {
-			printk("failed (timeout)\n");
-			return;
-		}
-		mdelay(50);
-	} while (GET_STAT() & BUSY_STAT);
-	mdelay(50);
-	if (!OK_STAT(GET_STAT(), 0, BAD_STAT))
-		printk("failed (status = 0x%02x)\n", GET_STAT());
-	else
-		printk("success\n");
-	if (do_probe(drive, WIN_IDENTIFY) >= 2) {	/* if !(success||timed-out) */
-		(void) do_probe(drive, WIN_PIDENTIFY);	/* look for ATAPI device */
-	}
-}
-
 /*
- * Tests for existence of a given drive using do_probe().
- */
-static inline void probe_for_drive(struct ata_device *drive)
-{
-	if (drive->noprobe)			/* skip probing? */
-		return;
-
-	if (do_probe(drive, WIN_IDENTIFY) >= 2) { /* if !(success||timed-out) */
-		do_probe(drive, WIN_PIDENTIFY); /* look for ATAPI device */
-	}
-
-	if (drive->id && strstr(drive->id->model, "E X A B Y T E N E S T"))
-		enable_nest(drive);
-
-	if (!drive->present)
-		return;			/* drive not found */
-
-	if (drive->id == NULL) {		/* identification failed? */
-		if (drive->type == ATA_DISK) {
-			printk ("%s: non-IDE drive, CHS=%d/%d/%d\n",
-			 drive->name, drive->cyl, drive->head, drive->sect);
-		} else if (drive->type == ATA_ROM) {
-			printk("%s: ATAPI cdrom (?)\n", drive->name);
-		} else {
-			drive->present = 0;	/* nuke it */
-		}
-	}
-}
-
-/*
- * This routine only knows how to look for drive units 0 and 1
- * on an interface, so any setting of MAX_DRIVES > 2 won't work here.
+ * Probe for drivers on a channel.
+ *
+ * This routine only knows how to look for drive units 0 and 1 on an interface,
+ * so any setting of MAX_DRIVES > 2 won't work here.
  */
 static void channel_probe(struct ata_channel *ch)
 {
@@ -457,7 +752,52 @@ static void channel_probe(struct ata_channel *ch)
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_device *drive = &ch->drives[i];
 
-		probe_for_drive(drive);
+		if (drive->noprobe)	/* don't look for this one */
+			continue;
+
+		if (do_probe(drive, WIN_IDENTIFY) >= 2) { /* if !(success||timed-out) */
+			do_probe(drive, WIN_PIDENTIFY); /* look for ATAPI device */
+		}
+
+		/* Special handling of EXABYTE controller cards. */
+		if (drive->id && strstr(drive->id->model, "E X A B Y T E N E S T")) {
+			unsigned long timeout;
+
+			printk("%s: enabling %s -- ", drive->channel->name, drive->id->model);
+			SELECT_DRIVE(drive->channel, drive);
+			mdelay(50);
+			OUT_BYTE(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
+			timeout = jiffies + WAIT_WORSTCASE;
+			do {
+				if (time_after(jiffies, timeout)) {
+					printk("failed (timeout)\n");
+					return;
+				}
+				mdelay(50);
+			} while (GET_STAT() & BUSY_STAT);
+			mdelay(50);
+			if (!OK_STAT(GET_STAT(), 0, BAD_STAT))
+				printk("failed (status = 0x%02x)\n", GET_STAT());
+			else
+				printk("success\n");
+
+			if (do_probe(drive, WIN_IDENTIFY) >= 2) { /* if !(success||timed-out) */
+				do_probe(drive, WIN_PIDENTIFY); /* look for ATAPI device */
+		}
+		}
+
+		if (!drive->present)
+			continue;	/* drive not found */
+
+		if (!drive->id) {	/* identification failed? */
+			if (drive->type == ATA_DISK)
+				printk ("%s: pre-ATA drive, CHS=%d/%d/%d\n",
+						drive->name, drive->cyl, drive->head, drive->sect);
+			else if (drive->type == ATA_ROM)
+				printk("%s: ATAPI cdrom (?)\n", drive->name);
+			else
+				drive->present = 0;	/* nuke it */
+		}
 
 		/* drive found, there is a channel it is attached too. */
 		if (drive->present)
@@ -518,9 +858,9 @@ static void channel_probe(struct ata_channel *ch)
 
 	device_register(&ch->dev);
 
-	if (ch->io_ports[IDE_CONTROL_OFFSET] && ch->reset) {
+	if (ch->reset && ch->io_ports[IDE_CONTROL_OFFSET]) {
 		unsigned long timeout = jiffies + WAIT_WORSTCASE;
-		byte stat;
+		u8 stat;
 
 		printk("%s: reset\n", ch->name);
 		OUT_BYTE(12, ch->io_ports[IDE_CONTROL_OFFSET]);
@@ -763,7 +1103,7 @@ static void channel_init(struct ata_channel *ch)
 	}
 #endif
 
-	if (devfs_register_blkdev (ch->major, ch->name, ide_fops)) {
+	if (devfs_register_blkdev(ch->major, ch->name, ide_fops)) {
 		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n", ch->name, ch->major);
 
 		return;
@@ -791,8 +1131,7 @@ static void channel_init(struct ata_channel *ch)
 		printk(KERN_INFO "%s: probed IRQ %d failed, using default.\n", ch->name, ch->irq);
 	}
 
-	/* Initialize partition and global device data.  ide_geninit() gets
-	 * called somewhat later, during the partition check.
+	/* Initialize partition and global device data.
 	 */
 
 	gd = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
@@ -873,7 +1212,13 @@ err_kmalloc_gd:
 	printk(KERN_CRIT "(%s) Out of memory\n", __FUNCTION__);
 }
 
-int ideprobe_init (void)
+/*
+ * FIXME: consider moving this to main.c, since this is the only place where
+ * it's used.
+ *
+ * Probe only for drives on channes which are not already present.
+ */
+int ideprobe_init(void)
 {
 	unsigned int i;
 	int probe[MAX_HWIFS];
@@ -884,12 +1229,19 @@ int ideprobe_init (void)
 	/*
 	 * Probe for drives in the usual way.. CMOS/BIOS, then poke at ports
 	 */
-	for (i = 0; i < MAX_HWIFS; ++i)
-		if (probe[i])
-			channel_probe(&ide_hwifs[i]);
-	for (i = 0; i < MAX_HWIFS; ++i)
-		if (probe[i])
-			channel_init(&ide_hwifs[i]);
-
+	for (i = 0; i < MAX_HWIFS; ++i) {
+		if (!probe[i])
+			continue;
+		channel_probe(&ide_hwifs[i]);
+	}
+	for (i = 0; i < MAX_HWIFS; ++i) {
+		if (!probe[i])
+			continue;
+		channel_init(&ide_hwifs[i]);
+	}
 	return 0;
 }
+
+EXPORT_SYMBOL(ata_fix_driveid);
+EXPORT_SYMBOL(eighty_ninty_three);
+EXPORT_SYMBOL(ide_config_drive_speed);

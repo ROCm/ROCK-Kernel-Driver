@@ -82,4 +82,5 @@ extern void ata_timing_merge(struct ata_timing *a, struct ata_timing *b,
 extern struct ata_timing* ata_timing_data(short speed);
 extern int ata_timing_compute(struct ata_device *drive,
 		short speed, struct ata_timing *t, int T, int UT);
+
 #endif

@@ -977,7 +977,6 @@ int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 		/* FIXME: what about the setup for the drive?! */
 		if (drive->channel->speedproc)
 			drive->channel->speedproc(drive, pio);
-		ide_driveid_update(drive);
 	}
 
 abort:

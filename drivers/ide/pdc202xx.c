@@ -53,8 +53,6 @@
 #define PDC202XX_DEBUG_DRIVE_INFO		0
 #define PDC202XX_DECODE_REGISTER_INFO		0
 
-extern char *ide_xfer_verbose (byte xfer_rate);
-
 /* A Register */
 #define	SYNC_ERRDY_EN	0xC0
 
@@ -276,12 +274,12 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	drive->current_speed = speed;
 
 #if PDC202XX_DEBUG_DRIVE_INFO
-	printk("%s: %s drive%d 0x%08x ",
-		drive->name, ide_xfer_verbose(speed),
+	printk("%s: %02x drive%d 0x%08x ",
+		drive->name, speed,
 		drive->dn, drive_conf);
 		pci_read_config_dword(dev, drive_pci, &drive_conf);
 	printk("0x%08x\n", drive_conf);
-#endif /* PDC202XX_DEBUG_DRIVE_INFO */
+#endif
 
 	return ide_config_drive_speed(drive, speed);
 }

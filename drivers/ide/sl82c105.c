@@ -29,8 +29,6 @@
 #include "ata-timing.h"
 #include "pcihost.h"
 
-extern char *ide_xfer_verbose (byte xfer_rate);
-
 /*
  * SL82C105 PCI config register 0x40 bits.
  */
@@ -100,8 +98,9 @@ static void config_for_pio(struct ata_device *drive, int pio, int report)
 		pci_read_config_word(dev, reg, &drv_ctrl);
 
 		if (report) {
-			printk("%s: selected %s (%dns) (%04X)\n", drive->name,
-			       ide_xfer_verbose(xfer_mode), t->cycle, drv_ctrl);
+			printk("%s: selected %02x (%dns) (%04X)\n",
+					drive->name, xfer_mode,
+					t->cycle, drv_ctrl);
 		}
 	}
 }

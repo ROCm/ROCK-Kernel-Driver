@@ -762,7 +762,6 @@ extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
-extern int ide_driveid_update(struct ata_device *);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
 
@@ -893,11 +892,14 @@ extern void ide_release_dma(struct ata_channel *);
 extern int ata_start_dma(struct ata_device *, struct request *rq);
 
 extern void ata_init_dma(struct ata_channel *,	unsigned long) __init;
+
 #endif
+
+extern void ata_fix_driveid(struct hd_driveid *);
 
 extern spinlock_t ide_lock;
 
-#define DRIVE_LOCK(drive)		((drive)->queue.queue_lock)
+#define DRIVE_LOCK(drive)	((drive)->queue.queue_lock)
 
 extern int drive_is_ready(struct ata_device *drive);
 

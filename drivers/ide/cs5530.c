@@ -76,8 +76,6 @@ static int cs5530_get_info (char *buffer, char **addr, off_t offset, int count)
 
 byte cs5530_proc = 0;
 
-extern char *ide_xfer_verbose (byte xfer_rate);
-
 /*
  * Set a new transfer mode at the drive
  */
@@ -85,7 +83,7 @@ int cs5530_set_xfer_mode(struct ata_device *drive, byte mode)
 {
 	int error = 0;
 
-	printk("%s: cs5530_set_xfer_mode(%s)\n", drive->name, ide_xfer_verbose(mode));
+	printk("%s: cs5530_set_xfer_mode(%02x)\n", drive->name, mode);
 	error = ide_config_drive_speed(drive, mode);
 
 	return error;

@@ -237,8 +237,6 @@ static byte svwks_proc;
 
 #define SVWKS_CSB5_REVISION_NEW	0x92 /* min PCI_REVISION_ID for UDMA5 (A2.0) */
 
-extern char *ide_xfer_verbose (byte xfer_rate);
-
 static struct pci_dev *isa_dev;
 
 static int svwks_ratemask(struct ata_device *drive)
@@ -347,8 +345,8 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 #endif
 
 #if SVWKS_DEBUG_DRIVE_INFO
-	printk("%s: %s drive%d\n", drive->name, ide_xfer_verbose(speed), drive->dn);
-#endif /* SVWKS_DEBUG_DRIVE_INFO */
+	printk("%s: %02x drive%d\n", drive->name, speed, drive->dn);
+#endif
 
 	pci_write_config_byte(dev, drive_pci, pio_timing);
 	if (csb5)

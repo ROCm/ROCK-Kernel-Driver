@@ -871,9 +871,10 @@ int cdrom_read_check_ireason(struct ata_device *drive, struct request *rq, int l
 		/* Throw some data at the drive so it doesn't hang
 		   and quit this request. */
 		while (len > 0) {
-			int dum = 0;
-			atapi_write(drive, &dum, sizeof (dum));
-			len -= sizeof (dum);
+			u8 dummy[4];
+
+			atapi_write(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 	} else  if (ireason == 1) {
 		/* Some drives (ASUS) seem to tell us that status
@@ -1293,10 +1294,10 @@ static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *r
 		/* If we haven't moved enough data to satisfy the drive,
 		   add some padding. */
 		while (len > thislen) {
-			int dum = 0;
+			u8 dummy[4];
 
-			atapi_write(drive, &dum, sizeof (dum));
-			len -= sizeof (dum);
+			atapi_write(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 
 		/* Keep count of how much data we've moved. */
@@ -1312,9 +1313,10 @@ static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *r
 		/* If we haven't moved enough data to satisfy the drive,
 		   add some padding. */
 		while (len > thislen) {
-			int dum = 0;
-			atapi_read(drive, &dum, sizeof (dum));
-			len -= sizeof (dum);
+			u8 dummy[4];
+
+			atapi_read(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 
 		/* Keep count of how much data we've moved. */
@@ -1456,9 +1458,9 @@ static inline int cdrom_write_check_ireason(struct ata_device *drive, struct req
 		/* Throw some data at the drive so it doesn't hang
 		   and quit this request. */
 		while (len > 0) {
-			int dum = 0;
-			atapi_write(drive, &dum, sizeof(dum));
-			len -= sizeof(dum);
+			u8 dummy[4];
+			atapi_write(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 	} else {
 		/* Drive wants a command packet, or invalid ireason... */
