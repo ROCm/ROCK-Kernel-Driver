@@ -1874,12 +1874,25 @@ endmenu
 #	Gigabit Ethernet
 #
 
-menu "Ethernet (1000 Mbit)"
+menu "Gigabit Ethernet (1000/10000 Mbit)"
 	depends on NETDEVICES
+
+config NET_GIGE
+	bool "Gigabit Ethernet (1000/10000 Mbit) controller support"
+	depends on NETDEVICES && NET_ETHERNET && (PCI || SBUS)
+	help
+	  Gigabit ethernet.  It's yummy and fast, fast, fast.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about this class of network cards. If you say Y, you
+	  will be asked for your specific card in the following questions.
+	  
+	  If you are unsure, say Y.
 
 config ACENIC
 	tristate "Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	---help---
 	  Say Y here if you have an Alteon AceNIC, 3Com 3C985(B), NetGear
 	  GA620, SGI Gigabit or Farallon PN9000-SX PCI Gigabit Ethernet
@@ -1906,7 +1919,7 @@ config ACENIC_OMIT_TIGON_I
 
 config DL2K
 	tristate "D-Link DL2000-based Gigabit Ethernet support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	select CRC32
 	help
 	  This driver supports D-Link 2000-based gigabit ethernet cards, which
@@ -1919,7 +1932,7 @@ config DL2K
 
 config E1000
 	tristate "Intel(R) PRO/1000 Gigabit Ethernet support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	---help---
 	  This driver supports Intel(R) PRO/1000 gigabit ethernet family of
 	  adapters, which includes:
@@ -1966,7 +1979,7 @@ config E1000_NAPI
 
 config MYRI_SBUS
 	tristate "MyriCOM Gigabit Ethernet support"
-	depends on SBUS
+	depends on SBUS && NET_GIGE
 	help
 	  This driver supports MyriCOM Sbus gigabit Ethernet cards.
 
@@ -1975,7 +1988,7 @@ config MYRI_SBUS
 
 config NS83820
 	tristate "National Semiconduct DP83820 support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	help
 	  This is a driver for the National Semiconductor DP83820 series
 	  of gigabit ethernet MACs.  Cards using this chipset include
@@ -1985,7 +1998,7 @@ config NS83820
 
 config HAMACHI
 	tristate "Packet Engines Hamachi GNIC-II support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	select MII
 	help
 	  If you have a Gigabit Ethernet card of this type, say Y and read
@@ -1998,7 +2011,7 @@ config HAMACHI
 
 config YELLOWFIN
 	tristate "Packet Engines Yellowfin Gigabit-NIC support (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
+	depends on PCI && EXPERIMENTAL && NET_GIGE
 	select CRC32
 	---help---
 	  Say Y here if you have a Packet Engines G-NIC PCI Gigabit Ethernet
@@ -2012,7 +2025,7 @@ config YELLOWFIN
 
 config R8169
 	tristate "Realtek 8169 gigabit ethernet support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	select CRC32
 	---help---
 	  Say Y here if you have a Realtek 8169 PCI Gigabit Ethernet adapter.
@@ -2022,7 +2035,7 @@ config R8169
 
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	---help---
 	  Say Y here if you have a Marvell Yukon or SysKonnect SK-98xx/SK-95xx
 	  compliant Gigabit Ethernet Adapter. The following adapters are supported
@@ -2101,25 +2114,16 @@ config SK98LIN
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	help
 	  This driver supports Broadcom Tigon3 based gigabit Ethernet cards.
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called tg3.  This is recommended.
 
-endmenu
-
-#
-#	10 Gigabit Ethernet
-#
-
-menu "Ethernet (10000 Mbit)"
-	depends on NETDEVICES
-
 config IXGB
 	tristate "Intel(R) PRO/10GbE support"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	---help---
 	  This driver supports Intel(R) PRO/10GbE family of
 	  adapters, which includes:
@@ -2151,7 +2155,7 @@ config IXGB_NAPI
 
 config S2IO
 	tristate "S2IO 10Gbe XFrame NIC"
-	depends on PCI
+	depends on PCI && NET_GIGE
 	---help---
 	  This driver supports the 10Gbe XFrame NIC of S2IO. 
 	  For help regarding driver compilation, installation and 
