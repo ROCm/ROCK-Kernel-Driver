@@ -56,11 +56,6 @@
 #define PCI_DEVICE_ID_ALI_1533		0x1533
 #endif
 
-#ifndef FALSE
-#define FALSE 		0
-#define TRUE  		1
-#endif
-
 #define CHANNEL_REGS	5
 #define CHANNEL_START	0xe0   // The first bytes of the contiguous register space.
 
@@ -363,7 +358,7 @@ static inline unsigned ld2(unsigned int x)
 #ifdef DEBUG
 
 #define TRDBG(msg, args...) do {          \
-        printk(KERN_DEBUG msg , ##args ); \
+        printk(DEBUG msg , ##args );      \
 } while (0)
 
 #else /* !defined(DEBUG) */ 
