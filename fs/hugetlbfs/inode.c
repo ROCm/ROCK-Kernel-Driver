@@ -48,9 +48,6 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	loff_t len;
 	int ret;
 
-	if (!capable(CAP_IPC_LOCK))
-		return -EPERM;
-
 	if (vma->vm_start & ~HPAGE_MASK)
 		return -EINVAL;
 
@@ -231,6 +228,7 @@ out_truncate:
 	spin_unlock(&inode_lock);
 	if (inode->i_data.nrpages)
 		truncate_hugepages(&inode->i_data, 0);
+
 	clear_inode(inode);
 	destroy_inode(inode);
 }
@@ -317,7 +315,6 @@ static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
 	struct inode *inode = dentry->d_inode;
 	int error;
 	unsigned int ia_valid = attr->ia_valid;
-	unsigned long dn_mask;
 
 	BUG_ON(!inode);
 
@@ -335,26 +332,21 @@ static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
 		if (error)
 			goto out;
 		attr->ia_valid &= ~ATTR_SIZE;
-		error = inode_setattr(inode, attr);
 	}
-	if (error)
-		goto out;
-	dn_mask = setattr_mask(ia_valid);
-	if (dn_mask)
-		dnotify_parent(dentry, dn_mask);
+	error = inode_setattr(inode, attr);
 out:
 	return error;
 }
 
-static struct inode *hugetlbfs_get_inode(struct super_block *sb,
-					int mode, dev_t dev)
+static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid, 
+					gid_t gid, int mode, dev_t dev)
 {
 	struct inode * inode = new_inode(sb);
 
 	if (inode) {
 		inode->i_mode = mode;
-		inode->i_uid = current->fsuid;
-		inode->i_gid = current->fsgid;
+		inode->i_uid = uid;
+		inode->i_gid = gid;
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
@@ -391,7 +383,8 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb,
 static int hugetlbfs_mknod(struct inode *dir,
 			struct dentry *dentry, int mode, dev_t dev)
 {
-	struct inode * inode = hugetlbfs_get_inode(dir->i_sb, mode, dev);
+	struct inode * inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid, 
+					current->fsgid, mode, dev);
 	int error = -ENOSPC;
 
 	if (inode) {
@@ -421,7 +414,8 @@ static int hugetlbfs_symlink(struct inode *dir,
 	struct inode *inode;
 	int error = -ENOSPC;
 
-	inode = hugetlbfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
+	inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid,
+					current->fsgid, S_IFLNK|S_IRWXUGO, 0);
 	if (inode) {
 		int l = strlen(symname)+1;
 		error = page_symlink(inode, symname, l);
@@ -478,16 +472,68 @@ static struct super_operations hugetlbfs_ops = {
 };
 
 static int
-hugetlbfs_fill_super(struct super_block * sb, void * data, int silent)
+hugetlbfs_parse_options(char *options, struct hugetlbfs_config *pconfig)
+{
+	char *opt, *value;
+	int ret = 0;
+
+	if (!options)
+		goto out;
+	while ((opt = strsep(&options, ",")) != NULL) {
+		if (!*opt)
+			continue;
+
+		value = strchr(opt, '=');
+		if (!value || !*value) {
+			ret = -EINVAL;
+			goto out;
+		} else {
+			*value++ = '\0';
+		}
+
+		if (!strcmp(opt, "uid"))
+			pconfig->uid = simple_strtoul(value, &value, 0);
+		else if (!strcmp(opt, "gid"))
+			pconfig->gid = simple_strtoul(value, &value, 0);
+		else if (!strcmp(opt, "mode"))
+			pconfig->mode = simple_strtoul(value,&value,0) & 0777U;
+		else {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		if (*value) {
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+	return 0;
+out:
+	pconfig->uid = current->fsuid;
+	pconfig->gid = current->fsgid;
+	pconfig->mode = 0755;
+	return ret;
+}
+
+static int
+hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode * inode;
 	struct dentry * root;
+	int ret;
+	struct hugetlbfs_config config;
 
+	ret = hugetlbfs_parse_options(data, &config);
+	if (ret) {
+		printk("hugetlbfs: invalid mount options: %s.\n", data);
+		return ret;
+	}
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = HUGETLBFS_MAGIC;
 	sb->s_op = &hugetlbfs_ops;
-	inode = hugetlbfs_get_inode(sb, S_IFDIR | 0755, 0);
+	inode = hugetlbfs_get_inode(sb, config.uid, config.gid,
+					S_IFDIR | config.mode, 0);
 	if (!inode)
 		return -ENOMEM;
 
@@ -548,7 +594,8 @@ struct file *hugetlb_zero_setup(size_t size)
 		goto out_dentry;
 
 	error = -ENOSPC;
-	inode = hugetlbfs_get_inode(root->d_sb, S_IFREG | S_IRWXUGO, 0);
+	inode = hugetlbfs_get_inode(root->d_sb, current->fsuid,
+				current->fsgid, S_IFREG | S_IRWXUGO, 0);
 	if (!inode)
 		goto out_file;
 

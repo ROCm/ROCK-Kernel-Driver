@@ -7,8 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/node.h>
-
-#include <asm/topology.h>
+#include <linux/topology.h>
 
 
 static struct class node_class = {

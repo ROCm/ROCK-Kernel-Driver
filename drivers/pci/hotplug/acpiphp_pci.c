@@ -35,6 +35,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/acpi.h>
+#include "../pci.h"
 #include "pci_hotplug.h"
 #include "acpiphp.h"
 

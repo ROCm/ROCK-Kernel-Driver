@@ -11,7 +11,7 @@
 #include "check.h"
 #include "mac.h"
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 extern void note_bootable_part(dev_t dev, int part, int goodness);
 #endif
 
@@ -34,7 +34,7 @@ int mac_partition(struct parsed_partitions *state, struct block_device *bdev)
 	unsigned char *data;
 	int blk, blocks_in_map;
 	unsigned secsize;
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	int found_root = 0;
 	int found_root_goodness = 0;
 #endif
@@ -74,7 +74,7 @@ int mac_partition(struct parsed_partitions *state, struct block_device *bdev)
 			be32_to_cpu(part->start_block) * (secsize/512),
 			be32_to_cpu(part->block_count) * (secsize/512));
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		/*
 		 * If this is the first bootable partition, tell the
 		 * setup code, in case it wants to make this the root.
@@ -115,11 +115,11 @@ int mac_partition(struct parsed_partitions *state, struct block_device *bdev)
 				found_root_goodness = goodness;
 			}
 		}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 		++slot;
 	}
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	if (found_root_goodness)
 		note_bootable_part(bdev->bd_dev, found_root, found_root_goodness);
 #endif

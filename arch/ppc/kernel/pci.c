@@ -45,8 +45,10 @@ static void fixup_broken_pcnet32(struct pci_dev* dev);
 static int reparent_resources(struct resource *parent, struct resource *res);
 static void fixup_rev1_53c810(struct pci_dev* dev);
 static void fixup_cpc710_pci64(struct pci_dev* dev);
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 static void pcibios_fixup_cardbus(struct pci_dev* dev);
+#endif
+#ifdef CONFIG_PPC_OF
 static u8* pci_to_OF_bus_map;
 #endif
 
@@ -65,10 +67,10 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NCR,	PCI_DEVICE_ID_NCR_53C810,	fixup_rev1_53c810 },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_IBM,	PCI_DEVICE_ID_IBM_CPC710_PCI64,	fixup_cpc710_pci64},
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pcibios_fixup_resources },
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	/* We should add per-machine fixup support in xxx_setup.c or xxx_pci.c */
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pcibios_fixup_cardbus }, 
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
  	{ 0 }
 };
 
@@ -153,7 +155,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 		ppc_md.pcibios_fixup_resources(dev);
 }
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 static void
 pcibios_fixup_cardbus(struct pci_dev* dev)
 {
@@ -188,7 +190,7 @@ pcibios_fixup_cardbus(struct pci_dev* dev)
 			pci_write_config_byte(dev, 0x92, val & ~0x06);
 	}
 }
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
@@ -548,12 +550,12 @@ static inline void alloc_resource(struct pci_dev *dev, int idx)
 static void __init
 pcibios_allocate_resources(int pass)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int idx, disabled;
 	u16 command;
 	struct resource *r;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
 		for (idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
@@ -586,11 +588,11 @@ pcibios_allocate_resources(int pass)
 static void __init
 pcibios_assign_resources(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int idx;
 	struct resource *r;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		int class = dev->class >> 8;
 
 		/* Don't touch classless devices and host bridges */
@@ -676,7 +678,7 @@ pcibios_alloc_controller(void)
 	return hose;
 }
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 /*
  * Functions below are used on OpenFirmware machines.
  */
@@ -881,7 +883,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 {
 	unsigned int *reg;
 	struct pci_controller* hose;
-	struct pci_dev* dev;
+	struct pci_dev* dev = NULL;
 		
 	if (!have_of)
 		return -ENODEV;
@@ -905,7 +907,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 	 */
 	if (!pci_to_OF_bus_map)
 		return 0;
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (pci_to_OF_bus_map[dev->bus->number] != *bus)
 			continue;
 		if (dev->devfn != *devfn)
@@ -1026,7 +1028,9 @@ pci_create_OF_bus_map(void)
 		prom_add_property(find_path_device("/"), of_prop);
 	}
 }
+#endif /* CONFIG_PPC_OF */
 
+#ifdef CONFIG_PPC_PMAC
 /*
  * This set of routines checks for PCI<->PCI bridges that have closed
  * IO resources and have child devices. It tries to re-open an IO
@@ -1235,7 +1239,7 @@ pcibios_fixup_p2p_bridges(void)
 	}
 }
 
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 static int __init
 pcibios_init(void)
@@ -1277,9 +1281,9 @@ pcibios_init(void)
 	pcibios_allocate_bus_resources(&pci_root_buses);
 	pcibios_allocate_resources(0);
 	pcibios_allocate_resources(1);
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	pcibios_fixup_p2p_bridges();
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 	pcibios_assign_resources();
 
 	/* Call machine dependent post-init code */

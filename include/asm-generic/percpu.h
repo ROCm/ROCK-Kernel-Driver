@@ -8,22 +8,25 @@
 extern unsigned long __per_cpu_offset[NR_CPUS];
 
 /* Separate out the type, so (int[3], foo) works. */
-#ifndef MODULE
 #define DEFINE_PER_CPU(type, name) \
     __attribute__((__section__(".data.percpu"))) __typeof__(type) name##__per_cpu
-#endif
 
 /* var is in discarded region: offset to particular copy we want */
 #define per_cpu(var, cpu) (*RELOC_HIDE(&var##__per_cpu, __per_cpu_offset[cpu]))
 #define __get_cpu_var(var) per_cpu(var, smp_processor_id())
 
+static inline void percpu_modcopy(void *pcpudst, const void *src,
+				  unsigned long size)
+{
+	unsigned int i;
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_possible(i))
+			memcpy(pcpudst + __per_cpu_offset[i], src, size);
+}
 #else /* ! SMP */
 
-/* Can't define per-cpu variables in modules.  Sorry --RR */
-#ifndef MODULE
 #define DEFINE_PER_CPU(type, name) \
     __typeof__(type) name##__per_cpu
-#endif
 
 #define per_cpu(var, cpu)			((void)cpu, var##__per_cpu)
 #define __get_cpu_var(var)			var##__per_cpu

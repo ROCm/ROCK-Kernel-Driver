@@ -97,32 +97,6 @@ config PPC64BRIDGE
 	depends on POWER3
 	default y
 
-config ALL_PPC
-	bool
-	depends on ALL_PPC_CH || POWER3
-	default y
-	---help---
-	  Linux currently supports several different kinds of PowerPC-based
-	  machines: Apple Power Macintoshes and clones (such as the Motorola
-	  Starmax series), PReP (PowerPC Reference Platform) machines (such
-	  as the Motorola PowerStacks, Motorola cPCI/VME embedded systems,
-	  and some IBM RS/6000 systems), CHRP (Common Hardware Reference
-	  Platform) machines (including all of the recent IBM RS/6000 and
-	  pSeries machines), and several embedded PowerPC systems containing
-	  4xx, 6xx, 7xx, 8xx, 74xx, and 82xx processors.  Currently, the
-	  default option is to build a kernel which works on the first three.
-
-	  Select CHRP/PowerMac/PReP if configuring for an IBM RS/6000 or
-	  pSeries machine, a Power Macintosh (including iMacs, iBooks and
-	  Powerbooks), or a PReP machine.
-
-	  Select Gemini if configuring for a Synergy Microsystems' Gemini
-	  series Single Board Computer.  More information is available at:
-	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
-
-	  Select APUS if configuring for a PowerUP Amiga.  More information is
-	  available at: <http://linux-apus.sourceforge.net/>.
-
 config PPC_STD_MMU
 	bool
 	depends on 6xx || POWER3
@@ -424,12 +398,34 @@ config EMBEDDEDBOOT
 	bool
 	depends on 8xx || 8260
 	default y
+
 choice
 	prompt "Machine Type"
-	depends on 6xx && !8260
-	default ALL_PPC_CH
+	depends on (6xx || POWER3) && !8260
+	default PPC_MULTIPLATFORM
+	---help---
+	  Linux currently supports several different kinds of PowerPC-based
+	  machines: Apple Power Macintoshes and clones (such as the Motorola
+	  Starmax series), PReP (PowerPC Reference Platform) machines (such
+	  as the Motorola PowerStacks, Motorola cPCI/VME embedded systems,
+	  and some IBM RS/6000 systems), CHRP (Common Hardware Reference
+	  Platform) machines (including all of the recent IBM RS/6000 and
+	  pSeries machines), and several embedded PowerPC systems containing
+	  4xx, 6xx, 7xx, 8xx, 74xx, and 82xx processors.  Currently, the
+	  default option is to build a kernel which works on the first three.
 
-config ALL_PPC_CH
+	  Select CHRP/PowerMac/PReP if configuring for an IBM RS/6000 or
+	  pSeries machine, a Power Macintosh (including iMacs, iBooks and
+	  Powerbooks), or a PReP machine.
+
+	  Select Gemini if configuring for a Synergy Microsystems' Gemini
+	  series Single Board Computer.  More information is available at:
+	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
+
+	  Select APUS if configuring for a PowerUP Amiga.  More information is
+	  available at: <http://linux-apus.sourceforge.net/>.
+
+config PPC_MULTIPLATFORM
 	bool "CHRP/PowerMac/PReP"
 
 config APUS
@@ -498,6 +494,26 @@ config ZX4500
 	bool "Zynx-ZX4500"
 
 endchoice
+
+config PPC_CHRP
+	bool
+	depends on PPC_MULTIPLATFORM
+	default y
+
+config PPC_PMAC
+	bool
+	depends on PPC_MULTIPLATFORM
+	default y
+
+config PPC_PREP
+	bool
+	depends on PPC_MULTIPLATFORM
+	default y
+
+config PPC_OF
+	bool
+	depends on PPC_PMAC || PPC_CHRP
+	default y
 
 config SANDPOINT_X3
 	bool "Sandpoint X3"
@@ -721,7 +737,7 @@ config HIGHMEM
 
 config ISA
 	bool "Support for ISA-bus hardware"
-	depends on ALL_PPC
+	depends on PREP || CHRP
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -851,7 +867,7 @@ source "drivers/parport/Kconfig"
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
-	depends on ALL_PPC && !POWER3
+	depends on 6xx && !POWER3
 	help
 	  Some versions of the PPC601 (the first PowerPC chip) have bugs which
 	  mean that extra synchronization instructions are required near
@@ -865,7 +881,7 @@ config PPC601_SYNC_FIX
 
 config PROC_DEVICETREE
 	bool "Support for Open Firmware device tree in /proc"
-	depends on ALL_PPC && PROC_FS
+	depends on PPC_OF && PROC_FS
 	help
 	  This option adds a device-tree directory under /proc which contains
 	  an image of the device tree that the kernel copies from Open
@@ -873,7 +889,7 @@ config PROC_DEVICETREE
 
 config PPC_RTAS
 	bool "Support for RTAS (RunTime Abstraction Services) in /proc"
-	depends on ALL_PPC && PROC_FS
+	depends on PPC_OF && PROC_FS
 	---help---
 	  When you use this option, you will be able to use RTAS from
 	  userspace.
@@ -906,7 +922,7 @@ config PPC_RTAS
 
 config PREP_RESIDUAL
 	bool "Support for PReP Residual Data"
-	depends on ALL_PPC
+	depends on PPC_PREP
 	help
 	  Some PReP systems have residual data passed to the kernel by the
 	  firmware.  This allows detection of memory size, devices present and
@@ -927,7 +943,7 @@ config PROC_PREPRESIDUAL
 
 config PPCBUG_NVRAM
 	bool "Enable reading PPCBUG NVRAM during boot" if PPLUS || LOPEC
-	default y if ALL_PPC
+	default y if PPC_PREP
 
 config CMDLINE_BOOL
 	bool "Default bootloader kernel arguments"
@@ -1156,7 +1172,7 @@ config TASK_SIZE
 
 config BOOT_LOAD_BOOL
 	bool "Set the boot link/load address"
-	depends on ADVANCED_OPTIONS && !ALL_PPC
+	depends on ADVANCED_OPTIONS && !PPC_MULTIPLATFORM
 	help
 	  This option allows you to set the initial load address of the zImage
 	  or zImage.initrd file.  This can be useful if you are on a board
@@ -1292,7 +1308,7 @@ menu "Macintosh device drivers"
 # we want to change this to something like CONFIG_SYSCTRL_CUDA/PMU
 config ADB_CUDA
 	bool "Support for CUDA based PowerMacs"
-	depends on ALL_PPC
+	depends on PPC_PMAC
 	help
 	  This provides support for CUDA based Power Macintosh systems.  This
 	  includes most OldWorld PowerMacs, the first generation iMacs, the
@@ -1304,7 +1320,7 @@ config ADB_CUDA
 
 config ADB_PMU
 	bool "Support for PMU  based PowerMacs"
-	depends on ALL_PPC
+	depends on PPC_PMAC
 	help
 	  On PowerBooks, iBooks, and recent iMacs and Power Macintoshes, the
 	  PMU is an embedded microprocessor whose primary function is to
@@ -1336,7 +1352,7 @@ config PMAC_PBOOK
 
 config PM
 	bool
-	depends on ALL_PPC && ADB_PMU && PMAC_PBOOK
+	depends on PPC_PMAC && ADB_PMU && PMAC_PBOOK
 	default y
 
 config PMAC_APM_EMU
@@ -1357,14 +1373,14 @@ config PMAC_BACKLIGHT
 
 config MAC_FLOPPY
 	bool "Support for PowerMac floppy"
-	depends on ALL_PPC
+	depends on PPC_PMAC
 	help
 	  If you have a SWIM-3 (Super Woz Integrated Machine 3; from Apple)
 	  floppy controller, say Y here. Most commonly found in PowerMacs.
 
 config MAC_SERIAL
 	tristate "Support for PowerMac serial ports"
-	depends on ALL_PPC
+	depends on PPC_PMAC
 	help
 	  If you have Macintosh style serial ports (8 pin mini-DIN), say Y
 	  here. If you also have regular serial ports and enable the driver
@@ -1372,11 +1388,11 @@ config MAC_SERIAL
 
 config SERIAL_CONSOLE
 	bool "Support for console on serial port"
-	depends on ALL_PPC && MAC_SERIAL=y
+	depends on PPC_PMAC && MAC_SERIAL=y
 
 config ADB
 	bool "Apple Desktop Bus (ADB) support"
-	depends on ALL_PPC
+	depends on PPC_PMAC
 	help
 	  Apple Desktop Bus (ADB) support is for support of devices which
 	  are connected to an ADB port.  ADB devices tend to have 4 pins.
@@ -1610,7 +1626,7 @@ config COMPILE_OPTIONS
 
 config BOOTX_TEXT
 	bool "Support for early boot text console (BootX or OpenFirmware only)"
-	depends on ALL_PPC
+	depends PPC_OF
 	help
 	  Say Y here to see progress messages from the boot firmware in text
 	  mode. Requires either BootX or Open Firmware.

@@ -2467,11 +2467,8 @@ int __init rs_8xx_init(void)
 	__clear_user(&serial_driver,sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.driver_name = "serial";
-#ifdef CONFIG_DEVFS_FS
-	serial_driver.name = "tts/";
-#else
+	serial_driver.devfs_name = "tts/";
 	serial_driver.name = "ttyS";
-#endif
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;
 	serial_driver.num = NR_PORTS;

@@ -213,7 +213,7 @@ struct pci_ops mips_pci_ops = {
 void __init pcibios_init(void)
 {
 #ifdef CONFIG_MIPS_MALTA
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	unsigned char reg_val;
 #endif
 
@@ -237,7 +237,7 @@ void __init pcibios_init(void)
 	GT_WRITE( GT_PCI0_CFGDATA_OFS, CPHYSADDR(MIPS_GT_BASE)); 
 
 #ifdef CONFIG_MIPS_MALTA
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		if ((pdev->vendor == PCI_VENDOR_ID_INTEL)
 		    && (pdev->device == PCI_DEVICE_ID_INTEL_82371AB)
 		    && (PCI_SLOT(pdev->devfn) == 0x0a)) {

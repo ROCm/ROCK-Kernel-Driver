@@ -1846,7 +1846,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	}
 
 	/* Configure DMA attributes. */
-	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff)) {
+	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffffULL)) {
 		cp->pci_using_dac = 1;
 	} else {
 		rc = pci_set_dma_mask(pdev, (u64) 0xffffffff);

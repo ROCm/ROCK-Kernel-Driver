@@ -8,13 +8,13 @@
 #include "infblock.h"
 #include "infutil.h"
 
-int ZEXPORT zlib_inflate_workspacesize(void)
+int zlib_inflate_workspacesize(void)
 {
   return sizeof(struct inflate_workspace);
 }
 
 
-int ZEXPORT zlib_inflateReset(
+int zlib_inflateReset(
 	z_streamp z
 )
 {
@@ -28,7 +28,7 @@ int ZEXPORT zlib_inflateReset(
 }
 
 
-int ZEXPORT zlib_inflateEnd(
+int zlib_inflateEnd(
 	z_streamp z
 )
 {
@@ -41,7 +41,7 @@ int ZEXPORT zlib_inflateEnd(
 }
 
 
-int ZEXPORT zlib_inflateInit2_(
+int zlib_inflateInit2_(
 	z_streamp z,
 	int w,
 	const char *version,
@@ -103,7 +103,7 @@ static int zlib_inflate_packet_flush(inflate_blocks_statef *s)
 }
 
 
-int ZEXPORT zlib_inflateInit_(
+int zlib_inflateInit_(
 	z_streamp z,
 	const char *version,
 	int stream_size
@@ -117,7 +117,7 @@ int ZEXPORT zlib_inflateInit_(
 #define NEEDBYTE {if(z->avail_in==0)goto empty;r=trv;}
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
-int ZEXPORT zlib_inflate(
+int zlib_inflate(
 	z_streamp z,
 	int f
 )
@@ -250,12 +250,12 @@ int ZEXPORT zlib_inflate(
 }
 
 
-int ZEXPORT zlib_inflateSync(
+int zlib_inflateSync(
 	z_streamp z
 )
 {
   uInt n;       /* number of bytes to look at */
-  Bytef *p;     /* pointer to bytes */
+  Byte *p;      /* pointer to bytes */
   uInt m;       /* number of marker bytes found in a row */
   uLong r, w;   /* temporaries to save total_in and total_out */
 
@@ -309,7 +309,7 @@ int ZEXPORT zlib_inflateSync(
  * decompressing, PPP checks that at the end of input packet, inflate is
  * waiting for these length bytes.
  */
-int ZEXPORT zlib_inflateSyncPoint(
+int zlib_inflateSyncPoint(
 	z_streamp z
 )
 {
@@ -332,9 +332,9 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
     uLong b;              /* bit buffer */  /* NOT USED HERE */
     uInt k;               /* bits in bit buffer */ /* NOT USED HERE */
     uInt t;               /* temporary storage */
-    Bytef *p;             /* input data pointer */
+    Byte *p;              /* input data pointer */
     uInt n;               /* bytes available there */
-    Bytef *q;             /* output window write pointer */
+    Byte *q;              /* output window write pointer */
     uInt m;               /* bytes to end of window or read pointer */
 
     if (s->read != s->write)
@@ -380,7 +380,7 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
  * will have been updated if need be.
  */
 
-int ZEXPORT zlib_inflateIncomp(
+int zlib_inflateIncomp(
 	z_stream *z
 	
 )

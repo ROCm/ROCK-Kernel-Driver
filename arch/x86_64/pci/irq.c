@@ -391,7 +391,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	int irq = 0;
 	u32 mask;
 	struct irq_router *r = pirq_router;
-	struct pci_dev *dev2;
+	struct pci_dev *dev2 = NULL;
 	char *msg = NULL;
 
 	/* Find IRQ pin */
@@ -483,7 +483,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	printk(KERN_INFO "PCI: %s IRQ %d for device %s\n", msg, irq, dev->slot_name);
 
 	/* Update IRQ for all devices with the same pirq value */
-	pci_for_each_dev(dev2) {
+	while ((dev2 = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev2)) != NULL) {
 		pci_read_config_byte(dev2, PCI_INTERRUPT_PIN, &pin);
 		if (!pin)
 			continue;
@@ -511,11 +511,11 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 
 void __init pcibios_fixup_irqs(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	u8 pin;
 
 	DBG("PCI: IRQ fixup\n");
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/*
 		 * If the BIOS has set an out of range IRQ number, just ignore it.
 		 * Also keep track of which IRQ's are already in use.
@@ -530,7 +530,8 @@ void __init pcibios_fixup_irqs(void)
 		pirq_penalty[dev->irq]++;
 	}
 
-	pci_for_each_dev(dev) {
+	dev = NULL;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 #ifdef CONFIG_X86_IO_APIC
 		/*

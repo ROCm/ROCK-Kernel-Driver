@@ -25,6 +25,7 @@
 #include <linux/sched.h>		/* wake_up() */
 #include <asm/semaphore.h>		/* struct semaphore */
 #include <linux/rwsem.h>		/* struct rw_semaphore */
+#include <linux/workqueue.h>		/* struct workqueue_struct */
 
 /* Typedef's */
 typedef struct timespec snd_timestamp_t;
@@ -158,6 +159,7 @@ struct _snd_card {
 	spinlock_t files_lock;		/* lock the files for this card */
 	int shutdown;			/* this card is going down */
 	wait_queue_head_t shutdown_sleep;
+	struct work_struct free_workq;	/* for free in workqueue */
 
 #ifdef CONFIG_PM
 	int (*set_power_state) (snd_card_t *card, unsigned int state);

@@ -50,7 +50,7 @@
 #define	RTM_MAX		(RTM_BASE+31)
 
 /* 
-   Generic structure for encapsulation optional route information.
+   Generic structure for encapsulation of optional route information.
    It is reminiscent of sockaddr, but with sa_family replaced
    with attribute type.
  */

@@ -186,7 +186,7 @@ static struct pci_device_id gx_chipset_tbl[] __initdata = {
  **/
 static __init struct pci_dev *gx_detect_chipset(void)
 {
-	struct pci_dev *gx_pci;
+	struct pci_dev *gx_pci = NULL;
 
 	/* check if CPU is a MediaGX or a Geode. */
         if ((current_cpu_data.x86_vendor != X86_VENDOR_NSC) && 
@@ -196,7 +196,7 @@ static __init struct pci_dev *gx_detect_chipset(void)
 	}
 
 	/* detect which companion chip is used */
-	pci_for_each_dev(gx_pci) {
+	while ((gx_pci = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, gx_pci)) != NULL) {
 		if ((pci_match_device (gx_chipset_tbl, gx_pci)) != NULL) {
 			return gx_pci;
 		}

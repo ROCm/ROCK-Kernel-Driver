@@ -363,21 +363,21 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	mtspr	SPRG0,r10
 	mtspr	SPRG1,r11
 	mfcr	r10
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_CHRP
 	mfspr	r11,SPRG2
 	cmpwi	0,r11,0
 	bne	7f
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_CHRP */
 	EXCEPTION_PROLOG_1
 7:	EXCEPTION_PROLOG_2
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_CHRP
 	mfspr	r4,SPRG2
 	cmpwi	cr1,r4,0
 	bne	cr1,1f
 #endif
 	EXC_XFER_STD(0x200, MachineCheckException)
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_CHRP
 1:	b	machine_check_in_rtas
 #endif
 

@@ -292,37 +292,19 @@ static void e100_set_network_leds(int active);
  */
 
 static int __init
-etrax_ethernet_init(struct net_device *dev)
+etrax_ethernet_init(void)
 {
-	int i;
+	struct net_device *dev;
+	int i, err;
 	int anOffset = 0;
 
 	printk("ETRAX 100LX 10/100MBit ethernet v2.0 (c) 2000-2001 Axis Communications AB\n");
 
-	dev->base_addr = (unsigned int)R_NETWORK_SA_0; /* just to have something to show */
-
-	printk("%s initialized\n", dev->name);
-
-	/* make Linux aware of the new hardware  */
-
-	if (!dev) {
-		printk(KERN_WARNING "%s: dev == NULL. Should this happen?\n",
-		       cardname);
-		dev = init_etherdev(dev, sizeof(struct net_local));
-		if (!dev)
-			panic("init_etherdev failed\n");
-	}
-
-	/* setup generic handlers and stuff in the dev struct */
-
-	ether_setup(dev);
-
-	/* make room for the local structure containing stats etc */
-
-	dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-	if (dev->priv == NULL)
+	dev = alloc_etherdev(sizeof(struct net_local));
+	if (!dev)
 		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_local));
+
+	dev->base_addr = (unsigned int)R_NETWORK_SA_0; /* just to have something to show */
 
 	/* now setup our etrax specific stuff */
 
@@ -339,10 +321,6 @@ etrax_ethernet_init(struct net_device *dev)
 	dev->set_mac_address    = e100_set_mac_address;
 	dev->do_ioctl           = e100_ioctl;
 	dev->tx_timeout         = e100_tx_timeout;
-
-	/* set the default MAC address */
-
-	e100_set_mac_address(dev, &default_mac);
 
 	/* Initialise the list of Etrax DMA-descriptors */
 
@@ -370,6 +348,16 @@ etrax_ethernet_init(struct net_device *dev)
 	myNextRxDesc = &RxDescList[0];
 	myLastRxDesc = &RxDescList[NBR_OF_RX_DESC - 1];
 	myPrevRxDesc = &RxDescList[NBR_OF_RX_DESC - 1];
+
+	err = register_netdev(dev);
+	if (err) {
+		kfree(dev);
+		return err;
+	}
+
+	/* set the default MAC address */
+
+	e100_set_mac_address(dev, &default_mac);
 
 	/* Initialize speed indicator stuff. */
 
@@ -1349,19 +1337,10 @@ e100_set_network_leds(int active)
 	}
 }
 
-static struct net_device dev_etrax_ethernet;  /* only got one */
-
 static int
 etrax_init_module(void)
 {
-	struct net_device *d = &dev_etrax_ethernet;
-
-	d->init = etrax_ethernet_init;
-
-	if (register_netdev(d) == 0)
-		return 0;
-	else
-		return -ENODEV;
+	return etrax_ethernet_init();
 }
 
 module_init(etrax_init_module);

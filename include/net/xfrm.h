@@ -9,6 +9,7 @@
 #include <linux/crypto.h>
 #include <linux/pfkeyv2.h>
 #include <linux/in6.h>
+#include <linux/slab.h>
 
 #include <net/sock.h>
 #include <net/dst.h>

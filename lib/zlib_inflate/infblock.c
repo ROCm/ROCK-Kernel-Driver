@@ -68,7 +68,7 @@ local const uInt border[] = { /* Order of the bit length code lengths */
 void zlib_inflate_blocks_reset(
 	inflate_blocks_statef *s,
 	z_streamp z,
-	uLongf *c
+	uLong *c
 )
 {
   if (c != Z_NULL)
@@ -80,7 +80,7 @@ void zlib_inflate_blocks_reset(
   s->bitb = 0;
   s->read = s->write = s->window;
   if (s->checkfn != Z_NULL)
-    z->adler = s->check = (*s->checkfn)(0L, (const Bytef *)Z_NULL, 0);
+    z->adler = s->check = (*s->checkfn)(0L, (const Byte *)Z_NULL, 0);
 }
 
 inflate_blocks_statef *zlib_inflate_blocks_new(
@@ -111,9 +111,9 @@ int zlib_inflate_blocks(
   uInt t;               /* temporary storage */
   uLong b;              /* bit buffer */
   uInt k;               /* bits in bit buffer */
-  Bytef *p;             /* input data pointer */
+  Byte *p;              /* input data pointer */
   uInt n;               /* bytes available there */
-  Bytef *q;             /* output window write pointer */
+  Byte *q;              /* output window write pointer */
   uInt m;               /* bytes to end of window or read pointer */
 
   /* copy input/output information to locals (UPDATE macro restores) */
@@ -340,7 +340,7 @@ int zlib_inflate_blocks_free(
 
 void zlib_inflate_set_dictionary(
 	inflate_blocks_statef *s,
-	const Bytef *d,
+	const Byte *d,
 	uInt  n
 )
 {

@@ -383,6 +383,7 @@ struct s_DevNet {
 	int             Mtu;
 	int             Up;
 	SK_AC   *pAC;
+	struct proc_dir_entry *proc;
 };  
 
 typedef struct s_TxPort		TX_PORT;

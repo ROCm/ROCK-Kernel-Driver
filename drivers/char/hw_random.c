@@ -573,13 +573,13 @@ MODULE_LICENSE("GPL");
 static int __init rng_init (void)
 {
 	int rc;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	const struct pci_device_id *ent;
 
 	DPRINTK ("ENTER\n");
 
 	/* Probe for Intel, AMD RNGs */
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		ent = pci_match_device (rng_pci_tbl, pdev);
 		if (ent) {
 			rng_ops = &rng_vendor_ops[ent->driver_data];

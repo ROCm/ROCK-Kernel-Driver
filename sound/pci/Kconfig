@@ -9,6 +9,12 @@ config SND_ALI5451
 	help
 	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
 
+config SND_AZT3328
+	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
+	depends on SND && EXPERIMENTAL
+	help
+	  Say 'Y' or 'M' to include support for Aztech AZF3328 (PCI168) soundcards.
+
 config SND_CS46XX
 	tristate "Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x"
 	depends on SND && SOUND_GAMEPORT
@@ -181,7 +187,7 @@ config SND_VX222
 	tristate "Digigram VX222"
 	depends on SND
 	help
-	  Say 'Y' or 'M' to include support for Digigram VX222 soundcards
+	  Say 'Y' or 'M' to include support for Digigram VX222 soundcards.
 
 endmenu
 

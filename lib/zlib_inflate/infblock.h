@@ -12,33 +12,33 @@
 #define _INFBLOCK_H
 
 struct inflate_blocks_state;
-typedef struct inflate_blocks_state FAR inflate_blocks_statef;
+typedef struct inflate_blocks_state inflate_blocks_statef;
 
-extern inflate_blocks_statef * zlib_inflate_blocks_new OF((
+extern inflate_blocks_statef * zlib_inflate_blocks_new (
     z_streamp z,
-    check_func c,               /* check function */
-    uInt w));                   /* window size */
+    check_func c,              /* check function */
+    uInt w);                   /* window size */
 
-extern int zlib_inflate_blocks OF((
+extern int zlib_inflate_blocks (
     inflate_blocks_statef *,
     z_streamp ,
-    int));                      /* initial return code */
+    int);                      /* initial return code */
 
-extern void zlib_inflate_blocks_reset OF((
+extern void zlib_inflate_blocks_reset (
     inflate_blocks_statef *,
     z_streamp ,
-    uLongf *));                  /* check value on output */
+    uLong *);                  /* check value on output */
 
-extern int zlib_inflate_blocks_free OF((
+extern int zlib_inflate_blocks_free (
     inflate_blocks_statef *,
-    z_streamp));
+    z_streamp);
 
-extern void zlib_inflate_set_dictionary OF((
+extern void zlib_inflate_set_dictionary (
     inflate_blocks_statef *s,
-    const Bytef *d,  /* dictionary */
-    uInt  n));       /* dictionary length */
+    const Byte *d,  /* dictionary */
+    uInt  n);       /* dictionary length */
 
-extern int zlib_inflate_blocks_sync_point OF((
-    inflate_blocks_statef *s));
+extern int zlib_inflate_blocks_sync_point (
+    inflate_blocks_statef *s);
 
 #endif /* _INFBLOCK_H */

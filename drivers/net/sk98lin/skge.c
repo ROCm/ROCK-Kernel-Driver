@@ -351,11 +351,7 @@ static int	SkGeIocMib(DEV_NET*, unsigned int, int);
 static const char SK_Root_Dir_entry[] = "sk98lin";
 static struct proc_dir_entry *pSkRootDir;
 
-
-//extern struct proc_dir_entry Our_Proc_Dir;
-extern int sk_proc_read(char *buffer, char **buffer_location,
-	off_t offset, int buffer_length, int *eof, void *data);
-
+extern struct file_operations sk_proc_fops;
 
 #ifdef DEBUG
 static void	DumpMsg(struct sk_buff*, char*);
@@ -399,7 +395,6 @@ static int __init skge_probe (void)
 	struct 		pci_dev	*pdev = NULL;
 	unsigned long		base_address;
 	struct net_device *dev = NULL;
-	struct proc_dir_entry	*pProcFile;
 
 	if (probed)
 		return -ENODEV;
@@ -420,18 +415,18 @@ static int __init skge_probe (void)
 	while((pdev = pci_find_device(PCI_VENDOR_ID_SYSKONNECT,
 				      PCI_DEVICE_ID_SYSKONNECT_GE, pdev)) != NULL) {
 
-		dev = NULL;
 		pNet = NULL;
 
 		if (pci_enable_device(pdev))
 			continue;
 
 		/* Configure DMA attributes. */
-		if (pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff) &&
+		if (pci_set_dma_mask(pdev, (u64) 0xffffffffffffffffULL) &&
 		    pci_set_dma_mask(pdev, (u64) 0xffffffff))
 				continue;
 
-		if ((dev = init_etherdev(dev, sizeof(DEV_NET))) == 0) {
+		dev = alloc_etherdev(sizeof(DEV_NET));
+		if (!dev) {
 			printk(KERN_ERR "Unable to allocate etherdev "
 			       "structure!\n");
 			break;
@@ -440,7 +435,7 @@ static int __init skge_probe (void)
 		pNet = dev->priv;
 		pNet->pAC = kmalloc(sizeof(SK_AC), GFP_KERNEL);
 		if (pNet->pAC == NULL){
-			kfree(dev->priv);
+			kfree(dev);
 			printk(KERN_ERR "Unable to allocate adapter "
 			       "structure!\n");
 			break;
@@ -476,15 +471,6 @@ static int __init skge_probe (void)
 			pSkRootDir->owner = THIS_MODULE;
 			proc_root_initialized = 1;
 		}
-
-		pProcFile = create_proc_entry(dev->name, 
-			S_IFREG | 0444, pSkRootDir);
- 		pProcFile->read_proc = sk_proc_read;
-		pProcFile->write_proc = NULL;
-		pProcFile->nlink = 1;
-		pProcFile->size = sizeof(dev->name+1);
-		pProcFile->data = (void*)pProcFile;
-		pProcFile->owner = THIS_MODULE;
 
 		/*
 		 * Dummy value.
@@ -532,11 +518,29 @@ static int __init skge_probe (void)
 		pNet->PortNr = 0;
 		pNet->NetNr = 0;
 
+		if (register_netdev(dev) != 0) {
+			printk(KERN_ERR "Unable to register etherdev\n");
+			sk98lin_root_dev = pAC->Next;
+			remove_proc_entry(dev->name, pSkRootDir);
+			FreeResources(dev);
+			kfree(dev);
+			continue;
+		}
+
+		pNet->proc = create_proc_entry(dev->name, 
+						S_IFREG | 0444, pSkRootDir);
+		if (pNet->proc) {
+			pNet->proc->data = dev;
+			pNet->proc->owner = THIS_MODULE;
+			pNet->proc->proc_fops = &sk_proc_fops;
+		}
+
 		boards_found++;
 
 		/* More then one port found */
 		if ((pAC->GIni.GIMacsFound == 2 ) && (pAC->RlmtNets == 2)) {
-			if ((dev = init_etherdev(NULL, sizeof(DEV_NET))) == 0) {
+			dev = alloc_etherdev(sizeof(DEV_NET));
+			if (!dev) {
 				printk(KERN_ERR "Unable to allocate etherdev "
 					"structure!\n");
 				break;
@@ -559,20 +563,25 @@ static int __init skge_probe (void)
 			dev->do_ioctl =		&SkGeIoctl;
 			dev->change_mtu =	&SkGeChangeMtu;
 
-			pProcFile = create_proc_entry(dev->name, 
-				S_IFREG | 0444, pSkRootDir);
-			pProcFile->read_proc = sk_proc_read;
-			pProcFile->write_proc = NULL;
-			pProcFile->nlink = 1;
-			pProcFile->size = sizeof(dev->name+1);
-			pProcFile->data = (void*)pProcFile;
-			pProcFile->owner = THIS_MODULE;
-
 			memcpy((caddr_t) &dev->dev_addr,
 			(caddr_t) &pAC->Addr.Net[1].CurrentMacAddress, 6);
 	
 			printk("%s: %s\n", dev->name, pAC->DeviceStr);
 			printk("      PrefPort:B  RlmtMode:Dual Check Link State\n");
+
+			if (register_netdev(dev) != 0) {
+				printk(KERN_ERR "Unable to register etherdev\n");
+				kfree(dev);
+				break;
+			}
+
+			pNet->proc = create_proc_entry(dev->name, 
+						S_IFREG | 0444, pSkRootDir);
+			if (pNet->proc) {
+				pNet->proc->data = dev;
+				pNet->proc->owner = THIS_MODULE;
+				pNet->proc->proc_fops = &sk_proc_fops;
+			}
 		
 		}
 
@@ -740,6 +749,7 @@ static int __init skge_init_module(void)
 	return cards ? 0 : -ENODEV;
 } /* skge_init_module */
 
+spinlock_t sk_devs_lock = SPIN_LOCK_UNLOCKED;
 
 /*****************************************************************************
  *
@@ -766,6 +776,11 @@ SK_EVPARA EvPara;
 
 		netif_stop_queue(sk98lin_root_dev);
 		SkGeYellowLED(pAC, pAC->IoBase, 0);
+		if (pNet->proc) {
+			spin_lock(&sk_devs_lock);
+			pNet->proc->data = NULL;
+			spin_unlock(&sk_devs_lock);
+		}
 
 		if(pAC->BoardLevel == 2) {
 			/* board is still alive */
@@ -792,6 +807,12 @@ SK_EVPARA EvPara;
 		}
 
 		if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 2){
+			pNet = (DEV_NET*) pAC->dev[1]->priv;
+			if (pNet->proc) {
+				spin_lock(&sk_devs_lock);
+				pNet->proc->data = NULL;
+				spin_unlock(&sk_devs_lock);
+			}
 			unregister_netdev(pAC->dev[1]);
 			kfree(pAC->dev[1]);
 		}

@@ -73,11 +73,11 @@ struct ArcProto *arc_proto_map[256], *arc_proto_default, *arc_bcast_proto;
 
 struct ArcProto arc_proto_null =
 {
-	'?',
-	XMTU,
-	null_rx,
-	null_build_header,
-	null_prepare_tx
+	.suffix		= '?',
+	.mtu		= XMTU,
+	.rx		= null_rx,
+	.build_header	= null_build_header,
+	.prepare_tx	= null_prepare_tx,
 };
 
 static spinlock_t arcnet_lock = SPIN_LOCK_UNLOCKED;

@@ -1100,7 +1100,7 @@ static void __init init_setup_hpt374 (struct pci_dev *dev, ide_pci_device_t *d)
 	if (PCI_FUNC(dev->devfn) & 1)
 		return;
 
-	pci_for_each_dev(findev) {
+	while ((findev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, findev)) != NULL) {
 		if ((findev->vendor == dev->vendor) &&
 		    (findev->device == dev->device) &&
 		    ((findev->devfn - dev->devfn) == 1) &&
@@ -1150,7 +1150,7 @@ static void __init init_setup_hpt366 (struct pci_dev *dev, ide_pci_device_t *d)
 	d->channels = 1;
 
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin1);
-	pci_for_each_dev(findev) {
+	while ((findev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, findev)) != NULL) {
 		if ((findev->vendor == dev->vendor) &&
 		    (findev->device == dev->device) &&
 		    ((findev->devfn - dev->devfn) == 1) &&

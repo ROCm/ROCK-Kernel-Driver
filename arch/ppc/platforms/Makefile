@@ -16,17 +16,15 @@ obj-$(CONFIG_APUS)		+= apus_setup.o
 ifeq ($(CONFIG_APUS),y)
 obj-$(CONFIG_PCI)		+= apus_pci.o
 endif
-obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o \
-					pmac_feature.o pmac_pci.o chrp_setup.o\
-					chrp_time.o chrp_pci.o prep_pci.o \
-					prep_time.o prep_setup.o pmac_sleep.o
-ifeq ($(CONFIG_ALL_PPC),y)
+obj-$(CONFIG_PPC_PMAC)		+= pmac_pic.o pmac_setup.o pmac_time.o \
+					pmac_feature.o pmac_pci.o pmac_sleep.o
+obj-$(CONFIG_PPC_CHRP)		+= chrp_setup.o chrp_time.o chrp_pci.o
+obj-$(CONFIG_PPC_PREP)		+= prep_pci.o prep_time.o prep_setup.o
+ifeq ($(CONFIG_PPC_PMAC),y)
 obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
-endif
-obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
-ifeq ($(CONFIG_ALL_PPC),y)
 obj-$(CONFIG_CPU_FREQ_PMAC)	+= pmac_cpufreq.o
 endif
+obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
 obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
 obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_ADIR)		+= adir_setup.o adir_pic.o adir_pci.o
@@ -50,5 +48,6 @@ obj-$(CONFIG_SPRUCE)		+= spruce_setup.o spruce_pci.o
 obj-$(CONFIG_ZX4500)		+= zx4500_setup.o zx4500_pci.o
 
 ifeq ($(CONFIG_SMP),y)
-obj-$(CONFIG_ALL_PPC)		+= pmac_smp.o chrp_smp.o
+obj-$(CONFIG_PPC_PMAC)		+= pmac_smp.o
+obj-$(CONFIG_PPC_CHRP)		+= chrp_smp.o
 endif

@@ -181,9 +181,9 @@ struct {
 
 static void __init ddb5074_pci_fixup(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (dev->vendor == PCI_VENDOR_ID_NEC &&
 		    dev->device == PCI_DEVICE_ID_NEC_NILE4) {
 			/*
@@ -227,10 +227,10 @@ static void __init ddb5074_pci_fixup(void)
 
 static void __init pcibios_fixup_irqs(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int slot_num;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		slot_num = PCI_SLOT(dev->devfn);
 		switch (slot_num) {
 		case 0:

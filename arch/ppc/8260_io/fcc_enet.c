@@ -1328,7 +1328,7 @@ int __init fec_enet_init(void)
 	struct net_device *dev;
 	struct fcc_enet_private *cep;
 	fcc_info_t	*fip;
-	int	i, np;
+	int	i, np, err;
 	volatile	immap_t		*immap;
 	volatile	iop8260_t	*io;
 
@@ -1339,22 +1339,15 @@ int __init fec_enet_init(void)
 	fip = fcc_ports;
 
 	while (np-- > 0) {
-
-		/* Allocate some private information.
-		*/
-		cep = (struct fcc_enet_private *)
-					kmalloc(sizeof(*cep), GFP_KERNEL);
-		if (cep == NULL)
-			return -ENOMEM;
-
-		__clear_user(cep,sizeof(*cep));
-		spin_lock_init(&cep->lock);
-		cep->fip = fip;
-
 		/* Create an Ethernet device instance.
 		*/
-		dev = init_etherdev(0, 0);
-		dev->priv = cep;
+		dev = alloc_etherdev(sizeof(*cep));
+		if (!dev)
+			return -ENOMEM;
+
+		cep = dev->priv;
+		spin_lock_init(&cep->lock);
+		cep->fip = fip;
 
 		init_fcc_shutdown(fip, cep, immap);
 		init_fcc_ioports(fip, io, immap);
@@ -1375,6 +1368,12 @@ int __init fec_enet_init(void)
 		dev->set_mac_address = fcc_enet_set_mac_address;
 
 		init_fcc_startup(fip, dev);
+
+		err = register_netdev(dev);
+		if (err) {
+			kfree(dev);
+			return err;
+		}
 
 		printk("%s: FCC ENET Version 0.3, ", dev->name);
 		for (i=0; i<5; i++)

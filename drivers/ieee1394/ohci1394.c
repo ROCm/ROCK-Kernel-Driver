@@ -111,7 +111,7 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <asm/prom.h>
@@ -3508,7 +3508,7 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 				   OHCI1394_REGISTER_SIZE);
 #endif
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	/* On UniNorth, power down the cable and turn off the chip
 	 * clock when the module is removed to save power on
 	 * laptops. Turning it back ON is done by the arch code when
@@ -3522,7 +3522,7 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 			pmac_call_feature(PMAC_FTR_1394_CABLE_POWER, of_node, 0, 0);
 		}
 	}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 	case OHCI_INIT_ALLOC_HOST:
 		pci_set_drvdata(ohci->dev, NULL);

@@ -349,7 +349,16 @@
 #define __NR_set_tid_address		411
 #define __NR_restart_syscall		412
 #define __NR_fadvise64			413
-#define NR_SYSCALLS			414
+#define __NR_timer_create		414
+#define __NR_timer_settime		415
+#define __NR_timer_gettime		416
+#define __NR_timer_getoverrun		417
+#define __NR_timer_delete		418
+#define __NR_clock_settime		419
+#define __NR_clock_gettime		420
+#define __NR_clock_getres		421
+#define __NR_clock_nanosleep		422
+#define NR_SYSCALLS			423
 
 #if defined(__GNUC__)
 

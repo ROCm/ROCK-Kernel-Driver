@@ -149,7 +149,7 @@ config PCMCIA_RAYCS
 	  unsure, say N.
 
 comment "Wireless 802.11b ISA/PCI cards support"
-	depends on NET_RADIO && (ISA || PCI || ALL_PPC || PCMCIA)
+	depends on NET_RADIO && (ISA || PCI || PPC_PMAC || PCMCIA)
 
 config AIRO
 	tristate "Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards"
@@ -169,7 +169,7 @@ config AIRO
 
 config HERMES
 	tristate "Hermes chipset 802.11b support (Orinoco/Prism2/Symbol)"
-	depends on NET_RADIO && (ALL_PPC || PCI || PCMCIA)
+	depends on NET_RADIO && (PPC_PMAC || PCI || PCMCIA)
 	---help---
 	  A driver for 802.11b wireless cards based based on the "Hermes" or
 	  Intersil HFA384x (Prism 2) MAC controller.  This includes the vast
@@ -191,7 +191,7 @@ config HERMES
 
 config APPLE_AIRPORT
 	tristate "Apple Airport support (built-in)"
-	depends on ALL_PPC && HERMES
+	depends on PPC_PMAC && HERMES
 	help
 	  Say Y here to support the Airport 802.11b wireless Ethernet hardware
 	  built into the Macintosh iBook and other recent PowerPC-based
@@ -281,10 +281,25 @@ config AIRO_CS
 	  for location).  You also want to check out the PCMCIA-HOWTO,
 	  available from <http://www.tldp.org/docs.html#howto>.
 
+config PCMCIA_ATMEL
+      tristate "Atmel at76c502/at76c504 PCMCIA cards"
+      depends on NET_RADIO && EXPERIMENTAL && PCMCIA
+       ---help---
+         A driver for PCMCIA 802.11 wireless cards based on the 
+         Atmel fast-vnet chips. This driver supports standard
+         Linux wireless extensions. 
+ 
+         Many  cards based on this chipset do not have flash memory
+         and need their firmware loaded at start-up. If yours is 
+         one of these, you will need to provide a firmware image
+	 to be loaded into the card by the driver. The Atmel
+	 firmware package can be downloaded from
+	 http://www.thekelleys.org.uk/atmel/atmel_firmware.tar.gz
+
 # yes, this works even when no drivers are selected
 config NET_WIRELESS
 	bool
-	depends on NET_RADIO && (ISA || PCI || ALL_PPC || PCMCIA)
+	depends on NET_RADIO && (ISA || PCI || PPC_PMAC || PCMCIA)
 	default y
 
 endmenu

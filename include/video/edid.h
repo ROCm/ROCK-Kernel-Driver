@@ -4,7 +4,7 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 #include <linux/pci.h>
 #endif
 
@@ -18,7 +18,7 @@ extern char *get_EDID_from_BIOS(void *);
 
 #endif /* CONFIG_X86 */
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 extern char *get_EDID_from_OF(struct pci_dev *pdev);
 #endif
 

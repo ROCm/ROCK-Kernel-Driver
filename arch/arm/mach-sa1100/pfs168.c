@@ -7,6 +7,7 @@
 #include <linux/tty.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -18,6 +19,35 @@
 
 #include "generic.h"
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start		= 0x40000000,
+		.end		= 0x40001fff,
+		.flags		= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start		= IRQ_GPIO25,
+		.end		= IRQ_GPIO25,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
 
 static int __init pfs168_init(void)
 {
@@ -32,10 +62,7 @@ static int __init pfs168_init(void)
 	 */
 	sa1110_mb_disable();
 
-	/*
-	 * Probe for SA1111.
-	 */
-	return sa1111_init(0x40000000, IRQ_GPIO25);
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
 arch_initcall(pfs168_init);

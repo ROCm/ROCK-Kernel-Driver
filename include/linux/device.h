@@ -194,7 +194,6 @@ struct class_device {
 	void			* class_data;	/* class-specific data */
 
 	char	class_id[BUS_ID_SIZE];	/* unique to this class */
-	void	(*release)(struct class_device * class_dev);
 };
 
 static inline void *
@@ -303,6 +302,8 @@ extern void device_unregister(struct device * dev);
 extern void device_initialize(struct device * dev);
 extern int device_add(struct device * dev);
 extern void device_del(struct device * dev);
+extern int device_for_each_child(struct device *, void *,
+		     int (*fn)(struct device *, void *));
 
 /*
  * Manual binding of a device to driver. See drivers/base/bus.c 
@@ -384,6 +385,8 @@ struct platform_device {
 	u32		num_resources;
 	struct resource	* resource;
 };
+
+#define to_platform_device(x) container_of((x), struct platform_device, dev)
 
 extern int platform_device_register(struct platform_device *);
 extern void platform_device_unregister(struct platform_device *);
