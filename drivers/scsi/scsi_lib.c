@@ -1215,6 +1215,7 @@ static void scsi_request_fn(struct request_queue *q)
 	spin_lock_irq(q->queue_lock);
 	if (blk_rq_tagged(req))
 		blk_queue_end_tag(q, req);
+	elv_completed_request(q, req);
 	__elv_add_request(q, req, 0, 0);
 	sdev->device_busy--;
 	if(sdev->device_busy == 0)
