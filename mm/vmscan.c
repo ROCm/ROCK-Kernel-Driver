@@ -398,10 +398,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 		page = list_entry(l_hold.prev, struct page, lru);
 		list_del(&page->lru);
 		if (page->pte.chain) {
-			if (test_and_set_bit(PG_chainlock, &page->flags)) {
-				list_add(&page->lru, &l_active);
-				continue;
-			}
+			pte_chain_lock(page);
 			if (page->pte.chain && page_referenced(page)) {
 				pte_chain_unlock(page);
 				list_add(&page->lru, &l_active);
