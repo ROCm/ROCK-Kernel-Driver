@@ -418,6 +418,15 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		 * The non-racy check for busy page.  It is critical to check
 		 * PageDirty _after_ making sure that the page is freeable and
 		 * not in use by anybody. 	(pagecache + us == 2)
+		 *
+		 * Like there is a dependency here on the number of VM
+		 * page->count references, another dependency is also in
+		 * try_to_unmap() to make sure not to unmap pages while
+		 * they're being pinned by get_user_pages() or other
+		 * paths that might write to the page. See the comment
+		 * in objrmap:try_to_unmap_one() for details.
+		 * In short if you change != 2, you've to change
+		 * objrmap:try_to_unmap_one too.
 		 */
 		if (page_count(page) != 2 || PageDirty(page)) {
 			spin_unlock_irq(&mapping->tree_lock);
