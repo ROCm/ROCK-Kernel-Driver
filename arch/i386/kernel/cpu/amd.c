@@ -90,14 +90,13 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 				d = d2-d;
 				
 				/* Knock these two lines out if it debugs out ok */
-				printk(KERN_INFO "K6 BUG %ld %d (Report these if test report is incorrect)\n", d, 20*K6_BUG_LOOP);
 				printk(KERN_INFO "AMD K6 stepping B detected - ");
 				/* -- cut here -- */
 				if (d > 20*K6_BUG_LOOP) 
 					printk("system stability may be impaired when more than 32 MB are used.\n");
 				else 
 					printk("probably OK (after B9730xxxx).\n");
-				printk(KERN_INFO "Please see http://www.mygale.com/~poulot/k6bug.html\n");
+				printk(KERN_INFO "Please see http://membres.lycos.fr/poulot/k6bug.html\n");
 			}
 
 			/* K6 with old style WHCR */
