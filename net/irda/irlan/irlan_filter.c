@@ -24,6 +24,7 @@
 
 #include <linux/skbuff.h>
 #include <linux/random.h>
+#include <linux/seq_file.h>
 
 #include <net/irda/irlan_common.h>
 
@@ -216,26 +217,24 @@ void irlan_check_command_param(struct irlan_cb *self, char *param, char *value)
  *    Print status of filter. Used by /proc file system
  *
  */
-int irlan_print_filter(int filter_type, char *buf)
+#ifdef CONFIG_PROC_FS
+void irlan_print_filter(struct seq_file *seq, int filter_type)
 {
-	int len = 0;
-
 	if (filter_type & IRLAN_DIRECTED)
-		len += sprintf(buf+len, "%s", "DIRECTED ");
+		seq_printf(seq, "%s", "DIRECTED ");
 	if (filter_type & IRLAN_FUNCTIONAL)
-		len += sprintf(buf+len, "%s", "FUNCTIONAL ");
+		seq_printf(seq, "%s", "FUNCTIONAL ");
 	if (filter_type & IRLAN_GROUP)
-		len += sprintf(buf+len, "%s", "GROUP ");
+		seq_printf(seq, "%s", "GROUP ");
 	if (filter_type & IRLAN_MAC_FRAME)
-		len += sprintf(buf+len, "%s", "MAC_FRAME ");
+		seq_printf(seq, "%s", "MAC_FRAME ");
 	if (filter_type & IRLAN_MULTICAST)
-		len += sprintf(buf+len, "%s", "MULTICAST ");
+		seq_printf(seq, "%s", "MULTICAST ");
 	if (filter_type & IRLAN_BROADCAST)
-		len += sprintf(buf+len, "%s", "BROADCAST ");
+		seq_printf(seq, "%s", "BROADCAST ");
 	if (filter_type & IRLAN_IPX_SOCKET)
-		len += sprintf(buf+len, "%s", "IPX_SOCKET");
+		seq_printf(seq, "%s", "IPX_SOCKET");
 
-	len += sprintf(buf+len, "\n");
-
-	return len;
+	seq_putc(seq, '\n');
 }
+#endif

@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
@@ -86,6 +87,20 @@ static char *irlan_media[] = {
 	"802.3",
 	"802.5"
 };
+
+extern struct proc_dir_entry *proc_irda;
+
+static int irlan_seq_open(struct inode *inode, struct file *file);
+
+static struct file_operations irlan_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = irlan_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
+extern struct proc_dir_entry *proc_irda;
 #endif /* CONFIG_PROC_FS */
 
 static void __irlan_close(struct irlan_cb *self);
@@ -93,12 +108,6 @@ static int __irlan_insert_param(struct sk_buff *skb, char *param, int type,
 				__u8 value_byte, __u16 value_short, 
 				__u8 *value_array, __u16 value_len);
 void irlan_close_tsaps(struct irlan_cb *self);
-
-#ifdef CONFIG_PROC_FS
-static int irlan_proc_read(char *buf, char **start, off_t offset, int len);
-
-extern struct proc_dir_entry *proc_irda;
-#endif /* CONFIG_PROC_FS */
 
 /*
  * Function irlan_init (void)
@@ -112,8 +121,17 @@ int __init irlan_init(void)
 	__u16 hints;
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
+
 #ifdef CONFIG_PROC_FS
-	create_proc_info_entry("irlan", 0, proc_irda, irlan_proc_read);
+	{ struct proc_dir_entry *proc;
+	proc = create_proc_entry("irlan", 0, proc_irda);
+	if (!proc) {
+		printk(KERN_ERR "irlan_init: can't create /proc entry!\n");
+		return -ENODEV;
+	}
+
+	proc->proc_fops = &irlan_fops;
+	}
 #endif /* CONFIG_PROC_FS */
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
@@ -1050,55 +1068,104 @@ int irlan_extract_param(__u8 *buf, char *name, char *value, __u16 *len)
 }
 
 #ifdef CONFIG_PROC_FS
+#define IRLAN_PROC_START_TOKEN	((void *)1)
+
 /*
- * Function irlan_client_proc_read (buf, start, offset, len, unused)
- *
- *    Give some info to the /proc file system
+ * Start of reading /proc entries.
+ * Return entry at pos, 
+ *	or start_token to indicate print header line
+ *	or NULL if end of file
  */
-static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
+static void *irlan_seq_start(struct seq_file *seq, loff_t *pos)
 {
+	int i = 1;
 	struct irlan_cb *self;
-     
-	len = 0;
-	
+
 	rcu_read_lock();
+	if (*pos == 0)
+		return IRLAN_PROC_START_TOKEN;
 
-	len += sprintf(buf+len, "IrLAN instances:\n");
-	
-	list_for_each_entry_rcu(self, &irlans, dev_list) {
+	list_for_each_entry(self, &irlans, dev_list) {
+		if (*pos == i) 
+			return self;
+		++i;
+	}
+	return NULL;
+}
 
-		ASSERT(self->magic == IRLAN_MAGIC, break;);
+/* Return entry after v, and increment pos */
+static void *irlan_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct list_head *nxt;
+
+	++*pos;
+	if (v == IRLAN_PROC_START_TOKEN) 
+		nxt = irlans.next;
+	else
+		nxt = ((struct irlan_cb *)v)->dev_list.next;
+
+	return (nxt == &irlans) ? NULL 
+		: list_entry(nxt, struct irlan_cb, dev_list);
+}
+
+/* End of reading /proc file */
+static void irlan_seq_stop(struct seq_file *seq, void *v)
+{
+	rcu_read_unlock();
+}
+
+
+/*
+ * Show one entry in /proc file.
+ */
+static int irlan_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == IRLAN_PROC_START_TOKEN)
+		seq_puts(seq, "IrLAN instances:\n");
+	else {
+		struct irlan_cb *self = v;
 		
-		len += sprintf(buf+len, "ifname: %s,\n",
+		ASSERT(self != NULL, return -1;);
+		ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+
+		seq_printf(seq,"ifname: %s,\n",
 			       self->dev->name);
-		len += sprintf(buf+len, "client state: %s, ",
+		seq_printf(seq,"client state: %s, ",
 			       irlan_state[ self->client.state]);
-		len += sprintf(buf+len, "provider state: %s,\n",
+		seq_printf(seq,"provider state: %s,\n",
 			       irlan_state[ self->provider.state]);
-		len += sprintf(buf+len, "saddr: %#08x, ",
+		seq_printf(seq,"saddr: %#08x, ",
 			       self->saddr);
-		len += sprintf(buf+len, "daddr: %#08x\n",
+		seq_printf(seq,"daddr: %#08x\n",
 			       self->daddr);
-		len += sprintf(buf+len, "version: %d.%d,\n",
+		seq_printf(seq,"version: %d.%d,\n",
 			       self->version[1], self->version[0]);
-		len += sprintf(buf+len, "access type: %s\n", 
+		seq_printf(seq,"access type: %s\n", 
 			       irlan_access[self->client.access_type]);
-		len += sprintf(buf+len, "media: %s\n", 
+		seq_printf(seq,"media: %s\n", 
 			       irlan_media[self->media]);
 		
-		len += sprintf(buf+len, "local filter:\n");
-		len += sprintf(buf+len, "remote filter: ");
-		len += irlan_print_filter(self->client.filter_type, 
-					  buf+len);
-			
-		len += sprintf(buf+len, "tx busy: %s\n", 
+		seq_printf(seq,"local filter:\n");
+		seq_printf(seq,"remote filter: ");
+		irlan_print_filter(seq, self->client.filter_type);
+		seq_printf(seq,"tx busy: %s\n", 
 			       netif_queue_stopped(self->dev) ? "TRUE" : "FALSE");
 			
-		len += sprintf(buf+len, "\n");
- 	} 
-	rcu_read_unlock();
+		seq_putc(seq,'\n');
+	}
+	return 0;
+}
 
-	return len;
+static struct seq_operations irlan_seq_ops = {
+	.start = irlan_seq_start,
+	.next  = irlan_seq_next,
+	.stop  = irlan_seq_stop,
+	.show  = irlan_seq_show,
+};
+
+static int irlan_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &irlan_seq_ops);
 }
 #endif
 
