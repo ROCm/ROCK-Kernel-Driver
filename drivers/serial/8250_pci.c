@@ -2212,6 +2212,13 @@ static struct pci_device_id serial_pci_tbl[] = {
 		0, pbn_exar_XR17C158 },
 
 	/*
+	 * Topic TP560 Data/Fax/Voice 56k modem (reported by Evan Clarke)
+	 */
+	{	PCI_VENDOR_ID_TOPIC, PCI_DEVICE_ID_TOPIC_TP560,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_1_115200 },
+
+	/*
 	 * These entries match devices with class COMMUNICATION_SERIAL,
 	 * COMMUNICATION_MODEM or COMMUNICATION_MULTISERIAL
 	 */
