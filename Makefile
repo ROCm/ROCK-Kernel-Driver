@@ -279,13 +279,13 @@ depend dep: .hdepend
 	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
 	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+ifdef CONFIG_MODVERSIONS
 	@$(MAKE) include/linux/modversions.h
+endif
 	@$(MAKE) archdep
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
 	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
-
-ifdef CONFIG_MODVERSIONS
 
 # 	Update modversions.h, but only if it would change.
 
@@ -307,13 +307,6 @@ include/linux/modversions.h: FORCE
 		mv -f $@.tmp $@; \
 	fi
 
-else # CONFIG_MODVERSIONS
-
-include/linux/modversions.h:
-	@echo "#include <linux/modsetver.h>" > $@
-
-endif # CONFIG_MODVERSIONS
-
 # ---------------------------------------------------------------------------
 # Modules
 
@@ -322,7 +315,7 @@ ifdef CONFIG_MODULES
 #	Build modules
 
 ifdef CONFIG_MODVERSIONS
-MODFLAGS += -DMODVERSIONS -include $(HPATH)/linux/modversions.h
+MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
