@@ -58,7 +58,7 @@ extern int eth16i_probe(struct net_device *);
 extern int i82596_probe(struct net_device *);
 extern int ewrk3_probe(struct net_device *);
 extern int el1_probe(struct net_device *);
-extern int wavelan_probe(struct net_device *);
+extern struct net_device *wavelan_probe(int unit);
 extern struct net_device *arlan_probe(int unit);
 extern struct net_device *el16_probe(int unit);
 extern int elmc_probe(struct net_device *);
@@ -265,13 +265,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_EL1		/* 3c501 */
 	{el1_probe, 0},
 #endif
-#ifdef CONFIG_WAVELAN		/* WaveLAN */
-	{wavelan_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_WAVELAN		/* WaveLAN */
+	{wavelan_probe, 0},
+#endif
 #ifdef CONFIG_ARLAN		/* Aironet */
 	{arlan_probe, 0},
 #endif
