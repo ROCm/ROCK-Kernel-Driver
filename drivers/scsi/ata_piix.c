@@ -2,6 +2,10 @@
 
     ata_piix.c - Intel PATA/SATA controllers
 
+    Maintained by:  Jeff Garzik <jgarzik@pobox.com>
+    		    Please ALWAYS copy linux-ide@vger.kernel.org
+		    on emails.
+
 
 	Copyright 2003-2004 Red Hat Inc
 	Copyright 2003-2004 Jeff Garzik

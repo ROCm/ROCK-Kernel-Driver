@@ -1,6 +1,10 @@
 /*
    sata_via.c - VIA Serial ATA controllers
 
+   Maintained by:  Jeff Garzik <jgarzik@pobox.com>
+   		   Please ALWAYS copy linux-ide@vger.kernel.org
+ 		   on emails.
+
    Copyright 2003-2004 Red Hat, Inc.  All rights reserved.
    Copyright 2003-2004 Jeff Garzik
 

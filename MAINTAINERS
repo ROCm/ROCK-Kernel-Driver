@@ -1804,6 +1804,12 @@ L: 	selinux@tycho.nsa.gov (general discussion)
 W:	http://www.nsa.gov/selinux
 S:	Supported
 
+SERIAL ATA (SATA) SUBSYSTEM:
+P:	Jeff Garzik
+M:	jgarzik@pobox.com
+L:	linux-ide@vger.kernel.org
+S:	Supported
+
 SGI SN-IA64 (Altix) SERIAL CONSOLE DRIVER
 P:	Pat Gefre
 M:	pfg@sgi.com

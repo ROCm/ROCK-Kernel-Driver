@@ -1,6 +1,10 @@
 /*
  *  sata_promise.c - Promise SATA
  *
+ *  Maintained by:  Jeff Garzik <jgarzik@pobox.com>
+ *  		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
+ *
  *  Copyright 2003-2004 Red Hat, Inc.
  *
  *  The contents of this file are subject to the Open

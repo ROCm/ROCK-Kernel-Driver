@@ -1,5 +1,10 @@
 /*
- *  ata_k2.c - Broadcom (Apple K2) SATA
+ *  sata_svw.c - ServerWorks / Apple K2 SATA
+ *
+ *  Maintained by: Benjamin Herrenschmidt <benh@kernel.crashing.org> and
+ *		   Jeff Garzik <jgarzik@pobox.com>
+ *  		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
  *
  *  Copyright 2003 Benjamin Herrenschmidt <benh@kernel.crashing.org>
  *

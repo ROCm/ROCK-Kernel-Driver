@@ -1,6 +1,10 @@
 /*
  *  sata_sis.c - Silicon Integrated Systems SATA
  *
+ *  Maintained by:  Uwe Koziolek
+ *  		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
+ *
  *  Copyright 2004 Uwe Koziolek
  *
  *  The contents of this file are subject to the Open

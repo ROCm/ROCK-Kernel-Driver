@@ -1,6 +1,10 @@
 /*
  *  sata_vsc.c - Vitesse VSC7174 4 port DPA SATA
  *
+ *  Maintained by:  Jeremy Higdon @ SGI
+ * 		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
+ *
  *  Copyright 2004 SGI
  *
  *  Bits from Jeff Garzik, Copyright RedHat, Inc.
