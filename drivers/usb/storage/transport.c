@@ -900,7 +900,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	bcb.DataTransferLength = cpu_to_le32(transfer_length);
 	bcb.Flags = srb->sc_data_direction == SCSI_DATA_READ ? 1 << 7 : 0;
 	bcb.Tag = srb->serial_number;
-	bcb.Lun = srb->cmnd[1] >> 5;
+	bcb.Lun = srb->device->lun;
 	if (us->flags & US_FL_SCM_MULT_TARG)
 		bcb.Lun |= srb->device->id << 4;
 	bcb.Length = srb->cmd_len;
