@@ -919,7 +919,6 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
  **/
 static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 {
-	struct scsi_device *sdev;
 	unsigned long flags;
 	int rtn;
 
@@ -937,16 +936,9 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(BUS_RESET_SETTLE_TIME);
-		/*
-		 * Mark all affected devices to expect a unit attention.
-		 */
-		list_for_each_entry(sdev, &scmd->device->host->my_devices,
-				    siblings)
-			if (scmd->device->channel == sdev->channel) {
-				sdev->was_reset = 1;
-				sdev->expecting_cc_ua = 1;
-			}
+		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 	}
+
 	return rtn;
 }
 
@@ -956,7 +948,6 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
  **/
 static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 {
-	struct scsi_device *sdev;
 	unsigned long flags;
 	int rtn;
 
@@ -974,16 +965,9 @@ static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(HOST_RESET_SETTLE_TIME);
-		/*
-		 * Mark all affected devices to expect a unit attention.
-		 */
-		list_for_each_entry(sdev, &scmd->device->host->my_devices,
-				    siblings)
-			if (scmd->device->channel == sdev->channel) {
-				sdev->was_reset = 1;
-				sdev->expecting_cc_ua = 1;
-			}
+		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 	}
+
 	return rtn;
 }
 
