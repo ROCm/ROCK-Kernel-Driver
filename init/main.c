@@ -259,6 +259,22 @@ static int __init unknown_bootoption(char *param, char *val)
 	return 0;
 }
 
+static int __init init_setup(char *str)
+{
+	unsigned int i;
+
+	execute_command = str;
+	/* In case LILO is going to boot us with default command line,
+	 * it prepends "auto" before the whole cmdline which makes
+	 * the shell think it should execute a script with such name.
+	 * So we ignore all arguments entered _before_ init=... [MJ]
+	 */
+	for (i = 1; i < MAX_INIT_ARGS; i++)
+		argv_init[i] = NULL;
+	return 1;
+}
+__setup("init=", init_setup);
+
 extern void setup_arch(char **);
 extern void cpu_idle(void);
 
