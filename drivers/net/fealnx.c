@@ -233,15 +233,29 @@ enum intr_status_bits {
 	RxErr = 0x00000002,	/* receive error */
 };
 
-/* Bits in the NetworkConfig register. */
+/* Bits in the NetworkConfig register, W for writing, R for reading */
+/* FIXME: some names are invented by me. Marked with (name?) */
+/* If you have docs and know bit names, please fix 'em */
 enum rx_mode_bits {
-	RxModeMask = 0xe0,
-	PROM = 0x80,		/* promiscuous mode */
-	AB = 0x40,		/* accept broadcast */
-	AM = 0x20,		/* accept mutlicast */
-	ARP = 0x08,		/* receive runt pkt */
-	ALP = 0x04,		/* receive long pkt */
-	SEP = 0x02,		/* receive error pkt */
+	CR_W_ENH	= 0x02000000,	/* enhanced mode (name?) */
+	CR_W_FD		= 0x00100000,	/* full duplex */
+	CR_W_PS10	= 0x00080000,	/* 10 mbit */
+	CR_W_TXEN	= 0x00040000,	/* tx enable (name?) */
+	CR_W_PS1000	= 0x00010000,	/* 1000 mbit */
+     /* CR_W_RXBURSTMASK= 0x00000e00, Im unsure about this */
+	CR_W_RXMODEMASK	= 0x000000e0,
+	CR_W_PROM	= 0x00000080,	/* promiscuous mode */
+	CR_W_AB		= 0x00000040,	/* accept broadcast */
+	CR_W_AM		= 0x00000020,	/* accept mutlicast */
+	CR_W_ARP	= 0x00000008,	/* receive runt pkt */
+	CR_W_ALP	= 0x00000004,	/* receive long pkt */
+	CR_W_SEP	= 0x00000002,	/* receive error pkt */
+	CR_W_RXEN	= 0x00000001,	/* rx enable (unicast?) (name?) */
+
+	CR_R_TXSTOP	= 0x04000000,	/* tx stopped (name?) */
+	CR_R_FD		= 0x00100000,	/* full duplex detected */
+	CR_R_PS10	= 0x00080000,	/* 10 mbit detected */
+	CR_R_RXSTOP	= 0x00008000,	/* rx stopped (name?) */
 };
 
 /* The Tulip Rx and Tx buffer descriptors. */
@@ -375,10 +389,7 @@ enum tx_desc_control_bits {
 #define LXT1000_Full    0x200
 // 89/12/29 add, for phy specific status register, levelone phy, (end)
 
-/* for 3-in-1 case */
-#define PS10            0x00080000
-#define FD              0x00100000
-#define PS1000          0x00010000
+/* for 3-in-1 case, BMCRSR register */
 #define LinkIsUp2	0x00040000
 
 /* for PHY */
@@ -449,13 +460,13 @@ static void reset_rx_descriptors(struct net_device *dev);
 
 void stop_nic_tx(long ioaddr, long crvalue)
 {
-	writel(crvalue & (~0x40000), ioaddr + TCRRCR);
+	writel(crvalue & (~CR_W_TXEN), ioaddr + TCRRCR);
 
 	/* wait for tx stop */
 	{
 		int i = 0, delay = 0x1000;
 
-		while ((!(readl(ioaddr + TCRRCR) & 0x04000000)) && (i < delay)) {
+		while ((!(readl(ioaddr + TCRRCR) & CR_R_TXSTOP)) && (i < delay)) {
 			++i;
 		}
 	}
@@ -464,13 +475,13 @@ void stop_nic_tx(long ioaddr, long crvalue)
 
 void stop_nic_rx(long ioaddr, long crvalue)
 {
-	writel(crvalue & (~0x1), ioaddr + TCRRCR);
+	writel(crvalue & (~CR_W_RXEN), ioaddr + TCRRCR);
 
 	/* wait for rx stop */
 	{
 		int i = 0, delay = 0x1000;
 
-		while ((!(readl(ioaddr + TCRRCR) & 0x00008000)) && (i < delay)) {
+		while ((!(readl(ioaddr + TCRRCR) & CR_R_RXSTOP)) && (i < delay)) {
 			++i;
 		}
 	}
@@ -949,7 +960,7 @@ static int netdev_open(struct net_device *dev)
 	np->imrvalue = TUNF | CNTOVF | RBU | TI | RI;
 	if (np->pci_dev->device == 0x891) {
 		np->bcrvalue |= 0x200;	/* set PROG bit */
-		np->crvalue |= 0x02000000;	/* set enhanced bit */
+		np->crvalue |= CR_W_ENH;	/* set enhanced bit */
 		np->imrvalue |= ETI;
 	}
 	writel(np->bcrvalue, ioaddr + BCR);
@@ -1026,11 +1037,11 @@ static void getlinktype(struct net_device *dev)
 	struct netdev_private *np = dev->priv;
 
 	if (np->PHYType == MysonPHY) {	/* 3-in-1 case */
-		if (readl(dev->base_addr + TCRRCR) & FD)
+		if (readl(dev->base_addr + TCRRCR) & CR_R_FD)
 			np->duplexmode = 2;	/* full duplex */
 		else
 			np->duplexmode = 1;	/* half duplex */
-		if (readl(dev->base_addr + TCRRCR) & PS10)
+		if (readl(dev->base_addr + TCRRCR) & CR_R_PS10)
 			np->line_speed = 1;	/* 10M */
 		else
 			np->line_speed = 2;	/* 100M */
@@ -1112,15 +1123,13 @@ static void getlinktype(struct net_device *dev)
 			else
 				np->line_speed = 1;	/* 10M */
 		}
-		// chage crvalue
-		// np->crvalue&=(~PS10)&(~FD);
-		np->crvalue &= (~PS10) & (~FD) & (~PS1000);
+		np->crvalue &= (~CR_W_PS10) & (~CR_W_FD) & (~CR_W_PS1000);
 		if (np->line_speed == 1)
-			np->crvalue |= PS10;
+			np->crvalue |= CR_W_PS10;
 		else if (np->line_speed == 3)
-			np->crvalue |= PS1000;
+			np->crvalue |= CR_W_PS1000;
 		if (np->duplexmode == 2)
-			np->crvalue |= FD;
+			np->crvalue |= CR_W_FD;
 	}
 }
 
@@ -1168,7 +1177,7 @@ static void netdev_timer(unsigned long data)
 			getlinktype(dev);
 			if (np->crvalue != old_crvalue) {
 				stop_nic_tx(ioaddr, np->crvalue);
-				stop_nic_rx(ioaddr, np->crvalue & (~0x40000));
+				stop_nic_rx(ioaddr, np->crvalue & (~CR_W_TXEN));
 				writel(np->crvalue, ioaddr + TCRRCR);
 			}
 		}
@@ -1488,7 +1497,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 			if (tx_status & TXOWN)
 				break;
 
-			if (!(np->crvalue & 0x02000000)) {
+			if (!(np->crvalue & CR_W_ENH)) {
 				if (tx_status & (CSL | LC | EC | UDF | HF)) {
 					np->stats.tx_errors++;
 					if (tx_status & EC)
@@ -1537,7 +1546,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 			netif_wake_queue(dev);
 
 		/* read transmit status for enhanced mode only */
-		if (np->crvalue & 0x02000000) {
+		if (np->crvalue & CR_W_ENH) {
 			long data;
 
 			data = readl(ioaddr + TSR);
@@ -1746,12 +1755,12 @@ static void set_rx_mode(struct net_device *dev)
 		/* Unconditionally log net taps. */
 		printk(KERN_NOTICE "%s: Promiscuous mode enabled.\n", dev->name);
 		memset(mc_filter, 0xff, sizeof(mc_filter));
-		rx_mode = PROM | AB | AM;
+		rx_mode = CR_W_PROM | CR_W_AB | CR_W_AM;
 	} else if ((dev->mc_count > multicast_filter_limit)
 		   || (dev->flags & IFF_ALLMULTI)) {
 		/* Too many to match, or accept all multicasts. */
 		memset(mc_filter, 0xff, sizeof(mc_filter));
-		rx_mode = AB | AM;
+		rx_mode = CR_W_AB | CR_W_AM;
 	} else {
 		struct dev_mc_list *mclist;
 		int i;
@@ -1763,15 +1772,15 @@ static void set_rx_mode(struct net_device *dev)
 			bit = (ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26) ^ 0x3F;
 			mc_filter[bit >> 5] |= (1 << bit);
 		}
-		rx_mode = AB | AM;
+		rx_mode = CR_W_AB | CR_W_AM;
 	}
 
 	stop_nic_tx(ioaddr, np->crvalue);
-	stop_nic_rx(ioaddr, np->crvalue & (~0x40000));
+	stop_nic_rx(ioaddr, np->crvalue & (~CR_W_TXEN));
 
 	writel(mc_filter[0], ioaddr + MAR0);
 	writel(mc_filter[1], ioaddr + MAR1);
-	np->crvalue &= ~RxModeMask;
+	np->crvalue &= ~CR_W_RXMODEMASK;
 	np->crvalue |= rx_mode;
 	writel(np->crvalue, ioaddr + TCRRCR);
 }
