@@ -73,7 +73,7 @@ int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
 	 * cifs tcp session reconnection
 	 * 
 	 * mark tcp session as reconnecting so temporarily locked
-	 * mark all smb sessions as reconnecting for tcp session  (TBD BB)
+	 * mark all smb sessions as reconnecting for tcp session
 	 * reconnect tcp session
 	 * wake up waiters on reconnection? - (not needed currently)
 	 */
@@ -407,7 +407,7 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 {
 	char *value;
 	char *data;
-	int  temp_len, i;
+	int  temp_len, i, j;
 
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
@@ -457,19 +457,17 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			/* NB: password legally can have multiple commas and
 			the only illegal character in a password is null */
 				
-			printk("\nvalue: %s",value);
 			if ((value[temp_len] == 0) && (value[temp_len+1] == ',')) {
 				/* reinsert comma */
 				value[temp_len] = ',';
-
+				temp_len+=2;  /* move after the second comma */
 				while(value[temp_len] != 0)  {
-					temp_len++;
 					if((value[temp_len] == ',') && (value[temp_len+1] != ',')) {
 						/* single comma indicating start of next parm */
 						break;
 					}
+					temp_len++;
 				}
-				printk("\nnew value with comma stuffing: %s",value);
 				if(value[temp_len] == 0) {
 					options = NULL;
 				} else {
@@ -479,8 +477,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				}
 				/* go from value to (value + temp_len) condensing double commas to singles */
 				vol->password = cifs_kcalloc(temp_len, GFP_KERNEL);
-				for(i=0;i<temp_len;i++) {
-					vol->password[i] = value[i];
+				for(i=0,j=0;i<temp_len;i++,j++) {
+					vol->password[j] = value[i];
 					if(value[i] == ',' && value[i+1] == ',') {
 						/* skip second comma */
 						i++;
@@ -824,7 +822,6 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		the default. sock_setsockopt not used because it expects 
 		user space buffer */
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
-	cFYI(1,("timeout addr: %p ",&((*csocket)->sk->sk_rcvtimeo))); /* BB removeme BB */
 		
 	return rc;
 }
@@ -2504,7 +2501,7 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 		} else
 			cFYI(1, ("No session or bad tcon"));
 	}
-	/* BB future check active count of tcon and then free if needed BB */
+	
 	cifs_sb->tcon = NULL;
 	if (ses) {
 		set_current_state(TASK_INTERRUPTIBLE);
