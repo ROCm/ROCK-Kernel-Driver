@@ -35,11 +35,18 @@
 #define HCI_DEV_PROTOCOL     0x01	/* Bluetooth programming protocol */
 
 #define HCI_CTRL_REQ	     0x20
+#define HCI_DIGI_REQ	     0x40
+
+#define HCI_IGNORE           0x01
+#define HCI_DIGIANSWER       0x02
 
 #define HCI_MAX_IFACE_NUM	3 
 
 #define HCI_MAX_BULK_TX     	4
 #define HCI_MAX_BULK_RX     	1
+
+#define HCI_MAX_ISOC_RX		2
+#define HCI_MAX_ISOC_TX		2
 
 #define HCI_MAX_ISOC_FRAMES     10
 
@@ -118,6 +125,8 @@ struct hci_usb {
 	struct usb_interface            *isoc_iface;
 	struct usb_host_endpoint	*isoc_out_ep;
 	struct usb_host_endpoint	*isoc_in_ep;
+
+	__u8			ctrl_req;
 
 	struct sk_buff_head	transmit_q[4];
 	struct sk_buff		*reassembly[4]; // Reassembly buffers

@@ -46,6 +46,19 @@ class_attr_store(struct kobject * kobj, struct attribute * attr,
 	return ret;
 }
 
+static void class_release(struct kobject * kobj)
+{
+	struct class *class = to_class(kobj);
+
+	pr_debug("class '%s': release.\n", class->name);
+
+	if (class->class_release)
+		class->class_release(class);
+	else
+		pr_debug("class '%s' does not have a release() function, "
+			 "be careful\n", class->name);
+}
+
 static struct sysfs_ops class_sysfs_ops = {
 	.show	= class_attr_show,
 	.store	= class_attr_store,
@@ -53,6 +66,7 @@ static struct sysfs_ops class_sysfs_ops = {
 
 static struct kobj_type ktype_class = {
 	.sysfs_ops	= &class_sysfs_ops,
+	.release	= class_release,
 };
 
 /* Hotplug events for classes go to the class_obj subsys */

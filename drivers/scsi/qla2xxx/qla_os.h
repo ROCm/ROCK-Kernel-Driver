@@ -22,36 +22,6 @@
 #ifndef __QLA_OS_H
 #define __QLA_OS_H
 
-/*
- * Driver debug definitions.
- */
-/* #define QL_DEBUG_LEVEL_1  */ /* Output register accesses to COM1 */
-/* #define QL_DEBUG_LEVEL_2  */ /* Output error msgs to COM1 */
-/* #define QL_DEBUG_LEVEL_3  */ /* Output function trace msgs to COM1 */
-/* #define QL_DEBUG_LEVEL_4  */ /* Output NVRAM trace msgs to COM1 */
-/* #define QL_DEBUG_LEVEL_5  */ /* Output ring trace msgs to COM1 */
-/* #define QL_DEBUG_LEVEL_6  */ /* Output WATCHDOG timer trace to COM1 */
-/* #define QL_DEBUG_LEVEL_7  */ /* Output RISC load trace msgs to COM1 */
-/* #define QL_DEBUG_LEVEL_8  */ /* Output ring saturation msgs to COM1 */
-/* #define QL_DEBUG_LEVEL_9  */ /* Output IOCTL trace msgs */
-/* #define QL_DEBUG_LEVEL_10 */ /* Output IOCTL error msgs */
-/* #define QL_DEBUG_LEVEL_11 */ /* Output Mbx Cmd trace msgs */
-/* #define QL_DEBUG_LEVEL_12 */ /* Output IP trace msgs */
-/* #define QL_DEBUG_LEVEL_13 */ /* Output fdmi function trace msgs */
-/* #define QL_DEBUG_LEVEL_14 */ /* Output RSCN trace msgs */
-/*
- *  Local Macro Definitions.
- */
-#if defined(QL_DEBUG_LEVEL_1)  || defined(QL_DEBUG_LEVEL_2) || \
-    defined(QL_DEBUG_LEVEL_3)  || defined(QL_DEBUG_LEVEL_4) || \
-    defined(QL_DEBUG_LEVEL_5)  || defined(QL_DEBUG_LEVEL_6) || \
-    defined(QL_DEBUG_LEVEL_7)  || defined(QL_DEBUG_LEVEL_8) || \
-    defined(QL_DEBUG_LEVEL_9)  || defined(QL_DEBUG_LEVEL_10) || \
-    defined(QL_DEBUG_LEVEL_11) || defined(QL_DEBUG_LEVEL_12) || \
-    defined(QL_DEBUG_LEVEL_13) || defined(QL_DEBUG_LEVEL_14)
-    #define QL_DEBUG_ROUTINES
-#endif
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/version.h>

@@ -667,6 +667,13 @@ regen_max_retry - INTEGER
 	valid temporary addresses.
 	Default: 5
 
+max_addresses - INTEGER
+	Number of maximum addresses per interface.  0 disables limitation.
+	It is recommended not set too large value (or 0) because it would 
+	be too easy way to crash kernel to allow to create too much of 
+	autoconfigured addresses.
+	Default: 16
+
 icmp/*:
 ratelimit - INTEGER
 	Limit the maximal rates for sending ICMPv6 packets.

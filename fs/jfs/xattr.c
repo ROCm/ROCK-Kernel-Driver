@@ -499,7 +499,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		if (ea_buf->xattr == NULL)
 			return -ENOMEM;
 
-		ea_buf->flag |= EA_MALLOC;
+		ea_buf->flag = EA_MALLOC;
 		ea_buf->max_size = (size + sb->s_blocksize - 1) &
 		    ~(sb->s_blocksize - 1);
 
@@ -668,12 +668,13 @@ static int can_set_system_xattr(struct inode *inode, const char *name,
 	 */
 	if (strcmp(name, XATTR_NAME_ACL_ACCESS) == 0) {
 		acl = posix_acl_from_xattr(value, value_len);
-		if (acl < 0) {
+		if (IS_ERR(acl)) {
+			rc = PTR_ERR(acl);
 			printk(KERN_ERR "posix_acl_from_xattr returned %d\n",
 			       rc);
 			return rc;
 		}
-		if (acl > 0) {
+		if (acl) {
 			mode_t mode = inode->i_mode;
 			rc = posix_acl_equiv_mode(acl, &mode);
 			posix_acl_release(acl);

@@ -10,9 +10,6 @@
 #ifdef CONFIG_ATM_ZATM
 extern int zatm_detect(void);
 #endif
-#ifdef CONFIG_ATM_NICSTAR
-extern int nicstar_detect(void);
-#endif
 #ifdef CONFIG_ATM_AMBASSADOR
 extern int amb_detect(void);
 #endif
@@ -40,9 +37,6 @@ int __init atmdev_init(void)
 	devs = 0;
 #ifdef CONFIG_ATM_ZATM
 	devs += zatm_detect();
-#endif
-#ifdef CONFIG_ATM_NICSTAR
-	devs += nicstar_detect();
 #endif
 #ifdef CONFIG_ATM_AMBASSADOR
 	devs += amb_detect();

@@ -215,54 +215,6 @@ static __inline__ void qla2x00_check_fabric_devices(scsi_qla_host_t *ha)
 	qla2x00_get_firmware_state(ha, &fw_state);
 }
 
-static inline void qla2x00_filter_command(scsi_qla_host_t *ha, srb_t *sp);
-static inline void
-qla2x00_filter_command(scsi_qla_host_t *ha, srb_t *sp)
-{
-	/* NOTE: 20/08/2003
-	 * 
-	 * The SCSI lun-scanning code in 2.6 has changed such that the
-	 * following workaround code is no longer necessary.  If the device
-	 * returns 011b for the PQ, the mid-layer will revert to a standard
-	 * sequential lun scan.
-	 *
-	 * Special case considertaion on an Inquiry command (0x12) for Lun 0,
-	 * device responds with no devices (0x7F), then Linux will not scan
-	 * further Luns. While reporting that some device exists on Lun 0 Linux
-	 * will scan all devices on this target.
-	 */
-#if 0
-	struct scsi_cmnd *cp = sp->cmd;
-	uint8_t		*strp;
-
-	if (qla2xenbinq && cp->cmnd[0] == INQUIRY && cp->device->lun == 0) {
-		strp = (uint8_t *)cp->request_buffer;
-		if (*strp == 0x7f) {
-			/* Make lun unassigned and processor type */
-			*strp = 0x23;
-		}
-	}
-#endif
-}
-
-static __inline__ void * qla2x00_kmem_zalloc(int, int, int);
-/*
- * qla2x00_kmem_zalloc
- * Allocate and zero out the block of memory
- */
-static __inline__ void *
-qla2x00_kmem_zalloc(int siz, int code, int id) 
-{
-	uint8_t *bp;
-
-	if ((bp = kmalloc(siz, code)) != NULL) {
-		memset(bp, 0, siz);
-	}
-
-	return ((void *)bp);
-}
-
-static inline int qla2x00_issue_marker(scsi_qla_host_t *, int);
 /**
  * qla2x00_issue_marker() - Issue a Marker IOCB if necessary.
  * @ha: HA context

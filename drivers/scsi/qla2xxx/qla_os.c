@@ -16,9 +16,8 @@
  * General Public License for more details.
  *
  */
-#define QLA_MODVERSION
-#include "qla_os.h"
 
+#include "qla_os.h"
 #include "qla_def.h"
 
 /*
@@ -31,13 +30,6 @@ char qla2x00_version_str[40];
  */
 char srb_cachep_name[16];
 kmem_cache_t *srb_cachep;
-
-/*
-* Command line options.
-*/
-unsigned long qla2x00_verbose;
-unsigned long qla2x00_reinit = 1;
-unsigned long qla2x00_req_dmp;
 
 /*
  * Stats for all adpaters.
@@ -53,92 +45,70 @@ int apiHBAInstance;
 /*
  * Module parameter information and variables
  */
-
-char *ql2xdevconf;
-int ql2xretrycount = 20;
-int qla2xenbinq = 1;
-int ql2xlogintimeout = 20;
-int qlport_down_retry;
 int ql2xmaxqdepth;
-int displayConfig;
-int ql2xplogiabsentdevice;
-int ql2xintrdelaytimer = 10;
-
-/* Enable for failover */
-int ConfigRequired;
-
-/* Persistent binding type */
-int Bind = BIND_BY_PORT_NAME;
-
-int ql2xsuspendcount = SUSPEND_COUNT;
-
-int ql2xdoinitscan = 1;
-
-int qla2x00_retryq_dmp;
-
-#if defined(MODULE)
-char *ql2xopts;
-
-/* insmod qla2100 ql2xopts=verbose" */
-MODULE_PARM(ql2xopts, "s");
-MODULE_PARM_DESC(ql2xopts,
-		"Additional driver options.");
-
-MODULE_PARM(ql2xmaxqdepth, "i");
+module_param(ql2xmaxqdepth, int, 0);
 MODULE_PARM_DESC(ql2xmaxqdepth,
 		"Maximum queue depth to report for target devices.");
 
-MODULE_PARM(ql2xlogintimeout,"i");
+int ql2xlogintimeout = 20;
+module_param(ql2xlogintimeout, int, 0);
 MODULE_PARM_DESC(ql2xlogintimeout,
 		"Login timeout value in seconds.");
 
-MODULE_PARM(qlport_down_retry,"i");
+int qlport_down_retry;
+module_param(qlport_down_retry, int, 0);
 MODULE_PARM_DESC(qlport_down_retry,
 		"Maximum number of command retries to a port that returns"
 		"a PORT-DOWN status.");
 
-MODULE_PARM(ql2xretrycount,"i");
+int ql2xretrycount = 20;
+module_param(ql2xretrycount, int, 0);
 MODULE_PARM_DESC(ql2xretrycount,
 		"Maximum number of mid-layer retries allowed for a command.  "
 		"Default value is 20, ");
 
-MODULE_PARM(displayConfig, "i");
+int displayConfig;
+module_param(displayConfig, int, 0);
 MODULE_PARM_DESC(displayConfig,
 		"If 1 then display the configuration used in /etc/modules.conf.");
 
-MODULE_PARM(ql2xplogiabsentdevice, "i");
+int ql2xplogiabsentdevice;
+module_param(ql2xplogiabsentdevice, int, 0);
 MODULE_PARM_DESC(ql2xplogiabsentdevice,
 		"Option to enable PLOGI to devices that are not present after "
 		"a Fabric scan.  This is needed for several broken switches."
 		"Default is 0 - no PLOGI. 1 - perfom PLOGI.");
 
-MODULE_PARM(ql2xintrdelaytimer,"i");
+int ql2xintrdelaytimer = 10;
+module_param(ql2xintrdelaytimer, int, 0);
 MODULE_PARM_DESC(ql2xintrdelaytimer,
 		"ZIO: Waiting time for Firmware before it generates an "
 		"interrupt to the host to notify completion of request.");
 
-MODULE_PARM(ConfigRequired, "i");
+int ConfigRequired;
+module_param(ConfigRequired, int, 0);
 MODULE_PARM_DESC(ConfigRequired,
 		"If 1, then only configured devices passed in through the"
 		"ql2xopts parameter will be presented to the OS");
 
-MODULE_PARM(Bind, "i");
+int Bind = BIND_BY_PORT_NAME;
+module_param(Bind, int, 0);
 MODULE_PARM_DESC(Bind,
 		"Target persistent binding method: "
 		"0 by Portname (default); 1 by PortID; 2 by Nodename. ");
 
-MODULE_PARM(ql2xsuspendcount,"i");
+int ql2xsuspendcount = SUSPEND_COUNT;
+module_param(ql2xsuspendcount, int, 0);
 MODULE_PARM_DESC(ql2xsuspendcount,
 		"Number of 6-second suspend iterations to perform while a "
 		"target returns a <NOT READY> status.  Default is 10 "
 		"iterations.");
 
-MODULE_PARM(ql2xdoinitscan, "i");
+int ql2xdoinitscan = 1;
+module_param(ql2xdoinitscan, int, 0);
 MODULE_PARM_DESC(ql2xdoinitscan,
 		"Signal mid-layer to perform scan after driver load: 0 -- no "
 		"signal sent to mid-layer.");
-#endif
-
 
 /*
  * Proc structures and functions
@@ -308,7 +278,7 @@ qla2x00_delete_from_done_queue(scsi_qla_host_t *, srb_t *);
 *
 * Description:
 *   Decrement reference count and call the callback if we're the last
-*   owner of the specified sp. Will get io_request_lock before calling
+*   owner of the specified sp. Will get the host_lock before calling
 *   the callback.
 *
 * Input:
@@ -1126,11 +1096,7 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	}
 
 	vis_ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
-	if (qla2x00_failover_enabled(vis_ha))
-		/* Get Actual HA pointer */
-		ha = (scsi_qla_host_t *)sp->ha;
-	else
-		ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
+	ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
 
 	host = ha->host;
 
@@ -1233,16 +1199,6 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 
 	} 
 	spin_unlock_irqrestore(&ha->list_lock, flags);
-
-	/*
-	 * Search failover queue
-	 */
-	if (qla2x00_failover_enabled(ha)) {
-		if (!found && qla2x00_search_failover_queue(ha, cmd)) {
-			return_status = SUCCESS;
-			found++;
-		}
-	}
 
 	/*
 	 * Our SP pointer points at the command we want to remove from the
@@ -1685,14 +1641,9 @@ int
 qla2xxx_eh_host_reset(struct scsi_cmnd *cmd)
 {
 	scsi_qla_host_t *ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
-	srb_t		*sp = (srb_t *)CMD_SP(cmd);
 	int		rval = SUCCESS;
 
 	ENTER("qla2xxx_eh_host_reset");
-
-	/* Find actual ha */
-	if (qla2x00_failover_enabled(ha) && ha->host->eh_active == EH_ACTIVE)
-		ha = sp->ha;
 
 	/* Display which one we're actually resetting for debug. */
 	DEBUG(printk("qla2xxx_eh_host_reset:Resetting scsi(%ld).\n",
@@ -2095,13 +2046,12 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	INIT_LIST_HEAD(&ha->done_queue);
 	INIT_LIST_HEAD(&ha->retry_queue);
 	INIT_LIST_HEAD(&ha->scsi_retry_queue);
-	INIT_LIST_HEAD(&ha->failover_queue);
 	INIT_LIST_HEAD(&ha->pending_queue);
 
 	/*
 	 * These locks are used to prevent more than one CPU
 	 * from modifying the queue at the same time. The
-	 * higher level "io_request_lock" will reduce most
+	 * higher level "host_lock" will reduce most
 	 * contention for these locks.
 	 */
 	spin_lock_init(&ha->mbx_bits_lock);
@@ -2190,12 +2140,6 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-	/*
-	 * if failover is enabled read the user configuration
-	 */
-	if (qla2x00_failover_enabled(ha))
-		qla2x00_cfg_init(ha);
-
 	/* Enable chip interrupts. */
 	qla2x00_enable_intrs(ha);
 
@@ -2227,10 +2171,7 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 
 	/* List the target we have found */
 	if (displayConfig) {
-		if (qla2x00_failover_enabled(ha))
-			qla2x00_cfg_display_devices();
-		else
-			qla2x00_display_fc_names(ha);
+		qla2x00_display_fc_names(ha);
 	}
 
 	if (scsi_add_host(host, &pdev->dev))
@@ -2319,9 +2260,6 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 	}
 
 	qla2x00_mem_free(ha);
-
-	if (qla2x00_failover_enabled(ha))
-		qla2x00_cfg_mem_free(ha);
 
 	ha->flags.online = FALSE;
 
@@ -2523,12 +2461,6 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->qthreads, ha->retry_q_cnt,
 	    ha->done_q_cnt, ha->scsi_retry_q_cnt);
 
-	if (qla2x00_failover_enabled(ha)) {
-		copy_info(&info,
-		    "Number of reqs in failover_q= %d\n",
-		    ha->failover_cnt);
-	}
-
 	flags = (unsigned long *) &ha->flags;
 
 	if (atomic_read(&ha->loop_state) == LOOP_DOWN) {
@@ -2607,31 +2539,14 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 		if ((tq = TGT_Q(ha, i)) == NULL)
 			continue;
 
-		if (qla2x00_failover_enabled(ha)) {
-			copy_info(&info,
-			    "scsi-qla%d-port-%d="
-			    "%02x%02x%02x%02x%02x%02x%02x%02x:"
-			    "%02x%02x%02x%02x%02x%02x%02x%02x;\n",
-			    (int)ha->instance, i,
-			    tq->node_name[0], tq->node_name[1],
-			    tq->node_name[2], tq->node_name[3],
-			    tq->node_name[4], tq->node_name[5],
-			    tq->node_name[6], tq->node_name[7],
-			    tq->port_name[0], tq->port_name[1],
-			    tq->port_name[2], tq->port_name[3],
-			    tq->port_name[4], tq->port_name[5],
-			    tq->port_name[6], tq->port_name[7]);
-		} else {
-			copy_info(&info,
-			    "scsi-qla%d-target-%d="
-			    "%02x%02x%02x%02x%02x%02x%02x%02x;\n",
-			    (int)ha->instance, i,
-			    tq->port_name[0], tq->port_name[1],
-			    tq->port_name[2], tq->port_name[3],
-			    tq->port_name[4], tq->port_name[5],
-			    tq->port_name[6], tq->port_name[7]);
-		}
-
+		copy_info(&info,
+			  "scsi-qla%d-target-%d="
+			  "%02x%02x%02x%02x%02x%02x%02x%02x;\n",
+			  (int)ha->instance, i,
+			  tq->port_name[0], tq->port_name[1],
+			  tq->port_name[2], tq->port_name[3],
+			  tq->port_name[4], tq->port_name[5],
+			  tq->port_name[6], tq->port_name[7]);
 	} /* 2.25 node/port display to proc */
 
 	copy_info(&info, "\nSCSI LUN Information:\n");
@@ -3051,7 +2966,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		 * Allocate an initial list of mailbox semaphore queue to be
 		 * used for serialization of the mailbox commands.
 		 */
-		tmp_q_head = (void *)KMEM_ZALLOC(sizeof(mbx_cmdq_t), 20);
+		tmp_q_head = kmalloc(sizeof(mbx_cmdq_t), GFP_KERNEL);
 		if (tmp_q_head == NULL) {
 			/* error */
 			qla_printk(KERN_WARNING, ha,
@@ -3063,12 +2978,13 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 
 			continue;
 		}
+		memset(tmp_q_head, 0, sizeof(mbx_cmdq_t));
 		ha->mbx_sem_pool_head = tmp_q_head;
 		tmp_q_tail = tmp_q_head;
 
 		/* Now try to allocate more */
 		for (i = 1; i < MBQ_INIT_LEN; i++) {
-			ptmp = (void *)KMEM_ZALLOC(sizeof(mbx_cmdq_t), 20 + i);
+			ptmp = kmalloc(sizeof(mbx_cmdq_t), GFP_KERNEL);
 			if (ptmp == NULL) {
 				/*
 				 * Error. Just exit. If more is needed later
@@ -3076,6 +2992,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 				 */
 				break;
 			}
+			memset(ptmp, 0, sizeof(mbx_cmdq_t));
 			tmp_q_tail->pnext = ptmp;
 			tmp_q_tail = ptmp;
 		}
@@ -3187,7 +3104,7 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 	tmp_q_head = ha->mbx_sem_pool_head;
 	while (tmp_q_head != NULL) {
 		ptmp = tmp_q_head->pnext;
-		KMEM_FREE(tmp_q_head, sizeof(mbx_cmdq_t));
+		kfree(tmp_q_head);
 		tmp_q_head = ptmp;
 	}
 	ha->mbx_sem_pool_head = NULL;
@@ -3374,10 +3291,7 @@ qla2x00_do_dpc(void *data)
 
 		DEBUG3(printk("scsi(%ld): DPC handler\n", ha->host_no));
 
-		/* spin_lock_irqsave(&io_request_lock, ha->cpu_flags);*/
 		ha->dpc_active = 1;
-
-		/* Determine what action is necessary */
 
 		/* Process commands in retry queue */
 		if (test_and_clear_bit(PORT_RESTART_NEEDED, &ha->dpc_flags)) {
@@ -3604,9 +3518,6 @@ qla2x00_do_dpc(void *data)
 			DEBUG(printk("scsi(%ld): qla2x00_loop_resync - end\n",
 			    ha->host_no));
 		}
-
-		if (qla2x00_failover_enabled(ha))
-			qla2x00_process_failover_event(ha);
 
 		if (test_bit(RESTART_QUEUES_NEEDED, &ha->dpc_flags)) {
 			DEBUG(printk("scsi(%ld): qla2x00_restart_queues()\n",
@@ -3870,14 +3781,6 @@ qla2x00_timer(scsi_qla_host_t *ha)
 		qla2x00_blink_led(ha);
 
 	/*
-	 * We try and failover any request in the failover queue every second.
-	 */
-	if (!list_empty(&ha->failover_queue)) {
-		set_bit(FAILOVER_NEEDED, &ha->dpc_flags);
-		start_dpc++;
-	}
-
-	/*
 	 * Ports - Port down timer.
 	 *
 	 * Whenever, a port is in the LOST state we start decrementing its port
@@ -3986,15 +3889,6 @@ qla2x00_timer(scsi_qla_host_t *ha)
 			set_bit(RESTART_QUEUES_NEEDED, &ha->dpc_flags);
 			start_dpc++;
 
-			if (!qla2x00_failover_enabled(ha) && qla2x00_reinit &&
-				!(ha->device_flags & DFLG_NO_CABLE)) {
-
-				DEBUG(printk("scsi(%ld): Loop down - "
-				    "aborting ISP.\n",
-				    ha->host_no));
-
-				set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
-			}
 		}
 		DEBUG3(printk("scsi(%ld): Loop Down - seconds remainning %d\n",
 		    ha->host_no,
@@ -4008,28 +3902,12 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
 
-	if (test_bit(FAILOVER_EVENT_NEEDED, &ha->dpc_flags)) {
-		if (ha->failback_delay)  {
-			ha->failback_delay--;
-			if (ha->failback_delay == 0)  {
-				set_bit(FAILOVER_EVENT, &ha->dpc_flags);
-				clear_bit(FAILOVER_EVENT_NEEDED,
-				    &ha->dpc_flags);
-			}
-		} else {
-			set_bit(FAILOVER_EVENT, &ha->dpc_flags);
-			clear_bit(FAILOVER_EVENT_NEEDED, &ha->dpc_flags);
-		}
-	}
-
 	/* Schedule the DPC routine if needed */
 	if ((test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
 	    test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags) ||
 	    start_dpc ||
 	    test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags) ||
-	    test_bit(RELOGIN_NEEDED, &ha->dpc_flags) ||
-	    test_bit(FAILOVER_EVENT, &ha->dpc_flags) ||
-	    test_bit(FAILOVER_NEEDED, &ha->dpc_flags)) &&
+	    test_bit(RELOGIN_NEEDED, &ha->dpc_flags)) &&
 	    ha->dpc_wait && !ha->dpc_active) {
 
 		up(ha->dpc_wait);
@@ -4144,8 +4022,7 @@ qla2x00_cmd_timeout(srb_t *sp)
 
 	spin_lock_irqsave(&dest_ha->list_lock, flags);
 	if ((sp->state == SRB_RETRY_STATE) ||
-	    (sp->state == SRB_SCSI_RETRY_STATE) ||
-	    (sp->state == SRB_FAILOVER_STATE)) {
+	    (sp->state == SRB_SCSI_RETRY_STATE)) {
 
 		DEBUG2(printk("scsi(%ld): Found in (Scsi) Retry queue or "
 		    "failover Q pid %ld, State = %x., fcport state=%d "
@@ -4157,8 +4034,6 @@ qla2x00_cmd_timeout(srb_t *sp)
 			__del_from_retry_queue(dest_ha, sp);
 		} else if ((sp->state == SRB_SCSI_RETRY_STATE)) {
 			__del_from_scsi_retry_queue(dest_ha, sp);
-		} else if ((sp->state == SRB_FAILOVER_STATE)) {
-			__del_from_failover_queue(dest_ha, sp);
 		}
 
 		/*
@@ -4166,16 +4041,13 @@ qla2x00_cmd_timeout(srb_t *sp)
 		 * DID_NO_CONNECT status.  Otherwise set the host_byte to
 		 * DID_BUS_BUSY to let the OS  retry this cmd.
 		 */
-		if (qla2x00_failover_enabled(dest_ha))  {
-			cmd->result = DID_BUS_BUSY << 16;
+
+		if ((atomic_read(&fcport->state) == FCS_DEVICE_DEAD) ||
+		    atomic_read(&dest_ha->loop_state) == LOOP_DEAD) {
+			qla2x00_extend_timeout(cmd, EXTEND_CMD_TIMEOUT);
+			cmd->result = DID_NO_CONNECT << 16;
 		} else {
-			if ((atomic_read(&fcport->state) == FCS_DEVICE_DEAD) ||
-			    atomic_read(&dest_ha->loop_state) == LOOP_DEAD) {
-				qla2x00_extend_timeout(cmd, EXTEND_CMD_TIMEOUT);
-				cmd->result = DID_NO_CONNECT << 16;
-			} else {
-				cmd->result = DID_BUS_BUSY << 16;
-			}
+			cmd->result = DID_BUS_BUSY << 16;
 		}
 
 		__add_to_done_queue(dest_ha, sp);
@@ -4299,10 +4171,6 @@ qla2x00_done(scsi_qla_host_t *old_ha)
 				    cmd->sc_data_direction);
 			}
 		}
-
-		if (qla2x00_failover_enabled(ha) && !(sp->flags & SRB_IOCTL))
-			if (qla2x00_do_fo_check(ha, sp, vis_ha))
-				continue;
 
 		switch (host_byte(cmd->result)) {
 			case DID_OK:
@@ -4476,8 +4344,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 	 	if (!(sp->flags & SRB_IOCTL) &&
 		    (atomic_read(&fcport->state) != FCS_ONLINE ||
 			test_bit(ABORT_ISP_ACTIVE, &dest_ha->dpc_flags) ||
-			atomic_read(&dest_ha->loop_state) != LOOP_READY ||
-			(sp->flags & SRB_FAILOVER))) {
+			atomic_read(&dest_ha->loop_state) != LOOP_READY)) {
 
 			DEBUG3(printk("scsi(%ld): port=(0x%x) retry_q(%d) "
 			    "loop state = %d, loop counter = 0x%x dpc flags "
@@ -4530,46 +4397,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 		/* Process response_queue if ZIO support is enabled*/ 
 		qla2x00_process_response_queue_in_zio_mode(vis_ha);
 
-		if (dest_ha && qla2x00_failover_enabled(dest_ha))
-			qla2x00_process_response_queue_in_zio_mode(dest_ha);
 	}
-}
-
-/*
- *  qla2x00_flush_failover_queue
- *	Return cmds of a "specific" LUN from the failover queue with
- *      DID_BUS_BUSY status.
- *
- * Input:
- *	ha = adapter block pointer.
- *      q  = lun queue.
- *
- * Context:
- *	Interrupt context.
- */
-void
-qla2x00_flush_failover_q(scsi_qla_host_t *ha, os_lun_t *q)
-{
-	srb_t  *sp;
-	struct list_head *list, *temp;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ha->list_lock, flags);
-	list_for_each_safe(list, temp, &ha->failover_queue) {
-		sp = list_entry(list, srb_t, list);
-		/*
-		 * If request originated from the same lun_q then delete it
-		 * from the failover queue 
-		 */
-		if (q == sp->lun_queue) {
-			/* Remove srb from failover queue. */
-			__del_from_failover_queue(ha, sp);
-			sp->cmd->result = DID_BUS_BUSY << 16;
-			sp->cmd->host_scribble = (unsigned char *) NULL;
-			__add_to_done_queue(ha, sp);
-		}
-	}
-	spin_unlock_irqrestore(&ha->list_lock, flags);
 }
 
 
@@ -4732,10 +4560,6 @@ qla2x00_module_init(void)
 #if DEBUG_QLA2100
 	strcat(qla2x00_version_str, "-debug");
 #endif
-#if defined(CONFIG_SCSI_QLA2XXX_FAILOVER_ENABLE)
-	strcat(qla2x00_version_str, "-fo");
-#endif
-
 	/* Allocate cache for SRBs. */
 	sprintf(srb_cachep_name, "qla2xxx_srbs");
 	srb_cachep = kmem_cache_create(srb_cachep_name, sizeof(srb_t), 0,

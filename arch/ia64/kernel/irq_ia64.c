@@ -13,6 +13,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 
 #include <linux/jiffies.h>
 #include <linux/errno.h>
@@ -54,6 +55,7 @@ __u8 isa_irq_to_vector_map[16] = {
 	0x2f, 0x20, 0x2e, 0x2d, 0x2c, 0x2b, 0x2a, 0x29,
 	0x28, 0x27, 0x26, 0x25, 0x24, 0x23, 0x22, 0x21
 };
+EXPORT_SYMBOL(isa_irq_to_vector_map);
 
 int
 ia64_alloc_vector (void)

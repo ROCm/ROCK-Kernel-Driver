@@ -20,6 +20,14 @@
 #include "qla_def.h"
 #include "qla_devtbl.h"
 
+/* XXX(hch): this is ugly, but we don't want to pull in exioctl.h */
+#ifndef EXT_IS_LUN_BIT_SET
+#define EXT_IS_LUN_BIT_SET(P,L) \
+    (((P)->mask[L/8] & (0x80 >> (L%8)))?1:0)
+#define EXT_SET_LUN_BIT(P,L) \
+    ((P)->mask[L/8] |= (0x80 >> (L%8)))
+#endif
+
 /*
 *  QLogic ISP2x00 Hardware Support Function Prototypes.
 */
@@ -57,12 +65,10 @@ static uint16_t qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport);
 static os_lun_t * qla2x00_fclun_bind(scsi_qla_host_t *, fc_port_t *,
     fc_lun_t *);
 static void qla2x00_lun_free(scsi_qla_host_t *, uint16_t, uint16_t);
-static void qla2x00_get_lun_mask_from_config(scsi_qla_host_t *, fc_port_t *,
-    uint16_t, uint16_t);
-
 static int qla2x00_bstr_to_hex(char *, uint8_t *, int);
 static int qla2x00_find_propname(scsi_qla_host_t *,
     char *, char *, char *, int);
+#if 0
 static int qla2x00_get_prop_16chars(scsi_qla_host_t *,
     char *, char *, char *);
 static void qla2x00_get_properties(scsi_qla_host_t *, char *);
@@ -70,6 +76,7 @@ static void qla2x00_get_properties(scsi_qla_host_t *, char *);
 static void qla2x00_cfg_persistent_binding(scsi_qla_host_t *);
 static os_tgt_t *qla2x00_persistent_bind(scsi_qla_host_t *, uint8_t *,
     uint8_t *, port_id_t *, uint16_t);
+#endif
 
 static int qla2x00_restart_isp(scsi_qla_host_t *);
 static void qla2x00_reset_adapter(scsi_qla_host_t *);
@@ -133,6 +140,7 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 
 	qla_printk(KERN_INFO, ha, "Verifying loaded RISC code...\n");
 
+#if 0
 	/*
 	 * If the user specified a device configuration on the command line
 	 * then use it as the configuration.  Otherwise, we scan for all
@@ -140,9 +148,8 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	 */
 	if (ql2xdevconf) {
 		ha->cmdline = ql2xdevconf;
-		if (!qla2x00_failover_enabled(ha))
-			qla2x00_get_properties(ha, ql2xdevconf);
 	}
+#endif
 
 	retry = 10;
 	/*
@@ -891,7 +898,7 @@ qla2x00_fw_ready(scsi_qla_host_t *ha)
 	wtime = jiffies + (wait_time * HZ);
 
 	/* Wait for ISP to finish LIP */
-	if (!ha->flags.init_done || qla2x00_verbose)
+	if (!ha->flags.init_done)
  		qla_printk(KERN_INFO, ha, "Waiting for LIP to complete...\n");
 
 	DEBUG3(printk("scsi(%ld): Waiting for LIP to complete...\n",
@@ -1052,7 +1059,7 @@ qla2x00_configure_hba(scsi_qla_host_t *ha)
 	ha->d_id.b.area = area;
 	ha->d_id.b.al_pa = al_pa;
 
-	if (!ha->flags.init_done || qla2x00_verbose)
+	if (!ha->flags.init_done)
  		qla_printk(KERN_INFO, ha,
 		    "Topology - %s, Host Loop address 0x%x\n",
  		    connect_type, ha->loop_id);
@@ -1585,24 +1592,10 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 	if (!atomic_read(&ha->loop_down_timer) &&
 	    !(test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags))) {
 
-		if (!qla2x00_failover_enabled(ha))
-			qla2x00_config_os(ha);
-
 		/* If we found all devices then go ready */
 		if (!(test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags))) {
 			atomic_set(&ha->loop_state, LOOP_READY);
 
-#if defined(CONFIG_SCSI_QLA2XXX_FAILOVER_ENABLE)
-			if (qla2x00_failover_enabled(ha)) {
-				DEBUG(printk("scsi(%ld): schedule FAILBACK "
-				    "EVENT\n", ha->host_no));
-				if (!(test_and_set_bit(FAILOVER_EVENT_NEEDED,
-				    &ha->dpc_flags))) {
-					ha->failback_delay = ql2xfailbackTime;
-				}
-				ha->failover_type = MP_NOTIFY_LOOP_UP;
-			}
-#endif
 			DEBUG(printk("scsi(%ld): LOOP READY\n", ha->host_no));
 		} else {
 			if (test_bit(LOCAL_LOOP_UPDATE, &save_flags))
@@ -1861,7 +1854,7 @@ qla2x00_update_fcport(scsi_qla_host_t *ha, fc_port_t *fcport)
 	    PORT_RETRY_TIME;
 	atomic_set(&fcport->port_down_timer, ha->port_down_retry_count *
 	    PORT_RETRY_TIME);
-	fcport->flags &= ~(FCF_FAILOVER_NEEDED | FCF_LOGIN_NEEDED);
+	fcport->flags &= ~(FCF_LOGIN_NEEDED);
 
 	/*
 	 * Check for outstanding cmd on tape Bypass LUN discovery if active
@@ -3182,18 +3175,15 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 	}
 
 	DEBUG2(printk("%s(%ld): active=%ld, retry=%d, pending=%d, "
-			"done=%ld, failover=%d, scsi retry=%d commands.\n",
+			"done=%ld, scsi retry=%d commands.\n",
 			__func__,
 			ha->host_no,
 			ha->actthreads,
 			ha->retry_q_cnt,
 			pending_q_cnt,
 			ha->done_q_cnt,
-			ha->failover_cnt,
 			ha->scsi_retry_q_cnt);)
 
-	if (qla2x00_failover_enabled(ha))
-		qla2xxx_start_all_adapters(ha);
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
 
@@ -3352,8 +3342,6 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		tq->flags |= TQF_ONLINE;
 		tq->port_down_retry_count = ha->port_down_retry_count;
 
-		if (!qla2x00_failover_enabled(ha))
-			qla2x00_get_lun_mask_from_config(ha, fcport, tgt, 0);
 	}
 
 	if (tgt == MAX_TARGETS) {
@@ -3598,50 +3586,6 @@ qla2x00_lun_free(scsi_qla_host_t *ha, uint16_t tgt, uint16_t lun)
 
 
 /*
- * qla2x00_get_lun_mask_from_config
- *      Get lun mask from the configuration parameters.
- *      Bit order is little endian.
- *
- * Input:
- * ha  -- Host adapter
- * tgt  -- target/device number
- * port -- pointer to port
- */
-static void
-qla2x00_get_lun_mask_from_config(scsi_qla_host_t *ha,
-    fc_port_t *fcport, uint16_t tgt, uint16_t dev_no) 
-{
-	char		propbuf[60]; /* size of search string */
-	int		rval, lun, bit;
-	lun_bit_mask_t	lun_mask, *mask_ptr = &lun_mask;
-
-	/* Get "target-N-device-N-lun-mask" as a 256 bit lun_mask*/
-	sprintf(propbuf, "scsi-qla%ld-tgt-%d-di-%d-lun-disabled",
-	    ha->instance, tgt, dev_no);
-
-	rval = qla2x00_get_prop_xstr(ha, propbuf,
-	    (uint8_t *)&lun_mask, sizeof(lun_bit_mask_t));
-	if (rval == sizeof(lun_bit_mask_t)) {
-		memset(&fcport->lun_mask, 0, sizeof(lun_bit_mask_t));
-		for (lun = 8 * sizeof(lun_bit_mask_t) - 1, bit = 0;
-		    lun >= 0; lun--, bit++) {
-			if (EXT_IS_LUN_BIT_SET(mask_ptr, lun))
-				EXT_SET_LUN_BIT((&fcport->lun_mask), bit);
-		}
-
-		DEBUG3(printk("scsi(%ld): returning lun mask for fcport "
-		    "%02x%02x%02x%02x%02x%02x%02x%02x:\n",
-		    ha->host_no,
-		    fcport->port_name[0], fcport->port_name[1],
-		    fcport->port_name[2], fcport->port_name[3],
-		    fcport->port_name[4], fcport->port_name[5],
-		    fcport->port_name[6], fcport->port_name[7]));
-		DEBUG3(qla2x00_dump_buffer((uint8_t *)&fcport->lun_mask,
-		    sizeof(lun_bit_mask_t));)
-	}
-}
-
-/*
  * qla2x00_bstr_to_hex
  *	Convert hex byte string to number.
  *
@@ -3788,7 +3732,7 @@ qla2x00_find_propname(scsi_qla_host_t *ha,
 	return (0);
 }
 
-
+#if 0
 /*
  * qla2x00_get_prop_16chars
  *	Get an 8-byte property value for the specified property name by
@@ -4069,6 +4013,7 @@ qla2x00_persistent_bind(scsi_qla_host_t *ha, uint8_t *node_name,
 
 	return (tq);
 }
+#endif
 
 /*
 *  qla2x00_abort_isp

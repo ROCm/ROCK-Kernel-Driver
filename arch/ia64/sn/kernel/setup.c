@@ -398,9 +398,6 @@ sn_cpu_init(void)
 	cnode = nasid_to_cnodeid(nasid);
 	slice = cpu_physical_id_to_slice(cpuphyid);
 
-	printk("CPU %d: nasid %d, slice %d, cnode %d\n",
-			smp_processor_id(), nasid, slice, cnode);
-
 	memset(pda, 0, sizeof(pda));
 	pda->p_nodepda = nodepdaindr[cnode];
 	pda->led_address = (typeof(pda->led_address)) (LED0 + (slice<<LED_CPU_SHIFT));

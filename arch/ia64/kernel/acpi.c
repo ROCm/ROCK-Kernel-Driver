@@ -32,6 +32,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -53,6 +54,7 @@
 #define PREFIX			"ACPI: "
 
 void (*pm_idle) (void);
+EXPORT_SYMBOL(pm_idle);
 void (*pm_power_off) (void);
 
 unsigned char acpi_kbd_controller_present = 1;
@@ -629,5 +631,6 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 			(polarity == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
 			(trigger == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 }
+EXPORT_SYMBOL(acpi_register_irq);
 
 #endif /* CONFIG_ACPI_BOOT */

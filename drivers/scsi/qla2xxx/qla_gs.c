@@ -20,6 +20,10 @@
 
 #include "qla_def.h"
 
+/* XXX(hch): this is ugly, but we don't want to pull in exioctl.h */
+#ifndef EXT_DEF_FC4_TYPE_SCSI
+#define EXT_DEF_FC4_TYPE_SCSI		0x1
+#endif
 
 static inline ms_iocb_entry_t *
 qla2x00_prep_ms_iocb(scsi_qla_host_t *, uint32_t, uint32_t);

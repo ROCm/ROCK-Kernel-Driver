@@ -17,6 +17,7 @@
  * 06/24/99 W.Drummond	added boot_cpu_data.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/init.h>
 
 #include <linux/acpi.h>
@@ -60,6 +61,7 @@ int efi_enabled = 1;
 
 #ifdef CONFIG_SMP
 unsigned long __per_cpu_offset[NR_CPUS];
+EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
@@ -71,7 +73,9 @@ struct screen_info screen_info;
 
 unsigned long ia64_max_cacheline_size;
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
+EXPORT_SYMBOL(ia64_iobase);
 struct io_space io_space[MAX_IO_SPACES];
+EXPORT_SYMBOL(io_space);
 unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
@@ -86,6 +90,7 @@ unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I
  * page-size of 2^64.
  */
 unsigned long ia64_max_iommu_merge_mask = ~0UL;
+EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
 
 #define COMMAND_LINE_SIZE	512
 
@@ -317,13 +322,13 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
 #endif
+#ifdef CONFIG_SERIAL_8250_CONSOLE
 #ifdef CONFIG_SERIAL_8250_HCDP
 	if (efi.hcdp) {
 		void setup_serial_hcdp(void *);
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
-#ifdef CONFIG_SERIAL_8250_CONSOLE
 	/*
 	 * Without HCDP, we won't discover any serial ports until the serial driver looks
 	 * in the ACPI namespace.  If ACPI claims there are some legacy devices, register
@@ -520,8 +525,6 @@ identify_cpu (struct cpuinfo_ia64 *c)
 		impl_va_msb = vm2.pal_vm_info_2_s.impl_va_msb;
 		phys_addr_size = vm1.pal_vm_info_1_s.phys_add_size;
 	}
-	printk(KERN_INFO "CPU %d: %lu virtual and %lu physical address bits\n",
-	       smp_processor_id(), impl_va_msb + 1, phys_addr_size);
 	c->unimpl_va_mask = ~((7L<<61) | ((1L << (impl_va_msb + 1)) - 1));
 	c->unimpl_pa_mask = ~((1L<<63) | ((1L << phys_addr_size) - 1));
 }

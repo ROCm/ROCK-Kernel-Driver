@@ -2,8 +2,8 @@
  *
  * Name:	skgepnmi.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.109 $
- * Date:	$Date: 2003/07/17 14:15:24 $
+ * Version:	$Revision: 1.111 $
+ * Date:	$Date: 2003/09/15 13:35:35 $
  * Purpose:	Private Network Management Interface
  *
  ****************************************************************************/
@@ -27,6 +27,22 @@
  * History:
  *
  *	$Log: skgepnmi.c,v $
+ *	Revision 1.111  2003/09/15 13:35:35  tschilli
+ *	Code for OID_SKGE_PHY_LP_MODE completed (using #define SK_PHY_LP_MODE).
+ *	SK_DIAG_ATTACHED handling for OID_SKGE_DIAG_MODE in DiagActions() changed.
+ *	
+ *	Revision 1.110  2003/08/15 12:28:04  tschilli
+ *	Added new OIDs:
+ *	OID_SKGE_DRIVER_RELDATE
+ *	OID_SKGE_DRIVER_FILENAME
+ *	OID_SKGE_CHIPID
+ *	OID_SKGE_RAMSIZE
+ *	OID_SKGE_VAUXAVAIL
+ *	OID_SKGE_PHY_TYPE
+ *	OID_SKGE_PHY_LP_MODE
+ *	
+ *	Added SK_DIAG_ATTACHED handling for OID_SKGE_DIAG_MODE in DiagActions().
+ *	
  *	Revision 1.109  2003/07/17 14:15:24  tschilli
  *	Bug in SkPnmiGenIoctl() fixed.
  *	
@@ -471,7 +487,7 @@
 
 #ifndef _lint
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgepnmi.c,v 1.109 2003/07/17 14:15:24 tschilli Exp $ (C) Marvell.";
+	"@(#) $Id: skgepnmi.c,v 1.111 2003/09/15 13:35:35 tschilli Exp $ (C) Marvell.";
 #endif /* !_lint */
 
 #include "h/skdrv1st.h"
@@ -4008,14 +4024,6 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 #endif /* SK_NDIS_64BIT_CTR */
 		break;
 
-	case OID_SKGE_BOARDLEVEL:
-		if (*pLen < sizeof(SK_U32)) {
-
-			*pLen = sizeof(SK_U32);
-			return (SK_PNMI_ERR_TOO_SHORT);
-		}
-		break;
-
 	case OID_SKGE_PORT_NUMBER:
 	case OID_SKGE_DEVICE_TYPE:
 	case OID_SKGE_RESULT:
@@ -4023,6 +4031,9 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 	case OID_GEN_TRANSMIT_QUEUE_LENGTH:
 	case OID_SKGE_TRAP_NUMBER:
 	case OID_SKGE_MDB_VERSION:
+	case OID_SKGE_BOARDLEVEL:
+	case OID_SKGE_CHIPID:
+	case OID_SKGE_RAMSIZE:
 		if (*pLen < sizeof(SK_U32)) {
 
 			*pLen = sizeof(SK_U32);
@@ -4043,6 +4054,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 	case OID_SKGE_BUS_WIDTH:
 	case OID_SKGE_SENSOR_NUMBER:
 	case OID_SKGE_CHKSM_NUMBER:
+	case OID_SKGE_VAUXAVAIL:
 		if (*pLen < sizeof(SK_U8)) {
 
 			*pLen = sizeof(SK_U8);
@@ -4234,6 +4246,66 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 		*pLen = Len;
 		break;
 
+	case OID_SKGE_DRIVER_RELDATE:
+		if (pAC->Pnmi.pDriverReleaseDate == NULL) {
+
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR030,
+				SK_PNMI_ERR053MSG);
+
+			*pLen = 0;
+			return (SK_PNMI_ERR_GENERAL);
+		}
+
+		Len = SK_STRLEN(pAC->Pnmi.pDriverReleaseDate) + 1;
+		if (Len > SK_PNMI_STRINGLEN1) {
+
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR031,
+				SK_PNMI_ERR054MSG);
+
+			*pLen = 0;
+			return (SK_PNMI_ERR_GENERAL);
+		}
+
+		if (*pLen < Len) {
+
+			*pLen = Len;
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
+		*pBuf = (char)(Len - 1);
+		SK_MEMCPY(pBuf + 1, pAC->Pnmi.pDriverReleaseDate, Len - 1);
+		*pLen = Len;
+		break;
+
+	case OID_SKGE_DRIVER_FILENAME:
+		if (pAC->Pnmi.pDriverFileName == NULL) {
+
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR030,
+				SK_PNMI_ERR055MSG);
+
+			*pLen = 0;
+			return (SK_PNMI_ERR_GENERAL);
+		}
+
+		Len = SK_STRLEN(pAC->Pnmi.pDriverFileName) + 1;
+		if (Len > SK_PNMI_STRINGLEN1) {
+
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR031,
+				SK_PNMI_ERR056MSG);
+
+			*pLen = 0;
+			return (SK_PNMI_ERR_GENERAL);
+		}
+
+		if (*pLen < Len) {
+
+			*pLen = Len;
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
+		*pBuf = (char)(Len - 1);
+		SK_MEMCPY(pBuf + 1, pAC->Pnmi.pDriverFileName, Len - 1);
+		*pLen = Len;
+		break;
+
 	case OID_SKGE_HW_DESCR:
 		/*
 		 * The hardware description is located in the VPD. This
@@ -4291,8 +4363,25 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 		*pLen = sizeof(SK_U16);
 		break;
 
+	case OID_SKGE_CHIPID:
+		Val32 = pAC->GIni.GIChipId;
+		SK_PNMI_STORE_U32(pBuf, Val32);
+		*pLen = sizeof(SK_U32);
+		break;
+
+	case OID_SKGE_RAMSIZE:
+		Val32 = pAC->GIni.GIRamSize;
+		SK_PNMI_STORE_U32(pBuf, Val32);
+		*pLen = sizeof(SK_U32);
+		break;
+
+	case OID_SKGE_VAUXAVAIL:
+		*pBuf = (char) pAC->GIni.GIVauxAvail;
+		*pLen = sizeof(char);
+		break;
+
 	case OID_SKGE_BUS_TYPE:
-		*pBuf = (char)SK_PNMI_BUS_PCI;
+		*pBuf = (char) SK_PNMI_BUS_PCI;
 		*pLen = sizeof(char);
 		break;
 
@@ -5435,6 +5524,9 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 		case OID_SKGE_SPEED_CAP:
 		case OID_SKGE_SPEED_MODE:
 		case OID_SKGE_SPEED_STATUS:
+#ifdef SK_PHY_LP_MODE
+		case OID_SKGE_PHY_LP_MODE:
+#endif
 			if (*pLen < (Limit - LogPortIndex) * sizeof(SK_U8)) {
 
 				*pLen = (Limit - LogPortIndex) * sizeof(SK_U8);
@@ -5443,6 +5535,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 			break;
 
         case OID_SKGE_MTU:
+        case OID_SKGE_PHY_TYPE:
 			if (*pLen < (Limit - LogPortIndex) * sizeof(SK_U32)) {
 
 				*pLen = (Limit - LogPortIndex) * sizeof(SK_U32);
@@ -5487,6 +5580,49 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 				*pBufPtr = pAC->Pnmi.Connector;
 				Offset += sizeof(char);
 				break;
+
+			case OID_SKGE_PHY_TYPE:
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						continue;
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+						Val32 = pAC->GIni.GP[PhysPortIndex].PhyType;
+						SK_PNMI_STORE_U32(pBufPtr, Val32);
+					}
+				}
+				else { /* DualNetMode */
+					
+					Val32 = pAC->GIni.GP[NetIndex].PhyType;
+					SK_PNMI_STORE_U32(pBufPtr, Val32);
+				}
+				Offset += sizeof(SK_U32);
+				break;
+
+#ifdef SK_PHY_LP_MODE
+			case OID_SKGE_PHY_LP_MODE:
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						continue;
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(pAC, LogPortIndex);
+						Val8 = (SK_U8) pAC->GIni.GP[PhysPortIndex].PPhyPowerState;
+						*pBufPtr = Val8;
+					}
+				}
+				else { /* DualNetMode */
+					
+					Val8 = (SK_U8) pAC->GIni.GP[PhysPortIndex].PPhyPowerState;
+					*pBufPtr = Val8;
+				}
+				Offset += sizeof(SK_U8);
+				break;
+#endif
 
 			case OID_SKGE_LINK_CAP:
 				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
@@ -5803,6 +5939,16 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 			return (SK_PNMI_ERR_BAD_VALUE);
 		}
 		break;
+
+#ifdef SK_PHY_LP_MODE
+	case OID_SKGE_PHY_LP_MODE:
+		if (*pLen < Limit - LogPortIndex) {
+
+			*pLen = Limit - LogPortIndex;
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
+		break;
+#endif
 
 	case OID_SKGE_MTU:
 		if (*pLen < sizeof(SK_U32)) {
@@ -6160,6 +6306,116 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 
 			Offset += sizeof(SK_U32);
 			break;
+		
+#ifdef SK_PHY_LP_MODE
+		case OID_SKGE_PHY_LP_MODE:
+			/* The preset ends here */
+			if (Action == SK_PNMI_PRESET) {
+
+				return (SK_PNMI_ERR_OK);
+			}
+
+			if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+				if (LogPortIndex == 0) {
+					Offset = 0;
+					continue;
+				}
+				else {
+					/* Set value for physical ports */
+					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(pAC, LogPortIndex);
+
+					switch (*(pBuf + Offset)) {
+						case 0:
+							/* If LowPowerMode is active, we can leave it. */
+							if (pAC->GIni.GP[PhysPortIndex].PPhyPowerState) {
+
+								Val32 = SkGmLeaveLowPowerMode(pAC, IoC, PhysPortIndex);
+								
+								if (pAC->GIni.GP[PhysPortIndex].PPhyPowerState < 3)	{
+									
+									SkDrvInitAdapter(pAC);
+								}
+								break;
+							}
+							else {
+								*pLen = 0;
+								return (SK_PNMI_ERR_GENERAL);
+							}
+						case 1:
+						case 2:
+						case 3:
+						case 4:
+							/* If no LowPowerMode is active, we can enter it. */
+							if (!pAC->GIni.GP[PhysPortIndex].PPhyPowerState) {
+
+								if ((*(pBuf + Offset)) < 3)	{
+								
+									SkDrvDeInitAdapter(pAC);
+								}
+
+								Val32 = SkGmEnterLowPowerMode(pAC, IoC, PhysPortIndex, *pBuf);
+								break;
+							}
+							else {
+								*pLen = 0;
+								return (SK_PNMI_ERR_GENERAL);
+							}
+						default:
+							*pLen = 0;
+							return (SK_PNMI_ERR_BAD_VALUE);
+					}
+				}
+			}
+			else { /* DualNetMode */
+				
+				switch (*(pBuf + Offset)) {
+					case 0:
+						/* If we are in a LowPowerMode, we can leave it. */
+						if (pAC->GIni.GP[PhysPortIndex].PPhyPowerState) {
+
+							Val32 = SkGmLeaveLowPowerMode(pAC, IoC, PhysPortIndex);
+							
+							if (pAC->GIni.GP[PhysPortIndex].PPhyPowerState < 3)	{
+
+								SkDrvInitAdapter(pAC);
+							}
+							break;
+						}
+						else {
+							*pLen = 0;
+							return (SK_PNMI_ERR_GENERAL);
+						}
+					
+					case 1:
+					case 2:
+					case 3:
+					case 4:
+						/* If we are not already in LowPowerMode, we can enter it. */
+						if (!pAC->GIni.GP[PhysPortIndex].PPhyPowerState) {
+
+							if ((*(pBuf + Offset)) < 3)	{
+
+								SkDrvDeInitAdapter(pAC);
+							}
+							else {
+
+								Val32 = SkGmEnterLowPowerMode(pAC, IoC, PhysPortIndex, *pBuf);
+							}
+							break;
+						}
+						else {
+							*pLen = 0;
+							return (SK_PNMI_ERR_GENERAL);
+						}
+					
+					default:
+						*pLen = 0;
+						return (SK_PNMI_ERR_BAD_VALUE);
+				}
+			}
+			Offset += sizeof(SK_U8);
+			break;
+#endif
 
 		default:
             SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_ERR,
@@ -6318,6 +6574,7 @@ char *pBuf)		/* Buffer used for the management data transfer */
 	unsigned int	PhysPortMax;
 	unsigned int	PhysPortIndex;
 	SK_U8		Val8;
+	SK_U32		Val32;
 	SK_BOOL		PortActiveFlag;
 	SK_GEPORT	*pPrt;
 
@@ -6339,6 +6596,14 @@ char *pBuf)		/* Buffer used for the management data transfer */
 		PortActiveFlag = SK_TRUE;
 
 		switch (Id) {
+
+		case OID_SKGE_PHY_TYPE:
+			/* Check if it is the first active port */
+			if (*pBuf == 0) {
+				Val32 = pPrt->PhyType;
+				SK_PNMI_STORE_U32(pBuf, Val32);
+				continue;
+			}
 
 		case OID_SKGE_LINK_CAP:
 
@@ -7974,6 +8239,7 @@ unsigned int TableIndex, /* Index to the Id table */
 SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 
+	SK_U32	DiagStatus;
 	SK_U32	RetCode = SK_PNMI_ERR_GENERAL;
 
 	/*
@@ -8012,7 +8278,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 		switch (Id) {
 
 		case OID_SKGE_DIAG_MODE:
-			SK_PNMI_STORE_U32(pBuf, pAC->DiagModeActive);
+			DiagStatus = pAC->Pnmi.DiagAttached;
+			SK_PNMI_STORE_U32(pBuf, DiagStatus);
 			*pLen = sizeof(SK_U32);	
 			RetCode = SK_PNMI_ERR_OK;
 			break;
@@ -8022,7 +8289,6 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 			RetCode = SK_PNMI_ERR_GENERAL;
 			break;
 		}
-
 		return (RetCode); 
 	}
 
@@ -8039,23 +8305,84 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 
 			/* Handle the SET. */
 			switch (*pBuf) {
-		
-				/* Enter the DIAG mode in the driver. */
-				case 1:
-					/* If DiagMode is not active, we can enter it. */
-					if (!pAC->DiagModeActive) {
 
-						RetCode = SkDrvEnterDiagMode(pAC);	
+				/* Attach the DIAG to this adapter. */
+				case SK_DIAG_ATTACHED:
+					/* Check if we come from running */
+					if (pAC->Pnmi.DiagAttached == SK_DIAG_RUNNING) {
+
+						RetCode = SkDrvLeaveDiagMode(pAC);
+
+					}
+					else if (pAC->Pnmi.DiagAttached == SK_DIAG_IDLE) {
+
+						RetCode = SK_PNMI_ERR_OK;
+					}	
+					
+					else {
+
+						RetCode = SK_PNMI_ERR_GENERAL;
+
+					}
+					
+					if (RetCode == SK_PNMI_ERR_OK) {
+
+						pAC->Pnmi.DiagAttached = SK_DIAG_ATTACHED;
+					}
+					break;
+
+				/* Enter the DIAG mode in the driver. */
+				case SK_DIAG_RUNNING:
+					RetCode = SK_PNMI_ERR_OK;
+					
+					/*
+					 * If DiagAttached is set, we can tell the driver
+					 * to enter the DIAG mode.
+					 */
+					if (pAC->Pnmi.DiagAttached == SK_DIAG_ATTACHED) {
+						/* If DiagMode is not active, we can enter it. */
+						if (!pAC->DiagModeActive) {
+
+							RetCode = SkDrvEnterDiagMode(pAC); 
+						}
+						else {
+
+							RetCode = SK_PNMI_ERR_GENERAL;
+						}
 					}
 					else {
 
 						RetCode = SK_PNMI_ERR_GENERAL;
 					}
+					
+					if (RetCode == SK_PNMI_ERR_OK) {
+
+						pAC->Pnmi.DiagAttached = SK_DIAG_RUNNING;
+					}
 					break;
 
-				/* Leave the DIAG mode in the driver. */
-				case 0:
-					RetCode = SkDrvLeaveDiagMode(pAC);	
+				case SK_DIAG_IDLE:
+					/* Check if we come from running */
+					if (pAC->Pnmi.DiagAttached == SK_DIAG_RUNNING) {
+
+						RetCode = SkDrvLeaveDiagMode(pAC);
+
+					}
+					else if (pAC->Pnmi.DiagAttached == SK_DIAG_ATTACHED) {
+
+						RetCode = SK_PNMI_ERR_OK;
+					}	
+					
+					else {
+
+						RetCode = SK_PNMI_ERR_GENERAL;
+
+					}
+
+					if (RetCode == SK_PNMI_ERR_OK) {
+
+						pAC->Pnmi.DiagAttached = SK_DIAG_IDLE;
+					}
 					break;
 
 				default:

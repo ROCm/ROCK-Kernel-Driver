@@ -46,6 +46,7 @@ struct device;
 struct device_driver;
 struct class;
 struct class_device;
+struct class_simple;
 
 struct bus_type {
 	char			* name;
@@ -155,6 +156,7 @@ struct class {
 			   int num_envp, char *buffer, int buffer_size);
 
 	void	(*release)(struct class_device *dev);
+	void	(*class_release)(struct class *class);
 };
 
 extern int class_register(struct class *);
@@ -245,6 +247,13 @@ struct class_interface {
 
 extern int class_interface_register(struct class_interface *);
 extern void class_interface_unregister(struct class_interface *);
+
+/* interface for class simple stuff */
+extern struct class_simple *class_simple_create(struct module *owner, char *name);
+extern void class_simple_destroy(struct class_simple *cs);
+extern struct class_device *class_simple_device_add(struct class_simple *cs, dev_t dev, struct device *device, const char *fmt, ...)
+	__attribute__((format(printf,4,5)));
+extern void class_simple_device_remove(dev_t dev);
 
 
 struct device {

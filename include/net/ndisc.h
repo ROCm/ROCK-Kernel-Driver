@@ -98,6 +98,17 @@ extern int			igmp6_event_report(struct sk_buff *skb);
 
 extern void			igmp6_cleanup(void);
 
+#ifdef CONFIG_SYSCTL
+extern int 			ndisc_ifinfo_sysctl_change(ctl_table *ctl,
+							   int write,
+							   struct file * filp,
+							   void __user *buffer,
+							   size_t *lenp);
+#endif
+
+extern void 			inet6_ifinfo_notify(int event,
+						    struct inet6_dev *idev);
+
 static inline struct neighbour * ndisc_get_neigh(struct net_device *dev, struct in6_addr *addr)
 {
 

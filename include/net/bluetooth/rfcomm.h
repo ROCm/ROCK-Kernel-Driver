@@ -167,8 +167,8 @@ struct rfcomm_session {
 	int              initiator;
 
 	/* Default DLC parameters */
+	int    cfc;
 	uint   mtu;
-	uint   credits;
 
 	struct list_head dlcs;
 };
@@ -190,7 +190,7 @@ struct rfcomm_dlc {
 	u8            mscex;
 
 	uint          mtu;
-	uint          credits;
+	uint          cfc;
 	uint          rx_credits;
 	uint          tx_credits;
 
@@ -218,6 +218,11 @@ struct rfcomm_dlc {
 #define RFCOMM_MSCEX_TX     1
 #define RFCOMM_MSCEX_RX     2
 #define RFCOMM_MSCEX_OK     (RFCOMM_MSCEX_TX + RFCOMM_MSCEX_RX)
+
+/* CFC states */
+#define RFCOMM_CFC_UNKNOWN  -1
+#define RFCOMM_CFC_DISABLED 0
+#define RFCOMM_CFC_ENABLED  RFCOMM_MAX_CREDITS
 
 extern struct task_struct *rfcomm_thread;
 extern unsigned long rfcomm_event;

@@ -30,6 +30,8 @@
 
 #ifdef __KERNEL__
 
+#include <linux/init.h>
+#include <linux/numa.h>
 #include <asm/system.h>
 
 #define COMPILER_DEPENDENT_INT64	long
@@ -92,7 +94,6 @@ int acpi_register_irq (u32 gsi, u32 polarity, u32 trigger);
 int acpi_irq_to_vector (u32 irq);
 
 #ifdef CONFIG_ACPI_NUMA
-#include <asm/numa.h>
 /* Proximity bitmap length; _PXM is at most 255 (8 bit)*/
 #define MAX_PXM_DOMAINS (256)
 extern int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];

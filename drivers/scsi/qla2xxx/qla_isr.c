@@ -21,6 +21,12 @@
 
 #include "qla_def.h"
 
+/* XXX(hch): this is ugly, but we don't want to pull in exioctl.h */
+#ifndef EXT_DEF_PORTSPEED_1GBIT
+#define EXT_DEF_PORTSPEED_1GBIT		1
+#define EXT_DEF_PORTSPEED_2GBIT		2
+#endif
+
 static void qla2x00_mbx_completion(scsi_qla_host_t *, uint16_t);
 static void qla2x00_async_event(scsi_qla_host_t *, uint32_t);
 static void qla2x00_process_completed_request(struct scsi_qla_host *, uint32_t);
@@ -410,9 +416,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		ha->flags.management_server_logged_in = 0;
 
 		/* Update AEN queue. */
-		if (ha->ioctl->flags & IOCTL_AEN_TRACKING_ENABLE) {
-			qla2x00_enqueue_aen(ha, MBA_LIP_OCCURRED, NULL);
-		}
+		qla2x00_enqueue_aen(ha, MBA_LIP_OCCURRED, NULL);
 
 		ha->total_lip_cnt++;
 		break;
@@ -439,9 +443,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		ha->flags.management_server_logged_in = 0;
 
 		/* Update AEN queue. */
-		if (ha->ioctl->flags & IOCTL_AEN_TRACKING_ENABLE) {
-			qla2x00_enqueue_aen(ha, MBA_LOOP_UP, NULL);
-		}
+		qla2x00_enqueue_aen(ha, MBA_LOOP_UP, NULL);
 		break;
 
 	case MBA_LOOP_DOWN:		/* Loop Down Event */
@@ -459,9 +461,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		ha->current_speed = 0; /* reset value */
 
 		/* Update AEN queue. */
-		if (ha->ioctl->flags & IOCTL_AEN_TRACKING_ENABLE) {
-			qla2x00_enqueue_aen(ha, MBA_LOOP_DOWN, NULL);
-		}
+		qla2x00_enqueue_aen(ha, MBA_LOOP_DOWN, NULL);
 		break;
 
 	case MBA_LIP_RESET:		/* LIP reset occurred */
@@ -484,9 +484,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		ha->flags.management_server_logged_in = 0;
 
 		/* Update AEN queue. */
-		if (ha->ioctl->flags & IOCTL_AEN_TRACKING_ENABLE) {
-			qla2x00_enqueue_aen(ha, MBA_LIP_RESET, NULL);
-		}
+		qla2x00_enqueue_aen(ha, MBA_LIP_RESET, NULL);
 
 		ha->total_lip_cnt++;
 		break;
@@ -612,9 +610,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		set_bit(LOCAL_LOOP_UPDATE, &ha->dpc_flags);
 
 		/* Update AEN queue. */
-		if (ha->ioctl->flags & IOCTL_AEN_TRACKING_ENABLE) {
-			qla2x00_enqueue_aen(ha, MBA_PORT_UPDATE, NULL);
-		}
+		qla2x00_enqueue_aen(ha, MBA_PORT_UPDATE, NULL);
 		break;
 
 	case MBA_RSCN_UPDATE:		/* State Change Registration */
@@ -656,9 +652,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		set_bit(RSCN_UPDATE, &ha->dpc_flags);
 
 		/* Update AEN queue. */
-		if (ha->ioctl->flags & IOCTL_AEN_TRACKING_ENABLE) {
-			qla2x00_enqueue_aen(ha, MBA_RSCN_UPDATE, &mb[0]);
-		}
+		qla2x00_enqueue_aen(ha, MBA_RSCN_UPDATE, &mb[0]);
 		break;
 
 	/* case MBA_RIO_RESPONSE: */
@@ -699,9 +693,6 @@ qla2x00_process_completed_request(struct scsi_qla_host *ha, uint32_t index)
 	if (sp) {
 		/* Free outstanding command slot. */
 		ha->outstanding_cmds[index] = 0;
-
-		/* Perform any post command processing */
-		qla2x00_filter_command(ha, sp);
 
 		if (ha->actthreads)
 			ha->actthreads--;
@@ -935,9 +926,6 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 	case CS_COMPLETE:
 		if (scsi_status == 0) {
 			cp->result = DID_OK << 16;
-
-			/* Perform any post command processing */
-			qla2x00_filter_command(ha, sp);
 			break;
 		}
 		if (lscsi_status == SS_BUSY_CONDITION) {
@@ -1093,9 +1081,6 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 
 			/* Everybody online, looking good... */
 			cp->result = DID_OK << 16;
-
-			/* Perform any post command processing */
-			qla2x00_filter_command(ha, sp);
 		}
 		break;
 

@@ -1,9 +1,9 @@
 /******************************************************************************
  *
  * Name:	skqueue.h
- * Project:	Gigabit Ethernet Adapters, Schedule-Modul
- * Version:	$Revision: 1.15 $
- * Date:	$Date: 2003/05/13 17:54:57 $
+ * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.16 $
+ * Date:	$Date: 2003/09/16 12:50:32 $
  * Purpose:	Defines for the Event queue
  *
  ******************************************************************************/
@@ -27,6 +27,9 @@
  * History:
  *
  *	$Log: skqueue.h,v $
+ *	Revision 1.16  2003/09/16 12:50:32  rschmidt
+ *	Editorial changes
+ *	
  *	Revision 1.15  2003/05/13 17:54:57  mkarl
  *	Editorial changes.
  *	
@@ -47,7 +50,7 @@
  *	add: typedef SK_QUEUE
  *	
  *	Revision 1.9  1998/08/19 09:50:59  gklug
- *	fix: remove struct keyword from c-code (see CCC) add typedefs
+ *	fix: remove struct keyword from C-code (see CCC) add typedefs
  *	
  *	Revision 1.8  1998/08/18 07:00:01  gklug
  *	fix: SK_PTR not defined use void * instead.
@@ -74,8 +77,6 @@
  *	Revision 1.1  1998/07/30 14:52:12  gklug
  *	Initial version.
  *	Defines Event Classes, Event structs and queue management variables.
- *	
- *	
  *
  ******************************************************************************/
 
@@ -92,7 +93,7 @@
  */
 #define	SKGE_DRV	1	/* Driver Event Class */
 #define	SKGE_RLMT	2	/* RLMT Event Class */
-#define	SKGE_I2C	3	/* i2C Event Class */
+#define	SKGE_I2C	3	/* I2C Event Class */
 #define	SKGE_PNMI	4	/* PNMI Event Class */
 #define	SKGE_CSUM	5	/* Checksum Event Class */
 #define	SKGE_HWAC	6	/* Hardware Access Event Class */
@@ -121,25 +122,25 @@ typedef	union u_EvPara {
  * Event Queue
  *	skqueue.c
  * events are class/value pairs
- *	class	is addressee, e.g. RMT, PCM etc.
+ *	class	is addressee, e.g. RLMT, PNMI etc.
  *	value	is command, e.g. line state change, ring op change etc.
  */
 typedef	struct s_EventElem {
-	SK_U32		Class ;			/* Event class */
-	SK_U32		Event ;			/* Event value */
-	SK_EVPARA	Para ;			/* Event parameter */
+	SK_U32		Class;			/* Event class */
+	SK_U32		Event;			/* Event value */
+	SK_EVPARA	Para;			/* Event parameter */
 } SK_EVENTELEM;
 
 typedef	struct s_Queue {
 	SK_EVENTELEM	EvQueue[SK_MAX_EVENT];
-	SK_EVENTELEM	*EvPut ;
-	SK_EVENTELEM	*EvGet ;
+	SK_EVENTELEM	*EvPut;
+	SK_EVENTELEM	*EvGet;
 } SK_QUEUE;
 
 extern	void SkEventInit(SK_AC *pAC, SK_IOC Ioc, int Level);
 extern	void SkEventQueue(SK_AC *pAC, SK_U32 Class, SK_U32 Event,
 	SK_EVPARA Para);
-extern	int SkEventDispatcher(SK_AC *pAC,SK_IOC Ioc);
+extern	int SkEventDispatcher(SK_AC *pAC, SK_IOC Ioc);
 
 
 /* Define Error Numbers and messages */

@@ -304,7 +304,24 @@ static __inline__ int __sk_del_node_init(struct sock *sk)
 	return 0;
 }
 
-static inline void __sock_put(struct sock *sk);
+/* Grab socket reference count. This operation is valid only
+   when sk is ALREADY grabbed f.e. it is found in hash table
+   or a list and the lookup is made under lock preventing hash table
+   modifications.
+ */
+
+static inline void sock_hold(struct sock *sk)
+{
+	atomic_inc(&sk->sk_refcnt);
+}
+
+/* Ungrab socket in the context, which assumes that socket refcnt
+   cannot hit zero, f.e. it is true in context of any socketcall.
+ */
+static inline void __sock_put(struct sock *sk)
+{
+	atomic_dec(&sk->sk_refcnt);
+}
 
 static __inline__ int sk_del_node_init(struct sock *sk)
 {
@@ -721,25 +738,6 @@ static inline void sk_filter_charge(struct sock *sk, struct sk_filter *fp)
  *   BR_NETPROTO_LOCK, so that it has not this race condition. UNIX sockets
  *   use separate SMP lock, so that they are prone too.
  */
-
-/* Grab socket reference count. This operation is valid only
-   when sk is ALREADY grabbed f.e. it is found in hash table
-   or a list and the lookup is made under lock preventing hash table
-   modifications.
- */
-
-static inline void sock_hold(struct sock *sk)
-{
-	atomic_inc(&sk->sk_refcnt);
-}
-
-/* Ungrab socket in the context, which assumes that socket refcnt
-   cannot hit zero, f.e. it is true in context of any socketcall.
- */
-static inline void __sock_put(struct sock *sk)
-{
-	atomic_dec(&sk->sk_refcnt);
-}
 
 /* Ungrab socket and destroy it, if it was the last reference. */
 static inline void sock_put(struct sock *sk)

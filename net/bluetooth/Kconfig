@@ -21,6 +21,7 @@ config BT
 	     SCO Module (SCO links)
 	     RFCOMM Module (RFCOMM protocol)  
 	     BNEP Module (BNEP protocol)
+	     CMTP Module (CMTP protocol)
 
 	  Say Y here to enable Linux Bluetooth support and to build Bluetooth Core
 	  layer.
@@ -56,6 +57,8 @@ config BT_SCO
 source "net/bluetooth/rfcomm/Kconfig"
 
 source "net/bluetooth/bnep/Kconfig"
+
+source "net/bluetooth/cmtp/Kconfig"
 
 source "drivers/bluetooth/Kconfig"
 

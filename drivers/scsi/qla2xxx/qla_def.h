@@ -33,12 +33,6 @@
 #define PCI_DEVICE_ID_QLOGIC_ISP2322	0x2322
 #endif
 
-#if !defined(CONFIG_SCSI_QLA21XX) && !defined(CONFIG_SCSI_QLA21XX_MODULE) && \
-  !defined(CONFIG_SCSI_QLA22XX) && !defined(CONFIG_SCSI_QLA22XX_MODULE) && \
-  !defined(CONFIG_SCSI_QLA23XX) && !defined(CONFIG_SCSI_QLA23XX_MODULE)
-#error Please define an ISP type for compilation!!!
-#endif
-
 #if defined(CONFIG_SCSI_QLA21XX) || defined(CONFIG_SCSI_QLA21XX_MODULE)
 #define IS_QLA2100(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2100)
 #else
@@ -81,8 +75,6 @@
 #define FPM_2310		7
 
 #include "qla_settings.h"
-#include "exioct.h"
-#include "inioct.h"
 
 /* 
  * Data bit definitions
@@ -1927,55 +1919,6 @@ struct io_descriptor {
 	uint32_t signature;
 };
 
-
-//TODO Complete Formatting...
-
-#define MAX_IOCTL_WAIT_THREADS	32
-typedef struct _wait_q_t {
-	uint8_t			flags;
-#define WQ_IN_USE	0x1
-
-	struct semaphore	wait_q_sem;
-	struct _wait_q_t	*pnext;
-} wait_q_t;
-
-typedef struct hba_ioctl{
-
-	/* Ioctl cmd serialization */
-	uint16_t	access_bits; /* bits should be used atomically */
-#define IOCTL_ACTIVE	1 /* first bit */
-#define IOCTL_WANT	2 /* 2nd bit */
-
-	spinlock_t	wait_q_lock; /* IOCTL wait_q Queue Lock */
-	wait_q_t	wait_q_arr[MAX_IOCTL_WAIT_THREADS];
-	wait_q_t	*wait_q_head;
-	wait_q_t	*wait_q_tail;
-
-	/* Passthru cmd/completion */
-	struct semaphore	cmpl_sem;
-	struct timer_list	cmpl_timer;
-	uint8_t		ioctl_tov;
-	uint8_t		SCSIPT_InProgress;
-	uint8_t		MSIOCB_InProgress;
-
-	os_tgt_t	*ioctl_tq;
-	os_lun_t	*ioctl_lq;
-
-	/* AEN queue */
-	void		*aen_tracking_queue;/* points to async events buffer */
-	uint8_t		aen_q_head;	/* index to the current head of q */
-	uint8_t		aen_q_tail;	/* index to the current tail of q */
-
-	/* Misc. */
-	uint32_t	flags;
-#define	IOCTL_OPEN			BIT_0
-#define	IOCTL_AEN_TRACKING_ENABLE	BIT_1
-	uint8_t		*scrap_mem;	/* per ha scrap buf for ioctl usage */
-	uint32_t	scrap_mem_size; /* total size */
-	uint32_t	scrap_mem_used; /* portion used */
-
-} hba_ioctl_context;
-
 /* Mailbox command semaphore queue for command serialization */
 typedef struct _mbx_cmdq_t {
 	struct semaphore	cmd_sem;
@@ -2116,8 +2059,7 @@ typedef struct scsi_qla_host {
 	 * Need to hold the list_lock with irq's disabled in order to access
 	 * the following list.
 	 *
-	 * This list_lock is of lower priority than the io_request_lock.
-	 *
+	 * This list_lock is of lower priority than the host_lock.
 	 */
 	spinlock_t		list_lock ____cacheline_aligned;
 						/* lock to guard lists which
@@ -2323,17 +2265,17 @@ typedef struct scsi_qla_host {
 	char *model_desc;
 
 /* following are new and needed for IOCTL support */
-	hba_ioctl_context *ioctl;
-	uint8_t     node_name[WWN_SIZE];
-
-	uint8_t     optrom_major; 
-	uint8_t     optrom_minor; 
-
-	uint8_t     nvram_version; 
+#ifdef CONFIG_SCSI_QLA2XXX_IOCTL
+	struct hba_ioctl *ioctl;
 
 	void        *ioctl_mem;
 	dma_addr_t  ioctl_mem_phys;
 	uint32_t    ioctl_mem_size;
+#endif
+	uint8_t     node_name[WWN_SIZE];
+	uint8_t     nvram_version; 
+	uint8_t     optrom_major; 
+	uint8_t     optrom_minor; 
 	uint32_t    isp_abort_cnt;
 
 	/* Adapter I/O statistics for failover */
@@ -2367,9 +2309,6 @@ typedef struct scsi_qla_host {
 #define TGT_Q(ha, t) (ha->otgt[t])
 #define LUN_Q(ha, t, l)	(TGT_Q(ha, t)->olun[l])
 #define GET_LU_Q(ha, t, l) ((TGT_Q(ha,t) != NULL)? TGT_Q(ha, t)->olun[l] : NULL)
-
-#define KMEM_ZALLOC(siz,id)	qla2x00_kmem_zalloc((siz), GFP_ATOMIC, (id))
-#define KMEM_FREE(ip,siz)	kfree((ip))
 
 #define to_qla_host(x)		((scsi_qla_host_t *) (x)->hostdata)
 
@@ -2415,10 +2354,7 @@ struct _qla2x00stats  {
         unsigned long   retry_q_cnt;
 };
 
-#define SYS_DELAY(x)		udelay(x);barrier()
-#define QLA2100_DELAY(sec)	mdelay(sec * HZ)
 #define NVRAM_DELAY()		udelay(10)
-#define UDELAY(x)		udelay(x)
 
 #define INVALID_HANDLE	(MAX_OUTSTANDING_COMMANDS+1)
 
@@ -2427,7 +2363,6 @@ struct _qla2x00stats  {
  */
 #define FLASH_IMAGE_SIZE	131072
 
-#include "qla_foln.h"
 #include "qla_gbl.h"
 #include "qla_dbg.h"
 #include "qla_inline.h"

@@ -2,8 +2,8 @@
  *
  * Name:	skgeinit.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.93 $
- * Date:	$Date: 2003/05/28 15:44:43 $
+ * Version:	$Revision: 1.97 $
+ * Date:	$Date: 2003/10/02 16:45:31 $
  * Purpose:	Contains functions to initialize the adapter
  *
  ******************************************************************************/
@@ -27,6 +27,32 @@
  * History:
  *
  *	$Log: skgeinit.c,v $
+ *	Revision 1.97  2003/10/02 16:45:31  rschmidt
+ *	Replaced default values of GMAC parameters with defines.
+ *	Removed hard reset of MACs in SkGeDeInit().
+ *	Added define SK_PHY_LP_MODE around power saving mode in SkGeDeInit().
+ *	Added check for VAUX available before switch power to VAUX.
+ *	
+ *	Revision 1.96  2003/09/18 14:02:41  rroesler
+ *	Add: Perform a hardreset of MACs in GeDeInit()
+ *	
+ *	Revision 1.95  2003/09/16 14:26:59  rschmidt
+ *	Added switch power to VCC (WA for VAUX problem) in SkGeInit1().
+ *	Fixed setting PHY to coma mode and D3 power state in SkGeDeInit().
+ *	Editorial changes.
+ *	
+ *	Revision 1.94  2003/09/16 07:17:10  mschmid
+ *	Added init for new members in port structure for MAC control
+ *	- PMacColThres
+ *	- PMacJamLen
+ *	- PMacJamIpgVal
+ *	- PMacJamIpgData
+ *	- PMacIpgData
+ *	- PMacLimit4
+ *	Added init for PHY power state in port structure
+ *	- PPhyPowerState
+ *	Added shutdown handling for Yukon Plus in SkGeDeInit()
+ *	
  *	Revision 1.93  2003/05/28 15:44:43  rschmidt
  *	Added check for chip Id on WOL WA for chip Rev. A.
  *	Added setting of GILevel in SkGeDeInit().
@@ -446,7 +472,7 @@
 
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgeinit.c,v 1.93 2003/05/28 15:44:43 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skgeinit.c,v 1.97 2003/10/02 16:45:31 rschmidt Exp $ (C) Marvell.";
 #endif
 
 struct s_QOffTab {
@@ -1013,8 +1039,6 @@ int		Port)		/* Port Index (MAC_1 + n) */
 	 *	- enable the FIFO
 	 */
 	
-	Word = (SK_U16)GMF_RX_CTRL_DEF;
-	
 #ifdef GENESIS
 	if (pAC->GIni.GIGenesis) {
 		/* Configure Rx MAC FIFO */
@@ -1039,6 +1063,8 @@ int		Port)		/* Port Index (MAC_1 + n) */
 		/* set Rx GMAC FIFO Flush Mask */
 		SK_OUT16(IoC, MR_ADDR(Port, RX_GMF_FL_MSK), (SK_U16)RX_FF_FL_DEF_MSK);
 		
+		Word = (SK_U16)GMF_RX_CTRL_DEF;
+
 		/* disable Rx GMAC FIFO Flush for YUKON-Lite Rev. A0 only */
 		if (pAC->GIni.GIYukonLite && pAC->GIni.GIChipId == CHIP_ID_YUKON) {
 
@@ -1809,6 +1835,13 @@ SK_IOC	IoC)		/* IO context */
 		pPrt->PAutoNegFail = SK_FALSE;
 		pPrt->PHWLinkUp = SK_FALSE;
 		pPrt->PLinkBroken = SK_TRUE; /* See WA code */
+		pPrt->PPhyPowerState = PHY_PM_OPERATIONAL_MODE;
+		pPrt->PMacColThres = TX_COL_DEF;
+		pPrt->PMacJamLen = TX_JAM_LEN_DEF;
+		pPrt->PMacJamIpgVal	= TX_JAM_IPG_DEF;
+		pPrt->PMacJamIpgData = TX_IPG_JAM_DEF;
+		pPrt->PMacIpgData = IPG_DATA_DEF;
+		pPrt->PMacLimit4 = SK_FALSE;
 	}
 
 	pAC->GIni.GIPortUsage = SK_RED_LINK;
@@ -1963,7 +1996,7 @@ SK_IOC	IoC)		/* IO context */
 	/* restore CLK_RUN bits */
 	SK_OUT16(IoC, B0_CTST, (SK_U16)(CtrlStat &
 		(CS_CLK_RUN_HOT | CS_CLK_RUN_RST | CS_CLK_RUN_ENA)));
-	
+
 	/* read Chip Identification Number */
 	SK_IN8(IoC, B2_CHIP_ID, &Byte);
 	pAC->GIni.GIChipId = Byte;
@@ -2052,6 +2085,10 @@ SK_IOC	IoC)		/* IO context */
 				SK_OUT32(IoC, B2_FAR, DWord);
 			}
 		}
+
+		/* switch power to VCC (WA for VAUX problem) */
+		SK_OUT8(IoC, B0_POWER_CTRL, (SK_U8)(PC_VAUX_ENA | PC_VCC_ENA |
+			PC_VAUX_OFF | PC_VCC_ON));
 
 		/* read the Interrupt source */
 		SK_IN32(IoC, B0_ISRC, &DWord);
@@ -2395,6 +2432,11 @@ SK_IOC	IoC)		/* IO context */
 	int	i;
 	SK_U16	Word;
 
+#ifdef SK_PHY_LP_MODE
+	SK_U8	Byte;
+	SK_U16	PmCtlSts;
+#endif /* SK_PHY_LP_MODE */
+
 #if (!defined(SK_SLIM) && !defined(VCPU))
 	/* ensure I2C is ready */
 	SkI2cWaitIrq(pAC, IoC);
@@ -2408,6 +2450,38 @@ SK_IOC	IoC)		/* IO context */
 			SkGeStopPort(pAC, IoC, i, SK_STOP_ALL, SK_HARD_RST);
 		}
 	}
+
+#ifdef SK_PHY_LP_MODE
+    /*
+	 * for power saving purposes within mobile environments
+	 * we set the PHY to coma mode and switch to D3 power state.
+	 */
+	if (pAC->GIni.GIYukonLite &&
+		pAC->GIni.GIChipRev == CHIP_REV_YU_LITE_A3) {
+
+		/* for all ports switch PHY to coma mode */
+		for (i = 0; i < pAC->GIni.GIMacsFound; i++) {
+			
+			SkGmEnterLowPowerMode(pAC, IoC, i, PHY_PM_DEEP_SLEEP);
+		}
+
+		if (pAC->GIni.GIVauxAvail) {
+			/* switch power to VAUX */
+			Byte = PC_VAUX_ENA | PC_VCC_ENA | PC_VAUX_ON | PC_VCC_OFF;
+
+			SK_OUT8(IoC, B0_POWER_CTRL, Byte);
+		}
+		
+		/* switch to D3 state */
+		SK_IN16(IoC, PCI_C(PCI_PM_CTL_STS), &PmCtlSts);
+
+		PmCtlSts |= PCI_PM_STATE_D3;
+
+		SK_OUT8(IoC, B2_TST_CTRL1, TST_CFG_WRITE_ON);
+
+		SK_OUT16(IoC, PCI_C(PCI_PM_CTL_STS), PmCtlSts);
+	}
+#endif /* SK_PHY_LP_MODE */
 
 	/* Reset all bits in the PCI STATUS register */
 	/*

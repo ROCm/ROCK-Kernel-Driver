@@ -1115,15 +1115,11 @@ static struct vio_driver ibmveth_driver = {
 
 static int __init ibmveth_module_init(void)
 {
-    int rc;
-
     ibmveth_printk("%s: %s %s\n", ibmveth_driver_name, ibmveth_driver_string, ibmveth_driver_version);
 
     ibmveth_proc_register_driver();
 
-    rc = vio_module_init(&ibmveth_driver);
-
-    return rc;
+    return vio_register_driver(&ibmveth_driver);
 }
 
 static void __exit ibmveth_module_exit(void)

@@ -448,21 +448,11 @@ static char banner[] __initdata = KERN_INFO "LAPB Ethernet driver version 0.02\n
 
 static int __init lapbeth_init_driver(void)
 {
-	struct net_device *dev;
-
 	dev_add_pack(&lapbeth_packet_type);
 
 	register_netdevice_notifier(&lapbeth_dev_notifier);
 
 	printk(banner);
-
-	rtnl_lock();
-	for (dev = dev_base; dev; dev = dev->next) {
-		if (dev_is_ethdev(dev)) {
-			lapbeth_new_device(dev);
-		}
-	}
-	rtnl_unlock();
 
 	return 0;
 }

@@ -775,33 +775,32 @@ restart:
 
 		if (unlikely(nx<0)) {
 			err = nx;
-			if (err == -EAGAIN) {
-				struct task_struct *tsk = current;
-				DECLARE_WAITQUEUE(wait, tsk);
-				if (!flags)
-					goto error;
+			if (err == -EAGAIN && !flags) {
+				DECLARE_WAITQUEUE(wait, current);
 
-				__set_task_state(tsk, TASK_INTERRUPTIBLE);
 				add_wait_queue(&km_waitq, &wait);
-				err = xfrm_tmpl_resolve(policy, fl, xfrm, family);
-				if (err == -EAGAIN)
-					schedule();
-				__set_task_state(tsk, TASK_RUNNING);
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule();
+				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&km_waitq, &wait);
 
-				if (err == -EAGAIN && signal_pending(current)) {
+				nx = xfrm_tmpl_resolve(policy, fl, xfrm, family);
+
+				if (nx == -EAGAIN && signal_pending(current)) {
 					err = -ERESTART;
 					goto error;
 				}
-				if (err == -EAGAIN ||
+				if (nx == -EAGAIN ||
 				    genid != atomic_read(&flow_cache_genid)) {
 					xfrm_pol_put(policy);
 					goto restart;
 				}
+				err = nx;
 			}
-			if (err)
+			if (err < 0)
 				goto error;
-		} else if (nx == 0) {
+		}
+		if (nx == 0) {
 			/* Flow passes not transformed. */
 			xfrm_pol_put(policy);
 			return 0;

@@ -224,6 +224,8 @@ struct gendisk *get_gendisk(dev_t dev, int *part)
 	return  kobj ? to_disk(kobj) : NULL;
 }
 
+EXPORT_SYMBOL(get_gendisk);
+
 #ifdef CONFIG_PROC_FS
 /* iterator */
 static void *part_start(struct seq_file *part, loff_t *pos)

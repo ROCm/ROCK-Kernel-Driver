@@ -229,7 +229,7 @@ qla2x00_mbx_q_add(scsi_qla_host_t *ha, mbx_cmdq_t **ret_mbq)
 	} else {
 		if (ha->mbx_q_tail == NULL) {
 			/* First thread to queue. */
-			set_bit(IOCTL_WANT, &ha->mbx_cmd_flags);
+			set_bit(MBX_CMD_WANT, &ha->mbx_cmd_flags);
 
 			ha->mbx_q_head = ptmp;
 		} else {
@@ -302,7 +302,9 @@ qla2x00_mbx_q_memb_alloc(scsi_qla_host_t *ha, mbx_cmdq_t **ret_mbx_q_memb)
 		/* We ran out of pre-allocated semaphores.  Try to allocate
 		 * a new one.
 		 */
-		ptmp = (void *)KMEM_ZALLOC(sizeof(mbx_cmdq_t), 40);
+		ptmp = kmalloc(sizeof(mbx_cmdq_t), GFP_ATOMIC);
+		if(ptmp)
+			memset(ptmp, 0, sizeof(mbx_cmdq_t));
 	}
 
 	*ret_mbx_q_memb = ptmp;
@@ -477,7 +479,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		/* Wait for either the timer to expire
 		 * or the mbox completion interrupt
 		 */
-		down_interruptible(&ha->mbx_intr_sem);
+		down(&ha->mbx_intr_sem);
 
 		DEBUG11(printk("qla2x00_mailbox_command:"
 		    "waking up."
@@ -1614,133 +1616,6 @@ qla2x00_get_retry_cnt(scsi_qla_host_t *ha, uint8_t *retry_cnt, uint8_t *tov,
 
 		DEBUG11(printk("qla2x00_get_retry_cnt(%ld): done. mb3=%d "
 		    "ratov=%d.\n", ha->host_no, mcp->mb[3], ratov);)
-	}
-
-	return rval;
-}
-
-/*
- * qla2x00_loopback_test
- *	Send out a LOOPBACK mailbox command.
- *
- * Input:
- *	ha = adapter block pointer.
- *	retry_cnt = pointer to login retry count.
- *	tov = pointer to login timeout value.
- *
- * Returns:
- *	qla2x00 local function return status code.
- *
- * Context:
- *	Kernel context.
- */
-int
-qla2x00_loopback_test(scsi_qla_host_t *ha, INT_LOOPBACK_REQ *req,
-    uint16_t *ret_mb)
-{
-	int		rval;
-	mbx_cmd_t	mc;
-	mbx_cmd_t	*mcp = &mc;
-
-	DEBUG11(printk("qla2x00_send_loopback: req.Options=%x iterations=%x "
-	    "MAILBOX_CNT=%d.\n", req->Options, req->IterationCount,
-	    MAILBOX_REGISTER_COUNT);)
-
-	memset(mcp->mb, 0 , sizeof(mcp->mb));
-
-	mcp->mb[0] = MBC_DIAGNOSTIC_LOOP_BACK;
-	mcp->mb[1] = req->Options | MBX_6;
-	mcp->mb[10] = LSW(req->TransferCount);
-	mcp->mb[11] = MSW(req->TransferCount);
-	mcp->mb[14] = LSW(ha->ioctl_mem_phys); /* send data address */
-	mcp->mb[15] = MSW(ha->ioctl_mem_phys);
-	mcp->mb[20] = LSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[21] = MSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[16] = LSW(ha->ioctl_mem_phys); /* rcv data address */
-	mcp->mb[17] = MSW(ha->ioctl_mem_phys);
-	mcp->mb[6] = LSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[7] = MSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[18] = LSW(req->IterationCount); /* iteration count lsb */
-	mcp->mb[19] = MSW(req->IterationCount); /* iteration count msb */
-	mcp->out_mb = MBX_21|MBX_20|MBX_19|MBX_18|MBX_17|MBX_16|MBX_15|
-	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|MBX_1|MBX_0;
-	mcp->in_mb = MBX_19|MBX_18|MBX_3|MBX_2|MBX_1|MBX_0;
-	mcp->buf_size = req->TransferCount;
-	mcp->flags = MBX_DMA_OUT|MBX_DMA_IN|IOCTL_CMD;
-	mcp->tov = 30;
-	rval = qla2x00_mailbox_command(ha, mcp);
-
-	/* Always copy back return mailbox values. */
-	memcpy((void *)ret_mb, (void *)mcp->mb, sizeof(mcp->mb));
-
-	if (rval != QLA_SUCCESS) {
-		/* Empty. */
-		DEBUG2_3_11(printk(
-		    "qla2x00_loopback_test(%ld): mailbox command FAILED=%x.\n",
-		    ha->host_no, mcp->mb[0]);)
-	} else {
-		/* Empty. */
-		DEBUG11(printk(
-		    "qla2x00_loopback_test(%ld): done.\n", ha->host_no);)
-	}
-
-	return rval;
-}
-
-/*
- * qla2x00_echo_test
- *	Send out a DIAGNOSTIC ECHO mailbox command.
- *
- * Input:
- *	ha = adapter block pointer.
- *	retry_cnt = pointer to login retry count.
- *	tov = pointer to login timeout value.
- *
- * Returns:
- *	qla2x00 local function return status code.
- *
- * Context:
- *	Kernel context.
- */
-int
-qla2x00_echo_test(scsi_qla_host_t *ha, INT_LOOPBACK_REQ *req, uint16_t *ret_mb)
-{
-	int		rval;
-	mbx_cmd_t	mc;
-	mbx_cmd_t	*mcp = &mc;
-
-	memset(mcp->mb, 0 , sizeof(mcp->mb));
-
-	mcp->mb[0] = MBC_DIAGNOSTIC_ECHO;
-	mcp->mb[1] = BIT_6; /* use 64bit DMA addr */
-	mcp->mb[10] = req->TransferCount;
-	mcp->mb[14] = LSW(ha->ioctl_mem_phys); /* send data address */
-	mcp->mb[15] = MSW(ha->ioctl_mem_phys);
-	mcp->mb[20] = LSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[21] = MSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[16] = LSW(ha->ioctl_mem_phys); /* rcv data address */
-	mcp->mb[17] = MSW(ha->ioctl_mem_phys);
-	mcp->mb[6] = LSW(MSD(ha->ioctl_mem_phys));
-	mcp->mb[7] = MSW(MSD(ha->ioctl_mem_phys));
-	mcp->out_mb = MBX_21|MBX_20|MBX_17|MBX_16|MBX_15|MBX_14|MBX_10|
-	    MBX_7|MBX_6|MBX_1|MBX_0;
-	mcp->in_mb = MBX_0;
-	mcp->buf_size = req->TransferCount;
-	mcp->flags = MBX_DMA_OUT|MBX_DMA_IN|IOCTL_CMD;
-	mcp->tov = 30;
-	rval = qla2x00_mailbox_command(ha, mcp);
-
-	/* Always copy back return mailbox values. */
-	memcpy((void *)ret_mb, (void *)mcp->mb, sizeof(mcp->mb));
-
-	if (rval != QLA_SUCCESS) {
-		/* Empty. */
-		DEBUG2_3_11(printk(
-		    "%s(%ld): mailbox command FAILED=%x.\n", __func__,
-		    ha->host_no, mcp->mb[0]);)
-	} else {
-		/* Empty. */
-		DEBUG11(printk("%s(%ld): done.\n", __func__, ha->host_no);)
 	}
 
 	return rval;

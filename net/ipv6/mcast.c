@@ -372,9 +372,9 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 			goto done;
 	} else if (pmc->sfmode != omode) {
 		/* allow mode switches for empty-set filters */
+		ip6_mc_add_src(idev, group, omode, 0, 0, 0);
 		ip6_mc_del_src(idev, group, pmc->sfmode, 0, 0, 0);
 		pmc->sfmode = omode;
-		ip6_mc_del_src(idev, group, pmc->sfmode, 0, 0, 0);
 	}
 
 	psl = pmc->sflist;

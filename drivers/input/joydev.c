@@ -145,6 +145,7 @@ static void joydev_free(struct joydev *joydev)
 {
 	devfs_remove("js%d", joydev->minor);
 	joydev_table[joydev->minor] = NULL;
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + joydev->minor));
 	kfree(joydev);
 }
 
@@ -444,6 +445,9 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "js%d", minor);
+	class_simple_device_add(input_class, 
+				MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
+				dev->dev, "js%d", minor);
 
 	return &joydev->handle;
 }
