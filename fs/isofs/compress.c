@@ -132,7 +132,7 @@ static int zisofs_readpage(struct file *file, struct page *page)
 			brelse(ptrbh[1]);
 		goto eio;
 	}
-	cstart = le32_to_cpu(*(u32 *)(bh->b_data + (blockptr & bufmask)));
+	cstart = le32_to_cpu(*(__le32 *)(bh->b_data + (blockptr & bufmask)));
 
 	if ( indexblocks == 2 ) {
 		/* We just crossed a block boundary.  Switch to the next block */
@@ -144,7 +144,7 @@ static int zisofs_readpage(struct file *file, struct page *page)
 			goto eio;
 		}
 	}
-	cend = le32_to_cpu(*(u32 *)(bh->b_data + (blockendptr & bufmask)));
+	cend = le32_to_cpu(*(__le32 *)(bh->b_data + (blockendptr & bufmask)));
 	brelse(bh);
 
 	csize = cend-cstart;
