@@ -2354,9 +2354,10 @@ bad_inode:
 /*
  * Post the struct inode info into an on-disk inode location in the
  * buffer-cache.  This gobbles the caller's reference to the
- * buffer_head in the inode location struct.  
+ * buffer_head in the inode location struct.
+ *
+ * The caller must have write access to iloc->bh.
  */
-
 static int ext3_do_update_inode(handle_t *handle, 
 				struct inode *inode, 
 				struct ext3_iloc *iloc)
@@ -2366,12 +2367,6 @@ static int ext3_do_update_inode(handle_t *handle,
 	struct buffer_head *bh = iloc->bh;
 	int err = 0, rc, block;
 
-	if (handle) {
-		BUFFER_TRACE(bh, "get_write_access");
-		err = ext3_journal_get_write_access(handle, bh);
-		if (err)
-			goto out_brelse;
-	}
 	/* For fields not not tracking in the in-memory inode,
 	 * initialise them to zero for new inodes. */
 	if (ei->i_state & EXT3_STATE_NEW)
@@ -2633,22 +2628,21 @@ int ext3_writepage_trans_blocks(struct inode *inode)
 	return ret;
 }
 
-int
-ext3_mark_iloc_dirty(handle_t *handle, 
-		     struct inode *inode,
-		     struct ext3_iloc *iloc)
+/*
+ * The caller must have previously called ext3_reserve_inode_write().
+ * Give this, we know that the caller already has write access to iloc->bh.
+ */
+int ext3_mark_iloc_dirty(handle_t *handle,
+		struct inode *inode, struct ext3_iloc *iloc)
 {
 	int err = 0;
 
-	if (handle) {
-		/* the do_update_inode consumes one bh->b_count */
-		atomic_inc(&iloc->bh->b_count);
-		err = ext3_do_update_inode(handle, inode, iloc);
-		/* ext3_do_update_inode() does journal_dirty_metadata */
-		brelse(iloc->bh);
-	} else {
-		printk(KERN_EMERG "%s: called with no handle!\n", __FUNCTION__);
-	}
+	/* the do_update_inode consumes one bh->b_count */
+	get_bh(iloc->bh);
+
+	/* ext3_do_update_inode() does journal_dirty_metadata */
+	err = ext3_do_update_inode(handle, inode, iloc);
+	put_bh(iloc->bh);
 	return err;
 }
 
