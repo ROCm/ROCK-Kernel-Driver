@@ -580,13 +580,6 @@ static int sd_release(struct inode *inode, struct file *filp)
 	if (sd_template.module)
 		__MOD_DEC_USE_COUNT(sd_template.module);
 
-	/* check that we actually have a write back cache to synchronize */
-	if(sdkp->WCE) {
-		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
-		sd_synchronize_cache(dsk_nr, 1);
-		printk("\n");
-	}
-		       
 	return 0;
 }
 
@@ -1477,15 +1470,22 @@ static void sd_detach(Scsi_Device * sdp)
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
 		sdkp = sd_dsk_arr[dsk_nr];
 		if (sdkp->device == sdp) {
-			sdkp->device = NULL;
-			sdkp->capacity = 0;
-			/* sdkp->detaching = 1; */
 			break;
 		}
 	}
 	write_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
 	if (dsk_nr >= sd_template.dev_max)
 		return;
+
+	/* check that we actually have a write back cache to synchronize */
+	if(sdkp->WCE) {
+		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
+		sd_synchronize_cache(dsk_nr, 1);
+		printk("\n");
+	}
+	sdkp->device = NULL;
+	sdkp->capacity = 0;
+	/* sdkp->detaching = 1; */
 
 	if (sdkp->has_been_registered) {
 		sdkp->has_been_registered = 0;
