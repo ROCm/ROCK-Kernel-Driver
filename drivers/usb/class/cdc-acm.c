@@ -697,6 +697,7 @@ static void acm_disconnect(struct usb_interface *intf)
 
 static struct usb_device_id acm_ids[] = {
 	{ USB_DEVICE_INFO(USB_CLASS_COMM, 0, 0) },
+	{ USB_DEVICE_INFO(USB_CLASS_COMM, 2, 0) },
 	{ }
 };
 
