@@ -568,9 +568,38 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 			   cifs_sb_source->local_nls);
 	if(rc == -EEXIST) {
-		cifs_unlink(target_inode, target_direntry);
-		rc = CIFSSMBRename(xid, pTcon, fromName, toName,
-				   cifs_sb_source->local_nls);
+		/* check if they are the same file 
+		because rename of hardlinked files is a noop */
+		FILE_UNIX_BASIC_INFO * info_buf_source;
+		FILE_UNIX_BASIC_INFO * info_buf_target;
+
+		info_buf_source = 
+			kmalloc(2 * sizeof(FILE_UNIX_BASIC_INFO),GFP_KERNEL);
+		if(info_buf_source != NULL) {
+			info_buf_target = info_buf_source+1;
+			rc = CIFSSMBUnixQPathInfo(xid, pTcon, fromName, 
+				info_buf_source, cifs_sb_source->local_nls);
+			if(rc == 0) {
+				rc = CIFSSMBUnixQPathInfo(xid,pTcon,toName,
+						info_buf_target,
+						cifs_sb_target->local_nls);
+			}
+			if((rc == 0) && 
+				(info_buf_source->UniqueId == 
+				 info_buf_target->UniqueId)) {
+			/* do not rename since the files are hardlinked 
+			   which is a noop */
+			} else {
+			/* we either can not tell the files are hardlinked
+			(as with Windows servers) or files are not hardlinked 
+			so delete the target manually before renaming to
+			follow POSIX rather than Windows semantics */
+				cifs_unlink(target_inode, target_direntry);
+				rc = CIFSSMBRename(xid, pTcon, fromName, toName,
+					cifs_sb_source->local_nls);
+			}
+			kfree(info_buf_source);
+		} /* if we can not get memory just leave rc as EEXIST */
 	}
 
 	if((rc == -EIO)||(rc == -EEXIST)) {

@@ -1,3 +1,8 @@
+Version 1.18
+------------
+Do not rename hardlinked files (since that should be a noop). Flush
+cached write behind data when reopening a file after session abend.
+
 Version 1.17
 ------------
 Update number of blocks in file so du command is happier (in Linux a fake

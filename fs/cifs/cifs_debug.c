@@ -209,7 +209,7 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	length += item_length;
 	buf += item_length;
 	item_length = sprintf(buf,
-		"%d sessions and %d shares reconnected after failure\n",
+		"%d session %d share reconnects\n",
 		tcpSesReconnectCount.counter,tconInfoReconnectCount.counter);
 	length += item_length;
 	buf += item_length;
