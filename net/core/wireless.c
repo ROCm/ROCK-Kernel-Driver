@@ -47,14 +47,17 @@
 
 /***************************** INCLUDES *****************************/
 
-#include <asm/uaccess.h>		/* copy_to_user() */
 #include <linux/config.h>		/* Not needed ??? */
 #include <linux/types.h>		/* off_t */
 #include <linux/netdevice.h>		/* struct ifreq, dev_get_by_name() */
+#include <linux/proc_fs.h>
 #include <linux/rtnetlink.h>		/* rtnetlink stuff */
-
+#include <linux/seq_file.h>
 #include <linux/wireless.h>		/* Pretty obvious */
+
 #include <net/iw_handler.h>		/* New driver API */
+
+#include <asm/uaccess.h>		/* copy_to_user() */
 
 /**************************** CONSTANTS ****************************/
 
@@ -330,83 +333,83 @@ static inline int get_priv_size(__u16	args)
 /*
  * Print one entry (line) of /proc/net/wireless
  */
-static inline int sprintf_wireless_stats(char *buffer, struct net_device *dev)
+static __inline__ void wireless_seq_printf_stats(struct seq_file *seq,
+						 struct net_device *dev)
 {
 	/* Get stats from the driver */
-	struct iw_statistics *stats;
-	int size;
+	struct iw_statistics *stats = get_wireless_stats(dev);
 
-	stats = get_wireless_stats(dev);
-	if (stats != (struct iw_statistics *) NULL) {
-		size = sprintf(buffer,
-			       "%6s: %04x  %3d%c  %3d%c  %3d%c  %6d %6d %6d %6d %6d   %6d\n",
-			       dev->name,
-			       stats->status,
-			       stats->qual.qual,
-			       stats->qual.updated & 1 ? '.' : ' ',
-			       ((__u8) stats->qual.level),
-			       stats->qual.updated & 2 ? '.' : ' ',
-			       ((__u8) stats->qual.noise),
-			       stats->qual.updated & 4 ? '.' : ' ',
-			       stats->discard.nwid,
-			       stats->discard.code,
-			       stats->discard.fragment,
-			       stats->discard.retries,
-			       stats->discard.misc,
-			       stats->miss.beacon);
+	if (stats) {
+		seq_printf(seq, "%6s: %04x  %3d%c  %3d%c  %3d%c  %6d %6d %6d "
+				"%6d %6d   %6d\n",
+			   dev->name, stats->status, stats->qual.qual,
+			   stats->qual.updated & 1 ? '.' : ' ',
+			   ((__u8) stats->qual.level),
+			   stats->qual.updated & 2 ? '.' : ' ',
+			   ((__u8) stats->qual.noise),
+			   stats->qual.updated & 4 ? '.' : ' ',
+			   stats->discard.nwid, stats->discard.code,
+			   stats->discard.fragment, stats->discard.retries,
+			   stats->discard.misc, stats->miss.beacon);
 		stats->qual.updated = 0;
 	}
-	else
-		size = 0;
-
-	return size;
 }
 
 /* ---------------------------------------------------------------- */
 /*
  * Print info for /proc/net/wireless (print all entries)
  */
-int dev_get_wireless_info(char * buffer, char **start, off_t offset,
-			  int length)
+static int wireless_seq_show(struct seq_file *seq, void *v)
 {
-	int		len = 0;
-	off_t		begin = 0;
-	off_t		pos = 0;
-	int		size;
-	
-	struct net_device *	dev;
+	if (v == (void *)1)
+		seq_printf(seq, "Inter-| sta-|   Quality        |   Discarded "
+				"packets               | Missed\n"
+				" face | tus | link level noise |  nwid  "
+				"crypt   frag  retry   misc | beacon\n");
+	else
+		wireless_seq_printf_stats(seq, v);
+	return 0;
+}
 
-	size = sprintf(buffer,
-		       "Inter-| sta-|   Quality        |   Discarded packets               | Missed\n"
-		       " face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon\n"
-			);
-	
-	pos += size;
-	len += size;
+extern void *dev_seq_start(struct seq_file *seq, loff_t *pos);
+extern void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos);
+extern void dev_seq_stop(struct seq_file *seq, void *v);
 
-	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
-		size = sprintf_wireless_stats(buffer + len, dev);
-		len += size;
-		pos = begin + len;
+static struct seq_operations wireless_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = wireless_seq_show,
+};
 
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			break;
-	}
-	read_unlock(&dev_base_lock);
+static int wireless_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &wireless_seq_ops);
+}
 
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= (offset - begin);		/* Start slop */
-	if (len > length)
-		len = length;			/* Ending slop */
-	if (len < 0)
-		len = 0;
+static struct file_operations wireless_seq_fops = {
+	.open    = wireless_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
 
-	return len;
+int __init wireless_proc_init(void)
+{
+	struct proc_dir_entry *p;
+	int rc = 0;
+
+	p = create_proc_entry("wireless", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &wireless_seq_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+
+void __init wireless_proc_exit(void)
+{
+	remove_proc_entry("wireless", proc_net);
 }
 #endif	/* CONFIG_PROC_FS */
 

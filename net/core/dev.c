@@ -1737,18 +1737,18 @@ static __inline__ struct net_device *dev_get_idx(struct seq_file *seq,
 	return i == pos ? dev : NULL;
 }
 
-static void *dev_seq_start(struct seq_file *seq, loff_t *pos)
+void *dev_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
 	return *pos ? dev_get_idx(seq, *pos) : (void *)1;
 }
 
-static void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	return v == (void *)1 ? dev_base : ((struct net_device *)v)->next;
 }
 
-static void dev_seq_stop(struct seq_file *seq, void *v)
+void dev_seq_stop(struct seq_file *seq, void *v)
 {
 	read_unlock(&dev_base_lock);
 }
@@ -1856,6 +1856,14 @@ static struct file_operations dev_seq_fops = {
 	.release = seq_release,
 };
 
+#ifdef WIRELESS_EXT
+extern int wireless_proc_init(void);
+extern int wireless_proc_exit(void);
+#else
+#define wireless_proc_init() 0
+#define wireless_proc_exit()
+#endif
+
 static int __init dev_proc_init(void)
 {
 	struct proc_dir_entry *p;
@@ -1865,13 +1873,15 @@ static int __init dev_proc_init(void)
 	if (!p)
 		goto out;
 	p->proc_fops = &dev_seq_fops;
+	if (wireless_proc_init())
+		goto out_dev;
 	create_proc_read_entry("net/softnet_stat", 0, 0, dev_proc_stats, NULL);
-#ifdef WIRELESS_EXT
-	proc_net_create("wireless", 0, dev_get_wireless_info);
-#endif
 	rc = 0;
 out:
 	return rc;
+out_dev:
+	remove_proc_entry("dev", proc_net);
+	goto out;
 }
 #else
 #define dev_proc_init() 0
