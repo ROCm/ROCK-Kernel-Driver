@@ -66,6 +66,13 @@ extern unsigned long __kernel_vsyscall;
 #define VSYSCALL_END vsyscall_end
 
 /*
+ * This is the range that is readable by user mode, and things
+ * acting like user mode such as get_user_pages.
+ */
+#define FIXADDR_USER_START      VSYSCALL_BASE
+#define FIXADDR_USER_END        VSYSCALL_END
+
+/*
  * Architecture-neutral AT_ values in 0-17, leave some room
  * for more of them, start the x86-specific ones at 32.
  */
