@@ -186,62 +186,6 @@ static inline void l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk, stru
 	write_unlock(&l->lock);
 }
 
-int l2cap_connect(struct sock *sk)
-{
-	bdaddr_t *src = &bt_sk(sk)->src;
-	bdaddr_t *dst = &bt_sk(sk)->dst;
-	struct l2cap_conn *conn;
-	struct hci_conn   *hcon;
-	struct hci_dev    *hdev;
-	int err = 0;
-
-	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst), l2cap_pi(sk)->psm);
-
-	if (!(hdev = hci_get_route(dst, src)))
-		return -EHOSTUNREACH;
-
-	hci_dev_lock_bh(hdev);
-
-	err = -ENOMEM;
-
-	hcon = hci_connect(hdev, ACL_LINK, dst);
-	if (!hcon)
-		goto done;
-
-	conn = l2cap_conn_add(hcon, 0);
-	if (!conn) {
-		hci_conn_put(hcon);
-		goto done;
-	}
-
-	err = 0;
-
-	/* Update source addr of the socket */
-	bacpy(src, conn->src);
-
-	l2cap_chan_add(conn, sk, NULL);
-
-	sk->state = BT_CONNECT;
-	l2cap_sock_set_timer(sk, sk->sndtimeo);
-
-	if (hcon->state == BT_CONNECTED) {
-		if (sk->type == SOCK_SEQPACKET) {
-			struct l2cap_conn_req req;
-			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
-			req.psm  = l2cap_pi(sk)->psm;
-			l2cap_send_req(conn, L2CAP_CONN_REQ, sizeof(req), &req);
-		} else {
-			l2cap_sock_clear_timer(sk);
-			sk->state = BT_CONNECTED;
-		}
-	}
-
-done:
-	hci_dev_unlock_bh(hdev);
-	hci_dev_put(hdev);
-	return err;
-}
-
 /* ---- Socket interface ---- */
 static struct sock *__l2cap_get_sock_by_addr(u16 psm, bdaddr_t *src)
 {
@@ -482,6 +426,62 @@ done:
 	return err;
 }
 
+static int l2cap_do_connect(struct sock *sk)
+{
+	bdaddr_t *src = &bt_sk(sk)->src;
+	bdaddr_t *dst = &bt_sk(sk)->dst;
+	struct l2cap_conn *conn;
+	struct hci_conn   *hcon;
+	struct hci_dev    *hdev;
+	int err = 0;
+
+	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst), l2cap_pi(sk)->psm);
+
+	if (!(hdev = hci_get_route(dst, src)))
+		return -EHOSTUNREACH;
+
+	hci_dev_lock_bh(hdev);
+
+	err = -ENOMEM;
+
+	hcon = hci_connect(hdev, ACL_LINK, dst);
+	if (!hcon)
+		goto done;
+
+	conn = l2cap_conn_add(hcon, 0);
+	if (!conn) {
+		hci_conn_put(hcon);
+		goto done;
+	}
+
+	err = 0;
+
+	/* Update source addr of the socket */
+	bacpy(src, conn->src);
+
+	l2cap_chan_add(conn, sk, NULL);
+
+	sk->state = BT_CONNECT;
+	l2cap_sock_set_timer(sk, sk->sndtimeo);
+
+	if (hcon->state == BT_CONNECTED) {
+		if (sk->type == SOCK_SEQPACKET) {
+			struct l2cap_conn_req req;
+			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
+			req.psm  = l2cap_pi(sk)->psm;
+			l2cap_send_req(conn, L2CAP_CONN_REQ, sizeof(req), &req);
+		} else {
+			l2cap_sock_clear_timer(sk);
+			sk->state = BT_CONNECTED;
+		}
+	}
+
+done:
+	hci_dev_unlock_bh(hdev);
+	hci_dev_put(hdev);
+	return err;
+}
+
 static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int alen, int flags)
 {
 	struct sockaddr_l2 *la = (struct sockaddr_l2 *) addr;
@@ -527,7 +527,7 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
 	bacpy(&bt_sk(sk)->dst, &la->l2_bdaddr);
 	l2cap_pi(sk)->psm = la->l2_psm;
 
-	if ((err = l2cap_connect(sk)))
+	if ((err = l2cap_do_connect(sk)))
 		goto done;
 
 wait:
@@ -2074,7 +2074,7 @@ static int __init l2cap_proc_init(void)
 
 static void __init l2cap_proc_cleanup(void)
 {
-        return 0;
+        return;
 }
 #endif /* CONFIG_PROC_FS */
 
