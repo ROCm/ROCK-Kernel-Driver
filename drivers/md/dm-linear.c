@@ -28,7 +28,7 @@ static int linear_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	struct linear_c *lc;
 
 	if (argc != 2) {
-		ti->error = "dm-linear: Not enough arguments";
+		ti->error = "dm-linear: Invalid argument count";
 		return -EINVAL;
 	}
 
