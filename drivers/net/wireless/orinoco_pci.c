@@ -364,9 +364,7 @@ static struct pci_driver orinoco_pci_driver = {
 	.name		= "orinoco_pci",
 	.id_table	= orinoco_pci_pci_id_table,
 	.probe		= orinoco_pci_init_one,
-	.remove		= orinoco_pci_remove_one,
-	.suspend	= 0,
-	.resume		= 0
+	.remove		= __devexit_p(orinoco_pci_remove_one),
 };
 
 static int __init orinoco_pci_init(void)
