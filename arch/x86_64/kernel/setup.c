@@ -585,7 +585,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 void __init print_cpu_info(struct cpuinfo_x86 *c)
 {
 	if (c->x86_model_id[0])
-		printk("AMD %s", c->x86_model_id);
+		printk("%s", c->x86_model_id);
 
 	if (c->x86_mask || c->cpuid_level >= 0) 
 		printk(" stepping %02x\n", c->x86_mask);

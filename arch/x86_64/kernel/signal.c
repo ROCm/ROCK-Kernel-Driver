@@ -475,8 +475,6 @@ void do_notify_resume(struct pt_regs *regs, sigset_t *oldset, __u32 thread_info_
 		do_signal(regs,oldset);
 }
 
-extern int exception_trace;
-
 void signal_fault(struct pt_regs *regs, void *frame, char *where)
 { 
 	struct task_struct *me = current; 

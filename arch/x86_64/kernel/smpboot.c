@@ -51,8 +51,7 @@
 #include <asm/desc.h>
 #include <asm/kdebug.h>
 #include <asm/tlbflush.h>
-
-extern int disable_apic;
+#include <asm/proto.h>
 
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map = 1;
@@ -66,8 +65,6 @@ struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 
 /* Set when the idlers are all forked */
 int smp_threads_ready;
-
-extern void time_init_smp(void);
 
 /*
  * Trampoline 80x86 program as an array.
@@ -128,7 +125,6 @@ static void __init synchronize_tsc_bp (void)
 	long long delta;
 	long one_usec;
 	int buggy = 0;
-	extern unsigned cpu_khz;
 
 	printk(KERN_INFO "checking TSC synchronization across %u CPUs: ",num_booting_cpus());
 
@@ -242,8 +238,6 @@ static void __init synchronize_tsc_ap (void)
 }
 #undef NR_LOOPS
 
-extern void calibrate_delay(void);
-
 static atomic_t init_deasserted;
 
 void __init smp_callin(void)
@@ -336,8 +330,6 @@ void __init smp_callin(void)
 }
 
 int cpucount;
-
-extern int cpu_idle(void);
 
 /*
  * Activate a secondary processor.
@@ -559,8 +551,6 @@ static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned int start_
 
 	return (send_status | accept_status);
 }
-
-extern unsigned long cpu_initialized;
 
 static void __init do_boot_cpu (int apicid)
 {

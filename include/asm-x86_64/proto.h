@@ -16,13 +16,20 @@ extern void mcheck_init(struct cpuinfo_x86 *c);
 extern void init_memory_mapping(void);
 
 extern void system_call(void); 
+extern int kernel_syscall(void);
+extern void syscall_init(void);
+
+extern void ia32_syscall(void);
 extern void ia32_cstar_target(void); 
+
 extern void calibrate_delay(void);
 extern void cpu_idle(void);
 extern void sys_ni_syscall(void);
 extern void config_acpi_tables(void);
 extern void ia32_syscall(void);
 extern void iommu_hole_init(void);
+
+extern void time_init_smp(void);
 
 extern void do_softirq_thunk(void);
 
@@ -39,7 +46,11 @@ extern unsigned long numa_free_all_bootmem(void);
 extern void reserve_bootmem_generic(unsigned long phys, unsigned len);
 extern void free_bootmem_generic(unsigned long phys, unsigned len);
 
+extern void load_gs_index(unsigned gs);
+
 extern unsigned long end_pfn_map; 
+
+extern unsigned long cpu_initialized;
 
 extern void show_stack(unsigned long * rsp);
 extern void show_trace(unsigned long * rsp);
@@ -66,9 +77,16 @@ extern unsigned long max_mapnr;
 extern unsigned long end_pfn; 
 extern unsigned long table_start, table_end;
 
-extern void syscall_init(void);
+extern int exception_trace;
+extern int no_iommu, force_mmu;
+extern int using_apic_timer;
+extern int disable_apic;
+extern unsigned cpu_khz;
 
-struct pt_regs;
+extern int fallback_aper_order;
+extern int fallback_aper_force;
+
+extern void smp_local_timer_interrupt(struct pt_regs * regs);
 
 long do_arch_prctl(struct task_struct *task, int code, unsigned long addr);
 

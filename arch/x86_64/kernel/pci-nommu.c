@@ -2,12 +2,11 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/string.h>
+#include <asm/proto.h>
 
 /* 
  * Dummy IO MMU functions
  */
-
-extern unsigned long end_pfn;
 
 void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t *dma_handle)
