@@ -156,6 +156,10 @@ struct pcmcia_device {
 
 	struct list_head	socket_device_list;
 
+	/* deprecated, a cleaned up version will be moved into this
+	   struct soon */
+	dev_link_t		*instance;
+
 	struct device		dev;
 };
 
