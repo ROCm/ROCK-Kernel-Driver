@@ -173,15 +173,15 @@ static int create_strip_zones (mddev_t *mddev)
 static int raid0_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio_vec *biovec)
 {
 	mddev_t *mddev = q->queuedata;
-	sector_t block;
-	unsigned int chunk_size;
-	unsigned int bio_sz;
+	sector_t sector;
+	unsigned int chunk_sectors;
+	unsigned int bio_sectors;
 
-	chunk_size = mddev->chunk_size >> 10;
-	block = bio->bi_sector >> 1;
-	bio_sz = (bio->bi_size + biovec->bv_len) >> 10;
+	chunk_sectors = mddev->chunk_size >> 9;
+	sector = bio->bi_sector;
+	bio_sectors = bio->bi_size >> 9;
 
-	return (chunk_size - ((block & (chunk_size - 1)) + bio_sz)) << 10;
+	return (chunk_sectors - ((sector & (chunk_sectors - 1)) + bio_sectors)) << 9;
 }
 
 static int raid0_run (mddev_t *mddev)
