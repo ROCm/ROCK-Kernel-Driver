@@ -490,7 +490,7 @@ spi_dv_device_internal(struct scsi_request *sreq, u8 *buffer)
 	}
 
 	/* test width */
-	if (i->f->set_width) {
+	if (i->f->set_width && sdev->wdtr) {
 		i->f->set_width(sdev, 1);
 
 		if (!spi_dv_device_compare_inquiry(sreq, buffer,
@@ -502,6 +502,10 @@ spi_dv_device_internal(struct scsi_request *sreq, u8 *buffer)
 	}
 
 	if (!i->f->set_period)
+		return;
+
+	/* device can't handle synchronous */
+	if(!sdev->ppr && !sdev->sdtr)
 		return;
 
 	/* now set up to the maximum */
