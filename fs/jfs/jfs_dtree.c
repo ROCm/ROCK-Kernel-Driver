@@ -3045,6 +3045,14 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				t = (dtslot_t *) & p->slot[next];
 				name_ptr += outlen;
 				d_namleft -= len;
+				/* Sanity Check */
+				if (d_namleft == 0) {
+					jERROR(1,("JFS:Dtree error: "
+					  "ino = %ld, bn=%Ld, index = %d\n",
+						  ip->i_ino, bn, i));
+					updateSuper(ip->i_sb, FM_DIRTY);
+					goto skip_one;
+				}
 				len = min(d_namleft, DTSLOTDATALEN);
 				outlen = jfs_strfromUCS_le(name_ptr, t->name,
 							   len, codepage);
@@ -3056,6 +3064,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			if (filldir(dirent, d_name, d_namlen, filp->f_pos,
 				    le32_to_cpu(d->inumber), DT_UNKNOWN))
 				goto out;
+skip_one:
 			if (!do_index)
 				dtoffset->index++;
 		}
