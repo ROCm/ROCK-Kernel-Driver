@@ -168,6 +168,7 @@ typedef struct pglist_data {
 	unsigned long node_size;
 	int node_id;
 	struct pglist_data *pgdat_next;
+	wait_queue_head_t       kswapd_wait;
 } pg_data_t;
 
 extern int numnodes;

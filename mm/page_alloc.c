@@ -348,8 +348,12 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	classzone->need_balance = 1;
 	mb();
 	/* we're somewhat low on memory, failed to find what we needed */
-	if (waitqueue_active(&kswapd_wait))
-		wake_up_interruptible(&kswapd_wait);
+	for (i = 0; zones[i] != NULL; i++) {
+		struct zone *z = zones[i];
+		if (z->free_pages <= z->pages_low &&
+		    waitqueue_active(&z->zone_pgdat->kswapd_wait))
+			wake_up_interruptible(&z->zone_pgdat->kswapd_wait);
+	}
 
 	/* Go through the zonelist again, taking __GFP_HIGH into account */
 	min = 1UL << order;
@@ -836,6 +840,8 @@ void __init free_area_init_core(pg_data_t *pgdat,
 	unsigned long zone_start_pfn = pgdat->node_start_pfn;
 
 	pgdat->nr_zones = 0;
+	init_waitqueue_head(&pgdat->kswapd_wait);
+	
 	local_offset = 0;                /* offset within lmem_map */
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
