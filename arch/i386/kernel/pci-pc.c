@@ -1132,9 +1132,21 @@ static void __devinit  pci_fixup_umc_ide(struct pci_dev *d)
 	 */
 	int i;
 
-	printk("PCI: Fixing base address flags for device %s\n", d->slot_name);
+	printk(KERN_WARNING "PCI: Fixing base address flags for device %s\n", d->slot_name);
 	for(i=0; i<4; i++)
 		d->resource[i].flags |= PCI_BASE_ADDRESS_SPACE_IO;
+}
+
+static void __devinit  pci_fixup_ncr53c810(struct pci_dev *d)
+{
+    /*
+     * NCR 53C810 returns class code 0 (at least on some systems).
+     * Fix class to be PCI_CLASS_STORAGE_SCSI
+     */
+    if (!d->class) {
+        printk("PCI: fixing NCR 53C810 class code for %s\n", d->slot_name);
+        d->class = PCI_CLASS_STORAGE_SCSI << 8;
+    }
 }
 
 static void __devinit pci_fixup_ide_bases(struct pci_dev *d)
@@ -1228,6 +1240,7 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8622,	        pci_fixup_via_northbridge_bug },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8361,	        pci_fixup_via_northbridge_bug },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8367_0,	pci_fixup_via_northbridge_bug },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NCR,	PCI_DEVICE_ID_NCR_53C810,	pci_fixup_ncr53c810 },
 	{ 0 }
 };
 
