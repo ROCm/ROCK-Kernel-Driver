@@ -92,13 +92,15 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (vma->vm_end - vma->vm_start < HPAGE_SIZE)
 		return -EINVAL;
 
+	down(&inode->i_sem);
+
 	bytes = huge_pages_needed(mapping, vma, vma->vm_start, vma->vm_end);
+	ret = -ENOMEM;
 	if (!sysctl_overcommit_hugepages && !is_hugepage_mem_enough(bytes))
-		return -ENOMEM;
+		goto out;
 	    
 	vma_len = (loff_t)(vma->vm_end - vma->vm_start);
 
-	down(&inode->i_sem);
 	file_accessed(file);
 	vma->vm_flags |= VM_HUGETLB | VM_RESERVED;
 	vma->vm_ops = &hugetlb_vm_ops;
@@ -106,6 +108,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	len = vma_len +	((loff_t)vma->vm_pgoff << PAGE_SHIFT);
 	if (ret == 0 && inode->i_size < len)
 		inode->i_size = len;
+ out:
 	up(&inode->i_sem);
 
 	return ret;
