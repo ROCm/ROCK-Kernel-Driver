@@ -832,7 +832,7 @@ int lento_unlink(const char *pathname, struct lento_vfs_context *info)
         if(IS_ERR(name))
                 return PTR_ERR(name);
 
-        error = path_lookup(name, LOOKUP_PARENT, &nd))
+        error = path_lookup(name, LOOKUP_PARENT, &nd);
         if (error)
                 goto exit;
         error = -EISDIR;

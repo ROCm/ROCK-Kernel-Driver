@@ -1629,7 +1629,7 @@ asmlinkage long sys_link(const char * oldname, const char * newname)
 	error = __user_walk(oldname, 0, &old_nd);
 	if (error)
 		goto exit;
-	error = path_lookup(to, 0, &nd);
+	error = path_lookup(to, LOOKUP_PARENT, &nd);
 	if (error)
 		goto out;
 	error = -EXDEV;
