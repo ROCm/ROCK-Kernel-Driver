@@ -18,7 +18,10 @@
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
 
+/* Ugh.  Need to stop exporting this to modules. */
 LIST_HEAD(pci_root_buses);
+EXPORT_SYMBOL(pci_root_buses);
+
 LIST_HEAD(pci_devices);
 
 /*
@@ -643,7 +646,7 @@ int __devinit pci_bus_exists(const struct list_head *list, int nr)
 	return 0;
 }
 
-static struct pci_bus * __devinit pci_alloc_primary_bus_parented(struct device *parent, int bus)
+struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b;
 
@@ -656,46 +659,39 @@ static struct pci_bus * __devinit pci_alloc_primary_bus_parented(struct device *
 	b = pci_alloc_bus();
 	if (!b)
 		return NULL;
-	
+
 	b->dev = kmalloc(sizeof(*(b->dev)),GFP_KERNEL);
 	if (!b->dev){
 		kfree(b);
 		return NULL;
 	}
-	
+
+	b->sysdata = sysdata;
+	b->ops = ops;
+
 	list_add_tail(&b->node, &pci_root_buses);
 
 	memset(b->dev,0,sizeof(*(b->dev)));
-	sprintf(b->dev->bus_id,"pci%d",bus);
-	strcpy(b->dev->name,"Host/PCI Bridge");
 	b->dev->parent = parent;
+	sprintf(b->dev->bus_id,"pci%04x:%02x", pci_domain_nr(b), bus);
+	strcpy(b->dev->name,"Host/PCI Bridge");
 	device_register(b->dev);
 
 	b->number = b->secondary = bus;
 	b->resource[0] = &ioport_resource;
 	b->resource[1] = &iomem_resource;
-	return b;
-}
 
-struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata)
-{
-	struct pci_bus *b = pci_alloc_primary_bus_parented(parent, bus);
-	if (b) {
-		b->sysdata = sysdata;
-		b->ops = ops;
-		b->subordinate = pci_scan_child_bus(b);
-		pci_bus_add_devices(b);
-	}
+	b->subordinate = pci_scan_child_bus(b);
+
+	pci_bus_add_devices(b);
+
 	return b;
 }
 EXPORT_SYMBOL(pci_scan_bus_parented);
-
-EXPORT_SYMBOL(pci_root_buses);
 
 #ifdef CONFIG_HOTPLUG
 EXPORT_SYMBOL(pci_add_new_bus);
 EXPORT_SYMBOL(pci_do_scan_bus);
 EXPORT_SYMBOL(pci_scan_slot);
-EXPORT_SYMBOL(pci_scan_bus);
 EXPORT_SYMBOL(pci_scan_bridge);
 #endif

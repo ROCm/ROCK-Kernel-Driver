@@ -8,7 +8,7 @@ obj-$(CONFIG_PM)  += power.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 ifndef CONFIG_SPARC64
-obj-$(CONFIG_PCI) += setup-res.o
+obj-y += setup-res.o
 endif
 
 obj-$(CONFIG_HOTPLUG) += hotplug.o
@@ -29,12 +29,7 @@ obj-$(CONFIG_SGI_IP27) += setup-irq.o
 obj-$(CONFIG_SGI_IP32) += setup-irq.o
 obj-$(CONFIG_X86_VISWS) += setup-irq.o
 
-# CompactPCI hotplug requires the pbus_* functions
-ifdef CONFIG_HOTPLUG_PCI_CPCI
-obj-y += setup-bus.o
-endif
-
-# Hotplug (eg, cardbus) now requires setup-bus
+# Cardbus & CompactPCI use setup-bus
 obj-$(CONFIG_HOTPLUG) += setup-bus.o
 
 ifndef CONFIG_X86
