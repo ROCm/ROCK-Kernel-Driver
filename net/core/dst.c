@@ -39,7 +39,7 @@ static void dst_run_gc(unsigned long);
 static void ___dst_free(struct dst_entry * dst);
 
 static struct timer_list dst_gc_timer =
-	{ data: DST_GC_MIN, function: dst_run_gc };
+	TIMER_INITIALIZER(dst_run_gc, 0, DST_GC_MIN);
 
 static void dst_run_gc(unsigned long dummy)
 {

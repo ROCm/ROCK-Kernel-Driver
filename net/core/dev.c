@@ -172,7 +172,7 @@ static struct packet_type *ptype_all;		/* Taps */
 
 #ifdef OFFLINE_SAMPLE
 static void sample_queue(unsigned long dummy);
-static struct timer_list samp_timer = { function: sample_queue };
+static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
 #endif
 
 #ifdef CONFIG_HOTPLUG
