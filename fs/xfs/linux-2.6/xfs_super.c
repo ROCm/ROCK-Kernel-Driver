@@ -835,12 +835,12 @@ init_xfs_fs( void )
 	vn_init();
 	xfs_init();
 	uuid_init();
-	vfs_initdmapi();
 	vfs_initquota();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
 		goto undo_register;
+	XFS_DM_INIT(&xfs_fs_type);
 	return 0;
 
 undo_register:
@@ -857,7 +857,7 @@ STATIC void __exit
 exit_xfs_fs( void )
 {
 	vfs_exitquota();
-	vfs_exitdmapi();
+	XFS_DM_EXIT(&xfs_fs_type);
 	unregister_filesystem(&xfs_fs_type);
 	xfs_cleanup();
 	pagebuf_terminate();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -92,6 +92,12 @@ extern void xfs_qm_exit(void);
 # define XFS_TRACE_STRING
 #endif
 
+#ifdef CONFIG_XFS_DMAPI
+# define XFS_DMAPI_STRING	"dmapi support, "
+#else
+# define XFS_DMAPI_STRING
+#endif
+
 #ifdef DEBUG
 # define XFS_DBG_STRING		"debug"
 #else
@@ -103,6 +109,7 @@ extern void xfs_qm_exit(void);
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
 				XFS_TRACE_STRING \
+				XFS_DMAPI_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
 #define LINVFS_GET_VFS(s) \
