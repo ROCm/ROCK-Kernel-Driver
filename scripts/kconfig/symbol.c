@@ -651,6 +651,74 @@ struct symbol *sym_find(const char *name)
 	return symbol;
 }
 
+struct symbol *sym_check_deps(struct symbol *sym);
+
+static struct symbol *sym_check_expr_deps(struct expr *e)
+{
+	struct symbol *sym;
+
+	if (!e)
+		return NULL;
+	switch (e->type) {
+	case E_OR:
+	case E_AND:
+		sym = sym_check_expr_deps(e->left.expr);
+		if (sym)
+			return sym;
+		return sym_check_expr_deps(e->right.expr);
+	case E_NOT:
+		return sym_check_expr_deps(e->left.expr);
+	case E_EQUAL:
+	case E_UNEQUAL:
+		sym = sym_check_deps(e->left.sym);
+		if (sym)
+			return sym;
+		return sym_check_deps(e->right.sym);
+	case E_SYMBOL:
+		return sym_check_deps(e->left.sym);
+	default:
+		break;
+	}
+	printf("Oops! How to check %d?\n", e->type);
+	return NULL;
+}
+
+struct symbol *sym_check_deps(struct symbol *sym)
+{
+	struct symbol *sym2;
+	struct property *prop;
+
+	if (sym->flags & SYMBOL_CHECK_DONE)
+		return NULL;
+	if (sym->flags & SYMBOL_CHECK) {
+		printf("Warning! Found recursive dependency: %s", sym->name);
+		return sym;
+	}
+
+	sym->flags |= (SYMBOL_CHECK | SYMBOL_CHECKED);
+	sym2 = sym_check_expr_deps(sym->rev_dep.expr);
+	if (sym2)
+		goto out;
+
+	for (prop = sym->prop; prop; prop = prop->next) {
+		if (prop->type == P_CHOICE)
+			continue;
+		sym2 = sym_check_expr_deps(prop->visible.expr);
+		if (sym2)
+			goto out;
+		if (prop->type != P_DEFAULT || sym_is_choice(sym))
+			continue;
+		sym2 = sym_check_expr_deps(prop->expr);
+		if (sym2)
+			goto out;
+	}
+out:
+	if (sym2)
+		printf(" %s", sym->name);
+	sym->flags &= ~SYMBOL_CHECK;
+	return sym2;
+}
+
 struct property *prop_alloc(enum prop_type type, struct symbol *sym)
 {
 	struct property *prop;

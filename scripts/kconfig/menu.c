@@ -94,7 +94,7 @@ void menu_set_type(int type)
 		sym->type = type;
 		return;
 	}
-	fprintf(stderr, "%s:%d: type of '%s' redefined from '%s' to '%s'\n",
+	fprintf(stderr, "%s:%d:warning: type of '%s' redefined from '%s' to '%s'\n",
 		current_entry->file->name, current_entry->lineno,
 		sym->name ? sym->name : "<choice>", sym_type_name(sym->type), sym_type_name(type));
 }
@@ -246,6 +246,47 @@ void menu_finalize(struct menu *parent)
 			menu->next = menu->list;
 			menu->list = NULL;
 		}
+	}
+
+	if (sym && !(sym->flags & SYMBOL_WARNED)) {
+		struct symbol *sym2;
+		if (sym->type == S_UNKNOWN)
+			fprintf(stderr, "%s:%d:warning: config symbol defined without type\n",
+				parent->file->name, parent->lineno);
+
+		if (sym_is_choice(sym) && !parent->prompt)
+			fprintf(stderr, "%s:%d:warning: choice must have a prompt\n",
+				parent->file->name, parent->lineno);
+
+		for (prop = sym->prop; prop; prop = prop->next) {
+			switch (prop->type) {
+			case P_DEFAULT:
+				if ((sym->type == S_STRING || sym->type == S_INT || sym->type == S_HEX) &&
+				    prop->expr->type != E_SYMBOL)
+					fprintf(stderr, "%s:%d:warning: default must be a single symbol\n",
+						prop->file->name, prop->lineno);
+				break;
+			case P_SELECT:
+				sym2 = prop_get_symbol(prop);
+				if ((sym->type != S_BOOLEAN && sym->type != S_TRISTATE) ||
+				    (sym2->type != S_BOOLEAN && sym2->type != S_TRISTATE))
+					fprintf(stderr, "%s:%d:warning: enable is only allowed with boolean and tristate symbols\n",
+						prop->file->name, prop->lineno);
+				break;
+			case P_RANGE:
+				if (sym->type != S_INT && sym->type != S_HEX)
+					fprintf(stderr, "%s:%d:warning: range is only allowed for int or hex symbols\n",
+						prop->file->name, prop->lineno);
+				if (!sym_string_valid(sym, prop->expr->left.sym->name) ||
+				    !sym_string_valid(sym, prop->expr->right.sym->name))
+					fprintf(stderr, "%s:%d:warning: range is invalid\n",
+						prop->file->name, prop->lineno);
+				break;
+			default:
+				;
+			}
+		}
+		sym->flags |= SYMBOL_WARNED;
 	}
 
 	if (sym && !sym_is_optional(sym) && parent->prompt) {

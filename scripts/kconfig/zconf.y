@@ -477,6 +477,9 @@ symbol:	  T_WORD	{ $$ = sym_lookup($1, 0); free($1); }
 
 void conf_parse(const char *name)
 {
+	struct symbol *sym;
+	int i;
+
 	zconf_initscan(name);
 
 	sym_init();
@@ -489,6 +492,12 @@ void conf_parse(const char *name)
 	if (zconfnerrs)
 		exit(1);
 	menu_finalize(&rootmenu);
+	for_all_symbols(i, sym) {
+                if (!(sym->flags & SYMBOL_CHECKED) && sym_check_deps(sym))
+                        printf("\n");
+		else
+			sym->flags |= SYMBOL_CHECK_DONE;
+        }
 
 	sym_change_count = 1;
 }
