@@ -58,14 +58,12 @@ static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	struct thread_struct * t = &current->thread;
-	int cpu = get_cpu();
+	struct tss_struct *tss;
 
 	if ((from + num <= from) || (from + num > IO_BITMAP_SIZE*32))
 		return -EINVAL;
 	if (turn_on && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
-
-	struct tss_struct * tss = init_tss + cpu;
 
 	/*
 	 * If it's the first ioperm() call in this thread's lifetime, set the
@@ -74,10 +72,8 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	 */
 	if (!t->io_bitmap_ptr) { 
 		t->io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
-		if (!t->io_bitmap_ptr) { 
-		put_cpu(); 
+		if (!t->io_bitmap_ptr)
 			return -ENOMEM;
-		}
 
 		memset(t->io_bitmap_ptr,0xff,IO_BITMAP_BYTES);
 	}
@@ -86,13 +82,13 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	 * do it in the per-thread copy and in the TSS ...
 	 */
 	set_bitmap((unsigned long *) t->io_bitmap_ptr, from, num, !turn_on);
+	tss = init_tss + get_cpu();
 	if (tss->io_map_base != IO_BITMAP_OFFSET) {
 		memcpy(tss->io_bitmap, t->io_bitmap_ptr, sizeof(tss->io_bitmap));
 		tss->io_map_base = IO_BITMAP_OFFSET;
 	} else {
-	set_bitmap((unsigned long *) tss->io_bitmap, from, num, !turn_on);
+		set_bitmap((unsigned long *) tss->io_bitmap, from, num, !turn_on);
 	}
-
 	put_cpu();
 	return 0;
 }
