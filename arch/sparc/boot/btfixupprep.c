@@ -171,6 +171,8 @@ main1:
 			}
 		} else if (buffer[nbase+4] != '_')
 			continue;
+		if (!strcmp (sect, ".text.exit"))
+			continue;
 		if (strcmp (sect, ".text") &&
 		    strcmp (sect, ".init.text") &&
 		    strcmp (sect, ".fixup") &&
