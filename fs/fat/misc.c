@@ -155,7 +155,7 @@ int fat_add_cluster(struct inode *inode)
 		ret = fat_access(sb, last, new_dclus);
 		if (ret < 0)
 			return ret;
-		fat_cache_add(inode, new_fclus, new_dclus);
+//		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
 		MSDOS_I(inode)->i_start = new_dclus;
 		MSDOS_I(inode)->i_logstart = new_dclus;

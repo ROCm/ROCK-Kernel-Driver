@@ -24,16 +24,23 @@ EXPORT_SYMBOL(fat_scan);
 EXPORT_SYMBOL(fat_add_entries);
 EXPORT_SYMBOL(fat_dir_empty);
 
+int __init fat_cache_init(void);
+void __exit fat_cache_destroy(void);
 int __init fat_init_inodecache(void);
 void __exit fat_destroy_inodecache(void);
 static int __init init_fat_fs(void)
 {
+	int ret;
 	fat_hash_init();
+	ret = fat_cache_init();
+	if (ret < 0)
+		return ret;
 	return fat_init_inodecache();
 }
 
 static void __exit exit_fat_fs(void)
 {
+	fat_cache_destroy();
 	fat_destroy_inodecache();
 }
 

@@ -26,15 +26,6 @@ struct fat_mount_options {
 		 nocase:1;	  /* Does this need case conversion? 0=need case conversion*/
 };
 
-#define FAT_CACHE_NR	8 /* number of FAT cache */
-
-struct fat_cache {
-	int start_cluster; /* first cluster of the chain. */
-	int file_cluster; /* cluster number in the file. */
-	int disk_cluster; /* cluster number on disk. */
-	struct fat_cache *next; /* next cache entry */
-};
-
 struct msdos_sb_info {
 	unsigned short sec_per_clus; /* sectors/cluster */
 	unsigned short cluster_bits; /* log2(cluster_size) */
@@ -59,7 +50,6 @@ struct msdos_sb_info {
 	int dir_per_block_bits;	     /* log2(dir_per_block) */
 
 	spinlock_t cache_lock;
-	struct fat_cache cache_array[FAT_CACHE_NR], *cache;
 };
 
 #endif

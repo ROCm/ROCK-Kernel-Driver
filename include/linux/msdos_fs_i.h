@@ -8,9 +8,8 @@
  */
 
 struct msdos_inode_info {
-	/* cache of lastest accessed cluster */
-	int file_cluster;	/* cluster number in the file. */
-	int disk_cluster;	/* cluster number on disk. */
+	struct list_head cache_lru;
+	int nr_caches;
 
 	loff_t mmu_private;
 	int i_start;	/* first cluster or 0 */

@@ -533,7 +533,6 @@ static int fat_read_root(struct inode *inode)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int error;
 
-	MSDOS_I(inode)->file_cluster = MSDOS_I(inode)->disk_cluster = 0;
 	MSDOS_I(inode)->i_pos = 0;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
@@ -736,6 +735,8 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
+		ei->nr_caches = 0;
+		INIT_LIST_HEAD(&ei->cache_lru);
 		INIT_HLIST_NODE(&ei->i_fat_hash);
 		inode_init_once(&ei->vfs_inode);
 	}
@@ -819,7 +820,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (error)
 		goto out_fail;
 
-	fat_cache_init(sb);
+	spin_lock_init(&MSDOS_SB(sb)->cache_lock);
 	/* set up enough so that it can read an inode */
 	init_MUTEX(&sbi->fat_lock);
 
@@ -1164,7 +1165,6 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int error;
 
-	MSDOS_I(inode)->file_cluster = MSDOS_I(inode)->disk_cluster = 0;
 	MSDOS_I(inode)->i_pos = 0;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
