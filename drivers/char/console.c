@@ -150,6 +150,7 @@ static void set_cursor(int currcons);
 static void hide_cursor(int currcons);
 static void unblank_screen_t(unsigned long dummy);
 static void console_callback(void *ignored);
+static void __init con_init_devfs (void);
 
 static int printable;		/* Is console ready for printing? */
 
@@ -2526,6 +2527,7 @@ int __init vty_init(void)
 
 	kbd_init();
 	console_map_init();
+	con_init_devfs();
 	vcs_init();
 	return 0;
 }
@@ -2624,7 +2626,7 @@ static void set_vesa_blanking(unsigned long arg)
  * is called before kmalloc() works.  This function is called later to
  * do the registration.
  */
-void __init con_init_devfs (void)
+static void __init con_init_devfs (void)
 {
 	int i;
 
