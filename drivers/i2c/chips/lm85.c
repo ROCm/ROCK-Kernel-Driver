@@ -405,7 +405,7 @@ static struct i2c_driver lm85_driver = {
 };
 
 /* Unique ID assigned to each LM85 detected */
-static int lm85_id = 0;
+static int lm85_id;
 
 
 /* 4 Fans */
@@ -707,6 +707,8 @@ show_temp_reg(3);
 
 int lm85_attach_adapter(struct i2c_adapter *adapter)
 {
+	if (!(adapter->class & I2C_CLASS_HWMON))
+		return 0;
 	return i2c_detect(adapter, &addr_data, lm85_detect);
 }
 

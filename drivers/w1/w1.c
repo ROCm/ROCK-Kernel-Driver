@@ -47,9 +47,11 @@ MODULE_DESCRIPTION("Driver for 1-wire Dallas network protocol.");
 
 static int w1_timeout = 10;
 int w1_max_slave_count = 10;
+int w1_max_slave_ttl = 10;
 
 module_param_named(timeout, w1_timeout, int, 0);
 module_param_named(max_slave_count, w1_max_slave_count, int, 0);
+module_param_named(slave_ttl, w1_max_slave_ttl, int, 0);
 
 spinlock_t w1_mlock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(w1_masters);
@@ -431,6 +433,7 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 		return err;
 	}
 
+	sl->ttl = dev->slave_ttl;
 	dev->slave_count++;
 
 	memcpy(&msg.id.id, rn, sizeof(msg.id.id));
@@ -569,7 +572,7 @@ static void w1_search(struct w1_master *dev)
 		}
 
 		if (slave_count == dev->slave_count &&
-		    ((rn >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
+			rn && ((rn >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
 			w1_attach_slave_device(dev, (struct w1_reg_num *) &rn);
 		}
 	}
@@ -718,7 +721,7 @@ int w1_process(void *data)
 		list_for_each_safe(ent, n, &dev->slist) {
 			sl = list_entry(ent, struct w1_slave, w1_slave_entry);
 
-			if (sl && !test_bit(W1_SLAVE_ACTIVE, (unsigned long *)&sl->flags)) {
+			if (sl && !test_bit(W1_SLAVE_ACTIVE, (unsigned long *)&sl->flags) && !--sl->ttl) {
 				list_del (&sl->w1_slave_entry);
 
 				w1_slave_detach (sl);
@@ -726,6 +729,8 @@ int w1_process(void *data)
 
 				dev->slave_count--;
 			}
+			else if (test_bit(W1_SLAVE_ACTIVE, (unsigned long *)&sl->flags))
+				sl->ttl = dev->slave_ttl;
 		}
 		up(&dev->mutex);
 	}

@@ -107,14 +107,6 @@ static int wait_for_bb(struct i2c_algo_iic_data *adap)
 	return(timeout<=0);
 }
 
-/*
- * Puts this process to sleep for a period equal to timeout 
- */
-static inline void iic_sleep(unsigned long timeout)
-{
-	schedule_timeout( timeout * HZ);
-}
-
 /* After we issue a transaction on the IIC bus, this function
  * is called.  It puts this process to sleep until we get an interrupt from
  * from the controller telling us that the transaction we requested in complete.

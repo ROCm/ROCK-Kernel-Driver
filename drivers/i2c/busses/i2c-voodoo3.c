@@ -61,7 +61,7 @@
 #define TIMEOUT		(HZ / 2)
 
 
-static void *ioaddr;
+static void __iomem *ioaddr;
 
 /* The voo GPIO registers don't have individual masks for each bit
    so we always have to read before writing. */
@@ -194,6 +194,8 @@ static struct pci_device_id voodoo3_ids[] __devinitdata = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_3DFX, PCI_DEVICE_ID_3DFX_BANSHEE) },
 	{ 0, }
 };
+
+MODULE_DEVICE_TABLE (pci, voodoo3_ids);
 
 static int __devinit voodoo3_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {

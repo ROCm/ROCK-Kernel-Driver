@@ -148,7 +148,7 @@ static struct i2c_driver adm1021_driver = {
 	.detach_client	= adm1021_detach_client,
 };
 
-static int adm1021_id = 0;
+static int adm1021_id;
 
 #define show(value)	\
 static ssize_t show_##value(struct device *dev, char *buf)		\

@@ -68,7 +68,7 @@
 #define MAX_BUSSES	2
 
 struct s_i2c_bus {
-	void	*mmvga;
+	void __iomem *mmvga;
 	int	i2c_reg;
 	int	adap_ok;
 	struct i2c_adapter		adap;
@@ -76,7 +76,7 @@ struct s_i2c_bus {
 };
 
 struct s_i2c_chip {
-	void	*mmio;
+	void __iomem *mmio;
 	struct s_i2c_bus	i2c_bus[MAX_BUSSES];
 };
 
@@ -181,7 +181,7 @@ static int bit_s3via_getsda(void *bus)
 /*
  * adapter initialisation
  */
-static int i2c_register_bus(struct pci_dev *dev, struct s_i2c_bus *p, u8 *mmvga, u32 i2c_reg)
+static int i2c_register_bus(struct pci_dev *dev, struct s_i2c_bus *p, void __iomem *mmvga, u32 i2c_reg)
 {
 	int ret;
 	p->adap.owner	  = THIS_MODULE;
@@ -312,6 +312,8 @@ static struct pci_device_id prosavage_pci_tbl[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_S3, PCI_DEVICE_ID_S3_PROSAVAGE8) },
 	{ 0, },
 };
+
+MODULE_DEVICE_TABLE (pci, prosavage_pci_tbl);
 
 static struct pci_driver prosavage_driver = {
 	.name		=	"prosavage_smbus",

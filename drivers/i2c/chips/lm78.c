@@ -692,26 +692,12 @@ static int lm78_write_value(struct i2c_client *client, u8 reg, u8 value)
 /* Called when we have found a new LM78. It should set limits, etc. */
 static void lm78_init_client(struct i2c_client *client)
 {
-	struct lm78_data *data = i2c_get_clientdata(client);
-	int vid;
-
-	/* Reset all except Watchdog values and last conversion values
-	   This sets fan-divs to 2, among others */
-	lm78_write_value(client, LM78_REG_CONFIG, 0x80);
-
-	vid = lm78_read_value(client, LM78_REG_VID_FANDIV) & 0x0f;
-	if (data->type == lm79)
-		vid |=
-		    (lm78_read_value(client, LM78_REG_CHIPID) & 0x01) << 4;
-	else
-		vid |= 0x10;
-	vid = VID_FROM_REG(vid);
+	u8 config = lm78_read_value(client, LM78_REG_CONFIG);
 
 	/* Start monitoring */
-	lm78_write_value(client, LM78_REG_CONFIG,
-			 (lm78_read_value(client, LM78_REG_CONFIG) & 0xf7)
-			 | 0x01);
-
+	if (!(config & 0x01))
+		lm78_write_value(client, LM78_REG_CONFIG,
+				 (config & 0xf7) | 0x01);
 }
 
 static struct lm78_data *lm78_update_device(struct device *dev)
