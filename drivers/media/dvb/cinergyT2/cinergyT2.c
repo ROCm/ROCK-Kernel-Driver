@@ -139,6 +139,7 @@ struct cinergyt2 {
 	struct work_struct query_work;
 
 	wait_queue_head_t poll_wq;
+	int pending_fe_events;
 
 	void *streambuf;
 	dma_addr_t streambuf_dmahandle;
@@ -204,7 +205,7 @@ static const uint32_t rc_keys [] = {
 
 static int cinergyt2_command (struct cinergyt2 *cinergyt2,
 		    char *send_buf, int send_buf_len,
-		    char *rec_buf, int rec_buf_len)
+			      char *recv_buf, int recv_buf_len)
 {
 	int actual_len;
 	char dummy;
@@ -216,11 +217,11 @@ static int cinergyt2_command (struct cinergyt2 *cinergyt2,
 	if (ret)
 		dprintk(1, "usb_bulk_msg (send) failed, err %i\n", ret);
 
-	if (!rec_buf)
-		rec_buf = &dummy;
+	if (!recv_buf)
+		recv_buf = &dummy;
 
 	ret = usb_bulk_msg(cinergyt2->udev, usb_rcvbulkpipe(cinergyt2->udev, 1),
-			   rec_buf, rec_buf_len, &actual_len, HZ);
+			   recv_buf, recv_buf_len, &actual_len, HZ);
 
 	if (ret)
 		dprintk(1, "usb_bulk_msg (read) failed, err %i\n", ret);
@@ -325,7 +326,7 @@ static void cinergyt2_stop_stream_xfer (struct cinergyt2 *cinergyt2)
 
 	for (i=0; i<STREAM_URB_COUNT; i++)
 		if (cinergyt2->stream_urb[i])
-			usb_unlink_urb(cinergyt2->stream_urb[i]);
+			usb_kill_urb(cinergyt2->stream_urb[i]);
 }
 
 static int cinergyt2_start_stream_xfer (struct cinergyt2 *cinergyt2)
@@ -586,14 +587,23 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		if (copy_from_user(&p, (void *) arg, sizeof(p)))
 			return -EFAULT;
 
+		if (down_interruptible(&cinergyt2->sem))
+			return -ERESTARTSYS;
+
 		param->cmd = CINERGYT2_EP1_SET_TUNER_PARAMETERS;
 		param->tps = cpu_to_le16(compute_tps(&p));
 		param->freq = cpu_to_le32(p.frequency / 1000);
 		param->bandwidth = 8 - p.u.ofdm.bandwidth - BANDWIDTH_8_MHZ;
 
+		stat->lock_bits = 0;
+		cinergyt2->pending_fe_events++;
+		wake_up_interruptible(&cinergyt2->poll_wq);
+
 		err = cinergyt2_command(cinergyt2,
 					(char *) param, sizeof(*param),
 					NULL, 0);
+
+		up(&cinergyt2->sem);
 
 		return (err < 0) ? err : 0;
 	}
@@ -607,6 +617,24 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		 *  functionality.
 		 */
 		break;
+
+	case FE_GET_EVENT:
+	{
+		/**
+		 *  for now we only fill the status field. the parameters
+		 *  are trivial to fill as soon FE_GET_FRONTEND is done.
+		 */
+		struct dvb_frontend_event *e = (void *) arg;
+		if (cinergyt2->pending_fe_events == 0) {
+			if (file->f_flags & O_NONBLOCK)
+				return -EWOULDBLOCK;
+			wait_event_interruptible(cinergyt2->poll_wq,
+						 cinergyt2->pending_fe_events > 0);
+		}
+		cinergyt2->pending_fe_events = 0;
+		return cinergyt2_ioctl(inode, file, FE_READ_STATUS,
+					(unsigned long) &e->status);
+	}
 
 	default:
 		;
@@ -734,8 +762,10 @@ static void cinergyt2_query (void *data)
 	unc += le32_to_cpu(s->uncorrected_block_count);
 	s->uncorrected_block_count = unc;
 
-	if (lock_bits != s->lock_bits)
+	if (lock_bits != s->lock_bits) {
 		wake_up_interruptible(&cinergyt2->poll_wq);
+		cinergyt2->pending_fe_events++;
+	}
 
 	schedule_delayed_work(&cinergyt2->query_work,
 			      msecs_to_jiffies(QUERY_INTERVAL));
@@ -762,6 +792,7 @@ static int cinergyt2_probe (struct usb_interface *intf,
 	INIT_WORK(&cinergyt2->query_work, cinergyt2_query, cinergyt2);
 
 	cinergyt2->udev = interface_to_usbdev(intf);
+	cinergyt2->param.cmd = CINERGYT2_EP1_SET_TUNER_PARAMETERS;
 	
 	if (cinergyt2_alloc_stream_urbs (cinergyt2) < 0) {
 		dprintk(1, "unable to allocate stream urbs\n");

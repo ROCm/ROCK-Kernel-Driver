@@ -476,10 +476,10 @@ static int dst_type_print(u8 type)
 		otype = "satellite";
 		break;
 	case DST_TYPE_IS_TERR:
-		otype = "terrestial TV";
+		otype = "terrestrial";
 		break;
 	case DST_TYPE_IS_CABLE:
-		otype = "terrestial TV";
+		otype = "cable";
 		break;
 	default:
 		printk("%s: invalid dst type %d\n", __FUNCTION__, type);

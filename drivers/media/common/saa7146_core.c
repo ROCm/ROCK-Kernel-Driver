@@ -292,7 +292,7 @@ static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 	if (0 != (isr & (MASK_16|MASK_17))) {
 		u32 status = saa7146_read(dev, I2C_STATUS);
 		if( (0x3 == (status & 0x3)) || (0 == (status & 0x1)) ) {
-			IER_DISABLE(dev, MASK_16|MASK_17);
+			SAA7146_IER_DISABLE(dev, MASK_16|MASK_17);
 			/* only wake up if we expect something */
 			if( 0 != dev->i2c_op ) {
 				u32 psr = (saa7146_read(dev, PSR) >> 16) & 0x2;
@@ -311,7 +311,7 @@ static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 	if( 0 != isr ) {
 		ERR(("warning: interrupt enabled, but not handled properly.(0x%08x)\n",isr));
 		ERR(("disabling interrupt source(s)!\n"));
-		IER_DISABLE(dev,isr);
+		SAA7146_IER_DISABLE(dev,isr);
 	}
 	return IRQ_HANDLED;
 }

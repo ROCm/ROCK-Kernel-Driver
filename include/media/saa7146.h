@@ -51,10 +51,12 @@ extern unsigned int saa7146_debug;
 #define DEB_INT(x)  if (0!=(DEBUG_VARIABLE&0x20)) { DEBUG_PROLOG; printk x; } /* interrupt debug messages */
 #define DEB_CAP(x)  if (0!=(DEBUG_VARIABLE&0x40)) { DEBUG_PROLOG; printk x; } /* capture debug messages */
 
-#define IER_DISABLE(x,y) \
+#define SAA7146_IER_DISABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) & ~(y));
-#define IER_ENABLE(x,y) \
+#define SAA7146_IER_ENABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) | (y));
+#define SAA7146_ISR_CLEAR(x,y) \
+	saa7146_write(x, ISR, (y));
 
 struct saa7146_dev;
 struct saa7146_extension;
