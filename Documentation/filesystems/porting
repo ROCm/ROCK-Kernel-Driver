@@ -198,3 +198,20 @@ e.g.
 ->revalidate() is gone.  If your filesystem had it - provide ->getattr()
 and let it call whatever you had as ->revlidate() + (for symlinks that
 had ->revalidate()) add calls in ->follow_link()/->readlink().
+
+---
+[mandatory]
+
+->d_parent changes are not protected by BKL anymore.  Read access is safe
+if at least one of the following is true:
+	* filesystem has no cross-directory rename()
+	* dcache_lock is held
+	* dparent_lock is held (shared)
+	* we know that parent had been locked (e.g. we are looking at
+->d_parent of ->lookup() argument).
+	* we are called from ->rename().
+Audit your code and add locking if needed.  Notice that any place that is
+not protected by the conditions above is risky even in the old tree - you
+had been relying on BKL and that's prone to screwups.  Old tree had quite
+a few holes of that kind - unprotected access to ->d_parent leading to
+anything from oops to silent memory corruption.
