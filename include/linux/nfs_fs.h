@@ -202,6 +202,7 @@ struct nfs_inode {
 #define NFS_INO_INVALID_ATTR	0x0008		/* cached attrs are invalid */
 #define NFS_INO_INVALID_DATA	0x0010		/* cached data is invalid */
 #define NFS_INO_INVALID_ATIME	0x0020		/* cached atime is invalid */
+#define NFS_INO_INVALID_ACCESS	0x0040		/* cached access cred invalid */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -240,7 +241,7 @@ static inline int nfs_caches_unstable(struct inode *inode)
 static inline void NFS_CACHEINV(struct inode *inode)
 {
 	if (!nfs_caches_unstable(inode))
-		NFS_FLAGS(inode) |= NFS_INO_INVALID_ATTR;
+		NFS_FLAGS(inode) |= NFS_INO_INVALID_ATTR | NFS_INO_INVALID_ACCESS;
 }
 
 static inline int nfs_server_capable(struct inode *inode, int cap)

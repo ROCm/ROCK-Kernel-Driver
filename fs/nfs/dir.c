@@ -1452,7 +1452,7 @@ int nfs_access_get_cached(struct inode *inode, struct rpc_cred *cred, struct nfs
 
 	if (cache->cred != cred
 			|| time_after(jiffies, cache->jiffies + NFS_ATTRTIMEO(inode))
-			|| (NFS_FLAGS(inode) & NFS_INO_INVALID_ATTR))
+			|| (NFS_FLAGS(inode) & NFS_INO_INVALID_ACCESS))
 		return -ENOENT;
 	memcpy(res, cache, sizeof(*res));
 	return 0;
@@ -1466,6 +1466,7 @@ void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
 		if (cache->cred)
 			put_rpccred(cache->cred);
 		cache->cred = get_rpccred(set->cred);
+		NFS_FLAGS(inode) &= ~NFS_INO_INVALID_ACCESS;
 	}
 	cache->jiffies = set->jiffies;
 	cache->mask = set->mask;

@@ -565,9 +565,9 @@ nfs_zap_caches(struct inode *inode)
 
 	memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
 	if (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode))
-		nfsi->flags |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
+		nfsi->flags |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA|NFS_INO_INVALID_ACCESS;
 	else
-		nfsi->flags |= NFS_INO_INVALID_ATTR;
+		nfsi->flags |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_ACCESS;
 }
 
 /*
@@ -766,13 +766,8 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 			vmtruncate(inode, attr->ia_size);
 		}
 	}
-	if ((attr->ia_valid & (ATTR_MODE|ATTR_UID|ATTR_GID)) != 0) {
-		struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
-		if (*cred) {
-			put_rpccred(*cred);
-			*cred = NULL;
-		}
-	}
+	if ((attr->ia_valid & (ATTR_MODE|ATTR_UID|ATTR_GID)) != 0)
+		NFS_FLAGS(inode) |= NFS_INO_INVALID_ACCESS;
 	nfs_end_data_update(inode);
 	unlock_kernel();
 	return error;
@@ -1160,7 +1155,7 @@ int nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	if ((inode->i_mode & S_IALLUGO) != (fattr->mode & S_IALLUGO)
 			|| inode->i_uid != fattr->uid
 			|| inode->i_gid != fattr->gid)
-		nfsi->flags |= NFS_INO_INVALID_ATTR;
+		nfsi->flags |= NFS_INO_INVALID_ATTR | NFS_INO_INVALID_ACCESS;
 
 	/* Has the link count changed? */
 	if (inode->i_nlink != fattr->nlink)
@@ -1269,7 +1264,7 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 #endif
 		nfsi->change_attr = fattr->change_attr;
 		if (!data_unstable)
-			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
+			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA|NFS_INO_INVALID_ACCESS;
 	}
 
 	memcpy(&inode->i_ctime, &fattr->ctime, sizeof(inode->i_ctime));
@@ -1277,14 +1272,8 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 
 	if ((inode->i_mode & S_IALLUGO) != (fattr->mode & S_IALLUGO) ||
 	    inode->i_uid != fattr->uid ||
-	    inode->i_gid != fattr->gid) {
-		struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
-		if (*cred) {
-			put_rpccred(*cred);
-			*cred = NULL;
-		}
-		invalid |= NFS_INO_INVALID_ATTR;
-	}
+	    inode->i_gid != fattr->gid)
+		invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_ACCESS;
 
 	inode->i_mode = fattr->mode;
 	inode->i_nlink = fattr->nlink;
