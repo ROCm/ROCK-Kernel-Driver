@@ -394,6 +394,12 @@
  *		o control first busy loop in wv_82593_cmd()
  *		o Extend spinlock protection in wv_hw_config()
  *
+ * Changes made for release in 3.1.33 :
+ * ----------------------------------
+ *	- Optional use new driver API for Wireless Extensions :
+ *		o got rid of wavelan_ioctl()
+ *		o use a bunch of iw_handler instead
+ *
  * Wishes & dreams:
  * ----------------
  *	- Cleanup and integrate the roaming code
@@ -430,6 +436,9 @@
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Wireless extensions */
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif	/* WIRELESS_EXT > 12 */
 #endif
 
 /* Pcmcia headers that we need */
@@ -498,7 +507,7 @@
 /************************ CONSTANTS & MACROS ************************/
 
 #ifdef DEBUG_VERSION_SHOW
-static const char *version = "wavelan_cs.c : v23 (SMP + wireless extensions) 20/12/00\n";
+static const char *version = "wavelan_cs.c : v24 (SMP + wireless extensions) 11/1/02\n";
 #endif
 
 /* Watchdog temporisation */
@@ -523,8 +532,8 @@ static const char *version = "wavelan_cs.c : v23 (SMP + wireless extensions) 20/
 #define SIOCSIPROAM     SIOCIWFIRSTPRIV + 2	/* Set roaming state */
 #define SIOCGIPROAM     SIOCIWFIRSTPRIV + 3	/* Get roaming state */
 
-#define SIOCSIPHISTO	SIOCIWFIRSTPRIV + 6	/* Set histogram ranges */
-#define SIOCGIPHISTO	SIOCIWFIRSTPRIV + 7	/* Get histogram values */
+#define SIOCSIPHISTO	SIOCIWFIRSTPRIV + 4	/* Set histogram ranges */
+#define SIOCGIPHISTO	SIOCIWFIRSTPRIV + 5	/* Get histogram values */
 
 /*************************** WaveLAN Roaming  **************************/
 #ifdef WAVELAN_ROAMING		/* Conditional compile, see above in options */
@@ -588,6 +597,16 @@ typedef struct iw_quality	iw_qual;
 typedef struct iw_freq		iw_freq;
 typedef struct net_local	net_local;
 typedef struct timer_list	timer_list;
+
+#if WIRELESS_EXT <= 12
+/* Wireless extensions backward compatibility */
+/* Part of iw_handler prototype we need */
+struct iw_request_info
+{
+	__u16		cmd;		/* Wireless Extension command */
+	__u16		flags;		/* More to come ;-) */
+};
+#endif	/* WIRELESS_EXT <= 12 */
 
 /* Basic types */
 typedef u_char		mac_addr[WAVELAN_ADDR_SIZE];	/* Hardware address */
