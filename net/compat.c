@@ -422,7 +422,6 @@ static int do_netfilter_replace(int fd, int level, int optname,
 {
 	struct compat_ipt_replace *urepl = (struct compat_ipt_replace *)optval;
 	struct ipt_replace *krepl;
-	struct ipt_counters *ucounters;
 	u32 origsize;
 	unsigned int kreplsize;
 	mm_segment_t old_fs;
@@ -437,8 +436,10 @@ static int do_netfilter_replace(int fd, int level, int optname,
 	if (optlen != sizeof(*urepl) + origsize)
 		return -ENOPROTOOPT;
 
-	kreplsize = sizeof(*krepl) + origsize - num_entries *
-		(sizeof(struct compat_ipt_entry) - sizeof(struct ipt_entry));
+	/* XXX Assumes that size of ipt_entry is the same both in
+	 *     native and compat environments.
+	 */
+	kreplsize = sizeof(*krepl) + origsize;
 	krepl = (struct ipt_replace *)kmalloc(kreplsize, GFP_KERNEL);
 	if (krepl == NULL)
 		return -ENOMEM;
@@ -453,7 +454,7 @@ static int do_netfilter_replace(int fd, int level, int optname,
 	    __get_user(ucntrs, &urepl->counters) ||
 	    __copy_from_user(krepl->entries, &urepl->entries, origsize))
 		goto out_free;
-	for (i = 0; i < NF_IP_NUM_HOOKS; i++) {
+	for (i = 0; i < NF_IP_NUMHOOKS; i++) {
 		if (__get_user(krepl->hook_entry[i], &urepl->hook_entry[i]) ||
 		    __get_user(krepl->underflow[i], &urepl->underflow[i]))
 			goto out_free;
@@ -493,7 +494,6 @@ static int do_set_attach_filter(int fd, int level, int optname,
 {
 	struct compat_sock_fprog *fprog32 = (struct compat_sock_fprog *)optval;
 	struct sock_fprog kfprog;
-	struct sock_filter *kfilter;
 	mm_segment_t old_fs;
 	compat_uptr_t uptr;
 	int ret;
@@ -529,7 +529,7 @@ static int do_set_icmpv6_filter(int fd, int level, int optname,
 	mm_segment_t old_fs;
 	int ret, i;
 
-	if (optlen < sizeof(*kfilter))
+	if (optlen < sizeof(kfilter))
 		return -EINVAL;
 	if (copy_from_user(&kfilter, optval, sizeof(kfilter)))
 		return -EFAULT;
@@ -703,13 +703,13 @@ asmlinkage long compat_sys_socketcall(int call, u32 *args)
 		ret = sys_send(a0, compat_ptr(a1), a[2], a[3]);
 		break;
 	case SYS_SENDTO:
-		ret = sys_sendto(a0, a1, a[2], a[3], a[4], a[5]);
+		ret = sys_sendto(a0, compat_ptr(a1), a[2], a[3], compat_ptr(a[4]), a[5]);
 		break;
 	case SYS_RECV:
 		ret = sys_recv(a0, compat_ptr(a1), a[2], a[3]);
 		break;
 	case SYS_RECVFROM:
-		ret = sys_recvfrom(a0, a1, a[2], a[3], a[4], a[5]);
+		ret = sys_recvfrom(a0, compat_ptr(a1), a[2], a[3], compat_ptr(a[4]), compat_ptr(a[5]));
 		break;
 	case SYS_SHUTDOWN:
 		ret = sys_shutdown(a0,a1);
