@@ -137,6 +137,7 @@ static int try_win(struct saa7146_dev *dev, struct v4l2_window *win)
         switch (field) {
         case V4L2_FIELD_TOP:
         case V4L2_FIELD_BOTTOM:
+        case V4L2_FIELD_ALTERNATE:
                 maxh = maxh / 2;
                 break;
         case V4L2_FIELD_INTERLACED:
@@ -186,11 +187,18 @@ static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 				: V4L2_FIELD_BOTTOM;
 		}
 		switch (field) {
+		case V4L2_FIELD_ALTERNATE: {
+			vv->last_field = V4L2_FIELD_TOP;
+			maxh = maxh / 2;
+			break;
+		}
 		case V4L2_FIELD_TOP:
 		case V4L2_FIELD_BOTTOM:
+			vv->last_field = V4L2_FIELD_INTERLACED;
 			maxh = maxh / 2;
 			break;
 		case V4L2_FIELD_INTERLACED:
+			vv->last_field = V4L2_FIELD_INTERLACED;
 			break;
 		default: {
 			DEB_D(("no known field mode '%d'.\n",field));
@@ -561,7 +569,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 				m3 = ((size+(size/2)+PAGE_SIZE)/PAGE_SIZE)-1;
 				o1 = size%PAGE_SIZE;
 				o2 = (size+(size/4))%PAGE_SIZE;
-				printk("size:%d, m1:%d, m2:%d, m3:%d, o1:%d, o2:%d\n",size,m1,m2,m3,o1,o2);
+				DEB_CAP(("size:%d, m1:%d, m2:%d, m3:%d, o1:%d, o2:%d\n",size,m1,m2,m3,o1,o2));
 				break;
 			}
 			case 16: {
@@ -571,7 +579,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 				m3 = ((2*size+PAGE_SIZE)/PAGE_SIZE)-1;
 				o1 = size%PAGE_SIZE;
 				o2 = (size+(size/2))%PAGE_SIZE;
-				printk("size:%d, m1:%d, m2:%d, m3:%d, o1:%d, o2:%d\n",size,m1,m2,m3,o1,o2);
+				DEB_CAP(("size:%d, m1:%d, m2:%d, m3:%d, o1:%d, o2:%d\n",size,m1,m2,m3,o1,o2));
 				break;
 			}
 			default: {
@@ -674,7 +682,7 @@ static int video_begin(struct saa7146_fh *fh)
 
 	spin_lock_irqsave(&dev->slock,flags);
 
-	/* clear out beginning of streaming bit */
+	/* clear out beginning of streaming bit (rps register 0)*/
 	saa7146_write(dev, MC2, MASK_27 );
 
 	/* enable rps0 irqs */
@@ -740,19 +748,19 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	struct videobuf_queue *q;
 
 	/* check if extension handles the command */
-	for(ee = 0; dev->ext->ext_vv_data->ioctls[ee].flags != 0; ee++) {
-		if( cmd == dev->ext->ext_vv_data->ioctls[ee].cmd )
+	for(ee = 0; dev->ext_vv_data->ioctls[ee].flags != 0; ee++) {
+		if( cmd == dev->ext_vv_data->ioctls[ee].cmd )
 			break;
 	}
 	
-	if( 0 != (dev->ext->ext_vv_data->ioctls[ee].flags & SAA7146_EXCLUSIVE) ) {
+	if( 0 != (dev->ext_vv_data->ioctls[ee].flags & SAA7146_EXCLUSIVE) ) {
 		DEB_D(("extension handles ioctl exclusive.\n"));
-		result = dev->ext->ext_vv_data->ioctl(fh, cmd, arg);
+		result = dev->ext_vv_data->ioctl(fh, cmd, arg);
 		return result;
 	}
-	if( 0 != (dev->ext->ext_vv_data->ioctls[ee].flags & SAA7146_BEFORE) ) {
+	if( 0 != (dev->ext_vv_data->ioctls[ee].flags & SAA7146_BEFORE) ) {
 		DEB_D(("extension handles ioctl before.\n"));
-		result = dev->ext->ext_vv_data->ioctl(fh, cmd, arg);
+		result = dev->ext_vv_data->ioctl(fh, cmd, arg);
 		if( -EAGAIN != result ) {
 			return result;
 		}
@@ -793,7 +801,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			V4L2_CAP_VIDEO_OVERLAY |
 			V4L2_CAP_READWRITE | 
 			V4L2_CAP_STREAMING;
-		cap->capabilities |= dev->ext->ext_vv_data->capabilities;
+		cap->capabilities |= dev->ext_vv_data->capabilities;
 		return 0;
 	}
 	case VIDIOC_G_FBUF:
@@ -942,9 +950,10 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		struct v4l2_standard *e = arg;
 		if (e->index < 0 )
 			return -EINVAL;
-		if( e->index < dev->ext->ext_vv_data->num_stds ) {
+		if( e->index < dev->ext_vv_data->num_stds ) {
 			DEB_EE(("VIDIOC_ENUMSTD: index:%d\n",e->index));
-			return v4l2_video_std_construct(e, dev->ext->ext_vv_data->stds[e->index].id, dev->ext->ext_vv_data->stds[e->index].name);
+			v4l2_video_std_construct(e, dev->ext_vv_data->stds[e->index].id, dev->ext_vv_data->stds[e->index].name);
+			return 0;
 		}
 		return -EINVAL;
 	}
@@ -972,13 +981,13 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			restart_overlay = 1;
 		}
 
-		for(i = 0; i < dev->ext->ext_vv_data->num_stds; i++)
-			if (*id & dev->ext->ext_vv_data->stds[i].id)
+		for(i = 0; i < dev->ext_vv_data->num_stds; i++)
+			if (*id & dev->ext_vv_data->stds[i].id)
 				break;
-		if (i != dev->ext->ext_vv_data->num_stds) {
-			vv->standard = &dev->ext->ext_vv_data->stds[i];
-			if( NULL != dev->ext->ext_vv_data->std_callback )
-				dev->ext->ext_vv_data->std_callback(dev, vv->standard);
+		if (i != dev->ext_vv_data->num_stds) {
+			vv->standard = &dev->ext_vv_data->stds[i];
+			if( NULL != dev->ext_vv_data->std_callback )
+				dev->ext_vv_data->std_callback(dev, vv->standard);
 			found = 1;
 		}
 
@@ -1000,7 +1009,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		int on = *(int *)arg;
 		int err = 0;
 
-		if( NULL == vv->ov_fmt ) {
+		if( NULL == vv->ov_fmt && on != 0 ) {
 			DEB_D(("VIDIOC_OVERLAY: no framebuffer informations. call S_FBUF first!\n"));
 			return -EAGAIN;
 		}
@@ -1036,12 +1045,18 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return videobuf_querybuf(q,arg);
 	}
 	case VIDIOC_QBUF: {
-		DEB_D(("VIDIOC_QBUF \n"));
-		return videobuf_qbuf(file,q,arg);
+		struct v4l2_buffer *b = arg;
+		int ret = 0;
+		ret = videobuf_qbuf(file,q,b);
+		DEB_D(("VIDIOC_QBUF: ret:%d, index:%d\n",ret,b->index));
+		return ret;
 	}
 	case VIDIOC_DQBUF: {
-		DEB_D(("VIDIOC_DQBUF \n"));
-		return videobuf_dqbuf(file,q,arg);
+		struct v4l2_buffer *b = arg;
+		int ret = 0;
+		ret = videobuf_dqbuf(file,q,b);
+		DEB_D(("VIDIOC_DQBUF: ret:%d, index:%d\n",ret,b->index));
+		return ret;
 	}
 	case VIDIOC_STREAMON: {
 		DEB_D(("VIDIOC_STREAMON \n"));
@@ -1075,7 +1090,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 		q = &fh->video_q;
 		down(&q->lock);
-		err = videobuf_mmap_setup(file,q,gbuffers,gbufsize);
+		err = videobuf_mmap_setup(file,q,gbuffers,gbufsize); // ,V4L2_MEMORY_MMAP);
 		if (err < 0) {
 			up(&q->lock);
 			return err;
@@ -1250,7 +1265,7 @@ static void video_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 	vv->video_q.dev              = dev;
 
 	/* set some default values */
-	vv->standard = &dev->ext->ext_vv_data->stds[0];
+	vv->standard = &dev->ext_vv_data->stds[0];
 
 	/* FIXME: what's this? */
 	vv->current_hps_source = SAA7146_HPS_SOURCE_PORT_A;
@@ -1358,8 +1373,3 @@ struct saa7146_use_ops saa7146_video_uops = {
 	.capture_begin = video_begin,
 	.capture_end = video_end,
 };
-
-EXPORT_SYMBOL_GPL(saa7146_video_uops);
-
-EXPORT_SYMBOL_GPL(saa7146_start_preview);
-EXPORT_SYMBOL_GPL(saa7146_stop_preview);

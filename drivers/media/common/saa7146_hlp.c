@@ -242,7 +242,9 @@ static int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field 
 		if( 2*out_y >= in_y) {
 			lpi = 1;
 		}
-	} else if (field == V4L2_FIELD_TOP || field == V4L2_FIELD_BOTTOM) {
+	} else if (field == V4L2_FIELD_TOP
+		|| field == V4L2_FIELD_ALTERNATE
+		|| field == V4L2_FIELD_BOTTOM) {
 		if( 4*out_y >= in_y ) {
 			lpi = 1;
 		}
@@ -468,9 +470,7 @@ static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct sa
 	*clip_format &= 0xfffffff7;
 	if (V4L2_FIELD_HAS_BOTH(field)) {
 		*clip_format |= 0x00000008;
-	} else if (field == V4L2_FIELD_TOP) {
-		*clip_format |= 0x00000000;
-	} else if (field == V4L2_FIELD_BOTTOM) {
+	} else {
 		*clip_format |= 0x00000000;
 	}
 }
@@ -593,6 +593,10 @@ static void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int 
 	}
 	
 	if (V4L2_FIELD_HAS_BOTH(field)) {
+	} else if (field == V4L2_FIELD_ALTERNATE) {
+		/* fixme */
+		vdma1.base_odd = vdma1.prot_addr;
+		vdma1.pitch /= 2;
 	} else if (field == V4L2_FIELD_TOP) {
 		vdma1.base_odd = vdma1.prot_addr;
 		vdma1.pitch /= 2;
@@ -706,7 +710,7 @@ void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_vi
 	/* calculate starting address */
 	where  = (which-1)*0x18;
 
-	if( 0 != (dev->ext->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
+	if( 0 != (dev->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
 		saa7146_write(dev, where, 	vdma->base_even);
 		saa7146_write(dev, where+0x04, 	vdma->base_odd);
 	} else {
@@ -760,6 +764,16 @@ static int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa71
 	}
 
 	if (V4L2_FIELD_HAS_BOTH(field)) {
+	} else if (field == V4L2_FIELD_ALTERNATE) {
+		/* fixme */
+		if ( vv->last_field == V4L2_FIELD_TOP ) {
+			vdma1.base_odd	= vdma1.prot_addr;
+			vdma1.pitch /= 2;
+		} else if ( vv->last_field == V4L2_FIELD_BOTTOM ) {
+			vdma1.base_odd	= vdma1.base_even;
+			vdma1.base_even = vdma1.prot_addr;
+			vdma1.pitch /= 2;
+		}
 	} else if (field == V4L2_FIELD_TOP) {
 		vdma1.base_odd	= vdma1.prot_addr;
 		vdma1.pitch /= 2;
@@ -896,6 +910,14 @@ static int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa71
 	}
 
 	if (V4L2_FIELD_HAS_BOTH(field)) {
+	} else if (field == V4L2_FIELD_ALTERNATE) {
+		/* fixme */
+		vdma1.base_odd	= vdma1.prot_addr;
+		vdma1.pitch /= 2;
+		vdma2.base_odd	= vdma2.prot_addr;
+		vdma2.pitch /= 2;
+		vdma3.base_odd	= vdma3.prot_addr;
+		vdma3.pitch /= 2;
 	} else if (field == V4L2_FIELD_TOP) {
 		vdma1.base_odd	= vdma1.prot_addr;
 		vdma1.pitch /= 2;
@@ -940,17 +962,17 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 	unsigned long e_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_E_FID_A : CMD_E_FID_B;
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
-	if( 0 != (dev->ext->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
+	if( 0 != (dev->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
 		unsigned long tmp = e_wait;
 		e_wait = o_wait;
 		o_wait = tmp;
 	}
 
-	/* wait for o_fid_a/b / e_fid_a/b toggle only if bit 0 is not set*/
-	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait);
+	/* wait for o_fid_a/b / e_fid_a/b toggle only if rps register 0 is not set*/
 	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait);
+	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait);
 
-	/* set bit 0 */
+	/* set rps register 0 */
 	WRITE_RPS0(CMD_WR_REG | (1 << 8) | (MC2/4)); 	
 	WRITE_RPS0(MASK_27 | MASK_11);
 	
@@ -971,8 +993,14 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 	}
 	
 	/* wait for o_fid_a/b / e_fid_a/b toggle */
+	if ( vv->last_field == V4L2_FIELD_INTERLACED ) {
+		WRITE_RPS0(CMD_PAUSE | o_wait);
 	WRITE_RPS0(CMD_PAUSE | e_wait);
+	} else if ( vv->last_field == V4L2_FIELD_TOP ) {
 	WRITE_RPS0(CMD_PAUSE | o_wait);
+	} else if ( vv->last_field == V4L2_FIELD_BOTTOM ) {
+		WRITE_RPS0(CMD_PAUSE | e_wait);
+	}
 
 	/* turn off video-dma1 */
 	WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));
@@ -1000,12 +1028,38 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
 {
 	struct saa7146_format *sfmt = format_by_fourcc(dev,buf->fmt->pixelformat);
+	struct saa7146_vv *vv = dev->vv_data;
+	u32 vdma1_prot_addr;
 
 	DEB_CAP(("buf:%p, next:%p\n",buf,next));
+
+/*
+	printk("vdma%d.base_even:     0x%08x\n", 1,saa7146_read(dev,BASE_EVEN1));
+	printk("vdma%d.base_odd:      0x%08x\n", 1,saa7146_read(dev,BASE_ODD1));
+	printk("vdma%d.prot_addr:     0x%08x\n", 1,saa7146_read(dev,PROT_ADDR1));
+	printk("vdma%d.base_page:     0x%08x\n", 1,saa7146_read(dev,BASE_PAGE1));
+	printk("vdma%d.pitch:         0x%08x\n", 1,saa7146_read(dev,PITCH1));
+	printk("vdma%d.num_line_byte: 0x%08x\n", 1,saa7146_read(dev,NUM_LINE_BYTE1));
+	printk("vdma%d => vptr      : 0x%08x\n", 1,saa7146_read(dev,PCI_VDP1));
+*/
+
+	vdma1_prot_addr = saa7146_read(dev, PROT_ADDR1);
+	if( 0 == vdma1_prot_addr ) {
+		/* clear out beginning of streaming bit (rps register 0)*/
+		DEB_CAP(("forcing sync to new frame\n"));
+		saa7146_write(dev, MC2, MASK_27 );
+	}
 
 	saa7146_set_window(dev, buf->fmt->width, buf->fmt->height, buf->fmt->field);
 	saa7146_set_output_format(dev, sfmt->trans);
 	saa7146_disable_clipping(dev);
+
+	if ( vv->last_field == V4L2_FIELD_INTERLACED ) {
+	} else if ( vv->last_field == V4L2_FIELD_TOP ) {
+		vv->last_field = V4L2_FIELD_BOTTOM;
+	} else if ( vv->last_field == V4L2_FIELD_BOTTOM ) {
+		vv->last_field = V4L2_FIELD_TOP;
+	}
 
 	if( 0 != IS_PLANAR(sfmt->trans)) {
 		calculate_video_dma_grab_planar(dev, buf);

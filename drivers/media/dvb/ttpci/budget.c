@@ -215,7 +215,6 @@ MODULE_DEVICE_TABLE(pci, pci_tbl);
 static struct saa7146_extension budget_extension = {
 	.name		= "budget dvb\0",
 	.flags	 	= 0,
-	.ext_vv_data	= NULL,
 	
 	.module		= THIS_MODULE,
 	.pci_tbl	= pci_tbl,
