@@ -1677,6 +1677,7 @@ static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 {
 	struct list_head *head, *tmp;
 	struct urb_priv *urbp = urb->hcpriv;
+	int prevactive = 1;
 
 	/* We can get called when urbp allocation fails, so check */
 	if (!urbp)
@@ -1684,6 +1685,19 @@ static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 
 	uhci_dec_fsbr(uhci, urb);	/* Safe since it checks */
 
+	/*
+	 * Now we need to find out what the last successful toggle was
+	 * so we can update the local data toggle for the next transfer
+	 *
+	 * There's 3 way's the last successful completed TD is found:
+	 *
+	 * 1) The TD is NOT active and the actual length < expected length
+	 * 2) The TD is NOT active and it's the last TD in the chain
+	 * 3) The TD is active and the previous TD is NOT active
+	 *
+	 * Control and Isochronous ignore the toggle, so this is safe
+	 * for all types
+	 */
 	head = &urbp->td_list;
 	tmp = head->next;
 	while (tmp != head) {
@@ -1691,15 +1705,18 @@ static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 
 		tmp = tmp->next;
 
-		/* Control and Isochronous ignore the toggle, so this */
-		/* is safe for all types */
-		if ((!(td->status & TD_CTRL_ACTIVE) &&
-		    (uhci_actual_length(td->status) < uhci_expected_length(td->info)) ||
-		    tmp == head)) {
+		if (!(td->status & TD_CTRL_ACTIVE) &&
+		    (uhci_actual_length(td->status) < uhci_expected_length(td->info) ||
+		    tmp == head))
 			usb_settoggle(urb->dev, uhci_endpoint(td->info),
 				uhci_packetout(td->info),
 				uhci_toggle(td->info) ^ 1);
-		}
+		else if ((td->status & TD_CTRL_ACTIVE) && !prevactive)
+			usb_settoggle(urb->dev, uhci_endpoint(td->info),
+				uhci_packetout(td->info),
+				uhci_toggle(td->info));
+
+		prevactive = td->status & TD_CTRL_ACTIVE;
 	}
 
 	uhci_delete_queued_urb(uhci, urb);
