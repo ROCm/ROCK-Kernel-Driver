@@ -181,7 +181,6 @@ int xfrm6_rcv(struct sk_buff **pskb)
 
 		x->curlft.bytes += skb->len;
 		x->curlft.packets++;
-		x->curlft.use_time = (unsigned long)xtime.tv_sec;
 
 		spin_unlock(&x->lock);
 

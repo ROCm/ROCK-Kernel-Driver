@@ -60,7 +60,6 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 
 		x->curlft.bytes += skb->len;
 		x->curlft.packets++;
-		x->curlft.use_time = (unsigned long)xtime.tv_sec;
 
 		spin_unlock(&x->lock);
 
