@@ -57,7 +57,6 @@ extern void isdn_MOD_DEC_USE_COUNT(void);
 extern void isdn_lock_drivers(void);
 extern void isdn_unlock_drivers(void);
 extern void isdn_free_channel(int di, int ch, int usage);
-extern int isdn_dc2minor(int di, int ch);
 extern void isdn_info_update(void);
 extern char *isdn_map_eaz2msn(char *msn, int di);
 extern void isdn_timer_ctrl(int tf, int onoff);
@@ -81,7 +80,6 @@ struct dial_info {
 
 extern int   isdn_get_free_slot(int, int, int, int, int, char *);
 extern void  isdn_slot_free(int slot);
-extern void  isdn_slot_all_eaz(int slot);
 extern int   isdn_slot_command(int slot, int cmd, isdn_ctrl *);
 extern int   isdn_slot_dial(int slot, struct dial_info *dial);
 extern char *isdn_slot_map_eaz2msn(int slot, char *msn);

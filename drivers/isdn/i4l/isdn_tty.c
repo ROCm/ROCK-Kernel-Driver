@@ -834,7 +834,6 @@ isdn_tty_modem_hup(modem_info * info, int local)
 	if (local)
 		isdn_slot_command(slot, ISDN_CMD_HANGUP, &cmd);
 
-	isdn_slot_all_eaz(slot);
 	info->emu.mdmreg[REG_RINGCNT] = 0;
 	skb_queue_purge(&info->rpqueue);
 	isdn_slot_free(slot);
@@ -2234,7 +2233,6 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 	char *eaz;
 	int i;
 	int wret;
-	int idx;
 	int si1;
 	int si2;
 	char *nr;
@@ -2265,10 +2263,9 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
                     continue;
 		if ((info->emu.mdmreg[REG_SI1] & si2bit[si1]) &&  /* SI1 is matching */
 		    (info->emu.mdmreg[REG_SI2] == si2))	{         /* SI2 is matching */
-			idx = isdn_dc2minor(di, ch);
 #ifdef ISDN_DEBUG_MODEM_ICALL
 			printk(KERN_DEBUG "m_fi: match1 wret=%d\n", wret);
-			printk(KERN_DEBUG "m_fi: idx=%d flags=%08lx drv=%d ch=%d usg=%d\n", idx,
+			printk(KERN_DEBUG "m_fi: sl=%d flags=%08lx drv=%d ch=%d usg=%d\n", sl,
 			       info->flags, info->isdn_driver, info->isdn_channel,
 			       dev->usage[idx]);
 #endif
@@ -2277,16 +2274,16 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 				(info->flags & ISDN_ASYNC_NORMAL_ACTIVE) &&
 #endif
 				(info->isdn_slot == -1) &&
-				(USG_NONE(isdn_slot_usage(idx)))) {
+				(USG_NONE(isdn_slot_usage(sl)))) {
 				int matchret;
 
 				if ((matchret = isdn_tty_match_icall(eaz, &info->emu, di)) > wret)
 					wret = matchret;
 				if (!matchret) {                  /* EAZ is matching */
-					info->isdn_slot = idx;
-					isdn_slot_set_m_idx(idx, info->line);
-					isdn_slot_set_priv(idx, isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]), info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
-					strcpy(isdn_slot_num(idx), nr);
+					info->isdn_slot = sl;
+					isdn_slot_set_m_idx(sl, info->line);
+					isdn_slot_set_priv(sl, isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]), info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+					strcpy(isdn_slot_num(sl), nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];
 					info->emu.mdmreg[REG_PLAN] = setup->plan;
@@ -2332,15 +2329,12 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 #ifdef ISDN_TTY_STAT_DEBUG
 				printk(KERN_DEBUG "tty_STAT_BSENT ttyI%d\n", info->line);
 #endif
-				if ((info->isdn_slot == isdn_dc2minor(c->driver, c->arg))) {
-					info->msr |= UART_MSR_CTS;
-					if (info->send_outstanding)
-						if (!(--info->send_outstanding))
-							info->lsr |= UART_LSR_TEMT;
-					isdn_tty_tint(info);
-					return 1;
-				}
-				break;
+				info->msr |= UART_MSR_CTS;
+				if (info->send_outstanding)
+					if (!(--info->send_outstanding))
+						info->lsr |= UART_LSR_TEMT;
+				isdn_tty_tint(info);
+				return 1;
 			case ISDN_STAT_CAUSE:
 #ifdef ISDN_TTY_STAT_DEBUG
 				printk(KERN_DEBUG "tty_STAT_CAUSE ttyI%d\n", info->line);

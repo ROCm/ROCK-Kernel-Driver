@@ -1408,12 +1408,11 @@ do_callback(struct fsm_inst *fi, int pr, void *arg)
 }
 
 static int
-isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
+isdn_net_dev_icall(isdn_net_dev *idev, int slot, int di, int ch, int si1,
 		   char *eaz, char *nr)
 {
 	isdn_net_local *mlp = idev->mlp;
 	struct isdn_net_phone *ph;
-	int slot = isdn_dc2minor(di, ch);
 	char *my_eaz;
 	
 	/* check acceptable call types for DOV */
@@ -1502,7 +1501,7 @@ isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
  *                   would eventually match if CID was longer.
  */
 int
-isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
+isdn_net_find_icall(int di, int ch, int sl, setup_parm *setup)
 {
 	isdn_net_local *lp;
 	isdn_net_dev *idev;
@@ -1542,8 +1541,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
                 return 0;
         }
 
-	dbg_net_icall("n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
-		      isdn_slot_usage(idx));
+	dbg_net_icall("n_fi: di=%d ch=%d sl=%d usg=%d\n", di, ch, sl,
+		      isdn_slot_usage(sl));
 
 	retval = 0;
 	spin_lock_irqsave(&running_devs_lock, flags);
@@ -1552,7 +1551,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		spin_unlock_irqrestore(&running_devs_lock, flags);
 
 		list_for_each_entry(idev, &lp->slaves, slaves) {
-			retval = isdn_net_dev_icall(idev, di, ch, si1, eaz, nr);
+			retval = isdn_net_dev_icall(idev, sl, di, ch, si1, eaz, nr);
 			if (retval > 0)
 				break;
 		}
@@ -1707,7 +1706,6 @@ connect_fail(struct fsm_inst *fi, int pr, void *arg)
 	isdn_net_dev *idev = fi->userdata;
 
 	del_timer(&idev->dial_timer);
-	isdn_slot_all_eaz(idev->isdn_slot);
 	printk(KERN_INFO "%s: connection failed\n", idev->name);
 	isdn_net_unbind_channel(idev);
 	return 0;
@@ -1791,7 +1789,6 @@ dhup(struct fsm_inst *fi, int pr, void *arg)
 	isdn_net_dev *idev = fi->userdata;
 
 	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, idev->charge);
-	isdn_slot_all_eaz(idev->isdn_slot);
 	isdn_net_unbind_channel(idev);
 	return 0;
 }

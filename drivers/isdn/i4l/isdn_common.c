@@ -392,8 +392,12 @@ static int
 slot_unbind(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
+	int sl = slot - slots;
+	isdn_ctrl cmd;
 
 	strcpy(slot->num, "???");
+	cmd.parm.num[0] = '\0';
+	isdn_slot_command(sl, ISDN_CMD_SETEAZ, &cmd);
 	slot->ibytes = 0;
 	slot->obytes = 0;
 	slot->usage = ISDN_USAGE_NONE;
@@ -636,6 +640,7 @@ set_global_features(void)
 static int  isdn_add_channels(struct isdn_driver *, int, int, int);
 static void isdn_receive_skb_callback(int di, int ch, struct sk_buff *skb);
 static int  isdn_status_callback(isdn_ctrl * c);
+static int  isdn_dc2minor(int di, int ch);
 
 static void isdn_v110_add_features(struct isdn_driver *drv);
 
@@ -1211,7 +1216,7 @@ int isdn_msncmp( const char * msn1, const char * msn2 )
 	return isdn_wildmat( TmpMsn1, TmpMsn2 );
 }
 
-int
+static int
 isdn_dc2minor(int di, int ch)
 {
 	int i;
@@ -2085,15 +2090,6 @@ isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
  * Set state of ISDN-channel to 'unused'
  */
 void
-isdn_free_channel(int di, int ch, int usage)
-{
-	int sl;
-
-	sl = isdn_dc2minor(di, ch);
-	isdn_slot_free(sl);
-}
-
-void
 isdn_slot_free(int sl)
 {
 	fsm_event(&slots[sl].fi, EV_SLOT_UNBIND, NULL);
@@ -2332,15 +2328,6 @@ isdn_slot_dial(int sl, struct dial_info *dial)
 	       dial->l2_proto, dial->l3_proto);
 
 	return isdn_slot_command(sl, ISDN_CMD_DIAL, &cmd);
-}
-
-void
-isdn_slot_all_eaz(int sl)
-{
-	isdn_ctrl cmd;
-
-	cmd.parm.num[0] = '\0';
-	isdn_slot_command(sl, ISDN_CMD_SETEAZ, &cmd);
 }
 
 int
