@@ -1676,37 +1676,28 @@ static __inline__ int deliver_skb(struct sk_buff *skb,
 	return pt_prev->func(skb, skb->dev, pt_prev);
 }
 
-
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
-int (*br_handle_frame_hook)(struct sk_buff *skb);
+int (*br_handle_frame_hook)(struct net_bridge_port *p, struct sk_buff **pskb);
 
-static __inline__ int handle_bridge(struct sk_buff *skb,
-				     struct packet_type *pt_prev)
+static __inline__ int handle_bridge(struct sk_buff **pskb,
+				    struct packet_type **pt_prev, int *ret)
 {
-	int ret = NET_RX_DROP;
-	if (pt_prev)
-		ret = deliver_skb(skb, pt_prev);
+	struct net_bridge_port *port;
 
-	return ret;
-}
+	if ((*pskb)->pkt_type == PACKET_LOOPBACK ||
+	    (port = rcu_dereference((*pskb)->dev->br_port)) == NULL)
+		return 0;
 
-#endif
-
-static inline int __handle_bridge(struct sk_buff *skb,
-			struct packet_type **pt_prev, int *ret)
-{
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	if (skb->dev->br_port && skb->pkt_type != PACKET_LOOPBACK) {
-		*ret = handle_bridge(skb, *pt_prev);
-		if (br_handle_frame_hook(skb) == 0)
-			return 1;
-
+	if (*pt_prev) {
+		*ret = deliver_skb(*pskb, *pt_prev);
 		*pt_prev = NULL;
-	}
-#endif
-	return 0;
+	} 
+	
+	return br_handle_frame_hook(port, pskb);
 }
-
+#else
+#define handle_bridge(skb, pt_prev, ret)	(0)
+#endif
 
 #ifdef CONFIG_NET_CLS_ACT
 /* TODO: Maybe we should just force sch_ingress to be compiled in
@@ -1812,7 +1803,7 @@ ncls:
 
 	handle_diverter(skb);
 
-	if (__handle_bridge(skb, &pt_prev, &ret))
+	if (handle_bridge(&skb, &pt_prev, &ret))
 		goto out;
 
 	type = skb->protocol;
