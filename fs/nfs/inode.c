@@ -596,7 +596,7 @@ nfs_find_actor(struct inode *inode, void *opaque)
 
 	if (NFS_FILEID(inode) != fattr->fileid)
 		return 0;
-	if (memcmp(NFS_FH(inode), fh, sizeof(struct nfs_fh)) != 0)
+	if (nfs_compare_fh(NFS_FH(inode), fh))
 		return 0;
 	if (is_bad_inode(inode))
 		return 0;
@@ -1259,7 +1259,7 @@ static int nfs_compare_super(struct super_block *sb, void *data)
 		return 0;
 	if (old->addr.sin_port != server->addr.sin_port)
 		return 0;
-	return !memcmp(&old->fh, &server->fh, sizeof(struct nfs_fh));
+	return !nfs_compare_fh(&old->fh, &server->fh);
 }
 
 static struct super_block *nfs_get_sb(struct file_system_type *fs_type,

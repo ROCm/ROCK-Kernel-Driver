@@ -610,7 +610,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 	verifier = nfs_save_change_attribute(dir);
 	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
 	if (!error) {
-		if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
+		if (nfs_compare_fh(NFS_FH(inode), &fhandle))
 			goto out_bad;
 		if (nfs_lookup_verify_inode(inode, isopen))
 			goto out_zap_parent;
@@ -623,7 +623,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
 	if (error)
 		goto out_bad;
-	if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
+	if (nfs_compare_fh(NFS_FH(inode), &fhandle))
 		goto out_bad;
 	if ((error = nfs_refresh_inode(inode, &fattr)) != 0)
 		goto out_bad;

@@ -8,6 +8,7 @@
 #define _LINUX_NFS_H
 
 #include <linux/sunrpc/msg_prot.h>
+#include <linux/string.h>
 
 #define NFS_PROGRAM	100003
 #define NFS_PORT	2049
@@ -137,6 +138,16 @@ struct nfs_fh {
 	unsigned short		size;
 	unsigned char		data[NFS_MAXFHSIZE];
 };
+
+/*
+ * Returns a zero iff the size and data fields match.
+ * Checks only "size" bytes in the data field.
+ */
+static inline int nfs_compare_fh(const struct nfs_fh *a, const struct nfs_fh *b)
+{
+	return a->size != b->size || memcmp(a->data, b->data, a->size) != 0;
+}
+
 
 /*
  * This is really a general kernel constant, but since nothing like
