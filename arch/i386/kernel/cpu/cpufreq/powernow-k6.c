@@ -144,6 +144,9 @@ static int powernow_k6_verify(struct cpufreq_policy *policy)
 
 	policy->max = clock_ratio[j] * busfreq;
 
+	cpufreq_verify_within_limits(policy, (20 * busfreq),
+				     (max_multiplier * busfreq));
+
 	return 0;
 }
 
@@ -156,53 +159,44 @@ static int powernow_k6_verify(struct cpufreq_policy *policy)
  */
 static int powernow_k6_setpolicy (struct cpufreq_policy *policy)
 {
-	unsigned int    number_states = 0;
-	unsigned int    i, j=4;
+	unsigned int    i;
+	unsigned int    optimal;
 
-	if (!powernow_driver)
+	if (!powernow_driver || !policy || policy->cpu)
 		return -EINVAL;
 
-	for (i=0; i<8; i++)
-		if ((policy->min <= (busfreq * clock_ratio[i])) &&
-		    (policy->max >= (busfreq * clock_ratio[i])))
-		{
-			number_states++;
-			j = i;
-		}
-
-	if (number_states == 1) {
-		/* if only one state is within the limit borders, it
-		   is easily detected and set */
-		powernow_k6_set_state(j);
-		return 0;
-	}
-
-	/* more than one state within limit */
-	switch (policy->policy) {
+	switch(policy->policy) {
 	case CPUFREQ_POLICY_POWERSAVE:
-		j = 6;
-		for (i=0; i<8; i++)
-		if ((policy->min <= (busfreq * clock_ratio[i])) &&
-		    (policy->max >= (busfreq * clock_ratio[i])) &&
-			    (clock_ratio[i] < clock_ratio[j]))
-				j = i;
+		optimal = 6;
 		break;
 	case CPUFREQ_POLICY_PERFORMANCE:
-		j = 4;
-		for (i=0; i<8; i++)
-		if ((policy->min <= (busfreq * clock_ratio[i])) &&
-		    (policy->max >= (busfreq * clock_ratio[i])) &&
-			    (clock_ratio[i] > clock_ratio[j]))
-				j = i;
+		optimal = max_multiplier;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	if (clock_ratio[i] > max_multiplier)
-		return -EINVAL;
+	for (i=0;i<8;i++) {
+		unsigned int freq = busfreq * clock_ratio[i];
+		if (clock_ratio[i] > max_multiplier)
+			continue;
+		if ((freq > policy->max) ||
+		    (freq < policy->min))
+			continue;
+		switch(policy->policy) {
+		case CPUFREQ_POLICY_POWERSAVE:
+			if (freq < (clock_ratio[optimal] * busfreq))
+				optimal = i;
+			break;
+		case CPUFREQ_POLICY_PERFORMANCE:
+			if (freq > (clock_ratio[optimal] * busfreq))
+				optimal = i;
+			break;
+		}
+	}
 
-	powernow_k6_set_state(j);
+	powernow_k6_set_state(optimal);
+
 	return 0;
 }
 
