@@ -27,7 +27,7 @@
  * as XCB=101 and then force a read-back from the register.
  *
  */
-#if defined(CONFIG_ARCH_IXDP2400) || defined(CONFIG_ARCH_IXDP2401)
+#if defined(CONFIG_ARCH_ENP2611) || defined(CONFIG_ARCH_IXDP2400) || defined(CONFIG_ARCH_IXDP2401)
 
 #include <asm/system.h>		/* Pickup local_irq_ functions */
 

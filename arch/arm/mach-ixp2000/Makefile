@@ -6,6 +6,7 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
+obj-$(CONFIG_ARCH_ENP2611)	+= enp2611.o
 obj-$(CONFIG_ARCH_IXDP2400)	+= ixdp2400.o
 obj-$(CONFIG_ARCH_IXDP2800)	+= ixdp2800.o
 obj-$(CONFIG_ARCH_IXDP2X00)	+= ixdp2x00.o

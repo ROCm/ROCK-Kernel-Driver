@@ -37,6 +37,7 @@
 /*
  * Platform-specific bits
  */
+#include "enp2611.h"		/* ENP-2611 */
 #include "ixdp2x00.h"		/* IXDP2400/2800 */
 #include "ixdp2x01.h"		/* IXDP2401/2801 */
 
