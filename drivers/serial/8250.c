@@ -1153,7 +1153,7 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id, struct pt_regs *r
 {
 	struct irq_info *i = dev_id;
 	struct list_head *l, *end = NULL;
-	int pass_counter = 0;
+	int pass_counter = 0, handled = 0;
 
 	DEBUG_INTR("serial8250_interrupt(%d)...", irq);
 
@@ -1172,6 +1172,8 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id, struct pt_regs *r
 			serial8250_handle_port(up, regs);
 			spin_unlock(&up->port.lock);
 
+			handled = 1;
+
 			end = NULL;
 		} else if (end == NULL)
 			end = l;
@@ -1189,8 +1191,8 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id, struct pt_regs *r
 	spin_unlock(&i->lock);
 
 	DEBUG_INTR("end.\n");
-	/* FIXME! Was it really ours? */
-	return IRQ_HANDLED;
+
+	return IRQ_RETVAL(handled);
 }
 
 /*
