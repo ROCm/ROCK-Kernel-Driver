@@ -69,6 +69,7 @@ pci_device_probe_dynamic(struct pci_driver *drv, struct pci_dev *pci_dev)
 	spin_unlock(&drv->dynids.lock);
 	return error;
 }
+
 static inline void
 dynid_init(struct dynid *dynid)
 {
@@ -78,15 +79,12 @@ dynid_init(struct dynid *dynid)
 
 /**
  * store_new_id
- * @ pdrv
- * @ buf
- * @ count
  *
  * Adds a new dynamic pci device ID to this driver,
  * and causes the driver to probe for all devices again.
  */
 static inline ssize_t
-store_new_id(struct device_driver * driver, const char * buf, size_t count)
+store_new_id(struct device_driver *driver, const char *buf, size_t count)
 {
 	struct dynid *dynid;
 	struct bus_type * bus;
@@ -159,7 +157,7 @@ pci_free_dynids(struct pci_driver *drv)
 }
 
 static int
-pci_create_newid_file(struct pci_driver * drv)
+pci_create_newid_file(struct pci_driver *drv)
 {
 	int error = 0;
 	if (drv->probe != NULL)
@@ -169,7 +167,7 @@ pci_create_newid_file(struct pci_driver * drv)
 }
 
 static int
-pci_bus_match_dynids(const struct pci_dev * pci_dev, const struct pci_driver * pci_drv)
+pci_bus_match_dynids(const struct pci_dev *pci_dev, struct pci_driver *pci_drv)
 {
 	struct list_head *pos;
 	struct dynid *dynid;
@@ -187,12 +185,21 @@ pci_bus_match_dynids(const struct pci_dev * pci_dev, const struct pci_driver * p
 }
 
 #else /* !CONFIG_HOTPLUG */
-#define pci_device_probe_dynamic(drv,pci_dev) (-ENODEV)
-#define dynid_init(dynid) do {} while (0)
-#define pci_init_dynids(dynids) do {} while (0)
-#define pci_free_dynids(drv) do {} while (0)
-#define pci_create_newid_file(drv) (0)
-#define pci_bus_match_dynids(pci_dev, pci_drv) (0)
+static inline int pci_device_probe_dynamic(struct pci_driver *drv, struct pci_dev *pci_dev)
+{
+	return -ENODEV;
+}
+static inline void dynid_init(struct dynid *dynid) {}
+static inline void pci_init_dynids(struct pci_dynids *dynids) {}
+static inline void pci_free_dynids(struct pci_driver *drv) {}
+static inline int pci_create_newid_file(struct pci_driver *drv)
+{
+	return 0;
+}
+static inline int pci_bus_match_dynids(const struct pci_dev *pci_dev, struct pci_driver *pci_drv)
+{
+	return 0;
+}
 #endif
 
 /**
@@ -352,7 +359,7 @@ static struct kobj_type pci_driver_kobj_type = {
 };
 
 static int
-pci_populate_driver_dir(struct pci_driver * drv)
+pci_populate_driver_dir(struct pci_driver *drv)
 {
 	return pci_create_newid_file(drv);
 }
