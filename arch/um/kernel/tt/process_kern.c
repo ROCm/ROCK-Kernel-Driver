@@ -523,13 +523,6 @@ void set_init_pid(int pid)
 		      -err);
 }
 
-void clear_singlestep(void *t)
-{
-	struct task_struct *task = t;
-
-	task->ptrace &= ~PT_DTRACE;
-}
-
 int start_uml_tt(void)
 {
 	void *sp;

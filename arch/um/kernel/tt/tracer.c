@@ -336,7 +336,6 @@ int tracer(int (*init_proc)(void *), void *sp)
 				tracing = 0;
 				if(do_syscall(task, pid, local_using_sysemu))
 					sig = SIGUSR2;
-				else clear_singlestep(task);
 				break;
 			case SIGPROF:
 				if(tracing) sig = 0;

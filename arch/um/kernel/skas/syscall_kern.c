@@ -30,7 +30,6 @@ long execute_syscall_skas(void *r)
 
 	if(current->thread.singlestep_syscall){
 		current->thread.singlestep_syscall = 0;
-		current->ptrace &= ~PT_DTRACE;
 		force_sig(SIGTRAP, current);
 	}
 

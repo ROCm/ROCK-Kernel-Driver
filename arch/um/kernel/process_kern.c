@@ -459,9 +459,15 @@ int singlestepping(void * t)
 {
 	struct task_struct *task = t ? t : current;
 
+	if ( ! (task->ptrace & PT_DTRACE) )
+		return(0);
+
+	task->ptrace &= ~PT_DTRACE;
+
 	if (task->thread.singlestep_syscall)
 		return(0);
-	return(task->ptrace & PT_DTRACE);
+
+	return 1;
 }
 
 /*
