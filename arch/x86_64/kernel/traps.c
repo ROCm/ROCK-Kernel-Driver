@@ -691,7 +691,9 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 	tsk->thread.debugreg6 = condition;
 
 	/* Mask out spurious TF errors due to lazy TF clearing */
-	if (condition & DR_STEP) {
+	if ((condition & DR_STEP) &&
+	    (notify_die(DIE_DEBUGSTEP, "debugstep", regs, condition,
+			1, SIGTRAP) != NOTIFY_STOP)) {
 		/*
 		 * The TF error should be masked out only if the current
 		 * process is not traced and if the TRAP flag has been set
