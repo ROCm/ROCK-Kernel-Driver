@@ -734,7 +734,6 @@ exp_addclient(struct nfsctl_client *ncp)
 		dprintk("created client %s (%p)\n", ncp->cl_ident, clp);
 
 		strcpy(clp->cl_ident, ncp->cl_ident);
-		clp->cl_idlen = ilen;
 	}
 
 	/* Allocate hash buckets */
