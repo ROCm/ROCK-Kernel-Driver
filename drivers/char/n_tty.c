@@ -249,7 +249,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
  * things.
  */
 static ssize_t opost_block(struct tty_struct * tty,
-		       const unsigned char * inbuf, unsigned int nr)
+		       const unsigned char __user * inbuf, unsigned int nr)
 {
 	char	buf[80];
 	int	space;
@@ -946,7 +946,7 @@ static inline int input_available_p(struct tty_struct *tty, int amt)
  * the buffer to head pointer.
  */
 static inline int copy_from_read_buf(struct tty_struct *tty,
-				      unsigned char **b,
+				      unsigned char __user **b,
 				      size_t *nr)
 
 {
@@ -976,9 +976,9 @@ static inline int copy_from_read_buf(struct tty_struct *tty,
 extern ssize_t redirected_tty_write(struct file *,const char *,size_t,loff_t *);
 
 static ssize_t read_chan(struct tty_struct *tty, struct file *file,
-			 unsigned char *buf, size_t nr)
+			 unsigned char __user *buf, size_t nr)
 {
-	unsigned char *b = buf;
+	unsigned char __user *b = buf;
 	DECLARE_WAITQUEUE(wait, current);
 	int c;
 	int minimum, time;
@@ -1183,9 +1183,9 @@ do_it_again:
 }
 
 static ssize_t write_chan(struct tty_struct * tty, struct file * file,
-			  const unsigned char * buf, size_t nr)
+			  const unsigned char __user * buf, size_t nr)
 {
-	const unsigned char *b = buf;
+	const unsigned char __user *b = buf;
 	DECLARE_WAITQUEUE(wait, current);
 	int c;
 	ssize_t retval = 0;
