@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2001
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -108,13 +108,12 @@ struct btpage {
  * record the path traversed during the search;
  * top frame record the leaf page/entry selected.
  */
-#define	MAXTREEHEIGHT		8
 struct btframe {	/* stack frame */
 	s64 bn;			/* 8: */
 	s16 index;		/* 2: */
-	s16 lastindex;		/* 2: */
-	struct metapage *mp;	/* 4: */
-};				/* (16) */
+	s16 lastindex;		/* 2: unused */
+	struct metapage *mp;	/* 4/8: */
+};				/* (16/24) */
 
 struct btstack {
 	struct btframe *top;
@@ -125,12 +124,15 @@ struct btstack {
 #define BT_CLR(btstack)\
 	(btstack)->top = (btstack)->stack
 
+#define BT_STACK_FULL(btstack)\
+	( (btstack)->top == &((btstack)->stack[MAXTREEHEIGHT-1]))
+
 #define BT_PUSH(BTSTACK, BN, INDEX)\
 {\
+	assert(!BT_STACK_FULL(BTSTACK));\
 	(BTSTACK)->top->bn = BN;\
 	(BTSTACK)->top->index = INDEX;\
 	++(BTSTACK)->top;\
-	assert((BTSTACK)->top != &((BTSTACK)->stack[MAXTREEHEIGHT]));\
 }
 
 #define BT_POP(btstack)\
@@ -138,6 +140,16 @@ struct btstack {
 
 #define BT_STACK(btstack)\
 	( (btstack)->top == (btstack)->stack ? NULL : (btstack)->top )
+
+static inline void BT_STACK_DUMP(struct btstack *btstack)
+{
+	int i;
+	printk("btstack dump:\n");
+	for (i = 0; i < MAXTREEHEIGHT; i++)
+		printk(KERN_ERR "bn = %Lx, index = %d\n",
+		       btstack->stack[i].bn,
+		       btstack->stack[i].index);
+}
 
 /* retrieve search results */
 #define BT_GETSEARCH(IP, LEAF, BN, MP, TYPE, P, INDEX, ROOT)\
