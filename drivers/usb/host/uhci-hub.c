@@ -36,13 +36,13 @@ static __u8 root_hub_hub_des[] =
 static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	unsigned long io_addr = uhci->io_addr;
-	int i;
+	int port;
 
 	*buf = 0;
-	for (i = 0; i < uhci->rh_numports; i++) {
-		if (inw(io_addr + USBPORTSC1 + i * 2) & RWC_BITS)
-			*buf |= (1 << (i + 1));
+	for (port = 0; port < uhci->rh_numports; ++port) {
+		if ((inw(uhci->io_addr + USBPORTSC1 + port * 2) & RWC_BITS) ||
+				test_bit(port, &uhci->port_c_suspend))
+			*buf |= (1 << (port + 1));
 	}
 	return !!*buf;
 }
@@ -62,6 +62,35 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	status &= ~(RWC_BITS|WZ_BITS); \
 	outw(status, port_addr)
 
+/* UHCI controllers don't automatically stop resume signalling after 20 msec,
+ * so we have to poll and check timeouts in order to take care of it.
+ * FIXME:  Synchronize access to these fields by a spinlock.
+ */
+static void uhci_check_resume(struct uhci_hcd *uhci)
+{
+	unsigned int port;
+	unsigned int port_addr;
+	int status;
+
+	for (port = 0; port < uhci->rh_numports; ++port) {
+		port_addr = uhci->io_addr + USBPORTSC1 + 2 * port;
+		if (unlikely(inw(port_addr) & USBPORTSC_RD)) {
+			if (!test_bit(port, &uhci->resuming_ports)) {
+
+				/* Port received a wakeup request */
+				set_bit(port, &uhci->resuming_ports);
+				uhci->resume_timeout = jiffies +
+						msecs_to_jiffies(20);
+			} else if (time_after_eq(jiffies,
+						uhci->resume_timeout)) {
+				CLR_RH_PORTSTAT(USBPORTSC_SUSP | USBPORTSC_RD);
+				clear_bit(port, &uhci->resuming_ports);
+				clear_bit(port, &uhci->suspended_ports);
+				set_bit(port, &uhci->port_c_suspend);
+			}
+		}
+	}
+}
 
 /* size of returned buffer is part of USB spec */
 static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
@@ -69,8 +98,9 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	int status, retval = 0, len = 0;
-	unsigned long port_addr = uhci->io_addr + USBPORTSC1 + 2 * (wIndex-1);
-	__u16 wPortChange, wPortStatus;
+	unsigned int port = wIndex - 1;
+	unsigned long port_addr = uhci->io_addr + USBPORTSC1 + 2 * port;
+	u16 wPortChange, wPortStatus;
 
 	switch (typeReq) {
 		/* Request Destination:
@@ -82,11 +112,15 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		*/
 
 	case GetHubStatus:
-		*(__u32 *)buf = cpu_to_le32(0);
+		*(u32 *) buf = cpu_to_le32(0);
 		OK(4);		/* hub power */
 	case GetPortStatus:
-		if (!wIndex || wIndex > uhci->rh_numports)
+		if (port >= uhci->rh_numports)
 			goto err;
+
+		if (uhci->resuming_ports)
+			uhci_check_resume(uhci);
+
 		status = inw(port_addr);
 
 		/* Intel controllers report the OverCurrent bit active on.
@@ -97,37 +131,39 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				PCI_VENDOR_ID_VIA)
 			status ^= USBPORTSC_OC;
 
-		/* UHCI doesn't support C_SUSPEND and C_RESET (always false) */
+		/* UHCI doesn't support C_RESET (always false) */
 		wPortChange = 0;
 		if (status & USBPORTSC_CSC)
-			wPortChange |= 1 << (USB_PORT_FEAT_C_CONNECTION - 16);
+			wPortChange |= USB_PORT_STAT_C_CONNECTION;
 		if (status & USBPORTSC_PEC)
-			wPortChange |= 1 << (USB_PORT_FEAT_C_ENABLE - 16);
+			wPortChange |= USB_PORT_STAT_C_ENABLE;
 		if (status & USBPORTSC_OCC)
-			wPortChange |= 1 << (USB_PORT_FEAT_C_OVER_CURRENT - 16);
+			wPortChange |= USB_PORT_STAT_C_OVERCURRENT;
+		if (test_bit(port, &uhci->port_c_suspend))
+			wPortChange |= USB_PORT_STAT_C_SUSPEND;
 
 		/* UHCI has no power switching (always on) */
-		wPortStatus = 1 << USB_PORT_FEAT_POWER;
+		wPortStatus = USB_PORT_STAT_POWER;
 		if (status & USBPORTSC_CCS)
-			wPortStatus |= 1 << USB_PORT_FEAT_CONNECTION;
+			wPortStatus |= USB_PORT_STAT_CONNECTION;
 		if (status & USBPORTSC_PE) {
-			wPortStatus |= 1 << USB_PORT_FEAT_ENABLE;
+			wPortStatus |= USB_PORT_STAT_ENABLE;
 			if (status & (USBPORTSC_SUSP | USBPORTSC_RD))
-				wPortStatus |= 1 << USB_PORT_FEAT_SUSPEND;
+				wPortStatus |= USB_PORT_STAT_SUSPEND;
 		}
 		if (status & USBPORTSC_OC)
-			wPortStatus |= 1 << USB_PORT_FEAT_OVER_CURRENT;
+			wPortStatus |= USB_PORT_STAT_OVERCURRENT;
 		if (status & USBPORTSC_PR)
-			wPortStatus |= 1 << USB_PORT_FEAT_RESET;
+			wPortStatus |= USB_PORT_STAT_RESET;
 		if (status & USBPORTSC_LSDA)
-			wPortStatus |= 1 << USB_PORT_FEAT_LOWSPEED;
+			wPortStatus |= USB_PORT_STAT_LOW_SPEED;
 
 		if (wPortChange)
 			dev_dbg(uhci_dev(uhci), "port %d portsc %04x\n",
 					wIndex, status);
 
-		*(__u16 *)buf = cpu_to_le16(wPortStatus);
-		*(__u16 *)(buf + 2) = cpu_to_le16(wPortChange);
+		*(u16 *) buf = cpu_to_le16(wPortStatus);
+		*(u16 *) (buf + 2) = cpu_to_le16(wPortChange);
 		OK(4);
 	case SetHubFeature:		/* We don't implement these */
 	case ClearHubFeature:
@@ -140,11 +176,12 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		}
 		break;
 	case SetPortFeature:
-		if (!wIndex || wIndex > uhci->rh_numports)
+		if (port >= uhci->rh_numports)
 			goto err;
 
 		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
+			set_bit(port, &uhci->suspended_ports);
 			SET_RH_PORTSTAT(USBPORTSC_SUSP);
 			OK(0);
 		case USB_PORT_FEAT_RESET:
@@ -164,7 +201,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		}
 		break;
 	case ClearPortFeature:
-		if (!wIndex || wIndex > uhci->rh_numports)
+		if (port >= uhci->rh_numports)
 			goto err;
 
 		switch (wValue) {
@@ -175,10 +212,12 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			CLR_RH_PORTSTAT(USBPORTSC_PEC);
 			OK(0);
 		case USB_PORT_FEAT_SUSPEND:
-			CLR_RH_PORTSTAT(USBPORTSC_SUSP);
+			set_bit(port, &uhci->resuming_ports);
+			uhci->resume_timeout = jiffies + msecs_to_jiffies(20);
+			SET_RH_PORTSTAT(USBPORTSC_RD);
 			OK(0);
 		case USB_PORT_FEAT_C_SUSPEND:
-			/* this driver won't report these */
+			clear_bit(port, &uhci->port_c_suspend);
 			OK(0);
 		case USB_PORT_FEAT_POWER:
 			/* UHCI has no power switching */

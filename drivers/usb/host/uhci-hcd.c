@@ -1661,6 +1661,8 @@ static void stall_callback(unsigned long ptr)
 
 	/* Poll for and perform state transitions */
 	hc_state_transitions(uhci);
+	if (unlikely(uhci->suspended_ports && uhci->state != UHCI_SUSPENDED))
+		uhci_check_resume(uhci);
 
 	init_stall_timer(hcd);
 }
