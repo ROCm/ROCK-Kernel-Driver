@@ -29,13 +29,56 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
+#ifdef CONFIG_IA64
+# include <linux/efi.h>
+#endif
+
 #ifdef CONFIG_FB
 extern void fbmem_init(void);
 #endif
 #if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
 extern void tapechar_init(void);
 #endif
-     
+
+/*
+ * Architectures vary in how they handle caching for addresses
+ * outside of main memory.
+ *
+ */
+static inline int uncached_access(struct file *file, unsigned long addr)
+{
+#if defined(__i386__)
+	/*
+	 * On the PPro and successors, the MTRRs are used to set
+	 * memory types for physical addresses outside main memory,
+	 * so blindly setting PCD or PWT on those pages is wrong.
+	 * For Pentiums and earlier, the surround logic should disable
+	 * caching for the high addresses through the KEN pin, but
+	 * we maintain the tradition of paranoia in this code.
+	 */
+	if (file->f_flags & O_SYNC)
+		return 1;
+ 	return !( test_bit(X86_FEATURE_MTRR, boot_cpu_data.x86_capability) ||
+		  test_bit(X86_FEATURE_K6_MTRR, boot_cpu_data.x86_capability) ||
+		  test_bit(X86_FEATURE_CYRIX_ARR, boot_cpu_data.x86_capability) ||
+		  test_bit(X86_FEATURE_CENTAUR_MCR, boot_cpu_data.x86_capability) )
+	  && addr >= __pa(high_memory);
+#elif defined(CONFIG_IA64)
+	/*
+	 * On ia64, we ignore O_SYNC because we cannot tolerate memory attribute aliases.
+	 */
+	return !(efi_mem_attributes(addr) & EFI_MEMORY_WB);
+#else
+	/*
+	 * Accessing memory above the top the kernel knows about or through a file pointer
+	 * that was marked O_SYNC will be done non-cached.
+	 */
+	if (file->f_flags & O_SYNC)
+		return 1;
+	return addr >= __pa(high_memory);
+#endif
+}
+
 static ssize_t do_write_mem(struct file * file, void *p, unsigned long realp,
 			    const char * buf, size_t count, loff_t *ppos)
 {
@@ -72,7 +115,7 @@ static ssize_t read_mem(struct file * file, char * buf,
 	unsigned long p = *ppos;
 	unsigned long end_mem;
 	ssize_t read;
-	
+
 	end_mem = __pa(high_memory);
 	if (p >= end_mem)
 		return 0;
@@ -116,77 +159,16 @@ static ssize_t write_mem(struct file * file, const char * buf,
 	return do_write_mem(file, __va(p), p, buf, count, ppos);
 }
 
-#ifndef pgprot_noncached
-
-/*
- * This should probably be per-architecture in <asm/pgtable.h>
- */
-static inline pgprot_t pgprot_noncached(pgprot_t _prot)
-{
-	unsigned long prot = pgprot_val(_prot);
-
-#if defined(__i386__) || defined(__x86_64__)
-	/* On PPro and successors, PCD alone doesn't always mean 
-	    uncached because of interactions with the MTRRs. PCD | PWT
-	    means definitely uncached. */ 
-	if (boot_cpu_data.x86 > 3)
-		prot |= _PAGE_PCD | _PAGE_PWT;
-#elif defined(__powerpc__)
-	prot |= _PAGE_NO_CACHE | _PAGE_GUARDED;
-#elif defined(__mc68000__) && defined(CONFIG_MMU)
-#ifdef SUN3_PAGE_NOCACHE
-	if (MMU_IS_SUN3)
-		prot |= SUN3_PAGE_NOCACHE;
-	else
-#endif
-	if (MMU_IS_851 || MMU_IS_030)
-		prot |= _PAGE_NOCACHE030;
-	/* Use no-cache mode, serialized */
-	else if (MMU_IS_040 || MMU_IS_060)
-		prot = (prot & _CACHEMASK040) | _PAGE_NOCACHE_S;
-#endif
-
-	return __pgprot(prot);
-}
-
-#endif /* !pgprot_noncached */
-
-/*
- * Architectures vary in how they handle caching for addresses 
- * outside of main memory.
- */
-static inline int noncached_address(unsigned long addr)
-{
-#if defined(__i386__)
-	/* 
-	 * On the PPro and successors, the MTRRs are used to set
-	 * memory types for physical addresses outside main memory, 
-	 * so blindly setting PCD or PWT on those pages is wrong.
-	 * For Pentiums and earlier, the surround logic should disable 
-	 * caching for the high addresses through the KEN pin, but
-	 * we maintain the tradition of paranoia in this code.
-	 */
- 	return !( test_bit(X86_FEATURE_MTRR, boot_cpu_data.x86_capability) ||
-		  test_bit(X86_FEATURE_K6_MTRR, boot_cpu_data.x86_capability) ||
-		  test_bit(X86_FEATURE_CYRIX_ARR, boot_cpu_data.x86_capability) ||
-		  test_bit(X86_FEATURE_CENTAUR_MCR, boot_cpu_data.x86_capability) )
-	  && addr >= __pa(high_memory);
-#else
-	return addr >= __pa(high_memory);
-#endif
-}
-
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	int uncached;
 
-	/*
-	 * Accessing memory above the top the kernel knows about or
-	 * through a file pointer that was marked O_SYNC will be
-	 * done non-cached.
-	 */
-	if (noncached_address(offset) || (file->f_flags & O_SYNC))
+	uncached = uncached_access(file, offset);
+#ifdef pgprot_noncached
+	if (uncached)
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
 
 	/* Don't try to swap out physical pages.. */
 	vma->vm_flags |= VM_RESERVED;
@@ -194,7 +176,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	/*
 	 * Don't dump addresses that are not real memory to a core file.
 	 */
-	if (offset >= __pa(high_memory) || (file->f_flags & O_SYNC))
+	if (uncached)
 		vma->vm_flags |= VM_IO;
 
 	if (remap_page_range(vma, vma->vm_start, offset, vma->vm_end-vma->vm_start,

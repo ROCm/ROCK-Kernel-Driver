@@ -153,6 +153,23 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 #ifndef __ASSEMBLY__
 #include <asm-generic/pgtable.h>
 
+/*
+ * Macro to mark a page protection value as "uncacheable".
+ */
+#ifdef SUN3_PAGE_NOCACHE
+# define __SUN3_PAGE_NOCACHE	SUN3_PAGE_NOCACHE
+#else
+# define __SUN3_PAGE_NOCACHE	0
+#endif
+#define pgprot_noncached(prot)							\
+	(MMU_IS_SUN3								\
+	 ? (__pgprot(pgprot_val(prot) | __SUN3_PAGE_NOCACHE))			\
+	 : ((MMU_IS_851 || MMU_IS_030)						\
+	    ? (__pgprot(pgprot_val(prot) | _PAGE_NOCACHE030))			\
+	    : (MMU_IS_040 || MMU_IS_060)					\
+	    ? (__pgprot((pgprot_val(prot) & _CACHEMASK040) | _PAGE_NOCACHE_S))	\
+	    : (prot)))
+
 typedef pte_t *pte_addr_t;
 
 #endif /* !__ASSEMBLY__ */
