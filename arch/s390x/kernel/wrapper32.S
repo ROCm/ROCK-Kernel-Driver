@@ -17,14 +17,14 @@ sys32_read_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# char *
 	llgfr	%r4,%r4			# size_t
-	jg	sys_read		# branch to sys_read
+	jg	sys32_read		# branch to sys_read
 
 	.globl  sys32_write_wrapper 
 sys32_write_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# const char *
 	llgfr	%r4,%r4			# size_t
-	jg	sys_write		# branch to system call
+	jg	sys32_write		# branch to system call
 
 	.globl  sys32_open_wrapper 
 sys32_open_wrapper:
