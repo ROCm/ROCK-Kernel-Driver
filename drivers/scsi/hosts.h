@@ -396,7 +396,6 @@ struct Scsi_Host
     unsigned int            eh_kill:1; /* set when killing the eh thread */
     wait_queue_head_t       host_wait;
     Scsi_Host_Template    * hostt;
-    atomic_t                host_active; /* commands checked out */
     volatile unsigned short host_busy;   /* commands actually active on low-level */
     volatile unsigned short host_failed; /* commands that failed. */
     

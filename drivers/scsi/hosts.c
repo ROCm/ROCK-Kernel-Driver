@@ -392,7 +392,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
-	atomic_set(&shost->host_active,0);
 	INIT_LIST_HEAD(&shost->my_devices);
 
 	init_waitqueue_head(&shost->host_wait);

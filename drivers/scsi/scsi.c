@@ -994,11 +994,11 @@ static void scsi_softirq(struct softirq_action *h)
 				 * Here we have a fatal error of some sort.
 				 * Turn it over to the error handler.
 				 */
-				SCSI_LOG_MLCOMPLETE(3, printk("Command failed %p %x active=%d busy=%d failed=%d\n",
-						    SCpnt, SCpnt->result,
-				  atomic_read(&SCpnt->device->host->host_active),
-						  SCpnt->device->host->host_busy,
-					      SCpnt->device->host->host_failed));
+				SCSI_LOG_MLCOMPLETE(3,
+					printk("Command failed %p %x busy=%d failed=%d\n",
+						SCpnt, SCpnt->result,
+						SCpnt->device->host->host_busy,
+						SCpnt->device->host->host_failed));
 
 				/*
 				 * Dump the sense information too.
