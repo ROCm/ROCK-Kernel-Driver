@@ -46,7 +46,6 @@
 typedef spinlock_t lock_t;
 
 #define spinlock_init(lock, name)	spin_lock_init(lock)
-#define init_spinlock(lock, name, ll)	spin_lock_init(lock)
 #define spinlock_destroy(lock)
 
 static inline unsigned long mutex_spinlock(lock_t *lock)
