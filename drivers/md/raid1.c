@@ -333,7 +333,7 @@ static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 	 * device if no resync is going on, or below the resync window.
 	 * We take the first readable disk when above the resync window.
 	 */
-	if (conf->resync_mirrors && (this_sector + sectors >= conf->next_resync)) {
+	if (!conf->mddev->in_sync && (this_sector + sectors >= conf->next_resync)) {
 		/* make sure that disk is operational */
 		new_disk = 0;
 		while (!conf->mirrors[new_disk].operational || conf->mirrors[new_disk].write_only) {
@@ -652,6 +652,9 @@ static void close_sync(conf_t *conf)
 	if (conf->barrier) BUG();
 	if (waitqueue_active(&conf->wait_idle)) BUG();
 	if (waitqueue_active(&conf->wait_resume)) BUG();
+
+	mempool_destroy(conf->r1buf_pool);
+	conf->r1buf_pool = NULL;
 }
 
 static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
@@ -768,7 +771,6 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 	 * Deactivate a spare disk:
 	 */
 	case DISKOP_SPARE_INACTIVE:
-		close_sync(conf);
 		sdisk = conf->mirrors + spare_disk;
 		sdisk->operational = 0;
 		sdisk->write_only = 0;
@@ -781,7 +783,6 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 	 * property)
 	 */
 	case DISKOP_SPARE_ACTIVE:
-		close_sync(conf);
 		sdisk = conf->mirrors + spare_disk;
 		fdisk = conf->mirrors + failed_disk;
 
@@ -915,10 +916,6 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 	}
 abort:
 	spin_unlock_irq(&conf->device_lock);
-	if (state == DISKOP_SPARE_ACTIVE || state == DISKOP_SPARE_INACTIVE) {
-		mempool_destroy(conf->r1buf_pool);
-		conf->r1buf_pool = NULL;
-	}
 
 	print_conf(conf);
 	return err;
@@ -1008,7 +1005,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 			 * we read from here, no need to write
 			 */
 			continue;
-		if (i < conf->raid_disks && !conf->resync_mirrors)
+		if (i < conf->raid_disks && mddev->in_sync)
 			/*
 			 * don't need to write this we are just rebuilding
 			 */
@@ -1113,29 +1110,6 @@ static void raid1d(void *data)
 	spin_unlock_irqrestore(&retry_list_lock, flags);
 }
 
-/*
- * Private kernel thread to reconstruct mirrors after an unclean
- * shutdown.
- */
-static void raid1syncd(void *data)
-{
-	conf_t *conf = data;
-	mddev_t *mddev = conf->mddev;
-
-	if (!conf->resync_mirrors)
-		return;
-	if (mddev->recovery_running != 2)
-		return;
-	if (!md_do_sync(mddev, NULL)) {
-		/*
-		 * Only if everything went Ok.
-		 */
-		conf->resync_mirrors = 0;
-	}
-
-	close_sync(conf);
-
-}
 
 static int init_resync(conf_t *conf)
 {
@@ -1170,9 +1144,16 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	sector_t max_sector, nr_sectors;
 	int disk, partial;
 
-	if (!sector_nr)
+	if (sector_nr == 0)
 		if (init_resync(conf))
 			return -ENOMEM;
+
+	max_sector = mddev->sb->size << 1;
+	if (sector_nr >= max_sector) {
+		close_sync(conf);
+		return 0;
+	}
+
 	/*
 	 * If there is non-resync activity waiting for us then
 	 * put in a delay to throttle resync.
@@ -1208,10 +1189,6 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	r1_bio->mddev = mddev;
 	r1_bio->sector = sector_nr;
 	r1_bio->cmd = SPECIAL;
-
-	max_sector = mddev->sb->size << 1;
-	if (sector_nr >= max_sector)
-		BUG();
 
 	bio = r1_bio->master_bio;
 	nr_sectors = RESYNC_BLOCK_SIZE >> 9;
@@ -1295,7 +1272,6 @@ static int run(mddev_t *mddev)
 	mdp_disk_t *descriptor;
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
-	int start_recovery = 0;
 
 	MOD_INC_USE_COUNT;
 
@@ -1447,10 +1423,6 @@ static int run(mddev_t *mddev)
 	conf->last_used = j;
 
 
-	if (conf->working_disks != sb->raid_disks) {
-		printk(KERN_ALERT "raid1: md%d, not all disks are operational -- trying to recover array\n", mdidx(mddev));
-		start_recovery = 1;
-	}
 
 	{
 		const char * name = "raid1d";
@@ -1462,21 +1434,6 @@ static int run(mddev_t *mddev)
 		}
 	}
 
-	if (!start_recovery && !(sb->state & (1 << MD_SB_CLEAN)) &&
-						(conf->working_disks > 1)) {
-		const char * name = "raid1syncd";
-
-		conf->resync_thread = md_register_thread(raid1syncd, conf, name);
-		if (!conf->resync_thread) {
-			printk(THREAD_ERROR, mdidx(mddev));
-			goto out_free_conf;
-		}
-
-		printk(START_RESYNC, mdidx(mddev));
-		conf->resync_mirrors = 1;
-		mddev->recovery_running = 2;
-		md_wakeup_thread(conf->resync_thread);
-	}
 
 	/*
 	 * Regenerate the "device is in sync with the raid set" bit for
@@ -1492,10 +1449,6 @@ static int run(mddev_t *mddev)
 		}
 	}
 	sb->active_disks = conf->working_disks;
-
-	if (start_recovery)
-		md_recover_arrays();
-
 
 	printk(ARRAY_IS_ACTIVE, mdidx(mddev), sb->active_disks, sb->raid_disks);
 	/*
@@ -1516,46 +1469,12 @@ out:
 	return -EIO;
 }
 
-static int stop_resync(mddev_t *mddev)
-{
-	conf_t *conf = mddev_to_conf(mddev);
-
-	if (conf->resync_thread) {
-		if (conf->resync_mirrors) {
-			md_interrupt_thread(conf->resync_thread);
-
-			printk(KERN_INFO "raid1: mirror resync was not fully finished, restarting next time.\n");
-			return 1;
-		}
-		return 0;
-	}
-	return 0;
-}
-
-static int restart_resync(mddev_t *mddev)
-{
-	conf_t *conf = mddev_to_conf(mddev);
-
-	if (conf->resync_mirrors) {
-		if (!conf->resync_thread) {
-			MD_BUG();
-			return 0;
-		}
-		mddev->recovery_running = 2;
-		md_wakeup_thread(conf->resync_thread);
-		return 1;
-	}
-	return 0;
-}
-
 static int stop(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 	int i;
 
 	md_unregister_thread(conf->thread);
-	if (conf->resync_thread)
-		md_unregister_thread(conf->resync_thread);
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
 	for (i = 0; i < MD_SB_DISKS; i++)
@@ -1576,8 +1495,6 @@ static mdk_personality_t raid1_personality =
 	status:		status,
 	error_handler:	error,
 	diskop:		diskop,
-	stop_resync:	stop_resync,
-	restart_resync:	restart_resync,
 	sync_request:	sync_request
 };
 

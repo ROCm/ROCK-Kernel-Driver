@@ -204,12 +204,11 @@ struct disk_info {
 struct raid5_private_data {
 	struct stripe_head	**stripe_hashtbl;
 	mddev_t			*mddev;
-	mdk_thread_t		*thread, *resync_thread;
+	mdk_thread_t		*thread;
 	struct disk_info	disks[MD_SB_DISKS];
 	struct disk_info	*spare;
 	int			chunk_size, level, algorithm;
 	int			raid_disks, working_disks, failed_disks;
-	int			resync_parity;
 	int			max_nr_stripes;
 
 	struct list_head	handle_list; /* stripes needing handling */

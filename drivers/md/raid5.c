@@ -1037,7 +1037,7 @@ static void handle_stripe(struct stripe_head *sh)
 				    ) &&
 			    !test_bit(R5_UPTODATE, &dev->flags)) {
 				if (conf->disks[i].operational 
-/*				    && !(conf->resync_parity && i == sh->pd_idx) */
+/*				    && !(!mddev->insync && i == sh->pd_idx) */
 					)
 					rmw++;
 				else rmw += 2*disks;  /* cannot read it */
@@ -1303,6 +1303,10 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	int raid_disks = conf->raid_disks;
 	int data_disks = raid_disks-1;
 
+	if (sector_nr >= mddev->sb->size <<1)
+		/* just being told to finish up .. nothing to do */
+		return 0;
+
 	first_sector = raid5_compute_sector(stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
 	sh = get_active_stripe(conf, sector_nr, pd_idx, 0);
@@ -1372,28 +1376,6 @@ static void raid5d (void *data)
 	PRINTK("--- raid5d inactive\n");
 }
 
-/*
- * Private kernel thread for parity reconstruction after an unclean
- * shutdown. Reconstruction on spare drives in case of a failed drive
- * is done by the generic mdsyncd.
- */
-static void raid5syncd (void *data)
-{
-	raid5_conf_t *conf = data;
-	mddev_t *mddev = conf->mddev;
-
-	if (!conf->resync_parity)
-		return;
-	if (mddev->recovery_running != 2)
-		return;
-	if (md_do_sync(mddev,NULL)) {
-		printk("raid5: resync aborted!\n");
-		return;
-	}
-	conf->resync_parity = 0;
-	printk("raid5: resync finished.\n");
-}
-
 static int run (mddev_t *mddev)
 {
 	raid5_conf_t *conf;
@@ -1403,7 +1385,6 @@ static int run (mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct disk_info *disk;
 	struct list_head *tmp;
-	int start_recovery = 0;
 
 	MOD_INC_USE_COUNT;
 
@@ -1555,9 +1536,10 @@ static int run (mddev_t *mddev)
 		goto abort;
 	}
 
-	if (conf->working_disks != sb->raid_disks) {
-		printk(KERN_ALERT "raid5: md%d, not all disks are operational -- trying to recover array\n", mdidx(mddev));
-		start_recovery = 1;
+	if (conf->failed_disks == 1 &&
+	    !(sb->state & (1<<MD_SB_CLEAN))) {
+		printk(KERN_ERR "raid5: cannot start dirty degraded array for md%d\n", mdidx(mddev));
+		goto abort;
 	}
 
 	{
@@ -1575,6 +1557,7 @@ static int run (mddev_t *mddev)
 	if (grow_stripes(conf, conf->max_nr_stripes)) {
 		printk(KERN_ERR "raid5: couldn't allocate %dkB for buffers\n", memory);
 		shrink_stripes(conf);
+		md_unregister_thread(conf->thread);
 		goto abort;
 	} else
 		printk(KERN_INFO "raid5: allocated %dkB for md%d\n", memory, mdidx(mddev));
@@ -1599,24 +1582,6 @@ static int run (mddev_t *mddev)
 	else
 		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), sb->active_disks, sb->raid_disks, conf->algorithm);
 
-	if (!start_recovery && !(sb->state & (1 << MD_SB_CLEAN))) {
-		const char * name = "raid5syncd";
-
-		conf->resync_thread = md_register_thread(raid5syncd, conf,name);
-		if (!conf->resync_thread) {
-			printk(KERN_ERR "raid5: couldn't allocate thread for md%d\n", mdidx(mddev));
-			goto abort;
-		}
-
-		printk("raid5: raid set md%d not clean; reconstructing parity\n", mdidx(mddev));
-		conf->resync_parity = 1;
-		mddev->recovery_running = 2;
-		md_wakeup_thread(conf->resync_thread);
-	}
-
-	print_raid5_conf(conf);
-	if (start_recovery)
-		md_recover_arrays();
 	print_raid5_conf(conf);
 
 	/* Ok, everything is just fine now */
@@ -1635,47 +1600,12 @@ abort:
 	return -EIO;
 }
 
-static int stop_resync (mddev_t *mddev)
-{
-	raid5_conf_t *conf = mddev_to_conf(mddev);
-	mdk_thread_t *thread = conf->resync_thread;
-
-	if (thread) {
-		if (conf->resync_parity) {
-			md_interrupt_thread(thread);
-			printk(KERN_INFO "raid5: parity resync was not fully finished, restarting next time.\n");
-			return 1;
-		}
-		return 0;
-	}
-	return 0;
-}
-
-static int restart_resync (mddev_t *mddev)
-{
-	raid5_conf_t *conf = mddev_to_conf(mddev);
-
-	if (conf->resync_parity) {
-		if (!conf->resync_thread) {
-			MD_BUG();
-			return 0;
-		}
-		printk("raid5: waking up raid5resync.\n");
-		mddev->recovery_running = 2;
-		md_wakeup_thread(conf->resync_thread);
-		return 1;
-	} else
-		printk("raid5: no restart-resync needed.\n");
-	return 0;
-}
 
 
 static int stop (mddev_t *mddev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 
-	if (conf->resync_thread)
-		md_unregister_thread(conf->resync_thread);
 	md_unregister_thread(conf->thread);
 	shrink_stripes(conf);
 	free_pages((unsigned long) conf->stripe_hashtbl, HASH_PAGES_ORDER);
@@ -2050,8 +1980,6 @@ static mdk_personality_t raid5_personality=
 	status:		status,
 	error_handler:	error,
 	diskop:		diskop,
-	stop_resync:	stop_resync,
-	restart_resync:	restart_resync,
 	sync_request:	sync_request
 };
 

@@ -106,6 +106,7 @@ static ctl_table raid_root_table[] = {
  * subsystems want to have a pre-defined structure
  */
 struct hd_struct md_hd_struct[MAX_MD_DEVS];
+static void md_recover_arrays(void);
 static mdk_thread_t *md_recovery_thread;
 
 int md_size[MAX_MD_DEVS];
@@ -1657,9 +1658,15 @@ static int do_md_run(mddev_t * mddev)
 		return -EINVAL;
 	}
 
-	mddev->sb->state &= ~(1 << MD_SB_CLEAN);
+	mddev->in_sync = (mddev->sb->state & (1<<MD_SB_CLEAN));
+	/* if personality doesn't have "sync_request", then
+	 * a dirty array doesn't mean anything
+	 */
+	if (mddev->pers->sync_request)
+		mddev->sb->state &= ~(1 << MD_SB_CLEAN);
 	__md_update_sb(mddev);
 
+	md_recover_arrays();
 	/*
 	 * md_size has units of 1K blocks, which are
 	 * twice as large as sectors.
@@ -1699,8 +1706,6 @@ static int restart_array(mddev_t *mddev)
 		 * Kick recovery or resync if necessary
 		 */
 		md_recover_arrays();
-		if (mddev->pers->restart_resync)
-			mddev->pers->restart_resync(mddev);
 		err = 0;
 	} else {
 		printk(KERN_ERR "md: md%d has no personality assigned.\n",
@@ -1717,11 +1722,9 @@ out:
 #define	STILL_IN_USE \
 "md: md%d still in use.\n"
 
-DECLARE_WAIT_QUEUE_HEAD(resync_wait);
-
 static int do_md_stop(mddev_t * mddev, int ro)
 {
-	int err = 0, resync_interrupted = 0;
+	int err = 0;
 	kdev_t dev = mddev_to_kdev(mddev);
 
 	if (atomic_read(&mddev->active)>1) {
@@ -1731,26 +1734,17 @@ static int do_md_stop(mddev_t * mddev, int ro)
 	}
 
 	if (mddev->pers) {
-		/*
-		 * It is safe to call stop here, it only frees private
-		 * data. Also, it tells us if a device is unstoppable
-		 * (eg. resyncing is in progress)
-		 */
-		if (mddev->pers->stop_resync)
-			if (mddev->pers->stop_resync(mddev))
-				resync_interrupted = 1;
-
-		if (mddev->recovery_running==1)
-			md_interrupt_thread(md_recovery_thread);
-
-		/*
-		 * This synchronizes with signal delivery to the
-		 * resync or reconstruction thread. It also nicely
-		 * hangs the process if some reconstruction has not
-		 * finished.
-		 */
-
-		wait_event(resync_wait, mddev->recovery_running <= 0);
+		if (mddev->sync_thread) {
+			if (mddev->recovery_running > 0)
+				mddev->recovery_running = -EINTR;
+			md_unregister_thread(mddev->sync_thread);
+			mddev->sync_thread = NULL;
+			if (mddev->spare) {
+				mddev->pers->diskop(mddev, &mddev->spare,
+						    DISKOP_SPARE_INACTIVE);
+				mddev->spare = NULL;
+			}
+		}
 
 		invalidate_device(dev, 1);
 
@@ -1776,7 +1770,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			 * mark it clean only if there was no resync
 			 * interrupted.
 			 */
-			if (!mddev->recovery_running && !resync_interrupted) {
+			if (mddev->in_sync) {
 				printk(KERN_INFO "md: marking sb clean...\n");
 				mddev->sb->state |= 1 << MD_SB_CLEAN;
 			}
@@ -2795,6 +2789,7 @@ int md_thread(void * arg)
 	 */
 
 	daemonize();
+	reparent_to_init();
 
 	sprintf(current->comm, thread->name);
 	current->exit_signal = SIGCHLD;
@@ -2896,7 +2891,7 @@ void md_unregister_thread(mdk_thread_t *thread)
 	kfree(thread);
 }
 
-void md_recover_arrays(void)
+static void md_recover_arrays(void)
 {
 	if (!md_recovery_thread) {
 		MD_BUG();
@@ -2931,10 +2926,8 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 	/*
 	 * if recovery was running, stop it now.
 	 */
-	if (mddev->pers->stop_resync)
-		mddev->pers->stop_resync(mddev);
-	if (mddev->recovery_running==1)
-		md_interrupt_thread(md_recovery_thread);
+	if (mddev->recovery_running) 
+		mddev->recovery_running = -EIO;
 	md_recover_arrays();
 
 	return 0;
@@ -2992,18 +2985,9 @@ static int status_resync(char * page, mddev_t * mddev)
 			sz += sprintf(page + sz, ".");
 		sz += sprintf(page + sz, "] ");
 	}
-	if (mddev->recovery_running==2)
-		/*
-		 * true resync
-		 */
-		sz += sprintf(page + sz, " resync =%3lu.%lu%% (%lu/%lu)",
-				res/10, res % 10, resync, max_blocks);
-	else
-		/*
-		 * recovery ...
-		 */
-		sz += sprintf(page + sz, " recovery =%3lu.%lu%% (%lu/%lu)",
-				res/10, res % 10, resync, max_blocks);
+	sz += sprintf(page + sz, " %s =%3lu.%lu%% (%lu/%lu)",
+		      (mddev->spare ? "recovery" : "resync"),
+		      res/10, res % 10, resync, max_blocks);
 
 	/*
 	 * We do not want to overflow, so the order of operands and
@@ -3078,12 +3062,11 @@ static int md_status_read_proc(char *page, char **start, off_t off,
 		sz += mddev->pers->status (page+sz, mddev);
 
 		sz += sprintf(page+sz, "\n      ");
-		if (mddev->curr_resync) {
+		if (mddev->curr_resync > 1)
 			sz += status_resync (page+sz, mddev);
-		} else {
-			if (mddev->recovery_running < 0)
+		else if (mddev->curr_resync == 1)
 				sz += sprintf(page + sz, "	resync=DELAYED");
-		}
+
 		sz += sprintf(page + sz, "\n");
 		mddev_unlock(mddev);
 	}
@@ -3192,14 +3175,20 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 	atomic_sub(blocks, &mddev->recovery_active);
 	wake_up(&mddev->recovery_wait);
 	if (!ok) {
+		mddev->recovery_running = -EIO;
+		md_recover_arrays();
 		// stop recovery, signal do_sync ....
 	}
 }
 
+
+DECLARE_WAIT_QUEUE_HEAD(resync_wait);
+
 #define SYNC_MARKS	10
 #define	SYNC_MARK_STEP	(3*HZ)
-int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
+static void md_do_sync(void *data)
 {
+	mddev_t *mddev = data;
 	mddev_t *mddev2;
 	unsigned int max_sectors, currspeed = 0,
 		j, window, err;
@@ -3209,6 +3198,9 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 	struct list_head *tmp;
 	unsigned long last_check;
 
+	/* just incase thread restarts... */
+	if (mddev->recovery_running <= 0)
+		return;
 
 	/* we overload curr_resync somewhat here.
 	 * 0 == not engaged in resync at all
@@ -3304,7 +3296,6 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 			/*
 			 * got a signal, exit.
 			 */
-			mddev->curr_resync = 0;
 			printk(KERN_INFO "md: md_do_sync() got signal ... exiting\n");
 			flush_curr_signals();
 			err = -EINTR;
@@ -3339,98 +3330,112 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 	 */
 out:
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
+	/* tell personality that we are finished */
+	mddev->pers->sync_request(mddev, max_sectors, 1);
+
 	mddev->curr_resync = 0;
-	mddev->recovery_running = err;
-	wake_up(&resync_wait);
-	return err;
+	if (err)
+		mddev->recovery_running = err;
+	if (mddev->recovery_running > 0)
+		mddev->recovery_running = 0;
+	if (mddev->recovery_running == 0)
+		mddev->in_sync = 1;
+	md_recover_arrays();
 }
 
 
 /*
- * This is a kernel thread which syncs a spare disk with the active array
- *
- * the amount of foolproofing might seem to be a tad excessive, but an
- * early (not so error-safe) version of raid1syncd synced the first 0.5 gigs
- * of my root partition with the first 0.5 gigs of my /home partition ... so
- * i'm a bit nervous ;)
+ * This is the kernel thread that watches all md arrays for re-sync action
+ * that might be needed.
+ * It does not do any resync itself, but rather "forks" off other threads
+ * to do that as needed.
+ * When it is determined that resync is needed, we set "->recovery_running" and
+ * create a thread at ->sync_thread.
+ * When the thread finishes is clears recovery_running (or set and error)
+ * and wakeup up this thread which will reap the thread and finish up.
  */
 void md_do_recovery(void *data)
 {
-	int err;
 	mddev_t *mddev;
 	mdp_super_t *sb;
-	mdp_disk_t *spare;
 	struct list_head *tmp;
 
 	dprintk(KERN_INFO "md: recovery thread got woken up ...\n");
 
 	ITERATE_MDDEV(mddev,tmp) if (mddev_lock(mddev)==0) {
 		sb = mddev->sb;
-		if (!sb)
+		if (!sb || !mddev->pers || !mddev->pers->diskop || mddev->ro)
 			goto unlock;
-		if (mddev->recovery_running)
+		if (mddev->recovery_running > 0)
+			/* resync/recovery still happening */
 			goto unlock;
-		if (sb->active_disks == sb->raid_disks)
-			goto unlock;
-		if (!sb->spare_disks) {
-			printk(KERN_ERR "md%d: no spare disk to reconstruct array! "
-			       "-- continuing in degraded mode\n", mdidx(mddev));
-			goto unlock;
-		}
-		/*
-		 * now here we get the spare and resync it.
-		 */
-		spare = get_spare(mddev);
-		if (!spare)
-			goto unlock;
-		printk(KERN_INFO "md%d: resyncing spare disk %s to replace failed disk\n",
-		       mdidx(mddev), partition_name(mk_kdev(spare->major,spare->minor)));
-		if (!mddev->pers->diskop)
-			goto unlock;
-		if (mddev->pers->diskop(mddev, &spare, DISKOP_SPARE_WRITE))
-			goto unlock;
-		mddev->recovery_running = 1;
-		mddev_unlock(mddev);
-		err = md_do_sync(mddev, spare);
-		mddev_lock(mddev); /* FIXME this can fail or deadlock with do_md_close */
-		if (err == -EIO) {
-			printk(KERN_INFO "md%d: spare disk %s failed, skipping to next spare.\n",
-			       mdidx(mddev), partition_name(mk_kdev(spare->major,spare->minor)));
-			if (!disk_faulty(spare)) {
-				mddev->pers->diskop(mddev,&spare,DISKOP_SPARE_INACTIVE);
-				mark_disk_faulty(spare);
-				mark_disk_nonsync(spare);
-				mark_disk_inactive(spare);
-				sb->spare_disks--;
-				sb->working_disks--;
-				sb->failed_disks++;
+		if (mddev->sync_thread) {
+			/* resync has finished, collect result */
+			md_unregister_thread(mddev->sync_thread);
+			mddev->sync_thread = NULL;
+			if (mddev->recovery_running < 0) {
+				/* some sort of failure.
+				 * If we were doing a reconstruction,
+				 * we need to retrieve the spare
+				 */
+				if (mddev->spare) {
+					mddev->pers->diskop(mddev, &mddev->spare,
+							    DISKOP_SPARE_INACTIVE);
+					mddev->spare = NULL;
+				}
+			} else {
+				/* success...*/
+				if (mddev->spare) {
+					mddev->pers->diskop(mddev, &mddev->spare,
+							    DISKOP_SPARE_ACTIVE);
+					mark_disk_sync(mddev->spare);
+					mark_disk_active(mddev->spare);
+					sb->active_disks++;
+					sb->spare_disks--;
+					mddev->spare = NULL;
+				}
 			}
-		} else
-			if (disk_faulty(spare))
-				mddev->pers->diskop(mddev, &spare,
-						DISKOP_SPARE_INACTIVE);
-		if (err == -EINTR || err == -ENOMEM) {
-			/*
-			 * Recovery got interrupted, or ran out of mem ...
-			 * signal back that we have finished using the array.
-			 */
-			mddev->pers->diskop(mddev, &spare,
-							 DISKOP_SPARE_INACTIVE);
+			__md_update_sb(mddev);
+			mddev->recovery_running = 0;
+			wake_up(&resync_wait);
 			goto unlock;
 		}
-		if (!disk_faulty(spare)) {
-			/*
-			 * the SPARE_ACTIVE diskop possibly changes the
-			 * pointer too
-			 */
-			mddev->pers->diskop(mddev, &spare, DISKOP_SPARE_ACTIVE);
-			mark_disk_sync(spare);
-			mark_disk_active(spare);
-			sb->active_disks++;
-			sb->spare_disks--;
+		if (mddev->recovery_running) {
+			/* that's odd.. */
+			mddev->recovery_running = 0;
+			wake_up(&resync_wait);
 		}
-		__md_update_sb(mddev);
-		mddev->recovery_running = 0;
+
+		if (sb->active_disks < sb->raid_disks) {
+			mddev->spare = get_spare(mddev);
+			if (!mddev->spare)
+				printk(KERN_ERR "md%d: no spare disk to reconstruct array! "
+				       "-- continuing in degraded mode\n", mdidx(mddev));
+			else
+				printk(KERN_INFO "md%d: resyncing spare disk %s to replace failed disk\n",
+				       mdidx(mddev), partition_name(mk_kdev(mddev->spare->major,mddev->spare->minor)));
+		}
+		if (!mddev->spare && mddev->in_sync) {
+			/* nothing we can do ... */
+			goto unlock;
+		}
+		if (mddev->pers->sync_request) {
+			mddev->sync_thread = md_register_thread(md_do_sync,
+								mddev,
+								"md_resync");
+			if (!mddev->sync_thread) {
+				printk(KERN_ERR "md%d: could not start resync thread...\n", mdidx(mddev));
+				if (mddev->spare)
+					mddev->pers->diskop(mddev, &mddev->spare, DISKOP_SPARE_INACTIVE);
+				mddev->spare = NULL;
+				mddev->recovery_running = 0;
+			} else {
+				if (mddev->spare)
+					mddev->pers->diskop(mddev, &mddev->spare, DISKOP_SPARE_WRITE);
+				mddev->recovery_running = 1;
+				md_wakeup_thread(mddev->sync_thread);
+			}
+		}
 	unlock:
 		mddev_unlock(mddev);
 	}
@@ -3900,10 +3905,8 @@ EXPORT_SYMBOL(register_md_personality);
 EXPORT_SYMBOL(unregister_md_personality);
 EXPORT_SYMBOL(partition_name);
 EXPORT_SYMBOL(md_error);
-EXPORT_SYMBOL(md_do_sync);
 EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);
-EXPORT_SYMBOL(md_recover_arrays);
 EXPORT_SYMBOL(md_register_thread);
 EXPORT_SYMBOL(md_unregister_thread);
 EXPORT_SYMBOL(md_update_sb);

@@ -181,6 +181,8 @@ struct mddev_s
 	struct list_head 		disks;
 	int				sb_dirty;
 	int				ro;
+
+	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
@@ -191,8 +193,10 @@ struct mddev_s
 	 * it can only be set > 0 under reconfig_sem
 	 */
 	int				recovery_running;
+	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
+	mdp_disk_t			*spare;
 
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
@@ -222,9 +226,6 @@ struct mdk_personality_s
  * SPARE_ACTIVE expects such a change)
  */
 	int (*diskop) (mddev_t *mddev, mdp_disk_t **descriptor, int state);
-
-	int (*stop_resync)(mddev_t *mddev);
-	int (*restart_resync)(mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
 
