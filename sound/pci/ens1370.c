@@ -1961,7 +1961,7 @@ static void snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static int __devinit snd_audiopci_probe(struct pci_dev *pci,
 					const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	ensoniq_t *ensoniq;
 	int err, pcm_devs[2];

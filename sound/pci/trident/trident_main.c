@@ -37,6 +37,9 @@
 #include <sound/control.h>
 #include <sound/trident.h>
 #include <sound/asoundef.h>
+#ifndef LINUX_2_2
+#include <linux/gameport.h>
+#endif
 
 #define chip_t trident_t
 
@@ -2946,6 +2949,100 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	return 0;
 }
 
+/*
+ * gameport interface
+ */
+#ifndef LINUX_2_2
+
+typedef struct snd_trident_gameport {
+	struct gameport info;
+	trident_t *chip;
+} trident_gameport_t;
+
+static unsigned char snd_trident_gameport_read(struct gameport *gameport)
+{
+	trident_gameport_t *gp = (trident_gameport_t *)gameport;
+	trident_t *chip;
+	snd_assert(gp, return 0);
+	chip = snd_magic_cast(trident_t, gp->chip, return 0);
+	return inb(TRID_REG(chip, GAMEPORT_LEGACY));
+}
+
+static void snd_trident_gameport_trigger(struct gameport *gameport)
+{
+	trident_gameport_t *gp = (trident_gameport_t *)gameport;
+	trident_t *chip;
+	snd_assert(gp, return);
+	chip = snd_magic_cast(trident_t, gp->chip, return);
+	outb(0xff, TRID_REG(chip, GAMEPORT_LEGACY));
+}
+
+static int snd_trident_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
+{
+	trident_gameport_t *gp = (trident_gameport_t *)gameport;
+	trident_t *chip;
+	int i;
+
+	snd_assert(gp, return 0);
+	chip = snd_magic_cast(trident_t, gp->chip, return 0);
+
+	*buttons = (~inb(TRID_REG(chip, GAMEPORT_LEGACY)) >> 4) & 0xf;
+
+	for (i = 0; i < 4; i++) {
+		axes[i] = inw(TRID_REG(chip, GAMEPORT_AXES + i * 2));
+		if (axes[i] == 0xffff) axes[i] = -1;
+	}
+        
+        return 0;
+}
+
+static int snd_trident_gameport_open(struct gameport *gameport, int mode)
+{
+	trident_gameport_t *gp = (trident_gameport_t *)gameport;
+	trident_t *chip;
+	snd_assert(gp, return -1);
+	chip = snd_magic_cast(trident_t, gp->chip, return -1);
+
+	switch (mode) {
+		case GAMEPORT_MODE_COOKED:
+			outb(GAMEPORT_MODE_ADC, TRID_REG(chip, GAMEPORT_GCR));
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1 + 20 * HZ / 1000); /* 20msec */
+			return 0;
+		case GAMEPORT_MODE_RAW:
+			outb(0, TRID_REG(chip, GAMEPORT_GCR));
+			return 0;
+		default:
+			return -1;
+	}
+}
+
+void __devinit snd_trident_gameport(trident_t *chip)
+{
+	trident_gameport_t *gp;
+	gp = kmalloc(sizeof(*gp), GFP_KERNEL);
+	if (! gp) {
+		snd_printk("cannot allocate gameport area\n");
+		return;
+	}
+	memset(gp, 0, sizeof(*gp));
+	gp->chip = chip;
+	gp->info.fuzz = 64;
+	gp->info.read = snd_trident_gameport_read;
+	gp->info.trigger = snd_trident_gameport_trigger;
+	gp->info.cooked_read = snd_trident_gameport_cooked_read;
+	gp->info.open = snd_trident_gameport_open;
+	chip->gameport = gp;
+
+	gameport_register_port(&gp->info);
+}
+
+#else
+void __devinit snd_trident_gameport(trident_t *chip)
+{
+}
+#endif
+
 /*  
  *  /proc interface
  */
@@ -3319,6 +3416,12 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 int snd_trident_free(trident_t *trident)
 {
+#ifndef LINUX_2_2
+	if (trident->gameport) {
+		gameport_unregister_port(&trident->gameport->info);
+		kfree(trident->gameport);
+	}
+#endif
 	snd_trident_disable_eso(trident);
 	// Disable S/PDIF out
 	if (trident->device == TRIDENT_DEVICE_ID_NX)

@@ -158,7 +158,7 @@ int snd_rawmidi_control_ioctl(snd_card_t * card,
 /* callbacks */
 
 void snd_rawmidi_receive_reset(snd_rawmidi_substream_t * substream);
-int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, unsigned char *buffer, int count);
+int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char *buffer, int count);
 void snd_rawmidi_transmit_reset(snd_rawmidi_substream_t * substream);
 int snd_rawmidi_transmit_empty(snd_rawmidi_substream_t * substream);
 int snd_rawmidi_transmit_peek(snd_rawmidi_substream_t * substream, unsigned char *buffer, int count);

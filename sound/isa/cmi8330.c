@@ -450,7 +450,7 @@ static void __exit alsa_card_cmi8330_exit(void)
 static int __init snd_cmi8330_isapnp_detect(struct isapnp_card *card,
                                             const struct isapnp_card_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {

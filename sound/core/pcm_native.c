@@ -32,7 +32,7 @@
 #include <sound/pcm_params.h>
 #include <sound/minors.h>
 
-spinlock_t pcm_link_lock = SPIN_LOCK_UNLOCKED;
+static rwlock_t pcm_link_lock = RW_LOCK_UNLOCKED;
 
 static inline mm_segment_t snd_enter_user(void)
 {
@@ -569,7 +569,7 @@ static void snd_pcm_trigger_time(snd_pcm_substream_t *substream)
 #define _SND_PCM_ACTION(aname, substream, state, res, check_master) { \
 	snd_pcm_substream_t *s; \
 	res = 0; \
-	spin_lock(&pcm_link_lock); \
+	read_lock(&pcm_link_lock); \
 	s = substream; \
 	do { \
 		if (s != substream) \
@@ -606,7 +606,7 @@ static void snd_pcm_trigger_time(snd_pcm_substream_t *substream)
 		s = s->link_next; \
 	} while (s != substream); \
  _end: \
-	spin_unlock(&pcm_link_lock); \
+	read_unlock(&pcm_link_lock); \
 }
 
 #define SND_PCM_ACTION(aname, substream, state) { \
@@ -965,7 +965,7 @@ int snd_pcm_prepare(snd_pcm_substream_t *substream)
 static void snd_pcm_change_state(snd_pcm_substream_t *substream, int state)
 {
 	snd_pcm_substream_t *s;
-	spin_lock(&pcm_link_lock);
+	read_lock(&pcm_link_lock);
 	s = substream->link_next;
 	while (s != substream) {
 		spin_lock(&s->runtime->lock);
@@ -979,7 +979,7 @@ static void snd_pcm_change_state(snd_pcm_substream_t *substream, int state)
 			spin_unlock(&runtime->lock);
 		s = s->link_next;
 	} while (s != substream);
-	spin_unlock(&pcm_link_lock);
+	read_unlock(&pcm_link_lock);
 }
 
 static int snd_pcm_playback_drop(snd_pcm_substream_t *substream);
@@ -1277,7 +1277,7 @@ static int snd_pcm_link(snd_pcm_substream_t *substream, int fd)
 		return -EBADFD;
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
 	substream1 = pcm_file->substream;
-	spin_lock_irq(&pcm_link_lock);
+	write_lock_irq(&pcm_link_lock);
 	if (substream->runtime->status->state != substream1->runtime->status->state) {
 		res = -EBADFD;
 		goto _end;
@@ -1295,19 +1295,19 @@ static int snd_pcm_link(snd_pcm_substream_t *substream, int fd)
 	substream->link_next = substream1;
 	substream1->link_prev = substream;
  _end:
-	spin_unlock_irq(&pcm_link_lock);
+	write_unlock_irq(&pcm_link_lock);
 	fput(file);
 	return res;
 }
 
 static int snd_pcm_unlink(snd_pcm_substream_t *substream)
 {
-	spin_lock_irq(&pcm_link_lock);
+	write_lock_irq(&pcm_link_lock);
 	substream->link_prev->link_next = substream->link_next;
 	substream->link_next->link_prev = substream->link_prev;
 	substream->link_prev = substream;
 	substream->link_next = substream;
-	spin_unlock_irq(&pcm_link_lock);
+	write_unlock_irq(&pcm_link_lock);
 	return 0;
 }
 

@@ -88,7 +88,7 @@ MODULE_DEVICE_TABLE(pci, snd_emu10k1_ids);
 static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 					    const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	emu10k1_t *emu;
 #ifdef ENABLE_SYNTH

@@ -2249,7 +2249,7 @@ static int __devinit
 snd_korg1212_probe(struct pci_dev *pci,
 		const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	korg1212_t *korg1212;
 	snd_card_t *card;
 	int err;

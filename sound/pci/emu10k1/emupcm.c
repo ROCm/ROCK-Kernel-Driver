@@ -617,7 +617,6 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 			break;
 		case CAPTURE_EFX:
 			snd_emu10k1_ptr_write(emu, FXWC, 0, epcm->capture_cr_val);
-			printk(">> FXWC = 0x%x\n", snd_emu10k1_ptr_read(emu, FXWC, 0));
 			break;
 		default:	
 			break;
@@ -888,6 +887,7 @@ static int snd_emu10k1_capture_efx_open(snd_pcm_substream_t * substream)
 	emu10k1_pcm_t *epcm;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned long flags;
+	int nefx = emu->audigy ? 64 : 32;
 	int idx;
 
 	epcm = snd_magic_kcalloc(emu10k1_pcm_t, 0, GFP_KERNEL);
@@ -908,13 +908,14 @@ static int snd_emu10k1_capture_efx_open(snd_pcm_substream_t * substream)
 	runtime->hw.rate_min = runtime->hw.rate_max = 48000;
 	spin_lock_irqsave(&emu->reg_lock, flags);
 	runtime->hw.channels_min = runtime->hw.channels_max = 0;
-	for (idx = 0; idx < 32; idx++) {
-		if (emu->efx_voices_mask & (1 << idx)) {
+	for (idx = 0; idx < nefx; idx++) {
+		if (emu->efx_voices_mask[idx/32] & (1 << (idx%32))) {
 			runtime->hw.channels_min++;
 			runtime->hw.channels_max++;
 		}
 	}
-	epcm->capture_cr_val = emu->efx_voices_mask;
+	epcm->capture_cr_val = emu->efx_voices_mask[0];
+	epcm->capture_cr_val2 = emu->efx_voices_mask[1];
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
 	emu->capture_efx_interrupt = snd_emu10k1_pcm_efx_interrupt;
 	emu->pcm_capture_efx_substream = substream;
@@ -1037,8 +1038,10 @@ int __devinit snd_emu10k1_pcm_mic(emu10k1_t * emu, int device, snd_pcm_t ** rpcm
 
 static int snd_emu10k1_pcm_efx_voices_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
+	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
+	int nefx = emu->audigy ? 64 : 32;
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 32;
+	uinfo->count = nefx;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = 1;
 	return 0;
@@ -1048,11 +1051,12 @@ static int snd_emu10k1_pcm_efx_voices_mask_get(snd_kcontrol_t * kcontrol, snd_ct
 {
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
+	int nefx = emu->audigy ? 64 : 32;
 	int idx;
 	
 	spin_lock_irqsave(&emu->reg_lock, flags);
-	for (idx = 0; idx < 32; idx++)
-		ucontrol->value.integer.value[idx] = (emu->efx_voices_mask & (1 << idx)) ? 1 : 0;
+	for (idx = 0; idx < nefx; idx++)
+		ucontrol->value.integer.value[idx] = (emu->efx_voices_mask[idx / 32] & (1 << (idx % 32))) ? 1 : 0;
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
 	return 0;
 }
@@ -1061,19 +1065,23 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 {
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
-	unsigned int nval, bits;
+	unsigned int nval[2], bits;
+	int nefx = emu->audigy ? 64 : 32;
 	int change, idx;
 	
-	for (idx = 0, nval = bits = 0; idx < 32; idx++)
+	nval[0] = nval[1] = 0;
+	for (idx = 0, bits = 0; idx < nefx; idx++)
 		if (ucontrol->value.integer.value[idx]) {
-			nval |= 1 << idx;
+			nval[idx / 32] |= 1 << (idx % 32);
 			bits++;
 		}
 	if (bits != 1 && bits != 2 && bits != 4 && bits != 8)
 		return -EINVAL;
 	spin_lock_irqsave(&emu->reg_lock, flags);
-	change = nval != emu->efx_voices_mask;
-	emu->efx_voices_mask = nval;
+	change = (nval[0] != emu->efx_voices_mask[0]) ||
+		(nval[1] != emu->efx_voices_mask[1]);
+	emu->efx_voices_mask[0] = nval[0];
+	emu->efx_voices_mask[1] = nval[1];
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
 	return change;
 }
@@ -1126,7 +1134,8 @@ int __devinit snd_emu10k1_pcm_efx(emu10k1_t * emu, int device, snd_pcm_t ** rpcm
 	if (rpcm)
 		*rpcm = pcm;
 
-	emu->efx_voices_mask = FXWC_DEFAULTROUTE_C | FXWC_DEFAULTROUTE_A;
+	emu->efx_voices_mask[0] = FXWC_DEFAULTROUTE_C | FXWC_DEFAULTROUTE_A;
+	emu->efx_voices_mask[1] = 0;
 	snd_ctl_add(emu->card, snd_ctl_new1(&snd_emu10k1_pcm_efx_voices_mask, emu));
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(emu->pci, pcm, 64*1024, 64*1024);
