@@ -24,6 +24,12 @@ ifeq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS		+=-g
 endif
 
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+CFLAGS		+= -mbig-endian
+AS		+= -EB
+LD		+= -EB
+endif
+
 # Select CPU dependent flags.  Note that order of declaration is important;
 # the options further down the list override previous items.
 #
@@ -76,7 +82,11 @@ endif
 ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	:= armv
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
-LDFLAGS_BLOB	+= --oformat elf32-littlearm
+  ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+    LDFLAGS_BLOB	+= --oformat elf32-bigarm
+  else
+    LDFLAGS_BLOB	+= --oformat elf32-littlearm
+  endif
 textaddr-y	:= 0xC0008000
 endif
 
