@@ -1615,7 +1615,7 @@ static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate)
 		if (i == MAX_ACTIVE) {
 			jfs_warn("Too many file systems sharing journal!");
 			lbmFree(bpsuper);
-			return EMFILE;	/* Is there a better rc? */
+			return -EMFILE;	/* Is there a better rc? */
 		}
 	} else {
 		for (i = 0; i < MAX_ACTIVE; i++)

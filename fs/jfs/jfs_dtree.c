@@ -1328,7 +1328,7 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	rbn = addressPXD(pxd);
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
 	if (rmp == NULL)
-		return EIO;
+		return -EIO;
 
 	jfs_info("dtSplitPage: ip:0x%p smp:0x%p rmp:0x%p", ip, smp, rmp);
 
