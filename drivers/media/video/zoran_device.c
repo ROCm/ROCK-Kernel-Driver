@@ -1453,38 +1453,23 @@ zoran_irq (int             irq,
 					    0) {
 						/* it is finished, notify the user */
 
-						zr->v4l_buffers.buffer[zr->
-								       v4l_grab_frame].
-						    state = BUZ_STATE_DONE;
-						zr->v4l_buffers.buffer[zr->
-								       v4l_grab_frame].
-						    bs.seq =
-						    zr->v4l_grab_seq;
-						do_gettimeofday(&zr->
-								v4l_buffers.
-								buffer[zr->
-								       v4l_grab_frame].
-								bs.
-								timestamp);
-						zr->v4l_grab_frame =
-						    NO_GRAB_ACTIVE;
+						zr->v4l_buffers.buffer[zr->v4l_grab_frame].state = BUZ_STATE_DONE;
+						zr->v4l_buffers.buffer[zr->v4l_grab_frame].bs.seq = zr->v4l_grab_seq;
+						do_gettimeofday(&zr->v4l_buffers.buffer[zr->v4l_grab_frame].bs.timestamp);
+						zr->v4l_grab_frame = NO_GRAB_ACTIVE;
 						zr->v4l_pend_tail++;
 					}
 				}
 
 				if (zr->v4l_grab_frame == NO_GRAB_ACTIVE)
-					wake_up_interruptible(&zr->
-							      v4l_capq);
+					wake_up_interruptible(&zr->v4l_capq);
 
 				/* Check if there is another grab queued */
 
 				if (zr->v4l_grab_frame == NO_GRAB_ACTIVE &&
-				    zr->v4l_pend_tail !=
-				    zr->v4l_pend_head) {
+				    zr->v4l_pend_tail != zr->v4l_pend_head) {
 
-					int frame =
-					    zr->v4l_pend[zr->
-							 v4l_pend_tail &
+					int frame = zr->v4l_pend[zr->v4l_pend_tail &
 							 V4L_MASK_FRAME];
 					u32 reg;
 
@@ -1559,11 +1544,8 @@ zoran_irq (int             irq,
 						int i;
 						strcpy(sv, sc);
 						for (i = 0; i < 4; i++) {
-							if (zr->
-							    stat_com[i] &
-							    1)
-								sv[i] =
-								    '1';
+							if (zr->stat_com[i] & 1)
+								sv[i] = '1';
 						}
 						sv[4] = 0;
 						printk(KERN_INFO
