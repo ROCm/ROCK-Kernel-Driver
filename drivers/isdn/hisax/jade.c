@@ -201,9 +201,9 @@ close_jadestate(struct BCState *bcs)
 {
     modejade(bcs, 0, bcs->channel);
     if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-	if (bcs->hw.hscx.rcvbuf) {
-		kfree(bcs->hw.hscx.rcvbuf);
-		bcs->hw.hscx.rcvbuf = NULL;
+	if (bcs->rcvbuf) {
+		kfree(bcs->rcvbuf);
+		bcs->rcvbuf = NULL;
 	}
 	if (bcs->blog) {
 		kfree(bcs->blog);
@@ -223,7 +223,7 @@ static int
 open_jadestate(struct IsdnCardState *cs, struct BCState *bcs)
 {
 	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.hscx.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
+		if (!(bcs->rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
 			printk(KERN_WARNING
 			       "HiSax: No memory for hscx.rcvbuf\n");
 			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
@@ -233,8 +233,8 @@ open_jadestate(struct IsdnCardState *cs, struct BCState *bcs)
 			printk(KERN_WARNING
 				"HiSax: No memory for bcs->blog\n");
 			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
+			kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 			return (2);
 		}
 		skb_queue_head_init(&bcs->rqueue);
@@ -243,7 +243,7 @@ open_jadestate(struct IsdnCardState *cs, struct BCState *bcs)
 	bcs->tx_skb = NULL;
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	bcs->event = 0;
-	bcs->hw.hscx.rcvidx = 0;
+	bcs->rcvidx = 0;
 	bcs->tx_cnt = 0;
 	return (0);
 }
@@ -262,6 +262,8 @@ setstack_jade(struct PStack *st, struct BCState *bcs)
 	setstack_l1_B(st);
 	return (0);
 }
+
+static void jade_fill_fifo(struct BCState *bcs);
 
 static struct bc_l1_ops jade_l1_ops = {
 	.fill_fifo = jade_fill_fifo,

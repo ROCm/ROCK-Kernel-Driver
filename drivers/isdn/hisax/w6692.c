@@ -221,29 +221,22 @@ W6692_fill_fifo(struct IsdnCardState *cs)
 static void
 W6692B_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *ptr;
+	u8 *p;
 	struct IsdnCardState *cs = bcs->cs;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "W6692B_empty_fifo");
-
-	if (bcs->hw.w6692.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "W6692B_empty_fifo: incoming packet too large");
+	p = recv_empty_fifo_b(bcs, count);
+	if (!p) {
 		w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
-		bcs->hw.w6692.rcvidx = 0;
 		return;
 	}
-	ptr = bcs->hw.w6692.rcvbuf + bcs->hw.w6692.rcvidx;
-	bcs->hw.w6692.rcvidx += count;
-	READW6692BFIFO(cs, bcs->channel, ptr, count);
+	READW6692BFIFO(cs, bcs->channel, p, count);
 	w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
 		t += sprintf(t, "W6692B_empty_fifo %c cnt %d",
 			     bcs->channel + '1', count);
-		QuickHex(t, ptr, count);
+		QuickHex(t, p, count);
 		debugl1(cs, bcs->blog);
 	}
 }

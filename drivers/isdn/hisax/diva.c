@@ -446,36 +446,26 @@ MemWriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u8 data)
 static void
 Memhscx_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *ptr;
+	u8 *p;
 	struct IsdnCardState *cs = bcs->cs;
-	unsigned long flags;
 	int cnt;
-
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hscx_empty_fifo");
-
-	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
+	
+	p = recv_empty_fifo_b(bcs, count);
+	if (!p) {
 		MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-		bcs->hw.hscx.rcvidx = 0;
 		return;
 	}
-	spin_lock_irqsave(&diva_lock, flags);
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	cnt = count;
 	while (cnt--)
-		*ptr++ = memreadreg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0);
+		*p++ = memreadreg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0);
 	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
-	bcs->hw.hscx.rcvidx += count;
-	spin_unlock_irqrestore(&diva_lock, flags);
+
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
 		t += sprintf(t, "hscx_empty_fifo %c cnt %d",
 			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, ptr, count);
+		QuickHex(t, p, count);
 		debugl1(cs, bcs->blog);
 	}
 }
@@ -535,18 +525,18 @@ Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 			if (count == 0)
 				count = fifo_size;
 			Memhscx_empty_fifo(bcs, count);
-			if ((count = bcs->hw.hscx.rcvidx - 1) > 0) {
+			if ((count = bcs->rcvidx - 1) > 0) {
 				if (cs->debug & L1_DEB_HSCX_FIFO)
 					debugl1(cs, "HX Frame %d", count);
 				if (!(skb = dev_alloc_skb(count)))
 					printk(KERN_WARNING "HSCX: receive out of memory\n");
 				else {
-					memcpy(skb_put(skb, count), bcs->hw.hscx.rcvbuf, count);
+					memcpy(skb_put(skb, count), bcs->rcvbuf, count);
 					skb_queue_tail(&bcs->rqueue, skb);
 				}
 			}
 		}
-		bcs->hw.hscx.rcvidx = 0;
+		bcs->rcvidx = 0;
 		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
@@ -556,10 +546,10 @@ Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 			if (!(skb = dev_alloc_skb(fifo_size)))
 				printk(KERN_WARNING "HiSax: receive out of memory\n");
 			else {
-				memcpy(skb_put(skb, fifo_size), bcs->hw.hscx.rcvbuf, fifo_size);
+				memcpy(skb_put(skb, fifo_size), bcs->rcvbuf, fifo_size);
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
-			bcs->hw.hscx.rcvidx = 0;
+			bcs->rcvidx = 0;
 			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}

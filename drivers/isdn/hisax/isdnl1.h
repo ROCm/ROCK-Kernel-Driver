@@ -413,3 +413,23 @@ xmit_fill_fifo_d(struct IsdnCardState *cs, int fifo_size, int *count, int *more)
 	}
 	return p;
 }
+
+static inline u8 *
+recv_empty_fifo_b(struct BCState *bcs, int count)
+{
+	u8 *p;
+	struct IsdnCardState *cs = bcs->cs;
+
+	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
+		debugl1(cs, "hscx_empty_fifo");
+
+	if (bcs->rcvidx + count > HSCX_BUFMAX) {
+		if (cs->debug & L1_DEB_WARN)
+			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
+		bcs->rcvidx = 0;
+		return NULL;
+	}
+	p = bcs->rcvbuf + bcs->rcvidx;
+	bcs->rcvidx += count;
+	return p;
+}

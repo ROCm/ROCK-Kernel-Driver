@@ -47,34 +47,28 @@ WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u8 data)
 static void
 jade_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *ptr;
+	u8 *p;
 	struct IsdnCardState *cs = bcs->cs;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "jade_empty_fifo");
-
-	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "jade_empty_fifo: incoming packet too large");
+	p = recv_empty_fifo_b(bcs, count);
+	if (!p) {
 		WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
-		bcs->hw.hscx.rcvidx = 0;
 		return;
 	}
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
-	bcs->hw.hscx.rcvidx += count;
-	jade_read_fifo(bcs, ptr, count);
+	jade_read_fifo(bcs, p, count);
 	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
+
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
 		t += sprintf(t, "jade_empty_fifo %c cnt %d",
 			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, ptr, count);
+		QuickHex(t, p, count);
 		debugl1(cs, bcs->blog);
 	}
 }
 
-void
+static void
 jade_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
@@ -125,18 +119,18 @@ jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 			if (count == 0)
 				count = fifo_size;
 			jade_empty_fifo(bcs, count);
-			if ((count = bcs->hw.hscx.rcvidx - 1) > 0) {
+			if ((count = bcs->rcvidx - 1) > 0) {
 				if (cs->debug & L1_DEB_HSCX_FIFO)
 					debugl1(cs, "HX Frame %d", count);
 				if (!(skb = dev_alloc_skb(count)))
 					printk(KERN_WARNING "JADE %s receive out of memory\n", (jade ? "B":"A"));
 				else {
-					memcpy(skb_put(skb, count), bcs->hw.hscx.rcvbuf, count);
+					memcpy(skb_put(skb, count), bcs->rcvbuf, count);
 					skb_queue_tail(&bcs->rqueue, skb);
 				}
 			}
 		}
-		bcs->hw.hscx.rcvidx = 0;
+		bcs->rcvidx = 0;
 		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
@@ -146,10 +140,10 @@ jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 			if (!(skb = dev_alloc_skb(fifo_size)))
 				printk(KERN_WARNING "HiSax: receive out of memory\n");
 			else {
-				memcpy(skb_put(skb, fifo_size), bcs->hw.hscx.rcvbuf, fifo_size);
+				memcpy(skb_put(skb, fifo_size), bcs->rcvbuf, fifo_size);
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
-			bcs->hw.hscx.rcvidx = 0;
+			bcs->rcvidx = 0;
 			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}

@@ -424,10 +424,10 @@ close_elsastate(struct BCState *bcs)
 {
 	modehscx(bcs, 0, bcs->channel);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.hscx.rcvbuf) {
+		if (bcs->rcvbuf) {
 			if (bcs->mode != L1_MODE_MODEM)
-				kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
+				kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 		}
 		skb_queue_purge(&bcs->rqueue);
 		skb_queue_purge(&bcs->squeue);
@@ -602,14 +602,14 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 		case L1_MODE_MODEM:
 			bcs->mode = L1_MODE_MODEM;
 			if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-				bcs->hw.hscx.rcvbuf = bcs->cs->hw.elsa.rcvbuf;
+				bcs->rcvbuf = bcs->cs->hw.elsa.rcvbuf;
 				skb_queue_head_init(&bcs->rqueue);
 				skb_queue_head_init(&bcs->squeue);
 			}
 			bcs->tx_skb = NULL;
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->event = 0;
-			bcs->hw.hscx.rcvidx = 0;
+			bcs->rcvidx = 0;
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
 			st->l1.l2l1 = modem_l2l1;

@@ -350,8 +350,6 @@ struct l3_process {
 
 struct hscx_hw {
 	int hscx;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 	u8 tsaxr0;
 	u8 tsaxr1;
 };
@@ -479,10 +477,12 @@ struct amd7930_hw {
 struct BCState {
 	int channel;
 	int mode;
-	long Flag; /* long req'd for set_bit --RR */
+	long Flag;
 	struct IsdnCardState *cs;
-	int tx_cnt;		/* B-Channel transmit counter */
-	struct sk_buff *tx_skb; /* B-Channel transmit Buffer */
+	int rcvidx;
+	u8 *rcvbuf;                     /* B-Channel receive Buffer */
+	int tx_cnt;  		        /* B-Channel transmit counter */
+	struct sk_buff *tx_skb;         /* B-Channel transmit Buffer */
 	struct sk_buff_head rqueue;	/* B-Channel receive queue */
 	struct sk_buff_head squeue;	/* B-Channel send queue */
 	struct sk_buff_head cmpl_queue;	/* B-Channel send complete queue */

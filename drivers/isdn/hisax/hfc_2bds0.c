@@ -850,9 +850,14 @@ unsigned int __init
 	return(send);
 }
 
+static struct bc_l1_ops hfcd_l1_ops = {
+	.fill_fifo = hfc_fill_fifo,
+};
+
 void __init
 init2bds0(struct IsdnCardState *cs)
 {
+	cs->bc_l1_ops = &hfcd_l1_ops;
 	cs->setstack_d = setstack_hfcd;
 	cs->dbusytimer.function = (void *) hfc_dbusy_timer;
 	cs->dbusytimer.data = (long) cs;

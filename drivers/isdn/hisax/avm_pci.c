@@ -262,18 +262,15 @@ hdlc_empty_fifo(struct BCState *bcs, int count)
 	register u_int *ptr;
 	u8 *p;
 	u8 idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
-	int cnt=0;
+	int cnt = 0;
 	struct IsdnCardState *cs = bcs->cs;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hdlc_empty_fifo %d", count);
-	if (bcs->hw.hdlc.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "hdlc_empty_fifo: incoming packet too large");
+	p = recv_empty_fifo_b(bcs, count);
+	if (!p) {
 		return;
 	}
-	ptr = (u_int *) p = bcs->hw.hdlc.rcvbuf + bcs->hw.hdlc.rcvidx;
-	bcs->hw.hdlc.rcvidx += count;
+
+	ptr = (u_int *) p;
 	if (cs->subtyp == AVM_FRITZ_PCI) {
 		outl(idx, cs->hw.avm.cfg_reg + 4);
 		while (cnt < count) {
