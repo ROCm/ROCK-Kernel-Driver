@@ -23,7 +23,6 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -74,11 +73,10 @@ KERN_INFO "(c) 1993-1996 Bas Laarhoven (bas@vimec.nl)\n"
 KERN_INFO "(c) 1995-1996 Kai Harrekilde-Petersen (khp@dolphinics.no)\n"
 KERN_INFO "(c) 1996-1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de)\n"
 KERN_INFO "QIC-117 driver for QIC-40/80/3010/3020 floppy tape drives\n"
-KERN_INFO "Compiled for Linux version %s\n", UTS_RELEASE);
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */
-	printk(KERN_INFO FTAPE_VERSION " for Linux " UTS_RELEASE "\n");
+	printk(KERN_INFO FTAPE_VERSION "\n");
 #endif /* MODULE */
 	TRACE(ft_t_info, "installing QIC-117 floppy tape hardware drive ... ");
 	TRACE(ft_t_info, "ftape_init @ 0x%p", ftape_init);

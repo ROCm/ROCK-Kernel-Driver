@@ -26,7 +26,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/delay.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
@@ -56,7 +56,7 @@ static int led_heartbeat = 1;
 static int led_diskio = 1;
 static int led_lanrxtx = 1;
 static char lcd_text[32];
-static char lcd_text_default[] = "Linux " UTS_RELEASE;
+static char lcd_text_default[32];
 
 #if 0
 #define DPRINTK(x)	printk x
@@ -675,6 +675,9 @@ int __init led_init(void)
 {
 	struct pdc_chassis_info chassis_info;
 	int ret;
+
+	snprintf(lcd_text_default, sizeof(lcd_text_default),
+		"Linux %s", system_utsname.release);
 
 	/* Work around the buggy PDC of KittyHawk-machines */
 	switch (CPU_HVERSION) {

@@ -33,7 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
-#include <linux/uts.h>			/* for UTS_SYSNAME */
+#include <linux/utsname.h>
 #include <linux/mm.h>
 #include <asm/io.h>
 #include <asm/scatterlist.h>
@@ -309,8 +309,8 @@ static int rh_string (
 
  	// id 3 == vendor description
 	} else if (id == 3) {
-                sprintf (buf, "%s %s %s", UTS_SYSNAME, UTS_RELEASE,
-			hcd->driver->description);
+                sprintf (buf, "%s %s %s",  system_utsname.sysname,
+			system_utsname.release, hcd->driver->description);
 
 	// unsupported IDs --> "protocol stall"
 	} else

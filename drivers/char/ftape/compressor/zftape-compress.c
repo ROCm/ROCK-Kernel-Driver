@@ -27,7 +27,6 @@
  *     changed * appropriately. See below.
  */
 
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/module.h>
@@ -1174,11 +1173,10 @@ int zft_compressor_init(void)
 		printk(
 KERN_INFO "(c) 1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de)\n"
 KERN_INFO "Compressor for zftape (lzrw3 algorithm)\n"
-KERN_INFO "Compiled for kernel version %s\n", UTS_RELEASE);
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */
-	printk("zftape compressor v1.00a 970514 for Linux " UTS_RELEASE "\n");
+	printk("zftape compressor v1.00a 970514\n");
 	printk("For use with " FTAPE_VERSION "\n");
 #endif /* MODULE */
 	TRACE(ft_t_info, "zft_compressor_init @ 0x%p", zft_compressor_init);

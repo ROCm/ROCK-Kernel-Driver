@@ -23,7 +23,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
-#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
@@ -319,13 +318,11 @@ KERN_INFO
 KERN_INFO
 "Support for QIC-113 compatible volume table, dynamic memory allocation\n"
 KERN_INFO
-"and builtin compression (lzrw3 algorithm).\n"
-KERN_INFO
-"Compiled for Linux version %s\n", UTS_RELEASE);
+"and builtin compression (lzrw3 algorithm).\n");
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */
-	printk(KERN_INFO ZFTAPE_VERSION " for Linux " UTS_RELEASE "\n");
+	printk(KERN_INFO ZFTAPE_VERSION "\n");
 #endif /* MODULE */
 	TRACE(ft_t_info, "zft_init @ 0x%p", zft_init);
 	TRACE(ft_t_info,
