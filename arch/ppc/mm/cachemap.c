@@ -157,6 +157,6 @@ size_t size, int direction)
 {
 	unsigned long start;
 
-	start = (unsigned long)(page->virtual) + offset; 
+	start = page_address(page) + offset;
 	consistent_sync(start, size, direction);
 }

@@ -44,6 +44,7 @@ SECTIONS
   {
     *(.data)
     *(.data1)
+    *(.data.boot)
     *(.sdata)
     *(.sdata2)
     *(.got.plt) *(.got)
