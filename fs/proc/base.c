@@ -127,7 +127,7 @@ static struct pid_entry tgid_base_stuff[] = {
 	E(PROC_TGID_EXE,       "exe",     S_IFLNK|S_IRWXUGO),
 	E(PROC_TGID_MOUNTS,    "mounts",  S_IFREG|S_IRUGO),
 #ifdef __HAS_ARCH_PROC_MAPPED_BASE
-   	E(PROC_TGID_MAPBASE,	"map_base",	S_IFREG|S_IRUSR|S_IWUSR),
+   	E(PROC_TGID_MAPBASE,	"mapped_base",	S_IFREG|S_IRUSR|S_IWUSR),
 #endif
 #ifdef CONFIG_SECURITY
 	E(PROC_TGID_ATTR,      "attr",    S_IFDIR|S_IRUGO|S_IXUGO),
