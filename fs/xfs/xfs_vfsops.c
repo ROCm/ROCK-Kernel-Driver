@@ -63,7 +63,6 @@ xfs_init(void)
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t		xfs_dabuf_global_lock;
 #endif
-	extern int		xfs_refcache_size;
 
 #ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
@@ -144,14 +143,6 @@ xfs_init(void)
 
 	xfs_init_procfs();
 	xfs_sysctl_register();
-
-	xfs_refcache_size = xfs_params.refcache_size;
-
-	/*
-	 * The inode hash table is created on a per mounted
-	 * file system bases.
-	 */
-
 	return 0;
 }
 
@@ -168,14 +159,9 @@ xfs_cleanup(void)
 	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_buf_item_zone;
 	extern kmem_zone_t	*xfs_chashlist_zone;
-	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();
 	xfs_sysctl_unregister();
-	if (xfs_refcache) {
-		kmem_free(xfs_refcache,
-			XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
-	}
 
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
@@ -582,13 +568,6 @@ xfs_unmount(
 		unmount_event_flags = (mp->m_dmevmask & (1<<DM_EVENT_UNMOUNT))?
 					0 : DM_FLAGS_UNWANTED;
 	}
-
-	/*
-	 * First blow any referenced inode from this file system
-	 * out of the reference cache, and delete the timer.
-	 */
-	xfs_refcache_purge_mp(mp);
-	del_timer_sync(&mp->m_sbdirty_timer);
 
 	/*
 	 * Make sure there are no active users.
@@ -1511,15 +1490,6 @@ xfs_syncsub(
 		if (error) {
 			last_error = error;
 		}
-	}
-
-	/*
-	 * If this is the 30 second sync, then kick some entries out of
-	 * the reference cache.	 This ensures that idle entries are
-	 * eventually kicked out of the cache.
-	 */
-	if (flags & SYNC_BDFLUSH) {
-		xfs_refcache_purge_some(mp);
 	}
 
 	/*

@@ -743,17 +743,7 @@ retry:
 		}
 	} /* (ioflags & O_SYNC) */
 
-	/*
-	 * If we are coming from an nfsd thread then insert into the
-	 * reference cache.
-	 */
-
-	if (!strcmp(current->comm, "nfsd"))
-		xfs_refcache_insert(xip);
-
-	/* Drop lock this way - the old refcache release is in here */
 	xfs_rwunlock(bdp, locktype);
-
 	return(ret);
 }
 
@@ -1810,7 +1800,6 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 	int error;
 
 	mp = XFS_BHVTOM(bdp);
-	xfs_refcache_purge_mp(mp);
 	xfs_binval(mp->m_ddev_targp);
 
 	do {

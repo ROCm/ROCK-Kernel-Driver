@@ -254,8 +254,6 @@ typedef struct xfs_mount {
 						 * snapshot */
 	sv_t			m_wait_unfreeze;/* waiting to unfreeze */
 	atomic_t		m_active_trans; /* number trans frozen */
-	struct timer_list	m_sbdirty_timer;/* superblock dirty timer
-						 * for nfs refcache */
 } xfs_mount_t;
 
 /*

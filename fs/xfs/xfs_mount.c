@@ -530,8 +530,6 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 }
 
-extern void xfs_refcache_sbdirty(struct super_block*);
-
 /*
  * xfs_mountfs
  *
@@ -802,12 +800,6 @@ xfs_mountfs(
 	if (mfsi_flags & XFS_MFSI_CLIENT) {
 		return(0);
 	}
-
-	/*
-	 * Set up timer list structure for nfs refcache
-	 */
-	init_timer(&mp->m_sbdirty_timer);
-	mp->m_sbdirty_timer.function = (void (*)(unsigned long)) xfs_refcache_sbdirty;
 
 	/* Initialize the I/O function vector with XFS functions */
 	mp->m_io_ops = xfs_iocore_xfs;
