@@ -811,7 +811,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		for (i = 0; i < size; i++) {
 			struct page *page = mem_map + offset + i;
 			set_page_zone(page, nid * MAX_NR_ZONES + j);
-			init_page_count(page);
+			set_page_count(page, 0);
 			__SetPageReserved(page);
 			memlist_init(&page->list);
 			if (j != ZONE_HIGHMEM)
