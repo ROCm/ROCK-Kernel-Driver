@@ -1012,11 +1012,14 @@ void __init smp_boot_cpus(void)
 {
 	int apicid, cpu, bit;
 
-        if (clustered_apic_mode) {
-                /* remap the 1st quad's 256k range for cross-quad I/O */
-                xquad_portio = ioremap (XQUAD_PORTIO_BASE, XQUAD_PORTIO_LEN);
-                printk("Cross quad port I/O vaddr 0x%08lx, len %08lx\n",
-                        (u_long) xquad_portio, (u_long) XQUAD_PORTIO_LEN);
+        if (clustered_apic_mode && (numnodes > 1)) {
+                printk("Remapping cross-quad port I/O for %d quads\n",
+			numnodes);
+                printk("xquad_portio vaddr 0x%08lx, len %08lx\n",
+                        (u_long) xquad_portio, 
+			(u_long) numnodes * XQUAD_PORTIO_LEN);
+                xquad_portio = ioremap (XQUAD_PORTIO_BASE, 
+			numnodes * XQUAD_PORTIO_LEN);
         }
 
 #ifdef CONFIG_MTRR
