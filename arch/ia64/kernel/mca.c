@@ -1133,6 +1133,7 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 	pal_min_state_area_t *ms;
 
 	oops_in_progress = 1;	/* avoid deadlock in printk, but it makes recovery dodgy */
+	console_loglevel = 15;	/* make sure printks make it to console */
 
 	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
 		ia64_sal_to_os_handoff_state.proc_state_param);
