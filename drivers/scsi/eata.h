@@ -14,7 +14,7 @@ int eata2x_reset(Scsi_Cmnd *);
 int eata2x_biosparam(Disk *, struct block_device *, int *);
 static int eata2x_slave_attach(Scsi_Device *);
 
-#define EATA_VERSION "7.22.00"
+#define EATA_VERSION "7.70.00"
 
 #define EATA {                                                               \
                 name:              "EATA/DMA 2.0x rev. " EATA_VERSION " ",   \
