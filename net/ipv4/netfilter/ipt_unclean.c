@@ -216,10 +216,9 @@ check_udp(const struct iphdr *iph,
 				 csum_partial((char *)udph, datalen, 0)) != 0)
 		return 0;
 
-	/* CHECK: Ports can't be zero. */
-	if (!udph->source || !udph->dest) {
-		limpk("UDP zero ports %u/%u\n",
-		      ntohs(udph->source), ntohs(udph->dest));
+	/* CHECK: Destination port can't be zero. */
+	if (!udph->dest) {
+		limpk("UDP zero destination port\n");
 		return 0;
 	}
 
