@@ -113,6 +113,11 @@ static int blkdev_get_block(struct inode * inode, long iblock, struct buffer_hea
 	return 0;
 }
 
+static int blkdev_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
+{
+	return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, blkdev_get_block);
+}
+
 static int blkdev_writepage(struct page * page)
 {
 	return block_write_full_page(page, blkdev_get_block);
@@ -640,6 +645,7 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
+	direct_IO: blkdev_direct_IO,
 };
 
 struct file_operations def_blk_fops = {

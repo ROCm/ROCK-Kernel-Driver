@@ -276,7 +276,7 @@ void __init smp_boot_cpus(void)
 			init_tasks[cpucount] = p;
 
 			p->processor = i;
-			p->has_cpu = 1; /* we schedule the first task manually */
+			p->cpus_runnable = 1 << i; /* we schedule the first task manually */
 
 			del_from_runqueue(p);
 			unhash_process(p);

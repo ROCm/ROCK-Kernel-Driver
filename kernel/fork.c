@@ -638,7 +638,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 #ifdef CONFIG_SMP
 	{
 		int i;
-		p->has_cpu = 0;
+		p->cpus_runnable = ~0UL;
 		p->processor = current->processor;
 		/* ?? should we just memset this ?? */
 		for(i = 0; i < smp_num_cpus; i++)

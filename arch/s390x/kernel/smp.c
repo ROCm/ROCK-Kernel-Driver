@@ -510,7 +510,7 @@ static void __init do_boot_cpu(int cpu)
         if (!idle)
                 panic("No idle process for CPU %d",cpu);
         idle->processor = cpu;
-        idle->has_cpu = 1; /* we schedule the first task manually */
+	idle->cpus_runnable = 1 << cpu; /* we schedule the first task manually */
 
         del_from_runqueue(idle);
         unhash_process(idle);

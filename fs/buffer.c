@@ -1172,6 +1172,7 @@ struct buffer_head * bread(kdev_t dev, int block, int size)
 	struct buffer_head * bh;
 
 	bh = getblk(dev, block, size);
+	touch_buffer(bh);
 	if (buffer_uptodate(bh))
 		return bh;
 	ll_rw_block(READ, 1, &bh);
@@ -1997,6 +1998,47 @@ int generic_block_bmap(struct address_space *mapping, long block, get_block_t *g
 	return tmp.b_blocknr;
 }
 
+int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize, get_block_t * get_block)
+{
+	int i, nr_blocks, retval;
+	unsigned long * blocks = iobuf->blocks;
+
+	nr_blocks = iobuf->length / blocksize;
+	/* build the blocklist */
+	for (i = 0; i < nr_blocks; i++, blocknr++) {
+		struct buffer_head bh;
+
+		bh.b_state = 0;
+		bh.b_dev = inode->i_dev;
+		bh.b_size = blocksize;
+
+		retval = get_block(inode, blocknr, &bh, rw == READ ? 0 : 1);
+		if (retval)
+			goto out;
+
+		if (rw == READ) {
+			if (buffer_new(&bh))
+				BUG();
+			if (!buffer_mapped(&bh)) {
+				/* there was an hole in the filesystem */
+				blocks[i] = -1UL;
+				continue;
+			}
+		} else {
+			if (buffer_new(&bh))
+				unmap_underlying_metadata(&bh);
+			if (!buffer_mapped(&bh))
+				BUG();
+		}
+		blocks[i] = bh.b_blocknr;
+	}
+
+	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, iobuf->blocks, blocksize);
+
+ out:
+	return retval;
+}
+
 /*
  * IO completion routine for a buffer_head being used for kiobuf IO: we
  * can't dispatch the kiobuf callback until io_count reaches 0.  
@@ -2350,10 +2392,13 @@ static int grow_buffers(kdev_t dev, unsigned long block, int size)
 	unsigned long index;
 	int sizebits;
 
-	if ((size & 511) || (size > PAGE_SIZE)) {
-		printk(KERN_ERR "VFS: grow_buffers: size = %d\n",size);
-		return 0;
-	}
+	/* Size must be multiple of hard sectorsize */
+	if (size & (get_hardsect_size(dev)-1))
+		BUG();
+	/* Size must be within 512 bytes and PAGE_SIZE */
+	if (size < 512 || size > PAGE_SIZE)
+		BUG();
+
 	sizebits = -1;
 	do {
 		sizebits++;

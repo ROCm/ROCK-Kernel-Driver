@@ -175,6 +175,8 @@ cpqfc.o: $(cpqfc-objs)
 
 53c8xx_u.h: 53c8xx_d.h
 
+53c7,8xx.o: 53c8xx_u.h
+
 53c7xx_d.h: 53c7xx.scr script_asm.pl
 	ln -sf 53c7xx.scr fake7.c
 	$(CPP) $(CPPFLAGS) -traditional -DCHIP=710 fake7.c | grep -v '^#' | $(PERL) -s script_asm.pl -ncr7x0_family

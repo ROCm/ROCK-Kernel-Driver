@@ -16,11 +16,10 @@
  *
  *	- AnchorChip 2720
  *	- Belkin, eTEK (interops with Win32 drivers)
+ *	- GeneSys GL620USB-A
  *	- "Linux Devices" (like iPaq and similar SA-1100 based PDAs)
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
  *	- Prolific PL-2301/2302 (replaces "plusb" driver)
- *	- GeneSys GL620USB-A
-
  *
  * USB devices can implement their side of this protocol at the cost
  * of two bulk endpoints; it's not restricted to "cable" applications.
@@ -78,9 +77,11 @@
  * 17-oct-2001	Handle "Advance USBNET" product, like Belkin/eTEK devices,
  *		from Ioannis Mavroukakis <i.mavroukakis@btinternet.com>;
  *		rx unlinks somehow weren't async; minor cleanup.
- * 25-oct-2001	Merged GeneSys driver, using code from
- *		Jiun-Jie Huang <huangjj@genesyslogic.com.tw>
- *		by Stanislav Brabec <utx@penguin.cz>
+ * 03-nov-2001	Merged GeneSys driver; original code from Jiun-Jie Huang
+ *		<huangjj@genesyslogic.com.tw>, updated by Stanislav Brabec
+ *		<utx@penguin.cz>.  Made framing options (NetChip/GeneSys)
+ *		tie mostly to (sub)driver info.  Workaround some PL-2302
+ *		chips that seem to reject SET_INTERFACE requests.
  *
  *-------------------------------------------------------------------------*/
 
@@ -106,10 +107,10 @@
 
 #define	CONFIG_USB_AN2720
 #define	CONFIG_USB_BELKIN
+#define	CONFIG_USB_GENESYS
 #define	CONFIG_USB_LINUXDEV
 #define	CONFIG_USB_NET1080
 #define	CONFIG_USB_PL2301
-#define	CONFIG_USB_GENELINK
 
 
 /*-------------------------------------------------------------------------*/
@@ -163,7 +164,10 @@ struct usbnet {
 	// protocol/interface state
 	struct net_device	net;
 	struct net_device_stats	stats;
+
+#ifdef CONFIG_USB_NET1080
 	u16			packet_id;
+#endif
 
 	// various kinds of pending driver work
 	struct sk_buff_head	rxq;
@@ -171,9 +175,6 @@ struct usbnet {
 	struct sk_buff_head	done;
 	struct tasklet_struct	bh;
 	struct tq_struct	ctrl_task;
-
-	// various data structure may be needed
-	void			*priv_data;
 };
 
 // device-specific info used by the driver
@@ -182,7 +183,7 @@ struct driver_info {
 
 	int		flags;
 #define FLAG_FRAMING_NC	0x0001		/* guard against device dropouts */ 
-#define FLAG_GENELINK	0x0002		/* genelink flag */
+#define FLAG_FRAMING_GL	0x0002		/* genelink batches packets */
 #define FLAG_NO_SETINT	0x0010		/* device can't set_interface() */
 
 	/* reset device ... can sleep */
@@ -191,13 +192,15 @@ struct driver_info {
 	/* see if peer is connected ... can sleep */
 	int	(*check_connect)(struct usbnet *);
 
-	/* allocate and initialize the private resources per device */
-	int	(*initialize_private)(struct usbnet *);
+	/* fixup rx packet (strip framing) */
+	int	(*rx_fixup)(struct usbnet *dev, struct sk_buff *skb);
 
-	/* free the private resources per device */
-	int	(*release_private)(struct usbnet *);
+	/* fixup tx packet (add framing) */
+	struct sk_buff	*(*tx_fixup)(struct usbnet *dev,
+				struct sk_buff *skb, int flags);
 
 	// FIXME -- also an interrupt mechanism
+	// useful for at least PL2301/2302 and GL620USB-A
 
 	/* framework currently "knows" bulk EPs talk packets */
 	int		in;		/* rx endpoint */
@@ -239,47 +242,6 @@ struct skb_data {	// skb->cb is one of these
 
 #define devinfo(usbnet, fmt, arg...) \
 	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
-
-/*-------------------------------------------------------------------------
- *
- * NetChip framing of ethernet packets, supporting additional error
- * checks for links that may drop bulk packets from inside messages.
- * Odd USB length == always short read for last usb packet.
- *	- nc_header
- *	- Ethernet header (14 bytes)
- *	- payload
- *	- (optional padding byte, if needed so length becomes odd)
- *	- nc_trailer
- *
- * This framing is to be avoided for non-NetChip devices.
- */
-
-struct nc_header {		// packed:
-	u16	hdr_len;		// sizeof nc_header (LE, all)
-	u16	packet_len;		// payload size (including ethhdr)
-	u16	packet_id;		// detects dropped packets
-#define MIN_HEADER	6
-
-	// all else is optional, and must start with:
-	// u16	vendorId;		// from usb-if
-	// u16	productId;
-} __attribute__((__packed__));
-
-#define	PAD_BYTE	((unsigned char)0xAC)
-
-struct nc_trailer {
-	u16	packet_id;
-} __attribute__((__packed__));
-
-// packets may use FLAG_FRAMING_NC and optional pad
-#define FRAMED_SIZE(mtu) (sizeof (struct nc_header) \
-				+ sizeof (struct ethhdr) \
-				+ (mtu) \
-				+ 1 \
-				+ sizeof (struct nc_trailer))
-
-#define MIN_FRAMED	FRAMED_SIZE(0)
-
 
 
 #ifdef	CONFIG_USB_AN2720
@@ -329,6 +291,330 @@ static const struct driver_info	belkin_info = {
 
 
 
+#ifdef CONFIG_USB_GENESYS
+
+/*-------------------------------------------------------------------------
+ *
+ * GeneSys GL620USB-A (www.genesyslogic.com.tw)
+ *
+ * ... should partially interop with the Win32 driver for this hardware
+ * The GeneSys docs imply there's some NDIS issue motivating this framing.
+ *
+ *-------------------------------------------------------------------------*/
+
+// control msg write command
+#define GENELINK_CONNECT_WRITE			0xF0
+// interrupt pipe index
+#define GENELINK_INTERRUPT_PIPE			0x03
+// interrupt read buffer size
+#define INTERRUPT_BUFSIZE			0x08
+// interrupt pipe interval value
+#define GENELINK_INTERRUPT_INTERVAL		0x10
+// max transmit packet number per transmit
+#define GL_MAX_TRANSMIT_PACKETS			32
+// max packet length
+#define GL_MAX_PACKET_LEN			1514
+// max receive buffer size 
+#define GL_RCV_BUF_SIZE		\
+	(((GL_MAX_PACKET_LEN + 4) * GL_MAX_TRANSMIT_PACKETS) + 4)
+
+struct gl_packet {
+	u32		packet_length;
+	char		packet_data [1];
+};
+
+struct gl_header {
+	u32			packet_count;
+	struct gl_packet	packets;
+};
+
+#ifdef	GENLINK_ACK
+
+// FIXME:  this code is incomplete, not debugged; it doesn't
+// handle interrupts correctly.  interrupts should be generic
+// code like all other device I/O, anyway.
+
+struct gl_priv { 
+	struct urb	*irq_urb;
+	char		irq_buf [INTERRUPT_BUFSIZE];
+};
+
+static inline int gl_control_write (struct usbnet *dev, u8 request, u16 value)
+{
+	int retval;
+
+	retval = usb_control_msg (dev->udev,
+		      usb_sndctrlpipe (dev->udev, 0),
+		      request,
+		      USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+		      value, 
+		      0,			// index
+		      0,			// data buffer
+		      0,			// size
+		      CONTROL_TIMEOUT_JIFFIES);
+	return retval;
+}
+
+static void gl_interrupt_complete (struct urb *urb)
+{
+	int status = urb->status;
+	
+	if (status)
+		dbg ("gl_interrupt_complete fail - %X", status);
+	else
+		dbg ("gl_interrupt_complete success...");
+}
+
+static int gl_interrupt_read (struct usbnet *dev)
+{
+	struct gl_priv	*priv = dev->priv_data;
+	int		retval;
+
+	// issue usb interrupt read
+	if (priv && priv->irq_urb) {
+		// submit urb
+		if ((retval = usb_submit_urb (priv->irq_urb)) != 0)
+			dbg ("gl_interrupt_read: submit fail - %X...", retval);
+		else
+			dbg ("gl_interrupt_read: submit success...");
+	}
+
+	return 0;
+}
+
+// check whether another side is connected
+static int genelink_check_connect (struct usbnet *dev)
+{
+	int			retval;
+
+	dbg ("genelink_check_connect...");
+
+	// detect whether another side is connected
+	if ((retval = gl_control_write (dev, GENELINK_CONNECT_WRITE, 0)) != 0) {
+		dbg ("%s: genelink_check_connect write fail - %X",
+			dev->net.name, retval);
+		return retval;
+	}
+
+	// usb interrupt read to ack another side 
+	if ((retval = gl_interrupt_read (dev)) != 0) {
+		dbg ("%s: genelink_check_connect read fail - %X",
+			dev->net.name, retval);
+		return retval;
+	}
+
+	dbg ("%s: genelink_check_connect read success", dev->net.name);
+	return 0;
+}
+
+// allocate and initialize the private data for genelink
+static int genelink_init (struct usbnet *dev)
+{
+	struct gl_priv *priv;
+
+	// allocate the private data structure
+	if ((priv = kmalloc (sizeof *priv, GFP_KERNEL)) == 0) {
+		dbg ("%s: cannot allocate private data per device",
+			dev->net.name);
+		return -ENOMEM;
+	}
+
+	// allocate irq urb
+	if ((priv->irq_urb = usb_alloc_urb (0)) == 0) {
+		dbg ("%s: cannot allocate private irq urb per device",
+			dev->net.name);
+		kfree (priv);
+		return -ENOMEM;
+	}
+
+	// fill irq urb
+	FILL_INT_URB (priv->irq_urb, dev->udev,
+		usb_rcvintpipe (dev->udev, GENELINK_INTERRUPT_PIPE),
+		priv->irq_buf, INTERRUPT_BUFSIZE,
+		gl_interrupt_complete, 0,
+		GENELINK_INTERRUPT_INTERVAL);
+
+	// set private data pointer
+	dev->priv_data = priv;
+
+	return 0;
+}
+
+// release the private data
+static int genelink_free (struct usbnet *dev)
+{
+	struct gl_priv	*priv = dev->priv_data;
+
+	if (!priv) 
+		return 0;
+
+// FIXME:  can't cancel here; it's synchronous, and
+// should have happened earlier in any case (interrupt
+// handling needs to be generic)
+
+	// cancel irq urb first
+	usb_unlink_urb (priv->irq_urb);
+
+	// free irq urb
+	usb_free_urb (priv->irq_urb);
+
+	// free the private data structure
+	kfree (priv);
+
+	return 0;
+}
+
+#else
+
+static int genelink_check_connect (struct usbnet *dev)
+{
+	dbg ("%s: assuming peer is connected", dev->net.name);
+	return 0;
+}
+
+#endif
+
+// reset the device status
+static int genelink_reset (struct usbnet *dev)
+{
+	// we don't need to reset, just return 0
+	return 0;
+}
+
+static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
+{
+	struct gl_header	*header;
+	struct gl_packet	*packet;
+	struct sk_buff		*gl_skb;
+	int			status;
+	u32			size;
+
+	header = (struct gl_header *) skb->data;
+
+	// get the packet count of the received skb
+	le32_to_cpus (&header->packet_count);
+	if ((header->packet_count > GL_MAX_TRANSMIT_PACKETS)
+			|| (header->packet_count < 0)) {
+		dbg ("genelink: illegal received packet count %d",
+			header->packet_count);
+		return 0;
+	}
+
+	// set the current packet pointer to the first packet
+	packet = &header->packets;
+
+	// decrement the length for the packet count size 4 bytes
+	skb_pull (skb, 4);
+
+	while (header->packet_count > 1) {
+		// get the packet length
+		size = packet->packet_length;
+
+		// this may be a broken packet
+		if (size > GL_MAX_PACKET_LEN) {
+			dbg ("genelink: illegal rx length %d", size);
+			return 0;
+		}
+
+		// allocate the skb for the individual packet
+		gl_skb = alloc_skb (size, GFP_ATOMIC);
+		if (gl_skb == 0)
+			return 0;
+
+		// copy the packet data to the new skb
+		memcpy (gl_skb->data, packet->packet_data, size);
+
+		// set skb data size
+		gl_skb->len = size;
+		gl_skb->dev = &dev->net;
+
+		// determine the packet's protocol ID
+		gl_skb->protocol = eth_type_trans (gl_skb, &dev->net);
+
+		// update the status
+		dev->stats.rx_packets++;
+		dev->stats.rx_bytes += size;
+
+		// notify os of the received packet
+		status = netif_rx (gl_skb);
+
+		// advance to the next packet
+		packet = (struct gl_packet *)
+			&packet->packet_data [size];
+		header->packet_count--;
+
+		// shift the data pointer to the next gl_packet
+		skb_pull (skb, size + 4);
+	}
+
+	// skip the packet length field 4 bytes
+	skb_pull (skb, 4);
+
+	if (skb->len > GL_MAX_PACKET_LEN) {
+		dbg ("genelink: illegal rx length %d", skb->len);
+		return 0;
+	}
+	return 1;
+}
+
+static struct sk_buff *
+genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
+{
+	int 	padlen;
+	int	length = skb->len;
+	int	headroom = skb_headroom (skb);
+	int	tailroom = skb_tailroom (skb);
+	u32	*packet_count;
+	u32	*packet_len;
+
+	// FIXME:  magic numbers, bleech
+	padlen = ((skb->len + (4 + 4*1)) % 64) ? 0 : 1;
+
+	if ((!skb_cloned (skb))
+			&& ((headroom + tailroom) >= (padlen + (4 + 4*1)))) {
+		if ((headroom < (4 + 4*1)) || (tailroom < padlen)) {
+			skb->data = memmove (skb->head + (4 + 4*1),
+					     skb->data, skb->len);
+			skb->tail = skb->data + skb->len;
+		}
+	} else {
+		struct sk_buff	*skb2;
+		skb2 = skb_copy_expand (skb, (4 + 4*1) , padlen, flags);
+		dev_kfree_skb_any (skb);
+		skb = skb2;
+	}
+
+	// attach the packet count to the header
+	packet_count = (u32 *) skb_push (skb, (4 + 4*1));
+	packet_len = packet_count + 1;
+
+	// FIXME little endian?
+	*packet_count = 1;
+	*packet_len = length;
+
+	// add padding byte
+	if ((skb->len % EP_SIZE (dev)) == 0)
+		skb_put (skb, 1);
+
+	return skb;
+}
+
+static const struct driver_info	genelink_info = {
+	description:	"Genesys GeneLink",
+	flags:		FLAG_FRAMING_GL | FLAG_NO_SETINT,
+	reset:		genelink_reset,
+	check_connect:	genelink_check_connect,
+	rx_fixup:	genelink_rx_fixup,
+	tx_fixup:	genelink_tx_fixup,
+
+	in: 1, out: 2,
+	epsize:	64,
+};
+
+#endif /* CONFIG_USB_GENESYS */
+
+
+
 #ifdef	CONFIG_USB_LINUXDEV
 
 /*-------------------------------------------------------------------------
@@ -364,8 +650,49 @@ static const struct driver_info	linuxdev_info = {
 /*-------------------------------------------------------------------------
  *
  * Netchip 1080 driver ... http://www.netchip.com
+ * Used in LapLink cables
  *
  *-------------------------------------------------------------------------*/
+
+/*
+ * NetChip framing of ethernet packets, supporting additional error
+ * checks for links that may drop bulk packets from inside messages.
+ * Odd USB length == always short read for last usb packet.
+ *	- nc_header
+ *	- Ethernet header (14 bytes)
+ *	- payload
+ *	- (optional padding byte, if needed so length becomes odd)
+ *	- nc_trailer
+ *
+ * This framing is to be avoided for non-NetChip devices.
+ */
+
+struct nc_header {		// packed:
+	u16	hdr_len;		// sizeof nc_header (LE, all)
+	u16	packet_len;		// payload size (including ethhdr)
+	u16	packet_id;		// detects dropped packets
+#define MIN_HEADER	6
+
+	// all else is optional, and must start with:
+	// u16	vendorId;		// from usb-if
+	// u16	productId;
+} __attribute__((__packed__));
+
+#define	PAD_BYTE	((unsigned char)0xAC)
+
+struct nc_trailer {
+	u16	packet_id;
+} __attribute__((__packed__));
+
+// packets may use FLAG_FRAMING_NC and optional pad
+#define FRAMED_SIZE(mtu) (sizeof (struct nc_header) \
+				+ sizeof (struct ethhdr) \
+				+ (mtu) \
+				+ 1 \
+				+ sizeof (struct nc_trailer))
+
+#define MIN_FRAMED	FRAMED_SIZE(0)
+
 
 /*
  * Zero means no timeout; else, how long a 64 byte bulk packet may be queued
@@ -652,11 +979,113 @@ static int net1080_check_connect (struct usbnet *dev)
 	return 0;
 }
 
+static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
+{
+	struct nc_header	*header;
+	struct nc_trailer	*trailer;
+
+	if (!(skb->len & 0x01)
+			|| MIN_FRAMED > skb->len
+			|| skb->len > FRAMED_SIZE (dev->net.mtu)) {
+		dev->stats.rx_frame_errors++;
+		dbg ("rx framesize %d range %d..%d mtu %d", skb->len,
+			MIN_FRAMED, FRAMED_SIZE (dev->net.mtu),
+			dev->net.mtu
+			);
+		return 0;
+	}
+
+	header = (struct nc_header *) skb->data;
+	le16_to_cpus (&header->hdr_len);
+	le16_to_cpus (&header->packet_len);
+	if (FRAMED_SIZE (header->packet_len) > MAX_PACKET) {
+		dev->stats.rx_frame_errors++;
+		dbg ("packet too big, %d", header->packet_len);
+		return 0;
+	} else if (header->hdr_len < MIN_HEADER) {
+		dev->stats.rx_frame_errors++;
+		dbg ("header too short, %d", header->hdr_len);
+		return 0;
+	} else if (header->hdr_len > MIN_HEADER) {
+		// out of band data for us?
+		dbg ("header OOB, %d bytes",
+			header->hdr_len - MIN_HEADER);
+		// switch (vendor/product ids) { ... }
+	}
+	skb_pull (skb, header->hdr_len);
+
+	trailer = (struct nc_trailer *)
+		(skb->data + skb->len - sizeof *trailer);
+	skb_trim (skb, skb->len - sizeof *trailer);
+
+	if ((header->packet_len & 0x01) == 0) {
+		if (skb->data [header->packet_len] != PAD_BYTE) {
+			dev->stats.rx_frame_errors++;
+			dbg ("bad pad");
+			return 0;
+		}
+		skb_trim (skb, skb->len - 1);
+	}
+	if (skb->len != header->packet_len) {
+		dev->stats.rx_frame_errors++;
+		dbg ("bad packet len %d (expected %d)",
+			skb->len, header->packet_len);
+		return 0;
+	}
+	if (header->packet_id != get_unaligned (&trailer->packet_id)) {
+		dev->stats.rx_fifo_errors++;
+		dbg ("(2+ dropped) rx packet_id mismatch 0x%x 0x%x",
+			header->packet_id, trailer->packet_id);
+		return 0;
+	}
+#if 0
+	devdbg (dev, "frame <rx h %d p %d id %d", header->hdr_len,
+		header->packet_len, header->packet_id);
+#endif
+	return 1;
+}
+
+static struct sk_buff *
+net1080_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
+{
+	int			padlen;
+	struct sk_buff		*skb2;
+
+	padlen = ((skb->len + sizeof (struct nc_header)
+			+ sizeof (struct nc_trailer)) & 0x01) ? 0 : 1;
+	if (!skb_cloned (skb)) {
+		int	headroom = skb_headroom (skb);
+		int	tailroom = skb_tailroom (skb);
+
+		if ((padlen + sizeof (struct nc_trailer)) <= tailroom
+			    && sizeof (struct nc_header) <= headroom)
+			return skb;
+
+		if ((sizeof (struct nc_header) + padlen
+					+ sizeof (struct nc_trailer)) <
+				(headroom + tailroom)) {
+			skb->data = memmove (skb->head
+						+ sizeof (struct nc_header),
+					    skb->data, skb->len);
+			skb->tail = skb->data + skb->len;
+			return skb;
+		}
+	}
+	skb2 = skb_copy_expand (skb,
+				sizeof (struct nc_header),
+				sizeof (struct nc_trailer) + padlen,
+				flags);
+	dev_kfree_skb_any (skb);
+	return skb2;
+}
+
 static const struct driver_info	net1080_info = {
 	description:	"NetChip TurboCONNECT",
 	flags:		FLAG_FRAMING_NC,
 	reset:		net1080_reset,
 	check_connect:	net1080_check_connect,
+	rx_fixup:	net1080_rx_fixup,
+	tx_fixup:	net1080_tx_fixup,
 
 	in: 1, out: 1,		// direction distinguishes these
 	epsize:	64,
@@ -730,6 +1159,8 @@ static int pl_check_connect (struct usbnet *dev)
 
 static const struct driver_info	prolific_info = {
 	description:	"Prolific PL-2301/PL-2302",
+	flags:		FLAG_NO_SETINT,
+		/* some PL-2302 versions seem to fail usb_set_interface() */
 	reset:		pl_reset,
 	check_connect:	pl_check_connect,
 
@@ -738,199 +1169,6 @@ static const struct driver_info	prolific_info = {
 };
 
 #endif /* CONFIG_USB_PL2301 */
-
-
-
-#ifdef CONFIG_USB_GENELINK
-
-/*-------------------------------------------------------------------------
- *
- * GeneSys GL620USB-A (www.genesyslogic.com.tw)
- *
- *-------------------------------------------------------------------------*/
-
-// control msg write command
-#define GENELINK_CONNECT_WRITE			0xF0
-// interrupt pipe index
-#define GENELINK_INTERRUPT_PIPE			0x03
-// interrupt read buffer size
-#define INTERRUPT_BUFSIZE				0x08
-// interrupt pipe interval value
-#define GENELINK_INTERRUPT_INTERVAL		0x10
-// max transmit packet number per transmit
-#define GL_MAX_TRANSMIT_PACKETS			32
-// max packet length
-#define GL_MAX_PACKET_LEN				1514
-// max receive buffer size 
-#define GL_RCV_BUF_SIZE					(((GL_MAX_PACKET_LEN + 4) * GL_MAX_TRANSMIT_PACKETS) + 4)
-
-struct gl_priv
-{ 
-	struct urb *irq_urb;
-	char irq_buf[INTERRUPT_BUFSIZE];
-};
-
-struct gl_packet 
-{
-	u32 packet_length;
-	char packet_data[1];
-};
-
-struct gl_header 
-{
-	u32 packet_count;
-
-	struct gl_packet packets;
-};
-
-static inline int gl_control_write(struct usbnet *dev, u8 request, u16 value)
-{
-	int retval;
-
-	retval = usb_control_msg (dev->udev,
-							  usb_sndctrlpipe (dev->udev, 0),
-							  request,
-							  USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-							  value, 
-							  0,			// index
-							  0,			// data buffer
-							  0,			// size
-							  CONTROL_TIMEOUT_JIFFIES);
-
-	return retval;
-}
-
-static void gl_interrupt_complete (struct urb *urb)
-{
-	int status = urb->status;
-	
-	if (status)
-		dbg("gl_interrupt_complete fail - %X\n", status);
-	else
-		dbg("gl_interrupt_complete success...\n");
-}
-
-static inline int gl_interrupt_read(struct usbnet *dev)
-{
-	struct gl_priv *priv = dev->priv_data;
-	int	retval;
-
-	// issue usb interrupt read
-	if (priv && priv->irq_urb) {
-		// submit urb
-		if ((retval = usb_submit_urb (priv->irq_urb)) != 0)
-			dbg("gl_interrupt_read: submit interrupt read urb fail - %X...\n", retval);
-		else
-			dbg("gl_interrupt_read: submit interrupt read urb success...\n");
-	}
-
-	return 0;
-}
-
-// check whether another side is connected
-static int genelink_check_connect (struct usbnet *dev)
-{
-	dbg ("%s: assuming peer is connected", dev->net.name);
-	return 0;
-
-	/*
-	// FIXME Uncomment this code after genelink_check_connect
-	// control hanshaking will be implemented
-
-	int			retval;
-
-	dbg("genelink_check_connect...\n");
-
-	// issue a usb control write command to detect whether another side is connected
-	if ((retval = gl_control_write(dev, GENELINK_CONNECT_WRITE, 0)) != 0) {
-		dbg ("%s: genelink_check_connect control write fail - %X\n", dev->net.name, retval);
-		return retval;
-	} else {
-		dbg("%s: genelink_check_conntect control write success\n",dev->net.name);
-
-		// issue a usb interrupt read command to ack another side 
-
-		if ((retval = gl_interrupt_read(dev)) != 0) {
-			dbg("%s: genelink_check_connect interrupt read fail - %X\n", dev->net.name, retval);
-			return retval;
-		} else {
-			dbg("%s: genelink_check_connect interrupt read success\n", dev->net.name);
-		}
-
-	}
-	*/
-
-	return 0;
-}
-
-// allocate and initialize the private data for genelink
-static int genelink_init_priv(struct usbnet *dev)
-{
-	struct gl_priv *priv;
-
-	// allocate the private data structure
-	if ((priv = kmalloc (sizeof *priv, GFP_KERNEL)) == 0) {
-		dbg("%s: cannot allocate private data per device", dev->net.name);
-		return -ENOMEM;
-	}
-
-	// allocate irq urb
-	if ((priv->irq_urb = usb_alloc_urb(0)) == 0) {
-		dbg("%s: cannot allocate private irq urb per device", dev->net.name);
-		kfree(priv);
-		return -ENOMEM;
-	}
-
-	// fill irq urb
-	FILL_INT_URB(priv->irq_urb, dev->udev, usb_rcvintpipe(dev->udev, GENELINK_INTERRUPT_PIPE),
-				 priv->irq_buf, INTERRUPT_BUFSIZE, gl_interrupt_complete, 0, GENELINK_INTERRUPT_INTERVAL);
-
-	// set private data pointer
-	dev->priv_data = priv;
-
-	return 0;
-}
-
-// release the private data
-static int genelink_release_priv(struct usbnet *dev)
-{
-	struct gl_priv *priv = dev->priv_data;
-
-	if (!priv) 
-		return 0;
-	
-	// cancel irq urb first
-	usb_unlink_urb(priv->irq_urb);
-
-	// free irq urb
-	usb_free_urb(priv->irq_urb);
-
-	// free the private data structure
-	kfree(priv);
-
-	return 0;
-}
-
-// reset the device status
-static int genelink_reset (struct usbnet *dev)
-{
-	// we don't need to reset, just return 0
-	return 0;
-}
-
-static const struct driver_info	genelink_info = {
-	description:	"Genesys GeneLink",
-	flags:		FLAG_GENELINK | FLAG_NO_SETINT,
-	reset:		genelink_reset,
-	check_connect:	genelink_check_connect,
-	initialize_private: genelink_init_priv,
-	release_private: genelink_release_priv,
-
-	in: 1, out: 2,		// direction distinguishes these
-	epsize:	64,
-};
-
-#endif /* CONFIG_USB_GENELINK */
 
 
 
@@ -946,11 +1184,19 @@ static int usbnet_change_mtu (struct net_device *net, int new_mtu)
 
 	if (new_mtu <= MIN_PACKET || new_mtu > MAX_PACKET)
 		return -EINVAL;
+#ifdef	CONFIG_USB_NET1080
 	if (((dev->driver_info->flags) & FLAG_FRAMING_NC)) {
 		if (FRAMED_SIZE (new_mtu) > MAX_PACKET)
 			return -EINVAL;
+	}
+#endif
+#ifdef	CONFIG_USB_GENESYS
+	if (((dev->driver_info->flags) & FLAG_FRAMING_GL)
+			&& new_mtu > GL_MAX_PACKET_LEN)
+		return -EINVAL;
+#endif
 	// no second zero-length packet read wanted after mtu-sized packets
-	} else if (((new_mtu + sizeof (struct ethhdr)) % EP_SIZE (dev)) == 0)
+	if (((new_mtu + sizeof (struct ethhdr)) % EP_SIZE (dev)) == 0)
 		return -EDOM;
 	net->mtu = new_mtu;
 	return 0;
@@ -994,14 +1240,16 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	unsigned long		lockflags;
 	size_t			size;
 
-#ifdef CONFIG_USB_GENELINK
-	if (dev->driver_info->flags & FLAG_GENELINK)
-		size = GL_RCV_BUF_SIZE;
-	else
-#endif
+#ifdef CONFIG_USB_NET1080
 	if (dev->driver_info->flags & FLAG_FRAMING_NC)
 		size = FRAMED_SIZE (dev->net.mtu);
 	else
+#endif
+#ifdef CONFIG_USB_GENESYS
+	if (dev->driver_info->flags & FLAG_FRAMING_GL)
+		size = GL_RCV_BUF_SIZE;
+	else
+#endif
 		size = (sizeof (struct ethhdr) + dev->net.mtu);
 
 	if ((skb = alloc_skb (size, flags)) == 0) {
@@ -1055,180 +1303,13 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 
 static inline void rx_process (struct usbnet *dev, struct sk_buff *skb)
 {
-	if (dev->driver_info->flags & FLAG_FRAMING_NC) {
-		struct nc_header	*header;
-		struct nc_trailer	*trailer;
-
-		if (!(skb->len & 0x01)
-				|| MIN_FRAMED > skb->len
-				|| skb->len > FRAMED_SIZE (dev->net.mtu)) {
-			dev->stats.rx_frame_errors++;
-			dbg ("rx framesize %d range %d..%d mtu %d", skb->len,
-				MIN_FRAMED, FRAMED_SIZE (dev->net.mtu),
-				dev->net.mtu
-				);
-			goto error;
-		}
-
-		header = (struct nc_header *) skb->data;
-		le16_to_cpus (&header->hdr_len);
-		le16_to_cpus (&header->packet_len);
-		if (FRAMED_SIZE (header->packet_len) > MAX_PACKET) {
-			dev->stats.rx_frame_errors++;
-			dbg ("packet too big, %d", header->packet_len);
-			goto error;
-		} else if (header->hdr_len < MIN_HEADER) {
-			dev->stats.rx_frame_errors++;
-			dbg ("header too short, %d", header->hdr_len);
-			goto error;
-		} else if (header->hdr_len > MIN_HEADER) {
-			// out of band data for us?
-			dbg ("header OOB, %d bytes",
-				header->hdr_len - MIN_HEADER);
-			// switch (vendor/product ids) { ... }
-		}
-		skb_pull (skb, header->hdr_len);
-
-		trailer = (struct nc_trailer *)
-			(skb->data + skb->len - sizeof *trailer);
-		skb_trim (skb, skb->len - sizeof *trailer);
-
-		if ((header->packet_len & 0x01) == 0) {
-			if (skb->data [header->packet_len] != PAD_BYTE) {
-				dev->stats.rx_frame_errors++;
-				dbg ("bad pad");
-				goto error;
-			}
-			skb_trim (skb, skb->len - 1);
-		}
-		if (skb->len != header->packet_len) {
-			dev->stats.rx_frame_errors++;
-			dbg ("bad packet len %d (expected %d)",
-				skb->len, header->packet_len);
-			goto error;
-		}
-		if (header->packet_id != get_unaligned (&trailer->packet_id)) {
-			dev->stats.rx_fifo_errors++;
-			dbg ("(2+ dropped) rx packet_id mismatch 0x%x 0x%x",
-				header->packet_id, trailer->packet_id);
-			goto error;
-		}
-#if 0
-		devdbg (dev, "frame <rx h %d p %d id %d", header->hdr_len,
-			header->packet_len, header->packet_id);
-#endif
-	} else {
-		// we trust the network stack to remove
-		// the extra byte we may have appended
-	}
-
-#ifdef CONFIG_USB_GENELINK
-	if (dev->driver_info->flags & FLAG_GENELINK) {
-		struct gl_header *header;
-		struct gl_packet *current_packet;
-		struct sk_buff *gl_skb;
-		int status;
-		u32 size;
-
-		header = (struct gl_header *)skb->data;
-
-		// get the packet count of the received skb
-		le32_to_cpus(&header->packet_count);
-
-//		dbg("receive packet count = %d", header->packet_count);
-
-		if ((header->packet_count > GL_MAX_TRANSMIT_PACKETS) || 
-		    (header->packet_count < 0)) {
-			dbg("genelink: illegal received packet count %d", header->packet_count);
-			goto error;
-		}
-
-		// set the current packet pointer to the first packet
-		current_packet = &(header->packets);
-
-		// decrement the length for the packet count size 4 bytes
-		skb_pull(skb, 4);
-
-		while (header->packet_count > 1) {
-			// get the packet length
-			size = current_packet->packet_length;
-
-			// this may be a broken packet
-			if (size > GL_MAX_PACKET_LEN) {
-				dbg("genelink: illegal received packet length %d, maybe a broken packet", size);
-				goto error;
-			}
-
-			// allocate the skb for the individual packet
-			gl_skb = alloc_skb (size, in_interrupt () ? GFP_ATOMIC : GFP_KERNEL);
-
-			if (gl_skb == 0)
-				goto error;
-
-			// copy the packet data to the new skb
-			memcpy(gl_skb->data,current_packet->packet_data,size);
-
-			// set skb data size
-			gl_skb->len = size;
-/*
-			dbg("rx_process one gl_packet, size = %d...", size);
-
-			dbg("%02X %02X %02X %02X %02X %02X",
-				(u8)gl_skb->data[0],(u8)gl_skb->data[1],(u8)gl_skb->data[2],
-				(u8)gl_skb->data[3],(u8)gl_skb->data[4],(u8)gl_skb->data[5]);
-			dbg("%02X %02X %02X %02X %02X %02X\n",
-				(u8)gl_skb->data[6],(u8)gl_skb->data[7],(u8)gl_skb->data[8],
-				(u8)gl_skb->data[9],(u8)gl_skb->data[10],(u8)gl_skb->data[11]);
-*/
-			gl_skb->dev = &dev->net;
-
-			// determine the packet's protocol ID
-			gl_skb->protocol = eth_type_trans(gl_skb, &dev->net);
-
-			// update the status
-			dev->stats.rx_packets++;
-			dev->stats.rx_bytes += size;
-
-			// notify os of the received packet
-			status = netif_rx (gl_skb);
-
-//			dev_kfree_skb (gl_skb);	// just for debug purpose, delete this line for normal operation
-
-			// advance to the next packet
-			current_packet = (struct gl_packet *)(current_packet->packet_data + size);
-
-			header->packet_count --;
-
-			// shift the data pointer to the next gl_packet
-			skb_pull(skb, size + 4);
-		}	// while (header->packet_count > 1)
-
-		// skip the packet length field 4 bytes
-		skb_pull(skb, 4);
-	}
-#endif
+	if (dev->driver_info->rx_fixup
+			&& !dev->driver_info->rx_fixup (dev, skb))
+		goto error;
+	// else network stack removes extra byte if we forced a short packet
 
 	if (skb->len) {
 		int	status;
-
-#ifdef CONFIG_USB_GENELINK
-/*
-		dbg("rx_process one packet, size = %d", skb->len);
-
-		dbg("%02X %02X %02X %02X %02X %02X",
-			(u8)skb->data[0],(u8)skb->data[1],(u8)skb->data[2],
-			(u8)skb->data[3],(u8)skb->data[4],(u8)skb->data[5]);
-		dbg("%02X %02X %02X %02X %02X %02X\n",
-			(u8)skb->data[6],(u8)skb->data[7],(u8)skb->data[8],
-			(u8)skb->data[9],(u8)skb->data[10],(u8)skb->data[11]);
-*/
-
-		if ((dev->driver_info->flags & FLAG_GENELINK) &&
-		    (skb->len > GL_MAX_PACKET_LEN)) {
-			dbg("genelink: illegal received packet length %d, maybe a broken packet", skb->len);
-			goto error;
-		}
-#endif
 
 // FIXME: eth_copy_and_csum "small" packets to new SKB (small < ~200 bytes) ?
 
@@ -1241,7 +1322,7 @@ static inline void rx_process (struct usbnet *dev, struct sk_buff *skb)
 		devdbg (dev, "< rx, len %d, type 0x%x",
 			skb->len + sizeof (struct ethhdr), skb->protocol);
 #endif
-		memset (skb->cb,0,sizeof(struct skb_data));
+		memset (skb->cb, 0, sizeof (struct skb_data));
 		status = netif_rx (skb);
 		if (status != NET_RX_SUCCESS)
 			devdbg (dev, "netif_rx status %d", status);
@@ -1359,7 +1440,7 @@ static int usbnet_stop (struct net_device *net)
 	DECLARE_WAITQUEUE (wait, current);
 
 	mutex_lock (&dev->mutex);
-	netif_stop_queue(net);
+	netif_stop_queue (net);
 
 	devdbg (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld",
 		dev->stats.rx_packets, dev->stats.tx_packets, 
@@ -1375,15 +1456,12 @@ static int usbnet_stop (struct net_device *net)
 	while (skb_queue_len (&dev->rxq)
 			&& skb_queue_len (&dev->txq)
 			&& skb_queue_len (&dev->done)) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
+		set_current_state (TASK_UNINTERRUPTIBLE);
 		schedule_timeout (UNLINK_TIMEOUT_JIFFIES);
 		dbg ("waited for %d urb completions", temp);
 	}
 	dev->wait = 0;
 	remove_wait_queue (&unlink_wakeup, &wait); 
-
-	if (dev->driver_info->release_private)
-		dev->driver_info->release_private(dev);
 
 	mutex_unlock (&dev->mutex);
 	return 0;
@@ -1412,14 +1490,6 @@ static int usbnet_open (struct net_device *net)
 		goto done;
 	}
 
-	// initialize the private resources
-	if (info->initialize_private) {
-		if ((retval = info->initialize_private(dev)) < 0) {
-			dbg("%s: open initialize private fail", dev->net.name);
-			goto done;
-		}
-	}
-
 	// insist peer be connected
 	if (info->check_connect && (retval = info->check_connect (dev)) < 0) {
 		devdbg (dev, "can't open; %d", retval);
@@ -1429,8 +1499,10 @@ static int usbnet_open (struct net_device *net)
 	netif_start_queue (net);
 	devdbg (dev, "open: enable queueing (rx %d, tx %d) mtu %d %s framing",
 		RX_QLEN, TX_QLEN, dev->net.mtu,
-		(info->flags & FLAG_FRAMING_NC)
-		    ? "NetChip"
+		(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
+		    ? ((info->flags & FLAG_FRAMING_NC)
+			? "NetChip"
+			: "GeneSys")
 		    : "raw"
 		);
 
@@ -1446,7 +1518,7 @@ done:
 /* usb_clear_halt cannot be called in interrupt context */
 
 static void
-tx_clear_halt(void *data)
+tx_clear_halt (void *data)
 {
 	struct usbnet		*dev = data;
 
@@ -1467,7 +1539,7 @@ static void tx_complete (struct urb *urb)
 		if (dev->ctrl_task.sync == 0) {
 			dev->ctrl_task.routine = tx_clear_halt;
 			dev->ctrl_task.data = dev;
-			schedule_task(&dev->ctrl_task);
+			schedule_task (&dev->ctrl_task);
 		} else {
 			dbg ("Cannot clear TX stall");
 		}
@@ -1491,79 +1563,6 @@ static void usbnet_tx_timeout (struct net_device *net)
 
 /*-------------------------------------------------------------------------*/
 
-static inline struct sk_buff *fixup_skb (struct sk_buff *skb, int flags)
-{
-	int			padlen;
-	struct sk_buff		*skb2;
-
-	padlen = ((skb->len + sizeof (struct nc_header)
-			+ sizeof (struct nc_trailer)) & 0x01) ? 0 : 1;
-	if (!skb_cloned (skb)) {
-		int	headroom = skb_headroom (skb);
-		int	tailroom = skb_tailroom (skb);
-
-		if ((padlen + sizeof (struct nc_trailer)) <= tailroom
-			    && sizeof (struct nc_header) <= headroom)
-			return skb;
-
-		if ((sizeof (struct nc_header) + padlen
-					+ sizeof (struct nc_trailer)) <
-				(headroom + tailroom)) {
-			skb->data = memmove (skb->head
-						+ sizeof (struct nc_header),
-					    skb->data, skb->len);
-			skb->tail = skb->data + skb->len;
-			return skb;
-		}
-	}
-	skb2 = skb_copy_expand (skb,
-				sizeof (struct nc_header),
-				sizeof (struct nc_trailer) + padlen,
-				flags);
-	dev_kfree_skb_any (skb);
-	return skb2;
-}
-
-/*-------------------------------------------------------------------------*/
-
-#ifdef CONFIG_USB_GENELINK
-static struct sk_buff *gl_build_skb (struct sk_buff *skb)
-{
-	struct sk_buff *skb2;
-	int padlen;
-
-	int	headroom = skb_headroom (skb);
-	int	tailroom = skb_tailroom (skb);
-
-//	dbg("headroom = %d, tailroom = %d", headroom, tailroom);
-
-	padlen = ((skb->len + (4 + 4*1)) % 64) ? 0 : 1;
-
-	if ((!skb_cloned (skb)) && ((headroom + tailroom) >= (padlen + (4 + 4*1)))) {
-		if ((headroom < (4 + 4*1)) || (tailroom < padlen)) {
-			skb->data = memmove (skb->head + (4 + 4*1),
-					     skb->data, skb->len);
-			skb->tail = skb->data + skb->len;
-		}
-		skb2 = skb;
-	} else {
-		skb2 = skb_copy_expand (skb, (4 + 4*1) , padlen, in_interrupt () ? GFP_ATOMIC : GFP_KERNEL);
-
-		if (!skb2) {
-			dbg("genelink: skb_copy_expand fail");
-			return 0;
-		}
-
-		// free the original skb
-		dev_kfree_skb_any (skb);
-	}
-
-	return skb2;
-}
-#endif
-
-/*-------------------------------------------------------------------------*/
-
 static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 {
 	struct usbnet		*dev = (struct usbnet *) net->priv;
@@ -1571,29 +1570,24 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	int			retval = NET_XMIT_SUCCESS;
 	struct urb		*urb = 0;
 	struct skb_data		*entry;
-	struct nc_header	*header = 0;
-	struct nc_trailer	*trailer = 0;
 	struct driver_info	*info = dev->driver_info;
 	int			flags;
+#ifdef	CONFIG_USB_NET1080
+	struct nc_header	*header = 0;
+	struct nc_trailer	*trailer = 0;
+#endif	/* CONFIG_USB_NET1080 */
 
 	flags = in_interrupt () ? GFP_ATOMIC : GFP_KERNEL;
 
-	if (info->flags & FLAG_FRAMING_NC) {
-		struct sk_buff	*skb2;
-		skb2 = fixup_skb (skb, flags);
-		if (!skb2) {
-			dbg ("can't fixup skb");
+	// some devices want funky USB-level framing, for
+	// win32 driver (usually) and/or hardware quirks
+	if (info->tx_fixup) {
+		skb = info->tx_fixup (dev, skb, flags);
+		if (!skb) {
+			dbg ("can't tx_fixup skb");
 			goto drop;
 		}
-		skb = skb2;
 	}
-
-#ifdef CONFIG_USB_GENELINK
-	if ((info->flags & FLAG_GENELINK) && (skb = gl_build_skb(skb)) == 0) {
-		dbg("can't build skb for genelink transmit");
-		goto drop;
-	}
-#endif
 
 	if (!(urb = usb_alloc_urb (0))) {
 		dbg ("no urb");
@@ -1606,6 +1600,10 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	entry->state = tx_start;
 	entry->length = length;
 
+	// FIXME: reorganize a bit, so that fixup() fills out NetChip
+	// framing too. (Packet ID update needs the spinlock...)
+
+#ifdef	CONFIG_USB_NET1080
 	if (info->flags & FLAG_FRAMING_NC) {
 		header = (struct nc_header *) skb_push (skb, sizeof *header);
 		header->hdr_len = cpu_to_le16 (sizeof (*header));
@@ -1613,40 +1611,12 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		if (!((skb->len + sizeof *trailer) & 0x01))
 			*skb_put (skb, 1) = PAD_BYTE;
 		trailer = (struct nc_trailer *) skb_put (skb, sizeof *trailer);
-	}
-#ifdef CONFIG_USB_GENELINK
-	  else if (info->flags & FLAG_GENELINK) {
-		u32 *packet_count, *packet_len;
+	} else
+#endif	/* CONFIG_USB_NET1080 */
 
-		// attach the packet count to the header
-		packet_count = (u32 *)skb_push(skb, (4 + 4*1));
-		packet_len = packet_count + 1;
-
-		// set packet to 1
-		*packet_count = 1;
-
-		// set packet length
-		*packet_len = length;
-
-		// add padding byte
-		if ((skb->len % EP_SIZE(dev)) == 0)
-			skb_put(skb, 1);
-	}
-#endif
-	  else if ((length % EP_SIZE (dev)) == 0) {
-		// not all hardware behaves with USB_ZERO_PACKET,
-		// so we add an extra one-byte packet
-		if (skb_shared (skb)) {
-			struct sk_buff *skb2;
-			skb2 = skb_unshare (skb, flags);
-			if (!skb2) {
-				dbg ("can't unshare skb");
-				goto drop;
-			}
-			skb = skb2;
-		}
+	/* don't assume the hardware handles USB_ZERO_PACKET */
+	if ((length % EP_SIZE (dev)) == 0)
 		skb->len++;
-	}
 
 	FILL_BULK_URB (urb, dev->udev,
 			usb_sndbulkpipe (dev->udev, info->out),
@@ -1658,6 +1628,8 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	// FIXME urb->timeout = ... jiffies ... ;
 
 	spin_lock_irqsave (&dev->txq.lock, flags);
+
+#ifdef	CONFIG_USB_NET1080
 	if (info->flags & FLAG_FRAMING_NC) {
 		header->packet_id = cpu_to_le16 (dev->packet_id++);
 		put_unaligned (header->packet_id, &trailer->packet_id);
@@ -1667,6 +1639,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 			header->packet_id);
 #endif
 	}
+#endif	/* CONFIG_USB_NET1080 */
 
 	netif_stop_queue (net);
 	if ((retval = usb_submit_urb (urb)) != 0) {
@@ -1685,7 +1658,8 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 drop:
 		retval = NET_XMIT_DROP;
 		dev->stats.tx_dropped++;
-		dev_kfree_skb_any (skb);
+		if (skb)
+			dev_kfree_skb_any (skb);
 		usb_free_urb (urb);
 #ifdef	VERBOSE
 	} else {
@@ -1911,6 +1885,13 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
+#ifdef	CONFIG_USB_GENESYS
+{
+	USB_DEVICE (0x05e3, 0x0502),	// GL620USB-A
+	driver_info:	(unsigned long) &genelink_info,
+},
+#endif
+
 #ifdef	CONFIG_USB_LINUXDEV
 /*
  * for example, this can be a host side talk-to-PDA driver.
@@ -1944,12 +1925,7 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
-#ifdef	CONFIG_USB_GENELINK
-{
-	USB_DEVICE (0x05e3, 0x0502),	// GL620USB-A
-	driver_info:	(unsigned long) &genelink_info,
-},
-#endif
+/* KC2190 from www.sepoong.co.kr "InstaNET" */
 
 	{ },		// END
 };

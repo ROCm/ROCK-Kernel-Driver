@@ -571,8 +571,7 @@ static int invalidate_list(struct list_head *head, struct super_block * sb, stru
 			continue;
 		invalidate_inode_buffers(inode);
 		if (!atomic_read(&inode->i_count)) {
-			list_del(&inode->i_hash);
-			INIT_LIST_HEAD(&inode->i_hash);
+			list_del_init(&inode->i_hash);
 			list_del(&inode->i_list);
 			list_add(&inode->i_list, dispose);
 			inode->i_state |= I_FREEING;
@@ -1029,13 +1028,14 @@ void remove_inode_hash(struct inode *inode)
 void iput(struct inode *inode)
 {
 	if (inode) {
+		struct super_block *sb = inode->i_sb;
 		struct super_operations *op = NULL;
 
 		if (inode->i_state == I_CLEAR)
 			BUG();
 
-		if (inode->i_sb && inode->i_sb->s_op)
-			op = inode->i_sb->s_op;
+		if (sb && sb->s_op)
+			op = sb->s_op;
 		if (op && op->put_inode)
 			op->put_inode(inode);
 
@@ -1065,7 +1065,7 @@ void iput(struct inode *inode)
 			if (inode->i_state != I_CLEAR)
 				BUG();
 		} else {
-			if (!list_empty(&inode->i_hash)) {
+			if (!list_empty(&inode->i_hash) && sb && sb->s_root) {
 				if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
 					list_del(&inode->i_list);
 					list_add(&inode->i_list, &inode_unused);
@@ -1074,9 +1074,8 @@ void iput(struct inode *inode)
 				spin_unlock(&inode_lock);
 				return;
 			} else {
-				/* magic nfs path */
-				list_del(&inode->i_list);
-				INIT_LIST_HEAD(&inode->i_list);
+				list_del_init(&inode->i_list);
+				list_del_init(&inode->i_hash);
 				inode->i_state|=I_FREEING;
 				inodes_stat.nr_inodes--;
 				spin_unlock(&inode_lock);

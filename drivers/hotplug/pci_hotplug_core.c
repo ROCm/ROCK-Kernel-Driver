@@ -622,7 +622,7 @@ exit:
 static ssize_t power_write_file (struct file *file, const char *ubuff, size_t count, loff_t *offset)
 {
 	struct hotplug_slot *slot = file->private_data;
-	const char *buff;
+	char *buff;
 	unsigned long lpower;
 	u8 power;
 	int retval = 0;
@@ -639,10 +639,11 @@ static ssize_t power_write_file (struct file *file, const char *ubuff, size_t co
 		return -ENODEV;
 	}
 
-	buff = kmalloc (count, GFP_KERNEL);
+	buff = kmalloc (count + 1, GFP_KERNEL);
 	if (!buff)
 		return -ENOMEM;
-
+	memset (buff, 0x00, count + 1);
+ 
 	if (copy_from_user ((void *)buff, (void *)ubuff, count)) {
 		retval = -EFAULT;
 		goto exit;
@@ -732,7 +733,7 @@ exit:
 static ssize_t attention_write_file (struct file *file, const char *ubuff, size_t count, loff_t *offset)
 {
 	struct hotplug_slot *slot = file->private_data;
-	const char *buff;
+	char *buff;
 	unsigned long lattention;
 	u8 attention;
 	int retval = 0;
@@ -749,9 +750,10 @@ static ssize_t attention_write_file (struct file *file, const char *ubuff, size_
 		return -ENODEV;
 	}
 
-	buff = kmalloc (count, GFP_KERNEL);
+	buff = kmalloc (count + 1, GFP_KERNEL);
 	if (!buff)
 		return -ENOMEM;
+	memset (buff, 0x00, count + 1);
 
 	if (copy_from_user ((void *)buff, (void *)ubuff, count)) {
 		retval = -EFAULT;
@@ -868,7 +870,7 @@ exit:
 static ssize_t test_write_file (struct file *file, const char *ubuff, size_t count, loff_t *offset)
 {
 	struct hotplug_slot *slot = file->private_data;
-	const char *buff;
+	char *buff;
 	unsigned long ltest;
 	u32 test;
 	int retval = 0;
@@ -885,9 +887,10 @@ static ssize_t test_write_file (struct file *file, const char *ubuff, size_t cou
 		return -ENODEV;
 	}
 
-	buff = kmalloc (count, GFP_KERNEL);
+	buff = kmalloc (count + 1, GFP_KERNEL);
 	if (!buff)
 		return -ENOMEM;
+	memset (buff, 0x00, count + 1);
 
 	if (copy_from_user ((void *)buff, (void *)ubuff, count)) {
 		retval = -EFAULT;

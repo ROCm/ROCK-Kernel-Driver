@@ -418,7 +418,7 @@ do_boot_cpu (int sapicid)
 
 	idle->processor = cpu;
 	ia64_cpu_to_sapicid[cpu] = sapicid;
-	idle->has_cpu = 1; /* we schedule the first task manually */
+	idle->cpus_runnable = 1 << cpu; /* we schedule the first task manually */
 
 	del_from_runqueue(idle);
 	unhash_process(idle);

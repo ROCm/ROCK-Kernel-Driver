@@ -846,30 +846,10 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		ret = ptrace_attach(child);
 		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
 		goto out_tsk;
-
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL)
-			goto out_tsk;
-	}
-
-	if (child->p_pptr != current)
-		goto out_tsk;
-
-	if (request != PTRACE_KILL) {
-		if (child->state != TASK_STOPPED)
-			goto out_tsk;
-
-#ifdef CONFIG_SMP
-		while (child->has_cpu) {
-			if (child->state != TASK_STOPPED)
-				goto out_tsk;
-			barrier();
-		}
-#endif
-	}
 
 	pt = ia64_task_regs(child);
 	sw = (struct switch_stack *) (child->thread.ksp + 16);

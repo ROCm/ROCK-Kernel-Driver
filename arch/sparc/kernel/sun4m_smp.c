@@ -198,7 +198,7 @@ void __init smp4m_boot_cpus(void)
 			init_tasks[i] = p;
 
 			p->processor = i;
-			p->has_cpu = 1; /* we schedule the first task manually */
+			p->cpus_runnable = 1 << i; /* we schedule the first task manually */
 
 			current_set[i] = p;
 

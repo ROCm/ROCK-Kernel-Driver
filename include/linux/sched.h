@@ -304,8 +304,16 @@ struct task_struct {
 	long nice;
 	unsigned long policy;
 	struct mm_struct *mm;
-	int has_cpu, processor;
-	unsigned long cpus_allowed;
+	int processor;
+	/*
+	 * cpus_runnable is ~0 if the process is not running on any
+	 * CPU. It's (1 << cpu) if it's running on a CPU. This mask
+	 * is updated under the runqueue lock.
+	 *
+	 * To determine whether a process might run on a CPU, this
+	 * mask is AND-ed with cpus_allowed.
+	 */
+	unsigned long cpus_runnable, cpus_allowed;
 	/*
 	 * (only the 'next' pointer fits into the cacheline, but
 	 * that's just fine.)
@@ -464,6 +472,7 @@ extern struct exec_domain	default_exec_domain;
     policy:		SCHED_OTHER,					\
     mm:			NULL,						\
     active_mm:		&init_mm,					\
+    cpus_runnable:	-1,						\
     cpus_allowed:	-1,						\
     run_list:		LIST_HEAD_INIT(tsk.run_list),			\
     next_task:		&tsk,						\
@@ -539,6 +548,19 @@ static inline struct task_struct *find_task_by_pid(int pid)
 		;
 
 	return p;
+}
+
+#define task_has_cpu(tsk) ((tsk)->cpus_runnable != ~0UL)
+
+static inline void task_set_cpu(struct task_struct *tsk, unsigned int cpu)
+{
+	tsk->processor = cpu;
+	tsk->cpus_runnable = 1UL << cpu;
+}
+
+static inline void task_release_cpu(struct task_struct *tsk)
+{
+	tsk->cpus_runnable = ~0UL;
 }
 
 /* per-UID process charging. */

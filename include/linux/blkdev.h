@@ -195,11 +195,15 @@ extern void drive_stat_acct (kdev_t dev, int rw,
 
 static inline int get_hardsect_size(kdev_t dev)
 {
-	extern int *hardsect_size[];
-	if (hardsect_size[MAJOR(dev)] != NULL)
-		return hardsect_size[MAJOR(dev)][MINOR(dev)];
-	else
-		return 512;
+	int retval = 512;
+	int major = MAJOR(dev);
+
+	if (hardsect_size[major]) {
+		int minor = MINOR(dev);
+		if (hardsect_size[major][minor])
+			retval = hardsect_size[major][minor];
+	}
+	return retval;
 }
 
 #define blk_finished_io(nsects)	do { } while (0)

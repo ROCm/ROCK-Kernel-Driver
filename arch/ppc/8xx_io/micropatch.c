@@ -17,7 +17,7 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/8xx_immap.h>
-#include "commproc.h"
+#include <asm/commproc.h>
 
 /* Define this to get SMC patches as well.  You need to modify the uart
  * driver as well......

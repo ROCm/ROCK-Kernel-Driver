@@ -238,6 +238,7 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/smp.h>
+#include <linux/blk.h>
 #include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
@@ -11739,7 +11740,7 @@ aic7xxx_biosparam(Disk *disk, kdev_t dev, int geom[])
   struct buffer_head *bh;
 
   p = (struct aic7xxx_host *) disk->device->host->hostdata;
-  bh = bread(MKDEV(MAJOR(dev), MINOR(dev)&~0xf), 0, 1024);
+  bh = bread(MKDEV(MAJOR(dev), MINOR(dev)&~0xf), 0, block_size(dev));
 
   if ( bh )
   {

@@ -1019,7 +1019,7 @@ void usb_free_urb(urb_t* urb)
 /*-------------------------------------------------------------------*/
 int usb_submit_urb(urb_t *urb)
 {
-	if (urb && urb->dev)
+	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
 		return urb->dev->bus->op->submit_urb(urb);
 	else
 		return -ENODEV;
@@ -1028,7 +1028,7 @@ int usb_submit_urb(urb_t *urb)
 /*-------------------------------------------------------------------*/
 int usb_unlink_urb(urb_t *urb)
 {
-	if (urb && urb->dev)
+	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
 		return urb->dev->bus->op->unlink_urb(urb);
 	else
 		return -ENODEV;

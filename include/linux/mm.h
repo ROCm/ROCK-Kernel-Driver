@@ -416,6 +416,7 @@ extern int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long d
 extern int ptrace_attach(struct task_struct *tsk);
 extern int ptrace_detach(struct task_struct *, unsigned int);
 extern void ptrace_disable(struct task_struct *);
+extern int ptrace_check_attach(struct task_struct *task, int kill);
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the

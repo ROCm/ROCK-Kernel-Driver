@@ -12742,6 +12742,17 @@ CONFIG_USB_SERIAL_VISOR
   The module will be called visor.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+USB IR Dongle Serial Driver
+CONFIG_USB_SERIAL_IR
+  Say Y here if you want to enable simple serial support for USB IrDA
+  devices.  This is useful if you do not want to use the full IrDA
+  stack.
+  
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ir-usb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 USB Belkin and Paracom Single Port Serial Driver
 CONFIG_USB_SERIAL_BELKIN
   Say Y here if you want to use a Belkin USB Serial single port

@@ -491,9 +491,9 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 		panic("idle process is init_task for CPU %d", cpuid);
 
 	idle->processor = cpuid;
+	idle->cpus_runnable = 1 << cpuid; /* we schedule the first task manually */
 	__cpu_logical_map[cpunum] = cpuid;
 	__cpu_number_map[cpuid] = cpunum;
-	idle->has_cpu = 1; /* we schedule the first task manually */
  
 	del_from_runqueue(idle);
 	unhash_process(idle);

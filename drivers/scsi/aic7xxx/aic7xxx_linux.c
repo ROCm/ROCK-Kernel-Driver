@@ -129,6 +129,7 @@
 #include "../sd.h"		/* For geometry detection */
 
 #include <linux/mm.h>		/* For fetching system memory size */
+#include <linux/blk.h>
 
 /*
  * To generate the correct addresses for the controller to issue
@@ -2742,7 +2743,7 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	struct	buffer_head *bh;
 
 	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
-	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
+	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, block_size(dev));
 
 	if (bh) {
 		ret = scsi_partsize(bh, disk->capacity,

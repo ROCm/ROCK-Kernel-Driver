@@ -555,8 +555,13 @@ int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx, unsig
  */
 int fail_writepage(struct page *page)
 {
-	activate_page(page);
-	SetPageReferenced(page);
+	/* Only activate on memory-pressure, not fsync.. */
+	if (PageLaunder(page)) {
+		activate_page(page);
+		SetPageReferenced(page);
+	}
+
+	/* Set the page dirty again, unlock */
 	SetPageDirty(page);
 	UnlockPage(page);
 	return 0;
@@ -1476,6 +1481,87 @@ no_cached_page:
 	UPDATE_ATIME(inode);
 }
 
+static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, size_t count, loff_t offset)
+{
+	ssize_t retval;
+	int new_iobuf, chunk_size, blocksize_mask, blocksize, blocksize_bits, iosize, progress;
+	struct kiobuf * iobuf;
+	struct inode * inode = filp->f_dentry->d_inode;
+	struct address_space * mapping = inode->i_mapping;
+
+	new_iobuf = 0;
+	iobuf = filp->f_iobuf;
+	if (test_and_set_bit(0, &filp->f_iobuf_lock)) {
+		/*
+		 * A parallel read/write is using the preallocated iobuf
+		 * so just run slow and allocate a new one.
+		 */
+		retval = alloc_kiovec(1, &iobuf);
+		if (retval)
+			goto out;
+		new_iobuf = 1;
+	}
+
+	blocksize = 1 << inode->i_blkbits;
+	blocksize_bits = inode->i_blkbits;
+	blocksize_mask = blocksize - 1;
+	chunk_size = KIO_MAX_ATOMIC_IO << 10;
+
+	retval = -EINVAL;
+	if ((offset & blocksize_mask) || (count & blocksize_mask))
+		goto out_free;
+	if (!mapping->a_ops->direct_IO)
+		goto out_free;
+
+	/*
+	 * Flush to disk exlusively the _data_, metadata must remains
+	 * completly asynchronous or performance will go to /dev/null.
+	 */
+	filemap_fdatasync(mapping);
+	retval = fsync_inode_data_buffers(inode);
+	filemap_fdatawait(mapping);
+	if (retval < 0)
+		goto out_free;
+
+	progress = retval = 0;
+	while (count > 0) {
+		iosize = count;
+		if (iosize > chunk_size)
+			iosize = chunk_size;
+
+		retval = map_user_kiobuf(rw, iobuf, (unsigned long) buf, iosize);
+		if (retval)
+			break;
+
+		retval = mapping->a_ops->direct_IO(rw, inode, iobuf, (offset+progress) >> blocksize_bits, blocksize);
+
+		if (rw == READ && retval > 0)
+			mark_dirty_kiobuf(iobuf, retval);
+		
+		if (retval >= 0) {
+			count -= retval;
+			buf += retval;
+			progress += retval;
+		}
+
+		unmap_kiobuf(iobuf);
+
+		if (retval != iosize)
+			break;
+	}
+
+	if (progress)
+		retval = progress;
+
+ out_free:
+	if (!new_iobuf)
+		clear_bit(0, &filp->f_iobuf_lock);
+	else
+		free_kiovec(1, &iobuf);
+ out:	
+	return retval;
+}
+
 int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	char *kaddr;
@@ -1509,6 +1595,9 @@ ssize_t generic_file_read(struct file * filp, char * buf, size_t count, loff_t *
 	if ((ssize_t) count < 0)
 		return -EINVAL;
 
+	if (filp->f_flags & O_DIRECT)
+		goto o_direct;
+
 	retval = -EFAULT;
 	if (access_ok(VERIFY_WRITE, buf, count)) {
 		retval = 0;
@@ -1527,7 +1616,29 @@ ssize_t generic_file_read(struct file * filp, char * buf, size_t count, loff_t *
 				retval = desc.error;
 		}
 	}
+ out:
 	return retval;
+
+ o_direct:
+	{
+		loff_t pos = *ppos, size;
+		struct address_space *mapping = filp->f_dentry->d_inode->i_mapping;
+		struct inode *inode = mapping->host;
+
+		retval = 0;
+		if (!count)
+			goto out; /* skip atime */
+		size = inode->i_size;
+		if (pos < size) {
+			if (pos + count > size)
+				count = size - pos;
+			retval = generic_file_direct_IO(READ, filp, buf, count, pos);
+			if (retval > 0)
+				*ppos = pos + retval;
+		}
+		UPDATE_ATIME(filp->f_dentry->d_inode);
+		goto out;
+	}
 }
 
 static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset , unsigned long size)
@@ -2765,7 +2876,8 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 
 	written = 0;
 
-	if (file->f_flags & O_APPEND)
+	/* FIXME: this is for backwards compatibility with 2.4 */
+	if (!S_ISBLK(inode->i_mode) && file->f_flags & O_APPEND)
 		pos = inode->i_size;
 
 	/*
@@ -2845,6 +2957,9 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty_sync(inode);
 
+	if (file->f_flags & O_DIRECT)
+		goto o_direct;
+
 	do {
 		unsigned long index, offset;
 		long page_fault;
@@ -2921,6 +3036,7 @@ unlock:
 			status = generic_osync_inode(inode, OSYNC_METADATA|OSYNC_DATA);
 	}
 	
+out_status:	
 	err = written ? written : status;
 out:
 
@@ -2929,6 +3045,25 @@ out:
 fail_write:
 	status = -EFAULT;
 	goto unlock;
+
+o_direct:
+	written = generic_file_direct_IO(WRITE, file, (char *) buf, count, pos);
+	if (written > 0) {
+		loff_t end = pos + written;
+		if (end > inode->i_size && !S_ISBLK(inode->i_mode)) {
+			inode->i_size = end;
+			mark_inode_dirty(inode);
+		}
+		*ppos = end;
+		invalidate_inode_pages2(mapping);
+	}
+	/*
+	 * Sync the fs metadata but not the minor inode changes and
+	 * of course not the data as we did direct DMA for the IO.
+	 */
+	if (written >= 0 && file->f_flags & O_SYNC)
+		status = generic_osync_inode(inode, OSYNC_METADATA);
+	goto out_status;
 }
 
 void __init page_cache_init(unsigned long mempages)

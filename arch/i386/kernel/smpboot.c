@@ -800,10 +800,10 @@ static void __init do_boot_cpu (int apicid)
 		panic("No idle process for CPU %d", cpu);
 
 	idle->processor = cpu;
+	idle->cpus_runnable = 1 << cpu; /* we schedule the first task manually */
 
 	map_cpu_to_boot_apicid(cpu, apicid);
 
-	idle->has_cpu = 1; /* we schedule the first task manually */
 	idle->thread.eip = (unsigned long) start_secondary;
 
 	del_from_runqueue(idle);

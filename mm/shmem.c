@@ -428,6 +428,8 @@ static int shmem_writepage(struct page * page)
 
 	if (!PageLocked(page))
 		BUG();
+	if (!PageLaunder(page))
+		return fail_writepage(page);
 
 	mapping = page->mapping;
 	index = page->index;

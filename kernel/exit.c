@@ -35,13 +35,13 @@ static void release_task(struct task_struct * p)
 		 */
 		for (;;) {
 			task_lock(p);
-			if (!p->has_cpu)
+			if (!task_has_cpu(p))
 				break;
 			task_unlock(p);
 			do {
 				cpu_relax();
 				barrier();
-			} while (p->has_cpu);
+			} while (task_has_cpu(p));
 		}
 		task_unlock(p);
 #endif

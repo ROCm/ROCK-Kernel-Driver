@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.63 11/13/01 21:26:07 paulus
+ * BK Id: SCCS/s.setup.c 1.65 11/18/01 20:57:25 trini
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -472,8 +472,8 @@ int parse_bootinfo(void)
 			break;
 #ifdef CONFIG_BLK_DEV_INITRD
 		case BI_INITRD:
-			initrd_start = data[0];
-			initrd_end = data[0] + data[1];
+			initrd_start = data[0] + KERNELBASE;
+			initrd_end = data[0] + data[1] + KERNELBASE;
 			break;
 #endif /* CONFIG_BLK_DEV_INITRD */
 #ifdef CONFIG_ALL_PPC
