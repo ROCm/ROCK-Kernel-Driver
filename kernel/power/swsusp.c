@@ -786,7 +786,6 @@ static int swsusp_alloc(void)
 
 int suspend_prepare_image(void)
 {
-	unsigned int nr_needed_pages;
 	int error;
 
 	pr_debug("swsusp: critical section: \n");
@@ -799,7 +798,6 @@ int suspend_prepare_image(void)
 	drain_local_pages();
 	count_data_pages();
 	printk("swsusp: Need to copy %u pages\n",nr_copy_pages);
-	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
 
 	error = swsusp_alloc();
 	if (error)
