@@ -164,7 +164,6 @@ struct Scsi_Device_Template osst_template =
        scsi_type:	TYPE_TAPE,
        major:		OSST_MAJOR,
        detect:		osst_detect,
-       init:		osst_init,
        attach:		osst_attach,
        detach:		osst_detach
 };
@@ -5427,6 +5426,8 @@ static int osst_attach(Scsi_Device * SDp)
 
 	if (SDp->type != TYPE_TAPE || !osst_supports(SDp))
 		 return 1;
+
+	osst_init();
 
 	if (osst_template.nr_dev >= osst_template.dev_max) {
 		 SDp->attached--;
