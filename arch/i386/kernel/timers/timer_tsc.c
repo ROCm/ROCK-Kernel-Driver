@@ -15,6 +15,9 @@
 /* processor.h for distable_tsc flag */
 #include <asm/processor.h>
 
+#include "io_ports.h"
+#include "mach_timer.h"
+
 int tsc_disable __initdata = 0;
 
 extern spinlock_t i8253_lock;
@@ -56,6 +59,8 @@ static inline unsigned long long cycles_2_ns(unsigned long long cyc)
 	return (cyc * cyc2ns_scale) >> CYC2NS_SCALE_FACTOR;
 }
 
+
+static int count2; /* counter for mark_offset_tsc() */
 
 /* Cached *multiplier* to convert TSC counts to microseconds.
  * (see the equation below).
@@ -114,7 +119,7 @@ static void mark_offset_tsc(void)
 {
 	int count;
 	int countmp;
-	static int count1=0, count2=LATCH;
+	static int count1 = 0;
 	unsigned long long this_offset, last_offset;
 	
 	write_lock(&monotonic_lock);
@@ -136,10 +141,10 @@ static void mark_offset_tsc(void)
 	rdtsc(last_tsc_low, last_tsc_high);
 
 	spin_lock(&i8253_lock);
-	outb_p(0x00, 0x43);     /* latch the count ASAP */
+	outb_p(0x00, PIT_MODE);     /* latch the count ASAP */
 
-	count = inb_p(0x40);    /* read the latched count */
-	count |= inb(0x40) << 8;
+	count = inb_p(PIT_CH0);    /* read the latched count */
+	count |= inb(PIT_CH0) << 8;
 	spin_unlock(&i8253_lock);
 
 	if (pit_latch_buggy) {
@@ -187,26 +192,11 @@ static void delay_tsc(unsigned long loops)
  * device.
  */
 
-#define CALIBRATE_LATCH	(5 * LATCH)
 #define CALIBRATE_TIME	(5 * 1000020/HZ)
 
 unsigned long __init calibrate_tsc(void)
 {
-       /* Set the Gate high, disable speaker */
-	outb((inb(0x61) & ~0x02) | 0x01, 0x61);
-
-	/*
-	 * Now let's take care of CTC channel 2
-	 *
-	 * Set the Gate high, program CTC channel 2 for mode 0,
-	 * (interrupt on terminal count mode), binary count,
-	 * load 5 * LATCH count, (LSB and MSB) to begin countdown.
-	 *
-	 * Some devices need a delay here.
-	 */
-	outb(0xb0, 0x43);			/* binary, mode 0, LSB/MSB, Ch 2 */
-	outb_p(CALIBRATE_LATCH & 0xff, 0x42);	/* LSB of count */
-	outb_p(CALIBRATE_LATCH >> 8, 0x42);       /* MSB of count */
+	mach_prepare_counter();
 
 	{
 		unsigned long startlow, starthigh;
@@ -214,10 +204,7 @@ unsigned long __init calibrate_tsc(void)
 		unsigned long count;
 
 		rdtsc(startlow,starthigh);
-		count = 0;
-		do {
-			count++;
-		} while ((inb(0x61) & 0x20) == 0);
+		mach_countup(&count);
 		rdtsc(endlow,endhigh);
 
 		last_tsc_low = endlow;
@@ -339,6 +326,8 @@ static int __init init_tsc(char* override)
 #ifdef CONFIG_CPU_FREQ
 	cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 #endif
+
+	count2 = LATCH; /* initialize counter for mark_offset_tsc() */
 
 	if (cpu_has_tsc) {
 		unsigned long tsc_quotient = calibrate_tsc();
