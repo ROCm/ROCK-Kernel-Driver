@@ -38,9 +38,6 @@ struct mts_desc {
 	u8 ep_image;
 
 	struct Scsi_Host * host;
-	Scsi_Host_Template ctempl;
-	int host_number;
-
 	struct semaphore lock;
 
 	struct urb *urb;

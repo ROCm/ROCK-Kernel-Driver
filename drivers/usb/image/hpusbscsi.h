@@ -13,7 +13,6 @@ typedef void (*scsi_callback)(Scsi_Cmnd *);
 
 struct hpusbscsi
 {
-        struct list_head lh;
         struct usb_device *dev; /* NULL indicates unplugged device */
         int ep_out;
         int ep_in;
@@ -36,7 +35,6 @@ struct hpusbscsi
 
         int state;
         int current_data_pipe;
-	Scsi_Host_Template ctempl;
 	u8 sense_command[SENSE_COMMAND_SIZE];
         u8 scsi_state_byte;
 };
@@ -52,7 +50,6 @@ static const unsigned char scsi_command_direction[256/8] = {
 
 #define DIRECTION_IS_IN(x) ((scsi_command_direction[x>>3] >> (x & 7)) & 1)
 
-static int hpusbscsi_scsi_detect (struct SHT * sht);
 static void simple_command_callback(struct urb *u, struct pt_regs *regs);
 static void scatter_gather_callback(struct urb *u, struct pt_regs *regs);
 static void simple_payload_callback (struct urb *u, struct pt_regs *regs);
@@ -63,25 +60,6 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback);
 static int hpusbscsi_scsi_host_reset (Scsi_Cmnd *srb);
 static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb);
 static void issue_request_sense (struct hpusbscsi *hpusbscsi);
-
-static Scsi_Host_Template hpusbscsi_scsi_host_template = {
-	.name			= "hpusbscsi",
-	.detect			= hpusbscsi_scsi_detect,
-//	.release		= hpusbscsi_scsi_release,
-	.queuecommand		= hpusbscsi_scsi_queuecommand,
-
-	.eh_abort_handler	= hpusbscsi_scsi_abort,
-	.eh_host_reset_handler	= hpusbscsi_scsi_host_reset,
-
-	.sg_tablesize		= SG_ALL,
-	.can_queue		= 1,
-	.this_id		= -1,
-	.cmd_per_lun		= 1,
-	.present		= 0,
-	.unchecked_isa_dma	= FALSE,
-	.use_clustering		= TRUE,
-	.emulated		= TRUE
-};
 
 /* defines for internal driver state */
 #define HP_STATE_FREE                 0  /*ready for next request */

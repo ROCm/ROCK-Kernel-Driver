@@ -720,7 +720,7 @@ typedef struct ide_drive_s {
 	unsigned doorlocking	: 1;	/* for removable only: door lock/unlock works */
 	unsigned autotune	: 3;	/* 1=autotune, 2=noautotune, 
 					   3=biostimings, 0=default */
-	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
+	unsigned remap_0_to_1	: 1;	/* 0=noremap, 1=remap 0->1 (for EZDrive) */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */

@@ -1607,6 +1607,7 @@ static void irda_usb_disconnect(struct usb_interface *intf)
  * USB device callbacks
  */
 static struct usb_driver irda_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "irda-usb",
 	.probe		= irda_usb_probe,
 	.disconnect	= irda_usb_disconnect,

@@ -1718,10 +1718,9 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 			copied = filemap_copy_from_user_iovec(page, offset,
 						cur_iov, iov_base, bytes);
 		flush_dcache_page(page);
+		status = a_ops->commit_write(file, page, offset,
+						offset + copied);
 		if (likely(copied > 0)) {
-			status = a_ops->commit_write(file, page, offset,
-						     offset + copied);
-
 			if (!status)
 				status = copied;
 

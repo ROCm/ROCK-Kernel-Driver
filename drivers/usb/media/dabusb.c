@@ -767,7 +767,6 @@ static int dabusb_probe (struct usb_interface *intf,
 	}
 	dbg("bound to interface: %d", ifnum);
 	up (&s->mutex);
-	MOD_INC_USE_COUNT;
 	usb_set_intfdata (intf, s);
 	return 0;
 
@@ -792,7 +791,6 @@ static void dabusb_disconnect (struct usb_interface *intf)
 			sleep_on (&s->remove_ok);
 		s->usbdev = NULL;
 		s->overruns = 0;
-		MOD_DEC_USE_COUNT;
 	}
 }
 
@@ -804,8 +802,8 @@ static struct usb_device_id dabusb_ids [] = {
 
 MODULE_DEVICE_TABLE (usb, dabusb_ids);
 
-static struct usb_driver dabusb_driver =
-{
+static struct usb_driver dabusb_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"dabusb",
 	.probe =	dabusb_probe,
 	.disconnect =	dabusb_disconnect,

@@ -359,6 +359,11 @@
  *    - Fixed endpoint detection. The endpoints were numbered from 1 to n but
  *      that assumption is not correct in all cases.
  *
+ * 0.4.13  2003-05-30
+ *    - Added vendor/product ids for Genius, Hewlett-Packard, Microtek, 
+ *      Mustek, Pacific Image Electronics, Plustek, and Visioneer scanners.
+ *      Fixed names of some other scanners.
+ *
  * TODO
  *    - Performance
  *    - Select/poll methods
@@ -1106,6 +1111,9 @@ probe_scanner(struct usb_interface *intf,
 	scn->scn_minor = intf->minor;
 	scn->isopen = 0;
 
+	snprintf(name, sizeof(name), scanner_class.name,
+		 intf->minor - scanner_class.minor_base);
+
 	info ("USB scanner device (0x%04x/0x%04x) now attached to %s",
 	      dev->descriptor.idVendor, dev->descriptor.idProduct, name);
 
@@ -1144,6 +1152,7 @@ static struct usb_device_id ids[] = {
 
 static struct
 usb_driver scanner_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usbscanner",
 	.probe =	probe_scanner,
 	.disconnect =	disconnect_scanner,

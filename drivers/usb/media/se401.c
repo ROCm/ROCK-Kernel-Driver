@@ -1548,6 +1548,7 @@ static void se401_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver se401_driver = {
+	.owner		= THIS_MODULE,
         .name		= "se401",
         .id_table	= device_table,
 	.probe		= se401_probe,

@@ -2241,7 +2241,7 @@ int tty_register_driver(struct tty_driver *driver)
 		return 0;
 
 	if (!driver->major) {
-		error = alloc_chrdev_region(&dev, driver->num,
+		error = alloc_chrdev_region(&dev, driver->minor_start, driver->num,
 						(char*)driver->name);
 		if (!error) {
 			driver->major = MAJOR(dev);
