@@ -67,6 +67,9 @@
 #define DL_DATA		0x0220
 #define DL_FLUSH	0x0224
 #define DL_UNIT_DATA	0x0230
+
+#define MDL_BC_RELEASE  0x0278  // Formula-n enter:now
+#define MDL_BC_ASSIGN   0x027C  // Formula-n enter:now
 #define MDL_ASSIGN	0x0280
 #define MDL_REMOVE	0x0284
 #define MDL_ERROR	0x0288
@@ -835,6 +838,17 @@ struct w6692_chip {
 	int ph_state;
 };
 
+struct amd7930_chip {
+	u_char lmr1;
+	u_char ph_state;
+	u_char old_state;
+	u_char flg_t3;
+	unsigned int tx_xmtlen;
+	struct timer_list timer3;
+	void (*ph_command) (struct IsdnCardState *, u_char, char *);
+	void (*setIrqMask) (struct IsdnCardState *, u_char);
+};
+
 struct icc_chip {
 	int ph_state;
 	u_char *mon_tx;
@@ -932,6 +946,7 @@ struct IsdnCardState {
 		struct hfcpci_chip hfcpci;
 		struct hfcsx_chip hfcsx;
 		struct w6692_chip w6692;
+		struct amd7930_chip amd7930;
 		struct icc_chip icc;
 	} dc;
 	u_char *rcvbuf;
@@ -993,7 +1008,8 @@ struct IsdnCardState {
 #define  ISDN_CTYPE_NETJET_U	38
 #define  ISDN_CTYPE_HFC_SP_PCMCIA      39
 #define  ISDN_CTYPE_DYNAMIC     40
-#define  ISDN_CTYPE_COUNT	40
+#define  ISDN_CTYPE_ENTERNOW	41
+#define  ISDN_CTYPE_COUNT	41
 
 
 #ifdef ISDN_CHIP_ISAC
@@ -1250,6 +1266,10 @@ struct IsdnCardState {
 #endif
 #else
 #define CARD_NETJET_U 0
+#endif
+
+#ifdef CONFIG_HISAX_ENTERNOW_PCI
+#define CARD_FN_ENTERNOW_PCI 1
 #endif
 
 #define TEI_PER_CARD 1

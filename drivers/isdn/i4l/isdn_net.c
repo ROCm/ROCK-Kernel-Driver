@@ -9,6 +9,14 @@
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
+ * Data Over Voice (DOV) support added - Guy Ellis 23-Mar-02 
+ *                                       guy@traverse.com.au
+ * Outgoing calls - looks for a 'V' in first char of dialed number
+ * Incoming calls - checks first character of eaz as follows:
+ *   Numeric - accept DATA only - original functionality
+ *   'V'     - accept VOICE (DOV) only
+ *   'B'     - accept BOTH DATA and DOV types
+ *
  * Jan 2001: fix CISCO HDLC      Bjoern A. Zeeb <i4l@zabbadoz.net>
  *           for info on the protocol, see 
  *           http://i4l.zabbadoz.net/i4l/cisco-hdlc.txt
@@ -569,6 +577,7 @@ isdn_net_dial(void)
 	int i;
 	unsigned long flags;
 	isdn_ctrl cmd;
+        u_char *phone_number;
 
 	while (p) {
 		isdn_net_local *lp = p->local;
@@ -667,7 +676,20 @@ isdn_net_dial(void)
 							break;
 						}
 
-					sprintf(cmd.parm.setup.phone, "%s", lp->dial->num);
+					cmd.driver = lp->isdn_device;
+					cmd.command = ISDN_CMD_DIAL;
+					cmd.parm.setup.si2 = 0;
+
+                                        /* check for DOV */
+                                        phone_number = lp->dial->num;
+                                        if ((*phone_number == 'v') ||
+					    (*phone_number == 'V')) { /* DOV call */
+                                                cmd.parm.setup.si1 = 1;
+                                        } else { /* DATA call */
+                                                cmd.parm.setup.si1 = 7;
+					}
+
+					strcpy(cmd.parm.setup.phone, phone_number);
 					/*
 					 * Switch to next number or back to start if at end of list.
 					 */
@@ -687,10 +709,6 @@ isdn_net_dial(void)
 						}
 					}
 					restore_flags(flags);
-					cmd.driver = lp->isdn_device;
-					cmd.command = ISDN_CMD_DIAL;
-					cmd.parm.setup.si1 = 7;
-					cmd.parm.setup.si2 = 0;
 					sprintf(cmd.parm.setup.eazmsn, "%s",
 						isdn_map_eaz2msn(lp->msn, cmd.driver));
 					i = isdn_dc2minor(lp->isdn_device, lp->isdn_channel);
@@ -699,8 +717,9 @@ isdn_net_dial(void)
 						dev->usage[i] |= ISDN_USAGE_OUTGOING;
 						isdn_info_update();
 					}
-					printk(KERN_INFO "%s: dialing %d %s...\n", lp->name,
-					       lp->dialretry, cmd.parm.setup.phone);
+					printk(KERN_INFO "%s: dialing %d %s... %s\n", lp->name,
+					       lp->dialretry, cmd.parm.setup.phone,
+					       (cmd.parm.setup.si1 == 1) ? "DOV" : "");
 					lp->dtimer = 0;
 #ifdef ISDN_DEBUG_NET_DIAL
 					printk(KERN_DEBUG "dial: d=%d c=%d\n", lp->isdn_device,
@@ -1746,10 +1765,6 @@ isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 	}
 
 	switch (type) {
-	case CISCO_TYPE_INET:
-		skb->protocol = htons(ETH_P_IP);
-		netif_rx(skb);
-		break;
 	case CISCO_TYPE_SLARP:
 		isdn_net_ciscohdlck_slarp_in(lp, skb);
 		goto out_free;
@@ -1759,11 +1774,11 @@ isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 				"\"no cdp enable\" on cisco.\n", lp->name);
 		goto out_free;
 	default:
-		printk(KERN_WARNING "%s: Unknown Cisco type 0x%04x\n",
-		       lp->name, type);
-		goto out_free;
+		/* no special cisco protocol */
+		skb->protocol = htons(type);
+		netif_rx(skb);
+		return;
 	}
-	return;
 
  out_free:
 	kfree_skb(skb);
@@ -2144,6 +2159,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 	isdn_net_phone *n;
 	ulong flags;
 	char nr[32];
+	char *my_eaz;
+
 	/* Search name in netdev-chain */
 	save_flags(flags);
 	cli();
@@ -2162,15 +2179,17 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		eaz = setup->eazmsn;
 	if (dev->net_verbose > 1)
 		printk(KERN_INFO "isdn_net: call from %s,%d,%d -> %s\n", nr, si1, si2, eaz);
-	/* Accept only calls with Si1 = 7 (Data-Transmission) */
-	if (si1 != 7) {
-		restore_flags(flags);
-		if (dev->net_verbose > 1)
-			printk(KERN_INFO "isdn_net: Service-Indicator not 7, ignored\n");
-		return 0;
-	}
-	n = (isdn_net_phone *) 0;
-	p = dev->netdev;
+        /* Accept DATA and VOICE calls at this stage
+        local eaz is checked later for allowed call types */
+        if ((si1 != 7) && (si1 != 1)) {
+                restore_flags(flags);
+                if (dev->net_verbose > 1)
+                        printk(KERN_INFO "isdn_net: Service-Indicator not 1 or 7, ignored\n");
+                return 0;
+        }
+
+n = (isdn_net_phone *) 0;
+p = dev->netdev;
 	ematch = wret = swapped = 0;
 #ifdef ISDN_DEBUG_NET_ICALL
 	printk(KERN_DEBUG "n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
@@ -2190,8 +2209,25 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				break;
 		}
 		swapped = 0;
-		if (!(matchret = isdn_msncmp(eaz, isdn_map_eaz2msn(lp->msn, di))))
-			ematch = 1;
+                /* check acceptable call types for DOV */
+                my_eaz = isdn_map_eaz2msn(lp->msn, di);
+                if (si1 == 1) { /* it's a DOV call, check if we allow it */
+                        if (*my_eaz == 'v' || *my_eaz == 'V' ||
+			    *my_eaz == 'b' || *my_eaz == 'B')
+                                my_eaz++; /* skip to allow a match */
+                        else
+                                my_eaz = 0; /* force non match */
+                } else { /* it's a DATA call, check if we allow it */
+                        if (*my_eaz == 'b' || *my_eaz == 'B')
+                                my_eaz++; /* skip to allow a match */
+                }
+                if (my_eaz)
+                        matchret = isdn_msncmp(eaz, my_eaz);
+                else
+                        matchret = 1;
+                if (!matchret)
+                        ematch = 1;
+
 		/* Remember if more numbers eventually can match */
 		if (matchret > wret)
 			wret = matchret;

@@ -29,10 +29,16 @@ typedef struct {
 
 static const PCI_ENTRY id_list[] =
 {
-	{PCI_VENDOR_ID_DYNALINK, PCI_DEVICE_ID_DYNALINK_IS64PH, "Dynalink/AsusCom", "IS64PH"},
 	{PCI_VENDOR_ID_WINBOND2, PCI_DEVICE_ID_WINBOND2_6692, "Winbond", "W6692"},
-	{0, 0, NULL, NULL}
+	{PCI_VENDOR_ID_DYNALINK, PCI_DEVICE_ID_DYNALINK_IS64PH, "Dynalink/AsusCom", "IS64PH"},
+	{0, 0, "U.S.Robotics", "ISDN PCI Card TA"}
 };
+
+#define W6692_SV_USR   0x16ec
+#define W6692_SD_USR   0x3409
+#define W6692_WINBOND  0
+#define W6692_DYNALINK 1
+#define W6692_USR      2
 
 extern const char *CardType[];
 
@@ -859,6 +865,28 @@ setstack_w6692(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
+void resetW6692(struct IsdnCardState *cs)
+{
+	cs->writeW6692(cs, W_D_CTL, W_D_CTL_SRST);
+	schedule_timeout((10*HZ)/1000);
+	cs->writeW6692(cs, W_D_CTL, 0x00);
+	schedule_timeout((10*HZ)/1000);
+	cs->writeW6692(cs, W_IMASK, 0xff);
+	cs->writeW6692(cs, W_D_SAM, 0xff);
+	cs->writeW6692(cs, W_D_TAM, 0xff);
+	cs->writeW6692(cs, W_D_EXIM, 0x00);
+	cs->writeW6692(cs, W_D_MODE, W_D_MODE_RACT);
+	cs->writeW6692(cs, W_IMASK, 0x18);
+	if (cs->subtyp == W6692_USR) {
+		/* seems that USR implemented some power control features
+		 * Pin 79 is connected to the oscilator circuit so we
+		 * have to handle it here
+		 */
+		cs->writeW6692(cs, W_PCTL, 0x80);
+		cs->writeW6692(cs, W_XDATA, 0x00);
+	}
+}
+
 void __init initW6692(struct IsdnCardState *cs, int part)
 {
 	if (part & 1) {
@@ -868,15 +896,7 @@ void __init initW6692(struct IsdnCardState *cs, int part)
 		cs->dbusytimer.function = (void *) dbusy_timer_handler;
 		cs->dbusytimer.data = (long) cs;
 		init_timer(&cs->dbusytimer);
-
-		cs->writeW6692(cs, W_D_CTL, W_D_CTL_SRST);
-		cs->writeW6692(cs, W_D_CTL, 0x00);
-		cs->writeW6692(cs, W_IMASK, 0xff);
-		cs->writeW6692(cs, W_D_SAM, 0xff);
-		cs->writeW6692(cs, W_D_TAM, 0xff);
-		cs->writeW6692(cs, W_D_EXIM, 0x00);
-		cs->writeW6692(cs, W_D_MODE, W_D_MODE_RACT);
-		cs->writeW6692(cs, W_IMASK, 0x18);
+		resetW6692(cs);
 		ph_command(cs, W_L1CMD_RST);
 		cs->dc.w6692.ph_state = W_L1CMD_RST;
 		W6692_new_ph(cs);
@@ -943,9 +963,14 @@ w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
 	switch (mt) {
 		case CARD_RESET:
+			resetW6692(cs);
 			return (0);
 		case CARD_RELEASE:
+			cs->writeW6692(cs, W_IMASK, 0xff);
 			release_region(cs->hw.w6692.iobase, 256);
+			if (cs->subtyp == W6692_USR) {
+				cs->writeW6692(cs, W_XDATA, 0x04);
+			}
 			return (0);
 		case CARD_INIT:
 			initW6692(cs, 3);
@@ -988,6 +1013,7 @@ setup_w6692(struct IsdnCard *card)
 		if (dev_w6692) {
 			if (pci_enable_device(dev_w6692))
 				continue;
+			cs->subtyp = id_idx;
 			break;
 		}
 		id_idx++;
@@ -998,6 +1024,13 @@ setup_w6692(struct IsdnCard *card)
 		/* I think address 0 is allways the configuration area */
 		/* and address 1 is the real IO space KKe 03.09.99 */
 		pci_ioaddr = pci_resource_start(dev_w6692, 1);
+		/* USR ISDN PCI card TA need some special handling */
+		if (cs->subtyp == W6692_WINBOND) {
+			if ((W6692_SV_USR == dev_w6692->subsystem_vendor) &&
+			    (W6692_SD_USR == dev_w6692->subsystem_device)) {
+				cs->subtyp = W6692_USR;
+			}
+		}
 	}
 	if (!found) {
 		printk(KERN_WARNING "W6692: No PCI card found\n");
@@ -1014,18 +1047,18 @@ setup_w6692(struct IsdnCard *card)
 	}
 	cs->hw.w6692.iobase = pci_ioaddr;
 	printk(KERN_INFO "Found: %s %s, I/O base: 0x%x, irq: %d\n",
-	       id_list[id_idx].vendor_name, id_list[id_idx].card_name,
-	       pci_ioaddr, dev_w6692->irq);
+	       id_list[cs->subtyp].vendor_name, id_list[cs->subtyp].card_name,
+	       pci_ioaddr, pci_irq);
 	if (check_region((cs->hw.w6692.iobase), 256)) {
 		printk(KERN_WARNING
 		       "HiSax: %s I/O ports %x-%x already in use\n",
-		       id_list[id_idx].card_name,
+		       id_list[cs->subtyp].card_name,
 		       cs->hw.w6692.iobase,
 		       cs->hw.w6692.iobase + 255);
 		return (0);
 	} else {
 		request_region(cs->hw.w6692.iobase, 256,
-			       id_list[id_idx].card_name);
+			       id_list[cs->subtyp].card_name);
 	}
 #else
 	printk(KERN_WARNING "HiSax: W6692 and NO_PCI_BIOS\n");
@@ -1035,7 +1068,7 @@ setup_w6692(struct IsdnCard *card)
 
 	printk(KERN_INFO
 	       "HiSax: %s config irq:%d I/O:%x\n",
-	       id_list[id_idx].card_name, cs->irq,
+	       id_list[cs->subtyp].card_name, cs->irq,
 	       cs->hw.w6692.iobase);
 
 	cs->readW6692 = &ReadW6692;
