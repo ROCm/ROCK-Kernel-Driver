@@ -571,15 +571,6 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 
 	ifp->dead = 1;
 
-#ifdef CONFIG_IPV6_PRIVACY
-	spin_lock_bh(&ifp->lock);
-	if (ifp->ifpub) {
-		__in6_ifa_put(ifp->ifpub);
-		ifp->ifpub = NULL;
-	}
-	spin_unlock_bh(&ifp->lock);
-#endif
-
 	write_lock_bh(&addrconf_hash_lock);
 	for (ifap = &inet6_addr_lst[hash]; (ifa=*ifap) != NULL;
 	     ifap = &ifa->lst_next) {
@@ -600,7 +591,7 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 			if (ifa == ifp) {
 				*ifap = ifa->tmp_next;
 				if (ifp->ifpub) {
-					__in6_ifa_put(ifp->ifpub);
+					in6_ifa_put(ifp->ifpub);
 					ifp->ifpub = NULL;
 				}
 				__in6_ifa_put(ifp);

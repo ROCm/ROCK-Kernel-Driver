@@ -1729,8 +1729,18 @@ static void __journal_remove_journal_head(struct buffer_head *bh)
 			J_ASSERT_BH(bh, buffer_jbd(bh));
 			J_ASSERT_BH(bh, jh2bh(jh) == bh);
 			BUFFER_TRACE(bh, "remove journal_head");
-			J_ASSERT_BH(bh, !jh->b_frozen_data);
-			J_ASSERT_BH(bh, !jh->b_committed_data);
+			if (jh->b_frozen_data) {
+				printk(KERN_WARNING "%s: freeing "
+						"b_frozen_data\n",
+						__FUNCTION__);
+				kfree(jh->b_frozen_data);
+			}
+			if (jh->b_committed_data) {
+				printk(KERN_WARNING "%s: freeing "
+						"b_committed_data\n",
+						__FUNCTION__);
+				kfree(jh->b_committed_data);
+			}
 			bh->b_private = NULL;
 			jh->b_bh = NULL;	/* debug, really */
 			clear_buffer_jbd(bh);

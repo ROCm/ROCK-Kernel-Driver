@@ -574,7 +574,11 @@ extern void do_timer(struct pt_regs *);
 
 extern int FASTCALL(wake_up_state(struct task_struct * tsk, unsigned int state));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
-extern int FASTCALL(wake_up_process_kick(struct task_struct * tsk));
+#ifdef CONFIG_SMP
+ extern void FASTCALL(kick_process(struct task_struct * tsk));
+#else
+ static inline void kick_process(struct task_struct *tsk) { }
+#endif
 extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
 extern void FASTCALL(sched_exit(task_t * p));
 

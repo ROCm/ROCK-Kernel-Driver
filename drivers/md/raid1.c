@@ -841,7 +841,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 	}
 
 	if (atomic_dec_and_test(&r1_bio->remaining)) {
-		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
+		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 1);
 		put_buf(r1_bio);
 	}
 }

@@ -219,8 +219,8 @@ tracesys:
 	movq %r10,%rcx	/* fixup for C */
 	call *sys_call_table(,%rax,8)
 	movq %rax,RAX-ARGOFFSET(%rsp)
-	SAVE_REST
-1:	movq %rsp,%rdi
+1:	SAVE_REST
+	movq %rsp,%rdi
 	call syscall_trace
 	RESTORE_TOP_OF_STACK %rbx
 	RESTORE_REST

@@ -395,7 +395,7 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 	for (i = start; i < stopat; i++) {
 		struct scatterlist *s = &sg[i];
 		unsigned long start_addr = s->dma_address;
-		BUG_ON(i > 0 && s->offset);
+		BUG_ON(i > start && s->offset);
 		if (i == start) {
 			*sout = *s; 
 			sout->dma_address = iommu_bus_base;
@@ -410,7 +410,6 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 			addr += PAGE_SIZE;
 			iommu_page++;
 	} 
-		BUG_ON(i > 0 && addr % PAGE_SIZE); 
 	} 
 	BUG_ON(iommu_page - iommu_start != pages);	
 	return 0;

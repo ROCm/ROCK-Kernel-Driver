@@ -2972,9 +2972,12 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	strcpy (net->name, "usb%d");
 	memcpy (net->dev_addr, node_id, sizeof node_id);
 
+#if 0
+// dma_supported() is deeply broken on almost all architectures
 	// possible with some EHCI controllers
 	if (dma_supported (&udev->dev, 0xffffffffffffffffULL))
 		net->features |= NETIF_F_HIGHDMA;
+#endif
 
 	net->change_mtu = usbnet_change_mtu;
 	net->get_stats = usbnet_get_stats;

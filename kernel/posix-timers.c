@@ -1104,29 +1104,6 @@ long clock_nanosleep_restart(struct restart_block *restart_block);
 extern long do_clock_nanosleep(clockid_t which_clock, int flags,
 			       struct timespec *t);
 
-#ifdef FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
-
-asmlinkage long
-sys_nanosleep(struct timespec __user *rqtp, struct timespec __user *rmtp)
-{
-	struct timespec t;
-	long ret;
-
-	if (copy_from_user(&t, rqtp, sizeof (t)))
-		return -EFAULT;
-
-	if ((unsigned) t.tv_nsec >= NSEC_PER_SEC || t.tv_sec < 0)
-		return -EINVAL;
-
-	ret = do_clock_nanosleep(CLOCK_REALTIME, 0, &t);
-
-	if (ret == -ERESTART_RESTARTBLOCK && rmtp &&
-					copy_to_user(rmtp, &t, sizeof (t)))
-		return -EFAULT;
-	return ret;
-}
-#endif				// ! FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
-
 asmlinkage long
 sys_clock_nanosleep(clockid_t which_clock, int flags,
 		    const struct timespec __user *rqtp,
@@ -1244,7 +1221,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 	return 0;
 }
 /*
- * This will restart either clock_nanosleep or clock_nanosleep
+ * This will restart clock_nanosleep. Incorrectly, btw.
  */
 long
 clock_nanosleep_restart(struct restart_block *restart_block)
