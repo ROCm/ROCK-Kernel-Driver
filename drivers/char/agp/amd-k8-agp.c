@@ -23,6 +23,19 @@
 /* Will need to be increased if hammer ever goes >8-way. */
 #define MAX_HAMMER_GARTS   8
 
+/* PTE bits. */
+#define GPTE_VALID	1
+#define GPTE_COHERENT	2
+
+/* Aperture control register bits. */
+#define GARTEN		1<<0
+#define DISGARTCPU	1<<4
+#define DISGARTIO	1<<5
+
+/* GART cache control register bits. */
+#define INVGART		1<<0
+#define GARTPTEERR	1<<1
+
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 
@@ -34,7 +47,7 @@ static void flush_x86_64_tlb(struct pci_dev *dev)
 	u32 tmp;
 
 	pci_read_config_dword (dev, AMD_X86_64_GARTCACHECTL, &tmp);
-	tmp |= 1<<0;
+	tmp |= INVGART;
 	pci_write_config_dword (dev, AMD_X86_64_GARTCACHECTL, tmp);
 }
 
@@ -49,7 +62,6 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 	int i, j, num_entries;
 	long tmp;
 	u32 pte;
-	u64 addr;
 
 	num_entries = agp_num_entries();
 
@@ -76,13 +88,12 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		addr = agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
+		tmp = agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
 
-		tmp = addr;
 		BUG_ON(tmp & 0xffffff0000000ffc);
 		pte = (tmp & 0x000000ff00000000) >> 28;
 		pte |=(tmp & 0x00000000fffff000);
-		pte |= 1<<1|1<<0;
+		pte |= GPTE_VALID | GPTE_COHERENT;
 
 		agp_bridge->gatt_table[j] = pte;
 	}
@@ -164,8 +175,8 @@ static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
 
 	/* Enable GART translation for this hammer. */
 	pci_read_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, &tmp);
-	tmp &= 0x3f;
-	tmp |= 1<<0;
+	tmp |= GARTEN;
+	tmp &= ~(DISGARTCPU | DISGARTIO);
 	pci_write_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, tmp);
 
 	/* keep CPU's coherent. */
@@ -212,11 +223,6 @@ static void amd_8151_cleanup(void)
 }
 
 
-static struct gatt_mask amd_8151_masks[] =
-{
-	{ .mask = 1, .type = 0 }
-};
-
 struct agp_bridge_driver amd_8151_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= amd_8151_sizes,
@@ -227,7 +233,7 @@ struct agp_bridge_driver amd_8151_driver = {
 	.cleanup		= amd_8151_cleanup,
 	.tlb_flush		= amd_x86_64_tlbflush,
 	.mask_memory		= agp_generic_mask_memory,
-	.masks			= amd_8151_masks,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -240,14 +246,31 @@ struct agp_bridge_driver amd_8151_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
+
+#ifdef CONFIG_SMP
+static int cache_nbs (void)
+{
+	struct pci_dev *loop_dev = NULL;
+	int i = 0;
+
+	/* cache pci_devs of northbridges. */
+	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) != NULL) {
+		hammers[i++] = loop_dev;
+		nr_garts = i;
+		if (i == MAX_HAMMER_GARTS)
+			return -1;
+	}
+	return 0;
+}
+#endif
+
+
 static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
-	struct pci_dev *loop_dev = NULL;
 	u8 rev_id;
 	u8 cap_ptr;
-	int i = 0;
 	char *revstring="  ";
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
@@ -297,24 +320,25 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev, bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
 
-	/* cache pci_devs of northbridges. */
-	while ((loop_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, loop_dev)) != NULL) {
-		if (loop_dev->bus->number == 0 &&
-		    PCI_FUNC(loop_dev->devfn) == 3 &&
-		    PCI_SLOT(loop_dev->devfn) >=24 &&
-		    PCI_SLOT(loop_dev->devfn) <=31) {
-			hammers[i++] = loop_dev;
-			nr_garts = i;
-			if (i == MAX_HAMMER_GARTS)
-				goto out_free;
-		}
+#ifdef CONFIG_SMP
+	if (cache_nbs() == -1) {
+		agp_put_bridge(bridge);
+		return -ENOMEM;
 	}
+#else
+	{
+	struct pci_dev *loop_dev = NULL;
+	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) != NULL) {
+		/* For UP, we only care about the first GART. */
+		hammers[0] = loop_dev;
+		nr_garts = 1;
+		break;
+	}
+	}
+#endif
 
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
-out_free:
-	agp_put_bridge(bridge);
-	return -ENOMEM;
 }
 
 static void __devexit agp_amdk8_remove(struct pci_dev *pdev)
