@@ -42,53 +42,17 @@
 #include <asm/it8172/it8172_int.h>
 
 #include "ide_modes.h"
+#include "it8172.h"
 
 /*
  * Prototypes
  */
-static byte it8172_ratemask (ide_drive_t *drive);
-static byte it8172_ratefilter (ide_drive_t *drive, byte speed);
-static void it8172_tune_drive (ide_drive_t *drive, byte pio);
-static byte it8172_dma_2_pio (byte xfer_rate);
-static int it8172_tune_chipset (ide_drive_t *drive, byte xferspeed);
-#ifdef CONFIG_BLK_DEV_IDEDMA
-static int it8172_config_chipset_for_dma (ide_drive_t *drive);
-static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive);
-#endif
-unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name);
-void __init ide_init_it8172 (ide_hwif_t *hwif);
-
-static byte it8172_ratemask (ide_drive_t *drive)
+static u8 it8172_ratemask (ide_drive_t *drive)
 {
-	byte mode	= 0x00;
-#if 1
-	mode |= 0x01;
-#endif
-	return (mode &= ~0xF8);
+	return 1;
 }
 
-static byte it8172_ratefilter (ide_drive_t *drive, byte speed)
-{
-#ifdef CONFIG_BLK_DEV_IDEDMA
-	byte mode = it8172_ratemask(drive);
-
-	switch(mode) {
-		case 0x04:	// while (speed > XFER_UDMA_6) speed--; break;
-		case 0x03:	// while (speed > XFER_UDMA_5) speed--; break;
-		case 0x02:	while (speed > XFER_UDMA_4) speed--; break;
-		case 0x01:	while (speed > XFER_UDMA_2) speed--; break;
-		case 0x00:
-		default:	while (speed > XFER_MW_DMA_2) speed--; break;
-			break;
-	}
-#else
-	while (speed > XFER_PIO_4) speed--;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-//	printk("%s: mode == %02x speed == %02x\n", drive->name, mode, speed);
-	return speed;
-}
-
-static void it8172_tune_drive (ide_drive_t *drive, byte pio)
+static void it8172_tune_drive (ide_drive_t *drive, u8 pio)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -133,7 +97,7 @@ static void it8172_tune_drive (ide_drive_t *drive, byte pio)
 	spin_unlock_irqrestore(&ide_lock, flags)
 }
 
-static byte it8172_dma_2_pio (byte xfer_rate)
+static u8 it8172_dma_2_pio (u8 xfer_rate)
 {
 	switch(xfer_rate) {
 		case XFER_UDMA_5:
@@ -162,15 +126,15 @@ static byte it8172_dma_2_pio (byte xfer_rate)
 	}
 }
 
-static int it8172_tune_chipset (ide_drive_t *drive, byte xferspeed)
+static int it8172_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
-	byte speed		= it8172_ratefilter(drive, xferspeed);
+	u8 speed	= ide_rate_filter(it8172_ratemask(drive), xferspeed);
 	int a_speed		= 3 << (drive->dn * 4);
 	int u_flag		= 1 << drive->dn;
 	int u_speed		= 0;
-	byte reg48, reg4a;
+	u8 reg48, reg4a;
 
 	pci_read_config_byte(dev, 0x48, &reg48);
 	pci_read_config_byte(dev, 0x4a, &reg4a);
@@ -221,116 +185,62 @@ static int it8172_tune_chipset (ide_drive_t *drive, byte xferspeed)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int it8172_config_chipset_for_dma (ide_drive_t *drive)
 {
-	struct hd_driveid *id	= drive->id;
-	byte mode		= it8172_ratemask(drive);
-	byte speed, tspeed, dma = 1;
+	u8 speed = ide_dma_speed(drive, it8172_ratemask(drive));
 
-	switch(mode) {
-		case 0x01:
-			if (id->dma_ultra & 0x0040)
-				{ speed = XFER_UDMA_2; break; }
-			if (id->dma_ultra & 0x0020)
-				{ speed = XFER_UDMA_2; break; }
-			if (id->dma_ultra & 0x0010)
-				{ speed = XFER_UDMA_2; break; }
-			if (id->dma_ultra & 0x0008)
-				{ speed = XFER_UDMA_2; break; }
-			if (id->dma_ultra & 0x0004)
-				{ speed = XFER_UDMA_2; break; }
-			if (id->dma_ultra & 0x0002)
-				{ speed = XFER_UDMA_1; break; }
-			if (id->dma_ultra & 0x0001)
-				{ speed = XFER_UDMA_0; break; }
-		case 0x00:
-			if (id->dma_mword & 0x0004)
-				{ speed = XFER_MW_DMA_2; break; }
-			if (id->dma_mword & 0x0002)
-				{ speed = XFER_MW_DMA_1; break; }
-			if (id->dma_1word & 0x0004)
-				{ speed = XFER_SW_DMA_2; break; }
-		default:
-			tspeed = ide_get_best_pio_mode(drive, 255, 4, NULL);
-			speed = it8172_dma_2_pio(XFER_PIO_0 + tspeed);
-			dma = 0;
-			break;
+	if (!(speed)) {
+		u8 tspeed = ide_get_best_pio_mode(drive, 255, 4, NULL);
+		speed = it8172_dma_2_pio(XFER_PIO_0 + tspeed);
 	}
 
 	(void) it8172_tune_chipset(drive, speed);
-
-//	return ((int)(dma) ? ide_dma_on : ide_dma_off_quietly);
-	return ((int)((id->dma_ultra >> 11) & 7) ? ide_dma_on :
-		    ((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-		    ((id->dma_mword >> 8) & 7) ? ide_dma_on :
-		    ((id->dma_1word >> 8) & 7) ? ide_dma_on :
-		    ide_dma_off_quietly);
+	return ide_dma_enable(drive);
 }
 
-static int config_drive_xfer_rate (ide_drive_t *drive)
+static int it8172_config_drive_xfer_rate (ide_drive_t *drive)
 {
-	struct hd_driveid *id = drive->id;
-	ide_dma_action_t dma_func = ide_dma_on;
+	ide_hwif_t *hwif	= HWIF(drive);
+	struct hd_driveid *id	= drive->id;
 
 	drive->init_speed = 0;
 
-	if (id && (id->capability & 1) && HWIF(drive)->autodma) {
+	if (id && (id->capability & 1) && drive->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
-			dma_func = ide_dma_off;
+		if (hwif->ide_dma_bad_drive(drive))
 			goto fast_ata_pio;
-		}
-		dma_func = ide_dma_off_quietly;
 		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x007F) {
+			if (id->dma_ultra & hwif->ultra_mask) {
 				/* Force if Capable UltraDMA */
-				dma_func = it8172_config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) &&
-				    (dma_func != ide_dma_on))
+				int dma = it8172_config_chipset_for_dma(drive);
+				if ((id->field_valid & 2) && !dma)
 					goto try_dma_modes;
 			}
 		} else if (id->field_valid & 2) {
 try_dma_modes:
-			if ((id->dma_mword & 0x0007) ||
-			    (id->dma_1word & 0x007)) {
+			if ((id->dma_mword & hwif->mwdma_mask) ||
+			    (id->dma_1word & hwif->swdma_mask)) {
 				/* Force if Capable regular DMA modes */
-				dma_func = it8172_config_chipset_for_dma(drive);
-				if (dma_func != ide_dma_on)
+				if (!it8172_config_chipset_for_dma(drive))
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
-			if (id->eide_dma_time > 150) {
-				goto no_dma_set;
-			}
+		} else if (hwif->ide_dma_good_drive(drive) &&
+			   (id->eide_dma_time < 150)) {
 			/* Consult the list of known "good" drives */
-			dma_func = it8172_config_chipset_for_dma(drive);
-			if (dma_func != ide_dma_on)
+			if (!it8172_config_chipset_for_dma(drive))
 				goto no_dma_set;
 		} else {
 			goto fast_ata_pio;
 		}
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-		dma_func = ide_dma_off_quietly;
 no_dma_set:
 		it8172_tune_drive(drive, 5);
+		return hwif->ide_dma_off_quietly(drive);
 	}
-	return HWIF(drive)->dmaproc(dma_func, drive);
-}
-
-static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
-{
-	switch (func) {
-		case ide_dma_check:
-			return config_drive_xfer_rate(drive);
-		default :
-			break;
-	}
-	/* Other cases are done by generic IDE-DMA code. */
-	return ide_dmaproc(func, drive);
+	return hwif->ide_dma_on(drive);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-
-unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name)
+static unsigned int __init init_chipset_it8172 (struct pci_dev *dev, const char *name)
 {
 	unsigned char progif;
     
@@ -344,7 +254,7 @@ unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name)
 }
 
 
-void __init ide_init_it8172 (ide_hwif_t *hwif)
+static void __init init_hwif_it8172 (ide_hwif_t *hwif)
 {
 	struct pci_dev* dev = hwif->pci_dev;
 	unsigned long cmdBase, ctrlBase;
@@ -352,8 +262,6 @@ void __init ide_init_it8172 (ide_hwif_t *hwif)
 	hwif->autodma = 0;
 	hwif->tuneproc = &it8172_tune_drive;
 	hwif->speedproc = &it8172_tune_chipset;
-	hwif->drives[0].autotune = 1;
-	hwif->drives[1].autotune = 1;
 
 	cmdBase = dev->resource[0].start;
 	ctrlBase = dev->resource[1].start;
@@ -362,28 +270,56 @@ void __init ide_init_it8172 (ide_hwif_t *hwif)
 	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
 	hwif->noprobe = 0;
 
-	if (!hwif->dma_base)
+	if (!hwif->dma_base) {
+		hwif->drives[0].autotune = 1;
+		hwif->drives[1].autotune = 1;
 		return;
+	}
+
+	hwif->atapi_dma = 1;
+	hwif->ultra_mask = 0x07;
+	hwif->mwdma_mask = 0x06;
+	hwif->swdma_mask = 0x04;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	hwif->dmaproc = &it8172_dmaproc;
-# ifdef CONFIG_IDEDMA_AUTO
+	hwif->ide_dma_check = &it8172_config_drive_xfer_rate;
 	if (!noautodma)
 		hwif->autodma = 1;
-# endif /* CONFIG_IDEDMA_AUTO */
+	hwif->drives[0].autodma = hwif->autodma;
+	hwif->drives[1].autodma = hwif->autodma;
 #endif /* !CONFIG_BLK_DEV_IDEDMA */
 }
 
-extern void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d);
+static void __init init_dma_it8172 (ide_hwif_t *hwif, unsigned long dmabase)
+{
+	ide_setup_dma(hwif, dmabase, 8);
+}
 
-void __init fixup_device_it8172 (struct pci_dev *dev, ide_pci_device_t *d)
+extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+
+static void __init init_setup_it8172 (struct pci_dev *dev, ide_pci_device_t *d)
 {
         if ((!(PCI_FUNC(dev->devfn) & 1) ||
             (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
                 return; /* IT8172 is more than only a IDE controller */
-
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
-		d->name, dev->bus->number, dev->devfn);
 	ide_setup_pci_device(dev, d);
+}
+
+static int __init it8172_scan_pcidev (struct pci_dev *dev)
+{
+	ide_pci_device_t *d;
+
+	if (dev->vendor != PCI_VENDOR_ID_ITE)
+		return 0;
+
+	for (d = it8172_chipsets; d && d->vendor && d->device; ++d) {
+		if (((d->vendor == dev->vendor) &&
+		     (d->device == dev->device)) &&
+		    (d->init_setup)) {
+			d->init_setup(dev, d);
+			return 1;
+		}
+	}
+	return 0;
 }
 
