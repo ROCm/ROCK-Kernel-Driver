@@ -549,8 +549,8 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
  */
 ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 {
-	struct request *rq	= HWGROUP(drive)->rq;
-	task_struct_t *taskfile	= (task_struct_t *) task->tfRegister;
+	struct request *rq = HWGROUP(drive)->rq;
+	struct hd_drive_task_hdr *taskfile = &task->taskfile;
 	unsigned long timeout;
 	byte stat;
 
@@ -652,8 +652,9 @@ ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigne
 	taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
 	taskfile.command	= (rq_data_dir(rq)==READ)?PROMISE_READ:PROMISE_WRITE;
 
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, NULL, sizeof(struct hd_drive_hob_hdr));
+	args.taskfile = taskfile;
+	memset(&args.hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+
 	ide_cmd_type_parser(&args);
 	/* We don't use the generic inerrupt handlers here? */
 	args.prehandler		= NULL;

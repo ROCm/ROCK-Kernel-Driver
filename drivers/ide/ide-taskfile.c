@@ -534,8 +534,8 @@ static ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq
 	}
 
 	/* (ks/hs): Fixed Multi Write */
-	if ((args->tfRegister[IDE_COMMAND_OFFSET] != WIN_MULTWRITE) &&
-	    (args->tfRegister[IDE_COMMAND_OFFSET] != WIN_MULTWRITE_EXT)) {
+	if ((args->taskfile.command != WIN_MULTWRITE) &&
+	    (args->taskfile.command != WIN_MULTWRITE_EXT)) {
 		unsigned long flags;
 		char *buf = ide_map_rq(rq, &flags);
 		/* For Write_sectors we need to stuff the first sector */
@@ -741,12 +741,12 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 /* Called by ioctl to feature out type of command being called */
 void ide_cmd_type_parser(ide_task_t *args)
 {
-	struct hd_drive_task_hdr *taskfile = (struct hd_drive_task_hdr *) args->tfRegister;
+	struct hd_drive_task_hdr *taskfile = &args->taskfile;
 
 	args->prehandler = NULL;
 	args->handler = NULL;
 
-	switch(args->tfRegister[IDE_COMMAND_OFFSET]) {
+	switch(args->taskfile.command) {
 		case WIN_IDENTIFY:
 		case WIN_PIDENTIFY:
 			args->handler = task_in_intr;
@@ -797,9 +797,11 @@ void ide_cmd_type_parser(ide_task_t *args)
 		case WIN_SMART:
 			if (taskfile->feature == SMART_WRITE_LOG_SECTOR)
 				args->prehandler = pre_task_out_intr;
-			args->tfRegister[IDE_LCYL_OFFSET] = SMART_LCYL_PASS;
-			args->tfRegister[IDE_HCYL_OFFSET] = SMART_HCYL_PASS;
-			switch(args->tfRegister[IDE_FEATURE_OFFSET]) {
+
+			args->taskfile.low_cylinder = SMART_LCYL_PASS;
+			args->taskfile.high_cylinder = SMART_HCYL_PASS;
+
+			switch(args->taskfile.feature) {
 				case SMART_READ_VALUES:
 				case SMART_READ_THRESHOLDS:
 				case SMART_READ_LOG_SECTOR:
@@ -837,7 +839,7 @@ void ide_cmd_type_parser(ide_task_t *args)
 #endif
 		case WIN_SETFEATURES:
 			args->handler = task_no_data_intr;
-			switch(args->tfRegister[IDE_FEATURE_OFFSET]) {
+			switch(args->taskfile.feature) {
 				case SETFEATURES_XFER:
 					args->command_type = IDE_DRIVE_TASK_SET_XFER;
 					return;
@@ -944,27 +946,13 @@ static void init_taskfile_request(struct request *rq)
 int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf)
 {
 	struct request rq;
+	/* FIXME: This is on stack! */
 	ide_task_t args;
 
 	memset(&args, 0, sizeof(ide_task_t));
 
-	args.tfRegister[IDE_DATA_OFFSET]         = taskfile->data;
-	args.tfRegister[IDE_FEATURE_OFFSET]      = taskfile->feature;
-	args.tfRegister[IDE_NSECTOR_OFFSET]      = taskfile->sector_count;
-	args.tfRegister[IDE_SECTOR_OFFSET]       = taskfile->sector_number;
-	args.tfRegister[IDE_LCYL_OFFSET]         = taskfile->low_cylinder;
-	args.tfRegister[IDE_HCYL_OFFSET]         = taskfile->high_cylinder;
-	args.tfRegister[IDE_SELECT_OFFSET]       = taskfile->device_head;
-	args.tfRegister[IDE_COMMAND_OFFSET]      = taskfile->command;
-
-	args.hobRegister[IDE_DATA_OFFSET_HOB]    = hobfile->data;
-	args.hobRegister[IDE_FEATURE_OFFSET_HOB] = hobfile->feature;
-	args.hobRegister[IDE_NSECTOR_OFFSET_HOB] = hobfile->sector_count;
-	args.hobRegister[IDE_SECTOR_OFFSET_HOB]  = hobfile->sector_number;
-	args.hobRegister[IDE_LCYL_OFFSET_HOB]    = hobfile->low_cylinder;
-	args.hobRegister[IDE_HCYL_OFFSET_HOB]    = hobfile->high_cylinder;
-	args.hobRegister[IDE_SELECT_OFFSET_HOB]  = hobfile->device_head;
-	args.hobRegister[IDE_CONTROL_OFFSET_HOB] = hobfile->control;
+	args.taskfile = *taskfile;
+	args.hobfile = *hobfile;
 
 	init_taskfile_request(&rq);
 
@@ -986,7 +974,9 @@ int ide_raw_taskfile(ide_drive_t *drive, ide_task_t *args, byte *buf)
 	rq.buffer = buf;
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
-		rq.current_nr_sectors = rq.nr_sectors = (args->hobRegister[IDE_NSECTOR_OFFSET_HOB] << 8) | args->tfRegister[IDE_NSECTOR_OFFSET];
+		rq.current_nr_sectors = rq.nr_sectors
+			= (args->hobfile.sector_count << 8)
+			| args->taskfile.sector_count;
 
 	rq.special = args;
 
@@ -1032,13 +1022,13 @@ int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, un
 	if (copy_from_user(args, (void *)arg, 4))
 		return -EFAULT;
 
-	tfargs.tfRegister[IDE_FEATURE_OFFSET] = args[2];
-	tfargs.tfRegister[IDE_NSECTOR_OFFSET] = args[3];
-	tfargs.tfRegister[IDE_SECTOR_OFFSET]  = args[1];
-	tfargs.tfRegister[IDE_LCYL_OFFSET]    = 0x00;
-	tfargs.tfRegister[IDE_HCYL_OFFSET]    = 0x00;
-	tfargs.tfRegister[IDE_SELECT_OFFSET]  = 0x00;
-	tfargs.tfRegister[IDE_COMMAND_OFFSET] = args[0];
+	tfargs.taskfile.feature = args[2];
+	tfargs.taskfile.sector_count = args[3];
+	tfargs.taskfile.sector_number = args[1];
+	tfargs.taskfile.low_cylinder = 0x00;
+	tfargs.taskfile.high_cylinder = 0x00;
+	tfargs.taskfile.device_head = 0x00;
+	tfargs.taskfile.command = args[0];
 
 	if (args[3]) {
 		argsize = 4 + (SECTOR_WORDS * 4 * args[3]);

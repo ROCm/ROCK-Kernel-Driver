@@ -54,16 +54,9 @@
  *	HDIO_DRIVE_CMD and HDIO_DRIVE_TASK
  */
 
-#if 0
-#include <asm/hdreg.h>
-typedef ide_ioreg_t task_ioreg_t;
-#else
-typedef unsigned char task_ioreg_t;
-#endif
-
-#define HDIO_DRIVE_CMD_HDR_SIZE		4*sizeof(task_ioreg_t)
-#define HDIO_DRIVE_TASK_HDR_SIZE	8*sizeof(task_ioreg_t)
-#define HDIO_DRIVE_HOB_HDR_SIZE		8*sizeof(task_ioreg_t)
+#define HDIO_DRIVE_CMD_HDR_SIZE		(4 * sizeof(u8))
+#define HDIO_DRIVE_TASK_HDR_SIZE	(8 * sizeof(u8))
+#define HDIO_DRIVE_HOB_HDR_SIZE		(8 * sizeof(u8))
 
 #define IDE_DRIVE_TASK_INVALID		-1
 #define IDE_DRIVE_TASK_NO_DATA		0
@@ -74,57 +67,27 @@ typedef unsigned char task_ioreg_t;
 #define IDE_DRIVE_TASK_OUT		3
 #define IDE_DRIVE_TASK_RAW_WRITE	4
 
-struct hd_drive_cmd_hdr {
-	task_ioreg_t command;
-	task_ioreg_t sector_number;
-	task_ioreg_t feature;
-	task_ioreg_t sector_count;
-};
+struct hd_drive_task_hdr {
+	u8 data;
+	u8 feature;
+	u8 sector_count;
+	u8 sector_number;
+	u8 low_cylinder;
+	u8 high_cylinder;
+	u8 device_head;
+	u8 command;
+} __attribute__((packed));
 
-typedef struct hd_drive_task_hdr {
-	task_ioreg_t data;
-	task_ioreg_t feature;
-	task_ioreg_t sector_count;
-	task_ioreg_t sector_number;
-	task_ioreg_t low_cylinder;
-	task_ioreg_t high_cylinder;
-	task_ioreg_t device_head;
-	task_ioreg_t command;
-} task_struct_t;
-
-typedef struct hd_drive_hob_hdr {
-	task_ioreg_t data;
-	task_ioreg_t feature;
-	task_ioreg_t sector_count;
-	task_ioreg_t sector_number;
-	task_ioreg_t low_cylinder;
-	task_ioreg_t high_cylinder;
-	task_ioreg_t device_head;
-	task_ioreg_t control;
-} hob_struct_t;
-
-typedef union ide_reg_valid_s {
-	unsigned all				: 16;
-	struct {
-		unsigned data			: 1;
-		unsigned error_feature		: 1;
-		unsigned sector			: 1;
-		unsigned nsector		: 1;
-		unsigned lcyl			: 1;
-		unsigned hcyl			: 1;
-		unsigned select			: 1;
-		unsigned status_command		: 1;
-
-		unsigned data_hob		: 1;
-		unsigned error_feature_hob	: 1;
-		unsigned sector_hob		: 1;
-		unsigned nsector_hob		: 1;
-		unsigned lcyl_hob		: 1;
-		unsigned hcyl_hob		: 1;
-		unsigned select_hob		: 1;
-		unsigned control_hob		: 1;
-	} b;
-} ide_reg_valid_t;
+struct hd_drive_hob_hdr {
+	u8 data;
+	u8 feature;
+	u8 sector_count;
+	u8 sector_number;
+	u8 low_cylinder;
+	u8 high_cylinder;
+	u8 device_head;
+	u8 control;
+} __attribute__((packed));
 
 /*
  * Define standard taskfile in/out register
@@ -133,23 +96,6 @@ typedef union ide_reg_valid_s {
 #define IDE_TASKFILE_STD_IN_FLAGS	0xFE
 #define IDE_HOB_STD_OUT_FLAGS		0xC0
 #define IDE_HOB_STD_IN_FLAGS		0xC0
-
-typedef struct ide_task_request_s {
-	task_ioreg_t	io_ports[8];
-	task_ioreg_t	hob_ports[8];
-	ide_reg_valid_t	out_flags;
-	ide_reg_valid_t	in_flags;
-	int		data_phase;
-	int		req_cmd;
-	unsigned long	out_size;
-	unsigned long	in_size;
-} ide_task_request_t;
-
-typedef struct ide_ioctl_request_s {
-	ide_task_request_t	*task_request;
-	unsigned char		*out_buffer;
-	unsigned char		*in_buffer;
-} ide_ioctl_request_t;
 
 #define TASKFILE_INVALID		0x7fff
 #define TASKFILE_48			0x8000
@@ -212,7 +158,7 @@ typedef struct ide_ioctl_request_s {
 #define WIN_PIDENTIFY			0xA1 /* identify ATAPI device	*/
 #define WIN_QUEUED_SERVICE		0xA2
 #define WIN_SMART			0xB0 /* self-monitoring and reporting */
-#define CFA_ERASE_SECTORS       	0xC0
+#define CFA_ERASE_SECTORS		0xC0
 #define WIN_MULTREAD			0xC4 /* read sectors using multiple mode*/
 #define WIN_MULTWRITE			0xC5 /* write sectors using multiple mode */
 #define WIN_SETMULT			0xC6 /* enable/disable multiple mode */
@@ -221,12 +167,12 @@ typedef struct ide_ioctl_request_s {
 #define WIN_WRITEDMA			0xCA /* write sectors using DMA transfers */
 #define WIN_WRITEDMA_QUEUED		0xCC /* write sectors using Queued DMA transfers */
 #define CFA_WRITE_MULTI_WO_ERASE	0xCD /* CFA Write multiple without erase */
-#define WIN_GETMEDIASTATUS		0xDA	
+#define WIN_GETMEDIASTATUS		0xDA
 #define WIN_DOORLOCK			0xDE /* lock door on removable drives */
 #define WIN_DOORUNLOCK			0xDF /* unlock door on removable drives */
 #define WIN_STANDBYNOW1			0xE0
 #define WIN_IDLEIMMEDIATE		0xE1 /* force drive to become "ready" */
-#define WIN_STANDBY             	0xE2 /* Set device in Standby Mode */
+#define WIN_STANDBY			0xE2 /* Set device in Standby Mode */
 #define WIN_SETIDLE1			0xE3
 #define WIN_READ_BUFFER			0xE4 /* force read only 1 sector */
 #define WIN_CHECKPOWERMODE1		0xE5
@@ -268,7 +214,7 @@ typedef struct ide_ioctl_request_s {
 
 #define SMART_LCYL_PASS			0x4F
 #define SMART_HCYL_PASS			0xC2
-		
+
 /* WIN_SETFEATURES sub-commands */
 
 #define SETFEATURES_EN_WCACHE	0x02	/* Enable write cache */

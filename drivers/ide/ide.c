@@ -737,22 +737,25 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 		ide_task_t *args = (ide_task_t *) rq->special;
 		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
 		if (args) {
-			args->tfRegister[IDE_ERROR_OFFSET]   = err;
-			args->tfRegister[IDE_NSECTOR_OFFSET] = IN_BYTE(IDE_NSECTOR_REG);
-			args->tfRegister[IDE_SECTOR_OFFSET]  = IN_BYTE(IDE_SECTOR_REG);
-			args->tfRegister[IDE_LCYL_OFFSET]    = IN_BYTE(IDE_LCYL_REG);
-			args->tfRegister[IDE_HCYL_OFFSET]    = IN_BYTE(IDE_HCYL_REG);
-			args->tfRegister[IDE_SELECT_OFFSET]  = IN_BYTE(IDE_SELECT_REG);
-			args->tfRegister[IDE_STATUS_OFFSET]  = stat;
+			args->taskfile.feature = err;
+			args->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
+			args->taskfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
+			args->taskfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
+			args->taskfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
+			args->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
+			args->taskfile.command = stat;
 			if ((drive->id->command_set_2 & 0x0400) &&
 			    (drive->id->cfs_enable_2 & 0x0400) &&
 			    (drive->addressing == 1)) {
-				OUT_BYTE(drive->ctl|0x80, IDE_CONTROL_REG_HOB);
-				args->hobRegister[IDE_FEATURE_OFFSET_HOB] = IN_BYTE(IDE_FEATURE_REG);
-				args->hobRegister[IDE_NSECTOR_OFFSET_HOB] = IN_BYTE(IDE_NSECTOR_REG);
-				args->hobRegister[IDE_SECTOR_OFFSET_HOB]  = IN_BYTE(IDE_SECTOR_REG);
-				args->hobRegister[IDE_LCYL_OFFSET_HOB]    = IN_BYTE(IDE_LCYL_REG);
-				args->hobRegister[IDE_HCYL_OFFSET_HOB]    = IN_BYTE(IDE_HCYL_REG);
+				/* The following command goes to the hob file! */
+
+				OUT_BYTE(drive->ctl|0x80, IDE_CONTROL_REG);
+				args->hobfile.feature = IN_BYTE(IDE_FEATURE_REG);
+				args->hobfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
+
+				args->hobfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
+				args->hobfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
+				args->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			}
 		}
 	}
@@ -1081,12 +1084,12 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 					goto args_error;
 
 				ata_taskfile(drive,
-						(struct hd_drive_task_hdr *)&args->tfRegister,
-						(struct hd_drive_hob_hdr *)&args->hobRegister,
+						&args->taskfile,
+						&args->hobfile,
 						args->handler, NULL, NULL);
 
 				if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
-							(args->command_type == IDE_DRIVE_TASK_OUT)) &&
+					(args->command_type == IDE_DRIVE_TASK_OUT)) &&
 						args->prehandler && args->handler)
 					return args->prehandler(drive, rq);
 				return ide_started;

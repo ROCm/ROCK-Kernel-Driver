@@ -106,7 +106,7 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
-static task_ioreg_t get_command(ide_drive_t *drive, int cmd)
+static u8 get_command(ide_drive_t *drive, int cmd)
 {
 	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
 
@@ -162,17 +162,19 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 	unsigned int head	= (track % drive->head);
 	unsigned int cyl	= (track / drive->head);
 
-	memset(&taskfile, 0, sizeof(task_struct_t));
-	memset(&hobfile, 0, sizeof(hob_struct_t));
+	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
+	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 
 	sectors = rq->nr_sectors;
 	if (sectors == 256)
 		sectors = 0;
 
 	taskfile.sector_count	= sectors;
+
 	taskfile.sector_number	= sect;
 	taskfile.low_cylinder	= cyl;
 	taskfile.high_cylinder	= (cyl>>8);
+
 	taskfile.device_head	= head;
 	taskfile.device_head	|= drive->select.all;
 	taskfile.command	=  get_command(drive, rq_data_dir(rq));
@@ -186,14 +188,14 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
 #endif
 
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
+	args.taskfile = taskfile;
+	args.hobfile = hobfile;
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
 	return ata_taskfile(drive,
-			(struct hd_drive_task_hdr *) &args.tfRegister,
-			(struct hd_drive_hob_hdr *) &args.hobRegister,
+			&args.taskfile,
+			&args.hobfile,
 			args.handler,
 			args.prehandler,
 			rq);
@@ -210,14 +212,16 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
 	if (sectors == 256)
 		sectors = 0;
 
-	memset(&taskfile, 0, sizeof(task_struct_t));
-	memset(&hobfile, 0, sizeof(hob_struct_t));
+	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
+	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 
 	taskfile.sector_count	= sectors;
 	taskfile.sector_number	= block;
-	taskfile.low_cylinder	= (block>>=8);
-	taskfile.high_cylinder	= (block>>=8);
-	taskfile.device_head	= ((block>>8)&0x0f);
+	taskfile.low_cylinder	= (block >>= 8);
+
+	taskfile.high_cylinder	= (block >>= 8);
+
+	taskfile.device_head	= ((block >> 8) & 0x0f);
 	taskfile.device_head	|= drive->select.all;
 	taskfile.command	= get_command(drive, rq_data_dir(rq));
 
@@ -230,14 +234,14 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
 	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
 #endif
 
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
+	args.taskfile = taskfile;
+	args.hobfile = hobfile;
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
 	return ata_taskfile(drive,
-			(struct hd_drive_task_hdr *) &args.tfRegister,
-			(struct hd_drive_hob_hdr *) &args.hobRegister,
+			&args.taskfile,
+			&args.hobfile,
 			args.handler,
 			args.prehandler,
 			rq);
@@ -256,8 +260,8 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 	ide_task_t			args;
 	int				sectors;
 
-	memset(&taskfile, 0, sizeof(task_struct_t));
-	memset(&hobfile, 0, sizeof(hob_struct_t));
+	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
+	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 
 	sectors = rq->nr_sectors;
 	if (sectors == 65536)
@@ -271,12 +275,14 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 		hobfile.sector_count	= 0x00;
 	}
 
-	taskfile.sector_number	= block;	/* low lba */
-	taskfile.low_cylinder	= (block>>=8);	/* mid lba */
-	taskfile.high_cylinder	= (block>>=8);	/* hi  lba */
-	hobfile.sector_number	= (block>>=8);	/* low lba */
-	hobfile.low_cylinder	= (block>>=8);	/* mid lba */
-	hobfile.high_cylinder	= (block>>=8);	/* hi  lba */
+	taskfile.sector_number	= block;		/* low lba */
+	taskfile.low_cylinder	= (block >>= 8);	/* mid lba */
+	taskfile.high_cylinder	= (block >>= 8);	/* hi  lba */
+
+	hobfile.sector_number	= (block >>= 8);	/* low lba */
+	hobfile.low_cylinder	= (block >>= 8);	/* mid lba */
+	hobfile.high_cylinder	= (block >>= 8);	/* hi  lba */
+
 	taskfile.device_head	= drive->select.all;
 	hobfile.device_head	= taskfile.device_head;
 	hobfile.control		= (drive->ctl|0x80);
@@ -291,14 +297,14 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
 #endif
 
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
+	args.taskfile = taskfile;
+	args.hobfile = hobfile;
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
 	return ata_taskfile(drive,
-			(struct hd_drive_task_hdr *) &args.tfRegister,
-			(struct hd_drive_hob_hdr *) &args.hobRegister,
+			&args.taskfile,
+			&args.hobfile,
 			args.handler,
 			args.prehandler,
 			rq);
@@ -355,6 +361,7 @@ static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *dr
 		memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 
 		check_disk_change(inode->i_rdev);
+
 		taskfile.command = WIN_DOORLOCK;
 
 		/*
@@ -376,9 +383,9 @@ static int idedisk_flushcache(ide_drive_t *drive)
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 	if (drive->id->cfs_enable_2 & 0x2400)
-		taskfile.command	= WIN_FLUSH_CACHE_EXT;
+		taskfile.command = WIN_FLUSH_CACHE_EXT;
 	else
-		taskfile.command	= WIN_FLUSH_CACHE;
+		taskfile.command = WIN_FLUSH_CACHE;
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 }
 
@@ -387,9 +394,12 @@ static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t
 	if (drive->removable && !drive->usage) {
 		struct hd_drive_task_hdr taskfile;
 		struct hd_drive_hob_hdr hobfile;
+
 		memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 		memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+
 		invalidate_bdev(inode->i_bdev, 0);
+
 		taskfile.command = WIN_DOORUNLOCK;
 		if (drive->doorlocking &&
 		    ide_wait_taskfile(drive, &taskfile, &hobfile, NULL))
@@ -423,21 +433,23 @@ static unsigned long idedisk_read_native_max_address(ide_drive_t *drive)
 
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(ide_task_t));
-	args.tfRegister[IDE_SELECT_OFFSET]	= 0x40;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_READ_NATIVE_MAX;
-	args.handler				= task_no_data_intr;
+	args.taskfile.device_head = 0x40;
+	args.taskfile.command = WIN_READ_NATIVE_MAX;
+	args.handler = task_no_data_intr;
 
 	/* submit command request */
 	ide_raw_taskfile(drive, &args, NULL);
 
 	/* if OK, compute maximum address value */
-	if ((args.tfRegister[IDE_STATUS_OFFSET] & 0x01) == 0) {
-		addr = ((args.tfRegister[IDE_SELECT_OFFSET] & 0x0f) << 24)
-		     | ((args.tfRegister[  IDE_HCYL_OFFSET]       ) << 16)
-		     | ((args.tfRegister[  IDE_LCYL_OFFSET]       ) <<  8)
-		     | ((args.tfRegister[IDE_SECTOR_OFFSET]       ));
+	if ((args.taskfile.command & 0x01) == 0) {
+		addr = ((args.taskfile.device_head & 0x0f) << 24)
+		     | (args.taskfile.high_cylinder << 16)
+		     | (args.taskfile.low_cylinder <<  8)
+		     | args.taskfile.sector_number;
 	}
+
 	addr++;	/* since the return value is (maxlba - 1), we add 1 */
+
 	return addr;
 }
 
@@ -449,24 +461,26 @@ static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(ide_task_t));
 
-	args.tfRegister[IDE_SELECT_OFFSET]	= 0x40;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_READ_NATIVE_MAX_EXT;
-	args.handler				= task_no_data_intr;
+	args.taskfile.device_head = 0x40;
+	args.taskfile.command = WIN_READ_NATIVE_MAX_EXT;
+	args.handler = task_no_data_intr;
 
         /* submit command request */
         ide_raw_taskfile(drive, &args, NULL);
 
 	/* if OK, compute maximum address value */
-	if ((args.tfRegister[IDE_STATUS_OFFSET] & 0x01) == 0) {
-		u32 high = ((args.hobRegister[IDE_HCYL_OFFSET_HOB])<<16) |
-			   ((args.hobRegister[IDE_LCYL_OFFSET_HOB])<<8) |
-			    (args.hobRegister[IDE_SECTOR_OFFSET_HOB]);
-		u32 low  = ((args.tfRegister[IDE_HCYL_OFFSET])<<16) |
-			   ((args.tfRegister[IDE_LCYL_OFFSET])<<8) |
-			    (args.tfRegister[IDE_SECTOR_OFFSET]);
+	if ((args.taskfile.command & 0x01) == 0) {
+		u32 high = (args.hobfile.high_cylinder << 16) |
+			   (args.hobfile.low_cylinder << 8) |
+			    args.hobfile.sector_number;
+		u32 low  = (args.taskfile.high_cylinder << 16) |
+			   (args.taskfile.low_cylinder << 8) |
+			    args.taskfile.sector_number;
 		addr = ((__u64)high << 24) | low;
 	}
+
 	addr++;	/* since the return value is (maxlba - 1), we add 1 */
+
 	return addr;
 }
 
@@ -483,20 +497,22 @@ static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long a
 	addr_req--;
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(ide_task_t));
-	args.tfRegister[IDE_SECTOR_OFFSET]	= ((addr_req >>  0) & 0xff);
-	args.tfRegister[IDE_LCYL_OFFSET]	= ((addr_req >>  8) & 0xff);
-	args.tfRegister[IDE_HCYL_OFFSET]	= ((addr_req >> 16) & 0xff);
-	args.tfRegister[IDE_SELECT_OFFSET]	= ((addr_req >> 24) & 0x0f) | 0x40;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_SET_MAX;
+
+	args.taskfile.sector_number = (addr_req >> 0);
+	args.taskfile.low_cylinder = (addr_req >> 8);
+	args.taskfile.high_cylinder = (addr_req >> 16);
+
+	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
+	args.taskfile.command = WIN_SET_MAX;
 	args.handler				= task_no_data_intr;
 	/* submit command request */
 	ide_raw_taskfile(drive, &args, NULL);
 	/* if OK, read new maximum address value */
-	if ((args.tfRegister[IDE_STATUS_OFFSET] & 0x01) == 0) {
-		addr_set = ((args.tfRegister[IDE_SELECT_OFFSET] & 0x0f) << 24)
-			 | ((args.tfRegister[  IDE_HCYL_OFFSET]       ) << 16)
-			 | ((args.tfRegister[  IDE_LCYL_OFFSET]       ) <<  8)
-			 | ((args.tfRegister[IDE_SECTOR_OFFSET]       ));
+	if ((args.taskfile.command & 0x01) == 0) {
+		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
+			 | (args.taskfile.high_cylinder << 16)
+			 | (args.taskfile.low_cylinder <<  8)
+			 | args.taskfile.sector_number;
 	}
 	addr_set++;
 	return addr_set;
@@ -510,27 +526,31 @@ static unsigned long long idedisk_set_max_address_ext(ide_drive_t *drive, unsign
 	addr_req--;
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(ide_task_t));
-	args.tfRegister[IDE_SECTOR_OFFSET]	= ((addr_req >>  0) & 0xff);
-	args.tfRegister[IDE_LCYL_OFFSET]	= ((addr_req >>= 8) & 0xff);
-	args.tfRegister[IDE_HCYL_OFFSET]	= ((addr_req >>= 8) & 0xff);
-	args.tfRegister[IDE_SELECT_OFFSET]      = 0x40;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_SET_MAX_EXT;
-	args.hobRegister[IDE_SECTOR_OFFSET_HOB]	= ((addr_req >>= 8) & 0xff);
-	args.hobRegister[IDE_LCYL_OFFSET_HOB]	= ((addr_req >>= 8) & 0xff);
-	args.hobRegister[IDE_HCYL_OFFSET_HOB]	= ((addr_req >>= 8) & 0xff);
-	args.hobRegister[IDE_SELECT_OFFSET_HOB]	= 0x40;
-	args.hobRegister[IDE_CONTROL_OFFSET_HOB]= (drive->ctl|0x80);
+
+	args.taskfile.sector_number = (addr_req >>  0);
+	args.taskfile.low_cylinder = (addr_req >>= 8);
+	args.taskfile.high_cylinder = (addr_req >>= 8);
+	args.taskfile.device_head = 0x40;
+	args.taskfile.command = WIN_SET_MAX_EXT;
+
+	args.hobfile.sector_number = (addr_req >>= 8);
+	args.hobfile.low_cylinder = (addr_req >>= 8);
+	args.hobfile.high_cylinder = (addr_req >>= 8);
+
+	args.hobfile.device_head = 0x40;
+	args.hobfile.control = (drive->ctl | 0x80);
+
         args.handler				= task_no_data_intr;
 	/* submit command request */
 	ide_raw_taskfile(drive, &args, NULL);
 	/* if OK, compute maximum address value */
-	if ((args.tfRegister[IDE_STATUS_OFFSET] & 0x01) == 0) {
-		u32 high = ((args.hobRegister[IDE_HCYL_OFFSET_HOB])<<16) |
-			   ((args.hobRegister[IDE_LCYL_OFFSET_HOB])<<8) |
-			    (args.hobRegister[IDE_SECTOR_OFFSET_HOB]);
-		u32 low  = ((args.tfRegister[IDE_HCYL_OFFSET])<<16) |
-			   ((args.tfRegister[IDE_LCYL_OFFSET])<<8) |
-			    (args.tfRegister[IDE_SECTOR_OFFSET]);
+	if ((args.taskfile.command & 0x01) == 0) {
+		u32 high = (args.hobfile.high_cylinder << 16) |
+			   (args.hobfile.low_cylinder << 8) |
+			    args.hobfile.sector_number;
+		u32 low  = (args.taskfile.high_cylinder << 16) |
+			   (args.taskfile.low_cylinder << 8) |
+			    args.taskfile.sector_number;
 		addr_set = ((__u64)high << 24) | low;
 	}
 	return addr_set;

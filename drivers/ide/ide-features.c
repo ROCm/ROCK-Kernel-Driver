@@ -2,7 +2,7 @@
  * linux/drivers/block/ide-features.c	Version 0.04	June 9, 2000
  *
  *  Copyright (C) 1999-2000	Linus Torvalds & authors (see below)
- *  
+ *
  *  Copyright (C) 1999-2000	Andre Hedrick <andre@linux-ide.org>
  *
  *  Extracts if ide.c to address the evolving transfer rate code for
@@ -186,9 +186,9 @@ int ide_driveid_update (ide_drive_t *drive)
  */
 int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
 {
-	if ((args->tfRegister[IDE_COMMAND_OFFSET] == WIN_SETFEATURES) &&
-	    (args->tfRegister[IDE_SECTOR_OFFSET] > XFER_UDMA_2) &&
-	    (args->tfRegister[IDE_FEATURE_OFFSET] == SETFEATURES_XFER)) {
+	if ((args->taskfile.command == WIN_SETFEATURES) &&
+	    (args->taskfile.sector_number > XFER_UDMA_2) &&
+	    (args->taskfile.feature == SETFEATURES_XFER)) {
 		if (!HWIF(drive)->udma_four) {
 			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", HWIF(drive)->name);
 			return 1;
@@ -213,9 +213,9 @@ int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
  */
 int set_transfer (ide_drive_t *drive, ide_task_t *args)
 {
-	if ((args->tfRegister[IDE_COMMAND_OFFSET] == WIN_SETFEATURES) &&
-	    (args->tfRegister[IDE_SECTOR_OFFSET] >= XFER_SW_DMA_0) &&
-	    (args->tfRegister[IDE_FEATURE_OFFSET] == SETFEATURES_XFER) &&
+	if ((args->taskfile.command == WIN_SETFEATURES) &&
+	    (args->taskfile.sector_number >= XFER_SW_DMA_0) &&
+	    (args->taskfile.feature == SETFEATURES_XFER) &&
 	    (drive->id->dma_ultra ||
 	     drive->id->dma_mword ||
 	     drive->id->dma_1word))
