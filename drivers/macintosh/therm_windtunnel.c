@@ -292,8 +292,7 @@ control_loop( void *dummy )
 	while( x.running ) {
 		up( &x.lock );
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout( 8*HZ );
+		msleep_interruptible(8000);
 		
 		down( &x.lock );
 		poll_temp();
