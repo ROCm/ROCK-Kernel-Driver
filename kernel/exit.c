@@ -1197,6 +1197,8 @@ end_wait4:
 	return retval;
 }
 
+EXPORT_SYMBOL(sys_wait4);
+
 #ifdef __ARCH_WANT_SYS_WAITPID
 
 /*
