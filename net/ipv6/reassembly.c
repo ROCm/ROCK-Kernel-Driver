@@ -599,7 +599,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len;
 	nhoff = head->h.raw - head->nh.raw;
 
-	if (payload_len > 65535 + 8) {
+	if (payload_len > 65535 + 8)
 		goto out_oversize;
 
 	/* Head of list must not be cloned. */
