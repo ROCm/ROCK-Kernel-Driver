@@ -135,6 +135,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	int items;
 	elf_addr_t elf_info[40];
 	int ei_index = 0;
+	struct task_struct *tsk = current;
 
 	/*
 	 * If this architecture has a platform capability string, copy it
@@ -186,10 +187,10 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	NEW_AUX_ENT(AT_BASE, interp_load_addr);
 	NEW_AUX_ENT(AT_FLAGS, 0);
 	NEW_AUX_ENT(AT_ENTRY, exec->e_entry);
-	NEW_AUX_ENT(AT_UID, (elf_addr_t) current->uid);
-	NEW_AUX_ENT(AT_EUID, (elf_addr_t) current->euid);
-	NEW_AUX_ENT(AT_GID, (elf_addr_t) current->gid);
-	NEW_AUX_ENT(AT_EGID, (elf_addr_t) current->egid);
+	NEW_AUX_ENT(AT_UID, (elf_addr_t) tsk->uid);
+	NEW_AUX_ENT(AT_EUID, (elf_addr_t) tsk->euid);
+	NEW_AUX_ENT(AT_GID, (elf_addr_t) tsk->gid);
+	NEW_AUX_ENT(AT_EGID, (elf_addr_t) tsk->egid);
 	if (k_platform) {
 		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
 	}
