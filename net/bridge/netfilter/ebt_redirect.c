@@ -47,7 +47,7 @@ static int ebt_target_redirect_check(const char *tablename, unsigned int hookmas
 {
 	struct ebt_redirect_info *info = (struct ebt_redirect_info *)data;
 
-	if (datalen != sizeof(struct ebt_redirect_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_redirect_info)))
 		return -EINVAL;
 	if (BASE_CHAIN && info->target == EBT_RETURN)
 		return -EINVAL;

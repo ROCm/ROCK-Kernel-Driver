@@ -191,9 +191,18 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	if (dev->master)
 		RTA_PUT(skb, IFLA_MASTER, sizeof(int), &dev->master->ifindex);
 	if (dev->get_stats) {
-		struct net_device_stats *stats = dev->get_stats(dev);
-		if (stats)
-			RTA_PUT(skb, IFLA_STATS, sizeof(*stats), stats);
+		unsigned long *stats = (unsigned long*)dev->get_stats(dev);
+		if (stats) {
+			struct rtattr  *a;
+			__u32	       *s;
+			int		i;
+			int		n = sizeof(struct rtnl_link_stats)/4;
+
+			a = __RTA_PUT(skb, IFLA_STATS, n*4);
+			s = RTA_DATA(a);
+			for (i=0; i<n; i++)
+				s[i] = stats[i];
+		}
 	}
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;

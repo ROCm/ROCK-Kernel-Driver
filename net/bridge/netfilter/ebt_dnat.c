@@ -47,7 +47,7 @@ static int ebt_target_dnat_check(const char *tablename, unsigned int hookmask,
 	   (hookmask & ~((1 << NF_BR_PRE_ROUTING) | (1 << NF_BR_LOCAL_OUT)))) &&
 	   (strcmp(tablename, "broute") || hookmask & ~(1 << NF_BR_BROUTING)) )
 		return -EINVAL;
-	if (datalen != sizeof(struct ebt_nat_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_nat_info)))
 		return -EINVAL;
 	if (INVALID_TARGET)
 		return -EINVAL;

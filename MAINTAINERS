@@ -1632,8 +1632,8 @@ L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
 SCTP PROTOCOL
-P: Jon Grimm
-M: jgrimm2@us.ibm.com
+P: Sridhar Samudrala
+M: sri@us.ibm.com
 L: lksctp-developers@lists.sourceforge.net
 S: Supported
 

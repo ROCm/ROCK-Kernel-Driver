@@ -256,10 +256,9 @@ load_b:
 			k = X + fentry->k;
 			goto load_b;
 		case BPF_LDX|BPF_B|BPF_MSH:
-			k = fentry->k;
-			if (k >= 0 && (unsigned int)k >= len)
+			if (fentry->k >= len)
 				return 0;
-			X = (data[k] & 0xf) << 2;
+			X = (data[fentry->k] & 0xf) << 2;
 			continue;
 		case BPF_LD|BPF_IMM:
 			A = fentry->k;
