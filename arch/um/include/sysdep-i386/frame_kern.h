@@ -20,7 +20,8 @@ static inline void *sp_to_rt_sc(unsigned long sp)
 {
 	unsigned long sc;
 
-	sc = sp - signal_frame_si.sp_index + signal_frame_si.len - 4;
+	sc = sp - signal_frame_si.common.sp_index + 
+		signal_frame_si.common.len - 4;
 	return((void *) sc);
 }
 
@@ -28,7 +29,8 @@ static inline void *sp_to_mask(unsigned long sp)
 {
 	unsigned long mask;
 
-	mask = sp - signal_frame_sc.sp_index + signal_frame_sc.len - 8;
+	mask = sp - signal_frame_sc.common.sp_index + 
+		signal_frame_sc.common.len - 8;
 	return((void *) mask);
 }
 
@@ -38,7 +40,8 @@ static inline void *sp_to_rt_mask(unsigned long sp)
 {
 	unsigned long mask;
 
-	mask = sp - signal_frame_si.sp_index + signal_frame_si.len + 
+	mask = sp - signal_frame_si.common.sp_index + 
+		signal_frame_si.common.len + 
 		sc_size(&signal_frame_sc.arch) - 4;
 	return((void *) mask);
 }

@@ -30,8 +30,8 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 	unsigned long addr;
 	int r, w, x, err;
 
-	if((current->thread.extern_pid != -1) && 
-	   (current->thread.extern_pid != os_getpid()))
+	if((current->thread.mode.tt.extern_pid != -1) && 
+	   (current->thread.mode.tt.extern_pid != os_getpid()))
 		panic("fix_range fixing wrong address space, current = 0x%p",
 		      current);
 	if(mm == NULL) return;
@@ -60,23 +60,25 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 				w = 0;
 			}
 			if(force || pte_newpage(*npte)){
-				err = unmap((void *) addr, PAGE_SIZE);
+				err = os_unmap_memory((void *) addr, 
+						      PAGE_SIZE);
 				if(err < 0)
 					panic("munmap failed, errno = %d\n",
 					      -err);
 				if(pte_present(*npte))
-					map(addr, pte_val(*npte) & PAGE_MASK,
-					    PAGE_SIZE, r, w, x);
+					map_memory(addr, 
+						   pte_val(*npte) & PAGE_MASK,
+						   PAGE_SIZE, r, w, x);
 			}
 			else if(pte_newprot(*npte)){
-				protect(addr, PAGE_SIZE, r, w, x, 1);
+				protect_memory(addr, PAGE_SIZE, r, w, x, 1);
 			}
 			*npte = pte_mkuptodate(*npte);
 			addr += PAGE_SIZE;
 		}
 		else {
 			if(force || pmd_newpage(*npmd)){
-				err = unmap((void *) addr, PMD_SIZE);
+				err = os_unmap_memory((void *) addr, PMD_SIZE);
 				if(err < 0)
 					panic("munmap failed, errno = %d\n",
 					      -err);
@@ -106,24 +108,26 @@ void flush_kernel_range(unsigned long start, unsigned long end, int update_seq)
 			pte = pte_offset_kernel(pmd, addr);
 			if(!pte_present(*pte) || pte_newpage(*pte)){
 				updated = 1;
-				err = unmap((void *) addr, PAGE_SIZE);
+				err = os_unmap_memory((void *) addr, 
+						      PAGE_SIZE);
 				if(err < 0)
 					panic("munmap failed, errno = %d\n",
 					      -err);
 				if(pte_present(*pte))
-					map(addr, pte_val(*pte) & PAGE_MASK,
-					    PAGE_SIZE, 1, 1, 1);
+					map_memory(addr, 
+						   pte_val(*pte) & PAGE_MASK,
+						   PAGE_SIZE, 1, 1, 1);
 			}
 			else if(pte_newprot(*pte)){
 				updated = 1;
-				protect(addr, PAGE_SIZE, 1, 1, 1, 1);
+				protect_memory(addr, PAGE_SIZE, 1, 1, 1, 1);
 			}
 			addr += PAGE_SIZE;
 		}
 		else {
 			if(pmd_newpage(*pmd)){
 				updated = 1;
-				err = unmap((void *) addr, PMD_SIZE);
+				err = os_unmap_memory((void *) addr, PMD_SIZE);
 				if(err < 0)
 					panic("munmap failed, errno = %d\n",
 					      -err);
@@ -143,7 +147,7 @@ static void protect_vm_page(unsigned long addr, int w, int must_succeed)
 {
 	int err;
 
-	err = protect(addr, PAGE_SIZE, 1, w, 1, must_succeed);
+	err = protect_memory(addr, PAGE_SIZE, 1, w, 1, must_succeed);
 	if(err == 0) return;
 	else if((err == -EFAULT) || (err == -ENOMEM)){
 		flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
@@ -207,8 +211,8 @@ void flush_tlb_mm(struct mm_struct *mm)
 	fix_range(mm, 0, STACK_TOP, 0);
 
 	seq = atomic_read(&vmchange_seq);
-	if(current->thread.vm_seq == seq) return;
-	current->thread.vm_seq = seq;
+	if(current->thread.mode.tt.vm_seq == seq) return;
+	current->thread.mode.tt.vm_seq = seq;
 	flush_kernel_range(start_vm, end_vm, 0);
 }
 

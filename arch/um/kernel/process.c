@@ -21,9 +21,6 @@
 #include <asm/sigcontext.h>
 #include <asm/unistd.h>
 #include <asm/page.h>
-#ifdef PROFILING
-#include <sys/gmon.h>
-#endif
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -33,13 +30,18 @@
 #include "sysdep/ptrace.h"
 #include "sysdep/sigcontext.h"
 #include "irq_user.h"
-#include "syscall_user.h"
 #include "ptrace_user.h"
 #include "time_user.h"
 #include "init.h"
 #include "os.h"
+#include "uml-config.h"
+#include "choose-mode.h"
+#include "mode.h"
+#ifdef CONFIG_MODE_SKAS
+#include "skas_ptrace.h"
+#endif
 
-void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
+void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
 {
 	int flags = 0;
 
@@ -47,6 +49,13 @@ void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
 		set_sigstack(sig_stack, 2 * page_size());
 		flags = SA_ONSTACK;
 	}
+	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
+}
+
+void init_new_thread_signals(int altstack)
+{
+	int flags = altstack ? SA_ONSTACK : 0;
+
 	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags,
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGTRAP, (__sighandler_t) sig_handler, flags, 
@@ -61,11 +70,10 @@ void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGUSR2, (__sighandler_t) sig_handler, 
 		    SA_NOMASK | flags, -1);
-	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
-	signal(SIGCHLD, SIG_IGN);
+	(void) CHOOSE_MODE(signal(SIGCHLD, SIG_IGN), (void *) 0);
 	signal(SIGHUP, SIG_IGN);
 
-	init_irq_signals(sig_stack != NULL);
+	init_irq_signals(altstack);
 }
 
 struct tramp {
@@ -128,26 +136,6 @@ void trace_myself(void)
 		panic("ptrace failed in trace_myself");
 }
 
-void attach_process(int pid)
-{
-	if((ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) ||
-	   (ptrace(PTRACE_CONT, pid, 0, 0) < 0))
-		tracer_panic("OP_FORK failed to attach pid");
-	wait_for_stop(pid, SIGSTOP, PTRACE_CONT, NULL);
-	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
-		tracer_panic("OP_FORK failed to continue process");
-}
-
-void tracer_panic(char *format, ...)
-{
-	va_list ap;
-
-	va_start(ap, format);
-	vprintf(format, ap);
-	printf("\n");
-	while(1) sleep(10);
-}
-
 void suspend_new_thread(int fd)
 {
 	char c;
@@ -164,19 +152,18 @@ static int ptrace_child(void *arg)
 
 	if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0){
 		perror("ptrace");
-		_exit(1);
+		os_kill_process(pid, 0);
 	}
 	os_stop_process(pid);
 	_exit(os_getpid() == pid);
 }
 
-void __init check_ptrace(void)
+static int start_ptraced_child(void **stack_out)
 {
 	void *stack;
 	unsigned long sp;
-	int status, pid, n, syscall;
-
-	printk("Checking that ptrace can change system call numbers...");
+	int pid, n, status;
+	
 	stack = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
 		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if(stack == MAP_FAILED)
@@ -191,6 +178,33 @@ void __init check_ptrace(void)
 	if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGSTOP))
 		panic("check_ptrace : expected SIGSTOP, got status = %d",
 		      status);
+
+	*stack_out = stack;
+	return(pid);
+}
+
+static void stop_ptraced_child(int pid, void *stack, int exitcode)
+{
+	int status, n;
+
+	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
+		panic("check_ptrace : ptrace failed, errno = %d", errno);
+	n = waitpid(pid, &status, 0);
+	if(!WIFEXITED(status) || (WEXITSTATUS(status) != exitcode))
+		panic("check_ptrace : child exited with status 0x%x", status);
+
+	if(munmap(stack, PAGE_SIZE) < 0)
+		panic("check_ptrace : munmap failed, errno = %d", errno);
+}
+
+void __init check_ptrace(void)
+{
+	void *stack;
+	int pid, syscall, n, status;
+
+	printk("Checking that ptrace can change system call numbers...");
+	pid = start_ptraced_child(&stack);
+
 	while(1){
 		if(ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0)
 			panic("check_ptrace : ptrace failed, errno = %d", 
@@ -213,23 +227,19 @@ void __init check_ptrace(void)
 			break;
 		}
 	}
-	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
-		panic("check_ptrace : ptrace failed, errno = %d", errno);
-	n = waitpid(pid, &status, 0);
-	if(!WIFEXITED(status) || (WEXITSTATUS(status) != 0))
-		panic("check_ptrace : child exited with status 0x%x", status);
-
-	if(munmap(stack, PAGE_SIZE) < 0)
-		panic("check_ptrace : munmap failed, errno = %d", errno);
+ 	stop_ptraced_child(pid, stack, 0);
 	printk("OK\n");
 }
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
 {
 	jmp_buf buf;
+ 	int n;
 
 	*jmp_ptr = &buf;
-	if(setjmp(buf)) return(1);
+ 	n = setjmp(buf);
+ 	if(n != 0)
+ 		return(n);
 	(*fn)(arg);
 	return(0);
 }
@@ -242,6 +252,66 @@ void forward_pending_sigio(int target)
 		panic("forward_pending_sigio : sigpending failed");
 	if(sigismember(&sigs, SIGIO))
 		kill(target, SIGIO);
+}
+
+#ifdef CONFIG_MODE_SKAS
+static void init_registers(int pid)
+{
+	int err;
+
+	if(ptrace(PTRACE_GETREGS, pid, 0, exec_regs) < 0)
+		panic("check_ptrace : PTRACE_GETREGS failed, errno = %d", 
+		      errno);
+
+	err = ptrace(PTRACE_GETFPXREGS, pid, 0, exec_fpx_regs);
+	if(!err)
+		return;
+
+	have_fpx_regs = 0;
+	if(errno != EIO)
+		panic("check_ptrace : PTRACE_GETFPXREGS failed, errno = %d", 
+		      errno);
+
+	err = ptrace(PTRACE_GETFPREGS, pid, 0, exec_fp_regs);
+	if(err)
+		panic("check_ptrace : PTRACE_GETFPREGS failed, errno = %d", 
+		      errno);
+}
+#endif	
+
+int can_do_skas(void)
+{
+#ifdef CONFIG_MODE_SKAS
+	struct ptrace_faultinfo fi;
+	void *stack;
+	int pid, n, ret = 1;
+
+	printk("Checking for the skas3 patch in the host...");
+	pid = start_ptraced_child(&stack);
+
+	n = ptrace(PTRACE_FAULTINFO, pid, 0, &fi);
+	if(n < 0){
+		if(errno == EIO)
+			printk("not found\n");
+		else printk("No (unexpected errno - %d)\n", errno);
+		ret = 0;
+	}
+	else printk("found\n");
+
+	init_registers(pid);
+	stop_ptraced_child(pid, stack, 1);
+
+	printk("Checking for /proc/mm...");
+	if(access("/proc/mm", W_OK)){
+		printk("not found\n");
+		ret = 0;
+	}
+	else printk("found\n");
+
+	return(ret);
+#else
+	return(0);
+#endif	
 }
 
 /*
