@@ -46,6 +46,8 @@ static int mode = 0;
 static char *xbuf;
 static char *tvmem;
 
+static char *check[] = { "des", "md5", "des3_ede", "rot13", "sha1", NULL };
+
 static void
 hexdump(unsigned char *buf, unsigned int len)
 {
@@ -1300,6 +1302,19 @@ test_des3_ede(void)
 }
 
 static void
+test_available(void)
+{
+	char **name = check;
+	
+	while (*name) {
+		printk("alg %s ", *name);
+		printk((crypto_alg_available(*name, 0)) ?
+			"found\n" : "not found\n");
+		name++;
+	}	
+}
+
+static void
 do_test(void)
 {
 	switch (mode) {
@@ -1332,6 +1347,10 @@ do_test(void)
 		test_md4();
 		break;
 
+	case 100:
+		test_available();
+		break;
+		
 	default:
 		/* useful for debugging */
 		printk("not testing anything\n");

@@ -112,6 +112,11 @@ int crypto_register_alg(struct crypto_alg *alg);
 int crypto_unregister_alg(struct crypto_alg *alg);
 
 /*
+ * Algorithm query interface.
+ */
+int crypto_alg_available(const char *name, u32 flags);
+
+/*
  * Transforms: user-instantiated objects which encapsulate algorithms
  * and core processing logic.  Managed via crypto_alloc_tfm() and
  * crypto_free_tfm(), as well as the various helpers below.

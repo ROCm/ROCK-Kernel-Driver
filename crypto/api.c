@@ -100,13 +100,7 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 	struct crypto_tfm *tfm = NULL;
 	struct crypto_alg *alg;
 
-	alg = crypto_alg_lookup(name);
-#ifdef CONFIG_KMOD
-	if (alg == NULL) {
-		crypto_alg_autoload(name);
-		alg = crypto_alg_lookup(name);
-	}
-#endif
+	alg = crypto_alg_mod_lookup(name);
 	if (alg == NULL)
 		goto out;
 	
@@ -208,6 +202,19 @@ out:
 	return ret;
 }
 
+int crypto_alg_available(const char *name, u32 flags)
+{
+	int ret = 0;
+	struct crypto_alg *alg = crypto_alg_mod_lookup(name);
+	
+	if (alg) {
+		crypto_alg_put(alg);
+		ret = 1;
+	}
+	
+	return ret;
+}
+
 static void *c_start(struct seq_file *m, loff_t *pos)
 {
 	struct list_head *v;
@@ -297,3 +304,4 @@ EXPORT_SYMBOL_GPL(crypto_register_alg);
 EXPORT_SYMBOL_GPL(crypto_unregister_alg);
 EXPORT_SYMBOL_GPL(crypto_alloc_tfm);
 EXPORT_SYMBOL_GPL(crypto_free_tfm);
+EXPORT_SYMBOL_GPL(crypto_alg_available);
