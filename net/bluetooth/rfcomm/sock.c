@@ -398,6 +398,27 @@ int rfcomm_sock_listen(struct socket *sock, int backlog)
 		goto done;
 	}
 
+	if (!rfcomm_pi(sk)->channel) {
+		bdaddr_t *src = &bt_sk(sk)->src;
+		u8 channel;
+
+		err = -EINVAL;
+
+		write_lock_bh(&rfcomm_sk_list.lock);
+
+		for (channel = 1; channel < 31; channel++)
+			if (!__rfcomm_get_sock_by_addr(channel, src)) {
+				rfcomm_pi(sk)->channel = channel;
+				err = 0;
+				break;
+			}
+
+		write_unlock_bh(&rfcomm_sk_list.lock);
+
+		if (err < 0)
+			goto done;
+	}
+
 	sk->sk_max_ack_backlog = backlog;
 	sk->sk_ack_backlog = 0;
 	sk->sk_state = BT_LISTEN;
