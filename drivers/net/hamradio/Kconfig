@@ -1,6 +1,6 @@
 config MKISS
 	tristate "Serial port KISS driver"
-	depends on AX25
+	depends on AX25 && BROKEN_ON_SMP
 	---help---
 	  KISS is a protocol used for the exchange of data between a computer
 	  and a Terminal Node Controller (a small embedded system commonly
@@ -19,7 +19,7 @@ config MKISS
 
 config 6PACK
 	tristate "Serial port 6PACK driver"
-	depends on AX25
+	depends on AX25 && BROKEN_ON_SMP
 	---help---
 	  6pack is a transmission protocol for the data exchange between your
 	  PC and your TNC (the Terminal Node Controller acts as a kind of
@@ -49,7 +49,7 @@ config BPQETHER
 
 config DMASCC
 	tristate "High-speed (DMA) SCC driver for AX.25"
-	depends on ISA && AX25
+	depends on ISA && AX25 && BROKEN_ON_SMP
 	---help---
 	  This is a driver for high-speed SCC boards, i.e. those supporting
 	  DMA on one port. You usually use those boards to connect your

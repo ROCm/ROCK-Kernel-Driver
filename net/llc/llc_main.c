@@ -604,3 +604,4 @@ module_exit(llc_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001-2003");
 MODULE_DESCRIPTION("LLC 2.0, NET4.0 IEEE 802.2 extended support");
+MODULE_ALIAS_NETPROTO(PF_LLC);

@@ -1832,3 +1832,4 @@ static int __init packet_init(void)
 module_init(packet_init);
 module_exit(packet_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_PACKET);

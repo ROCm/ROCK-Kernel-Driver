@@ -1136,3 +1136,5 @@ module_init(atm_init);
 module_exit(atm_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_ATMPVC);
+MODULE_ALIAS_NETPROTO(PF_ATMSVC);

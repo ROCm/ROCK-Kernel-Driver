@@ -644,6 +644,13 @@ static inline u8 probe_for_drive (ide_drive_t *drive)
 	return drive->present;
 }
 
+static void hwif_release_dev (struct device *dev)
+{
+	ide_hwif_t *hwif = container_of(dev, ide_hwif_t, gendev);
+
+	up(&hwif->gendev_rel_sem);
+}
+
 static void hwif_register (ide_hwif_t *hwif)
 {
 	/* register with global device tree */
@@ -656,6 +663,7 @@ static void hwif_register (ide_hwif_t *hwif)
 			/* Would like to do = &device_legacy */
 			hwif->gendev.parent = NULL;
 	}
+	hwif->gendev.release = hwif_release_dev;
 	device_register(&hwif->gendev);
 }
 
@@ -1196,6 +1204,13 @@ Enomem:
 	return -ENOMEM;
 }
 
+static void drive_release_dev (struct device *dev)
+{
+	ide_drive_t *drive = container_of(dev, ide_drive_t, gendev);
+
+	up(&drive->gendev_rel_sem);
+}
+
 /*
  * init_gendisk() (as opposed to ide_geninit) is called for each major device,
  * after probing for drives, to allocate partition tables and other data
@@ -1214,6 +1229,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
 		drive->gendev.driver_data = drive;
+		drive->gendev.release = drive_release_dev;
 		if (drive->present) {
 			device_register(&drive->gendev);
 			sprintf(drive->devfs_name, "ide/host%d/bus%d/target%d/lun%d",

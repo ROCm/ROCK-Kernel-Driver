@@ -16,8 +16,8 @@
 static char version[] =
         "sunhme.c:v2.02 24/Aug/2003 David S. Miller (davem@redhat.com)\n";
 
-#include <linux/module.h>
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
@@ -2504,11 +2504,14 @@ static void hme_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info
 	if (hp->happy_flags & HFLAG_PCI) {
 		struct pci_dev *pdev = hp->happy_dev;
 		strcpy(info->bus_info, pci_name(pdev));
-	} else {
+	}
+#ifdef CONFIG_SBUS
+	else {
 		struct sbus_dev *sdev = hp->happy_dev;
 		sprintf(info->bus_info, "SBUS:%d",
 			sdev->slot);
 	}
+#endif
 }
 
 static u32 hme_get_link(struct net_device *dev)

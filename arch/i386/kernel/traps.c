@@ -745,7 +745,8 @@ asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
  * Careful.. There are problems with IBM-designed IRQ13 behaviour.
  * Don't touch unless you *really* know how it works.
  *
- * Must be called with kernel preemption disabled.
+ * Must be called with kernel preemption disabled (in this case,
+ * local interrupts are disabled at the call-site in entry.S).
  */
 asmlinkage void math_state_restore(struct pt_regs regs)
 {

@@ -99,9 +99,6 @@ extern int i91u_biosparam(struct scsi_device *, struct block_device *,
 #define UDWORD  unsigned long
 #define U32   u32
 
-#ifndef NULL
-#define NULL     0		/* zero          */
-#endif
 #ifndef TRUE
 #define TRUE     (1)		/* boolean true  */
 #endif

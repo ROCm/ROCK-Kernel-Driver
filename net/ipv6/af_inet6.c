@@ -893,3 +893,5 @@ static void inet6_exit(void)
 }
 module_exit(inet6_exit);
 #endif /* MODULE */
+
+MODULE_ALIAS_NETPROTO(PF_INET6);

@@ -1086,3 +1086,4 @@ core_initcall(netlink_proto_init);
 module_exit(netlink_proto_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_NETLINK);

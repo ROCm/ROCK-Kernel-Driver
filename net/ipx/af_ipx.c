@@ -2021,3 +2021,4 @@ static void __exit ipx_proto_finito(void)
 module_init(ipx_init);
 module_exit(ipx_proto_finito);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_IPX);

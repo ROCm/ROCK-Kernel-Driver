@@ -1423,3 +1423,4 @@ module_exit(x25_exit);
 MODULE_AUTHOR("Jonathan Naylor <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The X.25 Packet Layer network layer protocol");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_X25);

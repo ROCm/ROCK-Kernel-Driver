@@ -35,7 +35,7 @@ config HOSTESS_SV11
 # The COSA/SRP driver has not been tested as non-modular yet.
 config COSA
 	tristate "COSA/SRP sync serial boards support"
-	depends on WAN && ISA && m
+	depends on WAN && ISA && m && BROKEN
 	---help---
 	  This is a driver for COSA and SRP synchronous serial boards. These
 	  boards allow to connect synchronous serial devices (for example
@@ -63,7 +63,7 @@ config COSA
 # Not updated to 2.6.
 config COMX
 	tristate "MultiGate (COMX) synchronous serial boards support"
-	depends on WAN && (ISA || PCI) && OBSOLETE
+	depends on WAN && (ISA || PCI) && BROKEN
 	---help---
 	  Say Y if you want to use any board from the MultiGate (COMX) family.
 	  These boards are synchronous serial adapters for the PC,
@@ -465,7 +465,7 @@ config DLCI_MAX
 
 config SDLA
 	tristate "SDLA (Sangoma S502/S508) support"
-	depends on DLCI && ISA
+	depends on DLCI && ISA && BROKEN_ON_SMP
 	help
 	  Say Y here if you need a driver for the Sangoma S502A, S502E, and
 	  S508 Frame Relay Access Devices. These are multi-protocol cards, but
@@ -498,7 +498,7 @@ config WAN_ROUTER_DRIVERS
 
 config VENDOR_SANGOMA
 	tristate "Sangoma WANPIPE(tm) multiprotocol cards"
-	depends on WAN_ROUTER_DRIVERS && WAN_ROUTER && (PCI || ISA)
+	depends on WAN_ROUTER_DRIVERS && WAN_ROUTER && (PCI || ISA) && BROKEN
 	---help---
 	  WANPIPE from Sangoma Technologies Inc. (<http://www.sangoma.com/>)
 	  is a family of intelligent multiprotocol WAN adapters with data

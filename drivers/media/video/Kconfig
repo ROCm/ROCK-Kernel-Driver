@@ -201,7 +201,7 @@ config VIDEO_ZORAN_LML33R10
 
 config VIDEO_ZR36120
 	tristate "Zoran ZR36120/36125 Video For Linux"
-	depends on VIDEO_DEV && PCI && I2C
+	depends on VIDEO_DEV && PCI && I2C && BROKEN
 	help
 	  Support for ZR36120/ZR36125 based frame grabber/overlay boards.
 	  This includes the Victor II, WaveWatcher, Video Wonder, Maxi-TV,
