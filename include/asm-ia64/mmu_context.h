@@ -28,36 +28,6 @@
 
 #include <asm/processor.h>
 
-#define MMU_CONTEXT_DEBUG	0
-
-#if MMU_CONTEXT_DEBUG
-
-#include <ia64intrin.h>
-
-extern struct mmu_trace_entry {
-	char op;
-	u8 cpu;
-	u32 context;
-	void *mm;
-} mmu_tbuf[1024];
-
-extern volatile int mmu_tbuf_index;
-
-# define MMU_TRACE(_op,_cpu,_mm,_ctx)							\
-do {											\
-	int i = __sync_fetch_and_add(&mmu_tbuf_index, 1) % ARRAY_SIZE(mmu_tbuf);	\
-	struct mmu_trace_entry e;							\
-	e.op = (_op);									\
-	e.cpu = (_cpu);									\
-	e.mm = (_mm);									\
-	e.context = (_ctx);								\
-	mmu_tbuf[i] = e;								\
-} while (0)
-
-#else
-# define MMU_TRACE(op,cpu,mm,ctx)	do { ; } while (0)
-#endif
-
 struct ia64_ctx {
 	spinlock_t lock;
 	unsigned int next;	/* next context number to use */
@@ -123,7 +93,6 @@ get_mmu_context (struct mm_struct *mm)
 static inline int
 init_new_context (struct task_struct *p, struct mm_struct *mm)
 {
-	MMU_TRACE('N', smp_processor_id(), mm, 0);
 	mm->context = 0;
 	return 0;
 }
@@ -132,7 +101,6 @@ static inline void
 destroy_context (struct mm_struct *mm)
 {
 	/* Nothing to do.  */
-	MMU_TRACE('D', smp_processor_id(), mm, mm->context);
 }
 
 static inline void
@@ -171,19 +139,14 @@ activate_context (struct mm_struct *mm)
 
 	do {
 		context = get_mmu_context(mm);
-		MMU_TRACE('A', smp_processor_id(), mm, context);
 		if (!cpu_isset(smp_processor_id(), mm->cpu_vm_mask))
 			cpu_set(smp_processor_id(), mm->cpu_vm_mask);
 		reload_context(context);
-		MMU_TRACE('a', smp_processor_id(), mm, context);
 		/* in the unlikely event of a TLB-flush by another thread, redo the load: */
 	} while (unlikely(context != mm->context));
 }
 
-#define deactivate_mm(tsk,mm)					\
-do {								\
-	MMU_TRACE('d', smp_processor_id(), mm, mm->context);	\
-} while (0)
+#define deactivate_mm(tsk,mm)	do { } while (0)
 
 /*
  * Switch from address space PREV to address space NEXT.
