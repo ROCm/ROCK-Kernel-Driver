@@ -153,6 +153,7 @@
 #define I2C_DRIVERID_FS451 1037
 #define I2C_DRIVERID_W83627HF 1038
 #define I2C_DRIVERID_LM85 1039
+#define I2C_DRIVERID_LM83 1040
 
 /*
  * ---- Adapter types ----------------------------------------------------
