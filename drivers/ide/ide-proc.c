@@ -57,6 +57,9 @@
  */
 
 #include <linux/config.h>
+#define __NO_VERSION__
+#include <linux/module.h>
+
 #include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -74,59 +77,6 @@
 #ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
-
-#ifdef CONFIG_BLK_DEV_AEC62XX
-extern byte aec62xx_proc;
-int (*aec62xx_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_AEC62XX */
-#ifdef CONFIG_BLK_DEV_ALI15X3
-extern byte ali_proc;
-int (*ali_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD74XX
-extern byte amd74xx_proc;
-int (*amd74xx_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_AMD74XX */
-#ifdef CONFIG_BLK_DEV_CMD64X
-extern byte cmd64x_proc;
-int (*cmd64x_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_CMD64X */
-#ifdef CONFIG_BLK_DEV_CS5530
-extern byte cs5530_proc;
-int (*cs5530_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_CS5530 */
-#ifdef CONFIG_BLK_DEV_HPT34X
-extern byte hpt34x_proc;
-int (*hpt34x_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_HPT34X */
-#ifdef CONFIG_BLK_DEV_HPT366
-extern byte hpt366_proc;
-int (*hpt366_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_PDC202XX
-extern byte pdc202xx_proc;
-int (*pdc202xx_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_PDC202XX */
-#ifdef CONFIG_BLK_DEV_PIIX
-extern byte piix_proc;
-int (*piix_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_PIIX */
-#ifdef CONFIG_BLK_DEV_SVWKS
-extern byte svwks_proc;
-int (*svwks_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_SVWKS */
-#ifdef CONFIG_BLK_DEV_SIS5513
-extern byte sis_proc;
-int (*sis_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_SIS5513 */
-#ifdef CONFIG_BLK_DEV_SLC90E66
-extern byte slc90e66_proc;
-int (*slc90e66_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_SLC90E66 */
-#ifdef CONFIG_BLK_DEV_VIA82CXXX
-extern byte via_proc;
-int (*via_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_VIA82CXXX */
 
 static int ide_getxdigit(char c)
 {
@@ -160,6 +110,15 @@ static int xx_xx_parse_error (const char *data, unsigned long len, const char *m
 }
 
 static struct proc_dir_entry * proc_ide_root = NULL;
+
+#ifdef CONFIG_BLK_DEV_IDEPCI
+#include <linux/delay.h>
+/*
+ * This is the list of registered PCI chipset driver data structures.
+ */
+static ide_pci_host_proc_t * ide_pci_host_proc_list;
+
+#endif /* CONFIG_BLK_DEV_IDEPCI */
 
 static int proc_ide_write_config
 	(struct file *file, const char *buffer, unsigned long count, void *data)
@@ -215,7 +174,7 @@ static int proc_ide_write_config
 						break;
 				case 'P':	is_pci = 1;
 #ifdef CONFIG_BLK_DEV_IDEPCI
-						if (hwif->pci_dev && !IDE_PCI_DEVID_EQ(hwif->pci_devid, IDE_PCI_DEVID_NULL))
+						if (hwif->pci_dev && !hwif->pci_dev->vendor)
 							break;
 #endif	/* CONFIG_BLK_DEV_IDEPCI */
 						msg = "not a PCI device";
@@ -313,11 +272,11 @@ static int proc_ide_write_config
  * 
  */
 					switch (digits) {
-						case 2:	OUT_BYTE(val, reg);
+						case 2:	hwif->OUTB(val, reg);
 							break;
-						case 4:	OUT_WORD(val, reg);
+						case 4:	hwif->OUTW(val, reg);
 							break;
-						case 8:	outl(val, reg);
+						case 8:	hwif->OUTL(val, reg);
 							break;
 					}
 #endif /* !__mc68000__ && !CONFIG_APUS */
@@ -333,7 +292,7 @@ parse_error:
 	return xx_xx_parse_error(start, startn, msg);
 }
 
-static int proc_ide_read_config
+int proc_ide_read_config
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	char		*out = page;
@@ -342,20 +301,26 @@ static int proc_ide_read_config
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	ide_hwif_t	*hwif = (ide_hwif_t *)data;
 	struct pci_dev	*dev = hwif->pci_dev;
-	if (!IDE_PCI_DEVID_EQ(hwif->pci_devid, IDE_PCI_DEVID_NULL) && dev && dev->bus) {
+	if ((hwif->pci_dev && hwif->pci_dev->vendor) && dev && dev->bus) {
 		int reg = 0;
 
-		out += sprintf(out, "pci bus %02x device %02x vid %04x did %04x channel %d\n",
-			dev->bus->number, dev->devfn, hwif->pci_devid.vid, hwif->pci_devid.did, hwif->channel);
+		out += sprintf(out, "pci bus %02x device %02x vendor %04x "
+				"device %04x channel %d\n",
+			dev->bus->number, dev->devfn,
+			hwif->pci_dev->vendor, hwif->pci_dev->device,
+			hwif->channel);
 		do {
-			byte val;
+			u8 val;
 			int rc = pci_read_config_byte(dev, reg, &val);
 			if (rc) {
-				printk("proc_ide_read_config: error %d reading bus %02x dev %02x reg 0x%02x\n",
+				printk("proc_ide_read_config: error %d reading"
+					" bus %02x dev %02x reg 0x%02x\n",
 					rc, dev->bus->number, dev->devfn, reg);
-				out += sprintf(out, "??%c", (++reg & 0xf) ? ' ' : '\n');
+				out += sprintf(out, "??%c",
+					(++reg & 0xf) ? ' ' : '\n');
 			} else
-				out += sprintf(out, "%02x%c", val, (++reg & 0xf) ? ' ' : '\n');
+				out += sprintf(out, "%02x%c",
+					val, (++reg & 0xf) ? ' ' : '\n');
 		} while (reg < 0x100);
 	} else
 #endif	/* CONFIG_BLK_DEV_IDEPCI */
@@ -364,6 +329,7 @@ static int proc_ide_read_config
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
+EXPORT_SYMBOL(proc_ide_read_config);
 
 static int ide_getdigit(char c)
 {
@@ -405,7 +371,9 @@ static int proc_ide_read_imodel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_mate
+EXPORT_SYMBOL(proc_ide_read_imodel);
+
+int proc_ide_read_mate
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_hwif_t	*hwif = (ide_hwif_t *) data;
@@ -418,7 +386,9 @@ static int proc_ide_read_mate
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_channel
+EXPORT_SYMBOL(proc_ide_read_mate);
+
+int proc_ide_read_channel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_hwif_t	*hwif = (ide_hwif_t *) data;
@@ -430,7 +400,9 @@ static int proc_ide_read_channel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_identify
+EXPORT_SYMBOL(proc_ide_read_channel);
+
+int proc_ide_read_identify
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *)data;
@@ -441,7 +413,8 @@ static int proc_ide_read_identify
 		char *out = ((char *)val) + (SECTOR_WORDS * 4);
 		page = out;
 		do {
-			out += sprintf(out, "%04x%c", le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
+			out += sprintf(out, "%04x%c",
+				le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
 			val += 1;
 		} while (i < (SECTOR_WORDS * 2));
 		len = out - page;
@@ -451,7 +424,9 @@ static int proc_ide_read_identify
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_settings
+EXPORT_SYMBOL(proc_ide_read_identify);
+
+int proc_ide_read_settings
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -481,9 +456,11 @@ static int proc_ide_read_settings
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
+EXPORT_SYMBOL(proc_ide_read_settings);
+
 #define MAX_LEN	30
 
-static int proc_ide_write_settings
+int proc_ide_write_settings
 	(struct file *file, const char *buffer, unsigned long count, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -558,6 +535,8 @@ parse_error:
 	return -EINVAL;
 }
 
+EXPORT_SYMBOL(proc_ide_write_settings);
+
 int proc_ide_read_capacity
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -569,9 +548,11 @@ int proc_ide_read_capacity
 		len = sprintf(page, "(none)\n");
         else
 		len = sprintf(page,"%llu\n",
-			      (unsigned long long) ((ide_driver_t *)drive->driver)->capacity(drive));
+			      (u64) ((ide_driver_t *)drive->driver)->capacity(drive));
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
+
+EXPORT_SYMBOL(proc_ide_read_capacity);
 
 int proc_ide_read_geometry
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
@@ -580,24 +561,32 @@ int proc_ide_read_geometry
 	char		*out = page;
 	int		len;
 
-	out += sprintf(out,"physical     %d/%d/%d\n", drive->cyl, drive->head, drive->sect);
-	out += sprintf(out,"logical      %d/%d/%d\n", drive->bios_cyl, drive->bios_head, drive->bios_sect);
+	out += sprintf(out,"physical     %d/%d/%d\n",
+			drive->cyl, drive->head, drive->sect);
+	out += sprintf(out,"logical      %d/%d/%d\n",
+			drive->bios_cyl, drive->bios_head, drive->bios_sect);
+
 	len = out - page;
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_dmodel
+EXPORT_SYMBOL(proc_ide_read_geometry);
+
+int proc_ide_read_dmodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
 	struct hd_driveid *id = drive->id;
 	int		len;
 
-	len = sprintf(page, "%.40s\n", (id && id->model[0]) ? (char *)id->model : "(none)");
+	len = sprintf(page, "%.40s\n",
+		(id && id->model[0]) ? (char *)id->model : "(none)");
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_driver
+EXPORT_SYMBOL(proc_ide_read_dmodel);
+
+int proc_ide_read_driver
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -607,11 +596,14 @@ static int proc_ide_read_driver
 	if (!driver)
 		len = sprintf(page, "(none)\n");
 	else
-		len = sprintf(page, "%s version %s\n", driver->name, driver->version);
+		len = sprintf(page, "%s version %s\n",
+			driver->name, driver->version);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_write_driver
+EXPORT_SYMBOL(proc_ide_read_driver);
+
+int proc_ide_write_driver
 	(struct file *file, const char *buffer, unsigned long count, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -623,7 +615,9 @@ static int proc_ide_write_driver
 	return count;
 }
 
-static int proc_ide_read_media
+EXPORT_SYMBOL(proc_ide_write_driver);
+
+int proc_ide_read_media
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -646,6 +640,8 @@ static int proc_ide_read_media
 	len = strlen(media);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
+
+EXPORT_SYMBOL(proc_ide_read_media);
 
 static ide_proc_entry_t generic_drive_entries[] = {
 	{ "driver",	S_IFREG|S_IRUGO,	proc_ide_read_driver,	proc_ide_write_driver },
@@ -673,6 +669,8 @@ void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void 
 	}
 }
 
+EXPORT_SYMBOL(ide_add_proc_entries);
+
 void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 {
 	if (!dir || !p)
@@ -683,7 +681,9 @@ void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 	}
 }
 
-static void create_proc_ide_drives(ide_hwif_t *hwif)
+EXPORT_SYMBOL(ide_remove_proc_entries);
+
+void create_proc_ide_drives(ide_hwif_t *hwif)
 {
 	int	d;
 	struct proc_dir_entry *ent;
@@ -713,6 +713,8 @@ static void create_proc_ide_drives(ide_hwif_t *hwif)
 	}
 }
 
+EXPORT_SYMBOL(create_proc_ide_drives);
+
 void recreate_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 {
 	struct proc_dir_entry *ent;
@@ -740,6 +742,8 @@ void recreate_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 	}
 }
 
+EXPORT_SYMBOL(recreate_proc_ide_device);
+
 void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 {
 	ide_driver_t *driver = drive->driver;
@@ -754,18 +758,20 @@ void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 	}
 }
 
+EXPORT_SYMBOL(destroy_proc_ide_device);
+
 void destroy_proc_ide_drives(ide_hwif_t *hwif)
 {
 	int	d;
 
 	for (d = 0; d < MAX_DRIVES; d++) {
 		ide_drive_t *drive = &hwif->drives[d];
-//		ide_driver_t *driver = drive->driver;
-
 		if (drive->proc)
 			destroy_proc_ide_device(hwif, drive);
 	}
 }
+
+EXPORT_SYMBOL(destroy_proc_ide_drives);
 
 static ide_proc_entry_t hwif_entries[] = {
 	{ "channel",	S_IFREG|S_IRUGO,	proc_ide_read_channel,	NULL },
@@ -794,7 +800,29 @@ void create_proc_ide_interfaces(void)
 	}
 }
 
-static void destroy_proc_ide_interfaces(void)
+#ifdef CONFIG_BLK_DEV_IDEPCI
+void ide_pci_register_host_proc (ide_pci_host_proc_t *p)
+{
+	ide_pci_host_proc_t *tmp;
+
+	if (!p) return;
+	p->next = NULL;
+	p->set = 1;
+	if (ide_pci_host_proc_list) {
+		tmp = ide_pci_host_proc_list;
+		while (tmp->next) tmp = tmp->next;
+		tmp->next = p;
+	} else
+		ide_pci_host_proc_list = p;
+}
+
+EXPORT_SYMBOL(ide_pci_register_host_proc);
+
+#endif /* CONFIG_BLK_DEV_IDEPCI */
+
+EXPORT_SYMBOL(create_proc_ide_interfaces);
+
+void destroy_proc_ide_interfaces(void)
 {
 	int	h;
 
@@ -815,6 +843,8 @@ static void destroy_proc_ide_interfaces(void)
 	}
 }
 
+EXPORT_SYMBOL(destroy_proc_ide_interfaces);
+
 extern struct seq_operations ide_drivers_op;
 static int ide_drivers_open(struct inode *inode, struct file *file)
 {
@@ -829,6 +859,9 @@ static struct file_operations ide_drivers_operations = {
 
 void proc_ide_create(void)
 {
+#ifdef CONFIG_BLK_DEV_IDEPCI
+	ide_pci_host_proc_t *p = ide_pci_host_proc_list;
+#endif /* CONFIG_BLK_DEV_IDEPCI */
 	struct proc_dir_entry *entry;
 	proc_ide_root = proc_mkdir("ide", 0);
 	if (!proc_ide_root) return;
@@ -839,120 +872,40 @@ void proc_ide_create(void)
 	if (entry)
 		entry->proc_fops = &ide_drivers_operations;
 
-#ifdef CONFIG_BLK_DEV_AEC62XX
-	if ((aec62xx_display_info) && (aec62xx_proc))
-		create_proc_info_entry("aec62xx", 0, proc_ide_root, aec62xx_display_info);
-#endif /* CONFIG_BLK_DEV_AEC62XX */
-#ifdef CONFIG_BLK_DEV_ALI15X3
-	if ((ali_display_info) && (ali_proc))
-		create_proc_info_entry("ali", 0, proc_ide_root, ali_display_info);
-#endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD74XX
-	if ((amd74xx_display_info) && (amd74xx_proc))
-		create_proc_info_entry("amd74xx", 0, proc_ide_root, amd74xx_display_info);
-#endif /* CONFIG_BLK_DEV_AMD74XX */
-#ifdef CONFIG_BLK_DEV_CMD64X
-	if ((cmd64x_display_info) && (cmd64x_proc))
-		create_proc_info_entry("cmd64x", 0, proc_ide_root, cmd64x_display_info);
-#endif /* CONFIG_BLK_DEV_CMD64X */
-#ifdef CONFIG_BLK_DEV_CS5530
-	if ((cs5530_display_info) && (cs5530_proc))
-		create_proc_info_entry("cs5530", 0, proc_ide_root, cs5530_display_info);
-#endif /* CONFIG_BLK_DEV_CS5530 */
-#ifdef CONFIG_BLK_DEV_HPT34X
-	if ((hpt34x_display_info) && (hpt34x_proc))
-		create_proc_info_entry("hpt34x", 0, proc_ide_root, hpt34x_display_info);
-#endif /* CONFIG_BLK_DEV_HPT34X */
-#ifdef CONFIG_BLK_DEV_HPT366
-	if ((hpt366_display_info) && (hpt366_proc))
-		create_proc_info_entry("hpt366", 0, proc_ide_root, hpt366_display_info);
-#endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_SVWKS
-	if ((svwks_display_info) && (svwks_proc))
-		create_proc_info_entry("svwks", 0, proc_ide_root, svwks_display_info);
-#endif /* CONFIG_BLK_DEV_SVWKS */
-#ifdef CONFIG_BLK_DEV_PDC202XX
-	if ((pdc202xx_display_info) && (pdc202xx_proc))
-		create_proc_info_entry("pdc202xx", 0, proc_ide_root, pdc202xx_display_info);
-#endif /* CONFIG_BLK_DEV_PDC202XX */
-#ifdef CONFIG_BLK_DEV_PIIX
-	if ((piix_display_info) && (piix_proc))
-		create_proc_info_entry("piix", 0, proc_ide_root, piix_display_info);
-#endif /* CONFIG_BLK_DEV_PIIX */
-#ifdef CONFIG_BLK_DEV_SIS5513
-	if ((sis_display_info) && (sis_proc))
-		create_proc_info_entry("sis", 0, proc_ide_root, sis_display_info);
-#endif /* CONFIG_BLK_DEV_SIS5513 */
-#ifdef CONFIG_BLK_DEV_SLC90E66
-	if ((slc90e66_display_info) && (slc90e66_proc))
-		create_proc_info_entry("slc90e66", 0, proc_ide_root, slc90e66_display_info);
-#endif /* CONFIG_BLK_DEV_SLC90E66 */
-#ifdef CONFIG_BLK_DEV_VIA82CXXX
-	if ((via_display_info) && (via_proc))
-		create_proc_info_entry("via", 0, proc_ide_root, via_display_info);
-#endif /* CONFIG_BLK_DEV_VIA82CXXX */
+#ifdef CONFIG_BLK_DEV_IDEPCI
+	while (p != NULL)
+	{
+		if (p->name != NULL && p->set == 1 && p->get_info != NULL) 
+		{
+			p->parent = proc_ide_root;
+			create_proc_info_entry(p->name, 0, p->parent, p->get_info);
+			p->set = 2;
+		}
+		p = p->next;
+	}
+#endif /* CONFIG_BLK_DEV_IDEPCI */
 }
+
+EXPORT_SYMBOL(proc_ide_create);
 
 void proc_ide_destroy(void)
 {
-	/*
-	 * Mmmm.. does this free up all resources,
-	 * or do we need to do a more proper cleanup here ??
-	 */
-#ifdef CONFIG_BLK_DEV_AEC62XX
-	if ((aec62xx_display_info) && (aec62xx_proc))
-		remove_proc_entry("ide/aec62xx",0);
-#endif /* CONFIG_BLK_DEV_AEC62XX */
-#ifdef CONFIG_BLK_DEV_ALI15X3
-	if ((ali_display_info) && (ali_proc))
-		remove_proc_entry("ide/ali",0);
-#endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD74XX
-	if ((amd74xx_display_info) && (amd74xx_proc))
-		remove_proc_entry("ide/amd74xx",0);
-#endif /* CONFIG_BLK_DEV_AMD74XX */
-#ifdef CONFIG_BLK_DEV_CMD64X
-	if ((cmd64x_display_info) && (cmd64x_proc))
-		remove_proc_entry("ide/cmd64x",0);
-#endif /* CONFIG_BLK_DEV_CMD64X */
-#ifdef CONFIG_BLK_DEV_CS5530
-	if ((cs5530_display_info) && (cs5530_proc))
-		remove_proc_entry("ide/cs5530",0);
-#endif /* CONFIG_BLK_DEV_CS5530 */
-#ifdef CONFIG_BLK_DEV_HPT34X
-	if ((hpt34x_display_info) && (hpt34x_proc))
-		remove_proc_entry("ide/hpt34x",0);
-#endif /* CONFIG_BLK_DEV_HPT34X */
-#ifdef CONFIG_BLK_DEV_HPT366
-	if ((hpt366_display_info) && (hpt366_proc))
-		remove_proc_entry("ide/hpt366",0);
-#endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_PDC202XX
-	if ((pdc202xx_display_info) && (pdc202xx_proc))
-		remove_proc_entry("ide/pdc202xx",0);
-#endif /* CONFIG_BLK_DEV_PDC202XX */
-#ifdef CONFIG_BLK_DEV_PIIX
-	if ((piix_display_info) && (piix_proc))
-		remove_proc_entry("ide/piix",0);
-#endif /* CONFIG_BLK_DEV_PIIX */
-#ifdef CONFIG_BLK_DEV_SVWKS
-	if ((svwks_display_info) && (svwks_proc))
-		remove_proc_entry("ide/svwks",0);
-#endif /* CONFIG_BLK_DEV_SVWKS */
-#ifdef CONFIG_BLK_DEV_SIS5513
-	if ((sis_display_info) && (sis_proc))
-		remove_proc_entry("ide/sis", 0);
-#endif /* CONFIG_BLK_DEV_SIS5513 */
-#ifdef CONFIG_BLK_DEV_SLC90E66
-	if ((slc90e66_display_info) && (slc90e66_proc))
-		remove_proc_entry("ide/slc90e66",0);
-#endif /* CONFIG_BLK_DEV_SLC90E66 */
-#ifdef CONFIG_BLK_DEV_VIA82CXXX
-	if ((via_display_info) && (via_proc))
-		remove_proc_entry("ide/via",0);
-#endif /* CONFIG_BLK_DEV_VIA82CXXX */
+#ifdef CONFIG_BLK_DEV_IDEPCI
+	ide_pci_host_proc_t *p = ide_pci_host_proc_list;
+	char name[32];
 
-	remove_proc_entry("ide/drivers", 0);
+	while ((p->name != NULL) && (p->set) && (p->get_info != NULL)) {
+		name[0] = '\0';
+		sprintf(name, "ide/%s", p->name);
+		if (p->set == 2)
+			remove_proc_entry(p->name, p->parent);
+		if (p->next == NULL) break;
+		p = p->next;
+	}
+#endif /* CONFIG_BLK_DEV_IDEPCI */
+	remove_proc_entry("ide/drivers", proc_ide_root);
 	destroy_proc_ide_interfaces();
 	remove_proc_entry("ide", 0);
 }
+
+EXPORT_SYMBOL(proc_ide_destroy);
