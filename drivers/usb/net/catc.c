@@ -847,16 +847,16 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		pktsz = RX_MAX_BURST * (PKT_SZ + 2);
 	}
 	
-	FILL_CONTROL_URB(catc->ctrl_urb, usbdev, usb_sndctrlpipe(usbdev, 0),
+	usb_fill_control_urb(catc->ctrl_urb, usbdev, usb_sndctrlpipe(usbdev, 0),
 		NULL, NULL, 0, catc_ctrl_done, catc);
 
-	FILL_BULK_URB(catc->tx_urb, usbdev, usb_sndbulkpipe(usbdev, 1),
+	usb_fill_bulk_urb(catc->tx_urb, usbdev, usb_sndbulkpipe(usbdev, 1),
 		NULL, 0, catc_tx_done, catc);
 
-	FILL_BULK_URB(catc->rx_urb, usbdev, usb_rcvbulkpipe(usbdev, 1),
+	usb_fill_bulk_urb(catc->rx_urb, usbdev, usb_rcvbulkpipe(usbdev, 1),
 		catc->rx_buf, pktsz, catc_rx_done, catc);
 
-	FILL_INT_URB(catc->irq_urb, usbdev, usb_rcvintpipe(usbdev, 2),
+	usb_fill_int_urb(catc->irq_urb, usbdev, usb_rcvintpipe(usbdev, 2),
                 catc->irq_buf, 2, catc_irq_done, catc, 1);
 
 	if (!catc->is_f5u011) {

@@ -330,7 +330,7 @@ static int usb_write( struct midi_out_endpoint *ep, unsigned char *buf, int len 
 
 	d = ep->usbdev;
 	pipe = usb_sndbulkpipe(d, ep->endpoint);
-	FILL_BULK_URB( ep->urb, d, pipe, (unsigned char*)buf, len,
+	usb_fill_bulk_urb( ep->urb, d, pipe, (unsigned char*)buf, len,
 		       (usb_complete_t)usb_write_callback, ep );
 
 	status = usb_submit_urb(ep->urb, GFP_KERNEL);
@@ -1045,7 +1045,7 @@ static struct midi_in_endpoint *alloc_midi_in_endpoint( struct usb_device *d, in
 		kfree(ep);
 		return NULL;
 	}
-	FILL_BULK_URB( ep->urb, d, 
+	usb_fill_bulk_urb( ep->urb, d, 
 		       usb_rcvbulkpipe(d, endPoint),
 		       (unsigned char *)ep->recvBuf, bufSize,
 		       (usb_complete_t)usb_bulk_read, ep );

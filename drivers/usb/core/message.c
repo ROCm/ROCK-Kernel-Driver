@@ -92,7 +92,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
   
-	FILL_CONTROL_URB(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,
+	usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,
 		   usb_api_blocking_completion, 0);
 
 	retv = usb_start_wait_urb(urb, timeout, &length);
@@ -190,7 +190,7 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
 
-	FILL_BULK_URB(urb, usb_dev, pipe, data, len,
+	usb_fill_bulk_urb(urb, usb_dev, pipe, data, len,
 		    usb_api_blocking_completion, 0);
 
 	return usb_start_wait_urb(urb,timeout,actual_length);

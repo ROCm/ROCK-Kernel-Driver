@@ -488,7 +488,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 	mdc800->open=0;
 
 	/* Setup URB Structs */
-	FILL_INT_URB (
+	usb_fill_int_urb (
 		mdc800->irq_urb,
 		mdc800->dev,
 		usb_rcvintpipe (mdc800->dev,mdc800->endpoint [1]),
@@ -499,7 +499,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 		irq_interval
 	);
 
-	FILL_BULK_URB (
+	usb_fill_bulk_urb (
 		mdc800->write_urb,
 		mdc800->dev,
 		usb_sndbulkpipe (mdc800->dev, mdc800->endpoint[0]),
@@ -509,7 +509,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 		mdc800
 	);
 
-	FILL_BULK_URB (
+	usb_fill_bulk_urb (
 		mdc800->download_urb,
 		mdc800->dev,
 		usb_rcvbulkpipe (mdc800->dev, mdc800->endpoint [3]),

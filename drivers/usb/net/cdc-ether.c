@@ -125,7 +125,7 @@ static void read_bulk_callback( struct urb *urb )
 
 goon:
 	// Prep the USB to wait for another frame
-	FILL_BULK_URB( ether_dev->rx_urb, ether_dev->usb,
+	usb_fill_bulk_urb( ether_dev->rx_urb, ether_dev->usb,
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );
@@ -293,7 +293,7 @@ static int CDCEther_start_xmit( struct sk_buff *skb, struct net_device *net )
 	memcpy(ether_dev->tx_buff, skb->data, skb->len);
 
 	// Fill in the URB for shipping it out.
-	FILL_BULK_URB( ether_dev->tx_urb, ether_dev->usb,
+	usb_fill_bulk_urb( ether_dev->tx_urb, ether_dev->usb,
 			usb_sndbulkpipe(ether_dev->usb, ether_dev->data_ep_out),
 			ether_dev->tx_buff, ether_dev->wMaxSegmentSize, 
 			write_bulk_callback, ether_dev );
@@ -344,7 +344,7 @@ static int CDCEther_open(struct net_device *net)
 	}
 
 	// Prep a receive URB
-	FILL_BULK_URB( ether_dev->rx_urb, ether_dev->usb,
+	usb_fill_bulk_urb( ether_dev->rx_urb, ether_dev->usb,
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );

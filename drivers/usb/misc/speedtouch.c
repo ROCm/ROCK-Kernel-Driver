@@ -592,7 +592,7 @@ static void udsl_usb_send_data_complete (struct urb *urb)
 	ctx->skb = skb_dequeue (&(instance->sndqueue));
 	ctx->vcc = ((struct udsl_cb *) (ctx->skb->cb))->vcc;
 	spin_unlock_irqrestore (&instance->sndqlock, flags);
-	FILL_BULK_URB (urb,
+	usb_fill_bulk_urb (urb,
 		       instance->usb_dev,
 		       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
 		       (unsigned char *) ctx->skb->data,
@@ -673,7 +673,7 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 	spin_unlock_irqrestore (&instance->sndqlock, flags);
 
 	/* submit packet */
-	FILL_BULK_URB (urb,
+	usb_fill_bulk_urb (urb,
 		       instance->usb_dev,
 		       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
 		       (unsigned char *) skb->data,
@@ -742,7 +742,7 @@ void udsl_usb_data_receive (struct urb *urb)
 		return;
 	}
 
-	FILL_BULK_URB (urb,
+	usb_fill_bulk_urb (urb,
 		       instance->usb_dev,
 		       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 		       (unsigned char *) ctx->skb->data,
@@ -790,7 +790,7 @@ int udsl_usb_data_init (struct udsl_instance_data *instance)
 			break;
 		};
 
-		FILL_BULK_URB (ctx->urb,
+		usb_fill_bulk_urb (ctx->urb,
 			       instance->usb_dev,
 			       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 			       (unsigned char *) ctx->skb->data,

@@ -487,7 +487,7 @@ void mts_int_submit_urb (struct urb* transfer,
 
 	MTS_INT_INIT();
 
-	FILL_BULK_URB(transfer,
+	usb_fill_bulk_urb(transfer,
 		      context->instance->usb_dev,
 		      pipe,
 		      data,
@@ -715,7 +715,7 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 	}
 
 	
-	FILL_BULK_URB(desc->urb,
+	usb_fill_bulk_urb(desc->urb,
 		      desc->usb_dev,
 		      usb_sndbulkpipe(desc->usb_dev,desc->ep_out),
 		      srb->cmnd,

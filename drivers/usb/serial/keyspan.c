@@ -1085,7 +1085,7 @@ static struct urb *keyspan_setup_urb (struct usb_serial *serial, int endpoint,
 	}
 
 		/* Fill URB using supplied data. */
-	FILL_BULK_URB(urb, serial->dev,
+	usb_fill_bulk_urb(urb, serial->dev,
 		      usb_sndbulkpipe(serial->dev, endpoint) | dir,
 		      buf, len, callback, ctx);
 

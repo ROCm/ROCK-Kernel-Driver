@@ -328,7 +328,7 @@ static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int
 	dr->wIndex = cpu_to_le16((u16) bluetooth->control_out_bInterfaceNum);
 	dr->wLength = cpu_to_le16((u16) len);
 	
-	FILL_CONTROL_URB (urb, bluetooth->dev, usb_sndctrlpipe(bluetooth->dev, 0),
+	usb_fill_control_urb (urb, bluetooth->dev, usb_sndctrlpipe(bluetooth->dev, 0),
 			  (unsigned char*)dr, urb->transfer_buffer, len, bluetooth_ctrl_callback, bluetooth);
 
 	/* send it down the pipe */
@@ -382,7 +382,7 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 
 #ifndef BTBUGGYHARDWARE
 		/* Start reading from the device */
-		FILL_BULK_URB (bluetooth->read_urb, bluetooth->dev, 
+		usb_fill_bulk_urb (bluetooth->read_urb, bluetooth->dev, 
 			       usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 			       bluetooth->bulk_in_buffer,
 			       bluetooth->bulk_in_buffer_size,
@@ -391,7 +391,7 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 		if (result)
 			dbg("%s - usb_submit_urb(read bulk) failed with status %d", __FUNCTION__, result);
 #endif
-		FILL_INT_URB (bluetooth->interrupt_in_urb, bluetooth->dev,
+		usb_fill_int_urb (bluetooth->interrupt_in_urb, bluetooth->dev,
 			      usb_rcvintpipe(bluetooth->dev, bluetooth->interrupt_in_endpointAddress),
 			      bluetooth->interrupt_in_buffer,
 			      bluetooth->interrupt_in_buffer_size,
@@ -535,7 +535,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				memcpy (urb->transfer_buffer, current_position, buffer_size);
 
 				/* build up our urb */
-				FILL_BULK_URB (urb, bluetooth->dev, usb_sndbulkpipe(bluetooth->dev, bluetooth->bulk_out_endpointAddress),
+				usb_fill_bulk_urb (urb, bluetooth->dev, usb_sndbulkpipe(bluetooth->dev, bluetooth->bulk_out_endpointAddress),
 						urb->transfer_buffer, buffer_size, bluetooth_write_bulk_callback, bluetooth);
 
 				/* send it down the pipe */
@@ -725,7 +725,7 @@ void btusb_enable_bulk_read(struct tty_struct *tty){
 	}
 
 	if (bluetooth->read_urb) {
-		FILL_BULK_URB(bluetooth->read_urb, bluetooth->dev, 
+		usb_fill_bulk_urb(bluetooth->read_urb, bluetooth->dev, 
 			      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 			      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
 			      bluetooth_read_bulk_callback, bluetooth);
@@ -933,7 +933,7 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 	if ((count == 4) && (data[0] == 0x00) && (data[1] == 0x00)
 	    && (data[2] == 0x00) && (data[3] == 0x00)) {
 		urb->actual_length = 0;
-		FILL_BULK_URB(bluetooth->read_urb, bluetooth->dev, 
+		usb_fill_bulk_urb(bluetooth->read_urb, bluetooth->dev, 
 			      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 			      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
 			      bluetooth_read_bulk_callback, bluetooth);
@@ -994,7 +994,7 @@ exit:
 	if (!bluetooth || !bluetooth->open_count)
 		return;
 
-	FILL_BULK_URB(bluetooth->read_urb, bluetooth->dev, 
+	usb_fill_bulk_urb(bluetooth->read_urb, bluetooth->dev, 
 		      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 		      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
 		      bluetooth_read_bulk_callback, bluetooth);
@@ -1160,7 +1160,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		err("Couldn't allocate bulk_in_buffer");
 		goto probe_error;
 	}
-	FILL_BULK_URB(bluetooth->read_urb, dev, usb_rcvbulkpipe(dev, endpoint->bEndpointAddress),
+	usb_fill_bulk_urb(bluetooth->read_urb, dev, usb_rcvbulkpipe(dev, endpoint->bEndpointAddress),
 		      bluetooth->bulk_in_buffer, buffer_size, bluetooth_read_bulk_callback, bluetooth);
 
 	endpoint = bulk_out_endpoint[0];
@@ -1196,7 +1196,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		err("Couldn't allocate interrupt_in_buffer");
 		goto probe_error;
 	}
-	FILL_INT_URB(bluetooth->interrupt_in_urb, dev, usb_rcvintpipe(dev, endpoint->bEndpointAddress),
+	usb_fill_int_urb(bluetooth->interrupt_in_urb, dev, usb_rcvintpipe(dev, endpoint->bEndpointAddress),
 		     bluetooth->interrupt_in_buffer, buffer_size, bluetooth_int_callback,
 		     bluetooth, endpoint->bInterval);
 

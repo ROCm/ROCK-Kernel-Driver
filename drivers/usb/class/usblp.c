@@ -1018,7 +1018,7 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol)
 		return r;
 	}
 
-	FILL_BULK_URB(usblp->writeurb, usblp->dev,
+	usb_fill_bulk_urb(usblp->writeurb, usblp->dev,
 		usb_sndbulkpipe(usblp->dev,
 		 usblp->protocol[protocol].epwrite->bEndpointAddress),
 		usblp->buf, 0,
@@ -1026,7 +1026,7 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol)
 
 	usblp->bidir = (usblp->protocol[protocol].epread != 0);
 	if (usblp->bidir)
-		FILL_BULK_URB(usblp->readurb, usblp->dev,
+		usb_fill_bulk_urb(usblp->readurb, usblp->dev,
 			usb_rcvbulkpipe(usblp->dev,
 			 usblp->protocol[protocol].epread->bEndpointAddress),
 			usblp->buf + USBLP_BUF_SIZE, USBLP_BUF_SIZE,

@@ -131,7 +131,7 @@ static int hci_usb_enable_intr(struct hci_usb *husb)
 	
         pipe = usb_rcvintpipe(husb->udev, husb->intr_ep);
         size = usb_maxpacket(husb->udev, pipe, usb_pipeout(pipe));
-	FILL_INT_URB(urb, husb->udev, pipe, buf, size, 
+	usb_fill_int_urb(urb, husb->udev, pipe, buf, size, 
 			hci_usb_interrupt, husb, husb->intr_interval);
 	
 	return usb_submit_urb(urb, GFP_KERNEL);
@@ -182,7 +182,7 @@ static int hci_usb_rx_submit(struct hci_usb *husb, struct urb *urb)
 
         pipe = usb_rcvbulkpipe(husb->udev, husb->bulk_in_ep);
 
-        FILL_BULK_URB(urb, husb->udev, pipe, skb->data, size, hci_usb_rx_complete, skb);
+        usb_fill_bulk_urb(urb, husb->udev, pipe, skb->data, size, hci_usb_rx_complete, skb);
 
 	skb_queue_tail(&husb->pending_q, skb);
 	err = usb_submit_urb(urb, GFP_ATOMIC);
@@ -299,7 +299,7 @@ static inline int hci_usb_send_ctrl(struct hci_usb *husb, struct sk_buff *skb)
 	cr->wValue   = 0;
 	cr->wLength  = __cpu_to_le16(skb->len);
 
-	FILL_CONTROL_URB(urb, husb->udev, pipe, (void *) cr,
+	usb_fill_control_urb(urb, husb->udev, pipe, (void *) cr,
 			skb->data, skb->len, hci_usb_tx_complete, skb);
 
 	BT_DBG("%s urb %p len %d", husb->hdev.name, urb, skb->len);
@@ -328,7 +328,7 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
 
 	pipe = usb_sndbulkpipe(husb->udev, husb->bulk_out_ep);
         
-	FILL_BULK_URB(urb, husb->udev, pipe, skb->data, skb->len,
+	usb_fill_bulk_urb(urb, husb->udev, pipe, skb->data, skb->len,
 	              hci_usb_tx_complete, skb);
 	urb->transfer_flags = USB_ZERO_PACKET;
 

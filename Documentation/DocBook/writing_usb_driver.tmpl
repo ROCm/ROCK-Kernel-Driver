@@ -307,7 +307,7 @@ if (result) {
   </programlisting>
   <para>
      When the write urb is filled up with the proper information using the
-     FILL_BULK_URB function, we point the urb's completion callback to call our
+     usb_fill_bulk_urb function, we point the urb's completion callback to call our
      own skel_write_bulk_callback function. This function is called when the
      urb is finished by the USB subsystem. The callback function is called in
      interrupt context, so caution must be taken not to do very much processing

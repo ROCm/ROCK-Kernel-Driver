@@ -717,7 +717,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->wIndex  = cpu_to_le16 (index);
 	dr->wLength = cpu_to_le16 (size);
 
-	FILL_CONTROL_URB (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
+	usb_fill_control_urb (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
 		          (usb_complete_t)auerchain_blocking_completion,0);
 	ret = auerchain_start_wait_urb (acp, urb, timeout, &length);
 
@@ -919,7 +919,7 @@ static void auerswald_ctrlread_wretcomplete (struct urb * urb)
 	bp->dr->wLength      = bp->dr->wValue;	/* temporary stored */
 	bp->dr->wValue       = cpu_to_le16 (1);	/* Retry Flag */
 	/* bp->dr->index    = channel id;          remains */
-	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
+	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, le16_to_cpu (bp->dr->wLength),
 		          (usb_complete_t)auerswald_ctrlread_complete,bp);
 
@@ -967,7 +967,7 @@ static void auerswald_ctrlread_complete (struct urb * urb)
 		bp->dr->wValue       = bp->dr->wLength; /* temporary storage */
 		// bp->dr->wIndex    channel ID remains
 		bp->dr->wLength      = cpu_to_le16 (32); /* >= 8 bytes */
-		FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
+		usb_fill_control_urb (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
   			(unsigned char*)bp->dr, bp->bufp, 32,
 	   		(usb_complete_t)auerswald_ctrlread_wretcomplete,bp);
 
@@ -1095,7 +1095,7 @@ static void auerswald_int_complete (struct urb * urb)
 	bp->dr->wValue       = cpu_to_le16 (0);
 	bp->dr->wIndex       = cpu_to_le16 (channelid | AUH_DIRECT | AUH_UNSPLIT);
 	bp->dr->wLength      = cpu_to_le16 (bytecount);
-	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
+	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, bytecount,
 		          (usb_complete_t)auerswald_ctrlread_complete,bp);
 
@@ -1164,7 +1164,7 @@ static int auerswald_int_open (pauerswald_t cp)
                 }
         }
         /* setup urb */
-        FILL_INT_URB (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
+        usb_fill_int_urb (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
         /* start the urb */
 	cp->inturbp->status = 0;	/* needed! */
 	ret = usb_submit_urb (cp->inturbp, GFP_KERNEL);
@@ -1830,7 +1830,7 @@ write_again:
 	bp->dr->wValue       = cpu_to_le16 (0);
 	bp->dr->wIndex       = cpu_to_le16 (ccp->scontext.id | AUH_DIRECT | AUH_UNSPLIT);
 	bp->dr->wLength      = cpu_to_le16 (len+AUH_SIZE);
-	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
+	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
                    (unsigned char*)bp->dr, bp->bufp, len+AUH_SIZE,
 		    auerchar_ctrlwrite_complete, bp);
 	/* up we go */

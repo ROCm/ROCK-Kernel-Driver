@@ -577,7 +577,7 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 			maxp = sizeof(ss->irqbuf);
 
 		/* fill in the URB with our data */
-		FILL_INT_URB(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf,
+		usb_fill_int_urb(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf,
 			maxp, usb_stor_CBI_irq, ss, ss->ep_int->bInterval); 
 
 		/* submit the URB for processing */

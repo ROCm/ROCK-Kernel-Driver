@@ -514,7 +514,7 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 {
 	int result;
 
-	FILL_BULK_URB(kaweth->rx_urb,
+	usb_fill_bulk_urb(kaweth->rx_urb,
 		      kaweth->dev,
 		      usb_rcvbulkpipe(kaweth->dev, 1),
 		      kaweth->rx_buf,
@@ -620,7 +620,7 @@ static int kaweth_open(struct net_device *net)
 	if (res)
 		return -EIO;
 
-	FILL_INT_URB(
+	usb_fill_int_urb(
 		kaweth->irq_urb,
 		kaweth->dev,
 		usb_rcvintpipe(kaweth->dev, 3),
@@ -752,7 +752,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 	*private_header = cpu_to_le16(skb->len);
 	kaweth->tx_skb = skb;
 
-	FILL_BULK_URB(kaweth->tx_urb,
+	usb_fill_bulk_urb(kaweth->tx_urb,
 		      kaweth->dev,
 		      usb_sndbulkpipe(kaweth->dev, 2),
 		      private_header,
@@ -1207,7 +1207,7 @@ int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
         if (!urb)
                 return -ENOMEM;
 
-        FILL_CONTROL_URB(urb, usb_dev, pipe, (unsigned char*)cmd, data,
+        usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data,
 			 len, (usb_complete_t)usb_api_blocking_completion,0);
 
         retv = usb_start_wait_urb(urb, timeout, &length);

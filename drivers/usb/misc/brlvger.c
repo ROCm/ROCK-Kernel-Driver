@@ -514,7 +514,7 @@ brlvger_open(struct inode *inode, struct file *file)
 		err("Unable to allocate URB");
 		goto error;
 	}
-	FILL_INT_URB( priv->intr_urb, priv->dev,
+	usb_fill_int_urb( priv->intr_urb, priv->dev,
 			usb_rcvintpipe(priv->dev,
 				       priv->in_interrupt->bEndpointAddress),
 			priv->intr_buff, sizeof(priv->intr_buff),

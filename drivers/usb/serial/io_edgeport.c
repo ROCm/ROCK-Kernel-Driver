@@ -1479,7 +1479,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	}
 
 	/* fill up the urb with all of our data and submit it */
-	FILL_BULK_URB (urb, edge_serial->serial->dev, 
+	usb_fill_bulk_urb (urb, edge_serial->serial->dev, 
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, count+2, edge_bulk_out_data_callback, edge_port);
 
@@ -2504,7 +2504,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	CmdUrbs++;
 	dbg("%s - ALLOCATE URB %p (outstanding %d)", __FUNCTION__, urb, CmdUrbs);
 
-	FILL_BULK_URB (urb, edge_serial->serial->dev, 
+	usb_fill_bulk_urb (urb, edge_serial->serial->dev, 
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, length, edge_bulk_out_cmd_callback, edge_port);
 

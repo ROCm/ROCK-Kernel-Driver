@@ -1024,7 +1024,7 @@ probe_scanner(struct usb_interface *intf,
 /* Ok, if we detected an interrupt EP, setup a handler for it */
 	if (have_intr) {
 		dbg("probe_scanner(%d): Configuring IRQ handler for intr EP:%d", scn_minor, have_intr);
-		FILL_INT_URB(scn->scn_irq, dev,
+		usb_fill_int_urb(scn->scn_irq, dev,
 			     usb_rcvintpipe(dev, have_intr),
 			     &scn->button, 1, irq_scanner, scn,
 			     // endpoint[(int)have_intr].bInterval);

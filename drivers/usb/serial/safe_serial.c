@@ -270,7 +270,7 @@ static void safe_read_bulk_callback (struct urb *urb)
 	}
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB (urb, serial->dev,
+	usb_fill_bulk_urb (urb, serial->dev,
 		       usb_rcvbulkpipe (serial->dev, port->bulk_in_endpointAddress),
 		       urb->transfer_buffer, urb->transfer_buffer_length,
 		       safe_read_bulk_callback, port);

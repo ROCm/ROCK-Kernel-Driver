@@ -474,7 +474,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	us->dr->wLength = cpu_to_le16(size);
 
 	/* fill and submit the URB */
-	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
+	usb_fill_control_urb(us->current_urb, us->pusb_dev, pipe, 
 			 (unsigned char*) us->dr, data, size, 
 			 usb_stor_blocking_completion, NULL);
 	status = usb_stor_msg_common(us);
@@ -494,7 +494,7 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
 	int status;
 
 	/* fill and submit the URB */
-	FILL_BULK_URB(us->current_urb, us->pusb_dev, pipe, data, len,
+	usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, data, len,
 		      usb_stor_blocking_completion, NULL);
 	status = usb_stor_msg_common(us);
 

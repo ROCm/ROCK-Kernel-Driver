@@ -428,7 +428,7 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 			     dev->write_urb->transfer_buffer);
 
 	/* set up our urb */
-	FILL_BULK_URB(dev->write_urb, dev->udev, 
+	usb_fill_bulk_urb(dev->write_urb, dev->udev, 
 		      usb_sndbulkpipe(dev->udev, dev->bulk_out_endpointAddr),
 		      dev->write_urb->transfer_buffer, bytes_written,
 		      skel_write_bulk_callback, dev);
@@ -587,7 +587,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 				err("Couldn't allocate bulk_out_buffer");
 				goto error;
 			}
-			FILL_BULK_URB(dev->write_urb, udev, 
+			usb_fill_bulk_urb(dev->write_urb, udev, 
 				      usb_sndbulkpipe(udev, 
 						      endpoint->bEndpointAddress),
 				      dev->bulk_out_buffer, buffer_size,

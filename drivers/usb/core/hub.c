@@ -418,7 +418,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 		return -1;
 	}
 
-	FILL_INT_URB(hub->urb, dev, pipe, hub->buffer, maxp, hub_irq,
+	usb_fill_int_urb(hub->urb, dev, pipe, hub->buffer, maxp, hub_irq,
 		hub, endpoint->bInterval);
 	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
 	if (ret) {

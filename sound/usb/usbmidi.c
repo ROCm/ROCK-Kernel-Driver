@@ -590,10 +590,10 @@ static int snd_usbmidi_in_endpoint_create(snd_usb_midi_t* umidi,
 		return -ENOMEM;
 	}
 	if (int_epd)
-		FILL_INT_URB(ep->urb, umidi->chip->dev, pipe, buffer, length,
+		usb_fill_int_urb(ep->urb, umidi->chip->dev, pipe, buffer, length,
 			     snd_usbmidi_in_urb_complete, ep, int_epd->bInterval);
 	else
-		FILL_BULK_URB(ep->urb, umidi->chip->dev, pipe, buffer, length,
+		usb_fill_bulk_urb(ep->urb, umidi->chip->dev, pipe, buffer, length,
 			      snd_usbmidi_in_urb_complete, ep);
 
 	rep->in = ep;
@@ -657,7 +657,7 @@ static int snd_usbmidi_out_endpoint_create(snd_usb_midi_t* umidi,
 		snd_usbmidi_out_endpoint_delete(ep);
 		return -ENOMEM;
 	}
-	FILL_BULK_URB(ep->urb, umidi->chip->dev, pipe, buffer,
+	usb_fill_bulk_urb(ep->urb, umidi->chip->dev, pipe, buffer,
 		      ep->max_transfer, snd_usbmidi_out_urb_complete, ep);
 
 	spin_lock_init(&ep->buffer_lock);

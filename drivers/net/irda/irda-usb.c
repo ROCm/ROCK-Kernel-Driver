@@ -265,7 +265,7 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self)
 	irda_usb_build_header(self, frame, 1);
 
 	/* Submit the 0 length IrDA frame to trigger new speed settings */
-        FILL_BULK_URB(urb, self->usbdev,
+        usb_fill_bulk_urb(urb, self->usbdev,
 		      usb_sndbulkpipe(self->usbdev, self->bulk_out_ep),
                       frame, IRDA_USB_SPEED_MTU,
                       speed_bulk_callback, self);
@@ -400,7 +400,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 	/* FIXME: Make macro out of this one */
 	((struct irda_skb_cb *)skb->cb)->context = self;
 
-        FILL_BULK_URB(urb, self->usbdev, 
+        usb_fill_bulk_urb(urb, self->usbdev, 
 		      usb_sndbulkpipe(self->usbdev, self->bulk_out_ep),
                       skb->data, IRDA_USB_MAX_MTU,
                       write_bulk_callback, skb);
@@ -729,7 +729,7 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, struc
 	cb->context = self;
 
 	/* Reinitialize URB */
-	FILL_BULK_URB(urb, self->usbdev, 
+	usb_fill_bulk_urb(urb, self->usbdev, 
 		      usb_rcvbulkpipe(self->usbdev, self->bulk_in_ep), 
 		      skb->data, skb->truesize,
                       irda_usb_receive, skb);

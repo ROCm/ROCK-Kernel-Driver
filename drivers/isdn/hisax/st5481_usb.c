@@ -284,7 +284,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	ctrl->urb = urb;
 	
 	// Fill the control URB
-	FILL_CONTROL_URB (urb, dev, 
+	usb_fill_control_urb (urb, dev, 
 			  usb_sndctrlpipe(dev, 0),
 			  NULL, NULL, 0, usb_ctrl_complete, adapter);
 
@@ -306,7 +306,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	endpoint = &altsetting->endpoint[EP_INT-1];
 				
 	// Fill the interrupt URB
-	FILL_INT_URB(urb, dev,
+	usb_fill_int_urb(urb, dev,
 		     usb_rcvintpipe(dev, endpoint->bEndpointAddress),
 		     buf, INT_PKT_SIZE,
 		     usb_int_complete, adapter,
