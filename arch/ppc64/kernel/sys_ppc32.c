@@ -32,6 +32,7 @@
 #include <linux/shm.h>
 #include <linux/slab.h>
 #include <linux/uio.h>
+#include <linux/aio.h>
 #include <linux/nfs_fs.h>
 #include <linux/smb_fs.h>
 #include <linux/smb_mount.h>
@@ -2717,7 +2718,7 @@ long sys32_io_submit(aio_context_t ctx_id, u32 number, u32 *iocbpp)
 		struct iocb tmp;
 		u32 *user_iocb;
 
-		if (unlikely(__get_user(user_iocb, iocbpp + i))) {
+		if (unlikely(__get_user((u32)(long)user_iocb, iocbpp + i))) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2727,7 +2728,7 @@ long sys32_io_submit(aio_context_t ctx_id, u32 number, u32 *iocbpp)
 			break;
 		}
 
-		ret = io_submit_one(ctx, user_iocb, &tmp);
+		ret = io_submit_one(ctx, (struct iocb *)user_iocb, &tmp);
 		if (ret)
 			break;
 	}
