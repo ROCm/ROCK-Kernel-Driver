@@ -297,6 +297,19 @@ typedef struct	SHT
      */
     char *proc_name;
 
+    /*
+     * countdown for host blocking with no commands outstanding
+     */
+    unsigned int max_host_blocked;
+
+    /*
+     * Default value for the blocking.  If the queue is empty, host_blocked
+     * counts down in the request_fn until it restarts host operations as
+     * zero is reached.  
+     *
+     * FIXME: This should probably be a value in the template */
+    #define SCSI_DEFAULT_HOST_BLOCKED	7
+
 } Scsi_Host_Template;
 
 /*
@@ -418,12 +431,9 @@ struct Scsi_Host
     unsigned int host_blocked;
 
     /*
-     * Initial value for the blocking.  If the queue is empty, host_blocked
-     * counts down in the request_fn until it restarts host operations as
-     * zero is reached.  
-     *
-     * FIXME: This should probably be a value in the template */
-    #define SCSI_START_HOST_BLOCKED	7
+     * Value host_blocked counts down from
+     */
+    unsigned int max_host_blocked;
 
     void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
 

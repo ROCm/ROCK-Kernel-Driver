@@ -756,14 +756,22 @@ void scsi_request_fn(request_queue_t * q)
 
 		if(SHpnt->host_busy == 0 && SHpnt->host_blocked) {
 			/* unblock after host_blocked iterates to zero */
-			if(--host_blocked == 0) {
+			if(--SHpnt->host_blocked == 0) {
 				printk("scsi%d unblocking host at zero depth\n", SHpnt->host_no);
 			} else {
 				blk_plug_device(q);
 				break;
 			}
 		}
-				
+		if(SDpnt->device_busy == 0 && SDpnt->device_blocked) {
+			/* unblock after device_blocked iterates to zero */
+			if(--SDpnt->device_blocked == 0) {
+				printk("scsi%d (%d:%d) unblocking device at zero depth\n", SHpnt->host_no, SDpnt->id, SDpnt->lun);
+			} else {
+				blk_plug_device(q);
+				break;
+			}
+		}
 		/*
 		 * If the device cannot accept another request, then quit.
 		 */
