@@ -45,7 +45,7 @@ static int nfs_rmdir(struct inode *, struct dentry *);
 static int nfs_unlink(struct inode *, struct dentry *);
 static int nfs_symlink(struct inode *, struct dentry *, const char *);
 static int nfs_link(struct dentry *, struct inode *, struct dentry *);
-static int nfs_mknod(struct inode *, struct dentry *, int, int);
+static int nfs_mknod(struct inode *, struct dentry *, int, dev_t);
 static int nfs_rename(struct inode *, struct dentry *,
 		      struct inode *, struct dentry *);
 
@@ -801,7 +801,8 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
 /*
  * See comments for nfs_proc_create regarding failed operations.
  */
-static int nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
+static int
+nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct iattr attr;
 	struct nfs_fattr fattr;

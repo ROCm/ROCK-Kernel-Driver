@@ -1479,8 +1479,6 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 */
 	spin_lock_irqsave(shost->host_lock, flags);
 	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		request_queue_t *q = &sdev->request_queue;
-
 		if ((shost->can_queue > 0 &&
 		     (shost->host_busy >= shost->can_queue))
 		    || (shost->host_blocked)
@@ -1488,7 +1486,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 			break;
 		}
 
-		q->request_fn(q);
+		__blk_run_queue(&sdev->request_queue);
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 }

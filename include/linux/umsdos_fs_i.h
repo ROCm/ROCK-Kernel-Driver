@@ -50,9 +50,9 @@ struct dir_locking_info {
 struct umsdos_inode_info {
 	struct msdos_inode_info msdos_info;
 	struct dir_locking_info dir_info;
-	int i_patched;			/* Inode has been patched */
-	int i_is_hlink;			/* Resolved hardlink inode? */
-	off_t pos;			/* Entry offset in the emd_owner file */
+	int i_patched;		/* Inode has been patched */
+	int i_is_hlink;		/* Resolved hardlink inode? */
+	off_t pos;		/* Entry offset in the emd_owner file */
 };
 
 #endif

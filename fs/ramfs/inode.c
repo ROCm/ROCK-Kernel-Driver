@@ -47,7 +47,7 @@ static struct backing_dev_info ramfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
+static struct inode *ramfs_get_inode(struct super_block *sb, int mode, dev_t dev)
 {
 	struct inode * inode = new_inode(sb);
 
@@ -87,14 +87,15 @@ struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
  * File creation. Allocate an inode, and we're done..
  */
 /* SMP-safe */
-static int ramfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int
+ramfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode * inode = ramfs_get_inode(dir->i_sb, mode, dev);
 	int error = -ENOSPC;
 
 	if (inode) {
 		d_instantiate(dentry, inode);
-		dget(dentry);		/* Extra count - pin the dentry in core */
+		dget(dentry);	/* Extra count - pin the dentry in core */
 		error = 0;
 	}
 	return error;

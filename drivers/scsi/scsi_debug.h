@@ -43,6 +43,7 @@ static Scsi_Host_Template sdebug_driver_template = {
 	.max_sectors =		4096,
 	.unchecked_isa_dma = 	0,
 	.use_clustering = 	ENABLE_CLUSTERING,
+	.module =		THIS_MODULE,
 };
 
 #endif

@@ -607,25 +607,9 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 
 		if (sdev->attached == 0) {
 			devfs_unregister (sdev->de);
-
-			/* Now we can remove the device structure */
-			if (sdev->next != NULL)
-				sdev->next->prev = sdev->prev;
-
-			if (sdev->prev != NULL)
-				sdev->prev->next = sdev->next;
-
-			if (shost->host_queue == sdev) {
-				shost->host_queue = sdev->next;
-			}
-			blk_cleanup_queue(&sdev->request_queue);
-			if (sdev->inquiry)
-				kfree(sdev->inquiry);
-			kfree((char *) sdev);
-		} else {
-			goto out;
+			scsi_free_sdev(sdev);
+			err = 0;
 		}
-		err = 0;
 	}
 out:
 	

@@ -128,25 +128,25 @@
  */
 
 #include <linux/module.h>
-
+#include <linux/blk.h>
+#include <linux/interrupt.h>
 #include <linux/stddef.h>
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/stat.h>
+
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <asm/system.h>
 #include <asm/dma.h>
 
 #define ULTRASTOR_PRIVATE	/* Get the private stuff from ultrastor.h */
-#include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "ultrastor.h"
-#include<linux/stat.h>
 
 #define FALSE 0
 #define TRUE 1

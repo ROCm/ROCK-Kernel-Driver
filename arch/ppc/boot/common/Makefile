@@ -15,5 +15,3 @@ obj-$(CONFIG_ALL_PPC)			+= mpc10x_memory.o
 obj-$(CONFIG_LOPEC)			+= mpc10x_memory.o
 obj-$(CONFIG_PAL4)			+= cpc700_memory.o
 obj-$(CONFIG_SERIAL_8250_CONSOLE)	+= ns16550.o
-
-include $(TOPDIR)/Rules.make

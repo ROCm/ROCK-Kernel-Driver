@@ -500,15 +500,6 @@ extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host *);
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
 extern void scsi_report_bus_reset(struct Scsi_Host *, int);
-
-typedef struct SHN
-{
-	struct list_head shn_list;
-	char *name;
-	unsigned short host_no;
-	unsigned short host_registered;
-} Scsi_Host_Name;
-	
 extern void scsi_register_blocked_host(struct Scsi_Host *);
 extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 

@@ -78,8 +78,7 @@
  **************************************************************************/
 
 #include <linux/module.h>
-
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/blk.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -88,6 +87,7 @@
 #include <linux/delay.h>
 #include <linux/mca.h>
 #include <linux/spinlock.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 

@@ -668,7 +668,7 @@ int isd200_write_config( struct us_data *us )
 #endif
 
 	/* let's send the command via the control pipe */
-	result = usb_stor_control_msg(
+	result = usb_stor_ctrl_transfer(
                 us, 
                 us->send_ctrl_pipe,
                 0x01, 
@@ -709,7 +709,7 @@ int isd200_read_config( struct us_data *us )
 	/* read the configuration information from ISD200.  Use this to */
 	/* determine what the special ATA CDB bytes are.                */
 
-	result = usb_stor_control_msg(
+	result = usb_stor_ctrl_transfer(
                 us, 
                 us->recv_ctrl_pipe,
                 0x02, 

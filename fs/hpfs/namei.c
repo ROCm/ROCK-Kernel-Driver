@@ -181,7 +181,7 @@ bail:
 	return -ENOSPC;
 }
 
-int hpfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
+int hpfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;

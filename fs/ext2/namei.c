@@ -134,7 +134,7 @@ static int ext2_create (struct inode * dir, struct dentry * dentry, int mode)
 	return err;
 }
 
-static int ext2_mknod (struct inode * dir, struct dentry *dentry, int mode, int rdev)
+static int ext2_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct inode * inode = ext2_new_inode (dir, mode);
 	int err = PTR_ERR(inode);
