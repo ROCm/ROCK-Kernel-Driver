@@ -57,10 +57,11 @@ extern struct llc_sap *llc_sap_alloc(void);
 extern void llc_sap_save(struct llc_sap *sap);
 extern void llc_free_sap(struct llc_sap *sap);
 extern struct llc_sap *llc_sap_find(u8 lsap);
-extern struct llc_station *llc_station_get(void);
 extern void llc_station_state_process(struct llc_station *station,
 				      struct sk_buff *skb);
 extern void llc_station_send_pdu(struct llc_station *station,
 				 struct sk_buff *skb);
 extern struct sk_buff *llc_alloc_frame(void);
+
+extern struct llc_station llc_main_station;
 #endif /* LLC_MAIN_H */

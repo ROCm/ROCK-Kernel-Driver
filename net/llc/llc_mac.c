@@ -197,12 +197,11 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
  */
 static void llc_station_rcv(struct sk_buff *skb)
 {
-	struct llc_station *station = llc_station_get();
 	struct llc_station_state_ev *ev = llc_station_ev(skb);
 
 	ev->type   = LLC_STATION_EV_TYPE_PDU;
 	ev->reason = 0;
-	llc_station_state_process(station, skb);
+	llc_station_state_process(&llc_main_station, skb);
 }
 
 

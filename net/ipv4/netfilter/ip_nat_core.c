@@ -804,7 +804,7 @@ do_bindings(struct ip_conntrack *ct,
 
 		/* Always defragged for helpers */
 		IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
-			       & __constant_htons(IP_MF|IP_OFFSET)));
+			       & htons(IP_MF|IP_OFFSET)));
 
 		/* Have to grab read lock before sibling_list traversal */
 		READ_LOCK(&ip_conntrack_lock);

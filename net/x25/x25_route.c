@@ -18,34 +18,12 @@
  */
 
 #include <linux/config.h>
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/in.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <linux/string.h>
-#include <linux/sockios.h>
-#include <linux/net.h>
-#include <linux/inet.h>
-#include <linux/netdevice.h>
-#include <net/arp.h>
 #include <linux/if_arp.h>
-#include <linux/skbuff.h>
-#include <net/sock.h>
-#include <asm/system.h>
-#include <asm/uaccess.h>
-#include <linux/fcntl.h>
-#include <linux/termios.h>	/* For TIOCINQ/OUTQ */
-#include <linux/mm.h>
-#include <linux/interrupt.h>
-#include <linux/notifier.h>
 #include <linux/init.h>
 #include <net/x25.h>
 
-static struct list_head x25_route_list = LIST_HEAD_INIT(x25_route_list);
-static rwlock_t x25_route_list_lock = RW_LOCK_UNLOCKED;
+struct list_head x25_route_list = LIST_HEAD_INIT(x25_route_list);
+rwlock_t x25_route_list_lock = RW_LOCK_UNLOCKED;
 
 /*
  *	Add a new route.
@@ -225,45 +203,6 @@ int x25_route_ioctl(unsigned int cmd, void *arg)
 out:
 	return rc;
 }
-
-int x25_routes_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	struct x25_route *rt;
-	struct list_head *entry;
-	off_t pos   = 0;
-	off_t begin = 0;
-	int len = sprintf(buffer, "address          digits  device\n");
-
-	read_lock_bh(&x25_route_list_lock);
-
-	list_for_each(entry, &x25_route_list) {
-		rt = list_entry(entry, struct x25_route, node);
-		len += sprintf(buffer + len, "%-15s  %-6d  %-5s\n",
-			       rt->address.x25_addr,
-			       rt->sigdigits,
-			       rt->dev ? rt->dev->name : "???");
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
-	}
-
-	read_unlock_bh(&x25_route_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
-} 
 
 /*
  *	Release all memory associated with X.25 routing structures.

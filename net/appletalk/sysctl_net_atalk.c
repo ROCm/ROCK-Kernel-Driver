@@ -7,7 +7,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/mm.h>
 #include <linux/sysctl.h>
 
 extern int sysctl_aarp_expiry_time;
@@ -16,7 +15,7 @@ extern int sysctl_aarp_retransmit_limit;
 extern int sysctl_aarp_resolve_time;
 
 #ifdef CONFIG_SYSCTL
-static ctl_table atalk_table[] = {
+static struct ctl_table atalk_table[] = {
 	{
 		.ctl_name	= NET_ATALK_AARP_EXPIRY_TIME,
 		.procname	= "aarp-expiry-time",
@@ -52,7 +51,7 @@ static ctl_table atalk_table[] = {
 	{ 0 },
 };
 
-static ctl_table atalk_dir_table[] = {
+static struct ctl_table atalk_dir_table[] = {
 	{
 		.ctl_name	= NET_ATALK,
 		.procname	= "appletalk",
@@ -62,7 +61,7 @@ static ctl_table atalk_dir_table[] = {
 	{ 0 },
 };
 
-static ctl_table atalk_root_table[] = {
+static struct ctl_table atalk_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",

@@ -112,7 +112,7 @@ static void dump_packet(const struct ip6t_log_info *info,
 			printk("FRAG:%u ", ntohs(fhdr->frag_off) & 0xFFF8);
 
 			/* Max length: 11 "INCOMPLETE " */
-			if (fhdr->frag_off & __constant_htons(0x0001))
+			if (fhdr->frag_off & htons(0x0001))
 				printk("INCOMPLETE ");
 
 			printk("ID:%08x ", fhdr->identification);

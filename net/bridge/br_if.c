@@ -18,6 +18,7 @@
 #include <linux/if_bridge.h>
 #include <linux/inetdevice.h>
 #include <linux/rtnetlink.h>
+#include <linux/brlock.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
 
@@ -37,7 +38,7 @@ static int br_initial_port_cost(struct net_device *dev)
 	return 100;
 }
 
-/* called under bridge lock */
+/* called under BR_NETPROTO_LOCK and bridge lock */
 static int __br_del_if(struct net_bridge *br, struct net_device *dev)
 {
 	struct net_bridge_port *p;
@@ -86,10 +87,12 @@ static struct net_bridge **__find_br(char *name)
 
 static void del_ifs(struct net_bridge *br)
 {
-	write_lock_bh(&br->lock);
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+	write_lock(&br->lock);
 	while (br->port_list != NULL)
 		__br_del_if(br, br->port_list->dev);
-	write_unlock_bh(&br->lock);
+	write_unlock(&br->lock);
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
 }
 
 static struct net_bridge *new_nb(char *name)
@@ -252,10 +255,12 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 {
 	int retval;
 
-	write_lock_bh(&br->lock);
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+	write_lock(&br->lock);
 	retval = __br_del_if(br, dev);
 	br_stp_recalculate_bridge_id(br);
-	write_unlock_bh(&br->lock);
+	write_unlock(&br->lock);
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
 
 	return retval;
 }

@@ -220,9 +220,8 @@ extern void x25_enquiry_response(struct sock *);
 /* x25_route.c */
 extern struct x25_route *x25_get_route(struct x25_address *addr);
 extern struct net_device *x25_dev_get(char *);
-extern void x25_route_device_down(struct net_device *);
+extern void x25_route_device_down(struct net_device *dev);
 extern int  x25_route_ioctl(unsigned int, void *);
-extern int  x25_routes_get_info(char *, char **, off_t, int);
 extern void x25_route_free(void);
 
 static __inline__ void x25_route_hold(struct x25_route *rt)
@@ -263,4 +262,12 @@ struct x25_skb_cb {
 	unsigned flags;
 };
 #define X25_SKB_CB(s) ((struct x25_skb_cb *) ((s)->cb))
+
+extern struct sock *x25_list;
+extern rwlock_t x25_list_lock;
+extern struct list_head x25_route_list;
+extern rwlock_t x25_route_list_lock;
+
+extern int x25_proc_init(void);
+extern void x25_proc_exit(void);
 #endif

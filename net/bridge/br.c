@@ -21,6 +21,7 @@
 #include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/if_bridge.h>
+#include <linux/brlock.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
 
@@ -55,11 +56,6 @@ static int __init br_init(void)
 	return 0;
 }
 
-static void __br_clear_frame_hook(void)
-{
-	br_handle_frame_hook = NULL;
-}
-
 static void __br_clear_ioctl_hook(void)
 {
 	br_ioctl_hook = NULL;
@@ -69,7 +65,11 @@ static void __exit br_deinit(void)
 {
 	unregister_netdevice_notifier(&br_device_notifier);
 	br_call_ioctl_atomic(__br_clear_ioctl_hook);
-	net_call_rx_atomic(__br_clear_frame_hook);
+
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+	br_handle_frame_hook = NULL;
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
+
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 	br_fdb_get_hook = NULL;
 	br_fdb_put_hook = NULL;

@@ -102,7 +102,7 @@ int ip6_output(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 	struct net_device *dev = dst->dev;
 
-	skb->protocol = __constant_htons(ETH_P_IPV6);
+	skb->protocol = htons(ETH_P_IPV6);
 	skb->dev = dev;
 
 	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr)) {
@@ -223,7 +223,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	 *	Fill in the IPv6 header
 	 */
 
-	*(u32*)hdr = __constant_htonl(0x60000000) | fl->fl6_flowlabel;
+	*(u32*)hdr = htonl(0x60000000) | fl->fl6_flowlabel;
 	hlimit = -1;
 	if (np)
 		hlimit = np->hop_limit;
@@ -264,7 +264,7 @@ int ip6_nd_hdr(struct sock *sk, struct sk_buff *skb, struct net_device *dev,
 	struct ipv6hdr *hdr;
 	int totlen;
 
-	skb->protocol = __constant_htons(ETH_P_IPV6);
+	skb->protocol = htons(ETH_P_IPV6);
 	skb->dev = dev;
 
 	totlen = len + sizeof(struct ipv6hdr);

@@ -1,3 +1,5 @@
+#ifndef _NET_INET_IPX_H_
+#define _NET_INET_IPX_H_
 /*
  *	The following information is in its entirety obtained from:
  *
@@ -6,9 +8,6 @@
  *
  *	Which is available from ftp.novell.com
  */
-
-#ifndef _NET_INET_IPX_H_
-#define _NET_INET_IPX_H_
 
 #include <linux/netdevice.h>
 #include <net/datalink.h>
@@ -25,8 +24,7 @@ struct ipx_address {
 
 #define IPX_MAX_PPROP_HOPS 8
 
-struct ipxhdr
-{
+struct ipxhdr {
 	__u16           ipx_checksum __attribute__ ((packed));
 #define IPX_NO_CHECKSUM	0xFFFF
 	__u16           ipx_pktsize __attribute__ ((packed));
@@ -110,4 +108,17 @@ struct ipx_opt {
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000
 #define IPX_MAX_EPHEMERAL_SOCKET	0x7fff
 
+extern struct ipx_route *ipx_routes;
+extern rwlock_t ipx_routes_lock;
+
+extern struct ipx_interface *ipx_interfaces;
+extern spinlock_t ipx_interfaces_lock;
+
+extern struct ipx_interface *ipx_primary_net;
+
+extern int ipx_proc_init(void);
+extern void ipx_proc_exit(void);
+
+extern const char *ipx_frame_name(unsigned short);
+extern const char *ipx_device_name(struct ipx_interface *intrfc);
 #endif /* def _NET_INET_IPX_H_ */

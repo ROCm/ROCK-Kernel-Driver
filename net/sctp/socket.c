@@ -4,41 +4,41 @@
  * Copyright (c) 2001-2002 Intel Corp.
  * Copyright (c) 2001-2002 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * These functions interface with the sockets layer to implement the
  * SCTP Extensions for the Sockets API.
- * 
+ *
  * Note that the descriptions from the specification are USER level
  * functions--this file is the functions which populate the struct proto
  * for SCTP which is the BOTTOM of the sockets interface.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Narasimha Budihal     <narsi@refcode.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
@@ -47,7 +47,7 @@
  *    Daisy Chang           <daisyc@us.ibm.com>
  *    Sridhar Samudrala     <samudrala@us.ibm.com>
  *    Inaky Perez-Gonzalez  <inaky.gonzalez@intel.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -67,14 +67,18 @@
 #include <net/icmp.h>
 #include <net/route.h>
 #include <net/ipv6.h>
-#include <net/inet_common.h> 
+#include <net/inet_common.h>
 
 #include <linux/socket.h> /* for sa_family_t */
 #include <net/sock.h>
-#include <net/sctp/sctp.h> 
+#include <net/sctp/sctp.h>
+
+/* WARNING:  Please do not remove the SCTP_STATIC attribute to
+ * any of the functions below as they are used to export functions
+ * used by a project regression testsuite.
+ */
 
 /* Forward declarations for internal helper functions. */
-static void __sctp_write_space(sctp_association_t *asoc);
 static int sctp_writeable(struct sock *sk);
 static inline int sctp_wspace(sctp_association_t *asoc);
 static inline void sctp_set_owner_w(sctp_chunk_t *chunk);
@@ -92,8 +96,7 @@ static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
 static int sctp_do_bind(struct sock *, sockaddr_storage_t *, int);
 static int sctp_autobind(struct sock *sk);
-static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head,
-					      unsigned short snum);
+
 
 /* API 3.1.2 bind() - UDP Style Syntax
  * The syntax of bind() is,
@@ -132,7 +135,8 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 static long sctp_get_port_local(struct sock *, unsigned short);
 
 /* Bind a local address either to an endpoint or to an association.  */
-static int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr, int addr_len)
+SCTP_STATIC int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr,
+			     int addr_len)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
@@ -151,7 +155,7 @@ static int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr, int addr_l
 	if (PF_INET == sk->family) {
 		if (sa_family != AF_INET)
 			return -EINVAL;
-	}	
+	}
 
 	/* Make a local copy of the new address.  */
 	tmpaddr = *newaddr;
@@ -317,7 +321,7 @@ static int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr, int addr_l
  * sctp_bindx() for a lock-protected call.
  */
 
-static int __sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs, 
+static int __sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs,
 			int addrcnt, int flags)
 {
 	int retval = 0;
@@ -603,9 +607,9 @@ err_bindx_rem:
  *
  * Returns 0 if ok, <0 errno code on error.
  */
-static int sctp_setsockopt_bindx(struct sock* sk,
-				 struct sockaddr_storage *addrs,
-				 int addrssize, int op)
+SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk,
+				      struct sockaddr_storage *addrs,
+				      int addrssize, int op)
 {
 	struct sockaddr_storage *kaddrs;
 	int err;
@@ -659,7 +663,7 @@ static int sctp_setsockopt_bindx(struct sock* sk,
  * If sd in the close() call is a branched-off socket representing only
  * one association, the shutdown is performed on that association only.
  */
-static void sctp_close(struct sock *sk, long timeout)
+SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 {
 	sctp_endpoint_t *ep;
 	sctp_association_t *asoc;
@@ -727,9 +731,9 @@ static void sctp_close(struct sock *sk, long timeout)
 /* BUG:  We do not implement timeouts.  */
 /* BUG:  We do not implement the equivalent of wait_for_tcp_memory(). */
 
-static int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
+SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 
-static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
+SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 {
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
@@ -931,7 +935,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 					= sinit->sinit_max_attempts;
 			}
 			if (sinit->sinit_max_init_timeo) {
-				asoc->max_init_timeo 
+				asoc->max_init_timeo
 					= sinit->sinit_max_init_timeo * HZ;
 			}
 		}
@@ -1094,8 +1098,8 @@ do_interrupted:
  */
 static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 
-static int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
-			int noblock, int flags, int *addr_len)
+SCTP_STATIC int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
+			     int noblock, int flags, int *addr_len)
 {
 	sctp_ulpevent_t *event = NULL;
 	sctp_opt_t *sp = sctp_sk(sk);
@@ -1170,7 +1174,7 @@ out:
 	return err;
 }
 
-static inline int sctp_setsockopt_disable_fragments(struct sock *sk, 
+static inline int sctp_setsockopt_disable_fragments(struct sock *sk,
 						    char *optval, int optlen)
 {
 	int val;
@@ -1186,7 +1190,7 @@ static inline int sctp_setsockopt_disable_fragments(struct sock *sk,
 	return 0;
 }
 
-static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval, 
+static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval,
 					     int optlen)
 {
 	if (optlen != sizeof(struct sctp_event_subscribe))
@@ -1196,7 +1200,7 @@ static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval,
 	return 0;
 }
 
-static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval, 
+static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 					    int optlen)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
@@ -1229,7 +1233,7 @@ static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
  *   optval  - the buffer to store the value of the option.
  *   optlen  - the size of the buffer.
  */
-static int sctp_setsockopt(struct sock *sk, int level, int optname,
+SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 			   char *optval, int optlen)
 {
 	int retval = 0;
@@ -1313,19 +1317,20 @@ out_nounlock:
 }
 
 /* FIXME: Write comments. */
-static int sctp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
+SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
+			     int addr_len)
 {
 	return -EOPNOTSUPP; /* STUB */
 }
 
 /* FIXME: Write comments. */
-static int sctp_disconnect(struct sock *sk, int flags)
+SCTP_STATIC int sctp_disconnect(struct sock *sk, int flags)
 {
 	return -EOPNOTSUPP; /* STUB */
 }
 
 /* FIXME: Write comments. */
-static struct sock *sctp_accept(struct sock *sk, int flags, int *err)
+SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 {
 	int error = -EOPNOTSUPP;
 
@@ -1334,7 +1339,7 @@ static struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 }
 
 /* FIXME: Write Comments. */
-static int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
+SCTP_STATIC int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
 	return -EOPNOTSUPP; /* STUB */
 }
@@ -1343,7 +1348,7 @@ static int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
  * initialized the SCTP-specific portion of the sock.
  * The sock structure should already be zero-filled memory.
  */
-static int sctp_init_sock(struct sock *sk)
+SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
 	sctp_endpoint_t *ep;
 	sctp_protocol_t *proto;
@@ -1428,7 +1433,7 @@ static int sctp_init_sock(struct sock *sk)
 }
 
 /* Cleanup any SCTP per socket resources.  */
-static int sctp_destroy_sock(struct sock *sk)
+SCTP_STATIC int sctp_destroy_sock(struct sock *sk)
 {
 	sctp_endpoint_t *ep;
 
@@ -1442,7 +1447,7 @@ static int sctp_destroy_sock(struct sock *sk)
 }
 
 /* FIXME: Comments needed.  */
-static void sctp_shutdown(struct sock *sk, int how)
+SCTP_STATIC void sctp_shutdown(struct sock *sk, int how)
 {
 	/* UDP-style sockets do not support shutdown. */
 	/* STUB */
@@ -1563,7 +1568,7 @@ static inline int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optv
 }
 
 /* Helper routine to branch off an association to a new socket.  */
-static int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newsock)
+SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newsock)
 {
 	struct sock *oldsk = assoc->base.sk;
 	struct sock *newsk;
@@ -1652,8 +1657,8 @@ static inline int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval
 	return 0;
 }
 
-static int sctp_getsockopt(struct sock *sk, int level, int optname,
-			   char *optval, int *optlen)
+SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
+				char *optval, int *optlen)
 {
 	int retval = 0;
 	sctp_protocol_t *proto = sctp_get_protocol();
@@ -1734,6 +1739,8 @@ static void sctp_unhash(struct sock *sk)
  * link to the socket (struct sock) that uses it, the port number and
  * a fastreuse flag (FIXME: NPI ipg).
  */
+static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head,
+					      unsigned short snum);
 static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 {
 	sctp_bind_hashbucket_t *head; /* hash list */
@@ -1927,7 +1934,7 @@ static int sctp_get_port(struct sock *sk, unsigned short snum)
  *   An application uses listen() to mark a socket as being able to
  *   accept new associations.
  */
-static int sctp_seqpacket_listen(struct sock *sk, int backlog)
+SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
@@ -2184,7 +2191,8 @@ static int sctp_autobind(struct sock *sk)
  * msg_control
  * points here
  */
-static int sctp_msghdr_parse(const struct msghdr *msg, sctp_cmsgs_t *cmsgs)
+SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
+				  sctp_cmsgs_t *cmsgs)
 {
 	struct cmsghdr *cmsg;
 
@@ -2500,6 +2508,31 @@ static inline void sctp_set_owner_w(sctp_chunk_t *chunk)
 	sk->wmem_queued += SCTP_DATA_SNDSIZE(chunk);
 }
 
+/* If sndbuf has changed, wake up per association sndbuf waiters.  */
+static void __sctp_write_space(sctp_association_t *asoc)
+{
+	struct sock *sk = asoc->base.sk;
+	struct socket *sock = sk->socket;
+
+	if ((sctp_wspace(asoc) > 0) && sock) {
+		if (waitqueue_active(&asoc->wait))
+			wake_up_interruptible(&asoc->wait);
+
+		if (sctp_writeable(sk)) {
+			if (sk->sleep && waitqueue_active(sk->sleep))
+				wake_up_interruptible(sk->sleep);
+
+			/* Note that we try to include the Async I/O support
+			 * here by modeling from the current TCP/UDP code.
+			 * We have not tested with it yet.
+			 */
+			if (sock->fasync_list &&
+			    !(sk->shutdown & SEND_SHUTDOWN))
+				sock_wake_async(sock, 2, POLL_OUT);
+		}
+	}
+}
+
 /* Do accounting for the sndbuf space.
  * Decrement the used sndbuf space of the corresponding association by the
  * data size which was just transmitted(freed).
@@ -2522,7 +2555,8 @@ static void sctp_wfree(struct sk_buff *skb)
 }
 
 /* Helper function to wait for space in the sndbuf.  */
-static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p, int msg_len)
+static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
+				int msg_len)
 {
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
@@ -2579,31 +2613,6 @@ do_interrupted:
 do_nonblock:
 	err = -EAGAIN;
 	goto out;
-}
-
-/* If sndbuf has changed, wake up per association sndbuf waiters.  */
-static void __sctp_write_space(sctp_association_t *asoc)
-{
-	struct sock *sk = asoc->base.sk;
-	struct socket *sock = sk->socket;
-
-	if ((sctp_wspace(asoc) > 0) && sock) {
-		if (waitqueue_active(&asoc->wait))
-			wake_up_interruptible(&asoc->wait);
-
-		if (sctp_writeable(sk)) {
-			if (sk->sleep && waitqueue_active(sk->sleep))
-				wake_up_interruptible(sk->sleep);
-
-			/* Note that we try to include the Async I/O support
-			 * here by modeling from the current TCP/UDP code.
-			 * We have not tested with it yet.
-			 */
-			if (sock->fasync_list &&
-			    !(sk->shutdown & SEND_SHUTDOWN))
-				sock_wake_async(sock, 2, POLL_OUT);
-		}
-	}
 }
 
 /* If socket sndbuf has changed, wake up all per association waiters.  */

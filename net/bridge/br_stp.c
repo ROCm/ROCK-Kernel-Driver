@@ -369,10 +369,19 @@ static void br_make_blocking(struct net_bridge_port *p)
 static void br_make_forwarding(struct net_bridge_port *p)
 {
 	if (p->state == BR_STATE_BLOCKING) {
-		printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-		       p->br->dev.name, p->port_no, p->dev->name, "listening");
+		if (p->br->stp_enabled) {
+			printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
+			       p->br->dev.name, p->port_no, p->dev->name,
+			       "listening");
 
-		p->state = BR_STATE_LISTENING;
+			p->state = BR_STATE_LISTENING;
+		} else {
+			printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
+			       p->br->dev.name, p->port_no, p->dev->name,
+			       "learning");
+
+			p->state = BR_STATE_LEARNING;
+		}
 		br_timer_set(&p->forward_delay_timer, jiffies);
 	}
 }

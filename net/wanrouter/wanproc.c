@@ -61,9 +61,6 @@ typedef struct wan_stat_entry
 
 #ifdef CONFIG_PROC_FS
 
-/* Proc filesystem interface */
-static int router_proc_perms(struct inode *, int);
-
 /* Miscellaneous */
 
 /*
@@ -79,11 +76,6 @@ static int router_proc_perms(struct inode *, int);
  *	Generic /proc/net/router/<file> file and inode operations 
  */
 
-static struct inode_operations router_inode =
-{
-	.permission =	router_proc_perms,
-};
-
 /*
  *	/proc/net/router 
  */
@@ -97,15 +89,6 @@ static struct proc_dir_entry *proc_router;
  */
 
 /****** Proc filesystem entry points ****************************************/
-
-/*
- *	Verify access rights.
- */
-
-static int router_proc_perms (struct inode* inode, int op)
-{
-	return 0;
-}
 
 /*
  *	Iterator
@@ -320,16 +303,14 @@ int __init wanrouter_proc_init (void)
 	if (!proc_router)
 		goto fail;
 
-	p = create_proc_entry("config",0,proc_router);
+	p = create_proc_entry("config", S_IRUGO, proc_router);
 	if (!p)
 		goto fail_config;
 	p->proc_fops = &config_fops;
-	p->proc_iops = &router_inode;
-	p = create_proc_entry("status",0,proc_router);
+	p = create_proc_entry("status", S_IRUGO, proc_router);
 	if (!p)
 		goto fail_stat;
 	p->proc_fops = &status_fops;
-	p->proc_iops = &router_inode;
 	return 0;
 fail_stat:
 	remove_proc_entry("config", proc_router);
@@ -359,11 +340,10 @@ int wanrouter_proc_add (wan_device_t* wandev)
 	if (wandev->magic != ROUTER_MAGIC)
 		return -EINVAL;
 		
-	wandev->dent = create_proc_entry(wandev->name, 0, proc_router);
+	wandev->dent = create_proc_entry(wandev->name, S_IRUGO, proc_router);
 	if (!wandev->dent)
 		return -ENOMEM;
 	wandev->dent->proc_fops	= &wandev_fops;
-	wandev->dent->proc_iops	= &router_inode;
 	wandev->dent->data	= wandev;
 	return 0;
 }

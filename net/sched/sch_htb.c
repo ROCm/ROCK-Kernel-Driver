@@ -15,9 +15,11 @@
  *			helped a lot to locate nasty class stall bug
  *		Andi Kleen, Jamal Hadi, Bert Hubert
  *			code review and helpful comments on shaping
+ *		Tomasz Wrona, <tw@eter.tym.pl>
+ *			created test case so that I was able to fix nasty bug
  *		and many others. thanks.
  *
- * $Id: sch_htb.c,v 1.13 2002/05/25 09:04:50 devik Exp $
+ * $Id: sch_htb.c,v 1.14 2002/09/28 12:55:22 devik Exp devik $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -69,7 +71,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x30006	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x30007	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -1496,19 +1498,23 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 #endif
 	} else sch_tree_lock(sch);
 
-	cl->un.leaf.quantum = rtab->rate.rate / q->rate2quantum;
-	if (!hopt->quantum && cl->un.leaf.quantum < 1000) {
-		printk(KERN_WARNING "HTB: quantum of class %X is small. Consider r2q change.", cl->classid);
-		cl->un.leaf.quantum = 1000;
+	/* it used to be a nasty bug here, we have to check that node
+           is really leaf before changing cl->un.leaf ! */
+	if (!cl->level) {
+		cl->un.leaf.quantum = rtab->rate.rate / q->rate2quantum;
+		if (!hopt->quantum && cl->un.leaf.quantum < 1000) {
+			printk(KERN_WARNING "HTB: quantum of class %X is small. Consider r2q change.", cl->classid);
+			cl->un.leaf.quantum = 1000;
+		}
+		if (!hopt->quantum && cl->un.leaf.quantum > 200000) {
+			printk(KERN_WARNING "HTB: quantum of class %X is big. Consider r2q change.", cl->classid);
+			cl->un.leaf.quantum = 200000;
+		}
+		if (hopt->quantum)
+			cl->un.leaf.quantum = hopt->quantum;
+		if ((cl->un.leaf.prio = hopt->prio) >= TC_HTB_NUMPRIO)
+			cl->un.leaf.prio = TC_HTB_NUMPRIO - 1;
 	}
-	if (!hopt->quantum && cl->un.leaf.quantum > 200000) {
-		printk(KERN_WARNING "HTB: quantum of class %X is big. Consider r2q change.", cl->classid);
-		cl->un.leaf.quantum = 200000;
-	}
-	if (hopt->quantum)
-		cl->un.leaf.quantum = hopt->quantum;
-	if ((cl->un.leaf.prio = hopt->prio) >= TC_HTB_NUMPRIO)
-		cl->un.leaf.prio = TC_HTB_NUMPRIO - 1;
 
 	cl->buffer = hopt->buffer;
 	cl->cbuffer = hopt->cbuffer;

@@ -40,6 +40,8 @@
  *                                              result.
  *		Arnaldo C. de Melo	:	Cleanup, in preparation for
  *						shared skb support 8)
+ *		Arnaldo C. de Melo	:	Move proc stuff to atalk_proc.c,
+ *						use seq_file
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -50,41 +52,14 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/socket.h>
-#include <linux/sockios.h>
-#include <linux/in.h>
 #include <linux/tcp.h>
-#include <linux/errno.h>
-#include <linux/interrupt.h>
-#include <linux/if_ether.h>
-#include <linux/notifier.h>
-#include <linux/netdevice.h>
-#include <linux/inetdevice.h>
-#include <linux/route.h>
-#include <linux/inet.h>
-#include <linux/etherdevice.h>
 #include <linux/if_arp.h>
-#include <linux/skbuff.h>
-#include <linux/spinlock.h>
 #include <linux/termios.h>	/* For TIOCOUTQ/INQ */
 #include <net/datalink.h>
-#include <net/p8022.h>
 #include <net/psnap.h>
 #include <net/sock.h>
-#include <linux/ip.h>
 #include <net/route.h>
 #include <linux/atalk.h>
-#include <linux/proc_fs.h>
-#include <linux/stat.h>
-#include <linux/init.h>
 
 #ifdef CONFIG_PROC_FS
 extern void aarp_register_proc_fs(void);
@@ -112,8 +87,8 @@ static struct proto_ops atalk_dgram_ops;
 *                                                                          *
 \**************************************************************************/
 
-static struct sock *atalk_sockets;
-static spinlock_t atalk_sockets_lock = SPIN_LOCK_UNLOCKED;
+struct sock *atalk_sockets;
+spinlock_t atalk_sockets_lock = SPIN_LOCK_UNLOCKED;
 
 extern inline void atalk_insert_socket(struct sock *sk)
 {
@@ -244,53 +219,6 @@ extern inline void atalk_destroy_socket(struct sock *sk)
 	}
 }
 
-/* Called from proc fs */
-static int atalk_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	off_t pos = 0;
-	off_t begin = 0;
-	int len = sprintf(buffer, "Type local_addr  remote_addr tx_queue "
-				  "rx_queue st uid\n");
-	struct sock *s;
-	/* Output the AppleTalk data for the /proc filesystem */
-
-	spin_lock_bh(&atalk_sockets_lock);
-	for (s = atalk_sockets; s; s = s->next) {
-		struct atalk_sock *at = at_sk(s);
-
-		len += sprintf(buffer + len, "%02X   ", s->type);
-		len += sprintf(buffer + len, "%04X:%02X:%02X  ",
-			       ntohs(at->src_net), at->src_node, at->src_port);
-		len += sprintf(buffer + len, "%04X:%02X:%02X  ",
-			       ntohs(at->dest_net), at->dest_node,
-			       at->dest_port);
-		len += sprintf(buffer + len, "%08X:%08X ",
-			       atomic_read(&s->wmem_alloc),
-			       atomic_read(&s->rmem_alloc));
-		len += sprintf(buffer + len, "%02X %d\n", s->state, 
-			       SOCK_INODE(s->socket)->i_uid);
-
-		/* Are we still dumping unwanted data then discard the record */
-		pos = begin + len;
-
-		if (pos < offset) {
-			len = 0;	/* Keep dumping into the buffer start */
-			begin = pos;
-		}
-		if (pos > offset + length)	/* We have dumped enough */
-			break;
-	}
-	spin_unlock_bh(&atalk_sockets_lock);
-
-	/* The data in question runs from begin to begin + len */
-	*start = buffer + offset - begin;	/* Start of wanted data */
-	len -= offset - begin;   /* Remove unwanted header data from length */
-	if (len > length)
-		len = length;	   /* Remove unwanted tail data from length */
-
-	return len;
-}
-
 /**************************************************************************\
 *                                                                          *
 * Routing tables for the AppleTalk socket layer.                           *
@@ -298,14 +226,14 @@ static int atalk_get_info(char *buffer, char **start, off_t offset, int length)
 \**************************************************************************/
 
 /* Anti-deadlock ordering is router_lock --> iface_lock -DaveM */
-static struct atalk_route *atalk_router_list;
-static rwlock_t atalk_router_lock = RW_LOCK_UNLOCKED;
+struct atalk_route *atalk_routes;
+rwlock_t atalk_routes_lock = RW_LOCK_UNLOCKED;
 
-static struct atalk_iface *atalk_iface_list;
-static spinlock_t atalk_iface_lock = SPIN_LOCK_UNLOCKED;
+struct atalk_iface *atalk_interfaces;
+spinlock_t atalk_interfaces_lock = SPIN_LOCK_UNLOCKED;
 
 /* For probing devices or in a routerless network */
-static struct atalk_route atrtr_default;
+struct atalk_route atrtr_default;
 
 /* AppleTalk interface control */
 /*
@@ -314,10 +242,10 @@ static struct atalk_route atrtr_default;
  */
 static void atif_drop_device(struct net_device *dev)
 {
-	struct atalk_iface **iface = &atalk_iface_list;
+	struct atalk_iface **iface = &atalk_interfaces;
 	struct atalk_iface *tmp;
 
-	spin_lock_bh(&atalk_iface_lock);
+	spin_lock_bh(&atalk_interfaces_lock);
 	while ((tmp = *iface) != NULL) {
 		if (tmp->dev == dev) {
 			*iface = tmp->next;
@@ -327,7 +255,7 @@ static void atif_drop_device(struct net_device *dev)
 		} else
 			iface = &tmp->next;
 	}
-	spin_unlock_bh(&atalk_iface_lock);
+	spin_unlock_bh(&atalk_interfaces_lock);
 }
 
 static struct atalk_iface *atif_add_device(struct net_device *dev,
@@ -346,10 +274,10 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	iface->address = *sa;
 	iface->status = 0;
 
-	spin_lock_bh(&atalk_iface_lock);
-	iface->next = atalk_iface_list;
-	atalk_iface_list = iface;
-	spin_unlock_bh(&atalk_iface_lock);
+	spin_lock_bh(&atalk_interfaces_lock);
+	iface->next = atalk_interfaces;
+	atalk_interfaces = iface;
+	spin_unlock_bh(&atalk_interfaces_lock);
 out:
 	return iface;
 out_mem:
@@ -466,8 +394,8 @@ static struct atalk_addr *atalk_find_primary(void)
 	 * Return a point-to-point interface only if
 	 * there is no non-ptp interface available.
 	 */
-	spin_lock_bh(&atalk_iface_lock);
-	for (iface = atalk_iface_list; iface; iface = iface->next) {
+	spin_lock_bh(&atalk_interfaces_lock);
+	for (iface = atalk_interfaces; iface; iface = iface->next) {
 		if (!fiface && !(iface->dev->flags & IFF_LOOPBACK))
 			fiface = iface;
 		if (!(iface->dev->flags & (IFF_LOOPBACK | IFF_POINTOPOINT))) {
@@ -478,12 +406,12 @@ static struct atalk_addr *atalk_find_primary(void)
 
 	if (fiface)
 		retval = &fiface->address;
-	else if (atalk_iface_list)
-		retval = &atalk_iface_list->address;
+	else if (atalk_interfaces)
+		retval = &atalk_interfaces->address;
 	else
 		retval = NULL;
 out:
-	spin_unlock_bh(&atalk_iface_lock);
+	spin_unlock_bh(&atalk_interfaces_lock);
 	return retval;
 }
 
@@ -514,8 +442,8 @@ static struct atalk_iface *atalk_find_interface(int net, int node)
 {
 	struct atalk_iface *iface;
 
-	spin_lock_bh(&atalk_iface_lock);
-	for (iface = atalk_iface_list; iface; iface = iface->next) {
+	spin_lock_bh(&atalk_interfaces_lock);
+	for (iface = atalk_interfaces; iface; iface = iface->next) {
 		if ((node == ATADDR_BCAST ||
 		     node == ATADDR_ANYNODE ||
 		     iface->address.s_node == node) &&
@@ -529,7 +457,7 @@ static struct atalk_iface *atalk_find_interface(int net, int node)
 		    ntohs(net) <= ntohs(iface->nets.nr_lastnet))
 		        break;
 	}
-	spin_unlock_bh(&atalk_iface_lock);
+	spin_unlock_bh(&atalk_interfaces_lock);
 	return iface;
 }
 
@@ -549,8 +477,8 @@ static struct atalk_route *atrtr_find(struct atalk_addr *target)
 	struct atalk_route *net_route = NULL;
 	struct atalk_route *r;
 	
-	read_lock_bh(&atalk_router_lock);
-	for (r = atalk_router_list; r; r = r->next) {
+	read_lock_bh(&atalk_routes_lock);
+	for (r = atalk_routes; r; r = r->next) {
 		if (!(r->flags & RTF_UP))
 			continue;
 
@@ -582,7 +510,7 @@ static struct atalk_route *atrtr_find(struct atalk_addr *target)
 	else /* No route can be found */
 		r = NULL;
 out:
-	read_unlock_bh(&atalk_router_lock);
+	read_unlock_bh(&atalk_routes_lock);
 	return r;
 }
 
@@ -630,8 +558,8 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 		goto out;
 
 	/* Now walk the routing table and make our decisions */
-	write_lock_bh(&atalk_router_lock);
-	for (rt = atalk_router_list; rt; rt = rt->next) {
+	write_lock_bh(&atalk_routes_lock);
+	for (rt = atalk_routes; rt; rt = rt->next) {
 		if (r->rt_flags != rt->flags)
 			continue;
 
@@ -646,8 +574,8 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 	if (!devhint) {
 		riface = NULL;
 
-		spin_lock_bh(&atalk_iface_lock);
-		for (iface = atalk_iface_list; iface; iface = iface->next) {
+		spin_lock_bh(&atalk_interfaces_lock);
+		for (iface = atalk_interfaces; iface; iface = iface->next) {
 			if (!riface &&
 			    ntohs(ga->sat_addr.s_net) >=
 			    		ntohs(iface->nets.nr_firstnet) &&
@@ -659,7 +587,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 			    ga->sat_addr.s_node == iface->address.s_node)
 				riface = iface;
 		}		
-		spin_unlock_bh(&atalk_iface_lock);
+		spin_unlock_bh(&atalk_interfaces_lock);
 
 		retval = -ENETUNREACH;
 		if (!riface)
@@ -675,8 +603,8 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 		if (!rt)
 			goto out;
 
-		rt->next = atalk_router_list;
-		atalk_router_list = rt;
+		rt->next = atalk_routes;
+		atalk_routes = rt;
 	}
 
 	/* Fill in the routing entry */
@@ -687,7 +615,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 
 	retval = 0;
 out_unlock:
-	write_unlock_bh(&atalk_router_lock);
+	write_unlock_bh(&atalk_routes_lock);
 out:
 	return retval;
 }
@@ -695,11 +623,11 @@ out:
 /* Delete a route. Find it and discard it */
 static int atrtr_delete(struct atalk_addr * addr)
 {
-	struct atalk_route **r = &atalk_router_list;
+	struct atalk_route **r = &atalk_routes;
 	int retval = 0;
 	struct atalk_route *tmp;
 
-	write_lock_bh(&atalk_router_lock);
+	write_lock_bh(&atalk_routes_lock);
 	while ((tmp = *r) != NULL) {
 		if (tmp->target.s_net == addr->s_net &&
 		    (!(tmp->flags&RTF_GATEWAY) ||
@@ -712,7 +640,7 @@ static int atrtr_delete(struct atalk_addr * addr)
 	}
 	retval = -ENOENT;
 out:
-	write_unlock_bh(&atalk_router_lock);
+	write_unlock_bh(&atalk_routes_lock);
 	return retval;
 }
 
@@ -722,10 +650,10 @@ out:
  */
 void atrtr_device_down(struct net_device *dev)
 {
-	struct atalk_route **r = &atalk_router_list;
+	struct atalk_route **r = &atalk_routes;
 	struct atalk_route *tmp;
 
-	write_lock_bh(&atalk_router_lock);
+	write_lock_bh(&atalk_routes_lock);
 	while ((tmp = *r) != NULL) {
 		if (tmp->dev == dev) {
 			*r = tmp->next;
@@ -733,7 +661,7 @@ void atrtr_device_down(struct net_device *dev)
 		} else
 			r = &tmp->next;
 	}
-	write_unlock_bh(&atalk_router_lock);
+	write_unlock_bh(&atalk_routes_lock);
 
 	if (atrtr_default.dev == dev)
 		atrtr_set_default(NULL);
@@ -1011,81 +939,6 @@ static int atrtr_ioctl(unsigned int cmd, void *arg)
 		}
 	}
 	return -EINVAL;
-}
-
-/* Called from proc fs - just make it print the ifaces neatly */
-static int atalk_if_get_info(char *buffer, char **start, off_t offset,
-			     int length)
-{
-	off_t pos = 0;
-	off_t begin = 0;
-	struct atalk_iface *iface;
-	int len = sprintf(buffer, "Interface	  Address   "
-				  "Networks   Status\n");
-
-	spin_lock_bh(&atalk_iface_lock);
-	for (iface = atalk_iface_list; iface; iface = iface->next) {
-		len += sprintf(buffer + len, "%-16s %04X:%02X  %04X-%04X  %d\n",
-			       iface->dev->name, ntohs(iface->address.s_net),
-			       iface->address.s_node,
-			       ntohs(iface->nets.nr_firstnet),
-			       ntohs(iface->nets.nr_lastnet), iface->status);
-		pos = begin + len;
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			break;
-	}
-	spin_unlock_bh(&atalk_iface_lock);
-
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-	if (len > length)
-		len = length;
-	return len;
-}
-
-/* Called from proc fs - just make it print the routes neatly */
-static int atalk_rt_get_info(char *buffer, char **start, off_t offset,
-			     int length)
-{
-	off_t pos = 0;
-	off_t begin = 0;
-	int len = sprintf(buffer, "Target        Router  Flags Dev\n");
-	struct atalk_route *rt;
-
-	if (atrtr_default.dev) {
-		rt = &atrtr_default;
-		len += sprintf(buffer + len,
-			       "Default     %04X:%02X  %-4d  %s\n",
-			       ntohs(rt->gateway.s_net), rt->gateway.s_node,
-			       rt->flags, rt->dev->name);
-	}
-
-	read_lock_bh(&atalk_router_lock);
-	for (rt = atalk_router_list; rt; rt = rt->next) {
-		len += sprintf(buffer + len,
-				"%04X:%02X     %04X:%02X  %-4d  %s\n",
-			       ntohs(rt->target.s_net), rt->target.s_node,
-			       ntohs(rt->gateway.s_net), rt->gateway.s_node,
-			       rt->flags, rt->dev->name);
-		pos = begin + len;
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			break;
-	}
-	read_unlock_bh(&atalk_router_lock);
-
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-	if (len > length)
-		len = length;
-	return len;
 }
 
 /**************************************************************************\
@@ -1991,17 +1844,14 @@ static int __init atalk_init(void)
 
 	register_netdevice_notifier(&ddp_notifier);
 	aarp_proto_init();
-
-	proc_net_create("appletalk", 0, atalk_get_info);
-	proc_net_create("atalk_route", 0, atalk_rt_get_info);
-	proc_net_create("atalk_iface", 0, atalk_if_get_info);
+	atalk_proc_init();
 #ifdef CONFIG_PROC_FS
 	aarp_register_proc_fs();
 #endif /* CONFIG_PROC_FS */
 #ifdef CONFIG_SYSCTL
 	atalk_register_sysctl();
 #endif /* CONFIG_SYSCTL */
-	printk(KERN_INFO "NET4: AppleTalk 0.18a for Linux NET4.0\n");
+	printk(KERN_INFO "NET4: AppleTalk 0.20 for Linux NET4.0\n");
 	return 0;
 }
 module_init(atalk_init);
@@ -2024,9 +1874,7 @@ static void __exit atalk_exit(void)
 #ifdef CONFIG_SYSCTL
 	atalk_unregister_sysctl();
 #endif /* CONFIG_SYSCTL */
-	proc_net_remove("appletalk");
-	proc_net_remove("atalk_route");
-	proc_net_remove("atalk_iface");
+	atalk_proc_exit();
 #ifdef CONFIG_PROC_FS
 	aarp_unregister_proc_fs();
 #endif /* CONFIG_PROC_FS */
@@ -2039,3 +1887,7 @@ static void __exit atalk_exit(void)
 }
 module_exit(atalk_exit);
 #endif  /* MODULE */
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Alan Cox <Alan.Cox@linux.org>");
+MODULE_DESCRIPTION("AppleTalk 0.20 for Linux NET4.0\n");
