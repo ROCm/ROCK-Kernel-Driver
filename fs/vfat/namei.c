@@ -11,7 +11,7 @@
  *
  *  Short name translation 1999, 2001 by Wolfram Pienkoss <wp@bszh.de>
  *
- *  Support Multibyte character and cleanup by
+ *  Support Multibyte characters and cleanup by
  *				OGAWA Hirofumi <hirofumi@mail.parknet.co.jp>
  */
 
