@@ -100,7 +100,7 @@ struct lsap_cb {
 	irda_queue_t queue;      /* Must be first */
 	magic_t magic;
 
-	int  connected;
+	unsigned long connected;	/* set_bit used on this */
 	int  persistent;
 
 	__u8 slsap_sel;   /* Source (this) LSAP address */

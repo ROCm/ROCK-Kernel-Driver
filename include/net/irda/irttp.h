@@ -139,7 +139,7 @@ struct tsap_cb {
 	__u32 tx_max_sdu_size; /* Max transmit user data size */
 
 	int close_pend;        /* Close, but disconnect_pend */
-	int disconnect_pend;   /* Disconnect, but still data to send */
+	unsigned long disconnect_pend; /* Disconnect, but still data to send */
 	struct sk_buff *disconnect_skb;
 };
 
