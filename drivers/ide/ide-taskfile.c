@@ -468,10 +468,10 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		/* for dma commands we don't set the handler */
 		if (args->taskfile.command == WIN_WRITEDMA
 		 || args->taskfile.command == WIN_WRITEDMA_EXT)
-			udma_write(drive, rq);
+			return !udma_write(drive, rq);
 		else if (args->taskfile.command == WIN_READDMA
 		      || args->taskfile.command == WIN_READDMA_EXT)
-			udma_read(drive, rq);
+			return !udma_read(drive, rq);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 		else if (args->taskfile.command == WIN_WRITEDMA_QUEUED
 		      || args->taskfile.command == WIN_WRITEDMA_QUEUED_EXT

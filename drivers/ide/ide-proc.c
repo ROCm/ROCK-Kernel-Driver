@@ -38,18 +38,6 @@
  * "settings" files.  e.g.    "cat /proc/ide0/hda/settings"
  * To write a new value "val" into a specific setting "name", use:
  *   echo "name:val" >/proc/ide/ide0/hda/settings
- *
- * Also useful, "cat /proc/ide0/hda/[identify, smart_values,
- * smart_thresholds, capabilities]" will issue an IDENTIFY /
- * PACKET_IDENTIFY / SMART_READ_VALUES / SMART_READ_THRESHOLDS /
- * SENSE CAPABILITIES command to /dev/hda, and then dump out the
- * returned data as 256 16-bit words.  The "hdparm" utility will
- * be updated someday soon to use this mechanism.
- *
- * Feel free to develop and distribute fancy GUI configuration
- * utilities for your favorite PCI chipsets.  I'll be working on
- * one for the Promise 20246 someday soon.  -ml
- *
  */
 
 #include <linux/config.h>
@@ -129,80 +117,6 @@ static int ide_getdigit(char c)
 	else
 		digit = -1;
 	return digit;
-}
-
-static int proc_ide_read_imodel
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_channel *hwif = data;
-	int		len;
-	const char	*name;
-
-	switch (hwif->chipset) {
-		case ide_unknown:	name = "(none)";	break;
-		case ide_generic:	name = "generic";	break;
-		case ide_pci:		name = "pci";		break;
-		case ide_cmd640:	name = "cmd640";	break;
-		case ide_dtc2278:	name = "dtc2278";	break;
-		case ide_ali14xx:	name = "ali14xx";	break;
-		case ide_qd65xx:	name = "qd65xx";	break;
-		case ide_umc8672:	name = "umc8672";	break;
-		case ide_ht6560b:	name = "ht6560b";	break;
-		case ide_pdc4030:	name = "pdc4030";	break;
-		case ide_rz1000:	name = "rz1000";	break;
-		case ide_trm290:	name = "trm290";	break;
-		case ide_cmd646:	name = "cmd646";	break;
-		case ide_cy82c693:	name = "cy82c693";	break;
-		case ide_pmac:		name = "mac-io";	break;
-		default:		name = "(unknown)";	break;
-	}
-	len = sprintf(page, "%s\n", name);
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_ide_read_channel(char *page, char **start,
-		off_t off, int count, int *eof, void *data)
-{
-	struct ata_channel *hwif = data;
-	int		len;
-
-	page[0] = hwif->unit ? '1' : '0';
-	page[1] = '\n';
-	len = 2;
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int get_identify(ide_drive_t *drive, u8 *buf)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.sector_count = 0x01;
-	args.taskfile.command = (drive->type == ATA_DISK) ? WIN_IDENTIFY : WIN_PIDENTIFY ;
-	ide_cmd_type_parser(&args);
-
-	return ide_raw_taskfile(drive, &args, buf);
-}
-
-static int proc_ide_read_identify
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t *drive = data;
-	int len = 0;
-	int i = 0;
-
-	if (drive && !get_identify(drive, page)) {
-		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c", le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
-	} else
-		len = sprintf(page, "\n");
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
 static int proc_ide_read_settings
@@ -320,72 +234,7 @@ parse_error:
 	return -EINVAL;
 }
 
-int proc_ide_read_capacity
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t *drive = data;
-	struct ata_operations *driver = drive->driver;
-	int len;
-
-	if (!driver)
-		len = sprintf(page, "(none)\n");
-        else
-		len = sprintf(page,"%llu\n", (unsigned long long) ata_capacity(drive));
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-int proc_ide_read_geometry
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t	*drive = data;
-	char		*out = page;
-	int		len;
-
-	out += sprintf(out,"physical     %d/%d/%d\n", drive->cyl, drive->head, drive->sect);
-	out += sprintf(out,"logical      %d/%d/%d\n", drive->bios_cyl, drive->bios_head, drive->bios_sect);
-	len = out - page;
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_ide_read_dmodel
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t	*drive = data;
-	struct hd_driveid *id = drive->id;
-	int		len;
-
-	len = sprintf(page, "%.40s\n", (id && id->model[0]) ? (char *)id->model : "(none)");
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_ide_read_media
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t	*drive = data;
-	const char	*type;
-	int		len;
-
-	switch (drive->type) {
-		case ATA_DISK:	type = "disk\n";
-				break;
-		case ATA_ROM:	type = "cdrom\n";
-				break;
-		case ATA_TAPE:	type = "tape\n";
-				break;
-		case ATA_FLOPPY:type = "floppy\n";
-				break;
-		default:	type = "UNKNOWN\n";
-				break;
-	}
-	strcpy(page,type);
-	len = strlen(type);
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
 static ide_proc_entry_t generic_drive_entries[] = {
-	{ "identify",	S_IFREG|S_IRUSR,	proc_ide_read_identify,	NULL },
-	{ "media",	S_IFREG|S_IRUGO,	proc_ide_read_media,	NULL },
-	{ "model",	S_IFREG|S_IRUGO,	proc_ide_read_dmodel,	NULL },
 	{ "settings",	S_IFREG|S_IRUSR|S_IWUSR,proc_ide_read_settings,	proc_ide_write_settings },
 	{ NULL,	0, NULL, NULL }
 };
@@ -472,12 +321,6 @@ void destroy_proc_ide_drives(struct ata_channel *hwif)
 	}
 }
 
-static ide_proc_entry_t hwif_entries[] = {
-	{ "channel",	S_IFREG|S_IRUGO,	proc_ide_read_channel,	NULL },
-	{ "model",	S_IFREG|S_IRUGO,	proc_ide_read_imodel,	NULL },
-	{ NULL,	0, NULL, NULL }
-};
-
 void create_proc_ide_interfaces(void)
 {
 	int	h;
@@ -491,7 +334,6 @@ void create_proc_ide_interfaces(void)
 			hwif->proc = proc_mkdir(hwif->name, proc_ide_root);
 			if (!hwif->proc)
 				return;
-			ide_add_proc_entries(hwif->proc, hwif_entries, hwif);
 		}
 		create_proc_ide_drives(hwif);
 	}
@@ -510,7 +352,6 @@ static void destroy_proc_ide_interfaces(void)
 #endif
 		if (exist) {
 			destroy_proc_ide_drives(hwif);
-			ide_remove_proc_entries(hwif->proc, hwif_entries);
 			remove_proc_entry(hwif->name, proc_ide_root);
 			hwif->proc = NULL;
 		} else

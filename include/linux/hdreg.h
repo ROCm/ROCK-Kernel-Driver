@@ -334,6 +334,7 @@ enum {
 /* structure returned by HDIO_GET_IDENTITY,
  * as per ANSI NCITS ATA6 rev.1b spec
  */
+/* if you change something here remember to update ide_fix_driveid() */
 struct hd_driveid {
 	unsigned short	config;		/* lots of obsolete bit flags */
 	unsigned short	cyls;		/* Obsolete, "physical" cyls */

@@ -80,29 +80,6 @@ static __inline__ void ide_init_default_hwifs(void)
 {
 }
 
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned bit7		: 1;	/* always 1 */
-		unsigned lba		: 1;	/* using LBA instead of CHS */
-		unsigned bit5		: 1;	/* always 1 */
-		unsigned unit		: 1;	/* drive select number, 0 or 1 */
-		unsigned head		: 4;	/* always zeros here */
-	} b;
-} select_t;
-
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned HOB		: 1;	/* 48-bit address ordering */
-		unsigned reserved456	: 3;
-		unsigned bit3		: 1;	/* ATA-2 thingy */
-		unsigned SRST		: 1;	/* host soft reset bit */
-		unsigned nIEN		: 1;	/* device INTRQ to host */
-		unsigned bit0		: 1;
-	} b;
-} control_t;
-
 #undef SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS 0
 
@@ -155,7 +132,6 @@ typedef union {
 #define outsl(data_reg, buffer, wcount) outsw(data_reg, buffer, (wcount)<<1)
 
 
-
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
 
 #define insl_swapw(data_reg, buffer, wcount) \
@@ -168,101 +144,6 @@ typedef union {
 
 #endif /* CONFIG_ATARI || CONFIG_Q40 */
 
-
-#define T_CHAR          (0x0000)        /* char:  don't touch  */
-#define T_SHORT         (0x4000)        /* short: 12 -> 21     */
-#define T_INT           (0x8000)        /* int:   1234 -> 4321 */
-#define T_TEXT          (0xc000)        /* text:  12 -> 21     */
-
-#define T_MASK_TYPE     (0xc000)
-#define T_MASK_COUNT    (0x3fff)
-
-#define D_CHAR(cnt)     (T_CHAR  | (cnt))
-#define D_SHORT(cnt)    (T_SHORT | (cnt))
-#define D_INT(cnt)      (T_INT   | (cnt))
-#define D_TEXT(cnt)     (T_TEXT  | (cnt))
-
-/* Q40 and Atari have byteswapped IDE bus and since many interesting
- * values in the identification string are text, chars and words they
- * happened to be almost correct without swapping.. However *_capacity 
- * is needed for drives over 8 GB. RZ */
-#if defined(CONFIG_Q40) || defined(CONFIG_ATARI)
-#define M68K_IDE_SWAPW  (MACH_IS_Q40 || MACH_IS_ATARI)
-#endif
-
-#if defined(CONFIG_AMIGA) || defined (CONFIG_MAC) || defined(M68K_IDE_SWAPW)
-static u_short driveid_types[] = {
-	D_SHORT(10),	/* config - vendor2 */
-	D_TEXT(20),	/* serial_no */
-	D_SHORT(3),	/* buf_type, buf_size - ecc_bytes */
-	D_TEXT(48),	/* fw_rev - model */
-	D_CHAR(2),	/* max_multsect - vendor3 */
-	D_SHORT(1),	/* dword_io */
-	D_CHAR(2),	/* vendor4 - capability */
-	D_SHORT(1),	/* reserved50 */
-	D_CHAR(4),	/* vendor5 - tDMA */
-	D_SHORT(4),	/* field_valid - cur_sectors */
-	D_INT(1),	/* cur_capacity */
-	D_CHAR(2),	/* multsect - multsect_valid */
-	D_INT(1),	/* lba_capacity */
-	D_SHORT(194)	/* dma_1word - reserved */
-};
-
-#define num_driveid_types       (sizeof(driveid_types)/sizeof(*driveid_types))
-#endif /* CONFIG_AMIGA */
-
-static __inline__ void ide_fix_driveid(struct hd_driveid *id)
-{
-#if defined(CONFIG_AMIGA) || defined (CONFIG_MAC) || defined(M68K_IDE_SWAPW)
-   u_char *p = (u_char *)id;
-   int i, j, cnt;
-   u_char t;
-
-   if (!MACH_IS_AMIGA && !MACH_IS_MAC && !MACH_IS_Q40 && !MACH_IS_ATARI)
-   	return;
-#ifdef M68K_IDE_SWAPW
-   if (M68K_IDE_SWAPW)    /* fix bus byteorder first */
-      for (i=0; i < 512; i+=2) {
-	 t = p[i]; p[i] = p[i+1]; p[i+1] = t; 
-      }
-#endif
-   for (i = 0; i < num_driveid_types; i++) {
-      cnt = driveid_types[i] & T_MASK_COUNT;
-      switch (driveid_types[i] & T_MASK_TYPE) {
-         case T_CHAR:
-            p += cnt;
-            break;
-         case T_SHORT:
-            for (j = 0; j < cnt; j++) {
-	       t = p[0];
-	       p[0] = p[1];
-	       p[1] = t;
-               p += 2;
-            }
-            break;
-         case T_INT:
-            for (j = 0; j < cnt; j++) {
-	       t = p[0];
-	       p[0] = p[3];
-	       p[3] = t;
-	       t = p[1];
-	       p[1] = p[2];
-	       p[2] = t;
-               p += 4;
-            }
-            break;
-         case T_TEXT:
-            for (j = 0; j < cnt; j += 2) {
-	       t = p[0];
-	       p[0] = p[1];
-	       p[1] = t;
-               p += 2;
-            }
-            break;
-      }
-   }
-#endif /* CONFIG_AMIGA */
-}
 
 static __inline__ void ide_release_lock (int *ide_lock)
 {

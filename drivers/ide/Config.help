@@ -216,11 +216,6 @@ CONFIG_BLK_DEV_RZ1000
   Linux. This may slow disk throughput by a few percent, but at least
   things will operate 100% reliably.
 
-CONFIG_BLK_DEV_IDEPCI
-  Say Y here for PCI systems which use IDE drive(s).
-  This option helps the IDE driver to automatically detect and
-  configure all PCI-based IDE interfaces in your system.
-
 CONFIG_IDEPCI_SHARE_IRQ
   Some ATA/IDE chipsets have hardware support which allows for
   sharing a single IRQ with other cards. To enable support for

@@ -6000,7 +6000,7 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	if (strstr(drive->id->model, "OnStream DI-"))
 		tape->onstream = 1;
 	drive->dsc_overlap = 1;
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	if (!tape->onstream && drive->channel->pci_dev != NULL) {
 		/*
 		 * These two ide-pci host adapters appear to need DSC overlap disabled.
@@ -6009,10 +6009,10 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 		if ((drive->channel->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) ||
 		    (drive->channel->pci_dev->device == PCI_DEVICE_ID_TTI_HPT343)) {
 			printk(KERN_INFO "ide-tape: %s: disabling DSC overlap\n", tape->name);
-		    	drive->dsc_overlap = 0;
+			drive->dsc_overlap = 0;
 		}
 	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 	tape->drive = drive;
 	tape->minor = minor;
 	tape->name[0] = 'h'; tape->name[1] = 't'; tape->name[2] = '0' + minor;

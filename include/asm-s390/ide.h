@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-arm/ide.h
+ *  linux/include/asm-s390/ide.h
  *
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
@@ -16,29 +16,6 @@
 #endif
 
 #define ide__sti()	do {} while (0)
-
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned head		: 4;	/* always zeros here */
-		unsigned unit		: 1;	/* drive select number, 0 or 1 */
-		unsigned bit5		: 1;	/* always 1 */
-		unsigned lba		: 1;	/* using LBA instead of CHS */
-		unsigned bit7		: 1;	/* always 1 */
-	} b;
-} select_t;
-
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned bit0		: 1;
-		unsigned nIEN		: 1;	/* device INTRQ to host */
-		unsigned SRST		: 1;	/* host soft reset bit */
-		unsigned bit3		: 1;	/* ATA-2 thingy */
-		unsigned reserved456	: 3;
-		unsigned HOB		: 1;	/* 48-bit address ordering */
-	} b;
-} control_t;
 
 /*
  * The following are not needed for the non-m68k ports
@@ -57,4 +34,4 @@ typedef union {
 
 #endif /* __KERNEL__ */
 
-#endif /* __ASMARM_IDE_H */
+#endif /* __ASMS390_IDE_H */

@@ -57,7 +57,6 @@
 /* Tell string.h we don't want memcpy etc. as cpp defines */
 #define EXPORT_SYMTAB_STROPS
 
-extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
 extern void transfer_to_handler(void);
 extern void do_syscall_trace(void);
 extern void do_IRQ(struct pt_regs *regs);
@@ -173,7 +172,6 @@ EXPORT_SYMBOL(iounmap);
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 EXPORT_SYMBOL(ppc_ide_md);
-EXPORT_SYMBOL(ppc_generic_ide_fix_driveid);
 #endif
 
 #ifdef CONFIG_PCI
