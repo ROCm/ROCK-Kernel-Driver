@@ -401,7 +401,6 @@ static int __init setup_card(unsigned long io, unsigned irq, unsigned char dma)
 int init_module(void)
 {
 	int i, num;
-	struct net_device *dev;
 
 	num = 0;
 	if (io[0]) { /* Only probe addresses from command line */

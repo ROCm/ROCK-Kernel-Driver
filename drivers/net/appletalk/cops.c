@@ -424,7 +424,7 @@ static int cops_open(struct net_device *dev)
 		    init_timer(&cops_timer);
 		    cops_timer.function = cops_poll;
 		    cops_timer.data 	= (unsigned long)dev;
-		    cops_timer.expires 	= jiffies + 5;
+		    cops_timer.expires 	= jiffies + HZ/20;
 		    add_timer(&cops_timer);
 		} 
 		else 
@@ -700,7 +700,8 @@ static void cops_poll(unsigned long ltdev)
 		status = inb(ioaddr+TANG_CARD_STATUS);
 	} while((++boguscount < 20) && (status&(TANG_RX_READY|TANG_TX_READY)));
 
-	cops_timer.expires = jiffies+5;
+	/* poll 20 times per second */
+	cops_timer.expires = jiffies + HZ/20;
 	add_timer(&cops_timer);
 
 	return;
