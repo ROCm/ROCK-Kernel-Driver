@@ -806,6 +806,13 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	unsigned int cpu_clock;
 	int ret, i;
 
+	/*
+	 * set default MECR calculation if the board specific
+	 * code did not specify one...
+	 */
+	if (!ops->socket_get_timing)
+		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
+
 	cls = kmalloc(sizeof(struct pcmcia_socket_class_data), GFP_KERNEL);
 	if (!cls) {
 		ret = -ENOMEM;
@@ -815,13 +822,6 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	memset(cls, 0, sizeof(struct pcmcia_socket_class_data));
 	cls->ops	= &sa11xx_pcmcia_operations;
 	cls->nsock	= nr;
-
-	/*
-	 * set default MECR calculation if the board specific
-	 * code did not specify one...
-	 */
-	if (!ops->socket_get_timing)
-		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
 	cpu_clock = cpufreq_get(0);
 
@@ -977,7 +977,8 @@ static void sa1100_pcmcia_update_mecr(unsigned int clock)
 
 	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-		sa1100_pcmcia_set_mecr(skt, clock);
+		if (skt->ops)
+			sa1100_pcmcia_set_mecr(skt, clock);
 	}
 }
 
