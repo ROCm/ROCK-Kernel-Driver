@@ -334,7 +334,6 @@ static void neigh_hash_grow(struct neigh_table *tbl, unsigned long new_entries)
 	for (i = 0; i < old_entries; i++) {
 		struct neighbour *n, *next;
 
-		next = NULL;
 		for (n = old_hash[i]; n; n = next) {
 			unsigned int hash_val = tbl->hash(n->primary_key, n->dev);
 
