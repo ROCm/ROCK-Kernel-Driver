@@ -451,10 +451,8 @@ out:
  */
 u8 llc_data_accept_state(u8 state)
 {
-	if (state != LLC_CONN_STATE_NORMAL && state != LLC_CONN_STATE_BUSY &&
-	    state != LLC_CONN_STATE_REJ)
-		return 1; /* data_conn_refuse */
-	return 0;
+	return state != LLC_CONN_STATE_NORMAL && state != LLC_CONN_STATE_BUSY &&
+	       state != LLC_CONN_STATE_REJ;
 }
 
 /**

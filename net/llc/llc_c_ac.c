@@ -1334,12 +1334,15 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_upd_p_flag(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-	u8 f_bit;
 
-	if (!LLC_PDU_IS_RSP(pdu) &&
-	    !llc_pdu_decode_pf_bit(skb, &f_bit) && f_bit) {
-		llc_sk(sk)->p_flag = 0;
-		llc_conn_ac_stop_p_timer(sk, skb);
+	if (!LLC_PDU_IS_RSP(pdu)) {
+		u8 f_bit;
+
+		llc_pdu_decode_pf_bit(skb, &f_bit);
+		if (f_bit) {
+			llc_sk(sk)->p_flag = 0;
+			llc_conn_ac_stop_p_timer(sk, skb);
+		}
 	}
 	return 0;
 }
