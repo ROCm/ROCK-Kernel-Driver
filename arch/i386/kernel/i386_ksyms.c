@@ -32,9 +32,11 @@
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
 
-#if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
+#if defined(CONFIG_APM_MODULE)
 extern void machine_real_restart(unsigned char *, int);
 EXPORT_SYMBOL(machine_real_restart);
+extern void default_idle(void);
+EXPORT_SYMBOL(default_idle);
 #endif
 
 #ifdef CONFIG_SMP
@@ -93,7 +95,6 @@ EXPORT_SYMBOL_NOVERS(__get_user_4);
 
 EXPORT_SYMBOL(strtok);
 EXPORT_SYMBOL(strpbrk);
-EXPORT_SYMBOL(simple_strtol);
 EXPORT_SYMBOL(strstr);
 
 EXPORT_SYMBOL(strncpy_from_user);
