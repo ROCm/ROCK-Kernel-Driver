@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/bitops.h>
 #include <linux/errno.h>
+#include <linux/threads.h>
 
 #ifdef CONFIG_SMP
 
