@@ -164,6 +164,11 @@ do {	spin_unlock_irq(&(prev)->switch_lock);	\
 	 * not preserve it's value.  Hairy, but it lets us remove 2 loads
 	 * and 2 stores in this critical code path.  -DaveM
 	 */
+#if __GNUC__ >= 3
+#define EXTRA_CLOBBER ,"%l1"
+#else
+#define EXTRA_CLOBBER
+#endif
 #define switch_to(prev, next, last)					\
 do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 		unsigned long __tmp;					\
@@ -209,10 +214,11 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	: "0" (next->thread_info),					\
 	  "i" (TI_WSTATE), "i" (TI_KSP), "i" (TI_FLAGS), "i" (TI_CWP),	\
 	  "i" (_TIF_NEWCHILD), "i" (TI_TASK)				\
-	: "cc", "g1", "g2", "g3", "g5", "g7",				\
-	  "l2", "l3", "l4", "l5", "l6", "l7",				\
+	: "cc",								\
+	        "g1", "g2", "g3",       "g5",       "g7",		\
+	              "l2", "l3", "l4", "l5", "l6", "l7",		\
 	  "i0", "i1", "i2", "i3", "i4", "i5",				\
-	  "o0", "o1", "o2", "o3", "o4", "o5", "o7");			\
+	  "o0", "o1", "o2", "o3", "o4", "o5",       "o7" EXTRA_CLOBBER);\
 	/* If you fuck with this, update ret_from_syscall code too. */	\
 	if (test_thread_flag(TIF_PERFCTR)) {				\
 		write_pcr(current_thread_info()->pcr_reg);		\
