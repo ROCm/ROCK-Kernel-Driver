@@ -576,54 +576,45 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
 {
-	struct ifreq ifr;
+	struct ifreq kifr;
+	struct ifreq *uifr;
+	struct ifreq32 *ifr32 = (struct ifreq32 *) arg;
 	mm_segment_t old_fs;
-	int err, len;
+	int err;
 	u32 data;
-	
-	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
-		return -EFAULT;
-	ifr.ifr_data = (__kernel_caddr_t)get_zeroed_page(GFP_KERNEL);
-	if (!ifr.ifr_data)
-		return -EAGAIN;
+	void *datap;
 
 	switch (cmd) {
 	case SIOCBONDENSLAVE:
 	case SIOCBONDRELEASE:
 	case SIOCBONDSETHWADDR:
 	case SIOCBONDCHANGEACTIVE:
-		len = IFNAMSIZ * sizeof(char);
-		break;
+		if (copy_from_user(&kifr, ifr32, sizeof(struct ifreq32)))
+			return -EFAULT;
+
+		old_fs = get_fs();
+		set_fs (KERNEL_DS);
+		err = sys_ioctl (fd, cmd, (unsigned long)&kifr);
+		set_fs (old_fs);
+
+		return err;
 	case SIOCBONDSLAVEINFOQUERY:
-		len = sizeof(struct ifslave);
-		break;
 	case SIOCBONDINFOQUERY:
-		len = sizeof(struct ifbond);
-		break;
+		uifr = compat_alloc_user_space(sizeof(*uifr));
+		if (copy_in_user(&uifr->ifr_name, &ifr32->ifr_name, IFNAMSIZ))
+			return -EFAULT;
+
+		if (get_user(data, &ifr32->ifr_ifru.ifru_data))
+			return -EFAULT;
+
+		datap = compat_ptr(data);
+		if (put_user(datap, &uifr->ifr_ifru.ifru_data))
+			return -EFAULT;
+
+		return sys_ioctl (fd, cmd, (unsigned long)uifr);
 	default:
-		err = -EINVAL;
-		goto out;
+		return -EINVAL;
 	};
-
-	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-	if (copy_from_user(ifr.ifr_data, compat_ptr(data), len)) {
-		err = -EFAULT;
-		goto out;
-	}
-
-	old_fs = get_fs();
-	set_fs (KERNEL_DS);
-	err = sys_ioctl (fd, cmd, (unsigned long)&ifr);
-	set_fs (old_fs);
-	if (!err) {
-		len = copy_to_user(compat_ptr(data), ifr.ifr_data, len);
-		if (len)
-			err = -EFAULT;
-	}
-
-out:
-	free_page((unsigned long)ifr.ifr_data);
-	return err;
 }
 
 int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
