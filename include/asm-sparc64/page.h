@@ -3,6 +3,8 @@
 #ifndef _SPARC64_PAGE_H
 #define _SPARC64_PAGE_H
 
+#include <linux/config.h>
+
 #define PAGE_SHIFT   13
 #ifndef __ASSEMBLY__
 /* I have my suspicions... -DaveM */
@@ -98,6 +100,14 @@ typedef unsigned long iopgprot_t;
 #define __iopgprot(x)	(x)
 
 #endif /* (STRICT_MM_TYPECHECKS) */
+
+#define HPAGE_SHIFT		22
+
+#ifdef CONFIG_HUGETLB_PAGE
+#define HPAGE_SIZE		((1UL) << HPAGE_SHIFT)
+#define HPAGE_MASK		(~(HPAGE_SIZE - 1UL))
+#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+#endif
 
 #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_32BIT) ? \
 				 (0x0000000070000000UL) : (PAGE_OFFSET))
