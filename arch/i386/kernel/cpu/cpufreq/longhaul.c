@@ -10,10 +10,11 @@
  *  +---------------------+----------+---------------------------------+
  *  | Marketing name      | Codename | longhaul version / features.    |
  *  +---------------------+----------+---------------------------------+
- *  |  Samuel/CyrixIII    |   C5A    | v1 : multipliers only           |
+ *  |  Samuel/CyrixIII    | C5A      | v1 : multipliers only           |
  *  |  Samuel2/C3         | C3E/C5B  | v1 : multiplier only            |
- *  |  Ezra               |   C5C    | v2 : multipliers & voltage      |
- *  |  Ezra-T             | C5M/C5N  | v3 : multipliers, voltage & FSB |
+ *  |  Ezra               | C5C      | v2 : multipliers & voltage      |
+ *  |  Ezra-T             | C5M      | v3 : multipliers, voltage & FSB |
+ *  |  Nehemiah           | C5N      | v3 : multipliers, voltage & FSB |
  *  +---------------------+----------+---------------------------------+
  *
  *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
@@ -345,10 +346,12 @@ static int longhaul_target (struct cpufreq_policy *policy,
 static int longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
+	char *cpuname=NULL;
 	int ret;
 
 	switch (c->x86_model) {
-	case 6:		/* VIA C3 Samuel C5A */
+	case 6:
+		cpuname = "C3 'Samuel' [C5A]";
 		longhaul_version=1;
 		memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
@@ -357,11 +360,13 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	case 7:		/* C5B / C5C */
 		switch (c->x86_mask) {
 		case 0:
+			cpuname = "C3 'Samuel 2' [C5B]";
 			longhaul_version=1;
 			memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
 		case 1 ... 15:
+			cpuname = "C3 'Ezra' [C5C]";
 			longhaul_version=2;
 			memcpy (clock_ratio, longhaul2_clock_ratio, sizeof(longhaul2_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
@@ -369,16 +374,26 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		}
 		break;
 
-	case 8:		/* C5M/C5N */
+	case 8:
+		cpuname = "C3 'Ezra-T [C5M]";
 		longhaul_version=3;
 		numscales=32;
 		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
 		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
 		break;
+	/*
+	case 9:
+		cpuname = "C3 'Nehemiah' [C5N]";
+		longhaul_version=3;
+		numscales=32;
+	*/
+	default:
+		cpuname = "Unknown";
+		break;
 	}
 
-	printk (KERN_INFO PFX "VIA CPU detected. Longhaul version %d supported\n",
-					longhaul_version);
+	printk (KERN_INFO PFX "VIA %s CPU detected. Longhaul v%d supported.\n",
+					cpuname, longhaul_version);
 
 	if ((longhaul_version==2 || longhaul_version==3) && (dont_scale_voltage==0))
 		longhaul_setup_voltagescaling();
