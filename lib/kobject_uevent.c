@@ -290,6 +290,56 @@ exit:
 	return;
 }
 EXPORT_SYMBOL(kobject_hotplug);
+
+/**
+ * add_hotplug_env_var - helper for creating hotplug environment variables
+ * @envp: Pointer to table of environment variables, as passed into
+ * hotplug() method.
+ * @num_envp: Number of environment variable slots available, as
+ * passed into hotplug() method.
+ * @cur_index: Pointer to current index into @envp.  It should be
+ * initialized to 0 before the first call to add_hotplug_env_var(),
+ * and will be incremented on success.
+ * @buffer: Pointer to buffer for environment variables, as passed
+ * into hotplug() method.
+ * @buffer_size: Length of @buffer, as passed into hotplug() method.
+ * @cur_len: Pointer to current length of space used in @buffer.
+ * Should be initialized to 0 before the first call to
+ * add_hotplug_env_var(), and will be incremented on success.
+ * @format: Format for creating environment variable (of the form
+ * "XXX=%x") for snprintf().
+ *
+ * Returns 0 if environment variable was added successfully or -ENOMEM
+ * if no space was available.
+ */
+int add_hotplug_env_var(char **envp, int num_envp, int *cur_index,
+			char *buffer, int buffer_size, int *cur_len,
+			const char *format, ...)
+{
+	va_list args;
+
+	/*
+	 * We check against num_envp - 1 to make sure there is at
+	 * least one slot left after we return, since the hotplug
+	 * method needs to set the last slot to NULL.
+	 */
+	if (*cur_index >= num_envp - 1)
+		return -ENOMEM;
+
+	envp[*cur_index] = buffer + *cur_len;
+
+	va_start(args, format);
+	*cur_len += vsnprintf(envp[*cur_index],
+			      max(buffer_size - *cur_len, 0),
+			      format, args) + 1;
+	va_end(args);
+
+	if (*cur_len > buffer_size)
+		return -ENOMEM;
+
+	(*cur_index)++;
+	return 0;
+}
+EXPORT_SYMBOL(add_hotplug_env_var);
+
 #endif /* CONFIG_HOTPLUG */
-
-

@@ -237,9 +237,17 @@ extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
 extern void subsys_remove_file(struct subsystem * , struct subsys_attribute *);
 
 #ifdef CONFIG_HOTPLUG
-extern void kobject_hotplug(struct kobject *kobj, enum kobject_action action);
+void kobject_hotplug(struct kobject *kobj, enum kobject_action action);
+int add_hotplug_env_var(char **envp, int num_envp, int *cur_index,
+			char *buffer, int buffer_size, int *cur_len,
+			const char *format, ...)
+	__attribute__((format (printf, 7, 8)));
 #else
 static inline void kobject_hotplug(struct kobject *kobj, enum kobject_action action) { }
+static inline int add_hotplug_env_var(char **envp, int num_envp, int *cur_index, 
+				      char *buffer, int buffer_size, int *cur_len, 
+				      const char *format, ...)
+{ return 0; }
 #endif
 
 #endif /* __KERNEL__ */
