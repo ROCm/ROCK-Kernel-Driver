@@ -10,11 +10,10 @@
 #ifndef _ASMARM_PGALLOC_H
 #define _ASMARM_PGALLOC_H
 
-#include <linux/config.h>
-
 #include <asm/processor.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
-#include <asm/proc/cache.h>
 #include <asm/proc/pgalloc.h>
 
 /*

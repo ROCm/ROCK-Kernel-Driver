@@ -628,14 +628,12 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 
 			case SIGSTOP: {
 				struct signal_struct *sig;
+				current->state = TASK_STOPPED;
 				current->exit_code = signr;
 				sig = current->parent->sig;
-				preempt_disable();
-				current->state = TASK_STOPPED;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
-				preempt_enable();
 				continue;
 			}
 

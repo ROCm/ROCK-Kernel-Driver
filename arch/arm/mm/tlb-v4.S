@@ -42,7 +42,7 @@ ENTRY(v4_flush_kern_tlb_all)
 /*
  *	v4_flush_user_tlb_range(start, end, mm)
  *
- *	Invalidate a range of TLB entries in the specified address space.
+ *	Invalidate a range of TLB entries in the specified user address space.
  *
  *	- start - range start address
  *	- end   - range end address
@@ -86,6 +86,27 @@ ENTRY(v4_flush_user_tlb_page)
 	mov	pc, lr
 
 /*
+ *	v4_flush_kerm_tlb_range(start, end)
+ *
+ *	Invalidate a range of TLB entries in the specified kernel
+ *	address range.
+ *
+ *	- start - virtual address (may not be aligned)
+ *	- end   - virtual address (may not be aligned)
+ */
+	.align	5
+ENTRY(v4_flush_kern_tlb_range)
+	bic	r0, r0, #0x0ff
+	bic	r0, r0, #0xf00
+1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
+	add	r0, r0, #PAGE_SZ
+	cmp	r0, r1
+	blo	1b
+	mcr	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
+	mov	pc, lr
+
+
+/*
  *	v4_flush_kern_tlb_page(kaddr)
  *
  *	Invalidate the TLB entry for the specified page.  The address
@@ -106,5 +127,6 @@ ENTRY(v4_tlb_fns)
 	.long	v4_flush_user_tlb_mm
 	.long	v4_flush_user_tlb_range
 	.long	v4_flush_user_tlb_page
+	.long	v4_flush_kern_tlb_range
 	.long	v4_flush_kern_tlb_page
 	.size	v4_tlb_fns, . - v4_tlb_fns
