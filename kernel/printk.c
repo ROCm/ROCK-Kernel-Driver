@@ -645,8 +645,9 @@ void release_console_sem(void)
 		_con_start = con_start;
 		_log_end = log_end;
 		con_start = log_end;		/* Flush */
-		spin_unlock_irqrestore(&logbuf_lock, flags);
+		spin_unlock(&logbuf_lock);
 		call_console_drivers(_con_start, _log_end);
+		local_irq_restore(flags);
 	}
 	console_locked = 0;
 	console_may_schedule = 0;

@@ -2506,6 +2506,38 @@ static inline int dependent_sleeper(int this_cpu, runqueue_t *this_rq)
 }
 #endif
 
+#if defined(CONFIG_PREEMPT) && defined(CONFIG_DEBUG_PREEMPT)
+
+void fastcall add_preempt_count(int val)
+{
+	/*
+	 * Underflow?
+	 */
+	BUG_ON(((int)preempt_count() < 0));
+	preempt_count() += val;
+	/*
+	 * Spinlock count overflowing soon?
+	 */
+	BUG_ON((preempt_count() & PREEMPT_MASK) >= PREEMPT_MASK-10);
+}
+EXPORT_SYMBOL(add_preempt_count);
+
+void fastcall sub_preempt_count(int val)
+{
+	/*
+	 * Underflow?
+	 */
+	BUG_ON(val > preempt_count());
+	/*
+	 * Is the spinlock portion underflowing?
+	 */
+	BUG_ON((val < PREEMPT_MASK) && !(preempt_count() & PREEMPT_MASK));
+	preempt_count() -= val;
+}
+EXPORT_SYMBOL(sub_preempt_count);
+
+#endif
+
 /*
  * schedule() is the main scheduler function.
  */
@@ -2688,7 +2720,10 @@ EXPORT_SYMBOL(schedule);
 asmlinkage void __sched preempt_schedule(void)
 {
 	struct thread_info *ti = current_thread_info();
-
+#ifdef CONFIG_PREEMPT_BKL
+	struct task_struct *task = current;
+	int saved_lock_depth;
+#endif
 	/*
 	 * If there is a non-zero preempt_count or interrupts are disabled,
 	 * we do not want to preempt the current task.  Just return..
@@ -2697,9 +2732,21 @@ asmlinkage void __sched preempt_schedule(void)
 		return;
 
 need_resched:
-	ti->preempt_count = PREEMPT_ACTIVE;
+	add_preempt_count(PREEMPT_ACTIVE);
+	/*
+	 * We keep the big kernel semaphore locked, but we
+	 * clear ->lock_depth so that schedule() doesnt
+	 * auto-release the semaphore:
+	 */
+#ifdef CONFIG_PREEMPT_BKL
+	saved_lock_depth = task->lock_depth;
+	task->lock_depth = -1;
+#endif
 	schedule();
-	ti->preempt_count = 0;
+#ifdef CONFIG_PREEMPT_BKL
+	task->lock_depth = saved_lock_depth;
+#endif
+	sub_preempt_count(PREEMPT_ACTIVE);
 
 	/* we could miss a preemption opportunity between schedule and now */
 	barrier();
@@ -3436,9 +3483,9 @@ asmlinkage long sys_sched_yield(void)
 static inline void __cond_resched(void)
 {
 	do {
-		preempt_count() += PREEMPT_ACTIVE;
+		add_preempt_count(PREEMPT_ACTIVE);
 		schedule();
-		preempt_count() -= PREEMPT_ACTIVE;
+		sub_preempt_count(PREEMPT_ACTIVE);
 	} while (need_resched());
 }
 
@@ -3522,7 +3569,7 @@ EXPORT_SYMBOL(yield);
  */
 void __sched io_schedule(void)
 {
-	struct runqueue *rq = this_rq();
+	struct runqueue *rq = &per_cpu(runqueues, _smp_processor_id());
 
 	atomic_inc(&rq->nr_iowait);
 	schedule();
@@ -3533,7 +3580,7 @@ EXPORT_SYMBOL(io_schedule);
 
 long __sched io_schedule_timeout(long timeout)
 {
-	struct runqueue *rq = this_rq();
+	struct runqueue *rq = &per_cpu(runqueues, _smp_processor_id());
 	long ret;
 
 	atomic_inc(&rq->nr_iowait);
@@ -3741,7 +3788,7 @@ void __devinit init_idle(task_t *idle, int cpu)
 	spin_unlock_irqrestore(&rq->lock, flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_BKL)
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
 #else
 	idle->thread_info->preempt_count = 0;

@@ -70,9 +70,9 @@ extern void enable_irq(unsigned int irq);
 
 /* SoftIRQ primitives.  */
 #define local_bh_disable() \
-		do { preempt_count() += SOFTIRQ_OFFSET; barrier(); } while (0)
+		do { add_preempt_count(SOFTIRQ_OFFSET); barrier(); } while (0)
 #define __local_bh_enable() \
-		do { barrier(); preempt_count() -= SOFTIRQ_OFFSET; } while (0)
+		do { barrier(); sub_preempt_count(SOFTIRQ_OFFSET); } while (0)
 
 extern void local_bh_enable(void);
 

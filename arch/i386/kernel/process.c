@@ -145,7 +145,7 @@ static void poll_idle (void)
  */
 void cpu_idle (void)
 {
-	int cpu = smp_processor_id();
+	int cpu = _smp_processor_id();
 
 	/* endless idle loop with no priority at all */
 	while (1) {
