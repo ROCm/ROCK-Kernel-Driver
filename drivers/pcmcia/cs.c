@@ -816,7 +816,8 @@ static int pccardd(void *__skt)
 				if ((skt->state & SOCKET_PRESENT) &&
 				     !(status & SS_DETECT))
 					socket_shutdown(skt);
-				if (status & SS_DETECT)
+				if (!(skt->state & SOCKET_PRESENT) &&
+				    (status & SS_DETECT))
 					socket_insert(skt);
 			}
 			if (events & SS_BATDEAD)
