@@ -104,12 +104,11 @@ static  void	arlan_rx_interrupt		(struct net_device * dev, u_char rxStatus, u_sh
 static  void	arlan_process_interrupt		(struct net_device * dev);
 static	void	arlan_tx_timeout		(struct net_device *dev);
 
-static inline long long arlan_time(void)
+static inline long us2ticks(int us)
 {
-	struct timeval timev;
-	do_gettimeofday(&timev);
-	return ((long long) timev.tv_sec * 1000000 + timev.tv_usec);
+	return us * (1000000 / HZ);
 }
+
 
 #ifdef ARLAN_ENTRY_EXIT_DEBUGGING
 #define ARLAN_DEBUG_ENTRY(name) \
@@ -166,7 +165,6 @@ int arlan_command(struct net_device *dev, int command_p)
 	struct arlan_conf_stru *conf = priv->Conf;
 	int udelayed = 0;
 	int i = 0;
-	long long time_mks = arlan_time();
 	unsigned long flags;
 
 	ARLAN_DEBUG_ENTRY("arlan_command");
@@ -175,14 +173,14 @@ int arlan_command(struct net_device *dev, int command_p)
 		priv->card_polling_interval = 1;
 
 	if (arlan_debug & ARLAN_DEBUG_CHAIN_LOCKS)
-		printk(KERN_DEBUG "arlan_command, %lx commandByte %x waiting %x incoming %x \n",
+		printk(KERN_DEBUG "arlan_command, %lx commandByte %x waiting %lx incoming %x \n",
 		jiffies, READSHMB(arlan->commandByte),
 		       priv->waiting_command_mask, command_p);
 
 	priv->waiting_command_mask |= command_p;
 
 	if (priv->waiting_command_mask & ARLAN_COMMAND_RESET)
-		if (jiffies - priv->lastReset < 5 * HZ)
+		if (time_after(jiffies, priv->lastReset + 5 * HZ))
 			priv->waiting_command_mask &= ~ARLAN_COMMAND_RESET;
 
 	if (priv->waiting_command_mask & ARLAN_COMMAND_INT_ACK)
@@ -383,7 +381,6 @@ int arlan_command(struct net_device *dev, int command_p)
 			WRITESHMB(arlan->commandParameter[0], conf->rxParameter);
 			arlan_interrupt_lancpu(dev);
 			priv->rx_command_given = 0; // mnjah, bad
-			priv->last_rx_time = arlan_time();
 			priv->waiting_command_mask &= ~ARLAN_COMMAND_RX;
 			priv->card_polling_interval = 1;
 		}
@@ -403,8 +400,10 @@ int arlan_command(struct net_device *dev, int command_p)
 	{
 		if (!test_and_set_bit(0, (void *) &priv->tx_command_given))
 		{
-			if ((time_mks - priv->last_tx_time > conf->rx_tweak1) ||
-				(time_mks - priv->last_rx_int_ack_time < conf->rx_tweak2))
+			if (time_after(jiffies, 
+				       priv->tx_last_sent + us2ticks(conf->rx_tweak1))
+			    || time_before(jiffies,
+					   priv->last_rx_int_ack_time + us2ticks(conf->rx_tweak2)))
 			{
 				setInterruptEnable(dev);
 				memset_io((void *) arlan->commandParameter, 0, 0xf);
@@ -413,7 +412,6 @@ int arlan_command(struct net_device *dev, int command_p)
 //				for ( i=1 ; i < 15 ; i++) printk("%02x:",READSHMB(arlan->commandParameter[i]));
 				priv->tx_last_sent = jiffies;
 				arlan_interrupt_lancpu(dev);
-				priv->last_tx_time = arlan_time();
 				priv->tx_command_given = 1;
 				priv->waiting_command_mask &= ~ARLAN_COMMAND_TX;
 				priv->card_polling_interval = 1;
@@ -463,7 +461,7 @@ int arlan_command(struct net_device *dev, int command_p)
 		udelay(10);
 	if (READSHMB(arlan->commandByte))
 		if (arlan_debug & ARLAN_DEBUG_CARD_STATE)
-			printk(KERN_ERR "card busy leaving command %x \n", priv->waiting_command_mask);
+			printk(KERN_ERR "card busy leaving command %lx\n", priv->waiting_command_mask);
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 	ARLAN_DEBUG_EXIT("arlan_command");
@@ -471,7 +469,7 @@ int arlan_command(struct net_device *dev, int command_p)
 	return 0;
 
 card_busy_end:
-	if (jiffies - priv->last_command_buff_free_time > HZ)
+	if (time_after(jiffies, priv->last_command_buff_free_time + HZ))
 		priv->waiting_command_mask |= ARLAN_COMMAND_CLEAN_AND_RESET;
 
 	if (arlan_debug & ARLAN_DEBUG_CARD_STATE)
@@ -551,14 +549,13 @@ static void arlan_registration_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct arlan_private *priv = dev->priv;
-
-	int lostTime = ((int) (jiffies - priv->registrationLastSeen)) * 1000 / HZ;
 	int bh_mark_needed = 0;
 	int next_tick = 1;
+	long lostTime = ((long)jiffies - (long)priv->registrationLastSeen)
+			* (1000/HZ);
 
 	if (registrationBad(dev))
 	{
-		//debug=100;
 		priv->registrationLostCount++;
 		if (lostTime > 7000 && lostTime < 7200)
 		{
@@ -581,16 +578,16 @@ static void arlan_registration_timer(unsigned long data)
 		if (priv->Conf->registrationMode && lostTime > 10000 &&
 			priv->registrationLostCount)
 		{
-			printk(KERN_NOTICE "%s registration is back after %d milliseconds\n", dev->name,
-				((int) (jiffies - priv->registrationLastSeen) * 1000) / HZ);
+			printk(KERN_NOTICE "%s registration is back after %ld milliseconds\n",
+			       dev->name, lostTime);
 		}
 		priv->registrationLastSeen = jiffies;
 		priv->registrationLostCount = 0;
 		priv->reRegisterExp = 1;
 		if (!netif_running(dev) )
 			netif_wake_queue(dev);
-		if (priv->tx_last_sent > priv->tx_last_cleared &&
-			jiffies - priv->tx_last_sent > 5*HZ ){
+		if (time_after(priv->tx_last_sent,priv->tx_last_cleared) &&
+		    time_after(jiffies, priv->tx_last_sent * 5*HZ) ){
 			arlan_command(dev, ARLAN_COMMAND_CLEAN_AND_RESET);		
 			priv->tx_last_cleared = jiffies;
 		}
@@ -728,18 +725,17 @@ static int arlan_hw_tx(struct net_device *dev, char *buf, int length)
 		IFDEBUG(ARLAN_DEBUG_TX_CHAIN)
 			printk(KERN_ERR "TX TAIL & HEAD full, return, tailStart %d headEnd %d\n", tailStarts, headEnds);
 	}
-
 	priv->out_bytes += length;
 	priv->out_bytes10 += length;
 	if (conf->measure_rate < 1)
 		conf->measure_rate = 1;
-	if (jiffies - priv->out_time > conf->measure_rate * HZ)
+	if (time_after(jiffies, priv->out_time + conf->measure_rate * HZ))
 	{
 		conf->out_speed = priv->out_bytes / conf->measure_rate;
 		priv->out_bytes = 0;
 		priv->out_time = jiffies;
 	}
-	if (jiffies - priv->out_time10 > conf->measure_rate * HZ * 10)
+	if (time_after(jiffies, priv->out_time10 + conf->measure_rate * 10*HZ))
 	{
 		conf->out_speed10 = priv->out_bytes10 / (10 * conf->measure_rate);
 		priv->out_bytes10 = 0;
@@ -1516,13 +1512,13 @@ static void arlan_rx_interrupt(struct net_device *dev, u_char rxStatus, u_short 
 	priv->in_bytes10 += pkt_len;
 	if (conf->measure_rate < 1)
 		conf->measure_rate = 1;
-	if (jiffies - priv->in_time > conf->measure_rate * HZ)
+	if (time_after(jiffies, priv->in_time + conf->measure_rate * HZ))
 	{
 		conf->in_speed = priv->in_bytes / conf->measure_rate;
 		priv->in_bytes = 0;
 		priv->in_time = jiffies;
 	}
-	if (jiffies - priv->in_time10 > conf->measure_rate * HZ * 10)
+	if (time_after(jiffies, priv->in_time10 + conf->measure_rate * 10*HZ))
 	{
 		conf->in_speed10 = priv->in_bytes10 / (10 * conf->measure_rate);
 		priv->in_bytes10 = 0;
@@ -1665,7 +1661,7 @@ static void arlan_process_interrupt(struct net_device *dev)
 			&& (interrupt_count < 5))
 	{
 		if (rxStatus)
-			priv->last_rx_int_ack_time = arlan_time();
+			priv->last_rx_int_ack_time = jiffies;
 
 		arlan_command(dev, ARLAN_COMMAND_INT_ACK);
 		arlan_command(dev, ARLAN_COMMAND_INT_ENABLE);
