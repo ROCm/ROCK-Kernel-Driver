@@ -1217,8 +1217,8 @@ __init void arch_init_sched_domains(void)
 		first_cpu = last_cpu = NULL;
 
 		if (i != first_cpu(cpu_domain->span)) {
-			&per_cpu(cpu_domains, i)->flags |= SD_SHARE_CPUPOWER;
-			&per_cpu(cpu_domains, first_cpu(cpu_domain->span))->flags |=
+			(&per_cpu(cpu_domains, i))->flags |= SD_SHARE_CPUPOWER;
+			(&per_cpu(cpu_domains, first_cpu(cpu_domain->span)))->flags |=
 				SD_SHARE_CPUPOWER;
 			continue;
 		}
