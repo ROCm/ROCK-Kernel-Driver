@@ -130,13 +130,6 @@ extern void xmon(struct pt_regs *excp);
 
 #define PAGE_BUG(page) do { BUG(); } while (0)
 
-/*
- * XXX A bug in the current ppc64 compiler prevents an optimisation
- * where a divide is replaced by a multiply by shifted inverse. For
- * the moment use page->virtaul
- */
-#define WANT_PAGE_VIRTUAL 1
-
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)
 {
