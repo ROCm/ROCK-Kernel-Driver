@@ -29,9 +29,12 @@
  *
  * Changelog:
  *
+ *  10 Feb 2004 - Stephane Eranian <eranian@hpl.hp.com>
+ *   Provide FPSWA version number via /proc/efi/fpswa
+ *
  *  10 Dec 2002 - Matt Domsch <Matt_Domsch@dell.com>
  *   fix locking per Peter Chubb's findings
- * 
+ *
  *  25 Mar 2002 - Matt Domsch <Matt_Domsch@dell.com>
  *   move uuid_unparse() to include/asm-ia64/efi.h:efi_guid_unparse()
  *
@@ -70,6 +73,7 @@
 #include <linux/smp.h>
 #include <linux/efi.h>
 
+#include <asm/fpswa.h>
 #include <asm/uaccess.h>
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
@@ -407,6 +411,37 @@ static struct file_operations efi_systab_fops = {
 	.read = efi_systab_read,
 };
 
+static ssize_t
+efi_fpswa_read (struct file *file, char *buffer, size_t count, loff_t *ppos)
+{
+	ssize_t size, length;
+	char str[32];
+	void *data;
+
+	snprintf(str, sizeof(str), "revision=%u.%u\n",
+                 fpswa_interface->revision >> 16, fpswa_interface->revision & 0xffff);
+
+	length = strlen(str);
+
+	if (*ppos >= length)
+                return 0;
+
+	data = str + file->f_pos;
+	size = length - file->f_pos;
+	if (size > count)
+		size = count;
+	if (copy_to_user(buffer, data, size))
+		return -EFAULT;
+
+	*ppos += size;
+	return size;
+}
+
+static struct proc_dir_entry *efi_fpswa_entry;
+static struct file_operations efi_fpswa_fops = {
+	.read = efi_fpswa_read,
+};
+
 static int __init
 efivars_init(void)
 {
@@ -428,6 +463,12 @@ efivars_init(void)
 	efi_systab_entry = create_proc_entry("systab", S_IRUSR | S_IRGRP, efi_dir);
 	if (efi_systab_entry)
 		efi_systab_entry->proc_fops = &efi_systab_fops;
+
+        if (fpswa_interface) {
+                efi_fpswa_entry = create_proc_entry("fpswa", S_IRUGO, efi_dir);
+                if (efi_fpswa_entry)
+                        efi_fpswa_entry->proc_fops = &efi_fpswa_fops;
+        }
 
 	efi_vars_dir = proc_mkdir("vars", efi_dir);
 
