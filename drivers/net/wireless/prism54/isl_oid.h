@@ -1,8 +1,9 @@
 /*
- *  $Id: isl_oid.h,v 1.3 2004/03/09 09:05:27 mcgrof Exp $
+ *
  *  
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
  *  Copyright (C) 2004 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>
+ *  Copyright (C) 2004 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -457,16 +458,29 @@ enum oid_num_t {
 	OID_NUM_LAST
 };
 
-/* We  could add more flags. eg: in which mode are they allowed, ro, rw, ...*/
-#define OID_FLAG_CACHED	0x01
-#define OID_FLAG_U32	0x02
-#define OID_FLAG_MLMEEX	0x04	/* this type is special because of a variable
-				   size field when sending. Not yet implemented (not used in driver). */
+#define OID_FLAG_CACHED		0x80
+#define OID_FLAG_TYPE		0x7f
+
+#define OID_TYPE_U32		0x01
+#define OID_TYPE_SSID		0x02
+#define OID_TYPE_KEY		0x03
+#define OID_TYPE_BUFFER		0x04
+#define OID_TYPE_BSS		0x05
+#define OID_TYPE_BSSLIST	0x06
+#define OID_TYPE_FREQUENCIES	0x07
+#define OID_TYPE_MLME		0x08
+#define OID_TYPE_MLMEEX		0x09
+#define OID_TYPE_ADDR		0x0A
+#define OID_TYPE_RAW		0x0B
+
+/* OID_TYPE_MLMEEX is special because of a variable size field when sending.
+ * Not yet implemented (not used in driver anyway).
+ */
 
 struct oid_t {
 	enum oid_num_t oid;
 	short range;		/* to define a range of oid */
-	short size;		/* size of the associated data */
+	short size;		/* max size of the associated data */
 	char flags;
 };
 
@@ -478,6 +492,7 @@ union oid_res_t {
 #define	IWMAX_BITRATES	20
 #define	IWMAX_BSS	24
 #define IWMAX_FREQ	30
+#define PRIV_STR_SIZE	1024
 
 #endif				/* !defined(_ISL_OID_H) */
 /* EOF */
