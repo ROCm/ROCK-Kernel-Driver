@@ -309,6 +309,7 @@ fix_alignment(struct pt_regs *regs)
 				/* Doing stfs, have to convert to single */
 				enable_kernel_fp();
 				cvt_df(&current->thread.fpr[reg], (float *)&data.v[4], &current->thread.fpscr);
+				disable_kernel_fp();
 			}
 			else
 				data.dd = current->thread.fpr[reg];
@@ -342,6 +343,7 @@ fix_alignment(struct pt_regs *regs)
 				/* Doing lfs, have to convert to double */
 				enable_kernel_fp();
 				cvt_fd((float *)&data.v[4], &current->thread.fpr[reg], &current->thread.fpscr);
+				disable_kernel_fp();
 			}
 			else
 				current->thread.fpr[reg] = data.dd;

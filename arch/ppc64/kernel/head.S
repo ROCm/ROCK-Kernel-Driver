@@ -792,11 +792,16 @@ ProgramCheck_common:
 FPUnavailable_common:
 	EXCEPTION_PROLOG_COMMON
 	bne	.load_up_fpu		/* if from user, just load it up */
-	li	r20,0
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+#ifdef DO_SOFT_DISABLE
+	ld	r20,SOFTE(r1)
+#else
+	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
+#endif
 	li	r6,0x800
-	bl      .save_remaining_regs    /* if from kernel, take a trap */
-	bl      .KernelFP
-	b       .ret_from_except
+	bl      .save_remaining_regs
+	bl      .KernelFPUnavailableException
+	BUG_OPCODE
 
 	.globl SystemCall_common
 SystemCall_common:
@@ -1483,19 +1488,16 @@ _STATIC(load_up_fpu)
 	b	fast_exception_return
 
 /*
- * FP unavailable trap from kernel - print a message, but let
- * the task use FP in the kernel until it returns to user mode.
+ * disable_kernel_fp()
+ * Disable the FPU.
  */
-_GLOBAL(KernelFP)
-	ld	r3,_MSR(r1)
-	ori	r3,r3,MSR_FP
-	std	r3,_MSR(r1)		/* enable use of FP after return */
-	LOADADDR(r3,86f)
-	ld	r4,PACACURRENT(r13)	/* current */
-	ld	r5,_NIP(r1)
-	b	.ret_from_except
-86:	.string	"floating point used in kernel (task=%p, pc=%x)\n"
-	.align	4
+_GLOBAL(disable_kernel_fp)
+	mfmsr   r3
+	rldicl  r0,r3,(63-MSR_FP_LG),1
+	rldicl  r3,r0,(MSR_FP_LG+1),0
+	mtmsrd  r3			/* disable use of fpu now */
+	isync
+	blr
 
 /*
  * giveup_fpu(tsk)
