@@ -869,7 +869,7 @@ static int esp_host_info(struct NCR_ESP *esp, char *ptr, off_t offset, int len)
 	for(i = 0; i < 15; i++) {
 		if(esp->targets_present & (1 << i)) {
 			Scsi_Device *SDptr = esp->ehost->host_queue;
-			struct ESP_device *esp_dev;
+			struct esp_device *esp_dev;
 
 			while((SDptr->host != esp->ehost) &&
 			      (SDptr->id != i) &&
@@ -1014,7 +1014,7 @@ static inline void build_sync_nego_msg(struct NCR_ESP *esp, int period, int offs
 static void esp_exec_cmd(struct NCR_ESP *esp)
 {
 	struct ESP_regs *eregs = esp->eregs;
-	struct ESP_device *esp_dev;
+	struct esp_device *esp_dev;
 	Scsi_Cmnd *SCptr;
 	Scsi_Device *SDptr;
 	volatile unchar *cmdp = esp->esp_command;
@@ -1043,18 +1043,18 @@ static void esp_exec_cmd(struct NCR_ESP *esp)
 	/*
 	 * If esp_dev == NULL then we need to allocate a struct for our data
 	 */
-	if(esp_dev == NULL) {
-		esp_dev = kmalloc(sizeof(struct ESP_device), GFP_ATOMIC);
-		if(esp_dev == NULL) {
+	if (!esp_dev) {
+		esp_dev = kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
+		if (!esp_dev) {
 			/* We're SOL.  Print a message and bail */
-			printk(KERN_WARNING "esp: no mem for ESP_device %d/%d\n",
+			printk(KERN_WARNING "esp: no mem for esp_device %d/%d\n",
 					target, lun);
 			esp->current_SC = NULL;
 			SCptr->result = DID_ERROR << 16;
 			SCptr->done(SCptr);
 			return;
 		}
-		memset(esp_dev, 0, sizeof(struct ESP_device));
+		memset(esp_dev, 0, sizeof(struct esp_device));
 		SDptr->hostdata = esp_dev;
 	}
 
@@ -1720,7 +1720,7 @@ static inline void esp_connect(struct NCR_ESP *esp, struct ESP_regs *eregs,
 			       Scsi_Cmnd *sp)
 {
 	Scsi_Device *dp = sp->device;
-	struct ESP_device *esp_dev = dp->hostdata;
+	struct esp_device *esp_dev = dp->hostdata;
 
 	if(esp->prev_soff  != esp_dev->sync_max_offset ||
 	   esp->prev_stp   != esp_dev->sync_min_period ||
@@ -2007,7 +2007,7 @@ static int esp_do_data_finale(struct NCR_ESP *esp,
 			      struct ESP_regs *eregs)
 {
 	Scsi_Cmnd *SCptr = esp->current_SC;
-	struct ESP_device *esp_dev = SCptr->device->hostdata;
+	struct esp_device *esp_dev = SCptr->device->hostdata;
 	int bogus_data = 0, bytes_sent = 0, fifocnt, ecount = 0;
 
 	if(esp->dma_led_off)
@@ -2228,7 +2228,7 @@ static int esp_do_freebus(struct NCR_ESP *esp, struct ESP_regs *eregs)
 	esp->msgout_len = 0;
 	esp->prevmsgout = NOP;
 	if(esp->prevmsgin == COMMAND_COMPLETE) {
-		struct ESP_device *esp_dev = SCptr->device->hostdata;
+		struct esp_device *esp_dev = SCptr->device->hostdata;
 		/* Normal end of nexus. */
 		if(esp->disconnected_SC)
 			esp_cmd(esp, eregs, ESP_CMD_ESEL);
@@ -2503,7 +2503,7 @@ static int esp_disconnect_amidst_phases(struct NCR_ESP *esp,
 					struct ESP_regs *eregs)
 {
 	Scsi_Cmnd *sp = esp->current_SC;
-	struct ESP_device *esp_dev = sp->device->hostdata;
+	struct esp_device *esp_dev = sp->device->hostdata;
 
 	/* This means real problems if we see this
 	 * here.  Unless we were actually trying
@@ -2602,7 +2602,7 @@ static int esp_do_phase_determine(struct NCR_ESP *esp,
 static int esp_select_complete(struct NCR_ESP *esp, struct ESP_regs *eregs)
 {
 	Scsi_Cmnd *SCptr = esp->current_SC;
-	struct ESP_device *esp_dev = SCptr->device->hostdata;
+	struct esp_device *esp_dev = SCptr->device->hostdata;
 	int cmd_bytes_sent, fcnt;
 
 	fcnt = (esp_read(eregs->esp_fflags) & ESP_FF_FBYTES);
@@ -2931,7 +2931,7 @@ static int check_singlebyte_msg(struct NCR_ESP *esp,
 	case MESSAGE_REJECT:
 		ESPMISC(("msg reject, "));
 		if(esp->prevmsgout == EXTENDED_MESSAGE) {
-			struct ESP_device *esp_dev = esp->current_SC->device->hostdata;
+			struct esp_device *esp_dev = esp->current_SC->device->hostdata;
 
 			/* Doesn't look like this target can
 			 * do synchronous or WIDE transfers.
@@ -2956,7 +2956,7 @@ static int check_singlebyte_msg(struct NCR_ESP *esp,
  */
 static int target_with_ants_in_pants(struct NCR_ESP *esp,
 				     Scsi_Cmnd *SCptr,
-				     struct ESP_device *esp_dev)
+				     struct esp_device *esp_dev)
 {
 	if(esp_dev->sync || SCptr->device->borken) {
 		/* sorry, no can do */
@@ -3011,7 +3011,7 @@ static int check_multibyte_msg(struct NCR_ESP *esp,
 			       struct ESP_regs *eregs)
 {
 	Scsi_Cmnd *SCptr = esp->current_SC;
-	struct ESP_device *esp_dev = SCptr->device->hostdata;
+	struct esp_device *esp_dev = SCptr->device->hostdata;
 	unchar regval = 0;
 	int message_out = 0;
 
@@ -3345,7 +3345,7 @@ static int esp_do_msgoutdone(struct NCR_ESP *esp,
 
 		default:
 			if(!fcount(esp, eregs) &&
-			   !(((struct ESP_device *)esp->current_SC->device->hostdata)->sync_max_offset))
+			   !(((struct esp_device *)esp->current_SC->device->hostdata)->sync_max_offset))
 				esp_cmd(esp, eregs, ESP_CMD_FLUSH);
 			break;
 

@@ -286,7 +286,7 @@ enum esp_rev {
 /* We allocate one of these for each scsi device and attach it to
  * SDptr->hostdata for use in the driver
  */
-struct ESP_device {
+struct esp_device {
   unsigned char sync_min_period;
   unsigned char sync_max_offset;
   unsigned sync:1;
