@@ -1518,11 +1518,8 @@ int pcmcia_release_configuration(client_handle_t handle)
     s = SOCKET(handle);
     
 #ifdef CONFIG_CARDBUS
-    if (handle->state & CLIENT_CARDBUS) {
-	cb_disable(s);
-	s->lock_count = 0;
+    if (handle->state & CLIENT_CARDBUS)
 	return CS_SUCCESS;
-    }
 #endif
     
     if (!(handle->state & CLIENT_STALE)) {
@@ -1569,9 +1566,8 @@ int pcmcia_release_io(client_handle_t handle, io_req_t *req)
     s = SOCKET(handle);
     
 #ifdef CONFIG_CARDBUS
-    if (handle->state & CLIENT_CARDBUS) {
+    if (handle->state & CLIENT_CARDBUS)
 	return CS_SUCCESS;
-    }
 #endif
     
     if (!(handle->state & CLIENT_STALE)) {
@@ -1674,16 +1670,8 @@ int pcmcia_request_configuration(client_handle_t handle,
 	return CS_NO_CARD;
     
 #ifdef CONFIG_CARDBUS
-    if (handle->state & CLIENT_CARDBUS) {
-	if (!(req->IntType & INT_CARDBUS))
-	    return CS_UNSUPPORTED_MODE;
-	if (s->lock_count != 0)
-	    return CS_CONFIGURATION_LOCKED;
-	cb_enable(s);
-	handle->state |= CLIENT_CONFIG_LOCKED;
-	s->lock_count++;
-	return CS_SUCCESS;
-    }
+    if (handle->state & CLIENT_CARDBUS)
+	return CS_UNSUPPORTED_MODE;
 #endif
     
     if (req->IntType & INT_CARDBUS)
