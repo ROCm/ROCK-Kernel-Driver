@@ -121,7 +121,7 @@ MODULE_PARM_DESC(ql2xloginretrycount,
 
 #ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
 int ql2xioctltimeout = QLA_PT_CMD_TOV;
-MODULE_PARM(ql2xioctltimeout,"i");
+module_param(ql2xioctltimeout, int, 0);
 MODULE_PARM_DESC(ql2xioctltimeout,
 		"IOCTL timeout value in seconds for pass-thur commands. "
 		"Default is 66 seconds.");
