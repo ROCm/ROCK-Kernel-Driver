@@ -830,8 +830,7 @@ static int ide_allocate_dma_engine(ide_hwif_t *hwif)
 		return 0;
 
 	printk(KERN_ERR "%s: -- Error, unable to allocate%s DMA table(s).\n",
-		(hwif->dmatable_cpu == NULL) ? " CPU" : "",
-		hwif->cds->name);
+			hwif->cds->name, !hwif->dmatable_cpu ? " CPU" : "");
 
 	ide_release_dma_engine(hwif);
 	return 1;
