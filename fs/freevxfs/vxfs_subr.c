@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_subr.c,v 1.5 2001/04/26 22:49:51 hch Exp hch $"
+#ident "$Id: vxfs_subr.c,v 1.8 2001/12/28 20:50:47 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - shared subroutines.
@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/pagemap.h>
 
+#include "vxfs_kcompat.h"
 #include "vxfs_extern.h"
 
 
@@ -62,9 +63,8 @@ struct address_space_operations vxfs_aops = {
  *   The wanted page on success, else a NULL pointer.
  */
 struct page *
-vxfs_get_page(struct inode *ip, u_long n)
+vxfs_get_page(struct address_space *mapping, u_long n)
 {
-	struct address_space *		mapping = ip->i_mapping;
 	struct page *			pp;
 
 	pp = read_cache_page(mapping, n,

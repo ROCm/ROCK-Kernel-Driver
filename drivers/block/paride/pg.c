@@ -565,7 +565,7 @@ static int pg_detect( void )
 	return -1;
 }
 
-#define DEVICE_NR(dev)	(MINOR(dev) % 128)
+#define DEVICE_NR(dev)	(minor(dev) & 0x7F)
 
 static int pg_open (struct inode *inode, struct file *file)
 

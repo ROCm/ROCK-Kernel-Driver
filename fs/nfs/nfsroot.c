@@ -334,7 +334,7 @@ int __init root_nfs_init(void)
  */
 int __init nfs_root_setup(char *line)
 {
-	ROOT_DEV = MKDEV(UNNAMED_MAJOR, 255);
+	ROOT_DEV = mk_kdev(UNNAMED_MAJOR, 255);
 	if (line[0] == '/' || line[0] == ',' || (line[0] >= '0' && line[0] <= '9')) {
 		strncpy(nfs_root_name, line, sizeof(nfs_root_name));
 		nfs_root_name[sizeof(nfs_root_name)-1] = '\0';

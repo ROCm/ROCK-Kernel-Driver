@@ -1651,7 +1651,7 @@ extern wait_queue_head_t reiserfs_commit_thread_wait ;
 #define _jhashfn(dev,block)	\
 	((((dev)<<(JBH_HASH_SHIFT - 6)) ^ ((dev)<<(JBH_HASH_SHIFT - 9))) ^ \
 	 (((block)<<(JBH_HASH_SHIFT - 6)) ^ ((block) >> 13) ^ ((block) << (JBH_HASH_SHIFT - 12))))
-#define journal_hash(t,dev,block) ((t)[_jhashfn((dev),(block)) & JBH_HASH_MASK])
+#define journal_hash(t,dev,block) ((t)[_jhashfn((kdev_t_to_nr(dev)),(block)) & JBH_HASH_MASK])
 
 /* finds n'th buffer with 0 being the start of this commit.  Needs to go away, j_ap_blocks has changed
 ** since I created this.  One chunk of code in journal.c needs changing before deleting it

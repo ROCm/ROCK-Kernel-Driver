@@ -27,15 +27,15 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_inode.c,v 1.37 2001/08/07 16:13:30 hch Exp hch $"
+#ident "$Id: vxfs_inode.c,v 1.42 2002/01/02 23:51:36 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - inode routines.
  */
 #include <linux/fs.h>
+#include <linux/pagemap.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
-#include <linux/pagemap.h>
 
 #include "vxfs.h"
 #include "vxfs_inode.h"
@@ -48,6 +48,7 @@ extern struct address_space_operations vxfs_immed_aops;
 extern struct inode_operations vxfs_immed_symlink_iops;
 
 static struct file_operations vxfs_file_operations = {
+	.open =			generic_file_open,
 	.llseek =		generic_file_llseek,
 	.read =			generic_file_read,
 	.mmap =			generic_file_mmap,
@@ -114,7 +115,7 @@ vxfs_blkiget(struct super_block *sbp, u_long extent, ino_t ino)
 		if (!(vip = kmem_cache_alloc(vxfs_inode_cachep, SLAB_KERNEL)))
 			goto fail;
 		dip = (struct vxfs_dinode *)(bp->b_data + offset);
-		memcpy(vip, dip, sizeof(struct vxfs_inode_info));
+		memcpy(vip, dip, sizeof(*vip));
 #ifdef DIAGNOSTIC
 		vxfs_dumpi(vip, ino);
 #endif
@@ -146,7 +147,7 @@ __vxfs_iget(ino_t ino, struct inode *ilistp)
 	u_long				offset;
 
 	offset = (ino % (PAGE_SIZE / VXFS_ISIZE)) * VXFS_ISIZE;
-	pp = vxfs_get_page(ilistp, ino * VXFS_ISIZE / PAGE_SIZE);
+	pp = vxfs_get_page(ilistp->i_mapping, ino * VXFS_ISIZE / PAGE_SIZE);
 
 	if (!IS_ERR(pp)) {
 		struct vxfs_inode_info	*vip;
@@ -156,7 +157,7 @@ __vxfs_iget(ino_t ino, struct inode *ilistp)
 		if (!(vip = kmem_cache_alloc(vxfs_inode_cachep, SLAB_KERNEL)))
 			goto fail;
 		dip = (struct vxfs_dinode *)(kaddr + offset);
-		memcpy(vip, dip, sizeof(struct vxfs_inode_info));
+		memcpy(vip, dip, sizeof(*vip));
 #ifdef DIAGNOSTIC
 		vxfs_dumpi(vip, ino);
 #endif

@@ -39,7 +39,10 @@
 
 /* Contributors:
    - Alvarado: adding whitebalance code
-   - Alistar Moire: QuickCam 3000 Pro testing
+   - Alistar Moire: QuickCam 3000 Pro device/product ID
+   - Tony Hoyle: Creative Labs Webcam 5 device/product ID
+   - Mark Burazin: solving hang in VIDIOCSYNC when camera gets unplugged
+   - Jk Fang: SOTEC device/product ID
 */
 
 #include <linux/errno.h>
@@ -76,6 +79,8 @@ static __devinitdata struct usb_device_id pwc_device_table [] = {
 	{ USB_DEVICE(0x046D, 0x08b0) },
 	{ USB_DEVICE(0x055D, 0x9000) },
 	{ USB_DEVICE(0x055D, 0x9001) },
+	{ USB_DEVICE(0x041E, 0x400C) },
+	{ USB_DEVICE(0x04CC, 0x8116) },
 	{ }
 };
 MODULE_DEVICE_TABLE(usb, pwc_device_table);
@@ -887,6 +892,7 @@ static void pwc_isoc_cleanup(struct pwc_device *pdev)
 	/* Stop camera, but only if we are sure the camera is still there */
 	if (!pdev->unplugged)
 		usb_set_interface(pdev->udev, 0, 0);
+	/* Unlinking ISOC buffers one by one */
 	for (i = MAX_ISO_BUFS - 1; i >= 0; i--) {
 		pdev->sbuf[i].urb->next = NULL;
 		usb_unlink_urb(pdev->sbuf[i].urb);
@@ -1493,6 +1499,12 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			 */
 			add_wait_queue(&pdev->frameq, &wait);
 			while (pdev->full_frames == NULL) {
+				if (pdev->unplugged) {
+					remove_wait_queue(&pdev->frameq, &wait);
+					set_current_state(TASK_RUNNING);
+					return -ENODEV;
+				}
+			
 	                	if (signal_pending(current)) {
 	                		remove_wait_queue(&pdev->frameq, &wait);
 		                	set_current_state(TASK_RUNNING);
@@ -1710,7 +1722,29 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			break;
 		}
 	}
-	else return NULL; /* Not Philips, Askey, Logitech or Samsung, for sure. */
+	else if (vendor_id == 0x041e) {
+		switch(product_id) {
+		case 0x400c:
+			Info("Creative Labs Webcam 5 detected.\n");
+			type_id = 730;
+			break;
+		default:
+			return NULL;
+			break;
+		}
+	}
+	else if (vendor_id == 0x04cc) { 
+		switch(product_id) {
+		case 0x8116:
+			Info("SOTEC CMS-001 USB webcam detected.\n");
+			type_id = 730;
+			break;  
+		default:
+			return NULL;
+			break;
+		}
+	}
+	else return NULL; /* Not Philips, Askey, Logitech, Samsung, Creative or SOTEC, for sure. */
 
 	memset(serial_number, 0, 30);
 	usb_string(udev, udev->descriptor.iSerialNumber, serial_number, 29);
@@ -1780,16 +1814,6 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 	if (hint < MAX_DEV_HINTS) 
 		device_hint[hint].pdev = pdev;
 
-#if 0
-	/* Shut down camera now (some people like the LED off) */
-	if (power_save) {
-		Trace(TRACE_PROBE, "Powering down camera");
-		i = pwc_camera_power(pdev, 0);
-		if (i < 0)
-			Info("Failed to power-down the camera (%d)\n", i);
-	}
-#endif
-
 	Trace(TRACE_PROBE, "probe() function returning struct at 0x%p.\n", pdev);
 	return pdev;
 }
@@ -1799,6 +1823,7 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 {
 	struct pwc_device *pdev;
 	int hint;
+	DECLARE_WAITQUEUE(wait, current);
 
 	lock_kernel();
 	free_mem_leak();
@@ -1833,13 +1858,19 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 			 */
 			wake_up(&pdev->frameq);
 			
-			/* Wait until we get a 'go' from _close(). This
-			   had a gigantic race condition, since we kfree()
+			/* Wait until we get a 'go' from _close(). This used
+			   to have a gigantic race condition, since we kfree()
 			   stuff here, but we have to wait until close() 
-			   is finished. */
+			   is finished. 
+			 */
 			   
 			Trace(TRACE_PROBE, "Sleeping on remove_ok.\n");
-			sleep_on(&pdev->remove_ok);
+			add_wait_queue(&pdev->remove_ok, &wait);
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			/* ... wait ... */
+			schedule();
+			remove_wait_queue(&pdev->remove_ok, &wait);
+			set_current_state(TASK_RUNNING);
 			Trace(TRACE_PROBE, "Done sleeping.\n");
 			set_mem_leak(pdev->vdev);
 			pdev->vdev = NULL;
@@ -1920,7 +1951,7 @@ static int __init usb_pwc_init(void)
 	char *sizenames[PSZ_MAX] = { "sqcif", "qsif", "qcif", "sif", "cif", "vga" };
 
 	Info("Philips PCA645/646 + PCVC675/680/690 + PCVC730/740/750 webcam module version " PWC_VERSION " loaded.\n");
-	Info("Also supports the Askey VC010, Logitech Quickcam 3000 Pro and the Samsung MPC-C10 and MPC-C30.\n");
+	Info("Also supports the Askey VC010, Logitech Quickcam 3000 Pro, Samsung MPC-C10 and MPC-C30, the Creative WebCam 5 and the SOTEC CMS-001.\n");
 
 	if (fps) {
 		if (fps < 5 || fps > 30) {

@@ -774,7 +774,7 @@ journal_t * journal_init_inode (struct inode *inode)
 	journal->j_inode = inode;
 	jbd_debug(1,
 		  "journal %p: inode %s/%ld, size %Ld, bits %d, blksize %ld\n",
-		  journal, bdevname(inode->i_dev), inode->i_ino, 
+		  journal, inode->i_sb->s_id, inode->i_ino, 
 		  (long long) inode->i_size,
 		  inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
 

@@ -362,7 +362,6 @@ int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 struct super_block *hpfs_read_super(struct super_block *s, void *options,
 				    int silent)
 {
-	kdev_t dev;
 	struct buffer_head *bh0, *bh1, *bh2;
 	struct hpfs_boot_block *bootblock;
 	struct hpfs_super_block *superblock;
@@ -408,7 +407,6 @@ struct super_block *hpfs_read_super(struct super_block *s, void *options,
 	}
 
 	/*s->s_hpfs_mounting = 1;*/
-	dev = s->s_dev;
 	sb_set_blocksize(s, 512);
 	s->s_hpfs_fs_size = -1;
 	if (!(bootblock = hpfs_map_sector(s, 0, &bh0, 0))) goto bail1;

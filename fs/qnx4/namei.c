@@ -213,7 +213,7 @@ int qnx4_unlink(struct inode *dir, struct dentry *dentry)
 	retval = -EPERM;
 	if (!inode->i_nlink) {
 		QNX4DEBUG(("Deleting nonexistent file (%s:%lu), %d\n",
-			   kdevname(inode->i_dev),
+			   inode->i_sb->s_id,
 			   inode->i_ino, inode->i_nlink));
 		inode->i_nlink = 1;
 	}

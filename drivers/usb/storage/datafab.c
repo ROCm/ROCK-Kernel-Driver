@@ -208,7 +208,7 @@ static int datafab_read_data(struct us_data *us,
 
 		if (use_sg) {
 			sg = (struct scatterlist *) dest;
-			buffer = kmalloc(len, GFP_KERNEL);
+			buffer = kmalloc(len, GFP_NOIO);
 			if (buffer == NULL)
 				return USB_STOR_TRANSPORT_ERROR;
 			ptr = buffer;
@@ -333,7 +333,7 @@ static int datafab_write_data(struct us_data *us,
 
 		if (use_sg) {
 			sg = (struct scatterlist *) src;
-			buffer = kmalloc(len, GFP_KERNEL);
+			buffer = kmalloc(len, GFP_NOIO);
 			if (buffer == NULL)
 				return USB_STOR_TRANSPORT_ERROR;
 			ptr = buffer;
@@ -665,7 +665,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 	};
 
 	if (!us->extra) {
-		us->extra = kmalloc(sizeof(struct datafab_info), GFP_KERNEL);
+		us->extra = kmalloc(sizeof(struct datafab_info), GFP_NOIO);
 		if (!us->extra) {
 			US_DEBUGP("datafab_transport:  Gah! Can't allocate storage for Datafab info struct!\n");
 			return USB_STOR_TRANSPORT_ERROR;

@@ -718,6 +718,8 @@ struct super_block {
 	struct list_head	s_instances;
 	struct quota_mount_options s_dquot;	/* Diskquota specific options */
 
+	char s_id[32];				/* Informational name */
+
 	union {
 		struct minix_sb_info	minix_sb;
 		struct ext2_sb_info	ext2_sb;

@@ -163,7 +163,7 @@ static void ext3_handle_error(struct super_block *sb)
 
 	if (ext3_error_behaviour(sb) == EXT3_ERRORS_PANIC) 
 		panic ("EXT3-fs (device %s): panic forced after error\n",
-		       bdevname(sb->s_dev));
+		       sb->s_id);
 
 	if (ext3_error_behaviour(sb) == EXT3_ERRORS_RO) {
 		printk (KERN_CRIT "Remounting filesystem read-only\n");
@@ -183,7 +183,7 @@ void ext3_error (struct super_block * sb, const char * function,
 	va_end (args);
 
 	printk (KERN_CRIT "EXT3-fs error (device %s): %s: %s\n",
-		bdevname(sb->s_dev), function, error_buf);
+		sb->s_id, function, error_buf);
 
 	ext3_handle_error(sb);
 }
@@ -231,7 +231,7 @@ void __ext3_std_error (struct super_block * sb, const char * function,
 	const char *errstr = ext3_decode_error(sb, errno, nbuf);
 
 	printk (KERN_CRIT "EXT3-fs error (device %s) in %s: %s\n",
-		bdevname(sb->s_dev), function, errstr);
+		sb->s_id, function, errstr);
 	
 	ext3_handle_error(sb);
 }
@@ -259,10 +259,10 @@ void ext3_abort (struct super_block * sb, const char * function,
 
 	if (ext3_error_behaviour(sb) == EXT3_ERRORS_PANIC)
 		panic ("EXT3-fs panic (device %s): %s: %s\n",
-		       bdevname(sb->s_dev), function, error_buf);
+		       sb->s_id, function, error_buf);
 
 	printk (KERN_CRIT "EXT3-fs abort (device %s): %s: %s\n",
-		bdevname(sb->s_dev), function, error_buf);
+		sb->s_id, function, error_buf);
 
 	if (sb->s_flags & MS_RDONLY)
 		return;
@@ -293,7 +293,7 @@ NORET_TYPE void ext3_panic (struct super_block * sb, const char * function,
 	/* AKPM: is this sufficient? */
 	sb->s_flags |= MS_RDONLY;
 	panic ("EXT3-fs panic (device %s): %s: %s\n",
-	       bdevname(sb->s_dev), function, error_buf);
+	       sb->s_id, function, error_buf);
 }
 
 void ext3_warning (struct super_block * sb, const char * function,
@@ -305,7 +305,7 @@ void ext3_warning (struct super_block * sb, const char * function,
 	vsprintf (error_buf, fmt, args);
 	va_end (args);
 	printk (KERN_WARNING "EXT3-fs warning (device %s): %s: %s\n",
-		bdevname(sb->s_dev), function, error_buf);
+		sb->s_id, function, error_buf);
 }
 
 void ext3_update_dynamic_rev(struct super_block *sb)
@@ -389,8 +389,8 @@ static void dump_orphan_list(struct super_block *sb, struct ext3_sb_info *sbi)
 	list_for_each(l, &sbi->s_orphan) {
 		struct inode *inode = orphan_list_entry(l);
 		printk(KERN_ERR "  "
-		       "inode 0x%04x.0x%04x:%ld at %p: mode %o, nlink %d, next %d\n",
-		       major(inode->i_dev), minor(inode->i_dev), inode->i_ino, inode,
+		       "inode %s:%ld at %p: mode %o, nlink %d, next %d\n",
+		       inode->i_sb->s_id, inode->i_ino, inode,
 		       inode->i_mode, inode->i_nlink, 
 		       le32_to_cpu(NEXT_ORPHAN(inode)));
 	}
@@ -712,7 +712,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 			EXT3_INODES_PER_GROUP(sb),
 			sbi->s_mount_opt);
 	printk(KERN_INFO "EXT3 FS " EXT3FS_VERSION ", " EXT3FS_DATE " on %s, ",
-				bdevname(sb->s_dev));
+				sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
 		printk("external journal on %s\n",
 				bdevname(EXT3_SB(sb)->s_journal->j_dev));
@@ -813,7 +813,7 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 
 	if (s_flags & MS_RDONLY) {
 		printk(KERN_INFO "EXT3-fs: %s: orphan cleanup on readonly fs\n",
-		       bdevname(sb->s_dev));
+		       sb->s_id);
 		sb->s_flags &= ~MS_RDONLY;
 	}
 
@@ -859,10 +859,10 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 
 	if (nr_orphans)
 		printk(KERN_INFO "EXT3-fs: %s: %d orphan inode%s deleted\n",
-		       bdevname(sb->s_dev), PLURAL(nr_orphans));
+		       sb->s_id, PLURAL(nr_orphans));
 	if (nr_truncates)
 		printk(KERN_INFO "EXT3-fs: %s: %d truncate%s cleaned up\n",
-		       bdevname(sb->s_dev), PLURAL(nr_truncates));
+		       sb->s_id, PLURAL(nr_truncates));
 	sb->s_flags = s_flags; /* Restore MS_RDONLY status */
 }
 
@@ -916,10 +916,8 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 	sbi->s_mount_opt = 0;
 	sbi->s_resuid = EXT3_DEF_RESUID;
 	sbi->s_resgid = EXT3_DEF_RESGID;
-	if (!parse_options ((char *) data, &sb_block, sbi, &journal_inum, 0)) {
-		sb->s_dev = NODEV;
+	if (!parse_options ((char *) data, &sb_block, sbi, &journal_inum, 0))
 		goto out_fail;
-	}
 
 	blocksize = sb_min_blocksize(sb, EXT3_MIN_BLOCK_SIZE);
 
@@ -947,7 +945,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		if (!silent)
 			printk(KERN_ERR 
 			       "VFS: Can't find ext3 filesystem on dev %s.\n",
-			       bdevname(dev));
+			       sb->s_id);
 		goto failed_mount;
 	}
 	if (le32_to_cpu(es->s_rev_level) == EXT3_GOOD_OLD_REV &&
@@ -965,14 +963,14 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 	if ((i = EXT3_HAS_INCOMPAT_FEATURE(sb, ~EXT3_FEATURE_INCOMPAT_SUPP))) {
 		printk(KERN_ERR "EXT3-fs: %s: couldn't mount because of "
 		       "unsupported optional features (%x).\n",
-		       bdevname(dev), i);
+		       sb->s_id, i);
 		goto failed_mount;
 	}
 	if (!(sb->s_flags & MS_RDONLY) &&
 	    (i = EXT3_HAS_RO_COMPAT_FEATURE(sb, ~EXT3_FEATURE_RO_COMPAT_SUPP))){
 		printk(KERN_ERR "EXT3-fs: %s: couldn't mount RDWR because of "
 		       "unsupported optional features (%x).\n",
-		       bdevname(dev), i);
+		       sb->s_id, i);
 		goto failed_mount;
 	}
 	blocksize = BLOCK_SIZE << le32_to_cpu(es->s_log_block_size);
@@ -981,7 +979,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 	    blocksize > EXT3_MAX_BLOCK_SIZE) {
 		printk(KERN_ERR 
 		       "EXT3-fs: Unsupported filesystem blocksize %d on %s.\n",
-		       blocksize, bdevname(dev));
+		       blocksize, sb->s_id);
 		goto failed_mount;
 	}
 
@@ -1135,7 +1133,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		if (!silent)
 			printk (KERN_ERR
 				"ext3: No journal on filesystem on %s\n",
-				bdevname(dev));
+				sb->s_id);
 		goto failed_mount2;
 	}
 
@@ -1654,7 +1652,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 				printk(KERN_WARNING "EXT3-fs: %s: couldn't "
 				       "remount RDWR because of unsupported "
 				       "optional features (%x).\n",
-				       bdevname(sb->s_dev), ret);
+				       sb->s_id, ret);
 				return -EROFS;
 			}
 			/*

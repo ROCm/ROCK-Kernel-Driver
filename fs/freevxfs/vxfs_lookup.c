@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_lookup.c,v 1.19 2001/05/30 19:50:20 hch Exp hch $"
+#ident "$Id: vxfs_lookup.c,v 1.21 2002/01/02 22:00:13 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - lookup and other directory related code.
@@ -126,7 +126,7 @@ vxfs_find_entry(struct inode *ip, struct dentry *dp, struct page **ppp)
 		caddr_t			kaddr;
 		struct page		*pp;
 
-		pp = vxfs_get_page(ip, page);
+		pp = vxfs_get_page(ip->i_mapping, page);
 		if (IS_ERR(pp))
 			continue;
 		kaddr = (caddr_t)page_address(pp);
@@ -273,7 +273,7 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 		caddr_t			kaddr;
 		struct page		*pp;
 
-		pp = vxfs_get_page(ip, page);
+		pp = vxfs_get_page(ip->i_mapping, page);
 		if (IS_ERR(pp))
 			continue;
 		kaddr = (caddr_t)page_address(pp);
@@ -318,6 +318,5 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 done:
 	fp->f_pos = ((page << PAGE_CACHE_SHIFT) | offset) + 2;
 out:
-	fp->f_version = ip->i_version;
 	return 0;
 }

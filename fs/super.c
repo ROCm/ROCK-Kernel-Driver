@@ -718,16 +718,17 @@ restart:
 	s->s_bdev = bdev;
 	s->s_flags = flags;
 	insert_super(s, fs_type);
+	strncpy(s->s_id, bdevname(dev), sizeof(s->s_id));
+	error = -EINVAL;
 	if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
-		goto Einval;
+		goto failed;
 	s->s_flags |= MS_ACTIVE;
 	path_release(&nd);
 	return s;
 
-Einval:
+failed:
 	deactivate_super(s);
 	remove_super(s);
-	error = -EINVAL;
 	goto out;
 out1:
 	blkdev_put(bdev, BDEV_FS);

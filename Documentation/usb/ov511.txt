@@ -8,11 +8,11 @@ Homepage: http://alpha.dyndns.org/ov511
 INTRODUCTION:
 
 This is a driver for the OV511, a USB-only chip used in many "webcam" devices.
-Any camera using the OV511/OV511+ and the OV7610/20/20AE CCD should work. It 
+Any camera using the OV511/OV511+ and the OV6620/OV7610/20/20AE should work.
+Video capture devices that use the Philips SAA7111A decoder also work. It 
 supports streaming and capture of color or monochrome video via the Video4Linux
-API. Most V4L apps are compatible with it, but a few video-conferencing programs
-do not work yet. The following resolutions are supported: 640x480, 448x336,
-384x288, 352x288, and 320x240.
+API. Most V4L apps are compatible with it. Most resolutions with a width and
+height that are a multiple of 8 are supported.
 
 If you need more information, please visit the OV511 homepage at the above URL.
 
@@ -27,22 +27,25 @@ WHAT YOU NEED:
 
 HOW TO USE IT:
 
+Note: These are simplified instructions. For complete instructions see:
+	http://alpha.dyndns.org/ov511/install.html
+
 You must have first compiled USB support, support for your specific USB host
 controller (UHCI or OHCI), and Video4Linux support for your kernel (I recommend
-making them modules.)
+making them modules.) Make sure "Enforce bandwidth allocation" is NOT enabled.
 
-Next, (as root) from your appropriate modules directory (lib/modules/2.3.XX):
+Next, (as root):
 
-	insmod usb/usbcore.o
-	insmod usb/usb-uhci.o  <OR>  insmod usb/ohci-hcd.o
-	insmod misc/videodev.o
-	insmod usb/ov511.o
+	modprobe usbcore
+	modprobe usb-uhci  <OR>  modprobe usb-ohci
+	modprobe videodev
+	modprobe ov511
 
 If it is not already there (it usually is), create the video device:
 
-	mknod /dev/video c 81 0
+	mknod /dev/video0 c 81 0
 
-Sometimes /dev/video is a symlink to /dev/video0
+Optionally, symlink /dev/video to /dev/video0
 
 You will have to set permissions on this device to allow you to read/write
 from it:
@@ -55,39 +58,40 @@ at 640x480.
 	
 [Using vidcat:]
 
-	vidcat -s 640x480 > test.jpg
+	vidcat -s 640x480 -p c > test.jpg
 	xview test.jpg
 	
 [Using xawtv:]
 
-You must make some modifications to the source and compile it before you use it.
-(Note: this may not be applicable to versions other than 3.06)
-
-In src/Xawtv.ad, change xawtv.tv.width to 640 and xawtv.tv.height to 480. Next,
-in src/grab-v4l.c, change SYNC_TIMEOUT from 1 to 2. Then, from the main xawtv
-directory:
+From the main xawtv directory:
 
 	make clean
 	./configure
 	make
 	make install
 
-Now you should be able to run xawtv. Right click for the options dialog. If
-you get a scrambled image it is likely that you made a mistake in Xawtv.ad.
-Try setting the size to 320x240 if all else fails.
+Now you should be able to run xawtv. Right click for the options dialog. 
 
 MODULE PARAMETERS:
 
   You can set these with:  insmod ov511 NAME=VALUE
   There is currently no way to set these on a per-camera basis.
 
-  NAME: autoadjust
-  TYPE: integer (boolean)
+  NAME: autobright
+  TYPE: integer (Boolean)
   DEFAULT: 1
-  DESC: The camera normally adjusts exposure, gain, and hue automatically. This
-        can be set to 0 to disable this automatic adjustment. Note that there is
-        currently no way to set these parameters manually once autoadjust is
-        disabled.
+  DESC: Brightness is normally under automatic control and can't be set
+        manually by the video app. Set to 0 for manual control.
+
+  NAME: autogain
+  TYPE: integer (Boolean)
+  DEFAULT: 1
+  DESC: Auto Gain Control enable. This feature is not yet implemented.
+
+  NAME: autoexp
+  TYPE: integer (Boolean)
+  DEFAULT: 1
+  DESC: Auto Exposure Control enable. This feature is not yet implemented.
 
   NAME: debug
   TYPE: integer (0-6)
@@ -102,49 +106,23 @@ MODULE PARAMETERS:
           5=highly repetitive mesgs
 
   NAME: fix_rgb_offset
-  TYPE: integer (boolean)
+  TYPE: integer (Boolean)
   DEFAULT: 0
   DESC: Some people have reported that the blue component of the image is one
         or so lines higher than the red component. This is only apparent in 
         images with white objects on black backgrounds at 640x480. Setting this
-        to 1 will realign the color planes correctly. NOTE: This is still
-        experimental and very buggy. You will likely need a fast (500 MHz) CPU.
+        to 1 will realign the color planes correctly. NOTE: You will likely
+        need a fast (500 MHz) CPU.
 
   NAME: snapshot
-  TYPE: integer (boolean)
+  TYPE: integer (Boolean)
   DEFAULT: 0
-  DESC: Set to 1 to enable snapshot mode. read() will block until the snapshot
-        button is pressed. Note that this does not yet work with most apps,
-        including xawtv and vidcat. NOTE: See the section "TODO" for more info.
+  DESC: Set to 1 to enable snapshot mode. read()/VIDIOCSYNC will block until
+	the snapshot button is pressed. Note: enabling this mode disables
+	/proc/video/ov511/<minor#>/button
 
-  NAME: sensor
-  TYPE: integer ([0, 1, 3])
-  DEFAULT: [varies]
-  DESC: If you know that your camera sensor is not detected correctly, set this
-        parameter. This is a global option for all attached OV511 cameras. You
-        will probably never need to set this, but if you do, valid values are:
-        	0 for OV7620
-        	1 for OV7620AE
-        	3 for OV7610
-
-  NAME: i2c_detect_tries
-  TYPE: integer (don't set it insanely high!)
-  DEFAULT: 5
-  DESC: This is the number of times the driver will try to sync and detect the
-        internal i2c bus (which connects the OV511 and sensor). If you are
-        getting intermittent detection failures ("Failed to read sensor ID...")
-        you should increase this by a modest amount. If setting it to 20 or so
-        doesn't fix things, look elsewhere for the cause of the problem.
-
-  NAME: aperture
-  TYPE: integer (0 - 15)
-  DEFAULT: [varies by sensor]
-  DESC: For legal values, see the OV7610/7620 specs under register Common F.
-        This setting affects the upper nybble of that reg (bits 4-7). This is
-        for if you want to play with the camera's pixel saturation.
-
-  NAME: force_rgb
-  TYPE: integer (boolean)
+  NAME: force_rgb	(Deprecated; may be removed in the future)
+  TYPE: integer (Boolean)
   DEFAULT: 0
   DESC: Force image to be read in RGB instead of BGR. This option allow
         programs that expect RGB data (e.g. gqcam) to work with this driver. If
@@ -169,60 +147,179 @@ MODULE PARAMETERS:
         both OV511 and OV511+ cameras, trial-and-error may be necessary for
         finding the optimum setting.
 
-  NAME: retry_sync
-  TYPE: boolean
+  NAME: compress
+  TYPE: integer (Boolean)
   DEFAULT: 0
-  DESC: Prevent apps from timing out if frame is not done in time. This is
-        useful if you are having problems with Xawtv getting "stuck" on a frame
-        when your system is under heavy load.
+  DESC: Set this to 1 to turn on the camera's compression engine. This can
+        potentially increase the frame rate at the expense of quality, if you
+        have a fast CPU. You must load the proper compression module for your
+        camera before starting your application (ov511_decomp or ov518_decomp).
 
-  NAME: sensor_gbr
-  TYPE: boolean
+  NAME: testpat
+  TYPE: integer (Boolean)
+  DEFAULT: 0
+  DESC: This configures the camera's sensor to transmit a colored test-pattern
+        instead of an image. This does not work correctly yet.
+
+  NAME: sensor_gbr (*** TEMPORARILY DISABLED ***)
+  TYPE: integer (Boolean)
   DEFAULT: 0
   DESC: This makes the sensor output GBR422 instead of YUV420. This saves the
         driver the trouble of converting YUV to RGB, but it currently does not
         work very well (the colors are not quite right)
 
+  NAME: dumppix
+  TYPE: integer (0-2)
+  DEFAULT: 0
+  DESC: Dumps raw pixel data and skips post-processing and format conversion.
+	It is for debugging purposes only. Options are:
+		0: Disable (default)
+		1: Dump raw data from camera, excluding headers and trailers
+		2: Dumps data exactly as received from camera
+
+  NAME: led
+  TYPE: integer (0-2)
+  DEFAULT: 1 (Always on)
+  DESC: Controls whether the LED (the little light) on the front of the camera
+	is always off (0), always on (1), or only on when driver is open (2).
+	This is only supported with the OV511+ chipset, and even then only on
+	some cameras (ones that actually have the LED wired to the control pin,
+	and not just hardwired to be on all the time).
+
+  NAME: dump_bridge
+  TYPE: integer (Boolean)
+  DEFAULT: 0
+  DESC: Dumps the bridge (OV511[+] or OV518[+]) register values to the system
+	log. Only useful for serious debugging/development purposes.
+
+  NAME: dump_sensor
+  TYPE: integer (Boolean)
+  DEFAULT: 0
+  DESC: Dumps the sensor register values to the system log. Only useful for
+	serious debugging/development purposes.
+
+  NAME: printph
+  TYPE: integer (Boolean)
+  DEFAULT: 0
+  DESC: Setting this to 1 will dump the first 12 bytes of each isoc frame. This
+	is only useful if you are trying to debug problems with the isoc data
+	stream (i.e.: camera initializes, but vidcat hangs until Ctrl-C). Be
+	warned that this dumps a large number of messages to your kernel log.
+
+  NAME: phy, phuv, pvy, pvuv, qhy, qhuv, qvy, qvuv
+  TYPE: integer (0-63 for phy and phuv, 0-255 for rest)
+  DEFAULT: OV511 default values
+  DESC: These are registers 70h - 77h of the OV511, which control the
+	prediction ranges and quantization thresholds of the compressor, for
+	the Y and UV channels in the horizontal and vertical directions. See
+	the OV511 or OV511+ data sheet for more detailed descriptions. These
+	normally do not need to be changed.
+
+  NAME: lightfreq
+  TYPE: integer (0, 50, or 60)
+  DEFAULT: 0 (use sensor default)
+  DESC: Sets the sensor to match your lighting frequency. This can reduce the
+	appearance of "banding", i.e. horizontal lines or waves of light and
+	dark that are often caused by artificial lighting. Valid values are:
+		0 - Use default (depends on sensor, most likely 60 Hz)
+		50 - For European and Asian 50 Hz power
+		60 - For American 60 Hz power
+
+  NAME: bandingfilter
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (off)
+  DESC: Enables the sensor´s banding filter exposure algorithm. This reduces
+	or stabilizes the "banding" caused by some artificial light sources
+	(especially fluorescent). You might have to set lightfreq correctly for
+	this to work right. As an added bonus, this sometimes makes it
+	possible to capture your monitor´s output.
+
+  NAME: fastset
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (off)
+  DESC: Allows picture settings (brightness, contrast, color, and hue) to take
+	effect immediately, even in the middle of a frame. This reduces the
+	time to change settings, but can ruin frames during the change. Only
+	affects OmniVision sensors.
+
+  NAME: force_palette
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (off)
+  DESC: Forces the palette (color format) to a specific value. If an
+	application requests a different palette, it will be rejected, thereby
+	forcing it to try others until it succeeds. This is useful for forcing
+	greyscale mode with a color camera, for example. Supported modes are:
+		0                           (Allows all the following formats)
+		1   VIDEO_PALETTE_GREY      (Linear greyscale)
+		3   VIDEO_PALETTE_RGB565    (565 16 bit RGB)
+		4   VIDEO_PALETTE_RGB24     (24bit RGB)
+		7   VIDEO_PALETTE_YUV422    (YUV422 capture)
+		8   VIDEO_PALETTE_YUYV      (YUV422 capture; same as 7)
+		10  VIDEO_PALETTE_YUV420    (YUV 4:2:0 Planar)
+		13  VIDEO_PALETTE_YUV422P   (YUV 4:2:2 Planar)
+		15  VIDEO_PALETTE_YUV420P   (YUV 4:2:0 Planar, same as 10)
+
+  NAME: tuner
+  TYPE: integer
+  DEFAULT: -1 (autodetect)
+  DESC: This sets the exact type of the tuner module in a device. This is set
+	automatically based on the custom ID of the OV511 device. In cases
+	where this fails, you can override this auto-detection. Please see
+	linux/drivers/media/video/tuner.h for a complete list.
+
+  NAME: backlight
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (off)
+  DESC: Setting this flag changes the exposure algorithm for OmniVision sensors
+	such that objects in the camera's view (i.e. your head) can be clearly
+	seen when they are illuminated from behind. It reduces or eliminates
+	the sensor's auto-exposure function, so it should only be used when
+	needed. Additionally, it is only supported with the OV6620 and OV7620.
+
+  NAME: unit_video
+  TYPE: Up to 16 comma-separated integers
+  DEFAULT: 0,0,0... (automatically assign the next available minor(s))
+  DESC: You can specify up to 16 minor numbers to be assigned to ov511 devices.
+	For example, "unit_video=1,3" will make the driver use /dev/video1 and
+	/dev/video3 for the first two devices it detects. Additional devices
+	will be assigned automatically starting at the first available device
+	node (/dev/video0 in this case). Note that you cannot specify 0 as a
+	minor number. This feature requires kernel version 2.4.5 or higher.
+
+  NAME: remove_zeros
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (do not skip any incoming data)
+  DESC: Setting this to 1 will remove zero-padding from incoming data. This
+	will compensate for the blocks of corruption that can appear when the
+	camera cannot keep up with the speed of the USB bus (eg. at low frame
+	resolutions). This feature is always enabled when compression is on.
+ 
 WORKING FEATURES:
- o Color streaming/capture at 640x480, 448x336, 384x288, 352x288, and 320x240
- o RGB24, RGB565, YUV420, YUV422, YUYV, and YUV422P color
- o Monochrome
+ o Color streaming/capture at most widths and heights that are multiples of 8.
+ o RGB24, RGB565, YUV420/YUV420P, YUV422/YUYV, and YUV422P color
+ o Monochrome (use force_palette=1 to enable)
  o Setting/getting of saturation, contrast, brightness, and hue (only some of
    them work the OV7620 and OV7620AE)
  o /proc status reporting
+ o SAA7111A video capture support at 320x240 and 640x480
+ o Compression support
 
 EXPERIMENTAL FEATURES:
- o fix_rgb_offset: Sometimes works, but other times causes errors with xawtv and
-   corrupted frames. If you have a very fast CPU, you can try it.
- o Snapshot mode (only works with some read() based apps; see below for more)
- o OV6620 sensor support
- o GBR422 parsing
- o 160x120
+ o OV6630 sensor support
+ o Banding filter
+ o SMP compatibility
 
-TODO:
- o Fix the noise / grainy image problem.
- o Get compression working. It would be a nice addition as it improves
-   frame rate quite a bit. OmniVision wouldn't tell me how the algorithm works,
-   so we can't really work on that yet. Please kindly inform OmniVision that you
-   would like them to release their specifications to the Linux community.
- o YUV422
- o Fix fixFrameRGBoffset(). It is not stable yet with streaming video.
- o V4L2 support (Probably not until it goes into the kernel)
- o Get rid of the memory management functions (put them in videodev.c??)
- o Setting of contrast and brightness not working with 7620/7620AE
- o Driver/camera state save/restore for when USB supports suspend/resume
- o Unstable on SMP systems
- o OV7620/OV6620 experience frame corruption with moving objects
- o OV6620 is too dark
- o 176x144 support
- o Driver sometimes hangs upon close() with OHCI
- o The image should always be written properly to the mmap'ed buffer as long as
-   the requested image size is at least the minimum size. This will likely
-   require a rewrite of all the parsing code.
+TO-DO:
+ o V4L2 support (This will be done after the next kernel patch release)
+ o Setting of hue not working with OV7620
+ o Setting of contrast and hue not working with OV7620AE
+ o OV8600 sensor support (Not used in anything yet)
+ o OV518/OV518+ support (all that's needed is the decompressor)
+ o cams >= 3 not working
 
 HOW TO CONTACT ME:
 
-You can email me at mwm@i.am . Please prefix the subject line
+You can email me at mmcclell@bigfoot.com . Please prefix the subject line
 with "OV511: " so that I am certain to notice your message.
 
 CREDITS:
@@ -232,3 +329,4 @@ Randy Dunlap, and others. Big thanks to them for their pioneering work on that
 and the USB stack. Thanks to Bret Wallach for getting camera reg IO, ISOC, and
 image capture working. Thanks to Orion Sky Lawlor, Kevin Moore, and Claudio
 Matsuoka for their work as well.
+

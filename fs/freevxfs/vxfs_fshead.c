@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_fshead.c,v 1.19 2001/08/07 16:14:10 hch Exp hch $"
+#ident "$Id: vxfs_fshead.c,v 1.20 2002/01/02 22:02:12 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - fileset header routines.
@@ -81,9 +81,9 @@ vxfs_getfsh(struct inode *ip, int which)
 	if (buffer_mapped(bp)) {
 		struct vxfs_fsh		*fhp;
 
-		if (!(fhp = kmalloc(sizeof(struct vxfs_fsh), SLAB_KERNEL)))
+		if (!(fhp = kmalloc(sizeof(*fhp), SLAB_KERNEL)))
 			return NULL;
-		memcpy(fhp, bp->b_data, sizeof(struct vxfs_fsh));
+		memcpy(fhp, bp->b_data, sizeof(*fhp));
 
 		brelse(bp);
 		return (fhp);

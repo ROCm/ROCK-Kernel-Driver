@@ -894,7 +894,7 @@ void devfs_put (devfs_handle_t de)
     {
 	devfs_dealloc_devnum ( S_ISCHR (de->mode) ? DEVFS_SPECIAL_CHR :
 			       DEVFS_SPECIAL_BLK,
-			       MKDEV (de->u.fcb.u.device.major,
+			       mk_kdev(de->u.fcb.u.device.major,
 				      de->u.fcb.u.device.minor) );
     }
     WRITE_ENTRY_MAGIC (de, 0);
@@ -1552,7 +1552,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     if ( ( S_ISCHR (mode) || S_ISBLK (mode) ) &&
 	 (flags & DEVFS_FL_AUTO_DEVNUM) )
     {
-	if ( ( devnum = devfs_alloc_devnum (devtype) ) == NODEV )
+	if ( kdev_none( devnum = devfs_alloc_devnum (devtype) ) )
 	{
 	    PRINTK ("(%s): exhausted %s device numbers\n",
 		    name, S_ISCHR (mode) ? "char" : "block");
@@ -1564,14 +1564,14 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
     {
 	PRINTK ("(%s): could not prepare leaf\n", name);
-	if (devnum != NODEV) devfs_dealloc_devnum (devtype, devnum);
+	if (!kdev_none(devnum)) devfs_dealloc_devnum (devtype, devnum);
 	return NULL;
     }
     if ( S_ISCHR (mode) || S_ISBLK (mode) )
     {
 	de->u.fcb.u.device.major = major;
 	de->u.fcb.u.device.minor = minor;
-	de->u.fcb.autogen = (devnum == NODEV) ? FALSE : TRUE;
+	de->u.fcb.autogen = kdev_none(devnum) ? FALSE : TRUE;
     }
     else if ( !S_ISREG (mode) )
     {
@@ -1601,7 +1601,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     {
 	PRINTK ("(%s): could not append to parent, err: %d\n", name, err);
 	devfs_put (dir);
-	if (devnum != NODEV) devfs_dealloc_devnum (devtype, devnum);
+	if (!kdev_none(devnum)) devfs_dealloc_devnum (devtype, devnum);
 	return NULL;
     }
     DPRINTK (DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"  pp: %p\n",
@@ -2413,7 +2413,7 @@ static int check_disc_changed (struct devfs_entry *de)
 {
     int tmp;
     int retval = 0;
-    kdev_t dev = MKDEV (de->u.fcb.u.device.major, de->u.fcb.u.device.minor);
+    kdev_t dev = mk_kdev(de->u.fcb.u.device.major, de->u.fcb.u.device.minor);
     struct block_device_operations *bdops;
     extern int warn_no_part;
 
@@ -2599,14 +2599,14 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     inode->i_rdev = NODEV;
     if ( S_ISCHR (de->mode) )
     {
-	inode->i_rdev = MKDEV (de->u.fcb.u.device.major,
+	inode->i_rdev = mk_kdev(de->u.fcb.u.device.major,
 			       de->u.fcb.u.device.minor);
 	inode->i_cdev = cdget ( kdev_t_to_nr (inode->i_rdev) );
 	is_fcb = TRUE;
     }
     else if ( S_ISBLK (de->mode) )
     {
-	inode->i_rdev = MKDEV (de->u.fcb.u.device.major,
+	inode->i_rdev = mk_kdev(de->u.fcb.u.device.major,
 			       de->u.fcb.u.device.minor);
 	if (bd_acquire (inode) == 0)
 	{

@@ -108,9 +108,9 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 		if (count < rsize)
 			rsize = count;
 
-		dprintk("NFS: nfs_proc_read(%s, (%x:%x/%Ld), %Ld, %d, %p)\n",
+		dprintk("NFS: nfs_proc_read(%s, (%s/%Ld), %Ld, %d, %p)\n",
 			NFS_SERVER(inode)->hostname,
-			major(inode->i_dev), minor(inode->i_dev),
+			inode->i_sb->s_id,
 			(long long)NFS_FILEID(inode),
 			(long long)offset, rsize, buffer);
 
@@ -266,9 +266,9 @@ nfs_pagein_one(struct list_head *head, struct inode *inode)
 	msg.rpc_cred = data->cred;
 
 	/* Start the async call */
-	dprintk("NFS: %4d initiated read call (req %x:%x/%Ld count %d nriov %d.\n",
+	dprintk("NFS: %4d initiated read call (req %s/%Ld count %d nriov %d.\n",
 		task->tk_pid,
-		major(inode->i_dev), minor(inode->i_dev),
+		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
 		data->args.count, data->args.nriov);
 
@@ -425,9 +425,8 @@ nfs_readpage_result(struct rpc_task *task)
 		kunmap(page);
 		UnlockPage(page);
 
-		dprintk("NFS: read (%x:%x/%Ld %d@%Ld)\n",
-                        major(req->wb_inode->i_dev),
-                        minor(req->wb_inode->i_dev),
+		dprintk("NFS: read (%s/%Ld %d@%Ld)\n",
+                        req->wb_inode->i_sb->s_id,
                         (long long)NFS_FILEID(req->wb_inode),
                         req->wb_bytes,
                         (long long)(page_offset(page) + req->wb_offset));

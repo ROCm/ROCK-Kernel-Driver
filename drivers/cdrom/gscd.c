@@ -162,6 +162,7 @@ static int AudioEnd_m;
 static int AudioEnd_f;
 
 static struct timer_list gscd_timer;
+static spinlock_t gscd_lock = SPIN_LOCK_UNLOCKED;
 
 static struct block_device_operations gscd_fops = {
 	owner:THIS_MODULE,
@@ -180,7 +181,7 @@ static int check_gscd_med_chg(kdev_t full_dev)
 	int target;
 
 
-	target = MINOR(full_dev);
+	target = minor(full_dev);
 
 	if (target > 0) {
 		printk
@@ -283,7 +284,7 @@ static void __do_gscd_request(unsigned long dummy)
 	if (QUEUE_EMPTY || CURRENT->rq_status == RQ_INACTIVE)
 		goto out;
 	INIT_REQUEST;
-	dev = MINOR(CURRENT->rq_dev);
+	dev = minor(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
 
@@ -296,7 +297,7 @@ static void __do_gscd_request(unsigned long dummy)
 		goto repeat;
 	}
 
-	if (MINOR(CURRENT->rq_dev) != 0) {
+	if (dev != 0) {
 		printk("GSCD: this version supports only one device\n");
 		end_request(0);
 		goto repeat;
@@ -1019,7 +1020,7 @@ int __init my_gscd_init(void)
 	devfs_register(NULL, "gscd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &gscd_lock);
 	blksize_size[MAJOR_NR] = gscd_blocksizes;
 	read_ahead[MAJOR_NR] = 4;
 
@@ -1027,7 +1028,7 @@ int __init my_gscd_init(void)
 	gscdPresent = 1;
 
 	request_region(gscd_port, 4, "gscd");
-	register_disk(NULL, MKDEV(MAJOR_NR, 0), 1, &gscd_fops, 0);
+	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &gscd_fops, 0);
 
 	printk(KERN_INFO "GSCD: GoldStar CD-ROM Drive found.\n");
 	return 0;

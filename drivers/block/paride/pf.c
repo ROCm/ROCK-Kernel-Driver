@@ -202,7 +202,7 @@ MODULE_PARM(drive3,"1-7i");
 #define MAJOR_NR   major
 #define DEVICE_NAME "PF"
 #define DEVICE_REQUEST do_pf_request
-#define DEVICE_NR(device) MINOR(device)
+#define DEVICE_NR(device) minor(device)
 #define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
@@ -368,7 +368,7 @@ int pf_init (void)      /* preliminary initialisation */
 	for (i=0;i<PF_UNITS;i++) pf_blocksizes[i] = 1024;
 	blksize_size[MAJOR_NR] = pf_blocksizes;
 	for (i=0;i<PF_UNITS;i++)
-		register_disk(NULL, MKDEV(MAJOR_NR, i), 1, &pf_fops, 0);
+		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &pf_fops, 0);
 
         return 0;
 }
@@ -399,7 +399,7 @@ static int pf_ioctl(struct inode *inode,struct file *file,
 {       int err, unit;
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
 
-        if ((!inode) || (!inode->i_rdev)) return -EINVAL;
+        if ((!inode) || kdev_none(inode->i_rdev)) return -EINVAL;
         unit = DEVICE_NR(inode->i_rdev);
         if (unit >= PF_UNITS) return -EINVAL;
         if (!PF.present) return -ENODEV;

@@ -291,6 +291,7 @@ static struct s_drive_stuff *mcdx_stuffp[MCDX_NDRIVES];
 static struct s_drive_stuff *mcdx_irq_map[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0
 };
+static spinlock_t mcdx_lock = SPIN_LOCK_UNLOCKED;
 MODULE_PARM(mcdx, "1-4i");
 
 static struct cdrom_device_ops mcdx_dops = {
@@ -318,7 +319,7 @@ static struct cdrom_device_info mcdx_info = {
 static int mcdx_audio_ioctl(struct cdrom_device_info *cdi,
 			    unsigned int cmd, void *arg)
 {
-	struct s_drive_stuff *stuffp = mcdx_stuffp[MINOR(cdi->dev)];
+	struct s_drive_stuff *stuffp = mcdx_stuffp[minor(cdi->dev)];
 
 	if (!stuffp->present)
 		return -ENXIO;
@@ -575,7 +576,7 @@ void do_mcdx_request(request_queue_t * q)
 
 	INIT_REQUEST;
 
-	dev = MINOR(CURRENT->rq_dev);
+	dev = minor(CURRENT->rq_dev);
 	stuffp = mcdx_stuffp[dev];
 
 	if ((dev < 0)
@@ -598,14 +599,13 @@ void do_mcdx_request(request_queue_t * q)
 	xtrace(REQUEST, "do_request() (%lu + %lu)\n",
 	       CURRENT->sector, CURRENT->nr_sectors);
 
-	switch (CURRENT->cmd) {
-	case WRITE:
-		xwarn("do_request(): attempt to write to cd!!\n");
+	if (CURRENT->cmd != READ) {
+		xwarn("do_request(): non-read command to cd!!\n");
 		xtrace(REQUEST, "end_request(0): write\n");
 		end_request(0);
 		return;
-
-	case READ:
+	}
+	else {
 		stuffp->status = 0;
 		while (CURRENT->nr_sectors) {
 			int i;
@@ -628,11 +628,6 @@ void do_mcdx_request(request_queue_t * q)
 
 		xtrace(REQUEST, "end_request(1)\n");
 		end_request(1);
-		break;
-
-	default:
-		panic(MCDX "do_request: unknown command.\n");
-		break;
 	}
 
 	goto again;
@@ -642,7 +637,7 @@ static int mcdx_open(struct cdrom_device_info *cdi, int purpose)
 {
 	struct s_drive_stuff *stuffp;
 	xtrace(OPENCLOSE, "open()\n");
-	stuffp = mcdx_stuffp[MINOR(cdi->dev)];
+	stuffp = mcdx_stuffp[minor(cdi->dev)];
 	if (!stuffp->present)
 		return -ENXIO;
 
@@ -791,7 +786,7 @@ static void mcdx_close(struct cdrom_device_info *cdi)
 
 	xtrace(OPENCLOSE, "close()\n");
 
-	stuffp = mcdx_stuffp[MINOR(cdi->dev)];
+	stuffp = mcdx_stuffp[minor(cdi->dev)];
 
 	--stuffp->users;
 }
@@ -805,7 +800,7 @@ static int mcdx_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 	xinfo("mcdx_media_changed called for device %s\n",
 	      kdevname(cdi->dev));
 
-	stuffp = mcdx_stuffp[MINOR(cdi->dev)];
+	stuffp = mcdx_stuffp[minor(cdi->dev)];
 	mcdx_getstatus(stuffp, 1);
 
 	if (stuffp->yyy == 0)
@@ -1187,7 +1182,8 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+		       &mcdx_lock);
 	read_ahead[MAJOR_NR] = READ_AHEAD;
 	blksize_size[MAJOR_NR] = mcdx_blocksizes;
 
@@ -1228,7 +1224,7 @@ int __init mcdx_init_drive(int drive)
 		stuffp->wreg_data, stuffp->irq, version.code, version.ver);
 	mcdx_stuffp[drive] = stuffp;
 	xtrace(INIT, "init() mcdx_stuffp[%d] = %p\n", drive, stuffp);
-	mcdx_info.dev = MKDEV(MAJOR_NR, 0);
+	mcdx_info.dev = mk_kdev(MAJOR_NR, 0);
 	if (register_cdrom(&mcdx_info) != 0) {
 		printk("Cannot register Mitsumi CD-ROM!\n");
 		release_region((unsigned long) stuffp->wreg_data,
@@ -1698,7 +1694,7 @@ mcdx_playtrk(struct s_drive_stuff *stuffp, const struct cdrom_ti *ti)
 
 static int mcdx_tray_move(struct cdrom_device_info *cdi, int position)
 {
-	struct s_drive_stuff *stuffp = mcdx_stuffp[MINOR(cdi->dev)];
+	struct s_drive_stuff *stuffp = mcdx_stuffp[minor(cdi->dev)];
 
 	if (!stuffp->present)
 		return -ENXIO;
@@ -1888,7 +1884,7 @@ static int mcdx_reset(struct s_drive_stuff *stuffp, enum resetmodes mode, int tr
 
 static int mcdx_lockdoor(struct cdrom_device_info *cdi, int lock)
 {
-	struct s_drive_stuff *stuffp = mcdx_stuffp[MINOR(cdi->dev)];
+	struct s_drive_stuff *stuffp = mcdx_stuffp[minor(cdi->dev)];
 	char cmd[2] = { 0xfe };
 
 	if (!(stuffp->present & DOOR))

@@ -208,7 +208,7 @@ static int detect_sysv (struct super_block *sb, struct buffer_head *bh)
  		if (!(sb->s_flags & MS_RDONLY)) {
  			printk("SysV FS: SCO EAFS on %s detected, " 
  				"forcing read-only mode.\n", 
- 				bdevname(sb->s_dev));
+ 				sb->s_id);
  			sb->s_flags |= MS_RDONLY;
  		}
  		return sbd->s_type;
@@ -232,7 +232,7 @@ static int detect_sysv (struct super_block *sb, struct buffer_head *bh)
 
 	if (sbd->s_type >= 0x10) {
 		printk("SysV FS: can't handle long file names on %s, "
-		       "forcing read-only mode.\n", kdevname(sb->s_dev));
+		       "forcing read-only mode.\n", sb->s_id);
 		sb->s_flags |= MS_RDONLY;
 	}
 
@@ -317,7 +317,7 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 
 	if (!silent)
 		printk("VFS: Found a %s FS (block size = %ld) on device %s\n",
-		       found, sb->s_blocksize, bdevname(sb->s_dev));
+		       found, sb->s_blocksize, sb->s_id);
 
 	sb->s_magic = SYSV_MAGIC_BASE + sb->sv_type;
 	/* set up enough so that it can read an inode */
@@ -345,7 +345,6 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 {
 	struct buffer_head *bh1;
 	struct buffer_head *bh = NULL;
-	kdev_t dev = sb->s_dev;
 	unsigned long blocknr;
 	int size = 0;
 	int i;
@@ -412,7 +411,7 @@ Eunknown:
 	brelse(bh);
 	if (!silent)
 		printk("VFS: unable to find oldfs superblock on device %s\n",
-			bdevname(dev));
+			sb->s_id);
 	goto failed;
 Ebadsize:
 	brelse(bh);
@@ -426,7 +425,6 @@ static struct super_block *v7_read_super(struct super_block *sb,void *data,
 				  int silent)
 {
 	struct buffer_head *bh, *bh2 = NULL;
-	kdev_t dev = sb->s_dev;
 	struct v7_super_block *v7sb;
 	struct sysv_inode *v7i;
 
@@ -443,7 +441,7 @@ static struct super_block *v7_read_super(struct super_block *sb,void *data,
 	if ((bh = sb_bread(sb, 1)) == NULL) {
 		if (!silent)
 			printk("VFS: unable to read V7 FS superblock on "
-			       "device %s.\n", bdevname(dev));
+			       "device %s.\n", sb->s_id);
 		goto failed;
 	}
 

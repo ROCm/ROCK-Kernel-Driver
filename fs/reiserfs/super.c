@@ -221,7 +221,7 @@ static int parse_options (char * options, unsigned long * mount_options, unsigne
 
 
 int reiserfs_is_super(struct super_block *s) {
-   return (s->s_dev != 0 && s->s_op == &reiserfs_sops) ;
+   return (!kdev_same(s->s_dev, NODEV) && s->s_op == &reiserfs_sops) ;
 }
 
 
@@ -366,7 +366,7 @@ static int read_super_block (struct super_block * s, int offset)
     if (!bh) {
       printk ("read_super_block: "
               "bread failed (dev %s, block %d, size %d)\n",
-              kdevname (s->s_dev), offset / s->s_blocksize, s->s_blocksize);
+              s->s_id, offset / s->s_blocksize, s->s_blocksize);
       return 1;
     }
  
@@ -374,7 +374,7 @@ static int read_super_block (struct super_block * s, int offset)
     if (!is_reiserfs_magic_string (rs)) {
       printk ("read_super_block: "
               "can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
-              kdevname(s->s_dev), bh->b_blocknr, s->s_blocksize);
+              s->s_id, bh->b_blocknr, s->s_blocksize);
       brelse (bh);
       return 1;
     }
@@ -390,7 +390,7 @@ static int read_super_block (struct super_block * s, int offset)
     if (!bh) {
 	printk("read_super_block: "
                 "bread failed (dev %s, block %d, size %d)\n",
-                kdevname (s->s_dev), offset / s->s_blocksize, s->s_blocksize);
+                s->s_id, offset / s->s_blocksize, s->s_blocksize);
 	return 1;
     }
     
@@ -398,9 +398,9 @@ static int read_super_block (struct super_block * s, int offset)
     if (!is_reiserfs_magic_string (rs) || sb_blocksize(rs) != s->s_blocksize) {
 	printk ("read_super_block: "
 		"can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
-		kdevname(s->s_dev), bh->b_blocknr, s->s_blocksize);
+		s->s_id, bh->b_blocknr, s->s_blocksize);
 	brelse (bh);
-	printk ("read_super_block: can't find a reiserfs filesystem on dev %s.\n", kdevname(s->s_dev));
+	printk ("read_super_block: can't find a reiserfs filesystem on dev %s.\n", s->s_id);
 	return 1;
     }
     /* must check to be sure we haven't pulled an old format super out

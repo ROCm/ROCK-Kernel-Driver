@@ -133,8 +133,8 @@ DEB( static int debugging = DEBUG; )
 #define ST_TIMEOUT (900 * HZ)
 #define ST_LONG_TIMEOUT (14000 * HZ)
 
-#define TAPE_NR(x) (MINOR(x) & ~(128 | ST_MODE_MASK))
-#define TAPE_MODE(x) ((MINOR(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
+#define TAPE_NR(x) (minor(x) & ~(-1 << ST_MODE_SHIFT))
+#define TAPE_MODE(x) ((minor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
 
 /* Internal ioctl to set both density (uppermost 8 bits) and blocksize (lower
    24 bits) */
@@ -878,7 +878,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	}
 	STp->in_use = 1;
 	write_unlock_irqrestore(&st_dev_arr_lock, flags);
-	STp->rew_at_close = STp->autorew_dev = (MINOR(inode->i_rdev) & 0x80) == 0;
+	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
 
 	if (STp->device->host->hostt->module)
 		__MOD_INC_USE_COUNT(STp->device->host->hostt->module);
@@ -3717,7 +3717,7 @@ static int st_attach(Scsi_Device * SDp)
 		tpnt->tape_type = MT_ISSCSI2;
 
         tpnt->inited = 0;
-	tpnt->devt = MKDEV(SCSI_TAPE_MAJOR, i);
+	tpnt->devt = mk_kdev(SCSI_TAPE_MAJOR, i);
 	tpnt->dirty = 0;
 	tpnt->in_use = 0;
 	tpnt->drv_buffer = 1;	/* Try buffering if no mode sense */

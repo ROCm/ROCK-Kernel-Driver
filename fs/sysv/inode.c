@@ -149,15 +149,14 @@ static void sysv_read_inode(struct inode *inode)
 
 	ino = inode->i_ino;
 	if (!ino || ino > sb->sv_ninodes) {
-		printk("Bad inode number on dev %s"
-		       ": %d is out of range\n",
-		       kdevname(inode->i_dev), ino);
+		printk("Bad inode number on dev %s: %d is out of range\n",
+		       inode->i_sb->s_id, ino);
 		goto bad_inode;
 	}
 	raw_inode = sysv_raw_inode(sb, ino, &bh);
 	if (!raw_inode) {
 		printk("Major problem: unable to read inode from dev %s\n",
-		       bdevname(inode->i_dev));
+		       inode->i_sb->s_id);
 		goto bad_inode;
 	}
 	/* SystemV FS: kludge permissions if ino==SYSV_ROOT_INO ?? */
@@ -195,7 +194,7 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	ino = inode->i_ino;
 	if (!ino || ino > sb->sv_ninodes) {
 		printk("Bad inode number on dev %s: %d is out of range\n",
-		       bdevname(inode->i_dev), ino);
+		       inode->i_sb->s_id, ino);
 		return 0;
 	}
 	raw_inode = sysv_raw_inode(sb, ino, &bh);
@@ -242,7 +241,7 @@ int sysv_sync_inode(struct inode * inode)
                 wait_on_buffer(bh);
                 if (buffer_req(bh) && !buffer_uptodate(bh)) {
                         printk ("IO error syncing sysv inode [%s:%08lx]\n",
-                                bdevname(inode->i_dev), inode->i_ino);
+                                inode->i_sb->s_id, inode->i_ino);
                         err = -1;
                 }
         }

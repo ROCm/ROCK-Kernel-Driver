@@ -1135,9 +1135,8 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 		ll_rw_block (WRITE, 1, &bh);
 		wait_on_buffer (bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh)) {
-			printk ("IO error syncing ext2 inode ["
-				"%s:%08lx]\n",
-				bdevname(inode->i_dev), inode->i_ino);
+			printk ("IO error syncing ext2 inode [%s:%08lx]\n",
+				inode->i_sb->s_id, inode->i_ino);
 			err = -EIO;
 		}
 	}

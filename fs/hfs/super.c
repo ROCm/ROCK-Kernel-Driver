@@ -425,7 +425,7 @@ struct super_block *hfs_read_super(struct super_block *s, void *data,
 	if (!mdb) {
 		if (!silent) {
 			hfs_warn("VFS: Can't find a HFS filesystem on dev %s.\n",
-			       kdevname(dev));
+			       s->s_id);
 		}
 		goto bail2;
 	}

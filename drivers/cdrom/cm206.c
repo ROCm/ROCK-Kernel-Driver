@@ -302,6 +302,7 @@ struct cm206_struct {
 #define PLAY_TO cd->toc[0]	/* toc[0] records end-time in play */
 
 static struct cm206_struct *cd;	/* the main memory structure */
+static spinlock_t cm206_lock = SPIN_LOCK_UNLOCKED;
 
 /* First, we define some polling functions. These are actually
    only being used in the initialization. */
@@ -866,7 +867,7 @@ static void do_cm206_request(request_queue_t * q)
 			end_request(0);
 			continue;
 		}
-		spin_unlock_irq(&q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 		error = 0;
 		for (i = 0; i < CURRENT->nr_sectors; i++) {
 			int e1, e2;
@@ -893,7 +894,7 @@ static void do_cm206_request(request_queue_t * q)
 				debug(("cm206_request: %d %d\n", e1, e2));
 			}
 		}
-		spin_lock_irq(&q->queue_lock);
+		spin_lock_irq(q->queue_lock);
 		end_request(!error);
 	}
 }
@@ -1491,7 +1492,7 @@ int __init cm206_init(void)
 		cleanup(3);
 		return -EIO;
 	}
-	cm206_info.dev = MKDEV(MAJOR_NR, 0);
+	cm206_info.dev = mk_kdev(MAJOR_NR, 0);
 	if (register_cdrom(&cm206_info) != 0) {
 		printk(KERN_INFO "Cannot register for cdrom %d!\n",
 		       MAJOR_NR);
@@ -1499,7 +1500,8 @@ int __init cm206_init(void)
 		return -EIO;
 	}
 	devfs_plain_cdrom(&cm206_info, &cm206_bdops);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+		       &cm206_lock);
 	blksize_size[MAJOR_NR] = cm206_blocksizes;
 	read_ahead[MAJOR_NR] = 16;	/* reads ahead what? */
 	init_bh(CM206_BH, cm206_bh);

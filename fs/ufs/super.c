@@ -203,13 +203,13 @@ void ufs_error (struct super_block * sb, const char * function,
 	switch (sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_ONERROR) {
 	case UFS_MOUNT_ONERROR_PANIC:
 		panic ("UFS-fs panic (device %s): %s: %s\n", 
-			kdevname(sb->s_dev), function, error_buf);
+			sb->s_id, function, error_buf);
 
 	case UFS_MOUNT_ONERROR_LOCK:
 	case UFS_MOUNT_ONERROR_UMOUNT:
 	case UFS_MOUNT_ONERROR_REPAIR:
 		printk (KERN_CRIT "UFS-fs error (device %s): %s: %s\n",
-			kdevname(sb->s_dev), function, error_buf);
+			sb->s_id, function, error_buf);
 	}		
 }
 
@@ -233,7 +233,7 @@ void ufs_panic (struct super_block * sb, const char * function,
 	va_end (args);
 	sb->s_flags |= MS_RDONLY;
 	printk (KERN_CRIT "UFS-fs panic (device %s): %s: %s\n",
-		kdevname(sb->s_dev), function, error_buf);
+		sb->s_id, function, error_buf);
 }
 
 void ufs_warning (struct super_block * sb, const char * function,
@@ -245,7 +245,7 @@ void ufs_warning (struct super_block * sb, const char * function,
 	vsprintf (error_buf, fmt, args);
 	va_end (args);
 	printk (KERN_WARNING "UFS-fs warning (device %s): %s: %s\n",
-		kdevname(sb->s_dev), function, error_buf);
+		sb->s_id, function, error_buf);
 }
 
 static int ufs_parse_options (char * options, unsigned * mount_options)

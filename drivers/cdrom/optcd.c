@@ -109,7 +109,6 @@ static void debug(int debug_this, const char* fmt, ...)
 #endif
 
 static int blksize = 2048;
-static int hsecsize = 2048;
 
 
 /* Drive hardware/firmware characteristics
@@ -267,6 +266,7 @@ static int sleep_timeout;	/* max # of ticks to sleep */
 static DECLARE_WAIT_QUEUE_HEAD(waitq);
 static void sleep_timer(unsigned long data);
 static struct timer_list delay_timer = {function: sleep_timer};
+spinlock_t optcd_lock = SPIN_LOCK_UNLOCKED;
 
 
 /* Timer routine: wake up when desired flag goes low,
@@ -977,7 +977,7 @@ static int update_toc(void)
 
 
 #define CURRENT_VALID \
-	(!QUEUE_EMPTY && MAJOR(CURRENT -> rq_dev) == MAJOR_NR \
+	(!QUEUE_EMPTY && major(CURRENT -> rq_dev) == MAJOR_NR \
 	 && CURRENT -> cmd == READ && CURRENT -> sector != -1)
 
 
@@ -1371,10 +1371,6 @@ static void do_optcd_request(request_queue_t * q)
 
 	transfer_is_active = 1;
 	while (CURRENT_VALID) {
-		if (CURRENT->bh) {
-			if (!buffer_locked(CURRENT->bh))
-				panic(DEVICE_NAME ": block not locked");
-		}
 		transfer();	/* First try to transfer block from buffers */
 		if (CURRENT -> nr_sectors == 0) {
 			end_request(1);
@@ -2063,12 +2059,12 @@ int __init optcd_init(void)
 	}
 	devfs_register (NULL, "optcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 			S_IFBLK | S_IRUGO | S_IWUGO, &opt_fops, NULL);
-	hardsect_size[MAJOR_NR] = &hsecsize;
 	blksize_size[MAJOR_NR] = &blksize;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+		       &optcd_lock);
 	read_ahead[MAJOR_NR] = 4;
 	request_region(optcd_port, 4, "optcd");
-	register_disk(NULL, MKDEV(MAJOR_NR,0), 1, &opt_fops, 0);
+	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &opt_fops, 0);
 
 	printk(KERN_INFO "optcd: DOLPHIN 8000 AT CDROM at 0x%x\n", optcd_port);
 	return 0;

@@ -1,6 +1,6 @@
 /* Driver for Freecom USB/IDE adaptor
  *
- * $Id: freecom.c,v 1.19 2001/11/11 05:42:34 mdharm Exp $
+ * $Id: freecom.c,v 1.21 2001/12/29 03:47:33 mdharm Exp $
  *
  * Freecom v0.1:
  *
@@ -206,9 +206,7 @@ freecom_ide_write (struct us_data *us, int reg, int value)
 
         return USB_STOR_TRANSPORT_GOOD;
 }
-#endif
 
-#if 0 /* Unused at this time */
 /* Read a value from an ide register. */
 static int
 freecom_ide_read (struct us_data *us, int reg, int *value)
@@ -435,7 +433,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* Get the status again */
 		fcb->Type = FCM_PACKET_STATUS;
 		fcb->Timeout = 0;
-		memset (fcb->Atapi, 0, sizeof(fcb->Filler));
+		memset (fcb->Atapi, 0, sizeof(fcb->Atapi));
 		memset (fcb->Filler, 0, sizeof (fcb->Filler));
 
         	/* Send it out. */
@@ -487,10 +485,19 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
          * and such will hang. */
         US_DEBUGP("Device indicates that it has %d bytes available\n",
                         le16_to_cpu (fst->Count));
+        US_DEBUGP("SCSI requested %d\n", usb_stor_transfer_length(srb));
 
         /* Find the length we desire to read. */
-        length = usb_stor_transfer_length (srb);
-        US_DEBUGP("SCSI requested %d\n", length);
+	switch (srb->cmnd[0]) {
+		case INQUIRY:
+		case REQUEST_SENSE:		/* 16 or 18 bytes? spec says 18, lots of devices only have 16 */
+		case MODE_SENSE:
+		case MODE_SENSE_10:
+			length = fst->Count;
+			break;
+		default:
+ 			length = usb_stor_transfer_length (srb);
+	}
 
 	/* verify that this amount is legal */
 	if (length > srb->request_bufflen) {

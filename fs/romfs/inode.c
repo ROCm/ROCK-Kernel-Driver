@@ -96,7 +96,6 @@ static struct super_block *
 romfs_read_super(struct super_block *s, void *data, int silent)
 {
 	struct buffer_head *bh;
-	kdev_t dev = s->s_dev;
 	struct romfs_super_block *rsb;
 	int sz;
 
@@ -119,12 +118,12 @@ romfs_read_super(struct super_block *s, void *data, int silent)
 	   || sz < ROMFH_SIZE) {
 		if (!silent)
 			printk ("VFS: Can't find a romfs filesystem on dev "
-				"%s.\n", kdevname(dev));
+				"%s.\n", s->s_id);
 		goto out;
 	}
 	if (romfs_checksum(rsb, min_t(int, sz, 512))) {
 		printk ("romfs: bad initial checksum on dev "
-			"%s.\n", kdevname(dev));
+			"%s.\n", s->s_id);
 		goto out;
 	}
 

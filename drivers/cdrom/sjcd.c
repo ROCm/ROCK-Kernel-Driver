@@ -1664,7 +1664,6 @@ static struct block_device_operations sjcd_fops = {
 };
 
 static int blksize = 2048;
-static int secsize = 2048;
 
 /*
  * Following stuff is intended for initialization of the cdrom. It
@@ -1692,7 +1691,6 @@ int __init sjcd_init(void)
 	printk("SJCD: sjcd=0x%x: ", sjcd_base);
 #endif
 
-	hardsect_size[MAJOR_NR] = &secsize;
 	blksize_size[MAJOR_NR] = &blksize;
 
 	if (devfs_register_blkdev(MAJOR_NR, "sjcd", &sjcd_fops) != 0) {

@@ -38,7 +38,9 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/ethtool.h>
 #include <asm/bitops.h>
+#include <asm/uaccess.h>
 
 #undef DEBUG
 
@@ -48,9 +50,10 @@
  * Version information.
  */
 
-#define DRIVER_VERSION "v2.7"
+#define DRIVER_VERSION "v2.8"
 #define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@suse.cz>"
 #define DRIVER_DESC "CATC EL1210A NetMate USB Ethernet driver"
+#define SHORT_DRIVER_DESC "EL1210A NetMate USB Ethernet"
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
@@ -259,11 +262,15 @@ static void catc_irq_done(struct urb *urb)
 		} 
 	}
 
-	if (data[1] & 0x40)
+	if (data[1] & 0x40) {
+		netif_carrier_on(catc->netdev);
 		dbg("link ok");
+	}
 
-	if (data[1] & 0x20) 
+	if (data[1] & 0x20) {
+		netif_carrier_off(catc->netdev);
 		dbg("link bad");
+	}
 }
 
 /*
@@ -564,6 +571,54 @@ static void catc_set_multicast_list(struct net_device *netdev)
 }
 
 /*
+ * ioctl's
+ */
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+        struct catc *catc = dev->priv;
+        u32 cmd;
+	char tmp[40];
+        
+        if (get_user(cmd, (u32 *)useraddr))
+                return -EFAULT;
+
+        switch (cmd) {
+        /* get driver info */
+        case ETHTOOL_GDRVINFO: {
+                struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+                strncpy(info.driver, SHORT_DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
+                strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
+		sprintf(tmp, "usb%d:%d", catc->usbdev->bus->busnum, catc->usbdev->devnum);
+                strncpy(info.bus_info, tmp,ETHTOOL_BUSINFO_LEN);
+                if (copy_to_user(useraddr, &info, sizeof(info)))
+                        return -EFAULT;
+                return 0;
+        }
+        /* get link status */
+        case ETHTOOL_GLINK: {
+                struct ethtool_value edata = {ETHTOOL_GLINK};
+                edata.data = netif_carrier_ok(dev);
+                if (copy_to_user(useraddr, &edata, sizeof(edata)))
+                        return -EFAULT;
+                return 0;
+        }
+	}
+        
+        return -EOPNOTSUPP;
+}
+
+static int catc_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+        switch(cmd) {
+        case SIOCETHTOOL:
+                return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+        default:
+                return -EOPNOTSUPP;
+        }
+}
+
+
+/*
  * Open, close.
  */
 
@@ -629,6 +684,7 @@ static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const str
 	netdev->tx_timeout = catc_tx_timeout;
 	netdev->watchdog_timeo = TX_TIMEOUT;
 	netdev->set_multicast_list = catc_set_multicast_list;
+	netdev->do_ioctl = catc_ioctl;
 	netdev->priv = catc;
 
 	catc->usbdev = usbdev;

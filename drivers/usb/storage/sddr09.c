@@ -1,6 +1,6 @@
 /* Driver for SanDisk SDDR-09 SmartMedia reader
  *
- * $Id: sddr09.c,v 1.21 2001/11/06 03:18:36 mdharm Exp $
+ * $Id: sddr09.c,v 1.22 2001/12/08 23:32:48 mdharm Exp $
  *
  * SDDR09 driver v0.1:
  *
@@ -79,7 +79,7 @@ static int sddr09_send_control(struct us_data *us,
 	// copy the data into the buffer.
 /*
 	if (xfer_len > 0) {
-		buffer = kmalloc(xfer_len, GFP_KERNEL);
+		buffer = kmalloc(xfer_len, GFP_NOIO);
 		if (!(command[0] & USB_DIR_IN))
 			memcpy(buffer, xfer_data, xfer_len);
 	}
@@ -303,7 +303,7 @@ int sddr09_read_data(struct us_data *us,
 
 	if (use_sg) {
 		sg = (struct scatterlist *)content;
-		buffer = kmalloc(len, GFP_KERNEL);
+		buffer = kmalloc(len, GFP_NOIO);
 		if (buffer == NULL)
 			return USB_STOR_TRANSPORT_ERROR;
 		ptr = buffer;
@@ -630,17 +630,17 @@ int sddr09_read_map(struct us_data *us) {
 
 	alloc_blocks = (alloc_len + (1<<17) - 1) >> 17;
 	sg = kmalloc(alloc_blocks*sizeof(struct scatterlist),
-		GFP_KERNEL);
+		GFP_NOIO);
 	if (sg == NULL)
 		return 0;
 
 	for (i=0; i<alloc_blocks; i++) {
 		if (i<alloc_blocks-1) {
-			sg[i].address = kmalloc( (1<<17), GFP_KERNEL );
+			sg[i].address = kmalloc( (1<<17), GFP_NOIO );
 			sg[i].page = NULL;
 			sg[i].length = (1<<17);
 		} else {
-			sg[i].address = kmalloc(alloc_len, GFP_KERNEL);
+			sg[i].address = kmalloc(alloc_len, GFP_NOIO);
 			sg[i].page = NULL;
 			sg[i].length = alloc_len;
 		}
@@ -672,8 +672,8 @@ int sddr09_read_map(struct us_data *us) {
 		kfree(info->lba_to_pba);
 	if (info->pba_to_lba)
 		kfree(info->pba_to_lba);
-	info->lba_to_pba = kmalloc(numblocks*sizeof(int), GFP_KERNEL);
-	info->pba_to_lba = kmalloc(numblocks*sizeof(int), GFP_KERNEL);
+	info->lba_to_pba = kmalloc(numblocks*sizeof(int), GFP_NOIO);
+	info->pba_to_lba = kmalloc(numblocks*sizeof(int), GFP_NOIO);
 
 	if (info->lba_to_pba == NULL || info->pba_to_lba == NULL) {
 		if (info->lba_to_pba != NULL)
@@ -842,7 +842,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	if (!us->extra) {
 		us->extra = kmalloc(
-			sizeof(struct sddr09_card_info), GFP_KERNEL);
+			sizeof(struct sddr09_card_info), GFP_NOIO);
 		if (!us->extra)
 			return USB_STOR_TRANSPORT_ERROR;
 		memset(us->extra, 0, sizeof(struct sddr09_card_info));

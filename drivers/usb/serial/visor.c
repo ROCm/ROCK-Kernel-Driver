@@ -12,6 +12,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (12/18/2001) gkh
+ *	Added better Clie support for 3.5 devices.  Thanks to Geoffrey Levand
+ *	for the patch.
+ *
  * (11/11/2001) gkh
  *	Added support for the m125 devices, and added check to prevent oopses
  *	for Clié devices that lie about the number of ports they have.
@@ -127,7 +131,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.7"
+#define DRIVER_VERSION "v1.8"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB HandSpring Visor, Palm m50x, Sony Clié driver"
 
@@ -145,6 +149,7 @@ static int  visor_ioctl		(struct usb_serial_port *port, struct file * file, unsi
 static void visor_set_termios	(struct usb_serial_port *port, struct termios *old_termios);
 static void visor_write_bulk_callback	(struct urb *urb);
 static void visor_read_bulk_callback	(struct urb *urb);
+static int  clie_3_5_startup	(struct usb_serial *serial);
 
 
 static __devinitdata struct usb_device_id combined_id_table [] = {
@@ -177,6 +182,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 
 /* All of the device info needed for the Handspring Visor, and Palm 4.0 devices */
 static struct usb_serial_device_type handspring_device = {
+	owner:			THIS_MODULE,
 	name:			"Handspring Visor / Palm 4.0 / Clié 4.0",
 	id_table:		combined_id_table,
 	num_interrupt_in:	0,
@@ -200,6 +206,7 @@ static struct usb_serial_device_type handspring_device = {
 
 /* device info for the Sony Clie OS version 3.5 */
 static struct usb_serial_device_type clie_3_5_device = {
+	owner:			THIS_MODULE,
 	name:			"Sony Clié 3.5",
 	id_table:		clie_id_3_5_table,
 	num_interrupt_in:	0,
@@ -210,6 +217,7 @@ static struct usb_serial_device_type clie_3_5_device = {
 	close:			visor_close,
 	throttle:		visor_throttle,
 	unthrottle:		visor_unthrottle,
+	startup:		clie_3_5_startup,
 	ioctl:			visor_ioctl,
 	set_termios:		visor_set_termios,
 	write:			visor_write,
@@ -249,7 +257,6 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 	
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 	
 	if (port->open_count == 1) {
 		bytes_in = 0;
@@ -321,8 +328,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
-
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -644,6 +649,46 @@ static int  visor_startup (struct usb_serial *serial)
 	return 0;
 }
 
+static int clie_3_5_startup (struct usb_serial *serial)
+{
+	int result;
+	u8 data;
+
+	dbg(__FUNCTION__);
+
+	/*
+	 * Note that PEG-300 series devices expect the following two calls.
+	 */
+
+	/* get the config number */
+	result = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0),
+				  USB_REQ_GET_CONFIGURATION, USB_DIR_IN,
+				  0, 0, &data, 1, HZ * 3);
+	if (result < 0) {
+		err(__FUNCTION__ ": get config number failed: %d", result);
+		return result;
+	}
+	if (result != 1) {
+		err(__FUNCTION__ ": get config number bad return length: %d", result);
+		return -EIO;
+	}
+
+	/* get the interface number */
+	result = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0),
+				  USB_REQ_GET_INTERFACE, 
+				  USB_DIR_IN | USB_DT_DEVICE,
+				  0, 0, &data, 1, HZ * 3);
+	if (result < 0) {
+		err(__FUNCTION__ ": get interface number failed: %d", result);
+		return result;
+	}
+	if (result != 1) {
+		err(__FUNCTION__ ": get interface number bad return length: %d", result);
+		return -EIO;
+	}
+
+	return 0;
+}
 
 static void visor_shutdown (struct usb_serial *serial)
 {

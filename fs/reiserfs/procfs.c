@@ -546,14 +546,13 @@ static const char *proc_info_root_name = "fs/reiserfs";
 int reiserfs_proc_info_init( struct super_block *sb )
 {
 	spin_lock_init( & __PINFO( sb ).lock );
-	sb->u.reiserfs_sb.procdir = proc_mkdir( bdevname( sb -> s_dev ), 
-						proc_info_root );
+	sb->u.reiserfs_sb.procdir = proc_mkdir(sb->s_id, proc_info_root);
 	if( sb->u.reiserfs_sb.procdir ) {
 		sb->u.reiserfs_sb.procdir -> owner = THIS_MODULE;
 		return 0;
 	}
 	reiserfs_warning( "reiserfs: cannot create /proc/%s/%s\n",
-			  proc_info_root_name, bdevname( sb -> s_dev ) );
+			  proc_info_root_name, sb->s_id );
 	return 1;
 }
 
@@ -564,7 +563,7 @@ int reiserfs_proc_info_done( struct super_block *sb )
 	__PINFO( sb ).exiting = 1;
 	spin_unlock( & __PINFO( sb ).lock );
 	if ( proc_info_root ) {
-		remove_proc_entry( bdevname( sb -> s_dev ), proc_info_root );
+		remove_proc_entry( sb->s_id, proc_info_root );
 		sb->u.reiserfs_sb.procdir = NULL;
 	}
 	return 0;

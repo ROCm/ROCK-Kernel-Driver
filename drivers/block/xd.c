@@ -249,7 +249,8 @@ static void __init xd_geninit (void)
 
 	for (i = 0; i < xd_drives; i++) {
 		xd_valid[i] = 1;
-		register_disk(&xd_gendisk, MKDEV(MAJOR_NR,i<<6), 1<<6, &xd_fops,
+		register_disk(&xd_gendisk, mk_kdev(MAJOR_NR,i<<6), 1<<6,
+				&xd_fops,
 				xd_info[i].heads * xd_info[i].cylinders *
 				xd_info[i].sectors);
 	}
@@ -287,8 +288,9 @@ static void do_xd_request (request_queue_t * q)
 		INIT_REQUEST;	/* do some checking on the request structure */
 
 		if (CURRENT_DEV < xd_drives
+		    && (CURRENT->flags & REQ_CMD)
 		    && CURRENT->sector + CURRENT->nr_sectors
-		         <= xd_struct[MINOR(CURRENT->rq_dev)].nr_sects) {
+		         <= xd_struct[minor(CURRENT->rq_dev)].nr_sects) {
 			block = CURRENT->sector;
 			count = CURRENT->nr_sectors;
 
@@ -312,7 +314,7 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 {
 	int dev;
 
-	if ((!inode) || !(inode->i_rdev))
+	if ((!inode) || kdev_none(inode->i_rdev))
 		return -EINVAL;
  	dev = DEVICE_NR(inode->i_rdev);
 

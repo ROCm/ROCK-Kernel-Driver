@@ -33,7 +33,7 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 
 	if (f->f_pos & (BFS_DIRENT_SIZE-1)) {
 		printf("Bad f_pos=%08lx for %s:%08lx\n", (unsigned long)f->f_pos, 
-			bdevname(dir->i_dev), dir->i_ino);
+			dir->i_sb->s_id, dir->i_ino);
 		return -EBADF;
 	}
 
@@ -168,7 +168,7 @@ static int bfs_unlink(struct inode * dir, struct dentry * dentry)
 		goto out_brelse;
 
 	if (!inode->i_nlink) {
-		printf("unlinking non-existent file %s:%lu (nlink=%d)\n", bdevname(inode->i_dev), 
+		printf("unlinking non-existent file %s:%lu (nlink=%d)\n", inode->i_sb->s_id, 
 				inode->i_ino, inode->i_nlink);
 		inode->i_nlink = 1;
 	}

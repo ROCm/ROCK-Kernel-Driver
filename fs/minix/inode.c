@@ -258,7 +258,7 @@ out_no_map:
 out_no_fs:
 	if (!silent)
 		printk("VFS: Can't find a Minix or Minix V2 filesystem on device "
-		       "%s.\n", bdevname(s->s_dev));
+		       "%s.\n", s->s_id);
     out_release:
 	brelse(bh);
 	goto out;
@@ -488,9 +488,8 @@ int minix_sync_inode(struct inode * inode)
 		wait_on_buffer(bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh))
 		{
-			printk ("IO error syncing minix inode ["
-				"%s:%08lx]\n",
-				kdevname(inode->i_dev), inode->i_ino);
+			printk ("IO error syncing minix inode [%s:%08lx]\n",
+				inode->i_sb->s_id, inode->i_ino);
 			err = -1;
 		}
 	}

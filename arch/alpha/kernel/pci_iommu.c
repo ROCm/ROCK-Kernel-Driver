@@ -215,12 +215,20 @@ pci_map_single_1(struct pci_dev *pdev, void *cpu_addr, size_t size,
 	/* If the machine doesn't define a pci_tbi routine, we have to
 	   assume it doesn't support sg mapping.  */
 	if (! alpha_mv.mv_pci_tbi) {
-		printk(KERN_WARNING "pci_map_single failed: no hw sg\n");
-		return 0;
+		static int been_here = 0;
+		if (!been_here) {
+		    printk(KERN_WARNING "pci_map_single: no hw sg, using "
+			   "direct map when possible\n");
+		    been_here = 1;
+		}
+		if (paddr + size <= __direct_map_size)
+		    return (paddr + __direct_map_base);
+		else
+		    return 0;
 	}
 		
 	arena = hose->sg_pci;
-	if (!arena || arena->dma_base + arena->size > max_dma)
+	if (!arena || arena->dma_base + arena->size - 1 > max_dma)
 		arena = hose->sg_isa;
 
 	npages = calc_npages((paddr & ~PAGE_MASK) + size);
@@ -247,20 +255,27 @@ pci_map_single_1(struct pci_dev *pdev, void *cpu_addr, size_t size,
 dma_addr_t
 pci_map_single(struct pci_dev *pdev, void *cpu_addr, size_t size, int dir)
 {
+	int dac_allowed; 
+
 	if (dir == PCI_DMA_NONE)
 		BUG();
-	return pci_map_single_1(pdev, cpu_addr, size,
-				pdev ? (pdev->dma_mask >> 32) != 0 : 0);
+
+	dac_allowed = pdev ? pci_dac_dma_supported(pdev, pdev->dma_mask) : 0; 
+	return pci_map_single_1(pdev, cpu_addr, size, dac_allowed);
 }
 
 dma_addr_t
 pci_map_page(struct pci_dev *pdev, struct page *page, unsigned long offset,
 	     size_t size, int dir)
 {
+	int dac_allowed;
+
 	if (dir == PCI_DMA_NONE)
 		BUG();
-	return pci_map_single_1(pdev, (char *)page_address(page) + offset,
-			        size, pdev ? (pdev->dma_mask >> 32) != 0 : 0);
+
+	dac_allowed = pdev ? pci_dac_dma_supported(pdev, pdev->dma_mask) : 0; 
+	return pci_map_single_1(pdev, (char *)page_address(page) + offset, 
+				size, dac_allowed);
 }
 
 /* Unmap a single streaming mode DMA translation.  The DMA_ADDR and
@@ -558,7 +573,7 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
-	dac_allowed = ((pdev->dma_mask >> 32) != 0);
+	dac_allowed = pdev ? pci_dac_dma_supported(pdev, pdev->dma_mask) : 0;
 
 	/* Fast path single entry scatterlists.  */
 	if (nents == 1) {
@@ -580,7 +595,7 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 		hose = pdev ? pdev->sysdata : pci_isa_hose;
 		max_dma = pdev ? pdev->dma_mask : 0x00ffffff;
 		arena = hose->sg_pci;
-		if (!arena || arena->dma_base + arena->size > max_dma)
+		if (!arena || arena->dma_base + arena->size - 1 > max_dma)
 			arena = hose->sg_isa;
 	} else {
 		max_dma = -1;
@@ -643,7 +658,7 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	hose = pdev ? pdev->sysdata : pci_isa_hose;
 	max_dma = pdev ? pdev->dma_mask : 0x00ffffff;
 	arena = hose->sg_pci;
-	if (!arena || arena->dma_base + arena->size > max_dma)
+	if (!arena || arena->dma_base + arena->size - 1 > max_dma)
 		arena = hose->sg_isa;
 
 	fbeg = -1, fend = 0;
@@ -710,11 +725,10 @@ pci_dma_supported(struct pci_dev *pdev, u64 mask)
 	struct pci_iommu_arena *arena;
 
 	/* If there exists a direct map, and the mask fits either
-	   MAX_DMA_ADDRESS defined such that GFP_DMA does something
-	   useful, or the total system memory as shifted by the
-	   map base.  */
+	   the entire direct mapped space or the total system memory as
+	   shifted by the map base */
 	if (__direct_map_size != 0
-	    && (__direct_map_base + MAX_DMA_ADDRESS-IDENT_ADDR-1 <= mask
+	    && (__direct_map_base + __direct_map_size - 1 <= mask
 		|| __direct_map_base + (max_low_pfn<<PAGE_SHIFT)-1 <= mask))
 		return 1;
 

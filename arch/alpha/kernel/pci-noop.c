@@ -126,6 +126,7 @@ int
 pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	   int direction)
 {
+	return 0;
 }
 void
 pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,

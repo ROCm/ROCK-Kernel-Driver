@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Ununsual Devices File
  *
- * $Id: unusual_devs.h,v 1.20 2001/09/02 05:12:57 mdharm Exp $
+ * $Id: unusual_devs.h,v 1.24 2001/12/29 03:12:45 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -58,6 +58,11 @@ UNUSUAL_DEV(  0x03f0, 0x0207, 0x0001, 0x0001,
 		"HP",
 		"CD-Writer+ 8200e",
 		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
+
+UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001, 
+		"HP",
+		"CD-Writer+ CD-4e",
+		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
 #endif
 
 #ifdef CONFIG_USB_STORAGE_DPCM
@@ -85,6 +90,25 @@ UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
 		US_SC_8070, US_PR_CBI, NULL, US_FL_FIX_INQUIRY),
+
+/* Reported by Peter Wächtler <pwaechtler@loewe-komp.de>
+ * The device needs the flags only.
+ */
+UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
+		"ScanLogic",
+		"SL11R-IDE",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY),
+
+/* Reported by Kriston Fincher <kriston@airmail.net>
+ * Patch submitted by Sean Millichamp <sean@bruenor.org>
+ * This is to support the Panasonic PalmCam PV-SD4090
+ * This entry is needed because the device reports Sub=ff 
+ */
+UNUSUAL_DEV(  0x04da, 0x0901, 0x0100, 0x0200,
+               "Panasonic",
+               "LS-120 Camera",
+               US_SC_UFI, US_PR_CBI, NULL, 0),
 
 /* Most of the following entries were developed with the help of
  * Shuttle/SCM directly.
@@ -161,14 +185,24 @@ UNUSUAL_DEV(  0x050d, 0x0115, 0x0133, 0x0133,
 		US_SC_SCSI, US_PR_BULK, usb_stor_euscsi_init,
 		US_FL_SCM_MULT_TARG ),
 
+/* Iomega Clik! Drive 
+ * Reported by David Chatenay <dchatenay@hotmail.com>
+ * The reason this is needed is not fully known.
+ */
+UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
+		"Iomega",
+		"USB Clik! 40",
+		US_SC_8070, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY | US_FL_START_STOP ),
+
 /* This entry is needed because the device reports Sub=ff */
-UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0322, 
+UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0422, 
 		"Sony",
 		"DSC-S30/S70/S75/505V/F505", 
 		US_SC_SCSI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP | US_FL_MODE_XLATE ),
 
-/* Reported by win@geeks.nl */
+/* Reported by wim@geeks.nl */
 UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick NW-MS7",
@@ -193,6 +227,13 @@ UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Memorystick MSC-U01N",
 		US_SC_UFI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		
+/* Submitted by Nathan Babb <nathan@lexi.com> */
+UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
+                "Sony",
+		"PEG Mass Storage",
+		US_SC_8070, US_PR_CBI, NULL,
+		US_FL_FIX_INQUIRY ),
 		
 UNUSUAL_DEV(  0x057b, 0x0000, 0x0000, 0x0299, 
 		"Y-E Data",
@@ -264,6 +305,14 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN | US_FL_START_STOP ),
 #endif
 
+/* Submitted by f.brugmans@hccnet.nl
+ * Needed for START_STOP flag */
+UNUSUAL_DEV( 0x0686, 0x4007, 0x0001, 0x0001,
+                "Minolta",
+                "Dimage S304",
+                US_SC_SCSI, US_PR_BULK, NULL,
+                US_FL_START_STOP ),
+
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
 		"FlashGate SmartMedia",
@@ -307,7 +356,7 @@ UNUSUAL_DEV(  0x07ab, 0xfc01, 0x0000, 0x9999,
                 US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
 #endif
 
-UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0100, 
+UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0133, 
 		"Microtech",
 		"USB-SCSI-DB25",
 		US_SC_SCSI, US_PR_BULK, usb_stor_euscsi_init,
@@ -374,16 +423,23 @@ UNUSUAL_DEV( 0x07c4, 0xa006, 0x0000, 0xffff,
 		"Simple Tech/Datafab CF+SM Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
 		US_FL_MODE_XLATE | US_FL_START_STOP ),
+
+/* Submitted by Olaf Hering <olh@suse.de> */
+UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
+		"Datafab Systems, Inc.",
+		"USB to CF + SM Combo (LC1)",
+		US_SC_SCSI, US_PR_DATAFAB, NULL,
+		US_FL_MODE_XLATE | US_FL_START_STOP ),
 #endif
 
-/* Casio QV 2x00/3x00/8000 digital still cameras are not conformant
+/* Casio QV 2x00/3x00/4000/8000 digital still cameras are not conformant
  * to the USB storage specification in two ways:
  * - They tell us they are using transport protocol CBI. In reality they
  *   are using transport protocol CB.
  * - They don't like the INQUIRY command. So we must handle this command
  *   of the SCSI layer ourselves.
  */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x9009, 0x9009,
+UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
                 "Casio",
                 "QV DigitalCamera",
                 US_SC_8070, US_PR_CB, NULL,
@@ -402,3 +458,12 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
                 US_SC_ISD200, US_PR_BULK, isd200_Initialization,
                 0 ),
 #endif
+
+/* Reported by Dan Pilone <pilone@slac.com>
+ * The device needs the flags only.
+ */
+UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x9999,
+		"CCYU TECHNOLOGY",
+		"EasyDisk Portable Device",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_MODE_XLATE | US_FL_START_STOP),

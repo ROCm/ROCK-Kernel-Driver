@@ -282,7 +282,7 @@ affs_init_bitmap(struct super_block *sb)
 
 	if (!AFFS_ROOT_TAIL(sb, AFFS_SB->s_root_bh)->bm_flag) {
 		printk(KERN_NOTICE "AFFS: Bitmap invalid - mounting %s read only\n",
-			kdevname(sb->s_dev));
+			sb->s_id);
 		sb->s_flags |= MS_RDONLY;
 		return 0;
 	}
@@ -316,7 +316,7 @@ affs_init_bitmap(struct super_block *sb)
 		}
 		if (affs_checksum_block(sb, bh)) {
 			printk(KERN_WARNING "AFFS: Bitmap %u invalid - mounting %s read only.\n",
-			       bm->bm_key, kdevname(sb->s_dev));
+			       bm->bm_key, sb->s_id);
 			sb->s_flags |= MS_RDONLY;
 			goto out;
 		}

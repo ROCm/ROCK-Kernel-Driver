@@ -39,7 +39,7 @@ void __adfs_error(struct super_block *sb, const char *function, const char *fmt,
 	va_end(args);
 
 	printk(KERN_CRIT "ADFS-fs error (device %s)%s%s: %s\n",
-		bdevname(sb->s_dev), function ? ": " : "",
+		sb->s_id, function ? ": " : "",
 		function ? function : "", error_buf);
 }
 
@@ -308,7 +308,6 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 	struct buffer_head *bh;
 	struct object_info root_obj;
 	unsigned char *b_data;
-	kdev_t dev = sb->s_dev;
 
 	/* set default options */
 	sb->u.adfs_sb.s_uid = 0;
@@ -330,7 +329,7 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 	if (adfs_checkbblk(b_data)) {
 		if (!silent)
 			printk("VFS: Can't find an adfs filesystem on dev "
-				"%s.\n", bdevname(dev));
+				"%s.\n", sb->s_id);
 		goto error_free_bh;
 	}
 
@@ -342,7 +341,7 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 	if (adfs_checkdiscrecord(dr)) {
 		if (!silent)
 			printk("VPS: Can't find an adfs filesystem on dev "
-				"%s.\n", bdevname(dev));
+				"%s.\n", sb->s_id);
 		goto error_free_bh;
 	}
 
@@ -363,7 +362,7 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 	} else {
 		if (!silent)
 			printk(KERN_ERR "VFS: Unsupported blocksize on dev "
-				"%s.\n", bdevname(dev));
+				"%s.\n", sb->s_id);
 		goto error;
 	}
 

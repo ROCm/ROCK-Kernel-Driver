@@ -182,7 +182,7 @@ MODULE_PARM(drive3,"1-6i");
 #define MAJOR_NR	major
 #define DEVICE_NAME "PCD"
 #define DEVICE_REQUEST do_pcd_request
-#define DEVICE_NR(device) (MINOR(device))
+#define DEVICE_NR(device) (minor(device))
 #define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
@@ -325,7 +325,7 @@ static void pcd_init_units( void )
 
 		PCD.info.ops = &pcd_dops;
 		PCD.info.handle = NULL;
-		PCD.info.dev = MKDEV(major,unit);
+		PCD.info.dev = mk_kdev(major,unit);
 		PCD.info.speed = 0;
 		PCD.info.capacity = 1;
 		PCD.info.mask = 0;
@@ -771,7 +771,7 @@ static void do_pcd_request (request_queue_t * q)
 	    if (QUEUE_EMPTY || (CURRENT->rq_status == RQ_INACTIVE)) return;
 	    INIT_REQUEST;
 	    if (rq_data_dir(CURRENT) == READ) {
-		unit = MINOR(CURRENT->rq_dev);
+		unit = minor(CURRENT->rq_dev);
 		if (unit != pcd_unit) {
 			pcd_bufblk = -1;
 			pcd_unit = unit;

@@ -206,7 +206,7 @@ MODULE_PARM(drive3,"1-8i");
 #define MAJOR_NR   major
 #define DEVICE_NAME "PD"
 #define DEVICE_REQUEST do_pd_request
-#define DEVICE_NR(device) (MINOR(device)>>PD_BITS)
+#define DEVICE_NR(device) (minor(device)>>PD_BITS)
 #define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
@@ -445,7 +445,7 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
 	int err, unit;
 
-	if (!inode || !inode->i_rdev)
+	if (!inode || kdev_none(inode->i_rdev))
 		return -EINVAL;
 	unit = DEVICE_NR(inode->i_rdev);
 	if (!PD.present)
@@ -814,7 +814,7 @@ static int pd_detect( void )
                 } else pi_release(PI);
             }
 	for (unit=0;unit<PD_UNITS;unit++)
-		register_disk(&pd_gendisk,MKDEV(MAJOR_NR,unit<<PD_BITS),
+		register_disk(&pd_gendisk,mk_kdev(MAJOR_NR,unit<<PD_BITS),
 				PD_PARTNS,&pd_fops,
 				PD.present?PD.capacity:0);
 
@@ -847,7 +847,7 @@ repeat:
         if (QUEUE_EMPTY || (CURRENT->rq_status == RQ_INACTIVE)) return;
         INIT_REQUEST;
 
-        pd_dev = MINOR(CURRENT->rq_dev);
+        pd_dev = minor(CURRENT->rq_dev);
 	pd_unit = unit = DEVICE_NR(CURRENT->rq_dev);
         pd_block = CURRENT->sector;
         pd_run = CURRENT->nr_sectors;
@@ -886,7 +886,7 @@ static void pd_next_buf( int unit )
 
 	if (QUEUE_EMPTY ||
 	    (rq_data_dir(CURRENT) != pd_cmd) ||
-	    (MINOR(CURRENT->rq_dev) != pd_dev) ||
+	    (minor(CURRENT->rq_dev) != pd_dev) ||
 	    (CURRENT->rq_status == RQ_INACTIVE) ||
 	    (CURRENT->sector != pd_block)) 
 		printk("%s: OUCH: request list changed unexpectedly\n",

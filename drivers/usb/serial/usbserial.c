@@ -506,6 +506,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
 	unsigned int portNumber;
+	int retval;
 	
 	dbg(__FUNCTION__);
 
@@ -527,10 +528,16 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	 
 	/* pass on to the driver specific version of this function if it is available */
 	if (serial->type->open) {
-		return (serial->type->open(port, filp));
+		if (serial->type->owner)
+			__MOD_INC_USE_COUNT(serial->type->owner);
+		retval = serial->type->open(port, filp);
+		if (retval)
+			__MOD_DEC_USE_COUNT(serial->type->owner);
 	} else {
-		return (generic_open(port, filp));
+		retval = generic_open(port, filp);
 	}
+
+	return retval;
 }
 
 
@@ -553,6 +560,8 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	/* pass on to the driver specific version of this function if it is available */
 	if (serial->type->close) {
 		serial->type->close(port, filp);
+		if (serial->type->owner)
+			__MOD_DEC_USE_COUNT(serial->type->owner);
 	} else {
 		generic_close(port, filp);
 	}
@@ -1059,6 +1068,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	struct usb_endpoint_descriptor *bulk_out_endpoint[MAX_NUM_PORTS];
 	struct usb_serial_device_type *type = NULL;
 	struct list_head *tmp;
+	int retval;
 	int found;
 	int minor;
 	int buffer_size;
@@ -1180,9 +1190,13 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 
 	/* if this device type has a startup function, call it */
 	if (type->startup) {
-		if (type->startup (serial)) {
+		if (type->owner)
+			__MOD_INC_USE_COUNT(type->owner);
+		retval = type->startup (serial);
+		if (type->owner)
+			__MOD_DEC_USE_COUNT(type->owner);
+		if (retval)
 			goto probe_error;
-		}
 	}
 
 	/* set up the endpoint information */

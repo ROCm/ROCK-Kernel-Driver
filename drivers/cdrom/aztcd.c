@@ -229,7 +229,7 @@ static int aztcd_blocksizes[1] = { 2048 };
 #endif
 
 #define CURRENT_VALID \
-  (!QUEUE_EMPTY && MAJOR(CURRENT -> rq_dev) == MAJOR_NR && CURRENT -> cmd == READ \
+  (!QUEUE_EMPTY && major(CURRENT -> rq_dev) == MAJOR_NR && CURRENT -> cmd == READ \
    && CURRENT -> sector != -1)
 
 #define AFL_STATUSorDATA (AFL_STATUS | AFL_DATA)
@@ -308,6 +308,8 @@ static char aztTocUpToDate = 0;
 static unsigned char aztIndatum;
 static unsigned long aztTimeOutCount;
 static int aztCmd = 0;
+
+static spinlock_t aztSpin = SPIN_LOCK_UNLOCKED;
 
 /*###########################################################################
    Function Prototypes
@@ -1599,10 +1601,6 @@ static void do_aztcd_request(request_queue_t * q)
 	}
 	azt_transfer_is_active = 1;
 	while (CURRENT_VALID) {
-		if (CURRENT->bh) {
-			if (!buffer_locked(CURRENT->bh))
-				panic(DEVICE_NAME ": block not locked");
-		}
 		azt_transfer();
 		if (CURRENT->nr_sectors == 0) {
 			end_request(1);
@@ -1927,10 +1925,10 @@ int __init aztcd_init(void)
 		       MAJOR_NR);
 		return -EIO;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &aztSpin);
 	blksize_size[MAJOR_NR] = aztcd_blocksizes;
 	read_ahead[MAJOR_NR] = 4;
-	register_disk(NULL, MKDEV(MAJOR_NR, 0), 1, &azt_fops, 0);
+	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &azt_fops, 0);
 
 	if ((azt_port == 0x1f0) || (azt_port == 0x170))
 		request_region(azt_port, 8, "aztcd");	/*IDE-interface */

@@ -122,7 +122,7 @@ static inline void hfs_mdb_dirty(hfs_sysmdb sys_mdb) {
 }
 
 static inline const char *hfs_mdb_name(hfs_sysmdb sys_mdb) {
-	return kdevname(sys_mdb->s_dev);
+	return sys_mdb->s_id;
 }
 
 

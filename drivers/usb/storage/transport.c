@@ -1,6 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: transport.c,v 1.41 2001/10/15 07:02:32 mdharm Exp $
+ * $Id: transport.c,v 1.42 2001/12/08 23:32:48 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -388,7 +388,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	devrequest *dr;
 
 	/* allocate the device request structure */
-	dr = kmalloc(sizeof(devrequest), GFP_KERNEL);
+	dr = kmalloc(sizeof(devrequest), GFP_NOIO);
 	if (!dr)
 		return -ENOMEM;
 

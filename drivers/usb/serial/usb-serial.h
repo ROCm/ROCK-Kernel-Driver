@@ -116,6 +116,7 @@ struct usb_serial {
 
 /**
  * usb_serial_device_type - a structure that defines a usb serial device
+ * @owner: pointer to the module that owns this device.
  * @name: pointer to a string that describes this device.  This string used
  *	in the syslog messages when a device is inserted or removed.
  * @id_table: pointer to a list of usb_device_id structures that define all
@@ -138,6 +139,7 @@ struct usb_serial {
  * called, the generic serial function will be used instead.
  */
 struct usb_serial_device_type {
+	struct module *owner;
 	char	*name;
 	const struct usb_device_id *id_table;
 	char	num_interrupt_in;

@@ -78,7 +78,7 @@ static int nbd_open(struct inode *inode, struct file *file)
 
 	if (!inode)
 		return -EINVAL;
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	if (dev >= MAX_NBD)
 		return -ENODEV;
 
@@ -253,7 +253,7 @@ void nbd_do_it(struct nbd_device *lo)
 		if (req != blkdev_entry_prev_request(&lo->queue_head)) {
 			printk(KERN_ALERT "NBD: I have problem...\n");
 		}
-		if (lo != &nbd_dev[MINOR(req->rq_dev)]) {
+		if (lo != &nbd_dev[minor(req->rq_dev)]) {
 			printk(KERN_ALERT "NBD: request corrupted!\n");
 			continue;
 		}
@@ -291,7 +291,7 @@ void nbd_clear_que(struct nbd_device *lo)
 			printk( KERN_ALERT "NBD: panic, panic, panic\n" );
 			break;
 		}
-		if (lo != &nbd_dev[MINOR(req->rq_dev)]) {
+		if (lo != &nbd_dev[minor(req->rq_dev)]) {
 			printk(KERN_ALERT "NBD: request corrupted when clearing!\n");
 			continue;
 		}
@@ -328,7 +328,7 @@ static void do_nbd_request(request_queue_t * q)
 		if (!req)
 			FAIL("que not empty but no request?");
 #endif
-		dev = MINOR(req->rq_dev);
+		dev = minor(req->rq_dev);
 #ifdef PARANOIA
 		if (dev >= MAX_NBD)
 			FAIL("Minor too big.");		/* Probably can not happen */
@@ -381,7 +381,7 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		return -EPERM;
 	if (!inode)
 		return -EINVAL;
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	if (dev >= MAX_NBD)
 		return -ENODEV;
 
@@ -473,7 +473,7 @@ static int nbd_release(struct inode *inode, struct file *file)
 
 	if (!inode)
 		return -ENODEV;
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	if (dev >= MAX_NBD)
 		return -ENODEV;
 	lo = &nbd_dev[dev];
@@ -528,7 +528,7 @@ static int __init nbd_init(void)
 		nbd_blksize_bits[i] = 10;
 		nbd_bytesizes[i] = 0x7ffffc00; /* 2GB */
 		nbd_sizes[i] = nbd_bytesizes[i] >> BLOCK_SIZE_BITS;
-		register_disk(NULL, MKDEV(MAJOR_NR,i), 1, &nbd_fops,
+		register_disk(NULL, mk_kdev(MAJOR_NR,i), 1, &nbd_fops,
 				nbd_bytesizes[i]>>9);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "nbd", NULL);

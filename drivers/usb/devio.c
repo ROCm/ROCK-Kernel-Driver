@@ -40,6 +40,7 @@
 #include <linux/smp_lock.h>
 #include <linux/signal.h>
 #include <linux/poll.h>
+#include <linux/module.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 #include <asm/uaccess.h>
@@ -1086,10 +1087,15 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			else if (ifp->driver == 0 || ifp->driver->ioctl == 0)
 				retval = -ENOSYS;
 		}
-		if (retval == 0)
+		if (retval == 0) {
+			if (ifp->driver->owner)
+				__MOD_INC_USE_COUNT(ifp->driver->owner);
 			/* ifno might usefully be passed ... */
 			retval = ifp->driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
 			/* size = min_t(int, size, retval)? */
+			if (ifp->driver->owner)
+				__MOD_DEC_USE_COUNT(ifp->driver->owner);
+		}
 	}
 
 	/* cleanup and return */

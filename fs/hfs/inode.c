@@ -311,14 +311,11 @@ struct inode *hfs_iget(struct hfs_cat_entry *entry, ino_t type,
 	        return NULL;
 	}
 
-	if (inode->i_dev != sb->s_dev) {
-	        iput(inode); /* automatically does an hfs_cat_put */
-		inode = NULL;
-	} else if (!inode->i_mode || (*sys_entry == NULL)) {
+	if (!inode->i_mode || (*sys_entry == NULL)) {
 		/* Initialize the inode */
 		struct hfs_sb_info *hsb = HFS_SB(sb);
 
-		inode->i_rdev = 0;
+		inode->i_rdev = NODEV;
 		inode->i_ctime = inode->i_atime = inode->i_mtime =
 					hfs_m_to_utime(entry->modify_date);
 		inode->i_blksize = HFS_SECTOR_SIZE;

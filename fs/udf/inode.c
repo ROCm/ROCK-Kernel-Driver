@@ -1531,7 +1531,7 @@ udf_update_inode(struct inode *inode, int do_sync)
 		if (buffer_req(bh) && !buffer_uptodate(bh))
 		{
 			printk("IO error syncing udf inode [%s:%08lx]\n",
-				bdevname(inode->i_dev), inode->i_ino);
+				inode->i_sb->s_id, inode->i_ino);
 			err = -EIO;
 		}
 	}

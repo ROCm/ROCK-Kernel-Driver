@@ -54,8 +54,8 @@ extern void mem_use(void);
  * task. The default time slice for zero-nice tasks will be 37ms.
  */
 #define NICE_RANGE	40
-#define MIN_NICE_TSLICE	5000
-#define MAX_NICE_TSLICE	70000
+#define MIN_NICE_TSLICE	10000
+#define MAX_NICE_TSLICE	90000
 #define TASK_TIMESLICE(p)	((int) ts_table[19 - (p)->nice])
 
 static unsigned char ts_table[NICE_RANGE];
@@ -538,17 +538,11 @@ void expire_task(struct task_struct *p)
 		goto need_resched;
 
 	if (!--p->time_slice) {
-		if (p->dyn_prio) {
-			p->time_slice--;
+		if (p->dyn_prio)
 			p->dyn_prio--;
-		}
-		p->need_resched = 1;
-	} else
-		if (p->time_slice < -TASK_TIMESLICE(p)) {
-			p->time_slice = 0;
 need_resched:
-			p->need_resched = 1;
-		}
+		p->need_resched = 1;
+	}
 }
 
 /*

@@ -453,7 +453,7 @@ static int __init rd_init (void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* We ought to separate initrd operations here */
-	register_disk(NULL, MKDEV(MAJOR_NR,INITRD_MINOR), 1, &rd_bd_op, rd_size<<1);
+	register_disk(NULL, mk_kdev(MAJOR_NR,INITRD_MINOR), 1, &rd_bd_op, rd_size<<1);
 	devfs_register(devfs_handle, "initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif

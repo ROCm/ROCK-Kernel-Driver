@@ -79,8 +79,8 @@ struct pwc_whitebalance
 /* Used with VIDIOCPWC[SG]LED */
 struct pwc_leds
 {
-	int led_on;			/* Led on-time; range = 0..255 */
-	int led_off;			/*  */
+	int led_on;			/* Led on-time; range = 0..25000 */
+	int led_off;			/* Led off-time; range = 0..25000  */
 };
 
 

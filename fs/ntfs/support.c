@@ -200,7 +200,7 @@ int ntfs_getput_clusters(ntfs_volume *vol, int cluster, ntfs_size_t start_offs,
 				if (buffer_req(bh) && !buffer_uptodate(bh)) {
 					printk(KERN_ERR "IO error syncing NTFS "
 					       "cluster [%s:%i]\n",
-					       bdevname(sb->s_dev), cluster);
+					       sb->s_id, cluster);
 					brelse(bh);
 					error = -EIO;
 					goto error_ret;

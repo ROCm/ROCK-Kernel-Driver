@@ -300,7 +300,7 @@ affs_read_super(struct super_block *sb, void *data, int silent)
 		for (num_bm = 0; num_bm < 2; num_bm++) {
 			pr_debug("AFFS: Dev %s, trying root=%u, bs=%d, "
 				"size=%d, reserved=%d\n",
-				kdevname(dev),
+				sb->s_id,
 				AFFS_SB->s_root_block + num_bm,
 				blocksize, size, reserved);
 			root_bh = affs_bread(sb, AFFS_SB->s_root_block + num_bm);
@@ -320,7 +320,7 @@ affs_read_super(struct super_block *sb, void *data, int silent)
 	}
 	if (!silent)
 		printk(KERN_ERR "AFFS: No valid root block on device %s\n",
-			kdevname(dev));
+			sb->s_id);
 	goto out_error;
 
 	/* N.B. after this point bh must be released */
@@ -343,7 +343,7 @@ got_root:
 	if ((chksum == FS_DCFFS || chksum == MUFS_DCFFS || chksum == FS_DCOFS
 	     || chksum == MUFS_DCOFS) && !(sb->s_flags & MS_RDONLY)) {
 		printk(KERN_NOTICE "AFFS: Dircache FS - mounting %s read only\n",
-			kdevname(dev));
+			sb->s_id);
 		sb->s_flags |= MS_RDONLY;
 		AFFS_SB->s_flags |= SF_READONLY;
 	}
@@ -379,7 +379,7 @@ got_root:
 			break;
 		default:
 			printk(KERN_ERR "AFFS: Unknown filesystem on device %s: %08X\n",
-				kdevname(dev), chksum);
+				sb->s_id, chksum);
 			goto out_error;
 	}
 

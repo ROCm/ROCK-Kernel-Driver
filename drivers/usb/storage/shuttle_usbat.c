@@ -1,6 +1,6 @@
 /* Driver for SCM Microsystems USB-ATAPI cable
  *
- * $Id: shuttle_usbat.c,v 1.14 2001/03/28 01:02:06 groovyjava Exp $
+ * $Id: shuttle_usbat.c,v 1.15 2001/12/08 23:32:48 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 2000, 2001 Robert Baruch (autophile@starband.net)
@@ -681,7 +681,7 @@ int usbat_handle_read10(struct us_data *us,
 
 	len = (65535/srb->transfersize) * srb->transfersize;
 	US_DEBUGP("Max read is %d bytes\n", len);
-	buffer = kmalloc(len, GFP_KERNEL);
+	buffer = kmalloc(len, GFP_NOIO);
 	if (buffer == NULL) // bloody hell!
 		return USB_STOR_TRANSPORT_FAILED;
 	sector = short_pack(data[7+3], data[7+2]);

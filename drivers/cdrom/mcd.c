@@ -123,7 +123,7 @@ static int mcdPresent;
 #define QUICK_LOOP_COUNT 20
 
 #define CURRENT_VALID \
-(!QUEUE_EMPTY && MAJOR(CURRENT -> rq_dev) == MAJOR_NR && CURRENT -> cmd == READ \
+(!QUEUE_EMPTY && major(CURRENT -> rq_dev) == MAJOR_NR && CURRENT -> cmd == READ \
 && CURRENT -> sector != -1)
 
 #define MFL_STATUSorDATA (MFL_STATUS | MFL_DATA)
@@ -185,6 +185,7 @@ static int mcd_open(struct cdrom_device_info *cdi, int purpose);
 static void mcd_release(struct cdrom_device_info *cdi);
 static int mcd_media_changed(struct cdrom_device_info *cdi, int disc_nr);
 static int mcd_tray_move(struct cdrom_device_info *cdi, int position);
+static spinlock_t mcd_spinlock = SPIN_LOCK_UNLOCKED;
 int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
 int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
@@ -617,10 +618,6 @@ static void do_mcd_request(request_queue_t * q)
 
 		mcd_transfer_is_active = 1;
 	while (CURRENT_VALID) {
-		if (CURRENT->bh) {
-			if (!buffer_locked(CURRENT->bh))
-				panic(DEVICE_NAME ": block not locked");
-		}
 		mcd_transfer();
 		if (CURRENT->nr_sectors == 0) {
 			end_request(1);
@@ -1076,7 +1073,8 @@ int __init mcd_init(void)
 	}
 
 	blksize_size[MAJOR_NR] = mcd_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+		       &mcd_spinlock);
 	read_ahead[MAJOR_NR] = 4;
 
 	/* check for card */
@@ -1150,7 +1148,7 @@ int __init mcd_init(void)
 	mcd_invalidate_buffers();
 	mcdPresent = 1;
 
-	mcd_info.dev = MKDEV(MAJOR_NR, 0);
+	mcd_info.dev = mk_kdev(MAJOR_NR, 0);
 
 	if (register_cdrom(&mcd_info) != 0) {
 		printk(KERN_ERR "mcd: Unable to register Mitsumi CD-ROM.\n");

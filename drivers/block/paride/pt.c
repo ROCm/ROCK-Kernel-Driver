@@ -688,7 +688,7 @@ static int pt_detect( void )
 	return -1;
 }
 
-#define DEVICE_NR(dev)	(MINOR(dev) % 128)
+#define DEVICE_NR(dev)	(minor(dev) & 0x7F)
 
 static int pt_open (struct inode *inode, struct file *file)
 
@@ -713,7 +713,7 @@ static int pt_open (struct inode *inode, struct file *file)
 		return -EROFS;
 		}
 
-	if (!(MINOR(inode->i_rdev) & 128))
+	if (!(minor(inode->i_rdev) & 128))
 		PT.flags |= PT_REWIND;
 
 	PT.bufptr = kmalloc(PT_BUFSIZE,GFP_KERNEL);
@@ -732,7 +732,7 @@ static int pt_ioctl(struct inode *inode,struct file *file,
 	int unit;
 	struct mtop mtop;
 
-        if (!inode || !inode->i_rdev)
+        if (!inode || kdev_none(inode->i_rdev))
 		return -EINVAL;
         unit = DEVICE_NR(inode->i_rdev);
         if (unit >= PT_UNITS)

@@ -74,7 +74,7 @@ void minix_free_block(struct inode * inode, int block)
 	bh = sb->u.minix_sb.s_zmap[zone];
 	if (!minix_test_and_clear_bit(bit,bh->b_data))
 		printk("free_block (%s:%d): bit already cleared\n",
-		       kdevname(sb->s_dev), block);
+		       sb->s_id, block);
 	mark_buffer_dirty(bh);
 	return;
 }
@@ -127,7 +127,7 @@ minix_V1_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 
 	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %ld is out of range\n",
-		       bdevname(sb->s_dev), ino);
+		       sb->s_id, ino);
 		return NULL;
 	}
 	ino--;
@@ -152,7 +152,7 @@ minix_V2_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 	*bh = NULL;
 	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %ld is out of range\n",
-		       bdevname(sb->s_dev), ino);
+		       sb->s_id, ino);
 		return NULL;
 	}
 	ino--;

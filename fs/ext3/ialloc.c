@@ -189,10 +189,6 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 	struct ext3_super_block * es;
 	int fatal = 0, err;
 
-	if (kdev_none(inode->i_dev)) {
-		printk ("ext3_free_inode: inode has no device\n");
-		return;
-	}
 	if (atomic_read(&inode->i_count) > 1) {
 		printk ("ext3_free_inode: inode has count=%d\n",
 					atomic_read(&inode->i_count));

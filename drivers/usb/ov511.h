@@ -1,19 +1,40 @@
-
 #ifndef __LINUX_OV511_H
 #define __LINUX_OV511_H
 
 #include <asm/uaccess.h>
 #include <linux/videodev.h>
 #include <linux/smp_lock.h>
+#include <linux/usb.h>
 
 #define OV511_DEBUG	/* Turn on debug messages */
 
 #ifdef OV511_DEBUG
 #  define PDEBUG(level, fmt, args...) \
-if (debug >= level) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args)
+if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , \
+	## args)
 #else
 #  define PDEBUG(level, fmt, args...) do {} while(0)
 #endif
+
+/* This macro restricts an int variable to an inclusive range */
+#define RESTRICT_TO_RANGE(v,mi,ma) { \
+	if ((v) < (mi)) (v) = (mi); \
+	else if ((v) > (ma)) (v) = (ma); \
+}
+
+/* --------------------------------- */
+/* DEFINES FOR OV511 AND OTHER CHIPS */
+/* --------------------------------- */
+
+/* USB IDs */
+#define VEND_OMNIVISION	0x05A9
+#define PROD_OV511	0x0511
+#define PROD_OV511PLUS	0xA511
+#define PROD_OV518	0x0518
+#define PROD_OV518PLUS	0xA518
+
+#define VEND_MATTEL	0x0813
+#define PROD_ME2CAM	0x0002
 
 /* Camera interface register numbers */
 #define OV511_REG_CAMERA_DELAY_MODE		0x10
@@ -52,6 +73,7 @@ if (debug >= level) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args
 
 /* I2C register numbers */
 #define OV511_REG_I2C_CONTROL			0x40
+#define OV518_REG_I2C_CONTROL			0x47	/* OV518(+) only */
 #define OV511_REG_I2C_SLAVE_ID_WRITE		0x41
 #define OV511_REG_I2C_SUB_ADDRESS_3_BYTE	0x42
 #define OV511_REG_I2C_SUB_ADDRESS_2_BYTE	0x43
@@ -78,8 +100,16 @@ if (debug >= level) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args
 #define OV511_REG_SYSTEM_CLOCK_DIVISOR		0x51
 #define OV511_REG_SYSTEM_SNAPSHOT		0x52
 #define OV511_REG_SYSTEM_INIT         		0x53
-#define OV511_REG_SYSTEM_PWR_CLK		0x54	/* OV511+ only */
+#define OV511_REG_SYSTEM_PWR_CLK		0x54 /* OV511+/OV518(+) only */
 #define OV511_REG_SYSTEM_LED_CTL		0x55	/* OV511+ only */
+#define OV518_REG_GPIO_IN			0x55	/* OV518(+) only */
+#define OV518_REG_GPIO_OUT			0x56	/* OV518(+) only */
+#define OV518_REG_GPIO_CTL			0x57	/* OV518(+) only */
+#define OV518_REG_GPIO_PULSE_IN			0x58	/* OV518(+) only */
+#define OV518_REG_GPIO_PULSE_CLEAR		0x59	/* OV518(+) only */
+#define OV518_REG_GPIO_PULSE_POLARITY		0x5a	/* OV518(+) only */
+#define OV518_REG_GPIO_PULSE_EN			0x5b	/* OV518(+) only */
+#define OV518_REG_GPIO_RESET			0x5c	/* OV518(+) only */
 #define OV511_REG_SYSTEM_USER_DEFINED		0x5E
 #define OV511_REG_SYSTEM_CUSTOM_ID		0x5F
 
@@ -118,6 +148,16 @@ if (debug >= level) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args
 #define OV511PLUS_ALT_SIZE_513	5
 #define OV511PLUS_ALT_SIZE_769	6
 #define OV511PLUS_ALT_SIZE_961	7
+
+/* Alternate numbers for various max packet sizes (OV518(+) only) */
+#define OV518_ALT_SIZE_0	0
+#define OV518_ALT_SIZE_128	1
+#define OV518_ALT_SIZE_256	2
+#define OV518_ALT_SIZE_384	3
+#define OV518_ALT_SIZE_512	4
+#define OV518_ALT_SIZE_640	5
+#define OV518_ALT_SIZE_768	6
+#define OV518_ALT_SIZE_896	7
 
 /* OV7610 registers */
 #define OV7610_REG_GAIN          0x00	/* gain setting (5:0) */
@@ -170,44 +210,74 @@ if (debug >= level) info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args
 					/* 36-37 reserved */
 #define OV7610_REG_COM_K         0x38	/* misc registers */
 
-
-#define SCRATCH_BUF_SIZE 512
-
 #define FRAMES_PER_DESC		10	/* FIXME - What should this be? */
 #define FRAME_SIZE_PER_DESC	993	/* FIXME - Deprecated */
 #define MAX_FRAME_SIZE_PER_DESC	993	/* For statically allocated stuff */
+#define PIXELS_PER_SEG		256	/* Pixels per segment */
 
 #define OV511_ENDPOINT_ADDRESS 1	/* Isoc endpoint number */
 
-// CAMERA SPECIFIC
-// FIXME - these can vary between specific models
-#define OV7610_I2C_WRITE_ID 0x42
-#define OV7610_I2C_READ_ID  0x43
-#define OV6xx0_I2C_WRITE_ID 0xC0
-#define OV6xx0_I2C_READ_ID  0xC1
+/* I2C addresses */
+#define OV7xx0_I2C_WRITE_ID   0x42
+#define OV7xx0_I2C_READ_ID    0x43
+#define OV6xx0_I2C_WRITE_ID   0xC0
+#define OV6xx0_I2C_READ_ID    0xC1
+#define OV8xx0_I2C_WRITE_ID   0xA0
+#define OV8xx0_I2C_READ_ID    0xA1
+#define KS0127_I2C_WRITE_ID   0xD8
+#define KS0127_I2C_READ_ID    0xD9
+#define SAA7111A_I2C_WRITE_ID 0x48
+#define SAA7111A_I2C_READ_ID  0x49
 
 #define OV511_I2C_CLOCK_PRESCALER 0x03
 
-/* Prototypes */
-int usb_ov511_reg_read(struct usb_device *dev, unsigned char reg);
-int usb_ov511_reg_write(struct usb_device *dev,
-                        unsigned char reg,
-                        unsigned char value);
-
 /* Bridge types */
 enum {
+	BRG_UNKNOWN,
 	BRG_OV511,
 	BRG_OV511PLUS,
+	BRG_OV518,
+	BRG_OV518PLUS,
+};
+
+/* Bridge classes */
+enum {
+	BCL_UNKNOWN,
+	BCL_OV511,
+	BCL_OV518,
 };
 
 /* Sensor types */
 enum {
 	SEN_UNKNOWN,
+	SEN_OV76BE,
 	SEN_OV7610,
 	SEN_OV7620,
 	SEN_OV7620AE,
 	SEN_OV6620,
+	SEN_OV6630,
+	SEN_OV6630AE,
+	SEN_OV6630AF,
+	SEN_OV8600,
+	SEN_KS0127,
+	SEN_KS0127B,
+	SEN_SAA7111A,
 };
+
+// Not implemented yet
+#if 0
+/* Sensor classes */
+enum {
+	SCL_UNKNOWN,
+	SCL_OV7610,	/* 7610, 76BE, 7620AE (for now) */
+	SCL_OV7620,
+	SCL_OV6620,	
+	SCL_OV6630,	/* 6630, 6630AE, 6630AF */
+	SCL_OV8600,
+	SCL_KS0127,	/* SEN_KS0127, SEN_KS0127B */
+	SCL_SAA7111A,
+};
+#endif
 
 enum {
 	STATE_SCANNING,		/* Scanning for start */
@@ -222,7 +292,77 @@ enum {
 	BUF_PEND_DEALLOC,	/* ov511->buf_timer is set */
 };
 
-struct usb_device;
+/* --------- Definition of ioctl interface --------- */
+
+#define OV511_INTERFACE_VER 101
+
+/* LED options */
+enum {
+	LED_OFF,
+	LED_ON,
+	LED_AUTO,
+};
+
+/* Raw frame formats */
+enum {
+	RAWFMT_INVALID,
+	RAWFMT_YUV400,
+	RAWFMT_YUV420,
+	RAWFMT_YUV422,
+	RAWFMT_GBR422,
+};
+
+/* Unsigned short option numbers */
+enum {
+	OV511_USOPT_INVALID,
+	OV511_USOPT_BRIGHT,
+	OV511_USOPT_SAT,
+	OV511_USOPT_HUE,
+	OV511_USOPT_CONTRAST,
+};
+
+/* Unsigned int option numbers */
+enum {
+	OV511_UIOPT_INVALID,
+	OV511_UIOPT_POWER_FREQ,
+	OV511_UIOPT_BFILTER,
+	OV511_UIOPT_LED,
+	OV511_UIOPT_DEBUG,
+	OV511_UIOPT_COMPRESS,
+};
+
+struct ov511_ushort_opt {
+	int optnum;		/* Specific option number */
+	unsigned short val;
+};
+
+struct ov511_uint_opt {
+	int optnum;		/* Specific option number */
+	unsigned int val;
+};
+
+struct ov511_i2c_struct {
+	unsigned char slave; /* Write slave ID (read ID - 1) */
+	unsigned char reg;   /* Index of register */
+	unsigned char value; /* User sets this w/ write, driver does w/ read */
+	unsigned char mask;  /* Bits to be changed. Not used with read ops */
+};
+
+/* ioctls */
+#define OV511IOC_GINTVER  _IOR('v', BASE_VIDIOCPRIVATE + 0, int)
+#define OV511IOC_GUSHORT _IOWR('v', BASE_VIDIOCPRIVATE + 1, \
+			       struct ov511_ushort_opt)
+#define OV511IOC_SUSHORT  _IOW('v', BASE_VIDIOCPRIVATE + 2, \
+			       struct ov511_ushort_opt)
+#define OV511IOC_GUINT   _IOWR('v', BASE_VIDIOCPRIVATE + 3, \
+			       struct ov511_uint_opt)
+#define OV511IOC_SUINT    _IOW('v', BASE_VIDIOCPRIVATE + 4, \
+			       struct ov511_uint_opt)
+#define OV511IOC_WI2C     _IOW('v', BASE_VIDIOCPRIVATE + 5, \
+			       struct ov511_i2c_struct)
+#define OV511IOC_RI2C    _IOWR('v', BASE_VIDIOCPRIVATE + 6, \
+			       struct ov511_i2c_struct)
+/* ------------- End IOCTL interface -------------- */
 
 struct ov511_sbuf {
 	char *data;
@@ -248,36 +388,51 @@ struct ov511_regvals {
 };
 
 struct ov511_frame {
+	int framenum;		/* Index of this frame */
 	char *data;		/* Frame buffer */
+	char *tempdata;		/* Temp buffer for multi-stage conversions */
+	char *rawdata;		/* Raw camera data buffer */
 
 	int depth;		/* Bytes per pixel */
 	int width;		/* Width application is expecting */
-	int height;		/* Height */
+	int height;		/* Height application is expecting */
 
-	int hdrwidth;		/* Width the frame actually is */
-	int hdrheight;		/* Height */
+	int rawwidth;		/* Actual width of frame sent from camera */
+	int rawheight;		/* Actual height of frame sent from camera */
 
 	int sub_flag;		/* Sub-capture mode for this frame? */
 	unsigned int format;	/* Format for this frame */
-	int segsize;		/* How big is each segment from the camera? */
+	int compressed;		/* Is frame compressed? */
 
 	volatile int grabstate;	/* State of grabbing */
 	int scanstate;		/* State of scanning */
 
-	int curline;		/* Line of frame we're working on */
-	int curpix;
-	int segment;		/* Segment from the incoming data */
+	int bytes_recvd;	/* Number of image bytes received from camera */
 
-	long scanlength;	/* uncompressed, raw data length of frame */
-	long bytes_read;	/* amount of scanlength that has been read from *data */
+	long bytes_read;	/* Amount that has been read() */
 
 	wait_queue_head_t wq;	/* Processes waiting */
 
 	int snapshot;		/* True if frame was a snapshot */
 };
 
+#define DECOMP_INTERFACE_VER 2
+
+/* Compression module operations */
+struct ov51x_decomp_ops {
+	int (*decomp_400)(unsigned char *, unsigned char *, int, int, int);
+	int (*decomp_420)(unsigned char *, unsigned char *, int, int, int);
+	int (*decomp_422)(unsigned char *, unsigned char *, int, int, int);
+	void (*decomp_lock)(void);
+	void (*decomp_unlock)(void);
+};
+
 #define OV511_NUMFRAMES	2
-#define OV511_NUMSBUF	2
+#if OV511_NUMFRAMES > VIDEO_MAX_FRAME
+#error "OV511_NUMFRAMES is too high"
+#endif
+
+#define OV511_NUMSBUF		2
 
 struct usb_ov511 {
 	struct video_device vdev;
@@ -292,22 +447,37 @@ struct usb_ov511 {
 	/* Determined by sensor type */
 	int maxwidth;
 	int maxheight;
+	int minwidth;
+	int minheight;
 
 	int brightness;
 	int colour;
 	int contrast;
 	int hue;
 	int whiteness;
+	int exposure;
+	int auto_brt;		/* Auto brightness enabled flag */
+	int auto_gain;		/* Auto gain control enabled flag */
+	int auto_exp;		/* Auto exposure enabled flag */
+	int backlight;		/* Backlight exposure algorithm flag */
 
-	struct semaphore lock;
+	int led_policy;		/* LED: off|on|auto; OV511+ only */
+
+	struct semaphore lock;	/* Serializes user-accessible operations */
 	int user;		/* user count for exclusive use */
 
 	int streaming;		/* Are we streaming Isochronous? */
 	int grabbing;		/* Are we grabbing? */
 
 	int compress;		/* Should the next frame be compressed? */
+	int compress_inited;	/* Are compression params uploaded? */
+
+	int lightfreq;		/* Power (lighting) frequency */
+	int bandfilt;		/* Banding filter enabled flag */
 
 	char *fbuf;		/* Videodev buffer area */
+	char *tempfbuf;		/* Temporary (intermediate) buffer area */
+	char *rawfbuf;		/* Raw camera data buffer area */
 
 	int sub_flag;		/* Pix Array subcapture on flag */
 	int subx;		/* Pix Array subcapture x offset */
@@ -318,30 +488,53 @@ struct usb_ov511 {
 	int curframe;		/* Current receiving sbuf */
 	struct ov511_frame frame[OV511_NUMFRAMES];	
 
-	int cursbuf;		/* Current receiving sbuf */
 	struct ov511_sbuf sbuf[OV511_NUMSBUF];
-
-	/* Scratch space from the Isochronous pipe */
-	unsigned char scratch[SCRATCH_BUF_SIZE];
-	int scratchlen;
 
 	wait_queue_head_t wq;	/* Processes waiting */
 
 	int snap_enabled;	/* Snapshot mode enabled */
 	
-	int bridge;		/* Type of bridge (OV511 or OV511+) */
-	int sensor;		/* Type of image sensor chip */
+	int bridge;		/* Type of bridge (BRG_*) */
+	int bclass;		/* Class of bridge (BCL_*) */
+	int sensor;		/* Type of image sensor chip (SEN_*) */
+	int sclass;		/* Type of image sensor chip (SCL_*) */
+	int tuner;		/* Type of TV tuner */
 
 	int packet_size;	/* Frame size per isoc desc */
 
-				/* proc interface */
 	struct semaphore param_lock;	/* params lock for this camera */
-	struct proc_dir_entry *proc_entry;	/* /proc/ov511/videoX */
-	
+
+	/* /proc entries, relative to /proc/video/ov511/ */
+	struct proc_dir_entry *proc_devdir;   /* Per-device proc directory */
+	struct proc_dir_entry *proc_info;     /* <minor#>/info entry */
+	struct proc_dir_entry *proc_button;   /* <minor#>/button entry */
+	struct proc_dir_entry *proc_control;  /* <minor#>/control entry */
+
 	/* Framebuffer/sbuf management */
 	int buf_state;
 	struct semaphore buf_lock;
 	struct timer_list buf_timer;
+
+	struct ov51x_decomp_ops *decomp_ops;
+
+	/* Stop streaming while changing picture settings */
+	int stop_during_set;
+
+	int stopped;		/* Streaming is temporarily paused */
+
+	/* Video decoder stuff */
+	int input;		/* Composite, S-VIDEO, etc... */
+	int num_inputs;		/* Number of inputs */
+	int norm; 		/* NTSC / PAL / SECAM */
+	int has_decoder;	/* Device has a video decoder */
+	int has_tuner;		/* Device has a TV tuner */
+	int has_audio_proc;	/* Device has an audio processor */
+	int freq;		/* Current tuner frequency */
+	int tuner_type;		/* Specific tuner model */
+
+	/* I2C interface to kernel */
+	struct semaphore i2c_lock;	  /* Protect I2C controller regs */
+	unsigned char primary_i2c_slave;  /* I2C write id of sensor */
 };
 
 struct cam_list {
@@ -354,18 +547,57 @@ struct palette_list {
 	char *name;
 };
 
-struct mode_list {
+struct mode_list_518 {
 	int width;
 	int height;
-	int color;		/* 0=grayscale, 1=color */
-	u8 pxcnt;		/* pixel counter */
-	u8 lncnt;		/* line counter */
-	u8 pxdv;		/* pixel divisor */
-	u8 lndv;		/* line divisor */
-	u8 m420;
-	u8 common_A;
-	u8 common_L;
+	u8 reg28;
+	u8 reg29;
+	u8 reg2a;
+	u8 reg2c;
+	u8 reg2e;
+	u8 reg24;
+	u8 reg25;
 };
 
-#endif
+/* Compression stuff */
 
+#define OV511_QUANTABLESIZE	64
+#define OV518_QUANTABLESIZE	32
+
+#define OV511_YQUANTABLE { \
+	0, 1, 1, 2, 2, 3, 3, 4, \
+	1, 1, 1, 2, 2, 3, 4, 4, \
+	1, 1, 2, 2, 3, 4, 4, 4, \
+	2, 2, 2, 3, 4, 4, 4, 4, \
+	2, 2, 3, 4, 4, 5, 5, 5, \
+	3, 3, 4, 4, 5, 5, 5, 5, \
+	3, 4, 4, 4, 5, 5, 5, 5, \
+	4, 4, 4, 4, 5, 5, 5, 5  \
+}
+
+#define OV511_UVQUANTABLE { \
+	0, 2, 2, 3, 4, 4, 4, 4, \
+	2, 2, 2, 4, 4, 4, 4, 4, \
+	2, 2, 3, 4, 4, 4, 4, 4, \
+	3, 4, 4, 4, 4, 4, 4, 4, \
+	4, 4, 4, 4, 4, 4, 4, 4, \
+	4, 4, 4, 4, 4, 4, 4, 4, \
+	4, 4, 4, 4, 4, 4, 4, 4, \
+	4, 4, 4, 4, 4, 4, 4, 4  \
+}
+
+#define OV518_YQUANTABLE { \
+	5, 4, 5, 6, 6, 7, 7, 7, \
+	5, 5, 5, 5, 6, 7, 7, 7, \
+	6, 6, 6, 6, 7, 7, 7, 8, \
+	7, 7, 6, 7, 7, 7, 8, 8  \
+}
+
+#define OV518_UVQUANTABLE { \
+	6, 6, 6, 7, 7, 7, 7, 7, \
+	6, 6, 6, 7, 7, 7, 7, 7, \
+	6, 6, 6, 7, 7, 7, 7, 8, \
+	7, 7, 7, 7, 7, 7, 8, 8  \
+}
+
+#endif

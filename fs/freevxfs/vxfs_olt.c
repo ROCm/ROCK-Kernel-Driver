@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_olt.c,v 1.9 2001/08/07 16:14:45 hch Exp hch $"
+#ident "$Id: vxfs_olt.c,v 1.10 2002/01/02 23:03:58 hch Exp hch $"
 
 /* 
  * Veritas filesystem driver - object location table support.
@@ -85,14 +85,23 @@ vxfs_read_olt(struct super_block *sbp, u_long bsize)
 	char			*oaddr, *eaddr;
 
 
-	bp = bread(sbp->s_dev,
-			vxfs_oblock(sbp, infp->vsi_oltext, bsize), bsize);
+	bp = sb_bread(sbp, vxfs_oblock(sbp, infp->vsi_oltext, bsize));
 	if (!bp || !bp->b_data)
 		goto fail;
 
 	op = (struct vxfs_olt *)bp->b_data;
 	if (op->olt_magic != VXFS_OLT_MAGIC) {
 		printk(KERN_NOTICE "vxfs: ivalid olt magic number\n");
+		goto fail;
+	}
+
+	/*
+	 * It is in theory possible that vsi_oltsize is > 1.
+	 * I've not seen any such filesystem yet and I'm lazy..  --hch
+	 */
+	if (infp->vsi_oltsize > 1) {
+		printk(KERN_NOTICE "vxfs: oltsize > 1 detected.\n");
+		printk(KERN_NOTICE "vxfs: please notify hch@caldera.de\n");
 		goto fail;
 	}
 

@@ -150,9 +150,13 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 		struct usb_interface *interface = &dev->actconfig->interface[i];
 		
 		if (interface->driver == driver) {
+			if (driver->owner)
+				__MOD_INC_USE_COUNT(driver->owner);
 			down(&driver->serialize);
 			driver->disconnect(dev, interface->private_data);
 			up(&driver->serialize);
+			if (driver->owner)
+				__MOD_DEC_USE_COUNT(driver->owner);
 			/* if driver->disconnect didn't release the interface */
 			if (interface->driver)
 				usb_driver_release_interface(driver, interface);
@@ -781,6 +785,8 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 		driver = list_entry(tmp, struct usb_driver, driver_list);
 		tmp = tmp->next;
 
+		if (driver->owner)
+			__MOD_INC_USE_COUNT(driver->owner);
 		id = driver->id_table;
 		/* new style driver? */
 		if (id) {
@@ -804,6 +810,8 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 			private = driver->probe(dev, ifnum, NULL);
 			up(&driver->serialize);
 		}
+		if (driver->owner)
+			__MOD_DEC_USE_COUNT(driver->owner);
 
 		/* probe() may have changed the config on us */
 		interface = dev->actconfig->interface + ifnum;
@@ -1887,9 +1895,13 @@ void usb_disconnect(struct usb_device **pdev)
 			struct usb_interface *interface = &dev->actconfig->interface[i];
 			struct usb_driver *driver = interface->driver;
 			if (driver) {
+				if (driver->owner)
+					__MOD_INC_USE_COUNT(driver->owner);
 				down(&driver->serialize);
 				driver->disconnect(dev, interface->private_data);
 				up(&driver->serialize);
+				if (driver->owner)
+					__MOD_DEC_USE_COUNT(driver->owner);
 				/* if driver->disconnect didn't release the interface */
 				if (interface->driver)
 					usb_driver_release_interface(driver, interface);

@@ -111,8 +111,8 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th, unsigned long 
   /* clear bit for the given block in bit map */
   if (!reiserfs_test_and_clear_le_bit (offset, apbh[nr]->b_data)) {
       reiserfs_warning ("vs-4080: reiserfs_free_block: "
-			"free_block (%04x:%lu)[dev:blocknr]: bit already cleared\n", 
-	    s->s_dev, block);
+			"free_block (%s:%lu)[dev:blocknr]: bit already cleared\n", 
+	    s->s_id, block);
   }
   journal_mark_dirty (th, s, apbh[nr]);
 

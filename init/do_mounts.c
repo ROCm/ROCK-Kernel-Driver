@@ -631,7 +631,7 @@ static int __init rd_load_disk(int n)
 #ifdef CONFIG_BLK_DEV_RAM
 	if (rd_prompt)
 		change_floppy("root floppy disk to be loaded into RAM disk");
-	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, n), NULL);
+	create_dev("/dev/ram", mk_kdev(RAMDISK_MAJOR, n), NULL);
 #endif
 	return rd_load_image("/dev/root");
 }
@@ -696,7 +696,7 @@ static void __init devfs_make_root(char *name)
 static void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
-	if (MAJOR(ROOT_DEV) == UNNAMED_MAJOR) {
+	if (major(ROOT_DEV) == UNNAMED_MAJOR) {
 		if (mount_nfs_root()) {
 			sys_chdir("/root");
 			ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
@@ -704,7 +704,7 @@ static void __init mount_root(void)
 			return;
 		}
 		printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
-		ROOT_DEV = MKDEV(FLOPPY_MAJOR, 0);
+		ROOT_DEV = mk_kdev(FLOPPY_MAJOR, 0);
 	}
 #endif
 	devfs_make_root(root_device_name);
@@ -749,7 +749,7 @@ static int do_linuxrc(void * shell)
 static void __init handle_initrd(void)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
-	int ram0 = kdev_t_to_nr(MKDEV(RAMDISK_MAJOR,0));
+	kdev_t ram0 = mk_kdev(RAMDISK_MAJOR,0);
 	int error;
 	int i, pid;
 
@@ -769,12 +769,12 @@ static void __init handle_initrd(void)
 	sys_mount("..", ".", NULL, MS_MOVE, NULL);
 	sys_umount("/old/dev", 0);
 
-	if (real_root_dev == ram0) {
+	if (real_root_dev == kdev_t_to_nr(ram0)) {
 		sys_chdir("/old");
 		return;
 	}
 
-	ROOT_DEV = real_root_dev;
+	ROOT_DEV = to_kdev_t(real_root_dev);
 	mount_root();
 
 	printk(KERN_NOTICE "Trying to move old root to /initrd ... ");
@@ -801,8 +801,8 @@ static void __init handle_initrd(void)
 static int __init initrd_load(void)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
-	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
-	create_dev("/dev/initrd", MKDEV(RAMDISK_MAJOR, INITRD_MINOR), NULL);
+	create_dev("/dev/ram", mk_kdev(RAMDISK_MAJOR, 0), NULL);
+	create_dev("/dev/initrd", mk_kdev(RAMDISK_MAJOR, INITRD_MINOR), NULL);
 #endif
 	return rd_load_image("/dev/initrd");
 }
@@ -816,7 +816,7 @@ void prepare_namespace(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (!initrd_start)
 		mount_initrd = 0;
-	real_root_dev = ROOT_DEV;
+	real_root_dev = kdev_t_to_nr(ROOT_DEV);
 #endif
 	sys_mkdir("/dev", 0700);
 	sys_mkdir("/root", 0700);

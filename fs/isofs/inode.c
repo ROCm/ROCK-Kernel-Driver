@@ -469,7 +469,6 @@ static unsigned int isofs_get_last_session(struct super_block *sb,s32 session )
 static struct super_block *isofs_read_super(struct super_block *s, void *data,
 					    int silent)
 {
-	kdev_t				dev = s->s_dev;
 	struct buffer_head	      * bh = NULL, *pri_bh = NULL;
 	struct hs_primary_descriptor  * h_pri = NULL;
 	struct iso_primary_descriptor * pri = NULL;
@@ -820,7 +819,7 @@ out_iput:
 out_no_read:
 	printk(KERN_WARNING "isofs_read_super: "
 		"bread failed, dev=%s, iso_blknum=%d, block=%d\n",
-		kdevname(dev), iso_blknum, block);
+		s->s_id, iso_blknum, block);
 	goto out_unlock;
 out_bad_zone_size:
 	printk(KERN_WARNING "Bad logical zone size %ld\n",

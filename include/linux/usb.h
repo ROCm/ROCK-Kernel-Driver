@@ -460,6 +460,7 @@ struct usb_device_id {
 
 /**
  * struct usb_driver - identifies USB driver to usbcore
+ * @owner: pointer to the module owner of this driver
  * @name: The driver name should be unique among USB drivers
  * @probe: Called to see if the driver is willing to manage a particular
  *	interface on a device.  The probe routine returns a handle that 
@@ -502,6 +503,7 @@ struct usb_device_id {
  * well as cancel any I/O requests that are still pending.
  */
 struct usb_driver {
+	struct module *owner;
 	const char *name;
 
 	void *(*probe)(

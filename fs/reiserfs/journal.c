@@ -420,7 +420,7 @@ static inline struct reiserfs_journal_cnode *get_journal_hash_dev(struct reiserf
   struct reiserfs_journal_cnode *cn ;
   cn = journal_hash(table, dev, bl) ;
   while(cn) {
-    if ((cn->blocknr == bl) && (cn->dev == dev))
+    if ((cn->blocknr == bl) && (kdev_same(cn->dev, dev)))
       return cn ;
     cn = cn->hnext ;
   }
@@ -766,7 +766,7 @@ static struct reiserfs_journal_list *find_newer_jl_for_cn(struct reiserfs_journa
 
   cn = cn->hprev ;
   while(cn) {
-    if (cn->dev == dev && cn->blocknr == blocknr && cn->jlist) {
+    if (kdev_same(cn->dev, dev) && cn->blocknr == blocknr && cn->jlist) {
       return cn->jlist ;
     }
     cn = cn->hprev ;
@@ -1179,7 +1179,7 @@ loop_start:
                 mark_buffer_notjournal_dirty(cn->bh) ;
                 while(walk_cn) {
                     if (walk_cn->bh && walk_cn->blocknr == blocknr && 
-                         walk_cn->dev == cn->dev) {
+                         kdev_same(walk_cn->dev, cn->dev)) {
                         if (walk_cn->jlist) {
                             atomic_dec(&(walk_cn->jlist->j_nonzerolen)) ;
                         }
@@ -1282,7 +1282,7 @@ void remove_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_
   }
   cur = *head ;
   while(cur) {
-    if (cur->blocknr == bh->b_blocknr && cur->dev == bh->b_dev && (jl == NULL || jl == cur->jlist) && 
+    if (cur->blocknr == bh->b_blocknr && kdev_same(cur->dev, bh->b_dev) && (jl == NULL || jl == cur->jlist) && 
         (!test_bit(BLOCK_FREED, &cur->state) || remove_freed)) {
       if (cur->hnext) {
         cur->hnext->hprev = cur->hprev ;
@@ -1293,7 +1293,7 @@ void remove_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_
 	*head = cur->hnext ;
       }
       cur->blocknr = 0 ;
-      cur->dev = 0 ;
+      cur->dev = NODEV ;
       cur->state = 0 ;
       if (cur->bh && cur->jlist) /* anybody who clears the cur->bh will also dec the nonzerolen */
 	atomic_dec(&(cur->jlist->j_nonzerolen)) ;
@@ -1607,8 +1607,7 @@ static int journal_read(struct super_block *p_s_sb) {
   int ret ;
 
   cur_dblock = reiserfs_get_journal_block(p_s_sb) ;
-  printk("reiserfs: checking transaction log (device %s) ...\n",
-          kdevname(p_s_sb->s_dev)) ;
+  printk("reiserfs: checking transaction log (device %s) ...\n", p_s_sb->s_id) ;
   start = CURRENT_TIME ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
@@ -2302,7 +2301,7 @@ static int can_dirty(struct reiserfs_journal_cnode *cn) {
   ** to disk right now.
   */
   while(cur && can_dirty) {
-    if (cur->jlist && cur->bh && cur->blocknr && cur->dev == dev && 
+    if (cur->jlist && cur->bh && cur->blocknr && kdev_same(cur->dev, dev) && 
         cur->blocknr == blocknr) {
       can_dirty = 0 ;
     }
@@ -2315,7 +2314,7 @@ static int can_dirty(struct reiserfs_journal_cnode *cn) {
   while(cur && can_dirty) {
     if (cur->jlist && cur->jlist->j_len > 0 && 
         atomic_read(&(cur->jlist->j_commit_left)) > 0 && cur->bh && 
-        cur->blocknr && cur->dev == dev && cur->blocknr == blocknr) {
+        cur->blocknr && kdev_same(cur->dev, dev) && cur->blocknr == blocknr) {
       can_dirty = 0 ;
     }
     cur = cur->hnext ;
@@ -2582,7 +2581,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
     /* find all older transactions with this block, make sure they don't try to write it out */
     cn = get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_list_hash_table, p_s_sb->s_dev, blocknr, p_s_sb->s_blocksize) ;
     while (cn) {
-      if (p_s_sb->s_dev == cn->dev && blocknr == cn->blocknr) {
+      if (kdev_same(p_s_sb->s_dev, cn->dev) && blocknr == cn->blocknr) {
 	set_bit(BLOCK_FREED, &cn->state) ;
 	if (cn->bh) {
 	  if (!cleaned) {

@@ -799,7 +799,7 @@ out_unload_nls:
 out_invalid:
 	if (!silent) {
 		printk("VFS: Can't find a valid FAT filesystem on dev %s.\n",
-			bdevname(sb->s_dev));
+			sb->s_id);
 	}
 out_fail:
 	if (opts.iocharset) {
@@ -973,7 +973,7 @@ retry:
 	}
 	lock_kernel();
 	if (!(bh = fat_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
-		printk("dev = %s, ino = %d\n", kdevname(inode->i_dev), i_pos);
+		printk("dev = %s, ino = %d\n", sb->s_id, i_pos);
 		fat_fs_panic(sb, "msdos_write_inode: unable to read i-node block");
 		unlock_kernel();
 		return;
