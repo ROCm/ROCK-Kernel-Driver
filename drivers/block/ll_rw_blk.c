@@ -28,11 +28,6 @@
 #include <linux/slab.h>
 
 /*
- * Disk stats 
- */
-struct disk_stat dkstat;
-
-/*
  * For the allocated request tables
  */
 static kmem_cache_t *request_cachep;
@@ -1412,19 +1407,6 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 
 	major = rq->rq_disk->major;
 	index = rq->rq_disk->first_minor >> rq->rq_disk->minor_shift;
-
-	if ((index >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
-		return;
-
-	dkstat.drive[major][index] += new_io;
-	if (rw == READ) {
-		dkstat.drive_rio[major][index] += new_io;
-		dkstat.drive_rblk[major][index] += nr_sectors;
-	} else if (rw == WRITE) {
-		dkstat.drive_wio[major][index] += new_io;
-		dkstat.drive_wblk[major][index] += nr_sectors;
-	} else
-		printk(KERN_ERR "drive_stat_acct: cmd not R/W?\n");
 }
 
 /*

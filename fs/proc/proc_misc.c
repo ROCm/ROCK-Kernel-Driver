@@ -330,7 +330,6 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	extern unsigned long total_forks;
 	unsigned long jif = jiffies;
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
-	int major, disk;
 
 	for (i = 0 ; i < NR_CPUS; i++) {
 		int j;
@@ -369,26 +368,6 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
-
-	len += sprintf(page + len, "\ndisk_io: ");
-
-	for (major = 0; major < DK_MAX_MAJOR; major++) {
-		for (disk = 0; disk < DK_MAX_DISK; disk++) {
-			int active = dkstat.drive[major][disk] +
-				dkstat.drive_rblk[major][disk] +
-				dkstat.drive_wblk[major][disk];
-			if (active)
-				len += sprintf(page + len,
-					"(%u,%u):(%u,%u,%u,%u,%u) ",
-					major, disk,
-					dkstat.drive[major][disk],
-					dkstat.drive_rio[major][disk],
-					dkstat.drive_rblk[major][disk],
-					dkstat.drive_wio[major][disk],
-					dkstat.drive_wblk[major][disk]
-			);
-		}
-	}
 
 	len += sprintf(page + len,
 		"\nctxt %lu\n"

@@ -404,6 +404,14 @@ static void led_get_diskio_stats(int addvalue)
 	int major, disk, total;
 	
 	total = 0;
+#ifdef 0
+	/*
+	 * this section will no longer work in 2.5, as we no longer
+	 * have either kstat.dk_drive nor DK_MAX_*.  It can probably
+	 * be rewritten to use the per-disk statistics now kept in the
+	 * gendisk, but since I have no HP machines to test it on, I'm
+	 * not really up to that.  ricklind@us.ibm.com 11/7/02
+	 */
 	for (major = 0; major < DK_MAX_MAJOR; major++) {
 	    for (disk = 0; disk < DK_MAX_DISK; disk++)
 		total += dkstat.drive[major][disk];
@@ -417,6 +425,7 @@ static void led_get_diskio_stats(int addvalue)
 	    } else
 		led_diskio_counter += CALC_ADD(total, diskio_max, addvalue);
 	}
+#endif
 	
 	diskio_total_last += total; 
 }
