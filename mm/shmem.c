@@ -43,7 +43,7 @@
 #define SHMEM_MAX_INDEX  (SHMEM_NR_DIRECT + (ENTRIES_PER_PAGEPAGE/2) * (ENTRIES_PER_PAGE+1))
 #define SHMEM_MAX_BYTES  ((unsigned long long)SHMEM_MAX_INDEX << PAGE_CACHE_SHIFT)
 
-#define VM_ACCT(size)    (((size) + PAGE_CACHE_SIZE - 1) >> PAGE_SHIFT)
+#define VM_ACCT(size)    (PAGE_CACHE_ALIGN(size) >> PAGE_SHIFT)
 
 /* Pretend that each entry is of this size in directory's i_size */
 #define BOGO_DIRENT_SIZE 20
@@ -428,6 +428,7 @@ static void shmem_truncate(struct inode *inode)
 				info->alloced++;
 			}
 			empty = subdir;
+			cond_resched_lock(&info->lock);
 			dir = shmem_dir_map(subdir);
 		}
 		subdir = *dir;
@@ -657,10 +658,8 @@ static int shmem_writepage(struct page * page)
 	unsigned long index;
 	struct inode *inode;
 
-	if (!PageLocked(page))
-		BUG();
-	if (page_mapped(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
+	BUG_ON(page_mapped(page));
 
 	mapping = page->mapping;
 	index = page->index;
@@ -675,10 +674,8 @@ static int shmem_writepage(struct page * page)
 	spin_lock(&info->lock);
 	shmem_recalc_inode(inode);
 	entry = shmem_swp_entry(info, index, NULL);
-	if (!entry)
-		BUG();
-	if (entry->val)
-		BUG();
+	BUG_ON(!entry);
+	BUG_ON(entry->val);
 
 	if (move_to_swap_cache(page, swap) == 0) {
 		shmem_swp_set(info, entry, swap.val);
@@ -852,10 +849,10 @@ repeat:
 		info->alloced++;
 		spin_unlock(&info->lock);
 		clear_highpage(page);
+		SetPageUptodate(page);
 	}
 
 	/* We have the page */
-	SetPageUptodate(page);
 	*pagep = page;
 	return 0;
 }
@@ -896,8 +893,9 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	unsigned long idx;
 	int error;
 
-	idx = (address - vma->vm_start) >> PAGE_CACHE_SHIFT;
+	idx = (address - vma->vm_start) >> PAGE_SHIFT;
 	idx += vma->vm_pgoff;
+	idx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
 
 	if (((loff_t) idx << PAGE_CACHE_SHIFT) >= inode->i_size)
 		return NOPAGE_SIGBUS;
@@ -1118,13 +1116,8 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 		if (status)
 			break;
 
-		/* We have exclusive IO access to the page.. */
-		if (!PageLocked(page)) {
-			PAGE_BUG(page);
-		}
-
 		kaddr = kmap(page);
-		status = copy_from_user(kaddr+offset, buf, bytes);
+		status = __copy_from_user(kaddr+offset, buf, bytes);
 		kunmap(page);
 		if (status)
 			goto fail_write;
