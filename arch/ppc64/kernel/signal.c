@@ -67,7 +67,7 @@ struct rt_sigframe {
 	struct siginfo info;
 	/* 64 bit ABI allows for 288 bytes below sp before decrementing it. */
 	char abigap[288];
-};
+} __attribute__ ((aligned (16)));
 
 
 /*
@@ -254,7 +254,7 @@ static inline void __user * get_sigframe(struct k_sigaction *ka, struct pt_regs 
 			newsp = (current->sas_ss_sp + current->sas_ss_size);
 	}
 
-        return (void __user *)((newsp - frame_size) & -8ul);
+        return (void __user *)((newsp - frame_size) & -16ul);
 }
 
 /*
