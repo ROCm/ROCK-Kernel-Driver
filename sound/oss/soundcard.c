@@ -566,13 +566,9 @@ static void soundcard_register_devfs (int do_register)
 					SOUND_MAJOR, dev_list[i].minor+ (j* 0x10),
 					S_IFCHR | dev_list[i].mode,
 					&oss_sound_fops, NULL);
-			else {
-				devfs_handle_t de;
-				
-				de = devfs_find_handle (NULL, name_buf, 0, 0,
-					DEVFS_SPECIAL_CHR, 0);
-				devfs_unregister (de);
-			}
+			else
+				devfs_find_and_unregister(NULL, name_buf, 0, 0,
+							  DEVFS_SPECIAL_CHR,0);
 		}
 	}
 }

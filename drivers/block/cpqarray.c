@@ -336,7 +336,7 @@ void cleanup_module(void)
 
 		del_gendisk(&ida_gendisk[i]);
 	}
-	devfs_unregister(devfs_find_handle(NULL, "ida", 0, 0, 0, 0));
+	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
 	kfree(ida_sizes);

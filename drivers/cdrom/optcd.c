@@ -2051,8 +2051,7 @@ int __init optcd_init(void)
 
 void __exit optcd_exit(void)
 {
-	devfs_unregister(devfs_find_handle(NULL, "optcd", 0, 0,
-					   DEVFS_SPECIAL_BLK, 0));
+	devfs_find_and_unregister(NULL, "optcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
 	if (devfs_unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {
 		printk(KERN_ERR "optcd: what's that: can't unregister\n");
 		return;

@@ -489,11 +489,12 @@ int check_disk_change(kdev_t dev)
 	if (bdops == NULL) {
 		devfs_handle_t de;
 
-		de = devfs_find_handle (NULL, NULL, i, minor(dev),
-					DEVFS_SPECIAL_BLK, 0);
+		de = devfs_get_handle(NULL, NULL, i, minor(dev),
+				      DEVFS_SPECIAL_BLK, 0);
 		if (de) {
-			bdops = devfs_get_ops (de);
-			devfs_put_ops (de); /* We're running in owner module */
+			bdops = devfs_get_ops(de);
+			devfs_put_ops(de); /* We're running in owner module */
+			devfs_put(de);
 		}
 	}
 	if (bdops == NULL)

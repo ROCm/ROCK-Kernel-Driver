@@ -639,6 +639,9 @@
     20020722   Richard Gooch <rgooch@atnf.csiro.au>
 	       Fixed devfs entry leak in <devfs_readdir> when *readdir fails.
   v1.18
+    20020725   Richard Gooch <rgooch@atnf.csiro.au>
+	       Created <devfs_find_and_unregister>.
+  v1.19
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -671,7 +674,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.18 (20020722)"
+#define DEVFS_VERSION            "1.19 (20020725)"
 
 #define DEVFS_NAME "devfs"
 
@@ -1880,6 +1883,16 @@ devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
     if ( (name != NULL) && (name[0] == '\0') ) name = NULL;
     return _devfs_find_entry (dir, name, major, minor, type,traverse_symlinks);
 }   /*  End Function devfs_get_handle  */
+
+void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
+				unsigned int major, unsigned int minor,
+				char type, int traverse_symlinks)
+{
+    devfs_handle_t de = devfs_get_handle (dir, name, major, minor,
+					  type,traverse_symlinks);
+    devfs_unregister (de);
+    devfs_put (de);
+}
 
 
 /*  Compatibility function. Will be removed in sometime in 2.5  */

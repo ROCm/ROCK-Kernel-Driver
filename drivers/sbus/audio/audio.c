@@ -2077,7 +2077,6 @@ kmalloc_failed1:
 
 int unregister_sparcaudio_driver(struct sparcaudio_driver *drv, int duplex)
 {
-	devfs_handle_t de;
 	int i;
 	char name_buf[32];
 
@@ -2104,9 +2103,8 @@ int unregister_sparcaudio_driver(struct sparcaudio_driver *drv, int duplex)
 	/* Unregister ourselves with devfs */
 	for (i=0; i < sizeof (dev_list) / sizeof (*dev_list); i++) {
 		sparcaudio_mkname (name_buf, dev_list[i].name, drv->index);
-		de = devfs_find_handle (devfs_handle, name_buf, 0, 0,
-					DEVFS_SPECIAL_CHR, 0);
-		devfs_unregister (de);
+		devfs_find_and_unregister(devfs_handle, name_buf, 0, 0,
+                                          DEVFS_SPECIAL_CHR, 0);
 	}
 
 	MOD_DEC_USE_COUNT;
