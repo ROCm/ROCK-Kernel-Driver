@@ -473,6 +473,15 @@ config MTD_IXP4XX
 	  IXDP425 and Coyote. If you have an IXP4xx based board and
 	  would like to use the flash chips on it, say 'Y'.
 
+config MTD_IXP2000
+	tristate "CFI Flash device mapped on Intel IXP2000 based systems"
+	depends on ARM && MTD_CFI && MTD_COMPLEX_MAPPINGS && ARCH_IXP2000
+	help
+	  This enables MTD access to flash devices on platforms based
+	  on Intel's IXP2000 family of network processors such as the
+	  IXDP2400 and IXDP2401. If you have an IXP2000 based board and
+	  would like to use the flash chips on it, say 'Y'.
+
 config MTD_EPXA10DB
 	tristate "CFI Flash device mapped on Epxa10db"
 	depends on ARM && MTD_CFI && MTD_PARTITIONS && ARCH_CAMELOT
