@@ -62,12 +62,16 @@ extern unsigned long *empty_zero_page;
  */
 
 extern unsigned long high_physmem;
-extern unsigned long end_vm;
 
 #define VMALLOC_OFFSET	(__va_space)
 #define VMALLOC_START	(((unsigned long) high_physmem + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END	(end_vm)
+
+#if CONFIG_HIGHMEM
+# define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
+#else
+# define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
+#endif
 
 #define _PAGE_PRESENT	0x001
 #define _PAGE_NEWPAGE	0x002
@@ -333,6 +337,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define __pgd_offset(address) pgd_index(address)
 
 /* to find an entry in a page-table-directory */
 #define pgd_offset(mm, address) \
@@ -340,6 +345,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
+
+#define __pmd_offset(address) \
+		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 
 /* Find an entry in the second-level page table.. */
 static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)

@@ -77,8 +77,8 @@ int create_mem_file(unsigned long len)
 	return(fd);
 }
 
-void setup_one_range(int n, int fd, char *driver, unsigned long start, 
-		     unsigned long len, struct mem_region *region)
+void init_range(int n, int fd, char *driver, unsigned long start, 
+		 unsigned long len, struct mem_region *region)
 {
 	if(fd == -1)
 		fd = create_mem_file(len);

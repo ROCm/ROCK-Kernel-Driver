@@ -8,6 +8,7 @@
 #define __UM_PGALLOC_H
 
 #include "linux/mm.h"
+#include "asm/fixmap.h"
 
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + (unsigned long) __pa(pte)))
