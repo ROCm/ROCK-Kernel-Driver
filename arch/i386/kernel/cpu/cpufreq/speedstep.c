@@ -447,7 +447,7 @@ static unsigned int speedstep_detect_processor (void)
 		if (c->x86_model != 2)
 			return 0;
 
-		if (c->x86_mask != 4)
+		if ((c->x86_mask != 4) && (c->x86_mask != 7))
 			return 0;
 
 		ebx = cpuid_ebx(0x00000001);
