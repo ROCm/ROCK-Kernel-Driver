@@ -278,17 +278,11 @@ int netdev_register_sysfs(struct net_device *net)
 		    goto out_unreg;
 	}
 
-	
 	net->stats_kobj.parent = NULL;
 	if (net->get_stats) {
 		struct kobject *k = &net->stats_kobj;
 
-		k->parent = kobject_get(&class_dev->kobj);
-		if (!k->parent) {
-			ret = -EBUSY;
-			goto out_unreg;
-		}
-
+		k->parent = &class_dev->kobj;
 		strlcpy(k->name, "statistics", KOBJ_NAME_LEN);
 		k->ktype = &netstat_ktype;
 
