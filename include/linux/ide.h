@@ -24,8 +24,6 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>
 
-#define DEBUG_PM
-
 /*
  * This is the multiple IDE interface driver, as evolved from hd.c.
  * It supports up to four IDE interfaces, on one or more IRQs (usually 14 & 15).
