@@ -108,7 +108,6 @@ xdr_decode_fhstatus(struct rpc_rqst *req, u32 *p, struct mnt_fhstatus *res)
 {
 	struct nfs_fh *fh = res->fh;
 
-	memset((void *)fh, 0, sizeof(*fh));
 	if ((res->status = ntohl(*p++)) == 0) {
 		fh->size = NFS2_FHSIZE;
 		memcpy(fh->data, p, NFS2_FHSIZE);
@@ -121,7 +120,6 @@ xdr_decode_fhstatus3(struct rpc_rqst *req, u32 *p, struct mnt_fhstatus *res)
 {
 	struct nfs_fh *fh = res->fh;
 
-	memset((void *)fh, 0, sizeof(*fh));
 	if ((res->status = ntohl(*p++)) == 0) {
 		int size = ntohl(*p++);
 		if (size <= NFS3_FHSIZE) {

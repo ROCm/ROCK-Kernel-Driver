@@ -148,6 +148,12 @@ static inline int nfs_compare_fh(const struct nfs_fh *a, const struct nfs_fh *b)
 	return a->size != b->size || memcmp(a->data, b->data, a->size) != 0;
 }
 
+static inline void nfs_copy_fh(struct nfs_fh *target, const struct nfs_fh *source)
+{
+	target->size = source->size;
+	memcpy(target->data, source->data, source->size);
+}
+
 
 /*
  * This is really a general kernel constant, but since nothing like

@@ -607,11 +607,10 @@ static int
 nfs_init_locked(struct inode *inode, void *opaque)
 {
 	struct nfs_find_desc	*desc = (struct nfs_find_desc *)opaque;
-	struct nfs_fh		*fh = desc->fh;
 	struct nfs_fattr	*fattr = desc->fattr;
 
 	NFS_FILEID(inode) = fattr->fileid;
-	memcpy(NFS_FH(inode), fh, sizeof(struct nfs_fh));
+	nfs_copy_fh(NFS_FH(inode), desc->fh);
 	return 0;
 }
 
@@ -1284,9 +1283,7 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	init_nfsv4_state(server);
 
 	root = &server->fh;
-	memcpy(root, &data->root, sizeof(*root));
-	if (root->size < sizeof(root->data))
-		memset(root->data+root->size, 0, sizeof(root->data)-root->size);
+	nfs_copy_fh(root, (struct nfs_fh *) &data->root);
 
 	if (data->version != NFS_MOUNT_VERSION) {
 		printk("nfs warning: mount version %s than kernel\n",
@@ -1297,7 +1294,6 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 			data->bsize  = 0;
 		if (data->version < 4) {
 			data->flags &= ~NFS_MOUNT_VER3;
-			memset(root, 0, sizeof(*root));
 			root->size = NFS2_FHSIZE;
 			memcpy(root->data, data->old_root.data, NFS2_FHSIZE);
 		}

@@ -77,8 +77,6 @@ xdr_encode_fhandle(u32 *p, struct nfs_fh *fhandle)
 static inline u32 *
 xdr_decode_fhandle(u32 *p, struct nfs_fh *fhandle)
 {
-	/* Zero handle first to allow comparisons */
-	memset(fhandle, 0, sizeof(*fhandle));
 	/* NFSv2 handles have a fixed length */
 	fhandle->size = NFS2_FHSIZE;
 	memcpy(fhandle->data, p, NFS2_FHSIZE);
