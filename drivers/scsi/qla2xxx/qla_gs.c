@@ -408,69 +408,6 @@ qla2x00_gnn_id(scsi_qla_host_t *ha, sw_info_t *list)
 }
 
 /**
- * qla2x00_gft_id() - SNS Get FC-4 TYPEs (GFT_ID) query.
- * @ha: HA context
- * @list: switch info entries to populate
- *
- * Returns 0 on success.
- */
-int
-qla2x00_gft_id(scsi_qla_host_t *ha, sw_info_t *list)
-{
-	int		rval;
-	uint16_t	i;
-
-	ms_iocb_entry_t	*ms_pkt;
-	struct ct_sns_req	*ct_req;
-	struct ct_sns_rsp	*ct_rsp;
-
-	for (i = 0; i < MAX_FIBRE_DEVICES; i++) {
-		/* Issue GFT_ID */
-		/* Prepare common MS IOCB */
-		ms_pkt = qla2x00_prep_ms_iocb(ha, GFT_ID_REQ_SIZE,
-		    GFT_ID_RSP_SIZE);
-
-		/* Prepare CT request */
-		ct_req = qla2x00_prep_ct_req(&ha->ct_sns->p.req, GFT_ID_CMD,
-		    GFT_ID_RSP_SIZE);
-		ct_rsp = &ha->ct_sns->p.rsp;
-
-		/* Prepare CT arguments -- port_id */
-		ct_req->req.port_id.port_id[0] = list[i].d_id.b.domain;
-		ct_req->req.port_id.port_id[1] = list[i].d_id.b.area;
-		ct_req->req.port_id.port_id[2] = list[i].d_id.b.al_pa;
-
-		/* Execute MS IOCB */
-		rval = qla2x00_issue_iocb(ha, ha->ms_iocb, ha->ms_iocb_dma,
-		    sizeof(ms_iocb_entry_t));
-		if (rval != QLA_SUCCESS) {
-			/*EMPTY*/
-			DEBUG2_3(printk("scsi(%ld): GFT_ID issue IOCB failed "
-			    "(%d).\n", ha->host_no, rval));
-		} else if (ct_rsp->header.response !=
-		    __constant_cpu_to_be16(CT_ACCEPT_RESPONSE)) {
-			DEBUG2_3(printk("scsi(%ld): GFT_ID failed, rejected "
-			    "request, gft_id_rsp:\n", ha->host_no));
-			DEBUG2_3(qla2x00_dump_buffer((uint8_t *)&ct_rsp->header,
-			    sizeof(struct ct_rsp_hdr)));
-			rval = QLA_FUNCTION_FAILED;
-		} else {
-			/* FCP-3 check necessary?  No, assume FCP-3 */
-			/*if (ct_rsp->rsp.gft_id.fc4_types[2] & 0x01)*/
-			list[i].type = SW_TYPE_SCSI;
-			if (ct_rsp->rsp.gft_id.fc4_types[3] & 0x20)
-				list[i].type |= SW_TYPE_IP;
-		}
-
-		/* Last device exit. */
-		if (list[i].d_id.b.rsvd_1 != 0)
-			break;
-	}
-
-	return (rval);
-}
-
-/**
  * qla2x00_rft_id() - SNS Register FC-4 TYPEs (RFT_ID) supported by the HBA.
  * @ha: HA context
  *
