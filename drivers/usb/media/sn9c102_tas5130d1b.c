@@ -1,5 +1,5 @@
 /***************************************************************************
- * Driver for TAS5130D1B image sensor connected to the SN9C10x PC Camera   *
+ * Plug-in for TAS5130D1B image sensor connected to the SN9C10x PC Camera  *
  * Controllers                                                             *
  *                                                                         *
  * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
@@ -96,8 +96,8 @@ static int tas5130d1b_set_crop(struct sn9c102_device* cam,
 	err += sn9c102_write_reg(cam, v_start, 0x13);
 
 	/* Do NOT change! */
-	err += sn9c102_write_reg(cam, 0x1d, 0x1a);
-	err += sn9c102_write_reg(cam, 0x10, 0x1b);
+	err += sn9c102_write_reg(cam, 0x1f, 0x1a);
+	err += sn9c102_write_reg(cam, 0x1a, 0x1b);
 	err += sn9c102_write_reg(cam, 0xf3, 0x19);
 
 	return err;
@@ -165,7 +165,7 @@ int sn9c102_probe_tas5130d1b(struct sn9c102_device* cam)
 	/* This sensor has no identifiers, so let's attach it anyway */
 	sn9c102_attach_sensor(cam, &tas5130d1b);
 
-	/* At the moment, sensor detection is based on USB pid/vid */
+	/* Sensor detection is based on USB pid/vid */
 	if (tas5130d1b.usbdev->descriptor.idProduct != 0x6025 &&
 	    tas5130d1b.usbdev->descriptor.idProduct != 0x60aa)
 		return -ENODEV;
