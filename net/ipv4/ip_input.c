@@ -116,6 +116,7 @@
  */
 
 #include <asm/system.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -432,3 +433,5 @@ out:
         return NET_RX_DROP;
 }
 
+EXPORT_SYMBOL(ip_rcv);
+EXPORT_SYMBOL(ip_statistics);

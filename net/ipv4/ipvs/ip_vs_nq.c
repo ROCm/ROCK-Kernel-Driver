@@ -81,8 +81,8 @@ ip_vs_nq_dest_overhead(struct ip_vs_dest *dest)
 static struct ip_vs_dest *
 ip_vs_nq_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 {
-	struct ip_vs_dest *dest, *least;
-	unsigned int loh, doh;
+	struct ip_vs_dest *dest, *least = NULL;
+	unsigned int loh = 0, doh;
 
 	IP_VS_DBG(6, "ip_vs_nq_schedule(): Scheduling...\n");
 
@@ -99,27 +99,10 @@ ip_vs_nq_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 * new connections.
 	 */
 
-	list_for_each_entry(least, &svc->destinations, n_list) {
-		if (!(least->flags & IP_VS_DEST_F_OVERLOAD) &&
-		    atomic_read(&least->weight) > 0) {
-			loh = ip_vs_nq_dest_overhead(least);
-
-			/* return the server directly if it is idle */
-			if (atomic_read(&least->activeconns) == 0)
-				goto out;
-
-			goto nextstage;
-		}
-	}
-	return NULL;
-
-	/*
-	 *    Find the destination with the least load.
-	 */
-  nextstage:
 	list_for_each_entry(dest, &svc->destinations, n_list) {
 
-		if (dest->flags & IP_VS_DEST_F_OVERLOAD)
+		if (dest->flags & IP_VS_DEST_F_OVERLOAD ||
+		    !atomic_read(&dest->weight))
 			continue;
 
 		doh = ip_vs_nq_dest_overhead(dest);
@@ -127,15 +110,20 @@ ip_vs_nq_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 		/* return the server directly if it is idle */
 		if (atomic_read(&dest->activeconns) == 0) {
 			least = dest;
+			loh = doh;
 			goto out;
 		}
 
-		if (loh * atomic_read(&dest->weight) >
-		    doh * atomic_read(&least->weight)) {
+		if (!least ||
+		    (loh * atomic_read(&dest->weight) >
+		     doh * atomic_read(&least->weight))) {
 			least = dest;
 			loh = doh;
 		}
 	}
+
+	if (!least)
+		return NULL;
 
   out:
 	IP_VS_DBG(6, "NQ: server %u.%u.%u.%u:%u "

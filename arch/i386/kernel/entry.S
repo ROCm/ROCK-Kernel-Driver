@@ -595,7 +595,7 @@ ENTRY(page_fault)
 #ifdef CONFIG_X86_MCE
 ENTRY(machine_check)
 	pushl $0
-	pushl $do_machine_check
+	pushl machine_check_vector
 	jmp error_code
 #endif
 

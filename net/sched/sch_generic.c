@@ -531,3 +531,12 @@ void dev_shutdown(struct net_device *dev)
 	spin_unlock_bh(&dev->queue_lock);
 	write_unlock(&qdisc_tree_lock);
 }
+
+EXPORT_SYMBOL(__netdev_watchdog_up);
+EXPORT_SYMBOL(noop_qdisc);
+EXPORT_SYMBOL(noop_qdisc_ops);
+EXPORT_SYMBOL(qdisc_create_dflt);
+EXPORT_SYMBOL(qdisc_destroy);
+EXPORT_SYMBOL(qdisc_reset);
+EXPORT_SYMBOL(qdisc_restart);
+EXPORT_SYMBOL(qdisc_tree_lock);

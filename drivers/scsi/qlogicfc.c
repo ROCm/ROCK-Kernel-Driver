@@ -718,8 +718,8 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 				continue;
 
 			/* Try to configure DMA attributes. */
-			if (pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff) &&
-			    pci_set_dma_mask(pdev, (u64) 0xffffffff))
+			if (pci_set_dma_mask(pdev, 0xffffffffffffffffULL) &&
+			    pci_set_dma_mask(pdev, 0xffffffffULL))
 					continue;
 
 		        host = scsi_register(tmpt, sizeof(struct isp2x00_hostdata));

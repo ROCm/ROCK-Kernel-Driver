@@ -759,3 +759,17 @@ void __init netfilter_init(void)
 			INIT_LIST_HEAD(&nf_hooks[i][h]);
 	}
 }
+
+EXPORT_SYMBOL(ip_ct_attach);
+EXPORT_SYMBOL(ip_route_me_harder);
+EXPORT_SYMBOL(nf_getsockopt);
+EXPORT_SYMBOL(nf_hook_slow);
+EXPORT_SYMBOL(nf_hooks);
+EXPORT_SYMBOL(nf_register_hook);
+EXPORT_SYMBOL(nf_register_queue_handler);
+EXPORT_SYMBOL(nf_register_sockopt);
+EXPORT_SYMBOL(nf_reinject);
+EXPORT_SYMBOL(nf_setsockopt);
+EXPORT_SYMBOL(nf_unregister_hook);
+EXPORT_SYMBOL(nf_unregister_queue_handler);
+EXPORT_SYMBOL(nf_unregister_sockopt);

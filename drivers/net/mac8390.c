@@ -442,14 +442,14 @@ int __init mac8390_initdev(struct net_device * dev, struct nubus_dev * ndev,
                ei_status.tx_start_page = CABLETRON_TX_START_PG;
                ei_status.rx_start_page = CABLETRON_RX_START_PG;
                ei_status.stop_page = CABLETRON_RX_STOP_PG;
-               dev->rmem_start = dev->mem_start;
-               dev->rmem_end = dev->mem_start + CABLETRON_RX_STOP_PG*256;
+               ei_status.rmem_start = dev->mem_start;
+               ei_status.rmem_end = dev->mem_start + CABLETRON_RX_STOP_PG*256;
 	} else {
                ei_status.tx_start_page = WD_START_PG;
                ei_status.rx_start_page = WD_START_PG + TX_PAGES;
                ei_status.stop_page = (dev->mem_end - dev->mem_start)/256;
-               dev->rmem_start = dev->mem_start + TX_PAGES*256;
-               dev->rmem_end = dev->mem_end;
+               ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+               ei_status.rmem_end = dev->mem_end;
 	}
 	
 	/* Fill in model-specific information and functions */
@@ -621,12 +621,12 @@ static void sane_block_input(struct net_device *dev, int count,
 	unsigned long xfer_base = ring_offset - (WD_START_PG<<8);
 	unsigned long xfer_start = xfer_base + dev->mem_start;
 
-	if (xfer_start + count > dev->rmem_end) {
+	if (xfer_start + count > ei_status.rmem_end) {
 		/* We must wrap the input move. */
-		int semi_count = dev->rmem_end - xfer_start;
+		int semi_count = ei_status.rmem_end - xfer_start;
 		memcpy_fromio(skb->data, (char *)dev->mem_start + xfer_base, semi_count);
 		count -= semi_count;
-		memcpy_toio(skb->data + semi_count, (char *)dev->rmem_start, count);
+		memcpy_toio(skb->data + semi_count, (char *)ei_status.rmem_start, count);
 	} else {
 		memcpy_fromio(skb->data, (char *)dev->mem_start + xfer_base, count);
 	}
@@ -657,15 +657,16 @@ static void dayna_block_input(struct net_device *dev, int count, struct sk_buff 
 
 	/* Note the offset math is done in card memory space which is word
 	   per long onto our space. */
-	 
-	if (xfer_start + count > dev->rmem_end) 
+
+	if (xfer_start + count > ei_status.rmem_end)
 	{
 		/* We must wrap the input move. */
-		int semi_count = dev->rmem_end - xfer_start;
+		int semi_count = ei_status.rmem_end - xfer_start;
 		dayna_memcpy_fromcard(dev, skb->data, xfer_base, semi_count);
 		count -= semi_count;
-		dayna_memcpy_fromcard(dev, skb->data + semi_count, 
-			dev->rmem_start - dev->mem_start, count);
+		dayna_memcpy_fromcard(dev, skb->data + semi_count,
+				      ei_status.rmem_start - dev->mem_start,
+				      count);
 	}
 	else
 	{
@@ -697,15 +698,15 @@ static void slow_sane_block_input(struct net_device *dev, int count, struct sk_b
 	unsigned long xfer_base = ring_offset - (WD_START_PG<<8);
 	unsigned long xfer_start = xfer_base+dev->mem_start;
 
-	if (xfer_start + count > dev->rmem_end)
+	if (xfer_start + count > ei_status.rmem_end)
 	{
 		/* We must wrap the input move. */
-		int semi_count = dev->rmem_end - xfer_start;
+		int semi_count = ei_status.rmem_end - xfer_start;
 		word_memcpy_fromcard(skb->data, (char *)dev->mem_start +
 			xfer_base, semi_count);
 		count -= semi_count;
 		word_memcpy_fromcard(skb->data + semi_count,
-			(char *)dev->rmem_start, count);
+				     (char *)ei_status.rmem_start, count);
 	}
 	else
 	{

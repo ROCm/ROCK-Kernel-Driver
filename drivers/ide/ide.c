@@ -1804,23 +1804,23 @@ extern void init_pdc4030(void);
 #endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 static int __initdata probe_ali14xx;
-extern void init_ali14xx(void);
+extern int ali14xx_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 static int __initdata probe_umc8672;
-extern void init_umc8672(void);
+extern int umc8672_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 static int __initdata probe_dtc2278;
-extern void init_dtc2278(void);
+extern int dtc2278_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_HT6560B
 static int __initdata probe_ht6560b;
-extern void init_ht6560b(void);
+extern int ht6560b_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_QD65XX
 static int __initdata probe_qd65xx;
-extern void init_qd65xx(void);
+extern int qd65xx_init(void);
 #endif
 
 static int __initdata is_chipset_set[MAX_HWIFS];
@@ -2601,23 +2601,23 @@ int __init ide_init (void)
 #endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 	if (probe_ali14xx)
-		init_ali14xx();
+		(void)ali14xx_init();
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 	if (probe_umc8672)
-		init_umc8672();
+		(void)umc8672_init();
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 	if (probe_dtc2278)
-		init_dtc2278();
+		(void)dtc2278_init();
 #endif
 #ifdef CONFIG_BLK_DEV_HT6560B
 	if (probe_ht6560b)
-		init_ht6560b();
+		(void)ht6560b_init();
 #endif
 #ifdef CONFIG_BLK_DEV_QD65XX
 	if (probe_qd65xx)
-		init_qd65xx();
+		(void)qd65xx_init();
 #endif
 
 	initializing = 1;

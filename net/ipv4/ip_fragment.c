@@ -23,6 +23,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/jiffies.h>
@@ -675,3 +676,5 @@ void ipfrag_init(void)
 	ipfrag_secret_timer.expires = jiffies + sysctl_ipfrag_secret_interval;
 	add_timer(&ipfrag_secret_timer);
 }
+
+EXPORT_SYMBOL(ip_defrag);

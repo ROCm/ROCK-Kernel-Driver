@@ -124,16 +124,16 @@ static void tune_umc (ide_drive_t *drive, u8 pio)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-int __init probe_umc8672 (void)
+static int __init umc8672_probe(void)
 {
 	unsigned long flags;
+	ide_hwif_t *hwif, *mate;
 
-	local_irq_save(flags);
 	if (!request_region(0x108, 2, "umc8672")) {
-		local_irq_restore(flags);
 		printk(KERN_ERR "umc8672: ports 0x108-0x109 already in use.\n");
 		return 1;
 	}
+	local_irq_save(flags);
 	outb_p(0x5A,0x108); /* enable umc */
 	if (in_umc (0xd5) != 0xa0) {
 		local_irq_restore(flags);
@@ -146,82 +146,62 @@ int __init probe_umc8672 (void)
 	umc_set_speeds (current_speeds);
 	local_irq_restore(flags);
 
-	ide_hwifs[0].chipset = ide_umc8672;
-	ide_hwifs[1].chipset = ide_umc8672;
-	ide_hwifs[0].tuneproc = &tune_umc;
-	ide_hwifs[1].tuneproc = &tune_umc;
-	ide_hwifs[0].mate = &ide_hwifs[1];
-	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
+	hwif = &ide_hwifs[0];
+	mate = &ide_hwifs[1];
 
-	probe_hwif_init(&ide_hwifs[0]);
-	probe_hwif_init(&ide_hwifs[1]);
+	hwif->chipset = ide_umc8672;
+	hwif->tuneproc = &tune_umc;
+	hwif->mate = mate;
+
+	mate->chipset = ide_umc8672;
+	mate->tuneproc = &tune_umc;
+	mate->mate = hwif;
+	mate->channel = 1;
+
+	probe_hwif_init(hwif);
+	probe_hwif_init(mate);
 
 	return 0;
 }
 
-static void umc8672_release (void)
+/* Can be called directly from ide.c. */
+int __init umc8672_init(void)
+{
+	if (umc8672_probe())
+		return -ENODEV;
+	return 0;
+}
+
+#ifdef MODULE
+static void __exit umc8672_release_hwif(ide_hwif_t *hwif)
+{
+	if (hwif->chipset != ide_umc8672)
+		return;
+
+	hwif->chipset = ide_unknown;
+	hwif->tuneproc = NULL;
+	hwif->mate = NULL;
+	hwif->channel = 0;
+}
+
+static void __exit umc8672_exit(void)
 {
 	unsigned long flags;
 
+	umc8672_release_hwif(&ide_hwifs[0]);
+	umc8672_release_hwif(&ide_hwifs[1]);
+
 	local_irq_save(flags);
-	if (ide_hwifs[0].chipset != ide_umc8672 &&
-	    ide_hwifs[1].chipset != ide_umc8672) {
-		local_irq_restore(flags);
-		return;
-	}
-
-	ide_hwifs[0].chipset = ide_unknown;
-	ide_hwifs[1].chipset = ide_unknown;	
-	ide_hwifs[0].tuneproc = NULL;
-	ide_hwifs[1].tuneproc = NULL;
-	ide_hwifs[0].mate = NULL;
-	ide_hwifs[1].mate = NULL;
-	ide_hwifs[0].channel = 0;
-	ide_hwifs[1].channel = 0;
-
-	outb_p(0xa5,0x108); /* disable umc */
+	outb_p(0xa5, 0x108);	/* disable umc */
+	local_irq_restore(flags);
 
 	release_region(0x108, 2);
-	local_irq_restore(flags);
 }
 
-#ifndef MODULE
-/*
- * init_umc8672:
- *
- * called by ide.c when parsing command line
- */
-
-void __init init_umc8672 (void)
-{
-	if (probe_umc8672())
-		printk(KERN_ERR "init_umc8672: umc8672 controller not found.\n");
-}
-
-#else
+module_init(umc8672_init);
+module_exit(umc8672_exit);
+#endif
 
 MODULE_AUTHOR("Wolfram Podien");
 MODULE_DESCRIPTION("Support for UMC 8672 IDE chipset");
 MODULE_LICENSE("GPL");
-
-static int __init umc8672_mod_init(void)
-{
-	if (probe_umc8672())
-		return -ENODEV;
-	if (ide_hwifs[0].chipset != ide_umc8672 &&
-	    ide_hwifs[1].chipset != ide_umc8672) {
-		umc8672_release();
-		return -ENODEV;
-	}
-	return 0;
-}
-module_init(umc8672_mod_init);
-
-static void __exit umc8672_mod_exit(void)
-{
-        umc8672_release();
-}
-module_exit(umc8672_mod_exit);
-#endif
-

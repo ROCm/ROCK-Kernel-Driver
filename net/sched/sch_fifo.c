@@ -203,3 +203,6 @@ struct Qdisc_ops bfifo_qdisc_ops = {
 	.dump		=	fifo_dump,
 	.owner		=	THIS_MODULE,
 };
+
+EXPORT_SYMBOL(bfifo_qdisc_ops);
+EXPORT_SYMBOL(pfifo_qdisc_ops);

@@ -1133,4 +1133,22 @@ core_initcall(netlink_proto_init);
 module_exit(netlink_proto_exit);
 
 MODULE_LICENSE("GPL");
+
 MODULE_ALIAS_NETPROTO(PF_NETLINK);
+
+EXPORT_SYMBOL(netlink_ack);
+EXPORT_SYMBOL(netlink_broadcast);
+EXPORT_SYMBOL(netlink_broadcast_deliver);
+EXPORT_SYMBOL(netlink_dump_start);
+EXPORT_SYMBOL(netlink_kernel_create);
+EXPORT_SYMBOL(netlink_register_notifier);
+EXPORT_SYMBOL(netlink_set_err);
+EXPORT_SYMBOL(netlink_set_nonroot);
+EXPORT_SYMBOL(netlink_unicast);
+EXPORT_SYMBOL(netlink_unregister_notifier);
+
+#if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
+EXPORT_SYMBOL(netlink_attach);
+EXPORT_SYMBOL(netlink_detach);
+EXPORT_SYMBOL(netlink_post);
+#endif

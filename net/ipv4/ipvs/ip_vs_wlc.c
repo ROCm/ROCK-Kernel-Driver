@@ -91,9 +91,10 @@ ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 * new connections.
 	 */
 
-	list_for_each_entry(least, &svc->destinations, n_list) {
-		if (!(least->flags & IP_VS_DEST_F_OVERLOAD) &&
-		    atomic_read(&least->weight) > 0) {
+	list_for_each_entry(dest, &svc->destinations, n_list) {
+		if (!(dest->flags & IP_VS_DEST_F_OVERLOAD) &&
+		    atomic_read(&dest->weight) > 0) {
+			least = dest;
 			loh = ip_vs_wlc_dest_overhead(least);
 			goto nextstage;
 		}
@@ -104,7 +105,7 @@ ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 *    Find the destination with the least load.
 	 */
   nextstage:
-	list_for_each_entry(dest, &svc->destinations, n_list) {
+	list_for_each_entry_continue(dest, &svc->destinations, n_list) {
 		if (dest->flags & IP_VS_DEST_F_OVERLOAD)
 			continue;
 		doh = ip_vs_wlc_dest_overhead(dest);

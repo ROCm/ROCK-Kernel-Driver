@@ -17,6 +17,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/socket.h>
 #include <linux/sched.h>
 #include <linux/netdevice.h>
@@ -1683,3 +1684,34 @@ void neigh_sysctl_unregister(struct neigh_parms *p)
 }
 
 #endif	/* CONFIG_SYSCTL */
+
+EXPORT_SYMBOL(__neigh_event_send);
+EXPORT_SYMBOL(neigh_add);
+EXPORT_SYMBOL(neigh_changeaddr);
+EXPORT_SYMBOL(neigh_compat_output);
+EXPORT_SYMBOL(neigh_connected_output);
+EXPORT_SYMBOL(neigh_create);
+EXPORT_SYMBOL(neigh_delete);
+EXPORT_SYMBOL(neigh_destroy);
+EXPORT_SYMBOL(neigh_dump_info);
+EXPORT_SYMBOL(neigh_event_ns);
+EXPORT_SYMBOL(neigh_ifdown);
+EXPORT_SYMBOL(neigh_lookup);
+EXPORT_SYMBOL(neigh_parms_alloc);
+EXPORT_SYMBOL(neigh_parms_release);
+EXPORT_SYMBOL(neigh_rand_reach_time);
+EXPORT_SYMBOL(neigh_resolve_output);
+EXPORT_SYMBOL(neigh_table_clear);
+EXPORT_SYMBOL(neigh_table_init);
+EXPORT_SYMBOL(neigh_update);
+EXPORT_SYMBOL(neigh_update_hhs);
+EXPORT_SYMBOL(pneigh_enqueue);
+EXPORT_SYMBOL(pneigh_lookup);
+
+#ifdef CONFIG_ARPD
+EXPORT_SYMBOL(neigh_app_ns);
+#endif
+#ifdef CONFIG_SYSCTL
+EXPORT_SYMBOL(neigh_sysctl_register);
+EXPORT_SYMBOL(neigh_sysctl_unregister);
+#endif

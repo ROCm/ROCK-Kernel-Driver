@@ -6,15 +6,16 @@
  */
 
 #include <linux/bitops.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/netdevice.h>
-#include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/mm.h>
+#include <linux/module.h>
+#include <linux/netdevice.h>
+#include <linux/sched.h>
+#include <linux/skbuff.h>
+#include <linux/string.h>
+#include <linux/types.h>
 
 #include <net/dst.h>
 
@@ -257,3 +258,7 @@ void __init dst_init(void)
 {
 	register_netdevice_notifier(&dst_dev_notifier);
 }
+
+EXPORT_SYMBOL(__dst_free);
+EXPORT_SYMBOL(dst_alloc);
+EXPORT_SYMBOL(dst_destroy);
