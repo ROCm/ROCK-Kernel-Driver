@@ -607,7 +607,6 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		FreeXid(xid);
 		return -EFAULT;
 	} else if(!mapping->host) {
-		kunmap(page);
 		FreeXid(xid);
 		return -EFAULT;
 	}
