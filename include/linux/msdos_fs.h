@@ -249,10 +249,14 @@ extern int fat_search_long(struct inode *inode, const unsigned char *name,
 extern int fat_readdir(struct file *filp, void *dirent, filldir_t filldir);
 extern int fat_dir_ioctl(struct inode * inode, struct file * filp,
 			 unsigned int cmd, unsigned long arg);
-extern int fat_dir_empty(struct inode *dir);
 extern int fat_add_entries(struct inode *dir, int slots, struct buffer_head **bh,
 			struct msdos_dir_entry **de, loff_t *i_pos);
 extern int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat);
+extern int fat_dir_empty(struct inode *dir);
+extern int fat_subdirs(struct inode *dir);
+extern int fat_scan(struct inode *dir, const unsigned char *name,
+		    struct buffer_head **res_bh,
+		    struct msdos_dir_entry **res_de, loff_t *i_pos);
 
 /* fat/file.c */
 extern struct file_operations fat_file_operations;
@@ -304,10 +308,6 @@ static __inline__ int fat_get_entry(struct inode *dir, loff_t *pos,
 	}
 	return fat__get_entry(dir, pos, bh, de, i_pos);
 }
-extern int fat_subdirs(struct inode *dir);
-extern int fat_scan(struct inode *dir, const unsigned char *name,
-		    struct buffer_head **res_bh,
-		    struct msdos_dir_entry **res_de, loff_t *i_pos);
 
 /* msdos/namei.c  - these are for Umsdos */
 extern struct dentry *msdos_lookup(struct inode *dir, struct dentry *, struct nameidata *);
