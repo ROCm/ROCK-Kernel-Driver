@@ -1759,6 +1759,17 @@ static int fbcon_switch(struct vc_data *vc)
 	if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
 		accel_clear_margins(vc, info, 0);
 	if (logo_shown == -2) {
+		struct fb_fillrect rect;
+		int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
+
+		logo_shown = fg_console;
+		rect.color = attr_bgcol_ec(bgshift, vc);
+		rect.rop = ROP_COPY;
+		rect.dx = rect.dy = 0;
+		rect.width = info->var.xres;
+		rect.height = logo_lines * vc->vc_font.height;
+		info->fbops->fb_fillrect(info, &rect);
+
 		logo_shown = fg_console;
 		/* This is protected above by initmem_freed */
 		fb_show_logo(info);
