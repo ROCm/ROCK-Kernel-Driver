@@ -1213,6 +1213,12 @@ static int __init find_next_best_node(int node, void *used_node_mask)
 		if (test_bit(n, used_node_mask))
 			continue;
 
+		/* Use the local node if we haven't already */
+		if (!test_bit(node, used_node_mask)) {
+			best_node = node;
+			break;
+		}
+
 		/* Use the distance array to find the distance */
 		val = node_distance(node, n);
 

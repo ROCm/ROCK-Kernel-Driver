@@ -81,8 +81,6 @@ static int   paletteEnabled = 0;
 MODULE_AUTHOR("(c) 2001-2002  Denis Oliver Kropp <dok@directfb.org>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("FBDev driver for S3 Savage PCI/AGP Chips");
-MODULE_PARM(disabled, "i");
-MODULE_PARM_DESC(disabled, "Disable this driver's initialization.");
 
 #endif
 
@@ -1499,7 +1497,7 @@ static int __devinit savage_map_mmio (struct fb_info *info)
 	info->fix.mmio_start = par->mmio.pbase;
 	info->fix.mmio_len   = par->mmio.len;
 
-	par->bci_base = (u32*)(par->mmio.vbase + BCI_BUFFER_OFFSET);
+	par->bci_base = (u32 __iomem *)(par->mmio.vbase + BCI_BUFFER_OFFSET);
 	par->bci_ptr  = 0;
 
 	savage_enable_mmio (par);
@@ -1515,7 +1513,7 @@ static void __devinit savage_unmap_mmio (struct fb_info *info)
 	savage_disable_mmio(par);
 
 	if (par->mmio.vbase) {
-		iounmap ((void *)par->mmio.vbase);
+		iounmap ((void __iomem *)par->mmio.vbase);
 		par->mmio.vbase = NULL;
 	}
 }
@@ -1552,10 +1550,6 @@ static int __devinit savage_map_video (struct fb_info *info,
 	par->video.mtrr = mtrr_add (par->video.pbase, video_len,
 				     MTRR_TYPE_WRCOMB, 1);
 #endif
-
-	/* Clear framebuffer, it's all white in memory after boot */
-	memset (par->video.vbase, 0, par->video.len);
-
 	return 0;
 }
 

@@ -379,6 +379,10 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		ret = ptrace_detach(child, data);
 		goto out_tsk;
 
+	case PTRACE_GETEVENTMSG:
+                ret = put_user(child->ptrace_message, (unsigned int __user *) data);
+		goto out_tsk;
+
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		goto out_tsk;

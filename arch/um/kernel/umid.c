@@ -54,6 +54,7 @@ static int __init set_umid(char *name, int is_random,
 
 static int __init set_umid_arg(char *name, int *add)
 {
+	*add = 0;
 	return(set_umid(name, 0, printf));
 }
 

@@ -15,4 +15,15 @@ extern void arch_enter_kernel(void *task, int pid);
 extern void arch_leave_kernel(void *task, int pid);
 extern void ptrace_pokeuser(unsigned long addr, unsigned long data);
 
+
+/* syscall emulation path in ptrace */
+
+#ifndef PTRACE_SYSEMU
+#define PTRACE_SYSEMU 31
+#endif
+
+void set_using_sysemu(int value);
+int get_using_sysemu(void);
+extern int sysemu_supported;
+
 #endif

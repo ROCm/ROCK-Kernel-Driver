@@ -218,7 +218,7 @@ acpi_bus_get_power_flags (
 
 	device->power.state = ACPI_STATE_UNKNOWN;
 
-	return 0;
+	return_VALUE(0);
 }
 
 int
@@ -334,7 +334,7 @@ acpi_bus_get_wakeup_device_flags (
 end:
 	if (ACPI_FAILURE(status))
 		device->flags.wake_capable = 0;
-	return 0;
+	return_VALUE(0);
 }
 
 /* --------------------------------------------------------------------------

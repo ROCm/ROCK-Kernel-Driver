@@ -1749,7 +1749,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 {
 	struct fb_info *info = rinfo->info;
 
-	info->currcon = -1;
 	info->par = rinfo;
 	info->pseudo_palette = rinfo->pseudo_palette;
 	info->flags = FBINFO_DEFAULT
@@ -2186,7 +2185,9 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	       		rinfo->video_ram = 8192 * 1024;
 	       		break;
 	       	default:
-	       		break;
+			printk (KERN_ERR "radeonfb: no video RAM reported\n");
+			ret = -ENXIO;
+			goto err_unmap_rom;
 		}
 	}
 

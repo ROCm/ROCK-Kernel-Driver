@@ -3781,7 +3781,7 @@ static int cpia_mmap(struct file *file, struct vm_area_struct *vma)
 
 	pos = (unsigned long)(cam->frame_buf);
 	while (size > 0) {
-		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		page = vmalloc_to_pfn((void *)pos);
 		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&cam->busy_lock);
 			return -EAGAIN;

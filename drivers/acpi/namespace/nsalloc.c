@@ -502,8 +502,8 @@ acpi_ns_delete_namespace_subtree (
 				 * visit the node
 				 */
 				level++;
-				parent_node   = child_node;
-				child_node    = NULL;
+				parent_node = child_node;
+				child_node = NULL;
 			}
 		}
 		else {
@@ -650,8 +650,8 @@ acpi_ns_delete_namespace_by_owner (
 				 * visit the node
 				 */
 				level++;
-				parent_node   = child_node;
-				child_node    = NULL;
+				parent_node = child_node;
+				child_node = NULL;
 			}
 			else if (child_node->owner_id == owner_id) {
 				deletion_node = child_node;

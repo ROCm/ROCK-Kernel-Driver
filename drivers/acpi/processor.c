@@ -493,8 +493,9 @@ acpi_processor_idle (void)
 	 * Track the number of longs (time asleep is greater than threshold)
 	 * and promote when the count threshold is reached.  Note that bus
 	 * mastering activity may prevent promotions.
+	 * Do not promote above acpi_cstate_limit.
 	 */
-	if (cx->promotion.state) {
+	if (cx->promotion.state && (cx->promotion.state <= acpi_cstate_limit)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -531,6 +532,13 @@ acpi_processor_idle (void)
 	}
 
 end:
+	/*
+	 * Demote if current state exceeds acpi_cstate_limit
+	 */
+	if (pr->power.state > acpi_cstate_limit) {
+		next_state = acpi_cstate_limit;
+	}
+
 	/*
 	 * New Cx State?
 	 * -------------
@@ -1227,7 +1235,7 @@ static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 			(u32) pr->performance->states[i].transition_latency);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
@@ -1949,7 +1957,7 @@ static int acpi_processor_info_seq_show(struct seq_file *seq, void *offset)
 			pr->flags.limit ? "yes" : "no");
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
@@ -2004,7 +2012,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
@@ -2048,7 +2056,7 @@ static int acpi_processor_throttling_seq_show(struct seq_file *seq, void *offset
 			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
@@ -2109,7 +2117,7 @@ static int acpi_processor_limit_seq_show(struct seq_file *seq, void *offset)
 			pr->limit.thermal.px, pr->limit.thermal.tx);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)
@@ -2913,6 +2921,11 @@ void acpi_processor_uninstall_hotplug_notify(void)
 #endif
 }
 
+/*
+ * We keep the driver loaded even when ACPI is not running. 
+ * This is needed for the powernow-k8 driver, that works even without
+ * ACPI, but needs symbols from this driver
+ */
 
 static int __init
 acpi_processor_init (void)
@@ -2926,13 +2939,13 @@ acpi_processor_init (void)
 
 	acpi_processor_dir = proc_mkdir(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 	if (!acpi_processor_dir)
-		return_VALUE(-ENODEV);
+		return_VALUE(0);
 	acpi_processor_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
 	if (result < 0) {
 		remove_proc_entry(ACPI_PROCESSOR_CLASS, acpi_root_dir);
-		return_VALUE(-ENODEV);
+		return_VALUE(0);
 	}
 
 	acpi_processor_install_hotplug_notify();
@@ -2968,5 +2981,6 @@ acpi_processor_exit (void)
 
 module_init(acpi_processor_init);
 module_exit(acpi_processor_exit);
+module_param_named(acpi_cstate_limit, acpi_cstate_limit, uint, 0);
 
 EXPORT_SYMBOL(acpi_processor_set_thermal_limit);

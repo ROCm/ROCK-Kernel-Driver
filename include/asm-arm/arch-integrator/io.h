@@ -22,8 +22,8 @@
 
 #define IO_SPACE_LIMIT 0xffff
 
-#define __io(a)			(PCI_IO_VADDR + (a))
-#define __mem_pci(a)		((unsigned long)(a))
-#define __mem_isa(a)		(PCI_MEMORY_VADDR + (unsigned long)(a))
+#define __io(a)			((void __iomem *)(PCI_IO_VADDR + (a)))
+#define __mem_pci(a)		(a)
+#define __mem_isa(a)		((a) + PCI_MEMORY_VADDR)
 
 #endif

@@ -452,15 +452,35 @@ static int ethtool_get_tx_csum(struct net_device *dev, char __user *useraddr)
 	return 0;
 }
 
+static int __ethtool_set_sg(struct net_device *dev, u32 data)
+{
+	int err;
+
+	if (!data && dev->ethtool_ops->set_tso) {
+		err = dev->ethtool_ops->set_tso(dev, 0);
+		if (err)
+			return err;
+	}
+
+	return dev->ethtool_ops->set_sg(dev, data);
+}
+
 static int ethtool_set_tx_csum(struct net_device *dev, char __user *useraddr)
 {
 	struct ethtool_value edata;
+	int err;
 
 	if (!dev->ethtool_ops->set_tx_csum)
 		return -EOPNOTSUPP;
 
 	if (copy_from_user(&edata, useraddr, sizeof(edata)))
 		return -EFAULT;
+
+	if (!edata.data && dev->ethtool_ops->set_sg) {
+		err = __ethtool_set_sg(dev, 0);
+		if (err)
+			return err;
+	}
 
 	return dev->ethtool_ops->set_tx_csum(dev, edata.data);
 }
@@ -489,7 +509,13 @@ static int ethtool_set_sg(struct net_device *dev, char __user *useraddr)
 	if (copy_from_user(&edata, useraddr, sizeof(edata)))
 		return -EFAULT;
 
-	return dev->ethtool_ops->set_sg(dev, edata.data);
+	if (edata.data && 
+	    !(dev->features & (NETIF_F_IP_CSUM |
+			       NETIF_F_NO_CSUM |
+			       NETIF_F_HW_CSUM)))
+		return -EINVAL;
+
+	return __ethtool_set_sg(dev, edata.data);
 }
 
 static int ethtool_get_tso(struct net_device *dev, char __user *useraddr)
@@ -515,6 +541,9 @@ static int ethtool_set_tso(struct net_device *dev, char __user *useraddr)
 
 	if (copy_from_user(&edata, useraddr, sizeof(edata)))
 		return -EFAULT;
+
+	if (edata.data && !(dev->features & NETIF_F_SG))
+		return -EINVAL;
 
 	return dev->ethtool_ops->set_tso(dev, edata.data);
 }

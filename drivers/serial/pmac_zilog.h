@@ -47,6 +47,7 @@ struct uart_pmac_port {
 #define PMACZILOG_FLAG_IS_OPEN		0x00002000
 #define PMACZILOG_FLAG_IS_IRQ_ON	0x00004000
 #define PMACZILOG_FLAG_IS_EXTCLK	0x00008000
+#define PMACZILOG_FLAG_BREAK		0x00010000
 
 	unsigned char			parity_mask;
 	unsigned char			prev_status;

@@ -484,14 +484,16 @@
 /*** Macros ***/
 
 /* I/O macros */
-#define INREG8(addr)	      readb((u8 *)(dinfo->mmio_base + (addr)))
-#define INREG(addr)	      readl((u32 *)(dinfo->mmio_base + (addr)))
-#define OUTREG8(addr, val)    writeb((val), (u8 *)(dinfo->mmio_base + (addr)))
-#define OUTREG(addr, val)     writel((val), (u32 *)(dinfo->mmio_base + (addr)))
+#define INREG8(addr)	      readb((u8 __iomem *)(dinfo->mmio_base + (addr)))
+#define INREG(addr)	      readl((u32 __iomem *)(dinfo->mmio_base + (addr)))
+#define OUTREG8(addr, val)    writeb((val),(u8 __iomem *)(dinfo->mmio_base + \
+							   (addr)))
+#define OUTREG(addr, val)     writel((val),(u32 __iomem *)(dinfo->mmio_base + \
+                                     (addr)))
 
 /* Ring buffer macros */
 #define OUT_RING(n)	do {						\
-	writel((n), (u32 *)(dinfo->ring.virtual + dinfo->ring_tail));	\
+	writel((n), (u32 __iomem *)(dinfo->ring.virtual + dinfo->ring_tail));\
 	dinfo->ring_tail += 4;						\
 	dinfo->ring_tail &= dinfo->ring_tail_mask;			\
 } while (0)

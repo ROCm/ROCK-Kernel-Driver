@@ -39,6 +39,15 @@ struct key_type key_type_dead = {
 	.name		= "dead",
 };
 
+#ifdef KEY_DEBUGGING
+void __key_check(const struct key *key)
+{
+	printk("__key_check: key %p {%08x} should be {%08x}\n",
+	       key, key->magic, KEY_DEBUG_MAGIC);
+	BUG();
+}
+#endif
+
 /*****************************************************************************/
 /*
  * get the key quota record for a user, allocating a new record if one doesn't
@@ -616,8 +625,6 @@ struct key *key_lookup(key_serial_t id)
 			goto found;
 	}
 
-	spin_unlock(&key_serial_lock);
-
  not_found:
 	key = ERR_PTR(-ENOKEY);
 	goto error;
@@ -634,8 +641,8 @@ struct key *key_lookup(key_serial_t id)
 	 */
 	atomic_inc(&key->usage);
 
-	spin_unlock(&key_serial_lock);
  error:
+	spin_unlock(&key_serial_lock);
 	return key;
 
 } /* end key_lookup() */
@@ -998,13 +1005,11 @@ EXPORT_SYMBOL(unregister_key_type);
 /*
  * initialise the key management stuff
  */
-static int __init key_init(void)
+void __init key_init(void)
 {
 	/* allocate a slab in which we can store keys */
 	key_jar = kmem_cache_create("key_jar", sizeof(struct key),
-				    0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!key_jar)
-		panic("Cannot create key jar\n");
+			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 	/* add the special key types */
 	list_add_tail(&key_type_keyring.link, &key_types_list);
@@ -1031,9 +1036,4 @@ static int __init key_init(void)
 
 	/* link the two root keyrings together */
 	key_link(&root_session_keyring, &root_user_keyring);
-
-	return 0;
-
 } /* end key_init() */
-
-subsys_initcall(key_init);

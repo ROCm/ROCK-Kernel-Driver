@@ -303,7 +303,7 @@ int acpi_enable_wakeup_device_power (struct acpi_device *dev)
 
 	ACPI_FUNCTION_TRACE("acpi_enable_wakeup_device_power");
 	if (!dev || !dev->wakeup.flags.valid)
-		return -1;
+		return_VALUE(-1);
 
 	arg.integer.value = 1;
 	/* Open power resource */
@@ -313,7 +313,7 @@ int acpi_enable_wakeup_device_power (struct acpi_device *dev)
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 				"Error transition power state\n"));
 			dev->wakeup.flags.valid = 0;
-			return -1;
+			return_VALUE(-1);
 		}
 	}
 
@@ -325,7 +325,7 @@ int acpi_enable_wakeup_device_power (struct acpi_device *dev)
 		ret = -1;
 	}
 
-	return ret;
+	return_VALUE(ret);
 }
 
 /*
@@ -344,7 +344,7 @@ int acpi_disable_wakeup_device_power (struct acpi_device *dev)
 	ACPI_FUNCTION_TRACE("acpi_disable_wakeup_device_power");
 
 	if (!dev || !dev->wakeup.flags.valid)
-		return -1;
+		return_VALUE(-1);
 
 	arg.integer.value = 0;	
 	/* Execute PSW */
@@ -352,7 +352,7 @@ int acpi_disable_wakeup_device_power (struct acpi_device *dev)
 	if (ACPI_FAILURE(status) && (status != AE_NOT_FOUND)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluate _PSW\n"));
 		dev->wakeup.flags.valid = 0;
-		return -1;
+		return_VALUE(-1);
 	}
 
 	/* Close power resource */
@@ -362,11 +362,11 @@ int acpi_disable_wakeup_device_power (struct acpi_device *dev)
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 				"Error transition power state\n"));
 			dev->wakeup.flags.valid = 0;
-			return -1;
+			return_VALUE(-1);
 		}
 	}
 
-	return ret;
+	return_VALUE(ret);
 }
 
 /* --------------------------------------------------------------------------
@@ -513,7 +513,7 @@ static int acpi_power_seq_show(struct seq_file *seq, void *offset)
 			resource->references);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_power_open_fs(struct inode *inode, struct file *file)

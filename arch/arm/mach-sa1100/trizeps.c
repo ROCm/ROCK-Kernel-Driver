@@ -20,6 +20,7 @@
 #include <linux/errno.h>
 #include <linux/delay.h>
 #include <linux/pm.h>
+#include <linux/serial_8250.h>
 
 #include <asm/mach-types.h>
 #include <asm/hardware.h>
@@ -32,9 +33,6 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/serial_sa1100.h>
-#include <linux/serial_core.h>
-#include <linux/serial_reg.h>
-#include <asm/arch/serial.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -178,6 +176,34 @@ static void trizeps_power_off(void)
 	PMCR = PMCR_SF;
 }
 
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.mapbase	= TRIZEPS_UART5,
+		.irq		= IRQ_GPIO16,
+		.uartclk	= 24000000,
+		.regshift	= 0,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.mapbase	= TRIZEPS_UART6,
+		.irq		= IRQ_GPIO17,
+		.uartclk	= 24000000,
+		.regshift	= 0,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
 static int __init trizeps_init(void)
 {
 	if (!machine_is_trizeps())
@@ -200,6 +226,8 @@ static int __init trizeps_init(void)
 	GPDR &= ~(GPIO_GPIO16 | GPIO_GPIO17);  // Set to Input
 	set_irq_type(IRQ_GPIO16, IRQT_RISING);
 	set_irq_type(IRQ_GPIO17, IRQT_RISING);
+
+	platform_device_register(&serial_device);
 
 	return 0;
 }

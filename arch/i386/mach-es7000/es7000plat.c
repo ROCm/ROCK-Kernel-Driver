@@ -195,7 +195,7 @@ find_unisys_acpi_oem_table(unsigned long *oem_addr, int *length)
 			}
 		}
 	}
-	printk("ES7000: did not find Unisys ACPI OEM table!\n");
+	Dprintk("ES7000: did not find Unisys ACPI OEM table!\n");
 	return -1;
 }
 

@@ -680,7 +680,7 @@ struct proc_dir_entry		*acpi_video_dir;
 
 /* video devices */
 
-static ssize_t
+static int
 acpi_video_device_info_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -719,7 +719,7 @@ acpi_video_device_info_open_fs (
 			   PDE(inode)->data);
 }
 
-static ssize_t
+static int  
 acpi_video_device_state_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -793,7 +793,7 @@ acpi_video_device_write_state (
 	return_VALUE(count);
 }
 
-static ssize_t
+static int
 acpi_video_device_brightness_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -863,7 +863,7 @@ acpi_video_device_write_brightness (
 	return_VALUE(count);
 }
 
-static ssize_t
+static int
 acpi_video_device_EDID_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -1010,7 +1010,7 @@ acpi_video_device_remove_fs (
 
 
 /* video bus */
-static ssize_t
+static int
 acpi_video_bus_info_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -1041,7 +1041,7 @@ acpi_video_bus_info_open_fs (
 	return single_open(file, acpi_video_bus_info_seq_show, PDE(inode)->data);
 }
 
-static ssize_t
+static int
 acpi_video_bus_ROM_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -1068,7 +1068,7 @@ acpi_video_bus_ROM_open_fs (
 	return single_open(file, acpi_video_bus_ROM_seq_show, PDE(inode)->data);
 }
 
-static ssize_t
+static int
 acpi_video_bus_POST_info_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -1109,7 +1109,7 @@ acpi_video_bus_POST_info_open_fs (
 	return single_open(file, acpi_video_bus_POST_info_seq_show, PDE(inode)->data);
 }
 
-static ssize_t
+static int
 acpi_video_bus_POST_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -1140,7 +1140,7 @@ end:
 	return_VALUE(0);
 }
 
-static ssize_t
+static int
 acpi_video_bus_DOS_seq_show (
 	struct seq_file		*seq,
 	void			*offset)
@@ -1670,7 +1670,7 @@ acpi_video_bus_put_one_device(
 	ACPI_FUNCTION_TRACE("acpi_video_bus_put_one_device");
 
 	if (!device || !device->video)
-		return (-ENOENT);
+		return_VALUE(-ENOENT);
 
 	video = device->video;
 

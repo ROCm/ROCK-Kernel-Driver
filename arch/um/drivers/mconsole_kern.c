@@ -19,6 +19,7 @@
 #include "linux/fs.h"
 #include "linux/namei.h"
 #include "linux/proc_fs.h"
+#include "linux/syscalls.h"
 #include "asm/irq.h"
 #include "asm/uaccess.h"
 #include "user_util.h"
@@ -118,6 +119,11 @@ void mconsole_log(struct mc_request *req)
 	mconsole_reply(req, "", 0, 0);
 }
 
+/* This is a more convoluted version of mconsole_proc, which has some stability
+ * problems; however, we need it fixed, because it is expected that UML users
+ * mount HPPFS instead of procfs on /proc. And we want mconsole_proc to still
+ * show the real procfs content, not the ones from hppfs.*/
+#if 0
 void mconsole_proc(struct mc_request *req)
 {
 	struct nameidata nd;
@@ -149,6 +155,9 @@ void mconsole_proc(struct mc_request *req)
 	nd.flags = O_RDONLY + 1;
 	nd.last_type = LAST_ROOT;
 
+	/* START: it was experienced that the stability problems are closed
+	 * if commenting out these two calls + the below read cycle. To
+	 * make UML crash again, it was enough to readd either one.*/
 	err = link_path_walk(ptr, &nd);
 	if(err){
 		mconsole_reply(req, "Failed to look up file", 1, 0);
@@ -160,6 +169,7 @@ void mconsole_proc(struct mc_request *req)
 		mconsole_reply(req, "Failed to open file", 1, 0);
 		goto out_kill;
 	}
+	/*END*/
 
 	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if(buf == NULL){
@@ -191,6 +201,62 @@ void mconsole_proc(struct mc_request *req)
  out_kill:
 	deactivate_super(super);
  out: ;
+}
+#endif
+
+void mconsole_proc(struct mc_request *req)
+{
+	char path[64];
+	char *buf;
+	int len;
+	int fd;
+	int first_chunk = 1;
+	char *ptr = req->request.data;
+
+	ptr += strlen("proc");
+	while(isspace(*ptr)) ptr++;
+	snprintf(path, sizeof(path), "/proc/%s", ptr);
+
+	fd = sys_open(path, 0, 0);
+	if (fd < 0) {
+		mconsole_reply(req, "Failed to open file", 1, 0);
+		printk("open %s: %d\n",path,fd);
+		goto out;
+	}
+
+	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if(buf == NULL){
+		mconsole_reply(req, "Failed to allocate buffer", 1, 0);
+		goto out_close;
+	}
+
+	for (;;) {
+		len = sys_read(fd, buf, PAGE_SIZE-1);
+		if (len < 0) {
+			mconsole_reply(req, "Read of file failed", 1, 0);
+			goto out_free;
+		}
+		/*Begin the file content on his own line.*/
+		if (first_chunk) {
+			mconsole_reply(req, "\n", 0, 1);
+			first_chunk = 0;
+		}
+		if (len == PAGE_SIZE-1) {
+			buf[len] = '\0';
+			mconsole_reply(req, buf, 0, 1);
+		} else {
+			buf[len] = '\0';
+			mconsole_reply(req, buf, 0, 0);
+			break;
+		}
+	}
+
+ out_free:
+	kfree(buf);
+ out_close:
+	sys_close(fd);
+ out:
+	/* nothing */;
 }
 
 #define UML_MCONSOLE_HELPTEXT \

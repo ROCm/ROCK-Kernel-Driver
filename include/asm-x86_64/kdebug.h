@@ -16,8 +16,8 @@ struct die_args {
 /* Note - you should never unregister because that can race with NMIs.
    If you really want to do it first unregister - then synchronize_kernel - then free. 
   */
+int register_die_notifier(struct notifier_block *nb);
 extern struct notifier_block *die_chain;
-
 /* Grossly misnamed. */
 enum die_val { 
 	DIE_OOPS = 1,
@@ -32,6 +32,7 @@ enum die_val {
 	DIE_GPF,
 	DIE_CALL,
 	DIE_NMI_IPI,
+	DIE_PAGE_FAULT,
 }; 
 	
 static inline int notify_die(enum die_val val,char *str,struct pt_regs *regs,long err,int trap, int sig)

@@ -290,7 +290,7 @@ intelfbhw_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 
 	if ((xoffset + var->xres > var->xres_virtual) ||
 	    (yoffset + var->yres > var->yres_virtual))
-		return EINVAL;
+		return -EINVAL;
 
 	offset = (yoffset * dinfo->pitch) +
 		 (xoffset * var->bits_per_pixel) / 8;
@@ -1240,17 +1240,19 @@ wait_ring(struct intelfb_info *dinfo, int n)
 
 	end = jiffies + (HZ * 3);
 	while (dinfo->ring_space < n) {
-		dinfo->ring_head = INREG(PRI_RING_HEAD) & RING_HEAD_MASK;
-		if (dinfo->ring_tail + RING_MIN_FREE < dinfo->ring_head)
-			dinfo->ring_space = dinfo->ring_head
+		dinfo->ring_head = (u8 __iomem *)(INREG(PRI_RING_HEAD) &
+						   RING_HEAD_MASK);
+		if (dinfo->ring_tail + RING_MIN_FREE <
+		    (u32 __iomem) dinfo->ring_head)
+			dinfo->ring_space = (u32 __iomem) dinfo->ring_head
 				- (dinfo->ring_tail + RING_MIN_FREE);
 		else
 			dinfo->ring_space = (dinfo->ring.size +
-					     dinfo->ring_head)
+					     (u32 __iomem) dinfo->ring_head)
 				- (dinfo->ring_tail + RING_MIN_FREE);
-		if (dinfo->ring_head != last_head) {
+		if ((u32 __iomem) dinfo->ring_head != last_head) {
 			end = jiffies + (HZ * 3);
-			last_head = dinfo->ring_head;
+			last_head = (u32 __iomem) dinfo->ring_head;
 		}
 		i++;
 		if (time_before(end, jiffies)) {
@@ -1310,13 +1312,15 @@ refresh_ring(struct intelfb_info *dinfo)
 	DBG_MSG("refresh_ring\n");
 #endif
 
-	dinfo->ring_head = INREG(PRI_RING_HEAD) & RING_HEAD_MASK;
+	dinfo->ring_head = (u8 __iomem *) (INREG(PRI_RING_HEAD) &
+					   RING_HEAD_MASK);
 	dinfo->ring_tail = INREG(PRI_RING_TAIL) & RING_TAIL_MASK;
-	if (dinfo->ring_tail + RING_MIN_FREE < dinfo->ring_head)
-		dinfo->ring_space = dinfo->ring_head
+	if (dinfo->ring_tail + RING_MIN_FREE < (u32 __iomem)dinfo->ring_head)
+		dinfo->ring_space = (u32 __iomem) dinfo->ring_head
 			- (dinfo->ring_tail + RING_MIN_FREE);
 	else
-		dinfo->ring_space = (dinfo->ring.size + dinfo->ring_head)
+		dinfo->ring_space = (dinfo->ring.size +
+				     (u32 __iomem) dinfo->ring_head)
 			- (dinfo->ring_tail + RING_MIN_FREE);
 }
 
@@ -1601,7 +1605,7 @@ intelfbhw_cursor_init(struct intelfb_info *dinfo)
 			 CURSOR_ENABLE | CURSOR_STRIDE_MASK);
 		tmp = CURSOR_FORMAT_3C;
 		OUTREG(CURSOR_CONTROL, tmp);
-		OUTREG(CURSOR_A_BASEADDR, dinfo->cursor.physical);
+		OUTREG(CURSOR_A_BASEADDR, dinfo->cursor.offset << 12);
 		tmp = (64 << CURSOR_SIZE_H_SHIFT) |
 		      (64 << CURSOR_SIZE_V_SHIFT);
 		OUTREG(CURSOR_SIZE, tmp);
@@ -1701,7 +1705,7 @@ void
 intelfbhw_cursor_load(struct intelfb_info *dinfo, int width, int height,
 		      u8 *data)
 {
-	u8 *addr = (u8 *)dinfo->cursor.virtual;
+	u8 __iomem *addr = (u8 __iomem *)dinfo->cursor.virtual;
 	int i, j, w = width / 8;
 	int mod = width % 8, t_mask, d_mask;
 
@@ -1729,7 +1733,7 @@ intelfbhw_cursor_load(struct intelfb_info *dinfo, int width, int height,
 
 void
 intelfbhw_cursor_reset(struct intelfb_info *dinfo) {
-	u8 *addr = (u8 *)dinfo->cursor.virtual;
+	u8 __iomem *addr = (u8 __iomem *)dinfo->cursor.virtual;
 	int i, j;
 
 #if VERBOSE > 0

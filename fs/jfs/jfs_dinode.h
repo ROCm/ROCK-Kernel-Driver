@@ -39,22 +39,22 @@ struct dinode {
 	 *
 	 * define generic/POSIX attributes
 	 */
-	u32 di_inostamp;	/* 4: stamp to show inode belongs to fileset */
-	s32 di_fileset;		/* 4: fileset number */
-	u32 di_number;		/* 4: inode number, aka file serial number */
-	u32 di_gen;		/* 4: inode generation number */
+	__le32 di_inostamp;	/* 4: stamp to show inode belongs to fileset */
+	__le32 di_fileset;	/* 4: fileset number */
+	__le32 di_number;	/* 4: inode number, aka file serial number */
+	__le32 di_gen;		/* 4: inode generation number */
 
 	pxd_t di_ixpxd;		/* 8: inode extent descriptor */
 
-	s64 di_size;		/* 8: size */
-	s64 di_nblocks;		/* 8: number of blocks allocated */
+	__le64 di_size;		/* 8: size */
+	__le64 di_nblocks;	/* 8: number of blocks allocated */
 
-	u32 di_nlink;		/* 4: number of links to the object */
+	__le32 di_nlink;	/* 4: number of links to the object */
 
-	u32 di_uid;		/* 4: user id of owner */
-	u32 di_gid;		/* 4: group id of owner */
+	__le32 di_uid;		/* 4: user id of owner */
+	__le32 di_gid;		/* 4: group id of owner */
 
-	u32 di_mode;		/* 4: attribute, format and permission */
+	__le32 di_mode;		/* 4: attribute, format and permission */
 
 	struct timestruc_t di_atime;	/* 8: time last data accessed */
 	struct timestruc_t di_ctime;	/* 8: time last status changed */
@@ -65,9 +65,9 @@ struct dinode {
 
 	dxd_t di_ea;		/* 16: ea descriptor */
 
-	u32 di_next_index;	/* 4: Next available dir_table index */
+	__le32 di_next_index;	/* 4: Next available dir_table index */
 
-	s32 di_acltype;		/* 4: Type of ACL */
+	__le32 di_acltype;	/* 4: Type of ACL */
 
 	/*
 	 *      Extension Areas.
@@ -103,7 +103,7 @@ struct dinode {
 				u8 _data[96];		/* 96: unused */
 				struct {
 					void *_imap;	/* 4: unused */
-					u32 _gengen;	/* 4: generator */
+					__le32 _gengen;	/* 4: generator */
 				} _imap;
 			} _u1;				/* 96: */
 #define di_gengen	u._file._u1._imap._gengen
@@ -114,7 +114,7 @@ struct dinode {
 					u8 unused[16];	/* 16: */
 					dxd_t _dxd;	/* 16: */
 					union {
-						u32 _rdev;	/* 4: */
+						__le32 _rdev;	/* 4: */
 						u8 _fastsymlink[128];
 					} _u;
 					u8 _inlineea[128];

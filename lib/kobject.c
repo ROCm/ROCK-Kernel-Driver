@@ -180,6 +180,7 @@ int kobject_add(struct kobject * kobj)
 
 	error = create_dir(kobj);
 	if (error) {
+		/* unlink does the kobject_put() for us */
 		unlink(kobj);
 		if (parent)
 			kobject_put(parent);

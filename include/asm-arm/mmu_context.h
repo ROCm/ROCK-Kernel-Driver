@@ -80,18 +80,17 @@ static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk)
 {
+	unsigned int cpu = smp_processor_id();
+
 	if (prev != next) {
+		cpu_set(cpu, next->cpu_vm_mask);
 		check_context(next);
 		cpu_switch_mm(next->pgd, next);
+		cpu_clear(cpu, prev->cpu_vm_mask);
 	}
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
-
-static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
-{
-	check_context(next);
-	cpu_switch_mm(next->pgd, next);
-}
+#define activate_mm(prev,next)	switch_mm(prev, next, NULL)
 
 #endif

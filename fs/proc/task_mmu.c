@@ -37,10 +37,10 @@ unsigned long task_vsize(struct mm_struct *mm)
 int task_statm(struct mm_struct *mm, int *shared, int *text,
 	       int *data, int *resident)
 {
-	*shared = mm->shared_vm;
+	*shared = mm->rss - mm->anon_rss;
 	*text = (PAGE_ALIGN(mm->end_code) - (mm->start_code & PAGE_MASK))
 								>> PAGE_SHIFT;
-	*data = mm->total_vm - mm->shared_vm - *text;
+	*data = mm->total_vm - mm->shared_vm;
 	*resident = mm->rss;
 	return mm->total_vm;
 }

@@ -584,7 +584,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 
 	tp = netdev_priv(dev);
 
-	tp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&tp->lock);
 	tp->pdev = pdev;
 	tp->chip_id = chip_idx;
 	/* BugFixes: The 21143-TD hangs with PCI Write-and-Invalidate cycles. */

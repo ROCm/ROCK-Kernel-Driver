@@ -486,12 +486,13 @@ acpi_ex_resolve_object_to_value (
 
 
 /*
- * exdump - Scanner debug output routines
+ * exdump - Interpreter debug output routines
  */
 
 void
 acpi_ex_dump_operand (
-	union acpi_operand_object       *entry_desc);
+	union acpi_operand_object       *obj_desc,
+	u32                             depth);
 
 void
 acpi_ex_dump_operands (

@@ -56,7 +56,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/slab.h>
-#include <linux/kmod.h>
+#include <linux/kobject_uevent.h>
 #include <linux/completion.h>
 #include <linux/spinlock.h>
 #include <linux/dmi.h>
@@ -532,15 +532,6 @@ static struct dmi_system_id pnpbios_dmi_table[] = {
 int __init pnpbios_init(void)
 {
 	int ret;
-
-	/* Don't use pnpbios if pnpacpi is used */
-#ifdef CONFIG_PNPACPI
-	if (!acpi_disabled) {
-		pnpbios_disabled = 1;
-		printk(KERN_INFO "PnPBIOS: Disabled by pnpacpi\n");
-		return -ENODEV;
-	}
-#endif
 
 	if (pnpbios_disabled || dmi_check_system(pnpbios_dmi_table)) {
 		printk(KERN_INFO "PnPBIOS: Disabled\n");

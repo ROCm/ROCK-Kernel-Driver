@@ -36,8 +36,8 @@ struct vxtime_data {
 	int mode;
 };
 
-#define hpet_readl(a)           readl(fix_to_virt(FIX_HPET_BASE) + a)
-#define hpet_writel(d,a)        writel(d, fix_to_virt(FIX_HPET_BASE) + a)
+#define hpet_readl(a)           readl((void *)fix_to_virt(FIX_HPET_BASE) + a)
+#define hpet_writel(d,a)        writel(d, (void *)fix_to_virt(FIX_HPET_BASE) + a)
 
 /* vsyscall space (readonly) */
 extern struct vxtime_data __vxtime;

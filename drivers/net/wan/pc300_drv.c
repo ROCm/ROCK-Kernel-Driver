@@ -1959,7 +1959,6 @@ void cpc_net_rx(struct net_device *dev)
 			cpc_trace(dev, skb, 'R');
 		}
 		stats->rx_packets++;
-		skb->mac.raw = skb->data;
 		skb->protocol = hdlc_type_trans(skb, dev);
 		netif_rx(skb);
 	}

@@ -576,6 +576,8 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 
 	/* Stop the machine so refcounts can't move and disable module. */
 	ret = try_stop_module(mod, flags, &forced);
+	if (ret != 0)
+		goto out;
 
 	/* Never wait if forced. */
 	if (!forced && module_refcount(mod) != 0)
@@ -649,7 +651,7 @@ void symbol_put_addr(void *addr)
 }
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
-static int show_refcnt(struct module *mod, char *buffer)
+static ssize_t show_refcnt(struct module *mod, char *buffer)
 {
 	/* sysfs holds a reference */
 	return sprintf(buffer, "%u\n", module_refcount(mod)-1);

@@ -179,11 +179,11 @@ struct neofb_par {
 #ifdef CONFIG_MTRR
 	int mtrr;
 #endif
-	u8 *mmio_vbase;
+	u8 __iomem *mmio_vbase;
 	u8 cursorOff;
 	u8 *cursorPad;		/* Must die !! */
 
-	Neo2200 *neo2200;
+	Neo2200 __iomem *neo2200;
 
 	/* Panels size */
 	int NeoPanelWidth;

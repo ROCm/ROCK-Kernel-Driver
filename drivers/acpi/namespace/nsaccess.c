@@ -206,6 +206,7 @@ acpi_ns_root_initialize (void)
 					status = acpi_os_create_semaphore (ACPI_NO_UNIT_LIMIT,
 							 1, &obj_desc->mutex.semaphore);
 					if (ACPI_FAILURE (status)) {
+						acpi_ut_remove_reference (obj_desc);
 						goto unlock_and_exit;
 					}
 
@@ -221,6 +222,7 @@ acpi_ns_root_initialize (void)
 					status = acpi_os_create_semaphore (1, 1,
 							   &obj_desc->mutex.semaphore);
 					if (ACPI_FAILURE (status)) {
+						acpi_ut_remove_reference (obj_desc);
 						goto unlock_and_exit;
 					}
 				}

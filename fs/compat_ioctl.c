@@ -96,6 +96,7 @@
 #include <asm/module.h>
 #include <linux/soundcard.h>
 #include <linux/lp.h>
+#include <linux/ppdev.h>
 
 #include <linux/atm.h>
 #include <linux/atmarp.h>

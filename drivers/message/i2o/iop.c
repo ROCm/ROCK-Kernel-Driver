@@ -810,7 +810,7 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 
 	writel(c->unit + 2, &msg->body[0]);
 	writel(0, &msg->body[1]);
-	writel(0x54000000 | i2o_systab.phys, &msg->body[2]);
+	writel(0x54000000 | i2o_systab.len, &msg->body[2]);
 	writel(i2o_systab.phys, &msg->body[3]);
 	writel(0x54000000 | sb->current_mem_size, &msg->body[4]);
 	writel(sb->current_mem_base, &msg->body[5]);

@@ -18,15 +18,7 @@
 #include <rxrpc/krxiod.h>
 
 /* call.c */
-EXPORT_SYMBOL(rxrpc_call_rcv_timeout);
-EXPORT_SYMBOL(rxrpc_call_acks_timeout);
-EXPORT_SYMBOL(rxrpc_call_dfr_ack_timeout);
-EXPORT_SYMBOL(rxrpc_call_max_resend);
-EXPORT_SYMBOL(rxrpc_call_states);
-EXPORT_SYMBOL(rxrpc_call_error_states);
-
 EXPORT_SYMBOL(rxrpc_create_call);
-EXPORT_SYMBOL(rxrpc_incoming_call);
 EXPORT_SYMBOL(rxrpc_put_call);
 EXPORT_SYMBOL(rxrpc_call_abort);
 EXPORT_SYMBOL(rxrpc_call_read_data);
@@ -37,15 +29,8 @@ EXPORT_SYMBOL(rxrpc_call_flush);
 EXPORT_SYMBOL(rxrpc_create_connection);
 EXPORT_SYMBOL(rxrpc_put_connection);
 
-/* sysctl.c */
-EXPORT_SYMBOL(rxrpc_ktrace);
-EXPORT_SYMBOL(rxrpc_kdebug);
-EXPORT_SYMBOL(rxrpc_kproto);
-EXPORT_SYMBOL(rxrpc_knet);
-
 /* transport.c */
 EXPORT_SYMBOL(rxrpc_create_transport);
-EXPORT_SYMBOL(rxrpc_clear_transport);
 EXPORT_SYMBOL(rxrpc_put_transport);
 EXPORT_SYMBOL(rxrpc_add_service);
 EXPORT_SYMBOL(rxrpc_del_service);

@@ -448,7 +448,22 @@ acpi_ds_method_data_get_value (
 		 * was referenced by the method (via the ASL)
 		 * before it was initialized.  Either case is an error.
 		 */
-		switch (opcode) {
+
+		/* If slack enabled, init the local_x/arg_x to an Integer of value zero */
+
+		if (acpi_gbl_enable_interpreter_slack) {
+			object = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+			if (!object) {
+				return_ACPI_STATUS (AE_NO_MEMORY);
+			}
+
+			object->integer.value = 0;
+			node->object = object;
+		}
+
+		/* Otherwise, return the error */
+
+		else switch (opcode) {
 		case AML_ARG_OP:
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Uninitialized Arg[%d] at node %p\n",

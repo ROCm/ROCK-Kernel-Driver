@@ -29,7 +29,7 @@
  * FUNCTION:	Convert little-endian unicode string to character string
  *
  */
-int jfs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
+int jfs_strfromUCS_le(char *to, const __le16 * from,
 		      int len, struct nls_table *codepage)
 {
 	int i;

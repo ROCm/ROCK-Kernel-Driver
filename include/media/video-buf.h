@@ -1,5 +1,5 @@
 /*
- * $Id: video-buf.h,v 1.7 2004/10/11 14:53:13 kraxel Exp $
+ * $Id: video-buf.h,v 1.8 2004/10/13 10:39:00 kraxel Exp $
  *
  * generic helper functions for video4linux capture buffers, to handle
  * memory management and PCI DMA.  Right now bttv + saa7134 use it.
@@ -9,7 +9,7 @@
  * into PAGE_SIZE chunks).  They also assume the driver does not need
  * to touch the video data (thus it is probably not useful for USB as
  * data often must be uncompressed by the drivers).
- * 
+ *
  * (c) 2001,02 Gerd Knorr <kraxel@bytesex.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -102,7 +102,7 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma);
  * functions, additionally some commonly used fields for v4l buffers
  * (width, height, lists, waitqueue) are in there.  That struct should
  * be used as first element in the drivers buffer struct.
- * 
+ *
  * about the mmap helpers (videobuf_mmap_*):
  *
  * The mmaper function allows to map any subset of contingous buffers.

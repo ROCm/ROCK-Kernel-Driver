@@ -177,7 +177,7 @@ EXPORT_SYMBOL(__atomic_sub);
 EXPORT_SYMBOL(__atomic64_add);
 EXPORT_SYMBOL(__atomic64_sub);
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(atomic_dec_and_lock);
+EXPORT_SYMBOL(_atomic_dec_and_lock);
 #endif
 
 /* Atomic bit operations. */

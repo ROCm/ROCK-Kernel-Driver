@@ -235,8 +235,12 @@ static long restore_user_regs(struct pt_regs *regs,
 #endif /* CONFIG_ALTIVEC */
 
 #ifndef CONFIG_SMP
-	last_task_used_math = NULL;
-	last_task_used_altivec = NULL;
+	preempt_disable();
+	if (last_task_used_math == current)
+		last_task_used_math = NULL;
+	if (last_task_used_altivec == current)
+		last_task_used_altivec = NULL;
+	preempt_enable();
 #endif
 	return 0;
 }

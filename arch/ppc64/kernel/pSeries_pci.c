@@ -548,7 +548,7 @@ void __init pSeries_final_fixup(void)
 
 	check_s7a();
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		pci_read_irq_line(dev);
 		if (s7a_workaround) {
 			if (dev->irq > 16) {

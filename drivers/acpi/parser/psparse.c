@@ -164,123 +164,125 @@ acpi_ps_complete_this_op (
 
 	/* Delete this op and the subtree below it if asked to */
 
-	if (((walk_state->parse_flags & ACPI_PARSE_TREE_MASK) == ACPI_PARSE_DELETE_TREE) &&
-		(walk_state->op_info->class != AML_CLASS_ARGUMENT)) {
-		/* Make sure that we only delete this subtree */
-
-		if (op->common.parent) {
-			/*
-			 * Check if we need to replace the operator and its subtree
-			 * with a return value op (placeholder op)
-			 */
-			parent_info = acpi_ps_get_opcode_info (op->common.parent->common.aml_opcode);
-
-			switch (parent_info->class) {
-			case AML_CLASS_CONTROL:
-				break;
-
-			case AML_CLASS_CREATE:
-
-				/*
-				 * These opcodes contain term_arg operands. The current
-				 * op must be replaced by a placeholder return op
-				 */
-				replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
-				if (!replacement_op) {
-					return_VOID;
-				}
-				break;
-
-			case AML_CLASS_NAMED_OBJECT:
-
-				/*
-				 * These opcodes contain term_arg operands. The current
-				 * op must be replaced by a placeholder return op
-				 */
-				if ((op->common.parent->common.aml_opcode == AML_REGION_OP)      ||
-					(op->common.parent->common.aml_opcode == AML_DATA_REGION_OP) ||
-					(op->common.parent->common.aml_opcode == AML_BUFFER_OP)      ||
-					(op->common.parent->common.aml_opcode == AML_PACKAGE_OP)     ||
-					(op->common.parent->common.aml_opcode == AML_VAR_PACKAGE_OP)) {
-					replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
-					if (!replacement_op) {
-						return_VOID;
-					}
-				}
-
-				if ((op->common.parent->common.aml_opcode == AML_NAME_OP) &&
-					(walk_state->descending_callback != acpi_ds_exec_begin_op)) {
-					if ((op->common.aml_opcode == AML_BUFFER_OP) ||
-						(op->common.aml_opcode == AML_PACKAGE_OP) ||
-						(op->common.aml_opcode == AML_VAR_PACKAGE_OP)) {
-						replacement_op = acpi_ps_alloc_op (op->common.aml_opcode);
-						if (!replacement_op) {
-							return_VOID;
-						}
-
-						replacement_op->named.data = op->named.data;
-						replacement_op->named.length = op->named.length;
-					}
-				}
-				break;
-
-			default:
-				replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
-				if (!replacement_op) {
-					return_VOID;
-				}
-			}
-
-			/* We must unlink this op from the parent tree */
-
-			prev = op->common.parent->common.value.arg;
-			if (prev == op) {
-				/* This op is the first in the list */
-
-				if (replacement_op) {
-					replacement_op->common.parent       = op->common.parent;
-					replacement_op->common.value.arg    = NULL;
-					replacement_op->common.node         = op->common.node;
-					op->common.parent->common.value.arg = replacement_op;
-					replacement_op->common.next         = op->common.next;
-				}
-				else {
-					op->common.parent->common.value.arg    = op->common.next;
-				}
-			}
-
-			/* Search the parent list */
-
-			else while (prev) {
-				/* Traverse all siblings in the parent's argument list */
-
-				next = prev->common.next;
-				if (next == op) {
-					if (replacement_op) {
-						replacement_op->common.parent   = op->common.parent;
-						replacement_op->common.value.arg = NULL;
-						replacement_op->common.node     = op->common.node;
-						prev->common.next               = replacement_op;
-						replacement_op->common.next     = op->common.next;
-						next = NULL;
-					}
-					else {
-						prev->common.next = op->common.next;
-						next = NULL;
-					}
-				}
-
-				prev = next;
-			}
-		}
-
-		/* Now we can actually delete the subtree rooted at op */
-
-		acpi_ps_delete_parse_tree (op);
-
+	if (((walk_state->parse_flags & ACPI_PARSE_TREE_MASK) != ACPI_PARSE_DELETE_TREE) ||
+		 (walk_state->op_info->class == AML_CLASS_ARGUMENT)) {
 		return_VOID;
 	}
 
+	/* Make sure that we only delete this subtree */
+
+	if (op->common.parent) {
+		/*
+		 * Check if we need to replace the operator and its subtree
+		 * with a return value op (placeholder op)
+		 */
+		parent_info = acpi_ps_get_opcode_info (op->common.parent->common.aml_opcode);
+
+		switch (parent_info->class) {
+		case AML_CLASS_CONTROL:
+			break;
+
+		case AML_CLASS_CREATE:
+
+			/*
+			 * These opcodes contain term_arg operands. The current
+			 * op must be replaced by a placeholder return op
+			 */
+			replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
+			if (!replacement_op) {
+				goto cleanup;
+			}
+			break;
+
+		case AML_CLASS_NAMED_OBJECT:
+
+			/*
+			 * These opcodes contain term_arg operands. The current
+			 * op must be replaced by a placeholder return op
+			 */
+			if ((op->common.parent->common.aml_opcode == AML_REGION_OP)      ||
+				(op->common.parent->common.aml_opcode == AML_DATA_REGION_OP) ||
+				(op->common.parent->common.aml_opcode == AML_BUFFER_OP)      ||
+				(op->common.parent->common.aml_opcode == AML_PACKAGE_OP)     ||
+				(op->common.parent->common.aml_opcode == AML_VAR_PACKAGE_OP)) {
+				replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
+				if (!replacement_op) {
+					goto cleanup;
+				}
+			}
+
+			if ((op->common.parent->common.aml_opcode == AML_NAME_OP) &&
+				(walk_state->descending_callback != acpi_ds_exec_begin_op)) {
+				if ((op->common.aml_opcode == AML_BUFFER_OP) ||
+					(op->common.aml_opcode == AML_PACKAGE_OP) ||
+					(op->common.aml_opcode == AML_VAR_PACKAGE_OP)) {
+					replacement_op = acpi_ps_alloc_op (op->common.aml_opcode);
+					if (!replacement_op) {
+						goto cleanup;
+					}
+
+					replacement_op->named.data = op->named.data;
+					replacement_op->named.length = op->named.length;
+				}
+			}
+			break;
+
+		default:
+			replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
+			if (!replacement_op) {
+				goto cleanup;
+			}
+		}
+
+		/* We must unlink this op from the parent tree */
+
+		prev = op->common.parent->common.value.arg;
+		if (prev == op) {
+			/* This op is the first in the list */
+
+			if (replacement_op) {
+				replacement_op->common.parent       = op->common.parent;
+				replacement_op->common.value.arg    = NULL;
+				replacement_op->common.node         = op->common.node;
+				op->common.parent->common.value.arg = replacement_op;
+				replacement_op->common.next         = op->common.next;
+			}
+			else {
+				op->common.parent->common.value.arg = op->common.next;
+			}
+		}
+
+		/* Search the parent list */
+
+		else while (prev) {
+			/* Traverse all siblings in the parent's argument list */
+
+			next = prev->common.next;
+			if (next == op) {
+				if (replacement_op) {
+					replacement_op->common.parent   = op->common.parent;
+					replacement_op->common.value.arg = NULL;
+					replacement_op->common.node     = op->common.node;
+					prev->common.next               = replacement_op;
+					replacement_op->common.next     = op->common.next;
+					next = NULL;
+				}
+				else {
+					prev->common.next = op->common.next;
+					next = NULL;
+				}
+			}
+
+			prev = next;
+		}
+	}
+
+
+cleanup:
+
+	/* Now we can actually delete the subtree rooted at op */
+
+	acpi_ps_delete_parse_tree (op);
 	return_VOID;
 }
 
@@ -552,7 +554,8 @@ acpi_ps_parse_loop (
 				if (!pre_op) {
 					pre_op = acpi_ps_alloc_op (walk_state->opcode);
 					if (!pre_op) {
-						return_ACPI_STATUS (AE_NO_MEMORY);
+						status = AE_NO_MEMORY;
+						goto close_this_op;
 					}
 				}
 
@@ -578,7 +581,8 @@ acpi_ps_parse_loop (
 				/* Make sure that we found a NAME and didn't run out of arguments */
 
 				if (!GET_CURRENT_ARG_TYPE (walk_state->arg_types)) {
-					return_ACPI_STATUS (AE_AML_NO_OPERAND);
+					status = AE_AML_NO_OPERAND;
+					goto close_this_op;
 				}
 
 				/* We know that this arg is a name, move to next arg */
@@ -638,7 +642,8 @@ acpi_ps_parse_loop (
 				walk_state->op_info = acpi_ps_get_opcode_info (walk_state->opcode);
 				op = acpi_ps_alloc_op (walk_state->opcode);
 				if (!op) {
-					return_ACPI_STATUS (AE_NO_MEMORY);
+					status = AE_NO_MEMORY;
+					goto close_this_op;
 				}
 
 				if (walk_state->op_info->flags & AML_CREATE) {
@@ -801,7 +806,7 @@ acpi_ps_parse_loop (
 			status = acpi_ps_push_scope (parser_state, op,
 					 walk_state->arg_types, walk_state->arg_count);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto close_this_op;
 			}
 			op = NULL;
 			continue;
@@ -1128,7 +1133,7 @@ acpi_ps_parse_aml (
 		else if (status == AE_CTRL_TERMINATE) {
 			status = AE_OK;
 		}
-		else if (status != AE_OK) {
+		else if ((status != AE_OK) && (walk_state->method_desc)) {
 			ACPI_REPORT_METHOD_ERROR ("Method execution failed",
 				walk_state->method_node, NULL, status);
 

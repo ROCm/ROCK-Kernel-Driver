@@ -47,6 +47,13 @@ struct ehci_stats {
 #define	EHCI_MAX_ROOT_PORTS	15		/* see HCS_N_PORTS */
 
 struct ehci_hcd {			/* one per controller */
+
+	/* glue to PCI and HCD framework */
+	struct usb_hcd		hcd;		/* must come first! */
+	struct ehci_caps __iomem *caps;
+	struct ehci_regs __iomem *regs;
+	__u32			hcs_params;	/* cached register copy */
+
 	spinlock_t		lock;
 
 	/* async schedule support */
@@ -68,12 +75,6 @@ struct ehci_hcd {			/* one per controller */
 
 	/* per root hub port */
 	unsigned long		reset_done [EHCI_MAX_ROOT_PORTS];
-
-	/* glue to PCI and HCD framework */
-	struct usb_hcd		hcd;
-	struct ehci_caps __iomem *caps;
-	struct ehci_regs __iomem *regs;
-	__u32			hcs_params;	/* cached register copy */
 
 	/* per-HC memory pools (could be per-bus, but ...) */
 	struct dma_pool		*qh_pool;	/* qh per active urb */

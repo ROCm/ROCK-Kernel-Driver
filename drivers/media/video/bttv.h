@@ -1,5 +1,5 @@
 /*
- * $Id: bttv.h,v 1.9 2004/09/15 16:15:24 kraxel Exp $
+ * $Id: bttv.h,v 1.10 2004/10/13 10:39:00 kraxel Exp $
  *
  *  bttv - Bt848 frame grabber driver
  *
@@ -26,9 +26,9 @@
 #define BTTV_HAUPPAUGE     0x02
 #define BTTV_STB           0x03
 #define BTTV_INTEL         0x04
-#define BTTV_DIAMOND       0x05 
-#define BTTV_AVERMEDIA     0x06 
-#define BTTV_MATRIX_VISION 0x07 
+#define BTTV_DIAMOND       0x05
+#define BTTV_AVERMEDIA     0x06
+#define BTTV_MATRIX_VISION 0x07
 #define BTTV_FLYVIDEO      0x08
 #define BTTV_TURBOTV       0x09
 #define BTTV_HAUPPAUGE878  0x0a
@@ -245,7 +245,7 @@ extern int bttv_handle_chipset(struct bttv *btv);
 
 /* returns card type + card ID (for bt878-based ones)
    for possible values see lines below beginning with #define BTTV_UNKNOWN
-   returns negative value if error occurred 
+   returns negative value if error occurred
 */
 extern int bttv_get_cardinfo(unsigned int card, int *type,
 			     unsigned int *cardid);
@@ -268,18 +268,18 @@ extern int bttv_read_gpio(unsigned int card, unsigned long *data);
 
 /* sets GPDATA register to new value:
   (data & mask) | (current_GPDATA_value & ~mask)
-  returns negative value if error occurred 
+  returns negative value if error occurred
 */
 extern int bttv_write_gpio(unsigned int card,
 			   unsigned long mask, unsigned long data);
 
-/* returns pointer to task queue which can be used as parameter to 
+/* returns pointer to task queue which can be used as parameter to
    interruptible_sleep_on
    in interrupt handler if BT848_INT_GPINT bit is set - this queue is activated
-   (wake_up_interruptible) and following call to the function bttv_read_gpio 
+   (wake_up_interruptible) and following call to the function bttv_read_gpio
    should return new value of GPDATA,
    returns NULL value if error occurred or queue is not available
-   WARNING: because there is no buffer for GPIO data, one MUST 
+   WARNING: because there is no buffer for GPIO data, one MUST
    process data ASAP
 */
 extern wait_queue_head_t* bttv_get_gpio_queue(unsigned int card);

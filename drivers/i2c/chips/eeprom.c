@@ -36,10 +36,9 @@
 #include <linux/i2c-sensor.h>
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x50, 0x57, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x50, 0x51, 0x52, 0x53, 0x54,
+					0x55, 0x56, 0x57, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_1(eeprom);

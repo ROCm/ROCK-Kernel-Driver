@@ -498,12 +498,6 @@ exit:
 /****************************************************************************
  *  sysfs
  ***************************************************************************/
-static inline struct usb_stv *cd_to_stv(struct class_device *cd)
-{
-	struct video_device *vdev = to_video_device(cd);
-	return video_get_drvdata(vdev);
-}
-
 #define stv680_file(name, variable, field)				\
 static ssize_t show_##name(struct class_device *class_dev, char *buf)	\
 {									\
@@ -1277,7 +1271,7 @@ static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 	}
 	pos = (unsigned long) stv680->fbuf;
 	while (size > 0) {
-		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		page = vmalloc_to_pfn((void *)pos);
 		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up (&stv680->lock);
 			return -EAGAIN;

@@ -62,11 +62,10 @@
 #include "sound_config.h"
 
 int aci_port;	/* as determined by bit 4 in the OPTi 929 MC4 register */
-int aci_idcode[2];	/* manufacturer and product ID */
+static int aci_idcode[2];	/* manufacturer and product ID */
 int aci_version;	/* ACI firmware version	*/
 
 EXPORT_SYMBOL(aci_port);
-EXPORT_SYMBOL(aci_idcode);
 EXPORT_SYMBOL(aci_version);
 
 #include "aci.h"

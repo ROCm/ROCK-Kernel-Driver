@@ -21,6 +21,7 @@
 #include <linux/netdevice.h>
 #include <linux/concap.h>
 #include <linux/wanrouter.h>
+#include <net/x25device.h>
 #include "isdn_x25iface.h"
 
 /* for debugging messages not to cause an oops when device pointer is NULL*/
@@ -191,12 +192,9 @@ int isdn_x25iface_receive(struct concap_proto *cprot, struct sk_buff *skb)
   	IX25DEBUG( "isdn_x25iface_receive %s \n", MY_DEVNAME(cprot->net_dev) );
 	if ( ( (ix25_pdata_t*) (cprot->proto_data) ) 
 	     -> state == WAN_CONNECTED ){
-		skb -> dev = cprot -> net_dev;
-		skb -> protocol = htons(ETH_P_X25);
-		skb -> pkt_type = PACKET_HOST;
 		if( skb_push(skb, 1)){
 			skb -> data[0]=0x00;
-			skb -> mac.raw = skb -> data;
+			skb->protocol = x25_type_trans(skb, cprot->net_dev);
 			netif_rx(skb);
 			return 0;
 		}
@@ -224,10 +222,7 @@ int isdn_x25iface_connect_ind(struct concap_proto *cprot)
 	*state_p = WAN_CONNECTED;
 	if( skb ){
 		*( skb_put(skb, 1) ) = 0x01;
-		skb -> mac.raw = skb -> data;
-		skb -> dev  = cprot -> net_dev;
-		skb -> protocol = htons(ETH_P_X25);
-		skb -> pkt_type = PACKET_HOST;
+		skb->protocol = x25_type_trans(skb, cprot->net_dev);
 		netif_rx(skb);
 		return 0;
 	} else {
@@ -256,10 +251,7 @@ int isdn_x25iface_disconn_ind(struct concap_proto *cprot)
 	skb = dev_alloc_skb(1);
 	if( skb ){
 		*( skb_put(skb, 1) ) = 0x02;
-		skb -> mac.raw = skb -> data;
-		skb -> dev  = cprot -> net_dev;
-		skb -> protocol = htons(ETH_P_X25);
-		skb -> pkt_type = PACKET_HOST;
+		skb->protocol = x25_type_trans(skb, cprot->net_dev);
 		netif_rx(skb);
 		return 0;
 	} else {

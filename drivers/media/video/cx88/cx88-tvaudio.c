@@ -338,7 +338,7 @@ static void set_audio_standard_NICAM(struct cx88_core *core)
 
 static void set_audio_standard_NICAM_L(struct cx88_core *core)
 {
-	/* This is officially wierd.. register dumps indicate windows
+	/* This is officially weird.. register dumps indicate windows
 	 * uses audio mode 4.. A2. Let's operate and find out. */
 
 	static const struct rlist nicam_l[] = {

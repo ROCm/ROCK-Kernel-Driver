@@ -52,7 +52,7 @@
 #include <asm/arch/map.h>
 
 /* io map for dma */
-static void *dma_base;
+static void __iomem *dma_base;
 
 /* dma channel state information */
 s3c2410_dma_chan_t s3c2410_chans[S3C2410_DMA_CHANNELS];
@@ -1065,7 +1065,7 @@ static int __init s3c2410_init_dma(void)
 		/* dma channel irqs are in order.. */
 		cp->number = channel;
 		cp->irq    = channel + IRQ_DMA0;
-		cp->regs   = (unsigned long)dma_base + (channel*0x40);
+		cp->regs   = dma_base + (channel*0x40);
 
 		/* point current stats somewhere */
 		cp->stats  = &cp->stats_store;
@@ -1075,7 +1075,7 @@ static int __init s3c2410_init_dma(void)
 
 		cp->load_timeout = 1<<18;
 
-		printk("DMA channel %d at %08lx, irq %d\n",
+		printk("DMA channel %d at %p, irq %d\n",
 		       cp->number, cp->regs, cp->irq);
 	}
 

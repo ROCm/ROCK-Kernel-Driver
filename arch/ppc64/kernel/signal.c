@@ -224,8 +224,12 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 #endif /* CONFIG_ALTIVEC */
 
 #ifndef CONFIG_SMP
-	last_task_used_math = NULL;
-	last_task_used_altivec = NULL;
+	preempt_disable();
+	if (last_task_used_math == current)
+		last_task_used_math = NULL;
+	if (last_task_used_altivec == current)
+		last_task_used_altivec = NULL;
+	preempt_enable();
 #endif
 	/* Force reload of FP/VEC */
 	regs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1 | MSR_VEC);

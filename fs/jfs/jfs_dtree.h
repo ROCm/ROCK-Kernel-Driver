@@ -47,7 +47,7 @@ typedef union {
 struct dtslot {
 	s8 next;		/* 1: */
 	s8 cnt;			/* 1: */
-	wchar_t name[15];	/* 30: */
+	__le16 name[15];	/* 30: */
 };				/* (32) */
 
 
@@ -67,7 +67,7 @@ struct idtentry {
 
 	s8 next;		/* 1: */
 	u8 namlen;		/* 1: */
-	wchar_t name[11];	/* 22: 2-byte aligned */
+	__le16 name[11];	/* 22: 2-byte aligned */
 };				/* (32) */
 
 #define DTIHDRSIZE	10
@@ -83,11 +83,11 @@ struct idtentry {
  * 	For legacy filesystems, name contains 13 wchars -- no index field
  */
 struct ldtentry {
-	u32 inumber;		/* 4: 4-byte aligned */
+	__le32 inumber;		/* 4: 4-byte aligned */
 	s8 next;		/* 1: */
 	u8 namlen;		/* 1: */
-	wchar_t name[11];	/* 22: 2-byte aligned */
-	u32 index;		/* 4: index into dir_table */
+	__le16 name[11];	/* 22: 2-byte aligned */
+	__le32 index;		/* 4: index into dir_table */
 };				/* (32) */
 
 #define DTLHDRSIZE	6
@@ -113,7 +113,7 @@ struct dir_table_slot {
 	u8 flag;		/* 1: 0 if free */
 	u8 slot;		/* 1: slot within leaf page of entry */
 	u8 addr1;		/* 1: upper 8 bits of leaf page address */
-	u32 addr2;		/* 4: lower 32 bits of leaf page address -OR-
+	__le32 addr2;		/* 4: lower 32 bits of leaf page address -OR-
 				   index of next entry when this entry was deleted */
 };				/* (8) */
 
@@ -151,7 +151,7 @@ typedef union {
 		s8 freecnt;	/* 1: free count */
 		s8 freelist;	/* 1: freelist header */
 
-		u32 idotdot;	/* 4: parent inode number */
+		__le32 idotdot;	/* 4: parent inode number */
 
 		s8 stbl[8];	/* 8: sorted entry index table */
 	} header;		/* (32) */
@@ -192,8 +192,8 @@ typedef union {
  */
 typedef union {
 	struct {
-		s64 next;	/* 8: next sibling */
-		s64 prev;	/* 8: previous sibling */
+		__le64 next;	/* 8: next sibling */
+		__le64 prev;	/* 8: previous sibling */
 
 		u8 flag;	/* 1: */
 		u8 nextindex;	/* 1: next entry index in stbl */

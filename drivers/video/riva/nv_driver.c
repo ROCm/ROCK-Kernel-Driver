@@ -104,12 +104,33 @@ static void
 riva_is_second(struct riva_par *par)
 {
 	if (par->FlatPanel == 1) {
-		switch(par->Chipset) {
-		case NV_CHIP_GEFORCE4_440_GO:
-		case NV_CHIP_GEFORCE4_440_GO_M64:
-		case NV_CHIP_GEFORCE4_420_GO:
-		case NV_CHIP_GEFORCE4_420_GO_M32:
-		case NV_CHIP_QUADRO4_500_GOGL:
+		switch(par->Chipset & 0xffff) {
+		case 0x0174:
+		case 0x0175:
+		case 0x0176:
+		case 0x0177:
+		case 0x0179:
+		case 0x017C:
+		case 0x017D:
+		case 0x0186:
+		case 0x0187:
+		/* this might not be a good default for the chips below */
+		case 0x0286:
+		case 0x028C:
+		case 0x0316:
+		case 0x0317:
+		case 0x031A:
+		case 0x031B:
+		case 0x031C:
+		case 0x031D:
+		case 0x031E:
+		case 0x031F:
+		case 0x0324:
+		case 0x0325:
+		case 0x0328:
+		case 0x0329:
+		case 0x032C:
+		case 0x032D:
 			par->SecondCRTC = TRUE;
 			break;
 		default:
@@ -308,13 +329,33 @@ riva_common_setup(struct riva_par *par)
 	par->riva.IO = (MISCin(par) & 0x01) ? 0x3D0 : 0x3B0;
 	
 	if (par->FlatPanel == -1) {
-		switch (par->Chipset) {
-		case NV_CHIP_GEFORCE4_440_GO:
-		case NV_CHIP_GEFORCE4_440_GO_M64:
-		case NV_CHIP_GEFORCE4_420_GO:
-		case NV_CHIP_GEFORCE4_420_GO_M32:
-		case NV_CHIP_QUADRO4_500_GOGL:
-		case NV_CHIP_GEFORCE2_GO:
+		switch (par->Chipset & 0xffff) {
+		case 0x0112:   /* known laptop chips */
+		case 0x0174:
+		case 0x0175:
+		case 0x0176:
+		case 0x0177:
+		case 0x0179:
+		case 0x017C:
+		case 0x017D:
+		case 0x0186:
+		case 0x0187:
+		case 0x0286:
+		case 0x028C:
+		case 0x0316:
+		case 0x0317:
+		case 0x031A:
+		case 0x031B:
+		case 0x031C:
+		case 0x031D:
+		case 0x031E:
+		case 0x031F:
+		case 0x0324:
+		case 0x0325:
+		case 0x0328:
+		case 0x0329:
+		case 0x032C:
+		case 0x032D:
 			printk(KERN_INFO PFX 
 				"On a laptop.  Assuming Digital Flat Panel\n");
 			par->FlatPanel = 1;
@@ -339,6 +380,11 @@ riva_common_setup(struct riva_par *par)
 	case 0x01F0:
 	case 0x0250:
 	case 0x0280:
+	case 0x0300:
+	case 0x0310:
+	case 0x0320:
+	case 0x0330:
+	case 0x0340:
 		riva_is_second(par);
 		break;
 	default:
@@ -362,5 +408,7 @@ riva_common_setup(struct riva_par *par)
 		par->FlatPanel = 0;
 	}
 	par->riva.flatPanel = (par->FlatPanel > 0) ? TRUE : FALSE;
+
+	RivaGetConfig(&par->riva, par->Chipset);
 }
 

@@ -188,11 +188,11 @@ typedef unsigned int       fcp_dl_t;
 #define UNTAGGED	5
 
 /* task management flags in FCP-2 FCP_CMND IU */
-#define CLEAR_ACA		0x40
-#define TARGET_RESET		0x20
-#define LOGICAL_UNIT_RESET	0x10
-#define CLEAR_TASK_SET		0x04
-#define ABORT_TASK_SET		0x02
+#define FCP_CLEAR_ACA		0x40
+#define FCP_TARGET_RESET	0x20
+#define FCP_LOGICAL_UNIT_RESET	0x10
+#define FCP_CLEAR_TASK_SET	0x04
+#define FCP_ABORT_TASK_SET	0x02
 
 #define FCP_CDB_LENGTH		16
 

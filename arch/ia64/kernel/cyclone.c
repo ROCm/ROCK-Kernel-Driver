@@ -19,10 +19,11 @@ void __init cyclone_setup(void)
 
 
 struct time_interpolator cyclone_interpolator = {
-	.source =	TIME_SOURCE_MMIO32,
-	.shift =	32,
+	.source =	TIME_SOURCE_MMIO64,
+	.shift =	16,
 	.frequency =	CYCLONE_TIMER_FREQ,
 	.drift =	-100,
+	.mask =		(1LL << 40) - 1
 };
 
 int __init init_cyclone_clock(void)

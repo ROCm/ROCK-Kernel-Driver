@@ -2913,6 +2913,8 @@ static struct pci_device_id hrz_pci_tbl[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE(pci, hrz_pci_tbl);
+
 static struct pci_driver hrz_driver = {
 	.name =		"horizon",
 	.probe =	hrz_probe,

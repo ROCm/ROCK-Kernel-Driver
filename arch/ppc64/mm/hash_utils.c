@@ -341,9 +341,7 @@ void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
 		     int local)
 {
 	unsigned long vsid, vpn, va, hash, secondary, slot;
-
-	/* XXX fix for large ptes */
-	unsigned long large = 0;
+	unsigned long huge = pte_huge(pte);
 
 	if ((ea >= USER_START) && (ea <= USER_END))
 		vsid = get_vsid(context, ea);
@@ -351,18 +349,18 @@ void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
 		vsid = get_kernel_vsid(ea);
 
 	va = (vsid << 28) | (ea & 0x0fffffff);
-	if (large)
+	if (huge)
 		vpn = va >> HPAGE_SHIFT;
 	else
 		vpn = va >> PAGE_SHIFT;
-	hash = hpt_hash(vpn, large);
+	hash = hpt_hash(vpn, huge);
 	secondary = (pte_val(pte) & _PAGE_SECONDARY) >> 15;
 	if (secondary)
 		hash = ~hash;
 	slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 	slot += (pte_val(pte) & _PAGE_GROUP_IX) >> 12;
 
-	ppc_md.hpte_invalidate(slot, va, large, local);
+	ppc_md.hpte_invalidate(slot, va, huge, local);
 }
 
 void flush_hash_range(unsigned long context, unsigned long number, int local)

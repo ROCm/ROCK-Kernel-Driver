@@ -48,6 +48,7 @@
 #include <asm/atomic.h>
 #include <linux/bio.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/pagemap.h>
@@ -508,9 +509,10 @@ __setup("ramdisk_blocksize=", ramdisk_blocksize);
 #endif
 
 /* options - modular */
-MODULE_PARM     (rd_size, "1i");
+module_param(rd_size, int, 0);
 MODULE_PARM_DESC(rd_size, "Size of each RAM disk in kbytes.");
-MODULE_PARM     (rd_blocksize, "i");
+module_param(rd_blocksize, int, 0);
 MODULE_PARM_DESC(rd_blocksize, "Blocksize of each RAM disk in bytes.");
+MODULE_ALIAS_BLOCKDEV_MAJOR(RAMDISK_MAJOR);
 
 MODULE_LICENSE("GPL");

@@ -272,11 +272,8 @@ static void rsvp_destroy(struct tcf_proto *tp)
 				struct rsvp_filter *f;
 
 				while ((f = s->ht[h2]) != NULL) {
-					unsigned long cl;
-
 					s->ht[h2] = f->next;
-					if ((cl = __cls_set_class(&f->res.class, 0)) != 0)
-						tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
+					tcf_unbind_filter(tp, &f->res);
 #ifdef CONFIG_NET_CLS_POLICE
 					tcf_police_release(f->police,TCA_ACT_UNBIND);
 #endif
@@ -299,16 +296,10 @@ static int rsvp_delete(struct tcf_proto *tp, unsigned long arg)
 
 	for (fp = &s->ht[(h>>8)&0xFF]; *fp; fp = &(*fp)->next) {
 		if (*fp == f) {
-			unsigned long cl;
-
-
 			tcf_tree_lock(tp);
 			*fp = f->next;
 			tcf_tree_unlock(tp);
-
-			if ((cl = cls_set_class(tp, &f->res.class, 0)) != 0)
-				tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
-
+			tcf_unbind_filter(tp, &f->res);
 #ifdef CONFIG_NET_CLS_POLICE
 			tcf_police_release(f->police,TCA_ACT_UNBIND);
 #endif
@@ -437,22 +428,15 @@ static int rsvp_change(struct tcf_proto *tp, unsigned long base,
 		if (f->handle != handle && handle)
 			return -EINVAL;
 		if (tb[TCA_RSVP_CLASSID-1]) {
-			unsigned long cl;
-
 			f->res.classid = *(u32*)RTA_DATA(tb[TCA_RSVP_CLASSID-1]);
-			cl = cls_set_class(tp, &f->res.class, tp->q->ops->cl_ops->bind_tcf(tp->q, base, f->res.classid));
-			if (cl)
-				tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
+			tcf_bind_filter(tp, &f->res, base);
 		}
 #ifdef CONFIG_NET_CLS_POLICE
 		if (tb[TCA_RSVP_POLICE-1]) {
-			struct tcf_police *police = tcf_police_locate(tb[TCA_RSVP_POLICE-1], tca[TCA_RATE-1]);
-
-			tcf_tree_lock(tp);
-			police = xchg(&f->police, police);
-			tcf_tree_unlock(tp);
-
-			tcf_police_release(police,TCA_ACT_UNBIND);
+			err = tcf_change_police(tp, &f->police,
+				tb[TCA_RSVP_POLICE-1], tca[TCA_RATE-1]);
+			if (err < 0)
+				return err;
 		}
 #endif
 		return 0;
@@ -531,10 +515,10 @@ insert:
 
 			f->sess = s;
 			if (f->tunnelhdr == 0)
-				cls_set_class(tp, &f->res.class, tp->q->ops->cl_ops->bind_tcf(tp->q, base, f->res.classid));
+				tcf_bind_filter(tp, &f->res, base);
 #ifdef CONFIG_NET_CLS_POLICE
 			if (tb[TCA_RSVP_POLICE-1])
-				f->police = tcf_police_locate(tb[TCA_RSVP_POLICE-1], tca[TCA_RATE-1]);
+				tcf_change_police(tp, &f->police, tb[TCA_RSVP_POLICE-1], tca[TCA_RATE-1]);
 #endif
 
 			for (fp = &s->ht[h2]; *fp; fp = &(*fp)->next)
@@ -601,7 +585,7 @@ static void rsvp_walk(struct tcf_proto *tp, struct tcf_walker *arg)
 					}
 					if (arg->fn(tp, (unsigned long)f, arg) < 0) {
 						arg->stop = 1;
-						break;
+						return;
 					}
 					arg->count++;
 				}
@@ -641,25 +625,15 @@ static int rsvp_dump(struct tcf_proto *tp, unsigned long fh,
 	if (((f->handle>>8)&0xFF) != 16)
 		RTA_PUT(skb, TCA_RSVP_SRC, sizeof(f->src), f->src);
 #ifdef CONFIG_NET_CLS_POLICE
-	if (f->police) {
-		struct rtattr * p_rta = (struct rtattr*)skb->tail;
-
-		RTA_PUT(skb, TCA_RSVP_POLICE, 0, NULL);
-
-		if (tcf_police_dump(skb, f->police) < 0)
-			goto rtattr_failure;
-
-		p_rta->rta_len = skb->tail - (u8*)p_rta;
-	}
+	if (tcf_dump_police(skb, f->police, TCA_RSVP_POLICE) < 0)
+		goto rtattr_failure;
 #endif
 
 	rta->rta_len = skb->tail - b;
 #ifdef CONFIG_NET_CLS_POLICE
-	if (f->police) {
-		if (qdisc_copy_stats(skb, &f->police->stats,
-				     f->police->stats_lock))
+	if (f->police)
+		if (tcf_police_dump_stats(skb, f->police) < 0)
 			goto rtattr_failure;
-	}
 #endif
 	return skb->len;
 

@@ -19,6 +19,7 @@
 
 #include <linux/config.h>
 #include <asm/8xx_immap.h>
+#include <asm/ptrace.h>
 
 /* CPM Command register.
 */
@@ -78,7 +79,9 @@ extern void cpm_dpdump(void);
 extern void *cpm_dpram_addr(uint offset);
 extern void cpm_setbrg(uint brg, uint rate);
 
-uint		m8xx_cpm_hostalloc(uint size);
+extern uint m8xx_cpm_hostalloc(uint size);
+extern int  m8xx_cpm_hostfree(uint start);
+extern void m8xx_cpm_hostdump(void);
 
 /* Buffer descriptors used by many of the CPM protocols.
 */
@@ -142,6 +145,8 @@ typedef struct smc_uart {
 	ushort	smc_brkec;	/* rcv'd break condition counter */
 	ushort	smc_brkcr;	/* xmt break count register */
 	ushort	smc_rmask;	/* Temporary bit mask */
+	char	res1[8];	/* Reserved */
+	ushort	smc_rpbase;	/* Relocation pointer */
 } smc_uart_t;
 
 /* Function code bits.
@@ -309,6 +314,7 @@ typedef struct smc_centronics {
 #define SCC_GSMRL_ENR		((uint)0x00000020)
 #define SCC_GSMRL_ENT		((uint)0x00000010)
 #define SCC_GSMRL_MODE_ENET	((uint)0x0000000c)
+#define SCC_GSMRL_MODE_QMC	((uint)0x0000000a)
 #define SCC_GSMRL_MODE_DDCMP	((uint)0x00000009)
 #define SCC_GSMRL_MODE_BISYNC	((uint)0x00000008)
 #define SCC_GSMRL_MODE_V14	((uint)0x00000007)
@@ -418,19 +424,19 @@ typedef struct scc_enet {
 
 /* SCC Mode Register (PMSR) as used by Ethernet.
 */
-#define SCC_PMSR_HBC	((ushort)0x8000)	/* Enable heartbeat */
-#define SCC_PMSR_FC	((ushort)0x4000)	/* Force collision */
-#define SCC_PMSR_RSH	((ushort)0x2000)	/* Receive short frames */
-#define SCC_PMSR_IAM	((ushort)0x1000)	/* Check individual hash */
-#define SCC_PMSR_ENCRC	((ushort)0x0800)	/* Ethernet CRC mode */
-#define SCC_PMSR_PRO	((ushort)0x0200)	/* Promiscuous mode */
-#define SCC_PMSR_BRO	((ushort)0x0100)	/* Catch broadcast pkts */
-#define SCC_PMSR_SBT	((ushort)0x0080)	/* Special backoff timer */
-#define SCC_PMSR_LPB	((ushort)0x0040)	/* Set Loopback mode */
-#define SCC_PMSR_SIP	((ushort)0x0020)	/* Sample Input Pins */
-#define SCC_PMSR_LCW	((ushort)0x0010)	/* Late collision window */
-#define SCC_PMSR_NIB22	((ushort)0x000a)	/* Start frame search */
-#define SCC_PMSR_FDE	((ushort)0x0001)	/* Full duplex enable */
+#define SCC_PSMR_HBC	((ushort)0x8000)	/* Enable heartbeat */
+#define SCC_PSMR_FC	((ushort)0x4000)	/* Force collision */
+#define SCC_PSMR_RSH	((ushort)0x2000)	/* Receive short frames */
+#define SCC_PSMR_IAM	((ushort)0x1000)	/* Check individual hash */
+#define SCC_PSMR_ENCRC	((ushort)0x0800)	/* Ethernet CRC mode */
+#define SCC_PSMR_PRO	((ushort)0x0200)	/* Promiscuous mode */
+#define SCC_PSMR_BRO	((ushort)0x0100)	/* Catch broadcast pkts */
+#define SCC_PSMR_SBT	((ushort)0x0080)	/* Special backoff timer */
+#define SCC_PSMR_LPB	((ushort)0x0040)	/* Set Loopback mode */
+#define SCC_PSMR_SIP	((ushort)0x0020)	/* Sample Input Pins */
+#define SCC_PSMR_LCW	((ushort)0x0010)	/* Late collision window */
+#define SCC_PSMR_NIB22	((ushort)0x000a)	/* Start frame search */
+#define SCC_PSMR_FDE	((ushort)0x0001)	/* Full duplex enable */
 
 /* Buffer descriptor control/status used by Ethernet receive.
 */
@@ -471,8 +477,7 @@ typedef struct scc_enet {
 */
 typedef struct scc_uart {
 	sccp_t	scc_genscc;
-	uint	scc_res1;	/* Reserved */
-	uint	scc_res2;	/* Reserved */
+	char	res1[8];	/* Reserved */
 	ushort	scc_maxidl;	/* Maximum idle chars */
 	ushort	scc_idlc;	/* temp idle counter */
 	ushort	scc_brkcr;	/* Break count register */
@@ -514,19 +519,19 @@ typedef struct scc_uart {
 
 /* The SCC PMSR when used as a UART.
 */
-#define SCU_PMSR_FLC		((ushort)0x8000)
-#define SCU_PMSR_SL		((ushort)0x4000)
-#define SCU_PMSR_CL		((ushort)0x3000)
-#define SCU_PMSR_UM		((ushort)0x0c00)
-#define SCU_PMSR_FRZ		((ushort)0x0200)
-#define SCU_PMSR_RZS		((ushort)0x0100)
-#define SCU_PMSR_SYN		((ushort)0x0080)
-#define SCU_PMSR_DRT		((ushort)0x0040)
-#define SCU_PMSR_PEN		((ushort)0x0010)
-#define SCU_PMSR_RPM		((ushort)0x000c)
-#define SCU_PMSR_REVP		((ushort)0x0008)
-#define SCU_PMSR_TPM		((ushort)0x0003)
-#define SCU_PMSR_TEVP		((ushort)0x0002)
+#define SCU_PSMR_FLC		((ushort)0x8000)
+#define SCU_PSMR_SL		((ushort)0x4000)
+#define SCU_PSMR_CL		((ushort)0x3000)
+#define SCU_PSMR_UM		((ushort)0x0c00)
+#define SCU_PSMR_FRZ		((ushort)0x0200)
+#define SCU_PSMR_RZS		((ushort)0x0100)
+#define SCU_PSMR_SYN		((ushort)0x0080)
+#define SCU_PSMR_DRT		((ushort)0x0040)
+#define SCU_PSMR_PEN		((ushort)0x0010)
+#define SCU_PSMR_RPM		((ushort)0x000c)
+#define SCU_PSMR_REVP		((ushort)0x0008)
+#define SCU_PSMR_TPM		((ushort)0x0003)
+#define SCU_PSMR_TEVP		((ushort)0x0002)
 
 /* CPM Transparent mode SCC.
  */
@@ -556,9 +561,9 @@ typedef struct iic {
 	ushort	iic_tbptr;	/* Internal */
 	ushort	iic_tbc;	/* Internal */
 	uint	iic_txtmp;	/* Internal */
-	uint	iic_res;	/* reserved */
-  	ushort	iic_rpbase;	/* Relocation pointer */
-	ushort	iic_res2;	/* reserved */
+	char	res1[4];	/* Reserved */
+	ushort	iic_rpbase;	/* Relocation pointer */
+	char	res2[2];	/* Reserved */
 } iic_t;
 
 #define BD_IIC_START		((ushort)0x0400)

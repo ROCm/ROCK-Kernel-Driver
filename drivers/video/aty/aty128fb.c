@@ -939,7 +939,7 @@ static void __iomem *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
                 rom_base = ioremap(segstart, 0x10000);
 		if (rom_base == NULL)
 			return NULL;
-                if ((*rom_base == 0x55) && (((*(rom_base + 1)) & 0xff) == 0xaa))
+		if (readb(rom_base) == 0x55 && readb(rom_base + 1) == 0xaa)
 	                break;
                 iounmap(rom_base);
 		rom_base = NULL;

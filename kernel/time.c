@@ -487,8 +487,6 @@ int do_settimeofday (struct timespec *tv)
 	return 0;
 }
 
-EXPORT_SYMBOL(do_settimeofday);
-
 void do_gettimeofday (struct timeval *tv)
 {
 	unsigned long seq, nsec, usec, sec, offset;
@@ -527,8 +525,6 @@ void getnstimeofday(struct timespec *tv)
 	tv->tv_nsec = x.tv_usec * NSEC_PER_USEC;
 }
 #endif
-
-EXPORT_SYMBOL(getnstimeofday);
 
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void)

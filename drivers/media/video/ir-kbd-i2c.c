@@ -1,4 +1,6 @@
 /*
+ * $Id: ir-kbd-i2c.c,v 1.8 2004/09/15 16:15:24 kraxel Exp $
+ *
  * keyboard input driver for i2c IR remote controls
  *
  * Copyright (c) 2000-2003 Gerd Knorr <kraxel@bytesex.org>
@@ -156,7 +158,7 @@ module_param(debug, int, 0644);    /* debug level (0,1,2) */
 static inline int reverse(int data, int bits)
 {
 	int i,c;
-	
+
 	for (c=0,i=0; i<bits; i++) {
 		c |= (((data & (1<<i)) ? 1:0)) << (bits-1-i);
 	}
@@ -193,7 +195,7 @@ static int get_key_haup(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 static int get_key_pixelview(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 {
         unsigned char b;
-	
+
 	/* poll IR chip */
 	if (1 != i2c_master_recv(&ir->c,&b,1)) {
 		dprintk(1,"read error\n");
@@ -207,7 +209,7 @@ static int get_key_pixelview(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 static int get_key_pv951(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 {
         unsigned char b;
-	
+
 	/* poll IR chip */
 	if (1 != i2c_master_recv(&ir->c,&b,1)) {
 		dprintk(1,"read error\n");
@@ -218,7 +220,7 @@ static int get_key_pv951(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 	if (b==0xaa)
 		return 0;
 	dprintk(2,"key %02x\n", b);
-	
+
 	*ir_key = b;
 	*ir_raw = b;
 	return 1;
@@ -227,26 +229,26 @@ static int get_key_pv951(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 static int get_key_knc1(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 {
 	unsigned char b;
-	
+
 	/* poll IR chip */
 	if (1 != i2c_master_recv(&ir->c,&b,1)) {
 		dprintk(1,"read error\n");
 		return -EIO;
 	}
-	
+
 	/* it seems that 0xFE indicates that a button is still hold
 	   down, while 0xFF indicates that no button is hold
 	   down. 0xFE sequences are sometimes interrupted by 0xFF */
-	
+
 	dprintk(2,"key %02x\n", b);
-	
+
 	if (b == 0xFF)
 		return 0;
-	
+
 	if (b == 0xFE)
 		/* keep old data */
 		return 1;
-	
+
 	*ir_key = b;
 	*ir_raw = b;
 	return 1;
@@ -323,7 +325,7 @@ static struct i2c_driver driver = {
         .detach_client  = ir_detach,
 };
 
-static struct i2c_client client_template = 
+static struct i2c_client client_template =
 {
         I2C_DEVNAME("unset"),
         .driver = &driver
@@ -336,7 +338,7 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 	char *name;
 	int ir_type;
         struct IR *ir;
-		
+
         if (NULL == (ir = kmalloc(sizeof(struct IR),GFP_KERNEL)))
                 return -ENOMEM;
 	memset(ir,0,sizeof(*ir));
@@ -400,14 +402,14 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 	input_register_device(&ir->input);
 	printk(DEVNAME ": %s detected at %s [%s]\n",
 	       ir->input.name,ir->input.phys,adap->name);
-	       
+
 	/* start polling via eventd */
 	INIT_WORK(&ir->work, ir_work, ir);
 	init_timer(&ir->timer);
 	ir->timer.function = ir_timer;
 	ir->timer.data     = (unsigned long)ir;
 	schedule_work(&ir->work);
-	
+
 	return 0;
 }
 
@@ -430,16 +432,16 @@ static int ir_detach(struct i2c_client *client)
 
 static int ir_probe(struct i2c_adapter *adap)
 {
-	
+
 	/* The external IR receiver is at i2c address 0x34 (0x35 for
 	   reads).  Future Hauppauge cards will have an internal
 	   receiver at 0x30 (0x31 for reads).  In theory, both can be
 	   fitted, and Hauppauge suggest an external overrides an
-	   internal. 
-	   
-	   That's why we probe 0x1a (~0x34) first. CB 
+	   internal.
+
+	   That's why we probe 0x1a (~0x34) first. CB
 	*/
-	
+
 	static const int probe_bttv[] = { 0x1a, 0x18, 0x4b, 0x64, 0x30, -1};
 	static const int probe_saa7134[] = { 0x7a, -1};
 	const int *probe = NULL;
@@ -478,13 +480,12 @@ MODULE_AUTHOR("Gerd Knorr, Michal Kochanowicz, Christoph Bartelmus, Ulrich Muell
 MODULE_DESCRIPTION("input driver for i2c IR remote controls");
 MODULE_LICENSE("GPL");
 
-static int ir_init(void)
+static int __init ir_init(void)
 {
-	i2c_add_driver(&driver);
-	return 0;
+	return i2c_add_driver(&driver);
 }
 
-static void ir_fini(void)
+static void __exit ir_fini(void)
 {
 	i2c_del_driver(&driver);
 }

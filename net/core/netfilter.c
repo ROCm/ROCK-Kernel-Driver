@@ -673,6 +673,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 
 	return 0;
 }
+EXPORT_SYMBOL(ip_route_me_harder);
 
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 {
@@ -751,10 +752,9 @@ int nf_log_register(int pf, nf_logfn *logfn)
 
 	/* Any setup of logging members must be done before
 	 * substituting pointer. */
-	smp_wmb();
 	spin_lock(&nf_log_lock);
 	if (!nf_logging[pf]) {
-		nf_logging[pf] = logfn;
+		rcu_assign_pointer(nf_logging[pf], logfn);
 		ret = 0;
 	}
 	spin_unlock(&nf_log_lock);
@@ -819,7 +819,6 @@ void __init netfilter_init(void)
 }
 
 EXPORT_SYMBOL(ip_ct_attach);
-EXPORT_SYMBOL(ip_route_me_harder);
 EXPORT_SYMBOL(nf_getsockopt);
 EXPORT_SYMBOL(nf_hook_slow);
 EXPORT_SYMBOL(nf_hooks);

@@ -18,6 +18,7 @@
 #define SGI_XBOW_ERROR                  (0x32)
 #define SGI_PCIBR_ERROR                 (0x33)
 #define SGI_ACPI_SCI_INT                (0x34)
+#define SGI_MMTIMER_VECTOR		(0x35)
 #define SGI_TIO_ERROR			(0x36)
 #define SGI_XPC_NOTIFY                  (0xe7)
 
@@ -43,7 +44,7 @@ struct sn_irq_info {
 	int		irq_share_cnt;	/* num devices sharing IRQ   */
 };
 
-extern void sn_send_IPI_phys(long, int, int);
+extern void sn_send_IPI_phys(int, long, int, int);
 
 #define CPU_VECTOR_TO_IRQ(cpuid,vector) (vector)
 

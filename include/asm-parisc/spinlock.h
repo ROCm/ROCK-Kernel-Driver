@@ -27,21 +27,35 @@ static inline int spin_is_locked(spinlock_t *x)
 
 static inline void _raw_spin_lock(spinlock_t *x)
 {
-	volatile unsigned int *a = __ldcw_align(x);
+	volatile unsigned int *a;
+
+	mb();
+	a = __ldcw_align(x);
 	while (__ldcw(a) == 0)
 		while (*a == 0);
+	mb();
 }
 
 static inline void _raw_spin_unlock(spinlock_t *x)
 {
-	volatile unsigned int *a = __ldcw_align(x);
+	volatile unsigned int *a;
+	mb();
+	a = __ldcw_align(x);
 	*a = 1;
+	mb();
 }
 
 static inline int _raw_spin_trylock(spinlock_t *x)
 {
-	volatile unsigned int *a = __ldcw_align(x);
-	return __ldcw(a) != 0;
+	volatile unsigned int *a;
+	int ret;
+
+	mb();
+	a = __ldcw_align(x);
+        ret = __ldcw(a) != 0;
+	mb();
+
+	return ret;
 }
 	
 #define spin_lock_own(LOCK, LOCATION)	((void)0)
@@ -207,6 +221,26 @@ static  __inline__ void _raw_write_unlock(rwlock_t *rw)
 	rw->counter = 0;
 	_raw_spin_unlock(&rw->lock);
 }
+
+#ifdef CONFIG_DEBUG_RWLOCK
+extern void _dbg_write_trylock(rwlock_t * rw, const char *bfile, int bline);
+#define _raw_write_trylock(rw) _dbg_write_trylock(rw, __FILE__, __LINE__)
+#else
+static  __inline__ int _raw_write_trylock(rwlock_t *rw)
+{
+	_raw_spin_lock(&rw->lock);
+	if (rw->counter != 0) {
+		/* this basically never happens */
+		_raw_spin_unlock(&rw->lock);
+
+		return 0;
+	}
+
+	/* got it.  now leave without unlocking */
+	rw->counter = -1; /* remember we are locked */
+	return 1;
+}
+#endif /* CONFIG_DEBUG_RWLOCK */
 
 static __inline__ int is_read_locked(rwlock_t *rw)
 {

@@ -445,8 +445,7 @@ char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 		bytes_out = 0;
 		crc = (ulg)0xffffffffL; /* shift register contents */
 		makecrc();
-		if (gunzip())
-			message = "ungzip failed";
+		gunzip();
 		if (state != Reset)
 			error("junk in gzipped archive");
 		this_header = saved_offset + inptr;

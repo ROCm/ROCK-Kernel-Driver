@@ -49,6 +49,10 @@ void pxa_gpio_mode(int gpio_mode)
 	int gafr;
 
 	local_irq_save(flags);
+	if (gpio_mode & GPIO_DFLT_LOW)
+		GPCR(gpio) = GPIO_bit(gpio);
+	else if (gpio_mode & GPIO_DFLT_HIGH)
+		GPSR(gpio) = GPIO_bit(gpio);
 	if (gpio_mode & GPIO_MD_MASK_DIR)
 		GPDR(gpio) |= GPIO_bit(gpio);
 	else

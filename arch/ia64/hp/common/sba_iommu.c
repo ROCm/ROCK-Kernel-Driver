@@ -479,7 +479,7 @@ sba_search_bitmap(struct ioc *ioc, unsigned long bits_wanted)
 	 * purges IOTLB entries in power-of-two sizes, so we also
 	 * allocate IOVA space in power-of-two sizes.
 	 */
-	bits_wanted = 1UL << get_iovp_order(bits_wanted << PAGE_SHIFT);
+	bits_wanted = 1UL << get_iovp_order(bits_wanted << iovp_shift);
 
 	if (likely(bits_wanted == 1)) {
 		unsigned int bitshiftcnt;
@@ -688,7 +688,7 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 	unsigned long m;
 
 	/* Round up to power-of-two size: see AR2305 note above */
-	bits_not_wanted = 1UL << get_iovp_order(bits_not_wanted << PAGE_SHIFT);
+	bits_not_wanted = 1UL << get_iovp_order(bits_not_wanted << iovp_shift);
 	for (; bits_not_wanted > 0 ; res_ptr++) {
 		
 		if (unlikely(bits_not_wanted > BITS_PER_LONG)) {

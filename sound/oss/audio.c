@@ -38,7 +38,7 @@
 #define NEUTRAL16	0x00
 
 
-int             dma_ioctl(int dev, unsigned int cmd, void __user *arg);
+static int             dma_ioctl(int dev, unsigned int cmd, void __user *arg);
 
 static int set_format(int dev, int fmt)
 {
@@ -735,7 +735,7 @@ static int dma_set_fragment(int dev, struct dma_buffparms *dmap, int fact)
 	return bytes | ((count - 1) << 16);
 }
 
-int dma_ioctl(int dev, unsigned int cmd, void __user *arg)
+static int dma_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	struct dma_buffparms *dmap_out = audio_devs[dev]->dmap_out;
 	struct dma_buffparms *dmap_in = audio_devs[dev]->dmap_in;

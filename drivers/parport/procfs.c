@@ -529,8 +529,5 @@ static void __exit parport_default_proc_unregister (void)
 }
 #endif
 
-EXPORT_SYMBOL(parport_device_proc_register);
-EXPORT_SYMBOL(parport_device_proc_unregister);
-
 module_init(parport_default_proc_register)
 module_exit(parport_default_proc_unregister)

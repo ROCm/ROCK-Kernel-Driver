@@ -405,6 +405,13 @@ static void __init psurge_dual_sync_tb(int cpu_nr)
 	smp_tb_synchronized = 1;
 }
 
+static struct irqaction psurge_irqaction = {
+	.handler = psurge_primary_intr,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+	.name = "primary IPI",
+};
+
 static void __init smp_psurge_setup_cpu(int cpu_nr)
 {
 
@@ -421,7 +428,7 @@ static void __init smp_psurge_setup_cpu(int cpu_nr)
 		/* reset the entry point so if we get another intr we won't
 		 * try to startup again */
 		out_be32(psurge_start, 0x100);
-		if (request_irq(30, psurge_primary_intr, SA_INTERRUPT, "primary IPI", NULL))
+		if (setup_irq(30, &psurge_irqaction))
 			printk(KERN_ERR "Couldn't get primary IPI interrupt");
 	}
 

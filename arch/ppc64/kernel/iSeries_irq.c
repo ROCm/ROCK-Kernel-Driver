@@ -110,6 +110,7 @@ static unsigned int iSeries_startup_IRQ(unsigned int irq)
 	/* Unmask bridge interrupts in the FISR */
 	mask = 0x01010000 << function;
 	HvCallPci_unmaskFisr(bus, subBus, deviceId, mask);
+	iSeries_enable_IRQ(irq);
 	return 0;
 }
 

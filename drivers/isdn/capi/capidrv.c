@@ -29,6 +29,7 @@
 #include <linux/kernelcapi.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 
 #include <linux/isdn/capiutil.h>
 #include <linux/isdn/capicmd.h>
@@ -40,7 +41,7 @@ static int debugmode = 0;
 MODULE_DESCRIPTION("CAPI4Linux: Interface to ISDN4Linux");
 MODULE_AUTHOR("Carsten Paeth");
 MODULE_LICENSE("GPL");
-MODULE_PARM(debugmode, "i");
+module_param(debugmode, uint, 0);
 
 /* -------- type definitions ----------------------------------------- */
 

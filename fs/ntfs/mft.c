@@ -68,20 +68,31 @@ static inline MFT_RECORD *map_mft_record_page(ntfs_inode *ni)
 		if (index > end_index || (mft_vi->i_size & ~PAGE_CACHE_MASK) <
 				ofs + vol->mft_record_size) {
 			page = ERR_PTR(-ENOENT);
+			ntfs_error(vol->sb, "Attemt to read mft record 0x%lx, "
+					"which is beyond the end of the mft.  "
+					"This is probably a bug in the ntfs "
+					"driver.", ni->mft_no);
 			goto err_out;
 		}
 	}
 	/* Read, map, and pin the page. */
 	page = ntfs_map_page(mft_vi->i_mapping, index);
 	if (likely(!IS_ERR(page))) {
-		ni->page = page;
-		ni->page_ofs = ofs;
-		return page_address(page) + ofs;
+		/* Catch multi sector transfer fixup errors. */
+		if (likely(ntfs_is_mft_recordp((le32*)(page_address(page) +
+				ofs)))) {
+			ni->page = page;
+			ni->page_ofs = ofs;
+			return page_address(page) + ofs;
+		}
+		ntfs_error(vol->sb, "Mft record 0x%lx is corrupt.  "
+				"Run chkdsk.", ni->mft_no);
+		ntfs_unmap_page(page);
+		page = ERR_PTR(-EIO);
 	}
 err_out:
 	ni->page = NULL;
 	ni->page_ofs = 0;
-	ntfs_error(vol->sb, "Failed with error code %lu.", -PTR_ERR(page));
 	return (void*)page;
 }
 
@@ -455,8 +466,10 @@ int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
 	struct buffer_head *bhs[max_bhs];
 	struct buffer_head *bh, *head;
 	u8 *kmirr;
-	unsigned int block_start, block_end, m_start, m_end;
+	runlist_element *rl;
+	unsigned int block_start, block_end, m_start, m_end, page_ofs;
 	int i_bhs, nr_bhs, err = 0;
+	unsigned char blocksize_bits = vol->mftmirr_ino->i_blkbits;
 
 	ntfs_debug("Entering for inode 0x%lx.", mft_no);
 	BUG_ON(!max_bhs);
@@ -475,24 +488,32 @@ int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
 		err = PTR_ERR(page);
 		goto err_out;
 	}
-	/*
-	 * Exclusion against other writers.   This should never be a problem
-	 * since the page in which the mft record @m resides is also locked and
-	 * hence any other writers would be held up there but it is better to
-	 * make sure no one is writing from elsewhere.
-	 */
 	lock_page(page);
 	BUG_ON(!PageUptodate(page));
 	ClearPageUptodate(page);
+	/* Offset of the mft mirror record inside the page. */
+	page_ofs = (mft_no << vol->mft_record_size_bits) & ~PAGE_CACHE_MASK;
 	/* The address in the page of the mirror copy of the mft record @m. */
-	kmirr = page_address(page) + ((mft_no << vol->mft_record_size_bits) &
-			~PAGE_CACHE_MASK);
+	kmirr = page_address(page) + page_ofs;
 	/* Copy the mst protected mft record to the mirror. */
 	memcpy(kmirr, m, vol->mft_record_size);
-	/* Make sure we have mapped buffers. */
-	BUG_ON(!page_has_buffers(page));
+	/* Create uptodate buffers if not present. */
+	if (unlikely(!page_has_buffers(page))) {
+		struct buffer_head *tail;
+
+		bh = head = alloc_page_buffers(page, blocksize, 1);
+		do {
+			set_buffer_uptodate(bh);
+			tail = bh;
+			bh = bh->b_this_page;
+		} while (bh);
+		tail->b_this_page = head;
+		attach_page_buffers(page, head);
+		BUG_ON(!page_has_buffers(page));
+	}
 	bh = head = page_buffers(page);
 	BUG_ON(!bh);
+	rl = NULL;
 	nr_bhs = 0;
 	block_start = 0;
 	m_start = kmirr - (u8*)page_address(page);
@@ -500,15 +521,61 @@ int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
 	do {
 		block_end = block_start + blocksize;
 		/* If the buffer is outside the mft record, skip it. */
-		if ((block_end <= m_start) || (block_start >= m_end))
+		if (block_end <= m_start)
 			continue;
-		BUG_ON(!buffer_mapped(bh));
+		if (unlikely(block_start >= m_end))
+			break;
+		/* Need to map the buffer if it is not mapped already. */
+		if (unlikely(!buffer_mapped(bh))) {
+			VCN vcn;
+			LCN lcn;
+			unsigned int vcn_ofs;
+
+			/* Obtain the vcn and offset of the current block. */
+			vcn = ((VCN)mft_no << vol->mft_record_size_bits) +
+					(block_start - m_start);
+			vcn_ofs = vcn & vol->cluster_size_mask;
+			vcn >>= vol->cluster_size_bits;
+			if (!rl) {
+				down_read(&NTFS_I(vol->mftmirr_ino)->
+						runlist.lock);
+				rl = NTFS_I(vol->mftmirr_ino)->runlist.rl;
+				/*
+				 * $MFTMirr always has the whole of its runlist
+				 * in memory.
+				 */
+				BUG_ON(!rl);
+			}
+			/* Seek to element containing target vcn. */
+			while (rl->length && rl[1].vcn <= vcn)
+				rl++;
+			lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
+			/* For $MFTMirr, only lcn >= 0 is a successful remap. */
+			if (likely(lcn >= 0)) {
+				/* Setup buffer head to correct block. */
+				bh->b_blocknr = ((lcn <<
+						vol->cluster_size_bits) +
+						vcn_ofs) >> blocksize_bits;
+				set_buffer_mapped(bh);
+			} else {
+				bh->b_blocknr = -1;
+				ntfs_error(vol->sb, "Cannot write mft mirror "
+						"record 0x%lx because its "
+						"location on disk could not "
+						"be determined (error code "
+						"%lli).", mft_no,
+						(long long)lcn);
+				err = -EIO;
+			}
+		}
 		BUG_ON(!buffer_uptodate(bh));
 		BUG_ON(!nr_bhs && (m_start != block_start));
 		BUG_ON(nr_bhs >= max_bhs);
 		bhs[nr_bhs++] = bh;
 		BUG_ON((nr_bhs >= max_bhs) && (m_end != block_end));
 	} while (block_start = block_end, (bh = bh->b_this_page) != head);
+	if (unlikely(rl))
+		up_read(&NTFS_I(vol->mftmirr_ino)->runlist.lock);
 	if (likely(!err)) {
 		/* Lock buffers and start synchronous write i/o on them. */
 		for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
@@ -517,8 +584,7 @@ int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
 			if (unlikely(test_set_buffer_locked(tbh)))
 				BUG();
 			BUG_ON(!buffer_uptodate(tbh));
-			if (buffer_dirty(tbh))
-				clear_buffer_dirty(tbh);
+			clear_buffer_dirty(tbh);
 			get_bh(tbh);
 			tbh->b_end_io = end_buffer_write_sync;
 			submit_bh(WRITE, tbh);
@@ -602,13 +668,14 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 {
 	ntfs_volume *vol = ni->vol;
 	struct page *page = ni->page;
-	unsigned int blocksize = vol->sb->s_blocksize;
+	unsigned char blocksize_bits = vol->mft_ino->i_blkbits;
+	unsigned int blocksize = 1 << blocksize_bits;
 	int max_bhs = vol->mft_record_size / blocksize;
 	struct buffer_head *bhs[max_bhs];
 	struct buffer_head *bh, *head;
+	runlist_element *rl;
 	unsigned int block_start, block_end, m_start, m_end;
 	int i_bhs, nr_bhs, err = 0;
-	BOOL rec_is_dirty = TRUE;
 
 	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	BUG_ON(NInoAttr(ni));
@@ -625,6 +692,7 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	BUG_ON(!page_has_buffers(page));
 	bh = head = page_buffers(page);
 	BUG_ON(!bh);
+	rl = NULL;
 	nr_bhs = 0;
 	block_start = 0;
 	m_start = ni->page_ofs;
@@ -636,31 +704,65 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 			continue;
 		if (unlikely(block_start >= m_end))
 			break;
+		/*
+		 * If this block is not the first one in the record, we ignore
+		 * the buffer's dirty state because we could have raced with a
+		 * parallel mark_ntfs_record_dirty().
+		 */
 		if (block_start == m_start) {
 			/* This block is the first one in the record. */
 			if (!buffer_dirty(bh)) {
+				BUG_ON(nr_bhs);
 				/* Clean records are not written out. */
-				rec_is_dirty = FALSE;
-				continue;
+				break;
 			}
-			rec_is_dirty = TRUE;
-		} else {
-			/*
-			 * This block is not the first one in the record.  We
-			 * ignore the buffer's dirty state because we could
-			 * have raced with a parallel mark_ntfs_record_dirty().
-			 */
-			if (!rec_is_dirty)
-				continue;
 		}
-		BUG_ON(!buffer_mapped(bh));
+		/* Need to map the buffer if it is not mapped already. */
+		if (unlikely(!buffer_mapped(bh))) {
+			VCN vcn;
+			LCN lcn;
+			unsigned int vcn_ofs;
+
+			/* Obtain the vcn and offset of the current block. */
+			vcn = ((VCN)ni->mft_no << vol->mft_record_size_bits) +
+					(block_start - m_start);
+			vcn_ofs = vcn & vol->cluster_size_mask;
+			vcn >>= vol->cluster_size_bits;
+			if (!rl) {
+				down_read(&NTFS_I(vol->mft_ino)->runlist.lock);
+				rl = NTFS_I(vol->mft_ino)->runlist.rl;
+				BUG_ON(!rl);
+			}
+			/* Seek to element containing target vcn. */
+			while (rl->length && rl[1].vcn <= vcn)
+				rl++;
+			lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
+			/* For $MFT, only lcn >= 0 is a successful remap. */
+			if (likely(lcn >= 0)) {
+				/* Setup buffer head to correct block. */
+				bh->b_blocknr = ((lcn <<
+						vol->cluster_size_bits) +
+						vcn_ofs) >> blocksize_bits;
+				set_buffer_mapped(bh);
+			} else {
+				bh->b_blocknr = -1;
+				ntfs_error(vol->sb, "Cannot write mft record "
+						"0x%lx because its location "
+						"on disk could not be "
+						"determined (error code %lli).",
+						ni->mft_no, (long long)lcn);
+				err = -EIO;
+			}
+		}
 		BUG_ON(!buffer_uptodate(bh));
 		BUG_ON(!nr_bhs && (m_start != block_start));
 		BUG_ON(nr_bhs >= max_bhs);
 		bhs[nr_bhs++] = bh;
 		BUG_ON((nr_bhs >= max_bhs) && (m_end != block_end));
 	} while (block_start = block_end, (bh = bh->b_this_page) != head);
-	if (!rec_is_dirty)
+	if (unlikely(rl))
+		up_read(&NTFS_I(vol->mft_ino)->runlist.lock);
+	if (!nr_bhs)
 		goto done;
 	if (unlikely(err))
 		goto cleanup_out;
@@ -734,7 +836,8 @@ err_out:
 				"Redirtying so the write is retried later.");
 		mark_mft_record_dirty(ni);
 		err = 0;
-	}
+	} else
+		NVolSetErrors(vol);
 	return err;
 }
 

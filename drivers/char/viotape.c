@@ -938,7 +938,7 @@ static void vioHandleTapeEvent(struct HvLpEvent *event)
 		}
 		break;
 	default:
-		printk(VIOTAPE_KERN_WARN "wierd ack\n");
+		printk(VIOTAPE_KERN_WARN "weird ack\n");
 	}
 }
 

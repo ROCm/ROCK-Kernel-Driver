@@ -466,8 +466,8 @@ struct cfb_info;
 
 struct cyberpro_info {
 	struct pci_dev	*dev;
-	unsigned char	*regs;
-	char		*fb;
+	unsigned char	__iomem *regs;
+	char		__iomem *fb;
 	char		dev_name[32];
 	unsigned int	fb_size;
 	unsigned int	chip_id;

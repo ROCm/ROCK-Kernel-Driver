@@ -62,17 +62,17 @@
 #define MAX_ACTIVE	128	/* Max active file systems sharing log */
 
 struct logsuper {
-	u32 magic;		/* 4: log lv identifier */
-	s32 version;		/* 4: version number */
-	s32 serial;		/* 4: log open/mount counter */
-	s32 size;		/* 4: size in number of LOGPSIZE blocks */
-	s32 bsize;		/* 4: logical block size in byte */
-	s32 l2bsize;		/* 4: log2 of bsize */
+	__le32 magic;		/* 4: log lv identifier */
+	__le32 version;		/* 4: version number */
+	__le32 serial;		/* 4: log open/mount counter */
+	__le32 size;		/* 4: size in number of LOGPSIZE blocks */
+	__le32 bsize;		/* 4: logical block size in byte */
+	__le32 l2bsize;		/* 4: log2 of bsize */
 
-	u32 flag;		/* 4: option */
-	u32 state;		/* 4: state - see below */
+	__le32 flag;		/* 4: option */
+	__le32 state;		/* 4: state - see below */
 
-	s32 end;		/* 4: addr of last log record set by logredo */
+	__le32 end;		/* 4: addr of last log record set by logredo */
 	char uuid[16];		/* 16: 128-bit journal uuid */
 	char label[16];		/* 16: journal label */
 	struct {
@@ -121,17 +121,17 @@ struct logsuper {
  */
 struct logpage {
 	struct {		/* header */
-		s32 page;	/* 4: log sequence page number */
-		s16 rsrvd;	/* 2: */
-		s16 eor;	/* 2: end-of-log offset of lasrt record write */
+		__le32 page;	/* 4: log sequence page number */
+		__le16 rsrvd;	/* 2: */
+		__le16 eor;	/* 2: end-of-log offset of lasrt record write */
 	} h;
 
-	s32 data[LOGPSIZE / 4 - 4];	/* log record area */
+	__le32 data[LOGPSIZE / 4 - 4];	/* log record area */
 
 	struct {		/* trailer */
-		s32 page;	/* 4: normally the same as h.page */
-		s16 rsrvd;	/* 2: */
-		s16 eor;	/* 2: normally the same as h.eor */
+		__le32 page;	/* 4: normally the same as h.page */
+		__le16 rsrvd;	/* 2: */
+		__le16 eor;	/* 2: normally the same as h.eor */
 	} t;
 };
 
@@ -202,11 +202,11 @@ struct lrd {
 	/*
 	 * type independent area
 	 */
-	s32 logtid;		/* 4: log transaction identifier */
-	s32 backchain;		/* 4: ptr to prev record of same transaction */
-	u16 type;		/* 2: record type */
-	s16 length;		/* 2: length of data in record (in byte) */
-	u32 aggregate;		/* 4: file system lv/aggregate */
+	__le32 logtid;		/* 4: log transaction identifier */
+	__le32 backchain;	/* 4: ptr to prev record of same transaction */
+	__le16 type;		/* 2: record type */
+	__le16 length;		/* 2: length of data in record (in byte) */
+	__le32 aggregate;	/* 4: file system lv/aggregate */
 	/* (16) */
 
 	/*
@@ -228,10 +228,10 @@ struct lrd {
 		 * N.B. REDOPAGE, NOREDOPAGE, and UPDATEMAP must be same format;
 		 */
 		struct {
-			u32 fileset;	/* 4: fileset number */
-			u32 inode;	/* 4: inode number */
-			u16 type;	/* 2: REDOPAGE record type */
-			s16 l2linesize;	/* 2: log2 of line size */
+			__le32 fileset;	/* 4: fileset number */
+			__le32 inode;	/* 4: inode number */
+			__le16 type;	/* 2: REDOPAGE record type */
+			__le16 l2linesize;	/* 2: log2 of line size */
 			pxd_t pxd;	/* 8: on-disk page pxd */
 		} redopage;	/* (20) */
 
@@ -244,10 +244,10 @@ struct lrd {
 		 * N.B. REDOPAGE, NOREDOPAGE, and UPDATEMAP must be same format;
 		 */
 		struct {
-			s32 fileset;	/* 4: fileset number */
-			u32 inode;	/* 4: inode number */
-			u16 type;	/* 2: NOREDOPAGE record type */
-			s16 rsrvd;	/* 2: reserved */
+			__le32 fileset;	/* 4: fileset number */
+			__le32 inode;	/* 4: inode number */
+			__le16 type;	/* 2: NOREDOPAGE record type */
+			__le16 rsrvd;	/* 2: reserved */
 			pxd_t pxd;	/* 8: on-disk page pxd */
 		} noredopage;	/* (20) */
 
@@ -260,10 +260,10 @@ struct lrd {
 		 * N.B. REDOPAGE, NOREDOPAGE, and UPDATEMAP must be same format;
 		 */
 		struct {
-			u32 fileset;	/* 4: fileset number */
-			u32 inode;	/* 4: inode number */
-			u16 type;	/* 2: UPDATEMAP record type */
-			s16 nxd;	/* 2: number of extents */
+			__le32 fileset;	/* 4: fileset number */
+			__le32 inode;	/* 4: inode number */
+			__le16 type;	/* 2: UPDATEMAP record type */
+			__le16 nxd;	/* 2: number of extents */
 			pxd_t pxd;	/* 8: pxd */
 		} updatemap;	/* (20) */
 
@@ -279,9 +279,9 @@ struct lrd {
 		 *
 		 */
 		struct {
-			s32 fileset;	/* 4: fileset number */
-			s32 iagnum;	/* 4: IAG number     */
-			s32 inoext_idx;	/* 4: inode extent index */
+			__le32 fileset;	/* 4: fileset number */
+			__le32 iagnum;	/* 4: IAG number     */
+			__le32 inoext_idx;	/* 4: inode extent index */
 			pxd_t pxd;	/* 8: on-disk page pxd */
 		} noredoinoext;	/* (20) */
 
@@ -291,7 +291,7 @@ struct lrd {
 		 * replay log upto syncpt address specified;
 		 */
 		struct {
-			s32 sync;	/* 4: syncpt address (0 = here) */
+			__le32 sync;	/* 4: syncpt address (0 = here) */
 		} syncpt;
 
 		/*
@@ -307,8 +307,8 @@ struct lrd {
 		 * N.B.: nextents should be length of data/sizeof(xad_t)
 		 */
 		struct {
-			s32 type;	/* 4: FREEXTENT record type */
-			s32 nextent;	/* 4: number of extents */
+			__le32 type;	/* 4: FREEXTENT record type */
+			__le32 nextent;	/* 4: number of extents */
 
 			/* data: PXD or XAD list */
 		} freextent;
@@ -327,8 +327,8 @@ struct lrd {
 		 * replay of the 
 		 */
 		struct {
-			s32 fileset;	/* 4: fileset number */
-			u32 inode;	/* 4: inode number */
+			__le32 fileset;	/* 4: fileset number */
+			__le32 inode;	/* 4: inode number */
 		} noredofile;
 
 		/*
@@ -337,9 +337,9 @@ struct lrd {
 		 * metadata type dependent
 		 */
 		struct {
-			s32 fileset;	/* 4: fileset number */
-			u32 inode;	/* 4: inode number */
-			s32 type;	/* 4: NEWPAGE record type */
+			__le32 fileset;	/* 4: fileset number */
+			__le32 inode;	/* 4: inode number */
+			__le32 type;	/* 4: NEWPAGE record type */
 			pxd_t pxd;	/* 8: on-disk page pxd */
 		} newpage;
 
@@ -357,8 +357,8 @@ struct lrd {
  *	line vector descriptor
  */
 struct lvd {
-	s16 offset;
-	s16 length;
+	__le16 offset;
+	__le16 length;
 };
 
 
@@ -372,7 +372,7 @@ struct jfs_log {
 				 */
 	struct list_head journal_list; /* Global list */
 	struct block_device *bdev; /* 4: log lv pointer */
-	s32 serial;		/* 4: log mount serial number */
+	int serial;		/* 4: log mount serial number */
 
 	s64 base;		/* @8: log extent address (inline log ) */
 	int size;		/* 4: log size in log page (in page) */
@@ -398,7 +398,7 @@ struct jfs_log {
 
 	/* commit */
 	uint cflag;		/* 4: */
-	struct list_head	cqueue; /* FIFO commit queue */
+	struct list_head cqueue; /* FIFO commit queue */
 	struct tblock *flush_tblk; /* tblk we're waiting on for flush */
 	int gcrtc;		/* 4: GC_READY transaction count */
 	struct tblock *gclrt;	/* 4: latest GC_READY transaction */

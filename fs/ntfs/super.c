@@ -44,6 +44,10 @@
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
 
+/* A global default upcase table and a corresponding reference count. */
+static ntfschar *default_upcase = NULL;
+static unsigned long ntfs_nr_upcase_users = 0;
+
 /* Error constants/strings used in inode.c::ntfs_show_options(). */
 typedef enum {
 	/* One of these must be present, default is ON_ERRORS_CONTINUE. */
@@ -680,7 +684,7 @@ hotfix_primary_boot_sector:
  * @b:		boot sector to parse
  *
  * Parse the ntfs boot sector @b and store all imporant information therein in
- * the ntfs super block @vol. Return TRUE on success and FALSE on error.
+ * the ntfs super block @vol.  Return TRUE on success and FALSE on error.
  */
 static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 {
@@ -713,12 +717,12 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 			vol->cluster_size_bits, vol->cluster_size_bits);
 	if (vol->sector_size > vol->cluster_size) {
 		ntfs_error(vol->sb, "Sector sizes above the cluster size are "
-				"not supported. Sorry.");
+				"not supported.  Sorry.");
 		return FALSE;
 	}
 	if (vol->sb->s_blocksize > vol->cluster_size) {
 		ntfs_error(vol->sb, "Cluster sizes smaller than the device "
-				"sector size are not supported. Sorry.");
+				"sector size are not supported.  Sorry.");
 		return FALSE;
 	}
 	clusters_per_mft_record = b->clusters_per_mft_record;
@@ -742,6 +746,18 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 			vol->mft_record_size_mask);
 	ntfs_debug("vol->mft_record_size_bits = %i (0x%x)",
 			vol->mft_record_size_bits, vol->mft_record_size_bits);
+	/*
+	 * We cannot support mft record sizes above the PAGE_CACHE_SIZE since
+	 * we store $MFT/$DATA, the table of mft records in the page cache.
+	 */
+	if (vol->mft_record_size > PAGE_CACHE_SIZE) {
+		ntfs_error(vol->sb, "Mft record size %i (0x%x) exceeds the "
+				"page cache size on your system %lu (0x%lx).  "
+				"This is not supported.  Sorry.",
+				vol->mft_record_size, vol->mft_record_size,
+				PAGE_CACHE_SIZE, PAGE_CACHE_SIZE);
+		return FALSE;
+	}
 	clusters_per_index_record = b->clusters_per_index_record;
 	ntfs_debug("clusters_per_index_record = %i (0x%x)",
 			clusters_per_index_record, clusters_per_index_record);
@@ -772,7 +788,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	 */
 	ll = sle64_to_cpu(b->number_of_sectors) >> sectors_per_cluster_bits;
 	if ((u64)ll >= 1ULL << 32) {
-		ntfs_error(vol->sb, "Cannot handle 64-bit clusters. Sorry.");
+		ntfs_error(vol->sb, "Cannot handle 64-bit clusters.  Sorry.");
 		return FALSE;
 	}
 	vol->nr_clusters = ll;
@@ -785,8 +801,8 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	if (sizeof(unsigned long) < 8) {
 		if ((ll << vol->cluster_size_bits) >= (1ULL << 41)) {
 			ntfs_error(vol->sb, "Volume size (%lluTiB) is too "
-					"large for this architecture. Maximum "
-					"supported is 2TiB. Sorry.",
+					"large for this architecture.  "
+					"Maximum supported is 2TiB.  Sorry.",
 					(unsigned long long)ll >> (40 -
 					vol->cluster_size_bits));
 			return FALSE;
@@ -794,14 +810,14 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	}
 	ll = sle64_to_cpu(b->mft_lcn);
 	if (ll >= vol->nr_clusters) {
-		ntfs_error(vol->sb, "MFT LCN is beyond end of volume. Weird.");
+		ntfs_error(vol->sb, "MFT LCN is beyond end of volume.  Weird.");
 		return FALSE;
 	}
 	vol->mft_lcn = ll;
 	ntfs_debug("vol->mft_lcn = 0x%llx", (long long)vol->mft_lcn);
 	ll = sle64_to_cpu(b->mftmirr_lcn);
 	if (ll >= vol->nr_clusters) {
-		ntfs_error(vol->sb, "MFTMirr LCN is beyond end of volume. "
+		ntfs_error(vol->sb, "MFTMirr LCN is beyond end of volume.  "
 				"Weird.");
 		return FALSE;
 	}
@@ -967,6 +983,10 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
  * @vol:	ntfs super block describing device whose mft mirror to check
  *
  * Return TRUE on success or FALSE on error.
+ *
+ * Note, this function also results in the mft mirror runlist being completely
+ * mapped into memory.  The mft mirror write code requires this and will BUG()
+ * should it find an unmapped runlist element.
  */
 static BOOL check_mft_mirror(ntfs_volume *vol)
 {
@@ -2163,7 +2183,7 @@ static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 /**
  * The complete super operations.
  */
-struct super_operations ntfs_sops = {
+static struct super_operations ntfs_sops = {
 	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
 	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
 	.put_inode	= ntfs_put_inode,	  /* VFS: Called just before
@@ -2581,10 +2601,6 @@ static void ntfs_big_inode_init_once(void *foo, kmem_cache_t *cachep,
 kmem_cache_t *ntfs_attr_ctx_cache;
 kmem_cache_t *ntfs_index_ctx_cache;
 
-/* A global default upcase table and a corresponding reference count. */
-ntfschar *default_upcase = NULL;
-unsigned long ntfs_nr_upcase_users = 0;
-
 /* Driver wide semaphore. */
 DECLARE_MUTEX(ntfs_lock);
 
@@ -2742,6 +2758,7 @@ static void __exit exit_ntfs_fs(void)
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
 MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2004 Anton Altaparmakov");
+MODULE_VERSION(NTFS_VERSION);
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 module_param(debug_msgs, bool, 0);

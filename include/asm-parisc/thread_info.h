@@ -18,12 +18,15 @@ struct thread_info {
 
 #define INIT_THREAD_INFO(tsk)			\
 {						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	cpu:		0,			\
-	addr_limit:	KERNEL_DS,		\
-	preempt_count:	0,			\
+	.task		= &tsk,			\
+	.exec_domain	= &default_exec_domain,	\
+	.flags		= 0,			\
+	.cpu		= 0,			\
+	.addr_limit	= KERNEL_DS,		\
+	.preempt_count	= 0,			\
+  	.restart_block	= {			\
+		.fn = do_no_restart_syscall	\
+	}					\
 }
 
 #define init_thread_info        (init_thread_union.thread_info)

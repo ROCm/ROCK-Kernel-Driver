@@ -54,7 +54,7 @@ enum {	SLEEP_SAVE_SP = 0,
 };
 
 
-static int sa11x0_pm_enter(u32 state)
+static int sa11x0_pm_enter(suspend_state_t state)
 {
 	unsigned long gpio, sleep_save[SLEEP_SAVE_SIZE];
 	struct timespec delta, rtc;
@@ -135,7 +135,7 @@ unsigned long sleep_phys_sp(void *sp)
 /*
  * Called after processes are frozen, but before we shut down devices.
  */
-static int sa11x0_pm_prepare(u32 state)
+static int sa11x0_pm_prepare(suspend_state_t state)
 {
 	return 0;
 }
@@ -143,7 +143,7 @@ static int sa11x0_pm_prepare(u32 state)
 /*
  * Called after devices are re-setup, but before processes are thawed.
  */
-static int sa11x0_pm_finish(u32 state)
+static int sa11x0_pm_finish(suspend_state_t state)
 {
 	return 0;
 }

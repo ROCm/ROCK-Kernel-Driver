@@ -32,7 +32,8 @@
  */
 #define IO_SPACE_LIMIT		0xffffffffffffffffUL
 
-#define MAX_IO_SPACES			16
+#define MAX_IO_SPACES_BITS		4
+#define MAX_IO_SPACES			(1UL << MAX_IO_SPACES_BITS)
 #define IO_SPACE_BITS			24
 #define IO_SPACE_SIZE			(1UL << IO_SPACE_BITS)
 
@@ -52,10 +53,24 @@ extern unsigned int num_io_spaces;
 
 # ifdef __KERNEL__
 
+/*
+ * All MMIO iomem cookies are in region 6; anything less is a PIO cookie:
+ *	0xCxxxxxxxxxxxxxxx	MMIO cookie (return from ioremap)
+ *	0x000000001SPPPPPP	PIO cookie (S=space number, P..P=port)
+ *
+ * ioread/writeX() uses the leading 1 in PIO cookies (PIO_OFFSET) to catch
+ * code that uses bare port numbers without the prerequisite pci_iomap().
+ */
+#define PIO_OFFSET		(1UL << (MAX_IO_SPACES_BITS + IO_SPACE_BITS))
+#define PIO_MASK		(PIO_OFFSET - 1)
+#define PIO_RESERVED		__IA64_UNCACHED_OFFSET
+#define HAVE_ARCH_PIO_SIZE
+
 #include <asm/intrinsics.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
+#include <asm-generic/iomap.h>
 
 /*
  * Change virtual addresses to physical addresses and vv.
@@ -92,7 +107,7 @@ extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c *
 #define __ia64_mf_a()	ia64_mfa()
 
 /**
- * __ia64_mmiowb - I/O write barrier
+ * ___ia64_mmiowb - I/O write barrier
  *
  * Ensure ordering of I/O space writes.  This will make sure that writes
  * following the barrier will arrive after all previous writes.  For most
@@ -100,7 +115,7 @@ extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c *
  *
  * See Documentation/DocBook/deviceiobook.tmpl for more information.
  */
-static inline void __ia64_mmiowb(void)
+static inline void ___ia64_mmiowb(void)
 {
 	ia64_mfa();
 }
@@ -147,6 +162,7 @@ __ia64_mk_io_addr (unsigned long port)
 #define __ia64_writew	___ia64_writew
 #define __ia64_writel	___ia64_writel
 #define __ia64_writeq	___ia64_writeq
+#define __ia64_mmiowb	___ia64_mmiowb
 
 /*
  * For the in/out routines, we need to do "mf.a" _after_ doing the I/O access to ensure

@@ -292,7 +292,7 @@ static struct fb_ops atyfb_ops = {
 	.fb_fillrect	= atyfb_fillrect,
 	.fb_copyarea	= atyfb_copyarea,
 	.fb_imageblit	= atyfb_imageblit,
-	.fb_cursor	= atyfb_cursor,
+	.fb_cursor	= soft_cursor,
 #ifdef __sparc__
 	.fb_mmap	= atyfb_mmap,
 #endif
@@ -2015,7 +2015,7 @@ static int aty_power_mgmt(int sleep, struct atyfb_par *par)
 	}
 	mdelay(500);
 
-	return timeout ? -1 : 0;
+	return timeout ? 0 : -EIO;
 }
 
 static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)
@@ -2191,6 +2191,14 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	par->aty_cmap_regs =
 	    (struct aty_cmap_regs __iomem *) (par->ati_regbase + 0xc0);
 
+#ifdef CONFIG_PPC_PMAC
+	/* The Apple iBook1 uses non-standard memory frequencies. We detect it
+	 * and set the frequency manually. */
+	if (machine_is_compatible("PowerBook2,1")) {
+		par->pll_limits.mclk = 70;
+		par->pll_limits.xclk = 53;
+	}
+#endif
 	if (pll)
 		par->pll_limits.pll_max = pll;
 	if (mclk)

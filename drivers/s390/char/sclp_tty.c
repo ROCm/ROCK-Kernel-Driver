@@ -397,8 +397,6 @@ sclp_tty_write_string(const unsigned char *str, int count)
 static int
 sclp_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
-	int length, ret;
-
 	if (sclp_tty_chars_count > 0) {
 		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
@@ -603,7 +601,7 @@ sclp_get_input(unsigned char *start, unsigned char *end)
 
 	/* if set in ioctl write operators input to console  */
 	if (sclp_ioctls.echo)
-		sclp_tty_write(sclp_tty, 0, start, count);
+		sclp_tty_write(sclp_tty, start, count);
 
 	/* transfer input to high level driver */
 	sclp_tty_input(start, count);

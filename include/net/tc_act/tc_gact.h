@@ -1,7 +1,7 @@
 #ifndef __NET_TC_GACT_H
 #define __NET_TC_GACT_H
 
-#include <net/pkt_sched.h>
+#include <net/act_api.h>
 
 struct tcf_gact
 {

@@ -140,12 +140,6 @@ static inline void trace(struct icom_port *, char *, unsigned long) {};
 static inline void trace(struct icom_port *icom_port, char *trace_pt, unsigned long trace_data) {};
 #endif
 
-static void msleep(unsigned long msecs)
-{
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSECS_TO_JIFFIES(msecs));
-}
-
 static void free_port_memory(struct icom_port *icom_port)
 {
 	struct pci_dev *dev = icom_port->adapter->pci_dev;

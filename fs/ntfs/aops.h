@@ -55,6 +55,13 @@ static inline void ntfs_unmap_page(struct page *page)
  * method defined in the address space operations of @mapping and the page is
  * added to the page cache of @mapping in the process.
  *
+ * If the page belongs to an mst protected attribute and it is marked as such
+ * in its ntfs inode (NInoMstProtected()) the mst fixups are applied but no
+ * error checking is performed.  This means the caller has to verify whether
+ * the ntfs record(s) contained in the page are valid or not using one of the
+ * ntfs_is_XXXX_record{,p}() macros, where XXXX is the record type you are
+ * expecting to see.  (For details of the macros, see fs/ntfs/layout.h.)
+ *
  * If the page is in high memory it is mapped into memory directly addressible
  * by the kernel.
  *

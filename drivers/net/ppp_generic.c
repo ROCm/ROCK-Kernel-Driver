@@ -1920,7 +1920,7 @@ ppp_register_channel(struct ppp_channel *chan)
 #endif /* CONFIG_PPP_MULTILINK */
 	init_rwsem(&pch->chan_sem);
 	spin_lock_init(&pch->downl);
-	pch->upl = RW_LOCK_UNLOCKED;
+	rwlock_init(&pch->upl);
 	spin_lock_bh(&all_channels_lock);
 	pch->file.index = ++last_channel_index;
 	list_add(&pch->list, &new_channels);

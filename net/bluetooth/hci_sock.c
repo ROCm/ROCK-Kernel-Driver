@@ -111,7 +111,8 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 		/* Apply filter */
 		flt = &hci_pi(sk)->filter;
 
-		if (!test_bit((skb->pkt_type & HCI_FLT_TYPE_BITS), &flt->type_mask))
+		if (!test_bit((skb->pkt_type == HCI_VENDOR_PKT) ?
+				0 : (skb->pkt_type & HCI_FLT_TYPE_BITS), &flt->type_mask))
 			continue;
 
 		if (skb->pkt_type == HCI_EVENT_PKT) {

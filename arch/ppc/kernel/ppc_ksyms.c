@@ -321,9 +321,6 @@ EXPORT_SYMBOL(cpm_free_handler);
 #if defined(CONFIG_8xx) || defined(CONFIG_40x) || defined(CONFIG_85xx)
 EXPORT_SYMBOL(__res);
 #endif
-#if defined(CONFIG_8xx)
-EXPORT_SYMBOL(request_8xxirq);
-#endif
 
 EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);

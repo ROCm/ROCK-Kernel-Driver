@@ -229,9 +229,7 @@ struct machdep_calls __initdata maple_md = {
 	.init_IRQ		= maple_init_IRQ,
 	.get_irq		= mpic_get_irq,
 	.pcibios_fixup		= maple_pcibios_fixup,
-#if 0
 	.pci_get_legacy_ide_irq	= maple_pci_get_legacy_ide_irq,
-#endif
 	.restart		= maple_restart,
 	.power_off		= maple_power_off,
 	.halt			= maple_halt,

@@ -63,7 +63,7 @@ enum {	SLEEP_SAVE_START = 0,
 };
 
 
-static int pxa_pm_enter(u32 state)
+static int pxa_pm_enter(suspend_state_t state)
 {
 	unsigned long sleep_save[SLEEP_SAVE_SIZE];
 	unsigned long checksum = 0;
@@ -163,7 +163,7 @@ unsigned long sleep_phys_sp(void *sp)
 /*
  * Called after processes are frozen, but before we shut down devices.
  */
-static int pxa_pm_prepare(u32 state)
+static int pxa_pm_prepare(suspend_state_t state)
 {
 	return 0;
 }
@@ -171,7 +171,7 @@ static int pxa_pm_prepare(u32 state)
 /*
  * Called after devices are re-setup, but before processes are thawed.
  */
-static int pxa_pm_finish(u32 state)
+static int pxa_pm_finish(suspend_state_t state)
 {
 	return 0;
 }

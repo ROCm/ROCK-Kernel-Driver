@@ -466,7 +466,6 @@ extern int parport_poll_peripheral (struct parport *port,
 				    int usec);
 
 /* For architectural drivers */
-extern void parport_ieee1284_wakeup (struct parport *port);
 extern size_t parport_ieee1284_write_compat (struct parport *,
 					     const void *, size_t, int);
 extern size_t parport_ieee1284_read_nibble (struct parport *,
@@ -500,20 +499,8 @@ extern struct pardevice *parport_open (int devnum, const char *name,
 extern void parport_close (struct pardevice *dev);
 extern ssize_t parport_device_id (int devnum, char *buffer, size_t len);
 extern int parport_device_num (int parport, int mux, int daisy);
-extern int parport_device_coords (int devnum, int *parport, int *mux,
-				  int *daisy);
 extern void parport_daisy_deselect_all (struct parport *port);
 extern int parport_daisy_select (struct parport *port, int daisy, int mode);
-
-/* For finding devices based on their device ID.  Example usage:
-   int devnum = -1;
-   while ((devnum = parport_find_class (PARPORT_CLASS_DIGCAM, devnum)) != -1) {
-       struct pardevice *dev = parport_open (devnum, ...);
-       ...
-   }
-*/
-extern int parport_find_device (const char *mfg, const char *mdl, int from);
-extern int parport_find_class (parport_device_class cls, int from);
 
 /* Lowlevel drivers _can_ call this support function to handle irqs.  */
 static __inline__ void parport_generic_irq(int irq, struct parport *port,

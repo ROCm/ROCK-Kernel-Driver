@@ -8,9 +8,9 @@
 
 DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	    kernel-hacking.sgml kernel-locking.sgml via-audio.sgml \
-	    mousedrivers.sgml deviceiobook.sgml procfs-guide.sgml \
-	    tulip-user.sgml writing_usb_driver.sgml scsidrivers.sgml \
-	    sis900.sgml kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
+	    deviceiobook.sgml procfs-guide.sgml tulip-user.sgml \
+	    writing_usb_driver.sgml scsidrivers.sgml sis900.sgml \
+	    kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
 	    gadget.sgml libata.sgml mtdnand.sgml librs.sgml
 
 ###

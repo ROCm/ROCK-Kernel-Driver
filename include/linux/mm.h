@@ -41,6 +41,8 @@ extern int sysctl_legacy_va_layout;
 #define MM_VM_SIZE(mm)	TASK_SIZE
 #endif
 
+#define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + n)
+
 /*
  * Linux kernel virtual memory manager primitives.
  * The idea being to have a "virtual" mm in the same way
@@ -756,6 +758,7 @@ static inline unsigned long vma_pages(struct vm_area_struct *vma)
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
 extern struct page * vmalloc_to_page(void *addr);
+extern unsigned long vmalloc_to_pfn(void *addr);
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 int remap_pfn_range(struct vm_area_struct *, unsigned long,

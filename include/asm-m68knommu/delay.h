@@ -1,13 +1,12 @@
 #ifndef _M68KNOMMU_DELAY_H
 #define _M68KNOMMU_DELAY_H
 
-#include <asm/param.h>
-
 /*
  * Copyright (C) 1994 Hamish Macdonald
- *
- * Delay routines, using a pre-computed "loops_per_second" value.
+ * Copyright (C) 2004 Greg Ungerer <gerg@snapgear.com>
  */
+
+#include <asm/param.h>
 
 extern __inline__ void __delay(unsigned long loops)
 {
@@ -34,35 +33,27 @@ extern __inline__ void __delay(unsigned long loops)
 }
 
 /*
- * Use only for very small delays ( < 1 msec).  Should probably use a
- * lookup table, really, as the multiplications take much too long with
- * short delays.  This is a "reasonable" implementation, though (and the
- * first constant multiplications gets optimized away if the delay is
- * a constant)  
+ *	Ideally we use a 32*32->64 multiply to calculate the number of
+ *	loop iterations, but the older standard 68k and ColdFire do not
+ *	have this instruction. So for them we have a clsoe approximation
+ *	loop using 32*32->32 multiplies only. This calculation based on
+ *	the ARM version of delay.
+ *
+ *	We want to implement:
+ *
+ *	loops = (usecs * 0x10c6 * HZ * loops_per_jiffy) / 2^32
  */
+
+#define	HZSCALE		(268435456 / (1000000/HZ))
 
 extern unsigned long loops_per_jiffy;
 
-extern __inline__ void udelay(unsigned long usecs)
+extern __inline__ void _udelay(unsigned long usecs)
 {
-#ifdef CONFIG_M68332
-        usecs *= 0x000010c6;       
-       __asm__ __volatile__ ("mulul %1,%0:%2"
-                    : "=d" (usecs)
-                  : "d" (usecs),
-                   "d" (loops_per_jiffy*HZ));
-	__delay(usecs);
-
-#elif defined(CONFIG_M68328) || defined(CONFIG_M68EZ328) || \
-		defined(CONFIG_COLDFIRE) || defined(CONFIG_M68360) || \
-		defined(CONFIG_M68VZ328)
-	register unsigned long full_loops, part_loops;
-
-	full_loops = ((usecs * HZ) / 1000000) * loops_per_jiffy;
-	usecs %= (1000000 / HZ);
-	part_loops = (usecs * HZ * loops_per_jiffy) / 1000000;
-
-	__delay(full_loops + part_loops);
+#if defined(CONFIG_M68328) || defined(CONFIG_M68EZ328) || \
+    defined(CONFIG_M68VZ328) || defined(CONFIG_M68360) || \
+    defined(CONFIG_COLDFIRE)
+	__delay((((usecs * HZSCALE) >> 11) * (loops_per_jiffy >> 11)) >> 6);
 #else
 	unsigned long tmp;
 
@@ -73,5 +64,13 @@ extern __inline__ void udelay(unsigned long usecs)
 	__delay(usecs);
 #endif
 }
+
+/*
+ *	Moved the udelay() function into library code, no longer inlined.
+ *	I had to change the algorithm because we are overflowing now on
+ *	the faster ColdFire parts. The code is a little biger, so it makes
+ *	sense to library it.
+ */
+extern void udelay(unsigned long usecs);
 
 #endif /* defined(_M68KNOMMU_DELAY_H) */

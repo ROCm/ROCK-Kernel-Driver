@@ -42,10 +42,11 @@
 
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x20, 0x2f, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x20, 0x21, 0x22, 0x23, 0x24,
+					0x25, 0x26, 0x27, 0x28, 0x29,
+					0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
+					0x2f, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { 0x0290, I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_2(it87, it8712);
@@ -55,13 +56,6 @@ SENSORS_INSMOD_2(it87, it8712);
 #define	VAL	0x2f	/* The value to read/write */
 #define PME	0x04	/* The device with the fan registers in it */
 #define	DEVID	0x20	/* Register: Device ID */
-
-static inline void
-superio_outb(int reg, int val)
-{
-	outb(reg, REG);
-	outb(val, VAL);
-}
 
 static inline int
 superio_inb(int reg)

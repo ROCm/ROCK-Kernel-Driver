@@ -86,7 +86,7 @@ static struct irqdesc bad_irq_desc = {
 };
 
 /**
- *	disable_irq - disable an irq and wait for completion
+ *	disable_irq_nosync - disable an irq without waiting
  *	@irq: Interrupt to disable
  *
  *	Disable the selected interrupt line.  Enables and disables
@@ -94,7 +94,7 @@ static struct irqdesc bad_irq_desc = {
  *
  *	This function may be called from IRQ context.
  */
-void disable_irq(unsigned int irq)
+void disable_irq_nosync(unsigned int irq)
 {
 	struct irqdesc *desc = irq_desc + irq;
 	unsigned long flags;
@@ -103,6 +103,28 @@ void disable_irq(unsigned int irq)
 	desc->disable_depth++;
 	list_del_init(&desc->pend);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
+}
+EXPORT_SYMBOL(disable_irq_nosync);
+
+/**
+ *	disable_irq - disable an irq and wait for completion
+ *	@irq: Interrupt to disable
+ *
+ *	Disable the selected interrupt line.  Enables and disables
+ *	are nested.  This functions waits for any pending IRQ
+ *	handlers for this interrupt to complete before returning.
+ *	If you use this function while holding a resource the IRQ
+ *	handler may need you will deadlock.
+ *
+ *	This function may be called - with care - from IRQ context.
+ */
+void disable_irq(unsigned int irq)
+{
+	struct irqdesc *desc = irq_desc + irq;
+
+	disable_irq_nosync(irq);
+	if (desc->action)
+		synchronize_irq(irq);
 }
 EXPORT_SYMBOL(disable_irq);
 
@@ -175,9 +197,20 @@ EXPORT_SYMBOL(disable_irq_wake);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i = *(loff_t *) v;
+	int i = *(loff_t *) v, cpu;
 	struct irqaction * action;
 	unsigned long flags;
+
+	if (i == 0) {
+		char cpuname[12];
+
+		seq_printf(p, "    ");
+		for_each_present_cpu(cpu) {
+			sprintf(cpuname, "CPU%d", cpu);
+			seq_printf(p, " %10s", cpuname);
+		}
+		seq_putc(p, '\n');
+	}
 
 	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_controller_lock, flags);
@@ -185,7 +218,9 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action)
 			goto unlock;
 
-		seq_printf(p, "%3d: %10u ", i, kstat_irqs(i));
+		seq_printf(p, "%3d: ", i);
+		for_each_present_cpu(cpu)
+			seq_printf(p, "%10u ", kstat_cpu(cpu).irqs[i]);
 		seq_printf(p, "  %s", action->name);
 		for (action = action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);

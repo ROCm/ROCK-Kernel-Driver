@@ -496,6 +496,7 @@ static void __devinit quirk_via_irqpic(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_2,	quirk_via_irqpic );
 DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic );
 DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic );
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8233_5,	quirk_via_irqpic );
 
 
 /*
@@ -937,8 +938,7 @@ static void __devinit quirk_usb_handoff_ohci(struct pci_dev *pdev)
 		while (wait_time > 0 && 
 				readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
 			wait_time -= 10;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((HZ*10 + 999) / 1000);
+			msleep(10);
 		}
 	}
 
@@ -987,8 +987,7 @@ static void __devinit quirk_usb_disable_ehci(struct pci_dev *pdev)
 
 			wait_time = 500;
 			do {
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout((HZ*10+999)/1000);
+				msleep(10);
 				wait_time -= 10;
 				pci_read_config_dword(pdev,
 						hcc_params + EHCI_USBLEGSUP,

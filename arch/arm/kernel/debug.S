@@ -647,7 +647,7 @@
 		.endm
 
 
-#elif defined(CONFIG_ARCH_VERSATILE_PB)
+#elif defined(CONFIG_ARCH_VERSATILE)
 
 #include <asm/hardware/amba_serial.h>
 

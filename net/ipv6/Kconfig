@@ -52,8 +52,8 @@ config INET6_IPCOMP
 	select CRYPTO
 	select CRYPTO_DEFLATE
 	---help---
-	  Support for IP Paylod Compression (RFC3173), typically needed
-	  for IPsec.
+	  Support for IP Payload Compression Protocol (IPComp) (RFC3173),
+	  typically needed for IPsec.
 
 	  If unsure, say Y.
 

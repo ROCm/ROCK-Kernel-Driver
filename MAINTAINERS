@@ -531,10 +531,9 @@ S:	Supported
 COMPUTONE INTELLIPORT MULTIPORT CARD
 P:	Michael H. Warfield
 M:	Michael H. Warfield <mhw@wittsend.com>
-W:	http://www.computone.com/
 W:	http://www.wittsend.com/computone.html
 L:	linux-computone@lazuli.wittsend.com
-S:	Supported
+S:	Orphaned
 
 COSA/SRP SYNC SERIAL DRIVER
 P:	Jan "Yenya" Kasprzak
@@ -670,7 +669,7 @@ P:	Digi International, Inc
 M:	Eng.Linux@digi.com
 L:	Eng.Linux@digi.com
 W:	http://www.digi.com
-S:	Maintained
+S:	Orphaned
 
 DIGI RIGHTSWITCH NETWORK DRIVER
 P:	Rick Richardson
@@ -683,7 +682,7 @@ P:	Christoph Lameter
 M:	christoph@lameter.com
 W:	http://www.digi.com
 L:	digilnux@digi.com
-S:	Orphaned
+S:	Obsolete
 
 DIRECTORY NOTIFICATION
 P:	Stephen Rothwell
@@ -818,11 +817,11 @@ W:	http://www.farsite.co.uk/
 S:	Supported
 
 FRAMEBUFFER LAYER
-P:	James Simmons, Geert Uytterhoeven	
-M:	jsimmons@infradead.org, geert@linux-m68k.org	
+P:	Antonino Daplas
+M:	adaplas@pol.net
 L:	linux-fbdev-devel@lists.sourceforge.net	
 W:	http://linux-fbdev.sourceforge.net/
-S:	Supported
+S:	Maintained
 
 FILE LOCKING (flock() and fcntl()/lockf())
 P:	Matthew Wilcox
@@ -832,7 +831,7 @@ S:	Maintained
 
 FILESYSTEMS (VFS and infrastructure)
 P:	Alexander Viro
-M:	viro@math.psu.edu
+M:	viro@parcelfarce.linux.theplanet.co.uk
 S:	Maintained
 
 FIRMWARE LOADER (request_firmware)
@@ -858,11 +857,9 @@ W:	ftp://ftp.openlinux.org/pub/people/hch/vxfs
 S:	Maintained
 
 FTAPE/QIC-117
-P:	Claus-Justus Heine
-M:	claus@momo.math.rwth-aachen.de
 L:	linux-tape@vger.kernel.org
-W:	http://www-math.math.rwth-aachen.de/~LBFM/claus/ftape/
-S:	Maintained
+W:	http://sourceforge.net/projects/ftape
+S:	Orphan
 
 FUTURE DOMAIN TMC-16x0 SCSI DRIVER (16-bit)
 P:	Rik Faith
@@ -1112,8 +1109,8 @@ P:	John Ronciak
 M:	john.ronciak@intel.com
 P:	Ganesh Venkatesan
 M:	ganesh.venkatesan@intel.com
-P:	Scott Feldman
-M:	scott.feldman@intel.com
+P:	Jesse Brandeburg
+M:	jesse.brandeburg@intel.com
 W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 
@@ -1248,6 +1245,12 @@ M:	neilb@cse.unsw.edu.au
 L:	nfs@lists.sourceforge.net
 W:	http://nfs.sourceforge.net/
 W:	http://www.cse.unsw.edu.au/~neilb/patches/linux-devel/
+S:	Maintained
+
+KERNEL EVENT LAYER (KOBJECT_UEVENT)
+P:	Robert Love
+M:	rml@novell.com
+L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 LANMEDIA WAN CARD DRIVER
@@ -2338,6 +2341,15 @@ M:	wgreathouse@smva.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+
+USB SERIAL CYPRESS M8 DRIVER
+P:	Lonnie Mendez
+M:	dignome@gmail.com
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+S:	Maintained
+W:	http://geocities.com/i0xox0i
+W:	http://firstlight.net/cvs
 
 USB SERIAL CYBERJACK PINPAD/E-COM DRIVER
 L:	linux-usb-users@lists.sourceforge.net

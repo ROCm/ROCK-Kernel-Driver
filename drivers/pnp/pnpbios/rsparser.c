@@ -287,10 +287,13 @@ static void
 pnpbios_parse_irq_option(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_irq * irq;
+	unsigned long bits;
+
 	irq = pnpbios_kmalloc(sizeof(struct pnp_irq), GFP_KERNEL);
 	if (!irq)
 		return;
-	irq->map = (p[2] << 8) | p[1];
+	bits = (p[2] << 8) | p[1];
+	bitmap_copy(irq->map, &bits, 16);
 	if (size > 2)
 		irq->flags = p[3];
 	else

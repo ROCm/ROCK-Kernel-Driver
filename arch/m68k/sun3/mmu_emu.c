@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/bitops.h>
+#include <linux/module.h>
 
 #include <asm/setup.h>
 #include <asm/traps.h>
@@ -46,6 +47,8 @@ extern void prom_reboot (char *) __attribute__ ((__noreturn__));
 */
 
 unsigned long vmalloc_end;
+EXPORT_SYMBOL(vmalloc_end);
+
 unsigned long pmeg_vaddr[PMEGS_NUM];
 unsigned char pmeg_alloc[PMEGS_NUM];
 unsigned char pmeg_ctx[PMEGS_NUM];

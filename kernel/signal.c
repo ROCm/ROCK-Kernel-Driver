@@ -265,7 +265,7 @@ next_signal(struct sigpending *pending, sigset_t *mask)
 	return sig;
 }
 
-static inline struct sigqueue *__sigqueue_alloc(struct task_struct *t, int flags)
+static struct sigqueue *__sigqueue_alloc(struct task_struct *t, int flags)
 {
 	struct sigqueue *q = NULL;
 
@@ -1109,7 +1109,7 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 {
-	struct task_struct *p;
+	struct task_struct *p = NULL;
 	int retval, success;
 
 	if (pgrp <= 0)

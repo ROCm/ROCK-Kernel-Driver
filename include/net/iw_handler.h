@@ -198,6 +198,7 @@
 /***************************** INCLUDES *****************************/
 
 #include <linux/wireless.h>		/* IOCTL user space API */
+#include <linux/if_ether.h>
 
 /***************************** VERSION *****************************/
 /*
@@ -294,6 +295,8 @@ struct iw_request_info
 	__u16		flags;		/* More to come ;-) */
 };
 
+struct net_device;
+
 /*
  * This is how a function handling a Wireless Extension should look
  * like (both get and set, standard and private).
@@ -311,10 +314,10 @@ struct iw_handler_def
 {
 	/* Number of handlers defined (more precisely, index of the
 	 * last defined handler + 1) */
-	const __u16		num_standard;
-	const __u16		num_private;
+	__u16			num_standard;
+	__u16			num_private;
 	/* Number of private arg description */
-	const __u16		num_private_args;
+	__u16			num_private_args;
 
 	/* Array of handlers for standard ioctls
 	 * We will call dev->wireless_handlers->standard[ioctl - SIOCSIWNAME]
@@ -332,7 +335,7 @@ struct iw_handler_def
 	const struct iw_priv_args *	private_args;
 
 	/* This field will be *removed* in the next version of WE */
-	const long		spy_offset;	/* DO NOT USE */
+	long			spy_offset;	/* DO NOT USE */
 
 	/* New location of get_wireless_stats, to de-bloat struct net_device.
 	 * The old pointer in struct net_device will be gradually phased

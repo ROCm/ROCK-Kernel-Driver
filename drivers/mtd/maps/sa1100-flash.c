@@ -3,7 +3,7 @@
  * 
  * (C) 2000 Nicolas Pitre <nico@cam.org>
  * 
- * $Id: sa1100-flash.c,v 1.39 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: sa1100-flash.c,v 1.47 2004/11/01 13:44:36 rmk Exp $
  */
 
 #include <linux/config.h>
@@ -496,6 +496,32 @@ static struct mtd_partition huw_webpanel_partitions[] = {
 };
 #endif
 
+#ifdef CONFIG_SA1100_JORNADA56X
+static struct mtd_partition jornada56x_partitions[] = {
+	{
+		.name		= "bootldr",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,
+	}, {
+		.name		= "rootfs",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
+	}
+};
+
+static void jornada56x_set_vpp(struct map_info *map, int vpp)
+{
+	if (vpp)
+		GPSR = GPIO_GPIO26;
+	else
+		GPCR = GPIO_GPIO26;
+	GPDR |= GPIO_GPIO26;
+}
+#else
+#define jornada56x_set_vpp NULL
+#endif
+
 #ifdef CONFIG_SA1100_JORNADA720
 static struct mtd_partition jornada720_partitions[] = {
 	{
@@ -822,6 +848,12 @@ static int __init sa1100_static_partitions(struct mtd_partition **parts)
 		nb_parts     = ARRAY_SIZE(huw_webpanel_partitions);
 	}
 #endif
+#ifdef CONFIG_SA1100_JORNADA56X
+	if (machine_is_jornada56x()) {
+		*parts       = jornada56x_partitions;
+		nb_parts     = ARRAY_SIZE(jornada56x_partitions);
+	}
+#endif
 #ifdef CONFIG_SA1100_JORNADA720
 	if (machine_is_jornada720()) {
 		*parts       = jornada720_partitions;
@@ -885,11 +917,10 @@ struct sa_info {
 	unsigned long base;
 	unsigned long size;
 	int width;
-	void __iomem *vbase;
-        void (*set_vpp)(struct map_info *, int);
+	void (*set_vpp)(struct map_info *, int);
+	char name[16];
 	struct map_info *map;
 	struct mtd_info *mtd;
-	struct resource *res;
 };
 
 #define NR_SUBMTD 4
@@ -918,21 +949,22 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 		if (sa[i].base == (unsigned long)-1)
 			break;
 
-		sa[i].res = request_mem_region(sa[i].base, sa[i].size, "sa1100 flash");
-		if (!sa[i].res) {
+		sa[i].map = maps + i;
+		sa[i].map->name = sa[i].name;
+		sprintf(sa[i].name, "sa1100-%d", i);
+
+		if (!request_mem_region(sa[i].base, sa[i].size, sa[i].name)) {
+			i -= 1;
 			ret = -EBUSY;
 			break;
 		}
 
-		sa[i].map = maps + i;
-
-		sa[i].vbase = ioremap(sa[i].base, sa[i].size);
-		if (!sa[i].vbase) {
+		sa[i].map->virt = ioremap(sa[i].base, sa[i].size);
+		if (!sa[i].map->virt) {
 			ret = -ENOMEM;
 			break;
 		}
 
-		sa[i].map->virt = sa[i].vbase;
 		sa[i].map->phys = sa[i].base;
 		sa[i].map->set_vpp = sa[i].set_vpp;
 		sa[i].map->bankwidth = sa[i].width;
@@ -964,10 +996,9 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 	 * resource and mark it as such.
 	 */
 	if (ret == -ENXIO) {
-		iounmap(sa[i].vbase);
-		sa[i].vbase = NULL;
-		release_resource(sa[i].res);
-		sa[i].res = NULL;
+		iounmap(sa[i].map->virt);
+		sa[i].map->virt = NULL;
+		release_mem_region(sa[i].base, sa[i].size);
 	}
 
 	/*
@@ -986,7 +1017,7 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 			 */
 #ifdef CONFIG_MTD_CONCAT
 			*rmtd = mtd_concat_create(subdev, found,
-						  "sa1100 flash");
+						  "sa1100");
 			if (*rmtd == NULL)
 				ret = -ENXIO;
 #else
@@ -1004,11 +1035,10 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 		do {
 			if (sa[i].mtd)
 				map_destroy(sa[i].mtd);
-			if (sa[i].vbase)
-				iounmap(sa[i].vbase);
-			if (sa[i].res)
-				release_resource(sa[i].res);
-		} while (i--);
+			if (sa[i].map->virt)
+				iounmap(sa[i].map->virt);
+			release_mem_region(sa[i].base, sa[i].size);
+		} while (i-- > 0);
 
 		kfree(maps);
 	}
@@ -1030,10 +1060,9 @@ static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
 	for (i = NR_SUBMTD; i >= 0; i--) {
 		if (sa[i].mtd)
 			map_destroy(sa[i].mtd);
-		if (sa[i].vbase)
-			iounmap(sa[i].vbase);
-		if (sa[i].res)
-			release_resource(sa[i].res);
+		if (sa[i].map->virt)
+			iounmap(sa[i].map->virt);
+		release_mem_region(sa[i].base, sa[i].size);
 	}
 	kfree(sa[0].map);
 }
@@ -1044,13 +1073,9 @@ static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
  *  - Is the MSC setup for flash (no -> failure)
  *  - Probe for flash
  */
-
-static struct map_info sa1100_probe_map __initdata = {
-	.name		= "SA1100-flash",
-};
-
 static void __init sa1100_probe_one_cs(unsigned int msc, unsigned long phys)
 {
+	struct map_info map;
 	struct mtd_info *mtd;
 
 	printk(KERN_INFO "* Probing 0x%08lx: MSC = 0x%04x %d bit ",
@@ -1066,19 +1091,23 @@ static void __init sa1100_probe_one_cs(unsigned int msc, unsigned long phys)
 		return;
 	}
 
-	sa1100_probe_map.bankwidth = msc & MSC_RBW ? 2 : 4;
-	sa1100_probe_map.size = SZ_1M;
-	sa1100_probe_map.phys = phys;
-	sa1100_probe_map.virt = (unsigned long)ioremap(phys, SZ_1M);
-	if (sa1100_probe_map.virt == 0)
+	memset(&map, 0, sizeof(struct map_info));
+
+	map.name = "Probe";
+	map.bankwidth = msc & MSC_RBW ? 2 : 4;
+	map.size = SZ_1M;
+	map.phys = phys;
+	map.virt = ioremap(phys, SZ_1M);
+	if (map.virt == NULL)
 		goto fail;
-	simple_map_init(&sa1100_probe_map);
+
+	simple_map_init(&map);
 
 	/* Shame cfi_probe blurts out kernel messages... */
-	mtd = do_map_probe("cfi_probe", &sa1100_probe_map);
+	mtd = do_map_probe("cfi_probe", &map);
 	if (mtd)
 		map_destroy(mtd);
-	iounmap((void *)sa1100_probe_map.virt);
+	iounmap(map.virt);
 
 	if (!mtd)
 		goto fail;
@@ -1172,6 +1201,12 @@ static int __init sa1100_locate_flash(void)
 		nr = 1;
 	}
 	if (machine_is_itsy()) {
+		info[0].base = SA1100_CS0_PHYS;
+		info[0].size = SZ_32M;
+		nr = 1;
+	}
+	if (machine_is_jornada56x()) {
+		info[0].set_vpp = jornada56x_set_vpp;
 		info[0].base = SA1100_CS0_PHYS;
 		info[0].size = SZ_32M;
 		nr = 1;

@@ -1,5 +1,6 @@
-
 /*
+ * $Id: ir-kbd-gpio.c,v 1.10 2004/09/15 16:15:24 kraxel Exp $
+ *
  * Copyright (c) 2003 Gerd Knorr
  * Copyright (c) 2003 Pavel Machek
  *
@@ -45,7 +46,7 @@ static IR_KEYTAB_TYPE ir_codes_avermedia[IR_KEYTAB_SIZE] = {
 	[ 60 ] = KEY_KP9,
 
 	[ 48 ] = KEY_EJECTCD,     // Unmarked on my controller
-	[  0 ] = KEY_POWER, 
+	[  0 ] = KEY_POWER,
 	[ 18 ] = BTN_LEFT,        // DISPLAY/L
 	[ 50 ] = BTN_RIGHT,       // LOOP/R
 	[ 10 ] = KEY_MUTE,
@@ -72,6 +73,45 @@ static IR_KEYTAB_TYPE ir_codes_avermedia[IR_KEYTAB_SIZE] = {
 	[ 17 ] = KEY_CHANNELDOWN,
 	[ 49 ] = KEY_CHANNELUP,
 	[  1 ] = KEY_BLUE,        // unmarked
+};
+
+/* Matt Jesson <dvb@jesson.eclipse.co.uk */
+static IR_KEYTAB_TYPE ir_codes_avermedia_dvbt[IR_KEYTAB_SIZE] = {
+	[ 0x28 ] = KEY_KP0,         //'0' / 'enter'
+	[ 0x22 ] = KEY_KP1,         //'1'
+	[ 0x12 ] = KEY_KP2,         //'2' / 'up arrow'
+	[ 0x32 ] = KEY_KP3,         //'3'
+	[ 0x24 ] = KEY_KP4,         //'4' / 'left arrow'
+	[ 0x14 ] = KEY_KP5,         //'5'
+	[ 0x34 ] = KEY_KP6,         //'6' / 'right arrow'
+	[ 0x26 ] = KEY_KP7,         //'7'
+	[ 0x16 ] = KEY_KP8,         //'8' / 'down arrow'
+	[ 0x36 ] = KEY_KP9,         //'9'
+
+	[ 0x20 ] = KEY_LIST,        // 'source'
+	[ 0x10 ] = KEY_TEXT,        // 'teletext'
+	[ 0x00 ] = KEY_POWER,       // 'power'
+	[ 0x04 ] = KEY_AUDIO,       // 'audio'
+	[ 0x06 ] = KEY_ZOOM,        // 'full screen'
+	[ 0x18 ] = KEY_VIDEO,       // 'display'
+	[ 0x38 ] = KEY_SEARCH,      // 'loop'
+	[ 0x08 ] = KEY_INFO,        // 'preview'
+	[ 0x2a ] = KEY_REWIND,      // 'backward <<'
+	[ 0x1a ] = KEY_FASTFORWARD, // 'forward >>'
+	[ 0x3a ] = KEY_RECORD,      // 'capture'
+	[ 0x0a ] = KEY_MUTE,        // 'mute'
+	[ 0x2c ] = KEY_RECORD,      // 'record'
+	[ 0x1c ] = KEY_PAUSE,       // 'pause'
+	[ 0x3c ] = KEY_STOP,        // 'stop'
+	[ 0x0c ] = KEY_PLAY,        // 'play'
+	[ 0x2e ] = KEY_RED,         // 'red'
+	[ 0x01 ] = KEY_BLUE,        // 'blue' / 'cancel'
+	[ 0x0e ] = KEY_YELLOW,      // 'yellow' / 'ok'
+	[ 0x21 ] = KEY_GREEN,       // 'green'
+	[ 0x11 ] = KEY_CHANNELDOWN, // 'channel -'
+	[ 0x31 ] = KEY_CHANNELUP,   // 'channel +'
+	[ 0x1e ] = KEY_VOLUMEDOWN,  // 'volume -'
+	[ 0x3e ] = KEY_VOLUMEUP,    // 'volume +'
 };
 
 static IR_KEYTAB_TYPE winfast_codes[IR_KEYTAB_SIZE] = {
@@ -130,7 +170,7 @@ static IR_KEYTAB_TYPE ir_codes_pixelview[IR_KEYTAB_SIZE] = {
 	[  6 ] = KEY_KP7,
 	[ 10 ] = KEY_KP8,
 	[ 18 ] = KEY_KP9,
-	
+
 	[  3 ] = KEY_TUNER,       // TV/FM
 	[  7 ] = KEY_SEARCH,      // scan
 	[ 28 ] = KEY_ZOOM,        // full screen
@@ -140,7 +180,7 @@ static IR_KEYTAB_TYPE ir_codes_pixelview[IR_KEYTAB_SIZE] = {
 	[ 20 ] = KEY_CHANNELDOWN,
 	[ 22 ] = KEY_CHANNELUP,
 	[ 24 ] = KEY_MUTE,
-	
+
 	[  0 ] = KEY_LIST,        // source
 	[ 19 ] = KEY_INFO,        // loop
 	[ 16 ] = KEY_LAST,        // +100
@@ -149,6 +189,47 @@ static IR_KEYTAB_TYPE ir_codes_pixelview[IR_KEYTAB_SIZE] = {
 	[  4 ] = BTN_LEFT,        // fun--
 	[ 14 ] = KEY_GOTO,        // function
 	[ 15 ] = KEY_STOP,         // freeze
+};
+
+/* Attila Kondoros <attila.kondoros@chello.hu> */
+static IR_KEYTAB_TYPE ir_codes_apac_viewcomp[IR_KEYTAB_SIZE] = {
+
+	[  1 ] = KEY_KP1,
+	[  2 ] = KEY_KP2,
+	[  3 ] = KEY_KP3,
+	[  4 ] = KEY_KP4,
+	[  5 ] = KEY_KP5,
+	[  6 ] = KEY_KP6,
+	[  7 ] = KEY_KP7,
+	[  8 ] = KEY_KP8,
+	[  9 ] = KEY_KP9,
+	[  0 ] = KEY_KP0,
+	[ 23 ] = KEY_LAST,        // +100
+	[ 10 ] = KEY_LIST,        // recall
+
+
+	[ 28 ] = KEY_TUNER,       // TV/FM
+	[ 21 ] = KEY_SEARCH,      // scan
+	[ 18 ] = KEY_POWER,       // power
+	[ 31 ] = KEY_VOLUMEDOWN,  // vol up
+	[ 27 ] = KEY_VOLUMEUP,    // vol down
+	[ 30 ] = KEY_CHANNELDOWN, // chn up
+	[ 26 ] = KEY_CHANNELUP,   // chn down
+
+	[ 17 ] = KEY_VIDEO,       // video
+	[ 15 ] = KEY_ZOOM,        // full screen
+	[ 19 ] = KEY_MUTE,        // mute/unmute
+	[ 16 ] = KEY_TEXT,        // min
+
+	[ 13 ] = KEY_STOP,        // freeze
+	[ 14 ] = KEY_RECORD,      // record
+	[ 29 ] = KEY_PLAYPAUSE,   // stop
+	[ 25 ] = KEY_PLAY,        // play
+
+	[ 22 ] = KEY_GOTO,        // osd
+	[ 20 ] = KEY_REFRESH,     // default
+	[ 12 ] = KEY_KPPLUS,      // fine tune >>>>
+	[ 24 ] = KEY_KPMINUS      // fine tune <<<<
 };
 
 /* ---------------------------------------------------------------------- */
@@ -202,7 +283,7 @@ static void ir_handle_key(struct IR *ir)
 			return;
 		ir->last_gpio = gpio;
 	}
-	
+
 	/* extract data */
 	data = ir_extract_bits(gpio, ir->mask_keycode);
 	dprintk(DEVNAME ": irq gpio=0x%x code=%d | %s%s%s\n",
@@ -284,6 +365,14 @@ static int ir_probe(struct device *dev)
 		ir->polling      = 50; // ms
 		break;
 
+	case BTTV_AVDVBT_761:
+	/* case BTTV_AVDVBT_771: */
+		ir_codes         = ir_codes_avermedia_dvbt;
+		ir->mask_keycode = 0x0f00c0;
+		ir->mask_keydown = 0x000020;
+		ir->polling      = 50; // ms
+		break;
+
 	case BTTV_PXELVWPLTVPAK:
 		ir_codes         = ir_codes_pixelview;
 		ir->mask_keycode = 0x003e00;
@@ -308,6 +397,12 @@ static int ir_probe(struct device *dev)
 		ir->mask_keycode = 0x0008e000;
 		ir->mask_keydown = 0x00200000;
 		break;
+	case BTTV_APAC_VIEWCOMP:
+		ir_codes         = ir_codes_apac_viewcomp;
+		ir->mask_keycode = 0x001f00;
+		ir->mask_keyup   = 0x008000;
+		ir->polling      = 50; // ms
+		break;
 	}
 	if (NULL == ir_codes) {
 		kfree(ir);
@@ -317,7 +412,7 @@ static int ir_probe(struct device *dev)
 	/* init hardware-specific stuff */
 	bttv_gpio_inout(sub->core, ir->mask_keycode | ir->mask_keydown, 0);
 	ir->sub = sub;
-	
+
 	/* init input device */
 	snprintf(ir->name, sizeof(ir->name), "bttv IR (card=%d)",
 		 sub->core->type);

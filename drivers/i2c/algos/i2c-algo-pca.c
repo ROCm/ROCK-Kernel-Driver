@@ -249,7 +249,7 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 			break;
 
 		case 0x20: /* SLA+W has been transmitted; NOT ACK has been received */
-			DEB2("NOT ACK recieved after SLA+W\n");
+			DEB2("NOT ACK received after SLA+W\n");
 			pca_stop(adap);
 			return -EREMOTEIO;
 
@@ -277,7 +277,7 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 			return -EREMOTEIO;
 
 		case 0x30: /* Data byte in I2CDAT has been transmitted; NOT ACK has been received */
-			DEB2("NOT ACK recieved after data byte\n");
+			DEB2("NOT ACK received after data byte\n");
 			return -EREMOTEIO;
 
 		case 0x38: /* Arbitration lost during SLA+W, SLA+R or data bytes */

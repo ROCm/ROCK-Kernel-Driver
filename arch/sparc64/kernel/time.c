@@ -1046,6 +1046,7 @@ static struct notifier_block sparc64_cpufreq_notifier_block = {
 static struct time_interpolator sparc64_cpu_interpolator = {
 	.source		=	TIME_SOURCE_CPU,
 	.shift		=	16,
+	.mask		=	0xffffffffffffffffLL
 };
 
 /* The quotient formula is taken from the IA64 port. */

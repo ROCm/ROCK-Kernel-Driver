@@ -18,6 +18,7 @@
 #include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/bcd.h>
+#include <linux/mc146818rtc.h>
 
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -47,8 +48,6 @@
  * 	 we set the 'R' bit before reading them, they basically stop counting.
  * 	 					--MAG
  */
-
-extern spinlock_t	rtc_lock;
 
 /*
  * 'todc_info' should be initialized in your *_setup.c file to
