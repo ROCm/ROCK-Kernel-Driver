@@ -94,7 +94,6 @@ struct pnp_driver {
 	int  (*probe)  (struct pnp_dev *dev, const struct pnp_id *card_id,
 		 	const struct pnp_id *dev_id);
 	void (*remove) (struct pnp_dev *dev);
-	struct device * (*legacy) (void);
 	struct device_driver	driver;
 };
 

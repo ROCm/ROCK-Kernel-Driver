@@ -151,6 +151,8 @@ struct bus_type pnp_bus_type = {
 int pnp_register_driver(struct pnp_driver *drv)
 {
 	int count;
+	struct list_head *pos;
+
 	pnp_dbg("the driver '%s' has been registered", drv->name);
 
 	drv->driver.name = drv->name;
@@ -159,7 +161,15 @@ int pnp_register_driver(struct pnp_driver *drv)
 	drv->driver.remove = pnp_device_remove;
 
 	count = driver_register(&drv->driver);
-	return count ? count : 1;
+
+	/* get the number of initial matches */
+	if (count >= 0){
+		count = 0;
+		list_for_each(pos,&drv->driver.devices){
+			count++;
+		}
+	}
+	return count;
 }
 
 void pnp_unregister_driver(struct pnp_driver *drv)
