@@ -30,6 +30,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/cfi.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #define CMD_RESET		0xffffffff
 #define CMD_READ_ID		0x90909090

@@ -612,7 +612,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		uref = &uref_multi->uref;
 		if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
 			if (copy_from_user(uref_multi, (void *) arg, 
-					   sizeof(uref_multi)))
+					   sizeof(*uref_multi)))
 				goto fault;
 		} else {
 			if (copy_from_user(uref, (void *) arg, sizeof(*uref)))

@@ -33,7 +33,7 @@ u16 hfs_brec_keylen(struct hfs_bnode *node, u16 rec)
 
 	if ((node->type == HFS_NODE_INDEX) &&
 	   !(node->tree->attributes & HFS_TREE_VARIDXKEYS)) {
-		retval = node->tree->max_key_len;
+		retval = node->tree->max_key_len + 2;
 	} else {
 		recoff = hfs_bnode_read_u16(node, node->tree->node_size - (rec + 1) * 2);
 		if (!recoff)
@@ -144,7 +144,7 @@ skip:
 		if (tree->attributes & HFS_TREE_VARIDXKEYS)
 			key_len = be16_to_cpu(fd->search_key->key_len) + 2;
 		else {
-			fd->search_key->key_len = tree->max_key_len;
+			fd->search_key->key_len = cpu_to_be16(tree->max_key_len);
 			key_len = tree->max_key_len + 2;
 		}
 		goto again;

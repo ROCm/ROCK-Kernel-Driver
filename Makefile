@@ -680,7 +680,7 @@ include/config/MARKER: include/linux/autoconf.h
 uts_len := 64
 
 define filechk_version.h
-	if ((`echo -n "$(KERNELRELEASE)" | wc -c ` > $(uts_len))); then \
+	if [ `echo -n "$(KERNELRELEASE)" | wc -c ` -gt $(uts_len) ]; then \
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi; \

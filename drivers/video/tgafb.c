@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/fb.h>
 #include <linux/pci.h>
+#include <linux/selection.h>
 #include <asm/io.h>
 #include <video/tgafb.h>
 #include <linux/selection.h>

@@ -538,11 +538,6 @@ CRAMFS FILESYSTEM
 W:     http://sourceforge.net/projects/cramfs/
 S:     Orphan
 
-CREDITS FILE
-P:	John A. Martin
-M:	jam@acm.org
-S:	Maintained
-
 CRIS PORT
 P:	Bjorn Wesen
 M:	bjornw@axis.com

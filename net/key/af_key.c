@@ -1976,7 +1976,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	memset(&sel, 0, sizeof(sel));
 
 	sa = ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
-	pfkey_sadb_addr2xfrm_addr(sa, &sel.saddr);
+	sel.family = pfkey_sadb_addr2xfrm_addr(sa, &sel.saddr);
 	sel.prefixlen_s = sa->sadb_address_prefixlen;
 	sel.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
 	sel.sport = ((struct sockaddr_in *)(sa+1))->sin_port;

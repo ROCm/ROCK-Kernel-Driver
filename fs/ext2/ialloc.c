@@ -663,7 +663,7 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 	}
 	brelse(bitmap_bh);
 	printk("ext2_count_free_inodes: stored = %lu, computed = %lu, %lu\n",
-		percpu_counter_read(EXT2_SB(sb)->s_freeinodes_counter),
+		percpu_counter_read(&EXT2_SB(sb)->s_freeinodes_counter),
 		desc_count, bitmap_count);
 	unlock_super(sb);
 	return desc_count;
@@ -724,7 +724,7 @@ void ext2_check_inodes_bitmap (struct super_block * sb)
 		bitmap_count += x;
 	}
 	brelse(bitmap_bh);
-	if (percpu_counter_read(EXT2_SB(sb)->s_freeinodes_counter) !=
+	if (percpu_counter_read(&EXT2_SB(sb)->s_freeinodes_counter) !=
 				bitmap_count)
 		ext2_error(sb, "ext2_check_inodes_bitmap",
 			    "Wrong free inodes count in super block, "

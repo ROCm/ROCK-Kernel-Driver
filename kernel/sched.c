@@ -141,8 +141,7 @@
 	(v1) * (v2_max) / (v1_max)
 
 #define DELTA(p) \
-	(SCALE(TASK_NICE(p), 40, MAX_USER_PRIO*PRIO_BONUS_RATIO/100) + \
-		INTERACTIVE_DELTA)
+	(SCALE(TASK_NICE(p), 40, MAX_BONUS) + INTERACTIVE_DELTA)
 
 #define TASK_INTERACTIVE(p) \
 	((p)->prio <= (p)->static_prio - DELTA(p))
@@ -2991,10 +2990,9 @@ asmlinkage long sys_sched_yield(void)
 
 	/*
 	 * Since we are going to call schedule() anyway, there's
-	 * no need to preempt:
+	 * no need to preempt or enable interrupts:
 	 */
 	_raw_spin_unlock(&rq->lock);
-	local_irq_enable();
 	preempt_enable_no_resched();
 
 	schedule();

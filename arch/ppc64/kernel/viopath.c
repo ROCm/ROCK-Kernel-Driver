@@ -190,6 +190,8 @@ static unsigned char e2a(unsigned char x)
 static int proc_viopath_show(struct seq_file *m, void *v)
 {
 	char *buf;
+	u16 vlanMap;
+	int vlanIndex;
 	dma_addr_t handle;
 	HvLpEvent_Rc hvrc;
 	DECLARE_MUTEX_LOCKED(Semaphore);
@@ -216,12 +218,18 @@ static int proc_viopath_show(struct seq_file *m, void *v)
 
 	down(&Semaphore);
 
-	dma_unmap_single(iSeries_vio_dev, handle, PAGE_SIZE, DMA_FROM_DEVICE);
-	kfree(buf);
+	vlanMap = HvLpConfig_getVirtualLanIndexMap();
+	vlanIndex = 0;
+	while (vlanMap != 0){
+		if (vlanMap & 0x8000)
+			vlanIndex++;;
+		vlanMap = vlanMap << 1;
+	}
 
-	buf[PAGE_SIZE] = '\0';
+	buf[PAGE_SIZE-1] = '\0';
 	seq_printf(m, "%s", buf);
 
+	seq_printf(m, "AVAILABLE_VETH=%d\n", vlanIndex );
 	seq_printf(m, "SRLNBR=%c%c%c%c%c%c%c\n",
 		   e2a(xItExtVpdPanel.mfgID[2]),
 		   e2a(xItExtVpdPanel.mfgID[3]),
@@ -230,6 +238,9 @@ static int proc_viopath_show(struct seq_file *m, void *v)
 		   e2a(xItExtVpdPanel.systemSerial[3]),
 		   e2a(xItExtVpdPanel.systemSerial[4]),
 		   e2a(xItExtVpdPanel.systemSerial[5]));
+
+	dma_unmap_single(iSeries_vio_dev, handle, PAGE_SIZE, DMA_FROM_DEVICE);
+	kfree(buf);
 
 	return 0;
 }

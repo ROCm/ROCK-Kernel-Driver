@@ -40,7 +40,6 @@
 #ifndef __ASSEMBLER__
 #include <asm/types.h>
 #endif
-#include <asm/mach-types.h>
 
 /*
  * ----------------------------------------------------------------------------

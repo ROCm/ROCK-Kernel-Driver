@@ -1845,10 +1845,13 @@ struct tg3_bufmgr_config {
 
 struct tg3_ethtool_stats {
 	/* Statistics maintained by Receive MAC. */
+	u64 	    	rx_octets;
 	u64		rx_fragments;
 	u64		rx_ucast_packets;
+	u64		rx_mcast_packets;
 	u64		rx_bcast_packets;
 	u64		rx_fcs_errors;
+	u64		rx_align_errors;
 	u64		rx_xon_pause_rcvd;
 	u64		rx_xoff_pause_rcvd;
 	u64		rx_mac_ctrl_rcvd;
@@ -1858,8 +1861,20 @@ struct tg3_ethtool_stats {
 	u64		rx_undersize_packets;
 	u64		rx_in_length_errors;
 	u64		rx_out_length_errors;
+	u64		rx_64_or_less_octet_packets;
+	u64		rx_65_to_127_octet_packets;
+	u64		rx_128_to_255_octet_packets;
+	u64		rx_256_to_511_octet_packets;
+	u64		rx_512_to_1023_octet_packets;
+	u64		rx_1024_to_1522_octet_packets;
+	u64		rx_1523_to_2047_octet_packets;
+	u64		rx_2048_to_4095_octet_packets;
+	u64		rx_4096_to_8191_octet_packets;
+	u64		rx_8192_to_9022_octet_packets;
 
 	/* Statistics maintained by Transmit MAC. */
+	u64		tx_octets;
+	u64		tx_collisions;
 	u64		tx_xon_sent;
 	u64		tx_xoff_sent;
 	u64		tx_flow_control;
@@ -1869,9 +1884,46 @@ struct tg3_ethtool_stats {
 	u64		tx_deferred;
 	u64		tx_excessive_collisions;
 	u64		tx_late_collisions;
+	u64		tx_collide_2times;
+	u64		tx_collide_3times;
+	u64		tx_collide_4times;
+	u64		tx_collide_5times;
+	u64		tx_collide_6times;
+	u64		tx_collide_7times;
+	u64		tx_collide_8times;
+	u64		tx_collide_9times;
+	u64		tx_collide_10times;
+	u64		tx_collide_11times;
+	u64		tx_collide_12times;
+	u64		tx_collide_13times;
+	u64		tx_collide_14times;
+	u64		tx_collide_15times;
 	u64		tx_ucast_packets;
 	u64		tx_mcast_packets;
 	u64		tx_bcast_packets;
+	u64		tx_carrier_sense_errors;
+	u64		tx_discards;
+	u64		tx_errors;
+
+	/* Statistics maintained by Receive List Placement. */
+	u64		dma_writeq_full;
+	u64		dma_write_prioq_full;
+	u64		rxbds_empty;
+	u64		rx_discards;
+	u64		rx_errors;
+	u64		rx_threshold_hit;
+
+	/* Statistics maintained by Send Data Initiator. */
+	u64		dma_readq_full;
+	u64		dma_read_prioq_full;
+	u64		tx_comp_queue_full;
+
+	/* Statistics maintained by Host Coalescing. */
+	u64		ring_set_send_prod_index;
+	u64		ring_status_update;
+	u64		nic_irqs;
+	u64		nic_avoided_irqs;
+	u64		nic_tx_threshold_hit;
 };
 
 struct tg3 {

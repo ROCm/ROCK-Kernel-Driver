@@ -52,6 +52,7 @@ static int handle_pm_event (struct pm_dev *dev, pm_request_t rqst, void *data);
 /* These belong in linux/pci.h. */
 #define PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO 0x8005
 #define PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO 0x8006
+#define PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO 0x8016
 
 /* List of cards.  */
 static struct nm256_info *nmcard_list;
@@ -1275,6 +1276,8 @@ nm256_probe(struct pci_dev *pcidev,const struct pci_device_id *pciid)
 	return nm256_install(pcidev, REV_NM256AV, "256AV");
     if (pcidev->device == PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO)
 	return nm256_install(pcidev, REV_NM256ZX, "256ZX");
+    if (pcidev->device == PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO)
+	return nm256_install(pcidev, REV_NM256ZX, "256XL+");
     return -1; /* should not come here ... */
 }
 
@@ -1661,6 +1664,8 @@ static struct pci_device_id nm256_pci_tbl[] = {
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO,
 	PCI_ANY_ID, PCI_ANY_ID, 0, 0},
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO,
+	PCI_ANY_ID, PCI_ANY_ID, 0, 0},
+	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO,
 	PCI_ANY_ID, PCI_ANY_ID, 0, 0},
 	{0,}
 };

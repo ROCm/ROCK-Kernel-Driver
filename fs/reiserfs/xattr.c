@@ -1370,13 +1370,15 @@ __reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd,
 		if (!(mode & S_IRWXG))
 			goto check_groups;
 
-                reiserfs_read_lock_xattr_i (inode);
-                if (need_lock)
+                if (need_lock) {
+		    reiserfs_read_lock_xattr_i (inode);
                     reiserfs_read_lock_xattrs (inode->i_sb);
+		}
                 acl = reiserfs_get_acl (inode, ACL_TYPE_ACCESS);
-                if (need_lock)
+                if (need_lock) {
                     reiserfs_read_unlock_xattrs (inode->i_sb);
-                reiserfs_read_unlock_xattr_i (inode);
+		    reiserfs_read_unlock_xattr_i (inode);
+		}
                 if (IS_ERR (acl)) {
                     if (PTR_ERR (acl) == -ENODATA)
                         goto check_groups;

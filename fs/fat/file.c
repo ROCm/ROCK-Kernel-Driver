@@ -47,7 +47,8 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 	if (!create)
 		return 0;
 	if (iblock != MSDOS_I(inode)->mmu_private >> sb->s_blocksize_bits) {
-		BUG();
+		fat_fs_panic(sb, "corrupted file size (i_pos %lld, %lld)",
+			     MSDOS_I(inode)->i_pos, MSDOS_I(inode)->mmu_private);
 		return -EIO;
 	}
 	if (!((unsigned long)iblock & (MSDOS_SB(sb)->sec_per_clus - 1))) {

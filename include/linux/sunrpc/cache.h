@@ -99,6 +99,7 @@ struct cache_detail {
 	atomic_t		readers;		/* how many time is /chennel open */
 	time_t			last_close;		/* if no readers, when did last close */
 	time_t			last_warn;		/* when we last warned about no readers */
+	void			(*warn_no_listener)(struct cache_detail *cd);
 };
 
 

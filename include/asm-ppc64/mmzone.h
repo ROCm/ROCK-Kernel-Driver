@@ -23,7 +23,6 @@ extern char *numa_memory_lookup_table;
 extern cpumask_t numa_cpumask_lookup_table[];
 extern int nr_cpus_in_node[];
 
-#define MAX_MEMORY (1UL << 41)
 /* 16MB regions */
 #define MEMORY_INCREMENT_SHIFT 24
 #define MEMORY_INCREMENT (1UL << MEMORY_INCREMENT_SHIFT)

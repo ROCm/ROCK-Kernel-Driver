@@ -472,6 +472,27 @@ static void emit_log_char(char c)
 }
 
 /*
+ * Zap console related locks when oopsing. Only zap at most once
+ * every 10 seconds, to leave time for slow consoles to print a
+ * full oops.
+ */
+static void zap_locks(void)
+{
+	static unsigned long oops_timestamp;
+
+	if (time_after_eq(jiffies, oops_timestamp) &&
+			!time_after(jiffies, oops_timestamp + 30*HZ))
+		return;
+
+	oops_timestamp = jiffies;
+
+	/* If a crash is occurring, make sure we can't deadlock */
+	spin_lock_init(&logbuf_lock);
+	/* And make sure that we print immediately */
+	init_MUTEX(&console_sem);
+}
+
+/*
  * This is printk.  It can be called from any context.  We want it to work.
  * 
  * We try to grab the console_sem.  If we succeed, it's easy - we log the output and
@@ -493,12 +514,8 @@ asmlinkage int printk(const char *fmt, ...)
 	static char printk_buf[1024];
 	static int log_level_unknown = 1;
 
-	if (oops_in_progress) {
-		/* If a crash is occurring, make sure we can't deadlock */
-		spin_lock_init(&logbuf_lock);
-		/* And make sure that we print immediately */
-		init_MUTEX(&console_sem);
-	}
+	if (unlikely(oops_in_progress))
+		zap_locks();
 
 	/* This stops the holder of console_sem just where we want him */
 	spin_lock_irqsave(&logbuf_lock, flags);

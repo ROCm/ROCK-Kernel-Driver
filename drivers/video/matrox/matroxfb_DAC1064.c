@@ -660,7 +660,7 @@ static int MGA1064_preinit(WPMINFO2) {
 	ACCESS_FBINFO(features.accel.has_cacheflush) = 1;
 
 	ACCESS_FBINFO(outputs[0]).output = &m1064;
-	ACCESS_FBINFO(outputs[0]).src = MATROXFB_SRC_CRTC1;
+	ACCESS_FBINFO(outputs[0]).src = ACCESS_FBINFO(outputs[0]).default_src;
 	ACCESS_FBINFO(outputs[0]).data = MINFO;
 	ACCESS_FBINFO(outputs[0]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
 
@@ -859,7 +859,7 @@ static int MGAG100_preinit(WPMINFO2) {
 	{
 		ACCESS_FBINFO(outputs[0]).output = &m1064;
 	}
-	ACCESS_FBINFO(outputs[0]).src = MATROXFB_SRC_CRTC1;
+	ACCESS_FBINFO(outputs[0]).src = ACCESS_FBINFO(outputs[0]).default_src;
 	ACCESS_FBINFO(outputs[0]).data = MINFO;
 	ACCESS_FBINFO(outputs[0]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
 
