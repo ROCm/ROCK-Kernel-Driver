@@ -232,6 +232,16 @@ static void __init md_setup_drive(void)
 			err = sys_ioctl(fd, RUN_ARRAY, 0);
 		if (err)
 			printk(KERN_WARNING "md: starting md%d failed\n", minor);
+		else {
+			/* reread the partition table.
+			 * I (neilb) and not sure why this is needed, but I cannot
+			 * boot a kernel with devfs compiled in from partitioned md
+			 * array without it
+			 */
+			sys_close(fd);
+			fd = sys_open(name, 0, 0);
+			sys_ioctl(fd, BLKRRPART, 0);
+		}
 		sys_close(fd);
 	}
 }

@@ -1473,10 +1473,13 @@ static struct kobject *md_probe(dev_t dev, int *part, void *data)
 	}
 	disk->major = MAJOR(dev);
 	disk->first_minor = unit << shift;
-	if (partitioned)
+	if (partitioned) {
 		sprintf(disk->disk_name, "md_d%d", unit);
-	else
+		sprintf(disk->devfs_name, "md/d%d", unit);
+	} else {
 		sprintf(disk->disk_name, "md%d", unit);
+		sprintf(disk->devfs_name, "md/%d", unit);
+	}
 	disk->fops = &md_fops;
 	disk->private_data = mddev;
 	disk->queue = mddev->queue;
@@ -3659,7 +3662,7 @@ int __init md_init(void)
 	for (minor=0; minor < MAX_MD_DEVS; ++minor)
 		devfs_mk_bdev(MKDEV(mdp_major, minor<<MdpMinorShift),
 			      S_IFBLK|S_IRUSR|S_IWUSR,
-			      "md/d%d", minor);
+			      "md/mdp%d", minor);
 
 
 	register_reboot_notifier(&md_notifier);
