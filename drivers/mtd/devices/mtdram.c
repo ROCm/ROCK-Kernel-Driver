@@ -1,6 +1,6 @@
 /*
  * mtdram - a test mtd device
- * $Id: mtdram.c,v 1.32 2003/05/21 15:15:07 dwmw2 Exp $
+ * $Id: mtdram.c,v 1.33 2004/08/09 13:19:44 dwmw2 Exp $
  * Author: Alexander Larsson <alex@cendio.se>
  *
  * Copyright (c) 1999 Alexander Larsson <alex@cendio.se>
@@ -57,9 +57,8 @@ ram_erase(struct mtd_info *mtd, struct erase_info *instr)
   memset((char *)mtd->priv + instr->addr, 0xff, instr->len);
 	
   instr->state = MTD_ERASE_DONE;
+  mtd_erase_callback(instr);
 
-  if (instr->callback)
-    (*(instr->callback))(instr);
   return 0;
 }
 

@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001.c,v 1.42 2004/04/04 12:36:45 gleixner Exp $
+ * $Id: doc2001.c,v 1.44 2004/08/09 14:04:24 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -845,8 +845,7 @@ int doc_erase (struct mtd_info *mtd, struct erase_info *instr)
 		instr->state = MTD_ERASE_DONE;
 	dummy = ReadDOC(docptr, LastDataRead);
 
-	if (instr->callback) 
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 
 	return 0;
 }
