@@ -2546,6 +2546,20 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		goto abort;
 	}
 
+
+	if (cmd == START_ARRAY) {
+		/* START_ARRAY doesn't need to lock the array as autostart_array
+		 * does the locking, and it could even be a different array
+		 */
+		err = autostart_array(val_to_kdev(arg));
+		if (err) {
+			printk(KERN_WARNING "md: autostart %s failed!\n",
+			       partition_name(val_to_kdev(arg)));
+			goto abort;
+		}
+		goto done;
+	}
+
 	err = mddev_lock(mddev);
 	if (err) {
 		printk(KERN_INFO "md: ioctl lock interrupted, reason %d, cmd %d\n",
@@ -2580,18 +2594,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 					printk(KERN_WARNING "md: couldnt set array info. %d\n", err);
 					goto abort_unlock;
 				}
-			}
-			goto done_unlock;
-
-		case START_ARRAY:
-			/*
-			 * possibly make it lock the array ...
-			 */
-			err = autostart_array(val_to_kdev(arg));
-			if (err) {
-				printk(KERN_WARNING "md: autostart %s failed!\n",
-					partition_name(val_to_kdev(arg)));
-				goto abort_unlock;
 			}
 			goto done_unlock;
 
