@@ -743,22 +743,22 @@ again:
 	/*
 	 * Check ufs magic number
 	 */
-	switch ((uspi->fs_magic = __constant_le32_to_cpu(usb3->fs_magic))) {
+	sbi->s_bytesex = BYTESEX_LE;
+	switch ((uspi->fs_magic = fs32_to_cpu(sb, usb3->fs_magic))) {
 		case UFS_MAGIC:
 		case UFS2_MAGIC:
 		case UFS_MAGIC_LFN:
 	        case UFS_MAGIC_FEA:
 	        case UFS_MAGIC_4GB:
-			sbi->s_bytesex = BYTESEX_LE;
 			goto magic_found;
 	}
-	switch ((uspi->fs_magic = __constant_be32_to_cpu(usb3->fs_magic))) {
+	sbi->s_bytesex = BYTESEX_BE;
+	switch ((uspi->fs_magic = fs32_to_cpu(sb, usb3->fs_magic))) {
 		case UFS_MAGIC:
 		case UFS2_MAGIC:
 		case UFS_MAGIC_LFN:
 	        case UFS_MAGIC_FEA:
 	        case UFS_MAGIC_4GB:
-			sbi->s_bytesex = BYTESEX_BE;
 			goto magic_found;
 	}
 

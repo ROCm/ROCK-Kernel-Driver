@@ -235,7 +235,7 @@ failed:
 		brelse (bh); \
 	}
 
-unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
+unsigned ufs_new_fragments (struct inode * inode, __fs32 * p, unsigned fragment,
 	unsigned goal, unsigned count, int * err )
 {
 	struct super_block * sb;
@@ -771,11 +771,11 @@ static void ufs_clusteracct(struct super_block * sb,
 	i = back + forw + 1;
 	if (i > uspi->s_contigsumsize)
 		i = uspi->s_contigsumsize;
-	fs32_add(sb, (u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (i << 2)), cnt);
+	fs32_add(sb, (__fs32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (i << 2)), cnt);
 	if (back > 0)
-		fs32_sub(sb, (u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (back << 2)), cnt);
+		fs32_sub(sb, (__fs32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (back << 2)), cnt);
 	if (forw > 0)
-		fs32_sub(sb, (u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (forw << 2)), cnt);
+		fs32_sub(sb, (__fs32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (forw << 2)), cnt);
 }
 
 
