@@ -35,7 +35,8 @@ static void zero_fill_bio(struct bio *bio)
 	bio_for_each_segment(bv, bio, i) {
 		char *data = bvec_kmap_irq(bv, &flags);
 		memset(data, 0, bv->bv_len);
-		bvec_kunmap_irq(bv, &flags);
+		flush_dcache_page(bv->bv_page);
+		bvec_kunmap_irq(data, &flags);
 	}
 }
 
