@@ -24,7 +24,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <asm/kmap_types.h>
-#include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 /* declarations for highmem.c */
 extern unsigned long highstart_pfn, highend_pfn;
