@@ -716,7 +716,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		emu->no_ac97 = 1;	
 	}
 	
-	if (emu->revision == 4 && emu->model == 0x2002) {
+	if (emu->revision == 4 && (emu->model == 0x2001 || emu->model == 0x2002)) {
 		/* Audigy 2 ZS */
 		snd_printdd(KERN_INFO "Audigy2 ZS is detected. setting 7.1 mode.\n");
 		emu->spk71 = 1;
