@@ -115,5 +115,5 @@ void config_BSP(char *command, int len)
 	mach_gettod          = BSP_gettod;
 	mach_reset           = BSP_reset;
 
-	config_M68VZ328_irq();
+	config_M68328_irq();
 }
