@@ -219,15 +219,15 @@ SystemResetException(struct pt_regs *regs)
  */
 static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 {
-	if (err.disposition == DISP_FULLY_RECOVERED) {
+	if (err.disposition == RTAS_DISP_FULLY_RECOVERED) {
 		/* Platform corrected itself */
 		return 1;
 	} else if ((regs->msr & MSR_RI) &&
 		   user_mode(regs) &&
-		   err.severity == SEVERITY_ERROR_SYNC &&
-		   err.disposition == DISP_NOT_RECOVERED &&
-		   err.target == TARGET_MEMORY &&
-		   err.type == TYPE_ECC_UNCORR &&
+		   err.severity == RTAS_SEVERITY_ERROR_SYNC &&
+		   err.disposition == RTAS_DISP_NOT_RECOVERED &&
+		   err.target == RTAS_TARGET_MEMORY &&
+		   err.type == RTAS_TYPE_ECC_UNCORR &&
 		   !(current->pid == 0 || current->pid == 1)) {
 		/* Kill off a user process with an ECC error */
 		printk(KERN_ERR "MCE: uncorrectable ecc error for pid %d\n",
