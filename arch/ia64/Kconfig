@@ -508,6 +508,8 @@ source "drivers/input/Kconfig"
 
 source "drivers/char/Kconfig"
 
+source "drivers/i2c/Kconfig"
+
 #source drivers/misc/Config.in
 source "drivers/media/Kconfig"
 
