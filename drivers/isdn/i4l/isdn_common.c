@@ -611,11 +611,9 @@ isdn_status_callback(isdn_ctrl * c)
 			dbg_statcallb("BHUP: %d\n", i);
 			dev->drv[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
-#ifdef CONFIG_ISDN_X25
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
 				break;
-#endif
 			isdn_v110_stat_callback(&slot[i].iv110, c);
 			if (isdn_tty_stat_callback(i, c))
 				break;

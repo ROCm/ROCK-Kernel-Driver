@@ -75,7 +75,6 @@
 #define ISDN_NET_ENCAP_UIHDLC     5
 #define ISDN_NET_ENCAP_CISCOHDLCK 6 /* With SLARP and keepalive    */
 #define ISDN_NET_ENCAP_X25IFACE   7 /* Documentation/networking/x25-iface.txt*/
-#define ISDN_NET_ENCAP_MAX_ENCAP  ISDN_NET_ENCAP_X25IFACE
 
 /* Facility which currently uses an ISDN-channel */
 #define ISDN_USAGE_NONE       0
@@ -353,13 +352,6 @@ typedef struct isdn_net_local_s {
                                        /* a particular channel (including  */
                                        /* the frame_cnt                    */
 
-  int                    (*org_hhc)(
-				    struct neighbour *neigh,
-				    struct hh_cache *hh);
-                                       /* Ptr to orig. header_cache_update */
-  void                   (*org_hcu)(struct hh_cache *,
-				    struct net_device *,
-                                    unsigned char *);
   int  pppbind;                        /* ippp device for bindings         */
   int					dialtimeout;	/* How long shall we try on dialing? (jiffies) */
   int					dialwait;		/* How long shall we wait after failed attempt? (jiffies) */
@@ -379,6 +371,11 @@ typedef struct isdn_net_local_s {
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
   struct timer_list cisco_timer;
   struct tq_struct tqueue;
+  void                   (*receive)(struct isdn_net_dev_s *p,
+				    struct isdn_net_local_s *olp,
+				    struct sk_buff *skb);
+  void                   (*connected)(struct isdn_net_local_s *lp);
+  void                   (*disconnected)(struct isdn_net_local_s *lp);
 } isdn_net_local;
 
 /* the interface itself */

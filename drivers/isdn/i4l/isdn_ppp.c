@@ -14,6 +14,7 @@
 #include <linux/smp_lock.h>
 #include <linux/poll.h>
 #include <linux/ppp-comp.h>
+#include <linux/if_arp.h>
 
 #include "isdn_common.h"
 #include "isdn_ppp.h"
@@ -98,7 +99,7 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
  * note: it can happen, that we hangup/free the master before the slaves
  *       in this case we bind another lp to the master device
  */
-int
+static void
 isdn_ppp_free(isdn_net_local * lp)
 {
 	unsigned long flags;
@@ -107,7 +108,7 @@ isdn_ppp_free(isdn_net_local * lp)
 	if (lp->ppp_slot < 0 || lp->ppp_slot > ISDN_MAX_CHANNELS) {
 		printk(KERN_ERR "%s: ppp_slot(%d) out of range\n",
 		       __FUNCTION__ , lp->ppp_slot);
-		return 0;
+		return;
 	}
 
 	save_flags(flags);
@@ -128,7 +129,7 @@ isdn_ppp_free(isdn_net_local * lp)
 		printk(KERN_ERR "%s: ppp_slot(%d) now invalid\n",
 		       __FUNCTION__ , lp->ppp_slot);
 		restore_flags(flags);
-		return 0;
+		return;
 	}
 	is = ippp_table[lp->ppp_slot];
 	if ((is->state & IPPP_CONNECT))
@@ -143,7 +144,7 @@ isdn_ppp_free(isdn_net_local * lp)
 	lp->ppp_slot = -1;      /* is this OK ?? */
 
 	restore_flags(flags);
-	return 0;
+	return;
 }
 
 /*
@@ -223,7 +224,7 @@ isdn_ppp_bind(isdn_net_local * lp)
  * (wakes up daemon after B-channel connect)
  */
 
-void
+static void
 isdn_ppp_wakeup_daemon(isdn_net_local * lp)
 {
 	if (lp->ppp_slot < 0 || lp->ppp_slot >= ISDN_MAX_CHANNELS) {
@@ -961,14 +962,19 @@ static int isdn_ppp_strip_proto(struct sk_buff *skb)
 /*
  * handler for incoming packets on a syncPPP interface
  */
-void isdn_ppp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff *skb)
+static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp, 
+			     struct sk_buff *skb)
 {
 	struct ippp_struct *is;
 	int slot;
 	int proto;
 
-	if (net_dev->local.master)
-		BUG(); // we're called with the master device always
+	/*
+	 * If encapsulation is syncppp, don't reset
+	 * huptimer on LCP packets.
+	 */
+	if (PPP_PROTOCOL(skb->data) != PPP_LCP)
+		isdn_net_reset_huptimer(&net_dev->local,lp);
 
 	slot = lp->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
@@ -2892,4 +2898,36 @@ static int isdn_ppp_set_compressor(struct ippp_struct *is, struct isdn_ppp_comp_
 		ipc = ipc->next;
 	}
 	return -EINVAL;
+}
+
+// ISDN_NET_ENCAP_SYNCPPP
+// ======================================================================
+
+static int
+isdn_ppp_header(struct sk_buff *skb, struct net_device *dev,
+		unsigned short type, void *daddr, void *saddr, 
+		unsigned plen)
+{
+	skb_push(skb, IPPP_MAX_HEADER);
+
+	return IPPP_MAX_HEADER;
+}
+
+
+
+int
+isdn_ppp_setup(isdn_net_dev *p)
+{
+	p->dev.hard_header = isdn_ppp_header;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+	p->dev.type = ARPHRD_PPP;	/* change ARP type */
+	p->dev.addr_len = 0;
+	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
+	p->local.receive = isdn_ppp_receive;
+	p->local.connected = isdn_ppp_wakeup_daemon;
+	p->local.disconnected = isdn_ppp_free;
+
+	return 0;
 }

@@ -106,3 +106,145 @@ struct concap_proto * isdn_concap_new( int encap )
 	}
 	return NULL;
 }
+
+void isdn_x25_cleanup(isdn_net_dev *p)
+{
+	isdn_net_local *lp = &p->local;
+	struct concap_proto * cprot = p -> cprot;
+	unsigned long flags;
+	
+	/* delete old encapsulation protocol if present ... */
+	save_flags(flags);
+	cli(); /* avoid races with incoming events trying to
+		  call cprot->pops methods */
+	if( cprot && cprot -> pops )
+		cprot -> pops -> proto_del ( cprot );
+	p -> cprot = NULL;
+	lp -> dops = NULL;
+	restore_flags(flags);
+}
+
+void isdn_x25_open(struct net_device *dev)
+{
+	struct concap_device_ops * dops =
+		( (isdn_net_local *) dev->priv ) -> dops;
+	struct concap_proto * cprot =
+		( (isdn_net_local *) dev->priv ) -> netdev -> cprot;
+	unsigned long flags;
+
+	save_flags(flags);
+	cli();                  /* Avoid glitch on writes to CMD regs */
+	if( cprot && cprot -> pops && dops )
+		cprot -> pops -> restart ( cprot, dev, dops );
+	restore_flags(flags);
+}
+
+void isdn_x25_close(struct net_device *dev)
+{
+	struct concap_proto * cprot =
+		( (isdn_net_local *) dev->priv ) -> netdev -> cprot;
+
+	if( cprot && cprot -> pops ) cprot -> pops -> close( cprot );
+}
+
+static void isdn_x25_connected(isdn_net_local *lp)
+{
+	struct concap_proto *cprot = lp -> netdev -> cprot;
+	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+
+	/* try if there are generic concap receiver routines */
+	if( pops )
+		if( pops->connect_ind)
+			pops->connect_ind(cprot);
+
+	isdn_net_device_wake_queue(lp);
+}
+
+static void isdn_x25_disconnected(isdn_net_local *lp)
+{
+	struct concap_proto *cprot = lp -> netdev -> cprot;
+	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+
+	/* try if there are generic encap protocol
+	   receiver routines and signal the closure of
+	   the link */
+	if( pops  &&  pops -> disconn_ind )
+		pops -> disconn_ind(cprot);
+}
+
+int isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+/* At this point hard_start_xmit() passes control to the encapsulation
+   protocol (if present).
+   For X.25 auto-dialing is completly bypassed because:
+   - It does not conform with the semantics of a reliable datalink
+     service as needed by X.25 PLP.
+   - I don't want that the interface starts dialing when the network layer
+     sends a message which requests to disconnect the lapb link (or if it
+     sends any other message not resulting in data transmission).
+   Instead, dialing will be initiated by the encapsulation protocol entity
+   when a dl_establish request is received from the upper layer.
+*/
+	isdn_net_local *lp = (isdn_net_local *) dev->priv;
+	struct concap_proto * cprot = lp -> netdev -> cprot;
+	int ret = cprot -> pops -> encap_and_xmit ( cprot , skb);
+
+	if (ret)
+		netif_stop_queue(dev);
+		
+	return ret;
+}
+
+static void 
+isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
+{
+	isdn_net_local *lp = &p->local;
+	struct concap_proto *cprot = lp -> netdev -> cprot;
+
+	/* try if there are generic sync_device receiver routines */
+	if(cprot) 
+		if(cprot -> pops)
+			if( cprot -> pops -> data_ind) {
+				cprot -> pops -> data_ind(cprot,skb);
+				return;
+			}
+}
+
+void isdn_x25_realrm(isdn_net_dev *p)
+{
+	if( p -> cprot && p -> cprot -> pops )
+		p -> cprot -> pops -> proto_del ( p -> cprot );
+}
+
+int isdn_x25_setup(isdn_net_dev *p, int encap)
+{
+	isdn_net_local *lp = &p->local;
+
+	/* ... ,  prepare for configuration of new one ... */
+	switch ( encap ){
+	case ISDN_NET_ENCAP_X25IFACE:
+		lp -> dops = &isdn_concap_reliable_dl_dops;
+	}
+	/* ... and allocate new one ... */
+	p -> cprot = isdn_concap_new( cfg -> p_encap );
+	/* p -> cprot == NULL now if p_encap is not supported
+	   by means of the concap_proto mechanism */
+	if (!p->cprot)
+		return -EINVAL;
+
+	p->dev.type = ARPHRD_X25;	/* change ARP type */
+	p->dev.addr_len = 0;
+	p->dev.hard_header = NULL;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->local.receive = isdn_x25_receive;
+	p->local.connected = isdn_x25_connected;
+	p->local.disconnected = isdn_x25_disconnected;
+
+	/* the protocol is not configured yet; this will
+	   happen later when isdn_x25_open() is called */
+
+	return 0;
+}
+
+#endif /* CONFIG_ISDN_X25 */
