@@ -18,8 +18,8 @@
  *
  */
 #include <linux/config.h>
-static char *sg_version_str = "3.5.28 [20030308]";
-static int sg_version_num = 30528;	/* 2 digits for each component */
+static char *sg_version_str = "3.5.29 [20030529]";
+static int sg_version_num = 30529;	/* 2 digits for each component */
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
  *      - scsi logging is available via SCSI_LOG_TIMEOUT macros. First
@@ -1884,11 +1884,8 @@ sg_write_xfer(Sg_request * srp)
 			if (res)
 				return res;
 
-			for (; k < schp->k_use_sg; ++k, ++sclp) {
-				ksglen = (int) sclp->length;
-				p = sg_scatg2virt(sclp);
-				if (NULL == p)
-					break;
+			for (; p; ++sclp, ksglen = (int) sclp->length,
+				  p = sg_scatg2virt(sclp)) {
 				if (usglen <= 0)
 					break;
 				if (ksglen > usglen) {
@@ -1915,6 +1912,9 @@ sg_write_xfer(Sg_request * srp)
 					up += ksglen;
 					usglen -= ksglen;
 				}
+				++k;
+				if (k >= schp->k_use_sg)
+					return 0;
 			}
 		}
 	}
@@ -2041,11 +2041,8 @@ sg_read_xfer(Sg_request * srp)
 			if (res)
 				return res;
 
-			for (; k < schp->k_use_sg; ++k, ++sclp) {
-				ksglen = (int) sclp->length;
-				p = sg_scatg2virt(sclp);
-				if (NULL == p)
-					break;
+			for (; p; ++sclp, ksglen = (int) sclp->length,
+				  p = sg_scatg2virt(sclp)) {
 				if (usglen <= 0)
 					break;
 				if (ksglen > usglen) {
@@ -2072,6 +2069,9 @@ sg_read_xfer(Sg_request * srp)
 					up += ksglen;
 					usglen -= ksglen;
 				}
+				++k;
+				if (k >= schp->k_use_sg)
+					return 0;
 			}
 		}
 	}
