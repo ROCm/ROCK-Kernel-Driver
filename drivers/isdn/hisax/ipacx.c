@@ -66,9 +66,6 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 	if (cs->debug &L1_DEB_ISAC)
 		debugl1(cs, "ph_command (%#x) in (%#x)", command,
 			cs->dc.isac.ph_state);
-//###################################  
-//	printk(KERN_INFO "ph_command (%#x)\n", command);
-//###################################  
 	cs->writeisac(cs, IPACX_CIX0, (command << 4) | 0x0E);
 }
 
@@ -82,9 +79,6 @@ cic_int(struct IsdnCardState *cs)
 
 	event = cs->readisac(cs, IPACX_CIR0) >> 4;
 	if (cs->debug &L1_DEB_ISAC) debugl1(cs, "cic_int(event=%#x)", event);
-//#########################################  
-//	printk(KERN_INFO "cic_int(%x)\n", event);
-//#########################################  
   cs->dc.isac.ph_state = event;
   dch_sched_event(cs, D_L1STATECHANGE);
 }
@@ -417,9 +411,6 @@ dch_int(struct IsdnCardState *cs)
 	int count;
 
 	istad = cs->readisac(cs, IPACX_ISTAD);
-//##############################################  
-//	printk(KERN_WARNING "dch_int(istad=%02x)\n", istad);
-//##############################################  
   
 	if (istad &0x80) {  // RME
 	  rstad = cs->readisac(cs, IPACX_RSTAD);
@@ -714,9 +705,6 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 
 	bcs = cs->bcs + hscx;
 	istab = cs->BC_Read_Reg(cs, hscx, IPACX_ISTAB);
-//##############################################  
-//	printk(KERN_WARNING "bch_int(istab=%02x)\n", istab);
-//##############################################  
 	if (!test_bit(BC_FLG_INIT, &bcs->Flag)) return;
 
 	if (istab &0x80) {	// RME
@@ -963,15 +951,11 @@ interrupt_ipacx(struct IsdnCardState *cs)
 	u_char ista;
   
 	while ((ista = cs->readisac(cs, IPACX_ISTA))) {
-//#################################################  
-//		printk(KERN_WARNING "interrupt_ipacx(ista=%02x)\n", ista);
-//#################################################  
-    if (ista &0x80) bch_int(cs, 0); // B channel interrupts
-    if (ista &0x40) bch_int(cs, 1);
-    
-    if (ista &0x01) dch_int(cs);    // D channel
-    if (ista &0x10) cic_int(cs);    // Layer 1 state
-  }  
+		if (ista &0x80) bch_int(cs, 0); // B channel interrupts
+		if (ista &0x40) bch_int(cs, 1);
+		if (ista &0x01) dch_int(cs);    // D channel
+		if (ista &0x10) cic_int(cs);    // Layer 1 state
+	}  
 }
 
 //----------------------------------------------------------
@@ -1003,9 +987,6 @@ void __init
 init_ipacx(struct IsdnCardState *cs, int part)
 {
 	if (part &1) {  // initialise chip
-//##################################################  
-//	printk(KERN_INFO "init_ipacx(%x)\n", part);
-//##################################################  
 		clear_pending_ints(cs);
 		bch_init(cs, 0);
 		bch_init(cs, 1);

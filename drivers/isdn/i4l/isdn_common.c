@@ -1090,14 +1090,14 @@ isdn_status_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 
 static struct file_operations isdn_status_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		isdn_status_read,
-	write:		isdn_status_write,
-	poll:		isdn_status_poll,
-	ioctl:		isdn_status_ioctl,
-	open:		isdn_status_open,
-	release:	isdn_status_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= isdn_status_read,
+	.write		= isdn_status_write,
+	.poll		= isdn_status_poll,
+	.ioctl		= isdn_status_ioctl,
+	.open		= isdn_status_open,
+	.release	= isdn_status_release,
 };
 
 /*
@@ -1609,14 +1609,14 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 
 static struct file_operations isdn_ctrl_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		isdn_ctrl_read,
-	write:		isdn_ctrl_write,
-	poll:		isdn_ctrl_poll,
-	ioctl:		isdn_ctrl_ioctl,
-	open:		isdn_ctrl_open,
-	release:	isdn_ctrl_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= isdn_ctrl_read,
+	.write		= isdn_ctrl_write,
+	.poll		= isdn_ctrl_poll,
+	.ioctl		= isdn_ctrl_ioctl,
+	.open		= isdn_ctrl_open,
+	.release	= isdn_ctrl_release,
 };
 
 /*
@@ -1661,8 +1661,8 @@ isdn_open(struct inode * inode, struct file * file)
 
 static struct file_operations isdn_fops =
 {
-	owner:		THIS_MODULE,
-	open:		isdn_open,
+	.owner		= THIS_MODULE,
+	.open		= isdn_open,
 };
 
 char *

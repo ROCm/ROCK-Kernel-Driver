@@ -22,8 +22,9 @@ if [ "$CONFIG_NET" != "n" ]; then
       tristate 'CAPI2.0 support' CONFIG_ISDN_CAPI
       if [ "$CONFIG_ISDN_CAPI" != "n" ]; then
          source drivers/isdn/capi/Config.in
-         source drivers/isdn/hardware/Config.in
       fi
+
+      source drivers/isdn/hardware/Config.in
    fi
 fi
 endmenu

@@ -352,10 +352,10 @@ static void __devexit b1pci_pci_remove(struct pci_dev *pdev)
 }
 
 static struct pci_driver b1pci_pci_driver = {
-	name:		"b1pci",
-	id_table:	b1pci_pci_tbl,
-	probe:		b1pci_pci_probe,
-	remove:		__devexit_p(b1pci_pci_remove),
+	.name		= "b1pci",
+	.id_table	= b1pci_pci_tbl,
+	.probe		= b1pci_pci_probe,
+	.remove		= __devexit_p(b1pci_pci_remove),
 };
 
 static int __init b1pci_init(void)

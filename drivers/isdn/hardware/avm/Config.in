@@ -3,7 +3,7 @@
 #
 
 mainmenu_option next_comment
-comment 'Drivers for active AVM cards'
+comment 'Active AVM cards'
 
 bool 'Support AVM cards' CONFIG_CAPI_AVM
 
