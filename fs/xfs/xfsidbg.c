@@ -78,7 +78,6 @@
 #include "xfs_rw.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
-#include "xfs_log_recover.h"
 #include "quota/xfs_qm.h"
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");

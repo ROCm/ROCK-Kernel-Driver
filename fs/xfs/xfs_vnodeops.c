@@ -66,7 +66,6 @@
 #include "xfs_utils.h"
 #include "xfs_trans_space.h"
 #include "xfs_dir_leaf.h"
-#include "xfs_dmapi.h"
 #include "xfs_mac.h"
 #include "xfs_log_priv.h"
 

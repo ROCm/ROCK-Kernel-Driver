@@ -40,7 +40,6 @@
 #include "xfs_dir.h"
 #include "xfs_dmapi.h"
 #include "xfs_mount.h"
-#include "xfs_log.h"
 #include "xfs_trans_priv.h"
 #include "xfs_error.h"
 

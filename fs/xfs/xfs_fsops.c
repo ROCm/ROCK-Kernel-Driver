@@ -53,7 +53,6 @@
 #include "xfs_rw.h"
 #include "xfs_trans_space.h"
 #include "xfs_rtalloc.h"
-#include "xfs_dir.h"
 #include "xfs_dir2.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"

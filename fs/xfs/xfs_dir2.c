@@ -63,7 +63,6 @@
 #include "xfs_dir2_leaf.h"
 #include "xfs_dir2_block.h"
 #include "xfs_dir2_node.h"
-#include "xfs_dir2_sf.h"
 #include "xfs_dir2_trace.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"

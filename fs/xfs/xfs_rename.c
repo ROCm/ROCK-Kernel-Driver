@@ -56,7 +56,6 @@
 #include "xfs_trans_space.h"
 #include "xfs_da_btree.h"
 #include "xfs_dir_leaf.h"
-#include "xfs_dmapi.h"
 
 
 /*

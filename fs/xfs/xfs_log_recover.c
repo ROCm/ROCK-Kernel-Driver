@@ -54,7 +54,6 @@
 #include "xfs_inode.h"
 #include "xfs_ialloc_btree.h"
 #include "xfs_ialloc.h"
-#include "xfs_error.h"
 #include "xfs_log_priv.h"
 #include "xfs_buf_item.h"
 #include "xfs_alloc_btree.h"
