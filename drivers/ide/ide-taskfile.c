@@ -53,12 +53,6 @@
 
 #define DEBUG_TASKFILE	0	/* unset when fixed */
 
-#if DEBUG_TASKFILE
-#define DTF(x...) printk(x)
-#else
-#define DTF(x...)
-#endif
-
 static void ata_bswap_data (void *buffer, int wcount)
 {
 	u16 *p = buffer;
@@ -283,8 +277,6 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 
 	local_irq_enable();
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),READY_STAT,BAD_STAT)) {
-		DTF("%s: command opcode 0x%02x\n", drive->name,
-			args->tfRegister[IDE_COMMAND_OFFSET]);
 		return DRIVER(drive)->error(drive, "task_no_data_intr", stat);
 		/* calls ide_end_drive_cmd */
 	}
@@ -316,15 +308,12 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 			return DRIVER(drive)->error(drive, "task_in_intr", stat);
 		}
 		if (!(stat & BUSY_STAT)) {
-			DTF("task_in_intr to Soon wait for next interrupt\n");
 			ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 			return ide_started;  
 		}
 	}
 
 	pBuf = rq->buffer + task_rq_offset(rq);
-	DTF("Read: %p, rq->current_nr_sectors: %d, stat: %02x\n",
-		pBuf, (int) rq->current_nr_sectors, stat);
 	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
 
 	/* FIXME: check drive status */
@@ -363,9 +352,6 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 		if (nsect > msect)
 			nsect = msect;
 		pBuf = rq->buffer + task_rq_offset(rq);
-		DTF("Multiread: %p, nsect: %d, msect: %d, " \
-			" rq->current_nr_sectors: %d\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
 		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
 		rq->errors = 0;
 		rq->current_nr_sectors -= nsect;
@@ -431,8 +417,6 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
 		rq = HWGROUP(drive)->rq;
 		pBuf = rq->buffer + task_rq_offset(rq);
-		DTF("write: %p, rq->current_nr_sectors: %d\n",
-			pBuf, (int) rq->current_nr_sectors);
 		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
 		rq->errors = 0;
 		rq->current_nr_sectors--;
@@ -514,9 +498,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		if (nsect > msect)
 			nsect = msect;
 		pBuf = rq->buffer + task_rq_offset(rq);
-		DTF("Multiwrite: %p, nsect: %d, msect: %d, " \
-			"rq->current_nr_sectors: %ld\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
 		msect -= nsect;
 		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
 		rq->current_nr_sectors -= nsect;
@@ -1338,8 +1319,6 @@ ide_startstop_t flagged_task_in_intr (ide_drive_t *drive)
 	}
 
 	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Read - rq->current_nr_sectors: %d, status: %02x\n", (int) rq->current_nr_sectors, stat);
-
 	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
 
 	if (--rq->current_nr_sectors != 0) {
@@ -1387,10 +1366,6 @@ ide_startstop_t flagged_task_mulin_intr (ide_drive_t *drive)
 
 	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
 	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-
-	DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-	    pBuf, nsect, rq->current_nr_sectors);
-
 	taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
 
 	rq->current_nr_sectors -= nsect;
@@ -1459,9 +1434,6 @@ ide_startstop_t flagged_task_out_intr (ide_drive_t *drive)
 	}
 
 	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Write - rq->current_nr_sectors: %d, status: %02x\n",
-		(int) rq->current_nr_sectors, stat);
-
 	taskfile_output_data(drive, pBuf, SECTOR_WORDS);
 	--rq->current_nr_sectors;
 
@@ -1490,9 +1462,6 @@ ide_startstop_t flagged_pre_task_mulout_intr (ide_drive_t *drive, struct request
 
 	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
 	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-	    pBuf, nsect, rq->current_nr_sectors);
-
 	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
 
 	rq->current_nr_sectors -= nsect;
@@ -1530,9 +1499,6 @@ ide_startstop_t flagged_task_mulout_intr (ide_drive_t *drive)
 
 	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
 	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-	    pBuf, nsect, rq->current_nr_sectors);
-
 	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
 	rq->current_nr_sectors -= nsect;
 
