@@ -215,11 +215,12 @@ static inline int get_order(unsigned long size)
 #define __a2p(x) ((void *) absolute_to_phys(x))
 #define __a2v(x) ((void *) __va(absolute_to_phys(x)))
 
-#define virt_to_page(kaddr) (mem_map+(__pa((unsigned long)kaddr) >> PAGE_SHIFT))
+#define pfn_to_page(pfn)	(mem_map + (pfn))
+#define page_to_pfn(pfn)	((unsigned long)((pfn) - mem_map))
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
-#define VALID_PAGE(page)    ((page - mem_map) < max_mapnr)
-
-#define MAP_NR(addr)        (__pa(addr) >> PAGE_SHIFT)
+#define pfn_valid(pfn)		((pfn) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

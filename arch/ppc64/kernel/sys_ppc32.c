@@ -38,7 +38,6 @@
 #include <linux/smb_fs.h>
 #include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
-#include <linux/quota.h>
 #include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -66,6 +65,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
 #include <asm/ppc32.h>
+#include <asm/mmu_context.h>
 
 extern unsigned long wall_jiffies;
 #define USEC_PER_SEC (1000000)
@@ -518,68 +518,6 @@ struct dqblk32 {
     __kernel_time_t32 dqb_itime;
 };
                                 
-
-extern asmlinkage long sys_quotactl(int cmd, const char *special, int id, caddr_t addr);
-
-/* Note: it is necessary to treat cmd and id as unsigned ints, 
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_quotactl(u32 cmd_parm, const char *special, u32 id_parm, unsigned long addr)
-{
-  int cmd = (int)cmd_parm;
-  int id  = (int)id_parm;
-	int cmds = cmd >> SUBCMDSHIFT;
-	int err;
-	struct dqblk d;
-	mm_segment_t old_fs;
-	char *spec;
-	
-	PPCDBG(PPCDBG_SYS32, "sys32_quotactl - entered - pid=%ld current=%lx comm=%s \n",
-		    current->pid, current, current->comm);
-
-	switch (cmds) {
-	case Q_GETQUOTA:
-		break;
-	case Q_SETQUOTA:
-	case Q_SETUSE:
-	case Q_SETQLIM:
-		if (copy_from_user (&d, (struct dqblk32 *)addr,
-				    sizeof (struct dqblk32)))
-			return -EFAULT;
-		d.dqb_itime = ((struct dqblk32 *)&d)->dqb_itime;
-		d.dqb_btime = ((struct dqblk32 *)&d)->dqb_btime;
-		break;
-	default:
-		return sys_quotactl(cmd, special,
-				    id, (caddr_t)addr);
-	}
-	spec = getname32 (special);
-	err = PTR_ERR(spec);
-	if (IS_ERR(spec)) return err;
-	old_fs = get_fs ();
-	set_fs (KERNEL_DS);
-	err = sys_quotactl(cmd, (const char *)spec, id, (caddr_t)&d);
-	set_fs (old_fs);
-	putname (spec);
-	if (cmds == Q_GETQUOTA) {
-		__kernel_time_t b = d.dqb_btime, i = d.dqb_itime;
-		((struct dqblk32 *)&d)->dqb_itime = i;
-		((struct dqblk32 *)&d)->dqb_btime = b;
-		if (copy_to_user ((struct dqblk32 *)addr, &d,
-				  sizeof (struct dqblk32)))
-			return -EFAULT;
-	}
-	
-	PPCDBG(PPCDBG_SYS32, "sys32_quotactl - exited - pid=%ld current=%lx comm=%s \n",
-		    current->pid, current, current->comm);
-
-	return err;
-}
-
-
-
 /* readdir & getdents */
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 #define ROUND_UP(x) (((x)+sizeof(u32)-1) & ~(sizeof(u32)-1))
@@ -900,15 +838,6 @@ out_nofds:
 	return ret;
 }
 
-
-
-
-/*
- * Due to some executables calling the wrong select we sometimes
- * get wrong args.  This determines how the args are being passed
- * (a single ptr to them all args passed) then calls
- * sys_select() with the appropriate args. -- Cort
- */
 /* Note: it is necessary to treat n as an unsigned int, 
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -916,13 +845,8 @@ out_nofds:
  */
 asmlinkage int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 {
-	if ((unsigned int)n >= 4096)
-		panic("ppc32_select - wrong arguments were passed in \n");
-
 	return sys32_select((int)n, inp, outp, exp, tvp_x);
 }
-
-
 
 static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 {
@@ -3800,63 +3724,76 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 	int retval;
 	int i;
 
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
-
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		return retval;
 
+	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
+	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
+
 	bprm.file = file;
 	bprm.filename = filename;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-	if ((bprm.argc = count32(argv, bprm.p / sizeof(u32))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
-	if ((bprm.envc = count32(envp, bprm.p / sizeof(u32))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
-  
+
+	bprm.mm = mm_alloc();
+	retval = -ENOMEM;
+	if (!bprm.mm)
+		goto out_file;
+
+	retval = init_new_context(current, bprm.mm);
+	if (retval < 0)
+		goto out_mm;
+
+	bprm.argc = count32(argv, bprm.p / sizeof(u32));
+	if ((retval = bprm.argc) < 0)
+		goto out_mm;
+
+	bprm.envc = count32(envp, bprm.p / sizeof(u32));
+	if ((retval = bprm.envc) < 0)
+		goto out_mm;
+
 	retval = prepare_binprm(&bprm);
-	if (retval < 0)
-		goto out;
-	
+	if (retval < 0) 
+		goto out; 
+
 	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
-	if (retval < 0)
-		goto out;
+	if (retval < 0) 
+		goto out; 
 
 	bprm.exec = bprm.p;
 	retval = copy_strings32(bprm.envc, envp, &bprm);
-	if (retval < 0)
-		goto out;
+	if (retval < 0) 
+		goto out; 
 
 	retval = copy_strings32(bprm.argc, argv, &bprm);
-	if (retval < 0)
-		goto out;
+	if (retval < 0) 
+		goto out; 
 
-	retval = search_binary_handler(&bprm, regs);
+	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0)
 		/* execve success */
 		return retval;
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	allow_write_access(bprm.file);
-	if (bprm.file)
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
+
+out_mm:
+	mmdrop(bprm.mm);
+
+out_file:
+	if (bprm.file) {
+		allow_write_access(bprm.file);
 		fput(bprm.file);
-
-	for (i=0 ; i<MAX_ARG_PAGES ; i++)
-		if (bprm.page[i])
-			__free_page(bprm.page[i]);
-
+	}
 	return retval;
 }
 
@@ -3867,11 +3804,6 @@ asmlinkage long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a
 	int error;
 	char * filename;
 	
-	ifppcdebug(PPCDBG_SYS32) {
-		udbg_printf("sys32_execve - entered - pid=%ld, comm=%s \n", current->pid, current->comm);
-		//PPCDBG(PPCDBG_SYS32NI, "               a0=%lx, a1=%lx, a2=%lx, a3=%lx, a4=%lx, a5=%lx, regs=%p \n", a0, a1, a2, a3, a4, a5, regs);
-	}
-
 	filename = getname((char *) a0);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
@@ -3886,10 +3818,6 @@ asmlinkage long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a
 	putname(filename);
 
 out:
-	ifppcdebug(PPCDBG_SYS32) {
-		udbg_printf("sys32_execve - exited - returning %x - pid=%ld \n", error, current->pid);
-		//udbg_printf("sys32_execve - at exit - regs->gpr[1]=%lx, gpr[3]=%lx, gpr[4]=%lx, gpr[5]=%lx, gpr[6]=%lx \n", regs->gpr[1], regs->gpr[3], regs->gpr[4], regs->gpr[5], regs->gpr[6]);
-	}
 	return error;
 }
 
@@ -4670,4 +4598,54 @@ asmlinkage long sys32_time(__kernel_time_t32* tloc)
 	}
 
 	return secs;
+}
+
+extern asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_setaffinity(__kernel_pid_t32 pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	if (get_user(kernel_mask, user_mask_ptr))
+		return -EFAULT;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_setaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	return ret;
+}
+
+extern asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_getaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	if (ret == 0) {
+		if (put_user(kernel_mask, user_mask_ptr))
+			ret = -EFAULT;
+	}
+
+	return ret;
 }
