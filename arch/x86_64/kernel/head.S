@@ -358,7 +358,7 @@ gdt_end:
 	/* asm/segment.h:GDT_ENTRIES must match this */	
 	/* This should be a multiple of the cache line size */
 	/* GDTs of other CPUs: */	
-	.fill (L1_CACHE_BYTES * NR_CPUS) - (gdt_end - cpu_gdt_table) 
+	.fill (GDT_SIZE * NR_CPUS) - (gdt_end - cpu_gdt_table)
 
 	.align  L1_CACHE_BYTES
 ENTRY(idt_table)	
