@@ -855,8 +855,8 @@ int swsusp_suspend(void)
 	error = swsusp_arch_suspend();
 	/* Restore control flow magically appears here */
 	restore_processor_state();
-	local_irq_enable();
 	restore_highmem();
+	local_irq_enable();
 	return error;
 }
 
