@@ -327,7 +327,7 @@ static ssize_t fw_get_destroy(struct bus_type *bus, char *buf)
 {
 	return sprintf(buf, "You can destroy in_limbo nodes by writing their GUID to this file\n");
 }
-BUS_ATTR(destroy, S_IWUGO | S_IRUGO, fw_get_destroy, fw_set_destroy);
+BUS_ATTR(destroy, S_IWUSR | S_IRUGO, fw_get_destroy, fw_set_destroy);
 
 
 fw_attr(ne, struct node_entry, capabilities, unsigned int, "0x%06x\n")
@@ -1177,46 +1177,6 @@ static void nodemgr_node_scan_one(struct host_info *hi,
 }
 
 
-static void nodemgr_ud_update_pdrv(struct unit_directory *ud)
-{
-	struct device *dev;
-	struct hpsb_protocol_driver *pdrv;
-
-	list_for_each_entry(dev, &ud->device.children, node)
-		nodemgr_ud_update_pdrv(container_of(dev, struct unit_directory, device));
-
-	pdrv = container_of(ud->device.driver, struct hpsb_protocol_driver, driver);
-
-	if (pdrv->update)
-		pdrv->update(ud);
-}
-
-
-static void nodemgr_probe_ne(struct host_info *hi, struct node_entry *ne)
-{
-	struct device *dev;
-
-	if (ne->host != hi->host || ne->in_limbo)
-		return;
-
-	dev = get_device(&ne->device);
-	if (!dev)
-		return;
-
-	if (ne->needs_probe) {
-		nodemgr_process_root_directory(hi, ne);
-	} else {
-		struct device *udev;
-
-		/* Update unit_dirs with attached drivers */
-		list_for_each_entry(udev, &dev->children, node)
-			nodemgr_ud_update_pdrv(container_of(udev, struct unit_directory, device));
-	}
-
-	put_device(dev);
-}
-
-
 static void nodemgr_node_scan(struct host_info *hi, int generation)
 {
         int count;
@@ -1303,6 +1263,56 @@ static void nodemgr_resume_ne(struct node_entry *ne)
 }
 
 
+static void nodemgr_ud_update_pdrv(struct unit_directory *ud)
+{
+	struct device *dev;
+	struct hpsb_protocol_driver *pdrv;
+
+	if (!get_device(&ud->device))
+		return;
+
+	list_for_each_entry(dev, &ud->device.children, node)
+		nodemgr_ud_update_pdrv(container_of(dev, struct unit_directory, device));
+
+	if (ud->device.driver) {
+		pdrv = container_of(ud->device.driver, struct hpsb_protocol_driver, driver);
+
+		if (pdrv->update)
+			pdrv->update(ud);
+	}
+
+	put_device(&ud->device);
+}
+
+
+static void nodemgr_probe_ne(struct host_info *hi, struct node_entry *ne, int generation)
+{
+	struct device *dev, *udev;
+
+	if (ne->host != hi->host || ne->in_limbo)
+		return;
+
+	dev = get_device(&ne->device);
+	if (!dev)
+		return;
+
+	/* If "needs_probe", then this is either a new or changed node we
+	 * rescan totally. If the generation matches for an existing node
+	 * (one that existed prior to the bus reset) we send update calls
+	 * down to the drivers. Otherwise, this is a dead node and we
+	 * suspend it. */
+	if (ne->needs_probe)
+		nodemgr_process_root_directory(hi, ne);
+	else if (ne->generation == generation)
+		list_for_each_entry(udev, &dev->children, node)
+			nodemgr_ud_update_pdrv(container_of(udev, struct unit_directory, device));
+	else
+		nodemgr_suspend_ne(ne);
+
+	put_device(dev);
+}
+
+
 static void nodemgr_node_probe(struct host_info *hi, int generation)
 {
 	struct hpsb_host *host = hi->host;
@@ -1315,7 +1325,7 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 	 * unit-directories. */
 	down_read(&class->subsys.rwsem);
 	list_for_each_entry(cdev, &class->children, node)
-		nodemgr_probe_ne(hi, container_of(cdev, struct node_entry, class_dev));
+		nodemgr_probe_ne(hi, container_of(cdev, struct node_entry, class_dev), generation);
         up_read(&class->subsys.rwsem);
 
 
@@ -1324,34 +1334,18 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 	 * skip the clean up for now, since we could remove nodes that
 	 * were still on the bus.  The bus reset increased hi->reset_sem,
 	 * so there's a bus scan pending which will do the clean up
-	 * eventually. */
-	if (generation == get_hpsb_generation(host)) {
-		struct node_entry *ne;
+	 * eventually.
+	 *
+	 * Now let's tell the bus to rescan our devices. This may seem
+	 * like overhead, but the driver-model core will only scan a
+	 * device for a driver when either the device is added, or when a
+	 * new driver is added. A bus reset is a good reason to rescan
+	 * devices that were there before.  For example, an sbp2 device
+	 * may become available for login, if the host that held it was
+	 * just removed.  */
 
-		/* Suspend any devices that are no longer connected */
-		down_read(&class->subsys.rwsem);
-		list_for_each_entry(cdev, &class->children, node) {
-			ne = container_of(cdev, struct node_entry, class_dev);
-
-			if (ne->in_limbo || ne->host != host)
-				continue;
-
-			if (ne->generation == generation)
-				continue;
-
-			nodemgr_suspend_ne(ne);
-		}
-		up_read(&class->subsys.rwsem);
-
-		/* Now let's tell the bus to rescan our devices. This may
-		 * seem like overhead, but the driver-model core will only
-		 * scan a device for a driver when either the device is
-		 * added, or when a new driver is added. A bus reset is a
-		 * good reason to rescan devices that were there before.
-		 * For example, an sbp2 device may become available for
-		 * login, if the host that held it was just removed. */
+	if (generation == get_hpsb_generation(host))
 		bus_rescan_devices(&ieee1394_bus_type);
-	}
 
 	return;
 }
