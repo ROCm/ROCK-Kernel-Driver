@@ -823,7 +823,13 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 					       AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
 					       v);
 	} else {
+		unsigned short extst = ac97->regs[AC97_EXTENDED_STATUS];
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0); /* turn off */
+
 		change |= snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
+		if (extst & AC97_EA_SPDIF) {
+			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
+                }
 	}
 
 	return change;
