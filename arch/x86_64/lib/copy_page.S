@@ -8,11 +8,6 @@
 	.globl copy_page
 	.p2align 4
 copy_page:
-	prefetch (%rsi) 
-	prefetch 1*64(%rsi)
-	prefetchw (%rdi) 
-	prefetchw 1*64(%rdi) 
-
 	subq	$3*8,%rsp
 	movq	%rbx,(%rsp)
 	movq	%r12,1*8(%rsp)
@@ -32,7 +27,7 @@ copy_page:
 	movq     48 (%rsi), %r11
 	movq     56 (%rsi), %r12
 
-	prefetch 5*64(%rsi)
+	prefetcht0 5*64(%rsi)
 
 	movq     %rax,    (%rdi)
 	movq     %rbx,  8 (%rdi)
@@ -42,8 +37,6 @@ copy_page:
 	movq     %r10, 40 (%rdi)
 	movq     %r11, 48 (%rdi)
 	movq     %r12, 56 (%rdi)
-
-	prefetchw 5*64(%rdi)
 
 	leaq    64 (%rsi), %rsi
 	leaq    64 (%rdi), %rdi

@@ -402,6 +402,13 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 
+#ifdef CONFIG_SWIOTLB
+       if (!iommu_aperture && end_pfn >= 0xffffffff>>PAGE_SHIFT) { 
+	       swiotlb_init();
+	       swiotlb = 1;
+       }
+#endif
+
 	/* How many end-of-memory variables you have, grandma! */
 	max_low_pfn = end_pfn;
 	max_pfn = end_pfn;

@@ -16,6 +16,7 @@
 #include <asm/segment.h>
 #include <asm/page.h>
 #include <asm/msr.h>
+#include <asm/cache.h>
 	
 /* we are not able to switch in one step to the final KERNEL ADRESS SPACE
  * because we need identity-mapped pages on setup so define __START_KERNEL to
@@ -322,7 +323,6 @@ gdt:
 	.endr
 #endif
 
-.align 64 /* cacheline aligned */
 ENTRY(gdt_table32)
 	.quad	0x0000000000000000	/* This one is magic */
 	.quad	0x0000000000000000	/* unused */
@@ -334,7 +334,7 @@ gdt32_end:
  * Also sysret mandates a special GDT layout 
  */
 		 		
-.align 64 /* cacheline aligned, keep this synchronized with asm/desc.h */
+.align L1_CACHE_BYTES
 
 /* The TLS descriptors are currently at a different place compared to i386.
    Hopefully nobody expects them at a fixed place (Wine?) */
@@ -354,18 +354,13 @@ ENTRY(cpu_gdt_table)
 	.quad	0			/* unused now */
 	.quad	0x00009a000000ffff	/* __KERNEL16_CS - 16bit PM for S3 wakeup. */
 					/* base must be patched for real base address. */
-	/* This should be a multiple of the cache line size */
 gdt_end:	
-	.globl gdt_end
+	/* asm/segment.h:GDT_ENTRIES must match this */	
+	/* This should be a multiple of the cache line size */
+	/* GDTs of other CPUs: */	
+	.fill (L1_CACHE_BYTES * NR_CPUS) - (gdt_end - cpu_gdt_table) 
 
-	/* GDTs of other CPUs */	
-#ifdef CONFIG_SMP
-	.rept NR_CPUS-1
-	.quad 0,0,0,0,0,0,0,0,0,0,0
-	.endr	
-#endif
-
-	.align  64
+	.align  L1_CACHE_BYTES
 ENTRY(idt_table)	
 	.rept   256
 	.quad   0

@@ -24,6 +24,8 @@
 #include <asm/proto.h>
 #include <asm/pci-direct.h>
 
+int iommu_aperture;
+
 int fallback_aper_order __initdata = 1; /* 64MB */
 int fallback_aper_force __initdata = 0; 
 
@@ -205,6 +207,8 @@ void __init iommu_hole_init(void)
 		char name[30];
 		if (read_pci_config(0, num, 3, 0x00) != NB_ID_3) 
 			continue;	
+
+		iommu_aperture = 1;; 
 
 		aper_order = (read_pci_config(0, num, 3, 0x90) >> 1) & 7; 
 		aper_size = (32 * 1024 * 1024) << aper_order; 
