@@ -2098,11 +2098,14 @@ static int tg3_setup_phy(struct tg3 *tp, int force_reset)
 		      (6 << TX_LENGTHS_IPG_SHIFT) |
 		      (32 << TX_LENGTHS_SLOT_TIME_SHIFT)));
 
-	if (netif_carrier_ok(tp->dev)) {
-		tw32(HOSTCC_STAT_COAL_TICKS,
-		     DEFAULT_STAT_COAL_TICKS);
-	} else {
-		tw32(HOSTCC_STAT_COAL_TICKS, 0);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5750) {
+		if (netif_carrier_ok(tp->dev)) {
+			tw32(HOSTCC_STAT_COAL_TICKS,
+			     DEFAULT_STAT_COAL_TICKS);
+		} else {
+			tw32(HOSTCC_STAT_COAL_TICKS, 0);
+		}
 	}
 
 	return err;
