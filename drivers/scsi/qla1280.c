@@ -1220,9 +1220,7 @@ qla1280_queuecommand(Scsi_Cmnd * cmd, void (*fn) (Scsi_Cmnd *))
 	sp = (struct srb *)CMD_SP(cmd);
 	sp->cmd = cmd;
 	cmd->scsi_done = fn;
-	if (cmd->flags == 0) {	/* new command */
-		sp->flags = 0;
-	}
+	sp->flags = 0;
 
 	qla1280_print_scsi_cmd(5, cmd);
 
