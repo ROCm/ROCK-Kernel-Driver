@@ -160,18 +160,20 @@ atomic_t irq_mis_count;
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, j;
+	int j, i = *(loff_t *) v;
 	struct irqaction * action;
 	irq_desc_t *idesc;
 	unsigned long flags;
 
-	seq_puts(p, "           ");
-	for (j=0; j<NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "CPU%d       ",j);
-	seq_putc(p, '\n');
+	if (i == 0) {
+		seq_puts(p, "           ");
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ",j);
+		seq_putc(p, '\n');
+	}
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		idesc = irq_descp(i);
 		spin_lock_irqsave(&idesc->lock, flags);
 		action = idesc->action;
@@ -194,25 +196,26 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&idesc->lock, flags);
-	}
-	seq_puts(p, "NMI: ");
-	for (j = 0; j < NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "%10u ", nmi_count(j));
-	seq_putc(p, '\n');
+	} else if (i == NR_IRQS) {
+		seq_puts(p, "NMI: ");
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", nmi_count(j));
+		seq_putc(p, '\n');
 #ifdef CONFIG_X86_LOCAL_APIC
-	seq_puts(p, "LOC: ");
-	for (j = 0; j < NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
-	seq_putc(p, '\n');
+		seq_puts(p, "LOC: ");
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
+		seq_putc(p, '\n');
 #endif
-	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
+		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
 #ifdef CONFIG_X86_IO_APIC
 #ifdef APIC_MISMATCH_DEBUG
-	seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
+		seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
 #endif
 #endif
+	}
 	return 0;
 }
 

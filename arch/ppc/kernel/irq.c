@@ -346,17 +346,19 @@ void enable_irq(unsigned int irq)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, j;
+	int i = *(loff_t *) v, j;
 	struct irqaction * action;
 	unsigned long flags;
 
-	seq_puts(p, "           ");
-	for (j=0; j<NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "CPU%d       ", j);
-	seq_putc(p, '\n');
+	if (i == 0) {
+		seq_puts(p, "           ");
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ", j);
+		seq_putc(p, '\n');
+	}
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if ( !action || !action->handler )
@@ -381,22 +383,23 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-	}
+	} else if (i == NR_IRQS) {
 #ifdef CONFIG_TAU_INT
-	if (tau_initialized){
-		seq_puts(p, "TAU: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", tau_interrupts(j));
-		seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
-	}
+		if (tau_initialized){
+			seq_puts(p, "TAU: ");
+			for (j = 0; j < NR_CPUS; j++)
+				if (cpu_online(j))
+					seq_printf(p, "%10u ", tau_interrupts(j));
+			seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
+		}
 #endif
 #ifdef CONFIG_SMP
-	/* should this be per processor send/receive? */
-	seq_printf(p, "IPI (recv/sent): %10u/%u\n",
-		   atomic_read(&ipi_recv), atomic_read(&ipi_sent));
+		/* should this be per processor send/receive? */
+		seq_printf(p, "IPI (recv/sent): %10u/%u\n",
+				atomic_read(&ipi_recv), atomic_read(&ipi_sent));
 #endif
-	seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
+		seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
+	}
 	return 0;
 }
 

@@ -135,10 +135,10 @@ void enable_irq(unsigned int irq)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction * action;
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 	    	action = irq_desc[i].action;
 		if (!action)
 			continue;
@@ -148,10 +148,10 @@ int show_interrupts(struct seq_file *p, void *v)
 			seq_printf(p, ", %s", action->name);
 		}
 		seq_putc(p, '\n');
+	} else if (i == NR_IRQS) {
+		show_fiq_list(p, v);
+		seq_printf(p, "Err: %10lu\n", irq_err_count);
 	}
-
-	show_fiq_list(p, v);
-	seq_printf(p, "Err: %10lu\n", irq_err_count);
 	return 0;
 }
 

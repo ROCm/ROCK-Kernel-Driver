@@ -75,13 +75,13 @@ spinlock_t sun4d_imsk_lock = SPIN_LOCK_UNLOCKED;
 
 int show_sun4d_interrupts(struct seq_file *p, void *v)
 {
-	int i, j = 0, k = 0, sbusl;
+	int i = *(loff_t *) v, j = 0, k = 0, sbusl;
 	struct irqaction * action;
 #ifdef CONFIG_SMP
 	int x;
 #endif
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		sbusl = pil_to_sbus[i];
 		if (!sbusl) {
 	 		action = *(i + irq_action);

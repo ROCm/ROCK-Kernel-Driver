@@ -128,14 +128,14 @@ static void register_irq_proc (unsigned int irq);
 int show_interrupts(struct seq_file *p, void *v)
 {
 	unsigned long flags;
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction *action;
 #ifdef CONFIG_SMP
 	int j;
 #endif
 
 	spin_lock_irqsave(&irq_action_lock, flags);
-	for (i = 0; i < (NR_IRQS + 1); i++) {
+	if (i <= NR_IRQS) {
 		if (!(action = *(i + irq_action)))
 			continue;
 		seq_printf(p, "%3d: ", i);

@@ -323,18 +323,20 @@ EXPORT_SYMBOL(enable_irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, j;
+	int i = *(loff_t *) v, j;
 	struct irqaction * action;
 	unsigned long flags;
 
-	seq_printf(p, "           ");
-	for (j=0; j<NR_CPUS; j++) {
-		if (cpu_online(j))
-			seq_printf(p, "CPU%d       ",j);
+	if (i == 0) {
+		seq_printf(p, "           ");
+		for (j=0; j<NR_CPUS; j++) {
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ",j);
+		}
+		seq_putc(p, '\n');
 	}
-	seq_putc(p, '\n');
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action || !action->handler)
@@ -359,8 +361,8 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-	}
-	seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
+	} else if (i == NR_IRQS)
+		seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
 	return 0;
 }
 
