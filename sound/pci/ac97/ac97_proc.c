@@ -332,7 +332,7 @@ static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t 
 	while (!snd_info_get_line(buffer, line, sizeof(line))) {
 		if (sscanf(line, "%x %x", &reg, &val) != 2)
 			continue;
-		/* register must be odd */
+		/* register must be even */
 		if (reg < 0x80 && (reg & 1) == 0 && val <= 0xffff)
 			snd_ac97_write_cache(ac97, reg, val);
 	}
