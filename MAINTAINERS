@@ -1315,7 +1315,7 @@ S:	Maintained
 
 PCMCIA SUBSYSTEM
 P:	David Hinds
-M:	dhinds@zen.stanford.edu
+M:	dahinds@users.sourceforge.net
 L:	linux-kernel@vger.kernel.org
 W:	http://pcmcia-cs.sourceforge.net
 S:	Maintained
