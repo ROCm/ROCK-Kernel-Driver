@@ -902,7 +902,9 @@ static void dump_tx_ring(struct net_device *dev);
 static void update_stats(long ioaddr, struct net_device *dev);
 static struct net_device_stats *vortex_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
+#ifdef CONFIG_PCI
 static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+#endif
 static void vortex_tx_timeout(struct net_device *dev);
 static void acpi_set_WOL(struct net_device *dev);
 static struct ethtool_ops vortex_ethtool_ops;
@@ -1473,7 +1475,9 @@ static int __devinit vortex_probe1(struct device *gendev,
 
 	dev->stop = vortex_close;
 	dev->get_stats = vortex_get_stats;
+#ifdef CONFIG_PCI
 	dev->do_ioctl = vortex_ioctl;
+#endif
 	dev->ethtool_ops = &vortex_ethtool_ops;
 	dev->set_multicast_list = set_rx_mode;
 	dev->tx_timeout = vortex_tx_timeout;
@@ -2880,6 +2884,7 @@ static struct ethtool_ops vortex_ethtool_ops = {
 	.get_drvinfo =		vortex_get_drvinfo,
 };
 
+#ifdef CONFIG_PCI
 static int vortex_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct vortex_private *vp = netdev_priv(dev);
@@ -2937,6 +2942,7 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	return err;
 }
+#endif
 
 
 /* Pre-Cyclone chips have no documented multicast filter, so the only
