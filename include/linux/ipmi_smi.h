@@ -100,6 +100,10 @@ struct ipmi_smi_handlers
 	   out and that none are pending, and any new requests are run
 	   to completion immediately. */
 	void (*set_run_to_completion)(void *send_info, int run_to_completion);
+
+	/* Called to poll for work to do.  This is so upper layers can
+	   poll for operations during things like crash dumps. */
+	void (*poll)(void *send_info);
 };
 
 /* Add a low-level interface to the IPMI driver. */

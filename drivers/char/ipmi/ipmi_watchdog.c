@@ -51,7 +51,7 @@
 #include <asm/apic.h>
 #endif
 
-#define IPMI_WATCHDOG_VERSION "v31"
+#define IPMI_WATCHDOG_VERSION "v32"
 
 /*
  * The IPMI command/response information for the watchdog timer.
@@ -883,14 +883,12 @@ static int wdog_panic_handler(struct notifier_block *this,
 
 	/* On a panic, if we have a panic timeout, make sure that the thing
 	   reboots, even if it hangs during that panic. */
-	if (watchdog_user && !panic_event_handled && (panic_timeout > 0)) {
+	if (watchdog_user && !panic_event_handled) {
 		/* Make sure the panic doesn't hang, and make sure we
 		   do this only once. */
 		panic_event_handled = 1;
 	    
-		timeout = panic_timeout + 120;
-		if (timeout > 255)
-			timeout = 255;
+		timeout = 255;
 		pretimeout = 0;
 		ipmi_watchdog_state = WDOG_TIMEOUT_RESET;
 		panic_halt_ipmi_set_timeout();

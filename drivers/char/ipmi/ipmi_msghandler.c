@@ -46,7 +46,7 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 
-#define IPMI_MSGHANDLER_VERSION "v31"
+#define IPMI_MSGHANDLER_VERSION "v32"
 
 struct ipmi_recv_msg *ipmi_alloc_recv_msg(void);
 static int ipmi_init_msghandler(void);
@@ -1648,6 +1648,22 @@ channel_handler(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
 		/* It's the one we want */
 		if (msg->rsp[2] != 0) {
 			/* Got an error from the channel, just go on. */
+
+			if (msg->rsp[2] == IPMI_INVALID_COMMAND_ERR) {
+				/* If the MC does not support this
+				   command, that is legal.  We just
+				   assume it has one IPMB at channel
+				   zero. */
+				intf->channels[0].medium
+					= IPMI_CHANNEL_MEDIUM_IPMB;
+				intf->channels[0].protocol
+					= IPMI_CHANNEL_PROTOCOL_IPMB;
+				rv = -ENOSYS;
+
+				intf->curr_channel = IPMI_MAX_CHANNELS;
+				wake_up(&intf->waitq);
+				goto out;
+			}
 			goto next_channel;
 		}
 		if (msg->rsp_size < 6) {
@@ -1671,10 +1687,20 @@ channel_handler(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
 			wake_up(&intf->waitq);
 
 			printk(KERN_WARNING "ipmi_msghandler: Error sending"
-			       "channel information: 0x%x\n",
+			       "channel information: %d\n",
 			       rv);
 		}
 	}
+ out:
+	return;
+}
+
+void ipmi_poll_interface(ipmi_user_t user)
+{
+	ipmi_smi_t intf = user->intf;
+
+	if (intf->handlers->poll)
+		intf->handlers->poll(intf->send_info);
 }
 
 int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
@@ -3154,6 +3180,7 @@ EXPORT_SYMBOL(ipmi_request);
 EXPORT_SYMBOL(ipmi_request_settime);
 EXPORT_SYMBOL(ipmi_request_supply_msgs);
 EXPORT_SYMBOL(ipmi_request_with_source);
+EXPORT_SYMBOL(ipmi_poll_interface);
 EXPORT_SYMBOL(ipmi_register_smi);
 EXPORT_SYMBOL(ipmi_unregister_smi);
 EXPORT_SYMBOL(ipmi_register_for_cmd);
