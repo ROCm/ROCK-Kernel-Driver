@@ -50,6 +50,7 @@ extern atomic_t nr_queued_signals;
 extern int max_queued_signals;
 extern int sysrq_enabled;
 extern int core_uses_pid;
+extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
 
@@ -176,6 +177,8 @@ static ctl_table kern_table[] = {
 	 0644, NULL, &proc_dointvec},
 	{KERN_CORE_USES_PID, "core_uses_pid", &core_uses_pid, sizeof(int),
 	 0644, NULL, &proc_dointvec},
+	{KERN_CORE_PATTERN, "core_pattern", core_pattern, 64,
+	 0644, NULL, &proc_dostring, &sysctl_string},
 	{KERN_TAINTED, "tainted", &tainted, sizeof(int),
 	 0644, NULL, &proc_dointvec},
 	{KERN_CAP_BSET, "cap-bound", &cap_bset, sizeof(kernel_cap_t),
