@@ -1,0 +1,15 @@
+menu "InfiniBand support"
+
+config INFINIBAND
+	tristate "InfiniBand support"
+	depends on X86 || X86_64 || IA64
+	default n
+	---help---
+	  Core support for InfiniBand (IB).  Make sure to also select
+	  any protocols you wish to use as well as drivers for your
+	  InfiniBand hardware.
+
+source "drivers/infiniband/ulp/Kconfig"
+source "drivers/infiniband/hw/Kconfig"
+
+endmenu

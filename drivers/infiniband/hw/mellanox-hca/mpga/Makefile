@@ -1,0 +1,26 @@
+IB_SRC_DIR ?= drivers/infiniband
+
+EXTRA_CFLAGS += \
+    -I$(src) \
+    -I$(IB_SRC_DIR)/include \
+    -I$(IB_SRC_DIR)/hw/mellanox-hca/include \
+    -DMT_KERNEL -D__LINUX__ -DMAX_ERROR=4 -DMTL_MODULE=MPGA
+
+# XXX This is bogus, but it should work OK for now (since we don't
+# XXX support all architectures yet)
+ifdef CONFIG_PPC
+EXTRA_CFLAGS += -DMT_BIG_ENDIAN
+else
+EXTRA_CFLAGS += -DMT_LITTLE_ENDIAN
+endif
+
+obj-m += mod_mpga.o
+
+mod_mpga-objs := \
+    packet_append.o \
+    mpga.o \
+    internal_functions.o \
+    packet_utilities.o \
+    nMPGA_packet_append.o \
+    nMPGA.o \
+    mpgaklsyms.o

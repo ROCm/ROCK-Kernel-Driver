@@ -1,0 +1,9 @@
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/os_dep/linux/vapicommonsyms.c
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vapi_common.c
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_array.c
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_cirq.c
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_delay_unlock.c
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_delay_unlock_priv.h
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_hash.c
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_hash.ic
+../../../../../common/hw/mellanox-hca/HCA/verbs/common/vip_hashv4p.h

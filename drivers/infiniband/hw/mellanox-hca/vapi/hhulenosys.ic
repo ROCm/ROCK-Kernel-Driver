@@ -1,0 +1,372 @@
+/*
+  This software is available to you under a choice of one of two
+  licenses.  You may choose to be licensed under the terms of the GNU
+  General Public License (GPL) Version 2, available at
+  <http://www.fsf.org/copyleft/gpl.html>, or the OpenIB.org BSD
+  license, available in the LICENSE.TXT file accompanying this
+  software.  These details are also available at
+  <http://openib.org/license.html>.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+  Copyright (c) 2004 Mellanox Technologies Ltd.  All rights reserved.
+*/
+
+
+static HH_ret_t  enosys_cleanup_user_level(
+  HHUL_hca_hndl_t  hhul_hndl
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_alloc_pd_prep(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_pd_hndl_t*  hhul_pd_p,
+  void*            pd_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_alloc_pd_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_pd_hndl_t   hhul_pd,
+  HH_pd_hndl_t     hh_pd,
+  void*            pd_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_free_pd_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_pd_hndl_t   hhul_pd
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_alloc_mw(
+  HHUL_hca_hndl_t  hhul_hndl,
+  IB_rkey_t        initial_rkey,
+  HHUL_mw_hndl_t*  mw_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_bind_mw(
+  HHUL_hca_hndl_t   hhul_hndl,
+  HHUL_mw_hndl_t    mw,
+  HHUL_mw_bind_t*   bind_prop_p,
+  IB_rkey_t*        bind_rkey_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_free_mw(
+  HHUL_hca_hndl_t  hhul_hndl,
+  HHUL_mw_hndl_t   mw
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_create_ud_av(
+  HHUL_hca_hndl_t     hca_hndl,
+  HHUL_pd_hndl_t      pd,    
+  VAPI_ud_av_t*       av_p,
+  HHUL_ud_av_hndl_t*  ah_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_modify_ud_av(
+  HHUL_hca_hndl_t    hca_hndl,
+  HHUL_ud_av_hndl_t  ah,
+  VAPI_ud_av_t*      av_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_query_ud_av(
+  HHUL_hca_hndl_t    hca_hndl,
+  HHUL_ud_av_hndl_t  ah,
+  VAPI_ud_av_t*      av_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_destroy_ud_av(
+  HHUL_hca_hndl_t    hca_hndl,
+  HHUL_ud_av_hndl_t  ah
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_create_cq_prep(
+  HHUL_hca_hndl_t  hca_hndl,
+  VAPI_cqe_num_t   num_o_cqes,
+  HHUL_cq_hndl_t*  hhul_cq_p,
+  VAPI_cqe_num_t*  num_o_cqes_p,
+  void*            cq_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_create_cq_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_cq_hndl_t   hhul_cq,
+  HH_cq_hndl_t     hh_cq,
+  void*            cq_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_resize_cq_prep(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_cq_hndl_t   cq,
+  VAPI_cqe_num_t   num_o_cqes,
+  VAPI_cqe_num_t*  num_o_cqes_p,
+  void*            cq_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_resize_cq_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_cq_hndl_t   cq,
+  void*            cq_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_poll4cqe(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_cq_hndl_t   cq,
+  VAPI_wc_desc_t*  cqe_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_peek_cq(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_cq_hndl_t   cq,
+  VAPI_cqe_num_t   cqe_num
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_req_comp_notif(
+  HHUL_hca_hndl_t       hca_hndl,
+  HHUL_cq_hndl_t        cq,
+  VAPI_cq_notif_type_t  notif_type
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_req_ncomp_notif(
+  HHUL_hca_hndl_t       hca_hndl,
+  HHUL_cq_hndl_t        cq,
+  VAPI_cqe_num_t  	cqe_num
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_destroy_cq_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_cq_hndl_t   cq
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_create_qp_prep(
+  HHUL_hca_hndl_t       hca_hndl,
+  HHUL_qp_init_attr_t*  qp_init_attr_p,
+  HHUL_qp_hndl_t*       qp_hndl_p,
+  VAPI_qp_cap_t*        qp_cap_out_p,
+  void*                 qp_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_special_qp_prep(
+  HHUL_hca_hndl_t    	hca_hndl,
+  VAPI_special_qp_t  	qp_type,
+  IB_port_t          	port,
+  HHUL_qp_init_attr_t*  qp_init_attr_p,
+  HHUL_qp_hndl_t*    	qp_hndl_p,
+  VAPI_qp_cap_t*     	qp_cap_out_p,
+  void*              	qp_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_create_qp_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_qp_hndl_t   hhul_qp,
+  IB_wqpn_t        hh_qp,
+  void*        	   qp_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_post_send_req(
+  HHUL_hca_hndl_t   hca_hndl,
+  HHUL_qp_hndl_t    qp_hndl,
+  VAPI_sr_desc_t*   send_req_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t enosys_post_inline_send_req(HHUL_hca_hndl_t   hca_hndl,
+                                           HHUL_qp_hndl_t    qp_hndl,
+                                           VAPI_sr_desc_t*   send_req_p)
+{
+  return HH_ENOSYS;
+}
+					   
+static HH_ret_t enosys_post_send_reqs(HHUL_hca_hndl_t   hca_hndl,
+                                    HHUL_qp_hndl_t    qp_hndl,
+                                    u_int32_t         num_of_requests,
+                                    VAPI_sr_desc_t*   send_req_array)
+{
+  return HH_ENOSYS;
+}
+  
+static HH_ret_t  enosys_post_recv_req(
+  HHUL_hca_hndl_t   hca_hndl,
+  HHUL_qp_hndl_t    qp_hndl,
+  VAPI_rr_desc_t*   recv_req_p
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t enosys_post_recv_reqs(HHUL_hca_hndl_t   hca_hndl,
+                                    HHUL_qp_hndl_t    qp_hndl,
+                                    u_int32_t         num_of_requests,
+                                    VAPI_rr_desc_t*   recv_req_array)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t  enosys_destroy_qp_done(
+  HHUL_hca_hndl_t  hca_hndl,
+  HHUL_qp_hndl_t   qp_hndl
+)
+{
+  return HH_ENOSYS;
+}
+
+static HH_ret_t enosys_create_srq_prep( 
+                                  /*IN*/
+                                  HHUL_hca_hndl_t hca, 
+                                  HHUL_pd_hndl_t  pd,
+                                  u_int32_t max_outs,
+                                  u_int32_t max_sentries,
+                                  /*OUT*/
+                                  HHUL_srq_hndl_t *srq_hndl_p,
+                                  u_int32_t *actual_max_outs_p,
+                                  u_int32_t *actual_max_sentries_p,
+                                  void /*THH_srq_ul_resources_t*/ *srq_ul_resources_p)
+{
+  return HH_ENOSYS;
+}
+                                  
+
+static HH_ret_t enosys_create_srq_done( 
+                                  HHUL_hca_hndl_t hca, 
+                                  HHUL_srq_hndl_t hhul_srq, 
+                                  HH_srq_hndl_t hh_srq, 
+                                  void/*THH_srq_ul_resources_t*/ *srq_ul_resources_p
+)
+{
+  return HH_ENOSYS;
+}
+
+
+static HH_ret_t enosys_destroy_srq_done( 
+                                   HHUL_hca_hndl_t hca, 
+                                   HHUL_qp_hndl_t hhul_srq 
+)
+{
+  return HH_ENOSYS;
+}
+
+
+static HH_ret_t enosys_post_srq(
+                     /*IN*/ HHUL_hca_hndl_t hca, 
+                     /*IN*/ HHUL_srq_hndl_t hhul_srq, 
+                     /*IN*/ u_int32_t num_of_requests,
+                     /*IN*/ VAPI_rr_desc_t *recv_req_array,
+                     /*OUT*/ u_int32_t *posted_requests_p
+)
+{
+  return HH_ENOSYS;
+}
+
+
+static void  enosys_init(HHUL_if_ops_t* p)
+{
+  p->HHULIF_cleanup_user_level = &enosys_cleanup_user_level;
+  p->HHULIF_alloc_pd_prep      = &enosys_alloc_pd_prep;
+  p->HHULIF_alloc_pd_done      = &enosys_alloc_pd_done;
+  p->HHULIF_free_pd_done       = &enosys_free_pd_done;
+  p->HHULIF_alloc_mw           = &enosys_alloc_mw;
+  p->HHULIF_bind_mw            = &enosys_bind_mw;
+  p->HHULIF_free_mw            = &enosys_free_mw;
+  p->HHULIF_create_ud_av       = &enosys_create_ud_av;
+  p->HHULIF_modify_ud_av       = &enosys_modify_ud_av;
+  p->HHULIF_query_ud_av        = &enosys_query_ud_av;
+  p->HHULIF_destroy_ud_av      = &enosys_destroy_ud_av;
+  p->HHULIF_create_cq_prep     = &enosys_create_cq_prep;
+  p->HHULIF_create_cq_done     = &enosys_create_cq_done;
+  p->HHULIF_resize_cq_prep     = &enosys_resize_cq_prep;
+  p->HHULIF_resize_cq_done     = &enosys_resize_cq_done;
+  p->HHULIF_poll4cqe           = &enosys_poll4cqe;
+  p->HHULIF_peek_cq	       = &enosys_peek_cq;
+  p->HHULIF_req_comp_notif     = &enosys_req_comp_notif;
+  p->HHULIF_req_ncomp_notif    = &enosys_req_ncomp_notif;
+  p->HHULIF_destroy_cq_done    = &enosys_destroy_cq_done;
+  p->HHULIF_create_qp_prep     = &enosys_create_qp_prep;
+  p->HHULIF_special_qp_prep    = &enosys_special_qp_prep;
+  p->HHULIF_create_qp_done     = &enosys_create_qp_done;
+  p->HHULIF_post_send_req      = &enosys_post_send_req;
+  p->HHULIF_post_inline_send_req = &enosys_post_inline_send_req;
+  p->HHULIF_post_send_reqs     = &enosys_post_send_reqs;
+  p->HHULIF_post_recv_req      = &enosys_post_recv_req;
+  p->HHULIF_post_recv_reqs     = &enosys_post_recv_reqs;
+  p->HHULIF_destroy_qp_done    = &enosys_destroy_qp_done;
+  p->HHULIF_create_srq_prep    = &enosys_create_srq_prep;  
+  p->HHULIF_create_srq_done    = &enosys_create_srq_done;  
+  p->HHULIF_destroy_srq_done   = &enosys_destroy_srq_done;  
+  p->HHULIF_post_srq           = &enosys_post_srq;  
+} /* enosys_init */
+

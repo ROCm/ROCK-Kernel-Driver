@@ -1,0 +1,874 @@
+/*
+  This software is available to you under a choice of one of two
+  licenses.  You may choose to be licensed under the terms of the GNU
+  General Public License (GPL) Version 2, available at
+  <http://www.fsf.org/copyleft/gpl.html>, or the OpenIB.org BSD
+  license, available in the LICENSE.TXT file accompanying this
+  software.  These details are also available at
+  <http://openib.org/license.html>.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+  Copyright (c) 2004 Mellanox Technologies Ltd.  All rights reserved.
+*/
+ 
+
+# undef __VIP_HASH_NODE_T        
+# undef __VIP_HASH_NODE_P_T      
+# undef __VIP_HASH_TBL_T         
+# undef __VIP_HASH_FUNC
+
+#if   __VIP_HASH_VARIANT == 0
+# define __VIP_HASH_NODE_T        VIP_hash_node_t
+# define __VIP_HASH_NODE_P_T      VIP_hash_node_p_t
+# define __VIP_HASH_TBL_T         VIP_hash_t
+# define __VIP_HASH_FUNC(k)       (k)
+# undef resize
+# define resize32
+#elif __VIP_HASH_VARIANT == 1
+# define __VIP_HASH_NODE_T        VIP_hashp_node_t
+# define __VIP_HASH_NODE_P_T      VIP_hashp_node_p_t
+# define __VIP_HASH_TBL_T         VIP_hashp_t
+# define __VIP_HASH_FUNC(k)       (k)
+# undef resize
+# define resize   resizep
+#elif __VIP_HASH_VARIANT == 2
+# define __VIP_HASH_NODE_T        VIP_hashp2p_node_t
+# define __VIP_HASH_NODE_P_T      VIP_hashp2p_node_p_t
+# define __VIP_HASH_TBL_T         VIP_hashp2p_t
+# ifdef MT_64BIT
+#  define __VIP_HASH_FUNC(pkey)    hash_u64tou32((u_int64_t) (pkey))
+# else
+#  define __VIP_HASH_FUNC(pkey)    ((u_int32_t) (pkey))
+# endif
+# undef resize
+# define resize   resizep2p
+#elif __VIP_HASH_VARIANT == 3
+# define __VIP_HASH_NODE_T        VIP_hash64p_node_t
+# define __VIP_HASH_NODE_P_T      VIP_hash64p_node_p_t
+# define __VIP_HASH_TBL_T         VIP_hash64p_t
+# define __VIP_HASH_FUNC(pkey)    hash_u64tou32((u_int64_t) (pkey))
+# undef resize
+# define resize   resize64p
+#elif __VIP_HASH_VARIANT == 4
+# define __VIP_HASH_NODE_T        VIP_hashv4p_node_t
+# define __VIP_HASH_NODE_P_T      VIP_hashv4p_node_p_t
+# define __VIP_HASH_TBL_T         VIP_hashv4p_t
+# define __VIP_HASH_FUNC(pkey)    hash_uv4tou32((pkey))
+# undef resize
+# define resize   resizev4p
+#else
+# error Unsupported __VIP_HASH_VARIANT variant
+#endif
+
+#include <mosal.h>
+
+typedef struct __VIP_HASH_NODE_T {
+    __VIP_HASH_KEY_T         key;
+    __VIP_HASH_VAL_T         val;
+    struct __VIP_HASH_NODE_T*  next;
+} __VIP_HASH_NODE_T;
+typedef __VIP_HASH_NODE_T* __VIP_HASH_NODE_P_T;
+
+
+typedef struct __VIP_HASH_TBL_T {
+    __VIP_HASH_NODE_P_T** nodes_1st_lvl_begin;
+    u_int32_t 		 size;      
+    u_int32_t 		 buckets;
+    MT_bool   		 may_grow;
+    MOSAL_spinlock_t hash_lock;
+    u_int32_t        max_size;
+    u_int32_t        max_buckets;
+    u_int32_t        max_2nd_lvl_blocks;
+    u_int32_t        sec_lvl_buckets_per_blk;
+    u_int32_t        sec_lvl_buckets_per_blk_m_1;
+    u_int32_t        size_2nd_lvl_block;
+    u_int32_t        log2_2nd_lvl_entries_per_blk;
+    MT_bool resize_in_progress; /* Notify other threads of an ongoing resize */
+} __VIP_HASH_TBL_T;
+
+#define HASH_DEFAULT_MAXSIZE      (16777212ul)   /* default max size is 16M entries */
+#define HASH_LOG_PTR_SIZE         ((sizeof(void *) == 8) ? 3 : 2)
+#define HASH_LOG_2ND_LVL_BUCKETS_PER_BLOCK (MOSAL_SYS_PAGE_SHIFT + 1 - HASH_LOG_PTR_SIZE)
+#define HASH_2ND_LVL_BLOCK_SIZE   (2*MOSAL_SYS_PAGE_SIZE)
+#define HASH_2ND_LVL_BUCKETS_PER_BLOCK (HASH_2ND_LVL_BLOCK_SIZE / sizeof(__VIP_HASH_NODE_P_T*))
+#define HASH_2ND_LVL_ENTRY_SIZE   (sizeof(__VIP_HASH_NODE_P_T*))
+
+#define CALC_MAX_2ND_LVL_BLOCKS(hash)  ((hash->max_buckets + (hash->sec_lvl_buckets_per_blk_m_1)) / (hash->sec_lvl_buckets_per_blk))
+#define CALC_NUM_2ND_LVL_BLOCKS(buckets, hash)  ((buckets + (hash->sec_lvl_buckets_per_blk_m_1)) / (hash->sec_lvl_buckets_per_blk))
+#define GET_BUCKET_BY_IX(hash, ix)  ((__VIP_HASH_NODE_P_T*) &((*(hash->nodes_1st_lvl_begin+((ix) >> hash_tbl->log2_2nd_lvl_entries_per_blk))\
+                                        )[(ix) & (hash->sec_lvl_buckets_per_blk_m_1)]))
+
+
+/******************************************************************************/
+static call_result_t resize(__VIP_HASH_T  hash_tbl, u_int32_t  reserve)
+{
+//  if (hash_tbl->buckets < reserve)
+//  {
+//  }     
+    u_int32_t  blocks_needed = 0, curr_blocks = 0, block_size_to_allocate = 0;
+    u_int32_t  old_last_allocated_blocksize = 0, new_first_allocated_blocksize = 0;
+    u_int32_t  buckets_per_blk = hash_tbl->sec_lvl_buckets_per_blk;
+    int i,j;
+    u_int32_t  old_buckets = hash_tbl->buckets;
+    u_int32_t  old_bucket_ix;
+    u_int32_t  new_buckets = (u_int32_t) mtl_find_prime((unsigned long) reserve);
+  
+  if (hash_tbl->buckets >= hash_tbl->max_buckets)  {
+       /* we already have the max number of buckets allocated */
+       hash_tbl->may_grow = FALSE;
+       return MT_EAGAIN;
+  } else if (new_buckets > hash_tbl->max_buckets) {
+      new_buckets = hash_tbl->max_buckets;
+  }
+  /* We may read the values below with no lock since only one thread will enter this
+   * function at one time (based on resize_in_progress flag), so these value cannot
+   * be modified at this time (here is the only location for such changes).
+   */
+    
+  /* allocate extension of table.  This extension is still invisible to users, because
+   * hash_tbl->buckets is not modified until after all the allocations succeed */
+  blocks_needed = CALC_NUM_2ND_LVL_BLOCKS(new_buckets, hash_tbl);
+  curr_blocks = CALC_NUM_2ND_LVL_BLOCKS(hash_tbl->buckets,hash_tbl);
+  if (blocks_needed > curr_blocks) {
+      /* Need a larger first level structure */
+      __VIP_HASH_NODE_P_T** new_1st_level;
+      __VIP_HASH_NODE_P_T** old_1st_level;
+      u_int32_t new_1st_lvl_size = sizeof(__VIP_HASH_NODE_P_T**)*(blocks_needed);
+      new_1st_level =  (__VIP_HASH_NODE_P_T**)MALLOC(new_1st_lvl_size);
+      if (new_1st_level == NULL) {
+          hash_tbl->may_grow = FALSE;
+          MTL_ERROR1(MT_FLFMT("%s failed: cannot allocate memory for first level"), __func__ );
+          return MT_EAGAIN;
+      }
+      memset(new_1st_level, 0, new_1st_lvl_size);
+      MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+      if (hash_tbl->nodes_1st_lvl_begin != NULL) {
+          memcpy(new_1st_level, hash_tbl->nodes_1st_lvl_begin, sizeof(__VIP_HASH_NODE_P_T**)*(curr_blocks));
+          old_1st_level = hash_tbl->nodes_1st_lvl_begin;
+          hash_tbl->nodes_1st_lvl_begin = new_1st_level;
+          MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+          FREE(old_1st_level);
+      }else {
+          hash_tbl->nodes_1st_lvl_begin = new_1st_level;
+          MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      }
+  }
+  block_size_to_allocate = hash_tbl->size_2nd_lvl_block;
+
+  /* adjust previous last block for new number of buckets. Need spinlock when adjust
+   * the last second level block in the current table. */
+  if (curr_blocks > 0) {
+      __VIP_HASH_NODE_P_T*  new_2nd_lvl_block;
+      __VIP_HASH_NODE_P_T*  old_2nd_lvl_block;
+      old_last_allocated_blocksize =
+          (hash_tbl->buckets - ((curr_blocks-1)*(hash_tbl->sec_lvl_buckets_per_blk)))*HASH_2ND_LVL_ENTRY_SIZE;
+      if (curr_blocks == blocks_needed) {
+          /* just allocate a new short block */
+          new_first_allocated_blocksize = (new_buckets - 
+                                      ((blocks_needed-1)*(hash_tbl->sec_lvl_buckets_per_blk))
+                                    ) * HASH_2ND_LVL_ENTRY_SIZE;
+      } else {
+          new_first_allocated_blocksize = block_size_to_allocate;
+      }
+
+      new_2nd_lvl_block = (__VIP_HASH_NODE_P_T*)MALLOC(new_first_allocated_blocksize);
+      if (new_2nd_lvl_block == NULL) {
+          hash_tbl->may_grow = FALSE;
+          MTL_ERROR1(MT_FLFMT("%s failed: cannot allocate memory for second level"), __func__ );
+          return MT_EAGAIN;
+      }
+      memset(new_2nd_lvl_block, 0, new_first_allocated_blocksize);
+      MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+      old_2nd_lvl_block = hash_tbl->nodes_1st_lvl_begin[curr_blocks-1];
+      memcpy(new_2nd_lvl_block,old_2nd_lvl_block,old_last_allocated_blocksize);
+      hash_tbl->nodes_1st_lvl_begin[curr_blocks-1] = new_2nd_lvl_block;
+      MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      FREE(old_2nd_lvl_block);
+  }
+  
+  for (i = curr_blocks; i < (int) blocks_needed; i++) {
+      if (i == (int)blocks_needed - 1) {
+          /* allocate a smaller block for the last 2nd level block */
+          block_size_to_allocate =  (new_buckets - 
+                                      ((blocks_needed-1)*(hash_tbl->sec_lvl_buckets_per_blk))
+                                    ) * HASH_2ND_LVL_ENTRY_SIZE;
+      }
+      hash_tbl->nodes_1st_lvl_begin[i] = (__VIP_HASH_NODE_P_T*)MALLOC(block_size_to_allocate);
+      if (hash_tbl->nodes_1st_lvl_begin[i] == NULL) {
+          MTL_ERROR1(MT_FLFMT("hash resize: malloc failure at 2nd level block %d"), i);
+          for (j = curr_blocks; j < i; j++) {
+              FREE(hash_tbl->nodes_1st_lvl_begin[j]);
+              hash_tbl->nodes_1st_lvl_begin[j]=NULL;
+          }
+          hash_tbl->may_grow = FALSE;
+          return MT_EAGAIN;
+      } else {
+          memset(hash_tbl->nodes_1st_lvl_begin[i], 0, block_size_to_allocate);
+      }
+  }
+
+  /* adjust vip array object parameters */
+   
+   /* add required n */
+   /* Rehash all nodes from buckets table to new positions */
+  MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+  hash_tbl->buckets     = new_buckets;
+
+  old_bucket_ix = 0;
+  for (i = 0; i < (int)curr_blocks; i++)
+  {
+      __VIP_HASH_NODE_P_T* sec_lvl_block;
+      if (i == (int)curr_blocks-1) {
+          buckets_per_blk = old_buckets - (i * buckets_per_blk);
+      }
+      sec_lvl_block = hash_tbl->nodes_1st_lvl_begin[i];
+      for (j = 0; j < (int)buckets_per_blk; old_bucket_ix++,j++) {
+
+          __VIP_HASH_NODE_P_T*  new_bucket;
+          __VIP_HASH_NODE_P_T  node;
+          __VIP_HASH_NODE_P_T* prev = (sec_lvl_block+j);
+          node = *prev;
+          while (node != NULL) 
+          {
+            u_int32_t   new_bucket_idx;
+            new_bucket_idx = __VIP_HASH_FUNC(node->key) % new_buckets;
+            if (old_bucket_ix == new_bucket_idx) {
+                /* rehashes to same bucket. just continue, updating prev pointer */
+                prev = &(node->next);
+                node = node->next;
+                continue;
+            }
+            /* need to move entry to another bucket */
+            /* a. remove from old */
+            *prev = node->next;
+            /* b. insert node into a different bucket. done here without spinlocks, since
+             *    entire table is currently locked
+             */
+            new_bucket = GET_BUCKET_BY_IX(hash_tbl,new_bucket_idx);
+            node->next = *new_bucket;
+            *new_bucket = node;
+            /* go to next link in old bucket. prev guaranteed not null */
+            node = *prev;
+          }
+      }
+  }
+  
+  MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+  return MT_OK;
+} /* resize[p] */
+ 
+
+/*******************************************************************************
+ * Function: VIP_hash[p]_create
+ *
+ * Arguments:
+ *  size (IN) - Approximate initial size. 
+ *  VIP_hash[p]_p (OUT) - Return new hash_tbl object here
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EAGAIN: Not enough resources
+ *
+ * Description:
+ *   Create a new hash_tbl table
+ *
+ ******************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_create_maxsize, 
+                                 VIP_hashp_create_maxsize,
+                                 VIP_hashp2p_create_maxsize,
+                                 VIP_hash64p_create_maxsize,
+                                 VIP_hashv4p_create_maxsize)
+(u_int32_t reserve, u_int32_t max_size, __VIP_HASH_T* hash_p)
+{
+  __VIP_HASH_T hash_tbl = NULL;
+
+  if (max_size == 0) {max_size =  HASH_DEFAULT_MAXSIZE;}
+  if ( reserve > max_size) {
+    MTL_ERROR1(MT_FLFMT("%s: requested size (0x%x) greater than supplied max size (0x%x"), __func__,
+                reserve, max_size);
+    return VIP_EINVAL_PARAM;
+}
+if (reserve > HASH_DEFAULT_MAXSIZE) {
+    MTL_ERROR1(MT_FLFMT("%s: requested size (0x%x) greater than max permitted"), __func__, reserve);
+    return VIP_EINVAL_PARAM;
+}
+  
+  hash_tbl = TMALLOC(__VIP_HASH_TBL_T);
+  if (hash_tbl == NULL) { 
+    MTL_ERROR1(MT_FLFMT("%s failed: cannot allocate memory"), __func__ );
+    return VIP_EAGAIN;
+  }
+
+  *hash_p = hash_tbl;
+
+  memset(hash_tbl, 0, sizeof(__VIP_HASH_TBL_T));
+  hash_tbl->size        = 0;
+  hash_tbl->buckets     = 0;
+  hash_tbl->may_grow    = TRUE;
+  hash_tbl->resize_in_progress= FALSE;
+  hash_tbl->max_size = max_size;
+  hash_tbl->max_buckets = (u_int32_t) mtl_find_prime((unsigned long) max_size);
+  hash_tbl->sec_lvl_buckets_per_blk      = HASH_2ND_LVL_BUCKETS_PER_BLOCK;
+  hash_tbl->sec_lvl_buckets_per_blk_m_1  = hash_tbl->sec_lvl_buckets_per_blk - 1;
+  hash_tbl->size_2nd_lvl_block           = HASH_2ND_LVL_BLOCK_SIZE;
+  hash_tbl->log2_2nd_lvl_entries_per_blk = HASH_LOG_2ND_LVL_BUCKETS_PER_BLOCK;  
+  hash_tbl->max_2nd_lvl_blocks = CALC_MAX_2ND_LVL_BLOCKS(hash_tbl);
+
+  MOSAL_spinlock_init(&(hash_tbl->hash_lock));
+  /* Allocate hash table of given "reserve" size (will be at least the minimum > 0)*/
+  // MTL_DEBUG4(MT_FLFMT("going to call resize"));
+  if (resize(hash_tbl, reserve ) != MT_OK)
+  { /* nodes_begin should never be NULL */
+    if (hash_tbl->nodes_1st_lvl_begin != NULL) {
+        FREE(hash_tbl->nodes_1st_lvl_begin);
+    }
+    FREE(hash_tbl);
+    return VIP_EAGAIN;
+  }
+
+  return VIP_OK;
+} /* VIP_hash[p]_create */
+
+
+
+/*******************************************************************************
+ * Function: VIP_hash[p]_create
+ *
+ * Arguments:
+ *  size (IN) - Approximate initial size. 
+ *  VIP_hash[p]_p (OUT) - Return new hash_tbl object here
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EAGAIN: Not enough resources
+ *
+ * Description:
+ *   Create a new hash_tbl table
+ *
+ ******************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_create, 
+                                 VIP_hashp_create,
+                                 VIP_hashp2p_create,
+                                 VIP_hash64p_create,
+                                 VIP_hashv4p_create)
+(u_int32_t reserve, __VIP_HASH_T* hash_p)
+{
+    return __VIP_HASH_PICK(VIP_hash_create_maxsize, 
+                                 VIP_hashp_create_maxsize,
+                                 VIP_hashp2p_create_maxsize,
+                                 VIP_hash64p_create_maxsize,
+                                 VIP_hashv4p_create_maxsize) (reserve, HASH_DEFAULT_MAXSIZE, hash_p);
+} /* VIP_hash[p]_create */
+
+
+/*******************************************************************************
+ * Function: VIP_hash[p]_destroy
+ *
+ * Arguments:
+ *  hash_tbl (IN) - Object to destroy
+ *
+ * Returns:
+ *  VIP_OK
+ *
+ * Description:
+ *   cleanup resources for a hash_tbl table
+ *
+ ********************************************************************************/
+VIP_common_ret_t
+#if __VIP_HASH_VARIANT != 1 && __VIP_HASH_VARIANT != 2 && __VIP_HASH_VARIANT != 3 && __VIP_HASH_VARIANT != 4
+   __VIP_HASH_PICK(VIP_hash_destroy,
+                   VIP_hashp_destroy BUTNOTUSEDHERE,
+                   VIP_hashp2p_destroy BUTNOTUSEDHERE,
+                   VIP_hash64p_destroy BUTNOTUSEDHERE,
+                   VIP_hashv4p_destroy BUTNOTUSEDHERE)
+   (__VIP_HASH_T          hash_tbl)
+#else /*  __VIP_HASH_VARIANT == 1||2||3 | 4 */
+   __VIP_HASH_PICK(VIP_hash_destroy BUTNOTUSEDHERE,
+                   VIP_hashp_destroy,
+                   VIP_hashp2p_destroy ,
+                   VIP_hash64p_destroy,
+                   VIP_hashv4p_destroy) (
+   __VIP_HASH_T          hash_tbl,
+  void          (*free_objects_fun)(__VIP_HASH_KEY_T key, __VIP_HASH_VAL_T val, void* priv_data),
+  void*          priv_data
+ )
+#endif
+{
+
+  int       i,j;
+  register u_int32_t buckets_per_blk=0; 
+  register u_int32_t curr_blocks;
+  register __VIP_HASH_NODE_P_T* sec_lvl_block;
+  register __VIP_HASH_NODE_P_T  node;
+  register __VIP_HASH_NODE_P_T  next;
+
+  if (hash_tbl == NULL) return VIP_OK;
+  curr_blocks = CALC_NUM_2ND_LVL_BLOCKS(hash_tbl->buckets,hash_tbl);
+  buckets_per_blk = hash_tbl->sec_lvl_buckets_per_blk;
+
+  /* No lock because: 
+   *  1) process is not suppose to use the object at this stage 
+   *  2) "free_objects_fun" may invoke "free" function
+   */
+  /*MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));*/
+  
+  for (i = 0; i < (int)curr_blocks; i++)
+  {
+      if (i == (int)curr_blocks-1) {
+          /* adjust for last 2nd level block having fewer entries */
+          buckets_per_blk = hash_tbl->buckets - (i * buckets_per_blk);
+      }
+      sec_lvl_block = hash_tbl->nodes_1st_lvl_begin[i];
+      for (j = 0; j < (int)buckets_per_blk; j++) {
+          for (node = *(sec_lvl_block+j); node ; node = next) 
+          {
+              next=node->next;
+#if __VIP_HASH_VARIANT == 1 || __VIP_HASH_VARIANT == 2 || __VIP_HASH_VARIANT == 3 || __VIP_HASH_VARIANT == 4
+              if (free_objects_fun) free_objects_fun(node->key,node->val,priv_data);
+#endif
+              FREE(node);
+          }
+      }
+      FREE(sec_lvl_block);
+  }
+
+  FREE(hash_tbl->nodes_1st_lvl_begin);
+  FREE(hash_tbl);
+  
+  return VIP_OK;
+}
+
+/********************************************************************************
+ * Function: VIP_hash[p]_insert
+ *
+ * Arguments:
+ *  hash_tbl (IN) - Insert in this table
+ *  key (IN) - Key to insert
+ *  val (IN) - Value to insert
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EBUSY: the key is already in the hash_tbl
+ *  VIP_EAGAIN: not enough resources
+ *
+ * Description:
+ *   Associate this value with this key.
+ *   Return the value associated with this key.
+ *   Note: if the key is in the hash_tbl, table is not changed, and so 
+ *   the returned value in tval_p may differ from val.
+ *
+ ******************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_insert, 
+                                 VIP_hashp_insert,
+                                 VIP_hashp2p_insert,
+                                 VIP_hash64p_insert,
+                                 VIP_hashv4p_insert)
+(
+  __VIP_HASH_T      hash_tbl, 
+  __VIP_HASH_KEY_T  key, 
+  __VIP_HASH_VAL_T  val)
+{
+  __VIP_HASH_VAL_T* val_p;
+  VIP_common_ret_t   rc = 
+    __VIP_HASH_PICK(VIP_hash_insert_ptr, 
+                    VIP_hashp_insert_ptr,
+                    VIP_hashp2p_insert_ptr,
+                    VIP_hash64p_insert_ptr,
+                    VIP_hashv4p_insert_ptr)(
+      hash_tbl, key, &val_p);
+  if (rc == VIP_OK)
+  {
+    *val_p = val;
+  }
+  return rc;
+} /* VIP_hash[p]_insert */
+
+
+/********************************************************************************
+ * Function: VIP_hash[p]_insert_ptr
+ *
+ * Arguments:
+ *  hash_tbl (IN) - Insert in this table
+ *  key (IN) - Key to insert
+ *  tval_p (OUT) - Value associated with the key
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EBUSY: the key is already in the hash_tbl
+ *  VIP_EAGAIN: not enough resources
+ *
+ * Description:
+ *   Associate a new value with this key.
+ *   This is like VIP_hash[p]_insert, but outputs a pointer
+ *   to the value field, through which the value may be set later.
+ *
+ *   Note: if the key is already in the hash_tbl, 
+ *   the returned value in tval_p points to the existing entry
+ *
+ ******************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_insert_ptr, 
+                                 VIP_hashp_insert_ptr,
+                                 VIP_hashp2p_insert_ptr,
+                                 VIP_hash64p_insert_ptr,
+                                 VIP_hashv4p_insert_ptr)
+(
+  __VIP_HASH_T       hash_tbl, 
+  __VIP_HASH_KEY_T   key, 
+  __VIP_HASH_VAL_T** tval_p)
+{
+  u_int32_t           bucket_n;   
+  __VIP_HASH_NODE_P_T* bucket   = NULL; /* init to silent warning */
+  __VIP_HASH_NODE_P_T  node;
+  __VIP_HASH_NODE_P_T  new_node;
+
+  if (hash_tbl == NULL)  return VIP_EINVAL_HNDL;
+  /* Try to allocate new hash node before locking spinlock */
+  new_node = TMALLOC(__VIP_HASH_NODE_T);
+  if (new_node == NULL) {
+    MTL_ERROR1(MT_FLFMT("VIP_hash_insert failed to allocate new node"));
+    return VIP_EAGAIN;
+  }
+  
+  MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+  
+  /* Check if resize is required */
+  if ((hash_tbl->size >= hash_tbl->buckets) && (hash_tbl->may_grow)  &&
+      (! hash_tbl->resize_in_progress) )  {  /* Only one resize at a time */
+      hash_tbl->resize_in_progress= TRUE;
+      MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      resize(hash_tbl, hash_tbl->size + 1); 
+      /* It will be nice if resize succeeds, but we can continue anyway */
+      MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+      hash_tbl->resize_in_progress= FALSE;
+  }
+  
+  bucket_n = __VIP_HASH_FUNC(key) % hash_tbl->buckets;
+  bucket   = GET_BUCKET_BY_IX(hash_tbl,bucket_n);
+  /* First check if givenkey is not already in use */
+  for (node=*bucket;node;node=node->next) {
+#if __VIP_HASH_VARIANT == 4
+    if (!memcmp((const void *)&node->key[0], (const void *)&key[0], sizeof(__VIP_HASH_KEY_T))) {
+#else
+    if (node->key == key) {
+#endif    
+      if (tval_p) { *tval_p=&(node->val); }
+      MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      FREE(new_node);
+      return VIP_EBUSY;
+    }
+  }
+  
+  /* Now insert */
+#if __VIP_HASH_VARIANT == 4
+  memcpy((void *)&new_node->key[0], (const void *)&key[0], sizeof(__VIP_HASH_KEY_T));
+#else
+  new_node->key = key;
+#endif
+  new_node->next = *bucket; /* Insert as first in bucket */
+  *bucket= new_node;
+  ++hash_tbl->size;
+  
+  MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+  
+  if (tval_p) { *tval_p = &(new_node->val); }
+
+  return VIP_OK;
+} /* VIP_hash[p]_insert_ptr */
+
+/*******************************************************************************
+ * Function: VIP_hash[p]_erase
+ *
+ * Arguments:
+ *  hash_tbl (IN) - Insert in this table
+ *  key (IN) - remove value by this key
+ *  val (OUT) - if non zero, returns the value by this key here
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EINVAL_HNDL: key is not in the hash_tbl
+ *
+ * Description:
+ *   Remove the value associated with this key
+ *   Note: fails if key is not already in the hash_tbl
+ *
+ ********************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_erase, 
+                                 VIP_hashp_erase,
+                                 VIP_hashp2p_erase,
+                                 VIP_hash64p_erase,
+                                 VIP_hashv4p_erase)
+(
+  __VIP_HASH_T       hash_tbl,
+  __VIP_HASH_KEY_T   key,
+  __VIP_HASH_VAL_T*  val)
+{
+  u_int32_t bucket_n;
+  __VIP_HASH_NODE_P_T* bucket;
+  __VIP_HASH_NODE_P_T node;
+  /*pointer in previous node to this one */
+  __VIP_HASH_NODE_P_T* prev;
+
+  if (hash_tbl == NULL)  return VIP_EINVAL_HNDL;
+  
+  MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+
+  bucket_n = __VIP_HASH_FUNC(key) % hash_tbl->buckets;
+  bucket   = GET_BUCKET_BY_IX(hash_tbl,bucket_n);
+  prev= bucket;
+  
+  /* Try to find */
+  for (node=*bucket; node; prev=&(node->next), node= node->next) {
+#if __VIP_HASH_VARIANT == 4
+    if (!memcmp((const void *)&node->key[0], (const void *)&key[0], sizeof(__VIP_HASH_KEY_T))) {
+#else
+    if (node->key == key) {
+#endif    
+      *prev= node->next;  /* take out of bucket */
+      --hash_tbl->size;
+      MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      if (val) { *val= node->val; } /* return last value before freeing node */
+      FREE(node);
+      return VIP_OK;
+    }
+  }
+  
+  MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+  return VIP_EINVAL_HNDL;
+} /* VIP_hash[p]_erase */
+
+/********************************************************************************
+ * Function: VIP_hash[p]_find
+ *
+ * Arguments:
+ *  hash_tbl (IN) - Insert in this table
+ *  key (IN) - remove value by this key
+ *  val (OUT) - if non zero, returns the value by this key here
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EINVAL_HNDL: key is not in the hash_tbl
+ *
+ * Description:
+ *   Find the value associated with this key
+ *   Note: fails if key is not already in the hash_tbl
+ *
+ ******************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_find, 
+                                 VIP_hashp_find,
+                                 VIP_hashp2p_find,
+                                 VIP_hash64p_find,
+                                 VIP_hashv4p_find)
+(
+  __VIP_HASH_T       hash_tbl,
+  __VIP_HASH_KEY_T   key,
+  __VIP_HASH_VAL_T*  val)
+{
+  u_int32_t bucket_n;
+  __VIP_HASH_NODE_P_T* bucket;
+  __VIP_HASH_NODE_P_T node;
+  
+  if (hash_tbl == NULL)  return VIP_EINVAL_HNDL;
+  
+  MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+  
+  bucket_n = __VIP_HASH_FUNC(key) % hash_tbl->buckets;
+  bucket   = GET_BUCKET_BY_IX(hash_tbl,bucket_n);
+
+  /* Try to find */
+  for (node=*bucket;node;node=node->next) {
+#if __VIP_HASH_VARIANT == 4
+    if (!memcmp((const void *)&node->key[0], (const void *)&key[0], sizeof(__VIP_HASH_KEY_T))) {
+#else
+    if (node->key == key) {
+#endif    
+      if (val) *val=node->val;
+      MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      return VIP_OK;
+    }
+  }
+  
+  MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+  return VIP_EINVAL_HNDL;
+} /* VIP_hash[p]_find */
+
+
+/******************************************************************************
+ * Function: VIP_hash[p]_find_ptr
+ *
+ * Arguments:
+ *  hash_tbl (IN) - Insert in this table
+ *  key (IN) - remove value by this key
+ *  val_p (OUT) - if non zero, contains the pointer to the entry
+ *                 coresponding to given key
+ *
+ * Returns:
+ *  VIP_OK, 
+ *  VIP_EINVAL_HNDL: key is not in the hash_tbl
+ *
+ * Description:
+ *   Find the value associated with this key
+ *   This is like hashp_find, but returns pointer to the
+ *   value field, which makes it possible to modify
+ *   the value stored by this key.
+ *
+ *   Note: fails if key is not already in the hash_tbl
+ *
+ ******************************************************************************/
+VIP_common_ret_t __VIP_HASH_PICK(VIP_hash_find_ptr, 
+                                 VIP_hashp_find_ptr,
+                                 VIP_hashp2p_find_ptr,
+                                 VIP_hash64p_find_ptr,
+                                 VIP_hashv4p_find_ptr)
+(
+  __VIP_HASH_T        hash_tbl,
+  __VIP_HASH_KEY_T    key,
+  __VIP_HASH_VAL_T**  val_p )
+{
+  u_int32_t bucket_n;
+  __VIP_HASH_NODE_P_T* bucket;
+  __VIP_HASH_NODE_P_T node;
+
+  if (hash_tbl == NULL)  return VIP_EINVAL_HNDL;
+
+  MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+
+  bucket_n = __VIP_HASH_FUNC(key) % hash_tbl->buckets;
+  bucket   = GET_BUCKET_BY_IX(hash_tbl,bucket_n);
+  
+  /* Try to find */
+  for (node=*bucket;node;node=node->next) {
+#if __VIP_HASH_VARIANT == 4
+    if (!memcmp((const void *)&node->key[0], (const void *)&key[0], sizeof(__VIP_HASH_KEY_T))) {
+#else
+    if (node->key == key) {
+#endif    
+      if (val_p) *val_p=&(node->val);
+      MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+      return VIP_OK;
+    }
+  }
+  
+  MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+  return VIP_EINVAL_HNDL;
+} /* VIP_hash[p]_find_ptr */
+
+
+/********************************************************************************
+ * Function: VIP_hash[p]_get_num_of_objects
+ *
+ * Arguments:
+ *  hash_tbl (IN) - table
+ *
+ * Returns:
+ *  number of objects in the array
+ *
+ * Description:
+ *   Get number of objects
+ *
+ ********************************************************************************/
+u_int32_t
+__VIP_HASH_PICK(VIP_hash_get_num_of_objects, 
+                VIP_hashp_get_num_of_objects,
+                VIP_hashp2p_get_num_of_objects,
+                VIP_hash64p_get_num_of_objects,
+                VIP_hashv4p_get_num_of_objects)
+(
+  __VIP_HASH_T hash_tbl)
+{
+  return hash_tbl->size;
+} /* VIP_hash[p]_get_num_of_objects */
+
+/********************************************************************************
+ * Function: VIP_hash[p]_get_num_of_buckets
+ *
+ * Arguments:
+ *  hash_tbl (IN) - table
+ *
+ * Returns:
+ *  number of buckets in the array
+ *
+ * Description:
+ *   Get number of buckets
+ *
+ ********************************************************************************/
+u_int32_t
+__VIP_HASH_PICK(VIP_hash_get_num_of_buckets, 
+                VIP_hashp_get_num_of_buckets,
+                VIP_hashp2p_get_num_of_buckets,
+                VIP_hash64p_get_num_of_buckets,
+                VIP_hashv4p_get_num_of_buckets)
+(
+  __VIP_HASH_T hash_tbl)
+{
+  return hash_tbl->buckets;
+} /* VIP_hash[p]_get_num_of_objects */
+
+/************************************************************************/
+MT_bool __VIP_HASH_PICK(VIP_hash_may_grow, 
+                        VIP_hashp_may_grow,
+                        VIP_hashp2p_may_grow,
+                        VIP_hash64p_may_grow,
+                        VIP_hashv4p_may_grow)
+(
+  __VIP_HASH_T hash_tbl, 
+  MT_bool      flag)
+{
+  MT_bool  old = hash_tbl->may_grow;
+  hash_tbl->may_grow = flag;
+  return old;
+} /* VIP_hash[p]_may_grow */
+
+
+/************************************************************************/
+void __VIP_HASH_PICK(VIP_hash_traverse, 
+                     VIP_hashp_traverse,
+                     VIP_hashp2p_traverse,
+                     VIP_hash64p_traverse,
+                     VIP_hashv4p_traverse)
+(
+  __VIP_HASH_T   hash_tbl,
+  int            (*ufunc)(__VIP_HASH_KEY_T key, __VIP_HASH_VAL_T val, void* vp),
+  void*          udata
+)
+{
+  int                  i,j,go = 1;
+  register u_int32_t            buckets_per_blk=0; 
+  register u_int32_t            curr_blocks; 
+  register __VIP_HASH_NODE_P_T* sec_lvl_block;
+  register __VIP_HASH_NODE_P_T  node;
+  register __VIP_HASH_NODE_P_T  next;
+  
+  if (hash_tbl == NULL)  return;
+
+  curr_blocks = CALC_NUM_2ND_LVL_BLOCKS(hash_tbl->buckets,hash_tbl);
+  buckets_per_blk = hash_tbl->sec_lvl_buckets_per_blk;
+
+  MOSAL_spinlock_irq_lock(&(hash_tbl->hash_lock));
+
+  for (i = 0; go && (i < (int)curr_blocks); i++)
+  {
+      if (i == (int)curr_blocks-1) {
+          /* adjust for last 2nd level block having fewer entries */
+          buckets_per_blk = hash_tbl->buckets - (i * buckets_per_blk);
+      }
+      sec_lvl_block = hash_tbl->nodes_1st_lvl_begin[i];
+      for (j = 0; go && (j < (int)buckets_per_blk); j++) {
+          for (node = *(sec_lvl_block+j); node && go; node = next) 
+          {
+              next = node->next;
+              go = (*ufunc)(node->key, node->val, udata);
+          }
+      }
+  }
+  
+  MOSAL_spinlock_unlock(&(hash_tbl->hash_lock));
+} /* VIP_hash[p]_traverse */
+

@@ -1,0 +1,469 @@
+/*
+  This software is available to you under a choice of one of two
+  licenses.  You may choose to be licensed under the terms of the GNU
+  General Public License (GPL) Version 2, available at
+  <http://www.fsf.org/copyleft/gpl.html>, or the OpenIB.org BSD
+  license, available in the LICENSE.TXT file accompanying this
+  software.  These details are also available at
+  <http://openib.org/license.html>.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+  Copyright (c) 2004 Mellanox Technologies Ltd.  All rights reserved.
+*/
+
+static HH_ret_t  zombie_open_hca(
+  HH_hca_hndl_t  hca_hndl,
+  EVAPI_hca_profile_t  *profile_p,
+  EVAPI_hca_profile_t  *sugg_profile_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_close_hca(
+  HH_hca_hndl_t  hca_hndl
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_alloc_ul_resources(
+  HH_hca_hndl_t  hca_hndl,
+  MOSAL_protection_ctx_t   user_protection_context,
+  void*          hca_ul_resources_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_free_ul_resources(
+  HH_hca_hndl_t  hca_hndl,
+  void*          hca_ul_resources_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_hca(
+  HH_hca_hndl_t    hca_hndl,
+  VAPI_hca_cap_t*  hca_cap_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_modify_hca(
+  HH_hca_hndl_t          hca_hndl,
+  IB_port_t              port_num,
+  VAPI_hca_attr_t*       hca_attr_p,
+  VAPI_hca_attr_mask_t*  hca_attr_mask_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_port_prop(
+  HH_hca_hndl_t     hca_hndl,
+  IB_port_t         port_num,
+  VAPI_hca_port_t*  hca_port_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_get_pkey_tbl(
+  HH_hca_hndl_t  hca_hndl,
+  IB_port_t      port_num,
+  u_int16_t      tbl_len_in,
+  u_int16_t*     tbl_len_out,
+  IB_pkey_t*     pkey_tbl_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_get_gid_tbl(
+  HH_hca_hndl_t  hca_hndl,
+  IB_port_t      port_num,
+  u_int16_t      tbl_len_in,
+  u_int16_t*     tbl_len_out,
+  IB_gid_t*      pkey_tbl_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_get_lid(
+  HH_hca_hndl_t  hca_hndl,
+  IB_port_t      port,
+  IB_lid_t*      lid_p,
+  u_int8_t*      lmc_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_alloc_pd(
+  HH_hca_hndl_t  hca_hndl, 
+  MOSAL_protection_ctx_t prot_ctx, 
+  void * pd_ul_resources_p, 
+  HH_pd_hndl_t *pd_num_p
+) 
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_free_pd(
+  HH_hca_hndl_t  hca_hndl,
+  HH_pd_hndl_t   pd
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_alloc_rdd(
+  HH_hca_hndl_t   hca_hndl,
+  HH_rdd_hndl_t*  rdd_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_free_rdd(
+  HH_hca_hndl_t  hca_hndl,
+  HH_rdd_hndl_t  rdd
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_create_priv_ud_av(
+  HH_hca_hndl_t     hca_hndl,
+  HH_pd_hndl_t      pd,
+  VAPI_ud_av_t*     av_p,
+  HH_ud_av_hndl_t*  ah_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_modify_priv_ud_av(
+  HH_hca_hndl_t    hca_hndl,
+  HH_ud_av_hndl_t  ah,
+  VAPI_ud_av_t*    av_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_priv_ud_av(
+  HH_hca_hndl_t    hca_hndl,
+  HH_ud_av_hndl_t  ah,
+  VAPI_ud_av_t*    av_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_destroy_priv_ud_av(
+  HH_hca_hndl_t    hca_hndl,
+  HH_ud_av_hndl_t  ah
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_register_mr(
+  HH_hca_hndl_t  hca_hndl,
+  HH_mr_t*       mr_props_p,
+  VAPI_lkey_t*   lkey_p,
+  VAPI_rkey_t*   rkey_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_reregister_mr(
+  HH_hca_hndl_t  hca_hndl,
+  VAPI_lkey_t    lkey,
+  VAPI_mr_change_t  change_mask,
+  HH_mr_t*       mr_props_p,
+  VAPI_lkey_t*   lkey_p,
+  VAPI_rkey_t*   rkey_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_register_smr(
+  HH_hca_hndl_t  hca_hndl,
+  HH_smr_t*      smr_props_p,
+  VAPI_lkey_t*   lkey_p,
+  VAPI_rkey_t*   rkey_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_deregister_mr(
+  HH_hca_hndl_t  hca_hndl,
+  VAPI_lkey_t    lkey
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_mr(
+  HH_hca_hndl_t  hca_hndl,
+  VAPI_lkey_t    lkey,
+  HH_mr_info_t*  mr_info_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_alloc_mw(
+  HH_hca_hndl_t  hca_hndl,
+  HH_pd_hndl_t   pd,
+  VAPI_rkey_t*   initial_rkey_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_free_mw(
+  HH_hca_hndl_t  hca_hndl,
+  VAPI_rkey_t    initial_rkey
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_create_cq(
+  HH_hca_hndl_t  hca_hndl,
+  MOSAL_protection_ctx_t  user_protection_context,
+  void*          cq_ul_resources_p,
+  HH_cq_hndl_t*  cq
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_resize_cq(
+  HH_hca_hndl_t  hca_hndl,
+  HH_cq_hndl_t   cq,
+  void*          cq_ul_resources_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_cq(
+  HH_hca_hndl_t   hca_hndl,
+  HH_cq_hndl_t    cq,
+  VAPI_cqe_num_t* num_o_cqes_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_destroy_cq(
+  HH_hca_hndl_t  hca_hndl,
+  HH_cq_hndl_t   cq
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_create_qp(
+  HH_hca_hndl_t       hca_hndl,
+  HH_qp_init_attr_t*  init_attr_p,
+  void*               qp_ul_resources_p,
+  IB_wqpn_t*          qpn_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_get_special_qp(
+  HH_hca_hndl_t       hca_hndl,
+  VAPI_special_qp_t   qp_type,
+  IB_port_t           port,
+  HH_qp_init_attr_t*  init_attr_p,
+  void*               qp_ul_resources_p,
+  IB_wqpn_t*          sqp_hndl_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_modify_qp(
+  HH_hca_hndl_t         hca_hndl,
+  IB_wqpn_t             qp_num,
+  VAPI_qp_state_t       cur_qp_state,
+  VAPI_qp_attr_t*       qp_attr_p,
+  VAPI_qp_attr_mask_t*  qp_attr_mask_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_qp(
+  HH_hca_hndl_t    hca_hndl,
+  IB_wqpn_t        qp_num,
+  VAPI_qp_attr_t*  qp_attr_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_destroy_qp(
+  HH_hca_hndl_t  hca_hndl,
+  IB_wqpn_t      qp_num
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_create_eec(
+  HH_hca_hndl_t  hca_hndl,
+  HH_rdd_hndl_t  rdd,
+  IB_eecn_t*     eecn_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_modify_eec(
+  HH_hca_hndl_t         hca_hndl,
+  IB_eecn_t             eecn,
+  VAPI_qp_state_t       cur_ee_state,
+  VAPI_qp_attr_t*       ee_attr_p,
+  VAPI_qp_attr_mask_t*  ee_attr_mask_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_query_eec(
+  HH_hca_hndl_t    hca_hndl,
+  IB_eecn_t        eecn,
+  VAPI_qp_attr_t*  ee_attr_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_destroy_eec(
+  HH_hca_hndl_t  hca_hndl,
+  IB_eecn_t      eecn
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_set_async_eventh(
+  HH_hca_hndl_t      hca_hndl,
+  HH_async_eventh_t  handler,
+  void*              private_data
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_set_comp_eventh(
+  HH_hca_hndl_t     hca_hndl,
+  HH_comp_eventh_t  handler,
+  void*             private_data
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_attach_to_multicast(
+  HH_hca_hndl_t  hca_hndl,
+  IB_wqpn_t      qpn,
+  IB_gid_t       dgid
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+static HH_ret_t  zombie_detach_from_multicast(
+  HH_hca_hndl_t  hca_hndl,
+  IB_wqpn_t      qpn,
+  IB_gid_t       dgid
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+
+static HH_ret_t  zombie_process_local_mad(
+  HH_hca_hndl_t        hca_hndl,
+  IB_port_t            port_num,
+  IB_lid_t	       slid,
+  EVAPI_proc_mad_opt_t proc_mad_opts,
+  void*                mad_in_p,
+  void*                mad_out_p
+)
+{
+  return HH_HCA_STATUS_ZOMBIE;
+}
+
+
+static void  zombie_init(HH_if_ops_t* p)
+{
+  p->HHIF_open_hca              = &zombie_open_hca;
+  p->HHIF_close_hca             = &zombie_close_hca;
+  p->HHIF_alloc_ul_resources    = &zombie_alloc_ul_resources;
+  p->HHIF_free_ul_resources     = &zombie_free_ul_resources;
+  p->HHIF_query_hca             = &zombie_query_hca;
+  p->HHIF_modify_hca            = &zombie_modify_hca;
+  p->HHIF_query_port_prop       = &zombie_query_port_prop;
+  p->HHIF_get_pkey_tbl          = &zombie_get_pkey_tbl;
+  p->HHIF_get_gid_tbl           = &zombie_get_gid_tbl;
+  p->HHIF_get_lid               = &zombie_get_lid;
+  p->HHIF_alloc_pd              = &zombie_alloc_pd;
+  p->HHIF_free_pd               = &zombie_free_pd;
+  p->HHIF_alloc_rdd             = &zombie_alloc_rdd;
+  p->HHIF_free_rdd              = &zombie_free_rdd;
+  p->HHIF_create_priv_ud_av     = &zombie_create_priv_ud_av;
+  p->HHIF_modify_priv_ud_av     = &zombie_modify_priv_ud_av;
+  p->HHIF_query_priv_ud_av      = &zombie_query_priv_ud_av;
+  p->HHIF_destroy_priv_ud_av    = &zombie_destroy_priv_ud_av;
+  p->HHIF_register_mr           = &zombie_register_mr;
+  p->HHIF_reregister_mr         = &zombie_reregister_mr;
+  p->HHIF_register_smr          = &zombie_register_smr;
+  p->HHIF_deregister_mr         = &zombie_deregister_mr;
+  p->HHIF_query_mr              = &zombie_query_mr;
+  p->HHIF_alloc_mw              = &zombie_alloc_mw;
+  p->HHIF_free_mw               = &zombie_free_mw;
+  p->HHIF_create_cq             = &zombie_create_cq;
+  p->HHIF_resize_cq             = &zombie_resize_cq;
+  p->HHIF_query_cq              = &zombie_query_cq;
+  p->HHIF_destroy_cq            = &zombie_destroy_cq;
+  p->HHIF_create_qp             = &zombie_create_qp;
+  p->HHIF_get_special_qp        = &zombie_get_special_qp;
+  p->HHIF_modify_qp             = &zombie_modify_qp;
+  p->HHIF_query_qp              = &zombie_query_qp;
+  p->HHIF_destroy_qp            = &zombie_destroy_qp;
+  p->HHIF_create_eec            = &zombie_create_eec;
+  p->HHIF_modify_eec            = &zombie_modify_eec;
+  p->HHIF_query_eec             = &zombie_query_eec;
+  p->HHIF_destroy_eec           = &zombie_destroy_eec;
+  p->HHIF_set_async_eventh      = &zombie_set_async_eventh;
+  p->HHIF_set_comp_eventh       = &zombie_set_comp_eventh;
+  p->HHIF_attach_to_multicast   = &zombie_attach_to_multicast;
+  p->HHIF_detach_from_multicast = &zombie_detach_from_multicast;
+  p->HHIF_process_local_mad     = &zombie_process_local_mad;
+} /* zombie_init */
+
