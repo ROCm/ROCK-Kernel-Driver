@@ -107,7 +107,8 @@ struct sa1100fb_info {
 	struct pm_dev		*pm;
 #endif
 #ifdef CONFIG_CPU_FREQ
-	struct notifier_block	clockchg;
+	struct notifier_block	freq_transition;
+	struct notifier_block	freq_policy;
 #endif
 };
 
