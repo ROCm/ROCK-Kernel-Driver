@@ -90,11 +90,7 @@ struct bus_attribute {
 };
 
 #define BUS_ATTR(_name,_mode,_show,_store)	\
-struct bus_attribute bus_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
+struct bus_attribute bus_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 extern int bus_create_file(struct bus_type *, struct bus_attribute *);
 extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
@@ -131,11 +127,7 @@ struct driver_attribute {
 };
 
 #define DRIVER_ATTR(_name,_mode,_show,_store)	\
-struct driver_attribute driver_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
+struct driver_attribute driver_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 extern int driver_create_file(struct device_driver *, struct driver_attribute *);
 extern void driver_remove_file(struct device_driver *, struct driver_attribute *);
@@ -172,11 +164,7 @@ struct class_attribute {
 };
 
 #define CLASS_ATTR(_name,_mode,_show,_store)			\
-struct class_attribute class_attr_##_name = { 			\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,					\
-	.store	= _store,					\
-};
+struct class_attribute class_attr_##_name = __ATTR(_name,_mode,_show,_store) 
 
 extern int class_create_file(struct class *, const struct class_attribute *);
 extern void class_remove_file(struct class *, const struct class_attribute *);
@@ -224,11 +212,8 @@ struct class_device_attribute {
 };
 
 #define CLASS_DEVICE_ATTR(_name,_mode,_show,_store)		\
-struct class_device_attribute class_device_attr_##_name = { 	\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,					\
-	.store	= _store,					\
-};
+struct class_device_attribute class_device_attr_##_name = 	\
+	__ATTR(_name,_mode,_show,_store)
 
 extern int class_device_create_file(struct class_device *, 
 				    const struct class_device_attribute *);
@@ -342,11 +327,7 @@ struct device_attribute {
 };
 
 #define DEVICE_ATTR(_name,_mode,_show,_store) \
-struct device_attribute dev_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
+struct device_attribute dev_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 
 extern int device_create_file(struct device *device, struct device_attribute * entry);

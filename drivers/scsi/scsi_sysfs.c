@@ -320,7 +320,7 @@ sdev_store_timeout (struct device *dev, const char *buf, size_t count)
 	sdev->timeout = timeout * HZ;
 	return count;
 }
-static DEVICE_ATTR(timeout, S_IRUGO | S_IWUSR, sdev_show_timeout, sdev_store_timeout)
+static DEVICE_ATTR(timeout, S_IRUGO | S_IWUSR, sdev_show_timeout, sdev_store_timeout);
 
 static ssize_t
 store_rescan_field (struct device *dev, const char *buf, size_t count) 
@@ -328,7 +328,7 @@ store_rescan_field (struct device *dev, const char *buf, size_t count)
 	scsi_rescan_device(dev);
 	return count;
 }
-static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field)
+static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field);
 
 static ssize_t sdev_store_delete(struct device *dev, const char *buf,
 				 size_t count)
