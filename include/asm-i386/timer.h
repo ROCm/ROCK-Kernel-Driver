@@ -21,6 +21,7 @@ struct timer_opts{
 #define TICK_SIZE (tick_nsec / 1000)
 
 extern struct timer_opts* select_timer(void);
+extern void clock_fallback(void);
 
 /* Modifiers for buggy PIT handling */
 

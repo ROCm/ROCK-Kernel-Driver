@@ -23,6 +23,15 @@ static int __init clock_setup(char* str)
 }
 __setup("clock=", clock_setup);
 
+
+/* The chosen timesource has been found to be bad.
+ * Fall back to a known good timesource (the PIT)
+ */
+void clock_fallback(void)
+{
+	cur_timer = &timer_pit;
+}
+
 /* iterates through the list of timers, returning the first 
  * one that initializes successfully.
  */
