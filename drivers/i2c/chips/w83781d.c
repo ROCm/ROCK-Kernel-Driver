@@ -318,18 +318,18 @@ store_in_reg(MAX, max);
 static ssize_t \
 show_regs_in_##offset (struct device *dev, char *buf) \
 { \
-        return show_in(dev, buf, 0x##offset); \
+        return show_in(dev, buf, offset); \
 } \
 static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL);
 
 #define sysfs_in_reg_offset(reg, offset) \
 static ssize_t show_regs_in_##reg##offset (struct device *dev, char *buf) \
 { \
-	return show_in_##reg (dev, buf, 0x##offset); \
+	return show_in_##reg (dev, buf, offset); \
 } \
 static ssize_t store_regs_in_##reg##offset (struct device *dev, const char *buf, size_t count) \
 { \
-	return store_in_##reg (dev, buf, count, 0x##offset); \
+	return store_in_##reg (dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset);
 
@@ -384,18 +384,18 @@ store_fan_min(struct device *dev, const char *buf, size_t count, int nr)
 #define sysfs_fan_offset(offset) \
 static ssize_t show_regs_fan_##offset (struct device *dev, char *buf) \
 { \
-	return show_fan(dev, buf, 0x##offset); \
+	return show_fan(dev, buf, offset); \
 } \
 static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL);
 
 #define sysfs_fan_min_offset(offset) \
 static ssize_t show_regs_fan_min##offset (struct device *dev, char *buf) \
 { \
-	return show_fan_min(dev, buf, 0x##offset); \
+	return show_fan_min(dev, buf, offset); \
 } \
 static ssize_t store_regs_fan_min##offset (struct device *dev, const char *buf, size_t count) \
 { \
-	return store_fan_min(dev, buf, count, 0x##offset); \
+	return store_fan_min(dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset);
 
@@ -464,18 +464,18 @@ store_temp_reg(HYST, max_hyst);
 static ssize_t \
 show_regs_temp_##offset (struct device *dev, char *buf) \
 { \
-	return show_temp(dev, buf, 0x##offset); \
+	return show_temp(dev, buf, offset); \
 } \
 static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL);
 
 #define sysfs_temp_reg_offset(reg, offset) \
 static ssize_t show_regs_temp_##reg##offset (struct device *dev, char *buf) \
 { \
-	return show_temp_##reg (dev, buf, 0x##offset); \
+	return show_temp_##reg (dev, buf, offset); \
 } \
 static ssize_t store_regs_temp_##reg##offset (struct device *dev, const char *buf, size_t count) \
 { \
-	return store_temp_##reg (dev, buf, count, 0x##offset); \
+	return store_temp_##reg (dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset);
 

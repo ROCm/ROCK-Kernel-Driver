@@ -266,29 +266,29 @@ set_in_reg(MAX, max)
 static ssize_t \
 	show_in##offset (struct device *dev, char *buf) \
 { \
-	return show_in(dev, buf, 0x##offset); \
+	return show_in(dev, buf, offset); \
 } \
 static DEVICE_ATTR(in##offset##_input, S_IRUGO, \
 		show_in##offset, NULL); \
 static ssize_t \
 	show_in##offset##_min (struct device *dev, char *buf) \
 { \
-	return show_in_min(dev, buf, 0x##offset); \
+	return show_in_min(dev, buf, offset); \
 } \
 static ssize_t \
 	show_in##offset##_max (struct device *dev, char *buf) \
 { \
-	return show_in_max(dev, buf, 0x##offset); \
+	return show_in_max(dev, buf, offset); \
 } \
 static ssize_t set_in##offset##_min (struct device *dev, \
 		const char *buf, size_t count) \
 { \
-	return set_in_min(dev, buf, count, 0x##offset); \
+	return set_in_min(dev, buf, count, offset); \
 } \
 static ssize_t set_in##offset##_max (struct device *dev, \
 		const char *buf, size_t count) \
 { \
-	return set_in_max(dev, buf, count, 0x##offset); \
+	return set_in_max(dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, \
 		show_in##offset##_min, set_in##offset##_min); \

@@ -298,43 +298,43 @@ static ssize_t set_pwm_en(struct device *dev, const char *buf,
 #define fan_present(offset)						\
 static ssize_t get_fan##offset (struct device *dev, char *buf)		\
 {									\
-	return get_fan(dev, buf, 0x##offset - 1);			\
+	return get_fan(dev, buf, offset - 1);				\
 }									\
 static ssize_t get_fan##offset##_min (struct device *dev, char *buf)	\
 {									\
-	return get_fan_min(dev, buf, 0x##offset - 1);			\
+	return get_fan_min(dev, buf, offset - 1);			\
 }									\
 static ssize_t set_fan##offset##_min (struct device *dev,		\
 		const char *buf, size_t count)				\
 {									\
-	return set_fan_min(dev, buf, count, 0x##offset - 1);		\
+	return set_fan_min(dev, buf, count, offset - 1);		\
 }									\
 static ssize_t get_fan##offset##_div (struct device *dev, char *buf)	\
 {									\
-	return get_fan_div(dev, buf, 0x##offset - 1);			\
+	return get_fan_div(dev, buf, offset - 1);			\
 }									\
 static ssize_t set_fan##offset##_div (struct device *dev,		\
 		const char *buf, size_t count)				\
 {									\
-	return set_fan_div(dev, buf, count, 0x##offset - 1);		\
+	return set_fan_div(dev, buf, count, offset - 1);		\
 }									\
 static ssize_t get_pwm##offset (struct device *dev, char *buf)		\
 {									\
-	return get_pwm(dev, buf, 0x##offset - 1);			\
+	return get_pwm(dev, buf, offset - 1);				\
 }									\
 static ssize_t set_pwm##offset (struct device *dev,			\
 		const char *buf, size_t count)				\
 {									\
-	return set_pwm(dev, buf, count, 0x##offset - 1);		\
+	return set_pwm(dev, buf, count, offset - 1);			\
 }									\
 static ssize_t get_pwm##offset##_en (struct device *dev, char *buf)	\
 {									\
-	return get_pwm_en(dev, buf, 0x##offset - 1);			\
+	return get_pwm_en(dev, buf, offset - 1);			\
 }									\
 static ssize_t set_pwm##offset##_en (struct device *dev,		\
 		const char *buf, size_t count)				\
 {									\
-	return set_pwm_en(dev, buf, count, 0x##offset - 1);		\
+	return set_pwm_en(dev, buf, count, offset - 1);			\
 }									\
 static DEVICE_ATTR(fan##offset##_input, S_IRUGO, get_fan##offset,	\
 		NULL);							\
