@@ -133,6 +133,15 @@ static long snd_pcm_oss_bytes(snd_pcm_substream_t *substream, long frames)
 	return (runtime->oss.buffer_bytes * frames) / buffer_size;
 }
 
+static long snd_pcm_alsa_frames(snd_pcm_substream_t *substream, long bytes)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_uframes_t buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	if (buffer_size == runtime->oss.buffer_bytes)
+		return bytes_to_frames(runtime, bytes);
+	return bytes_to_frames(runtime, (buffer_size * bytes) / runtime->oss.buffer_bytes);
+}
+
 static int snd_pcm_oss_format_from(int format)
 {
 	switch (format) {
@@ -254,7 +263,7 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 
 	snd_assert(oss_period_size >= 16, return -EINVAL);
 	runtime->oss.period_bytes = oss_period_size;
-	runtime->oss.period_frames = oss_period_size / oss_frame_size;
+	runtime->oss.period_frames = snd_pcm_alsa_frames(substream, oss_period_size);
 	runtime->oss.periods = oss_periods;
 	return 0;
 }
