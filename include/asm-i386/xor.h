@@ -489,7 +489,7 @@ xor_p5_mmx_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 	"       jnz 1b               ;\n"
 	"	popl %5\n"
 	"	popl %4\n"
-	: "+g" (lines),
+	: "+r" (lines),
 	  "+r" (p1), "+r" (p2), "+r" (p3)
 	: "r" (p4), "r" (p5)
 	: "memory");
