@@ -117,6 +117,9 @@ static int xircom_open(struct net_device *dev);
 static int xircom_close(struct net_device *dev);
 static void xircom_up(struct xircom_private *card);
 static struct net_device_stats *xircom_get_stats(struct net_device *dev);
+#if CONFIG_NET_POLL_CONTROLLER
+static void xircom_poll_controller(struct net_device *dev);
+#endif
 
 static void investigate_read_descriptor(struct net_device *dev,struct xircom_private *card, int descnr, unsigned int bufferoffset);
 static void investigate_write_descriptor(struct net_device *dev, struct xircom_private *card, int descnr, unsigned int bufferoffset);
@@ -269,6 +272,9 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 	dev->stop = &xircom_close;
 	dev->get_stats = &xircom_get_stats;
 	dev->priv = private;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &xircom_poll_controller;
+#endif
 	SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 	pci_set_drvdata(pdev, dev);
 
@@ -500,6 +506,14 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 } 
                                                  
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void xircom_poll_controller(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	xircom_interrupt(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 
 static void initialize_card(struct xircom_private *card)
