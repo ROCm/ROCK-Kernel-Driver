@@ -912,8 +912,20 @@ int __devinit __cpu_up(unsigned int cpu)
 	 * use this value that I found through experimentation.
 	 * -- Cort
 	 */
-	for (c = 5000; c && !cpu_callin_map[cpu]; c--)
-		udelay(100);
+	if (system_state == SYSTEM_BOOTING)
+		for (c = 5000; c && !cpu_callin_map[cpu]; c--)
+			udelay(100);
+#ifdef CONFIG_HOTPLUG_CPU
+	else
+		/*
+		 * CPUs can take much longer to come up in the
+		 * hotplug case.  Wait five seconds.
+		 */
+		for (c = 25; c && !cpu_callin_map[cpu]; c--) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/5);
+		}
+#endif
 
 	if (!cpu_callin_map[cpu]) {
 		printk("Processor %u is stuck.\n", cpu);
