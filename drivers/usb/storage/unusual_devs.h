@@ -402,8 +402,8 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 		"Lexar",
 		"Jumpshot USB CF Reader",
-		US_SC_DEVICE, US_PR_JUMPSHOT, NULL,
-		US_FL_MODE_XLATE ),
+		US_SC_SCSI, US_PR_JUMPSHOT, NULL,
+		US_FL_NEED_OVERRIDE | US_FL_MODE_XLATE ),
 #endif
 
 /* Reported by Blake Matheny <bmatheny@purdue.edu> */
