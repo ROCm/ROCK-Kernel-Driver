@@ -48,6 +48,13 @@ Here is what the fields mean:
             the interpreter to execute non-readable binaries. This feature should
             be used with care - the interpreter has to be trusted not to emit
             the contents of the non-readable binary.
+      'C' - credentials. Currently, the behavior of binfmt_misc is to calculate
+            the credentials and security token of the new process according to
+            the interpreter. When this flag is included, these attributes are
+            calculated according to the binary. It also implies the 'O' flag.
+            This feature should be used with care as the interpreter
+            will run with root permissions when a setuid binary owned by root
+            is run with binfmt_misc.
 
 
 There are some restrictions:
