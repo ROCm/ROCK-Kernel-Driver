@@ -647,8 +647,9 @@ int izo_set_fileid(struct file *dir, struct izo_ioctl_data *data)
         CDEBUG(D_FILE,"de:%p dd:%p\n", dentry, dd);
 
         if (dd->remote_ino != 0) {
-                CERROR("remote_ino already set? %Lx:%Lx\n", dd->remote_ino,
-                       dd->remote_generation);
+                CERROR("remote_ino already set? %Lx:%Lx\n",
+                       (unsigned long long) dd->remote_ino,
+                       (unsigned long long) dd->remote_generation);
                 rc = 0;
                 EXIT;
                 goto out_close;
@@ -656,8 +657,9 @@ int izo_set_fileid(struct file *dir, struct izo_ioctl_data *data)
 
 
         CDEBUG(D_FILE,"setting %p %p, %s to %Lx:%Lx\n", dentry, dd, 
-               buf, data->ioc_ino,
-               data->ioc_generation);
+               buf,
+               (unsigned long long) data->ioc_ino,
+               (unsigned long long) data->ioc_generation);
         dd->remote_ino = data->ioc_ino;
         dd->remote_generation = data->ioc_generation;
 
