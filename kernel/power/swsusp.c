@@ -336,32 +336,17 @@ static void init_header(void)
 	dump_info();
 }
 
-/**
- *	write_header - Fill and write the suspend header.
- *	@entry:	Location of the last swap entry used.
- *
- *	Allocate a page, fill header, write header. 
- *
- *	@entry is the location of the last pagedir entry written on 
- *	entrance. On exit, it contains the location of the header. 
- */
-
-static int write_header(swp_entry_t * entry)
-{
-	return write_page((unsigned long)&swsusp_info,entry);
-}
-
-
 static int close_swap(void)
 {
 	swp_entry_t entry;
 	int error;
-	error = write_header(&entry);
 
-	printk( "S" );
-	if (!error)
+	error = write_page((unsigned long)&swsusp_info,&entry);
+	if (!error) { 
+		printk( "S" );
 		error = mark_swapfiles(entry);
-	printk( "|\n" );
+		printk( "|\n" );
+	}
 	return error;
 }
 
