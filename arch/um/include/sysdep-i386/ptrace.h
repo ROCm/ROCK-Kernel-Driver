@@ -8,11 +8,11 @@
 
 #include "uml-config.h"
 
-#ifdef CONFIG_MODE_TT
+#ifdef UML_CONFIG_MODE_TT
 #include "ptrace-tt.h"
 #endif
 
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 #include "ptrace-skas.h"
 #endif
 
@@ -23,10 +23,10 @@ struct uml_pt_regs {
 	long syscall;
 	int is_user;
 	union {
-#ifdef CONFIG_MODE_TT
+#ifdef UML_CONFIG_MODE_TT
 		void *tt;
 #endif
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 		struct {
 			unsigned long regs[HOST_FRAME_SIZE];
 			unsigned long fp[HOST_FP_SIZE];
