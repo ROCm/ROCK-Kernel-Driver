@@ -691,41 +691,39 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				} 
 			} 
 #else /* LINUX_VERSION_CODE > 2.1.99 */
-			if (pci_present()) {
-				struct pci_dev *pci_dev_i = NULL;
-				pci_dev_i = pci_find_device(PCI_VENDOR_ID_COMPUTONE,
-							  PCI_DEVICE_ID_COMPUTONE_IP2EX, pci_dev_i);
-				if (pci_dev_i != NULL) {
-					unsigned int addr;
-					unsigned char pci_irq;
+			struct pci_dev *pci_dev_i = NULL;
+			pci_dev_i = pci_find_device(PCI_VENDOR_ID_COMPUTONE,
+						  PCI_DEVICE_ID_COMPUTONE_IP2EX, pci_dev_i);
+			if (pci_dev_i != NULL) {
+				unsigned int addr;
+				unsigned char pci_irq;
 
-					ip2config.type[i] = PCI;
-					status =
-					pci_read_config_dword(pci_dev_i, PCI_BASE_ADDRESS_1, &addr);
-					if ( addr & 1 ) {
-						ip2config.addr[i]=(USHORT)(addr&0xfffe);
-					} else {
-						printk( KERN_ERR "IP2: PCI I/O address error\n");
-					}
-					status =
-					pci_read_config_byte(pci_dev_i, PCI_INTERRUPT_LINE, &pci_irq);
+				ip2config.type[i] = PCI;
+				status =
+				pci_read_config_dword(pci_dev_i, PCI_BASE_ADDRESS_1, &addr);
+				if ( addr & 1 ) {
+					ip2config.addr[i]=(USHORT)(addr&0xfffe);
+				} else {
+					printk( KERN_ERR "IP2: PCI I/O address error\n");
+				}
+				status =
+				pci_read_config_byte(pci_dev_i, PCI_INTERRUPT_LINE, &pci_irq);
 
 //		If the PCI BIOS assigned it, lets try and use it.  If we
 //		can't acquire it or it screws up, deal with it then.
 
-//					if (!is_valid_irq(pci_irq)) {
-//						printk( KERN_ERR "IP2: Bad PCI BIOS IRQ(%d)\n",pci_irq);
-//						pci_irq = 0;
-//					}
-					ip2config.irq[i] = pci_irq;
-				} else {	// ann error
-					ip2config.addr[i] = 0;
-					if (status == PCIBIOS_DEVICE_NOT_FOUND) {
-						printk( KERN_ERR "IP2: PCI board %d not found\n", i );
-					} else {
-						pcibios_strerror(status);
-					}
-				} 
+//				if (!is_valid_irq(pci_irq)) {
+//					printk( KERN_ERR "IP2: Bad PCI BIOS IRQ(%d)\n",pci_irq);
+//					pci_irq = 0;
+//				}
+				ip2config.irq[i] = pci_irq;
+			} else {	// ann error
+				ip2config.addr[i] = 0;
+				if (status == PCIBIOS_DEVICE_NOT_FOUND) {
+					printk( KERN_ERR "IP2: PCI board %d not found\n", i );
+				} else {
+					pcibios_strerror(status);
+				}
 			} 
 #endif	/* ! 2_0_X */
 #else
