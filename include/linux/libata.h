@@ -384,7 +384,6 @@ extern int ata_scsi_detect(Scsi_Host_Template *sht);
 extern int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *));
 extern int ata_scsi_error(struct Scsi_Host *host);
 extern int ata_scsi_release(struct Scsi_Host *host);
-extern int ata_scsi_slave_config(struct scsi_device *sdev);
 extern unsigned int ata_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
 /*
  * Default driver ops implementations
@@ -409,6 +408,7 @@ extern void ata_eng_timeout(struct ata_port *ap);
 extern int ata_std_bios_param(struct scsi_device *sdev,
 			      struct block_device *bdev,
 			      sector_t capacity, int geom[]);
+extern int ata_scsi_slave_config(struct scsi_device *sdev);
 
 
 static inline unsigned long msecs_to_jiffies(unsigned long msecs)
