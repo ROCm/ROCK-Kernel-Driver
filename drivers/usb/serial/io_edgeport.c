@@ -2,7 +2,7 @@
  * Edgeport USB Serial Converter driver
  *
  * Copyright(c) 2000 Inside Out Networks, All rights reserved.
- * Copyright(c) 2001 Greg Kroah-Hartman <greg@kroah.com>
+ * Copyright(c) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -25,6 +25,9 @@
  *
  * Version history:
  * 
+ * 2.3 2002_03_08 greg kroah-hartman
+ *	- fixed bug when multiple devices were attached at the same time.
+ *
  * 2.2 2001_11_14 greg kroah-hartman
  *	- fixed bug in edge_close that kept the port from being used more
  *	  than once.
@@ -1438,8 +1441,8 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 		edge_port->write_in_progress = FALSE;
 		return;
 	}
-	buffer[0] = IOSP_BUILD_DATA_HDR1 (edge_port->port->number, count);
-	buffer[1] = IOSP_BUILD_DATA_HDR2 (edge_port->port->number, count);
+	buffer[0] = IOSP_BUILD_DATA_HDR1 (edge_port->port->number - edge_port->port->serial->minor, count);
+	buffer[1] = IOSP_BUILD_DATA_HDR2 (edge_port->port->number - edge_port->port->serial->minor, count);
 
 	/* now copy our data */
 	bytesleft =  fifo->size - fifo->tail;
@@ -2436,7 +2439,9 @@ static int send_iosp_ext_cmd (struct edgeport_port *edge_port, __u8 command, __u
 
 	currentCommand = buffer;
 
-	MAKE_CMD_EXT_CMD( &currentCommand, &length, edge_port->port->number, command, param);
+	MAKE_CMD_EXT_CMD (&currentCommand, &length,
+			  edge_port->port->number - edge_port->port->serial->minor,
+			  command, param);
 
 	status = write_cmd_usb (edge_port, buffer, length);
 	if (status) {
@@ -2516,9 +2521,9 @@ static int send_cmd_write_baud_rate (struct edgeport_port *edge_port, int baudRa
 	int cmdLen = 0;
 	int divisor;
 	int status;
-	unsigned char number = edge_port->port->number;
+	unsigned char number = edge_port->port->number - edge_port->port->serial->minor;
 
-	dbg(__FUNCTION__" - port = %d, baud = %d", number, baudRate);
+	dbg(__FUNCTION__" - port = %d, baud = %d", edge_port->port->number, baudRate);
 
 	status = calc_baud_rate_divisor (baudRate, &divisor);
 	if (status) {
@@ -2621,7 +2626,9 @@ static int send_cmd_write_uart_register (struct edgeport_port *edge_port, __u8 r
 	currCmd = cmdBuffer;
 
 	// Build a cmd in the buffer to write the given register
-	MAKE_CMD_WRITE_REG(&currCmd, &cmdLen, edge_port->port->number, regNum, regValue);
+	MAKE_CMD_WRITE_REG (&currCmd, &cmdLen,
+			    edge_port->port->number - edge_port->port->serial->minor,
+			    regNum, regValue);
 
 	status = write_cmd_usb(edge_port, cmdBuffer, cmdLen);
 	if (status) {
