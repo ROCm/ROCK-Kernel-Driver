@@ -217,47 +217,6 @@ static int configure_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct pci_bu
 	return 0;
 }
 
-
-static int is_pci_dev_in_use (struct pci_dev* dev)
-{
-	/*
-	 * dev->driver will be set if the device is in use by a new-style
-	 * driver -- otherwise, check the device's regions to see if any
-	 * driver has claimed them
-	 */
-
-	int i, inuse=0;
-
-	if (dev->driver) return 1; //assume driver feels responsible
-
-	for (i = 0; !dev->driver && !inuse && (i < 6); i++) {
-		if (!pci_resource_start(dev, i))
-			continue;
-
-		if (pci_resource_flags(dev, i) & IORESOURCE_IO)
-			inuse = check_region(pci_resource_start(dev, i),
-					     pci_resource_len(dev, i));
-		else if (pci_resource_flags(dev, i) & IORESOURCE_MEM)
-			inuse = check_mem_region(pci_resource_start(dev, i),
-						 pci_resource_len(dev, i));
-	}
-
-	return inuse;
-}
-
-
-static int pci_hp_remove_device (struct pci_dev *dev)
-{
-	if (is_pci_dev_in_use(dev)) {
-		err("***Cannot safely power down device -- "
-		       "it appears to be in use***\n");
-		return -EBUSY;
-	}
-	pci_remove_device(dev);
-	return 0;
-}
-
-
 /* remove device driver */
 static int unconfigure_pci_dev_driver (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus)
 {
@@ -274,7 +233,7 @@ static int unconfigure_pci_dev_driver (struct pci_dev_wrapped *wrapped_dev, stru
 		dev->driver = NULL;
 	}
 
-	return is_pci_dev_in_use(dev);
+	return (pci_dev_driver(dev) != NULL);
 }
 
 
@@ -285,7 +244,7 @@ static int unconfigure_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct pci_
 
 	/* Now, remove the Linux Representation */
 	if (dev) {
-		if (pci_hp_remove_device(dev) == 0) {
+		if (pci_remove_device_safe(dev) == 0) {
 			info("Device %s removed\n", dev->slot_name);
 			kfree(dev); /* Now, remove */
 		} else {

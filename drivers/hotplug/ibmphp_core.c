@@ -781,39 +781,6 @@ static void free_slots (void)
 	debug ("%s -- exit\n", __FUNCTION__);
 }
 
-static int ibm_is_pci_dev_in_use (struct pci_dev *dev)
-{
-	int i = 0;
-	int inuse = 0;
-
-	if (dev->driver)
-		return 1;
-
-	for (i = 0; !dev->driver && !inuse && (i < 6); i++) {
-
-		if (!pci_resource_start (dev, i))
-			continue;
-
-		if (pci_resource_flags (dev, i) & IORESOURCE_IO)
-			inuse = check_region (pci_resource_start (dev, i), pci_resource_len (dev, i));
-
-		else if (pci_resource_flags (dev, i) & IORESOURCE_MEM)
-			inuse = check_mem_region (pci_resource_start (dev, i), pci_resource_len (dev, i));
-	}
-
-	return inuse;
-}
-
-static int ibm_pci_hp_remove_device (struct pci_dev *dev)
-{
-	if (ibm_is_pci_dev_in_use (dev)) {
-		err ("***Cannot safely power down device -- it appears to be in use***\n");
-		return -EBUSY;
-	}
-	pci_remove_device (dev);
-	return 0;
-}
-
 static int ibm_unconfigure_visit_pci_dev_phase2 (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus)
 {
 	struct pci_dev *dev = wrapped_dev->dev;
@@ -825,7 +792,7 @@ static int ibm_unconfigure_visit_pci_dev_phase2 (struct pci_dev_wrapped *wrapped
 	} while (temp_func && (temp_func->function != (dev->devfn & 0x07)));
 
 	if (dev) {
-		if (ibm_pci_hp_remove_device (dev) == 0)
+		if (pci_remove_device_safe(dev) == 0)
 			kfree (dev);    /* Now, remove */
 		else
 			return -1;
@@ -872,7 +839,7 @@ static int ibm_unconfigure_visit_pci_dev_phase1 (struct pci_dev_wrapped *wrapped
 		dev->driver = NULL;
 	}
 
-	return ibm_is_pci_dev_in_use (dev);
+	return (pci_dev_driver(dev) != NULL);
 }
 
 static struct pci_visit ibm_unconfigure_functions_phase1 = {

@@ -692,7 +692,6 @@ struct pci_visit {
 extern int pci_visit_dev(struct pci_visit *fn,
 			 struct pci_dev_wrapped *wrapped_dev,
 			 struct pci_bus_wrapped *wrapped_parent);
-extern int pci_is_dev_in_use(struct pci_dev *dev);
 extern int pci_remove_device_safe(struct pci_dev *dev);
 
 #endif /* CONFIG_PCI */
