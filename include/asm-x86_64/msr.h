@@ -28,8 +28,8 @@
 
 #define wrmsrl(msr,val) wrmsr(msr,(__u32)((__u64)(val)),((__u64)(val))>>32) 
 
-/* wrmsrl with exception handling */
-#define checking_wrmsrl(msr,val) ({ int ret__;						\
+/* wrmsr with exception handling */
+#define wrmsr_safe(msr,a,b) ({ int ret__;						\
 	asm volatile("2: wrmsr ; xorl %0,%0\n"						\
 		     "1:\n\t"								\
 		     ".section .fixup,\"ax\"\n\t"					\
@@ -40,8 +40,10 @@
 		     "   .quad 	2b,3b\n\t"						\
 		     ".previous"							\
 		     : "=a" (ret__)							\
-		     : "c" (msr), "0" ((__u32)val), "d" ((val)>>32), "i" (-EFAULT));\
+		     : "c" (msr), "0" (a), "d" (b), "i" (-EFAULT));\
 	ret__; })
+
+#define checking_wrmsrl(msr,val) wrmsr_safe(msr,(u32)(val),(u32)((val)>>32))
 
 #define rdtsc(low,high) \
      __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))
