@@ -402,25 +402,6 @@ static int ndisc_output(struct sk_buff *skb)
 	return -EINVAL;
 }
 
-static inline struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
-						struct neighbour *neigh)
-{
-	struct rt6_info *rt = ip6_dst_alloc();
-
-	if (unlikely(rt == NULL))
-		goto out;
-
-	rt->rt6i_dev	  = dev;
-	rt->rt6i_nexthop  = neigh;
-	rt->rt6i_expires  = 0;
-	rt->rt6i_flags    = RTF_LOCAL;
-	rt->rt6i_metric   = 0;
-	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
-	rt->u.dst.output  = ndisc_output;
-out:
-	return (struct dst_entry *)rt;
-}
-
 static inline void ndisc_flow_init(struct flowi *fl, u8 type,
 			    struct in6_addr *saddr, struct in6_addr *daddr)
 {
@@ -463,13 +444,13 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh);	
+	dst = ndisc_dst_alloc(dev, neigh, ndisc_output);
 	if (!dst)
 		return;
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
-		dst_free(dst);
+		dst_release(dst);
 		return;
 	}
 
@@ -485,7 +466,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	if (skb == NULL) {
 		ND_PRINTK1("send_na: alloc skb failed\n");
-		dst_free(dst);
+		dst_release(dst);
 		return;
 	}
 
@@ -515,7 +496,6 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 						 csum_partial((__u8 *) msg, 
 							      len, 0));
 
-	dst_clone(dst);
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
@@ -550,10 +530,9 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh);
+	dst = ndisc_dst_alloc(dev, neigh, ndisc_output);
 	if (!dst)
 		return;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
@@ -570,6 +549,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
+		dst_release(dst);
 		return;
 	}
 
@@ -595,7 +575,6 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 						 csum_partial((__u8 *) msg, 
 							      len, 0));
 	/* send it! */
-	dst_clone(dst);
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
@@ -622,10 +601,9 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 
 	ndisc_flow_init(&fl, NDISC_ROUTER_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, NULL);
+	dst = ndisc_dst_alloc(dev, NULL, ndisc_output);
 	if (!dst)
 		return;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
@@ -664,7 +642,6 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 					   csum_partial((__u8 *) hdr, len, 0));
 
 	/* send it! */
-	dst_clone(dst);
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
