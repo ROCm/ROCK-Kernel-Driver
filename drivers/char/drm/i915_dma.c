@@ -93,9 +93,8 @@ int i915_dma_cleanup(drm_device_t * dev)
 		}
 
 		if (dev_priv->hw_status_page) {
-			pci_free_consistent(dev->pdev, PAGE_SIZE,
-					    dev_priv->hw_status_page,
-					    dev_priv->dma_status_page);
+			drm_pci_free(dev, PAGE_SIZE, dev_priv->hw_status_page,
+				     dev_priv->dma_status_page);
 			/* Need to rewrite hardware status page */
 			I915_WRITE(0x02080, 0x1ffff000);
 		}
@@ -172,9 +171,9 @@ static int i915_initialize(drm_device_t * dev,
 	dev_priv->allow_batchbuffer = 1;
 
 	/* Program Hardware Status Page */
-	dev_priv->hw_status_page =
-	    pci_alloc_consistent(dev->pdev, PAGE_SIZE,
-				 &dev_priv->dma_status_page);
+	dev_priv->hw_status_page = drm_pci_alloc(dev, PAGE_SIZE, PAGE_SIZE,
+						 0xffffffff, 
+						 &dev_priv->dma_status_page);
 
 	if (!dev_priv->hw_status_page) {
 		dev->dev_private = (void *)dev_priv;
