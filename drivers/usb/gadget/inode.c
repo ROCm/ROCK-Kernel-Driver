@@ -812,7 +812,7 @@ ep0_read (struct file *fd, char *buf, size_t len, loff_t *ptr)
 			if (dev->setup_out_error)
 				retval = -EIO;
 			else {
-				len = min (len, dev->req->actual);
+				len = min (len, (size_t)dev->req->actual);
 // FIXME don't call this with the spinlock held ...
 				if (copy_to_user (buf, &dev->req->buf, len))
 					retval = -EFAULT;
@@ -1670,7 +1670,7 @@ dev_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
 
 fail:
 	spin_unlock_irq (&dev->lock);
-	pr_debug ("%s: %s fail %d, %p\n", shortname, __FUNCTION__, value, dev);
+	pr_debug ("%s: %s fail %Zd, %p\n", shortname, __FUNCTION__, value, dev);
 	kfree (dev->buf);
 	dev->buf = 0;
 	return value;
