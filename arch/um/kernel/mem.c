@@ -155,7 +155,7 @@ static void __init fixrange_init(unsigned long start, unsigned long end,
 
 	vaddr = start;
 	i = pgd_index(vaddr);
-	j = __pmd_offset(vaddr);
+	j = pmd_index(vaddr);
 	pgd = pgd_base + i;
 
 	for ( ; (i < PTRS_PER_PGD) && (vaddr < end); pgd++, i++) {

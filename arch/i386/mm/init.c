@@ -98,12 +98,12 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
-	int pgd_idx, pmd_ofs;
+	int pgd_idx, pmd_idx;
 	unsigned long vaddr;
 
 	vaddr = start;
 	pgd_idx = pgd_index(vaddr);
-	pmd_ofs = __pmd_offset(vaddr);
+	pmd_idx = pmd_index(vaddr);
 	pgd = pgd_base + pgd_idx;
 
 	for ( ; (pgd_idx < PTRS_PER_PGD) && (vaddr != end); pgd++, pgd_idx++) {
@@ -111,13 +111,13 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 			one_md_table_init(pgd);
 
 		pmd = pmd_offset(pgd, vaddr);
-		for (; (pmd_ofs < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_ofs++) {
+		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_idx++) {
 			if (pmd_none(*pmd)) 
 				one_page_table_init(pmd);
 
 			vaddr += PMD_SIZE;
 		}
-		pmd_ofs = 0;
+		pmd_idx = 0;
 	}
 }
 
@@ -132,7 +132,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
-	int pgd_idx, pmd_ofs, pte_ofs;
+	int pgd_idx, pmd_idx, pte_ofs;
 
 	pgd_idx = pgd_index(PAGE_OFFSET);
 	pgd = pgd_base + pgd_idx;
@@ -142,7 +142,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 		pmd = one_md_table_init(pgd);
 		if (pfn >= max_low_pfn)
 			continue;
-		for (pmd_ofs = 0; pmd_ofs < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_ofs++) {
+		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {
 				set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE));
