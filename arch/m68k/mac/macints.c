@@ -251,7 +251,7 @@ void mac_init_IRQ(void)
 #endif /* SHUTUP_SONIC */
 
 	/* 
-	 * Now register the handlers for the the master IRQ handlers
+	 * Now register the handlers for the master IRQ handlers
 	 * at levels 1-7. Most of the work is done elsewhere.
 	 */
 
