@@ -7,6 +7,7 @@
  */
 
 #include <asm/pgtable.h>
+#include <asm/mmu_context.h>
 
 #if PAGE_SHIFT == 13
 #define FILL_VALID_SZ_BITS1(r1) \
