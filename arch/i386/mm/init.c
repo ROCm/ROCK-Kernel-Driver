@@ -338,6 +338,13 @@ static void __init pagetable_init (void)
 void zap_low_mappings (void)
 {
 	int i;
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	{
+		extern char swsusp_pg_dir[PAGE_SIZE];
+		memcpy(swsusp_pg_dir, swapper_pg_dir, PAGE_SIZE);
+	}
+#endif
 	/*
 	 * Zap initial low-memory mappings.
 	 *

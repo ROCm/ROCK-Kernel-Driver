@@ -29,13 +29,12 @@ ENTRY(do_magic)
 	jmp .L1449
 	.p2align 4,,7
 .L1450:
-	movl $swapper_pg_dir-__PAGE_OFFSET,%ecx
+	movl $swsusp_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
 	call do_magic_resume_1
-	movl nr_copy_pages,%eax
-	movl %eax,loop
-	cmpl $0,%eax
+	movl $0,loop
+	cmpl $0,nr_copy_pages
 	je .L1453
 	.p2align 4,,7
 .L1455:
@@ -46,8 +45,8 @@ ENTRY(do_magic)
 	movl loop,%eax
 	movl loop2,%edx
 	sall $4,%eax
-	movl -12(%ecx,%eax),%ebx
-	movl -16(%ecx,%eax),%eax
+	movl 4(%ecx,%eax),%ebx
+	movl (%ecx,%eax),%eax
 	movb (%edx,%eax),%al
 	movb %al,(%edx,%ebx)
 	movl %cr3, %eax;              
@@ -60,11 +59,11 @@ ENTRY(do_magic)
 	cmpl $4095,%eax
 	jbe .L1459
 	movl loop,%eax
-	leal -1(%eax),%edx
+	leal 1(%eax),%edx
 	movl %edx,loop
 	movl %edx,%eax
-	cmpl $0,%eax
-	jne .L1455
+	cmpl nr_copy_pages,%eax
+	jb .L1455
 	.p2align 4,,7
 .L1453:
 	movl $__USER_DS,%eax

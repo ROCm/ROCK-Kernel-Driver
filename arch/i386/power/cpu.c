@@ -35,6 +35,10 @@ unsigned long saved_context_esp, saved_context_ebp;
 unsigned long saved_context_esi, saved_context_edi;
 unsigned long saved_context_eflags;
 
+/* Special page directory for resume */
+char __nosavedata swsusp_pg_dir[PAGE_SIZE]
+                  __attribute__ ((aligned (PAGE_SIZE)));
+
 extern void enable_sep_cpu(void *);
 
 void save_processor_state(void)
