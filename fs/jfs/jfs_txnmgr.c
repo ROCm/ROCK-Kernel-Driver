@@ -1354,7 +1354,7 @@ static int txLog(struct jfs_log * log, struct tblock * tblk, struct commit * cd)
 
 		/* initialize lrd common */
 		ip = tlck->ip;
-		lrd->aggregate = cpu_to_le32(ip->i_sb->s_bdev->bd_dev);
+		lrd->aggregate = cpu_to_le32(old_encode_dev(ip->i_sb->s_bdev->bd_dev));
 		lrd->log.redopage.fileset = cpu_to_le32(JFS_IP(ip)->fileset);
 		lrd->log.redopage.inode = cpu_to_le32(ip->i_ino);
 
