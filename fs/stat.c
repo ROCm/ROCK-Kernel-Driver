@@ -107,7 +107,8 @@ EXPORT_SYMBOL(vfs_fstat);
 
 #if !defined(__alpha__) && !defined(__sparc__) && !defined(__ia64__) \
   && !defined(CONFIG_ARCH_S390) && !defined(__hppa__) \
-  && !defined(__arm__) && !defined(CONFIG_V850) && !defined(__powerpc64__)
+  && !defined(__arm__) && !defined(CONFIG_V850) && !defined(__powerpc64__) \
+  && !defined(__mips__)
 
 /*
  * For backward compatibility?  Maybe this should be moved
