@@ -1338,17 +1338,13 @@ int usb_serial_register(struct usb_serial_device_type *new_device)
 	/* Add this device to our list of devices */
 	list_add(&new_device->driver_list, &usb_serial_driver_list);
 
-	retval =  usb_serial_bus_register (new_device);
-
-	if (retval)
-		goto error;
-
-	info("USB Serial support registered for %s", new_device->name);
-
-	return retval;
-error:
-	err("problem %d when registering driver %s", retval, new_device->name);
-	list_del(&new_device->driver_list);
+	retval = usb_serial_bus_register(new_device);
+	if (retval) {
+		err("problem %d when registering driver %s", retval, new_device->name);
+		list_del(&new_device->driver_list);
+	}
+	else
+		info("USB Serial support registered for %s", new_device->name);
 
 	return retval;
 }
