@@ -312,14 +312,6 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->rsize = nfs_block_size(fsinfo.rtpref <= PAGE_SIZE ?fsinfo.rtpref:PAGE_SIZE, NULL);
 	if (server->wsize == 0)
 		server->wsize = nfs_block_size(fsinfo.wtpref <= PAGE_SIZE ?fsinfo.wtpref:PAGE_SIZE, NULL);
-	if (sb->s_blocksize == 0) {
-		if (fsinfo.wtmult == 0) {
-			sb->s_blocksize = 512;
-			sb->s_blocksize_bits = 9;
-		} else
-			sb->s_blocksize = nfs_block_bits(fsinfo.wtmult,
-							 &sb->s_blocksize_bits);
-	}
 
 	if (fsinfo.rtmax >= 512 && server->rsize > fsinfo.rtmax)
 		server->rsize = nfs_block_size(fsinfo.rtmax, NULL);
@@ -337,6 +329,10 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->wpages = NFS_WRITE_MAXIOV;
                 server->wsize = server->wpages << PAGE_CACHE_SHIFT;
 	}
+
+	if (sb->s_blocksize == 0)
+		sb->s_blocksize = nfs_block_bits(server->wsize,
+							 &sb->s_blocksize_bits);
 
 	server->dtsize = nfs_block_size(fsinfo.dtpref, NULL);
 	if (server->dtsize > PAGE_CACHE_SIZE)
