@@ -71,8 +71,8 @@ config USB_NET2280
 	default USB_GADGET
 
 config USB_GADGET_PXA2XX
-	boolean "PXA 2xx or IXP 42x"
-	depends on ARCH_PXA || ARCH_IXP425
+	boolean "PXA 2xx or IXP 4xx"
+	depends on ARCH_PXA || ARCH_IXP4XX
 	help
 	   Intel's PXA 2xx series XScale ARM-5TE processors include
 	   an integrated full speed USB 1.1 device controller.  The
