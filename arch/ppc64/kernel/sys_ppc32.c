@@ -2797,6 +2797,47 @@ long sys32_io_submit(aio_context_t ctx_id, u32 number, u32 *iocbpp)
 	return i ? i : ret;
 }
 
+int get_compat_timeval(struct timeval *tv, struct compat_timeval *ctv)
+{
+	return (verify_area(VERIFY_READ, ctv, sizeof(*ctv)) ||
+		__get_user(tv->tv_sec, &ctv->tv_sec) ||
+		__get_user(tv->tv_usec, &ctv->tv_usec)) ? -EFAULT : 0;
+}
+
+long sys32_utimes(char *filename, struct compat_timeval *tvs)
+{
+	char *kfilename;
+	struct timeval ktvs[2];
+	mm_segment_t old_fs;
+	long ret;
+
+	kfilename = getname(filename);
+	ret = PTR_ERR(kfilename);
+	if (!IS_ERR(kfilename)) {
+		if (tvs) {
+			if (get_compat_timeval(&ktvs[0], &tvs[0]) ||
+			    get_compat_timeval(&ktvs[1], &tvs[1]))
+				return -EFAULT;
+		}
+
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		ret = do_utimes(kfilename, (tvs ? &ktvs[0] : NULL));
+		set_fs(old_fs);
+
+		putname(kfilename);
+	}
+	return ret;
+}
+
+extern long sys_tgkill(int tgid, int pid, int sig);
+
+long sys32_tgkill(u32 tgid, u32 pid, int sig)
+{
+	/* sign extend tgid, pid */
+	return sys_tgkill((int)tgid, (int)pid, sig);
+}
+
 /* 
  * long long munging:
  * The 32 bit ABI passes long longs in an odd even register pair.
