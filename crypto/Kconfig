@@ -133,6 +133,13 @@ config CRYPTO_CAST5
 	  The CAST5 encryption algorithm (synonymous with CAST-128) is
 	  described in RFC2144.
 
+config CRYPTO_CAST6
+	tristate "CAST6 (CAST-256) cipher algorithm"
+	depends on CRYPTO
+	help
+	  The CAST6 encryption algorithm (synonymous with CAST-256) is
+	  described in RFC2612.
+
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO

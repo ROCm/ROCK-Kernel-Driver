@@ -1983,10 +1983,11 @@ void __init ip6_route_init(void)
 						     NULL, NULL);
 	fib6_init();
 #ifdef 	CONFIG_PROC_FS
-	proc_net_create("ipv6_route", 0, rt6_proc_info);
-	p = create_proc_entry("rt6_stats", S_IRUGO, proc_net);
+	p = proc_net_create("ipv6_route", 0, rt6_proc_info);
 	if (p)
-		p->proc_fops = &rt6_stats_seq_fops;
+		p->owner = THIS_MODULE;
+
+	proc_net_fops_create("rt6_stats", S_IRUGO, &rt6_stats_seq_fops);
 #endif
 #ifdef CONFIG_XFRM
 	xfrm6_init();
@@ -2000,7 +2001,9 @@ void ip6_route_cleanup(void)
 	proc_net_remove("ipv6_route");
 	proc_net_remove("rt6_stats");
 #endif
+#ifdef CONFIG_XFRM
 	xfrm6_fini();
+#endif
 	rt6_ifdown(NULL);
 	fib6_gc_cleanup();
 	kmem_cache_destroy(ip6_dst_ops.kmem_cachep);
