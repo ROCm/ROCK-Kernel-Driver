@@ -29,6 +29,8 @@ int device_suspend(u32 state, u32 level)
 	struct device * prev = &device_root;
 	int error = 0;
 
+	printk(KERN_EMERG "Suspending Devices\n");
+
 	get_device(prev);
 
 	spin_lock(&device_lock);
@@ -82,6 +84,8 @@ void device_resume(u32 level)
 	}
 	spin_unlock(&device_root);
 	put_device(prev);
+
+	printk(KERN_EMERG "Devices Resumed\n");
 }
 
 /**
@@ -96,6 +100,8 @@ void device_shutdown(void)
 {
 	struct device * dev;
 	struct device * prev = &device_root;
+
+	printk(KERN_EMERG "Shutting down devices\n");
 
 	get_device(prev);
 
