@@ -133,8 +133,7 @@ do {											\
 	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, "acq") < 0)) {	\
 		ia64_fetchadd(-1, (int *) __read_lock_ptr, "rel");			\
 		while (*(volatile int *)__read_lock_ptr < 0)				\
-			barrier();							\
-											\
+			cpu_relax();							\
 	}										\
 } while (0)
 

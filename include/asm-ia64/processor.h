@@ -624,8 +624,13 @@ ia64_set_lrr0 (unsigned long val)
 	asm volatile ("mov cr.lrr0=%0;; srlz.d" :: "r"(val) : "memory");
 }
 
-#define cpu_relax()	barrier()
+static inline void
+ia64_hint_pause (void)
+{
+	asm volatile ("hint @pause" ::: "memory");
+}
 
+#define cpu_relax()	ia64_hint_pause()
 
 static inline void
 ia64_set_lrr1 (unsigned long val)
