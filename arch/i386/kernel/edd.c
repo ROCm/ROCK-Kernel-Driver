@@ -65,6 +65,8 @@ MODULE_LICENSE("GPL");
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://domsch.com/linux/edd30/results.html"
 
+#define left (count - (p - buf) - 1)
+
 /*
  * bios_dir may go away completely,
  * and it definitely won't be at the root
@@ -133,35 +135,36 @@ static struct driverfs_ops edd_attr_ops = {
 };
 
 static int
-edd_dump_raw_data(char *b, void *data, int length)
+edd_dump_raw_data(char *b, int count, void *data, int length)
 {
 	char *orig_b = b;
-	char buffer1[80], buffer2[80], *b1, *b2, c;
+	char hexbuf[80], ascbuf[20], *h, *a, c;
 	unsigned char *p = data;
 	unsigned long column = 0;
-	int length_printed = 0;
+	int length_printed = 0, d;
 	const char maxcolumn = 16;
-	while (length_printed < length) {
-		b1 = buffer1;
-		b2 = buffer2;
+	while (length_printed < length && count > 0) {
+		h = hexbuf;
+		a = ascbuf;
 		for (column = 0;
 		     column < maxcolumn && length_printed < length; column++) {
-			b1 += sprintf(b1, "%02x ", (unsigned char) *p);
-			if (*p < 32 || *p > 126)
+			h += sprintf(h, "%02x ", (unsigned char) *p);
+			if (!isprint(*p))
 				c = '.';
 			else
 				c = *p;
-			b2 += sprintf(b2, "%c", c);
+			a += sprintf(a, "%c", c);
 			p++;
 			length_printed++;
 		}
 		/* pad out the line */
 		for (; column < maxcolumn; column++) {
-			b1 += sprintf(b1, "   ");
-			b2 += sprintf(b2, " ");
+			h += sprintf(h, "   ");
+			a += sprintf(a, " ");
 		}
-
-		b += sprintf(b, "%s\t%s\n", buffer1, buffer2);
+		d = snprintf(b, count, "%s\t%s\n", hexbuf, ascbuf);
+		b += d;
+		count -= d;
 	}
 	return (b - orig_b);
 }
@@ -179,18 +182,18 @@ edd_show_host_bus(struct edd_device *edev, char *buf, size_t count, loff_t off)
 
 	for (i = 0; i < 4; i++) {
 		if (isprint(info->params.host_bus_type[i])) {
-			p += sprintf(p, "%c", info->params.host_bus_type[i]);
+			p += snprintf(p, left, "%c", info->params.host_bus_type[i]);
 		} else {
-			p += sprintf(p, " ");
+			p += snprintf(p, left, " ");
 		}
 	}
 
 	if (!strncmp(info->params.host_bus_type, "ISA", 3)) {
-		p += sprintf(p, "\tbase_address: %x\n",
+		p += snprintf(p, left, "\tbase_address: %x\n",
 			     info->params.interface_path.isa.base_address);
 	} else if (!strncmp(info->params.host_bus_type, "PCIX", 4) ||
 		   !strncmp(info->params.host_bus_type, "PCI", 3)) {
-		p += sprintf(p,
+		p += snprintf(p, left,
 			     "\t%02x:%02x.%01x  channel: %u\n",
 			     info->params.interface_path.pci.bus,
 			     info->params.interface_path.pci.slot,
@@ -199,12 +202,12 @@ edd_show_host_bus(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	} else if (!strncmp(info->params.host_bus_type, "IBND", 4) ||
 		   !strncmp(info->params.host_bus_type, "XPRS", 4) ||
 		   !strncmp(info->params.host_bus_type, "HTPT", 4)) {
-		p += sprintf(p,
+		p += snprintf(p, left,
 			     "\tTBD: %llx\n",
 			     info->params.interface_path.ibnd.reserved);
 
 	} else {
-		p += sprintf(p, "\tunknown: %llx\n",
+		p += snprintf(p, left, "\tunknown: %llx\n",
 			     info->params.interface_path.unknown.reserved);
 	}
 	return (p - buf);
@@ -223,43 +226,43 @@ edd_show_interface(struct edd_device *edev, char *buf, size_t count, loff_t off)
 
 	for (i = 0; i < 8; i++) {
 		if (isprint(info->params.interface_type[i])) {
-			p += sprintf(p, "%c", info->params.interface_type[i]);
+			p += snprintf(p, left, "%c", info->params.interface_type[i]);
 		} else {
-			p += sprintf(p, " ");
+			p += snprintf(p, left, " ");
 		}
 	}
 	if (!strncmp(info->params.interface_type, "ATAPI", 5)) {
-		p += sprintf(p, "\tdevice: %u  lun: %u\n",
+		p += snprintf(p, left, "\tdevice: %u  lun: %u\n",
 			     info->params.device_path.atapi.device,
 			     info->params.device_path.atapi.lun);
 	} else if (!strncmp(info->params.interface_type, "ATA", 3)) {
-		p += sprintf(p, "\tdevice: %u\n",
+		p += snprintf(p, left, "\tdevice: %u\n",
 			     info->params.device_path.ata.device);
 	} else if (!strncmp(info->params.interface_type, "SCSI", 4)) {
-		p += sprintf(p, "\tid: %u  lun: %llu\n",
+		p += snprintf(p, left, "\tid: %u  lun: %llu\n",
 			     info->params.device_path.scsi.id,
 			     info->params.device_path.scsi.lun);
 	} else if (!strncmp(info->params.interface_type, "USB", 3)) {
-		p += sprintf(p, "\tserial_number: %llx\n",
+		p += snprintf(p, left, "\tserial_number: %llx\n",
 			     info->params.device_path.usb.serial_number);
 	} else if (!strncmp(info->params.interface_type, "1394", 4)) {
-		p += sprintf(p, "\teui: %llx\n",
+		p += snprintf(p, left, "\teui: %llx\n",
 			     info->params.device_path.i1394.eui);
 	} else if (!strncmp(info->params.interface_type, "FIBRE", 5)) {
-		p += sprintf(p, "\twwid: %llx lun: %llx\n",
+		p += snprintf(p, left, "\twwid: %llx lun: %llx\n",
 			     info->params.device_path.fibre.wwid,
 			     info->params.device_path.fibre.lun);
 	} else if (!strncmp(info->params.interface_type, "I2O", 3)) {
-		p += sprintf(p, "\tidentity_tag: %llx\n",
+		p += snprintf(p, left, "\tidentity_tag: %llx\n",
 			     info->params.device_path.i2o.identity_tag);
 	} else if (!strncmp(info->params.interface_type, "RAID", 4)) {
-		p += sprintf(p, "\tidentity_tag: %x\n",
+		p += snprintf(p, left, "\tidentity_tag: %x\n",
 			     info->params.device_path.raid.array_number);
 	} else if (!strncmp(info->params.interface_type, "SATA", 4)) {
-		p += sprintf(p, "\tdevice: %u\n",
+		p += snprintf(p, left, "\tdevice: %u\n",
 			     info->params.device_path.sata.device);
 	} else {
-		p += sprintf(p, "\tunknown: %llx %llx\n",
+		p += snprintf(p, left, "\tunknown: %llx %llx\n",
 			     info->params.device_path.unknown.reserved1,
 			     info->params.device_path.unknown.reserved2);
 	}
@@ -289,15 +292,15 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	if (!(info->params.key == 0xBEDD || info->params.key == 0xDDBE))
 		len = info->params.length;
 
-	p += sprintf(p, "int13 fn48 returned data:\n\n");
-	p += edd_dump_raw_data(p, ((char *) edd) + 4, len);
+	p += snprintf(p, left, "int13 fn48 returned data:\n\n");
+	p += edd_dump_raw_data(p, left, ((char *) edd) + 4, len);
 
 	/* Spec violation.  Adaptec AIC7899 returns 0xDDBE
 	   here, when it should be 0xBEDD.
 	 */
-	p += sprintf(p, "\n");
+	p += snprintf(p, left, "\n");
 	if (info->params.key == 0xDDBE) {
-		p += sprintf(p,
+		p += snprintf(p, left,
 			     "Warning: Spec violation.  Key should be 0xBEDD, is 0xDDBE\n");
 		email++;
 	}
@@ -314,13 +317,13 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	}
 
 	if (checksum) {
-		p += sprintf(p,
+		p += snprintf(p, left,
 			     "Warning: Spec violation.  Device Path checksum invalid.\n");
 		email++;
 	}
 
 	if (!nonzero_path) {
-		p += sprintf(p, "Error: Spec violation.  Empty device path.\n");
+		p += snprintf(p, left, "Error: Spec violation.  Empty device path.\n");
 		email++;
 		goto out;
 	}
@@ -337,7 +340,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	}
 
 	if (warn_padding) {
-		p += sprintf(p,
+		p += snprintf(p, left,
 			     "Warning: Spec violation.  Padding should be 0x20.\n");
 		email++;
 	}
@@ -350,8 +353,8 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 						  info->params.interface_path.
 						  pci.function));
 		if (!pci_dev) {
-			p += sprintf(p, "Error: BIOS says this is a PCI device, but the OS doesn't know\n");
-			p += sprintf(p, "  about a PCI device at %02x:%02x.%01x\n",
+			p += snprintf(p, left, "Error: BIOS says this is a PCI device, but the OS doesn't know\n");
+			p += snprintf(p, left, "  about a PCI device at %02x:%02x.%01x\n",
 				     info->params.interface_path.pci.bus,
 				     info->params.interface_path.pci.slot,
 				     info->params.interface_path.pci.function);
@@ -365,18 +368,18 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	if (found_pci) {
 		sd = edd_find_matching_scsi_device(edev);
 		if (!sd) {
-			p += sprintf(p, "Error: BIOS says this is a SCSI device, but\n");
-			p += sprintf(p, "  the OS doesn't know about this SCSI device.\n");
-			p += sprintf(p, "  Do you have it's driver module loaded?\n");
+			p += snprintf(p, left, "Error: BIOS says this is a SCSI device, but\n");
+			p += snprintf(p, left, "  the OS doesn't know about this SCSI device.\n");
+			p += snprintf(p, left, "  Do you have it's driver module loaded?\n");
 			email++;
 		}
 	}
 
 out:
 	if (email) {
-		p += sprintf(p, "\nPlease check %s\n", REPORT_URL);
-		p += sprintf(p, "to see if this has been reported.  If not,\n");
-		p += sprintf(p, "please send the information requested there.\n");
+		p += snprintf(p, left, "\nPlease check %s\n", REPORT_URL);
+		p += snprintf(p, left, "to see if this has been reported.  If not,\n");
+		p += snprintf(p, left, "please send the information requested there.\n");
 	}
 
 	return (p - buf);
@@ -391,7 +394,7 @@ edd_show_version(struct edd_device *edev, char *buf, size_t count, loff_t off)
 		return 0;
 	}
 
-	p += sprintf(p, "0x%02x\n", info->version);
+	p += snprintf(p, left, "0x%02x\n", info->version);
 	return (p - buf);
 }
 
@@ -406,16 +409,16 @@ edd_show_extensions(struct edd_device *edev, char *buf, size_t count,
 	}
 
 	if (info->interface_support & EDD_EXT_FIXED_DISK_ACCESS) {
-		p += sprintf(p, "Fixed disk access\n");
+		p += snprintf(p, left, "Fixed disk access\n");
 	}
 	if (info->interface_support & EDD_EXT_DEVICE_LOCKING_AND_EJECTING) {
-		p += sprintf(p, "Device locking and ejecting\n");
+		p += snprintf(p, left, "Device locking and ejecting\n");
 	}
 	if (info->interface_support & EDD_EXT_ENHANCED_DISK_DRIVE_SUPPORT) {
-		p += sprintf(p, "Enhanced Disk Drive support\n");
+		p += snprintf(p, left, "Enhanced Disk Drive support\n");
 	}
 	if (info->interface_support & EDD_EXT_64BIT_EXTENSIONS) {
-		p += sprintf(p, "64-bit extensions\n");
+		p += snprintf(p, left, "64-bit extensions\n");
 	}
 	return (p - buf);
 }
@@ -431,21 +434,21 @@ edd_show_info_flags(struct edd_device *edev, char *buf, size_t count,
 	}
 
 	if (info->params.info_flags & EDD_INFO_DMA_BOUNDRY_ERROR_TRANSPARENT)
-		p += sprintf(p, "DMA boundry error transparent\n");
+		p += snprintf(p, left, "DMA boundry error transparent\n");
 	if (info->params.info_flags & EDD_INFO_GEOMETRY_VALID)
-		p += sprintf(p, "geometry valid\n");
+		p += snprintf(p, left, "geometry valid\n");
 	if (info->params.info_flags & EDD_INFO_REMOVABLE)
-		p += sprintf(p, "removable\n");
+		p += snprintf(p, left, "removable\n");
 	if (info->params.info_flags & EDD_INFO_WRITE_VERIFY)
-		p += sprintf(p, "write verify\n");
+		p += snprintf(p, left, "write verify\n");
 	if (info->params.info_flags & EDD_INFO_MEDIA_CHANGE_NOTIFICATION)
-		p += sprintf(p, "media change notification\n");
+		p += snprintf(p, left, "media change notification\n");
 	if (info->params.info_flags & EDD_INFO_LOCKABLE)
-		p += sprintf(p, "lockable\n");
+		p += snprintf(p, left, "lockable\n");
 	if (info->params.info_flags & EDD_INFO_NO_MEDIA_PRESENT)
-		p += sprintf(p, "no media present\n");
+		p += snprintf(p, left, "no media present\n");
 	if (info->params.info_flags & EDD_INFO_USE_INT13_FN50)
-		p += sprintf(p, "use int13 fn50\n");
+		p += snprintf(p, left, "use int13 fn50\n");
 	return (p - buf);
 }
 
@@ -459,7 +462,7 @@ edd_show_default_cylinders(struct edd_device *edev, char *buf, size_t count,
 		return 0;
 	}
 
-	p += sprintf(p, "0x%x\n", info->params.num_default_cylinders);
+	p += snprintf(p, left, "0x%x\n", info->params.num_default_cylinders);
 	return (p - buf);
 }
 
@@ -473,7 +476,7 @@ edd_show_default_heads(struct edd_device *edev, char *buf, size_t count,
 		return 0;
 	}
 
-	p += sprintf(p, "0x%x\n", info->params.num_default_heads);
+	p += snprintf(p, left, "0x%x\n", info->params.num_default_heads);
 	return (p - buf);
 }
 
@@ -487,7 +490,7 @@ edd_show_default_sectors_per_track(struct edd_device *edev, char *buf,
 		return 0;
 	}
 
-	p += sprintf(p, "0x%x\n", info->params.sectors_per_track);
+	p += snprintf(p, left, "0x%x\n", info->params.sectors_per_track);
 	return (p - buf);
 }
 
@@ -500,7 +503,7 @@ edd_show_sectors(struct edd_device *edev, char *buf, size_t count, loff_t off)
 		return 0;
 	}
 
-	p += sprintf(p, "0x%llx\n", info->params.number_of_sectors);
+	p += snprintf(p, left, "0x%llx\n", info->params.number_of_sectors);
 	return (p - buf);
 }
 
