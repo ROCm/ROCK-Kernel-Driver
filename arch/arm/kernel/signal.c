@@ -187,6 +187,9 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
 	struct sigframe *frame;
 	sigset_t set;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	/*
 	 * Since we stacked the signal on a 64-bit boundary,
 	 * then 'sp' should be word aligned here.  If it's
@@ -231,6 +234,9 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe *frame;
 	sigset_t set;
+
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	/*
 	 * Since we stacked the signal on a 64-bit boundary,
@@ -462,8 +468,6 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (syscall) {
 		switch (regs->ARM_r0) {
 		case -ERESTART_RESTARTBLOCK:
-			current_thread_info()->restart_block.fn =
-				do_no_restart_syscall;
 		case -ERESTARTNOHAND:
 			regs->ARM_r0 = -EINTR;
 			break;
