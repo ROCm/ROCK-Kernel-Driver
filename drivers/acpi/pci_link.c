@@ -791,9 +791,16 @@ static int __init acpi_irq_penalty_update(char *str, int used)
 	return 1;
 }
 
+/*
+ * We'd like PNP to call this routine for the
+ * single ISA_USED value for each legacy device.
+ * But instead it calls us with each POSSIBLE setting.
+ * There is no ISA_POSSIBLE weight, so we simply use
+ * the (small) PCI_USING penalty.
+ */
 void acpi_penalize_isa_irq(int irq)
 {
-	acpi_irq_penalty[irq] += PIRQ_PENALTY_ISA_USED;
+	acpi_irq_penalty[irq] += PIRQ_PENALTY_PCI_USING;
 }
 
 /*
