@@ -418,9 +418,14 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 		if (ipc.opt->srr)
 			daddr = icmp_param->replyopts.faddr;
 	}
-	if (ip_route_output(&rt, daddr, rt->rt_spec_dst,
-			    RT_TOS(skb->nh.iph->tos), 0))
-		goto out_unlock;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = daddr,
+						.saddr = rt->rt_spec_dst,
+						.tos = RT_TOS(skb->nh.iph->tos) } } };
+		if (ip_route_output_key(&rt, &fl))
+			goto out_unlock;
+	}
 	if (icmpv4_xrlim_allow(rt, icmp_param->data.icmph.type,
 			       icmp_param->data.icmph.code)) {
 		ip_build_xmit(sk, icmp_glue_bits, icmp_param,
@@ -526,8 +531,8 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	 *	Restore original addresses if packet has been translated.
 	 */
 	if (rt->rt_flags & RTCF_NAT && IPCB(skb_in)->flags & IPSKB_TRANSLATED) {
-		iph->daddr = rt->key.dst;
-		iph->saddr = rt->key.src;
+		iph->daddr = rt->fl.fl4_dst;
+		iph->saddr = rt->fl.fl4_src;
 	}
 #endif
 
@@ -539,9 +544,13 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 					   IPTOS_PREC_INTERNETCONTROL) :
 					  iph->tos;
 
-	if (ip_route_output(&rt, iph->saddr, saddr, RT_TOS(tos), 0))
-		goto out_unlock;
-
+	{
+		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = iph->saddr,
+							 .saddr = saddr,
+							 .tos = RT_TOS(tos) } } };
+		if (ip_route_output_key(&rt, &fl))
+		    goto out_unlock;
+	}
 	if (ip_options_echo(&icmp_param.replyopts, skb_in))
 		goto ende;
 
@@ -563,9 +572,12 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	ipc.addr = iph->saddr;
 	ipc.opt = &icmp_param.replyopts;
 	if (icmp_param.replyopts.srr) {
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = icmp_param.replyopts.faddr,
+						.saddr = saddr,
+						.tos = RT_TOS(tos) } } };
 		ip_rt_put(rt);
-		if (ip_route_output(&rt, icmp_param.replyopts.faddr,
-				    saddr, RT_TOS(tos), 0))
+		if (ip_route_output_key(&rt, &fl))
 			goto out_unlock;
 	}
 

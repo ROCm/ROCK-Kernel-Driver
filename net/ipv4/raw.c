@@ -402,8 +402,14 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 			rfh.saddr = inet->mc_addr;
 	}
 
-	err = ip_route_output(&rt, daddr, rfh.saddr, tos, ipc.oif);
-
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = daddr,
+						.saddr = rfh.saddr,
+						.tos = tos } },
+				    .oif = ipc.oif };
+		err = ip_route_output_key(&rt, &fl);
+	}
 	if (err)
 		goto done;
 
