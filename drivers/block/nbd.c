@@ -155,13 +155,14 @@ void nbd_send_req(struct socket *sock, struct request *req)
 	unsigned long size = req->nr_sectors << 9;
 
 	DEBUG("NBD: sending control, ");
+	
+	rw = rq_data_dir(req);
+	
 	request.magic = htonl(NBD_REQUEST_MAGIC);
-	request.type = htonl(req->flags);
+	request.type = htonl((rw & WRITE) ? 1 : 0);
 	request.from = cpu_to_be64( (u64) req->sector << 9);
 	request.len = htonl(size);
 	memcpy(request.handle, &req, sizeof(req));
-
-	rw = rq_data_dir(req);
 
 	result = nbd_xmit(1, sock, (char *) &request, sizeof(request), rw & WRITE ? MSG_MORE : 0);
 	if (result <= 0)
@@ -517,6 +518,7 @@ static int __init nbd_init(void)
 	blksize_size[MAJOR_NR] = nbd_blksizes;
 	blk_size[MAJOR_NR] = nbd_sizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, &nbd_lock);
+	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 20);
 	for (i = 0; i < MAX_NBD; i++) {
 		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;
