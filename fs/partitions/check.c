@@ -200,7 +200,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 		/*  Unaware driver: construct "real" directory  */
 		sprintf(dirname, "../%s/disc%d", dev->disk_name,
 			dev->first_minor >> dev->minor_shift);
-		dir = devfs_mk_dir(NULL, dirname + 3, NULL);
+		dir = devfs_mk_dir(dirname + 3);
 		dev->de = dir;
 	}
 	dev->number = devfs_alloc_unique_number (&disc_numspace);

@@ -979,7 +979,7 @@ int swim3_init(void)
 	int err = -ENOMEM;
 	int i;
 
-	floppy_devfs_handle = devfs_mk_dir(NULL, "floppy", NULL);
+	floppy_devfs_handle = devfs_mk_dir("floppy");
 
 	swim = find_devices("floppy");
 	while (swim && (floppy_count < MAX_FLOPPIES))

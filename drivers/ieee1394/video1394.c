@@ -1486,7 +1486,7 @@ static int __init video1394_init_module (void)
 		return -EIO;
         }
 
-	devfs_handle = devfs_mk_dir(NULL, VIDEO1394_DRIVER_NAME, NULL);
+	devfs_handle = devfs_mk_dir(VIDEO1394_DRIVER_NAME);
 
 	hl_handle = hpsb_register_highlevel (VIDEO1394_DRIVER_NAME, &hl_ops);
 	if (hl_handle == NULL) {

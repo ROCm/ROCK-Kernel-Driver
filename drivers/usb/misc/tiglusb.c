@@ -478,7 +478,7 @@ tiglusb_init (void)
 	}
 
 	/* Use devfs, tree: /dev/ticables/usb/[0..3] */
-	devfs_mk_dir (NULL, "ticables/usb", NULL);
+	devfs_mk_dir ("ticables/usb");
 
 	/* register USB module */
 	result = usb_register (&tiglusb_driver);

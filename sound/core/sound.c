@@ -346,7 +346,7 @@ static int __init alsa_sound_init(void)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 	devfs_handle = devfs_mk_dir(NULL, "snd", 3, NULL);
 #else
-	devfs_handle = devfs_mk_dir(NULL, "snd", NULL);
+	devfs_handle = devfs_mk_dir("snd");
 #endif
 #endif
 	if (register_chrdev(major, "alsa", &snd_fops)) {

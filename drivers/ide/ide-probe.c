@@ -1304,7 +1304,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 			hwif->channel, unit, drive->lun);
 		if (drive->present) {
 			device_register(&drive->gendev);
-			drive->de = devfs_mk_dir(NULL, name, NULL);
+			drive->de = devfs_mk_dir(name);
 		}
 	}
 	blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,

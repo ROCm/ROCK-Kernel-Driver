@@ -1128,8 +1128,6 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 		char *inq_result, int *bflags)
 {
-	char devname[64];
-
 	/*
 	 * XXX do not save the inquiry, since it can change underneath us,
 	 * save just vendor/model/rev.
@@ -1230,13 +1228,10 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 	
 	scsi_device_register(sdev);
 
-	sprintf(devname, "scsi/host%d/bus%d/target%d/lun%d",
-		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
-	if (sdev->de)
-		printk(KERN_WARNING "scsi devfs dir: \"%s\" already exists\n",
-		       devname);
-	else
-		sdev->de = devfs_mk_dir(NULL, devname, NULL);
+	sdev->de = devfs_mk_dir("scsi/host%d/bus%d/target%d/lun%d",
+				sdev->host->host_no, sdev->channel,
+				sdev->id, sdev->lun);
+
 	/*
 	 * End driverfs/devfs code.
 	 */

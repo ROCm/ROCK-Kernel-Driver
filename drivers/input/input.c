@@ -699,7 +699,7 @@ static int __init input_init(void)
 		return -EBUSY;
 	}
 
-	input_devfs_handle = devfs_mk_dir(NULL, "input", NULL);
+	input_devfs_handle = devfs_mk_dir("input");
 
 	return 0;
 }

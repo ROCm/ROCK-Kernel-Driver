@@ -198,7 +198,7 @@ int __init init_netlink(void)
 		printk(KERN_ERR "netlink: unable to get major %d\n", NETLINK_MAJOR);
 		return -EIO;
 	}
-	devfs_mk_dir (NULL, "netlink", NULL);
+	devfs_mk_dir("netlink");
 	/*  Someone tell me the official names for the uppercase ones  */
 	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++) {
 		char name[20];

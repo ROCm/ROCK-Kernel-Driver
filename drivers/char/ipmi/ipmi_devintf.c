@@ -489,7 +489,7 @@ static __init int init_ipmi_devintf(void)
 		ipmi_major = rv;
 	}
 
-	devfs_handle = devfs_mk_dir(NULL, DEVICE_NAME, NULL);
+	devfs_handle = devfs_mk_dir(DEVICE_NAME);
 
 	rv = ipmi_smi_watcher_register(&smi_watcher);
 	if (rv) {

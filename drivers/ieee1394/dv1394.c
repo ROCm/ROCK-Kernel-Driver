@@ -2648,12 +2648,9 @@ static void dv1394_add_host (struct hpsb_host *host)
 #endif
 
 #ifdef CONFIG_DEVFS_FS
-	snprintf(buf, sizeof(buf), "ieee1394/dv/host%d", ohci->id);
-	devfs_mk_dir(NULL, buf, NULL);
-	snprintf(buf, sizeof(buf), "ieee1394/dv/host%d/NTSC", ohci->id);
-	devfs_mk_dir(NULL, buf, NULL);
-	snprintf(buf, sizeof(buf), "ieee1394/dv/host%d/PAL", ohci->id);
-	devfs_mk_dir(NULL, buf, NULL);
+	devfs_mk_dir("ieee1394/dv/host%d", ohci->id);
+	devfs_mk_dir("ieee1394/dv/host%d/NTSC", ohci->id);
+	devfs_mk_dir("ieee1394/dv/host%d/PAL", ohci->id);
 #endif
 	
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);
@@ -2922,7 +2919,7 @@ static int __init dv1394_init_module(void)
 	}
 
 #ifdef CONFIG_DEVFS_FS
-	if (!devfs_mk_dir(NULL, "ieee1394/dv", NULL)) {
+	if (!devfs_mk_dir("ieee1394/dv")) {
 		printk(KERN_ERR "dv1394: unable to create /dev/ieee1394/dv\n");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 		return -ENOMEM;

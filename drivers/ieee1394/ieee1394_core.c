@@ -1155,7 +1155,7 @@ static int __init ieee1394_init(void)
 	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
 					      0, 0, NULL, NULL);
 
-	ieee1394_devfs_handle = devfs_mk_dir(NULL, "ieee1394", NULL);
+	ieee1394_devfs_handle = devfs_mk_dir("ieee1394");
 
 	if (register_chrdev(IEEE1394_MAJOR, "ieee1394", &ieee1394_chardev_ops)) {
 		HPSB_ERR("unable to register character device major %d!\n", IEEE1394_MAJOR);

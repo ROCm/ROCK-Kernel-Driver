@@ -490,7 +490,7 @@ tipar_init_module(void)
 	}
 
 	/* Use devfs with tree: /dev/ticables/par/[0..2] */
-	devfs_mk_dir(NULL, "ticables/par", NULL);
+	devfs_mk_dir("ticables/par");
 
 	if (parport_register_driver(&tipar_driver)) {
 		printk("tipar: unable to register with parport\n");

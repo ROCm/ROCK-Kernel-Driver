@@ -1006,7 +1006,7 @@ int slm_init( void )
 	BufferP = SLMBuffer;
 	SLMState = IDLE;
 	
-	devfs_mk_dir (NULL, "slm", NULL);
+	devfs_mk_dir("slm");
 	for (i = 0; i < MAX_SLM; i++) {
 		char name[16];
 		sprintf(name, "slm/%d", i);

@@ -434,7 +434,7 @@ static int __init xpram_setup_blkdev(void)
 	if (rc < 0)
 		goto out;
 
-	devfs_mk_dir(NULL, "slram", NULL);
+	devfs_mk_dir("slram");
 
 	/*
 	 * Assign the other needed values: make request function, sizes and

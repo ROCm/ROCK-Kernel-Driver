@@ -111,8 +111,6 @@ static struct file_operations dvb_device_fops =
 	.owner =	THIS_MODULE,
 	.open =		dvb_device_open,
 };
-#endif /* CONFIG_DVB_DEVFS_ONLY */
-
 
 
 int dvb_generic_open(struct inode *inode, struct file *file)
@@ -271,7 +269,6 @@ skip:
 
 int dvb_register_adapter(struct dvb_adapter **padap, char *name)
 {
-	char dirname[16];
 	struct dvb_adapter *adap;
 	int num;
 
@@ -295,8 +292,7 @@ int dvb_register_adapter(struct dvb_adapter **padap, char *name)
 
 	printk ("DVB: registering new adapter (%s).\n", name);
 	
-	sprintf(dirname, "dvb/adapter%d", num);
-	adap->devfs_handle = devfs_mk_dir(NULL, dirname, NULL);
+	adap->devfs_handle = devfs_mk_dir("dvb/adapter%d", num);
 	adap->num = num;
 
 	list_add_tail (&adap->list_head, &dvb_adapter_list);
@@ -323,7 +319,7 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 static
 int __init init_dvbdev(void)
 {
-	dvb_devfs_handle = devfs_mk_dir (NULL, "dvb", NULL);
+	dvb_devfs_handle = devfs_mk_dir ("dvb");
 #ifndef CONFIG_DVB_DEVFS_ONLY
 	if(register_chrdev(DVB_MAJOR,"DVB", &dvb_device_fops)) {
 		printk("video_dev: unable to get major %d\n", DVB_MAJOR);

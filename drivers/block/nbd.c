@@ -565,7 +565,7 @@ static int __init nbd_init(void)
 	printk("nbd: registered device at major %d\n", NBD_MAJOR);
 #endif
 	blk_init_queue(&nbd_queue, do_nbd_request, &nbd_lock);
-	devfs_mk_dir (NULL, "nbd", NULL);
+	devfs_mk_dir("nbd");
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
 		char name[16];

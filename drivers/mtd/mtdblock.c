@@ -575,7 +575,7 @@ int __init init_mtdblock(void)
 		return -EAGAIN;
 
 #ifdef CONFIG_DEVFS_FS
-	devfs_mk_dir(NULL, DEVICE_NAME, NULL);
+	devfs_mk_dir(DEVICE_NAME);
 #endif
 	register_mtd_user(&notifier);
 	

@@ -4233,7 +4233,7 @@ int __init floppy_init(void)
 			goto Enomem;
 	}
 
-	devfs_mk_dir (NULL, "floppy", NULL);
+	devfs_mk_dir ("floppy");
 	if (register_blkdev(FLOPPY_MAJOR,"fd")) {
 		err = -EBUSY;
 		goto out;

@@ -1154,7 +1154,8 @@ int __init mm_init(void)
 		if (!mm_gendisk[i])
 			goto out;
 	}
-	devfs_mk_dir(NULL, "umem", NULL);
+
+	devfs_mk_dir("umem");
 
 	for (i = 0; i < num_cards; i++) {
 		struct gendisk *disk = mm_gendisk[i];

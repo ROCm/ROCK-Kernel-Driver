@@ -2472,7 +2472,7 @@ int __init ide_init (void)
 	static char banner_printed;
 	if (!banner_printed) {
 		printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
-		devfs_mk_dir(NULL, "ide", NULL);
+		devfs_mk_dir("ide");
 		system_bus_speed = ide_system_bus_speed();
 		banner_printed = 1;
 	}

@@ -642,7 +642,7 @@ static int __init pg_init(void)
 		  if (PG.present) pi_release(PI);
 		return -1;
 	}
-	devfs_mk_dir (NULL, "pg", NULL);
+	devfs_mk_dir ("pg");
 	for (unit=0; unit<PG_UNITS; unit++)
 		if (PG.present) {
 			char name[16];

@@ -73,7 +73,7 @@ fs3270_init(void)
 		return -1;
 	}
 #ifdef CONFIG_DEVFS_FS
-	fs3270_devfs_dir = devfs_mk_dir(NULL, "3270", NULL);
+	fs3270_devfs_dir = devfs_mk_dir("3270");
 	fs3270_devfs_tub = 
 		devfs_register(fs3270_devfs_dir, "tub", DEVFS_FL_DEFAULT,
 			       IBM_FS3270_MAJOR, 0,
