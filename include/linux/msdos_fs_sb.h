@@ -22,7 +22,6 @@ struct fat_mount_options {
 		 isvfat:1,        /* 0=no vfat long filename support, 1=vfat support */
 		 utf8:1,	  /* Use of UTF8 character set (Default) */
 		 unicode_xlate:1, /* create escape sequences for unhandled Unicode */
-		 posixfs:1,       /* Allow names like makefile and Makefile to coexist */
 		 numtail:1,       /* Does first alias have a numeric '~1' type tail? */
 		 atari:1,         /* Use Atari GEMDOS variation of MS-DOS fs */
 		 nocase:1;	  /* Does this need case conversion? 0=need case conversion*/

@@ -236,7 +236,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 	opts->name_check = 'n';
 	opts->conversion = 'b';
 	opts->quiet = opts->showexec = opts->sys_immutable = opts->dotsOK =  0;
-	opts->utf8 = opts->unicode_xlate = opts->posixfs = 0;
+	opts->utf8 = opts->unicode_xlate = 0;
 	opts->numtail = 1;
 	opts->nocase = 0;
 	*debug = 0;
@@ -383,8 +383,8 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			if (ret) opts->unicode_xlate = val;
 		}
 		else if (is_vfat && !strcmp(this_char,"posix")) {
-			ret = simple_getbool(value, &val);
-			if (ret) opts->posixfs = val;
+			printk("FAT: posix option is obsolete, "
+			       "not supported now\n");
 		}
 		else if (is_vfat && !strcmp(this_char,"nonumtail")) {
 			ret = simple_getbool(value, &val);
@@ -417,8 +417,6 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			break;
 	}
 out:
-	if (opts->posixfs)
-		opts->name_check = 's';
 	if (opts->unicode_xlate)
 		opts->utf8 = 0;
 	
