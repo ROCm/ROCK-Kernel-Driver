@@ -182,11 +182,6 @@
 #define FTDI_GUDEADS_E88E_PID    0xE88E
 #define FTDI_GUDEADS_E88F_PID    0xE88F
 
-/* 
- * Gude Analog- und Digitalsysteme GmbH
- */
-#define FTDI_GUDEADS_889_PID    0xe889  /* USB RS323 OptoBridge */ 
-
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */
