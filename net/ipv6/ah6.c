@@ -158,70 +158,55 @@ static int ipv6_clear_mutable_options(struct ipv6hdr *iph, int len)
 int ah6_output(struct sk_buff **pskb)
 {
 	int err;
-	int hdr_len = sizeof(struct ipv6hdr);
+	int extlen;
 	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x  = dst->xfrm;
-	struct ipv6hdr *iph = NULL;
+	struct ipv6hdr *top_iph;
 	struct ip_auth_hdr *ah;
 	struct ah_data *ahp;
 	u8 nexthdr;
+	char tmp_base[8];
+	struct {
+		struct in6_addr daddr;
+		char hdrs[0];
+	} *tmp_ext;
 
-	if ((*pskb)->ip_summed == CHECKSUM_HW) {
-		err = skb_checksum_help(pskb, 0);
-		if (err)
-			goto error_nolock;
-	}
+	top_iph = (struct ipv6hdr *)(*pskb)->data;
+	top_iph->payload_len = htons((*pskb)->len - sizeof(*top_iph));
 
-	spin_lock_bh(&x->lock);
-	err = xfrm_state_check(x, *pskb);
-	if (err)
-		goto error;
+	nexthdr = *(*pskb)->nh.raw;
+	*(*pskb)->nh.raw = IPPROTO_AH;
 
-	if (x->props.mode) {
-		err = xfrm6_tunnel_check_size(*pskb);
-		if (err)
-			goto error;
+	/* When there are no extension headers, we only need to save the first
+	 * 8 bytes of the base IP header.
+	 */
+	memcpy(tmp_base, top_iph, sizeof(tmp_base));
 
-		iph = (*pskb)->nh.ipv6h;
-		(*pskb)->nh.ipv6h = (struct ipv6hdr*)skb_push(*pskb, x->props.header_len);
-		(*pskb)->nh.ipv6h->version = 6;
-		(*pskb)->nh.ipv6h->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
-		(*pskb)->nh.ipv6h->nexthdr = IPPROTO_AH;
-		ipv6_addr_copy(&(*pskb)->nh.ipv6h->saddr,
-			       (struct in6_addr *) &x->props.saddr);
-		ipv6_addr_copy(&(*pskb)->nh.ipv6h->daddr,
-			       (struct in6_addr *) &x->id.daddr);
-		ah = (struct ip_auth_hdr*)((*pskb)->nh.ipv6h+1);
-		ah->nexthdr = IPPROTO_IPV6;
-	} else {
-		u8 *prevhdr;
-
-		hdr_len = ip6_find_1stfragopt(*pskb, &prevhdr);
-		nexthdr = *prevhdr;
-		*prevhdr = IPPROTO_AH;
-		iph = kmalloc(hdr_len, GFP_ATOMIC);
-		if (!iph) {
+	tmp_ext = NULL;
+	extlen = (*pskb)->h.raw - (unsigned char *)(top_iph + 1);
+	if (extlen) {
+		extlen += sizeof(*tmp_ext);
+		tmp_ext = kmalloc(extlen, GFP_ATOMIC);
+		if (!tmp_ext) {
 			err = -ENOMEM;
 			goto error;
 		}
-		memcpy(iph, (*pskb)->data, hdr_len);
-		(*pskb)->nh.ipv6h = (struct ipv6hdr*)skb_push(*pskb, x->props.header_len);
-		iph->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
-		memcpy((*pskb)->nh.ipv6h, iph, hdr_len);
-		err = ipv6_clear_mutable_options((*pskb)->nh.ipv6h, hdr_len);
+		memcpy(tmp_ext, &top_iph->daddr, extlen);
+		err = ipv6_clear_mutable_options(top_iph,
+						 extlen - sizeof(*tmp_ext) +
+						 sizeof(*top_iph));
 		if (err)
 			goto error_free_iph;
-
-		ah = (struct ip_auth_hdr*)((*pskb)->nh.raw+hdr_len);
-		(*pskb)->h.raw = (unsigned char*) ah;
-		ah->nexthdr = nexthdr;
 	}
 
-	(*pskb)->nh.ipv6h->priority    = 0;
-	(*pskb)->nh.ipv6h->flow_lbl[0] = 0;
-	(*pskb)->nh.ipv6h->flow_lbl[1] = 0;
-	(*pskb)->nh.ipv6h->flow_lbl[2] = 0;
-	(*pskb)->nh.ipv6h->hop_limit    = 0;
+	ah = (struct ip_auth_hdr *)(*pskb)->h.raw;
+	ah->nexthdr = nexthdr;
+
+	top_iph->priority    = 0;
+	top_iph->flow_lbl[0] = 0;
+	top_iph->flow_lbl[1] = 0;
+	top_iph->flow_lbl[2] = 0;
+	top_iph->hop_limit   = 0;
 
 	ahp = x->data;
 	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + 
@@ -232,35 +217,16 @@ int ah6_output(struct sk_buff **pskb)
 	ah->seq_no = htonl(++x->replay.oseq);
 	ahp->icv(ahp, *pskb, ah->auth_data);
 
-	if (x->props.mode) {
-		(*pskb)->nh.ipv6h->hop_limit   = iph->hop_limit;
-		(*pskb)->nh.ipv6h->priority    = iph->priority; 	
-		(*pskb)->nh.ipv6h->flow_lbl[0] = iph->flow_lbl[0];
-		(*pskb)->nh.ipv6h->flow_lbl[1] = iph->flow_lbl[1];
-		(*pskb)->nh.ipv6h->flow_lbl[2] = iph->flow_lbl[2];
-		if (x->props.flags & XFRM_STATE_NOECN)
-			IP6_ECN_clear((*pskb)->nh.ipv6h);
-	} else {
-		memcpy((*pskb)->nh.ipv6h, iph, hdr_len);
-		kfree (iph);
-	}
+	err = 0;
 
-	(*pskb)->nh.raw = (*pskb)->data;
-
-	x->curlft.bytes += (*pskb)->len;
-	x->curlft.packets++;
-	spin_unlock_bh(&x->lock);
-	if (((*pskb)->dst = dst_pop(dst)) == NULL) {
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	return NET_XMIT_BYPASS;
+	memcpy(top_iph, tmp_base, sizeof(tmp_base));
+	if (tmp_ext) {
+		memcpy(&top_iph->daddr, tmp_ext, extlen);
 error_free_iph:
-	kfree(iph);
+		kfree(tmp_ext);
+	}
+
 error:
-	spin_unlock_bh(&x->lock);
-error_nolock:
-	kfree_skb(*pskb);
 	return err;
 }
 

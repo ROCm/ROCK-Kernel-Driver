@@ -365,46 +365,12 @@ EXPORT_SYMBOL(xfrm6_tunnel_check_size);
 static int xfrm6_tunnel_output(struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x = dst->xfrm;
-	struct ipv6hdr *iph, *top_iph;
-	int err;
+	struct ipv6hdr *top_iph;
 
-	if ((err = xfrm6_tunnel_check_size(skb)) != 0)
-		goto error_nolock;
-
-	iph = skb->nh.ipv6h;
-
-	top_iph = (struct ipv6hdr *)skb_push(skb, x->props.header_len);
-	top_iph->version = 6;
-	top_iph->priority = iph->priority;
-	top_iph->flow_lbl[0] = iph->flow_lbl[0];
-	top_iph->flow_lbl[1] = iph->flow_lbl[1];
-	top_iph->flow_lbl[2] = iph->flow_lbl[2];
-	top_iph->nexthdr = IPPROTO_IPV6; 
+	top_iph = (struct ipv6hdr *)skb->data;
 	top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-	top_iph->hop_limit = iph->hop_limit;
-	memcpy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr, sizeof(struct in6_addr));
-	memcpy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr, sizeof(struct in6_addr));
-	skb->nh.raw = skb->data;
-	skb->h.raw = skb->nh.raw + sizeof(struct ipv6hdr);
 
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-
-	spin_unlock_bh(&x->lock);
-
-	if ((skb->dst = dst_pop(dst)) == NULL) { 
-		kfree_skb(skb);
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-
-	return NET_XMIT_BYPASS;
-
-error_nolock:
-	kfree_skb(skb);
-	return err;
+	return 0;
 }
 
 static int xfrm6_tunnel_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
