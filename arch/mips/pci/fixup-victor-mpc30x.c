@@ -19,54 +19,30 @@
 #include <asm/vr41xx/vrc4173.h>
 #include <asm/vr41xx/mpc30x.h>
 
-void __init pcibios_fixup_resources(struct pci_dev *dev)
+/*
+ * Shortcuts
+ */
+#define PCMCIA1	VRC4173_PCMCIA1_IRQ
+#define PCMCIA2	VRC4173_PCMCIA2_IRQ
+#define MQ	MQ200_IRQ
+
+static const int internal_func_irqs[8] __initdata = {
+	VRC4173_CASCADE_IRQ,
+	VRC4173_AC97_IRQ,
+	VRC4173_USB_IRQ,
+	
+};
+
+static char irq_tab_mpc30x[][5] __initdata = {
+ [12] = { PCMCIA1, PCMCIA1, 0, 0 },
+ [13] = { PCMCIA2, PCMCIA2, 0, 0 },
+ [29] = {      MQ,      MQ, 0, 0 },		/* mediaQ MQ-200 */
+};
+
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-}
+	if (slot == 30)
+		return internal_func_irqs[PCI_FUNC(dev->devfn)];
 
-void __init pcibios_fixup(void)
-{
-}
-
-void __init pcibios_fixup_irqs(void)
-{
-	struct pci_dev *dev = NULL;
-	u8 slot, func;
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		slot = PCI_SLOT(dev->devfn);
-		func = PCI_FUNC(dev->devfn);
-		dev->irq = 0;
-
-		switch (slot) {
-		case 12:	/* NEC VRC4173 CARDU1 */
-			dev->irq = VRC4173_PCMCIA1_IRQ;
-			break;
-		case 13:	/* NEC VRC4173 CARDU2 */
-			dev->irq = VRC4173_PCMCIA2_IRQ;
-			break;
-		case 29:	/* mediaQ MQ-200 */
-			dev->irq = MQ200_IRQ;
-			break;
-		case 30:
-			switch (func) {
-			case 0:	/* NEC VRC4173 */
-				dev->irq = VRC4173_CASCADE_IRQ;
-				break;
-			case 1:	/* NEC VRC4173 AC97U */
-				dev->irq = VRC4173_AC97_IRQ;
-				break;
-			case 2:	/* NEC VRC4173 USBU */
-				dev->irq = VRC4173_USB_IRQ;
-				break;
-			}
-			break;
-		}
-
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-	}
-}
-
-unsigned int pcibios_assign_all_busses(void)
-{
-	return 0;
+	return irq_tab_mpc30x[slot][pin];
 }

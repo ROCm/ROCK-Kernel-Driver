@@ -9,7 +9,6 @@
 #define _ASM_PGTABLE_H
 
 #include <linux/config.h>
-
 #ifdef CONFIG_MIPS32
 #include <asm/pgtable-32.h>
 #endif
@@ -67,6 +66,8 @@ extern unsigned long zero_page_mask;
 #define ZERO_PAGE(vaddr) \
 	(virt_to_page(empty_zero_page + (((unsigned long)(vaddr)) & zero_page_mask)))
 
+extern void paging_init(void);
+
 /*
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
@@ -118,6 +119,11 @@ static inline void pte_clear(pte_t *ptep)
 #define set_pmd(pmdptr, pmdval) do { *(pmdptr) = (pmdval); } while(0)
 #define set_pgd(pgdptr, pgdval) do { *(pgdptr) = (pgdval); } while(0)
 
+#define PGD_T_LOG2	ffz(~sizeof(pgd_t))
+#define PMD_T_LOG2	ffz(~sizeof(pmd_t))
+#define PTE_T_LOG2	ffz(~sizeof(pte_t))
+
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 #define PTE_FILE_MAX_BITS	27
 

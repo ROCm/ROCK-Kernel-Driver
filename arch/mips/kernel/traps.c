@@ -83,12 +83,12 @@ void show_stack(struct task_struct *task, unsigned long *sp)
 
 	sp = sp ? sp : (unsigned long *) &sp;
 
-	printk("Stack: ");
-	i = 1;
+	printk("Stack :");
+	i = 0;
 	while ((unsigned long) sp & (PAGE_SIZE - 1)) {
-		if (i && ((i % (64 / sizeof(unsigned long))) == 0))
+		if (i && ((i % (64 / field)) == 0))
 			printk("\n       ");
-		if (i > 40) {
+		if (i > 39) {
 			printk(" ...");
 			break;
 		}
@@ -116,7 +116,7 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 #ifdef CONFIG_KALLSYMS
 	printk("\n");
 #endif
-	while (((long) stack & (THREAD_SIZE-1)) != 0) {
+	while (!kstack_end(stack)) {
 		addr = *stack++;
 		if (kernel_text_address(addr)) {
 			printk(" [<%0*lx>] ", field, addr);
@@ -162,6 +162,7 @@ void show_code(unsigned int *pc)
 void show_regs(struct pt_regs *regs)
 {
 	const int field = 2 * sizeof(unsigned long);
+	unsigned int cause = regs->cp0_cause;
 	int i;
 
 	printk("Cpu %d\n", smp_processor_id());
@@ -171,7 +172,7 @@ void show_regs(struct pt_regs *regs)
 	 */
 	for (i = 0; i < 32; ) {
 		if ((i % 4) == 0)
-			printk("$%2d :", i);
+			printk("$%2d   :", i);
 		if (i == 0)
 			printk(" %0*lx", field, 0UL);
 		else if (i == 26 || i == 27)
@@ -184,15 +185,19 @@ void show_regs(struct pt_regs *regs)
 			printk("\n");
 	}
 
-	printk("Hi      : %0*lx\n", field, regs->hi);
-	printk("Lo      : %0*lx\n", field, regs->lo);
+	printk("Hi    : %0*lx\n", field, regs->hi);
+	printk("Lo    : %0*lx\n", field, regs->lo);
 
 	/*
 	 * Saved cp0 registers
 	 */
-	printk("epc   : %0*lx    %s\n", field, regs->cp0_epc, print_tainted());
-	printk("Status: %0*lx\n", field, regs->cp0_status);
-	printk("Cause : %0*lx\n", field, regs->cp0_cause);
+	printk("epc   : %0*lx ", field, regs->cp0_epc);
+	print_symbol("%s ", regs->cp0_epc);
+	printk("    %s\n", print_tainted());
+	printk("ra    : %0*lx ", field, regs->regs[31]);
+	print_symbol("%s\n", regs->regs[31]);
+
+	printk("Status: %08x    ", (uint32_t) regs->cp0_status);
 
 	if (regs->cp0_status & ST0_KX)
 		printk("KX ");
@@ -220,15 +225,22 @@ void show_regs(struct pt_regs *regs)
 		printk("EXL ");
 	if (regs->cp0_status & ST0_IE)
 		printk("IE ");
+	printk("\n");
+
+	printk("Cause : %08x\n", cause);
+
+	cause = (cause & CAUSEF_EXCCODE) >> CAUSEB_EXCCODE;
+	if (1 <= cause && cause <= 5)
+		printk("BadVA : %0*lx\n", field, regs->cp0_badvaddr);
+
+	printk("PrId  : %08x\n", read_c0_prid());
 }
 
 void show_registers(struct pt_regs *regs)
 {
-	const int field = 2 * sizeof(unsigned long);
-
 	show_regs(regs);
-	printk("Process %s (pid: %d, stackpage=%0*lx)\n",
-		current->comm, current->pid, field, (unsigned long) current);
+	printk("Process %s (pid: %d, threadinfo=%p, task=%p)\n",
+	        current->comm, current->pid, current_thread_info(), current);
 	show_stack(current, (long *) regs->regs[29]);
 	show_trace(current, (long *) regs->regs[29]);
 	show_code((unsigned int *) regs->cp0_epc);
@@ -237,8 +249,8 @@ void show_registers(struct pt_regs *regs)
 
 static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
-void __die(const char * str, struct pt_regs * regs, const char * file,
-	   const char * func, unsigned long line)
+NORET_TYPE void __die(const char * str, struct pt_regs * regs,
+	const char * file, const char * func, unsigned long line)
 {
 	static int die_counter;
 
@@ -271,6 +283,56 @@ void __declare_dbe_table(void)
 	);
 }
 
+#ifdef CONFIG_MDULES
+
+/* Given an address, look for it in the module exception tables. */
+const struct exception_table_entry *search_module_dbetables(unsigned long addr)
+{
+	unsigned long flags;
+	const struct exception_table_entry *e = NULL;
+	struct module *mod;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+	list_for_each_entry(mod, &modules, list) {
+		if (mod->arch.num_dbeentries == 0)
+			continue;
+				
+		e = search_extable(mod->arch.dbe_table_start,
+				   mod->arch.dbe_table_end +
+		                   mod->arch.num_dbeentries - 1,
+				   addr);
+		if (e)
+			break;
+	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
+
+	/* Now, if we found one, we are running inside it now, hence
+           we cannot unload the module, hence no refcnt needed. */
+	return e;
+}
+
+#else
+
+/* Given an address, look for it in the exception tables. */
+static inline const struct exception_table_entry *
+search_module_dbetables(unsigned long addr)
+{
+	return NULL;
+}
+
+#endif
+
+/* Given an address, look for it in the exception tables. */
+const struct exception_table_entry *search_dbe_tables(unsigned long addr)
+{
+	const struct exception_table_entry *e;
+
+	e = search_extable(__start___dbe_table, __stop___dbe_table - 1, addr);
+	if (!e)
+		e = search_module_dbetables(addr);
+	return e;
+}
+
 asmlinkage void do_be(struct pt_regs *regs)
 {
 	const int field = 2 * sizeof(unsigned long);
@@ -280,7 +342,7 @@ asmlinkage void do_be(struct pt_regs *regs)
 
 	/* XXX For now.  Fixme, this searches the wrong table ...  */
 	if (data && !user_mode(regs))
-		fixup = search_exception_tables(regs->cp0_epc);
+		fixup = search_dbe_tables(exception_epc(regs));
 
 	if (fixup)
 		action = MIPS_BE_FIXUP;
@@ -725,10 +787,10 @@ asmlinkage void cache_parity_error(void)
 
 #if defined(CONFIG_CPU_MIPS32) || defined (CONFIG_CPU_MIPS64)
 	if (reg_val & (1<<22))
-		printk("DErrAddr0: 0x%08x\n", read_c0_derraddr0());
+		printk("DErrAddr0: 0x%0*lx\n", field, read_c0_derraddr0());
 
 	if (reg_val & (1<<23))
-		printk("DErrAddr1: 0x%08x\n", read_c0_derraddr1());
+		printk("DErrAddr1: 0x%0*lx\n", field, read_c0_derraddr1());
 #endif
 
 	panic("Can't handle the cache error!");
@@ -794,9 +856,9 @@ void *set_except_vector(int n, void *addr)
 
 	exception_handlers[n] = handler;
 	if (n == 0 && cpu_has_divec) {
-		*(volatile u32 *)(KSEG0+0x200) = 0x08000000 |
+		*(volatile u32 *)(CAC_BASE + 0x200) = 0x08000000 |
 		                                 (0x03ffffff & (handler >> 2));
-		flush_icache_range(KSEG0+0x200, KSEG0 + 0x204);
+		flush_icache_range(CAC_BASE + 0x200, CAC_BASE + 0x204);
 	}
 	return (void *)old_handler;
 }
@@ -850,6 +912,9 @@ static inline void signal32_init(void)
 }
 #endif
 
+extern void cpu_cache_init(void);
+extern void tlb_init(void);
+
 void __init per_cpu_trap_init(void)
 {
 	unsigned int cpu = smp_processor_id();
@@ -860,6 +925,9 @@ void __init per_cpu_trap_init(void)
 	set_c0_status(ST0_CU0|ST0_FR|ST0_KX|ST0_SX|ST0_UX);
 #endif
 
+	if (current_cpu_data.isa_level == MIPS_CPU_ISA_IV)
+		set_c0_status(ST0_XX);
+
 	/*
 	 * Some MIPS CPUs have a dedicated interrupt vector which reduces the
 	 * interrupt processing overhead.  Use it where available.
@@ -868,19 +936,19 @@ void __init per_cpu_trap_init(void)
 		set_c0_cause(CAUSEF_IV);
 
 	cpu_data[cpu].asid_cache = ASID_FIRST_VERSION;
-#ifdef CONFIG_MIPS32
-	write_c0_context(cpu << 23);
-#endif
-#ifdef CONFIG_MIPS64
-	write_c0_context(((long)(&pgd_current[cpu])) << 23);
-#endif
-	write_c0_wired(0);
+	TLBMISS_HANDLER_SETUP();
+
+	atomic_inc(&init_mm.mm_count);
+	current->active_mm = &init_mm;
+	BUG_ON(current->mm);
+	enter_lazy_tlb(&init_mm, current);
+
+	cpu_cache_init();
+	tlb_init();
 }
 
 void __init trap_init(void)
 {
-	extern char except_vec0_generic;
-	extern char except_vec1_generic;
 	extern char except_vec3_generic, except_vec3_r4000;
 	extern char except_vec_ejtag_debug;
 	extern char except_vec4;
@@ -893,9 +961,7 @@ void __init trap_init(void)
 	 * This will be overriden later as suitable for a particular
 	 * configuration.
 	 */
-	memcpy((void *) KSEG0         , &except_vec0_generic, 0x80);
-	memcpy((void *)(KSEG0 + 0x080), &except_vec1_generic, 0x80);
-	memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic, 0x80);
+	memcpy((void *)(CAC_BASE + 0x180), &except_vec3_generic, 0x80);
 
 	/*
 	 * Setup default vectors
@@ -908,7 +974,7 @@ void __init trap_init(void)
 	 * destination.
 	 */
 	if (cpu_has_ejtag)
-		memcpy((void *)(KSEG0 + 0x300), &except_vec_ejtag_debug, 0x80);
+		memcpy((void *)(CAC_BASE + 0x300), &except_vec_ejtag_debug, 0x80);
 
 	/*
 	 * Only some CPUs have the watch exceptions or a dedicated
@@ -922,7 +988,7 @@ void __init trap_init(void)
 	 * interrupt processing overhead.  Use it where available.
 	 */
 	if (cpu_has_divec)
-		memcpy((void *)(KSEG0 + 0x200), &except_vec4, 0x8);
+		memcpy((void *)(CAC_BASE + 0x200), &except_vec4, 0x8);
 
 	/*
 	 * Some CPUs can enable/disable for cache parity detection, but does
@@ -969,11 +1035,11 @@ void __init trap_init(void)
 		set_except_vector(24, handle_mcheck);
 
 	if (cpu_has_vce)
-		memcpy((void *)(KSEG0 + 0x180), &except_vec3_r4000, 0x80);
+		memcpy((void *)(CAC_BASE + 0x180), &except_vec3_r4000, 0x80);
 	else if (cpu_has_4kex)
-		memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic, 0x80);
+		memcpy((void *)(CAC_BASE + 0x180), &except_vec3_generic, 0x80);
 	else
-		memcpy((void *)(KSEG0 + 0x080), &except_vec3_generic, 0x80);
+		memcpy((void *)(CAC_BASE + 0x080), &except_vec3_generic, 0x80);
 
 	if (current_cpu_data.cputype == CPU_R6000 ||
 	    current_cpu_data.cputype == CPU_R6000A) {
@@ -994,11 +1060,5 @@ void __init trap_init(void)
 	signal32_init();
 #endif
 
-	flush_icache_range(KSEG0, KSEG0 + 0x400);
-
-	if (current_cpu_data.isa_level == MIPS_CPU_ISA_IV)
-		set_c0_status(ST0_XX);
-
-	atomic_inc(&init_mm.mm_count);	/* XXX UP?  */
-	current->active_mm = &init_mm;
+	flush_icache_range(CAC_BASE, CAC_BASE + 0x400);
 }

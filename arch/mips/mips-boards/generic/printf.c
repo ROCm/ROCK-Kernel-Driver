@@ -25,53 +25,39 @@
 #include <asm/io.h>
 
 #ifdef CONFIG_MIPS_ATLAS
-
 #include <asm/mips-boards/atlas.h>
 
-/*
- * Atlas registers are memory mapped on 64-bit aligned boundaries and
- * only word access are allowed.
- * When reading the UART 8 bit registers only the LSB are valid.
- */
-static inline unsigned int serial_in(int offset)
-{
-	return (*(volatile unsigned int *)(mips_io_port_base + ATLAS_UART_REGS_BASE + offset*8) & 0xff);
-}
-
-static inline void serial_out(int offset, int value)
-{
-	*(volatile unsigned int *)(mips_io_port_base + ATLAS_UART_REGS_BASE + offset*8) = value;
-}
+#ifdef CONFIG_CPU_LITTLE_ENDIAN
+#define PORT(offset) (ATLAS_UART_REGS_BASE     + ((offset)<<3))
+#else
+#define PORT(offset) (ATLAS_UART_REGS_BASE + 3 + ((offset)<<3))
+#endif
 
 #elif defined(CONFIG_MIPS_SEAD)
 
 #include <asm/mips-boards/sead.h>
 
-/*
- * SEAD registers are just like Atlas registers.
- */
-static inline unsigned int serial_in(int offset)
-{
-	return (*(volatile unsigned int *)(mips_io_port_base + SEAD_UART0_REGS_BASE + offset*8) & 0xff);
-}
-
-static inline void serial_out(int offset, int value)
-{
-	*(volatile unsigned int *)(mips_io_port_base + SEAD_UART0_REGS_BASE + offset*8) = value;
-}
+#ifdef CONFIG_CPU_LITTLE_ENDIAN
+#define PORT(offset) (SEAD_UART0_REGS_BASE     + ((offset)<<3))
+#else
+#define PORT(offset) (SEAD_UART0_REGS_BASE + 3 + ((offset)<<3))
+#endif
 
 #else
 
+#define PORT(offset) (0x3f8 + (offset))
+
+#endif
+
 static inline unsigned int serial_in(int offset)
 {
-	return inb(0x3f8 + offset);
+	return inb(PORT(offset));
 }
 
 static inline void serial_out(int offset, int value)
 {
-	outb(value, 0x3f8 + offset);
+	outb(value, PORT(offset));
 }
-#endif
 
 int putPromChar(char c)
 {
@@ -85,7 +71,7 @@ int putPromChar(char c)
 
 char getPromChar(void)
 {
-	while (!(serial_in(UART_LSR) & 1))
+	while (!(serial_in(UART_LSR) & UART_LSR_DR))
 		;
 
 	return serial_in(UART_RX);
@@ -102,9 +88,8 @@ void __init prom_printf(char *fmt, ...)
 	char *p, *buf_end;
 	long flags;
 
-	int putPromChar(char);
-
 	spin_lock_irqsave(con_lock, flags);
+
 	va_start(args, fmt);
 	l = vsprintf(buf, fmt, args); /* hopefully i < sizeof(buf) */
 	va_end(args);
@@ -117,5 +102,8 @@ void __init prom_printf(char *fmt, ...)
 			putPromChar('\r');
 		putPromChar(*p);
 	}
+	/* wait for output to drain */
+	while ((serial_in(UART_LSR) & UART_LSR_TEMT) == 0)
+		;
 	spin_unlock_irqrestore(con_lock, flags);
 }

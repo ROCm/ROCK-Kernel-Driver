@@ -105,22 +105,99 @@ static void __init verify_mode(void)
 }
 
 #define XBOW_WIDGET_PART_NUM    0x0
-#define XXBOW_WIDGET_PART_NUM   0xd000          /* Xbridge */
+#define XXBOW_WIDGET_PART_NUM   0xd000  /* Xbow in Xbridge */
 #define BASE_XBOW_PORT  	8     /* Lowest external port */
 
-unsigned int bus_to_cpu[256];
-unsigned long bus_to_baddr[256];
+extern int bridge_probe(nasid_t nasid, int widget, int masterwid);
+
+static int __init probe_one_port(nasid_t nasid, int widget, int masterwid)
+{
+	widgetreg_t 		widget_id;
+	xwidget_part_num_t	partnum;
+
+	widget_id = *(volatile widgetreg_t *)
+		(RAW_NODE_SWIN_BASE(nasid, widget) + WIDGET_ID);
+	partnum = XWIDGET_PART_NUM(widget_id);
+
+	printk(KERN_INFO "Cpu %d, Nasid 0x%x, widget 0x%x (partnum 0x%x) is ",
+			smp_processor_id(), nasid, widget, partnum);
+
+	switch (partnum) {
+	case BRIDGE_WIDGET_PART_NUM:
+	case XBRIDGE_WIDGET_PART_NUM:
+		bridge_probe(nasid, widget, masterwid);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int __init xbow_probe(nasid_t nasid)
+{
+	lboard_t *brd;
+	klxbow_t *xbow_p;
+	unsigned masterwid, i;
+
+	printk("is xbow\n");
+
+	/*
+	 * found xbow, so may have multiple bridges
+	 * need to probe xbow
+	 */
+	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_MIDPLANE8);
+	if (!brd)
+		return -ENODEV;
+	
+	xbow_p = (klxbow_t *)find_component(brd, NULL, KLSTRUCT_XBOW);
+	if (!xbow_p)
+		return -ENODEV;
+
+	/*
+	 * Okay, here's a xbow. Lets arbitrate and find
+	 * out if we should initialize it. Set enabled
+	 * hub connected at highest or lowest widget as
+	 * master.
+	 */
+#ifdef WIDGET_A
+	i = HUB_WIDGET_ID_MAX + 1;
+	do {
+		i--;
+	} while ((!XBOW_PORT_TYPE_HUB(xbow_p, i)) ||
+		 (!XBOW_PORT_IS_ENABLED(xbow_p, i)));
+#else
+	i = HUB_WIDGET_ID_MIN - 1;
+	do {
+		i++;
+	} while ((!XBOW_PORT_TYPE_HUB(xbow_p, i)) ||
+		 (!XBOW_PORT_IS_ENABLED(xbow_p, i)));
+#endif
+
+	masterwid = i;
+	if (nasid != XBOW_PORT_NASID(xbow_p, i))
+		return 1;
+
+	for (i = HUB_WIDGET_ID_MIN; i <= HUB_WIDGET_ID_MAX; i++) {
+		if (XBOW_PORT_IS_ENABLED(xbow_p, i) &&
+		    XBOW_PORT_TYPE_IO(xbow_p, i))
+			probe_one_port(nasid, i, masterwid);
+	}
+
+	return 0;
+}
+
+static spinlock_t pcibr_setup_lock = SPIN_LOCK_UNLOCKED;
 
 void __init pcibr_setup(cnodeid_t nid)
 {
-	int 			i, start, num;
-	unsigned long		masterwid;
-	bridge_t 		*bridge;
 	volatile u64 		hubreg;
-	nasid_t	 		nasid, masternasid;
+	nasid_t	 		nasid;
 	xwidget_part_num_t	partnum;
 	widgetreg_t 		widget_id;
-	static spinlock_t	pcibr_setup_lock = SPIN_LOCK_UNLOCKED;
+
+
+	spin_lock(&pcibr_setup_lock);
 
 	/*
 	 * If the master is doing this for headless node, nothing to do.
@@ -132,164 +209,66 @@ void __init pcibr_setup(cnodeid_t nid)
 	 * is selectable by WIDGET_A below.
 	 */
 	if (nid != get_compact_nodeid())
-		return;
-	/*
-	 * find what's on our local node
-	 */
-	spin_lock(&pcibr_setup_lock);
-	start = num_bridges;		/* Remember where we start from */
+		goto out;
+
+	/* find what's on our local node */
 	nasid = COMPACT_TO_NASID_NODEID(nid);
 	hubreg = REMOTE_HUB_L(nasid, IIO_LLP_CSR);
-	if (hubreg & IIO_LLP_CSR_IS_UP) {
-		/* link is up */
-		widget_id = *(volatile widgetreg_t *)
-                        (RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID);
-		partnum = XWIDGET_PART_NUM(widget_id);
-		printk("Cpu %d, Nasid 0x%x, pcibr_setup(): found partnum= 0x%x",
-					smp_processor_id(), nasid, partnum);
-		if (partnum == BRIDGE_WIDGET_PART_NUM) {
-			/*
-			 * found direct connected bridge so must be Origin200
-			 */
-			printk("...is bridge\n");
-			num_bridges = 1;
-        		bus_to_wid[0] = 0x8;
-			bus_to_nid[0] = 0;
-			masterwid = 0xa;
-			bus_to_baddr[0] = 0xa100000000000000UL;
-		} else if (partnum == XBOW_WIDGET_PART_NUM) {
-			lboard_t *brd;
-			klxbow_t *xbow_p;
-			/*
-			 * found xbow, so may have multiple bridges
-			 * need to probe xbow
-			 */
-			printk("...is xbow\n");
 
-			if ((brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid),
-                                   KLTYPE_MIDPLANE8)) == NULL)
-				printk("argh\n");
-			else
-				printk("brd = 0x%lx\n", (unsigned long) brd);
-			if ((xbow_p = (klxbow_t *)
-			     find_component(brd, NULL, KLSTRUCT_XBOW)) == NULL)
-				printk("argh\n");
-			else {
-			   /*
-			    * Okay, here's a xbow. Lets arbitrate and find
-			    * out if we should initialize it. Set enabled
-			    * hub connected at highest or lowest widget as
-			    * master.
-			    */
-#ifdef WIDGET_A
-			   i = HUB_WIDGET_ID_MAX + 1;
-			   do {
-				i--;
-			   } while ((!XBOW_PORT_TYPE_HUB(xbow_p, i)) ||
-					(!XBOW_PORT_IS_ENABLED(xbow_p, i)));
-#else
-			   i = HUB_WIDGET_ID_MIN - 1;
-			   do {
-				i++;
-			   } while ((!XBOW_PORT_TYPE_HUB(xbow_p, i)) ||
-					(!XBOW_PORT_IS_ENABLED(xbow_p, i)));
-#endif
-			   masterwid = i;
-			   masternasid = XBOW_PORT_NASID(xbow_p, i);
-			   if (nasid == masternasid)
-			   for (i=HUB_WIDGET_ID_MIN; i<=HUB_WIDGET_ID_MAX; i++) {
-				if (!XBOW_PORT_IS_ENABLED(xbow_p, i))
-					continue;
-				if (XBOW_PORT_TYPE_IO(xbow_p, i)) {
-				   widget_id = *(volatile widgetreg_t *)
-                        		   (RAW_NODE_SWIN_BASE(nasid, i) + WIDGET_ID);
-				   partnum = XWIDGET_PART_NUM(widget_id);
-				   if (partnum == BRIDGE_WIDGET_PART_NUM) {
-					printk("widget 0x%x is a bridge\n", i);
-					bus_to_wid[num_bridges] = i;
-					bus_to_nid[num_bridges] = nasid;
-					bus_to_baddr[num_bridges] = ((masterwid << 60) | (1UL << 56));	/* Barrier set */
-					num_bridges++;
-				   }
-				}
-			   }
-			}
-		} else if (partnum == XXBOW_WIDGET_PART_NUM) {
-			/*
-			 * found xbridge, assume ibrick for now
-			 */
-			printk("...is xbridge\n");
-        		bus_to_wid[0] = 0xb;
-        		bus_to_wid[1] = 0xe;
-        		bus_to_wid[2] = 0xf;
+	/* check whether the link is up */
+	if (!(hubreg & IIO_LLP_CSR_IS_UP))
+		goto out;
 
-        		bus_to_nid[0] = 0;
-        		bus_to_nid[1] = 0;
-        		bus_to_nid[2] = 0;
+	widget_id = *(volatile widgetreg_t *)
+                       (RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID);
+	partnum = XWIDGET_PART_NUM(widget_id);
 
-			bus_to_baddr[0] = 0xa100000000000000UL;
-			bus_to_baddr[1] = 0xa100000000000000UL;
-			bus_to_baddr[2] = 0xa100000000000000UL;
-			masterwid = 0xa;
-			num_bridges = 3;
-		}
+	printk(KERN_INFO "Cpu %d, Nasid 0x%x: partnum 0x%x is ",
+			smp_processor_id(), nasid, partnum);
+
+	switch (partnum) {
+	case BRIDGE_WIDGET_PART_NUM:
+		bridge_probe(nasid, 0x8, 0xa);
+		break;
+	case XBOW_WIDGET_PART_NUM:
+	case XXBOW_WIDGET_PART_NUM:
+		xbow_probe(nasid);
+		break;
+	default:
+		printk(" unknown widget??\n");
+		break;
 	}
-	num = num_bridges - start;
+
+ out:
 	spin_unlock(&pcibr_setup_lock);
-	/*
-         * set bridge registers
-         */
-	for (i = start; i < (start + num); i++) {
-
-		DBG("pcibr_setup: bus= %d  bus_to_wid[%2d]= %d  bus_to_nid[%2d]= %d\n",
-                        i, i, bus_to_wid[i], i, bus_to_nid[i]);
-
-		bus_to_cpu[i] = smp_processor_id();
-		/*
-		 * point to this bridge
-		 */
-		bridge = (bridge_t *) NODE_SWIN_BASE(bus_to_nid[i],bus_to_wid[i]);
-		/*
-	 	 * Clear all pending interrupts.
-	 	 */
-		bridge->b_int_rst_stat = (BRIDGE_IRR_ALL_CLR);
-		/*
-	 	 * Until otherwise set up, assume all interrupts are from slot 0
-	 	 */
-		bridge->b_int_device = (u32) 0x0;
-		/*
-	 	 * swap pio's to pci mem and io space (big windows)
-	 	 */
-		bridge->b_wid_control |= BRIDGE_CTRL_IO_SWAP;
-		bridge->b_wid_control |= BRIDGE_CTRL_MEM_SWAP;
-
-		/*
-		 * Hmm...  IRIX sets additional bits in the address which
-		 * are documented as reserved in the bridge docs.
-		 */
-		bridge->b_int_mode = 0x0;		/* Don't clear ints */
-		bridge->b_wid_int_upper = 0x8000 | (masterwid << 16);
-		bridge->b_wid_int_lower = 0x01800090;	/* PI_INT_PEND_MOD off*/
-		bridge->b_dir_map = (masterwid << 20);	/* DMA */
-		bridge->b_int_enable = 0;
-
-		bridge->b_wid_tflush;     /* wait until Bridge PIO complete */
-	}
 }
 
 extern void ip27_setup_console(void);
 extern void ip27_time_init(void);
 extern void ip27_reboot_setup(void);
 
-void __init ip27_setup(void)
+void __init per_cpu_init(void)
 {
-	nasid_t nid;
+	cnodeid_t cnode = get_compact_nodeid();
+	int cpu = smp_processor_id();
+
+	clear_c0_status(ST0_IM);
+	per_hub_init(cnode);
+	cpu_time_init();
+	install_ipi();
+	/* Install our NMI handler if symmon hasn't installed one. */
+	install_cpu_nmi_handler(cputoslice(cpu));
+	set_c0_status(SRB_DEV0 | SRB_DEV1);
+}
+
+static int __init ip27_setup(void)
+{
 	hubreg_t p, e;
+	nasid_t nid;
 
 	ip27_setup_console();
 	ip27_reboot_setup();
 
-	num_bridges = 0;
 	/*
 	 * hub_rtc init and cpu clock intr enabled for later calibrate_delay.
 	 */
@@ -314,6 +293,11 @@ void __init ip27_setup(void)
 	ioc3_eth_init();
 	per_cpu_init();
 
-	mips_io_port_base = IO_BASE;
+	set_io_port_base(IO_BASE);
+
 	board_time_init = ip27_time_init;
+
+	return 0;
 }
+
+early_initcall(ip27_setup);

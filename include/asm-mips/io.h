@@ -14,19 +14,13 @@
 #include <linux/types.h>
 
 #include <asm/addrspace.h>
+#include <asm/cpu.h>
+#include <asm/cpu-features.h>
 #include <asm/page.h>
 #include <asm/pgtable-bits.h>
+#include <asm/processor.h>
 #include <asm/byteorder.h>
-
-#ifdef CONFIG_SGI_IP27
-extern unsigned long bus_to_baddr[256];
-
-#define bus_to_baddr(bus, addr)	(bus_to_baddr[(bus)->number] + (addr))
-#define baddr_to_bus(bus, addr)	((addr) - bus_to_baddr[(bus)->number])
-#else
-#define bus_to_baddr(bus, addr)	(addr)
-#define baddr_to_bus(bus, addr)	(addr)
-#endif
+#include <mangle-port.h>
 
 /*
  * Slowdown I/O port space accesses for antique hardware.
@@ -177,6 +171,24 @@ extern unsigned long isa_slot_offset;
 extern void * __ioremap(phys_t offset, phys_t size, unsigned long flags);
 extern void __iounmap(void *addr);
 
+static inline void * __ioremap_mode(unsigned long offset, unsigned long size,
+	unsigned long flags)
+{
+	if (cpu_has_64bit_addresses) {
+		u64 base = UNCAC_BASE;
+
+		/*
+		 * R10000 supports a 2 bit uncached attribute therefore
+		 * UNCAC_BASE may not equal IO_BASE.
+		 */
+		if (flags == _CACHE_UNCACHED)
+			base = (u64) IO_BASE;
+		return (void *) (unsigned long) (base + offset);
+	}
+
+	return __ioremap(offset, size, flags);
+}
+
 /*
  * ioremap     -   map bus memory into CPU space
  * @offset:    bus address of the memory
@@ -189,7 +201,7 @@ extern void __iounmap(void *addr);
  * address.
  */
 #define ioremap(offset, size)						\
-	__ioremap((offset), (size), _CACHE_UNCACHED)
+	__ioremap_mode((offset), (size), _CACHE_UNCACHED)
 
 /*
  * ioremap_nocache     -   map bus memory into CPU space
@@ -211,19 +223,27 @@ extern void __iounmap(void *addr);
  * write combining or read caching is not desirable:
  */
 #define ioremap_nocache(offset, size)					\
-	__ioremap((offset), (size), _CACHE_UNCACHED)
-#define ioremap_cacheable_cow(offset, size)				\
-	__ioremap((offset), (size), _CACHE_CACHABLE_COW)
-#define ioremap_uncached_accelerated(offset, size)			\
-	__ioremap((offset), (size), _CACHE_UNCACHED_ACCELERATED)
-
-extern void iounmap(void *addr);
+	__ioremap_mode((offset), (size), _CACHE_UNCACHED)
 
 /*
- * XXX We need system specific versions of these to handle EISA address bits
- * 24-31 on SNI.
- * XXX more SNI hacks.
+ * These two are MIPS specific ioremap variant.  ioremap_cacheable_cow
+ * requests a cachable mapping, ioremap_uncached_accelerated requests a
+ * mapping using the uncached accelerated mode which isn't supported on
+ * all processors.
  */
+#define ioremap_cacheable_cow(offset, size)				\
+	__ioremap_mode((offset), (size), _CACHE_CACHABLE_COW)
+#define ioremap_uncached_accelerated(offset, size)			\
+	__ioremap_mode((offset), (size), _CACHE_UNCACHED_ACCELERATED)
+
+static inline void iounmap(void *addr)
+{
+	if (cpu_has_64bits)
+		return;
+
+	__iounmap(addr);
+}
+
 #define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
 #define __raw_readw(addr)	(*(volatile unsigned short *)(addr))
 #define __raw_readl(addr)	(*(volatile unsigned int *)(addr))
@@ -240,14 +260,8 @@ extern void iounmap(void *addr);
 		"	.set	mips0				\n"	\
 		: "=r" (__res)						\
 		: "r" (addr));						\
-									\
 	__res;								\
 })
-#endif
-#ifdef CONFIG_MIPS64
-#define ____raw_readq(addr)	(*(volatile unsigned long *)(addr))
-#endif
-
 #define __raw_readq(addr)						\
 ({									\
 	unsigned long __flags;						\
@@ -256,9 +270,13 @@ extern void iounmap(void *addr);
 	local_irq_save(__flags);					\
 	__res = ____raw_readq(addr);					\
 	local_irq_restore(__flags);					\
-									\
 	__res;								\
 })
+#endif
+#ifdef CONFIG_MIPS64
+#define ____raw_readq(addr)	(*(volatile unsigned long *)(addr))
+#define __raw_readq(addr)	____raw_readq(addr)
+#endif
 
 #define readb(addr)		__ioswab8(__raw_readb(addr))
 #define readw(addr)		__ioswab16(__raw_readw(addr))
@@ -273,7 +291,7 @@ extern void iounmap(void *addr);
 #define __raw_writew(w,addr)	((*(volatile unsigned short *)(addr)) = (w))
 #define __raw_writel(l,addr)	((*(volatile unsigned int *)(addr)) = (l))
 #ifdef CONFIG_MIPS32
-#define ____raw_writeq(val,addr)					\
+#define ____raw_writeq(val,addr)						\
 ({									\
 	u64 __tmp;							\
 									\
@@ -288,11 +306,6 @@ extern void iounmap(void *addr);
 		: "=r" (__tmp)						\
 		: "0" ((unsigned long long)val), "r" (addr));		\
 })
-#endif
-#ifdef CONFIG_MIPS64
-#define ____raw_writeq(l,addr)	((*(volatile unsigned long *)(addr)) = (l))
-#endif
-
 #define __raw_writeq(val,addr)						\
 ({									\
 	unsigned long __flags;						\
@@ -301,6 +314,11 @@ extern void iounmap(void *addr);
 	____raw_writeq(val, addr);					\
 	local_irq_restore(__flags);					\
 })
+#endif
+#ifdef CONFIG_MIPS64
+#define ____raw_writeq(q,addr)	((*(volatile unsigned long *)(addr)) = (q))
+#define __raw_writeq(q,addr)	____raw_writeq(q, addr)
+#endif
 
 #define writeb(b,addr)		__raw_writeb(__ioswab8(b),(addr))
 #define writew(w,addr)		__raw_writew(__ioswab16(w),(addr))
@@ -380,57 +398,84 @@ out:
  */
 #define isa_check_signature(io, s, l)	check_signature(i,s,l)
 
-#define outb(val,port)							\
-do {									\
-	*(volatile u8 *)(mips_io_port_base + (port)) = __ioswab8(val);	\
-} while(0)
+static inline void __outb(unsigned char val, unsigned long port)
+{
+	port = __swizzle_addr_b(port);
 
-#define outw(val,port)							\
-do {									\
-	*(volatile u16 *)(mips_io_port_base + (port)) = __ioswab16(val);\
-} while(0)
+	*(volatile u8 *)(mips_io_port_base + port) = __ioswab8(val);
+}
 
-#define outl(val,port)							\
-do {									\
-	*(volatile u32 *)(mips_io_port_base + (port)) = __ioswab32(val);\
-} while(0)
+static inline void __outw(unsigned short val, unsigned long port)
+{
+	port = __swizzle_addr_w(port);
 
-#define outb_p(val,port)						\
-do {									\
-	*(volatile u8 *)(mips_io_port_base + (port)) = __ioswab8(val);	\
-	SLOW_DOWN_IO;							\
-} while(0)
+	*(volatile u16 *)(mips_io_port_base + port) = __ioswab16(val);
+}
 
-#define outw_p(val,port)						\
-do {									\
-	*(volatile u16 *)(mips_io_port_base + (port)) = __ioswab16(val);\
-	SLOW_DOWN_IO;							\
-} while(0)
+static inline void __outl(unsigned int val, unsigned long port)
+{
+	port = __swizzle_addr_l(port);
 
-#define outl_p(val,port)						\
-do {									\
-	*(volatile u32 *)(mips_io_port_base + (port)) = __ioswab32(val);\
-	SLOW_DOWN_IO;							\
-} while(0)
+	*(volatile u32 *)(mips_io_port_base + port) = __ioswab32(val);
+}
+
+static inline void __outb_p(unsigned char val, unsigned long port)
+{
+	port = __swizzle_addr_b(port);
+
+	*(volatile u8 *)(mips_io_port_base + port) = __ioswab8(val);
+	SLOW_DOWN_IO;
+}
+
+static inline void __outw_p(unsigned short val, unsigned long port)
+{
+	port = __swizzle_addr_w(port);
+
+	*(volatile u16 *)(mips_io_port_base + port) = __ioswab16(val);
+	SLOW_DOWN_IO;
+}
+
+static inline void __outl_p(unsigned int val, unsigned long port)
+{
+	port = __swizzle_addr_l(port);
+
+	*(volatile u32 *)(mips_io_port_base + port) = __ioswab32(val);
+	SLOW_DOWN_IO;
+}
+
+#define outb(val, port)		__outb(val, port)
+#define outw(val, port)		__outw(val, port)
+#define outl(val, port)		__outl(val, port)
+#define outb_p(val, port)	__outb_p(val, port)
+#define outw_p(val, port)	__outw_p(val, port)
+#define outl_p(val, port)	__outl_p(val, port)
 
 static inline unsigned char __inb(unsigned long port)
 {
+	port = __swizzle_addr_b(port);
+
 	return __ioswab8(*(volatile u8 *)(mips_io_port_base + port));
 }
 
 static inline unsigned short __inw(unsigned long port)
 {
+	port = __swizzle_addr_w(port);
+
 	return __ioswab16(*(volatile u16 *)(mips_io_port_base + port));
 }
 
 static inline unsigned int __inl(unsigned long port)
 {
+	port = __swizzle_addr_l(port);
+
 	return __ioswab32(*(volatile u32 *)(mips_io_port_base + port));
 }
 
 static inline unsigned char __inb_p(unsigned long port)
 {
 	u8 __val;
+
+	port = __swizzle_addr_b(port);
 
 	__val = *(volatile u8 *)(mips_io_port_base + port);
 	SLOW_DOWN_IO;
@@ -442,6 +487,8 @@ static inline unsigned short __inw_p(unsigned long port)
 {
 	u16 __val;
 
+	port = __swizzle_addr_w(port);
+
 	__val = *(volatile u16 *)(mips_io_port_base + port);
 	SLOW_DOWN_IO;
 
@@ -452,8 +499,11 @@ static inline unsigned int __inl_p(unsigned long port)
 {
 	u32 __val;
 
+	port = __swizzle_addr_l(port);
+
 	__val = *(volatile u32 *)(mips_io_port_base + port);
 	SLOW_DOWN_IO;
+
 	return __ioswab32(__val);
 }
 
@@ -537,7 +587,7 @@ static inline void __insl(unsigned long port, void *addr, unsigned int count)
  *    be discarded.  This operation is necessary before dma operations
  *    to the memory.
  */
-#ifdef CONFIG_NONCOHERENT_IO
+#ifdef CONFIG_DMA_NONCOHERENT
 
 extern void (*_dma_cache_wback_inv)(unsigned long start, unsigned long size);
 extern void (*_dma_cache_wback)(unsigned long start, unsigned long size);
@@ -556,7 +606,7 @@ extern void (*_dma_cache_inv)(unsigned long start, unsigned long size);
 #define dma_cache_inv(start,size)	\
 	do { (void) (start); (void) (size); } while (0)
 
-#endif /* CONFIG_NONCOHERENT_IO */
+#endif /* CONFIG_DMA_NONCOHERENT */
 
 /*
  * Read a 32-bit register that requires a 64-bit read cycle on the bus.

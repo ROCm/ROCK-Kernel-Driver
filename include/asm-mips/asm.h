@@ -6,6 +6,7 @@
  * Copyright (C) 1995, 1996, 1997, 1999, 2001 by Ralf Baechle
  * Copyright (C) 1999 by Silicon Graphics, Inc.
  * Copyright (C) 2001 MIPS Technologies, Inc.
+ * Copyright (C) 2002  Maciej W. Rozycki
  *
  * Some useful macros for MIPS assembler code
  *
@@ -13,8 +14,8 @@
  * away by gas in -O mode. These nops are however required to fill delay
  * slots in noreorder mode.
  */
-#ifndef	_ASM_ASM_H
-#define	_ASM_ASM_H
+#ifndef __ASM_ASM_H
+#define __ASM_ASM_H
 
 #include <linux/config.h>
 #include <asm/sgidefs.h>
@@ -204,13 +205,11 @@ symbol		=	value
 /*
  * Stack alignment
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS32)
+#if (_MIPS_SIM == _MIPS_SIM_ABI32)
 #define ALSZ	7
 #define ALMASK	~7
 #endif
-#if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
+#if (_MIPS_SIM == _MIPS_SIM_ABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 #define ALSZ	15
 #define ALMASK	~15
 #endif
@@ -232,15 +231,13 @@ symbol		=	value
  * Use the following macros in assemblercode to load/store registers,
  * pointers etc.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS32)
+#if (_MIPS_SIM == _MIPS_SIM_ABI32)
 #define REG_S		sw
 #define REG_L		lw
 #define REG_SUBU	subu
 #define REG_ADDU	addu
 #endif
-#if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
+#if (_MIPS_SIM == _MIPS_SIM_ABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 #define REG_S		sd
 #define REG_L		ld
 #define REG_SUBU	dsubu
@@ -385,17 +382,15 @@ symbol		=	value
 /*
  * Some cp0 registers were extended to 64bit for MIPS III.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS32)
+#if (_MIPS_SIM == _MIPS_SIM_ABI32)
 #define MFC0		mfc0
 #define MTC0		mtc0
 #endif
-#if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
+#if (_MIPS_SIM == _MIPS_SIM_ABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 #define MFC0		dmfc0
 #define MTC0		dmtc0
 #endif
 
 #define SSNOP		sll zero,zero,1
 
-#endif /* _ASM_ASM_H */
+#endif /* __ASM_ASM_H */

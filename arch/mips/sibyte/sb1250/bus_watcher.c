@@ -25,6 +25,7 @@
  * /proc/bus_watcher if PROC_FS is on.
  */
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
@@ -80,10 +81,10 @@ void check_bus_watcher(void)
 
 #ifdef CONFIG_SB1_PASS_1_WORKAROUNDS
 	/* Destructive read, clears register and interrupt */
-	status = csr_in32(IO_SPACE_BASE | A_SCD_BUS_ERR_STATUS);
+	status = csr_in32(IOADDR(A_SCD_BUS_ERR_STATUS));
 #else
 	/* Use non-destructive register */
-	status = csr_in32(IO_SPACE_BASE | A_SCD_BUS_ERR_STATUS_DEBUG);
+	status = csr_in32(IOADDR(A_SCD_BUS_ERR_STATUS_DEBUG));
 #endif
 	if (!(status & 0x7fffffff)) {
 		printk("Using last values reaped by bus watcher driver\n");
@@ -91,8 +92,8 @@ void check_bus_watcher(void)
 		l2_err = bw_stats.l2_err;
 		memio_err = bw_stats.memio_err;
 	} else {
-		l2_err = csr_in32(IO_SPACE_BASE | A_BUS_L2_ERRORS);
-		memio_err = csr_in32(IO_SPACE_BASE | A_BUS_MEM_IO_ERRORS);
+		l2_err = csr_in32(IOADDR(A_BUS_L2_ERRORS));
+		memio_err = csr_in32(IOADDR(A_BUS_MEM_IO_ERRORS));
 	}
 	if (status & ~(1UL << 31))
 		print_summary(status, l2_err, memio_err);
@@ -175,31 +176,46 @@ static irqreturn_t sibyte_bw_int(int irq, void *data, struct pt_regs *regs)
 {
 	struct bw_stats_struct *stats = data;
 	unsigned long cntr;
+#ifdef CONFIG_SIBYTE_BW_TRACE
+	int i;
+#endif
 #ifndef CONFIG_PROC_FS
 	char bw_buf[1024];
 #endif
 
+#ifdef CONFIG_SIBYTE_BW_TRACE
+	csr_out32(M_SCD_TRACE_CFG_FREEZE, IOADDR(A_SCD_TRACE_CFG));
+	csr_out32(M_SCD_TRACE_CFG_START_READ, IOADDR(A_SCD_TRACE_CFG));
+
+	for (i=0; i<256*6; i++)
+		printk("%016llx\n", (unsigned long long)__raw_readq(IOADDR(A_SCD_TRACE_READ)));
+
+	csr_out32(M_SCD_TRACE_CFG_RESET, IOADDR(A_SCD_TRACE_CFG));
+	csr_out32(M_SCD_TRACE_CFG_START, IOADDR(A_SCD_TRACE_CFG));
+#endif
+
 	/* Destructive read, clears register and interrupt */
-	stats->status = csr_in32(IO_SPACE_BASE | A_SCD_BUS_ERR_STATUS);
+	stats->status = csr_in32(IOADDR(A_SCD_BUS_ERR_STATUS));
 	stats->status_printed = 0;
 
-	stats->l2_err = cntr = csr_in32(IO_SPACE_BASE | A_BUS_L2_ERRORS);
+	stats->l2_err = cntr = csr_in32(IOADDR(A_BUS_L2_ERRORS));
 	stats->l2_cor_d += G_SCD_L2ECC_CORR_D(cntr);
 	stats->l2_bad_d += G_SCD_L2ECC_BAD_D(cntr);
 	stats->l2_cor_t += G_SCD_L2ECC_CORR_T(cntr);
 	stats->l2_bad_t += G_SCD_L2ECC_BAD_T(cntr);
-	csr_out32(0, IO_SPACE_BASE | A_BUS_L2_ERRORS);
+	csr_out32(0, IOADDR(A_BUS_L2_ERRORS));
 
-	stats->memio_err = cntr = csr_in32(IO_SPACE_BASE | A_BUS_MEM_IO_ERRORS);
+	stats->memio_err = cntr = csr_in32(IOADDR(A_BUS_MEM_IO_ERRORS));
 	stats->mem_cor_d += G_SCD_MEM_ECC_CORR(cntr);
 	stats->mem_bad_d += G_SCD_MEM_ECC_BAD(cntr);
 	stats->bus_error += G_SCD_MEM_BUSERR(cntr);
-	csr_out32(0, IO_SPACE_BASE | A_BUS_MEM_IO_ERRORS);
+	csr_out32(0, IOADDR(A_BUS_MEM_IO_ERRORS));
 
 #ifndef CONFIG_PROC_FS
 	bw_print_buffer(bw_buf, stats);
 	printk(bw_buf);
 #endif
+
 	return IRQ_HANDLED;
 }
 
@@ -226,6 +242,14 @@ int __init sibyte_bus_watcher(void)
 
 #ifdef CONFIG_PROC_FS
 	create_proc_decoder(&bw_stats);
+#endif
+
+#ifdef CONFIG_SIBYTE_BW_TRACE
+	csr_out32((M_SCD_TRSEQ_ASAMPLE | M_SCD_TRSEQ_DSAMPLE |
+		   K_SCD_TRSEQ_TRIGGER_ALL),
+		  IOADDR(A_SCD_TRACE_SEQUENCE_0));
+	csr_out32(M_SCD_TRACE_CFG_RESET, IOADDR(A_SCD_TRACE_CFG));
+	csr_out32(M_SCD_TRACE_CFG_START, IOADDR(A_SCD_TRACE_CFG));
 #endif
 
 	return 0;

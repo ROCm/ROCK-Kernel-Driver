@@ -1,3 +1,4 @@
+#include <linux/config.h>
 #include <asm-generic/vmlinux.lds.h>
 
 #undef mips		/* CPP really sucks for this job  */
@@ -44,10 +45,11 @@ SECTIONS
 
   RODATA
 
-  . = ALIGN(64);
-
   /* writeable */
   .data : {			/* Data */
+    . = . + MAPPED_OFFSET;	/* for CONFIG_MAPPED_KERNEL */
+    *(.data.init_task)
+
     *(.data)
 
    /* Align the initial ramdisk image (INITRD) on page boundaries. */
@@ -73,22 +75,10 @@ SECTIONS
   . = ALIGN(4096);
   __nosave_end = .;
 
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) }
-
   . = ALIGN(32);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
   _edata =  .;			/* End of data section */
-
-#ifdef CONFIG_MIPS32
-  . = ALIGN(8192);		/* init_task */
-#endif
-#ifdef CONFIG_MIPS64
-  . = ALIGN(16384);		/* init_task */
-#endif
-  . = . + MAPPED_OFFSET;	/* for CONFIG_MAPPED_KERNEL */
-  .data.init_task : { *(.data.init_task) }
 
   /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
@@ -108,6 +98,13 @@ SECTIONS
   __start___param = .;
   __param : { *(__param) }
   __stop___param = .;
+
+  .early_initcall.init : {
+  __earlyinitcall_start = .;
+	*(.initcall.early1.init)
+  }
+  __earlyinitcall_end = .;
+
   __initcall_start = .;
   .initcall.init : {
 	*(.initcall1.init)
@@ -119,6 +116,7 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;

@@ -13,6 +13,7 @@
  *  Free Software Foundation; either version 2 of the License, or (at your
  *  option) any later version.
  */
+#include <linux/config.h>
 #include <asm/io.h>
 #include <asm/vr41xx/tb0229.h>
 
@@ -20,11 +21,7 @@
 
 void tanbac_tb0229_restart(char *command)
 {
-#ifdef CONFIG_TANBAC_TB0219
 	local_irq_disable();
 	tb0229_hard_reset();
 	while (1);
-#else
-	vr41xx_restart(command);
-#endif
 }

@@ -59,6 +59,8 @@ struct termio {
 };
 
 #ifdef __KERNEL__
+#include <linux/module.h>
+
 /*
  *	intr=^C		quit=^\		erase=del	kill=^U
  *	vmin=\1		vtime=\0	eol2=\0		swtc=\0

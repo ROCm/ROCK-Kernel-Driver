@@ -10,11 +10,8 @@
 #include <linux/kernel.h>
 #include <linux/kdev_t.h>
 #include <linux/types.h>
-#include <linux/console.h>
 #include <linux/sched.h>
-#include <linux/mc146818rtc.h>
 #include <linux/pci.h>
-#include <linux/ide.h>
 
 #include <asm/addrspace.h>
 #include <asm/bcache.h>
@@ -42,9 +39,6 @@
 #ifdef CONFIG_KGDB
 extern void breakpoint(void);
 #endif
-
-extern struct ide_ops std_ide_ops;
-extern struct kbd_ops std_kbd_ops;
 
 static void (*back_to_prom) (void) = (void (*)(void)) 0xbfc00000;
 
@@ -82,7 +76,7 @@ extern void rtc_ds1386_init(unsigned long base);
 static void __init ddb_time_init(void)
 {
 #if defined(USE_CPU_COUNTER_TIMER)
-	mips_counter_frequency = CPU_COUNTER_FREQUENCY;
+	mips_hpt_frequency = CPU_COUNTER_FREQUENCY;
 #endif
 
 	/* we have ds1396 RTC chip */
@@ -114,20 +108,16 @@ static void __init ddb_timer_setup(struct irqaction *irq)
 
 static struct {
 	struct resource dma1;
-	struct resource pic1;
 	struct resource timer;
 	struct resource rtc;
 	struct resource dma_page_reg;
-	struct resource pic2;
 	struct resource dma2;
 } ddb5476_ioport = {
 	{
 	"dma1", 0x00, 0x1f, IORESOURCE_BUSY}, {
-	"pic1", 0x20, 0x3f, IORESOURCE_BUSY}, {
 	"timer", 0x40, 0x5f, IORESOURCE_BUSY}, {
 	"rtc", 0x70, 0x7f, IORESOURCE_BUSY}, {
 	"dma page reg", 0x80, 0x8f, IORESOURCE_BUSY}, {
-	"pic2", 0xa0, 0xbf, IORESOURCE_BUSY}, {
 	"dma2", 0xc0, 0xdf, IORESOURCE_BUSY}
 };
 
@@ -142,8 +132,7 @@ static void ddb5476_board_init(void);
 extern void ddb5476_irq_setup(void);
 extern void (*irq_setup)(void);
 
-void __init
-ddb_setup(void)
+static void __init ddb5476_setup(void)
 {
 	extern int panic_timeout;
 
@@ -159,21 +148,16 @@ ddb_setup(void)
 
 	/* request io port/mem resources  */
 	if (request_resource(&ioport_resource, &ddb5476_ioport.dma1) ||
-	    request_resource(&ioport_resource, &ddb5476_ioport.pic1) ||
 	    request_resource(&ioport_resource, &ddb5476_ioport.timer) ||
 	    request_resource(&ioport_resource, &ddb5476_ioport.rtc) ||
 	    request_resource(&ioport_resource,
 			     &ddb5476_ioport.dma_page_reg)
-	    || request_resource(&ioport_resource, &ddb5476_ioport.pic2)
 	    || request_resource(&ioport_resource, &ddb5476_ioport.dma2)
 	    || request_resource(&iomem_resource, &ddb5476_iomem.nile4)) {
 		printk
 		    ("ddb_setup - requesting oo port resources failed.\n");
 		for (;;);
 	}
-#ifdef CONFIG_BLK_DEV_IDE
-	ide_ops = &std_ide_ops;
-#endif
 
 	/* Reboot on panic */
 	panic_timeout = 180;
@@ -181,13 +165,11 @@ ddb_setup(void)
 	/* [jsun] we need to set BAR0 so that SDRAM 0 appears at 0x0 in PCI */
 	/* *(long*)0xbfa00218 = 0x8; */
 
-#ifdef CONFIG_FB
-	conswitchp = &dummy_con;
-#endif
-
 	/* board initialization stuff */
 	ddb5476_board_init();
 }
+
+early_initcall(ddb5476_setup);
 
 /*
  * We don't trust bios.  We essentially does hardware re-initialization

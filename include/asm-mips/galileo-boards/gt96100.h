@@ -3,8 +3,6 @@
  * Author: MontaVista Software, Inc.
  *         	stevel@mvista.com or source@mvista.com
  *
- * ########################################################################
- *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
  *  published by the Free Software Foundation.
@@ -18,10 +16,7 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
- * ########################################################################
- *
  * Register offsets of the MIPS GT96100 Advanced Communication Controller.
- *
  */
 #ifndef _GT96100_H
 #define _GT96100_H

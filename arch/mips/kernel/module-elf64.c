@@ -160,23 +160,6 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
-/* We don't need anything special. */
-long module_core_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
-{
-	return module->core_size;
-}
-
-long module_init_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
-{
-	return module->init_size;
-}
-
 int module_frob_arch_sections(Elf_Ehdr *hdr,
 			      Elf_Shdr *sechdrs,
 			      char *secstrings,

@@ -32,93 +32,31 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <asm/au1000.h>
+#include <asm/mach-au1x00/au1000.h>
 //#include <asm/pb1500.h>
 #ifdef CONFIG_MIPS_PB1000
-#include <asm/pb1000.h>
+#include <asm/mach-pb1x00/pb1000.h>
 #endif
 
-#undef	DEBUG
-#ifdef 	DEBUG
-#define	DBG(x...)	printk(x)
-#else
-#define	DBG(x...)
-#endif
+/*
+ * Shortcut
+ */
+#define INTA	AU1000_PCI_INTA
+#define INTB	AU1000_PCI_INTB
 
-static void fixup_resource(int r_num, struct pci_dev *dev);
-#ifdef CONFIG_SOC_AU1500
-static unsigned long virt_io_addr;
+static char irq_tab_alchemy[][5] __initdata = {
+ [11] = { -1, INTA, INTA, INTA, INTA },
+ [12] = { -1, INTA, INTA, INTA, INTA }
+#if defined( CONFIG_SOC_AU1550 )
+ [13] = { -1, INTB, INTB, INTB, INTB }
 #endif
+};
 
-void __init pcibios_fixup_resources(struct pci_dev *dev)
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	/* will need to fixup IO resources */
+	return irq_tab_alchemy[slot][pin];
 }
 
-void __init pcibios_fixup(void)
-{
-#ifdef CONFIG_SOC_AU1500
-	int i;
-	struct pci_dev *dev;
-
-	virt_io_addr = (unsigned long) ioremap(Au1500_PCI_IO_START,
-					       Au1500_PCI_IO_END -
-					       Au1500_PCI_IO_START + 1);
-
-	if (!virt_io_addr) {
-		printk(KERN_ERR "Unable to ioremap pci space\n");
-		return;
-	}
-
-	set_io_port_base(virt_io_addr);
-#endif
-
-#ifdef CONFIG_MIPS_PB1000	/* This is truly board specific */
-	unsigned long pci_mem_start = (unsigned long) PCI_MEM_START;
-
-	au_writel(0, PCI_BRIDGE_CONFIG);	// set extend byte to 0
-	au_writel(0, SDRAM_MBAR);	// set mbar to 0
-	au_writel(0x2, SDRAM_CMD);	// enable memory accesses
-	au_sync_delay(1);
-
-	// set extend byte to mbar of ext slot
-	au_writel(((pci_mem_start >> 24) & 0xff) |
-		  (1 << 8 | 1 << 9 | 1 << 10 | 1 << 27),
-		  PCI_BRIDGE_CONFIG);
-	DBG("Set bridge config to %x\n", au_readl(PCI_BRIDGE_CONFIG));
-#endif
-}
-
-void __init pcibios_fixup_irqs(void)
-{
-#ifdef CONFIG_SOC_AU1500
-	unsigned int slot, func;
-	unsigned char pin;
-	struct pci_dev *dev = NULL;
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		if (dev->bus->number != 0)
-			return;
-
-		dev->irq = 0xff;
-		slot = PCI_SLOT(dev->devfn);
-		switch (slot) {
-		case 12:
-		case 13:
-			dev->irq = AU1000_PCI_INTA;
-			break;
-
-		}
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-		DBG("slot %d irq %d\n", slot, dev->irq);
-	}
-#endif
-}
-unsigned int pcibios_assign_all_busses(void)
-{
-	return 0;
-}
-
-static void fixup_resource(int r_num, struct pci_dev *dev)
-{
-}
+struct pci_fixup pcibios_fixups[] __initdata = {
+	{ 0 }
+};

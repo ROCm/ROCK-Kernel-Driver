@@ -57,7 +57,7 @@
 
 #define X1241_CCR_ADDRESS	0x6F
 
-#define SMB_CSR(reg) (KSEG1 | A_SMB_REGISTER(1, reg))
+#define SMB_CSR(reg) (IOADDR(A_SMB_REGISTER(1, reg)))
 
 static int xicor_read(uint8_t addr)
 {

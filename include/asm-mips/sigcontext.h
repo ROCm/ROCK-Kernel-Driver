@@ -65,6 +65,7 @@ struct sigcontext {
 	unsigned int	sc_cause;
 };
 
+#ifdef __KERNEL__
 struct sigcontext32 {
 	__u32	sc_regmask;		/* Unused */
 	__u32	sc_status;
@@ -84,6 +85,7 @@ struct sigcontext32 {
 
 	__u32	sc_sigset[4];		/* kernel's sigset_t */
 };
+#endif /* __KERNEL__ */
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 || _MIPS_SIM == _MIPS_SIM_NABI32 */
 

@@ -19,8 +19,6 @@
 #include <asm/bootinfo.h>
 #include <asm/addrspace.h>
 
-char arcs_cmdline[CL_SIZE];
-
 const char *get_system_type(void)
 {
 	return "NEC_Vr41xx Osprey";
@@ -30,10 +28,11 @@ const char *get_system_type(void)
  * [jsun] right now we assume it is the nec debug monitor, which does
  * not pass any arguments.
  */
-void __init prom_init()
+void __init prom_init(void)
 {
-	strcpy(arcs_cmdline, "ip=bootp ");
-	strcat(arcs_cmdline, "ether=46,0x03fe0300,eth0 ");
+	// cmdline is now set in default config
+	// strcpy(arcs_cmdline, "ip=bootp ");
+	// strcat(arcs_cmdline, "ether=46,0x03fe0300,eth0 ");
 	// strcpy(arcs_cmdline, "ether=0,0x0300,eth0 "
 	// strcat(arcs_cmdline, "video=vr4181fb:xres:240,yres:320,bpp:8 ");
 
@@ -44,11 +43,7 @@ void __init prom_init()
 	add_memory_region(0, 16 << 20, BOOT_MEM_RAM);
 }
 
-void __init prom_free_prom_memory(void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }
-
-void __init prom_fixup_mem_map(unsigned long start, unsigned long end)
-{
-}
-

@@ -14,117 +14,82 @@
  *  You should have received a copy of the GNU General Public License along
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- *
- * Atlas specific setup.
  */
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
-#include <linux/mc146818rtc.h>
 #include <linux/ioport.h>
+#include <linux/tty.h>
+#include <linux/serial.h>
+#include <linux/serial_core.h>
 
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
 #include <asm/mips-boards/generic.h>
 #include <asm/mips-boards/prom.h>
+#include <asm/mips-boards/atlas.h>
 #include <asm/mips-boards/atlasint.h>
-#include <asm/gt64120.h>
 #include <asm/time.h>
 #include <asm/traps.h>
 
-#if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_PROM_CONSOLE)
-extern void console_setup(char *, int *);
-char serial_console[20];
-#endif
+extern void mips_reboot_setup(void);
+extern void mips_time_init(void);
+extern void mips_timer_setup(struct irqaction *irq);
+extern unsigned long mips_rtc_get_time(void);
 
 #ifdef CONFIG_KGDB
-extern void rs_kgdb_hook(int);
-extern void saa9730_kgdb_hook(void);
-extern void breakpoint(void);
-int remote_debug = 0;
+extern void kgdb_config(void);
 #endif
 
-extern struct rtc_ops atlas_rtc_ops;
-
-extern void mips_reboot_setup(void);
+static void __init serial_init(void);
 
 const char *get_system_type(void)
 {
 	return "MIPS Atlas";
 }
 
-extern void mips_time_init(void);
-extern void mips_timer_setup(struct irqaction *irq);
-extern unsigned long mips_rtc_get_time(void);
-
-void __init atlas_setup(void)
+static int __init atlas_setup(void)
 {
-#ifdef CONFIG_KGDB
-	int rs_putDebugChar(char);
-	char rs_getDebugChar(void);
-	int saa9730_putDebugChar(char);
-	char saa9730_getDebugChar(void);
-	extern int (*generic_putDebugChar)(char);
-	extern char (*generic_getDebugChar)(void);
-#endif
-	char *argptr;
-
 	ioport_resource.end = 0x7fffffff;
 
-#ifdef CONFIG_SERIAL_CONSOLE
-	argptr = prom_getcmdline();
-	if ((argptr = strstr(argptr, "console=ttyS0")) == NULL) {
-		int i = 0;
-		char *s = prom_getenv("modetty0");
-		while(s[i] >= '0' && s[i] <= '9')
-			i++;
-		strcpy(serial_console, "ttyS0,");
-		strncpy(serial_console + 6, s, i);
-		prom_printf("Config serial console: %s\n", serial_console);
-		console_setup(serial_console, NULL);
-	}
-#endif
+	serial_init ();
 
 #ifdef CONFIG_KGDB
-	argptr = prom_getcmdline();
-	if ((argptr = strstr(argptr, "kgdb=ttyS")) != NULL) {
-		int line;
-		argptr += strlen("kgdb=ttyS");
-		if (*argptr != '0' && *argptr != '1')
-			printk("KGDB: Uknown serial line /dev/ttyS%c, "
-			       "falling back to /dev/ttyS1\n", *argptr);
-		line = *argptr == '0' ? 0 : 1;
-		printk("KGDB: Using serial line /dev/ttyS%d for session\n",
-		       line ? 1 : 0);
-
-		if(line == 0) {
-			rs_kgdb_hook(line);
-			generic_putDebugChar = rs_putDebugChar;
-			generic_getDebugChar = rs_getDebugChar;
-		} else {
-			saa9730_kgdb_hook();
-			generic_putDebugChar = saa9730_putDebugChar;
-			generic_getDebugChar = saa9730_getDebugChar;
-		}
-
-		prom_printf("KGDB: Using serial line /dev/ttyS%d for session, "
-			    "please connect your debugger\n", line ? 1 : 0);
-
-		remote_debug = 1;
-		/* Breakpoints and stuff are in atlas_irq_setup() */
-	}
+	kgdb_config();
 #endif
-	argptr = prom_getcmdline();
+	mips_reboot_setup();
 
-	if ((argptr = strstr(argptr, "nofpu")) != NULL)
-		cpu_data[0].options &= ~MIPS_CPU_FPU;
-
-	rtc_ops = &atlas_rtc_ops;
 	board_time_init = mips_time_init;
 	board_timer_setup = mips_timer_setup;
 	rtc_get_time = mips_rtc_get_time;
 
-	mips_reboot_setup();
+	return 0;
+}
+
+early_initcall(atlas_setup);
+
+static void __init serial_init(void)
+{
+#ifdef CONFIG_SERIAL_8250
+	struct uart_port s;
+
+	memset(&s, 0, sizeof(s));
+
+#ifdef CONFIG_CPU_LITTLE_ENDIAN
+	s.iobase = ATLAS_UART_REGS_BASE;
+#else
+	s.iobase = ATLAS_UART_REGS_BASE+3;
+#endif
+	s.irq = ATLASINT_UART;
+	s.uartclk = ATLAS_BASE_BAUD * 16;
+	s.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST | UPF_RESOURCES | ASYNC_AUTO_IRQ;
+	s.iotype = SERIAL_IO_PORT;
+	s.regshift = 3;
+
+	if (early_serial_setup(&s) != 0) {
+		printk(KERN_ERR "Serial setup failed!\n");
+	}
+#endif
 }

@@ -60,20 +60,18 @@ extern int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
  * we don't really have any PMD directory physically.
  */
 #ifdef CONFIG_64BIT_PHYS_ADDR
-#define PTRS_PER_PTE	512
-#define PTRS_PER_PMD	1
-#define PTRS_PER_PGD	2048
 #define PGD_ORDER	1
 #define PMD_ORDER	0
 #define PTE_ORDER	0
 #else
-#define PTRS_PER_PTE	1024
-#define PTRS_PER_PMD	1
-#define PTRS_PER_PGD	1024
 #define PGD_ORDER	0
 #define PMD_ORDER	0
 #define PTE_ORDER	0
 #endif
+
+#define PTRS_PER_PGD	((PAGE_SIZE << PGD_ORDER) / sizeof(pgd_t))
+#define PTRS_PER_PMD	1
+#define PTRS_PER_PTE	((PAGE_SIZE << PTE_ORDER) / sizeof(pte_t))
 
 #define USER_PTRS_PER_PGD	(0x80000000UL/PGDIR_SIZE)
 #define FIRST_USER_PGD_NR	0
@@ -133,8 +131,15 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
 static inline void pgd_clear(pgd_t *pgdp)	{ }
 
 #define pte_page(x)		pfn_to_page(pte_pfn(x))
+
+
+#ifdef CONFIG_CPU_VR41XX
+#define pte_pfn(x)		((unsigned long)((x).pte >> (PAGE_SHIFT + 2)))
+#define pfn_pte(pfn, prot)	__pte(((pfn) << (PAGE_SHIFT + 2)) | pgprot_val(prot))
+#else
 #define pte_pfn(x)		((unsigned long)((x).pte >> PAGE_SHIFT))
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#endif
 
 #if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 
@@ -194,9 +199,6 @@ static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
 	((pte_t *)page_address(pmd_page(*(dir))) + __pte_offset(address))
 #define pte_unmap(pte) ((void)(pte))
 #define pte_unmap_nested(pte) ((void)(pte))
-
-extern pgd_t swapper_pg_dir[1024];
-extern void paging_init(void);
 
 /* Swap entries must have VALID and GLOBAL bits cleared. */
 #if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)

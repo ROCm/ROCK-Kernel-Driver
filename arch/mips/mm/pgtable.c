@@ -4,6 +4,7 @@
 
 void show_mem(void)
 {
+#ifndef CONFIG_DISCONTIGMEM  /* XXX(hch): later.. */
 	int pfn, total = 0, reserved = 0;
 	int shared = 0, cached = 0;
 	int highmem = 0;
@@ -30,4 +31,5 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
+#endif
 }

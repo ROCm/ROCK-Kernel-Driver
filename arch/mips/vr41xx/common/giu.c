@@ -34,20 +34,23 @@
  * Changes:
  *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
  *  - New creation, NEC VR4111, VR4121, VR4122 and VR4131 are supported.
+ *
+ *  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  - Added support for NEC VR4133.
  */
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
+#include <linux/smp.h>
 #include <linux/types.h>
 
-#include <asm/addrspace.h>
 #include <asm/cpu.h>
 #include <asm/io.h>
 #include <asm/vr41xx/vr41xx.h>
 
-#define VR4111_GIUIOSELL	KSEG1ADDR(0x0b000100)
-#define VR4122_GIUIOSELL	KSEG1ADDR(0x0f000140)
+#define GIUIOSELL_TYPE1	KSEG1ADDR(0x0b000100)
+#define GIUIOSELL_TYPE2	KSEG1ADDR(0x0f000140)
 
 #define GIUIOSELL	0x00
 #define GIUIOSELH	0x02
@@ -61,15 +64,19 @@
 #define GIUINTALSELH	0x16
 #define GIUINTHTSELL	0x18
 #define GIUINTHTSELH	0x1a
+#define GIUFEDGEINHL	0x20
+#define GIUFEDGEINHH	0x22
+#define GIUREDGEINHL	0x24
+#define GIUREDGEINHH	0x26
 
-u32 vr41xx_giu_base = 0;
+static uint32_t giu_base;
 
-#define read_giuint(offset)		readw(vr41xx_giu_base + (offset))
-#define write_giuint(val, offset)	writew((val), vr41xx_giu_base + (offset))
+#define read_giuint(offset)		readw(giu_base + (offset))
+#define write_giuint(val, offset)	writew((val), giu_base + (offset))
 
-static inline u16 set_giuint(u16 offset, u16 set)
+static inline uint16_t set_giuint(uint8_t offset, uint16_t set)
 {
-	u16 res;
+	uint16_t res;
 
 	res = read_giuint(offset);
 	res |= set;
@@ -78,9 +85,9 @@ static inline u16 set_giuint(u16 offset, u16 set)
 	return res;
 }
 
-static inline u16 clear_giuint(u16 offset, u16 clear)
+static inline uint16_t clear_giuint(uint8_t offset, uint16_t clear)
 {
-	u16 res;
+	uint16_t res;
 
 	res = read_giuint(offset);
 	res &= ~clear;
@@ -92,51 +99,83 @@ static inline u16 clear_giuint(u16 offset, u16 clear)
 void vr41xx_enable_giuint(int pin)
 {
 	if (pin < 16)
-		set_giuint(GIUINTENL, (u16)1 << pin);
+		set_giuint(GIUINTENL, (uint16_t)1 << pin);
 	else
-		set_giuint(GIUINTENH, (u16)1 << (pin - 16));
+		set_giuint(GIUINTENH, (uint16_t)1 << (pin - 16));
 }
 
 void vr41xx_disable_giuint(int pin)
 {
 	if (pin < 16)
-		clear_giuint(GIUINTENL, (u16)1 << pin);
+		clear_giuint(GIUINTENL, (uint16_t)1 << pin);
 	else
-		clear_giuint(GIUINTENH, (u16)1 << (pin - 16));
+		clear_giuint(GIUINTENH, (uint16_t)1 << (pin - 16));
 }
 
 void vr41xx_clear_giuint(int pin)
 {
 	if (pin < 16)
-		write_giuint((u16)1 << pin, GIUINTSTATL);
+		write_giuint((uint16_t)1 << pin, GIUINTSTATL);
 	else
-		write_giuint((u16)1 << (pin - 16), GIUINTSTATH);
+		write_giuint((uint16_t)1 << (pin - 16), GIUINTSTATH);
 }
 
 void vr41xx_set_irq_trigger(int pin, int trigger, int hold)
 {
-	u16 mask;
+	uint16_t mask;
 
 	if (pin < 16) {
-		mask = (u16)1 << pin;
-		if (trigger == TRIGGER_EDGE) {
+		mask = (uint16_t)1 << pin;
+		if (trigger != TRIGGER_LEVEL) {
         		set_giuint(GIUINTTYPL, mask);
 			if (hold == SIGNAL_HOLD)
 				set_giuint(GIUINTHTSELL, mask);
 			else
 				clear_giuint(GIUINTHTSELL, mask);
+			if (current_cpu_data.cputype == CPU_VR4133) {
+				switch (trigger) {
+				case TRIGGER_EDGE_FALLING:
+					set_giuint(GIUFEDGEINHL, mask);
+					clear_giuint(GIUREDGEINHL, mask);
+					break;
+				case TRIGGER_EDGE_RISING:
+					clear_giuint(GIUFEDGEINHL, mask);
+					set_giuint(GIUREDGEINHL, mask);
+					break;
+				default:
+					set_giuint(GIUFEDGEINHL, mask);
+					set_giuint(GIUREDGEINHL, mask);
+					break;
+				}
+			}
 		} else {
 			clear_giuint(GIUINTTYPL, mask);
 			clear_giuint(GIUINTHTSELL, mask);
 		}
 	} else {
-		mask = (u16)1 << (pin - 16);
-		if (trigger == TRIGGER_EDGE) {
+		mask = (uint16_t)1 << (pin - 16);
+		if (trigger != TRIGGER_LEVEL) {
 			set_giuint(GIUINTTYPH, mask);
 			if (hold == SIGNAL_HOLD)
 				set_giuint(GIUINTHTSELH, mask);
 			else
 				clear_giuint(GIUINTHTSELH, mask);
+			if (current_cpu_data.cputype == CPU_VR4133) {
+				switch (trigger) {
+				case TRIGGER_EDGE_FALLING:
+					set_giuint(GIUFEDGEINHH, mask);
+					clear_giuint(GIUREDGEINHH, mask);
+					break;
+				case TRIGGER_EDGE_RISING:
+					clear_giuint(GIUFEDGEINHH, mask);
+					set_giuint(GIUREDGEINHH, mask);
+					break;
+				default:
+					set_giuint(GIUFEDGEINHH, mask);
+					set_giuint(GIUREDGEINHH, mask);
+					break;
+				}
+			}
 		} else {
 			clear_giuint(GIUINTTYPH, mask);
 			clear_giuint(GIUINTHTSELH, mask);
@@ -148,16 +187,16 @@ void vr41xx_set_irq_trigger(int pin, int trigger, int hold)
 
 void vr41xx_set_irq_level(int pin, int level)
 {
-	u16 mask;
+	uint16_t mask;
 
 	if (pin < 16) {
-		mask = (u16)1 << pin;
+		mask = (uint16_t)1 << pin;
 		if (level == LEVEL_HIGH)
 			set_giuint(GIUINTALSELL, mask);
 		else
 			clear_giuint(GIUINTALSELL, mask);
 	} else {
-		mask = (u16)1 << (pin - 16);
+		mask = (uint16_t)1 << (pin - 16);
 		if (level == LEVEL_HIGH)
 			set_giuint(GIUINTALSELH, mask);
 		else
@@ -198,7 +237,7 @@ int vr41xx_cascade_irq(unsigned int irq, int (*get_irq_number)(int irq))
 	if(!get_irq_number)
 		return -EINVAL;
 
-	pin = irq - GIU_IRQ(0);
+	pin = GIU_IRQ_TO_PIN(irq);
 	giuint_cascade[pin].flag = GIUINT_CASCADE;
 	giuint_cascade[pin].get_irq_number = get_irq_number;
 
@@ -219,7 +258,7 @@ unsigned int giuint_do_IRQ(int pin, struct pt_regs *regs)
 
 	disable_irq(GIUINT_CASCADE_IRQ);
 	cascade = &giuint_cascade[pin];
-	giuint_irq = pin + GIU_IRQ(0);
+	giuint_irq = GIU_IRQ(pin);
 	if (cascade->flag == GIUINT_CASCADE) {
 		cascade_irq = cascade->get_irq_number(giuint_irq);
 		disable_irq(giuint_irq);
@@ -242,11 +281,12 @@ void __init vr41xx_giuint_init(void)
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
 	case CPU_VR4121:
-		vr41xx_giu_base = VR4111_GIUIOSELL;
+		giu_base = GIUIOSELL_TYPE1;
 		break;
 	case CPU_VR4122:
 	case CPU_VR4131:
-		vr41xx_giu_base = VR4122_GIUIOSELL;
+	case CPU_VR4133:
+		giu_base = GIUIOSELL_TYPE2;
 		break;
 	default:
 		panic("GIU: Unexpected CPU of NEC VR4100 series");

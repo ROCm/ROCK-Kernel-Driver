@@ -35,12 +35,9 @@ typedef u64	nic_t;
 #define CNODE_NUM_CPUS(_cnode)		(NODEPDA(_cnode)->node_num_cpus)
 
 #define CNODE_TO_CPU_BASE(_cnode)	(NODEPDA(_cnode)->node_first_cpu)
-#define cputocnode(cpu)				\
-               (cpu_data[(cpu)].p_nodeid)
-#define cputonasid(cpu)				\
-               (cpu_data[(cpu)].p_nasid)
-#define cputoslice(cpu)				\
-               (cpu_data[(cpu)].p_slice)
+#define cputocnode(cpu)			(cpu_data[(cpu)].p_nodeid)
+#define cputonasid(cpu)			(cpu_data[(cpu)].p_nasid)
+#define cputoslice(cpu)			(cpu_data[(cpu)].p_slice)
 #define makespnum(_nasid, _slice)					\
 		(((_nasid) << CPUS_PER_NODE_SHFT) | (_slice))
 
@@ -99,8 +96,6 @@ nasid_t compact_to_nasid_nodeid(cnodeid_t cnode);
 #define COMPACT_TO_NASID_NODEID(cnode)	compact_to_nasid_nodeid(cnode)
 #define CPUID_TO_COMPACT_NODEID(cpu)	(cpuid_to_compact_node[(cpu)])
 #endif
-
-extern int node_getlastslot(cnodeid_t);
 
 #endif /* !__ASSEMBLY__ */
 

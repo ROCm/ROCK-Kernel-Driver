@@ -80,7 +80,7 @@ static unsigned int mips_cpu_irq_startup(unsigned int irq)
 static void mips_cpu_irq_ack(unsigned int irq)
 {
 	/* Only necessary for soft interrupts */
-	clear_c0_cause(1 << (irq - mips_cpu_irq_base + 8));
+	clear_c0_cause(0x100 << (irq - mips_cpu_irq_base));
 
 	mask_mips_irq(irq);
 }
@@ -101,6 +101,7 @@ static hw_irq_controller mips_cpu_irq_controller = {
 	mips_cpu_irq_end,
 	NULL			/* no affinity stuff for UP */
 };
+
 
 void __init mips_cpu_irq_init(int irq_base)
 {

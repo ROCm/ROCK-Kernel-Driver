@@ -4,7 +4,7 @@
  */
 
 #include <linux/types.h>
-#include <asm/galileo-boards/ev96100.h>
+#include <asm/gt64120.h>
 
 
 //#define SERIAL_BASE    EV96100_UART0_REGS_BASE
@@ -22,123 +22,117 @@
 #undef SLOW_DOWN
 
 static const char digits[16] = "0123456789abcdef";
-static volatile unsigned char * const com1 = (unsigned char *)SERIAL_BASE;
+static volatile unsigned char *const com1 = (unsigned char *) SERIAL_BASE;
 
 
 #ifdef SLOW_DOWN
 static inline void slow_down()
 {
-    int k;
-    for (k=0; k<10000; k++);
+	int k;
+	for (k = 0; k < 10000; k++);
 }
 #else
 #define slow_down()
 #endif
 
-void
-putch(const unsigned char c)
+void putch(const unsigned char c)
 {
-    unsigned char ch;
-    int i = 0;
+	unsigned char ch;
+	int i = 0;
 
-    do {
-        ch = com1[SERB_CMD];
-        slow_down();
-        i++;
-        if (i>TIMEOUT) {
-            break;
-        }
-    } while (0 == (ch & TX_BUSY));
-    com1[SERB_DATA] = c;
+	do {
+		ch = com1[SERB_CMD];
+		slow_down();
+		i++;
+		if (i > TIMEOUT) {
+			break;
+		}
+	} while (0 == (ch & TX_BUSY));
+	com1[SERB_DATA] = c;
 }
 
-void
-putchar(const unsigned char c)
+void putchar(const unsigned char c)
 {
-    unsigned char ch;
-    int i = 0;
+	unsigned char ch;
+	int i = 0;
 
-    do {
-        ch = com1[SERB_CMD];
-        slow_down();
-        i++;
-        if (i>TIMEOUT) {
-            break;
-        }
-    } while (0 == (ch & TX_BUSY));
-    com1[SERB_DATA] = c;
+	do {
+		ch = com1[SERB_CMD];
+		slow_down();
+		i++;
+		if (i > TIMEOUT) {
+			break;
+		}
+	} while (0 == (ch & TX_BUSY));
+	com1[SERB_DATA] = c;
 }
 
-void
-puts(unsigned char *cp)
+void puts(unsigned char *cp)
 {
-    unsigned char ch;
-    int i = 0;
+	unsigned char ch;
+	int i = 0;
 
-    while (*cp) {
-        do {
-             ch = com1[SERB_CMD];
-            slow_down();
-            i++;
-            if (i>TIMEOUT) {
-                break;
-            }
-        } while (0 == (ch & TX_BUSY));
-        com1[SERB_DATA] = *cp++;
-    }
-    putch('\r');
-    putch('\n');
+	while (*cp) {
+		do {
+			ch = com1[SERB_CMD];
+			slow_down();
+			i++;
+			if (i > TIMEOUT) {
+				break;
+			}
+		} while (0 == (ch & TX_BUSY));
+		com1[SERB_DATA] = *cp++;
+	}
+	putch('\r');
+	putch('\n');
 }
 
-void
-fputs(unsigned char *cp)
+void fputs(unsigned char *cp)
 {
-    unsigned char ch;
-    int i = 0;
+	unsigned char ch;
+	int i = 0;
 
-    while (*cp) {
+	while (*cp) {
 
-        do {
-             ch = com1[SERB_CMD];
-             slow_down();
-            i++;
-            if (i>TIMEOUT) {
-                break;
-            }
-        } while (0 == (ch & TX_BUSY));
-        com1[SERB_DATA] = *cp++;
-    }
+		do {
+			ch = com1[SERB_CMD];
+			slow_down();
+			i++;
+			if (i > TIMEOUT) {
+				break;
+			}
+		} while (0 == (ch & TX_BUSY));
+		com1[SERB_DATA] = *cp++;
+	}
 }
 
 
-void
-put64(uint64_t ul)
+void put64(uint64_t ul)
 {
-    int cnt;
-    unsigned ch;
+	int cnt;
+	unsigned ch;
 
-    cnt = 16;            /* 16 nibbles in a 64 bit long */
-    putch('0');
-    putch('x');
-    do {
-        cnt--;
-        ch = (unsigned char)(ul >> cnt * 4) & 0x0F;
-                putch(digits[ch]);
-    } while (cnt > 0);
+	cnt = 16;		/* 16 nibbles in a 64 bit long */
+	putch('0');
+	putch('x');
+	do {
+		cnt--;
+		ch = (unsigned char) (ul >> cnt * 4) & 0x0F;
+		putch(digits[ch]);
+	} while (cnt > 0);
 }
 
-void
-put32(unsigned u)
+void put32(unsigned u)
 {
-    int cnt;
-    unsigned ch;
+	int cnt;
+	unsigned ch;
 
-    cnt = 8;            /* 8 nibbles in a 32 bit long */
-    putch('0');
-    putch('x');
-    do {
-        cnt--;
-        ch = (unsigned char)(u >> cnt * 4) & 0x0F;
-                putch(digits[ch]);
-    } while (cnt > 0);
+	cnt = 8;		/* 8 nibbles in a 32 bit long */
+	putch('0');
+	putch('x');
+	do {
+		cnt--;
+		ch = (unsigned char) (u >> cnt * 4) & 0x0F;
+		putch(digits[ch]);
+	} while (cnt > 0);
 }

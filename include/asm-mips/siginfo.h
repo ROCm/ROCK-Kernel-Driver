@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1998, 1999, 2001 Ralf Baechle
+ * Copyright (C) 1998, 1999, 2001, 2003 Ralf Baechle
  * Copyright (C) 2000, 2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SIGINFO_H
@@ -11,11 +11,11 @@
 
 #include <linux/config.h>
 
-#define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 4)
+#define SIGEV_HEAD_SIZE	(sizeof(long) + 2*sizeof(int))
+#define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE-SIGEV_HEAD_SIZE) / sizeof(int))
 #define SI_PAD_SIZE	((SI_MAX_SIZE/sizeof(int)) - 4)
 
 #define HAVE_ARCH_SIGINFO_T
-#define HAVE_ARCH_SIGEVENT_T
 
 /*
  * We duplicate the generic versions - <asm-generic/siginfo.h> is just borked
@@ -176,38 +176,6 @@ typedef struct siginfo32 {
 #define SI_ASYNCIO	-2	/* sent by AIO completion */
 #define SI_TIMER __SI_CODE(__SI_TIMER,-3) /* sent by timer expiration */
 #define SI_MESGQ	-4	/* sent by real time mesq state change */
-
-/*
- * sigevent definitions
- *
- * It seems likely that SIGEV_THREAD will have to be handled from
- * userspace, libpthread transmuting it to SIGEV_SIGNAL, which the
- * thread manager then catches and does the appropriate nonsense.
- * However, everything is written out here so as to not get lost.
- */
-#undef SIGEV_NONE
-#undef SIGEV_SIGNAL
-#undef SIGEV_THREAD
-#define SIGEV_NONE	128	/* other notification: meaningless */
-#define SIGEV_SIGNAL	129	/* notify via signal */
-#define SIGEV_CALLBACK	130	/* ??? */
-#define SIGEV_THREAD	131	/* deliver via thread creation */
-
-/* XXX This one isn't yet IRIX / ABI compatible.  */
-typedef struct sigevent {
-	int	sigev_notify;
-	sigval_t	sigev_value;
-	int	sigev_signo;
-	union {
-		int	_pad[SIGEV_PAD_SIZE];
-		int	_tid;
-
-		struct {
-			void	(*_function)(sigval_t);
-			void	*_attribute;	/* really pthread_attr_t */
-		} _sigev_thread;
-	} _sigev_un;
-} sigevent_t;
 
 #ifdef __KERNEL__
 

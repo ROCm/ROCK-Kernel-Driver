@@ -15,7 +15,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/reboot.h>
 #include <linux/string.h>
@@ -23,7 +23,6 @@
 #include <asm/bootinfo.h>
 #include <asm/mipsregs.h>
 #include <asm/io.h>
-#include <asm/system.h>
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_scd.h>
@@ -154,7 +153,7 @@ void sb1250_setup(void)
 	int bad_config = 0;
 
 	sb1_pass = read_c0_prid() & 0xff;
-	sys_rev = __raw_readq(IO_SPACE_BASE | A_SCD_SYSTEM_REVISION);
+	sys_rev = __raw_readq(IOADDR(A_SCD_SYSTEM_REVISION));
 	soc_type = SYS_SOC_TYPE(sys_rev);
 	soc_pass = G_SYS_REVISION(sys_rev);
 
@@ -163,11 +162,8 @@ void sb1250_setup(void)
 		machine_restart(NULL);
 	}
 
-	plldiv = G_SYS_PLL_DIV(__raw_readq(IO_SPACE_BASE | A_SCD_SYSTEM_CFG));
+	plldiv = G_SYS_PLL_DIV(__raw_readq(IOADDR(A_SCD_SYSTEM_CFG)));
 	zbbus_mhz = ((plldiv >> 1) * 50) + ((plldiv & 1) * 25);
-#ifndef CONFIG_SB1_PASS_1_WORKAROUNDS
-	__raw_writeq(0, KSEG1 + A_SCD_ZBBUS_CYCLE_COUNT);
-#endif
 
 	prom_printf("Broadcom SiByte %s %s @ %d MHz (SB1 rev %d)\n",
 		    soc_str, pass_str, zbbus_mhz * 2, sb1_pass);

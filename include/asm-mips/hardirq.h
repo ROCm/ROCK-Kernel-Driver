@@ -80,6 +80,7 @@ typedef struct {
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
 #ifdef CONFIG_PREEMPT
+# include <linux/smp_lock.h>
 # define in_atomic()	(preempt_count() != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else

@@ -8,7 +8,6 @@
 #ifndef _ASM_ASMMACRO_64_H
 #define _ASM_ASMMACRO_64_H
 
-#include <linux/config.h>
 #include <asm/offset.h>
 #include <asm/regdef.h>
 #include <asm/fpregdef.h>

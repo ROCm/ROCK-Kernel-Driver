@@ -324,9 +324,10 @@ static int vidc_audio_prepare_for_input(int dev, int bsize, int bcount)
 	return -EINVAL;
 }
 
-static void vidc_audio_dma_interrupt(void)
+static irqreturn_t vidc_audio_dma_interrupt(void)
 {
 	DMAbuf_outputintr(vidc_adev, 1);
+	return IRQ_HANDLED;
 }
 
 /*

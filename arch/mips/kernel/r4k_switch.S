@@ -18,14 +18,11 @@
 #include <asm/offset.h>
 #include <asm/page.h>
 #include <asm/pgtable-bits.h>
-#include <asm/processor.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
 #include <asm/thread_info.h>
 
 #include <asm/asmmacro.h>
-
-	.set	mips3
 
 /*
  * Offset to the current process status flags, the first 32 bytes of the
@@ -196,7 +193,42 @@ LEAF(_init_fpu)
 	dmtc1	t1, $f31
 1:
 #endif
-
+	
+#ifdef CONFIG_CPU_MIPS32
+	mtc1	t1, $f0
+	mtc1	t1, $f1
+	mtc1	t1, $f2
+	mtc1	t1, $f3
+	mtc1	t1, $f4
+	mtc1	t1, $f5
+	mtc1	t1, $f6
+	mtc1	t1, $f7
+	mtc1	t1, $f8
+	mtc1	t1, $f9
+	mtc1	t1, $f10
+	mtc1	t1, $f11
+	mtc1	t1, $f12
+	mtc1	t1, $f13
+	mtc1	t1, $f14
+	mtc1	t1, $f15
+	mtc1	t1, $f16
+	mtc1	t1, $f17
+	mtc1	t1, $f18
+	mtc1	t1, $f19
+	mtc1	t1, $f20
+	mtc1	t1, $f21
+	mtc1	t1, $f22
+	mtc1	t1, $f23
+	mtc1	t1, $f24
+	mtc1	t1, $f25
+	mtc1	t1, $f26
+	mtc1	t1, $f27
+	mtc1	t1, $f28
+	mtc1	t1, $f29
+	mtc1	t1, $f30
+	mtc1	t1, $f31
+#else
+	.set	mips3
 	dmtc1	t1, $f0
 	dmtc1	t1, $f2
 	dmtc1	t1, $f4
@@ -213,5 +245,6 @@ LEAF(_init_fpu)
 	dmtc1	t1, $f26
 	dmtc1	t1, $f28
 	dmtc1	t1, $f30
+#endif
 	jr	ra
 	END(_init_fpu)

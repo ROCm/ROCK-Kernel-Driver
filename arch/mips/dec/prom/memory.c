@@ -93,7 +93,7 @@ void __init prom_meminit(u32 magic)
 		rex_setup_memory_region();
 }
 
-void __init prom_free_prom_memory (void)
+unsigned long __init prom_free_prom_memory(void)
 {
 	unsigned long addr, end;
 
@@ -125,4 +125,6 @@ void __init prom_free_prom_memory (void)
 
 	printk("Freeing unused PROM memory: %ldk freed\n",
 	       (end - PAGE_SIZE) >> 10);
+
+	return end - PAGE_SIZE;
 }
