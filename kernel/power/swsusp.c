@@ -878,6 +878,7 @@ int swsusp_resume(void)
 {
 	int error;
 	local_irq_disable();
+	device_power_down(PM_SUSPEND_DISK);
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
 	error = swsusp_arch_resume();
@@ -887,6 +888,7 @@ int swsusp_resume(void)
 	BUG_ON(!error);
 	restore_processor_state();
 	restore_highmem();
+	device_power_up();
 	local_irq_enable();
 	return error;
 }
