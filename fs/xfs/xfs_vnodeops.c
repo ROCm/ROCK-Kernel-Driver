@@ -823,10 +823,14 @@ xfs_setattr(
 				mp->m_sb.sb_blocklog;
 		}
 		if (mask & XFS_AT_XFLAGS) {
-			ip->i_d.di_flags = 0;
+			/* can't set PREALLOC this way, just preserve it */
+			ip->i_d.di_flags =
+				(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
 			if (vap->va_xflags & XFS_XFLAG_REALTIME) {
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
 				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
+			} else {
+				ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
 			}
 			if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
 				ip->i_d.di_flags |= XFS_DIFLAG_IMMUTABLE;
@@ -838,7 +842,6 @@ xfs_setattr(
 				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
 				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
-			/* can't set PREALLOC this way, just ignore it */
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
