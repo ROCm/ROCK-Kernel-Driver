@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/device.h>
+#include <linux/slab.h>
 
 #ifdef CONFIG_CPU_FREQ_PROC_INTF
 #include <linux/ctype.h>
