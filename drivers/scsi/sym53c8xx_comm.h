@@ -502,36 +502,6 @@ static int __map_scsi_sg_data(struct device *dev, struct scsi_cmnd *cmd)
 	return use_sg;
 }
 
-static void __sync_scsi_data_for_cpu(struct device *dev, struct scsi_cmnd *cmd)
-{
-	switch(cmd->__data_mapped) {
-	case 2:
-		dma_sync_sg_for_cpu(dev, cmd->buffer, cmd->use_sg,
-				cmd->sc_data_direction);
-		break;
-	case 1:
-		dma_sync_single_for_cpu(dev, cmd->__data_mapping,
-					cmd->request_bufflen,
-					cmd->sc_data_direction);
-		break;
-	}
-}
-
-static void __sync_scsi_data_for_device(struct device *dev, struct scsi_cmnd *cmd)
-{
-	switch(cmd->__data_mapped) {
-	case 2:
-		dma_sync_sg_for_device(dev, cmd->buffer, cmd->use_sg,
-				cmd->sc_data_direction);
-		break;
-	case 1:
-		dma_sync_single_for_device(dev, cmd->__data_mapping,
-					   cmd->request_bufflen,
-					   cmd->sc_data_direction);
-		break;
-	}
-}
-
 #define unmap_scsi_data(np, cmd)	__unmap_scsi_data(np->dev, cmd)
 #define map_scsi_single_data(np, cmd)	__map_scsi_single_data(np->dev, cmd)
 #define map_scsi_sg_data(np, cmd)	__map_scsi_sg_data(np->dev, cmd)
