@@ -2857,7 +2857,7 @@ static struct xfrm_mgr pfkeyv2_mgr =
 static void __exit ipsec_pfkey_exit(void)
 {
 	xfrm_unregister_km(&pfkeyv2_mgr);
-	remove_proc_entry("net/pfkey", 0);
+	remove_proc_entry("net/pfkey", NULL);
 	sock_unregister(PF_KEY);
 }
 
@@ -2865,7 +2865,7 @@ static int __init ipsec_pfkey_init(void)
 {
 	sock_register(&pfkey_family_ops);
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry("net/pfkey", 0, 0, pfkey_read_proc, NULL);
+	create_proc_read_entry("net/pfkey", 0, NULL, pfkey_read_proc, NULL);
 #endif
 	xfrm_register_km(&pfkeyv2_mgr);
 	return 0;

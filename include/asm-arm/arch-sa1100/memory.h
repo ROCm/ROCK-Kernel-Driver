@@ -8,11 +8,35 @@
 #define __ASM_ARCH_MEMORY_H
 
 #include <linux/config.h>
+#include <asm/sizes.h>
 
 /*
  * Physical DRAM offset is 0xc0000000 on the SA1100
  */
 #define PHYS_OFFSET	(0xc0000000UL)
+
+#ifndef __ASSEMBLY__
+
+#ifdef CONFIG_SA1111
+static inline void
+__arch_adjust_zones(int node, unsigned long *size, unsigned long *holes)
+{
+	unsigned int sz = SZ_1M >> PAGE_SHIFT;
+
+	if (node != 0)
+		sz = 0;
+
+	size[1] = size[0] - sz;
+	size[0] = sz;
+}
+
+#define arch_adjust_zones(node, size, holes) \
+	__arch_adjust_zones(node, size, holes)
+
+#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_1M - 1)
+
+#endif
+#endif
 
 /*
  * Virtual view <-> DMA view memory address translations

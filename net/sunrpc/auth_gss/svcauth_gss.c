@@ -763,7 +763,7 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 	if (!svcdata)
 		goto auth_err;
 	rqstp->rq_auth_data = svcdata;
-	svcdata->body_start = 0;
+	svcdata->body_start = NULL;
 	svcdata->rsci = NULL;
 	gc = &svcdata->clcred;
 
@@ -970,7 +970,7 @@ svcauth_gss_release(struct svc_rqst *rqstp)
 		break;
 	case RPC_GSS_SVC_INTEGRITY:
 		p = gsd->body_start;
-		gsd->body_start = 0;
+		gsd->body_start = NULL;
 		/* move accept_stat to right place: */
 		memcpy(p, p + 2, 4);
 		/* don't wrap in failure case: */

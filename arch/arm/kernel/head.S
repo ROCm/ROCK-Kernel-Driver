@@ -17,7 +17,6 @@
 #include <asm/mach-types.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
-#include <asm/mach/arch.h>
 
 /*
  * We place the page tables 16K below TEXTADDR.  Therefore, we must make sure
