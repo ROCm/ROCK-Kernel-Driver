@@ -130,7 +130,7 @@ module_param(action, int, 0);
 MODULE_PARM_DESC(action, "after watchdog resets, generate: 0 = RESET(*)  1 = SMI  2 = NMI  3 = SCI");
 
 static int zf_action = GEN_RESET;
-static int zf_is_open = 0;
+static unsigned long zf_is_open;
 static char zf_expect_close;
 static spinlock_t zf_lock;
 static spinlock_t zf_port_lock;
@@ -359,9 +359,7 @@ static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 	  
 		case WDIOC_GETSTATUS:
-			if (copy_to_user((int *)arg, &zf_is_open, sizeof(int)))
-				return -EFAULT;
-			break;
+			return put_user(0, (int *) arg);
 
 		case WDIOC_KEEPALIVE:
 			zf_ping(0);
@@ -377,15 +375,13 @@ static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int zf_open(struct inode *inode, struct file *file)
 {
 	spin_lock(&zf_lock);
-	if(zf_is_open){
+	if(test_and_set_bit(0, &zf_is_open)) {
 		spin_unlock(&zf_lock);
 		return -EBUSY;
 	}
 
 	if (nowayout)
 		__module_get(THIS_MODULE);
-
-	zf_is_open = 1;
 
 	spin_unlock(&zf_lock);
 
@@ -404,7 +400,7 @@ static int zf_close(struct inode *inode, struct file *file)
 	}
 		
 	spin_lock(&zf_lock);
-	zf_is_open = 0;
+	clear_bit(0, &zf_is_open);
 	spin_unlock(&zf_lock);
 
 	zf_expect_close = 0;

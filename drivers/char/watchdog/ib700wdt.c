@@ -48,7 +48,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-static int ibwdt_is_open;
+static unsigned long ibwdt_is_open;
 static spinlock_t ibwdt_lock;
 static char expect_close;
 
@@ -184,9 +184,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  break;
 
 	case WDIOC_GETSTATUS:
-	  if (copy_to_user((int *)arg, &ibwdt_is_open,  sizeof(int)))
-	    return -EFAULT;
-	  break;
+	  return put_user(0, (int *) arg);
 
 	case WDIOC_KEEPALIVE:
 	  ibwdt_ping();
@@ -218,7 +216,7 @@ static int
 ibwdt_open(struct inode *inode, struct file *file)
 {
 	spin_lock(&ibwdt_lock);
-	if (ibwdt_is_open) {
+	if (test_and_set_bit(0, &ibwdt_is_open)) {
 		spin_unlock(&ibwdt_lock);
 		return -EBUSY;
 	}
@@ -226,7 +224,6 @@ ibwdt_open(struct inode *inode, struct file *file)
 		__module_get(THIS_MODULE);
 
 	/* Activate */
-	ibwdt_is_open = 1;
 	ibwdt_ping();
 	spin_unlock(&ibwdt_lock);
 	return 0;
@@ -241,7 +238,7 @@ ibwdt_close(struct inode *inode, struct file *file)
 	else
 		printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 
-	ibwdt_is_open = 0;
+	clear_bit(0, &ibwdt_is_open);
 	expect_close = 0;
 	spin_unlock(&ibwdt_lock);
 	return 0;
