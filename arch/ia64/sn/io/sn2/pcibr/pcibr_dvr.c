@@ -2085,8 +2085,8 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 		bridge->b_wid_tflush;   /* wait until Bridge PIO complete */
 #ifdef PCI_LATER
 		PCIBR_DEBUG((PCIBR_DEBUG_DEVREG, pconn_vhdl, 
-			    "pcibr_addr_pci_to_xio: Device(%d): %x\n",
-			    win, devreg, device_bits));
+			    "pcibr_addr_pci_to_xio: Device(%d): 0x%x\n",
+			    win, devreg));
 #endif
 	    }
 	    pcibr_soft->bs_slot[win].bss_devio.bssd_space = space;
@@ -2161,9 +2161,9 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	} else if (IS_PIC_BUSNUM_SOFT(pcibr_soft, 1)) {	/* PIC bus 1 */
 		base = PICBRIDGE1_PCI_MEM32_BASE;
 		limit = PICBRIDGE1_PCI_MEM32_LIMIT;
-	} else {					/* Bridge/Xbridge */
-		base = BRIDGE_PCI_MEM32_BASE;
-		limit = BRIDGE_PCI_MEM32_LIMIT;
+	} else {
+		printk("pcibr_addr_pci_to_xio(): unknown bridge type");
+		return (iopaddr_t)0;
 	}
 
 	if ((pci_addr + base + req_size - 1) <= limit)
@@ -2177,9 +2177,9 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	} else if (IS_PIC_BUSNUM_SOFT(pcibr_soft, 1)) {	/* PIC bus 1 */
 		base = PICBRIDGE1_PCI_MEM64_BASE;
 		limit = PICBRIDGE1_PCI_MEM64_LIMIT;
-	} else {					/* Bridge/Xbridge */
-		base = BRIDGE_PCI_MEM64_BASE;
-		limit = BRIDGE_PCI_MEM64_LIMIT;
+	} else {
+		printk("pcibr_addr_pci_to_xio(): unknown bridge type");
+		return (iopaddr_t)0;
 	}
 
 	if ((pci_addr + base + req_size - 1) <= limit)
@@ -2554,6 +2554,7 @@ pcibr_piospace_free(vertex_hdl_t pconn_vhdl,
 		    size_t req_size)
 {
     pcibr_info_t            pcibr_info = pcibr_info_get(pconn_vhdl);
+    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pcibr_info->f_mfast;
     pciio_piospace_t        piosp;
     unsigned long           s;
     char                    name[1024];

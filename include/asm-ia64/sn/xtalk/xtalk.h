@@ -234,6 +234,8 @@ xtalk_widgetdev_enable_f (vertex_hdl_t, int);
 typedef void
 xtalk_widgetdev_shutdown_f (vertex_hdl_t, int);
 
+/* Error Management */
+
 /* Early Action Support */
 typedef caddr_t
 xtalk_early_piotrans_addr_f (xwidget_part_num_t part_num,
@@ -276,8 +278,6 @@ typedef struct xtalk_provider_s {
     /* CONFIGURATION MANAGEMENT */
     xtalk_provider_startup_f *provider_startup;
     xtalk_provider_shutdown_f *provider_shutdown;
-
-    /* Error Management     */
 } xtalk_provider_t;
 
 /* Crosstalk devices use these standard Crosstalk provider interfaces */

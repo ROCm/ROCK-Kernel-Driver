@@ -254,12 +254,6 @@ print_register(unsigned long long reg, struct reg_desc *addr)
 	printk(">\n");
 }
 
-#define BEM_ADD_STR(s)  printk("%s", (s))
-#define BEM_ADD_VAR(v)  printk("\t%20s: 0x%llx\n", #v, ((unsigned long long)v))
-#define BEM_ADD_REG(r)  printk("\t%20s: ", #r); print_register((r), r ## _desc)
-#define BEM_ADD_NSPC(n,s)       printk("\t%20s: ", n); print_register(s, space_desc)
-#define BEM_ADD_SPC(s)          BEM_ADD_NSPC(#s, s)
-
 
 /*
  * display memory directory state

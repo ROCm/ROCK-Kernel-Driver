@@ -351,19 +351,6 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		     */
 		    xtalk_intr_free(xtalk_intr);
 		    xtalk_intr = *xtalk_intr_p;
-#if PARANOID
-		    /* once xtalk_intr is set, we never clear it,
-		     * so if the CAS fails above, this condition
-		     * can "never happen" ...
-		     */
-		    if (!xtalk_intr) {
-			printk(KERN_ALERT  
-				"pcibr_intr_alloc %v: unable to set xtalk interrupt resources",
-				xconn_vhdl);
-			/* yes, we leak resources here. */
-			return 0;
-		    }
-#endif
 		}
 	    }
 
@@ -648,9 +635,6 @@ pcibr_intr_disconnect(pcibr_intr_t pcibr_intr)
     if (!pcibr_int_bits)
 	return;
 
-    /* PIC WAR. PV# 854697
-     * On PIC we must write 64-bit MMRs with 64-bit stores
-     */
     s = pcibr_lock(pcibr_soft);
     if (PCIBR_WAR_ENABLED(PV854697, pcibr_soft)) {
 	int_enable = bridge->p_int_enable_64;
@@ -904,26 +888,27 @@ pcibr_intr_func(intr_arg_t arg)
 	    for (list = wrap->iw_list; list != NULL; list = list->il_next) {
 		if ((intr = list->il_intr) && (intr->bi_flags & PCIIO_INTR_CONNECTED)) {
 
-		    /*
-		     * This device may have initiated write
-		     * requests since the bridge last saw
-		     * an edge on this interrupt input; flushing
-		     * the buffer prior to invoking the handler
-		     * should help but may not be sufficient if we 
-		     * get more requests after the flush, followed
-		     * by the card deciding it wants service, before
-		     * the interrupt handler checks to see if things need
-		     * to be done.
-		     *
-		     * There is a similar race condition if
-		     * an interrupt handler loops around and
-		     * notices further service is required.
-		     * Perhaps we need to have an explicit
-		     * call that interrupt handlers need to
-		     * do between noticing that DMA to memory
-		     * has completed, but before observing the
-		     * contents of memory?
-		     */
+
+		/*
+		 * This device may have initiated write
+		 * requests since the bridge last saw
+		 * an edge on this interrupt input; flushing
+		 * the buffer prior to invoking the handler
+		 * should help but may not be sufficient if we 
+		 * get more requests after the flush, followed
+		 * by the card deciding it wants service, before
+		 * the interrupt handler checks to see if things need
+		 * to be done.
+		 *
+		 * There is a similar race condition if
+		 * an interrupt handler loops around and
+		 * notices further service is requred.
+		 * Perhaps we need to have an explicit
+		 * call that interrupt handlers need to
+		 * do between noticing that DMA to memory
+		 * has completed, but before observing the
+		 * contents of memory?
+		 */
 
 		    if ((do_nonthreaded) && (!is_threaded)) {
 			/* Non-threaded -  Call the interrupt handler at interrupt level */

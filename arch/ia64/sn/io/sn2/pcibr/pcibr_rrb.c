@@ -72,7 +72,7 @@ do_pcibr_rrb_count_valid(bridge_t *bridge,
 			 pciio_slot_t slot,
 			 int vchan)
 {
-    bridgereg_t tmp;
+    uint64_t tmp;
     uint16_t enable_bit, vchan_bits, pdev_bits, rrb_bits;
     int rrb_index, cnt=0;
 
@@ -105,7 +105,7 @@ int
 do_pcibr_rrb_count_avail(bridge_t *bridge,
 			 pciio_slot_t slot)
 {
-    bridgereg_t tmp;
+    uint64_t tmp;
     uint16_t enable_bit;
     int rrb_index, cnt=0;
     
@@ -141,7 +141,7 @@ do_pcibr_rrb_alloc(bridge_t *bridge,
 		   int vchan,
 		   int more)
 {
-    bridgereg_t reg, tmp = (bridgereg_t)0;
+    uint64_t reg, tmp = 0;
     uint16_t enable_bit, vchan_bits, pdev_bits, rrb_bits;
     int rrb_index;
     
@@ -186,7 +186,7 @@ do_pcibr_rrb_free(bridge_t *bridge,
 		  int vchan,
 		  int less)
 {
-    bridgereg_t reg, tmp = (bridgereg_t)0, clr = 0;
+    uint64_t reg, tmp = 0, clr = 0;
     uint16_t enable_bit, vchan_bits, pdev_bits, rrb_bits;
     int rrb_index;
     
@@ -258,7 +258,7 @@ do_pcibr_rrb_free_all(pcibr_soft_t pcibr_soft,
 void
 do_pcibr_rrb_clear(bridge_t *bridge, int rrb)
 {
-    bridgereg_t             status;
+    uint64_t             status;
 
     /* bridge_lock must be held;
      * this RRB must be disabled.
@@ -350,7 +350,7 @@ pcibr_rrb_flush(vertex_hdl_t pconn_vhdl)
     pciio_slot_t  slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
     bridge_t	 *bridge = pcibr_soft->bs_base;
 
-    bridgereg_t tmp;
+    uint64_t tmp;
     uint16_t enable_bit, pdev_bits, rrb_bits, rrb_mask;
     int rrb_index;
     unsigned long s;

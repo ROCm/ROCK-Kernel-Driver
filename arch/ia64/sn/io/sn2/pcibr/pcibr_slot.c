@@ -280,13 +280,9 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
 	     */
 	    if (!(pcix_cap = pcibr_find_capability(cfgw, PCI_CAP_PCIX))) {
 		printk(KERN_WARNING
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-		        "%v: Bus running in PCI-X mode, But card in slot %d, "
-		        "func %d not PCI-X capable\n", pcibr_vhdl, slot, func);
-#else
-		        "0x%lx: Bus running in PCI-X mode, But card in slot %d, "
-		        "func %d not PCI-X capable\n", (unsigned long)pcibr_vhdl, slot, func);
-#endif
+		        "%s: Bus running in PCI-X mode, But card in slot %d, "
+		        "func %d not PCI-X capable\n", 
+			pcibr_soft->bs_name, slot, func);
 		pcibr_device_info_new(pcibr_soft, slot, PCIIO_FUNC_NONE,
 		               PCIIO_VENDOR_ID_NONE, PCIIO_DEVICE_ID_NONE);
 		continue;

@@ -170,13 +170,14 @@ pic_attach(vertex_hdl_t conn_v)
 	bridge1 = (bridge_t *)((char *)bridge0 + PIC_BUS1_OFFSET);
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
-		    "pic_attach: bridge0=0x%x, bridge1=0x%x\n", 
+		    "pic_attach: bridge0=0x%lx, bridge1=0x%lx\n", 
 		    bridge0, bridge1));
 
 	conn_v0 = conn_v1 = conn_v;
 
 	/* If dual-ported then split the two PIC buses across both Cbricks */
-	if ((peer_conn_v = (pic_bus1_redist(NASID_GET(bridge0), conn_v))))
+	peer_conn_v = pic_bus1_redist(NASID_GET(bridge0), conn_v);
+	if (peer_conn_v)
 		conn_v1 = peer_conn_v;
 
 	/*
@@ -204,7 +205,7 @@ pic_attach(vertex_hdl_t conn_v)
 	}
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
-		    "pic_attach: pcibr_vhdl0=%v, pcibr_vhdl1=%v\n",
+		    "pic_attach: pcibr_vhdl0=0x%lx, pcibr_vhdl1=0x%lx\n",
 		    pcibr_vhdl0, pcibr_vhdl1));
 
 	/* register pci provider array */
@@ -222,7 +223,7 @@ pic_attach(vertex_hdl_t conn_v)
         bus1_soft->bs_peers_soft = bus0_soft;
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
-		    "pic_attach: bus0_soft=0x%x, bus1_soft=0x%x\n",
+		    "pic_attach: bus0_soft=0x%lx, bus1_soft=0x%lx\n",
 		    bus0_soft, bus1_soft));
 
 	return 0;
