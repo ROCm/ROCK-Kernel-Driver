@@ -142,10 +142,13 @@ UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
 		"785EPX Storage",
 		US_SC_SCSI, US_PR_BULK, NULL, US_FL_SINGLE_LUN),
 
+/* Not sure who reported this originally but
+ * Pavel Machek <pavel@ucw.cz> reported that the extra US_FL_SINGLE_LUN
+ * flag be added */
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
-		US_SC_UFI, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+		US_SC_UFI, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY | US_FL_SINGLE_LUN),
 
 /* Reported by Peter Wächtler <pwaechtler@loewe-komp.de>
  * The device needs the flags only.
