@@ -193,7 +193,8 @@ static unsigned int task_timeslice(task_t *p)
 	else
 		return SCALE_PRIO(DEF_TIMESLICE, p->static_prio);
 }
-#define task_hot(p, now, sd) ((now) - (p)->timestamp < (sd)->cache_hot_time)
+#define task_hot(p, now, sd) ((long long) ((now) - (p)->timestamp)	\
+				< (long long) (sd)->cache_hot_time)
 
 enum idle_type
 {
@@ -908,7 +909,6 @@ static void activate_task(task_t *p, runqueue_t *rq, int local)
 			p->activated = 1;
 		}
 	}
-	p->timestamp = now;
 
 	__activate_task(p, rq);
 }

@@ -383,7 +383,7 @@ asmlinkage long sys_mbind(unsigned long start, unsigned long len,
 }
 
 /* Set the process memory policy */
-asmlinkage long sys_set_mempolicy(int mode, unsigned long __user *nmask,
+asmlinkage long sys_set_mempolicy(unsigned long mode, unsigned long __user *nmask,
 				   unsigned long maxnode)
 {
 	int err;
