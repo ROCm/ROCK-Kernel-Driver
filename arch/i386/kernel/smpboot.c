@@ -815,6 +815,8 @@ static int __init do_boot_cpu(int apicid)
 	/* Stack for startup_32 can be just as for start_secondary onwards */
 	stack_start.esp = (void *) idle->thread.esp;
 
+	irq_ctx_init(cpu);
+
 	/*
 	 * This grunge runs the startup process for
 	 * the targeted processor.

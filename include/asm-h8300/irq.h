@@ -68,4 +68,8 @@ extern void disable_irq(unsigned int);
 #define enable_irq_nosync(x)	enable_irq(x)
 #define disable_irq_nosync(x)	disable_irq(x)
 
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif /* _H8300_IRQ_H_ */

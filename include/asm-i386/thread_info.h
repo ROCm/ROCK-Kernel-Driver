@@ -9,6 +9,9 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #endif
@@ -29,12 +32,16 @@ struct thread_info {
 	__u32			cpu;		/* current CPU */
 	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
 
+
 	mm_segment_t		addr_limit;	/* thread address space:
 					 	   0-0xBFFFFFFF for user-thead
 						   0-0xFFFFFFFF for kernel-thread
 						*/
 	struct restart_block    restart_block;
 
+	unsigned long           previous_esp;   /* ESP of the previous stack in case
+						   of nested (IRQ) stacks
+						*/
 	__u8			supervisor_stack[0];
 };
 
@@ -53,7 +60,13 @@ struct thread_info {
 #endif
 
 #define PREEMPT_ACTIVE		0x4000000
+#ifdef CONFIG_4KSTACKS
+#define THREAD_SIZE            (4096)
+#else
+#define THREAD_SIZE		(8192)
+#endif
 
+#define STACK_WARN             (THREAD_SIZE/8)
 /*
  * macros/functions for gaining access to the thread information structure
  *
@@ -77,13 +90,20 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
-#define THREAD_SIZE (2*PAGE_SIZE)
 
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {
 	struct thread_info *ti;
 	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~(THREAD_SIZE - 1)));
+	return ti;
+}
+
+/* how to get the current stack pointer from C */
+static inline unsigned long current_stack_pointer(void)
+{
+	unsigned long ti;
+	__asm__("movl %%esp,%0; ":"=r" (ti) : );
 	return ti;
 }
 
@@ -107,8 +127,6 @@ static inline struct thread_info *current_thread_info(void)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
 #else /* !__ASSEMBLY__ */
-
-#define THREAD_SIZE	8192
 
 /* how to get the thread information struct from ASM */
 #define GET_THREAD_INFO(reg) \
