@@ -260,12 +260,17 @@ static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 {
 	int timeout = 200000; /* 200 msec */
 
+	psmouse->nak = 1;
 	set_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
-	if (serio_write(psmouse->serio, byte))
-		return -1;
-	while (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags) && timeout--) udelay(1);
-	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 
+	if (serio_write(psmouse->serio, byte))
+		goto out;
+
+	while (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags) && timeout--)
+		udelay(1);
+
+out:
+	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 	return -psmouse->nak;
 }
 
