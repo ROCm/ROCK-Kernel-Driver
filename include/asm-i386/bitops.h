@@ -239,9 +239,9 @@ static __inline__ int test_and_change_bit(int nr, volatile unsigned long* addr)
 static int test_bit(int nr, const volatile void * addr);
 #endif
 
-static __inline__ int constant_test_bit(int nr, const volatile unsigned long * addr)
+static inline int constant_test_bit(int nr, const volatile unsigned long *addr)
 {
-	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
+	return ((1UL << (nr & 31)) & (addr[nr >> 5])) != 0;
 }
 
 static __inline__ int variable_test_bit(int nr, const volatile unsigned long * addr)
