@@ -464,7 +464,7 @@ int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 		if (np->sndflow)
 			sin->sin6_flowinfo = np->flow_label;
 	} else {
-		if (ipv6_addr_type(&np->rcv_saddr) == IPV6_ADDR_ANY)
+		if (ipv6_addr_any(&np->rcv_saddr))
 			ipv6_addr_copy(&sin->sin6_addr, &np->saddr);
 		else
 			ipv6_addr_copy(&sin->sin6_addr, &np->rcv_saddr);
