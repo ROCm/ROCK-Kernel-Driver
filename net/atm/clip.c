@@ -110,7 +110,8 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 				goto out;
 			entry->expires = jiffies-1;
 				/* force resolution or expiration */
-			error = neigh_update(entry->neigh,NULL,NUD_NONE,0,0);
+			error = neigh_update(entry->neigh, NULL, NUD_NONE,
+					     NEIGH_UPDATE_F_ADMIN);
 			if (error)
 				printk(KERN_CRIT "unlink_clip_vcc: "
 				    "neigh_update failed with %d\n",error);
@@ -570,7 +571,8 @@ static int clip_setentry(struct atm_vcc *vcc,u32 ip)
 		}
 		link_vcc(clip_vcc,entry);
 	}
-	error = neigh_update(neigh,llc_oui,NUD_PERMANENT,1,0);
+	error = neigh_update(neigh, llc_oui, NUD_PERMANENT, 
+			     NEIGH_UPDATE_F_OVERRIDE|NEIGH_UPDATE_F_ADMIN);
 	neigh_release(neigh);
 	return error;
 }

@@ -800,14 +800,16 @@ static __inline__ void neigh_update_hhs(struct neighbour *neigh)
 /* Generic update routine.
    -- lladdr is new lladdr or NULL, if it is not supplied.
    -- new    is new state.
-   -- override == 1 allows to override existing lladdr, if it is different.
-   -- arp == 0 means that the change is administrative.
+   -- flags
+	NEIGH_UPDATE_F_OVERRIDE allows to override existing lladdr,
+				if it is different.
+	NEIGH_UPDATE_F_ADMIN	means that the change is administrative.
 
    Caller MUST hold reference count on the entry.
  */
 
 int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
-		 int override, int arp)
+		 u32 flags)
 {
 	u8 old;
 	int err;
@@ -822,7 +824,8 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	old    = neigh->nud_state;
 	err    = -EPERM;
 
-	if (arp && (old & (NUD_NOARP | NUD_PERMANENT)))
+	if (!(flags & NEIGH_UPDATE_F_ADMIN) && 
+	    (old & (NUD_NOARP | NUD_PERMANENT)))
 		goto out;
 
 	if (!(new & NUD_VALID)) {
@@ -850,7 +853,7 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		if (old & NUD_VALID) {
 			if (!memcmp(lladdr, neigh->ha, dev->addr_len))
 				lladdr = neigh->ha;
-			else if (!override)
+			else if (!(flags & NEIGH_UPDATE_F_OVERRIDE))
 				goto out;
 		}
 	} else {
@@ -928,7 +931,8 @@ struct neighbour *neigh_event_ns(struct neigh_table *tbl,
 	struct neighbour *neigh = __neigh_lookup(tbl, saddr, dev,
 						 lladdr || !dev->addr_len);
 	if (neigh)
-		neigh_update(neigh, lladdr, NUD_STALE, 1, 1);
+		neigh_update(neigh, lladdr, NUD_STALE, 
+			     NEIGH_UPDATE_F_OVERRIDE);
 	return neigh;
 }
 
@@ -1274,7 +1278,9 @@ int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 		n = neigh_lookup(tbl, RTA_DATA(nda[NDA_DST - 1]), dev);
 		if (n) {
-			err = neigh_update(n, NULL, NUD_FAILED, 1, 0);
+			err = neigh_update(n, NULL, NUD_FAILED, 
+					   NEIGH_UPDATE_F_OVERRIDE|
+					   NEIGH_UPDATE_F_ADMIN);
 			neigh_release(n);
 		}
 		goto out_dev_put;
@@ -1347,7 +1353,8 @@ int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 						RTA_DATA(nda[NDA_LLADDR - 1]) :
 						NULL,
 					   ndm->ndm_state,
-					   override, 0);
+					   (override ? NEIGH_UPDATE_F_OVERRIDE : 0) |
+					   NEIGH_UPDATE_F_ADMIN);
 		}
 		if (n)
 			neigh_release(n);

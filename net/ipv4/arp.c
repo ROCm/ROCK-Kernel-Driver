@@ -914,7 +914,7 @@ int arp_process(struct sk_buff *skb)
 		if (arp->ar_op != htons(ARPOP_REPLY) ||
 		    skb->pkt_type != PACKET_HOST)
 			state = NUD_STALE;
-		neigh_update(n, sha, state, override, 1);
+		neigh_update(n, sha, state, override ? NEIGH_UPDATE_F_OVERRIDE : 0);
 		neigh_release(n);
 	}
 
@@ -1021,7 +1021,9 @@ int arp_req_set(struct arpreq *r, struct net_device * dev)
 		if (r->arp_flags & ATF_PERM)
 			state = NUD_PERMANENT;
 		err = neigh_update(neigh, (r->arp_flags&ATF_COM) ?
-				   r->arp_ha.sa_data : NULL, state, 1, 0);
+				   r->arp_ha.sa_data : NULL, state, 
+				   NEIGH_UPDATE_F_OVERRIDE|
+				   NEIGH_UPDATE_F_ADMIN);
 		neigh_release(neigh);
 	}
 	return err;
@@ -1101,7 +1103,9 @@ int arp_req_delete(struct arpreq *r, struct net_device * dev)
 	neigh = neigh_lookup(&arp_tbl, &ip, dev);
 	if (neigh) {
 		if (neigh->nud_state&~NUD_NOARP)
-			err = neigh_update(neigh, NULL, NUD_FAILED, 1, 0);
+			err = neigh_update(neigh, NULL, NUD_FAILED, 
+					   NEIGH_UPDATE_F_OVERRIDE|
+					   NEIGH_UPDATE_F_ADMIN);
 		neigh_release(neigh);
 	}
 	return err;
