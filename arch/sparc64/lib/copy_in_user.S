@@ -31,7 +31,8 @@
 	 * to copy register windows around during thread cloning.
 	 */
 
-	.globl	___copy_in_user
+	.globl		___copy_in_user
+	.type		___copy_in_user,#function
 ___copy_in_user:	/* %o0=dst, %o1=src, %o2=len */
 	/* Writing to %asi is _expensive_ so we hardcode it.
 	 * Reading %asi to check for KERNEL_DS is comparatively
@@ -99,11 +100,14 @@ ___copy_in_user:	/* %o0=dst, %o1=src, %o2=len */
 	retl
 	 clr		%o0
 
+	.size		___copy_in_user, .-___copy_in_user
+
 	/* Act like copy_{to,in}_user(), ie. return zero instead
 	 * of original destination pointer.  This is invoked when
 	 * copy_{to,in}_user() finds that %asi is kernel space.
 	 */
 	.globl		memcpy_user_stub
+	.type		memcpy_user_stub,#function
 memcpy_user_stub:
 	save		%sp, -192, %sp
 	mov		%i0, %o0
@@ -112,3 +116,4 @@ memcpy_user_stub:
 	 mov		%i2, %o2
 	ret
 	 restore	%g0, %g0, %o0
+	.size		memcpy_user_stub, .-memcpy_user_stub

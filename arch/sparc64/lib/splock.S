@@ -7,6 +7,7 @@
 	.align	64
 
 	.globl		_raw_spin_lock
+	.type		_raw_spin_lock,#function
 _raw_spin_lock:		/* %o0 = lock_ptr */
 1:	ldstub		[%o0], %g7
 	brnz,pn		%g7, 2f
@@ -17,8 +18,10 @@ _raw_spin_lock:		/* %o0 = lock_ptr */
 	brnz,pt		%g7, 2b
 	 membar		#LoadLoad
 	ba,a,pt		%xcc, 1b
+	.size		_raw_spin_lock, .-_raw_spin_lock
 
-	.globl	_raw_spin_lock_flags
+	.globl		_raw_spin_lock_flags
+	.type		_raw_spin_lock_flags,#function
 _raw_spin_lock_flags:	/* %o0 = lock_ptr, %o1 = irq_flags */
 1:	ldstub		[%o0], %g7
 	brnz,pn		%g7, 2f
@@ -33,3 +36,4 @@ _raw_spin_lock_flags:	/* %o0 = lock_ptr, %o1 = irq_flags */
 	 membar		#LoadLoad
 	ba,pt		%xcc, 1b		! Retry lock acquire
 	 wrpr		%g2, %pil		! Restore PIL
+	.size		_raw_spin_lock_flags, .-_raw_spin_lock_flags

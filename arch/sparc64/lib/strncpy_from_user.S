@@ -12,7 +12,7 @@
 0:	.xword	0x0101010101010101
 
 	.text
-	.align	4
+	.align	32
 
 	/* Must return:
 	 *
@@ -31,6 +31,7 @@
 	 */
 
 	.globl	__strncpy_from_user
+	.type	__strncpy_from_user,#function
 __strncpy_from_user:
 	/* %o0=dest, %o1=src, %o2=count */
 	sethi	%hi(0b), %o5		! IEU0	Group
@@ -122,6 +123,7 @@ __strncpy_from_user:
 	 mov	%o2, %o0
 2:	retl
 	 add	%o2, %o3, %o0
+	.size	__strncpy_from_user, .-__strncpy_from_user
 
 	.section .fixup,#alloc,#execinstr
 	.align	4
