@@ -1,5 +1,5 @@
 /*
- *	Acquire Single Board Computer Watchdog Timer driver for Linux 2.1.x
+ *	Acquire Single Board Computer Watchdog Timer driver
  *
  *      Based on wdt.c. Original copyright messages:
  *
@@ -10,10 +10,10 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide 
- *	warranty for any of this software. This material is provided 
- *	"AS-IS" and at no charge.	
+ *
+ *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
+ *	warranty for any of this software. This material is provided
+ *	"AS-IS" and at no charge.
  *
  *	(c) Copyright 1995    Alan Cox <alan@redhat.com>
  *
@@ -22,33 +22,39 @@
  *          Can't add timeout - driver doesn't allow changing value
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/fs.h>
 #include <linux/ioport.h>
 #include <linux/notifier.h>
-#include <linux/fs.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/spinlock.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-static int acq_is_open;
-static spinlock_t acq_lock;
-static int expect_close = 0;
+#define WATCHDOG_NAME "Acquire WDT"
+#define PFX WATCHDOG_NAME ": "
+#define WATCHDOG_TIMEOUT 0	/* ??? Is the timeout hardcoded to 1 minute ??? */
+
+static unsigned long acq_is_open;
+static char expect_close;
 
 /*
  *	You must set these - there is no sane way to probe for this board.
  */
- 
-#define WDT_STOP 0x43
-#define WDT_START 0x443
+
+static int wdt_stop = 0x43;
+module_param(wdt_stop, int, 0);
+MODULE_PARM_DESC(wdt_stop, "Acquire WDT 'stop' io port (default 0x43)");
+
+static int wdt_start = 0x443;
+module_param(wdt_start, int, 0);
+MODULE_PARM_DESC(wdt_start, "Acquire WDT 'start' io port (default 0x443)");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -62,13 +68,22 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 /*
  *	Kernel methods.
  */
- 
 
 static void acq_ping(void)
 {
 	/* Write a watchdog value */
-	inb_p(WDT_START);
+	inb_p(wdt_start);
 }
+
+static void acq_stop(void)
+{
+	/* Turn the card off */
+	inb_p(wdt_stop);
+}
+
+/*
+ *	/dev/watchdog handling.
+ */
 
 static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
@@ -76,24 +91,29 @@ static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
+	/* See if we got the magic character 'V' and reload the timer */
 	if(count) {
 		if (!nowayout) {
 			size_t i;
 
+			/* note: just in case someone wrote the magic character
+			 * five months ago... */
 			expect_close = 0;
 
+			/* scan to see wether or not we got the magic character */
 			for (i = 0; i != count; i++) {
 				char c;
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
+
+		/* Well, anyhow someone wrote to us, we should return that favour */
 		acq_ping();
-		return 1;
 	}
-	return 0;
+	return count;
 }
 
 static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
@@ -103,65 +123,75 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	{
 		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "Acquire WDT"
+		.identity = "Acquire WDT",
 	};
-	
+
 	switch(cmd)
 	{
 	case WDIOC_GETSUPPORT:
-	  if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)))
-	    return -EFAULT;
-	  break;
-	  
+	  return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)) ? -EFAULT : 0;
+
 	case WDIOC_GETSTATUS:
-	  if (copy_to_user((int *)arg, &acq_is_open,  sizeof(int)))
-	    return -EFAULT;
-	  break;
+	case WDIOC_GETBOOTSTATUS:
+	  return put_user(0, (int *)arg);
 
 	case WDIOC_KEEPALIVE:
 	  acq_ping();
-	  break;
+	  return 0;
+
+	case WDIOC_GETTIMEOUT:
+	  return put_user(WATCHDOG_TIMEOUT, (int *)arg);
+
+	case WDIOC_SETOPTIONS:
+	{
+	    int options, retval = -EINVAL;
+
+	    if (get_user(options, (int *)arg))
+	      return -EFAULT;
+
+	    if (options & WDIOS_DISABLECARD)
+	    {
+	      acq_stop();
+	      retval = 0;
+	    }
+
+	    if (options & WDIOS_ENABLECARD)
+	    {
+	      acq_ping();
+	      retval = 0;
+	    }
+
+	    return retval;
+	}
 
 	default:
-	  return -ENOTTY;
+	  return -ENOIOCTLCMD;
 	}
-	return 0;
 }
 
 static int acq_open(struct inode *inode, struct file *file)
 {
-	if ((minor(inode->i_rdev) == WATCHDOG_MINOR)) {
-		spin_lock(&acq_lock);
-		if(acq_is_open) {
-			spin_unlock(&acq_lock);
-			return -EBUSY;
-		}
-		if (nowayout)
-			__module_get(THIS_MODULE);
+	if (test_and_set_bit(0, &acq_is_open))
+		return -EBUSY;
 
-		/* Activate */
-		acq_is_open=1;
-		inb_p(WDT_START);      
-		spin_unlock(&acq_lock);
-		return 0;
+	if (nowayout)
+		__module_get(THIS_MODULE);
 
-	} else {
-		return -ENODEV;
-	}
+	/* Activate */
+	acq_ping();
+	return 0;
 }
 
 static int acq_close(struct inode *inode, struct file *file)
 {
-	if(minor(inode->i_rdev)==WATCHDOG_MINOR) {
-		spin_lock(&acq_lock);
-		if (expect_close)
-			inb_p(WDT_STOP);
-		else
-			printk(KERN_CRIT "WDT closed unexpectedly.  WDT will not stop!\n");
-
-		acq_is_open=0;
-		spin_unlock(&acq_lock);
+	if (expect_close == 42) {
+		acq_stop();
+	} else {
+		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
+		acq_ping();
 	}
+	clear_bit(0, &acq_is_open);
+	expect_close = 0;
 	return 0;
 }
 
@@ -172,20 +202,20 @@ static int acq_close(struct inode *inode, struct file *file)
 static int acq_notify_sys(struct notifier_block *this, unsigned long code,
 	void *unused)
 {
-	if(code==SYS_DOWN || code==SYS_HALT)
-		/* Turn the card off */
-		inb_p(WDT_STOP);
-
+	if(code==SYS_DOWN || code==SYS_HALT) {
+		/* Turn the WDT off */
+		acq_stop();
+	}
 	return NOTIFY_DONE;
 }
- 
+
 /*
  *	Kernel Interfaces
  */
- 
- 
+
 static struct file_operations acq_fops = {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= acq_write,
 	.ioctl		= acq_ioctl,
 	.open		= acq_open,
@@ -196,52 +226,84 @@ static struct miscdevice acq_miscdev=
 {
 	.minor = WATCHDOG_MINOR,
 	.name = "watchdog",
-	.fops = &acq_fops
+	.fops = &acq_fops,
 };
-
 
 /*
  *	The WDT card needs to learn about soft shutdowns in order to
- *	turn the timebomb registers off. 
+ *	turn the timebomb registers off.
  */
- 
+
 static struct notifier_block acq_notifier =
 {
 	.notifier_call = acq_notify_sys,
 	.next = NULL,
-	.priority = 0
+	.priority = 0,
 };
 
 static int __init acq_init(void)
 {
+	int ret;
+
 	printk(KERN_INFO "WDT driver for Acquire single board computer initialising.\n");
 
-	spin_lock_init(&acq_lock);
-	if (misc_register(&acq_miscdev))
-		return -ENODEV;
-	if (!request_region(WDT_STOP, 1, "Acquire WDT")) {
-		misc_deregister(&acq_miscdev);
-		return -EIO;
-	}
-	if (!request_region(WDT_START, 1, "Acquire WDT")) {
-		release_region(WDT_STOP, 1);
-		misc_deregister(&acq_miscdev);
-		return -EIO;
+	if (wdt_stop != wdt_start) {
+		if (!request_region(wdt_stop, 1, WATCHDOG_NAME)) {
+			printk (KERN_ERR PFX "I/O address 0x%04x already in use\n",
+				wdt_stop);
+			ret = -EIO;
+			goto out;
+		}
 	}
 
-	register_reboot_notifier(&acq_notifier);
-	return 0;
+	if (!request_region(wdt_start, 1, WATCHDOG_NAME)) {
+		printk (KERN_ERR PFX "I/O address 0x%04x already in use\n",
+			wdt_start);
+		ret = -EIO;
+		goto unreg_stop;
+	}
+
+        ret = register_reboot_notifier(&acq_notifier);
+        if (ret != 0) {
+                printk (KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+                        ret);
+                goto unreg_regions;
+        }
+                                                                                                 
+        ret = misc_register(&acq_miscdev);
+        if (ret != 0) {
+                printk (KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+                        WATCHDOG_MINOR, ret);
+                goto unreg_reboot;
+        }
+                                                                                                 
+        printk (KERN_INFO PFX "initialized. (nowayout=%d)\n",
+                nowayout);
+                                                                                                 
+out:
+        return ret;
+unreg_reboot:
+        unregister_reboot_notifier(&acq_notifier);
+unreg_regions:
+        release_region(wdt_start, 1);
+unreg_stop:
+        if (wdt_stop != wdt_start)
+                release_region(wdt_stop, 1);
+        goto out;
 }
-	
+
 static void __exit acq_exit(void)
 {
 	misc_deregister(&acq_miscdev);
 	unregister_reboot_notifier(&acq_notifier);
-	release_region(WDT_STOP,1);
-	release_region(WDT_START,1);
+	if(wdt_stop != wdt_start)
+		release_region(wdt_stop,1);
+	release_region(wdt_start,1);
 }
 
 module_init(acq_init);
 module_exit(acq_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Unkown");
+MODULE_DESCRIPTION("Acquire Single Board Computer Watchdog Timer driver");
