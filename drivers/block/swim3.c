@@ -1015,6 +1015,7 @@ int swim3_init(void)
 		disk->private_data = &floppy_states[i];
 		disk->queue = &swim3_queue;
 		sprintf(disk->disk_name, "fd%d", i);
+		sprintf(disk->devfs_name, "floppy/%d", i);
 		set_capacity(disk, 2880);
 		add_disk(disk);
 	}
@@ -1031,7 +1032,6 @@ static int swim3_add_device(struct device_node *swim)
 {
 	struct device_node *mediabay;
 	struct floppy_state *fs = &floppy_states[floppy_count];
-	char floppy_name[16];
 
 	if (swim->n_addrs < 2)
 	{
@@ -1092,12 +1092,6 @@ static int swim3_add_device(struct device_node *swim)
 
 	printk(KERN_INFO "fd%d: SWIM3 floppy controller %s\n", floppy_count,
 		mediabay ? "in media bay" : "");
-
-	sprintf(floppy_name, "floppy/%d", floppy_count);
-	devfs_register(NULL, floppy_name, 
-			DEVFS_FL_DEFAULT, FLOPPY_MAJOR, floppy_count, 
-			S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP, 
-			&floppy_fops, NULL);
 
 	floppy_count++;
 	
