@@ -1,39 +1,40 @@
-/* SCTP kernel reference Implementation 
+/* SCTP kernel reference Implementation
  * Copyright (c) 2002 International Business Machines Corp.
  * Copyright (c) 2002 Intel Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * Sysctl related interfaces for SCTP. 
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * Sysctl related interfaces for SCTP.
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    Mingqin Liu           <liuming@us.ibm.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Ardelle Fan           <ardelle.fan@intel.com>
+ *    Ryan Layer            <rmlayer@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -42,42 +43,54 @@
 #include <net/sctp/structs.h>
 #include <linux/sysctl.h>
 
+static ctl_handler sctp_sysctl_jiffies_ms;
+static long rto_timer_min = 0;
+static long rto_timer_max = 86400000; /* One day */
+
 static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_RTO_INITIAL,
 		.procname	= "rto_initial",
 		.data		= &sctp_rto_initial,
-		.maxlen		= sizeof(int),
+		.maxlen		= sizeof(long),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies
+		.proc_handler	= &proc_doulongvec_ms_jiffies_minmax,
+		.strategy	= &sctp_sysctl_jiffies_ms,
+		.extra1         = &rto_timer_min,
+		.extra2         = &rto_timer_max
 	},
 	{
 		.ctl_name	= NET_SCTP_RTO_MIN,
 		.procname	= "rto_min",
 		.data		= &sctp_rto_min,
-		.maxlen		= sizeof(int),
+		.maxlen		= sizeof(long),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies
+		.proc_handler	= &proc_doulongvec_ms_jiffies_minmax,
+		.strategy	= &sctp_sysctl_jiffies_ms,
+		.extra1         = &rto_timer_min,
+		.extra2         = &rto_timer_max
 	},
 	{
 		.ctl_name	= NET_SCTP_RTO_MAX,
 		.procname	= "rto_max",
 		.data		= &sctp_rto_max,
-		.maxlen		= sizeof(int),
+		.maxlen		= sizeof(long),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies
+		.proc_handler	= &proc_doulongvec_ms_jiffies_minmax,
+		.strategy	= &sctp_sysctl_jiffies_ms,
+		.extra1         = &rto_timer_min,
+		.extra2         = &rto_timer_max
 	},
 	{
 		.ctl_name	= NET_SCTP_VALID_COOKIE_LIFE,
 		.procname	= "valid_cookie_life",
 		.data		= &sctp_valid_cookie_life,
-		.maxlen		= sizeof(int),
+		.maxlen		= sizeof(long),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies
+		.proc_handler	= &proc_doulongvec_ms_jiffies_minmax,
+		.strategy	= &sctp_sysctl_jiffies_ms,
+		.extra1         = &rto_timer_min,
+		.extra2         = &rto_timer_max
 	},
 	{
 		.ctl_name	= NET_SCTP_MAX_BURST,
@@ -182,4 +195,38 @@ void sctp_sysctl_register(void)
 void sctp_sysctl_unregister(void)
 {
 	unregister_sysctl_table(sctp_sysctl_header);
+}
+
+/* Strategy function to convert jiffies to milliseconds.  */
+static int sctp_sysctl_jiffies_ms(ctl_table *table, int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen, void **context) {
+
+	if (oldval) {
+		size_t olen;
+
+		if (oldlenp) {
+			if (get_user(olen, oldlenp))
+				return -EFAULT;
+
+			if (olen != sizeof (int))
+				return -EINVAL;
+		}
+		if (put_user((*(int *)(table->data) / HZ) * 1000,
+			(int *)oldval) ||
+		    (oldlenp && put_user(sizeof (int), oldlenp)))
+			return -EFAULT;
+	}
+	if (newval && newlen) {
+		int new;
+
+		if (newlen != sizeof (int))
+			return -EINVAL;
+
+		if (get_user(new, (int *)newval))
+			return -EFAULT;
+
+		*(int *)(table->data) = (new * HZ) * 1000;
+	}
+	return 1;
 }

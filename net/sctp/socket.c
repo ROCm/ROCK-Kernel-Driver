@@ -101,6 +101,9 @@ static char *sctp_hmac_alg = SCTP_COOKIE_HMAC_ALG;
 
 extern kmem_cache_t *sctp_bucket_cachep;
 
+
+extern int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc);
+
 /* Look up the association by its id.  If this is not a UDP-style
  * socket, the ID field is always ignored.
  */
@@ -110,32 +113,24 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 
 	/* If this is not a UDP-style socket, assoc id should be ignored. */
 	if (!sctp_style(sk, UDP)) {
-		/* Return NULL if the socket state is not ESTABLISHED. It 
+		/* Return NULL if the socket state is not ESTABLISHED. It
 		 * could be a TCP-style listening socket or a socket which
 		 * hasn't yet called connect() to establish an association.
 		 */
 		if (!sctp_sstate(sk, ESTABLISHED))
 			return NULL;
 
-		/* Get the first and the only association from the list. */ 
+		/* Get the first and the only association from the list. */
 		if (!list_empty(&sctp_sk(sk)->ep->asocs))
 			asoc = list_entry(sctp_sk(sk)->ep->asocs.next,
 					  struct sctp_association, asocs);
 		return asoc;
 	}
 
-	/* First, verify that this is a kernel address. */
-	if (sctp_is_valid_kaddr((unsigned long) id)) {
-		struct sctp_association *temp;
-
-		/* Verify that this _is_ an sctp_association
-		 * data structure and if so, that the socket matches.
-		 */
-		temp = (struct sctp_association *)id;
-		if ((SCTP_ASSOC_EYECATCHER == temp->eyecatcher) &&
-		    (temp->base.sk == sk))
-			asoc = temp;
-	}
+	/* Otherwise this is a UDP-style socket. */
+	asoc = (struct sctp_association *)id;
+	if (!sctp_assoc_valid(sk, asoc))
+		return NULL;
 
 	return asoc;
 }
@@ -1456,7 +1451,7 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
  *   spp_pathmaxrxt  - This contains the maximum number of
  *                     retransmissions before this address shall be
  *                     considered unreachable.
- */ 
+ */
 static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 					    char *optval, int optlen)
 {
@@ -2430,7 +2425,7 @@ out:
  *   spp_pathmaxrxt  - This contains the maximum number of
  *                     retransmissions before this address shall be
  *                     considered unreachable.
- */ 
+ */
 static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 						char *optval, int *optlen)
 {

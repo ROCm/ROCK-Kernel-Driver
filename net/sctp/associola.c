@@ -281,7 +281,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->default_flags = sp->default_flags;
 	asoc->default_context = sp->default_context;
 	asoc->default_timetolive = sp->default_timetolive;
-	
+
 	return asoc;
 
 fail_init:
@@ -384,7 +384,7 @@ void sctp_assoc_set_primary(struct sctp_association *asoc,
 	if (transport->active)
 		asoc->peer.active_path = transport;
 
-	/* 
+	/*
 	 * SFR-CACC algorithm:
 	 * Upon the receipt of a request to change the primary
 	 * destination address, on the data structure for the new
@@ -793,6 +793,26 @@ out:
 	return transport;
 }
 
+/*  Is this a live association structure. */
+int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc)
+{
+
+	/* First, verify that this is a kernel address. */
+	if (!sctp_is_valid_kaddr((unsigned long) asoc))
+		return 0;
+
+	/* Verify that this _is_ an sctp_association
+	 * data structure and if so, that the socket matches.
+	 */
+	if (SCTP_ASSOC_EYECATCHER != asoc->eyecatcher)
+		return 0;
+	if (asoc->base.sk != sk)
+		return 0;
+
+	/* The association is valid. */
+	return 1;
+}
+
 /* Do delayed input processing.  This is scheduled by sctp_rcv(). */
 static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 {
@@ -801,7 +821,6 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 	struct sock *sk;
 	struct sctp_inq *inqueue;
 	int state, subtype;
-	sctp_assoc_t associd = sctp_assoc2id(asoc);
 	int error = 0;
 
 	/* The association should be held so we should be safe. */
@@ -831,7 +850,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 		/* Check to see if the association is freed in response to
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
-		if (!sctp_id2assoc(sk, associd))
+		if (!sctp_assoc_valid(sk, asoc))
 			break;
 
 		/* If there is an error on chunk, discard this packet. */
