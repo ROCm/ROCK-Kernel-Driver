@@ -102,14 +102,8 @@ static struct tc_u_common *u32_list;
 
 static __inline__ unsigned u32_hash_fold(u32 key, struct tc_u32_sel *sel, u8 fshift)
 {
-#ifndef fix_u32_bug
 	unsigned h = (key & sel->hmask)>>fshift;
-#else
-	unsigned h = (key & sel->hmask);
 
-	h ^= h>>16;
-	h ^= h>>8;
-#endif
 	return h;
 }
 
