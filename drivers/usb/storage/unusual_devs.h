@@ -281,6 +281,14 @@ UNUSUAL_DEV(  0x052b, 0x1801, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
+/* Yakumo Mega Image 47
+ * Reported by Bjoern Paetzel <kolrabi@kolrabi.de> */
+UNUSUAL_DEV(  0x052b, 0x1905, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"400_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
