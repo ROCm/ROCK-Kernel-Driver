@@ -205,7 +205,8 @@ out:
  * internally. Essentially, translate the "PROT_xxx" and "MAP_xxx" bits
  * into "VM_xxx".
  */
-static inline unsigned long calc_vm_flags(unsigned long prot, unsigned long flags)
+static inline unsigned long
+calc_vm_flags(unsigned long prot, unsigned long flags)
 {
 #define _trans(x,bit1,bit2) \
 ((bit1==bit2)?(x&bit1):(x&bit1)?bit2:0)
@@ -254,10 +255,10 @@ static void validate_mm(struct mm_struct * mm) {
 #define validate_mm(mm) do { } while (0)
 #endif
 
-static struct vm_area_struct * find_vma_prepare(struct mm_struct * mm, unsigned long addr,
-						struct vm_area_struct ** pprev,
-						struct rb_node *** rb_link,
-						struct rb_node ** rb_parent)
+static struct vm_area_struct *
+find_vma_prepare(struct mm_struct *mm, unsigned long addr,
+		struct vm_area_struct **pprev, struct rb_node ***rb_link,
+		struct rb_node ** rb_parent)
 {
 	struct vm_area_struct * vma;
 	struct rb_node ** __rb_link, * __rb_parent, * rb_prev;
@@ -291,8 +292,9 @@ static struct vm_area_struct * find_vma_prepare(struct mm_struct * mm, unsigned 
 	return vma;
 }
 
-static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct * vma,
-				   struct vm_area_struct * prev, struct rb_node * rb_parent)
+static inline void
+__vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
+		struct vm_area_struct *prev, struct rb_node *rb_parent)
 {
 	if (prev) {
 		vma->vm_next = prev->vm_next;
@@ -300,20 +302,21 @@ static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct 
 	} else {
 		mm->mmap = vma;
 		if (rb_parent)
-			vma->vm_next = rb_entry(rb_parent, struct vm_area_struct, vm_rb);
+			vma->vm_next = rb_entry(rb_parent,
+					struct vm_area_struct, vm_rb);
 		else
 			vma->vm_next = NULL;
 	}
 }
 
-static void __vma_link_rb(struct mm_struct * mm, struct vm_area_struct * vma,
-				 struct rb_node ** rb_link, struct rb_node * rb_parent)
+static void __vma_link_rb(struct mm_struct *mm, struct vm_area_struct *vma,
+			struct rb_node **rb_link, struct rb_node *rb_parent)
 {
 	rb_link_node(&vma->vm_rb, rb_parent, rb_link);
 	rb_insert_color(&vma->vm_rb, &mm->mm_rb);
 }
 
-static inline void __vma_link_file(struct vm_area_struct * vma)
+static inline void __vma_link_file(struct vm_area_struct *vma)
 {
 	struct file * file;
 
@@ -332,8 +335,10 @@ static inline void __vma_link_file(struct vm_area_struct * vma)
 	}
 }
 
-static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  struct vm_area_struct * prev,
-		       struct rb_node ** rb_link, struct rb_node * rb_parent)
+static void
+__vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
+	struct vm_area_struct *prev, struct rb_node **rb_link,
+	struct rb_node *rb_parent)
 {
 	__vma_link_list(mm, vma, prev, rb_parent);
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
@@ -529,7 +534,8 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	 * to. we assume access permissions have been handled by the open
 	 * of the memory object, so we don't do any here.
 	 */
-	vm_flags = calc_vm_flags(prot,flags) | mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
+	vm_flags = calc_vm_flags(prot,flags) | mm->def_flags |
+			VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
 	if (flags & MAP_LOCKED) {
 		if (!capable(CAP_IPC_LOCK))
@@ -549,14 +555,19 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	if (file) {
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
-			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))
+			if ((prot&PROT_WRITE) && !(file->f_mode&FMODE_WRITE))
 				return -EACCES;
 
-			/* Make sure we don't allow writing to an append-only file.. */
+			/*
+			 * Make sure we don't allow writing to an append-only
+			 * file..
+			 */
 			if (IS_APPEND(inode) && (file->f_mode & FMODE_WRITE))
 				return -EACCES;
 
-			/* make sure there are no mandatory locks on the file. */
+			/*
+			 * Make sure there are no mandatory locks on the file.
+			 */
 			if (locks_verify_locked(inode))
 				return -EAGAIN;
 
@@ -610,7 +621,9 @@ munmap_back:
 			/* Check memory availability in shmem_file_setup? */
 			vm_flags |= VM_ACCOUNT;
 		} else if (vm_flags & VM_WRITE) {
-			/* Private writable mapping: check memory availability */
+			/*
+			 * Private writable mapping: check memory availability
+			 */
 			charged = len >> PAGE_SHIFT;
 			if (!vm_enough_memory(charged))
 				return -ENOMEM;
@@ -620,10 +633,12 @@ munmap_back:
 
 	/* Can we just expand an old anonymous mapping? */
 	if (!file && !(vm_flags & VM_SHARED) && rb_parent)
-		if (vma_merge(mm, prev, rb_parent, addr, addr + len, vm_flags, NULL, 0))
+		if (vma_merge(mm, prev, rb_parent, addr, addr + len,
+					vm_flags, NULL, 0))
 			goto out;
 
-	/* Determine the object being mapped and call the appropriate
+	/*
+	 * Determine the object being mapped and call the appropriate
 	 * specific mapper. the address has already been validated, but
 	 * not unmapped, but the maps are removed from the list.
 	 */
@@ -734,7 +749,9 @@ unacct_error:
  * This function "knows" that -ENOMEM has the bits set.
  */
 #ifndef HAVE_ARCH_UNMAPPED_AREA
-static inline unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
+static inline unsigned long
+arch_get_unmapped_area(struct file *filp, unsigned long addr,
+		unsigned long len, unsigned long pgoff, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
@@ -769,10 +786,14 @@ static inline unsigned long arch_get_unmapped_area(struct file *filp, unsigned l
 	}
 }
 #else
-extern unsigned long arch_get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+extern unsigned long
+arch_get_unmapped_area(struct file *, unsigned long, unsigned long,
+			unsigned long, unsigned long);
 #endif	
 
-unsigned long get_unmapped_area(struct file *file, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
+unsigned long
+get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
+		unsigned long pgoff, unsigned long flags)
 {
 	if (flags & MAP_FIXED) {
 		if (addr > TASK_SIZE - len)
@@ -783,7 +804,8 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr, unsigned 
 	}
 
 	if (file && file->f_op && file->f_op->get_unmapped_area)
-		return file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
+		return file->f_op->get_unmapped_area(file, addr, len,
+						pgoff, flags);
 
 	return arch_get_unmapped_area(file, addr, len, pgoff, flags);
 }
@@ -806,7 +828,8 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 			while (rb_node) {
 				struct vm_area_struct * vma_tmp;
 
-				vma_tmp = rb_entry(rb_node, struct vm_area_struct, vm_rb);
+				vma_tmp = rb_entry(rb_node,
+						struct vm_area_struct, vm_rb);
 
 				if (vma_tmp->vm_end > addr) {
 					vma = vma_tmp;
@@ -824,8 +847,9 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 }
 
 /* Same as find_vma, but also return a pointer to the previous VMA in *pprev. */
-struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
-				      struct vm_area_struct **pprev)
+struct vm_area_struct *
+find_vma_prev(struct mm_struct *mm, unsigned long addr,
+			struct vm_area_struct **pprev)
 {
 	struct vm_area_struct *vma = NULL, *prev = NULL;
 	struct rb_node * rb_node;
@@ -852,7 +876,7 @@ struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
 		}
 	}
 
- out:
+out:
 	*pprev = prev;
 	return prev ? prev->vm_next : vma;
 }
@@ -899,7 +923,8 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	return 0;
 }
 
-struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long addr)
+struct vm_area_struct *
+find_extend_vma(struct mm_struct *mm, unsigned long addr)
 {
 	struct vm_area_struct *vma, *prev;
 
@@ -918,7 +943,7 @@ struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long add
 /*
  * vma is the first one with address < vma->vm_start.  Have to extend vma.
  */
-int expand_stack(struct vm_area_struct * vma, unsigned long address)
+int expand_stack(struct vm_area_struct *vma, unsigned long address)
 {
 	unsigned long grow;
 
@@ -953,7 +978,8 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	return 0;
 }
 
-struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long addr)
+struct vm_area_struct *
+find_extend_vma(struct mm_struct * mm, unsigned long addr)
 {
 	struct vm_area_struct * vma;
 	unsigned long start;
@@ -1023,7 +1049,7 @@ static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 		break;
 	}
 no_mmaps:
-	if (last < first)	/* needed for arches with discontiguous pgd indices */
+	if (last < first)	/* for arches with discontiguous pgd indices */
 		return;
 	/*
 	 * If the PGD bits are not consecutive in the virtual address, the
@@ -1298,7 +1324,8 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
 	/* Can we just expand an old anonymous mapping? */
-	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len, flags, NULL, 0))
+	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len,
+					flags, NULL, 0))
 		goto out;
 
 	/*
@@ -1408,7 +1435,7 @@ void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 	struct vm_area_struct * __vma, * prev;
 	struct rb_node ** rb_link, * rb_parent;
 
-	__vma = find_vma_prepare(mm, vma->vm_start, &prev, &rb_link, &rb_parent);
+	__vma = find_vma_prepare(mm,vma->vm_start,&prev,&rb_link,&rb_parent);
 	if (__vma && __vma->vm_start < vma->vm_end)
 		BUG();
 	vma_link(mm, vma, prev, rb_link, rb_parent);
