@@ -188,7 +188,7 @@ if [ "$CONFIG_SCSI" != "n" ]; then
    if [ "$CONFIG_CHR_DEV_ST" != "n" ]; then
       int  'Maximum number of SCSI tapes that can be loaded as modules' CONFIG_ST_EXTRA_DEVS 2
    fi
-   dep_tristate '  SCSI CD-ROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
+   dep_tristate '  SCSI CDROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
    if [ "$CONFIG_BLK_DEV_SR" != "n" ]; then
       bool '    Enable vendor-specific extensions (for SCSI CDROM)' CONFIG_BLK_DEV_SR_VENDOR
       int  'Maximum number of CDROM devices that can be loaded as modules' CONFIG_SR_EXTRA_DEVS 2
