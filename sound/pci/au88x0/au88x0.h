@@ -208,6 +208,7 @@ static void vortex_adbdma_startfifo(vortex_t * vortex, int adbdma);
 static void vortex_adbdma_pausefifo(vortex_t * vortex, int adbdma);
 static void vortex_adbdma_resumefifo(vortex_t * vortex, int adbdma);
 static int inline vortex_adbdma_getlinearpos(vortex_t * vortex, int adbdma);
+static void vortex_adbdma_resetup(vortex_t *vortex, int adbdma);
 
 #ifndef CHIP_AU8810
 static void vortex_wtdma_startfifo(vortex_t * vortex, int wtdma);
