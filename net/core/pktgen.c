@@ -104,6 +104,8 @@
  * Corrections from Nikolai Malykh (nmalykh@bilim.com) 
  * Removed unused flags F_SET_SRCMAC & F_SET_SRCIP 041230
  *
+ * interruptible_sleep_on_timeout() replaced Nishanth Aravamudan <nacc@us.ibm.com> 
+ * 050103
  */
 #include <linux/sys.h>
 #include <linux/types.h>
@@ -135,6 +137,7 @@
 #include <linux/ipv6.h>
 #include <linux/udp.h>
 #include <linux/proc_fs.h>
+#include <linux/wait.h>
 #include <net/checksum.h>
 #include <net/ipv6.h>
 #include <net/addrconf.h>
@@ -148,7 +151,7 @@
 #include <asm/timex.h>
 
 
-#define VERSION  "pktgen v2.56: Packet Generator for packet performance testing.\n"
+#define VERSION  "pktgen v2.57: Packet Generator for packet performance testing.\n"
 
 /* #define PG_DEBUG(a) a */
 #define PG_DEBUG(a) 
@@ -2402,16 +2405,14 @@ static int thread_is_running(struct pktgen_thread *t )
 
 static int pktgen_wait_thread_run(struct pktgen_thread *t )
 {
-        wait_queue_head_t queue;
-        
-        init_waitqueue_head(&queue);
-        
         if_lock(t);
 
         while(thread_is_running(t)) {
+
                 if_unlock(t);
-        
-                interruptible_sleep_on_timeout(&queue, HZ/10);
+
+		msleep_interruptible(100); 
+
                 if (signal_pending(current)) 
                         goto signal;
                 if_lock(t);
@@ -2738,6 +2739,7 @@ retry_now:
 
 static void pktgen_thread_worker(struct pktgen_thread *t) 
 {
+	DEFINE_WAIT(wait);
         struct pktgen_dev *pkt_dev = NULL;
 	int cpu = t->cpu;
 	sigset_t tmpsig;
@@ -2805,9 +2807,11 @@ static void pktgen_thread_worker(struct pktgen_thread *t)
 					do_softirq();
 				tx_since_softirq = 0;
 			}
+		} else {
+			prepare_to_wait(&(t->queue), &wait, TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ/10);
+			finish_wait(&(t->queue), &wait);
 		}
-                else 
-                        interruptible_sleep_on_timeout(&(t->queue), HZ/10);
 
                 /* 
 		 * Back from sleep, either due to the timeout or signal.
@@ -3117,8 +3121,7 @@ static void __exit pg_cleanup(void)
                 struct pktgen_thread *t = pktgen_threads;
                 pktgen_threads->control |= (T_TERMINATE);
 
-                while( t == pktgen_threads) 
-                        interruptible_sleep_on_timeout(&queue, HZ);
+		wait_event_interruptible_timeout(queue, (t != pktgen_threads), HZ);
         }
 
         /* Un-register us from receiving netdevice events */
