@@ -227,6 +227,9 @@ flush_thread(void)
 	   with respect to the FPU.  This is all exceptions disabled.  */
 	current_thread_info()->ieee_state = 0;
 	wrfpcr(FPCR_DYN_NORMAL | ieee_swcr_to_fpcr(0));
+
+	/* Clean slate for TLS.  */
+	current->pcb.unique = 0;
 }
 
 void
