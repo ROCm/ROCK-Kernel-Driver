@@ -314,7 +314,7 @@ extern int zft_compressor_init(void);
 /*  Called by modules package when installing the driver or by kernel
  *  during the initialization phase
  */
-static int __init zft_init(void)
+int __init zft_init(void)
 {
 	int i;
 	TRACE_FUN(ft_t_flow);
