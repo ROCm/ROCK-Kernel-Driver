@@ -50,7 +50,7 @@ struct splash_data {
     int splash_sboxcount;
 };
 #endif
-
+    
 struct display {
     /* Filled in by the frame buffer device */
     u_short inverse;                /* != 0 text black on white as default */

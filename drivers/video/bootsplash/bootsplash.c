@@ -2,7 +2,7 @@
  *           linux/drivers/video/bootsplash/bootsplash.c - 
  *                 splash screen handling functions.
  *	
- *	(w) 2001-2003 by Volker Poplawski, <volker@poplawski.de>,
+ *	(w) 2001-2004 by Volker Poplawski, <volker@poplawski.de>,
  * 		    Stefan Reinauer, <stepan@suse.de>,
  * 		    Steffen Winterfeldt, <snwint@suse.de>,
  *                  Michael Schroeder <mls@suse.de>
@@ -19,6 +19,7 @@
 #include <linux/vt_kern.h>
 #include <linux/vmalloc.h>
 #include <linux/unistd.h>
+#include <linux/syscalls.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>
@@ -29,7 +30,7 @@
 
 extern struct fb_ops vesafb_ops;
 
-#define SPLASH_VERSION "3.1.4-2004/02/19"
+#define SPLASH_VERSION "3.1.5-2004/03/18"
 
 /* These errors have to match fbcon-jpegdec.h */
 static unsigned char *jpg_errors[] = {
@@ -865,10 +866,6 @@ static int splash_proc_unregister(void)
 }
 # endif
 #endif	/* CONFIG_PROC_FS */
-
-asmlinkage long sys_lseek(int fd, off_t offset, unsigned int origin);
-asmlinkage long sys_read(int fd, char *buf, size_t count);
-asmlinkage long sys_unlink(const char *name);
 
 void splash_init(void)
 {

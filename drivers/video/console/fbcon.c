@@ -2448,10 +2448,9 @@ int __init fb_console_init(void)
 {
 	if (!num_registered_fb)
 		return -ENODEV;
-#ifdef CONFIG_BOOTSPLASH
-	splash_init();
-#endif
-
+	#ifdef CONFIG_BOOTSPLASH
+		splash_init();
+	#endif
 	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
 	acquire_console_sem();
 	if (!fbcon_event_notifier_registered) {
