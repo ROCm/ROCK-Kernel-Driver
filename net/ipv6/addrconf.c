@@ -487,10 +487,15 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	struct inet6_ifaddr *ifa = NULL;
 	struct rt6_info *rt;
 	int hash;
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	int err = 0;
 
-	spin_lock_bh(&lock);
+	read_lock_bh(&addrconf_lock);
+	if (idev->dead) {
+		err = -ENODEV;			/*XXX*/
+		goto out2;
+	}
+
+	write_lock(&addrconf_hash_lock);
 
 	/* Ignore adding duplicate addresses on an interface */
 	if (ipv6_chk_same_addr(addr, idev->dev)) {
@@ -524,13 +529,6 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	ifa->flags = flags | IFA_F_TENTATIVE;
 	ifa->cstamp = ifa->tstamp = jiffies;
 
-	read_lock(&addrconf_lock);
-	if (idev->dead) {
-		read_unlock(&addrconf_lock);
-		err = -ENODEV;	/*XXX*/
-		goto out;
-	}
-
 	inet6_ifa_count++;
 	ifa->idev = idev;
 	in6_dev_hold(idev);
@@ -540,35 +538,30 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	/* Add to big hash table */
 	hash = ipv6_addr_hash(addr);
 
-	write_lock_bh(&addrconf_hash_lock);
 	ifa->lst_next = inet6_addr_lst[hash];
 	inet6_addr_lst[hash] = ifa;
 	in6_ifa_hold(ifa);
-	write_unlock_bh(&addrconf_hash_lock);
+	write_unlock(&addrconf_hash_lock);
 
-	write_lock_bh(&idev->lock);
+	write_lock(&idev->lock);
 	/* Add to inet6_dev unicast addr list. */
 	ifa->if_next = idev->addr_list;
 	idev->addr_list = ifa;
 
 #ifdef CONFIG_IPV6_PRIVACY
-	ifa->regen_count = 0;
 	if (ifa->flags&IFA_F_TEMPORARY) {
 		ifa->tmp_next = idev->tempaddr_list;
 		idev->tempaddr_list = ifa;
 		in6_ifa_hold(ifa);
-	} else {
-		ifa->tmp_next = NULL;
 	}
 #endif
 
 	ifa->rt = rt;
 
 	in6_ifa_hold(ifa);
-	write_unlock_bh(&idev->lock);
-	read_unlock(&addrconf_lock);
-out:
-	spin_unlock_bh(&lock);
+	write_unlock(&idev->lock);
+out2:
+	read_unlock_bh(&addrconf_lock);
 
 	if (unlikely(err == 0))
 		notifier_call_chain(&inet6addr_chain, NETDEV_UP, ifa);
@@ -578,6 +571,9 @@ out:
 	}
 
 	return ifa;
+out:
+	write_unlock(&addrconf_hash_lock);
+	goto out2;
 }
 
 /* This function wants to get referenced ifp and releases it before return */
