@@ -96,9 +96,11 @@
  *
  * Any operation working on dquots via inode pointers must hold dqptr_sem.  If
  * operation is just reading pointers from inode (or not using them at all) the
- * read lock is enough. If pointers are altered function must hold write lock.
- * If operation is holding reference to dquot in other way (e.g. quotactl ops)
- * it must be guarded by dqonoff_sem.
+ * read lock is enough. If pointers are altered function must hold write lock
+ * (these locking rules also apply for S_NOQUOTA flag in the inode - note that
+ * for altering the flag i_sem is also needed).  If operation is holding
+ * reference to dquot in other way (e.g. quotactl ops) it must be guarded by
+ * dqonoff_sem.
  * This locking assures that:
  *   a) update/access to dquot pointers in inode is serialized
  *   b) everyone is guarded against invalidate_dquots()
@@ -112,7 +114,7 @@
  * operations on dquots don't hold dq_lock as they copy data under dq_data_lock
  * spinlock to internal buffers before writing.
  *
- * Lock ordering (including some related VFS locks) is the following:
+ * Lock ordering (including related VFS locks) is following:
  *   i_sem > dqonoff_sem > iprune_sem > journal_lock > dqptr_sem >
  *   > dquot->dq_lock > dqio_sem
  * i_sem on quota files is special (it's below dqio_sem)
@@ -686,16 +688,8 @@ static inline int dqput_blocks(struct dquot *dquot)
 int remove_inode_dquot_ref(struct inode *inode, int type, struct list_head *tofree_head)
 {
 	struct dquot *dquot = inode->i_dquot[type];
-	int cnt;
 
 	inode->i_dquot[type] = NODQUOT;
-	/* any other quota in use? */
-	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
-		if (inode->i_dquot[cnt] != NODQUOT)
-			goto put_it;
-	}
-	inode->i_flags &= ~S_QUOTA;
-put_it:
 	if (dquot != NODQUOT) {
 		if (dqput_blocks(dquot)) {
 #ifdef __DQUOT_PARANOIA
@@ -956,8 +950,6 @@ int dquot_initialize(struct inode *inode, int type)
 					break;
 			}
 			inode->i_dquot[cnt] = dqget(inode->i_sb, id, cnt);
-			if (inode->i_dquot[cnt])
-				inode->i_flags |= S_QUOTA;
 		}
 	}
 out_err:
@@ -974,7 +966,6 @@ int dquot_drop(struct inode *inode)
 	int cnt;
 
 	down_write(&sb_dqopt(inode->i_sb)->dqptr_sem);
-	inode->i_flags &= ~S_QUOTA;
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		if (inode->i_dquot[cnt] != NODQUOT) {
 			dqput(inode->i_dquot[cnt]);
@@ -1367,7 +1358,7 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	struct quota_info *dqopt = sb_dqopt(sb);
 	struct dquot *to_drop[MAXQUOTAS];
 	int error, cnt;
-	unsigned int oldflags;
+	unsigned int oldflags = -1;
 
 	if (!fmt)
 		return -ESRCH;
@@ -1379,22 +1370,26 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	if (!S_ISREG(inode->i_mode))
 		goto out_fmt;
 
+	down(&inode->i_sem);
 	down(&dqopt->dqonoff_sem);
 	if (sb_has_quota_enabled(sb, type)) {
+		up(&inode->i_sem);
 		error = -EBUSY;
 		goto out_lock;
 	}
-	oldflags = inode->i_flags;
-	dqopt->files[type] = f;
-	error = -EINVAL;
-	if (!fmt->qf_ops->check_quota_file(sb, type))
-		goto out_file_init;
 	/* We don't want quota and atime on quota files (deadlocks possible)
 	 * We also need to set GFP mask differently because we cannot recurse
 	 * into filesystem when allocating page for quota inode */
 	down_write(&dqopt->dqptr_sem);
+	oldflags = inode->i_flags & (S_NOATIME | S_NOQUOTA);
 	inode->i_flags |= S_NOQUOTA | S_NOATIME;
+	up_write(&dqopt->dqptr_sem);
+	up(&inode->i_sem);
 
+	dqopt->files[type] = f;
+	error = -EINVAL;
+	if (!fmt->qf_ops->check_quota_file(sb, type))
+		goto out_file_init;
 	/*
 	 * We write to quota files deep within filesystem code.  We don't want
 	 * the VFS to reenter filesystem code when it tries to allocate a
@@ -1404,11 +1399,11 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	mapping_set_gfp_mask(inode->i_mapping,
 		mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS);
 
+	down_write(&dqopt->dqptr_sem);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		to_drop[cnt] = inode->i_dquot[cnt];
 		inode->i_dquot[cnt] = NODQUOT;
 	}
-	inode->i_flags &= ~S_QUOTA;
 	up_write(&dqopt->dqptr_sem);
 	/* We must put dquots outside of dqptr_sem because we may need to
 	 * start transaction for dquot_release() */
@@ -1434,11 +1429,20 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	return 0;
 
 out_file_init:
-	inode->i_flags = oldflags;
 	dqopt->files[type] = NULL;
 out_lock:
-	up_write(&dqopt->dqptr_sem);
 	up(&dqopt->dqonoff_sem);
+	if (oldflags != -1) {
+		down(&inode->i_sem);
+		down_write(&dqopt->dqptr_sem);
+		/* Reset the NOATIME flag back. I know it could change in the
+		 * mean time but playing with NOATIME flags on a quota file is
+		 * never a good idea */
+		inode->i_flags &= ~(S_NOATIME | S_NOQUOTA);
+		inode->i_flags |= oldflags;
+		up_write(&dqopt->dqptr_sem);
+		up(&inode->i_sem);
+	}
 out_fmt:
 	put_quota_format(fmt);
 
