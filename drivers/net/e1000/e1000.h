@@ -92,6 +92,16 @@ struct e1000_adapter;
 
 #define E1000_MAX_INTR 10
 
+/* How many descriptors for TX and RX ? */
+#define E1000_DEFAULT_TXD                  256
+#define E1000_MAX_TXD                      256
+#define E1000_MIN_TXD                       80
+#define E1000_MAX_82544_TXD               4096
+#define E1000_DEFAULT_RXD                  256
+#define E1000_MAX_RXD                      256
+#define E1000_MIN_RXD                       80
+#define E1000_MAX_82544_RXD               4096
+
 /* Supported Rx Buffer Sizes */
 #define E1000_RXBUFFER_2048  2048
 #define E1000_RXBUFFER_4096  4096

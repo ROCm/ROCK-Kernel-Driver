@@ -30,10 +30,20 @@
 
 /* Change Log
  *
- * 5.2.20	9/30/03
+ * 5.2.27	12/14/03
+ *   o Added netpoll support.
+ *   o Fixed endianess bug causing ethtool loopback diags to fail on ppc.
+ *   o Use pdev->irq rather than netdev->irq in preparation for MSI support.
+ *   o Report driver message on user override of InterruptThrottleRate
+ *     module parameter.
+ *   o Change I/O address storage from uint32_t to unsigned long.
+ *   o Added ethtool RINGPARAM support.
+ *
+ * 5.2.22	10/15/03
  *   o Bug fix: SERDES devices might be connected to a back-plane
  *     switch that doesn't support auto-neg, so add the capability
- *     to force 1000/Full.
+ *     to force 1000/Full.  Also, since forcing 1000/Full, sample
+ *     RxSynchronize bit to detect link state.
  *   o Bug fix: Flow control settings for hi/lo watermark didn't
  *     consider changes in the Rx FIFO size, which could occur with
  *     Jumbo Frames or with the reduced FIFO in 82547.
@@ -42,29 +52,18 @@
  *   o Bug fix: hang under heavy Tx stress when running out of Tx
  *     descriptors; wasn't clearing context descriptor when backing
  *     out of send because of no-resource condition.
+ *   o Bug fix: check netif_running in dev->poll so we don't have to
+ *     hang in dev->close until all polls are finished.  [Robert
+ *     Ollson (robert.olsson@data.slu.se)].
+ *   o Revert TxDescriptor ring size back to 256 since change to 1024
+ *     wasn't accepted into the kernel.
  *
  * 5.2.16	8/8/03
- *   o Added support for new controllers: 82545GM, 82546GB, 82541/7_B1
- *   o Bug fix: reset h/w before first EEPROM read because we don't know
- *     who may have been messing with the device before we got there.
- *     [Dave Johnson (ddj -a-t- cascv.brown.edu)]
- *   o Bug fix: read the correct work from EEPROM to detect programmed
- *     WoL settings.
- *   o Bug fix: TSO would hang if space left in FIFO was being miscalculated
- *     when mss dropped without a correspoding drop in the DMA buffer size.
- *   o ASF for Fiber nics isn't supported.
- *   o Bug fix: Workaround added for potential hang with 82544 running in
- *     PCI-X if send buffer terminates within an evenly-aligned dword.
- *   o Feature: Add support for ethtool flow control setting.
- *   o Feature: Add support for ethtool TSO setting.
- *   o Feature: Increase default Tx Descriptor count to 1024 for >= 82544.
- *   
- * 5.1.13	5/28/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.20-k1";
+char e1000_driver_version[] = "5.2.27-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -89,7 +88,6 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x1014, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1015, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
@@ -113,12 +111,16 @@ static struct pci_device_id e1000_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, e1000_pci_tbl);
 
-/* Local Function Prototypes */
-
 int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
 void e1000_reset(struct e1000_adapter *adapter);
 int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
+int e1000_setup_tx_resources(struct e1000_adapter *adapter);
+int e1000_setup_rx_resources(struct e1000_adapter *adapter);
+void e1000_free_tx_resources(struct e1000_adapter *adapter);
+void e1000_free_rx_resources(struct e1000_adapter *adapter);
+
+/* Local Function Prototypes */
 
 static int e1000_init_module(void);
 static void e1000_exit_module(void);
@@ -127,15 +129,11 @@ static void __devexit e1000_remove(struct pci_dev *pdev);
 static int e1000_sw_init(struct e1000_adapter *adapter);
 static int e1000_open(struct net_device *netdev);
 static int e1000_close(struct net_device *netdev);
-static int e1000_setup_tx_resources(struct e1000_adapter *adapter);
-static int e1000_setup_rx_resources(struct e1000_adapter *adapter);
 static void e1000_configure_tx(struct e1000_adapter *adapter);
 static void e1000_configure_rx(struct e1000_adapter *adapter);
 static void e1000_setup_rctl(struct e1000_adapter *adapter);
 static void e1000_clean_tx_ring(struct e1000_adapter *adapter);
 static void e1000_clean_rx_ring(struct e1000_adapter *adapter);
-static void e1000_free_tx_resources(struct e1000_adapter *adapter);
-static void e1000_free_rx_resources(struct e1000_adapter *adapter);
 static void e1000_set_multi(struct net_device *netdev);
 static void e1000_update_phy_info(unsigned long data);
 static void e1000_watchdog(unsigned long data);
@@ -180,6 +178,11 @@ static int e1000_notify_reboot(struct notifier_block *, unsigned long event, voi
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
 #ifdef CONFIG_PM
 static int e1000_resume(struct pci_dev *pdev);
+#endif
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/* for netdump / net console */
+static void e1000_netpoll (struct net_device *dev);
 #endif
 
 struct notifier_block e1000_notifier_reboot = {
@@ -268,7 +271,7 @@ e1000_up(struct e1000_adapter *adapter)
 	e1000_configure_rx(adapter);
 	e1000_alloc_rx_buffers(adapter);
 
-	if((err = request_irq(netdev->irq, &e1000_intr,
+	if((err = request_irq(adapter->pdev->irq, &e1000_intr,
 		              SA_SHIRQ | SA_SAMPLE_RANDOM,
 		              netdev->name, netdev)))
 		return err;
@@ -285,7 +288,7 @@ e1000_down(struct e1000_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 
 	e1000_irq_disable(adapter);
-	free_irq(netdev->irq, netdev);
+	free_irq(adapter->pdev->irq, netdev);
 	del_timer_sync(&adapter->tx_fifo_stall_timer);
 	del_timer_sync(&adapter->watchdog_timer);
 	del_timer_sync(&adapter->phy_info_timer);
@@ -434,8 +437,10 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	netdev->poll_controller = e1000_netpoll;
+#endif
 
-	netdev->irq = pdev->irq;
 	netdev->mem_start = mmio_start;
 	netdev->mem_end = mmio_start + mmio_len;
 	netdev->base_addr = adapter->hw.io_base;
@@ -749,7 +754,7 @@ e1000_close(struct net_device *netdev)
  * Return 0 on success, negative on failure
  **/
 
-static int
+int
 e1000_setup_tx_resources(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
@@ -866,7 +871,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
  * Returns 0 on success, negative on failure
  **/
 
-static int
+int
 e1000_setup_rx_resources(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *rxdr = &adapter->rx_ring;
@@ -1005,7 +1010,7 @@ e1000_configure_rx(struct e1000_adapter *adapter)
  * Free all transmit software resources
  **/
 
-static void
+void
 e1000_free_tx_resources(struct e1000_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
@@ -1073,7 +1078,7 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
  * Free all receive software resources
  **/
 
-static void
+void
 e1000_free_rx_resources(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
@@ -1281,41 +1286,6 @@ e1000_set_multi(struct net_device *netdev)
 		e1000_leave_82542_rst(adapter);
 }
 
-static void
-e1000_tx_flush(struct e1000_adapter *adapter)
-{
-	uint32_t ctrl, tctl, txcw, icr;
-
-	e1000_irq_disable(adapter);
-
-	if(adapter->hw.mac_type < e1000_82543) {
-		/* Transmit Unit Reset */
-		tctl = E1000_READ_REG(&adapter->hw, TCTL);
-		E1000_WRITE_REG(&adapter->hw, TCTL, tctl | E1000_TCTL_RST);
-		E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
-		e1000_clean_tx_ring(adapter);
-		e1000_configure_tx(adapter);
-	} else {
-		txcw = E1000_READ_REG(&adapter->hw, TXCW);
-		E1000_WRITE_REG(&adapter->hw, TXCW, txcw & ~E1000_TXCW_ANE);
-
-		ctrl = E1000_READ_REG(&adapter->hw, CTRL);
-		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl | E1000_CTRL_SLU |
-				E1000_CTRL_ILOS);
-
-		mdelay(10);
-
-		e1000_clean_tx_irq(adapter);
-		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
-		E1000_WRITE_REG(&adapter->hw, TXCW, txcw);
-
-		/* clear the link status change interrupts this caused */
-		icr = E1000_READ_REG(&adapter->hw, ICR);
-	}
-
-	e1000_irq_enable(adapter);
-}
-
 /* need to wait a few seconds after link up to get diagnostic information from the phy */
 
 static void
@@ -1379,10 +1349,17 @@ e1000_watchdog(unsigned long data)
 	struct net_device *netdev = adapter->netdev;
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
 	unsigned int i;
+	uint32_t link;
 
 	e1000_check_for_link(&adapter->hw);
 
-	if(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU) {
+	if((adapter->hw.media_type == e1000_media_type_internal_serdes) &&
+	   !(E1000_READ_REG(&adapter->hw, TXCW) & E1000_TXCW_ANE))
+		link = !adapter->hw.serdes_link_down;
+	else
+		link = E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU;
+
+	if(link) {
 		if(!netif_carrier_ok(netdev)) {
 			e1000_get_speed_and_duplex(&adapter->hw,
 			                           &adapter->link_speed,
@@ -1419,10 +1396,11 @@ e1000_watchdog(unsigned long data)
 
 	if(!netif_carrier_ok(netdev)) {
 		if(E1000_DESC_UNUSED(txdr) + 1 < txdr->count) {
-			unsigned long flags;
-			spin_lock_irqsave(&netdev->xmit_lock, flags);
-			e1000_tx_flush(adapter);
-			spin_unlock_irqrestore(&netdev->xmit_lock, flags);
+			/* We've lost link, so the controller stops DMA,
+			 * but we've got queued Tx work that's never going
+			 * to get done, so reset controller to flush Tx.
+			 * (Do the reset outside of interrupt context). */
+			schedule_work(&adapter->tx_timeout_task);
 		}
 	}
 
@@ -2064,7 +2042,7 @@ e1000_irq_disable(struct e1000_adapter *adapter)
 	atomic_inc(&adapter->irq_sem);
 	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
 	E1000_WRITE_FLUSH(&adapter->hw);
-	synchronize_irq(adapter->netdev->irq);
+	synchronize_irq(adapter->pdev->irq);
 }
 
 /**
@@ -2093,6 +2071,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 {
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev->priv;
+	struct e1000_hw *hw = &adapter->hw;
 	uint32_t icr = E1000_READ_REG(&adapter->hw, ICR);
 #ifndef CONFIG_E1000_NAPI
 	unsigned int i;
@@ -2102,7 +2081,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		return IRQ_NONE;  /* Not our interrupt */
 
 	if(icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
-		adapter->hw.get_link_status = 1;
+		hw->get_link_status = 1;
 		mod_timer(&adapter->watchdog_timer, jiffies);
 	}
 
@@ -2114,7 +2093,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		*/
 
 		atomic_inc(&adapter->irq_sem);
-		E1000_WRITE_REG(&adapter->hw, IMC, ~0);
+		E1000_WRITE_REG(hw, IMC, ~0);
 		__netif_rx_schedule(netdev);
 	}
 #else
@@ -2146,7 +2125,7 @@ e1000_clean(struct net_device *netdev, int *budget)
 	*budget -= work_done;
 	netdev->quota -= work_done;
 	
-	if(work_done < work_to_do) {
+	if(work_done < work_to_do || !netif_running(netdev)) {
 		netif_rx_complete(netdev);
 		e1000_irq_enable(adapter);
 	}
@@ -2642,13 +2621,13 @@ e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 }
 
 uint32_t
-e1000_io_read(struct e1000_hw *hw, uint32_t port)
+e1000_io_read(struct e1000_hw *hw, unsigned long port)
 {
 	return inl(port);
 }
 
 void
-e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value)
+e1000_io_write(struct e1000_hw *hw, unsigned long port, uint32_t value)
 {
 	outl(value, port);
 }
@@ -2897,6 +2876,22 @@ e1000_resume(struct pci_dev *pdev)
 	}
 
 	return 0;
+}
+#endif
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void e1000_netpoll (struct net_device *dev)
+{
+	struct e1000_adapter *adapter = dev->priv;
+	disable_irq(adapter->pdev->irq);
+	e1000_intr (adapter->pdev->irq, dev, NULL);
+	enable_irq(adapter->pdev->irq);
 }
 #endif
 
