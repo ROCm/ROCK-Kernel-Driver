@@ -27,7 +27,7 @@ define_bool CONFIG_GSC y
 bool 'U2/Uturn I/O MMU' CONFIG_IOMMU_CCIO y
 bool 'LASI I/O support' CONFIG_GSC_LASI y
 
-bool 'PCI bus support' CONFIG_PCI y
+bool 'PCI support' CONFIG_PCI y
 
 if [ "$CONFIG_PCI" = "y" ]; then
 	bool 'GSCtoPCI/DINO PCI support' CONFIG_GSC_DINO y

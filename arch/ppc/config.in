@@ -311,7 +311,7 @@ define_bool CONFIG_SBUS n
 define_bool CONFIG_MCA n
 
 if [ "$CONFIG_4xx" = "y" -o "$CONFIG_8260" = "y" ]; then
-   bool "Enable PCI" CONFIG_PCI
+   bool "PCI support" CONFIG_PCI
    bool 'PC PS/2 style Keyboard' CONFIG_PC_KEYBOARD
 else
    if [ "$CONFIG_8xx" = "y" ]; then
