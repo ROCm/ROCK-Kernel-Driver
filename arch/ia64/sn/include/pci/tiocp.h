@@ -8,7 +8,7 @@
 #ifndef _ASM_IA64_SN_PCI_TIOCP_H
 #define _ASM_IA64_SN_PCI_TIOCP_H
 
-#define TIOCP_HOST_INTR_ADDR            0x003FFFFFFFFFFFFF
+#define TIOCP_HOST_INTR_ADDR            0x003FFFFFFFFFFFFFUL
 #define TIOCP_PCI64_CMDTYPE_MEM         (0x1ull << 60)
 
 

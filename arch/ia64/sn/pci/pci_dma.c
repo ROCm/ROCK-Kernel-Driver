@@ -474,3 +474,4 @@ EXPORT_SYMBOL(sn_pci_unmap_sg);
 EXPORT_SYMBOL(sn_pci_alloc_consistent);
 EXPORT_SYMBOL(sn_pci_free_consistent);
 EXPORT_SYMBOL(sn_pci_dma_supported);
+EXPORT_SYMBOL(sn_dma_mapping_error);
