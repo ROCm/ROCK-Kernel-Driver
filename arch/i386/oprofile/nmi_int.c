@@ -333,7 +333,9 @@ static int __init ppro_init(void)
 	if (cpu_model > 0xd)
 		return 0;
 
-	if (cpu_model > 5) {
+	if (cpu_model == 9) {
+		nmi_ops.cpu_type = "i386/p6_mobile";
+	} else if (cpu_model > 5) {
 		nmi_ops.cpu_type = "i386/piii";
 	} else if (cpu_model > 2) {
 		nmi_ops.cpu_type = "i386/pii";
