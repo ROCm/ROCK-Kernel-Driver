@@ -82,9 +82,9 @@ static struct {
 static int nTxBlock = 512;	/* number of transaction blocks */
 struct tblock *TxBlock;	        /* transaction block table */
 
-static int nTxLock = 2048;	/* number of transaction locks */
-static int TxLockLWM = 2048*.4;	/* Low water mark for number of txLocks used */
-static int TxLockHWM = 2048*.8;	/* High water mark for number of txLocks used */
+static int nTxLock = 4096;	/* number of transaction locks */
+static int TxLockLWM = 4096*.4;	/* Low water mark for number of txLocks used */
+static int TxLockHWM = 4096*.8;	/* High water mark for number of txLocks used */
 struct tlock *TxLock;           /* transaction lock table */
 static int TlocksLow = 0;	/* Indicates low number of available tlocks */
 
