@@ -120,13 +120,13 @@ config FBCON_ADVANCED
 
 config FBCON_ACCEL
 	tristate "Hardware acceleration support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_NEOMAGIC!=y && !FB_VESA && !FB_FM2 && FB_HIT!=y && !FB_HP300 && !FB_Q40 && !FB_ANAKIN && !FB_G364 && FB_VIRTUAL!=y && !FB_CLPS711X && !FB_PMAG_BA && !FB_PMAGB_B && FB_3DFX!=y && !FB_TX3912 && !FB_MAXINE && !FB_APOLLO && FB_ATY!=y && !FB_MAC && FB_RIVA!=y && FB_HGA!=y && !FB_OF && FB_SGIVW!=y && (FB_NEOMAGIC=m || FB_HIT=m || FB_VIRTUAL=m || FB_3DFX=m || FB_RIVA=m || FB_SGIVW=m || FB_HGA=m)
-	default y if !FBCON_ADVANCED && (FB_NEOMAGIC=y || FB_VESA || FB_FM2 || FB_HIT=y || FB_HP300 || FB_Q40 || FB_ANAKIN || FB_G364 || FB_VIRTUAL=y || FB_CLPS711X || FB_PMAG_BA || FB_PMAGB_B || FB_3DFX=y || FB_TX3912 || FB_MAXINE || FB_APOLLO || FB_ATY=y || FB_MAC || FB_RIVA=y || FB_OF || FB_SGIVW=y || FB_HGA=y)
+	depends on FRAMEBUFFER_CONSOLE 
+	default m if !FBCON_ADVANCED && FB_NEOMAGIC!=y && !FB_VESA && !FB_FM2 && FB_HIT!=y && !FB_HP300 && !FB_Q40 && !FB_ANAKIN && !FB_G364 && FB_VIRTUAL!=y && !FB_CLPS711X && !FB_PMAG_BA && !FB_PMAGB_B && FB_3DFX!=y && !FB_TX3912 && !FB_MAXINE && !FB_APOLLO && FB_ATY!=y && !FB_MAC && FB_RIVA!=y && FB_HGA!=y && !FB_OF && FB_SGIVW!=y && FB_VGA16!=y && (FB_NEOMAGIC=m || FB_HIT=m || FB_VIRTUAL=m || FB_3DFX=m || FB_RIVA=m || FB_SGIVW=m || FB_HGA=m)
+	default y if !FBCON_ADVANCED && (FB_NEOMAGIC=y || FB_VESA || FB_FM2 || FB_HIT=y || FB_HP300 || FB_Q40 || FB_ANAKIN || FB_G364 || FB_VIRTUAL=y || FB_CLPS711X || FB_PMAG_BA || FB_PMAGB_B || FB_3DFX=y || FB_TX3912 || FB_MAXINE || FB_APOLLO || FB_ATY=y || FB_MAC || FB_RIVA=y || FB_OF || FB_SGIVW=y || FB_HGA=y || FB_VGA16)
 
 config FBCON_AFB
 	tristate "Amiga bitplanes support" if FBCON_ADVANCED
-	depends on FB
+	depends on FRAMEBUFFER_CONSOLE 
 	default m if !FBCON_ADVANCED && FB_AMIGA=m
 	default y if !FBCON_ADVANCED && FB_AMIGA=y
 	help
@@ -135,7 +135,7 @@ config FBCON_AFB
 
 config FBCON_ILBM
 	tristate "Amiga interleaved bitplanes support" if FBCON_ADVANCED
-	depends on FB
+	depends on FRAMEBUFFER_CONSOLE 
 	default m if !FBCON_ADVANCED && FB_AMIGA=m
 	default y if !FBCON_ADVANCED && FB_AMIGA=y
 	help
@@ -144,7 +144,7 @@ config FBCON_ILBM
 
 config FBCON_IPLAN2P2
 	tristate "Atari interleaved bitplanes (2 planes) support" if FBCON_ADVANCED
-	depends on FB
+	depends on FRAMEBUFFER_CONSOLE 
 	default y if !FBCON_ADVANCED && FB_ATARI
 	help
 	  This is the low level frame buffer console driver for 2 interleaved
@@ -152,7 +152,7 @@ config FBCON_IPLAN2P2
 
 config FBCON_IPLAN2P4
 	tristate "Atari interleaved bitplanes (4 planes) support" if FBCON_ADVANCED
-	depends on FB
+	depends on FRAMEBUFFER_CONSOLE 
 	default y if !FBCON_ADVANCED && FB_ATARI
 	help
 	  This is the low level frame buffer console driver for 4 interleaved
@@ -160,7 +160,7 @@ config FBCON_IPLAN2P4
 
 config FBCON_IPLAN2P8
 	tristate "Atari interleaved bitplanes (8 planes) support" if FBCON_ADVANCED
-	depends on FB
+	depends on FRAMEBUFFER_CONSOLE 
 	default y if !FBCON_ADVANCED && FB_ATARI
 	help
 	  This is the low level frame buffer console driver for 8 interleaved
@@ -169,7 +169,7 @@ config FBCON_IPLAN2P8
 # Guess what we need
 config FBCON_STI
 	tristate
-	depends on !FBCON_ADVANCED && FB_STI
+	depends on !FBCON_ADVANCED && FRAMEBUFFER_CONSOLE && FB_STI
 	default y
 
 config FBCON_FONTWIDTH8_ONLY

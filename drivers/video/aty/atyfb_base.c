@@ -2633,15 +2633,15 @@ void cleanup_module(void)
 	if (info->screen_base)
 		iounmap((void *) info->screen_base);
 #ifdef __BIG_ENDIAN
-	if (info->cursor && info->cursor->ram)
-		iounmap(info->cursor->ram);
+	if (par->cursor && par->cursor->ram)
+		iounmap(par->cursor->ram);
 #endif
 #endif
 
-	if (info->cursor) {
-		if (info->cursor->timer)
-			kfree(info->cursor->timer);
-		kfree(info->cursor);
+	if (par->cursor) {
+		if (par->cursor->timer)
+			kfree(par->cursor->timer);
+		kfree(par->cursor);
 	}
 #ifdef __sparc__
 	if (par->mmap_map)

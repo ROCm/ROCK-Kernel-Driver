@@ -22,25 +22,27 @@
 #include <linux/init.h>
 
 #include <asm/io.h>
-
-#include <video/fbcon.h>
-#include "fbcon-accel.h"
 #include "vga.h"
 
-#define GRAPHICS_ADDR_REG 0x3ce		/* Graphics address register. */
-#define GRAPHICS_DATA_REG 0x3cf		/* Graphics data register. */
+#define GRAPHICS_ADDR_REG VGA_GFX_I	/* Graphics address register. */
+#define GRAPHICS_DATA_REG VGA_GFX_D	/* Graphics data register. */
 
-#define SET_RESET_INDEX 0		/* Set/Reset Register index. */
-#define ENABLE_SET_RESET_INDEX 1	/* Enable Set/Reset Register index. */
-#define DATA_ROTATE_INDEX 3		/* Data Rotate Register index. */
-#define GRAPHICS_MODE_INDEX 5		/* Graphics Mode Register index. */
-#define BIT_MASK_INDEX 8		/* Bit Mask Register index. */
+#define SET_RESET_INDEX 	VGA_GFX_SR_VALUE	/* Set/Reset Register index. */
+#define ENABLE_SET_RESET_INDEX	VGA_GFX_SR_ENABLE	/* Enable Set/Reset Register index. */
+#define DATA_ROTATE_INDEX	VGA_GFX_DATA_ROTATE	/* Data Rotate Register index. */
+#define GRAPHICS_MODE_INDEX	VGA_GFX_MODE		/* Graphics Mode Register index. */
+#define BIT_MASK_INDEX		VGA_GFX_BIT_MASK	/* Bit Mask Register index. */
 
 #define dac_reg	(VGA_PEL_IW)
 #define dac_val	(VGA_PEL_D)
 
 #define VGA_FB_PHYS 0xA0000
 #define VGA_FB_PHYS_LEN 65536
+
+#define MODE_SKIP4	1
+#define MODE_8BPP	2
+#define MODE_CFB	4
+#define MODE_TEXT	8
 
 /* --------------------------------------------------------------------- */
 
@@ -80,7 +82,7 @@ static struct fb_var_screeninfo vga16fb_defined = {
 	.xres_virtual	= 640,
 	.yres_virtual	= 480,
 	.bits_per_pixel	= 4,	
-	.activate	= FB_ACTIVATE_NOW,
+	.activate	= FB_ACTIVATE_TEST,
 	.height		= -1,
 	.width		= -1,
 	.pixclock	= 39721,
@@ -107,8 +109,6 @@ static struct fb_fix_screeninfo vga16fb_fix __initdata = {
 	.accel		= FB_ACCEL_NONE
 };
 
-static struct display disp;
-
 /* The VGA's weird architecture often requires that we read a byte and
    write a byte to the same location.  It doesn't matter *what* byte
    we write, however.  This is because all the action goes on behind
@@ -126,70 +126,90 @@ static inline void rmw(volatile char *p)
 	writeb(1, p);
 }
 
-/* Set the Graphics Mode Register.  Bits 0-1 are write mode, bit 3 is
-   read mode. */
-static inline void setmode(int mode)
+/* Set the Graphics Mode Register, and return its previous value.
+   Bits 0-1 are write mode, bit 3 is read mode. */
+static inline int setmode(int mode)
 {
-	outb(GRAPHICS_MODE_INDEX, GRAPHICS_ADDR_REG);
-	outb(mode, GRAPHICS_DATA_REG);
+	int oldmode;
+	
+	vga_io_w(GRAPHICS_ADDR_REG, GRAPHICS_MODE_INDEX);
+	oldmode = vga_io_r(GRAPHICS_DATA_REG);
+	vga_io_w(GRAPHICS_DATA_REG, mode);
+	return oldmode;
 }
 
-/* Select the Bit Mask Register. */
-static inline void selectmask(void)
+/* Select the Bit Mask Register and return its value. */
+static inline int selectmask(void)
 {
-	outb(BIT_MASK_INDEX, GRAPHICS_ADDR_REG);
+	return vga_io_rgfx(BIT_MASK_INDEX);
 }
 
 /* Set the value of the Bit Mask Register.  It must already have been
    selected with selectmask(). */
 static inline void setmask(int mask)
 {
-	outb(mask, GRAPHICS_DATA_REG);
+	vga_io_w(GRAPHICS_DATA_REG, mask);
 }
 
-/* Set the Data Rotate Register.  Bits 0-2 are rotate count, bits 3-4
-   are logical operation (0=NOP, 1=AND, 2=OR, 3=XOR). */
-static inline void setop(int op)
+/* Set the Data Rotate Register and return its old value. 
+   Bits 0-2 are rotate count, bits 3-4 are logical operation
+   (0=NOP, 1=AND, 2=OR, 3=XOR). */
+static inline int setop(int op)
 {
-	outb(DATA_ROTATE_INDEX, GRAPHICS_ADDR_REG);
-	outb(op, GRAPHICS_DATA_REG);
+	int oldop;
+	
+	vga_io_w(GRAPHICS_ADDR_REG, DATA_ROTATE_INDEX);
+	oldop = vga_io_r(GRAPHICS_DATA_REG);
+	vga_io_w(GRAPHICS_DATA_REG, op);
+	return oldop;
 }
 
-/* Set the Enable Set/Reset Register.  The code here always uses value
-   0xf for this register.  */
-static inline void setsr(int sr)
+/* Set the Enable Set/Reset Register and return its old value.  
+   The code here always uses value 0xf for thsi register. */
+static inline int setsr(int sr)
 {
-	outb(ENABLE_SET_RESET_INDEX, GRAPHICS_ADDR_REG);
-	outb(sr, GRAPHICS_DATA_REG);
+	int oldsr;
+
+	vga_io_w(GRAPHICS_ADDR_REG, ENABLE_SET_RESET_INDEX);
+	oldsr = vga_io_r(GRAPHICS_DATA_REG);
+	vga_io_w(GRAPHICS_DATA_REG, sr);
+	return oldsr;
 }
 
-/* Set the Set/Reset Register. */
-static inline void setcolor(int color)
+/* Set the Set/Reset Register and return its old value. */
+static inline int setcolor(int color)
 {
-	outb(SET_RESET_INDEX, GRAPHICS_ADDR_REG);
-	outb(color, GRAPHICS_DATA_REG);
+	int oldcolor;
+
+	vga_io_w(GRAPHICS_ADDR_REG, SET_RESET_INDEX);
+	oldcolor = vga_io_r(GRAPHICS_DATA_REG);
+	vga_io_w(GRAPHICS_DATA_REG, color);
+	return oldcolor;
+}
+
+/* Return the value in the Graphics Address Register. */
+static inline int getindex(void)
+{
+	return vga_io_r(GRAPHICS_ADDR_REG);
 }
 
 /* Set the value in the Graphics Address Register. */
 static inline void setindex(int index)
 {
-	outb(index, GRAPHICS_ADDR_REG);
+	vga_io_w(GRAPHICS_ADDR_REG, index);
 }
 
 static void vga16fb_pan_var(struct fb_info *info, 
 			    struct fb_var_screeninfo *var)
 {
-	struct display *p;
+	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
 	u32 xoffset, pos;
-
-	p = (info->currcon < 0) ? info->disp : fb_display + info->currcon;
 
 	xoffset = var->xoffset;
 	if (info->var.bits_per_pixel == 8) {
 		pos = (info->var.xres_virtual * var->yoffset + xoffset) >> 2;
-	} else if (info->var.bits_per_pixel == 0) {
-		int fh = fontheight(p);
-		if (!fh) fh = 16;
+	} else if (par->mode & MODE_TEXT) {
+		int fh = 16; // FIXME !!! font height. Fugde for now.
 		pos = (info->var.xres_virtual * (var->yoffset / fh) + xoffset) >> 3;
 	} else {
 		if (info->var.nonstd)
@@ -198,8 +218,8 @@ static void vga16fb_pan_var(struct fb_info *info,
 	}
 	vga_io_wcrt(VGA_CRTC_START_HI, pos >> 8);
 	vga_io_wcrt(VGA_CRTC_START_LO, pos & 0xFF);
-/* if we support CFB4, then we must! support xoffset with pixel granularity */
-	/* if someone supports xoffset in bit resolution */
+	/* if we support CFB4, then we must! support xoffset with pixel
+	 * granularity if someone supports xoffset in bit resolution */
 	vga_io_r(VGA_IS1_RC);		/* reset flip-flop */
 	vga_io_w(VGA_ATT_IW, VGA_ATC_PEL);
 	if (var->bits_per_pixel == 8)
@@ -208,12 +228,6 @@ static void vga16fb_pan_var(struct fb_info *info,
 		vga_io_w(VGA_ATT_IW, xoffset & 7);
 	vga_io_r(VGA_IS1_RC);
 	vga_io_w(VGA_ATT_IW, 0x20);
-}
-
-static int vga16fb_update_var(int con, struct fb_info *info)
-{
-	vga16fb_pan_var(info, &info->var);
-	return 0;
 }
 
 static void vga16fb_update_fix(struct fb_info *info)
@@ -240,47 +254,6 @@ static void vga16fb_update_fix(struct fb_info *info)
 			info->fix.type = FB_TYPE_PACKED_PIXELS;
 			info->fix.line_length = info->var.xres_virtual;
 		}
-	}
-}
-
-static void vga16fb_set_disp(int con, struct fb_info *info)
-{
-	struct display *display;
-
-	display = (con < 0) ? info->disp : fb_display + con;
-
-	if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR ||
-            info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-                display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
-                display->dispsw_data = NULL;
-        } else {
-                display->can_soft_blank = 0;
-                display->dispsw_data = info->pseudo_palette;
-        }
-        display->var = info->var;
-
-	vga16fb_update_fix(info);
-	display->next_line = info->fix.line_length;
-	display->can_soft_blank = 1;
-	display->inverse = 0;
-
-	switch (info->fix.type) {
-		case FB_TYPE_VGA_PLANES:
-			if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
-				display->dispsw = &fbcon_accel;
-			} else
-#ifdef FBCON_HAS_VGA_PLANES
-				display->dispsw = &fbcon_vga8_planes;
-#endif
-			break;
-#ifdef FBCON_HAS_VGA
-		case FB_TYPE_TEXT:
-			display->dispsw = &fbcon_vga;
-			break;
-#endif
-		default: /* only FB_TYPE_PACKED_PIXELS */
-			display->dispsw = &fbcon_accel;
-			break;
 	}
 }
 
@@ -322,10 +295,6 @@ static void vga16fb_clock_chip(struct vga16fb_par *par,
 			       
 #define FAIL(X) return -EINVAL
 
-#define MODE_SKIP4	1
-#define MODE_8BPP	2
-#define MODE_CFB	4
-#define MODE_TEXT	8
 static int vga16fb_check_var(struct fb_var_screeninfo *var,
 			     struct fb_info *info)
 {
@@ -548,10 +517,13 @@ static int vga16fb_check_var(struct fb_var_screeninfo *var,
 }
 #undef FAIL
 
-static void vga16fb_load_font(struct display* p) {
+#ifdef FBCON_HAS_VGA
+static void vga16fb_load_font(struct display* p)
+{
 	int chars;
 	unsigned char* font;
 	unsigned char* dest;
+	int chars;
 	
 	if (!p || !p->fontdata)
 		return;
@@ -579,11 +551,11 @@ static void vga16fb_load_font(struct display* p) {
 	vga_io_wgfx(VGA_GFX_MODE, 0x10);
 	vga_io_wgfx(VGA_GFX_MISC, 0x06);
 }
+#endif
 
 static int vga16fb_set_par(struct fb_info *info)
 {
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
-	struct display *p = (info->currcon < 0) ? info->disp : (fb_display + info->currcon);
 	u8 gdc[VGA_GFX_C];
 	u8 seq[VGA_SEQ_C];
 	u8 atc[VGA_ATT_C];
@@ -637,9 +609,7 @@ static int vga16fb_set_par(struct fb_info *info)
 	atc[VGA_ATC_COLOR_PAGE] = 0x00;
 	
 	if (par->mode & MODE_TEXT) {
-		fh = fontheight(p);
-		if (!fh)
-			fh = 16;
+		fh = 16; // FIXME !!! Fudge font height. 
 		par->crtc[VGA_CRTC_MAX_SCAN] = (par->crtc[VGA_CRTC_MAX_SCAN] 
 					       & ~0x1F) | (fh - 1);
 	}
@@ -689,9 +659,10 @@ static int vga16fb_set_par(struct fb_info *info)
 		vga_io_wattr(i, atc[i]);
 	}
 
+#ifdef FBCON_HAS_VGA
 	if (par->mode & MODE_TEXT)
 		vga16fb_load_font(p);
-		
+#endif	
 	/* Wait for screen to stabilize. */
 	mdelay(50);
 
@@ -699,47 +670,8 @@ static int vga16fb_set_par(struct fb_info *info)
 
 	vga_io_r(VGA_IS1_RC);
 	vga_io_w(VGA_ATT_IW, 0x20);
-	return 0;
-}
 
-static int vga16fb_set_var(struct fb_var_screeninfo *var, int con,
-			  struct fb_info *info)
-{
-	struct display *display;
-	int err;
-
-	if (con < 0)
-		display = info->disp;
-	else
-		display = fb_display + con;
-	if ((err = vga16fb_check_var(var, info)) != 0)
-		return err;
-	
-	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
-		u32 oldxres, oldyres, oldvxres, oldvyres, oldbpp, oldnonstd;
-
-		oldxres = info->var.xres;
-		oldyres = info->var.yres;
-		oldvxres = info->var.xres_virtual;
-		oldvyres = info->var.yres_virtual;
-		oldbpp = info->var.bits_per_pixel;
-		oldnonstd = info->var.nonstd;
-		info->var = *var;
-
-		if (con == info->currcon)
-			vga16fb_set_par(info);
-
-		vga16fb_set_disp(con, info);
-		if (oldxres != var->xres || 
-		    oldyres != var->yres ||
-		    oldvxres != var->xres_virtual || 
-		    oldvyres != var->yres_virtual ||
-		    oldbpp != var->bits_per_pixel || 
-		    oldnonstd != var->nonstd) {
-			if (info->changevar)
-				info->changevar(con);
-		}
-	}
+	vga16fb_update_fix(info);
 	return 0;
 }
 
@@ -782,10 +714,8 @@ static int vga16fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno >= 256)
 		return 1;
 
-	if (info->currcon < 0)
-		gray = info->disp->var.grayscale;
-	else
-		gray = fb_display[info->currcon].var.grayscale;
+	gray = info->var.grayscale;
+	
 	if (gray) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
@@ -797,14 +727,15 @@ static int vga16fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-static int vga16fb_pan_display(struct fb_var_screeninfo *var, int con,
+static int vga16fb_pan_display(struct fb_var_screeninfo *var,
 			       struct fb_info *info) 
 {
 	if (var->xoffset + info->var.xres > info->var.xres_virtual ||
 	    var->yoffset + info->var.yres > info->var.yres_virtual)
 		return -EINVAL;
-	if (con == info->currcon)
-		vga16fb_pan_var(info, var);
+
+	vga16fb_pan_var(info, var);
+
 	info->var.xoffset = var->xoffset;
 	info->var.yoffset = var->yoffset;
 	info->var.vmode &= ~FB_VMODE_YWRAP;
@@ -968,6 +899,59 @@ static int vga16fb_blank(int blank, struct fb_info *info)
 	return 0;
 }
 
+void vga_8planes_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+        char oldindex = getindex();
+        char oldmode = setmode(0x40);
+        char oldmask = selectmask();
+        int line_ofs, height;
+        char oldop, oldsr;
+        char *where;
+
+        rect->dx /= 4;
+        where = info->screen_base + rect->dx + rect->dy * info->fix.line_length;
+
+        if (rect->rop == ROP_COPY) {
+                oldop = setop(0);
+                oldsr = setsr(0);
+
+                rect->width /= 4;
+                line_ofs = info->fix.line_length - rect->width;
+                setmask(0xff);
+
+                height = rect->height;
+
+                while (height--) {
+                        int x;
+
+                        /* we can do memset... */
+                        for (x = rect->width; x > 0; --x) {
+                                writeb(rect->color, where);
+                                where++;
+                        }
+                        where += line_ofs;
+                }
+        } else {
+                char oldcolor = setcolor(0xf);
+                int y;
+
+                oldop = setop(0x18);
+                oldsr = setsr(0xf);
+                setmask(0x0F);
+                for (y = 0; y < rect->height; y++) {
+                        rmw(where);
+                        rmw(where+1);
+                        where += info->fix.line_length;
+                }
+                setcolor(oldcolor);
+        }
+        setmask(oldmask);
+        setsr(oldsr);
+        setop(oldop);
+        setmode(oldmode);
+        setindex(oldindex);
+}
+
 void vga16fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 {
 	int x, x2, y2, vxres, vyres, width, height, line_ofs;
@@ -988,47 +972,114 @@ void vga16fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 	y2 = y2 < vyres ? y2 : vyres;
 	rect->width = x2 - rect->dx;
 
-	height = y2 - rect->dy;
-	width = rect->width/8;
+	switch (info->fix.type) {
+	case FB_TYPE_VGA_PLANES:
+		if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
 
-	line_ofs = info->fix.line_length - width;
-	dst = info->screen_base + (rect->dx/8) + rect->dy * info->fix.line_length;
+			height = y2 - rect->dy;
+			width = rect->width/8;
 
-	switch (rect->rop) {
-		case ROP_COPY:
-			setmode(0);
-			setop(0);
-			setsr(0xf);
-			setcolor(rect->color);
-			selectmask();
+			line_ofs = info->fix.line_length - width;
+			dst = info->screen_base + (rect->dx/8) + rect->dy * info->fix.line_length;
 
-			setmask(0xff);
+			switch (rect->rop) {
+			case ROP_COPY:
+				setmode(0);
+				setop(0);
+				setsr(0xf);
+				setcolor(rect->color);
+				selectmask();
 
-			while (height--) {
-				for (x = 0; x < width; x++) {
-					writeb(0, dst);
-					dst++;
+				setmask(0xff);
+
+				while (height--) {
+					for (x = 0; x < width; x++) {
+						writeb(0, dst);
+						dst++;
+					}
+					dst += line_ofs;
 				}
-				dst += line_ofs;
-			}
-			break;
-		case ROP_XOR:
-			setmode(0);
-			setop(0x18);
-			setsr(0xf);
-			setcolor(0xf);
-			selectmask();
+				break;
+			case ROP_XOR:
+				setmode(0);
+				setop(0x18);
+				setsr(0xf);
+				setcolor(0xf);
+				selectmask();
 
-			setmask(0xff);
-			while (height--) {
-				for (x = 0; x < width; x++) {
-					rmw(dst);
-					dst++;
+				setmask(0xff);
+				while (height--) {
+					for (x = 0; x < width; x++) {
+						rmw(dst);
+						dst++;
+					}
+					dst += line_ofs;
 				}
-				dst += line_ofs;
+				break;
 			}
-			break;
+		} else 
+			vga_8planes_fillrect(info, rect);
+		break;
+#ifdef FBCON_HAS_VGA
+	case FB_TYPE_TEXT:
+		break;
+#endif
+	case FB_TYPE_PACKED_PIXELS:
+	default:
+		cfb_fillrect(info, rect);
+		break;
 	}
+}
+
+void vga_8planes_copyarea(struct fb_info *info, struct fb_copyarea *area)
+{
+        int height, line_ofs, x;
+        char oldindex = getindex();
+        char oldmode = setmode(0x41);
+        char oldop = setop(0);
+        char oldsr = setsr(0xf);
+        char *dest, *src;
+
+        height = area->height;
+
+        area->sx = area->sx / 4;
+        area->dx = area->dx / 4;
+        area->width = area->width / 4;
+
+        if (area->dy < area->sy || (area->dy == area->sy && area->dx < area->sx)) {
+                line_ofs = info->fix.line_length - area->width;
+                dest = info->screen_base + area->dx + area->dy * info->fix.line_length;
+                src = info->screen_base + area->sx + area->sy * info->fix.line_length;
+                while (height--) {
+                        for (x = 0; x < area->width; x++) {
+                                readb(src);
+                                writeb(0, dest);
+                                src++;
+                                dest++;
+                        }
+                        src += line_ofs;
+                        dest += line_ofs;
+                }
+        } else {
+                line_ofs = info->fix.line_length - area->width;
+                dest = info->screen_base + area->dx + area->width + (area->dy + height - 1) * info->fix.line_length;
+                src = info->screen_base + area->sx + area->width + (area->sy + height - 1) * info->fix.line_length;
+                while (height--) {
+                        for (x = 0; x < area->width; x++) {
+                                --src;
+                                --dest;
+                                readb(src);
+                                writeb(0, dest);
+                        }
+                        src -= line_ofs;
+                        dest -= line_ofs;
+                }
+        }
+
+        setsr(oldsr);
+        setop(oldop);
+        setmode(oldmode);
+        setindex(oldindex);
 }
 
 void vga16fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
@@ -1071,41 +1122,104 @@ void vga16fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	    (area->sy + area->height) > vyres)
 		return;
 
-	width = area->width/8;
-	height = area->height;
-	line_ofs = info->fix.line_length - width;
+	switch (info->fix.type) {
+	case FB_TYPE_VGA_PLANES:
+		if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
+			width = area->width/8;
+			height = area->height;
+			line_ofs = info->fix.line_length - width;
 
-	setmode(1);
-	setop(0);
-	setsr(0xf);
+			setmode(1);
+			setop(0);
+			setsr(0xf);
 
-	if (area->dy < area->sy || (area->dy == area->sy && area->dx < area->sx)) {
-		dst = info->screen_base + (area->dx/8) + area->dy * info->fix.line_length;
-		src = info->screen_base + (area->sx/8) + area->sy * info->fix.line_length;
-		while (height--) {
-			for (x = 0; x < width; x++) {
-				readb(src);
-				writeb(0, dst);
-				dst++;
-				src++;
+			if (area->dy < area->sy || (area->dy == area->sy && area->dx < area->sx)) {
+				dst = info->screen_base + (area->dx/8) + area->dy * info->fix.line_length;
+				src = info->screen_base + (area->sx/8) + area->sy * info->fix.line_length;
+				while (height--) {
+					for (x = 0; x < width; x++) {
+						readb(src);
+						writeb(0, dst);
+						dst++;
+						src++;
+					}
+					src += line_ofs;
+					dst += line_ofs;
+				}
+			} else {
+				dst = info->screen_base + (area->dx/8) + width + (area->dy + height - 1) * info->fix.line_length;
+				src = info->screen_base + (area->sx/8) + width + (area->sy + height  - 1) * info->fix.line_length;
+				while (height--) {
+					for (x = 0; x < width; x++) {
+						dst--;
+						src--;
+						readb(src);
+						writeb(0, dst);
+					}
+					src -= line_ofs;
+					dst -= line_ofs;
+				}
 			}
-			src += line_ofs;
-			dst += line_ofs;
-		}
-	} else {
-		dst = info->screen_base + (area->dx/8) + width + (area->dy + height - 1) * info->fix.line_length;
-		src = info->screen_base + (area->sx/8) + width + (area->sy + height  - 1) * info->fix.line_length;
-		while (height--) {
-			for (x = 0; x < width; x++) {
-				dst--;
-				src--;
-				readb(src);
-				writeb(0, dst);
-			}
-			src -= line_ofs;
-			dst -= line_ofs;
-		}
+		} else 
+			vga_8planes_copyarea(info, area);
+		break;
+#ifdef FBCON_HAS_VGA
+	case FB_TYPE_TEXT:
+		break;
+#endif
+	case FB_TYPE_PACKED_PIXELS:
+	default:
+		cfb_copyarea(info, area);
+		break;
 	}
+}
+
+#ifdef __LITTLE_ENDIAN
+static unsigned int transl_l[] =
+{0x0,0x8,0x4,0xC,0x2,0xA,0x6,0xE,0x1,0x9,0x5,0xD,0x3,0xB,0x7,0xF};
+static unsigned int transl_h[] =
+{0x000, 0x800, 0x400, 0xC00, 0x200, 0xA00, 0x600, 0xE00,
+ 0x100, 0x900, 0x500, 0xD00, 0x300, 0xB00, 0x700, 0xF00};
+#else
+#ifdef __BIG_ENDIAN
+static unsigned int transl_h[] =
+{0x0,0x8,0x4,0xC,0x2,0xA,0x6,0xE,0x1,0x9,0x5,0xD,0x3,0xB,0x7,0xF};
+static unsigned int transl_l[] =
+{0x000, 0x800, 0x400, 0xC00, 0x200, 0xA00, 0x600, 0xE00,
+ 0x100, 0x900, 0x500, 0xD00, 0x300, 0xB00, 0x700, 0xF00};
+#else
+#error "Only __BIG_ENDIAN and __LITTLE_ENDIAN are supported in vga-planes"
+#endif
+#endif
+
+void vga_8planes_imageblit(struct fb_info *info, struct fb_image *image)
+{
+        char oldindex = getindex();
+        char oldmode = setmode(0x40);
+        char oldop = setop(0);
+        char oldsr = setsr(0);
+        char oldmask = selectmask();
+        u8 *cdat = image->data;
+        char *where;
+        int y;
+
+        image->dx /= 4;
+        where = info->screen_base + image->dx + image->dy * info->fix.line_length;
+
+        setmask(0xff);
+        writeb(image->bg_color, where);
+        readb(where);
+        selectmask();
+        setmask(image->fg_color ^ image->bg_color);
+        setmode(0x42);
+        setop(0x18);
+        for (y = 0; y < image->height; y++, where += info->fix.line_length)
+                writew(transl_h[cdat[y]&0xF] | transl_l[cdat[y] >> 4], where);
+        setmask(oldmask);
+        setsr(oldsr);
+        setop(oldop);
+        setmode(oldmode);
+        setindex(oldindex);
 }
 
 void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
@@ -1115,51 +1229,63 @@ void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
 	u8 *cdat = image->data;
 	int y;
 
-	if (par->isVGA) {
-		setmode(2);
-		setop(0);
-		setsr(0xf);
-		setcolor(image->fg_color);
-		selectmask();
+	switch (info->fix.type) {
+		case FB_TYPE_VGA_PLANES:
+			if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
+				if (par->isVGA) {
+					setmode(2);
+					setop(0);
+					setsr(0xf);
+					setcolor(image->fg_color);
+					selectmask();
 
-		setmask(0xff);
-		writeb(image->bg_color, where);
-		rmb();
-		readb(where); /* fill latches */
-		setmode(3);
-		wmb();
-		for (y = 0; y < image->height; y++, where += info->fix.line_length)
-			writeb(cdat[y], where);
-			wmb();
-	} else {
-		setmode(0);
-		setop(0);
-		setsr(0xf);
-		setcolor(image->bg_color);
-		selectmask();
+					setmask(0xff);
+					writeb(image->bg_color, where);
+					rmb();
+					readb(where); /* fill latches */
+					setmode(3);
+					wmb();
+					for (y = 0; y < image->height; y++, where += info->fix.line_length)
+						writeb(cdat[y], where);
+						wmb();
+				} else {
+					setmode(0);
+					setop(0);
+					setsr(0xf);
+					setcolor(image->bg_color);
+					selectmask();
 
-		setmask(0xff);
-		for (y = 0; y < image->height; y++, where += info->fix.line_length)
-			rmw(where);
+					setmask(0xff);
+					for (y = 0; y < image->height; y++, where += info->fix.line_length)
+						rmw(where);
 
-		where -= info->fix.line_length * y;
-		setcolor(image->fg_color);
-		selectmask();
-		for (y = 0; y < image->height; y++, where += info->fix.line_length)
-		if (cdat[y]) {
-			setmask(cdat[y]);
-			rmw(where);
-		}
+					where -= info->fix.line_length * y;
+					setcolor(image->fg_color);
+					selectmask();
+					for (y = 0; y < image->height; y++, where += info->fix.line_length)
+					if (cdat[y]) {
+						setmask(cdat[y]);
+						rmw(where);
+					}
+				}
+			} else 
+				vga_8planes_imageblit(info, image);
+			break;
+#ifdef FBCON_HAS_VGA
+		case FB_TYPE_TEXT:
+			break;
+#endif
+		case FB_TYPE_PACKED_PIXELS:
+		default:
+			cfb_imageblit(info, image);
+			break;
 	}
 }
 
 static struct fb_ops vga16fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= vga16fb_set_var,
 	.fb_check_var	= vga16fb_check_var,
 	.fb_set_par	= vga16fb_set_par,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap 	= gen_set_cmap,
 	.fb_setcolreg 	= vga16fb_setcolreg,
 	.fb_pan_display = vga16fb_pan_display,
 	.fb_blank 	= vga16fb_blank,
@@ -1172,16 +1298,11 @@ int vga16fb_setup(char *options)
 {
 	char *this_opt;
 	
-	vga16fb.fontname[0] = '\0';
-	
 	if (!options || !*options)
 		return 0;
 	
 	while ((this_opt = strsep(&options, ",")) != NULL) {
 		if (!*this_opt) continue;
-		
-		if (!strncmp(this_opt, "font:", 5))
-			strcpy(vga16fb.fontname, this_opt+5);
 	}
 	return 0;
 }
@@ -1192,7 +1313,7 @@ int __init vga16fb_init(void)
 
 	printk(KERN_DEBUG "vga16fb: initializing\n");
 
-	/* XXX share VGA_FB_PHYS region with vgacon */
+	/* XXX share VGA_FB_PHYS and I/O region with vgacon and others */
 
         vga16fb.screen_base = ioremap(VGA_FB_PHYS, VGA_FB_PHYS_LEN);
 	if (!vga16fb.screen_base) {
@@ -1211,24 +1332,16 @@ int __init vga16fb_init(void)
 	vga16fb_defined.green.length = i;
 	vga16fb_defined.blue.length  = i;	
 
-	/* XXX share VGA I/O region with vgacon and others */
-
-	disp.var = vga16fb_defined;
-
 	/* name should not depend on EGA/VGA */
-	strcpy(vga16fb.modename, "VGA16 VGA");
-	vga16fb.changevar = NULL;
 	vga16fb.node = NODEV;
 	vga16fb.fbops = &vga16fb_ops;
 	vga16fb.var = vga16fb_defined;
 	vga16fb.fix = vga16fb_fix;
 	vga16fb.par = &vga16_par;
-	vga16fb.disp = &disp;
-	vga16fb.currcon = -1;
-	vga16fb.switch_con = gen_switch;
-	vga16fb.updatevar=&vga16fb_update_var;
-	vga16fb.flags=FBINFO_FLAG_DEFAULT;
-	vga16fb_set_disp(-1, &vga16fb);
+	vga16fb.flags = FBINFO_FLAG_DEFAULT;
+
+	i = (vga16fb_defined.bits_per_pixel == 8) ? 256 : 16;
+	fb_alloc_cmap(&vga16fb.cmap, i, 0);
 
 	if (register_framebuffer(&vga16fb) < 0) {
 		iounmap(vga16fb.screen_base);
@@ -1236,7 +1349,7 @@ int __init vga16fb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       minor(vga16fb.node), vga16fb.modename);
+	       minor(vga16fb.node), vga16fb.fix.id);
 
 	return 0;
 }

@@ -844,8 +844,8 @@ vgacon_do_font_op(char *arg, int set, int ch512)
 static int
 vgacon_adjust_height(unsigned fontheight)
 {
-	int rows, maxscan;
 	unsigned char ovr, vde, fsr;
+	int rows, maxscan, i;
 
 	if (fontheight == vga_video_font_height)
 		return 0;

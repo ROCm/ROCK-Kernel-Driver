@@ -771,8 +771,8 @@ static devfs_handle_t devfs_handle;
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-	static int fb_ever_opened[FB_MAX];
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
+	static int fb_ever_opened[FB_MAX];
 	static int first = 1;
 	int j;
 #endif
@@ -788,9 +788,9 @@ register_framebuffer(struct fb_info *fb_info)
 	fb_info->node = mk_kdev(FB_MAJOR, i);
 	fb_info->currcon = -1;
 	registered_fb[i] = fb_info;
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	if (!fb_ever_opened[i]) {
 		struct module *owner = fb_info->fbops->owner;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 		/*
 		 *  We assume initial frame buffer devices can be opened this
 		 *  many times
@@ -812,14 +812,6 @@ register_framebuffer(struct fb_info *fb_info)
 	if (first) {
 		first = 0;
 		take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
-	}
-#else
-		if (owner) {
-			__MOD_INC_USE_COUNT(owner);
-			if (fb_info->fbops->fb_open && fb_info->fbops->fb_open(fb_info,0))
-				__MOD_DEC_USE_COUNT(owner);
-		}
-		fb_ever_opened[i] = 1;
 	}
 #endif
 	sprintf (name_buf, "%d", i);
