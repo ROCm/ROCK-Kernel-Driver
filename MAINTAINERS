@@ -287,6 +287,11 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/CORGI MACHINE SUPPORT
+P:	Richard Purdie
+M:	rpurdie@rpsys.net
+S:	Maintained
+
 ARM/PLEB SUPPORT
 P:	Peter Chubb
 M:	pleb@gelato.unsw.edu.au
