@@ -451,7 +451,7 @@ static inline int sctp_frag_point(const struct sctp_opt *sp, int pmtu)
  * there is room for a param header too.
  */
 #define sctp_walk_params(pos, chunk, member)\
-_sctp_walk_params((pos), (chunk), ntohs(WORD_ROUND((chunk)->chunk_hdr.length)), member)
+_sctp_walk_params((pos), (chunk), WORD_ROUND(ntohs((chunk)->chunk_hdr.length)), member)
 
 #define _sctp_walk_params(pos, chunk, end, member)\
 for (pos.v = chunk->member;\
