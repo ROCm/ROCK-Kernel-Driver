@@ -152,7 +152,7 @@ int __devinit cx8800_i2c_init(struct cx8800_dev *dev)
 	       sizeof(dev->i2c_client));
 
 	dev->i2c_adap.dev.parent = &dev->pci->dev;
-	strcpy(dev->i2c_adap.name,dev->name);
+	strlcpy(dev->i2c_adap.name,dev->name,sizeof(dev->i2c_adap.name));
         dev->i2c_algo.data = dev;
         i2c_set_adapdata(&dev->i2c_adap,dev);
         dev->i2c_adap.algo_data = &dev->i2c_algo;
@@ -162,6 +162,8 @@ int __devinit cx8800_i2c_init(struct cx8800_dev *dev)
 	cx8800_bit_setsda(dev,1);
 
 	dev->i2c_rc = i2c_bit_add_bus(&dev->i2c_adap);
+	printk("%s: i2c register %s\n", dev->name,
+	       (0 == dev->i2c_rc) ? "ok" : "FAILED");
 	return dev->i2c_rc;
 }
 
