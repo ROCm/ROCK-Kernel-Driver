@@ -412,7 +412,9 @@ static int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change)
 {
 	struct sk_buff *skb;
-	int size = NLMSG_GOODSIZE;
+	int size = NLMSG_SPACE(sizeof(struct ifinfomsg) +
+			       sizeof(struct rtnl_link_ifmap) +
+			       sizeof(struct rtnl_link_stats) + 128);
 
 	skb = alloc_skb(size, GFP_KERNEL);
 	if (!skb)
