@@ -95,7 +95,7 @@ __init void sctp_proc_init(void)
 }
 
 /* Clean up the proc fs entry for the SCTP protocol. */
-__exit void sctp_proc_exit(void)
+void sctp_proc_exit(void)
 {
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
