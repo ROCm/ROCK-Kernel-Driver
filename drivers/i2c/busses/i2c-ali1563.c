@@ -15,11 +15,6 @@
  *	This file is released under the GPLv2
  */
 
-#include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_BUS
-#define DEBUG 0
-#endif
-
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/pci.h>
