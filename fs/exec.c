@@ -46,7 +46,6 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/rmap.h>
-#include <linux/mempolicy.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -294,17 +293,19 @@ EXPORT_SYMBOL(copy_strings_kernel);
  * This routine is used to map in a page into an address space: needed by
  * execve() for the initial stack and environment pages.
  *
- * tsk->mm->mmap_sem is held for writing.
+ * vma->vm_mm->mmap_sem is held for writing.
  */
-void put_dirty_page(struct task_struct *tsk, struct page *page,
-			unsigned long address, pgprot_t prot)
+void install_arg_page(struct vm_area_struct *vma,
+			struct page *page, unsigned long address)
 {
-	struct mm_struct *mm = tsk->mm;
+	struct mm_struct *mm = vma->vm_mm;
 	pgd_t * pgd;
 	pmd_t * pmd;
 	pte_t * pte;
 
+	flush_dcache_page(page);
 	pgd = pgd_offset(mm, address);
+
 	spin_lock(&mm->page_table_lock);
 	pmd = pmd_alloc(mm, pgd, address);
 	if (!pmd)
@@ -318,8 +319,8 @@ void put_dirty_page(struct task_struct *tsk, struct page *page,
 	}
 	mm->rss++;
 	lru_cache_add_active(page);
-	flush_dcache_page(page);
-	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, prot))));
+	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(
+					page, vma->vm_page_prot))));
 	page_add_anon_rmap(page, mm, address);
 	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);
@@ -329,7 +330,7 @@ void put_dirty_page(struct task_struct *tsk, struct page *page,
 out:
 	spin_unlock(&mm->page_table_lock);
 	__free_page(page);
-	force_sig(SIGKILL, tsk);
+	force_sig(SIGKILL, current);
 }
 
 int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
@@ -435,8 +436,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current, page, stack_base,
-					mpnt->vm_page_prot);
+			install_arg_page(mpnt, page, stack_base);
 		}
 		stack_base += PAGE_SIZE;
 	}

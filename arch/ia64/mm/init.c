@@ -19,7 +19,6 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/proc_fs.h>
-#include <linux/mempolicy.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>
@@ -218,7 +217,7 @@ free_initrd_mem (unsigned long start, unsigned long end)
 }
 
 /*
- * This is like put_dirty_page() but installs a clean page in the kernel's page table.
+ * This installs a clean page in the kernel's page table.
  */
 struct page *
 put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
