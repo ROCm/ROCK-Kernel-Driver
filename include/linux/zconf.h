@@ -23,7 +23,7 @@
 
 /* Maximum value for memLevel in deflateInit2 */
 #ifndef MAX_MEM_LEVEL
-#  define MAX_MEM_LEVEL 9
+#  define MAX_MEM_LEVEL 8
 #endif
 
 /* Maximum value for windowBits in deflateInit2 and inflateInit2.
