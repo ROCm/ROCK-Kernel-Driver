@@ -71,10 +71,6 @@ extern unsigned long _SDR1;
 extern unsigned long klimit;
 extern struct Naca *naca;
 
-extern unsigned long _ASR;
-extern inline void make_ste(unsigned long stab,
-			    unsigned long esid, unsigned long vsid);
-
 extern char _stext[], _etext[], __start_naca[], __end_stab[];
 
 static spinlock_t hash_table_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
@@ -788,12 +784,11 @@ void hpte_init_pSeries(void)
 	ppc_md.hpte_find	 = hpte_find_pSeries;
 }
 
-/* Handle a fault by adding an HPTE 
- * If the address can't be determined to be valid
- * via Linux page tables, return 1.  If handled
- * return 0
+/*
+ * Handle a fault by adding an HPTE. If the address can't be determined
+ * to be valid via Linux page tables, return 1. If handled return 0
  */
-int hash_page( unsigned long ea, unsigned long access )
+int hash_page(unsigned long ea, unsigned long access)
 {
 	int rc = 1;
 	void * pgdir = NULL;
@@ -801,45 +796,44 @@ int hash_page( unsigned long ea, unsigned long access )
 	unsigned long newpp, hash_ind, prpn;
 	unsigned long hpteflags, regionid;
 	long slot;
-	struct mm_struct * mm;
+	struct mm_struct *mm;
 	pte_t old_pte, new_pte, *ptep;
 
 	/* Check for invalid addresses. */
-	if (!IS_VALID_EA(ea)) {
+	if (!IS_VALID_EA(ea))
 		return 1;
-	}
 
 	regionid =  REGION_ID(ea);
 	switch ( regionid ) {
 	case USER_REGION_ID:
 		mm = current->mm;
-		if ( mm == NULL ) {
-			PPCDBG(PPCDBG_MM, "hash_page returning; mm = 0\n"); 
+		if (mm == NULL)
 			return 1;
-		}
-		vsid = get_vsid(mm->context, ea );
+
+		vsid = get_vsid(mm->context, ea);
 		break;
 	case IO_REGION_ID:
 		mm = &ioremap_mm;
-		vsid = get_kernel_vsid( ea );
+		vsid = get_kernel_vsid(ea);
 		break;
 	case VMALLOC_REGION_ID:
 		mm = &init_mm;
-		vsid = get_kernel_vsid( ea );
+		vsid = get_kernel_vsid(ea);
 		break;
 #ifdef CONFIG_PPC_EEH
 	case IO_UNMAPPED_REGION_ID:
 		udbg_printf("EEH Error ea = 0x%lx\n", ea);
- 		PPCDBG_ENTER_DEBUGGER();
+		PPCDBG_ENTER_DEBUGGER();
 		panic("EEH Error ea = 0x%lx\n", ea);
 		break;
 #endif
 	case KERNEL_REGION_ID:
-		/* As htab_initialize is now, we shouldn't ever get here since
+		/*
+		 * As htab_initialize is now, we shouldn't ever get here since
 		 * we're bolting the entire 0xC0... region.
 		 */
 		udbg_printf("Little faulted on kernel address 0x%lx\n", ea);
- 		PPCDBG_ENTER_DEBUGGER();
+		PPCDBG_ENTER_DEBUGGER();
 		panic("Little faulted on kernel address 0x%lx\n", ea);
 		break;
 	default:
@@ -849,7 +843,7 @@ int hash_page( unsigned long ea, unsigned long access )
 	}
 
 	/* Search the Linux page table for a match with va */
-        va = ( vsid << 28 ) | ( ea & 0x0fffffff );
+	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> PAGE_SHIFT;
 	pgdir = mm->pgd;
 	PPCDBG(PPCDBG_MM, "hash_page ea = 0x%16.16lx, va = 0x%16.16lx\n          current = 0x%16.16lx, access = %lx\n", ea, va, current, access); 
@@ -869,8 +863,9 @@ int hash_page( unsigned long ea, unsigned long access )
 	  spin_unlock( &mm->page_table_lock );
 	  return 1;
 	}
-	
-	/* Acquire the hash table lock to guarantee that the linux
+
+	/*
+	 * Acquire the hash table lock to guarantee that the linux
 	 * pte we fetch will not change
 	 */
 	spin_lock( &hash_table_lock );
@@ -1046,7 +1041,7 @@ int hash_page( unsigned long ea, unsigned long access )
 	return rc;
 }
 
-void flush_hash_page( unsigned long context, unsigned long ea, pte_t pte )
+void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte)
 {
 	unsigned long vsid, vpn, va, hash, secondary, slot, flags;
 	/* Local copy of first doubleword of HPTE */
@@ -1055,15 +1050,16 @@ void flush_hash_page( unsigned long context, unsigned long ea, pte_t pte )
 		Hpte_dword0   h;
 	} hpte_dw0;
 
-	if ( (ea >= USER_START ) && ( ea <= USER_END ) )
-		vsid = get_vsid( context, ea );
+	if ((ea >= USER_START) && (ea <= USER_END))
+		vsid = get_vsid(context, ea);
 	else
-		vsid = get_kernel_vsid( ea );
+		vsid = get_kernel_vsid(ea);
+
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> PAGE_SHIFT;
 	hash = hpt_hash(vpn, 0);
 	secondary = (pte_val(pte) & _PAGE_SECONDARY) >> 15;
-	if ( secondary )
+	if (secondary)
 		hash = ~hash;
 	slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 	slot += (pte_val(pte) & _PAGE_GROUP_IX) >> 12;
@@ -1075,7 +1071,7 @@ void flush_hash_page( unsigned long context, unsigned long ea, pte_t pte )
 	     (hpte_dw0.h.v) && 
 	     (hpte_dw0.h.h == secondary ) ){
 		/* HPTE matches */
-		ppc_md.hpte_invalidate( slot );	
+		ppc_md.hpte_invalidate(slot);	
 	}
 	else {
 		unsigned k;
