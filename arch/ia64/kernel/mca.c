@@ -1204,7 +1204,7 @@ static struct irqaction mca_cpep_irqaction = {
 
 /* Do per-CPU MCA-related initialization.  */
 
-void __init
+void __devinit
 ia64_mca_cpu_init(void *cpu_data)
 {
 	void *pal_vaddr;
