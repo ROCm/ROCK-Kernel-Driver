@@ -63,14 +63,12 @@
 #define MAX_NUM_PORTS		8	/* The maximum number of ports one device can grab at once */
 
 #define USB_SERIAL_MAGIC	0x6702	/* magic number for usb_serial struct */
-#define USB_SERIAL_PORT_MAGIC	0x7301	/* magic number for usb_serial_port struct */
 
 /* parity check flag */
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 
 /**
  * usb_serial_port: structure for the specific ports of a device.
- * @magic: magic number for internal validity of this pointer.
  * @serial: pointer back to the struct usb_serial owner of this port.
  * @tty: pointer to the corresponding tty for this port.
  * @number: the number of the port (the minor number).
@@ -95,8 +93,7 @@
  * ports of a device.
  */
 struct usb_serial_port {
-	int			magic;
-	struct usb_serial	*serial;
+	struct usb_serial *	serial;
 	struct tty_struct *	tty;
 	unsigned char		number;
 
@@ -325,10 +322,6 @@ static inline int port_paranoia_check (struct usb_serial_port *port, const char 
 {
 	if (!port) {
 		dbg("%s - port == NULL", function);
-		return -1;
-	}
-	if (port->magic != USB_SERIAL_PORT_MAGIC) {
-		dbg("%s - bad magic number for port", function);
 		return -1;
 	}
 	if (!port->serial) {

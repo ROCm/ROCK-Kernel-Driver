@@ -1117,7 +1117,6 @@ int usb_serial_probe(struct usb_interface *interface,
 		memset(port, 0x00, sizeof(struct usb_serial_port));
 		port->number = i + serial->minor;
 		port->serial = serial;
-		port->magic = USB_SERIAL_PORT_MAGIC;
 		INIT_WORK(&port->work, usb_serial_port_softint, port);
 		serial->port[i] = port;
 	}
