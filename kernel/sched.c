@@ -1147,24 +1147,24 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
 }
 
 /*
- * Previously:
- *
- * #define CAN_MIGRATE_TASK(p,rq,this_cpu)	\
- *	((!idle || (NS_TO_JIFFIES(now - (p)->timestamp) > \
- *		cache_decay_ticks)) && !task_running(rq, p) && \
- *			cpu_isset(this_cpu, (p)->cpus_allowed))
+ * can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
  */
-
 static inline int
 can_migrate_task(task_t *tsk, runqueue_t *rq, int this_cpu, int idle)
 {
 	unsigned long delta = rq->timestamp_last_tick - tsk->timestamp;
 
-	if (!idle && (delta <= JIFFIES_TO_NS(cache_decay_ticks)))
-		return 0;
+	/*
+	 * We do not migrate tasks that are:
+	 * 1) running (obviously), or
+	 * 2) cannot be migrated to this CPU due to cpus_allowed, or
+	 * 3) are cache-hot on their current CPU.
+	 */
 	if (task_running(rq, tsk))
 		return 0;
 	if (!cpu_isset(this_cpu, tsk->cpus_allowed))
+		return 0;
+	if (!idle && (delta <= JIFFIES_TO_NS(cache_decay_ticks)))
 		return 0;
 	return 1;
 }
@@ -1227,13 +1227,6 @@ skip_bitmap:
 skip_queue:
 	tmp = list_entry(curr, task_t, run_list);
 
-	/*
-	 * We do not migrate tasks that are:
-	 * 1) running (obviously), or
-	 * 2) cannot be migrated to this CPU due to cpus_allowed, or
-	 * 3) are cache-hot on their current CPU.
-	 */
-
 	curr = curr->prev;
 
 	if (!can_migrate_task(tmp, busiest, this_cpu, idle)) {
@@ -1243,6 +1236,8 @@ skip_queue:
 		goto skip_bitmap;
 	}
 	pull_task(busiest, array, tmp, this_rq, this_cpu);
+
+	/* Only migrate one task if we are idle */
 	if (!idle && --imbalance) {
 		if (curr != head)
 			goto skip_queue;
