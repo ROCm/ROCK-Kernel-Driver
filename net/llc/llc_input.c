@@ -1,5 +1,5 @@
 /*
- * llc_mac.c - Manages interface between LLC and MAC
+ * llc_input.c - Minimal input path for LLC
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
  * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
@@ -12,15 +12,9 @@
  * See the GNU General Public License for more details.
  */
 #include <linux/netdevice.h>
-#include <linux/if_arp.h>
-#include <linux/if_tr.h>
-#include <linux/rtnetlink.h>
-#include <net/llc_mac.h>
+#include <net/llc.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
-#include <net/llc_main.h>
-#include <net/llc_evnt.h>
-#include <linux/trdevice.h>
 
 #if 0
 #define dprintk(args...) printk(KERN_DEBUG args)
@@ -28,14 +22,19 @@
 #define dprintk(args...)
 #endif
 
-static int fix_up_incoming_skb(struct sk_buff *skb);
-static void llc_station_rcv(struct sk_buff *skb);
+/*
+ * Packet handler for the station, registerable because in the minimal
+ * LLC core that is taking shape only the very minimal subset of LLC that
+ * is needed for things like IPX, Appletalk, etc will stay, with all the
+ * rest in the llc1 and llc2 modules.
+ */
+static void (*llc_station_handler)(struct sk_buff *skb);
 
 /*
  * Packet handlers for LLC_DEST_SAP and LLC_DEST_CONN.
  */
 static void (*llc_type_handlers[2])(struct llc_sap *sap,
-				 struct sk_buff *skb);
+				    struct sk_buff *skb);
 
 void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
 					    struct sk_buff *skb))
@@ -48,6 +47,11 @@ void llc_remove_pack(int type)
 {
 	if (type == LLC_DEST_SAP || type == LLC_DEST_CONN)
 		llc_type_handlers[type] = NULL;
+}
+
+void llc_set_station_handler(void (*handler)(struct sk_buff *skb))
+{
+	llc_station_handler = handler;
 }
 
 /**
@@ -84,70 +88,7 @@ out:
 }
 
 /**
- *	llc_rcv - 802.2 entry point from net lower layers
- *	@skb: received pdu
- *	@dev: device that receive pdu
- *	@pt: packet type
- *
- *	When the system receives a 802.2 frame this function is called. It
- *	checks SAP and connection of received pdu and passes frame to
- *	llc_{station,sap,conn}_rcv for sending to proper state machine. If
- *	the frame is related to a busy connection (a connection is sending
- *	data now), it queues this frame in the connection's backlog.
- */
-int llc_rcv(struct sk_buff *skb, struct net_device *dev,
-	    struct packet_type *pt)
-{
-	struct llc_sap *sap;
-	struct llc_pdu_sn *pdu;
-	int dest;
-
-	/*
-	 * When the interface is in promisc. mode, drop all the crap that it
-	 * receives, do not try to analyse it.
-	 */
-	if (skb->pkt_type == PACKET_OTHERHOST) {
-		dprintk("%s: PACKET_OTHERHOST\n", __FUNCTION__);
-		goto drop;
-	}
-	skb = skb_share_check(skb, GFP_ATOMIC);
-	if (!skb)
-		goto out;
-	if (!fix_up_incoming_skb(skb))
-		goto drop;
-	pdu = llc_pdu_sn_hdr(skb);
-	if (!pdu->dsap) { /* NULL DSAP, refer to station */
-		dprintk("%s: calling llc_station_rcv!\n", __FUNCTION__);
-		llc_station_rcv(skb);
-		goto out;
-	}
-	sap = llc_sap_find(pdu->dsap);
-	if (!sap) {/* unknown SAP */
-		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__,
-		        pdu->dsap);
-		goto drop;
-	}
-	/*
-	 * First the upper layer protocols that don't need the full
-	 * LLC functionality
-	 */
-	if (sap->rcv_func) {
-		sap->rcv_func(skb, dev, pt);
-		goto out;
-	}
-	dest = llc_pdu_type(skb);
-	if (unlikely(!dest || !llc_type_handlers[dest - 1]))
-		goto drop;
-	llc_type_handlers[dest - 1](sap, skb);
-out:
-	return 0;
-drop:
-	kfree_skb(skb);
-	goto out;
-}
-
-/**
- *	fix_up_incoming_skb - initializes skb pointers
+ *	llc_fixup_skb - initializes skb pointers
  *	@skb: This argument points to incoming skb
  *
  *	Initializes internal skb pointer to start of network layer by deriving
@@ -155,7 +96,7 @@ drop:
  *	by looking at the two lowest-order bits of the first control field
  *	byte; field is either 3 or 4 bytes long.
  */
-static int fix_up_incoming_skb(struct sk_buff *skb)
+static inline int llc_fixup_skb(struct sk_buff *skb)
 {
 	u8 llc_len = 2;
 	struct llc_pdu_sn *pdu;
@@ -178,75 +119,71 @@ static int fix_up_incoming_skb(struct sk_buff *skb)
 	return 1;
 }
 
-/*
- *	llc_station_rcv - send received pdu to the station state machine
- *	@skb: received frame.
- *
- *	Sends data unit to station state machine.
- */
-static void llc_station_rcv(struct sk_buff *skb)
-{
-	struct llc_station_state_ev *ev = llc_station_ev(skb);
-
-	ev->type   = LLC_STATION_EV_TYPE_PDU;
-	ev->reason = 0;
-	llc_station_state_process(&llc_main_station, skb);
-}
-
 /**
- *	lan_hdrs_init - fills MAC header fields
- *	@skb: Address of the frame to initialize its MAC header
- *	@sa: The MAC source address
- *	@da: The MAC destination address
+ *	llc_rcv - 802.2 entry point from net lower layers
+ *	@skb: received pdu
+ *	@dev: device that receive pdu
+ *	@pt: packet type
  *
- *	Fills MAC header fields, depending on MAC type. Returns 0, If MAC type
- *	is a valid type and initialization completes correctly 1, otherwise.
+ *	When the system receives a 802.2 frame this function is called. It
+ *	checks SAP and connection of received pdu and passes frame to
+ *	llc_{station,sap,conn}_rcv for sending to proper state machine. If
+ *	the frame is related to a busy connection (a connection is sending
+ *	data now), it queues this frame in the connection's backlog.
  */
-u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
+int llc_rcv(struct sk_buff *skb, struct net_device *dev,
+	    struct packet_type *pt)
 {
-	u16 rc = 0;
+	struct llc_sap *sap;
+	struct llc_pdu_sn *pdu;
+	int dest;
 
-	switch (skb->dev->type) {
-#ifdef CONFIG_TR
-	case ARPHRD_IEEE802_TR: {
-		struct trh_hdr *trh;
-		struct net_device *dev = skb->dev;
-
-		trh = (struct trh_hdr *)skb_push(skb, sizeof(*trh));
-		trh->ac = AC;
-		trh->fc = LLC_FRAME;
-		if (sa)
-			memcpy(trh->saddr, sa, dev->addr_len);
-		else
-			memset(trh->saddr, 0, dev->addr_len);
-		if (da) {
-			memcpy(trh->daddr, da, dev->addr_len);
-			tr_source_route(skb, trh, dev);
-		}
-		skb->mac.raw = skb->data;
-		break;
+	/*
+	 * When the interface is in promisc. mode, drop all the crap that it
+	 * receives, do not try to analyse it.
+	 */
+	if (unlikely(skb->pkt_type == PACKET_OTHERHOST)) {
+		dprintk("%s: PACKET_OTHERHOST\n", __FUNCTION__);
+		goto drop;
 	}
-#endif
-	case ARPHRD_ETHER:
-	case ARPHRD_LOOPBACK: {
-		unsigned short len = skb->len;
-		struct ethhdr *eth;
-
-		skb->mac.raw = skb_push(skb, sizeof(*eth));
-		eth = (struct ethhdr *)skb->mac.raw;
-		eth->h_proto = htons(len);
-		memcpy(eth->h_dest, da, ETH_ALEN);
-		memcpy(eth->h_source, sa, ETH_ALEN);
-		break;
+	skb = skb_share_check(skb, GFP_ATOMIC);
+	if (unlikely(!skb))
+		goto out;
+	if (unlikely(!llc_fixup_skb(skb)))
+		goto drop;
+	pdu = llc_pdu_sn_hdr(skb);
+	if (unlikely(!pdu->dsap)) /* NULL DSAP, refer to station */
+	       goto handle_station;
+	sap = llc_sap_find(pdu->dsap);
+	if (unlikely(!sap)) {/* unknown SAP */
+		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__,
+		        pdu->dsap);
+		goto drop;
 	}
-	default:
-		printk(KERN_WARNING "Unknown DEVICE type : %d\n",
-		       skb->dev->type);
-		rc = 1;
+	/*
+	 * First the upper layer protocols that don't need the full
+	 * LLC functionality
+	 */
+	if (sap->rcv_func) {
+		sap->rcv_func(skb, dev, pt);
+		goto out;
 	}
-	return rc;
+	dest = llc_pdu_type(skb);
+	if (unlikely(!dest || !llc_type_handlers[dest - 1]))
+		goto drop;
+	llc_type_handlers[dest - 1](sap, skb);
+out:
+	return 0;
+drop:
+	kfree_skb(skb);
+	goto out;
+handle_station:
+	if (!llc_station_handler)
+		goto drop;
+	llc_station_handler(skb);
+	goto out;
 }
 
 EXPORT_SYMBOL(llc_add_pack);
 EXPORT_SYMBOL(llc_remove_pack);
-EXPORT_SYMBOL(lan_hdrs_init);
+EXPORT_SYMBOL(llc_set_station_handler);

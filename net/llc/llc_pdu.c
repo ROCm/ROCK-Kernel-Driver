@@ -11,11 +11,9 @@
  *
  * See the GNU General Public License for more details.
  */
+
 #include <linux/netdevice.h>
-#include <linux/if_tr.h>
 #include <net/llc_pdu.h>
-#include <net/llc_if.h>
-#include <net/llc_main.h>
 
 static void llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type);
 static u8 llc_pdu_get_pf_bit(struct llc_pdu_sn *pdu);

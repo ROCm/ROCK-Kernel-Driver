@@ -11,17 +11,38 @@
  *
  * See the GNU General Public License for more details.
  */
-#include <linux/skbuff.h>
+
+#include <net/llc.h>
+#include <net/llc_if.h>
 #include <net/llc_conn.h>
+#include <net/llc_pdu.h>
 #include <net/llc_sap.h>
-#include <net/llc_s_ev.h>
 #include <net/llc_s_ac.h>
+#include <net/llc_s_ev.h>
 #include <net/llc_s_st.h>
 #include <net/sock.h>
 #include <linux/tcp.h>
-#include <net/llc_main.h>
-#include <net/llc_pdu.h>
-#include <linux/if_tr.h>
+#include <linux/llc.h>
+
+/**
+ *	llc_alloc_frame - allocates sk_buff for frame
+ *
+ *	Allocates an sk_buff for frame and initializes sk_buff fields.
+ *	Returns allocated skb or %NULL when out of memory.
+ */
+struct sk_buff *llc_alloc_frame(void)
+{
+	struct sk_buff *skb = alloc_skb(128, GFP_ATOMIC);
+
+	if (skb) {
+		skb_reserve(skb, 50);
+		skb->nh.raw   = skb->h.raw = skb->data;
+		skb->protocol = htons(ETH_P_802_2);
+		skb->dev      = dev_base->next;
+		skb->mac.raw  = skb->head;
+	}
+	return skb;
+}
 
 void llc_save_primitive(struct sk_buff* skb, u8 prim)
 {
@@ -181,36 +202,6 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 }
 
 /**
- *	llc_build_and_send_ui_pkt - unitdata request interface for upper layers
- *	@sap: sap to use
- *	@skb: packet to send
- *	@dmac: destination mac address
- *	@dsap: destination sap
- *
- *	Upper layers calls this function when upper layer wants to send data
- *	using connection-less mode communication (UI pdu).
- *
- *	Accept data frame from network layer to be sent using connection-
- *	less mode communication; timeout/retries handled by network layer;
- *	package primitive as an event and send to SAP event handler
- */
-void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
-			       u8 *dmac, u8 dsap)
-{
-	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	ev->saddr.lsap = sap->laddr.lsap;
-	ev->daddr.lsap = dsap;
-	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
-
-	ev->type      = LLC_SAP_EV_TYPE_PRIM;
-	ev->prim      = LLC_DATAUNIT_PRIM;
-	ev->prim_type = LLC_PRIM_TYPE_REQ;
-	llc_sap_state_process(sap, skb);
-}
-
-/**
  *	llc_build_and_send_test_pkt - TEST interface for upper layers.
  *	@sap: sap to use
  *	@skb: packet to send
@@ -325,79 +316,6 @@ void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
 		kfree_skb(skb);
 }
 
-/**
- *	llc_sap_alloc - allocates and initializes sap.
- *
- *	Allocates and initializes sap.
- */
-struct llc_sap *llc_sap_alloc(void)
-{
-	struct llc_sap *sap = kmalloc(sizeof(*sap), GFP_ATOMIC);
-
-	if (sap) {
-		memset(sap, 0, sizeof(*sap));
-		sap->state = LLC_SAP_STATE_ACTIVE;
-		memcpy(sap->laddr.mac, llc_main_station.mac_sa, ETH_ALEN);
-		rwlock_init(&sap->sk_list.lock);
-	}
-	return sap;
-}
-
-/**
- *	llc_sap_open - open interface to the upper layers.
- *	@lsap: SAP number.
- *	@func: rcv func for datalink protos
- *
- *	Interface function to upper layer. Each one who wants to get a SAP
- *	(for example NetBEUI) should call this function. Returns the opened
- *	SAP for success, NULL for failure.
- */
-struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
-						  struct net_device *dev,
-						  struct packet_type *pt))
-{
-	/* verify this SAP is not already open; if so, return error */
-	struct llc_sap *sap;
-
-	sap = llc_sap_find(lsap);
-	if (sap) { /* SAP already exists */
-		sap = NULL;
-		goto out;
-	}
-	/* sap requested does not yet exist */
-	sap = llc_sap_alloc();
-	if (!sap)
-		goto out;
-	/* allocated a SAP; initialize it and clear out its memory pool */
-	sap->laddr.lsap = lsap;
-	sap->rcv_func	= func;
-	sap->station	= &llc_main_station;
-	/* initialized SAP; add it to list of SAPs this station manages */
-	llc_sap_save(sap);
-out:
-	return sap;
-}
-
-/**
- *	llc_sap_close - close interface for upper layers.
- *	@sap: SAP to be closed.
- *
- *	Close interface function to upper layer. Each one who wants to
- *	close an open SAP (for example NetBEUI) should call this function.
- * 	Removes this sap from the list of saps in the station and then
- * 	frees the memory for this sap.
- */
-void llc_sap_close(struct llc_sap *sap)
-{
-	WARN_ON(!hlist_empty(&sap->sk_list.list));
-	write_lock_bh(&sap->station->sap_list.lock);
-	list_del(&sap->node);
-	write_unlock_bh(&sap->station->sap_list.lock);
-	kfree(sap);
-}
-
-EXPORT_SYMBOL(llc_sap_open);
-EXPORT_SYMBOL(llc_sap_close);
 EXPORT_SYMBOL(llc_save_primitive);
 EXPORT_SYMBOL(llc_build_and_send_test_pkt);
 EXPORT_SYMBOL(llc_build_and_send_ui_pkt);

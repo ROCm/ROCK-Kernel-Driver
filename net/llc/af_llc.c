@@ -24,14 +24,13 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/tcp.h>
+#include <linux/rtnetlink.h>
+#include <linux/init.h>
+#include <net/llc.h>
 #include <net/llc_sap.h>
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
-#include <net/llc_mac.h>
-#include <net/llc_main.h>
 #include <net/llc_proc.h>
-#include <linux/rtnetlink.h>
-#include <linux/init.h>
 
 /* remember: uninitialized global data is zeroed because its in .bss */
 static u16 llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
@@ -1053,6 +1052,7 @@ static int __init llc2_init(void)
 	int rc;
 
 	llc_build_offset_table();
+	llc_station_init();
 	llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
 	rc = llc_proc_init();
 	if (!rc) {
@@ -1065,6 +1065,7 @@ static int __init llc2_init(void)
 
 static void __exit llc2_exit(void)
 {
+	llc_station_exit();
 	llc_remove_pack(LLC_DEST_SAP);
 	llc_remove_pack(LLC_DEST_CONN);
 	sock_unregister(PF_LLC);
