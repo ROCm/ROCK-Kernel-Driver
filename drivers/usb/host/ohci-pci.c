@@ -96,7 +96,7 @@ ohci_pci_start (struct usb_hcd *hcd)
 	}
 
 	if (hc_start (ohci) < 0) {
-		err ("can't start %s", ohci->hcd.self.bus_name);
+		ohci_err (ohci, "can't start\n");
 		ohci_stop (hcd);
 		return -EBUSY;
 	}
@@ -116,13 +116,13 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	u16			cmd;
 
 	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER) {
-		dbg ("can't suspend %s (state is %s)", hcd->self.bus_name,
+		ohci_dbg (ohci, "can't suspend (state is %s)\n",
 			hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS));
 		return -EIO;
 	}
 
 	/* act as if usb suspend can always be used */
-	dbg ("%s: suspend to %d", hcd->self.bus_name, state);
+	ohci_dbg (ohci, "suspend to %d\n", state);
 	ohci->sleeping = 1;
 
 	/* First stop processing */
@@ -157,16 +157,16 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 
 	switch (readl (&ohci->regs->control) & OHCI_CTRL_HCFS) {
 		case OHCI_USB_RESET:
-			dbg ("%s suspend->reset ?", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspend->reset ?\n");
 			break;
 		case OHCI_USB_RESUME:
-			dbg ("%s suspend->resume ?", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspend->resume ?\n");
 			break;
 		case OHCI_USB_OPER:
-			dbg ("%s suspend->operational ?", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspend->operational ?\n");
 			break;
 		case OHCI_USB_SUSPEND:
-			dbg ("%s suspended", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspended\n");
 			break;
 	}
 
@@ -223,13 +223,13 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	switch (temp) {
 
 	case OHCI_USB_RESET:	// lost power
-		info ("USB restart: %s", hcd->self.bus_name);
+		ohci_info (ohci, "USB restart\n");
 		retval = hc_restart (ohci);
 		break;
 
 	case OHCI_USB_SUSPEND:	// host wakeup
 	case OHCI_USB_RESUME:	// remote wakeup
-		info ("USB continue: %s from %s wakeup", hcd->self.bus_name,
+		ohci_info (ohci, "USB continue from %s wakeup\n",
 			 (temp == OHCI_USB_SUSPEND)
 				? "host" : "remote");
 		ohci->hc_control = OHCI_USB_RESUME;
@@ -242,7 +242,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 		temp = readl (&ohci->regs->control);
 		temp = ohci->hc_control & OHCI_CTRL_HCFS;
 		if (temp != OHCI_USB_RESUME) {
-			err ("controller %s won't resume", hcd->self.bus_name);
+			ohci_err (ohci, "controller won't resume\n");
 			ohci->disabled = 1;
 			retval = -EIO;
 			break;
@@ -288,11 +288,12 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 		writel (OHCI_BLF | OHCI_CLF, &ohci->regs->cmdstatus);
 
 // ohci_dump_status (ohci);
-dbg ("sleeping = %d, disabled = %d", ohci->sleeping, ohci->disabled);
+ohci_dbg (ohci, "sleeping = %d, disabled = %d\n",
+		ohci->sleeping, ohci->disabled);
 		break;
 
 	default:
-		warn ("odd PCI resume for %s", hcd->self.bus_name);
+		ohci_warn (ohci, "odd PCI resume\n");
 	}
 	return retval;
 }
@@ -383,11 +384,11 @@ static struct pci_driver ohci_pci_driver = {
  
 static int __init ohci_hcd_pci_init (void) 
 {
-	dbg (DRIVER_INFO " (PCI)");
+	printk (KERN_DEBUG "%s: " DRIVER_INFO " (PCI)\n", hcd_name);
 	if (usb_disabled())
 		return -ENODEV;
 
-	dbg ("block sizes: ed %d td %d",
+	printk (KERN_DEBUG "%s: block sizes: ed %d td %d\n", hcd_name,
 		sizeof (struct ed), sizeof (struct td));
 	return pci_module_init (&ohci_pci_driver);
 }

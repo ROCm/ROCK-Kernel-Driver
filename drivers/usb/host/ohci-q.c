@@ -110,12 +110,9 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 {
 	unsigned	i;
 
-#ifdef OHCI_VERBOSE_DEBUG
-	dbg ("%s: link %sed %p branch %d [%dus.], interval %d",
-		ohci->hcd.self.bus_name,
+	ohci_vdbg (ohci, "link %sed %p branch %d [%dus.], interval %d\n",
 		(ed->hwINFO & ED_ISO) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
-#endif
 
 	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
 		struct ed	**prev = &ohci->periodic [i];
@@ -206,7 +203,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	default:
 		branch = balance (ohci, ed->interval, ed->load);
 		if (branch < 0) {
-			dev_dbg (ohci->hcd.controller,
+			ohci_dbg (ohci,
 				"ERR %d, interval %d msecs, load %d\n",
 				branch, ed->interval, ed->load);
 			// FIXME if there are TDs queued, fail them!
@@ -787,7 +784,7 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 	}
 
 	/* help for troubleshooting: */
-	dev_dbg (&urb->dev->dev,
+	ohci_dbg (ohci,
 		"urb %p usb-%s-%s ep-%d-%s cc %d --> status %d\n",
 		urb,
 		urb->dev->bus->bus_name, urb->dev->devpath,
@@ -821,8 +818,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
 		td = dma_to_td (ohci, td_dma);
 		if (!td) {
-			err ("%s bad entry %8x",
-				ohci->hcd.self.bus_name, td_dma);
+			ohci_err (ohci, "bad entry %8x\n", td_dma);
 			break;
 		}
 

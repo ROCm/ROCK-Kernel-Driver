@@ -40,7 +40,7 @@ static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
 /*-------------------------------------------------------------------------*/
 
 #define dbg_port(hc,label,num,value) \
-	dev_dbg (hc->hcd.controller, \
+	ohci_dbg (hc, \
 		"%s roothub.portstatus [%d] " \
 		"= 0x%08x%s%s%s%s%s%s%s%s%s%s%s%s\n", \
 		label, num, temp, \
@@ -75,9 +75,8 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	if (ports > MAX_ROOT_PORTS) {
 		if (ohci->disabled)
 			return -ESHUTDOWN;
-		err ("%s bogus NDP=%d, rereads as NDP=%d",
-			hcd->self.bus_name, ports,
-			readl (&ohci->regs->roothub.a) & RH_A_NDP);
+		ohci_err (ohci, "bogus NDP=%d, rereads as NDP=%d\n",
+			ports, readl (&ohci->regs->roothub.a) & RH_A_NDP);
 		/* retry later; "should not happen" */
 		return 0;
 	}

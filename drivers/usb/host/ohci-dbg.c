@@ -72,9 +72,9 @@ urb_print (struct urb * urb, char * str, int small)
 #endif
 }
 
-static void ohci_dump_intr_mask (struct device *dev, char *label, __u32 mask)
+static void ohci_dump_intr_mask (struct ohci_hcd *ohci, char *label, __u32 mask)
 {
-	dev_dbg (dev, "%s: 0x%08x%s%s%s%s%s%s%s%s%s\n",
+	ohci_dbg (ohci, "%s: 0x%08x%s%s%s%s%s%s%s%s%s\n",
 		label,
 		mask,
 		(mask & OHCI_INTR_MIE) ? " MIE" : "",
@@ -89,10 +89,10 @@ static void ohci_dump_intr_mask (struct device *dev, char *label, __u32 mask)
 		);
 }
 
-static void maybe_print_eds (struct device *dev, char *label, __u32 value)
+static void maybe_print_eds (struct ohci_hcd *ohci, char *label, __u32 value)
 {
 	if (value)
-		dev_dbg (dev, "%s %08x\n", label, value);
+		ohci_dbg (ohci, "%s %08x\n", label, value);
 }
 
 static char *hcfs2string (int state)
@@ -110,16 +110,16 @@ static char *hcfs2string (int state)
 static void ohci_dump_status (struct ohci_hcd *controller)
 {
 	struct ohci_regs	*regs = controller->regs;
-	struct device		*dev = controller->hcd.controller;
 	__u32			temp;
 
 	temp = readl (&regs->revision) & 0xff;
-	dev_dbg (dev, "OHCI %d.%d, %s legacy support registers\n",
+	ohci_dbg (controller, "OHCI %d.%d, %s legacy support registers\n",
 		0x03 & (temp >> 4), (temp & 0x0f),
 		(temp & 0x10) ? "with" : "NO");
 
 	temp = readl (&regs->control);
-	dev_dbg (dev, "control: 0x%08x%s%s%s HCFS=%s%s%s%s%s CBSR=%d\n", temp,
+	ohci_dbg (controller,
+		"control: 0x%08x%s%s%s HCFS=%s%s%s%s%s CBSR=%d\n", temp,
 		(temp & OHCI_CTRL_RWE) ? " RWE" : "",
 		(temp & OHCI_CTRL_RWC) ? " RWC" : "",
 		(temp & OHCI_CTRL_IR) ? " IR" : "",
@@ -132,7 +132,7 @@ static void ohci_dump_status (struct ohci_hcd *controller)
 		);
 
 	temp = readl (&regs->cmdstatus);
-	dev_dbg (dev, "cmdstatus: 0x%08x SOC=%d%s%s%s%s\n", temp,
+	ohci_dbg (controller, "cmdstatus: 0x%08x SOC=%d%s%s%s%s\n", temp,
 		(temp & OHCI_SOC) >> 16,
 		(temp & OHCI_OCR) ? " OCR" : "",
 		(temp & OHCI_BLF) ? " BLF" : "",
@@ -140,20 +140,19 @@ static void ohci_dump_status (struct ohci_hcd *controller)
 		(temp & OHCI_HCR) ? " HCR" : ""
 		);
 
-	ohci_dump_intr_mask (dev, "intrstatus", readl (&regs->intrstatus));
-	ohci_dump_intr_mask (dev, "intrenable", readl (&regs->intrenable));
+	ohci_dump_intr_mask (controller, "intrstatus", readl (&regs->intrstatus));
+	ohci_dump_intr_mask (controller, "intrenable", readl (&regs->intrenable));
 	// intrdisable always same as intrenable
-	// ohci_dump_intr_mask (dev, "intrdisable", readl (&regs->intrdisable));
 
-	maybe_print_eds (dev, "ed_periodcurrent", readl (&regs->ed_periodcurrent));
+	maybe_print_eds (controller, "ed_periodcurrent", readl (&regs->ed_periodcurrent));
 
-	maybe_print_eds (dev, "ed_controlhead", readl (&regs->ed_controlhead));
-	maybe_print_eds (dev, "ed_controlcurrent", readl (&regs->ed_controlcurrent));
+	maybe_print_eds (controller, "ed_controlhead", readl (&regs->ed_controlhead));
+	maybe_print_eds (controller, "ed_controlcurrent", readl (&regs->ed_controlcurrent));
 
-	maybe_print_eds (dev, "ed_bulkhead", readl (&regs->ed_bulkhead));
-	maybe_print_eds (dev, "ed_bulkcurrent", readl (&regs->ed_bulkcurrent));
+	maybe_print_eds (controller, "ed_bulkhead", readl (&regs->ed_bulkhead));
+	maybe_print_eds (controller, "ed_bulkcurrent", readl (&regs->ed_bulkcurrent));
 
-	maybe_print_eds (dev, "donehead", readl (&regs->donehead));
+	maybe_print_eds (controller, "donehead", readl (&regs->donehead));
 }
 
 static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
@@ -166,7 +165,7 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 	ndp = (temp & RH_A_NDP);
 
 	if (verbose) {
-		dev_dbg (controller->hcd.controller,
+		ohci_dbg (controller,
 			"roothub.a: %08x POTPGT=%d%s%s%s%s%s NDP=%d\n", temp,
 			((temp & RH_A_POTPGT) >> 24) & 0xff,
 			(temp & RH_A_NOCP) ? " NOCP" : "",
@@ -177,14 +176,14 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 			ndp
 			);
 		temp = roothub_b (controller);
-		dev_dbg (controller->hcd.controller,
+		ohci_dbg (controller,
 			"roothub.b: %08x PPCM=%04x DR=%04x\n",
 			temp,
 			(temp & RH_B_PPCM) >> 16,
 			(temp & RH_B_DR)
 			);
 		temp = roothub_status (controller);
-		dev_dbg (controller->hcd.controller,
+		ohci_dbg (controller,
 			"roothub.status: %08x%s%s%s%s%s%s\n",
 			temp,
 			(temp & RH_HS_CRWE) ? " CRWE" : "",
@@ -204,13 +203,12 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 
 static void ohci_dump (struct ohci_hcd *controller, int verbose)
 {
-	dev_dbg (controller->hcd.controller,
-		"OHCI controller state\n");
+	ohci_dbg (controller, "OHCI controller state\n");
 
 	// dumps some of the state we know about
 	ohci_dump_status (controller);
 	if (controller->hcca)
-		dev_dbg (controller->hcd.controller,
+		ohci_dbg (controller,
 			"hcca frame #%04x\n", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
 }
@@ -218,11 +216,11 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 static const char data0 [] = "DATA0";
 static const char data1 [] = "DATA1";
 
-static void ohci_dump_td (char *label, struct td *td)
+static void ohci_dump_td (struct ohci_hcd *ohci, char *label, struct td *td)
 {
 	u32	tmp = le32_to_cpup (&td->hwINFO);
 
-	dbg ("%s td %p%s; urb %p index %d; hw next td %08x",
+	ohci_dbg (ohci, "%s td %p%s; urb %p index %d; hw next td %08x",
 		label, td,
 		(tmp & TD_DONE) ? " (DONE)" : "",
 		td->urb, td->index,
@@ -243,28 +241,28 @@ static void ohci_dump_td (char *label, struct td *td)
 		case TD_DP_OUT: pid = "OUT"; break;
 		default: pid = "(bad pid)"; break;
 		}
-		dbg ("     info %08x CC=%x %s DI=%d %s %s", tmp,
+		ohci_dbg (ohci, "     info %08x CC=%x %s DI=%d %s %s", tmp,
 			TD_CC_GET(tmp), /* EC, */ toggle,
 			(tmp & TD_DI) >> 21, pid,
 			(tmp & TD_R) ? "R" : "");
 		cbp = le32_to_cpup (&td->hwCBP);
 		be = le32_to_cpup (&td->hwBE);
-		dbg ("     cbp %08x be %08x (len %d)", cbp, be,
+		ohci_dbg (ohci, "     cbp %08x be %08x (len %d)", cbp, be,
 			cbp ? (be + 1 - cbp) : 0);
 	} else {
 		unsigned	i;
-		dbg ("     info %08x CC=%x FC=%d DI=%d SF=%04x", tmp,
+		ohci_dbg (ohci, "     info %08x CC=%x FC=%d DI=%d SF=%04x", tmp,
 			TD_CC_GET(tmp),
 			(tmp >> 24) & 0x07,
 			(tmp & TD_DI) >> 21,
 			tmp & 0x0000ffff);
-		dbg ("     bp0 %08x be %08x",
+		ohci_dbg (ohci, "     bp0 %08x be %08x",
 			le32_to_cpup (&td->hwCBP) & ~0x0fff,
 			le32_to_cpup (&td->hwBE));
 		for (i = 0; i < MAXPSW; i++) {
 			u16	psw = le16_to_cpup (&td->hwPSW [i]);
 			int	cc = (psw >> 12) & 0x0f;
-			dbg ("       psw [%d] = %2x, CC=%x %s=%d", i,
+			ohci_dbg (ohci, "       psw [%d] = %2x, CC=%x %s=%d", i,
 				psw, cc,
 				(cc >= 0x0e) ? "OFFSET" : "SIZE",
 				psw & 0x0fff);
@@ -279,8 +277,9 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	u32	tmp = ed->hwINFO;
 	char	*type = "";
 
-	dbg ("%s: %s, ed %p state 0x%x type %s; next ed %08x",
-		ohci->hcd.self.bus_name, label,
+	ohci_dbg (ohci,
+		"%s, ed %p state 0x%x type %s; next ed %08x\n",
+		label,
 		ed, ed->state, edstring (ed->type),
 		le32_to_cpup (&ed->hwNextED));
 	switch (tmp & (ED_IN|ED_OUT)) {
@@ -288,7 +287,8 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	case ED_IN: type = "-IN"; break;
 	/* else from TDs ... control */
 	}
-	dbg ("  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d", le32_to_cpu (tmp),
+	ohci_dbg (ohci,
+		"  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d", le32_to_cpu (tmp),
 		0x03ff & (le32_to_cpu (tmp) >> 16),
 		(tmp & ED_DEQUEUE) ? " DQ" : "",
 		(tmp & ED_ISO) ? " ISO" : "",
@@ -297,7 +297,8 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 		0x000f & (le32_to_cpu (tmp) >> 7),
 		type,
 		0x007f & le32_to_cpu (tmp));
-	dbg ("  tds: head %08x %s%s tail %08x%s",
+	ohci_dbg (ohci,
+		"  tds: head %08x %s%s tail %08x%s",
 		tmp = le32_to_cpup (&ed->hwHeadP),
 		(ed->hwHeadP & ED_C) ? data1 : data0,
 		(ed->hwHeadP & ED_H) ? " HALT" : "",
@@ -312,7 +313,7 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 		list_for_each (tmp, &ed->td_list) {
 			struct td		*td;
 			td = list_entry (tmp, struct td, td_list);
-			ohci_dump_td ("  ->", td);
+			ohci_dump_td (ohci, "  ->", td);
 		}
 	}
 }

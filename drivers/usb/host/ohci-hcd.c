@@ -334,9 +334,11 @@ rescan:
 			td_free (ohci, ed->dummy);
 			break;
 		default:
-			err ("%s-%s ed %p (#%d) not unlinked; disconnect() bug? %d",
-				ohci->hcd.self.bus_name, udev->devpath, ed,
-				i, ed->state);
+			ohci_err (ohci,
+				"dev %s ep%d-%s linked; disconnect() bug?\n",
+				udev->devpath,
+				(i >> 1) & 0x0f, (i & 1) ? "out" : "in");
+
 			/* ED_OPER: some driver disconnect() is broken,
 			 * it didn't even start its unlinks much less wait
 			 * for their completions.
@@ -356,8 +358,10 @@ do_rescan:
 #ifdef DEBUG
 	/* a driver->disconnect() returned before its unlinks completed? */
 	if (in_interrupt ()) {
-		warn ("disconnect() bug for dev usb-%s-%s ep 0x%x", 
-			ohci->hcd.self.bus_name, udev->devpath, i);
+		ohci_warn (ohci,
+			"driver disconnect() bug %s ep%d-%s\n", 
+			udev->devpath,
+			(i >> 1) & 0x0f, (i & 1) ? "out" : "in");
 	}
 #endif
 
@@ -428,7 +432,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	temp = 30;	/* ... allow extra time */
 	while ((readl (&ohci->regs->cmdstatus) & OHCI_HCR) != 0) {
 		if (--temp == 0) {
-			dev_err (ohci->hcd.controller, "USB HC reset timed out!");
+			ohci_err (ohci, "USB HC reset timed out!\n");
 			return -1;
 		}
 		udelay (1);
@@ -485,7 +489,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	 */
 	if ((readl (&ohci->regs->fminterval) & 0x3fff0000) == 0
 			|| !readl (&ohci->regs->periodicstart)) {
-		err ("%s init err", ohci->hcd.self.bus_name);
+		ohci_err (ohci, "init err\n");
 		return -EOVERFLOW;
 	}
 
@@ -564,7 +568,7 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	/* cardbus/... hardware gone before remove() */
 	} else if ((ints = readl (&regs->intrstatus)) == ~(u32)0) {
 		disable (ohci);
-		dbg ("%s device removed!", hcd->self.bus_name);
+		ohci_dbg (ohci, "device removed!\n");
 		return;
 
 	/* interrupt for some other device? */
@@ -572,13 +576,9 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		return;
 	} 
 
-
-	// dbg ("Interrupt: %x frame: %x", ints, le16_to_cpu (ohci->hcca->frame_no));
-
 	if (ints & OHCI_INTR_UE) {
 		disable (ohci);
-		err ("OHCI Unrecoverable Error, %s disabled",
-				hcd->self.bus_name);
+		ohci_err (ohci, "OHCI Unrecoverable Error, disabled\n");
 		// e.g. due to PCI Master/Target Abort
 
 		ohci_dump (ohci, 1);
@@ -613,7 +613,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 {	
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
-	dev_dbg (hcd->controller, "stop %s controller%s\n",
+	ohci_dbg (ohci, "stop %s controller%s\n",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
 		ohci->disabled ? " (disabled)" : ""
 		);
