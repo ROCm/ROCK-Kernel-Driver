@@ -1566,11 +1566,20 @@ void
 pagebuf_delwri_dequeue(
 	xfs_buf_t		*pb)
 {
+	int			dequeued = 0;
+
 	PB_TRACE(pb, "delwri_uq", 0);
+
 	spin_lock(&pbd_delwrite_lock);
-	list_del_init(&pb->pb_list);
+	if ((pb->pb_flags & PBF_DELWRI) && !list_empty(&pb->pb_list)) {
+		list_del_init(&pb->pb_list);
+		dequeued = 1;
+	}
 	pb->pb_flags &= ~PBF_DELWRI;
 	spin_unlock(&pbd_delwrite_lock);
+
+	if (dequeued)
+		pagebuf_rele(pb);
 }
 
 STATIC void

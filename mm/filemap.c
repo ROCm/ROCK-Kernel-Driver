@@ -204,6 +204,18 @@ int filemap_flush(struct address_space *mapping)
 EXPORT_SYMBOL(filemap_flush);
 
 /*
+ * This is a completely non-blocking flush.  Not suitable for much,
+ * used by filesystems where page locks may be held already - not
+ * only may I/O not be started against all dirty pages, but we will
+ * only trylock pages too.
+ */
+int filemap_flushfast(struct address_space *mapping)
+{
+	return __filemap_fdatawrite(mapping, WB_SYNC_FAST);
+}
+EXPORT_SYMBOL(filemap_flushfast);
+
+/*
  * Wait for writeback to complete against pages indexed by start->end
  * inclusive. 
  * This could be a synchronous wait or could just queue an async

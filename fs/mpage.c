@@ -655,7 +655,10 @@ retry:
 			 * mapping
 			 */
 
-			lock_page(page);
+			if (wbc->sync_mode != WB_SYNC_FAST)
+				lock_page(page);
+			else if (TestSetPageLocked(page))
+		                continue;
 
 			if (unlikely(page->mapping != mapping)) {
 				unlock_page(page);

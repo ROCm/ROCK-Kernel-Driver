@@ -1285,6 +1285,7 @@ extern void write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawrite_range(struct address_space *, loff_t, loff_t);
 extern int filemap_flush(struct address_space *);
+extern int filemap_flushfast(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern int filemap_write_and_wait(struct address_space *mapping);
 extern void sync_supers(void);

@@ -259,7 +259,7 @@ xfs_flush_inode(
 {
 	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
 
-	filemap_flush(inode->i_mapping);
+	filemap_flushfast(inode->i_mapping);
 }
 
 void
