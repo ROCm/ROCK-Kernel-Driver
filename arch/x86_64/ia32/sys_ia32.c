@@ -1082,8 +1082,6 @@ long sys32_lookup_dcookie(u32 addr_low, u32 addr_high,
 	return sys_lookup_dcookie(((u64)addr_high << 32) | addr_low, buf, len);
 }
 
-cond_syscall(sys32_ipc)
-
 static int __init ia32_init (void)
 {
 	printk("IA32 emulation $Id: sys_ia32.c,v 1.32 2002/03/24 13:02:28 ak Exp $\n");  

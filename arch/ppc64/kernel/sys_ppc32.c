@@ -492,6 +492,7 @@ asmlinkage long sys32_settimeofday(struct compat_timeval __user *tv, struct time
 	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
+#ifdef CONFIG_SYSVIPC
 long sys32_ipc(u32 call, u32 first, u32 second, u32 third, compat_uptr_t ptr,
 	       u32 fifth)
 {
@@ -556,6 +557,7 @@ long sys32_ipc(u32 call, u32 first, u32 second, u32 third, compat_uptr_t ptr,
 
 	return -ENOSYS;
 }
+#endif
 
 /* Note: it is necessary to treat out_fd and in_fd as unsigned ints, 
  * with the corresponding cast to a signed int to insure that the 
