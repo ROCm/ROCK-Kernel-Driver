@@ -556,13 +556,13 @@ ippp_ccp_send_ccp(struct ippp_ccp *ccp, struct sk_buff *skb)
 	}
 }
 
-static struct isdn_ppp_compressor *ipc_head = NULL;
+static LIST_HEAD(ipc_head);
 
 int
 ippp_ccp_set_compressor(struct ippp_ccp *ccp, int unit,
 			struct isdn_ppp_comp_data *data)
 {
-	struct isdn_ppp_compressor *ipc = ipc_head;
+	struct isdn_ppp_compressor *ipc;
 	int ret;
 	void *stat;
 	int num = data->num;
@@ -571,7 +571,7 @@ ippp_ccp_set_compressor(struct ippp_ccp *ccp, int unit,
 		printk(KERN_DEBUG "[%d] Set %scompressor type %d\n", unit,
 		       data->flags & IPPP_COMP_FLAG_XMIT ? "" : "de", num);
 
-	for (ipc = ipc_head; ipc; ipc = ipc->next) {
+	list_for_each_entry(ipc, &ipc_head, list) {
 		if (ipc->num != num)
 			continue;
 		
@@ -618,7 +618,7 @@ ippp_ccp_get_compressors(unsigned long protos[8])
 	int i, j;
 
 	memset(protos, 0, sizeof(unsigned long) * 8);
-	for (ipc = ipc_head; ipc; ipc = ipc->next) {
+	list_for_each_entry(ipc, &ipc_head, list) {
 		j = ipc->num / (sizeof(long)*8);
 		i = ipc->num % (sizeof(long)*8);
 		if (j < 8)
@@ -629,25 +629,14 @@ ippp_ccp_get_compressors(unsigned long protos[8])
 int
 isdn_ppp_register_compressor(struct isdn_ppp_compressor *ipc)
 {
-	ipc->next = ipc_head;
-	ipc->prev = NULL;
-	if (ipc_head) {
-		ipc_head->prev = ipc;
-	}
-	ipc_head = ipc;
+	list_add_tail(&ipc->list, &ipc_head);
 	return 0;
 }
 
 int
 isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *ipc)
 {
-	if (ipc->prev)
-		ipc->prev->next = ipc->next;
-	else
-		ipc_head = ipc->next;
-	if (ipc->next)
-		ipc->next->prev = ipc->prev;
-	ipc->prev = ipc->next = NULL;
+	list_del(&ipc->list);
 	return 0;
 }
 
