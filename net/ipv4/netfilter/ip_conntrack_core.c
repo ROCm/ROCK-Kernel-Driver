@@ -917,11 +917,55 @@ static void expectation_timed_out(unsigned long ul_expect)
 	WRITE_UNLOCK(&ip_conntrack_lock);
 }
 
-/* Add a related connection. */
-int ip_conntrack_expect_related(struct ip_conntrack *related_to,
-				struct ip_conntrack_expect *expect)
+struct ip_conntrack_expect *
+ip_conntrack_expect_alloc()
 {
-	struct ip_conntrack_expect *old, *new;
+	struct ip_conntrack_expect *new;
+	
+	new = (struct ip_conntrack_expect *)
+		kmalloc(sizeof(struct ip_conntrack_expect), GFP_ATOMIC);
+	if (!new) {
+		DEBUGP("expect_related: OOM allocating expect\n");
+		return NULL;
+	}
+
+	/* tuple_cmp compares whole union, we have to initialized cleanly */
+	memset(new, 0, sizeof(struct ip_conntrack_expect));
+
+	return new;
+}
+
+static void
+ip_conntrack_expect_insert(struct ip_conntrack_expect *new,
+			   struct ip_conntrack *related_to)
+{
+	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
+	new->expectant = related_to;
+	new->sibling = NULL;
+	atomic_set(&new->use, 1);
+
+	/* add to expected list for this connection */
+	list_add(&new->expected_list, &related_to->sibling_list);
+	/* add to global list of expectations */
+
+	list_prepend(&ip_conntrack_expect_list, &new->list);
+	/* add and start timer if required */
+	if (related_to->helper->timeout) {
+		init_timer(&new->timeout);
+		new->timeout.data = (unsigned long)new;
+		new->timeout.function = expectation_timed_out;
+		new->timeout.expires = jiffies +
+					related_to->helper->timeout * HZ;
+		add_timer(&new->timeout);
+	}
+	related_to->expecting++;
+}
+
+/* Add a related connection. */
+int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
+				struct ip_conntrack *related_to)
+{
+	struct ip_conntrack_expect *old;
 	int ret = 0;
 
 	WRITE_LOCK(&ip_conntrack_lock);
@@ -943,7 +987,7 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 		if (related_to->helper->timeout) {
 			if (!del_timer(&old->timeout)) {
 				/* expectation is dying. Fall through */
-				old = NULL;
+				goto out;
 			} else {
 				old->timeout.expires = jiffies + 
 					related_to->helper->timeout * HZ;
@@ -951,10 +995,10 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 			}
 		}
 
-		if (old) {
-			WRITE_UNLOCK(&ip_conntrack_lock);
-			return -EEXIST;
-		}
+		WRITE_UNLOCK(&ip_conntrack_lock);
+		kfree(expect);
+		return -EEXIST;
+
 	} else if (related_to->helper->max_expected && 
 		   related_to->expecting >= related_to->helper->max_expected) {
 		struct list_head *cur_item;
@@ -971,6 +1015,7 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 				       related_to->helper->name,
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
+			kfree(expect);
 			return -EPERM;
 		}
 		DEBUGP("ip_conntrack: max number of expected "
@@ -1010,37 +1055,12 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 			     &expect->mask)) {
 		WRITE_UNLOCK(&ip_conntrack_lock);
 		DEBUGP("expect_related: busy!\n");
+
+		kfree(expect);
 		return -EBUSY;
 	}
-	
-	new = (struct ip_conntrack_expect *) 
-	      kmalloc(sizeof(struct ip_conntrack_expect), GFP_ATOMIC);
-	if (!new) {
-		WRITE_UNLOCK(&ip_conntrack_lock);
-		DEBUGP("expect_relaed: OOM allocating expect\n");
-		return -ENOMEM;
-	}
-	
-	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
-	memcpy(new, expect, sizeof(*expect));
-	new->expectant = related_to;
-	new->sibling = NULL;
-	atomic_set(&new->use, 1);
-	
-	/* add to expected list for this connection */	
-	list_add(&new->expected_list, &related_to->sibling_list);
-	/* add to global list of expectations */
-	list_prepend(&ip_conntrack_expect_list, &new->list);
-	/* add and start timer if required */
-	if (related_to->helper->timeout) {
-		init_timer(&new->timeout);
-		new->timeout.data = (unsigned long)new;
-		new->timeout.function = expectation_timed_out;
-		new->timeout.expires = jiffies + 
-					related_to->helper->timeout * HZ;
-		add_timer(&new->timeout);
-	}
-	related_to->expecting++;
+
+out:	ip_conntrack_expect_insert(expect, related_to);
 
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
