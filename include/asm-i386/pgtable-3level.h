@@ -8,24 +8,6 @@
  * Copyright (C) 1999 Ingo Molnar <mingo@redhat.com>
  */
 
-/*
- * PGDIR_SHIFT determines what a top-level page table entry can map
- */
-#define PGDIR_SHIFT	30
-#define PTRS_PER_PGD	4
-
-/*
- * PMD_SHIFT determines the size of the area a middle-level
- * page table can map
- */
-#define PMD_SHIFT	21
-#define PTRS_PER_PMD	512
-
-/*
- * entries per page directory level
- */
-#define PTRS_PER_PTE	512
-
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %p(%08lx%08lx).\n", __FILE__, __LINE__, &(e), (e).pte_high, (e).pte_low)
 #define pmd_ERROR(e) \
@@ -36,6 +18,29 @@
 static inline int pgd_none(pgd_t pgd)		{ return 0; }
 static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
+
+/*
+ * Is the pte executable?
+ */
+static inline int pte_x(pte_t pte)
+{
+	return !(pte_val(pte) & _PAGE_NX);
+}
+
+/*
+ * All present user-pages with !NX bit are user-executable:
+ */
+static inline int pte_exec(pte_t pte)
+{
+	return pte_user(pte) && pte_x(pte);
+}
+/*
+ * All present pages with !NX bit are kernel-executable:
+ */
+static inline int pte_exec_kernel(pte_t pte)
+{
+	return pte_x(pte);
+}
 
 /* Rules for using set_pte: the pte being assigned *must* be
  * either not present or in a state where the hardware will
