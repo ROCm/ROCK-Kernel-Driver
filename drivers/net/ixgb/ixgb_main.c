@@ -55,6 +55,8 @@ MODULE_DEVICE_TABLE(pci, ixgb_pci_tbl);
 
 /* Local Function Prototypes */
 
+static inline void ixgb_irq_disable(struct ixgb_adapter *adapter);
+static inline void ixgb_irq_enable(struct ixgb_adapter *adapter);
 int ixgb_up(struct ixgb_adapter *adapter);
 void ixgb_down(struct ixgb_adapter *adapter, boolean_t kill_watchdog);
 void ixgb_reset(struct ixgb_adapter *adapter);
@@ -82,10 +84,11 @@ static struct net_device_stats *ixgb_get_stats(struct net_device *netdev);
 static int ixgb_change_mtu(struct net_device *netdev, int new_mtu);
 static int ixgb_set_mac(struct net_device *netdev, void *p);
 static void ixgb_update_stats(struct ixgb_adapter *adapter);
-static inline void ixgb_irq_disable(struct ixgb_adapter *adapter);
-static inline void ixgb_irq_enable(struct ixgb_adapter *adapter);
 static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs);
 static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter);
+static inline void ixgb_rx_checksum(struct ixgb_adapter *adapter,
+				    struct ixgb_rx_desc *rx_desc,
+				    struct sk_buff *skb);
 #ifdef CONFIG_IXGB_NAPI
 static int ixgb_clean(struct net_device *netdev, int *budget);
 static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter,
@@ -95,9 +98,6 @@ static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter);
 #endif
 static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter);
 static int ixgb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
-static inline void ixgb_rx_checksum(struct ixgb_adapter *adapter,
-				    struct ixgb_rx_desc *rx_desc,
-				    struct sk_buff *skb);
 static void ixgb_tx_timeout(struct net_device *dev);
 static void ixgb_tx_timeout_task(struct net_device *dev);
 static void ixgb_vlan_rx_register(struct net_device *netdev,
@@ -184,6 +184,34 @@ static void __exit ixgb_exit_module(void)
 }
 
 module_exit(ixgb_exit_module);
+
+/**
+ * ixgb_irq_disable - Mask off interrupt generation on the NIC
+ * @adapter: board private structure
+ **/
+
+static inline void ixgb_irq_disable(struct ixgb_adapter *adapter)
+{
+	atomic_inc(&adapter->irq_sem);
+	IXGB_WRITE_REG(&adapter->hw, IMC, ~0);
+	IXGB_WRITE_FLUSH(&adapter->hw);
+	synchronize_irq(adapter->pdev->irq);
+}
+
+/**
+ * ixgb_irq_enable - Enable default interrupt generation settings
+ * @adapter: board private structure
+ **/
+
+static inline void ixgb_irq_enable(struct ixgb_adapter *adapter)
+{
+	if (atomic_dec_and_test(&adapter->irq_sem)) {
+		IXGB_WRITE_REG(&adapter->hw, IMS,
+			       IXGB_INT_RXT0 | IXGB_INT_RXDMT0 | IXGB_INT_TXDW |
+			       IXGB_INT_RXO | IXGB_INT_LSC);
+		IXGB_WRITE_FLUSH(&adapter->hw);
+	}
+}
 
 int ixgb_up(struct ixgb_adapter *adapter)
 {
@@ -1550,34 +1578,6 @@ static void ixgb_update_stats(struct ixgb_adapter *adapter)
 	adapter->net_stats.tx_window_errors = 0;
 }
 
-/**
- * ixgb_irq_disable - Mask off interrupt generation on the NIC
- * @adapter: board private structure
- **/
-
-static inline void ixgb_irq_disable(struct ixgb_adapter *adapter)
-{
-	atomic_inc(&adapter->irq_sem);
-	IXGB_WRITE_REG(&adapter->hw, IMC, ~0);
-	IXGB_WRITE_FLUSH(&adapter->hw);
-	synchronize_irq(adapter->pdev->irq);
-}
-
-/**
- * ixgb_irq_enable - Enable default interrupt generation settings
- * @adapter: board private structure
- **/
-
-static inline void ixgb_irq_enable(struct ixgb_adapter *adapter)
-{
-	if (atomic_dec_and_test(&adapter->irq_sem)) {
-		IXGB_WRITE_REG(&adapter->hw, IMS,
-			       IXGB_INT_RXT0 | IXGB_INT_RXDMT0 | IXGB_INT_TXDW |
-			       IXGB_INT_RXO | IXGB_INT_LSC);
-		IXGB_WRITE_FLUSH(&adapter->hw);
-	}
-}
-
 #define IXGB_MAX_INTR 10
 /**
  * ixgb_intr - Interrupt Handler
@@ -1727,6 +1727,39 @@ static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter)
 	spin_unlock(&adapter->tx_lock);
 
 	return cleaned;
+}
+
+/**
+ * ixgb_rx_checksum - Receive Checksum Offload for 82597.
+ * @adapter: board private structure
+ * @rx_desc: receive descriptor
+ * @sk_buff: socket buffer with received data
+ **/
+
+static inline void
+ixgb_rx_checksum(struct ixgb_adapter *adapter,
+		 struct ixgb_rx_desc *rx_desc, struct sk_buff *skb)
+{
+	/* Ignore Checksum bit is set OR
+	 * TCP Checksum has not been calculated
+	 */
+	if ((rx_desc->status & IXGB_RX_DESC_STATUS_IXSM) ||
+	    (!(rx_desc->status & IXGB_RX_DESC_STATUS_TCPCS))) {
+		skb->ip_summed = CHECKSUM_NONE;
+		return;
+	}
+
+	/* At this point we know the hardware did the TCP checksum */
+	/* now look at the TCP checksum error bit */
+	if (rx_desc->errors & IXGB_RX_DESC_ERRORS_TCPE) {
+		/* let the stack verify checksum errors */
+		skb->ip_summed = CHECKSUM_NONE;
+		adapter->hw_csum_rx_error++;
+	} else {
+		/* TCP checksum is good */
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
+		adapter->hw_csum_rx_good++;
+	}
 }
 
 /**
@@ -1953,39 +1986,6 @@ static int ixgb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	}
 
 	return 0;
-}
-
-/**
- * ixgb_rx_checksum - Receive Checksum Offload for 82597.
- * @adapter: board private structure
- * @rx_desc: receive descriptor
- * @sk_buff: socket buffer with received data
- **/
-
-static inline void
-ixgb_rx_checksum(struct ixgb_adapter *adapter,
-		 struct ixgb_rx_desc *rx_desc, struct sk_buff *skb)
-{
-	/* Ignore Checksum bit is set OR 
-	 * TCP Checksum has not been calculated 
-	 */
-	if ((rx_desc->status & IXGB_RX_DESC_STATUS_IXSM) ||
-	    (!(rx_desc->status & IXGB_RX_DESC_STATUS_TCPCS))) {
-		skb->ip_summed = CHECKSUM_NONE;
-		return;
-	}
-
-	/* At this point we know the hardware did the TCP checksum */
-	/* now look at the TCP checksum error bit */
-	if (rx_desc->errors & IXGB_RX_DESC_ERRORS_TCPE) {
-		/* let the stack verify checksum errors */
-		skb->ip_summed = CHECKSUM_NONE;
-		adapter->hw_csum_rx_error++;
-	} else {
-		/* TCP checksum is good */
-		skb->ip_summed = CHECKSUM_UNNECESSARY;
-		adapter->hw_csum_rx_good++;
-	}
 }
 
 /**
