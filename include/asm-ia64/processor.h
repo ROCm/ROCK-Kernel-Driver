@@ -289,7 +289,7 @@ struct thread_struct {
 	.ksp =		0,			\
 	.map_base =	DEFAULT_MAP_BASE,	\
 	.task_size =	DEFAULT_TASK_SIZE,	\
-	.last_fph_cpu =  0,			\
+	.last_fph_cpu =  -1,			\
 	INIT_THREAD_IA32			\
 	INIT_THREAD_PM				\
 	.dbr =		{0, },			\

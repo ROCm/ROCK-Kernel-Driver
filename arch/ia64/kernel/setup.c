@@ -746,10 +746,6 @@ cpu_init (void)
 	 */
 	ia64_set_dcr(  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 		     | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
-#ifndef CONFIG_SMP
-	ia64_set_fpu_owner(0);
-#endif
-
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 	if (current->mm)
