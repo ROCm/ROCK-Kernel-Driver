@@ -611,7 +611,6 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
-extern int sysctl_tcp_default_win_scale;
 extern int sysctl_tcp_moderate_rcvbuf;
 
 extern atomic_t tcp_memory_allocated;
@@ -1690,68 +1689,10 @@ static inline void tcp_syn_build_options(__u32 *ptr, int mss, int ts, int sack,
 		*ptr++ = htonl((TCPOPT_NOP << 24) | (TCPOPT_WINDOW << 16) | (TCPOLEN_WINDOW << 8) | (wscale));
 }
 
-/* Determine a window scaling and initial window to offer.
- * Based on the assumption that the given amount of space
- * will be offered. Store the results in the tp structure.
- * NOTE: for smooth operation initial space offering should
- * be a multiple of mss if possible. We assume here that mss >= 1.
- * This MUST be enforced by all callers.
- */
-static inline void tcp_select_initial_window(int __space, __u32 mss,
-	__u32 *rcv_wnd,
-	__u32 *window_clamp,
-	int wscale_ok,
-	__u8 *rcv_wscale)
-{
-	unsigned int space = (__space < 0 ? 0 : __space);
-
-	/* If no clamp set the clamp to the max possible scaled window */
-	if (*window_clamp == 0)
-		(*window_clamp) = (65535 << 14);
-	space = min(*window_clamp, space);
-
-	/* Quantize space offering to a multiple of mss if possible. */
-	if (space > mss)
-		space = (space / mss) * mss;
-
-	/* NOTE: offering an initial window larger than 32767
-	 * will break some buggy TCP stacks. We try to be nice.
-	 * If we are not window scaling, then this truncates
-	 * our initial window offering to 32k. There should also
-	 * be a sysctl option to stop being nice.
-	 */
-	(*rcv_wnd) = min(space, MAX_TCP_WINDOW);
-	(*rcv_wscale) = 0;
-	if (wscale_ok) {
-		/* See RFC1323 for an explanation of the limit to 14 */
-		while (space > 65535 && (*rcv_wscale) < 14) {
-			space >>= 1;
-			(*rcv_wscale)++;
-		}
-		if (*rcv_wscale && sysctl_tcp_app_win && space>=mss &&
-		    space - max((space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
-			(*rcv_wscale)--;
-
-		*rcv_wscale = max((__u8)sysctl_tcp_default_win_scale,
-				  *rcv_wscale);
-	}
-
-	/* Set initial window to value enough for senders,
-	 * following RFC1414. Senders, not following this RFC,
-	 * will be satisfied with 2.
-	 */
-	if (mss > (1<<*rcv_wscale)) {
-		int init_cwnd = 4;
-		if (mss > 1460*3)
-			init_cwnd = 2;
-		else if (mss > 1460)
-			init_cwnd = 3;
-		if (*rcv_wnd > init_cwnd*mss)
-			*rcv_wnd = init_cwnd*mss;
-	}
-	/* Set the clamp no higher than max representable value */
-	(*window_clamp) = min(65535U << (*rcv_wscale), *window_clamp);
-}
+/* Determine a window scaling and initial window to offer. */
+extern void tcp_select_initial_window(int __space, __u32 mss,
+				      __u32 *rcv_wnd, __u32 *window_clamp,
+				      int wscale_ok, __u8 *rcv_wscale);
 
 static inline int tcp_win_from_space(int space)
 {
@@ -1761,13 +1702,13 @@ static inline int tcp_win_from_space(int space)
 }
 
 /* Note: caller must be prepared to deal with negative returns */ 
-static inline int tcp_space(struct sock *sk)
+static inline int tcp_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf -
 				  atomic_read(&sk->sk_rmem_alloc));
 } 
 
-static inline int tcp_full_space( struct sock *sk)
+static inline int tcp_full_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf); 
 }
