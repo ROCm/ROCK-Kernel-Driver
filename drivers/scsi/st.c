@@ -3109,6 +3109,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 	ST_mode *STm;
 	ST_partstat *STps;
 	char *name = tape_name(STp);
+	void __user *p = (void __user *)arg;
 
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
@@ -3144,7 +3145,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 			goto out;
 		}
 
-		i = copy_from_user((char *) &mtc, (char *) arg, sizeof(struct mtop));
+		i = copy_from_user(&mtc, p, sizeof(struct mtop));
 		if (i) {
 			retval = (-EFAULT);
 			goto out;
@@ -3380,8 +3381,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 		if (STp->cleaning_req)
 			mt_status.mt_gstat |= GMT_CLN(0xffffffff);
 
-		i = copy_to_user((char *) arg, (char *) &(mt_status),
-				 sizeof(struct mtget));
+		i = copy_to_user(p, &mt_status, sizeof(struct mtget));
 		if (i) {
 			retval = (-EFAULT);
 			goto out;
@@ -3402,7 +3402,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 			goto out;
 		}
 		mt_pos.mt_blkno = blk;
-		i = copy_to_user((char *) arg, (char *) (&mt_pos), sizeof(struct mtpos));
+		i = copy_to_user(p, &mt_pos, sizeof(struct mtpos));
 		if (i)
 			retval = (-EFAULT);
 		goto out;

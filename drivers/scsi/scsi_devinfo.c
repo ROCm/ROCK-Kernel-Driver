@@ -433,7 +433,7 @@ stop_output:
  * To add a black/white list entry for vendor and model with an integer
  * value of flag to the scsi device info list.
  */
-static int proc_scsi_devinfo_write(struct file *file, const char *buf,
+static int proc_scsi_devinfo_write(struct file *file, const char __user *buf,
 				   unsigned long length, void *data)
 {
 	char *buffer;
