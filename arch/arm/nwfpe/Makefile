@@ -1,6 +1,4 @@
 #
-# linux/arch/arm/nwfpe/Makefile
-#
 # Copyright (C) 1998, 1999, 2001 Philip Blundell
 #
 
@@ -11,8 +9,6 @@ O_TARGET		:= math-emu.o
 obj-y			:=
 obj-m			:=
 obj-n			:=
-
-list-multi		:= nwfpe.o
 
 obj-$(CONFIG_FPE_NWFPE)	+= nwfpe.o
 
@@ -27,6 +23,3 @@ nwfpe-objs		+= entry.o
 endif
 
 include $(TOPDIR)/Rules.make
-
-nwfpe.o: $(nwfpe-objs)
-	$(LD) -r -o $@ $(nwfpe-objs)

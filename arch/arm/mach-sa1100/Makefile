@@ -1,9 +1,6 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
 
 USE_STANDARD_AS_RULE := true
 
@@ -115,7 +112,6 @@ export-objs				+= yopy.o
 obj-$(CONFIG_LEDS) += $(led-y)
 
 # SA1110 USB client support
-list-multi += sa1100usb_core.o
 sa1100usb_core-objs := usb_ctl.o usb_ep0.o usb_recv.o usb_send.o
 obj-$(CONFIG_SA1100_USB) += sa1100usb_core.o
 obj-$(CONFIG_SA1100_USB_NETLINK) += usb-eth.o
@@ -125,7 +121,3 @@ obj-$(CONFIG_SA1100_USB_CHAR) += usb-char.o
 obj-$(CONFIG_PM) += pm.o sleep.o
 
 include $(TOPDIR)/Rules.make
-
-sa1100usb_core.o: $(sa1100usb_core-objs)
-	$(LD) -r -o $@ $(sa1100usb_core-objs)
-
