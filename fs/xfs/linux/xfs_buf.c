@@ -396,7 +396,6 @@ _pagebuf_lookup_pages(
 
 		nbytes = min_t(size_t, size, PAGE_CACHE_SIZE - offset);
 		size -= nbytes;
-		offset = 0;
 
 		if (!PageUptodate(page)) {
 			page_count--;
@@ -420,6 +419,7 @@ _pagebuf_lookup_pages(
 		}
 
 		bp->pb_pages[i] = page;
+		offset = 0;
 	}
 
 	if (!bp->pb_locked) {
