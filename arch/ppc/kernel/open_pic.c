@@ -799,26 +799,20 @@ static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs)
 
 #endif /* CONFIG_SMP */
 
-/* This one may be merged with PReP and CHRP */
 int
 openpic_get_irq(struct pt_regs *regs)
 {
-/*
- * Clean up needed. -VAL
- */
 	int irq = openpic_irq();
 
-	/* Management of the cascade should be moved out of here */
-
-	/* Yep - because openpic !=> i8259, for one thing. -VAL */
-	if (open_pic_irq_offset && irq == open_pic_irq_offset)
-	{
-#ifndef CONFIG_GEMINI
-		irq = i8259_irq(regs); /* get IRQ from cascade */
-#endif
+	/*
+	 * This needs to be cleaned up.  We don't necessarily have
+	 * an i8259 cascaded or even a cascade.
+	 */
+	if (open_pic_irq_offset && irq == open_pic_irq_offset) {
+		/* Get the IRQ from the cascade. */
+		irq = i8259_irq(regs);
 		openpic_eoi();
-	}
-	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
+	} else if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
 		irq = -1;
 	return irq;
 }
