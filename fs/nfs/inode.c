@@ -125,8 +125,12 @@ nfs_delete_inode(struct inode * inode)
 static void
 nfs_clear_inode(struct inode *inode)
 {
-	struct rpc_cred *cred = NFS_I(inode)->mm_cred;
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct rpc_cred *cred = nfsi->mm_cred;
 
+	if (cred)
+		put_rpccred(cred);
+	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
 }
@@ -722,6 +726,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
+		NFS_I(inode)->cache_access.cred = NULL;
 
 		unlock_new_inode(inode);
 	} else
@@ -1084,6 +1089,16 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 	NFS_CACHE_ISIZE(inode) = new_size;
 	inode->i_size = new_isize;
+
+	if (inode->i_mode != fattr->mode ||
+	    inode->i_uid != fattr->uid ||
+	    inode->i_gid != fattr->gid) {
+		struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
+		if (*cred) {
+			put_rpccred(*cred);
+			*cred = NULL;
+		}
+	}
 
 	inode->i_mode = fattr->mode;
 	inode->i_nlink = fattr->nlink;

@@ -1080,38 +1080,70 @@ out:
 int
 nfs_permission(struct inode *inode, int mask)
 {
-	int			error = vfs_permission(inode, mask);
+	struct nfs_access_cache *cache = &NFS_I(inode)->cache_access;
+	struct rpc_cred *cred;
+	int mode = inode->i_mode;
+	int res;
 
-	if (!NFS_PROTO(inode)->access)
-		goto out;
+	if (mask & MAY_WRITE) {
+		/*
+		 *
+		 * Nobody gets write access to a read-only fs.
+		 *
+		 */
+		if (IS_RDONLY(inode) &&
+		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+			return -EROFS;
 
-	if (error == -EROFS)
-		goto out;
-
-	/*
-	 * Trust UNIX mode bits except:
-	 *
-	 * 1) When override capabilities may have been invoked
-	 * 2) When root squashing may be involved
-	 * 3) When ACLs may overturn a negative answer */
-	if (!capable(CAP_DAC_OVERRIDE) && !capable(CAP_DAC_READ_SEARCH)
-	    && (current->fsuid != 0) && (current->fsgid != 0)
-	    && error != -EACCES)
-		goto out;
+		/*
+		 *
+		 * Nobody gets write access to an immutable file.
+		 *
+		 */
+		if (IS_IMMUTABLE(inode))
+			return -EACCES;
+	}
 
 	lock_kernel();
 
-	error = NFS_PROTO(inode)->access(inode, mask, 0);
+	if (!NFS_PROTO(inode)->access)
+		goto out_notsup;
 
-	if (error == -EACCES && NFS_CLIENT(inode)->cl_droppriv &&
-	    current->uid != 0 && current->gid != 0 &&
-	    (current->fsuid != current->uid || current->fsgid != current->gid))
-		error = NFS_PROTO(inode)->access(inode, mask, 1);
+	cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0);
+	if (cache->cred == cred
+	    && time_before(jiffies, cache->jiffies + NFS_ATTRTIMEO(inode))) {
+		if (!(res = cache->err)) {
+			/* Is the mask a subset of an accepted mask? */
+			if ((cache->mask & mask) == mask)
+				goto out;
+		} else {
+			/* ...or is it a superset of a rejected mask? */
+			if ((cache->mask & mask) == cache->mask)
+				goto out;
+		}
+	}
 
+	res = NFS_PROTO(inode)->access(inode, cred, mask);
+	if (!res || res == -EACCES)
+		goto add_cache;
+out:
+	put_rpccred(cred);
 	unlock_kernel();
-
- out:
-	return error;
+	return res;
+out_notsup:
+	nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	res = vfs_permission(inode, mask);
+	unlock_kernel();
+	return res;
+add_cache:
+	cache->jiffies = jiffies;
+	if (cache->cred)
+		put_rpccred(cache->cred);
+	cache->cred = cred;
+	cache->mask = mask;
+	cache->err = res;
+	unlock_kernel();
+	return res;
 }
 
 /*

@@ -90,6 +90,16 @@
 #ifdef __KERNEL__
 
 /*
+ * NFSv3 Access mode cache
+ */
+struct nfs_access_cache {
+	unsigned long		jiffies;
+	struct rpc_cred *	cred;
+	int			mask;
+	int			err;
+};
+
+/*
  * nfs fs inode data in memory
  */
 struct nfs_inode {
@@ -137,6 +147,8 @@ struct nfs_inode {
 	 * This is of use for dentry revalidation
 	 */
 	unsigned long		cache_mtime_jiffies;
+
+	struct nfs_access_cache	cache_access;
 
 	/*
 	 * This is the cookie verifier used for NFSv3 readdir
