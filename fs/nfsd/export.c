@@ -112,18 +112,6 @@ exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
 	return exp_find_key(clp, 0, fsidv);
 }
 
-static inline svc_export *
-exp_get(svc_client *clp, dev_t dev, ino_t ino)
-{
-	struct svc_expkey *ek;
-
-	ek = exp_get_key(clp, dev, ino);
-	if (ek)
-		return ek->ek_export;
-	else
-		return NULL;
-}
-
 /*
  * Find the client's export entry matching fsid
  */
@@ -135,18 +123,6 @@ exp_get_fsid_key(svc_client *clp, int fsid)
 	mk_fsid_v1(fsidv, fsid);
 
 	return exp_find_key(clp, 1, fsidv);
-}
-
-static inline svc_export *
-exp_get_fsid(svc_client *clp, int fsid)
-{
-	struct svc_expkey *ek;
-
-	ek = exp_get_fsid_key(clp, fsid);
-	if (ek)
-		return ek->ek_export;
-	else
-		return NULL;
 }
 
 svc_export *
@@ -301,7 +277,7 @@ exp_export(struct nfsctl_export *nxp)
 {
 	svc_client	*clp;
 	svc_export	*exp = NULL;
-	svc_export	*fsid_exp;
+	struct svc_expkey	*fsid_key;
 	struct nameidata nd;
 	struct inode	*inode = NULL;
 	int		err;
@@ -335,8 +311,9 @@ exp_export(struct nfsctl_export *nxp)
 
 	/* must make sure there wont be an ex_fsid clash */
 	if ((nxp->ex_flags & NFSEXP_FSID) &&
-	    (fsid_exp = exp_get_fsid(clp, nxp->ex_dev)) &&
-	    fsid_exp != exp)
+	    (fsid_key = exp_get_fsid_key(clp, nxp->ex_dev)) &&
+	    fsid_key->ek_export &&
+	    fsid_key->ek_export != exp)
 		goto finish;
 
 	if (exp != NULL) {
@@ -477,9 +454,9 @@ exp_unexport(struct nfsctl_export *nxp)
 	dom = auth_domain_find(nxp->ex_client);
 
 	if (dom) {
-		svc_export *exp = exp_get(dom, nxp->ex_dev, nxp->ex_ino);
-		if (exp) {
-			exp_do_unexport(exp);
+		struct svc_expkey *key = exp_get_key(dom, nxp->ex_dev, nxp->ex_ino);
+		if (key && key->ek_export) {
+			exp_do_unexport(key->ek_export);
 			err = 0;
 		} else
 			dprintk("nfsd: no export %x/%lx for %s\n",
@@ -547,14 +524,15 @@ out:
 int
 exp_pseudoroot(struct auth_domain *clp, struct svc_fh *fhp)
 {
-	struct svc_export *exp;
+	struct svc_expkey *fsid_key;
 
-	exp = exp_get_fsid(clp, 0);
-	if (!exp)
+	fsid_key = exp_get_fsid_key(clp, 0);
+	if (!fsid_key || IS_ERR(fsid_key))
 		return nfserr_perm;
 
-	dget(exp->ex_dentry);
-	return fh_compose(fhp, exp, exp->ex_dentry, NULL);
+	dget(fsid_key->ek_export->ex_dentry);
+	return fh_compose(fhp, fsid_key->ek_export, 
+			  fsid_key->ek_export->ex_dentry, NULL);
 }
 
 /* Iterator */
