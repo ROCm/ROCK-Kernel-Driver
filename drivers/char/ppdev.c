@@ -751,6 +751,8 @@ static struct file_operations pp_fops = {
 
 static int __init ppdev_init (void)
 {
+	int i;
+
 	if (register_chrdev (PP_MAJOR, CHRDEV, &pp_fops)) {
 		printk (KERN_WARNING CHRDEV ": unable to get major %d\n",
 			PP_MAJOR);
