@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -233,22 +233,40 @@ static inline void sctp_ulpqueue_store_reasm(sctp_ulpqueue_t *ulpq, sctp_ulpeven
 
 /* Helper function to return an event corresponding to the reassembled
  * datagram.
+ * This routine creates a re-assembled skb given the first and last skb's
+ * as stored in the reassembly queue. The skb's may be non-linear if the sctp
+ * payload was fragmented on the way and ip had to reassemble them.
+ * We add the rest of skb's to the first skb's fraglist.
  */
 static inline sctp_ulpevent_t *sctp_make_reassembled_event(struct sk_buff *f_frag, struct sk_buff *l_frag)
 {
 	struct sk_buff *pos;
 	sctp_ulpevent_t *event;
-	struct sk_buff *pnext;
+	struct sk_buff *pnext, *last;
+	struct sk_buff *list = skb_shinfo(f_frag)->frag_list;
 
+	/* Store the pointer to the 2nd skb */
 	pos = f_frag->next;
 
-	/* Set the first fragment's frag_list to point to the 2nd fragment.  */
-	skb_shinfo(f_frag)->frag_list = pos;
+	/* Get the last skb in the f_frag's frag_list if present. */
+	for (last = list; list; last = list,list = list->next);
+
+	/* Add the list of remaining fragments to the first fragments
+	 * frag_list.
+	 */
+	if (last)
+		last->next = pos;
+	else
+		skb_shinfo(f_frag)->frag_list = pos;
 
 	/* Remove the first fragment from the reassembly queue.  */
 	__skb_unlink(f_frag, f_frag->list);
 	do {
 		pnext = pos->next;
+
+		/* Update the len and data_len fields of the first fragment. */
+		f_frag->len += pos->len;
+		f_frag->data_len += pos->len;
 
 		/* Remove the fragment from the reassembly queue.  */
 		__skb_unlink(pos, pos->list);

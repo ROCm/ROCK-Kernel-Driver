@@ -49,7 +49,7 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
-sctp_sm_table_entry_t bug = {
+static sctp_sm_table_entry_t bug = {
 	.fn = sctp_sf_bug, 
 	.name = "sctp_sf_bug"
 };

@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -72,10 +72,19 @@ static inline int sctp_rcv_checksum(struct sk_buff *skb)
 {
 	struct sctphdr *sh;
 	__u32 cmp, val;
+	struct sk_buff *list = skb_shinfo(skb)->frag_list;
 
 	sh = (struct sctphdr *) skb->h.raw;
 	cmp = ntohl(sh->checksum);
-	val = count_crc((__u8 *)sh, skb->len);
+
+	val = sctp_start_cksum((__u8 *)sh, skb_headlen(skb));
+
+	for (; list; list = list->next)
+		val = sctp_update_cksum((__u8 *)list->data, skb_headlen(list),
+					val);
+
+	val = sctp_end_cksum(val);
+
 	if (val != cmp) {
 		/* CRC failure, dump it. */
 		return -1;
