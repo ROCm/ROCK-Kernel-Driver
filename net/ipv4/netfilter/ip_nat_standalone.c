@@ -177,45 +177,6 @@ ip_nat_fn(unsigned int hooknum,
 	return do_bindings(ct, ctinfo, info, hooknum, pskb);
 }
 
-struct nat_route_key
-{
-	u_int32_t addr;
-#ifdef CONFIG_XFRM
-	u_int16_t port;
-#endif
-};
-
-static inline void
-nat_route_key_get(struct sk_buff *skb, struct nat_route_key *key, int which)
-{
-	struct iphdr *iph = skb->nh.iph;
-
-	key->addr = which ? iph->daddr : iph->saddr;
-#ifdef CONFIG_XFRM
-	key->port = 0;
-	if (iph->protocol == IPPROTO_TCP || iph->protocol == IPPROTO_UDP) {
-		u_int16_t *ports = (u_int16_t *)(skb->nh.raw + iph->ihl*4);
-		key->port = ports[which];
-	}
-#endif
-}
-
-static inline int
-nat_route_key_compare(struct sk_buff *skb, struct nat_route_key *key, int which)
-{
-	struct iphdr *iph = skb->nh.iph;
-
-	if (key->addr != (which ? iph->daddr : iph->saddr))
-		return 1;
-#ifdef CONFIG_XFRM
-	if (iph->protocol == IPPROTO_TCP || iph->protocol == IPPROTO_UDP) {
-		u_int16_t *ports = (u_int16_t *)(skb->nh.raw + iph->ihl*4);
-		if (key->port != ports[which])
-			return 1;
-	}
-#endif
-}
-
 static unsigned int
 ip_nat_out(unsigned int hooknum,
 	   struct sk_buff **pskb,
@@ -223,9 +184,6 @@ ip_nat_out(unsigned int hooknum,
 	   const struct net_device *out,
 	   int (*okfn)(struct sk_buff *))
 {
-	struct nat_route_key key;
-	unsigned int ret;
-
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
@@ -248,29 +206,7 @@ ip_nat_out(unsigned int hooknum,
 			return NF_STOLEN;
 	}
 
-	nat_route_key_get(*pskb, &key, 0);
-	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
-
-	if (ret != NF_DROP && ret != NF_STOLEN
-	    && nat_route_key_compare(*pskb, &key, 0)) {
-		if (ip_route_me_harder(pskb) != 0)
-			ret = NF_DROP;
-#ifdef CONFIG_XFRM
-		/*
-		 * POST_ROUTING hook is called with fixed outfn, we need
-		 * to manually confirm the packet and direct it to the
-		 * transformers if a policy matches.
-		 */
-		else if ((*pskb)->dst->xfrm != NULL) {
-			ret = ip_conntrack_confirm(*pskb);
-			if (ret != NF_DROP) {
-				dst_output(*pskb);
-				ret = NF_STOLEN;
-			}
-		}
-#endif
-	}
-	return ret;
+	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
 #ifdef CONFIG_IP_NF_NAT_LOCAL
@@ -281,7 +217,7 @@ ip_nat_local_fn(unsigned int hooknum,
 		const struct net_device *out,
 		int (*okfn)(struct sk_buff *))
 {
-	struct nat_route_key key;
+	u_int32_t saddr, daddr;
 	unsigned int ret;
 
 	/* root is playing with raw sockets. */
@@ -289,14 +225,14 @@ ip_nat_local_fn(unsigned int hooknum,
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
-	nat_route_key_get(*pskb, &key, 1);
-	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
+	saddr = (*pskb)->nh.iph->saddr;
+	daddr = (*pskb)->nh.iph->daddr;
 
+	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
 	if (ret != NF_DROP && ret != NF_STOLEN
-	    && nat_route_key_compare(*pskb, &key, 1)) {
-		if (ip_route_me_harder(pskb) != 0)
-			ret = NF_DROP;
-	}
+	    && ((*pskb)->nh.iph->saddr != saddr
+		|| (*pskb)->nh.iph->daddr != daddr))
+		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
 }
 #endif

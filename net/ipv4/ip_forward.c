@@ -51,7 +51,7 @@ static inline int ip_forward_finish(struct sk_buff *skb)
 	if (unlikely(opt->optlen))
 		ip_forward_options(skb);
 
-	return ip_dst_output(skb);
+	return dst_output(skb);
 }
 
 int ip_forward(struct sk_buff *skb)

@@ -249,7 +249,6 @@ int raw_rcv(struct sock *sk, struct sk_buff *skb)
 		kfree_skb(skb);
 		return NET_RX_DROP;
 	}
-	nf_reset(skb);
 
 	skb_push(skb, skb->data - skb->nh.raw);
 
@@ -308,7 +307,7 @@ static int raw_send_hdrinc(struct sock *sk, void *from, int length,
 	}
 
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-	              ip_dst_output);
+		      dst_output);
 	if (err > 0)
 		err = inet->recverr ? net_xmit_errno(err) : 0;
 	if (err)

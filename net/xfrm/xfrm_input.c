@@ -29,9 +29,6 @@ struct sec_path *secpath_dup(struct sec_path *src)
 	if (!sp)
 		return NULL;
 
-#ifdef CONFIG_NETFILTER
-	sp->decap_done = 0;
-#endif
 	sp->len = 0;
 	if (src) {
 		int i;

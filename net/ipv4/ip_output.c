@@ -123,15 +123,6 @@ static inline int ip_select_ttl(struct inet_opt *inet, struct dst_entry *dst)
 	return ttl;
 }
 
-#ifdef CONFIG_NETFILTER
-/* out-of-line copy is only required with netfilter */
-int ip_dst_output(struct sk_buff *skb)
-{
-	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL,
-	                    skb->dst->dev, dst_output, skb->dst->xfrm != NULL);
-}
-#endif
-
 /* 
  *		Add an ip header to a skbuff and send it out.
  *
@@ -174,7 +165,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 
 	/* Send it out. */
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 }
 
 static inline int ip_finish_output2(struct sk_buff *skb)
@@ -293,7 +284,7 @@ int ip_mc_output(struct sk_buff **pskb)
 		return ip_finish_output(skb);
 }
 
-static inline int ip_output2(struct sk_buff **pskb)
+int ip_output(struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
 
@@ -304,16 +295,6 @@ static inline int ip_output2(struct sk_buff **pskb)
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
-}
-
-int ip_output(struct sk_buff *skb)
-{
-	int transformed = IPCB(skb)->flags & IPSKB_XFRM_TRANSFORMED;
-
-	if (transformed)
-		nf_reset(skb);
-	return NF_HOOK_COND(PF_INET, NF_IP_LOCAL_OUT, skb, NULL,
-	                    skb->dst->dev, ip_output2, transformed);
 }
 
 int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
@@ -409,7 +390,7 @@ packet_routed:
 	skb->priority = sk->sk_priority;
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 
 no_route:
 	IP_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
@@ -1182,7 +1163,7 @@ int ip_push_pending_frames(struct sock *sk)
 
 	/* Netfilter gets whole the not fragmented skb. */
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, 
-		      skb->dst->dev, ip_dst_output);
+		      skb->dst->dev, dst_output);
 	if (err) {
 		if (err > 0)
 			err = inet->recverr ? net_xmit_errno(err) : 0;
