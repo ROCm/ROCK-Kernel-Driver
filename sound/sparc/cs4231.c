@@ -23,6 +23,7 @@
 #include <sound/timer.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+#include <sound/pcm_params.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
