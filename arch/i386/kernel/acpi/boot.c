@@ -660,6 +660,12 @@ acpi_parse_madt_ioapic_entries(void)
 		return count;
 	}
 
+	/* temporal bandaid to fix x86-64. Otherwise the timer interrupt
+	   routing comes out wrong. */
+#ifdef __x86_64__
+	mp_config_acpi_legacy_irqs();
+#endif
+
 	count = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, NR_IRQ_VECTORS);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
@@ -675,7 +681,9 @@ acpi_parse_madt_ioapic_entries(void)
 		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
 
 	/* Fill in identity legacy mapings where no override */
+#ifndef __x86_64__
 	mp_config_acpi_legacy_irqs();
+#endif
 
 	count = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
 	if (count < 0) {
