@@ -423,42 +423,41 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 {
 	unsigned int cpu = sys_dev->id;
 	unsigned long flags;
+	struct cpufreq_policy *data;
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
-	if (!cpufreq_cpu_data[cpu]) {
+	data = cpufreq_cpu_data[cpu];
+
+	if (!data) {
 		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		return -EINVAL;
 	}
 	cpufreq_cpu_data[cpu] = NULL;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
-	if (!kobject_get(&cpufreq_driver->policy[cpu].kobj))
+	if (!kobject_get(&data->kobj))
 		return -EFAULT;
 
 	down(&cpufreq_driver_sem);
-	if ((cpufreq_driver->target) && 
-	    (cpufreq_driver->policy[cpu].policy == CPUFREQ_POLICY_GOVERNOR)) {
-		cpufreq_driver->policy[cpu].governor->governor(&cpufreq_driver->policy[cpu], CPUFREQ_GOV_STOP);
-		module_put(cpufreq_driver->policy[cpu].governor->owner);
-	}
-
-	/* we may call driver->exit here without checking for try_module_exit
-	 * as it's either the driver which wants to unload or we have a CPU
-	 * removal AND driver removal at the same time...
-	 */
-	if (cpufreq_driver->exit)
-		cpufreq_driver->exit(&cpufreq_driver->policy[cpu]);
-
-	kobject_unregister(&cpufreq_driver->policy[cpu].kobj);
-
+	kobject_unregister(&data->kobj);
 	up(&cpufreq_driver_sem);
-	kobject_put(&cpufreq_driver->policy[cpu].kobj);
+
+	kobject_put(&data->kobj);
 
 	/* we need to make sure that the underlying kobj is actually
-	 * destroyed before we proceed e.g. with cpufreq driver module
-	 * unloading
+	 * not referenced anymore by anybody before we proceed with 
+	 * unloading.
 	 */
-	wait_for_completion(&cpufreq_driver->policy[cpu].kobj_unregister);
+	wait_for_completion(&data->kobj_unregister);
+
+	if ((cpufreq_driver->target) && 
+	    (data->policy == CPUFREQ_POLICY_GOVERNOR)) {
+		data->governor->governor(data, CPUFREQ_GOV_STOP);
+		module_put(data->governor->owner);
+	}
+
+	if (cpufreq_driver->exit)
+		cpufreq_driver->exit(data);
 
 	return 0;
 }
