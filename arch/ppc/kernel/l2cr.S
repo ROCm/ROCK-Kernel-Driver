@@ -101,6 +101,12 @@ BEGIN_FTR_SECTION
 	blr
 END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 
+	/* Stop DST streams */
+BEGIN_FTR_SECTION
+	DSSALL
+	sync
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
+
 	/* Turn off interrupts and data relocation. */
 	mfmsr	r7		/* Save MSR in r7 */
 	rlwinm	r4,r7,0,17,15
@@ -136,7 +142,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 
 	/* TODO: use HW flush assist when available */
 
-	lis	r4,0x0002
+	lis	r4,0x0004
 	mtctr	r4
 	li	r4,0
 1:
@@ -145,7 +151,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 	bdnz	1b
 	
 	/* Now, flush the first 4MB of memory */
-	lis	r4,0x0002
+	lis	r4,0x0004
 	mtctr	r4
 	li	r4,0
 	sync
@@ -246,6 +252,10 @@ BEGIN_FTR_SECTION
 	blr
 END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 
+	/* Stop DST streams */
+	DSSALL
+	sync
+	
 	/* Turn off interrupts and data relocation. */
 	mfmsr	r7		/* Save MSR in r7 */
 	rlwinm	r4,r7,0,17,15
@@ -254,9 +264,6 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	mtmsr	r4
 	isync
 
-	/* Stop DST streams */
-	dssall
-	
 	/* Get the current enable bit of the L3CR into r4 */
 	mfspr	r4,SPRN_L3CR
 	
@@ -269,48 +276,24 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	rlwinm.	r4,r4,0,0,0
 	beq	2f
 
-	/* Flush the cache. First, read the first 4MB of memory (physical) to
-	 * put new data in the cache.  (Actually we only need
-	 * the size of the L3 cache plus the size of the L1+L2 cache, but 4MB will
-	 * cover everything just to be safe).
+	/* Flush the cache.
 	 */
 		
 	/* TODO: use HW flush assist */
 
-	lis	r4,0x0002
+	lis	r4,0x0008
 	mtctr	r4
 	li	r4,0
 1:
 	lwzx	r0,r0,r4
-	addi	r4,r4,32		/* Go to start of next cache line */
-	bdnz	1b
-	
-	/* Now, flush the first 4MB of memory */
-	lis	r4,0x0002
-	mtctr	r4
-	li	r4,0
-	sync
-1:
 	dcbf	r0,r4
 	addi	r4,r4,32		/* Go to start of next cache line */
 	bdnz	1b
-
+	
 2:
 	/* Set up the L3CR configuration bits (and switch L3 off) */
 	sync
 	mtspr	SPRN_L3CR,r3
-	sync
-
-	/* Before we perform the global invalidation, we must disable dynamic
-	 * power management via HID0[DPM] to work around a processor bug where
-	 * DPM can possibly interfere with the state machine in the processor
-	 * that invalidates the L3 cache tags. Hrm... This is necessary for L2,
-	 * is it for L3 as well ? --BenH.
-	 */
-	mfspr	r8,HID0			/* Save HID0 in r8 */
-	rlwinm	r4,r8,0,12,10		/* Turn off HID0[DPM] */
-	sync
-	mtspr	HID0,r4			/* Disable DPM */
 	sync
 
 	oris	r3,r3,L3CR_L3RES@h		/* Set reserved bit 5 */
@@ -321,7 +304,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	sync
 
 	/* Wait for stabilize */
-	li	r0,128
+	li	r0,256
 	mtctr	r0
 1:	bdnz	1b
 	
@@ -343,15 +326,10 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	sync
 
 	/* Wait for stabilize */
-	li	r0,128
+	li	r0,256
 	mtctr	r0
 1:	bdnz	1b
 	
-	/* Restore HID0[DPM] to whatever it was before */
-	sync
-	mtspr	1008,r8
-	sync
-
 	/* See if we need to enable the cache */
 	cmplwi	r5,0
 	beq	4f
@@ -360,6 +338,11 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	oris	r3,r3,(L3CR_L3E | L3CR_L3CLKEN)@h
 	mtspr	SPRN_L3CR,r3
 	sync
+
+	/* Wait for stabilize */
+	li	r0,256
+	mtctr	r0
+1:	bdnz	1b
 
 	/* Restore MSR (restores EE and DR bits to original state) */
 4:	SYNC
