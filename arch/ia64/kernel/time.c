@@ -39,6 +39,7 @@ EXPORT_SYMBOL(jiffies_64);
 #ifdef CONFIG_IA64_DEBUG_IRQ
 
 unsigned long last_cli_ip;
+EXPORT_SYMBOL(last_cli_ip);
 
 #endif
 

@@ -20,6 +20,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -1042,12 +1043,10 @@ pfm_restore_pmds(unsigned long *pmds, unsigned long mask)
 	int i;
 	unsigned long val, ovfl_val = pmu_conf.ovfl_val;
 
-	DPRINT(("mask=0x%lx\n", mask));
 	for (i=0; mask; i++, mask>>=1) {
 		if ((mask & 0x1) == 0) continue;
 		val = PMD_IS_COUNTING(i) ? pmds[i] & ovfl_val : pmds[i];
 		ia64_set_pmd(i, val);
-		DPRINT(("pmd[%d]=0x%lx\n", i, val));
 	}
 	ia64_srlz_d();
 }
@@ -1115,11 +1114,9 @@ pfm_restore_pmcs(unsigned long *pmcs, unsigned long mask)
 {
 	int i;
 
-	DPRINT(("mask=0x%lx\n", mask));
 	for (i=0; mask; i++, mask>>=1) {
 		if ((mask & 0x1) == 0) continue;
 		ia64_set_pmc(i, pmcs[i]);
-		DPRINT(("pmc[%d]=0x%lx\n", i, pmcs[i]));
 	}
 	ia64_srlz_d();
 }
@@ -1259,6 +1256,7 @@ out:
 	spin_unlock(&pfm_buffer_fmt_lock);
  	return ret;
 }
+EXPORT_SYMBOL(pfm_register_buffer_fmt);
 
 int
 pfm_unregister_buffer_fmt(pfm_uuid_t uuid)
@@ -1282,6 +1280,7 @@ out:
 	return ret;
 
 }
+EXPORT_SYMBOL(pfm_unregister_buffer_fmt);
 
 static int
 pfm_reserve_session(struct task_struct *task, int is_syswide, unsigned int cpu)
@@ -3421,6 +3420,7 @@ pfm_mod_write_pmcs(struct task_struct *task, pfarg_reg_t *req, unsigned int nreq
 
 	return pfm_write_pmcs(ctx, req, nreq, regs);
 }
+EXPORT_SYMBOL(pfm_mod_write_pmcs);
 
 long
 pfm_mod_read_pmds(struct task_struct *task, pfarg_reg_t *req, unsigned int nreq, struct pt_regs *regs)
@@ -3442,6 +3442,7 @@ pfm_mod_read_pmds(struct task_struct *task, pfarg_reg_t *req, unsigned int nreq,
 
 	return pfm_read_pmds(ctx, req, nreq, regs);
 }
+EXPORT_SYMBOL(pfm_mod_read_pmds);
 
 long
 pfm_mod_fast_read_pmds(struct task_struct *task, unsigned long mask[4], unsigned long *addr, struct pt_regs *regs)
@@ -3483,6 +3484,7 @@ pfm_mod_fast_read_pmds(struct task_struct *task, unsigned long mask[4], unsigned
 	}
 	return 0;
 }
+EXPORT_SYMBOL(pfm_mod_fast_read_pmds);
 
 /*
  * Only call this function when a process it trying to
@@ -5670,7 +5672,7 @@ pfm_save_regs(struct task_struct *task)
 
 
 	ctx = PFM_GET_CTX(task);
-	if (ctx == NULL) goto save_error;
+	if (ctx == NULL) return;
 	t = &task->thread;
 
 	/*
@@ -5684,8 +5686,6 @@ pfm_save_regs(struct task_struct *task)
 		struct pt_regs *regs = ia64_task_regs(task);
 
 		pfm_clear_psr_up();
-
-		DPRINT(("ctx zombie, forcing cleanup for [%d]\n", task->pid));
 
 		pfm_force_cleanup(ctx, regs);
 
@@ -5701,12 +5701,7 @@ pfm_save_regs(struct task_struct *task)
 	 * sanity check
 	 */
 	if (ctx->ctx_last_activation != GET_ACTIVATION()) {
-		printk("ctx_activation=%lu activation=%lu state=%d: no save\n",
-				ctx->ctx_last_activation,
-				GET_ACTIVATION(), ctx->ctx_state);
-
 		pfm_unprotect_ctx_ctxsw(ctx, flags);
-
 		return;
 	}
 
@@ -5763,13 +5758,6 @@ pfm_save_regs(struct task_struct *task)
 	 * interrupts will still be masked after this call.
 	 */
 	pfm_unprotect_ctx_ctxsw(ctx, flags);
-
-	return;
-
-save_error:
-	printk(KERN_ERR "perfmon: pfm_save_regs CPU%d [%d] NULL context PM_VALID=%ld\n",
-		smp_processor_id(), task->pid,
-		task->thread.flags & IA64_THREAD_PM_VALID);
 }
 
 #else /* !CONFIG_SMP */
@@ -5780,7 +5768,7 @@ pfm_save_regs(struct task_struct *task)
 	u64 psr;
 
 	ctx = PFM_GET_CTX(task);
-	if (ctx == NULL) goto save_error;
+	if (ctx == NULL) return;
 
 	/*
 	 * save current PSR: needed because we modify it
@@ -5802,12 +5790,6 @@ pfm_save_regs(struct task_struct *task)
 	 * keep a copy of psr.up (for reload)
 	 */
 	ctx->ctx_saved_psr_up = psr & IA64_PSR_UP;
-
-	return;
-save_error:
-	printk(KERN_ERR "perfmon: pfm_save_regs CPU%d [%d] NULL context PM_VALID=%ld\n",
-		smp_processor_id(), task->pid,
-		task->thread.flags & IA64_THREAD_PM_VALID);
 }
 
 static void
@@ -5823,8 +5805,6 @@ pfm_lazy_save_regs (struct task_struct *task)
 
 	ctx = PFM_GET_CTX(task);
 	t   = &task->thread;
-
-	DPRINT(("on [%d] used_pmds=0x%lx\n", task->pid, ctx->ctx_used_pmds[0]));
 
 	/*
 	 * we need to mask PMU overflow here to
@@ -5886,10 +5866,7 @@ pfm_load_regs (struct task_struct *task)
 	u64 psr, psr_up;
 
 	ctx = PFM_GET_CTX(task);
-	if (unlikely(ctx == NULL)) {
-		printk(KERN_ERR "perfmon: pfm_load_regs() null context\n");
-		return;
-	}
+	if (unlikely(ctx == NULL)) return;
 
 	BUG_ON(GET_PMU_OWNER());
 
@@ -5897,10 +5874,7 @@ pfm_load_regs (struct task_struct *task)
 	/*
 	 * possible on unload
 	 */
-	if (unlikely((t->flags & IA64_THREAD_PM_VALID) == 0)) {
-		printk("[%d] PM_VALID=0, nothing to do\n", task->pid);
-		return;
-	}
+	if (unlikely((t->flags & IA64_THREAD_PM_VALID) == 0)) return;
 
 	/*
  	 * we always come here with interrupts ALREADY disabled by
@@ -5917,8 +5891,6 @@ pfm_load_regs (struct task_struct *task)
 		struct pt_regs *regs = ia64_task_regs(task);
 
 		BUG_ON(ctx->ctx_smpl_hdr);
-
-		DPRINT(("ctx zombie, forcing cleanup for [%d]\n", task->pid));
 
 		pfm_force_cleanup(ctx, regs);
 
@@ -5957,7 +5929,6 @@ pfm_load_regs (struct task_struct *task)
 		pmc_mask = ctx->ctx_reload_pmcs[0];
 		pmd_mask = ctx->ctx_reload_pmds[0];
 
-		if (pmc_mask || pmd_mask) DPRINT(("partial reload [%d] pmd_mask=0x%lx pmc_mask=0x%lx\n", task->pid, pmd_mask, pmc_mask));
 	} else {
 		/*
 	 	 * To avoid leaking information to the user level when psr.sp=0,
@@ -5975,12 +5946,6 @@ pfm_load_regs (struct task_struct *task)
 	 	 * PMC0 is never in the mask. It is always restored separately.
 	 	 */
 		pmc_mask = ctx->ctx_all_pmcs[0];
-
-		DPRINT(("full reload for [%d] activation=%lu last_activation=%lu last_cpu=%d pmd_mask=0x%lx pmc_mask=0x%lx\n",
-			task->pid,
-			GET_ACTIVATION(), ctx->ctx_last_activation,
-			GET_LAST_CPU(ctx), pmd_mask, pmc_mask));
-
 	}
 	/*
 	 * when context is MASKED, we will restore PMC with plm=0
@@ -6008,7 +5973,6 @@ pfm_load_regs (struct task_struct *task)
 		/*
 		 * will replay the PMU interrupt
 		 */
-		DPRINT(("perfmon: resend irq for [%d]\n", task->pid));
 		hw_resend_irq(NULL, IA64_PERFMON_VECTOR);
 #endif
 		pfm_stats[smp_processor_id()].pfm_replay_ovfl_intr_count++;
@@ -6102,8 +6066,6 @@ pfm_load_regs (struct task_struct *task)
 		return;
 	}
 
-	DPRINT(("reload for [%d] owner=%d\n", task->pid, owner ? owner->pid : -1));
-
 	/*
 	 * someone else is still using the PMU, first push it out and
 	 * then we'll be able to install our stuff !
@@ -6150,7 +6112,6 @@ pfm_load_regs (struct task_struct *task)
 		/*
 		 * will replay the PMU interrupt
 		 */
-		DPRINT(("perfmon: resend irq for [%d]\n", task->pid));
 		hw_resend_irq(NULL, IA64_PERFMON_VECTOR);
 #endif
 		pfm_stats[smp_processor_id()].pfm_replay_ovfl_intr_count++;

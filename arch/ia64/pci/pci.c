@@ -223,6 +223,9 @@ add_window (struct acpi_resource *res, void *data)
 
 	status = acpi_resource_to_address64(res, &addr);
 	if (ACPI_SUCCESS(status)) {
+		if (!addr.address_length)
+			return AE_OK;
+
 		if (addr.resource_type == ACPI_MEMORY_RANGE) {
 			flags = IORESOURCE_MEM;
 			root = &iomem_resource;

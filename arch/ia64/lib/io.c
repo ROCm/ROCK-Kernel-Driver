@@ -1,4 +1,5 @@
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 
 #include <asm/io.h>
@@ -17,6 +18,7 @@ __ia64_memcpy_fromio (void * to, unsigned long from, long count)
 		from++;
 	}
 }
+EXPORT_SYMBOL(__ia64_memcpy_fromio);
 
 /*
  * Copy data from "real" memory space to IO memory space.
@@ -32,6 +34,7 @@ __ia64_memcpy_toio (unsigned long to, void * from, long count)
 		to++;
 	}
 }
+EXPORT_SYMBOL(__ia64_memcpy_toio);
 
 /*
  * "memset" on IO memory space.
@@ -48,6 +51,7 @@ __ia64_memset_c_io (unsigned long dst, unsigned long c, long count)
 		dst++;
 	}
 }
+EXPORT_SYMBOL(__ia64_memset_c_io);
 
 #ifdef CONFIG_IA64_GENERIC
 

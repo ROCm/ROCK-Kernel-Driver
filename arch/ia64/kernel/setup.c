@@ -17,6 +17,7 @@
  * 06/24/99 W.Drummond	added boot_cpu_data.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/init.h>
 
 #include <linux/acpi.h>
@@ -60,6 +61,7 @@ int efi_enabled = 1;
 
 #ifdef CONFIG_SMP
 unsigned long __per_cpu_offset[NR_CPUS];
+EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
@@ -71,7 +73,9 @@ struct screen_info screen_info;
 
 unsigned long ia64_max_cacheline_size;
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
+EXPORT_SYMBOL(ia64_iobase);
 struct io_space io_space[MAX_IO_SPACES];
+EXPORT_SYMBOL(io_space);
 unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
@@ -86,6 +90,7 @@ unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I
  * page-size of 2^64.
  */
 unsigned long ia64_max_iommu_merge_mask = ~0UL;
+EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
 
 #define COMMAND_LINE_SIZE	512
 
