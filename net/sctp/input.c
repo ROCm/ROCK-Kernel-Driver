@@ -578,7 +578,7 @@ int sctp_has_association(const sockaddr_storage_t *laddr,
 	sctp_association_t *asoc;
 	sctp_transport_t *transport;
 
-	if (asoc = sctp_lookup_association(laddr, paddr, &transport)) {
+	if ((asoc = sctp_lookup_association(laddr, paddr, &transport))) {
 		sock_put(asoc->base.sk);
 		sctp_association_put(asoc);
 		return 1;

@@ -2775,13 +2775,6 @@ sctp_disposition_t sctp_sf_ootb(const sctp_endpoint_t *ep,
  *   the Verification Tag received in the SHUTDOWN ACK and set the
  *   T-bit in the Chunk Flags to indicate that no TCB was found.
  *
- * Verification Tag:  8.5.1 E) Rules for packet carrying a SHUTDOWN ACK
- *   If the receiver is in COOKIE-ECHOED or COOKIE-WAIT state the
- *   procedures in section 8.4 SHOULD be followed, in other words it
- *   should be treated as an Out Of The Blue packet.
- *   [This means that we do NOT check the Verification Tag on these
- *   chunks. --piggy ]
- *
  * Inputs
  * (endpoint, asoc, type, arg, commands)
  *
@@ -2824,6 +2817,31 @@ sctp_disposition_t sctp_sf_shut_8_4_5(const sctp_endpoint_t *ep,
 	}
 
 	return SCTP_DISPOSITION_NOMEM;
+}
+
+/*
+ * Handle SHUTDOWN ACK in COOKIE_ECHOED or COOKIE_WAIT state.
+ *
+ * Verification Tag:  8.5.1 E) Rules for packet carrying a SHUTDOWN ACK
+ *   If the receiver is in COOKIE-ECHOED or COOKIE-WAIT state the
+ *   procedures in section 8.4 SHOULD be followed, in other words it
+ *   should be treated as an Out Of The Blue packet.
+ *   [This means that we do NOT check the Verification Tag on these
+ *   chunks. --piggy ]
+ *
+ */
+sctp_disposition_t sctp_sf_do_8_5_1_E_sa(const sctp_endpoint_t *ep,
+				      const sctp_association_t *asoc,
+				      const sctp_subtype_t type,
+				      void *arg,
+				      sctp_cmd_seq_t *commands)
+{
+	/* Although we do have an association in this case, it corresponds
+	 * to a restarted association. So the packet is treated as an OOTB
+	 * packet and the state function that handles OOTB SHUTDOWN_ACK is
+	 * called with a NULL association.
+	 */
+	return sctp_sf_shut_8_4_5(ep, NULL, type, arg, commands);
 }
 
 /*
