@@ -177,9 +177,8 @@ DECLARE_TASK_QUEUE(tq_specialix);
 #define RS_EVENT_WRITE_WAKEUP	0
 
 #define SPECIALIX_TYPE_NORMAL	1
-#define SPECIALIX_TYPE_CALLOUT	2
 
-static struct tty_driver specialix_driver, specialix_callout_driver;
+static struct tty_driver specialix_driver;
 static int    specialix_refcount;
 static struct tty_struct * specialix_table[SX_NBOARD * SX_NPORT];
 static struct termios * specialix_termios[SX_NBOARD * SX_NPORT];
@@ -827,17 +826,11 @@ static inline void sx_check_modem(struct specialix_board * bp)
 			printk ( "Waking up guys in open.\n");
 #endif
 			wake_up_interruptible(&port->open_wait);
-		}
-		else if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		           (port->flags & ASYNC_CALLOUT_NOHUP))) {
+		} else {
 #ifdef SPECIALIX_DEBUG
 			printk ( "Sending HUP.\n");
 #endif
 			schedule_task(&port->tqueue_hangup);
-		} else {
-#ifdef SPECIALIX_DEBUG
-			printk ( "Don't need to send HUP.\n");
-#endif
 		}
 	}
 	
@@ -1341,25 +1334,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		else
 			return -ERESTARTSYS;
 	}
-
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SPECIALIX_TYPE_CALLOUT) {
-		if (port->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (port->session != current->session))
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (port->pgrp != current->pgrp))
-			return -EBUSY;
-		port->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
 	
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
@@ -1367,20 +1341,13 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (port->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		port->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (port->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (port->normal_termios.c_cflag & CLOCAL) 
-			do_clocal = 1;
-	} else {
-		if (C_CLOCAL(tty))
-			do_clocal = 1;
-	}
-	
+	if (C_CLOCAL(tty))
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1399,17 +1366,15 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		cli();
 		sx_out(bp, CD186x_CAR, port_No(port));
 		CD = sx_in(bp, CD186x_MSVR) & MSVR_CD;
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE)) {
-			if (SX_CRTSCTS (tty)) {
-				/* Activate RTS */
-				port->MSVR |= MSVR_DTR;
-				sx_out (bp, CD186x_MSVR, port->MSVR);
-			} else {
-				/* Activate DTR */
-				port->MSVR |= MSVR_DTR;
-				sx_out (bp, CD186x_MSVR, port->MSVR);
-			} 
-		}
+		if (SX_CRTSCTS (tty)) {
+			/* Activate RTS */
+			port->MSVR |= MSVR_DTR;		/* WTF? */
+			sx_out (bp, CD186x_MSVR, port->MSVR);
+		} else {
+			/* Activate DTR */
+			port->MSVR |= MSVR_DTR;
+			sx_out (bp, CD186x_MSVR, port->MSVR);
+		} 
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
@@ -1420,8 +1385,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(port->flags & ASYNC_CLOSING) &&
+		if (!(port->flags & ASYNC_CLOSING) &&
 		    (do_clocal || CD))
 			break;
 		if (signal_pending(current)) {
@@ -1481,17 +1445,11 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 		return error;
 
 	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SPECIALIX_TYPE_NORMAL)
-			*tty->termios = port->normal_termios;
-		else
-			*tty->termios = port->callout_termios;
+		*tty->termios = port->normal_termios;
 		save_flags(flags); cli();
 		sx_change_speed(bp, port);
 		restore_flags(flags);
 	}
-
-	port->session = current->session;
-	port->pgrp = current->pgrp;
 	return 0;
 }
 
@@ -1535,8 +1493,6 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 	 */
 	if (port->flags & ASYNC_NORMAL_ACTIVE)
 		port->normal_termios = *tty->termios;
-	if (port->flags & ASYNC_CALLOUT_ACTIVE)
-		port->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1587,8 +1543,7 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 		}
 		wake_up_interruptible(&port->open_wait);
 	}
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&port->close_wait);
 	restore_flags(flags);
 }
@@ -2162,7 +2117,7 @@ static void sx_hangup(struct tty_struct * tty)
 	sx_shutdown_port(bp, port);
 	port->event = 0;
 	port->count = 0;
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	port->flags &= ~ASYNC_NORMAL_ACTIVE;
 	port->tty = 0;
 	wake_up_interruptible(&port->open_wait);
 }
@@ -2259,28 +2214,14 @@ static int sx_init_drivers(void)
 	specialix_driver.start = sx_start;
 	specialix_driver.hangup = sx_hangup;
 
-	specialix_callout_driver = specialix_driver;
-	specialix_callout_driver.name = "cuw";
-	specialix_callout_driver.major = SPECIALIX_CALLOUT_MAJOR;
-	specialix_callout_driver.subtype = SPECIALIX_TYPE_CALLOUT;
-	
 	if ((error = tty_register_driver(&specialix_driver))) {
 		free_page((unsigned long)tmp_buf);
 		printk(KERN_ERR "sx: Couldn't register specialix IO8+ driver, error = %d\n",
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&specialix_callout_driver))) {
-		free_page((unsigned long)tmp_buf);
-		tty_unregister_driver(&specialix_driver);
-		printk(KERN_ERR "sx: Couldn't register specialix IO8+ callout driver, error = %d\n",
-		       error);
-		return 1;
-	}
-	
 	memset(sx_port, 0, sizeof(sx_port));
 	for (i = 0; i < SX_NPORT * SX_NBOARD; i++) {
-		sx_port[i].callout_termios = specialix_callout_driver.init_termios;
 		sx_port[i].normal_termios  = specialix_driver.init_termios;
 		sx_port[i].magic = SPECIALIX_MAGIC;
 		sx_port[i].tqueue.routine = do_softint;
@@ -2301,7 +2242,6 @@ static void sx_release_drivers(void)
 {
 	free_page((unsigned long)tmp_buf);
 	tty_unregister_driver(&specialix_driver);
-	tty_unregister_driver(&specialix_callout_driver);
 }
 
 
