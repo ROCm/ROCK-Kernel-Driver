@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,19 +31,19 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: background.c,v 1.16 2001/10/08 09:22:38 dwmw2 Exp $
+ * $Id: background.c,v 1.23 2002/03/06 12:37:08 dwmw2 Exp $
  *
  */
 
 #define __KERNEL_SYSCALLS__
 
 #include <linux/kernel.h>
-#include <linux/time.h>
 #include <linux/unistd.h>
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
+#include <linux/mtd/compatmac.h> /* recalc_sigpending() */
 #include "nodelist.h"
 
 
@@ -106,10 +106,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 
         sprintf(current->comm, "jffs2_gcd_mtd%d", c->mtd->index);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	/* FIXME in the 2.2 backport */
-	current->nice = 10;
-#endif
+	set_user_nice(current, 10);
 
 	for (;;) {
 		spin_lock_irq(&current->sigmask_lock);

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by Arjan van de Ven <arjanv@redhat.com>
  *
@@ -31,24 +31,34 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: compr.c,v 1.17 2001/09/23 09:56:46 dwmw2 Exp $
+ * $Id: compr.c,v 1.23 2002/01/25 01:49:26 dwmw2 Exp $
  *
  */
 
+#ifdef __KERNEL__
 #include <linux/kernel.h>
 #include <linux/string.h>
-#include <linux/types.h>
 #include <linux/errno.h>
+#else 
+#define KERN_DEBUG
+#define KERN_NOTICE
+#define KERN_WARNING
+#define printk printf
+#include <stdio.h>
+#include <stdint.h>
+#include <errno.h>
+#endif
+
 #include <linux/jffs2.h>
 
-int zlib_compress(unsigned char *data_in, unsigned char *cpage_out, __u32 *sourcelen, __u32 *dstlen);
-void zlib_decompress(unsigned char *data_in, unsigned char *cpage_out, __u32 srclen, __u32 destlen);
-int rtime_compress(unsigned char *data_in, unsigned char *cpage_out, __u32 *sourcelen, __u32 *dstlen);
-void rtime_decompress(unsigned char *data_in, unsigned char *cpage_out, __u32 srclen, __u32 destlen);
-int rubinmips_compress(unsigned char *data_in, unsigned char *cpage_out, __u32 *sourcelen, __u32 *dstlen);
-void rubinmips_decompress(unsigned char *data_in, unsigned char *cpage_out, __u32 srclen, __u32 destlen);
-int dynrubin_compress(unsigned char *data_in, unsigned char *cpage_out, __u32 *sourcelen, __u32 *dstlen);
-void dynrubin_decompress(unsigned char *data_in, unsigned char *cpage_out, __u32 srclen, __u32 destlen);
+int jffs2_zlib_compress(unsigned char *data_in, unsigned char *cpage_out, uint32_t *sourcelen, uint32_t *dstlen);
+void jffs2_zlib_decompress(unsigned char *data_in, unsigned char *cpage_out, uint32_t srclen, uint32_t destlen);
+int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out, uint32_t *sourcelen, uint32_t *dstlen);
+void jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out, uint32_t srclen, uint32_t destlen);
+int jffs2_rubinmips_compress(unsigned char *data_in, unsigned char *cpage_out, uint32_t *sourcelen, uint32_t *dstlen);
+void jffs2_rubinmips_decompress(unsigned char *data_in, unsigned char *cpage_out, uint32_t srclen, uint32_t destlen);
+int jffs2_dynrubin_compress(unsigned char *data_in, unsigned char *cpage_out, uint32_t *sourcelen, uint32_t *dstlen);
+void jffs2_dynrubin_decompress(unsigned char *data_in, unsigned char *cpage_out, uint32_t srclen, uint32_t destlen);
 
 
 /* jffs2_compress:
@@ -69,28 +79,28 @@ void dynrubin_decompress(unsigned char *data_in, unsigned char *cpage_out, __u32
  * *datalen accordingly to show the amount of data which were compressed.
  */
 unsigned char jffs2_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		    __u32 *datalen, __u32 *cdatalen)
+		    uint32_t *datalen, uint32_t *cdatalen)
 {
 	int ret;
 
-	ret = zlib_compress(data_in, cpage_out, datalen, cdatalen);
+	ret = jffs2_zlib_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_ZLIB;
 	}
 #if 0 /* Disabled 23/9/1. With zlib it hardly ever gets a look in */
-	ret = dynrubin_compress(data_in, cpage_out, datalen, cdatalen);
+	ret = jffs2_dynrubin_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_DYNRUBIN;
 	}
 #endif
 #if 0 /* Disabled 26/2/1. Obsoleted by dynrubin */
-	ret = rubinmips_compress(data_in, cpage_out, datalen, cdatalen);
+	ret = jffs2_rubinmips_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_RUBINMIPS;
 	}
 #endif
 	/* rtime does manage to recompress already-compressed data */
-	ret = rtime_compress(data_in, cpage_out, datalen, cdatalen);
+	ret = jffs2_rtime_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_RTIME;
 	}
@@ -108,7 +118,7 @@ unsigned char jffs2_compress(unsigned char *data_in, unsigned char *cpage_out,
 
 
 int jffs2_decompress(unsigned char comprtype, unsigned char *cdata_in, 
-		     unsigned char *data_out, __u32 cdatalen, __u32 datalen)
+		     unsigned char *data_out, uint32_t cdatalen, uint32_t datalen)
 {
 	switch (comprtype) {
 	case JFFS2_COMPR_NONE:
@@ -121,23 +131,23 @@ int jffs2_decompress(unsigned char comprtype, unsigned char *cdata_in,
 		break;
 
 	case JFFS2_COMPR_ZLIB:
-		zlib_decompress(cdata_in, data_out, cdatalen, datalen);
+		jffs2_zlib_decompress(cdata_in, data_out, cdatalen, datalen);
 		break;
 
 	case JFFS2_COMPR_RTIME:
-		rtime_decompress(cdata_in, data_out, cdatalen, datalen);
+		jffs2_rtime_decompress(cdata_in, data_out, cdatalen, datalen);
 		break;
 
 	case JFFS2_COMPR_RUBINMIPS:
 #if 0 /* Disabled 23/9/1 */
-		rubinmips_decompress(cdata_in, data_out, cdatalen, datalen);
+		jffs2_rubinmips_decompress(cdata_in, data_out, cdatalen, datalen);
 #else
 		printk(KERN_WARNING "JFFS2: Rubinmips compression encountered but support not compiled in!\n");
 #endif
 		break;
 	case JFFS2_COMPR_DYNRUBIN:
 #if 1 /* Phase this one out */
-		dynrubin_decompress(cdata_in, data_out, cdatalen, datalen);
+		jffs2_dynrubin_decompress(cdata_in, data_out, cdatalen, datalen);
 #else
 		printk(KERN_WARNING "JFFS2: Dynrubin compression encountered but support not compiled in!\n");
 #endif

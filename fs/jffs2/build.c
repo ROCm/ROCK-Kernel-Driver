@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,12 +31,11 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: build.c,v 1.16 2001/03/15 15:38:23 dwmw2 Exp $
+ * $Id: build.c,v 1.32 2002/03/08 15:11:24 dwmw2 Exp $
  *
  */
 
 #include <linux/kernel.h>
-#include <linux/jffs2.h>
 #include <linux/slab.h>
 #include "nodelist.h"
 
@@ -51,7 +50,7 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *, struct jffs2_inode
  - Scan directory tree from top down, setting nlink in inocaches
  - Scan inocaches for inodes with nlink==0
 */
-int jffs2_build_filesystem(struct jffs2_sb_info *c)
+static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 {
 	int ret;
 	int i;
@@ -59,7 +58,11 @@ int jffs2_build_filesystem(struct jffs2_sb_info *c)
 
 	/* First, scan the medium and build all the inode caches with
 	   lists of physical nodes */
+
+	c->flags |= JFFS2_SB_FLAG_MOUNTING;
 	ret = jffs2_scan_medium(c);
+	c->flags &= ~JFFS2_SB_FLAG_MOUNTING;
+
 	if (ret)
 		return ret;
 
@@ -147,6 +150,7 @@ int jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2_inode_cache *i
 			D1(printk(KERN_DEBUG "jffs2_build_inode_pass1 ignoring old metadata at 0x%08x\n",
 				  metadata->fn->raw->flash_offset &~3));
 			
+			jffs2_mark_node_obsolete(c, metadata->fn->raw);
 			jffs2_free_full_dnode(metadata->fn);
 			jffs2_free_tmp_dnode_info(metadata);
 			metadata = NULL;
@@ -159,15 +163,25 @@ int jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2_inode_cache *i
 			if (!metadata) {
 				metadata = tn;
 			} else {
+				/* This will only happen if it has the _same_ version
+				   number as the existing metadata node. */
 				D1(printk(KERN_DEBUG "jffs2_build_inode_pass1 ignoring new metadata at 0x%08x\n",
 					  tn->fn->raw->flash_offset &~3));
 				
+				jffs2_mark_node_obsolete(c, tn->fn->raw);
 				jffs2_free_full_dnode(tn->fn);
 				jffs2_free_tmp_dnode_info(tn);
 			}
 		}
 	}
-		
+
+	if (ic->scan->version) {
+		/* It's a regular file, so truncate it to the last known
+		   i_size, if necessary */
+		D1(printk(KERN_DEBUG "jffs2_build_inode_pass1 truncating fraglist to 0x%08x\n", ic->scan->isize));
+		jffs2_truncate_fraglist(c, &fraglist, ic->scan->isize);
+	}
+	
 	/* OK. Now clear up */
 	if (metadata) {
 		jffs2_free_full_dnode(metadata->fn);
@@ -201,6 +215,10 @@ int jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2_inode_cache *i
 
 		if (child_ic->nlink++ && fd->type == DT_DIR) {
 			printk(KERN_NOTICE "Child dir \"%s\" (ino #%u) of dir ino #%u appears to be a hard link\n", fd->name, fd->ino, ic->ino);
+			if (fd->ino == 1 && ic->ino == 1) {
+				printk(KERN_NOTICE "This is mostly harmless, and probably caused by creating a JFFS2 image\n");
+				printk(KERN_NOTICE "using a buggy version of mkfs.jffs2. Use at least v1.17.\n");
+			}
 			/* What do we do about it? */
 		}
 		D1(printk(KERN_DEBUG "Increased nlink for child \"%s\" (ino #%u)\n", fd->name, fd->ino));
@@ -251,7 +269,58 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inod
 	}
 	kfree(ic->scan);
 	ic->scan = NULL;
-	//	jffs2_del_ino_cache(c, ic);
-	//	jffs2_free_inode_cache(ic);
+
+	/*
+	   We don't delete the inocache from the hash list and free it yet. 
+	   The erase code will do that, when all the nodes are completely gone.
+	*/
+
 	return ret;
+}
+
+int jffs2_do_mount_fs(struct jffs2_sb_info *c)
+{
+	int i;
+
+	c->free_size = c->flash_size;
+	c->nr_blocks = c->flash_size / c->sector_size;
+	c->blocks = kmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks, GFP_KERNEL);
+	if (!c->blocks)
+		return -ENOMEM;
+	for (i=0; i<c->nr_blocks; i++) {
+		INIT_LIST_HEAD(&c->blocks[i].list);
+		c->blocks[i].offset = i * c->sector_size;
+		c->blocks[i].free_size = c->sector_size;
+		c->blocks[i].dirty_size = 0;
+		c->blocks[i].used_size = 0;
+		c->blocks[i].first_node = NULL;
+		c->blocks[i].last_node = NULL;
+	}
+
+	init_MUTEX(&c->alloc_sem);
+	init_MUTEX(&c->erase_free_sem);
+	init_waitqueue_head(&c->erase_wait);
+	spin_lock_init(&c->erase_completion_lock);
+	spin_lock_init(&c->inocache_lock);
+
+	INIT_LIST_HEAD(&c->clean_list);
+	INIT_LIST_HEAD(&c->dirty_list);
+	INIT_LIST_HEAD(&c->erasable_list);
+	INIT_LIST_HEAD(&c->erasing_list);
+	INIT_LIST_HEAD(&c->erase_pending_list);
+	INIT_LIST_HEAD(&c->erasable_pending_wbuf_list);
+	INIT_LIST_HEAD(&c->erase_complete_list);
+	INIT_LIST_HEAD(&c->free_list);
+	INIT_LIST_HEAD(&c->bad_list);
+	INIT_LIST_HEAD(&c->bad_used_list);
+	c->highest_ino = 1;
+
+	if (jffs2_build_filesystem(c)) {
+		D1(printk(KERN_DEBUG "build_fs failed\n"));
+		jffs2_free_ino_caches(c);
+		jffs2_free_raw_node_refs(c);
+		kfree(c->blocks);
+		return -EIO;
+	}
+	return 0;
 }
