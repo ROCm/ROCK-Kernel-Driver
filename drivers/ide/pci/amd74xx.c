@@ -26,7 +26,8 @@
 #include <asm/io.h>
 
 #include "ide-timing.h"
-#include "amd74xx.h"
+
+#define DISPLAY_AMD_TIMINGS
 
 #define AMD_IDE_ENABLE		(0x00 + amd_config->base)
 #define AMD_IDE_CONFIG		(0x01 + amd_config->base)
@@ -440,6 +441,45 @@ static void __init init_hwif_amd74xx(ide_hwif_t *hwif)
         hwif->drives[0].autodma = hwif->autodma;
         hwif->drives[1].autodma = hwif->autodma;
 }
+
+#define DECLARE_AMD_DEV(name_str)					\
+	{								\
+		.name		= name_str,				\
+		.init_chipset	= init_chipset_amd74xx,			\
+		.init_hwif	= init_hwif_amd74xx,			\
+		.channels	= 2,					\
+		.autodma	= AUTODMA,				\
+		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},	\
+		.bootable	= ON_BOARD,				\
+	}
+
+#define DECLARE_NV_DEV(name_str)					\
+	{								\
+		.name		= name_str,				\
+		.init_chipset	= init_chipset_amd74xx,			\
+		.init_hwif	= init_hwif_amd74xx,			\
+		.channels	= 2,					\
+		.autodma	= AUTODMA,				\
+		.enablebits	= {{0x50,0x02,0x02}, {0x50,0x01,0x01}},	\
+		.bootable	= ON_BOARD,				\
+	}
+
+static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
+	/*  0 */ DECLARE_AMD_DEV("AMD7401"),
+	/*  1 */ DECLARE_AMD_DEV("AMD7409"),
+	/*  2 */ DECLARE_AMD_DEV("AMD7411"),
+	/*  3 */ DECLARE_AMD_DEV("AMD7441"),
+	/*  4 */ DECLARE_AMD_DEV("AMD8111"),
+
+	/*  5 */ DECLARE_NV_DEV("NFORCE"),
+	/*  6 */ DECLARE_NV_DEV("NFORCE2"),
+	/*  7 */ DECLARE_NV_DEV("NFORCE2S"),
+	/*  8 */ DECLARE_NV_DEV("NFORCE2S-SATA"),
+	/*  9 */ DECLARE_NV_DEV("NFORCE3"),
+	/* 10 */ DECLARE_NV_DEV("NFORCE3S"),
+	/* 11 */ DECLARE_NV_DEV("NFORCE3S-SATA"),
+	/* 12 */ DECLARE_NV_DEV("NFORCE3S-SATA2")
+};
 
 static int __devinit amd74xx_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
