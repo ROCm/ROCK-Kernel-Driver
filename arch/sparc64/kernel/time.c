@@ -259,7 +259,8 @@ static struct sparc64_tick_ops stick_operations = {
  */
 unsigned long timer_tick_offset;
 unsigned long timer_tick_compare;
-unsigned long timer_ticks_per_usec_quotient;
+
+static unsigned long timer_ticks_per_usec_quotient;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
@@ -823,11 +824,14 @@ static unsigned long sparc64_init_timers(void (*cfunc)(int, void *, struct pt_re
 	return clock;
 }
 
+/* The quotient formula is taken from the IA64 port. */
 void __init time_init(void)
 {
 	unsigned long clock = sparc64_init_timers(timer_interrupt);
 
-	timer_ticks_per_usec_quotient = ((1UL<<32) / (clock / 1000020));
+	timer_ticks_per_usec_quotient =
+		(((1000000UL << 30) +
+		  (clock / 2)) / clock);
 }
 
 static __inline__ unsigned long do_gettimeoffset(void)
@@ -837,7 +841,7 @@ static __inline__ unsigned long do_gettimeoffset(void)
 	ticks += timer_tick_offset;
 	ticks -= timer_tick_compare;
 
-	return (ticks * timer_ticks_per_usec_quotient) >> 32UL;
+	return (ticks * timer_ticks_per_usec_quotient) >> 30UL;
 }
 
 void do_settimeofday(struct timeval *tv)
