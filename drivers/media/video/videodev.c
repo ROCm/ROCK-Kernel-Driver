@@ -484,8 +484,7 @@ static struct file_operations video_fops=
 static int __init videodev_init(void)
 {
 	printk(KERN_INFO "Linux video capture interface: v1.00\n");
-	if(devfs_register_chrdev(VIDEO_MAJOR,"video_capture", &video_fops))
-	{
+	if (register_chrdev(VIDEO_MAJOR,"video_capture", &video_fops)) {
 		printk("video_dev: unable to get major %d\n", VIDEO_MAJOR);
 		return -EIO;
 	}
@@ -502,7 +501,7 @@ static void __exit videodev_exit(void)
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 	videodev_proc_destroy ();
 #endif
-	devfs_unregister_chrdev(VIDEO_MAJOR, "video_capture");
+	unregister_chrdev(VIDEO_MAJOR, "video_capture");
 }
 
 module_init(videodev_init)

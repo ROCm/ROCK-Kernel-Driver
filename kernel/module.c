@@ -44,15 +44,15 @@ extern const char __stop___kallsyms[] __attribute__ ((weak));
 
 struct module kernel_module =
 {
-	size_of_struct:		sizeof(struct module),
-	name: 			"",
-	uc:	 		{ATOMIC_INIT(1)},
-	flags:			MOD_RUNNING,
-	syms:			__start___ksymtab,
-	ex_table_start:		__start___ex_table,
-	ex_table_end:		__stop___ex_table,
-	kallsyms_start:		__start___kallsyms,
-	kallsyms_end:		__stop___kallsyms,
+	.size_of_struct		= sizeof(struct module),
+	.name 			= "",
+	.uc	 		= {ATOMIC_INIT(1)},
+	.flags			= MOD_RUNNING,
+	.syms			= __start___ksymtab,
+	.ex_table_start		= __start___ex_table,
+	.ex_table_end		= __stop___ex_table,
+	.kallsyms_start		= __start___kallsyms,
+	.kallsyms_end		= __stop___kallsyms,
 };
 
 struct module *module_list = &kernel_module;
@@ -1132,10 +1132,10 @@ static int m_show(struct seq_file *m, void *p)
 	return 0;
 }
 struct seq_operations modules_op = {
-	start:	m_start,
-	next:	m_next,
-	stop:	m_stop,
-	show:	m_show
+	.start	= m_start,
+	.next	= m_next,
+	.stop	= m_stop,
+	.show	= m_show
 };
 
 /*
@@ -1214,10 +1214,10 @@ static int s_show(struct seq_file *m, void *p)
 }
 
 struct seq_operations ksyms_op = {
-	start:	s_start,
-	next:	s_next,
-	stop:	s_stop,
-	show:	s_show
+	.start	= s_start,
+	.next	= s_next,
+	.stop	= s_stop,
+	.show	= s_show
 };
 
 #else		/* CONFIG_MODULES */

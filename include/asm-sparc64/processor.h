@@ -225,7 +225,7 @@ __out:	__ret; \
 #define KSTK_EIP(tsk)  ((tsk)->thread_info->kregs->tpc)
 #define KSTK_ESP(tsk)  ((tsk)->thread_info->kregs->u_regs[UREG_FP])
 
-#define cpu_relax()	udelay(1 + smp_processor_id())
+#define cpu_relax()	do { udelay(1 + smp_processor_id()); barrier(); } while  (0)
 
 #endif /* !(__ASSEMBLY__) */
 

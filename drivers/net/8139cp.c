@@ -18,7 +18,7 @@
 
 	See the file COPYING in this distribution for more information.
 
-	Contribuitors:
+	Contributors:
 	
 		Wake-on-LAN support - Felipe Damasio <felipewd@terra.com.br>
 			

@@ -3648,15 +3648,15 @@ sys32_sched_rr_get_interval (pid_t pid, struct timespec32 *interval)
 asmlinkage long
 sys32_pread (unsigned int fd, void *buf, unsigned int count, u32 pos_lo, u32 pos_hi)
 {
-	extern asmlinkage long sys_pread (unsigned int, char *, size_t, loff_t);
-	return sys_pread(fd, buf, count, ((unsigned long) pos_hi << 32) | pos_lo);
+	extern asmlinkage long sys_pread64 (unsigned int, char *, size_t, loff_t);
+	return sys_pread64(fd, buf, count, ((unsigned long) pos_hi << 32) | pos_lo);
 }
 
 asmlinkage long
 sys32_pwrite (unsigned int fd, void *buf, unsigned int count, u32 pos_lo, u32 pos_hi)
 {
-	extern asmlinkage long sys_pwrite (unsigned int, const char *, size_t, loff_t);
-	return sys_pwrite(fd, buf, count, ((unsigned long) pos_hi << 32) | pos_lo);
+	extern asmlinkage long sys_pwrite64 (unsigned int, const char *, size_t, loff_t);
+	return sys_pwrite64(fd, buf, count, ((unsigned long) pos_hi << 32) | pos_lo);
 }
 
 asmlinkage long

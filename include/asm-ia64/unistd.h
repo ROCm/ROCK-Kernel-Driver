@@ -137,8 +137,8 @@
 #define __NR_flock			1145
 #define __NR_readv			1146
 #define __NR_writev			1147
-#define __NR_pread			1148
-#define __NR_pwrite			1149
+#define __NR_pread64			1148
+#define __NR_pwrite64			1149
 #define __NR__sysctl			1150
 #define __NR_mmap			1151
 #define __NR_munmap			1152

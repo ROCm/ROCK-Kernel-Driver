@@ -126,7 +126,7 @@
  * Bufctl's are used for linking objs within a slab
  * linked offsets.
  *
- * This implementaion relies on "struct page" for locating the cache &
+ * This implementation relies on "struct page" for locating the cache &
  * slab an object belongs to.
  * This allows the bufctl structure to be small (one int), but limits
  * the number of objects a slab (not a cache) can contain when off-slab
@@ -384,14 +384,14 @@ static struct {
 
 /* internal cache of cache description objs */
 static kmem_cache_t cache_cache = {
-	slabs_full:	LIST_HEAD_INIT(cache_cache.slabs_full),
-	slabs_partial:	LIST_HEAD_INIT(cache_cache.slabs_partial),
-	slabs_free:	LIST_HEAD_INIT(cache_cache.slabs_free),
-	objsize:	sizeof(kmem_cache_t),
-	flags:		SLAB_NO_REAP,
-	spinlock:	SPIN_LOCK_UNLOCKED,
-	colour_off:	L1_CACHE_BYTES,
-	name:		"kmem_cache",
+	.slabs_full	= LIST_HEAD_INIT(cache_cache.slabs_full),
+	.slabs_partial	= LIST_HEAD_INIT(cache_cache.slabs_partial),
+	.slabs_free	= LIST_HEAD_INIT(cache_cache.slabs_free),
+	.objsize	= sizeof(kmem_cache_t),
+	.flags		= SLAB_NO_REAP,
+	.spinlock	= SPIN_LOCK_UNLOCKED,
+	.colour_off	= L1_CACHE_BYTES,
+	.name		= "kmem_cache",
 };
 
 /* Guard access to the cache-chain. */
@@ -1647,6 +1647,15 @@ void kfree (const void *objp)
 	local_irq_restore(flags);
 }
 
+unsigned int kmem_cache_size(kmem_cache_t *cachep)
+{
+#if DEBUG
+	if (cachep->flags & SLAB_RED_ZONE)
+		return (cachep->objsize - 2*BYTES_PER_WORD);
+#endif
+	return cachep->objsize;
+}
+
 kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
 {
 	cache_sizes_t *csizep = cache_sizes;
@@ -2044,10 +2053,10 @@ static int s_show(struct seq_file *m, void *p)
  */
 
 struct seq_operations slabinfo_op = {
-	start:	s_start,
-	next:	s_next,
-	stop:	s_stop,
-	show:	s_show
+	.start	= s_start,
+	.next	= s_next,
+	.stop	= s_stop,
+	.show	= s_show,
 };
 
 #define MAX_SLABINFO_WRITE 128

@@ -2266,7 +2266,7 @@ static int __init isdn_init(void)
 		init_waitqueue_head(&dev->mdm.info[i].open_wait);
 		init_waitqueue_head(&dev->mdm.info[i].close_wait);
 	}
-	if (devfs_register_chrdev(ISDN_MAJOR, "isdn", &isdn_fops)) {
+	if (register_chrdev(ISDN_MAJOR, "isdn", &isdn_fops)) {
 		printk(KERN_WARNING "isdn: Could not register control devices\n");
 		vfree(dev);
 		return -EIO;
@@ -2280,7 +2280,7 @@ static int __init isdn_init(void)
 			tty_unregister_driver(&dev->mdm.tty_modem);
 		vfree(dev);
 		isdn_cleanup_devfs();
-		devfs_unregister_chrdev(ISDN_MAJOR, "isdn");
+		unregister_chrdev(ISDN_MAJOR, "isdn");
 		return -EIO;
 	}
 #ifdef CONFIG_ISDN_PPP
@@ -2291,7 +2291,7 @@ static int __init isdn_init(void)
 		for (i = 0; i < ISDN_MAX_CHANNELS; i++)
 			kfree(dev->mdm.info[i].xmit_buf - 4);
 		isdn_cleanup_devfs();
-		devfs_unregister_chrdev(ISDN_MAJOR, "isdn");
+		unregister_chrdev(ISDN_MAJOR, "isdn");
 		vfree(dev);
 		return -EIO;
 	}
@@ -2354,7 +2354,7 @@ static void __exit isdn_exit(void)
 		kfree(dev->mdm.info[i].fax);
 #endif
 	}
-	if (devfs_unregister_chrdev(ISDN_MAJOR, "isdn") != 0) {
+	if (unregister_chrdev(ISDN_MAJOR, "isdn") != 0) {
 		printk(KERN_WARNING "isdn: controldevice busy, remove cancelled\n");
 		restore_flags(flags);
 	} else {

@@ -33,6 +33,15 @@
 
 #include "ioctl.h"
 
+
+/* BIG GEOMETRY - dying, used only by HDIO_GETGEO_BIG_RAW */
+struct hd_big_geometry {
+	u8 heads;
+	u8 sectors;
+	u32 cylinders;
+	unsigned long start;
+};
+
 /*
  * Implement generic ioctls invoked from userspace to imlpement specific
  * functionality.

@@ -137,17 +137,14 @@ xprt_from_sock(struct sock *sk)
  * Also prevents TCP socket reconnections from colliding with writes.
  */
 static int
-xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
+__xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 {
-	int retval;
-	spin_lock_bh(&xprt->sock_lock);
 	if (!xprt->snd_task) {
 		if (xprt->nocong || __xprt_get_cong(xprt, task))
 			xprt->snd_task = task;
 	}
 	if (xprt->snd_task != task) {
-		dprintk("RPC: %4d TCP write queue full (task %d)\n",
-			task->tk_pid, xprt->snd_task->tk_pid);
+		dprintk("RPC: %4d TCP write queue full\n", task->tk_pid);
 		task->tk_timeout = 0;
 		task->tk_status = -EAGAIN;
 		if (task->tk_rqstp->rq_nresend)
@@ -155,10 +152,20 @@ xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 		else
 			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
 	}
-	retval = xprt->snd_task == task;
+	return xprt->snd_task == task;
+}
+
+static inline int
+xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
+{
+	int retval;
+
+	spin_lock_bh(&xprt->sock_lock);
+	retval = __xprt_lock_write(xprt, task);
 	spin_unlock_bh(&xprt->sock_lock);
 	return retval;
 }
+
 
 static void
 __xprt_lock_write_next(struct rpc_xprt *xprt)
@@ -564,8 +571,8 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 #endif
 
 	dprintk("RPC: %4d has input (%d bytes)\n", task->tk_pid, copied);
-	task->tk_status = copied;
 	req->rq_received = copied;
+	list_del_init(&req->rq_list);
 
 	/* ... and wake up the process. */
 	rpc_wake_up_task(task);
@@ -1057,8 +1064,16 @@ xprt_transmit(struct rpc_task *task)
 		*marker = htonl(0x80000000|(req->rq_slen-sizeof(*marker)));
 	}
 
-	if (!xprt_lock_write(xprt, task))
+	spin_lock_bh(&xprt->sock_lock);
+	if (!__xprt_lock_write(xprt, task)) {
+		spin_unlock_bh(&xprt->sock_lock);
 		return;
+	}
+	if (list_empty(&req->rq_list)) {
+		list_add_tail(&req->rq_list, &xprt->recv);
+		req->rq_received = 0;
+	}
+	spin_unlock_bh(&xprt->sock_lock);
 
 	do_xprt_transmit(task);
 }
@@ -1242,9 +1257,6 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	if (!xid)
 		xid++;
 	INIT_LIST_HEAD(&req->rq_list);
-	spin_lock_bh(&xprt->sock_lock);
-	list_add_tail(&req->rq_list, &xprt->recv);
-	spin_unlock_bh(&xprt->sock_lock);
 }
 
 /*

@@ -333,8 +333,8 @@ sys_call_table:
 	PTR	sys_rt_sigtimedwait
 	PTR	sys_rt_sigqueueinfo
 	PTR	sys_rt_sigsuspend
-	PTR	sys_pread				/* 5200 */
-	PTR	sys_pwrite
+	PTR	sys_pread64				/* 5200 */
+	PTR	sys_pwrite64
 	PTR	sys_chown
 	PTR	sys_getcwd
 	PTR	sys_capget

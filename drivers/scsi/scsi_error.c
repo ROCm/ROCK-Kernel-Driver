@@ -1878,6 +1878,7 @@ void scsi_error_handler(void *data)
 	 */
 
 	daemonize();
+	reparent_to_init();
 
 	/*
 	 * Set the name of this process.

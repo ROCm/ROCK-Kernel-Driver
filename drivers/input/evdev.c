@@ -233,6 +233,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev_list *list = file->private_data;
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
+	struct input_absinfo abs;
 	int t, u;
 
 	if (!evdev->exist) return -ENODEV;
@@ -378,11 +379,14 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				int t = _IOC_NR(cmd) & ABS_MAX;
 
-				if (put_user(dev->abs[t],     ((int *) arg) + 0)) return -EFAULT;
-				if (put_user(dev->absmin[t],  ((int *) arg) + 1)) return -EFAULT;
-				if (put_user(dev->absmax[t],  ((int *) arg) + 2)) return -EFAULT;
-				if (put_user(dev->absfuzz[t], ((int *) arg) + 3)) return -EFAULT;
-				if (put_user(dev->absflat[t], ((int *) arg) + 4)) return -EFAULT;
+				abs.value = dev->abs[t];
+				abs.minimum = dev->absmin[t];
+				abs.maximum = dev->absmax[t];
+				abs.fuzz = dev->absfuzz[t];
+				abs.flat = dev->absflat[t];
+
+				if (copy_to_user((void *) arg, &abs, sizeof(struct input_absinfo)))
+					return -EFAULT;
 
 				return 0;
 			}
@@ -391,11 +395,14 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				int t = _IOC_NR(cmd) & ABS_MAX;
 
-				if (get_user(dev->abs[t],     ((int *) arg) + 0)) return -EFAULT;
-				if (get_user(dev->absmin[t],  ((int *) arg) + 1)) return -EFAULT;
-				if (get_user(dev->absmax[t],  ((int *) arg) + 2)) return -EFAULT;
-				if (get_user(dev->absfuzz[t], ((int *) arg) + 3)) return -EFAULT;
-				if (get_user(dev->absflat[t], ((int *) arg) + 4)) return -EFAULT;
+				if (copy_from_user(&abs, (void *) arg, sizeof(struct input_absinfo)))
+					return -EFAULT;
+
+				dev->abs[t] = abs.value;
+				dev->absmin[t] = abs.minimum;
+				dev->absmax[t] = abs.maximum;
+				dev->absfuzz[t] = abs.fuzz;
+				dev->absflat[t] = abs.flat;
 
 				return 0;
 			}

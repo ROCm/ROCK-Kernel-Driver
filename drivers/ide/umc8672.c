@@ -108,19 +108,14 @@ static void umc_set_speeds(u8 speeds[])
 
 static void tune_umc(struct ata_device *drive, u8 pio)
 {
-	unsigned long flags;
-
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 	else
 		pio = min_t(u8, pio, 4);
 
 	printk("%s: setting umc8672 to PIO mode%d (speed %d)\n", drive->name, pio, pio_to_umc[pio]);
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
 	current_speeds[drive->name[2] - 'a'] = pio_to_umc[pio];
 	umc_set_speeds (current_speeds);
-	restore_flags(flags);	/* all CPUs */
 }
 
 void __init init_umc8672(void)	/* called from ide.c */

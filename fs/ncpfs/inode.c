@@ -83,12 +83,12 @@ static void destroy_inodecache(void)
 
 static struct super_operations ncp_sops =
 {
-	alloc_inode:	ncp_alloc_inode,
-	destroy_inode:	ncp_destroy_inode,
-	drop_inode:	generic_delete_inode,
-	delete_inode:	ncp_delete_inode,
-	put_super:	ncp_put_super,
-	statfs:		ncp_statfs,
+	.alloc_inode	= ncp_alloc_inode,
+	.destroy_inode	= ncp_destroy_inode,
+	.drop_inode	= generic_delete_inode,
+	.delete_inode	= ncp_delete_inode,
+	.put_super	= ncp_put_super,
+	.statfs		= ncp_statfs,
 };
 
 extern struct dentry_operations ncp_root_dentry_operations;
@@ -792,10 +792,10 @@ static struct super_block *ncp_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type ncp_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"ncpfs",
-	get_sb:		ncp_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner		= THIS_MODULE,
+	.name		= "ncpfs",
+	.get_sb		= ncp_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 static int __init init_ncp_fs(void)

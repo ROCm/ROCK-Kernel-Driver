@@ -1081,8 +1081,8 @@ sys_call_table:
 	.quad sys_pciconfig_write
 	.quad sys_query_module
 	.quad sys_prctl
-	.quad sys_pread
-	.quad sys_pwrite			/* 350 */
+	.quad sys_pread64
+	.quad sys_pwrite64			/* 350 */
 	.quad sys_rt_sigreturn
 	.quad sys_rt_sigaction
 	.quad sys_rt_sigprocmask

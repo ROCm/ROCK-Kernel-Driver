@@ -26,7 +26,7 @@ dep_tristate 'Apple Macintosh file system support (EXPERIMENTAL)' CONFIG_HFS_FS 
 
 dep_tristate 'BFS file system support (EXPERIMENTAL)' CONFIG_BFS_FS $CONFIG_EXPERIMENTAL
 
-tristate 'Ext3 journalling file system support (EXPERIMENTAL)' CONFIG_EXT3_FS
+tristate 'Ext3 journalling file system support' CONFIG_EXT3_FS
 # CONFIG_JBD could be its own option (even modular), but until there are
 # other users than ext3, we will simply make it be the same as CONFIG_EXT3_FS
 # dep_tristate '  Journal Block Device support (JBD for ext3)' CONFIG_JBD $CONFIG_EXT3_FS

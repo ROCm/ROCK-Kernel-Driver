@@ -553,3 +553,22 @@ if_changed_rule = $(if $(strip $? \
 # If quiet is set, only print short version of command
 
 cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
+
+# do_cmd is a shorthand used to support both compressed, verbose
+# and silent output in a single line.
+# Compared to cmd described avobe, do_cmd does no rely on any variables 
+# previously assigned a value.
+#
+# Usage $(call do_cmd,CMD   $@,cmd_to_execute bla bla)
+# Example:
+# $(call do_cmd,CP $@,cp -b $< $@)
+# make -s => nothing will be printed
+# make KBUILD_VERBOSE=1 => cp -b path/to/src.file path/to/dest.file
+# make KBUILD_VERBOSE=0 =>   CP path/to/dest.file
+define do_cmd
+        @$(if $(filter quiet_,$(quiet)), echo '  $(1)' &&,
+           $(if $(filter silent_,$(quiet)),,
+             echo "$(2)" &&)) \
+        $(2)
+endef
+

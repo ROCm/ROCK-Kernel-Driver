@@ -605,17 +605,17 @@ call_status(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
 	struct rpc_xprt *xprt = clnt->cl_xprt;
-	struct rpc_rqst	*req;
-	int		status = task->tk_status;
+	struct rpc_rqst	*req = task->tk_rqstp;
+	int		status;
+
+	if (req->rq_received != 0)
+		task->tk_status = req->rq_received;
 
 	dprintk("RPC: %4d call_status (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
-	req = task->tk_rqstp;
-	if (req->rq_received != 0)
-		status = req->rq_received;
+	status = task->tk_status;
 	if (status >= 0) {
-		req->rq_received = 0;
 		task->tk_action = call_decode;
 		return;
 	}

@@ -835,11 +835,8 @@ show_config (struct device *dev, char *buf, size_t count, loff_t off)
 	udev = to_usb_device (dev);
 	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
 }
-static struct driver_file_entry usb_config_entry = {
-	.name =	"configuration",
-	.mode =	S_IRUGO,
-	.show =	show_config,
-};
+
+static DEVICE_ATTR(config,"configuration",S_IRUGO,show_config,NULL);
 
 /* interfaces have one current setting; alternates
  * can have different endpoints and class info.
@@ -854,11 +851,7 @@ show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
 	interface = to_usb_interface (dev);
 	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
 }
-static struct driver_file_entry usb_altsetting_entry = {
-	.name =	"altsetting",
-	.mode =	S_IRUGO,
-	.show =	show_altsetting,
-};
+static DEVICE_ATTR(altsetting,"altsetting",S_IRUGO,show_altsetting,NULL);
 
 /* product driverfs file */
 static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
@@ -875,11 +868,7 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 	buf[len+1] = 0x00;
 	return len+1;
 }
-static struct driver_file_entry usb_product_entry = {
-	.name =	"product",
-	.mode =	S_IRUGO,
-	.show =	show_product,
-};
+static DEVICE_ATTR(product,"product",S_IRUGO,show_product,NULL);
 
 /* manufacturer driverfs file */
 static ssize_t
@@ -897,11 +886,7 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 	buf[len+1] = 0x00;
 	return len+1;
 }
-static struct driver_file_entry usb_manufacturer_entry = {
-	.name =	"manufacturer",
-	.mode =	S_IRUGO,
-	.show =	show_manufacturer,
-};
+static DEVICE_ATTR(manufacturer,"manufacturer",S_IRUGO,show_manufacturer,NULL);
 
 /* serial number driverfs file */
 static ssize_t
@@ -919,11 +904,7 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 	buf[len+1] = 0x00;
 	return len+1;
 }
-static struct driver_file_entry usb_serial_entry = {
-	.name =	"serial",
-	.mode =	S_IRUGO,
-	.show =	show_serial,
-};
+static DEVICE_ATTR(serial,"serial",S_IRUGO,show_serial,NULL);
 
 /*
  * This entrypoint gets called for each new device.
@@ -965,7 +946,7 @@ static void usb_find_drivers(struct usb_device *dev)
 				interface->altsetting->bInterfaceNumber);
 		}
 		device_register (&interface->dev);
-		device_create_file (&interface->dev, &usb_altsetting_entry);
+		device_create_file (&interface->dev, &dev_attr_altsetting);
 
 		/* if this interface hasn't already been claimed */
 		if (!usb_interface_claimed(interface)) {
@@ -1453,13 +1434,13 @@ int usb_new_device(struct usb_device *dev)
 	err = device_register (&dev->dev);
 	if (err)
 		return err;
-	device_create_file (&dev->dev, &usb_config_entry);
+	device_create_file (&dev->dev, &dev_attr_config);
 	if (dev->descriptor.iManufacturer)
-		device_create_file (&dev->dev, &usb_manufacturer_entry);
+		device_create_file (&dev->dev, &dev_attr_manufacturer);
 	if (dev->descriptor.iProduct)
-		device_create_file (&dev->dev, &usb_product_entry);
+		device_create_file (&dev->dev, &dev_attr_product);
 	if (dev->descriptor.iSerialNumber)
-		device_create_file (&dev->dev, &usb_serial_entry);
+		device_create_file (&dev->dev, &dev_attr_serial);
 
 	/* now that the basic setup is over, add a /proc/bus/usb entry */
 	usbfs_add_device(dev);

@@ -128,11 +128,7 @@ tapechar_init (void)
 	tape_init();
 
 	/* Register the tape major number to the kernel */
-#ifdef CONFIG_DEVFS_FS
-	result = devfs_register_chrdev (tapechar_major, "tape", &tape_fops);
-#else
 	result = register_chrdev (tapechar_major, "tape", &tape_fops);
-#endif
 	if (result < 0) {
 		PRINT_WARN (KERN_ERR "tape: can't get major %d\n", tapechar_major);
 		tape_sprintf_event (tape_dbf_area,3,"c:initfail\n");
@@ -178,11 +174,7 @@ tapechar_init (void)
 void
 tapechar_uninit (void)
 {
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister_chrdev (tapechar_major, "tape");
-#else
 	unregister_chrdev (tapechar_major, "tape");
-#endif
 }
 
 

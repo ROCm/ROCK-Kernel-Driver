@@ -723,7 +723,7 @@ static int idedisk_check_media_change(struct ata_device *drive)
 
 static sector_t idedisk_capacity(struct ata_device *drive)
 {
-	return drive->capacity - drive->sect0;
+	return drive->capacity;
 }
 
 /*
@@ -1064,9 +1064,9 @@ static void idedisk_setup(struct ata_device *drive)
 		if (drive != &ch->drives[i])
 		    continue;
 		drvid = i;
-		ch->gd->de_arr[i] = drive->de;
+		ch->gd[i]->de_arr[0] = drive->de;
 		if (drive->removable)
-			ch->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			ch->gd[i]->flags[0] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 
@@ -1279,7 +1279,7 @@ static int idedisk_cleanup(struct ata_device *drive)
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 	}
-	ret = ide_unregister_subdriver(drive);
+	ret = ata_unregister_device(drive);
 
 	/* FIXME: This is killing the kernel with BUG 185 at asm/spinlocks.h
 	 * horribly.  Check whatever we did REGISTER the device properly
@@ -1471,8 +1471,8 @@ static void idedisk_attach(struct ata_device *drive)
 	if (req[0] != '\0' && strcmp(req, "ide-disk"))
 		return;
 
-	if (ide_register_subdriver(drive, &idedisk_driver)) {
-		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
+	if (ata_register_device(drive, &idedisk_driver)) {
+		printk(KERN_ERR "%s: Failed to register the driver with ide.c\n", drive->name);
 		return;
 	}
 

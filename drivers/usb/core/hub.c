@@ -1059,9 +1059,9 @@ static int usb_hub_thread(void *__hub)
 	/* Send me a signal to get me die (for debugging) */
 	do {
 		usb_hub_events();
+		wait_event_interruptible(khubd_wait, !list_empty(&hub_event_list)); 
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
-		wait_event_interruptible(khubd_wait, !list_empty(&hub_event_list)); 
 	} while (!signal_pending(current));
 
 	dbg("usb_hub_thread exiting");
