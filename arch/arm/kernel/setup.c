@@ -61,7 +61,6 @@ extern int root_mountflags;
 extern int _stext, _text, _etext, _edata, _end;
 
 unsigned int processor_id;
-unsigned int compat;
 unsigned int __machine_arch_type;
 unsigned int system_rev;
 unsigned int system_serial_low;
@@ -289,11 +288,6 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
 	}
 
 	printk("Machine: %s\n", list->name);
-	if (compat)
-		printk(KERN_WARNING "Using compatibility code "
-			"scheduled for removal in v%d.%d.%d\n",
-			compat >> 24, (compat >> 12) & 0x3ff,
-			compat & 0x3ff);
 
 	return list;
 }
