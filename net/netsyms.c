@@ -632,4 +632,6 @@ extern void wireless_send_event(struct net_device *dev, unsigned int cmd, union 
 EXPORT_SYMBOL(wireless_send_event);
 #endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
 
+EXPORT_SYMBOL(linkwatch_fire_event);
+
 #endif  /* CONFIG_NET */
