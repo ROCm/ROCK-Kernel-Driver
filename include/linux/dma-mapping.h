@@ -61,8 +61,9 @@ dma_release_declared_memory(struct device *dev)
 {
 }
 
-void *dma_mark_declared_memory_occupied(struct device *dev,
-					dma_addr_t device_addr, size_t size)
+static inline void *
+dma_mark_declared_memory_occupied(struct device *dev,
+				  dma_addr_t device_addr, size_t size)
 {
 	return ERR_PTR(-EBUSY);
 }
