@@ -311,7 +311,7 @@ int ip6_nd_hdr(struct sock *sk, struct sk_buff *skb, struct net_device *dev,
 	return 0;
 }
 
-int ip6_call_ra_chain(struct sk_buff *skb, int sel)
+static int ip6_call_ra_chain(struct sk_buff *skb, int sel)
 {
 	struct ip6_ra_chain *ra;
 	struct sock *last = NULL;
