@@ -833,7 +833,7 @@ static struct audio_driver waveartist_audio_driver = {
 };
 
 
-static void
+static irqreturn_t
 waveartist_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	wavnc_info *devc = (wavnc_info *)dev_id;
@@ -872,6 +872,7 @@ waveartist_intr(int irq, void *dev_id, struct pt_regs *regs)
 		// We do not use SB mode natively...
 		printk(KERN_WARNING "waveartist: Unexpected SB interrupt...\n");
 	spin_unlock(&waveartist_lock);
+	return IRQ_HANDLED;
 }
 
 /* -------------------------------------------------------------------------

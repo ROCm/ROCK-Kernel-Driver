@@ -89,7 +89,7 @@ void pas_write(unsigned char data, int ioaddr)
 
 /******************* Begin of the Interrupt Handler ********************/
 
-void pasintr(int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t pasintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	int             status;
 
@@ -106,6 +106,7 @@ void pasintr(int irq, void *dev_id, struct pt_regs *dummy)
 		  pas_midi_interrupt();
 		  status &= ~0x10;
 	}
+	return IRQ_HANDLED;
 }
 
 int pas_set_intr(int mask)

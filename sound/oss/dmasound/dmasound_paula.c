@@ -83,7 +83,7 @@ static int AmiSetVolume(int volume);
 static int AmiSetTreble(int treble);
 static void AmiPlayNextFrame(int index);
 static void AmiPlay(void);
-static void AmiInterrupt(int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t AmiInterrupt(int irq, void *dummy, struct pt_regs *fp);
 
 #ifdef CONFIG_HEARTBEAT
 
@@ -567,7 +567,7 @@ static void AmiPlay(void)
 }
 
 
-static void AmiInterrupt(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t AmiInterrupt(int irq, void *dummy, struct pt_regs *fp)
 {
 	int minframes = 1;
 
@@ -578,7 +578,7 @@ static void AmiInterrupt(int irq, void *dummy, struct pt_regs *fp)
 		 * the sq variables, so better don't do anything here.
 		 */
 		WAKE_UP(write_sq.sync_queue);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	if (write_sq.active & AMI_PLAY_PLAYING) {
@@ -608,6 +608,7 @@ static void AmiInterrupt(int irq, void *dummy, struct pt_regs *fp)
 		/* Nothing to play anymore.
 		   Wake up a process waiting for audio output to drain. */
 		WAKE_UP(write_sq.sync_queue);
+	return IRQ_HANDLED;
 }
 
 /*** Mid level stuff *********************************************************/

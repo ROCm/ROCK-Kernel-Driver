@@ -629,7 +629,7 @@ static void fritz_b_l2l1(struct hisax_if *ifc, int pr, void *arg)
 
 // ----------------------------------------------------------------------
 
-static void fcpci2_irq(int intno, void *dev, struct pt_regs *regs)
+static irqreturn_t fcpci2_irq(int intno, void *dev, struct pt_regs *regs)
 {
 	struct fritz_adapter *adapter = dev;
 	unsigned char val;
@@ -637,16 +637,17 @@ static void fcpci2_irq(int intno, void *dev, struct pt_regs *regs)
 	val = inb(adapter->io + AVM_STATUS0);
 	if (!(val & AVM_STATUS0_IRQ_MASK))
 		/* hopefully a shared  IRQ reqest */
-		return;
+		return IRQ_NONE;
 	DBG(2, "STATUS0 %#x", val);
 	if (val & AVM_STATUS0_IRQ_ISAC)
 		isacsx_irq(&adapter->isac);
 
 	if (val & AVM_STATUS0_IRQ_HDLC)
 		hdlc_irq(adapter);
+	return IRQ_HANDLED;
 }
 
-static void fcpci_irq(int intno, void *dev, struct pt_regs *regs)
+static irqreturn_t fcpci_irq(int intno, void *dev, struct pt_regs *regs)
 {
 	struct fritz_adapter *adapter = dev;
 	unsigned char sval;
@@ -654,13 +655,14 @@ static void fcpci_irq(int intno, void *dev, struct pt_regs *regs)
 	sval = inb(adapter->io + 2);
 	if ((sval & AVM_STATUS0_IRQ_MASK) == AVM_STATUS0_IRQ_MASK)
 		/* possibly a shared  IRQ reqest */
-		return;
+		return IRQ_NONE;
 	DBG(2, "sval %#x", sval);
 	if (!(sval & AVM_STATUS0_IRQ_ISAC))
 		isac_irq(&adapter->isac);
 
 	if (!(sval & AVM_STATUS0_IRQ_HDLC))
 		hdlc_irq(adapter);
+	return IRQ_HANDLED;
 }
 
 // ----------------------------------------------------------------------

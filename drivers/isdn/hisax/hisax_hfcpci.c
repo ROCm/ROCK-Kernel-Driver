@@ -1321,7 +1321,7 @@ hfcpci_timer_irq(struct hfcpci_adapter *adapter)
 // ----------------------------------------------------------------------
 // IRQ handler
 
-static void
+static irqreturn_t
 hfcpci_irq(int intno, void *dev, struct pt_regs *regs)
 {
 	struct hfcpci_adapter *adapter = dev;
@@ -1329,11 +1329,11 @@ hfcpci_irq(int intno, void *dev, struct pt_regs *regs)
 	u8 val, stat;
 
 	if (!(adapter->int_m2 & 0x08))
-		return;		/* not initialised */ // XX
+		return IRQ_NONE;		/* not initialised */ // XX
 
 	stat = hfcpci_readb(adapter, HFCPCI_STATUS);
 	if (!(stat & HFCPCI_ANYINT))
-		return;
+		return IRQ_NONE;
 
 	spin_lock(&adapter->hw_lock);
 	while (loop-- > 0) {
@@ -1369,6 +1369,7 @@ hfcpci_irq(int intno, void *dev, struct pt_regs *regs)
 			hfcpci_timer_irq(adapter);
 	}
 	spin_unlock(&adapter->hw_lock);
+	return IRQ_HANDLED;
 }
 
 // ----------------------------------------------------------------------

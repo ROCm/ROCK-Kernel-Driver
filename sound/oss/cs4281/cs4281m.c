@@ -3792,7 +3792,7 @@ static void cs4281_handle_midi(struct cs4281_state *s)
 
 
 
-static void cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cs4281_state *s = (struct cs4281_state *) dev_id;
 	unsigned int temp1;
@@ -3809,7 +3809,7 @@ static void cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		writel(HICR_IEV | HICR_CHGM, s->pBA0 + BA0_HICR);
 		CS_DBGOUT(CS_INTERRUPT, 9, printk(KERN_INFO
 			"cs4281: cs4281_interrupt(): returning not cs4281 interrupt.\n"));
-		return;
+		return IRQ_NONE;
 	}
 
 	if (temp1 & HISR_DMA0)	// If play interrupt,
@@ -3823,6 +3823,7 @@ static void cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	cs4281_update_ptr(s,CS_TRUE);
 	cs4281_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 // **************************************************************************

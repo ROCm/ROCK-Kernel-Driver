@@ -78,7 +78,8 @@ static void gunze_process_packet(struct gunze* gunze, struct pt_regs *regs)
 	input_sync(dev);
 }
 
-static void gunze_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t gunze_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct gunze* gunze = serio->private;
 
@@ -88,7 +89,8 @@ static void gunze_interrupt(struct serio *serio, unsigned char data, unsigned in
 	} else {
 		if (gunze->idx < GUNZE_MAX_LENGTH)
 			gunze->data[gunze->idx++] = data;
-	} 
+	}
+	return IRQ_HANDLED;
 }
 
 /*

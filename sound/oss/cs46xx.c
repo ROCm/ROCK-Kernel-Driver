@@ -1670,7 +1670,7 @@ static void cs_handle_midi(struct cs_card *card)
                 wake_up(&card->midi.owait);
 }
 
-static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cs_card *card = (struct cs_card *)dev_id;
 	/* Single channel card */
@@ -1688,7 +1688,7 @@ static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	{
 		cs461x_pokeBA0(card, BA0_HICR, HICR_CHGM|HICR_IEV);
 		spin_unlock(&card->lock);
-		return;
+		return IRQ_HANDLED;	/* Might be IRQ_NONE.. */
 	}
 	
 	/*
@@ -1709,6 +1709,7 @@ static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	cs461x_pokeBA0(card, BA0_HICR, HICR_CHGM|HICR_IEV);
 	spin_unlock(&card->lock);
 	CS_DBGOUT(CS_INTERRUPT, 9, printk("cs46xx: cs_interrupt()- \n"));
+	return IRQ_HANDLED;
 }
 
 

@@ -194,16 +194,18 @@ static unsigned int snd_vt1724_get_gpio_data(ice1712_t *ice)
  *  Interrupt handler
  */
 
-static void snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return);
 	unsigned char status;
+	int handled = 0;
 
 	while (1) {
 		status = inb(ICEREG1724(ice, IRQSTAT));
 		if (status == 0)
 			break;
-		
+
+		handled = 1;		
 		/*  these should probably be separated at some point, 
 			but as we don't currently have MPU support on the board I will leave it */
 		if ((status & VT1724_IRQ_MPU_RX)||(status & VT1724_IRQ_MPU_TX)) {
@@ -242,6 +244,7 @@ static void snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /*

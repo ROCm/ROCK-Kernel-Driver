@@ -442,11 +442,12 @@ static void send_osd_data(struct saa7146 *saa)
 	}
 }
 
-static void saa7146_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t saa7146_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct saa7146 *saa = (struct saa7146 *) dev_id;
 	u32 stat, astat;
 	int count;
+	int handled = 0;
 
 	count = 0;
 	while (1) {
@@ -454,7 +455,8 @@ static void saa7146_irq(int irq, void *dev_id, struct pt_regs *regs)
 		stat = saaread(SAA7146_ISR);
 		astat = stat & saaread(SAA7146_IER);
 		if (!astat)
-			return;
+			break;
+		handled = 1;
 		saawrite(astat, SAA7146_ISR);
 		if (astat & SAA7146_PSR_DEBI_S) {
 			do_irq_send_data(saa);
@@ -611,6 +613,7 @@ static void saa7146_irq(int irq, void *dev_id, struct pt_regs *regs)
 			       "stradis%d: IRQ loop cleared\n", saa->nr);
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 static int ibm_send_command(struct saa7146 *saa,

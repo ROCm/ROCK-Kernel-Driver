@@ -266,9 +266,9 @@ static int PMacSetFormat(int format);
 static int PMacSetVolume(int volume);
 static void PMacPlay(void);
 static void PMacRecord(void);
-static void pmac_awacs_tx_intr(int irq, void *devid, struct pt_regs *regs);
-static void pmac_awacs_rx_intr(int irq, void *devid, struct pt_regs *regs);
-static void pmac_awacs_intr(int irq, void *devid, struct pt_regs *regs);
+static irqreturn_t pmac_awacs_tx_intr(int irq, void *devid, struct pt_regs *regs);
+static irqreturn_t pmac_awacs_rx_intr(int irq, void *devid, struct pt_regs *regs);
+static irqreturn_t pmac_awacs_intr(int irq, void *devid, struct pt_regs *regs);
 static void awacs_write(int val);
 static int awacs_get_volume(int reg, int lshift);
 static int awacs_volume_setter(int volume, int n, int mute, int lshift);
@@ -395,20 +395,24 @@ read_audio_gpio(int gpio_addr)
 	return ((pmac_call_feature(PMAC_FTR_READ_GPIO, NULL, gpio_addr, 0) & 0x02) !=0);
 }
 
-static void
+static irqreturn_t
 headphone_intr(int irq, void *devid, struct pt_regs *regs)
 {
+	int handled = 0;
 	spin_lock(&dmasound.lock);
 	if (read_audio_gpio(gpio_headphone_detect) == gpio_headphone_detect_pol) {
+		handled = 1;
 		printk(KERN_INFO "Audio jack plugged, muting speakers.\n");
 		write_audio_gpio(gpio_amp_mute, gpio_amp_mute_pol);
 		write_audio_gpio(gpio_headphone_mute, !gpio_headphone_mute_pol);
 	} else {
+		handled = 1;
 		printk(KERN_INFO "Audio jack unplugged, enabling speakers.\n");
 		write_audio_gpio(gpio_amp_mute, !gpio_amp_mute_pol);
 		write_audio_gpio(gpio_headphone_mute, gpio_headphone_mute_pol);
 	}
 	spin_unlock(&dmasound.lock);
+	return IRQ_RETVAL(handled);
 }
 
 
@@ -923,7 +927,7 @@ static void PMacRecord(void)
    'next_cmd' field will already point back to the original loop of blocks.
 */
 
-static void
+static irqreturn_t
 pmac_awacs_tx_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	int i = write_sq.front;
@@ -1009,10 +1013,11 @@ printk("dmasound_pmac: tx-irq: xfer died - patching it up...\n") ;
 	if (!write_sq.active && (write_sq.syncing & 1))
 		WAKE_UP(write_sq.sync_queue); /* any time we're empty */
 	spin_unlock(&dmasound.lock);
+	return IRQ_HANDLED;
 }
 
 
-static void
+static irqreturn_t
 pmac_awacs_rx_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	int stat ;
@@ -1023,12 +1028,12 @@ pmac_awacs_rx_intr(int irq, void *devid, struct pt_regs *regs)
 	 * just blow it off.
 	 */
 	if (in_le32(&awacs_rxdma->cmdptr) == 0)
-		return;
+		return IRQ_HANDLED;
 
 	/* We also want to blow 'em off when shutting down.
 	*/
 	if (read_sq.active == 0)
-		return;
+		return IRQ_HANDLED;
 
 	spin_lock(&dmasound.lock);
 	/* Check multiple buffers in case we were held off from
@@ -1063,7 +1068,7 @@ printk("dmasound_pmac: rx-irq: DIED - attempting resurection\n");
 			out_le32(&awacs_rxdma->control,
 				((RUN|WAKE) << 16) + (RUN|WAKE));
 			spin_unlock(&dmasound.lock);
-			return; /* try this block again */
+			return IRQ_HANDLED; /* try this block again */
 		}
 		/* Clear status and move on to next buffer.
 		*/
@@ -1091,10 +1096,11 @@ printk("dmasound_pmac: rx-irq: DIED - attempting resurection\n");
 
 	WAKE_UP(read_sq.action_queue);
 	spin_unlock(&dmasound.lock);
+	return IRQ_HANDLED;
 }
 
 
-static void
+static irqreturn_t
 pmac_awacs_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	int ctrl;
@@ -1113,6 +1119,7 @@ pmac_awacs_intr(int irq, void *devid, struct pt_regs *regs)
 	/* Writing 1s to the CNTLERR and PORTCHG bits clears them... */
 	out_le32(&awacs->control, ctrl);
 	spin_unlock(&dmasound.lock);
+	return IRQ_HANDLED;
 }
 
 static void

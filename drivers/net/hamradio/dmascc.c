@@ -674,7 +674,7 @@ static int read_scc(struct scc_priv *priv, int reg) {
     if (reg) outb_p(reg, priv->scc_cmd);
     return inb_p(priv->scc_cmd);
   default:
-    spin_lock_irqsave(&priv->register_lock, flags);
+    spin_lock_irqsave(priv->register_lock, flags);
     outb_p(0, priv->card_base + PI_DREQ_MASK);
     if (reg) outb_p(reg, priv->scc_cmd);
     rc = inb_p(priv->scc_cmd);

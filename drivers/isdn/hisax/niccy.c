@@ -151,7 +151,7 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
+static irqreturn_t
 niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -160,10 +160,10 @@ niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		int ival;
 		ival = inl(cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
 		if (!(ival & PCI_IRQ_ASSERT)) /* IRQ not for us (shared) */
-			return;
+			return IRQ_NONE;
 		outl(ival, cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
 	}
-	hscxisac_irq(intno, dev_id, regs);
+	return hscxisac_irq(intno, dev_id, regs);
 }
 
 void

@@ -111,13 +111,14 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
+static irqreturn_t
 sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 
 	hscxisac_irq(intno, dev_id, regs);
 	bytein(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ +1);
+	return IRQ_HANDLED;
 }
 
 static void

@@ -185,7 +185,7 @@ isac_write(struct IsdnCardState *cs, u8 addr, u8 val)
 	cs->dc_hw_ops->write_reg(cs, addr, val);
 }
 
-void
+irqreturn_t
 hscxisac_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -221,5 +221,6 @@ hscxisac_irq(int intno, void *dev_id, struct pt_regs *regs)
 	hscx_write(&cs->bcs[0], HSCX_MASK, 0x0);
 	hscx_write(&cs->bcs[1], HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 

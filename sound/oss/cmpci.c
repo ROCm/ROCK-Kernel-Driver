@@ -1156,7 +1156,7 @@ static void cm_handle_midi(struct cm_state *s)
 }
 #endif
 
-static void cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct cm_state *s = (struct cm_state *)dev_id;
 	unsigned int intsrc, intstat;
@@ -1165,7 +1165,7 @@ static void cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inl(s->iobase + CODEC_CMI_INT_STATUS);
 	if (!(intsrc & 0x80000000))
-		return;
+		return IRQ_NONE;
 	spin_lock(&s->lock);
 	intstat = inb(s->iobase + CODEC_CMI_INT_HLDCLR + 2);
 	/* acknowledge interrupt */
@@ -1180,6 +1180,7 @@ static void cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	cm_handle_midi(s);
 #endif
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_SOUND_CMPCI_MIDI

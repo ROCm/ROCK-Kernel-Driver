@@ -2236,7 +2236,7 @@ static void vwsnd_audio_write_intr(vwsnd_dev_t *devc, unsigned int status)
 		pcm_output(devc, underflown, 0);
 }
 
-static void vwsnd_audio_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t vwsnd_audio_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	vwsnd_dev_t *devc = (vwsnd_dev_t *) dev_id;
 	unsigned int status;
@@ -2246,6 +2246,7 @@ static void vwsnd_audio_intr(int irq, void *dev_id, struct pt_regs *regs)
 	status = li_get_clear_intr_status(&devc->lith);
 	vwsnd_audio_read_intr(devc, status);
 	vwsnd_audio_write_intr(devc, status);
+	return IRQ_HANDLED;
 }
 
 static ssize_t vwsnd_audio_do_read(struct file *file,

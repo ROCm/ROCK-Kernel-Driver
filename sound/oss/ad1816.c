@@ -540,7 +540,7 @@ static struct audio_driver ad1816_audio_driver =
 /* Interrupt handler */
 
 
-static void ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 {
 	unsigned char	status;
 	ad1816_info	*devc;
@@ -549,7 +549,7 @@ static void ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 	
 	if (irq < 0 || irq > 15) {
 	        printk(KERN_WARNING "ad1816: Got bogus interrupt %d\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	dev = irq2dev[irq];
@@ -557,7 +557,7 @@ static void ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 	if (dev < 0 || dev >= num_audiodevs) {
 	        printk(KERN_WARNING "ad1816: IRQ2AD1816-mapping failed for "
 				    "irq %d device %d\n", irq,dev);
-		return;	        
+		return IRQ_NONE;
 	}
 
 	devc = (ad1816_info *) audio_devs[dev]->devc;
@@ -583,6 +583,7 @@ static void ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 		DMAbuf_outputintr (dev, 1);
 
 	spin_unlock(&devc->lock);
+	return IRQ_HANDLED;
 }
 
 /* ------------------------------------------------------------------- */

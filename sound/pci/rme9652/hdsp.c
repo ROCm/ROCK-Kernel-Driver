@@ -3076,7 +3076,7 @@ void hdsp_midi_tasklet(unsigned long arg)
 	}
 } 
 
-void snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	hdsp_t *hdsp = (hdsp_t *) dev_id;
 	unsigned int status;
@@ -3094,7 +3094,7 @@ void snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	midi1 = status & HDSP_midi1IRQPending;
 
 	if (!audio && !midi0 && !midi1) {
-		return;
+		return IRQ_NONE;
 	}
 
 	hdsp_write(hdsp, HDSP_interruptConfirmation, 0);
@@ -3128,6 +3128,7 @@ void snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if (schedule)
 	    tasklet_hi_schedule(&hdsp->midi_tasklet);
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_uframes_t snd_hdsp_hw_pointer(snd_pcm_substream_t *substream)

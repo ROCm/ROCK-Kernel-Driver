@@ -967,7 +967,7 @@ static void snd_cs4231_overrange(cs4231_t *chip)
 		chip->capture_substream->runtime->overrange++;
 }
 
-void snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return);
 	unsigned char status;
@@ -998,6 +998,7 @@ void snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock(&chip->reg_lock);
 	snd_cs4231_outm(chip, CS4231_IRQ_STATUS, ~CS4231_ALL_IRQS | ~status, 0);
 	spin_unlock(&chip->reg_lock);
+	return IRQ_HANDLED;
 }
 
 #ifdef LEGACY_SUPPORT

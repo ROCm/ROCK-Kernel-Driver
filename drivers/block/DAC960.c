@@ -2586,7 +2586,7 @@ DAC960_DetectController(PCI_Device_T *PCI_Device,
 					const struct pci_device_id *entry)
 {
   struct DAC960_privdata *privdata = (struct DAC960_privdata *)entry->driver_data;
-  void (*InterruptHandler)(int, void *, Registers_T *) = privdata->InterruptHandler;
+  irqreturn_t (*InterruptHandler)(int, void *, Registers_T *) = privdata->InterruptHandler;
   unsigned int MemoryWindowSize = privdata->MemoryWindowSize;
   DAC960_Controller_T *Controller = NULL;
   unsigned char DeviceFunction = PCI_Device->devfn;
@@ -5112,7 +5112,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
   Controllers.
 */
 
-static void DAC960_BA_InterruptHandler(int IRQ_Channel,
+static irqreturn_t DAC960_BA_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
 				       Registers_T *InterruptRegisters)
 {
@@ -5120,6 +5120,7 @@ static void DAC960_BA_InterruptHandler(int IRQ_Channel,
   void *ControllerBaseAddress = Controller->BaseAddress;
   DAC960_V2_StatusMailbox_T *NextStatusMailbox;
   ProcessorFlags_T ProcessorFlags;
+
   /*
     Acquire exclusive access to Controller.
   */
@@ -5154,6 +5155,7 @@ static void DAC960_BA_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Controller.
   */
   DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 
@@ -5162,7 +5164,7 @@ static void DAC960_BA_InterruptHandler(int IRQ_Channel,
   Controllers.
 */
 
-static void DAC960_LP_InterruptHandler(int IRQ_Channel,
+static irqreturn_t DAC960_LP_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
 				       Registers_T *InterruptRegisters)
 {
@@ -5204,6 +5206,7 @@ static void DAC960_LP_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Controller.
   */
   DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 
@@ -5212,7 +5215,7 @@ static void DAC960_LP_InterruptHandler(int IRQ_Channel,
   Controllers.
 */
 
-static void DAC960_LA_InterruptHandler(int IRQ_Channel,
+static irqreturn_t DAC960_LA_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
 				       Registers_T *InterruptRegisters)
 {
@@ -5250,6 +5253,7 @@ static void DAC960_LA_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Controller.
   */
   DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 
@@ -5258,7 +5262,7 @@ static void DAC960_LA_InterruptHandler(int IRQ_Channel,
   Controllers.
 */
 
-static void DAC960_PG_InterruptHandler(int IRQ_Channel,
+static irqreturn_t DAC960_PG_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
 				       Registers_T *InterruptRegisters)
 {
@@ -5296,6 +5300,7 @@ static void DAC960_PG_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Controller.
   */
   DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 
@@ -5304,7 +5309,7 @@ static void DAC960_PG_InterruptHandler(int IRQ_Channel,
   Controllers.
 */
 
-static void DAC960_PD_InterruptHandler(int IRQ_Channel,
+static irqreturn_t DAC960_PD_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
 				       Registers_T *InterruptRegisters)
 {
@@ -5338,6 +5343,7 @@ static void DAC960_PD_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Controller.
   */
   DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 
@@ -5350,7 +5356,7 @@ static void DAC960_PD_InterruptHandler(int IRQ_Channel,
   an arbitrary buffer.
 */
 
-static void DAC960_P_InterruptHandler(int IRQ_Channel,
+static irqreturn_t DAC960_P_InterruptHandler(int IRQ_Channel,
 				      void *DeviceIdentifier,
 				      Registers_T *InterruptRegisters)
 {
@@ -5419,6 +5425,7 @@ static void DAC960_P_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Controller.
   */
   DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 

@@ -105,10 +105,11 @@ static void uart6850_input_loop(void)
 	}
 }
 
-void m6850intr(int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t m6850intr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	if (input_avail())
 		uart6850_input_loop();
+	return IRQ_HANDLED;
 }
 
 /*

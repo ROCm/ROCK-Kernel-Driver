@@ -132,13 +132,15 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
+static irqreturn_t
 saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
+	irqreturn_t ret;
 
-	hscxisac_irq(intno, dev_id, regs);
+	ret = hscxisac_irq(intno, dev_id, regs);
 	mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
+	return ret;
 }
 
 static void

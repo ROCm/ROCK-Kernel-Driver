@@ -113,7 +113,8 @@ static void magellan_process_packet(struct magellan* magellan, struct pt_regs *r
 	input_sync(dev);
 }
 
-static void magellan_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t magellan_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct magellan* magellan = serio->private;
 
@@ -123,7 +124,8 @@ static void magellan_interrupt(struct serio *serio, unsigned char data, unsigned
 	} else {
 		if (magellan->idx < MAGELLAN_MAX_LENGTH)
 			magellan->data[magellan->idx++] = data;
-	} 
+	}
+	return IRQ_HANDLED;
 }
 
 /*

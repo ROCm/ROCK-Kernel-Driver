@@ -36,7 +36,7 @@ ux_diva_card_t card_pool[MAX_CARDS];
 
 void UxPause(long int ms)
 {
-	int timeout = jiffies + ((ms * HZ) / 1000);
+	unsigned long timeout = jiffies + ((ms * HZ) / 1000);
 
 	while (time_before(jiffies, timeout));
 }
@@ -577,7 +577,7 @@ void UxCardIoOutBuffer(ux_diva_card_t *card, void *AttachedDivasIOBase, void *ad
     return;
 }
 
-void 	Divasintr(int arg, void *unused, struct pt_regs *unused_regs)
+irqreturn_t Divasintr(int arg, void *unused, struct pt_regs *unused_regs)
 {
 	int i;
 	card_t *card = NULL;
@@ -602,7 +602,7 @@ void 	Divasintr(int arg, void *unused, struct pt_regs *unused_regs)
 		}
 	}
 
-	return;
+	return IRQ_HANDLED;
 }
 
 
@@ -680,7 +680,7 @@ long UxCardLock(ux_diva_card_t *card)
 	return flags;
 }
 
-void UxCardUnlock(ux_diva_card_t *card, long ipl)
+void UxCardUnlock(ux_diva_card_t *card, unsigned long ipl)
 {
 	spin_unlock_irqrestore(&diva_lock, ipl);
 }

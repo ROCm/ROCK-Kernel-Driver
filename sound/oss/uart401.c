@@ -96,18 +96,19 @@ static void uart401_input_loop(uart401_devc * devc)
 		printk(KERN_WARNING "Too much work in interrupt on uart401 (0x%X). UART jabbering ??\n", devc->base);
 }
 
-void uart401intr(int irq, void *dev_id, struct pt_regs *dummy)
+irqreturn_t uart401intr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	uart401_devc *devc = dev_id;
 
 	if (devc == NULL)
 	{
 		printk(KERN_ERR "uart401: bad devc\n");
-		return;
+		return IRQ_NONE;
 	}
 
 	if (input_avail(devc))
 		uart401_input_loop(devc);
+	return IRQ_HANDLED;
 }
 
 static int

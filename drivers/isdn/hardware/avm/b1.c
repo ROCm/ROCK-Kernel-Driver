@@ -491,7 +491,7 @@ void b1_parse_version(avmctrl_info *cinfo)
 
 /* ------------------------------------------------------------- */
 
-void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
+irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
@@ -506,7 +506,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 	unsigned WindowSize;
 
 	if (!b1_rx_full(card->port))
-	   return;
+	   return IRQ_NONE;
 
 	b1cmd = b1_get_byte(card->port);
 
@@ -619,12 +619,13 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 	case 0xff:
 		printk(KERN_ERR "%s: card removed ?\n", card->name);
-		return;
+		return IRQ_NONE;
 	default:
 		printk(KERN_ERR "%s: b1_interrupt: 0x%x ???\n",
 				card->name, b1cmd);
-		return;
+		return IRQ_HANDLED;
 	}
+	return IRQ_HANDLED;
 }
 
 /* ------------------------------------------------------------- */

@@ -34,9 +34,11 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, dev_id, return);
 	unsigned int status;
+	int handled = 0;
 
 	while ((status = inl(emu->port + IPR)) != 0) {
 		// printk("irq - status = 0x%x\n", status);
+		handled = 1;
 		if (status & IPR_PCIERROR) {
 			snd_printk("interrupt: PCI error\n");
 			snd_emu10k1_intr_disable(emu, INTE_PCIERRORENABLE);
@@ -145,6 +147,5 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			outl(IPR_FXDSP, emu->port + IPR);
 		}
 	}
-
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(handled);
 }

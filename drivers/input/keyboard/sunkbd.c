@@ -89,18 +89,19 @@ struct sunkbd {
  * is received.
  */
 
-static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t sunkbd_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct sunkbd* sunkbd = serio->private;
 
 	if (sunkbd->reset <= -1) {		/* If cp[i] is 0xff, sunkbd->reset will stay -1. */
 		sunkbd->reset = data;		/* The keyboard sends 0xff 0xff 0xID on powerup */
-		return;
+		goto out;
 	}
 
 	if (sunkbd->layout == -1) {
 		sunkbd->layout = data;
-		return;
+		goto out;
 	}
 
 	switch (data) {
@@ -108,14 +109,14 @@ static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned i
 		case SUNKBD_RET_RESET:
 			schedule_work(&sunkbd->tq);
 			sunkbd->reset = -1;
-			return;
+			break;
 
 		case SUNKBD_RET_LAYOUT:
 			sunkbd->layout = -1;
-			return;
+			break;
 
 		case SUNKBD_RET_ALLUP: /* All keys released */
-			return;
+			break;
 
 		default:
 			if (sunkbd->keycode[data & SUNKBD_KEY]) {
@@ -127,6 +128,8 @@ static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned i
                                         data & SUNKBD_KEY, data & SUNKBD_RELEASE ? "released" : "pressed");
                         }
 	}
+out:
+	return IRQ_HANDLED;
 }
 
 /*

@@ -720,17 +720,18 @@ static void irport_receive(struct irport_cb *self)
  *
  *    Interrupt handler
  */
-void irport_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
+irqreturn_t irport_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct irport_cb *self;
 	int boguscount = 0;
 	int iobase;
 	int iir, lsr;
+	int handled = 0;
 
 	if (!dev) {
 		WARNING("%s() irq %d for unknown device.\n", __FUNCTION__, irq);
-		return;
+		return IRQ_NONE;
 	}
 	self = (struct irport_cb *) dev->priv;
 
@@ -740,6 +741,8 @@ void irport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	iir = inb(iobase+UART_IIR) & UART_IIR_ID;
 	while (iir) {
+		handled = 1;
+
 		/* Clear interrupt */
 		lsr = inb(iobase+UART_LSR);
 
@@ -771,6 +774,7 @@ void irport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  	        iir = inb(iobase + UART_IIR) & UART_IIR_ID;
 	}
 	spin_unlock(&self->lock);
+	return IRQ_RETVAL(handled);
 }
 
 static int irport_net_init(struct net_device *dev)

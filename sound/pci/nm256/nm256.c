@@ -238,7 +238,7 @@ struct snd_nm256 {
 	int mixer_status_mask;		/* bit mask to test the mixer status */
 
 	int irq;
-	void (*interrupt)(int, void *, struct pt_regs *);
+	irqreturn_t (*interrupt)(int, void *, struct pt_regs *);
 	int badintrcount;		/* counter to check bogus interrupts */
 
 	nm256_stream_t streams[2];
@@ -972,7 +972,7 @@ snd_nm256_intr_check(nm256_t *chip)
  * I suppose...yucky bleah.)
  */
 
-static void
+static irqreturn_t
 snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return);
@@ -984,7 +984,7 @@ snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
 	/* Not ours. */
 	if (status == 0) {
 		snd_nm256_intr_check(chip);
-		return;
+		return IRQ_NONE;
 	}
 
 	chip->badintrcount = 0;
@@ -1030,6 +1030,7 @@ snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
 	}
 
 	spin_unlock(&chip->reg_lock);
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1038,7 +1039,7 @@ snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
  * routine.
  */
 
-static void
+static irqreturn_t
 snd_nm256_interrupt_zx(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return);
@@ -1050,7 +1051,7 @@ snd_nm256_interrupt_zx(int irq, void *dev_id, struct pt_regs *dummy)
 	/* Not ours. */
 	if (status == 0) {
 		snd_nm256_intr_check(chip);
-		return;
+		return IRQ_NONE;
 	}
 
 	chip->badintrcount = 0;
@@ -1095,6 +1096,7 @@ snd_nm256_interrupt_zx(int irq, void *dev_id, struct pt_regs *dummy)
 	}
 
 	spin_unlock(&chip->reg_lock);
+	return IRQ_HANDLED;
 }
 
 /*

@@ -37,10 +37,11 @@
 
 /* Interrupt handler */
 
-void emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct emu10k1_card *card = (struct emu10k1_card *) dev_id;
 	u32 irqstatus, irqstatus_tmp;
+	int handled = 0;
 
 	DPD(4, "emu10k1_interrupt called, irq =  %u\n", irq);
 
@@ -105,6 +106,8 @@ void emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		/* acknowledge interrupt */
-                outl(irqstatus_tmp, card->iobase + IPR);
+		outl(irqstatus_tmp, card->iobase + IPR);
+		handled = 1;
 	}
+	return IRQ_RETVAL(handled);
 }

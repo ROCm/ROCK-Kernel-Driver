@@ -120,7 +120,7 @@ fcclassic_write_hscx_fifo(struct hscx *hscx, unsigned char * data, int size)
 
 // ----------------------------------------------------------------------
 
-static void
+static irqreturn_t
 fcclassic_irq(int intno, void *dev, struct pt_regs *regs)
 {
 	struct fritz_adapter *adapter = dev;
@@ -139,6 +139,7 @@ fcclassic_irq(int intno, void *dev, struct pt_regs *regs)
 			isac_irq(&adapter->isac);
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 // ----------------------------------------------------------------------

@@ -130,7 +130,8 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb, struct pt_regs *r
 	input_sync(dev);
 }
 
-static void spaceorb_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t spaceorb_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct spaceorb* spaceorb = serio->private;
 
@@ -140,6 +141,7 @@ static void spaceorb_interrupt(struct serio *serio, unsigned char data, unsigned
 	}
 	if (spaceorb->idx < SPACEORB_MAX_LENGTH)
 		spaceorb->data[spaceorb->idx++] = data & 0x7f;
+	return IRQ_HANDLED;
 }
 
 /*

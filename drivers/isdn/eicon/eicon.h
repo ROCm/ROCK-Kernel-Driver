@@ -14,6 +14,8 @@
 #ifndef eicon_h
 #define eicon_h
 
+#include <linux/interrupt.h>
+
 #define EICON_IOCTL_SETMMIO   0
 #define EICON_IOCTL_GETMMIO   1
 #define EICON_IOCTL_SETIRQ    2
@@ -364,7 +366,7 @@ extern __inline__ void eicon_schedule_ack(eicon_card *card)
 
 extern int eicon_addcard(int, int, int, char *, int);
 extern void eicon_io_transmit(eicon_card *card);
-extern void eicon_irq(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t eicon_irq(int irq, void *dev_id, struct pt_regs *regs);
 extern void eicon_io_rcv_dispatch(eicon_card *ccard);
 extern void eicon_io_ack_dispatch(eicon_card *ccard);
 #ifdef CONFIG_MCA

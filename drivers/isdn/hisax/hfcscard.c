@@ -32,7 +32,7 @@ hfcs_write_reg(struct IsdnCardState *cs, int data, u8 reg, u8 val)
 	cs->bc_hw_ops->write_reg(cs, data, reg, val);
 }
 
-static void
+static irqreturn_t
 hfcs_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -40,7 +40,7 @@ hfcs_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 	if (!cs) {
 		printk(KERN_WARNING "HFCS: Spurious interrupt!\n");
-		return;
+		return IRQ_NONE;
 	}
 	if ((HFCD_ANYINT | HFCD_BUSY_NBUSY) & 
 		(stat = hfcs_read_reg(cs, HFCD_DATA, HFCD_STAT))) {
@@ -52,6 +52,7 @@ hfcs_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "HFCS: irq_no_irq stat(%02x)", stat);
 	}
+	return IRQ_HANDLED;
 }
 
 static void

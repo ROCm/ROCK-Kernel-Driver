@@ -78,40 +78,38 @@ static void iforce_serio_write_wakeup(struct serio *serio)
 	iforce_serial_xmit((struct iforce *)serio->private);
 }
 
-static void iforce_serio_irq(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t iforce_serio_irq(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct iforce* iforce = serio->private;
 
 	if (!iforce->pkt) {
-		if (data != 0x2b) {
-			return;
-		}
-		iforce->pkt = 1;
-		return;
+		if (data == 0x2b)
+			iforce->pkt = 1;
+		goto out;
 	}
 
 	if (!iforce->id) {
-		if (data > 3 && data != 0xff) {
+		if (data > 3 && data != 0xff)
 			iforce->pkt = 0;
-			return;
-		}
-		iforce->id = data;
-		return;
+		else
+			iforce->id = data;
+		goto out;
 	}
 
 	if (!iforce->len) {
 		if (data > IFORCE_MAX_LENGTH) {
 			iforce->pkt = 0;
 			iforce->id = 0;
-			return;
+		} else {
+			iforce->len = data;
 		}
-		iforce->len = data;
-		return;
+		goto out;
 	}
 
 	if (iforce->idx < iforce->len) {
 		iforce->csum += iforce->data[iforce->idx++] = data;
-		return;
+		goto out;
 	}
 
 	if (iforce->idx == iforce->len) {
@@ -122,6 +120,8 @@ static void iforce_serio_irq(struct serio *serio, unsigned char data, unsigned i
 		iforce->idx = 0;
 		iforce->csum = 0;
 	}
+out:
+	return IRQ_HANDLED;
 }
 
 static void iforce_serio_connect(struct serio *serio, struct serio_dev *dev)

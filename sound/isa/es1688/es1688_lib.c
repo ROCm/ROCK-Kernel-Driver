@@ -482,7 +482,7 @@ static int snd_es1688_capture_trigger(snd_pcm_substream_t * substream,
 	return snd_es1688_trigger(chip, cmd, 0x0f);
 }
 
-void snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	es1688_t *chip = snd_magic_cast(es1688_t, dev_id, return);
 
@@ -492,6 +492,7 @@ void snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		snd_pcm_period_elapsed(chip->capture_substream);
 
 	inb(ES1688P(chip, DATA_AVAIL));	/* ack interrupt */
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_uframes_t snd_es1688_playback_pointer(snd_pcm_substream_t * substream)

@@ -157,7 +157,7 @@ extern struct file_operations emu10k1_midi_fops;
 static struct midi_operations emu10k1_midi_operations;
 #endif
 
-extern void emu10k1_interrupt(int, void *, struct pt_regs *s);
+extern irqreturn_t emu10k1_interrupt(int, void *, struct pt_regs *s);
 
 static int __devinit emu10k1_audio_init(struct emu10k1_card *card)
 {
