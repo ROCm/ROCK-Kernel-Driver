@@ -371,14 +371,14 @@ static int i830_dma_initialize(drm_device_t *dev,
 		DRM_ERROR("can not find sarea!\n");
 		return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->mmio_map, init->mmio_offset );
+	dev_priv->mmio_map = drm_core_findmap(dev, init->mmio_offset);
 	if(!dev_priv->mmio_map) {
 		dev->dev_private = (void *)dev_priv;
 		i830_dma_cleanup(dev);
 		DRM_ERROR("can not find mmio map!\n");
 		return -EINVAL;
 	}
-	DRM_FIND_MAP( dev->agp_buffer_map, init->buffers_offset );
+	dev->agp_buffer_map = drm_core_findmap(dev, init->buffers_offset);
 	if(!dev->agp_buffer_map) {
 		dev->dev_private = (void *)dev_priv;
 		i830_dma_cleanup(dev);
