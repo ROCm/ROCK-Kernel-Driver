@@ -151,8 +151,8 @@ static inline int ioapic_setup_disabled(void)
 }
 
 #else
-static inline void disable_ioapic_setup(void)
-{ }
+static inline void disable_ioapic_setup(void) { }
+static inline void check_acpi_pci(void) { }
 
 #endif
 
