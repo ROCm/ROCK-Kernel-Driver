@@ -308,7 +308,7 @@ static u32 nforce2_func(struct i2c_adapter *adapter)
 }
 
 
-static struct pci_device_id nforce2_ids[] __devinitdata = {
+static struct pci_device_id nforce2_ids[] = {
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2_SMBUS,
 	       	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0 }
