@@ -2686,16 +2686,7 @@ static int selinux_task_setrlimit(unsigned int resource, struct rlimit *new_rlim
 
 static int selinux_task_setscheduler(struct task_struct *p, int policy, struct sched_param *lp)
 {
-	struct task_security_struct *tsec1, *tsec2;
-
-	tsec1 = current->security;
-	tsec2 = p->security;
-
-	/* No auditing from the setscheduler hook, since the runqueue lock
-	   is held and the system will deadlock if we try to log an audit
-	   message. */
-	return avc_has_perm_noaudit(tsec1->sid, tsec2->sid,
-				    SECCLASS_PROCESS, PROCESS__SETSCHED, NULL);
+	return task_has_perm(current, p, PROCESS__SETSCHED);
 }
 
 static int selinux_task_getscheduler(struct task_struct *p)
