@@ -672,9 +672,7 @@ static int smsc_ircc_setup_netdev(struct smsc_ircc_cb *self)
 	dev->base_addr = self->io.fir_base;
 	dev->irq = self->io.irq;
 
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
+	err = register_netdev(dev);
 	if (err) {
 		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
 		kfree(self->tx_buff.head);
