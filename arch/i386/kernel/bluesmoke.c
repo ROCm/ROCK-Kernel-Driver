@@ -76,11 +76,11 @@ static void __init intel_init_thermal(struct cpuinfo_x86 *c)
 	unsigned int cpu = smp_processor_id();
 
 	/* Thermal monitoring */
-	if (!test_bit(X86_FEATURE_ACPI, &c->x86_capability))
+	if (!test_bit(X86_FEATURE_ACPI, c->x86_capability))
 		return;	/* -ENODEV */
 	
 	/* Clock modulation */
-	if (!test_bit(X86_FEATURE_ACC, &c->x86_capability))
+	if (!test_bit(X86_FEATURE_ACC, c->x86_capability))
 		return;	/* -ENODEV */
 
 	rdmsr(MSR_IA32_MISC_ENABLE, l, h);
