@@ -105,8 +105,6 @@ static unsigned char scc_inittab[] = {
 #endif
 #define ZS_CLOCK         3686400 	/* Z8530 RTxC input clock rate */
 
-static struct tty_driver serial_driver;
-
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
 
@@ -2487,6 +2485,26 @@ probe_sccs(void)
 #endif /* CONFIG_PMAC_PBOOK */
 }
 
+static struct tty_operations serial_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = macserial_read_proc,
+};
+
 /* rs_init inits the driver */
 int macserial_init(void)
 {
@@ -2496,6 +2514,10 @@ int macserial_init(void)
 	/* Find out how many Z8530 SCCs we have */
 	if (zs_chain == 0)
 		probe_sccs();
+
+	serial_driver = alloc_tty_driver(zs_channels_found);
+	if (!serial_driver)
+		return -ENOMEM;
 
 	/* XXX assume it's a powerbook if we have a via-pmu
 	 * 
@@ -2511,6 +2533,7 @@ int macserial_init(void)
 		struct device_node* ch = zs_soft[i].dev_node;
 		if (!request_OF_resource(ch, 0, NULL)) {
 			printk(KERN_ERR "macserial: can't request IO resource !\n");
+			put_tty_driver(serial_driver);
 			return -ENODEV;
 		}
 		if (zs_soft[i].has_dma) {
@@ -2549,42 +2572,21 @@ no_dma:
 	/* Initialize the tty_driver structure */
 	/* Not all of this is exactly right for us. */
 
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.driver_name = "macserial";
-	serial_driver.devfs_name = "tts/";
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = zs_channels_found;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "macserial";
+	serial_driver->devfs_name = "tts/";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B38400 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &serial_ops);
 
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.break_ctl = rs_break;
-	serial_driver.wait_until_sent = rs_wait_until_sent;
-	serial_driver.read_proc = macserial_read_proc;
-
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		printk(KERN_ERR "Error: couldn't register serial driver\n");
 
 	for (channel = 0; channel < zs_channels_found; ++channel) {
@@ -2679,7 +2681,8 @@ void macserial_cleanup(void)
 		}
 	}
 	spin_unlock_irqrestore(&info->lock, flags);
-	tty_unregister_driver(&serial_driver);
+	tty_unregister_driver(serial_driver);
+	put_tty_driver(serial_driver);
 
 	if (tmp_buf) {
 		free_page((unsigned long) tmp_buf);
@@ -2755,11 +2758,12 @@ static void serial_console_write(struct console *co, const char *s,
 	/* Don't disable the transmitter. */
 }
 
-extern struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
+
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 /*
