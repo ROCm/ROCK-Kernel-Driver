@@ -395,7 +395,7 @@ struct video_code
 #define VID_HARDWARE_MEYE	32	/* Sony Vaio MotionEye cameras */
 #define VID_HARDWARE_CPIA2	33
 #define VID_HARDWARE_VICAM      34
-
+#define VID_HARDWARE_SF16FMR2	35
 #endif /* __LINUX_VIDEODEV_H */
 
 /*
