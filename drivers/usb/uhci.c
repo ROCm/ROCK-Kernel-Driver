@@ -1662,6 +1662,7 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 		/* Interrupts are an exception */
 		if (urb->interval) {
 			uhci_add_complete(urb);
+			spin_unlock_irqrestore(&urb->lock, flags);
 			return;		/* <-- note return */
 		}
 
