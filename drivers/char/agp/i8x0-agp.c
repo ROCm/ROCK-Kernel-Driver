@@ -311,6 +311,11 @@ static int intel_845_configure(void)
 	return 0;
 }
 
+static void intel_845_resume(void)
+{
+	intel_845_configure();
+}
+
 static int intel_850_configure(void)
 {
 	u32 temp;
@@ -650,7 +655,7 @@ int __init intel_845_setup (struct pci_dev *pdev)
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
+	agp_bridge.resume = intel_845_resume;
 	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
