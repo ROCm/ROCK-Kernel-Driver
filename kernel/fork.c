@@ -317,8 +317,11 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
 
-		if(mpnt->vm_flags & VM_DONTCOPY)
+		if (mpnt->vm_flags & VM_DONTCOPY) {
+			__vm_stat_account(mm, mpnt->vm_flags, mpnt->vm_file,
+							-vma_pages(mpnt));
 			continue;
+		}
 		charge = 0;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
