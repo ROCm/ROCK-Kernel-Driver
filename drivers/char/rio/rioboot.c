@@ -580,14 +580,14 @@ register struct DownLoad *rbp;
 			HostP->UnixRups[RupN].RupP		= &HostP->RupP[RupN];
 			HostP->UnixRups[RupN].Id		  = RupN+1;
 			HostP->UnixRups[RupN].BaseSysPort = NO_PORT;
-			HostP->UnixRups[RupN].RupLock = SPIN_LOCK_UNLOCKED;
+			spin_lock_init(&HostP->UnixRups[RupN].RupLock);
 		}
 
 		for ( RupN = 0; RupN<LINKS_PER_UNIT; RupN++ ) {
 			HostP->UnixRups[RupN+MAX_RUP].RupP	= &HostP->LinkStrP[RupN].rup;
 			HostP->UnixRups[RupN+MAX_RUP].Id  = 0;
 			HostP->UnixRups[RupN+MAX_RUP].BaseSysPort = NO_PORT;
-			HostP->UnixRups[RupN+MAX_RUP].RupLock = SPIN_LOCK_UNLOCKED;
+			spin_lock_init(&HostP->UnixRups[RupN+MAX_RUP].RupLock);
 		}
 
 		/*

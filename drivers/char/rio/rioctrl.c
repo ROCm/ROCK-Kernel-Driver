@@ -1203,7 +1203,7 @@ RIO_DEBUG_CTRL, 				if (su)
 					p->RIOPortp[loop]->TtyP = &p->channel[loop];
 #endif
 					
-					p->RIOPortp[loop]->portSem = SPIN_LOCK_UNLOCKED;
+					spin_lock_init(&p->RIOPortp[loop]->portSem);
 					p->RIOPortp[loop]->InUse = NOT_INUSE;
 				}
 

@@ -1444,7 +1444,7 @@ struct rio_info	* p;
 				}
 				RIODefaultName(p, HostP, rup);
 			}
-			HostP->UnixRups[rup].RupLock = SPIN_LOCK_UNLOCKED;
+			spin_lock_init(&HostP->UnixRups[rup].RupLock);
 		}
 	}
 }

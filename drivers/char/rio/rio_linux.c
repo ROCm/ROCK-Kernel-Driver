@@ -979,7 +979,7 @@ static int rio_init_datastructures (void)
     port->gs.close_delay = HZ/2;
     port->gs.closing_wait = 30 * HZ;
     port->gs.rd = &rio_real_driver;
-    port->portSem = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&port->portSem);
     /*
      * Initializing wait queue
      */
@@ -1141,7 +1141,7 @@ static int __init rio_init(void)
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy; 
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
-      hp->HostLock = SPIN_LOCK_UNLOCKED;
+      spin_lock_init(&hp->HostLock);
       rio_reset_interrupt (hp);
       rio_start_card_running (hp);
 
@@ -1199,7 +1199,7 @@ static int __init rio_init(void)
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy;
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
-      hp->HostLock = SPIN_LOCK_UNLOCKED;
+      spin_lock_init(&hp->HostLock);
 
       rio_dprintk (RIO_DEBUG_PROBE, "Ivec: %x\n", hp->Ivec);
       rio_dprintk (RIO_DEBUG_PROBE, "Mode: %x\n", hp->Mode);
@@ -1249,7 +1249,7 @@ static int __init rio_init(void)
                              * Moreover, the ISA card will work with the 
                              * special PCI copy anyway. -- REW */
     hp->Mode = 0;
-    hp->HostLock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&hp->HostLock);
 
     vpdp = get_VPD_PROM (hp);
     rio_dprintk (RIO_DEBUG_PROBE, "Got VPD ROM\n");
