@@ -10,6 +10,7 @@ dep_tristate '  Logitech ADI digital joysticks and gamepads' CONFIG_JOYSTICK_ADI
 dep_tristate '  Creative Labs Blaster Cobra gamepad' CONFIG_JOYSTICK_COBRA $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Genius Flight2000 Digital joysticks and gamepads' CONFIG_JOYSTICK_GF2K $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Gravis GrIP joysticks and gamepads' CONFIG_JOYSTICK_GRIP $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
+dep_tristate '  Gravis GrIP MultiPort' CONFIG_JOYSTICK_GRIP_MP $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Guillemot joysticks and gamepads' CONFIG_JOYSTICK_GUILLEMOT $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  InterAct digital joysticks and gamepads' CONFIG_JOYSTICK_INTERACT $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Microsoft SideWinder digital joysticks and gamepads' CONFIG_JOYSTICK_SIDEWINDER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
