@@ -217,8 +217,20 @@ void __init setup_arch(char **cmdline_p)
 	int i;
 	char *p, *q;
 
-	/* The bootinfo is located right after the kernel bss */
-	m68k_parse_bootinfo((const struct bi_record *)&_end);
+	if (!MACH_IS_HP300) {
+		/* The bootinfo is located right after the kernel bss */
+		m68k_parse_bootinfo((const struct bi_record *)&_end);
+	} else {
+		/* FIXME HP300 doesn't use bootinfo yet */
+		extern unsigned long hp300_phys_ram_base;
+		unsigned long hp300_mem_size = 0xffffffff-hp300_phys_ram_base;
+		m68k_cputype = CPU_68030;
+		m68k_fputype = FPU_68882;
+		m68k_memory[0].addr = hp300_phys_ram_base;
+		/* 0.5M fudge factor */
+		m68k_memory[0].size = hp300_mem_size-512*1024;
+		m68k_num_memory++;
+	}
 
 	if (CPU_IS_040)
 		m68k_is040or060 = 4;
