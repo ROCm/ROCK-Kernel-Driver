@@ -1490,7 +1490,7 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif)
 	int err;
 	const struct usbmix_ctl_map *map;
 	struct usb_device_descriptor *dev = &chip->dev->descriptor;
-	struct usb_host_interface *hostif = &chip->dev->actconfig->interface[ctrlif].altsetting[0];
+	struct usb_host_interface *hostif = &get_iface(chip->dev->actconfig, ctrlif)->altsetting[0];
 
 	strcpy(chip->card->mixername, "USB Mixer");
 
