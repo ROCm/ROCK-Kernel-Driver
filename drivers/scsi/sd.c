@@ -84,9 +84,6 @@
 
 #define SD_DSK_ARR_LUMP 6 /* amount to over allocate sd_dsk_arr by */
 
-
-struct hd_struct *sd;
-
 static Scsi_Disk ** sd_dsk_arr;
 static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
 
@@ -125,8 +122,6 @@ static struct Scsi_Device_Template sd_template = {
 static void sd_rw_intr(Scsi_Cmnd * SCpnt);
 
 static Scsi_Disk * sd_get_sdisk(int index);
-
-extern void driverfs_remove_partitions(struct gendisk *hd, int minor);
 
 #if defined(CONFIG_PPC32)
 /**
@@ -288,6 +283,8 @@ static request_queue_t *sd_find_queue(kdev_t dev)
 		return NULL;	/* No such device */
 }
 
+static struct gendisk **sd_disks;
+
 /**
  *	sd_init_command - build a scsi (read or write) command from
  *	information in the request structure.
@@ -323,7 +320,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	/* >>>>> this change is not in the lk 2.5 series */
 	if (part_nr >= (sd_template.dev_max << 4) || (part_nr & 0xf) ||
 	    !sdp || !sdp->online ||
- 	    block + SCpnt->request->nr_sectors > sd[part_nr].nr_sects) {
+ 	    block + SCpnt->request->nr_sectors > get_capacity(sd_disks[dsk_nr])) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
 				 SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
@@ -589,8 +586,6 @@ static struct block_device_operations sd_fops =
 	check_media_change:	check_scsidisk_media_change,
 	revalidate:		sd_revalidate
 };
-
-static struct gendisk **sd_disks;
 
 /**
  *	sd_rw_intr - bottom half handler: called when the lower level
@@ -1207,12 +1202,10 @@ static int sd_init()
 	init_mem_lth(sd_disks, sd_template.dev_max);
 	if (sd_disks)
 		zero_mem_lth(sd_disks, sd_template.dev_max);
-	init_mem_lth(sd, maxparts);
 
-	if (!sd_dsk_arr || !sd || !sd_disks)
+	if (!sd_dsk_arr || !sd_disks)
 		goto cleanup_mem;
 
-	zero_mem_lth(sd, maxparts);
 	return 0;
 
 #undef init_mem_lth
@@ -1221,8 +1214,6 @@ static int sd_init()
 cleanup_mem:
 	vfree(sd_disks);
 	sd_disks = NULL;
-	vfree(sd);
-	sd = NULL;
 	if (sd_dsk_arr) {
                 for (k = 0; k < sd_template.dev_max; ++k)
 			vfree(sd_dsk_arr[k]);
@@ -1312,9 +1303,6 @@ static int sd_attach(Scsi_Device * sdp)
 	unsigned long iflags;
 	struct {
 		struct gendisk disk;
-		devfs_handle_t de;
-		struct device *dev;
-		char flags;
 		char name[5];
 	} *p;
 	struct gendisk *gd;
@@ -1327,9 +1315,6 @@ static int sd_attach(Scsi_Device * sdp)
 	if (!p)
 		return 1;
 	gd = &p->disk;
-	gd->de_arr = &p->de;
-	gd->flags = &p->flags;
-	gd->driverfs_dev_arr = &p->dev;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
@@ -1361,21 +1346,19 @@ static int sd_attach(Scsi_Device * sdp)
 	}
 
 	sd_template.nr_dev++;
-	gd->nr_real = 1;
-        gd->de_arr[0] = sdp->de;
-        gd->driverfs_dev_arr[0] = &sdp->sdev_driverfs_dev;
+        gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
 	gd->minor_shift = 4;
-	gd->part = sd + (dsk_nr << 4);
 	gd->fops = &sd_fops;
 	if (dsk_nr > 26)
 		sprintf(p->name, "sd%c%c", 'a'+dsk_nr/26-1, 'a'+dsk_nr%26);
 	else
 		sprintf(p->name, "sd%c", 'a'+dsk_nr%26);
 	gd->major_name = p->name;
-        if (sdp->removable)
-		gd->flags[0] |= GENHD_FL_REMOVABLE;
+        gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
+        gd->driverfs_dev = &sdp->sdev_driverfs_dev;
+        gd->flags |= GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
 	sd_disks[dsk_nr] = gd;
 	sd_dskname(dsk_nr, diskname);
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
@@ -1393,7 +1376,7 @@ static int sd_revalidate(kdev_t dev)
 		return -ENODEV;
 
 	sd_init_onedisk(sdkp, dsk_nr);
-	sd_disks[dsk_nr]->part[0].nr_sects = sdkp->capacity;
+	set_capacity(sd_disks[dsk_nr], sdkp->capacity);
 	return 0;
 }
 
@@ -1435,10 +1418,6 @@ static void sd_detach(Scsi_Device * sdp)
 	if (sdkp->has_been_registered) {
 		sdkp->has_been_registered = 0;
 		dev = MKDEV_SD(dsk_nr);
-		driverfs_remove_partitions(sd_disks[dsk_nr], minor(dev));
-		wipe_partitions(dev);
-		devfs_register_partitions (sd_disks[dsk_nr], minor(dev), 1);
-		/* unregister_disk() */
 		del_gendisk(sd_disks[dsk_nr]);
 	}
 	sdp->attached--;
@@ -1488,7 +1467,6 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	vfree((char *) sd);
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		blk_dev[SD_MAJOR(k)].queue = NULL;
 		blk_clear(SD_MAJOR(k));

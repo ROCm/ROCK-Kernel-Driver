@@ -75,34 +75,49 @@
 
 #define MAX_DMA_CHANNELS	8
 
-/* The maximum address that we can perform a DMA transfer to on Alpha XL,
-   due to a hardware SIO (PCI<->ISA bus bridge) chip limitation, is 64MB.
-   See <asm/apecs.h> for more info.
+/*
+  ISA DMA limitations on Alpha platforms,
+
+  These may be due to SIO (PCI<->ISA bridge) chipset limitation, or
+  just a wiring limit.
 */
-/* The maximum address that we can perform a DMA transfer to on RUFFIAN,
-   due to a hardware SIO (PCI<->ISA bus bridge) chip limitation, is 16MB.
-   See <asm/pyxis.h> for more info.
+
+/* The maximum address for ISA DMA transfer on Alpha XL, due to an
+   hardware SIO limitation, is 64MB.
 */
-/* NOTE: we must define the maximum as something less than 64Mb, to prevent 
-   virt_to_bus() from returning an address in the first window, for a
-   data area that goes beyond the 64Mb first DMA window. Sigh...
-   We MUST coordinate the maximum with <asm/apecs.h> for consistency.
-   For now, this limit is set to 48Mb...
+#define ALPHA_XL_MAX_DMA_ADDRESS	(IDENT_ADDR+0x04000000UL)
+
+/* The maximum address for ISA DMA transfer on RUFFIAN and NAUTILUS,
+   due to an hardware SIO limitation, is 16MB.
 */
-#define ALPHA_XL_MAX_DMA_ADDRESS	(IDENT_ADDR+0x3000000UL)
-#define ALPHA_RUFFIAN_MAX_DMA_ADDRESS	(IDENT_ADDR+0x1000000UL)
-#define ALPHA_NAUTILUS_MAX_DMA_ADDRESS	(IDENT_ADDR+0x1000000UL)
-#define ALPHA_MAX_DMA_ADDRESS		(~0UL)
+#define ALPHA_RUFFIAN_MAX_DMA_ADDRESS	(IDENT_ADDR+0x01000000UL)
+#define ALPHA_NAUTILUS_MAX_DMA_ADDRESS	(IDENT_ADDR+0x01000000UL)
+
+/* The maximum address for ISA DMA transfer on SABLE, and some ALCORs,
+   due to an hardware SIO chip limitation, is 2GB.
+*/
+#define ALPHA_SABLE_MAX_DMA_ADDRESS	(IDENT_ADDR+0x80000000UL)
+#define ALPHA_ALCOR_MAX_DMA_ADDRESS	(IDENT_ADDR+0x80000000UL)
+
+/*
+  Maximum address for all the others is the complete 32-bit bus
+  address space.
+*/
+#define ALPHA_MAX_DMA_ADDRESS		(IDENT_ADDR+0x100000000UL)
 
 #ifdef CONFIG_ALPHA_GENERIC
 # define MAX_DMA_ADDRESS		(alpha_mv.max_dma_address)
 #else
-# ifdef CONFIG_ALPHA_XL
+# if defined(CONFIG_ALPHA_XL)
 #  define MAX_DMA_ADDRESS		ALPHA_XL_MAX_DMA_ADDRESS
 # elif defined(CONFIG_ALPHA_RUFFIAN)
 #  define MAX_DMA_ADDRESS		ALPHA_RUFFIAN_MAX_DMA_ADDRESS
 # elif defined(CONFIG_ALPHA_NAUTILUS)
 #  define MAX_DMA_ADDRESS		ALPHA_NAUTILUS_MAX_DMA_ADDRESS
+# elif defined(CONFIG_ALPHA_SABLE)
+#  define MAX_DMA_ADDRESS		ALPHA_SABLE_MAX_DMA_ADDRESS
+# elif defined(CONFIG_ALPHA_ALCOR)
+#  define MAX_DMA_ADDRESS		ALPHA_ALCOR_MAX_DMA_ADDRESS
 # else
 #  define MAX_DMA_ADDRESS		ALPHA_MAX_DMA_ADDRESS
 # endif

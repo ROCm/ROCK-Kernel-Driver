@@ -29,10 +29,11 @@
 	.mmlist		= LIST_HEAD_INIT(name.mmlist),	\
 }
 
-#define INIT_SIGNALS {	\
+#define INIT_SIGNALS(sig) {	\
 	.count		= ATOMIC_INIT(1), 		\
 	.action		= { {{0,}}, }, 			\
-	.siglock	= SPIN_LOCK_UNLOCKED 		\
+	.siglock	= SPIN_LOCK_UNLOCKED, 		\
+	.shared_pending	= { NULL, &sig.shared_pending.head, {{0}}}, \
 }
 
 /*

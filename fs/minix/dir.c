@@ -7,6 +7,7 @@
  */
 
 #include "minix.h"
+#include <linux/highmem.h>
 #include <linux/smp_lock.h>
 
 typedef struct minix_dir_entry minix_dirent;
@@ -261,7 +262,7 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 	struct inode *inode = (struct inode*)mapping->host;
-	char *kaddr = (char*)page_address(page);
+	char *kaddr = page_address(page);
 	unsigned from = (char*)de - kaddr;
 	unsigned to = from + minix_sb(inode->i_sb)->s_dirsize;
 	int err;
@@ -286,7 +287,7 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 	struct page *page = grab_cache_page(mapping, 0);
 	struct minix_sb_info * sbi = minix_sb(inode->i_sb);
 	struct minix_dir_entry * de;
-	char *base;
+	char *kaddr;
 	int err;
 
 	if (!page)
@@ -297,15 +298,16 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 		goto fail;
 	}
 
-	base = (char*)page_address(page);
-	memset(base, 0, PAGE_CACHE_SIZE);
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr, 0, PAGE_CACHE_SIZE);
 
-	de = (struct minix_dir_entry *) base;
+	de = (struct minix_dir_entry *)kaddr;
 	de->inode = inode->i_ino;
 	strcpy(de->name,".");
 	de = minix_next_entry(de, sbi);
 	de->inode = dir->i_ino;
 	strcpy(de->name,"..");
+	kunmap_atomic(kaddr, KM_USER0);
 
 	err = dir_commit_chunk(page, 0, 2 * sbi->s_dirsize);
 fail:

@@ -121,8 +121,6 @@ static unsigned int xd_bases[] __initdata =
 	0xE0000
 };
 
-static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
-
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
 extern struct block_device_operations xd_fops;
@@ -133,17 +131,13 @@ static struct gendisk xd_gendisk[2] = {
 	.first_minor =	0,
 	.major_name =	"xda",
 	.minor_shift =	6,
-	.part =		xd_struct,
 	.fops =		&xd_fops,
-	.nr_real =	1
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
 	.major_name =	"xdb",
 	.minor_shift =	6,
-	.part =		xd_struct + 64,
 	.fops =		&xd_fops,
-	.nr_real =	1
 }
 };
 
@@ -281,15 +275,17 @@ static void do_xd_request (request_queue_t * q)
 		return;
 
 	while (1) {
+		int unit;
 		code = 0;
 		/* do some checking on the request structure */
 		if (blk_queue_empty(QUEUE))
 			return;
 
-		if (DEVICE_NR(CURRENT->rq_dev) < xd_drives
+		unit = DEVICE_NR(CURRENT->rq_dev);
+		if (unit < xd_drives
 		    && (CURRENT->flags & REQ_CMD)
 		    && CURRENT->sector + CURRENT->nr_sectors
-		         <= xd_struct[minor(CURRENT->rq_dev)].nr_sects) {
+		         <= get_capacity(xd_gendisk + unit)) {
 			block = CURRENT->sector;
 			count = CURRENT->nr_sectors;
 
@@ -297,7 +293,7 @@ static void do_xd_request (request_queue_t * q)
 				case READ:
 				case WRITE:
 					for (retry = 0; (retry < XD_RETRIES) && !code; retry++)
-						code = xd_readwrite(rq_data_dir(CURRENT),DEVICE_NR(CURRENT->rq_dev),
+						code = xd_readwrite(rq_data_dir(CURRENT),unit,
 							CURRENT->buffer,block,count);
 					break;
 				default:

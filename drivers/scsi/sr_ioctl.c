@@ -24,8 +24,6 @@
  * It is off by default and can be turned on with this module parameter */
 static int xa_test = 0;
 
-extern void get_sectorsize(int);
-
 #define IOCTL_RETRIES 3
 /* The CDROM is fairly slow, so we need a little extra time */
 /* In fact, it is very slow if it has to spin up first */
@@ -69,14 +67,14 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 	sr_cmd[6] = trk1_te.cdte_addr.msf.minute;
 	sr_cmd[7] = trk1_te.cdte_addr.msf.second;
 	sr_cmd[8] = trk1_te.cdte_addr.msf.frame;
-	return sr_do_ioctl(minor(cdi->dev), sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL);
+	return sr_do_ioctl(cdi->handle, sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL);
 }
 
 /* We do our own retries because we want to know what the specific
    error code is.  Normally the UNIT_ATTENTION code will automatically
    clear after one error */
 
-int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflength, int quiet, int readwrite, struct request_sense *sense)
+int sr_do_ioctl(Scsi_CD *cd, unsigned char *sr_cmd, void *buffer, unsigned buflength, int quiet, int readwrite, struct request_sense *sense)
 {
 	Scsi_Request *SRpnt;
 	Scsi_Device *SDev;
@@ -84,7 +82,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 	int result, err = 0, retries = 0;
 	char *bounce_buffer;
 
-	SDev = scsi_CDs[target].device;
+	SDev = cd->device;
 	SRpnt = scsi_allocate_request(SDev);
         if (!SRpnt) {
                 printk("Unable to allocate SCSI request in sr_do_ioctl");
@@ -127,7 +125,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 		case UNIT_ATTENTION:
 			SDev->changed = 1;
 			if (!quiet)
-				printk(KERN_INFO "sr%d: disc change detected.\n", target);
+				printk(KERN_INFO "%s: disc change detected.\n", cd->cdi.name);
 			if (retries++ < 10)
 				goto retry;
 			err = -ENOMEDIUM;
@@ -137,7 +135,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 			    SRpnt->sr_sense_buffer[13] == 0x01) {
 				/* sense: Logical unit is in process of becoming ready */
 				if (!quiet)
-					printk(KERN_INFO "sr%d: CDROM not ready yet.\n", target);
+					printk(KERN_INFO "%s: CDROM not ready yet.\n", cd->cdi.name);
 				if (retries++ < 10) {
 					/* sleep 2 sec and try again */
 					scsi_sleep(2 * HZ);
@@ -149,7 +147,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 				}
 			}
 			if (!quiet)
-				printk(KERN_INFO "sr%d: CDROM not ready.  Make sure there is a disc in the drive.\n", target);
+				printk(KERN_INFO "%s: CDROM not ready.  Make sure there is a disc in the drive.\n", cd->cdi.name);
 #ifdef DEBUG
 			print_req_sense("sr", SRpnt);
 #endif
@@ -157,8 +155,8 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 			break;
 		case ILLEGAL_REQUEST:
 			if (!quiet)
-				printk(KERN_ERR "sr%d: CDROM (ioctl) reports ILLEGAL "
-				       "REQUEST.\n", target);
+				printk(KERN_ERR "%s: CDROM (ioctl) reports ILLEGAL "
+				       "REQUEST.\n", cd->cdi.name);
 			if (SRpnt->sr_sense_buffer[12] == 0x20 &&
 			    SRpnt->sr_sense_buffer[13] == 0x00) {
 				/* sense: Invalid command operation code */
@@ -172,7 +170,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 #endif
 			break;
 		default:
-			printk(KERN_ERR "sr%d: CDROM (ioctl) error, command: ", target);
+			printk(KERN_ERR "%s: CDROM (ioctl) error, command: ", cd->cdi.name);
 			print_command(sr_cmd);
 			print_req_sense("sr", SRpnt);
 			err = -EIO;
@@ -191,38 +189,36 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 /* ---------------------------------------------------------------------- */
 /* interface to cdrom.c                                                   */
 
-static int test_unit_ready(int minor)
+static int test_unit_ready(Scsi_CD *cd)
 {
-	Scsi_CD *SCp;
 	u_char sr_cmd[10];
 
-	SCp = &scsi_CDs[minor];
 	sr_cmd[0] = GPCMD_TEST_UNIT_READY;
-	sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	            ((SCp->device->lun) << 5) : 0;
+	sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	            ((cd->device->lun) << 5) : 0;
 	sr_cmd[2] = sr_cmd[3] = sr_cmd[4] = sr_cmd[5] = 0;
-	return sr_do_ioctl(minor, sr_cmd, NULL, 0, 1, SCSI_DATA_NONE, NULL);
+	return sr_do_ioctl(cd, sr_cmd, NULL, 0, 1, SCSI_DATA_NONE, NULL);
 }
 
 int sr_tray_move(struct cdrom_device_info *cdi, int pos)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	u_char sr_cmd[10];
 
 	sr_cmd[0] = GPCMD_START_STOP_UNIT;
-	sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	            ((SCp->device->lun) << 5) : 0;
+	sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	            ((cd->device->lun) << 5) : 0;
 	sr_cmd[2] = sr_cmd[3] = sr_cmd[5] = 0;
 	sr_cmd[4] = (pos == 0) ? 0x03 /* close */ : 0x02 /* eject */ ;
 
-	return sr_do_ioctl(minor(cdi->dev), sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL);
+	return sr_do_ioctl(cd, sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL);
 }
 
 int sr_lock_door(struct cdrom_device_info *cdi, int lock)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 
-	return scsi_ioctl(SCp->device, lock ? SCSI_IOCTL_DOORLOCK :
+	return scsi_ioctl(cd->device, lock ? SCSI_IOCTL_DOORLOCK :
 			SCSI_IOCTL_DOORUNLOCK, 0);
 }
 
@@ -232,7 +228,7 @@ int sr_drive_status(struct cdrom_device_info *cdi, int slot)
 		/* we have no changer support */
 		return -EINVAL;
 	}
-	if (0 == test_unit_ready(minor(cdi->dev)))
+	if (0 == test_unit_ready(cdi->handle))
 		return CDS_DISC_OK;
 
 	return CDS_TRAY_OPEN;
@@ -240,7 +236,7 @@ int sr_drive_status(struct cdrom_device_info *cdi, int slot)
 
 int sr_disk_status(struct cdrom_device_info *cdi)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	struct cdrom_tochdr toc_h;
 	struct cdrom_tocentry toc_e;
 	int i, rc, have_datatracks = 0;
@@ -262,7 +258,7 @@ int sr_disk_status(struct cdrom_device_info *cdi)
 	if (!have_datatracks)
 		return CDS_AUDIO;
 
-	if (SCp->xa_flag)
+	if (cd->xa_flag)
 		return CDS_XA_2_1;
 	else
 		return CDS_DATA_1;
@@ -271,24 +267,24 @@ int sr_disk_status(struct cdrom_device_info *cdi)
 int sr_get_last_session(struct cdrom_device_info *cdi,
 			struct cdrom_multisession *ms_info)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 
-	ms_info->addr.lba = SCp->ms_offset;
-	ms_info->xa_flag = SCp->xa_flag || SCp->ms_offset > 0;
+	ms_info->addr.lba = cd->ms_offset;
+	ms_info->xa_flag = cd->xa_flag || cd->ms_offset > 0;
 
 	return 0;
 }
 
 int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	u_char sr_cmd[10];
 	char buffer[32];
 	int result;
 
 	sr_cmd[0] = GPCMD_READ_SUBCHANNEL;
-	sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	            ((SCp->device->lun) << 5) : 0;
+	sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	            ((cd->device->lun) << 5) : 0;
 	sr_cmd[2] = 0x40;	/* I do want the subchannel info */
 	sr_cmd[3] = 0x02;	/* Give me medium catalog number info */
 	sr_cmd[4] = sr_cmd[5] = 0;
@@ -297,7 +293,7 @@ int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 	sr_cmd[8] = 24;
 	sr_cmd[9] = 0;
 
-	result = sr_do_ioctl(minor(cdi->dev), sr_cmd, buffer, 24, 0, SCSI_DATA_READ, NULL);
+	result = sr_do_ioctl(cd, sr_cmd, buffer, 24, 0, SCSI_DATA_READ, NULL);
 
 	memcpy(mcn->medium_catalog_number, buffer + 9, 13);
 	mcn->medium_catalog_number[13] = 0;
@@ -307,13 +303,12 @@ int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 
 int sr_reset(struct cdrom_device_info *cdi)
 {
-	invalidate_buffers(cdi->dev);
 	return 0;
 }
 
 int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	u_char sr_cmd[MAX_COMMAND_SIZE];
 
 	if (speed == 0)
@@ -323,12 +318,12 @@ int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 
 	memset(sr_cmd, 0, MAX_COMMAND_SIZE);
 	sr_cmd[0] = GPCMD_SET_SPEED;	/* SET CD SPEED */
-	sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	            ((SCp->device->lun) << 5) : 0;
+	sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	            ((cd->device->lun) << 5) : 0;
 	sr_cmd[2] = (speed >> 8) & 0xff;	/* MSB for speed (in kbytes/sec) */
 	sr_cmd[3] = speed & 0xff;	/* LSB */
 
-	if (sr_do_ioctl(minor(cdi->dev), sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL))
+	if (sr_do_ioctl(cd, sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL))
 		return -EIO;
 	return 0;
 }
@@ -341,9 +336,9 @@ int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 
 int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	u_char sr_cmd[10];
-	int result, target = minor(cdi->dev);
+	int result;
 	unsigned char buffer[32];
 
 	memset(sr_cmd, 0, sizeof(sr_cmd));
@@ -354,12 +349,12 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 			struct cdrom_tochdr *tochdr = (struct cdrom_tochdr *) arg;
 
 			sr_cmd[0] = GPCMD_READ_TOC_PMA_ATIP;
-			sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-			            ((SCp->device->lun) << 5) : 0;
+			sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			            ((cd->device->lun) << 5) : 0;
 			sr_cmd[2] = sr_cmd[3] = sr_cmd[4] = sr_cmd[5] = 0;
 			sr_cmd[8] = 12;		/* LSB of length */
 
-			result = sr_do_ioctl(target, sr_cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
+			result = sr_do_ioctl(cd, sr_cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
 
 			tochdr->cdth_trk0 = buffer[2];
 			tochdr->cdth_trk1 = buffer[3];
@@ -372,14 +367,14 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 			struct cdrom_tocentry *tocentry = (struct cdrom_tocentry *) arg;
 
 			sr_cmd[0] = GPCMD_READ_TOC_PMA_ATIP;
-			sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-			            ((SCp->device->lun) << 5) : 0;
+			sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			            ((cd->device->lun) << 5) : 0;
 			sr_cmd[1] |= (tocentry->cdte_format == CDROM_MSF) ? 0x02 : 0;
 			sr_cmd[2] = sr_cmd[3] = sr_cmd[4] = sr_cmd[5] = 0;
 			sr_cmd[6] = tocentry->cdte_track;
 			sr_cmd[8] = 12;		/* LSB of length */
 
-			result = sr_do_ioctl(target, sr_cmd, buffer, 12, 0, SCSI_DATA_READ, NULL);
+			result = sr_do_ioctl(cd, sr_cmd, buffer, 12, 0, SCSI_DATA_READ, NULL);
 
 			tocentry->cdte_ctrl = buffer[5] & 0xf;
 			tocentry->cdte_adr = buffer[5] >> 4;
@@ -399,14 +394,14 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 		struct cdrom_ti* ti = (struct cdrom_ti*)arg;
 
 		sr_cmd[0] = GPCMD_PLAYAUDIO_TI;
-		sr_cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-		            (SCp->device->lun << 5) : 0;
+		sr_cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		            (cd->device->lun << 5) : 0;
 		sr_cmd[4] = ti->cdti_trk0;
 		sr_cmd[5] = ti->cdti_ind0;
 		sr_cmd[7] = ti->cdti_trk1;
 		sr_cmd[8] = ti->cdti_ind1;
 
-		result = sr_do_ioctl(target, sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL);
+		result = sr_do_ioctl(cd, sr_cmd, NULL, 0, 0, SCSI_DATA_NONE, NULL);
 		if (result == -EDRIVE_CANT_DO_THIS)
 			result = sr_fake_playtrkind(cdi, ti);
 
@@ -439,20 +434,19 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
  * blksize: 2048 | 2336 | 2340 | 2352
  */
 
-int sr_read_cd(int minor, unsigned char *dest, int lba, int format, int blksize)
+static int sr_read_cd(Scsi_CD *cd, unsigned char *dest, int lba, int format, int blksize)
 {
 	unsigned char cmd[MAX_COMMAND_SIZE];
-	Scsi_CD *SCp = &scsi_CDs[minor];
 
 #ifdef DEBUG
-	printk("sr%d: sr_read_cd lba=%d format=%d blksize=%d\n",
-	       minor, lba, format, blksize);
+	printk("%s: sr_read_cd lba=%d format=%d blksize=%d\n",
+	       cd->cdi.name, lba, format, blksize);
 #endif
 
 	memset(cmd, 0, MAX_COMMAND_SIZE);
 	cmd[0] = GPCMD_READ_CD;	/* READ_CD */
-	cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	         (SCp->device->lun << 5) : 0;
+	cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	         (cd->device->lun << 5) : 0;
 	cmd[1] |= ((format & 7) << 2);
 	cmd[2] = (unsigned char) (lba >> 24) & 0xff;
 	cmd[3] = (unsigned char) (lba >> 16) & 0xff;
@@ -473,47 +467,46 @@ int sr_read_cd(int minor, unsigned char *dest, int lba, int format, int blksize)
 		cmd[9] = 0x10;
 		break;
 	}
-	return sr_do_ioctl(minor, cmd, dest, blksize, 0, SCSI_DATA_READ, NULL);
+	return sr_do_ioctl(cd, cmd, dest, blksize, 0, SCSI_DATA_READ, NULL);
 }
 
 /*
  * read sectors with blocksizes other than 2048
  */
 
-int sr_read_sector(int minor, int lba, int blksize, unsigned char *dest)
+static int sr_read_sector(Scsi_CD *cd, int lba, int blksize, unsigned char *dest)
 {
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
-	Scsi_CD *SCp = &scsi_CDs[minor];
 	int rc;
 
 	/* we try the READ CD command first... */
-	if (SCp->readcd_known) {
-		rc = sr_read_cd(minor, dest, lba, 0, blksize);
+	if (cd->readcd_known) {
+		rc = sr_read_cd(cd, dest, lba, 0, blksize);
 		if (-EDRIVE_CANT_DO_THIS != rc)
 			return rc;
-		SCp->readcd_known = 0;
+		cd->readcd_known = 0;
 		printk("CDROM does'nt support READ CD (0xbe) command\n");
 		/* fall & retry the other way */
 	}
 	/* ... if this fails, we switch the blocksize using MODE SELECT */
-	if (blksize != SCp->device->sector_size) {
-		if (0 != (rc = sr_set_blocklength(minor, blksize)))
+	if (blksize != cd->device->sector_size) {
+		if (0 != (rc = sr_set_blocklength(cd, blksize)))
 			return rc;
 	}
 #ifdef DEBUG
-	printk("sr%d: sr_read_sector lba=%d blksize=%d\n", minor, lba, blksize);
+	printk("%s: sr_read_sector lba=%d blksize=%d\n", cd->cdi.name, lba, blksize);
 #endif
 
 	memset(cmd, 0, MAX_COMMAND_SIZE);
 	cmd[0] = GPCMD_READ_10;
-	cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	         (SCp->device->lun << 5) : 0;
+	cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	         (cd->device->lun << 5) : 0;
 	cmd[2] = (unsigned char) (lba >> 24) & 0xff;
 	cmd[3] = (unsigned char) (lba >> 16) & 0xff;
 	cmd[4] = (unsigned char) (lba >> 8) & 0xff;
 	cmd[5] = (unsigned char) lba & 0xff;
 	cmd[8] = 1;
-	rc = sr_do_ioctl(minor, cmd, dest, blksize, 0, SCSI_DATA_READ, NULL);
+	rc = sr_do_ioctl(cd, cmd, dest, blksize, 0, SCSI_DATA_READ, NULL);
 
 	return rc;
 }
@@ -523,10 +516,9 @@ int sr_read_sector(int minor, int lba, int blksize, unsigned char *dest)
  * ret: 1 == mode2 (XA), 0 == mode1, <0 == error 
  */
 
-int sr_is_xa(int minor)
+int sr_is_xa(Scsi_CD *cd)
 {
 	unsigned char *raw_sector;
-	Scsi_CD *SCp = &scsi_CDs[minor];
 	int is_xa;
 
 	if (!xa_test)
@@ -535,7 +527,7 @@ int sr_is_xa(int minor)
 	raw_sector = (unsigned char *) kmalloc(2048, GFP_DMA | GFP_KERNEL);
 	if (!raw_sector)
 		return -ENOMEM;
-	if (0 == sr_read_sector(minor, SCp->ms_offset + 16,
+	if (0 == sr_read_sector(cd, cd->ms_offset + 16,
 				CD_FRAMESIZE_RAW1, raw_sector)) {
 		is_xa = (raw_sector[3] == 0x02) ? 1 : 0;
 	} else {
@@ -544,7 +536,7 @@ int sr_is_xa(int minor)
 	}
 	kfree(raw_sector);
 #ifdef DEBUG
-	printk("sr%d: sr_is_xa: %d\n", minor, is_xa);
+	printk("%s: sr_is_xa: %d\n", cd->cdi.name, is_xa);
 #endif
 	return is_xa;
 }
@@ -552,16 +544,16 @@ int sr_is_xa(int minor)
 int sr_dev_ioctl(struct cdrom_device_info *cdi,
 		 unsigned int cmd, unsigned long arg)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 
 	switch (cmd) {
 	case BLKGETSIZE:
-		return put_user(SCp->capacity, (unsigned long *) arg);
+		return put_user(cd->capacity, (unsigned long *) arg);
 	case BLKGETSIZE64:
-		return put_user((u64)SCp->capacity << 9, (u64 *)arg);
+		return put_user((u64)cd->capacity << 9, (u64 *)arg);
 
 	default:
-		return scsi_ioctl(SCp->device, cmd, (void *)arg);
+		return scsi_ioctl(cd->device, cmd, (void *)arg);
 	}
 }
 

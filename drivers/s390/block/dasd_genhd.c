@@ -34,10 +34,7 @@ struct major_info {
 	struct list_head list;
 	int major;
 	struct gendisk disks[DASD_PER_MAJOR];
-	devfs_handle_t de_arr[DASD_PER_MAJOR];
-	char flags[DASD_PER_MAJOR];
 	char names[DASD_PER_MAJOR * 8];
-	struct hd_struct part[1<<MINORBITS];
 };
 
 /*
@@ -106,11 +103,8 @@ dasd_register_major(int major)
 		disk->major = new_major;
 		disk->first_minor = i << DASD_PARTN_BITS;
 		disk->minor_shift = DASD_PARTN_BITS;
-		disk->nr_real = 1;
 		disk->fops = &dasd_device_operations;
-		disk->de_arr = mi->de_arr + i;
-		disk->flags = mi->flags + i;
-		disk->part = mi->part + (i << DASD_PARTN_BITS);
+		disk->flags = GENHD_FL_DEVFS;
 	}
 
 	/* Setup block device pointers for the new major. */
@@ -284,14 +278,6 @@ dasd_destroy_partitions(dasd_device_t * device)
 	if (disk == NULL)
 		return;
 
-	wipe_partitions(device->kdev);
-
-	/*
-	 * This is confusing. The funcions is devfs_register_partitions
-	 * but the 1 as third parameter makes it do an unregister...
-	 * FIXME: there must be a better way to get rid of the devfs entries
-	 */
-	devfs_register_partitions(disk, minor(device->kdev), 1);
 	del_gendisk(disk);
 }
 

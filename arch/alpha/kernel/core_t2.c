@@ -26,6 +26,18 @@
 #include "proto.h"
 #include "pci_impl.h"
 
+/*
+ * By default, we direct-map starting at 2GB, in order to allow the
+ * maximum size direct-map window (2GB) to match the maximum amount of
+ * memory (2GB) that can be present on SABLEs. But that limits the
+ * floppy to DMA only via the scatter/gather window set up for 8MB
+ * ISA DMA, since the maximum ISA DMA address is 2GB-1.
+ *
+ * For now, this seems a reasonable trade-off: even though most SABLEs
+ * have far less than even 1GB of memory, floppy usage/performance will
+ * not really be affected by forcing it to go via scatter/gather...
+ */
+#define T2_DIRECTMAP_2G 1
 
 /*
  * NOTE: Herein lie back-to-back mb instructions.  They are magic. 
@@ -89,11 +101,11 @@
  */
 
 static int
-mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 	     unsigned long *pci_addr, unsigned char *type1)
 {
 	unsigned long addr;
-	u8 bus = bus_dev->number;
+	u8 bus = pbus->number;
 
 	DBG(("mk_conf_addr(bus=%d, dfn=0x%x, where=0x%x,"
 	     " addr=0x%lx, type1=0x%x)\n",
@@ -248,20 +260,8 @@ t2_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		mask = 0x00;
-		shift = (where & 3) * 8;
-		break;
-	case 2:
-		mask = 0x08;
-		shift = (where & 3) * 8;
-		break;
-	case 4:
-		mask = 0x18;
-		shift = 0;
-		break;
-	}
+	mask = (size - 1) * 8;
+	shift = (where & 3) * 8;
 	addr = (pci_addr << 5) + mask + T2_CONF;
 	*value = conf_read(addr, type1) >> (shift);
 	return PCIBIOS_SUCCESSFUL;
@@ -275,20 +275,10 @@ t2_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
 	unsigned char type1;
 	long mask;
 
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		mask = 0x00;
-		break;
-	case 2:
-		mask = 0x08;
-		break;
-	case 4:
-		mask = 0x18;
-		break;
-	}
+	mask = (size - 1) * 8;
 	addr = (pci_addr << 5) + mask + T2_CONF;
 	conf_write(addr, value << ((where & 3) * 8), type1);
 	return PCIBIOS_SUCCESSFUL;
@@ -304,6 +294,7 @@ void __init
 t2_init_arch(void)
 {
 	struct pci_controller *hose;
+	unsigned long t2_iocsr;
 	unsigned int i;
 
 	for (i = 0; i < NR_CPUS; i++) {
@@ -312,51 +303,29 @@ t2_init_arch(void)
 	}
 
 #if 0
-	{
-	  /* Set up error reporting.  */
-	  unsigned long t2_err;
+	/* Set up error reporting.  */
+	t2_iocsr = *(vulp)T2_IOCSR;
+	*(vulp)T2_IOCSR = t2_iocsr | (0x1UL << 7); /* TLB error check */
+	mb();
+	*(vulp)T2_IOCSR; /* read it back to make sure */
+#endif
 
-	  t2_err = *(vulp)T2_IOCSR;
-	  t2_err |= (0x1 << 7);   /* master abort */
-	  *(vulp)T2_IOCSR = t2_err;
-	  mb();
+	/* Enable scatter/gather TLB use.  */
+	t2_iocsr = *(vulp)T2_IOCSR;
+	if (!(t2_iocsr & (0x1UL << 26))) {
+		printk("t2_init_arch: enabling SG TLB, IOCSR was 0x%lx\n",
+		       t2_iocsr);
+		*(vulp)T2_IOCSR = t2_iocsr | (0x1UL << 26);
+		mb();	
+		*(vulp)T2_IOCSR; /* read it back to make sure */
 	}
-#endif
 
-	printk("t2_init: HBASE was 0x%lx\n", *(vulp)T2_HBASE);
 #if 0
-	printk("t2_init: WBASE1=0x%lx WMASK1=0x%lx TBASE1=0x%lx\n",
-	       *(vulp)T2_WBASE1,
-	       *(vulp)T2_WMASK1,
-	       *(vulp)T2_TBASE1);
-	printk("t2_init: WBASE2=0x%lx WMASK2=0x%lx TBASE2=0x%lx\n",
-	       *(vulp)T2_WBASE2,
-	       *(vulp)T2_WMASK2,
-	       *(vulp)T2_TBASE2);
-#endif
-
-	/*
-	 * Set up the PCI->physical memory translation windows.
-	 * For now, window 2 is  disabled.  In the future, we may
-	 * want to use it to do scatter/gather DMA. 
-	 *
-	 * Window 1 goes at 1 GB and is 1 GB large.
-	 */
-
-	/* WARNING!! must correspond to the DMA_WIN params!!! */
-	*(vulp)T2_WBASE1 = 0x400807ffU;
-	*(vulp)T2_WMASK1 = 0x3ff00000U;
-	*(vulp)T2_TBASE1 = 0;
-
-	*(vulp)T2_WBASE2 = 0x0;
-	*(vulp)T2_HBASE = 0x0;
-
-	/* Zero HAE.  */
-	*(vulp)T2_HAE_1 = 0; mb();
-	*(vulp)T2_HAE_2 = 0; mb();
-	*(vulp)T2_HAE_3 = 0; mb();
-#if 0
-	*(vulp)T2_HAE_4 = 0; mb(); /* do not touch this */
+	printk("t2_init_arch: HBASE was 0x%lx\n", *(vulp)T2_HBASE);
+	printk("t2_init_arch: WBASE1=0x%lx WMASK1=0x%lx TBASE1=0x%lx\n",
+	       *(vulp)T2_WBASE1, *(vulp)T2_WMASK1, *(vulp)T2_TBASE1);
+	printk("t2_init_arch: WBASE2=0x%lx WMASK2=0x%lx TBASE2=0x%lx\n",
+	       *(vulp)T2_WBASE2, *(vulp)T2_WMASK2, *(vulp)T2_TBASE2);
 #endif
 
 	/*
@@ -373,9 +342,70 @@ t2_init_arch(void)
 	hose->sparse_io_base = T2_IO - IDENT_ADDR;
 	hose->dense_io_base = 0;
 
-	hose->sg_isa = hose->sg_pci = NULL;
-	__direct_map_base = 0x40000000;
-	__direct_map_size = 0x40000000;
+	/* Note we can only do 1 SG window, as the other is for direct, so
+	   do an ISA SG area, especially for the floppy. */
+        hose->sg_isa = iommu_arena_new(hose, 0x00800000, 0x00800000, 0);
+	hose->sg_pci = NULL;
+
+	/*
+	 * Set up the PCI->physical memory translation windows.
+	 *
+	 * Window 1 goes at ? GB and is ?GB large, direct mapped.
+	 * Window 2 goes at 8 MB and is 8MB large, scatter/gather (for ISA).
+	 */
+
+#if T2_DIRECTMAP_2G
+	__direct_map_base = 0x80000000UL;
+	__direct_map_size = 0x80000000UL;
+
+	/* WARNING!! must correspond to the direct map window params!!! */
+	*(vulp)T2_WBASE1 = 0x80080fffU;
+	*(vulp)T2_WMASK1 = 0x7ff00000U;
+	*(vulp)T2_TBASE1 = 0;
+#else /* T2_DIRECTMAP_2G */
+	__direct_map_base = 0x40000000UL;
+	__direct_map_size = 0x40000000UL;
+
+	/* WARNING!! must correspond to the direct map window params!!! */
+	*(vulp)T2_WBASE1 = 0x400807ffU;
+	*(vulp)T2_WMASK1 = 0x3ff00000U;
+	*(vulp)T2_TBASE1 = 0;
+#endif /* T2_DIRECTMAP_2G */
+
+	/* WARNING!! must correspond to the SG arena/window params!!! */
+	*(vulp)T2_WBASE2 = 0x008c000fU;
+	*(vulp)T2_WMASK2 = 0x00700000U;
+	*(vulp)T2_TBASE2 = virt_to_phys(hose->sg_isa->ptes) >> 1;
+
+	*(vulp)T2_HBASE = 0x0;
+
+	/* Zero HAE.  */
+	*(vulp)T2_HAE_1 = 0; mb();
+	*(vulp)T2_HAE_2 = 0; mb();
+	*(vulp)T2_HAE_3 = 0; mb();
+#if 0
+	*(vulp)T2_HAE_4 = 0; mb(); /* DO NOT TOUCH THIS!!! */
+#endif
+
+	t2_pci_tbi(hose, 0, -1); /* flush TLB all */
+}
+
+void
+t2_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
+{
+	unsigned long t2_iocsr;
+
+	t2_iocsr = *(vulp)T2_IOCSR;
+
+	/* set the TLB Clear bit */
+	*(vulp)T2_IOCSR = t2_iocsr | (0x1UL << 28);
+	mb();
+	*(vulp)T2_IOCSR; /* read it back to make sure */
+
+	/* clear the TLB Clear bit */
+	*(vulp)T2_IOCSR = t2_iocsr & ~(0x1UL << 28);
+	mb();
+	*(vulp)T2_IOCSR; /* read it back to make sure */
 }
 
 #define SIC_SEIC (1UL << 33)    /* System Event Clear */

@@ -128,6 +128,9 @@ archmrproper:
 
 vmlinux: arch/alpha/vmlinux.lds.s
 
+arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S
+	$(CPP) $(CPPFLAGS) $(CPPFLAGS_$@) -D__ASSEMBLY__ -P -C -U$(ARCH) $< -o $@
+
 bootpfile:
 	@$(MAKEBOOT) bootpfile
 

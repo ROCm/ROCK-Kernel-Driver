@@ -271,8 +271,6 @@ static void pd_doorlock(int unit, int func);
 static int pd_check_media(kdev_t dev);
 static void pd_eject( int unit);
 
-static struct hd_struct pd_hd[PD_DEVS];
-
 #define PD_NAMELEN	8
 
 struct pd_unit {
@@ -438,9 +436,9 @@ static int pd_revalidate(kdev_t dev)
 	if ((unit >= PD_UNITS) || !PD.present)
 		return -ENODEV;
 	if (pd_identify(unit))
-		pd_hd[minor(dev)].nr_sects = PD.capacity;
+		set_capacity(&PD.gd, PD.capacity);
 	else
-		pd_hd[minor(dev)].nr_sects = 0;
+		set_capacity(&PD.gd, 0);
         return 0;
 }
 
@@ -687,10 +685,8 @@ static int pd_detect( void )
 			PD.gd.major_name = PD.name;
 			PD.gd.minor_shift = PD_BITS;
 			PD.gd.fops = &pd_fops;
-			PD.gd.nr_real = 1;
 			PD.gd.major = major;
 			PD.gd.first_minor = unit << PD_BITS;
-			PD.gd.part = pd_hd + (unit << PD_BITS);
 			add_gendisk(&PD.gd);
 			register_disk(&PD.gd,mk_kdev(MAJOR_NR,unit<<PD_BITS),
 					PD_PARTNS,&pd_fops,
@@ -728,7 +724,7 @@ repeat:
         pd_count = CURRENT->current_nr_sectors;
 
         if ((pd_dev >= PD_DEVS) || 
-	    ((pd_block+pd_count) > pd_hd[pd_dev].nr_sects)) {
+	    ((pd_block+pd_count) > get_capacity(&pd[unit].gd))) {
                 end_request(CURRENT, 0);
                 goto repeat;
         }

@@ -1516,8 +1516,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
 
 static void idedisk_setup (ide_drive_t *drive)
 {
-	int i;
-	
 	struct hd_driveid *id = drive->id;
 	unsigned long capacity;
 	
@@ -1537,15 +1535,6 @@ static void idedisk_setup (ide_drive_t *drive)
 		if (id->model[0] != 'W' || id->model[1] != 'D') {
 			drive->doorlocking = 1;
 		}
-	}
-	for (i = 0; i < MAX_DRIVES; ++i) {
-		ide_hwif_t *hwif = HWIF(drive);
-
-		if (drive != &hwif->drives[i]) continue;
-		hwif->gd[i]->de_arr[i] = drive->de;
-		if (drive->removable)
-			hwif->gd[i]->flags[i] |= GENHD_FL_REMOVABLE;
-		break;
 	}
 
 #if 1
@@ -1629,9 +1618,7 @@ static void idedisk_setup (ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
@@ -1683,9 +1670,7 @@ MODULE_DESCRIPTION("ATA DISK Driver");
 
 static int idedisk_reinit(ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 
 	/* strstr("foo", "") is non-NULL */
 	if (!strstr("ide-disk", drive->driver_req))
@@ -1714,6 +1699,9 @@ static int idedisk_reinit(ide_drive_t *drive)
 	}
 	DRIVER(drive)->busy--;
 	g->minor_shift = PARTN_BITS;
+	g->de = drive->de;
+	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
+	g->flags |= GENHD_FL_DEVFS;
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,

@@ -20,8 +20,6 @@
 #include <linux/genhd.h>
 #endif
 
-extern struct hd_struct *sd;
-
 typedef struct scsi_disk {
 	unsigned capacity;		/* size in 512-byte sectors */
 	Scsi_Device *device;
