@@ -659,7 +659,7 @@ static int do_format(kdev_t device, struct atari_format_descr *desc)
 	unsigned char	*p;
 	int sect, nsect;
 	unsigned long	flags;
-	int type, drive = MINOR(device) & 3;
+	int type, drive = minor(device) & 3;
 
 	DPRINT(("do_format( dr=%d tr=%d he=%d offs=%d )\n",
 		drive, desc->track, desc->head, desc->sect_offset ));
@@ -672,7 +672,7 @@ static int do_format(kdev_t device, struct atari_format_descr *desc)
 	atari_turnon_irq( IRQ_MFP_FDC ); /* should be already, just to be sure */
 	restore_flags(flags);
 
-	type = MINOR(device) >> 2;
+	type = minor(device) >> 2;
 	if (type) {
 		if (--type >= NUM_DISK_MINORS ||
 		    minor2disktype[type].drive_types > DriveType) {
@@ -1367,9 +1367,9 @@ static void floppy_off( unsigned int nr) {}
 
 static int check_floppy_change (kdev_t dev)
 {
-	unsigned int drive = MINOR(dev) & 0x03;
+	unsigned int drive = minor(dev) & 0x03;
 
-	if (MAJOR(dev) != MAJOR_NR) {
+	if (major(dev) != MAJOR_NR) {
 		printk(KERN_ERR "floppy_changed: not a floppy\n");
 		return 0;
 	}
@@ -1394,7 +1394,7 @@ static int check_floppy_change (kdev_t dev)
 
 static int floppy_revalidate (kdev_t dev)
 {
-	int drive = MINOR(dev) & 3;
+	int drive = minor(dev) & 3;
 
 	if (test_bit(drive, &changed_floppies) ||
 	    test_bit(drive, &fake_change) ||
@@ -1466,13 +1466,13 @@ repeat:
 	if (QUEUE_EMPTY)
 		goto the_end;
 
-	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
+	if (major(CURRENT->rq_dev) != MAJOR_NR)
 		panic(DEVICE_NAME ": request list destroyed");
 
 	if (CURRENT->bh && !buffer_locked(CURRENT->bh))
 		panic(DEVICE_NAME ": block not locked");
 
-	device = MINOR(CURRENT_DEVICE);
+	device = minor(CURRENT_DEVICE);
 	drive = device & 3;
 	type = device >> 2;
 	
@@ -1553,7 +1553,7 @@ static int invalidate_drive(kdev_t rdev)
 {
 	/* invalidate the buffer track to force a reread */
 	BufferDrive = -1;
-	set_bit(MINOR(rdev) & 3, &fake_change);
+	set_bit(minor(rdev) & 3, &fake_change);
 	check_disk_change(rdev);
 	return 0;
 }
@@ -1576,7 +1576,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		case BLKFLSBUF:
 			return blk_ioctl(device, cmd, param);
 	}
-	drive = MINOR (device);
+	drive = minor (device);
 	type  = drive >> 2;
 	drive &= 3;
 	switch (cmd) {
@@ -1896,15 +1896,15 @@ static int floppy_open( struct inode *inode, struct file *filp )
 		return -EIO;
 	}
 
-	drive = MINOR(inode->i_rdev) & 3;
-	type  = MINOR(inode->i_rdev) >> 2;
+	drive = minor(inode->i_rdev) & 3;
+	type  = minor(inode->i_rdev) >> 2;
 	DPRINT(("fd_open: type=%d\n",type));
 	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
 		return -ENXIO;
 
 	old_dev = fd_device[drive];
 
-	if (fd_ref[drive] && old_dev != MINOR(inode->i_rdev))
+	if (fd_ref[drive] && old_dev != minor(inode->i_rdev))
 		return -EBUSY;
 
 	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
@@ -1915,10 +1915,10 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	else
 		fd_ref[drive]++;
 
-	fd_device[drive] = MINOR(inode->i_rdev);
+	fd_device[drive] = minor(inode->i_rdev);
 
-	if (old_dev && old_dev != MINOR(inode->i_rdev))
-		invalidate_buffers(MKDEV(FLOPPY_MAJOR, old_dev));
+	if (old_dev && old_dev != minor(inode->i_rdev))
+		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, old_dev));
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;
@@ -1939,7 +1939,7 @@ static int floppy_open( struct inode *inode, struct file *filp )
 
 static int floppy_release( struct inode * inode, struct file * filp )
 {
-	int drive = MINOR(inode->i_rdev) & 3;
+	int drive = minor(inode->i_rdev) & 3;
 
 	if (fd_ref[drive] < 0)
 		fd_ref[drive] = 0;

@@ -784,7 +784,7 @@ static void read_intr( void )
 	
 	status = acsi_getstatus();
 	if (status != 0) {
-		int dev = DEVICE_NR(MINOR(CURRENT->rq_dev));
+		int dev = DEVICE_NR(minor(CURRENT->rq_dev));
 		printk( KERN_ERR "ad%c: ", dev+'a' );
 		if (!acsi_reqsense( acsi_buffer, acsi_info[dev].target, 
 					acsi_info[dev].lun))
@@ -815,7 +815,7 @@ static void write_intr(void)
 
 	status = acsi_getstatus();
 	if (status != 0) {
-		int	dev = DEVICE_NR(MINOR(CURRENT->rq_dev));
+		int	dev = DEVICE_NR(minor(CURRENT->rq_dev));
 		printk( KERN_ERR "ad%c: ", dev+'a' );
 		if (!acsi_reqsense( acsi_buffer, acsi_info[dev].target,
 					acsi_info[dev].lun))
@@ -993,7 +993,7 @@ static void redo_acsi_request( void )
 			panic(DEVICE_NAME ": block not locked");
 	}
 
-	dev = MINOR(CURRENT->rq_dev);
+	dev = minor(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	if (DEVICE_NR(dev) >= NDevices ||
 		block+CURRENT->nr_sectors >= acsi_part[dev].nr_sects) {
@@ -1111,7 +1111,7 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 
 	if (!inode)
 		return -EINVAL;
-	dev = DEVICE_NR(MINOR(inode->i_rdev));
+	dev = DEVICE_NR(minor(inode->i_rdev));
 	if (dev >= NDevices)
 		return -EINVAL;
 	switch (cmd) {
@@ -1174,7 +1174,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 	int  device;
 	struct acsi_info_struct *aip;
 
-	device = DEVICE_NR(MINOR(inode->i_rdev));
+	device = DEVICE_NR(minor(inode->i_rdev));
 	if (device >= NDevices)
 		return -ENXIO;
 	aip = &acsi_info[device];
@@ -1212,7 +1212,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 
 static int acsi_release( struct inode * inode, struct file * file )
 {
-	int device = DEVICE_NR(MINOR(inode->i_rdev));
+	int device = DEVICE_NR(minor(inode->i_rdev));
 	if (--access_count[device] == 0 && acsi_info[device].removable)
 		acsi_prevent_removal(device, 0);
 	return( 0 );
@@ -1240,7 +1240,7 @@ static void acsi_prevent_removal(int device, int flag)
 
 static int acsi_media_change (dev_t dev)
 {
-	int device = DEVICE_NR(MINOR(dev));
+	int device = DEVICE_NR(minor(dev));
 	struct acsi_info_struct *aip;
 
 	aip = &acsi_info[device];
@@ -1742,7 +1742,7 @@ static void acsi_geninit(void)
 		acsi_blocksizes[i] = 1024;
 	blksize_size[MAJOR_NR] = acsi_blocksizes;
 	for( i = 0; i < NDevices; ++i )
-		register_disk(&acsi_gendisk, MKDEV(MAJOR_NR,i<<4),
+		register_disk(&acsi_gendisk, mk_kdev(MAJOR_NR,i<<4),
 				(acsi_info[i].type==HARDDISK)?1<<4:1,
 				&acsi_fops,
 				acsi_info[i].size);
@@ -1853,7 +1853,7 @@ static int revalidate_acsidisk( int dev, int maxusage )
 	int res;
 	struct acsi_info_struct *aip;
 	
-	device = DEVICE_NR(MINOR(dev));
+	device = DEVICE_NR(minor(dev));
 	aip = &acsi_info[device];
 	gdev = &GENDISK_STRUCT;
 

@@ -524,7 +524,7 @@ void get_sectorsize(int i)
 		scsi_CDs[i].needs_sector_size = 1;
 	} else {
 #if 0
-		if (cdrom_get_last_written(MKDEV(MAJOR_NR, i),
+		if (cdrom_get_last_written(mkdev(MAJOR_NR, i),
 					   &scsi_CDs[i].capacity))
 #endif
 			scsi_CDs[i].capacity = 1 + ((buffer[0] << 24) |

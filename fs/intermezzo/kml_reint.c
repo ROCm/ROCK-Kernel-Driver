@@ -280,7 +280,7 @@ static int reint_mknod (int slot_offset, struct kml_rec *rec)
         old_fs = get_fs();
         set_fs (get_ds());
         error = lento_mknod (mknod->path, mknod->mode, 
-                MKDEV(mknod->major, mknod->minor), &info);
+                mk_kdev(mknod->major, mknod->minor), &info);
         set_fs (old_fs);
         kmlreint_post_secure (rec);
         EXIT;

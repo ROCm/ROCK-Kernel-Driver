@@ -2074,7 +2074,7 @@ extern int DAC960_KernelIOCTL(unsigned int Request, void *Argument);
 #define DAC960_KernelDevice(ControllerNumber,				       \
 			    LogicalDriveNumber,				       \
 			    PartitionNumber)				       \
-   MKDEV(DAC960_MajorNumber(ControllerNumber),				       \
+   mk_kdev(DAC960_MajorNumber(ControllerNumber),				       \
 	 DAC960_MinorNumber(LogicalDriveNumber, PartitionNumber))
 
 
