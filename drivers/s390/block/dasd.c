@@ -244,6 +244,7 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 		kfree(device);
 		return (dasd_device_t *) gdp;
 	}
+	gdp->private_data = device;
 	device->gdp = gdp;
 
 	dasd_init_chunklist(&device->ccw_chunks, device->ccw_mem, PAGE_SIZE*2);
@@ -2098,7 +2099,7 @@ dasd_open(struct inode *inp, struct file *filp)
 			major(inp->i_rdev), minor(inp->i_rdev));
 		return -EPERM;
 	}
-	devmap = dasd_devmap_from_kdev(inp->i_rdev);
+	devmap = dasd_devmap_from_bdev(inp->i_bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device)) {
@@ -2134,7 +2135,7 @@ dasd_release(struct inode *inp, struct file *filp)
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
-	devmap = dasd_devmap_from_kdev(inp->i_rdev);
+	devmap = dasd_devmap_from_bdev(inp->i_bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device)) {
