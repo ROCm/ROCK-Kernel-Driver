@@ -228,7 +228,7 @@ void QUIRK_LIST (ide_drive_t *drive)
  * of the sector count register location, with interrupts disabled
  * to ensure that the reads all happen together.
  */
-void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
+static void ata_vlb_sync(ide_drive_t *drive, unsigned long port)
 {
 	(void) HWIF(drive)->INB(port);
 	(void) HWIF(drive)->INB(port);
@@ -238,7 +238,7 @@ void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
 /*
  * This is used for most PIO data transfers *from* the IDE interface
  */
-void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
+static void ata_input_data(ide_drive_t *drive, void *buffer, u32 wcount)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 io_32bit		= drive->io_32bit;
@@ -260,7 +260,7 @@ void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
-void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
+static void ata_output_data(ide_drive_t *drive, void *buffer, u32 wcount)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 io_32bit		= drive->io_32bit;
@@ -1107,7 +1107,7 @@ static void check_dma_crc(ide_drive_t *drive)
 #endif
 }
 
-void pre_reset (ide_drive_t *drive)
+static void pre_reset(ide_drive_t *drive)
 {
 	DRIVER(drive)->pre_reset(drive);
 
