@@ -51,7 +51,7 @@ static int __init init_physmap(void)
 	const char **type;
 
        	printk(KERN_NOTICE "physmap flash device: %lx at %lx\n", physmap_map.size, physmap_map.phys);
-	physmap_map.virt = (unsigned long)ioremap(physmap_map.phys, physmap_map.size);
+	physmap_map.virt = ioremap(physmap_map.phys, physmap_map.size);
 
 	if (!physmap_map.virt) {
 		printk("Failed to ioremap\n");
@@ -92,7 +92,7 @@ static int __init init_physmap(void)
 		return 0;
 	}
 
-	iounmap((void *)physmap_map.virt);
+	iounmap(physmap_map.virt);
 	return -ENXIO;
 }
 
@@ -112,7 +112,7 @@ static void __exit cleanup_physmap(void)
 #endif
 	map_destroy(mymtd);
 
-	iounmap((void *)physmap_map.virt);
+	iounmap(physmap_map.virt);
 	physmap_map.virt = 0;
 }
 
