@@ -15,6 +15,7 @@
  *    19-06-2003  Ben Dooks      Created file
  *    12-03-2004  Ben Dooks      Updated include protection
  *    29-Sep-2004 Ben Dooks	 Fixed usage for assembly inclusion
+ *    10-Feb-2005 Ben Dooks	 Fixed CAMDIVN address (Guillaume Gourat)
  */
 
 #ifndef __ASM_ARM_REGS_CLOCK
@@ -77,17 +78,17 @@
 static inline unsigned int
 s3c2410_get_pll(int pllval, int baseclk)
 {
-  int mdiv, pdiv, sdiv;
+	int mdiv, pdiv, sdiv;
 
-  mdiv = pllval >> S3C2410_PLLCON_MDIVSHIFT;
-  pdiv = pllval >> S3C2410_PLLCON_PDIVSHIFT;
-  sdiv = pllval >> S3C2410_PLLCON_SDIVSHIFT;
+	mdiv = pllval >> S3C2410_PLLCON_MDIVSHIFT;
+	pdiv = pllval >> S3C2410_PLLCON_PDIVSHIFT;
+	sdiv = pllval >> S3C2410_PLLCON_SDIVSHIFT;
 
-  mdiv &= S3C2410_PLLCON_MDIVMASK;
-  pdiv &= S3C2410_PLLCON_PDIVMASK;
-  sdiv &= S3C2410_PLLCON_SDIVMASK;
+	mdiv &= S3C2410_PLLCON_MDIVMASK;
+	pdiv &= S3C2410_PLLCON_PDIVMASK;
+	sdiv &= S3C2410_PLLCON_SDIVMASK;
 
-  return (baseclk * (mdiv + 8)) / ((pdiv + 2) << sdiv);
+	return (baseclk * (mdiv + 8)) / ((pdiv + 2) << sdiv);
 }
 
 #endif /* __ASSEMBLY__ */
@@ -95,7 +96,7 @@ s3c2410_get_pll(int pllval, int baseclk)
 #ifdef CONFIG_CPU_S3C2440
 
 /* extra registers */
-#define S3C2440_CAMDIVN	    S3C2410_CLKREG(0x14)
+#define S3C2440_CAMDIVN	    S3C2410_CLKREG(0x18)
 
 #define S3C2440_CLKCON_CAMERA        (1<<19)
 #define S3C2440_CLKCON_AC97          (1<<20)
