@@ -177,12 +177,12 @@ static u32 access_EV (u16 operation, u8 *ev_name, u8 *buffer, u32 *buf_size)
 	
 	spin_lock_irqsave(&int15_lock, flags);
 	__asm__ (
-		"xorl   %%ebx,%%ebx
-		xorl    %%edx,%%edx
-		pushf
-		push    %%cs
-		cli
-		call    *%6"
+		"xorl   %%ebx,%%ebx\n" \
+		"xorl    %%edx,%%edx\n" \
+		"pushf\n" \
+		"push %%cs\n" \
+		"cli\n" \
+		"call *%6\n"
 		: "=c" (*buf_size), "=a" (ret_val)
 		: "a" (op), "c" (*buf_size), "S" (ev_name),
 		"D" (buffer), "m" (compaq_int15_entry_point)
