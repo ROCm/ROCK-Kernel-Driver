@@ -63,8 +63,10 @@ static int power_down(u32 mode)
 		break;
 	}
 	machine_halt();
-	device_power_up();
-	local_irq_restore(flags);
+	/* Valid image is on the disk, if we continue we risk serious data corruption
+	   after resume. */
+	printk("Please power me down manually\n");
+	while(1);
 	return 0;
 }
 
