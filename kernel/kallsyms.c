@@ -322,5 +322,4 @@ int __init kallsyms_init(void)
 }
 __initcall(kallsyms_init);
 
-EXPORT_SYMBOL(kallsyms_lookup);
 EXPORT_SYMBOL(__print_symbol);

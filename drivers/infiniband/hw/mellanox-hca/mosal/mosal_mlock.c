@@ -294,6 +294,13 @@ int find_m_lock_unlock_ptrs(sys_lock_ptr_t *lock_p, sys_lock_ptr_t *unlock_p)
 #ifdef __ia64__
   return 0;
 #elif LINUX_KERNEL_2_6
+  /* Original programmer of this should have his or her programming license
+     revoked. -AK */
+#if 1
+  extern void sys_mlock(void), sys_munlock(void);
+  *lock_p = sys_mlock; 
+  *lock_p = sys_munlock;  return 0;
+#else
   char *modname;
   const char *name;
   unsigned long offset, size, n;
@@ -318,7 +325,7 @@ int find_m_lock_unlock_ptrs(sys_lock_ptr_t *lock_p, sys_lock_ptr_t *unlock_p)
     return 0;
   }
   else return -1;
-
+#endif
 #elif defined(sys_call_table) || defined(USE_SYS_CALL_TABLE) || ( defined(__x86_64__) && !defined(RH_AS_3_0) )
   *lock_p = (sys_lock_ptr_t)sys_call_table[__NR_mlock]; 
   *unlock_p = (sys_lock_ptr_t)sys_call_table[__NR_munlock]; 

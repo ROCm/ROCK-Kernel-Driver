@@ -7,6 +7,7 @@
 
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 
 
 static int mlock_fixup(struct vm_area_struct * vma, 
@@ -130,6 +131,7 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 	up_write(&current->mm->mmap_sem);
 	return error;
 }
+EXPORT_SYMBOL(sys_mlock);
 
 asmlinkage long sys_munlock(unsigned long start, size_t len)
 {
@@ -142,6 +144,7 @@ asmlinkage long sys_munlock(unsigned long start, size_t len)
 	up_write(&current->mm->mmap_sem);
 	return ret;
 }
+EXPORT_SYMBOL(sys_munlock);
 
 static int do_mlockall(int flags)
 {
