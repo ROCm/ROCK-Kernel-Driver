@@ -199,7 +199,7 @@ pcibios_config_init (void)
 	return;
 }
 
-void __init
+static int __init
 pcibios_init (void)
 {
 #	define PCI_BUSES_TO_SCAN 255
