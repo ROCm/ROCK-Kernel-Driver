@@ -255,13 +255,6 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 	envp [i++] = scratch;
 	scratch += sprintf (scratch, "DEVPATH=%s", kobj_path) + 1;
 
-	spin_lock(&sequence_lock);
-	seq = ++hotplug_seqnum;
-	spin_unlock(&sequence_lock);
-
-	envp [i++] = scratch;
-	scratch += sprintf(scratch, "SEQNUM=%lld", (long long)seq) + 1;
-
 	envp [i++] = scratch;
 	scratch += sprintf(scratch, "SUBSYSTEM=%s", name) + 1;
 
@@ -277,7 +270,15 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 		}
 	}
 
-	pr_debug ("%s: %s %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
+	spin_lock(&sequence_lock);
+	seq = ++hotplug_seqnum;
+	spin_unlock(&sequence_lock);
+
+	envp [i++] = scratch;
+	scratch += sprintf(scratch, "SEQNUM=%lld", (long long)seq) + 1;
+
+	pr_debug ("%s: %s %s seq=%lld %s %s %s %s %s\n",
+		  __FUNCTION__, argv[0], argv[1], (long long)seq,
 		  envp[0], envp[1], envp[2], envp[3], envp[4]);
 
 	send_uevent(action_string, kobj_path, buffer, scratch - buffer, GFP_KERNEL);
