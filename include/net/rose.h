@@ -140,6 +140,9 @@ typedef struct {
 
 #define rose_sk(__sk) ((rose_cb *)(__sk)->sk_protinfo)
 
+/* Magic value indicating first entry in /proc (ie header) */
+#define ROSE_PROC_START ((void *) 1)
+
 /* af_rose.c */
 extern ax25_address rose_callsign;
 extern int  sysctl_rose_restart_request_timeout;
@@ -154,7 +157,7 @@ extern int  sysctl_rose_maximum_vcs;
 extern int  sysctl_rose_window_size;
 extern int  rosecmp(rose_address *, rose_address *);
 extern int  rosecmpm(rose_address *, rose_address *, unsigned short);
-extern char *rose2asc(rose_address *);
+extern const char *rose2asc(const rose_address *);
 extern struct sock *rose_find_socket(unsigned int, struct rose_neigh *);
 extern void rose_kill_by_neigh(struct rose_neigh *);
 extern unsigned int rose_new_lci(struct rose_neigh *);
@@ -193,6 +196,9 @@ extern void rose_enquiry_response(struct sock *);
 
 /* rose_route.c */
 extern struct rose_neigh *rose_loopback_neigh;
+extern struct file_operations rose_neigh_fops;
+extern struct file_operations rose_nodes_fops;
+extern struct file_operations rose_routes_fops;
 
 extern int  rose_add_loopback_neigh(void);
 extern int  rose_add_loopback_node(rose_address *);
@@ -207,9 +213,6 @@ extern struct rose_neigh *rose_get_neigh(rose_address *, unsigned char *, unsign
 extern int  rose_rt_ioctl(unsigned int, void *);
 extern void rose_link_failed(ax25_cb *, int);
 extern int  rose_route_frame(struct sk_buff *, ax25_cb *);
-extern int  rose_nodes_get_info(char *, char **, off_t, int);
-extern int  rose_neigh_get_info(char *, char **, off_t, int);
-extern int  rose_routes_get_info(char *, char **, off_t, int);
 extern void rose_rt_free(void);
 
 /* rose_subr.c */
