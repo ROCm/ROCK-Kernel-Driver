@@ -867,7 +867,7 @@ isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto)
 		skb_pull(skb, 1);
 	} else {
 		if (skb->len < 2)
-			return -1;
+			return -EINVAL;
 		get_u16(skb->data, proto);
 		skb_pull(skb, 2);
 	}
