@@ -828,43 +828,6 @@ static void ixgb_configure_rx(struct ixgb_adapter *adapter)
 	    | RXDCTL_PTHRESH_DEFAULT << IXGB_RXDCTL_PTHRESH_SHIFT;
 	IXGB_WRITE_REG(hw, RXDCTL, rxdctl);
 
-	if (adapter->raidc) {
-		uint32_t raidc;
-		uint8_t poll_threshold;
-
-		/* Poll every rx_int_delay period, if RBD exists
-		 * Receive Backlog Detection is set to <threshold> 
-		 * Rx Descriptors
-		 * max is 0x3F == set to poll when 504 RxDesc left 
-		 * min is 0 */
-
-		/* polling times are 1 == 0.8192us
-		   2 == 1.6384us
-		   3 == 3.2768us etc
-		   ...
-		   511 == 418 us
-		 */
-#define IXGB_RAIDC_POLL_DEFAULT 122	/* set to poll every ~100 us under load 
-					   also known as 10000 interrupts / sec */
-
-		/* divide this by 2^3 (8) to get a register size count */
-		poll_threshold = ((adapter->rx_ring.count - 1) >> 3);
-		/* poll at half of that size */
-		poll_threshold >>= 1;
-		/* make sure its not bigger than our max */
-		poll_threshold &= 0x3F;
-
-		raidc = IXGB_RAIDC_EN |	/* turn on raidc style moderation */
-		    IXGB_RAIDC_RXT_GATE |	/* don't interrupt with rxt0 while
-						   in RBD mode (polling) */
-		    (IXGB_RAIDC_POLL_DEFAULT << IXGB_RAIDC_POLL_SHIFT) |
-		    /* this sets the regular "min interrupt delay" */
-		    (adapter->rx_int_delay << IXGB_RAIDC_DELAY_SHIFT) |
-		    poll_threshold;
-
-		IXGB_WRITE_REG(hw, RAIDC, raidc);
-	}
-
 	/* Enable Receive Checksum Offload for TCP and UDP */
 	if (adapter->rx_csum == TRUE) {
 		rxcsum = IXGB_READ_REG(hw, RXCSUM);
@@ -1613,7 +1576,7 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 	struct net_device *netdev = data;
 	struct ixgb_adapter *adapter = netdev->priv;
 	struct ixgb_hw *hw = &adapter->hw;
-	uint32_t icr = IXGB_READ_REG(&adapter->hw, ICR);
+	uint32_t icr = IXGB_READ_REG(hw, ICR);
 #ifndef CONFIG_IXGB_NAPI
 	unsigned int i;
 #endif
@@ -1632,7 +1595,7 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		 */
 
 		atomic_inc(&adapter->irq_sem);
-		IXGB_WRITE_REG(hw, IMC, ~0);
+		IXGB_WRITE_REG(&adapter->hw, IMC, ~0);
 		__netif_rx_schedule(netdev);
 	}
 #else
@@ -1644,16 +1607,7 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		if(!ixgb_clean_rx_irq(adapter) &
 		   !ixgb_clean_tx_irq(adapter))
 			break;
-	/* if RAIDC:EN == 1 and ICR:RXDMT0 == 1, we need to
-	 * set IMS:RXDMT0 to 1 to restart the RBD timer (POLL)
-	 */
-	if ((icr & IXGB_INT_RXDMT0) && adapter->raidc) {
-		/* ready the timer by writing the clear reg */
-		IXGB_WRITE_REG(hw, IMC, IXGB_INT_RXDMT0);
-		/* now restart it, h/w will decide if its necessary */
-		IXGB_WRITE_REG(hw, IMS, IXGB_INT_RXDMT0);
-	}
-#endif
+#endif 
 	return IRQ_HANDLED;
 }
 
@@ -1949,11 +1903,7 @@ static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter)
 	buffer_info = &rx_ring->buffer_info[i];
 	cleancount = IXGB_DESC_UNUSED(rx_ring);
 
-	/* lessen this to 4 if we're
-	 * in the midst of raidc and rbd is occuring
-	 * because we don't want to delay returning buffers when low
-	 */
-	num_group_tail_writes = adapter->raidc ? 4 : IXGB_RX_BUFFER_WRITE;
+	num_group_tail_writes = IXGB_RX_BUFFER_WRITE;
 
 	/* leave one descriptor unused */
 	while (--cleancount > 0) {

@@ -177,7 +177,6 @@ struct ixgb_adapter {
 	uint64_t hw_csum_rx_error;
 	uint64_t hw_csum_rx_good;
 	uint32_t rx_int_delay;
-	boolean_t raidc;
 	boolean_t rx_csum;
 
 	/* OS defined structs */

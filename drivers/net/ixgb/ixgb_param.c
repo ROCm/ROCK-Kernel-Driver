@@ -121,15 +121,6 @@ IXGB_PARAM(TxIntDelay, "Transmit Interrupt Delay");
 
 IXGB_PARAM(RxIntDelay, "Receive Interrupt Delay");
 
-/* Receive Interrupt Moderation enable (uses RxIntDelay too)
- *
- * Valid Range: 0,1
- *
- * Default Value: 1
- */
-
-IXGB_PARAM(RAIDC, "Disable or enable Receive Interrupt Moderation");
-
 /* Receive Flow control high threshold (when we send a pause frame)
  * (FCRTH)
  *
@@ -436,18 +427,6 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 
 		adapter->rx_int_delay = RxIntDelay[bd];
 		ixgb_validate_option(&adapter->rx_int_delay, &opt);
-	}
-	{			/* Receive Interrupt Moderation */
-		struct ixgb_option opt = {
-			.type = enable_option,
-			.name = "Advanced Receive Interrupt Moderation",
-			.err = "defaulting to Enabled",
-			.def = OPTION_ENABLED
-		};
-		int raidc = RAIDC[bd];
-
-		ixgb_validate_option(&raidc, &opt);
-		adapter->raidc = raidc;
 	}
 	{			/* Transmit Interrupt Delay */
 		struct ixgb_option opt = {
