@@ -129,6 +129,7 @@ struct asus_hotk {
 		M1A,      //M1300A
 		M2E,      //M2400E, L4400L
 		M6N,      //M6800N
+		M6R,      //M6700R
 		P30,	  //Samsung P30
 		S1x,      //S1300A, but also L1400B and M2400A (L84F)
 		S2x,      //S200 (J1 reported), Victor MP-XP7210
@@ -316,6 +317,18 @@ static struct model_data model_conf[END_MODEL] = {
 		.display_set       = "SDSP",
 		.display_get       = "\\SSTE"
 	},
+	{
+		.name              = "M6R",
+		.mt_mled           = "MLED",
+		.mt_wled           = "WLED",
+		.mt_lcd_switch     = xxN_PREFIX "_Q10",
+		.lcd_status        = "\\_SB.PCI0.SBSM.SEO4",
+		.brightness_set    = "SPLV",
+		.brightness_get    = "GPLV",
+		.display_set       = "SDSP",
+		.display_get       = "\\SSTE"
+	},
+
 
 	{
 		.name              = "P30",
@@ -1031,6 +1044,8 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 		hotk->model = L4R;
 	else if (strncmp(model->string.pointer, "M6N", 3) == 0)
 		hotk->model = M6N;
+	else if (strncmp(model->string.pointer, "M6R", 3) == 0)
+		hotk->model = M6R;
 	else if (strncmp(model->string.pointer, "M2N", 3) == 0 ||
 		 strncmp(model->string.pointer, "M3N", 3) == 0 ||
 		 strncmp(model->string.pointer, "M5N", 3) == 0 ||
