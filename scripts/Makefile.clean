@@ -29,13 +29,25 @@ subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 # Add subdir path
 
 subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
+
+# build a list of files to remove, usually releative to the current
+# directory
+
 __clean-files	:= $(extra-y) $(EXTRA_TARGETS) $(always) \
 		   $(targets) $(clean-files)             \
 		   $(host-progs)                         \
 		   $(hostprogs-y) $(hostprogs-m) $(hostprogs-)
+
+# as clean-files is given relative to the current directory, this adds
+# a $(obj) prefix, except for absolute paths
+
 __clean-files   := $(wildcard                                               \
                    $(addprefix $(obj)/, $(filter-out /%, $(__clean-files))) \
 		   $(filter /%, $(__clean-files)))
+
+# as clean-dirs is given relative to the current directory, this adds
+# a $(obj) prefix, except for absolute paths
+
 __clean-dirs    := $(wildcard                                               \
                    $(addprefix $(obj)/, $(filter-out /%, $(clean-dirs)))    \
 		   $(filter /%, $(clean-dirs)))
