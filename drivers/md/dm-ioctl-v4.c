@@ -401,7 +401,7 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 				old_nl->next = (uint32_t) ((void *) nl -
 							   (void *) old_nl);
 			disk = dm_disk(hc->md);
-			nl->dev = MKDEV(disk->major, disk->first_minor);
+			nl->dev = old_encode_dev(MKDEV(disk->major, disk->first_minor));
 			nl->next = 0;
 			strcpy(nl->name, hc->name);
 
@@ -445,7 +445,7 @@ static int __dev_status(struct mapped_device *md, struct dm_ioctl *param)
 	if (!bdev)
 		return -ENXIO;
 
-	param->dev = MKDEV(disk->major, disk->first_minor);
+	param->dev = old_encode_dev(MKDEV(disk->major, disk->first_minor));
 
 	/*
 	 * Yes, this will be out of date by the time it gets back
@@ -481,7 +481,7 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
 		return r;
 
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
-		r = dm_create_with_minor(MINOR(param->dev), &md);
+		r = dm_create_with_minor(MINOR(old_decode_dev(param->dev)), &md);
 	else
 		r = dm_create(&md);
 
@@ -961,7 +961,7 @@ static void retrieve_deps(struct dm_table *table,
 	count = 0;
 	list_for_each(tmp, dm_table_get_devices(table)) {
 		struct dm_dev *dd = list_entry(tmp, struct dm_dev, list);
-		deps->dev[count++] = dd->bdev->bd_dev;
+		deps->dev[count++] = old_encode_dev(dd->bdev->bd_dev);
 	}
 
 	param->data_size = param->data_start + needed;
