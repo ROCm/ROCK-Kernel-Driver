@@ -1392,7 +1392,6 @@ void ide_add_generic_settings (ide_drive_t *drive)
 	ide_add_setting(drive,	"keepsettings",		SETTING_RW,					HDIO_GET_KEEPSETTINGS,	HDIO_SET_KEEPSETTINGS,	TYPE_BYTE,	0,	1,				1,		1,		&drive->keep_settings,		NULL);
 	ide_add_setting(drive,	"nice1",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->nice1,			NULL);
 	ide_add_setting(drive,	"pio_mode",		SETTING_WRITE,					-1,			HDIO_SET_PIO_MODE,	TYPE_BYTE,	0,	255,				1,		1,		NULL,				set_pio_mode);
-	ide_add_setting(drive,	"slow",			SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->slow,			NULL);
 	ide_add_setting(drive,	"unmaskirq",		drive->no_unmask ? SETTING_READ : SETTING_RW,	HDIO_GET_UNMASKINTR,	HDIO_SET_UNMASKINTR,	TYPE_BYTE,	0,	1,				1,		1,		&drive->unmask,			NULL);
 	ide_add_setting(drive,	"using_dma",		SETTING_RW,					HDIO_GET_DMA,		HDIO_SET_DMA,		TYPE_BYTE,	0,	1,				1,		1,		&drive->using_dma,		set_using_dma);
 	ide_add_setting(drive,	"init_speed",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	70,				1,		1,		&drive->init_speed,		NULL);
@@ -1805,15 +1804,9 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  *				Not fully supported by all chipset types,
  *				and quite likely to cause trouble with
  *				older/odd IDE drives.
- * "hdx=slow"		: insert a huge pause after each access to the data
- *				port. Should be used only as a last resort.
- *
  * "hdx=swapdata"	: when the drive is a disk, byte swap all data
  * "hdx=bswap"		: same as above..........
  * "hdxlun=xx"          : set the drive last logical unit.
- * "hdx=flash"		: allows for more than one ata_flash disk to be
- *				registered. In most cases, only one device
- *				will be present.
  * "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
  *				allowing ide-floppy, ide-tape, and ide-cdrom|writers
  *				to use ide-scsi emulation on a device specific option.
@@ -1915,8 +1908,8 @@ int __init ide_setup (char *s)
 	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
-			"autotune", "noautotune", "slow", "swapdata", "bswap",
-			"flash", "remap", "remap63", "scsi", NULL };
+			"autotune", "noautotune", "minus8", "swapdata", "bswap",
+			"minus11", "remap", "remap63", "scsi", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -1941,7 +1934,6 @@ int __init ide_setup (char *s)
 		}
 		switch (match_parm(&s[3], hd_words, vals, 3)) {
 			case -1: /* "none" */
-				drive->nobios = 1;  /* drop into "noprobe" */
 			case -2: /* "noprobe" */
 				drive->noprobe = 1;
 				goto done;
@@ -1963,15 +1955,9 @@ int __init ide_setup (char *s)
 			case -7: /* "noautotune" */
 				drive->autotune = IDE_TUNE_NOAUTO;
 				goto done;
-			case -8: /* "slow" */
-				drive->slow = 1;
-				goto done;
 			case -9: /* "swapdata" */
 			case -10: /* "bswap" */
 				drive->bswap = 1;
-				goto done;
-			case -11: /* "flash" */
-				drive->ata_flash = 1;
 				goto done;
 			case -12: /* "remap" */
 				drive->remap_0_to_1 = 1;

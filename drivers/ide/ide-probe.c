@@ -237,27 +237,9 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	 */
 	if (id->config & (1<<7))
 		drive->removable = 1;
-		
-	/*
-	 * Prevent long system lockup probing later for non-existant
-	 * slave drive if the hwif is actually a flash memory card of
-	 * some variety:
-	 */
-	drive->is_flash = 0;
-	if (drive_is_flashcard(drive)) {
-#if 0
-		/* The new IDE adapter widgets don't follow this heuristic
-		   so we must nowdays just bite the bullet and take the
-		   probe hit */	
-		ide_drive_t *mate = &hwif->drives[1^drive->select.b.unit];		
-		ide_drive_t *mate = &hwif->drives[1^drive->select.b.unit];
-		if (!mate->ata_flash) {
-			mate->present = 0;
-			mate->noprobe = 1;
-		}
-#endif		
+
+	if (drive_is_flashcard(drive))
 		drive->is_flash = 1;
-	}
 	drive->media = ide_disk;
 	printk("%s DISK drive\n", (drive->is_flash) ? "CFA" : "ATA" );
 	QUIRK_LIST(drive);

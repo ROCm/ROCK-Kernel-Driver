@@ -241,16 +241,9 @@ Summary of ide driver parameters for kernel command line
 			  and quite likely to cause trouble with
 			  older/odd IDE drives.
 
- "hdx=slow"		: insert a huge pause after each access to the data
-			  port. Should be used only as a last resort.
-
  "hdx=swapdata"		: when the drive is a disk, byte swap all data
 
  "hdx=bswap"		: same as above..........
-
- "hdx=flash"		: allows for more than one ata_flash disk to be
- 			  registered. In most cases, only one device
- 			  will be present.
 
  "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
  			  allowing ide-floppy, ide-tape, and ide-cdrom|writers
