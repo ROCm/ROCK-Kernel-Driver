@@ -1100,12 +1100,18 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		chunk->transport = chunk_tp;
 
 		/* Send it to the lower layers.  */
-		sctp_primitive_SEND(asoc, chunk);
+		err = sctp_primitive_SEND(asoc, chunk);
+		/* Did the lower layer accept the chunk? */
+		if (err)
+			sctp_chunk_free(chunk);
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
 	}
 
 	sctp_datamsg_free(datamsg);
-	err = msg_len;
+	if (err) 
+		goto out_free;
+	else
+		err = msg_len;
 
 	/* If we are already past ASSOCIATE, the lower
 	 * layers are responsible for association cleanup.
