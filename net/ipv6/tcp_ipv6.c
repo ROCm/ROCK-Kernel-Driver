@@ -480,7 +480,7 @@ static int tcp_v6_check_established(struct sock *sk)
 
 	/* And established part... */
 	sk_for_each(sk2, node, &head->chain) {
-		if(TCP_IPV6_MATCH(sk, saddr, daddr, ports, dif))
+		if(TCP_IPV6_MATCH(sk2, saddr, daddr, ports, dif))
 			goto not_unique;
 	}
 
