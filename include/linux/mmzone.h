@@ -316,7 +316,7 @@ extern struct pglist_data contig_page_data;
 
 #include <asm/mmzone.h>
 
-#if BITS_PER_LONG == 32
+#if BITS_PER_LONG == 32 || defined(ARCH_HAS_ATOMIC_UNSIGNED)
 /*
  * with 32 bit page->flags field, we reserve 8 bits for node/zone info.
  * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.
