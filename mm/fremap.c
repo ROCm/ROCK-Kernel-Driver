@@ -61,9 +61,8 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pmd_t *pmd;
 	pte_t pte_val;
 
-	spin_lock(&mm->page_table_lock);
 	pgd = pgd_offset(mm, addr);
-
+	spin_lock(&mm->page_table_lock);
 	pmd = pmd_alloc(mm, pgd, addr);
 	if (!pmd)
 		goto err_unlock;
@@ -103,9 +102,8 @@ int install_file_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 	pmd_t *pmd;
 	pte_t pte_val;
 
-	spin_lock(&mm->page_table_lock);
 	pgd = pgd_offset(mm, addr);
-
+	spin_lock(&mm->page_table_lock);
 	pmd = pmd_alloc(mm, pgd, addr);
 	if (!pmd)
 		goto err_unlock;

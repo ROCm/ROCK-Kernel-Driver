@@ -365,7 +365,6 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = mpnt->vm_start >> PAGE_SHIFT;
 		mpnt->vm_file = NULL;
-		mpol_set_vma_default(mpnt);
 		INIT_VMA_SHARED(mpnt);
 		/* insert_vm_struct takes care of anon_vma_node */
 		mpnt->anon_vma = NULL;

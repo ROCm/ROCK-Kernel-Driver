@@ -322,10 +322,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 		if (!tmp)
 			goto fail_nomem;
 		*tmp = *mpnt;
-		tmp->vm_policy = mpol_copy(mpnt->vm_policy); 
-		retval = PTR_ERR(tmp->vm_policy);
-		if (IS_ERR(tmp->vm_policy)) 
-			goto fail_nomem_policy;
 		tmp->vm_flags &= ~VM_LOCKED;
 		tmp->vm_mm = mm;
 		tmp->vm_next = NULL;
@@ -374,8 +370,6 @@ out:
 	flush_tlb_mm(current->mm);
 	up_write(&oldmm->mmap_sem);
 	return retval;
-fail_nomem_policy: 
-	kmem_cache_free(vm_area_cachep, tmp);
 fail_nomem:
 	retval = -ENOMEM;
 fail:
@@ -968,14 +962,9 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->io_context = NULL;
 	p->io_wait = NULL;
 
-	p->mempolicy = mpol_copy(p->mempolicy);
-	retval = PTR_ERR(p->mempolicy);
-	if (IS_ERR(p->mempolicy)) 
-		goto bad_fork_cleanup; 
-	
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
-		goto bad_fork_cleanup_policy;
+		goto bad_fork_cleanup;
 	/* copy all the process information */
 	if ((retval = copy_semundo(clone_flags, p)))
 		goto bad_fork_cleanup_security;
@@ -1115,8 +1104,6 @@ bad_fork_cleanup_semundo:
 	exit_sem(p);
 bad_fork_cleanup_security:
 	security_task_free(p);
-bad_fork_cleanup_policy:
-	mpol_free(p->mempolicy);
 bad_fork_cleanup:
 	if (p->pid > 0)
 		free_pidmap(p->pid);

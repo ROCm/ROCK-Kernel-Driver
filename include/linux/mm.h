@@ -13,7 +13,6 @@
 #include <linux/rbtree.h>
 #include <linux/prio_tree.h>
 #include <linux/fs.h>
-#include <linux/mempolicy.h>
 
 #ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
@@ -65,9 +64,6 @@ typedef struct anon_vma_s {
  *
  * This structure is exactly 64 bytes on ia32.  Please think very, very hard
  * before adding anything to it.
- * [Now 4 bytes more on 32bit NUMA machines. Sorry. -AK.
- * But if you want to recover the 4 bytes justr remove vm_next. It is redundant 
- * with vm_rb. Will be a lot of editing work though. vm_rb.color is redundant too.] 
  */
 struct vm_area_struct {
 	struct mm_struct * vm_mm;	/* The address space we belong to. */
@@ -132,8 +128,6 @@ struct vm_area_struct {
 					   units, *not* PAGE_CACHE_SIZE */
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
-
-	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 };
 
 /*
@@ -350,8 +344,6 @@ struct vm_operations_struct {
 	void (*close)(struct vm_area_struct * area);
 	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int *type);
 	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, pgprot_t prot, unsigned long pgoff, int nonblock);
-	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
-	struct mempolicy *(*get_policy)(struct vm_area_struct *vma, unsigned long addr);
 };
 
 /* forward declaration; pte_chain is meant to be internal to rmap.c */
@@ -634,8 +626,6 @@ extern void show_free_areas(void);
 
 struct page *shmem_nopage(struct vm_area_struct * vma,
 			unsigned long address, int *type);
-int shmem_set_policy(struct vm_area_struct *vma, struct mempolicy *new);
-struct mempolicy *shmem_get_policy(struct vm_area_struct *vma, unsigned long addr);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 void shmem_lock(struct file * file, int lock);
 int shmem_zero_setup(struct vm_area_struct *);
@@ -780,6 +770,7 @@ extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
 
+/* vma merging helpers */
 static inline void
 __vma_unlink(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_area_struct *prev)
@@ -790,14 +781,48 @@ __vma_unlink(struct mm_struct *mm, struct vm_area_struct *vma,
 		mm->mmap_cache = prev;
 }
 
-static inline int
-can_vma_merge(struct vm_area_struct *vma, unsigned long vm_flags)
+extern void __remove_shared_vm_struct(struct vm_area_struct *, struct inode *,
+				      struct address_space *);
+
+/*
+ * If the vma has a ->close operation then the driver probably needs to release
+ * per-vma resources, so we don't attempt to merge those.
+ */
+#define VM_SPECIAL (VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_RESERVED)
+
+static inline int is_mergeable_vma(struct vm_area_struct *vma,
+				   struct file *file,
+				   unsigned long vm_flags,
+				   unsigned long pgoff,
+				   anon_vma_t ** anon_vma_cache)
 {
-#ifdef CONFIG_MMU
-	if (!vma->vm_file && vma->vm_flags == vm_flags)
-		return 1;
-#endif
-	return 0;
+	if (vma->vm_ops && vma->vm_ops->close)
+		return 0;
+	if (vma->vm_file != file)
+		return 0;
+	if (vma->vm_pgoff != pgoff)
+		return 0;
+	if (vma->vm_private_data)
+		return 0;
+	if (vma->vm_flags != vm_flags) {
+		/*
+		 * If the only difference between two adiacent
+		 * vmas is the page protection we try to
+		 * share the same anon_vma to maximize the
+		 * merging in mprotect.
+		 */
+		if (anon_vma_cache && !*anon_vma_cache)
+			*anon_vma_cache = vma->anon_vma;
+		return 0;
+	}
+	return 1;
+}
+
+static inline int is_mergeable_anon_vma(struct vm_area_struct *prev,
+					struct vm_area_struct *next)
+{
+	return ((!next->anon_vma || !prev->anon_vma) ||
+		(next->anon_vma == prev->anon_vma));
 }
 
 /* filemap.c */
@@ -847,11 +872,6 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 	return vma;
 }
 
-static inline unsigned long vma_pages(struct vm_area_struct *vma)
-{
-	return (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-}
-
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
 extern unsigned int nr_used_zone_pages(void);
@@ -861,9 +881,6 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
-
-extern int arch_hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma, 
-			      unsigned long address, int write_access);
 
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void

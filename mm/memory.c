@@ -1036,7 +1036,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (unlikely(anon_vma_prepare(vma)))
 		goto no_new_page;
 
-	new_page = alloc_page_vma(GFP_HIGHUSER, vma, address);
+	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
 		goto no_new_page;
 	copy_cow_page(old_page,new_page,address);
@@ -1186,17 +1186,9 @@ EXPORT_SYMBOL(vmtruncate);
  * (1 << page_cluster) entries in the swap area. This method is chosen
  * because it doesn't cost us any seek time.  We also make sure to queue
  * the 'original' request together with the readahead ones...  
- * 
- * This has been extended to use the NUMA policies from the mm triggering
- * the readahead.
- * 
- * Caller must hold down_read on the vma->vm_mm if vma is not NULL.
  */
-void swapin_readahead(swp_entry_t entry, unsigned long addr,struct vm_area_struct *vma) 
+void swapin_readahead(swp_entry_t entry)
 {
-#ifdef CONFIG_NUMA
-	struct vm_area_struct *next_vma = vma ? vma->vm_next : NULL;
-#endif
 	int i, num;
 	struct page *new_page;
 	unsigned long offset;
@@ -1208,31 +1200,10 @@ void swapin_readahead(swp_entry_t entry, unsigned long addr,struct vm_area_struc
 	for (i = 0; i < num; offset++, i++) {
 		/* Ok, do the async read-ahead now */
 		new_page = read_swap_cache_async(swp_entry(swp_type(entry),
-							   offset), vma, addr); 
+						offset));
 		if (!new_page)
 			break;
 		page_cache_release(new_page);
-#ifdef CONFIG_NUMA
-		/* 
-		 * Find the next applicable VMA for the NUMA policy.
-		 */
-		addr += PAGE_SIZE;
-		if (addr == 0) 
-			vma = NULL;
-		if (vma) { 
-			if (addr >= vma->vm_end) { 
-				vma = next_vma;
-				next_vma = vma ? vma->vm_next : NULL;
-			}
-			if (vma && addr < vma->vm_start) 
-				vma = NULL; 
-		} else { 
-			if (next_vma && addr >= next_vma->vm_start) { 
-				vma = next_vma;
-				next_vma = vma->vm_next;
-			}
-		} 
-#endif
 	}
 	lru_add_drain();	/* Push any new pages onto the LRU now */
 }
@@ -1258,8 +1229,8 @@ static int do_swap_page(struct mm_struct * mm,
 	ret = VM_FAULT_MINOR;
 	page = lookup_swap_cache(entry);
 	if (!page) {
- 		swapin_readahead(entry, address, vma);
- 		page = read_swap_cache_async(entry, vma, address);
+		swapin_readahead(entry);
+		page = read_swap_cache_async(entry);
 		if (!page) {
 			/*
 			 * Back out if somebody else faulted in this pte while
@@ -1349,7 +1320,7 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		if (unlikely(anon_vma_prepare(vma)))
 			return VM_FAULT_OOM;
 
-		page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
+		page = alloc_page(GFP_HIGHUSER);
 		if (unlikely(!page))
 			return VM_FAULT_OOM;
 		clear_user_highpage(page, addr);
@@ -1462,7 +1433,7 @@ retry:
 		struct page * page;
 		if (unlikely(anon_vma_prepare(vma)))
 			goto oom;
-		page = alloc_page_vma(GFP_HIGHUSER, vma, address);
+		page = alloc_page(GFP_HIGHUSER);
 		if (!page)
 			goto oom;
 		copy_user_highpage(page, new_page, address);
@@ -1620,15 +1591,6 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 	return VM_FAULT_MINOR;
 }
 
-
-/* Can be overwritten by the architecture */
-int __attribute__((weak)) arch_hugetlb_fault(struct mm_struct *mm, 
-					     struct vm_area_struct *vma, 
-					     unsigned long address, int write_access)
-{
-	return VM_FAULT_SIGBUS;
-}
-
 /*
  * By the time we get here, we already hold the mm semaphore
  */
@@ -1644,7 +1606,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	inc_page_state(pgfault);
 
 	if (is_vm_hugetlb_page(vma))
-		return arch_hugetlb_fault(mm, vma, address, write_access);
+		return VM_FAULT_SIGBUS;	/* mapping truncation does this. */
 
 	/*
 	 * We need the page table lock to synchronize with kswapd

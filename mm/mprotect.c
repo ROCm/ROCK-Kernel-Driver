@@ -16,6 +16,8 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/security.h>
+#include <linux/objrmap.h>
+#include <linux/file.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -107,7 +109,6 @@ change_protection(struct vm_area_struct *vma, unsigned long start,
 	return;
 }
 
-#if VMA_MERGING_FIXUP
 /*
  * Try to merge a vma with the previous flag, return 1 if successful or 0 if it
  * was impossible.
@@ -116,45 +117,183 @@ static int
 mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 		unsigned long end, int newflags)
 {
-	struct mm_struct * mm = vma->vm_mm;
+	unsigned long prev_pgoff;
+	struct file *file;
+	struct inode *inode;
+	struct address_space *mapping;
+	struct semaphore *i_shared_sem;
+	struct prio_tree_root *root;
 
-	if (!prev || !vma)
+	if (newflags & VM_SPECIAL)
+		return 0;
+	if (!prev)
 		return 0;
 	if (prev->vm_end != vma->vm_start)
 		return 0;
-	if (!can_vma_merge(prev, newflags))
+
+	prev_pgoff = vma->vm_pgoff - ((prev->vm_end - prev->vm_start) >> PAGE_SHIFT);
+	file = vma->vm_file;
+	if (!is_mergeable_vma(prev, file, newflags, prev_pgoff, NULL))
 		return 0;
-	if (vma->vm_file || (vma->vm_flags & VM_SHARED))
+	if (!is_mergeable_anon_vma(prev, vma))
 		return 0;
-	if (!mpol_equal(vma->vm_policy, prev->vm_policy))
-		return 0;
+
+	/*
+	 * Only "root" and "inode" have to be NULL too if "file" is null,
+	 * however mapping and i_shared_sem would cause gcc to warn about
+	 * uninitialized usage so we set them to NULL too.
+	 */
+	inode = NULL;
+	root = NULL;
+	i_shared_sem = NULL;
+	mapping = NULL;
+	if (file) {
+		inode = file->f_dentry->d_inode;
+		mapping = file->f_mapping;
+		i_shared_sem = &mapping->i_shared_sem;
+
+		if (vma->vm_flags & VM_SHARED) {
+			if (likely(!(vma->vm_flags & VM_NONLINEAR)))
+				root = &mapping->i_mmap_shared;
+		} else
+			root = &mapping->i_mmap;
+	}
 
 	/*
 	 * If the whole area changes to the protection of the previous one
 	 * we can just get rid of it.
 	 */
 	if (end == vma->vm_end) {
-		spin_lock(&mm->page_table_lock);
-		prev->vm_end = end;
-		__vma_unlink(mm, vma, prev);
-		spin_unlock(&mm->page_table_lock);
+		struct mm_struct * mm = vma->vm_mm;
 
-		mpol_free(vma->vm_policy);
-		kmem_cache_free(vm_area_cachep, vma);
+		/* serialized by the mmap_sem */
+		__vma_unlink(mm, vma, prev);
+
+		if (file)
+			down(i_shared_sem);
+		__vma_modify(root, prev, prev->vm_start,
+			     end, prev->vm_pgoff);
+
+		__remove_shared_vm_struct(vma, inode, mapping);
+		if (file)
+			up(i_shared_sem);
+
+		/*
+		 * The anon_vma_lock is taken inside and
+		 * we can race with the vm_end move on the right,
+		 * that will not be a problem, moves on the right
+		 * of vm_end are controlled races.
+		 */
+		anon_vma_merge(prev, vma);
+
+		if (file)
+			fput(file);
+
 		mm->map_count--;
+		kmem_cache_free(vm_area_cachep, vma);
 		return 1;
 	} 
 
 	/*
 	 * Otherwise extend it.
 	 */
-	spin_lock(&mm->page_table_lock);
-	prev->vm_end = end;
-	vma->vm_start = end;
-	spin_unlock(&mm->page_table_lock);
+	if (file)
+		down(i_shared_sem);
+	__vma_modify(root, prev, prev->vm_start, end, prev->vm_pgoff);
+	/*
+	 * We need the anon_vma_lock only for "vma" since it's changing
+	 * vma->vm_start and vma->vm_pgoff. prev->vm_start and
+	 * prev->vm_pgoff are unchanged so the race on prev->vm_end
+	 * is controlled w/o explicit anon-vma locking.
+	 */
+	anon_vma_lock(vma);
+	__vma_modify(root, vma, end, vma->vm_end,
+		     vma->vm_pgoff + ((end - vma->vm_start) >> PAGE_SHIFT));
+	anon_vma_unlock(vma);
+	if (file)
+		up(i_shared_sem);
 	return 1;
 }
-#endif
+
+static void
+mprotect_attempt_merge_final(struct vm_area_struct *prev,
+			     struct vm_area_struct *next)
+{
+	unsigned long next_pgoff;
+	struct file * file;
+	struct inode *inode;
+	struct address_space *mapping;
+	struct semaphore *i_shared_sem;
+	struct prio_tree_root *root;
+	struct mm_struct * mm;
+	unsigned int newflags;
+
+	if (!next)
+		return;
+	if (prev->vm_end != next->vm_start)
+		return;
+	newflags = prev->vm_flags;
+	if (newflags & VM_SPECIAL)
+		return;
+
+	next_pgoff = prev->vm_pgoff + ((prev->vm_end - prev->vm_start) >> PAGE_SHIFT);
+	file = prev->vm_file;
+	if (!is_mergeable_vma(next, file, newflags, next_pgoff, NULL))
+		return;
+	if (!is_mergeable_anon_vma(prev, next))
+		return;
+
+
+	/*
+	 * Only "root" and "inode" have to be NULL too if "file" is null,
+	 * however mapping and i_shared_sem would cause gcc to warn about
+	 * uninitialized usage so we set them to NULL too.
+	 */
+	inode = NULL;
+	root = NULL;
+	i_shared_sem = NULL;
+	mapping = NULL;
+	if (file) {
+		inode = file->f_dentry->d_inode;
+		mapping = file->f_mapping;
+		i_shared_sem = &mapping->i_shared_sem;
+
+		if (next->vm_flags & VM_SHARED) {
+			if (likely(!(next->vm_flags & VM_NONLINEAR)))
+				root = &mapping->i_mmap_shared;
+		} else
+			root = &mapping->i_mmap;
+	}
+
+	mm = next->vm_mm;
+
+	/* serialized by the mmap_sem */
+	__vma_unlink(mm, next, prev);
+
+	if (file)
+		down(i_shared_sem);
+	/* no need of anon_vma_lock for any "vm_end" extension */
+	__vma_modify(root, prev, prev->vm_start,
+		     next->vm_end, prev->vm_pgoff);
+
+	__remove_shared_vm_struct(next, inode, mapping);
+	if (file)
+		up(i_shared_sem);
+
+	/*
+	 * The anon_vma_lock is taken inside and
+	 * we can race with the vm_end move on the right,
+	 * that will not be a problem, moves on the right
+	 * of vm_end are controlled races.
+	 */
+	anon_vma_merge(prev, next);
+
+	if (file)
+		fput(file);
+
+	mm->map_count--;
+	kmem_cache_free(vm_area_cachep, next);
+}
 
 static int
 mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
@@ -191,7 +330,6 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	newprot = protection_map[newflags & 0xf];
 
 	if (start == vma->vm_start) {
-#if VMA_MERGING_FIXUP
 		/*
 		 * Try to merge with the previous vma.
 		 */
@@ -199,7 +337,6 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 			vma = *pprev;
 			goto success;
 		}
-#endif
 	} else {
 		error = split_vma(mm, vma, start, 1);
 		if (error)
@@ -217,13 +354,13 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 			goto fail;
 	}
 
-	spin_lock(&mm->page_table_lock);
+	/*
+	 * vm_flags and vm_page_prot are protected by the mmap_sem
+	 * hold in write mode.
+	 */
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = newprot;
-	spin_unlock(&mm->page_table_lock);
-#if VMA_MERGING_FIXUP
 success:
-#endif
 	change_protection(vma, start, end, newprot);
 	return 0;
 
@@ -326,21 +463,7 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 		}
 	}
 
-#if VMA_MERGING_FIXUP
-	if (next && prev->vm_end == next->vm_start &&
-			can_vma_merge(next, prev->vm_flags) &&
-	    		mpol_equal(prev->vm_policy, next->vm_policy) &&
-			!prev->vm_file && !(prev->vm_flags & VM_SHARED)) {
-		spin_lock(&prev->vm_mm->page_table_lock);
-		prev->vm_end = next->vm_end;
-		__vma_unlink(prev->vm_mm, next, prev);
-		spin_unlock(&prev->vm_mm->page_table_lock);
-
-		mpol_free(next->vm_policy);
-		kmem_cache_free(vm_area_cachep, next);
-		prev->vm_mm->map_count--;
-	}
-#endif
+	mprotect_attempt_merge_final(prev, next);
 out:
 	up_write(&mm->mmap_sem);
 	return error;

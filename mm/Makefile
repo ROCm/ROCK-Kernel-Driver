@@ -14,5 +14,4 @@ obj-y			:= bootmem.o filemap.o mempool.o oom_kill.o fadvise.o \
 
 obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o
 obj-$(CONFIG_PROC_MM)	+= proc_mm.o
-obj-$(CONFIG_NUMA) 	+= policy.o
 
