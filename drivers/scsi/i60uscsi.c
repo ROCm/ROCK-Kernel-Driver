@@ -110,7 +110,7 @@ ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
 extern void inia100SCBPost(BYTE * pHcb, BYTE * pScb);
 
 /* ---- INTERNAL VARIABLES ---- */
-static INIA100_ADPT_STRUCT *inia100_adpt;
+struct inia100_Adpt_Struc *inia100_adpt;
 
 NVRAM nvram, *nvramp = &nvram;
 static UCHAR dftNvRam[64] =
@@ -690,22 +690,15 @@ void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 
 
 /***************************************************************************/
-void orc_release_dma(ORC_HCS * hcsp, ORC_SCB * scbp)
+void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * SCpnt)
 {
-	ESCB *pEScb;
-	Scsi_Cmnd *SCpnt;
 	struct scatterlist *pSrbSG;
-	ORC_SG *pSG;
-
-	pEScb = scbp->SCB_EScb;
-	SCpnt = pEScb->SCB_Srb;
-	pSG = (ORC_SG *) & pEScb->ESCB_SGList[0];
 
 	if (SCpnt->use_sg) {
 		pSrbSG = (struct scatterlist *)SCpnt->request_buffer;
 		pci_unmap_sg(hcsp->pdev, pSrbSG, SCpnt->use_sg,
 			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-	} else {
+	} else if (SCpnt->request_bufflen != 0) {
 		pci_unmap_single(hcsp->pdev, (U32)SCpnt->host_scribble,
 			SCpnt->request_bufflen,
 			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));

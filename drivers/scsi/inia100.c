@@ -122,7 +122,7 @@ extern int init_inia100Adapter_table(int);
 extern ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
 extern void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
 extern void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
-extern void orc_release_dma(ORC_HCS * hcsp, ORC_SCB * scbp);
+extern void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * cmnd);
 extern void orc_interrupt(ORC_HCS * hcsp);
 extern int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target, unsigned int ResetFlags);
 extern int orc_reset_scsi_bus(ORC_HCS * pHCB);
@@ -472,13 +472,17 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
 				pSG->SG_Len = (U32) sg_dma_len(pSrbSG);
 				TotalLen += (U32) sg_dma_len(pSrbSG);
 			}
-		} else {	/* Non SG                       */
+		} else if (SCpnt->request_bufflen != 0) {/* Non SG */
 			pSCB->SCB_SGLen = 0x8;
 			pSG->SG_Ptr = (U32) pci_map_single(pHCB->pdev,
 				SCpnt->request_buffer, SCpnt->request_bufflen,
 				scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
 			SCpnt->host_scribble = (void *)pSG->SG_Ptr;
 			pSG->SG_Len = (U32) SCpnt->request_bufflen;
+		} else {
+			pSCB->SCB_SGLen = 0;
+			pSG->SG_Ptr = 0;
+			pSG->SG_Len = 0;
 		}
 	}
 	pSCB->SCB_SGPAddr = (U32) pSCB->SCB_SensePAddr;
@@ -584,7 +588,6 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 	pEScb = pSCB->SCB_EScb;
 	if ((pSRB = (Scsi_Cmnd *) pEScb->SCB_Srb) == 0) {
 		printk("inia100SCBPost: SRB pointer is empty\n");
-		orc_release_dma(pHCB, pSCB);
 		orc_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
 		return;
 	}
@@ -630,18 +633,14 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 		   (unsigned char *) &pEScb->ESCB_SGList[0], SENSE_SIZE);
 	}
 	pSRB->result = pSCB->SCB_TaStat | (pSCB->SCB_HaStat << 16);
+	orc_release_dma(pHCB, pSRB);  /* release DMA before we call scsi_done */
 	pSRB->scsi_done(pSRB);	/* Notify system DONE           */
 
 	/* Find the next pending SRB    */
 	if ((pSRB = inia100PopSRBFromQueue(pHCB)) != NULL) {	/* Assume resend will success   */
-		/*
-		 * We must free the pci DMA mappings before reusing the scb
-		 */
-		orc_release_dma(pHCB, pSCB);
 		inia100BuildSCB(pHCB, pSCB, pSRB);	/* Create corresponding SCB     */
 		orc_exec_scb(pHCB, pSCB);	/* Start execute SCB            */
 	} else {
-		orc_release_dma(pHCB, pSCB);
 		orc_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
 	}
 	return;
