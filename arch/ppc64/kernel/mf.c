@@ -25,24 +25,21 @@
   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
   */
 
-#include <asm/iSeries/mf.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/module.h>
 #include <linux/completion.h>
-#include <asm/iSeries/HvLpConfig.h>
-#include <linux/slab.h>
 #include <linux/delay.h>
-#include <asm/nvram.h>
-#include <asm/time.h>
-#include <asm/iSeries/ItSpCommArea.h>
-#include <asm/uaccess.h>
 #include <linux/dma-mapping.h>
 #include <linux/bcd.h>
+
+#include <asm/time.h>
+#include <asm/uaccess.h>
 #include <asm/iSeries/vio.h>
+#include <asm/iSeries/mf.h>
+#include <asm/iSeries/HvLpConfig.h>
+#include <asm/iSeries/ItSpCommArea.h>
 
 /*
  * This is the structure layout for the Machine Facilites LPAR event
@@ -198,8 +195,8 @@ static int signal_event(struct pending_event *ev)
 		hv_rc = HvCallEvent_signalLpEvent(
 				&pending_event_head->event.hp_lp_event);
 		if (hv_rc != HvLpEvent_Rc_Good) {
-			printk(KERN_ERR "mf.c: HvCallEvent_signalLpEvent() failed with %d\n",
-					(int)hv_rc);
+			printk(KERN_ERR "mf.c: HvCallEvent_signalLpEvent() "
+					"failed with %d\n", (int)hv_rc);
 
 			spin_lock_irqsave(&pending_event_spinlock, flags);
 			ev1 = pending_event_head;
@@ -238,12 +235,13 @@ static struct pending_event *new_pending_event(void)
 		pending_event_avail = pending_event_avail->next;
 	}
 	spin_unlock_irqrestore(&pending_event_spinlock, flags);
-	if (ev == NULL)
-		ev = kmalloc(sizeof(struct pending_event),GFP_ATOMIC);
 	if (ev == NULL) {
-		printk(KERN_ERR "mf.c: unable to kmalloc %ld bytes\n",
-				sizeof(struct pending_event));
-		return NULL;
+		ev = kmalloc(sizeof(struct pending_event), GFP_ATOMIC);
+		if (ev == NULL) {
+			printk(KERN_ERR "mf.c: unable to kmalloc %ld bytes\n",
+					sizeof(struct pending_event));
+			return NULL;
+		}
 	}
 	memset(ev, 0, sizeof(struct pending_event));
 	hev = &ev->event.hp_lp_event;
@@ -254,7 +252,7 @@ static struct pending_event *new_pending_event(void)
 	hev->xType = HvLpEvent_Type_MachineFac;
 	hev->xSourceLp = HvLpConfig_getLpIndex();
 	hev->xTargetLp = primary_lp;
-	hev->xSizeMinus1 = sizeof(ev->event)-1;
+	hev->xSizeMinus1 = sizeof(ev->event) - 1;
 	hev->xRc = HvLpEvent_Rc_Good;
 	hev->xSourceInstanceId = HvCallEvent_getSourceLpInstanceId(primary_lp,
 			HvLpEvent_Type_MachineFac);
@@ -373,8 +371,10 @@ static int shutdown(void)
  */
 static void handle_int(struct io_mf_lp_event *event)
 {
-	int free_it = 0;
-	struct pending_event *two = NULL;
+	struct ce_msg_data *ce_msg_data;
+	struct ce_msg_data *pce_msg_data;
+	unsigned long flags;
+	struct pending_event *pev;
 
 	/* ack the interrupt */
 	event->hp_lp_event.xRc = HvLpEvent_Rc_Good;
@@ -383,49 +383,42 @@ static void handle_int(struct io_mf_lp_event *event)
 	/* process interrupt */
 	switch (event->hp_lp_event.xSubtype) {
 	case 0:	/* CE message */
-		switch (event->data.ce_msg.ce_msg[3]) {
+		ce_msg_data = &event->data.ce_msg;
+		switch (ce_msg_data->ce_msg[3]) {
 		case 0x5B:	/* power control notification */
-			if ((event->data.ce_msg.ce_msg[5] & 0x20) != 0) {
+			if ((ce_msg_data->ce_msg[5] & 0x20) != 0) {
 				printk(KERN_INFO "mf.c: Commencing partition shutdown\n");
 				if (shutdown() == 0)
 					signal_ce_msg_simple(0xDB, NULL);
 			}
 			break;
 		case 0xC0:	/* get time */
-			if ((pending_event_head == NULL) ||
-			    (pending_event_head->event.data.ce_msg.ce_msg[3]
-			     != 0x40))
+			spin_lock_irqsave(&pending_event_spinlock, flags);
+			pev = pending_event_head;
+			if (pev != NULL)
+				pending_event_head = pending_event_head->next;
+			spin_unlock_irqrestore(&pending_event_spinlock, flags);
+			if (pev == NULL)
 				break;
-			free_it = 1;
-			if (pending_event_head->event.data.ce_msg.completion != 0) {
-				ce_msg_comp_hdlr handler = pending_event_head->event.data.ce_msg.completion->handler;
-				void *token = pending_event_head->event.data.ce_msg.completion->token;
+			pce_msg_data = &pev->event.data.ce_msg;
+			if (pce_msg_data->ce_msg[3] != 0x40)
+				break;
+			if (pce_msg_data->completion != NULL) {
+				ce_msg_comp_hdlr handler =
+					pce_msg_data->completion->handler;
+				void *token = pce_msg_data->completion->token;
 
 				if (handler != NULL)
-					(*handler)(token, &(event->data.ce_msg));
+					(*handler)(token, ce_msg_data);
 			}
+			spin_lock_irqsave(&pending_event_spinlock, flags);
+			free_pending_event(pev);
+			spin_unlock_irqrestore(&pending_event_spinlock, flags);
+			/* send next waiting event */
+			if (pending_event_head != NULL)
+				signal_event(NULL);
 			break;
 		}
-
-		/* remove from queue */
-		if (free_it == 1) {
-			unsigned long flags;
-
-			spin_lock_irqsave(&pending_event_spinlock, flags);
-			if (pending_event_head != NULL) {
-				struct pending_event *oldHead =
-					pending_event_head;
-
-				pending_event_head = pending_event_head->next;
-				two = pending_event_head;
-				free_pending_event(oldHead);
-			}
-			spin_unlock_irqrestore(&pending_event_spinlock, flags);
-		}
-
-		/* send next waiting event */
-		if (two != NULL)
-			signal_event(NULL);
 		break;
 	case 1:	/* IT sys shutdown */
 		printk(KERN_INFO "mf.c: Commencing system shutdown\n");
@@ -442,52 +435,57 @@ static void handle_int(struct io_mf_lp_event *event)
 static void handle_ack(struct io_mf_lp_event *event)
 {
 	unsigned long flags;
-	struct pending_event * two = NULL;
+	struct pending_event *two = NULL;
 	unsigned long free_it = 0;
+	struct ce_msg_data *ce_msg_data;
+	struct ce_msg_data *pce_msg_data;
+	struct vsp_rsp_data *rsp;
 
 	/* handle current event */
-	if (pending_event_head != NULL) {
-		switch (event->hp_lp_event.xSubtype) {
-		case 0:     /* CE msg */
-			if (event->data.ce_msg.ce_msg[3] == 0x40) {
-				if (event->data.ce_msg.ce_msg[2] != 0) {
-					free_it = 1;
-					if (pending_event_head->event.data.ce_msg.completion
-							!= 0) {
-						ce_msg_comp_hdlr handler = pending_event_head->event.data.ce_msg.completion->handler;
-						void *token = pending_event_head->event.data.ce_msg.completion->token;
+	if (pending_event_head == NULL) {
+		printk(KERN_ERR "mf.c: stack empty for receiving ack\n");
+		return;
+	}
 
-						if (handler != NULL)
-							(*handler)(token, &(event->data.ce_msg));
-					}
-				}
-			} else
-				free_it = 1;
-			break;
-		case 4:	/* allocate */
-		case 5:	/* deallocate */
-			if (pending_event_head->hdlr != NULL) {
-				(*pending_event_head->hdlr)((void *)event->hp_lp_event.xCorrelationToken, event->data.alloc.count);
-			}
+	switch (event->hp_lp_event.xSubtype) {
+	case 0:     /* CE msg */
+		ce_msg_data = &event->data.ce_msg;
+		if (ce_msg_data->ce_msg[3] != 0x40) {
 			free_it = 1;
 			break;
-		case 6:
-			{
-				struct vsp_rsp_data *rsp = (struct vsp_rsp_data *)event->data.vsp_cmd.token;
+		}
+		if (ce_msg_data->ce_msg[2] == 0)
+			break;
+		free_it = 1;
+		pce_msg_data = &pending_event_head->event.data.ce_msg;
+		if (pce_msg_data->completion != NULL) {
+			ce_msg_comp_hdlr handler =
+				pce_msg_data->completion->handler;
+			void *token = pce_msg_data->completion->token;
 
-				if (rsp != NULL) {
-					if (rsp->response != NULL)
-						memcpy(rsp->response, &(event->data.vsp_cmd), sizeof(event->data.vsp_cmd));
-					complete(&rsp->com);
-				} else
-					printk(KERN_ERR "mf.c: no rsp\n");
-				free_it = 1;
-			}
+			if (handler != NULL)
+				(*handler)(token, ce_msg_data);
+		}
+		break;
+	case 4:	/* allocate */
+	case 5:	/* deallocate */
+		if (pending_event_head->hdlr != NULL)
+			(*pending_event_head->hdlr)((void *)event->hp_lp_event.xCorrelationToken, event->data.alloc.count);
+		free_it = 1;
+		break;
+	case 6:
+		free_it = 1;
+		rsp = (struct vsp_rsp_data *)event->data.vsp_cmd.token;
+		if (rsp == NULL) {
+			printk(KERN_ERR "mf.c: no rsp\n");
 			break;
 		}
+		if (rsp->response != NULL)
+			memcpy(rsp->response, &event->data.vsp_cmd,
+					sizeof(event->data.vsp_cmd));
+		complete(&rsp->com);
+		break;
 	}
-	else
-		printk(KERN_ERR "mf.c: stack empty for receiving ack\n");
 
 	/* remove from queue */
 	spin_lock_irqsave(&pending_event_spinlock, flags);
@@ -618,7 +616,9 @@ void mf_display_src(u32 word)
 {
 	u8 ce[12];
 
-	memcpy(ce, "\x00\x00\x00\x4A\x00\x00\x00\x01\x00\x00\x00\x00", 12);
+	memset(ce, 0, sizeof(ce));
+	ce[3] = 0x4a;
+	ce[7] = 0x01;
 	ce[8] = word >> 24;
 	ce[9] = word >> 16;
 	ce[10] = word >> 8;
@@ -677,64 +677,324 @@ void mf_init(void)
 	signal_ce_msg_simple(0x57, NULL);
 
 	/* initialization complete */
-	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n");
+	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities "
+			"initialized\n");
 }
 
-void mf_setSide(char side)
-{
-	u64 new_side;
-	struct vsp_cmd_data vsp_cmd;
+struct rtc_time_data {
+	struct completion com;
+	struct ce_msg_data ce_msg;
+	int rc;
+};
 
-	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
-	switch (side) {
-	case 'A':	new_side = 0;
-			break;
-	case 'B':	new_side = 1;
-			break;
-	case 'C':	new_side = 2;
-			break;
-	default:	new_side = 3;
-			break;
+static void get_rtc_time_complete(void *token, struct ce_msg_data *ce_msg)
+{
+	struct rtc_time_data *rtc = token;
+
+	memcpy(&rtc->ce_msg, ce_msg, sizeof(rtc->ce_msg));
+	rtc->rc = 0;
+	complete(&rtc->com);
+}
+
+int mf_get_rtc(struct rtc_time *tm)
+{
+	struct ce_msg_comp_data ce_complete;
+	struct rtc_time_data rtc_data;
+	int rc;
+
+	memset(&ce_complete, 0, sizeof(ce_complete));
+	memset(&rtc_data, 0, sizeof(rtc_data));
+	init_completion(&rtc_data.com);
+	ce_complete.handler = &get_rtc_time_complete;
+	ce_complete.token = &rtc_data;
+	rc = signal_ce_msg_simple(0x40, &ce_complete);
+	if (rc)
+		return rc;
+	wait_for_completion(&rtc_data.com);
+	tm->tm_wday = 0;
+	tm->tm_yday = 0;
+	tm->tm_isdst = 0;
+	if (rtc_data.rc) {
+		tm->tm_sec = 0;
+		tm->tm_min = 0;
+		tm->tm_hour = 0;
+		tm->tm_mday = 15;
+		tm->tm_mon = 5;
+		tm->tm_year = 52;
+		return rtc_data.rc;
 	}
-	vsp_cmd.sub_data.ipl_type = new_side;
-	vsp_cmd.cmd = 10;
 
-	(void)signal_vsp_instruction(&vsp_cmd);
+	if ((rtc_data.ce_msg.ce_msg[2] == 0xa9) ||
+	    (rtc_data.ce_msg.ce_msg[2] == 0xaf)) {
+		/* TOD clock is not set */
+		tm->tm_sec = 1;
+		tm->tm_min = 1;
+		tm->tm_hour = 1;
+		tm->tm_mday = 10;
+		tm->tm_mon = 8;
+		tm->tm_year = 71;
+		mf_set_rtc(tm);
+	}
+	{
+		u8 *ce_msg = rtc_data.ce_msg.ce_msg;
+		u8 year = ce_msg[5];
+		u8 sec = ce_msg[6];
+		u8 min = ce_msg[7];
+		u8 hour = ce_msg[8];
+		u8 day = ce_msg[10];
+		u8 mon = ce_msg[11];
+
+		BCD_TO_BIN(sec);
+		BCD_TO_BIN(min);
+		BCD_TO_BIN(hour);
+		BCD_TO_BIN(day);
+		BCD_TO_BIN(mon);
+		BCD_TO_BIN(year);
+
+		if (year <= 69)
+			year += 100;
+
+		tm->tm_sec = sec;
+		tm->tm_min = min;
+		tm->tm_hour = hour;
+		tm->tm_mday = day;
+		tm->tm_mon = mon;
+		tm->tm_year = year;
+	}
+
+	return 0;
 }
 
-char mf_getSide(void)
+int mf_set_rtc(struct rtc_time *tm)
 {
-	char return_value = ' ';
-	int rc = 0;
+	char ce_time[12];
+	u8 day, mon, hour, min, sec, y1, y2;
+	unsigned year;
+
+	year = 1900 + tm->tm_year;
+	y1 = year / 100;
+	y2 = year % 100;
+
+	sec = tm->tm_sec;
+	min = tm->tm_min;
+	hour = tm->tm_hour;
+	day = tm->tm_mday;
+	mon = tm->tm_mon + 1;
+
+	BIN_TO_BCD(sec);
+	BIN_TO_BCD(min);
+	BIN_TO_BCD(hour);
+	BIN_TO_BCD(mon);
+	BIN_TO_BCD(day);
+	BIN_TO_BCD(y1);
+	BIN_TO_BCD(y2);
+
+	memset(ce_time, 0, sizeof(ce_time));
+	ce_time[3] = 0x41;
+	ce_time[4] = y1;
+	ce_time[5] = y2;
+	ce_time[6] = sec;
+	ce_time[7] = min;
+	ce_time[8] = hour;
+	ce_time[10] = day;
+	ce_time[11] = mon;
+
+	return signal_ce_msg(ce_time, NULL);
+}
+
+#ifdef CONFIG_PROC_FS
+
+static int proc_mf_dump_cmdline(char *page, char **start, off_t off,
+		int count, int *eof, void *data)
+{
+	int len;
+	char *p;
+	struct vsp_cmd_data vsp_cmd;
+	int rc;
+	dma_addr_t dma_addr;
+
+	/* The HV appears to return no more than 256 bytes of command line */
+	if (off >= 256)
+		return 0;
+	if ((off + count) > 256)
+		count = 256 - off;
+
+	dma_addr = dma_map_single(iSeries_vio_dev, page, off + count,
+			DMA_FROM_DEVICE);
+	if (dma_mapping_error(dma_addr))
+		return -ENOMEM;
+	memset(page, 0, off + count);
+	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
+	vsp_cmd.cmd = 33;
+	vsp_cmd.sub_data.kern.token = dma_addr;
+	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	vsp_cmd.sub_data.kern.side = (u64)data;
+	vsp_cmd.sub_data.kern.length = off + count;
+	mb();
+	rc = signal_vsp_instruction(&vsp_cmd);
+	dma_unmap_single(iSeries_vio_dev, dma_addr, off + count,
+			DMA_FROM_DEVICE);
+	if (rc)
+		return rc;
+	if (vsp_cmd.result_code != 0)
+		return -ENOMEM;
+	p = page;
+	len = 0;
+	while (len < (off + count)) {
+		if ((*p == '\0') || (*p == '\n')) {
+			if (*p == '\0')
+				*p = '\n';
+			p++;
+			len++;
+			*eof = 1;
+			break;
+		}
+		p++;
+		len++;
+	}
+
+	if (len < off) {
+		*eof = 1;
+		len = 0;
+	}
+	return len;
+}
+
+#if 0
+static int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
+{
+	struct vsp_cmd_data vsp_cmd;
+	int rc;
+	int len = *size;
+	dma_addr_t dma_addr;
+
+	dma_addr = dma_map_single(iSeries_vio_dev, buffer, len,
+			DMA_FROM_DEVICE);
+	memset(buffer, 0, len);
+	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
+	vsp_cmd.cmd = 32;
+	vsp_cmd.sub_data.kern.token = dma_addr;
+	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	vsp_cmd.sub_data.kern.side = side;
+	vsp_cmd.sub_data.kern.offset = offset;
+	vsp_cmd.sub_data.kern.length = len;
+	mb();
+	rc = signal_vsp_instruction(&vsp_cmd);
+	if (rc == 0) {
+		if (vsp_cmd.result_code == 0)
+			*size = vsp_cmd.sub_data.length_out;
+		else
+			rc = -ENOMEM;
+	}
+
+	dma_unmap_single(iSeries_vio_dev, dma_addr, len, DMA_FROM_DEVICE);
+
+	return rc;
+}
+
+static int proc_mf_dump_vmlinux(char *page, char **start, off_t off,
+		int count, int *eof, void *data)
+{
+	int sizeToGet = count;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (mf_getVmlinuxChunk(page, &sizeToGet, off, (u64)data) == 0) {
+		if (sizeToGet != 0) {
+			*start = page + off;
+			return sizeToGet;
+		}
+		*eof = 1;
+		return 0;
+	}
+	*eof = 1;
+	return 0;
+}
+#endif
+
+static int proc_mf_dump_side(char *page, char **start, off_t off,
+		int count, int *eof, void *data)
+{
+	int len;
+	char mf_current_side = ' ';
 	struct vsp_cmd_data vsp_cmd;
 
 	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
 	vsp_cmd.cmd = 2;
 	vsp_cmd.sub_data.ipl_type = 0;
 	mb();
-	rc = signal_vsp_instruction(&vsp_cmd);
 
-	if (rc != 0)
-		return return_value;
-
-	if (vsp_cmd.result_code == 0) {
-		switch (vsp_cmd.sub_data.ipl_type) {
-		case 0:	return_value = 'A';
-			break;
-		case 1:	return_value = 'B';
-			break;
-		case 2:	return_value = 'C';
-			break;
-		default:	return_value = 'D';
-			break;
+	if (signal_vsp_instruction(&vsp_cmd) == 0) {
+		if (vsp_cmd.result_code == 0) {
+			switch (vsp_cmd.sub_data.ipl_type) {
+			case 0:	mf_current_side = 'A';
+				break;
+			case 1:	mf_current_side = 'B';
+				break;
+			case 2:	mf_current_side = 'C';
+				break;
+			default:	mf_current_side = 'D';
+				break;
+			}
 		}
 	}
-	return return_value;
+
+	len = sprintf(page, "%c\n", mf_current_side);
+
+	if (len <= (off + count))
+		*eof = 1;
+	*start = page + off;
+	len -= off;
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
+	return len;
 }
 
-void mf_getSrcHistory(char *buffer, int size)
+static int proc_mf_change_side(struct file *file, const char __user *buffer,
+		unsigned long count, void *data)
 {
+	char side;
+	u64 newSide;
+	struct vsp_cmd_data vsp_cmd;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (count == 0)
+		return 0;
+
+	if (get_user(side, buffer))
+		return -EFAULT;
+
+	switch (side) {
+	case 'A':	newSide = 0;
+			break;
+	case 'B':	newSide = 1;
+			break;
+	case 'C':	newSide = 2;
+			break;
+	case 'D':	newSide = 3;
+			break;
+	default:
+		printk(KERN_ERR "mf_proc.c: proc_mf_change_side: invalid side\n");
+		return -EINVAL;
+	}
+
+	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
+	vsp_cmd.sub_data.ipl_type = newSide;
+	vsp_cmd.cmd = 10;
+
+	(void)signal_vsp_instruction(&vsp_cmd);
+
+	return count;
+}
+
 #if 0
+static void mf_getSrcHistory(char *buffer, int size)
+{
 	struct IplTypeReturnStuff return_stuff;
 	struct pending_event *ev = new_pending_event();
 	int rc = 0;
@@ -775,352 +1035,13 @@ void mf_getSrcHistory(char *buffer, int size)
 	kfree(pages[1]);
 	kfree(pages[2]);
 	kfree(pages[3]);
-#endif
-}
-
-void mf_setCmdLine(const char *cmdline, int size, u64 side)
-{
-	struct vsp_cmd_data vsp_cmd;
-	dma_addr_t dma_addr = 0;
-	char *page = dma_alloc_coherent(iSeries_vio_dev, size, &dma_addr,
-			GFP_ATOMIC);
-
-	if (page == NULL) {
-		printk(KERN_ERR "mf.c: couldn't allocate memory to set command line\n");
-		return;
-	}
-
-	copy_from_user(page, cmdline, size);
-
-	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
-	vsp_cmd.cmd = 31;
-	vsp_cmd.sub_data.kern.token = dma_addr;
-	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
-	vsp_cmd.sub_data.kern.side = side;
-	vsp_cmd.sub_data.kern.length = size;
-	mb();
-	(void)signal_vsp_instruction(&vsp_cmd);
-
-	dma_free_coherent(iSeries_vio_dev, size, page, dma_addr);
-}
-
-int mf_getCmdLine(char *cmdline, int *size, u64 side)
-{
-	struct vsp_cmd_data vsp_cmd;
-	int rc;
-	int len = *size;
-	dma_addr_t dma_addr;
-
-	dma_addr = dma_map_single(iSeries_vio_dev, cmdline, len,
-			DMA_FROM_DEVICE);
-	memset(cmdline, 0, len);
-	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
-	vsp_cmd.cmd = 33;
-	vsp_cmd.sub_data.kern.token = dma_addr;
-	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
-	vsp_cmd.sub_data.kern.side = side;
-	vsp_cmd.sub_data.kern.length = len;
-	mb();
-	rc = signal_vsp_instruction(&vsp_cmd);
-
-	if (rc == 0) {
-		if (vsp_cmd.result_code == 0)
-			len = vsp_cmd.sub_data.length_out;
-#if 0
-		else
-			memcpy(cmdline, "Bad cmdline", 11);
-#endif
-	}
-
-	dma_unmap_single(iSeries_vio_dev, dma_addr, *size, DMA_FROM_DEVICE);
-
-	return len;
-}
-
-
-int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
-{
-	struct vsp_cmd_data vsp_cmd;
-	int rc;
-	dma_addr_t dma_addr = 0;
-	char *page = dma_alloc_coherent(iSeries_vio_dev, size, &dma_addr,
-			GFP_ATOMIC);
-
-	if (page == NULL) {
-		printk(KERN_ERR "mf.c: couldn't allocate memory to set vmlinux chunk\n");
-		return -ENOMEM;
-	}
-
-	copy_from_user(page, buffer, size);
-	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
-
-	vsp_cmd.cmd = 30;
-	vsp_cmd.sub_data.kern.token = dma_addr;
-	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
-	vsp_cmd.sub_data.kern.side = side;
-	vsp_cmd.sub_data.kern.offset = offset;
-	vsp_cmd.sub_data.kern.length = size;
-	mb();
-	rc = signal_vsp_instruction(&vsp_cmd);
-	if (rc == 0) {
-		if (vsp_cmd.result_code == 0)
-			rc = 0;
-		else
-			rc = -ENOMEM;
-	}
-
-	dma_free_coherent(iSeries_vio_dev, size, page, dma_addr);
-
-	return rc;
-}
-
-int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
-{
-	struct vsp_cmd_data vsp_cmd;
-	int rc;
-	int len = *size;
-	dma_addr_t dma_addr;
-
-	dma_addr = dma_map_single(iSeries_vio_dev, buffer, len,
-			DMA_FROM_DEVICE);
-	memset(buffer, 0, len);
-	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
-	vsp_cmd.cmd = 32;
-	vsp_cmd.sub_data.kern.token = dma_addr;
-	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
-	vsp_cmd.sub_data.kern.side = side;
-	vsp_cmd.sub_data.kern.offset = offset;
-	vsp_cmd.sub_data.kern.length = len;
-	mb();
-	rc = signal_vsp_instruction(&vsp_cmd);
-	if (rc == 0) {
-		if (vsp_cmd.result_code == 0)
-			*size = vsp_cmd.sub_data.length_out;
-		else
-			rc = -ENOMEM;
-	}
-
-	dma_unmap_single(iSeries_vio_dev, dma_addr, len, DMA_FROM_DEVICE);
-
-	return rc;
-}
-
-struct rtc_time_data {
-	struct completion com;
-	struct ce_msg_data ce_msg;
-	int rc;
-};
-
-static void get_rtc_time_complete(void *token, struct ce_msg_data *ce_msg)
-{
-	struct rtc_time_data *rtc = token;
-
-	memcpy(&rtc->ce_msg, ce_msg, sizeof(rtc->ce_msg));
-	rtc->rc = 0;
-	complete(&rtc->com);
-}
-
-int mf_get_rtc(struct rtc_time *tm)
-{
-	struct ce_msg_comp_data ce_complete;
-	struct rtc_time_data rtc_data;
-	int rc;
-
-	memset(&ce_complete, 0, sizeof(ce_complete));
-	memset(&rtc_data, 0, sizeof(rtc_data));
-	init_completion(&rtc_data.com);
-	ce_complete.handler = &get_rtc_time_complete;
-	ce_complete.token = &rtc_data;
-	rc = signal_ce_msg_simple(0x40, &ce_complete);
-	if (rc == 0) {
-		wait_for_completion(&rtc_data.com);
-
-		if (rtc_data.rc == 0) {
-			if ((rtc_data.ce_msg.ce_msg[2] == 0xa9) ||
-			    (rtc_data.ce_msg.ce_msg[2] == 0xaf)) {
-				/* TOD clock is not set */
-				tm->tm_sec = 1;
-				tm->tm_min = 1;
-				tm->tm_hour = 1;
-				tm->tm_mday = 10;
-				tm->tm_mon = 8;
-				tm->tm_year = 71;
-				mf_set_rtc(tm);
-			}
-			{
-				u8 *ce_msg = rtc_data.ce_msg.ce_msg;
-				u8 year = ce_msg[5];
-				u8 sec = ce_msg[6];
-				u8 min = ce_msg[7];
-				u8 hour = ce_msg[8];
-				u8 day = ce_msg[10];
-				u8 mon = ce_msg[11];
-
-				BCD_TO_BIN(sec);
-				BCD_TO_BIN(min);
-				BCD_TO_BIN(hour);
-				BCD_TO_BIN(day);
-				BCD_TO_BIN(mon);
-				BCD_TO_BIN(year);
-
-				if (year <= 69)
-					year += 100;
-
-				tm->tm_sec = sec;
-				tm->tm_min = min;
-				tm->tm_hour = hour;
-				tm->tm_mday = day;
-				tm->tm_mon = mon;
-				tm->tm_year = year;
-			}
-		} else {
-			rc = rtc_data.rc;
-			tm->tm_sec = 0;
-			tm->tm_min = 0;
-			tm->tm_hour = 0;
-			tm->tm_mday = 15;
-			tm->tm_mon = 5;
-			tm->tm_year = 52;
-
-		}
-		tm->tm_wday = 0;
-		tm->tm_yday = 0;
-		tm->tm_isdst = 0;
-	}
-
-	return rc;
-}
-
-int mf_set_rtc(struct rtc_time *tm)
-{
-	char ce_time[12] = "\x00\x00\x00\x41\x00\x00\x00\x00\x00\x00\x00\x00";
-	u8 day, mon, hour, min, sec, y1, y2;
-	unsigned year;
-
-	year = 1900 + tm->tm_year;
-	y1 = year / 100;
-	y2 = year % 100;
-
-	sec = tm->tm_sec;
-	min = tm->tm_min;
-	hour = tm->tm_hour;
-	day = tm->tm_mday;
-	mon = tm->tm_mon + 1;
-
-	BIN_TO_BCD(sec);
-	BIN_TO_BCD(min);
-	BIN_TO_BCD(hour);
-	BIN_TO_BCD(mon);
-	BIN_TO_BCD(day);
-	BIN_TO_BCD(y1);
-	BIN_TO_BCD(y2);
-
-	ce_time[4] = y1;
-	ce_time[5] = y2;
-	ce_time[6] = sec;
-	ce_time[7] = min;
-	ce_time[8] = hour;
-	ce_time[10] = day;
-	ce_time[11] = mon;
-
-	return signal_ce_msg(ce_time, NULL);
-}
-
-static int proc_mf_dump_cmdline(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	int len = count;
-	char *p;
-
-	if (off) {
-		*eof = 1;
-		return 0;
-	}
-
-	len = mf_getCmdLine(page, &len, (u64)data);
-
-	p = page;
-	while (len < (count - 1)) {
-		if (!*p || *p == '\n')
-			break;
-		p++;
-		len++;
-	}
-	*p = '\n';
-	p++;
-	*p = 0;
-
-	return p - page;
-}
-
-#if 0
-static int proc_mf_dump_vmlinux(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	int sizeToGet = count;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	if (mf_getVmlinuxChunk(page, &sizeToGet, off, (u64)data) == 0) {
-		if (sizeToGet != 0) {
-			*start = page + off;
-			return sizeToGet;
-		}
-		*eof = 1;
-		return 0;
-	}
-	*eof = 1;
-	return 0;
 }
 #endif
-
-static int proc_mf_dump_side(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	int len;
-	char mf_current_side = mf_getSide();
-
-	len = sprintf(page, "%c\n", mf_current_side);
-
-	if (len <= (off + count))
-		*eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-	return len;
-}
-
-static int proc_mf_change_side(struct file *file, const char __user *buffer,
-		unsigned long count, void *data)
-{
-	char stkbuf[10];
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	if (count > (sizeof(stkbuf) - 1))
-		count = sizeof(stkbuf) - 1;
-	if (copy_from_user(stkbuf, buffer, count))
-		return -EFAULT;
-	stkbuf[count] = 0;
-	if ((*stkbuf != 'A') && (*stkbuf != 'B') &&
-	    (*stkbuf != 'C') && (*stkbuf != 'D')) {
-		printk(KERN_ERR "mf_proc.c: proc_mf_change_side: invalid side\n");
-		return -EINVAL;
-	}
-
-	mf_setSide(*stkbuf);
-
-	return count;
-}
 
 static int proc_mf_dump_src(char *page, char **start, off_t off,
 		int count, int *eof, void *data)
 {
+#if 0
 	int len;
 
 	mf_getSrcHistory(page, count);
@@ -1134,6 +1055,9 @@ static int proc_mf_dump_src(char *page, char **start, off_t off,
 		len = count;
 	*start = page + off;
 	return len;
+#else
+	return 0;
+#endif
 }
 
 static int proc_mf_change_src(struct file *file, const char __user *buffer,
@@ -1162,34 +1086,91 @@ static int proc_mf_change_src(struct file *file, const char __user *buffer,
 	return count;
 }
 
-static int proc_mf_change_cmdline(struct file *file, const char *buffer,
+static int proc_mf_change_cmdline(struct file *file, const char __user *buffer,
 		unsigned long count, void *data)
 {
+	struct vsp_cmd_data vsp_cmd;
+	dma_addr_t dma_addr;
+	char *page;
+	int ret = -EACCES;
+
 	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
+		goto out;
 
-	mf_setCmdLine(buffer, count, (u64)data);
+	dma_addr = 0;
+	page = dma_alloc_coherent(iSeries_vio_dev, count, &dma_addr,
+			GFP_ATOMIC);
+	ret = -ENOMEM;
+	if (page == NULL)
+		goto out;
 
-	return count;
+	ret = -EFAULT;
+	if (copy_from_user(page, buffer, count))
+		goto out_free;
+
+	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
+	vsp_cmd.cmd = 31;
+	vsp_cmd.sub_data.kern.token = dma_addr;
+	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	vsp_cmd.sub_data.kern.side = (u64)data;
+	vsp_cmd.sub_data.kern.length = count;
+	mb();
+	(void)signal_vsp_instruction(&vsp_cmd);
+	ret = count;
+
+out_free:
+	dma_free_coherent(iSeries_vio_dev, count, page, dma_addr);
+out:
+	return ret;
 }
 
 static ssize_t proc_mf_change_vmlinux(struct file *file,
 				      const char __user *buf,
 				      size_t count, loff_t *ppos)
 {
-	struct inode * inode = file->f_dentry->d_inode;
-	struct proc_dir_entry * dp = PDE(inode);
-	int rc;
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
+	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
+	ssize_t rc;
+	dma_addr_t dma_addr;
+	char *page;
+	struct vsp_cmd_data vsp_cmd;
 
-	rc = mf_setVmlinuxChunk(buf, count, *ppos, (u64)dp->data);
-	if (rc < 0)
-		return rc;
+	rc = -EACCES;
+	if (!capable(CAP_SYS_ADMIN))
+		goto out;
+
+	dma_addr = 0;
+	page = dma_alloc_coherent(iSeries_vio_dev, count, &dma_addr,
+			GFP_ATOMIC);
+	rc = -ENOMEM;
+	if (page == NULL) {
+		printk(KERN_ERR "mf.c: couldn't allocate memory to set vmlinux chunk\n");
+		goto out;
+	}
+	rc = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out_free;
+
+	memset(&vsp_cmd, 0, sizeof(vsp_cmd));
+	vsp_cmd.cmd = 30;
+	vsp_cmd.sub_data.kern.token = dma_addr;
+	vsp_cmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	vsp_cmd.sub_data.kern.side = (u64)dp->data;
+	vsp_cmd.sub_data.kern.offset = *ppos;
+	vsp_cmd.sub_data.kern.length = count;
+	mb();
+	rc = signal_vsp_instruction(&vsp_cmd);
+	if (rc)
+		goto out_free;
+	rc = -ENOMEM;
+	if (vsp_cmd.result_code != 0)
+		goto out_free;
 
 	*ppos += count;
-
-	return count;
+	rc = count;
+out_free:
+	dma_free_coherent(iSeries_vio_dev, count, page, dma_addr);
+out:
+	return rc;
 }
 
 static struct file_operations proc_vmlinux_operations = {
@@ -1254,3 +1235,5 @@ static int __init mf_proc_init(void)
 }
 
 __initcall(mf_proc_init);
+
+#endif /* CONFIG_PROC_FS */

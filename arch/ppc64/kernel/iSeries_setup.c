@@ -55,6 +55,7 @@
 #include <asm/iSeries/IoHriMainStore.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/iSeries/mf.h>
+#include <asm/iSeries/HvLpEvent.h>
 
 extern void hvlog(char *fmt, ...);
 
