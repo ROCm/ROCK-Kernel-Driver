@@ -555,8 +555,7 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void _
 {
 	if (!newsp)
 		newsp = regs->rsp;
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0,
-		    parent_tid, child_tid);
+	return do_fork(clone_flags, newsp, regs, 0, parent_tid, child_tid);
 }
 
 /*

@@ -1148,8 +1148,7 @@ asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp,
 	void __user *child_tid = (void __user *)regs->rdi;
 	if (!newsp)
 		newsp = regs->rsp;
-        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0,
-		    parent_tid, child_tid);
+        return do_fork(clone_flags, newsp, regs, 0, parent_tid, child_tid);
 }
 
 /*

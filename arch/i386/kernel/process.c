@@ -595,7 +595,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
 	child_tidptr = (int __user *)regs.edi;
 	if (!newsp)
 		newsp = regs.esp;
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, parent_tidptr, child_tidptr);
+	return do_fork(clone_flags, newsp, &regs, 0, parent_tidptr, child_tidptr);
 }
 
 /*

@@ -1219,7 +1219,7 @@ asmlinkage long sys32_clone(struct pt_regs regs)
 	child_tidptr = (int *) (regs.gprs[5] & 0x7fffffffUL);
         if (!newsp)
                 newsp = regs.gprs[15];
-        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+        return do_fork(clone_flags, newsp, &regs, 0,
 		       parent_tidptr, child_tidptr);
 }
 

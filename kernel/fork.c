@@ -45,6 +45,9 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
+/* set if new pid should be 0 (kernel only)*/
+#define CLONE_IDLETASK	0x00001000
+
 /* The idle threads do not count..
  * Protected by write_lock_irq(&tasklist_lock)
  */
@@ -1194,7 +1197,7 @@ task_t * __init fork_idle(int cpu)
 
 static inline int fork_traceflag (unsigned clone_flags)
 {
-	if (clone_flags & (CLONE_UNTRACED | CLONE_IDLETASK))
+	if (clone_flags & CLONE_UNTRACED)
 		return 0;
 	else if (clone_flags & CLONE_VFORK) {
 		if (current->ptrace & PT_TRACE_VFORK)
@@ -1225,6 +1228,7 @@ long do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long pid;
 
+	clone_flags &= ~CLONE_IDLETASK;
 	if (unlikely(current->ptrace)) {
 		trace = fork_traceflag (clone_flags);
 		if (trace)
@@ -1254,13 +1258,11 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		if (likely(!(clone_flags & CLONE_IDLETASK))) {
-			if (!(clone_flags & CLONE_STOPPED))
-				wake_up_new_task(p, clone_flags);
-			else
-				p->state = TASK_STOPPED;
-			++total_forks;
-		}
+		if (!(clone_flags & CLONE_STOPPED))
+			wake_up_new_task(p, clone_flags);
+		else
+			p->state = TASK_STOPPED;
+		++total_forks;
 
 		if (unlikely (trace)) {
 			current->ptrace_message = pid;

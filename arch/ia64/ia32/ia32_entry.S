@@ -41,7 +41,7 @@ ENTRY(ia32_clone)
 	zxt4 out1=in1				// newsp
 	mov out3=16				// stacksize (compensates for 16-byte scratch area)
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
-	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
+	mov out0=in0				// out0 = clone_flags
 	zxt4 out4=in2				// out4 = parent_tidptr
 	zxt4 out5=in4				// out5 = child_tidptr
 	br.call.sptk.many rp=do_fork

@@ -820,7 +820,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
 {
 	if (!newsp)
 		newsp = pregs->regs[15];
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, pregs, 0, 0, 0);
+	return do_fork(clone_flags, newsp, pregs, 0, 0, 0);
 }
 
 /*

@@ -435,8 +435,6 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 {
 	unsigned long parent_tid_ptr, child_tid_ptr;
 
-	clone_flags &= ~CLONE_IDLETASK;
-
 	parent_tid_ptr = regs->u_regs[UREG_I2];
 	child_tid_ptr = regs->u_regs[UREG_I4];
 
