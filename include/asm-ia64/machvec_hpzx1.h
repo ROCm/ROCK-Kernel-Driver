@@ -2,6 +2,7 @@
 #define _ASM_IA64_MACHVEC_HPZX1_h
 
 extern ia64_mv_setup_t dig_setup;
+extern ia64_mv_setup_t			sba_setup;
 extern ia64_mv_dma_alloc_coherent	sba_alloc_coherent;
 extern ia64_mv_dma_free_coherent	sba_free_coherent;
 extern ia64_mv_dma_map_single		sba_map_single;
@@ -19,7 +20,7 @@ extern ia64_mv_dma_mapping_error	sba_dma_mapping_error;
  * the macros are used directly.
  */
 #define platform_name			"hpzx1"
-#define platform_setup			dig_setup
+#define platform_setup			sba_setup
 #define platform_dma_init		machvec_noop
 #define platform_dma_alloc_coherent	sba_alloc_coherent
 #define platform_dma_free_coherent	sba_free_coherent
