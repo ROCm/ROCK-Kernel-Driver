@@ -1523,8 +1523,10 @@ void __init paging_init(void)
 	/* Now can init the kernel/bad page tables. */
 	pgd_set(&swapper_pg_dir[0], swapper_pmd_dir + (shift / sizeof(pgd_t)));
 	
-	sparc64_vpte_patchme1[0] |= (pgd_val(init_mm.pgd[0]) >> 10);
-	sparc64_vpte_patchme2[0] |= (pgd_val(init_mm.pgd[0]) & 0x3ff);
+	sparc64_vpte_patchme1[0] |=
+		(((unsigned long)pgd_val(init_mm.pgd[0])) >> 10);
+	sparc64_vpte_patchme2[0] |=
+		(((unsigned long)pgd_val(init_mm.pgd[0])) & 0x3ff);
 	flushi((long)&sparc64_vpte_patchme1[0]);
 	
 	/* Setup bootmem... */
