@@ -289,6 +289,7 @@ module_init(agp_init);
 EXPORT_SYMBOL(agp_backend_acquire);
 EXPORT_SYMBOL(agp_backend_release);
 EXPORT_SYMBOL_GPL(agp_register_driver);
+EXPORT_SYMBOL_GPL(agp_unregister_driver);
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");

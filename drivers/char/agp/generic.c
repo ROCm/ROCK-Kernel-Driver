@@ -693,7 +693,23 @@ void agp_enable(u32 mode)
 EXPORT_SYMBOL(agp_free_memory);
 EXPORT_SYMBOL(agp_allocate_memory);
 EXPORT_SYMBOL(agp_copy_info);
+EXPORT_SYMBOL(agp_create_memory);
 EXPORT_SYMBOL(agp_bind_memory);
 EXPORT_SYMBOL(agp_unbind_memory);
+EXPORT_SYMBOL(agp_free_key);
 EXPORT_SYMBOL(agp_enable);
+EXPORT_SYMBOL(agp_bridge);
+
+EXPORT_SYMBOL(agp_generic_alloc_page);
+EXPORT_SYMBOL(agp_generic_destroy_page);
+EXPORT_SYMBOL(agp_generic_suspend);
+EXPORT_SYMBOL(agp_generic_resume);
+EXPORT_SYMBOL(agp_generic_agp_enable);
+EXPORT_SYMBOL(agp_generic_create_gatt_table);
+EXPORT_SYMBOL(agp_generic_free_gatt_table);
+EXPORT_SYMBOL(agp_generic_insert_memory);
+EXPORT_SYMBOL(agp_generic_remove_memory);
+EXPORT_SYMBOL(agp_generic_alloc_by_type);
+EXPORT_SYMBOL(agp_generic_free_by_type);
+EXPORT_SYMBOL(global_cache_flush);
 
