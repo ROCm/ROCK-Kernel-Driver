@@ -43,8 +43,8 @@ config X86_POWERNOW_K8
 	  If in doubt, say N.
 
 config X86_POWERNOW_K8_ACPI
-	tristate "AMD Opteron/Athlon64 PowerNow! using ACPI"
-	depends on CPU_FREQ && EXPERIMENTAL && ACPI
+	bool "AMD Opteron/Athlon64 PowerNow! using ACPI"
+	depends on CPU_FREQ && EXPERIMENTAL && ACPI && X86_POWERNOW_K8
 	help
 	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
 	  This version uses information from ACPI.
