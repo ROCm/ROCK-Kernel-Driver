@@ -26,10 +26,6 @@
    for Alpha Processor Inc. UP-2000(+) boards */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_BUS
-#define DEBUG	1
-#endif
-
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/module.h>

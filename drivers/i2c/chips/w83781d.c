@@ -25,8 +25,7 @@
 
     Chip	#vin	#fanin	#pwm	#temp	wchipid	vendid	i2c	ISA
     as99127f	7	3	1?	3	0x31	0x12c3	yes	no
-    as99127f rev.2 (type_name = 1299127f)	0x31	0x5ca3	yes	no
-    asb100 "bach" (type_name = as99127f)	0x31	0x0694	yes	no
+    as99127f rev.2 (type_name = as99127f)	0x31	0x5ca3	yes	no
     w83781d	7	3	0	3	0x10-1	0x5ca3	yes	yes
     w83627hf	9	3	2	3	0x21	0x5ca3	yes	yes(LPC)
     w83627thf	9	3	2	3	0x90	0x5ca3	no	yes(LPC)
@@ -37,10 +36,6 @@
 */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CHIP
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -248,10 +243,10 @@ struct w83781d_data {
 	u8 fan_min[3];		/* Register value */
 	u8 temp;
 	u8 temp_max;		/* Register value */
-	u8 temp_hyst;		/* Register value */
+	u8 temp_max_hyst;	/* Register value */
 	u16 temp_add[2];	/* Register value */
 	u16 temp_max_add[2];	/* Register value */
-	u16 temp_hyst_add[2];	/* Register value */
+	u16 temp_max_hyst_add[2];	/* Register value */
 	u8 fan_div[3];		/* Register encoding, shifted right */
 	u8 vid;			/* Register encoding, combined */
 	u32 alarms;		/* Register encoding, combined */
@@ -277,7 +272,7 @@ static int w83781d_detach_client(struct i2c_client *client);
 static int w83781d_read_value(struct i2c_client *client, u16 register);
 static int w83781d_write_value(struct i2c_client *client, u16 register,
 			       u16 value);
-static void w83781d_update_client(struct i2c_client *client);
+static struct w83781d_data *w83781d_update_device(struct device *dev);
 static void w83781d_init_client(struct i2c_client *client);
 
 static inline u16 swap_bytes(u16 val)
@@ -298,11 +293,7 @@ static struct i2c_driver w83781d_driver = {
 #define show_in_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83781d_data *data = i2c_get_clientdata(client); \
-	 \
-	w83781d_update_client(client); \
-	 \
+	struct w83781d_data *data = w83781d_update_device(dev); \
 	return sprintf(buf,"%ld\n", (long)IN_FROM_REG(data->reg[nr] * 10)); \
 }
 show_in_reg(in);
@@ -331,7 +322,7 @@ show_regs_in_##offset (struct device *dev, char *buf) \
 { \
         return show_in(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(in_input##offset, S_IRUGO, show_regs_in_##offset, NULL)
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL)
 
 #define sysfs_in_reg_offset(reg, offset) \
 static ssize_t show_regs_in_##reg##offset (struct device *dev, char *buf) \
@@ -342,7 +333,7 @@ static ssize_t store_regs_in_##reg##offset (struct device *dev, const char *buf,
 { \
 	return store_in_##reg (dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(in_##reg##offset, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset)
+static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset)
 
 #define sysfs_in_offsets(offset) \
 sysfs_in_offset(offset); \
@@ -361,19 +352,15 @@ sysfs_in_offsets(8);
 
 #define device_create_file_in(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_in_input##offset); \
-device_create_file(&client->dev, &dev_attr_in_min##offset); \
-device_create_file(&client->dev, &dev_attr_in_max##offset); \
+device_create_file(&client->dev, &dev_attr_in##offset##_input); \
+device_create_file(&client->dev, &dev_attr_in##offset##_min); \
+device_create_file(&client->dev, &dev_attr_in##offset##_max); \
 } while (0)
 
 #define show_fan_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83781d_data *data = i2c_get_clientdata(client); \
-	 \
-	w83781d_update_client(client); \
-	 \
+	struct w83781d_data *data = w83781d_update_device(dev); \
 	return sprintf(buf,"%ld\n", \
 		FAN_FROM_REG(data->reg[nr-1], (long)DIV_FROM_REG(data->fan_div[nr-1]))); \
 }
@@ -401,7 +388,7 @@ static ssize_t show_regs_fan_##offset (struct device *dev, char *buf) \
 { \
 	return show_fan(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(fan_input##offset, S_IRUGO, show_regs_fan_##offset, NULL)
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL)
 
 #define sysfs_fan_min_offset(offset) \
 static ssize_t show_regs_fan_min##offset (struct device *dev, char *buf) \
@@ -412,7 +399,7 @@ static ssize_t store_regs_fan_min##offset (struct device *dev, const char *buf, 
 { \
 	return store_fan_min(dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(fan_min##offset, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset)
+static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset)
 
 sysfs_fan_offset(1);
 sysfs_fan_min_offset(1);
@@ -423,18 +410,14 @@ sysfs_fan_min_offset(3);
 
 #define device_create_file_fan(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_fan_input##offset); \
-device_create_file(&client->dev, &dev_attr_fan_min##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_input); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_min); \
 } while (0)
 
 #define show_temp_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83781d_data *data = i2c_get_clientdata(client); \
-	 \
-	w83781d_update_client(client); \
-	 \
+	struct w83781d_data *data = w83781d_update_device(dev); \
 	if (nr >= 2) {	/* TEMP2 and TEMP3 */ \
 		if (data->type == as99127f) { \
 			return sprintf(buf,"%ld\n", \
@@ -449,7 +432,7 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 }
 show_temp_reg(temp);
 show_temp_reg(temp_max);
-show_temp_reg(temp_hyst);
+show_temp_reg(temp_max_hyst);
 
 #define store_temp_reg(REG, reg) \
 static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t count, int nr) \
@@ -477,7 +460,7 @@ static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t cou
 	return count; \
 }
 store_temp_reg(OVER, max);
-store_temp_reg(HYST, hyst);
+store_temp_reg(HYST, max_hyst);
 
 #define sysfs_temp_offset(offset) \
 static ssize_t \
@@ -485,7 +468,7 @@ show_regs_temp_##offset (struct device *dev, char *buf) \
 { \
 	return show_temp(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(temp_input##offset, S_IRUGO, show_regs_temp_##offset, NULL)
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL)
 
 #define sysfs_temp_reg_offset(reg, offset) \
 static ssize_t show_regs_temp_##reg##offset (struct device *dev, char *buf) \
@@ -496,12 +479,12 @@ static ssize_t store_regs_temp_##reg##offset (struct device *dev, const char *bu
 { \
 	return store_temp_##reg (dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(temp_##reg##offset, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
+static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset); \
 sysfs_temp_reg_offset(max, offset); \
-sysfs_temp_reg_offset(hyst, offset);
+sysfs_temp_reg_offset(max_hyst, offset);
 
 sysfs_temp_offsets(1);
 sysfs_temp_offsets(2);
@@ -509,34 +492,26 @@ sysfs_temp_offsets(3);
 
 #define device_create_file_temp(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_temp_input##offset); \
-device_create_file(&client->dev, &dev_attr_temp_max##offset); \
-device_create_file(&client->dev, &dev_attr_temp_hyst##offset); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_input); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_max); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_max_hyst); \
 } while (0)
 
 static ssize_t
 show_vid_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
 }
 
 static
-DEVICE_ATTR(vid, S_IRUGO, show_vid_reg, NULL)
+DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
 #define device_create_file_vid(client) \
-device_create_file(&client->dev, &dev_attr_vid);
+device_create_file(&client->dev, &dev_attr_in0_ref);
 static ssize_t
 show_vrm_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->vrm);
 }
 
@@ -560,11 +535,7 @@ device_create_file(&client->dev, &dev_attr_vrm);
 static ssize_t
 show_alarms_reg(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) ALARMS_FROM_REG(data->alarms));
 }
 
@@ -575,11 +546,7 @@ device_create_file(&client->dev, &dev_attr_alarms);
 #define show_beep_reg(REG, reg) \
 static ssize_t show_beep_##reg (struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct w83781d_data *data = i2c_get_clientdata(client); \
-	 \
-	w83781d_update_client(client); \
-	 \
+	struct w83781d_data *data = w83781d_update_device(dev); \
 	return sprintf(buf,"%ld\n", (long)BEEP_##REG##_FROM_REG(data->beep_##reg)); \
 }
 show_beep_reg(ENABLE, enable);
@@ -640,61 +607,113 @@ device_create_file(&client->dev, &dev_attr_beep_enable); \
 device_create_file(&client->dev, &dev_attr_beep_mask); \
 } while (0)
 
-/* w83697hf only has two fans */
 static ssize_t
 show_fan_div_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n",
 		       (long) DIV_FROM_REG(data->fan_div[nr - 1]));
 }
 
-/* w83697hf only has two fans */
+/* Note: we save and restore the fan minimum here, because its value is
+   determined in part by the fan divisor.  This follows the principle of
+   least suprise; the user doesn't expect the fan minimum to change just
+   because the divisor changed. */
 static ssize_t
-store_fan_div_reg(struct device *dev, const char *buf, size_t count, int nr)
+store_regs_fan_div_1(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct w83781d_data *data = i2c_get_clientdata(client);
-	u32 val, old, old2, old3 = 0;
+	unsigned long min;
+	u8 reg;
 
-	val = simple_strtoul(buf, NULL, 10);
-	old = w83781d_read_value(client, W83781D_REG_VID_FANDIV);
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[0],
+			   DIV_FROM_REG(data->fan_div[0]));
 
-	data->fan_div[nr - 1] = DIV_TO_REG(val, data->type);
+	data->fan_div[0] = DIV_TO_REG(simple_strtoul(buf, NULL, 10),
+				      data->type);
+
+	reg = w83781d_read_value(client, W83781D_REG_VID_FANDIV) & 0xcf;
+	reg |= (data->fan_div[0] & 0x03) << 4;
+	w83781d_write_value(client, W83781D_REG_VID_FANDIV, reg);
 
 	/* w83781d and as99127f don't have extended divisor bits */
-	if ((data->type != w83781d) && data->type != as99127f) {
-		old3 = w83781d_read_value(client, W83781D_REG_VBAT);
+	if (data->type != w83781d && data->type != as99127f) {
+		reg = w83781d_read_value(client, W83781D_REG_VBAT) & 0xdf;
+		reg |= (data->fan_div[0] & 0x04) << 3;
+		w83781d_write_value(client, W83781D_REG_VBAT, reg);
 	}
-	if (nr >= 3 && data->type != w83697hf) {
-		old2 = w83781d_read_value(client, W83781D_REG_PIN);
-		old2 = (old2 & 0x3f) | ((data->fan_div[2] & 0x03) << 6);
-		w83781d_write_value(client, W83781D_REG_PIN, old2);
 
-		if ((data->type != w83781d) && (data->type != as99127f)) {
-			old3 = (old3 & 0x7f) | ((data->fan_div[2] & 0x04) << 5);
-		}
-	}
-	if (nr >= 2) {
-		old = (old & 0x3f) | ((data->fan_div[1] & 0x03) << 6);
+	/* Restore fan_min */
+	data->fan_min[0] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[0]));
+	w83781d_write_value(client, W83781D_REG_FAN_MIN(1), data->fan_min[0]);
 
-		if ((data->type != w83781d) && (data->type != as99127f)) {
-			old3 = (old3 & 0xbf) | ((data->fan_div[1] & 0x04) << 4);
-		}
-	}
-	if (nr >= 1) {
-		old = (old & 0xcf) | ((data->fan_div[0] & 0x03) << 4);
-		w83781d_write_value(client, W83781D_REG_VID_FANDIV, old);
+	return count;
+}
 
-		if ((data->type != w83781d) && (data->type != as99127f)) {
-			old3 = (old3 & 0xdf) | ((data->fan_div[0] & 0x04) << 3);
-			w83781d_write_value(client, W83781D_REG_VBAT, old3);
-		}
+static ssize_t
+store_regs_fan_div_2(struct device *dev, const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct w83781d_data *data = i2c_get_clientdata(client);
+	unsigned long min;
+	u8 reg;
+
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[1],
+			   DIV_FROM_REG(data->fan_div[1]));
+
+	data->fan_div[1] = DIV_TO_REG(simple_strtoul(buf, NULL, 10),
+				      data->type);
+
+	reg = w83781d_read_value(client, W83781D_REG_VID_FANDIV) & 0x3f;
+	reg |= (data->fan_div[1] & 0x03) << 6;
+	w83781d_write_value(client, W83781D_REG_VID_FANDIV, reg);
+
+	/* w83781d and as99127f don't have extended divisor bits */
+	if (data->type != w83781d && data->type != as99127f) {
+		reg = w83781d_read_value(client, W83781D_REG_VBAT) & 0xbf;
+		reg |= (data->fan_div[1] & 0x04) << 4;
+		w83781d_write_value(client, W83781D_REG_VBAT, reg);
 	}
+
+	/* Restore fan_min */
+	data->fan_min[1] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[1]));
+	w83781d_write_value(client, W83781D_REG_FAN_MIN(2), data->fan_min[1]);
+
+	return count;
+}
+
+static ssize_t
+store_regs_fan_div_3(struct device *dev, const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct w83781d_data *data = i2c_get_clientdata(client);
+	unsigned long min;
+	u8 reg;
+
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[2],
+			   DIV_FROM_REG(data->fan_div[2]));
+
+	data->fan_div[2] = DIV_TO_REG(simple_strtoul(buf, NULL, 10),
+				      data->type);
+
+	reg = w83781d_read_value(client, W83781D_REG_PIN) & 0x3f;
+	reg |= (data->fan_div[2] & 0x03) << 6;
+	w83781d_write_value(client, W83781D_REG_PIN, reg);
+
+	/* w83781d and as99127f don't have extended divisor bits */
+	if (data->type != w83781d && data->type != as99127f) {
+		reg = w83781d_read_value(client, W83781D_REG_VBAT) & 0x7f;
+		reg |= (data->fan_div[2] & 0x04) << 5;
+		w83781d_write_value(client, W83781D_REG_VBAT, reg);
+	}
+
+	/* Restore fan_min */
+	data->fan_min[2] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[2]));
+	w83781d_write_value(client, W83781D_REG_FAN_MIN(3), data->fan_min[2]);
 
 	return count;
 }
@@ -704,11 +723,7 @@ static ssize_t show_regs_fan_div_##offset (struct device *dev, char *buf) \
 { \
 	return show_fan_div_reg(dev, buf, offset); \
 } \
-static ssize_t store_regs_fan_div_##offset (struct device *dev, const char *buf, size_t count) \
-{ \
-	return store_fan_div_reg(dev, buf, count, offset); \
-} \
-static DEVICE_ATTR(fan_div##offset, S_IRUGO | S_IWUSR, show_regs_fan_div_##offset, store_regs_fan_div_##offset)
+static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, show_regs_fan_div_##offset, store_regs_fan_div_##offset)
 
 sysfs_fan_div(1);
 sysfs_fan_div(2);
@@ -716,18 +731,14 @@ sysfs_fan_div(3);
 
 #define device_create_file_fan_div(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_fan_div##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_div); \
 } while (0)
 
 /* w83697hf only has two fans */
 static ssize_t
 show_pwm_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) PWM_FROM_REG(data->pwm[nr - 1]));
 }
 
@@ -735,11 +746,7 @@ show_pwm_reg(struct device *dev, char *buf, int nr)
 static ssize_t
 show_pwmenable_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->pwmenable[nr - 1]);
 }
 
@@ -809,7 +816,7 @@ static ssize_t store_regs_pwm_##offset (struct device *dev, const char *buf, siz
 { \
 	return store_pwm_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(pwm##offset, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset)
+static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset)
 
 #define sysfs_pwmenable(offset) \
 static ssize_t show_regs_pwmenable_##offset (struct device *dev, char *buf) \
@@ -820,7 +827,7 @@ static ssize_t store_regs_pwmenable_##offset (struct device *dev, const char *bu
 { \
 	return store_pwmenable_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(pwm_enable##offset, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
+static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
 
 sysfs_pwm(1);
 sysfs_pwm(2);
@@ -830,22 +837,18 @@ sysfs_pwm(4);
 
 #define device_create_file_pwm(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_pwm##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_pwm); \
 } while (0)
 
 #define device_create_file_pwmenable(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_pwm_enable##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_pwm_enable); \
 } while (0)
 
 static ssize_t
 show_sensor_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
-
-	w83781d_update_client(client);
-
+	struct w83781d_data *data = w83781d_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->sens[nr - 1]);
 }
 
@@ -902,7 +905,7 @@ static ssize_t store_regs_sensor_##offset (struct device *dev, const char *buf, 
 { \
     return store_sensor_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(sensor##offset, S_IRUGO | S_IWUSR, show_regs_sensor_##offset, store_regs_sensor_##offset)
+static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR, show_regs_sensor_##offset, store_regs_sensor_##offset)
 
 sysfs_sensor(1);
 sysfs_sensor(2);
@@ -910,18 +913,15 @@ sysfs_sensor(3);
 
 #define device_create_file_sensor(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_sensor##offset); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_type); \
 } while (0)
 
 #ifdef W83781D_RT
 static ssize_t
 show_rt_reg(struct device *dev, char *buf, int nr)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct w83781d_data *data = i2c_get_clientdata(client);
+	struct w83781d_data *data = w83781d_update_device(dev);
 	int i, j = 0;
-
-	w83781d_update_client(client);
 
 	for (i = 0; i < 32; i++) {
 		if (i > 0)
@@ -997,7 +997,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 {
 	int i, val1 = 0, id;
 	int err;
-	const char *client_name;
+	const char *client_name = "";
 	struct w83781d_data *data = i2c_get_clientdata(new_client);
 
 	data->lm75[0] = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
@@ -1063,8 +1063,6 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 		client_name = "w83627hf subclient";
 	else if (kind == as99127f)
 		client_name = "as99127f subclient";
-	else
-		client_name = "unknown subclient?";
 
 	for (i = 0; i <= 1; i++) {
 		/* store all data in w83781d */
@@ -1118,6 +1116,23 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		goto ERROR0;
 	}
 
+	/* Prevent users from forcing a kind for a bus it isn't supposed
+	   to possibly be on */
+	if (is_isa && (kind == as99127f || kind == w83783s)) {
+		dev_err(&adapter->dev,
+			"Cannot force I2C-only chip for ISA address 0x%02x.\n",
+			address);
+		err = -EINVAL;
+		goto ERROR0;
+	}
+	if (!is_isa && kind == w83697hf) {
+		dev_err(&adapter->dev,
+			"Cannot force ISA-only chip for I2C address 0x%02x.\n",
+			address);
+		err = -EINVAL;
+		goto ERROR0;
+	}
+	
 	if (is_isa)
 		if (!request_region(address, W83781D_EXTENT, "w83781d")) {
 			err = -EBUSY;
@@ -1194,10 +1209,8 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		val2 = w83781d_read_value(new_client, W83781D_REG_CHIPMAN);
 		/* Check for Winbond or Asus ID if in bank 0 */
 		if ((!(val1 & 0x07)) &&
-		    (((!(val1 & 0x80)) && (val2 != 0xa3) && (val2 != 0xc3)
-		      && (val2 != 0x94))
-		     || ((val1 & 0x80) && (val2 != 0x5c) && (val2 != 0x12)
-			 && (val2 != 0x06)))) {
+		    (((!(val1 & 0x80)) && (val2 != 0xa3) && (val2 != 0xc3))
+		     || ((val1 & 0x80) && (val2 != 0x5c) && (val2 != 0x12)))) {
 			err = -ENODEV;
 			goto ERROR2;
 		}
@@ -1226,7 +1239,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		val2 = w83781d_read_value(new_client, W83781D_REG_CHIPMAN);
 		if (val2 == 0x5c)
 			vendid = winbond;
-		else if ((val2 == 0x12) || (val2 == 0x06))
+		else if (val2 == 0x12)
 			vendid = asus;
 		else {
 			err = -ENODEV;
@@ -1273,11 +1286,6 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		client_name = "as99127f";
 	} else if (kind == w83697hf) {
 		client_name = "w83697hf";
-	} else {
-		dev_err(&new_client->dev, "Internal error: unknown "
-						"kind (%d)?!?", kind);
-		err = -ENODEV;
-		goto ERROR2;
 	}
 
 	/* Fill in the remaining client fields and put into the global list */
@@ -1632,7 +1640,11 @@ w83781d_init_client(struct i2c_client *client)
 		if (type != w83781d) {
 			/* enable comparator mode for temp2 and temp3 so
 			   alarm indication will work correctly */
-			w83781d_write_value(client, W83781D_REG_IRQ, 0x41);
+			i = w83781d_read_value(client, W83781D_REG_IRQ);
+			if (!(i & 0x40))
+				w83781d_write_value(client, W83781D_REG_IRQ,
+						    i | 0x40);
+
 			for (i = 0; i < 3; i++)
 				data->pwmenable[i] = 1;
 		}
@@ -1645,9 +1657,9 @@ w83781d_init_client(struct i2c_client *client)
 			    | 0x01);
 }
 
-static void
-w83781d_update_client(struct i2c_client *client)
+static struct w83781d_data *w83781d_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct w83781d_data *data = i2c_get_clientdata(client);
 	int i;
 
@@ -1697,13 +1709,13 @@ w83781d_update_client(struct i2c_client *client)
 		data->temp = w83781d_read_value(client, W83781D_REG_TEMP(1));
 		data->temp_max =
 		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(1));
-		data->temp_hyst =
+		data->temp_max_hyst =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(1));
 		data->temp_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP(2));
 		data->temp_max_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(2));
-		data->temp_hyst_add[0] =
+		data->temp_max_hyst_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(2));
 		if (data->type != w83783s && data->type != w83697hf) {
 			data->temp_add[1] =
@@ -1711,7 +1723,7 @@ w83781d_update_client(struct i2c_client *client)
 			data->temp_max_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_OVER(3));
-			data->temp_hyst_add[1] =
+			data->temp_max_hyst_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_HYST(3));
 		}
@@ -1760,6 +1772,8 @@ w83781d_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init

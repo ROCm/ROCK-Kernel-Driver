@@ -54,10 +54,6 @@
 /* Note: we assume there can only be one ALI1535, with one SMBus interface */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_BUS
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -484,6 +480,7 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter ali1535_adapter = {
 	.owner		= THIS_MODULE,
+	.class          = I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
 	.name		= "unset",
 };
@@ -517,6 +514,7 @@ static int __devinit ali1535_probe(struct pci_dev *dev, const struct pci_device_
 static void __devexit ali1535_remove(struct pci_dev *dev)
 {
 	i2c_del_adapter(&ali1535_adapter);
+	release_region(ali1535_smba, ALI1535_SMB_IOSIZE);
 }
 
 static struct pci_driver ali1535_driver = {
@@ -534,7 +532,6 @@ static int __init i2c_ali1535_init(void)
 static void __exit i2c_ali1535_exit(void)
 {
 	pci_unregister_driver(&ali1535_driver);
-	release_region(ali1535_smba, ALI1535_SMB_IOSIZE);
 }
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>, "

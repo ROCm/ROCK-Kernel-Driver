@@ -19,10 +19,6 @@
 */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CHIP
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -64,7 +60,7 @@ static void lm75_init_client(struct i2c_client *client);
 static int lm75_detach_client(struct i2c_client *client);
 static int lm75_read_value(struct i2c_client *client, u8 reg);
 static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value);
-static void lm75_update_client(struct i2c_client *client);
+static struct lm75_data *lm75_update_device(struct device *dev);
 
 
 /* This is the driver that will be inserted */
@@ -82,9 +78,7 @@ static int lm75_id = 0;
 #define show(value)	\
 static ssize_t show_##value(struct device *dev, char *buf)		\
 {									\
-	struct i2c_client *client = to_i2c_client(dev);			\
-	struct lm75_data *data = i2c_get_clientdata(client);		\
-	lm75_update_client(client);					\
+	struct lm75_data *data = lm75_update_device(dev);		\
 	return sprintf(buf, "%d\n", LM75_TEMP_FROM_REG(data->value));	\
 }
 show(temp_max);
@@ -104,9 +98,9 @@ static ssize_t set_##value(struct device *dev, const char *buf, size_t count)	\
 set(temp_max, LM75_REG_TEMP_OS);
 set(temp_hyst, LM75_REG_TEMP_HYST);
 
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_max, set_temp_max);
-static DEVICE_ATTR(temp_hyst1, S_IWUSR | S_IRUGO, show_temp_hyst, set_temp_hyst);
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_max, set_temp_max);
+static DEVICE_ATTR(temp1_max_hyst, S_IWUSR | S_IRUGO, show_temp_hyst, set_temp_hyst);
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input, NULL);
 
 static int lm75_attach_adapter(struct i2c_adapter *adapter)
 {
@@ -122,7 +116,7 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct lm75_data *data;
 	int err = 0;
-	const char *name;
+	const char *name = "";
 
 	/* Make sure we aren't probing the ISA bus!! This is just a safety check
 	   at this moment; i2c_detect really won't call us. */
@@ -176,10 +170,6 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if (kind == lm75) {
 		name = "lm75";
-	} else {
-		dev_dbg(&adapter->dev, "Internal error: unknown kind (%d)?!?",
-			kind);
-		goto exit_free;
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
@@ -197,9 +187,9 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 	lm75_init_client(new_client);
 	
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
 
 	return 0;
 
@@ -250,8 +240,9 @@ static void lm75_init_client(struct i2c_client *client)
 	lm75_write_value(client, LM75_REG_CONF, 0);
 }
 
-static void lm75_update_client(struct i2c_client *client)
+static struct lm75_data *lm75_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm75_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -268,6 +259,8 @@ static void lm75_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_lm75_init(void)

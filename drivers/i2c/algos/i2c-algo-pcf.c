@@ -27,8 +27,6 @@
    messages, proper stop/repstart signaling during receive,
    added detect code */
 
-/* #define DEBUG 1 */		/* to pick up dev_dbg calls */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>

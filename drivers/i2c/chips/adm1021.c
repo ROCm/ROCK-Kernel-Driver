@@ -20,10 +20,6 @@
 */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CHIP
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -139,7 +135,7 @@ static int adm1021_detach_client(struct i2c_client *client);
 static int adm1021_read_value(struct i2c_client *client, u8 reg);
 static int adm1021_write_value(struct i2c_client *client, u8 reg,
 			       u16 value);
-static void adm1021_update_client(struct i2c_client *client);
+static struct adm1021_data *adm1021_update_device(struct device *dev);
 
 /* (amalysh) read only mode, otherwise any limit's writing confuse BIOS */
 static int read_only = 0;
@@ -148,7 +144,7 @@ static int read_only = 0;
 /* This is the driver that will be inserted */
 static struct i2c_driver adm1021_driver = {
 	.owner		= THIS_MODULE,
-	.name		= "ADM1021-MAX1617",
+	.name		= "adm1021",
 	.id		= I2C_DRIVERID_ADM1021,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= adm1021_attach_adapter,
@@ -161,15 +157,10 @@ static struct i2c_driver adm1021_driver = {
 static int adm1021_id = 0;
 
 #define show(value)	\
-static ssize_t show_##value(struct device *dev, char *buf)	\
-{								\
-	struct i2c_client *client = to_i2c_client(dev);		\
-	struct adm1021_data *data = i2c_get_clientdata(client);	\
-	int temp;						\
-								\
-	adm1021_update_client(client);				\
-	temp = TEMP_FROM_REG(data->value);			\
-	return sprintf(buf, "%d\n", temp);			\
+static ssize_t show_##value(struct device *dev, char *buf)		\
+{									\
+	struct adm1021_data *data = adm1021_update_device(dev);		\
+	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->value));	\
 }
 show(temp_max);
 show(temp_hyst);
@@ -179,13 +170,10 @@ show(remote_temp_hyst);
 show(remote_temp_input);
 
 #define show2(value)	\
-static ssize_t show_##value(struct device *dev, char *buf)	\
-{								\
-	struct i2c_client *client = to_i2c_client(dev);		\
-	struct adm1021_data *data = i2c_get_clientdata(client);	\
-								\
-	adm1021_update_client(client);				\
-	return sprintf(buf, "%d\n", data->value);		\
+static ssize_t show_##value(struct device *dev, char *buf)		\
+{									\
+	struct adm1021_data *data = adm1021_update_device(dev);		\
+	return sprintf(buf, "%d\n", data->value);			\
 }
 show2(alarms);
 show2(die_code);
@@ -206,12 +194,12 @@ set(temp_hyst, ADM1021_REG_THYST_W);
 set(remote_temp_max, ADM1021_REG_REMOTE_TOS_W);
 set(remote_temp_hyst, ADM1021_REG_REMOTE_THYST_W);
 
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_max, set_temp_max);
-static DEVICE_ATTR(temp_min1, S_IWUSR | S_IRUGO, show_temp_hyst, set_temp_hyst);
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input, NULL);
-static DEVICE_ATTR(temp_max2, S_IWUSR | S_IRUGO, show_remote_temp_max, set_remote_temp_max);
-static DEVICE_ATTR(temp_min2, S_IWUSR | S_IRUGO, show_remote_temp_hyst, set_remote_temp_hyst);
-static DEVICE_ATTR(temp_input2, S_IRUGO, show_remote_temp_input, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_max, set_temp_max);
+static DEVICE_ATTR(temp1_min, S_IWUSR | S_IRUGO, show_temp_hyst, set_temp_hyst);
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input, NULL);
+static DEVICE_ATTR(temp2_max, S_IWUSR | S_IRUGO, show_remote_temp_max, set_remote_temp_max);
+static DEVICE_ATTR(temp2_min, S_IWUSR | S_IRUGO, show_remote_temp_hyst, set_remote_temp_hyst);
+static DEVICE_ATTR(temp2_input, S_IRUGO, show_remote_temp_input, NULL);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 static DEVICE_ATTR(die_code, S_IRUGO, show_die_code, NULL);
 
@@ -309,10 +297,6 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 		type_name = "gl523sm";
 	} else if (kind == mc1066) {
 		type_name = "mc1066";
-	} else {
-		dev_err(&adapter->dev, "Internal error: unknown kind (%d)?!?",
-			kind);
-		goto error1;
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
@@ -331,12 +315,12 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	adm1021_init_client(new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_min1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_min2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_min);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_min);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 	if (data->type == adm1021)
 		device_create_file(&new_client->dev, &dev_attr_die_code);
@@ -393,8 +377,9 @@ static int adm1021_write_value(struct i2c_client *client, u8 reg, u16 value)
 	return 0;
 }
 
-static void adm1021_update_client(struct i2c_client *client)
+static struct adm1021_data *adm1021_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1021_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -424,6 +409,8 @@ static void adm1021_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_adm1021_init(void)
