@@ -190,7 +190,7 @@ static inline int power_on (struct slot *slot_cur)
 		err ("command not completed successfully in power_on\n");
 		return -EIO;
 	}
-	long_delay (3 * HZ); /* For ServeRAID cards, and some 66 PCI */
+	msleep(3000);	/* For ServeRAID cards, and some 66 PCI */
 	return 0;
 }
 
@@ -913,7 +913,7 @@ static int set_bus (struct slot * slot_cur)
 	}
 	/* This is for x440, once Brandon fixes the firmware, 
 	will not need this delay */
-	long_delay (1 * HZ);
+	msleep(1000);
 	debug ("%s -Exit\n", __FUNCTION__);
 	return 0;
 }
