@@ -664,9 +664,7 @@ void __init pmac_pcibios_fixup(void)
 
 	pci_fix_bus_sysdata();
 
-#ifdef CONFIG_PMAC_DART
-	iommu_setup_pmac();
-#endif /* CONFIG_PMAC_DART */
+	iommu_setup_u3();
 
 }
 
