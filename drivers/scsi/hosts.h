@@ -515,8 +515,6 @@ extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host *);
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
 extern void scsi_report_bus_reset(struct Scsi_Host *, int);
-extern void scsi_register_blocked_host(struct Scsi_Host *);
-extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
 static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 {

@@ -1340,23 +1340,6 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 	}
 }
 
-/*
- * FIXME(eric) - these are empty stubs for the moment.  I need to re-implement
- * host blocking from scratch. The theory is that hosts that wish to block
- * will register/deregister using these functions instead of the old way
- * of setting the wish_block flag.
- *
- * The details of the implementation remain to be settled, however the
- * stubs are here now so that the actual drivers will properly compile.
- */
-void scsi_register_blocked_host(struct Scsi_Host * shost)
-{
-}
-
-void scsi_deregister_blocked_host(struct Scsi_Host * shost)
-{
-}
-
 int __init scsi_init_queue(void)
 {
 	int i;
