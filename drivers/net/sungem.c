@@ -894,7 +894,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
 		 */
-		first_len = skb->len - skb->data_len;
+		first_len = skb_headlen(skb);
 		first_mapping = pci_map_page(gp->pdev, virt_to_page(skb->data),
 					     ((unsigned long) skb->data & ~PAGE_MASK),
 					     first_len, PCI_DMA_TODEVICE);

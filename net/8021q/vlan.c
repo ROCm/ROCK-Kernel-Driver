@@ -29,7 +29,6 @@
 #include <net/p8022.h>
 #include <net/arp.h>
 #include <linux/rtnetlink.h>
-#include <linux/brlock.h>
 #include <linux/notifier.h>
 
 #include <linux/if_vlan.h>
@@ -68,7 +67,6 @@ static struct packet_type vlan_packet_type = {
 	.dev =NULL,
 	.func = vlan_skb_recv, /* VLAN receive method */
 	.data = (void *)(-1),  /* Set here '(void *)1' when this code can SHARE SKBs */
-	.next = NULL
 };
 
 /* End of global variables definitions. */
@@ -231,9 +229,8 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 				real_dev->vlan_rx_kill_vid(real_dev, vlan_id);
 			}
 
-			br_write_lock(BR_NETPROTO_LOCK);
 			grp->vlan_devices[vlan_id] = NULL;
-			br_write_unlock(BR_NETPROTO_LOCK);
+			synchronize_net();
 
 
 			/* Caller unregisters (and if necessary, puts)
@@ -266,7 +263,7 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 				ret = 1;
 			}
 
-			MOD_DEC_USE_COUNT;
+			module_put(THIS_MODULE);
 		}
 	}
 
@@ -433,6 +430,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* set up method calls */
 	new_dev->init = vlan_dev_init;
 	new_dev->destructor = vlan_dev_destruct;
+	new_dev->owner = THIS_MODULE;
 	    
 	/* new_dev->ifindex = 0;  it will be set when added to
 	 * the global list.
@@ -540,15 +538,21 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	register_netdevice(new_dev);
 
 	rtnl_unlock();
-	    
+
 	/* NOTE:  We have a reference to the real device,
 	 * so hold on to the reference.
 	 */
-	MOD_INC_USE_COUNT; /* Add was a success!! */
+	if (!try_module_get(THIS_MODULE))
+		goto out_module_dying;
+
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG "Allocated new device successfully, returning.\n");
 #endif
 	return new_dev;
+
+out_module_dying:
+	rtnl_lock();
+	unregister_netdevice(new_dev);
 
 out_free_newdev_priv:
 	kfree(new_dev->priv);

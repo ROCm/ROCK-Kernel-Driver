@@ -2199,10 +2199,10 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 
 		(tcb->tbd_ptr)->tbd_buf_addr =
 			cpu_to_le32(pci_map_single(bdp->pdev, skb->data,
-						   (skb->len - skb->data_len),
+						   skb_headlen(skb),
 						   PCI_DMA_TODEVICE));
 		(tcb->tbd_ptr)->tbd_buf_cnt =
-			cpu_to_le16(skb->len - skb->data_len);
+			cpu_to_le16(skb_headlen(skb));
 
 		for (i = 0; i < skb_shinfo(skb)->nr_frags;
 		     i++, tbd_arr_ptr++, frag++) {

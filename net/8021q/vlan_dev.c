@@ -31,7 +31,6 @@
 #include <net/datalink.h>
 #include <net/p8022.h>
 #include <net/arp.h>
-#include <linux/brlock.h>
 
 #include "vlan.h"
 #include "vlanproc.h"
