@@ -1022,8 +1022,9 @@ static void
 pcnet32_tx_timeout (struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
-    unsigned long ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr, flags;
 
+    spin_lock_irqsave(&lp->lock, flags);
     /* Transmitter timeout, serious problems. */
 	printk(KERN_ERR "%s: transmit timed out, status %4.4x, resetting.\n",
 	       dev->name, lp->a.read_csr(ioaddr, 0));
@@ -1048,6 +1049,8 @@ pcnet32_tx_timeout (struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	netif_start_queue(dev);
+
+	spin_unlock_irqrestore(&lp->lock, flags);
 }
 
 
@@ -1474,9 +1477,10 @@ static void pcnet32_load_multicast (struct net_device *dev)
  */
 static void pcnet32_set_multicast_list(struct net_device *dev)
 {
-    unsigned long ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr, flags;
     struct pcnet32_private *lp = dev->priv;	 
 
+    spin_lock_irqsave(&lp->lock, flags);
     if (dev->flags&IFF_PROMISC) {
 	/* Log any net taps. */
 	printk(KERN_INFO "%s: Promiscuous mode enabled.\n", dev->name);
@@ -1489,6 +1493,7 @@ static void pcnet32_set_multicast_list(struct net_device *dev)
     lp->a.write_csr (ioaddr, 0, 0x0004); /* Temporarily stop the lance. */
 
     pcnet32_restart(dev, 0x0042); /*  Resume normal operation */
+    spin_unlock_irqrestore(&lp->lock, flags);
 }
 
 static int mdio_read(struct net_device *dev, int phy_id, int reg_num)
