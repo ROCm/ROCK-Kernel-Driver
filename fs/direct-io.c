@@ -489,7 +489,7 @@ int do_direct_IO(struct dio *dio)
 
 			/* Work out how much disk we can add to this page */
 			this_chunk_blocks = dio->blocks_available;
-			u = (PAGE_SIZE - dio->bvec->bv_len) >> blkbits;
+			u = (PAGE_SIZE - (dio->bvec->bv_offset + dio->bvec->bv_len)) >> blkbits;
 			if (this_chunk_blocks > u)
 				this_chunk_blocks = u;
 			u = dio->final_block_in_request - dio->block_in_file;
@@ -567,10 +567,11 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	dio.curr_page = 0;
 	bytes = count;
 	dio.total_pages = 0;
-	if (offset & PAGE_SIZE) {
+	if (user_addr & (PAGE_SIZE - 1)) {
 		dio.total_pages++;
-		bytes -= PAGE_SIZE - (offset & ~(PAGE_SIZE - 1));
+		bytes -= PAGE_SIZE - (user_addr & (PAGE_SIZE - 1));
 	}
+
 	dio.total_pages += (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 	dio.curr_user_address = user_addr;
 

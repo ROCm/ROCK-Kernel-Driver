@@ -105,7 +105,7 @@ static int
 blkdev_get_blocks(struct inode *inode, sector_t iblock,
 		unsigned long max_blocks, struct buffer_head *bh, int create)
 {
-	if ((iblock + max_blocks) >= max_block(inode->i_bdev))
+	if ((iblock + max_blocks) > max_block(inode->i_bdev))
 		return -EIO;
 
 	bh->b_bdev = inode->i_bdev;
