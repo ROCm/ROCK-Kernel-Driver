@@ -174,10 +174,10 @@ static int inet6_create(struct socket *sock, int protocol)
 		goto out;
 
 	sock_init_data(sock, sk);
+	sk->sk_prot = answer_prot;
 	sk_set_owner(sk, sk->sk_prot->owner);
 
 	rc = 0;
-	sk->sk_prot = answer_prot;
 	sk->sk_no_check = answer_no_check;
 	if (INET_PROTOSW_REUSE & answer_flags)
 		sk->sk_reuse = 1;
