@@ -532,6 +532,7 @@ typedef struct {
 
 /* The tape drive descriptor */
 typedef struct {
+  char name[8];
   kdev_t devt;
   unsigned capacity;
   Scsi_Device* device;
