@@ -41,7 +41,7 @@ static int use_sysenter = -1;
 int __map_syscall32(struct mm_struct *mm, unsigned long address)
 { 
 	pgd_t *pgd;
-	pgd_t *pud;
+	pud_t *pud;
 	pte_t *pte;
 	pmd_t *pmd;
 	int err = -ENOMEM;
