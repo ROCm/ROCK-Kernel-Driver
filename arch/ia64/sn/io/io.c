@@ -27,7 +27,6 @@
 #include <asm/sn/sn_cpuid.h>
 
 extern xtalk_provider_t hub_provider;
-extern void hub_intr_init(vertex_hdl_t hubv);
 
 static int force_fire_and_forget = 1;
 static int ignore_conveyor_override;
@@ -84,7 +83,7 @@ hub_pio_init(vertex_hdl_t hubv)
 	}
 	hub_set_piomode(nasid, HUB_PIO_CONVEYOR);
 
-	mutex_spinlock_init(&hubinfo->h_bwlock);
+	spin_lock_init(&hubinfo->h_bwlock);
 	init_waitqueue_head(&hubinfo->h_bwwait);
 }
 
@@ -117,7 +116,6 @@ hub_piomap_alloc(vertex_hdl_t dev,	/* set up mapping for this device */
 	int bigwin, free_bw_index;
 	nasid_t nasid;
 	volatile hubreg_t junk;
-	unsigned long s;
 	caddr_t kvaddr;
 #ifdef PIOMAP_UNC_ACC_SPACE
 	uint64_t addr;
@@ -165,7 +163,7 @@ hub_piomap_alloc(vertex_hdl_t dev,	/* set up mapping for this device */
 	 */
 tryagain:
 	free_bw_index = -1;
-	s = mutex_spinlock(&hubinfo->h_bwlock);
+	spin_lock(&hubinfo->h_bwlock);
 	for (bigwin=0; bigwin < HUB_NUM_BIG_WINDOW; bigwin++) {
 		bw_piomap = hubinfo_bwin_piomap_get(hubinfo, bigwin);
 
@@ -185,7 +183,7 @@ tryagain:
 		if ( xtalk_addr == bw_piomap->hpio_xtalk_info.xp_xtalk_addr &&
 		     widget == bw_piomap->hpio_xtalk_info.xp_target) {
 			bw_piomap->hpio_holdcnt++;
-			mutex_spinunlock(&hubinfo->h_bwlock, s);
+			spin_unlock(&hubinfo->h_bwlock);
 			return(bw_piomap);
 		}
 	}
@@ -265,7 +263,7 @@ tryagain:
 		bw_piomap->hpio_flags |= HUB_PIOMAP_IS_VALID;
 
 done:
-	mutex_spinunlock(&hubinfo->h_bwlock, s);
+	spin_unlock(&hubinfo->h_bwlock);
 	return(bw_piomap);
 }
 
@@ -285,7 +283,6 @@ hub_piomap_free(hub_piomap_t hub_piomap)
 	vertex_hdl_t hubv;
 	hubinfo_t hubinfo;
 	nasid_t nasid;
-	unsigned long s;
 
 	/* 
 	 * Small windows are permanently mapped to corresponding widgets,
@@ -301,7 +298,7 @@ hub_piomap_free(hub_piomap_t hub_piomap)
 	hubinfo_get(hubv, &hubinfo);
 	nasid = hubinfo->h_nasid;
 
-	s = mutex_spinlock(&hubinfo->h_bwlock);
+	spin_lock(&hubinfo->h_bwlock);
 
 	/*
 	 * If this is the last hold on this mapping, free it.
@@ -319,7 +316,7 @@ hub_piomap_free(hub_piomap_t hub_piomap)
 		wake_up(&hubinfo->h_bwwait);
 	}
 
-	mutex_spinunlock(&hubinfo->h_bwlock, s);
+	spin_unlock(&hubinfo->h_bwlock);
 }
 
 /*
@@ -440,7 +437,7 @@ void
 hub_dmamap_free(hub_dmamap_t hub_dmamap)
 {
 	hub_dmamap->hdma_flags &= ~HUB_DMAMAP_IS_VALID;
-	kern_free(hub_dmamap);
+	kfree(hub_dmamap);
 }
 
 /*
@@ -461,12 +458,9 @@ hub_dmamap_addr(	hub_dmamap_t dmamap,	/* use these mapping resources */
 	if (dmamap->hdma_flags & HUB_DMAMAP_USED) {
 	    /* If the map is FIXED, re-use is OK. */
 	    if (!(dmamap->hdma_flags & HUB_DMAMAP_IS_FIXED)) {
+		char name[MAXDEVNAME];
 		vhdl = dmamap->hdma_xtalk_info.xd_dev;
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-		printk(KERN_WARNING  "%v: hub_dmamap_addr re-uses dmamap.\n",vhdl);
-#else
-		printk(KERN_WARNING  "%p: hub_dmamap_addr re-uses dmamap.\n", (void *)vhdl);
-#endif
+		printk(KERN_WARNING  "%s: hub_dmamap_addr re-uses dmamap.\n", vertex_to_name(vhdl, name, MAXDEVNAME));
 	    }
 	} else {
 		dmamap->hdma_flags |= HUB_DMAMAP_USED;
@@ -494,12 +488,9 @@ hub_dmamap_list(hub_dmamap_t hub_dmamap,	/* use these mapping resources */
 	if (hub_dmamap->hdma_flags & HUB_DMAMAP_USED) {
 	    /* If the map is FIXED, re-use is OK. */
 	    if (!(hub_dmamap->hdma_flags & HUB_DMAMAP_IS_FIXED)) {
+		char name[MAXDEVNAME];
 		vhdl = hub_dmamap->hdma_xtalk_info.xd_dev;
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-		printk(KERN_WARNING  "%v: hub_dmamap_list re-uses dmamap\n",vhdl);
-#else
-		printk(KERN_WARNING  "%p: hub_dmamap_list re-uses dmamap\n", (void *)vhdl);
-#endif
+		printk(KERN_WARNING  "%s: hub_dmamap_list re-uses dmamap\n", vertex_to_name(vhdl, name, MAXDEVNAME));
 	    }
 	} else {
 		hub_dmamap->hdma_flags |= HUB_DMAMAP_USED;
@@ -523,12 +514,9 @@ hub_dmamap_done(hub_dmamap_t hub_dmamap)	/* done with these mapping resources */
 	} else {
 	    /* If the map is FIXED, re-done is OK. */
 	    if (!(hub_dmamap->hdma_flags & HUB_DMAMAP_IS_FIXED)) {
+		char name[MAXDEVNAME];
 		vhdl = hub_dmamap->hdma_xtalk_info.xd_dev;
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-		printk(KERN_WARNING  "%v: hub_dmamap_done already done with dmamap\n",vhdl);
-#else
-		printk(KERN_WARNING  "%p: hub_dmamap_done already done with dmamap\n", (void *)vhdl);
-#endif
+		printk(KERN_WARNING  "%s: hub_dmamap_done already done with dmamap\n", vertex_to_name(vhdl, name, MAXDEVNAME));
 	    }
 	}
 }
@@ -599,7 +587,6 @@ void
 hub_provider_startup(vertex_hdl_t hubv)
 {
 	hub_pio_init(hubv);
-	hub_intr_init(hubv);
 }
 
 /*
@@ -806,4 +793,3 @@ xtalk_provider_t hub_provider = {
 	(xtalk_provider_startup_f *)	hub_provider_startup,
 	(xtalk_provider_shutdown_f *)	hub_provider_shutdown,
 };
-
