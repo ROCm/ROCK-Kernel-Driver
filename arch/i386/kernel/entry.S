@@ -69,24 +69,27 @@ IF_MASK		= 0x00000200
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
-/* These are offsets into the irq_stat structure
+/*
+ * These are offsets into the irq_stat structure
  * There is one per cpu and it is aligned to 32
  * byte boundry (we put that here as a shift count)
  */
-irq_array_shift			= CONFIG_X86_L1_CACHE_SHIFT
-irq_stat_local_irq_count	= 4
-irq_stat_local_bh_count		= 8
+irq_array_shift	= CONFIG_X86_L1_CACHE_SHIFT
+local_irq_count	= 4
+local_bh_count	= 8
 
 #ifdef CONFIG_SMP
-#define GET_CPU_INDX	movl TI_CPU(%ebx),%eax;  \
-                        shll $irq_array_shift,%eax
-#define GET_CURRENT_CPU_INDX GET_THREAD_INFO(%ebx); \
-                             GET_CPU_INDX
-#define CPU_INDX (,%eax)
+#define GET_CPU_IDX \
+		movl TI_CPU(%ebx), %eax;  \
+		shll $irq_array_shift, %eax
+#define GET_CURRENT_CPU_IDX \
+		GET_THREAD_INFO(%ebx); \
+		GET_CPU_IDX
+#define CPU_IDX (,%eax)
 #else
-#define GET_CPU_INDX
-#define GET_CURRENT_CPU_INDX GET_THREAD_INFO(%ebx)
-#define CPU_INDX
+#define GET_CPU_IDX
+#define GET_CURRENT_CPU_IDX GET_THREAD_INFO(%ebx)
+#define CPU_IDX
 #endif
 
 #ifdef CONFIG_PREEMPT
@@ -111,9 +114,9 @@ irq_stat_local_bh_count		= 8
 	pushl %edx; \
 	pushl %ecx; \
 	pushl %ebx; \
-	movl $(__KERNEL_DS),%edx; \
-	movl %edx,%ds; \
-	movl %edx,%es;
+	movl $(__KERNEL_DS), %edx; \
+	movl %edx, %ds; \
+	movl %edx, %es;
 
 #define RESTORE_ALL	\
 	popl %ebx;	\
@@ -125,7 +128,7 @@ irq_stat_local_bh_count		= 8
 	popl %eax;	\
 1:	popl %ds;	\
 2:	popl %es;	\
-	addl $4,%esp;	\
+	addl $4, %esp;	\
 3:	iret;		\
 .section .fixup,"ax";	\
 4:	movl $0,(%esp);	\
@@ -147,20 +150,21 @@ irq_stat_local_bh_count		= 8
 .previous
 
 ENTRY(lcall7)
-	pushfl			# We get a different stack layout with call gates,
-	pushl %eax		# which has to be cleaned up later..
+	pushfl			# We get a different stack layout with call
+				# gates, which has to be cleaned up later..
+	pushl %eax
 	SAVE_ALL
-	movl EIP(%esp),%eax	# due to call gates, this is eflags, not eip..
-	movl CS(%esp),%edx	# this is eip..
-	movl EFLAGS(%esp),%ecx	# and this is cs..
+	movl EIP(%esp), %eax	# due to call gates, this is eflags, not eip..
+	movl CS(%esp), %edx	# this is eip..
+	movl EFLAGS(%esp), %ecx	# and this is cs..
 	movl %eax,EFLAGS(%esp)	#
 	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%esp)	#
-	movl %esp,%ebx
+	movl %esp, %ebx
 	pushl %ebx
-	andl $-8192,%ebx	# GET_THREAD_INFO
-	movl TI_EXEC_DOMAIN(%ebx),%edx	# Get the execution domain
-	movl 4(%edx),%edx	# Get the lcall7 handler for the domain
+	andl $-8192, %ebx	# GET_THREAD_INFO
+	movl TI_EXEC_DOMAIN(%ebx), %edx	# Get the execution domain
+	movl 4(%edx), %edx	# Get the lcall7 handler for the domain
 	pushl $0x7
 	call *%edx
 	addl $4, %esp
@@ -168,20 +172,21 @@ ENTRY(lcall7)
 	jmp resume_userspace
 
 ENTRY(lcall27)
-	pushfl			# We get a different stack layout with call gates,
-	pushl %eax		# which has to be cleaned up later..
+	pushfl			# We get a different stack layout with call
+				# gates, which has to be cleaned up later..
+	pushl %eax
 	SAVE_ALL
-	movl EIP(%esp),%eax	# due to call gates, this is eflags, not eip..
-	movl CS(%esp),%edx	# this is eip..
-	movl EFLAGS(%esp),%ecx	# and this is cs..
+	movl EIP(%esp), %eax	# due to call gates, this is eflags, not eip..
+	movl CS(%esp), %edx	# this is eip..
+	movl EFLAGS(%esp), %ecx	# and this is cs..
 	movl %eax,EFLAGS(%esp)	#
 	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%esp)	#
-	movl %esp,%ebx
+	movl %esp, %ebx
 	pushl %ebx
-	andl $-8192,%ebx	# GET_THREAD_INFO
-	movl TI_EXEC_DOMAIN(%ebx),%edx	# Get the execution domain
-	movl 4(%edx),%edx	# Get the lcall7 handler for the domain
+	andl $-8192, %ebx	# GET_THREAD_INFO
+	movl TI_EXEC_DOMAIN(%ebx), %edx	# Get the execution domain
+	movl 4(%edx), %edx	# Get the lcall7 handler for the domain
 	pushl $0x27
 	call *%edx
 	addl $4, %esp
@@ -211,15 +216,17 @@ ENTRY(ret_from_intr)
 	GET_THREAD_INFO(%ebx)
 	init_ret_intr
 ret_from_exception:
-	movl EFLAGS(%esp),%eax		# mix EFLAGS and CS
-	movb CS(%esp),%al
-	testl $(VM_MASK | 3),%eax
+	movl EFLAGS(%esp), %eax		# mix EFLAGS and CS
+	movb CS(%esp), %al
+	testl $(VM_MASK | 3), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
- 	cli				# make sure we don't miss an interrupt setting need_resched
- 					# or sigpending between sampling and the iret
-	movl TI_FLAGS(%ebx),%ecx
-	andl $_TIF_WORK_MASK,%ecx	# is there any work to be done on int/excp return?
+ 	cli				# make sure we don't miss an interrupt
+					# setting need_resched or sigpending
+					# between sampling and the iret
+	movl TI_FLAGS(%ebx), %ecx
+	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done on
+					# int/exception return?
 	jne work_pending
 	jmp restore_all
 
@@ -227,16 +234,16 @@ ENTRY(resume_userspace)
 ENTRY(resume_kernel)
 	cmpl $0,TI_PRE_COUNT(%ebx)
 	jnz restore_all
-	movl TI_FLAGS(%ebx),%ecx
-	testb $_TIF_NEED_RESCHED,%cl
+	movl TI_FLAGS(%ebx), %ecx
+	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
-	movl SYMBOL_NAME(irq_stat)+irq_stat_local_bh_count CPU_INDX,%ecx
-	addl SYMBOL_NAME(irq_stat)+irq_stat_local_irq_count CPU_INDX,%ecx
+	movl SYMBOL_NAME(irq_stat)+local_bh_count CPU_IDX, %ecx
+	addl SYMBOL_NAME(irq_stat)+local_irq_count CPU_IDX, %ecx
 	jnz restore_all
 	incl TI_PRE_COUNT(%ebx)
 	sti
-	movl TI_TASK(%ebx), %ecx	# ti->task
-	movl $0, (%ecx)			# current->state = TASK_RUNNING
+	movl TI_TASK(%ebx), %ecx		# ti->task
+	movl $0,(%ecx)			# current->state = TASK_RUNNING
 	call SYMBOL_NAME(schedule)
 	jmp ret_from_intr
 #endif
@@ -247,18 +254,20 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebx)
-	cmpl $(NR_syscalls),%eax
+	cmpl $(NR_syscalls), %eax
 	jae syscall_badsys
-	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebx)	# system call tracing in operation
+					# system call tracing in operation
+	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebx)
 	jnz syscall_trace_entry
 syscall_call:
 	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
- 	cli				# make sure we don't miss an interrupt setting need_resched
- 					# or sigpending between sampling and the iret
-	movl TI_FLAGS(%ebx),%ecx
-	testw $_TIF_ALLWORK_MASK,%cx	# current->work
+	cli				# make sure we don't miss an interrupt
+					# setting need_resched or sigpending
+					# between sampling and the iret
+	movl TI_FLAGS(%ebx), %ecx
+	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work
 restore_all:
 	RESTORE_ALL
@@ -266,23 +275,27 @@ restore_all:
 	# perform work that needs to be done immediately before resumption
 	ALIGN
 work_pending:
-	testb $_TIF_NEED_RESCHED,%cl
+	testb $_TIF_NEED_RESCHED, %cl
 	jz work_notifysig
 work_resched:
 	call SYMBOL_NAME(schedule)
- 	cli				# make sure we don't miss an interrupt setting need_resched
- 					# or sigpending between sampling and the iret
-	movl TI_FLAGS(%ebx),%ecx
-	andl $_TIF_WORK_MASK,%ecx	# is there any work to be done other than syscall tracing?
+	cli				# make sure we don't miss an interrupt
+					# setting need_resched or sigpending
+					# between sampling and the iret
+	movl TI_FLAGS(%ebx), %ecx
+	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other
+					# than syscall tracing?
 	jz restore_all
-	testb $_TIF_NEED_RESCHED,%cl
+	testb $_TIF_NEED_RESCHED, %cl
 	jnz work_resched
 
-work_notifysig:				# deal with pending signals and notify-resume requests
+work_notifysig:				# deal with pending signals and
+					# notify-resume requests
 	testl $(VM_MASK),EFLAGS(%esp)
-	movl %esp,%eax
-	jne work_notifysig_v86		# returning to kernel-space or vm86-space
-	xorl %edx,%edx
+	movl %esp, %eax
+	jne work_notifysig_v86		# returning to kernel-space or
+					# vm86-space
+	xorl %edx, %edx
 	call SYMBOL_NAME(do_notify_resume)
 	jmp restore_all
 
@@ -291,8 +304,8 @@ work_notifysig_v86:
 	pushl %ecx
 	call SYMBOL_NAME(save_v86_state)
 	popl %ecx
-	movl %eax,%esp
-	xorl %edx,%edx
+	movl %eax, %esp
+	xorl %edx, %edx
 	call SYMBOL_NAME(do_notify_resume)
 	jmp restore_all
 
@@ -300,22 +313,23 @@ work_notifysig_v86:
 	ALIGN
 syscall_trace_entry:
 	movl $-ENOSYS,EAX(%esp)
-	movl %esp,%eax
+	movl %esp, %eax
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_syscall_trace)
-	movl ORIG_EAX(%esp),%eax
-	cmpl $(NR_syscalls),%eax
+	movl ORIG_EAX(%esp), %eax
+	cmpl $(NR_syscalls), %eax
 	jnae syscall_call
 	jmp syscall_exit
 
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	testb $_TIF_SYSCALL_TRACE,%cl
+	testb $_TIF_SYSCALL_TRACE, %cl
 	jz work_pending
-	sti				# could let do_syscall_trace() call schedule() instead
-	movl %esp,%eax
-	movl $1,%edx
+	sti				# could let do_syscall_trace() call
+					# schedule() instead
+	movl %esp, %eax
+	movl $1, %edx
 	call SYMBOL_NAME(do_syscall_trace)
 	jmp resume_userspace
 
@@ -325,13 +339,13 @@ syscall_badsys:
 	jmp resume_userspace
 
 ENTRY(divide_error)
-	pushl $0		# no error code
+	pushl $0			# no error code
 	pushl $ SYMBOL_NAME(do_divide_error)
 	ALIGN
 error_code:
 	pushl %ds
 	pushl %eax
-	xorl %eax,%eax
+	xorl %eax, %eax
 	pushl %ebp
 	pushl %edi
 	pushl %esi
@@ -340,20 +354,20 @@ error_code:
 	pushl %ecx
 	pushl %ebx
 	cld
-	movl %es,%ecx
+	movl %es, %ecx
 	movl ORIG_EAX(%esp), %esi	# get the error code
 	movl ES(%esp), %edi		# get the function address
 	movl %eax, ORIG_EAX(%esp)
 	movl %ecx, ES(%esp)
-	movl %esp,%edx
+	movl %esp, %edx
 	pushl %esi			# push the error code
 	pushl %edx			# push the pt_regs pointer
-	movl $(__KERNEL_DS),%edx
-	movl %edx,%ds
-	movl %edx,%es
+	movl $(__KERNEL_DS), %edx
+	movl %edx, %ds
+	movl %edx, %es
 	GET_THREAD_INFO(%ebx)
 	call *%edi
-	addl $8,%esp
+	addl $8, %esp
 	preempt_stop
 	jmp ret_from_exception
 
@@ -368,19 +382,19 @@ ENTRY(simd_coprocessor_error)
 	jmp error_code
 
 ENTRY(device_not_available)
-	pushl $-1		# mark this as an int
+	pushl $-1			# mark this as an int
 	SAVE_ALL
 	GET_THREAD_INFO(%ebx)
-	movl %cr0,%eax
-	testl $0x4,%eax			# EM (math emulation bit)
+	movl %cr0, %eax
+	testl $0x4, %eax		# EM (math emulation bit)
 	jne device_not_available_emulate
 	preempt_stop
 	call SYMBOL_NAME(math_state_restore)
 	jmp ret_from_exception
 device_not_available_emulate:
-	pushl $0		# temporary storage for ORIG_EIP
+	pushl $0			# temporary storage for ORIG_EIP
 	call  SYMBOL_NAME(math_emulate)
-	addl $4,%esp
+	addl $4, %esp
 	preempt_stop
 	jmp ret_from_exception
 
@@ -392,11 +406,11 @@ ENTRY(debug)
 ENTRY(nmi)
 	pushl %eax
 	SAVE_ALL
-	movl %esp,%edx
+	movl %esp, %edx
 	pushl $0
 	pushl %edx
 	call SYMBOL_NAME(do_nmi)
-	addl $8,%esp
+	addl $8, %esp
 	RESTORE_ALL
 
 ENTRY(int3)
@@ -481,7 +495,7 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_mknod)
 	.long SYMBOL_NAME(sys_chmod)		/* 15 */
 	.long SYMBOL_NAME(sys_lchown16)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old break syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old break syscall holder */
 	.long SYMBOL_NAME(sys_stat)
 	.long SYMBOL_NAME(sys_lseek)
 	.long SYMBOL_NAME(sys_getpid)		/* 20 */
@@ -495,11 +509,12 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_fstat)
 	.long SYMBOL_NAME(sys_pause)
 	.long SYMBOL_NAME(sys_utime)		/* 30 */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old stty syscall holder */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old gtty syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old stty syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old gtty syscall holder */
 	.long SYMBOL_NAME(sys_access)
 	.long SYMBOL_NAME(sys_nice)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* 35 */		/* old ftime syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* 35 */
+						/* old ftime syscall holder */
 	.long SYMBOL_NAME(sys_sync)
 	.long SYMBOL_NAME(sys_kill)
 	.long SYMBOL_NAME(sys_rename)
@@ -508,7 +523,7 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_dup)
 	.long SYMBOL_NAME(sys_pipe)
 	.long SYMBOL_NAME(sys_times)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old prof syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old prof syscall holder */
 	.long SYMBOL_NAME(sys_brk)		/* 45 */
 	.long SYMBOL_NAME(sys_setgid16)
 	.long SYMBOL_NAME(sys_getgid16)
@@ -516,13 +531,13 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_geteuid16)
 	.long SYMBOL_NAME(sys_getegid16)	/* 50 */
 	.long SYMBOL_NAME(sys_acct)
-	.long SYMBOL_NAME(sys_umount)					/* recycled never used phys() */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old lock syscall holder */
+	.long SYMBOL_NAME(sys_umount)		/* recycled never used phys() */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old lock syscall holder */
 	.long SYMBOL_NAME(sys_ioctl)
 	.long SYMBOL_NAME(sys_fcntl)		/* 55 */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old mpx syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old mpx syscall holder */
 	.long SYMBOL_NAME(sys_setpgid)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old ulimit syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old ulimit syscall holder */
 	.long SYMBOL_NAME(sys_olduname)
 	.long SYMBOL_NAME(sys_umask)		/* 60 */
 	.long SYMBOL_NAME(sys_chroot)
@@ -562,7 +577,7 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_fchown16)		/* 95 */
 	.long SYMBOL_NAME(sys_getpriority)
 	.long SYMBOL_NAME(sys_setpriority)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old profil syscall holder */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* old profil syscall holder */
 	.long SYMBOL_NAME(sys_statfs)
 	.long SYMBOL_NAME(sys_fstatfs)		/* 100 */
 	.long SYMBOL_NAME(sys_ioperm)
@@ -652,8 +667,8 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_capset)           /* 185 */
 	.long SYMBOL_NAME(sys_sigaltstack)
 	.long SYMBOL_NAME(sys_sendfile)
-	.long SYMBOL_NAME(sys_ni_syscall)		/* streams1 */
-	.long SYMBOL_NAME(sys_ni_syscall)		/* streams2 */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* streams1 */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* streams2 */
 	.long SYMBOL_NAME(sys_vfork)            /* 190 */
 	.long SYMBOL_NAME(sys_getrlimit)
 	.long SYMBOL_NAME(sys_mmap2)
@@ -702,7 +717,7 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_removexattr)	/* 235 */
 	.long SYMBOL_NAME(sys_lremovexattr)
 	.long SYMBOL_NAME(sys_fremovexattr)
- 	.long SYMBOL_NAME(sys_tkill)
+	.long SYMBOL_NAME(sys_tkill)
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long SYMBOL_NAME(sys_ni_syscall)
