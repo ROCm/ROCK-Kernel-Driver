@@ -740,16 +740,16 @@ sa1100_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++) {
-		do {
-			status = UART_GET_UTSR1(sport);
-		} while (!(status & UTSR1_TNF));
-		UART_PUT_CHAR(sport, s[i]);
 		if (s[i] == '\n') {
 			do {
 				status = UART_GET_UTSR1(sport);
 			} while (!(status & UTSR1_TNF));
 			UART_PUT_CHAR(sport, '\r');
 		}
+		do {
+			status = UART_GET_UTSR1(sport);
+		} while (!(status & UTSR1_TNF));
+		UART_PUT_CHAR(sport, s[i]);
 	}
 
 	/*
