@@ -74,11 +74,8 @@ static int dummy_acct (struct file *file)
 
 static int dummy_capable (struct task_struct *tsk, int cap)
 {
-	if (cap_is_fs_cap (cap) ? tsk->fsuid == 0 : tsk->euid == 0)
-		/* capability granted */
+	if (cap_raised (tsk->cap_effective, cap))
 		return 0;
-
-	/* capability denied */
 	return -EPERM;
 }
 
@@ -183,6 +180,7 @@ static int dummy_bprm_alloc_security (struct linux_binprm *bprm)
 
 static void dummy_bprm_free_security (struct linux_binprm *bprm)
 {
+	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 	return;
 }
 
@@ -558,6 +556,7 @@ static int dummy_task_setuid (uid_t id0, uid_t id1, uid_t id2, int flags)
 
 static int dummy_task_post_setuid (uid_t id0, uid_t id1, uid_t id2, int flags)
 {
+	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 	return 0;
 }
 
