@@ -127,14 +127,16 @@ extern struct seq_operations nfs_exports_op;
 static int exports_open(struct inode *inode, struct file *file)
 {
 	int res;
+	char *namebuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (namebuf == NULL)
+		return -ENOMEM;
+
 	res = seq_open(file, &nfs_exports_op);
-	if (!res) {
-		char *namebuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-		if (namebuf == NULL)
-			res = -ENOMEM;
-		else
-			((struct seq_file *)file->private_data)->private = namebuf;
-	}
+	if (res)
+		kfree(namebuf);
+	else
+		((struct seq_file *)file->private_data)->private = namebuf;
+
 	return res;
 }
 static int exports_release(struct inode *inode, struct file *file)
