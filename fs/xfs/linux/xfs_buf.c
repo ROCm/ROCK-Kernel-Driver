@@ -475,6 +475,7 @@ _pagebuf_lookup_pages(
 		}
 		if ((flags & PBF_MAPPED) && !(pb->pb_flags & PBF_MAPPED)) {
 			all_mapped = 1;
+			rval = 0;
 			goto mapit;
 		}
 		return 0;
@@ -485,7 +486,7 @@ _pagebuf_lookup_pages(
 	if (rval)
 		return rval;
 
-	rval = pi = 0;
+	all_mapped = 1;
 	blocksize = pb->pb_target->pbr_bsize;
 	sectorshift = pb->pb_target->pbr_sshift;
 	size = pb->pb_count_desired;
@@ -493,7 +494,7 @@ _pagebuf_lookup_pages(
 
 	/* Enter the pages in the page list */
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
-	for (all_mapped = 1; pi < page_count; pi++, index++) {
+	for (pi = 0; pi < page_count; pi++, index++) {
 		if (pb->pb_pages[pi] == 0) {
 			retries = 0;
 		      retry:
