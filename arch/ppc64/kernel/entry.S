@@ -162,7 +162,7 @@ syscall_error_cont:
 
 	/* check for syscall tracing or audit */
 	ld	r9,TI_FLAGS(r12)
-	andi.	r0,r9,_TIF_SYSCALL_T_OR_A
+	andi.	r0,r9,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	bne-	syscall_exit_trace
 syscall_exit_trace_cont:
 
@@ -322,7 +322,7 @@ _GLOBAL(ppc64_rt_sigreturn)
 	blt	syscall_exit
 	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
-	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
+	andi.	r4,r4,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	beq+	81f
 	bl	.do_syscall_trace_leave
 81:	b	.ret_from_except

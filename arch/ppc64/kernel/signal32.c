@@ -25,6 +25,7 @@
 #include <linux/errno.h>
 #include <linux/elf.h>
 #include <linux/compat.h>
+#include <linux/ptrace.h>
 #include <asm/ppc32.h>
 #include <asm/uaccess.h>
 #include <asm/ppcdebug.h>
@@ -700,6 +701,9 @@ static void handle_rt_signal32(unsigned long sig, struct k_sigaction *ka,
 	regs->trap = 0;
 	regs->result = 0;
 
+	if (test_thread_flag(TIF_SINGLESTEP))
+		ptrace_notify(SIGTRAP);
+
 	return;
 
 badframe:
@@ -862,6 +866,9 @@ static void handle_signal32(unsigned long sig, struct k_sigaction *ka,
 	regs->link = (unsigned long) frame->mctx.tramp;
 	regs->trap = 0;
 	regs->result = 0;
+
+	if (test_thread_flag(TIF_SINGLESTEP))
+		ptrace_notify(SIGTRAP);
 
 	return;
 

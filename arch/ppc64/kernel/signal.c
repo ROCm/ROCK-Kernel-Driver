@@ -26,6 +26,7 @@
 #include <linux/unistd.h>
 #include <linux/stddef.h>
 #include <linux/elf.h>
+#include <linux/ptrace.h>
 #include <asm/sigcontext.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
@@ -451,6 +452,9 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	}
 	if (err)
 		goto badframe;
+
+	if (test_thread_flag(TIF_SINGLESTEP))
+		ptrace_notify(SIGTRAP);
 
 	return;
 
