@@ -176,11 +176,34 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 }
 static int validate_t2(struct smb_t2_rsp * pSMB) 
 {
-	int rc = 0;
+	int rc = -EINVAL;
+	int total_size;
+	char * pBCC;
 
-	/* check for plausible wct, bcc and possible t2 data and parm sizes */
+	/* check for plausible wct, bcc and t2 data and parm sizes */
 	/* check for parm and data offset going beyond end of smb */
-
+	if(pSMB->hdr.WordCount >= 10) {
+		if((le16_to_cpu(pSMB->t2_rsp.ParameterOffset) <= 1024) &&
+		   (le16_to_cpu(pSMB->t2_rsp.DataOffset) <= 1024)) {
+			/* check that bcc is at least as big as parms + data */
+			/* check that bcc is less than negotiated smb buffer */
+			total_size = le16_to_cpu(pSMB->t2_rsp.ParameterCount);
+			if(total_size < 512) {
+				total_size+=le16_to_cpu(pSMB->t2_rsp.DataCount);
+				/* BCC le converted in SendReceive */
+				pBCC = (pSMB->hdr.WordCount * 2) + sizeof(struct smb_hdr) + 
+					(char *)pSMB;
+				if((total_size <= (*(u16 *)pBCC)) && 
+				   (total_size < 
+					CIFS_MAX_MSGSIZE+MAX_CIFS_HDR_SIZE)) {
+					return 0;
+				}
+				
+			}
+		}
+	}
+	cifs_dump_mem("Invalid transact2 SMB: ",(char *)pSMB,
+		sizeof(struct smb_t2_rsp) + 16);
 	return rc;
 }
 int
