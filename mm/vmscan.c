@@ -364,7 +364,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 */
 		if (PagePrivate(page)) {
 			if (!try_to_release_page(page, gfp_mask))
-				goto keep_locked;
+				goto activate_locked;
 			if (!mapping && page_count(page) == 1)
 				goto free_it;
 		}
