@@ -67,99 +67,185 @@ static char *ax2asc2(ax25_address *a, char *buf)
 }
 #endif /* CONFIG_AX25 */
 
+struct arp_iter_state {
+	loff_t  is_pneigh: 1,
+		bucket:	   6,
+		pos:	   sizeof(loff_t) * 8 - 7;
+};
+
+static __inline__ struct neighbour *neigh_get_bucket(loff_t *pos)
+{
+	struct neighbour *n = NULL;
+	struct arp_iter_state* state = (struct arp_iter_state *)pos;
+	loff_t l = state->pos;
+	int i, bucket = state->bucket;
+
+	for (; bucket <= NEIGH_HASHMASK; ++bucket)
+		for (i = 0, n = arp_tbl.hash_buckets[bucket]; n;
+		     ++i, n = n->next)
+			/* Do not confuse users "arp -a" with magic entries */
+			if ((n->nud_state & ~NUD_NOARP) && !l--) {
+				state->pos    = i;
+				state->bucket = bucket;
+				goto out;
+			}
+out:
+	return n;
+}
+
+static __inline__ struct pneigh_entry *pneigh_get_bucket(loff_t *pos)
+{
+	struct pneigh_entry *n = NULL;
+	struct arp_iter_state* state = (struct arp_iter_state *)pos;
+	loff_t l = state->pos;
+	int i, bucket = state->bucket;
+
+	for (; bucket <= PNEIGH_HASHMASK; ++bucket)
+		for (i = 0, n = arp_tbl.phash_buckets[bucket]; n;
+		     ++i, n = n->next)
+			if (!l--) {
+				state->pos    = i;
+				state->bucket = bucket;
+				goto out;
+			}
+out:
+	return n;
+}
+
+static __inline__ void *arp_get_bucket(struct seq_file *seq, loff_t *pos)
+{
+	void *rc = neigh_get_bucket(pos);
+
+	if (!rc) {
+		struct arp_iter_state* state = (struct arp_iter_state *)pos;
+
+		read_unlock_bh(&arp_tbl.lock);
+		state->is_pneigh = 1;
+		state->bucket	 = 0;
+		state->pos	 = 0;
+		/* HACK: till there is state we can pass to seq_show...  */
+		seq->private = (void *)1;
+		rc = pneigh_get_bucket(pos);
+	}
+	return rc;
+}
+
 static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return (void *)(unsigned long)++*pos;
+	read_lock_bh(&arp_tbl.lock);
+	return *pos ? arp_get_bucket(seq, pos) : (void *)1;
 }
 
 static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return (void *)(unsigned long)((++*pos) >=
-				       (NEIGH_HASHMASK +
-					PNEIGH_HASHMASK - 1) ? 0 : *pos);
+	void *rc;
+	struct arp_iter_state* state;
+
+	if (v == (void *)1) {
+		rc = arp_get_bucket(seq, pos);
+		goto out;
+	}
+
+	state = (struct arp_iter_state *)pos;
+	if (!state->is_pneigh) {
+		struct neighbour *n = v;
+
+		rc = n = n->next;
+		if (n)
+			goto out;
+		state->pos = 0;
+		++state->bucket;
+		rc = neigh_get_bucket(pos);
+		if (rc)
+			goto out;
+		read_unlock_bh(&arp_tbl.lock);
+		/* HACK: till there is state we can pass to seq_show...  */
+		seq->private	 = (void *)1;
+		state->is_pneigh = 1;
+		state->bucket	 = 0;
+		state->pos	 = 0;
+		rc = pneigh_get_bucket(pos);
+	} else {
+		struct pneigh_entry *pn = v;
+
+		pn = pn->next;
+		if (!pn) {
+			++state->bucket;
+			state->pos = 0;
+			pn = pneigh_get_bucket(pos);
+		}
+		rc = pn;
+	}
+out:
+	++*pos;
+	return rc;
 }
 
 static void arp_seq_stop(struct seq_file *seq, void *v)
 {
+	if (!seq->private)
+		read_unlock_bh(&arp_tbl.lock);
 }
 
 #define HBUFFERLEN 30
 
-static __inline__ void arp_format_neigh_table(struct seq_file *seq, int entry)
+static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
+					      struct neighbour *n)
 {
 	char hbuffer[HBUFFERLEN];
 	const char hexbuf[] = "0123456789ABCDEF";
-	struct neighbour *n;
 	int k, j;
+	char tbuf[16];
+	struct net_device *dev = n->dev;
+	int hatype = dev->type;
 
-	read_lock_bh(&arp_tbl.lock);
-	for (n = arp_tbl.hash_buckets[entry]; n; n = n->next) {
-		char tbuf[16];
-		struct net_device *dev = n->dev;
-		int hatype = dev->type;
-
-		/* Do not confuse users "arp -a" with magic entries */
-		if (!(n->nud_state & ~NUD_NOARP))
-			continue;
-
-		read_lock(&n->lock);
-		/* Convert hardware address to XX:XX:XX:XX ... form. */
+	read_lock(&n->lock);
+	/* Convert hardware address to XX:XX:XX:XX ... form. */
 #ifdef CONFIG_AX25
-		if (hatype == ARPHRD_AX25 || hatype == ARPHRD_NETROM)
-			ax2asc2((ax25_address *)n->ha, hbuffer);
-		else {
+	if (hatype == ARPHRD_AX25 || hatype == ARPHRD_NETROM)
+		ax2asc2((ax25_address *)n->ha, hbuffer);
+	else {
 #endif
-		for (k = 0, j = 0; k < HBUFFERLEN - 3 &&
-				   j < dev->addr_len; j++) {
-			hbuffer[k++] = hexbuf[(n->ha[j] >> 4) & 15];
-			hbuffer[k++] = hexbuf[n->ha[j] & 15];
-			hbuffer[k++] = ':';
-		}
-		hbuffer[--k] = 0;
-#ifdef CONFIG_AX25
-		}
-#endif
-		sprintf(tbuf, "%u.%u.%u.%u",
-			NIPQUAD(*(u32*)n->primary_key));
-		seq_printf(seq, "%-16s 0x%-10x0x%-10x%s"
-				"     *        %s\n",
-			   tbuf, hatype, arp_state_to_flags(n), 
-			   hbuffer, dev->name);
-		read_unlock(&n->lock);
+	for (k = 0, j = 0; k < HBUFFERLEN - 3 && j < dev->addr_len; j++) {
+		hbuffer[k++] = hexbuf[(n->ha[j] >> 4) & 15];
+		hbuffer[k++] = hexbuf[n->ha[j] & 15];
+		hbuffer[k++] = ':';
 	}
-	read_unlock_bh(&arp_tbl.lock);
+	hbuffer[--k] = 0;
+#ifdef CONFIG_AX25
+	}
+#endif
+	sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->primary_key));
+	seq_printf(seq, "%-16s 0x%-10x0x%-10x%s     *        %s\n",
+		   tbuf, hatype, arp_state_to_flags(n), hbuffer, dev->name);
+	read_unlock(&n->lock);
 }
 
-static __inline__ void arp_format_pneigh_table(struct seq_file *seq, int entry)
+static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
+					       struct pneigh_entry *n)
 {
-	struct pneigh_entry *n;
 
-	for (n = arp_tbl.phash_buckets[entry]; n; n = n->next) {
-		struct net_device *dev = n->dev;
-		int hatype = dev ? dev->type : 0;
-		char tbuf[16];
+	struct net_device *dev = n->dev;
+	int hatype = dev ? dev->type : 0;
+	char tbuf[16];
 
-		sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->key));
-		seq_printf(seq, "%-16s 0x%-10x0x%-10x%s"
-				"     *        %s\n",
-			   tbuf, hatype, ATF_PUBL | ATF_PERM,
-			   "00:00:00:00:00:00",
-			   dev ? dev->name : "*");
-	}
+	sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->key));
+	seq_printf(seq, "%-16s 0x%-10x0x%-10x%s     *        %s\n",
+		   tbuf, hatype, ATF_PUBL | ATF_PERM, "00:00:00:00:00:00",
+		   dev ? dev->name : "*");
 }
 
 static int arp_seq_show(struct seq_file *seq, void *v)
 {
-	unsigned long l = (unsigned long)v - 1;
-
-	if (!l)
+	if (v == (void *)1)
 		seq_puts(seq, "IP address       HW type     Flags       "
 			      "HW address            Mask     Device\n");
-
-	if (l <= NEIGH_HASHMASK)
-		arp_format_neigh_table(seq, l);
-	else
-		arp_format_pneigh_table(seq, l - NEIGH_HASHMASK);
+	else {
+		if (seq->private)
+			arp_format_pneigh_entry(seq, v);
+		else
+			arp_format_neigh_entry(seq, v);
+	}
 
 	return 0;
 }
