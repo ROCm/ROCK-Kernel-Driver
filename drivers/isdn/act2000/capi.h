@@ -138,7 +138,7 @@ typedef struct actcapi_ncpd {
 
 typedef struct actcapi_msg {
 	actcapi_msghdr hdr;
-	union msg {
+	union {
 		__u16 manuf_msg;
 		struct manufacturer_req_net {
 			__u16 manuf_msg;

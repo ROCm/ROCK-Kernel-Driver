@@ -757,6 +757,10 @@ isdnloop_vstphone(isdnloop_card * card, char *phone, int caller)
 	int i;
 	static char nphone[30];
 
+	if (!card) {
+		printk("BUG!!!\n");
+		return "";
+	}
 	switch (card->ptype) {
 		case ISDN_PTYPE_EURO:
 			if (caller) {
@@ -775,7 +779,7 @@ isdnloop_vstphone(isdnloop_card * card, char *phone, int caller)
 				return (&phone[strlen(phone) - 1]);
 			break;
 	}
-	return ("\0");
+	return "";
 }
 
 /*
@@ -882,7 +886,7 @@ isdnloop_parse_cmd(isdnloop_card * card)
 						isdnloop_vstphone(card, cmd.parm.setup.eazmsn, 1),
 						cmd.parm.setup.si1,
 						cmd.parm.setup.si2,
-					isdnloop_vstphone(card->rcard[ch],
+					isdnloop_vstphone(card->rcard[ch - 1],
 					       cmd.parm.setup.phone, 0));
 					isdnloop_fake(card->rcard[ch - 1], buf, card->rch[ch - 1] + 1);
 					/* Fall through */
