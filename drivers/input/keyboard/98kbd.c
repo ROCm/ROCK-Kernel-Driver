@@ -109,8 +109,8 @@ struct kbd98 {
 	struct jis_kbd_conv jis[16];
 };
 
-void kbd98_interrupt(struct serio *serio, unsigned char data,
-			unsigned int flags, struct pt_regs *regs)
+irqreturn_t kbd98_interrupt(struct serio *serio, unsigned char data,
+			    unsigned int flags, struct pt_regs *regs)
 {
 	struct kbd98 *kbd98 = serio->private;
 	unsigned char scancode, keycode;
@@ -119,15 +119,15 @@ void kbd98_interrupt(struct serio *serio, unsigned char data,
 	switch (data) {
 		case KBD98_RET_ACK:
 			kbd98->ack = 1;
-			return;
+			goto out;
 		case KBD98_RET_NAK:
 			kbd98->ack = -1;
-			return;
+			goto out;
 	}
 
 	if (kbd98->cmdcnt) {
 		kbd98->cmdbuf[--kbd98->cmdcnt] = data;
-		return;
+		goto out;
 	}
 
 	scancode = data & KBD98_KEY;
@@ -164,7 +164,7 @@ void kbd98_interrupt(struct serio *serio, unsigned char data,
 
 			keycode = kbd98->jis[i].emul[kbd98->shift].keycode;
 			if (keycode == KBD98_KEY_NULL)
-				return;
+				break;
 
 			if (press) {
 				kbd98->emul.scancode = scancode;
@@ -187,27 +187,31 @@ void kbd98_interrupt(struct serio *serio, unsigned char data,
 			}
 
 			input_sync(&kbd98->dev);
-			return;
+			break;
 
 		case KEY_CAPSLOCK:
 			input_report_key(&kbd98->dev, keycode, 1);
 			input_sync(&kbd98->dev);
 			input_report_key(&kbd98->dev, keycode, 0);
 			input_sync(&kbd98->dev);
-			return;
+			break;
 
 		case KBD98_KEY_NULL:
-			return;
+			break;
 
 		case 0:
 			printk(KERN_WARNING "kbd98.c: Unknown key (scancode %#x) %s.\n",
 				data & KBD98_KEY, data & KBD98_RELEASE ? "released" : "pressed");
-			return;
+			break;
 
 		default:
 			input_report_key(&kbd98->dev, keycode, press);
 			input_sync(&kbd98->dev);
-		}
+			break;
+	}
+
+out:
+	return IRQ_HANDLED;
 }
 
 /*
