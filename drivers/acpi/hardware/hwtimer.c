@@ -108,7 +108,7 @@ acpi_get_timer (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	status = acpi_hw_low_level_read (32, ticks, &acpi_gbl_FADT->xpm_tmr_blk, 0);
+	status = acpi_hw_low_level_read (32, ticks, &acpi_gbl_FADT->xpm_tmr_blk);
 
 	return_ACPI_STATUS (status);
 }
