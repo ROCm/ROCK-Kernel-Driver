@@ -457,7 +457,7 @@ static unsigned char aureon51_eeprom[] __devinitdata = {
 	0x12,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 3DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
-	0xc2,	/* SPDIF: out-en, out-int, spdif-in */
+	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
 	0xbf,	/* GPIO_DIR2 */
@@ -473,7 +473,7 @@ static unsigned char aureon71_eeprom[] __devinitdata = {
 	0x13,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 4DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
-	0xc2,	/* SPDIF: out-en, out-int, spdif-in */
+	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
 	0xbf,	/* GPIO_DIR2 */
