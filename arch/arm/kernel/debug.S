@@ -465,6 +465,31 @@
 		beq	1001b
 		.endm
 
+#elif defined(CONFIG_ARCH_IXP4XX)
+
+                .macro  addruart,rx
+                mrc     p15, 0, \rx, c1, c0
+                tst     \rx, #1                 @ MMU enabled?
+                moveq   \rx, #0xc8000000
+                movne   \rx, #0xff000000
+                add     \rx,\rx,#3              @ Uart regs are at off set of 3 if
+						@ byte writes used - Big Endian.
+                .endm
+
+               .macro  senduart,rd,rx
+                strb    \rd, [\rx]
+                .endm
+
+                .macro  waituart,rd,rx
+1002:           ldrb    \rd, [\rx, #0x14]
+                and     \rd, \rd, #0x60		@ check THRE and TEMT bits
+                teq     \rd, #0x60
+                bne     1002b
+                .endm
+
+                .macro  busyuart,rd,rx
+                .endm
+
 #elif defined(CONFIG_ARCH_OMAP)
 
 #include <asm/arch/serial.h>

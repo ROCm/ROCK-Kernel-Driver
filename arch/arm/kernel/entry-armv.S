@@ -639,6 +639,34 @@ ENTRY(soft_irq_mask)
 		.macro	irq_prio_table
 		.endm
 
+#elif defined (CONFIG_ARCH_IXP4XX)
+
+		.macro	disable_fiq
+		.endm
+		
+		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+		ldr	\irqstat, =(IXP4XX_INTC_BASE_VIRT+IXP4XX_ICIP_OFFSET)
+		ldr	\irqstat, [\irqstat]		@ get interrupts
+		cmp	\irqstat, #0
+		beq	1002f
+		clz     \irqnr, \irqstat
+		mov     \base, #31
+		subs    \irqnr, \base, \irqnr
+		
+/*
+1001:		tst	\irqstat, #1
+		addeq	\irqnr, \irqnr, #1
+		moveq	\irqstat, \irqstat, lsr #1
+		tsteq	\irqnr, #32
+		beq	1001b
+		teq	\irqnr, #32
+*/
+1002:
+		.endm
+
+                .macro  irq_prio_table
+                .endm
+
 #elif defined(CONFIG_ARCH_OMAP)
 
 		.macro	disable_fiq
