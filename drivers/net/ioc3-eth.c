@@ -1817,6 +1817,7 @@ static void ioc3_set_multicast_list(struct net_device *dev)
 
 MODULE_AUTHOR("Ralf Baechle <ralf@oss.sgi.com>");
 MODULE_DESCRIPTION("SGI IOC3 Ethernet driver");
+MODULE_LICENSE("GPL");
 
 module_init(ioc3_init_module);
 module_exit(ioc3_cleanup_module);

@@ -636,6 +636,7 @@ static int io = 0x300;
 static int irq;
 static int dma;
 static int mem;
+MODULE_LICENSE("GPL");
 
 int init_module(void)
 {

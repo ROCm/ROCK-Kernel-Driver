@@ -19,8 +19,8 @@
 */
 
 
-#define DAC960_DriverVersion			"2.4.10"
-#define DAC960_DriverDate			"23 July 2001"
+#define DAC960_DriverVersion			"2.4.11"
+#define DAC960_DriverDate			"11 October 2001"
 
 
 #include <linux/version.h>
@@ -42,6 +42,7 @@
 #include <linux/spinlock.h>
 #include <linux/timer.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <asm/segment.h>
 #include <asm/uaccess.h>
@@ -99,7 +100,7 @@ static PROC_DirectoryEntry_T
 */
 
 static NotifierBlock_T
-  DAC960_NotifierBlock =    { DAC960_Finalize, NULL, 0 };
+  DAC960_NotifierBlock =    { DAC960_Notifier, NULL, 0 };
 
 
 /*
@@ -269,7 +270,9 @@ static inline void DAC960_V2_ClearCommand(DAC960_Command_T *Command)
 
 /*
   DAC960_AllocateCommand allocates a Command structure from Controller's
-  free list.
+  free list.  During driver initialization, a special initialization command
+  has been placed on the free list to guarantee that command allocation can
+  never fail.
 */
 
 static inline DAC960_Command_T *DAC960_AllocateCommand(DAC960_Controller_T
@@ -480,6 +483,52 @@ static void DAC960_PD_QueueCommand(DAC960_Command_T *Command)
 
 
 /*
+  DAC960_P_QueueCommand queues Command for DAC960 P Series Controllers.
+*/
+
+static void DAC960_P_QueueCommand(DAC960_Command_T *Command)
+{
+  DAC960_Controller_T *Controller = Command->Controller;
+  void *ControllerBaseAddress = Controller->BaseAddress;
+  DAC960_V1_CommandMailbox_T *CommandMailbox = &Command->V1.CommandMailbox;
+  CommandMailbox->Common.CommandIdentifier = Command->CommandIdentifier;
+  switch (CommandMailbox->Common.CommandOpcode)
+    {
+    case DAC960_V1_Enquiry:
+      CommandMailbox->Common.CommandOpcode = DAC960_V1_Enquiry_Old;
+      break;
+    case DAC960_V1_GetDeviceState:
+      CommandMailbox->Common.CommandOpcode = DAC960_V1_GetDeviceState_Old;
+      break;
+    case DAC960_V1_Read:
+      CommandMailbox->Common.CommandOpcode = DAC960_V1_Read_Old;
+      DAC960_PD_To_P_TranslateReadWriteCommand(CommandMailbox);
+      break;
+    case DAC960_V1_Write:
+      CommandMailbox->Common.CommandOpcode = DAC960_V1_Write_Old;
+      DAC960_PD_To_P_TranslateReadWriteCommand(CommandMailbox);
+      break;
+    case DAC960_V1_ReadWithScatterGather:
+      CommandMailbox->Common.CommandOpcode =
+	DAC960_V1_ReadWithScatterGather_Old;
+      DAC960_PD_To_P_TranslateReadWriteCommand(CommandMailbox);
+      break;
+    case DAC960_V1_WriteWithScatterGather:
+      CommandMailbox->Common.CommandOpcode =
+	DAC960_V1_WriteWithScatterGather_Old;
+      DAC960_PD_To_P_TranslateReadWriteCommand(CommandMailbox);
+      break;
+    default:
+      break;
+    }
+  while (DAC960_PD_MailboxFullP(ControllerBaseAddress))
+    udelay(1);
+  DAC960_PD_WriteCommandMailbox(ControllerBaseAddress, CommandMailbox);
+  DAC960_PD_NewCommand(ControllerBaseAddress);
+}
+
+
+/*
   DAC960_ExecuteCommand executes Command and waits for completion.
 */
 
@@ -514,6 +563,32 @@ static boolean DAC960_V1_ExecuteType3(DAC960_Controller_T *Controller,
   Command->CommandType = DAC960_ImmediateCommand;
   CommandMailbox->Type3.CommandOpcode = CommandOpcode;
   CommandMailbox->Type3.BusAddress = Virtual_to_Bus32(DataPointer);
+  DAC960_ExecuteCommand(Command);
+  CommandStatus = Command->V1.CommandStatus;
+  DAC960_DeallocateCommand(Command);
+  return (CommandStatus == DAC960_V1_NormalCompletion);
+}
+
+
+/*
+  DAC960_V1_ExecuteTypeB executes a DAC960 V1 Firmware Controller Type 3B
+  Command and waits for completion.  It returns true on success and false
+  on failure.
+*/
+
+static boolean DAC960_V1_ExecuteType3B(DAC960_Controller_T *Controller,
+				       DAC960_V1_CommandOpcode_T CommandOpcode,
+				       unsigned char CommandOpcode2,
+				       void *DataPointer)
+{
+  DAC960_Command_T *Command = DAC960_AllocateCommand(Controller);
+  DAC960_V1_CommandMailbox_T *CommandMailbox = &Command->V1.CommandMailbox;
+  DAC960_V1_CommandStatus_T CommandStatus;
+  DAC960_V1_ClearCommand(Command);
+  Command->CommandType = DAC960_ImmediateCommand;
+  CommandMailbox->Type3B.CommandOpcode = CommandOpcode;
+  CommandMailbox->Type3B.CommandOpcode2 = CommandOpcode2;
+  CommandMailbox->Type3B.BusAddress = Virtual_to_Bus32(DataPointer);
   DAC960_ExecuteCommand(Command);
   CommandStatus = Command->V1.CommandStatus;
   DAC960_DeallocateCommand(Command);
@@ -1055,7 +1130,17 @@ static boolean DAC960_V1_ReadControllerConfiguration(DAC960_Controller_T
     DAC1164P		    5.06 and above
     DAC960PTL/PRL/PJ/PG	    4.06 and above
     DAC960PU/PD/PL	    3.51 and above
+    DAC960PU/PD/PL/P	    2.73 and above
   */
+  if (Enquiry2.FirmwareID.MajorVersion == 0)
+    {
+      Enquiry2.FirmwareID.MajorVersion =
+	Controller->V1.Enquiry.MajorFirmwareVersion;
+      Enquiry2.FirmwareID.MinorVersion =
+	Controller->V1.Enquiry.MinorFirmwareVersion;
+      Enquiry2.FirmwareID.FirmwareType = '0';
+      Enquiry2.FirmwareID.TurnID = 0;
+    }
   sprintf(Controller->FirmwareVersion, "%d.%02d-%c-%02d",
 	  Enquiry2.FirmwareID.MajorVersion, Enquiry2.FirmwareID.MinorVersion,
 	  Enquiry2.FirmwareID.FirmwareType, Enquiry2.FirmwareID.TurnID);
@@ -1064,7 +1149,9 @@ static boolean DAC960_V1_ReadControllerConfiguration(DAC960_Controller_T
 	(Controller->FirmwareVersion[0] == '4' &&
 	 strcmp(Controller->FirmwareVersion, "4.06") >= 0) ||
 	(Controller->FirmwareVersion[0] == '3' &&
-	 strcmp(Controller->FirmwareVersion, "3.51") >= 0)))
+	 strcmp(Controller->FirmwareVersion, "3.51") >= 0) ||
+	(Controller->FirmwareVersion[0] == '2' &&
+	 strcmp(Controller->FirmwareVersion, "2.73") >= 0)))
     {
       DAC960_Failure(Controller, "FIRMWARE VERSION VERIFICATION");
       DAC960_Error("Firmware Version = '%s'\n", Controller,
@@ -1118,6 +1205,20 @@ static boolean DAC960_V1_ReadControllerConfiguration(DAC960_Controller_T
       break;
     default:
       return DAC960_Failure(Controller, "CONFIG2 DRIVE GEOMETRY");
+    }
+  /*
+    Initialize the Background Initialization Status.
+  */
+  if ((Controller->FirmwareVersion[0] == '4' &&
+      strcmp(Controller->FirmwareVersion, "4.08") >= 0) ||
+      (Controller->FirmwareVersion[0] == '5' &&
+       strcmp(Controller->FirmwareVersion, "5.08") >= 0))
+    {
+      Controller->V1.BackgroundInitializationStatusSupported = true;
+      DAC960_V1_ExecuteType3B(Controller,
+			      DAC960_V1_BackgroundInitializationControl, 0x20,
+			      &Controller->
+			       V1.LastBackgroundInitializationStatus);
     }
   /*
     Initialize the Logical Drive Initially Accessible flag.
@@ -1573,7 +1674,7 @@ static boolean DAC960_V1_ReportDeviceConfiguration(DAC960_Controller_T
 	    DeviceState->DeviceType == DAC960_V1_DiskType)
 	  {
 	    if (Controller->V1.DeviceResetCount[Channel][TargetID] > 0)
-	      DAC960_Info("         Disk Status: %s, %d blocks, %d resets\n",
+	      DAC960_Info("         Disk Status: %s, %u blocks, %d resets\n",
 			  Controller,
 			  (DeviceState->DeviceState == DAC960_V1_Device_Dead
 			   ? "Dead"
@@ -1586,7 +1687,7 @@ static boolean DAC960_V1_ReportDeviceConfiguration(DAC960_Controller_T
 			  DeviceState->DiskSize,
 			  Controller->V1.DeviceResetCount[Channel][TargetID]);
 	    else
-	      DAC960_Info("         Disk Status: %s, %d blocks\n", Controller,
+	      DAC960_Info("         Disk Status: %s, %u blocks\n", Controller,
 			  (DeviceState->DeviceState == DAC960_V1_Device_Dead
 			   ? "Dead"
 			   : DeviceState->DeviceState
@@ -1615,7 +1716,7 @@ static boolean DAC960_V1_ReportDeviceConfiguration(DAC960_Controller_T
     {
       DAC960_V1_LogicalDriveInformation_T *LogicalDriveInformation =
 	&Controller->V1.LogicalDriveInformation[LogicalDriveNumber];
-      DAC960_Info("    /dev/rd/c%dd%d: RAID-%d, %s, %d blocks, %s\n",
+      DAC960_Info("    /dev/rd/c%dd%d: RAID-%d, %s, %u blocks, %s\n",
 		  Controller, Controller->ControllerNumber, LogicalDriveNumber,
 		  LogicalDriveInformation->RAIDLevel,
 		  (LogicalDriveInformation->LogicalDriveState
@@ -1681,18 +1782,32 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
       if (PhysicalDeviceInfo->PhysicalDeviceState ==
 	  DAC960_V2_Device_Unconfigured)
 	continue;
-      DAC960_Info("         Disk Status: %s, %d blocks\n", Controller,
+      DAC960_Info("         Disk Status: %s, %u blocks\n", Controller,
 		  (PhysicalDeviceInfo->PhysicalDeviceState
 		   == DAC960_V2_Device_Online
 		   ? "Online"
 		   : PhysicalDeviceInfo->PhysicalDeviceState
-		     == DAC960_V2_Device_WriteOnly
-		     ? "Write-Only"
+		     == DAC960_V2_Device_Rebuild
+		     ? "Rebuild"
 		     : PhysicalDeviceInfo->PhysicalDeviceState
-		       == DAC960_V2_Device_Dead
-		       ? "Dead" : "Standby"),
-		  PhysicalDeviceInfo
-		  ->ConfigurableDeviceSizeIn512ByteBlocksOrMB);
+		       == DAC960_V2_Device_Missing
+		       ? "Missing"
+		       : PhysicalDeviceInfo->PhysicalDeviceState
+			 == DAC960_V2_Device_Critical
+			 ? "Critical"
+			 : PhysicalDeviceInfo->PhysicalDeviceState
+			   == DAC960_V2_Device_Dead
+			   ? "Dead"
+			   : PhysicalDeviceInfo->PhysicalDeviceState
+			     == DAC960_V2_Device_SuspectedDead
+			     ? "Suspected-Dead"
+			     : PhysicalDeviceInfo->PhysicalDeviceState
+			       == DAC960_V2_Device_CommandedOffline
+			       ? "Commanded-Offline"
+			       : PhysicalDeviceInfo->PhysicalDeviceState
+				 == DAC960_V2_Device_Standby
+				 ? "Standby" : "Unknown"),
+		  PhysicalDeviceInfo->ConfigurableDeviceSize);
       if (PhysicalDeviceInfo->ParityErrors == 0 &&
 	  PhysicalDeviceInfo->SoftErrors == 0 &&
 	  PhysicalDeviceInfo->HardErrors == 0 &&
@@ -1734,7 +1849,7 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 					    "-", "-", "-", "-" };
       unsigned char *GeometryTranslation;
       if (LogicalDeviceInfo == NULL) continue;
-      switch(LogicalDeviceInfo->DriveGeometry)
+      switch (LogicalDeviceInfo->DriveGeometry)
 	{
 	case DAC960_V2_Geometry_128_32:
 	  GeometryTranslation = "128/32";
@@ -1748,7 +1863,7 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 		       Controller, LogicalDeviceInfo->DriveGeometry);
 	  break;
 	}
-      DAC960_Info("    /dev/rd/c%dd%d: RAID-%d, %s, %d blocks\n",
+      DAC960_Info("    /dev/rd/c%dd%d: RAID-%d, %s, %u blocks\n",
 		  Controller, Controller->ControllerNumber, LogicalDriveNumber,
 		  LogicalDeviceInfo->RAIDLevel,
 		  (LogicalDeviceInfo->LogicalDeviceState
@@ -1757,7 +1872,7 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 		   : LogicalDeviceInfo->LogicalDeviceState
 		     == DAC960_V2_LogicalDevice_Critical
 		     ? "Critical" : "Offline"),
-		  LogicalDeviceInfo->ConfigurableDeviceSizeIn512ByteBlocksOrMB);
+		  LogicalDeviceInfo->ConfigurableDeviceSize);
       DAC960_Info("                  Logical Device %s, BIOS Geometry: %s\n",
 		  Controller,
 		  (LogicalDeviceInfo->LogicalDeviceControl
@@ -1907,15 +2022,11 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   RequestQueue->queuedata = Controller;
   Controller->RequestQueue = RequestQueue;
   /*
-    Initialize the Disk Partitions array, Partition Sizes array, Block Sizes
-    array, and Max Sectors per Request array.
+    Initialize the Max Sectors per Request array.
   */
   for (MinorNumber = 0; MinorNumber < DAC960_MinorCount; MinorNumber++)
-    {
-      Controller->BlockSizes[MinorNumber] = BLOCK_SIZE;
-      Controller->MaxSectorsPerRequest[MinorNumber] =
-	Controller->MaxBlocksPerCommand;
-    }
+    Controller->MaxSectorsPerRequest[MinorNumber] =
+      Controller->MaxBlocksPerCommand;
   Controller->GenericDiskInfo.part = Controller->DiskPartitions;
   Controller->GenericDiskInfo.sizes = Controller->PartitionSizes;
   blksize_size[MajorNumber] = Controller->BlockSizes;
@@ -1931,7 +2042,8 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   Controller->GenericDiskInfo.major_name = "rd";
   Controller->GenericDiskInfo.minor_shift = DAC960_MaxPartitionsBits;
   Controller->GenericDiskInfo.max_p = DAC960_MaxPartitions;
-  Controller->GenericDiskInfo.nr_real = Controller->LogicalDriveCount;
+  Controller->GenericDiskInfo.nr_real = DAC960_MaxLogicalDrives;
+  Controller->GenericDiskInfo.real_devices = Controller;
   Controller->GenericDiskInfo.next = NULL;
   Controller->GenericDiskInfo.fops = &DAC960_BlockDeviceOperations;
   /*
@@ -1978,6 +2090,46 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
 
 
 /*
+  DAC960_ComputeGenericDiskInfo computes the values for the Generic Disk
+  Information Partition Sector Counts and Block Sizes.
+*/
+
+static void DAC960_ComputeGenericDiskInfo(GenericDiskInfo_T *GenericDiskInfo)
+{
+  DAC960_Controller_T *Controller =
+    (DAC960_Controller_T *) GenericDiskInfo->real_devices;
+  int LogicalDriveNumber, i;
+  for (LogicalDriveNumber = 0;
+       LogicalDriveNumber < DAC960_MaxLogicalDrives;
+       LogicalDriveNumber++)
+    {
+      int MinorNumber = DAC960_MinorNumber(LogicalDriveNumber, 0);
+      if (Controller->FirmwareType == DAC960_V1_Controller)
+	{
+	  if (LogicalDriveNumber < Controller->LogicalDriveCount)
+	    GenericDiskInfo->part[MinorNumber].nr_sects =
+	      Controller->V1.LogicalDriveInformation
+			     [LogicalDriveNumber].LogicalDriveSize;
+	  else GenericDiskInfo->part[MinorNumber].nr_sects = 0;
+	}
+      else
+	{
+	  DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
+	    Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
+	  if (LogicalDeviceInfo != NULL)
+	    GenericDiskInfo->part[MinorNumber].nr_sects =
+	      LogicalDeviceInfo->ConfigurableDeviceSize;
+	  else GenericDiskInfo->part[MinorNumber].nr_sects = 0;
+	}
+      for (i = 0; i < DAC960_MaxPartitions; i++)
+	if (GenericDiskInfo->part[MinorNumber].nr_sects > 0)
+	  Controller->BlockSizes[MinorNumber + i] = BLOCK_SIZE;
+	else Controller->BlockSizes[MinorNumber + i] = 0;
+    }
+}
+
+
+/*
   DAC960_RegisterDisk registers the DAC960 Logical Disk Device for Logical
   Drive Number if it exists.
 */
@@ -1991,7 +2143,8 @@ static void DAC960_RegisterDisk(DAC960_Controller_T *Controller,
       register_disk(&Controller->GenericDiskInfo,
 		    DAC960_KernelDevice(Controller->ControllerNumber,
 					LogicalDriveNumber, 0),
-		    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations,
+		    DAC960_MaxPartitions,
+		    &DAC960_BlockDeviceOperations,
 		    Controller->V1.LogicalDriveInformation
 				   [LogicalDriveNumber].LogicalDriveSize);
     }
@@ -2003,9 +2156,9 @@ static void DAC960_RegisterDisk(DAC960_Controller_T *Controller,
       register_disk(&Controller->GenericDiskInfo,
 		    DAC960_KernelDevice(Controller->ControllerNumber,
 					LogicalDriveNumber, 0),
-		    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations,
-		    LogicalDeviceInfo
-		    ->ConfigurableDeviceSizeIn512ByteBlocksOrMB);
+		    DAC960_MaxPartitions,
+		    &DAC960_BlockDeviceOperations,
+		    LogicalDeviceInfo->ConfigurableDeviceSize);
     }
 }
 
@@ -2116,6 +2269,13 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
       InterruptHandler = DAC960_PD_InterruptHandler;
       MemoryWindowSize = DAC960_PD_RegisterWindowSize;
       break;
+    case DAC960_P_Controller:
+      VendorID = PCI_VENDOR_ID_MYLEX;
+      DeviceID = PCI_DEVICE_ID_MYLEX_DAC960_P;
+      FirmwareType = DAC960_V1_Controller;
+      InterruptHandler = DAC960_P_InterruptHandler;
+      MemoryWindowSize = DAC960_PD_RegisterWindowSize;
+      break;
     }
   while ((PCI_Device = pci_find_device(VendorID, DeviceID, PCI_Device)) != NULL)
     {
@@ -2148,6 +2308,10 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	  PCI_Address = pci_resource_start(PCI_Device, 0);
 	  break;
 	case DAC960_PD_Controller:
+	  IO_Address = pci_resource_start(PCI_Device, 0);
+	  PCI_Address = pci_resource_start(PCI_Device, 1);
+	  break;
+	case DAC960_P_Controller:
 	  IO_Address = pci_resource_start(PCI_Device, 0);
 	  PCI_Address = pci_resource_start(PCI_Device, 1);
 	  break;
@@ -2348,6 +2512,32 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	  Controller->QueueReadWriteCommand =
 	    DAC960_V1_QueueReadWriteCommand;
 	  break;
+	case DAC960_P_Controller:
+	  request_region(Controller->IO_Address, 0x80,
+			 Controller->FullModelName);
+	  DAC960_PD_DisableInterrupts(BaseAddress);
+	  DAC960_PD_AcknowledgeStatus(BaseAddress);
+	  udelay(1000);
+	  while (DAC960_PD_InitializationInProgressP(BaseAddress))
+	    {
+	      if (DAC960_PD_ReadErrorStatus(BaseAddress, &ErrorStatus,
+					    &Parameter0, &Parameter1) &&
+		  DAC960_ReportErrorStatus(Controller, ErrorStatus,
+					   Parameter0, Parameter1))
+		goto Failure;
+	      udelay(10);
+	    }
+	  DAC960_PD_EnableInterrupts(Controller->BaseAddress);
+	  Controller->QueueCommand = DAC960_P_QueueCommand;
+	  Controller->ReadControllerConfiguration =
+	    DAC960_V1_ReadControllerConfiguration;
+	  Controller->ReadDeviceConfiguration =
+	    DAC960_V1_ReadDeviceConfiguration;
+	  Controller->ReportDeviceConfiguration =
+	    DAC960_V1_ReportDeviceConfiguration;
+	  Controller->QueueReadWriteCommand =
+	    DAC960_V1_QueueReadWriteCommand;
+	  break;
 	}
       /*
 	Acquire shared access to the IRQ Channel.
@@ -2519,7 +2709,7 @@ static void DAC960_FinalizeController(DAC960_Controller_T *Controller)
   DAC960_Initialize initializes the DAC960 Driver.
 */
 
-void DAC960_Initialize(void)
+static int DAC960_Initialize(void)
 {
   int ControllerNumber;
   DAC960_DetectControllers(DAC960_BA_Controller);
@@ -2527,8 +2717,9 @@ void DAC960_Initialize(void)
   DAC960_DetectControllers(DAC960_LA_Controller);
   DAC960_DetectControllers(DAC960_PG_Controller);
   DAC960_DetectControllers(DAC960_PD_Controller);
+  DAC960_DetectControllers(DAC960_P_Controller);
   DAC960_SortControllers();
-  if (DAC960_ActiveControllerCount == 0) return;
+  if (DAC960_ActiveControllerCount == 0) return -ENODEV;
   for (ControllerNumber = 0;
        ControllerNumber < DAC960_ControllerCount;
        ControllerNumber++)
@@ -2537,6 +2728,7 @@ void DAC960_Initialize(void)
       int LogicalDriveNumber;
       if (Controller == NULL) continue;
       DAC960_InitializeController(Controller);
+      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
       for (LogicalDriveNumber = 0;
 	   LogicalDriveNumber < DAC960_MaxLogicalDrives;
 	   LogicalDriveNumber++)
@@ -2544,6 +2736,7 @@ void DAC960_Initialize(void)
     }
   DAC960_CreateProcEntries();
   register_reboot_notifier(&DAC960_NotifierBlock);
+  return 0;
 }
 
 
@@ -2551,14 +2744,10 @@ void DAC960_Initialize(void)
   DAC960_Finalize finalizes the DAC960 Driver.
 */
 
-static int DAC960_Finalize(NotifierBlock_T *NotifierBlock,
-			   unsigned long Event,
-			   void *Buffer)
+static void DAC960_Finalize(void)
 {
   int ControllerNumber;
-  if (!(Event == SYS_RESTART || Event == SYS_HALT || Event == SYS_POWER_OFF))
-    return NOTIFY_DONE;
-  if (DAC960_ActiveControllerCount == 0) return NOTIFY_OK;
+  if (DAC960_ActiveControllerCount == 0) return;
   for (ControllerNumber = 0;
        ControllerNumber < DAC960_ControllerCount;
        ControllerNumber++)
@@ -2566,6 +2755,20 @@ static int DAC960_Finalize(NotifierBlock_T *NotifierBlock,
       DAC960_FinalizeController(DAC960_Controllers[ControllerNumber]);
   DAC960_DestroyProcEntries();
   unregister_reboot_notifier(&DAC960_NotifierBlock);
+}
+
+
+/*
+  DAC960_Notifier is the notifier for the DAC960 Driver.
+*/
+
+static int DAC960_Notifier(NotifierBlock_T *NotifierBlock,
+			   unsigned long Event,
+			   void *Buffer)
+{
+  if (!(Event == SYS_RESTART || Event == SYS_HALT || Event == SYS_POWER_OFF))
+    return NOTIFY_DONE;
+  DAC960_Finalize();
   return NOTIFY_OK;
 }
 
@@ -2599,11 +2802,9 @@ static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *Command)
       char *LastDataEndPointer = NULL;
       int SegmentNumber = 0;
       if (Command->CommandType == DAC960_ReadCommand)
-	CommandMailbox->Type5.CommandOpcode =
-	  DAC960_V1_ReadWithOldScatterGather;
+	CommandMailbox->Type5.CommandOpcode = DAC960_V1_ReadWithScatterGather;
       else
-	CommandMailbox->Type5.CommandOpcode =
-	  DAC960_V1_WriteWithOldScatterGather;
+	CommandMailbox->Type5.CommandOpcode = DAC960_V1_WriteWithScatterGather;
       CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
       CommandMailbox->Type5.LD.LogicalDriveNumber = Command->LogicalDriveNumber;
       CommandMailbox->Type5.LogicalBlockAddress = Command->BlockNumber;
@@ -2865,12 +3066,12 @@ static void DAC960_V1_ReadWriteError(DAC960_Command_T *Command)
 		   Controller, Command->V1.CommandStatus, CommandName);
       break;
     }
-  DAC960_Error("  /dev/rd/c%dd%d:   absolute blocks %d..%d\n",
+  DAC960_Error("  /dev/rd/c%dd%d:   absolute blocks %u..%u\n",
 	       Controller, Controller->ControllerNumber,
 	       Command->LogicalDriveNumber, Command->BlockNumber,
 	       Command->BlockNumber + Command->BlockCount - 1);
   if (DAC960_PartitionNumber(Command->BufferHeader->b_rdev) > 0)
-    DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %d..%d\n",
+    DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %u..%u\n",
 		 Controller, Controller->ControllerNumber,
 		 Command->LogicalDriveNumber,
 		 DAC960_PartitionNumber(Command->BufferHeader->b_rdev),
@@ -3027,6 +3228,8 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 				LogicalDriveNumber,
 				Controller->ControllerNumber,
 				LogicalDriveNumber);
+	      Controller->LogicalDriveCount = NewEnquiry->NumberOfLogicalDrives;
+	      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
 	    }
 	  if (NewEnquiry->NumberOfLogicalDrives < Controller->LogicalDriveCount)
 	    {
@@ -3037,8 +3240,9 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 				LogicalDriveNumber,
 				Controller->ControllerNumber,
 				LogicalDriveNumber);
+	      Controller->LogicalDriveCount = NewEnquiry->NumberOfLogicalDrives;
+	      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
 	    }
-	  Controller->LogicalDriveCount = NewEnquiry->NumberOfLogicalDrives;
 	  if (NewEnquiry->StatusFlags.DeferredWriteError !=
 	      OldEnquiry->StatusFlags.DeferredWriteError)
 	    DAC960_Critical("Deferred Write Error Flag is now %s\n", Controller,
@@ -3064,6 +3268,8 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      Controller->V1.NeedErrorTableInformation = true;
 	      Controller->V1.NeedDeviceStateInformation = true;
 	      Controller->V1.StartDeviceStateScan = true;
+	      Controller->V1.NeedBackgroundInitializationStatus =
+		Controller->V1.BackgroundInitializationStatusSupported;
 	      Controller->SecondaryMonitoringTime = jiffies;
 	    }
 	  if (NewEnquiry->RebuildFlag == DAC960_V1_StandbyRebuildInProgress ||
@@ -3186,7 +3392,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 			   AdditionalSenseCodeQualifier == 0x02))))
 		{
 		  DAC960_Critical("Physical Device %d:%d Error Log: "
-				  "Sense Key = %d, ASC = %02X, ASCQ = %02X\n",
+				  "Sense Key = %X, ASC = %02X, ASCQ = %02X\n",
 				  Controller,
 				  EventLogEntry->Channel,
 				  EventLogEntry->TargetID,
@@ -3396,6 +3602,77 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      Controller->EphemeralProgressMessage = false;
 	    }
 	}
+      else if (CommandOpcode == DAC960_V1_BackgroundInitializationControl)
+	{
+	  unsigned int LogicalDriveNumber =
+	    Controller->V1.BackgroundInitializationStatus.LogicalDriveNumber;
+	  unsigned int LogicalDriveSize =
+	    Controller->V1.BackgroundInitializationStatus.LogicalDriveSize;
+	  unsigned int BlocksCompleted =
+	    Controller->V1.BackgroundInitializationStatus.BlocksCompleted;
+	  switch (CommandStatus)
+	    {
+	    case DAC960_V1_NormalCompletion:
+	      switch (Controller->V1.BackgroundInitializationStatus.Status)
+		{
+		case DAC960_V1_BackgroundInitializationInvalid:
+		  break;
+		case DAC960_V1_BackgroundInitializationStarted:
+		  DAC960_Progress("Background Initialization Started\n",
+				  Controller);
+		  break;
+		case DAC960_V1_BackgroundInitializationInProgress:
+		  if (BlocksCompleted ==
+		      Controller->V1.LastBackgroundInitializationStatus
+				    .BlocksCompleted &&
+		      LogicalDriveNumber ==
+		      Controller->V1.LastBackgroundInitializationStatus
+				    .LogicalDriveNumber)
+		    break;
+		  Controller->EphemeralProgressMessage = true;
+		  DAC960_Progress("Background Initialization in Progress: "
+				  "Logical Drive %d (/dev/rd/c%dd%d) "
+				  "%d%% completed\n",
+				  Controller, LogicalDriveNumber,
+				  Controller->ControllerNumber,
+				  LogicalDriveNumber,
+				  (100 * (BlocksCompleted >> 7))
+				  / (LogicalDriveSize >> 7));
+		  Controller->EphemeralProgressMessage = false;
+		  break;
+		case DAC960_V1_BackgroundInitializationSuspended:
+		  DAC960_Progress("Background Initialization Suspended\n",
+				  Controller);
+		  break;
+		case DAC960_V1_BackgroundInitializationCancelled:
+		  DAC960_Progress("Background Initialization Cancelled\n",
+				  Controller);
+		  break;
+		}
+	      memcpy(&Controller->V1.LastBackgroundInitializationStatus,
+		     &Controller->V1.BackgroundInitializationStatus,
+		     sizeof(DAC960_V1_BackgroundInitializationStatus_T));
+	      break;
+	    case DAC960_V1_BackgroundInitSuccessful:
+	      if (Controller->V1.BackgroundInitializationStatus.Status ==
+		  DAC960_V1_BackgroundInitializationInProgress)
+		DAC960_Progress("Background Initialization "
+				"Completed Successfully\n", Controller);
+	      Controller->V1.BackgroundInitializationStatus.Status =
+		DAC960_V1_BackgroundInitializationInvalid;
+	      break;
+	    case DAC960_V1_BackgroundInitAborted:
+	      if (Controller->V1.BackgroundInitializationStatus.Status ==
+		  DAC960_V1_BackgroundInitializationInProgress)
+		DAC960_Progress("Background Initialization Aborted\n",
+				Controller);
+	      Controller->V1.BackgroundInitializationStatus.Status =
+		DAC960_V1_BackgroundInitializationInvalid;
+	      break;
+	    case DAC960_V1_NoBackgroundInitInProgress:
+	      break;
+	    }
+	}
     }
   if (CommandType == DAC960_MonitoringCommand)
     {
@@ -3562,6 +3839,17 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
+      if (Controller->V1.NeedBackgroundInitializationStatus)
+	{
+	  Controller->V1.NeedBackgroundInitializationStatus = false;
+	  Command->V1.CommandMailbox.Type3B.CommandOpcode =
+	    DAC960_V1_BackgroundInitializationControl;
+	  Command->V1.CommandMailbox.Type3B.CommandOpcode2 = 0x20;
+	  Command->V1.CommandMailbox.Type3B.BusAddress =
+	    Virtual_to_Bus32(&Controller->V1.BackgroundInitializationStatus);
+	  DAC960_QueueCommand(Command);
+	  return;
+	}
       Controller->MonitoringTimerCount++;
       Controller->MonitoringTimer.expires =
 	jiffies + DAC960_MonitoringTimerInterval;
@@ -3642,12 +3930,12 @@ static void DAC960_V2_ReadWriteError(DAC960_Command_T *Command)
     }
   DAC960_Error("Error Condition %s on %s:\n", Controller,
 	       SenseErrors[Command->V2.RequestSense.SenseKey], CommandName);
-  DAC960_Error("  /dev/rd/c%dd%d:   absolute blocks %d..%d\n",
+  DAC960_Error("  /dev/rd/c%dd%d:   absolute blocks %u..%u\n",
 	       Controller, Controller->ControllerNumber,
 	       Command->LogicalDriveNumber, Command->BlockNumber,
 	       Command->BlockNumber + Command->BlockCount - 1);
   if (DAC960_PartitionNumber(Command->BufferHeader->b_rdev) > 0)
-    DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %d..%d\n",
+    DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %u..%u\n",
 		 Controller, Controller->ControllerNumber,
 		 Command->LogicalDriveNumber,
 		 DAC960_PartitionNumber(Command->BufferHeader->b_rdev),
@@ -3680,11 +3968,14 @@ static void DAC960_V2_ReportEvent(DAC960_Controller_T *Controller,
       { 0x000B, "P Rebuild Failed due to Logical Drive Failure" },
       { 0x000C, "S Offline" },
       { 0x000D, "P Found" },
-      { 0x000E, "P Gone" },
+      { 0x000E, "P Removed" },
       { 0x000F, "P Unconfigured" },
       { 0x0010, "P Expand Capacity Started" },
       { 0x0011, "P Expand Capacity Completed" },
       { 0x0012, "P Expand Capacity Failed" },
+      { 0x0013, "P Command Timed Out" },
+      { 0x0014, "P Command Aborted" },
+      { 0x0015, "P Command Retried" },
       { 0x0016, "P Parity Error" },
       { 0x0017, "P Soft Error" },
       { 0x0018, "P Miscellaneous Error" },
@@ -3715,6 +4006,8 @@ static void DAC960_V2_ReportEvent(DAC960_Controller_T *Controller,
       { 0x0031, "P Failed because BDT Write Operation Failed" },
       { 0x0039, "P Missing at Startup" },
       { 0x003A, "P Start Rebuild Failed due to Physical Drive Too Small" },
+      { 0x003C, "P Temporarily Offline Device Automatically Made Online" },
+      { 0x003D, "P Standby Rebuild Started" },
       /* Logical Device Events (0x0080 - 0x00FF) */
       { 0x0080, "M Consistency Check Started" },
       { 0x0081, "M Consistency Check Completed" },
@@ -3737,7 +4030,7 @@ static void DAC960_V2_ReportEvent(DAC960_Controller_T *Controller,
       { 0x0092, "M Initialization Cancelled" },
       { 0x0093, "M Initialization Failed" },
       { 0x0094, "L Found" },
-      { 0x0095, "L Gone" },
+      { 0x0095, "L Deleted" },
       { 0x0096, "M Expand Capacity Started" },
       { 0x0097, "M Expand Capacity Completed" },
       { 0x0098, "M Expand Capacity Failed" },
@@ -3747,6 +4040,9 @@ static void DAC960_V2_ReportEvent(DAC960_Controller_T *Controller,
       { 0x009C, "L Bad Data Block Found" },
       { 0x009E, "L Read of Data Block in BDT" },
       { 0x009F, "L Write Back Data for Disk Block Lost" },
+      { 0x00A0, "L Temporarily Offline RAID-5/3 Drive Made Online" },
+      { 0x00A1, "L Temporarily Offline RAID-6/1/0/7 Drive Made Online" },
+      { 0x00A2, "L Standby Rebuild Started" },
       /* Fault Management Events (0x0100 - 0x017F) */
       { 0x0140, "E Fan %d Failed" },
       { 0x0141, "E Fan %d OK" },
@@ -3754,24 +4050,31 @@ static void DAC960_V2_ReportEvent(DAC960_Controller_T *Controller,
       { 0x0143, "E Power Supply %d Failed" },
       { 0x0144, "E Power Supply %d OK" },
       { 0x0145, "E Power Supply %d Not Present" },
-      { 0x0146, "E Temperature Sensor %d Failed" },
-      { 0x0147, "E Temperature Sensor %d Critical" },
-      { 0x0148, "E Temperature Sensor %d OK" },
+      { 0x0146, "E Temperature Sensor %d Temperature Exceeds Safe Limit" },
+      { 0x0147, "E Temperature Sensor %d Temperature Exceeds Working Limit" },
+      { 0x0148, "E Temperature Sensor %d Temperature Normal" },
       { 0x0149, "E Temperature Sensor %d Not Present" },
-      { 0x014A, "E Unit %d Access Critical" },
-      { 0x014B, "E Unit %d Access OK" },
-      { 0x014C, "E Unit %d Access Offline" },
+      { 0x014A, "E Enclosure Management Unit %d Access Critical" },
+      { 0x014B, "E Enclosure Management Unit %d Access OK" },
+      { 0x014C, "E Enclosure Management Unit %d Access Offline" },
       /* Controller Events (0x0180 - 0x01FF) */
       { 0x0181, "C Cache Write Back Error" },
       { 0x0188, "C Battery Backup Unit Found" },
       { 0x0189, "C Battery Backup Unit Charge Level Low" },
       { 0x018A, "C Battery Backup Unit Charge Level OK" },
       { 0x0193, "C Installation Aborted" },
-      { 0x0195, "C Mirror Race Recovery In Progress" },
-      { 0x0196, "C Mirror Race on Critical Drive" },
-      { 0x019E, "C Memory Soft ECC Error" },
-      { 0x019F, "C Memory Hard ECC Error" },
+      { 0x0195, "C Battery Backup Unit Physically Removed" },
+      { 0x0196, "C Memory Error During Warm Boot" },
+      { 0x019E, "C Memory Soft ECC Error Corrected" },
+      { 0x019F, "C Memory Hard ECC Error Corrected" },
       { 0x01A2, "C Battery Backup Unit Failed" },
+      { 0x01AB, "C Mirror Race Recovery Failed" },
+      { 0x01AC, "C Mirror Race on Critical Drive" },
+      /* Controller Internal Processor Events */
+      { 0x0380, "C Internal Controller Hung" },
+      { 0x0381, "C Internal Controller Firmware Breakpoint" },
+      { 0x0390, "C Internal Controller i960 Processor Specific Error" },
+      { 0x03A0, "C Internal Controller StrongARM Processor Specific Error" },
       { 0, "" } };
   int EventListIndex = 0, EventCode;
   unsigned char EventType, *EventMessage;
@@ -3821,7 +4124,7 @@ static void DAC960_V2_ReportEvent(DAC960_Controller_T *Controller,
       DAC960_Critical("Physical Device %d:%d %s\n", Controller,
 		      Event->Channel, Event->TargetID, EventMessage);
       DAC960_Critical("Physical Device %d:%d Request Sense: "
-		      "Sense Key = %d, ASC = %02X, ASCQ = %02X\n",
+		      "Sense Key = %X, ASC = %02X, ASCQ = %02X\n",
 		      Controller,
 		      Event->Channel,
 		      Event->TargetID,
@@ -4142,22 +4445,34 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	    {
 	      if (NewPhysicalDeviceInfo->PhysicalDeviceState !=
 		  PhysicalDeviceInfo->PhysicalDeviceState)
-		DAC960_Critical("Physical Device %d:%d is now %s\n", Controller,
-				NewPhysicalDeviceInfo->Channel,
-				NewPhysicalDeviceInfo->TargetID,
-				(NewPhysicalDeviceInfo->PhysicalDeviceState
-				 == DAC960_V2_Device_Unconfigured
-				 ? "UNCONFIGURED"
-				 : NewPhysicalDeviceInfo->PhysicalDeviceState
-				   == DAC960_V2_Device_Online
-				   ? "ONLINE"
-				   : NewPhysicalDeviceInfo->PhysicalDeviceState
-				     == DAC960_V2_Device_WriteOnly
-				     ? "WRITE-ONLY"
-				     : NewPhysicalDeviceInfo
-				       ->PhysicalDeviceState
-				       == DAC960_V2_Device_Dead
-				       ? "DEAD" : "STANDBY"));
+		DAC960_Critical(
+		  "Physical Device %d:%d is now %s\n", Controller,
+		  NewPhysicalDeviceInfo->Channel,
+		  NewPhysicalDeviceInfo->TargetID,
+		  (NewPhysicalDeviceInfo->PhysicalDeviceState
+		   == DAC960_V2_Device_Online
+		   ? "ONLINE"
+		   : NewPhysicalDeviceInfo->PhysicalDeviceState
+		     == DAC960_V2_Device_Rebuild
+		     ? "REBUILD"
+		     : NewPhysicalDeviceInfo->PhysicalDeviceState
+		       == DAC960_V2_Device_Missing
+		       ? "MISSING"
+		       : NewPhysicalDeviceInfo->PhysicalDeviceState
+			 == DAC960_V2_Device_Critical
+			 ? "CRITICAL"
+			 : NewPhysicalDeviceInfo->PhysicalDeviceState
+			   == DAC960_V2_Device_Dead
+			   ? "DEAD"
+			   : NewPhysicalDeviceInfo->PhysicalDeviceState
+			     == DAC960_V2_Device_SuspectedDead
+			     ? "SUSPECTED-DEAD"
+			     : NewPhysicalDeviceInfo->PhysicalDeviceState
+			       == DAC960_V2_Device_CommandedOffline
+			       ? "COMMANDED-OFFLINE"
+			       : NewPhysicalDeviceInfo->PhysicalDeviceState
+				 == DAC960_V2_Device_Standby
+				 ? "STANDBY" : "UNKNOWN"));
 	      if ((NewPhysicalDeviceInfo->ParityErrors !=
 		   PhysicalDeviceInfo->ParityErrors) ||
 		  (NewPhysicalDeviceInfo->SoftErrors !=
@@ -4263,13 +4578,16 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 			      (LogicalDeviceInfo != NULL
 			       ? "" : " - Allocation Failed"));
 	      if (LogicalDeviceInfo != NULL)
-		memset(LogicalDeviceInfo, 0,
-		       sizeof(DAC960_V2_LogicalDeviceInfo_T));
+		{
+		  memset(LogicalDeviceInfo, 0,
+			 sizeof(DAC960_V2_LogicalDeviceInfo_T));
+		  DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
+		}
 	    }
 	  if (LogicalDeviceInfo != NULL)
 	    {
 	      unsigned long LogicalDeviceSize =
-		NewLogicalDeviceInfo->ConfigurableDeviceSizeIn512ByteBlocksOrMB;
+		NewLogicalDeviceInfo->ConfigurableDeviceSize;
 	      if (NewLogicalDeviceInfo->LogicalDeviceState !=
 		  LogicalDeviceInfo->LogicalDeviceState)
 		DAC960_Critical("Logical Drive %d (/dev/rd/c%dd%d) "
@@ -4380,6 +4698,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      kfree(LogicalDeviceInfo);
 	      Controller->LogicalDriveInitiallyAccessible
 			  [LogicalDriveNumber] = false;
+	      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
 	    }
 	  Controller->V2.NeedLogicalDeviceInformation = false;
 	}
@@ -4785,6 +5104,85 @@ static void DAC960_PD_InterruptHandler(int IRQ_Channel,
 
 
 /*
+  DAC960_P_InterruptHandler handles hardware interrupts from DAC960 P Series
+  Controllers.
+*/
+
+static void DAC960_P_InterruptHandler(int IRQ_Channel,
+				      void *DeviceIdentifier,
+				      Registers_T *InterruptRegisters)
+{
+  DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
+  void *ControllerBaseAddress = Controller->BaseAddress;
+  ProcessorFlags_T ProcessorFlags;
+  /*
+    Acquire exclusive access to Controller.
+  */
+  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
+  /*
+    Process Hardware Interrupts for Controller.
+  */
+  while (DAC960_PD_StatusAvailableP(ControllerBaseAddress))
+    {
+      DAC960_V1_CommandIdentifier_T CommandIdentifier =
+	DAC960_PD_ReadStatusCommandIdentifier(ControllerBaseAddress);
+      DAC960_Command_T *Command = Controller->Commands[CommandIdentifier-1];
+      DAC960_V1_CommandMailbox_T *CommandMailbox = &Command->V1.CommandMailbox;
+      DAC960_V1_CommandOpcode_T CommandOpcode =
+	CommandMailbox->Common.CommandOpcode;
+      Command->V1.CommandStatus =
+	DAC960_PD_ReadStatusRegister(ControllerBaseAddress);
+      DAC960_PD_AcknowledgeInterrupt(ControllerBaseAddress);
+      DAC960_PD_AcknowledgeStatus(ControllerBaseAddress);
+      switch (CommandOpcode)
+	{
+	case DAC960_V1_Enquiry_Old:
+	  Command->V1.CommandMailbox.Common.CommandOpcode = DAC960_V1_Enquiry;
+	  DAC960_P_To_PD_TranslateEnquiry(
+	    Bus32_to_Virtual(CommandMailbox->Type3.BusAddress));
+	  break;
+	case DAC960_V1_GetDeviceState_Old:
+	  Command->V1.CommandMailbox.Common.CommandOpcode =
+	    DAC960_V1_GetDeviceState;
+	  DAC960_P_To_PD_TranslateDeviceState(
+	    Bus32_to_Virtual(CommandMailbox->Type3.BusAddress));
+	  break;
+	case DAC960_V1_Read_Old:
+	  Command->V1.CommandMailbox.Common.CommandOpcode = DAC960_V1_Read;
+	  DAC960_P_To_PD_TranslateReadWriteCommand(CommandMailbox);
+	  break;
+	case DAC960_V1_Write_Old:
+	  Command->V1.CommandMailbox.Common.CommandOpcode = DAC960_V1_Write;
+	  DAC960_P_To_PD_TranslateReadWriteCommand(CommandMailbox);
+	  break;
+	case DAC960_V1_ReadWithScatterGather_Old:
+	  Command->V1.CommandMailbox.Common.CommandOpcode =
+	    DAC960_V1_ReadWithScatterGather;
+	  DAC960_P_To_PD_TranslateReadWriteCommand(CommandMailbox);
+	  break;
+	case DAC960_V1_WriteWithScatterGather_Old:
+	  Command->V1.CommandMailbox.Common.CommandOpcode =
+	    DAC960_V1_WriteWithScatterGather;
+	  DAC960_P_To_PD_TranslateReadWriteCommand(CommandMailbox);
+	  break;
+	default:
+	  break;
+	}
+      DAC960_V1_ProcessCompletedCommand(Command);
+    }
+  /*
+    Attempt to remove additional I/O Requests from the Controller's
+    I/O Request Queue and queue them to the Controller.
+  */
+  while (DAC960_ProcessRequest(Controller, false)) ;
+  /*
+    Release exclusive access to Controller.
+  */
+  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+}
+
+
+/*
   DAC960_V1_QueueMonitoringCommand queues a Monitoring Command to DAC960 V1
   Firmware Controllers.
 */
@@ -4881,8 +5279,7 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
 		Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
 	      if (LogicalDeviceInfo == NULL) continue;
 	      if (!LogicalDeviceInfo->LogicalDeviceControl
-				     .LogicalDeviceInitialized &&
-		  Controller->LogicalDriveUsageCount[LogicalDriveNumber] > 0)
+				     .LogicalDeviceInitialized)
 		{
 		  ForceMonitoringCommand = true;
 		  break;
@@ -4970,6 +5367,7 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
   if (!Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber])
     {
       Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
+      DAC960_ComputeGenericDiskInfo(&Controller->GenericDiskInfo);
       DAC960_RegisterDisk(Controller, LogicalDriveNumber);
     }
   if (Controller->GenericDiskInfo.sizes[MINOR(Inode->i_rdev)] == 0)
@@ -5049,7 +5447,7 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 	    Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
 	  if (LogicalDeviceInfo == NULL)
 	    return -EINVAL;
-	  switch(LogicalDeviceInfo->DriveGeometry)
+	  switch (LogicalDeviceInfo->DriveGeometry)
 	    {
 	    case DAC960_V2_Geometry_128_32:
 	      Geometry.heads = 128;
@@ -5065,7 +5463,7 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 	      return -EINVAL;
 	    }
 	  Geometry.cylinders =
-	    LogicalDeviceInfo->ConfigurableDeviceSizeIn512ByteBlocksOrMB
+	    LogicalDeviceInfo->ConfigurableDeviceSize
 	    / (Geometry.heads * Geometry.sectors);
 	}
       Geometry.start =
@@ -5074,19 +5472,22 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
     case BLKGETSIZE:
       /* Get Device Size. */
+      if ((unsigned long *) Argument == NULL) return -EINVAL;
       return put_user(Controller->GenericDiskInfo.part[MINOR(Inode->i_rdev)]
 						 .nr_sects,
-		      (long *) Argument);
+		      (unsigned long *) Argument);
     case BLKGETSIZE64:
-      return put_user((u64)Controller->GenericDiskInfo.part[MINOR(Inode->i_rdev)].nr_sects << 9,
+      if ((u64 *) Argument == NULL) return -EINVAL;
+      return put_user((u64) Controller->GenericDiskInfo
+				       .part[MINOR(Inode->i_rdev)]
+				       .nr_sects << 9,
 		      (u64 *) Argument);
     case BLKRAGET:
     case BLKRASET:
     case BLKFLSBUF:
     case BLKBSZGET:
     case BLKBSZSET:
-      return blk_ioctl (Inode->i_rdev, Request, Argument);
-
+      return blk_ioctl(Inode->i_rdev, Request, Argument);
     case BLKRRPART:
       /* Re-Read Partition Table. */
       if (!capable(CAP_SYS_ADMIN)) return -EACCES;
@@ -5120,20 +5521,7 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 	  */
 	  set_blocksize(Device, BLOCK_SIZE);
 	}
-      if (Controller->FirmwareType == DAC960_V1_Controller)
-	grok_partitions(&Controller->GenericDiskInfo,
-			LogicalDriveNumber,
-			DAC960_MaxPartitions,
-			Controller->V1.LogicalDriveInformation
-				       [LogicalDriveNumber]
-				       .LogicalDriveSize);
-      else
-	grok_partitions(
-	  &Controller->GenericDiskInfo,
-	  LogicalDriveNumber,
-	  DAC960_MaxPartitions,
-	  Controller->V2.LogicalDeviceInformation[LogicalDriveNumber]
-			 ->ConfigurableDeviceSizeIn512ByteBlocksOrMB);
+      DAC960_RegisterDisk(Controller, LogicalDriveNumber);
       return 0;
     }
   return -EINVAL;
@@ -6365,6 +6753,43 @@ static boolean DAC960_V2_ExecuteUserCommand(DAC960_Controller_T *Controller,
 			   == DAC960_V2_NormalCompletion
 			   ? "Cancelled" : "Not Cancelled"));
     }
+  else if (strcmp(UserCommand, "perform-discovery") == 0)
+    {
+      CommandMailbox->Common.IOCTL_Opcode = DAC960_V2_StartDiscovery;
+      DAC960_ExecuteCommand(Command);
+      DAC960_UserCritical("Discovery %s\n", Controller,
+			  (Command->V2.CommandStatus
+			   == DAC960_V2_NormalCompletion
+			   ? "Initiated" : "Not Initiated"));
+      if (Command->V2.CommandStatus == DAC960_V2_NormalCompletion)
+	{
+	  CommandMailbox->ControllerInfo.CommandOpcode = DAC960_V2_IOCTL;
+	  CommandMailbox->ControllerInfo.CommandControlBits
+					.DataTransferControllerToHost = true;
+	  CommandMailbox->ControllerInfo.CommandControlBits
+					.NoAutoRequestSense = true;
+	  CommandMailbox->ControllerInfo.DataTransferSize =
+	    sizeof(DAC960_V2_ControllerInfo_T);
+	  CommandMailbox->ControllerInfo.ControllerNumber = 0;
+	  CommandMailbox->ControllerInfo.IOCTL_Opcode =
+	    DAC960_V2_GetControllerInfo;
+	  CommandMailbox->ControllerInfo.DataTransferMemoryAddress
+					.ScatterGatherSegments[0]
+					.SegmentDataPointer =
+	    Virtual_to_Bus64(&Controller->V2.NewControllerInformation);
+	  CommandMailbox->ControllerInfo.DataTransferMemoryAddress
+					.ScatterGatherSegments[0]
+					.SegmentByteCount =
+	    CommandMailbox->ControllerInfo.DataTransferSize;
+	  DAC960_ExecuteCommand(Command);
+	  while (Controller->V2.NewControllerInformation.PhysicalScanActive)
+	    {
+	      DAC960_ExecuteCommand(Command);
+	      sleep_on_timeout(&Controller->CommandWaitQueue, HZ);
+	    }
+	  DAC960_UserCritical("Discovery Completed\n", Controller);
+ 	}
+    }
   else if (strcmp(UserCommand, "suppress-enclosure-messages") == 0)
     Controller->SuppressEnclosureMessages = true;
   else DAC960_UserCritical("Illegal User Command: '%s'\n",
@@ -6587,24 +7012,5 @@ static void DAC960_DestroyProcEntries(void)
 }
 
 
-/*
-  Include Module support if requested.
-*/
-
-#ifdef MODULE
-
-
-int init_module(void)
-{
-  DAC960_Initialize();
-  return (DAC960_ActiveControllerCount > 0 ? 0 : -1);
-}
-
-
-void cleanup_module(void)
-{
-  DAC960_Finalize(&DAC960_NotifierBlock, SYS_RESTART, NULL);
-}
-
-
-#endif
+module_init(DAC960_Initialize);
+module_exit(DAC960_Finalize);

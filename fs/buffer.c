@@ -508,11 +508,13 @@ static void __insert_into_lru_list(struct buffer_head * bh, int blist)
 	size_buffers_type[blist] += bh->b_size;
 }
 
-static void __remove_from_lru_list(struct buffer_head * bh, int blist)
+static void __remove_from_lru_list(struct buffer_head * bh)
 {
 	struct buffer_head *next = bh->b_next_free;
 	if (next) {
 		struct buffer_head *prev = bh->b_prev_free;
+		int blist = bh->b_list;
+
 		prev->b_next_free = next;
 		next->b_prev_free = prev;
 		if (lru_list[blist] == bh) {
@@ -532,7 +534,7 @@ static void __remove_from_lru_list(struct buffer_head * bh, int blist)
 static void __remove_from_queues(struct buffer_head *bh)
 {
 	__hash_unlink(bh);
-	__remove_from_lru_list(bh, bh->b_list);
+	__remove_from_lru_list(bh);
 }
 
 struct buffer_head * get_hash_table(kdev_t dev, int block, int size)
@@ -1101,7 +1103,7 @@ static void __refile_buffer(struct buffer_head *bh)
 	if (buffer_dirty(bh))
 		dispose = BUF_DIRTY;
 	if (dispose != bh->b_list) {
-		__remove_from_lru_list(bh, bh->b_list);
+		__remove_from_lru_list(bh);
 		bh->b_list = dispose;
 		if (dispose == BUF_CLEAN)
 			remove_inode_queue(bh);
@@ -1134,8 +1136,26 @@ void __brelse(struct buffer_head * buf)
  */
 void __bforget(struct buffer_head * buf)
 {
-	/* mark_buffer_clean(bh); */
-	__brelse(buf);
+	/* grab the lru lock here so that "b_count" is stable */
+	spin_lock(&lru_list_lock);
+	write_lock(&hash_table_lock);
+	if (!atomic_dec_and_test(&buf->b_count) || buffer_locked(buf))
+		goto in_use;
+
+	/* Mark it clean */
+	clear_bit(BH_Dirty, &buf->b_state);
+	write_unlock(&hash_table_lock);
+
+	/* After which we can remove it from all queues */
+	remove_inode_queue(buf);
+	__remove_from_lru_list(buf);
+	buf->b_list = BUF_CLEAN;
+	spin_unlock(&lru_list_lock);
+	return;
+
+in_use:
+	write_unlock(&hash_table_lock);
+	spin_unlock(&lru_list_lock);
 }
 
 /**

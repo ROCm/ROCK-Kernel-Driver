@@ -1121,6 +1121,12 @@ L:	linux-parport@torque.net
 W:	http://www.torque.net/linux-pp.html
 S:	Maintained
 
+PERSONALITY HANDLING
+P:	Christoph Hellwig
+M:	hch@caldera.de
+L:	linux-abi-devel@lists.sourceforge.net
+S:	Supported
+
 PCI ID DATABASE
 P:	Jens Maurer
 M:	jmaurer@cck.uni-kl.de

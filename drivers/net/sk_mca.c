@@ -1229,6 +1229,7 @@ int __init skmca_probe(struct SKMCA_NETDEV *dev)
  * ------------------------------------------------------------------------ */
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 
 #define DEVMAX 5
 

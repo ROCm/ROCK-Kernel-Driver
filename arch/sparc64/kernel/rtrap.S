@@ -1,4 +1,4 @@
-/* $Id: rtrap.S,v 1.55 2001/06/05 09:56:06 davem Exp $
+/* $Id: rtrap.S,v 1.56 2001/10/13 00:14:34 kanoj Exp $
  * rtrap.S: Preparing for return from trap on Sparc V9.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -82,12 +82,12 @@ __handle_signal:
 		 andn			%l1, %l4, %l1
 
 		.align			64
-		.globl			rtrap_clr_l6, rtrap
+		.globl			rtrap_clr_l6, rtrap, irqsz_patchme
 rtrap_clr_l6:	clr			%l6
 rtrap:		lduw			[%g6 + AOFF_task_processor], %l0
 		sethi			%hi(irq_stat), %l2	! &softirq_active
 		or			%l2, %lo(irq_stat), %l2	! &softirq_active
-		sllx			%l0, 6, %l0
+irqsz_patchme:	sllx			%l0, 0, %l0
 		lduw			[%l2 + %l0], %l1	! softirq_pending
 		cmp			%l1, 0
 

@@ -9,7 +9,8 @@
 
 #define        L1_CACHE_ALIGN(x)       (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 
-#define        SMP_CACHE_BYTES		64 /* L2 cache line size. */
+#define        SMP_CACHE_BYTES_SHIFT	6
+#define        SMP_CACHE_BYTES		(1 << SMP_CACHE_BYTES_SHIFT) /* L2 cache line size. */
 
 #ifdef MODULE
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))

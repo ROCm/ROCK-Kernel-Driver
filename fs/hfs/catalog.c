@@ -100,7 +100,7 @@ static LIST_HEAD(entry_in_use);
 static LIST_HEAD(entry_unused);
 static struct list_head hash_table[C_HASHSIZE];
 
-spinlock_t entry_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t entry_lock = SPIN_LOCK_UNLOCKED;
 
 static struct {
         int nr_entries;

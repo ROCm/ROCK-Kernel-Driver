@@ -1690,7 +1690,8 @@ static int raid1_run (mddev_t *mddev)
 		}
 	}
 
-	if (!start_recovery && !(sb->state & (1 << MD_SB_CLEAN))) {
+	if (!start_recovery && !(sb->state & (1 << MD_SB_CLEAN)) &&
+	    (conf->working_disks > 1)) {
 		const char * name = "raid1syncd";
 
 		conf->resync_thread = md_register_thread(raid1syncd, conf,name);

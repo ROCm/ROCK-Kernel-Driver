@@ -86,8 +86,8 @@ nfsd_proc_lookup(struct svc_rqst *rqstp, struct nfsd_diropargs *argp,
 {
 	int	nfserr;
 
-	dprintk("nfsd: LOOKUP   %s %s\n",
-		SVCFH_fmt(&argp->fh), argp->name);
+	dprintk("nfsd: LOOKUP   %s %.*s\n",
+		SVCFH_fmt(&argp->fh), argp->len, argp->name);
 
 	fh_init(&resp->fh, NFS_FHSIZE);
 	nfserr = nfsd_lookup(rqstp, &argp->fh, argp->name, argp->len,
@@ -199,8 +199,8 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	int		nfserr, type, mode;
 	dev_t		rdev = NODEV;
 
-	dprintk("nfsd: CREATE   %s %s\n",
-		SVCFH_fmt(dirfhp), argp->name);
+	dprintk("nfsd: CREATE   %s %*.s\n",
+		SVCFH_fmt(dirfhp), argp->len, argp->name);
 
 	/* First verify the parent file handle */
 	nfserr = fh_verify(rqstp, dirfhp, S_IFDIR, MAY_EXEC);
@@ -349,7 +349,8 @@ nfsd_proc_remove(struct svc_rqst *rqstp, struct nfsd_diropargs *argp,
 {
 	int	nfserr;
 
-	dprintk("nfsd: REMOVE   %s %s\n", SVCFH_fmt(&argp->fh), argp->name);
+	dprintk("nfsd: REMOVE   %s %.*s\n", SVCFH_fmt(&argp->fh),
+		argp->len, argp->name);
 
 	/* Unlink. -SIFDIR means file must not be a directory */
 	nfserr = nfsd_unlink(rqstp, &argp->fh, -S_IFDIR, argp->name, argp->len);
@@ -363,10 +364,10 @@ nfsd_proc_rename(struct svc_rqst *rqstp, struct nfsd_renameargs *argp,
 {
 	int	nfserr;
 
-	dprintk("nfsd: RENAME   %s %s -> \n",
-		SVCFH_fmt(&argp->ffh), argp->fname);
-	dprintk("nfsd:        ->  %s %s\n",
-		SVCFH_fmt(&argp->tfh), argp->tname);
+	dprintk("nfsd: RENAME   %s %.*s -> \n",
+		SVCFH_fmt(&argp->ffh), argp->flen, argp->fname);
+	dprintk("nfsd:        ->  %s %.*s\n",
+		SVCFH_fmt(&argp->tfh), argp->tlen, argp->tname);
 
 	nfserr = nfsd_rename(rqstp, &argp->ffh, argp->fname, argp->flen,
 				    &argp->tfh, argp->tname, argp->tlen);
@@ -383,8 +384,9 @@ nfsd_proc_link(struct svc_rqst *rqstp, struct nfsd_linkargs *argp,
 
 	dprintk("nfsd: LINK     %s ->\n",
 		SVCFH_fmt(&argp->ffh));
-	dprintk("nfsd:    %s %s\n",
+	dprintk("nfsd:    %s %.*s\n",
 		SVCFH_fmt(&argp->tfh),
+		argp->tlen,
 		argp->tname);
 
 	nfserr = nfsd_link(rqstp, &argp->tfh, argp->tname, argp->tlen,
@@ -401,8 +403,9 @@ nfsd_proc_symlink(struct svc_rqst *rqstp, struct nfsd_symlinkargs *argp,
 	struct svc_fh	newfh;
 	int		nfserr;
 
-	dprintk("nfsd: SYMLINK  %s %s -> %s\n",
-		SVCFH_fmt(&argp->ffh), argp->fname, argp->tname);
+	dprintk("nfsd: SYMLINK  %s %.*s -> %.*s\n",
+		SVCFH_fmt(&argp->ffh), argp->flen, argp->fname,
+		argp->tlen, argp->tname);
 
 	fh_init(&newfh, NFS_FHSIZE);
 	/*
@@ -428,7 +431,7 @@ nfsd_proc_mkdir(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 {
 	int	nfserr;
 
-	dprintk("nfsd: MKDIR    %s %s\n", SVCFH_fmt(&argp->fh), argp->name);
+	dprintk("nfsd: MKDIR    %s %.*s\n", SVCFH_fmt(&argp->fh), argp->len, argp->name);
 
 	if (resp->fh.fh_dentry) {
 		printk(KERN_WARNING
@@ -452,7 +455,7 @@ nfsd_proc_rmdir(struct svc_rqst *rqstp, struct nfsd_diropargs *argp,
 {
 	int	nfserr;
 
-	dprintk("nfsd: RMDIR    %s %s\n", SVCFH_fmt(&argp->fh), argp->name);
+	dprintk("nfsd: RMDIR    %s %.*s\n", SVCFH_fmt(&argp->fh), argp->len, argp->name);
 
 	nfserr = nfsd_unlink(rqstp, &argp->fh, S_IFDIR, argp->name, argp->len);
 	fh_put(&argp->fh);

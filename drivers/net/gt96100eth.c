@@ -1250,3 +1250,4 @@ static struct net_device_stats *gt96100_get_stats(struct net_device *dev)
 }
 
 module_init(gt96100_probe);
+MODULE_LICENSE("GPL");

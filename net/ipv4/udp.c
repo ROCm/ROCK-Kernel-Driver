@@ -5,7 +5,7 @@
  *
  *		The User Datagram Protocol (UDP).
  *
- * Version:	$Id: udp.c,v 1.99 2001/09/01 00:31:50 davem Exp $
+ * Version:	$Id: udp.c,v 1.100 2001/10/15 12:34:50 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -724,7 +724,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	sk_dst_reset(sk);
 
 	err = ip_route_connect(&rt, usin->sin_addr.s_addr, sk->saddr,
-			       sk->protinfo.af_inet.tos|sk->localroute, sk->bound_dev_if);
+			       RT_CONN_FLAGS(sk), sk->bound_dev_if);
 	if (err)
 		return err;
 	if ((rt->rt_flags&RTCF_BROADCAST) && !sk->broadcast) {

@@ -696,3 +696,4 @@ static void __exit oaknet_cleanup_module (void)
 
 module_init(oaknet_init_module);
 module_exit(oaknet_cleanup_module);
+MODULE_LICENSE("GPL");

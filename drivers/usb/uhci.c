@@ -159,7 +159,7 @@ static inline void uhci_set_next_interrupt(struct uhci *uhci)
 	unsigned long flags;
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
-	uhci->skel_term_td->status |= TD_CTRL_IOC;
+	set_bit(TD_CTRL_IOC_BIT, &uhci->skel_term_td->status);
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 }
 
@@ -168,7 +168,7 @@ static inline void uhci_clear_next_interrupt(struct uhci *uhci)
 	unsigned long flags;
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
-	uhci->skel_term_td->status &= ~TD_CTRL_IOC;
+	clear_bit(TD_CTRL_IOC_BIT, &uhci->skel_term_td->status);
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 }
 
@@ -796,7 +796,7 @@ static int uhci_map_status(int status, int dir_out)
 	if (status & TD_CTRL_NAK)			/* NAK */
 		return -ETIMEDOUT;
 	if (status & TD_CTRL_BABBLE)			/* Babble */
-		return -EPIPE;
+		return -EOVERFLOW;
 	if (status & TD_CTRL_DBUFERR)			/* Buffer error */
 		return -ENOSR;
 	if (status & TD_CTRL_STALLED)			/* Stalled */
@@ -961,7 +961,7 @@ static int uhci_result_control(struct urb *urb)
 		    !(td->status & TD_CTRL_ACTIVE)) {
 			uhci_inc_fsbr(urb->dev->bus->hcpriv, urb);
 			urbp->fsbr_timeout = 0;
-			td->status &= ~TD_CTRL_IOC;
+			clear_bit(TD_CTRL_IOC_BIT, &td->status);
 		}
 
 		status = uhci_status_bits(td->status);
@@ -1134,7 +1134,7 @@ static int uhci_result_interrupt(struct urb *urb)
 		    !(td->status & TD_CTRL_ACTIVE)) {
 			uhci_inc_fsbr(urb->dev->bus->hcpriv, urb);
 			urbp->fsbr_timeout = 0;
-			td->status &= ~TD_CTRL_IOC;
+			clear_bit(TD_CTRL_IOC_BIT, &td->status);
 		}
 
 		status = uhci_status_bits(td->status);
@@ -1796,7 +1796,7 @@ static int uhci_fsbr_timeout(struct uhci *uhci, struct urb *urb)
 		tmp = tmp->next;
 
 		if (td->status & TD_CTRL_ACTIVE) {
-			td->status |= TD_CTRL_IOC;
+			set_bit(TD_CTRL_IOC_BIT, &td->status);
 			break;
 		}
 	}

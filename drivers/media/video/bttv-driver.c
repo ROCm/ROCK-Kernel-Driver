@@ -104,7 +104,7 @@ MODULE_PARM(radio_nr,"i");
 MODULE_PARM(vbi_nr,"i");
 
 MODULE_DESCRIPTION("bttv - v4l driver module for bt848/878 based cards");
-MODULE_AUTHOR("Ralph  Metzler & Marcus Metzler & Gerd Knorr");
+MODULE_AUTHOR("Ralph Metzler & Marcus Metzler & Gerd Knorr");
 MODULE_LICENSE("GPL");
 
 /* kernel args */
@@ -209,9 +209,11 @@ static void * rvmalloc(signed long size)
 	unsigned long adr, page;
 
 	mem=vmalloc_32(size);
-	if (mem) 
-	{
-		memset(mem, 0, size); /* Clear the ram out, no junk to the user */
+	if (NULL == mem)
+		printk(KERN_INFO "bttv: vmalloc_32(%ld) failed\n",size);
+	else {
+		/* Clear the ram out, no junk to the user */
+		memset(mem, 0, size);
 	        adr=(unsigned long) mem;
 		while (size > 0) 
                 {
@@ -475,7 +477,13 @@ static struct tvnorm tvnorms[] = {
  	/* actually, max active PAL with HSCALE=0 is 948, NTSC is 768 - nil */
         { 35468950,
           924, 576, 1135, 0x7f, 0x72, (BT848_IFORM_PAL_BDGHI|BT848_IFORM_XT1),
-          1135, 186, 924, 0x20, 255},
+          1135, 186, 924,
+#ifdef VIDEODAT_HACK
+	  VBI_MAXLINES*2,
+#else
+	  0x20,
+#endif
+	  255},
 
 	/* NTSC */
 	{ 28636363,
@@ -526,7 +534,7 @@ static void make_vbitab(struct bttv *btv)
 		       btv->nr,virt_to_bus(po), virt_to_bus(pe));
         
 	*(po++)=cpu_to_le32(BT848_RISC_SYNC|BT848_FIFO_STATUS_FM1); *(po++)=0;
-	for (i=0; i<16; i++) 
+	for (i=0; i<VBI_MAXLINES; i++) 
 	{
 		*(po++)=cpu_to_le32(VBI_RISC);
 		*(po++)=cpu_to_le32(kvirt_to_bus((unsigned long)btv->vbibuf+i*2048));
@@ -535,7 +543,7 @@ static void make_vbitab(struct bttv *btv)
 	*(po++)=cpu_to_le32(virt_to_bus(btv->risc_jmp+4));
 
 	*(pe++)=cpu_to_le32(BT848_RISC_SYNC|BT848_FIFO_STATUS_FM1); *(pe++)=0;
-	for (i=16; i<32; i++) 
+	for (i=VBI_MAXLINES; i<VBI_MAXLINES*2; i++) 
 	{
 		*(pe++)=cpu_to_le32(VBI_RISC);
 		*(pe++)=cpu_to_le32(kvirt_to_bus((unsigned long)btv->vbibuf+i*2048));
@@ -553,23 +561,23 @@ static int fmtbppx2[16] = {
 };
 
 static int palette2fmt[] = {
-       0,
-       BT848_COLOR_FMT_Y8,
-       BT848_COLOR_FMT_RGB8,
-       BT848_COLOR_FMT_RGB16,
-       BT848_COLOR_FMT_RGB24,
-       BT848_COLOR_FMT_RGB32,
-       BT848_COLOR_FMT_RGB15,
-       BT848_COLOR_FMT_YUY2,
-       BT848_COLOR_FMT_BtYUV,
-       -1,
-       -1,
-       -1,
-       BT848_COLOR_FMT_RAW,
-       BT848_COLOR_FMT_YCrCb422,
-       BT848_COLOR_FMT_YCrCb411,
-       BT848_COLOR_FMT_YCrCb422,
-       BT848_COLOR_FMT_YCrCb411,
+	0,
+	BT848_COLOR_FMT_Y8,
+	BT848_COLOR_FMT_RGB8,
+	BT848_COLOR_FMT_RGB16,
+	BT848_COLOR_FMT_RGB24,
+	BT848_COLOR_FMT_RGB32,
+	BT848_COLOR_FMT_RGB15,
+	BT848_COLOR_FMT_YUY2,
+	BT848_COLOR_FMT_YUY2,
+	-1,
+	-1,
+	-1,
+	BT848_COLOR_FMT_RAW,
+	BT848_COLOR_FMT_YCrCb422,
+	BT848_COLOR_FMT_YCrCb411,
+	BT848_COLOR_FMT_YCrCb422,
+	BT848_COLOR_FMT_YCrCb411,
 };
 #define PALETTEFMT_MAX (sizeof(palette2fmt)/sizeof(int))
 
@@ -2626,7 +2634,9 @@ static int __devinit init_bt848(struct bttv *btv)
 
 	/* needs to be done before i2c is registered */
         if (btv->type == BTTV_HAUPPAUGE || btv->type == BTTV_HAUPPAUGE878)
-                bttv_hauppauge_boot_msp34xx(btv);
+                bttv_boot_msp34xx(btv,5);
+	if (btv->type == BTTV_VOODOOTV_FM)
+		bttv_boot_msp34xx(btv,20);
 
 	/* register i2c */
         btv->tuner_type=-1;

@@ -53,7 +53,10 @@ struct ethtool_wolinfo {
 #define ETHTOOL_GDRVINFO	0x00000003 /* Get driver info. */
 #define ETHTOOL_GREGS		0x00000004 /* Get NIC registers, privileged. */
 #define ETHTOOL_GWOL		0x00000005 /* Get wake-on-lan options. */
-#define ETHTOOL_SWOL		0x00000006 /* Set wake-on-lan options. */
+#define ETHTOOL_SWOL		0x00000006 /* Set wake-on-lan options, priv. */
+#define ETHTOOL_GMSGLVL		0x00000007 /* Get driver message level */
+#define ETHTOOL_SMSGLVL		0x00000008 /* Set driver msg level, priv. */
+#define ETHTOOL_NWAY_RST	0X00000009 /* Restart autonegotiation, priv. */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -71,6 +74,7 @@ struct ethtool_wolinfo {
 #define SUPPORTED_AUI			(1 << 8)
 #define SUPPORTED_MII			(1 << 9)
 #define SUPPORTED_FIBRE			(1 << 10)
+#define SUPPORTED_10base2		(1 << 11)
 
 /* Indicates what features are advertised by the interface. */
 #define ADVERTISED_10baseT_Half		(1 << 0)
@@ -84,6 +88,7 @@ struct ethtool_wolinfo {
 #define ADVERTISED_AUI			(1 << 8)
 #define ADVERTISED_MII			(1 << 9)
 #define ADVERTISED_FIBRE		(1 << 10)
+#define ADVERTISED_10base2		(1 << 11)
 
 /* The following are all involved in forcing a particular link
  * mode for the device for setting things.  When getting the

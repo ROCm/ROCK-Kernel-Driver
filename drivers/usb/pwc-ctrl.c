@@ -495,7 +495,7 @@ void pwc_set_image_buffer_size(struct pwc_device *pdev)
 }
 
 
-#ifdef __KERNEL__
+
 /* BRIGHTNESS */
 
 int pwc_get_brightness(struct pwc_device *pdev)
@@ -983,6 +983,7 @@ static inline int pwc_read_red_gain(struct pwc_device *pdev)
 	
 	return (buf << 8);
 }
+
 static inline int pwc_read_blue_gain(struct pwc_device *pdev)
 {
 	unsigned char buf;
@@ -1001,43 +1002,55 @@ static inline int pwc_read_blue_gain(struct pwc_device *pdev)
 	return (buf << 8);
 }
 
-/* still unused (it doesn't work yet...) */
-static inline int pwc_set_led(struct pwc_device *pdev, int value)
+int pwc_set_leds(struct pwc_device *pdev, int on_value, int off_value)
 {
-	unsigned char buf;
+	unsigned char buf[2];
 
-	if (value < 0)
-		value = 0;
-	if (value > 0xffff)
-		value = 0xffff;
+	if (pdev->type < 730)
+		return 0;
+	if (on_value < 0)
+		on_value = 0;
+	if (on_value > 0xff)
+		on_value = 0xff;
+	if (off_value < 0)
+		off_value = 0;
+	if (off_value > 0xff)
+		off_value = 0xff;
 
-	buf = (value >> 8);
+	buf[0] = on_value;
+	buf[1] = off_value;
 
 	return usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
 		SET_STATUS_CTL,
 		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		LED_FORMATTER,
 		pdev->vcinterface,
-		&buf, 1, HZ / 2);
+		&buf, 2, HZ / 2);
 }
 
-/* still unused (it doesn't work yet...) */
-static inline int pwc_get_led(struct pwc_device *pdev)
+int pwc_get_leds(struct pwc_device *pdev, int *on_value, int *off_value)
 {
-	unsigned char buf;
+	unsigned char buf[2];
 	int ret;
 	
+	if (pdev->type < 730) {
+		*on_value = -1;
+		*off_value = -1;
+		return 0;
+	}
+
 	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
    	        GET_STATUS_CTL,
 		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		LED_FORMATTER,
 		pdev->vcinterface,
-		&buf, 1, HZ / 2);
+		&buf, 2, HZ / 2);
 
 	if (ret < 0)
-	    return ret;
-	
-	return (buf << 8);
+		return ret;
+	*on_value = buf[0];
+	*off_value = buf[1];
+	return 0;
 }
 
  /* End of Add-Ons                                    */
@@ -1167,15 +1180,15 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 
         case VIDIOCPWCSLED:
 	{
-	    int led, ret;
-	    if (copy_from_user(&led,arg,sizeof(led)))
-		return -EFAULT;
-	    else {
-		/* ret = pwc_set_led(pdev, led); */
-		ret = 0;
+		int ret;
+		struct pwc_leds leds;
+
+		if (copy_from_user(&leds, arg, sizeof(leds)))
+			return -EFAULT;
+
+		ret = pwc_set_leds(pdev, leds.led_on, leds.led_off);
 		if (ret<0)
 		    return ret;
-	    }
 	    break;
 	}
 
@@ -1184,11 +1197,12 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 	case VIDIOCPWCGLED:
 	{
 		int led;
+		struct pwc_leds leds;
 		
-		led = pwc_get_led(pdev); 
+		led = pwc_get_leds(pdev, &leds.led_on, &leds.led_off); 
 		if (led < 0)
 			return -EINVAL;
-		if (copy_to_user(arg, &led, sizeof(led)))
+		if (copy_to_user(arg, &leds, sizeof(leds)))
 			return -EFAULT;
 		break;
 	}
@@ -1202,9 +1216,6 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 	}
 	return 0;
 }
-
-#endif
-
 
 
 

@@ -711,6 +711,7 @@ inline void wait_for_buffer(struct net_device * dev)
 static struct net_device dev_seeq = { init: seeq8005_probe };
 static int io = 0x320;
 static int irq = 10;
+MODULE_LICENSE("GPL");
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM_DESC(io, "SEEQ 8005 I/O base address");

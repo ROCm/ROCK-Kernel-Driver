@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.231 2001/09/26 23:38:47 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.232 2001/10/15 12:34:50 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -660,7 +660,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	}
 
 	tmp = ip_route_connect(&rt, nexthop, sk->saddr,
-			       RT_TOS(sk->protinfo.af_inet.tos)|RTO_CONN|sk->localroute, sk->bound_dev_if);
+			       RT_CONN_FLAGS(sk), sk->bound_dev_if);
 	if (tmp < 0)
 		return tmp;
 
@@ -676,7 +676,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		daddr = rt->rt_dst;
 
 	err = -ENOBUFS;
-	buff = alloc_skb(MAX_TCP_HEADER + 15, GFP_KERNEL);
+	buff = alloc_skb(MAX_TCP_HEADER + 15, sk->allocation);
 
 	if (buff == NULL)
 		goto failure;
@@ -1147,8 +1147,7 @@ static struct dst_entry* tcp_v4_route_req(struct sock *sk, struct open_request *
 				 opt->faddr :
 				 req->af.v4_req.rmt_addr),
 			   req->af.v4_req.loc_addr,
-			   RT_TOS(sk->protinfo.af_inet.tos) | RTO_CONN | sk->localroute,
-			   sk->bound_dev_if)) {
+			   RT_CONN_FLAGS(sk), sk->bound_dev_if)) {
 		IP_INC_STATS_BH(IpOutNoRoutes);
 		return NULL;
 	}
@@ -1776,8 +1775,7 @@ int tcp_v4_rebuild_header(struct sock *sk)
 		daddr = sk->protinfo.af_inet.opt->faddr;
 
 	err = ip_route_output(&rt, daddr, sk->saddr,
-			      RT_TOS(sk->protinfo.af_inet.tos) | RTO_CONN | sk->localroute,
-			      sk->bound_dev_if);
+			      RT_CONN_FLAGS(sk), sk->bound_dev_if);
 	if (!err) {
 		__sk_dst_set(sk, &rt->u.dst);
 		sk->route_caps = rt->u.dst.dev->features;

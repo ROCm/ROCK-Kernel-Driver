@@ -1,4 +1,4 @@
-/*	$Id: aurora.c,v 1.16 2001/10/08 22:19:51 davem Exp $
+/*	$Id: aurora.c,v 1.17 2001/10/13 08:27:50 davem Exp $
  *	linux/drivers/sbus/char/aurora.c -- Aurora multiport driver
  *
  *	Copyright (c) 1999 by Oliver Aldulea (oli at bv dot ro)
@@ -33,6 +33,14 @@
  *	read that file before reading this one.
  *
  *	Several parts of the code do not have comments yet.
+ * 
+ * n.b.  The board can support 115.2 bit rates, but only on a few
+ * ports. The total badwidth of one chip (ports 0-7 or 8-15) is equal
+ * to OSC_FREQ div 16. In case of my board, each chip can take 6
+ * channels of 115.2 kbaud.  This information is not well-tested.
+ * 
+ * Fixed to use tty_get_baud_rate().
+ *   Theodore Ts'o <tytso@mit.edu>, 2001-Oct-12
  */
 
 #include <linux/module.h>
@@ -99,16 +107,6 @@ static struct termios * aurora_termios[AURORA_TNPORTS] = { NULL, };
 static struct termios * aurora_termios_locked[AURORA_TNPORTS] = { NULL, };
 
 DECLARE_TASK_QUEUE(tq_aurora);
-
-/* Yes, the board can support 115.2 bit rates, but only on a few ports. The
- * total badwidth of one chip (ports 0-7 or 8-15) is equal to OSC_FREQ div
- * 16. In case of my board, each chip can take 6 channels of 115.2 kbaud.
- * This information is not well-tested.
- */
-static unsigned long baud_table[] =  {
-        0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
-        9600, 19200, 38400, 57600, 115200, 0,
-};
 
 static inline int aurora_paranoia_check(struct Aurora_port const * port,
 				    kdev_t device, const char *routine)
@@ -1030,28 +1028,14 @@ static void aurora_change_speed(struct Aurora_board *bp, struct Aurora_port *por
 	port->COR2 = 0;
 	port->MSVR = MSVR_RTS|MSVR_DTR;
 	
-	baud = C_BAUD(tty);
-	
-	if (baud & CBAUDEX) {
-		baud &= ~CBAUDEX;
-		if (baud < 1 || baud > 2) 
-			port->tty->termios->c_cflag &= ~CBAUDEX;
-		else
-			baud += 15;
-	}
-	if (baud == 15)  {
-		if ((port->flags & ASYNC_SPD_MASK) == ASYNC_SPD_HI)
-			baud ++;
-		if ((port->flags & ASYNC_SPD_MASK) == ASYNC_SPD_VHI)
-			baud += 2;
-	}
+	baud = tty_get_baud_rate(tty);
 	
 	/* Select port on the board */
 	sbus_writeb(port_No(port) & 7,
 		    &bp->r[chip]->r[CD180_CAR]);
 	udelay(1);
 	
-	if (!baud_table[baud])  {
+	if (!baud)  {
 		/* Drop DTR & exit */
 		port->MSVR &= ~(bp->DTR|bp->RTS);
 		sbus_writeb(port->MSVR,
@@ -1067,10 +1051,10 @@ static void aurora_change_speed(struct Aurora_board *bp, struct Aurora_port *por
 	/* Now we must calculate some speed dependant things. */
 	
 	/* Set baud rate for port. */
-	tmp = (((bp->oscfreq + baud_table[baud]/2) / baud_table[baud] +
+	tmp = (((bp->oscfreq + baud/2) / baud +
 		CD180_TPC/2) / CD180_TPC);
 
-/*	tmp = (bp->oscfreq/7)/baud_table[baud];
+/*	tmp = (bp->oscfreq/7)/baud;
 	if((tmp%10)>4)tmp=tmp/10+1;else tmp=tmp/10;*/
 /*	printk("Prescaler period: %d\n",tmp);*/
 
@@ -1081,7 +1065,7 @@ static void aurora_change_speed(struct Aurora_board *bp, struct Aurora_port *por
 	sbus_writeb(tmp & 0xff, &bp->r[chip]->r[CD180_RBPRL]);
 	sbus_writeb(tmp & 0xff, &bp->r[chip]->r[CD180_TBPRL]);
 	
-	baud = (baud_table[baud] + 5) / 10;   /* Estimated CPS */
+	baud = (baud + 5) / 10;   /* Estimated CPS */
 	
 	/* Two timer ticks seems enough to wakeup something like SLIP driver */
 	tmp = ((baud + HZ/2) / HZ) * 2 - CD180_NFIFO;		

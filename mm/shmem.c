@@ -1235,45 +1235,54 @@ static struct inode_operations shmem_symlink_inode_operations = {
 
 static int shmem_parse_options(char *options, int *mode, unsigned long * blocks, unsigned long *inodes)
 {
-	char *this_char, *value;
+	char *this_char, *value, *rest;
 
 	this_char = NULL;
 	if ( options )
 		this_char = strtok(options,",");
 	for ( ; this_char; this_char = strtok(NULL,",")) {
-		if ((value = strchr(this_char,'=')) != NULL)
+		if ((value = strchr(this_char,'=')) != NULL) {
 			*value++ = 0;
+		} else {
+			printk(KERN_ERR 
+			    "shmem_parse_options: No value for option '%s'\n", 
+			    this_char);
+			return 1;
+		}
+
 		if (!strcmp(this_char,"size")) {
 			unsigned long long size;
-			if (!value || !*value || !blocks)
-				return 1;
-			size = memparse(value,&value);
-			if (*value)
-				return 1;
+			size = memparse(value,&rest);
+			if (*rest)
+				goto bad_val;
 			*blocks = size >> PAGE_CACHE_SHIFT;
 		} else if (!strcmp(this_char,"nr_blocks")) {
-			if (!value || !*value || !blocks)
-				return 1;
-			*blocks = memparse(value,&value);
-			if (*value)
-				return 1;
+			*blocks = memparse(value,&rest);
+			if (*rest)
+				goto bad_val;
 		} else if (!strcmp(this_char,"nr_inodes")) {
-			if (!value || !*value || !inodes)
-				return 1;
-			*inodes = memparse(value,&value);
-			if (*value)
-				return 1;
+			*inodes = memparse(value,&rest);
+			if (*rest)
+				goto bad_val;
 		} else if (!strcmp(this_char,"mode")) {
-			if (!value || !*value || !mode)
-				return 1;
-			*mode = simple_strtoul(value,&value,8);
-			if (*value)
-				return 1;
-		}
-		else
+			if (!mode)
+				continue;
+			*mode = simple_strtoul(value,&rest,8);
+			if (*rest)
+				goto bad_val;
+		} else {
+			printk(KERN_ERR "shmem_parse_options: Bad option %s\n",
+			       this_char);
 			return 1;
+		}
 	}
 	return 0;
+
+bad_val:
+	printk(KERN_ERR "shmem_parse_options: Bad value '%s' for option '%s'\n", 
+	       value, this_char);
+	return 1;
+
 }
 
 static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)

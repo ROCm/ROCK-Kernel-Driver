@@ -349,4 +349,6 @@ extern void __global_restore_flags(unsigned long);
 void disable_hlt(void);
 void enable_hlt(void);
 
+extern int is_sony_vaio_laptop;
+
 #endif

@@ -1,0 +1,88 @@
+
+SAMSUNG Tuner identification: (e.g. TCPM9091PD27)
+  TCP [ABCJLMNQ] 90[89][125] [DP] [ACD] 27 [ABCD]
+ [ABCJLMNQ]:
+   A= BG+DK
+   B= BG
+   C= I+DK
+   J= NTSC-Japan
+   L= Secam LL
+   M= BG+I+DK
+   N= NTSC 
+   Q= BG+I+DK+LL
+ [125]:
+   2: No FM
+   5: With FM
+ [DP]:
+   D= NTSC
+   P= PAL
+ [ACD]:
+   A= F-connector
+   C= Phono connector
+   D= Din Jack
+ [ABCD]:
+   3-wire/I2C tuning, 2-band/3-band
+
+Philips Tuner identification: (e.g. FM1216MF)
+  F[IRMQ]12[1345]{MF|ME|MP}
+  [IRMQ]:
+   I: Tuner Series
+   R: Tuner + Radio IF
+   M: Tuner + FM
+   Q,MR: specials
+   TD15xx: Digital Tuner ATSC
+  [1345]
+   1: PAL BG
+   3: NTSC
+   4: PAL I
+   5: Pal DK
+  {MF|ME|MP}
+   MF: w/ Secam
+   ME: BD DK I LL
+   MP: BG DK I
+   MR: BG DK M (?)
+   MG: BG DKI M (?)
+
+Temic Tuner identification: (.e.g 4006FH5)
+   4[01][0136][269]F[HYNR]5
+    40x2: Tuner (5V/33V), different I2C programming from Philips !
+    40x6: Tuner 5V
+    41xx: Tuner compact
+    40x9: Tuner+FM compact
+   [0136]
+    0: PAL BG
+    1: Pal DK, Secam LL
+    3: NTSC
+    6: PAL I
+   F[HYNR]5
+    FH5: Pal BG
+    FY5: others
+    FN5: multistandard
+    FR5: w/ FM radio
+   3X xxxx: order number with specific connector
+
+LG Innotek Tuner:
+  TPI8NSR11 : NTSC J/M    (TPI8NSR01 w/FM)  (P,210/497)
+  TPI8PSB11 : PAL B/G     (TPI8PSB01 w/FM)  (P,170/450)
+  TAPC-I701 : PAL I       (TAPC-I001 w/FM)  (P,170/450)
+  TPI8PSB12 : PAL D/K+B/G (TPI8PSB02 w/FM)  (P,170/450)
+  TAPC-H701P: NTSC_JP     (TAPC-H001P w/FM) (L,170/450)
+  TAPC-G701P: PAL B/G     (TAPC-G001P w/FM) (L,170/450)
+  TAPC-W701P: PAL I       (TAPC-W001P w/FM) (L,170/450)
+  TAPC-Q703P: PAL D/K     (TAPC-Q001P w/FM) (L,170/450)
+  TAPC-Q704P: PAL D/K+I   (L,170/450)
+  TAPC-G702P: PAL D/K+B/G (L,170/450)
+
+  TADC-H002F: NTSC (L,175/410?; 2-B, C-W+11, W+12-69)
+  TADC-M201D: PAL D/K+B/G+I (L,143/425)  (sound control at I2C address 0xc8)
+  TADC-T003F: NTSC Taiwan  (L,175/410?; 2-B, C-W+11, W+12-69)
+
+  (API,Lo-Hi-takeover/Hi-UHF-takeover)
+   I2C APIs:
+    L= LG programming (VHF_LO=0x01, VHF_HI=0x02, UHF=0x08, radio=0x04)
+    P= Philips progr. (VHF_LO=0xA0, VHF_HI=0x90, UHF=0x30, radio=0x04)
+    T= Temic progr.   (VHF_LO=0x02, VHF_HI=0x04, UHF=0x01)
+  Suffix: 
+    P= Standard phono female socket
+    D= IEC female socket
+    F= F-connector

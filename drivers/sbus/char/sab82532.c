@@ -1,4 +1,4 @@
-/* $Id: sab82532.c,v 1.64 2001/10/08 22:19:51 davem Exp $
+/* $Id: sab82532.c,v 1.65 2001/10/13 08:27:50 davem Exp $
  * sab82532.c: ASYNC Driver for the SIEMENS SAB82532 DUSCC.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -6,6 +6,10 @@
  * Rewrote buffer handling to use CIRC(Circular Buffer) macros.
  *   Maxim Krasnyanskiy <maxk@qualcomm.com>
  *
+ * Fixed to use tty_get_baud_rate, and to allow for arbitrary baud
+ * rates to be programmed into the UART.  Also eliminated a lot of
+ * duplicated code in the console setup.
+ *   Theodore Ts'o <tytso@mit.edu>, 2001-Oct-12
  */
 
 #include <linux/config.h>
@@ -147,45 +151,47 @@ static inline int serial_paranoia_check(struct sab82532 *info,
  * The formula is:    Baud = BASE_BAUD / ((N + 1) * (1 << M)),
  *
  * with               0 <= N < 64 and 0 <= M < 16
- *
- * XXX:	Speeds with M = 0 might not work properly for XTAL frequencies
- *      above 10 MHz.
+ * 
+ * 12-Oct-2001 - Replaced table driven approach with code written by
+ * Theodore Ts'o <tytso@alum.mit.edu> which exactly replicates the
+ * table.  (Modulo bugs for the 307200 and 61440 baud rates, which
+ * were clearly incorrectly calculated in the original table.  This is
+ * why tables filled with magic constants are evil.)
  */
-struct ebrg_struct {
-	int	baud;
-	int	n;
-	int	m;
-};
 
-static struct ebrg_struct ebrg_table[] = {
-	{       0,	0,	 0 },
-	{      50,	35,	10 },
-	{      75,	47,	 9 },
-	{     110,	32,	 9 },
-	{     134,	53,	 8 },
-	{     150,	47,	 8 },
-	{     200,	35,	 8 },
-	{     300,	47,	 7 },
-	{     600,	47,	 6 },
-	{    1200,	47,	 5 },
-	{    1800,	31,	 5 },
-	{    2400,	47,	 4 },
-	{    4800,	47,	 3 },
-	{    9600,	47,	 2 },
-	{   19200,	47,	 1 },
-	{   38400,	23,	 1 },
-	{   57600,	15,	 1 },
-	{  115200,	 7,	 1 },
-	{  230400,	 3,	 1 },
-	{  460800,	 1,	 1 },
-	{   76800,	11,	 1 },
-	{  153600,	 5,	 1 },
-	{  307200,	 3,	 1 },
-	{  614400,	 3,	 0 },
-	{  921600,	 0,	 1 },
-};
+static void calc_ebrg(int baud, int *n_ret, int *m_ret)
+{
+	int	n, m;
 
-#define NR_EBRG_VALUES	(sizeof(ebrg_table)/sizeof(struct ebrg_struct))
+	if (baud == 0) {
+		*n_ret = 0;
+		*m_ret = 0;
+		return;
+	}
+     
+	/*
+	 * We scale numbers by 10 so that we get better accuracy
+	 * without having to use floating point.  Here we increment m
+	 * until n is within the valid range.
+	 */
+	n = (BASE_BAUD*10) / baud;
+	m = 0;
+	while (n >= 640) {
+		n = n / 2;
+		m++;
+	}
+	n = (n+5) / 10;
+	/*
+	 * We try very hard to avoid speeds with M == 0 since they may
+	 * not work correctly for XTAL frequences above 10 MHz.
+	 */
+	if ((m == 0) && ((n & 1) == 0)) {
+		n = n / 2;
+		m++;
+	}
+	*n_ret = n - 1;
+	*m_ret = m;
+}
 
 #define SAB82532_MAX_TEC_TIMEOUT 200000	/* 1 character time (at 50 baud) */
 #define SAB82532_MAX_CEC_TIMEOUT  50000	/* 2.5 TX CLKs (at 50 baud) */
@@ -939,7 +945,7 @@ static void change_speed(struct sab82532 *info)
 	unsigned int	ebrg;
 	tcflag_t	cflag;
 	unsigned char	dafo;
-	int		i, bits;
+	int		bits, n, m;
 
 	if (!info->tty || !info->tty->termios)
 		return;
@@ -982,18 +988,11 @@ static void change_speed(struct sab82532 *info)
 	}
 
 	/* Determine EBRG values based on baud rate */
-	i = cflag & CBAUD;
-	if (i & CBAUDEX) {
-		i &= ~(CBAUDEX);
-		if ((i < 1) || ((i + 15) >= NR_EBRG_VALUES))
-			info->tty->termios->c_cflag &= ~CBAUDEX;
-		else
-			i += 15;
-	}
-	ebrg = ebrg_table[i].n;
-	ebrg |= (ebrg_table[i].m << 6);
+	info->baud = tty_get_baud_rate(info->tty);
+	calc_ebrg(info->baud, &n, &m);
+	
+	ebrg = n | (m << 6);
 
-	info->baud = ebrg_table[i].baud;
 	if (info->baud) {
 		info->timeout = (info->xmit_fifo_size * HZ * bits) / info->baud;
 		info->tec_timeout = (10 * 1000000) / info->baud;
@@ -2205,7 +2204,7 @@ static void __init sab82532_kgdb_hook(int line)
 
 static inline void __init show_serial_version(void)
 {
-	char *revision = "$Revision: 1.64 $";
+	char *revision = "$Revision: 1.65 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2558,12 +2557,11 @@ sab82532_console_device(struct console *con)
 static int
 sab82532_console_setup(struct console *con, char *options)
 {
+	static struct tty_struct c_tty;
+	static struct termios c_termios;
 	struct sab82532 *info;
-	unsigned int	ebrg;
 	tcflag_t	cflag;
-	unsigned char	dafo;
-	int		i, bits;
-	unsigned long	flags;
+	int		i;
 
 	info = sab82532_chain;
 	for (i = con->index; i; i--) {
@@ -2595,92 +2593,28 @@ sab82532_console_setup(struct console *con, char *options)
 	sunserial_console_termios(con);
 	cflag = con->cflag;
 
-	/* Byte size and parity */
-	switch (cflag & CSIZE) {
-	      case CS5: dafo = SAB82532_DAFO_CHL5; bits = 7; break;
-	      case CS6: dafo = SAB82532_DAFO_CHL6; bits = 8; break;
-	      case CS7: dafo = SAB82532_DAFO_CHL7; bits = 9; break;
-	      case CS8: dafo = SAB82532_DAFO_CHL8; bits = 10; break;
-	      /* Never happens, but GCC is too dumb to figure it out */
-	      default:  dafo = SAB82532_DAFO_CHL5; bits = 7; break;
+	/*
+	 * Fake up the tty and tty->termios structures so we can use
+	 * change_speed (and eliminate a lot of duplicate code).
+	 */
+	if (!info->tty) {
+		memset(&c_tty, 0, sizeof(c_tty));
+		info->tty = &c_tty;
 	}
-
-	if (cflag & CSTOPB) {
-		dafo |= SAB82532_DAFO_STOP;
-		bits++;
+	if (!info->tty->termios) {
+		memset(&c_termios, 0, sizeof(c_termios));
+		info->tty->termios = &c_termios;
 	}
+	info->tty->termios->c_cflag = con->cflag;
 
-	if (cflag & PARENB) {
-		dafo |= SAB82532_DAFO_PARE;
-		bits++;
-	}
+	change_speed(info);
 
-	if (cflag & PARODD) {
-#ifdef CMSPAR
-		if (cflag & CMSPAR)
-			dafo |= SAB82532_DAFO_PAR_MARK;
-		else
-#endif
-			dafo |= SAB82532_DAFO_PAR_ODD;
-	} else {
-#ifdef CMSPAR
-		if (cflag & CMSPAR)
-			dafo |= SAB82532_DAFO_PAR_SPACE;
-		else
-#endif
-			dafo |= SAB82532_DAFO_PAR_EVEN;
-	}
-
-	/* Determine EBRG values based on baud rate */
-	i = cflag & CBAUD;
-	if (i & CBAUDEX) {
-		i &= ~(CBAUDEX);
-		if ((i < 1) || ((i + 15) >= NR_EBRG_VALUES))
-			cflag &= ~CBAUDEX;
-		else
-			i += 15;
-	}
-	ebrg = ebrg_table[i].n;
-	ebrg |= (ebrg_table[i].m << 6);
-
-	info->baud = ebrg_table[i].baud;
-	if (info->baud)
-		info->timeout = (info->xmit_fifo_size * HZ * bits) / info->baud;
-	else
-		info->timeout = 0;
-	info->timeout += HZ / 50;		/* Add .02 seconds of slop */
-
-	/* CTS flow control flags */
-	if (cflag & CRTSCTS)
-		info->flags |= ASYNC_CTS_FLOW;
-	else
-		info->flags &= ~(ASYNC_CTS_FLOW);
-
-	if (cflag & CLOCAL)
-		info->flags &= ~(ASYNC_CHECK_CD);
-	else
-		info->flags |= ASYNC_CHECK_CD;
-
-	save_flags(flags); cli();
-	sab82532_cec_wait(info);
-	sab82532_tec_wait(info);
-	writeb(dafo, &info->regs->w.dafo);
-	writeb(ebrg & 0xff, &info->regs->w.bgr);
-	writeb(readb(&info->regs->rw.ccr2) & ~(0xc0), &info->regs->rw.ccr2);
-	writeb(readb(&info->regs->rw.ccr2) | ((ebrg >> 2) & 0xc0), &info->regs->rw.ccr2);
-	if (info->flags & ASYNC_CTS_FLOW) {
-		writeb(readb(&info->regs->rw.mode) & ~(SAB82532_MODE_RTS), &info->regs->rw.mode);
-		writeb(readb(&info->regs->rw.mode) | SAB82532_MODE_FRTS, &info->regs->rw.mode);
-		writeb(readb(&info->regs->rw.mode) & ~(SAB82532_MODE_FCTS), &info->regs->rw.mode);
-	} else {
-		writeb(readb(&info->regs->rw.mode) | SAB82532_MODE_RTS, &info->regs->rw.mode);
-		writeb(readb(&info->regs->rw.mode) & ~(SAB82532_MODE_FRTS), &info->regs->rw.mode);
-		writeb(readb(&info->regs->rw.mode) | SAB82532_MODE_FCTS, &info->regs->rw.mode);
-	}
-	writeb(~(info->pvr_dtr_bit), &info->regs->rw.pvr);
-	writeb(readb(&info->regs->rw.mode) | SAB82532_MODE_RAC, &info->regs->rw.mode);
-	restore_flags(flags);
-
+	/* Now take out the pointers to static structures if necessary */
+	if (info->tty->termios == &c_termios)
+		info->tty->termios = 0;
+	if (info->tty == &c_tty)
+		info->tty = 0;
+	
 	return 0;
 }
 

@@ -487,22 +487,24 @@ static int raid5_error (mddev_t *mddev, kdev_t dev)
 	PRINTK("raid5_error called\n");
 
 	for (i = 0, disk = conf->disks; i < conf->raid_disks; i++, disk++) {
-		if (disk->dev == dev && disk->operational) {
-			disk->operational = 0;
-			mark_disk_faulty(sb->disks+disk->number);
-			mark_disk_nonsync(sb->disks+disk->number);
-			mark_disk_inactive(sb->disks+disk->number);
-			sb->active_disks--;
-			sb->working_disks--;
-			sb->failed_disks++;
-			mddev->sb_dirty = 1;
-			conf->working_disks--;
-			conf->failed_disks++;
-			md_wakeup_thread(conf->thread);
-			printk (KERN_ALERT
-				"raid5: Disk failure on %s, disabling device."
-				" Operation continuing on %d devices\n",
-				partition_name (dev), conf->working_disks);
+		if (disk->dev == dev) {
+			if (disk->operational) {
+				disk->operational = 0;
+				mark_disk_faulty(sb->disks+disk->number);
+				mark_disk_nonsync(sb->disks+disk->number);
+				mark_disk_inactive(sb->disks+disk->number);
+				sb->active_disks--;
+				sb->working_disks--;
+				sb->failed_disks++;
+				mddev->sb_dirty = 1;
+				conf->working_disks--;
+				conf->failed_disks++;
+				md_wakeup_thread(conf->thread);
+				printk (KERN_ALERT
+					"raid5: Disk failure on %s, disabling device."
+					" Operation continuing on %d devices\n",
+					partition_name (dev), conf->working_disks);
+			}
 			return 0;
 		}
 	}

@@ -1520,6 +1520,53 @@ out:
 	return retval;
 }
 
+static ssize_t do_readahead(struct file *file, unsigned long index, unsigned long nr)
+{
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	unsigned long max;
+
+	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
+		return -EINVAL;
+
+	/* Limit it to the size of the file.. */
+	max = (mapping->host->i_size + ~PAGE_CACHE_MASK) >> PAGE_CACHE_SHIFT;
+	if (index > max)
+		return 0;
+	max -= index;
+	if (nr > max)
+		nr = max;
+
+	/* And limit it to a sane percentage of the inactive list.. */
+	max = nr_inactive_pages / 2;
+	if (nr > max)
+		nr = max;
+
+	while (nr) {
+		page_cache_read(file, index);
+		index++;
+		nr--;
+	}
+	return 0;
+}
+
+asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
+{
+	ssize_t ret;
+	struct file *file;
+
+	ret = -EBADF;
+	file = fget(fd);
+	if (file) {
+		if (file->f_mode & FMODE_READ) {
+			unsigned long start = offset >> PAGE_CACHE_SHIFT;
+			unsigned long len = (count + ((long)offset & ~PAGE_CACHE_MASK)) >> PAGE_CACHE_SHIFT;
+			ret = do_readahead(file, start, len);
+		}
+		fput(file);
+	}
+	return ret;
+}
+
 /*
  * Read-ahead and flush behind for MADV_SEQUENTIAL areas.  Since we are
  * sure this is sequential access, we don't need a flexible read-ahead
@@ -2312,7 +2359,7 @@ static unsigned char mincore_page(struct vm_area_struct * vma,
 	unsigned long pgoff)
 {
 	unsigned char present = 0;
-	struct address_space * as = &vma->vm_file->f_dentry->d_inode->i_mapping;
+	struct address_space * as = vma->vm_file->f_dentry->d_inode->i_mapping;
 	struct page * page, ** hash = page_hash(as, pgoff);
 
 	spin_lock(&pagecache_lock);

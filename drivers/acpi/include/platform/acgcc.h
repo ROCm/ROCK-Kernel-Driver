@@ -39,7 +39,6 @@
 #define BREAKPOINT3
 #define disable() __cli()
 #define enable()  __sti()
-#define wbinvd()
 
 /*! [Begin] no source code translation */
 

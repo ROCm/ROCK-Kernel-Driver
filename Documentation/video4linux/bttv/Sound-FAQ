@@ -126,6 +126,7 @@ pll             - same as pll= insmod option
 tuner_type      - same as tuner= insmod option
 *_modulename    - hint whenever some card needs this or that audio
                   module loaded to work properly.
+has_radio	- whenever this TV card has a radio tuner.
 
 If some config item is specified both from the tvcards array and as
 insmod option, the insmod option takes precedence.

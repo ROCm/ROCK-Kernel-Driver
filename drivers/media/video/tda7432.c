@@ -52,7 +52,6 @@ MODULE_AUTHOR("Eric Sandeen <eric_sandeen@bigfoot.com>");
 MODULE_DESCRIPTION("bttv driver for the tda7432 audio processor chip");
 MODULE_LICENSE("GPL");
 
-
 MODULE_PARM(debug,"i");
 MODULE_PARM(loudness,"i");
 static int loudness = 0; /* disable loudness by default */

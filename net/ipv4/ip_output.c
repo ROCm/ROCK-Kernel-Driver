@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.98 2001/09/01 00:31:50 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.99 2001/10/15 12:34:50 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -367,7 +367,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 		 * out.
 		 */
 		if (ip_route_output(&rt, daddr, sk->saddr,
-				    RT_TOS(sk->protinfo.af_inet.tos) | RTO_CONN | sk->localroute,
+				    RT_CONN_FLAGS(sk),
 				    sk->bound_dev_if))
 			goto no_route;
 		__sk_dst_set(sk, &rt->u.dst);

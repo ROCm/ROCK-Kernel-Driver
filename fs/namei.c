@@ -646,10 +646,14 @@ int path_walk(const char * name, struct nameidata *nd)
 static int __emul_lookup_dentry(const char *name, struct nameidata *nd)
 {
 	if (path_walk(name, nd))
-		return 0;
+		return 0;		/* something went wrong... */
 
-	if (!nd->dentry->d_inode) {
+	if (!nd->dentry->d_inode || S_ISDIR(nd->dentry->d_inode->i_mode)) {
 		struct nameidata nd_root;
+		/*
+		 * NAME was not found in alternate root or it's a directory.  Try to find
+		 * it in the normal root:
+		 */
 		nd_root.last_type = LAST_ROOT;
 		nd_root.flags = nd->flags;
 		read_lock(&current->fs->lock);

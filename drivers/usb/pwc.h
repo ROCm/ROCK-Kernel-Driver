@@ -60,8 +60,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	2
-#define PWC_VERSION 	"8.2"
+#define PWC_MINOR	3
+#define PWC_VERSION 	"8.3"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -245,6 +245,8 @@ extern int pwc_get_gamma(struct pwc_device *pdev);
 extern int pwc_set_gamma(struct pwc_device *pdev, int value);
 extern int pwc_get_saturation(struct pwc_device *pdev);
 extern int pwc_set_saturation(struct pwc_device *pdev, int value);
+extern int pwc_set_leds(struct pwc_device *pdev, int on_value, int off_value);
+extern int pwc_get_leds(struct pwc_device *pdev, int *on_value, int *off_value);
 
 /* Power down or up the camera; not supported by all models */
 extern int pwc_camera_power(struct pwc_device *pdev, int power);

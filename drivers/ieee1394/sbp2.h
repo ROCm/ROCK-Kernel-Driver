@@ -36,16 +36,6 @@
 #define ORB_DIRECTION_READ_FROM_MEDIA   0x1
 #define ORB_DIRECTION_NO_DATA_TRANSFER  0x2
 
-/* 2^(MAX_PAYLOAD+1) = Maximum data transfer length */
-#define MAX_PAYLOAD_S100		0x7
-#define MAX_PAYLOAD_S200		0x8
-#define MAX_PAYLOAD_S400		0x9
-
-/* Max rec matches node_entry values */
-#define MAX_REC_S100			512
-#define MAX_REC_S200			1024
-#define MAX_REC_S400			2048
-
 #define ORB_SET_NOTIFY(value)                   ((value & 0x1) << 31)
 #define ORB_SET_RQ_FMT(value)                   ((value & 0x3) << 29)
 #define ORB_SET_NODE_ID(value)			((value & 0xffff) << 16)
@@ -268,6 +258,9 @@ struct sbp2_status_block {
  * DOU = OUT data direction
  * DNO = No data transfer
  * DUN = Unknown data direction
+ *
+ * Opcode 0xec (Teac specific "opc execute") possibly should be DNO,
+ * but we'll change it when somebody reports a problem with this.
  */
 #define DIN				ORB_DIRECTION_READ_FROM_MEDIA
 #define DOU				ORB_DIRECTION_WRITE_TO_MEDIA
@@ -280,7 +273,7 @@ static unchar sbp2scsi_direction_table[0x100] = {
 	DIN,DUN,DIN,DIN,DOU,DIN,DUN,DUN,DIN,DIN,DOU,DNO,DUN,DIN,DOU,DOU,
 	DOU,DOU,DOU,DNO,DIN,DNO,DNO,DIN,DOU,DOU,DOU,DOU,DIN,DOU,DIN,DOU,
 	DOU,DOU,DIN,DIN,DIN,DNO,DIN,DNO,DNO,DNO,DUN,DNO,DOU,DIN,DNO,DUN,
-	DUN,DIN,DIN,DNO,DOU,DOU,DUN,DUN,DNO,DIN,DIN,DNO,DIN,DOU,DUN,DUN,
+	DUN,DIN,DIN,DNO,DNO,DOU,DUN,DUN,DNO,DIN,DIN,DNO,DIN,DOU,DUN,DUN,
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,

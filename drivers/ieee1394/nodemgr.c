@@ -27,11 +27,8 @@
 #include "nodemgr.h"
 
 
-#define NODE_BUS_FMT	"%d:%d"
-#define NODE_BUS_ARGS(nodeid) \
-	(nodeid & NODE_MASK), ((nodeid & BUS_MASK) >> 6)
-
-/* Basically what we do here is start off retrieving the bus_info block.
+/* 
+ * Basically what we do here is start off retrieving the bus_info block.
  * From there will fill in some info about the node, verify it is of IEEE
  * 1394 type, and that the crc checks out ok. After that we start off with
  * the root directory, and subdirectories. To do this, we retrieve the
@@ -42,9 +39,7 @@
  * We verify CRC's along the way for each directory/block/leaf. The
  * entire node structure is generic, and simply stores the information in
  * a way that's easy to parse by the protocol interface.
- *
- * XXX: Most of this isn't done yet :)  */
-
+ */
 
 static LIST_HEAD(node_list);
 static rwlock_t node_lock = RW_LOCK_UNLOCKED;

@@ -22,20 +22,11 @@ options are:
 size
    Can be one of 'sqcif', 'qsif', 'qcif', 'sif', 'cif' or
    'vga', for an image size of resp. 128x96, 160x120, 176x144,
-   320x240, 352x288 and 640x480 (of course, only for those cameras that support these resolutions).
+   320x240, 352x288 and 640x480 (of course, only for those cameras that 
+   support these resolutions).
 
 fps
    Specifies the desired framerate. Is an integer in the range of 4-30.
-
-palette
-   Specifies the desired colour order that should be delivered by read() and
-   mmap(). The string can be one of yuv420 or yuv420p; however, yuv420 will
-   be phased out, leaving only yuv420p, so this option will disappear
-   entirely.
-
-   Only the native yuv420/yuv420p format is supported by the in kernel driver. 
-   If you want to use other formats with in-kernel conversion download the
-   driver from the URL given. [Alan]
 
 fbufs
    This paramter specifies the number of internal buffers to use for storing 
@@ -88,6 +79,26 @@ compression (only useful with the plugin)
       
    The compression parameter only applies to the Vesta & ToUCam cameras.
    The 645 and 646 have fixed compression parameters.      
+
+leds
+   This settings takes 2 integers, that define the on/off time for the LED
+   (in milliseconds). One of the interesting things that you can do with
+   this is let the LED blink while the camera is in use. This:
+
+     leds=500,500
+      
+   will blink the LED once every second. But with:
+
+     leds=0,0
+
+   the LED never goes on, making it suitable for silent survaillance.
+
+   By default the camera's LED is on solid while in use, and turned off
+   when the camera is not used anymore.
+
+   This parameter works only with the ToUCam range of cameras (730, 740,
+   750). For other cameras this command is silently ignored, and the LED
+   cannot be controlled.
 
 trace
    In order to better detect problems, it is now possible to turn on a

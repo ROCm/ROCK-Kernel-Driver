@@ -744,6 +744,7 @@ static struct net_device dev_ne[MAX_NE_CARDS];
 static int io[MAX_NE_CARDS];
 static int irq[MAX_NE_CARDS];
 static int bad[MAX_NE_CARDS];	/* 0xbad = bad sig or no reset ack */
+MODULE_LICENSE("GPL");
 
 #ifdef MODULE_PARM
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");

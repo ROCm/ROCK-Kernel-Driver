@@ -1837,6 +1837,8 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 
 	pcount = next_scsi_host;
 
+	MOD_INC_USE_COUNT;
+
 	/* The detect routine must carefully spinunlock/spinlock if 
 	   it enables interrupts, since all interrupt handlers do 
 	   spinlock as well.
@@ -1966,8 +1968,6 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 	       (scsi_init_memory_start - scsi_memory_lower_value) / 1024,
 	       (scsi_memory_upper_value - scsi_init_memory_start) / 1024);
 #endif
-
-	MOD_INC_USE_COUNT;
 
 	if (out_of_space) {
 		scsi_unregister_host(tpnt);	/* easiest way to clean up?? */

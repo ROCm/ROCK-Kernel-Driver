@@ -1,4 +1,4 @@
-/* $Id: su.c,v 1.52 2001/06/29 21:54:32 davem Exp $
+/* $Id: su.c,v 1.53 2001/10/13 08:27:50 davem Exp $
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -6,6 +6,9 @@
  *
  * This is mainly a variation of drivers/char/serial.c,
  * credits go to authors mentioned therein.
+ *
+ * Fixed to use tty_get_baud_rate().
+ *   Theodore Ts'o <tytso@mit.edu>, 2001-Oct-12
  */
 
 /*
@@ -935,24 +938,18 @@ shutdown(struct su_struct *info)
 static int
 su_get_baud_rate(struct su_struct *info)
 {
-	static int baud_table[] = {
-		0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400,
-		4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 0
-	};
-	int i;
+	static struct tty_struct c_tty;
+	static struct termios c_termios;
 
 	if (info->tty)
 		return tty_get_baud_rate(info->tty);
 
-	i = info->cflag & CBAUD;
-	if (i & CBAUDEX) {
-		i &= ~(CBAUDEX);
-		if (i < 1 || i > 4)
-			info->cflag &= ~(CBAUDEX);
-		else
-			i += 15;
-	}
-	return baud_table[i];
+	memset(&c_tty, 0, sizeof(c_tty));
+	memset(&c_termios, 0, sizeof(c_termios));
+	c_tty.termios = &c_termios;
+	c_termios.c_cflag = info->cflag;
+
+	return tty_get_baud_rate(&c_tty);
 }
 
 /*
@@ -1168,7 +1165,7 @@ su_change_mouse_baud(int baud)
 	if (info->port_type != SU_PORT_MS)
 		return;
 
-	info->cflag &= ~(CBAUDEX | CBAUD);
+	info->cflag &= ~CBAUD;
 	switch (baud) {
 		case 1200:
 			info->cflag |= B1200;
@@ -2255,7 +2252,7 @@ done:
  */
 static __inline__ void __init show_su_version(void)
 {
-	char *revision = "$Revision: 1.52 $";
+	char *revision = "$Revision: 1.53 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

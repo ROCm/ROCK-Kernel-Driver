@@ -5,7 +5,7 @@
  *
  *		ROUTE - implementation of the IP router.
  *
- * Version:	$Id: route.c,v 1.99 2001/09/18 22:29:09 davem Exp $
+ * Version:	$Id: route.c,v 1.100 2001/10/15 12:34:50 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2002,9 +2002,7 @@ int ip_route_output_key(struct rtable **rp, const struct rt_key *key)
 		    rth->key.fwmark == key->fwmark &&
 #endif
 		    !((rth->key.tos ^ key->tos) &
-			    (IPTOS_RT_MASK | RTO_ONLINK)) &&
-		    ((key->tos & RTO_TPROXY) ||
-		     !(rth->rt_flags & RTCF_TPROXY))) {
+			    (IPTOS_RT_MASK | RTO_ONLINK))) {
 			rth->u.dst.lastuse = jiffies;
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;

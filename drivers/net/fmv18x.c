@@ -632,6 +632,7 @@ MODULE_PARM(net_debug, "i");
 MODULE_PARM_DESC(io, "FMV-18X I/O address");
 MODULE_PARM_DESC(irq, "FMV-18X IRQ number");
 MODULE_PARM_DESC(net_debug, "FMV-18X debug level (0-1,5-6)");
+MODULE_LICENSE("GPL");
 
 int init_module(void)
 {

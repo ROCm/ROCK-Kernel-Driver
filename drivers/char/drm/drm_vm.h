@@ -175,7 +175,7 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	page = pte_page(*pte);
 	get_page(page);
 
-	DRM_DEBUG("0x%08lx => 0x%08x\n", address, page_to_bus(page));
+	DRM_DEBUG("shm_nopage 0x%lx\n", address);
 #if LINUX_VERSION_CODE < 0x020317
 	return page_address(page);
 #else
@@ -299,8 +299,7 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 
 	get_page(page);
 
-	DRM_DEBUG("0x%08lx (page %lu) => 0x%08x\n", address, page_nr, 
-		  page_to_bus(page));
+	DRM_DEBUG("dma_nopage 0x%lx (page %lu)\n", address, page_nr); 
 #if LINUX_VERSION_CODE < 0x020317
 	return page_address(page);
 #else

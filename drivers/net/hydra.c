@@ -254,3 +254,4 @@ static void __exit hydra_cleanup(void)
 
 module_init(hydra_probe);
 module_exit(hydra_cleanup);
+MODULE_LICENSE("GPL");

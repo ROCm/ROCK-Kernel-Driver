@@ -542,8 +542,10 @@ static int check_disk_sb(mdk_rdev_t * rdev)
 		goto abort;
 	}
 
-	if (calc_sb_csum(sb) != sb->sb_csum)
+	if (calc_sb_csum(sb) != sb->sb_csum) {
 		printk(BAD_CSUM, partition_name(rdev->dev));
+		goto abort;
+	}
 	ret = 0;
 abort:
 	return ret;

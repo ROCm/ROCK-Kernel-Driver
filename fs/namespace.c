@@ -153,6 +153,8 @@ clone_mnt(struct vfsmount *old, struct dentry *root)
 		atomic_inc(&sb->s_active);
 		mnt->mnt_sb = sb;
 		mnt->mnt_root = dget(root);
+		mnt->mnt_mountpoint = mnt->mnt_root;
+		mnt->mnt_parent = mnt;
 	}
 	return mnt;
 }
@@ -1086,7 +1088,7 @@ int __init change_root(kdev_t new_root_dev,const char *put_old)
 		printk(KERN_NOTICE "Trying to unmount old root ... ");
 		if (!blivet) {
 			spin_lock(&dcache_lock);
-			list_del(&old_rootmnt->mnt_list);
+			list_del_init(&old_rootmnt->mnt_list);
  			spin_unlock(&dcache_lock);
  			mntput(old_rootmnt);
 			mntput(old_rootmnt);

@@ -9,11 +9,25 @@
 	Scyld Computing Corporation
 	410 Severn Ave., Suite 210
 	Annapolis MD 21403
+
+	-----------------------------------------------------------
+
+	Linux kernel-specific changes:
+
+	LK1.0 (Ion Badulescu)
+	- Major cleanup
+	- Use 2.4 PCI API
+	- Support ethtool
+	- Rewrite perfect filter/hash code
+	- Use interrupts for media changes
+
+	LK1.1 (Ion Badulescu)
+	- Disallow negotiation of unsupported full-duplex modes
 */
 
 #define DRV_NAME	"xircom_tulip_cb"
-#define DRV_VERSION	"0.91+LK"
-#define DRV_RELDATE	"July 19, 2001"
+#define DRV_VERSION	"0.91+LK1.1"
+#define DRV_RELDATE	"October 11, 2001"
 
 #define CARDBUS 1
 
@@ -94,7 +108,6 @@ static int csr0 = 0x00A00000 | 0x4800;
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c derived from tulip.c:v0.91 4/14/99 becker@scyld.com\n"
-KERN_INFO " modified by danilo@cs.uni-magdeburg.de for XIRCOM CBE, fixed by Doug Ledford\n"
 KERN_INFO " unofficial 2.4.x kernel port, version " DRV_VERSION ", " DRV_RELDATE "\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
@@ -238,7 +251,7 @@ static struct xircom_chip_table {
 	int valid_intrs;			/* CSR7 interrupt enable settings */
 	int flags;
 } xircom_tbl[] = {
-  { "Xircom Cardbus Adapter (DEC 21143 compatible mode)",
+  { "Xircom Cardbus Adapter",
 	LinkChange | NormalIntr | AbnormalIntr | BusErrorIntr |
 	RxDied | RxNoBuf | RxIntr | TxFIFOUnderflow | TxNoBuf | TxDied | TxIntr,
 	HAS_MII | HAS_ACPI, },
@@ -425,11 +438,21 @@ static void __devinit read_mac_address(struct net_device *dev)
 
 /*
  * locate the MII interfaces and initialize them.
+ * we disable full-duplex modes here,
+ * because we don't know how to handle them.
  */
 static void find_mii_transceivers(struct net_device *dev)
 {
 	struct xircom_private *tp = dev->priv;
 	int phy, phy_idx;
+
+	if (media_cap[tp->default_port] & MediaIsMII) {
+		u16 media2advert[] = { 0x20, 0x40, 0x03e0, 0x60, 0x80, 0x100, 0x200 };
+		tp->to_advertise = media2advert[tp->default_port - 9];
+	} else
+		tp->to_advertise =
+			/*ADVERTISE_100BASE4 | ADVERTISE_100FULL |*/ ADVERTISE_100HALF |
+			/*ADVERTISE_10FULL |*/ ADVERTISE_10HALF | ADVERTISE_CSMA;
 
 	/* Find the connected MII xcvrs.
 	   Doing this in open() would allow detecting external xcvrs later,
@@ -447,17 +470,6 @@ static void find_mii_transceivers(struct net_device *dev)
 			printk(KERN_INFO "%s:  MII transceiver #%d "
 				   "config %4.4x status %4.4x advertising %4.4x.\n",
 				   dev->name, phy, mii_reg0, mii_status, mii_advert);
-			/* Fixup for DLink with miswired PHY. */
-			if (mii_advert != reg4) {
-				printk(KERN_DEBUG "%s:  Advertising %4.4x on PHY %d,"
-					   " previously advertising %4.4x.\n",
-					   dev->name, reg4, phy, mii_advert);
-				mdio_write(dev, phy, MII_ADVERTISE, reg4);
-			}
-			/* Enable autonegotiation: some boards default to off. */
-			mdio_write(dev, phy, MII_BMCR, mii_reg0 | BMCR_ANENABLE |
-					   (tp->full_duplex ? BMCR_FULLDPLX : 0) |
-					   (media_cap[tp->default_port]&MediaIs100 ? BMCR_SPEED100 : 0));
 		}
 	}
 	tp->mii_cnt = phy_idx;
@@ -529,7 +541,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 		printk(version);
 #endif
 
-	printk(KERN_INFO "xircom_init_one(%s)\n", pdev->slot_name);
+	//printk(KERN_INFO "xircom_init_one(%s)\n", pdev->slot_name);
 
 	board_idx++;
 
@@ -1696,7 +1708,6 @@ static int xircom_suspend(struct pci_dev *pdev, u32 state)
 }
 
 
-/* XXX: resume isn't able to power up the MII/PHY! */
 static int xircom_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pdev->driver_data;

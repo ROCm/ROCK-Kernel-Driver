@@ -128,6 +128,7 @@ extern struct net_device *init_etherdev(struct net_device *dev, int sizeof_priva
 unsigned int bionet_debug = NET_DEBUG;
 MODULE_PARM(bionet_debug, "i");
 MODULE_PARM_DESC(bionet_debug, "bionet debug level (0-2)");
+MODULE_LICENSE("GPL");
 
 static unsigned int bionet_min_poll_time = 2;
 

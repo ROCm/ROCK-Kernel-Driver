@@ -2193,7 +2193,7 @@ _static int uhci_map_status (int status, int dir_out)
 	if (status & TD_CTRL_NAK)	/* NAK */
 		return -ETIMEDOUT;
 	if (status & TD_CTRL_BABBLE)	/* Babble */
-		return -EPIPE;
+		return -EOVERFLOW;
 	if (status & TD_CTRL_DBUFERR)	/* Buffer error */
 		return -ENOSR;
 	if (status & TD_CTRL_STALLED)	/* Stalled */

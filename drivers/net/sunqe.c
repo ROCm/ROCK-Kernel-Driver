@@ -1041,3 +1041,4 @@ static void __exit qec_cleanup(void)
 
 module_init(qec_probe);
 module_exit(qec_cleanup);
+MODULE_LICENSE("GPL");

@@ -43,6 +43,7 @@ static char version[] __initdata = "airport.c 0.06f (Benjamin Herrenschmidt <ben
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("Driver for the Apple Airport wireless card.");
 MODULE_LICENSE("Dual MPL/GPL");
+EXPORT_NO_SYMBOLS;
 
 typedef struct dldwd_card {
 	struct device_node* node;

@@ -81,6 +81,13 @@
 #define BTTV_ATI_TVWONDERVE 0x40
 #define BTTV_FLYVIDEO2000   0x41
 #define BTTV_TERRATVALUER   0x42
+#define BTTV_GVBCTV4PCI     0x43
+#define BTTV_VOODOOTV_FM    0x44
+#define BTTV_AIMMS          0x45
+#define BTTV_PV_BT878P_PLUS 0x46
+#define BTTV_FLYVIDEO98EZ   0x47
+#define BTTV_PV_BT878P_9B   0x48
+
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -88,6 +95,7 @@
 #define I2C_TDA8425        0x82
 #define I2C_TDA9840        0x84
 #define I2C_TDA9850        0xb6 /* also used by 9855,9873 */
+#define I2C_TDA9874A       0xb0 /* also used by 9875 */
 #define I2C_TDA9875        0xb0
 #define I2C_HAUPEE         0xa0
 #define I2C_STBEE          0xae
@@ -121,6 +129,7 @@ struct tvcard
 
 	/* i2c audio flags */
 	int no_msp34xx:1;
+	int no_tda9875:1;
 	int needs_tvaudio:1;
 
 	/* other settings */
@@ -130,6 +139,7 @@ struct tvcard
 #define PLL_35   2
 
 	int tuner_type;
+	int has_radio;
 	void (*audio_hook)(struct bttv *btv, struct video_audio *v, int set);
 };
 
@@ -142,7 +152,7 @@ extern void bttv_init_card(struct bttv *btv);
 
 /* card-specific funtions */
 extern void tea5757_set_freq(struct bttv *btv, unsigned short freq);
-extern void bttv_hauppauge_boot_msp34xx(struct bttv *btv);
+extern void bttv_boot_msp34xx(struct bttv *btv, int pin);
 
 /* kernel cmd line parse helper */
 extern int bttv_parse(char *str, int max, int *vals);
@@ -195,7 +205,7 @@ extern int bttv_write_gpio(unsigned int card,
 extern wait_queue_head_t* bttv_get_gpio_queue(unsigned int card);
 
 /* i2c */
-#define I2C_CLIENTS_MAX 8
+#define I2C_CLIENTS_MAX 16
 extern void bttv_bit_setscl(void *data, int state);
 extern void bttv_bit_setsda(void *data, int state);
 extern void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg);
@@ -205,3 +215,8 @@ extern int bttv_I2CWrite(struct bttv *btv, unsigned char addr, unsigned char b1,
 extern void bttv_readee(struct bttv *btv, unsigned char *eedata, int addr);
 
 #endif /* _BTTV_H_ */
+/*
+ * Local variables:
+ * c-basic-offset: 8
+ * End:
+ */

@@ -109,6 +109,7 @@ KERN_INFO "fealnx.c:v2.50 1/17/2001\n";
 
 MODULE_AUTHOR("Myson or whoever");
 MODULE_DESCRIPTION("Myson MTD-8xx 100/10M Ethernet PCI Adapter Driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(max_interrupt_work, "i");
 //MODULE_PARM(min_pci_latency, "i");
 MODULE_PARM(debug, "i");

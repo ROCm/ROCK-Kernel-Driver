@@ -1,0 +1,210 @@
+Suppported cards:
+
+
+Bt848/Bt848a/Bt849/Bt878/Bt879 cards
+------------------------------------
+
+All cards with Bt848/Bt848a/Bt849/Bt878/Bt879 and normal Composite/S-VHS inputs
+are supported.
+Teletext and Intercast support (PAL only) for ALL cards via VBI sample decoding
+in software.
+
+Some cards with additional multiplexing of inputs are only partially 
+supported (unless specifications by the card manufacturer are given).
+
+All other cards only differ by additional components as tuners, sound decoders,
+EEPROMs, teletext decoders ...
+
+
+MATRIX Vision
+-------------
+
+MV-Delta
+- Bt848A
+- 4 Composite inputs, 1 S-VHS input (shared with 4th composite)
+- EEPROM
+
+http://www.matrix-vision.de/
+
+This card has no tuner but supports all 4 composite (1 shared with an
+S-VHS input) of the Bt848A.
+Very nice card if you only have satellite TV but several tuners connected
+to the card via composite.
+
+Many thanks to Matrix-Vision for giving us 2 cards for free which made
+Bt848a/Bt849 single crytal operation support possible!!!
+
+
+
+Miro/Pinnacle PCTV
+------------------
+
+- Bt848 
+  some (all??) come with 2 crystals for PAL/SECAM and NTSC 
+- PAL, SECAM or NTSC TV tuner (Philips or TEMIC)
+- MSP34xx sound decoder on add on board
+  decoder is supported but AFAIK does not yet work 
+  (other sound MUX setting in GPIO port needed??? somebody who fixed this???)
+- 1 tuner, 1 composite and 1 S-VHS input
+- tuner type is autodetected
+
+http://www.miro.de/
+http://www.miro.com/
+
+
+Many thanks for the free card which made first NTSC support possible back
+in 1997!
+
+
+Hauppauge Win/TV pci
+--------------------
+
+There are many different versions of the Hauppauge cards with different 
+tuners (TV+Radio ...), teletext decoders.
+Note that even cards with same model numbers have (depending on the revision)
+different chips on it.
+
+- Bt848 (and others but always in 2 crystal operation???)
+  newer cards have a Bt878
+- PAL, SECAM, NTSC or tuner with or without Radio support
+
+e.g.:
+  PAL: 
+  TDA5737: VHF, hyperband and UHF mixer/oscillator for TV and VCR 3-band tuners
+  TSA5522: 1.4 GHz I2C-bus controlled synthesizer, I2C 0xc2-0xc3
+  
+  NTSC:
+  TDA5731: VHF, hyperband and UHF mixer/oscillator for TV and VCR 3-band tuners
+  TSA5518: no datasheet available on Philips site
+- Philips SAA5246 or SAA5284 ( or no) Teletext decoder chip	
+  with buffer RAM (e.g. Winbond W24257AS-35: 32Kx8 CMOS static RAM)
+  SAA5246 (I2C 0x22) is supported
+- 256 bytes EEPROM: Microchip 24LC02B or Philips 8582E2Y 
+  with configuration information
+  I2C address 0xa0 (24LC02B also responds to 0xa2-0xaf)
+- 1 tuner, 1 composite and (depending on model) 1 S-VHS input
+- 14052B: mux for selection of sound source
+- sound decoder: TDA9800, MSP34xx (stereo cards) 
+
+
+CPH-Series (CPH050, ...)
+------------------------
+Developed by TelSignal(?), OEMed by many vendors (Askey, Typhoon, 
+  Anubis, Dynalink)
+
+  Card series:
+    CPH01x: BT848 capture only
+    CPH03x: BT848
+    CPH05x: BT878 with FM
+    CPH06x: BT878 (w/o FM)
+    CPH07x: BT878 capture only
+ 
+  TV standards:
+     CPH0x0: NTSC-M/M
+     CPH0x1: PAL-B/G
+     CPH0x2: PAL-I/I
+     CPH0x3: PAL-D/K
+     CPH0x4: SECAM-L/L 
+     CPH0x5: SECAM-B/G 
+     CPH0x6: SECAM-D/K 
+     CPH0x7: PAL-N/N 
+     CPH0x8: PAL-B/H 
+     CPH0x9: PAL-M/M
+
+  CPH03x was often sold as "TV capturer".
+
+  Identifying:
+  1) 878 cards can be identified by PCI Subsystem-ID:
+      144f:3000 = CPH06x
+      144F:3002 = CPH05x w/ FM
+      144F:3005 = CPH06x_LC (w/o remote control)
+  1) The cards have a sticker with "CPH"-model on the back.
+  2) These cards have a number printed on the PCB just above the tuner metal box:
+      "80-CP2000300-x" = CPH03X
+      "80-CP2000500-x" = CPH05X
+      "80-CP2000600-x" = CPH06X / CPH06x_LC
+
+  Askey sells these cards as "Magic TView series", Brand "MagicXpress".
+  Other OEM often call these "Tview", "TView99" or else.
+
+Lifeview Flyvideo Series:
+-------------------------
+  The naming of these series differs in time and space.
+
+  Identifying:
+  1) Some models can be identified by PCI subsystem ID:
+      1852:1852 = Flyvideo 98 FM
+      1851:1850 = Flyvideo 98
+      1851:1851 = Flyvideo 98 EZ (capture only)
+  2) There is a print on the PCB:
+      LR25       = Flyvideo (Zoran)
+      LR37 Rev.C = Capture only (ZR36120 + SAA7110)
+      LR50 Rev.Q = Flyvideo 98 (w/eeprom and PCI subsystem ID)
+      LR50 Rev.W = Flyvideo 98 (no eeprom)
+      LR51 Rev.E = Flyvideo 98 EZ (capture only)
+      LR90       = Flyvideo 2000 series
+      LR90 Rev.F = Lifetec/Medion LT 9815
+      LR97       = Flyvideo DVBS
+
+  "Flyvideo II" had been the name for the 848 cards, nowadays (in Germany)
+  this name is re-used for LR50 Rev.W.
+  The Lifeview website has even more names: Flyvideo III,2100,3000,3100.
+  These cards are sold by many OEMs too.
+
+
+Typhoon TV card series:
+-----------------------
+  These can be CPH, Flyvideo, Pixelview or KNC1 series.
+  Typhoon is the brand of Anubis.
+  Model 50680 got re-used, some model no. had different contents over time.
+
+  Models:
+  50680 "TV Tuner PCI Pal BG"(old,red package)=can be CPH03x(bt848) or CPH06x(bt878)
+  50680 "TV Tuner Pal BG" (blue package)= Pixelview PV-BT878P+ (Rev 9B)
+  50681 "TV Tuner PCI Pal I" (variant of 50680)
+  50682 "TView TV/FM Tuner Pal BG"       = Flyvideo 98FM (LR50 Rev.Q)
+         Note: The package has a picture of CPH05x (which would be a real TView)
+  50683 "TV Tuner PCI SECAM" (variant of 50680)
+  50684 "TV Tuner Pal BG"                = Pixelview 878TV(Rev.3D)
+  50686 "TV Tuner"                       = KNC1 TV Station
+  50687 "TV Tuner stereo"                = KNC1 TV Station pro
+  50688 "TV Tuner RDS" (black package)   = KNC1 TV Station RDS
+  50692 "TV/FM Tuner" (small PCB)
+  50868 "TV/FM Tuner Pal I" (variant of 50682)
+  50999 "TV/FM Tuner Secam" (variant of 50682)
+
+
+Guillemot
+---------
+  Maxi TV Video 2 = LR50 Rev.Q (FI1216MF, PAL BG+SECAM)
+  Maxi TV Video 3 = CPH064 (PAL BG + SECAM)
+
+Mentor
+------
+  Mentor TV card ("55-878TV-U1") = Pixelview 878TV(Rev.3F) (w/FM w/Remote)
+
+Prolink
+-------
+   Pixelview Play TV Pro:
+     PV-BT878P+rev.9B (Play TV Pro w/FM w/NICAM)
+     PV-BT878P+rev.8X 
+     PV-BT878P+rev.4C (Play TV Pro) 
+     PV-BT878P+rev.4E (Play TV Pak) 
+     PV-BT878P+rev.2F 
+     PV-BT878TV 
+
+   PixelView Play TV 
+     PV-BT848P+
+
+Dynalink
+--------
+   These are CPH series.
+
+Phoebemicro
+-----------
+   TV Master    = CPH030 or CPH060
+   TV Master FM = CPH050
+
+Genius/Kye
+----------
+   Video Wonder/Genius Internet Video Kit = LR37 Rev.C

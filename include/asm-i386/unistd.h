@@ -229,6 +229,7 @@
 #define __NR_fcntl64		221
 #define __NR_security		223	/* syscall for security modules */
 #define __NR_gettid		224
+#define __NR_readahead		225
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 

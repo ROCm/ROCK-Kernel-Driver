@@ -301,7 +301,7 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	long ioaddr = dev->base_addr;
 	int csr5;
 	int entry;
-	int csr8;
+	int missed;
 	int rx = 0;
 	int tx = 0;
 	int oi = 0;
@@ -434,6 +434,7 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				}
 			}
 			if (csr5 & RxDied) {		/* Missed a Rx frame. */
+                                tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
 #ifdef CONFIG_NET_HW_FLOWCONTROL
 				if (tp->fc_bit && !test_bit(tp->fc_bit, &netdev_fc_xoff)) {
 					tp->stats.rx_errors++;
@@ -547,8 +548,9 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		}
 	}
 
-	csr8 = inl(ioaddr + CSR8);
-	tp->stats.rx_dropped += (csr8 & 0x1ffff) + ((csr8 >> 17) & 0xfff);
+	if ((missed = inl(ioaddr + CSR8) & 0x1ffff)) {
+		tp->stats.rx_dropped += missed & 0x10000 ? 0x10000 : missed;
+	}
 
 	if (tulip_debug > 4)
 		printk(KERN_DEBUG "%s: exiting interrupt, csr5=%#4.4x.\n",

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.134 2001/08/27 18:42:07 kanoj Exp $
+/* $Id: entry.S,v 1.135 2001/10/13 23:04:09 kanoj Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -725,19 +725,14 @@ netbsd_syscall:
 __do_data_access_exception_tl1:
 	rdpr		%pstate, %g4
 	wrpr		%g4, PSTATE_MG|PSTATE_AG, %pstate
-	rdpr		%tl, %g3
-	cmp		%g3, 1
 	mov		TLB_SFSR, %g3
 	mov		DMMU_SFAR, %g5
 	ldxa		[%g3] ASI_DMMU, %g4	! Get SFSR
 	ldxa		[%g5] ASI_DMMU, %g5	! Get SFAR
 	stxa		%g0, [%g3] ASI_DMMU	! Clear SFSR.FaultValid bit
 	membar		#Sync
-	bgu,pn		%icc, winfix_dax
+	ba,pt		%xcc, winfix_dax
 	 rdpr		%tpc, %g3
-	sethi		%hi(109f), %g7
-	ba,pt		%xcc, etraptl1
-	 or		%g7, %lo(109f), %g7	! Merge in below
 __do_data_access_exception:
 	rdpr		%pstate, %g4
 	wrpr		%g4, PSTATE_MG|PSTATE_AG, %pstate
@@ -1186,7 +1181,7 @@ do_mna:
 	ldxa		[%g3] ASI_DMMU, %g5
 	stxa		%g0, [%g3] ASI_DMMU	! Clear FaultValid bit
 	membar		#Sync
-	bgu,pn		%icc, winfix_dax
+	bgu,pn		%icc, winfix_mna
 	 rdpr		%tpc, %g3
 
 1:	sethi		%hi(109f), %g7

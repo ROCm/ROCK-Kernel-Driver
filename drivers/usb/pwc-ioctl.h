@@ -76,6 +76,15 @@ struct pwc_whitebalance
 };
 
 
+/* Used with VIDIOCPWC[SG]LED */
+struct pwc_leds
+{
+	int led_on;			/* Led on-time; range = 0..255 */
+	int led_off;			/*  */
+};
+
+
+
  /* Restore user settings */
 #define VIDIOCPWCRUSER		_IO('v', 192)
  /* Save user settings */
@@ -107,9 +116,8 @@ struct pwc_whitebalance
 #define VIDIOCPWCGAWB           _IOR('v', 202, struct pwc_whitebalance)
 
  /* Turn LED on/off ; int range 0..65535 */
-#define VIDIOCPWCSLED           _IOW('v', 205, int)
-
+#define VIDIOCPWCSLED           _IOW('v', 205, struct pwc_leds)
  /* Get state of LED; int range 0..65535 */
-#define VIDIOCPWCGLED           _IOR('v', 205, int)
+#define VIDIOCPWCGLED           _IOR('v', 205, struct pwc_leds)
 
 #endif

@@ -1676,6 +1676,7 @@ out_txdesc:
 
 MODULE_AUTHOR("Paul Mackerras/Ben Herrenschmidt");
 MODULE_DESCRIPTION("PowerMac GMAC driver.");
+MODULE_LICENSE("GPL");
 
 static void __exit gmac_cleanup_module(void)
 {

@@ -25,7 +25,7 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,7,72)
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,7,83)
 
 
 #include <linux/types.h>
@@ -62,10 +62,14 @@ extern struct bttv bttvs[BTTV_MAX];
 #define O_NONCAP	O_TRUNC
 #endif
 
+#ifdef VIDEODAT_HACK
+# define VBI_MAXLINES   19
+#else
+# define VBI_MAXLINES   16
+#endif
+#define VBIBUF_SIZE     (2048*VBI_MAXLINES*2)
 #define MAX_GBUFFERS	64
 #define RISCMEM_LEN	(32744*2)
-#define VBI_MAXLINES    16
-#define VBIBUF_SIZE     (2048*VBI_MAXLINES*2)
 
 #define BTTV_MAX_FBUF	0x208000
 

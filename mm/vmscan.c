@@ -33,6 +33,8 @@
  */
 #define DEF_PRIORITY (6)
 
+#define page_zone_plenty(page) ((page)->zone->free_pages > (page)->zone->pages_high)
+
 /*
  * The swap-out function returns 1 if it successfully
  * scanned all the pages it was asked to (`count').
@@ -43,11 +45,10 @@
  */
 
 /* mm->page_table_lock is held. mmap_sem is not held */
-static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page, zone_t * classzone)
+static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page)
 {
 	pte_t pte;
 	swp_entry_t entry;
-	int right_classzone;
 
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
@@ -55,12 +56,12 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 		return 0;
 	}
 
-	if (TryLockPage(page))
+	/* Don't bother replenishing zones that have tons of memory */
+	if (page_zone_plenty(page))
 		return 0;
 
-	right_classzone = 1;
-	if (!memclass(page->zone, classzone))
-		right_classzone = 0;
+	if (TryLockPage(page))
+		return 0;
 
 	/* From this point on, the odds are that we're going to
 	 * nuke this pte, so read and clear the pte.  This hook
@@ -89,7 +90,7 @@ drop_pte:
 		{
 			int freeable = page_count(page) - !!page->buffers <= 2;
 			page_cache_release(page);
-			return freeable & right_classzone;
+			return freeable;
 		}
 	}
 
@@ -145,7 +146,7 @@ drop_pte:
 }
 
 /* mm->page_table_lock is held. mmap_sem is not held */
-static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end, int count, zone_t * classzone)
+static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end, int count)
 {
 	pte_t * pte;
 	unsigned long pmd_end;
@@ -169,7 +170,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 			struct page *page = pte_page(*pte);
 
 			if (VALID_PAGE(page) && !PageReserved(page)) {
-				count -= try_to_swap_out(mm, vma, address, pte, page, classzone);
+				count -= try_to_swap_out(mm, vma, address, pte, page);
 				if (!count) {
 					address += PAGE_SIZE;
 					break;
@@ -184,7 +185,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 }
 
 /* mm->page_table_lock is held. mmap_sem is not held */
-static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end, int count, zone_t * classzone)
+static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end, int count)
 {
 	pmd_t * pmd;
 	unsigned long pgd_end;
@@ -204,7 +205,7 @@ static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vm
 		end = pgd_end;
 	
 	do {
-		count = swap_out_pmd(mm, vma, pmd, address, end, count, classzone);
+		count = swap_out_pmd(mm, vma, pmd, address, end, count);
 		if (!count)
 			break;
 		address = (address + PMD_SIZE) & PMD_MASK;
@@ -214,7 +215,7 @@ static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vm
 }
 
 /* mm->page_table_lock is held. mmap_sem is not held */
-static inline int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address, int count, zone_t * classzone)
+static inline int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address, int count)
 {
 	pgd_t *pgdir;
 	unsigned long end;
@@ -229,7 +230,7 @@ static inline int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vm
 	if (address >= end)
 		BUG();
 	do {
-		count = swap_out_pgd(mm, vma, pgdir, address, end, count, classzone);
+		count = swap_out_pgd(mm, vma, pgdir, address, end, count);
 		if (!count)
 			break;
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
@@ -244,7 +245,7 @@ struct mm_struct *swap_mm = &init_mm;
 /*
  * Returns remaining count of pages to be swapped out by followup call.
  */
-static inline int swap_out_mm(struct mm_struct * mm, int count, int * mmcounter, zone_t * classzone)
+static inline int swap_out_mm(struct mm_struct * mm, int count, int * mmcounter)
 {
 	unsigned long address;
 	struct vm_area_struct* vma;
@@ -266,7 +267,7 @@ static inline int swap_out_mm(struct mm_struct * mm, int count, int * mmcounter,
 			address = vma->vm_start;
 
 		for (;;) {
-			count = swap_out_vma(mm, vma, address, count, classzone);
+			count = swap_out_vma(mm, vma, address, count);
 			vma = vma->vm_next;
 			if (!vma)
 				break;
@@ -283,8 +284,8 @@ out_unlock:
 	return count;
 }
 
-static int FASTCALL(swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages));
-static int swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages)
+static int FASTCALL(swap_out(unsigned int priority, unsigned int gfp_mask, int nr_pages));
+static int swap_out(unsigned int priority, unsigned int gfp_mask, int nr_pages)
 {
 	int counter;
 	struct mm_struct *mm;
@@ -311,7 +312,7 @@ static int swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_
 		atomic_inc(&mm->mm_users);
 		spin_unlock(&mmlist_lock);
 
-		nr_pages = swap_out_mm(mm, nr_pages, &counter, classzone);
+		nr_pages = swap_out_mm(mm, nr_pages, &counter);
 
 		mmput(mm);
 
@@ -326,8 +327,8 @@ empty:
 	return 0;
 }
 
-static int FASTCALL(shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned int gfp_mask));
-static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned int gfp_mask)
+static int FASTCALL(shrink_cache(int nr_pages, int max_scan, unsigned int gfp_mask));
+static int shrink_cache(int nr_pages, int max_scan, unsigned int gfp_mask)
 {
 	struct list_head * entry;
 
@@ -348,28 +349,45 @@ static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned
 		if (unlikely(!PageInactive(page) && !PageActive(page)))
 			BUG();
 
+		/* Mapping-less page on LRU-list? */
+		if (unlikely(!page->mapping))
+			BUG();
+
 		list_del(entry);
 		list_add(entry, &inactive_list);
 		if (PageTestandClearReferenced(page))
 			continue;
 
 		max_scan--;
-
-		if (unlikely(!memclass(page->zone, classzone)))
+		if (unlikely(page_zone_plenty(page)))
 			continue;
 
 		/* Racy check to avoid trylocking when not worthwhile */
-		if (!page->buffers && page_count(page) != 1)
+		if (!is_page_cache_freeable(page))
 			continue;
+
+		if (unlikely(TryLockPage(page))) {
+			if (gfp_mask & __GFP_FS) {
+				page_cache_get(page);
+				spin_unlock(&pagemap_lru_lock);
+				wait_on_page(page);
+				page_cache_release(page);
+				spin_lock(&pagemap_lru_lock);
+			}
+			continue;
+		}
 
 		/*
-		 * The page is locked. IO in progress?
-		 * Move it to the back of the list.
+		 * Still strictly racy - we don't own the pagecache lock,
+		 * so somebody might look up the page while we do this.
+		 * It's just a heuristic, though.
 		 */
-		if (unlikely(TryLockPage(page)))
+		if (!is_page_cache_freeable(page)) {
+			UnlockPage(page);
 			continue;
+		}
 
-		if (PageDirty(page) && is_page_cache_freeable(page)) {
+		if (PageDirty(page)) {
 			/*
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
@@ -442,9 +460,6 @@ static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned
 				continue;
 			}
 		}
-
-		if (unlikely(!page->mapping))
-			BUG();
 
 		if (unlikely(!spin_trylock(&pagecache_lock))) {
 			/* we hold the page lock so the page cannot go away from under us */
@@ -522,8 +537,8 @@ static void refill_inactive(int nr_pages)
 	spin_unlock(&pagemap_lru_lock);
 }
 
-static int FASTCALL(shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages));
-static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages)
+static int FASTCALL(shrink_caches(int priority, unsigned int gfp_mask, int nr_pages));
+static int shrink_caches(int priority, unsigned int gfp_mask, int nr_pages)
 {
 	int max_scan;
 	int chunk_size = nr_pages;
@@ -537,9 +552,9 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 	/* try to keep the active list 2/3 of the size of the cache */
 	ratio = (unsigned long) nr_pages * nr_active_pages / ((nr_inactive_pages + 1) * 2);
 	refill_inactive(ratio);
-  
+
 	max_scan = nr_inactive_pages / priority;
-	nr_pages = shrink_cache(nr_pages, max_scan, classzone, gfp_mask);
+	nr_pages = shrink_cache(nr_pages, max_scan, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
@@ -552,18 +567,18 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 	return nr_pages;
 }
 
-int try_to_free_pages(zone_t * classzone, unsigned int gfp_mask, unsigned int order)
+int try_to_free_pages(unsigned int gfp_mask, unsigned int order)
 {
 	int ret = 0;
 	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
 
 	do {
-		nr_pages = shrink_caches(priority, classzone, gfp_mask, nr_pages);
+		nr_pages = shrink_caches(priority, gfp_mask, nr_pages);
 		if (nr_pages <= 0)
 			return 1;
 
-		ret |= swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
+		ret |= swap_out(priority, gfp_mask, SWAP_CLUSTER_MAX << 2);
 	} while (--priority);
 
 	return ret;
@@ -595,7 +610,7 @@ static int kswapd_balance_pgdat(pg_data_t * pgdat)
 			schedule();
 		if (!zone->need_balance)
 			continue;
-		if (!try_to_free_pages(zone, GFP_KSWAPD, 0)) {
+		if (!try_to_free_pages(GFP_KSWAPD, 0)) {
 			zone->need_balance = 0;
 			__set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ);

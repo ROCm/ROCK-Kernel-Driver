@@ -79,8 +79,7 @@ USB_ST_CRC
 -EILSEQ			CRC mismatch
 
 USB_ST_STALL
--EPIPE			a) babble detect
-			b) endpoint stalled
+-EPIPE			endpoint stalled
 
 USB_ST_BUFFEROVERRUN
 -ECOMM			During an IN transfer, the host controller
@@ -95,7 +94,7 @@ USB_ST_BUFFERUNDERRUN
 USB_ST_DATAOVERRUN
 -EOVERFLOW		The amount of data returned by the endpoint was
 			greater than either the max packet size of the
-			endpoint or the remaining buffer size
+			endpoint or the remaining buffer size.  "Babble".
 
 USB_ST_DATAUNDERRUN
 -EREMOTEIO		The endpoint returned less than max packet size

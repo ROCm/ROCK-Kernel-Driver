@@ -1080,3 +1080,4 @@ static int __init saa9730_probe(void)
 }
 
 module_init(saa9730_probe);
+MODULE_LICENSE("GPL");

@@ -437,6 +437,7 @@ static int ultramca_close_card(struct net_device *dev)
 static struct net_device dev_ultra[MAX_ULTRAMCA_CARDS];
 static int io[MAX_ULTRAMCA_CARDS];
 static int irq[MAX_ULTRAMCA_CARDS];
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ULTRAMCA_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_ULTRAMCA_CARDS) "i");

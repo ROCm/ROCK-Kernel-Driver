@@ -1,17 +1,17 @@
    Linux Driver for Mylex DAC960/AcceleRAID/eXtremeRAID PCI RAID Controllers
 
-			Version 2.2.9 for Linux 2.2.17
-			Version 2.4.9 for Linux 2.4.0
+			Version 2.2.11 for Linux 2.2.19
+			Version 2.4.11 for Linux 2.4.12
 
 			      PRODUCTION RELEASE
 
-			       7 September 2000
+				11 October 2001
 
 			       Leonard N. Zubkoff
 			       Dandelion Digital
 			       lnz@dandelion.com
 
-	 Copyright 1998-2000 by Leonard N. Zubkoff <lnz@dandelion.com>
+	 Copyright 1998-2001 by Leonard N. Zubkoff <lnz@dandelion.com>
 
 
 				 INTRODUCTION
@@ -20,7 +20,7 @@ Mylex, Inc. designs and manufactures a variety of high performance PCI RAID
 controllers.  Mylex Corporation is located at 34551 Ardenwood Blvd., Fremont,
 California 94555, USA and can be reached at 510.796.6100 or on the World Wide
 Web at http://www.mylex.com.  Mylex Technical Support can be reached by
-electronic mail at support@mylex.com, by voice at 510.608.2400, or by FAX at
+electronic mail at mylexsup@us.ibm.com, by voice at 510.608.2400, or by FAX at
 510.745.7715.  Contact information for offices in Europe and Japan is available
 on their Web site.
 
@@ -120,7 +120,7 @@ AcceleRAID 170
 	    100MHz Intel i960RM RISC Processor
 	    16MB/32MB/64MB ECC SDRAM Memory
 
-AcceleRAID 160
+AcceleRAID 160 (AcceleRAID 170LP)
 	    1 Wide Ultra-160 LVD SCSI channel
 	    100MHz Intel i960RS RISC Processor
 	    Built in 16M ECC SDRAM Memory
@@ -170,6 +170,10 @@ DAC960PL    1/2/3 Wide Fast SCSI-2 Channels
 	    Intel i960 RISC Processor
 	    2MB/4MB/8MB/16MB/32MB DRAM Memory
 
+DAC960P	    1/2/3 Wide Fast SCSI-2 Channels
+	    Intel i960 RISC Processor
+	    2MB/4MB/8MB/16MB/32MB DRAM Memory
+
 For the eXtremeRAID 2000/3000 and AcceleRAID 352/170/160, firmware version
 6.00-01 or above is required.
 
@@ -180,36 +184,29 @@ required.
 
 For the DAC960PJ and DAC960PG, firmware version 4.06-0-00 or above is required.
 
-For the DAC960PU, DAC960PD, and DAC960PL, firmware version 3.51-0-04 or above
-is required.
-
-Note that earlier revisions of the DAC960PU, DAC960PD, and DAC960PL controllers
-were delivered with version 2.xx firmware.  Version 2.xx firmware is not
-supported by this driver and no support is envisioned.  Contact Mylex RAID
-Technical Support to inquire about upgrading controllers with version 2.xx
-firmware to version 3.51-0-04.  Upgrading to version 3.xx firmware requires
-installation of higher capacity Flash ROM chips, and not all DAC960PD and
-DAC960PL controllers can be upgraded.
+For the DAC960PU, DAC960PD, DAC960PL, and DAC960P, either firmware version
+3.51-0-04 or above is required (for dual Flash ROM controllers), or firmware
+version 2.73-0-00 or above is required (for single Flash ROM controllers)
 
 Please note that not all SCSI disk drives are suitable for use with DAC960
 controllers, and only particular firmware versions of any given model may
 actually function correctly.  Similarly, not all motherboards have a BIOS that
 properly initializes the AcceleRAID 250, AcceleRAID 200, AcceleRAID 150,
 DAC960PJ, and DAC960PG because the Intel i960RD/RP is a multi-function device.
-If in doubt, contact Mylex RAID Technical Support (support@mylex.com) to verify
-compatibility.  Mylex makes available a hard disk compatibility list by FTP at
-ftp://ftp.mylex.com/pub/dac960/diskcomp.html.
+If in doubt, contact Mylex RAID Technical Support (mylexsup@us.ibm.com) to
+verify compatibility.  Mylex makes available a hard disk compatibility list at
+http://www.mylex.com/support/hdcomp/hd-lists.html.
 
 
 			      DRIVER INSTALLATION
 
-This distribution was prepared for Linux kernel version 2.2.17 or 2.4.0.
+This distribution was prepared for Linux kernel version 2.2.19 or 2.4.12.
 
 To install the DAC960 RAID driver, you may use the following commands,
 replacing "/usr/src" with wherever you keep your Linux kernel source tree:
 
   cd /usr/src
-  tar -xvzf DAC960-2.2.9.tar.gz (or DAC960-2.4.9.tar.gz)
+  tar -xvzf DAC960-2.2.11.tar.gz (or DAC960-2.4.11.tar.gz)
   mv README.DAC960 linux/Documentation
   mv DAC960.[ch] linux/drivers/block
   patch -p0 < DAC960.patch (if DAC960.patch is included)
@@ -374,11 +371,14 @@ commands are:
 
     The "make-online" command changes the physical drive <channel>:<target-id>
     from status DEAD to status ONLINE.  In cases where multiple physical drives
-    have been killed simultaneously, this command may be used to bring them
-    back online, after which a consistency check is advisable.
+    have been killed simultaneously, this command may be used to bring all but
+    one of them back online, after which a rebuild to the final drive is
+    necessary.
 
     Warning: make-online should only be used on a dead physical drive that is
-    an active part of a drive group, never on a standby drive.
+    an active part of a drive group, never on a standby drive.  The command
+    should never be used on a dead drive that is part of a critical logical
+    drive; rebuild should be used if only a single drive is dead.
 
   make-standby <channel>:<target-id>
 

@@ -242,7 +242,7 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 	current->allocation_order = order;
 	current->flags |= PF_MEMALLOC | PF_FREE_PAGES;
 
-	__freed = try_to_free_pages(classzone, gfp_mask, order);
+	__freed = try_to_free_pages(gfp_mask, order);
 
 	current->flags &= ~(PF_MEMALLOC | PF_FREE_PAGES);
 

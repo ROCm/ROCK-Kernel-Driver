@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.32 09/27/01 09:01:12 trini
+ * BK Id: SCCS/s.m8xx_setup.c 1.35 10/11/01 11:55:47 trini
  *
  *  linux/arch/ppc/kernel/setup.c
  *
@@ -52,7 +52,7 @@ void m8xx_calibrate_decr(void);
 
 unsigned char __res[sizeof(bd_t)];
 
-extern void m8xx_ide_init();
+extern void m8xx_ide_init(void);
 
 #ifdef CONFIG_BLK_DEV_RAM
 extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
@@ -164,9 +164,9 @@ void __init m8xx_calibrate_decr(void)
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbscrk = ~KAPWR_KEY;
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_rtcsck = ~KAPWR_KEY;
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk    = ~KAPWR_KEY;
-	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbscrk = KAPWR_KEY;
-	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_rtcsck = KAPWR_KEY;
-	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk    = KAPWR_KEY;
+	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbscrk =  KAPWR_KEY;
+	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_rtcsck =  KAPWR_KEY;
+	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk    =  KAPWR_KEY;
 
 	/* Disable the RTC one second and alarm interrupts. */
 	((volatile immap_t *)IMAP_ADDR)->im_sit.sit_rtcsc &=

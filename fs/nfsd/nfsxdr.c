@@ -86,7 +86,6 @@ decode_pathname(u32 *p, char **namp, int *lenp)
 			if (*name == '\0')
 				return NULL;
 		}
-		*name = '\0';
 	}
 
 	return p;

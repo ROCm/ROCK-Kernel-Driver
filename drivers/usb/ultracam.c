@@ -537,11 +537,7 @@ static void ultracam_configure_video(uvd_t *uvd)
  * 12-Nov-2000 Reworked to comply with new probe() signature.
  * 23-Jan-2001 Added compatibility with 2.2.x kernels.
  */
-static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum
-#if defined(usb_device_id_ver)
-	,const struct usb_device_id *devid
-#endif
-	)
+static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const struct usb_device_id *devid)
 {
 	uvd_t *uvd = NULL;
 	int i, nas;

@@ -45,6 +45,25 @@ out:
 	return err;
 }
 
+static int read_default_ldt(void * ptr, unsigned long bytecount)
+{
+	int err;
+	unsigned long size;
+	void *address;
+
+	err = 0;
+	address = &default_ldt[0];
+	size = sizeof(struct desc_struct);
+	if (size > bytecount)
+		size = bytecount;
+
+	err = size;
+	if (copy_to_user(ptr, address, size))
+		err = -EFAULT;
+
+	return err;
+}
+
 static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 {
 	struct mm_struct * mm = current->mm;
@@ -139,6 +158,9 @@ asmlinkage int sys_modify_ldt(int func, void *ptr, unsigned long bytecount)
 		break;
 	case 1:
 		ret = write_ldt(ptr, bytecount, 1);
+		break;
+	case 2:
+		ret = read_default_ldt(ptr, bytecount);
 		break;
 	case 0x11:
 		ret = write_ldt(ptr, bytecount, 0);

@@ -1,9 +1,12 @@
-/* $Id: zs.c,v 1.66 2001/06/29 21:33:22 davem Exp $
+/* $Id: zs.c,v 1.67 2001/10/13 08:27:50 davem Exp $
  * zs.c: Zilog serial port driver for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
  * Copyright (C) 1996 Eddie C. Dost   (ecd@skynet.be)
  * Fixes by Pete A. Zaitcev <zaitcev@yahoo.com>.
+ *
+ * Fixed to use tty_get_baud_rate().
+ *   Theodore Ts'o <tytso@mit.edu>, 2001-Oct-12
  */
 
 #include <linux/errno.h>
@@ -240,12 +243,6 @@ static inline int serial_paranoia_check(struct sun_serial *info,
 #endif
 	return 0;
 }
-
-/* This is used to figure out the divisor speeds and the timeouts. */
-static int baud_table[] = {
-	0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
-	9600, 19200, 38400, 76800, 0
-};
 
 /* Reading and writing Zilog8530 registers.  The delays are to make this
  * driver work on the Sun4 which needs a settling delay after each chip
@@ -944,8 +941,7 @@ static void shutdown(struct sun_serial * info)
 static void change_speed(struct sun_serial *info)
 {
 	unsigned cflag;
-	int	quot = 0;
-	int	i;
+	int	baud, quot = 0;
 	int	brg;
 
 	if (!info->tty || !info->tty->termios)
@@ -953,20 +949,12 @@ static void change_speed(struct sun_serial *info)
 	cflag = info->tty->termios->c_cflag;
 	if (!info->port)
 		return;
-	i = cflag & CBAUD;
-	if (cflag & CBAUDEX) {
-		i &= ~CBAUDEX;
-		if (i != 5)
-			info->tty->termios->c_cflag &= ~CBAUDEX;
-		else
-			i = 16;
-	}
-	if (i == 15) {
-		if ((info->flags & ZILOG_SPD_MASK) == ZILOG_SPD_HI)
-			i += 1;
-		if ((info->flags & ZILOG_SPD_MASK) == ZILOG_SPD_CUST)
-			quot = info->custom_divisor;
-	}
+	baud = tty_get_baud_rate(info->tty);
+	
+	if ((baud == 38400) && 
+	    ((info->flags & ZILOG_SPD_MASK) == ZILOG_SPD_CUST))
+		quot = info->custom_divisor;
+
 	if (quot) {
 		info->zs_baud = info->baud_base / quot;
 		info->clk_divisor = 16;
@@ -978,8 +966,8 @@ static void change_speed(struct sun_serial *info)
 		info->curregs[13] = ((brg >> 8) & 255);
 		info->curregs[14] = BRSRC | BRENAB;
 		zs_rtsdtr(info, 1);
-	} else if (baud_table[i]) {
-		info->zs_baud = baud_table[i];
+	} else if (baud) {
+		info->zs_baud = baud;
 		info->clk_divisor = 16;
 
 		info->curregs[4] = X16CLK;
@@ -1945,7 +1933,7 @@ int zs_open(struct tty_struct *tty, struct file * filp)
 
 static void show_serial_version(void)
 {
-	char *revision = "$Revision: 1.66 $";
+	char *revision = "$Revision: 1.67 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2796,22 +2784,23 @@ static kdev_t zs_console_device(struct console *con)
 
 static int __init zs_console_setup(struct console *con, char *options)
 {
+	static struct tty_struct c_tty;
+	static struct termios c_termios;
 	struct sun_serial *info;
-	int i, brg, baud;
+	int brg, baud;
 
 	info = zs_soft + con->index;
 	info->is_cons = 1;
 
 	printk("Console: ttyS%d (Zilog8530)\n", info->line);
-
+	
 	sunserial_console_termios(con);
+	memset(&c_tty, 0, sizeof(c_tty));
+	memset(&c_termios, 0, sizeof(c_termios));
+	c_tty.termios = &c_termios;
+	c_termios.c_cflag = con->cflag;
+	baud = tty_get_baud_rate(&c_tty);
 
-	i = con->cflag & CBAUD;
-	if (con->cflag & CBAUDEX) {
-		i &= ~CBAUDEX;
-		con->cflag &= ~CBAUDEX;
-	}
-	baud = baud_table[i];
 	info->zs_baud = baud;
 
 	switch (con->cflag & CSIZE) {

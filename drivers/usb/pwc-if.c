@@ -73,7 +73,9 @@ static __devinitdata struct usb_device_id pwc_device_table [] = {
 	{ USB_DEVICE(0x0471, 0x0311) },
 	{ USB_DEVICE(0x0471, 0x0312) },
 	{ USB_DEVICE(0x069A, 0x0001) },
-	{ USB_DEVICE(0x046D, 0x0b80) },
+	{ USB_DEVICE(0x046D, 0x08b0) },
+	{ USB_DEVICE(0x055D, 0x9000) },
+	{ USB_DEVICE(0x055D, 0x9001) },
 	{ }
 };
 MODULE_DEVICE_TABLE(usb, pwc_device_table);
@@ -96,6 +98,7 @@ static int default_fbufs = 3;   /* Default number of frame buffers */
 static int default_mbufs = 2;	/* Default number of mmap() buffers */
        int pwc_trace = TRACE_MODULE | TRACE_FLOW | TRACE_PWCX;
 static int power_save = 0;
+static int led_on = 1, led_off = 0; /* defaults to LED that is on while in use */
 int pwc_preferred_compression = 2; /* 0..3 = uncompressed..high */
 
 static struct semaphore mem_lock;
@@ -592,7 +595,8 @@ static inline void pwc_next_image(struct pwc_device *pdev)
 	pdev->fill_image = (pdev->fill_image + 1) % default_mbufs;
 }
 
-/* XXX: 2001-06-17: The YUV420 palette will be phased out soon */
+/* 2001-10-14: The YUV420 is still there, but you can only set it from within 
+   a program (YUV420P being the default) */
 static int pwc_set_palette(struct pwc_device *pdev, int pal)
 {
 	if (   pal == VIDEO_PALETTE_YUV420
@@ -947,14 +951,16 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 			Info("Failed to set alternate interface to 0.\n");
 		pdev->usb_init = 1;
 	}
-	else {
-		/* Turn on camera */
-		if (power_save) {
-			i = pwc_camera_power(pdev, 1);
-			if (i < 0)
-				Info("Failed to restore power to the camera! (%d)\n", i);
-		}
+
+	/* Turn on camera */
+	if (power_save) {
+		i = pwc_camera_power(pdev, 1);
+		if (i < 0)
+			Info("Failed to restore power to the camera! (%d)\n", i);
 	}
+	/* Set LED on/off time */
+	if (pwc_set_leds(pdev, led_on, led_off) < 0)
+		Info("Failed to set LED on/off time.\n");
 
 	/* Find our decompressor, if any */
 	pdev->decompressor = pwc_find_decompressor(pdev->type);
@@ -1007,6 +1013,7 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 		up(&pdev->modlock);
 		return i;
 	}
+	
 	i = usb_set_interface(pdev->udev, 0, pdev->valternate);
 	if (i) {
 		Trace(TRACE_OPEN, "Failed to set alternate interface = %d.\n", i);
@@ -1066,7 +1073,10 @@ static void pwc_video_close(struct video_device *vdev)
 		Trace(TRACE_OPEN, "Normal close(): setting interface to 0.\n");
 		usb_set_interface(pdev->udev, 0, 0);
 
-		/* Turn off LED by powering down camera */
+		/* Turn LEDs off */
+		if (pwc_set_leds(pdev, 0, 0) < 0)
+			Info("Failed to set LED on/off time..\n");
+		/* Power down camere to save energy */
 		if (power_save) {
 			i = pwc_camera_power(pdev, 0);
 			if (i < 0) 
@@ -1121,19 +1131,19 @@ static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long c
 		while (pdev->full_frames == NULL) {
 	                if (noblock) {
 	                	remove_wait_queue(&pdev->frameq, &wait);
-	                	current->state = TASK_RUNNING;
+	                	set_current_state(TASK_RUNNING);
 	                	return -EWOULDBLOCK;
 	                }
 	                if (signal_pending(current)) {
 	                	remove_wait_queue(&pdev->frameq, &wait);
-	                	current->state = TASK_RUNNING;
+	                	set_current_state(TASK_RUNNING);
 	                	return -ERESTARTSYS;
 	                }
 	                schedule();
-	                current->state = TASK_INTERRUPTIBLE;
+	                set_current_state(TASK_INTERRUPTIBLE);
 		}
 		remove_wait_queue(&pdev->frameq, &wait);
-		current->state = TASK_RUNNING;
+		set_current_state(TASK_RUNNING);
 	                                                                                                                                                                                
 		/* Decompress [, convert] and release frame */
 		if (pwc_handle_frame(pdev))
@@ -1473,14 +1483,14 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			while (pdev->full_frames == NULL) {
 	                	if (signal_pending(current)) {
 	                		remove_wait_queue(&pdev->frameq, &wait);
-		                	current->state = TASK_RUNNING;
+		                	set_current_state(TASK_RUNNING);
 		                	return -ERESTARTSYS;
 	        	        }
 	                	schedule();
-		                current->state = TASK_INTERRUPTIBLE;
+		                set_current_state(TASK_INTERRUPTIBLE);
 			}
 			remove_wait_queue(&pdev->frameq, &wait);
-			current->state = TASK_RUNNING;
+			set_current_state(TASK_RUNNING);
 				
 			/* The frame is ready. Expand in the image buffer 
 			   requested by the user. I don't care if you 
@@ -1656,18 +1666,37 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			break;
 		}
 	}
-        else if (vendor_id == 0x046d) {
-        	switch(product_id) {
-        	case 0x08b0:
-        		Info("Logitech QuickCam 3000 Pro detected.\n");
-        		type_id = 730;
+	else if (vendor_id == 0x046d) {
+		switch(product_id) {
+		case 0x08b0:
+			Info("Logitech QuickCam 3000 Pro detected.\n");
+			type_id = 730;
         		break;
         	default:
         		return NULL;
         		break;
         	}
         }
-        else return NULL; /* Not Philips or Askey, for sure. */
+	else if (vendor_id == 0x055d) {
+		/* I don't know the difference between the C10 and the C30;
+		   I suppose the difference is the sensor, but both cameras
+		   work equally well with a type_id of 675
+		 */
+		switch(product_id) {
+		case 0x9000:
+			Info("Samsung MPC-C10 USB webcam detected.\n");
+			type_id = 675;
+			break;
+		case 0x9001:
+			Info("Samsung MPC-C30 USB webcam detected.\n");
+			type_id = 675;
+			break;
+		default:
+			return NULL;
+			break;
+		}
+	}
+	else return NULL; /* Not Philips, Askey, Logitech or Samsung, for sure. */
 
 	if (udev->descriptor.bNumConfigurations > 1)
 		Info("Warning: more than 1 configuration available.\n");
@@ -1799,19 +1828,17 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 
 static char *size = NULL;
 static int fps = 0;
-static char *palette = NULL;
 static int fbufs = 0;
 static int mbufs = 0;
 static int trace = -1;
 static int compression = -1;
+static int leds[2] = { -1, -1 };
 
 MODULE_PARM(video_nr, "i");
 MODULE_PARM(size, "s");
 MODULE_PARM_DESC(size, "Initial image size. One of sqcif, qsif, qcif, sif, cif, vga");
 MODULE_PARM(fps, "i");
 MODULE_PARM_DESC(fps, "Initial frames per second. Varies with model, useful range 5-30");
-MODULE_PARM(palette, "s");
-MODULE_PARM_DESC(palette, "Initial colour format of images. One of yuv420, yuv420p");
 MODULE_PARM(fbufs, "i");
 MODULE_PARM_DESC(fbufs, "Number of internal frame buffers to reserve");
 MODULE_PARM(mbufs, "i");
@@ -1822,7 +1849,8 @@ MODULE_PARM(power_save, "i");
 MODULE_PARM_DESC(power_save, "Turn power save feature in camera on or off");
 MODULE_PARM(compression, "i");
 MODULE_PARM_DESC(compression, "Preferred compression quality. Range 0 (uncompressed) to 3 (high compression)");
-
+MODULE_PARM(leds, "2i");
+MODULE_PARM_DESC(leds, "LED on,off time in milliseconds");
 MODULE_DESCRIPTION("Philips USB webcam driver");
 MODULE_AUTHOR("Nemosoft Unv. <nemosoft@smcc.demon.nl>");
 MODULE_LICENSE("GPL");
@@ -1833,7 +1861,7 @@ static int __init usb_pwc_init(void)
 	char *sizenames[PSZ_MAX] = { "sqcif", "qsif", "qcif", "sif", "cif", "vga" };
 
 	Info("Philips PCA645/646 + PCVC675/680/690 + PCVC730/740/750 webcam module version " PWC_VERSION " loaded.\n");
-	Info("Also supports Askey VC010 cam.\n");
+	Info("Also supports the Askey VC010, Logitech Quickcam 3000 Pro and the Samsung MPC-C10 and MPC-C30.\n");
 
 	if (fps) {
 		if (fps < 5 || fps > 30) {
@@ -1857,18 +1885,6 @@ static int __init usb_pwc_init(void)
 			return -EINVAL;
 		}
 		Info("Default image size set to %s [%dx%d].\n", sizenames[default_size], pwc_image_sizes[default_size].x, pwc_image_sizes[default_size].y);
-	}
-	if (palette) {
-		/* Determine default palette */
-		if (!strcmp(palette, "yuv420"))
-			default_palette = VIDEO_PALETTE_YUV420;
-		else if (!strcmp(palette, "yuv420p"))
-			default_palette = VIDEO_PALETTE_YUV420P;
-		else {
-			Err("Palette not recognized: try palette=yuv420 or yuv420p.\n");
-			return -EINVAL;
-		}
-		Info("Default palette set to %d.\n", default_palette);
 	}
 	if (mbufs) {
 		if (mbufs < 1 || mbufs > MAX_IMAGES) {
@@ -1900,6 +1916,10 @@ static int __init usb_pwc_init(void)
 	}
 	if (power_save)
 		Info("Enabling power save on open/close.\n");
+	if (leds[0] >= 0)
+		led_on = leds[0] / 100;
+	if (leds[1] >= 0)
+		led_off = leds[1] / 100;
 
 	init_MUTEX(&mem_lock);
  	Trace(TRACE_PROBE, "Registering driver at address 0x%p.\n", &pwc_driver);

@@ -913,6 +913,7 @@ static void mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 MODULE_AUTHOR("Paul Mackerras");
 MODULE_DESCRIPTION("PowerMac MACE driver.");
+MODULE_LICENSE("GPL");
 
 static void __exit mace_cleanup (void)
 {

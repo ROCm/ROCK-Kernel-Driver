@@ -316,3 +316,4 @@ do_stnic_intr (int irq, void *dev_id, struct pt_regs *regs)
 
 module_init(stnic_probe);
 /* No cleanup routine. */
+MODULE_LICENSE("GPL");

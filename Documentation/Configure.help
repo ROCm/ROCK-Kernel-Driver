@@ -11609,26 +11609,14 @@ CONFIG_USB_SE401
   The module will be called se401.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
 
-USB ADMtek Pegasus-based ethernet device support
+Pegasus/Pegasus II based USB-Ethernet device support
 CONFIG_USB_PEGASUS
-  Say Y if you want to use your USB ethernet device. Supported
-  cards until now are:
-    ADMtek AN986 Pegasus (eval. board)
-    ADMtek ADM8511 Pegasus II (eval. board)
-    Accton 10/100
-    Billington USB-100
-    Corega FEter USB-TX
-    MELCO/BUFFALO LUA-TX
-    D-Link DSB-650TX, DSB-650TX-PNA, DSB-650, DU-E10, DU-E100
-    Linksys USB100TX, USB10TX
-    LANEED Ethernet LD-USB/TX
-    SMC 202
-    SOHOware NUB Ethernet
-    
-  Any Pegasus II based board also are supported.
-  If you have devices with vendor IDs other than noted above
-  you should add them in the driver code and send a message
-  to me (petkan@dce.bg) for update.
+  Say Y here if you know you have Pegasus or Pegasus II based adapter.
+  If in doubt then look at linux/drivers/usb/pegasus.h for the complete
+  list of supported devices.
+  If your particular adapter is not in the list and you are _sure_ it
+  is Pegasus or Pegasus II based then send me (pmanolov@lnxw.com) vendor
+  and device IDs.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).

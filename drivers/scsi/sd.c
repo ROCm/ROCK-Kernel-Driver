@@ -152,6 +152,9 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 	int diskinfo[4];
     
 	SDev = rscsi_disks[DEVICE_NR(dev)].device;
+	if (!SDev)
+		return -ENODEV;
+
 	/*
 	 * If we are in the middle of error recovery, don't let anyone
 	 * else try and use this device.  Also, if error recovery fails, it
@@ -533,6 +536,8 @@ static int sd_release(struct inode *inode, struct file *file)
 
 	target = DEVICE_NR(inode->i_rdev);
 	SDev = rscsi_disks[target].device;
+	if (!SDev)
+		return -ENODEV;
 
 	SDev->access_count--;
 

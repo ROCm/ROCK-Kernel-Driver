@@ -1,4 +1,4 @@
-/* $Id: dtlb_base.S,v 1.16 2001/10/09 04:02:11 davem Exp $
+/* $Id: dtlb_base.S,v 1.17 2001/10/11 22:33:52 davem Exp $
  * dtlb_base.S:	Front end to DTLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -71,8 +71,8 @@ from_tl1_trap:
 	be,pn		%xcc, 3f			! Yep, special processing
 	 CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset
 	cmp		%g5, 3				! Last trap level?
-	be,a,pn		%xcc, 1f			! Yep, use non-faulting load
-	 ldxa		[%g3 + %g6] ASI_SNF, %g5	! Load VPTE (no-VPTE-fault)
+	be,pn		%xcc, longpath			! Yep, cannot risk VPTE miss
+	 nop						! delay slot
 
 /* DTLB ** ICACHE line 2: User finish + quick kernel TLB misses	*/
 	ldxa		[%g3 + %g6] ASI_S, %g5		! Load VPTE

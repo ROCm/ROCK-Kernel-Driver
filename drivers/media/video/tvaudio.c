@@ -42,6 +42,9 @@ static int debug = 0;	/* insmod parameter */
 
 #define dprintk  if (debug) printk
 
+MODULE_DESCRIPTION("device driver for various i2c TV sound decoder / audiomux chips");
+MODULE_AUTHOR("Eric Sandeen, Steve VanDeBogart, Greg Alexander, Gerd Knorr");
+MODULE_LICENSE("GPL");
 
 /* ---------------------------------------------------------------------- */
 /* our structs                                                            */
@@ -51,6 +54,7 @@ static int debug = 0;	/* insmod parameter */
 struct CHIPSTATE;
 typedef int  (*getvalue)(int);
 typedef int  (*checkit)(struct CHIPSTATE*);
+typedef int  (*initialize)(struct CHIPSTATE*);
 typedef int  (*getmode)(struct CHIPSTATE*);
 typedef void (*setmode)(struct CHIPSTATE*, int mode);
 typedef void (*checkmode)(struct CHIPSTATE*);
@@ -70,6 +74,7 @@ struct CHIPDESC {
 
 	int        *insmodopt;
 	checkit    checkit;
+	initialize initialize;
 	int        flags;
 #define CHIP_HAS_VOLUME      1
 #define CHIP_HAS_BASSTREBLE  2
@@ -134,6 +139,7 @@ static unsigned short normal_i2c[] = {
 	I2C_TDA9840   >> 1,
 	I2C_TDA985x_L >> 1,
 	I2C_TDA985x_H >> 1,
+	I2C_TDA9874A  >> 1,
 	I2C_PIC16C54  >> 1,
 	I2C_CLIENT_END };
 static unsigned short normal_i2c_range[2] = { I2C_CLIENT_END, I2C_CLIENT_END };
@@ -216,7 +222,7 @@ static int chip_read2(struct CHIPSTATE *chip, int subaddr)
                 { chip->c.addr, 0,        1, write },
                 { chip->c.addr, I2C_M_RD, 1, read  }
         };
-        write[1] = subaddr;
+        write[0] = subaddr;
 
 	if (2 != i2c_transfer(chip->c.adapter,msgs,2)) {
 		printk(KERN_WARNING "%s: I/O error (read2)\n",
@@ -323,6 +329,8 @@ void generic_checkmode(struct CHIPSTATE *chip)
 
 	if (mode & VIDEO_SOUND_LANG1)
 		desc->setmode(chip,VIDEO_SOUND_LANG1);
+	else if (mode & VIDEO_SOUND_LANG2)
+		desc->setmode(chip,VIDEO_SOUND_LANG2);
 	else if (mode & VIDEO_SOUND_STEREO)
 		desc->setmode(chip,VIDEO_SOUND_STEREO);
 	else
@@ -695,6 +703,7 @@ void tda9873_setmode(struct CHIPSTATE *chip, int mode)
 		return;
 	}
 
+	chip_write(chip, TDA9873_SW, sw_data);
 	dprintk("tda9873_setmode(): req. mode %d; chip_write: %d\n",
 		mode, sw_data);
 }
@@ -706,6 +715,181 @@ int tda9873_checkit(struct CHIPSTATE *chip)
 	if (-1 == (rc = chip_read2(chip,254)))
 		return 0;
 	return (rc & ~0x1f) == 0x80;
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* audio chip description - defines+functions for tda9874a                */
+/* Dariusz Kowalewski <darekk@automex.pl>                                 */
+
+/* Subaddresses for TDA9874A (slave rx) */
+#define TDA9874A_AGCGR		0x00	/* AGC gain */
+#define TDA9874A_GCONR		0x01	/* general config */
+#define TDA9874A_MSR		0x02	/* monitor select */
+#define TDA9874A_C1FRA		0x03	/* carrier 1 freq. */
+#define TDA9874A_C1FRB		0x04	/* carrier 1 freq. */
+#define TDA9874A_C1FRC		0x05	/* carrier 1 freq. */
+#define TDA9874A_C2FRA		0x06	/* carrier 2 freq. */
+#define TDA9874A_C2FRB		0x07	/* carrier 2 freq. */
+#define TDA9874A_C2FRC		0x08	/* carrier 2 freq. */
+#define TDA9874A_DCR		0x09	/* demodulator config */
+#define TDA9874A_FMER		0x0a	/* FM de-emphasis */
+#define TDA9874A_FMMR		0x0b	/* FM dematrix */
+#define TDA9874A_C1OLAR		0x0c	/* ch.1 output level adj. */
+#define TDA9874A_C2OLAR		0x0d	/* ch.2 output level adj. */
+#define TDA9874A_NCONR		0x0e	/* NICAM config */
+#define TDA9874A_NOLAR		0x0f	/* NICAM output level adj. */
+#define TDA9874A_NLELR		0x10	/* NICAM lower error limit */
+#define TDA9874A_NUELR		0x11	/* NICAM upper error limit */
+#define TDA9874A_AMCONR		0x12	/* audio mute control */
+#define TDA9874A_SDACOSR	0x13	/* stereo DAC output select */
+#define TDA9874A_AOSR		0x14	/* analog output select */
+#define TDA9874A_DAICONR	0x15	/* digital audio interface config */
+#define TDA9874A_I2SOSR		0x16	/* I2S-bus output select */
+#define TDA9874A_I2SOLAR	0x17	/* I2S-bus output level adj. */
+#define TDA9874A_MDACOSR	0x18	/* mono DAC output select */
+#define TDA9874A_ESP		0xFF	/* easy standard progr. */
+
+/* Subaddresses for TDA9874A (slave tx) */
+#define TDA9874A_DSR		0x00	/* device status */
+#define TDA9874A_NSR		0x01	/* NICAM status */
+#define TDA9874A_NECR		0x02	/* NICAM error count */
+#define TDA9874A_DR1		0x03	/* add. data LSB */
+#define TDA9874A_DR2		0x04	/* add. data MSB */
+#define TDA9874A_LLRA		0x05	/* monitor level read-out LSB */
+#define TDA9874A_LLRB		0x06	/* monitor level read-out MSB */
+#define TDA9874A_SIFLR		0x07	/* SIF level */
+#define TDA9874A_TR2		252	/* test reg. 2 */
+#define TDA9874A_TR1		253	/* test reg. 1 */
+#define TDA9874A_DIC		254	/* device id. code */
+#define TDA9874A_SIC		255	/* software id. code */
+
+
+static int tda9874a_mode = 1;		/* 0: A2, 1: NICAM */
+static int tda9874a_GCONR = 0xc0;	/* default config. input pin: SIFSEL=0 */
+static int tda9874a_ESP = 0x07;		/* default standard: NICAM D/K */
+
+/* insmod options for tda9874a */
+static int tda9874a_SIF = -1;
+static int tda9874a_STD = -1;
+MODULE_PARM(tda9874a_SIF,"i");
+MODULE_PARM(tda9874a_STD,"i");
+
+
+static int tda9874a_setup(struct CHIPSTATE *chip)
+{
+	chip_write(chip, TDA9874A_AGCGR, 0x00); /* 0 dB */
+	chip_write(chip, TDA9874A_GCONR, tda9874a_GCONR);
+	chip_write(chip, TDA9874A_MSR, (tda9874a_mode) ? 0x03:0x02);
+	chip_write(chip, TDA9874A_FMMR, 0x80);
+	chip_write(chip, TDA9874A_C1OLAR, 0x00); /* 0 dB */
+	chip_write(chip, TDA9874A_C2OLAR, 0x00); /* 0 dB */
+	chip_write(chip, TDA9874A_NCONR, 0x00); /* not 0x04 as doc. table 10 says! */
+	chip_write(chip, TDA9874A_NOLAR, 0x00); /* 0 dB */
+	chip_write(chip, TDA9874A_AMCONR, 0xf9);
+	chip_write(chip, TDA9874A_SDACOSR, (tda9874a_mode) ? 0x81:0x80); /* 0x81 */
+	chip_write(chip, TDA9874A_AOSR, 0x80);
+	chip_write(chip, TDA9874A_MDACOSR, (tda9874a_mode) ? 0x82:0x80);
+	chip_write(chip, TDA9874A_ESP, tda9874a_ESP);
+
+	return 1;
+}
+
+int tda9874a_getmode(struct CHIPSTATE *chip)
+{
+	int dsr,nsr,mode;
+
+	mode = VIDEO_SOUND_MONO;
+
+	if(-1 == (dsr = chip_read2(chip,TDA9874A_DSR)))
+		return mode;
+	if(-1 == (nsr = chip_read2(chip,TDA9874A_NSR)))
+		return mode;
+
+	if(tda9874a_mode) {
+		/* check also DSR.RSSF and DSR.AMSTAT bits? */
+		if(nsr & 0x02) /* NSR.S/MB */
+			mode |= VIDEO_SOUND_STEREO;
+		if(nsr & 0x01) /* NSR.D/SB */ 
+			mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
+	} else {
+		if(dsr & 0x02) /* DSR.IDSTE */
+			mode |= VIDEO_SOUND_STEREO;
+		if(dsr & 0x04) /* DSR.IDDUA */
+			mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
+	}
+
+	dprintk("tda9874a_getmode(): DSR=0x%X, NSR=0x%X, return: %d.\n",
+		 dsr, nsr, mode);
+	return mode;
+}
+
+void tda9874a_setmode(struct CHIPSTATE *chip, int mode)
+{
+	int aosr=0x80,mdacosr=0x82;
+
+	/* note: TDA9874A has auto-select function for audio output */
+	switch(mode) {
+	case VIDEO_SOUND_MONO:
+	case VIDEO_SOUND_STEREO:
+		break;
+	case VIDEO_SOUND_LANG1:
+		aosr = 0x80; /* dual A/A */
+		mdacosr = (tda9874a_mode) ? 0x82:0x80;
+		break;
+	case VIDEO_SOUND_LANG2:
+		aosr = 0xa0; /* dual B/B */
+		mdacosr = (tda9874a_mode) ? 0x83:0x81;
+		break;
+	default:
+		chip->mode = 0;
+		return;
+	}
+
+	chip_write(chip, TDA9874A_AOSR, aosr);
+	chip_write(chip, TDA9874A_MDACOSR, mdacosr);
+
+	dprintk("tda9874a_setmode(): req. mode %d; AOSR=0x%X, MDACOSR=0x%X.\n",
+		mode, aosr, mdacosr);
+}
+
+int tda9874a_checkit(struct CHIPSTATE *chip)
+{
+	int dic,sic;	/* device id. and software id. codes */
+
+	if(-1 == (dic = chip_read2(chip,TDA9874A_DIC)))
+		return 0;
+	if(-1 == (sic = chip_read2(chip,TDA9874A_SIC)))
+		return 0;
+
+	dprintk("tda9874a_checkit(): DIC=0x%X, SIC=0x%X.\n", dic, sic);
+
+	return((dic & 0xff) == 0x11);
+}
+
+int tda9874a_initialize(struct CHIPSTATE *chip)
+{
+	if(tda9874a_SIF != -1) {
+		if(tda9874a_SIF == 1)
+			tda9874a_GCONR = 0xc0;	/* sound IF input 1 */
+		else if(tda9874a_SIF == 2)
+			tda9874a_GCONR = 0xc1;	/* sound IF input 2 */
+		else
+			printk(KERN_WARNING "tda9874a: SIF parameter must be 1 or 2.\n");
+	}
+
+	if(tda9874a_STD != -1) {
+		if((tda9874a_STD >= 0)&&(tda9874a_STD <= 8)) {
+			tda9874a_ESP = tda9874a_STD;
+			tda9874a_mode = (tda9874a_STD < 5) ? 0 : 1;
+		} else {
+			printk(KERN_WARNING "tda9874a: STD parameter must be between 0 and 8.\n");
+		}
+	}
+
+	tda9874a_setup(chip);
+
+	return 0;
 }
 
 
@@ -779,6 +963,7 @@ int tda9840  = 1;
 int tda9850  = 1;
 int tda9855  = 1;
 int tda9873  = 1;
+int tda9874a = 1;
 int tea6300  = 0;
 int tea6420  = 1;
 int pic16c54 = 1;
@@ -787,6 +972,7 @@ MODULE_PARM(tda9840,"i");
 MODULE_PARM(tda9850,"i");
 MODULE_PARM(tda9855,"i");
 MODULE_PARM(tda9873,"i");
+MODULE_PARM(tda9874a,"i");
 MODULE_PARM(tea6300,"i");
 MODULE_PARM(tea6420,"i");
 MODULE_PARM(pic16c54,"i");
@@ -827,6 +1013,19 @@ static struct CHIPDESC chiplist[] = {
 		inputmap:   {0xa0, 0xa2, 0xa0, 0xa0, 0xc0},
 		inputmask:  TDA9873_INP_MASK | TDA9873_MUTE | TDA9873_AUTOMUTE
 		
+	},
+	{
+		name:       "tda9874a",
+		id:         I2C_DRIVERID_TDA9874A,
+		checkit:    tda9874a_checkit,
+		initialize: tda9874a_initialize,
+		insmodopt:  &tda9874a,
+		addr_lo:    I2C_TDA9874A >> 1,
+		addr_hi:    I2C_TDA9874A >> 1,
+
+		getmode:    tda9874a_getmode,
+		setmode:    tda9874a_setmode,
+		checkmode:  generic_checkmode,
 	},
 	{
 		name:       "tda9850",
@@ -991,7 +1190,11 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 	i2c_attach_client(&chip->c);
 
 	/* initialization  */
-	chip_cmd(chip,"init",&desc->init);
+	if (desc->initialize != NULL)
+		desc->initialize(chip);
+	else
+		chip_cmd(chip,"init",&desc->init);
+
 	if (desc->flags & CHIP_HAS_VOLUME) {
 		chip->left   = desc->leftinit   ? desc->leftinit   : 65536;
 		chip->right  = desc->rightinit  ? desc->rightinit  : 65536;
@@ -1168,7 +1371,6 @@ void audiochip_cleanup_module(void)
 
 module_init(audiochip_init_module);
 module_exit(audiochip_cleanup_module);
-MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

@@ -77,7 +77,7 @@
 
 static int max_loop = 8;
 static struct loop_device *loop_dev;
-static unsigned long *loop_sizes;
+static int *loop_sizes;
 static int *loop_blksizes;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
@@ -865,7 +865,7 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 			err = -ENXIO;
 			break;
 		}
-		err = put_user(loop_sizes[lo->lo_number] << 1, (unsigned long *) arg);
+		err = put_user((unsigned long)loop_sizes[lo->lo_number] << 1, (unsigned long *) arg);
 		break;
 	case BLKGETSIZE64:
 		if (lo->lo_state != Lo_bound) {
@@ -1007,7 +1007,7 @@ int __init loop_init(void)
 	if (!loop_dev)
 		return -ENOMEM;
 
-	loop_sizes = kmalloc(max_loop * sizeof(unsigned long), GFP_KERNEL);
+	loop_sizes = kmalloc(max_loop * sizeof(int), GFP_KERNEL);
 	if (!loop_sizes)
 		goto out_sizes;
 
@@ -1027,7 +1027,7 @@ int __init loop_init(void)
 		spin_lock_init(&lo->lo_lock);
 	}
 
-	memset(loop_sizes, 0, max_loop * sizeof(unsigned long));
+	memset(loop_sizes, 0, max_loop * sizeof(int));
 	memset(loop_blksizes, 0, max_loop * sizeof(int));
 	blk_size[MAJOR_NR] = loop_sizes;
 	blksize_size[MAJOR_NR] = loop_blksizes;

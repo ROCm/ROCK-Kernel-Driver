@@ -135,12 +135,10 @@ void __init swap_setup(void)
 	/* Use a smaller cluster for small-memory machines */
 	if (megs < 16)
 		page_cluster = 2;
-	else if (megs < 32)
-		page_cluster = 3;
-	else if (megs < 64)
-		page_cluster = 4;
-	else if (megs < 128)
-		page_cluster = 5;
 	else
-		page_cluster = 6;
+		page_cluster = 3;
+	/*
+	 * Right now other parts of the system means that we
+	 * _really_ don't want to cluster much more
+	 */
 }

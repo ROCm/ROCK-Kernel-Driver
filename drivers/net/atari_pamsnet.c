@@ -124,6 +124,7 @@ extern struct net_device *init_etherdev(struct net_device *dev, int sizeof_priva
 unsigned int pamsnet_debug = NET_DEBUG;
 MODULE_PARM(pamsnet_debug, "i");
 MODULE_PARM_DESC(pamsnet_debug, "pamsnet debug enable (0-1)");
+MODULE_LICENSE("GPL");
 
 static unsigned int pamsnet_min_poll_time = 2;
 

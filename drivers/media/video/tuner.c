@@ -30,24 +30,28 @@ static struct i2c_client_address_data addr_data = {
 	force
 };
 
-static int debug =  0; /* insmod parameter */
-static int type  = -1; /* insmod parameter */
-
+/* insmod options */
+static int debug =  0;
+static int type  = -1;
 static int addr  =  0;
 static char *pal =  "b";
-static int this_adap;
 static int tv_range[2]    = { 44, 958 };
 static int radio_range[2] = { 65, 108 };
-
-#define dprintk     if (debug) printk
-
 MODULE_PARM(debug,"i");
 MODULE_PARM(type,"i");
 MODULE_PARM(addr,"i");
 MODULE_PARM(tv_range,"2i");
 MODULE_PARM(radio_range,"2i");
 MODULE_PARM(pal,"s");
+
+#define optimize_vco 1
+
+MODULE_DESCRIPTION("device driver for various TV and TV+FM radio tuners");
+MODULE_AUTHOR("Ralph Metzler, Gerd Knorr, Gunther Mayer");
 MODULE_LICENSE("GPL");
+
+static int this_adap;
+#define dprintk     if (debug) printk
 
 struct tuner
 {
@@ -56,11 +60,14 @@ struct tuner
 	int std;
 
 	int radio;
-	int mode;            /* PAL(0)/SECAM(1) mode (PHILIPS_SECAM only) */
+	int mode;            /* current norm for multi-norm tuners */
+	int xogc;	     // only for MT2032
 };
 
 static struct i2c_driver driver;
 static struct i2c_client client_template;
+
+/* ---------------------------------------------------------------------- */
 
 /* tv standard selection for Temic 4046 FM5
    this value takes the low bits of control byte 2
@@ -154,13 +161,13 @@ static struct tunertype tuners[] = {
 	  16*133.25,16*351.25,0x01,0x02,0x08,0x8e,622},
         { "Alps TSBC5", Alps, PAL, /* untested - data sheet guess. Only IF differs. */
 	  16*133.25,16*351.25,0x01,0x02,0x08,0x8e,608},
-	{ "Temic PAL_I (4006FH5)", TEMIC, PAL_I,
+	{ "Temic PAL_BG (4006FH5)", TEMIC, PAL,
 	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623}, 
   	{ "Alps TSCH6",Alps,NTSC,
   	  16*137.25,16*385.25,0x14,0x12,0x11,0x8e,732},
 
   	{ "Temic PAL_DK (4016 FY5)",TEMIC,PAL,
-  	  16*136.25,16*456.25,0xa0,0x90,0x30,0x8e,623},
+  	  16*168.25,16*456.25,0xa0,0x90,0x30,0x8e,623},
   	{ "Philips NTSC_M (MK2)",Philips,NTSC,
   	  16*160.00,16*454.00,0xa0,0x90,0x30,0x8e,732},
         { "Temic PAL_I (4066 FY5)", TEMIC, PAL_I,
@@ -191,7 +198,24 @@ static struct tunertype tuners[] = {
 	{ "LG PAL_BG (TPI8PSB11D)", LGINNOTEK, PAL,
 	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
 	{ "Temic PAL* auto + FM (4009 FN5)", TEMIC, PAL,
-	  16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623}
+	  16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623},
+	{ "SHARP NTSC_JP (2U5JF5540)", SHARP, NTSC, /* 940=16*58.75 NTSC@Japan */
+	  16*137.25,16*317.25,0x01,0x02,0x08,0x8e,940},
+
+	{ "Samsung PAL TCPM9091PD27", Samsung, PAL,  /* from sourceforge v3tv */
+          16*169,16*464,0xA0,0x90,0x30,0x8e,623},
+	{ "MT2032 universal", Microtune,PAL|NTSC,
+               0,0,0,0,0,0,0},
+	{ "Temic PAL_BG (4106 FH5)", TEMIC, PAL,
+          16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623},
+	{ "Temic PAL_DK/SECAM_L (4012 FY5)", TEMIC, PAL,
+          16*140.25, 16*463.25, 0x02,0x04,0x01,0x8e,623},
+
+	{ "Temic NTSC (4136 FY5)", TEMIC, NTSC,
+          16*158.00, 16*453.00, 0xa0,0x90,0x30,0x8e,732},
+        { "LG PAL (newer TAPC series)", LGINNOTEK, PAL,
+          16*170.00, 16*450.00, 0x01,0x02,0x08,0x8e,623},
+	
 };
 #define TUNERS (sizeof(tuners)/sizeof(struct tunertype))
 
@@ -200,6 +224,11 @@ static struct tunertype tuners[] = {
 static int tuner_getstatus(struct i2c_client *c)
 {
 	unsigned char byte;
+
+	struct tuner *t = (struct tuner*)c->data;
+
+        if (t->type == TUNER_MT2032)
+		return 0;
 
 	if (1 != i2c_master_recv(c,&byte,1))
 		return 0;
@@ -241,6 +270,315 @@ static int tuner_mode (struct i2c_client *c)
         return (tuner_getstatus (c) & TUNER_MODE) >> 3;
 }
 #endif
+// Initalization as described in "MT203x Programming Procedures", Rev 1.2, Feb.2001
+int mt2032_init(struct i2c_client *c)
+{
+        unsigned char buf[21];
+        int ret,xogc,xok=0;
+	struct tuner *t = (struct tuner*)c->data;
+
+        buf[0]=0;
+        ret=i2c_master_send(c,buf,1);
+        i2c_master_recv(c,buf,21);
+
+        printk("MT2032: Companycode=%02x%02x Part=%02x Revision=%02x\n",
+                buf[0x11],buf[0x12],buf[0x13],buf[0x14]);
+
+        if(debug) {
+                int i;
+                printk("MT2032 hexdump:\n");
+                for(i=0;i<21;i++) {
+                        printk(" %02x",buf[i]);
+                        if(((i+1)%8)==0) printk(" ");
+                        if(((i+1)%16)==0) printk("\n ");
+                }
+                printk("\n ");
+        }
+
+        // Initialize Registers per spec.
+        buf[1]=2; // Index to register 2
+        buf[2]=0xff;
+        buf[3]=0x0f;
+        buf[4]=0x1f;
+        ret=i2c_master_send(c,buf+1,4);
+
+        buf[5]=6; // Index register 6
+        buf[6]=0xe4;
+        buf[7]=0x8f;
+        buf[8]=0xc3;
+        buf[9]=0x4e;
+        buf[10]=0xec;
+        ret=i2c_master_send(c,buf+5,6);
+
+        buf[12]=13;  // Index register 13
+        buf[13]=0x32;
+        ret=i2c_master_send(c,buf+12,2);
+
+        // Adjust XOGC (register 7), wait for XOK
+        xogc=7;
+        do {
+		dprintk("mt2032: xogc = 0x%02x\n",xogc&0x07);
+                mdelay(10);
+                buf[0]=0x0e;
+                i2c_master_send(c,buf,1);
+                i2c_master_recv(c,buf,1);
+                xok=buf[0]&0x01;
+                dprintk("mt2032: xok = 0x%02x\n",xok);
+                if (xok == 1) break;
+
+                xogc--;
+                dprintk("mt2032: xogc = 0x%02x\n",xogc&0x07);
+                if (xogc == 3) {
+                        xogc=4; // min. 4 per spec
+                        break;
+                }
+                buf[0]=0x07;
+                buf[1]=0x88 + xogc;
+                ret=i2c_master_send(c,buf,2);
+                if (ret!=2)
+                        printk("mt2032_init failed with %d\n",ret);
+        } while (xok != 1 );
+	t->xogc=xogc;
+
+        return(1);
+}
+
+
+// IsSpurInBand()?
+int mt2032_spurcheck(int f1, int f2, int spectrum_from,int spectrum_to)
+{
+	int n1=1,n2,f;
+
+	f1=f1/1000; //scale to kHz to avoid 32bit overflows
+	f2=f2/1000;
+	spectrum_from/=1000;
+	spectrum_to/=1000;
+
+	dprintk("spurcheck f1=%d f2=%d  from=%d to=%d\n",f1,f2,spectrum_from,spectrum_to);
+
+	do {
+	    n2=-n1;
+	    f=n1*(f1-f2);
+	    do {
+		n2--;
+		f=f-f2;
+		dprintk(" spurtest n1=%d n2=%d ftest=%d\n",n1,n2,f);
+
+		if( (f>spectrum_from) && (f<spectrum_to))
+			printk("mt2032 spurcheck triggered: %d\n",n1);
+	    } while ( (f>(f2-spectrum_to)) || (n2>-5));
+	    n1++;
+	} while (n1<5);
+
+	return 1;
+}
+
+int mt2032_compute_freq(int rfin, int if1, int if2, int spectrum_from,
+	int spectrum_to, unsigned char *buf, int *ret_sel, int xogc) //all in Hz
+{
+        int fref,lo1,lo1n,lo1a,s,sel,lo1freq, desired_lo1,
+		desired_lo2,lo2,lo2n,lo2a,lo2num,lo2freq;
+
+        fref= 5250 *1000; //5.25MHz
+	desired_lo1=rfin+if1;
+
+	lo1=(2*(desired_lo1/1000)+(fref/1000)) / (2*fref/1000);
+        lo1n=lo1/8;
+        lo1a=lo1-(lo1n*8);
+
+        s=rfin/1000/1000+1090;
+
+	if(optimize_vco) {
+		if(s>1890) sel=0;
+		else if(s>1720) sel=1;
+		else if(s>1530) sel=2;
+		else if(s>1370) sel=3;
+		else sel=4; // >1090
+	}
+	else {
+        	if(s>1790) sel=0; // <1958
+        	else if(s>1617) sel=1;
+        	else if(s>1449) sel=2;
+        	else if(s>1291) sel=3;
+        	else sel=4; // >1090
+	}
+	*ret_sel=sel;
+
+        lo1freq=(lo1a+8*lo1n)*fref;
+
+        dprintk("mt2032: rfin=%d lo1=%d lo1n=%d lo1a=%d sel=%d, lo1freq=%d\n",
+		rfin,lo1,lo1n,lo1a,sel,lo1freq);
+
+        desired_lo2=lo1freq-rfin-if2;
+        lo2=(desired_lo2)/fref;
+        lo2n=lo2/8;
+        lo2a=lo2-(lo2n*8);
+        lo2num=((desired_lo2/1000)%(fref/1000))* 3780/(fref/1000); //scale to fit in 32bit arith
+        lo2freq=(lo2a+8*lo2n)*fref + lo2num*(fref/1000)/3780*1000;
+
+        dprintk("mt2032: rfin=%d lo2=%d lo2n=%d lo2a=%d num=%d lo2freq=%d\n",
+		rfin,lo2,lo2n,lo2a,lo2num,lo2freq);
+
+        if(lo1a<0 || lo1a>7 || lo1n<17 ||lo1n>48 || lo2a<0 ||lo2a >7 ||lo2n<17 || lo2n>30) {
+                printk("mt2032: frequency parameters out of range: %d %d %d %d\n",
+		       lo1a, lo1n, lo2a,lo2n);
+                return(-1);
+        }
+
+	mt2032_spurcheck(lo1freq, desired_lo2,  spectrum_from, spectrum_to);
+	// should recalculate lo1 (one step up/down)
+
+	// set up MT2032 register map for transfer over i2c
+	buf[0]=lo1n-1;
+	buf[1]=lo1a | (sel<<4);
+	buf[2]=0x86; // LOGC
+	buf[3]=0x0f; //reserved
+	buf[4]=0x1f;
+	buf[5]=(lo2n-1) | (lo2a<<5);
+ 	if(rfin >400*1000*1000)
+                buf[6]=0xe4;
+        else
+                buf[6]=0xf4; // set PKEN per rev 1.2 
+	buf[7]=8+xogc;
+	buf[8]=0xc3; //reserved
+	buf[9]=0x4e; //reserved
+	buf[10]=0xec; //reserved
+	buf[11]=(lo2num&0xff);
+	buf[12]=(lo2num>>8) |0x80; // Lo2RST
+
+	return 0;
+}
+
+int mt2032_check_lo_lock(struct i2c_client *c)
+{
+	int try,lock=0;
+	unsigned char buf[2];
+	for(try=0;try<10;try++) {
+		buf[0]=0x0e;
+		i2c_master_send(c,buf,1);
+		i2c_master_recv(c,buf,1);
+		dprintk("mt2032 Reg.E=0x%02x\n",buf[0]);
+		lock=buf[0] &0x06;
+		
+		if (lock==6)
+			break;
+		
+		dprintk("mt2032: pll wait 1ms for lock (0x%2x)\n",buf[0]);
+		udelay(1000);
+	}
+        return lock;
+}
+
+int mt2032_optimize_vco(struct i2c_client *c,int sel,int lock)
+{
+	unsigned char buf[2];
+	int tad1;
+
+	buf[0]=0x0f;
+	i2c_master_send(c,buf,1);
+	i2c_master_recv(c,buf,1);
+	dprintk("mt2032 Reg.F=0x%02x\n",buf[0]);
+	tad1=buf[0]&0x07;
+
+	if(tad1 ==0) return lock;
+	if(tad1 ==1) return lock;
+
+	if(tad1==2) {
+		if(sel==0) 
+			return lock;
+		else sel--;
+	}
+	else {
+		if(sel<4)
+			sel++;
+		else
+			return lock;
+	}
+
+	dprintk("mt2032 optimize_vco: sel=%d\n",sel);
+
+	buf[0]=0x0f;
+	buf[1]=sel;
+        i2c_master_send(c,buf,2);
+	lock=mt2032_check_lo_lock(c);
+	return lock;
+}
+
+
+void mt2032_set_if_freq(struct i2c_client *c,int rfin, int if1, int if2, int from, int to)
+{
+	unsigned char buf[21];
+	int lint_try,ret,sel,lock=0;
+	struct tuner *t = (struct tuner*)c->data;
+
+	dprintk("mt2032_set_if_freq rfin=%d if1=%d if2=%d from=%d to=%d\n",rfin,if1,if2,from,to);
+
+        buf[0]=0;
+        ret=i2c_master_send(c,buf,1);
+        i2c_master_recv(c,buf,21);
+
+	buf[0]=0;
+	ret=mt2032_compute_freq(rfin,if1,if2,from,to,&buf[1],&sel,t->xogc);
+	if (ret<0)
+		return;
+
+        // send only the relevant registers per Rev. 1.2
+        buf[0]=0;
+        ret=i2c_master_send(c,buf,4);
+        buf[5]=5;
+        ret=i2c_master_send(c,buf+5,4);
+        buf[11]=11;
+        ret=i2c_master_send(c,buf+11,3);
+        if(ret!=3)
+                printk("mt2032_set_if_freq failed with %d\n",ret);
+
+	// wait for PLLs to lock (per manual), retry LINT if not.
+	for(lint_try=0; lint_try<2; lint_try++) {
+		lock=mt2032_check_lo_lock(c);
+		
+		if(optimize_vco)
+			lock=mt2032_optimize_vco(c,sel,lock);
+		if(lock==6) break;
+		
+		printk("mt2032: re-init PLLs by LINT\n"); 
+		buf[0]=7; 
+		buf[1]=0x80 +8+t->xogc; // set LINT to re-init PLLs
+		i2c_master_send(c,buf,2);
+		mdelay(10);
+		buf[1]=8+t->xogc;
+		i2c_master_send(c,buf,2);
+        }
+
+	if (lock!=6)
+		printk("MT2032 Fatal Error: PLLs didn't lock.\n");
+
+	buf[0]=2;
+	buf[1]=0x20; // LOGC for optimal phase noise
+	ret=i2c_master_send(c,buf,2);
+	if (ret!=2)
+		printk("mt2032_set_if_freq2 failed with %d\n",ret);
+}
+
+
+void mt2032_set_tv_freq(struct i2c_client *c, int freq, int norm)
+{
+	int if2,from,to;
+
+	// signal bandwidth and picture carrier
+	if(norm==VIDEO_MODE_NTSC) {
+		from=40750*1000;
+		to=46750*1000;
+		if2=45750*1000; 
+	}
+	else {  // Pal 
+		from=32900*1000;
+		to=39900*1000;
+		if2=38900*1000;
+	}
+
+        mt2032_set_if_freq(c,freq* 1000*1000/16, 1090*1000*1000, if2, from, to);
+}
+
 
 // Set tuner frequency,  freq in Units of 62.5kHz = 1/16MHz
 static void set_tv_freq(struct i2c_client *c, int freq)
@@ -252,6 +590,15 @@ static void set_tv_freq(struct i2c_client *c, int freq)
         unsigned char buffer[4];
 	int rc;
 
+	if (t->type == -1) {
+		printk("tuner: tuner type not set\n");
+		return;
+	}
+	if (t->type == TUNER_MT2032) {
+		mt2032_set_tv_freq(c,freq,t->mode);
+		return;
+	}
+
 	if (freq < tv_range[0]*16 || freq > tv_range[1]*16) {
 		/* FIXME: better do that chip-specific, but
 		   right now we don't have that in the config
@@ -259,10 +606,6 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 		   check at all */
 		printk("tuner: TV freq (%d.%02d) out of range (%d-%d)\n",
 		       freq/16,freq%16*100/16,tv_range[0],tv_range[1]);
-	}
-
-	if (t->type == -1) {
-		printk("tuner: tuner type not set\n");
 		return;
 	}
 
@@ -282,7 +625,7 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 		/* 0x02 -> PAL BDGHI / SECAM L */
 		/* 0x04 -> ??? PAL others / SECAM others ??? */
 		config &= ~0x02;
-		if (t->mode)
+		if (t->mode == VIDEO_MODE_SECAM)
 			config |= 0x02;
 		break;
 
@@ -366,6 +709,15 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 
 }
 
+static void mt2032_set_radio_freq(struct i2c_client *c,int freq)
+{               
+        int if2;
+
+        if2=10700*1000; //  10.7MHz FM intermediate frequency
+
+        mt2032_set_if_freq(c,freq* 1000*1000/16, 1085*1000*1000,if2,if2,if2);
+}
+
 static void set_radio_freq(struct i2c_client *c, int freq)
 {
 	u8 config;
@@ -383,6 +735,11 @@ static void set_radio_freq(struct i2c_client *c, int freq)
 	}
 	if (t->type == -1) {
 		printk("tuner: tuner type not set\n");
+		return;
+	}
+
+        if (t->type == TUNER_MT2032) {
+                mt2032_set_radio_freq(c,freq);
 		return;
 	}
 
@@ -448,6 +805,9 @@ static int tuner_attach(struct i2c_adapter *adap, int addr,
 		t->type = -1;
 	}
         i2c_attach_client(client);
+        if (t->type == TUNER_MT2032)
+                 mt2032_init(client);
+
 	MOD_INC_USE_COUNT;
 
 	return 0;
@@ -497,6 +857,8 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		dprintk("tuner: type set to %d (%s)\n",
                         t->type,tuners[t->type].name);
 		strncpy(client->name, tuners[t->type].name, sizeof(client->name));
+		if (t->type == TUNER_MT2032)
+                        mt2032_init(client);
 		break;
 	case AUDC_SET_RADIO:
 		t->radio = 1;
@@ -508,12 +870,11 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	case VIDIOCSCHAN:
 	{
 		struct video_channel *vc = arg;
-		
+
 		t->radio = 0;
-		if (t->type == TUNER_PHILIPS_SECAM) {
-			t->mode = (vc->norm == VIDEO_MODE_SECAM) ? 1 : 0;
+		t->mode = vc->norm;
+		if (t->freq)
 			set_tv_freq(client,t->freq);
-		}
 		return 0;
 	}
 	case VIDIOCSFREQ:

@@ -13168,14 +13168,14 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 	** in the size field.  We use normal 32-bit PCI addresses for
 	** descriptors.
 	*/
-	if (chip->features & FE_DAC) {
+	if (chip && (chip->features & FE_DAC)) {
 		if (pci_set_dma_mask(pdev, (u64) 0xffffffffff))
 			chip->features &= ~FE_DAC_IN_USE;
 		else
 			chip->features |= FE_DAC_IN_USE;
 	}
 
-	if (!(chip->features & FE_DAC_IN_USE)) {
+	if (chip && !(chip->features & FE_DAC_IN_USE)) {
 		if (pci_set_dma_mask(pdev, (u64) 0xffffffff)) {
 			printk(KERN_WARNING NAME53C8XX
 			       "32 BIT PCI BUS DMA ADDRESSING NOT SUPPORTED\n");

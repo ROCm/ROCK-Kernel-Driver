@@ -748,6 +748,24 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
         case SNDCTL_DSP_SYNC:
 		/* NOP */
 		return 0;
+	case SNDCTL_DSP_GETISPACE:
+	{
+		audio_buf_info info;
+		if (!bta->recording)
+			return -EINVAL;
+		info.fragsize = bta->block_bytes>>bta->sampleshift;
+		info.fragstotal = bta->block_count;
+		info.bytes = bta->read_count;
+		info.fragments = info.bytes / info.fragsize;
+		if (debug)
+			printk(KERN_DEBUG "btaudio: SNDCTL_DSP_GETISPACE "
+			       "returns %d/%d/%d/%d\n",
+			       info.fragsize, info.fragstotal,
+			       info.bytes, info.fragments);
+		if (copy_to_user((void *)arg, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
 #if 0 /* TODO */
         case SNDCTL_DSP_GETTRIGGER:
         case SNDCTL_DSP_SETTRIGGER:

@@ -226,6 +226,7 @@ static int hplance_close(struct net_device *dev)
 }
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 int init_module(void)
 {
         root_lance_dev = NULL;

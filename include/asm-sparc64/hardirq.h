@@ -12,6 +12,7 @@
 #include <linux/spinlock.h>
 
 /* entry.S is sensitive to the offsets of these fields */
+/* rtrap.S is sensitive to the size of this structure */
 typedef struct {
 	unsigned int __softirq_pending;
 	unsigned int __unused_1;

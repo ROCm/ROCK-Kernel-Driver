@@ -47,7 +47,10 @@
 
 #define SPEED_100                0x0
 #define SPEED_200                0x1
-#define SPEED_400                0x2 
+#define SPEED_400                0x2
+
+/* Maps speed values above to a string representation */
+extern const char *hpsb_speedto_str[];
 
 #define SELFID_PWRCL_NO_POWER    0x0
 #define SELFID_PWRCL_PROVIDE_15W 0x1

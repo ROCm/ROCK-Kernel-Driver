@@ -1558,6 +1558,7 @@ static struct net_device devSMC9194;
 static int io;
 static int irq;
 static int ifport;
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");

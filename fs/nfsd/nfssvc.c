@@ -162,7 +162,7 @@ nfsd(struct svc_rqst *rqstp)
 	lock_kernel();
 	daemonize();
 	sprintf(current->comm, "nfsd");
-	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY; 
+	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 
 	nfsdstats.th_cnt++;
 	/* Let svc_process check client's authentication. */

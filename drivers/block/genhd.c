@@ -161,9 +161,6 @@ out:
 
 
 extern int blk_dev_init(void);
-#ifdef CONFIG_BLK_DEV_DAC960
-extern void DAC960_Initialize(void);
-#endif
 #ifdef CONFIG_FUSION_BOOT
 extern int fusion_init(void);
 #endif
@@ -181,9 +178,6 @@ int __init device_init(void)
 	sti();
 #ifdef CONFIG_I2O
 	i2o_init();
-#endif
-#ifdef CONFIG_BLK_DEV_DAC960
-	DAC960_Initialize();
 #endif
 #ifdef CONFIG_FUSION_BOOT
 	fusion_init();

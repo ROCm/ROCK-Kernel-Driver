@@ -37,9 +37,12 @@
 #endif
 
 #define RTO_ONLINK	0x01
-#define RTO_TPROXY	0x80000000
 
 #define RTO_CONN	0
+/* RTO_CONN is not used (being alias for 0), but preserved not to break
+ * some modules referring to it. */
+
+#define RT_CONN_FLAGS(sk)   (RT_TOS(sk->protinfo.af_inet.tos) | sk->localroute)
 
 struct rt_key
 {

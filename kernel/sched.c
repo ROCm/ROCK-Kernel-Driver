@@ -1297,6 +1297,7 @@ void daemonize(void)
 
 	current->session = 1;
 	current->pgrp = 1;
+	current->tty = NULL;
 
 	/* Become as one with the init task */
 

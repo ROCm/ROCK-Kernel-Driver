@@ -837,3 +837,4 @@ static void __exit a2065_cleanup(void)
 
 module_init(a2065_probe);
 module_exit(a2065_cleanup);
+MODULE_LICENSE("GPL");

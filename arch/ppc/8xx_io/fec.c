@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.fec.c 1.18 09/22/01 09:12:32 trini
+ * BK Id: SCCS/s.fec.c 1.20 10/11/01 11:55:47 trini
  */
 /*
  * Fast Ethernet Controller (FEC) driver for Motorola MPC8xx.
@@ -868,6 +868,8 @@ static void mii_parse_sr(uint mii_reg, struct net_device *dev)
 		*s |= PHY_STAT_FAULT;
 	if (mii_reg & 0x0020)
 		*s |= PHY_STAT_ANC;
+
+	fep->link = (*s & PHY_STAT_LINK) ? 1 : 0;
 }
 
 static void mii_parse_cr(uint mii_reg, struct net_device *dev)
@@ -1650,11 +1652,11 @@ int __init fec_enet_init(void)
 #endif
 
 #ifdef PHY_INTERRUPT
-	if (request_8xxirq(PHY_INTERRUPT, mii_link_interrupt, 0, "mii", dev) != 0)
-		panic("Could not allocate MII IRQ!");
-
 	((immap_t *)IMAP_ADDR)->im_siu_conf.sc_siel |=
 		(0x80000000 >> PHY_INTERRUPT);
+
+	if (request_8xxirq(PHY_INTERRUPT, mii_link_interrupt, 0, "mii", dev) != 0)
+		panic("Could not allocate MII IRQ!");
 #endif
 
 	dev->base_addr = (unsigned long)fecp;

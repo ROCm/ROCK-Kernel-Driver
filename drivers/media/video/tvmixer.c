@@ -26,6 +26,9 @@ static int devnr = -1;
 MODULE_PARM(debug,"i");
 MODULE_PARM(devnr,"i");
 
+MODULE_AUTHOR("Gerd Knorr");
+MODULE_LICENSE("GPL");
+
 /* ----------------------------------------------------------------------- */
 
 struct TVMIXER {
@@ -38,27 +41,6 @@ static struct TVMIXER devices[DEV_MAX];
 
 static int tvmixer_adapters(struct i2c_adapter *adap);
 static int tvmixer_clients(struct i2c_client *client);
-
-static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-static int tvmixer_open(struct inode *inode, struct file *file);
-static int tvmixer_release(struct inode *inode, struct file *file);
-
-
-static struct i2c_driver driver = {
-	name:            "tv card mixer driver",
-        id:              I2C_DRIVERID_TVMIXER,
-	flags:           I2C_DF_DUMMY,
-        attach_adapter:  tvmixer_adapters,
-        detach_client:   tvmixer_clients,
-};
-
-static struct file_operations tvmixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:         no_llseek,
-	ioctl:          tvmixer_ioctl,
-	open:           tvmixer_open,
-	release:        tvmixer_release,
-};
 
 /* ----------------------------------------------------------------------- */
 
@@ -232,6 +214,23 @@ static int tvmixer_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+
+static struct i2c_driver driver = {
+	name:            "tv card mixer driver",
+        id:              I2C_DRIVERID_TVMIXER,
+	flags:           I2C_DF_DUMMY,
+        attach_adapter:  tvmixer_adapters,
+        detach_client:   tvmixer_clients,
+};
+
+static struct file_operations tvmixer_fops = {
+	owner:		THIS_MODULE,
+	llseek:         no_llseek,
+	ioctl:          tvmixer_ioctl,
+	open:           tvmixer_open,
+	release:        tvmixer_release,
+};
+
 /* ----------------------------------------------------------------------- */
 
 static int tvmixer_adapters(struct i2c_adapter *adap)
@@ -355,4 +354,3 @@ module_exit(tvmixer_cleanup_module);
  * c-basic-offset: 8
  * End:
  */
-MODULE_LICENSE("GPL");

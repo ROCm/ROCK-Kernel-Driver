@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.enet.c 1.15 09/14/01 18:01:16 trini
+ * BK Id: SCCS/s.enet.c 1.17 10/11/01 11:55:47 trini
  */
 /*
  * Ethernet driver for Motorola MPC8xx.
@@ -147,7 +147,7 @@ struct scc_enet_private {
 static int scc_enet_open(struct net_device *dev);
 static int scc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int scc_enet_rx(struct net_device *dev);
-static void scc_enet_interrupt(void *dev_id);
+static void scc_enet_interrupt(void *dev_id, struct pt_regs *regs);
 static int scc_enet_close(struct net_device *dev);
 static struct net_device_stats *scc_enet_get_stats(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
@@ -303,7 +303,7 @@ scc_enet_timeout(struct net_device *dev)
  * This is called from the CPM handler, not the MPC core interrupt.
  */
 static void
-scc_enet_interrupt(void *dev_id)
+scc_enet_interrupt(void *dev_id, struct pt_regs *regs)
 {
 	struct	net_device *dev = dev_id;
 	volatile struct	scc_enet_private *cep;
@@ -805,22 +805,10 @@ int __init scc_enet_init(void)
 	ep->sen_iaddr4 = 0;
 
 	/* Set Ethernet station address.
-	 *
-	 * If we performed a MBX diskless boot, the Ethernet controller
-	 * has been initialized and we copy the address out into our
-	 * own structure.
-	 *
-	 * All other types of boards supply the address in the board
-	 * information structure, so we copy that into the controller.
 	 */
 	eap = (unsigned char *)&(ep->sen_paddrh);
-#ifndef CONFIG_MBX
 	for (i=5; i>=0; i--)
 		*eap++ = dev->dev_addr[i] = bd->bi_enetaddr[i];
-#else
-	for (i=5; i>=0; i--)
-		dev->dev_addr[i] = *eap++;
-#endif
 
 	ep->sen_pper = 0;	/* 'cause the book says so */
 	ep->sen_taddrl = 0;	/* temp address (LSB) */
@@ -943,6 +931,14 @@ int __init scc_enet_init(void)
 	immap->im_ioport.iop_pcdat &= ~PC_BSE_LOOPBACK;
 #endif
 
+#ifdef CONFIG_FADS
+	cp->cp_pbpar |= PB_ENET_TENA;
+	cp->cp_pbdir |= PB_ENET_TENA;
+
+	/* Enable the EEST PHY.
+	*/
+	*((volatile uint *)BCSR1) &= ~BCSR1_ETHEN;
+#endif
 
 	dev->base_addr = (unsigned long)ep;
 	dev->priv = cep;
@@ -970,5 +966,3 @@ int __init scc_enet_init(void)
 
 	return 0;
 }
-
-

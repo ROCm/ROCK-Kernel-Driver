@@ -40,6 +40,8 @@
 
 /* fwd decl */
 static void hauppauge_eeprom(struct bttv *btv);
+static void avermedia_eeprom(struct bttv *btv);
+
 static void init_PXC200(struct bttv *btv);
 #if 0
 static void init_tea5757(struct bttv *btv);
@@ -52,6 +54,7 @@ static void avermedia_tvphone_audio(struct bttv *btv, struct video_audio *v,
 static void terratv_audio(struct bttv *btv, struct video_audio *v, int set);
 static void gvbctv3pci_audio(struct bttv *btv, struct video_audio *v, int set);
 static void winfast2000_audio(struct bttv *btv, struct video_audio *v, int set);
+static void pvbt878p9b_audio(struct bttv *btv, struct video_audio *v, int set);
 
 /* config variables */
 static int triton1=0;
@@ -71,6 +74,10 @@ static unsigned int audiomux[5] = { -1, -1, -1, -1, -1 };
 
 /* insmod options */
 MODULE_PARM(triton1,"i");
+MODULE_PARM_DESC(triton1,"set ETBF pci config bit "
+		 "[enable bug compatibility for triton1 + others]");
+MODULE_PARM(vsfx,"i");
+MODULE_PARM_DESC(vsfx,"set VSFX pci config bit [yet another chipset flaw workaround]");
 MODULE_PARM(no_overlay,"i");
 MODULE_PARM(card,"1-4i");
 MODULE_PARM_DESC(card,"specify TV/grabber card model, see CARDLIST file for a list");
@@ -83,7 +90,6 @@ MODULE_PARM_DESC(autoload,"automatically load i2c modules like tuner.o, default 
 MODULE_PARM(gpiomask,"i");
 MODULE_PARM(audioall,"i");
 MODULE_PARM(audiomux,"1-5i");
-MODULE_LICENSE("GPL");
 
 /* kernel args */
 #ifndef MODULE
@@ -127,13 +133,18 @@ static struct CARD {
 	{ 0x6606107d, BTTV_WINFAST2000,   "Leadtek WinFast TV 2000" },
 	{ 0x263610b4, BTTV_STB2,          "STB TV PCI FM, P/N 6000704" },
  	{ 0x402010fc, BTTV_GVBCTV3PCI,    "I-O Data Co. GV-BCV3/PCI" },
-	{ 0x405010fc, BTTV_GVBCTV3PCI,    "I-O Data Co. GV-BCV4/PCI" },
+	{ 0x405010fc, BTTV_GVBCTV4PCI,    "I-O Data Co. GV-BCV4/PCI" },
+
+	{ 0x1200bd11, BTTV_PINNACLE,      "Pinnacle PCTV" },
 	{ 0x001211bd, BTTV_PINNACLE,      "Pinnacle PCTV" },
-	{ 0x3000121a, 0/* no entry yet */,"VoodooTV 200" },
+	{ 0x001c11bd, BTTV_PINNACLE,      "Pinnacle PCTV Sat" },
 
-	{ 0x3000144f, BTTV_MAGICTVIEW063, "TView 99 (CPH063)" },
-	{ 0x3002144f, BTTV_MAGICTVIEW061, "Askey Magic TView" },
-
+	{ 0x3000121a, BTTV_VOODOOTV_FM,   "3Dfx VoodooTV FM/ VoodooTV 200" },
+	
+	{ 0x3000144f, BTTV_MAGICTVIEW063, "(Askey Magic/others) TView99 CPH06x" },
+	{ 0x3002144f, BTTV_MAGICTVIEW061, "(Askey Magic/others) TView99 CPH05x" },
+	{ 0x3005144f, BTTV_MAGICTVIEW061, "(Askey Magic/others) TView99 CPH061/06L (T1/LC)" },
+	
 	{ 0x00011461, BTTV_AVPHONE98,     "AVerMedia TVPhone98" },
 	{ 0x00021461, BTTV_AVERMEDIA98,   "AVermedia TVCapture 98" },
 	{ 0x00031461, BTTV_AVPHONE98,     "AVerMedia TVPhone98" },
@@ -154,15 +165,15 @@ static struct CARD {
 	{ 0x400a15b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV" },
 	{ 0x400d15b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV / Radio" },
 	{ 0x401015b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV / Radio" },
+	{ 0x401615b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV / Radio" },
 
     	{ 0x010115cb, BTTV_GMV1,          "AG GMV1" },
-	{ 0x010114c7, 16 /* FIXME */,     "Modular Technology PCTV" },
-	{ 0x18501851, BTTV_CHRONOS_VS2,   "Chronos Video Shuttle II" },
-	{ 0x18511851, 0 /* FIXME */,      "CyberMail AV" },
-	{ 0x18521852, BTTV_TYPHOON_TVIEW, "Typhoon TView TV/FM Tuner" },
+	{ 0x010114c7, BTTV_MODTEC_205,    "Modular Technology PCTV" },
+	{ 0x18501851, BTTV_CHRONOS_VS2,   "Flyvideo 98 (LR50)/ Chronos Video Shuttle II" },
+	{ 0x18511851, BTTV_FLYVIDEO98EZ,  "Flyvideo 98EZ (LR51)/ CyberMail AV" },
+	{ 0x18521852, BTTV_TYPHOON_TVIEW, "Flyvideo 98FM (LR50)/ Typhoon TView TV/FM Tuner" },
 	{ 0x10b42636, BTTV_HAUPPAUGE878,  "STB ???" },
 	{ 0x217d6606, BTTV_WINFAST2000,   "Leadtek WinFast TV 2000" },
-	{ 0x1200bd11, BTTV_PINNACLE,      "Pinnacle PCTV" },
 
 	{ 0, -1, NULL }
 };
@@ -173,7 +184,7 @@ static struct CARD {
 struct tvcard bttv_tvcards[] = {
 {
 /* ---- card 0x00 ---------------------------------- */
-	name:		" *** UNKNOWN *** ",
+	name:		" *** UNKNOWN/GENERIC *** ",
 	video_inputs:	4,
 	audio_inputs:	1,
 	tuner:		0,
@@ -192,7 +203,7 @@ struct tvcard bttv_tvcards[] = {
 	needs_tvaudio:	1,
 	tuner_type:	-1,
 },{
-	name:		"Hauppauge old",
+	name:		"Hauppauge (bt848)",
 	video_inputs:	4,
 	audio_inputs:	1,
 	tuner:		0,
@@ -265,7 +276,7 @@ struct tvcard bttv_tvcards[] = {
 },{
 
 /* ---- card 0x08 ---------------------------------- */
-	name:		"Fly Video II",
+	name:		"Fly Video II (Bt848)",
 	video_inputs:	3,
 	audio_inputs:	1,
 	tuner:		0,
@@ -287,12 +298,12 @@ struct tvcard bttv_tvcards[] = {
 	needs_tvaudio:	1,
 	tuner_type:	-1,
 },{
-	name:		"Hauppauge new (bt878)",
+	name:		"Hauppauge (bt878)",
 	video_inputs:	4,
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		2,
-	gpiomask:	7,
+	gpiomask:	0x0f, /* old: 7 */
 	muxsel:		{ 2, 0, 1, 1},
 	audiomux:	{ 0, 1, 2, 3, 4},
 	needs_tvaudio:	1,
@@ -333,7 +344,7 @@ struct tvcard bttv_tvcards[] = {
 	audiomux:	{ 13, 14, 11, 7, 0, 0},
 	needs_tvaudio:	1,
 	pll:		PLL_28,
-	tuner_type:	5,
+	tuner_type:	-1,
 },{
 	name:		"Aimslab VHX",
 	video_inputs:	3,
@@ -452,14 +463,14 @@ struct tvcard bttv_tvcards[] = {
 },{
 
 /* ---- card 0x18 ---------------------------------- */
-	name:		"Askey/Typhoon/Anubis Magic TView CPH051/061 (bt878)",
+	name:		"[many vendors] CPH05X/06X (bt878)",
 	video_inputs:	3,
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		2,
 	gpiomask:	0xe00,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{0x400, 0x400, 0x400, 0x400, 0},
+	audiomux:	{0x400, 0x400, 0x400, 0x400, 0xc00},
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	-1,
@@ -528,9 +539,9 @@ struct tvcard bttv_tvcards[] = {
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		2,
-	gpiomask:	0x8dfe00,
+	gpiomask:	0x1800,  //0x8dfe00
 	muxsel:		{2, 3, 1, 1},
-	audiomux:	{ 0, 0x8dff00, 0x8df700, 0x8de700, 0x8dff00, 0 },
+	audiomux:	{ 0, 0x0800, 0x1000, 0x1000, 0x1800, 0 },
 	needs_tvaudio:	1,
 	tuner_type:	-1,
 },{
@@ -582,31 +593,32 @@ struct tvcard bttv_tvcards[] = {
 	tuner_type:	-1,
 	audio_hook:	winfast2000_audio,
 },{
-	name:		"Chronos Video Shuttle II",
+	name:		"Flyvideo 98 (LR50Q) / Chronos Video Shuttle II",
 	video_inputs:	3,
 	audio_inputs:	3,
 	tuner:		0,
 	svhs:		2,
 	gpiomask:	0x1800,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 0, 0, 0x1000, 0x1000, 0x0800},
+	audiomux:	{ 0, 0x800, 0x1000, 0x1000, 0x1800},
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	-1,
 },{
 
 /* ---- card 0x24 ---------------------------------- */
-	name:		"Typhoon TView TV/FM Tuner",
+	name:		"Flyvideo 98FM (LR50Q) / Typhoon TView TV/FM Tuner",
 	video_inputs:	3,
 	audio_inputs:	3,
 	tuner:		0,
 	svhs:		2,
 	gpiomask:	0x1800,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 0, 0x800, 0, 0, 0x1800, 0 },
+	audiomux:	{ 0, 0x800, 0x1000, 0x1000, 0x1800, 0 },
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	-1,
+	has_radio:	1,
 },{
 	name:		"PixelView PlayTV pro",
 	video_inputs:	3,
@@ -620,14 +632,14 @@ struct tvcard bttv_tvcards[] = {
 	pll:		PLL_28,
 	tuner_type:	-1,
 },{
-	name:		"TView99 CPH063",
+	name:		"TView99 CPH06X",
 	video_inputs:	4,
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		2,
 	gpiomask:	0x551e00,
 	muxsel:		{ 2, 3, 1, 0},
-	audiomux:	{ 0x551400, 0x551200, 0, 0, 0, 0x551200 },
+	audiomux:	{ 0x551400, 0x551200, 0, 0, 0x551c00, 0x551200 },
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	-1,
@@ -668,7 +680,8 @@ struct tvcard bttv_tvcards[] = {
 	audiomux:	{ 13, 4, 11, 7, 0, 0},
 	needs_tvaudio:	1,
 	pll:		PLL_28,
-	tuner_type:	5,
+	tuner_type:	-1,
+	has_radio:	1,
 },{
 	name:		"ProVideo PV951", /* pic16c54 */
 	video_inputs:	3,
@@ -742,6 +755,7 @@ struct tvcard bttv_tvcards[] = {
 	no_msp34xx:	1,
 	pll:		PLL_35,
 	tuner_type:	1,
+	has_radio:	1,
 },{
 
 /* ---- card 0x30 ---------------------------------- */
@@ -770,7 +784,7 @@ struct tvcard bttv_tvcards[] = {
 	tuner_type:	TUNER_ALPS_TSHC6_NTSC,
 	audio_hook:	gvbctv3pci_audio,
 },{
-	name:		"Prolink PV-BT878P+4E (PixelView PlayTV PAK)",
+	name:		"Prolink PV-BT878P+4E / PixelView PlayTV PAK / Lenco MXTV-9578 CP",
 	video_inputs:	4,
 	audio_inputs:	1,
 	tuner:		0,
@@ -810,7 +824,7 @@ struct tvcard bttv_tvcards[] = {
 },{
 	/* Claas Langbehn <claas@bigfoot.com>,
 	   Sven Grothklags <sven@upb.de> */
-	name:		"Typhoon TView RDS / FM Stereo",
+	name:		"Typhoon TView RDS + FM Stereo / KNC1 TV Station RDS",
 	video_inputs:	3,
 	audio_inputs:	3,
 	tuner:		0,
@@ -821,13 +835,14 @@ struct tvcard bttv_tvcards[] = {
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	TUNER_PHILIPS_PAL_I,
+	has_radio:	1,
 },{
 	/* Tim Röstermundt <rosterm@uni-muenster.de>
 	   in de.comp.os.unix.linux.hardware:
 		options bttv card=0 pll=1 radio=1 gpiomask=0x18e0
 		audiomux=0x44c71f,0x44d71f,0,0x44d71f,0x44dfff
 		options tuner type=5 */
-	name:		"Lifetec LT 9415 TV",
+	name:		"Lifetec LT 9415 TV (LR90 Rev.F)",
 	video_inputs:	4,
 	audio_inputs:	1,
 	tuner:		0,
@@ -841,6 +856,7 @@ struct tvcard bttv_tvcards[] = {
 	pll:		PLL_28,
 	tuner_type:	TUNER_PHILIPS_PAL,
 	audio_hook:	lt9415_audio,
+	has_radio:	1,
 },{
 	/* Miguel Angel Alvarez <maacruz@navegalia.com>
 	   old Easy TV BT848 version (model CPH031) */
@@ -866,7 +882,7 @@ struct tvcard bttv_tvcards[] = {
 	svhs:           2,
 	gpiomask:       0x1800,
 	muxsel:         { 2, 3, 0, 1},
-	audiomux:       { 0, 0x800, 0, 0, 0x1800, 0 },
+	audiomux:       { 0, 0x800, 0x1000, 0x1000, 0x1800, 0 },
 	needs_tvaudio:  1,
 	pll:            PLL_28,
 	tuner_type:     5,
@@ -893,7 +909,7 @@ struct tvcard bttv_tvcards[] = {
         audio_inputs:   1,
         tuner:          0,
         svhs:           2,
-        gpiomask:       0x0e00,
+        gpiomask:       0xe00,
         muxsel:         { 2, 3, 1, 1},
         audiomux:       { 0x400, 0x400, 0x400, 0x400, 0x800, 0x400 },
         needs_tvaudio:  1,
@@ -1005,7 +1021,93 @@ struct tvcard bttv_tvcards[] = {
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	TUNER_PHILIPS_PAL,
-}};
+	has_radio:	1,
+},{
+	/* TANAKA Kei <peg00625@nifty.com> */
+	name:           "GV-BCTV4/PCI",
+	video_inputs:   3,
+	audio_inputs:   1,
+	tuner:          0,
+	svhs:           2,
+	gpiomask:       0x010f00,
+	muxsel:         {2, 3, 0, 0},
+	audiomux:       {0x10000, 0, 0x10000, 0, 0, 0},
+	no_msp34xx:     1,
+	pll:            PLL_28,
+	tuner_type:     TUNER_SHARP_2U5JF5540_NTSC,
+	audio_hook:     gvbctv3pci_audio,
+},{
+
+/* ---- card 0x44 ---------------------------------- */
+        name:           "3Dfx VoodooTV FM (Euro), VoodooTV 200 (USA)",
+	// try "insmod msp3400 simple=0" if you have
+	// sound problems with this card.
+        video_inputs:   4,
+        audio_inputs:   1,
+        tuner:          0,
+        svhs:           -1,
+        gpiomask:       0x4f8a00,
+	                // 0x100000: 1=MSP enabled (0=disable again)
+			// 0x010000: somehow influences tuner picture quality (?)
+        audiomux:       {0x947fff, 0x987fff,0x947fff,0x947fff},
+                        //tvtuner, radio,   external,internal,mute,stereo
+        muxsel:         { 2, 3 ,0 ,1}, /* tuner, Composit, SVid, Composit-on-Svid-adapter*/
+        tuner_type:     TUNER_MT2032,
+	pll:		PLL_28,
+	has_radio:	1,
+},{
+	/* Philip Blundell <pb@nexus.co.uk> */
+	name:           "Active Imaging AIMMS",
+	video_inputs:   1,
+	audio_inputs:   0,
+	tuner:          -1,
+	tuner_type:     -1,
+	pll:            PLL_28,
+	muxsel:         { 2 },
+	gpiomask:       0
+},{
+        /* Tomasz Pyra <hellfire@sedez.iq.pl> */
+        name:           "PV-BT878P+",
+        video_inputs:   3,
+        audio_inputs:   4,
+        tuner:          0,
+        svhs:           2,
+        gpiomask:       15,
+        muxsel:         { 2, 3, 1, 1},
+        audiomux:       { 0, 0, 11, 7, 13, 0},
+        needs_tvaudio:  1,
+        pll:            PLL_28,
+        tuner_type:     25,
+},{
+	name:		"Flyvideo 98EZ (capture only)",
+	video_inputs:	4,
+	audio_inputs:   0,
+	tuner:		-1,
+	svhs:		2,
+	muxsel:		{ 2, 3, 1, 1}, // AV1, AV2, SVHS, CVid adapter on SVHS
+	pll:		PLL_28,
+	no_msp34xx:	1,
+},{
+
+/* ---- card 0x48 ---------------------------------- */
+	/* Dariusz Kowalewski <darekk@automex.pl> */
+	name:		"Prolink PV-BT878P+9B (PlayTV Pro rev.9B FM+NICAM)",
+	video_inputs:	3,
+	audio_inputs:	1,
+	tuner:		0,
+	svhs:		2,
+	gpiomask:	0x3f,
+	muxsel:		{ 2, 3, 0, 1 },
+	audiomux:	{ 0x01, 0x00, 0x03, 0x03, 0x09, 0x02 },
+	needs_tvaudio:  1,
+	no_msp34xx:	1,
+	no_tda9875:	1,
+	pll:		PLL_28,
+	tuner_type:	-1,
+	audio_hook:	pvbt878p9b_audio,
+	has_radio:	1,
+}
+};
 
 const int bttv_num_tvcards = (sizeof(bttv_tvcards)/sizeof(struct tvcard));
 
@@ -1036,17 +1138,17 @@ void __devinit bttv_idcard(struct bttv *btv)
 		
 		if (type != -1) {
 			/* found it */
-			printk(KERN_INFO "bttv%d: subsystem: %04x:%04x  =>  %s  =>  card=%d\n",
-			       btv->nr, btv->cardid & 0xffff, btv->cardid >> 16,
-			       cards[type].name,cards[type].cardnr);
+			printk(KERN_INFO "bttv%d: detected: %s [card=%d], "
+			       "PCI subsystem ID is %04x:%04x\n",
+			       btv->nr,cards[type].name,cards[type].cardnr,
+			       btv->cardid & 0xffff, btv->cardid >> 16);
 			btv->type = cards[type].cardnr;
 		} else {
 			/* 404 */
 			printk(KERN_INFO "bttv%d: subsystem: %04x:%04x (UNKNOWN)\n",
 			       btv->nr, btv->cardid&0xffff, btv->cardid>>16);
 			printk(KERN_DEBUG "please mail id, board name and "
-			       "the correct card= insmod option to "
-			       "kraxel@goldbach.in-berlin.de\n");
+			       "the correct card= insmod option to kraxel@bytesex.org\n");
 		}
 	}
 
@@ -1059,7 +1161,8 @@ void __devinit bttv_idcard(struct bttv *btv)
 		btv->id,
 		(btv->id==848 && btv->revision==0x12) ? "A" : "",
 		bttv_tvcards[btv->type].name);
-	printk(KERN_INFO "bttv%d: model: %s [%s]\n",btv->nr,btv->video_dev.name,
+	printk(KERN_INFO "bttv%d: using: %s [card=%d,%s]\n",btv->nr,
+	       btv->video_dev.name,btv->type,
 	       (card[btv->nr] >= 0 && card[btv->nr] < bttv_num_tvcards) ?
 	       "insmod option" : "autodetected");
 
@@ -1128,7 +1231,8 @@ void __devinit bttv_init_card(struct bttv *btv)
 				btv->type = BTTV_PINNACLEPRO;
 		}
 		if (bttv_verbose)
-			printk("bttv%d: miro: id=%d tuner=%d radio=%s stereo=%s\n",
+			printk(KERN_INFO "bttv%d: miro: id=%d tuner=%d "
+			       "radio=%s stereo=%s\n",
 			       btv->nr, id+1, btv->tuner_type,
 			       !btv->has_radio ? "no" :
 				   (btv->has_matchbox ? "matchbox" : "fmtuner"),
@@ -1148,6 +1252,11 @@ void __devinit bttv_init_card(struct bttv *btv)
                 hauppauge_eeprom(btv);
         }
 
+	if (btv->type == BTTV_AVERMEDIA98 || btv->type == BTTV_AVPHONE98) {
+		bttv_readee(btv,eeprom_data,0xa0);
+		avermedia_eeprom(btv);
+	}
+
  	if (btv->type == BTTV_PXC200)
 		init_PXC200(btv);
 
@@ -1166,7 +1275,13 @@ void __devinit bttv_init_card(struct bttv *btv)
 			printk("bttv%d: lifetec: tv mono/fm stereo card\n", btv->nr);
 		else
 			printk("bttv%d: lifetec: stereo(TDA9821) card\n",btv->nr);
-		btv->has_radio=1;
+	}
+
+	if (btv->type == BTTV_MAGICTVIEW061) {
+		if(btv->cardid == 0x4002144f) {
+			btv->has_radio=1;
+			printk("bttv%d: radio detected by subsystem id (CPH05x)\n",btv->nr);
+		}
 	}
 
 	/* pll configuration */
@@ -1210,6 +1325,9 @@ void __devinit bttv_init_card(struct bttv *btv)
 	if (btv->tuner_type != -1)
 		bttv_call_i2c_clients(btv,TUNER_SET_TYPE,&btv->tuner_type);
 
+	if (bttv_tvcards[btv->type].has_radio)
+		btv->has_radio=1;
+
 	/* try to detect audio/fader chips */
 	if (!bttv_tvcards[btv->type].no_msp34xx &&
 	    bttv_I2CRead(btv, I2C_MSP3400, "MSP34xx") >=0) {
@@ -1217,7 +1335,8 @@ void __devinit bttv_init_card(struct bttv *btv)
 			request_module("msp3400");
 	}
 
-	if (bttv_I2CRead(btv, I2C_TDA9875, "TDA9875") >=0) {
+	if (!bttv_tvcards[btv->type].no_tda9875 &&
+	    bttv_I2CRead(btv, I2C_TDA9875, "TDA9875") >=0) {
 		if (autoload)
 			request_module("tda9875");
 	}
@@ -1307,7 +1426,8 @@ static void __devinit hauppauge_eeprom(struct bttv *btv)
 	int blk2,tuner,radio,model;
 
 	if (eeprom_data[0] != 0x84 || eeprom_data[2] != 0)
-		printk("bttv%d: Hauppauge eeprom: invalid\n",btv->nr);
+		printk(KERN_WARNING "bttv%d: Hauppauge eeprom: invalid\n",
+		       btv->nr);
 
 	/* Block 2 starts after len+3 bytes header */
 	blk2 = eeprom_data[1] + 3;
@@ -1323,24 +1443,83 @@ static void __devinit hauppauge_eeprom(struct bttv *btv)
 		btv->has_radio = 1;
 	
 	if (bttv_verbose)
-		printk("bttv%d: Hauppauge eeprom: model=%d, tuner=%s (%d), radio=%s\n",
+		printk(KERN_INFO "bttv%d: Hauppauge eeprom: model=%d, "
+		       "tuner=%s (%d), radio=%s\n",
 		       btv->nr, model, hauppauge_tuner[tuner].name,
 		       btv->tuner_type, radio ? "yes" : "no");
 }
 
-void __devinit bttv_hauppauge_boot_msp34xx(struct bttv *btv)
+// AVermedia specific stuff...
+// from  bktr_card.c
+int tuner_0_table[] = {
+        TUNER_PHILIPS_NTSC,  TUNER_PHILIPS_PAL,
+        TUNER_PHILIPS_PAL,   TUNER_PHILIPS_PAL,
+        TUNER_PHILIPS_PAL,   TUNER_PHILIPS_PAL,
+        TUNER_PHILIPS_SECAM, TUNER_PHILIPS_SECAM,
+        TUNER_PHILIPS_SECAM, TUNER_PHILIPS_PAL};
+/*
+int tuner_0_fm_table[] = {
+        PHILIPS_FR1236_NTSC,  PHILIPS_FR1216_PAL,
+        PHILIPS_FR1216_PAL,   PHILIPS_FR1216_PAL,
+        PHILIPS_FR1216_PAL,   PHILIPS_FR1216_PAL,
+        PHILIPS_FR1236_SECAM, PHILIPS_FR1236_SECAM,
+        PHILIPS_FR1236_SECAM, PHILIPS_FR1216_PAL};
+*/
+
+int tuner_1_table[] = {
+        TUNER_TEMIC_NTSC,  TUNER_TEMIC_PAL,
+	TUNER_TEMIC_PAL,   TUNER_TEMIC_PAL,
+	TUNER_TEMIC_PAL,   TUNER_TEMIC_PAL,
+        TUNER_TEMIC_4012FY5, TUNER_TEMIC_4012FY5, //TUNER_TEMIC_SECAM
+        TUNER_TEMIC_4012FY5, TUNER_TEMIC_PAL};
+
+static void __devinit avermedia_eeprom(struct bttv *btv)
 {
-        /* reset/enable the MSP on some Hauppauge cards */
-        /* Thanks to Kyösti Mälkki (kmalkki@cc.hut.fi)! */
-        btaor(32, ~32, BT848_GPIO_OUT_EN);
-        btaor(0, ~32, BT848_GPIO_DATA);
+        int tuner_make,tuner_tv_fm,tuner_format,tuner=0;
+
+	tuner_make   = (eeprom_data[0x41] & 0x7);
+        tuner_tv_fm  = (eeprom_data[0x41] & 0x18) >> 3;
+        tuner_format = (eeprom_data[0x42] & 0xf0) >> 4;
+
+	if (tuner_make == 0 || tuner_make == 2)
+		if(tuner_format <=9)
+			tuner = tuner_0_table[tuner_format];
+	if (tuner_make == 1)
+		if(tuner_format <=9)
+			tuner = tuner_1_table[tuner_format];
+	
+	printk(KERN_INFO "bttv%d: Avermedia eeprom[0x%02x%02x]: tuner=",
+		btv->nr,eeprom_data[0x41],eeprom_data[0x42]);
+	if(tuner) {
+		btv->tuner_type=tuner;
+		printk("%d\n",tuner);
+	} else
+		printk("Unknown type\n");
+}
+
+
+
+/*
+ * reset/enable the MSP on some Hauppauge cards
+ * Thanks to Kyösti Mälkki (kmalkki@cc.hut.fi)!
+ *
+ * Hauppauge:  pin  5
+ * Voodoo:     pin 20
+ */
+void __devinit bttv_boot_msp34xx(struct bttv *btv, int pin)
+{
+	int mask = (1 << pin);
+
+        btaor(mask, ~mask, BT848_GPIO_OUT_EN);
+        btaor(0, ~mask, BT848_GPIO_DATA);
         udelay(2500);
-        btaor(32, ~32, BT848_GPIO_DATA);
+        btaor(mask, ~mask, BT848_GPIO_DATA);
 	if (bttv_gpio)
 		bttv_gpio_tracking(btv,"msp34xx");
 
 	if (bttv_verbose)
-		printk("bttv%d: Hauppauge msp34xx: reset line init\n",btv->nr);
+		printk(KERN_INFO "bttv%d: Hauppauge/Voodoo msp34xx: reset line "
+		       "init [%d]\n", btv->nr, pin);
 }
 
 
@@ -1352,9 +1531,9 @@ void __devinit bttv_hauppauge_boot_msp34xx(struct bttv *btv)
 
 static void __devinit init_PXC200(struct bttv *btv)
 {
-	static const int vals[] = { 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0d,
-				    0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-				    0x00 };
+	static int vals[] __devinitdata = { 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0d,
+					    0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+					    0x00 };
 	int i,tmp;
 
 	/* Initialise GPIO-connevted stuff */
@@ -1465,7 +1644,7 @@ static int tea5757_read(struct bttv *btv)
 	    BUS_IN(btv->mbox_data) && time_before(jiffies, timeout);
 	    schedule());	/* 10 s */
 	if (BUS_IN(btv->mbox_data)) {
-		printk("bttv%d: tea5757: read timeout\n",btv->nr);
+		printk(KERN_WARNING "bttv%d: tea5757: read timeout\n",btv->nr);
 		return -1;
 	}
 	for(timeout = jiffies + HZ/5;
@@ -1706,6 +1885,43 @@ winfast2000_audio(struct bttv *btv, struct video_audio *v, int set)
 	}
 }
 
+/*
+ * Dariusz Kowalewski <darekk@automex.pl>
+ * sound control for Prolink PV-BT878P+9B (PixelView PlayTV Pro FM+NICAM
+ * revision 9B has on-board TDA9874A sound decoder).
+ */
+static void
+pvbt878p9b_audio(struct bttv *btv, struct video_audio *v, int set)
+{
+	unsigned int val = 0;
+
+#if BTTV_VERSION_CODE > KERNEL_VERSION(0,8,0)
+	if (btv->radio_user)
+		return;
+#else
+	if (btv->radio)
+		return;
+#endif
+
+	if (set) {
+		if (v->mode & VIDEO_SOUND_MONO)	{
+			val = 0x01;
+		}
+		if ((v->mode & (VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2))
+		    || (v->mode & VIDEO_SOUND_STEREO)) {
+			val = 0x02;
+		}
+		if (val) {
+			btaor(val, ~0x03, BT848_GPIO_DATA);
+			if (bttv_gpio)
+				bttv_gpio_tracking(btv,"pvbt878p9b");
+		}
+	} else {
+		v->mode = VIDEO_SOUND_MONO | VIDEO_SOUND_STEREO |
+			  VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
+	}
+}
+
 /* ----------------------------------------------------------------------- */
 /* motherboard chipset specific stuff                                      */
 
@@ -1717,13 +1933,16 @@ void __devinit bttv_check_chipset(void)
 	/* for 2.4.x we'll use the pci quirks (drivers/pci/quirks.c) */
 	if (pci_pci_problems & PCIPCI_FAIL)
 		pcipci_fail = 1;
-
 	if (pci_pci_problems & (PCIPCI_TRITON|PCIPCI_NATOMA|PCIPCI_VIAETBF))
 		triton1 = 1;
-	while ((dev = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C576, dev)))
+	if (pci_pci_problems & PCIPCI_VSFX)
 		vsfx = 1;
 
-	/* print warnings about quirks found */
+	/* print which chipset we have */
+	while ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
+		printk(KERN_INFO "bttv: Host bridge is %s\n",dev->name);
+
+	/* print warnings about any quirks found */
 	if (triton1)
 		printk(KERN_INFO "bttv: Host bridge needs ETBF enabled.\n");
 	if (vsfx)

@@ -1,15 +1,15 @@
 bttv.o
-  card=0 -  *** UNKNOWN *** 
+  card=0 -  *** UNKNOWN/GENERIC *** 
   card=1 - MIRO PCTV
-  card=2 - Hauppauge old
+  card=2 - Hauppauge (bt848)
   card=3 - STB
   card=4 - Intel
   card=5 - Diamond DTV2000
   card=6 - AVerMedia TVPhone
   card=7 - MATRIX-Vision MV-Delta
-  card=8 - Fly Video II
+  card=8 - Fly Video II (Bt848)
   card=9 - TurboTV
-  card=10 - Hauppauge new (bt878)
+  card=10 - Hauppauge (bt878)
   card=11 - MIRO PCTV pro
   card=12 - ADS Technologies Channel Surfer TV
   card=13 - AVerMedia TVCapture 98
@@ -23,7 +23,7 @@ bttv.o
   card=21 - Lucky Star Image World ConferenceTV
   card=22 - Phoebe Tv Master + FM
   card=23 - Modular Technology MM205 PCTV, bt878
-  card=24 - Askey/Typhoon/Anubis Magic TView CPH051/061 (bt878)
+  card=24 - [many vendors] CPH05X/06X (bt878)
   card=25 - Terratec/Vobis TV-Boostar
   card=26 - Newer Hauppauge WinCam (bt878)
   card=27 - MAXI TV Video PCI2
@@ -34,10 +34,10 @@ bttv.o
   card=32 - Intel Create and Share PCI
   card=33 - Terratec TerraTValue
   card=34 - Leadtek WinFast 2000
-  card=35 - Chronos Video Shuttle II
-  card=36 - Typhoon TView TV/FM Tuner
+  card=35 - Flyvideo 98 (LR50Q) / Chronos Video Shuttle II
+  card=36 - Flyvideo 98FM (LR50Q) / Typhoon TView TV/FM Tuner
   card=37 - PixelView PlayTV pro
-  card=38 - TView99 CPH063
+  card=38 - TView99 CPH06X
   card=39 - Pinnacle PCTV Studio/Rave
   card=40 - STB2
   card=41 - AVerMedia TVPhone 98
@@ -49,11 +49,11 @@ bttv.o
   card=47 - Terratec TV/Radio+
   card=48 - Dynalink Magic TView 
   card=49 - GV-BCTV3
-  card=50 - Prolink PV-BT878P+4E (PixelView PlayTV PAK)
+  card=50 - Prolink PV-BT878P+4E / PixelView PlayTV PAK / Lenco MXTV-9578 CP
   card=51 - Eagle Wireless Capricorn2 (bt878A)
   card=52 - Pinnacle PCTV Studio Pro
-  card=53 - Typhoon TView RDS / FM Stereo
-  card=54 - Lifetec LT 9415 TV
+  card=53 - Typhoon TView RDS + FM Stereo / KNC1 TV Station RDS
+  card=54 - Lifetec LT 9415 TV (LR90 Rev.F)
   card=55 - BESTBUY Easy TV
   card=56 - FlyVideo '98/FM
   card=57 - GrandTec 'Grand Video Capture'
@@ -66,6 +66,12 @@ bttv.o
   card=64 - ATI TV-Wonder VE
   card=65 - FlyVideo 2000S
   card=66 - Terratec TValueRadio
+  card=67 - GV-BCTV4/PCI
+  card=68 - 3Dfx VoodooTV FM (Euro), VoodooTV 200 (USA)
+  card=69 - Active Imaging AIMMS
+  card=70 - PV-BT878P+
+  card=71 - Flyvideo 98EZ (capture only)
+  card=72 - Prolink PV-BT878P+9B (PlayTV Pro rev.9B FM+NICAM)
 
 tuner.o
   type=0 - Temic PAL (4002 FH5)
@@ -82,7 +88,7 @@ tuner.o
   type=11 - Alps TSBB5
   type=12 - Alps TSBE5
   type=13 - Alps TSBC5
-  type=14 - Temic PAL_I (4006FH5)
+  type=14 - Temic PAL_BG (4006FH5)
   type=15 - Alps TSCH6
   type=16 - Temic PAL_DK (4016 FY5)
   type=17 - Philips NTSC_M (MK2)
@@ -99,3 +105,10 @@ tuner.o
   type=28 - LG PAL_BG+FM (TPI8PSB01D)
   type=29 - LG PAL_BG (TPI8PSB11D)
   type=30 - Temic PAL* auto + FM (4009 FN5)
+  type=31 - SHARP NTSC_JP (2U5JF5540)
+  type=32 - Samsung PAL TCPM9091PD27
+  type=33 - MT2032 universal
+  type=34 - Temic PAL_BG (4106 FH5)
+  type=35 - Temic PAL_DK/SECAM_L (4012 FY5)
+  type=36 - Temic NTSC (4136 FY5)
+  type=37 - LG PAL (newer TAPC series)
