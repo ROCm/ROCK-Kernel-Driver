@@ -562,7 +562,7 @@ asmlinkage void __div0(void)
 	printk("Division by zero in kernel.\n");
 	dump_stack();
 }
-EXPORT_SYMBOL_NOVERS(__div0);
+EXPORT_SYMBOL(__div0);
 
 void abort(void)
 {

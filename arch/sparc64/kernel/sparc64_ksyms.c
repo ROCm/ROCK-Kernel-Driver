@@ -142,7 +142,7 @@ EXPORT_SYMBOL(synchronize_irq);
 
 #if defined(CONFIG_MCOUNT)
 extern void _mcount(void);
-EXPORT_SYMBOL_NOVERS(_mcount);
+EXPORT_SYMBOL(_mcount);
 #endif
 
 /* CPU online map and active count.  */
@@ -363,14 +363,14 @@ EXPORT_SYMBOL(pfn_to_page);
 /* No version information on this, heavily used in inline asm,
  * and will always be 'void __ret_efault(void)'.
  */
-EXPORT_SYMBOL_NOVERS(__ret_efault);
+EXPORT_SYMBOL(__ret_efault);
 
 /* No version information on these, as gcc produces such symbols. */
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(strncmp);
+EXPORT_SYMBOL(memcmp);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(memset);
+EXPORT_SYMBOL(memmove);
+EXPORT_SYMBOL(strncmp);
 
 /* Delay routines. */
 EXPORT_SYMBOL(__udelay);
@@ -380,7 +380,7 @@ EXPORT_SYMBOL(__delay);
 
 void VISenter(void);
 /* RAID code needs this */
-EXPORT_SYMBOL_NOVERS(VISenter);
+EXPORT_SYMBOL(VISenter);
 
 /* for input/keybdev */
 EXPORT_SYMBOL(sun_do_break);

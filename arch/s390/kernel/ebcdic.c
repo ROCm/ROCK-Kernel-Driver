@@ -391,10 +391,10 @@ __u8 _ebc_toupper[256] =
 	0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF
 };
 
-EXPORT_SYMBOL_NOVERS(_ascebc_500);
-EXPORT_SYMBOL_NOVERS(_ebcasc_500);
-EXPORT_SYMBOL_NOVERS(_ascebc);
-EXPORT_SYMBOL_NOVERS(_ebcasc);
-EXPORT_SYMBOL_NOVERS(_ebc_tolower);
-EXPORT_SYMBOL_NOVERS(_ebc_toupper);
+EXPORT_SYMBOL(_ascebc_500);
+EXPORT_SYMBOL(_ebcasc_500);
+EXPORT_SYMBOL(_ascebc);
+EXPORT_SYMBOL(_ebcasc);
+EXPORT_SYMBOL(_ebc_tolower);
+EXPORT_SYMBOL(_ebc_toupper);
 
