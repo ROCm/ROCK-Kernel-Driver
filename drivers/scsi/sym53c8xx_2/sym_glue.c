@@ -2015,17 +2015,17 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 
 	SYM_UNLOCK_HCB(np, flags);
 
-	scsi_set_device(instance, &dev->pdev->dev);
-
 	/*
 	 *  Now let the generic SCSI driver
 	 *  look for the SCSI devices on the bus ..
 	 */
-	scsi_add_host(instance, &dev->pdev->dev);
+	scsi_add_host(instance, &dev->pdev->dev); /* XXX: handle failure */
+	scsi_scan_host(instance);
 	return 0;
 
 attach_failed:
-	if (!instance) return -1;
+	if (!instance)
+		return -1;
 	printf_info("%s: giving up ...\n", sym_name(np));
 	if (np)
 		sym_free_resources(np);
