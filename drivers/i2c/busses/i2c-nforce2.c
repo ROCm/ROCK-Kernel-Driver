@@ -394,7 +394,7 @@ static struct pci_driver nforce2_driver = {
 
 static int __init nforce2_init(void)
 {
-	return pci_module_init(&nforce2_driver);
+	return pci_register_driver(&nforce2_driver);
 }
 
 static void __exit nforce2_exit(void)

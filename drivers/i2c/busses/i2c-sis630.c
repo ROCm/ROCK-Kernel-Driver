@@ -505,7 +505,7 @@ static struct pci_driver sis630_driver = {
 
 static int __init i2c_sis630_init(void)
 {
-	return pci_module_init(&sis630_driver);
+	return pci_register_driver(&sis630_driver);
 }
 
 

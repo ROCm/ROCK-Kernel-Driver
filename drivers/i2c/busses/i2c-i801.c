@@ -633,7 +633,7 @@ static struct pci_driver i801_driver = {
 
 static int __init i2c_i801_init(void)
 {
-	return pci_module_init(&i801_driver);
+	return pci_register_driver(&i801_driver);
 }
 
 static void __exit i2c_i801_exit(void)

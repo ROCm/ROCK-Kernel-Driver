@@ -241,7 +241,7 @@ static struct pci_driver i810_driver = {
 
 static int __init i2c_i810_init(void)
 {
-	return pci_module_init(&i810_driver);
+	return pci_register_driver(&i810_driver);
 }
 
 static void __exit i2c_i810_exit(void)

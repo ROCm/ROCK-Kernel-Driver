@@ -402,7 +402,7 @@ static struct pci_driver amd8111_driver = {
 
 static int __init i2c_amd8111_init(void)
 {
-	return pci_module_init(&amd8111_driver);
+	return pci_register_driver(&amd8111_driver);
 }
 
 

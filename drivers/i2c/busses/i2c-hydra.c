@@ -168,7 +168,7 @@ static struct pci_driver hydra_driver = {
 
 static int __init i2c_hydra_init(void)
 {
-	return pci_module_init(&hydra_driver);
+	return pci_register_driver(&hydra_driver);
 }
 
 

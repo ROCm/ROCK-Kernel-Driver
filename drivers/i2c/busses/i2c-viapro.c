@@ -465,7 +465,7 @@ static struct pci_driver vt596_driver = {
 
 static int __init i2c_vt596_init(void)
 {
-	return pci_module_init(&vt596_driver);
+	return pci_register_driver(&vt596_driver);
 }
 
 

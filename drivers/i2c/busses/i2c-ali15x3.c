@@ -519,7 +519,7 @@ static struct pci_driver ali15x3_driver = {
 
 static int __init i2c_ali15x3_init(void)
 {
-	return pci_module_init(&ali15x3_driver);
+	return pci_register_driver(&ali15x3_driver);
 }
 
 static void __exit i2c_ali15x3_exit(void)

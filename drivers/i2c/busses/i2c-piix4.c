@@ -503,7 +503,7 @@ static struct pci_driver piix4_driver = {
 
 static int __init i2c_piix4_init(void)
 {
-	return pci_module_init(&piix4_driver);
+	return pci_register_driver(&piix4_driver);
 }
 
 static void __exit i2c_piix4_exit(void)

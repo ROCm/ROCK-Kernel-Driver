@@ -168,7 +168,7 @@ static struct pci_driver vt586b_driver = {
 
 static int __init i2c_vt586b_init(void)
 {
-	return pci_module_init(&vt586b_driver);
+	return pci_register_driver(&vt586b_driver);
 }
 
 static void __exit i2c_vt586b_exit(void)

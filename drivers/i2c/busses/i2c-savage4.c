@@ -188,7 +188,7 @@ static struct pci_driver savage4_driver = {
 
 static int __init i2c_savage4_init(void)
 {
-	return pci_module_init(&savage4_driver);
+	return pci_register_driver(&savage4_driver);
 }
 
 static void __exit i2c_savage4_exit(void)

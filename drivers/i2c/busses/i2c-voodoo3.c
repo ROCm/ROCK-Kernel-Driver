@@ -234,7 +234,7 @@ static struct pci_driver voodoo3_driver = {
 
 static int __init i2c_voodoo3_init(void)
 {
-	return pci_module_init(&voodoo3_driver);
+	return pci_register_driver(&voodoo3_driver);
 }
 
 static void __exit i2c_voodoo3_exit(void)

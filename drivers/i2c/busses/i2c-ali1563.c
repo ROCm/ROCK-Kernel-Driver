@@ -405,7 +405,7 @@ static struct pci_driver ali1563_pci_driver = {
 
 static int __init ali1563_init(void)
 {
-	return pci_module_init(&ali1563_pci_driver);
+	return pci_register_driver(&ali1563_pci_driver);
 }
 
 module_init(ali1563_init);

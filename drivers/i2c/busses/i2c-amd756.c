@@ -408,7 +408,7 @@ static struct pci_driver amd756_driver = {
 
 static int __init amd756_init(void)
 {
-	return pci_module_init(&amd756_driver);
+	return pci_register_driver(&amd756_driver);
 }
 
 static void __exit amd756_exit(void)

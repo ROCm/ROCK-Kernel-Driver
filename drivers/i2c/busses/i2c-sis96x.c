@@ -350,7 +350,7 @@ static struct pci_driver sis96x_driver = {
 static int __init i2c_sis96x_init(void)
 {
 	printk(KERN_INFO "i2c-sis96x version %s\n", SIS96x_VERSION);
-	return pci_module_init(&sis96x_driver);
+	return pci_register_driver(&sis96x_driver);
 }
 
 static void __exit i2c_sis96x_exit(void)

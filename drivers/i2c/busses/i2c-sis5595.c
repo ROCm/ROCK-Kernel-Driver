@@ -403,7 +403,7 @@ static struct pci_driver sis5595_driver = {
 
 static int __init i2c_sis5595_init(void)
 {
-	return pci_module_init(&sis5595_driver);
+	return pci_register_driver(&sis5595_driver);
 }
 
 static void __exit i2c_sis5595_exit(void)

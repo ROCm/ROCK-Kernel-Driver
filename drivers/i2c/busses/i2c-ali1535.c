@@ -529,7 +529,7 @@ static struct pci_driver ali1535_driver = {
 
 static int __init i2c_ali1535_init(void)
 {
-	return pci_module_init(&ali1535_driver);
+	return pci_register_driver(&ali1535_driver);
 }
 
 static void __exit i2c_ali1535_exit(void)
