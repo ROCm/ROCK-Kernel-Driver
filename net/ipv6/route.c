@@ -587,19 +587,6 @@ out:
    Remove it only when all the things will work!
  */
 
-static void ipv6_addr_prefix(struct in6_addr *pfx,
-			     const struct in6_addr *addr, int plen)
-{
-	int b = plen&0x7;
-	int o = plen>>3;
-
-	memcpy(pfx->s6_addr, addr, o);
-	if (o < 16)
-		memset(pfx->s6_addr + o, 0, 16 - o);
-	if (b != 0)
-		pfx->s6_addr[o] = addr->s6_addr[o]&(0xff00 >> b);
-}
-
 static int ipv6_get_mtu(struct net_device *dev)
 {
 	int mtu = IPV6_MIN_MTU;
