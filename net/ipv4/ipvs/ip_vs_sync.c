@@ -18,8 +18,6 @@
  *					messages filtering.
  */
 
-#define __KERNEL_SYSCALLS__             /*  for waitpid */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -27,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/net.h>
 #include <linux/sched.h>
-#include <linux/wait.h>
 #include <linux/unistd.h>
 #include <linux/completion.h>
 
@@ -842,7 +839,6 @@ int start_sync_thread(int state, char *mcast_ifn, __u8 syncid)
 {
 	DECLARE_COMPLETION(startup);
 	pid_t pid;
-	int waitpid_result;
 
 	if ((state == IP_VS_STATE_MASTER && sync_master_pid) ||
 	    (state == IP_VS_STATE_BACKUP && sync_backup_pid))
@@ -863,11 +859,6 @@ int start_sync_thread(int state, char *mcast_ifn, __u8 syncid)
 
 	if ((pid = kernel_thread(fork_sync_thread, &startup, 0)) < 0)
 		IP_VS_BUG();
-
-	if ((waitpid_result = waitpid(pid, NULL, __WCLONE)) != pid) {
-		IP_VS_ERR("%s: waitpid(%d,...) failed, errno %d\n",
-			  __FUNCTION__, pid, -waitpid_result);
-	}
 
 	wait_for_completion(&startup);
 
