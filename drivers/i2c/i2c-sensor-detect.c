@@ -81,16 +81,6 @@ int i2c_detect(struct i2c_adapter *adapter,
 				found = 1;
 			}
 		}
-		for (i = 0; !found && (address_data->ignore_range[i] != I2C_CLIENT_END); i += 3) {
-			if ( ((adapter_id == address_data->ignore_range[i]) ||
-			      ((address_data-> ignore_range[i] == ANY_I2C_BUS) & 
-			       !is_isa)) &&
-			     (addr >= address_data->ignore_range[i + 1]) &&
-			     (addr <= address_data->ignore_range[i + 2])) {
-				dev_dbg(&adapter->dev,  "found ignore_range parameter for adapter %d, addr %04x\n", adapter_id, addr);
-				found = 1;
-			}
-		}
 		if (found)
 			continue;
 

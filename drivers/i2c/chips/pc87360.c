@@ -57,8 +57,6 @@ static struct i2c_address_data addr_data = {
 	.normal_i2c_range	= normal_i2c_range,
 	.normal_isa		= normal_isa,
 	.normal_isa_range	= normal_isa_range,
-	.ignore			= normal_i2c,		/* cheat */
-	.ignore_range		= normal_i2c_range,	/* cheat */
 	.forces			= forces,
 };
 
