@@ -59,6 +59,11 @@ static void snd_pcm_lib_preallocate_dma_free(snd_pcm_substream_t *substream)
 		snd_free_pci_pages((struct pci_dev *)substream->dma_private, substream->dma_bytes, substream->dma_area, substream->dma_addr);
 		break;
 #endif
+#ifdef CONFIG_SBUS
+	case SNDRV_PCM_DMA_TYPE_SBUS:
+		snd_free_sbus_pages((struct sbus_dev *)substream->dma_private, substream->dma_bytes, substream->dma_area, substream->dma_addr);
+		break;
+#endif
 	}
 	substream->dma_area = NULL;
 }
@@ -129,6 +134,11 @@ static void snd_pcm_lib_preallocate_proc_write(snd_info_entry_t *entry,
 				dma_area = snd_malloc_pci_pages((struct pci_dev *)substream->dma_private, size, &dma_addr);
 				break;
 #endif
+#ifdef CONFIG_SBUS
+			case SNDRV_PCM_DMA_TYPE_SBUS:
+				dma_area = snd_malloc_sbus_pages((struct sbus_dev *)substream->dma_private, size, &dma_addr);
+				break;
+#endif
 			default:
 				dma_area = NULL;
 				dma_addr = 0UL;
@@ -175,6 +185,11 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 #ifdef CONFIG_PCI
 		case SNDRV_PCM_DMA_TYPE_PCI:
 			dma_area = snd_malloc_pci_pages_fallback((struct pci_dev *)substream->dma_private, size, &dma_addr, &rsize);
+			break;
+#endif
+#ifdef CONFIG_SBUS
+		case SNDRV_PCM_DMA_TYPE_SBUS:
+			dma_area = snd_malloc_sbus_pages_fallback((struct sbus_dev *)substream->dma_private, size, &dma_addr, &rsize);
 			break;
 #endif
 		default:
@@ -288,6 +303,11 @@ int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 			dma_area = snd_malloc_pci_pages((struct pci_dev *)substream->dma_private, size, &dma_addr);
 			break;
 #endif
+#ifdef CONFIG_SBUS
+		case SNDRV_PCM_DMA_TYPE_SBUS:
+			dma_area = snd_malloc_sbus_pages((struct sbus_dev *)substream->dma_private, size, &dma_addr);
+			break;
+#endif
 		default:
 			return -ENXIO;
 		}
@@ -319,6 +339,11 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream)
 #ifdef CONFIG_PCI
 		case SNDRV_PCM_DMA_TYPE_PCI:
 			snd_free_pci_pages((struct pci_dev *)substream->dma_private, runtime->dma_bytes, runtime->dma_area, runtime->dma_addr);
+			break;
+#endif
+#ifdef CONFIG_SBUS
+		case SNDRV_PCM_DMA_TYPE_SBUS:
+			snd_free_sbus_pages((struct sbus_dev *)substream->dma_private, runtime->dma_bytes, runtime->dma_area, runtime->dma_addr);
 			break;
 #endif
 		}
@@ -355,3 +380,30 @@ int snd_pcm_lib_preallocate_pci_pages_for_all(struct pci_dev *pci,
 }
 
 #endif /* CONFIG_PCI */
+
+#ifdef CONFIG_SBUS
+
+int snd_pcm_lib_preallocate_sbus_pages(struct sbus_dev *sdev,
+				       snd_pcm_substream_t *substream,
+				       size_t size, size_t max)
+{
+	substream->dma_type = SNDRV_PCM_DMA_TYPE_SBUS;
+	substream->dma_private = sdev;
+	return snd_pcm_lib_preallocate_pages1(substream, size, max);
+}
+
+int snd_pcm_lib_preallocate_sbus_pages_for_all(struct sbus_dev *sdev,
+					       snd_pcm_t *pcm,
+					       size_t size, size_t max)
+{
+	snd_pcm_substream_t *substream;
+	int stream, err;
+
+	for (stream = 0; stream < 2; stream++)
+		for (substream = pcm->streams[stream].substream; substream; substream = substream->next)
+			if ((err = snd_pcm_lib_preallocate_sbus_pages(sdev, substream, size, max)) < 0)
+				return err;
+	return 0;
+}
+
+#endif /* CONFIG_SBUS */

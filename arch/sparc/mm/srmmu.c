@@ -387,13 +387,13 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 	int offset;
 
 	if (vaddr < SRMMU_NOCACHE_VADDR) {
-		printk("Vaddr %x is smaller than nocache base 0x%x\n",
-		    vaddr, SRMMU_NOCACHE_VADDR);
+		printk("Vaddr %lx is smaller than nocache base 0x%lx\n",
+		    vaddr, (unsigned long)SRMMU_NOCACHE_VADDR);
 		BUG();
 	}
 	if (vaddr >= SRMMU_NOCACHE_END) {
-		printk("Vaddr %x is bigger than nocache end 0x%x\n",
-		    vaddr, SRMMU_NOCACHE_END);
+		printk("Vaddr %lx is bigger than nocache end 0x%lx\n",
+		    vaddr, (unsigned long)SRMMU_NOCACHE_END);
 		BUG();
 	}
 	if (size & (size-1)) {
@@ -405,7 +405,7 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 		BUG();
 	}
 	if (vaddr & (size-1)) {
-		printk("Vaddr 0x%x is not aligned to size 0x%x\n", vaddr, size);
+		printk("Vaddr %lx is not aligned to size 0x%x\n", vaddr, size);
 		BUG();
 	}
 
@@ -1173,7 +1173,7 @@ void __init srmmu_inherit_prom_mappings(unsigned long start,unsigned long end)
 			 */
 			unsigned int x;	/* Index of HW PMD in soft cluster */
 			x = (start >> SRMMU_PMD_SHIFT) & 15;
-			*(ulong *)__nocache_fix(&pmdp->pmdv[x]) = prompte;
+			*(unsigned long *)__nocache_fix(&pmdp->pmdv[x]) = prompte;
 			start += SRMMU_PMD_SIZE;
 			continue;
 		}
