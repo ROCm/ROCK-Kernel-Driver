@@ -486,9 +486,11 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	if (err)
 		goto out_unlock;
 
+	err = -ENOENT;
 	spin_lock(&dcache_lock);
 	if (IS_ROOT(nd->dentry) || !d_unhashed(nd->dentry)) {
 		struct list_head head;
+
 		attach_mnt(mnt, nd);
 		list_add_tail(&head, &mnt->mnt_list);
 		list_splice(&head, current->namespace->list.prev);
