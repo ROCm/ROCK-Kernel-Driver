@@ -455,6 +455,22 @@ static inline void rq_unlock(runqueue_t *rq)
 	spin_unlock_irq(&rq->lock);
 }
 
+#ifdef CONFIG_SCHED_SMT
+static int cpu_and_siblings_are_idle(int cpu)
+{
+	int sib;
+	for_each_cpu_mask(sib, cpu_sibling_map[cpu]) {
+		if (idle_cpu(sib))
+			continue;
+		return 0;
+	}
+
+	return 1;
+}
+#else
+#define cpu_and_siblings_are_idle(A) idle_cpu(A)
+#endif
+
 #ifdef CONFIG_SCHEDSTATS
 /*
  * Called when a process is dequeued from the active array and given
@@ -1668,13 +1684,18 @@ int can_migrate_task(task_t *p, runqueue_t *rq, int this_cpu,
 	if (!cpu_isset(this_cpu, p->cpus_allowed))
 		return 0;
 
-	/* Aggressive migration if we've failed balancing */
-	if (idle == NEWLY_IDLE ||
-			sd->nr_balance_failed < sd->cache_nice_tries) {
-		if (task_hot(p, rq->timestamp_last_tick, sd))
-			return 0;
-	}
+	/*
+	 * Aggressive migration if:
+	 * 1) the [whole] cpu is idle, or
+	 * 2) too many balance attempts have failed.
+	 */
 
+	if (cpu_and_siblings_are_idle(this_cpu) || \
+			sd->nr_balance_failed > sd->cache_nice_tries)
+		return 1;
+
+	if (task_hot(p, rq->timestamp_last_tick, sd))
+			return 0;
 	return 1;
 }
 
@@ -2088,23 +2109,6 @@ static inline void idle_balance(int this_cpu, runqueue_t *this_rq)
 		}
 	}
 }
-
-#ifdef CONFIG_SCHED_SMT
-static int cpu_and_siblings_are_idle(int cpu)
-{
-	int sib;
-	for_each_cpu_mask(sib, cpu_sibling_map[cpu]) {
-		if (idle_cpu(sib))
-			continue;
-		return 0;
-	}
-
-	return 1;
-}
-#else
-#define cpu_and_siblings_are_idle(A) idle_cpu(A)
-#endif
-
 
 /*
  * active_load_balance is run by migration threads. It pushes running tasks
