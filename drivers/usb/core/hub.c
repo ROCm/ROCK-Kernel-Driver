@@ -126,7 +126,6 @@ static int get_port_status(struct usb_device *dev, int port,
 static void hub_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_hub *hub = (struct usb_hub *)urb->context;
-	unsigned long flags;
 	int status;
 
 	switch (urb->status) {
@@ -151,12 +150,12 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	hub->nerrors = 0;
 
 	/* Something happened, let khubd figure it out */
-	spin_lock_irqsave(&hub_event_lock, flags);
+	spin_lock(&hub_event_lock);
 	if (list_empty(&hub->event_list)) {
 		list_add(&hub->event_list, &hub_event_list);
 		wake_up(&khubd_wait);
 	}
-	spin_unlock_irqrestore(&hub_event_lock, flags);
+	spin_unlock(&hub_event_lock);
 
 resubmit:
 	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0
@@ -494,10 +493,8 @@ static void hub_disconnect(struct usb_interface *intf)
 	spin_lock_irqsave(&hub_event_lock, flags);
 
 	/* Delete it and then reset it */
-	list_del(&hub->event_list);
-	INIT_LIST_HEAD(&hub->event_list);
-	list_del(&hub->hub_list);
-	INIT_LIST_HEAD(&hub->hub_list);
+	list_del_init(&hub->event_list);
+	list_del_init(&hub->hub_list);
 
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
