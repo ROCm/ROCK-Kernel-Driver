@@ -97,7 +97,9 @@
 static const char	hcd_name [] = "ehci_hcd";
 
 
-// #define EHCI_VERBOSE_DEBUG
+#undef EHCI_VERBOSE_DEBUG
+#undef EHCI_URB_TRACE
+
 // #define have_split_iso
 
 #ifdef DEBUG

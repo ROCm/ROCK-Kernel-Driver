@@ -381,7 +381,7 @@ struct ehci_qh {
 	unsigned short		period;		/* polling interval */
 	unsigned short		start;		/* where polling starts */
 #define NO_FRAME ((unsigned short)~0)			/* pick new start */
-
+	struct usb_device	*dev;		/* access to TT */
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/

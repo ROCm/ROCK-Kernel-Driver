@@ -116,7 +116,7 @@ static inline void dbg_hcc_params (struct ehci_hcd *ehci, char *label) {}
 #ifdef	DEBUG
 
 static void __attribute__((__unused__))
-dbg_qtd (char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
+dbg_qtd (const char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 {
 	ehci_dbg (ehci, "%s td %p n%08x %08x t%08x p0=%08x\n", label, qtd,
 		cpu_to_le32p (&qtd->hw_next),
@@ -132,7 +132,7 @@ dbg_qtd (char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 }
 
 static void __attribute__((__unused__))
-dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
+dbg_qh (const char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	ehci_dbg (ehci, "%s qh %p n%08x info %x %x qtd %x\n", label,
 		qh, qh->hw_next, qh->hw_info1, qh->hw_info2,
