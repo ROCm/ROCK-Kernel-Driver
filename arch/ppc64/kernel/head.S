@@ -31,6 +31,7 @@
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
+#include <asm/bug.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE
