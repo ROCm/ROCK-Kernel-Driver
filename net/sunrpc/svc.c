@@ -247,8 +247,8 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	vers = ntohl(*bufp++);
 
 	/* First words of reply: */
-	svc_putlong(resp, xdr_one);		/* REPLY */
-	svc_putlong(resp, xdr_zero);		/* ACCEPT */
+	svc_putu32(resp, xdr_one);		/* REPLY */
+	svc_putu32(resp, xdr_zero);		/* ACCEPT */
 
 	if (dir != 0)		/* direction != CALL */
 		goto err_bad_dir;
@@ -300,7 +300,7 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 
 	/* Build the reply header. */
 	statp = resp->buf;
-	svc_putlong(resp, rpc_success);		/* RPC_SUCCESS */
+	svc_putu32(resp, rpc_success);		/* RPC_SUCCESS */
 
 	/* Bump per-procedure stats counter */
 	procp->pc_count++;
@@ -371,17 +371,17 @@ err_bad_dir:
 err_bad_rpc:
 	serv->sv_stats->rpcbadfmt++;
 	resp->buf[-1] = xdr_one;	/* REJECT */
-	svc_putlong(resp, xdr_zero);	/* RPC_MISMATCH */
-	svc_putlong(resp, xdr_two);	/* Only RPCv2 supported */
-	svc_putlong(resp, xdr_two);
+	svc_putu32(resp, xdr_zero);	/* RPC_MISMATCH */
+	svc_putu32(resp, xdr_two);	/* Only RPCv2 supported */
+	svc_putu32(resp, xdr_two);
 	goto sendit;
 
 err_bad_auth:
 	dprintk("svc: authentication failed (%d)\n", ntohl(auth_stat));
 	serv->sv_stats->rpcbadauth++;
 	resp->buf[-1] = xdr_one;	/* REJECT */
-	svc_putlong(resp, xdr_one);	/* AUTH_ERROR */
-	svc_putlong(resp, auth_stat);	/* status */
+	svc_putu32(resp, xdr_one);	/* AUTH_ERROR */
+	svc_putu32(resp, auth_stat);	/* status */
 	goto sendit;
 
 err_bad_prog:
@@ -391,7 +391,7 @@ err_bad_prog:
 	/* else it is just a Solaris client seeing if ACLs are supported */
 #endif
 	serv->sv_stats->rpcbadfmt++;
-	svc_putlong(resp, rpc_prog_unavail);
+	svc_putu32(resp, rpc_prog_unavail);
 	goto sendit;
 
 err_bad_vers:
@@ -399,9 +399,9 @@ err_bad_vers:
 	printk("svc: unknown version (%d)\n", vers);
 #endif
 	serv->sv_stats->rpcbadfmt++;
-	svc_putlong(resp, rpc_prog_mismatch);
-	svc_putlong(resp, htonl(progp->pg_lovers));
-	svc_putlong(resp, htonl(progp->pg_hivers));
+	svc_putu32(resp, rpc_prog_mismatch);
+	svc_putu32(resp, htonl(progp->pg_lovers));
+	svc_putu32(resp, htonl(progp->pg_hivers));
 	goto sendit;
 
 err_bad_proc:
@@ -409,7 +409,7 @@ err_bad_proc:
 	printk("svc: unknown procedure (%d)\n", proc);
 #endif
 	serv->sv_stats->rpcbadfmt++;
-	svc_putlong(resp, rpc_proc_unavail);
+	svc_putu32(resp, rpc_proc_unavail);
 	goto sendit;
 
 err_garbage:
@@ -417,6 +417,6 @@ err_garbage:
 	printk("svc: failed to decode args\n");
 #endif
 	serv->sv_stats->rpcbadfmt++;
-	svc_putlong(resp, rpc_garbage_args);
+	svc_putu32(resp, rpc_garbage_args);
 	goto sendit;
 }

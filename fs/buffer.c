@@ -2413,12 +2413,16 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 	return err ? err : transferred;
 }
 
-static void end_bio_bh_io_sync(struct bio *bio)
+static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)
 {
 	struct buffer_head *bh = bio->bi_private;
 
+	if (bio->bi_size)
+		return 1;
+
 	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
 	bio_put(bio);
+	return 0;
 }
 
 int submit_bh(int rw, struct buffer_head * bh)

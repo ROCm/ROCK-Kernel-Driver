@@ -1,7 +1,7 @@
 /*
- * linux/fs/nfs/rpcauth.c
+ * linux/net/sunrpc/auth.c
  *
- * Generic RPC authentication API.
+ * Generic RPC client authentication API.
  *
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
  */
@@ -18,9 +18,7 @@
 # define RPCDBG_FACILITY	RPCDBG_AUTH
 #endif
 
-#define RPC_MAXFLAVOR	8
-
-static struct rpc_authops *	auth_flavors[RPC_MAXFLAVOR] = {
+static struct rpc_authops *	auth_flavors[RPC_AUTH_MAXFLAVOR] = {
 	&authnull_ops,		/* AUTH_NULL */
 	&authunix_ops,		/* AUTH_UNIX */
 	NULL,			/* others can be loadable modules */
@@ -29,9 +27,9 @@ static struct rpc_authops *	auth_flavors[RPC_MAXFLAVOR] = {
 int
 rpcauth_register(struct rpc_authops *ops)
 {
-	unsigned int	flavor;
+	rpc_authflavor_t flavor;
 
-	if ((flavor = ops->au_flavor) >= RPC_MAXFLAVOR)
+	if ((flavor = ops->au_flavor) >= RPC_AUTH_MAXFLAVOR)
 		return -EINVAL;
 	if (auth_flavors[flavor] != NULL)
 		return -EPERM;		/* what else? */
@@ -42,9 +40,9 @@ rpcauth_register(struct rpc_authops *ops)
 int
 rpcauth_unregister(struct rpc_authops *ops)
 {
-	unsigned int	flavor;
+	rpc_authflavor_t flavor;
 
-	if ((flavor = ops->au_flavor) >= RPC_MAXFLAVOR)
+	if ((flavor = ops->au_flavor) >= RPC_AUTH_MAXFLAVOR)
 		return -EINVAL;
 	if (auth_flavors[flavor] != ops)
 		return -EPERM;		/* what else? */
@@ -53,11 +51,11 @@ rpcauth_unregister(struct rpc_authops *ops)
 }
 
 struct rpc_auth *
-rpcauth_create(unsigned int flavor, struct rpc_clnt *clnt)
+rpcauth_create(rpc_authflavor_t flavor, struct rpc_clnt *clnt)
 {
 	struct rpc_authops	*ops;
 
-	if (flavor >= RPC_MAXFLAVOR || !(ops = auth_flavors[flavor]))
+	if (flavor >= RPC_AUTH_MAXFLAVOR || !(ops = auth_flavors[flavor]))
 		return NULL;
 	clnt->cl_auth = ops->create(clnt);
 	return clnt->cl_auth;

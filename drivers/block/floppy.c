@@ -3846,9 +3846,13 @@ static int check_floppy_change(kdev_t dev)
  * a disk in the drive, and whether that disk is writable.
  */
 
-static void floppy_rb0_complete(struct bio *bio)
+static int floppy_rb0_complete(struct bio *bio, unsigned int bytes_done, int err)
 {
+	if (bio->bi_size)
+		return 1;
+
 	complete((struct completion*)bio->bi_private);
+	return 0;
 }
 
 static int __floppy_read_block_0(struct block_device *bdev)

@@ -142,10 +142,10 @@ static int __will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_ta
 	for_each_process(p) {
 		if ((p == ignored_task) || (p->pgrp != pgrp) ||
 		    (p->state == TASK_ZOMBIE) ||
-		    (p->parent->pid == 1))
+		    (p->real_parent->pid == 1))
 			continue;
-		if ((p->parent->pgrp != pgrp) &&
-		    (p->parent->session == p->session)) {
+		if ((p->real_parent->pgrp != pgrp) &&
+		    (p->real_parent->session == p->session)) {
  			return 0;
 		}
 	}
@@ -221,7 +221,6 @@ void reparent_to_init(void)
 	/* Set the exit signal to SIGCHLD so we signal init on exit */
 	current->exit_signal = SIGCHLD;
 
-	current->ptrace = 0;
 	if ((current->policy == SCHED_NORMAL) && (task_nice(current) < 0))
 		set_user_nice(current, 0);
 	/* cpus_allowed? */
@@ -266,25 +265,6 @@ void daemonize(void)
 	atomic_inc(&current->files->count);
 
 	reparent_to_init();
-}
-
-static void reparent_thread(task_t *p, task_t *reaper, task_t *child_reaper)
-{
-	/* We dont want people slaying init */
-	if (p->exit_signal != -1)
-		p->exit_signal = SIGCHLD;
-	p->self_exec_id++;
-
-	/* Make sure we're not reparenting to ourselves */
-	if (p == reaper)
-		p->real_parent = child_reaper;
-	else
-		p->real_parent = reaper;
-	if (p->parent == p->real_parent)
-		BUG();
-
-	if (p->pdeath_signal)
-		send_sig(p->pdeath_signal, p, 0);
 }
 
 static inline void close_files(struct files_struct * files)
@@ -434,6 +414,66 @@ void exit_mm(struct task_struct *tsk)
 	__exit_mm(tsk);
 }
 
+static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_reaper)
+{
+	/* Make sure we're not reparenting to ourselves.  */
+	if (p == reaper)
+		p->real_parent = child_reaper;
+	else
+		p->real_parent = reaper;
+	if (p->parent == p->real_parent)
+		BUG();
+}
+
+static inline void reparent_thread(task_t *p, task_t *father, int traced)
+{
+	/* We dont want people slaying init.  */
+	if (p->exit_signal != -1)
+		p->exit_signal = SIGCHLD;
+	p->self_exec_id++;
+
+	if (p->pdeath_signal)
+		send_sig(p->pdeath_signal, p, 0);
+
+	/* Move the child from its dying parent to the new one.  */
+	if (unlikely(traced)) {
+		/* Preserve ptrace links if someone else is tracing this child.  */
+		list_del_init(&p->ptrace_list);
+		if (p->parent != p->real_parent)
+			list_add(&p->ptrace_list, &p->real_parent->ptrace_children);
+	} else {
+		/* If this child is being traced, then we're the one tracing it
+		 * anyway, so let go of it.
+		 */
+		p->ptrace = 0;
+		list_del_init(&p->sibling);
+		p->parent = p->real_parent;
+		list_add_tail(&p->sibling, &p->parent->children);
+
+		/* If we'd notified the old parent about this child's death,
+		 * also notify the new parent.
+		 */
+		if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
+			do_notify_parent(p, p->exit_signal);
+	}
+
+	/*
+	 * process group orphan check
+	 * Case ii: Our child is in a different pgrp
+	 * than we are, and it was the only connection
+	 * outside, so the child pgrp is now orphaned.
+	 */
+	if ((p->pgrp != father->pgrp) &&
+	    (p->session == father->session)) {
+		int pgrp = p->pgrp;
+
+		if (__will_become_orphaned_pgrp(pgrp, 0) && __has_stopped_jobs(pgrp)) {
+			__kill_pg_info(SIGHUP, (void *)1, pgrp);
+			__kill_pg_info(SIGCONT, (void *)1, pgrp);
+		}
+	}
+}
+
 /*
  * When we die, we re-parent all our children.
  * Try to give them to another thread in our thread
@@ -443,7 +483,7 @@ void exit_mm(struct task_struct *tsk)
 static inline void forget_original_parent(struct task_struct * father)
 {
 	struct task_struct *p, *reaper = father;
-	struct list_head *_p;
+	struct list_head *_p, *_n;
 
 	reaper = father->group_leader;
 	if (reaper == father)
@@ -457,60 +497,21 @@ static inline void forget_original_parent(struct task_struct * father)
 	 *
 	 * Search them and reparent children.
 	 */
-	list_for_each(_p, &father->children) {
+	list_for_each_safe(_p, _n, &father->children) {
 		p = list_entry(_p,struct task_struct,sibling);
-		if (father == p->real_parent)
-			reparent_thread(p, reaper, child_reaper);
+		if (father == p->real_parent) {
+			choose_new_parent(p, reaper, child_reaper);
+			reparent_thread(p, father, 0);
+		} else {
+			ptrace_unlink (p);
+			if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
+				do_notify_parent(p, p->exit_signal);
+		}
 	}
-	list_for_each(_p, &father->ptrace_children) {
+	list_for_each_safe(_p, _n, &father->ptrace_children) {
 		p = list_entry(_p,struct task_struct,ptrace_list);
-		reparent_thread(p, reaper, child_reaper);
-	}
-}
-
-static inline void zap_thread(task_t *p, task_t *father, int traced)
-{
-	/* If someone else is tracing this thread, preserve the ptrace links.  */
-	if (unlikely(traced)) {
-		task_t *trace_task = p->parent;
-		int ptrace_flag = p->ptrace;
-		BUG_ON (ptrace_flag == 0);
-
-		__ptrace_unlink(p);
-		p->ptrace = ptrace_flag;
-		__ptrace_link(p, trace_task);
-	} else {
-		/*
-		 * Otherwise, if we were tracing this thread, untrace it.
-		 * If we were only tracing the thread (i.e. not its real
-		 * parent), stop here.
-		 */
-		ptrace_unlink (p);
-		if (p->parent != father) {
-			BUG_ON(p->parent != p->real_parent);
-			return;
-		}
-		list_del_init(&p->sibling);
-		p->parent = p->real_parent;
-		list_add_tail(&p->sibling, &p->parent->children);
-	}
-
-	if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
-		do_notify_parent(p, p->exit_signal);
-	/*
-	 * process group orphan check
-	 * Case ii: Our child is in a different pgrp
-	 * than we are, and it was the only connection
-	 * outside, so the child pgrp is now orphaned.
-	 */
-	if ((p->pgrp != current->pgrp) &&
-	    (p->session == current->session)) {
-		int pgrp = p->pgrp;
-
-		if (__will_become_orphaned_pgrp(pgrp, 0) && __has_stopped_jobs(pgrp)) {
-			__kill_pg_info(SIGHUP, (void *)1, pgrp);
-			__kill_pg_info(SIGCONT, (void *)1, pgrp);
-		}
+		choose_new_parent(p, reaper, child_reaper);
+		reparent_thread(p, father, 1);
 	}
 }
 
@@ -524,7 +525,18 @@ static void exit_notify(void)
 
 	write_lock_irq(&tasklist_lock);
 
+	/*
+	 * This does two things:
+	 *
+  	 * A.  Make init inherit all the child processes
+	 * B.  Check to see if any process groups have become orphaned
+	 *	as a result of our exiting, and if they have any stopped
+	 *	jobs, send them a SIGHUP and then a SIGCONT.  (POSIX 3.2.2.2)
+	 */
+
 	forget_original_parent(current);
+	BUG_ON(!list_empty(&current->children));
+
 	/*
 	 * Check to see if any process groups have become orphaned
 	 * as a result of our exiting, and if they have any stopped
@@ -568,23 +580,8 @@ static void exit_notify(void)
 		current->exit_signal = SIGCHLD;
 
 
-	/*
-	 * This loop does two things:
-	 *
-  	 * A.  Make init inherit all the child processes
-	 * B.  Check to see if any process groups have become orphaned
-	 *	as a result of our exiting, and if they have any stopped
-	 *	jobs, send them a SIGHUP and then a SIGCONT.  (POSIX 3.2.2.2)
-	 */
-
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
-
-	while (!list_empty(&current->children))
-		zap_thread(list_entry(current->children.next,struct task_struct,sibling), current, 0);
-	while (!list_empty(&current->ptrace_children))
-		zap_thread(list_entry(current->ptrace_children.next,struct task_struct,ptrace_list), current, 1);
-	BUG_ON(!list_empty(&current->children));
 
 	current->state = TASK_ZOMBIE;
 	/*

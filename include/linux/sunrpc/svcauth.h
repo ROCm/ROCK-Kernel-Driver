@@ -14,7 +14,7 @@
 #include <linux/sunrpc/msg_prot.h>
 
 struct svc_cred {
-	u32			cr_flavor;
+	rpc_authflavor_t	cr_flavor;
 	uid_t			cr_uid;
 	gid_t			cr_gid;
 	gid_t			cr_groups[NGROUPS];
@@ -23,8 +23,9 @@ struct svc_cred {
 struct svc_rqst;		/* forward decl */
 
 void	svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp);
-int	svc_auth_register(u32 flavor, void (*)(struct svc_rqst *,u32 *,u32 *));
-void	svc_auth_unregister(u32 flavor);
+int	svc_auth_register(rpc_authflavor_t flavor,
+				void (*)(struct svc_rqst *,u32 *,u32 *));
+void	svc_auth_unregister(rpc_authflavor_t flavor);
 
 #if 0
 /*
@@ -39,7 +40,7 @@ struct authunix_parms {
 	u32		aup_gids[NGRPS];
 };
 
-struct svc_authops *	auth_getops(u32 flavor);
+struct svc_authops *	auth_getops(rpc_authflavor_t flavor);
 #endif
 
 
