@@ -165,7 +165,7 @@ struct edd_info {
 	struct edd_device_params params;
 } __attribute__ ((packed));
 
-extern struct edd_info edd[EDDNR];
+extern struct edd_info edd[EDDMAXNR];
 extern unsigned char eddnr;
 #endif				/*!__ASSEMBLY__ */
 

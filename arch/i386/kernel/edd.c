@@ -1,6 +1,6 @@
 /*
  * linux/arch/i386/kernel/edd.c
- *  Copyright (C) 2002 Dell Computer Corporation
+ *  Copyright (C) 2002, 2003 Dell Computer Corporation
  *  by Matt Domsch <Matt_Domsch@dell.com>
  *
  * BIOS Enhanced Disk Drive Services (EDD)
@@ -11,7 +11,7 @@
  * fn41 - Check Extensions Present and
  * fn48 - Get Device Parametes with EDD extensions
  * made in setup.S, copied to safe structures in setup.c,
- * and presents it in driverfs.
+ * and presents it in sysfs.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License v2.0 as published by
@@ -30,8 +30,6 @@
  *
  * TODO:
  * - Add IDE and USB disk device support
- * - Get symlink creator helper functions exported from
- *   drivers/base instead of duplicating them here.
  * - move edd.[ch] to better locations if/when one is decided
  */
 
@@ -46,18 +44,18 @@
 #include <linux/limits.h>
 #include <linux/device.h>
 #include <linux/pci.h>
-#include <asm/edd.h>
 #include <linux/device.h>
 #include <linux/blkdev.h>
+#include <asm/edd.h>
 /* FIXME - this really belongs in include/scsi/scsi.h */
 #include <../drivers/scsi/scsi.h>
 #include <../drivers/scsi/hosts.h>
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
-MODULE_DESCRIPTION("driverfs interface to BIOS EDD information");
+MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
 
-#define EDD_VERSION "0.07 2002-Oct-24"
+#define EDD_VERSION "0.09 2003-Jan-22"
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://domsch.com/linux/edd30/results.html"
 
@@ -78,6 +76,7 @@ struct edd_attribute {
 static int edd_dev_is_type(struct edd_device *edev, const char *type);
 static struct pci_dev *edd_get_pci_dev(struct edd_device *edev);
 static struct scsi_device *edd_find_matching_scsi_device(struct edd_device *edev);
+static int kernel_has_scsi(void);
 
 static struct edd_device *edd_devices[EDDMAXNR];
 
@@ -93,6 +92,7 @@ edd_dev_get_info(struct edd_device *edev)
 {
 	return edev->info;
 }
+
 static inline void
 edd_dev_set_info(struct edd_device *edev, struct edd_info *info)
 {
@@ -263,8 +263,8 @@ static ssize_t
 edd_show_raw_data(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
-	int i, rc, warn_padding = 0, email = 0, nonzero_path = 0,
-		len = sizeof (*edd) - 4, found_pci=0;
+	int i, warn_padding = 0, nonzero_path = 0,
+		len = sizeof (*info) - 4, found_pci=0;
 	uint8_t checksum = 0, c = 0;
 	char *p = buf;
 	struct pci_dev *pci_dev=NULL;
@@ -277,7 +277,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 		len = info->params.length;
 
 	p += snprintf(p, left, "int13 fn48 returned data:\n\n");
-	p += edd_dump_raw_data(p, left, ((char *) edd) + 4, len);
+	p += edd_dump_raw_data(p, left, ((char *) info) + 4, len);
 
 	/* Spec violation.  Adaptec AIC7899 returns 0xDDBE
 	   here, when it should be 0xBEDD.
@@ -286,7 +286,6 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 	if (info->params.key == 0xDDBE) {
 		p += snprintf(p, left,
 			     "Warning: Spec violation.  Key should be 0xBEDD, is 0xDDBE\n");
-		email++;
 	}
 
 	if (!(info->params.key == 0xBEDD || info->params.key == 0xDDBE)) {
@@ -294,7 +293,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 	}
 
 	for (i = 30; i <= 73; i++) {
-		c = *(((uint8_t *) edd) + i + 4);
+		c = *(((uint8_t *) info) + i + 4);
 		if (c)
 			nonzero_path++;
 		checksum += c;
@@ -303,12 +302,10 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 	if (checksum) {
 		p += snprintf(p, left,
 			     "Warning: Spec violation.  Device Path checksum invalid.\n");
-		email++;
 	}
 
 	if (!nonzero_path) {
 		p += snprintf(p, left, "Error: Spec violation.  Empty device path.\n");
-		email++;
 		goto out;
 	}
 
@@ -326,45 +323,35 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 	if (warn_padding) {
 		p += snprintf(p, left,
 			     "Warning: Spec violation.  Padding should be 0x20.\n");
-		email++;
 	}
 
-	rc = edd_dev_is_type(edev, "PCI");
-	if (!rc) {
-		pci_dev = pci_find_slot(info->params.interface_path.pci.bus,
-					PCI_DEVFN(info->params.interface_path.
-						  pci.slot,
-						  info->params.interface_path.
-						  pci.function));
+	if (edd_dev_is_type(edev, "PCI")) {
+		pci_dev = edd_get_pci_dev(edev);
 		if (!pci_dev) {
 			p += snprintf(p, left, "Error: BIOS says this is a PCI device, but the OS doesn't know\n");
 			p += snprintf(p, left, "  about a PCI device at %02x:%02x.%d\n",
 				     info->params.interface_path.pci.bus,
 				     info->params.interface_path.pci.slot,
 				     info->params.interface_path.pci.function);
-			email++;
 		}
 		else {
 			found_pci++;
 		}
 	}
 
-	if (found_pci && !edd_dev_is_type(edev, "SCSI")) {
+	if (found_pci && kernel_has_scsi() && edd_dev_is_type(edev, "SCSI")) {
 		sd = edd_find_matching_scsi_device(edev);
 		if (!sd) {
 			p += snprintf(p, left, "Error: BIOS says this is a SCSI device, but\n");
 			p += snprintf(p, left, "  the OS doesn't know about this SCSI device.\n");
 			p += snprintf(p, left, "  Do you have it's driver module loaded?\n");
-			email++;
 		}
 	}
 
 out:
-	if (email) {
-		p += snprintf(p, left, "\nPlease check %s\n", REPORT_URL);
-		p += snprintf(p, left, "to see if this has been reported.  If not,\n");
-		p += snprintf(p, left, "please send the information requested there.\n");
-	}
+	p += snprintf(p, left, "\nPlease check %s\n", REPORT_URL);
+	p += snprintf(p, left, "to see if this device has been reported.  If not,\n");
+	p += snprintf(p, left, "please send the information requested there.\n");
 
 	return (p - buf);
 }
@@ -502,8 +489,8 @@ edd_has_default_cylinders(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	if (!edev || !info)
-		return 1;
-	return !info->params.num_default_cylinders;
+		return 0;
+	return info->params.num_default_cylinders > 0;
 }
 
 static int
@@ -511,8 +498,8 @@ edd_has_default_heads(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	if (!edev || !info)
-		return 1;
-	return !info->params.num_default_heads;
+		return 0;
+	return info->params.num_default_heads > 0;
 }
 
 static int
@@ -520,8 +507,8 @@ edd_has_default_sectors_per_track(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	if (!edev || !info)
-		return 1;
-	return !info->params.sectors_per_track;
+		return 0;
+	return info->params.sectors_per_track > 0;
 }
 
 static int
@@ -532,24 +519,24 @@ edd_has_edd30(struct edd_device *edev)
 	char c;
 
 	if (!edev || !info)
-		return 1;
+		return 0;
 
 	if (!(info->params.key == 0xBEDD || info->params.key == 0xDDBE)) {
-		return 1;
+		return 0;
 	}
 
 	for (i = 30; i <= 73; i++) {
-		c = *(((uint8_t *) edd) + i + 4);
+		c = *(((uint8_t *) info) + i + 4);
 		if (c) {
 			nonzero_path++;
 			break;
 		}
 	}
 	if (!nonzero_path) {
-		return 1;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 static EDD_DEVICE_ATTR(raw_data, 0444, edd_show_raw_data, NULL);
@@ -590,7 +577,23 @@ static struct edd_attribute * edd_attrs[] = {
 	NULL,
 };
 
+/**
+ *	edd_release - free edd structure
+ *	@kobj:	kobject of edd structure
+ *
+ *	This is called when the refcount of the edd structure
+ *	reaches 0. This should happen right after we unregister,
+ *	but just in case, we use the release callback anyway.
+ */
+
+static void edd_release(struct kobject * kobj)
+{
+	struct edd_device * dev = to_edd_device(kobj);
+	kfree(dev);
+}
+
 static struct kobj_type ktype_edd = {
+	.release	= edd_release,
 	.sysfs_ops	= &edd_attr_ops,
 	.default_attrs	= def_attrs,
 };
@@ -598,27 +601,24 @@ static struct kobj_type ktype_edd = {
 static decl_subsys(edd,&ktype_edd);
 
 
-
 /**
  * edd_dev_is_type() - is this EDD device a 'type' device?
  * @edev
  * @type - a host bus or interface identifier string per the EDD spec
  *
- * Returns 0 if it is a 'type' device, nonzero otherwise.
+ * Returns 1 (TRUE) if it is a 'type' device, 0 otherwise.
  */
 static int
 edd_dev_is_type(struct edd_device *edev, const char *type)
 {
-	int rc;
 	struct edd_info *info = edd_dev_get_info(edev);
-	if (!edev || !info)
-		return 1;
 
-	rc = strncmp(info->params.host_bus_type, type, strlen(type));
-	if (!rc)
-		return 0;
-
-	return strncmp(info->params.interface_type, type, strlen(type));
+	if (edev && type && info) {
+		if (!strncmp(info->params.host_bus_type, type, strlen(type)) ||
+		    !strncmp(info->params.interface_type, type, strlen(type)))
+			return 1;
+	}
+	return 0;
 }
 
 /**
@@ -631,16 +631,14 @@ static struct pci_dev *
 edd_get_pci_dev(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
-	int rc;
 
-	rc = edd_dev_is_type(edev, "PCI");
-	if (rc)
-		return NULL;
-
-	return pci_find_slot(info->params.interface_path.pci.bus,
-			     PCI_DEVFN(info->params.interface_path.pci.slot,
-				       info->params.interface_path.pci.
-				       function));
+	if (edd_dev_is_type(edev, "PCI")) {
+		return pci_find_slot(info->params.interface_path.pci.bus,
+				     PCI_DEVFN(info->params.interface_path.pci.slot,
+					       info->params.interface_path.pci.
+					       function));
+	}
+	return NULL;
 }
 
 static int
@@ -653,105 +651,117 @@ edd_create_symlink_to_pcidev(struct edd_device *edev)
 	return sysfs_create_link(&edev->kobj,&pci_dev->dev.kobj,"pci_dev");
 }
 
+/*
+ * FIXME - as of 15-Jan-2003, there are some non-"scsi_device"s on the
+ * scsi_bus list.  The following functions could possibly mis-access
+ * memory in that case.  This is actually a problem with the SCSI
+ * layer, which is being addressed there.  Until then, don't use the
+ * SCSI functions.
+ */
+
+#undef CONFIG_SCSI
+#undef CONFIG_SCSI_MODULE
+#if defined(CONFIG_SCSI) || defined(CONFIG_SCSI_MODULE)
+
+struct edd_match_data {
+	struct edd_device	* edev;
+	struct scsi_device	* sd;
+};
+
 /**
  * edd_match_scsidev()
  * @edev - EDD device is a known SCSI device
  * @sd - scsi_device with host who's parent is a PCI controller
  * 
- * returns 0 on success, 1 on failure
+ * returns 1 if a match is found, 0 if not.
  */
-static int
-edd_match_scsidev(struct edd_device *edev, struct scsi_device *sd)
+static int edd_match_scsidev(struct device * dev, void * d)
 {
-	struct edd_info *info = edd_dev_get_info(edev);
+	struct edd_match_data * data = (struct edd_match_data *)d;
+	struct edd_info *info = edd_dev_get_info(data->edev);
+	struct scsi_device * sd = to_scsi_device(dev);
 
-	if (!edev || !sd || !info)
-		return 1;
-
-	if ((sd->channel == info->params.interface_path.pci.channel) &&
-	    (sd->id == info->params.device_path.scsi.id) &&
-	    (sd->lun == info->params.device_path.scsi.lun)) {
-		return 0;
+	if (info) {
+		if ((sd->channel == info->params.interface_path.pci.channel) &&
+		    (sd->id == info->params.device_path.scsi.id) &&
+		    (sd->lun == info->params.device_path.scsi.lun)) {
+			data->sd = sd;
+			return 1;
+		}
 	}
-
-	return 1;
+	return 0;
 }
 
 /**
  * edd_find_matching_device()
  * @edev - edd_device to match
  *
- * Returns struct scsi_device * on success,
- * or NULL on failure.
- * This assumes that all children of the PCI controller
- * are scsi_hosts, and that all children of scsi_hosts
- * are scsi_devices.
- * The reference counting probably isn't the best it could be.
+ * Search the SCSI devices for a drive that matches the EDD 
+ * device descriptor we have. If we find a match, return it,
+ * otherwise, return NULL.
  */
 
-#define children_to_dev(n) container_of(n,struct device,node)
 static struct scsi_device *
 edd_find_matching_scsi_device(struct edd_device *edev)
 {
-	struct list_head *sdev_node;
-	int rc = 1;
-	struct scsi_device *sd = NULL;
-	struct pci_dev *pci_dev;
+	struct edd_match_data data;
+	struct bus_type * scsi_bus = find_bus("scsi");
 
-	rc = edd_dev_is_type(edev, "SCSI");
-	if (rc)
+	if (!scsi_bus) {
 		return NULL;
-
-	pci_dev = edd_get_pci_dev(edev);
-	if (!pci_dev)
-		return NULL;
-
-	get_device(&pci_dev->dev);
-
-	list_for_each(sdev_node, &pci_dev->dev.children) {
-		struct device *sdev_dev = children_to_dev(sdev_node);
-		get_device(sdev_dev);
-		sd = to_scsi_device(sdev_dev);
-		rc = edd_match_scsidev(edev, sd);
-		put_device(sdev_dev);
-		if (!rc)
-			break;
 	}
 
-	put_device(&pci_dev->dev);
-	return rc ? NULL : sd;
+	data.edev = edev;
+
+	if (edd_dev_is_type(edev, "SCSI")) {
+		if (bus_for_each_dev(scsi_bus,NULL,&data,edd_match_scsidev))
+			return data.sd;
+	}
+	return NULL;
 }
 
 static int
 edd_create_symlink_to_scsidev(struct edd_device *edev)
 {
-
-	struct scsi_device *sdev;
 	struct pci_dev *pci_dev;
-	struct edd_info *info = edd_dev_get_info(edev);
-	int rc;
+	int rc = -EINVAL;
 
-	rc = edd_dev_is_type(edev, "PCI");
-	if (rc)
-		return rc;
-
-	pci_dev = pci_find_slot(info->params.interface_path.pci.bus,
-				PCI_DEVFN(info->params.interface_path.pci.slot,
-					  info->params.interface_path.pci.
-					  function));
-	if (!pci_dev)
-		return 1;
-
-	sdev = edd_find_matching_scsi_device(edev);
-	if (!sdev)
-		return 1;
-
-	get_device(&sdev->sdev_driverfs_dev);
-	rc = sysfs_create_link(&edev->kobj,&sdev->sdev_driverfs_dev.kobj, "disc");
-	put_device(&sdev->sdev_driverfs_dev);
-
+	pci_dev = edd_get_pci_dev(edev);
+	if (pci_dev) {
+		struct scsi_device * sdev = edd_find_matching_scsi_device(edev);
+		if (sdev && get_device(&sdev->sdev_driverfs_dev)) {
+			rc = sysfs_create_link(&edev->kobj,
+					       &sdev->sdev_driverfs_dev.kobj,
+					       "disc");
+			put_device(&sdev->sdev_driverfs_dev);
+		}
+	}
 	return rc;
 }
+
+static int kernel_has_scsi(void)
+{
+	return 1;
+}
+
+#else
+static int kernel_has_scsi(void)
+{
+	return 0;
+}
+
+static struct scsi_device *
+edd_find_matching_scsi_device(struct edd_device *edev)
+{
+	return NULL;
+}
+static int
+edd_create_symlink_to_scsidev(struct edd_device *edev)
+{
+	return -ENOSYS;
+}
+#endif
+
 
 static inline void
 edd_device_unregister(struct edd_device *edev)
@@ -759,7 +769,7 @@ edd_device_unregister(struct edd_device *edev)
 	kobject_unregister(&edev->kobj);
 }
 
-static void populate_dir(struct edd_device * edev)
+static void edd_populate_dir(struct edd_device * edev)
 {
 	struct edd_attribute * attr;
 	int error = 0;
@@ -767,7 +777,7 @@ static void populate_dir(struct edd_device * edev)
 
 	for (i = 0; (attr = edd_attrs[i]) && !error; i++) {
 		if (!attr->test || 
-		    (attr->test && !attr->test(edev)))
+		    (attr->test && attr->test(edev)))
 			error = sysfs_create_file(&edev->kobj,&attr->attr);
 	}
 	
@@ -791,12 +801,12 @@ edd_device_register(struct edd_device *edev, int i)
 	kobj_set_kset_s(edev,edd_subsys);
 	error = kobject_register(&edev->kobj);
 	if (!error)
-		populate_dir(edev);
+		edd_populate_dir(edev);
 	return error;
 }
 
 /**
- * edd_init() - creates driverfs tree of EDD data
+ * edd_init() - creates sysfs tree of EDD data
  *
  * This assumes that eddnr and edd were
  * assigned in setup.c already.
@@ -845,10 +855,8 @@ edd_exit(void)
 	struct edd_device *edev;
 
 	for (i = 0; i < eddnr && i < EDDMAXNR; i++) {
-		if ((edev = edd_devices[i])) {
+		if ((edev = edd_devices[i]))
 			edd_device_unregister(edev);
-			kfree(edev);
-		}
 	}
 	firmware_unregister(&edd_subsys);
 }
