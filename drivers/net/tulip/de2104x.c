@@ -28,8 +28,8 @@
  */
 
 #define DRV_NAME		"de2104x"
-#define DRV_VERSION		"0.6"
-#define DRV_RELDATE		"Sep 1, 2003"
+#define DRV_VERSION		"0.7"
+#define DRV_RELDATE		"Mar 17, 2004"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -1173,18 +1173,18 @@ static int de_reset_mac (struct de_private *de)
 	u32 status, tmp;
 
 	/*
-	 * Reset MAC.  Copied from de4x5.c.
+	 * Reset MAC.  de4x5.c and tulip.c examined for "advice"
+	 * in this area.
 	 */
 
-	tmp = dr32 (BusMode);
-	if (tmp == 0xffffffff)
-		return -ENODEV;
+	if (dr32(BusMode) == 0xffffffff)
+		return -EBUSY;
+
+	/* Reset the chip, holding bit 0 set at least 50 PCI cycles. */
+	dw32 (BusMode, CmdReset);
 	mdelay (1);
 
-	dw32 (BusMode, tmp | CmdReset);
-	mdelay (1);
-
-	dw32 (BusMode, tmp);
+	dw32 (BusMode, de_bus_mode);
 	mdelay (1);
 
 	for (tmp = 0; tmp < 5; tmp++) {
