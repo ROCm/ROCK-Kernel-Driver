@@ -11,8 +11,6 @@
 
 O_TARGET := amiga.o
 
-export-objs	:= amiga_ksyms.o
-
 obj-y		:= config.o amiints.o cia.o time.o bootinfo.o amisound.o \
 			chipram.o amiga_ksyms.o
 

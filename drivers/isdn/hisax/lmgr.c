@@ -10,7 +10,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "hisax.h"
 
 static void

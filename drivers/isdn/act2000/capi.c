@@ -13,7 +13,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "act2000.h"
 #include "capi.h"
 

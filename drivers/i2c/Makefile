@@ -3,7 +3,7 @@
 #
 
 export-objs	:= i2c-core.o i2c-algo-bit.o i2c-algo-pcf.o \
-		   i2c-algo-ite.o i2c-proc.o
+		   i2c-algo-ite.o i2c-proc.o i2c-algo-ibm_ocp.o
 
 obj-$(CONFIG_I2C)		+= i2c-core.o
 obj-$(CONFIG_I2C_CHARDEV)	+= i2c-dev.o

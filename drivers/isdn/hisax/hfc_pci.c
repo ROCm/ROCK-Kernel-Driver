@@ -17,7 +17,6 @@
 
 #include <linux/init.h>
 #include <linux/config.h>
-#define __NO_VERSION__
 #include "hisax.h"
 #include "hfc_pci.h"
 #include "isdnl1.h"

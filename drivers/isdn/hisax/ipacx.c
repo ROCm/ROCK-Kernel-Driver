@@ -9,7 +9,6 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  */
-#define __NO_VERSION__
 #include <linux/kernel.h>
 #include <linux/config.h>
 #include <linux/init.h>
