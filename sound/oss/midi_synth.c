@@ -418,7 +418,6 @@ midi_synth_open(int dev, int mode)
 {
 	int             orig_dev = synth_devs[dev]->midi_dev;
 	int             err;
-	unsigned long   flags;
 	struct midi_input_info *inc;
 
 	if (orig_dev < 0 || orig_dev > num_midis || midi_devs[orig_dev] == NULL)
@@ -433,14 +432,15 @@ midi_synth_open(int dev, int mode)
 		return err;
 	inc = &midi_devs[orig_dev]->in_info;
 
-	save_flags(flags);
-	cli();
+	/* save_flags(flags);
+	cli(); 
+	don't know against what irqhandler to protect*/
 	inc->m_busy = 0;
 	inc->m_state = MST_INIT;
 	inc->m_ptr = 0;
 	inc->m_left = 0;
 	inc->m_prev_status = 0x00;
-	restore_flags(flags);
+	/* restore_flags(flags); */
 
 	return 1;
 }
