@@ -359,7 +359,8 @@
 #define __NR_clock_getres		421
 #define __NR_clock_nanosleep		422
 #define __NR_semtimedop			423
-#define NR_SYSCALLS			424
+#define __NR_tgkill			424
+#define NR_SYSCALLS			425
 
 #if defined(__GNUC__)
 

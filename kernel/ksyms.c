@@ -605,6 +605,9 @@ EXPORT_SYMBOL(next_thread);
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
+EXPORT_SYMBOL(set_fs_pwd);
+EXPORT_SYMBOL(set_fs_root);
+
 /* debug */
 EXPORT_SYMBOL(dump_stack);
 EXPORT_SYMBOL(ptrace_notify);

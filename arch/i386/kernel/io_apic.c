@@ -682,6 +682,21 @@ __initcall(balanced_irq_init);
 
 #else /* !SMP */
 static inline void move_irq(int irq) { }
+
+void send_IPI_self(int vector)
+{
+	unsigned int cfg;
+
+	/*
+	 * Wait for idle.
+	 */
+	apic_wait_icr_idle();
+	cfg = APIC_DM_FIXED | APIC_DEST_SELF | vector | APIC_DEST_LOGICAL;
+	/*
+	 * Send the IPI. The write to APIC_ICR fires this off.
+	 */
+	apic_write_around(APIC_ICR, cfg);
+}
 #endif /* defined(CONFIG_SMP) */
 
 

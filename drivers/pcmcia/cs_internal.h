@@ -113,7 +113,7 @@ struct cis_cache_entry {
     (((h) == NULL) || ((h)->client_magic != CLIENT_MAGIC))
 
 #define CHECK_SOCKET(s) \
-    (((s) >= sockets) || (socket_table[s]->ss_entry == NULL))
+    (((s) >= sockets) || (socket_table[s]->ops == NULL))
 
 #define SOCKET(h) (h->Socket)
 #define CONFIG(h) (&SOCKET(h)->config[(h)->Function])

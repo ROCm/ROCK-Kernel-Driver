@@ -161,7 +161,7 @@ static int debug;
  * then put the packet into tx_queue, and call sppp_flush_xmit()
  * after spinlock is released.
  */
-static void sppp_flush_xmit()
+static void sppp_flush_xmit(void)
 {
 	struct sk_buff *skb;
 	while ((skb = skb_dequeue(&tx_queue)) != NULL)

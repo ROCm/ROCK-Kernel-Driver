@@ -456,10 +456,10 @@ struct pci_bus {
 	void		*sysdata;	/* hook for sys-specific extension */
 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
 
-	unsigned char	number;		/* bus number */
-	unsigned char	primary;	/* number of primary bridge */
-	unsigned char	secondary;	/* number of secondary bridge */
-	unsigned char	subordinate;	/* max number of subordinate buses */
+	unsigned int	number;		/* bus number */
+	unsigned int	primary;	/* number of primary bridge */
+	unsigned int	secondary;	/* number of secondary bridge */
+	unsigned int	subordinate;	/* max number of subordinate buses */
 
 	char		name[48];
 

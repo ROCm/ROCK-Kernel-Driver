@@ -519,7 +519,7 @@ static int __init init_tcic(void)
     platform_device_register(&tcic_device);
 
     for (i = 0; i < sockets; i++) {
-	    socket_table[i].socket.ss_entry = &tcic_operations;
+	    socket_table[i].socket.ops = &tcic_operations;
 	    socket_table[i].socket.dev.dev = &tcic_device.dev;
 	    ret = pcmcia_register_socket(&socket_table[i].socket);	    
 	    if (ret && i)

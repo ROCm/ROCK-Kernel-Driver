@@ -2,7 +2,7 @@
 #define _NAMESPACE_H_
 #ifdef __KERNEL__
 
-#include <linux/dcache.h>
+#include <linux/mount.h>
 #include <linux/sched.h>
 
 struct namespace {
@@ -19,9 +19,9 @@ static inline void put_namespace(struct namespace *namespace)
 {
 	if (atomic_dec_and_test(&namespace->count)) {
 		down_write(&namespace->sem);
-		spin_lock(&dcache_lock);
+		spin_lock(&vfsmount_lock);
 		umount_tree(namespace->root);
-		spin_unlock(&dcache_lock);
+		spin_unlock(&vfsmount_lock);
 		up_write(&namespace->sem);
 		kfree(namespace);
 	}
