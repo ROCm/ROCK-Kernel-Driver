@@ -22,8 +22,6 @@
 int foo(void)
 {
 	DEFINE(AOFF_task_thread, offsetof(struct task_struct, thread));
-	DEFINE(AOFF_task_ptrace, offsetof(struct task_struct, ptrace));
-	DEFINE(AOFF_task_blocked, offsetof(struct task_struct, blocked));
 	BLANK();
 	/* XXX This is the stuff for sclow.S, kill it. */
 	DEFINE(AOFF_task_pid, offsetof(struct task_struct, pid));

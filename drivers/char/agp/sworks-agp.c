@@ -308,13 +308,6 @@ static void serverworks_cleanup(void)
 	iounmap((void *) serverworks_private.registers);
 }
 
-static unsigned long serverworks_mask_memory(unsigned long addr, int type)
-{
-	/* Only type 0 is supported by the serverworks chipsets */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
 static int serverworks_insert_memory(agp_memory * mem,
 			     off_t pg_start, int type)
 {
@@ -383,7 +376,7 @@ static int serverworks_remove_memory(agp_memory * mem, off_t pg_start,
 
 static struct gatt_mask serverworks_masks[] =
 {
-	{.mask = 0x00000001, .type = 0}
+	{.mask = 1, .type = 0}
 };
 
 static struct aper_size_info_lvl2 serverworks_sizes[7] =
@@ -421,7 +414,6 @@ static void serverworks_agp_enable(u32 mode)
 
 struct agp_bridge_driver sworks_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= serverworks_masks,
 	.aperture_sizes		= serverworks_sizes,
 	.size_type		= LVL2_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -429,7 +421,8 @@ struct agp_bridge_driver sworks_driver = {
 	.fetch_size		= serverworks_fetch_size,
 	.cleanup		= serverworks_cleanup,
 	.tlb_flush		= serverworks_tlbflush,
-	.mask_memory		= serverworks_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= serverworks_masks,
 	.agp_enable		= serverworks_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= serverworks_create_gatt_table,
@@ -440,8 +433,6 @@ struct agp_bridge_driver sworks_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static int __init agp_serverworks_probe(struct pci_dev *pdev,
@@ -532,7 +523,7 @@ static struct pci_device_id agp_serverworks_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_serverworks_pci_table);
 
-static struct __initdata pci_driver agp_serverworks_pci_driver = {
+static struct pci_driver agp_serverworks_pci_driver = {
 	.name		= "agpgart-serverworks",
 	.id_table	= agp_serverworks_pci_table,
 	.probe		= agp_serverworks_probe,

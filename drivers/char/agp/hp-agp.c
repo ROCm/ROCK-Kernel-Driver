@@ -330,13 +330,13 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 
 struct agp_bridge_driver hp_zx1_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= hp_zx1_masks,
 	.size_type		= FIXED_APER_SIZE,
 	.configure		= hp_zx1_configure,
 	.fetch_size		= hp_zx1_fetch_size,
 	.cleanup		= hp_zx1_cleanup,
 	.tlb_flush		= hp_zx1_tlbflush,
 	.mask_memory		= hp_zx1_mask_memory,
+	.masks			= hp_zx1_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= hp_zx1_create_gatt_table,
@@ -400,7 +400,7 @@ static struct pci_device_id agp_hp_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_hp_pci_table);
 
-static struct __initdata pci_driver agp_hp_pci_driver = {
+static struct pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",
 	.id_table	= agp_hp_pci_table,
 	.probe		= agp_hp_probe,

@@ -114,12 +114,6 @@ static int ali_configure(void)
 	return 0;
 }
 
-static unsigned long ali_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
 
 static void m1541_cache_flush(void)
 {
@@ -180,10 +174,6 @@ static void m1541_destroy_page(void * addr)
 
 
 /* Setup function */
-static struct gatt_mask ali_generic_masks[] =
-{
-	{.mask = 0x00000000, .type = 0}
-};
 
 static struct aper_size_info_32 ali_generic_sizes[7] =
 {
@@ -198,7 +188,6 @@ static struct aper_size_info_32 ali_generic_sizes[7] =
 
 struct agp_bridge_driver ali_generic_bridge = {
 	.owner			= THIS_MODULE,
-	.masks			= ali_generic_masks,
 	.aperture_sizes		= ali_generic_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -206,7 +195,8 @@ struct agp_bridge_driver ali_generic_bridge = {
 	.fetch_size		= ali_fetch_size,
 	.cleanup		= ali_cleanup,
 	.tlb_flush		= ali_tlbflush,
-	.mask_memory		= ali_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -217,13 +207,10 @@ struct agp_bridge_driver ali_generic_bridge = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= ali_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver ali_m1541_bridge = {
 	.owner			= THIS_MODULE,
-	.masks			= ali_generic_masks,
 	.aperture_sizes		= ali_generic_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -231,7 +218,8 @@ struct agp_bridge_driver ali_m1541_bridge = {
 	.fetch_size		= ali_fetch_size,
 	.cleanup		= ali_cleanup,
 	.tlb_flush		= ali_tlbflush,
-	.mask_memory		= ali_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= m1541_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -242,8 +230,6 @@ struct agp_bridge_driver ali_m1541_bridge = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= m1541_alloc_page,
 	.agp_destroy_page	= m1541_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 
@@ -391,7 +377,7 @@ static struct pci_device_id agp_ali_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_ali_pci_table);
 
-static struct __initdata pci_driver agp_ali_pci_driver = {
+static struct pci_driver agp_ali_pci_driver = {
 	.name		= "agpgart-ali",
 	.id_table	= agp_ali_pci_table,
 	.probe		= agp_ali_probe,
