@@ -48,12 +48,10 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 		if (dev == NULL)
 			return -EINVAL;
 
-		spin_lock_bh(&br->lock);
 		if (cmd == BRCTL_ADD_IF)
 			ret = br_add_if(br, dev);
 		else
 			ret = br_del_if(br, dev);
-		spin_unlock_bh(&br->lock);
 
 		dev_put(dev);
 		return ret;

@@ -740,6 +740,7 @@ int dev_ethtool(struct ifreq *ifr)
 	return -EOPNOTSUPP;
 }
 
+EXPORT_SYMBOL(dev_ethtool);
 EXPORT_SYMBOL(ethtool_op_get_link);
 EXPORT_SYMBOL(ethtool_op_get_sg);
 EXPORT_SYMBOL(ethtool_op_get_tso);
