@@ -396,14 +396,23 @@ extern void ia64_load_extra (struct task_struct *task);
  * task->thread.fph, avoiding the complication of having to fetch
  * the latest fph state from another CPU.
  */
-# define switch_to(prev,next,last) do {						\
-	if (ia64_psr(ia64_task_regs(prev))->mfh) {				\
-		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
-		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
-		__ia64_save_fpu((prev)->thread.fph);				\
-	}									\
-	ia64_psr(ia64_task_regs(prev))->dfh = 1;				\
-	__switch_to(prev,next,last);						\
+# define switch_to(prev,next,last) do {					\
+	if (ia64_psr(ia64_task_regs(prev))->mfh) {			\
+		ia64_psr(ia64_task_regs(prev))->mfh = 0;		\
+		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;		\
+		__ia64_save_fpu((prev)->thread.fph);			\
+		(prev)->thread.last_fph_cpu = smp_processor_id();	\
+	}								\
+	if ((next)->thread.flags & IA64_THREAD_FPH_VALID) {		\
+		if (((next)->thread.last_fph_cpu == smp_processor_id())	\
+		    && (ia64_get_fpu_owner() == next))			\
+		{							\
+			ia64_psr(ia64_task_regs(next))->dfh = 0;	\
+			ia64_psr(ia64_task_regs(next))->mfh = 0;	\
+		} else						\
+			ia64_psr(ia64_task_regs(next))->dfh = 1;	\
+	}								\
+	__switch_to(prev,next,last);					\
   } while (0)
 #else
 # define switch_to(prev,next,last) do {						\

@@ -223,6 +223,7 @@ struct thread_struct {
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
 	struct siginfo *siginfo;	/* current siginfo struct for ptrace() */
+	__u64 last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
 
 #ifdef CONFIG_IA32_SUPPORT
 	__u64 eflag;			/* IA32 EFLAGS reg */
@@ -389,8 +390,6 @@ ia64_set_kr (unsigned long regnum, unsigned long r)
 	}
 }
 
-#ifndef CONFIG_SMP
-
 static inline struct task_struct *
 ia64_get_fpu_owner (void)
 {
@@ -402,8 +401,6 @@ ia64_set_fpu_owner (struct task_struct *t)
 {
 	ia64_set_kr(IA64_KR_FPU_OWNER, (unsigned long) t);
 }
-
-#endif /* !CONFIG_SMP */
 
 extern void __ia64_init_fpu (void);
 extern void __ia64_save_fpu (struct ia64_fpreg *fph);

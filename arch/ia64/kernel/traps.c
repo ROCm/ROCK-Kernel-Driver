@@ -248,10 +248,9 @@ disabled_fph_fault (struct pt_regs *regs)
 
 		if (fpu_owner)
 			ia64_flush_fph(fpu_owner);
-
-		ia64_set_fpu_owner(current);
 	}
 #endif /* !CONFIG_SMP */
+	ia64_set_fpu_owner(current);
 	if ((current->thread.flags & IA64_THREAD_FPH_VALID) != 0) {
 		__ia64_load_fpu(current->thread.fph);
 		psr->mfh = 0;
