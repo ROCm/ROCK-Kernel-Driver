@@ -180,6 +180,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     filp->f_pos = next_pos;
     pathrelse (&path_to_entry);
     reiserfs_check_path(&path_to_entry) ;
+    UPDATE_ATIME(inode) ;
     return 0;
 }
 
