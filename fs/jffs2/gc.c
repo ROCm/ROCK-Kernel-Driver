@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.143 2004/11/16 20:36:11 dwmw2 Exp $
+ * $Id: gc.c,v 1.144 2004/12/21 11:18:50 dwmw2 Exp $
  *
  */
 
@@ -602,7 +602,7 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 			printk(KERN_NOTICE "Not marking the space at 0x%08x as dirty because the flash driver returned retlen zero\n", nraw->flash_offset);
                         jffs2_free_raw_node_ref(nraw);
 		}
-		if (!retried && (nraw == jffs2_alloc_raw_node_ref())) {
+		if (!retried && (nraw = jffs2_alloc_raw_node_ref())) {
 			/* Try to reallocate space and retry */
 			uint32_t dummy;
 			struct jffs2_eraseblock *jeb = &c->blocks[phys_ofs / c->sector_size];
