@@ -130,16 +130,6 @@ static void free_block( struct mem_block *p )
 	}
 }
 
-static void print_heap( struct mem_block *heap )
-{
-	struct mem_block *p;
-
-	for (p = heap->next ; p != heap ; p = p->next) 
-		DRM_DEBUG("0x%x..0x%x (0x%x) -- owner %d\n",
-			  p->start, p->start + p->size,
-			  p->size, p->pid);
-}
-
 /* Initialize.  How to check for an uninitialized heap?
  */
 static int init_heap(struct mem_block **heap, int start, int size)
