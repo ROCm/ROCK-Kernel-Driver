@@ -48,7 +48,7 @@ struct psmouse {
 	unsigned char state;
 	char acking;
 	volatile char ack;
-	char error;
+	unsigned char error;
 	char devname[64];
 	char phys[32];
 
