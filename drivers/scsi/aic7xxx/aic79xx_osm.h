@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#121 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#123 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -255,7 +255,7 @@ typedef struct timer_list ahd_timer_t;
 
 /***************************** Timer Facilities *******************************/
 #define ahd_timer_init init_timer
-#define ahd_timer_stop del_timer
+#define ahd_timer_stop del_timer_sync
 typedef void ahd_linux_callback_t (u_long);  
 static __inline void ahd_timer_reset(ahd_timer_t *timer, u_int usec,
 				     ahd_callback_t *func, void *arg);
@@ -293,7 +293,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHD_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.5"
+#define AIC79XX_DRIVER_VERSION "1.3.6"
 
 /**************************** Front End Queues ********************************/
 /*

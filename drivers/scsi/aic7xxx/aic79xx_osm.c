@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#141 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#147 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -548,7 +548,6 @@ static aic_option_callback_t ahd_linux_setup_dv;
 static aic_option_callback_t ahd_linux_setup_iocell_info;
 static int ahd_linux_next_unit(void);
 static void ahd_runq_tasklet(unsigned long data);
-static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf);
 static int aic79xx_setup(char *c);
 
 /****************************** Inlines ***************************************/
@@ -1087,7 +1086,8 @@ ahd_linux_slave_destroy(Scsi_Device *device)
 	 && (dev->flags & AHD_DEV_SLAVE_CONFIGURED) != 0) {
 		dev->flags |= AHD_DEV_UNCONFIGURED;
 		if (TAILQ_EMPTY(&dev->busyq)
-		 && dev->active == 0)
+		 && dev->active == 0
+		 && (dev->flags & AHD_DEV_TIMER_ACTIVE) == 0)
 			ahd_linux_free_device(ahd, dev);
 	}
 	ahd_midlayer_entrypoint_unlock(ahd, &flags);
@@ -1476,7 +1476,7 @@ done:
 		printf("Recovery code sleeping\n");
 		down(&ahd->platform_data->eh_sem);
 		printf("Recovery code awake\n");
-        	ret = del_timer(&timer);
+        	ret = del_timer_sync(&timer);
 		if (ret == 0) {
 			printf("Timer Expired\n");
 			retval = FAILED;
@@ -1581,7 +1581,7 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	down(&ahd->platform_data->eh_sem);
 	printf("Recovery code awake\n");
 	retval = SUCCESS;
-	if (del_timer(&timer) == 0) {
+	if (del_timer_sync(&timer) == 0) {
 		printf("Timer Expired\n");
 		retval = FAILED;
 	}
@@ -1715,35 +1715,6 @@ ahd_runq_tasklet(unsigned long data)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	ahd_unlock(ahd, &flags);
 #endif
-}
-
-/************************ Shutdown/halt/reboot hook ***************************/
-#include <linux/notifier.h>
-#include <linux/reboot.h>
-
-static struct notifier_block ahd_linux_notifier = {
-	ahd_linux_halt, NULL, 0
-};
-
-static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	struct ahd_softc *ahd;
-
-	/*
-	 * In 2.5.X, this is called prior to the filesystems
-	 * being synced and the SCSI layer being properly
-	 * shutdown.  A different API is required there,
-	 * but the device hooks for this don't quite look
-	 * right.
-	 */
-	if (event == SYS_DOWN || event == SYS_HALT) {
-		TAILQ_FOREACH(ahd, &ahd_tailq, links) {
-			ahd_shutdown(ahd);
-		}
-	}
-#endif
-	return (NOTIFY_OK);
 }
 
 /******************************** Bus DMA *************************************/
@@ -1927,7 +1898,7 @@ ahd_softc_comp(struct ahd_softc *lahd, struct ahd_softc *rahd)
 }
 
 static void
-ahd_linux_setup_tag_info(void *arg, int instance, int targ, int32_t value)
+ahd_linux_setup_tag_info(u_long arg, int instance, int targ, int32_t value)
 {
 
 	if ((instance >= 0) && (targ >= 0)
@@ -1940,18 +1911,18 @@ ahd_linux_setup_tag_info(void *arg, int instance, int targ, int32_t value)
 }
 
 static void
-ahd_linux_setup_rd_strm_info(void *arg, int instance, int targ, int32_t value)
+ahd_linux_setup_rd_strm_info(u_long arg, int instance, int targ, int32_t value)
 {
 	if ((instance >= 0)
 	 && (instance < NUM_ELEMENTS(aic79xx_rd_strm_info))) {
-		aic79xx_rd_strm_info[instance] = value * 0xFFFF;
+		aic79xx_rd_strm_info[instance] = value & 0xFFFF;
 		if (bootverbose)
 			printf("rd_strm[%d] = 0x%x\n", instance, value);
 	}
 }
 
 static void
-ahd_linux_setup_dv(void *arg, int instance, int targ, int32_t value)
+ahd_linux_setup_dv(u_long arg, int instance, int targ, int32_t value)
 {
 	if ((instance >= 0)
 	 && (instance < NUM_ELEMENTS(aic79xx_dv_settings))) {
@@ -1962,11 +1933,9 @@ ahd_linux_setup_dv(void *arg, int instance, int targ, int32_t value)
 }
 
 static void
-ahd_linux_setup_iocell_info(void *arg, int instance, int targ, int32_t value)
+ahd_linux_setup_iocell_info(u_long index, int instance, int targ, int32_t value)
 {
-	u_int index;
 
-	index = (u_int)arg;
 	if ((instance >= 0)
 	 && (instance < NUM_ELEMENTS(aic79xx_iocell_info))) {
 		uint8_t *iocell_info;
@@ -1974,7 +1943,7 @@ ahd_linux_setup_iocell_info(void *arg, int instance, int targ, int32_t value)
 		iocell_info = (uint8_t*)&aic79xx_iocell_info[instance];
 		iocell_info[index] = value & 0xFFFF;
 		if (bootverbose)
-			printf("iocell[%d:%d] = %d\n", instance, index, value);
+			printf("iocell[%d:%ld] = %d\n", instance, index, value);
 	}
 }
 
@@ -2053,26 +2022,26 @@ aic79xx_setup(char *s)
 			ahd_linux_setup_tag_info_global(p + n);
 		} else if (strncmp(p, "tag_info", n) == 0) {
 			s = aic_parse_brace_option("tag_info", p + n, end,
-			    2, ahd_linux_setup_tag_info, NULL);
+			    2, ahd_linux_setup_tag_info, 0);
 		} else if (strncmp(p, "rd_strm", n) == 0) {
 			printf("Calling brace parse for %s\n", p);
 			s = aic_parse_brace_option("rd_strm", p + n, end,
-			    1, ahd_linux_setup_rd_strm_info, NULL);
+			    1, ahd_linux_setup_rd_strm_info, 0);
 		} else if (strncmp(p, "dv", n) == 0) {
 			s = aic_parse_brace_option("dv", p + n, end, 1,
-			    ahd_linux_setup_dv, NULL);
+			    ahd_linux_setup_dv, 0);
 		} else if (strncmp(p, "slewrate", n) == 0) {
 			s = aic_parse_brace_option("slewrate",
 			    p + n, end, 1, ahd_linux_setup_iocell_info,
-			    (void *)AIC79XX_SLEWRATE_INDEX);
+			    AIC79XX_SLEWRATE_INDEX);
 		} else if (strncmp(p, "precomp", n) == 0) {
 			s = aic_parse_brace_option("precomp",
 			    p + n, end, 1, ahd_linux_setup_iocell_info,
-			    (void *)AIC79XX_PRECOMP_INDEX);
+			    AIC79XX_PRECOMP_INDEX);
 		} else if (strncmp(p, "amplitude", n) == 0) {
 			s = aic_parse_brace_option("amplitude",
 			    p + n, end, 1, ahd_linux_setup_iocell_info,
-			    (void *)AIC79XX_AMPLITUDE_INDEX);
+			    AIC79XX_AMPLITUDE_INDEX);
 		} else if (p[n] == ':') {
 			*(options[i].flag) = simple_strtoul(p + n + 1, NULL, 0);
 		} else if (!strncmp(p, "verbose", n)) {
@@ -2291,8 +2260,6 @@ ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg)
 #endif
 	ahd_setup_runq_tasklet(ahd);
 	ahd->seltime = (aic79xx_seltime & 0x3) << 4;
-	if (TAILQ_EMPTY(&ahd_tailq))
-		register_reboot_notifier(&ahd_linux_notifier);
 	return (0);
 }
 
@@ -2304,6 +2271,7 @@ ahd_platform_free(struct ahd_softc *ahd)
 	int i, j;
 
 	if (ahd->platform_data != NULL) {
+		del_timer_sync(&ahd->platform_data->completeq_timer);
 		ahd_linux_kill_dv_thread(ahd);
 		ahd_teardown_runq_tasklet(ahd);
 		if (ahd->platform_data->host != NULL) {
@@ -2317,15 +2285,20 @@ ahd_platform_free(struct ahd_softc *ahd)
 		for (i = 0; i < AHD_NUM_TARGETS; i++) {
 			targ = ahd->platform_data->targets[i];
 			if (targ != NULL) {
+				/* Keep target around through the loop. */
+				targ->refcount++;
 				for (j = 0; j < AHD_NUM_LUNS; j++) {
-					if (targ->devices[j] != NULL) {
-						dev = targ->devices[j];
-						ahd_linux_free_device(ahd, dev);
-					}
-					if (ahd->platform_data->targets[i] ==
-					    NULL)
-						break;
+
+					if (targ->devices[j] == NULL)
+						continue;
+					dev = targ->devices[j];
+					ahd_linux_free_device(ahd, dev);
 				}
+				/*
+				 * Forcibly free the target now that
+				 * all devices are gone.
+				 */
+				ahd_linux_free_target(ahd, targ);
 			}
 		}
 
@@ -2921,10 +2894,14 @@ out:
 	}
 
 	ahd_lock(ahd, &s);
-	if (targ->dv_buffer != NULL)
+	if (targ->dv_buffer != NULL) {
 		free(targ->dv_buffer, M_DEVBUF);
-	if (targ->dv_buffer1 != NULL)
+		targ->dv_buffer = NULL;
+	}
+	if (targ->dv_buffer1 != NULL) {
 		free(targ->dv_buffer1, M_DEVBUF);
+		targ->dv_buffer1 = NULL;
+	}
 	targ->flags &= ~AHD_DV_REQUIRED;
 	if (targ->refcount == 0)
 		ahd_linux_free_target(ahd, targ);
@@ -4542,7 +4519,8 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 
 	if (TAILQ_EMPTY(&dev->busyq)) {
 		if ((dev->flags & AHD_DEV_UNCONFIGURED) != 0
-		 && dev->active == 0)
+		 && dev->active == 0
+		 && (dev->flags & AHD_DEV_TIMER_ACTIVE) == 0)
 			ahd_linux_free_device(ahd, dev);
 	} else if ((dev->flags & AHD_DEV_ON_RUN_LIST) == 0) {
 		TAILQ_INSERT_TAIL(&ahd->platform_data->device_runq, dev, links);
@@ -5065,6 +5043,9 @@ ahd_linux_dev_timed_unfreeze(u_long arg)
 	if (dev->qfrozen == 0
 	 && (dev->flags & AHD_DEV_ON_RUN_LIST) == 0)
 		ahd_linux_run_device_queue(ahd, dev);
+	if ((dev->flags & AHD_DEV_UNCONFIGURED) != 0
+	 && dev->active == 0)
+		ahd_linux_free_device(ahd, dev);
 	ahd_unlock(ahd, &s);
 }
 
@@ -5143,8 +5124,6 @@ ahd_linux_exit(void)
 	scsi_unregister_module(MODULE_SCSI_HA, &aic79xx_driver_template);
 #endif
 	ahd_linux_pci_exit();
-
-	unregister_reboot_notifier(&ahd_linux_notifier);
 }
 
 module_init(ahd_linux_init);

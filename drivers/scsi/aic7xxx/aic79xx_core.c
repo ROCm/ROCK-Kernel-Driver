@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#178 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#182 $
  *
  * $FreeBSD$
  */
@@ -1166,7 +1166,7 @@ ahd_handle_scsiint(struct ahd_softc *ahd, u_int intstat)
 		/*
 		 * A change in I/O mode is equivalent to a bus reset.
 		 */
-		ahd_reset_channel(ahd, 'A', /*Initiate Reset*/FALSE);
+		ahd_reset_channel(ahd, 'A', /*Initiate Reset*/TRUE);
 		ahd_pause(ahd);
 		ahd_setup_iocell_workaround(ahd);
 		ahd_unpause(ahd);
@@ -4887,7 +4887,6 @@ ahd_free(struct ahd_softc *ahd)
 {
 	int i;
 
-	ahd_fini_scbdata(ahd);
 	switch (ahd->init_level) {
 	default:
 	case 5:
@@ -4919,6 +4918,7 @@ ahd_free(struct ahd_softc *ahd)
 	ahd_dma_tag_destroy(ahd, ahd->parent_dmat);
 #endif
 	ahd_platform_free(ahd);
+	ahd_fini_scbdata(ahd);
 	for (i = 0; i < AHD_NUM_TARGETS; i++) {
 		struct ahd_tmode_tstate *tstate;
 
@@ -5584,8 +5584,8 @@ ahd_alloc_scbs(struct ahd_softc *ahd)
 	if (scb_data->sgs_left != 0) {
 		int offset;
 
-		offset = ahd_sglist_allocsize(ahd)
-		       - (scb_data->sgs_left * ahd_sglist_size(ahd));
+		offset = ((ahd_sglist_allocsize(ahd) / ahd_sglist_size(ahd))
+		       - scb_data->sgs_left) * ahd_sglist_size(ahd);
 		sg_map = SLIST_FIRST(&scb_data->sg_maps);
 		segs = sg_map->vaddr + offset;
 		sg_busaddr = sg_map->physaddr + offset;
@@ -6605,56 +6605,55 @@ ahd_enable_coalessing(struct ahd_softc *ahd, int enable)
 void
 ahd_pause_and_flushwork(struct ahd_softc *ahd)
 {
-	ahd_mode_state	saved_modes;
 	u_int		intstat;
 	u_int		maxloops;
-	int		paused;
+	u_int		qfreeze_cnt;
 
 	maxloops = 1000;
 	ahd->flags |= AHD_ALL_INTERRUPTS;
-	paused = FALSE;
+	ahd_pause(ahd);
+	/*
+	 * Increment the QFreeze Count so that the sequencer
+	 * will not start new selections.  We do this only
+	 * until we are safely paused without further selections
+	 * pending.
+	 */
+	ahd_outw(ahd, QFREEZE_COUNT, ahd_inw(ahd, QFREEZE_COUNT) + 1);
+	ahd_outb(ahd, SEQ_FLAGS2, ahd_inb(ahd, SEQ_FLAGS2) | SELECTOUT_QFROZEN);
 	do {
-		struct scb *waiting_scb;
 
-		if (paused)
-			ahd_unpause(ahd);
+		ahd_unpause(ahd);
 		ahd_intr(ahd);
 		ahd_pause(ahd);
-		paused = TRUE;
 		ahd_clear_critical_section(ahd);
-		saved_modes = ahd_save_modes(ahd);
-		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
-		if ((ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) == 0)
-			ahd_outb(ahd, SCSISEQ0,
-				 ahd_inb(ahd, SCSISEQ0) & ~ENSELO);
-		/*
-		 * In the non-packetized case, the sequencer (for Rev A),
-		 * relies on ENSELO remaining set after SELDO.  The hardware
-		 * auto-clears ENSELO in the packetized case.
-		 */
-		waiting_scb = ahd_lookup_scb(ahd,
-					     ahd_inw(ahd, WAITING_TID_HEAD));
-		if (waiting_scb != NULL
-		 && (waiting_scb->flags & SCB_PACKETIZED) == 0
-		 && (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) != 0)
-			ahd_outb(ahd, SCSISEQ0,
-				 ahd_inb(ahd, SCSISEQ0) | ENSELO);
-
 		intstat = ahd_inb(ahd, INTSTAT);
+		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
 	} while (--maxloops
 	      && (intstat != 0xFF || (ahd->features & AHD_REMOVABLE) == 0)
 	      && ((intstat & INT_PEND) != 0
-	       || (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO))));
+	       || (ahd_inb(ahd, SCSISEQ0) & ENSELO) != 0
+	       || (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) != 0));
+
 	if (maxloops == 0) {
 		printf("Infinite interrupt loop, INTSTAT = %x",
 		      ahd_inb(ahd, INTSTAT));
 	}
+	qfreeze_cnt = ahd_inw(ahd, QFREEZE_COUNT);
+	if (qfreeze_cnt == 0) {
+		printf("%s: ahd_pause_and_flushwork with 0 qfreeze count!\n",
+		       ahd_name(ahd));
+	} else {
+		qfreeze_cnt--;
+	}
+	ahd_outw(ahd, QFREEZE_COUNT, qfreeze_cnt);
+	if (qfreeze_cnt == 0)
+		ahd_outb(ahd, SEQ_FLAGS2,
+			 ahd_inb(ahd, SEQ_FLAGS2) & ~SELECTOUT_QFROZEN);
 
 	ahd_flush_qoutfifo(ahd);
 
 	ahd_platform_flushwork(ahd);
 	ahd->flags &= ~AHD_ALL_INTERRUPTS;
-	ahd_restore_modes(ahd, saved_modes);
 }
 
 int
@@ -7514,14 +7513,17 @@ ahd_reset_channel(struct ahd_softc *ahd, char channel, int initiate_reset)
 		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
 		ahd_outb(ahd, DFFSTAT, next_fifo);
 	} while (next_fifo != fifo);
+
 	/*
 	 * Reset the bus if we are initiating this reset
 	 */
 	ahd_clear_msg_state(ahd);
 	ahd_outb(ahd, SIMODE1,
 		 ahd_inb(ahd, SIMODE1) & ~(ENBUSFREE|ENSCSIRST|ENBUSFREE));
+
 	if (initiate_reset)
 		ahd_reset_current_bus(ahd);
+
 	ahd_clear_intstat(ahd);
 
 	/*
@@ -7709,6 +7711,7 @@ ahd_handle_scsi_status(struct ahd_softc *ahd, struct scb *scb)
 {
 	struct hardware_scb *hscb;
 	u_int  qfreeze_cnt;
+	u_int  maxloops;
 
 	/*
 	 * The sequencer freezes its select-out queue
@@ -7718,10 +7721,23 @@ ahd_handle_scsi_status(struct ahd_softc *ahd, struct scb *scb)
 	 */
 	hscb = scb->hscb; 
 
+	/*
+	 * Wait until any pending selections have been processed.
+	 */
+	maxloops = 1000;
+	do {
+		ahd_pause(ahd);
+		ahd_clear_critical_section(ahd);
+		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
+		if (((ahd_inb(ahd, SCSISEQ0) & ENSELO) == 0
+		  && (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) == 0)
+		 || (ahd_inb(ahd, SSTAT1) & SELTO) != 0)
+			break;
+		ahd_unpause(ahd);
+		ahd_delay(200);
+	} while (--maxloops);
+
 	/* Freeze the queue until the client sees the error. */
-	ahd_pause(ahd);
-	ahd_clear_critical_section(ahd);
-	ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
 	ahd_freeze_devq(ahd, scb);
 	ahd_freeze_scb(scb);
 	qfreeze_cnt = ahd_inw(ahd, QFREEZE_COUNT);
