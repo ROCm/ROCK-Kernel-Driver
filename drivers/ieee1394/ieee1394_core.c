@@ -22,7 +22,6 @@
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
-#include <asm/smplock.h>
 
 #include "ieee1394_types.h"
 #include "ieee1394.h"
