@@ -956,9 +956,12 @@ int kswapd(void *p)
 	struct reclaim_state reclaim_state = {
 		.reclaimed_slab = 0,
 	};
+	unsigned long cpumask;
 
 	daemonize("kswapd%d", pgdat->node_id);
-	set_cpus_allowed(tsk, node_to_cpumask(pgdat->node_id));
+	cpumask = node_to_cpumask(pgdat->node_id);
+	if (cpumask)
+		set_cpus_allowed(tsk, cpumask);
 	current->reclaim_state = &reclaim_state;
 
 	/*
