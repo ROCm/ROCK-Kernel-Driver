@@ -2983,14 +2983,14 @@ static struct pnp_dev *activate_dev(char *devname, char *resname, struct pnp_dev
 {
 	int err;
 
-	/* Device already active? Let's use it */
-	if(dev->active)
-		return(dev);
+	err = pnp_device_attach(dev);
+	if (err < 0)
+		return(NULL);
 
 	if((err = pnp_activate_dev(dev,NULL)) < 0) {
 		printk(KERN_ERR "ad1848: %s %s config failed (out of resources?)[%d]\n", devname, resname, err);
 
-		pnp_disable_dev(dev);
+		pnp_device_detach(dev);
 
 		return(NULL);
 	}
@@ -3006,12 +3006,11 @@ static struct pnp_dev *ad1848_init_generic(struct pnp_card *bus, struct address_
 	{
 		if((ad1848_dev = activate_dev(ad1848_isapnp_list[slot].name, "ad1848", ad1848_dev)))
 		{
-			get_device(&ad1848_dev->dev);
-			hw_config->io_base 	= ad1848_dev->resource[ad1848_isapnp_list[slot].mss_io].start;
-			hw_config->irq 		= ad1848_dev->irq_resource[ad1848_isapnp_list[slot].irq].start;
-			hw_config->dma 		= ad1848_dev->dma_resource[ad1848_isapnp_list[slot].dma].start;
+			hw_config->io_base 	= pnp_port_start(ad1848_dev, ad1848_isapnp_list[slot].mss_io);
+			hw_config->irq 		= pnp_irq(ad1848_dev, ad1848_isapnp_list[slot].irq);
+			hw_config->dma 		= pnp_dma(ad1848_dev, ad1848_isapnp_list[slot].dma);
 			if(ad1848_isapnp_list[slot].dma2 != -1)
-				hw_config->dma2 = ad1848_dev->dma_resource[ad1848_isapnp_list[slot].dma2].start;
+				hw_config->dma2 = pnp_dma(ad1848_dev, ad1848_isapnp_list[slot].dma2);
 			else
 				hw_config->dma2 = -1;
                         hw_config->card_subtype = ad1848_isapnp_list[slot].type;
@@ -3032,7 +3031,7 @@ static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_
 	if(ad1848_init_generic(bus, hw_config, slot)) {
 		/* We got it. */
 
-		printk(KERN_NOTICE "ad1848: ISAPnP reports '%s' at i/o %#x, irq %d, dma %d, %d\n",
+		printk(KERN_NOTICE "ad1848: PnP reports '%s' at i/o %#x, irq %d, dma %d, %d\n",
 		       busname,
 		       hw_config->io_base, hw_config->irq, hw_config->dma,
 		       hw_config->dma2);
@@ -3122,8 +3121,7 @@ static void __exit cleanup_ad1848(void)
 #ifdef CONFIG_PNP
 	if(ad1848_dev){
 		if(audio_activated)
-			pnp_disable_dev(ad1848_dev);
-		put_device(&ad1848_dev->dev);
+			pnp_device_detach(ad1848_dev);
 	}
 #endif
 }
