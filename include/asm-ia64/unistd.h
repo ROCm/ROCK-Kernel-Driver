@@ -373,7 +373,7 @@ asmlinkage long sys_rt_sigaction(int sig,
  * proper prototype, but we can't use __typeof__ either, because not all cond_syscall()
  * declarations have prototypes at the moment.
  */
-#define cond_syscall(x) asmlinkage long x() __attribute__((weak,alias("sys_ni_syscall")));
+#define cond_syscall(x) asmlinkage long x (void) __attribute__((weak,alias("sys_ni_syscall")));
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
