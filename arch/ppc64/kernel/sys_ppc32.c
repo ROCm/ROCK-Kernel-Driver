@@ -819,45 +819,6 @@ asmlinkage long sys32_sysfs(u32 option, u32 arg1, u32 arg2)
 	return sys_sysfs((int)option, arg1, arg2);
 }
 
-
-
-
-extern unsigned long do_mremap(unsigned long addr,
-	unsigned long old_len, unsigned long new_len,
-	unsigned long flags, unsigned long new_addr);
-                
-asmlinkage unsigned long sys32_mremap(unsigned long addr, unsigned long old_len, unsigned long new_len,
-                                    	unsigned long flags, u32 __new_addr)
-{
-	unsigned long ret = -EINVAL;
-	unsigned long new_addr = AA(__new_addr);
-	
-	if (old_len > 0xf0000000UL || new_len > 0xf0000000UL)
-		goto out;
-	if (addr > 0xf0000000UL - old_len)
-		goto out;
-	down_write(&current->mm->mmap_sem);
-	if (flags & MREMAP_FIXED) {
-		if (new_addr > 0xf0000000UL - new_len)
-			goto out_sem;
-	} else if (addr > 0xf0000000UL - new_len) {
-		ret = -ENOMEM;
-		if (!(flags & MREMAP_MAYMOVE))
-			goto out_sem;
-		new_addr = get_unmapped_area (NULL, addr, new_len, 0, 0);
-		if (!new_addr)
-			goto out_sem;
-		flags |= MREMAP_FIXED;
-	}
-	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
-out_sem:
-	up_write(&current->mm->mmap_sem);
-out:
-	return ret;       
-}
-
-
-
 /* Handle adjtimex compatability. */
 struct timex32 {
 	u32 modes;
