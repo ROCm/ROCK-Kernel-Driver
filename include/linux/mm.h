@@ -354,12 +354,6 @@ extern pte_t *FASTCALL(pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned 
 extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsigned long address, int write_access);
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
-extern int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int len);
-extern int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int len);
-extern int ptrace_attach(struct task_struct *tsk);
-extern int ptrace_detach(struct task_struct *, unsigned int);
-extern void ptrace_disable(struct task_struct *);
-extern int ptrace_check_attach(struct task_struct *task, int kill);
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);

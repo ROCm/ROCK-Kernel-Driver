@@ -387,8 +387,7 @@ CONFIG_FB_MATROX
   Say Y here if you have a Matrox Millennium, Matrox Millennium II,
   Matrox Mystique, Matrox Mystique 220, Matrox Productiva G100, Matrox
   Mystique G200, Matrox Millennium G200, Matrox Marvel G200 video,
-  Matrox G400, G450 or G550 card in your box. At this time, support for 
-  the G-series digital output is almost non-existant.
+  Matrox G400, G450 or G550 card in your box.
 
   This driver is also available as a module ( = code which can be
   inserted and removed from the running kernel whenever you want).
@@ -413,7 +412,7 @@ CONFIG_FB_MATROX_MYSTIQUE
   packed pixel and 32 bpp packed pixel. You can also use font widths
   different from 8.
 
-CONFIG_FB_MATROX_G100
+CONFIG_FB_MATROX_G450
   Say Y here if you have a Matrox G100, G200, G400, G450 or G550 based
   video card. If you select "Advanced lowlevel driver options", you
   should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
@@ -423,11 +422,35 @@ CONFIG_FB_MATROX_G100
   If you need support for G400 secondary head, you must first say Y to
   "I2C support" and "I2C bit-banging support" in the character devices
   section, and then to "Matrox I2C support" and "G400 second head
-  support" here in the framebuffer section.
+  support" here in the framebuffer section. G450/G550 secondary head
+  and digital output are supported without additional modules.
   
-  If you have G550, you must also compile support for G450/G550 secondary
-  head into kernel, otherwise picture will be shown only on output you
-  are probably not using...
+  The driver starts in monitor mode. You must use the matroxset tool 
+  (available at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to 
+  swap primary and secondary head outputs, or to change output mode.  
+  Secondary head driver always start in 640x480 resolution and you 
+  must use fbset to change it.
+
+  Do not forget that second head supports only 16 and 32 bpp
+  packed pixels, so it is a good idea to compile them into the kernel
+  too. You can use only some font widths, as the driver uses generic
+  painting procedures (the secondary head does not use acceleration
+  engine).
+  
+  G450/G550 hardware can display TV picture only from secondary CRTC,
+  and it performs no scaling, so picture must have 525 or 625 lines.
+
+CONFIG_FB_MATROX_G100A
+  Say Y here if you have a Matrox G100, G200 or G400 based
+  video card. If you select "Advanced lowlevel driver options", you
+  should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
+  pixel and 32 bpp packed pixel. You can also use font widths
+  different from 8.
+
+  If you need support for G400 secondary head, you must first say Y to
+  "I2C support" and "I2C bit-banging support" in the character devices
+  section, and then to "Matrox I2C support" and "G400 second head
+  support" here in the framebuffer section.
 
 CONFIG_FB_MATROX_I2C
   This drivers creates I2C buses which are needed for accessing the
@@ -467,27 +490,6 @@ CONFIG_FB_MATROX_MAVEN
   Also do not forget that second head supports only 16 and 32 bpp
   packed pixels, so it is a good idea to compile them into the kernel
   too.  You can use only some font widths, as the driver uses generic
-  painting procedures (the secondary head does not use acceleration
-  engine).
-
-CONFIG_FB_MATROX_G450
-  Say Y or M here if you want to use a secondary head (meaning two
-  monitors in parallel) on G450, or if you are using analog output
-  of G550.
-
-  If you compile it as module, two modules are created,
-  matroxfb_crtc2.o and matroxfb_g450.o. Both modules are needed if you
-  want two independent display devices.
-
-  The driver starts in monitor mode and currently does not support
-  output in TV modes.  You must use the matroxset tool (available
-  at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to swap
-  primary and secondary head outputs.  Secondary head driver always
-  start in 640x480 resolution and you must use fbset to change it.
-
-  Also do not forget that second head supports only 16 and 32 bpp
-  packed pixels, so it is a good idea to compile them into the kernel
-  too. You can use only some font widths, as the driver uses generic
   painting procedures (the secondary head does not use acceleration
   engine).
 

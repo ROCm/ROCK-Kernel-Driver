@@ -61,7 +61,6 @@ static const char rcsid[] = "$Id: sk_g16.c,v 1.1 1994/06/30 16:25:15 root Exp $"
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/ptrace.h>
 #include <linux/fcntl.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>

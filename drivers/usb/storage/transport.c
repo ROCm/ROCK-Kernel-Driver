@@ -348,7 +348,10 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 	 * violates this invariant is a bug.  In the hopes of removing
 	 * all the complex logic above, let's find them and eliminate them.
 	 */
-	BUG_ON(len != srb->request_bufflen);
+	if (len != srb->request_bufflen) {
+		printk("USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
+		show_trace(NULL);
+	}
 
 	return len;
 }

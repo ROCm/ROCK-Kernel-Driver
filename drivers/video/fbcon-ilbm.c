@@ -32,12 +32,12 @@
 
 void fbcon_ilbm_setup(struct display *p)
 {
-    if (p->line_length) {
-	p->next_line = p->line_length*p->var.bits_per_pixel;
-	p->next_plane = p->line_length;
+    if (p->fb_info->fix.line_length) {
+	p->next_line = p->fb_info->fix.line_length*p->var.bits_per_pixel;
+	p->next_plane = p->fb_info->fix.line_length;
     } else {
-	p->next_line = p->type_aux;
-	p->next_plane = p->type_aux/p->var.bits_per_pixel;
+	p->next_line = p->fb_info->fix.type_aux;
+	p->next_plane = p->fb_info->fix.type_aux/p->var.bits_per_pixel;
     }
 }
 

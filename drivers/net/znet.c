@@ -65,7 +65,6 @@ static const char version[] = "znet.c:v1.02 9/23/94 becker@cesdis.gsfc.nasa.gov\
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>

@@ -1029,8 +1029,7 @@ idt_48:
 	.word	0				# idt limit = 0
 	.word	0, 0				# idt base = 0L
 gdt_48:
-	.word	0x8000				# gdt limit=2048,
-						#  256 GDT entries
+	.word	GDT_ENTRY_KERNEL_CS*8 + 16 - 1	# gdt limit
 
 	.word	0, 0				# gdt base (filled in later)
 

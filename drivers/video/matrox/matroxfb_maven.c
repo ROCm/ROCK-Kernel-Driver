@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
  *
- * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2001/11/29
+ * Version: 1.64 2002/06/10
  *
  * See matroxfb_base.c for contributors.
  *
@@ -22,18 +22,12 @@
 
 #define MAVEN_I2CID	(0x1B)
 
-#define MODE_PAL	MATROXFB_OUTPUT_MODE_PAL
-#define MODE_NTSC	MATROXFB_OUTPUT_MODE_NTSC
-#define MODE_TV(x)	(((x) == MODE_PAL) || ((x) == MODE_NTSC))
-#define MODE_MONITOR	MATROXFB_OUTPUT_MODE_MONITOR
-
 #define MGATVO_B	1
 #define MGATVO_C	2
 
 struct maven_data {
 	struct matrox_fb_info*		primary_head;
 	struct i2c_client*		client;
-	int				mode;
 	int				version;
 };
 
@@ -127,7 +121,7 @@ static int matroxfb_PLL_mavenclock(const struct matrox_pll_features2* pll,
 	fwant = htotal * vtotal;
 	fmax = pll->vco_freq_max / ctl->den;
 
-	printk(KERN_DEBUG "want: %u, xtal: %u, h: %u, v: %u, fmax: %u\n",
+	dprintk(KERN_DEBUG "want: %u, xtal: %u, h: %u, v: %u, fmax: %u\n",
 		fwant, fxtal, htotal, vtotal, fmax);
 	for (p = 1; p <= pll->post_shift_max; p++) {
 		if (fwant * 2 > fmax)
@@ -163,9 +157,9 @@ static int matroxfb_PLL_mavenclock(const struct matrox_pll_features2* pll,
 			ln = ln - scrlen;
 			if (ln > htotal)
 				continue;
-			printk(KERN_DEBUG "Match: %u / %u / %u / %u\n", n, m, p, ln);
+			dprintk(KERN_DEBUG "Match: %u / %u / %u / %u\n", n, m, p, ln);
 			if (ln > besth2) {
-				printk(KERN_DEBUG "Better...\n");
+				dprintk(KERN_DEBUG "Better...\n");
 				*h2 = besth2 = ln;
 				*post = p;
 				*in = m;
@@ -221,6 +215,13 @@ static void DAC1064_calcclock(unsigned int freq, unsigned int fmax,
 	return;
 }
 
+static unsigned char maven_compute_deflicker (const struct maven_data* md) {
+	unsigned char df;
+	
+	df = (md->version == MGATVO_B?0x40:0x00);
+	return df;
+}
+
 static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* data) {
 	static struct mavenregs palregs = { {
 		0x2A, 0x09, 0x8A, 0xCB,	/* 00: chroma subcarrier */
@@ -273,7 +274,7 @@ static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* dat
 		0x3F, 0x03, /* 3C-3D */
 		0x00,	/* 3E written multiple times */
 		0x00,	/* 3F not written */
-	}, MODE_PAL, 625, 50 };
+	}, MATROXFB_OUTPUT_MODE_PAL, 625, 50 };
 	static struct mavenregs ntscregs = { {
 		0x21, 0xF0, 0x7C, 0x1F,	/* 00: chroma subcarrier */
 		0x00,
@@ -325,14 +326,16 @@ static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* dat
 		0x3C, 0x00, /* 3C-3D */
 		0x00,	/* 3E written multiple times */
 		0x00,	/* never written */
-	}, MODE_NTSC, 525, 60 };
+	}, MATROXFB_OUTPUT_MODE_NTSC, 525, 60 };
+	MINFO_FROM(md->primary_head);
 
-	if (md->mode & MODE_PAL)
+	if (ACCESS_FBINFO(outputs[1]).mode == MATROXFB_OUTPUT_MODE_PAL)
 		*data = palregs;
 	else
 		*data = ntscregs;
 
-	data->regs[0x93] = 0xA2;
+	/* Set deflicker */
+	data->regs[0x93] = maven_compute_deflicker(md);
 
 	/* gamma correction registers */
 	data->regs[0x83] = 0x00;
@@ -386,7 +389,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LRP(0x17);
 	LR(0x0B);
 	LR(0x0C);
-	if (m->mode & MODE_PAL) {
+	if (m->mode == MATROXFB_OUTPUT_MODE_PAL) {
 		maven_set_reg(c, 0x35, 0x10); /* ... */
 	} else {
 		maven_set_reg(c, 0x35, 0x0F); /* ... */
@@ -424,7 +427,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LR(0x27);
 	LR(0x21);
 	LRP(0x2A);
-	if (m->mode & MODE_PAL)
+	if (m->mode == MATROXFB_OUTPUT_MODE_PAL)
 		maven_set_reg(c, 0x35, 0x1D);	/* ... */
 	else
 		maven_set_reg(c, 0x35, 0x1C);
@@ -473,7 +476,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LR(0xC2);
 
 	maven_get_reg(c, 0x8D);
-	maven_set_reg(c, 0x8D, 0x00);
+	maven_set_reg(c, 0x8D, 0x04);
 
 	LR(0x20);	/* saturation #1 */
 	LR(0x22);	/* saturation #2 */
@@ -498,7 +501,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LR(0x8B);
 
 	val = maven_get_reg(c, 0x8D);
-	val &= 0x10;			/* 0x10 or anything ored with it */
+	val &= 0x14;			/* 0x10 or anything ored with it */
 	maven_set_reg(c, 0x8D, val);
 
 	LR(0x33);
@@ -524,7 +527,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LR(0x27);
 	LR(0x21);
 	LRP(0x2A);
-	if (m->mode & MODE_PAL)
+	if (m->mode == MATROXFB_OUTPUT_MODE_PAL)
 		maven_set_reg(c, 0x35, 0x1D);
 	else
 		maven_set_reg(c, 0x35, 0x1C);
@@ -562,7 +565,7 @@ static int maven_find_exact_clocks(unsigned int ht, unsigned int vt,
 		unsigned int a, b, c, h2;
 		unsigned int h = ht + 2 + x;
 
-		if (!matroxfb_mavenclock((m->mode & MODE_PAL) ? &maven_PAL : &maven_NTSC, h, vt, &a, &b, &c, &h2)) {
+		if (!matroxfb_mavenclock((m->mode == MATROXFB_OUTPUT_MODE_PAL) ? &maven_PAL : &maven_NTSC, h, vt, &a, &b, &c, &h2)) {
 			unsigned int diff = h - h2;
 
 			if (diff < err) {
@@ -583,9 +586,10 @@ static inline int maven_compute_timming(struct maven_data* md,
 		struct mavenregs* m) {
 	unsigned int tmpi;
 	unsigned int a, bv, c;
+	MINFO_FROM(md->primary_head);
 
-	m->mode = md->mode;
-	if (MODE_TV(md->mode)) {
+	m->mode = ACCESS_FBINFO(outputs[1]).mode;
+	if (m->mode != MATROXFB_OUTPUT_MODE_MONITOR) {
 		unsigned int lmargin;
 		unsigned int umargin;
 		unsigned int vslen;
@@ -804,7 +808,7 @@ static inline int maven_compute_timming(struct maven_data* md,
 	m->regs[0xB0] = 0x03;	/* output: monitor */
 	m->regs[0xB1] = 0xA0;	/* ??? */
 	m->regs[0x8C] = 0x20;	/* must be set... */
-	m->regs[0x8D] = 0x00;	/* defaults to 0x10: test signal */
+	m->regs[0x8D] = 0x04;	/* defaults to 0x10: test signal */
 	m->regs[0xB9] = 0x1A;	/* defaults to 0x2C: too bright */
 	m->regs[0xBF] = 0x22;	/* makes picture stable */
 
@@ -815,7 +819,7 @@ static inline int maven_program_timming(struct maven_data* md,
 		const struct mavenregs* m) {
 	struct i2c_client* c = md->client;
 
-	if (m->mode & MODE_MONITOR) {
+	if (m->mode == MATROXFB_OUTPUT_MODE_MONITOR) {
 		LR(0x80);
 		LR(0x81);
 		LR(0x82);
@@ -855,20 +859,14 @@ static inline int maven_resync(struct maven_data* md) {
 	return 0;
 }
 
-static int maven_set_output_mode(struct maven_data* md, u_int32_t arg) {
+static int maven_verify_output_mode(struct maven_data* md, u_int32_t arg) {
 	switch (arg) {
 		case MATROXFB_OUTPUT_MODE_PAL:
 		case MATROXFB_OUTPUT_MODE_NTSC:
 		case MATROXFB_OUTPUT_MODE_MONITOR:
-			md->mode = arg;
-			return 1;
+			return 0;
 	}
 	return -EINVAL;
-}
-
-static int maven_get_output_mode(struct maven_data* md, u_int32_t *arg) {
-	*arg = md->mode;
-	return 0;
 }
 
 /******************************************************/
@@ -893,48 +891,31 @@ static int maven_out_start(void* md) {
 	return maven_resync(md);
 }
 
-static void maven_out_incuse(void* md) {
-	if (md)
-		i2c_inc_use_client(((struct maven_data*)md)->client);
-}
-
-static void maven_out_decuse(void* md) {
-	if (md)
-		i2c_dec_use_client(((struct maven_data*)md)->client);
-}
-
-static int maven_out_set_mode(void* md, u_int32_t arg) {
-	return maven_set_output_mode(md, arg);
-}
-
-static int maven_out_get_mode(void* md, u_int32_t* arg) {
-	return maven_get_output_mode(md, arg);
+static int maven_out_verify_mode(void* md, u_int32_t arg) {
+	return maven_verify_output_mode(md, arg);
 }
 
 static struct matrox_altout maven_altout = {
-	maven_out_compute,
-	maven_out_program,
-	maven_out_start,
-	maven_out_incuse,
-	maven_out_decuse,
-	maven_out_set_mode,
-	maven_out_get_mode
+	.name		= "Secondary output",
+	.compute	= maven_out_compute,
+	.program	= maven_out_program,
+	.start		= maven_out_start,
+	.verifymode	= maven_out_verify_mode,
 };
 
 static int maven_init_client(struct i2c_client* clnt) {
 	struct i2c_adapter* a = clnt->adapter;
 	struct maven_data* md = clnt->data;
-	struct matroxfb_dh_maven_info* m2info __attribute__((unused)) = ((struct i2c_bit_adapter*)a)->minfo;
-	MINFO_FROM(m2info->primary_dev);
+	MINFO_FROM(container_of(a, struct i2c_bit_adapter, adapter)->minfo);
 
-	md->mode = MODE_MONITOR;
 	md->primary_head = MINFO;
 	md->client = clnt;
 	down_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(altout.device) = md;
-	ACCESS_FBINFO(altout.output) = &maven_altout;
+	ACCESS_FBINFO(outputs[1]).output = &maven_altout;
+	ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_NONE;
+	ACCESS_FBINFO(outputs[1]).data = md;
+	ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
 	up_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
 	if (maven_get_reg(clnt, 0xB2) < 0x14) {
 		md->version = MGATVO_B;
 	} else {
@@ -947,13 +928,14 @@ static int maven_shutdown_client(struct i2c_client* clnt) {
 	struct maven_data* md = clnt->data;
 
 	if (md->primary_head) {
-		md->primary_head->output.all &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		md->primary_head->output.ph &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		md->primary_head->output.sh &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		down_write(&md->primary_head->altout.lock);
-		md->primary_head->altout.device = NULL;
-		md->primary_head->altout.output = NULL;
-		up_write(&md->primary_head->altout.lock);
+		MINFO_FROM(md->primary_head);
+
+		down_write(&ACCESS_FBINFO(altout.lock));
+		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_NONE;
+		ACCESS_FBINFO(outputs[1]).output = NULL;
+		ACCESS_FBINFO(outputs[1]).data = NULL;
+		ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
+		up_write(&ACCESS_FBINFO(altout.lock));
 		md->primary_head = NULL;
 	}
 	return 0;
@@ -983,7 +965,7 @@ static int maven_detect_client(struct i2c_adapter* adapter, int address, unsigne
 					      I2C_FUNC_SMBUS_BYTE_DATA |
 					      I2C_FUNC_PROTOCOL_MANGLING))
 		goto ERROR0;
-	if (!(new_client = (struct i2c_client*)kmalloc(sizeof(struct i2c_client) + sizeof(struct maven_data),
+	if (!(new_client = (struct i2c_client*)kmalloc(sizeof(*new_client) + sizeof(*data),
 			GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR0;
@@ -1066,7 +1048,7 @@ static void matroxfb_maven_exit(void) {
 		i2c_del_driver(&maven_driver);
 }
 
-MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 1999-2002 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G200/G400 Matrox MGA-TVO driver");
 MODULE_LICENSE("GPL");
 module_init(matroxfb_maven_init);

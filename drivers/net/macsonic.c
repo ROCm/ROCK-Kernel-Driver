@@ -31,7 +31,6 @@
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
-#include <linux/ptrace.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/in.h>

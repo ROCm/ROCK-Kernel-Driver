@@ -127,7 +127,6 @@ static const char version[] =
 #include <linux/ioport.h>
 #include <asm/io.h>
 #include <linux/in.h>
-#include <linux/ptrace.h>
 #include <asm/system.h>
 #include <linux/errno.h>
 #include <linux/init.h>

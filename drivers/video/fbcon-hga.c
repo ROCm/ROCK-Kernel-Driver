@@ -45,7 +45,7 @@ void fbcon_hga_setup(struct display *p)
 {
 	DPRINTK("fbcon_hga_setup: ll:%d\n", (int)p->line_length);
 
-	p->next_line = p->line_length;
+	p->next_line = p->fb_info->fix.line_length;
 	p->next_plane = 0;
 }
 
