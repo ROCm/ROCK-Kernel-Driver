@@ -96,7 +96,7 @@
 #define PARAM_VESAPM_SEG	0x2e
 #define PARAM_VESAPM_OFF	0x30
 #define PARAM_LFB_PAGES		0x32
-#define PARAM_VESA_ATTRIB	0x34
+
 
 /* Define DO_STORE according to CONFIG_VIDEO_RETAIN */
 #ifdef CONFIG_VIDEO_RETAIN
@@ -221,8 +221,6 @@ mopar_gr:
 	movl	%eax, %fs:(PARAM_LFB_COLORS)
 	movl	35(%di), %eax
 	movl	%eax, %fs:(PARAM_LFB_COLORS+4)
-	movw	%ax, %fs:(PARAM_VESA_ATTRIB)
-	movw	0(%di), %ax	
 
 # get video mem size
 	leaw	modelist+1024, %di

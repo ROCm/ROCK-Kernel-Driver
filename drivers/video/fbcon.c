@@ -682,7 +682,7 @@ static void fbcon_setup(int con, int init, int logo)
     	}
     	scr_memsetw((unsigned short *)conp->vc_origin,
 		    conp->vc_video_erase_char, 
-		    old_cols * logo_lines);
+		    conp->vc_size_row * logo_lines);
     }
     
     /*
