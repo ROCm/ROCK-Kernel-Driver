@@ -34,7 +34,7 @@
 #define DEBUG_TASKFILE	0	/* unset when fixed */
 
 #if DEBUG_TASKFILE
-#define DTF(x...) printk(x)
+#define DTF(x...) printk(##x)
 #else
 #define DTF(x...)
 #endif
@@ -901,20 +901,25 @@ void init_taskfile_request(struct request *rq)
 int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
-	struct ata_request ar;
+	struct ata_request star;
 
-	ata_ar_init(drive, &ar);
+	ata_ar_init(drive, &star);
+
+	/* Don't put this request on free_req list after usage.
+	 */
+	star.ar_flags |= ATA_AR_STATIC;
+
 	init_taskfile_request(&rq);
 	rq.buffer = buf;
 
-	memcpy(&ar.ar_task, args, sizeof(*args));
+	memcpy(&star.ar_task, args, sizeof(*args));
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors
 			= (args->hobfile.sector_count << 8)
 			| args->taskfile.sector_count;
 
-	rq.special = &ar;
+	rq.special = &star;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }

@@ -1729,20 +1729,23 @@ static void unexpected_intr(int irq, ide_hwgroup_t *hwgroup)
 	 * handle the unexpected interrupt
 	 */
 	do {
-		if (hwif->irq == irq) {
-			stat = IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
-			if (!OK_STAT(stat, READY_STAT, BAD_STAT)) {
-				/* Try to not flood the console with msgs */
-				static unsigned long last_msgtime, count;
-				++count;
-				if (0 < (signed long)(jiffies - (last_msgtime + HZ))) {
-					last_msgtime = jiffies;
-					printk("%s%s: unexpected interrupt, status=0x%02x, count=%ld\n",
-					 hwif->name, (hwif->next == hwgroup->hwif) ? "" : "(?)", stat, count);
-				}
+		if (hwif->irq != irq)
+			continue;
+
+		stat = IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
+		if (!OK_STAT(stat, READY_STAT, BAD_STAT)) {
+			/* Try to not flood the console with msgs */
+			static unsigned long last_msgtime;
+			static int count;
+			++count;
+			if (time_after(jiffies, last_msgtime + HZ)) {
+				last_msgtime = jiffies;
+				printk("%s%s: unexpected interrupt, status=0x%02x, count=%d\n",
+						hwif->name, (hwif->next == hwgroup->hwif) ? "" : "(?)", stat, count);
 			}
 		}
-	} while ((hwif = hwif->next) != hwgroup->hwif);
+		hwif = hwif->next;
+	} while (hwif != hwgroup->hwif);
 }
 
 /*
@@ -1764,7 +1767,8 @@ void ide_intr(int irq, void *dev_id, struct pt_regs *regs)
 		goto out_lock;
 
 	if ((handler = hwgroup->handler) == NULL || hwgroup->poll_timeout != 0) {
-		printk("ide: unexpected interrupt\n");
+		printk(KERN_INFO "ide: unexpected interrupt %d %d\n", hwif->unit, irq);
+
 		/*
 		 * Not expecting an interrupt from this drive.
 		 * That means this could be:

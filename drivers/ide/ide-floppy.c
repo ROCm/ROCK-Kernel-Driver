@@ -1,8 +1,8 @@
 /*
- * linux/drivers/ide/ide-floppy.c	Version 0.97.sv	Jan 14 2001
+ * linux/drivers/ide/ide-floppy.c	Version 0.99	Feb 24 2002
  *
  * Copyright (C) 1996 - 1999 Gadi Oxman <gadio@netvision.net.il>
- * Copyright (C) 2000 - 2001 Paul Bristow <paul@paulbristow.net>
+ * Copyright (C) 2000 - 2002 Paul Bristow <paul@paulbristow.net>
  */
 
 /*
@@ -13,7 +13,7 @@
  *
  * This driver supports the following IDE floppy drives:
  *
- * LS-120 SuperDisk
+ * LS-120/240 SuperDisk
  * Iomega Zip 100/250
  * Iomega PC Card Clik!/PocketZip
  *
@@ -76,9 +76,11 @@
  *                        bit was being deasserted by my IOMEGA ATAPI ZIP 100
  *                        drive before the drive was actually ready.
  * Ver 0.98a Oct 29 01   Expose delay value so we can play.
+ * Ver 0.99  Feb 24 02   Remove duplicate code, modify clik! detection code
+ *                       to support new PocketZip drives
  */
 
-#define IDEFLOPPY_VERSION "0.98a"
+#define IDEFLOPPY_VERSION "0.99"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -1070,8 +1072,8 @@ static ide_startstop_t idefloppy_transfer_pc1 (ide_drive_t *drive)
 	 */
 	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive,
-	  &idefloppy_pc_intr,		/* service routine for packet command */
-	  floppy->ticks,			/* wait this long before "failing" */
+	  &idefloppy_pc_intr, 		/* service routine for packet command */
+	  floppy->ticks,		/* wait this long before "failing" */
 	  &idefloppy_transfer_pc2);	/* fail == transfer_pc2 */
 
 	return ide_started;
@@ -2005,7 +2007,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	*      above fix.  It makes nasty clicking noises without
 	*      it, so please don't remove this.
 	*/
-	if (strcmp(drive->id->model, "IOMEGA Clik! 40 CZ ATAPI") == 0) {
+	if (strncmp(drive->id->model, "IOMEGA Clik!", 11) == 0) {
 		blk_queue_max_sectors(&drive->queue, 64);
 		set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
 	}

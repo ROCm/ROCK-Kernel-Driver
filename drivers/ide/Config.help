@@ -160,7 +160,7 @@ CONFIG_BLK_DEV_IDESCSI
   you can then use this emulation together with an appropriate SCSI
   device driver. In order to do this, say Y here and to "SCSI support"
   and "SCSI generic support", below. You must then provide the kernel
-  command line "hdx=scsi" (try "man bootparam" or see the
+  command line "hdx=ide-scsi" (try "man bootparam" or see the
   documentation of your boot loader (lilo or loadlin) about how to
   pass options to the kernel at boot time) for devices if you want the
   native EIDE sub-drivers to skip over the native support, so that
@@ -543,13 +543,13 @@ CONFIG_BLK_DEV_HT6560B
 
 CONFIG_BLK_DEV_PDC4030
   This driver provides support for the secondary IDE interface and
-  cache of Promise IDE chipsets, e.g. DC4030 and DC5030.  This driver
-  is known to incur timeouts/retries during heavy I/O to drives
-  attached to the secondary interface.  CD-ROM and TAPE devices are
-  not supported yet.  This driver is enabled at runtime using the
-  "ide0=dc4030" kernel boot parameter.  See the
-  <file:Documentation/ide.txt> and <file:drivers/ide/pdc4030.c> files
-  for more info.
+  cache of the original Promise IDE chipsets, e.g. DC4030 and DC5030.
+  It is nothing to do with the later range of Promise UDMA chipsets -
+  see the PDC_202XX support for these. CD-ROM and TAPE devices are not
+  supported (and probably never will be since I don't think the cards
+  support them). This driver is enabled at runtime using the "ide0=dc4030"
+  or "ide1=dc4030" kernel boot parameter. See the
+  <file:drivers/ide/pdc4030.c> file for more info.
 
 CONFIG_BLK_DEV_QD65XX
   This driver is enabled at runtime using the "ide0=qd65xx" kernel
@@ -628,6 +628,11 @@ CONFIG_BLK_DEV_MAC_IDE
   Say Y if you have such an Macintosh model and want to use IDE
   devices (hard disks, CD-ROM drives, etc.) that are connected to the
   builtin IDE interface.
+
+CONFIG_BLK_DEV_Q40IDE
+  Enable the on-board IDE controller in the Q40/Q60.  This should
+  normally be on; disable it only if you are running a custom hard
+  drive subsystem through an expansion card.
 
 CONFIG_BLK_DEV_IDE_ICSIDE
   On Acorn systems, say Y here if you wish to use the ICS IDE

@@ -975,6 +975,7 @@ extern void revalidate_drives(void);
 #define ATA_AR_QUEUED	1
 #define ATA_AR_SETUP	2
 #define ATA_AR_RETURN	4
+#define ATA_AR_STATIC	8
 
 /*
  * if turn-around time is longer than this, halve queue depth
@@ -1015,7 +1016,8 @@ static inline struct ata_request *ata_ar_get(ide_drive_t *drive)
 
 static inline void ata_ar_put(ide_drive_t *drive, struct ata_request *ar)
 {
-	list_add(&ar->ar_queue, &drive->free_req);
+	if (!(ar->ar_flags & ATA_AR_STATIC))
+	    list_add(&ar->ar_queue, &drive->free_req);
 
 	if (ar->ar_flags & ATA_AR_QUEUED) {
 		/* clear the tag */

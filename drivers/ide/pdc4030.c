@@ -1,7 +1,7 @@
 /*  -*- linux-c -*-
- *  linux/drivers/ide/pdc4030.c		Version 0.90  May 27, 1999
+ *  linux/drivers/ide/pdc4030.c		Version 0.92  Jan 15, 2002
  *
- *  Copyright (C) 1995-1999  Linus Torvalds & authors (see below)
+ *  Copyright (C) 1995-2002  Linus Torvalds & authors (see below)
  */
 
 /*
@@ -37,6 +37,8 @@
  *			Autodetection code added.
  *
  *  Version 0.90	Transition to BETA code. No lost/unexpected interrupts
+ *  Version 0.91	Bring in line with new bio code in 2.5.1
+ *  Version 0.92	Update for IDE driver taskfile changes
  */
 
 /*
@@ -72,8 +74,8 @@
  * effects.
  */
 
-#define DEBUG_READ
-#define DEBUG_WRITE
+#undef DEBUG_READ
+#undef DEBUG_WRITE
 
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -90,6 +92,10 @@
 #include <asm/irq.h>
 
 #include "pdc4030.h"
+
+#if SUPPORT_VLB_SYNC != 1
+#error This driver will not work unless SUPPORT_VLB_SYNC is 1
+#endif
 
 /*
  * promise_selectproc() is invoked by ide.c
@@ -229,12 +235,12 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	hwif->selectproc = hwif2->selectproc = &promise_selectproc;
 	hwif->serialized = hwif2->serialized = 1;
 
-/* Shift the remaining interfaces down by one */
+/* Shift the remaining interfaces up by one */
 	for (i=MAX_HWIFS-1 ; i > hwif->index+1 ; i--) {
 		struct ata_channel *h = &ide_hwifs[i];
 
 #ifdef DEBUG
-		printk(KERN_DEBUG "Shifting i/f %d values to i/f %d\n",i-1,i);
+		printk(KERN_DEBUG "pdc4030: Shifting i/f %d values to i/f %d\n",i-1,i);
 #endif
 		ide_init_hwif_ports(&h->hw, (h-1)->io_ports[IDE_DATA_OFFSET], 0, NULL);
 		memcpy(h->io_ports, h->hw.io_ports, sizeof(h->io_ports));
@@ -652,8 +658,8 @@ ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigne
 	   are distinguished by writing the drive number (0-3) to the
 	   Feature register.
 	   FIXME: Is promise_selectproc now redundant??
-	 */
-	taskfile.feature    = (drive->channel->unit << 1) + drive->select.b.unit;
+	*/
+	taskfile.feature	= (drive->channel->unit << 1) + drive->select.b.unit;
 	taskfile.sector_count	= rq->nr_sectors;
 	taskfile.sector_number	= block;
 	taskfile.low_cylinder	= (block>>=8);
