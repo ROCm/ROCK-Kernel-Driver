@@ -69,10 +69,9 @@ int __init uclinux_mtd_init(void)
 	printk("uclinux[mtd]: RAM probe address=0x%x size=0x%x\n",
 	       	(int) mapp->map_priv_2, (int) mapp->size);
 
-	mapp->virt = (unsigned long)
-		ioremap_nocache(mapp->phys, mapp->size);
+	mapp->virt = ioremap_nocache(mapp->phys, mapp->size);
 
-	if (mapp->virt == 0) {
+	if (!mapp->virt) {
 		printk("uclinux[mtd]: ioremap_nocache() failed\n");
 		return(-EIO);
 	}
@@ -82,7 +81,7 @@ int __init uclinux_mtd_init(void)
 	mtd = do_map_probe("map_ram", mapp);
 	if (!mtd) {
 		printk("uclinux[mtd]: failed to find a mapping?\n");
-		iounmap((void *) mapp->virt);
+		iounmap(mapp->virt);
 		return(-ENXIO);
 	}
 		

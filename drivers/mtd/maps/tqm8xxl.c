@@ -50,7 +50,7 @@ static struct mtd_info* mtd_banks[FLASH_BANK_MAX];
 static struct map_info* map_banks[FLASH_BANK_MAX];
 static struct mtd_part_def part_banks[FLASH_BANK_MAX];
 static unsigned long num_banks;
-static unsigned long start_scan_addr;
+static void __iomem *start_scan_addr;
 
 /*
  * Here are partition information for all known TQM8xxL series devices.
@@ -121,7 +121,7 @@ int __init init_tqm_mtd(void)
 	flash_size = bd->bi_flashsize;
 
 	//request maximum flash size address space
-	start_scan_addr = (unsigned long)ioremap(flash_addr, flash_size);
+	start_scan_addr = ioremap(flash_addr, flash_size);
 	if (!start_scan_addr) {
 		printk(KERN_WARNING "%s:Failed to ioremap address:0x%x\n", __FUNCTION__, flash_addr);
 		return -EIO;
@@ -231,7 +231,7 @@ error_mem:
 		}
 	}
 error:
-	iounmap((void *)start_scan_addr);
+	iounmap(start_scan_addr);
 	return ret;
 }
 
@@ -250,7 +250,7 @@ static void __exit cleanup_tqm_mtd(void)
 	}
 
 	if (start_scan_addr) {
-		iounmap((void *)start_scan_addr);
+		iounmap(start_scan_addr);
 		start_scan_addr = 0;
 	}
 }

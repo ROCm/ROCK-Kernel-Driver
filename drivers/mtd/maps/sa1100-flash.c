@@ -885,7 +885,7 @@ struct sa_info {
 	unsigned long base;
 	unsigned long size;
 	int width;
-	void *vbase;
+	void __iomem *vbase;
         void (*set_vpp)(struct map_info *, int);
 	struct map_info *map;
 	struct mtd_info *mtd;
@@ -932,7 +932,7 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 			break;
 		}
 
-		sa[i].map->virt = (unsigned long)sa[i].vbase;
+		sa[i].map->virt = sa[i].vbase;
 		sa[i].map->phys = sa[i].base;
 		sa[i].map->set_vpp = sa[i].set_vpp;
 		sa[i].map->bankwidth = sa[i].width;

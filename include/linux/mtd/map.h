@@ -179,7 +179,7 @@ struct map_info {
 	unsigned long phys;
 #define NO_XIP (-1UL)
 
-	unsigned long virt;
+	void __iomem *virt;
 	void *cached;
 
 	int bankwidth; /* in octets. This isn't necessarily the width
