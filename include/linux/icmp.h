@@ -17,6 +17,8 @@
 #ifndef _LINUX_ICMP_H
 #define	_LINUX_ICMP_H
 
+#include <linux/types.h>
+
 #define ICMP_ECHOREPLY		0	/* Echo Reply			*/
 #define ICMP_DEST_UNREACH	3	/* Destination Unreachable	*/
 #define ICMP_SOURCE_QUENCH	4	/* Source Quench		*/

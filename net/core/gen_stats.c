@@ -125,6 +125,7 @@ gnet_stats_finish_copy(struct gnet_dump *d)
 
 
 EXPORT_SYMBOL(gnet_stats_start_copy);
+EXPORT_SYMBOL(gnet_stats_start_copy_compat);
 EXPORT_SYMBOL(gnet_stats_copy_basic);
 EXPORT_SYMBOL(gnet_stats_copy_rate_est);
 EXPORT_SYMBOL(gnet_stats_copy_queue);

@@ -103,14 +103,12 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		r->tcpdiag_wqueue = 0;
 		r->tcpdiag_uid = 0;
 		r->tcpdiag_inode = 0;
-#ifdef CONFIG_IPV6
 		if (r->tcpdiag_family == AF_INET6) {
 			ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_src,
 				       &tw->tw_v6_rcv_saddr);
 			ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
 				       &tw->tw_v6_daddr);
 		}
-#endif
 		nlh->nlmsg_len = skb->tail - b;
 		return skb->len;
 	}
@@ -120,7 +118,6 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 	r->id.tcpdiag_src[0] = inet->rcv_saddr;
 	r->id.tcpdiag_dst[0] = inet->daddr;
 
-#ifdef CONFIG_IPV6
 	if (r->tcpdiag_family == AF_INET6) {
 		struct ipv6_pinfo *np = inet6_sk(sk);
 
@@ -129,7 +126,6 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
 			       &np->daddr);
 	}
-#endif
 
 #define EXPIRES_IN_MS(tmo)  ((tmo-jiffies)*1000+HZ-1)/HZ
 
@@ -188,11 +184,19 @@ nlmsg_failure:
 	return -1;
 }
 
-extern struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr, u16 dport, int dif);
-#ifdef CONFIG_IPV6
+extern struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr, u16 dport,
+				  int dif);
+#ifdef CONFIG_IP_TCPDIAG_IPV6
 extern struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 				  struct in6_addr *daddr, u16 dport,
 				  int dif);
+#else
+static inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
+					 struct in6_addr *daddr, u16 dport,
+					 int dif)
+{
+	return NULL;
+}
 #endif
 
 static int tcpdiag_get_exact(struct sk_buff *in_skb, const struct nlmsghdr *nlh)
@@ -207,13 +211,11 @@ static int tcpdiag_get_exact(struct sk_buff *in_skb, const struct nlmsghdr *nlh)
 				   req->id.tcpdiag_src[0], req->id.tcpdiag_sport,
 				   req->id.tcpdiag_if);
 	}
-#ifdef CONFIG_IPV6
 	else if (req->tcpdiag_family == AF_INET6) {
 		sk = tcp_v6_lookup((struct in6_addr*)req->id.tcpdiag_dst, req->id.tcpdiag_dport,
 				   (struct in6_addr*)req->id.tcpdiag_src, req->id.tcpdiag_sport,
 				   req->id.tcpdiag_if);
 	}
-#endif
 	else {
 		return -EINVAL;
 	}
@@ -422,14 +424,12 @@ static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
 		struct inet_opt *inet = inet_sk(sk);
 
 		entry.family = sk->sk_family;
-#ifdef CONFIG_IPV6
 		if (entry.family == AF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
 
 			entry.saddr = np->rcv_saddr.s6_addr32;
 			entry.daddr = np->daddr.s6_addr32;
 		} else
-#endif
 		{
 			entry.saddr = &inet->rcv_saddr;
 			entry.daddr = &inet->daddr;
@@ -482,14 +482,12 @@ static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
 	r->tcpdiag_wqueue = 0;
 	r->tcpdiag_uid = sock_i_uid(sk);
 	r->tcpdiag_inode = 0;
-#ifdef CONFIG_IPV6
 	if (r->tcpdiag_family == AF_INET6) {
 		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_src,
 			       &req->af.v6_req.loc_addr);
 		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
 			       &req->af.v6_req.rmt_addr);
 	}
-#endif
 	nlh->nlmsg_len = skb->tail - b;
 
 	return skb->len;
@@ -545,16 +543,12 @@ static int tcpdiag_dump_reqs(struct sk_buff *skb, struct sock *sk,
 
 			if (bc) {
 				entry.saddr =
-#ifdef CONFIG_IPV6
 					(entry.family == AF_INET6) ?
 					req->af.v6_req.loc_addr.s6_addr32 :
-#endif
 					&req->af.v4_req.loc_addr;
 				entry.daddr = 
-#ifdef CONFIG_IPV6
 					(entry.family == AF_INET6) ?
 					req->af.v6_req.rmt_addr.s6_addr32 :
-#endif
 					&req->af.v4_req.rmt_addr;
 				entry.dport = ntohs(req->rmt_port);
 
