@@ -1997,6 +1997,7 @@ static int ftdi_tiocmset(struct usb_serial_port *port, struct file * file, unsig
 {
 	int ret;
 	
+	dbg("%s TIOCMSET", __FUNCTION__);
 	if (set & TIOCM_DTR){
 		if ((ret = set_dtr(port, HIGH)) < 0) {
 			err("Urb to set DTR failed");
