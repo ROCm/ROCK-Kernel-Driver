@@ -531,5 +531,3 @@ get_out:
 	return ret;
 }
 
-EXPORT_SYMBOL_GPL(agp_3_5_enable);
-

@@ -18,5 +18,3 @@ int agp_3_0_enable(struct agp_bridge_data *bridge, u32 mode)
 	return 0;
 }
 
-EXPORT_SYMBOL_GPL(agp_3_0_enable);
-
