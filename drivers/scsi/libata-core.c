@@ -2767,6 +2767,59 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 	return timeout;
 }
 
+void atapi_start(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	struct ata_device *dev = qc->dev;
+	struct scsi_cmnd *cmd = qc->scsicmd;
+	u8 status;
+	int doing_dma;
+
+	doing_dma = (qc->tf.protocol == ATA_PROT_ATAPI_DMA);
+
+	if (cmd->sc_data_direction == SCSI_DATA_NONE) {
+		ap->active_tag = qc->tag;
+		qc->flags |= ATA_QCFLAG_ACTIVE | ATA_QCFLAG_POLL;
+
+		ata_dev_select(ap, dev->devno, 1, 0);
+
+		DPRINTK("direction: none\n");
+		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
+		ata_tf_to_host_nolock(ap, &qc->tf);
+	} else {
+		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
+		qc->tf.feature = ATAPI_PKT_DMA;
+
+		/* select device, send command to hardware */
+		if (ata_qc_issue(qc))
+			goto err_out;
+	}
+
+	status = ata_busy_wait(ap, ATA_BUSY, 1000);
+	if (status & ATA_BUSY) {
+		queue_work(ata_wq, &ap->packet_task);
+		return;
+	}
+	if ((status & ATA_DRQ) == 0)
+		goto err_out;
+
+	/* FIXME: mmio-ize */
+	DPRINTK("writing cdb\n");
+	outsl(ap->ioaddr.data_addr, cmd->cmnd, ap->host->max_cmd_len / 4);
+
+	if (!doing_dma)
+		queue_work(ata_wq, &ap->packet_task);
+
+	VPRINTK("EXIT\n");
+	return;
+
+err_out:
+	if (!doing_dma)
+		ata_irq_on(ap);	/* re-enable interrupts */
+	ata_bad_cdb(cmd, qc->scsidone);
+	DPRINTK("EXIT - badcmd\n");
+}
+
 /**
  *	atapi_packet_task - Write CDB bytes to hardware
  *	@_data: Port to which ATAPI device is attached.
