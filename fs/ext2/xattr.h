@@ -57,9 +57,9 @@ struct ext2_xattr_entry {
 struct ext2_xattr_handler {
 	char *prefix;
 	size_t (*list)(char *list, struct inode *inode, const char *name,
-		       int name_len);
+		       int name_len, int flags);
 	int (*get)(struct inode *inode, const char *name, void *buffer,
-		   size_t size);
+		   size_t size, int flags);
 	int (*set)(struct inode *inode, const char *name, const void *buffer,
 		   size_t size, int flags);
 };
@@ -68,12 +68,12 @@ extern int ext2_xattr_register(int, struct ext2_xattr_handler *);
 extern void ext2_xattr_unregister(int, struct ext2_xattr_handler *);
 
 extern int ext2_setxattr(struct dentry *, const char *, const void *, size_t, int);
-extern ssize_t ext2_getxattr(struct dentry *, const char *, void *, size_t);
-extern ssize_t ext2_listxattr(struct dentry *, char *, size_t);
-extern int ext2_removexattr(struct dentry *, const char *);
+extern ssize_t ext2_getxattr(struct dentry *, const char *, void *, size_t, int);
+extern ssize_t ext2_listxattr(struct dentry *, char *, size_t, int);
+extern int ext2_removexattr(struct dentry *, const char *, int);
 
 extern int ext2_xattr_get(struct inode *, int, const char *, void *, size_t);
-extern int ext2_xattr_list(struct inode *, char *, size_t);
+extern int ext2_xattr_list(struct inode *, char *, size_t, int flags);
 extern int ext2_xattr_set(struct inode *, int, const char *, const void *, size_t, int);
 
 extern void ext2_xattr_delete_inode(struct inode *);

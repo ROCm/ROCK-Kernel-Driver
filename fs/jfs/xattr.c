@@ -962,12 +962,13 @@ ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
 }
 
 ssize_t jfs_getxattr(struct dentry *dentry, const char *name, void *data,
-		     size_t buf_size)
+		     size_t buf_size, int flags)
 {
 	return __jfs_getxattr(dentry->d_inode, name, data, buf_size);
 }
 
-ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
+ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size,
+		      int flags)
 {
 	struct inode *inode = dentry->d_inode;
 	char *buffer;
@@ -1013,7 +1014,7 @@ ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
 	return size;
 }
 
-int jfs_removexattr(struct dentry *dentry, const char *name)
+int jfs_removexattr(struct dentry *dentry, const char *name, int flags)
 {
 	return __jfs_setxattr(dentry->d_inode, name, 0, 0, XATTR_REPLACE);
 }

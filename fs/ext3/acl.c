@@ -431,7 +431,7 @@ ext3_acl_chmod(struct inode *inode)
  */
 static size_t
 ext3_xattr_list_acl_access(char *list, struct inode *inode,
-			   const char *name, int name_len)
+			   const char *name, int name_len, int flags)
 {
 	const size_t size = sizeof(XATTR_NAME_ACL_ACCESS);
 
@@ -444,7 +444,7 @@ ext3_xattr_list_acl_access(char *list, struct inode *inode,
 
 static size_t
 ext3_xattr_list_acl_default(char *list, struct inode *inode,
-			    const char *name, int name_len)
+			    const char *name, int name_len, int flags)
 {
 	const size_t size = sizeof(XATTR_NAME_ACL_DEFAULT);
 
@@ -477,7 +477,7 @@ ext3_xattr_get_acl(struct inode *inode, int type, void *buffer, size_t size)
 
 static int
 ext3_xattr_get_acl_access(struct inode *inode, const char *name,
-			  void *buffer, size_t size)
+			  void *buffer, size_t size, int flags)
 {
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
@@ -486,7 +486,7 @@ ext3_xattr_get_acl_access(struct inode *inode, const char *name,
 
 static int
 ext3_xattr_get_acl_default(struct inode *inode, const char *name,
-			   void *buffer, size_t size)
+			   void *buffer, size_t size, int flags)
 {
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
@@ -494,7 +494,8 @@ ext3_xattr_get_acl_default(struct inode *inode, const char *name,
 }
 
 static int
-ext3_xattr_set_acl(struct inode *inode, int type, const void *value, size_t size)
+ext3_xattr_set_acl(struct inode *inode, int type, const void *value,
+		   size_t size)
 {
 	handle_t *handle;
 	struct posix_acl *acl;

@@ -19,7 +19,7 @@
 
 static size_t
 ext2_xattr_user_list(char *list, struct inode *inode,
-		     const char *name, int name_len)
+		     const char *name, int name_len, int flags)
 {
 	const int prefix_len = sizeof(XATTR_USER_PREFIX)-1;
 
@@ -36,7 +36,7 @@ ext2_xattr_user_list(char *list, struct inode *inode,
 
 static int
 ext2_xattr_user_get(struct inode *inode, const char *name,
-		    void *buffer, size_t size)
+		    void *buffer, size_t size, int flags)
 {
 	int error;
 
