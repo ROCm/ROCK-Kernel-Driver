@@ -180,8 +180,8 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 #define SWAPFILE_SUSPEND   1	/* This is the suspending device */
 #define SWAPFILE_IGNORED   2	/* Those are other swap devices ignored for suspension */
 
-static unsigned short swapfile_used[MAX_SWAPFILES];
-static unsigned short root_swap;
+unsigned short swapfile_used[MAX_SWAPFILES];
+unsigned short root_swap;
 #define MARK_SWAP_SUSPEND 0
 #define MARK_SWAP_RESUME 2
 
@@ -243,7 +243,7 @@ static int is_resume_device(const struct swap_info_struct *swap_info)
 		resume_device == MKDEV(imajor(inode), iminor(inode));
 }
 
-static void read_swapfiles(void) /* This is called before saving image */
+int swsusp_swap_check(void) /* This is called before saving image */
 {
 	int i, len;
 	
@@ -274,18 +274,23 @@ static void read_swapfiles(void) /* This is called before saving image */
 		}
 	}
 	swap_list_unlock();
+	return (root_swap != 0xffff) ? 0 : -ENODEV;
 }
 
-static void lock_swapdevices(void) /* This is called after saving image so modification
-				      will be lost after resume... and that's what we want. */
+/**
+ * This is called after saving image so modification
+ * will be lost after resume... and that's what we want.
+ * we make the device unusable. A new call to
+ * lock_swapdevices can unlock the devices. 
+ */
+void swsusp_swap_lock(void)
 {
 	int i;
 
 	swap_list_lock();
 	for(i = 0; i< MAX_SWAPFILES; i++)
 		if(swapfile_used[i] == SWAPFILE_IGNORED) {
-			swap_info[i].flags ^= 0xFF; /* we make the device unusable. A new call to
-						       lock_swapdevices can unlock the devices. */
+			swap_info[i].flags ^= 0xFF;
 		}
 	swap_list_unlock();
 }
@@ -675,9 +680,10 @@ static void suspend_save_image(void)
 {
 	device_resume();
 
-	lock_swapdevices();
+	swsusp_swap_lock();
 	write_suspend_image();
-	lock_swapdevices();	/* This will unlock ignored swap devices since writing is finished */
+	/* This will unlock ignored swap devices since writing is finished */
+	swsusp_swap_lock();
 
 	/* It is important _NOT_ to umount filesystems at this point. We want
 	 * them synced (in case something goes wrong) but we DO not want to mark
@@ -788,7 +794,7 @@ asmlinkage void do_magic_suspend_1(void)
 asmlinkage void do_magic_suspend_2(void)
 {
 	int is_problem;
-	read_swapfiles();
+	swsusp_swap_check();
 	device_power_down(3);
 	is_problem = suspend_prepare_image();
 	device_power_up();

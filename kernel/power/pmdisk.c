@@ -109,8 +109,10 @@ struct pmdisk_header {
 #define SWAPFILE_SUSPEND   1	/* This is the suspending device */
 #define SWAPFILE_IGNORED   2	/* Those are other swap devices ignored for suspension */
 
-static unsigned short swapfile_used[MAX_SWAPFILES];
-static unsigned short root_swap;
+extern unsigned short swapfile_used[MAX_SWAPFILES];
+extern unsigned short root_swap;
+extern int swsusp_swap_check(void);
+extern void swsusp_swap_lock(void);
 
 
 static int mark_swapfiles(swp_entry_t prev)
@@ -134,56 +136,6 @@ static int mark_swapfiles(swp_entry_t prev)
 		error = -ENODEV;
 	}
 	return error;
-}
-
-static int read_swapfiles(void) /* This is called before saving image */
-{
-	int i, len;
-	
-	len=strlen(resume_file);
-	root_swap = 0xFFFF;
-	
-	swap_list_lock();
-	for(i=0; i<MAX_SWAPFILES; i++) {
-		if (swap_info[i].flags == 0) {
-			swapfile_used[i]=SWAPFILE_UNUSED;
-		} else {
-			if(!len) {
-				pr_debug("pmdisk: Default resume partition not set.\n");
-				if(root_swap == 0xFFFF) {
-					swapfile_used[i] = SWAPFILE_SUSPEND;
-					root_swap = i;
-				} else
-					swapfile_used[i] = SWAPFILE_IGNORED;				  
-			} else {
-	  			/* we ignore all swap devices that are not the resume_file */
-				if (1) {
-// FIXME				if(resume_device == swap_info[i].swap_device) {
-					swapfile_used[i] = SWAPFILE_SUSPEND;
-					root_swap = i;
-				} else
-				  	swapfile_used[i] = SWAPFILE_IGNORED;
-			}
-		}
-	}
-	swap_list_unlock();
-	return (root_swap != 0xffff) ? 0 : -ENODEV;
-}
-
-
-/* This is called after saving image so modification
-   will be lost after resume... and that's what we want. */
-static void lock_swapdevices(void)
-{
-	int i;
-
-	swap_list_lock();
-	for(i = 0; i< MAX_SWAPFILES; i++)
-		if(swapfile_used[i] == SWAPFILE_IGNORED) {
-			swap_info[i].flags ^= 0xFF; /* we make the device unusable. A new call to
-						       lock_swapdevices can unlock the devices. */
-		}
-	swap_list_unlock();
 }
 
 
@@ -625,7 +577,7 @@ int pmdisk_suspend(void)
 {
 	int error = 0;
 
-	if ((error = read_swapfiles()))
+	if ((error = swsusp_swap_check()))
 		return error;
 
 	drain_local_pages();
@@ -681,7 +633,7 @@ int pmdisk_suspend(void)
  *	IRQs are re-enabled here so we can resume devices and safely write
  *	to the swap devices. We disable them again before we leave.
  *
- *	The second lock_swapdevices() will unlock ignored swap devices since
+ *	The second swsusp_swap_lock() will unlock ignored swap devices since
  *	writing is finished.
  *	It is important _NOT_ to umount filesystems at this point. We want
  *	them synced (in case something goes wrong) but we DO not want to mark
@@ -693,9 +645,9 @@ static int suspend_save_image(void)
 {
 	int error;
 	device_resume();
-	lock_swapdevices();
+	swsusp_swap_lock();
 	error = write_suspend_image();
-	lock_swapdevices();
+	swsusp_swap_lock();
 	return error;
 }
 
