@@ -23,23 +23,5 @@
  */
 void		nfsd_setuser(struct svc_rqst *, struct svc_export *);
 
-#if 0
-/*
- * These must match the actual size of uid_t and gid_t
- */
-#define UGID_BITS		(8 * sizeof(uid_t))
-#define UGID_SHIFT		8
-#define UGID_MASK		((1 << UGID_SHIFT) - 1)
-#define UGID_NRENTRIES		((1 << (UGID_BITS - UGID_SHIFT)) + 1)
-#define UGID_NONE		((unsigned short)-1)
-
-typedef struct svc_uidmap {
-	uid_t *			um_ruid[UGID_NRENTRIES];
-	uid_t *			um_luid[UGID_NRENTRIES];
-	gid_t *			um_rgid[UGID_NRENTRIES];
-	gid_t *			um_lgid[UGID_NRENTRIES];
-} svc_uidmap;
-#endif
-
 #endif /* __KERNEL__ */
 #endif /* LINUX_NFSD_AUTH_H */

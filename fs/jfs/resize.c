@@ -65,8 +65,8 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	struct inode *ipbmap = sbi->ipbmap;
 	struct inode *ipbmap2;
 	struct inode *ipimap = sbi->ipimap;
-	log_t *log = sbi->log;
-	bmap_t *bmp = sbi->bmap;
+	struct jfs_log *log = sbi->log;
+	struct bmap *bmp = sbi->bmap;
 	s64 newLogAddress, newFSCKAddress;
 	int newFSCKSize;
 	s64 newMapSize = 0, mapSize;

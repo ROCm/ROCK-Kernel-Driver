@@ -28,7 +28,7 @@
 
 
 /*
- *      on-disk inode (dinode_t): 512 bytes
+ *      on-disk inode : 512 bytes
  *
  * note: align 64-bit fields on 8-byte boundary.
  */
@@ -89,7 +89,7 @@ struct dinode {
 			 * If the index is small enough, the table is inline,
 			 * otherwise, an x-tree root overlays this table
 			 */
-			dir_table_slot_t _table[12];	/* 96: inline */
+			struct dir_table_slot _table[12]; /* 96: inline */
 
 			dtroot_t _dtroot;		/* 288: dtree root */
 		} _dir;					/* (384) */
@@ -130,9 +130,6 @@ struct dinode {
 #define di_inlineea     u._file._u2._special._inlineea
 	} u;
 };
-
-typedef struct dinode dinode_t;
-
 
 /* extended mode bits (on-disk inode di_mode) */
 #define IFJOURNAL       0x00010000	/* journalled file */

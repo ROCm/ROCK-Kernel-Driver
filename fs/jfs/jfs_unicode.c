@@ -89,7 +89,7 @@ int jfs_strtoUCS(wchar_t * to,
  * FUNCTION:	Allocate and translate to unicode string
  *
  */
-int get_UCSname(component_t * uniName, struct dentry *dentry,
+int get_UCSname(struct component_name * uniName, struct dentry *dentry,
 		struct nls_table *nls_tab)
 {
 	int length = dentry->d_name.len;
