@@ -1814,8 +1814,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 
 	exp_get(exp);
 	if (d_mountpoint(dentry)) {
-		if ((nfserr = nfsd_cross_mnt(cd->rd_rqstp, &dentry,
-				 &exp))) {
+		if (nfsd_cross_mnt(cd->rd_rqstp, &dentry, &exp)) {
 		/*
 		 * -EAGAIN is the only error returned from
 		 * nfsd_cross_mnt() and it indicates that an
