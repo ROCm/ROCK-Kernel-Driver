@@ -1006,7 +1006,7 @@ static struct inode *ufs_alloc_inode(struct super_block *sb)
 	ei = (struct ufs_inode_info *)kmem_cache_alloc(ufs_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
-	ei->vfs_inode.i_version = 0;
+	ei->vfs_inode.i_version = 1;
 	return &ei->vfs_inode;
 }
 

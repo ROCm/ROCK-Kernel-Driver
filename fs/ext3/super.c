@@ -434,7 +434,7 @@ static struct inode *ext3_alloc_inode(struct super_block *sb)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
-	ei->vfs_inode.i_version = 0;
+	ei->vfs_inode.i_version = 1;
 	return &ei->vfs_inode;
 }
 

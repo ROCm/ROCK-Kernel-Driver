@@ -92,7 +92,7 @@ static struct inode *affs_alloc_inode(struct super_block *sb)
 	ei = (struct affs_inode_info *)kmem_cache_alloc(affs_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
-	ei->vfs_inode.i_version = 0;
+	ei->vfs_inode.i_version = 1;
 	return &ei->vfs_inode;
 }
 
