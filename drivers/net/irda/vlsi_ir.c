@@ -967,18 +967,6 @@ static int vlsi_set_baud(vlsi_irda_dev_t *idev, unsigned iobase)
 	return ret;
 }
 
-static inline int vlsi_set_baud_lock(struct net_device *ndev)
-{
-	vlsi_irda_dev_t *idev = ndev->priv;
-	unsigned long flags;
-	int ret;
-
-	spin_lock_irqsave(&idev->lock, flags);
-	ret = vlsi_set_baud(idev, ndev->base_addr);
-	spin_unlock_irqrestore(&idev->lock, flags);
-	return ret;
-}
-
 static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
@@ -991,77 +979,100 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	int mtt;
 	int len, speed;
 	struct timeval  now, ready;
+	char *msg = NULL;
 
 	speed = irda_get_next_speed(skb);
+	spin_lock_irqsave(&idev->lock, flags);
 	if (speed != -1  &&  speed != idev->baud) {
 		netif_stop_queue(ndev);
 		idev->new_baud = speed;
-		if (!skb->len) {
-			dev_kfree_skb_any(skb);
-
-			/* due to the completely asynch tx operation we might have
-			 * IrLAP racing with the hardware here, f.e. if the controller
-			 * is just sending the last packet with current speed while
-			 * the LAP is already switching the speed using synchronous
-			 * len=0 packet. Immediate execution would lead to hw lockup
-			 * requiring a powercycle to reset. Good candidate to trigger
-			 * this is the final UA:RSP packet after receiving a DISC:CMD
-			 * when getting the LAP down.
-			 * Note that we are not protected by the queue_stop approach
-			 * because the final UA:RSP arrives _without_ request to apply
-			 * new-speed-after-this-packet - hence the driver doesn't know
-			 * this was the last packet and doesn't stop the queue. So the
-			 * forced switch to default speed from LAP gets through as fast
-			 * as only some 10 usec later while the UA:RSP is still processed
-			 * by the hardware and we would get screwed.
-			 * Note: no locking required since we (netdev->xmit) are the only
-			 * supplier for tx and the network layer provides serialization
-			 */
-			spin_lock_irqsave(&idev->lock, flags);
-			if (ring_first(idev->tx_ring) == NULL) {
-				/* no race - tx-ring already empty */
-				vlsi_set_baud(idev, iobase);
-				netif_wake_queue(ndev);
-			}
-			else
-				; /* keep the speed change pending like it would
-				   * for any len>0 packet. tx completion interrupt
-				   * will apply it when the tx ring becomes empty.
-				   */
-			spin_unlock_irqrestore(&idev->lock, flags);
-			return 0;
-		}
 		status = RD_TX_CLRENTX;  /* stop tx-ring after this frame */
 	}
 	else
 		status = 0;
 
 	if (skb->len == 0) {
-		WARNING("%s: dropping len=0 packet\n", __FUNCTION__);
-		goto drop;
+		/* handle zero packets - should be speed change */
+		if (status == 0) {
+			msg = "bogus zero-length packet";
+			goto drop_unlock;
+		}
+
+		/* due to the completely asynch tx operation we might have
+		 * IrLAP racing with the hardware here, f.e. if the controller
+		 * is just sending the last packet with current speed while
+		 * the LAP is already switching the speed using synchronous
+		 * len=0 packet. Immediate execution would lead to hw lockup
+		 * requiring a powercycle to reset. Good candidate to trigger
+		 * this is the final UA:RSP packet after receiving a DISC:CMD
+		 * when getting the LAP down.
+		 * Note that we are not protected by the queue_stop approach
+		 * because the final UA:RSP arrives _without_ request to apply
+		 * new-speed-after-this-packet - hence the driver doesn't know
+		 * this was the last packet and doesn't stop the queue. So the
+		 * forced switch to default speed from LAP gets through as fast
+		 * as only some 10 usec later while the UA:RSP is still processed
+		 * by the hardware and we would get screwed.
+		 */
+
+		if (ring_first(idev->tx_ring) == NULL) {
+			/* no race - tx-ring already empty */
+			vlsi_set_baud(idev, iobase);
+			netif_wake_queue(ndev);
+		}
+		else
+			;
+			/* keep the speed change pending like it would
+			 * for any len>0 packet. tx completion interrupt
+			 * will apply it when the tx ring becomes empty.
+			 */
+		spin_unlock_irqrestore(&idev->lock, flags);
+		dev_kfree_skb_any(skb);
+		return 0;
 	}
 
 	/* sanity checks - simply drop the packet */
 
 	rd = ring_last(r);
 	if (!rd) {
-		ERROR("%s - ring full but queue wasn't stopped", __FUNCTION__);
-		goto drop;
+		msg = "ring full, but queue wasn't stopped";
+		goto drop_unlock;
 	}
 
 	if (rd_is_active(rd)) {
-		ERROR("%s - entry still owned by hw!", __FUNCTION__);
-		goto drop;
+		msg = "entry still owned by hw";
+		goto drop_unlock;
 	}
 
 	if (!rd->buf) {
-		ERROR("%s - tx ring entry without pci buffer", __FUNCTION__);
-		goto drop;
+		msg = "tx ring entry without pci buffer";
+		goto drop_unlock;
 	}
 
 	if (rd->skb) {
-		ERROR("%s - ring entry with old skb still attached", __FUNCTION__);
-		goto drop;
+		msg = "ring entry with old skb still attached";
+		goto drop_unlock;
+	}
+
+	/* no need for serialization or interrupt disable during mtt */
+	spin_unlock_irqrestore(&idev->lock, flags);
+
+	if ((mtt = irda_get_mtt(skb)) > 0) {
+	
+		ready.tv_usec = idev->last_rx.tv_usec + mtt;
+		ready.tv_sec = idev->last_rx.tv_sec;
+		if (ready.tv_usec >= 1000000) {
+			ready.tv_usec -= 1000000;
+			ready.tv_sec++;		/* IrLAP 1.1: mtt always < 1 sec */
+		}
+		for(;;) {
+			do_gettimeofday(&now);
+			if (now.tv_sec > ready.tv_sec
+			    ||  (now.tv_sec==ready.tv_sec && now.tv_usec>=ready.tv_usec))
+			    	break;
+			udelay(100);
+			/* must not sleep here - we are called under xmit_lock! */
+		}
 	}
 
 	/* tx buffer already owned by CPU due to pci_dma_sync_single() either
@@ -1091,32 +1102,11 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		status |= RD_TX_PULSE;		/* send 2 us highspeed indication pulse */
 		len = skb->len;
 		if (len > r->len) {
-			WARNING("%s: no space - skb too big (%d)\n",
-				__FUNCTION__, skb->len);
+			msg = "frame exceeds tx buffer length";
 			goto drop;
 		}
 		else
 			memcpy(rd->buf, skb->data, len);
-	}
-
-	/* do mtt delay before we need to disable interrupts! */
-
-	if ((mtt = irda_get_mtt(skb)) > 0) {
-	
-		ready.tv_usec = idev->last_rx.tv_usec + mtt;
-		ready.tv_sec = idev->last_rx.tv_sec;
-		if (ready.tv_usec >= 1000000) {
-			ready.tv_usec -= 1000000;
-			ready.tv_sec++;		/* IrLAP 1.1: mtt always < 1 sec */
-		}
-		for(;;) {
-			do_gettimeofday(&now);
-			if (now.tv_sec > ready.tv_sec
-			    ||  (now.tv_sec==ready.tv_sec && now.tv_usec>=ready.tv_usec))
-			    	break;
-			udelay(100);
-			/* must not sleep here - we are called under xmit_lock! */
-		}
 	}
 
 	rd->skb = skb;			/* remember skb for tx-complete stats */
@@ -1130,10 +1120,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	pci_dma_prep_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
 
-/*
- *	We need to disable IR output in order to switch to TX mode.
- *	Better not do this blindly anytime we want to transmit something
- *	because TX may already run. However we are racing with the controller
+/*	Switching to TX mode here races with the controller
  *	which may stop TX at any time when fetching an inactive descriptor
  *	or one with CLR_ENTX set. So we switch on TX only, if TX was not running
  *	_after_ the new descriptor was activated on the ring. This ensures
@@ -1157,9 +1144,9 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		}
 
 		config = inw(iobase+VLSI_PIO_IRCFG);
-		rmb();
-		outw(config | IRCFG_ENTX, iobase+VLSI_PIO_IRCFG);
 		mb();
+		outw(config | IRCFG_ENTX, iobase+VLSI_PIO_IRCFG);
+		wmb();
 		outw(0, iobase+VLSI_PIO_PROMPT);
 	}
 	ndev->trans_start = jiffies;
@@ -1172,11 +1159,19 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	return 0;
 
+drop_unlock:
+	spin_unlock_irqrestore(&idev->lock, flags);
 drop:
+	WARNING("%s: dropping packet - %s\n", __FUNCTION__, msg);
 	dev_kfree_skb_any(skb);
 	idev->stats.tx_errors++;
 	idev->stats.tx_dropped++;
-	return 1;
+	/* Don't even think about returning NET_XMIT_DROP (=1) here!
+	 * In fact any retval!=0 causes the packet scheduler to requeue the
+	 * packet for later retry of transmission - which isn't exactly
+	 * what we want after we've just called dev_kfree_skb_any ;-)
+	 */
+	return 0;
 }
 
 static void vlsi_tx_interrupt(struct net_device *ndev)
@@ -1209,12 +1204,12 @@ static void vlsi_tx_interrupt(struct net_device *ndev)
 		}
 	}
 
-	if (idev->new_baud  &&  rd == NULL)	/* tx ring empty and speed change pending */
-		vlsi_set_baud_lock(ndev);
-
 	iobase = ndev->base_addr;
-	config = inw(iobase+VLSI_PIO_IRCFG);
 
+	if (idev->new_baud  &&  rd == NULL)	/* tx ring empty and speed change pending */
+		vlsi_set_baud(idev, iobase);
+
+	config = inw(iobase+VLSI_PIO_IRCFG);
 	if (rd == NULL)			/* tx ring empty: re-enable rx */
 		outw((config & ~IRCFG_ENTX) | IRCFG_ENRX, iobase+VLSI_PIO_IRCFG);
 
