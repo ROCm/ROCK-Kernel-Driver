@@ -30,7 +30,7 @@ struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
 static void wq_sync_buffer(void *);
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
-int timers_enabled;
+int work_enabled;
 
 static void __free_cpu_buffers(int num)
 {
@@ -80,11 +80,11 @@ void free_cpu_buffers(void)
 }
 
 
-void start_cpu_timers(void)
+void start_cpu_work(void)
 {
 	int i;
 
-	timers_enabled = 1;
+	work_enabled = 1;
 
 	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
@@ -98,11 +98,11 @@ void start_cpu_timers(void)
 }
 
 
-void end_cpu_timers(void)
+void end_cpu_work(void)
 {
 	int i;
 
-	timers_enabled = 0;
+	work_enabled = 0;
 
 	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
@@ -220,6 +220,6 @@ static void wq_sync_buffer(void * data)
 	sync_buffer(b->cpu);
 
 	/* don't re-add the work if we're shutting down */
-	if (timers_enabled)
+	if (work_enabled)
 		schedule_delayed_work(&b->work, DEFAULT_TIMER_EXPIRE);
 }

@@ -20,8 +20,8 @@ struct task_struct;
 int alloc_cpu_buffers(void);
 void free_cpu_buffers(void);
 
-void start_cpu_timers(void);
-void end_cpu_timers(void);
+void start_cpu_work(void);
+void end_cpu_work(void);
 
 /* CPU buffer is composed of such entries (which are
  * also used for context switch notes)
