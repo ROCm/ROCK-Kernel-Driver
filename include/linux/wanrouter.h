@@ -534,7 +534,8 @@ extern void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
 
 
 /* Public Data */
-extern struct wan_device *router_devlist;	/* list of registered devices */
+/* list of registered devices */
+extern struct wan_device *wanrouter_router_devlist;
 
 #endif	/* __KERNEL__ */
 #endif	/* _ROUTER_H */
