@@ -807,8 +807,7 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 		if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 			continue;	/* Let kswapd poll it */
 
-		max_scan = max(zone->nr_inactive >> priority,
-				SWAP_CLUSTER_MAX * 2UL);
+		max_scan = zone->nr_inactive >> priority;
 		ret += shrink_zone(zone, max_scan, gfp_mask, total_scanned, ps);
 	}
 	return ret;
@@ -932,8 +931,6 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			}
 			zone->temp_priority = priority;
 			max_scan = zone->nr_inactive >> priority;
-			if (max_scan < SWAP_CLUSTER_MAX)
-				max_scan = SWAP_CLUSTER_MAX;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
 					&total_scanned, ps);
 			reclaim_state->reclaimed_slab = 0;
