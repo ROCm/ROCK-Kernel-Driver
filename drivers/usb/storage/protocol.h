@@ -57,6 +57,8 @@
 #define US_SC_MIN	US_SC_RBC
 #define US_SC_MAX	US_SC_ISD200
 
+#define US_SC_DEVICE	0xff		/* Use device's value */
+
 extern void usb_stor_ATAPI_command(Scsi_Cmnd*, struct us_data*);
 extern void usb_stor_qic157_command(Scsi_Cmnd*, struct us_data*);
 extern void usb_stor_ufi_command(Scsi_Cmnd*, struct us_data*);

@@ -102,8 +102,6 @@ static void storage_disconnect(struct usb_interface *iface);
 /* The entries in this table, except for final ones here
  * (USB_MASS_STORAGE_CLASS and the empty entry), correspond,
  * line for line with the entries of us_unsuaul_dev_list[].
- * For now, we duplicate idVendor and idProduct in us_unsual_dev_list,
- * just to avoid alignment bugs.
  */
 
 #define UNUSUAL_DEV(id_vendor, id_product, bcdDeviceMin, bcdDeviceMax, \
@@ -353,7 +351,7 @@ static int usb_stor_control_thread(void * __us)
 		 */
 		else if (us->srb->device->id && 
 				!(us->flags & US_FL_SCM_MULT_TARG)) {
-			US_DEBUGP("Bad target number (%d/%d)\n",
+			US_DEBUGP("Bad target number (%d:%d)\n",
 				  us->srb->device->id, us->srb->device->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
@@ -424,10 +422,13 @@ static int usb_stor_control_thread(void * __us)
  ***********************************************************************/
 
 /* Get the unusual_devs entries and the string descriptors */
-static void get_device_info(struct us_data *us,
-			struct us_unusual_dev *unusual_dev)
+static void get_device_info(struct us_data *us, int id_index)
 {
 	struct usb_device *dev = us->pusb_dev;
+	struct usb_host_interface *altsetting =
+		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting];
+	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
+	struct usb_device_id *id = &storage_usb_ids[id_index];
 
 	if (unusual_dev->vendorName)
 		US_DEBUGP("Vendor: %s\n", unusual_dev->vendorName);
@@ -436,9 +437,39 @@ static void get_device_info(struct us_data *us,
 
 	/* Store the entries */
 	us->unusual_dev = unusual_dev;
-	us->subclass = unusual_dev->useProtocol;
-	us->protocol = unusual_dev->useTransport;
+	us->subclass = (unusual_dev->useProtocol == US_SC_DEVICE) ?
+			altsetting->desc.bInterfaceSubClass :
+			unusual_dev->useProtocol;
+	us->protocol = (unusual_dev->useTransport == US_PR_DEVICE) ?
+			altsetting->desc.bInterfaceProtocol :
+			unusual_dev->useTransport;
 	us->flags = unusual_dev->flags;
+
+	/* Log a message if a non-generic unusual_dev entry contains an
+	 * unnecessary subclass or protocol override.  This may stimulate
+	 * reports from users that will help us remove unneeded entries
+	 * from the unusual_devs.h table.
+	 */
+	if (id->idVendor || id->idProduct) {
+		static char *msgs[3] = {
+			"an unneeded SubClass entry",
+			"an unneeded Protocol entry",
+			"unneeded SubClass and Protocol entries"};
+		int msg = -1;
+
+		if (unusual_dev->useProtocol != US_SC_DEVICE &&
+			us->subclass == altsetting->desc.bInterfaceSubClass)
+			msg += 1;
+		if (unusual_dev->useTransport != US_PR_DEVICE &&
+			us->protocol == altsetting->desc.bInterfaceProtocol)
+			msg += 2;
+		if (msg >= 0)
+			printk(KERN_NOTICE USB_STORAGE "This device "
+				"(%04x,%04x) has %s in unusual_devs.h\n"
+				"   Please send a copy of this message to "
+				"<linux-usb-devel@lists.sourceforge.net>\n",
+				id->idVendor, id->idProduct, msgs[msg]);
+	}
 
 	/* Read the device's string descriptors */
 	if (dev->descriptor.iManufacturer)
@@ -843,7 +874,7 @@ static int storage_probe(struct usb_interface *intf,
 	 * of the match from the usb_device_id table, so we can find the
 	 * corresponding entry in the private table.
 	 */
-	get_device_info(us, &us_unusual_dev_list[id_index]);
+	get_device_info(us, id_index);
 
 #ifdef CONFIG_USB_STORAGE_SDDR09
 	if (us->protocol == US_PR_EUSB_SDDR09 ||
