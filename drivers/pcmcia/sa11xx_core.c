@@ -800,9 +800,13 @@ static const char *skt_names[] = {
 	"PCMCIA socket 1",
 };
 
+struct skt_dev_info {
+	int nskt;
+};
+
 int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, int first, int nr)
 {
-	struct pcmcia_socket_class_data *cls;
+	struct skt_dev_info *sinfo;
 	unsigned int cpu_clock;
 	int ret, i;
 
@@ -813,19 +817,14 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	if (!ops->socket_get_timing)
 		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
-	cls = kmalloc(sizeof(struct pcmcia_socket_class_data), GFP_KERNEL);
-	if (!cls) {
+	sinfo = kmalloc(sizeof(struct skt_dev_info), GFP_KERNEL);
+	if (!sinfo) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	memset(cls, 0, sizeof(struct pcmcia_socket_class_data));
-	cls->ops	= &sa11xx_pcmcia_operations;
-	cls->nsock	= nr;
-	cls->class_dev.class = &pcmcia_socket_class;
-	cls->class_dev.dev = dev;
-	strlcpy(cls->class_dev.class_id, dev->bus_id, BUS_ID_SIZE);
-	class_set_devdata(&cls->class_dev, cls);
+	memset(sinfo, 0, sizeof(struct skt_dev_info));
+	sinfo->nskt = nr;
 
 	cpu_clock = cpufreq_get(0);
 
@@ -835,6 +834,9 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	for (i = 0; i < nr; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 		memset(skt, 0, sizeof(*skt));
+
+		skt->socket.ss_entry = &sa11xx_pcmcia_operations;
+		skt->socket.dev.dev = dev;
 
 		INIT_WORK(&skt->work, sa1100_pcmcia_task_handler, skt);
 
@@ -902,18 +904,26 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 			goto out_err_6;
 
 		skt->status = sa1100_pcmcia_skt_state(skt);
+
+		ret = pcmcia_register_socket(&skt->socket);
+		if (ret)
+			goto out_err_7;
+
+		WARN_ON(skt->socket.sock != i);
+
 		add_timer(&skt->poll_timer);
 	}
 
-	dev_set_drvdata(dev, cls);
-	class_device_register(&cls->class_dev);
-
+	dev_set_drvdata(dev, sinfo);
 	return 0;
 
 	do {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
 		del_timer_sync(&skt->poll_timer);
+		pcmcia_unregister_socket(&skt->socket);
+
+ out_err_7:
 		flush_scheduled_work();
 
 		ops->hw_shutdown(skt);
@@ -931,7 +941,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		i--;
 	} while (i > 0);
 
-	kfree(cls);
+	kfree(sinfo);
 
  out:
 	return ret;
@@ -940,19 +950,21 @@ EXPORT_SYMBOL(sa11xx_drv_pcmcia_probe);
 
 int sa11xx_drv_pcmcia_remove(struct device *dev)
 {
-	struct pcmcia_socket_class_data *cls = dev_get_drvdata(dev);
+	struct skt_dev_info *sinfo = dev_get_drvdata(dev);
 	int i;
 
-	class_device_unregister(&cls->class_dev);
 	dev_set_drvdata(dev, NULL);
 
-	for (i = 0; i < cls->nsock; i++) {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(cls->sock_offset + i);
-
-		skt->ops->hw_shutdown(skt);
+	for (i = 0; i < sinfo->nskt; i++) {
+		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
 		del_timer_sync(&skt->poll_timer);
+
+		pcmcia_unregister_socket(&skt->socket);
+
 		flush_scheduled_work();
+
+		skt->ops->hw_shutdown(skt);
 
 		sa1100_pcmcia_config_skt(skt, &dead_socket);
 
@@ -964,7 +976,7 @@ int sa11xx_drv_pcmcia_remove(struct device *dev)
 		release_resource(&skt->res_skt);
 	}
 
-	kfree(cls);
+	kfree(sinfo);
 
 	return 0;
 }

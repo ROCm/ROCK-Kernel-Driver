@@ -106,8 +106,8 @@ static struct device_driver sa11x0_pcmcia_driver = {
 	.remove		= sa11xx_drv_pcmcia_remove,
 	.name		= "sa11x0-pcmcia",
 	.bus		= &platform_bus_type,
-/*	.suspend 	= pcmcia_socket_dev_suspend,*/
-/*	.resume 	= pcmcia_socket_dev_resume,*/
+	.suspend 	= pcmcia_socket_dev_suspend,
+	.resume 	= pcmcia_socket_dev_resume,
 };
 
 /* sa11x0_pcmcia_init()
