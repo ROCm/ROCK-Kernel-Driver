@@ -164,13 +164,13 @@ exit:
 /*
  * count() counts the number of strings in array ARGV.
  */
-static int count(char ** argv, int max)
+static int count(char __user * __user * argv, int max)
 {
 	int i = 0;
 
 	if (argv != NULL) {
 		for (;;) {
-			char * p;
+			char __user * p;
 
 			if (get_user(p, argv))
 				return -EFAULT;
@@ -189,14 +189,14 @@ static int count(char ** argv, int max)
  * memory to free pages in kernel mem. These are in a format ready
  * to be put directly into the top of new user memory.
  */
-int copy_strings(int argc,char ** argv, struct linux_binprm *bprm) 
+int copy_strings(int argc,char __user * __user * argv, struct linux_binprm *bprm) 
 {
 	struct page *kmapped_page = NULL;
 	char *kaddr = NULL;
 	int ret;
 
 	while (argc-- > 0) {
-		char *str;
+		char __user *str;
 		int len;
 		unsigned long pos;
 
@@ -275,7 +275,7 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
 	int r;
 	mm_segment_t oldfs = get_fs();
 	set_fs(KERNEL_DS); 
-	r = copy_strings(argc, argv, bprm);
+	r = copy_strings(argc, (char __user * __user *)argv, bprm);
 	set_fs(oldfs);
 	return r; 
 }
@@ -1050,7 +1050,10 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 /*
  * sys_execve() executes a new program.
  */
-int do_execve(char * filename, char ** argv, char ** envp, struct pt_regs * regs)
+int do_execve(char * filename,
+	char __user *__user *argv,
+	char __user *__user *envp,
+	struct pt_regs * regs)
 {
 	struct linux_binprm bprm;
 	struct file *file;
