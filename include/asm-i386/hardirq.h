@@ -7,7 +7,6 @@
 
 typedef struct {
 	unsigned int __softirq_pending;
-	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
 	unsigned long idle_timestamp;
 	unsigned int __nmi_count;	/* arch dependent */
 	unsigned int apic_timer_irqs;	/* arch dependent */

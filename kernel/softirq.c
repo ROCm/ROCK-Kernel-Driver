@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
+#include <linux/percpu.h>
 #include <linux/cpu.h>
 
 /*
@@ -41,15 +42,18 @@ EXPORT_SYMBOL(irq_stat);
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
+static DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
+
 /*
  * we cannot loop indefinitely here to avoid userspace starvation,
  * but we also don't want to introduce a worst case 1/HZ latency
  * to the pending events, so lets the scheduler to balance
  * the softirq load for us.
  */
-static inline void wakeup_softirqd(unsigned cpu)
+static inline void wakeup_softirqd(void)
 {
-	struct task_struct * tsk = ksoftirqd_task(cpu);
+	/* Interrupts are disabled: no need to stop preemption */
+	struct task_struct *tsk = __get_cpu_var(ksoftirqd);
 
 	if (tsk && tsk->state != TASK_RUNNING)
 		wake_up_process(tsk);
@@ -96,7 +100,7 @@ restart:
 			goto restart;
 		}
 		if (pending)
-			wakeup_softirqd(smp_processor_id());
+			wakeup_softirqd();
 		__local_bh_enable();
 	}
 
@@ -131,7 +135,7 @@ inline void raise_softirq_irqoff(unsigned int nr)
 	 * schedule the softirq soon.
 	 */
 	if (!in_interrupt())
-		wakeup_softirqd(cpu);
+		wakeup_softirqd();
 }
 
 void raise_softirq(unsigned int nr)
@@ -325,7 +329,7 @@ static int ksoftirqd(void * __bind_cpu)
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();
 
-	local_ksoftirqd_task() = current;
+	__get_cpu_var(ksoftirqd) = current;
 
 	for (;;) {
 		if (!local_softirq_pending())
@@ -354,7 +358,7 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 			return NOTIFY_BAD;
 		}
 
-		while (!ksoftirqd_task(hotcpu))
+		while (!per_cpu(ksoftirqd, hotcpu))
 			yield();
  	}
 	return NOTIFY_OK;
