@@ -41,15 +41,6 @@ config CLEAN_COMPILE
 
 	  If unsure, say Y
 
-config STANDALONE
-	bool "Select only drivers that don't need compile-time external firmware" if EXPERIMENTAL
-	default y
-	help
-	  Select this option if you don't have magic firmware for drivers that
-	  need it.
-
-	  If unsure, say Y.
-
 config BROKEN
 	bool
 	depends on !CLEAN_COMPILE

@@ -867,7 +867,7 @@ menu "Ftape, the floppy tape device driver"
 
 config FTAPE
 	tristate "Ftape (QIC-80/Travan) support"
-	depends on BROKEN_ON_SMP
+	depends on BROKEN_ON_SMP && (ALPHA || X86)
 	---help---
 	  If you have a tape drive that is connected to your floppy
 	  controller, say Y here.

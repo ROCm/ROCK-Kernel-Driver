@@ -51,7 +51,7 @@
 #include <linux/list.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
-#include <linux/irq.h>
+#include <asm/irq.h>
 #ifdef CONFIG_HIGH_RES_TIMERS
 #include <linux/hrtime.h>
 # if defined(schedule_next_int)

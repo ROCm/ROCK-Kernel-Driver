@@ -53,7 +53,7 @@ ifndef KBUILD_CHECKSRC
   KBUILD_CHECKSRC = 0
 endif
 
-# Use make M=dir to specify direcotry of external module to build
+# Use make M=dir to specify directory of external module to build
 # Old syntax make ... SUBDIRS=$PWD is still supported
 # Setting the environment variable KBUILD_EXTMOD take precedence
 ifdef SUBDIRS
@@ -129,16 +129,6 @@ _all: all
 else
 _all: modules
 endif
-
-# Make sure we're not wasting cpu-cycles doing locale handling, yet do make
-# sure error messages appear in the user-desired language
-ifdef LC_ALL
-LANG := $(LC_ALL)
-LC_ALL :=
-endif
-LC_COLLATE := C
-LC_CTYPE := C
-export LANG LC_ALL LC_COLLATE LC_CTYPE
 
 srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
 TOPDIR		:= $(srctree)
@@ -621,25 +611,44 @@ vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 
 $(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds.s: $(vmlinux-dirs) ;
 
-# 	Handle descending into subdirectories listed in $(vmlinux-dirs)
+# Handle descending into subdirectories listed in $(vmlinux-dirs)
+# Preset locale variables to speed up the build process. Limit locale
+# tweaks to this spot to avoid wrong language settings when running
+# make menuconfig etc.
+# Error messages still appears in the original language
 
 .PHONY: $(vmlinux-dirs)
 $(vmlinux-dirs): prepare-all scripts
-	$(Q)$(MAKE) $(build)=$@
+	$(Q)if [ ! -z $$LC_ALL ]; then          \
+		export LANG=$$LC_ALL;           \
+		export LC_ALL= ;                \
+	fi;                                     \
+	export LC_COLLATE=C; export LC_CTYPE=C; \
+	$(MAKE) $(build)=$@
 
 # Things we need to do before we recursively start building the kernel
 # or the modules are listed in "prepare-all".
 # A multi level approach is used. prepare1 is updated first, then prepare0.
 # prepare-all is the collection point for the prepare targets.
 
-.PHONY: prepare-all prepare prepare0 prepare1
+.PHONY: prepare-all prepare prepare0 prepare1 prepare2
+
+# prepare 2 generate Makefile to be placed in output directory, if
+# using a seperate output directory. This allows convinient use
+# of make in output directory
+prepare2:
+	$(Q)if [ ! $(srctree) -ef $(objtree) ]; then       \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile      \
+	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL) \
+	    > $(objtree)/Makefile;                         \
+	fi
 
 # prepare1 is used to check if we are building in a separate output directory,
 # and if so do:
 # 1) Check that make has not been executed in the kernel src $(srctree)
 # 2) Create the include2 directory, used for the second asm symlink
 
-prepare1:
+prepare1: prepare2
 ifneq ($(KBUILD_SRC),)
 	@echo '  Using $(srctree) as source for kernel'
 	$(Q)if [ -h $(srctree)/include/asm -o -f $(srctree)/.config ]; then \
@@ -760,9 +769,13 @@ _modinst_:
 		sleep 1; \
 	fi
 	@rm -rf $(MODLIB)/kernel
-	@rm -f $(MODLIB)/build
+	@rm -f $(MODLIB)/source
 	@mkdir -p $(MODLIB)/kernel
-	@ln -s $(TOPDIR) $(MODLIB)/build
+	@ln -s $(srctree) $(MODLIB)/source
+	@if [ ! $(objtree) -ef  $(MODLIB)/build ]; then \
+		rm -f $(MODLIB)/build ; \
+		ln -s $(objtree) $(MODLIB)/build ; \
+	fi
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
 
 # If System.map exists, run depmod.  This deliberately does not have a
@@ -1009,19 +1022,19 @@ endif # KBUILD_EXTMOD
 # ---------------------------------------------------------------------------
 
 define all-sources
-	( find . $(RCS_FIND_IGNORE) \
+	( find $(srctree) $(RCS_FIND_IGNORE) \
 	       \( -name include -o -name arch \) -prune -o \
 	       -name '*.[chS]' -print; \
-	  find arch/$(ARCH) $(RCS_FIND_IGNORE) \
+	  find $(srctree)/arch/$(ARCH) $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \
-	  find security/selinux/include $(RCS_FIND_IGNORE) \
+	  find $(srctree)/security/selinux/include $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \
-	  find include $(RCS_FIND_IGNORE) \
+	  find $(srctree)/include $(RCS_FIND_IGNORE) \
 	       \( -name config -o -name 'asm-*' \) -prune \
 	       -o -name '*.[chS]' -print; \
-	  find include/asm-$(ARCH) $(RCS_FIND_IGNORE) \
+	  find $(srctree)/include/asm-$(ARCH) $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \
-	  find include/asm-generic $(RCS_FIND_IGNORE) \
+	  find $(srctree)/include/asm-generic $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print )
 endef
 

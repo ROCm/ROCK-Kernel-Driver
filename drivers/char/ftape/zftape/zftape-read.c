@@ -154,7 +154,7 @@ int zft_fetch_segment_fraction(const unsigned int segment, void *buffer,
  * amount of data actually * copied to the user-buffer
  */
 static int zft_simple_read (int *read_cnt, 
-			    __u8  *dst_buf, 
+			    __u8  __user *dst_buf, 
 			    const int to_do, 
 			    const __u8 *src_buf, 
 			    const int seg_sz, 
@@ -252,7 +252,7 @@ static int check_read_access(int *req_len,
  * req_len: how much data should be read at most.
  * volume: contains information on current volume (blk_sz etc.)
  */  
-static int empty_deblock_buf(__u8 *usr_buf, const int req_len,
+static int empty_deblock_buf(__u8 __user *usr_buf, const int req_len,
 			     const __u8 *src_buf, const int seg_sz,
 			     zft_position *pos,
 			     const zft_volinfo *volume)
@@ -293,7 +293,7 @@ static int empty_deblock_buf(__u8 *usr_buf, const int req_len,
  * use small block-sizes. The block-size may be 1kb (SECTOR_SIZE). In
  * this case a MTFSR 28 maybe still inside the same segment.
  */
-int _zft_read(char* buff, int req_len)
+int _zft_read(char __user *buff, int req_len)
 {
 	int req_clipped;
 	int result     = 0;

@@ -167,7 +167,7 @@ static struct s_srf_evc *smt_get_evc(struct s_smc *smc, int code, int index)
 		if (evc->evc_code == code && evc->evc_index == index)
 			return(evc) ;
 	}
-	return(0) ;
+	return NULL;
 }
 
 #define THRESHOLD_2	(2*TICKS_PER_SECOND)

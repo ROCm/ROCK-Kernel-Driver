@@ -15,7 +15,7 @@ struct erase_info_user {
 struct mtd_oob_buf {
 	uint32_t start;
 	uint32_t length;
-	unsigned char *ptr;
+	unsigned char __user *ptr;
 };
 
 #define MTD_ABSENT		0

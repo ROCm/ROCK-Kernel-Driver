@@ -150,7 +150,7 @@ put_log_buffer(hysdn_card * card, char *cp)
 /* write log file -> set log level bits */
 /****************************************/
 static ssize_t
-hysdn_log_write(struct file *file, const char *buf, size_t count, loff_t * off)
+hysdn_log_write(struct file *file, const char __user *buf, size_t count, loff_t * off)
 {
 	ulong u = 0;
 	int found = 0;
@@ -203,7 +203,7 @@ hysdn_log_write(struct file *file, const char *buf, size_t count, loff_t * off)
 /* read log file */
 /******************/
 static ssize_t
-hysdn_log_read(struct file *file, char *buf, size_t count, loff_t * off)
+hysdn_log_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 {
 	struct log_data *inf;
 	int len;

@@ -52,10 +52,10 @@ extern const  ftape_info *zft_status; /* needed for zftape-vtbl.h */
 struct zft_cmpr_ops {
 	int (*write)(int *write_cnt,
 		     __u8 *dst_buf, const int seg_sz,
-		     const __u8 *src_buf, const int req_len, 
+		     const __u8 __user *src_buf, const int req_len, 
 		     const zft_position *pos, const zft_volinfo *volume);
 	int (*read)(int *read_cnt,
-		    __u8 *dst_buf, const int req_len,
+		    __u8 __user *dst_buf, const int req_len,
 		    const __u8 *src_buf, const int seg_sz,
 		    const zft_position *pos, const zft_volinfo *volume);
 	int (*seek)(unsigned int new_block_pos,

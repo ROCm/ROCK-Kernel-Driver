@@ -626,7 +626,7 @@ static void ax25_close(struct tty_struct *tty)
 
 	unregister_netdev(ax->dev);
 
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	ax->tty        = NULL;
 
 	ax_free(ax);
@@ -774,7 +774,7 @@ static void kiss_unesc(struct ax_disp *ax, unsigned char s)
 }
 
 
-static int ax_set_mac_address(struct net_device *dev, void *addr)
+static int ax_set_mac_address(struct net_device *dev, void __user *addr)
 {
 	if (copy_from_user(dev->dev_addr, addr, AX25_ADDR_LEN))
 		return -EFAULT;
@@ -792,7 +792,7 @@ static int ax_set_dev_mac_address(struct net_device *dev, void *addr)
 
 
 /* Perform I/O control on an active ax25 channel. */
-static int ax25_disp_ioctl(struct tty_struct *tty, void *file, int cmd, void *arg)
+static int ax25_disp_ioctl(struct tty_struct *tty, void *file, int cmd, void __user *arg)
 {
 	struct ax_disp *ax = (struct ax_disp *) tty->disc_data;
 	unsigned int tmp;
@@ -808,10 +808,10 @@ static int ax25_disp_ioctl(struct tty_struct *tty, void *file, int cmd, void *ar
 			return 0;
 
 		case SIOCGIFENCAP:
-			return put_user(4, (int *)arg);
+			return put_user(4, (int __user *)arg);
 
 		case SIOCSIFENCAP:
-			if (get_user(tmp, (int *)arg))
+			if (get_user(tmp, (int __user *)arg))
 				return -EFAULT;
 			ax->mode = tmp;
 			ax->dev->addr_len        = AX25_ADDR_LEN;	  /* sizeof an AX.25 addr */

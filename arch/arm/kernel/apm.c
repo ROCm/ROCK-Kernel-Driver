@@ -206,7 +206,7 @@ static int apm_suspend(void)
 	return err;
 }
 
-static ssize_t apm_read(struct file *fp, char *buf, size_t count, loff_t *ppos)
+static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct apm_user *as = fp->private_data;
 	apm_event_t event;

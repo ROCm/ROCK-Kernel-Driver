@@ -1296,21 +1296,6 @@ xprt_transmit(struct rpc_task *task)
 /*
  * Reserve an RPC call slot.
  */
-void
-xprt_reserve(struct rpc_task *task)
-{
-	struct rpc_xprt	*xprt = task->tk_xprt;
-
-	task->tk_status = -EIO;
-	if (!xprt->shutdown) {
-		spin_lock(&xprt->xprt_lock);
-		do_xprt_reserve(task);
-		spin_unlock(&xprt->xprt_lock);
-		if (task->tk_rqstp)
-			del_timer_sync(&xprt->timer);
-	}
-}
-
 static inline void
 do_xprt_reserve(struct rpc_task *task)
 {
@@ -1330,6 +1315,21 @@ do_xprt_reserve(struct rpc_task *task)
 	task->tk_status = -EAGAIN;
 	task->tk_timeout = 0;
 	rpc_sleep_on(&xprt->backlog, task, NULL, NULL);
+}
+
+void
+xprt_reserve(struct rpc_task *task)
+{
+	struct rpc_xprt	*xprt = task->tk_xprt;
+
+	task->tk_status = -EIO;
+	if (!xprt->shutdown) {
+		spin_lock(&xprt->xprt_lock);
+		do_xprt_reserve(task);
+		spin_unlock(&xprt->xprt_lock);
+		if (task->tk_rqstp)
+			del_timer_sync(&xprt->timer);
+	}
 }
 
 /*
