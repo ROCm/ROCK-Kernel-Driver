@@ -92,6 +92,7 @@ host-cshobjs	:= $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
 # Add subdir path
 
 EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
+build-targets	:= $(addprefix $(obj)/,$(build-targets))
 obj-y		:= $(addprefix $(obj)/,$(obj-y))
 obj-m		:= $(addprefix $(obj)/,$(obj-m))
 export-objs	:= $(addprefix $(obj)/,$(export-objs))
@@ -128,6 +129,12 @@ modname_flags  = $(if $(filter 1,$(words $(modname))),-DKBUILD_MODNAME=$(subst $
 c_flags        = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	         $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
 	         $(basename_flags) $(modname_flags) $(export_flags) 
+a_flags        = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS)\
+		 $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+hostc_flags    = -Wp,-MD,$(depfile) $(HOSTCFLAGS) $(HOST_EXTRACFLAGS)\
+		 $(HOSTCFLAGS_$(*F).o)
+hostcxx_flags  = -Wp,-MD,$(depfile) $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS)\
+		 $(HOSTCXXFLAGS_$(*F).o)
 
 # Finds the multi-part object the current object will be linked into
 modname-multi = $(sort $(foreach m,$(multi-used),\
@@ -139,7 +146,7 @@ modname-multi = $(sort $(foreach m,$(multi-used),\
 quiet_cmd_shipped = SHIPPED $@
 cmd_shipped = cat $< > $@
 
-%:: %_shipped
+$(obj)/%:: $(src)/%_shipped
 	$(call cmd,shipped)
 
 # Commands useful for building a boot image
@@ -236,4 +243,4 @@ endef
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
 
-descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
+descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
