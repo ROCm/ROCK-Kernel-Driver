@@ -678,6 +678,8 @@ static int __init el3_mca_probe(struct device *device) {
 		err = el3_common_init(dev);
 
 		if (err) {
+			device->driver_data = NULL;
+			free_netdev(dev);
 			return -ENOMEM;
 		}
 
@@ -737,6 +739,8 @@ static int __init el3_eisa_probe (struct device *device)
 	err = el3_common_init(dev);
 
 	if (err) {
+		eisa_set_drvdata (edev, NULL);
+		free_netdev(dev);
 		return err;
 	}
 
