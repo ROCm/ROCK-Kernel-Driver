@@ -92,6 +92,7 @@
 #include <linux/delay.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/acpi.h>
 #include <linux/apm_bios.h>
 #ifdef CONFIG_BLK_DEV_RAM
 #include <linux/blk.h>
@@ -167,8 +168,6 @@ void __init visws_get_board_type_and_rev(void);
 
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_x86_fxsr __initdata = 0;
-
-int enable_acpi_smp_table;
 
 /*
  * This is set up by the setup-routine at boot-time
@@ -642,9 +641,6 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 				add_memory_region(start_at, mem_size, E820_RAM);
 			}
 		}
-		/* acpismp=force forces parsing and use of the ACPI SMP table */
-		if (c == ' ' && !memcmp(from, "acpismp=force", 13))
-			 enable_acpi_smp_table = 1;
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
 		 * This works even on boxes that have no highmem otherwise.
@@ -869,7 +865,12 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	reserve_bootmem(PAGE_SIZE, PAGE_SIZE);
 #endif
-
+#ifdef CONFIG_ACPI_SLEEP
+	/*
+	 * Reserve low memory region for sleep support.
+	 */
+	acpi_reserve_bootmem();
+#endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
@@ -903,6 +904,15 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+#ifdef CONFIG_ACPI_BOOT
+	/*
+	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
+	 * Must do this after paging_init (due to reliance on fixmap, and thus
+	 * the bootmem allocator) but before get_smp_config (to allow parsing
+	 * of MADT).
+	 */
+	acpi_table_init(*cmdline_p);
+#endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * get boot-time SMP configuration:
