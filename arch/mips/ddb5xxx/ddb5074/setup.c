@@ -13,21 +13,23 @@
 #include <linux/console.h>
 #include <linux/sched.h>
 #include <linux/mc146818rtc.h>
-#include <linux/pc_keyb.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
+#include <linux/ioport.h>
+#include <linux/irq.h>
 
 #include <asm/addrspace.h>
 #include <asm/bcache.h>
-#include <asm/keyboard.h>
 #include <asm/irq.h>
 #include <asm/reboot.h>
 #include <asm/gdb-stub.h>
+#include <asm/time.h>
 #include <asm/nile4.h>
-#include <asm/ddb5074.h>
+#include <asm/ddb5xxx/ddb5074.h>
+#include <asm/ddb5xxx/ddb5xxx.h>
 
 
-#ifdef CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_KGDB
 extern void rs_kgdb_hook(int);
 extern void breakpoint(void);
 #endif
@@ -37,6 +39,7 @@ extern void console_setup(char *);
 #endif
 
 extern struct ide_ops std_ide_ops;
+extern struct kbd_ops std_kbd_ops;
 extern struct rtc_ops ddb_rtc_ops;
 
 static void (*back_to_prom) (void) = (void (*)(void)) 0xbfc00000;
@@ -72,11 +75,11 @@ static void ddb_machine_power_off(void)
 }
 
 extern void ddb_irq_setup(void);
+extern void rtc_ds1386_init(unsigned long base);
 
-void (*board_time_init) (struct irqaction * irq);
+extern void (*board_timer_setup) (struct irqaction * irq);
 
-
-static void __init ddb_time_init(struct irqaction *irq)
+static void __init ddb_timer_init(struct irqaction *irq)
 {
 	/* set the clock to 1 Hz */
 	nile4_out32(NILE4_T2CTRL, 1000000);
@@ -85,25 +88,31 @@ static void __init ddb_time_init(struct irqaction *irq)
 	/* reset timer */
 	nile4_out32(NILE4_T2CNTR, 0);
 	/* enable interrupt */
-	nile4_enable_irq(NILE4_INT_GPT);
-	i8259_setup_irq(nile4_to_irq(NILE4_INT_GPT), irq);
-	change_cp0_status(ST0_IM,
+	setup_irq(nile4_to_irq(NILE4_INT_GPT), irq);
+	nile4_enable_irq(nile4_to_irq(NILE4_INT_GPT));
+	change_c0_status(ST0_IM,
 		          IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4);
+
 }
+
+static void __init ddb_time_init(void)
+{
+    /* we have ds1396 RTC chip */
+	rtc_ds1386_init(KSEG1ADDR(DDB_PCI_MEM_BASE));
+}
+
+
 
 void __init ddb_setup(void)
 {
 	extern int panic_timeout;
 
 	irq_setup = ddb_irq_setup;
-	mips_io_port_base = NILE4_PCI_IO_BASE;
+	set_io_port_base(NILE4_PCI_IO_BASE);
 	isa_slot_offset = NILE4_PCI_MEM_BASE;
-	request_region(0x00, 0x20, "dma1");
-	request_region(0x40, 0x20, "timer");
-	request_region(0x70, 0x10, "rtc");
-	request_region(0x80, 0x10, "dma page reg");
-	request_region(0xc0, 0x20, "dma2");
+	board_timer_setup = ddb_timer_init;
 	board_time_init = ddb_time_init;
+
 
 	_machine_restart = ddb_machine_restart;
 	_machine_halt = ddb_machine_halt;
@@ -112,7 +121,17 @@ void __init ddb_setup(void)
 #ifdef CONFIG_BLK_DEV_IDE
 	ide_ops = &std_ide_ops;
 #endif
+
 	rtc_ops = &ddb_rtc_ops;
+
+    ddb_out32(DDB_BAR0, 0);
+
+	ddb_set_pmr(DDB_PCIINIT0, DDB_PCICMD_IO, 0, 0x10);
+	ddb_set_pmr(DDB_PCIINIT1, DDB_PCICMD_MEM, DDB_PCI_MEM_BASE , 0x10);
+
+#ifdef CONFIG_FB
+    conswitchp = &dummy_con;
+#endif
 
 	/* Reboot on panic */
 	panic_timeout = 180;

@@ -3,6 +3,6 @@
 # under Linux.
 #
 
-EXTRA_AFLAGS := $(CFLAGS)
+obj-y			+= setup.o irq.o int-handler.o nile4_pic.o time.o
 
-obj-y	:= setup.o irq.o time.o prom.o pci.o int-handler.o nile4.o
+EXTRA_AFLAGS := $(CFLAGS)

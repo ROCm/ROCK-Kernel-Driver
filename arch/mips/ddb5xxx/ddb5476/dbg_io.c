@@ -1,5 +1,5 @@
 /*
- * kgdb io functions for DDB5477.  We use the second serial port (upper one).
+ * kgdb io functions for DDB5476.  We use the second serial port.
  *
  * Copyright (C) 2001 MontaVista Software Inc.
  * Author: jsun@mvista.com or jsun@junsun.net
@@ -14,11 +14,11 @@
 /* ======================= CONFIG ======================== */
 
 /* [jsun] we use the second serial port for kdb */
-#define         BASE                    0xbfa04240
+#define         BASE                    0xa60002f8
 #define         MAX_BAUD                115200
 
 /* distance in bytes between two serial registers */
-#define         REG_OFFSET              8
+#define         REG_OFFSET              1
 
 /*
  * 0 - kgdb does serial init

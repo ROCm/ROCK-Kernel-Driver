@@ -18,7 +18,6 @@
 #define __ASM_DDB5XXX_DDB5477_H
 
 #include <linux/config.h>
-#include <asm/ddb5xxx/ddb5xxx.h>
 
 /*
  * This contains macros that are specific to DDB5477 or renamed from
@@ -28,9 +27,9 @@
 /*
  * renamed PADRs
  */
-#define	DDB_LCS0	DDB_LDCS0
-#define	DDB_LCS1	DDB_LDCS1
-#define	DDB_LCS2	DDB_LDCS2
+#define	DDB_LCS0	DDB_DCS2
+#define	DDB_LCS1	DDB_DCS3
+#define	DDB_LCS2	DDB_DCS4
 #define	DDB_VRC5477	DDB_INTCS
 
 /*
@@ -173,8 +172,10 @@
  *  corresponding size.  For example, if PCI_IO_SIZE is 16MB, then
  *  PCI_IO_BASE must be aligned along 16MB boundary.
  */
+
+/* the actual ram size is detected at run-time */
 #define	DDB_SDRAM_BASE		0x00000000
-#define	DDB_SDRAM_SIZE		0x08000000	/* 128MB, for sure? */
+#define	DDB_MAX_SDRAM_SIZE	0x08000000	/* less than 128MB */
 
 #define	DDB_PCI0_MEM_BASE	0x08000000
 #define	DDB_PCI0_MEM_SIZE	0x08000000	/* 128 MB */
@@ -215,6 +216,7 @@
 /*
  * DDB5477 specific functions
  */
+#ifndef __ASSEMBLY__
 extern void ddb5477_irq_setup(void);
 
 /* route irq to cpu int pin */
@@ -223,16 +225,122 @@ extern void ll_vrc5477_irq_route(int vrc5477_irq, int ip);
 /* low-level routine for enabling vrc5477 irq, bypassing high-level */
 extern void ll_vrc5477_irq_enable(int vrc5477_irq);
 extern void ll_vrc5477_irq_disable(int vrc5477_irq);
+#endif /* !__ASSEMBLY__ */
+
+/* PCI intr ack share PCIW0 with PCI IO */
+#define	DDB_PCI_IACK_BASE	DDB_PCI_IO_BASE
+
+/*
+ * Interrupt mapping
+ *
+ * We have three interrupt controllers:
+ *
+ *   . CPU itself - 8 sources
+ *   . i8259 - 16 sources
+ *   . vrc5477 - 32 sources
+ *
+ *  They connected as follows:
+ *    all vrc5477 interrupts are routed to cpu IP2 (by software setting)
+ *    all i8359 are routed to INTC in vrc5477 (by hardware connection)
+ *
+ *  All VRC5477 PCI interrupts are level-triggered (no ack needed).
+ *  All PCI irq but INTC are active low.
+ */
 
 /* 
+ * irq number block assignment
+ */
+
+#define	NUM_CPU_IRQ		8
+#define	NUM_I8259_IRQ		16
+#define	NUM_VRC5477_IRQ		32
+
+#define	DDB_IRQ_BASE		0
+
+#define	I8259_IRQ_BASE		DDB_IRQ_BASE
+#define	VRC5477_IRQ_BASE	(I8259_IRQ_BASE + NUM_I8259_IRQ)
+#define	CPU_IRQ_BASE		(VRC5477_IRQ_BASE + NUM_VRC5477_IRQ)
+
+/*
+ * vrc5477 irq defs
+ */
+
+#define VRC5477_IRQ_CPCE	(0 + VRC5477_IRQ_BASE)	/* cpu parity error */
+#define VRC5477_IRQ_CNTD	(1 + VRC5477_IRQ_BASE)	/* cpu no target */
+#define VRC5477_IRQ_I2C		(2 + VRC5477_IRQ_BASE)	/* I2C */
+#define VRC5477_IRQ_DMA		(3 + VRC5477_IRQ_BASE)	/* DMA */
+#define VRC5477_IRQ_UART0	(4 + VRC5477_IRQ_BASE)
+#define VRC5477_IRQ_WDOG	(5 + VRC5477_IRQ_BASE)	/* watchdog timer */
+#define VRC5477_IRQ_SPT1	(6 + VRC5477_IRQ_BASE)    /* special purpose timer 1 */
+#define VRC5477_IRQ_LBRT	(7 + VRC5477_IRQ_BASE)	/* local bus read timeout */
+#define VRC5477_IRQ_INTA	(8 + VRC5477_IRQ_BASE)	/* PCI INT #A */
+#define VRC5477_IRQ_INTB	(9 + VRC5477_IRQ_BASE)	/* PCI INT #B */
+#define VRC5477_IRQ_INTC	(10 + VRC5477_IRQ_BASE)	/* PCI INT #C */
+#define VRC5477_IRQ_INTD	(11 + VRC5477_IRQ_BASE)	/* PCI INT #D */
+#define VRC5477_IRQ_INTE	(12 + VRC5477_IRQ_BASE)	/* PCI INT #E */
+#define VRC5477_IRQ_RESERVED_13	(13 + VRC5477_IRQ_BASE)	/* reserved  */
+#define VRC5477_IRQ_PCIS	(14 + VRC5477_IRQ_BASE)	/* PCI SERR #  */
+#define VRC5477_IRQ_PCI		(15 + VRC5477_IRQ_BASE)	/* PCI internal error */
+#define VRC5477_IRQ_IOPCI_INTA	(16 + VRC5477_IRQ_BASE)      /* USB-H */
+#define VRC5477_IRQ_IOPCI_INTB	(17 + VRC5477_IRQ_BASE)      /* USB-P */
+#define VRC5477_IRQ_IOPCI_INTC	(18 + VRC5477_IRQ_BASE)      /* AC97 */
+#define VRC5477_IRQ_IOPCI_INTD	(19 + VRC5477_IRQ_BASE)      /* Reserved */
+#define VRC5477_IRQ_UART1	(20 + VRC5477_IRQ_BASE)     
+#define VRC5477_IRQ_SPT0	(21 + VRC5477_IRQ_BASE)      /* special purpose timer 0 */
+#define VRC5477_IRQ_GPT0	(22 + VRC5477_IRQ_BASE)      /* general purpose timer 0 */
+#define VRC5477_IRQ_GPT1	(23 + VRC5477_IRQ_BASE)      /* general purpose timer 1 */
+#define VRC5477_IRQ_GPT2	(24 + VRC5477_IRQ_BASE)      /* general purpose timer 2 */
+#define VRC5477_IRQ_GPT3	(25 + VRC5477_IRQ_BASE)      /* general purpose timer 3 */
+#define VRC5477_IRQ_GPIO	(26 + VRC5477_IRQ_BASE)
+#define VRC5477_IRQ_SIO0	(27 + VRC5477_IRQ_BASE)
+#define VRC5477_IRQ_SIO1        (28 + VRC5477_IRQ_BASE)
+#define VRC5477_IRQ_RESERVED_29 (29 + VRC5477_IRQ_BASE)      /* reserved */
+#define VRC5477_IRQ_IOPCISERR	(30 + VRC5477_IRQ_BASE)      /* IO PCI SERR # */
+#define VRC5477_IRQ_IOPCI	(31 + VRC5477_IRQ_BASE)
+
+/*
+ * i2859 irq assignment
+ */
+#define I8259_IRQ_RESERVED_0	(0 + I8259_IRQ_BASE)	
+#define I8259_IRQ_KEYBOARD	(1 + I8259_IRQ_BASE)	/* M1543 default */
+#define I8259_IRQ_CASCADE	(2 + I8259_IRQ_BASE)
+#define I8259_IRQ_UART_B	(3 + I8259_IRQ_BASE)	/* M1543 default, may conflict with RTC according to schematic diagram  */
+#define I8259_IRQ_UART_A	(4 + I8259_IRQ_BASE)	/* M1543 default */
+#define I8259_IRQ_PARALLEL	(5 + I8259_IRQ_BASE)	/* M1543 default */
+#define I8259_IRQ_RESERVED_6	(6 + I8259_IRQ_BASE)
+#define I8259_IRQ_RESERVED_7	(7 + I8259_IRQ_BASE)
+#define I8259_IRQ_RTC		(8 + I8259_IRQ_BASE)	/* who set this? */
+#define I8259_IRQ_USB		(9 + I8259_IRQ_BASE)	/* ddb_setup */
+#define I8259_IRQ_PMU		(10 + I8259_IRQ_BASE)	/* ddb_setup */
+#define I8259_IRQ_RESERVED_11	(11 + I8259_IRQ_BASE)
+#define I8259_IRQ_RESERVED_12	(12 + I8259_IRQ_BASE)	/* m1543_irq_setup */
+#define I8259_IRQ_RESERVED_13	(13 + I8259_IRQ_BASE)
+#define I8259_IRQ_HDC1		(14 + I8259_IRQ_BASE)	/* default and ddb_setup */
+#define I8259_IRQ_HDC2		(15 + I8259_IRQ_BASE)	/* default */
+
+
+/*
+ * misc
+ */
+#define	VRC5477_I8259_CASCADE	(VRC5477_IRQ_INTC - VRC5477_IRQ_BASE)
+#define	CPU_VRC5477_CASCADE	2
+
+/*
  * debug routines
  */
-#if defined(CONFIG_LL_DEBUG)
+#ifndef __ASSEMBLY__
+#if defined(CONFIG_RUNTIME_DEBUG)
 extern void vrc5477_show_pdar_regs(void);
 extern void vrc5477_show_pci_regs(void);
 extern void vrc5477_show_bar_regs(void);
 extern void vrc5477_show_int_regs(void);
 extern void vrc5477_show_all_regs(void);
 #endif
+
+/*
+ * RAM size
+ */
+extern int board_ram_size;
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_DDB5XXX_DDB5477_H */

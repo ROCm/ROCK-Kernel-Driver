@@ -13,31 +13,37 @@
 #include <linux/console.h>
 #include <linux/sched.h>
 #include <linux/mc146818rtc.h>
-#include <linux/pc_keyb.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
 
 #include <asm/addrspace.h>
 #include <asm/bcache.h>
-#include <asm/keyboard.h>
 #include <asm/irq.h>
 #include <asm/reboot.h>
 #include <asm/gdb-stub.h>
-#include <asm/nile4.h>
 #include <asm/time.h>
+#include <asm/debug.h>
+#include <asm/traps.h>
 
+#include <asm/ddb5xxx/ddb5xxx.h>
 
-#ifdef CONFIG_REMOTE_DEBUG
-extern void rs_kgdb_hook(int);
+// #define USE_CPU_COUNTER_TIMER	/* whether we use cpu counter */
+
+#ifdef USE_CPU_COUNTER_TIMER
+
+#define CPU_COUNTER_FREQUENCY           83000000
+#else
+/* otherwise we use general purpose timer */
+#define TIMER_FREQUENCY			83000000
+#define TIMER_BASE			DDB_T2CTRL
+#define TIMER_IRQ			(VRC5476_IRQ_BASE + VRC5476_IRQ_GPT)
+#endif
+
+#ifdef CONFIG_KGDB
 extern void breakpoint(void);
 #endif
 
-#if defined(CONFIG_SERIAL_CONSOLE)
-extern void console_setup(char *);
-#endif
-
 extern struct ide_ops std_ide_ops;
-extern struct rtc_ops ddb_rtc_ops;
 extern struct kbd_ops std_kbd_ops;
 
 static void (*back_to_prom) (void) = (void (*)(void)) 0xbfc00000;
@@ -47,59 +53,62 @@ static void ddb_machine_restart(char *command)
 	u32 t;
 
 	/* PCI cold reset */
-	t = nile4_in32(NILE4_PCICTRL + 4);
+	t = ddb_in32(DDB_PCICTRL + 4);
 	t |= 0x40000000;
-	nile4_out32(NILE4_PCICTRL + 4, t);
+	ddb_out32(DDB_PCICTRL + 4, t);
 	/* CPU cold reset */
-	t = nile4_in32(NILE4_CPUSTAT);
+	t = ddb_in32(DDB_CPUSTAT);
 	t |= 1;
-	nile4_out32(NILE4_CPUSTAT, t);
+	ddb_out32(DDB_CPUSTAT, t);
 	/* Call the PROM */
 	back_to_prom();
 }
 
 static void ddb_machine_halt(void)
 {
-	printk("DDB Vrc-5476 halted.\n");
+	printk(KERN_NOTICE "DDB Vrc-5476 halted.\n");
 	while (1);
 }
 
 static void ddb_machine_power_off(void)
 {
-	printk("DDB Vrc-5476 halted. Please turn off the power.\n");
+	printk(KERN_NOTICE "DDB Vrc-5476 halted. Please turn off the power.\n");
 	while (1);
 }
 
 extern void ddb_irq_setup(void);
+extern void rtc_ds1386_init(unsigned long base);
 
-static void __init ddb_time_init(struct irqaction *irq)
+static void __init ddb_time_init(void)
 {
-	printk("ddb_time_init invoked.\n");
-	mips_counter_frequency = 83000000;
+#if defined(USE_CPU_COUNTER_TIMER)
+	mips_counter_frequency = CPU_COUNTER_FREQUENCY;
+#endif
+
+	/* we have ds1396 RTC chip */
+	rtc_ds1386_init(KSEG1ADDR(DDB_PCI_MEM_BASE));
 }
 
+
+extern int setup_irq(unsigned int irq, struct irqaction *irqaction);
 static void __init ddb_timer_setup(struct irqaction *irq)
 {
+#if defined(USE_CPU_COUNTER_TIMER)
+
 	unsigned int count;
 
 	/* we are using the cpu counter for timer interrupts */
-	i8259_setup_irq(0, irq);
-	set_cp0_status(IE_IRQ5);
+	setup_irq(CPU_IRQ_BASE + 7, irq);
 
 	/* to generate the first timer interrupt */
-	count = read_32bit_cp0_register(CP0_COUNT);
-	write_32bit_cp0_register(CP0_COMPARE, count + 1000);
+	count = read_c0_count();
+	write_c0_compare(count + 1000);
 
-#if 0		/* the old way to do timer interrupt */
-	/* set the clock to 100 Hz */
-	nile4_out32(NILE4_T2CTRL, 830000);
-	/* enable the General-Purpose Timer */
-	nile4_out32(NILE4_T2CTRL + 4, 0x00000001);
-	/* reset timer */
-	nile4_out32(NILE4_T2CNTR, 0);
-	/* enable interrupt */
-	nile4_enable_irq(NILE4_INT_GPT);
-	i8259_setup_irq(nile4_to_irq(NILE4_INT_GPT), irq);
+#else
+
+	ddb_out32(TIMER_BASE, TIMER_FREQUENCY/HZ);
+	ddb_out32(TIMER_BASE+4, 0x1);	/* enable timer */
+	setup_irq(TIMER_IRQ, irq);
 #endif
 }
 
@@ -125,16 +134,21 @@ static struct {
 static struct {
 	struct resource nile4;
 } ddb5476_iomem = {
-	{ "Nile 4", NILE4_BASE, NILE4_BASE + NILE4_SIZE - 1, IORESOURCE_BUSY}
+	{ "Nile 4", DDB_BASE, DDB_BASE + DDB_SIZE - 1, IORESOURCE_BUSY}
 };
 
-void __init ddb_setup(void)
+
+static void ddb5476_board_init(void);
+extern void ddb5476_irq_setup(void);
+extern void (*irq_setup)(void);
+
+void __init
+ddb_setup(void)
 {
 	extern int panic_timeout;
 
-	irq_setup = ddb_irq_setup;
-	mips_io_port_base = NILE4_PCI_IO_BASE;
-	isa_slot_offset = NILE4_PCI_MEM_BASE;
+	irq_setup = ddb5476_irq_setup;
+	set_io_port_base(KSEG1ADDR(DDB_PCI_IO_BASE));
 
 	board_time_init = ddb_time_init;
 	board_timer_setup = ddb_timer_setup;
@@ -160,11 +174,6 @@ void __init ddb_setup(void)
 #ifdef CONFIG_BLK_DEV_IDE
 	ide_ops = &std_ide_ops;
 #endif
-	rtc_ops = &ddb_rtc_ops;
-
-#ifdef CONFIG_PC_KEYB
-	kbd_ops = &std_kbd_ops;
-#endif
 
 	/* Reboot on panic */
 	panic_timeout = 180;
@@ -176,19 +185,74 @@ void __init ddb_setup(void)
 	conswitchp = &dummy_con;
 #endif
 
+	/* board initialization stuff */
+	ddb5476_board_init();
+}
 
-	/* board initialization stuff - non-fundamental, but need to be set
-	 * before kernel runs */
+/*
+ * We don't trust bios.  We essentially does hardware re-initialization
+ * as complete as possible, as far as we know we can safely do.
+ */
+static void ddb5476_board_init(void)
+{
+	/* ----------- setup PDARs ------------ */
+	/* check SDRAM0, whether we are on MEM bus does not matter */
+	db_assert((ddb_in32(DDB_SDRAM0) & 0xffffffef) ==
+		  ddb_calc_pdar(DDB_SDRAM_BASE, DDB_SDRAM_SIZE, 32, 0, 1));
 
-	/* setup I/O space */
-	nile4_set_pdar(NILE4_PCIW0,
-		       PHYSADDR(NILE4_PCI_IO_BASE), 0x02000000, 32, 0, 0);
-	nile4_set_pmr(NILE4_PCIINIT0, NILE4_PCICMD_IO, 0);
+	/* SDRAM1 should be turned off.  What is this for anyway ? */
+	db_assert( (ddb_in32(DDB_SDRAM1) & 0xf) == 0);
 
-	/* map config space to 0xa8000000, 128MB */
-	nile4_set_pdar(NILE4_PCIW1,
-		       PHYSADDR(NILE4_PCI_CFG_BASE), 0x08000000, 32, 0, 0);
-	nile4_set_pmr(NILE4_PCIINIT1, NILE4_PCICMD_CFG, 0x0);
+	/* flash 1&2, DDB status, DDB control */
+	ddb_set_pdar(DDB_DCS2, DDB_DCS2_BASE, DDB_DCS2_SIZE, 16, 0, 0);
+	ddb_set_pdar(DDB_DCS3, DDB_DCS3_BASE, DDB_DCS3_SIZE, 16, 0, 0);
+	ddb_set_pdar(DDB_DCS4, DDB_DCS4_BASE, DDB_DCS4_SIZE, 8, 0, 0);
+	ddb_set_pdar(DDB_DCS5, DDB_DCS5_BASE, DDB_DCS5_SIZE, 8, 0, 0);
+
+	/* shut off other pdar so they don't accidentally get into the way */
+	ddb_set_pdar(DDB_DCS6, 0xffffffff, 0, 32, 0, 0);
+	ddb_set_pdar(DDB_DCS7, 0xffffffff, 0, 32, 0, 0);
+	ddb_set_pdar(DDB_DCS8, 0xffffffff, 0, 32, 0, 0);
+
+	/* verify VRC5477 base addr */
+	/* don't care about some details */
+	db_assert((ddb_in32(DDB_INTCS) & 0xffffff0f) ==
+		  ddb_calc_pdar(DDB_INTCS_BASE, DDB_INTCS_SIZE, 8, 0, 0));
+
+	/* verify BOOT ROM addr */
+	/* don't care about some details */
+	db_assert((ddb_in32(DDB_BOOTCS) & 0xffffff0f) ==
+		  ddb_calc_pdar(DDB_BOOTCS_BASE, DDB_BOOTCS_SIZE, 8, 0, 0));
+
+	/* setup PCI windows - window1 for MEM/config, window0 for IO */
+	ddb_set_pdar(DDB_PCIW0, DDB_PCI_IO_BASE, DDB_PCI_IO_SIZE, 32, 0, 1);
+	ddb_set_pmr(DDB_PCIINIT0, DDB_PCICMD_IO, 0, DDB_PCI_ACCESS_32);
+
+	ddb_set_pdar(DDB_PCIW1, DDB_PCI_MEM_BASE, DDB_PCI_MEM_SIZE, 32, 0, 1);
+	ddb_set_pmr(DDB_PCIINIT1, DDB_PCICMD_MEM, DDB_PCI_MEM_BASE, DDB_PCI_ACCESS_32);
+
+	/* ----------- setup PDARs ------------ */
+	/* this is problematic - it will reset Aladin which cause we loose
+	 * serial port, and we don't know how to set up Aladin chip again.
+	 */
+	// ddb_pci_reset_bus();
+
+	ddb_out32(DDB_BAR0, 0x00000008);
+
+	ddb_out32(DDB_BARC, 0xffffffff);
+	ddb_out32(DDB_BARB, 0xffffffff);
+	ddb_out32(DDB_BAR1, 0xffffffff);
+	ddb_out32(DDB_BAR2, 0xffffffff);
+	ddb_out32(DDB_BAR3, 0xffffffff);
+	ddb_out32(DDB_BAR4, 0xffffffff);
+	ddb_out32(DDB_BAR5, 0xffffffff);
+	ddb_out32(DDB_BAR6, 0xffffffff);
+	ddb_out32(DDB_BAR7, 0xffffffff);
+	ddb_out32(DDB_BAR8, 0xffffffff);
+
+	/* ----------- switch PCI1 to PCI CONFIG space  ------------ */
+	ddb_set_pdar(DDB_PCIW1, DDB_PCI_CONFIG_BASE, DDB_PCI_CONFIG_SIZE, 32, 0, 1);
+	ddb_set_pmr(DDB_PCIINIT1, DDB_PCICMD_CFG, 0x0, DDB_PCI_ACCESS_32);
 
 	/* ----- M1543 PCI setup ------ */
 
@@ -200,9 +264,9 @@ void __init ddb_setup(void)
 	/* setup USB interrupt to IRQ 9, (bit 0:3 - 0001)
 	 * no IOCHRDY signal, (bit 7 - 1)
 	 * M1543C & M7101 VID and Subsys Device ID are read-only (bit 6 - 1)
-	 * Bypass USB Master INTAJ level to edge conversion (bit 4 - 0)
+	 * Make USB Master INTAJ level to edge conversion (bit 4 - 1)
 	 */
-	*(unsigned char *) 0xa8040074 = 0xc1;
+	*(unsigned char *) 0xa8040074 = 0xd1;
 
 	/* setup PMU(SCI to IRQ 10 (bit 0:3 - 0011)
 	 * SCI routing to IRQ 13 disabled (bit 7 - 1)
@@ -256,138 +320,7 @@ void __init ddb_setup(void)
 
 	/* ----- end of reset on-board ether chip  ------ */
 
-	/* ----- set pci window 1 to pci memory space -------- */
-	nile4_set_pdar(NILE4_PCIW1,
-		       PHYSADDR(NILE4_PCI_MEM_BASE), 0x08000000, 32, 0, 0);
-	// nile4_set_pmr(NILE4_PCIINIT1, NILE4_PCICMD_MEM, 0);
-	nile4_set_pmr(NILE4_PCIINIT1, NILE4_PCICMD_MEM, 0x08000000);
-
-}
-
-#define USE_NILE4_SERIAL	0
-
-#if USE_NILE4_SERIAL
-#define ns16550_in(reg)		nile4_in8((reg)*8)
-#define ns16550_out(reg, val)	nile4_out8((reg)*8, (val))
-#else
-#define NS16550_BASE		(NILE4_PCI_IO_BASE+0x03f8)
-static inline u8 ns16550_in(u32 reg)
-{
-	return *(volatile u8 *) (NS16550_BASE + reg);
-}
-
-static inline void ns16550_out(u32 reg, u8 val)
-{
-	*(volatile u8 *) (NS16550_BASE + reg) = val;
-}
-#endif
-
-#define NS16550_RBR		0
-#define NS16550_THR		0
-#define NS16550_DLL		0
-#define NS16550_IER		1
-#define NS16550_DLM		1
-#define NS16550_FCR		2
-#define NS16550_IIR		2
-#define NS16550_LCR		3
-#define NS16550_MCR		4
-#define NS16550_LSR		5
-#define NS16550_MSR		6
-#define NS16550_SCR		7
-
-#define NS16550_LSR_DR		0x01	/* Data ready */
-#define NS16550_LSR_OE		0x02	/* Overrun */
-#define NS16550_LSR_PE		0x04	/* Parity error */
-#define NS16550_LSR_FE		0x08	/* Framing error */
-#define NS16550_LSR_BI		0x10	/* Break */
-#define NS16550_LSR_THRE	0x20	/* Xmit holding register empty */
-#define NS16550_LSR_TEMT	0x40	/* Xmitter empty */
-#define NS16550_LSR_ERR		0x80	/* Error */
-
-
-void _serinit(void)
-{
-#if USE_NILE4_SERIAL
-	ns16550_out(NS16550_LCR, 0x80);
-	ns16550_out(NS16550_DLM, 0x00);
-	ns16550_out(NS16550_DLL, 0x36);	/* 9600 baud */
-	ns16550_out(NS16550_LCR, 0x00);
-	ns16550_out(NS16550_LCR, 0x03);
-	ns16550_out(NS16550_FCR, 0x47);
-#else
-	/* done by PMON */
-#endif
-}
-
-void _putc(char c)
-{
-	while (!(ns16550_in(NS16550_LSR) & NS16550_LSR_THRE));
-	ns16550_out(NS16550_THR, c);
-	if (c == '\n') {
-		while (!(ns16550_in(NS16550_LSR) & NS16550_LSR_THRE));
-		ns16550_out(NS16550_THR, '\r');
-	}
-}
-
-void _puts(const char *s)
-{
-	char c;
-
-	while ((c = *s++))
-		_putc(c);
-}
-
-char _getc(void)
-{
-	while (!(ns16550_in(NS16550_LSR) & NS16550_LSR_DR));
-
-	return ns16550_in(NS16550_RBR);
-}
-
-int _testc(void)
-{
-	return (ns16550_in(NS16550_LSR) & NS16550_LSR_DR) != 0;
-}
-
-
-/*
- *  Hexadecimal 7-segment LED
- */
-void ddb5476_led_hex(int hex)
-{
-	outb(hex, 0x80);
-}
-
-
-/*
- *  LEDs D2 and D3, connected to the GPIO pins of the PMU in the ALi M1543
- */
-struct pci_dev *pci_pmu = NULL;
-
-void ddb5476_led_d2(int on)
-{
-	u8 t;
-
-	if (pci_pmu) {
-		pci_read_config_byte(pci_pmu, 0x7e, &t);
-		if (on)
-			t &= 0x7f;
-		else
-			t |= 0x80;
-		pci_write_config_byte(pci_pmu, 0x7e, t);
-	}
-}
-
-void ddb5476_led_d3(int on)
-{
-	u8 t;
-
-	if (pci_pmu) {
-		pci_read_config_byte(pci_pmu, 0x7e, &t);
-		if (on)
-			t &= 0xbf;
-		else
-			t |= 0x40;
-		pci_write_config_byte(pci_pmu, 0x7e, t);
-	}
+	/* ----------- switch PCI1 back to PCI MEM space  ------------ */
+	ddb_set_pdar(DDB_PCIW1, DDB_PCI_MEM_BASE, DDB_PCI_MEM_SIZE, 32, 0, 1);
+	ddb_set_pmr(DDB_PCIINIT1, DDB_PCICMD_MEM, DDB_PCI_MEM_BASE, DDB_PCI_ACCESS_32);
 }

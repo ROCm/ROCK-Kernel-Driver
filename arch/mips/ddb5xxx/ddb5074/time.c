@@ -3,21 +3,22 @@
  *
  *  Copyright (C) 2000 Geert Uytterhoeven <geert@sonycom.com>
  *                     Sony Software Development Center Europe (SDCE), Brussels
+ *
  */
 #include <linux/init.h>
-
 #include <asm/mc146818rtc.h>
+#include <asm/ddb5xxx/ddb5074.h>
+#include <asm/ddb5xxx/ddb5xxx.h>
+
 
 static unsigned char ddb_rtc_read_data(unsigned long addr)
 {
-	outb_p(addr, RTC_PORT(0));
-	return inb_p(RTC_PORT(1));
+	return *(volatile unsigned char *)(KSEG1ADDR(DDB_PCI_MEM_BASE)+addr);
 }
 
 static void ddb_rtc_write_data(unsigned char data, unsigned long addr)
 {
-	outb_p(addr, RTC_PORT(0));
-	outb_p(data, RTC_PORT(1));
+ 	*(volatile unsigned char *)(KSEG1ADDR(DDB_PCI_MEM_BASE)+addr)=data;
 }
 
 static int ddb_rtc_bcd_mode(void)
