@@ -281,7 +281,7 @@ static int dsp_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t dsp_read(struct file *file, char *buffer,
+static ssize_t dsp_read(struct file *file, char __user *buffer,
 			size_t count, loff_t *ppos)
 {
 	struct saa7134_dev *dev = file->private_data;
@@ -354,7 +354,7 @@ static ssize_t dsp_read(struct file *file, char *buffer,
 	return ret;
 }
 
-static ssize_t dsp_write(struct file *file, const char *buffer,
+static ssize_t dsp_write(struct file *file, const char __user *buffer,
 			 size_t count, loff_t *ppos)
 {
 	return -EINVAL;
@@ -364,25 +364,27 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
 	struct saa7134_dev *dev = file->private_data;
+	void __user *argp = (void __user *) arg;
+	int __user *p = argp;
 	int val = 0;
 	
 	if (oss_debug > 1)
 		saa7134_print_ioctl(dev->name,cmd);
         switch (cmd) {
         case OSS_GETVERSION:
-                return put_user(SOUND_VERSION, (int *)arg);
+                return put_user(SOUND_VERSION, p);
         case SNDCTL_DSP_GETCAPS:
 		return 0;
 
         case SNDCTL_DSP_SPEED:
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		/* fall through */
         case SOUND_PCM_READ_RATE:
-		return put_user(dev->oss.rate, (int*)arg);
+		return put_user(dev->oss.rate, p);
 
         case SNDCTL_DSP_STEREO:
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		down(&dev->oss.lock);
 		dev->oss.channels = val ? 2 : 1;
@@ -391,10 +393,10 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 			dsp_rec_start(dev);
 		}
 		up(&dev->oss.lock);
-		return put_user(dev->oss.channels-1, (int *)arg);
+		return put_user(dev->oss.channels-1, p);
 
         case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != 1 && val != 2)
 			return -EINVAL;
@@ -407,15 +409,15 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		up(&dev->oss.lock);
 		/* fall through */
         case SOUND_PCM_READ_CHANNELS:
-		return put_user(dev->oss.channels, (int *)arg);
+		return put_user(dev->oss.channels, p);
 		
         case SNDCTL_DSP_GETFMTS: /* Returns a mask */
 		return put_user(AFMT_U8     | AFMT_S8     |
 				AFMT_U16_LE | AFMT_U16_BE |
-				AFMT_S16_LE | AFMT_S16_BE, (int*)arg);
+				AFMT_S16_LE | AFMT_S16_BE, p);
 
         case SNDCTL_DSP_SETFMT: /* Selects ONE fmt */
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		switch (val) {
 		case AFMT_QUERY:
@@ -434,7 +436,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 				dsp_rec_start(dev);
 			}
 			up(&dev->oss.lock);
-			return put_user(dev->oss.afmt,(int*)arg);
+			return put_user(dev->oss.afmt, p);
 		default:
 			return -EINVAL;
 		}
@@ -443,12 +445,12 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		switch (dev->oss.afmt) {
 		case AFMT_U8:
 		case AFMT_S8:
-			return put_user(8, (int*)arg);
+			return put_user(8, p);
 		case AFMT_U16_LE:
 		case AFMT_U16_BE:
 		case AFMT_S16_LE:
 		case AFMT_S16_BE:
-			return put_user(16, (int*)arg);
+			return put_user(16, p);
 		default:
 			return -EINVAL;
 		}
@@ -464,15 +466,16 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		up(&dev->oss.lock);
 		return 0;
         case SNDCTL_DSP_GETBLKSIZE:
-		return put_user(dev->oss.blksize,(int*)arg);
+		return put_user(dev->oss.blksize, p);
 
         case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (dev->oss.recording_on)
 			return -EBUSY;
 		dsp_buffer_free(dev);
-		dsp_buffer_conf(dev,1 << (val & 0xffff), (arg >> 16) & 0xffff);
+		/* used to be arg >> 16 instead of val >> 16; fixed */
+		dsp_buffer_conf(dev,1 << (val & 0xffff), (val >> 16) & 0xffff);
 		dsp_buffer_init(dev);
 		return 0;
 
@@ -487,7 +490,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		info.fragstotal = dev->oss.blocks;
 		info.bytes      = dev->oss.read_count;
 		info.fragments  = info.bytes / info.fragsize;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user(argp, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -648,12 +651,14 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 	struct saa7134_dev *dev = file->private_data;
 	enum saa7134_audio_in input;
 	int val,ret;
+	void __user *argp = (void __user *) arg;
+	int __user *p = argp;
 	
 	if (oss_debug > 1)
 		saa7134_print_ioctl(dev->name,cmd);
         switch (cmd) {
         case OSS_GETVERSION:
-                return put_user(SOUND_VERSION, (int *)arg);
+                return put_user(SOUND_VERSION, p);
 	case SOUND_MIXER_INFO:
 	{
 		mixer_info info;
@@ -661,7 +666,7 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
                 strlcpy(info.id,   "TV audio", sizeof(info.id));
                 strlcpy(info.name, dev->name,  sizeof(info.name));
                 info.modify_counter = dev->oss.count;
-                if (copy_to_user((void *)arg, &info, sizeof(info)))
+                if (copy_to_user(argp, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;
 	}
@@ -671,23 +676,23 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 		memset(&info,0,sizeof(info));
                 strlcpy(info.id,   "TV audio", sizeof(info.id));
                 strlcpy(info.name, dev->name,  sizeof(info.name));
-                if (copy_to_user((void *)arg, &info, sizeof(info)))
+                if (copy_to_user(argp, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;
 	}
 	case MIXER_READ(SOUND_MIXER_CAPS):
-		return put_user(SOUND_CAP_EXCL_INPUT,(int*)arg);
+		return put_user(SOUND_CAP_EXCL_INPUT, p);
 	case MIXER_READ(SOUND_MIXER_STEREODEVS):
-		return put_user(0,(int*)arg);
+		return put_user(0, p);
 	case MIXER_READ(SOUND_MIXER_RECMASK):
 	case MIXER_READ(SOUND_MIXER_DEVMASK):
 		val = SOUND_MASK_LINE1 | SOUND_MASK_LINE2;
 		if (32000 == dev->oss.rate)
 			val |= SOUND_MASK_VIDEO;
-		return put_user(val,(int*)arg);
+		return put_user(val, p);
 
 	case MIXER_WRITE(SOUND_MIXER_RECSRC):
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		input = dev->oss.input;
 		if (32000 == dev->oss.rate  &&
@@ -707,16 +712,16 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 		case LINE2: ret = SOUND_MASK_LINE2; break;
 		default:    ret = 0;
 		}
-		return put_user(ret,(int*)arg);
+		return put_user(ret, p);
 
 	case MIXER_WRITE(SOUND_MIXER_VIDEO):
 	case MIXER_READ(SOUND_MIXER_VIDEO):
 		if (32000 != dev->oss.rate)
 			return -EINVAL;
-		return put_user(100 | 100 << 8,(int*)arg);
+		return put_user(100 | 100 << 8, p);
 
 	case MIXER_WRITE(SOUND_MIXER_LINE1):
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		val &= 0xff;
 		val = (val <= 50) ? 50 : 100;
@@ -724,11 +729,10 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 		mixer_level(dev,LINE1,dev->oss.line1);
 		/* fall throuth */
 	case MIXER_READ(SOUND_MIXER_LINE1):
-		return put_user(dev->oss.line1 | dev->oss.line1 << 8,
-				(int*)arg);
+		return put_user(dev->oss.line1 | dev->oss.line1 << 8, p);
 
 	case MIXER_WRITE(SOUND_MIXER_LINE2):
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		val &= 0xff;
 		val = (val <= 50) ? 50 : 100;
@@ -736,8 +740,7 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 		mixer_level(dev,LINE2,dev->oss.line2);
 		/* fall throuth */
 	case MIXER_READ(SOUND_MIXER_LINE2):
-		return put_user(dev->oss.line2 | dev->oss.line2 << 8,
-				(int*)arg);
+		return put_user(dev->oss.line2 | dev->oss.line2 << 8, p);
 
 	default:
 		return -EINVAL;

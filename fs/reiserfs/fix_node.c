@@ -2445,12 +2445,12 @@ int fix_nodes (int n_op_mode,
 		reiserfs_restore_prepared_buffer(p_s_tb->tb_sb, p_s_tb->CFR[i]);
 	    }
 
-	    brelse (p_s_tb->L[i]);p_s_tb->L[i] = 0;
-	    brelse (p_s_tb->R[i]);p_s_tb->R[i] = 0;
-	    brelse (p_s_tb->FL[i]);p_s_tb->FL[i] = 0;
-	    brelse (p_s_tb->FR[i]);p_s_tb->FR[i] = 0;
-	    brelse (p_s_tb->CFL[i]);p_s_tb->CFL[i] = 0;
-	    brelse (p_s_tb->CFR[i]);p_s_tb->CFR[i] = 0;
+	    brelse (p_s_tb->L[i]);p_s_tb->L[i] = NULL;
+	    brelse (p_s_tb->R[i]);p_s_tb->R[i] = NULL;
+	    brelse (p_s_tb->FL[i]);p_s_tb->FL[i] = NULL;
+	    brelse (p_s_tb->FR[i]);p_s_tb->FR[i] = NULL;
+	    brelse (p_s_tb->CFL[i]);p_s_tb->CFL[i] = NULL;
+	    brelse (p_s_tb->CFR[i]);p_s_tb->CFR[i] = NULL;
 	}
 
 	if (wait_tb_buffers_run) {

@@ -39,44 +39,16 @@
 #define DEFLATE_DEF_MEMLEVEL		MAX_MEM_LEVEL
 
 struct deflate_ctx {
-	int comp_initialized;
-	int decomp_initialized;
 	struct z_stream_s comp_stream;
 	struct z_stream_s decomp_stream;
 };
 
-static inline int deflate_gfp(void)
-{
-	return in_softirq() ? GFP_ATOMIC : GFP_KERNEL;
-}
-
-static int deflate_init(void *ctx)
-{
-	return 0;
-}
-
-static void deflate_exit(void *ctx)
-{
-	struct deflate_ctx *dctx = ctx;
-
-	if (dctx->comp_initialized)
-		vfree(dctx->comp_stream.workspace);
-	if (dctx->decomp_initialized)
-		kfree(dctx->decomp_stream.workspace);
-}
-
-/*
- * Lazy initialization to make interface simple without allocating
- * un-needed workspaces.  Thus can be called in softirq context.
- */
 static int deflate_comp_init(struct deflate_ctx *ctx)
 {
 	int ret = 0;
 	struct z_stream_s *stream = &ctx->comp_stream;
 
-	stream->workspace = __vmalloc(zlib_deflate_workspacesize(),
-	                              deflate_gfp()|__GFP_HIGHMEM,
-	                              PAGE_KERNEL);
+	stream->workspace = vmalloc(zlib_deflate_workspacesize());
 	if (!stream->workspace ) {
 		ret = -ENOMEM;
 		goto out;
@@ -89,7 +61,6 @@ static int deflate_comp_init(struct deflate_ctx *ctx)
 		ret = -EINVAL;
 		goto out_free;
 	}
-	ctx->comp_initialized = 1;
 out:	
 	return ret;
 out_free:
@@ -102,8 +73,7 @@ static int deflate_decomp_init(struct deflate_ctx *ctx)
 	int ret = 0;
 	struct z_stream_s *stream = &ctx->decomp_stream;
 
-	stream->workspace = kmalloc(zlib_inflate_workspacesize(),
-	                            deflate_gfp());
+	stream->workspace = kmalloc(zlib_inflate_workspacesize(), GFP_KERNEL);
 	if (!stream->workspace ) {
 		ret = -ENOMEM;
 		goto out;
@@ -114,12 +84,41 @@ static int deflate_decomp_init(struct deflate_ctx *ctx)
 		ret = -EINVAL;
 		goto out_free;
 	}
-	ctx->decomp_initialized = 1;
 out:
 	return ret;
 out_free:
 	kfree(stream->workspace);
 	goto out;
+}
+
+static void deflate_comp_exit(struct deflate_ctx *ctx)
+{
+	vfree(ctx->comp_stream.workspace);
+}
+
+static void deflate_decomp_exit(struct deflate_ctx *ctx)
+{
+	kfree(ctx->decomp_stream.workspace);
+}
+
+static int deflate_init(void *ctx)
+{
+	int ret;
+	
+	ret = deflate_comp_init(ctx);
+	if (ret)
+		goto out;
+	ret = deflate_decomp_init(ctx);
+	if (ret)
+		deflate_comp_exit(ctx);
+out:
+	return ret;
+}
+
+static void deflate_exit(void *ctx)
+{
+	deflate_comp_exit(ctx);
+	deflate_decomp_exit(ctx);
 }
 
 static int deflate_compress(void *ctx, const u8 *src, unsigned int slen,
@@ -128,12 +127,6 @@ static int deflate_compress(void *ctx, const u8 *src, unsigned int slen,
 	int ret = 0;
 	struct deflate_ctx *dctx = ctx;
 	struct z_stream_s *stream = &dctx->comp_stream;
-
-	if (!dctx->comp_initialized) {
-		ret = deflate_comp_init(dctx);
-		if (ret)
-			goto out;
-	}
 
 	ret = zlib_deflateReset(stream);
 	if (ret != Z_OK) {
@@ -164,12 +157,6 @@ static int deflate_decompress(void *ctx, const u8 *src, unsigned int slen,
 	int ret = 0;
 	struct deflate_ctx *dctx = ctx;
 	struct z_stream_s *stream = &dctx->decomp_stream;
-
-	if (!dctx->decomp_initialized) {
-		ret = deflate_decomp_init(dctx);
-		if (ret)
-			goto out;
-	}
 
 	ret = zlib_inflateReset(stream);
 	if (ret != Z_OK) {

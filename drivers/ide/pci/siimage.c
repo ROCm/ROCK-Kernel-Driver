@@ -1007,7 +1007,7 @@ static void __devinit init_iops_siimage(ide_hwif_t *hwif)
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
 	class_rev &= 0xff;
 	
-	hwif->hwif_data = 0;
+	hwif->hwif_data = NULL;
 
 	hwif->rqsize = 128;
 	if (is_sata(hwif) && is_dev_seagate_sata(&hwif->drives[0]))

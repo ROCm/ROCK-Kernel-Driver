@@ -1876,7 +1876,7 @@ static int __init vlsi_mod_init(void)
 	 * Failure to create the procfs entry is handled like running
 	 * without procfs - it's not required for the driver to work.
 	 */
-	vlsi_proc_root = create_proc_entry(PROC_DIR, S_IFDIR, 0);
+	vlsi_proc_root = create_proc_entry(PROC_DIR, S_IFDIR, NULL);
 	if (vlsi_proc_root) {
 		/* protect registered procdir against module removal.
 		 * Because we are in the module init path there's no race
@@ -1888,7 +1888,7 @@ static int __init vlsi_mod_init(void)
 	ret = pci_module_init(&vlsi_irda_driver);
 
 	if (ret && vlsi_proc_root)
-		remove_proc_entry(PROC_DIR, 0);
+		remove_proc_entry(PROC_DIR, NULL);
 	return ret;
 
 }
@@ -1897,7 +1897,7 @@ static void __exit vlsi_mod_exit(void)
 {
 	pci_unregister_driver(&vlsi_irda_driver);
 	if (vlsi_proc_root)
-		remove_proc_entry(PROC_DIR, 0);
+		remove_proc_entry(PROC_DIR, NULL);
 }
 
 module_init(vlsi_mod_init);

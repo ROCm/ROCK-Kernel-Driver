@@ -383,7 +383,7 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 {
 
 	unsigned char segment, intr=0, irq=0, i, j, cardpresent=NOTOK, temp=0;
-	void * t_mmio = 0;
+	void * t_mmio = NULL;
 	struct tok_info *ti = dev->priv;
 	void *cd_chanid;
 	unsigned char *tchanid, ctemp;

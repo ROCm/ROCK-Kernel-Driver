@@ -239,7 +239,7 @@ tei_id_remove(struct FsmInst *fi, int event, void *arg)
 	if ((st->l2.tei != -1) && ((tei == GROUP_TEI) || (tei == st->l2.tei))) {
 		FsmDelTimer(&st->ma.t202, 5);
 		FsmChangeState(&st->ma.tei_m, ST_TEI_NOP);
-		st->l3.l3l2(st, MDL_REMOVE | REQUEST, 0);
+		st->l3.l3l2(st, MDL_REMOVE | REQUEST, NULL);
 		cs = (struct IsdnCardState *) st->l1.hardware;
 		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
 	}
@@ -275,7 +275,7 @@ tei_id_req_tout(struct FsmInst *fi, int event, void *arg)
 		FsmAddTimer(&st->ma.t202, st->ma.T202, EV_T202, NULL, 3);
 	} else {
 		st->ma.tei_m.printdebug(&st->ma.tei_m, "assign req failed");
-		st->l3.l3l2(st, MDL_ERROR | RESPONSE, 0);
+		st->l3.l3l2(st, MDL_ERROR | RESPONSE, NULL);
 		cs = (struct IsdnCardState *) st->l1.hardware;
 		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
 		FsmChangeState(fi, ST_TEI_NOP);
@@ -298,7 +298,7 @@ tei_id_ver_tout(struct FsmInst *fi, int event, void *arg)
 	} else {
 		st->ma.tei_m.printdebug(&st->ma.tei_m,
 			"verify req for tei %d failed", st->l2.tei);
-		st->l3.l3l2(st, MDL_REMOVE | REQUEST, 0);
+		st->l3.l3l2(st, MDL_REMOVE | REQUEST, NULL);
 		cs = (struct IsdnCardState *) st->l1.hardware;
 		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
 		FsmChangeState(fi, ST_TEI_NOP);

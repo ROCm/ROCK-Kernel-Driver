@@ -974,7 +974,7 @@ no_irq:
 		release_region(RTC_PORT(0), RTC_IO_EXTENT);
 		return -ENODEV;
 	}
-	if (create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL) == NULL) {
+	if (!create_proc_read_entry ("driver/rtc", 0, NULL, rtc_read_proc, NULL)) {
 #ifdef RTC_IRQ
 		free_irq(RTC_IRQ, NULL);
 #endif

@@ -116,11 +116,14 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 }
 
 asmlinkage int
-sys_sigaltstack(struct pt_regs regs)
+sys_sigaltstack(unsigned long ebx)
 {
-	const stack_t __user *uss = (const stack_t __user *)regs.ebx;
-	stack_t __user *uoss = (stack_t __user *)regs.ecx;
-	return do_sigaltstack(uss, uoss, regs.esp);
+	/* This is needed to make gcc realize it doesn't own the "struct pt_regs" */
+	struct pt_regs *regs = (struct pt_regs *)&ebx;
+	const stack_t __user *uss = (const stack_t __user *)ebx;
+	stack_t __user *uoss = (stack_t __user *)regs->ecx;
+
+	return do_sigaltstack(uss, uoss, regs->esp);
 }
 
 

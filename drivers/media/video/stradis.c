@@ -1322,7 +1322,7 @@ static int saa_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long argl)
 {
 	struct saa7146 *saa = file->private_data;
-	void *arg = (void *)argl;
+	void __user *arg = (void __user *)argl;
 
 	switch (cmd) {
 	case VIDIOCGCAP:
@@ -1580,7 +1580,7 @@ static int saa_ioctl(struct inode *inode, struct file *file,
 			vu.radio = VIDEO_NO_UNIT;
 			vu.audio = VIDEO_NO_UNIT;
 			vu.teletext = VIDEO_NO_UNIT;
-			if (copy_to_user((void *) arg, (void *) &vu, sizeof(vu)))
+			if (copy_to_user(arg, &vu, sizeof(vu)))
 				return -EFAULT;
 			return 0;
 		}
@@ -1754,16 +1754,14 @@ static int saa_ioctl(struct inode *inode, struct file *file,
 			struct video_code ucode;
 			__u8 *udata;
 			int i;
-			if (copy_from_user((void *) &ucode, arg,
-			    sizeof(ucode)))
+			if (copy_from_user(&ucode, arg, sizeof(ucode)))
 				return -EFAULT;
 			if (ucode.datasize > 65536 || ucode.datasize < 1024 ||
 			    strncmp(ucode.loadwhat, "dec", 3))
 				return -EINVAL;
 			if ((udata = vmalloc(ucode.datasize)) == NULL)
 				return -ENOMEM;
-			if (copy_from_user((void *) udata, ucode.data,
-			    ucode.datasize)) {
+			if (copy_from_user(udata, ucode.data, ucode.datasize)) {
 				vfree(udata);
 				return -EFAULT;
 			}
@@ -1814,13 +1812,13 @@ static int saa_mmap(struct file *file, struct vm_area_struct *vma)
 	return -EINVAL;
 }
 
-static ssize_t saa_read(struct file *file, char *buf,
+static ssize_t saa_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	return -EINVAL;
 }
 
-static ssize_t saa_write(struct file *file, const char *buf,
+static ssize_t saa_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	struct saa7146 *saa = file->private_data;

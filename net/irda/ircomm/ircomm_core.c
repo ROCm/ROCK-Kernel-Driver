@@ -62,7 +62,7 @@ static struct file_operations ircomm_proc_fops = {
 	.open           = ircomm_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= seq_release_private,
+	.release	= seq_release,
 };
 #endif /* CONFIG_PROC_FS */
 

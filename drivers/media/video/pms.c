@@ -625,7 +625,7 @@ static void pms_vcrinput(short input)
 }
 
 
-static int pms_capture(struct pms_device *dev, char *buf, int rgb555, int count)
+static int pms_capture(struct pms_device *dev, char __user *buf, int rgb555, int count)
 {
 	int y;
 	int dw = 2*dev->width;
@@ -865,7 +865,7 @@ static int pms_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, pms_do_ioctl);
 }
 
-static int pms_read(struct file *file, char *buf,
+static int pms_read(struct file *file, char __user *buf,
 		    size_t count, loff_t *ppos)
 {
 	struct video_device *v = video_devdata(file);
