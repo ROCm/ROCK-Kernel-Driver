@@ -5,7 +5,6 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci.h,v 1.6 2002/03/22 16:04:54 dbrownell Exp $
  */
  
 /*
@@ -18,13 +17,16 @@
 struct ed {
 	/* first fields are hardware-specified, le32 */
 	__u32			hwINFO;       	/* endpoint config bitmap */
+	/* info bits defined by hcd */
+#define ED_DEQUEUE	__constant_cpu_to_le32(1 << 27)
+	/* info bits defined by the hardware */
 #define ED_ISO		__constant_cpu_to_le32(1 << 15)
 #define ED_SKIP		__constant_cpu_to_le32(1 << 14)
 #define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
 #define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
 #define ED_IN		__constant_cpu_to_le32(0x02 << 11)
 	__u32			hwTailP;	/* tail of TD list */
-	__u32			hwHeadP;	/* head of TD list */
+	__u32			hwHeadP;	/* head of TD list (hc r/w) */
 #define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
 #define ED_H		__constant_cpu_to_le32(0x01)	/* halted */
 	__u32			hwNextED;	/* next ED in list */
@@ -48,14 +50,12 @@ struct ed {
 #define ED_OPER		0x02		/* IS linked to hc */
 
 	u8			type; 		/* PIPE_{BULK,...} */
-	u16			interval;	/* interrupt, isochronous */
-	union {
-		struct intr_info {		/* interrupt */
-			u8	int_branch;
-			u8	int_load; 
-		} intr_info;
-		u16		last_iso;	/* isochronous */
-	} intriso;
+
+	/* periodic scheduling params (for intr and iso) */
+	u8			branch;
+	u16			interval;
+	u16			load;
+	u16			last_iso;	/* iso only */
 
 	/* HC may see EDs on rm_list until next frame (frame_no == tick) */
 	u16			tick;
@@ -335,10 +335,8 @@ struct hash_list_t {
 };
 
 #define TD_HASH_SIZE    64    /* power'o'two */
-#define ED_HASH_SIZE    64    /* power'o'two */
 
 #define TD_HASH_FUNC(td_dma) ((td_dma ^ (td_dma >> 5)) % TD_HASH_SIZE)
-#define ED_HASH_FUNC(ed_dma) ((ed_dma ^ (ed_dma >> 5)) % ED_HASH_SIZE)
 
 
 /*
@@ -373,7 +371,7 @@ struct ohci_hcd {
 
 	struct ed		*ed_bulktail;		/* last in bulk list */
 	struct ed		*ed_controltail;	/* last in ctrl list */
- 	struct ed		*ed_isotail;		/* last in iso list */
+ 	struct ed		*periodic [NUM_INTS];	/* shadow int_table */
 
 	/*
 	 * memory management for queue data structures
@@ -381,14 +379,13 @@ struct ohci_hcd {
 	struct pci_pool		*td_cache;
 	struct pci_pool		*ed_cache;
 	struct hash_list_t	td_hash [TD_HASH_SIZE];
-	struct hash_list_t	ed_hash [ED_HASH_SIZE];
 
 	/*
 	 * driver state
 	 */
 	int			disabled;	/* e.g. got a UE, we're hung */
 	int			sleeping;
-	int			ohci_int_load [NUM_INTS];
+	int			load [NUM_INTS];
 	u32 			hc_control;	/* copy of hc control reg */
 
 	unsigned long		flags;		/* for HC bugs */
