@@ -58,6 +58,7 @@ int main(void)
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));
 	DEFINE(KSP, offsetof(struct thread_struct, ksp));
+	DEFINE(KSP_VSID, offsetof(struct thread_struct, ksp_vsid));
 
 #ifdef CONFIG_ALTIVEC
 	DEFINE(THREAD_VR0, offsetof(struct thread_struct, vr[0]));
