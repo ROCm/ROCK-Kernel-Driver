@@ -2267,38 +2267,6 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	return ret;
 }
 
-extern asmlinkage long sys_fcntl (unsigned int fd, unsigned int cmd, unsigned long arg);
-
-asmlinkage long
-sys32_fcntl (unsigned int fd, unsigned int cmd, unsigned int arg)
-{
-	mm_segment_t old_fs;
-	struct flock f;
-	long ret;
-
-	switch (cmd) {
-	      case F_GETLK:
-	      case F_SETLK:
-	      case F_SETLKW:
-		if (get_compat_flock(&f, (struct compat_flock *) A(arg)))
-			return -EFAULT;
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_fcntl(fd, cmd, (unsigned long) &f);
-		set_fs(old_fs);
-		if (cmd == F_GETLK && put_compat_flock(&f, (struct compat_flock *) A(arg)))
-			return -EFAULT;
-		return ret;
-
-	      default:
-		/*
-		 *  `sys_fcntl' lies about arg, for the F_SETOWN
-		 *  sub-function arg can have a negative value.
-		 */
-		return sys_fcntl(fd, cmd, arg);
-	}
-}
-
 asmlinkage long sys_ni_syscall(void);
 
 asmlinkage long
@@ -2590,66 +2558,6 @@ sys32_setgroups16 (int gidsetsize, short *grouplist)
 	set_fs(KERNEL_DS);
 	ret = sys_setgroups(gidsetsize, gl);
 	set_fs(old_fs);
-	return ret;
-}
-
-/*
- * Unfortunately, the x86 compiler aligns variables of type "long long" to a 4 byte boundary
- * only, which means that the x86 version of "struct flock64" doesn't match the ia64 version
- * of struct flock.
- */
-
-static inline long
-ia32_put_flock (struct flock *l, unsigned long addr)
-{
-	return (put_user(l->l_type, (short *) addr)
-		| put_user(l->l_whence, (short *) (addr + 2))
-		| put_user(l->l_start, (long *) (addr + 4))
-		| put_user(l->l_len, (long *) (addr + 12))
-		| put_user(l->l_pid, (int *) (addr + 20)));
-}
-
-static inline long
-ia32_get_flock (struct flock *l, unsigned long addr)
-{
-	unsigned int start_lo, start_hi, len_lo, len_hi;
-	int err = (get_user(l->l_type, (short *) addr)
-		   | get_user(l->l_whence, (short *) (addr + 2))
-		   | get_user(start_lo, (int *) (addr + 4))
-		   | get_user(start_hi, (int *) (addr + 8))
-		   | get_user(len_lo, (int *) (addr + 12))
-		   | get_user(len_hi, (int *) (addr + 16))
-		   | get_user(l->l_pid, (int *) (addr + 20)));
-	l->l_start = ((unsigned long) start_hi << 32) | start_lo;
-	l->l_len = ((unsigned long) len_hi << 32) | len_lo;
-	return err;
-}
-
-asmlinkage long
-sys32_fcntl64 (unsigned int fd, unsigned int cmd, unsigned int arg)
-{
-	mm_segment_t old_fs;
-	struct flock f;
-	long ret;
-
-	switch (cmd) {
-	      case F_GETLK64:
-	      case F_SETLK64:
-	      case F_SETLKW64:
-		if (ia32_get_flock(&f, arg))
-			return -EFAULT;
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_fcntl(fd, cmd, (unsigned long) &f);
-		set_fs(old_fs);
-		if (cmd == F_GETLK && ia32_put_flock(&f, arg))
-			return -EFAULT;
-		break;
-
-	      default:
-		ret = sys32_fcntl(fd, cmd, arg);
-		break;
-	}
 	return ret;
 }
 

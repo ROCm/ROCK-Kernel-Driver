@@ -68,6 +68,22 @@ struct compat_flock {
 	compat_pid_t	l_pid;
 };
 
+#define F_GETLK64	12
+#define F_SETLK64	13
+#define F_SETLKW64	14
+
+/*
+ * IA32 uses 4 byte alignment for 64 bit quantities,
+ * so we need to pack this structure.
+ */
+struct compat_flock64 {
+	short		l_type;
+	short		l_whence;
+	compat_loff_t	l_start;
+	compat_loff_t	l_len;
+	compat_pid_t	l_pid;
+} __attribute__((packed));
+
 struct compat_statfs {
 	int		f_type;
 	int		f_bsize;
@@ -87,5 +103,8 @@ typedef u32		compat_old_sigset_t;	/* at least 32 bits */
 #define _COMPAT_NSIG_BPW	32
 
 typedef u32		compat_sigset_word;
+
+#define COMPAT_OFF_T_MAX	0x7fffffff
+#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
 
 #endif /* _ASM_IA64_COMPAT_H */
