@@ -32,6 +32,6 @@ struct linux_logo {
 	const unsigned char *data;
 };
 
-extern const struct linux_logo * __init fb_find_logo(int type);
+extern const struct linux_logo * __init find_logo(int depth);
 
 #endif /* _LINUX_LINUX_LOGO_H */

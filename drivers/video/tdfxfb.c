@@ -930,34 +930,34 @@ static void tdfxfb_copyarea(struct fb_info *info, const struct fb_copyarea *area
 	banshee_wait_idle(info);
 }
 
-static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *pixmap) 
+static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image) 
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
-	int size = pixmap->height*((pixmap->width*pixmap->depth + 7)>>3);
+	int size = image->height * ((image->width * image->depth + 7)>>3);
 	int i, stride = info->fix.line_length;
 	u32 bpp = info->var.bits_per_pixel;
 	u32 dstfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13); 
-	u8 *chardata = (u8 *) pixmap->data;
+	u8 *chardata = (u8 *) image->data;
 	u32 srcfmt;
 
-	if (pixmap->depth != 0) {
+	if (image->depth != 1) {
 		//banshee_make_room(par, 6 + ((size + 3) >> 2));
 		//srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
-		cfb_imageblit(info, pixmap);
+		cfb_imageblit(info, image);
 		return;
 	} else {
 		banshee_make_room(par, 8 + ((size + 3) >> 2));
-		tdfx_outl(par, COLORFORE, pixmap->fg_color);
-		tdfx_outl(par, COLORBACK, pixmap->bg_color);
+		tdfx_outl(par, COLORFORE, image->fg_color);
+		tdfx_outl(par, COLORBACK, image->bg_color);
 		srcfmt = 0x400000;
 	}	
 
 	tdfx_outl(par,	SRCXY,     0);
-	tdfx_outl(par,	DSTXY,     pixmap->dx | (pixmap->dy << 16));
+	tdfx_outl(par,	DSTXY,     image->dx | (image->dy << 16));
 	tdfx_outl(par,	COMMAND_2D, COMMAND_2D_H2S_BITBLT | (TDFX_ROP_COPY << 24));
 	tdfx_outl(par,	SRCFORMAT, srcfmt);
 	tdfx_outl(par,	DSTFORMAT, dstfmt);
-	tdfx_outl(par,	DSTSIZE,   pixmap->width | (pixmap->height << 16));
+	tdfx_outl(par,	DSTSIZE,   image->width | (image->height << 16));
 
 	/* Send four bytes at a time of data */	
 	for (i = (size >> 2) ; i > 0; i--) { 

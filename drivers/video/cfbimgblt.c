@@ -329,7 +329,7 @@ void cfb_imageblit(struct fb_info *p, const struct fb_image *image)
 	if (p->fbops->fb_sync)
 		p->fbops->fb_sync(p);
 
-	if (image->depth == 0) {
+	if (image->depth == 1) {
 		if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
 		    p->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 			fgcolor = ((u32*)(p->pseudo_palette))[image->fg_color];
@@ -346,7 +346,7 @@ void cfb_imageblit(struct fb_info *p, const struct fb_image *image)
 		else 
 			slow_imageblit(image, p, dst1, fgcolor, bgcolor,
 					start_index, pitch_index);
-	} else if (image->depth == bpp) 
+	} else if (image->depth <= bpp) 
 		color_imageblit(image, p, dst1, start_index, pitch_index);
 }
 

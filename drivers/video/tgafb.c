@@ -583,7 +583,7 @@ tgafb_imageblit(struct fb_info *info, const struct fb_image *image)
 	   can do better than the generic code.  */
 	/* ??? There is a DMA write mode; I wonder if that could be
 	   made to pull the data from the image buffer...  */
-	if (image->depth > 0) {
+	if (image->depth > 1) {
 		cfb_imageblit(info, image);
 		return;
 	}

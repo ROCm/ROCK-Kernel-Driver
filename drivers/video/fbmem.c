@@ -566,13 +566,13 @@ static void __init fb_set_logo_directpalette(struct fb_info *info,
 
 static void __init fb_set_logo(struct fb_info *info,
 			       const struct linux_logo *logo, u8 *dst,
-			       int needs_logo)
+			       int depth)
 {
 	int i, j, shift;
 	const u8 *src = logo->data;
 	u8 d, xor = 0;
 
-	switch (needs_logo) {
+	switch (depth) {
 	case 4:
 		for (i = 0; i < logo->height; i++)
 			for (j = 0; j < logo->width; src++) {
@@ -620,11 +620,11 @@ static void __init fb_set_logo(struct fb_info *info,
  * to set the DAC or the pseudo_palette.  However, the bitmap is packed, ie,
  * each byte contains color information for two pixels (upper and lower nibble).
  * To be consistent with fb_imageblit() usage, we therefore separate the two
- * nibbles into separate bytes. The "needs_logo" flag will be set to 4.
+ * nibbles into separate bytes. The "depth" flag will be set to 4.
  *
  * Case 3 - linux_logo_mono:
  * This is similar with Case 2.  Each byte contains information for 8 pixels.
- * We isolate each bit and expand each into a byte. The "needs_logo" flag will
+ * We isolate each bit and expand each into a byte. The "depth" flag will
  * be set to 1.
  */
 static struct logo_data {
@@ -633,7 +633,6 @@ static struct logo_data {
 	int needs_directpalette;
 	int needs_truepalette;
 	int needs_cmapreset;
-	int type;
 	const struct linux_logo *logo;
 } fb_logo;
 
@@ -641,24 +640,22 @@ int fb_prepare_logo(struct fb_info *info)
 {
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
-	fb_logo.depth = info->var.bits_per_pixel;
-
 	switch (info->fix.visual) {
 	case FB_VISUAL_TRUECOLOR:
-		if (fb_logo.depth >= 8) {
+		if (info->var.bits_per_pixel >= 8) {
 			fb_logo.needs_truepalette = 1;
 			fb_logo.needs_logo = 8;
-		} else if (fb_logo.depth >= 4)
+		} else if (info->var.bits_per_pixel >= 4)
 			fb_logo.needs_logo = 4;
 		else 
 			fb_logo.needs_logo = 1;
 		break;
 	case FB_VISUAL_DIRECTCOLOR:
-		if (fb_logo.depth >= 24) {
+		if (info->var.bits_per_pixel >= 24) {
 			fb_logo.needs_directpalette = 1;
 			fb_logo.needs_cmapreset = 1;
 			fb_logo.needs_logo = 8;
-		} else if (fb_logo.depth >= 16)	/* 16 colors */
+		} else if (info->var.bits_per_pixel >= 16)	/* 16 colors */
 			fb_logo.needs_logo = 4;
 		else
 			fb_logo.needs_logo = 1;	/* 2 colors */
@@ -671,26 +668,21 @@ int fb_prepare_logo(struct fb_info *info)
 		fb_logo.needs_logo = 1;
 		break;
 	case FB_VISUAL_STATIC_PSEUDOCOLOR:
-		if (fb_logo.depth >= 8) {
+		if (info->var.bits_per_pixel >= 8) {
 			fb_logo.needs_logo = 8;
 			if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
 				fb_logo.needs_cmapreset = 1;
-		} else if (fb_logo.depth >= 4)
+		} else if (info->var.bits_per_pixel >= 4)
 			fb_logo.needs_logo = 4;	/* 16 colors */
 		else
 			fb_logo.needs_logo = 1;	
 		break;
 	}
 
-	if (fb_logo.needs_logo >= 8)
-		fb_logo.type = LINUX_LOGO_CLUT224;
-	else if (fb_logo.needs_logo >= 4)
-		fb_logo.type = LINUX_LOGO_VGA16;
-	else
-		fb_logo.type = LINUX_LOGO_MONO;
-
+	fb_logo.depth = info->var.bits_per_pixel;
+	
 	/* Return if no suitable logo was found */
-	fb_logo.logo = fb_find_logo(fb_logo.type);
+	fb_logo.logo = find_logo(fb_logo.needs_logo);
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;
 		return 0;
@@ -700,14 +692,13 @@ int fb_prepare_logo(struct fb_info *info)
 
 int fb_show_logo(struct fb_info *info)
 {
-	unsigned char *fb = info->screen_base, *logo_new = NULL;
 	u32 *palette = NULL, *saved_pseudo_palette = NULL;
+	unsigned char *logo_new = NULL;
 	struct fb_image image;
 	int x;
 
 	/* Return if the frame buffer is not mapped */
-	if (!fb || !info->fbops->fb_imageblit ||
-	    fb_logo.logo == NULL)
+	if (!info->fbops->fb_imageblit || fb_logo.logo == NULL)
 		return 0;
 
 	image.depth = fb_logo.depth;
@@ -741,9 +732,8 @@ int fb_show_logo(struct fb_info *info)
 				info->pseudo_palette = saved_pseudo_palette;
 			return 0;
 		}
-
 		image.data = logo_new;
-		fb_set_logo(info, fb_logo.logo, logo_new, fb_logo.needs_logo);
+		fb_set_logo(info, fb_logo.logo, logo_new, fb_logo.depth);
 	}
 
 	image.width = fb_logo.logo->width;

@@ -43,8 +43,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (cursor->set & FB_CUR_SETSHAPE) {
 		if (info->cursor.mask)
 			kfree(info->cursor.mask);
-		info->cursor.mask = kmalloc(dsize, GFP_KERNEL);
-		if (!info->cursor.mask) return -ENOMEM;
+		info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
 		if (cursor->mask)
 			memcpy(info->cursor.mask, cursor->mask, dsize);
 		else
@@ -60,7 +59,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		info->cursor.hot = cursor->hot;
 
 	if (cursor->set & FB_CUR_SETCMAP) {
-		if (cursor->image.depth == 0) {
+		if (cursor->image.depth == 1) {
 			info->cursor.image.bg_color = cursor->image.bg_color;
 			info->cursor.image.fg_color = cursor->image.fg_color;
 		} else {

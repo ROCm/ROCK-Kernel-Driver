@@ -1388,7 +1388,7 @@ static void rivafb_imageblit(struct fb_info *info,
 	volatile u32 *d;
 	int i, size;
 
-	if (image->depth != 0) {
+	if (image->depth != 1) {
 		cfb_imageblit(info, image);
 		return;
 	}

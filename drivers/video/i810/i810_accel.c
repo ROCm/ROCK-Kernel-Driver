@@ -387,7 +387,7 @@ void i810fb_imageblit(struct fb_info *info, const struct fb_image *image)
 	u8 *s_addr, *d_addr;
 	
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP ||
-	    par->depth == 4 || image->depth != 0) 
+	    par->depth == 4 || image->depth != 1) 
 		return cfb_imageblit(info, image);
 
 	switch (info->var.bits_per_pixel) {
