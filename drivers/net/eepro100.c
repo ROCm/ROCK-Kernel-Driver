@@ -542,6 +542,7 @@ static int speedo_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void speedo_refill_rx_buffers(struct net_device *dev, int force);
 static int speedo_rx(struct net_device *dev);
 static void speedo_tx_buffer_gc(struct net_device *dev);
+static void poll_speedo (struct net_device *dev);
 static irqreturn_t speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int speedo_close(struct net_device *dev);
 static struct net_device_stats *speedo_get_stats(struct net_device *dev);
@@ -885,6 +886,9 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	dev->get_stats = &speedo_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &speedo_ioctl;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &poll_speedo;
+#endif
 
 	if (register_netdevice(dev))
 		goto err_free_unlock;
@@ -1674,6 +1678,23 @@ static irqreturn_t speedo_interrupt(int irq, void *dev_instance, struct pt_regs 
 	clear_bit(0, (void*)&sp->in_interrupt);
 	return IRQ_RETVAL(handled);
 }
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void poll_speedo (struct net_device *dev)
+{
+	/* disable_irq is not very nice, but with the funny lockless design
+	   we have no other choice. */
+	disable_irq(dev->irq);
+	speedo_interrupt (dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 static inline struct RxFD *speedo_rx_alloc(struct net_device *dev, int entry)
 {
