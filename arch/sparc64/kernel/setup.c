@@ -127,10 +127,10 @@ int prom_callback(long *args)
 	if (!strcmp(cmd, "sync")) {
 		prom_printf("PROM `%s' command...\n", cmd);
 		show_free_areas();
-		if(current->pid != 0) {
-			sti();
+		if (current->pid != 0) {
+			local_irq_enable();
 			sys_sync();
-			cli();
+			local_irq_disable();
 		}
 		args[2] = 0;
 		args[args[1] + 3] = -1;

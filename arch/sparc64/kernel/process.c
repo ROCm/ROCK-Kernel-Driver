@@ -289,10 +289,6 @@ void __show_regs(struct pt_regs * regs)
 			     : "=r" (flags)
 			     : "i" (PSTATE_IE));
 	spin_lock(&regdump_lock);
-	printk("CPU[%d]: local_irq_count[%u] irqs_running[%d]\n",
-	       smp_processor_id(),
-	       local_irq_count(smp_processor_id()),
-	       irqs_running());
 #endif
 	printk("TSTATE: %016lx TPC: %016lx TNPC: %016lx Y: %08x    %s\n", regs->tstate,
 	       regs->tpc, regs->tnpc, regs->y, print_tainted());
