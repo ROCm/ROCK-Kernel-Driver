@@ -548,10 +548,7 @@ define rule_vmlinux__
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-define rule_vmlinux
-	$(rule_vmlinux__); \
-	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
-endef
+do_system_map = $(NM) $(1) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > $(2)
 
 LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds.s
 
@@ -565,29 +562,56 @@ LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds.s
 #	  but due to the added section, some addresses have shifted
 #	  From here, we generate a correct .tmp_kallsyms2.o
 #	o The correct .tmp_kallsyms2.o is linked into the final vmlinux.
+#	o Verify that the System.map from vmlinux matches the map from
+#	  .tmp_vmlinux2, just in case we did not generate kallsyms correctly.
+#	o If CONFIG_KALLSYMS_EXTRA_PASS is set, do an extra pass using
+#	  .tmp_vmlinux3 and .tmp_kallsyms3.o.  This is only meant as a
+#	  temporary bypass to allow the kernel to be built while the
+#	  maintainers work out what went wrong with kallsyms.
 
 ifdef CONFIG_KALLSYMS
 
-kallsyms.o := .tmp_kallsyms2.o
+ifdef CONFIG_KALLSYMS_EXTRA_PASS
+last_kallsyms := 3
+else
+last_kallsyms := 2
+endif
+
+kallsyms.o := .tmp_kallsyms$(last_kallsyms).o
+
+define rule_verify_kallsyms
+	@$(call do_system_map, .tmp_vmlinux$(last_kallsyms), .tmp_System.map)
+	@cmp -s System.map .tmp_System.map || \
+		(echo Inconsistent kallsyms data, try setting CONFIG_KALLSYMS_EXTRA_PASS ; rm .tmp_kallsyms* ; false)
+endef
 
 quiet_cmd_kallsyms = KSYM    $@
 cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) $(foreach x,$(CONFIG_KALLSYMS_ALL),--all-symbols) > $@
 
-.tmp_kallsyms1.o .tmp_kallsyms2.o: %.o: %.S scripts FORCE
+.tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S scripts FORCE
 	$(call if_changed_dep,as_o_S)
 
 .tmp_kallsyms%.S: .tmp_vmlinux%
 	$(call cmd,kallsyms)
 
 .tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
-	+$(call if_changed_rule,vmlinux__)
+	$(call if_changed_rule,vmlinux__)
 
 .tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
+	$(call if_changed_rule,vmlinux__)
+
+.tmp_vmlinux3: $(vmlinux-objs) .tmp_kallsyms2.o arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 	$(call if_changed_rule,vmlinux__)
 
 endif
 
 #	Finally the vmlinux rule
+
+define rule_vmlinux
+	$(rule_vmlinux__); \
+	$(call do_system_map, $@, System.map)
+	$(rule_verify_kallsyms)
+endef
 
 vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 	$(call if_changed_rule,vmlinux)
@@ -800,7 +824,7 @@ endef
 # Directories & files removed with 'make clean'
 CLEAN_DIRS  += $(MODVERDIR)
 CLEAN_FILES +=	vmlinux System.map \
-                .tmp_kallsyms* .tmp_version .tmp_vmlinux*
+                .tmp_kallsyms* .tmp_version .tmp_vmlinux* .tmp_System.map
 
 # Directories & files removed with 'make mrproper'
 MRPROPER_DIRS  += include/config include2
