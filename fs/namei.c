@@ -764,17 +764,15 @@ last_component:
  				nd->flags |= LOOKUP_LAST;
  				err = revalidate_special(nd);
  				nd->flags &= ~LOOKUP_LAST;
+				if (!nd->dentry->d_inode)
+					err = -ENOENT;
 				if (err)
  					break;
 				goto return_reval;
 		}
-		
-		if (err) {
-			if (!nd->dentry->d_inode)
-				err = -ENOENT;
-			
+
+		if (err)
 			goto return_err;			
-		}
 		
 		if (nd->dentry->d_op && nd->dentry->d_op->d_hash) {
 			err = nd->dentry->d_op->d_hash(nd->dentry, &this);
