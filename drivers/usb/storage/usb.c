@@ -361,65 +361,42 @@ static int usb_stor_control_thread(void * __us)
 
 		BUG_ON(action != US_ACT_COMMAND);
 
+		/* lock the device pointers */
+		down(&(us->dev_semaphore));
+
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
 		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
 		/* reject if target != 0 or if LUN is higher than
 		 * the maximum known LUN
 		 */
-		if (us->srb->target && 
+		else if (us->srb->target && 
 				!(us->flags & US_FL_SCM_MULT_TARG)) {
 			US_DEBUGP("Bad target number (%d/%d)\n",
 				  us->srb->target, us->srb->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
-
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
-		if (us->srb->lun > us->max_lun) {
+		else if (us->srb->lun > us->max_lun) {
 			US_DEBUGP("Bad LUN (%d/%d)\n",
 				  us->srb->target, us->srb->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
-
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
 		/* handle those devices which can't do a START_STOP */
-		if ((us->srb->cmnd[0] == START_STOP) &&
+		else if ((us->srb->cmnd[0] == START_STOP) &&
 		    (us->flags & US_FL_START_STOP)) {
 			US_DEBUGP("Skipping START_STOP command\n");
 			us->srb->result = GOOD << 1;
-
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
-		/* lock the device pointers */
-		down(&(us->dev_semaphore));
-
 		/* our device has gone - pretend not ready */
-		if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
+		else if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
 			US_DEBUGP("Request is for removed device\n");
 			/* For REQUEST_SENSE, it's the data.  But
 			 * for anything else, it should look like
@@ -443,24 +420,25 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = CHECK_CONDITION << 1;
 			}
-		} else { /* test_bit(DEV_ATTACHED, &us->bitflags) */
+		}  /* test_bit(DEV_ATTACHED, &us->bitflags) */
 
-			/* Handle those devices which need us to fake 
-			 * their inquiry data */
-			if ((us->srb->cmnd[0] == INQUIRY) &&
+		/* Handle those devices which need us to fake 
+		 * their inquiry data */
+		else if ((us->srb->cmnd[0] == INQUIRY) &&
 			    (us->flags & US_FL_FIX_INQUIRY)) {
-				unsigned char data_ptr[36] = {
-				    0x00, 0x80, 0x02, 0x02,
-				    0x1F, 0x00, 0x00, 0x00};
+			unsigned char data_ptr[36] = {
+			    0x00, 0x80, 0x02, 0x02,
+			    0x1F, 0x00, 0x00, 0x00};
 
-				US_DEBUGP("Faking INQUIRY command\n");
-				fill_inquiry_response(us, data_ptr, 36);
-				us->srb->result = GOOD << 1;
-			} else {
-				/* we've got a command, let's do it! */
-				US_DEBUG(usb_stor_show_command(us->srb));
-				us->proto_handler(us->srb, us);
-			}
+			US_DEBUGP("Faking INQUIRY command\n");
+			fill_inquiry_response(us, data_ptr, 36);
+			us->srb->result = GOOD << 1;
+		}
+
+		/* we've got a command, let's do it! */
+		else {
+			US_DEBUG(usb_stor_show_command(us->srb));
+			us->proto_handler(us->srb, us);
 		}
 
 		/* unlock the device pointers */
