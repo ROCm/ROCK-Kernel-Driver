@@ -3474,13 +3474,11 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 }
 
 
-#ifdef  CONFIG_PM
 static int ohci1394_pci_resume (struct pci_dev *dev)
 {
 	pci_enable_device(dev);
 	return 0;
 }
-#endif
 
 
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)
@@ -3504,10 +3502,7 @@ static struct pci_driver ohci1394_pci_driver = {
 	.id_table =	ohci1394_pci_tbl,
 	.probe =	ohci1394_pci_probe,
 	.remove =	ohci1394_pci_remove,
-
-#ifdef  CONFIG_PM
 	.resume =	ohci1394_pci_resume,
-#endif  /* PM */
 };
 
 
