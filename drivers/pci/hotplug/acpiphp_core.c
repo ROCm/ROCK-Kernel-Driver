@@ -95,17 +95,14 @@ static struct hotplug_slot_ops acpi_hotplug_slot_ops = {
  * Actual tasks are done in acpiphp_enable_slot()
  *
  */
-static int enable_slot (struct hotplug_slot *hotplug_slot)
+static int enable_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/* enable the specified slot */
-	retval = acpiphp_enable_slot(slot->acpi_slot);
-
-	return retval;
+	return acpiphp_enable_slot(slot->acpi_slot);
 }
 
 
@@ -116,17 +113,14 @@ static int enable_slot (struct hotplug_slot *hotplug_slot)
  * Actual tasks are done in acpiphp_disable_slot()
  *
  */
-static int disable_slot (struct hotplug_slot *hotplug_slot)
+static int disable_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/* disable the specified slot */
-	retval = acpiphp_disable_slot(slot->acpi_slot);
-
-	return retval;
+	return acpiphp_disable_slot(slot->acpi_slot);
 }
 
 
@@ -138,10 +132,8 @@ static int disable_slot (struct hotplug_slot *hotplug_slot)
  * attention status LED.
  *
  */
-static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
+static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
 {
-	int retval = 0;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	switch (status) {
@@ -157,7 +149,7 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 			break;
 	}
 
-	return retval;
+	return 0;
 }
 
 
@@ -167,17 +159,14 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
  * We have nothing to do for now...
  *
  */
-static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
+static int hardware_test(struct hotplug_slot *hotplug_slot, u32 value)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	err("No hardware tests are defined for this driver\n");
-	retval = -ENODEV;
-
-	return retval;
+	return -ENODEV;
 }
 
 
@@ -190,16 +179,15 @@ static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
  * In that case, the value returned may not be reliable.
  *
  */
-static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_power_status(slot->acpi_slot);
 
-	return retval;
+	return 0;
 }
 
 
@@ -210,15 +198,13 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
  * ACPI doesn't provide any formal means to access attention LED status.
  *
  */
-static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	int retval = 0;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = hotplug_slot->info->attention_status;
 
-	return retval;
+	return 0;
 }
 
 
@@ -231,16 +217,15 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
  * Instead, we fake latch status from _STA
  *
  */
-static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_latch_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_latch_status(slot->acpi_slot);
 
-	return retval;
+	return 0;
 }
 
 
@@ -253,16 +238,15 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
  * Instead, we fake adapter status from _STA
  *
  */
-static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_adapter_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_adapter_status(slot->acpi_slot);
 
-	return retval;
+	return 0;
 }
 
 
@@ -272,16 +256,15 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
  * @busdev: pointer to struct pci_busdev (seg, bus, dev)
  *
  */
-static int get_address (struct hotplug_slot *hotplug_slot, u32 *value)
+static int get_address(struct hotplug_slot *hotplug_slot, u32 *value)
 {
 	struct slot *slot = hotplug_slot->private;
-	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_address(slot->acpi_slot);
 
-	return retval;
+	return 0;
 }
 
 
@@ -326,7 +309,7 @@ static int __init init_acpi (void)
  * @slot: slot to name
  *
  */
-static void make_slot_name (struct slot *slot)
+static void make_slot_name(struct slot *slot)
 {
 	snprintf(slot->hotplug_slot->name, SLOT_NAME_SIZE, "%u",
 		 slot->acpi_slot->sun);
@@ -352,7 +335,7 @@ static void release_slot(struct hotplug_slot *hotplug_slot)
  * init_slots - initialize 'struct slot' structures for each slot
  *
  */
-static int __init init_slots (void)
+static int __init init_slots(void)
 {
 	struct slot *slot;
 	int retval = 0;
