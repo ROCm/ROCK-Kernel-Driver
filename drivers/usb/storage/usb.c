@@ -941,6 +941,7 @@ BadDevice:
 static void storage_disconnect(struct usb_interface *intf)
 {
 	struct us_data *ss;
+	struct scsi_device *sdev;
 
 	US_DEBUGP("storage_disconnect() called\n");
 
@@ -952,7 +953,11 @@ static void storage_disconnect(struct usb_interface *intf)
 	 */
 	BUG_ON(ss == NULL);
 
-	/* TODO: set devices offline -- need host lock for this */
+	/* set devices offline -- need host lock for this */
+	scsi_lock(ss->host);
+	list_for_each_entry(sdev, &ss->host->my_devices, siblings)
+		sdev->online = 0;
+	scsi_unlock(ss->host);
 
 	/* lock device access -- no need to unlock, as we're going away */
 	down(&(ss->dev_semaphore));
