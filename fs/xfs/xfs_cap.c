@@ -115,15 +115,17 @@ xfs_cap_vget(
 	int		flags = ATTR_ROOT;
 	xfs_cap_set_t	xfs_cap = { 0 };
 	posix_cap_xattr	*xattr_cap = cap;
+	char		*data = (char *)&xfs_cap;
 
 	VN_HOLD(vp);
 	if ((error = _MAC_VACCESS(vp, NULL, VREAD)))
 		goto out;
 
-	if (!size)
+	if (!size) {
 		flags |= ATTR_KERNOVAL;
-	VOP_ATTR_GET(vp, SGI_CAP_LINUX, (char *)&xfs_cap,
-			&len, flags, sys_cred, error);
+		data = NULL;
+	}
+	VOP_ATTR_GET(vp, SGI_CAP_LINUX, data, &len, flags, sys_cred, error);
 	if (error)
 		goto out;
 	ASSERT(len == sizeof(xfs_cap_set_t));

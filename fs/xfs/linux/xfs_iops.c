@@ -663,8 +663,10 @@ linvfs_getxattr(
 	}
 
 	/* Convert Linux syscall to XFS internal ATTR flags */
-	if (!size)
+	if (!size) {
 		xflags |= ATTR_KERNOVAL;
+		data = NULL;
+	}
 
 	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
 			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
