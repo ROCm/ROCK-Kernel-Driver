@@ -1,3 +1,7 @@
+2004-06-07 Linas Vepstas <linas@linas.org>
+
+	* Apply Keith Owens' per_cpu patch
+
 2004-04-11 Keith Owens  <kaos@sgi.com>
 
 	* Unlock sn_sal_lock before entering kdb from sn_serial.

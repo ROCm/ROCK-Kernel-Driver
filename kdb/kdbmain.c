@@ -1351,6 +1351,183 @@ do_full_getstr:
 	return(diag);
 }
 
+static void
+kdb_md_line(const char *fmtstr, kdb_machreg_t addr,
+	    int symbolic, int nosect, int bytesperword,
+	    int num, int repeat)
+{
+	/* print just one line of data */
+	kdb_symtab_t symtab;
+	char cbuf[32];
+	char *c = cbuf;
+	int i;
+	unsigned long word;
+
+	memset(cbuf, '\0', sizeof(cbuf));
+	kdb_printf(kdb_machreg_fmt0 " ", addr);
+
+	for (i = 0; i < num && repeat--; i++) {
+		if (kdb_getword(&word, addr, bytesperword))
+			break;
+		kdb_printf(fmtstr, word);
+		if (symbolic)
+			kdbnearsym(word, &symtab);
+		else
+			memset(&symtab, 0, sizeof(symtab));
+		if (symtab.sym_name) {
+			kdb_symbol_print(word, &symtab, 0);
+			if (!nosect) {
+				kdb_printf("\n");
+				kdb_printf("                       %s %s "
+					   kdb_machreg_fmt " " kdb_machreg_fmt " " kdb_machreg_fmt,
+					symtab.mod_name,
+					symtab.sec_name,
+					symtab.sec_start,
+					symtab.sym_start,
+					symtab.sym_end);
+			}
+			addr += bytesperword;
+		} else {
+			union {
+				u64 word;
+				unsigned char c[8];
+			} wc;
+			unsigned char *cp;
+#ifdef	__BIG_ENDIAN
+			cp = wc.c + 8 - bytesperword;
+#else
+			cp = wc.c;
+#endif
+			wc.word = word;
+#define printable_char(c) ({unsigned char __c = c; isprint(__c) ? __c : '.';})
+			switch (bytesperword) {
+			case 8:
+				*c++ = printable_char(*cp++);
+				*c++ = printable_char(*cp++);
+				*c++ = printable_char(*cp++);
+				*c++ = printable_char(*cp++);
+				addr += 4;
+			case 4:
+				*c++ = printable_char(*cp++);
+				*c++ = printable_char(*cp++);
+				addr += 2;
+			case 2:
+				*c++ = printable_char(*cp++);
+				addr++;
+			case 1:
+				*c++ = printable_char(*cp++);
+				addr++;
+				break;
+			}
+#undef printable_char
+		}
+	}
+	kdb_printf("%*s %s\n", (int)((num-i)*(2*bytesperword + 1)+1), " ", cbuf);
+}
+
+/*
+ * kdb_per_cpu
+ *
+ *	This function implements the 'per_cpu' command.
+ *
+ * Inputs:
+ *	argc	argument count
+ *	argv	argument vector
+ *	envp	environment vector
+ *	regs	registers at time kdb was entered.
+ * Outputs:
+ *	None.
+ * Returns:
+ *	zero for success, a kdb diagnostic if error
+ * Locking:
+ *	none.
+ * Remarks:
+ */
+
+static int
+kdb_per_cpu(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+{
+	char buf[256], fmtstr[64];
+	kdb_symtab_t symtab;
+	cpumask_t suppress = CPU_MASK_NONE;
+	int cpu, diag;
+	unsigned long addr, val, bytesperword = 0, whichcpu = ~0UL;
+
+	if (argc < 1 || argc > 3)
+		return KDB_ARGCOUNT;
+
+	snprintf(buf, sizeof(buf), "per_cpu__%s", argv[1]);
+	if (!kdbgetsymval(buf, &symtab)) {
+		kdb_printf("%s is not a per_cpu variable\n", argv[1]);
+		return KDB_BADADDR;
+	}
+	if (argc >=2 && (diag = kdbgetularg(argv[2], &bytesperword)))
+		return diag;
+	if (!bytesperword)
+		bytesperword = sizeof(kdb_machreg_t);
+	else if (bytesperword > sizeof(kdb_machreg_t))
+		return KDB_BADWIDTH;
+	sprintf(fmtstr, "%%0%dlx ", (int)(2*bytesperword));
+	if (argc >= 3) {
+		if ((diag = kdbgetularg(argv[3], &whichcpu)))
+			return diag;
+		if (!cpu_online(whichcpu)) {
+			kdb_printf("cpu %ld is not online\n", whichcpu);
+			return KDB_BADCPUNUM;
+		}
+	}
+
+	/* Most architectures use __per_cpu_offset[cpu], some use
+	 * __per_cpu_offset(cpu), smp has no __per_cpu_offset.
+	 */
+#ifdef	__per_cpu_offset
+#define KDB_PCU(cpu) __per_cpu_offset(cpu)
+#else
+#ifdef	CONFIG_SMP
+#define KDB_PCU(cpu) __per_cpu_offset[cpu]
+#else
+#define KDB_PCU(cpu) 0
+#endif
+#endif
+
+	for_each_online_cpu(cpu) {
+		if (whichcpu != ~0UL && whichcpu != cpu)
+			continue;
+		addr = symtab.sym_start + KDB_PCU(cpu);
+		if ((diag = kdb_getword(&val, addr, bytesperword))) {
+			kdb_printf("%5d " kdb_bfd_vma_fmt0 " - unable to read, diag=%d\n",
+				cpu, addr, diag);
+			continue;
+		}
+#ifdef	CONFIG_SMP
+		if (!val) {
+			cpu_set(cpu, suppress);
+			continue;
+		}
+#endif	/* CONFIG_SMP */
+		kdb_printf("%5d ", cpu);
+		kdb_md_line(fmtstr, addr,
+			bytesperword == sizeof(kdb_machreg_t),
+			1, bytesperword, 1, 1);
+	}
+	if (cpus_weight(suppress) == 0)
+		return 0;
+	kdb_printf("Zero suppressed cpu(s):");
+	for (cpu = first_cpu(suppress); cpu < NR_CPUS; cpu = next_cpu(cpu, suppress)) {
+		kdb_printf(" %d", cpu);
+		if (cpu == NR_CPUS-1 || next_cpu(cpu, suppress) != cpu + 1)
+			continue;
+		while (cpu < NR_CPUS && next_cpu(cpu, suppress) == cpu + 1)
+			++cpu;
+		kdb_printf("-%d", cpu);
+	}
+	kdb_printf("\n");
+
+#undef KDB_PCU
+
+	return 0;
+}
+
 
 /*
  * kdb_print_state
@@ -3392,6 +3569,7 @@ kdb_inittab(void)
 	kdb_register_repeat("dmesg", kdb_dmesg, "[lines]",	"Display syslog buffer", 0, KDB_REPEAT_NONE);
 	kdb_register_repeat("defcmd", kdb_defcmd, "name \"usage\" \"help\"", "Define a set of commands, down to endefcmd", 0, KDB_REPEAT_NONE);
 	kdb_register_repeat("kill", kdb_kill, "<-signal> <pid>", "Send a signal to a process", 0, KDB_REPEAT_NONE);
+	kdb_register_repeat("per_cpu", kdb_per_cpu, "", "Display per_cpu variables", 3, KDB_REPEAT_NONE);
 
 	/* Any kdb commands that are not in the base code but are required
 	 * earlier than normal initcall processing.

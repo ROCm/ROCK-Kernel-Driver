@@ -22,7 +22,7 @@ struct sym_entry {
 
 static struct sym_entry *table;
 static int size, cnt;
-static unsigned long long _stext, _etext, _sinittext, _einittext, _end;
+static unsigned long long _stext, _etext, _sinittext, _einittext, __per_cpu_end;
 #ifdef CONFIG_KDB
 #define kdb 1
 #else
@@ -57,7 +57,7 @@ read_symbol(FILE *in, struct sym_entry *s)
 static int
 symbol_valid(struct sym_entry *s)
 {
-	if ((s->addr < _stext || (kdb && s->addr > _end) || (!kdb && s->addr > _etext))
+	if ((s->addr < _stext || (kdb && s->addr > __per_cpu_end) || (!kdb && s->addr > _etext))
 	    && (s->addr < _sinittext || s->addr > _einittext))
 		return 0;
 
@@ -99,8 +99,8 @@ read_map(FILE *in)
 			_sinittext = table[i].addr;
 		if (strcmp(table[i].sym, "_einittext") == 0)
 			_einittext = table[i].addr;
-		if (kdb && strcmp(table[i].sym, "_end") == 0)
-			_end = table[i].addr;
+		if (kdb && strcmp(table[i].sym, "__per_cpu_end") == 0)
+			__per_cpu_end = table[i].addr;
 	}
 }
 

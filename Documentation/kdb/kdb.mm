@@ -128,6 +128,7 @@ mdr	Display raw memory contents
 mds	Display memory contents symbolically
 mm	Modify memory contents, words
 mmW	Modify memory contents, bytes
+per_cpu	Display per_cpu variables
 pid	Change the default process context
 ps	Display process status
 reboot	Reboot the machine
@@ -214,6 +215,18 @@ kill -signal pid.
 lsmod
 Internal command to list modules.
 This does not use any kernel nor user space services so can be used at any time.
+.TP 8
+per_cpu <variable_name> [<length>] [<cpu>]
+Display the values of a per_cpu variable, the variable_name is
+specified without the \fIper_cpu__\fR prefix.
+Length is the length of the variable, 1-8, if omitted or 0 it defaults
+to the size of the machine's register.
+To display the variable on a specific cpu, the third parameter is the
+cpu number.
+When the third parameter is omitted, the variable's value is printed
+from all cpus, except that zero values are suppressed.
+For each cpu, per_cpu prints the cpu number, the address of the
+variable and its value.
 .TP 8
 pid <number>
 Change the current process context, with no parameters it displays the
