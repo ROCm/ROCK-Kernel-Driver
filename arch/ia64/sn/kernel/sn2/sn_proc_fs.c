@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 #include <linux/config.h>
 #include <asm/uaccess.h>
@@ -118,11 +118,33 @@ register_sn_force_interrupt(void) {
 	}
 }
 
+static int coherence_id_read_proc(char *page, char **start, off_t off,
+		int count, int *eof, void *data) {
+	return sprintf(page, "%d\n", cpuid_to_coherence_id(smp_processor_id()));
+}
+
+void
+register_sn_coherence_id(void) {
+	struct proc_dir_entry *entry;
+
+	if (!sgi_proc_dir) {
+		sgi_proc_dir = proc_mkdir("sgi_sn", 0);
+	}
+	entry = create_proc_entry("coherence_id", 0444, sgi_proc_dir);
+	if (entry) {
+		entry->nlink = 1;
+		entry->data = 0;
+		entry->read_proc = coherence_id_read_proc;
+		entry->write_proc = NULL;
+	}
+}
+
 void
 register_sn_procfs(void) {
 	register_sn_partition_id();
 	register_sn_serial_numbers();
 	register_sn_force_interrupt();
+	register_sn_coherence_id();
 }
 
 #endif /* CONFIG_PROC_FS */
