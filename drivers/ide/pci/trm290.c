@@ -179,64 +179,15 @@ static void trm290_selectproc (ide_drive_t *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
+static void trm290_ide_dma_exec_cmd(ide_drive_t *drive, u8 command)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq	= HWGROUP(drive)->rq;
-//	ide_task_t *args	= rq->special;
-	task_ioreg_t command	= WIN_NOP;
 
 	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
 		BUG();
 	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
-	command = /* (lba48) ? WIN_READDMA_EXT : */ WIN_READDMA;
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#endif
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
-	return hwif->ide_dma_begin(drive);
-}
-
-static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq	= HWGROUP(drive)->rq;
-//	ide_task_t *args	= rq->special;
-	task_ioreg_t command	= WIN_NOP;
-
-	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-		BUG();
-	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
-	command = /* (lba48) ? WIN_WRITEDMA_EXT : */ WIN_WRITEDMA;
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#endif
-	/* issue cmd to drive */
-	hwif->OUTB(command, IDE_COMMAND_REG);
-	return hwif->ide_dma_begin(drive);
 }
 
 static int trm290_ide_dma_setup(ide_drive_t *drive)
@@ -343,8 +294,7 @@ void __devinit init_hwif_trm290(ide_hwif_t *hwif)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->dma_setup = &trm290_ide_dma_setup;
-	hwif->ide_dma_write = &trm290_ide_dma_write;
-	hwif->ide_dma_read = &trm290_ide_dma_read;
+	hwif->dma_exec_cmd = &trm290_ide_dma_exec_cmd;
 	hwif->ide_dma_begin = &trm290_ide_dma_begin;
 	hwif->ide_dma_end = &trm290_ide_dma_end;
 	hwif->ide_dma_test_irq = &trm290_ide_dma_test_irq;

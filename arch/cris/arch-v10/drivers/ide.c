@@ -210,8 +210,6 @@ etrax100_ide_inb(ide_ioreg_t reg)
 static int e100_dma_check (ide_drive_t *drive);
 static int e100_dma_begin (ide_drive_t *drive);
 static int e100_dma_end (ide_drive_t *drive);
-static int e100_dma_read (ide_drive_t *drive);
-static int e100_dma_write (ide_drive_t *drive);
 static void e100_ide_input_data (ide_drive_t *drive, void *, unsigned int);
 static void e100_ide_output_data (ide_drive_t *drive, void *, unsigned int);
 static void e100_atapi_input_bytes(ide_drive_t *drive, void *, unsigned int);
@@ -305,6 +303,15 @@ static int e100_dma_setup(ide_drive_t *drive)
 	return 0;
 }
 
+static void e100_dma_exec_cmd(ide_drive_t *drive, u8 command)
+{
+	/* set the irq handler which will finish the request when DMA is done */
+	ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
+
+	/* issue cmd to drive */
+	etrax100_ide_outb(command, IDE_COMMAND_REG);
+}
+
 void __init
 init_e100_ide (void)
 {
@@ -327,8 +334,7 @@ init_e100_ide (void)
                 hwif->ide_dma_check = &e100_dma_check;
                 hwif->ide_dma_end = &e100_dma_end;
 		hwif->dma_setup = &e100_dma_setup;
-		hwif->ide_dma_write = &e100_dma_write;
-		hwif->ide_dma_read = &e100_dma_read;
+		hwif->dma_exec_cmd = &e100_dma_exec_cmd;
 		hwif->ide_dma_begin = &e100_dma_begin;
 		hwif->OUTB = &etrax100_ide_outb;
 		hwif->OUTW = &etrax100_ide_outw;
@@ -809,27 +815,9 @@ static int e100_dma_end(ide_drive_t *drive)
 	return 0;
 }
 
-static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
+static int e100_dma_begin(ide_drive_t *drive)
 {
-	if(reading) {
-
-		if(!atapi) {
-			/* set the irq handler which will finish the request when DMA is done */
-
-			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
-
-			/* issue cmd to drive */
-                        if ((HWGROUP(drive)->rq->cmd == IDE_DRIVE_TASKFILE) &&
-			    (drive->addressing == 1)) {
-				ide_task_t *args = HWGROUP(drive)->rq->special;
-				etrax100_ide_outb(args->tfRegister[IDE_COMMAND_OFFSET], IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				etrax100_ide_outb(WIN_READDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				etrax100_ide_outb(WIN_READDMA, IDE_COMMAND_REG);
-			}
-		}
-
+	if (e100_read_command) {
 		/* begin DMA */
 
 		/* need to do this before RX DMA due to a chip bug
@@ -862,24 +850,6 @@ static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 
 	} else {
 		/* writing */
-
-		if(!atapi) {
-			/* set the irq handler which will finish the request when DMA is done */
-
-			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
-
-			/* issue cmd to drive */
-			if ((HWGROUP(drive)->rq->cmd == IDE_DRIVE_TASKFILE) &&
-			    (drive->addressing == 1)) {
-				ide_task_t *args = HWGROUP(drive)->rq->special;
-				etrax100_ide_outb(args->tfRegister[IDE_COMMAND_OFFSET], IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				etrax100_ide_outb(WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				etrax100_ide_outb(WIN_WRITEDMA, IDE_COMMAND_REG);
-			}
-		}
-
 		/* begin DMA */
 
 		*R_DMA_CH2_FIRST = virt_to_phys(ata_descrs);
@@ -903,27 +873,4 @@ static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 		D(printk("dma write of %d bytes.\n", ata_tot_size));
 	}
 	return 0;
-}
-
-static int e100_dma_write(ide_drive_t *drive)
-{
-	return e100_start_dma(drive, 0, 0);
-}
-
-static int e100_dma_read(ide_drive_t *drive)
-{
-	return e100_start_dma(drive, 0, 1);
-}
-
-static int e100_dma_begin(ide_drive_t *drive)
-{
-	/* begin DMA, used by ATAPI devices which want to issue the
-	 * appropriate IDE command themselves.
-	 *
-	 * they have already called ->dma_setup to set the
-	 * static reading flag, now they call ide_dma_begin to do
-	 * the real stuff. we tell our code below not to issue
-	 * any IDE commands itself and jump into it.
-	 */
-	 return e100_start_dma(drive, 1, e100_read_command);
 }

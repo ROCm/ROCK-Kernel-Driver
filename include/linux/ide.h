@@ -888,8 +888,7 @@ typedef struct hwif_s {
 	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
 
 	int (*dma_setup)(ide_drive_t *);
-	int (*ide_dma_read)(ide_drive_t *drive);
-	int (*ide_dma_write)(ide_drive_t *drive);
+	void (*dma_exec_cmd)(ide_drive_t *, u8);
 	int (*ide_dma_begin)(ide_drive_t *drive);
 	int (*ide_dma_end)(ide_drive_t *drive);
 	int (*ide_dma_check)(ide_drive_t *drive);

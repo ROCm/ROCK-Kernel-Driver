@@ -602,11 +602,6 @@ static int sgiioc4_ide_dma_setup(ide_drive_t *drive)
 	return 0;
 }
 
-static int sgiioc4_ide_dma_dummy(ide_drive_t *drive)
-{
-	return 0;
-}
-
 static void __init
 ide_init_sgiioc4(ide_hwif_t * hwif)
 {
@@ -630,8 +625,6 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->busproc = NULL;
 
 	hwif->dma_setup = &sgiioc4_ide_dma_setup;
-	hwif->ide_dma_read = &sgiioc4_ide_dma_dummy;
-	hwif->ide_dma_write = &sgiioc4_ide_dma_dummy;
 	hwif->ide_dma_begin = &sgiioc4_ide_dma_begin;
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;

@@ -422,10 +422,16 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 	if (dma) {
 		if (!hwif->dma_setup(drive)) {
 			if (rq_data_dir(rq)) {
-				hwif->ide_dma_write(drive);
+				command = lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+				if (drive->vdma)
+					command = lba48 ? WIN_WRITE_EXT: WIN_WRITE;
 			} else {
-				hwif->ide_dma_read(drive);
+				command = lba48 ? WIN_READDMA_EXT : WIN_READDMA;
+				if (drive->vdma)
+					command = lba48 ? WIN_READ_EXT: WIN_READ;
 			}
+			hwif->dma_exec_cmd(drive, command);
+			hwif->ide_dma_begin(drive);
 			return ide_started;
 		}
 		/* fallback to PIO */

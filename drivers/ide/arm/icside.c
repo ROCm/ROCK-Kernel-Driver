@@ -484,67 +484,10 @@ static int icside_dma_setup(ide_drive_t *drive)
 	return 0;
 }
 
-static int icside_dma_read(ide_drive_t *drive)
+static void icside_dma_exec_cmd(ide_drive_t *drive, u8 command)
 {
-	struct request *rq = HWGROUP(drive)->rq;
-	task_ioreg_t cmd;
-
-	BUG_ON(HWGROUP(drive)->handler != NULL);
-
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	} else if (drive->addressing == 1) {
-		cmd = WIN_READDMA_EXT;
-	} else {
-		cmd = WIN_READDMA;
-	}
-#endif
 	/* issue cmd to drive */
 	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);
-
-	return icside_dma_begin(drive);
-}
-
-static int icside_dma_write(ide_drive_t *drive)
-{
-	struct request *rq = HWGROUP(drive)->rq;
-	task_ioreg_t cmd;
-
-	BUG_ON(HWGROUP(drive)->handler != NULL);
-
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	} else if (drive->addressing == 1) {
-		cmd = WIN_WRITEDMA_EXT;
-	} else {
-		cmd = WIN_WRITEDMA;
-	}
-#endif
-
-	/* issue cmd to drive */
-	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);
-
-	return icside_dma_begin(drive);
 }
 
 static int icside_dma_test_irq(ide_drive_t *drive)
@@ -615,8 +558,7 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->ide_dma_host_on	= icside_dma_host_on;
 	hwif->ide_dma_on	= icside_dma_on;
 	hwif->dma_setup		= icside_dma_setup;
-	hwif->ide_dma_read	= icside_dma_read;
-	hwif->ide_dma_write	= icside_dma_write;
+	hwif->dma_exec_cmd	= icside_dma_exec_cmd;
 	hwif->ide_dma_begin	= icside_dma_begin;
 	hwif->ide_dma_end	= icside_dma_end;
 	hwif->ide_dma_test_irq	= icside_dma_test_irq;
