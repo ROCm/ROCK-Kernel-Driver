@@ -621,7 +621,8 @@ crypt_clone(struct crypt_config *cc, struct crypt_io *io, struct bio *bio,
 	return clone;
 }
 
-static int crypt_map(struct dm_target *ti, struct bio *bio)
+static int crypt_map(struct dm_target *ti, struct bio *bio,
+		     union map_info *map_context)
 {
 	struct crypt_config *cc = (struct crypt_config *) ti->private;
 	struct crypt_io *io = mempool_alloc(cc->io_pool, GFP_NOIO);

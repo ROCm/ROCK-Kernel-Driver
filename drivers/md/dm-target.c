@@ -157,7 +157,8 @@ static void io_err_dtr(struct dm_target *ti)
 	/* empty */
 }
 
-static int io_err_map(struct dm_target *ti, struct bio *bio)
+static int io_err_map(struct dm_target *ti, struct bio *bio,
+		      union map_info *map_context)
 {
 	return -EIO;
 }

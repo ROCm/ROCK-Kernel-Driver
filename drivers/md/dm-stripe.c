@@ -166,7 +166,8 @@ static void stripe_dtr(struct dm_target *ti)
 	kfree(sc);
 }
 
-static int stripe_map(struct dm_target *ti, struct bio *bio)
+static int stripe_map(struct dm_target *ti, struct bio *bio,
+		      union map_info *map_context)
 {
 	struct stripe_c *sc = (struct stripe_c *) ti->private;
 
