@@ -10,6 +10,13 @@
 
 #ifdef UML_CONFIG_MODE_SKAS
 
+/* syscall emulation path in ptrace */
+
+#ifndef PTRACE_SYSEMU
+#define PTRACE_SYSEMU 31
+#endif
+extern int use_sysemu;
+
 #include "skas_ptregs.h"
 
 #define HOST_FRAME_SIZE 17

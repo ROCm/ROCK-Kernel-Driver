@@ -19,6 +19,7 @@
 #include <asm/sigcontext.h>
 #include <asm/unistd.h>
 #include <asm/page.h>
+#include <asm/user.h>
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -227,6 +228,40 @@ void __init check_ptrace(void)
 	}
 	stop_ptraced_child(pid, stack, 0);
 	printk("OK\n");
+
+#ifdef PTRACE_SYSEMU
+	printk("Checking syscall emulation patch for ptrace...");
+	use_sysemu = 0;
+	pid = start_ptraced_child(&stack);
+	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
+		struct user_regs_struct regs;
+
+		if (waitpid(pid, &status, WUNTRACED) < 0)
+			panic("check_ptrace : wait failed, errno = %d", errno);
+		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
+			panic("check_ptrace : expected SIGTRAP, "
+			      "got status = %d", status);
+
+		if (ptrace(PTRACE_GETREGS, pid, 0, &regs) < 0)
+			panic("check_ptrace : failed to read child "
+			      "registers, errno = %d", errno);
+		regs.orig_eax = pid;
+		if (ptrace(PTRACE_SETREGS, pid, 0, &regs) < 0)
+			panic("check_ptrace : failed to modify child "
+			      "registers, errno = %d", errno);
+
+		stop_ptraced_child(pid, stack, 0);
+
+		printk("OK\n");
+		use_sysemu = 1;
+	}
+	else
+	{
+		printk("missing\n");
+		stop_ptraced_child(pid, stack, 1);
+	}
+
+# endif /* PTRACE_SYSEMU */
 }
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)

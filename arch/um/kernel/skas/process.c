@@ -28,6 +28,10 @@
 #include "chan_user.h"
 #include "signal_user.h"
 
+#ifdef PTRACE_SYSEMU
+int use_sysemu = 0;
+#endif
+
 int is_skas_winch(int pid, int fd, void *data)
 {
 	if(pid != getpid())
@@ -68,6 +72,10 @@ static void handle_trap(int pid, union uml_pt_regs *regs)
 		return;
 	}
 
+#ifdef PTRACE_SYSEMU
+	if (!use_sysemu)
+	{
+#endif
 	err = ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, __NR_getpid);
 	if(err < 0)
 	        panic("handle_trap - nullifying syscall failed errno = %d\n", 
@@ -82,6 +90,9 @@ static void handle_trap(int pid, union uml_pt_regs *regs)
 	if((err < 0) || !WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
 		panic("handle_trap - failed to wait at end of syscall, "
 		      "errno = %d, status = %d\n", errno, status);
+#ifdef PTRACE_SYSEMU
+	}
+#endif
 
 	handle_syscall(regs);
 }
@@ -139,6 +150,11 @@ void userspace(union uml_pt_regs *regs)
 
 	restore_registers(regs);
 		
+#ifdef PTRACE_SYSEMU
+	if (use_sysemu)
+		err = ptrace(PTRACE_SYSEMU, pid, 0, 0);
+	else
+#endif
 	err = ptrace(PTRACE_SYSCALL, pid, 0, 0);
 	if(err)
 		panic("userspace - PTRACE_SYSCALL failed, errno = %d\n", 
@@ -177,6 +193,12 @@ void userspace(union uml_pt_regs *regs)
 
 		restore_registers(regs);
 
+#ifdef PTRACE_SYSEMU
+		if (use_sysemu)
+			op = singlestepping_skas() ? PTRACE_SINGLESTEP :
+				PTRACE_SYSEMU;
+		else
+#endif
 		op = singlestepping_skas() ? PTRACE_SINGLESTEP : 
 			PTRACE_SYSCALL;
 		err = ptrace(op, pid, 0, 0);
