@@ -105,11 +105,10 @@ static struct irqaction pxa_timer_irq = {
 	.handler	= pxa_timer_interrupt
 };
 
-void __init pxa_init_time(void)
+static void __init pxa_timer_init(void)
 {
 	struct timespec tv;
 
-	gettimeoffset = pxa_gettimeoffset;
 	set_rtc = pxa_set_rtc;
 
 	tv.tv_nsec = 0;
@@ -123,3 +122,39 @@ void __init pxa_init_time(void)
 	OSCR = 0;		/* initialize free-running timer, force first match */
 }
 
+#ifdef CONFIG_PM
+static unsigned long osmr[4], oier;
+
+static void pxa_timer_suspend(void)
+{
+	osmr[0] = OSMR0;
+	osmr[1] = OSMR1;
+	osmr[2] = OSMR2;
+	osmr[3] = OSMR3;
+	oier = OIER;
+}
+
+static void pxa_timer_resume(void)
+{
+	OSMR0 = osmr[0];
+	OSMR1 = osmr[1];
+	OSMR2 = osmr[2];
+	OSMR3 = osmr[3];
+	OIER = oier;
+
+	/*
+	 * OSMR0 is the system timer: make sure OSCR is sufficiently behind
+	 */
+	OSCR = OSMR0 - LATCH;
+}
+#else
+#define pxa_timer_suspend NULL
+#define pxa_timer_resume NULL
+#endif
+
+struct sys_timer pxa_timer = {
+	.init		= pxa_timer_init,
+	.suspend	= pxa_timer_suspend,
+	.resume		= pxa_timer_resume,
+	.offset		= pxa_gettimeoffset,
+};

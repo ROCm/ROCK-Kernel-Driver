@@ -110,14 +110,11 @@ static struct irqaction iop331_timer_irq = {
 	.flags		= SA_INTERRUPT
 };
 
-extern int setup_arm_irq(int, struct irqaction*);
-
-void __init iop331_init_time(void)
+static void __init iop331_timer_init(void)
 {
 	u32 timer_ctl;
 
 	iop331_latch = (CLOCK_TICK_RATE + HZ / 2) / HZ;
-	gettimeoffset = iop331_gettimeoffset;
 	setup_irq(IRQ_IOP331_TIMER0, &iop331_timer_irq);
 
 	timer_ctl = IOP331_TMR_EN | IOP331_TMR_PRIVILEGED | IOP331_TMR_RELOAD |
@@ -138,4 +135,7 @@ void __init iop331_init_time(void)
 #endif
 }
 
-
+struct sys_timer iop331_timer = {
+	.init		= iop331_timer_init,
+	.offset		= iop331_gettimeoffset,
+};

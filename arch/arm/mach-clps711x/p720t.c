@@ -34,9 +34,7 @@
 #include <asm/mach/map.h>
 #include <asm/arch/syspld.h>
 
-extern void clps711x_init_irq(void);
-extern void clps711x_map_io(void);
-extern void clps711x_init_time(void);
+#include "common.h"
 
 /*
  * Map the P720T system PLD.  It occupies two address spaces:
@@ -87,7 +85,7 @@ MACHINE_START(P720T, "ARM-Prospector720T")
 	FIXUP(fixup_p720t)
 	MAPIO(p720t_map_io)
 	INITIRQ(clps711x_init_irq)
-	INITTIME(clps711x_init_time)
+	.timer		= &clps711x_timer,
 MACHINE_END
 
 static int p720t_hw_init(void)

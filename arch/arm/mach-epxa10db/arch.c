@@ -29,13 +29,13 @@
 
 extern void epxa10db_map_io(void);
 extern void epxa10db_init_irq(void);
-extern void epxa10db_init_time(void);
+extern struct sys_timer epxa10db_timer;
 
 MACHINE_START(CAMELOT, "Altera Epxa10db")
 	MAINTAINER("Altera Corporation")
 	BOOT_MEM(0x00000000, 0x7fffc000, 0xffffc000)
 	MAPIO(epxa10db_map_io)
 	INITIRQ(epxa10db_init_irq)
-	INITTIME(epxa10db_init_time)
+	.timer		= &epxa10db_timer,
 MACHINE_END
 
