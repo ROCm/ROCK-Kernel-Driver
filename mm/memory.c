@@ -484,6 +484,16 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 #define ZAP_BLOCK_SIZE	(~(0UL))
 #endif
 
+/*
+ * hugepage regions must be unmapped with HPAGE_SIZE granularity
+ */
+static inline unsigned long zap_block_size(struct vm_area_struct *vma)
+{
+	if (is_vm_hugetlb_page(vma))
+		return HPAGE_SIZE;
+	return ZAP_BLOCK_SIZE;
+}
+
 /**
  * unmap_vmas - unmap a range of memory covered by a list of vma's
  * @tlbp: address of the caller's struct mmu_gather
@@ -514,7 +524,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 		struct vm_area_struct *vma, unsigned long start_addr,
 		unsigned long end_addr, unsigned long *nr_accounted)
 {
-	unsigned long zap_bytes = ZAP_BLOCK_SIZE;
+	unsigned long zap_bytes = zap_block_size(vma);
 	unsigned long tlb_start;	/* For tlb_finish_mmu */
 	int tlb_start_valid = 0;
 	int ret = 0;
@@ -562,7 +572,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 				*tlbp = tlb_gather_mmu(mm, 0);
 				tlb_start_valid = 0;
 			}
-			zap_bytes = ZAP_BLOCK_SIZE;
+			zap_bytes = zap_block_size(vma);
 		}
 		if (vma->vm_next && vma->vm_next->vm_start < vma->vm_end)
 			printk("%s: VMA list is not sorted correctly!\n",
