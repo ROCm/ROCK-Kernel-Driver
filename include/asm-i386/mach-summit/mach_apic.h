@@ -4,13 +4,7 @@
 #include <linux/config.h>
 #include <asm/smp.h>
 
-#ifdef CONFIG_X86_GENERICARCH
-#define x86_summit 1	/* must be an constant expressiona for generic arch */
-#else
-extern int x86_summit;
-#endif
-
-#define esr_disable (x86_summit ? 1 : 0)
+#define esr_disable (1)
 #define NO_BALANCE_IRQ (0)
 
 #define XAPIC_DEST_CPUS_MASK    0x0Fu
@@ -22,27 +16,27 @@ static inline unsigned long xapic_phys_to_log_apicid(int phys_apic)
 		 ((phys_apic) & XAPIC_DEST_CLUSTER_MASK) );
 }
 
-#define APIC_DFR_VALUE	(x86_summit ? APIC_DFR_CLUSTER : APIC_DFR_FLAT)
+#define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 
 static inline unsigned long target_cpus(void)
 {
-	return (x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_online_map);
+	return XAPIC_DEST_CPUS_MASK;
 } 
 #define TARGET_CPUS	(target_cpus())
 
-#define INT_DELIVERY_MODE (x86_summit ? dest_Fixed : dest_LowestPrio)
+#define INT_DELIVERY_MODE (dest_Fixed)
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
 #define APIC_BROADCAST_ID     (0x0F)
 static inline unsigned long check_apicid_used(unsigned long bitmap, int apicid) 
 {
-	return (x86_summit ? 0 : (bitmap & (1 << apicid)));
+	return 0;
 } 
 
 /* we don't use the phys_cpu_present_map to indicate apicid presence */
 static inline unsigned long check_apicid_present(int bit) 
 {
-	return (x86_summit ? 1 : (phys_cpu_present_map & (1 << bit)));
+	return 1;
 }
 
 #define apicid_cluster(apicid) (apicid & 0xF0)
@@ -53,10 +47,7 @@ static inline void init_apic_ldr(void)
 {
 	unsigned long val, id;
 
-	if (x86_summit)
-		id = xapic_phys_to_log_apicid(hard_smp_processor_id());
-	else
-		id = 1UL << smp_processor_id();
+	id = xapic_phys_to_log_apicid(hard_smp_processor_id());
 	apic_write_around(APIC_DFR, APIC_DFR_VALUE);
 	val = apic_read(APIC_LDR) & ~APIC_LDR_MASK;
 	val |= SET_APIC_LOGICAL_ID(id);
@@ -75,8 +66,8 @@ static inline int apic_id_registered(void)
 
 static inline void clustered_apic_check(void)
 {
-	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
-		(x86_summit ? "Summit" : "Flat"), nr_ioapics);
+	printk("Enabling APIC mode:  Summit.  Using %d I/O APICs\n",
+						nr_ioapics);
 }
 
 static inline int apicid_to_node(int logical_apicid)
@@ -93,24 +84,18 @@ static inline int cpu_to_logical_apicid(int cpu)
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	if (x86_summit)
-		return (int) bios_cpu_apicid[mps_cpu];
-	else
-		return mps_cpu;
+	return (int) bios_cpu_apicid[mps_cpu];
 }
 
 static inline ulong ioapic_phys_id_map(ulong phys_map)
 {
 	/* For clustered we don't have a good way to do this yet - hack */
-	return (x86_summit ? 0x0F : phys_map);
+	return 0x0F;
 }
 
 static inline unsigned long apicid_to_cpu_present(int apicid)
 {
-	if (x86_summit)
-		return 1;
-	else
-		return (1ul << apicid);
+	return 1;
 }
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, 
@@ -130,10 +115,7 @@ static inline void setup_portio_remap(void)
 
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
-	if (x86_summit)
-		return (1);
-	else
-		return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
+	return 1;
 }
 
 static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
