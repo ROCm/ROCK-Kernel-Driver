@@ -1591,16 +1591,13 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
   return 0 ;
 }
 
-/*
-** read and replay the log
-** on a clean unmount, the journal header's next unflushed pointer will be to an invalid
-** transaction.  This tests that before finding all the transactions in the log, whic makes normal mount times fast.
-**
-** After a crash, this starts with the next unflushed transaction, and replays until it finds one too old, or invalid.
-**
-** On exit, it sets things up so the first transaction will work correctly.
-*/
-struct buffer_head * reiserfs_breada (struct super_block *sb, int block, 
+/* This function reads blocks starting from block and to max_block of bufsize
+   size (but no more than BUFNR blocks at a time). This proved to improve
+   mounting speed on self-rebuilding raid5 arrays at least.
+   Right now it is only used from journal code. But later we might use it
+   from other places.
+   Note: Do not use journal_getblk/sb_getblk functions here! */
+struct buffer_head * reiserfs_breada (struct block_device *dev, int block, int bufsize,
 			    unsigned int max_block)
 {
 	struct buffer_head * bhlist[BUFNR];
@@ -1608,7 +1605,7 @@ struct buffer_head * reiserfs_breada (struct super_block *sb, int block,
 	struct buffer_head * bh;
 	int i, j;
 	
-	bh = sb_getblk (sb, block);
+	bh = __getblk (dev, block, bufsize );
 	if (buffer_uptodate (bh))
 		return (bh);   
 		
@@ -1618,7 +1615,7 @@ struct buffer_head * reiserfs_breada (struct super_block *sb, int block,
 	bhlist[0] = bh;
 	j = 1;
 	for (i = 1; i < blocks; i++) {
-		bh = sb_getblk (sb, block + i);
+		bh = __getblk (dev, block + i, bufsize);
 		if (buffer_uptodate (bh)) {
 			brelse (bh);
 			break;
@@ -1635,6 +1632,16 @@ struct buffer_head * reiserfs_breada (struct super_block *sb, int block,
 	brelse (bh);
 	return NULL;
 }
+
+/*
+** read and replay the log
+** on a clean unmount, the journal header's next unflushed pointer will be to an invalid
+** transaction.  This tests that before finding all the transactions in the log, whic makes normal mount times fast.
+**
+** After a crash, this starts with the next unflushed transaction, and replays until it finds one too old, or invalid.
+**
+** On exit, it sets things up so the first transaction will work correctly.
+*/
 static int journal_read(struct super_block *p_s_sb) {
   struct reiserfs_journal_desc *desc ;
   unsigned long oldest_trans_id = 0;
@@ -1701,7 +1708,9 @@ static int journal_read(struct super_block *p_s_sb) {
   ** all the valid transactions, and pick out the oldest.
   */
   while(continue_replay && cur_dblock < (SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb))) {
-    d_bh = reiserfs_breada(p_s_sb, cur_dblock,
+    /* Note that it is required for blocksize of primary fs device and journal
+       device to be the same */
+    d_bh = reiserfs_breada(SB_JOURNAL(p_s_sb)->j_dev_bd, cur_dblock, p_s_sb->s_blocksize,
 			   SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb)) ;
     ret = journal_transaction_is_valid(p_s_sb, d_bh, &oldest_invalid_trans_id, &newest_mount_id) ;
     if (ret == 1) {
