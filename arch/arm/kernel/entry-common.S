@@ -9,6 +9,7 @@
  */
 #include <linux/config.h>
 #include "entry-header.S"
+#include <asm/thread_info.h>
 
 /* 
  * We rely on the fact that R0 is at the bottom of the stack (due to
@@ -34,39 +35,42 @@ ENTRY(__do_softirq)
  * stack.
  */
 ret_fast_syscall:
-#error	ldr	r1, [tsk, #TSK_NEED_RESCHED]
-#error	ldr	r2, [tsk, #TSK_SIGPENDING]
-	teq	r1, #0				@ need_resched || sigpending
-	teqeq	r2, #0
-	bne	slow
+	set_cpsr_c r1, #PSR_I_BIT | MODE_SVC	@ disable interrupts
+	ldr	r1, [tsk, #TI_FLAGS]
+	tst	r1, #_TIF_WORK_MASK
+	bne	ret_fast_work
 	fast_restore_user_regs
 
 /*
  * Ok, we need to do extra processing, enter the slow path.
  */
-slow:	str	r0, [sp, #S_R0+S_OFF]!	@ returned r0
-	b	1f
+ret_fast_work:
+	str	r0, [sp, #S_R0+S_OFF]!	@ returned r0
+	b	work_pending
 
+work_resched:
+	bl	SYMBOL_NAME(schedule)
 /*
  * "slow" syscall return path.  "why" tells us if this was a real syscall.
  */
-reschedule:
-	bl	SYMBOL_NAME(schedule)
 ENTRY(ret_to_user)
 ret_slow_syscall:
-#error	ldr	r1, [tsk, #TSK_NEED_RESCHED]
-#error	ldr	r2, [tsk, #TSK_SIGPENDING]
-1:	teq	r1, #0				@ need_resched => schedule()
-	bne	reschedule
-	teq	r2, #0				@ sigpending => do_signal()
-	blne	__do_signal
+	set_cpsr_c r1, #PSR_I_BIT | MODE_SVC
+	ldr	r1, [tsk, #TI_FLAGS]
+	tst	r1, #_TIF_WORK_MASK
+	beq	no_work_pending
+work_pending:
+	tst	r1, #_TIF_NEED_RESCHED
+	bne	work_resched
+	tst	r1, #_TIF_NOTIFY_RESUME | _TIF_SIGPENDING
+	blne	__do_notify_resume
+no_work_pending:
 	restore_user_regs
 
-__do_signal:
-	mov	r0, #0				@ NULL 'oldset'
-	mov	r1, sp				@ 'regs'
+__do_notify_resume:
+	mov	r0, sp				@ 'regs'
 	mov	r2, why				@ 'syscall'
-#error	b	SYMBOL_NAME(do_signal)		@ note the bl above sets lr
+	b	SYMBOL_NAME(do_notify_resume)	@ note the bl above sets lr
 
 /*
  * This is how we return from a fork.  __switch_to will be calling us
@@ -75,14 +79,14 @@ __do_signal:
  */
 ENTRY(ret_from_fork)
 	bl	SYMBOL_NAME(schedule_tail)
-	get_current_task tsk
-	ldr	ip, [tsk, #TSK_PTRACE]		@ check for syscall tracing
+	get_thread_info tsk
+	ldr	ip, [tsk, #TI_FLAGS]		@ check for syscall tracing
 	mov	why, #1
-	tst	ip, #PT_TRACESYS		@ are we tracing syscalls?
+	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
 	beq	ret_slow_syscall
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
-#error	bl	SYMBOL_NAME(syscall_trace)
+	bl	SYMBOL_NAME(syscall_trace)
 	b	ret_slow_syscall
 	
 
@@ -134,12 +138,12 @@ ENTRY(vector_swi)
 
 	str	r4, [sp, #-S_OFF]!		@ push fifth arg
 
-	get_current_task tsk
-	ldr	ip, [tsk, #TSK_PTRACE]		@ check for syscall tracing
+	get_thread_info tsk
+	ldr	ip, [tsk, #TI_FLAGS]		@ check for syscall tracing
 	bic	scno, scno, #0xff000000		@ mask off SWI op-code
 	eor	scno, scno, #OS_NUMBER << 20	@ check OS number
 	adr	tbl, sys_call_table		@ load syscall table pointer
-	tst	ip, #PT_TRACESYS		@ are we tracing syscalls?
+	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
 	bne	__sys_trace
 
 	adrsvc	al, lr, ret_fast_syscall	@ return address
@@ -160,7 +164,7 @@ ENTRY(vector_swi)
 __sys_trace:
 	add	r1, sp, #S_OFF
 	mov	r0, #0				@ trace entry [IP = 0]
-#error	bl	SYMBOL_NAME(syscall_trace)
+	bl	SYMBOL_NAME(syscall_trace)
 
 	adrsvc	al, lr, __sys_trace_return	@ return address
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
@@ -173,7 +177,7 @@ __sys_trace_return:
 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
-#error	bl	SYMBOL_NAME(syscall_trace)
+	bl	SYMBOL_NAME(syscall_trace)
 	b	ret_slow_syscall
 
 	.align	5

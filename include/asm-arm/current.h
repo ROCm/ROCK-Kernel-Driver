@@ -1,12 +1,13 @@
 #ifndef _ASMARM_CURRENT_H
 #define _ASMARM_CURRENT_H
 
+#include <asm/thread_info.h>
+
 static inline struct task_struct *get_current(void) __attribute__ (( __const__ ));
 
 static inline struct task_struct *get_current(void)
 {
-	register unsigned long sp asm ("sp");
-	return (struct task_struct *)(sp & ~0x1fff);
+	return current_thread_info()->task;
 }
 
 #define current (get_current())

@@ -480,6 +480,7 @@ static void
 handle_signal(unsigned long sig, struct k_sigaction *ka,
 	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs)
 {
+	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = current;
 	int usig = sig;
 	int ret;
@@ -487,8 +488,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	/*
 	 * translate the signal
 	 */
-	if (usig < 32 && tsk->exec_domain && tsk->exec_domain->signal_invmap)
-		usig = tsk->exec_domain->signal_invmap[usig];
+	if (usig < 32 && thread->exec_domain && thread->exec_domain->signal_invmap)
+		usig = thread->exec_domain->signal_invmap[usig];
 
 	/*
 	 * Set up the stack frame
@@ -532,7 +533,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
  * the kernel can handle, and then we build all the user-level signal handling
  * stack-frames in one go after that.
  */
-asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
+int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 {
 	struct k_sigaction *ka;
 	siginfo_t info;
@@ -677,4 +678,11 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 	if (single_stepping)
 		ptrace_set_bpt(current);
 	return 0;
+}
+
+asmlinkage void
+do_notify_resume(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+{
+	if (thread_flags & _TIF_SIGPENDING)
+		do_signal(NULL, regs, syscall);
 }

@@ -27,12 +27,13 @@
  * Note also that it is intended that __put_user_bad is not global.
  */
 #include <asm/constants.h>
+#include <asm/thread_info.h>
 
 	.global	__put_user_1
 __put_user_1:
 	bic	r2, sp, #0x1f00
 	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TSK_ADDR_LIMIT]
+	ldr	r2, [r2, #TI_ADDR_LIMIT]
 	sub	r2, r2, #1
 	cmp	r0, r2
 1:	strlsbt	r1, [r0]
@@ -44,7 +45,7 @@ __put_user_1:
 __put_user_2:
 	bic	r2, sp, #0x1f00
 	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TSK_ADDR_LIMIT]
+	ldr	r2, [r2, #TI_ADDR_LIMIT]
 	sub	r2, r2, #2
 	cmp	r0, r2
 	movls	r2, r1, lsr #8
@@ -63,7 +64,7 @@ __put_user_2:
 __put_user_4:
 	bic	r2, sp, #0x1f00
 	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TSK_ADDR_LIMIT]
+	ldr	r2, [r2, #TI_ADDR_LIMIT]
 	sub	r2, r2, #4
 	cmp	r0, r2
 4:	strlst	r1, [r0]
@@ -75,7 +76,7 @@ __put_user_4:
 __put_user_8:
 	bic	ip, sp, #0x1f00
 	bic	ip, ip, #0x00ff
-	ldr	ip, [ip, #TSK_ADDR_LIMIT]
+	ldr	ip, [ip, #TI_ADDR_LIMIT]
 	sub	ip, ip, #8
 	cmp	r0, ip
 5:	strlst	r1, [r0], #4

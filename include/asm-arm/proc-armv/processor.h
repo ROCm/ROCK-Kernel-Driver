@@ -22,7 +22,7 @@
 
 #define KERNEL_STACK_SIZE	PAGE_SIZE
 
-struct context_save_struct {
+struct cpu_context_save {
 	unsigned long cpsr;
 	unsigned long r4;
 	unsigned long r5;
@@ -35,15 +35,12 @@ struct context_save_struct {
 	unsigned long pc;
 };
 
-#define INIT_CSS (struct context_save_struct){ SVC_MODE, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+#define INIT_CSS (struct cpu_context_save){ SVC_MODE, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 
-#define EXTRA_THREAD_STRUCT						\
-	unsigned int	domain;
-
-#define EXTRA_THREAD_STRUCT_INIT					\
-	domain:	  domain_val(DOMAIN_USER, DOMAIN_CLIENT) |		\
-		  domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) |		\
-		  domain_val(DOMAIN_IO, DOMAIN_CLIENT)
+#define INIT_EXTRA_THREAD_INFO						\
+	cpu_domain:	  domain_val(DOMAIN_USER, DOMAIN_CLIENT) |	\
+			  domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) |	\
+			  domain_val(DOMAIN_IO, DOMAIN_CLIENT)
 
 #define start_thread(regs,pc,sp)					\
 ({									\
@@ -63,12 +60,5 @@ struct context_save_struct {
 
 #define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1021])
 #define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1019])
-
-/* Allocation and freeing of basic task resources. */
-/*
- * NOTE! The task struct and the stack go together
- */
-#define ll_alloc_task_struct() ((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
-#define ll_free_task_struct(p) free_pages((unsigned long)(p),1)
 
 #endif

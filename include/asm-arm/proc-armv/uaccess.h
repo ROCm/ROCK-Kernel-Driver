@@ -16,8 +16,7 @@
 
 static inline void set_fs (mm_segment_t fs)
 {
-	current->addr_limit = fs;
-
+	current_thread_info()->addr_limit = fs;
 	modify_domain(DOMAIN_KERNEL, fs ? DOMAIN_CLIENT : DOMAIN_MANAGER);
 }
 
@@ -26,7 +25,7 @@ static inline void set_fs (mm_segment_t fs)
 	unsigned long flag, sum; \
 	__asm__("adds %1, %2, %3; sbcccs %1, %1, %0; movcc %0, #0" \
 		: "=&r" (flag), "=&r" (sum) \
-		: "r" (addr), "Ir" (size), "0" (current->addr_limit) \
+		: "r" (addr), "Ir" (size), "0" (current_thread_info()->addr_limit) \
 		: "cc"); \
 	flag; })
 
@@ -34,7 +33,7 @@ static inline void set_fs (mm_segment_t fs)
 	unsigned long flag; \
 	__asm__("cmp %2, %0; movlo %0, #0" \
 		: "=&r" (flag) \
-		: "0" (current->addr_limit), "r" (addr) \
+		: "0" (current_thread_info()->addr_limit), "r" (addr) \
 		: "cc"); \
 	(flag == 0); })
 

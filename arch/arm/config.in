@@ -464,6 +464,7 @@ tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 bool 'Power Management support' CONFIG_PM
+dep_bool 'Preemptible Kernel (experimental)' CONFIG_PREEMPT $CONFIG_CPU_32 $CONFIG_EXPERIMENTAL
 dep_tristate 'Advanced Power Management Emulation' CONFIG_APM $CONFIG_PM
 dep_tristate 'RISC OS personality' CONFIG_ARTHUR $CONFIG_CPU_32
 

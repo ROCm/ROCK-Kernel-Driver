@@ -73,7 +73,7 @@ put_stack_long(struct task_struct *task, int offset, long data)
 
 	newregs = *regs;
 	newregs.uregs[offset] = data;
-	
+
 	if (valid_user_regs(&newregs)) {
 		regs->uregs[offset] = data;
 		ret = 0;
@@ -456,9 +456,9 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			if ((unsigned long) data > _NSIG)
 				break;
 			if (request == PTRACE_SYSCALL)
-				child->ptrace |= PT_TRACESYS;
+				set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			else
-				child->ptrace &= ~PT_TRACESYS;
+				clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			child->exit_code = data;
 			/* make sure single-step breakpoint is gone. */
 			__ptrace_cancel_bpt(child);
@@ -491,7 +491,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			if ((unsigned long) data > _NSIG)
 				break;
 			child->thread.debug.nsaved = -1;
-			child->ptrace &= ~PT_TRACESYS;
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			child->exit_code = data;
 			/* give it a chance to run. */
 			wake_up_process(child);
@@ -548,7 +548,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 				break;
 
 			/* we should check child->used_math here */
-			ret = __copy_to_user((void *)data, &child->thread.fpstate,
+			ret = __copy_to_user((void *)data, &child->thread_info->fpstate,
 					     sizeof(struct user_fp)) ? -EFAULT : 0;
 			break;
 		
@@ -561,7 +561,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 				break;
 
 			child->used_math = 1;
-			ret = __copy_from_user(&child->thread.fpstate, (void *)data,
+			ret = __copy_from_user(&child->thread_info->fpstate, (void *)data,
 					   sizeof(struct user_fp)) ? -EFAULT : 0;
 			break;
 
@@ -617,7 +617,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	ret = do_ptrace(request, child, addr, data);
 
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
@@ -627,8 +627,9 @@ asmlinkage void syscall_trace(int why, struct pt_regs *regs)
 {
 	unsigned long ip;
 
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-			!= (PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(current->ptrace & PT_PTRACED))
 		return;
 
 	/*

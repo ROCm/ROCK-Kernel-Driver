@@ -149,7 +149,7 @@ __switch_data:	.long	__mmap_switched
 		.long	SYMBOL_NAME(processor_id)
 		.long	SYMBOL_NAME(__machine_arch_type)
 		.long	SYMBOL_NAME(cr_alignment)
-		.long	SYMBOL_NAME(init_task_union)+8192
+		.long	SYMBOL_NAME(init_thread_union)+8192
 
 		.type	__ret, %function
 __ret:		ldr	lr, __switch_data

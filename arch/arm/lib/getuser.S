@@ -27,12 +27,13 @@
  * Note also that it is intended that __get_user_bad is not global.
  */
 #include <asm/constants.h>
+#include <asm/thread_info.h>
 
 	.global	__get_user_1
 __get_user_1:
 	bic	r1, sp, #0x1f00
 	bic	r1, r1, #0x00ff
-	ldr	r1, [r1, #TSK_ADDR_LIMIT]
+	ldr	r1, [r1, #TI_ADDR_LIMIT]
 	sub	r1, r1, #1
 	cmp	r0, r1
 1:	ldrlsbt	r1, [r0]
@@ -44,7 +45,7 @@ __get_user_1:
 __get_user_2:
 	bic	r2, sp, #0x1f00
 	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TSK_ADDR_LIMIT]
+	ldr	r2, [r2, #TI_ADDR_LIMIT]
 	sub	r2, r2, #2
 	cmp	r0, r2
 2:	ldrlsbt	r1, [r0], #1
@@ -62,7 +63,7 @@ __get_user_2:
 __get_user_4:
 	bic	r1, sp, #0x1f00
 	bic	r1, r1, #0x00ff
-	ldr	r1, [r1, #TSK_ADDR_LIMIT]
+	ldr	r1, [r1, #TI_ADDR_LIMIT]
 	sub	r1, r1, #4
 	cmp	r0, r1
 4:	ldrlst	r1, [r0]
@@ -74,7 +75,7 @@ __get_user_4:
 __get_user_8:
 	bic	r2, sp, #0x1f00
 	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TSK_ADDR_LIMIT]
+	ldr	r2, [r2, #TI_ADDR_LIMIT]
 	sub	r2, r2, #8
 	cmp	r0, r2
 5:	ldrlst	r1, [r0], #4
