@@ -494,7 +494,6 @@ fake_volatile:
 	acct_process(code);
 	__exit_mm(tsk);
 
-	lock_kernel();
 	sem_exit();
 	__exit_files(tsk);
 	__exit_fs(tsk);

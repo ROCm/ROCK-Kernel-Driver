@@ -995,6 +995,8 @@ void sem_exit (void)
 	struct sem_array *sma;
 	int nsems, i;
 
+	lock_kernel();
+
 	/* If the current process was sleeping for a semaphore,
 	 * remove it from the queue.
 	 */
@@ -1051,6 +1053,8 @@ next_entry:
 		sem_unlock(semid);
 	}
 	current->semundo = NULL;
+
+	unlock_kernel();
 }
 
 #ifdef CONFIG_PROC_FS
