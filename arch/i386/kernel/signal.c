@@ -56,16 +56,15 @@ sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 }
 
 asmlinkage int
-sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
+sys_rt_sigsuspend(struct pt_regs regs)
 {
-	struct pt_regs * regs = (struct pt_regs *) &unewset;
 	sigset_t saveset, newset;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t))
+	if (regs.ecx != sizeof(sigset_t))
 		return -EINVAL;
 
-	if (copy_from_user(&newset, unewset, sizeof(newset)))
+	if (copy_from_user(&newset, (sigset_t __user *)regs.ebx, sizeof(newset)))
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
@@ -75,11 +74,11 @@ sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	regs->eax = -EINTR;
+	regs.eax = -EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (do_signal(regs, &saveset))
+		if (do_signal(&regs, &saveset))
 			return -EINTR;
 	}
 }
@@ -117,10 +116,11 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 }
 
 asmlinkage int
-sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss)
+sys_sigaltstack(struct pt_regs regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &uss;
-	return do_sigaltstack(uss, uoss, regs->esp);
+	const stack_t __user *uss = (const stack_t __user *)regs.ebx;
+	stack_t __user *uoss = (stack_t __user *)regs.ecx;
+	return do_sigaltstack(uss, uoss, regs.esp);
 }
 
 
