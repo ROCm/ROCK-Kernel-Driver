@@ -646,16 +646,8 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	u8 stat;
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat)) {
-		if ((stat & (ERR_STAT | DRQ_STAT)) ||
-		    ((stat & WRERR_STAT) && !drive->nowerr))
-			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
-		if (stat & BUSY_STAT) {
-			/* Not ready yet, so wait for another IRQ. */
-			ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
-			return ide_started;
-		}
-	}
+	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 
 	/* Deal with unexpected ATA data phase. */
 	if ((!(stat & DATA_READY) && rq->nr_sectors) ||
@@ -714,16 +706,8 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	u8 stat;
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat)) {
-		if ((stat & (ERR_STAT | DRQ_STAT)) ||
-		    ((stat & WRERR_STAT) && !drive->nowerr))
-			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
-		if (stat & BUSY_STAT) {
-			/* Not ready yet, so wait for another IRQ. */
-			ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-			return ide_started;
-		}
-	}
+	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 
 	/* Deal with unexpected ATA data phase. */
 	if ((!(stat & DATA_READY) && rq->nr_sectors) ||
