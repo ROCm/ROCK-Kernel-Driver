@@ -46,3 +46,10 @@ The implementor should read comments in include/linux/sched.h:
 struct sched_domain fields, SD_FLAG_*, SD_*_INIT to get an idea of
 the specifics and what to tune.
 
+Implementors should change the line
+#undef SCHED_DOMAIN_DEBUG
+to
+#define SCHED_DOMAIN_DEBUG
+in kernel/sched.c as this enables an error checking parse of the sched domains
+which should catch most possible errors (described above). It also prints out
+the domain structure in a visual format.

@@ -3395,9 +3395,87 @@ static void __init arch_init_sched_domains(void)
 #endif /* CONFIG_NUMA */
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
+#undef SCHED_DOMAIN_DEBUG
+#ifdef SCHED_DOMAIN_DEBUG
+void sched_domain_debug(void)
+{
+	int i;
+
+	for_each_cpu(i) {
+		int level = 0;
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+
+		printk(KERN_DEBUG "CPU%d: %s\n",
+				i, (cpu_online(i) ? " online" : "offline"));
+
+		do {
+			int j;
+			char str[NR_CPUS];
+			struct sched_group *group = cpu_domain->groups;
+			cpumask_t groupmask, tmp;
+
+			cpumask_snprintf(str, NR_CPUS, cpu_domain->span);
+			cpus_clear(groupmask);
+
+			printk(KERN_DEBUG);
+			for (j = 0; j < level + 1; j++)
+				printk(" ");
+			printk("domain %d: span %s\n", level, str);
+
+			if (!cpu_isset(i, cpu_domain->span))
+				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
+			if (!cpu_isset(i, group->cpumask))
+				printk(KERN_DEBUG "ERROR domain->groups does not contain CPU%d\n", i);
+
+			printk(KERN_DEBUG);
+			for (j = 0; j < level + 2; j++)
+				printk(" ");
+			printk("groups:");
+			do {
+				if (group == NULL) {
+					printk(" ERROR: NULL");
+					break;
+				}
+
+				if (cpus_weight(group->cpumask) == 0)
+					printk(" ERROR empty group:");
+
+				cpus_and(tmp, groupmask, group->cpumask);
+				if (cpus_weight(tmp) > 0)
+					printk(" ERROR repeated CPUs:");
+
+				cpus_or(groupmask, groupmask, group->cpumask);
+
+				cpumask_snprintf(str, NR_CPUS, group->cpumask);
+				printk(" %s", str);
+
+				group = group->next;
+			} while (group != cpu_domain->groups);
+			printk("\n");
+
+			if (!cpus_equal(cpu_domain->span, groupmask))
+				printk(KERN_DEBUG "ERROR groups don't span domain->span\n");
+
+			level++;
+			cpu_domain = cpu_domain->parent;
+
+			if (cpu_domain) {
+				cpus_and(tmp, groupmask, cpu_domain->span);
+				if (!cpus_equal(tmp, groupmask))
+					printk(KERN_DEBUG "ERROR parent span is not a superset of domain->span\n");
+			}
+
+		} while (cpu_domain);
+	}
+}
+#else
+#define sched_domain_debug() {}
+#endif
+
 void __init sched_init_smp(void)
 {
 	arch_init_sched_domains();
+	sched_domain_debug();
 }
 #else
 void __init sched_init_smp(void)
