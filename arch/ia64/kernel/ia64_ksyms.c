@@ -88,6 +88,7 @@ EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_single);
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(phys_cpu_present_map);
 EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 #else /* !CONFIG_SMP */
 
@@ -124,7 +125,7 @@ EXPORT_SYMBOL_NOVERS(__udivdi3);
 EXPORT_SYMBOL_NOVERS(__moddi3);
 EXPORT_SYMBOL_NOVERS(__umoddi3);
 
-#ifdef CONFIG_MD_RAID5
+#if defined(CONFIG_MD_RAID5) || defined(CONFIG_MD_RAID5_MODULE)
 extern void xor_ia64_2(void);
 extern void xor_ia64_3(void);
 extern void xor_ia64_4(void);
@@ -194,3 +195,8 @@ extern void ia64_spinlock_contention (void);
 EXPORT_SYMBOL(ia64_spinlock_contention);
 # endif
 #endif
+
+EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
+
+#include <linux/pm.h>
+EXPORT_SYMBOL(pm_idle);

@@ -102,11 +102,8 @@ ia64_patch_vtop (unsigned long start, unsigned long end)
 		ia64_fc(ip);
 		++offp;
 	}
-	ia64_insn_group_barrier();
 	ia64_sync_i();
-	ia64_insn_group_barrier();
 	ia64_srlz_i();
-	ia64_insn_group_barrier();
 }
 
 void
@@ -137,11 +134,8 @@ ia64_patch_mckinley_e9 (unsigned long start, unsigned long end)
 		ia64_fc(wp);
 		++offp;
 	}
-	ia64_insn_group_barrier();
 	ia64_sync_i();
-	ia64_insn_group_barrier();
 	ia64_srlz_i();
-	ia64_insn_group_barrier();
 }
 
 static void
