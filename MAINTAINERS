@@ -444,6 +444,13 @@ M:	dz@debian.org
 W:	http://www.debian.org/~dz/i8k/
 S:	Maintained
 
+DEVICE-MAPPER
+P:	Joe Thornber
+M:	dm@uk.sistina.com
+L:	linux-lvm@sistina.com
+W:	http://www.sistina.com/lvm
+S:	Maintained
+
 DEVICE NUMBER REGISTRY
 P:	H. Peter Anvin
 M:	hpa@zytor.com
@@ -457,23 +464,24 @@ L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 DIGI INTL. EPCA DRIVER
-P:	Chad Schwartz
-M:	support@dgii.com
-L:	digilnux@dgii.com
+P:	Digi International, Inc
+M:	Eng.Linux@digi.com
+L:	Eng.Linux@digi.com
+W:	http://www.digi.com
 S:	Maintained
 
 DIGI RIGHTSWITCH NETWORK DRIVER
 P:	Rick Richardson
 L:	linux-net@vger.kernel.org
-W:	http://www.dgii.com/linux/
-S:	Maintained
+W:	http://www.digi.com
+S:	Orphaned
 
 DIGIBOARD PC/XE AND PC/XI DRIVER
 P:	Christoph Lameter
 M:	christoph@lameter.com
-W:	http://www.dgii.com/linux,http://lameter.com/digi
+W:	http://www.digi.com
 L:	digilnux@dgii.com
-S:	Maintained
+S:	Orphaned
 
 DIRECTORY NOTIFICATION
 P:	Stephen Rothwell
@@ -852,9 +860,8 @@ L:	linux-net@vger.kernel.org
 S:	Maintained
 
 IRDA SUBSYSTEM
-P:	Dag Brattli
-M:	Dag Brattli <dag@brattli.net>
-L:	linux-irda@pasta.cs.uit.no
+P:	Jean Tourrilhes
+L:	irda-users@lists.sourceforge.net
 W:	http://irda.sourceforge.net/
 S:	Maintained
 
@@ -957,6 +964,12 @@ P:	Paul Mackerras
 M:	paulus@au.ibm.com
 W:	http://www.ibm.com/linux/ltc/projects/ppc
 S:	Supported
+
+LINUX FOR NCR VOYAGER
+P:	James Bottomley
+M:	James.Bottomley@HansenPartnership.com
+W:	http://www.hansenpartnership.com/voyager
+S:	Maintained
 
 LINUX FOR POWERPC
 P:	Paul Mackerras
