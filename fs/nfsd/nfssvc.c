@@ -338,10 +338,23 @@ static struct svc_version	nfsd_version3 = {
 		.vs_dispatch	= nfsd_dispatch
 };
 #endif
+#ifdef CONFIG_NFSD_V4
+static struct svc_version	nfsd_version4 = {
+		.vs_vers	= 4,
+		.vs_nproc	= 2,
+		.vs_proc	= nfsd_procedures4,
+		.vs_dispatch	= nfsd_dispatch
+};
+#endif
 static struct svc_version *	nfsd_version[] = {
 	[2] = &nfsd_version2,
-#ifdef CONFIG_NFSD_V3
+#if defined(CONFIG_NFSD_V3)
 	[3] = &nfsd_version3,
+#elif defined(CONFIG_NFSD_V4)
+	[3] = NULL,
+#endif
+#if defined(CONFIG_NFSD_V4)
+	[4] = &nfsd_version4,
 #endif
 };
 

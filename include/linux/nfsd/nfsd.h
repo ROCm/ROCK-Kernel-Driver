@@ -26,6 +26,7 @@
  * nfsd version
  */
 #define NFSD_VERSION		"0.5"
+#define NFSD_SUPPORTED_MINOR_VERSION	0
 
 #ifdef __KERNEL__
 /*
@@ -69,6 +70,9 @@ extern struct svc_procedure	nfsd_procedures2[];
 #ifdef CONFIG_NFSD_V3
 extern struct svc_procedure	nfsd_procedures3[];
 #endif /* CONFIG_NFSD_V3 */
+#ifdef CONFIG_NFSD_V4
+extern struct svc_procedure	nfsd_procedures4[];
+#endif /* CONFIG_NFSD_V4 */
 extern struct svc_program	nfsd_program;
 
 /*
@@ -196,6 +200,73 @@ void		nfsd_lockd_unexport(struct svc_client *);
  * Time of server startup
  */
 extern struct timeval	nfssvc_boot;
+
+
+#ifdef CONFIG_NFSD_V4
+
+/* before processing a COMPOUND operation, we have to check that there
+ * is enough space in the buffer for XDR encode to succeed.  otherwise,
+ * we might process an operation with side effects, and be unable to
+ * tell the client that the operation succeeded.
+ *
+ * COMPOUND_SLACK_SPACE - this is the minimum amount of buffer space
+ * needed to encode an "ordinary" _successful_ operation.  (GETATTR,
+ * READ, READDIR, and READLINK have their own buffer checks.)  if we
+ * fall below this level, we fail the next operation with NFS4ERR_RESOURCE.
+ *
+ * COMPOUND_ERR_SLACK_SPACE - this is the minimum amount of buffer space
+ * needed to encode an operation which has failed with NFS4ERR_RESOURCE.
+ * care is taken to ensure that we never fall below this level for any
+ * reason.
+ */
+#define	COMPOUND_SLACK_SPACE		140    /* OP_GETFH */
+#define COMPOUND_ERR_SLACK_SPACE	12     /* OP_SETATTR */
+
+#define NFSD_LEASE_TIME			60  /* seconds */
+
+/*
+ * The following attributes are currently not supported by the NFSv4 server:
+ *    ACL           (will be supported in a forthcoming patch)
+ *    ARCHIVE       (deprecated anyway)
+ *    FS_LOCATIONS  (will be supported eventually)
+ *    HIDDEN        (unlikely to be supported any time soon)
+ *    MIMETYPE      (unlikely to be supported any time soon)
+ *    QUOTA_*       (will be supported in a forthcoming patch)
+ *    SYSTEM        (unlikely to be supported any time soon)
+ *    TIME_BACKUP   (unlikely to be supported any time soon)
+ *    TIME_CREATE   (unlikely to be supported any time soon)
+ */
+#define NFSD_SUPPORTED_ATTRS_WORD0                                                          \
+(FATTR4_WORD0_SUPPORTED_ATTRS   | FATTR4_WORD0_TYPE         | FATTR4_WORD0_FH_EXPIRE_TYPE   \
+ | FATTR4_WORD0_CHANGE          | FATTR4_WORD0_SIZE         | FATTR4_WORD0_LINK_SUPPORT     \
+ | FATTR4_WORD0_SYMLINK_SUPPORT | FATTR4_WORD0_NAMED_ATTR   | FATTR4_WORD0_FSID             \
+ | FATTR4_WORD0_UNIQUE_HANDLES  | FATTR4_WORD0_LEASE_TIME   | FATTR4_WORD0_RDATTR_ERROR     \
+ | FATTR4_WORD0_ACLSUPPORT      | FATTR4_WORD0_CANSETTIME   | FATTR4_WORD0_CASE_INSENSITIVE \
+ | FATTR4_WORD0_CASE_PRESERVING | FATTR4_WORD0_CHOWN_RESTRICTED                             \
+ | FATTR4_WORD0_FILEHANDLE      | FATTR4_WORD0_FILEID       | FATTR4_WORD0_FILES_AVAIL      \
+ | FATTR4_WORD0_FILES_FREE      | FATTR4_WORD0_FILES_TOTAL  | FATTR4_WORD0_HOMOGENEOUS      \
+ | FATTR4_WORD0_MAXFILESIZE     | FATTR4_WORD0_MAXLINK      | FATTR4_WORD0_MAXNAME          \
+ | FATTR4_WORD0_MAXREAD         | FATTR4_WORD0_MAXWRITE)
+
+#define NFSD_SUPPORTED_ATTRS_WORD1                                                          \
+(FATTR4_WORD1_MODE              | FATTR4_WORD1_NO_TRUNC     | FATTR4_WORD1_NUMLINKS         \
+ | FATTR4_WORD1_OWNER	        | FATTR4_WORD1_OWNER_GROUP  | FATTR4_WORD1_RAWDEV           \
+ | FATTR4_WORD1_SPACE_AVAIL     | FATTR4_WORD1_SPACE_FREE   | FATTR4_WORD1_SPACE_TOTAL      \
+ | FATTR4_WORD1_SPACE_USED      | FATTR4_WORD1_TIME_ACCESS  | FATTR4_WORD1_TIME_ACCESS_SET  \
+ | FATTR4_WORD1_TIME_CREATE     | FATTR4_WORD1_TIME_DELTA   | FATTR4_WORD1_TIME_METADATA    \
+ | FATTR4_WORD1_TIME_MODIFY     | FATTR4_WORD1_TIME_MODIFY_SET)
+
+/* These will return ERR_INVAL if specified in GETATTR or READDIR. */
+#define NFSD_WRITEONLY_ATTRS_WORD1							    \
+(FATTR4_WORD1_TIME_ACCESS_SET   | FATTR4_WORD1_TIME_MODIFY_SET)
+
+/* These are the only attrs allowed in CREATE/OPEN/SETATTR. */
+#define NFSD_WRITEABLE_ATTRS_WORD0                            FATTR4_WORD0_SIZE
+#define NFSD_WRITEABLE_ATTRS_WORD1                                                          \
+(FATTR4_WORD1_MODE              | FATTR4_WORD1_OWNER         | FATTR4_WORD1_OWNER_GROUP     \
+ | FATTR4_WORD1_TIME_ACCESS_SET | FATTR4_WORD1_TIME_METADATA | FATTR4_WORD1_TIME_MODIFY_SET)
+
+#endif /* CONFIG_NFSD_V4 */
 
 #endif /* __KERNEL__ */
 

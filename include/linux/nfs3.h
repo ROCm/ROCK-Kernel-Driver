@@ -28,6 +28,7 @@
 #define NFS3_ACCESS_EXTEND	0x0008
 #define NFS3_ACCESS_DELETE	0x0010
 #define NFS3_ACCESS_EXECUTE	0x0020
+#define NFS3_ACCESS_FULL	0x003f
 
 /* Flags for create mode */
 enum nfs3_createmode {
