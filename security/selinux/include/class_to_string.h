@@ -47,5 +47,14 @@ static char *class_to_string[] =
     "xserver",
     "xextension",
     "pax",
+    "netlink_route_socket",
+    "netlink_firewall_socket",
+    "netlink_tcpdiag_socket",
+    "netlink_nflog_socket",
+    "netlink_xfrm_socket",
+    "netlink_selinux_socket",
+    "netlink_audit_socket",
+    "netlink_ip6fw_socket",
+    "netlink_dnrt_socket",
 };
 

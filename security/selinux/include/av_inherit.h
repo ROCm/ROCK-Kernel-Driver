@@ -29,6 +29,15 @@ static struct av_inherit av_inherit[] = {
    { SECCLASS_SEM, common_ipc_perm_to_string, 0x00000200UL },
    { SECCLASS_MSGQ, common_ipc_perm_to_string, 0x00000200UL },
    { SECCLASS_SHM, common_ipc_perm_to_string, 0x00000200UL },
+   { SECCLASS_NETLINK_ROUTE_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_FIREWALL_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_TCPDIAG_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_NFLOG_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_XFRM_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_SELINUX_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_AUDIT_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_IP6FW_SOCKET, common_socket_perm_to_string, 0x00400000UL },
+   { SECCLASS_NETLINK_DNRT_SOCKET, common_socket_perm_to_string, 0x00400000UL },
 };
 
 
