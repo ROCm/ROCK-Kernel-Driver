@@ -9,6 +9,7 @@
 #define _Z8530_H
 
 #include <linux/tty.h>
+#include <linux/interrupt.h>
 
 /* Conversion routines to/from brg time constants from/to bits
  * per second.
@@ -399,7 +400,7 @@ struct z8530_dev
 extern u8 z8530_dead_port[];
 extern u8 z8530_hdlc_kilostream_85230[];
 extern u8 z8530_hdlc_kilostream[];
-extern void z8530_interrupt(int, void *, struct pt_regs *);
+extern irqreturn_t z8530_interrupt(int, void *, struct pt_regs *);
 extern void z8530_describe(struct z8530_dev *, char *mapping, unsigned long io);
 extern int z8530_init(struct z8530_dev *);
 extern int z8530_shutdown(struct z8530_dev *);

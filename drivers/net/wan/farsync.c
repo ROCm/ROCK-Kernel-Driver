@@ -772,7 +772,7 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
  *      The interrupt service routine
  *      Dev_id is our fst_card_info pointer
  */
-static void
+static irqreturn_t
 fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
 {
         struct fst_card_info *card;
@@ -785,7 +785,7 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
         if (( card = dev_id ) == NULL )
         {
                 dbg ( DBG_INTR,"intr: spurious %d\n", irq );
-                return;
+                return IRQ_NONE;
         }
 
         dbg ( DBG_INTR,"intr: %d %p\n", irq, card );
@@ -882,6 +882,7 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
         }
 
         spin_unlock ( &card->card_lock );
+	return IRQ_HANDLED;
 }
 
 
