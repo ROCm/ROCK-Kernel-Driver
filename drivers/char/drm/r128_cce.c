@@ -782,59 +782,8 @@ int r128_engine_reset( DRM_IOCTL_ARGS )
 	return r128_do_engine_reset( dev );
 }
 
-
-/* ================================================================
- * Fullscreen mode
- */
-
-static int r128_do_init_pageflip( drm_device_t *dev )
-{
-	drm_r128_private_t *dev_priv = dev->dev_private;
-	DRM_DEBUG( "\n" );
-
-	dev_priv->crtc_offset =      R128_READ( R128_CRTC_OFFSET );
-	dev_priv->crtc_offset_cntl = R128_READ( R128_CRTC_OFFSET_CNTL );
-
-	R128_WRITE( R128_CRTC_OFFSET, dev_priv->front_offset );
-	R128_WRITE( R128_CRTC_OFFSET_CNTL,
-		    dev_priv->crtc_offset_cntl | R128_CRTC_OFFSET_FLIP_CNTL );
-
-	dev_priv->page_flipping = 1;
-	dev_priv->current_page = 0;
-
-	return 0;
-}
-
-int r128_do_cleanup_pageflip( drm_device_t *dev )
-{
-	drm_r128_private_t *dev_priv = dev->dev_private;
-	DRM_DEBUG( "\n" );
-
-	R128_WRITE( R128_CRTC_OFFSET,      dev_priv->crtc_offset );
-	R128_WRITE( R128_CRTC_OFFSET_CNTL, dev_priv->crtc_offset_cntl );
-
-	dev_priv->page_flipping = 0;
-	dev_priv->current_page = 0;
-
-	return 0;
-}
-
 int r128_fullscreen( DRM_IOCTL_ARGS )
 {
-	DRM_DEVICE;
-	drm_r128_fullscreen_t fs;
-
-	LOCK_TEST_WITH_RETURN( dev, filp );
-
-	DRM_COPY_FROM_USER_IOCTL( fs, (drm_r128_fullscreen_t *)data, sizeof(fs) );
-
-	switch ( fs.func ) {
-	case R128_INIT_FULLSCREEN:
-		return r128_do_init_pageflip( dev );
-	case R128_CLEANUP_FULLSCREEN:
-		return r128_do_cleanup_pageflip( dev );
-	}
-
 	return DRM_ERR(EINVAL);
 }
 
@@ -927,7 +876,7 @@ drm_buf_t *r128_freelist_get( drm_device_t *dev )
 		DRM_UDELAY( 1 );
 	}
 
-	DRM_ERROR( "returning NULL!\n" );
+	DRM_DEBUG( "returning NULL!\n" );
 	return NULL;
 }
 

@@ -9,8 +9,6 @@
 #ifndef _ASM_IA64_SN_DMAMAP_H
 #define _ASM_IA64_SN_DMAMAP_H
 
-#include <asm/sn/sv.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -65,8 +63,6 @@ extern struct map *a32map[];
 
 extern int a24_mapsize;
 extern int a32_mapsize;
-
-extern sv_t dmamapout;
 
 #ifdef __cplusplus
 }

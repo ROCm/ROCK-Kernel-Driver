@@ -389,6 +389,24 @@ static void __exit alsa_sound_exit(void)
 module_init(alsa_sound_init)
 module_exit(alsa_sound_exit)
 
+#ifndef MODULE
+
+/* format is: snd=major,cards_limit[,device_mode] */
+
+static int __init alsa_sound_setup(char *str)
+{
+	(void)(get_option(&str,&major) == 2 &&
+	       get_option(&str,&cards_limit) == 2);
+#ifdef CONFIG_DEVFS_FS
+	(void)(get_option(&str,&device_mode) == 2);
+#endif
+	return 1;
+}
+
+__setup("snd=", alsa_sound_setup);
+
+#endif /* ifndef MODULE */
+
   /* sound.c */
 EXPORT_SYMBOL(snd_major);
 EXPORT_SYMBOL(snd_ecards_limit);

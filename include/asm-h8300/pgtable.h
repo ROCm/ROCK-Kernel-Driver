@@ -15,6 +15,9 @@ typedef pte_t *pte_addr_t;
 #define pgd_clear(pgdp)
 #define kern_addr_valid(addr)	(1)
 #define	pmd_offset(a, b)	((void *)0)
+#define pmd_none(pmd)           (1)
+#define pgd_offset_k(adrdress)  ((pgd_t *)0)
+#define pte_offset_kernel(dir, address) ((pte_t *)0)
 
 #define PAGE_NONE		__pgprot(0)    /* these mean nothing to NO_MM */
 #define PAGE_SHARED		__pgprot(0)    /* these mean nothing to NO_MM */
@@ -30,6 +33,8 @@ extern void paging_init(void);
 #define __swp_entry(typ,off)	((swp_entry_t) { ((typ) | ((off) << 7)) })
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)	((pte_t) { (x).val })
+
+static inline int pte_file(pte_t pte) { return 0; }
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -48,5 +53,19 @@ extern int is_in_rom(unsigned long);
  */
 #define pgtable_cache_init()   do { } while (0)
 #define io_remap_page_range	remap_page_range
+
+/*
+ * All 32bit addresses are effectively valid for vmalloc...
+ * Sort of meaningless for non-VM targets.
+ */
+#define	VMALLOC_START	0
+#define	VMALLOC_END	0xffffffff
+
+/*
+ * All 32bit addresses are effectively valid for vmalloc...
+ * Sort of meaningless for non-VM targets.
+ */
+#define	VMALLOC_START	0
+#define	VMALLOC_END	0xffffffff
 
 #endif /* _H8300_PGTABLE_H */

@@ -1940,7 +1940,7 @@ static snd_card_t *snd_audiodrive_legacy[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
 #ifdef CONFIG_PNP
 
-static struct pnp_card_device_id snd_audiodrive_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_audiodrive_pnpids[] = {
 	/* ESS 1868 (integrated on Compaq dual P-Pro motherboard and Genius 18PnP 3D) */
 	{ .id = "ESS1868", .devs = { { "ESS1868" }, { "ESS0000" } } },
 	/* ESS 1868 (integrated on Maxisound Cards) */
@@ -1966,7 +1966,7 @@ static int __devinit snd_audiodrive_pnp(int dev, struct snd_audiodrive *acard,
 					const struct pnp_card_device_id *id)
 {
 	struct pnp_dev *pdev;
-	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_ATOMIC);
+	struct pnp_resource_table * cfg = kmalloc(sizeof(struct pnp_resource_table), GFP_KERNEL);
 	int err;
 
 	if (!cfg)

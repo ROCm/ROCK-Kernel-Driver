@@ -244,14 +244,14 @@ struct _snd_es1938 {
 	spinlock_t mixer_lock;
         snd_info_entry_t *proc_entry;
 
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	struct gameport gameport;
 #endif
 };
 
 static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-static struct pci_device_id snd_es1938_ids[] __devinitdata = {
+static struct pci_device_id snd_es1938_ids[] = {
         { 0x125d, 0x1969, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* Solo-1 */
 	{ 0, }
 };
@@ -1346,7 +1346,7 @@ static int snd_es1938_free(es1938_t *chip)
 {
 	/*if (chip->rmidi)
 	  snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0);*/
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	if (chip->gameport.io)
 		gameport_unregister_port(&chip->gameport);
 #endif
@@ -1663,7 +1663,7 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	} /*else
 	    snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0x40);*/
 
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	chip->gameport.io = chip->game_port;
 	gameport_register_port(&chip->gameport);
 #endif

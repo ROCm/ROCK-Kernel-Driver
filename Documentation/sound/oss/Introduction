@@ -114,8 +114,7 @@ the README takes precedence.
     Blaster, etc., select M (module) for OSS sound modules.
     [thanks to Marvin Stodolsky <stodolsk@erols.com>]A
 
-5.  Make the kernel (e.g., make dep ; make bzImage), and install
-    the kernel.
+5.  Make the kernel (e.g., make bzImage), and install the kernel.
 
 6.  Make the modules and install them (make modules; make modules_install).
 

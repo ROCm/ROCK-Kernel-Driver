@@ -523,13 +523,18 @@ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
 	unsigned int length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	unsigned int ptr, next_ptr;
 
-	length = (length + 1) & ~1;
-
 	if (priv->broken) {
 		dev_kfree_skb(skb);
 		priv->stats.tx_dropped ++;
 		netif_start_queue(dev);
 		return 0;
+	}
+
+	length = (length + 1) & ~1;
+	if (length != skb->len) {
+		skb = skb_padto(skb, length);
+		if (skb == NULL)
+			goto out;
 	}
 
 	next_ptr = (priv->tx_head + 1) & 15;
@@ -573,6 +578,7 @@ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
 	if (priv->tx_tail == next_ptr)
 		netif_stop_queue(dev);
 
+ out:
 	return 0;
 }
 
@@ -816,7 +822,7 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	ether3_banner();
 
-	dev = init_etherdev(NULL, sizeof(struct dev_priv));
+	dev = alloc_etherdev(sizeof(struct dev_priv));
 	if (!dev) {
 		ret = -ENOMEM;
 		goto out;
@@ -892,13 +898,16 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 	dev->tx_timeout		= ether3_timeout;
 	dev->watchdog_timeo	= 5 * HZ / 100;
 
+	ret = register_netdev(dev);
+	if (ret)
+		goto failed;
+
 	ecard_set_drvdata(ec, dev);
 	return 0;
 
 failed:
 	release_region(dev->base_addr, 128);
 free:
-	unregister_netdev(dev);
 	kfree(dev);
 out:
 	return ret;

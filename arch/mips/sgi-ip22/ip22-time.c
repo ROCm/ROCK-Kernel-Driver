@@ -92,15 +92,15 @@ static unsigned long dosample(void)
 	/* Start the counter. */
 	sgint->tcword = (SGINT_TCWORD_CNT2 | SGINT_TCWORD_CALL |
 			 SGINT_TCWORD_MRGEN);
-	sgint->tcnt2 = (SGINT_TCSAMP_COUNTER & 0xff);
-	sgint->tcnt2 = (SGINT_TCSAMP_COUNTER >> 8);
+	sgint->tcnt2 = SGINT_TCSAMP_COUNTER & 0xff;
+	sgint->tcnt2 = SGINT_TCSAMP_COUNTER >> 8;
 
 	/* Get initial counter invariant */
 	ct0 = read_c0_count();
 
 	/* Latch and spin until top byte of counter2 is zero */
 	do {
-		sgint->tcword = (SGINT_TCWORD_CNT2 | SGINT_TCWORD_CLAT);
+		sgint->tcword = SGINT_TCWORD_CNT2 | SGINT_TCWORD_CLAT;
 		lsb = sgint->tcnt2;
 		msb = sgint->tcnt2;
 		ct1 = read_c0_count();
@@ -112,9 +112,10 @@ static unsigned long dosample(void)
 	/*
 	 * Return the difference, this is how far the r4k counter increments
 	 * for every 1/HZ seconds. We round off the nearest 1 MHz of master
-	 * clock (= 1000000 / 100 / 2 = 5000 count).
+	 * clock (= 1000000 / HZ / 2).
 	 */
-	return ((ct1 - ct0) / 5000) * 5000;
+	//return (ct1 - ct0 + (500000/HZ/2)) / (500000/HZ) * (500000/HZ);
+	return (ct1 - ct0) / (500000/HZ) * (500000/HZ);
 }
 
 /*
@@ -126,15 +127,13 @@ static __init void indy_time_init(void)
 	unsigned long r4k_tick;
 
 	/* 
-	 * Figure out the r4k offset, the algorithm is very simple
-	 * and works in _all_ cases as long as the 8254 counter
-	 * register itself works ok (as an interrupt driving timer
-	 * it does not because of bug, this is why we are using
-	 * the onchip r4k counter/compare register to serve this
-	 * purpose, but for r4k_offset calculation it will work
-	 * ok for us).  There are other very complicated ways
-	 * of performing this calculation but this one works just
-	 * fine so I am not going to futz around. ;-)
+	 * Figure out the r4k offset, the algorithm is very simple and works in
+	 * _all_ cases as long as the 8254 counter register itself works ok (as
+	 * an interrupt driving timer it does not because of bug, this is why
+	 * we are using the onchip r4k counter/compare register to serve this
+	 * purpose, but for r4k_offset calculation it will work ok for us).
+	 * There are other very complicated ways of performing this calculation
+	 * but this one works just fine so I am not going to futz around. ;-)
 	 */
 	printk(KERN_INFO "Calibrating system timer... ");
 	dosample();	/* Prime cache. */
@@ -161,8 +160,9 @@ static __init void indy_time_init(void)
 	} else
 		r4k_tick = r4k_ticks[0];
 
-	printk("%d [%d.%02d MHz CPU]\n", (int) r4k_tick,
-		(int) (r4k_tick / 5000), (int) (r4k_tick % 5000) / 50);
+	printk("%d [%d.%04d MHz CPU]\n", (int) r4k_tick,
+		(int) (r4k_tick / (500000 / HZ)),
+		(int) (r4k_tick % (500000 / HZ)));
 
 	mips_counter_frequency = r4k_tick * HZ;
 }
@@ -170,13 +170,12 @@ static __init void indy_time_init(void)
 /* Generic SGI handler for (spurious) 8254 interrupts */
 void indy_8254timer_irq(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
 	int irq = SGI_8254_0_IRQ;
 	ULONG cnt;
 	char c;
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	printk(KERN_ALERT "Oops, got 8254 interrupt.\n");
 	ArcRead(0, &c, 1, &cnt);
 	ArcEnterInteractiveMode();
@@ -185,16 +184,12 @@ void indy_8254timer_irq(struct pt_regs *regs)
 
 void indy_r4k_timer_interrupt(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
 	int irq = SGI_TIMER_IRQ;
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	timer_interrupt(irq, NULL, regs);
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
 }
 
 extern int setup_irq(unsigned int irq, struct irqaction *irqaction);

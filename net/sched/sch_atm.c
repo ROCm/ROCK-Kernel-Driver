@@ -645,7 +645,7 @@ static int atm_tc_dump_class(struct Qdisc *sch, unsigned long cl,
 	if (flow->excess)
 		RTA_PUT(skb,TCA_ATM_EXCESS,sizeof(u32),&flow->classid);
 	else {
-		static u32 zero = 0;
+		static u32 zero;
 
 		RTA_PUT(skb,TCA_ATM_EXCESS,sizeof(zero),&zero);
 	}

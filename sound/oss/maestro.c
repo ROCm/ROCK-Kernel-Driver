@@ -2030,8 +2030,9 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	VALIDATE_CARD(card);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strncpy(info.name, card_names[card->card_type], sizeof(info.name));
+		memset(&info, 0, sizeof(info));
+		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
 		info.modify_counter = card->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -2039,8 +2040,9 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strncpy(info.name, card_names[card->card_type], sizeof(info.name));
+		memset(&info, 0, sizeof(info));
+		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -3610,7 +3612,7 @@ static void maestro_remove(struct pci_dev *pcidev) {
 	pci_set_drvdata(pcidev,NULL);
 }
 
-static struct pci_device_id maestro_pci_tbl[] __devinitdata = {
+static struct pci_device_id maestro_pci_tbl[] = {
 	{PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1968, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO2},
 	{PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1978, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO2E},
 	{PCI_VENDOR_ESS_OLD, PCI_DEVICE_ID_ESS_ESS0100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO},

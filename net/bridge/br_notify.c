@@ -43,15 +43,18 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 	{
 	case NETDEV_CHANGEADDR:
 		br_fdb_changeaddr(p, dev->dev_addr);
-		br_stp_recalculate_bridge_id(br);
+		if (br->dev->flags & IFF_UP)
+			br_stp_recalculate_bridge_id(br);
 		break;
 
 	case NETDEV_DOWN:
-		br_stp_disable_port(p);
+		if (br->dev->flags & IFF_UP)
+			br_stp_disable_port(p);
 		break;
 
 	case NETDEV_UP:
-		br_stp_enable_port(p);
+		if (br->dev->flags & IFF_UP)
+			br_stp_enable_port(p);
 		break;
 
 	case NETDEV_UNREGISTER:

@@ -118,7 +118,7 @@ static void RCreset_callback (U32, U32, U32, struct net_device *);
 static void RCreboot_callback (U32, U32, U32, struct net_device *);
 static int RC_allocate_and_post_buffers (struct net_device *, int);
 
-static struct pci_device_id rcpci45_pci_table[] __devinitdata = {
+static struct pci_device_id rcpci45_pci_table[] = {
 	{ PCI_VENDOR_ID_REDCREEK, PCI_DEVICE_ID_RC45, PCI_ANY_ID, PCI_ANY_ID,},
 	{}
 };

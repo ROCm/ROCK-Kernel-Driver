@@ -103,7 +103,6 @@ MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the I801 at the given address. "
 		 "EXTREMELY DANGEROUS!");
 
-static void i801_do_pause(unsigned int amount);
 static int i801_transaction(void);
 static int i801_block_transaction(union i2c_smbus_data *data,
 				  char read_write, int command);
@@ -178,13 +177,6 @@ END:
 	return error_return;
 }
 
-
-static void i801_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 static int i801_transaction(void)
 {
 	int temp;
@@ -214,7 +206,7 @@ static int i801_transaction(void)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i801_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
 
@@ -342,7 +334,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i801_do_pause(1);
+			i2c_delay(1);
 		}
 		    while ((!(temp & 0x80))
 			   && (timeout++ < MAX_TIMEOUT));
@@ -402,7 +394,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i801_do_pause(1);
+			i2c_delay(1);
 		} while ((!(temp & 0x02))
 			   && (timeout++ < MAX_TIMEOUT));
 
@@ -551,12 +543,10 @@ static struct i2c_adapter i801_adapter = {
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_I801,
 	.class		= I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
-	.dev		= {
-		.name	= "unset",
-	},
+	.name		= "unset",
 };
 
-static struct pci_device_id i801_ids[] __devinitdata = {
+static struct pci_device_id i801_ids[] = {
 	{
 		.vendor =	PCI_VENDOR_ID_INTEL,
 		.device =	PCI_DEVICE_ID_INTEL_82801AA_3,
@@ -608,7 +598,7 @@ static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id 
 	/* set up the driverfs linkage to our parent device */
 	i801_adapter.dev.parent = &dev->dev;
 
-	snprintf(i801_adapter.dev.name, DEVICE_NAME_SIZE,
+	snprintf(i801_adapter.name, DEVICE_NAME_SIZE,
 		"SMBus I801 adapter at %04x", i801_smba);
 	return i2c_add_adapter(&i801_adapter);
 }

@@ -83,9 +83,9 @@ static const int iso_buffer_max = 4 * 1024 * 1024; /* 4 MB */
 static struct hpsb_highlevel raw1394_highlevel;
 
 static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-             u64 addr, unsigned int length, u16 flags);
+		     u64 addr, size_t length, u16 flags);
 static int arm_write (struct hpsb_host *host, int nodeid, int destid,
-              quadlet_t *data, u64 addr, unsigned int length, u16 flags);
+		      quadlet_t *data, u64 addr, size_t length, u16 flags);
 static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
              u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags);
 static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
@@ -293,7 +293,7 @@ static void host_reset(struct hpsb_host *host)
 }
 
 static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
-                        unsigned int length)
+                        size_t length)
 {
         unsigned long flags;
         struct list_head *lh;
@@ -345,7 +345,7 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
                         req->req.generation = get_hpsb_generation(host);
                         req->req.misc = 0;
                         req->req.recvb = ptr2int(fi->iso_buffer);
-                        req->req.length = MIN(length, fi->iso_buffer_length);
+                        req->req.length = min(length, fi->iso_buffer_length);
                         
                         list_add_tail(&req->list, &reqs);
                 }
@@ -362,7 +362,7 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
 }
 
 static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
-                        int cts, u8 *data, unsigned int length)
+			int cts, u8 *data, size_t length)
 {
         unsigned long flags;
         struct list_head *lh;
@@ -538,9 +538,9 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
 
                 if (khl != NULL) {
                         req->req.error = RAW1394_ERROR_NONE;
-                        req->req.length = MIN(req->req.length,
-                                              sizeof(struct raw1394_khost_list)
-                                              * req->req.misc);
+                        req->req.length = min(req->req.length,
+                                              (u32)(sizeof(struct raw1394_khost_list)
+                                              * req->req.misc));
                         req->free_data = 1;
                 } else {
                         return -ENOMEM;
@@ -878,7 +878,7 @@ static int handle_async_send(struct file_info *fi, struct pending_request *req)
 }
 
 static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-             u64 addr, unsigned int length, u16 flags)
+		     u64 addr, size_t length, u16 flags)
 {
         struct pending_request *req;
         struct list_head *lh;
@@ -1014,7 +1014,7 @@ static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 }
 
 static int arm_write (struct hpsb_host *host, int nodeid, int destid,
-              quadlet_t *data, u64 addr, unsigned int length, u16 flags)
+		      quadlet_t *data, u64 addr, size_t length, u16 flags)
 {
         struct pending_request *req;
         struct list_head *lh;
@@ -2079,6 +2079,9 @@ static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
 {
 	struct raw1394_iso_status stat;
 
+	if (!fi->host)
+		return -EINVAL;
+
 	if (copy_from_user(&stat, uaddr, sizeof(stat)))
 		return -EFAULT;
 
@@ -2107,6 +2110,9 @@ static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
 static int raw1394_iso_recv_init(struct file_info *fi, void *uaddr)
 {
 	struct raw1394_iso_status stat;
+
+	if (!fi->host)
+		return -EINVAL;
 
 	if (copy_from_user(&stat, uaddr, sizeof(stat)))
 		return -EFAULT;

@@ -131,6 +131,7 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] =
 		sp->rtoinfo.srto_initial * HZ / 1000;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] = 0;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T4_RTO] = 0;
 
 	/* sctpimpguide-05 Section 2.12.2
 	 * If the 'T5-shutdown-guard' timer is used, it SHOULD be set to the

@@ -24,6 +24,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
@@ -55,7 +56,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
 
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*
@@ -94,13 +95,6 @@ static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_
 	}
 	return 0;
 }
-
-static ssize_t acq_read(struct file *file, char *buf, size_t count, loff_t *ppos)
-{
-	return -EINVAL;
-}
-
-
 
 static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
@@ -192,7 +186,6 @@ static int acq_notify_sys(struct notifier_block *this, unsigned long code,
  
 static struct file_operations acq_fops = {
 	.owner		= THIS_MODULE,
-	.read		= acq_read,
 	.write		= acq_write,
 	.ioctl		= acq_ioctl,
 	.open		= acq_open,

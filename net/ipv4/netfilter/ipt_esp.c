@@ -1,6 +1,7 @@
 /* Kernel module to match ESP parameters. */
 #include <linux/module.h>
 #include <linux/skbuff.h>
+#include <linux/ip.h>
 
 #include <linux/netfilter_ipv4/ipt_esp.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
@@ -12,10 +13,6 @@ MODULE_LICENSE("GPL");
 #else
 #define duprintf(format, args...)
 #endif
-
-struct esphdr {
-	__u32   spi;
-};
 
 /* Returns 1 if the spi is matched by the range, 0 otherwise */
 static inline int
@@ -37,7 +34,7 @@ match(const struct sk_buff *skb,
       int offset,
       int *hotdrop)
 {
-	struct esphdr esp;
+	struct ip_esp_hdr esp;
 	const struct ipt_esp *espinfo = matchinfo;
 
 	/* Must not be a fragment. */

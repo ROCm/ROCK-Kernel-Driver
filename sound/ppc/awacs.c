@@ -92,18 +92,9 @@ snd_pmac_awacs_write_noreg(pmac_t *chip, int reg, int val)
 	snd_pmac_awacs_write(chip, val | (reg << 12));
 }
 
-static void do_mdelay(int msec, int can_schedule)
-{
-	if (can_schedule) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((msec * HZ + 999) / 1000);
-	} else
-		mdelay(msec);
-}
-
 #ifdef CONFIG_PMAC_PBOOK
 /* Recalibrate chip */
-static void screamer_recalibrate(pmac_t *chip, int can_schedule)
+static void screamer_recalibrate(pmac_t *chip)
 {
 	if (chip->model != PMAC_SCREAMER)
 		return;
@@ -114,7 +105,7 @@ static void screamer_recalibrate(pmac_t *chip, int can_schedule)
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
 	if (chip->manufacturer == 0x1)
 		/* delay for broken crystal part */
-		do_mdelay(750, can_schedule);
+		big_mdelay(750);
 	snd_pmac_awacs_write_noreg(chip, 1,
 				   chip->awacs_reg[1] | MASK_RECALIBRATE | MASK_CMUTE | MASK_AMUTE);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
@@ -122,7 +113,7 @@ static void screamer_recalibrate(pmac_t *chip, int can_schedule)
 }
 
 #else
-#define screamer_recalibrate(chip, can_schedule) /* NOP */
+#define screamer_recalibrate(chip) /* NOP */
 #endif
 
 
@@ -631,7 +622,7 @@ static int build_mixers(pmac_t *chip, int nums, snd_kcontrol_new_t *mixers)
 /*
  * restore all registers
  */
-static void awacs_restore_all_regs(pmac_t *chip, int can_schedule)
+static void awacs_restore_all_regs(pmac_t *chip)
 {
 	snd_pmac_awacs_write_noreg(chip, 0, chip->awacs_reg[0]);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
@@ -655,19 +646,19 @@ static void snd_pmac_awacs_resume(pmac_t *chip)
 {
 	if (machine_is_compatible("PowerBook3,1")
 	    || machine_is_compatible("PowerBook3,2")) {
-		do_mdelay(100, 0);
+		big_mdelay(100);
 		snd_pmac_awacs_write_reg(chip, 1,
 			chip->awacs_reg[1] & ~MASK_PAROUT);
-		do_mdelay(300, 0);
+		big_mdelay(300);
 	}
 
-	awacs_restore_all_regs(chip, 0);
+	awacs_restore_all_regs(chip);
 	if (chip->model == PMAC_SCREAMER) {
 		/* reset power bits in reg 6 */
 		mdelay(5);
 		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
 	}
-	screamer_recalibrate(chip, 0);
+	screamer_recalibrate(chip);
 #ifdef PMAC_AMP_AVAIL
 	if (chip->mixer_data) {
 		awacs_amp_t *amp = chip->mixer_data;
@@ -775,9 +766,9 @@ snd_pmac_awacs_init(pmac_t *chip)
 		chip->awacs_reg[7] = 0;
 	}
 
-	awacs_restore_all_regs(chip, 1);
+	awacs_restore_all_regs(chip);
 	chip->manufacturer = (in_le32(&chip->awacs->codec_stat) >> 8) & 0xf;
-	screamer_recalibrate(chip, 1);
+	screamer_recalibrate(chip);
 
 	chip->revision = (in_le32(&chip->awacs->codec_stat) >> 12) & 0xf;
 #ifdef PMAC_AMP_AVAIL

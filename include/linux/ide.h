@@ -672,7 +672,7 @@ typedef struct ide_drive_s {
 	char		name[4];	/* drive name, such as "hda" */
         char            driver_req[10];	/* requests specific driver */
 
-	request_queue_t		queue;	/* request queue */
+	request_queue_t		*queue;	/* request queue */
 
 	struct request		*rq;	/* current request */
 	struct ide_drive_s 	*next;	/* circular list of hwgroup drives */
@@ -711,6 +711,7 @@ typedef struct ide_drive_s {
 	unsigned id_read	: 1;	/* 1=id read from disk 0 = synthetic */
 	unsigned noprobe 	: 1;	/* from:  hdx=noprobe */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
+	unsigned attach		: 1;	/* needed for removable devices */
 	unsigned is_flash	: 1;	/* 1 if probed as flash */
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
@@ -1225,7 +1226,7 @@ typedef struct ide_driver_s {
 	ide_startstop_t	(*abort)(ide_drive_t *, const char *);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	void		(*pre_reset)(ide_drive_t *);
-	unsigned long	(*capacity)(ide_drive_t *);
+	sector_t	(*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t	*proc;
 	int		(*attach)(ide_drive_t *);
@@ -1358,7 +1359,7 @@ extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long
 /*
  * Return the current idea about the total capacity of this drive.
  */
-extern unsigned long current_capacity (ide_drive_t *drive);
+extern sector_t current_capacity (ide_drive_t *drive);
 
 /*
  * Start a reset operation for an IDE interface.
@@ -1774,7 +1775,7 @@ extern int ide_hwif_request_regions(ide_hwif_t *hwif);
 extern void ide_hwif_release_regions(ide_hwif_t* hwif);
 extern void ide_unregister (unsigned int index);
 
-extern void export_ide_init_queue(ide_drive_t *);
+extern int export_ide_init_queue(ide_drive_t *);
 extern u8 export_probe_for_drive(ide_drive_t *);
 extern int probe_hwif_init(ide_hwif_t *);
 
@@ -1818,7 +1819,7 @@ extern struct semaphore ide_cfg_sem;
 static inline int ata_pending_commands(ide_drive_t *drive)
 {
 	if (drive->using_tcq)
-		return blk_queue_tag_depth(&drive->queue);
+		return blk_queue_tag_depth(drive->queue);
 
 	return 0;
 }
@@ -1826,7 +1827,7 @@ static inline int ata_pending_commands(ide_drive_t *drive)
 static inline int ata_can_queue(ide_drive_t *drive)
 {
 	if (drive->using_tcq)
-		return blk_queue_tag_queue(&drive->queue);
+		return blk_queue_tag_queue(drive->queue);
 
 	return 1;
 }

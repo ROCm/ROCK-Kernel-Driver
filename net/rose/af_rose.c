@@ -39,11 +39,12 @@
 #include <linux/notifier.h>
 #include <net/rose.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/tcp.h>
 #include <net/ip.h>
 #include <net/arp.h>
 
-int rose_ndevs = 10;
+static int rose_ndevs = 10;
 
 int sysctl_rose_restart_request_timeout = ROSE_DEFAULT_T0;
 int sysctl_rose_call_request_timeout    = ROSE_DEFAULT_T1;
@@ -57,7 +58,7 @@ int sysctl_rose_maximum_vcs             = ROSE_DEFAULT_MAXVC;
 int sysctl_rose_window_size             = ROSE_DEFAULT_WINDOW_SIZE;
 
 HLIST_HEAD(rose_list);
-static spinlock_t rose_list_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t rose_list_lock = SPIN_LOCK_UNLOCKED;
 
 static struct proto_ops rose_proto_ops;
 
@@ -66,7 +67,7 @@ ax25_address rose_callsign;
 /*
  *	Convert a ROSE address into text.
  */
-char *rose2asc(rose_address *addr)
+const char *rose2asc(const rose_address *addr)
 {
 	static char buffer[11];
 
@@ -1332,29 +1333,57 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
-static int rose_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+static void *rose_info_start(struct seq_file *seq, loff_t *pos)
 {
+	int i;
 	struct sock *s;
 	struct hlist_node *node;
-	struct net_device *dev;
-	const char *devname, *callsign;
-	int len = 0;
-	off_t pos = 0;
-	off_t begin = 0;
 
 	spin_lock_bh(&rose_list_lock);
-
-	len += sprintf(buffer, "dest_addr  dest_call src_addr   src_call  dev   lci neigh st vs vr va   t  t1  t2  t3  hb    idle Snd-Q Rcv-Q inode\n");
-
+	if (*pos == 0)
+		return ROSE_PROC_START;
+	
+	i = 1;
 	sk_for_each(s, node, &rose_list) {
-		rose_cb *rose = rose_sk(s);
+		if (i == *pos)
+			return s;
+		++i;
+	}
+	return NULL;
+}
 
-		if ((dev = rose->device) == NULL)
+static void *rose_info_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+
+	return (v == ROSE_PROC_START) ? sk_head(&rose_list) 
+		: sk_next((struct sock *)v);
+}
+	
+static void rose_info_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&rose_list_lock);
+}
+
+static int rose_info_show(struct seq_file *seq, void *v)
+{
+	if (v == ROSE_PROC_START)
+		seq_puts(seq, 
+			 "dest_addr  dest_call src_addr   src_call  dev   lci neigh st vs vr va   t  t1  t2  t3  hb    idle Snd-Q Rcv-Q inode\n");
+
+	else {
+		struct sock *s = v;
+		rose_cb *rose = rose_sk(s);
+		const char *devname, *callsign;
+		const struct net_device *dev = rose->device;
+
+		if (!dev)
 			devname = "???";
 		else
 			devname = dev->name;
-
-		len += sprintf(buffer + len, "%-10s %-9s ",
+		
+		seq_printf(seq, "%-10s %-9s ",
 			rose2asc(&rose->dest_addr),
 			ax2asc(&rose->dest_call));
 
@@ -1363,7 +1392,8 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 		else
 			callsign = ax2asc(&rose->source_call);
 
-		len += sprintf(buffer + len, "%-10s %-9s %-5s %3.3X %05d  %d  %d  %d  %d %3lu %3lu %3lu %3lu %3lu %3lu/%03lu %5d %5d %ld\n",
+		seq_printf(seq,
+			   "%-10s %-9s %-5s %3.3X %05d  %d  %d  %d  %d %3lu %3lu %3lu %3lu %3lu %3lu/%03lu %5d %5d %ld\n",
 			rose2asc(&rose->source_addr),
 			callsign,
 			devname,
@@ -1383,26 +1413,31 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 			atomic_read(&s->sk_wmem_alloc),
 			atomic_read(&s->sk_rmem_alloc),
 			s->sk_socket ? SOCK_INODE(s->sk_socket)->i_ino : 0L);
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
 	}
-	spin_unlock_bh(&rose_list_lock);
 
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length) len = length;
-
-	return len;
+	return 0;
 }
+
+static struct seq_operations rose_info_seqops = {
+	.start = rose_info_start,
+	.next = rose_info_next,
+	.stop = rose_info_stop,
+	.show = rose_info_show,
+};
+
+static int rose_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &rose_info_seqops);
+}
+
+static struct file_operations rose_info_fops = {
+	.owner = THIS_MODULE,
+	.open = rose_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+#endif	/* CONFIG_PROC_FS */
 
 static struct net_proto_family rose_family_ops = {
 	.family		=	PF_ROSE,
@@ -1435,7 +1470,7 @@ static struct notifier_block rose_dev_notifier = {
 	.notifier_call	=	rose_device_event,
 };
 
-static struct net_device *dev_rose;
+static struct net_device **dev_rose;
 
 static const char banner[] = KERN_INFO "F6FBB/G4KLX ROSE for Linux. Version 0.62 for AX25.037 Linux 2.4\n";
 
@@ -1450,17 +1485,39 @@ static int __init rose_proto_init(void)
 		return -1;
 	}
 
-	if ((dev_rose = kmalloc(rose_ndevs * sizeof(struct net_device), GFP_KERNEL)) == NULL) {
+	dev_rose = kmalloc(rose_ndevs * sizeof(struct net_device *), GFP_KERNEL);
+	if (dev_rose == NULL) {
 		printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate device structure\n");
 		return -1;
 	}
 
-	memset(dev_rose, 0x00, rose_ndevs * sizeof(struct net_device));
+	memset(dev_rose, 0x00, rose_ndevs * sizeof(struct net_device*));
+	for (i = 0; i < rose_ndevs; i++) {
+		struct net_device *dev;
+		char name[IFNAMSIZ];
+
+		sprintf(name, "rose%d", i);
+		dev = alloc_netdev(sizeof(struct net_device_stats), 
+				   name, rose_setup);
+		if (!dev) {
+			printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate memory\n");
+			while (--i >= 0)
+				kfree(dev_rose[i]);
+			return -ENOMEM;
+		}
+		dev_rose[i] = dev;
+	}
 
 	for (i = 0; i < rose_ndevs; i++) {
-		sprintf(dev_rose[i].name, "rose%d", i);
-		dev_rose[i].init = rose_init;
-		register_netdev(&dev_rose[i]);
+		if (register_netdev(dev_rose[i])) {
+			printk(KERN_ERR "ROSE: netdevice regeistration failed\n");
+			while (--i >= 0) {
+				unregister_netdev(dev_rose[i]);
+				kfree(dev_rose[i]);
+				return -EIO;
+			}
+		}
+			
 	}
 
 	sock_register(&rose_family_ops);
@@ -1477,10 +1534,11 @@ static int __init rose_proto_init(void)
 
 	rose_add_loopback_neigh();
 
-	proc_net_create("rose", 0, rose_get_info);
-	proc_net_create("rose_neigh", 0, rose_neigh_get_info);
-	proc_net_create("rose_nodes", 0, rose_nodes_get_info);
-	proc_net_create("rose_routes", 0, rose_routes_get_info);
+	proc_net_fops_create("rose", S_IRUGO, &rose_info_fops);
+	proc_net_fops_create("rose_neigh", S_IRUGO, &rose_neigh_fops);
+	proc_net_fops_create("rose_nodes", S_IRUGO, &rose_nodes_fops);
+	proc_net_fops_create("rose_routes", S_IRUGO, &rose_routes_fops);
+
 	return 0;
 }
 module_init(rose_proto_init);
@@ -1518,10 +1576,11 @@ static void __exit rose_exit(void)
 	sock_unregister(PF_ROSE);
 
 	for (i = 0; i < rose_ndevs; i++) {
-		if (dev_rose[i].priv != NULL) {
-			kfree(dev_rose[i].priv);
-			dev_rose[i].priv = NULL;
-			unregister_netdev(&dev_rose[i]);
+		struct net_device *dev = dev_rose[i];
+
+		if (dev) {
+			unregister_netdev(dev);
+			kfree(dev);
 		}
 	}
 

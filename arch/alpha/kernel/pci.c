@@ -280,7 +280,7 @@ common_swizzle(struct pci_dev *dev, u8 *pinp)
 {
 	struct pci_controller *hose = dev->sysdata;
 
-	if (dev->bus->number != hose->first_busno) {
+	if (dev->bus != hose->bus) {
 		u8 pin = *pinp;
 		do {
 			pin = bridge_swizzle(pin, PCI_SLOT(dev->devfn));
@@ -335,7 +335,7 @@ pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	if (cmd != oldcmd) {
 		printk(KERN_DEBUG "PCI: Enabling device: (%s), cmd %x\n",
-		       dev->slot_name, cmd);
+		       pci_name(dev), cmd);
 		/* Enable the appropriate bits in the PCI command register.  */
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
@@ -354,7 +354,7 @@ pcibios_set_master(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
 	if (lat >= 16) return;
 	printk("PCI: Setting latency timer of device %s to 64\n",
-							dev->slot_name);
+							pci_name(dev));
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
 }
 
@@ -398,15 +398,20 @@ common_init_pci(void)
 	struct pci_controller *hose;
 	struct pci_bus *bus;
 	int next_busno;
+	int need_domain_info = 0;
 
 	/* Scan all of the recorded PCI controllers.  */
 	for (next_busno = 0, hose = hose_head; hose; hose = hose->next) {
-		hose->first_busno = next_busno;
-		hose->last_busno = 0xff;
 		bus = pci_scan_bus(next_busno, alpha_mv.pci_ops, hose);
 		hose->bus = bus;
-		next_busno = hose->last_busno = bus->subordinate;
-		next_busno += 1;
+		hose->need_domain_info = need_domain_info;
+		next_busno = bus->subordinate + 1;
+		/* Don't allow 8-bit bus number overflow inside the hose -
+		   reserve some space for bridges. */ 
+		if (next_busno > 224) {
+			next_busno = 0;
+			need_domain_info = 1;
+		}
 	}
 
 	if (pci_probe_only)

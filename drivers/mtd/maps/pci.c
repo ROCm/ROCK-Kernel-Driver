@@ -140,7 +140,7 @@ intel_dc21285_init(struct pci_dev *dev, struct map_pci_info *map)
 			pci_read_config_dword(dev, PCI_ROM_ADDRESS, &val);
 			val |= PCI_ROM_ADDRESS_ENABLE;
 			pci_write_config_dword(dev, PCI_ROM_ADDRESS, val);
-			printk("%s: enabling expansion ROM\n", dev->slot_name);
+			printk("%s: enabling expansion ROM\n", pci_name(dev));
 		}
 	}
 
@@ -191,7 +191,7 @@ static struct mtd_pci_info intel_dc21285_info = {
  * PCI device ID table
  */
 
-static struct pci_device_id mtd_pci_ids[] __devinitdata = {
+static struct pci_device_id mtd_pci_ids[] = {
 	{
 		.vendor =	PCI_VENDOR_ID_INTEL,
 		.device =	0x530d,
@@ -306,7 +306,7 @@ mtd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		goto release;
 
 	map->map       = mtd_pci_map;
-	map->map.name  = dev->slot_name;
+	map->map.name  = pci_name(dev);
 	map->dev       = dev;
 	map->exit      = info->exit;
 	map->translate = info->translate;

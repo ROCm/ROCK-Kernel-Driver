@@ -498,7 +498,7 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	struct ext3_super_block *es;
 	struct ext3_sb_info *sbi;
 #ifdef EXT3FS_DEBUG
-	static int goal_hits = 0, goal_attempts = 0;
+	static int goal_hits, goal_attempts;
 #endif
 	*errp = -ENOSPC;
 	sb = inode->i_sb;

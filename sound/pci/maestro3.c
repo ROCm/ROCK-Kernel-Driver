@@ -43,6 +43,7 @@
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
+#include <sound/mpu401.h>
 #include <sound/ac97_codec.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
@@ -851,6 +852,9 @@ struct snd_m3 {
 	int external_amp;
 	int amp_gpio;
 
+	/* midi */
+	snd_rawmidi_t *rmidi;
+
 	/* pcm streams */
 	int num_substreams;
 	m3_dma_t *substreams;
@@ -894,7 +898,7 @@ struct snd_m3 {
 #define PCI_DEVICE_ID_ESS_MAESTRO3_2	0x199b
 #endif
 
-static struct pci_device_id snd_m3_ids[] __devinitdata = {
+static struct pci_device_id snd_m3_ids[] = {
 	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_ALLEGRO_1, PCI_ANY_ID, PCI_ANY_ID,
 	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
 	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_ALLEGRO, PCI_ANY_ID, PCI_ANY_ID,
@@ -971,6 +975,11 @@ static struct m3_quirk m3_quirk_list[] = {
  * lowlevel functions
  */
 
+#define big_mdelay(msec) do {\
+	set_current_state(TASK_UNINTERRUPTIBLE);\
+	schedule_timeout(((msec) * HZ) / 1000);\
+} while (0)
+	
 inline static void snd_m3_outw(m3_t *chip, u16 value, unsigned long reg)
 {
 	outw(value, chip->iobase + reg);
@@ -1012,7 +1021,7 @@ static void snd_m3_assp_write(m3_t *chip, u16 region, u16 index, u16 data)
 static void snd_m3_assp_halt(m3_t *chip)
 {
 	chip->reset_state = snd_m3_inb(chip, DSP_PORT_CONTROL_REG_B) & ~REGB_STOP_CLOCK;
-	mdelay(10);
+	big_mdelay(10);
 	snd_m3_outb(chip, chip->reset_state & ~REGB_ENABLE_RESET, DSP_PORT_CONTROL_REG_B);
 }
 
@@ -1526,9 +1535,14 @@ static snd_pcm_uframes_t
 snd_m3_pcm_pointer(snd_pcm_substream_t * subs)
 {
 	m3_t *chip = snd_pcm_substream_chip(subs);
+	unsigned int ptr;
 	m3_dma_t *s = (m3_dma_t*)subs->runtime->private_data;
 	snd_assert(s != NULL, return 0);
-	return bytes_to_frames(subs->runtime, snd_m3_get_pointer(chip, s, subs));
+
+	spin_lock(&chip->reg_lock);
+	ptr = snd_m3_get_pointer(chip, s, subs);
+	spin_unlock(&chip->reg_lock);
+	return bytes_to_frames(subs->runtime, ptr);
 }
 
 
@@ -1562,17 +1576,11 @@ snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	u8 status;
 	int i;
 
-	status = inb(chip->iobase + 0x1A);
+	status = inb(chip->iobase + HOST_INT_STATUS);
 
 	if (status == 0xff)
 		return IRQ_NONE;
    
-	/* presumably acking the ints? */
-	outw(status, chip->iobase + 0x1A);
-
-	/*if (in_suspend)
-		return IRQ_NONE;*/
-
 	/*
 	 * ack an assp int if its running
 	 * and has an int pending
@@ -1595,9 +1603,13 @@ snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 	}
 
-	/* XXX is this needed? */
-	if (status & 0x40) 
-		outb(0x40, chip->iobase+0x1A);
+#if 0 /* TODO: not supported yet */
+	if ((status & MPU401_INT_PENDING) && chip->rmidi)
+		snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
+#endif
+
+	/* ack ints */
+	snd_m3_outw(chip, HOST_INT_STATUS, status);
 
 	return IRQ_HANDLED;
 }
@@ -1898,7 +1910,7 @@ static int snd_m3_try_read_vendor(m3_t *chip)
 	return (ret == 0) || (ret == 0xffff);
 }
 
-static void snd_m3_ac97_reset(m3_t *chip, int busywait)
+static void snd_m3_ac97_reset(m3_t *chip)
 {
 	u16 dir;
 	int delay1 = 0, delay2 = 0, i;
@@ -1933,12 +1945,8 @@ static void snd_m3_ac97_reset(m3_t *chip, int busywait)
 		outw(0, io + GPIO_DATA);
 		outw(dir | GPO_PRIMARY_AC97, io + GPIO_DIRECTION);
 
-		if (busywait)  {
-			mdelay(delay1);
-		} else {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((delay1 * HZ) / 1000);
-		}
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((delay1 * HZ) / 1000);
 
 		outw(GPO_PRIMARY_AC97, io + GPIO_DATA);
 		udelay(5);
@@ -1946,12 +1954,9 @@ static void snd_m3_ac97_reset(m3_t *chip, int busywait)
 		outw(IO_SRAM_ENABLE | SERIAL_AC_LINK_ENABLE, io + RING_BUS_CTRL_A);
 		outw(~0, io + GPIO_MASK);
 
-		if (busywait) {
-			mdelay(delay2);
-		} else {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((delay2 * HZ) / 1000);
-		}
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((delay2 * HZ) / 1000);
+
 		if (! snd_m3_try_read_vendor(chip))
 			break;
 
@@ -1968,9 +1973,9 @@ static void snd_m3_ac97_reset(m3_t *chip, int busywait)
 	 */
 	tmp = inw(io + RING_BUS_CTRL_A);
 	outw(RAC_SDFS_ENABLE|LAC_SDFS_ENABLE, io + RING_BUS_CTRL_A);
-	mdelay(20);
+	big_mdelay(20);
 	outw(tmp, io + RING_BUS_CTRL_A);
-	mdelay(50);
+	big_mdelay(50);
 #endif
 }
 
@@ -2298,7 +2303,14 @@ snd_m3_chip_init(m3_t *chip)
 {
 	struct pci_dev *pcidev = chip->pci;
 	u32 n;
+	u16 w;
 	u8 t; /* makes as much sense as 'n', no? */
+
+	pci_read_config_word(pcidev, PCI_LEGACY_AUDIO_CTRL, &w);
+	w &= ~(SOUND_BLASTER_ENABLE|FM_SYNTHESIS_ENABLE|
+	       MPU401_IO_ENABLE|MPU401_IRQ_ENABLE|ALIAS_10BIT_IO|
+	       DISABLE_LEGACY);
+	pci_write_config_word(pcidev, PCI_LEGACY_AUDIO_CTRL, w);
 
 	pci_read_config_dword(pcidev, PCI_ALLEGRO_CONFIG, &n);
 	n &= REDUCED_DEBOUNCE;
@@ -2337,7 +2349,7 @@ snd_m3_enable_ints(m3_t *chip)
 {
 	unsigned long io = chip->iobase;
 
-	outw(ASSP_INT_ENABLE, io + HOST_INT_CTRL);
+	outw(ASSP_INT_ENABLE | MPU401_INT_ENABLE, io + HOST_INT_CTRL);
 	outb(inb(io + ASSP_CONTROL_C) | ASSP_HOST_INT_ENABLE,
 	     io + ASSP_CONTROL_C);
 }
@@ -2363,6 +2375,10 @@ static int snd_m3_free(m3_t *chip)
 		spin_unlock_irqrestore(&chip->reg_lock, flags);
 		kfree(chip->substreams);
 	}
+	if (chip->iobase_res) {
+		snd_m3_outw(chip, HOST_INT_CTRL, 0); /* disable ints */
+	}
+
 #ifdef CONFIG_PM
 	if (chip->suspend_mem)
 		vfree(chip->suspend_mem);
@@ -2400,7 +2416,7 @@ static void m3_suspend(m3_t *chip)
 
 	snd_pcm_suspend_all(chip->pcm);
 
-	mdelay(10); /* give the assp a chance to idle.. */
+	big_mdelay(10); /* give the assp a chance to idle.. */
 
 	snd_m3_assp_halt(chip);
 
@@ -2435,7 +2451,7 @@ static void m3_resume(m3_t *chip)
 
 	snd_m3_chip_init(chip);
 	snd_m3_assp_halt(chip);
-	snd_m3_ac97_reset(chip, 1);
+	snd_m3_ac97_reset(chip);
 
 	/* restore dsp image */
 	index = 0;
@@ -2460,7 +2476,6 @@ static void m3_resume(m3_t *chip)
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
 
-#ifndef PCI_OLD_SUSPEND
 static int snd_m3_suspend(struct pci_dev *pci, u32 state)
 {
 	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return -ENXIO);
@@ -2473,18 +2488,6 @@ static int snd_m3_resume(struct pci_dev *pci)
 	m3_resume(chip);
 	return 0;
 }
-#else
-static void snd_m3_suspend(struct pci_dev *pci)
-{
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return);
-	m3_suspend(chip);
-}
-static void snd_m3_resume(struct pci_dev *pci)
-{
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return);
-	m3_resume(chip);
-}
-#endif
 
 /* callback */
 static int snd_m3_set_power_state(snd_card_t *card, unsigned int power_state)
@@ -2606,7 +2609,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	snd_m3_chip_init(chip);
 	snd_m3_assp_halt(chip);
 
-	snd_m3_ac97_reset(chip, 0);
+	snd_m3_ac97_reset(chip);
 
 	snd_m3_assp_init(chip);
 	snd_m3_amp_enable(chip, 1);
@@ -2716,6 +2719,15 @@ snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		snd_card_free(card);
 		return err;
 	}
+
+#if 0 /* TODO: not supported yet */
+	/* TODO enable midi irq and i/o */
+	err = snd_mpu401_uart_new(chip->card, 0, MPU401_HW_MPU401,
+				  chip->iobase + MPU401_DATA_PORT, 1,
+				  chip->irq, 0, &chip->rmidi);
+	if (err < 0)
+		printk(KERN_WARNING "maestro3: no midi support.\n");
+#endif
 
 	pci_set_drvdata(pci, chip);
 	dev++;

@@ -452,7 +452,7 @@ struct _snd_via82xx {
 	snd_info_entry_t *proc_entry;
 };
 
-static struct pci_device_id snd_via82xx_ids[] __devinitdata = {
+static struct pci_device_id snd_via82xx_ids[] = {
 	{ 0x1106, 0x3058, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_CARD_VIA686, },	/* 686A */
 	{ 0x1106, 0x3059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_CARD_VIA8233, },	/* VT8233 */
 	{ 0, }
@@ -886,7 +886,7 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 		snd_ac97_set_rate(chip->ac97, AC97_PCM_LFE_DAC_RATE, runtime->rate);
 		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	}
-	if (chip->chip_type == TYPE_VIA8233A)
+	if (chip->revision == VIA_REV_8233A)
 		rbits = 0;
 	else
 		rbits = (0xfffff / 48000) * runtime->rate + ((0xfffff % 48000) * runtime->rate) / 48000;
@@ -928,7 +928,7 @@ static int snd_via8233_multi_prepare(snd_pcm_substream_t *substream)
 	fmt = (runtime->format == SNDRV_PCM_FORMAT_S16_LE) ? VIA_REG_MULTPLAY_FMT_16BIT : VIA_REG_MULTPLAY_FMT_8BIT;
 	fmt |= runtime->channels << 4;
 	outb(fmt, VIADEV_REG(viadev, OFS_MULTPLAY_FORMAT));
-	if (chip->chip_type == TYPE_VIA8233A)
+	if (chip->revision == VIA_REV_8233A)
 		slots = 0;
 	else {
 		/* set sample number to slot 3, 4, 7, 8, 6, 9 (for VIA8233/C,8235) */
@@ -1108,7 +1108,7 @@ static int snd_via8233_multi_open(snd_pcm_substream_t * substream)
 	if ((err = snd_via82xx_pcm_open(chip, viadev, substream)) < 0)
 		return err;
 	substream->runtime->hw.channels_max = 6;
-	if (chip->chip_type == TYPE_VIA8233A)
+	if (chip->revision == VIA_REV_8233A)
 		snd_pcm_hw_constraint_list(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels);
 	return 0;
 }

@@ -22,8 +22,6 @@
  *
  */
 
-#define __NO_VERSION__
-
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>

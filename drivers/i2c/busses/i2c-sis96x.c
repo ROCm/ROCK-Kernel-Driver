@@ -99,13 +99,6 @@ static inline void sis96x_write(u8 reg, u8 data)
 	outb(data, sis96x_smbus_base + reg) ;
 }
 
-/* Internally used pause function */
-static void sis96x_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 /* Execute a SMBus transaction.
    int size is from SIS96x_QUICK to SIS96x_BLOCK_DATA
  */
@@ -147,7 +140,7 @@ static int sis96x_transaction(int size)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		sis96x_do_pause(1);
+		i2c_delay(1);
 		temp = sis96x_read(SMB_STS);
 	} while (!(temp & 0x0e) && (timeout++ < MAX_TIMEOUT));
 
@@ -271,12 +264,10 @@ static struct i2c_adapter sis96x_adapter = {
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_SIS96X,
 	.class		= I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
-	.dev		= {
-		.name	="unset",
-	},
+	.name		= "unset",
 };
 
-static struct pci_device_id sis96x_ids[] __devinitdata = {
+static struct pci_device_id sis96x_ids[] = {
 
 	{
 		.vendor	=	PCI_VENDOR_ID_SI,
@@ -327,7 +318,7 @@ static int __devinit sis96x_probe(struct pci_dev *dev,
 	/* set up the driverfs linkage to our parent device */
 	sis96x_adapter.dev.parent = &dev->dev;
 
-	snprintf(sis96x_adapter.dev.name, DEVICE_NAME_SIZE,
+	snprintf(sis96x_adapter.name, DEVICE_NAME_SIZE,
 		"SiS96x SMBus adapter at 0x%04x", sis96x_smbus_base);
 
 	if ((retval = i2c_add_adapter(&sis96x_adapter))) {

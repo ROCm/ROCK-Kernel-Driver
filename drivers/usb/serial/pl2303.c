@@ -61,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.9"
+#define DRIVER_VERSION "v0.10"
 #define DRIVER_DESC "Prolific PL2303 USB to serial adaptor driver"
 
 
@@ -285,12 +285,6 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	     buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 
 
-	i = usb_control_msg (serial->dev, usb_sndctrlpipe (serial->dev, 0),
-			     VENDOR_WRITE_REQUEST, VENDOR_WRITE_REQUEST_TYPE,
-			     0, 1, NULL, 0, 100);
-
-	dbg ("0x40:1:0:1  %d", i);
-
 	if (cflag & CSIZE) {
 		switch (cflag & CSIZE) {
 			case CS5:	buf[6] = 5;	break;
@@ -428,9 +422,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 1);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
-	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0, 1);
-	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 1, 0xc0);
-	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 4);
 
 	/* Setup termios */
 	if (port->tty) {
@@ -550,7 +541,9 @@ static int pl2303_tiocmget (struct usb_serial_port *port, struct file *file)
 	result = ((mcr & CONTROL_DTR)		? TIOCM_DTR : 0)
 		  | ((mcr & CONTROL_RTS)	? TIOCM_RTS : 0)
 		  | ((status & UART_CTS)	? TIOCM_CTS : 0)
-		  | ((status & UART_DSR)	? TIOCM_DSR : 0);
+		  | ((status & UART_DSR)	? TIOCM_DSR : 0)
+		  | ((status & UART_RING)	? TIOCM_RI  : 0)
+		  | ((status & UART_DCD)	? TIOCM_CD  : 0);
 
 	dbg("%s - result = %x", __FUNCTION__, result);
 
@@ -637,7 +630,7 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 
-	if (urb->actual_length > UART_STATE)
+	if (urb->actual_length < UART_STATE)
 		goto exit;
 
 	/* Save off the uart status for others to look at */

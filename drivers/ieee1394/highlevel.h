@@ -46,14 +46,14 @@ struct hpsb_highlevel {
          * packet header (first quadlet, CRCs are missing).  You may get called
          * for channel/host combinations you did not request. */
         void (*iso_receive) (struct hpsb_host *host, int channel,
-                             quadlet_t *data, unsigned int length);
+                             quadlet_t *data, size_t length);
 
         /* A write request was received on either the FCP_COMMAND (direction =
          * 0) or the FCP_RESPONSE (direction = 1) register.  The cts arg
          * contains the cts field (first byte of data).
          */
         void (*fcp_request) (struct hpsb_host *host, int nodeid, int direction,
-                             int cts, u8 *data, unsigned int length);
+                             int cts, u8 *data, size_t length);
 
 
 	struct list_head hl_list;
@@ -79,9 +79,9 @@ struct hpsb_address_ops {
            will send the response itself
         */
         int (*read) (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-                     u64 addr, unsigned int length, u16 flags);
+                     u64 addr, size_t length, u16 flags);
         int (*write) (struct hpsb_host *host, int nodeid, int destid,
-		      quadlet_t *data, u64 addr, unsigned int length, u16 flags);
+		      quadlet_t *data, u64 addr, size_t length, u16 flags);
 
         /* Lock transactions: write results of ext_tcode operation into
          * *store. */
@@ -117,9 +117,9 @@ int highlevel_lock64(struct hpsb_host *host, int nodeid, octlet_t *store,
                      u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags);
 
 void highlevel_iso_receive(struct hpsb_host *host, void *data,
-                           unsigned int length);
+                           size_t length);
 void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
-                           void *data, unsigned int length);
+                           void *data, size_t length);
 
 
 /*

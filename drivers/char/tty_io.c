@@ -611,6 +611,8 @@ void stop_tty(struct tty_struct *tty)
 		(tty->driver->stop)(tty);
 }
 
+EXPORT_SYMBOL(stop_tty);
+
 void start_tty(struct tty_struct *tty)
 {
 	if (!tty->stopped || tty->flow_stopped)
@@ -628,6 +630,8 @@ void start_tty(struct tty_struct *tty)
 		(tty->ldisc.write_wakeup)(tty);
 	wake_up_interruptible(&tty->write_wait);
 }
+
+EXPORT_SYMBOL(start_tty);
 
 static ssize_t tty_read(struct file * file, char * buf, size_t count, 
 			loff_t *ppos)
@@ -2106,7 +2110,7 @@ static spinlock_t tty_dev_list_lock = SPIN_LOCK_UNLOCKED;
 static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
 	struct tty_dev *tty_dev = to_tty_dev(class_dev);
-	return sprintf(buf, "%04lx\n", (unsigned long)tty_dev->dev);
+	return print_dev_t(buf, tty_dev->dev);
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 

@@ -70,8 +70,11 @@ static int check_vfsmnt(struct vfsmount *mnt, struct dentry *dentry)
 	int ret = dentry->d_mounted;
 	struct vfsmount *vfs = lookup_mnt(mnt, dentry);
 
-	if (vfs && is_vfsmnt_tree_busy(vfs))
-		ret--;
+	if (vfs) {
+		mntput(vfs);
+		if (is_vfsmnt_tree_busy(vfs))
+			ret--;
+	}
 	DPRINTK(("check_vfsmnt: ret=%d\n", ret));
 	return ret;
 }

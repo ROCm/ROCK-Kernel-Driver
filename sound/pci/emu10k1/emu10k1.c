@@ -35,7 +35,7 @@ MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Creative Labs,SB Live!/PCI512/E-mu APS},"
 	       "{Creative Labs,SB Audigy}}");
 
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 #define ENABLE_SYNTH
 #include <sound/emu10k1_synth.h>
 #endif
@@ -78,7 +78,7 @@ MODULE_PARM(enable_ir, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable_ir, "Enable IR.");
 MODULE_PARM_SYNTAX(enable_ir, SNDRV_ENABLE_DESC);
 
-static struct pci_device_id snd_emu10k1_ids[] __devinitdata = {
+static struct pci_device_id snd_emu10k1_ids[] = {
 	{ 0x1102, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* EMU10K1 */
 	{ 0x1102, 0x0006, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* Dell OEM version (EMU10K1) */
 	{ 0x1102, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },	/* Audigy */
@@ -135,11 +135,9 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}		
-	if (!emu->APS) {	/* APS board has not an AC97 mixer */
-		if ((err = snd_emu10k1_mixer(emu)) < 0) {
-			snd_card_free(card);
-			return err;
-		}		
+	if ((err = snd_emu10k1_mixer(emu)) < 0) {
+		snd_card_free(card);
+		return err;
 	}
 	if (emu->audigy) {
 		if ((err = snd_emu10k1_audigy_midi(emu)) < 0) {

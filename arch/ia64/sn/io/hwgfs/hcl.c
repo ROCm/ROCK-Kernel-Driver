@@ -759,28 +759,6 @@ hwgraph_info_unexport_LBL(vertex_hdl_t de, char *name)
 }
 
 /*
- * hwgraph_path_lookup - return the handle for the given path.
- *
- */
-int
-hwgraph_path_lookup(vertex_hdl_t start_vertex_handle,
-			char *lookup_path,
-			vertex_hdl_t *vertex_handle_ptr,
-			char **remainder)
-{
-	*vertex_handle_ptr = hwgfs_find_handle(start_vertex_handle,	/* start dir */
-					lookup_path,		/* path */
-					0,			/* major */
-					0,			/* minor */
-					0,			/* char | block */
-					1);			/* traverse symlinks */
-	if (*vertex_handle_ptr == NULL)
-		return(-1);
-	else
-		return(0);
-}
-
-/*
  * hwgraph_traverse - Find and return the handle starting from de.
  *
  */
@@ -920,6 +898,5 @@ EXPORT_SYMBOL(hwgraph_info_get_exported_LBL);
 EXPORT_SYMBOL(hwgraph_info_get_next_LBL);
 EXPORT_SYMBOL(hwgraph_info_export_LBL);
 EXPORT_SYMBOL(hwgraph_info_unexport_LBL);
-EXPORT_SYMBOL(hwgraph_path_lookup);
 EXPORT_SYMBOL(hwgraph_traverse);
 EXPORT_SYMBOL(hwgraph_vertex_name_get);

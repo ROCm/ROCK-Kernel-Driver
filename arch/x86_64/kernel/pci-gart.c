@@ -21,6 +21,7 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/topology.h>
+#include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
 #include <asm/bitops.h>
@@ -41,9 +42,13 @@ u32 *iommu_gatt_base; 		/* Remapping table */
 int no_iommu; 
 static int no_agp; 
 #ifdef CONFIG_IOMMU_DEBUG
+int panic_on_overflow = 1; 
 int force_iommu = 1;
+int sac_force_size = 0; 
 #else
+int panic_on_overflow = 1; /* for testing */
 int force_iommu = 0;
+int sac_force_size = 256*1024*1024;
 #endif
 
 /* Allocation bitmap for the remapping area */ 
@@ -82,15 +87,16 @@ AGPEXTERN int agp_memory_reserved;
 AGPEXTERN __u32 *agp_gatt_table;
 
 static unsigned long next_bit;  /* protected by iommu_bitmap_lock */
+static int need_flush; 		/* global flush state. set for each gart wrap */
 
-static unsigned long alloc_iommu(int size, int *flush) 
+static unsigned long alloc_iommu(int size) 
 { 	
 	unsigned long offset, flags;
 
 	spin_lock_irqsave(&iommu_bitmap_lock, flags);	
 	offset = find_next_zero_string(iommu_gart_bitmap,next_bit,iommu_pages,size);
 	if (offset == -1) {
-		*flush = 1;
+		need_flush = 1;
 	       	offset = find_next_zero_string(iommu_gart_bitmap,0,next_bit,size);
 	}
 	if (offset != -1) { 
@@ -98,7 +104,7 @@ static unsigned long alloc_iommu(int size, int *flush)
 		next_bit = offset+size; 
 		if (next_bit >= iommu_pages) { 
 			next_bit = 0;
-			*flush = 1;
+			need_flush = 1;
 		} 
 	} 
 	spin_unlock_irqrestore(&iommu_bitmap_lock, flags);      
@@ -118,21 +124,36 @@ static void free_iommu(unsigned long offset, int size)
 } 
 
 /* 
- * Only flush the aperture on the CPU the PCI bridge is connected to.
+ * Use global flush state to avoid races with multiple flushers.
  */
-static void flush_gart(int bus) 
+static void __flush_gart(struct pci_dev *dev)
 { 
+	unsigned long flags;
+	int bus = dev ? dev->bus->number : -1; 
 	int flushed = 0;
 	int i;
-	for (i = 0; northbridges[i]; i++) { 
-		if (bus >= 0 && !(pcibus_to_cpumask(bus) & (1UL << i))) 
-			continue;
-		pci_write_config_dword(northbridges[i], 0x9c, 
-				       northbridge_flush_word[i] | 1); 
-		flushed++;
+
+	spin_lock_irqsave(&iommu_bitmap_lock, flags);
+	/* recheck flush count inside lock */
+	if (need_flush) { 
+		for (i = 0; northbridges[i]; i++) { 
+			if (bus >= 0 && !(pcibus_to_cpumask(bus) & (1UL << i))) 
+				continue;
+			pci_write_config_dword(northbridges[i], 0x9c, 
+					       northbridge_flush_word[i] | 1); 
+			flushed++;
+		} 
+		if (!flushed) 
+			printk("nothing to flush? %d\n", bus);
+		need_flush = 0;
 	} 
-	if (!flushed) 
-		printk("nothing to flush? %d\n", bus);
+	spin_unlock_irqrestore(&iommu_bitmap_lock, flags);
+} 
+
+static inline void flush_gart(struct pci_dev *dev)
+{ 
+	if (need_flush)
+		__flush_gart(dev);
 } 
 
 /* 
@@ -185,6 +206,8 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	return memory; 
 	
 error:
+	if (panic_on_overflow)
+		panic("pci_map_single: overflow %lu bytes\n", size); 
 	free_pages((unsigned long)memory, get_order(size)); 
 	return NULL; 
 }
@@ -292,13 +315,15 @@ static inline int nonforced_iommu(struct pci_dev *dev, unsigned long addr, size_
  * Caller needs to check if the iommu is needed and flush.
  */
 static dma_addr_t pci_map_area(struct pci_dev *dev, unsigned long phys_mem, 
-				size_t size, int *flush, int dir)
+				size_t size, int dir)
 { 
 	unsigned long npages = to_pages(phys_mem, size);
-	unsigned long iommu_page = alloc_iommu(npages, flush);
+	unsigned long iommu_page = alloc_iommu(npages);
 	if (iommu_page == -1) {
 		if (!nonforced_iommu(dev, phys_mem, size))
 			return phys_mem; 
+		if (panic_on_overflow)
+			panic("pci_map_area overflow %lu bytes\n", size);
 		iommu_full(dev, size, dir);
 		return bad_dma_address;
 	}
@@ -313,11 +338,9 @@ static dma_addr_t pci_map_area(struct pci_dev *dev, unsigned long phys_mem,
 }
 
 /* Map a single area into the IOMMU */
-dma_addr_t pci_map_single(struct pci_dev *dev, void *addr, size_t size, 
-				  	 	 int dir)
+dma_addr_t pci_map_single(struct pci_dev *dev, void *addr, size_t size, int dir)
 { 
 	unsigned long phys_mem, bus;
-	int flush = 0;
 
 	BUG_ON(dir == PCI_DMA_NONE);
 
@@ -325,9 +348,8 @@ dma_addr_t pci_map_single(struct pci_dev *dev, void *addr, size_t size,
 	if (!need_iommu(dev, phys_mem, size))
 		return phys_mem; 
 
-	bus = pci_map_area(dev, phys_mem, size, &flush, dir);
-	if (flush)
-		flush_gart(dev->bus->number); 
+	bus = pci_map_area(dev, phys_mem, size, dir);
+	flush_gart(dev); 
 	return bus; 
 } 
 
@@ -336,35 +358,37 @@ static int pci_map_sg_nonforce(struct pci_dev *dev, struct scatterlist *sg,
 			       int nents, int dir)
 {
 	int i;
-	int flush = 0;
+
+#ifdef CONFIG_IOMMU_DEBUG
+	printk(KERN_DEBUG "pci_map_sg overflow\n");
+#endif
+
  	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
 		unsigned long addr = page_to_phys(s->page) + s->offset; 
 		if (nonforced_iommu(dev, addr, s->length)) { 
-			addr = pci_map_area(dev, addr, s->length, &flush, dir); 
+			addr = pci_map_area(dev, addr, s->length, dir); 
 			if (addr == bad_dma_address) { 
 				if (i > 0) 
 					pci_unmap_sg(dev, sg, i, dir); 
 				nents = 0; 
 				break;
-	} 
+			}
 		}
 		s->dma_address = addr;
 	}
-	if (flush) 
-		flush_gart(dev->bus->number);
+	flush_gart(dev);
 	return nents;
 }
 
 /* Map multiple scatterlist entries continuous into the first. */
 static int __pci_map_cont(struct scatterlist *sg, int start, int stopat, 
-		      struct scatterlist *sout,
-		      unsigned long pages, int *flush)
+		      struct scatterlist *sout, unsigned long pages)
 {
-	unsigned long iommu_start = alloc_iommu(pages, flush);
+	unsigned long iommu_start = alloc_iommu(pages);
 	if (iommu_start == -1)
 		return -1;
-		
+
 	unsigned long iommu_page = iommu_start; 
 	int i;
 	
@@ -385,7 +409,7 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 			SET_LEAK(iommu_page);
 			addr += PAGE_SIZE;
 			iommu_page++;
-		}
+	} 
 		BUG_ON(i > 0 && addr % PAGE_SIZE); 
 	} 
 	BUG_ON(iommu_page - iommu_start != pages);	
@@ -394,30 +418,31 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 
 static inline int pci_map_cont(struct scatterlist *sg, int start, int stopat, 
 		      struct scatterlist *sout,
-		      unsigned long pages, int *flush, int need)
+		      unsigned long pages, int need)
 {
 	if (!need) { 
 		BUG_ON(stopat - start != 1);
-		if (sout != sg + start)
-			*sout = sg[start]; 
+		*sout = sg[start]; 
 		return 0;
 	} 
-	return __pci_map_cont(sg, start, stopat, sout, pages, flush);
+	return __pci_map_cont(sg, start, stopat, sout, pages);
 }
+		
+#define PCI_NO_MERGE 0
 		
 /*
  * DMA map all entries in a scatterlist.
  * Merge chunks that have page aligned sizes into a continuous mapping. 
 		 */
-int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg,
-	       int nents, int dir)
+int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 {
 	int i;
 	int out;
-	int flush = 0;
 	int start;
 	unsigned long pages = 0;
 	int need = 0;
+
+	unsigned long size = 0; 
 
 	BUG_ON(dir == PCI_DMA_NONE);
 	if (nents == 0) 
@@ -430,42 +455,44 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg,
 		s->dma_address = addr;
 		BUG_ON(s->length == 0); 
 
+		size += s->length; 
+
 		/* Handle the previous not yet processed entries */
-		if (i > 0) {
+		if (i > start) {
 			struct scatterlist *ps = &sg[i-1];
 			/* Can only merge when the last chunk ends on a page 
-			   boundary */
-			if (!need || (i > start+1 && ps->offset) ||
+			   boundary. */
+			if (PCI_NO_MERGE || !need || (i-1 > start && ps->offset) ||
 			    (ps->offset + ps->length) % PAGE_SIZE) { 
 				if (pci_map_cont(sg, start, i, sg+out, pages, 
-						 &flush, need) < 0)
+						 need) < 0)
 					goto error;
 				out++;
 				pages = 0;
-				start = i;		
+				start = i;	
 			}
 	}
 
 		need = need_iommu(dev, addr, s->length); 
 		pages += to_pages(s->offset, s->length);
 	}
-	if (pci_map_cont(sg, start, i, sg+out, pages, &flush, need) < 0)
+	if (pci_map_cont(sg, start, i, sg+out, pages, need) < 0)
 		goto error;
-	out++;	
-	if (flush)
-		flush_gart(dev->bus->number);
+	out++;
+	flush_gart(dev);
 	if (out < nents) 
 		sg[out].length = 0; 
 	return out;
 
 error:
-	if (out > 0) 
-		flush_gart(-1);
+	flush_gart(NULL);
 	pci_unmap_sg(dev, sg, nents, dir);
 	/* When it was forced try again unforced */
 	if (force_iommu) 
 		return pci_map_sg_nonforce(dev, sg, nents, dir);
-	iommu_full(dev, pages << PAGE_SHIFT, dir);	
+	if (panic_on_overflow)
+		panic("pci_map_sg: overflow on %lu pages\n", pages); 
+	iommu_full(dev, pages << PAGE_SHIFT, dir);
 	for (i = 0; i < nents; i++)
 		sg[i].dma_address = bad_dma_address;
 	return 0;
@@ -507,7 +534,7 @@ void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg, int nents,
 	}
 }
 
-int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
+int pci_dma_supported(struct pci_dev *dev, u64 mask)
 {
 	/* Copied from i386. Doesn't make much sense, because it will 
 	   only work for pci_alloc_consistent. 
@@ -515,16 +542,24 @@ int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
         if (mask < 0x00ffffff)
                 return 0;
 
-	/* Tell the device to use SAC. This allows it to use cheaper accesses
-	   in some cases.
+	/* Tell the device to use SAC when IOMMU force is on. 
+	   This allows the driver to use cheaper accesses in some cases.
+
 	   Problem with this is that if we overflow the IOMMU area
 	   and return DAC as fallback address the device may not handle it correctly.
-	   As a compromise we only do this if the IOMMU area is >= 256MB,
-	   which should make overflow unlikely enough. */
-	if (force_iommu && mask > 0xffffffff && iommu_size >= 256*1024*1024) 
+	   As a compromise we only do this if the IOMMU area is >= 256MB 
+	   which should make overflow unlikely enough.
+	   
+	   As a special case some controllers have a 39bit address mode 
+	   that is as efficient as 32bit (aic79xx). Don't force SAC for these.
+	   Assume all masks <= 40 bits are of this type. Normally this doesn't
+	   make any difference, but gives more gentle handling of IOMMU overflow. */
+	if (force_iommu && (mask > 0xffffffffffULL) && (iommu_size >= sac_force_size)){ 
+		printk(KERN_INFO "%s: Force SAC with mask %Lx\n", dev->slot_name,mask);
 		return 0; 
+	}
 
-	if (no_iommu && (~mask & (end_pfn << PAGE_SHIFT)))
+	if (no_iommu && (mask < (end_pfn << PAGE_SHIFT)))
 		return 0;
 
 	return 1;
@@ -628,7 +663,7 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 
 		pci_write_config_dword(dev, 0x90, ctl); 
 	}
-	flush_gart(-1); 
+	flush_gart(NULL); 
 	
 	printk("PCI-DMA: aperture base @ %x size %u KB\n",aper_base, aper_size>>10); 
 	return 0;
@@ -736,7 +771,7 @@ static int __init pci_iommu_init(void)
 		northbridge_flush_word[cpu] = flag; 
 	}
 		     
-	flush_gart(-1);
+	flush_gart(NULL);
 
 	return 0;
 } 
@@ -773,6 +808,10 @@ __init int iommu_setup(char *opt)
 		    if (*p == '=' && get_option(&p, &arg))
 			    fallback_aper_order = arg;
 	    } 
+	    if (!memcmp(p, "panic", 5))
+		    panic_on_overflow = 1;
+	    if (!memcmp(p, "nopanic", 7))
+		    panic_on_overflow = 0;	    
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;

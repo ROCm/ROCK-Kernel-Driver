@@ -44,6 +44,7 @@ static struct usb_hcd *ehci_hcd_alloc (void)
 		kmalloc (sizeof (struct ehci_hcd), GFP_KERNEL);
 	if (ehci != 0) {
 		memset (ehci, 0, sizeof (struct ehci_hcd));
+		ehci->hcd.product_desc = "EHCI Host Controller";
 		return &ehci->hcd;
 	}
 	return 0;

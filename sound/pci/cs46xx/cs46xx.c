@@ -72,7 +72,7 @@ MODULE_PARM(mmap_valid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(mmap_valid, "Support OSS mmap.");
 MODULE_PARM_SYNTAX(mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
-static struct pci_device_id snd_cs46xx_ids[] __devinitdata = {
+static struct pci_device_id snd_cs46xx_ids[] = {
         { 0x1013, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4280 */
         { 0x1013, 0x6003, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4612 */
         { 0x1013, 0x6004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4615 */
@@ -163,7 +163,6 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 }
 
 #ifdef CONFIG_PM
-#ifndef PCI_OLD_SUSPEND
 static int snd_card_cs46xx_suspend(struct pci_dev *pci, u32 state)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return -ENXIO);
@@ -176,18 +175,6 @@ static int snd_card_cs46xx_resume(struct pci_dev *pci)
 	snd_cs46xx_resume(chip);
 	return 0;
 }
-#else
-static void snd_card_cs46xx_suspend(struct pci_dev *pci)
-{
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return);
-	snd_cs46xx_suspend(chip);
-}
-static void snd_card_cs46xx_resume(struct pci_dev *pci)
-{
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return);
-	snd_cs46xx_resume(chip);
-}
-#endif
 #endif
 
 static void __devexit snd_card_cs46xx_remove(struct pci_dev *pci)

@@ -440,9 +440,9 @@ ia32_syscall_table:
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall	/*255*/
-	data8 sys_ni_syscall
+	data8 sys_epoll_create
+	data8 sys32_epoll_ctl	/* 255 */
+	data8 sys32_epoll_wait
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall

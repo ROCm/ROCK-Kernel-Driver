@@ -2,16 +2,15 @@
  * This is a module which is used for logging packets.
  */
 #include <linux/module.h>
+#include <linux/spinlock.h>
 #include <linux/skbuff.h>
 #include <linux/ip.h>
-#include <linux/spinlock.h>
 #include <net/icmp.h>
 #include <net/udp.h>
 #include <net/tcp.h>
-#include <linux/netfilter_ipv4/ip_tables.h>
-
-struct in_device;
 #include <net/route.h>
+
+#include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_LOG.h>
 
 #if 0
@@ -20,10 +19,6 @@ struct in_device;
 #define DEBUGP(format, args...)
 #endif
 
-struct esphdr {
-	__u32   spi;
-}; /* FIXME evil kludge */
-        
 /* Use lock to serialize, so printks don't overlap */
 static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
 
@@ -256,13 +251,31 @@ static void dump_packet(const struct ipt_log_info *info,
 		break;
 	}
 	/* Max Length */
-	case IPPROTO_AH:
+	case IPPROTO_AH: {
+		struct ip_auth_hdr ah;
+
+		if (ntohs(iph.frag_off) & IP_OFFSET)
+			break;
+		
+		/* Max length: 9 "PROTO=AH " */
+		printk("PROTO=AH ");
+
+		/* Max length: 25 "INCOMPLETE [65535 bytes] " */
+		if (skb_copy_bits(skb, iphoff+iph.ihl*4, &ah, sizeof(ah)) < 0) {
+			printk("INCOMPLETE [%u bytes] ",
+			       skb->len - iphoff - iph.ihl*4);
+			break;
+		}
+
+		/* Length: 15 "SPI=0xF1234567 " */
+		printk("SPI=0x%x ", ntohl(ah.spi));
+		break;
+	}
 	case IPPROTO_ESP: {
-		struct esphdr esph;
-		int esp = (iph.protocol==IPPROTO_ESP);
+		struct ip_esp_hdr esph;
 
 		/* Max length: 10 "PROTO=ESP " */
-		printk("PROTO=%s ",esp? "ESP" : "AH");
+		printk("PROTO=ESP ");
 
 		if (ntohs(iph.frag_off) & IP_OFFSET)
 			break;

@@ -72,15 +72,17 @@ static void dump(struct pt_regs *fp)
 			(int) current->mm->end_data,
 			(int) current->mm->end_data,
 			(int) current->mm->brk);
-		printk("USER-STACK=%08x  KERNEL-STACK=%08x\n\n",
+		printk("USER-STACK=%08x  KERNEL-STACK=%08lx\n\n",
 			(int) current->mm->start_stack,
 			(int) PAGE_SIZE+(unsigned long)current);
 	}
 
 	printk("PC: %08lx\n", (long)fp->pc);
-	printk("CCR: %08lx   SP: %08lx\n", fp->ccr, (long) fp);
+	printk("CCR: %02x   SP: %08lx\n", fp->ccr, (long) fp);
 	printk("ER0: %08lx  ER1: %08lx   ER2: %08lx   ER3: %08lx\n",
 		fp->er0, fp->er1, fp->er2, fp->er3);
+	printk("ER4: %08lx  ER5: %08lx   ER6: %08lx\n",
+		fp->er4, fp->er5, fp->er6);
 	printk("\nCODE:");
 	tp = ((unsigned char *) fp->pc) - 0x20;
 	for (sp = (unsigned long *) tp, i = 0; (i < 0x40);  i += 4) {
@@ -122,3 +124,53 @@ void die_if_kernel (char *str, struct pt_regs *fp, int nr)
 
 	do_exit(SIGSEGV);
 }
+
+extern char _start, _etext;
+#define check_kernel_text(addr) \
+        ((addr >= (unsigned long)(&_start)) && \
+         (addr <  (unsigned long)(&_etext))) 
+
+static int kstack_depth_to_print = 24;
+
+void show_stack(struct task_struct *task, unsigned long *esp)
+{
+	unsigned long *stack,  addr;
+	int i;
+
+	if (esp == NULL)
+		esp = (unsigned long *) &esp;
+
+	stack = esp;
+
+	printk("Stack from %08lx:", (unsigned long)stack);
+	for (i = 0; i < kstack_depth_to_print; i++) {
+		if (((unsigned long)stack & (THREAD_SIZE - 1)) == 0)
+			break;
+		if (i % 8 == 0)
+			printk("\n       ");
+		printk(" %08lx", *stack++);
+	}
+
+	printk("\nCall Trace:");
+	i = 0;
+	stack = esp;
+	while (((unsigned long)stack & (THREAD_SIZE - 1)) == 0) {
+		addr = *stack++;
+		/*
+		 * If the address is either in the text segment of the
+		 * kernel, or in the region which contains vmalloc'ed
+		 * memory, it *may* be the address of a calling
+		 * routine; if so, print it so that someone tracing
+		 * down the cause of the crash will be able to figure
+		 * out the call path that was taken.
+		 */
+		if (check_kernel_text(addr)) {
+			if (i % 4 == 0)
+				printk("\n       ");
+			printk(" [<%08lx>]", addr);
+			i++;
+		}
+	}
+	printk("\n");
+}
+

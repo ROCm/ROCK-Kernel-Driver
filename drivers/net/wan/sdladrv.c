@@ -428,7 +428,7 @@ int sdla_setup (sdlahw_t* hw, void* sfm, unsigned len)
 
                 /* Verify IRQ configuration options */
                 if (!get_option_index(irq_opt, hw->irq)) {
-                        printk(KERN_INFO "%s: IRQ %d is illegal!\n",
+                        printk(KERN_INFO "%s: IRQ %d is invalid!\n",
                         	modname, hw->irq);
                       return -EINVAL;
                 } 
@@ -438,7 +438,7 @@ int sdla_setup (sdlahw_t* hw, void* sfm, unsigned len)
                         hw->pclk = pclk_opt[1];  /* use default */
         
                 else if (!get_option_index(pclk_opt, hw->pclk)) {
-                        printk(KERN_INFO "%s: CPU clock %u is illegal!\n",
+                        printk(KERN_INFO "%s: CPU clock %u is invalid!\n",
 				modname, hw->pclk);
                         return -EINVAL;
                 } 
@@ -458,7 +458,7 @@ int sdla_setup (sdlahw_t* hw, void* sfm, unsigned len)
                 else if (!get_option_index(dpmbase_opt,
 			virt_to_phys(hw->dpmbase))) {
                         printk(KERN_INFO
-				"%s: memory address 0x%lX is illegal!\n",
+				"%s: memory address 0x%lX is invalid!\n",
 				modname, virt_to_phys(hw->dpmbase));
                         return -EINVAL;
                 }               

@@ -207,7 +207,6 @@ static inline int
 elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *regs, elf_fpregset_t *fpu)
 {
 	struct _fpstate_ia32 *fpstate = (void*)fpu; 
-	struct pt_regs *regs = (struct pt_regs *)(tsk->thread.rsp0); 
 	mm_segment_t oldfs = get_fs();
 
 	if (!tsk->used_math) 

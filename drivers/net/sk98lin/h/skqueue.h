@@ -1,32 +1,23 @@
 /******************************************************************************
  *
  * Name:	skqueue.h
- * Project:	Genesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.12 $
- * Date:	$Date: 1998/09/08 08:48:01 $
+ * Project:	Gigabit Ethernet Adapters, Schedule-Modul
+ * Version:	$Revision: 1.15 $
+ * Date:	$Date: 2003/05/13 17:54:57 $
  * Purpose:	Defines for the Event queue
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1989-1998 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
- *	All Rights Reserved
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
- *	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF SYSKONNECT
- *	The copyright notice above does not evidence any
- *	actual or intended publication of such source code.
+ *	This program is free software; you can redistribute it and/or modify
+ *	it under the terms of the GNU General Public License as published by
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
- *	This Module contains Proprietary Information of SysKonnect
- *	and should be treated as Confidential.
- *
- *	The information in this file is provided for the exclusive use of
- *	the licensees of SysKonnect.
- *	Such users have the right to use, modify, and incorporate this code
- *	into products for purposes authorized by the license agreement
- *	provided they include this notice and the associated copyright notice
- *	with any such product.
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -36,6 +27,15 @@
  * History:
  *
  *	$Log: skqueue.h,v $
+ *	Revision 1.15  2003/05/13 17:54:57  mkarl
+ *	Editorial changes.
+ *	
+ *	Revision 1.14  2002/03/15 10:52:13  mkunz
+ *	Added event classes for link aggregation
+ *	
+ *	Revision 1.13  1999/11/22 13:59:05  cgoos
+ *	Changed license header to GPL.
+ *	
  *	Revision 1.12  1998/09/08 08:48:01  gklug
  *	add: init level handling
  *	
@@ -96,6 +96,12 @@
 #define	SKGE_PNMI	4	/* PNMI Event Class */
 #define	SKGE_CSUM	5	/* Checksum Event Class */
 #define	SKGE_HWAC	6	/* Hardware Access Event Class */
+
+#define	SKGE_SWT	9	/* Software Timer Event Class */
+#define	SKGE_LACP	10	/* LACP Aggregation Event Class */
+#define	SKGE_RSF	11	/* RSF Aggregation Event Class */
+#define	SKGE_MARKER	12	/* MARKER Aggregation Event Class */
+#define	SKGE_FD		13	/* FD Distributor Event Class */
 
 /*
  * define event queue as circular buffer

@@ -197,9 +197,7 @@ static struct i2c_client client_template =
 {
         .id 		= -1,
         .driver		= &i2c_driver_tuner,
-        .dev		= {
-		.name	= "SAB3036",
-	},
+	.name		= "SAB3036",
 };
 
 int __init

@@ -862,7 +862,7 @@ GDTH_INITFUNC(static int, gdth_search_pci(gdth_pci_str *pcistr))
 /* Vortex only makes RAID controllers.
  * We do not really want to specify all 550 ids here, so wildcard match.
  */
-static struct pci_device_id gdthtable[] __devinitdata = {
+static struct pci_device_id gdthtable[] = {
     {PCI_VENDOR_ID_VORTEX,PCI_ANY_ID,PCI_ANY_ID, PCI_ANY_ID},
     {PCI_VENDOR_ID_INTEL,PCI_DEVICE_ID_INTEL_SRC,PCI_ANY_ID,PCI_ANY_ID}, 
     {PCI_VENDOR_ID_INTEL,PCI_DEVICE_ID_INTEL_SRC_XSCALE,PCI_ANY_ID,PCI_ANY_ID}, 
@@ -3838,9 +3838,9 @@ static char *async_cache_tab[] = {
 /*31*/  "\007\000\002\012\001\013\001"
         "GDT HA %u, Fault bus %u, ID %u: old disk detected",
 /*32*/  "\007\000\002\012\001\013\001"
-        "GDT HA %u, Fault bus %u, ID %u: plugging an active disk is illegal",
+        "GDT HA %u, Fault bus %u, ID %u: plugging an active disk is invalid",
 /*33*/  "\007\000\002\012\001\013\001"
-        "GDT HA %u, Fault bus %u, ID %u: illegal device detected",
+        "GDT HA %u, Fault bus %u, ID %u: invalid device detected",
 /*34*/  "\011\000\002\012\001\013\001\006\004"
         "GDT HA %u, Fault bus %u, ID %u: insufficient disk capacity (%lu MB required)",
 /*35*/  "\007\000\002\012\001\013\001"

@@ -39,7 +39,7 @@ static DECLARE_WAIT_QUEUE_HEAD(sigd_sleep);
 static void sigd_put_skb(struct sk_buff *skb)
 {
 #ifdef WAIT_FOR_DEMON
-	static unsigned long silence = 0;
+	static unsigned long silence;
 	DECLARE_WAITQUEUE(wait,current);
 
 	add_wait_queue(&sigd_sleep,&wait);

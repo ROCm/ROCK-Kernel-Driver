@@ -96,16 +96,16 @@ unsigned int openpic_vec_spurious;
 #if 0
 #define check_arg_ipi(ipi) \
     if (ipi < 0 || ipi >= OPENPIC_NUM_IPI) \
-	printk(KERN_ERR "open_pic.c:%d: illegal ipi %d\n", __LINE__, ipi);
+	printk(KERN_ERR "open_pic.c:%d: invalid ipi %d\n", __LINE__, ipi);
 #define check_arg_timer(timer) \
     if (timer < 0 || timer >= OPENPIC_NUM_TIMERS) \
-	printk(KERN_ERR "open_pic.c:%d: illegal timer %d\n", __LINE__, timer);
+	printk(KERN_ERR "open_pic.c:%d: invalid timer %d\n", __LINE__, timer);
 #define check_arg_vec(vec) \
     if (vec < 0 || vec >= OPENPIC_NUM_VECTORS) \
-	printk(KERN_ERR "open_pic.c:%d: illegal vector %d\n", __LINE__, vec);
+	printk(KERN_ERR "open_pic.c:%d: invalid vector %d\n", __LINE__, vec);
 #define check_arg_pri(pri) \
     if (pri < 0 || pri >= OPENPIC_NUM_PRI) \
-	printk(KERN_ERR "open_pic.c:%d: illegal priority %d\n", __LINE__, pri);
+	printk(KERN_ERR "open_pic.c:%d: invalid priority %d\n", __LINE__, pri);
 /*
  * Print out a backtrace if it's out of range, since if it's larger than NR_IRQ's
  * data has probably been corrupted and we're going to panic or deadlock later
@@ -113,11 +113,11 @@ unsigned int openpic_vec_spurious;
  */
 #define check_arg_irq(irq) \
     if (irq < open_pic_irq_offset || irq >= (NumSources+open_pic_irq_offset)){ \
-      printk(KERN_ERR "open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
+      printk(KERN_ERR "open_pic.c:%d: invalid irq %d\n", __LINE__, irq); \
       dump_stack(); }
 #define check_arg_cpu(cpu) \
     if (cpu < 0 || cpu >= OPENPIC_MAX_PROCESSORS){ \
-	printk(KERN_ERR "open_pic.c:%d: illegal cpu %d\n", __LINE__, cpu); \
+	printk(KERN_ERR "open_pic.c:%d: invalid cpu %d\n", __LINE__, cpu); \
 	dump_stack(); }
 #else
 #define check_arg_ipi(ipi)	do {} while (0)
@@ -158,7 +158,6 @@ void __init openpic_init_IRQ(void)
         openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
         for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
                 irq_desc[i].handler = &i8259_pic;
-        i8259_init();
 }
 
 static inline u_int openpic_read(volatile u_int *addr)
@@ -384,17 +383,29 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 	ppc64_boot_msg(0x24, "OpenPic Spurious");
 	openpic_set_spurious(openpic_vec_spurious);
 
-	/* Initialize the cascade */
-	if (offset) {
-		if (request_irq(offset, no_action, SA_INTERRUPT,
-				"82c59 cascade", NULL))
-			printk(KERN_ERR "Unable to get OpenPIC IRQ 0 for cascade\n");
-	}
 	openpic_set_priority(0);
 	openpic_disable_8259_pass_through();
 
 	ppc64_boot_msg(0x25, "OpenPic Done");
 }
+
+/* 
+ * We cant do this in init_IRQ because we need the memory subsystem up for
+ * request_irq()
+ */
+static int __init openpic_setup_i8259(void)
+{
+	if (naca->interrupt_controller == IC_OPEN_PIC) {
+		/* Initialize the cascade */
+		if (request_irq(NUM_8259_INTERRUPTS, no_action, SA_INTERRUPT,
+				"82c59 cascade", NULL))
+			printk(KERN_ERR "Unable to get OpenPIC IRQ 0 for cascade\n");
+		i8259_init();
+	}
+
+	return 0;
+}
+arch_initcall(openpic_setup_i8259);
 
 void openpic_setup_ISU(int isu_num, unsigned long addr)
 {

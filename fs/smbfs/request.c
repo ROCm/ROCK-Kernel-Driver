@@ -194,7 +194,7 @@ static int smb_setup_trans2request(struct smb_request *req)
 {
 	struct smb_sb_info *server = req->rq_server;
 	int mparam, mdata;
-	static unsigned char padding[4] = { 0, };
+	static unsigned char padding[4];
 
 	/* I know the following is very ugly, but I want to build the
 	   smb packet as efficiently as possible. */

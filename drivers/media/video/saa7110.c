@@ -147,7 +147,7 @@ int determine_norm(struct i2c_client* client)
 }
 
 static
-int saa7110_attach(struct i2c_adapter *adap, int  addr, unsigned short flags, int kind)
+int saa7110_attach(struct i2c_adapter *adap, int  addr, int kind)
 {
 static	const unsigned char initseq[] = {
 	     0, 0x4C, 0x3C, 0x0D, 0xEF, 0xBD, 0xF0, 0x00, 0x00,
@@ -176,7 +176,7 @@ static	const unsigned char initseq[] = {
 
 	/* clear our private data */
 	memset(decoder, 0, sizeof(*decoder));
-	strlcpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
+	strlcpy(client->name, IF_NAME, DEVICE_NAME_SIZE);
 	decoder->client = client;
 	i2c_set_clientdata(client, decoder);
 	decoder->addr = addr;
@@ -190,7 +190,7 @@ static	const unsigned char initseq[] = {
 
 	rv = i2c_master_send(client, initseq, sizeof(initseq));
 	if (rv < 0)
-		printk(KERN_ERR "%s_attach: init status %d\n", client->dev.name, rv);
+		printk(KERN_ERR "%s_attach: init status %d\n", client->name, rv);
 	else {
 		i2c_smbus_write_byte_data(client,0x21,0x16);
 		i2c_smbus_write_byte_data(client,0x0D,0x04);
@@ -393,9 +393,7 @@ static struct i2c_driver i2c_driver_saa7110 =
 static struct i2c_client client_template = {
 	.id 		= -1,
 	.driver 	= &i2c_driver_saa7110,
-	.dev		= {
-		.name	= "saa7110_client",
-	},
+	.name		= "saa7110_client",
 };
 
 static int saa7110_init(void)

@@ -194,8 +194,8 @@
 */
 
 #define MAJOR_NR AZTECH_CDROM_MAJOR
-#define QUEUE (&azt_queue)
-#define CURRENT elv_next_request(&azt_queue)
+#define QUEUE (azt_queue)
+#define CURRENT elv_next_request(azt_queue)
 #define SET_TIMER(func, jifs)   delay_timer.expires = jiffies + (jifs); \
                                 delay_timer.function = (void *) (func); \
                                 add_timer(&delay_timer);
@@ -226,7 +226,7 @@
 #define AZT_DEBUG_MULTISESSION
 #endif
 
-static struct request_queue azt_queue;
+static struct request_queue *azt_queue;
 
 static int current_valid(void)
 {
@@ -1915,19 +1915,26 @@ static int __init aztcd_init(void)
 		goto err_out2;
 	}
 
-	blk_init_queue(&azt_queue, do_aztcd_request, &aztSpin);
-	blk_queue_hardsect_size(&azt_queue, 2048);
+	azt_queue = blk_init_queue(do_aztcd_request, &aztSpin);
+	if (!azt_queue) {
+		ret = -ENOMEM;
+		goto err_out3;
+	}
+
+	blk_queue_hardsect_size(azt_queue, 2048);
 	azt_disk->major = MAJOR_NR;
 	azt_disk->first_minor = 0;
 	azt_disk->fops = &azt_fops;
 	sprintf(azt_disk->disk_name, "aztcd");
 	sprintf(azt_disk->devfs_name, "aztcd");
-	azt_disk->queue = &azt_queue;
+	azt_disk->queue = azt_queue;
 	add_disk(azt_disk);
 	azt_invalidate_buffers();
 	aztPresent = 1;
 	aztCloseDoor();
 	return 0;
+err_out3:
+	unregister_blkdev(MAJOR_NR, "aztcd");
 err_out2:
 	put_disk(azt_disk);
 err_out:
@@ -1948,7 +1955,7 @@ static void __exit aztcd_exit(void)
 		printk("What's that: can't unregister aztcd\n");
 		return;
 	}
-	blk_cleanup_queue(&azt_queue);
+	blk_cleanup_queue(azt_queue);
 	if ((azt_port == 0x1f0) || (azt_port == 0x170)) {
 		SWITCH_IDE_MASTER;
 		release_region(azt_port, 8);	/*IDE-interface */

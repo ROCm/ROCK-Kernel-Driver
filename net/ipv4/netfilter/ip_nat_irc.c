@@ -36,7 +36,7 @@
 
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
-static int ports_c = 0;
+static int ports_c;
 
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IRC (DCC) network address translation module");

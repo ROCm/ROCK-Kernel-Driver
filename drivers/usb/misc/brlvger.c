@@ -289,7 +289,7 @@ brlvger_probe (struct usb_interface *intf,
 	   we reserve it.*/
 	static DECLARE_MUTEX(reserve_sem);
 
-	actifsettings = dev->actconfig->interface->altsetting;
+	actifsettings = dev->actconfig->interface[0]->altsetting;
 
 	if( dev->descriptor.bNumConfigurations != 1
 			|| dev->config->desc.bNumInterfaces != 1 

@@ -1,7 +1,7 @@
 
 #include <linux/config.h>
 
-#ifdef CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_KGDB
 
 /* --- CONFIG --- */
 

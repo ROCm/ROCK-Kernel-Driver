@@ -323,7 +323,7 @@ static int full_duplex[MAX_UNITS] = {0, };
 #define netif_start_if(dev)
 #define netif_stop_if(dev)
 
-#define PCI_SLOT_NAME(pci_dev)	(pci_dev)->slot_name
+#define PCI_SLOT_NAME(pci_dev)	pci_name(pci_dev)
 
 #endif /* LINUX_VERSION_CODE > 0x20300 */
 
@@ -487,7 +487,7 @@ enum chipset {
 	CH_6915 = 0,
 };
 
-static struct pci_device_id starfire_pci_tbl[] __devinitdata = {
+static struct pci_device_id starfire_pci_tbl[] = {
 	{ 0x9004, 0x6915, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_6915 },
 	{ 0, }
 };

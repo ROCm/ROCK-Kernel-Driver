@@ -78,7 +78,7 @@ MODULE_PARM_DESC(dma, "DMA # for SoundScape driver.");
 MODULE_PARM_SYNTAX(dma, SNDRV_DMA8_DESC);
   
 #ifdef CONFIG_PNP
-static struct pnp_card_device_id sscape_pnpids[] __devinitdata = {
+static struct pnp_card_device_id sscape_pnpids[] = {
 	{ .id = "ENS3081", .devs = { { "ENS0000" } } },
 	{ .id = "" }	/* end */
 };
@@ -809,7 +809,7 @@ static snd_kcontrol_new_t midi_mixer_ctl = {
  */
 static unsigned __devinit get_irq_config(int irq)
 {
-	static const int valid_irq[] __devinitdata = { 9, 5, 7, 10 };
+	static const int valid_irq[] = { 9, 5, 7, 10 };
 	unsigned cfg;
 
 	for (cfg = 0; cfg < ARRAY_SIZE(valid_irq); ++cfg) {

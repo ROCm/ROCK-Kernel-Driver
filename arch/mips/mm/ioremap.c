@@ -172,7 +172,7 @@ void * __ioremap(phys_t phys_addr, phys_t size, unsigned long flags)
 
 #define IS_KSEG1(addr) (((unsigned long)(addr) & ~0x1fffffffUL) == KSEG1)
 
-void iounmap(void *addr)
+void __iounmap(void *addr)
 {
 	struct vm_struct *p;
 
@@ -190,4 +190,4 @@ void iounmap(void *addr)
 }
 
 EXPORT_SYMBOL(__ioremap);
-EXPORT_SYMBOL(iounmap);
+EXPORT_SYMBOL(__iounmap);

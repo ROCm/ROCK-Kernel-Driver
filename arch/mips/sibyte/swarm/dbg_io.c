@@ -1,5 +1,5 @@
 /*
- * kgdb debug routines for swarm board.
+ * kgdb debug routines for SiByte boards.
  *
  * Copyright (C) 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
@@ -14,11 +14,11 @@
 /* -------------------- BEGINNING OF CONFIG --------------------- */
 
 #include <linux/delay.h>
+#include <asm/io.h>
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_uart.h>
 #include <asm/sibyte/sb1250_int.h>
-#include <asm/sibyte/64bit.h>
 #include <asm/addrspace.h>
 
 /*
@@ -35,12 +35,10 @@
 static int duart_initialized = 0;	/* 0: need to be init'ed by kgdb */
 
 /* -------------------- END OF CONFIG --------------------- */
+extern int kgdb_port;
 
-
-#define	duart_out(reg, val)	out64(val, KSEG1 + A_DUART_CHANREG(1,reg))
-#define duart_in(reg)		in64(KSEG1 + A_DUART_CHANREG(1,reg))
-
-extern void set_async_breakpoint(unsigned int epc);
+#define	duart_out(reg, val)	csr_out32(val, KSEG1 + A_DUART_CHANREG(kgdb_port,reg))
+#define duart_in(reg)		csr_in32(KSEG1 + A_DUART_CHANREG(kgdb_port,reg))
 
 void putDebugChar(unsigned char c);
 unsigned char getDebugChar(void);

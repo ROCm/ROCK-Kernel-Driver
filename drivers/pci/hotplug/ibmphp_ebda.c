@@ -1230,7 +1230,7 @@ void ibmphp_free_ebda_pci_rsrc_queue (void)
 	}
 }
 
-static struct pci_device_id id_table[] __devinitdata = {
+static struct pci_device_id id_table[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_IBM,
 		.device		= HPC_DEVICE_ID,

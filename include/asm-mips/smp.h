@@ -85,7 +85,7 @@ extern cpumask_t cpu_online_map;
 #define cpu_possible(cpu) (phys_cpu_present_map & (1<<(cpu)))
 #define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 
-extern inline unsigned int num_online_cpus(void)
+static inline unsigned int num_online_cpus(void)
 {
 	return hweight32(cpu_online_map);
 }

@@ -66,7 +66,7 @@ MODULE_DEVICES("{{Creative Labs,SB AWE 32},"
 #define SNDRV_DEBUG_IRQ
 #endif
 
-#if defined(SNDRV_SBAWE) && (defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE))
+#if defined(SNDRV_SBAWE) && (defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE)))
 #define SNDRV_SBAWE_EMU8000
 #endif
 
@@ -157,7 +157,7 @@ struct snd_card_sb16 {
 
 static snd_card_t *snd_sb16_legacy[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
-static struct pnp_card_device_id snd_sb16_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_sb16_pnpids[] = {
 #ifndef SNDRV_SBAWE
 	/* Sound Blaster 16 PnP */
 	{ .id = "CTL0024", .devs = { { "CTL0031" } } },
@@ -350,6 +350,18 @@ __wt_error:
 
 #endif /* CONFIG_PNP */
 
+static void snd_sb16_free(snd_card_t *card)
+{
+	struct snd_card_sb16 *acard = (struct snd_card_sb16 *)card->private_data;
+        
+	if (acard == NULL)
+		return;
+	if (acard->fm_res) {
+		release_resource(acard->fm_res);
+		kfree_nocheck(acard->fm_res);
+	}
+}
+
 static int __init snd_sb16_probe(int dev,
 				 struct pnp_card_link *pcard,
 				 const struct pnp_card_device_id *pid)
@@ -374,6 +386,7 @@ static int __init snd_sb16_probe(int dev,
 	if (card == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_sb16 *) card->private_data;
+	card->private_free = snd_sb16_free;
 #ifdef CONFIG_PNP
 	if (isapnp[dev]) {
 		if ((err = snd_card_sb16_pnp(dev, acard, pcard, pid))) {
@@ -464,7 +477,8 @@ static int __init snd_sb16_probe(int dev,
 
 	if (fm_port[dev] > 0) {
 		if (snd_opl3_create(card, fm_port[dev], fm_port[dev] + 2,
-				    OPL3_HW_OPL3, fm_port[dev] == port[dev],
+				    OPL3_HW_OPL3,
+				    fm_port[dev] == port[dev] || fm_port[dev] == 0x388,
 				    &opl3) < 0) {
 			snd_printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
 				   fm_port[dev], fm_port[dev] + 2);

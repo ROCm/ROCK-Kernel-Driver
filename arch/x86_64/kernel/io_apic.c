@@ -1786,7 +1786,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq)
 void send_IPI_self(int vector)
 {
 	unsigned int cfg;
-	
+
        /*
         * Wait for idle.
         */

@@ -43,10 +43,10 @@ Installation
 For the latest version of the bonding driver, use kernel 2.4.12 or above
 (otherwise you will need to apply a patch).
 
-Configure kernel with `make menuconfig/xconfig/config', and select
-"Bonding driver support" in the "Network device support" section. It is
-recommended to configure the driver as module since it is currently the only way
-to pass parameters to the driver and configure more than one bonding device.
+Configure kernel with `make menuconfig/xconfig/config', and select "Bonding
+driver support" in the "Network device support" section. It is recommended
+to configure the driver as module since it is currently the only way to
+pass parameters to the driver and configure more than one bonding device.
 
 Build and install the new kernel and modules.
 
@@ -108,17 +108,17 @@ MASTER=bond0
 SLAVE=yes
 BOOTPROTO=none
 
-Use DEVICE=eth1 in the ifcfg-eth1 config file. If you configure a second bonding
-interface (bond1), use MASTER=bond1 in the config file to make the network
-interface be a slave of bond1.
+Use DEVICE=eth1 in the ifcfg-eth1 config file. If you configure a second
+bonding interface (bond1), use MASTER=bond1 in the config file to make the
+network interface be a slave of bond1.
 
 Restart the networking subsystem or just bring up the bonding device if your
 administration tools allow it. Otherwise, reboot. On Red Hat distros you can 
 issue `ifup bond0' or `/etc/rc.d/init.d/network restart'.
 
-If the administration tools of your distribution do not support master/slave
-notation in configuring network interfaces, you will need to manually configure 
-the bonding device with the following commands:
+If the administration tools of your distribution do not support
+master/slave notation in configuring network interfaces, you will need to
+manually configure the bonding device with the following commands:
 
     # /sbin/ifconfig bond0 192.168.1.1 netmask 255.255.255.0 \
       broadcast 192.168.1.255 up
@@ -166,8 +166,9 @@ in the ifDescr table (ifDescr.2).
      ip.ipAddrTable.ipAddrEntry.ipAdEntIfIndex.127.0.0.1 = 1
 
 This problem is avoided by loading the bonding driver before any network
-drivers participating in a bond. Below is an example of loading the bonding 
-driver first, the IP address 192.168.1.1 is correctly associated with ifDescr.2.
+drivers participating in a bond. Below is an example of loading the bonding
+driver first, the IP address 192.168.1.1 is correctly associated with
+ifDescr.2.
 
      interfaces.ifTable.ifEntry.ifDescr.1 = lo
      interfaces.ifTable.ifEntry.ifDescr.2 = bond0
@@ -200,6 +201,44 @@ It is critical that either the miimon or arp_interval and arp_ip_target
 parameters be specified, otherwise serious network degradation will occur
 during link failures.
 
+arp_interval
+ 
+        Specifies the ARP monitoring frequency in milli-seconds. 
+        If ARP monitoring is used in a load-balancing mode (mode 0 or 2), the 
+        switch should be configured in a mode that evenly distributes packets 
+        across all links - such as round-robin. If the switch is configured to 
+        distribute the packets in an XOR fashion, all replies from the ARP 
+        targets will be received on the same link which could cause the other 
+        team members to fail. ARP monitoring should not be used in conjunction
+        with miimon. A value of 0 disables ARP monitoring. The default value 
+        is 0.
+ 
+arp_ip_target
+ 
+	Specifies the ip addresses to use when arp_interval is > 0. These
+	are the targets of the ARP request sent to determine the health of
+	the link to the targets. Specify these values in ddd.ddd.ddd.ddd
+	format. Multiple ip adresses must be seperated by a comma. At least
+	one ip address needs to be given for ARP monitoring to work. The
+	maximum number of targets that can be specified is set at 16.
+
+downdelay
+ 
+        Specifies the delay time in milli-seconds to disable a link after a 
+        link failure has been detected. This should be a multiple of miimon
+        value, otherwise the value will be rounded. The default value is 0.
+
+lacp_rate
+
+        Option specifying the rate in which we'll ask our link partner to
+	transmit LACPDU packets in 802.3ad mode.  Possible values are:
+
+	slow or 0
+		Request partner to transmit LACPDUs every 30 seconds (default)
+
+	fast or 1
+		Request partner to transmit LACPDUs every 1 second
+
 max_bonds
 
 	Specifies the number of bonding devices to create for this
@@ -207,18 +246,27 @@ max_bonds
 	the bonding driver is not already loaded, then bond0, bond1
 	and bond2 will be created.  The default value is 1.
 
+miimon
+ 
+        Specifies the frequency in milli-seconds that MII link monitoring
+        will occur. A value of zero disables MII link monitoring. A value
+        of 100 is a good starting point. See High Availability section for
+        additional information. The default value is 0.
+
 mode
 
-	Specifies one of four bonding policies. The default is
-round-robin (balance-rr).  Possible values are (you can use either the
-text or numeric option):
+	Specifies one of the bonding policies. The default is
+	round-robin (balance-rr).  Possible values are (you can use
+	either the text or numeric option):
  
 	balance-rr or 0
+
 		Round-robin policy: Transmit in a sequential order
 		from the first available slave through the last. This
 		mode provides load balancing and fault tolerance.
 
 	active-backup or 1
+
 		Active-backup policy: Only one slave in the bond is
 		active. A different slave becomes active if, and only
 		if, the active slave fails. The bond's MAC address is
@@ -226,7 +274,8 @@ text or numeric option):
 		to avoid confusing the switch.  This mode provides
 		fault tolerance.
  
-        balance-xor or 2
+	balance-xor or 2
+
 		XOR policy: Transmit based on [(source MAC address
 		XOR'd with destination MAC address) modula slave
 		count]. This selects the same slave for each
@@ -234,16 +283,125 @@ text or numeric option):
 		balancing and fault tolerance.
 
 	broadcast or 3
+
 		Broadcast policy: transmits everything on all slave
 		interfaces. This mode provides fault tolerance.
 
-miimon
- 
-        Specifies the frequency in milli-seconds that MII link monitoring will 
-        occur. A value of zero disables MII link monitoring. A value of 
-        100 is a good starting point. See High Availability section for 
-        additional information. The default value is 0.
+	802.3ad or 4
 
+		IEEE 802.3ad Dynamic link aggregation. Creates aggregation
+		groups that share the same speed and duplex settings.
+		Transmits and receives on all slaves in the active
+		aggregator.
+ 
+		Pre-requisites:
+
+		1. Ethtool support in the base drivers for retrieving the
+		speed and duplex of each slave.
+
+		2. A switch that supports IEEE 802.3ad Dynamic link
+		aggregation.
+
+	balance-tlb or 5
+
+		Adaptive transmit load balancing: channel bonding that does
+		not require any special switch support. The outgoing
+		traffic is distributed according to the current load
+		(computed relative to the speed) on each slave. Incoming
+		traffic is received by the current slave. If the receiving
+		slave fails, another slave takes over the MAC address of
+		the failed receiving slave.
+
+		Prerequisite:
+
+		Ethtool support in the base drivers for retrieving the
+		speed of each slave.
+
+	balance-alb or 6 
+
+		Adaptive load balancing: includes balance-tlb + receive
+		load balancing (rlb) for IPV4 traffic and does not require
+		any special switch support. The receive load balancing is
+		achieved by ARP negotiation. The bonding driver intercepts
+		the ARP Replies sent by the server on their way out and
+		overwrites the src hw address with the unique hw address of
+		one of the slaves in the bond such that different clients
+		use different hw addresses for the server.
+		
+		Receive traffic from connections created by the server is
+		also balanced. When the server sends an ARP Request the
+		bonding driver copies and saves the client's IP information
+		from the ARP. When the ARP Reply arrives from the client,
+		its hw address is retrieved and the bonding driver
+		initiates an ARP reply to this client assigning it to one
+		of the slaves in the bond. A problematic outcome of using
+		ARP negotiation for balancing is that each time that an ARP
+		request is broadcasted it uses the hw address of the
+		bond. Hence, clients learn the hw address of the bond and
+		the balancing of receive traffic collapses to the current
+		salve. This is handled by sending updates (ARP Replies) to
+		all the clients with their assigned hw address such that
+		the traffic is redistributed. Receive traffic is also
+		redistributed when a new slave is added to the bond and
+		when an inactive slave is re-activated. The receive load is
+		distributed sequentially (round robin) among the group of
+		highest speed slaves in the bond.
+
+		When a link is reconnected or a new slave joins the bond
+		the receive traffic is redistributed among all active
+		slaves in the bond by intiating ARP Replies with the
+		selected mac address to each of the clients. The updelay
+		modeprobe parameter must be set to a value equal or greater
+		than the switch's forwarding delay so that the ARP Replies
+		sent to the clients will not be blocked by the switch.
+
+		Prerequisites:
+
+		1. Ethtool support in the base drivers for retrieving the
+		speed of each slave.
+
+		2. Base driver support for setting the hw address of a
+		device also when it is open. This is required so that there
+		will always be one slave in the team using the bond hw
+		address (the current_slave) while having a unique hw
+		address for each slave in the bond. If the current_slave
+		fails it's hw address is swapped with the new current_slave
+		that was chosen.
+
+multicast
+
+        Option specifying the mode of operation for multicast support.
+        Possible values are:
+
+	disabled or 0
+		Disabled (no multicast support)
+
+        active or 1
+		Enabled on active slave only, useful in active-backup mode
+
+	all or 2
+		Enabled on all slaves, this is the default
+
+primary
+
+        A string (eth0, eth2, etc) to equate to a primary device. If this
+        value is entered, and the device is on-line, it will be used first
+        as the output media. Only when this device is off-line, will
+        alternate devices be used. Otherwise, once a failover is detected
+        and a new default output is chosen, it will remain the output media
+        until it too fails. This is useful when one slave was preferred
+        over another, i.e. when one slave is 1000Mbps and another is
+        100Mbps. If the 1000Mbps slave fails and is later restored, it may
+        be preferred the faster slave gracefully become the active slave -
+        without deliberately failing the 100Mbps slave. Specifying a
+        primary is only valid in active-backup mode.
+
+updelay
+ 
+        Specifies the delay time in milli-seconds to enable a link after a 
+        link up status has been detected. This should be a multiple of miimon
+        value, otherwise the value will be rounded. The default value is 0.
+ 
 use_carrier
 
         Specifies whether or not miimon should use MII or ETHTOOL
@@ -265,80 +423,27 @@ use_carrier
         0 will use the deprecated MII / ETHTOOL ioctls.  The default
         value is 1.
 
-downdelay
- 
-        Specifies the delay time in milli-seconds to disable a link after a 
-        link failure has been detected. This should be a multiple of miimon
-        value, otherwise the value will be rounded. The default value is 0.
-
-updelay
- 
-        Specifies the delay time in milli-seconds to enable a link after a 
-        link up status has been detected. This should be a multiple of miimon
-        value, otherwise the value will be rounded. The default value is 0.
- 
-arp_interval
- 
-        Specifies the ARP monitoring frequency in milli-seconds. 
-        If ARP monitoring is used in a load-balancing mode (mode 0 or 2), the 
-        switch should be configured in a mode that evenly distributes packets 
-        across all links - such as round-robin. If the switch is configured to 
-        distribute the packets in an XOR fashion, all replies from the ARP 
-        targets will be received on the same link which could cause the other 
-        team members to fail. ARP monitoring should not be used in conjunction
-        with miimon. A value of 0 disables ARP monitoring. The default value 
-        is 0.
- 
-arp_ip_target
- 
-        Specifies the ip addresses to use when arp_interval is > 0. These are
-        the targets of the ARP request sent to determine the health of the link
-        to the targets. Specify these values in ddd.ddd.ddd.ddd format.
-        Multiple ip addresses must be separated by a comma. At least one ip
-        address needs to be given for ARP monitoring to work. The maximum number
-        of targets that can be specified is set at 16.
-
-primary
-
-        A string (eth0, eth2, etc) to equate to a primary device. If this 
-        value is entered, and the device is on-line, it will be used first as 
-        the output media. Only when this device is off-line, will alternate 
-        devices be used. Otherwise, once a failover is detected and a new 
-        default output is chosen, it will remain the output media until it too 
-        fails. This is useful when one slave was preferred over another, i.e. 
-        when one slave is 1000Mbps and another is 100Mbps. If the 1000Mbps 
-        slave fails and is later restored, it may be preferred the faster slave
-        gracefully become the active slave - without deliberately failing the
-        100Mbps slave. Specifying a primary is only valid in active-backup mode.
-
-multicast
-
-        Option specifying the mode of operation for multicast support.
-        Possible values are:
-
-	disabled or 0
-		Disabled (no multicast support)
-
-        active or 1
-		Enabled on active slave only, useful in active-backup mode
-
-	all or 2
-		Enabled on all slaves, this is the default
-
 
 Configuring Multiple Bonds
 ==========================
 
-If several bonding interfaces are required, the driver must be loaded
-multiple times. For example, to configure two bonding interfaces with link 
-monitoring performed every 100 milli-seconds, the /etc/conf.modules should
+If several bonding interfaces are required, either specify the max_bonds
+parameter (described above), or load the driver multiple times.  Using
+the max_bonds parameter is less complicated, but has the limitation that
+all bonding instances created will have the same options.  Loading the
+driver multiple times allows each instance of the driver to have differing
+options.
+
+For example, to configure two bonding interfaces, one with mii link
+monitoring performed every 100 milliseconds, and one with ARP link
+monitoring performed every 200 milliseconds, the /etc/conf.modules should
 resemble the following:
 
 alias bond0 bonding
 alias bond1 bonding
 
 options bond0 miimon=100
-options bond1 -o bonding1 miimon=100
+options bond1 -o bonding1 arp_interval=200 arp_ip_target=10.0.0.1
 
 Configuring Multiple ARP Targets
 ================================
@@ -347,8 +452,9 @@ While ARP monitoring can be done with just one target, it can be useful
 in a High Availability setup to have several targets to monitor. In the
 case of just one target,  the target itself may go down or have a problem
 making it unresponsive to ARP requests. Having an additional target (or
-several) would increase the reliability of the ARP monitoring.
-Multiple ARP targets must be separated by commas as follows:
+several) increases the reliability of the ARP monitoring.
+
+Multiple ARP targets must be seperated by commas as follows:
 
 # example options for ARP monitoring with three targets
 alias bond0 bonding
@@ -410,9 +516,10 @@ additions may cause trouble.
 Switch Configuration
 ====================
 
-While the switch does not need to be configured when the active-backup
-policy is used (mode=1), it does need to be configured for the round-robin, 
-XOR, and broadcast policies (mode=0, mode=2, and mode=3). 
+While the switch does not need to be configured when the active-backup,
+balance-tlb or balance-alb policies (mode=1,5,6) are used, it does need to
+be configured for the round-robin, XOR, broadcast, or 802.3ad policies
+(mode=0,2,3,4).
 
 
 Verifying Bond Configuration
@@ -420,7 +527,7 @@ Verifying Bond Configuration
 
 1) Bonding information files
 ----------------------------
-The bonding driver information files reside in the /proc/net/bond* directories. 
+The bonding driver information files reside in the /proc/net/bond* directories.
 
 Sample contents of /proc/net/bond0/info after the driver is loaded with 
 parameters of mode=0 and miimon=1000 is shown below.
@@ -445,7 +552,8 @@ parameters of mode=0 and miimon=1000 is shown below.
 The network configuration can be verified using the ifconfig command. In
 the example below, the bond0 interface is the master (MASTER) while eth0 and 
 eth1 are slaves (SLAVE). Notice all slaves of bond0 have the same MAC address 
-(HWaddr) as bond0.
+(HWaddr) as bond0 for all modes except TLB and ALB that require a unique MAC
+address for each slave.
 
 [root]# /sbin/ifconfig
 bond0     Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4  
@@ -488,8 +596,7 @@ Frequently Asked Questions
 
 3.  How many bonding devices can I have?
 
-	One for each module you load. See section on Module Parameters for how
-	to accomplish this.
+	There is no limit.
 
 4.  How many slaves can a bonding device have?
 
@@ -508,10 +615,11 @@ Frequently Asked Questions
 	For ethernet cards not supporting MII status, the arp_interval and
         arp_ip_target parameters must be specified for bonding to work
         correctly. If packets have not been sent or received during the
-        specified arp_interval durration, an ARP request is sent to the targets 
-        to generate send and receive traffic. If after this interval, either 
-        the successful send and/or receive count has not incremented, the next 
-        slave in the sequence will become the active slave.
+        specified arp_interval durration, an ARP request is sent to the
+        targets to generate send and receive traffic. If after this
+        interval, either the successful send and/or receive count has not
+        incremented, the next slave in the sequence will become the active
+        slave.
 
 	If neither mii_monitor and arp_interval is configured, the bonding
 	driver will not handle this situation very well. The driver will 
@@ -522,15 +630,16 @@ Frequently Asked Questions
 
 6.  Can bonding be used for High Availability?
 
-	Yes, if you use MII monitoring and ALL your cards support MII link
-	status reporting. See section on High Availability for more information.
+        Yes, if you use MII monitoring and ALL your cards support MII link
+        status reporting. See section on High Availability for more
+        information.
 
 7.  Which switches/systems does it work with?
 
 	In round-robin and XOR mode, it works with systems that support 
 	trunking:
 	
-	* Cisco 5500 series (look for EtherChannel support).
+	* Many Cisco switches and routers (look for EtherChannel support).
 	* SunTrunking software.
 	* Alteon AceDirector switches / WebOS (use Trunks).
 	* BayStack Switches (trunks must be explicitly configured). Stackable
@@ -538,7 +647,17 @@ Frequently Asked Questions
 	  units.
 	* Linux bonding, of course !
 	
-	In active-backup mode, it should work with any Layer-II switche.
+	In 802.3ad mode, it works with with systems that support IEEE 802.3ad
+	Dynamic Link Aggregation:
+
+	* Extreme networks Summit 7i (look for link-aggregation).
+	* Many Cisco switches and routers (look for LACP support; this may
+	  require an upgrade to your IOS software; LACP support was added
+	  by Cisco in late 2002).
+	* Foundry Big Iron 4000
+
+        In active-backup, balance-tlb and balance-alb modes, it should work
+        with any Layer-II switch.
 
 
 8.  Where does a bonding device get its MAC address from?
@@ -591,6 +710,20 @@ Frequently Asked Questions
 
 	Broadcast policy transmits everything on all slave interfaces.
 
+	802.3ad, based on XOR but distributes traffic among all interfaces
+	in the active aggregator.
+
+	Transmit load balancing (balance-tlb) balances the traffic
+	according to the current load on each slave. The balancing is
+	clients based and the least loaded slave is selected for each new
+	client. The load of each slave is calculated relative to its speed
+	and enables load balancing in mixed speed teams.
+
+	Adaptive load balancing (balance-alb) uses the Transmit load
+	balancing for the transmit load. The receive load is balanced only
+	among the group of highest speed active slaves in the bond. The
+	load is distributed with round-robin i.e. next available slave in
+	the high speed group of active slaves.
 
 High Availability
 =================
@@ -826,10 +959,6 @@ The main limitations are :
     Use the arp_interval/arp_ip_target parameters to count incoming/outgoing
     frames.  
 
-  - A Transmit Load Balancing policy is not currently available. This mode 
-    allows every slave in the bond to transmit while only one receives. If 
-    the "receiving" slave fails, another slave takes over the MAC address of 
-    the failed receiving slave.
 
 
 Resources and Links

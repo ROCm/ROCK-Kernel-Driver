@@ -118,7 +118,7 @@ typedef struct hdlc_device_struct {
 		void (*stop)(struct hdlc_device_struct *hdlc);
 
 		void (*detach)(struct hdlc_device_struct *hdlc);
-		void (*netif_rx)(struct sk_buff *skb);
+		int (*netif_rx)(struct sk_buff *skb);
 		unsigned short (*type_trans)(struct sk_buff *skb,
 					     struct net_device *dev);
 		int id;		/* IF_PROTO_HDLC/CISCO/FR/etc. */

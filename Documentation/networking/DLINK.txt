@@ -93,7 +93,6 @@ Released 1994-06-13
 	  (else included in the kernel:)
 	  #  make config (answer yes on CONFIG _NET, _INET and _DE600 or _DE620)
 	  # make clean
-	  # make depend
 	  # make zImage (or whatever magic you usually do)
 
 	o I use lilo to boot multiple kernels, so that I at least

@@ -1227,13 +1227,12 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
-	struct request_queue *q = kmalloc(sizeof(*q), GFP_ATOMIC);
+	struct request_queue *q;
 
+	q = blk_init_queue(scsi_request_fn, &sdev->sdev_lock);
 	if (!q)
 		return NULL;
-	memset(q, 0, sizeof(*q));
 
-	blk_init_queue(q, scsi_request_fn, &sdev->sdev_lock);
 	blk_queue_prep_rq(q, scsi_prep_fn);
 
 	blk_queue_max_hw_segments(q, shost->sg_tablesize);
@@ -1249,7 +1248,6 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 void scsi_free_queue(struct request_queue *q)
 {
 	blk_cleanup_queue(q);
-	kfree(q);
 }
 
 /*

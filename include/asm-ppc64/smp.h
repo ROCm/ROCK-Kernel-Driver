@@ -44,7 +44,7 @@ static inline unsigned int num_online_cpus(void)
 	return hweight64(cpu_online_map);
 }
 
-static inline unsigned int any_online_cpu(unsigned int mask)
+static inline unsigned int any_online_cpu(unsigned long mask)
 {
 	if (mask & cpu_online_map)
 		return __ffs(mask & cpu_online_map);

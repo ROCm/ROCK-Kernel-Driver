@@ -281,8 +281,8 @@ static int check_selfids(struct hpsb_host *host)
 
 static void build_speed_map(struct hpsb_host *host, int nodecount)
 {
-        char speedcap[nodecount];
-        char cldcnt[nodecount];
+	u8 speedcap[nodecount];
+	u8 cldcnt[nodecount];
         u8 *map = host->speed_map;
         struct selfid *sid;
         struct ext_selfid *esid;
@@ -333,7 +333,7 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
         for (i = 1; i < nodecount; i++) {
                 for (j = cldcnt[i], n = i - 1; j > 0; j--) {
                         cldcnt[i] += cldcnt[n];
-                        speedcap[n] = MIN(speedcap[n], speedcap[i]);
+                        speedcap[n] = min(speedcap[n], speedcap[i]);
                         n -= cldcnt[n] + 1;
                 }
         }
@@ -342,11 +342,11 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
                 for (i = n - cldcnt[n]; i <= n; i++) {
                         for (j = 0; j < (n - cldcnt[n]); j++) {
                                 map[j*64 + i] = map[i*64 + j] =
-                                        MIN(map[i*64 + j], speedcap[n]);
+                                        min(map[i*64 + j], speedcap[n]);
                         }
                         for (j = n + 1; j < nodecount; j++) {
                                 map[j*64 + i] = map[i*64 + j] =
-                                        MIN(map[i*64 + j], speedcap[n]);
+                                        min(map[i*64 + j], speedcap[n]);
                         }
                 }
         }

@@ -267,11 +267,6 @@ static unsigned char snd_opl4_volume_table[128] = {
 	  2,  2,  2,  1,  1,  0,  0,  0
 };
 
-static void snd_opl4_write_mask(opl4_t *opl4, u8 reg, u8 mask, u8 value)
-{
-	snd_opl4_write(opl4, reg, ((snd_opl4_read(opl4, reg)) & ~mask) | (value & mask));
-}
-
 /*
  * Initializes all voices.
  */
@@ -302,7 +297,8 @@ void snd_opl4_synth_shutdown(opl4_t *opl4)
 	int i;
 
 	for (i = 0; i < OPL4_MAX_VOICES; i++)
-		snd_opl4_write_mask(opl4, OPL4_REG_MISC + i, OPL4_KEY_ON_BIT, 0);
+		snd_opl4_write(opl4, OPL4_REG_MISC + i,
+			       opl4->voices[i].reg_misc & ~OPL4_KEY_ON_BIT);
 }
 
 /*
@@ -378,7 +374,9 @@ static void snd_opl4_update_volume(opl4_t *opl4, opl4_voice_t *voice)
 		att = 0;
 	else if (att > 0x7e)
 		att = 0x7e;
-	snd_opl4_write(opl4, OPL4_REG_LEVEL + voice->number, att << 1);
+	snd_opl4_write(opl4, OPL4_REG_LEVEL + voice->number,
+		       (att << 1) | voice->level_direct);
+	voice->level_direct = 0;
 }
 
 static void snd_opl4_update_pan(opl4_t *opl4, opl4_voice_t *voice)
@@ -405,8 +403,10 @@ static void snd_opl4_update_vibrato_depth(opl4_t *opl4, opl4_voice_t *voice)
 	depth = (7 - voice->sound->vibrato)
 		* (voice->chan->control[MIDI_CTL_VIBRATO_DEPTH] & 0x7f);
 	depth = (depth >> 7) + voice->sound->vibrato;
-	snd_opl4_write_mask(opl4, OPL4_REG_LFO_VIBRATO + voice->number,
-			    OPL4_VIBRATO_DEPTH_MASK, depth);
+	voice->reg_lfo_vibrato &= ~OPL4_VIBRATO_DEPTH_MASK;
+	voice->reg_lfo_vibrato |= depth & OPL4_VIBRATO_DEPTH_MASK;
+	snd_opl4_write(opl4, OPL4_REG_LFO_VIBRATO + voice->number,
+		       voice->reg_lfo_vibrato);
 }
 
 static void snd_opl4_update_pitch(opl4_t *opl4, opl4_voice_t *voice)
@@ -441,8 +441,6 @@ static void snd_opl4_update_pitch(opl4_t *opl4, opl4_voice_t *voice)
 
 static void snd_opl4_update_tone_parameters(opl4_t *opl4, opl4_voice_t *voice)
 {
-	snd_opl4_write(opl4, OPL4_REG_LFO_VIBRATO + voice->number,
-		       voice->sound->reg_lfo_vibrato);
 	snd_opl4_write(opl4, OPL4_REG_ATTACK_DECAY1 + voice->number,
 		       voice->sound->reg_attack_decay1);
 	snd_opl4_write(opl4, OPL4_REG_LEVEL_DECAY2 + voice->number,
@@ -521,6 +519,7 @@ void snd_opl4_note_on(void *private_data, int note, int vel, snd_midi_channel_t 
 		voice[i]->reg_misc = OPL4_LFO_RESET_BIT;
 		snd_opl4_update_pan(opl4, voice[i]);
 		snd_opl4_update_pitch(opl4, voice[i]);
+		voice[i]->level_direct = OPL4_LEVEL_DIRECT_BIT;
 		snd_opl4_update_volume(opl4, voice[i]);
 	}
 
@@ -530,6 +529,7 @@ void snd_opl4_note_on(void *private_data, int note, int vel, snd_midi_channel_t 
 	/* set remaining parameters */
 	for (i = 0; i < voices; i++) {
 		snd_opl4_update_tone_parameters(opl4, voice[i]);
+		voice[i]->reg_lfo_vibrato = voice[i]->sound->reg_lfo_vibrato;
 		snd_opl4_update_vibrato_depth(opl4, voice[i]);
 	}
 

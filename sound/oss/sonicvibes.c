@@ -1046,8 +1046,9 @@ static int mixer_ioctl(struct sv_state *s, unsigned int cmd, unsigned long arg)
 	VALIDATE_STATE(s);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, "SonicVibes", sizeof(info.id));
-		strncpy(info.name, "S3 SonicVibes", sizeof(info.name));
+		memset(&info, 0, sizeof(info));
+		strlcpy(info.id, "SonicVibes", sizeof(info.id));
+		strlcpy(info.name, "S3 SonicVibes", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -1055,8 +1056,9 @@ static int mixer_ioctl(struct sv_state *s, unsigned int cmd, unsigned long arg)
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, "SonicVibes", sizeof(info.id));
-		strncpy(info.name, "S3 SonicVibes", sizeof(info.name));
+		memset(&info, 0, sizeof(info));
+		strlcpy(info.id, "SonicVibes", sizeof(info.id));
+		strlcpy(info.name, "S3 SonicVibes", sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -2707,7 +2709,7 @@ static void __devinit sv_remove(struct pci_dev *dev)
 	pci_set_drvdata(dev, NULL);
 }
 
-static struct pci_device_id id_table[] __devinitdata = {
+static struct pci_device_id id_table[] = {
        { PCI_VENDOR_ID_S3, PCI_DEVICE_ID_S3_SONICVIBES, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
        { 0, }
 };

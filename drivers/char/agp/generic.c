@@ -40,6 +40,12 @@
 __u32 *agp_gatt_table; 
 int agp_memory_reserved;
 
+/*
+ * Needed by the Nforce GART driver for the time being. Would be
+ * nice to do this some other way instead of needing this export.
+ */
+EXPORT_SYMBOL_GPL(agp_memory_reserved);
+
 /* 
  * Generic routines for handling agp_memory structures -
  * They use the basic page allocation routines to do the brunt of the work.
@@ -515,7 +521,7 @@ void agp_device_command(u32 command, int agp_v3)
 			continue;
 
 		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
-				agp_v3 ? 3 : 2, device->slot_name, mode);
+				agp_v3 ? 3 : 2, pci_name(device), mode);
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 	}
 }

@@ -8,7 +8,7 @@
     *  
     *  SB1250 specification level:  User's manual 1/02/02
     *  
-    *  Author:  Mitch Lichtenberg (mpl@broadcom.com)
+    *  Author:  Mitch Lichtenberg
     *  
     *********************************************************************  
     *
@@ -58,6 +58,7 @@
 #define K_SYS_REVISION_BCM1250_PASS2_2	16
 #define K_SYS_REVISION_BCM1250_B2	17
 #define K_SYS_REVISION_BCM1250_PASS3	32
+#define K_SYS_REVISION_BCM1250_C1	33
 
 /* XXX: discourage people from using these constants.  */
 #define K_SYS_REVISION_PASS1	    K_SYS_REVISION_BCM1250_PASS1
@@ -126,6 +127,43 @@
 #define V_SYS_WID(x)                _SB_MAKEVALUE(x,S_SYS_WID)
 #define G_SYS_WID(x)                _SB_GETVALUE(x,S_SYS_WID,M_SYS_WID)
 
+/* System Manufacturing Register
+* Register: SCD_SYSTEM_MANUF
+*/
+ 
+/* Wafer ID: bits 31:0 */
+#define S_SYS_WAFERID1_200        _SB_MAKE64(0)
+#define M_SYS_WAFERID1_200        _SB_MAKEMASK(32,S_SYS_WAFERID1_200)
+#define V_SYS_WAFERID1_200(x)     _SB_MAKEVALUE(x,S_SYS_WAFERID1_200)
+#define G_SYS_WAFERID1_200(x)     _SB_GETVALUE(x,S_SYS_WAFERID1_200,M_SYS_WAFERID1_200)
+ 
+#define S_SYS_BIN                 _SB_MAKE64(32)
+#define M_SYS_BIN                 _SB_MAKEMASK(4,S_SYS_BIN)
+#define V_SYS_BIN                 _SB_MAKEVALUE(x,S_SYS_BIN)
+#define G_SYS_BIN                 _SB_GETVALUE(x,S_SYS_BIN,M_SYS_BIN)
+ 
+/* Wafer ID: bits 39:36 */
+#define S_SYS_WAFERID2_200        _SB_MAKE64(36)
+#define M_SYS_WAFERID2_200        _SB_MAKEMASK(4,S_SYS_WAFERID2_200)
+#define V_SYS_WAFERID2_200(x)     _SB_MAKEVALUE(x,S_SYS_WAFERID2_200)
+#define G_SYS_WAFERID2_200(x)     _SB_GETVALUE(x,S_SYS_WAFERID2_200,M_SYS_WAFERID2_200)
+ 
+/* Wafer ID: bits 39:0 */
+#define S_SYS_WAFERID_300         _SB_MAKE64(0)
+#define M_SYS_WAFERID_300         _SB_MAKEMASK(40,S_SYS_WAFERID_300)
+#define V_SYS_WAFERID_300(x)      _SB_MAKEVALUE(x,S_SYS_WAFERID_300)
+#define G_SYS_WAFERID_300(x)      _SB_GETVALUE(x,S_SYS_WAFERID_300,M_SYS_WAFERID_300)
+ 
+#define S_SYS_XPOS                _SB_MAKE64(40)
+#define M_SYS_XPOS                _SB_MAKEMASK(6,S_SYS_XPOS)
+#define V_SYS_XPOS(x)             _SB_MAKEVALUE(x,S_SYS_XPOS)
+#define G_SYS_XPOS(x)             _SB_GETVALUE(x,S_SYS_XPOS,M_SYS_XPOS)
+ 
+#define S_SYS_YPOS                _SB_MAKE64(46)
+#define M_SYS_YPOS                _SB_MAKEMASK(6,S_SYS_YPOS)
+#define V_SYS_YPOS(x)             _SB_MAKEVALUE(x,S_SYS_YPOS)
+#define G_SYS_YPOS(x)             _SB_GETVALUE(x,S_SYS_YPOS,M_SYS_YPOS)
+ 
 /*
  * System Config Register (Table 4-2)
  * Register: SCD_SYSTEM_CFG
@@ -243,7 +281,26 @@
 #define S_SCD_WDOG_CNT              0
 #define M_SCD_WDOG_CNT              _SB_MAKEMASK(23,S_SCD_WDOG_CNT)
 
-#define M_SCD_WDOG_ENABLE           _SB_MAKEMASK1(0)
+#define S_SCD_WDOG_ENABLE           0
+#define M_SCD_WDOG_ENABLE           _SB_MAKEMASK1(S_SCD_WDOG_ENABLE)
+
+#define S_SCD_WDOG_RESET_TYPE       2
+#define M_SCD_WDOG_RESET_TYPE       _SB_MAKEMASK(3,S_SCD_WDOG_RESET_TYPE)
+#define V_SCD_WDOG_RESET_TYPE(x)    _SB_MAKEVALUE(x,S_SCD_WDOG_RESET_TYPE)
+#define G_SCD_WDOG_RESET_TYPE(x)    _SB_GETVALUE(x,S_SCD_WDOG_RESET_TYPE,M_SCD_WDOG_RESET_TYPE)
+
+#define K_SCD_WDOG_RESET_FULL       0	/* actually, (x & 1) == 0  */
+#define K_SCD_WDOG_RESET_SOFT       1
+#define K_SCD_WDOG_RESET_CPU0       3
+#define K_SCD_WDOG_RESET_CPU1       5
+#define K_SCD_WDOG_RESET_BOTH_CPUS  7
+
+/* This feature is present in 1250 C0 and later, but *not* in 112x A revs.  */
+#if SIBYTE_HDR_FEATURE(1250, PASS3)
+#define S_SCD_WDOG_HAS_RESET        8
+#define M_SCD_WDOG_HAS_RESET        _SB_MAKEMASK1(S_SCD_WDOG_HAS_RESET)
+#endif
+
 
 /*
  * Timer Registers (Table 4-11) (Table 4-12) (Table 4-13)

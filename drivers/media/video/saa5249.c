@@ -171,7 +171,7 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, int kind)
 		return -ENOMEM;
 	}
 	memset(t, 0, sizeof(*t));
-	strlcpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
+	strlcpy(client->name, IF_NAME, DEVICE_NAME_SIZE);
 	init_MUTEX(&t->lock);
 	
 	/*
@@ -263,9 +263,7 @@ static struct i2c_driver i2c_driver_videotext =
 static struct i2c_client client_template = {
 	.id 		= -1,
 	.driver		= &i2c_driver_videotext,
-	.dev		= {
-		.name	= "(unset)",
-	},
+	.name		= "(unset)",
 };
 
 /*
@@ -579,7 +577,7 @@ static int do_saa5249_ioctl(struct inode *inode, struct file *file,
 		case VTXIOCSETVIRT: 
 		{
 			/* The SAA5249 has virtual-row reception turned on always */
-			t->virtual_mode = (int)arg;
+			t->virtual_mode = (int)(long)arg;
 			return 0;
 		}
 	}

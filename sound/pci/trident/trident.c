@@ -69,7 +69,7 @@ MODULE_PARM(wavetable_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(wavetable_size, "Maximum memory size in kB for wavetable synth.");
 MODULE_PARM_SYNTAX(wavetable_size, SNDRV_ENABLED ",default:8192,skill:advanced");
 
-static struct pci_device_id snd_trident_ids[] __devinitdata = {
+static struct pci_device_id snd_trident_ids[] = {
 	{ 0x1023, 0x2000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* Trident 4DWave DX PCI Audio */
 	{ 0x1023, 0x2001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* Trident 4DWave NX PCI Audio */
 	{ 0x1039, 0x7018, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* SiS SI7018 PCI Audio */
@@ -132,7 +132,7 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 		return err;
 	}
 
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if ((err = snd_trident_attach_synthesizer(trident)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -182,7 +182,6 @@ static void __devexit snd_trident_remove(struct pci_dev *pci)
 }
 
 #ifdef CONFIG_PM
-#ifndef PCI_OLD_SUSPEND
 static int snd_card_trident_suspend(struct pci_dev *pci, u32 state)
 {
 	trident_t *chip = snd_magic_cast(trident_t, pci_get_drvdata(pci), return -ENXIO);
@@ -195,18 +194,6 @@ static int snd_card_trident_resume(struct pci_dev *pci)
 	snd_trident_resume(chip);
 	return 0;
 }
-#else
-static void snd_card_trident_suspend(struct pci_dev *pci)
-{
-	trident_t *chip = snd_magic_cast(trident_t, pci_get_drvdata(pci), return);
-	snd_trident_suspend(chip);
-}
-static void snd_card_trident_resume(struct pci_dev *pci)
-{
-	trident_t *chip = snd_magic_cast(trident_t, pci_get_drvdata(pci), return);
-	snd_trident_resume(chip);
-}
-#endif
 #endif
 
 static struct pci_driver driver = {

@@ -161,7 +161,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1011 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1023 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -3571,7 +3571,7 @@ static int ohci1394_pci_resume (struct pci_dev *dev)
 
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)
 
-static struct pci_device_id ohci1394_pci_tbl[] __devinitdata = {
+static struct pci_device_id ohci1394_pci_tbl[] = {
 	{
 		.class = 	PCI_CLASS_FIREWIRE_OHCI,
 		.class_mask = 	PCI_ANY_ID,

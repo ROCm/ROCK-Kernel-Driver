@@ -501,7 +501,7 @@ static int load_flat_file(struct linux_binprm * bprm,
 	extra = max(bss_len + stack_len, relocs * sizeof(unsigned long));
 
 	/*
-	 * there are a couple of cases here,  the seperate code/data
+	 * there are a couple of cases here,  the separate code/data
 	 * case,  and then the fully copied to RAM case which lumps
 	 * it all together.
 	 */

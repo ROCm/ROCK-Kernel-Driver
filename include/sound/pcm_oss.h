@@ -30,7 +30,9 @@ struct _snd_pcm_oss_setup {
 	unsigned int disable:1,
 		     direct:1,
 		     block:1,
-		     nonblock:1;
+		     nonblock:1,
+		     wholefrag:1,
+		     nosilence:1;
 	unsigned int periods;
 	unsigned int period_size;
 	snd_pcm_oss_setup_t *next;

@@ -23,6 +23,8 @@
 #include <linux/videodev.h>
 #include <linux/kdev_t.h>
 
+#include <asm/io.h>
+
 #include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>

@@ -33,10 +33,6 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	if (regno >= 16)
 		return 1;
-	m2info->palette[regno].red = red;
-	m2info->palette[regno].blue = blue;
-	m2info->palette[regno].green = green;
-	m2info->palette[regno].transp = transp;
 	if (m2info->fbcon.var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
@@ -152,7 +148,7 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 	mga_outl(0x3C10, tmp);
 	ACCESS_FBINFO(hw).crtc2.ctl = tmp;
 
-	tmp = 0x0FFF0000;		/* line compare */
+	tmp = mt->VDisplay << 16;	/* line compare */
 	if (mt->sync & FB_SYNC_HOR_HIGH_ACT)
 		tmp |= 0x00000100;
 	if (mt->sync & FB_SYNC_VERT_HIGH_ACT)
@@ -609,6 +605,7 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
 	m2info->fbcon.currcon = -1;
 	m2info->fbcon.pseudo_palette = m2info->cmap;
+	fb_alloc_cmap(&m2info->fbcon.cmap, 256, 1);
 
 	if (mem < 64)
 		mem *= 1024;

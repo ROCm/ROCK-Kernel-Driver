@@ -62,7 +62,7 @@ int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 
 /* Bitmask of currently online CPUs */
-unsigned long cpu_online_map = 1;
+unsigned long cpu_online_map;
 
 static volatile unsigned long cpu_callin_map;
 volatile unsigned long cpu_callout_map;

@@ -9,8 +9,7 @@ menu "Serial drivers"
 #
 # The new 8250/16550 serial drivers
 config SERIAL_8250
-	tristate "8250/16550 and compatible serial support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	tristate "8250/16550 and compatible serial support"
 	---help---
 	  This selects whether you want to include the driver for the standard
 	  serial ports.  The standard answer is Y.  People who might say N
@@ -40,7 +39,7 @@ config SERIAL_8250
 	  modems and similar devices connecting to the standard serial ports.
 
 config SERIAL_8250_CONSOLE
-	bool "Console on 8250/16550 and compatible serial port (EXPERIMENTAL)"
+	bool "Console on 8250/16550 and compatible serial port"
 	depends on SERIAL_8250=y
 	---help---
 	  If you say Y here, it will be possible to use a serial port as the
@@ -53,8 +52,8 @@ config SERIAL_8250_CONSOLE
 	  (/dev/tty0) will still be used as the system console by default, but
 	  you can alter that using a kernel command line option such as
 	  "console=ttyS1". (Try "man bootparam" or see the documentation of
-	  your boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time.)
+	  your boot loader (grub or lilo or loadlin) about how to pass options
+	  to the kernel at boot time.)
 
 	  If you don't have a VGA card installed and you say Y here, the
 	  kernel will automatically use the first serial line, /dev/ttyS0, as

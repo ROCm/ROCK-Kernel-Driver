@@ -179,7 +179,11 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 				cERROR(1,
 				 ("Server requires /proc/fs/cifs/PacketSigningEnabled"));
 			server->secMode &= ~(SECMODE_SIGN_ENABLED | SECMODE_SIGN_REQUIRED);
+		} else if(sign_CIFS_PDUs == 1) {
+			if((server->secMode & SECMODE_SIGN_REQUIRED) == 0)
+				server->secMode &= ~(SECMODE_SIGN_ENABLED | SECMODE_SIGN_REQUIRED);
 		}
+				
 	}
 	if (pSMB)
 		buf_release(pSMB);
@@ -419,7 +423,8 @@ int
 CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 	    const char *fileName, const int openDisposition,
 	    const int access_flags, const int create_options, __u16 * netfid,
-	    int *pOplock, const struct nls_table *nls_codepage)
+	    int *pOplock, FILE_ALL_INFO * pfile_info, 
+	    const struct nls_table *nls_codepage)
 {
 	int rc = -EACCES;
 	OPEN_REQ *pSMB = NULL;
@@ -476,16 +481,23 @@ CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	/* long_op set to 1 to allow for oplock break timeouts */
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
-			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 1);
 	if (rc) {
 		cFYI(1, ("Error in Open = %d", rc));
 	} else {
 		*pOplock = pSMBr->OplockLevel;	/* one byte no need to le_to_cpu */
 		*netfid = pSMBr->Fid;	/* cifs fid stays in le */
 		/* Do we care about the CreateAction in any cases? */
-
-		/* BB add code to update inode file sizes from create response */
+		if(pfile_info) {
+		    memcpy((char *)pfile_info,(char *)&pSMBr->CreationTime,
+			36 /* CreationTime to Attributes */);
+		    /* the file_info buf is endian converted by caller */
+		    pfile_info->AllocationSize = pSMBr->AllocationSize;
+		    pfile_info->EndOfFile = pSMBr->EndOfFile;
+		    pfile_info->NumberOfLinks = cpu_to_le32(1);
+		}
 	}
 	if (pSMB)
 		buf_release(pSMB);
@@ -1231,11 +1243,12 @@ CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 		/* BB also check enough total bytes returned */
 		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512)) 
 			rc = -EIO;	/* bad smb */
-		else {
+		else if (pFindData){
 			memcpy((char *) pFindData,
 			       (char *) &pSMBr->hdr.Protocol +
 			       pSMBr->DataOffset, sizeof (FILE_ALL_INFO));
-		}
+		} else
+		    rc = -ENOMEM;
 	}
 	if (pSMB)
 		buf_release(pSMB);

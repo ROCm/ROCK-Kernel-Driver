@@ -383,7 +383,7 @@ static void usblp_cleanup (struct usblp *usblp)
 	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
 			usblp->writebuf, usblp->writeurb->transfer_dma);
 	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
-			usblp->readbuf, usblp->writeurb->transfer_dma);
+			usblp->readbuf, usblp->readurb->transfer_dma);
 	kfree (usblp->device_id_string);
 	kfree (usblp->statusbuf);
 	usb_free_urb(usblp->writeurb);
@@ -403,14 +403,12 @@ static int usblp_release(struct inode *inode, struct file *file)
 	struct usblp *usblp = file->private_data;
 
 	down (&usblp->sem);
-	lock_kernel();
 	usblp->used = 0;
 	if (usblp->present) {
 		usblp_unlink_urbs(usblp);
 		up(&usblp->sem);
 	} else 		/* finish cleanup from disconnect */
 		usblp_cleanup (usblp);
-	unlock_kernel();
 	return 0;
 }
 
@@ -419,8 +417,8 @@ static unsigned int usblp_poll(struct file *file, struct poll_table_struct *wait
 {
 	struct usblp *usblp = file->private_data;
 	poll_wait(file, &usblp->wait, wait);
- 	return ((!usblp->bidir || usblp->readurb->status  == -EINPROGRESS) ? 0 : POLLIN  | POLLRDNORM)
- 			       | (usblp->writeurb->status == -EINPROGRESS  ? 0 : POLLOUT | POLLWRNORM);
+ 	return ((!usblp->bidir || !usblp->rcomplete) ? 0 : POLLIN  | POLLRDNORM)
+ 			       | (!usblp->wcomplete ? 0 : POLLOUT | POLLWRNORM);
 }
 
 static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
@@ -573,7 +571,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				break;
 
 			default:
-				retval = -EINVAL;
+				retval = -ENOTTY;
 		}
 	else	/* old-style ioctl value */
 		switch (cmd) {
@@ -590,7 +588,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				break;
 
 			default:
-				retval = -EINVAL;
+				retval = -ENOTTY;
 		}
 
 done:
@@ -628,6 +626,12 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 				}
 			}
 			remove_wait_queue(&usblp->wait, &wait);
+			if (!timeout) {
+				/* we timed out and need to bail out cleanly */
+				usb_unlink_urb(usblp->writeurb);
+				return writecount ? writecount : -EIO;
+			}
+
 		}
 
 		down (&usblp->sem);
@@ -738,7 +742,7 @@ static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, 
 		usblp->readurb->dev = usblp->dev;
  		usblp->readcount = 0;
 		if (usb_submit_urb(usblp->readurb, GFP_KERNEL) < 0)
-			dbg("error submitting urb"); 
+			dbg("error submitting urb");
 		count = -EIO;
 		goto done;
 	}
@@ -966,7 +970,7 @@ static int usblp_select_alts(struct usblp *usblp)
 	struct usb_endpoint_descriptor *epd, *epwrite, *epread;
 	int p, i, e;
 
-	if_alt = &usblp->dev->actconfig->interface[usblp->ifnum];
+	if_alt = usblp->dev->actconfig->interface[usblp->ifnum];
 
 	for (p = 0; p < USBLP_MAX_PROTOCOLS; p++)
 		usblp->protocol[p].alt_setting = -1;

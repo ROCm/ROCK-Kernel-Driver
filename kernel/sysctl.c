@@ -580,22 +580,12 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#ifdef CONFIG_SMP
-	{
-		.ctl_name	= KERN_CACHEDECAYTICKS,
-		.procname	= "cache_decay_ticks",
-		.data		= &cache_decay_ticks,
-		.maxlen		= sizeof(cache_decay_ticks),
-		.mode		= 0644,
-		.proc_handler	= &proc_doulongvec_minmax,
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 
 /* Constants for minimum and maximum testing in vm_table.
    We use these as one-element integer vectors. */
-static int zero = 0;
+static int zero;
 static int one_hundred = 100;
 
 
@@ -808,17 +798,7 @@ static ctl_table fs_table[] = {
 	{ .ctl_name = 0 }
 };
 
-extern int sysctl_vsyscall32;
-
 static ctl_table debug_table[] = {
-#if defined(__x86_64__) && defined(CONFIG_IA32_EMULATION)
-	{ .ctl_name = 100, 
-	  .procname = "vsyscall32", 
-	  .data = &sysctl_vsyscall32, 
-	  .maxlen = sizeof(int), 
-	  .mode = 0644, 
-	  .proc_handler = &proc_dointvec},
-#endif
 	{ .ctl_name = 0 }
 };
 

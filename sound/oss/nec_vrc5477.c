@@ -1989,7 +1989,7 @@ static void __devinit vrc5477_ac97_remove(struct pci_dev *dev)
 }
 
 
-static struct pci_device_id id_table[] __devinitdata = {
+static struct pci_device_id id_table[] = {
     { PCI_VENDOR_ID_NEC, PCI_DEVICE_ID_NEC_VRC5477_AC97, 
       PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
     { 0, }

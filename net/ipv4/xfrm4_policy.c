@@ -271,7 +271,6 @@ void __init xfrm4_init(void)
 {
 	xfrm4_state_init();
 	xfrm4_policy_init();
-	xfrm4_input_init();
 }
 
 void __exit xfrm4_fini(void)

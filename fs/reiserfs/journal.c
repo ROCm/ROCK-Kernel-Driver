@@ -64,7 +64,7 @@
 /* the number of mounted filesystems.  This is used to decide when to
 ** start and kill the commit workqueue
 */
-static int reiserfs_mounted_fs_count = 0 ;
+static int reiserfs_mounted_fs_count;
 
 static struct workqueue_struct *commit_wq;
 
@@ -113,7 +113,7 @@ static int reiserfs_clean_and_file_buffer(struct buffer_head *bh) {
 static struct reiserfs_bitmap_node *
 allocate_bitmap_node(struct super_block *p_s_sb) {
   struct reiserfs_bitmap_node *bn ;
-  static int id = 0 ;
+  static int id;
 
   bn = reiserfs_kmalloc(sizeof(struct reiserfs_bitmap_node), GFP_NOFS, p_s_sb) ;
   if (!bn) {

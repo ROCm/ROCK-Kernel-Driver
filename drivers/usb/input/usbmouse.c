@@ -247,9 +247,10 @@ static struct usb_driver usb_mouse_driver = {
 
 static int __init usb_mouse_init(void)
 {
-	usb_register(&usb_mouse_driver);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+	int retval = usb_register(&usb_mouse_driver);
+	if (retval == 0) 
+		info(DRIVER_VERSION ":" DRIVER_DESC);
+	return retval;
 }
 
 static void __exit usb_mouse_exit(void)

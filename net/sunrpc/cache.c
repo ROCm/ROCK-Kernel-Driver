@@ -557,7 +557,6 @@ struct cache_request {
 struct cache_reader {
 	struct cache_queue	q;
 	int			offset;	/* if non-0, we have a refcnt on next request */
-	char			*page;
 };
 
 static ssize_t
@@ -644,7 +643,7 @@ cache_write(struct file *filp, const char *buf, size_t count,
 	    loff_t *ppos)
 {
 	int err;
-	struct cache_reader *rp = filp->private_data;
+	char *page;
 	struct cache_detail *cd = PDE(filp->f_dentry->d_inode)->data;
 
 	if (ppos != &filp->f_pos)
@@ -657,26 +656,26 @@ cache_write(struct file *filp, const char *buf, size_t count,
 
 	down(&queue_io_sem);
 
-	if (rp->page == NULL) {
-		rp->page = kmalloc(PAGE_SIZE, GFP_KERNEL);
-		if (rp->page == NULL) {
-			up(&queue_io_sem);
-			return -ENOMEM;
-		}
+	page = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (page == NULL) {
+		up(&queue_io_sem);
+		return -ENOMEM;
 	}
 
-	if (copy_from_user(rp->page, buf, count)) {
+	if (copy_from_user(page, buf, count)) {
 		up(&queue_io_sem);
+		kfree(page);
 		return -EFAULT;
 	}
 	if (count < PAGE_SIZE)
-		rp->page[count] = '\0';
+		page[count] = '\0';
 	if (cd->cache_parse)
-		err = cd->cache_parse(cd, rp->page, count);
+		err = cd->cache_parse(cd, page, count);
 	else
 		err = -EINVAL;
 
 	up(&queue_io_sem);
+	kfree(page);
 	return err ? err : count;
 }
 
@@ -694,6 +693,10 @@ cache_poll(struct file *filp, poll_table *wait)
 
 	/* alway allow write */
 	mask = POLL_OUT | POLLWRNORM;
+
+	if (!rp)
+		return mask;
+
 	spin_lock(&queue_lock);
 
 	for (cq= &rp->q; &cq->list != &cd->queue;
@@ -715,8 +718,9 @@ cache_ioctl(struct inode *ino, struct file *filp,
 	struct cache_queue *cq;
 	struct cache_detail *cd = PDE(ino)->data;
 
-	if (cmd != FIONREAD)
+	if (cmd != FIONREAD || !rp)
 		return -EINVAL;
+
 	spin_lock(&queue_lock);
 
 	/* only find the length remaining in current request,
@@ -738,19 +742,21 @@ cache_ioctl(struct inode *ino, struct file *filp,
 static int
 cache_open(struct inode *inode, struct file *filp)
 {
-	struct cache_reader *rp;
-	struct cache_detail *cd = PDE(inode)->data;
+	struct cache_reader *rp = NULL;
 
-	rp = kmalloc(sizeof(*rp), GFP_KERNEL);
-	if (!rp)
-		return -ENOMEM;
-	rp->page = NULL;
-	rp->offset = 0;
-	rp->q.reader = 1;
-	atomic_inc(&cd->readers);
-	spin_lock(&queue_lock);
-	list_add(&rp->q.list, &cd->queue);
-	spin_unlock(&queue_lock);
+	if (filp->f_mode & FMODE_READ) {
+		struct cache_detail *cd = PDE(inode)->data;
+
+		rp = kmalloc(sizeof(*rp), GFP_KERNEL);
+		if (!rp)
+			return -ENOMEM;
+		rp->offset = 0;
+		rp->q.reader = 1;
+		atomic_inc(&cd->readers);
+		spin_lock(&queue_lock);
+		list_add(&rp->q.list, &cd->queue);
+		spin_unlock(&queue_lock);
+	}
 	filp->private_data = rp;
 	return 0;
 }
@@ -761,29 +767,28 @@ cache_release(struct inode *inode, struct file *filp)
 	struct cache_reader *rp = filp->private_data;
 	struct cache_detail *cd = PDE(inode)->data;
 
-	spin_lock(&queue_lock);
-	if (rp->offset) {
-		struct cache_queue *cq;
-		for (cq= &rp->q; &cq->list != &cd->queue;
-		     cq = list_entry(cq->list.next, struct cache_queue, list))
-			if (!cq->reader) {
-				container_of(cq, struct cache_request, q)
-					->readers--;
-				break;
-			}
-		rp->offset = 0;
+	if (rp) {
+		spin_lock(&queue_lock);
+		if (rp->offset) {
+			struct cache_queue *cq;
+			for (cq= &rp->q; &cq->list != &cd->queue;
+			     cq = list_entry(cq->list.next, struct cache_queue, list))
+				if (!cq->reader) {
+					container_of(cq, struct cache_request, q)
+						->readers--;
+					break;
+				}
+			rp->offset = 0;
+		}
+		list_del(&rp->q.list);
+		spin_unlock(&queue_lock);
+
+		filp->private_data = NULL;
+		kfree(rp);
+
+		cd->last_close = get_seconds();
+		atomic_dec(&cd->readers);
 	}
-	list_del(&rp->q.list);
-	spin_unlock(&queue_lock);
-
-	if (rp->page)
-		kfree(rp->page);
-
-	filp->private_data = NULL;
-	kfree(rp);
-
-	cd->last_close = get_seconds();
-	atomic_dec(&cd->readers);
 	return 0;
 }
 

@@ -30,7 +30,7 @@ void sni_machine_restart(char *command)
 
 	/* This does a normal via the keyboard controller like a PC.
 	   We can do that easier ...  */
-	sti();
+	local_irq_disable();
 	for (;;) {
 		for (i=0; i<100; i++) {
 			kb_wait();

@@ -13,11 +13,9 @@ OS := $(shell uname -s)
 # EXTRAVERSION...
 MODLIB := $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
 
-ifeq ($(CONFIG_DEBUGSYM),y)
+ifeq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS))
 endif
-
-CFLAGS-$(CONFIG_DEBUGSYM) += -g
 
 core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/drivers/          \

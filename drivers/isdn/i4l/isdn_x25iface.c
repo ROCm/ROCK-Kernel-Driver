@@ -63,7 +63,7 @@ static struct concap_proto_ops ix25_pops = {
 /* error message helper function */
 static void illegal_state_warn( unsigned state, unsigned char firstbyte) 
 {
-	printk( KERN_WARNING "isdn_x25iface: firstbyte %x illegal in"
+	printk( KERN_WARNING "isdn_x25iface: firstbyte %x invalid in"
 		"current state %d\n",firstbyte, state );
 }
 
@@ -72,7 +72,7 @@ static int pdata_is_bad( ix25_pdata_t * pda ){
 
 	if( pda  &&  pda -> magic == ISDN_X25IFACE_MAGIC ) return 0;
 	printk( KERN_WARNING
-		"isdn_x25iface_xxx: illegal pointer to proto data\n" );
+		"isdn_x25iface_xxx: invalid pointer to proto data\n" );
 	return 1;
 }
 
@@ -334,7 +334,7 @@ int isdn_x25iface_xmit(struct concap_proto *cprot, struct sk_buff *skb)
 		       " options not yet supported\n");
 		break;
 	default:
-		printk(KERN_WARNING "isdn_x25iface_xmit: frame with illegal"
+		printk(KERN_WARNING "isdn_x25iface_xmit: frame with invalid"
 		       " first byte %x ignored:\n", firstbyte);
 	}
 	dev_kfree_skb(skb);

@@ -876,6 +876,8 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	        d->do_ioctl = dscc4_ioctl;
 		d->tx_timeout = dscc4_tx_timeout;
 		d->watchdog_timeo = TX_TIMEOUT;
+		SET_MODULE_OWNER(d);
+		SET_NETDEV_DEV(d, &pdev->dev);
 
 		dpriv->dev_id = i;
 		dpriv->pci_priv = ppriv;
@@ -888,8 +890,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
 			goto err_unregister;
 	        }
-		hdlc->proto = IF_PROTO_HDLC;
-		SET_MODULE_OWNER(d);
+
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
@@ -955,8 +956,6 @@ static int dscc4_open(struct net_device *dev)
 	if ((ret = hdlc_open(hdlc)))
 		goto err;
 
-	MOD_INC_USE_COUNT;
-
 	ppriv = dpriv->pci_priv;
 
 	if ((ret = dscc4_init_ring(dev)))
@@ -1015,7 +1014,6 @@ err_free_ring:
 	dscc4_release_ring(dpriv);
 err_out:
 	hdlc_close(hdlc);
-	MOD_DEC_USE_COUNT;
 err:
 	return ret;
 }
@@ -1867,7 +1865,7 @@ static int __init dscc4_setup(char *str)
 
 __setup("dscc4.setup=", dscc4_setup);
 
-static struct pci_device_id dscc4_pci_tbl[] __devinitdata = {
+static struct pci_device_id dscc4_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SIEMENS, PCI_DEVICE_ID_SIEMENS_DSCC4,
 	        PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0,}

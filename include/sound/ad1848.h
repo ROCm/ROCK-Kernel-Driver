@@ -120,6 +120,12 @@
 #define AD1848_HW_AD1848	0x0002	/* AD1848 chip */
 #define AD1848_HW_CS4248	0x0003	/* CS4248 chip */
 #define AD1848_HW_CMI8330	0x0004	/* CMI8330 chip */
+#define AD1848_HW_THINKPAD	0x0005	/* Thinkpad 360/750/755 */
+
+/* IBM Thinkpad specific stuff */
+#define AD1848_THINKPAD_CTL_PORT1		0x15e8
+#define AD1848_THINKPAD_CTL_PORT2		0x15e9
+#define AD1848_THINKPAD_CS4248_ENABLE_BIT	0x02
 
 struct _snd_ad1848 {
 	unsigned long port;		/* i/o port */
@@ -140,6 +146,10 @@ struct _snd_ad1848 {
 	int mce_bit;
 	int calibrate_mute;
 	int dma_size;
+	int thinkpad_flag;		/* Thinkpad CS4248 needs some extra help */
+#ifdef CONFIG_PM
+	struct pm_dev *thinkpad_pmstate;
+#endif
 
 	spinlock_t reg_lock;
 	struct semaphore open_mutex;

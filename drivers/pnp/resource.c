@@ -252,7 +252,7 @@ int pnp_check_port(struct pnp_dev * dev, int idx)
 	end = &dev->res.port_resource[idx].end;
 
 	/* if the resource doesn't exist, don't complain about it */
-	if (dev->res.port_resource[idx].start == 0)
+	if (dev->res.port_resource[idx].flags & IORESOURCE_UNSET)
 		return 1;
 
 	/* check if the resource is already in use, skip if the
@@ -308,7 +308,7 @@ int pnp_check_mem(struct pnp_dev * dev, int idx)
 	end = &dev->res.mem_resource[idx].end;
 
 	/* if the resource doesn't exist, don't complain about it */
-	if (dev->res.mem_resource[idx].start == 0)
+	if (dev->res.mem_resource[idx].flags & IORESOURCE_UNSET)
 		return 1;
 
 	/* check if the resource is already in use, skip if the
@@ -367,7 +367,7 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 	unsigned long * irq = &dev->res.irq_resource[idx].start;
 
 	/* if the resource doesn't exist, don't complain about it */
-	if (dev->res.irq_resource[idx].start == -1)
+	if (dev->res.irq_resource[idx].flags & IORESOURCE_UNSET)
 		return 1;
 
 	/* check if the resource is valid */
@@ -431,7 +431,7 @@ int pnp_check_dma(struct pnp_dev * dev, int idx)
 	unsigned long * dma = &dev->res.dma_resource[idx].start;
 
 	/* if the resource doesn't exist, don't complain about it */
-	if (dev->res.dma_resource[idx].start == -1)
+	if (dev->res.dma_resource[idx].flags & IORESOURCE_UNSET)
 		return 1;
 
 	/* check if the resource is valid */

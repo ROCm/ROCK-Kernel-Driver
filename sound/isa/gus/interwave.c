@@ -138,7 +138,7 @@ static snd_card_t *snd_interwave_legacy[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
 #ifdef CONFIG_PNP
 
-static struct pnp_card_device_id snd_interwave_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_interwave_pnpids[] = {
 #ifndef SNDRV_STB
 	/* Gravis UltraSound Plug & Play */
 	{ .id = "GRV0001", .devs = { { .id = "GRV0000" } } },

@@ -54,8 +54,8 @@ static __inline__ void local_sub(unsigned long i, local_t *v)
 /* Use these for per-cpu local_t variables: on some archs they are
  * much more efficient than these naive implementations.  Note they take
  * a variable, not an address.
- * 
- * This could be done better if we moved the per cpu data directly 
+ *
+ * This could be done better if we moved the per cpu data directly
  * after GS.
  */
 #define cpu_local_read(v)	local_read(&__get_cpu_var(v))

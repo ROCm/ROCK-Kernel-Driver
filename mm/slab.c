@@ -2492,7 +2492,7 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 		seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
 #if STATS
 		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> <reaped> <error> <maxfreeable> <freelimit>");
-		seq_puts(m, " : cpustat <allochit> <allocmiss> <freehit <freemiss>");
+		seq_puts(m, " : cpustat <allochit> <allocmiss> <freehit> <freemiss>");
 #endif
 		seq_putc(m, '\n');
 	}

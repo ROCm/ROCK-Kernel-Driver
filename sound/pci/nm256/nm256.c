@@ -276,7 +276,7 @@ struct snd_nm256 {
 #endif
 
 
-static struct pci_device_id snd_nm256_ids[] __devinitdata = {
+static struct pci_device_id snd_nm256_ids[] = {
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,},
@@ -1307,7 +1307,6 @@ static void nm256_resume(nm256_t *chip)
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
 
-#ifndef PCI_OLD_SUSPEND
 static int snd_nm256_suspend(struct pci_dev *dev, u32 state)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return -ENXIO);
@@ -1320,18 +1319,6 @@ static int snd_nm256_resume(struct pci_dev *dev)
 	nm256_resume(chip);
 	return 0;
 }
-#else
-static void snd_nm256_suspend(struct pci_dev *dev)
-{
-	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return);
-	nm256_suspend(chip);
-}
-static void snd_nm256_resume(struct pci_dev *dev)
-{
-	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return);
-	nm256_resume(chip);
-}
-#endif
 
 /* callback */
 static int snd_nm256_set_power_state(snd_card_t *card, unsigned int power_state)

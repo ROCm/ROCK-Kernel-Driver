@@ -176,6 +176,27 @@ static void update_crtc2(WPMINFO unsigned int pos) {
 	}
 }
 
+static void matroxfb_crtc1_panpos(WPMINFO2) {
+	if (ACCESS_FBINFO(crtc1.panpos) >= 0) {
+		unsigned long flags;
+		int panpos;
+
+		matroxfb_DAC_lock_irqsave(flags);
+		panpos = ACCESS_FBINFO(crtc1.panpos);
+		if (panpos >= 0) {
+			unsigned int extvga_reg;
+
+			ACCESS_FBINFO(crtc1.panpos) = -1; /* No update pending anymore */
+			extvga_reg = mga_inb(M_EXTVGA_INDEX);
+			mga_setr(M_EXTVGA_INDEX, 0x00, panpos);
+			if (extvga_reg != 0x00) {
+				mga_outb(M_EXTVGA_INDEX, extvga_reg);
+			}
+		}
+		matroxfb_DAC_unlock_irqrestore(flags);
+	}
+}
+
 static irqreturn_t matrox_irq(int irq, void *dev_id, struct pt_regs *fp)
 {
 	u_int32_t status;
@@ -188,6 +209,7 @@ static irqreturn_t matrox_irq(int irq, void *dev_id, struct pt_regs *fp)
 	if (status & 0x20) {
 		mga_outl(M_ICLEAR, 0x20);
 		ACCESS_FBINFO(crtc1.vsync.cnt)++;
+		matroxfb_crtc1_panpos(PMINFO2);
 		wake_up_interruptible(&ACCESS_FBINFO(crtc1.vsync.wait));
 		handled = 1;
 	}
@@ -209,12 +231,13 @@ int matroxfb_enable_irq(WPMINFO int reenable) {
 		bm = 0x020;
 
 	if (!test_and_set_bit(0, &ACCESS_FBINFO(irq_flags))) {
-		printk(KERN_DEBUG "matroxfb: enabling IRQ\n");
 		if (request_irq(ACCESS_FBINFO(pcidev)->irq, matrox_irq,
-				SA_SHIRQ, "MGA Vertical Sync", MINFO)) {
+				SA_SHIRQ, "matroxfb", MINFO)) {
 			clear_bit(0, &ACCESS_FBINFO(irq_flags));
 			return -EINVAL;
 		}
+		/* Clear any pending field interrupts */
+		mga_outl(M_ICLEAR, bm);
 		mga_outl(M_IEN, mga_inl(M_IEN) | bm);
 	} else if (reenable) {
 		u_int32_t ien;
@@ -230,7 +253,8 @@ int matroxfb_enable_irq(WPMINFO int reenable) {
 
 static void matroxfb_disable_irq(WPMINFO2) {
 	if (test_and_clear_bit(0, &ACCESS_FBINFO(irq_flags))) {
-		printk(KERN_DEBUG "matroxfb: disabling IRQ\n");
+		/* Flush pending pan-at-vbl request... */
+		matroxfb_crtc1_panpos(PMINFO2);
 		if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG400)
 			mga_outl(M_IEN, mga_inl(M_IEN) & ~0x220);
 		else
@@ -284,6 +308,9 @@ static void matrox_pan_var(WPMINFO struct fb_var_screeninfo *var) {
 #ifdef CONFIG_FB_MATROX_32MB
 	unsigned int p3;
 #endif
+	int vbl;
+	unsigned long flags;
+
 	CRITFLAGS
 
 	DBG(__FUNCTION__)
@@ -302,15 +329,26 @@ static void matrox_pan_var(WPMINFO struct fb_var_screeninfo *var) {
 	p3 = ACCESS_FBINFO(hw).CRTCEXT[8] = pos >> 21;
 #endif
 
+	/* FB_ACTIVATE_VBL and we can acquire interrupts? Honor FB_ACTIVATE_VBL then... */
+	vbl = (var->activate & FB_ACTIVATE_VBL) && (matroxfb_enable_irq(PMINFO 0) == 0);
+
 	CRITBEGIN
 
+	matroxfb_DAC_lock_irqsave(flags);
 	mga_setr(M_CRTC_INDEX, 0x0D, p0);
 	mga_setr(M_CRTC_INDEX, 0x0C, p1);
 #ifdef CONFIG_FB_MATROX_32MB
 	if (ACCESS_FBINFO(devflags.support32MB))
 		mga_setr(M_EXTVGA_INDEX, 0x08, p3);
 #endif
-	mga_setr(M_EXTVGA_INDEX, 0x00, p2);
+	if (vbl) {
+		ACCESS_FBINFO(crtc1.panpos) = p2;
+	} else {
+		/* Abort any pending change */
+		ACCESS_FBINFO(crtc1.panpos) = -1;
+		mga_setr(M_EXTVGA_INDEX, 0x00, p2);
+	}
+	matroxfb_DAC_unlock_irqrestore(flags);
 	
 	update_crtc2(PMINFO pos);
 
@@ -627,11 +665,6 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno >= ACCESS_FBINFO(curr.cmap_len))
 		return 1;
 
-	ACCESS_FBINFO(palette[regno].red)   = red;
-	ACCESS_FBINFO(palette[regno].green) = green;
-	ACCESS_FBINFO(palette[regno].blue)  = blue;
-	ACCESS_FBINFO(palette[regno].transp) = transp;
-
 	if (ACCESS_FBINFO(fbcon).var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
@@ -748,19 +781,6 @@ static int matroxfb_set_par(struct fb_info *info)
 		else
 			ACCESS_FBINFO(curr.ydstorg.pixels) = (ydstorg * 8) / var->bits_per_pixel;
 		ACCESS_FBINFO(curr.final_bppShift) = matroxfb_get_final_bppShift(PMINFO var->bits_per_pixel);
-		if (visual == MX_VISUAL_PSEUDOCOLOR) {
-			int i;
-
-			for (i = 0; i < 16; i++) {
-				int j;
-
-				j = color_table[i];
-				ACCESS_FBINFO(palette[i].red)   = default_red[j];
-				ACCESS_FBINFO(palette[i].green) = default_grn[j];
-				ACCESS_FBINFO(palette[i].blue)  = default_blu[j];
-			}
-		}
-
 		{	struct my_timming mt;
 			struct matrox_hw_state* hw;
 			int out;
@@ -1070,7 +1090,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				memset(&r, 0, sizeof(r));
 				strcpy(r.driver, "matroxfb");
 				strcpy(r.card, "Matrox");
-				sprintf(r.bus_info, "PCI:%s", ACCESS_FBINFO(pcidev)->slot_name);
+				sprintf(r.bus_info, "PCI:%s", pci_name(ACCESS_FBINFO(pcidev)));
 				r.version = KERNEL_VERSION(1,0,0);
 				r.capabilities = V4L2_CAP_VIDEO_OUTPUT;
 				if (copy_to_user((void*)arg, &r, sizeof(r)))
@@ -1698,6 +1718,7 @@ static int initMatrox2(WPMINFO struct board* b){
 	/* after __init time we are like module... no logo */
 	ACCESS_FBINFO(fbcon.flags) = hotplug ? FBINFO_FLAG_MODULE : FBINFO_FLAG_DEFAULT;
 	ACCESS_FBINFO(video.len_usable) &= PAGE_MASK;
+	fb_alloc_cmap(&ACCESS_FBINFO(fbcon.cmap), 256, 1);
 
 #ifndef MODULE
 	/* mode database is marked __init!!! */
@@ -1990,6 +2011,7 @@ static int matroxfb_probe(struct pci_dev* pdev, const struct pci_device_id* dumm
 	ACCESS_FBINFO(irq_flags) = 0;
 	init_waitqueue_head(&ACCESS_FBINFO(crtc1.vsync.wait));
 	init_waitqueue_head(&ACCESS_FBINFO(crtc2.vsync.wait));
+	ACCESS_FBINFO(crtc1.panpos) = -1;
 
 	err = initMatrox2(PMINFO b);
 	if (!err) {
@@ -2012,7 +2034,7 @@ static void pci_remove_matrox(struct pci_dev* pdev) {
 	matroxfb_remove(PMINFO 1);
 }
 
-static struct pci_device_id matroxfb_devices[] __devinitdata = {
+static struct pci_device_id matroxfb_devices[] = {
 #ifdef CONFIG_FB_MATROX_MILLENIUM
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
@@ -2483,6 +2505,7 @@ module_exit(matrox_done);
 EXPORT_SYMBOL(matroxfb_register_driver);
 EXPORT_SYMBOL(matroxfb_unregister_driver);
 EXPORT_SYMBOL(matroxfb_wait_for_sync);
+EXPORT_SYMBOL(matroxfb_enable_irq);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

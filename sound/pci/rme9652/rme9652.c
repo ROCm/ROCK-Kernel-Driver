@@ -309,11 +309,42 @@ static char channel_map_9636_ds[26] = {
 #define RME9652_PREALLOCATE_MEMORY	/* via module snd-hammerfall-mem */
 
 #ifdef RME9652_PREALLOCATE_MEMORY
-extern void *snd_hammerfall_get_buffer(struct pci_dev *, dma_addr_t *dmaaddr);
-extern void snd_hammerfall_free_buffer(struct pci_dev *, void *ptr);
+static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_addr_t *addrp, int capture)
+{
+	struct snd_dma_device pdev;
+	struct snd_dma_buffer dmbuf;
+
+	snd_dma_device_pci(&pdev, pci, capture);
+	dmbuf.bytes = 0;
+	if (! snd_dma_get_reserved(&pdev, &dmbuf)) {
+		if (snd_dma_alloc_pages(&pdev, size, &dmbuf) < 0)
+			return NULL;
+		snd_dma_set_reserved(&pdev, &dmbuf);
+	}
+	*addrp = dmbuf.addr;
+	return dmbuf.area;
+}
+
+static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
+{
+	struct snd_dma_device dev;
+	snd_dma_device_pci(&dev, pci, capture);
+	snd_dma_free_reserved(&dev);
+}
+
+#else
+static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_addr_t *addrp, int capture)
+{
+	return snd_malloc_pci_pages(pci, size, addrp);
+}
+
+static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
+{
+	snd_free_pci_pages(pci, size, ptr, addr);
+}
 #endif
 
-static struct pci_device_id snd_rme9652_ids[] __devinitdata = {
+static struct pci_device_id snd_rme9652_ids[] = {
 	{
 		.vendor	   = 0x10ee,
 		.device	   = 0x3fc4,
@@ -1810,25 +1841,15 @@ static void __devinit snd_rme9652_proc_init(rme9652_t *rme9652)
 static void snd_rme9652_free_buffers(rme9652_t *rme9652)
 {
 	if (rme9652->capture_buffer_unaligned) {
-#ifndef RME9652_PREALLOCATE_MEMORY
-		snd_free_pci_pages(rme9652->pci,
-				   RME9652_DMA_AREA_BYTES,
-				   rme9652->capture_buffer_unaligned,
-				   rme9652->capture_buffer_addr);
-#else
-		snd_hammerfall_free_buffer(rme9652->pci, rme9652->capture_buffer_unaligned);
-#endif
+		snd_hammerfall_free_buffer(rme9652->pci, RME9652_DMA_AREA_BYTES,
+					   rme9652->capture_buffer_unaligned,
+					   rme9652->capture_buffer_addr, 1);
 	}
 
 	if (rme9652->playback_buffer_unaligned) {
-#ifndef RME9652_PREALLOCATE_MEMORY
-		snd_free_pci_pages(rme9652->pci,
-				   RME9652_DMA_AREA_BYTES,
-				   rme9652->playback_buffer_unaligned,
-				   rme9652->playback_buffer_addr);
-#else
-		snd_hammerfall_free_buffer(rme9652->pci, rme9652->playback_buffer_unaligned);
-#endif
+		snd_hammerfall_free_buffer(rme9652->pci, RME9652_DMA_AREA_BYTES,
+					   rme9652->playback_buffer_unaligned,
+					   rme9652->playback_buffer_addr, 0);
 	}
 }
 
@@ -1855,28 +1876,15 @@ static int __devinit snd_rme9652_initialize_memory(rme9652_t *rme9652)
 	dma_addr_t pb_addr, cb_addr;
 	unsigned long pb_bus, cb_bus;
 
-#ifndef RME9652_PREALLOCATE_MEMORY
-	cb = snd_malloc_pci_pages(rme9652->pci, RME9652_DMA_AREA_BYTES, &cb_addr);
-	pb = snd_malloc_pci_pages(rme9652->pci, RME9652_DMA_AREA_BYTES, &pb_addr);
-#else
-	cb = snd_hammerfall_get_buffer(rme9652->pci, &cb_addr);
-	pb = snd_hammerfall_get_buffer(rme9652->pci, &pb_addr);
-#endif
+	cb = snd_hammerfall_get_buffer(rme9652->pci, RME9652_DMA_AREA_BYTES, &cb_addr, 1);
+	pb = snd_hammerfall_get_buffer(rme9652->pci, RME9652_DMA_AREA_BYTES, &pb_addr, 0);
 
 	if (cb == 0 || pb == 0) {
 		if (cb) {
-#ifdef RME9652_PREALLOCATE_MEMORY
-			snd_hammerfall_free_buffer(rme9652->pci, cb);
-#else
-			snd_free_pci_pages(rme9652->pci, RME9652_DMA_AREA_BYTES, cb, cb_addr);
-#endif
+			snd_hammerfall_free_buffer(rme9652->pci, RME9652_DMA_AREA_BYTES, cb, cb_addr, 1);
 		}
 		if (pb) {
-#ifdef RME9652_PREALLOCATE_MEMORY
-			snd_hammerfall_free_buffer(rme9652->pci, pb);
-#else
-			snd_free_pci_pages(rme9652->pci, RME9652_DMA_AREA_BYTES, pb, pb_addr);
-#endif
+			snd_hammerfall_free_buffer(rme9652->pci, RME9652_DMA_AREA_BYTES, pb, pb_addr, 0);
 		}
 
 		printk(KERN_ERR "%s: no buffers available\n", rme9652->card_name);

@@ -85,11 +85,7 @@ static void resample_expand(snd_pcm_plugin_t *plugin,
 #undef PUT_S16_LABELS
 	void *get = get_s16_labels[data->get];
 	void *put = put_s16_labels[data->put];
-	void *get_s16_end = 0;
 	signed short sample = 0;
-#define GET_S16_END *get_s16_end
-#include "plugin_ops.h"
-#undef GET_S16_END
 	
 	for (channel = 0; channel < plugin->src_format.channels; channel++) {
 		pos = data->pos;
@@ -108,24 +104,16 @@ static void resample_expand(snd_pcm_plugin_t *plugin,
 		dst_step = dst_channels[channel].area.step / 8;
 		src_frames1 = src_frames;
 		dst_frames1 = dst_frames;
-		if (pos & ~R_MASK) {
-			get_s16_end = &&after_get1;
-			goto *get;
-		after_get1:
-			pos &= R_MASK;
-			S1 = S2;
-			S2 = sample;
-			src += src_step;
-			src_frames1--;
-		}
 		while (dst_frames1-- > 0) {
 			if (pos & ~R_MASK) {
 				pos &= R_MASK;
 				S1 = S2;
 				if (src_frames1-- > 0) {
-					get_s16_end = &&after_get2;
 					goto *get;
-				after_get2:
+#define GET_S16_END after_get
+#include "plugin_ops.h"
+#undef GET_S16_END
+				after_get:
 					S2 = sample;
 					src += src_step;
 				}
@@ -318,6 +306,8 @@ static snd_pcm_sframes_t rate_transfer(snd_pcm_plugin_t *plugin,
 #endif
 
 	dst_frames = rate_dst_frames(plugin, frames);
+	if (dst_frames > dst_channels[0].frames)
+		dst_frames = dst_channels[0].frames;
 	data = (rate_t *)plugin->extra_data;
 	data->func(plugin, src_channels, dst_channels, frames, dst_frames);
 	return dst_frames;

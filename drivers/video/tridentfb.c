@@ -1176,7 +1176,7 @@ static void __devexit trident_pci_remove(struct pci_dev * dev)
 }
 
 /* List of boards that we are trying to support */
-static struct pci_device_id trident_devices[] __devinitdata = {
+static struct pci_device_id trident_devices[] = {
 	{PCI_VENDOR_ID_TRIDENT,	BLADE3D, PCI_ANY_ID,PCI_ANY_ID,0,0,0},
 	{PCI_VENDOR_ID_TRIDENT,	CYBERBLADEi7, PCI_ANY_ID,PCI_ANY_ID,0,0,0},
 	{PCI_VENDOR_ID_TRIDENT,	CYBERBLADEi7D, PCI_ANY_ID,PCI_ANY_ID,0,0,0},

@@ -669,7 +669,7 @@ static void receive_char(struct r3964_info *pInfo, const unsigned char c)
          }
          else
          {
-            TRACE_PE("TRANSMITTING - got illegal char");
+            TRACE_PE("TRANSMITTING - got invalid char");
  
             pInfo->state = R3964_WAIT_ZVZ_BEFORE_TX_RETRY;
 	    mod_timer(&pInfo->tmr, jiffies + R3964_TO_ZVZ);

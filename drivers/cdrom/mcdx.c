@@ -315,7 +315,7 @@ static struct s_drive_stuff *mcdx_irq_map[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0
 };
 static spinlock_t mcdx_lock = SPIN_LOCK_UNLOCKED;
-static struct request_queue mcdx_queue;
+static struct request_queue *mcdx_queue;
 MODULE_PARM(mcdx, "1-4i");
 
 static struct cdrom_device_ops mcdx_dops = {
@@ -1066,7 +1066,7 @@ void __exit mcdx_exit(void)
 	if (unregister_blkdev(MAJOR_NR, "mcdx") != 0) {
 		xwarn("cleanup() unregister_blkdev() failed\n");
 	}
-	blk_cleanup_queue(&mcdx_queue);
+	blk_cleanup_queue(mcdx_queue);
 #if !MCDX_QUIET
 	else
 	xinfo("cleanup() succeeded\n");
@@ -1199,7 +1199,15 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	blk_init_queue(&mcdx_queue, do_mcdx_request, &mcdx_lock);
+	mcdx_queue = blk_init_queue(do_mcdx_request, &mcdx_lock);
+	if (!mcdx_queue) {
+		unregister_blkdev(MAJOR_NR, "mcdx");
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
+		kfree(stuffp);
+		put_disk(disk);
+		return 1;
+	}
 
 	xtrace(INIT, "init() subscribe irq and i/o\n");
 	mcdx_irq_map[stuffp->irq] = stuffp;
@@ -1209,7 +1217,7 @@ int __init mcdx_init_drive(int drive)
 		xwarn("%s=0x%3p,%d: Init failed. Can't get irq (%d).\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, stuffp->irq);
 		stuffp->irq = 0;
-		blk_cleanup_queue(&mcdx_queue);
+		blk_cleanup_queue(mcdx_queue);
 		kfree(stuffp);
 		put_disk(disk);
 		return 0;
@@ -1258,11 +1266,11 @@ int __init mcdx_init_drive(int drive)
 		put_disk(disk);
 		if (unregister_blkdev(MAJOR_NR, "mcdx") != 0)
 			xwarn("cleanup() unregister_blkdev() failed\n");
-		blk_cleanup_queue(&mcdx_queue);
+		blk_cleanup_queue(mcdx_queue);
 		return 2;
 	}
 	disk->private_data = stuffp;
-	disk->queue = &mcdx_queue;
+	disk->queue = mcdx_queue;
 	add_disk(disk);
 	printk(msg);
 	return 0;

@@ -5166,7 +5166,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 			printk ("extraneous data discarded.\n");
 			break;
 		case XE_BAD_PHASE:
-			printk ("illegal scsi phase (4/5).\n");
+			printk ("invalid scsi phase (4/5).\n");
 			break;
 		default:
 			printk ("extended error %d.\n", cp->xerr_status);

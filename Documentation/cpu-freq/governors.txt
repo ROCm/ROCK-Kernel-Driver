@@ -135,21 +135,21 @@ CPUfreq core to ensure proper locking.
 The CPUfreq governor may call the CPU processor driver using one of
 these two functions:
 
-inline int cpufreq_driver_target(struct cpufreq_policy *policy,
+int cpufreq_driver_target(struct cpufreq_policy *policy,
                                  unsigned int target_freq,
                                  unsigned int relation);
 
-inline int cpufreq_driver_target_l(struct cpufreq_policy *policy,
+int __cpufreq_driver_target(struct cpufreq_policy *policy,
                                    unsigned int target_freq,
                                    unsigned int relation);
 
 target_freq must be within policy->min and policy->max, of course.
 What's the difference between these two functions? When your governor
 still is in a direct code path of a call to governor->governor, the
-cpufreq_driver_sem lock is still held in the cpufreq core, and there's
+per-CPU cpufreq lock is still held in the cpufreq core, and there's
 no need to lock it again (in fact, this would cause a deadlock). So
-use cpufreq_driver_target only in these cases. In all other cases (for
-example, when there's a "daemonized" function that wakes up every
-second), use cpufreq_driver_target_l to lock the cpufreq_driver_sem
-before the command is passed to the cpufreq processor driver.
+use __cpufreq_driver_target only in these cases. In all other cases 
+(for example, when there's a "daemonized" function that wakes up 
+every second), use cpufreq_driver_target to lock the cpufreq per-CPU
+lock before the command is passed to the cpufreq processor driver.
 

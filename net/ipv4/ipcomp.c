@@ -18,10 +18,10 @@
 #include <asm/scatterlist.h>
 #include <linux/crypto.h>
 #include <linux/pfkeyv2.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/icmp.h>
-#include <net/esp.h>
 #include <net/ipcomp.h>
 
 static int ipcomp_decompress(struct xfrm_state *x, struct sk_buff *skb)
@@ -210,6 +210,8 @@ static int ipcomp_output(struct sk_buff *skb)
 	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct ip_comp_hdr));
 	memcpy(top_iph, &tmp_iph, iph->ihl * 4);
 	iph = top_iph;
+	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
+		IP_ECN_clear(iph);
 	iph->tot_len = htons(skb->len);
 	iph->protocol = IPPROTO_COMP;
 	iph->check = 0;

@@ -380,7 +380,7 @@ static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
 static int
 acpi_processor_write_performance (
         struct file		*file,
-        const char		*buffer,
+        const char		__user *buffer,
         size_t			count,
         loff_t			*data)
 {

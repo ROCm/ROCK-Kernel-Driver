@@ -107,7 +107,7 @@ static struct {
 	{
 "RealTek RTL8169 Gigabit Ethernet"},};
 
-static struct pci_device_id rtl8169_pci_tbl[] __devinitdata = {
+static struct pci_device_id rtl8169_pci_tbl[] = {
 	{0x10ec, 0x8169, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,},
 };
@@ -437,9 +437,9 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	//if unknown chip, assume array element #0, original RTL-8169 in this case
 	printk(KERN_DEBUG PFX
 	       "PCI device %s: unknown chip version, assuming RTL-8169\n",
-	       pdev->slot_name);
+	       pci_name(pdev));
 	printk(KERN_DEBUG PFX "PCI device %s: TxConfig = 0x%lx\n",
-	       pdev->slot_name, (unsigned long) RTL_R32(TxConfig));
+	       pci_name(pdev), (unsigned long) RTL_R32(TxConfig));
 	tp->chipset = 0;
 
 match:

@@ -1,13 +1,12 @@
-/* $Id: jazz.h,v 1.9 1998/09/19 19:19:37 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1995 - 1998 by Andreas Busse and Ralf Baechle
  */
-#ifndef __ASM_MIPS_JAZZ_H 
-#define __ASM_MIPS_JAZZ_H 
+#ifndef __ASM_JAZZ_H
+#define __ASM_JAZZ_H
 
 /*
  * The addresses below are virtual address. The mappings are
@@ -71,16 +70,16 @@
 #define LED_E                   0x9e
 #define LED_F                   0x8e
 
-#ifndef _LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLY__
 
-extern __inline__ void pica_set_led(unsigned int bits)
+static __inline__ void pica_set_led(unsigned int bits)
 {
 	volatile unsigned int *led_register = (unsigned int *) PICA_LED;
 
 	*led_register = bits;
 }
 
-#endif
+#endif /* !__ASSEMBLY__ */
 
 /*
  * Base address of the Sonic Ethernet adapter in Jazz machines.
@@ -101,7 +100,7 @@ extern __inline__ void pica_set_led(unsigned int bits)
 #define JAZZ_KEYBOARD_DATA      0xe0005000
 #define JAZZ_KEYBOARD_COMMAND   0xe0005001
 
-#ifndef _LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLY__
 
 typedef struct {
 	unsigned char data;
@@ -120,7 +119,7 @@ typedef struct {
  */
 #define keyboard_hardware       jazz_keyboard_hardware
 
-#endif
+#endif /* !__ASSEMBLY__ */
 
 /*
  * i8042 keyboard controller for most other Mips machines.
@@ -140,7 +139,7 @@ typedef struct {
  * Dummy Device Address. Used in jazzdma.c
  */
 #define JAZZ_DUMMY_DEVICE       0xe000d000
-     
+
 /*
  * JAZZ timer registers and interrupt no.
  * Note that the hardware timer interrupt is actually on
@@ -153,7 +152,7 @@ typedef struct {
 /*
  * DRAM configuration register
  */
-#ifndef _LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLY__
 #ifdef __MIPSEL__
 typedef struct {
 	unsigned int bank2 : 3;
@@ -173,7 +172,7 @@ typedef struct {
 	unsigned int bank2 : 3;
 } dram_configuration;
 #endif
-#endif /* _LANGUAGE_ASSEMBLY */
+#endif /* !__ASSEMBLY__ */
 
 #define PICA_DRAM_CONFIG        0xe00fffe0
 
@@ -249,7 +248,7 @@ typedef struct {
 #define JAZZ_R4030_CACHE_BWIN   0xE0000060	/* I/O Cache Buffer Window */
 
 /*
- * Remote Speed Registers. 
+ * Remote Speed Registers.
  *
  *  0: free,      1: Ethernet,  2: SCSI,      3: Floppy,
  *  4: RTC,       5: Kb./Mouse  6: serial 1,  7: serial 2,
@@ -271,9 +270,9 @@ typedef struct {
 /*
  * Access the R4030 DMA and I/O Controller
  */
-#ifndef _LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLY__
 
-extern inline void r4030_delay(void)
+static inline void r4030_delay(void)
 {
 __asm__ __volatile__(
 	".set\tnoreorder\n\t"
@@ -284,33 +283,33 @@ __asm__ __volatile__(
 	".set\treorder");
 }
 
-extern inline unsigned short r4030_read_reg16(unsigned addr)
+static inline unsigned short r4030_read_reg16(unsigned addr)
 {
 	unsigned short ret = *((volatile unsigned short *)addr);
 	r4030_delay();
 	return ret;
 }
 
-extern inline unsigned int r4030_read_reg32(unsigned addr)
+static inline unsigned int r4030_read_reg32(unsigned addr)
 {
 	unsigned int ret = *((volatile unsigned int *)addr);
 	r4030_delay();
 	return ret;
 }
 
-extern inline void r4030_write_reg16(unsigned addr, unsigned val)
+static inline void r4030_write_reg16(unsigned addr, unsigned val)
 {
 	*((volatile unsigned short *)addr) = val;
 	r4030_delay();
 }
 
-extern inline void r4030_write_reg32(unsigned addr, unsigned val)
+static inline void r4030_write_reg32(unsigned addr, unsigned val)
 {
 	*((volatile unsigned int *)addr) = val;
 	r4030_delay();
 }
 
-#endif /* !LANGUAGE_ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */
 
 #define JAZZ_FDC_BASE	0xe0003000
 #define JAZZ_RTC_BASE	0xe0004000
@@ -318,4 +317,4 @@ extern inline void r4030_write_reg32(unsigned addr, unsigned val)
 
 #define JAZZ_EISA_BASE	0xe3000000
 
-#endif /* __ASM_MIPS_JAZZ_H */
+#endif /* __ASM_JAZZ_H */

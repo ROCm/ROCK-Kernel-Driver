@@ -204,6 +204,9 @@
 #define BT848_COLOR_FMT_YCrCb411    0x99
 #define BT848_COLOR_FMT_RAW         0xee
 
+#define BT848_VTOTAL_LO             0xB0
+#define BT848_VTOTAL_HI             0xB4
+
 #define BT848_COLOR_CTL                0x0D8
 #define BT848_COLOR_CTL_EXT_FRMRATE    (1<<7)
 #define BT848_COLOR_CTL_COLOR_BARS     (1<<6)
@@ -311,29 +314,28 @@
 
 /* WRITE and SKIP */
 /* disable which bytes of each DWORD */
-#define BT848_RISC_BYTE0       (1<<12)
-#define BT848_RISC_BYTE1       (1<<13)
-#define BT848_RISC_BYTE2       (1<<14)
-#define BT848_RISC_BYTE3       (1<<15)
-#define BT848_RISC_BYTE_ALL    (0x0f<<12)
+#define BT848_RISC_BYTE0       (1U<<12)
+#define BT848_RISC_BYTE1       (1U<<13)
+#define BT848_RISC_BYTE2       (1U<<14)
+#define BT848_RISC_BYTE3       (1U<<15)
+#define BT848_RISC_BYTE_ALL    (0x0fU<<12)
 #define BT848_RISC_BYTE_NONE   0
 /* cause RISCI */
-#define BT848_RISC_IRQ         (1<<24)
+#define BT848_RISC_IRQ         (1U<<24)
 /* RISC command is last one in this line */
-#define BT848_RISC_EOL         (1<<26)
+#define BT848_RISC_EOL         (1U<<26)
 /* RISC command is first one in this line */
-#define BT848_RISC_SOL         (1<<27)
+#define BT848_RISC_SOL         (1U<<27)
 
-#define BT848_RISC_WRITE       (0x01<<28)
-#define BT848_RISC_SKIP        (0x02<<28)
-#define BT848_RISC_WRITEC      (0x05<<28)
-#define BT848_RISC_JUMP        (0x07<<28)
-#define BT848_RISC_SYNC        (0x08<<28)
+#define BT848_RISC_WRITE       (0x01U<<28)
+#define BT848_RISC_SKIP        (0x02U<<28)
+#define BT848_RISC_WRITEC      (0x05U<<28)
+#define BT848_RISC_JUMP        (0x07U<<28)
+#define BT848_RISC_SYNC        (0x08U<<28)
 
-#define BT848_RISC_WRITE123    (0x09<<28)
-#define BT848_RISC_SKIP123     (0x0a<<28)
-#define BT848_RISC_WRITE1S23   (0x0b<<28)
-
+#define BT848_RISC_WRITE123    (0x09U<<28)
+#define BT848_RISC_SKIP123     (0x0aU<<28)
+#define BT848_RISC_WRITE1S23   (0x0bU<<28)
 
 
 /* Bt848A and higher only !! */

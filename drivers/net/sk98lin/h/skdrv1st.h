@@ -2,16 +2,15 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.9.2.1 $
- * Date:	$Date: 2001/03/12 16:50:59 $
+ * Version:	$Revision: 1.15 $
+ * Date:	$Date: 2003/07/17 14:54:09 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2001 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2003 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,30 @@
  * History:
  *
  *	$Log: skdrv1st.h,v $
+ *	Revision 1.15  2003/07/17 14:54:09  rroesler
+ *	Fix: Corrected SK_PNMI_READ macros to copy right amount of bytes
+ *	
+ *	Revision 1.14  2003/06/03 14:36:32  mlindner
+ *	Add: Additions for SK_SLIM
+ *	
+ *	Revision 1.13  2003/05/26 14:03:06  mlindner
+ *	Add: Support for SLIM skaddr
+ *	
+ *	Revision 1.12  2003/05/26 12:56:39  mlindner
+ *	Add: Support for Kernel 2.5/2.6
+ *	Add: New SkOsGetTimeCurrent function
+ *	Add: SK_PNMI_HUNDREDS_SEC definition
+ *	Fix: SK_TICKS_PER_SEC on Intel Itanium2
+ *	
+ *	Revision 1.11  2003/02/25 14:16:40  mlindner
+ *	Fix: Copyright statement
+ *	
+ *	Revision 1.10  2002/10/02 12:46:02  mlindner
+ *	Add: Support for Yukon
+ *	
+ *	Revision 1.9.2.2  2001/12/07 12:06:42  mlindner
+ *	Fix: malloc -> slab changes
+ *	
  *	Revision 1.9.2.1  2001/03/12 16:50:59  mlindner
  *	chg: kernel 2.4 adaption
  *	
@@ -72,7 +95,7 @@
  * Description:
  *
  * This is the first include file of the driver, which includes all
- * necessary system header files and some of the GEnesis header files.
+ * neccessary system header files and some of the GEnesis header files.
  * It also defines some basic items.
  *
  * Include File Hierarchy:
@@ -84,8 +107,13 @@
 #ifndef __INC_SKDRV1ST_H
 #define __INC_SKDRV1ST_H
 
+/* Check kernel version */
+#include <linux/version.h>
 
 typedef struct s_AC	SK_AC;
+
+/* Set card versions */
+#define SK_FAR
 
 /* override some default functions with optimized linux functions */
 
@@ -93,8 +121,8 @@ typedef struct s_AC	SK_AC;
 #define SK_PNMI_STORE_U32(p,v)		memcpy((char*)(p),(char*)&(v),4)
 #define SK_PNMI_STORE_U64(p,v)		memcpy((char*)(p),(char*)&(v),8)
 #define SK_PNMI_READ_U16(p,v)		memcpy((char*)&(v),(char*)(p),2)
-#define SK_PNMI_READ_U32(p,v)		memcpy((char*)&(v),(char*)(p),2)
-#define SK_PNMI_READ_U64(p,v)		memcpy((char*)&(v),(char*)(p),2)
+#define SK_PNMI_READ_U32(p,v)		memcpy((char*)&(v),(char*)(p),4)
+#define SK_PNMI_READ_U64(p,v)		memcpy((char*)&(v),(char*)(p),8)
 
 #define SkCsCalculateChecksum(p,l)	((~ip_compute_csum(p, l)) & 0xffff)
 
@@ -116,7 +144,6 @@ typedef struct s_AC	SK_AC;
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
-#include <linux/crc32.h>
 #include <asm/byteorder.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -140,9 +167,11 @@ typedef struct s_AC	SK_AC;
 #define SK_BIG_ENDIAN
 #endif
 
+#define SK_NET_DEVICE	net_device
+
 
 /* we use gethrtime(), return unit: nanoseconds */
-#define SK_TICKS_PER_SEC	HZ
+#define SK_TICKS_PER_SEC	100
 
 #define	SK_MEM_MAPPED_IO
 
@@ -161,17 +190,17 @@ typedef struct s_DrvRlmtMbuf SK_MBUF;
 #define SK_MEMCPY(dest,src,size)	memcpy(dest,src,size)
 #define SK_MEMCMP(s1,s2,size)		memcmp(s1,s2,size)
 #define SK_MEMSET(dest,val,size)	memset(dest,val,size)
-#define SK_STRLEN(pStr)			strlen((char*)pStr)
-#define SK_STRNCPY(pDest,pSrc,size)	strncpy((char*)pDest,(char*)pSrc,size)
-#define SK_STRCMP(pStr1,pStr2)		strcmp((char*)pStr1,(char*)pStr2)
+#define SK_STRLEN(pStr)			strlen((char*)(pStr))
+#define SK_STRNCPY(pDest,pSrc,size)	strncpy((char*)(pDest),(char*)(pSrc),size)
+#define SK_STRCMP(pStr1,pStr2)		strcmp((char*)(pStr1),(char*)(pStr2))
 
 /* macros to access the adapter */
-#define SK_OUT8(b,a,v)		writeb(v, (b+a))	
-#define SK_OUT16(b,a,v)		writew(v, (b+a))	
-#define SK_OUT32(b,a,v)		writel(v, (b+a))	
-#define SK_IN8(b,a,pv)		(*(pv) = readb(b+a))
-#define SK_IN16(b,a,pv)		(*(pv) = readw(b+a))
-#define SK_IN32(b,a,pv)		(*(pv) = readl(b+a))
+#define SK_OUT8(b,a,v)		writeb((v), ((b)+(a)))	
+#define SK_OUT16(b,a,v)		writew((v), ((b)+(a)))	
+#define SK_OUT32(b,a,v)		writel((v), ((b)+(a)))	
+#define SK_IN8(b,a,pv)		(*(pv) = readb((b)+(a)))
+#define SK_IN16(b,a,pv)		(*(pv) = readw((b)+(a)))
+#define SK_IN32(b,a,pv)		(*(pv) = readl((b)+(a)))
 
 #define int8_t		char
 #define int16_t		short
@@ -222,11 +251,11 @@ extern void SkDbgPrintf(const char *format,...);
 #define SK_DBGCAT_DRV_INT_SRC		0x04000000
 #define SK_DBGCAT_DRV_EVENT		0x08000000
 
-#endif /* DEBUG */
+#endif
 
 #define SK_ERR_LOG		SkErrorLog
 
 extern void SkErrorLog(SK_AC*, int, int, char*);
 
-#endif /* __INC_SKDRV1ST_H */
+#endif
 

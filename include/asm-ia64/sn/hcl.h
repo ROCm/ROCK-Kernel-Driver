@@ -99,12 +99,12 @@ extern int hwgraph_info_replace_LBL(vertex_hdl_t, char *, arbitrary_info_t,
 extern int hwgraph_info_get_exported_LBL(vertex_hdl_t, char *, int *, arbitrary_info_t *);
 extern int hwgraph_info_get_next_LBL(vertex_hdl_t, char *, arbitrary_info_t *,
                                 labelcl_info_place_t *);
-extern int hwgraph_path_lookup(vertex_hdl_t, char *, vertex_hdl_t *, char **);
 extern int hwgraph_info_export_LBL(vertex_hdl_t, char *, int);
 extern int hwgraph_info_unexport_LBL(vertex_hdl_t, char *);
 extern int hwgraph_info_remove_LBL(vertex_hdl_t, char *, arbitrary_info_t *);
 extern char * vertex_to_name(vertex_hdl_t, char *, uint);
 extern graph_error_t hwgraph_vertex_unref(vertex_hdl_t);
 
+extern int init_hcl(void);
 
 #endif /* _ASM_IA64_SN_HCL_H */

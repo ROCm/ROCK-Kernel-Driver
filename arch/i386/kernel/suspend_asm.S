@@ -6,32 +6,6 @@
 #include <asm/segment.h>
 #include <asm/page.h>
 
-	.data
-	.align	4
-	.globl	saved_context_eax, saved_context_ebx
-	.globl	saved_context_ecx, saved_context_edx
-	.globl	saved_context_esp, saved_context_ebp
-	.globl	saved_context_esi, saved_context_edi
-	.globl	saved_context_eflags
-saved_context_eax:
-	.long	0
-saved_context_ebx:
-	.long	0
-saved_context_ecx:
-	.long	0
-saved_context_edx:
-	.long	0
-saved_context_esp:
-	.long	0
-saved_context_ebp:
-	.long	0
-saved_context_esi:
-	.long	0
-saved_context_edi:
-	.long	0
-saved_context_eflags:
-	.long	0
-
 	.text
 
 ENTRY(do_magic)

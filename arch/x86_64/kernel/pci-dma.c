@@ -58,4 +58,3 @@ void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg,
 }
 
 EXPORT_SYMBOL(pci_unmap_sg);
-

@@ -119,7 +119,7 @@ ixgb_ethtool_gdrvinfo(struct ixgb_adapter *adapter,
 	strncpy(drvinfo->driver, ixgb_driver_name, 32);
 	strncpy(drvinfo->version, ixgb_driver_version, 32);
 	strncpy(drvinfo->fw_version, "", 32);
-	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
+	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), 32);
 #ifdef ETHTOOL_GREGS
 	drvinfo->regdump_len = IXGB_REG_DUMP_LEN;
 #endif				/* ETHTOOL_GREGS */

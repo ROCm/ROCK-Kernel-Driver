@@ -70,14 +70,14 @@ GLOBAL_ENTRY(xor_ia64_3)
 	adds in0 = -1, in0
 	mov r16 = in1
 	mov r17 = in2
-	;;	
+	;;
 	mov r18 = in3
 	mov ar.lc = in0
 	mov pr.rot = 1 << 16
 	;;
 	.rotr s1[6+1], s2[6+1], s3[6+1], d[2]
 	.rotp p[6+2]
-0:	
+0:
 (p[0])	ld8.nta s1[0] = [r16], 8
 (p[0])	ld8.nta s2[0] = [r17], 8
 (p[6])	xor d[0] = s1[6], s2[6]
@@ -162,7 +162,7 @@ GLOBAL_ENTRY(xor_ia64_5)
 	;;
 	.rotr s1[6+1], s2[6+1], s3[6+1], s4[6+1], s5[6+1], d[2]
 	.rotp p[6+2]
-0:	
+0:
 (p[0])	ld8.nta s1[0] = [r16], 8
 (p[0])	ld8.nta s2[0] = [r17], 8
 (p[6])	xor d[0] = s1[6], s2[6]

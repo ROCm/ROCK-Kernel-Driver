@@ -908,9 +908,9 @@ EXPORT_SYMBOL(save_match);
 /*
  * init request queue
  */
-static void ide_init_queue(ide_drive_t *drive)
+static int ide_init_queue(ide_drive_t *drive)
 {
-	request_queue_t *q = &drive->queue;
+	request_queue_t *q;
 	ide_hwif_t *hwif = HWIF(drive);
 	int max_sectors = 256;
 
@@ -922,7 +922,10 @@ static void ide_init_queue(ide_drive_t *drive)
 	 *	do not.
 	 */
 	 
-	blk_init_queue(q, do_ide_request, &ide_lock);
+	q = blk_init_queue(do_ide_request, &ide_lock);
+	if (!q)
+		return 1;
+
 	q->queuedata = HWGROUP(drive);
 	blk_queue_segment_boundary(q, 0xffff);
 
@@ -937,6 +940,13 @@ static void ide_init_queue(ide_drive_t *drive)
 
 	/* This is a driver limit and could be eliminated. */
 	blk_queue_max_phys_segments(q, PRD_ENTRIES);
+
+	/* assign drive and gendisk queue */
+	drive->queue = q;
+	if (drive->disk)
+		drive->disk->queue = drive->queue;
+
+	return 0;
 }
 
 /*
@@ -1068,7 +1078,10 @@ static int init_irq (ide_hwif_t *hwif)
 		ide_drive_t *drive = &hwif->drives[index];
 		if (!drive->present)
 			continue;
-		ide_init_queue(drive);
+		if (ide_init_queue(drive)) {
+			printk(KERN_ERR "ide: failed to init %s\n",drive->name);
+			continue;
+		}
 		spin_lock_irq(&ide_lock);
 		if (!hwgroup->drive) {
 			/* first drive for hwgroup. */
@@ -1134,6 +1147,8 @@ static int ata_lock(dev_t dev, void *data)
 	return 0;
 }
 
+extern ide_driver_t idedefault_driver;
+
 struct kobject *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
@@ -1141,7 +1156,7 @@ struct kobject *ata_probe(dev_t dev, int *part, void *data)
 	ide_drive_t *drive = &hwif->drives[unit];
 	if (!drive->present)
 		return NULL;
-	if (!drive->driver) {
+	if (drive->driver == &idedefault_driver) {
 		if (drive->media == ide_disk)
 			(void) request_module("ide-disk");
 		if (drive->scsi)
@@ -1153,7 +1168,7 @@ struct kobject *ata_probe(dev_t dev, int *part, void *data)
 		if (drive->media == ide_floppy)
 			(void) request_module("ide-floppy");
 	}
-	if (!drive->driver)
+	if (drive->driver == &idedefault_driver)
 		return NULL;
 	*part &= (1 << PARTN_BITS) - 1;
 	return get_disk(drive->disk);
@@ -1177,7 +1192,6 @@ static int alloc_disks(ide_hwif_t *hwif)
 		sprintf(disk->disk_name,"hd%c",'a'+hwif->index*MAX_DRIVES+unit);
 		disk->fops = ide_fops;
 		disk->private_data = drive;
-		disk->queue = &drive->queue;
 		drive->disk = disk;
 	}
 	return 0;
@@ -1292,10 +1306,13 @@ out:
 
 EXPORT_SYMBOL(hwif_init);
 
-void export_ide_init_queue (ide_drive_t *drive)
+int export_ide_init_queue (ide_drive_t *drive)
 {
-	ide_init_queue(drive);
+	if (ide_init_queue(drive))
+		return 1;
+
 	ide_init_drive(drive);
+	return 0;
 }
 
 EXPORT_SYMBOL(export_ide_init_queue);

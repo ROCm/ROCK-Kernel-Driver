@@ -446,7 +446,7 @@ nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 	 */
 	svc_take_page(rqstp);
 	len = ntohl(*p++);
-	if (len <= 0 || len > NFS3_MAXPATHLEN)
+	if (len <= 0 || len > NFS3_MAXPATHLEN || len >= PAGE_SIZE)
 		return 0;
 	args->tname = new = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
 	args->tlen = len;
@@ -454,7 +454,7 @@ nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 	old = (char*)p;
 	vec = &rqstp->rq_arg.head[0];
 	avail = vec->iov_len - (old - (char*)vec->iov_base);
-	while (len > 0 && *old && avail) {
+	while (len && avail && *old) {
 		*new++ = *old++;
 		len--;
 		avail--;
@@ -465,7 +465,7 @@ nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 		if (avail > PAGE_SIZE) avail = PAGE_SIZE;
 		old = page_address(rqstp->rq_arg.pages[0]);
 	}
-	while (len > 0 && *old && avail) {
+	while (len && avail && *old) {
 		*new++ = *old++;
 		len--;
 		avail--;

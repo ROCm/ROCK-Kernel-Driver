@@ -56,7 +56,7 @@ void __devinit pci_name_device(struct pci_dev *dev)
 {
 	const struct pci_vendor_info *vendor_p = pci_vendor_list;
 	int i = VENDORS;
-	char *name = dev->dev.name;
+	char *name = dev->pretty_name;
 
 	do {
 		if (vendor_p->vendor == dev->vendor)

@@ -2,7 +2,6 @@ extern struct bus_type pnp_bus_type;
 extern spinlock_t pnp_lock;
 void *pnp_alloc(long size);
 int pnp_interface_attach_device(struct pnp_dev *dev);
-void pnp_name_device(struct pnp_dev *dev);
 void pnp_fixup_device(struct pnp_dev *dev);
 void pnp_free_option(struct pnp_option *option);
 int __pnp_add_device(struct pnp_dev *dev);

@@ -1488,7 +1488,7 @@ static void unload_cpqphpd(void)
 
 
 
-static struct pci_device_id hpcd_pci_tbl[] __devinitdata = {
+static struct pci_device_id hpcd_pci_tbl[] = {
 	{
 	/* handle any PCI Hotplug controller */
 	.class =        ((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),

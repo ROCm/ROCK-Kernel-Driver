@@ -45,7 +45,7 @@ struct des_cred {
  * Make sure we don't place more than one call to the key server at
  * a time.
  */
-static int			in_keycall = 0;
+static int			in_keycall;
 
 #define FAIL(err) \
 	{ if (data) put_cred(data);			\
@@ -202,7 +202,7 @@ garbage:
 static struct des_cred *
 get_cred_byname(struct svc_rqst *rqstp, u32 *authp, char *fullname, u32 *cryptkey)
 {
-	static int	in_keycall = 0;
+	static int	in_keycall;
 	struct des_cred	*cred;
 
 	if (in_keycall) {

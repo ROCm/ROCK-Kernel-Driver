@@ -474,6 +474,8 @@ static struct irq_router pirq_routers[] = {
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_12, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_0, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801EB_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ESB_0, pirq_piix_get, pirq_piix_set },
 
 	{ "ALI", PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, pirq_ali_get, pirq_ali_set },
 
@@ -545,7 +547,7 @@ static void __init pirq_find_router(void)
 		pirq_router->name,
 		pirq_router_dev->vendor,
 		pirq_router_dev->device,
-		pirq_router_dev->slot_name);
+		pci_name(pirq_router_dev));
 }
 
 static struct irq_info *pirq_get_info(struct pci_dev *dev)
@@ -589,7 +591,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	if (!pirq_table)
 		return 0;
 	
-	DBG("IRQ for %s:%d", dev->slot_name, pin);
+	DBG("IRQ for %s:%d", pci_name(dev), pin);
 	info = pirq_get_info(dev);
 	if (!info) {
 		DBG(" -> not found in routing table\n");
@@ -620,7 +622,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	newirq = dev->irq;
 	if (!((1 << newirq) & mask)) {
 		if ( pci_probe & PCI_USE_PIRQ_MASK) newirq = 0;
-		else printk(KERN_WARNING "PCI: IRQ %i for device %s doesn't match PIRQ mask - try pci=usepirqmask\n", newirq, dev->slot_name);
+		else printk(KERN_WARNING "PCI: IRQ %i for device %s doesn't match PIRQ mask - try pci=usepirqmask\n", newirq, pci_name(dev));
 	}
 	if (!newirq && assign) {
 		for (i = 0; i < 16; i++) {
@@ -662,7 +664,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		} else
 			return 0;
 	}
-	printk(KERN_INFO "PCI: %s IRQ %d for device %s\n", msg, irq, dev->slot_name);
+	printk(KERN_INFO "PCI: %s IRQ %d for device %s\n", msg, irq, pci_name(dev));
 
 	/* Update IRQ for all devices with the same pirq value */
 	while ((dev2 = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev2)) != NULL) {
@@ -679,13 +681,13 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
 			((1 << dev2->irq) & mask)) ) {
 		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
-				       dev2->slot_name, dev2->irq, irq);
+				       pci_name(dev2), dev2->irq, irq);
 		    		continue;
 		    	}
 			dev2->irq = irq;
 			pirq_penalty[irq]++;
 			if (dev != dev2)
-				printk(KERN_INFO "PCI: Sharing IRQ %d with %s\n", irq, dev2->slot_name);
+				printk(KERN_INFO "PCI: Sharing IRQ %d with %s\n", irq, pci_name(dev2));
 		}
 	}
 	return 1;
@@ -703,7 +705,7 @@ static void __init pcibios_fixup_irqs(void)
 		 * Also keep track of which IRQ's are already in use.
 		 */
 		if (dev->irq >= 16) {
-			DBG("%s: ignoring bogus IRQ %d\n", dev->slot_name, dev->irq);
+			DBG("%s: ignoring bogus IRQ %d\n", pci_name(dev), dev->irq);
 			dev->irq = 0;
 		}
 		/* If the IRQ is already assigned to a PCI device, ignore its ISA use penalty */
@@ -822,7 +824,7 @@ int pirq_enable_irq(struct pci_dev *dev)
 			return 0;
 			
 		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.%s\n",
-		       'A' + pin - 1, dev->slot_name, msg);
+		       'A' + pin - 1, pci_name(dev), msg);
 	}
 	/* VIA bridges use interrupt line for apic/pci steering across
 	   the V-Link */

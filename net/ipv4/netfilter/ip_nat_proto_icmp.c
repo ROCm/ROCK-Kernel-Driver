@@ -26,7 +26,7 @@ icmp_unique_tuple(struct ip_conntrack_tuple *tuple,
 		  enum ip_nat_manip_type maniptype,
 		  const struct ip_conntrack *conntrack)
 {
-	static u_int16_t id = 0;
+	static u_int16_t id;
 	unsigned int range_size
 		= (unsigned int)range->max.icmp.id - range->min.icmp.id + 1;
 	unsigned int i;

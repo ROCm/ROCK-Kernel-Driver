@@ -2,16 +2,15 @@
  *
  * Name:	skdrv2nd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.12.2.1 $
- * Date:	$Date: 2001/03/12 16:50:59 $
+ * Version:	$Revision: 1.19 $
+ * Date:	$Date: 2003/07/07 09:53:10 $
  * Purpose:	Second header file for driver and all other modules
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2001 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2003 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,33 @@
  * History:
  *
  *	$Log: skdrv2nd.h,v $
+ *	Revision 1.19  2003/07/07 09:53:10  rroesler
+ *	Fix: Removed proprietary RxTx defines and used the ones from skgehw.h instead
+ *	
+ *	Revision 1.18  2003/06/12 07:54:14  mlindner
+ *	Fix: Changed Descriptor Alignment to 64 Byte
+ *	
+ *	Revision 1.17  2003/05/26 12:56:39  mlindner
+ *	Add: Support for Kernel 2.5/2.6
+ *	Add: New SkOsGetTimeCurrent function
+ *	Add: SK_PNMI_HUNDREDS_SEC definition
+ *	Fix: SK_TICKS_PER_SEC on Intel Itanium2
+ *	
+ *	Revision 1.16  2003/03/21 14:56:18  rroesler
+ *	Added code regarding interrupt moderation
+ *	
+ *	Revision 1.15  2003/02/25 14:16:40  mlindner
+ *	Fix: Copyright statement
+ *	
+ *	Revision 1.14  2003/02/25 13:26:26  mlindner
+ *	Add: Support for various vendors
+ *	
+ *	Revision 1.13  2002/10/02 12:46:02  mlindner
+ *	Add: Support for Yukon
+ *	
+ *	Revision 1.12.2.2  2001/09/05 12:14:50  mlindner
+ *	add: New hardware revision int
+ *	
  *	Revision 1.12.2.1  2001/03/12 16:50:59  mlindner
  *	chg: kernel 2.4 adaption
  *	
@@ -85,7 +111,7 @@
  * Description:
  *
  * This is the second include file of the driver, which includes all other
- * necessary files and defines all structures and constants used by the
+ * neccessary files and defines all structures and constants used by the
  * driver and the common modules.
  *
  * Include File Hierarchy:
@@ -111,7 +137,54 @@
 #include "h/skrlmt.h"
 #include "h/skgedrv.h"
 
-/* global function prototypes ******************************************/
+#define SK_PCI_ISCOMPLIANT(result, pdev) {     \
+    result = SK_FALSE; /* default */     \
+    /* 3Com (0x10b7) */     \
+    if (pdev->vendor == 0x10b7) {     \
+        /* Gigabit Ethernet Adapter (0x1700) */     \
+        if ((pdev->device == 0x1700)) { \
+            result = SK_TRUE;     \
+        }     \
+    /* SysKonnect (0x1148) */     \
+    } else if (pdev->vendor == 0x1148) {     \
+        /* SK-98xx Gigabit Ethernet Server Adapter (0x4300) */     \
+        /* SK-98xx V2.0 Gigabit Ethernet Adapter (0x4320) */     \
+        if ((pdev->device == 0x4300) || \
+            (pdev->device == 0x4320)) { \
+            result = SK_TRUE;     \
+        }     \
+    /* D-Link (0x1186) */     \
+    } else if (pdev->vendor == 0x1186) {     \
+        /* Gigabit Ethernet Adapter (0x4c00) */     \
+        if ((pdev->device == 0x4c00)) { \
+            result = SK_TRUE;     \
+        }     \
+    /* Marvell (0x11ab) */     \
+    } else if (pdev->vendor == 0x11ab) {     \
+        /* Gigabit Ethernet Adapter (0x4320) */     \
+        if ((pdev->device == 0x4320)) { \
+            result = SK_TRUE;     \
+        }     \
+    /* CNet (0x1371) */     \
+    } else if (pdev->vendor == 0x1371) {     \
+        /* GigaCard Network Adapter (0x434e) */     \
+        if ((pdev->device == 0x434e)) { \
+            result = SK_TRUE;     \
+        }     \
+    /* Linksys (0x1737) */     \
+    } else if (pdev->vendor == 0x1737) {     \
+        /* Gigabit Network Adapter (0x1032) */     \
+        /* Gigabit Network Adapter (0x1064) */     \
+        if ((pdev->device == 0x1032) || \
+            (pdev->device == 0x1064)) { \
+            result = SK_TRUE;     \
+        }     \
+    } else {     \
+        result = SK_FALSE;     \
+    }     \
+}
+
+
 extern SK_MBUF		*SkDrvAllocRlmtMbuf(SK_AC*, SK_IOC, unsigned);
 extern void		SkDrvFreeRlmtMbuf(SK_AC*, SK_IOC, SK_MBUF*);
 extern SK_U64		SkOsGetTime(SK_AC*);
@@ -136,6 +209,25 @@ struct s_DrvRlmtMbuf {
 };
 
 
+/*
+ * Time macros
+ */
+#if SK_TICKS_PER_SEC == 100
+#define SK_PNMI_HUNDREDS_SEC(t)	(t)
+#else
+#define SK_PNMI_HUNDREDS_SEC(t)	((((unsigned long)t) * 100) / \
+										(SK_TICKS_PER_SEC))
+#endif
+
+/*
+ * New SkOsGetTime
+ */
+#define SkOsGetTimeCurrent(pAC, pUsec) {\
+	struct timeval t;\
+	do_gettimeofday(&t);\
+	*pUsec = ((((t.tv_sec) * 1000000L)+t.tv_usec)/10000);\
+}
+
 
 /*
  * ioctl definitions
@@ -144,6 +236,7 @@ struct s_DrvRlmtMbuf {
 #define		SK_IOCTL_GETMIB		(SK_IOCTL_BASE + 0)
 #define		SK_IOCTL_SETMIB		(SK_IOCTL_BASE + 1)
 #define		SK_IOCTL_PRESETMIB	(SK_IOCTL_BASE + 2)
+#define		SK_IOCTL_GEN		(SK_IOCTL_BASE + 3)
 
 typedef struct s_IOCTL	SK_GE_IOCTL;
 
@@ -178,7 +271,7 @@ struct s_IOCTL {
 /*
  * alignment of rx/tx descriptors
  */
-#define DESCR_ALIGN	8
+#define DESCR_ALIGN	64
 
 /*
  * definitions for pnmi. TODO
@@ -191,6 +284,43 @@ struct s_IOCTL {
 #define SK_DRIVER_SET_MTU(pAc,IoC,i,v)	0
 #define SK_DRIVER_PRESET_MTU(pAc,IoC,i,v)	0
 
+/*
+** Interim definition of SK_DRV_TIMER placed in this file until 
+** common modules have boon finallized
+*/
+#define SK_DRV_TIMER			11 
+#define	SK_DRV_MODERATION_TIMER		1
+#define SK_DRV_MODERATION_TIMER_LENGTH  1000000  /* 1 second */
+#define SK_DRV_RX_CLEANUP_TIMER		2
+#define SK_DRV_RX_CLEANUP_TIMER_LENGTH	1000000	 /* 100 millisecs */
+
+/*
+** Definitions regarding transmitting frames 
+** any calculating any checksum.
+*/
+#define C_LEN_ETHERMAC_HEADER_DEST_ADDR 6
+#define C_LEN_ETHERMAC_HEADER_SRC_ADDR  6
+#define C_LEN_ETHERMAC_HEADER_LENTYPE   2
+#define C_LEN_ETHERMAC_HEADER           ( (C_LEN_ETHERMAC_HEADER_DEST_ADDR) + \
+                                          (C_LEN_ETHERMAC_HEADER_SRC_ADDR)  + \
+                                          (C_LEN_ETHERMAC_HEADER_LENTYPE) )
+
+#define C_LEN_ETHERMTU_MINSIZE          46
+#define C_LEN_ETHERMTU_MAXSIZE_STD      1500
+#define C_LEN_ETHERMTU_MAXSIZE_JUMBO    9000
+
+#define C_LEN_ETHERNET_MINSIZE          ( (C_LEN_ETHERMAC_HEADER) + \
+                                          (C_LEN_ETHERMTU_MINSIZE) )
+
+#define C_OFFSET_IPHEADER               C_LEN_ETHERMAC_HEADER
+#define C_OFFSET_IPHEADER_IPPROTO       9
+#define C_OFFSET_TCPHEADER_TCPCS        16
+
+#define C_OFFSET_IPPROTO                ( (C_LEN_ETHERMAC_HEADER) + \
+                                          (C_OFFSET_IPHEADER_IPPROTO) )
+
+#define C_PROTO_ID_UDP                  6       /* refer to RFC 790 or Stevens'   */
+#define C_PROTO_ID_TCP                  17      /* TCP/IP illustrated for details */
 
 /* TX and RX descriptors *****************************************************/
 
@@ -202,7 +332,7 @@ struct s_RxD {
 	SK_U32		VDataLow;	/* Receive buffer Addr, low dword */
 	SK_U32		VDataHigh;	/* Receive buffer Addr, high dword */
 	SK_U32		FrameStat;	/* Receive Frame Status word */
-	SK_U32		TimeStamp;	/* Time stamp from XMAX */
+	SK_U32		TimeStamp;	/* Time stamp from XMAC */
 	SK_U32		TcpSums;	/* TCP Sum 2 / TCP Sum 1 */
 	SK_U32		TcpSumStarts;	/* TCP Sum Start 2 / TCP Sum Start 1 */
 	RXD		*pNextRxd;	/* Pointer to next Rxd */
@@ -218,162 +348,44 @@ struct s_TxD {
 	SK_U32		VDataHigh;	/* Transmit Buffer Addr, high dword */
 	SK_U32		FrameStat;	/* Transmit Frame Status Word */
 	SK_U32		TcpSumOfs;	/* Reserved / TCP Sum Offset */
-	SK_U32		TcpSumStWr;	/* TCP Sum Start / TCP Sum Write */
+	SK_U16		TcpSumSt;	/* TCP Sum Start */
+	SK_U16		TcpSumWr;	/* TCP Sum Write */
 	SK_U32		TcpReserved;	/* not used */
 	TXD		*pNextTxd;	/* Pointer to next Txd */
 	struct sk_buff	*pMBuf;		/* Pointer to Linux' socket buffer */
 };
 
+/* Used interrupt bits in the interrupts source register *********************/
 
-/* definition of flags in descriptor control field */
-#define	RX_CTRL_OWN_BMU 	UINT32_C(0x80000000)
-#define	RX_CTRL_STF		UINT32_C(0x40000000)
-#define	RX_CTRL_EOF		UINT32_C(0x20000000)
-#define	RX_CTRL_EOB_IRQ		UINT32_C(0x10000000)
-#define	RX_CTRL_EOF_IRQ		UINT32_C(0x08000000)
-#define RX_CTRL_DEV_NULL	UINT32_C(0x04000000)
-#define RX_CTRL_STAT_VALID	UINT32_C(0x02000000)
-#define RX_CTRL_TIME_VALID	UINT32_C(0x01000000)
-#define RX_CTRL_CHECK_DEFAULT	UINT32_C(0x00550000)
-#define RX_CTRL_CHECK_CSUM	UINT32_C(0x00560000)
-#define	RX_CTRL_LEN_MASK	UINT32_C(0x0000FFFF)
+#define DRIVER_IRQS	((IS_IRQ_SW)   | \
+			(IS_R1_F)      |(IS_R2_F)  | \
+			(IS_XS1_F)     |(IS_XA1_F) | \
+			(IS_XS2_F)     |(IS_XA2_F))
 
-#define	TX_CTRL_OWN_BMU 	UINT32_C(0x80000000)
-#define	TX_CTRL_STF		UINT32_C(0x40000000)
-#define	TX_CTRL_EOF		UINT32_C(0x20000000)
-#define	TX_CTRL_EOB_IRQ		UINT32_C(0x10000000)
-#define	TX_CTRL_EOF_IRQ		UINT32_C(0x08000000)
-#define TX_CTRL_ST_FWD		UINT32_C(0x04000000)
-#define TX_CTRL_DISAB_CRC	UINT32_C(0x02000000)
-#define TX_CTRL_SOFTWARE	UINT32_C(0x01000000)
-#define TX_CTRL_CHECK_DEFAULT	UINT32_C(0x00550000)
-#define TX_CTRL_CHECK_CSUM	UINT32_C(0x00560000)
-#define	TX_CTRL_LEN_MASK	UINT32_C(0x0000FFFF)
+#define SPECIAL_IRQS	((IS_HW_ERR)   |(IS_I2C_READY)  | \
+			(IS_EXT_REG)   |(IS_TIMINT)     | \
+			(IS_PA_TO_RX1) |(IS_PA_TO_RX2)  | \
+			(IS_PA_TO_TX1) |(IS_PA_TO_TX2)  | \
+			(IS_MAC1)      |(IS_LNK_SYNC_M1)| \
+			(IS_MAC2)      |(IS_LNK_SYNC_M2)| \
+			(IS_R1_C)      |(IS_R2_C)       | \
+			(IS_XS1_C)     |(IS_XA1_C)      | \
+			(IS_XS2_C)     |(IS_XA2_C))
 
+#define IRQ_MASK	((IS_IRQ_SW)   | \
+			(IS_R1_B)      |(IS_R1_F)     |(IS_R2_B) |(IS_R2_F) | \
+			(IS_XS1_B)     |(IS_XS1_F)    |(IS_XA1_B)|(IS_XA1_F)| \
+			(IS_XS2_B)     |(IS_XS2_F)    |(IS_XA2_B)|(IS_XA2_F)| \
+			(IS_HW_ERR)    |(IS_I2C_READY)| \
+			(IS_EXT_REG)   |(IS_TIMINT)   | \
+			(IS_PA_TO_RX1) |(IS_PA_TO_RX2)| \
+			(IS_PA_TO_TX1) |(IS_PA_TO_TX2)| \
+			(IS_MAC1)      |(IS_MAC2)     | \
+			(IS_R1_C)      |(IS_R2_C)     | \
+			(IS_XS1_C)     |(IS_XA1_C)    | \
+			(IS_XS2_C)     |(IS_XA2_C))
 
-
-/* The offsets of registers in the TX and RX queue control io area ***********/
-
-#define RX_Q_BUF_CTRL_CNT	0x00
-#define RX_Q_NEXT_DESCR_LOW	0x04
-#define RX_Q_BUF_ADDR_LOW	0x08
-#define RX_Q_BUF_ADDR_HIGH	0x0c
-#define RX_Q_FRAME_STAT		0x10
-#define RX_Q_TIME_STAMP		0x14
-#define RX_Q_CSUM_1_2		0x18
-#define RX_Q_CSUM_START_1_2	0x1c
-#define RX_Q_CUR_DESCR_LOW	0x20
-#define RX_Q_DESCR_HIGH		0x24
-#define RX_Q_CUR_ADDR_LOW	0x28
-#define RX_Q_CUR_ADDR_HIGH	0x2c
-#define RX_Q_CUR_BYTE_CNT	0x30
-#define RX_Q_CTRL		0x34
-#define RX_Q_FLAG		0x38
-#define RX_Q_TEST1		0x3c
-#define RX_Q_TEST2		0x40
-#define RX_Q_TEST3		0x44
-
-#define TX_Q_BUF_CTRL_CNT	0x00
-#define TX_Q_NEXT_DESCR_LOW	0x04
-#define TX_Q_BUF_ADDR_LOW	0x08
-#define TX_Q_BUF_ADDR_HIGH	0x0c
-#define TX_Q_FRAME_STAT		0x10
-#define TX_Q_CSUM_START		0x14
-#define TX_Q_CSUM_START_POS	0x18
-#define TX_Q_RESERVED		0x1c
-#define TX_Q_CUR_DESCR_LOW	0x20
-#define TX_Q_DESCR_HIGH		0x24
-#define TX_Q_CUR_ADDR_LOW	0x28
-#define TX_Q_CUR_ADDR_HIGH	0x2c
-#define TX_Q_CUR_BYTE_CNT	0x30
-#define TX_Q_CTRL		0x34
-#define TX_Q_FLAG		0x38
-#define TX_Q_TEST1		0x3c
-#define TX_Q_TEST2		0x40
-#define TX_Q_TEST3		0x44
-
-/* definition of flags in the queue control field */
-#define RX_Q_CTRL_POLL_ON	0x00000080
-#define RX_Q_CTRL_POLL_OFF	0x00000040
-#define RX_Q_CTRL_STOP		0x00000020
-#define RX_Q_CTRL_START		0x00000010
-#define RX_Q_CTRL_CLR_I_PAR	0x00000008
-#define RX_Q_CTRL_CLR_I_EOB	0x00000004
-#define RX_Q_CTRL_CLR_I_EOF	0x00000002
-#define RX_Q_CTRL_CLR_I_ERR	0x00000001
-
-#define TX_Q_CTRL_POLL_ON	0x00000080
-#define TX_Q_CTRL_POLL_OFF	0x00000040
-#define TX_Q_CTRL_STOP		0x00000020
-#define TX_Q_CTRL_START		0x00000010
-#define TX_Q_CTRL_CLR_I_EOB	0x00000004
-#define TX_Q_CTRL_CLR_I_EOF	0x00000002
-#define TX_Q_CTRL_CLR_I_ERR	0x00000001
-
-
-/* Interrupt bits in the interrupts source register **************************/
-#define IRQ_HW_ERROR		0x80000000
-#define IRQ_RESERVED		0x40000000
-#define IRQ_PKT_TOUT_RX1	0x20000000
-#define IRQ_PKT_TOUT_RX2	0x10000000
-#define IRQ_PKT_TOUT_TX1	0x08000000
-#define IRQ_PKT_TOUT_TX2	0x04000000
-#define IRQ_I2C_READY		0x02000000
-#define IRQ_SW			0x01000000
-#define IRQ_EXTERNAL_REG	0x00800000
-#define IRQ_TIMER		0x00400000
-#define IRQ_MAC1		0x00200000
-#define IRQ_LINK_SYNC_C_M1	0x00100000
-#define IRQ_MAC2		0x00080000
-#define IRQ_LINK_SYNC_C_M2	0x00040000
-#define IRQ_EOB_RX1		0x00020000
-#define IRQ_EOF_RX1		0x00010000
-#define IRQ_CHK_RX1		0x00008000
-#define IRQ_EOB_RX2		0x00004000
-#define IRQ_EOF_RX2		0x00002000
-#define IRQ_CHK_RX2		0x00001000
-#define IRQ_EOB_SY_TX1		0x00000800
-#define IRQ_EOF_SY_TX1		0x00000400
-#define IRQ_CHK_SY_TX1		0x00000200
-#define IRQ_EOB_AS_TX1		0x00000100
-#define IRQ_EOF_AS_TX1		0x00000080
-#define IRQ_CHK_AS_TX1		0x00000040
-#define IRQ_EOB_SY_TX2		0x00000020
-#define IRQ_EOF_SY_TX2		0x00000010
-#define IRQ_CHK_SY_TX2		0x00000008
-#define IRQ_EOB_AS_TX2		0x00000004
-#define IRQ_EOF_AS_TX2		0x00000002
-#define IRQ_CHK_AS_TX2		0x00000001
-
-#define DRIVER_IRQS	(IRQ_SW | IRQ_EOF_RX1 | IRQ_EOF_RX2 | \
-			IRQ_EOF_SY_TX1 | IRQ_EOF_AS_TX1 | \
-			IRQ_EOF_SY_TX2 | IRQ_EOF_AS_TX2)
-
-#define SPECIAL_IRQS	(IRQ_HW_ERROR | IRQ_PKT_TOUT_RX1 | IRQ_PKT_TOUT_RX2 | \
-			IRQ_PKT_TOUT_TX1 | IRQ_PKT_TOUT_TX2 | \
-			IRQ_I2C_READY | IRQ_EXTERNAL_REG | IRQ_TIMER | \
-			IRQ_MAC1 | IRQ_LINK_SYNC_C_M1 | \
-			IRQ_MAC2 | IRQ_LINK_SYNC_C_M2 | \
-			IRQ_CHK_RX1 | IRQ_CHK_RX2 | \
-			IRQ_CHK_SY_TX1 | IRQ_CHK_AS_TX1 | \
-			IRQ_CHK_SY_TX2 | IRQ_CHK_AS_TX2)
-
-#define IRQ_MASK	(IRQ_SW | IRQ_EOB_RX1 | IRQ_EOF_RX1 | \
-			IRQ_EOB_RX2 | IRQ_EOF_RX2 | \
-			IRQ_EOB_SY_TX1 | IRQ_EOF_SY_TX1 | \
-			IRQ_EOB_AS_TX1 | IRQ_EOF_AS_TX1 | \
-			IRQ_EOB_SY_TX2 | IRQ_EOF_SY_TX2 | \
-			IRQ_EOB_AS_TX2 | IRQ_EOF_AS_TX2 | \
-			IRQ_HW_ERROR | IRQ_PKT_TOUT_RX1 | IRQ_PKT_TOUT_RX2 | \
-			IRQ_PKT_TOUT_TX1 | IRQ_PKT_TOUT_TX2 | \
-			IRQ_I2C_READY | IRQ_EXTERNAL_REG | IRQ_TIMER | \
-			IRQ_MAC1 | \
-			IRQ_MAC2 | \
-			IRQ_CHK_RX1 | IRQ_CHK_RX2 | \
-			IRQ_CHK_SY_TX1 | IRQ_CHK_AS_TX1 | \
-			IRQ_CHK_SY_TX2 | IRQ_CHK_AS_TX2)
-
-#define IRQ_HWE_MASK	0x00000FFF /* enable all HW irqs */
+#define IRQ_HWE_MASK	(IS_ERR_MSK) /* enable all HW irqs */
 
 typedef struct s_DevNet DEV_NET;
 
@@ -383,7 +395,6 @@ struct s_DevNet {
 	int             Mtu;
 	int             Up;
 	SK_AC   *pAC;
-	struct proc_dir_entry *proc;
 };  
 
 typedef struct s_TxPort		TX_PORT;
@@ -417,6 +428,55 @@ struct s_RxPort {
 	int		PortIndex;	/* index number of port (0 or 1) */
 };
 
+/* Definitions needed for interrupt moderation *******************************/
+
+#define IRQ_EOF_AS_TX     ((IS_XA1_F)     | (IS_XA2_F))
+#define IRQ_EOF_SY_TX     ((IS_XS1_F)     | (IS_XS2_F))
+#define IRQ_MASK_TX_ONLY  ((IRQ_EOF_AS_TX)| (IRQ_EOF_SY_TX))
+#define IRQ_MASK_RX_ONLY  ((IS_R1_F)      | (IS_R2_F))
+#define IRQ_MASK_SP_ONLY  (SPECIAL_IRQS)
+#define IRQ_MASK_TX_RX    ((IRQ_MASK_TX_ONLY)| (IRQ_MASK_RX_ONLY))
+#define IRQ_MASK_SP_RX    ((SPECIAL_IRQS)    | (IRQ_MASK_RX_ONLY))
+#define IRQ_MASK_SP_TX    ((SPECIAL_IRQS)    | (IRQ_MASK_TX_ONLY))
+#define IRQ_MASK_RX_TX_SP ((SPECIAL_IRQS)    | (IRQ_MASK_TX_RX))
+
+#define C_INT_MOD_NONE                 1
+#define C_INT_MOD_STATIC               2
+#define C_INT_MOD_DYNAMIC              4
+
+#define C_CLK_FREQ_GENESIS      53215000 /* shorter: 53.125 MHz  */
+#define C_CLK_FREQ_YUKON        78215000 /* shorter: 78.125 MHz  */
+
+#define C_INTS_PER_SEC_DEFAULT      2000 
+#define C_INT_MOD_ENABLE_PERCENTAGE   50 /* if higher 50% enable */
+#define C_INT_MOD_DISABLE_PERCENTAGE  50 /* if lower 50% disable */
+
+typedef struct s_DynIrqModInfo  DIM_INFO;
+struct s_DynIrqModInfo {
+	unsigned long   PrevTimeVal;
+	unsigned int    PrevSysLoad;
+	unsigned int    PrevUsedTime;
+	unsigned int    PrevTotalTime;
+	int             PrevUsedDescrRatio;
+	int             NbrProcessedDescr;
+        SK_U64          PrevPort0RxIntrCts;
+        SK_U64          PrevPort1RxIntrCts;
+        SK_U64          PrevPort0TxIntrCts;
+        SK_U64          PrevPort1TxIntrCts;
+	SK_BOOL         ModJustEnabled;     /* Moderation just enabled yes/no */
+
+	int             MaxModIntsPerSec;            /* Moderation Threshold */
+	int             MaxModIntsPerSecUpperLimit;  /* Upper limit for DIM  */
+	int             MaxModIntsPerSecLowerLimit;  /* Lower limit for DIM  */
+
+	long            MaskIrqModeration;   /* ModIrqType (eg. 'TxRx')      */
+	SK_BOOL         DisplayStats;        /* Stats yes/no                 */
+	SK_BOOL         AutoSizing;          /* Resize DIM-timer on/off      */
+	int             IntModTypeSelect;    /* EnableIntMod (eg. 'dynamic') */
+
+	SK_TIMER        ModTimer; /* just some timer */
+};
+
 typedef struct s_PerStrm	PER_STRM;
 
 #define SK_ALLOC_IRQ	0x00000001
@@ -446,11 +506,11 @@ struct s_AC  {
 	int		BoardLevel;	/* level of active hw init (0-2) */
 	char		DeviceStr[80];	/* adapter string from vpd */
 	SK_U32		AllocFlag;	/* flag allocation of resources */
-	struct pci_dev	PciDev;		/* for access to pci config space */
+	struct pci_dev	*PciDev;	/* for access to pci config space */
 	SK_U32		PciDevId;	/* pci device id */
-	struct net_device	*dev[2];		/* pointer to device struct */
+	struct SK_NET_DEVICE	*dev[2];	/* pointer to device struct */
 	char		Name[30];	/* driver name */
-	struct net_device	*Next;		/* link all devices (for clearing) */
+	struct SK_NET_DEVICE	*Next;		/* link all devices (for clearing) */
 	int		RxBufSize;	/* length of receive buffers */
         struct net_device_stats stats;	/* linux 'netstat -i' statistics */
 	int		Index;		/* internal board index number */
@@ -466,12 +526,12 @@ struct s_AC  {
 					/*  addresses for this board */
 					/*  (may be more than HW can)*/
 
+	int		HWRevision;	/* Hardware revision */
 	int		ActivePort;	/* the active XMAC port */
 	int		MaxPorts;		/* number of activated ports */
 	int		TxDescrPerRing;	/* # of descriptors per tx ring */
 	int		RxDescrPerRing;	/* # of descriptors per rx ring */
 
-	
 	caddr_t		pDescrMem;	/* Pointer to the descriptor area */
 	dma_addr_t	pDescrMemDMA;	/* PCI DMA address of area */
 
@@ -484,6 +544,12 @@ struct s_AC  {
 	SK_U32		CsOfs;		/* for checksum calculation */
 
 	SK_BOOL		CheckQueue;	/* check event queue soon */
+	SK_TIMER        DrvCleanupTimer;/* to check for pending descriptors */
+	DIM_INFO        DynIrqModInfo;  /* all data related to DIM */
+
+	/* Only for tests */
+	int		PortUp;
+	int		PortDown;
 };
 
 

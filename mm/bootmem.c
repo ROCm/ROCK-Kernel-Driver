@@ -48,8 +48,24 @@ static unsigned long __init init_bootmem_core (pg_data_t *pgdat,
 	bootmem_data_t *bdata = pgdat->bdata;
 	unsigned long mapsize = ((end - start)+7)/8;
 
-	pgdat->pgdat_next = pgdat_list;
-	pgdat_list = pgdat;
+
+	/*
+	 * sort pgdat_list so that the lowest one comes first,
+	 * which makes alloc_bootmem_low_pages work as desired.
+	 */
+	if (!pgdat_list || pgdat_list->node_start_pfn > pgdat->node_start_pfn) {
+		pgdat->pgdat_next = pgdat_list;
+		pgdat_list = pgdat;
+	} else {
+		pg_data_t *tmp = pgdat_list;
+		while (tmp->pgdat_next) {
+			if (tmp->pgdat_next->node_start_pfn > pgdat->node_start_pfn)
+				break;
+			tmp = tmp->pgdat_next;
+		}
+		pgdat->pgdat_next = tmp->pgdat_next;
+		tmp->pgdat_next = pgdat;
+	}
 
 	mapsize = (mapsize + (sizeof(long) - 1UL)) & ~(sizeof(long) - 1UL);
 	bdata->node_bootmem_map = phys_to_virt(mapstart << PAGE_SHIFT);
@@ -251,7 +267,7 @@ found:
 
 static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 {
-	struct page *page = pgdat->node_mem_map;
+	struct page *page;
 	bootmem_data_t *bdata = pgdat->bdata;
 	unsigned long i, count, total = 0;
 	unsigned long idx;
@@ -260,6 +276,8 @@ static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 	if (!bdata->node_bootmem_map) BUG();
 
 	count = 0;
+	/* first extant page of the node */
+	page = virt_to_page(phys_to_virt(bdata->node_boot_start));
 	idx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
 	map = bdata->node_bootmem_map;
 	for (i = 0; i < idx; ) {

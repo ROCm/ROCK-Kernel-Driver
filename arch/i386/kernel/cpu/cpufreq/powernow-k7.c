@@ -1,7 +1,6 @@
 /*
- *  $Id: powernow-k7.c,v 1.34 2003/02/22 10:23:46 db Exp $
- *
- *  (C) 2003 Dave Jones <davej@suse.de>
+ *  AMD K7 Powernow driver.
+ *  (C) 2003 Dave Jones <davej@codemonkey.org.uk> on behalf of SuSE Labs.
  *
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by AMD.
@@ -83,27 +82,6 @@ static unsigned int number_scales;
 static unsigned int fsb;
 static unsigned int latency;
 static char have_a0;
-
-
-#ifndef rdmsrl
-#define rdmsrl(msr,val) do {unsigned long l__,h__; \
-	rdmsr (msr, l__, h__);	\
-	val = l__;	\
-	val |= ((u64)h__<<32);	\
-} while(0)
-#endif
-
-#ifndef wrmsrl
-static void wrmsrl (u32 msr, u64 val)
-{
-	u32 lo, hi;
-
-	lo = (u32) val;
-	hi = val >> 32;
-	wrmsr (msr, lo, hi);
-}
-#endif
-
 
 
 static int check_powernow(void)
@@ -240,6 +218,7 @@ static void change_speed (unsigned int index)
 	u8 fid, vid;
 	struct cpufreq_freqs freqs;
 	union msr_fidvidstatus fidvidstatus;
+	int cfid;
 
 	/* fid are the lower 8 bits of the index we stored into
 	 * the cpufreq frequency table in powernow_decode_bios,
@@ -251,8 +230,9 @@ static void change_speed (unsigned int index)
 
 	freqs.cpu = 0;
 
+	cfid = fidvidstatus.bits.CFID;
 	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
-	freqs.old = fsb * fid_codes[fidvidstatus.bits.CFID] * 100;
+	freqs.old = fsb * fid_codes[cfid] * 100;
 	freqs.new = powernow_table[index].frequency;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
@@ -426,7 +406,7 @@ static void __exit powernow_exit (void)
 		kfree(powernow_table);
 }
 
-MODULE_AUTHOR ("Dave Jones <davej@suse.de>");
+MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Powernow driver for AMD K7 processors.");
 MODULE_LICENSE ("GPL");
 

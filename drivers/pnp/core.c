@@ -113,7 +113,6 @@ static void pnp_release_device(struct device *dmdev)
 int __pnp_add_device(struct pnp_dev *dev)
 {
 	int ret;
-	pnp_name_device(dev);
 	pnp_fixup_device(dev);
 	dev->dev.bus = &pnp_bus_type;
 	dev->dev.release = &pnp_release_device;
@@ -170,7 +169,7 @@ void pnp_remove_device(struct pnp_dev *dev)
 
 static int __init pnp_init(void)
 {
-	printk(KERN_INFO "Linux Plug and Play Support v0.96 (c) Adam Belay\n");
+	printk(KERN_INFO "Linux Plug and Play Support v0.97 (c) Adam Belay\n");
 	return bus_register(&pnp_bus_type);
 }
 

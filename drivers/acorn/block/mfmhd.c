@@ -123,12 +123,12 @@
 #include <asm/hardware/ioc.h>
 
 static void (*do_mfm)(void) = NULL;
-static struct request_queue mfm_queue;
+static struct request_queue *mfm_queue;
 static spinlock_t mfm_lock = SPIN_LOCK_UNLOCKED;
 
 #define MAJOR_NR	MFM_ACORN_MAJOR
-#define QUEUE (&mfm_queue)
-#define CURRENT elv_next_request(&mfm_queue)
+#define QUEUE (mfm_queue)
+#define CURRENT elv_next_request(mfm_queue)
 /*
  * This sort of stuff should be in a header file shared with ide.c, hd.c, xd.c etc
  */
@@ -1275,7 +1275,9 @@ static int mfm_do_init(unsigned char irqmask)
 	hdc63463_irqpolladdress	= mfm_IRQPollLoc;
 	hdc63463_irqpollmask	= irqmask;
 
-	blk_init_queue(&mfm_queue, do_mfm_request, &mfm_lock);
+	mfm_queue = blk_init_queue(do_mfm_request, &mfm_lock);
+	if (!mfm_queue)
+		goto out2a;
 
 	Busy = 0;
 	lastspecifieddrive = -1;
@@ -1310,7 +1312,7 @@ static int mfm_do_init(unsigned char irqmask)
 
 	for (i = 0; i < mfm_drives; i++) {
 		mfm_geometry(i);
-		mfm_gendisk[i]->queue = &mfm_queue;
+		mfm_gendisk[i]->queue = mfm_queue;
 		add_disk(mfm_gendisk[i]);
 	}
 	return 0;
@@ -1319,7 +1321,8 @@ out4:
 	for (i = 0; i < mfm_drives; i++)
 		put_disk(mfm_gendisk[i]);
 out3:
-	blk_cleanup_queue(&mfm_queue);
+	blk_cleanup_queue(mfm_queue);
+out2a:
 	unregister_blkdev(MAJOR_NR, "mfm");
 out2:
 	release_region(mfm_addr, 10);
@@ -1340,7 +1343,7 @@ static void mfm_do_exit(void)
 		del_gendisk(mfm_gendisk[i]);
 		put_disk(mfm_gendisk[i]);
 	}
-	blk_cleanup_queue(&mfm_queue);
+	blk_cleanup_queue(mfm_queue);
 	unregister_blkdev(MAJOR_NR, "mfm");
 	if (mfm_addr)
 		release_region(mfm_addr, 10);

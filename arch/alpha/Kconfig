@@ -681,41 +681,7 @@ source "fs/Kconfig"
 
 source "drivers/video/Kconfig"
 
-menu "Sound"
-
-config SOUND
-	tristate "Sound card support"
-	---help---
-	  If you have a sound card in your computer, i.e. if it can say more
-	  than an occasional beep, say Y.  Be sure to have all the information
-	  about your sound card and its configuration down (I/O port,
-	  interrupt and DMA channel), because you will be asked for it.
-
-	  You want to read the Sound-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>. General information about
-	  the modular sound system is contained in the files
-	  <file:Documentation/sound/Introduction>.  The file
-	  <file:Documentation/sound/README.OSS> contains some slightly
-	  outdated but still useful information as well.
-
-	  If you have a PnP sound card and you want to configure it at boot
-	  time using the ISA PnP tools (read
-	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
-	  compile the sound card support as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want)
-	  and load that module after the PnP configuration is finished.  To do
-	  this, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.
-
-	  I'm told that even without a sound card, you can make your computer
-	  say more than an occasional beep, by programming the PC speaker.
-	  Kernel patches and supporting utilities to do that are in the pcsp
-	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
-
 source "sound/Kconfig"
-
-endmenu
 
 source "drivers/usb/Kconfig"
 
@@ -727,9 +693,13 @@ menu "Kernel hacking"
 
 config ALPHA_LEGACY_START_ADDRESS
 	bool "Legacy kernel start address"
+	depends on ALPHA_GENERIC
+	default n
 	---help---
 	  The 2.4 kernel changed the kernel start address from 0x310000
 	  to 0x810000 to make room for the Wildfire's larger SRM console.
+	  Recent consoles on Titan and Marvel machines also require the
+	  extra room.
 
 	  If you're using aboot 0.7 or later, the bootloader will examine the
 	  ELF headers to determine where to transfer control. Unfortunately,
@@ -738,7 +708,12 @@ config ALPHA_LEGACY_START_ADDRESS
 	  hard lockup.
 
 	  Say Y if you have a broken bootloader.  Say N if you do not, or if
-	  you wish to run on Wildfire.
+	  you wish to run on Wildfire, Titan, or Marvel.
+
+config ALPHA_LEGACY_START_ADDRESS
+	bool
+	depends on !ALPHA_GENERIC && !ALPHA_TITAN && !ALPHA_MARVEL && !ALPHA_WILDFIRE
+	default y
 
 config DEBUG_KERNEL
 	bool "Kernel debugging"
@@ -801,6 +776,15 @@ config DEBUG_SEMAPHORE
 	  If you say Y here then semaphore processing will issue lots of
 	  verbose debugging messages.  If you suspect a semaphore problem or a
 	  kernel hacker asks for this option then say Y.  Otherwise say N.
+
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	help
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
 
 endmenu
 

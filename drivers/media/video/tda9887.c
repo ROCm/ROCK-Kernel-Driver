@@ -441,9 +441,7 @@ static struct i2c_client client_template =
 {
 	.flags  = I2C_CLIENT_ALLOW_USE,
         .driver = &driver,
-        .dev	= {
-		.name	= "tda9887",
-	},
+	.name	= "tda9887",
 };
 
 static int tda9887_init_module(void)

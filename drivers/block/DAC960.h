@@ -2366,7 +2366,7 @@ typedef struct DAC960_Controller
   DAC960_Command_T *FreeCommands;
   unsigned char *CombinedStatusBuffer;
   unsigned char *CurrentStatusBuffer;
-  struct request_queue RequestQueue;
+  struct request_queue *RequestQueue;
   spinlock_t queue_lock;
   wait_queue_head_t CommandWaitQueue;
   wait_queue_head_t HealthStatusWaitQueue;

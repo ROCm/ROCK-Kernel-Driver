@@ -409,7 +409,7 @@ struct _snd_ensoniq {
 	dma_addr_t bugbuf_addr;
 #endif
 
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	struct gameport gameport;
 	struct semaphore joy_sem;	// gameport configuration semaphore
 #endif
@@ -417,7 +417,7 @@ struct _snd_ensoniq {
 
 static irqreturn_t snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-static struct pci_device_id snd_audiopci_ids[] __devinitdata = {
+static struct pci_device_id snd_audiopci_ids[] = {
 #ifdef CHIP1370
 	{ 0x1274, 0x5000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* ES1370 */
 #endif
@@ -1559,7 +1559,7 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 #endif /* CHIP1371 */
 
 /* generic control callbacks for ens1370 and for joystick */
-#if defined(CHIP1370) || defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CHIP1370) || defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define ENSONIQ_CONTROL(xname, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_CARD, .name = xname, .info = snd_ensoniq_control_info, \
   .get = snd_ensoniq_control_get, .put = snd_ensoniq_control_put, \
@@ -1657,7 +1657,7 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
  *  General Switches...
  */
 
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 /* MQ: gameport driver connectivity */
 #define ENSONIQ_JOY_CONTROL(xname, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_CARD, .name = xname, .info = snd_ensoniq_control_info, \
@@ -1814,7 +1814,7 @@ static void __devinit snd_ensoniq_proc_init(ensoniq_t * ensoniq)
 
 static int snd_ensoniq_free(ensoniq_t *ensoniq)
 {
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	if (ensoniq->ctrl & ES_JYSTK_EN)
 		snd_ensoniq_joy_disable(ensoniq);
 #endif
@@ -2012,7 +2012,7 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	outb(ensoniq->uartc = 0x00, ES_REG(ensoniq, UART_CONTROL));
 	outb(0x00, ES_REG(ensoniq, UART_RES));
 	outl(ensoniq->cssr, ES_REG(ensoniq, STATUS));
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	init_MUTEX(&ensoniq->joy_sem);
 #ifdef CHIP1371
 	snd_ctl_add(card, snd_ctl_new1(&snd_es1371_joystick_addr, ensoniq));

@@ -116,7 +116,7 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 				dn->eeh_config_addr, BUID_HI(dn->phb->buid), BUID_LO(dn->phb->buid));
 		if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
 			panic("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
-			      rets[0], dev->slot_name, dev->dev.name);
+			      rets[0], pci_name(dev), dev->dev.name);
 		}
 	}
 	eeh_false_positives++;

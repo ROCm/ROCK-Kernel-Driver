@@ -31,17 +31,17 @@
  *
  * The actual BIOS layout has been mostly reverse engineered.  Intel BIOS
  * updates for this board include 10 related (*.bio - &.bi9) binary files and
- * another seperate (*.bbo) binary file.  The 10 files are 64k of data + a
+ * another separate (*.bbo) binary file.  The 10 files are 64k of data + a
  * small header.  If the headers are stripped off, the 10 64k files can be
  * concatenated into a 640k image.  This is your BIOS image, proper.  The
- * seperate .bbo file also has a small header.  It is the 'Boot Block'
+ * separate .bbo file also has a small header.  It is the 'Boot Block'
  * recovery BIOS.  Once the header is stripped, no further prep is needed.
  * As best I can tell, the BIOS is arranged as such:
  * offset 0x00000 to 0x4ffff (320k):  unknown - SCSI BIOS, etc?
  * offset 0x50000 to 0xeffff (640k):  BIOS proper
  * offset 0xf0000 ty 0xfffff (64k):   Boot Block region
  *
- * Intel's BIOS update program flashes the BIOS and Boot Block in seperate
+ * Intel's BIOS update program flashes the BIOS and Boot Block in separate
  * steps.  Probably a wise thing to do.
  */
 
@@ -218,7 +218,7 @@ scb2_flash_remove(struct pci_dev *dev)
 	pci_set_drvdata(dev, NULL);
 }
 
-static struct pci_device_id scb2_flash_pci_ids[] __devinitdata = {
+static struct pci_device_id scb2_flash_pci_ids[] = {
 	{
 	  .vendor = PCI_VENDOR_ID_SERVERWORKS,
 	  .device = PCI_DEVICE_ID_SERVERWORKS_CSB5,

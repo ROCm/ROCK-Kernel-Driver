@@ -348,5 +348,23 @@ config SA1100_FIR
 	tristate "SA1100 Internal IR"
 	depends on ARCH_SA1100 && IRDA
 
+config VIA_FIR
+	tristate "VIA VT8231/VT1211 SIR/MIR/FIR"
+	depends on IRDA && ISA
+	help
+	  Say Y here if you want to build support for the VIA VT8231
+	  and VIA VT1211 IrDA controllers, found on the motherboards using
+	  those those VIA chipsets. To use this controller, you will need
+	  to plug a specific 5 pins FIR IrDA dongle in the specific
+	  motherboard connector. The driver provides support for SIR, MIR
+	  and FIR (4Mbps) speeds.
+
+	  You will need to specify the 'dongle_id' module parameter to
+	  indicate the FIR dongle attached to the controller.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>. The module will be called
+	  via-ircc.
+
 endmenu
 

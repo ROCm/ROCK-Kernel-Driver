@@ -73,7 +73,7 @@ static unsigned int logo_width;
 static unsigned int logo_height;
 static struct color **logo_data;
 static struct color logo_clut[MAX_LINUX_LOGO_COLORS];
-static unsigned int logo_clutsize = 0;
+static unsigned int logo_clutsize;
 
 static void die(const char *fmt, ...)
     __attribute__ ((noreturn)) __attribute ((format (printf, 1, 2)));
@@ -236,14 +236,14 @@ static void write_header(void)
     fprintf(out, " *  Linux logo %s\n", logoname);
     fputs(" */\n\n", out);
     fputs("#include <linux/linux_logo.h>\n\n", out);
-    fprintf(out, "static const unsigned char %s_data[] __initdata = {\n",
+    fprintf(out, "static unsigned char %s_data[] __initdata = {\n",
 	    logoname);
 }
 
 static void write_footer(void)
 {
     fputs("\n};\n\n", out);
-    fprintf(out, "const struct linux_logo %s __initdata = {\n", logoname);
+    fprintf(out, "struct linux_logo %s __initdata = {\n", logoname);
     fprintf(out, "    .type\t= %s,\n", logo_types[logo_type]);
     fprintf(out, "    .width\t= %d,\n", logo_width);
     fprintf(out, "    .height\t= %d,\n", logo_height);
@@ -259,7 +259,7 @@ static void write_footer(void)
 	fclose(out);
 }
 
-static int write_hex_cnt = 0;
+static int write_hex_cnt;
 
 static void write_hex(unsigned char byte)
 {
@@ -373,7 +373,7 @@ static void write_logo_clut224(void)
     fputs("\n};\n\n", out);
 
     /* write logo clut */
-    fprintf(out, "static const unsigned char %s_clut[] __initdata = {\n",
+    fprintf(out, "static unsigned char %s_clut[] __initdata = {\n",
 	    logoname);
     write_hex_cnt = 0;
     for (i = 0; i < logo_clutsize; i++) {

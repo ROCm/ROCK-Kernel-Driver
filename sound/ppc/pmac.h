@@ -201,6 +201,11 @@ int snd_pmac_boolean_mono_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *ui
 
 int snd_pmac_add_automute(pmac_t *chip);
 
+#define big_mdelay(msec) do {\
+	set_current_state(TASK_UNINTERRUPTIBLE);\
+	schedule_timeout(((msec) * HZ + 999) / 1000);\
+} while (0)
+
 #ifndef PMAC_SUPPORT_PCM_BEEP
 #define snd_pmac_attach_beep(chip) 0
 #define snd_pmac_beep_stop(chip)  /**/

@@ -1,9 +1,10 @@
 /*
  * Copyright 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
+ * Copyright (c) 2003  Maciej W. Rozycki
  *
  * Common time service routines for MIPS machines. See
- * Documents/mips/README.txt.
+ * Documentation/mips/time.README.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -25,9 +26,10 @@
 
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
-#include <asm/time.h>
-#include <asm/hardirq.h>
 #include <asm/div64.h>
+#include <asm/hardirq.h>
+#include <asm/sections.h>
+#include <asm/time.h>
 
 /* This is for machines which generate the exact clock. */
 #define USECS_PER_JIFFY (1000000/HZ)
@@ -64,6 +66,7 @@ static int null_rtc_set_time(unsigned long sec)
 
 unsigned long (*rtc_get_time)(void) = null_rtc_get_time;
 int (*rtc_set_time)(unsigned long) = null_rtc_set_time;
+int (*rtc_set_mmss)(unsigned long);
 
 
 /*
@@ -143,14 +146,11 @@ int do_settimeofday(struct timespec *tv)
  */
 
 
-/* This is for machines which generate the exact clock. */
-#define USECS_PER_JIFFY (1000000/HZ)
-
 /* usecs per counter cycle, shifted to left by 32 bits */
-static unsigned int sll32_usecs_per_cycle=0;
+static unsigned int sll32_usecs_per_cycle;
 
 /* how many counter cycles in a jiffy */
-static unsigned long cycles_per_jiffy=0;
+static unsigned long cycles_per_jiffy;
 
 /* Cycle counter value at the previous timer interrupt.. */
 static unsigned int timerhi, timerlo;
@@ -180,34 +180,33 @@ unsigned long fixed_rate_gettimeoffset(void)
 	/* .. relative to previous jiffy (32 bits is enough) */
 	count -= timerlo;
 
-	__asm__("multu\t%1,%2\n\t"
-	        "mfhi\t%0"
-	        :"=r" (res)
-	        :"r" (count),
-	         "r" (sll32_usecs_per_cycle));
+	__asm__("multu	%1,%2"
+		: "=h" (res)
+		: "r" (count), "r" (sll32_usecs_per_cycle)
+		: "lo", "accum");
 
 	/*
 	 * Due to possible jiffies inconsistencies, we need to check
 	 * the result so that we'll get a timer that is monotonic.
 	 */
 	if (res >= USECS_PER_JIFFY)
-		res = USECS_PER_JIFFY-1;
+		res = USECS_PER_JIFFY - 1;
 
 	return res;
 }
 
 /*
- * Cached "1/(clocks per usec)*2^32" value.
+ * Cached "1/(clocks per usec) * 2^32" value.
  * It has to be recalculated once each jiffy.
  */
 static unsigned long cached_quotient;
 
 /* Last jiffy when calibrate_divXX_gettimeoffset() was called. */
-static unsigned long last_jiffies = 0;
+static unsigned long last_jiffies;
 
 
 /*
- * This is copied from dec/time.c:do_ioasic_gettimeoffset() by Mercij.
+ * This is copied from dec/time.c:do_ioasic_gettimeoffset() by Maciej.
  */
 unsigned long calibrate_div32_gettimeoffset(void)
 {
@@ -225,7 +224,7 @@ unsigned long calibrate_div32_gettimeoffset(void)
 			unsigned long r0;
 			do_div64_32(r0, timerhi, timerlo, tmp);
 			do_div64_32(quotient, USECS_PER_JIFFY,
-			            USECS_PER_JIFFY_FRAC, r0);
+				    USECS_PER_JIFFY_FRAC, r0);
 			cached_quotient = quotient;
 		}
 	}
@@ -236,9 +235,10 @@ unsigned long calibrate_div32_gettimeoffset(void)
 	/* .. relative to previous jiffy (32 bits is enough) */
 	count -= timerlo;
 
-	__asm__("multu  %2,%3"
-	        : "=l" (tmp), "=h" (res)
-	        : "r" (count), "r" (quotient));
+	__asm__("multu  %1,%2"
+		: "=h" (res)
+		: "r" (count), "r" (quotient)
+		: "lo", "accum");
 
 	/*
 	 * Due to possible jiffies inconsistencies, we need to check
@@ -262,27 +262,24 @@ unsigned long calibrate_div64_gettimeoffset(void)
 
 	if (tmp && last_jiffies != tmp) {
 		last_jiffies = tmp;
-		__asm__(".set\tnoreorder\n\t"
-	        ".set\tnoat\n\t"
-	        ".set\tmips3\n\t"
-	        "lwu\t%0,%2\n\t"
-	        "dsll32\t$1,%1,0\n\t"
-	        "or\t$1,$1,%0\n\t"
-	        "ddivu\t$0,$1,%3\n\t"
-	        "mflo\t$1\n\t"
-	        "dsll32\t%0,%4,0\n\t"
-	        "nop\n\t"
-	        "ddivu\t$0,%0,$1\n\t"
-	        "mflo\t%0\n\t"
-	        ".set\tmips0\n\t"
-	        ".set\tat\n\t"
-	        ".set\treorder"
-	        :"=&r" (quotient)
-	        :"r" (timerhi),
-	         "m" (timerlo),
-	         "r" (tmp),
-	         "r" (USECS_PER_JIFFY));
-	        cached_quotient = quotient;
+		__asm__(".set	push\n\t"
+			".set	noreorder\n\t"
+			".set	noat\n\t"
+			".set	mips3\n\t"
+			"lwu	%0,%2\n\t"
+			"dsll32	$1,%1,0\n\t"
+			"or	$1,$1,%0\n\t"
+			"ddivu	$0,$1,%3\n\t"
+			"mflo	$1\n\t"
+			"dsll32	%0,%4,0\n\t"
+			"nop\n\t"
+			"ddivu	$0,%0,$1\n\t"
+			"mflo	%0\n\t"
+			".set	pop"
+			: "=&r" (quotient)
+			: "r" (timerhi), "m" (timerlo),
+			  "r" (tmp), "r" (USECS_PER_JIFFY));
+		cached_quotient = quotient;
 	}
 
 	/* Get last timer tick in absolute kernel time */
@@ -291,18 +288,17 @@ unsigned long calibrate_div64_gettimeoffset(void)
 	/* .. relative to previous jiffy (32 bits is enough) */
 	count -= timerlo;
 
-	__asm__("multu\t%1,%2\n\t"
-	        "mfhi\t%0"
-	        :"=r" (res)
-	        :"r" (count),
-	         "r" (quotient));
+	__asm__("multu	%1,%2"
+		: "=h" (res)
+		: "r" (count), "r" (quotient)
+		: "lo", "accum");
 
 	/*
 	 * Due to possible jiffies inconsistencies, we need to check
 	 * the result so that we'll get a timer that is monotonic.
 	 */
 	if (res >= USECS_PER_JIFFY)
-		res = USECS_PER_JIFFY-1;
+		res = USECS_PER_JIFFY - 1;
 
 	return res;
 }
@@ -322,18 +318,17 @@ void local_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (!user_mode(regs)) {
 		if (prof_buffer && current->pid) {
-			extern int _stext;
 			unsigned long pc = regs->cp0_epc;
 
-			pc -= (unsigned long) &_stext;
+			pc -= (unsigned long) _stext;
 			pc >>= prof_shift;
 			/*
 			 * Dont ignore out-of-bounds pc values silently,
 			 * put them into the last histogram slot, so if
 			 * present, they will show up as a sharp peak.
 			 */
-			if (pc > prof_len-1)
-			pc = prof_len-1;
+			if (pc > prof_len - 1)
+				pc = prof_len - 1;
 			atomic_inc((atomic_t *)&prof_buffer[pc]);
 		}
 	}
@@ -360,7 +355,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		/* check to see if we have missed any timer interrupts */
 		if ((count - expirelo) < 0x7fffffff) {
-			/* missed_timer_count ++; */
+			/* missed_timer_count++; */
 			expirelo = count + cycles_per_jiffy;
 			write_c0_compare(expirelo);
 		}
@@ -385,11 +380,11 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    xtime.tv_sec > last_rtc_update + 660 &&
 	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2 &&
 	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2) {
-		if (rtc_set_time(xtime.tv_sec) == 0) {
+		if (rtc_set_mmss(xtime.tv_sec) == 0) {
 			last_rtc_update = xtime.tv_sec;
 		} else {
-			last_rtc_update = xtime.tv_sec - 600;
 			/* do it again in 60 s */
+			last_rtc_update = xtime.tv_sec - 600;
 		}
 	}
 	write_sequnlock(&xtime_lock);
@@ -411,7 +406,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * In SMP mode, local_timer_interrupt() is invoked by appropriate
 	 * low-level local timer interrupt handler.
 	 */
-	local_timer_interrupt(0, NULL, regs);
+	local_timer_interrupt(irq, dev_id, regs);
 
 #else	/* CONFIG_SMP */
 
@@ -433,34 +428,24 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 asmlinkage void ll_timer_interrupt(int irq, struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
-
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 
 	/* we keep interrupt disabled all the time */
 	timer_interrupt(irq, NULL, regs);
 
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
 }
 
 asmlinkage void ll_local_timer_interrupt(int irq, struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
-
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 
 	/* we keep interrupt disabled all the time */
 	local_timer_interrupt(irq, NULL, regs);
 
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
 }
 
 /*
@@ -480,18 +465,15 @@ asmlinkage void ll_local_timer_interrupt(int irq, struct pt_regs *regs)
  *	c) enable the timer interrupt
  */
 
-void (*board_time_init)(void) = NULL;
-void (*board_timer_setup)(struct irqaction *irq) = NULL;
+void (*board_time_init)(void);
+void (*board_timer_setup)(struct irqaction *irq);
 
-unsigned int mips_counter_frequency = 0;
+unsigned int mips_counter_frequency;
 
 static struct irqaction timer_irqaction = {
-	timer_interrupt,
-	SA_INTERRUPT,
-	0,
-	"timer",
-	NULL,
-	NULL
+	.handler = timer_interrupt,
+	.flags = SA_INTERRUPT,
+	.name = "timer",
 };
 
 void __init time_init(void)
@@ -499,11 +481,14 @@ void __init time_init(void)
 	if (board_time_init)
 		board_time_init();
 
+	if (!rtc_set_mmss)
+		rtc_set_mmss = rtc_set_time;
+
 	xtime.tv_sec = rtc_get_time();
 	xtime.tv_nsec = 0;
 
-        set_normalized_timespec(&wall_to_monotonic,
-                                -xtime.tv_sec, -xtime.tv_nsec);
+	set_normalized_timespec(&wall_to_monotonic,
+	                        -xtime.tv_sec, -xtime.tv_nsec);
 
 	/* choose appropriate gettimeoffset routine */
 	if (!cpu_has_counter) {
@@ -561,15 +546,15 @@ void __init time_init(void)
 #define STARTOFTIME		1970
 #define SECDAY			86400L
 #define SECYR			(SECDAY * 365)
-#define leapyear(year)		((year) % 4 == 0)
-#define days_in_year(a)		(leapyear(a) ? 366 : 365)
-#define days_in_month(a)	(month_days[(a) - 1])
+#define leapyear(y)		((!((y) % 4) && ((y) % 100)) || !((y) % 400))
+#define days_in_year(y)		(leapyear(y) ? 366 : 365)
+#define days_in_month(m)	(month_days[(m) - 1])
 
 static int month_days[12] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
-void to_tm(unsigned long tim, struct rtc_time * tm)
+void to_tm(unsigned long tim, struct rtc_time *tm)
 {
 	long hms, day, gday;
 	int i;
@@ -584,16 +569,16 @@ void to_tm(unsigned long tim, struct rtc_time * tm)
 
 	/* Number of years in days */
 	for (i = STARTOFTIME; day >= days_in_year(i); i++)
-	day -= days_in_year(i);
+		day -= days_in_year(i);
 	tm->tm_year = i;
 
 	/* Number of months in days left */
 	if (leapyear(tm->tm_year))
-	days_in_month(FEBRUARY) = 29;
+		days_in_month(FEBRUARY) = 29;
 	for (i = 1; day >= days_in_month(i); i++)
-	day -= days_in_month(i);
+		day -= days_in_month(i);
 	days_in_month(FEBRUARY) = 28;
-	tm->tm_mon = i-1;	/* tm_mon starts from 0 to 11 */
+	tm->tm_mon = i - 1;		/* tm_mon starts from 0 to 11 */
 
 	/* Days are what is left over (+1) from all that. */
 	tm->tm_mday = day + 1;
@@ -601,7 +586,10 @@ void to_tm(unsigned long tim, struct rtc_time * tm)
 	/*
 	 * Determine the day of week
 	 */
-	tm->tm_wday = (gday + 4) % 7; /* 1970/1/1 was Thursday */
+	tm->tm_wday = (gday + 4) % 7;	/* 1970/1/1 was Thursday */
 }
 
 EXPORT_SYMBOL(rtc_lock);
+EXPORT_SYMBOL(to_tm);
+EXPORT_SYMBOL(rtc_set_time);
+EXPORT_SYMBOL(rtc_get_time);

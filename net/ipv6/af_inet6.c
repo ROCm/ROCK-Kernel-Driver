@@ -65,7 +65,7 @@
 #include <asm/system.h>
 
 #if 0 /*def MODULE*/
-static int unloadable = 0; /* XX: Turn to one when all is ok within the
+static int unloadable;     /* XX: Turn to one when all is ok within the
 			      module for allowing unload */
 MODULE_PARM(unloadable, "i");
 #endif
@@ -624,7 +624,7 @@ out_permanent:
 
 out_illegal:
 	printk(KERN_ERR
-	       "Ignoring attempt to register illegal socket type %d.\n",
+	       "Ignoring attempt to register invalid socket type %d.\n",
 	       p->type);
 	goto out;
 }

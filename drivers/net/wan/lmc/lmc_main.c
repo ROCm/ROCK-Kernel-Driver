@@ -88,7 +88,7 @@ static int lmc_first_load = 0;
 int LMC_PKT_BUF_SZ = 1542;
 
 #ifdef MODULE
-static struct pci_device_id lmc_pci_tbl[] __devinitdata = {
+static struct pci_device_id lmc_pci_tbl[] = {
     { 0x1011, 0x009, 0x1379, PCI_ANY_ID, 0, 0, 0},
     { 0, }
 };

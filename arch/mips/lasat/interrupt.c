@@ -149,7 +149,7 @@ void lasat_hw0_irqdispatch(struct pt_regs *regs)
 	}
 
 	irq_enter();
-	kstat_cpu(0).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	action->handler(irq, action->dev_id, regs);
 	irq_exit();
 

@@ -910,11 +910,11 @@ void reiserfs_release_claimed_blocks(
 int reiserfs_can_fit_pages ( struct super_block *sb /* superblock of filesystem
 						       to estimate space */ )
 {
-	b_blocknr_t space;
+	int space;
 
 	spin_lock(&REISERFS_SB(sb)->bitmap_lock);
 	space = (SB_FREE_BLOCKS(sb) - REISERFS_SB(sb)->reserved_blocks) >> ( PAGE_CACHE_SHIFT - sb->s_blocksize_bits);
 	spin_unlock(&REISERFS_SB(sb)->bitmap_lock);
 
-	return space;
+	return space>0?space:0;
 }

@@ -40,31 +40,6 @@
 #define MBX_TX_0	2
 #define MBX_TX_1	3
 
-
-/*
- * mkdep doesn't spot this dependency, but that's okay, because zatm.c uses
- * CONFIG_ATM_ZATM_EXACT_TS too.
- */
-
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-#define POLL_INTERVAL	60	/* TSR poll interval in seconds; must be <=
-				   (2^31-1)/clock */
-#define TIMER_SHIFT	20	/* scale factor for fixed-point arithmetic;
-				   1 << TIMER_SHIFT must be
-				     (1)  <= (2^64-1)/(POLL_INTERVAL*clock),
-				     (2)  >> clock/10^6, and
-				     (3)  <= (2^32-1)/1000  */
-#define ADJ_IGN_THRES	1000000	/* don't adjust if we're off by more than that
-				   many usecs - this filters clock corrections,
-				   time zone changes, etc. */
-#define ADJ_REP_THRES	20000	/* report only differences of more than that
-				   many usecs (don't mention single lost timer
-				   ticks; 10 msec is only 0.03% anyway) */
-#define ADJ_MSG_THRES	5	/* issue complaints only if getting that many
-				   significant timer differences in a row */
-#endif
-
-
 struct zatm_vcc {
 	/*-------------------------------- RX part */
 	int rx_chan;			/* RX channel, 0 if none */
@@ -103,17 +78,6 @@ struct zatm_dev {
 	u32 pool_base;			/* Free buffer pool dsc (word addr) */
 	/*-------------------------------- ZATM links */
 	struct atm_dev *more;		/* other ZATM devices */
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-	/*-------------------------------- timestamp calculation */
-	u32 last_clk;			/* results of last poll: clock, */
-	struct timeval last_time;	/*   virtual time and */
-	struct timeval last_real_time;	/*   real time */
-	u32 factor;			/* multiplication factor */
-	int timer_diffs;		/* number of significant deviations */
-	struct zatm_t_hist timer_history[ZATM_TIMER_HISTORY_SIZE];
-					/* record of timer synchronizations */
-	int th_curr;			/* current position */
-#endif
 	/*-------------------------------- general information */
 	int mem;			/* RAM on board (in bytes) */
 	int khz;			/* timer clock */
@@ -121,6 +85,7 @@ struct zatm_dev {
 	unsigned char irq;		/* IRQ */
 	unsigned int base;		/* IO base address */
 	struct pci_dev *pci_dev;	/* PCI stuff */
+	spinlock_t lock;
 };
 
 

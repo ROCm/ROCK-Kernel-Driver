@@ -759,7 +759,7 @@ e100_remove1(struct pci_dev *pcid)
 	--e100nics;
 }
 
-static struct pci_device_id e100_id_table[] __devinitdata = {
+static struct pci_device_id e100_id_table[] = {
 	{0x8086, 0x1229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
 	{0x8086, 0x2449, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
 	{0x8086, 0x1059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
@@ -3592,7 +3592,7 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 	strncpy(info.version, e100_driver_version, sizeof (info.version) - 1);
 	strncpy(info.fw_version, "N/A",
 		sizeof (info.fw_version) - 1);
-	strncpy(info.bus_info, bdp->pdev->slot_name,
+	strncpy(info.bus_info, pci_name(bdp->pdev),
 		sizeof (info.bus_info) - 1);
 	info.n_stats = E100_STATS_LEN;
 	info.regdump_len  = E100_REGS_LEN * sizeof(u32);

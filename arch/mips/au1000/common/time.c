@@ -39,7 +39,6 @@
 #include <linux/timex.h>
 
 extern void startup_match20_interrupt(void);
-extern void do_softirq(void);
 extern volatile unsigned long wall_jiffies;
 unsigned long missed_heart_beats = 0;
 
@@ -76,7 +75,7 @@ void mips_timer_interrupt(struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 
 #ifdef CONFIG_PM
 	printk(KERN_ERR "Unexpected CP0 interrupt\n");
@@ -92,7 +91,7 @@ void mips_timer_interrupt(struct pt_regs *regs)
 		timerhi += (count < timerlo);   /* Wrap around */
 		timerlo = count;
 
-		kstat_cpu(0).irqs[irq]++;
+		kstat_this_cpu.irqs[irq]++;
 		do_timer(regs);
 		r4k_cur += r4k_offset;
 		ack_r4ktimer(r4k_cur);
@@ -102,8 +101,6 @@ void mips_timer_interrupt(struct pt_regs *regs)
 
 	irq_exit();
 
-	if (softirq_pending(cpu))
-		do_softirq();
 	return;
 
 null:
@@ -117,7 +114,7 @@ void counter0_irq(int irq, void *dev_id, struct pt_regs *regs)
 	int time_elapsed;
 	static int jiffie_drift = 0;
 
-	kstat_cpu(0).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	if (au_readl(SYS_COUNTER_CNTRL) & SYS_CNTRL_M20) {
 		/* should never happen! */
 		printk(KERN_WARNING "counter 0 w status eror\n");

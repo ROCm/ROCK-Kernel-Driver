@@ -69,7 +69,7 @@ struct snd_card_es968 {
 	struct pnp_dev *dev;
 };
 
-static struct pnp_card_device_id snd_es968_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_es968_pnpids[] = {
 	{ .id = "ESS0968", .devs = { { "@@@0968" }, } },
 	{ .id = "", } /* end */
 };

@@ -87,7 +87,7 @@ static struct parport_pc_pci {
 	/* siig_2s1p_20x */		{ 1, { { 2, 3 }, } },
 };
 
-static struct pci_device_id parport_serial_pci_tbl[] __devinitdata = {
+static struct pci_device_id parport_serial_pci_tbl[] = {
 	/* PCI cards */
 	{ PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_110L,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, titan_110l },

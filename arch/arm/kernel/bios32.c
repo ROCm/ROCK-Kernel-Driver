@@ -460,7 +460,7 @@ static u8 __devinit pcibios_swizzle(struct pci_dev *dev, u8 *pin)
 
 	if (debug_pci)
 		printk("PCI: %s swizzling pin %d => pin %d slot %d\n",
-			dev->slot_name, oldpin, *pin, slot);
+			pci_name(dev), oldpin, *pin, slot);
 
 	return slot;
 }
@@ -478,7 +478,7 @@ static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 	if (debug_pci)
 		printk("PCI: %s mapping slot %d pin %d => irq %d\n",
-			dev->slot_name, slot, pin, irq);
+			pci_name(dev), slot, pin, irq);
 
 	return irq;
 }
@@ -611,7 +611,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 		r = dev->resource + idx;
 		if (!r->start && r->end) {
 			printk(KERN_ERR "PCI: Device %s not available because"
-			       " of resource collisions\n", dev->slot_name);
+			       " of resource collisions\n", pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -628,7 +628,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	if (cmd != old_cmd) {
 		printk("PCI: enabling device %s (%04x -> %04x)\n",
-		       dev->slot_name, old_cmd, cmd);
+		       pci_name(dev), old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;

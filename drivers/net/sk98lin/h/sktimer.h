@@ -1,32 +1,23 @@
 /******************************************************************************
  *
  * Name:	sktimer.h
- * Project:	Genesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.8 $
- * Date:	$Date: 1998/09/08 08:48:02 $
+ * Project:	Gigabit Ethernet Adapters, Schedule-Modul
+ * Version:	$Revision: 1.10 $
+ * Date:	$Date: 2003/05/13 17:56:44 $
  * Purpose:	Defines for the timer functions
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1989-1998 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
- *	All Rights Reserved
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
- *	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF SYSKONNECT
- *	The copyright notice above does not evidence any
- *	actual or intended publication of such source code.
+ *	This program is free software; you can redistribute it and/or modify
+ *	it under the terms of the GNU General Public License as published by
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
- *	This Module contains Proprietary Information of SysKonnect
- *	and should be treated as Confidential.
- *
- *	The information in this file is provided for the exclusive use of
- *	the licensees of SysKonnect.
- *	Such users have the right to use, modify, and incorporate this code
- *	into products for purposes authorized by the license agreement
- *	provided they include this notice and the associated copyright notice
- *	with any such product.
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -36,6 +27,12 @@
  * History:
  *
  *	$Log: sktimer.h,v $
+ *	Revision 1.10  2003/05/13 17:56:44  mkarl
+ *	Editorial changes.
+ *	
+ *	Revision 1.9  1999/11/22 14:00:29  cgoos
+ *	Changed license header to GPL.
+ *	
  *	Revision 1.8  1998/09/08 08:48:02  gklug
  *	add: init level handling
  *	

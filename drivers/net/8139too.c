@@ -248,7 +248,7 @@ static struct {
 };
 
 
-static struct pci_device_id rtl8139_pci_tbl[] __devinitdata = {
+static struct pci_device_id rtl8139_pci_tbl[] = {
 	{0x10ec, 0x8139, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
 	{0x10ec, 0x8138, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139_CB },
 	{0x1113, 0x1211, PCI_ANY_ID, PCI_ANY_ID, 0, 0, SMC1211TX },
@@ -765,7 +765,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	/* dev and dev->priv zeroed in alloc_etherdev */
 	dev = alloc_etherdev (sizeof (*tp));
 	if (dev == NULL) {
-		printk (KERN_ERR PFX "%s: Unable to alloc new net device\n", pdev->slot_name);
+		printk (KERN_ERR PFX "%s: Unable to alloc new net device\n", pci_name(pdev));
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
@@ -797,25 +797,25 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 #ifdef USE_IO_OPS
 	/* make sure PCI base addr 0 is PIO */
 	if (!(pio_flags & IORESOURCE_IO)) {
-		printk (KERN_ERR PFX "%s: region #0 not a PIO resource, aborting\n", pdev->slot_name);
+		printk (KERN_ERR PFX "%s: region #0 not a PIO resource, aborting\n", pci_name(pdev));
 		rc = -ENODEV;
 		goto err_out;
 	}
 	/* check for weird/broken PCI region reporting */
 	if (pio_len < RTL_MIN_IO_SIZE) {
-		printk (KERN_ERR PFX "%s: Invalid PCI I/O region size(s), aborting\n", pdev->slot_name);
+		printk (KERN_ERR PFX "%s: Invalid PCI I/O region size(s), aborting\n", pci_name(pdev));
 		rc = -ENODEV;
 		goto err_out;
 	}
 #else
 	/* make sure PCI base addr 1 is MMIO */
 	if (!(mmio_flags & IORESOURCE_MEM)) {
-		printk (KERN_ERR PFX "%s: region #1 not an MMIO resource, aborting\n", pdev->slot_name);
+		printk (KERN_ERR PFX "%s: region #1 not an MMIO resource, aborting\n", pci_name(pdev));
 		rc = -ENODEV;
 		goto err_out;
 	}
 	if (mmio_len < RTL_MIN_IO_SIZE) {
-		printk (KERN_ERR PFX "%s: Invalid PCI mem region size(s), aborting\n", pdev->slot_name);
+		printk (KERN_ERR PFX "%s: Invalid PCI mem region size(s), aborting\n", pci_name(pdev));
 		rc = -ENODEV;
 		goto err_out;
 	}
@@ -837,7 +837,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	/* ioremap MMIO region */
 	ioaddr = ioremap (mmio_start, mmio_len);
 	if (ioaddr == NULL) {
-		printk (KERN_ERR PFX "%s: cannot remap MMIO, aborting\n", pdev->slot_name);
+		printk (KERN_ERR PFX "%s: cannot remap MMIO, aborting\n", pci_name(pdev));
 		rc = -EIO;
 		goto err_out;
 	}
@@ -852,7 +852,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	/* check for missing/broken hardware */
 	if (RTL_R32 (TxConfig) == 0xFFFFFFFF) {
 		printk (KERN_ERR PFX "%s: Chip not responding, ignoring board\n",
-			pdev->slot_name);
+			pci_name(pdev));
 		rc = -EIO;
 		goto err_out;
 	}
@@ -867,8 +867,8 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 
 	/* if unknown chip, assume array element #0, original RTL-8139 in this case */
 	printk (KERN_DEBUG PFX "%s: unknown chip version, assuming RTL-8139\n",
-		pdev->slot_name);
-	printk (KERN_DEBUG PFX "%s: TxConfig = 0x%lx\n", pdev->slot_name, RTL_R32 (TxConfig));
+		pci_name(pdev));
+	printk (KERN_DEBUG PFX "%s: TxConfig = 0x%lx\n", pci_name(pdev), RTL_R32 (TxConfig));
 	tp->chipset = 0;
 
 match:
@@ -943,7 +943,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	if (pdev->vendor == PCI_VENDOR_ID_REALTEK &&
 	    pdev->device == PCI_DEVICE_ID_REALTEK_8139 && pci_rev >= 0x20) {
 		printk(KERN_INFO PFX "pci dev %s (id %04x:%04x rev %02x) is an enhanced 8139C+ chip\n",
-		       pdev->slot_name, pdev->vendor, pdev->device, pci_rev);
+		       pci_name(pdev), pdev->vendor, pdev->device, pci_rev);
 		printk(KERN_INFO PFX "Use the \"8139cp\" driver for improved performance and stability.\n");
 	}
 
@@ -2260,7 +2260,7 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, np->pci_dev->slot_name);
+		strcpy (info.bus_info, pci_name(np->pci_dev));
 		info.regdump_len = np->regs_len;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;

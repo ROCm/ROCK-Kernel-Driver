@@ -48,6 +48,7 @@ static const char *version =
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/spinlock.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -442,6 +443,7 @@ struct tc35815_local {
 	unsigned char fbl_curid;
 	dma_addr_t data_buf_dma_handle[RX_BUF_PAGES];
 	void * data_buf[RX_BUF_PAGES];		/* packing */
+	spinlock_t lock;
 };
 
 /* Index to functions, as function prototypes. */
@@ -469,7 +471,7 @@ static struct net_device *root_tc35815_dev = NULL;
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers
  */
-static struct pci_device_id tc35815_pci_tbl[] __devinitdata = {
+static struct pci_device_id tc35815_pci_tbl[] = {
     { PCI_VENDOR_ID_TOSHIBA_2, PCI_DEVICE_ID_TOSHIBA_TC35815CF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
     { 0, }
 };
@@ -576,6 +578,8 @@ static int __init tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, u
 	lp->pdev = pdev;
 	lp->next_module = root_tc35815_dev;
 	root_tc35815_dev = dev;
+
+	spin_lock_init(&lp->lock);
 
 	if (dev->mem_start > 0) {
 		lp->option = dev->mem_start;
@@ -895,7 +899,7 @@ static void tc35815_tx_timeout(struct net_device *dev)
 	struct tc35815_regs *tr = (struct tc35815_regs *)dev->base_addr;
 	int flags;
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&lp->lock, flags);
 	printk(KERN_WARNING "%s: transmit timed out, status %#x\n",
 	       dev->name, tc_readl(&tr->Tx_Stat));
 	/* Try to restart the adaptor. */
@@ -903,7 +907,7 @@ static void tc35815_tx_timeout(struct net_device *dev)
 	tc35815_clear_queues(dev);
 	tc35815_chip_init(dev);
 	lp->tbusy=0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
 	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
 }
@@ -951,7 +955,7 @@ static int tc35815_send_packet(struct sk_buff *skb, struct net_device *dev)
 		dma_cache_wback_inv((unsigned long)buf, length);
 #endif
 
-		save_and_cli(flags);
+		spin_lock_irqsave(&lp->lock, flags);
 
 		/* failsafe... */
 		if (lp->tfd_start != lp->tfd_end)
@@ -999,7 +1003,7 @@ static int tc35815_send_packet(struct sk_buff *skb, struct net_device *dev)
 			if (tc35815_debug > 1)
 				printk(KERN_WARNING "%s: TxFD Exhausted.\n", dev->name);
 		}
-		restore_flags(flags);
+		spin_unlock_irqrestore(&lp->lock, flags);
 	}
 
 	return 0;
@@ -1403,10 +1407,10 @@ static struct net_device_stats *tc35815_get_stats(struct net_device *dev)
 	unsigned long flags;
 
 	if (netif_running(dev)) {
-		save_and_cli(flags);
+		spin_lock_irqsave(&lp->lock, flags);
 		/* Update the statistics from the device registers. */
 		lp->stats.rx_missed_errors = tc_readl(&tr->Miss_Cnt);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&lp->lock, flags);
 	}
 
 	return &lp->stats;
@@ -1507,28 +1511,34 @@ tc35815_set_multicast_list(struct net_device *dev)
 	}
 }
 
-static unsigned long tc_phy_read(struct tc35815_regs *tr, int phy, int phy_reg)
+static unsigned long tc_phy_read(struct net_device *dev, struct tc35815_regs *tr, int phy, int phy_reg)
 {
+	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
 	unsigned long data;
 	int flags;
-	save_and_cli(flags);
+	
+	spin_lock_irqsave(&lp->lock, flags);
+
 	tc_writel(MD_CA_Busy | (phy << 5) | phy_reg, &tr->MD_CA);
 	while (tc_readl(&tr->MD_CA) & MD_CA_Busy)
 		;
 	data = tc_readl(&tr->MD_Data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
 	return data;
 }
 
-static void tc_phy_write(unsigned long d, struct tc35815_regs *tr, int phy, int phy_reg)
+static void tc_phy_write(struct net_device *dev, unsigned long d, struct tc35815_regs *tr, int phy, int phy_reg)
 {
+	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
 	int flags;
-	save_and_cli(flags);
+
+	spin_lock_irqsave(&lp->lock, flags);
+
 	tc_writel(d, &tr->MD_Data);
 	tc_writel(MD_CA_Busy | MD_CA_Wr | (phy << 5) | phy_reg, &tr->MD_CA);
 	while (tc_readl(&tr->MD_CA) & MD_CA_Busy)
 		;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
 }
 
 static void tc35815_phy_chip_init(struct net_device *dev)
@@ -1544,18 +1554,18 @@ static void tc35815_phy_chip_init(struct net_device *dev)
 		first = 0;
 
 		/* first data written to the PHY will be an ID number */
-		tc_phy_write(0, tr, 0, MII_CONTROL);	/* ID:0 */
+		tc_phy_write(dev, 0, tr, 0, MII_CONTROL);	/* ID:0 */
 #if 0
-		tc_phy_write(MIICNTL_RESET, tr, 0, MII_CONTROL);
+		tc_phy_write(dev, MIICNTL_RESET, tr, 0, MII_CONTROL);
 		printk(KERN_INFO "%s: Resetting PHY...", dev->name);
-		while (tc_phy_read(tr, 0, MII_CONTROL) & MIICNTL_RESET)
+		while (tc_phy_read(dev, tr, 0, MII_CONTROL) & MIICNTL_RESET)
 			;
 		printk("\n");
-		tc_phy_write(MIICNTL_AUTO|MIICNTL_SPEED|MIICNTL_FDX, tr, 0,
+		tc_phy_write(dev, MIICNTL_AUTO|MIICNTL_SPEED|MIICNTL_FDX, tr, 0,
 			     MII_CONTROL);
 #endif
-		id0 = tc_phy_read(tr, 0, MII_PHY_ID0);
-		id1 = tc_phy_read(tr, 0, MII_PHY_ID1);
+		id0 = tc_phy_read(dev, tr, 0, MII_PHY_ID0);
+		id1 = tc_phy_read(dev, tr, 0, MII_PHY_ID1);
 		printk(KERN_DEBUG "%s: PHY ID %04x %04x\n", dev->name,
 		       id0, id1);
 		if (lp->option & TC35815_OPT_10M) {
@@ -1567,10 +1577,10 @@ static void tc35815_phy_chip_init(struct net_device *dev)
 		} else {
 			/* auto negotiation */
 			unsigned long neg_result;
-			tc_phy_write(MIICNTL_AUTO | MIICNTL_RST_AUTO, tr, 0, MII_CONTROL);
+			tc_phy_write(dev, MIICNTL_AUTO | MIICNTL_RST_AUTO, tr, 0, MII_CONTROL);
 			printk(KERN_INFO "%s: Auto Negotiation...", dev->name);
 			count = 0;
-			while (!(tc_phy_read(tr, 0, MII_STATUS) & MIISTAT_AUTO_DONE)) {
+			while (!(tc_phy_read(dev, tr, 0, MII_STATUS) & MIISTAT_AUTO_DONE)) {
 				if (count++ > 5000) {
 					printk(" failed. Assume 10Mbps\n");
 					lp->linkspeed = 10;
@@ -1582,7 +1592,7 @@ static void tc35815_phy_chip_init(struct net_device *dev)
 				mdelay(1);
 			}
 			printk(" done.\n");
-			neg_result = tc_phy_read(tr, 0, MII_ANLPAR);
+			neg_result = tc_phy_read(dev, tr, 0, MII_ANLPAR);
 			if (neg_result & (MII_AN_TX_FDX | MII_AN_TX_HDX))
 				lp->linkspeed = 100;
 			else
@@ -1601,7 +1611,7 @@ static void tc35815_phy_chip_init(struct net_device *dev)
 		ctl |= MIICNTL_SPEED;
 	if (lp->fullduplex)
 		ctl |= MIICNTL_FDX;
-	tc_phy_write(ctl, tr, 0, MII_CONTROL);
+	tc_phy_write(dev, ctl, tr, 0, MII_CONTROL);
 
 	if (lp->fullduplex) {
 		tc_writel(tc_readl(&tr->MAC_Ctl) | MAC_FullDup, &tr->MAC_Ctl);
@@ -1652,7 +1662,7 @@ static void tc35815_chip_init(struct net_device *dev)
 	tc_writel(CAM_Ena_Bit(CAM_ENTRY_SOURCE), &tr->CAM_Ena);
 	tc_writel(CAM_CompEn | CAM_BroadAcc, &tr->CAM_Ctl);
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&lp->lock, flags);
 
 	tc_writel(DMA_BURST_SIZE, &tr->DMA_Ctl);
 
@@ -1683,7 +1693,7 @@ static void tc35815_chip_init(struct net_device *dev)
 #if 0	/* No need to polling */
 	tc_writel(virt_to_bus(lp->tfd_base), &tr->TxFrmPtr);	/* start DMA transmitter */
 #endif
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
 }
 
 static int tc35815_proc_info(char *buffer, char **start, off_t offset, int length, int *eof, void *data)

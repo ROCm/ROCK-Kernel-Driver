@@ -19,7 +19,7 @@
 /*
  * User-level device driver visible types
  */
-typedef char            xwidgetnum_t;	/* xtalk widget number  (0..15) */
+typedef int            xwidgetnum_t;	/* xtalk widget number  (0..15) */
 
 #define XWIDGET_NONE		(-1)
 

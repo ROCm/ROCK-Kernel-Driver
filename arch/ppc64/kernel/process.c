@@ -46,6 +46,7 @@
 #include <asm/iSeries/HvCallHpt.h>
 #include <asm/hardirq.h>
 #include <asm/cputable.h>
+#include <asm/sections.h>
 
 struct task_struct *last_task_used_math = NULL;
 
@@ -423,8 +424,6 @@ void initialize_paca_hardware_interrupt_stack(void)
 		ppc_md.hpte_updateboltedpp(PP_RXRX,end_of_stack);
 	}
 }
-
-extern char _stext[], _etext[], __init_begin[], __init_end[];
 
 char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
 {

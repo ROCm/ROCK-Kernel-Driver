@@ -741,44 +741,6 @@ config UNIX98_PTY_COUNT
 endmenu
 
 
-menu "Video For Linux"
-
-config VIDEO_DEV
-	tristate "Video For Linux"
-	---help---
-	  Support for audio/video capture and overlay devices and FM radio
-	  cards. The exact capabilities of each device vary. User tools for
-	  this are available from
-	  <ftp://ftp.uk.linux.org/pub/linux/video4linux/>.
-
-	  If you are interested in writing a driver for such an audio/video
-	  device or user software interacting with such a driver, please read
-	  the file <file:Documentation/video4linux/API.html>.
-
-	  This driver is also available as a module called videodev ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
-config VIDEO_BT848
-	tristate "BT848 Video For Linux"
-	depends on PCI && VIDEO_DEV
-	---help---
-	  Support for BT848 based frame grabber/overlay boards. This includes
-	  the Miro, Hauppauge and STB boards. Please read the material in
-	  <file:Documentation/video4linux/bttv> for more information.
-
-	  If you say Y or M here, you need to say Y or M to "I2C support" and
-	  "I2C bit-banging interfaces" in the character device section.
-
-	  This driver is available as a module called bttv ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
-endmenu
-
-
 menu "XFree86 DRI support"
 
 config DRM
@@ -819,44 +781,13 @@ endmenu
 
 source "drivers/input/Kconfig"
 
+source "drivers/i2c/Kconfig"
+
 source "fs/Kconfig"
 
-
-menu "Sound"
-
-config SOUND
-	tristate "Sound card support"
-	---help---
-	  If you have a sound card in your computer, i.e. if it can say more
-	  than an occasional beep, say Y.  Be sure to have all the information
-	  about your sound card and its configuration down (I/O port,
-	  interrupt and DMA channel), because you will be asked for it.
-
-	  You want to read the Sound-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>. General information about
-	  the modular sound system is contained in the files
-	  <file:Documentation/sound/Introduction>.  The file
-	  <file:Documentation/sound/README.OSS> contains some slightly
-	  outdated but still useful information as well.
-
-	  If you have a PnP sound card and you want to configure it at boot
-	  time using the ISA PnP tools (read
-	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
-	  compile the sound card support as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want)
-	  and load that module after the PnP configuration is finished.  To do
-	  this, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.
-
-	  I'm told that even without a sound card, you can make your computer
-	  say more than an occasional beep, by programming the PC speaker.
-	  Kernel patches and supporting utilities to do that are in the pcsp
-	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+source "drivers/media/Kconfig"
 
 source "sound/Kconfig"
-
-endmenu
 
 source "drivers/usb/Kconfig"
 
@@ -947,6 +878,15 @@ config DEBUG_DCFLUSH
 	bool "D-cache flush debugging"
 	depends on DEBUG_KERNEL
 
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	help
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
+	  
 config STACK_DEBUG
 	bool "Stack Overflow Detection Support"
 

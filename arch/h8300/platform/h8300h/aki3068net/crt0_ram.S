@@ -3,7 +3,7 @@
  *
  *  Yoshinori Sato <ysato@users.sourceforge.jp>
  *
- *  Platform depend startup for uClinux-2.4.x
+ *  Platform depend startup
  *  Target Archtecture:	AE-3068 (aka. aki3068net)
  *  Memory Layout     :	RAM
  */
@@ -12,6 +12,16 @@
 
 #include <linux/config.h>
 #include <asm/linkage.h>
+	
+#if !defined(CONFIG_BLKDEV_RESERVE)
+#if defined(CONFIG_GDB_DEBUG)
+#define RAMEND (__ramend - 0xc000)
+#else
+#define RAMEND __ramend
+#endif
+#else
+#define RAMEND CONFIG_BLKDEV_RESERVE_ADDRESS
+#endif
 	
 	.global SYMBOL_NAME(_start)
 	.global SYMBOL_NAME(command_line)
@@ -25,23 +35,28 @@
 
 	/* CPU Reset entry */
 SYMBOL_NAME_LABEL(_start)
-	mov.l	#__ramend,sp
+	mov.l	#RAMEND,sp
 	ldc	#0x80,ccr
 
 	/* Peripheral Setup */
 	
+#if defined(CONFIG_BLK_DEV_BLKMEM)
+	/* move romfs image */
+	jsr	@__move_romfs	
+#endif
+	
 	/* .bss clear */
 	mov.l	#__sbss,er5
-	mov.l	er5,er6
-	inc.l	#1,er6
 	mov.l	#__ebss,er4
 	sub.l	er5,er4
-	sub.w	r0,r0
-	mov.b	r0l,@er5
+	shlr	er4
+	shlr	er4
+	sub.l	er0,er0
 1:	
-	eepmov.w
-	dec.w	#1,e4
-	bpl	1b
+	mov.l	er0,@er5
+	adds	#4,er5
+	dec.l	#1,er4
+	bne	1b
 
 	/* copy kernel commandline */
 	mov.l	#COMMAND_START,er5
@@ -49,22 +64,9 @@ SYMBOL_NAME_LABEL(_start)
 	mov.w	#512,r4
 	eepmov.w
 
-	/* RAM Interrupt Vector Table Setup */
-#if defined(CONFIG_GDB_DEBUG)
-	mov.l	@SYMBOL_NAME(interrupt_redirect_table)+11*4,er0
-#endif
-	mov.l	#SYMBOL_NAME(_vector_lma),er5
-	mov.l	#SYMBOL_NAME(interrupt_redirect_table),er6
-	mov.w	#0x100,r4
-	eepmov.w
-#if defined(CONFIG_GDB_DEBUG)
-	mov.l	er0,@SYMBOL_NAME(interrupt_redirect_table)+11*4
-#endif
-
 	/* uClinux kernel start */
 	ldc	#0x90,ccr	/* running kernel */
-	mov.l	#SYMBOL_NAME(init_task_union),sp
-	mov.l	sp,@SYMBOL_NAME(_current_task)
+	mov.l	#SYMBOL_NAME(init_thread_union),sp
 	add.l	#0x2000,sp
 	jsr	@_start_kernel
 _exit:

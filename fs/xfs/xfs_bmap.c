@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -2170,7 +2170,7 @@ xfs_bmap_alloc(
 	xfs_extlen_t	ralen=0;	/* realtime allocation length */
 #endif
 
-#define	ISLEGAL(x,y)	\
+#define	ISVALID(x,y)	\
 	(rt ? \
 		(x) < mp->m_sb.sb_rblocks : \
 		XFS_FSB_TO_AGNO(mp, x) == XFS_FSB_TO_AGNO(mp, y) && \
@@ -2249,7 +2249,7 @@ xfs_bmap_alloc(
 		/*
 		 * If we're now overlapping the next or previous extent that
 		 * means we can't fit an extsz piece in this hole.  Just move
-		 * the start forward to the first legal spot and set
+		 * the start forward to the first valid spot and set
 		 * the length so we hit the end.
 		 */
 		if ((ap->off != orig_off && ap->off < prevo) ||
@@ -2310,7 +2310,7 @@ xfs_bmap_alloc(
 		ralen = ap->alen / mp->m_sb.sb_rextsize;
 		/*
 		 * If the old value was close enough to MAXEXTLEN that
-		 * we rounded up to it, cut it back so it's legal again.
+		 * we rounded up to it, cut it back so it's valid again.
 		 * Note that if it's a really large request (bigger than
 		 * MAXEXTLEN), we don't hear about that number, and can't
 		 * adjust the starting point to match it.
@@ -2343,7 +2343,7 @@ xfs_bmap_alloc(
 	 */
 	if (ap->eof && ap->prevp->br_startoff != NULLFILEOFF &&
 	    !ISNULLSTARTBLOCK(ap->prevp->br_startblock) &&
-	    ISLEGAL(ap->prevp->br_startblock + ap->prevp->br_blockcount,
+	    ISVALID(ap->prevp->br_startblock + ap->prevp->br_blockcount,
 		    ap->prevp->br_startblock)) {
 		ap->rval = ap->prevp->br_startblock + ap->prevp->br_blockcount;
 		/*
@@ -2352,7 +2352,7 @@ xfs_bmap_alloc(
 		adjust = ap->off -
 			(ap->prevp->br_startoff + ap->prevp->br_blockcount);
 		if (adjust &&
-		    ISLEGAL(ap->rval + adjust, ap->prevp->br_startblock))
+		    ISVALID(ap->rval + adjust, ap->prevp->br_startblock))
 			ap->rval += adjust;
 	}
 	/*
@@ -2374,7 +2374,7 @@ xfs_bmap_alloc(
 		    !ISNULLSTARTBLOCK(ap->prevp->br_startblock) &&
 		    (prevbno = ap->prevp->br_startblock +
 			       ap->prevp->br_blockcount) &&
-		    ISLEGAL(prevbno, ap->prevp->br_startblock)) {
+		    ISVALID(prevbno, ap->prevp->br_startblock)) {
 			/*
 			 * Calculate gap to end of previous block.
 			 */
@@ -2386,11 +2386,11 @@ xfs_bmap_alloc(
 			 * end and the gap size.
 			 * Heuristic!
 			 * If the gap is large relative to the piece we're
-			 * allocating, or using it gives us an illegal block
+			 * allocating, or using it gives us an invalid block
 			 * number, then just use the end of the previous block.
 			 */
 			if (prevdiff <= XFS_ALLOC_GAP_UNITS * ap->alen &&
-			    ISLEGAL(prevbno + prevdiff,
+			    ISVALID(prevbno + prevdiff,
 				    ap->prevp->br_startblock))
 				prevbno += adjust;
 			else
@@ -2425,14 +2425,14 @@ xfs_bmap_alloc(
 			/*
 			 * Heuristic!
 			 * If the gap is large relative to the piece we're
-			 * allocating, or using it gives us an illegal block
+			 * allocating, or using it gives us an invalid block
 			 * number, then just use the start of the next block
 			 * offset by our length.
 			 */
 			if (gotdiff <= XFS_ALLOC_GAP_UNITS * ap->alen &&
-			    ISLEGAL(gotbno - gotdiff, gotbno))
+			    ISVALID(gotbno - gotdiff, gotbno))
 				gotbno -= adjust;
-			else if (ISLEGAL(gotbno - ap->alen, gotbno)) {
+			else if (ISVALID(gotbno - ap->alen, gotbno)) {
 				gotbno -= ap->alen;
 				gotdiff += adjust - ap->alen;
 			} else
@@ -2734,7 +2734,7 @@ xfs_bmap_alloc(
 		}
 	}
 	return 0;
-#undef	ISLEGAL
+#undef	ISVALID
 }
 
 /*
@@ -3353,7 +3353,7 @@ xfs_bmap_local_to_extents(
 
 	/*
 	 * We don't want to deal with the case of keeping inode data inline yet.
-	 * So sending the data fork of a regular inode is illegal.
+	 * So sending the data fork of a regular inode is invalid.
 	 */
 	ASSERT(!((ip->i_d.di_mode & IFMT) == IFREG &&
 		 whichfork == XFS_DATA_FORK));
@@ -5579,7 +5579,7 @@ xfs_getbmap(
 	if (whichfork == XFS_DATA_FORK) {
 		if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
 			prealloced = 1;
-			fixlen = XFS_MAX_FILE_OFFSET;
+			fixlen = XFS_MAXIOFFSET(mp);
 		} else {
 			prealloced = 0;
 			fixlen = ip->i_d.di_size;

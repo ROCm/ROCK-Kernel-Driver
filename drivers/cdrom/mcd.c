@@ -114,11 +114,11 @@ static int mcd1xhold;
 
 /* Is the drive connected properly and responding?? */
 static int mcdPresent;
-static struct request_queue mcd_queue;
+static struct request_queue *mcd_queue;
 
 #define MAJOR_NR MITSUMI_CDROM_MAJOR
-#define QUEUE (&mcd_queue)
-#define CURRENT elv_next_request(&mcd_queue)
+#define QUEUE (mcd_queue)
+#define CURRENT elv_next_request(mcd_queue)
 
 #define QUICK_LOOP_DELAY udelay(45)	/* use udelay */
 #define QUICK_LOOP_COUNT 20
@@ -1078,7 +1078,9 @@ int __init mcd_init(void)
 		goto out_region;
 	}
 
-	blk_init_queue(&mcd_queue, do_mcd_request, &mcd_spinlock);
+	mcd_queue = blk_init_queue(do_mcd_request, &mcd_spinlock);
+	if (!mcd_queue)
+		goto out_queue;
 
 	/* check for card */
 
@@ -1155,18 +1157,19 @@ int __init mcd_init(void)
 		printk(KERN_ERR "mcd: Unable to register Mitsumi CD-ROM.\n");
 		goto out_cdrom;
 	}
-	disk->queue = &mcd_queue;
+	disk->queue = mcd_queue;
 	add_disk(disk);
 	printk(msg);
 	return 0;
 
 out_cdrom:
 	free_irq(mcd_irq, NULL);
-out_probe:
+out_queue:
 	release_region(mcd_port, 4);
+out_probe:
+	blk_cleanup_queue(mcd_queue);
 out_region:
 	unregister_blkdev(MAJOR_NR, "mcd");
-	blk_cleanup_queue(&mcd_queue);
 	put_disk(disk);
 	return -EIO;
 }
@@ -1545,7 +1548,7 @@ void __exit mcd_exit(void)
 		printk(KERN_WARNING "Can't unregister major mcd\n");
 		return;
 	}
-	blk_cleanup_queue(&mcd_queue);
+	blk_cleanup_queue(mcd_queue);
 	del_timer_sync(&mcd_timer);
 }
 

@@ -199,10 +199,9 @@ shubstats_ioctl(struct inode *inode, struct file *file,
 {
         cnodeid_t       cnode;
         uint64_t        longarg;
-        vertex_hdl_t	d;
 	int		nasid;
 
-        cnode = (cnodeid_t)hwgraph_fastinfo_get(d);
+        cnode = (cnodeid_t)file->f_dentry->d_fsdata;
 
         switch (cmd) {
 	case SNDRV_SHUB_CONFIGURE:

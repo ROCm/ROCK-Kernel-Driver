@@ -112,12 +112,6 @@ void prom_free_prom_memory(void)
 	/* Not sure what I'm supposed to do here.  Nothing, I think */
 }
 
-int page_is_ram(unsigned long pagenr)
-{
-	phys_t addr = pagenr << PAGE_SHIFT;
-	return (addr < (CONFIG_SIBYTE_STANDALONE_RAM_SIZE * 1024 * 1024));
-}
-
 void prom_putchar(char c)
 {
 }

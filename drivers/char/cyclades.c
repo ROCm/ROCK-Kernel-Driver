@@ -5665,7 +5665,7 @@ void
 cy_cleanup_module(void)
 {
     int i;
-    int e1, e2;
+    int e1;
     unsigned long flags;
 
 #ifndef CONFIG_CYZ_INTR

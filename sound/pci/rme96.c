@@ -260,7 +260,7 @@ typedef struct snd_rme96 {
 	snd_kcontrol_t	   *spdif_ctl;
 } rme96_t;
 
-static struct pci_device_id snd_rme96_ids[] __devinitdata = {
+static struct pci_device_id snd_rme96_ids[] = {
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_DIGI96,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_DIGI96_8,
@@ -806,10 +806,12 @@ snd_rme96_setclockmode(rme96_t *rme96,
 {
 	switch (mode) {
 	case RME96_CLOCKMODE_SLAVE:
+	        /* AutoSync */ 
 		rme96->wcreg &= ~RME96_WCR_MASTER;
 		rme96->areg &= ~RME96_AR_WSEL;
 		break;
 	case RME96_CLOCKMODE_MASTER:
+	        /* Internal */
 		rme96->wcreg |= RME96_WCR_MASTER;
 		rme96->areg &= ~RME96_AR_WSEL;
 		break;
@@ -1318,7 +1320,7 @@ snd_rme96_capture_adat_open(snd_pcm_substream_t *substream)
 	snd_pcm_set_sync(substream);
 
 	runtime->hw = snd_rme96_capture_adat_info;
-        if (snd_rme96_getinputtype(rme96) != RME96_INPUT_ANALOG) {
+        if (snd_rme96_getinputtype(rme96) == RME96_INPUT_ANALOG) {
                 /* makes no sense to use analog input. Note that analog
                    expension cards AEB4/8-I are RME96_INPUT_INTERNAL */
                 return -EIO;
@@ -1862,15 +1864,15 @@ snd_rme96_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 		snd_iprintf(buffer, "  sample format: 16 bit\n");
 	}
 	if (rme96->areg & RME96_AR_WSEL) {
-		snd_iprintf(buffer, "  clock mode: word clock\n");
+		snd_iprintf(buffer, "  sample clock source: word clock\n");
 	} else if (rme96->wcreg & RME96_WCR_MASTER) {
-		snd_iprintf(buffer, "  clock mode: master\n");
+		snd_iprintf(buffer, "  sample clock source: internal\n");
 	} else if (snd_rme96_getinputtype(rme96) == RME96_INPUT_ANALOG) {
-		snd_iprintf(buffer, "  clock mode: slave (master anyway due to analog input setting)\n");
+		snd_iprintf(buffer, "  sample clock source: autosync (internal anyway due to analog input setting)\n");
 	} else if (snd_rme96_capture_getrate(rme96, &n) < 0) {
-		snd_iprintf(buffer, "  clock mode: slave (master anyway due to no valid signal)\n");
+		snd_iprintf(buffer, "  sample clock source: autosync (internal anyway due to no valid signal)\n");
 	} else {
-		snd_iprintf(buffer, "  clock mode: slave\n");
+		snd_iprintf(buffer, "  sample clock source: autosync\n");
 	}
 	if (rme96->wcreg & RME96_WCR_PRO) {
 		snd_iprintf(buffer, "  format: AES/EBU (professional)\n");
@@ -2095,7 +2097,7 @@ snd_rme96_put_inputtype_control(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int
 snd_rme96_info_clockmode_control(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-	static char *texts[3] = { "Slave", "Master", "Wordclock" };
+	static char *texts[3] = { "AutoSync", "Internal", "Word" };
 	
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -2418,7 +2420,7 @@ static snd_kcontrol_new_t snd_rme96_controls[] = {
 },
 {
         .iface =        SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =         "Clock Mode",
+	.name =         "Sample Clock Source",
 	.info =         snd_rme96_info_clockmode_control, 
 	.get =          snd_rme96_get_clockmode_control,
 	.put =          snd_rme96_put_clockmode_control

@@ -74,6 +74,17 @@ static inline void write_ireg(u_long base, u_int reg, u_int val)
 		" : : "r" (val), "r" (reg), "r" (ISAIO_BASE + 0x0464));
 }
 
+static inline unsigned short read_ireg(u_long base_addr, u_int reg)
+{
+	u_short v;
+	__asm__(
+	"str%?h	%1, [%2]	@ NAT_RAP\n\t"
+	"str%?h	%0, [%2, #8]	@ NET_IDP\n\t"
+	: "=r" (v)
+	: "r" (reg), "r" (ISAIO_BASE + 0x0464));
+	return v;
+}
+
 #define am_writeword(dev,off,val) __raw_writew(val, ISAMEM_BASE + ((off) << 1))
 #define am_readword(dev,off)      __raw_readw(ISAMEM_BASE + ((off) << 1))
 
@@ -253,7 +264,25 @@ am79c961_init_for_open(struct net_device *dev)
 	write_rreg (dev->base_addr, BASERXH, 0);
 	write_rreg (dev->base_addr, CSR0, CSR0_STOP);
 	write_rreg (dev->base_addr, CSR3, CSR3_IDONM|CSR3_BABLM|CSR3_DXSUFLO);
+	write_rreg (dev->base_addr, CSR4, CSR4_APAD_XMIT|CSR4_MFCOM|CSR4_RCVCCOM|CSR4_TXSTRTM|CSR4_JABM);
 	write_rreg (dev->base_addr, CSR0, CSR0_IENA|CSR0_STRT);
+}
+
+static void am79c961_timer(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	unsigned int lnkstat, carrier;
+
+	lnkstat = read_ireg(dev->base_addr, ISALED0) & ISALED0_LNKST;
+	carrier = netif_carrier_ok(dev);
+
+	if (lnkstat && !carrier)
+		netif_carrier_on(dev);
+	else if (!lnkstat && carrier)
+		netif_carrier_off(dev);
+
+	mod_timer(&priv->timer, jiffies + 5*HZ);
 }
 
 /*
@@ -273,6 +302,11 @@ am79c961_open(struct net_device *dev)
 
 	am79c961_init_for_open(dev);
 
+	netif_carrier_off(dev);
+
+	priv->timer.expires = jiffies;
+	add_timer(&priv->timer);
+
 	netif_start_queue(dev);
 
 	return 0;
@@ -287,7 +321,10 @@ am79c961_close(struct net_device *dev)
 	struct dev_priv *priv = (struct dev_priv *)dev->priv;
 	unsigned long flags;
 
+	del_timer_sync(&priv->timer);
+
 	netif_stop_queue(dev);
+	netif_carrier_off(dev);
 
 	spin_lock_irqsave(priv->chip_lock, flags);
 	write_rreg (dev->base_addr, CSR0, CSR0_STOP);
@@ -408,18 +445,9 @@ static int
 am79c961_sendpacket(struct sk_buff *skb, struct net_device *dev)
 {
 	struct dev_priv *priv = (struct dev_priv *)dev->priv;
-	unsigned int length = skb->len;
 	unsigned int hdraddr, bufaddr;
 	unsigned int head;
 	unsigned long flags;
-	
-	/* FIXME: I thought the 79c961 could do padding - RMK ??? */
-	if (length < ETH_ZLEN) {
-		skb = skb_padto(skb, ETH_ZLEN);
-		if (skb == NULL)
-			return 0;
-		length = ETH_ZLEN;
-	}
 
 	head = priv->txhead;
 	hdraddr = priv->txhdr + (head << 3);
@@ -428,8 +456,8 @@ am79c961_sendpacket(struct sk_buff *skb, struct net_device *dev)
 	if (head >= TX_BUFFERS)
 		head = 0;
 
-	am_writebuffer (dev, bufaddr, skb->data, length);
-	am_writeword (dev, hdraddr + 4, -length);
+	am_writebuffer (dev, bufaddr, skb->data, skb->len);
+	am_writeword (dev, hdraddr + 4, -skb->len);
 	am_writeword (dev, hdraddr + 2, TMD_OWN|TMD_STP|TMD_ENP);
 	priv->txhead = head;
 
@@ -518,6 +546,7 @@ static void
 am79c961_tx(struct net_device *dev, struct dev_priv *priv)
 {
 	do {
+		short len;
 		u_int hdraddr;
 		u_int status;
 
@@ -553,6 +582,8 @@ am79c961_tx(struct net_device *dev, struct dev_priv *priv)
 			continue;
 		}
 		priv->stats.tx_packets ++;
+		len = am_readword (dev, hdraddr + 4);
+		priv->stats.tx_bytes += -len;
 	} while (priv->txtail != priv->txhead);
 
 	netif_wake_queue(dev);
@@ -563,24 +594,32 @@ am79c961_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct dev_priv *priv = (struct dev_priv *)dev->priv;
-	u_int status;
+	u_int status, n = 100;
 	int handled = 0;
 
-	status = read_rreg(dev->base_addr, CSR0);
-	write_rreg(dev->base_addr, CSR0, status & (CSR0_TINT|CSR0_RINT|CSR0_MISS|CSR0_IENA));
+	do {
+		status = read_rreg(dev->base_addr, CSR0);
+		write_rreg(dev->base_addr, CSR0, status &
+			   (CSR0_IENA|CSR0_TINT|CSR0_RINT|
+			    CSR0_MERR|CSR0_MISS|CSR0_CERR|CSR0_BABL));
 
-	if (status & CSR0_RINT) {
-		handled = 1;
-		am79c961_rx(dev, priv);
-	}
-	if (status & CSR0_TINT) {
-		handled = 1;
-		am79c961_tx(dev, priv);
-	}
-	if (status & CSR0_MISS) {
-		handled = 1;
-		priv->stats.rx_dropped ++;
-	}
+		if (status & CSR0_RINT) {
+			handled = 1;
+			am79c961_rx(dev, priv);
+		}
+		if (status & CSR0_TINT) {
+			handled = 1;
+			am79c961_tx(dev, priv);
+		}
+		if (status & CSR0_MISS) {
+			handled = 1;
+			priv->stats.rx_dropped ++;
+		}
+		if (status & CSR0_CERR) {
+			handled = 1;
+			mod_timer(&priv->timer, jiffies);
+	} while (--n && status & (CSR0_RINT | CSR0_TINT));
+
 	return IRQ_RETVAL(handled);
 }
 
@@ -593,10 +632,10 @@ am79c961_hw_init(struct net_device *dev)
 {
 	struct dev_priv *priv = (struct dev_priv *)dev->priv;
 
-	spin_lock_irq(priv->chip_lock);
+	spin_lock_irq(&priv->chip_lock);
 	write_rreg (dev->base_addr, CSR0, CSR0_STOP);
 	write_rreg (dev->base_addr, CSR3, CSR3_MASKALL);
-	spin_unlock_irq(priv->chip_lock);
+	spin_unlock_irq(&priv->chip_lock);
 
 	am79c961_ramtest(dev, 0x66);
 	am79c961_ramtest(dev, 0x99);
@@ -618,7 +657,7 @@ static int __init am79c961_init(void)
 	struct dev_priv *priv;
 	int i, ret;
 
-	dev = init_etherdev(NULL, sizeof(struct dev_priv));
+	dev = alloc_etherdev(sizeof(struct dev_priv));
 	ret = -ENOMEM;
 	if (!dev)
 		goto out;
@@ -661,6 +700,11 @@ static int __init am79c961_init(void)
 		printk (i == 5 ? "%02x\n" : "%02x:", dev->dev_addr[i]);
 	}
 
+	spin_lock_init(&priv->chip_lock);
+	init_timer(&priv->timer);
+	priv->timer.data = (unsigned long)dev;
+	priv->timer.function = am79c961_timer;
+
 	if (am79c961_hw_init(dev))
 		goto release;
 
@@ -671,12 +715,13 @@ static int __init am79c961_init(void)
 	dev->set_multicast_list	= am79c961_setmulticastlist;
 	dev->tx_timeout		= am79c961_timeout;
 
-	return 0;
+	ret = register_netdev(dev);
+	if (ret == 0)
+		return 0;
 
 release:
 	release_region(dev->base_addr, 0x18);
 nodev:
-	unregister_netdev(dev);
 	kfree(dev);
 out:
 	return ret;

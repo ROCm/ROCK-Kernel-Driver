@@ -29,6 +29,9 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
 
+config ISA
+	bool
+	default y
 
 source "init/Kconfig"
 
@@ -67,6 +70,21 @@ config H8300H_SIM
 	  More Information.
 	  arch/h8300/Doc/simulator.txt
 
+config H8S_EDOSK2674
+	bool "EDOSK-2674"
+	help
+	  Renesas EDOSK-2674R Evalution Board Support
+	  More Information.
+	  <http://www.azpower.com/H8-uClinux/index.html>
+ 	  <http://www.eu.renesas.com/tools/edk/support/edosk2674.html>
+
+config H8S_SIM
+	bool "H8S Simulator"
+	help
+	  GDB Simulator Support
+	  More Information.
+	  arch/h8300/Doc/simulator.txt
+
 endchoice
 
 choice 
@@ -88,11 +106,20 @@ config H83068
 	bool "H8/3065,3066,3067,3068,3069"
 	depends on (H8300H_GENERIC || H8300H_AKI3068NET || H8300H_H8MAX)
 
+config H8S2678
+	bool "H8S/2670,2673,2674R,2675,2676"
+	depends on (H8S_GENERIC || H8S_EDOSK2674 || H8S_SIM)
+
 endchoice
 
 config CPU_H8300H
 	bool
 	depends on (H8300H_GENERIC || H8300H_AKI3068NET || H8300H_H8MAX || H8300H_SIM)
+	default y
+
+config CPU_H8S
+	bool
+	depends on (H8S_GENERIC || H8S_EDOSK2674 || H8S_SIM)
 	default y
 
 config CPU_CLOCK
@@ -101,6 +128,9 @@ config CPU_CLOCK
 	default "25000" if H8300H_H8MAX
 	default "16000" if H8300H_SIM
 	default "16000" if H8300H_GENERIC
+	default "33000" if H8S_GENERIC
+	default "33000" if H8S_SIM
+	default "33000" if H8S_EDOSK2674
 	help
 	  CPU Clock Frequency divide to 1000
 choice
@@ -121,15 +151,28 @@ config ROMKERNEL
 endchoice
 
 config DEFAULT_CMDLINE
-	bool
+	bool "Use buildin commandline"
+	default n
 	help
 	  buildin kernel commandline enabled.
 
 config KERNEL_COMMAND
-	string
+	string "Buildin commmand string"
+	depends on DEFAULT_CMDLINE
 	help
 	  buildin kernel commandline strings.
 
+config BLKDEV_RESERVE
+	bool "BLKDEV Reserved Memory"
+	default n
+	help
+	  Reserved BLKDEV area.
+
+config CONFIG_BLKDEV_RESERVE_ADDRESS
+	hex 'start address'
+	depends on BLKDEV_RESERVE
+	help
+	  BLKDEV start address.
 endmenu
 
 menu "Executable file formats"
@@ -152,43 +195,6 @@ source "drivers/block/Kconfig"
 source "drivers/ide/Kconfig"
 
 source "net/Kconfig"
-
-
-menu "Network device support"
-	depends on NET
-
-config NETDEVICES
-	bool "Network device support"
-	---help---
-	  You can say N here if you don't intend to connect your Linux box to
-	  any other computer at all or if all your connections will be over a
-	  telephone line with a modem either via UUCP (UUCP is a protocol to
-	  forward mail and news between unix hosts over telephone lines; read
-	  the UUCP-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>) or dialing up a shell
-	  account or a BBS, even using term (term is a program which gives you
-	  almost full Internet connectivity if you have a regular dial up
-	  shell account on some Internet connected Unix computer. Read
-	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
-
-	  You'll have to say Y if your computer contains a network card that
-	  you want to use under Linux (make sure you know its name because you
-	  will be asked for it and read the Ethernet-HOWTO (especially if you
-	  plan to use more than one network card under Linux)) or if you want
-	  to use SLIP (Serial Line Internet Protocol is the protocol used to
-	  send Internet traffic over telephone lines or null modem cables) or
-	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
-	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
-	  Protocol is mainly used to create a mini network by connecting the
-	  parallel ports of two local machines) or AX.25/KISS (protocol for
-	  sending Internet traffic over amateur radio links).
-
-	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
-	  Olaf Kirch's excellent and free book "Network Administrator's
-	  Guide", to be found in <http://www.tldp.org/docs.html#guide>. If
-	  unsure, say Y.
-
-endmenu
 
 source "net/ax25/Kconfig"
 
@@ -379,7 +385,7 @@ config NO_KERNEL_MSG
 
 config GDB_MAGICPRINT
 	bool "Message Output for GDB MagicPrint service"
-	depends on H8300H_SIM
+	depends on (H8300H_SIM || H8S_SIM)
 	help
 	  kernel messages output useing MagicPrint service from GDB
 
@@ -390,13 +396,13 @@ config SYSCALL_PRINT
 
 config GDB_DEBUG
    	bool "Use gdb stub"
-	depends on !H8300H_SIM
+	depends on (!H8300H_SIM && H8S_SIM)
 	help
 	  gdb stub exception support
 
 config CONFIG_SH_STANDARD_BIOS
 	bool "Use gdb protocol serial console"
-	depends on !H8300H_SIM
+	depends on (!H8300H_SIM && H8S_SIM)
 	help
 	  serial console output using GDB protocol.
 	  Require eCos/RedBoot

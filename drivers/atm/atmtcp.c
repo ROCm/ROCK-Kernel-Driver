@@ -77,7 +77,7 @@ static int atmtcp_send_control(struct atm_vcc *vcc,int type,
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule();
 	}
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(vcc->sk->sk_sleep, &wait);
 	return error;
 }

@@ -32,16 +32,15 @@
 #define NFSEXP_ALLSQUASH	0x0008
 #define NFSEXP_ASYNC		0x0010
 #define NFSEXP_GATHERED_WRITES	0x0020
-#define NFSEXP_UIDMAP		0x0040
-#define NFSEXP_KERBEROS		0x0080		/* not available */
-#define NFSEXP_SUNSECURE	0x0100
+/* 40 80 100 currently unused */
 #define NFSEXP_NOHIDE		0x0200
 #define NFSEXP_NOSUBTREECHECK	0x0400
 #define	NFSEXP_NOAUTHNLM	0x0800		/* Don't authenticate NLM requests - just trust */
 #define NFSEXP_MSNFS		0x1000	/* do silly things that MS clients expect */
 #define NFSEXP_FSID		0x2000
-#define	NFSEXP_CROSSMNT		0x4000
-#define NFSEXP_ALLFLAGS		0x7FFF
+#define	NFSEXP_CROSSMOUNT	0x4000
+#define	NFSEXP_NOACL		0x8000	/* reserved for possible ACL related use */
+#define NFSEXP_ALLFLAGS		0xFE3F
 
 
 #ifdef __KERNEL__
@@ -74,8 +73,7 @@ struct svc_expkey {
 #define EX_SECURE(exp)		(!((exp)->ex_flags & NFSEXP_INSECURE_PORT))
 #define EX_ISSYNC(exp)		(!((exp)->ex_flags & NFSEXP_ASYNC))
 #define EX_RDONLY(exp)		((exp)->ex_flags & NFSEXP_READONLY)
-#define EX_NOHIDE(exp)	((exp)->ex_flags & NFSEXP_NOHIDE)
-#define EX_SUNSECURE(exp)	((exp)->ex_flags & NFSEXP_SUNSECURE)
+#define EX_NOHIDE(exp)		((exp)->ex_flags & NFSEXP_NOHIDE)
 #define EX_WGATHER(exp)		((exp)->ex_flags & NFSEXP_GATHERED_WRITES)
 
 

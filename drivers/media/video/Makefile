@@ -6,8 +6,6 @@ bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o \
 			bttv-risc.o bttv-vbi.o
 zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o
 
-obj-y		:=	dummy.o
-
 obj-$(CONFIG_VIDEO_DEV) += videodev.o v4l2-common.o v4l1-compat.o
 
 obj-$(CONFIG_VIDEO_BT848) += bttv.o msp3400.o tvaudio.o \
@@ -40,4 +38,4 @@ obj-$(CONFIG_TUNER_3036) += tuner-3036.o
 
 obj-$(CONFIG_VIDEO_TUNER) += tuner.o tda9887.o
 obj-$(CONFIG_VIDEO_BUF)   += video-buf.o
-
+obj-$(CONFIG_VIDEO_BTCX)  += btcx-risc.o

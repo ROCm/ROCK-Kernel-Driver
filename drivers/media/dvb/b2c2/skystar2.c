@@ -21,6 +21,9 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
+#include <linux/init.h>
+
+#include <asm/io.h>
 
 #include "dvb_i2c.h"
 #include "dvb_frontend.h"
@@ -71,8 +74,8 @@ struct adapter {
 	u32 PidFilterMax;
 	u32 MacFilterMax;
 	u32 irq;
-	u32 io_mem;
-	u32 io_port;
+	unsigned long io_mem;
+	unsigned long io_port;
 	u8 mac_addr[8];
 	u32 dwSramType;
 
@@ -285,7 +288,7 @@ static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg *msgs, int 
 		dprintk("%s:\n", __FUNCTION__);
 
 		for (i = 0; i < num; i++) {
-			printk("message %d: flags=%x, addr=0x%04x, buf=%x, len=%d \n", i, msgs[i].flags, msgs[i].addr, (u32) msgs[i].buf, msgs[i].len);
+			printk("message %d: flags=%x, addr=0x%04x, buf=%p, len=%d \n", i, msgs[i].flags, msgs[i].addr, msgs[i].buf, msgs[i].len);
 		}
 	}
 	
@@ -1942,7 +1945,7 @@ static void Initdmaqueue(struct adapter *adapter)
 
 		adapter->dma_status = adapter->dma_status | 0x10000000;
 
-		dprintk("%s: allocated dma buffer at 0x%x, length=%d\n", __FUNCTION__, (int) adapter->dmaq1.buffer, SizeOfBufDMA1);
+		dprintk("%s: allocated dma buffer at 0x%p, length=%d\n", __FUNCTION__, adapter->dmaq1.buffer, SizeOfBufDMA1);
 
 	} else {
 
@@ -1968,7 +1971,7 @@ static void Initdmaqueue(struct adapter *adapter)
 
 		adapter->dma_status = adapter->dma_status | 0x20000000;
 
-		dprintk("%s: allocated dma buffer at 0x%x, length=%d\n", __FUNCTION__, (int) adapter->dmaq2.buffer, (int) SizeOfBufDMA2);
+		dprintk("%s: allocated dma buffer at 0x%p, length=%d\n", __FUNCTION__, adapter->dmaq2.buffer, (int) SizeOfBufDMA2);
 
 	} else {
 
@@ -2045,7 +2048,7 @@ static int ClaimAdapter(struct adapter *adapter)
 
 	adapter->io_port = pdev->resource[1].start;
 
-	adapter->io_mem = (u32) ioremap(pdev->resource[0].start, 0x800);
+	adapter->io_mem = (unsigned long) ioremap(pdev->resource[0].start, 0x800);
 
 	if (adapter->io_mem == 0) {
 		dprintk("%s: can not map io memory\n", __FUNCTION__);
@@ -2053,7 +2056,7 @@ static int ClaimAdapter(struct adapter *adapter)
 		return 2;
 	}
 
-	dprintk("%s: io memory maped at %x\n", __FUNCTION__, adapter->io_mem);
+	dprintk("%s: io memory maped at %lx\n", __FUNCTION__, adapter->io_mem);
 
 	return 1;
 }

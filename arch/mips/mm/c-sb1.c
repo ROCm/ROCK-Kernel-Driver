@@ -25,8 +25,14 @@
 #include <asm/cpu.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_SIBYTE_DMA_PAGEOPS
+extern void sb1_dma_init(void);
+extern void sb1_clear_page_dma(void * page);
+extern void sb1_copy_page_dma(void * to, void * from);
+#else
 extern void sb1_clear_page(void * page);
 extern void sb1_copy_page(void * to, void * from);
+#endif
 
 /* These are probed at ld_mmu time */
 static unsigned long icache_size;
@@ -47,23 +53,6 @@ static unsigned int dcache_sets;
 static unsigned int icache_range_cutoff;
 static unsigned int dcache_range_cutoff;
 
-void pgd_init(unsigned long page)
-{
-	unsigned long *p = (unsigned long *) page;
-	int i;
-
-	for (i = 0; i < USER_PTRS_PER_PGD; i+=8) {
-		p[i + 0] = (unsigned long) invalid_pte_table;
-		p[i + 1] = (unsigned long) invalid_pte_table;
-		p[i + 2] = (unsigned long) invalid_pte_table;
-		p[i + 3] = (unsigned long) invalid_pte_table;
-		p[i + 4] = (unsigned long) invalid_pte_table;
-		p[i + 5] = (unsigned long) invalid_pte_table;
-		p[i + 6] = (unsigned long) invalid_pte_table;
-		p[i + 7] = (unsigned long) invalid_pte_table;
-	}
-}
-
 /*
  * The dcache is fully coherent to the system, with one
  * big caveat:  the instruction stream.  In other words,
@@ -77,28 +66,36 @@ void pgd_init(unsigned long page)
  * to flush it
  */
 
+#define cache_set_op(op, addr)						\
+	__asm__ __volatile__(						\
+	"	.set	noreorder		\n"			\
+	"	.set	mips64\n\t		\n"			\
+	"	cache	%0, (0<<13)(%1)		\n"			\
+	"	cache	%0, (1<<13)(%1)		\n"			\
+	"	cache	%0, (2<<13)(%1)		\n"			\
+	"	cache	%0, (3<<13)(%1)		\n"			\
+	"	.set	mips0			\n"			\
+	"	.set	reorder"					\
+	:								\
+	: "i" (op), "r" (addr))
+
+#define sync()								\
+	__asm__ __volatile(						\
+	"	.set	mips64\n\t		\n"			\
+	"	sync				\n"			\
+	"	.set	mips0")
+
 /*
  * Writeback and invalidate the entire dcache
  */
 static inline void __sb1_writeback_inv_dcache_all(void)
 {
-	__asm__ __volatile__ (
-		".set push                  \n"
-		".set noreorder             \n"
-		".set noat                  \n"
-		".set mips4                 \n"
-		"     move   $1, $0         \n" /* Start at index 0 */
-		"1:   cache  %2, 0($1)      \n" /* Invalidate this index */
-		"     cache  %2, (1<<13)($1)\n" /* Invalidate this index */
-		"     cache  %2, (2<<13)($1)\n" /* Invalidate this index */
-		"     cache  %2, (3<<13)($1)\n" /* Invalidate this index */
-		"     addiu  %1, %1, -1     \n" /* Decrement loop count */
-		"     bnez   %1, 1b         \n" /* loop test */
-		"      addu  $1, $1, %0     \n" /* Next address */
-		".set pop                   \n"
-		:
-		: "r" (dcache_line_size), "r" (dcache_sets),
-		  "i" (Index_Writeback_Inv_D));
+	unsigned long addr = 0;
+
+	while (addr < dcache_line_size * dcache_sets) {
+		cache_set_op(Index_Writeback_Inv_D, addr);
+		addr += dcache_line_size;
+	}
 }
 
 /*
@@ -110,32 +107,14 @@ static inline void __sb1_writeback_inv_dcache_all(void)
 static inline void __sb1_writeback_inv_dcache_range(unsigned long start,
 	unsigned long end)
 {
-	__asm__ __volatile__ (
-	"	.set	push		\n"
-	"	.set	noreorder	\n"
-	"	.set	noat		\n"
-	"	.set	mips4		\n"
-	"	and	$1, %0, %3	\n" /* mask non-index bits */
-	"1:	cache	%4, (0<<13)($1)	\n" /* Index-WB-inval this address */
-	"	cache	%4, (1<<13)($1)	\n" /* Index-WB-inval this address */
-	"	cache	%4, (2<<13)($1)	\n" /* Index-WB-inval this address */
-	"	cache	%4, (3<<13)($1)	\n" /* Index-WB-inval this address */
-	"	xori	$1, $1, 1<<12 	\n" /* flip bit 12 (va/pa alias) */
-	"	cache	%4, (0<<13)($1)	\n" /* Index-WB-inval this address */
-	"	cache	%4, (1<<13)($1)	\n" /* Index-WB-inval this address */
-	"	cache	%4, (2<<13)($1)	\n" /* Index-WB-inval this address */
-	"	cache	%4, (3<<13)($1)	\n" /* Index-WB-inval this address */
-	"	addu	%0, %0, %2	\n" /* next line */
-	"	bne	%0, %1, 1b	\n" /* loop test */
-	"	 and	$1, %0, %3	\n" /* mask non-index bits */
-	"	sync			\n"
-	"	.set pop		\n"
-	:
-	: "r" (start & ~(dcache_line_size - 1)),
-	  "r" ((end + dcache_line_size - 1) & ~(dcache_line_size - 1)),
-	  "r" (dcache_line_size),
-	  "r" (dcache_index_mask),
-	  "i" (Index_Writeback_Inv_D));
+	start &= ~(dcache_line_size - 1);
+	end = (end + dcache_line_size - 1) & ~(dcache_line_size - 1);
+
+	while (start != end) {
+		cache_set_op(Index_Writeback_Inv_D, start);
+		cache_set_op(Index_Writeback_Inv_D, start ^ (1<<12));
+		start += dcache_line_size;
+	}
 }
 
 /*
@@ -146,27 +125,14 @@ static inline void __sb1_writeback_inv_dcache_range(unsigned long start,
 static inline void __sb1_writeback_inv_dcache_phys_range(unsigned long start,
 	unsigned long end)
 {
-	__asm__ __volatile__ (
-		"	.set	push		\n"
-		"	.set	noreorder	\n"
-		"	.set	noat		\n"
-		"	.set	mips4		\n"
-		"	and	$1, %0, %3	\n" /* mask non-index bits */
-		"1:	cache	%4, (0<<13)($1)	\n" /* Index-WB-inval this address */
-		"	cache	%4, (1<<13)($1)	\n" /* Index-WB-inval this address */
-		"	cache	%4, (2<<13)($1)	\n" /* Index-WB-inval this address */
-		"	cache	%4, (3<<13)($1)	\n" /* Index-WB-inval this address */
-		"	addu	%0, %0, %2	\n" /* next line */
-		"	bne	%0, %1, 1b	\n" /* loop test */
-		"	 and	$1, %0, %3	\n" /* mask non-index bits */
-		"	sync			\n"
-		"	.set pop		\n"
-		:
-		: "r" (start  & ~(dcache_line_size - 1)),
-		  "r" ((end + dcache_line_size - 1) & ~(dcache_line_size - 1)),
-		  "r" (dcache_line_size),
-		  "r" (dcache_index_mask),
-		  "i" (Index_Writeback_Inv_D));
+	start &= ~(dcache_line_size - 1);
+	end = (end + dcache_line_size - 1) & ~(dcache_line_size - 1);
+
+	while (start != end) {
+		cache_set_op(Index_Writeback_Inv_D, start & dcache_index_mask);
+		start += dcache_line_size;
+	}
+	sync();
 }
 
 
@@ -175,26 +141,12 @@ static inline void __sb1_writeback_inv_dcache_phys_range(unsigned long start,
  */
 static inline void __sb1_flush_icache_all(void)
 {
-	__asm__ __volatile__ (
-		".set push                  \n"
-		".set noreorder             \n"
-		".set noat                  \n"
-		".set mips4                 \n"
-		"     move   $1, $0         \n" /* Start at index 0 */
-		"1:   cache  %2, 0($1)      \n" /* Invalidate this index */
-		"     cache  %2, (1<<13)($1)\n" /* Invalidate this index */
-		"     cache  %2, (2<<13)($1)\n" /* Invalidate this index */
-		"     cache  %2, (3<<13)($1)\n" /* Invalidate this index */
-		"     addiu  %1, %1, -1     \n" /* Decrement loop count */
-		"     bnez   %1, 1b         \n" /* loop test */
-		"      addu  $1, $1, %0     \n" /* Next address */
-		"     bnezl  $0, 2f         \n" /* Force mispredict */
-		"      nop                  \n"
-		"2:   sync                  \n"
-		".set pop                   \n"
-		:
-		: "r" (icache_line_size), "r" (icache_sets),
-		  "i" (Index_Invalidate_I));
+	unsigned long addr = 0;
+
+	while (addr < icache_line_size * icache_sets) {
+		cache_set_op(Index_Invalidate_I, addr);
+		addr += icache_line_size;
+	}
 }
 
 /*
@@ -260,29 +212,19 @@ asm("sb1_flush_cache_page = local_sb1_flush_cache_page");
 static inline void __sb1_flush_icache_range(unsigned long start,
 	unsigned long end)
 {
-	__asm__ __volatile__ (
-		".set push                  \n"
-		".set noreorder             \n"
-		".set noat                  \n"
-		".set mips4                 \n"
-		"     and    $1, %0, %3     \n" /* mask non-index bits */
-		"1:   cache  %4, (0<<13)($1) \n" /* Index-inval this address */
-		"     cache  %4, (1<<13)($1) \n" /* Index-inval this address */
-		"     cache  %4, (2<<13)($1) \n" /* Index-inval this address */
-		"     cache  %4, (3<<13)($1) \n" /* Index-inval this address */
-		"     addu   %0, %0, %2     \n" /* next line */
-		"     bne    %0, %1, 1b     \n" /* loop test */
-		"      and   $1, %0, %3     \n" /* mask non-index bits */
-		"     bnezl  $0, 2f         \n" /* Force mispredict */
-		"      nop                  \n"
-		"2:   sync                  \n"
-		".set pop                   \n"
-		:
-		: "r" (start  & ~(icache_line_size - 1)),
-		  "r" ((end + icache_line_size - 1) & ~(icache_line_size - 1)),
-		  "r" (icache_line_size),
-		  "r" (icache_index_mask),
-		  "i" (Index_Invalidate_I));
+	start &= ~(icache_line_size - 1);
+	end = (end + icache_line_size - 1) & ~(icache_line_size - 1);
+
+	while (start != end) {
+		cache_set_op(Index_Invalidate_I, start & icache_index_mask);
+		start += icache_line_size;
+	}
+
+	__asm__ __volatile__(
+	"	bnezl  $0, 1f		\n" /* Force mispredict */
+	"1:				\n");
+
+	sync();
 }
 
 
@@ -562,7 +504,6 @@ static __init void probe_cache_sizes(void)
 void ld_mmu_sb1(void)
 {
 	extern char except_vec2_sb1;
-	unsigned long temp;
 
 	/* Special cache error handler for SB1 */
 	memcpy((void *)(KSEG0 + 0x100), &except_vec2_sb1, 0x80);
@@ -570,8 +511,14 @@ void ld_mmu_sb1(void)
 
 	probe_cache_sizes();
 
+#ifdef CONFIG_SIBYTE_DMA_PAGEOPS
+	_clear_page = sb1_clear_page_dma;
+	_copy_page = sb1_copy_page_dma;
+	sb1_dma_init();
+#else
 	_clear_page = sb1_clear_page;
 	_copy_page = sb1_copy_page;
+#endif
 
 	/*
 	 * None of these are needed for the SB1 - the Dcache is
@@ -595,17 +542,22 @@ void ld_mmu_sb1(void)
 	__flush_cache_all = sb1___flush_cache_all;
 
 	change_c0_config(CONF_CM_CMASK, CONF_CM_DEFAULT);
+
 	/*
 	 * This is the only way to force the update of K0 to complete
 	 * before subsequent instruction fetch.
 	 */
-	__asm__ __volatile__ (
-	"	.set	push		\n"
-	"	.set	mips4		\n"
-	"	la	%0, 1f		\n"
-	"	mtc0	%0, $14		\n"
-	"	eret			\n"
-	"1:	.set	pop		\n"
-	: "=r" (temp));
+	write_c0_epc(&&here);
+here:
+	__asm__ __volatile__(
+	"	.set	noreorder		\n"
+	"	.set	mips3\n\t		\n"
+	"	eret				\n"
+	"	.set	mips0\n\t		\n"
+	"	.set	reorder"
+	:
+	:
+	: "memory");
+
 	flush_cache_all();
 }

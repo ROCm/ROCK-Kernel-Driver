@@ -18,8 +18,9 @@ struct x25_asy {
   int			magic;
 
   /* Various fields. */
+  spinlock_t		lock;
   struct tty_struct	*tty;		/* ptr to TTY structure		*/
-  struct net_device		*dev;		/* easy for intr handling	*/
+  struct net_device	*dev;		/* easy for intr handling	*/
 
   /* These are pointers to the malloc()ed frame buffers. */
   unsigned char		*rbuff;		/* receiver buffer		*/
@@ -29,17 +30,8 @@ struct x25_asy {
   int                   xleft;          /* bytes left in XMIT queue     */
 
   /* X.25 interface statistics. */
-  unsigned long		rx_packets;	/* inbound frames counter	*/
-  unsigned long         tx_packets;     /* outbound frames counter      */
-  unsigned long		rx_bytes;	/* inbound byte counte		*/
-  unsigned long         tx_bytes;       /* outbound byte counter	*/
-  unsigned long         rx_errors;      /* Parity, etc. errors          */
-  unsigned long         tx_errors;      /* Planned stuff                */
-  unsigned long         rx_dropped;     /* No memory for skb            */
-  unsigned long         tx_dropped;     /* When MTU change              */
-  unsigned long         rx_over_errors; /* Frame bigger then X.25 buf.  */
+  struct net_device_stats stats;
 
-  int			mtu;		/* Our mtu (to spot changes!)   */
   int                   buffsize;       /* Max buffers sizes            */
 
   unsigned long		flags;		/* Flag values/ mode etc	*/

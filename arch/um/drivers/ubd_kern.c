@@ -75,7 +75,7 @@ static struct block_device_operations ubd_blops = {
 };
 
 /* Protected by the queue_lock */
-static request_queue_t ubd_queue;
+static request_queue_t *ubd_queue;
 
 /* Protected by ubd_lock */
 static int fake_major = MAJOR_NR;
@@ -387,7 +387,7 @@ static void ubd_finish(struct request *req, int error)
 static void ubd_handler(void)
 {
 	struct io_thread_req req;
-	struct request *rq = elv_next_request(&ubd_queue);
+	struct request *rq = elv_next_request(ubd_queue);
 	int n;
 
 	do_ubd = NULL;
@@ -408,7 +408,7 @@ static void ubd_handler(void)
 	
 	ubd_finish(rq, req.error);
 	reactivate_fd(thread_fd, UBD_IRQ);	
-	do_ubd_request(&ubd_queue);
+	do_ubd_request(ubd_queue);
 }
 
 static irqreturn_t ubd_intr(int irq, void *dev, struct pt_regs *unused)
@@ -529,7 +529,7 @@ static int ubd_new_disk(int major, u64 size, int unit,
 	}
 
 	disk->private_data = &ubd_dev[unit];
-	disk->queue = &ubd_queue;
+	disk->queue = ubd_queue;
 	add_disk(disk);
 
 	*disk_out = disk;
@@ -691,8 +691,13 @@ int ubd_init(void)
 	if (register_blkdev(MAJOR_NR, "ubd"))
 		return -1;
 
-	blk_init_queue(&ubd_queue, do_ubd_request, &ubd_io_lock);
-	elevator_init(&ubd_queue, &elevator_noop);
+	ubd_queue = blk_init_queue(do_ubd_request, &ubd_io_lock);
+	if (!ubd_queue) {
+		unregister_blkdev(MAJOR_NR, "ubd");
+		return -1;
+	}
+		
+	elevator_init(ubd_queue, &elevator_noop);
 
 	if (fake_major != MAJOR_NR) {
 		char name[sizeof("ubd_nnn\0")];

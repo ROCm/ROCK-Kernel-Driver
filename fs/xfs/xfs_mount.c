@@ -728,6 +728,8 @@ xfs_mountfs(
 	} else
 		mp->m_maxicount = 0;
 
+	mp->m_maxioffset = xfs_max_file_offset(sbp->sb_blocklog);
+
 	/*
 	 * XFS uses the uuid from the superblock as the unique
 	 * identifier for fsid.  We can not use the uuid from the volume
@@ -889,7 +891,7 @@ xfs_mountfs(
 	 *  File systems that don't support user level file handles (i.e.
 	 *  all of them except for XFS) will leave vfs_altfsid as NULL.
 	 */
-	vfsp->vfs_altfsid = (fsid_t *)mp->m_fixedfsid;
+	vfsp->vfs_altfsid = (__kernel_fsid_t *)mp->m_fixedfsid;
 	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
 
 	/*

@@ -366,9 +366,10 @@ static struct usb_driver usb_kbd_driver = {
 
 static int __init usb_kbd_init(void)
 {
-	usb_register(&usb_kbd_driver);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+	int result = usb_register(&usb_kbd_driver);
+	if (result == 0)
+		info(DRIVER_VERSION ":" DRIVER_DESC);
+	return result;
 }
 
 static void __exit usb_kbd_exit(void)

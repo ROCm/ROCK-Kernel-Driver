@@ -1,12 +1,11 @@
 /*
- * termbits stuff for Linux/MIPS.
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 2001 Ralf Baechle
- * Copyright (C) 2001  MIPS Technologies, Inc.
+ * Copyright (C) 1995, 1996, 1999, 2001 Ralf Baechle
+ * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
 #ifndef _ASM_TERMBITS_H
 #define _ASM_TERMBITS_H
@@ -14,8 +13,14 @@
 #include <linux/posix_types.h>
 
 typedef unsigned char cc_t;
+#if (_MIPS_SZLONG == 32)
 typedef unsigned long speed_t;
 typedef unsigned long tcflag_t;
+#endif
+#if (_MIPS_SZLONG == 64)
+typedef __u32 speed_t;
+typedef __u32 tcflag_t;
+#endif
 
 /*
  * The ABI says nothing about NCC but seems to use NCCS as
@@ -27,9 +32,6 @@ struct termios {
 	tcflag_t c_oflag;		/* output mode flags */
 	tcflag_t c_cflag;		/* control mode flags */
 	tcflag_t c_lflag;		/* local mode flags */
-	/*
-	 * Seems nonexistent in the ABI, but Linux assumes existence ...
-	 */
 	cc_t c_line;			/* line discipline */
 	cc_t c_cc[NCCS];		/* control characters */
 };

@@ -160,7 +160,7 @@ static void __devexit amd76xrom_remove_one (struct pci_dev *pdev)
 #endif /* REQUEST_MEM_REGION */
 }
 
-static struct pci_device_id amd76xrom_pci_tbl[] __devinitdata = {
+static struct pci_device_id amd76xrom_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7410,  
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7440,  

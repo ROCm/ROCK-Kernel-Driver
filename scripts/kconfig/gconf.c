@@ -56,7 +56,7 @@ GdkColor color;
 
 GtkTreeStore *tree1, *tree2, *tree;
 GtkTreeModel *model1, *model2;
-static GtkTreeIter *parents[256] = { 0 };
+static GtkTreeIter *parents[256];
 static gint indent;
 
 static struct menu *current; // current node for SINGLE view
@@ -110,7 +110,7 @@ const char *dbg_print_stype(int val)
 
 const char *dbg_print_flags(int val)
 {
-	static char buf[256] = { 0 };
+	static char buf[256];
 
 	bzero(buf, 256);
 
@@ -577,7 +577,7 @@ void
 on_window1_size_request(GtkWidget * widget,
 			GtkRequisition * requisition, gpointer user_data)
 {
-	static gint old_h = 0;
+	static gint old_h;
 	gint w, h;
 
 	if (widget->window == NULL)
@@ -1184,7 +1184,7 @@ on_treeview1_button_press_event(GtkWidget * widget,
 /* Fill a row of strings */
 static gchar **fill_row(struct menu *menu)
 {
-	static gchar *row[COL_NUMBER] = { 0 };
+	static gchar *row[COL_NUMBER];
 	struct symbol *sym = menu->sym;
 	const char *def;
 	int stype;

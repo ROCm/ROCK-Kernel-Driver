@@ -31,7 +31,7 @@
  * Offset to the current process status flags, the first 32 bytes of the
  * stack are not used.
  */
-#define ST_OFF (KERNEL_STACK_SIZE - 32 - PT_SIZE + PT_STATUS)
+#define ST_OFF (THREAD_SIZE - 32 - PT_SIZE + PT_STATUS)
 
 /*
  * FPU context is saved iff the process has used it's FPU in the current
@@ -53,7 +53,7 @@ LEAF(resume)
 #endif
 	mfc0	t1, CP0_STATUS
 	sw	t1, THREAD_STATUS(a0)
-	CPU_SAVE_NONSCRATCH(a0)
+	cpu_save_nonscratch a0
 	sw	ra, THREAD_REG31(a0)
 
 	/* 
@@ -61,7 +61,7 @@ LEAF(resume)
 	 */
 	lw	t3, TASK_THREAD_INFO(a0)
 	lw	t0, TI_FLAGS(t3)
-	li	t1, TIF_USEDFPU
+	li	t1, _TIF_USEDFPU
 	and	t2, t0, t1
 	beqz	t2, 1f
 	nor	t1, zero, t1
@@ -77,7 +77,7 @@ LEAF(resume)
 	and	t0, t0, t1
 	sw	t0, ST_OFF(t3)
 
-	FPU_SAVE_SINGLE(a0, t0)			# clobbers t0
+	fpu_save_single a0, t0			# clobbers t0
 
 1:
 	/*
@@ -85,9 +85,9 @@ LEAF(resume)
 	 * updating $28, $29 and kernelsp without disabling ints.
 	 */
 	move	$28, a2
-	CPU_RESTORE_NONSCRATCH(a1)
+	cpu_restore_nonscratch a1
 
-	addiu	t1, $28, KERNEL_STACK_SIZE-32
+	addiu	t1, $28, THREAD_SIZE-32
 	sw	t1, kernelsp
 
 	mfc0	t1, CP0_STATUS		/* Do we really need this? */
@@ -106,7 +106,7 @@ LEAF(resume)
  * Save a thread's fp context.
  */
 LEAF(_save_fp)
-	FPU_SAVE_SINGLE(a0, t1)			# clobbers t1
+	fpu_save_single a0, t1			# clobbers t1
 	jr	ra
 	END(_save_fp)
 
@@ -114,7 +114,7 @@ LEAF(_save_fp)
  * Restore a thread's fp context.
  */
 LEAF(_restore_fp)
-	FPU_RESTORE_SINGLE(a0, t1)		# clobbers t1
+	fpu_restore_single a0, t1		# clobbers t1
 	jr	ra
 	END(_restore_fp)
 

@@ -40,6 +40,8 @@
 
 #include "paride.h"
 
+MODULE_LICENSE("GPL");
+
 #define MAX_PROTOS	32
 
 static struct pi_protocol *protocols[MAX_PROTOS];

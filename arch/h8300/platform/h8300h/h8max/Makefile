@@ -6,8 +6,7 @@
 # unless it's something special (ie not a .c file).
 #
 
-all: $(BOARD).o
-O_TARGET := $(BOARD).o
+extra-y := crt0_ram.o
 obj-y := timer.o
 
 timer.o: timer.c

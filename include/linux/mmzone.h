@@ -89,6 +89,18 @@ struct zone {
 
 	ZONE_PADDING(_pad2_)
 
+ 	/*
+	 * measure of scanning intensity for this zone. It is calculated
+	 * as exponentially decaying average of the scanning priority
+	 * required to free enough pages in this zone
+	 * (zone_adj_pressure()).
+	 *
+	 *     0                    --- low pressure
+	 *
+	 *     (DEF_PRIORITY << 10) --- high pressure
+	 */
+	int pressure;
+
 	/*
 	 * free areas of different sizes
 	 */

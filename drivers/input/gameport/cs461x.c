@@ -216,7 +216,7 @@ static int cs461x_gameport_open(struct gameport *gameport, int mode)
 	return 0;
 }
 
-static struct pci_device_id cs461x_pci_tbl[] __devinitdata = {
+static struct pci_device_id cs461x_pci_tbl[] = {
 	{ PCI_VENDOR_ID_CIRRUS, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* Cirrus CS4610 */
 	{ PCI_VENDOR_ID_CIRRUS, 0x6003, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* Cirrus CS4612 */
 	{ PCI_VENDOR_ID_CIRRUS, 0x6005, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* Cirrus CS4615 */
@@ -287,7 +287,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	port->read = cs461x_gameport_read;
 	port->cooked_read = cs461x_gameport_cooked_read;
 
-	sprintf(phys, "pci%s/gameport0", pdev->slot_name);
+	sprintf(phys, "pci%s/gameport0", pci_name(pdev));
 
 	port->name = name;
 	port->phys = phys;
@@ -301,7 +301,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	gameport_register_port(port);
 
 	printk(KERN_INFO "gameport: %s on pci%s speed %d kHz\n",
-		name, pdev->slot_name, port->speed);
+		name, pci_name(pdev), port->speed);
 
 	return 0;
 }

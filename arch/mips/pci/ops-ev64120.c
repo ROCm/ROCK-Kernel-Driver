@@ -804,7 +804,7 @@ static void galileo_pcibios_set_master(struct pci_dev *dev)
 	galileo_pcibios_read_config_word(dev, PCI_COMMAND, &cmd);
 	cmd |= PCI_COMMAND_MASTER;
 	galileo_pcibios_write_config_word(dev, PCI_COMMAND, cmd);
-	DBG("PCI: Enabling device %s (%04x)\n", dev->slot_name, cmd);
+	DBG("PCI: Enabling device %s (%04x)\n", pci_name(dev), cmd);
 }
 
 /*  Externally-expected functions.  Do not change function names  */
@@ -829,7 +829,7 @@ int pcibios_enable_resources(struct pci_dev *dev)
 		if (!r->start && r->end) {
 			printk(KERN_ERR
 			       "PCI: Device %s not available because of resource collisions\n",
-			       dev->slot_name);
+			       pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -839,7 +839,7 @@ int pcibios_enable_resources(struct pci_dev *dev)
 	}
 	if (cmd != old_cmd) {
 		DBG(KERN_INFO "PCI: Enabling device %s (%04x -> %04x)\n",
-		    dev->slot_name, old_cmd, cmd);
+		    pci_name(dev), old_cmd, cmd);
 		galileo_pcibios_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 
@@ -884,7 +884,7 @@ void pcibios_align_resource(void *data, struct resource *res,
 		   addresses kilobyte aligned.  */
 		if (size > 0x100) {
 			DBG(KERN_ERR "PCI: I/O Region %s/%d too large"
-			    " (%ld bytes)\n", dev->slot_name,
+			    " (%ld bytes)\n", pci_name(dev),
 			    dev->resource - res, size);
 		}
 

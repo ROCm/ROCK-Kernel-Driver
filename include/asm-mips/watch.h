@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1996, 1997, 1998, 2000, 2001 by Ralf Baechle
  */
-#ifndef __ASM_WATCH_H
-#define __ASM_WATCH_H
+#ifndef _ASM_WATCH_H
+#define _ASM_WATCH_H
 
 #include <linux/linkage.h>
 
@@ -32,4 +32,4 @@ extern asmlinkage void __watch_reenable(void);
 	if (cpu_has_watch)					\
 		__watch_reenable()
 
-#endif /* __ASM_WATCH_H */
+#endif /* _ASM_WATCH_H */

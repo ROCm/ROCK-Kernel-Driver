@@ -10,9 +10,9 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
-#ifndef __ASM_MIPS_IRQ_CPU_H
-#define __ASM_MIPS_IRQ_CPU_H
+#ifndef _ASM_IRQ_CPU_H
+#define _ASM_IRQ_CPU_H
 
 extern void mips_cpu_irq_init(int irq_base);
 
-#endif /* __ASM_MIPS_IRQ_CPU_H */
+#endif /* _ASM_IRQ_CPU_H */

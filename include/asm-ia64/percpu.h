@@ -45,6 +45,7 @@ DECLARE_PER_CPU(unsigned long, local_per_cpu_offset);
 #define __get_cpu_var(var) (*RELOC_HIDE(&per_cpu__##var, __ia64_per_cpu_var(local_per_cpu_offset)))
 
 extern void percpu_modcopy(void *pcpudst, const void *src, unsigned long size);
+extern void setup_per_cpu_areas (void);
 
 #else /* ! SMP */
 
@@ -55,10 +56,6 @@ extern void percpu_modcopy(void *pcpudst, const void *src, unsigned long size);
 
 #define EXPORT_PER_CPU_SYMBOL(var)		EXPORT_SYMBOL(per_cpu__##var)
 #define EXPORT_PER_CPU_SYMBOL_GPL(var)		EXPORT_SYMBOL_GPL(per_cpu__##var)
-
-/* ia64-specific part: */
-
-extern void setup_per_cpu_areas (void);
 
 /*
  * Be extremely careful when taking the address of this variable!  Due to virtual

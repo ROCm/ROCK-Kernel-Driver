@@ -4,7 +4,7 @@
  * for more details.
  *
  * Copyright (c) 1994 - 1997, 1999, 2000  Ralf Baechle (ralf@gnu.org)
- * Copyright (c) 2000  Silicon Graphics, Inc.
+ * Copyright (c) 1999, 2000  Silicon Graphics, Inc.
  */
 #ifndef _ASM_BITOPS_H
 #define _ASM_BITOPS_H
@@ -17,9 +17,13 @@
 #if (_MIPS_SZLONG == 32)
 #define SZLONG_LOG 5
 #define SZLONG_MASK 31UL
+#define __LL	"ll"
+#define __SC	"sc"
 #elif (_MIPS_SZLONG == 64)
 #define SZLONG_LOG 6
-#define SZLONG_MASK 63UL 
+#define SZLONG_MASK 63UL
+#define __LL	"lld"
+#define __SC	"scd"
 #endif
 
 #ifdef __KERNEL__
@@ -67,18 +71,18 @@
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(int nr, volatile unsigned long *addr)
+static inline void set_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	unsigned long *m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long *m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 	unsigned long temp;
 
 	__asm__ __volatile__(
-		"1:\tll\t%0, %1\t\t# set_bit\n\t"
+		"1:\t" __LL "\t%0, %1\t\t# set_bit\n\t"
 		"or\t%0, %2\n\t"
-		"sc\t%0, %1\n\t"
+		__SC "\t%0, %1\n\t"
 		"beqz\t%0, 1b"
 		: "=&r" (temp), "=m" (*m)
-		: "ir" (1UL << (nr & 0x1f)), "m" (*m));
+		: "ir" (1UL << (nr & SZLONG_MASK)), "m" (*m));
 }
 
 /*
@@ -90,11 +94,11 @@ static __inline__ void set_bit(int nr, volatile unsigned long *addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
+static inline void __set_bit(unsigned long nr, volatile unsigned long * addr)
 {
-	unsigned long * m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long * m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 
-	*m |= 1UL << (nr & 31);
+	*m |= 1UL << (nr & SZLONG_MASK);
 }
 
 /*
@@ -107,18 +111,18 @@ static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
-static __inline__ void clear_bit(int nr, volatile unsigned long *addr)
+static inline void clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	unsigned long *m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long *m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 	unsigned long temp;
 
 	__asm__ __volatile__(
-		"1:\tll\t%0, %1\t\t# clear_bit\n\t"
+		"1:\t" __LL "\t%0, %1\t\t# clear_bit\n\t"
 		"and\t%0, %2\n\t"
-		"sc\t%0, %1\n\t"
+		__SC "\t%0, %1\n\t"
 		"beqz\t%0, 1b\n\t"
 		: "=&r" (temp), "=m" (*m)
-		: "ir" (~(1UL << (nr & 0x1f))), "m" (*m));
+		: "ir" (~(1UL << (nr & SZLONG_MASK))), "m" (*m));
 }
 
 /*
@@ -130,34 +134,34 @@ static __inline__ void clear_bit(int nr, volatile unsigned long *addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
+static inline void __clear_bit(unsigned long nr, volatile unsigned long * addr)
 {
-	unsigned long * m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long * m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 
-	*m &= ~(1UL << (nr & 31));
+	*m &= ~(1UL << (nr & SZLONG_MASK));
 }
 
 /*
  * change_bit - Toggle a bit in memory
- * @nr: Bit to clear
+ * @nr: Bit to change
  * @addr: Address to start counting from
  *
  * change_bit() is atomic and may not be reordered.
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void change_bit(int nr, volatile unsigned long *addr)
+static inline void change_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	unsigned long *m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long *m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 	unsigned long temp;
 
 	__asm__ __volatile__(
-		"1:\tll\t%0, %1\t\t# change_bit\n\t"
+		"1:\t" __LL "\t%0, %1\t\t# change_bit\n\t"
 		"xor\t%0, %2\n\t"
-		"sc\t%0, %1\n\t"
+		__SC "\t%0, %1\n\t"
 		"beqz\t%0, 1b"
 		: "=&r" (temp), "=m" (*m)
-		: "ir" (1UL << (nr & 0x1f)), "m" (*m));
+		: "ir" (1UL << (nr & SZLONG_MASK)), "m" (*m));
 }
 
 /*
@@ -169,11 +173,11 @@ static __inline__ void change_bit(int nr, volatile unsigned long *addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __change_bit(int nr, volatile unsigned long * addr)
+static inline void __change_bit(unsigned long nr, volatile unsigned long * addr)
 {
-	unsigned long * m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long * m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 
-	*m ^= 1UL << (nr & 31);
+	*m ^= 1UL << (nr & SZLONG_MASK);
 }
 
 /*
@@ -184,17 +188,17 @@ static __inline__ void __change_bit(int nr, volatile unsigned long * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_set_bit(int nr, volatile unsigned long *addr)
+static inline int test_and_set_bit(unsigned long nr,
+	volatile unsigned long *addr)
 {
-	unsigned long *m = ((unsigned long *) addr) + (nr >> 5);
-	unsigned long temp;
-	int res;
+	unsigned long *m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
+	unsigned long temp, res;
 
 	__asm__ __volatile__(
 		".set\tnoreorder\t\t# test_and_set_bit\n"
-		"1:\tll\t%0, %1\n\t"
+		"1:\t" __LL "\t%0, %1\n\t"
 		"or\t%2, %0, %3\n\t"
-		"sc\t%2, %1\n\t"
+		__SC "\t%2, %1\n\t"
 		"beqz\t%2, 1b\n\t"
 		" and\t%2, %0, %3\n\t"
 #ifdef CONFIG_SMP
@@ -202,7 +206,7 @@ static __inline__ int test_and_set_bit(int nr, volatile unsigned long *addr)
 #endif
 		".set\treorder"
 		: "=&r" (temp), "=m" (*m), "=&r" (res)
-		: "r" (1UL << (nr & 0x1f)), "m" (*m)
+		: "r" (1UL << (nr & SZLONG_MASK)), "m" (*m)
 		: "memory");
 
 	return res != 0;
@@ -217,14 +221,15 @@ static __inline__ int test_and_set_bit(int nr, volatile unsigned long *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * addr)
+static inline int __test_and_set_bit(unsigned long nr,
+	volatile unsigned long *addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	retval = (mask & *a) != 0;
 	*a |= mask;
 
@@ -239,17 +244,18 @@ static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_clear_bit(int nr, volatile unsigned long *addr)
+static inline int test_and_clear_bit(unsigned long nr,
+	volatile unsigned long *addr)
 {
-	unsigned long *m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long *m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 	unsigned long temp, res;
 
 	__asm__ __volatile__(
 		".set\tnoreorder\t\t# test_and_clear_bit\n"
-		"1:\tll\t%0, %1\n\t"
+		"1:\t" __LL "\t%0, %1\n\t"
 		"or\t%2, %0, %3\n\t"
 		"xor\t%2, %3\n\t"
-		"sc\t%2, %1\n\t"
+		__SC "\t%2, %1\n\t"
 		"beqz\t%2, 1b\n\t"
 		" and\t%2, %0, %3\n\t"
 #ifdef CONFIG_SMP
@@ -257,7 +263,7 @@ static __inline__ int test_and_clear_bit(int nr, volatile unsigned long *addr)
 #endif
 		".set\treorder"
 		: "=&r" (temp), "=m" (*m), "=&r" (res)
-		: "r" (1UL << (nr & 0x1f)), "m" (*m)
+		: "r" (1UL << (nr & SZLONG_MASK)), "m" (*m)
 		: "memory");
 
 	return res != 0;
@@ -272,15 +278,16 @@ static __inline__ int test_and_clear_bit(int nr, volatile unsigned long *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_clear_bit(int nr,
+static inline int __test_and_clear_bit(unsigned long nr,
 	volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
-	unsigned long mask, retval;
+	unsigned long mask;
+	int retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *a) != 0;
+	a += (nr >> SZLONG_LOG);
+	mask = 1UL << (nr & SZLONG_MASK);
+	retval = ((mask & *a) != 0);
 	*a &= ~mask;
 
 	return retval;
@@ -294,16 +301,17 @@ static __inline__ int __test_and_clear_bit(int nr,
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_change_bit(int nr, volatile unsigned long *addr)
+static inline int test_and_change_bit(unsigned long nr,
+	volatile unsigned long *addr)
 {
-	unsigned long *m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long *m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 	unsigned long temp, res;
 
 	__asm__ __volatile__(
 		".set\tnoreorder\t\t# test_and_change_bit\n"
-		"1:\tll\t%0, %1\n\t"
+		"1:\t" __LL "\t%0, %1\n\t"
 		"xor\t%2, %0, %3\n\t"
-		"sc\t%2, %1\n\t"
+		__SC "\t%2, %1\n\t"
 		"beqz\t%2, 1b\n\t"
 		" and\t%2, %0, %3\n\t"
 #ifdef CONFIG_SMP
@@ -311,7 +319,7 @@ static __inline__ int test_and_change_bit(int nr, volatile unsigned long *addr)
 #endif
 		".set\treorder"
 		: "=&r" (temp), "=m" (*m), "=&r" (res)
-		: "r" (1UL << (nr & 0x1f)), "m" (*m)
+		: "r" (1UL << (nr & SZLONG_MASK)), "m" (*m)
 		: "memory");
 
 	return res != 0;
@@ -326,16 +334,16 @@ static __inline__ int test_and_change_bit(int nr, volatile unsigned long *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_change_bit(int nr,
+static inline int __test_and_change_bit(unsigned long nr,
 	volatile unsigned long *addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *a) != 0;
+	a += (nr >> SZLONG_LOG);
+	mask = 1UL << (nr & SZLONG_MASK);
+	retval = ((mask & *a) != 0);
 	*a ^= mask;
 
 	return retval;
@@ -353,14 +361,14 @@ static __inline__ int __test_and_change_bit(int nr,
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(int nr, volatile unsigned long * addr)
+static inline void set_bit(unsigned long nr, volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	__bi_flags;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	__bi_local_irq_save(flags);
 	*a |= mask;
 	__bi_local_irq_restore(flags);
@@ -375,13 +383,13 @@ static __inline__ void set_bit(int nr, volatile unsigned long * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
+static inline void __set_bit(unsigned long nr, volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	*a |= mask;
 }
 
@@ -395,26 +403,26 @@ static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
-static __inline__ void clear_bit(int nr, volatile unsigned long * addr)
+static inline void clear_bit(unsigned long nr, volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	__bi_flags;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	__bi_local_irq_save(flags);
 	*a &= ~mask;
 	__bi_local_irq_restore(flags);
 }
 
-static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
+static inline void __clear_bit(unsigned long nr, volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	*a &= ~mask;
 }
 
@@ -427,14 +435,14 @@ static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void change_bit(int nr, volatile unsigned long * addr)
+static inline void change_bit(unsigned long nr, volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	__bi_flags;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	__bi_local_irq_save(flags);
 	*a ^= mask;
 	__bi_local_irq_restore(flags);
@@ -449,11 +457,11 @@ static __inline__ void change_bit(int nr, volatile unsigned long * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __change_bit(int nr, volatile unsigned long * addr)
+static inline void __change_bit(unsigned long nr, volatile unsigned long * addr)
 {
-	unsigned long * m = ((unsigned long *) addr) + (nr >> 5);
+	unsigned long * m = ((unsigned long *) addr) + (nr >> SZLONG_LOG);
 
-	*m ^= 1UL << (nr & 31);
+	*m ^= 1UL << (nr & SZLONG_MASK);
 }
 
 /*
@@ -464,15 +472,16 @@ static __inline__ void __change_bit(int nr, volatile unsigned long * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_set_bit(int nr, volatile unsigned long * addr)
+static inline int test_and_set_bit(unsigned long nr,
+	volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 	__bi_flags;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	__bi_local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a |= mask;
@@ -490,14 +499,15 @@ static __inline__ int test_and_set_bit(int nr, volatile unsigned long * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * addr)
+static inline int __test_and_set_bit(unsigned long nr,
+	volatile unsigned long *addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	retval = (mask & *a) != 0;
 	*a |= mask;
 
@@ -512,15 +522,16 @@ static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_clear_bit(int nr, volatile unsigned long * addr)
+static inline int test_and_clear_bit(unsigned long nr,
+	volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 	__bi_flags;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	__bi_local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a &= ~mask;
@@ -538,16 +549,16 @@ static __inline__ int test_and_clear_bit(int nr, volatile unsigned long * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_clear_bit(int nr,
+static inline int __test_and_clear_bit(unsigned long nr,
 	volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *a) != 0;
+	a += (nr >> SZLONG_LOG);
+	mask = 1UL << (nr & SZLONG_MASK);
+	retval = ((mask & *a) != 0);
 	*a &= ~mask;
 
 	return retval;
@@ -561,14 +572,15 @@ static __inline__ int __test_and_clear_bit(int nr,
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_change_bit(int nr, volatile unsigned long * addr)
+static inline int test_and_change_bit(unsigned long nr,
+	volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask, retval;
 	__bi_flags;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += nr >> SZLONG_LOG;
+	mask = 1 << (nr & SZLONG_MASK);
 	__bi_local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a ^= mask;
@@ -586,15 +598,15 @@ static __inline__ int test_and_change_bit(int nr, volatile unsigned long * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_change_bit(int nr,
+static inline int __test_and_change_bit(unsigned long nr,
 	volatile unsigned long * addr)
 {
 	volatile unsigned long *a = addr;
 	unsigned long mask;
 	int retval;
 
-	a += nr >> 5;
-	mask = 1 << (nr & 0x1f);
+	a += (nr >> SZLONG_LOG);
+	mask = 1 << (nr & SZLONG_MASK);
 	retval = (mask & *a) != 0;
 	*a ^= mask;
 
@@ -613,7 +625,7 @@ static __inline__ int __test_and_change_bit(int nr,
  * @nr: bit number to test
  * @addr: Address to start counting from
  */
-static inline int test_bit(int nr, const volatile unsigned long *addr)
+static inline int test_bit(unsigned long nr, const volatile unsigned long *addr)
 {
 	return 1UL & (((const volatile unsigned long *) addr)[nr >> SZLONG_LOG] >> (nr & SZLONG_MASK));
 }
@@ -624,16 +636,26 @@ static inline int test_bit(int nr, const volatile unsigned long *addr)
  *
  * Undefined if no zero exists, so code should check against ~0UL first.
  */
-static __inline__ unsigned long ffz(unsigned long word)
+static inline unsigned long ffz(unsigned long word)
 {
 	int b = 0, s;
 
 	word = ~word;
+#ifdef CONFIG_MIPS32
 	s = 16; if (word << 16 != 0) s = 0; b += s; word >>= s;
 	s =  8; if (word << 24 != 0) s = 0; b += s; word >>= s;
 	s =  4; if (word << 28 != 0) s = 0; b += s; word >>= s;
 	s =  2; if (word << 30 != 0) s = 0; b += s; word >>= s;
 	s =  1; if (word << 31 != 0) s = 0; b += s;
+#endif
+#ifdef CONFIG_MIPS64
+	s = 32; if (word << 32 != 0) s = 0; b += s; word >>= s;
+	s = 16; if (word << 48 != 0) s = 0; b += s; word >>= s;
+	s =  8; if (word << 56 != 0) s = 0; b += s; word >>= s;
+	s =  4; if (word << 60 != 0) s = 0; b += s; word >>= s;
+	s =  2; if (word << 62 != 0) s = 0; b += s; word >>= s;
+	s =  1; if (word << 63 != 0) s = 0; b += s;
+#endif
 
 	return b;
 }
@@ -644,7 +666,7 @@ static __inline__ unsigned long ffz(unsigned long word)
  *
  * Undefined if no bit exists, so code should check against 0 first.
  */
-static __inline__ unsigned long __ffs(unsigned long word)
+static inline unsigned long __ffs(unsigned long word)
 {
 	return ffz(~word);
 }
@@ -763,23 +785,30 @@ found_middle:
 
 /*
  * Every architecture must define this function. It's the fastest
- * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be set. It's guaranteed that at least one of the 168
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
  * bits is cleared.
  */
 static inline int sched_find_first_bit(unsigned long *b)
 {
+#ifdef CONFIG_MIPS32
 	if (unlikely(b[0]))
 		return __ffs(b[0]);
 	if (unlikely(b[1]))
 		return __ffs(b[1]) + 32;
 	if (unlikely(b[2]))
 		return __ffs(b[2]) + 64;
-	if (unlikely(b[3]))
+	if (b[3])
 		return __ffs(b[3]) + 96;
-	if (b[4])
-		return __ffs(b[4]) + 128;
-	return __ffs(b[5]) + 32 + 128;
+	return __ffs(b[4]) + 128;
+#endif
+#ifdef CONFIG_MIPS64
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 64;
+	return __ffs(b[2]) + 128;
+#endif
 }
 
 /*
@@ -800,9 +829,9 @@ static inline int sched_find_first_bit(unsigned long *b)
  * The Hamming Weight of a number is the total number of bits set in it.
  */
 
-#define hweight32(x) generic_hweight32(x)
-#define hweight16(x) generic_hweight16(x)
-#define hweight8(x) generic_hweight8(x)
+#define hweight32(x)	generic_hweight32(x)
+#define hweight16(x)	generic_hweight16(x)
+#define hweight8(x)	generic_hweight8(x)
 
 static inline int __test_and_set_le_bit(unsigned long nr, unsigned long *addr)
 {
@@ -858,15 +887,15 @@ static inline unsigned long ext2_ffz(unsigned int word)
 static inline unsigned long find_next_zero_le_bit(unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
-	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
-	unsigned int result = offset & ~31;
+	unsigned int *p = ((unsigned int *) addr) + (offset >> SZLONG_LOG);
+	unsigned int result = offset & ~SZLONG_MASK;
 	unsigned int tmp;
 
 	if (offset >= size)
 		return size;
 
 	size -= result;
-	offset &= 31;
+	offset &= SZLONG_MASK;
 	if (offset) {
 		tmp = cpu_to_le32p(p++);
 		tmp |= ~0U >> (32-offset); /* bug or feature ? */

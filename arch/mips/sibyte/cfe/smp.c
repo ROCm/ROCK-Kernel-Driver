@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000, 2001 Broadcom Corporation
+ * Copyright (C) 2000, 2001, 2002, 2003 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -43,13 +43,16 @@ int prom_boot_secondary(int cpu, unsigned long sp, unsigned long gp)
 
 void prom_init_secondary(void)
 {
-	/* Set up kseg0 to be cachable coherent */
-	clear_c0_config(CONF_CM_CMASK);
-	set_c0_config(0x5);
+	extern void load_mmu(void);
+	unsigned int imask = STATUSF_IP4 | STATUSF_IP3 | STATUSF_IP2 |
+		STATUSF_IP1 | STATUSF_IP0;
 
-	/* Enable interrupts for lines 0-4 */
-	clear_c0_status(0xe000);
-	set_c0_status(0x1f01);
+	/* Enable basic interrupts */
+	change_c0_status(ST0_IM, imask);
+	set_c0_status(ST0_IE);
+
+	/* cache and TLB setup */
+	load_mmu();
 }
 
 /*

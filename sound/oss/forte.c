@@ -2092,7 +2092,7 @@ forte_remove (struct pci_dev *pci_dev)
 }
 
 
-static struct pci_device_id forte_pci_ids[] __devinitdata = {
+static struct pci_device_id forte_pci_ids[] = {
 	{ 0x1319, 0x0801, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
 	{ 0, }
 };

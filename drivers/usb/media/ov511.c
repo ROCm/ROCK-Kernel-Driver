@@ -6088,7 +6088,7 @@ ov518_configure(struct usb_ov511 *ov)
 
 	if (ov->bridge == BRG_OV518)
 	{
-		struct usb_interface *ifp = &ov->dev->config[0].interface[0];
+		struct usb_interface *ifp = ov->dev->config[0].interface[0];
 		__u16 mxps = ifp->altsetting[7].endpoint[0].desc.wMaxPacketSize;
 
 		/* Some OV518s have packet numbering by default, some don't */

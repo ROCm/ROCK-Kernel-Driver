@@ -3,13 +3,9 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994 - 1999 by Ralf Baechle
+ * Copyright (C) 1994, 95, 96, 97, 98, 99, 2003 by Ralf Baechle
  * Copyright (C) 1996 by Paul M. Antoine
- * Copyright (C) 1994 - 1999 by Ralf Baechle
- *
- * Changed set_except_vector declaration to allow return of previous
- * vector address value - necessary for "borrowing" vectors.
- *
+ * Copyright (C) 1999 Silicon Graphics
  * Kevin D. Kissell, kevink@mips.org and Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 2000 MIPS Technologies, Inc.
  */
@@ -36,7 +32,7 @@ __asm__ (
 	".set\tpop\n\t"
 	".endm");
 
-extern inline void local_irq_enable(void)
+static inline void local_irq_enable(void)
 {
 	__asm__ __volatile__(
 		"local_irq_enable"
@@ -67,7 +63,7 @@ __asm__ (
 	".set\tpop\n\t"
 	".endm");
 
-extern inline void local_irq_disable(void)
+static inline void local_irq_disable(void)
 {
 	__asm__ __volatile__(
 		"local_irq_disable"
@@ -284,12 +280,10 @@ do { \
 	(last) = resume(prev, next, next->thread_info); \
 } while(0)
 
-/*
- * For 32 and 64 bit operands we can take advantage of ll and sc.
- * FIXME: This doesn't work for R3000 machines.
- */
-extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
+static inline unsigned long xchg_u32(volatile int * m, unsigned int val)
 {
+	__u32 retval;
+
 #ifdef CONFIG_CPU_HAS_LLSC
 	unsigned long dummy;
 
@@ -304,31 +298,69 @@ extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
 		" ll\t%0, %3\n\t"
 		"sync\n\t"
 		".set\tpop"
-		: "=&r" (val), "=m" (*m), "=&r" (dummy)
+		: "=&r" (retval), "=m" (*m), "=&r" (dummy)
 		: "R" (*m), "Jr" (val)
 		: "memory");
-
-	return val;
 #else
-	unsigned long flags, retval;
+	unsigned long flags;
 
 	local_irq_save(flags);
 	retval = *m;
 	*m = val;
 	local_irq_restore(flags);	/* implies memory barrier  */
+#endif
+
 	return retval;
-#endif /* Processor-dependent optimization */
 }
+
+#ifdef CONFIG_MIPS64
+static inline __u64 xchg_u64(volatile __u64 * m, __u64 long val)
+{
+	__u64 retval;
+
+#ifdef CONFIG_CPU_HAS_LLDSCD
+	unsigned long dummy;
+
+	__asm__ __volatile__(
+		".set\tpush\t\t\t\t# xchg_u64\n\t"
+		".set\tnoreorder\n\t"
+		".set\tnomacro\n\t"
+		"lld\t%0, %3\n"
+		"1:\tmove\t%2, %z4\n\t"
+		"scd\t%2, %1\n\t"
+		"beqzl\t%2, 1b\n\t"
+		" lld\t%0, %3\n\t"
+		"sync\n\t"
+		".set\tpop"
+		: "=&r" (retval), "=m" (*m), "=&r" (dummy)
+		: "R" (*m), "Jr" (val)
+		: "memory");
+#else
+	unsigned long flags;
+
+	local_irq_save(flags);
+	retval = *m;
+	*m = val;
+	local_irq_restore(flags);	/* implies memory barrier  */
+#endif
+
+	return retval;
+}
+#else
+extern __u64 __xchg_u64_unsupported_on_32bit_kernels(volatile __u64 * m, __u64 val);
+#define xchg_u64 __xchg_u64_unsupported_on_32bit_kernels
+#endif
 
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
 #define tas(ptr) (xchg((ptr),1))
 
-static __inline__ unsigned long
-__xchg(unsigned long x, volatile void * ptr, int size)
+static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
 {
 	switch (size) {
 		case 4:
 			return xchg_u32(ptr, x);
+		case 8:
+			return xchg_u64(ptr, x);
 	}
 	return x;
 }

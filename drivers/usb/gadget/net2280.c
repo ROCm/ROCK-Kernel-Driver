@@ -2537,7 +2537,6 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->gadget.ops = &net2280_ops;
 
 	strcpy (dev->gadget.dev.bus_id, pci_name(pdev));
-	strcpy (dev->gadget.dev.name, pdev->dev.name);
 	dev->gadget.dev.parent = &pdev->dev;
 	dev->gadget.dev.dma_mask = pdev->dev.dma_mask;
 	dev->gadget.name = driver_name;
@@ -2666,7 +2665,7 @@ done:
 
 /*-------------------------------------------------------------------------*/
 
-static struct pci_device_id __devinitdata pci_ids [] = { {
+static struct pci_device_id pci_ids [] = { {
 	.class = 	((PCI_CLASS_SERIAL_USB << 8) | 0xfe),
 	.class_mask = 	~0,
 	.vendor =	0x17cc,

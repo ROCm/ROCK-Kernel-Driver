@@ -342,9 +342,10 @@ static struct usb_driver xpad_driver = {
 
 static int __init usb_xpad_init(void)
 {
-	usb_register(&xpad_driver);
-	info(DRIVER_DESC ":" DRIVER_VERSION);
-	return 0;
+	int result = usb_register(&xpad_driver);
+	if (result == 0)
+		info(DRIVER_DESC ":" DRIVER_VERSION);
+	return result;
 }
 
 static void __exit usb_xpad_exit(void)

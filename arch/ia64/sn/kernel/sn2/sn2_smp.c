@@ -41,6 +41,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/mmzone.h>
+#include <linux/module.h>
 
 #include <asm/processor.h>
 #include <asm/irq.h>
@@ -214,6 +215,7 @@ sn_send_IPI_phys(long physid, int vector, int delivery_mode)
 	}
 
 }
+EXPORT_SYMBOL(sn_send_IPI_phys);
 
 /**
  * sn2_send_IPI - send an IPI to a processor

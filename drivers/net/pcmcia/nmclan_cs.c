@@ -427,7 +427,7 @@ Function Prototypes
 ---------------------------------------------------------------------------- */
 
 static void nmclan_config(dev_link_t *link);
-static void nmclan_release(u_long arg);
+static void nmclan_release(dev_link_t *link);
 static int nmclan_event(event_t event, int priority,
 			event_callback_args_t *args);
 
@@ -490,9 +490,6 @@ static dev_link_t *nmclan_attach(void)
     link->priv = dev;
     
     spin_lock_init(&lp->bank_lock);
-    init_timer(&link->release);
-    link->release.function = &nmclan_release;
-    link->release.data = (u_long)link;
     link->io.NumPorts1 = 32;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
     link->io.IOAddrLines = 5;
@@ -569,9 +566,8 @@ static void nmclan_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	nmclan_release((u_long)link);
+	nmclan_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -815,7 +811,7 @@ static void nmclan_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    nmclan_release((u_long)link);
+    nmclan_release(link);
     return;
 
 } /* nmclan_config */
@@ -826,9 +822,8 @@ nmclan_release
 	net device, and release the PCMCIA configuration.  If the device
 	is still open, this will be postponed until it is closed.
 ---------------------------------------------------------------------------- */
-static void nmclan_release(u_long arg)
+static void nmclan_release(dev_link_t *link)
 {
-  dev_link_t *link = (dev_link_t *)arg;
 
   DEBUG(0, "nmclan_release(0x%p)\n", link);
 
@@ -867,7 +862,7 @@ static int nmclan_event(event_t event, int priority,
       link->state &= ~DEV_PRESENT;
       if (link->state & DEV_CONFIG) {
 	netif_device_detach(dev);
-	mod_timer(&link->release, jiffies + HZ/20);
+	nmclan_release(link);
       }
       break;
     case CS_EVENT_CARD_INSERTION:
@@ -1012,7 +1007,7 @@ static int mace_close(struct net_device *dev)
   link->open--;
   netif_stop_queue(dev);
   if (link->state & DEV_STALE_CONFIG)
-    mod_timer(&link->release, jiffies + HZ/20);
+	  nmclan_release(link);
 
   return 0;
 } /* mace_close */

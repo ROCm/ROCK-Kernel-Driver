@@ -285,10 +285,10 @@ void ide_setup_pci_noise (struct pci_dev *dev, ide_pci_device_t *d)
 	if ((d->vendor != dev->vendor) && (d->device != dev->device)) {
 		printk(KERN_INFO "%s: unknown IDE controller at PCI slot "
 			"%s, VID=%04x, DID=%04x\n",
-			d->name, dev->slot_name, dev->vendor, dev->device);
+			d->name, pci_name(dev), dev->vendor, dev->device);
         } else {
 		printk(KERN_INFO "%s: IDE controller at PCI slot %s\n",
-			d->name, dev->slot_name);
+			d->name, pci_name(dev));
 	}
 }
 

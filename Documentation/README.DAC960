@@ -212,7 +212,6 @@ replacing "/usr/src" with wherever you keep your Linux kernel source tree:
   patch -p0 < DAC960.patch (if DAC960.patch is included)
   cd linux
   make config
-  make depend
   make bzImage (or zImage)
 
 Then install "arch/i386/boot/bzImage" or "arch/i386/boot/zImage" as your

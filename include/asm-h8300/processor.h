@@ -52,17 +52,16 @@ extern inline void wrusp(unsigned long usp) {
 #define MCA_bus 0
 
 struct thread_struct {
-	unsigned long  ksp;		/* kernel stack pointer */
-	unsigned long  usp;		/* user stack pointer */
-	unsigned short ccr;		/* saved status register */
-	unsigned long  esp0;            /* points to SR of stack frame */
-	unsigned long  vfork_ret;
-	unsigned long  debugreg[8];     /* debug info */
-} __attribute__((aligned(2),packed));
+	unsigned long ksp;		/* kernel stack pointer */
+	unsigned long usp;		/* user stack pointer */
+	unsigned long ccr;		/* saved status register */
+	unsigned long esp0;             /* points to SR of stack frame */
+	unsigned long debugreg[8];      /* debug info */
+};
 
 #define INIT_THREAD  { \
 	sizeof(init_stack) + (unsigned long) init_stack, 0, \
-	PS_S,  0, 0, \
+	PS_S, \
 }
 
 /*
@@ -71,13 +70,25 @@ struct thread_struct {
  * pass the data segment into user programs if it exists,
  * it can't hurt anything as far as I can tell
  */
+#if defined(__H8300S__)
 #define start_thread(_regs, _pc, _usp)			        \
 do {							        \
-	(_regs)->pc = (_pc);				        \
-	(_regs)->ccr &= ~0x10;				        \
-        *((unsigned long *)(_usp)-1) = _pc;                     \
-	wrusp((unsigned long)(_usp) - sizeof(unsigned long)*3);	\
+	set_fs(USER_DS);           /* reads from user space */  \
+  	(_regs)->pc = (_pc);				        \
+	(_regs)->ccr &= ~0x10;	   /* clear kernel flag */      \
 } while(0)
+#endif
+#if defined(__H8300S__)
+#define start_thread(_regs, _pc, _usp)			        \
+do {							        \
+	set_fs(USER_DS);           /* reads from user space */  \
+	(_regs)->pc = (_pc);				        \
+	(_regs)->ccr &= ~0x10;	   /* clear kernel flag */      \
+	(_regs)->exr = 0x78;       /* enable all interrupts */  \
+	/* 14 = space for retaddr(4), vector(4), er0(4) and ext(2) on stack */ \
+	wrusp(((unsigned long)(_usp)) - 14);                    \
+} while(0)
+#endif
 
 /* Forward declaration, a strange C thing */
 struct task_struct;

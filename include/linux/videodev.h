@@ -3,18 +3,10 @@
 
 #include <linux/types.h>
 #include <linux/version.h>
+#include <linux/device.h>
 
-#if 1
-/*
- * v4l2 is still work-in-progress, integration planed for 2.5.x
- *   documentation:           http://bytesex.org/v4l/
- *   patches available from:  http://bytesex.org/patches/
- */ 
-# define HAVE_V4L2 1
-# include <linux/videodev2.h>
-#else
-# undef HAVE_V4L2
-#endif
+#define HAVE_V4L2 1
+#include <linux/videodev2.h>
 
 #ifdef __KERNEL__
 
@@ -23,34 +15,70 @@
 
 struct video_device
 {
-	struct module *owner;
-     	char name[32];
- 	int type;       /* v4l1 */
- 	int type2;      /* v4l2 */
+	/* device info */
+	struct device *dev;
+	char name[32];
+	int type;       /* v4l1 */
+	int type2;      /* v4l2 */
 	int hardware;
 	int minor;
 
- 	/* new interface -- we will use file_operations directly
- 	 * like soundcore does. */
- 	struct file_operations *fops;
-	void *priv;		/* Used to be 'private' but that upsets C++ */
+	/* device ops + callbacks */
+	struct file_operations *fops;
+	void (*release)(struct video_device *vfd);
 
-	/* for videodev.c intenal usage -- don't touch */
-	int users;
-	struct semaphore lock;
-	char devfs_name[64];	/* devfs */
+
+#if 1 /* to be removed in 2.7.x */
+	/* obsolete -- fops->owner is used instead */
+	struct module *owner;
+	/* dev->driver_data will be used instead some day.
+	 * Use the video_{get|set}_drvdata() helper functions,
+	 * so the switch over will be transparent for you.
+	 * Or use {pci|usb}_{get|set}_drvdata() directly. */
+	void *priv;
+#endif
+
+	/* for videodev.c intenal usage -- please don't touch */
+	int users;                     /* video_exclusive_{open|close} ... */
+	struct semaphore lock;         /* ... helper function uses these   */
+	char devfs_name[64];           /* devfs */
+	struct class_device class_dev; /* sysfs */
 };
 
 #define VIDEO_MAJOR	81
-extern int video_register_device(struct video_device *, int type, int nr);
 
 #define VFL_TYPE_GRABBER	0
 #define VFL_TYPE_VBI		1
 #define VFL_TYPE_RADIO		2
 #define VFL_TYPE_VTX		3
 
+extern int video_register_device(struct video_device *, int type, int nr);
 extern void video_unregister_device(struct video_device *);
 extern struct video_device* video_devdata(struct file*);
+
+#define to_video_device(cd) container_of(cd, struct video_device, class_dev)
+static inline void
+video_device_create_file(struct video_device *vfd,
+			 struct class_device_attribute *attr)
+{
+	class_device_create_file(&vfd->class_dev, attr);
+}
+
+/* helper functions to alloc / release struct video_device, the
+   later can be used for video_device->release() */
+struct video_device *video_device_alloc(void);
+void video_device_release(struct video_device *vfd);
+
+/* helper functions to access driver private data. */
+static inline void *video_get_drvdata(struct video_device *dev)
+{
+	return dev->priv;
+}
+
+static inline void video_set_drvdata(struct video_device *dev, void *data)
+{
+	dev->priv = data;
+}
 
 extern int video_exclusive_open(struct inode *inode, struct file *file);
 extern int video_exclusive_release(struct inode *inode, struct file *file);

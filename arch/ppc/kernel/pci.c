@@ -117,7 +117,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 	unsigned long offset;
 
 	if (!hose) {
-		printk(KERN_ERR "No hose for PCI dev %s!\n", dev->slot_name);
+		printk(KERN_ERR "No hose for PCI dev %s!\n", pci_name(dev));
 		return;
 	}
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
@@ -126,7 +126,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 			continue;
 		if (!res->start || res->end == 0xffffffff) {
 			DBG("PCI:%s Resource %d [%08lx-%08lx] is unassigned\n",
-			    dev->slot_name, i, res->start, res->end);
+			    pci_name(dev), i, res->start, res->end);
 			res->end -= res->start;
 			res->start = 0;
 			res->flags |= IORESOURCE_UNSET;
@@ -144,7 +144,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 			res->end += offset;
 #ifdef DEBUG
 			printk("Fixup res %d (%lx) of dev %s: %lx -> %lx\n",
-			       i, res->flags, dev->slot_name,
+			       i, res->flags, pci_name(dev),
 			       res->start - offset, res->start);
 #endif
 		}
@@ -231,7 +231,7 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size,
 
 		if (size > 0x100) {
 			printk(KERN_ERR "PCI: I/O Region %s/%d too large"
-			       " (%ld bytes)\n", dev->slot_name,
+			       " (%ld bytes)\n", pci_name(dev),
 			       dev->resource - res, size);
 		}
 
@@ -522,7 +522,7 @@ update_bridge_base(struct pci_bus *bus, int i)
 
 	} else {
 		DBG(KERN_ERR "PCI: ugh, bridge %s res %d has flags=%lx\n",
-		    dev->slot_name, i, res->flags);
+		    pci_name(dev), i, res->flags);
 	}
 	pci_write_config_word(dev, PCI_COMMAND, cmd);
 }
@@ -532,11 +532,11 @@ static inline void alloc_resource(struct pci_dev *dev, int idx)
 	struct resource *pr, *r = &dev->resource[idx];
 
 	DBG("PCI:%s: Resource %d: %08lx-%08lx (f=%lx)\n",
-	    dev->slot_name, idx, r->start, r->end, r->flags);
+	    pci_name(dev), idx, r->start, r->end, r->flags);
 	pr = pci_find_parent_resource(dev, r);
 	if (!pr || request_resource(pr, r) < 0) {
 		printk(KERN_ERR "PCI: Cannot allocate resource region %d"
-		       " of device %s\n", idx, dev->slot_name);
+		       " of device %s\n", idx, pci_name(dev));
 		if (pr)
 			DBG("PCI:  parent is %p: %08lx-%08lx (f=%lx)\n",
 			    pr, pr->start, pr->end, pr->flags);
@@ -576,7 +576,7 @@ pcibios_allocate_resources(int pass)
 		if (r->flags & PCI_ROM_ADDRESS_ENABLE) {
 			/* Turn the ROM off, leave the resource region, but keep it unregistered. */
 			u32 reg;
-			DBG("PCI: Switching off ROM of %s\n", dev->slot_name);
+			DBG("PCI: Switching off ROM of %s\n", pci_name(dev));
 			r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
 			pci_read_config_dword(dev, dev->rom_base_reg, &reg);
 			pci_write_config_dword(dev, dev->rom_base_reg,
@@ -643,7 +643,7 @@ pcibios_enable_resources(struct pci_dev *dev, int mask)
 		
 		r = &dev->resource[idx];
 		if (r->flags & IORESOURCE_UNSET) {
-			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
+			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -654,7 +654,7 @@ pcibios_enable_resources(struct pci_dev *dev, int mask)
 	if (dev->resource[PCI_ROM_RESOURCE].start)
 		cmd |= PCI_COMMAND_MEMORY;
 	if (cmd != old_cmd) {
-		printk("PCI: Enabling device %s (%04x -> %04x)\n", dev->slot_name, old_cmd, cmd);
+		printk("PCI: Enabling device %s (%04x -> %04x)\n", pci_name(dev), old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;
@@ -1409,7 +1409,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 	for (idx=0; idx<6; idx++) {
 		r = &dev->resource[idx];
 		if (r->flags & IORESOURCE_UNSET) {
-			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
+			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -1419,7 +1419,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 	}
 	if (cmd != old_cmd) {
 		printk("PCI: Enabling device %s (%04x -> %04x)\n",
-		       dev->slot_name, old_cmd, cmd);
+		       pci_name(dev), old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;

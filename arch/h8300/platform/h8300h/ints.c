@@ -18,6 +18,9 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
+#include <linux/random.h>
+#include <linux/bootmem.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -27,8 +30,7 @@
 #include <asm/gpio.h>
 #include <asm/hardirq.h>
 #include <asm/regs306x.h>
-
-#define INTERNAL_IRQS (64)
+#include <asm/errno.h>
 
 #define EXT_IRQ0 12
 #define EXT_IRQ1 13
@@ -39,75 +41,144 @@
 #define EXT_IRQ6 18
 #define EXT_IRQ7 19
 
-#define WDT_IRQ 20
+/*
+ * This structure has only 4 elements for speed reasons
+ */
+typedef struct irq_handler {
+	irqreturn_t (*handler)(int, void *, struct pt_regs *);
+	int         flags;
+	int         count;
+	void	    *dev_id;
+	const char  *devname;
+} irq_handler_t;
 
-/* table for system interrupt handlers */
-static irq_handler_t irq_list[SYS_IRQS];
+irq_handler_t *irq_list[NR_IRQS];
 
-/* The number of spurious interrupts */
-volatile unsigned int num_spurious;
+extern unsigned long *interrupt_redirect_table;
 
-/* assembler routines */
-asmlinkage void system_call(void);
-asmlinkage void bad_interrupt(void);
-
-/* irq node variables for the 32 (potential) on chip sources */
-/*static irq_node_t *int_irq_list[INTERNAL_IRQS];*/
-static int int_irq_count[INTERNAL_IRQS];
-
-#if 0
-static void int_badint(int irq, void *dev_id, struct pt_regs *fp)
+static inline unsigned long *get_vector_address(void)
 {
-	num_spurious += 1;
-}
-#endif
+	unsigned long *rom_vector = (unsigned long *)0x000000;
+	unsigned long base,tmp;
+	int vec_no;
 
-void init_IRQ(void)
-{
-	int i;
-
-	for (i = 0; i < SYS_IRQS; i++) {
-		irq_list[i].handler = NULL;
-		irq_list[i].flags   = 0;
-		irq_list[i].devname = NULL;
-		irq_list[i].dev_id  = NULL;
+	base = rom_vector[EXT_IRQ0];
+	
+	/* check romvector format */
+	for (vec_no = EXT_IRQ1; vec_no <= EXT_IRQ5; vec_no++) {
+		if ((base+(vec_no - EXT_IRQ0)*4) != rom_vector[vec_no])
+			return NULL;
 	}
 
+	/* ramvector base address */
+	base -= EXT_IRQ0*4;
+
+	/* writerble check */
+	tmp = ~(*(volatile unsigned long *)base);
+	(*(volatile unsigned long *)base) = tmp;
+	if ((*(volatile unsigned long *)base) != tmp)
+		return NULL;
+	return (unsigned long *)base;
 }
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+void __init init_IRQ(void)
+{
+#if defined(CONFIG_RAMKERNEL)
+	int i;
+	unsigned long *ramvec,*ramvec_p;
+	unsigned long break_vec;
+
+#if defined(CONFIG_GDB_DEBUG)
+	break_vec = ramvec[TRAP3_VEC];
+#else
+	break_vec = VECTOR(trace_break);
+#endif
+
+	ramvec = get_vector_address();
+	if (ramvec == NULL)
+		panic("interrupt vector serup failed.");
+	else
+		printk("virtual vector at 0x%08lx\n",(unsigned long)ramvec);
+
+	for (ramvec_p = ramvec, i = 0; i < NR_IRQS; i++)
+		*ramvec_p++ = REDIRECT(interrupt_entry);
+
+	ramvec[TRAP0_VEC] = VECTOR(system_call);
+	ramvec[TRAP3_VEC] = break_vec;
+	interrupt_redirect_table = ramvec;
+#ifdef DUMP_VECTOR
+	ramvec_p = interrupt_redirect_table;
+	for (i = 0; i < NR_IRQS; i++) {
+		if ((i % 8) == 0)
+			printk("\n%p: ",ramvec_p);
+		printk("%p ",*ramvec_p);
+		ramvec_p++;
+	}
+	printk("\n");
+#endif
+#endif
+}
+
+void __init request_irq_boot(unsigned int irq, 
+  	                     irqreturn_t (*handler)(int, void *, struct pt_regs *),
+                             unsigned long flags, const char *devname, void *dev_id)
+{
+	irq_handler_t *irq_handle;
+	irq_handle = alloc_bootmem(sizeof(irq_handler_t));
+	irq_handle->handler = handler;
+	irq_handle->flags   = flags;
+	irq_handle->count   = 0;
+	irq_handle->dev_id  = dev_id;
+	irq_handle->devname = devname;
+	irq_list[irq] = irq_handle;
+}
+
+int request_irq(unsigned int irq, 
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
                 unsigned long flags, const char *devname, void *dev_id)
 {
+	irq_handler_t *irq_handle;
+	if (irq < 0 || irq >= NR_IRQS) {
+		printk("Incorrect IRQ %d from %s\n", irq, devname);
+		return -EINVAL;
+	}
+	if (irq_list[irq])
+		return -EBUSY;
 	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ3) {
 		if (H8300_GPIO_RESERVE(H8300_GPIO_P8, 1 << (irq - EXT_IRQ0)) == 0)
-			return 1;
+			return -EBUSY;
 		H8300_GPIO_DDR(H8300_GPIO_P8, (irq - EXT_IRQ0), 0);
 	}
 	if (irq >= EXT_IRQ4 && irq <= EXT_IRQ5) {
 		if (H8300_GPIO_RESERVE(H8300_GPIO_P9, 1 << (irq - EXT_IRQ0)) == 0)
-			return 1;
+			return -EBUSY;
 		H8300_GPIO_DDR(H8300_GPIO_P9, (irq - EXT_IRQ0), 0);
 	}
-	irq_list[irq].handler = handler;
-	irq_list[irq].flags   = flags;
-	irq_list[irq].devname = devname;
-	irq_list[irq].dev_id  = dev_id;
-	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5)
-		*(volatile unsigned char *)IER |= 1 << (irq - EXT_IRQ0);
+	irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+	if (irq_handle == NULL)
+		return -ENOMEM;
+
+	irq_handle->handler = handler;
+	irq_handle->flags   = flags;
+	irq_handle->count   = 0;
+	irq_handle->dev_id  = dev_id;
+	irq_handle->devname = devname;
+	irq_list[irq] = irq_handle;
 	return 0;
 }
 
 void free_irq(unsigned int irq, void *dev_id)
 {
-	if (irq_list[irq].dev_id != dev_id)
-		printk("%s: Removing probably wrong IRQ %d from %s\n",
-		       __FUNCTION__, irq, irq_list[irq].devname);
+	if (irq >= NR_IRQS) {
+		return;
+	}
+	if (!irq_list[irq] || irq_list[irq]->dev_id != dev_id)
+		printk("Removing probably wrong IRQ %d from %s\n",
+		       irq, irq_list[irq]->devname);
 	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5)
 		*(volatile unsigned char *)IER &= ~(1 << (irq - EXT_IRQ0));
-	irq_list[irq].handler = NULL;
-	irq_list[irq].flags   = 0;
-	irq_list[irq].dev_id  = NULL;
-	irq_list[irq].devname = NULL;
+	kfree(irq_list[irq]);
+	irq_list[irq] = NULL;
 }
 
 /*
@@ -123,115 +194,36 @@ int probe_irq_off (unsigned long irqs)
 	return 0;
 }
 
-struct int_regs {
-	unsigned long ier;
-	unsigned long isr;
-	unsigned char mask;
-};
-
-#define REGS_DEF(ier,isr,mask) {ier,isr,mask}
-
-const struct int_regs interrupt_registers[]= {
-	REGS_DEF(IER,ISR,0x01),
-	REGS_DEF(IER,ISR,0x02),
-	REGS_DEF(IER,ISR,0x04),
-	REGS_DEF(IER,ISR,0x08),
-	REGS_DEF(IER,ISR,0x10),
-	REGS_DEF(IER,ISR,0x20),
-	REGS_DEF(IER,ISR,0x40),
-	REGS_DEF(IER,ISR,0x80),
-	REGS_DEF(TCSR,TCSR,0x20),
-	REGS_DEF(RTMCSR,RTMCSR,0x40),
-	REGS_DEF(0,0,0),
-	REGS_DEF(ADCSR,ADCSR,0x40),
-	REGS_DEF(TISRA,TISRA,0x10),
-	REGS_DEF(TISRB,TISRB,0x10),
-	REGS_DEF(TISRC,TISRC,0x10),
-	REGS_DEF(0,0,0),
-	REGS_DEF(TISRA,TISRA,0x20),
-	REGS_DEF(TISRB,TISRB,0x20),
-	REGS_DEF(TISRC,TISRC,0x20),
-	REGS_DEF(0,0,0),
-	REGS_DEF(TISRA,TISRA,0x40),
-	REGS_DEF(TISRB,TISRB,0x40),
-	REGS_DEF(TISRC,TISRC,0x40),
-	REGS_DEF(0,0,0),
-	REGS_DEF(_8TCR0,_8TCSR0,0x40),
-	REGS_DEF(_8TCR0,_8TCSR0,0x80),
-	REGS_DEF(_8TCR1,_8TCSR1,0xC0),
-	REGS_DEF(_8TCR0,_8TCSR0,0x20),
-	REGS_DEF(_8TCR2,_8TCSR2,0x40),
-	REGS_DEF(_8TCR2,_8TCSR2,0x80),
-	REGS_DEF(_8TCR3,_8TCSR3,0xC0),
-	REGS_DEF(_8TCR2,_8TCSR2,0x20),
-	REGS_DEF(DTCR0A,DTCR0A,0x0),
-	REGS_DEF(DTCR0B,DTCR0B,0x0),
-	REGS_DEF(DTCR1A,DTCR1A,0x0),
-	REGS_DEF(DTCR1B,DTCR1B,0x0),
-	REGS_DEF(0,0,0),
-	REGS_DEF(0,0,0),
-	REGS_DEF(0,0,0),
-	REGS_DEF(0,0,0),
-	REGS_DEF(SCR0,SSR0,0x40),
-	REGS_DEF(SCR0,SSR0,0x40),
-	REGS_DEF(SCR0,SSR0,0x80),
-	REGS_DEF(SCR0,SSR0,0x04),
-	REGS_DEF(SCR1,SSR1,0x40),
-	REGS_DEF(SCR1,SSR1,0x40),
-	REGS_DEF(SCR1,SSR1,0x80),
-	REGS_DEF(SCR1,SSR1,0x04),
-	REGS_DEF(SCR2,SSR2,0x40),
-	REGS_DEF(SCR2,SSR2,0x40),
-	REGS_DEF(SCR2,SSR2,0x80),
-	REGS_DEF(SCR2,SSR2,0x04)
-};
-
 void enable_irq(unsigned int irq)
 {
-	unsigned char ier;
-	const struct int_regs *regs=&interrupt_registers[irq - 12];
-	if (irq == WDT_IRQ) {
-		ier = ctrl_inb(TCSR);
-		ier |= 0x20;
-		ctrl_outb((0xa500 | ier),TCSR);
-	} else {
-		if ((irq > 12) && regs->ier) {
-			ier = ctrl_inb(regs->ier);
-			ier |= regs->mask;
-			ctrl_outb(ier, regs->ier);
-		} else
-			panic("Unknown interrupt vector");
+	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5) {
+		*(volatile unsigned char *)IER |= (1 << (irq - EXT_IRQ0));
+		*(volatile unsigned char *)ISR &= ~(1 << (irq - EXT_IRQ0));
 	}
 }
 
 void disable_irq(unsigned int irq)
 {
-	unsigned char ier;
-	const struct int_regs *regs=&interrupt_registers[irq - 12];
-	if (irq == WDT_IRQ) {
-		ier = ctrl_inb(TCSR);
-		ier &= ~0x20;
-		ctrl_outb((0xa500 | ier),TCSR);
-	} else {
-		if ((irq > 12) && regs->ier) {
-			ier = ctrl_inb(regs->ier);
-			ier &= ~(regs->mask);
-			ctrl_outb(ier, regs->ier);
-		} else
-			panic("Unknown interrupt vector");
+	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5) {
+		*(volatile unsigned char *)IER &= ~(1 << (irq - EXT_IRQ0));
 	}
 }
 
-asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
+asmlinkage void process_int(int vec, struct pt_regs *fp)
 {
 	irq_enter();
-	if (irq_list[vec].handler) {
-		irq_list[vec].handler(vec, irq_list[vec].dev_id, fp);
-		int_irq_count[vec]++;
-	} else
-		panic("No interrupt handler for %ld\n", vec);
 	if (vec >= EXT_IRQ0 && vec <= EXT_IRQ5)
 		*(volatile unsigned char *)ISR &= ~(1 << (vec - EXT_IRQ0));
+	if (vec < NR_IRQS) {
+		if (irq_list[vec]) {
+			irq_list[vec]->handler(vec, irq_list[vec]->dev_id, fp);
+			irq_list[vec]->count++;
+			if (irq_list[vec]->flags & SA_SAMPLE_RANDOM)
+				add_interrupt_randomness(vec);
+		}
+	} else {
+		BUG();
+	}
 	irq_exit();
 }
 
@@ -240,8 +232,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i;
 
 	for (i = 0; i < NR_IRQS; i++) {
-		seq_printf(p, "%3d: %10u ",i,int_irq_count[i]);
-		seq_printf(p, "%s\n", irq_list[i].devname);
+		if (irq_list[i]) {
+			seq_printf(p, "%3d: %10u ",i,irq_list[i]->count);
+			seq_printf(p, "%s\n", irq_list[i]->devname);
+		}
 	}
 
 	return 0;

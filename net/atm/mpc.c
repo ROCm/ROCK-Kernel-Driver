@@ -1379,8 +1379,8 @@ static void mpc_timer_refresh()
 static void mpc_cache_check( unsigned long checking_time  )
 {
 	struct mpoa_client *mpc = mpcs;
-	static unsigned long previous_resolving_check_time = 0;
-	static unsigned long previous_refresh_time = 0;
+	static unsigned long previous_resolving_check_time;
+	static unsigned long previous_refresh_time;
 	
 	while( mpc != NULL ){
 		mpc->in_ops->clear_count(mpc);

@@ -564,7 +564,10 @@ static int rh_connect_rh (hci_t * hci)
 		return -ENOMEM;
 
 	hci->bus->root_hub = usb_dev;
-	usb_connect (usb_dev);
+	usb_dev->devnum = 1;
+	usb_dev->bus->devnum_next = usb_dev->devnum + 1;
+	set_bit (usb_dev->devnum, usb_dev->bus->devmap.devicemap);
+
 	if (usb_new_device (usb_dev) != 0) {
 		usb_put_dev (usb_dev);
 		return -ENODEV;

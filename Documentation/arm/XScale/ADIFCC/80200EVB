@@ -35,7 +35,6 @@ Building the Kernel
 change Linux makefile
 make adi_evb_config
 make oldconfig
-make dep
 make zImage
 
 Loading Linux

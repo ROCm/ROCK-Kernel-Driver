@@ -8,7 +8,7 @@
     *
     *  SB1250 specification level:  User's manual 1/02/02
     *  
-    *  Author:  Mitch Lichtenberg (mpl@broadcom.com)
+    *  Author:  Mitch Lichtenberg
     *  
     *********************************************************************  
     *
@@ -100,10 +100,10 @@
 #define	SIBYTE_HDR_FMASK_1250_ALL		0x00000ff
 #define	SIBYTE_HDR_FMASK_1250_PASS1		0x0000001
 #define	SIBYTE_HDR_FMASK_1250_PASS2		0x0000002
+#define	SIBYTE_HDR_FMASK_1250_PASS3		0x0000004
 
 #define	SIBYTE_HDR_FMASK_112x_ALL		0x0000f00
 #define	SIBYTE_HDR_FMASK_112x_PASS1		0x0000100
-#define SIBYTE_HDR_FMASK_112x_PASS3		0x0000200
 
 /* Bit mask for chip/revision.  (use _ALL for all revisions of a chip).  */ 
 #define	SIBYTE_HDR_FMASK(chip, pass)					\
@@ -234,7 +234,7 @@
  */
 
 
-#if !defined(__ASSEMBLER__)
+#if defined(__mips64) && !defined(__ASSEMBLER__)
 #define SBWRITECSR(csr,val) *((volatile uint64_t *) PHYS_TO_K1(csr)) = (val)
 #define SBREADCSR(csr) (*((volatile uint64_t *) PHYS_TO_K1(csr)))
 #endif /* __ASSEMBLER__ */

@@ -347,7 +347,7 @@ void __release_region(struct resource *parent, unsigned long start, unsigned lon
 #define MAXRESERVE 4
 static int __init reserve_setup(char *str)
 {
-	static int reserved = 0;
+	static int reserved;
 	static struct resource reserve[MAXRESERVE];
 
 	for (;;) {

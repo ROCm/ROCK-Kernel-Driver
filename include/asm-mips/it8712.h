@@ -4,7 +4,7 @@
 
 #define LPC_BASE_ADDR	0x14000000
 
-// MB PnP configuration register 
+// MB PnP configuration register
 #define LPC_KEY_ADDR	0x1400002E
 #define LPC_DATA_ADDR	0x1400002F
 

@@ -30,6 +30,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
@@ -97,8 +98,6 @@ static unsigned short zf_readb(unsigned char port)
 MODULE_AUTHOR("Fernando Fuganti <fuganti@conectiva.com.br>");
 MODULE_DESCRIPTION("MachZ ZF-Logic Watchdog driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(action, "i");
-MODULE_PARM_DESC(action, "after watchdog resets, generate: 0 = RESET(*)  1 = SMI  2 = NMI  3 = SCI");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -106,7 +105,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
 
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 #define PFX "machzwd"
@@ -127,6 +126,9 @@ static struct watchdog_info zf_info = {
  * defaults to GEN_RESET (0)
  */
 static int action = 0;
+module_param(action, int, 0);
+MODULE_PARM_DESC(action, "after watchdog resets, generate: 0 = RESET(*)  1 = SMI  2 = NMI  3 = SCI");
+
 static int zf_action = GEN_RESET;
 static int zf_is_open = 0;
 static int zf_expect_close = 0;
@@ -347,14 +349,6 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 	return 0;
 }
 
-static ssize_t zf_read(struct file *file, char *buf, size_t count, 
-							loff_t *ppos)
-{
-	return -EINVAL;
-}
-
-
-
 static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
@@ -446,7 +440,6 @@ static int zf_notify_sys(struct notifier_block *this, unsigned long code,
 
 static struct file_operations zf_fops = {
 	.owner          = THIS_MODULE,
-	.read           = zf_read,
 	.write          = zf_write,
 	.ioctl          = zf_ioctl,
 	.open           = zf_open,

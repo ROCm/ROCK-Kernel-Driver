@@ -1660,7 +1660,7 @@ static struct audio_driver nm256_audio_driver =
 	.local_qlen		= nm256_audio_local_qlen,
 };
 
-static struct pci_device_id nm256_pci_tbl[] __devinitdata = {
+static struct pci_device_id nm256_pci_tbl[] = {
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO,
 	PCI_ANY_ID, PCI_ANY_ID, 0, 0},
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO,

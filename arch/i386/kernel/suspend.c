@@ -29,6 +29,12 @@
 static struct saved_context saved_context;
 static void fix_processor_context(void);
 
+unsigned long saved_context_eax, saved_context_ebx;
+unsigned long saved_context_ecx, saved_context_edx;
+unsigned long saved_context_esp, saved_context_ebp;
+unsigned long saved_context_esi, saved_context_edi;
+unsigned long saved_context_eflags;
+
 extern void enable_sep_cpu(void *);
 
 void save_processor_state(void)

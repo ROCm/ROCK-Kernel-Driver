@@ -184,6 +184,7 @@ void inode_init_once(struct inode *inode)
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	spin_lock_init(&inode->i_data.page_lock);
 	init_MUTEX(&inode->i_data.i_shared_sem);
+	atomic_set(&inode->i_data.truncate_count, 0);
 	INIT_LIST_HEAD(&inode->i_data.private_list);
 	spin_lock_init(&inode->i_data.private_lock);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap);
@@ -685,7 +686,7 @@ static inline unsigned long hash(struct super_block *sb, unsigned long hashval)
  
 ino_t iunique(struct super_block *sb, ino_t max_reserved)
 {
-	static ino_t counter = 0;
+	static ino_t counter;
 	struct inode *inode;
 	struct hlist_head * head;
 	ino_t res;

@@ -236,7 +236,7 @@ static int __devinit ns87415_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-static struct pci_device_id ns87415_pci_tbl[] __devinitdata = {
+static struct pci_device_id ns87415_pci_tbl[] = {
 	{ PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };

@@ -1222,7 +1222,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	unsigned int type;
 	int i, prev;
 	int error;
-	static int least_priority = 0;
+	static int least_priority;
 	union swap_header *swap_header = 0;
 	int swap_header_version;
 	int nr_good_pages = 0;

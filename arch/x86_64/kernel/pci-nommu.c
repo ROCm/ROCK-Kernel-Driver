@@ -39,8 +39,8 @@ int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
          * we fall back to GFP_DMA when the mask isn't all 1s,
          * so we can't guarantee allocations that must be
          * within a tighter range than GFP_DMA..
-	 * XXX: this won't work for pci_map_single. Caller has to
-	 * use GFP_DMA in the first place.
+		 * RED-PEN this won't work for pci_map_single. Caller has to
+		 * use GFP_DMA in the first place.
          */
         if (mask < 0x00ffffff)
                 return 0;

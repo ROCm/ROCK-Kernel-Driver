@@ -8,12 +8,6 @@
  * work is done in the northbridge(s).
  */
 
-/*
- * On x86-64 the AGP driver needs to be initialized early by the IOMMU 
- * code.  When you use this driver as a template for a new K8 AGP bridge
- * driver don't forget to change arch/x86_64/kernel/pci-gart.c too -AK.
- */
-
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -255,15 +249,18 @@ struct agp_bridge_driver amd_8151_driver = {
 /* Some basic sanity checks for the aperture. */
 static int __init aperture_valid(u64 aper, u32 size)
 { 
+	static int not_first_call; 
 	u32 pfn, c;
-	if (aper == 0)
+	if (aper == 0) { 
+		printk(KERN_ERR "No aperture\n");
 		return 0; 
+	}
 	if (size < 32*1024*1024) {
-		printk(KERN_INFO "Aperture too small (%d MB)\n", size>>20);
+		printk(KERN_ERR "Aperture too small (%d MB)\n", size>>20);
 		return 0;
 	}
 	if (aper + size > 0xffffffff) { 
-		printk(KERN_INFO "Aperture out of bounds\n"); 
+		printk(KERN_ERR "Aperture out of bounds\n"); 
 		return 0;
 	} 
 	pfn = aper >> PAGE_SHIFT;
@@ -271,10 +268,22 @@ static int __init aperture_valid(u64 aper, u32 size)
 		if (!pfn_valid(pfn + c))
 			break;
 		if (!PageReserved(pfn_to_page(pfn + c))) { 
-			printk(KERN_INFO "Aperture pointing to RAM\n");
+			printk(KERN_ERR "Aperture pointing to RAM\n");
 			return 0;
 		}
 	}
+
+	/* Request the Aperture. This catches cases when someone else
+	   already put a mapping in there - happens with some very broken BIOS 
+
+	   Maybe better to use pci_assign_resource/pci_enable_device instead trusting
+	   the bridges? */
+	if (!not_first_call && request_mem_region(aper, size, "aperture") < 0) { 
+		printk(KERN_ERR "Aperture conflicts with PCI mapping.\n"); 
+		return 0;
+	}
+
+	not_first_call = 1;
 	return 1;
 } 
 
@@ -283,6 +292,9 @@ static int __init aperture_valid(u64 aper, u32 size)
  * bridge, not the northbridge. On AMD64 this is handled early 
  * in aperture.c, but when GART_IOMMU is not enabled or we run
  * on a 32bit kernel this needs to be redone. 
+ * Unfortunately it is impossible to fix the aperture here because it's too late
+ * to allocate that much memory. But at least error out cleanly instead of
+ * crashing.
  */ 
 static __init int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp, 
 								 u16 cap)
@@ -293,12 +305,16 @@ static __init int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp,
 	u32 nb_order, nb_base;
 	u16 apsize;
 
+	printk("fix northbridge\n");
+
 	pci_read_config_dword(nb, 0x90, &nb_order); 
 	nb_order = (nb_order >> 1) & 7;
 	pci_read_config_dword(nb, 0x94, &nb_base); 
 	nb_aper = nb_base << 25;	
-	if (aperture_valid(nb_aper, (32*1024*1024)<<nb_order))
+	if (aperture_valid(nb_aper, (32*1024*1024)<<nb_order)) { 
+		printk("aperture valid\n");
 		return 0;
+	}
 
 	/* Northbridge seems to contain crap. Try the AGP bridge. */
 
@@ -307,13 +323,19 @@ static __init int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp,
 		return -1; 
 
 	apsize &= 0xfff;
+	/* Some BIOS use weird encodings not in the AGPv3 table. */
+	if (apsize & 0xff) 
+		apsize |= 0xf00; 
 	order = 7 - hweight16(apsize); 
+
 	pci_read_config_dword(agp, 0x10, &aper_low);
 	pci_read_config_dword(agp, 0x14, &aper_hi);
 	aper = (aper_low & ~((1<<22)-1)) | ((u64)aper_hi << 32); 
 	printk(KERN_INFO "Aperture from AGP @ %Lx size %u MB\n", aper, 32 << order);
-	if (order < 0 || !aperture_valid(aper, (32*1024*1024)<<order))
+	if (order < 0 || !aperture_valid(aper, (32*1024*1024)<<order)) { 
+		printk("bad aperture\n");
 		return -1; 
+	}
 	
 	pci_write_config_dword(nb, 0x90, order << 1); 
 	pci_write_config_dword(nb, 0x94, aper >> 25); 
@@ -329,8 +351,14 @@ static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	/* cache pci_devs of northbridges. */
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) 
 			!= NULL) {
-		if (fix_northbridge(loop_dev, pdev, cap_ptr) < 0) 
+		if (fix_northbridge(loop_dev, pdev, cap_ptr) < 0) { 
+			printk("No usable aperture found.\n");
+#ifdef __x86_64__ 
+			/* should port this to i386 */
+			printk("Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
+#endif 
 			return -1;  
+		}
 		hammers[i++] = loop_dev;
 		nr_garts = i;
 		if (i == MAX_HAMMER_GARTS) { 
@@ -412,11 +440,13 @@ static void __devexit agp_amdk8_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
+	release_mem_region(virt_to_phys(bridge->gatt_table_real), 
+			   x86_64_aperture_sizes[bridge->aperture_size_idx].size); 
 	agp_remove_bridge(bridge);
 	agp_put_bridge(bridge);
 }
 
-static struct pci_device_id agp_amdk8_pci_table[] __initdata = {
+static struct pci_device_id agp_amdk8_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
@@ -453,10 +483,14 @@ static struct pci_driver agp_amdk8_pci_driver = {
 	.remove		= agp_amdk8_remove,
 };
 
+
 /* Not static due to IOMMU code calling it early. */
 int __init agp_amdk8_init(void)
 {
-	int err = pci_module_init(&agp_amdk8_pci_driver);
+	int err;
+	if (agp_off)
+		return -EINVAL;
+	err = pci_module_init(&agp_amdk8_pci_driver);
 	if (err == -ENODEV) { 
 		struct pci_dev *dev;
 		if (!agp_try_unsupported) { 

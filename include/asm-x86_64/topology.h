@@ -20,9 +20,9 @@ extern unsigned long cpu_online_map;
 #define node_to_memblk(node)		(node)
 
 static inline unsigned long pcibus_to_cpumask(int bus)
-{ 
-	return mp_bus_to_cpumask[bus] & cpu_online_map; 
-} 
+{
+	return mp_bus_to_cpumask[bus] & cpu_online_map;
+}
 
 #define NODE_BALANCE_RATE 30	/* CHECKME */ 
 

@@ -474,11 +474,6 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
 	     */
 	    if (bad) {
 		pcibr_unlock(pcibr_soft, s);
-#ifdef PIC_LATER
-		PCIBR_DEBUG((PCIBR_DEBUG_DEVREG, pcibr_soft->bs_vhdl,
-			    "pcibr_try_set_device: mod blocked by %x\n",
-			    bad, device_bits));
-#endif
 		return bad;
 	    }
 	}
@@ -519,13 +514,7 @@ pcibr_try_set_device(pcibr_soft_t pcibr_soft,
     }
     pcibr_unlock(pcibr_soft, s);
 
-#ifdef PIC_LATER
-    PCIBR_DEBUG((PCIBR_DEBUG_DEVREG, pcibr_soft->bs_vhdl,
-		"pcibr_try_set_device: Device(%d): %x\n",
-		slot, new, device_bits));
-#else
     printk("pcibr_try_set_device: Device(%d): %x\n", slot, new);
-#endif
     return 0;
 }
 
@@ -824,14 +813,7 @@ pcibr_driver_reg_callback(vertex_hdl_t pconn_vhdl,
     slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
 
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
-
-#ifdef PIC_LATER
-    /* This may be a loadable driver so lock out any pciconfig actions */
-    mrlock(pcibr_soft->bs_bus_lock, MR_UPDATE, PZERO);
-#endif
-
     pcibr_info->f_att_det_error = error;
-
     pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
 
     if (error) {
@@ -839,11 +821,6 @@ pcibr_driver_reg_callback(vertex_hdl_t pconn_vhdl,
     } else {
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_STARTUP_CMPLT;
     }
-        
-#ifdef PIC_LATER
-    /* Release the bus lock */
-    mrunlock(pcibr_soft->bs_bus_lock);
-#endif
 }
 
 /*
@@ -875,14 +852,7 @@ pcibr_driver_unreg_callback(vertex_hdl_t pconn_vhdl,
     slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
 
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
-
-#ifdef PIC_LATER
-    /* This may be a loadable driver so lock out any pciconfig actions */
-    mrlock(pcibr_soft->bs_bus_lock, MR_UPDATE, PZERO);
-#endif
-
     pcibr_info->f_att_det_error = error;
-
     pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
 
     if (error) {
@@ -890,11 +860,6 @@ pcibr_driver_unreg_callback(vertex_hdl_t pconn_vhdl,
     } else {
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_SHUTDOWN_CMPLT;
     }
-
-#ifdef PIC_LATER
-    /* Release the bus lock */
-    mrunlock(pcibr_soft->bs_bus_lock);
-#endif
 }
 
 /* 
@@ -1245,9 +1210,6 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * Initialize bridge and bus locks
      */
     spin_lock_init(&pcibr_soft->bs_lock);
-#ifdef PIC_LATER
-    mrinit(pcibr_soft->bs_bus_lock, "bus_lock");
-#endif
     /*
      * If we have one, process the hints structure.
      */
@@ -2250,17 +2212,10 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	     * arguments fails so sprintf() it into a temporary string.
 	     */
 	    if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-#ifdef PIC_LATER
-	        sprintf(tmp_str, "pcibr_addr_pci_to_xio: map to %x[%x..%x] for "
-		        "slot %d allocates DevIO(%d) Device(%d) set to %x\n",
-		        space, space_desc, pci_addr, pci_addr + req_size - 1,
-		        slot, win, win, devreg, device_bits);
-#else
 	        sprintf(tmp_str, "pcibr_addr_pci_to_xio: map to [%lx..%lx] for "
 		        "slot %d allocates DevIO(%d) Device(%d) set to %lx\n",
 		        (unsigned long)pci_addr, (unsigned long)(pci_addr + req_size - 1),
 		        (unsigned int)slot, win, win, (unsigned long)devreg);
-#endif
 	        PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
 	    }
 	    goto done;
@@ -2291,11 +2246,6 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
             pcibr_info->f_window[bar].w_devio_index = win;
 
 	if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-#ifdef PIC_LATER
-	    sprintf(tmp_str, "pcibr_addr_pci_to_xio: map to %x[%x..%x] for "
-		    "slot %d uses DevIO(%d)\n", space, space_desc, pci_addr,
-		    pci_addr + req_size - 1, slot, win);
-#endif
 	    PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
 	}
 	goto done;
@@ -2392,14 +2342,6 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	    ;
 	} else if (bfo != 0) {		/* we have a conflict. */
 	    if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-#ifdef PIC_LATER
-	        sprintf(tmp_str, "pcibr_addr_pci_to_xio: swap conflict in %x, "
-		        "was%s%s, want%s%s\n", space, space_desc,
-		        bfo & PCIIO_BYTE_STREAM ? " BYTE_STREAM" : "",
-		        bfo & PCIIO_WORD_VALUES ? " WORD_VALUES" : "",
-		        bfn & PCIIO_BYTE_STREAM ? " BYTE_STREAM" : "",
-		        bfn & PCIIO_WORD_VALUES ? " WORD_VALUES" : "");
-#endif
 	        PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
 	    }
 	    xio_addr = XIO_NOWHERE;
@@ -2432,12 +2374,6 @@ pcibr_addr_pci_to_xio(vertex_hdl_t pconn_vhdl,
 	    *bfp = bfn;			/* record the assignment */
 
 	    if (pcibr_debug_mask & PCIBR_DEBUG_PIOMAP) {
-#ifdef PIC_LATER
-	        sprintf(tmp_str, "pcibr_addr_pci_to_xio: swap for %x set "
-			"to%s%s\n", space, space_desc,
-		        bfn & PCIIO_BYTE_STREAM ? " BYTE_STREAM" : "",
-		        bfn & PCIIO_WORD_VALUES ? " WORD_VALUES" : "");
-#endif
 	        PCIBR_DEBUG((PCIBR_DEBUG_PIOMAP, pconn_vhdl, "%s", tmp_str));
 	    }
 	}
@@ -2740,10 +2676,6 @@ pcibr_piospace_free(vertex_hdl_t pconn_vhdl,
 		    size_t req_size)
 {
     pcibr_info_t            pcibr_info = pcibr_info_get(pconn_vhdl);
-#ifdef PIC_LATER
-    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pcibr_info->f_mfast;
-#endif
-
     pciio_piospace_t        piosp;
     unsigned long           s;
     char                    name[1024];
@@ -3395,10 +3327,6 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
 void
 pcibr_dmamap_done(pcibr_dmamap_t pcibr_dmamap)
 {
-#ifdef PIC_LATER
-    pcibr_soft_t            pcibr_soft = pcibr_dmamap->bd_soft;
-    pciio_slot_t            slot = PCIBR_SLOT_TO_DEVICE(pcibr_soft,
-#endif
     /*
      * We could go through and invalidate ATEs here;
      * for performance reasons, we don't.
@@ -3719,72 +3647,8 @@ pcibr_provider_shutdown(vertex_hdl_t pcibr)
 int
 pcibr_reset(vertex_hdl_t conn)
 {
-#ifdef PIC_LATER
-    pciio_info_t            pciio_info = pciio_info_get(conn);
-    pciio_slot_t            pciio_slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
-    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-    bridge_t               *bridge = pcibr_soft->bs_base;
-    bridgereg_t             ctlreg;
-    unsigned                cfgctl[8];
-    unsigned long           s;
-    int                     f, nf;
-    pcibr_info_h            pcibr_infoh;
-    pcibr_info_t            pcibr_info;
-    int                     win;
-    int                     error = 0;
-#endif	/* PIC_LATER */
-
 	BUG();
-#ifdef PIC_LATER
-    if (pcibr_soft->bs_slot[pciio_slot].has_host) {
-	pciio_slot = pcibr_soft->bs_slot[pciio_slot].host_slot;
-	pcibr_info = pcibr_soft->bs_slot[pciio_slot].bss_infos[0];
-    }
-
-    if ((pciio_slot >= pcibr_soft->bs_first_slot) &&
-        (pciio_slot <= pcibr_soft->bs_last_reset)) {
-	s = pcibr_lock(pcibr_soft);
-	nf = pcibr_soft->bs_slot[pciio_slot].bss_ninfo;
-	pcibr_infoh = pcibr_soft->bs_slot[pciio_slot].bss_infos;
-	for (f = 0; f < nf; ++f)
-	    if (pcibr_infoh[f])
-		cfgctl[f] = pcibr_func_config_get(bridge, pciio_slot, f,
-							PCI_CFG_COMMAND/4);
-
-        error = iobrick_pci_slot_rst(pcibr_soft->bs_l1sc,
-                             pcibr_widget_to_bus(pcibr_soft->bs_vhdl),
-                             PCIBR_DEVICE_TO_SLOT(pcibr_soft,pciio_slot),
-                             NULL);
-
-	ctlreg = bridge->b_wid_control;
-	bridge->b_wid_control = ctlreg & ~BRIDGE_CTRL_RST_PIN(pciio_slot);
-        nano_delay(&ts);
-	bridge->b_wid_control = ctlreg | BRIDGE_CTRL_RST_PIN(pciio_slot);
-        nano_delay(&ts);
-
-	for (f = 0; f < nf; ++f)
-	    if ((pcibr_info = pcibr_infoh[f]))
-		for (win = 0; win < 6; ++win)
-		    if (pcibr_info->f_window[win].w_base != 0)
-			pcibr_func_config_set(bridge, pciio_slot, f,
-					PCI_CFG_BASE_ADDR(win) / 4, 
-					pcibr_info->f_window[win].w_base);
-	for (f = 0; f < nf; ++f)
-	    if (pcibr_infoh[f])
-		pcibr_func_config_set(bridge, pciio_slot, f,
-					PCI_CFG_COMMAND / 4,
-					cfgctl[f]);
-	pcibr_unlock(pcibr_soft, s);
-
-	if (error)
-            return(-1);
-
-	return 0;
-    }
-    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DETACH, conn,
-    		"pcibr_reset unimplemented for slot %d\n", conn, pciio_slot));
-#endif	/* PIC_LATER */
-    return -1;
+	return -1;
 }
 
 pciio_endian_t
@@ -3836,13 +3700,7 @@ pcibr_endian_set(vertex_hdl_t pconn_vhdl,
     }
     pcibr_unlock(pcibr_soft, s);
 
-#ifdef PIC_LATER
-    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DEVREG, pconn_vhdl,
-    		"pcibr_endian_set: Device(%d): %x\n",
-		pciio_slot, devreg, device_bits));
-#else
     printk("pcibr_endian_set: Device(%d): %x\n", pciio_slot, devreg);
-#endif
     return desired_end;
 }
 
@@ -4026,13 +3884,7 @@ pcibr_device_flags_set(vertex_hdl_t pconn_vhdl,
 	    }
 	}
 	pcibr_unlock(pcibr_soft, s);
-#ifdef PIC_LATER
-	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DEVREG, pconn_vhdl,
-		    "pcibr_device_flags_set: Device(%d): %x\n",
-		    pciio_slot, devreg, device_bits));
-#else
 	printk("pcibr_device_flags_set: Device(%d): %x\n", pciio_slot, devreg);
-#endif
     }
     return (1);
 }

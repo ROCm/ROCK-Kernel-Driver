@@ -525,11 +525,17 @@ do_get_write_access(handle_t *handle, struct journal_head *jh,
 			int force_copy, int *credits) 
 {
 	struct buffer_head *bh;
-	transaction_t *transaction = handle->h_transaction;
-	journal_t *journal = transaction->t_journal;
+	transaction_t *transaction;
+	journal_t *journal;
 	int error;
 	char *frozen_buffer = NULL;
 	int need_copy = 0;
+
+	if (is_handle_aborted(handle))
+		return -EROFS;
+
+	transaction = handle->h_transaction;
+	journal = transaction->t_journal;
 
 	jbd_debug(5, "buffer_head %p, force_copy %d\n", jh, force_copy);
 
@@ -1088,7 +1094,6 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
 	struct journal_head *jh = bh2jh(bh);
-	int console_loglevel_saved = console_loglevel;
 
 	jbd_debug(5, "journal_head %p\n", jh);
 	JBUFFER_TRACE(jh, "entry");
@@ -1147,7 +1152,6 @@ out_unlock_bh:
 	jbd_unlock_bh_state(bh);
 out:
 	JBUFFER_TRACE(jh, "exit");
-	console_loglevel = console_loglevel_saved;
 	return 0;
 }
 

@@ -38,6 +38,7 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 
 #include <asm/io.h>
@@ -79,7 +80,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
  
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*
@@ -182,12 +183,6 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 	return 0;
 }
 
-static ssize_t fop_read(struct file * file, char * buf, size_t count, loff_t * ppos)
-{
-	/* No can do */
-	return -EINVAL;
-}
-
 static int fop_open(struct inode * inode, struct file * file)
 {
 	/* Just in case we're already talking to someone... */
@@ -233,7 +228,6 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 static struct file_operations wdt_fops = {
 	.owner=		THIS_MODULE,
 	.llseek=	no_llseek,
-	.read=		fop_read,
 	.write=		fop_write,
 	.open=		fop_open,
 	.release=	fop_close,

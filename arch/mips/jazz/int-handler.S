@@ -1,5 +1,4 @@
-/* $Id: int-handler.S,v 1.14 1999/05/01 22:40:34 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -251,14 +250,14 @@ loc_call:	/*
 
  		nor	s1,zero,s1
 		jal	do_IRQ
- 
+
  		/*
  		 * Reenable interrupt
  		 */
 		lhu	t2,JAZZ_IO_IRQ_ENABLE
  		or	t2,s1
 		sh	t2,JAZZ_IO_IRQ_ENABLE
- 
+
  		j	ret_from_irq
 
 /*

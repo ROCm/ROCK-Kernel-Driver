@@ -139,7 +139,6 @@ PART THREE: configure your kernel
 	      soundcards you want support for)
 
 
-   make dep
    make boot
    .
    .

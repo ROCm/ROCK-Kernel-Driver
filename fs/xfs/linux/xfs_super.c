@@ -79,7 +79,7 @@ STATIC struct export_operations linvfs_export_ops;
 STATIC kmem_cache_t * linvfs_inode_cachep;
 
 STATIC struct xfs_mount_args *
-args_allocate(
+xfs_args_allocate(
 	struct super_block	*sb)
 {
 	struct xfs_mount_args	*args;
@@ -96,6 +96,40 @@ args_allocate(
 	args->flags |= XFSMNT_32BITINODES;
 
 	return args;
+}
+
+__uint64_t
+xfs_max_file_offset(
+	unsigned int		blockshift)
+{
+	unsigned int		pagefactor = 1;
+	unsigned int		bitshift = BITS_PER_LONG - 1;
+
+	/* Figure out maximum filesize, on Linux this can depend on
+	 * the filesystem blocksize (on 32 bit platforms).
+	 * __block_prepare_write does this in an [unsigned] long...
+	 *      page->index << (PAGE_CACHE_SHIFT - bbits)
+	 * So, for page sized blocks (4K on 32 bit platforms),
+	 * this wraps at around 8Tb (hence MAX_LFS_FILESIZE which is
+	 *      (((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG-1))-1)
+	 * but for smaller blocksizes it is less (bbits = log2 bsize).
+	 * Note1: get_block_t takes a long (implicit cast from above)
+	 * Note2: The Large Block Device (LBD and HAVE_SECTOR_T) patch
+	 * can optionally convert the [unsigned] long from above into
+	 * an [unsigned] long long.
+	 */
+
+#if BITS_PER_LONG == 32
+# if defined(HAVE_SECTOR_T)
+	ASSERT(sizeof(sector_t) == 8);
+	pagefactor = PAGE_CACHE_SIZE;
+	bitshift = BITS_PER_LONG;
+# else
+	pagefactor = PAGE_CACHE_SIZE >> (PAGE_CACHE_SHIFT - blockshift);
+# endif
+#endif
+
+	return (((__uint64_t)pagefactor) << bitshift) - 1;
 }
 
 STATIC __inline__ void
@@ -144,7 +178,7 @@ xfs_revalidate_inode(
 	}
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_generation = ip->i_d.di_gen;
-	inode->i_size	= ip->i_d.di_size;
+	i_size_write(inode, ip->i_d.di_size);
 	inode->i_blocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 	inode->i_atime.tv_sec	= ip->i_d.di_atime.t_sec;
@@ -287,20 +321,14 @@ xfs_alloc_buftarg(
 	return btp;
 }
 
-STATIC __inline__ unsigned int gfp_mask(void)
-{
-	/* If we're not in a transaction, FS activity is ok */
-	if (current->flags & PF_FSTRANS) return GFP_NOFS;
-	return GFP_KERNEL;
-}
-
 STATIC struct inode *
 linvfs_alloc_inode(
 	struct super_block	*sb)
 {
 	vnode_t			*vp;
 
-	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, gfp_mask());
+	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, 
+                kmem_flags_convert(KM_SLEEP));
 	if (!vp)
 		return NULL;
 	return LINVFS_GET_IP(vp);
@@ -497,7 +525,7 @@ linvfs_remount(
 	char			*options)
 {
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
-	struct xfs_mount_args	*args = args_allocate(sb);
+	struct xfs_mount_args	*args = xfs_args_allocate(sb);
 	int			error;
 
 	VFS_PARSEARGS(vfsp, options, args, 1, error);
@@ -676,7 +704,7 @@ linvfs_fill_super(
 {
 	vnode_t			*rootvp;
 	struct vfs		*vfsp = vfs_allocate();
-	struct xfs_mount_args	*args = args_allocate(sb);
+	struct xfs_mount_args	*args = xfs_args_allocate(sb);
 	struct kstatfs		statvfs;
 	int			error;
 
@@ -693,7 +721,6 @@ linvfs_fill_super(
 	}
 
 	sb_min_blocksize(sb, BBSIZE);
-	sb->s_maxbytes = XFS_MAX_FILE_OFFSET;
 	sb->s_export_op = &linvfs_export_ops;
 	sb->s_qcop = &linvfs_qops;
 	sb->s_op = &linvfs_sops;
@@ -709,9 +736,10 @@ linvfs_fill_super(
 		goto fail_unmount;
 
 	sb->s_dirt = 1;
-	sb->s_magic = XFS_SB_MAGIC;
+	sb->s_magic = statvfs.f_type;
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
+	sb->s_maxbytes = xfs_max_file_offset(sb->s_blocksize_bits);
 	set_posix_acl_flag(sb);
 
 	VFS_ROOT(vfsp, &rootvp, error);

@@ -103,13 +103,6 @@ MODULE_PARM_DESC(force_addr,
 
 static struct i2c_adapter vt596_adapter;
 
-/* Internally used pause function */
-static void vt596_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 /* Another internally used function */
 static int vt596_transaction(void)
 {
@@ -143,7 +136,7 @@ static int vt596_transaction(void)
 	/* We will always wait for a fraction of a second! 
 	   I don't know if VIA needs this, Intel did  */
 	do {
-		vt596_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
 
@@ -297,9 +290,7 @@ static struct i2c_adapter vt596_adapter = {
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_VIA2,
 	.class		= I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
-	.dev		= {
-		.name	= "unset",
-	},
+	.name		= "unset",
 };
 
 static int __devinit vt596_probe(struct pci_dev *pdev,
@@ -385,7 +376,7 @@ static int __devinit vt596_probe(struct pci_dev *pdev,
 	dev_dbg(&pdev->dev, "VT596_smba = 0x%X\n", vt596_smba);
 
 	vt596_adapter.dev.parent = &pdev->dev;
-	snprintf(vt596_adapter.dev.name, DEVICE_NAME_SIZE,
+	snprintf(vt596_adapter.name, DEVICE_NAME_SIZE,
 			"SMBus Via Pro adapter at %04x", vt596_smba);
 	
 	return i2c_add_adapter(&vt596_adapter);
@@ -401,7 +392,7 @@ static void __devexit vt596_remove(struct pci_dev *pdev)
 	release_region(vt596_smba, 8);
 }
 
-static struct pci_device_id vt596_ids[] __devinitdata = {
+static struct pci_device_id vt596_ids[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_VIA,
 		.device 	= PCI_DEVICE_ID_VIA_82C596_3,

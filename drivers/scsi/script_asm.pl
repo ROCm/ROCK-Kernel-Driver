@@ -813,7 +813,7 @@ foreach $i (@absolute) {
 	$address = $2;
 	$length = $3;
 	die 
-"$0 : $symbol $i has illegal relative reference at address $address,
+"$0 : $symbol $i has invalid relative reference at address $address,
     size $length\n"
 	if ($type eq 'REL');
 	    
@@ -831,12 +831,12 @@ print STDERR "checking external $external \n" if ($debug_external);
 	    $length = $3;
 	    
 	    die 
-"$0 : symbol $label is external, has illegal relative reference at $address, 
+"$0 : symbol $label is external, has invalid relative reference at $address,
     size $length\n"
 		if ($type eq 'REL');
 
 	    die 
-"$0 : symbol $label has illegal reference at $address, size $length\n"
+"$0 : symbol $label has invalid reference at $address, size $length\n"
 		if ((($address % 4) !=0) || ($length != 4));
 
 	    $symbol = $symbol_values{$external};
@@ -862,7 +862,7 @@ foreach $label (@label) {
 	    $length = $3;
 
 	    if ((($address % 4) !=0) || ($length != 4)) {
-		die "$0 : symbol $label has illegal reference at $1, size $2\n";
+		die "$0 : symbol $label has invalid reference at $1, size $2\n";
 	    }
 
 	    if ($type eq 'ABS') {

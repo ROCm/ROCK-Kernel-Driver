@@ -1,33 +1,28 @@
 /*
- *  linux/arch/mips/jazz/process.c
- *
- *  Reset a Jazz machine.
- *
- *  $Id:$
+ * Reset a Jazz machine.
  */
-
 #include <linux/jiffies.h>
 #include <asm/jazz.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/reboot.h>
 #include <asm/delay.h>
-#include <asm/keyboard.h>
 
 static inline void kb_wait(void)
 {
 	unsigned long start = jiffies;
+	unsigned long timeout = start + HZ/2;
 
 	do {
 		if (! (kbd_read_status() & 0x02))
 			return;
-	} while (jiffies - start < 50);
+	} time_before_eq(jiffies, timeout);
 }
 
 void jazz_machine_restart(char *command)
 {
     while (1) {
-	kb_wait ();    
+	kb_wait ();
 	kbd_write_command (0xd1);
 	kb_wait ();
 	kbd_write_output (0x00);

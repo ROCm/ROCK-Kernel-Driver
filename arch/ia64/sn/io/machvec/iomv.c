@@ -73,3 +73,4 @@ sn_mmiob (void)
 				SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK)
 		udelay(1);
 }
+EXPORT_SYMBOL(sn_mmiob);

@@ -64,30 +64,6 @@ static int get_stripe(struct dm_target *ti, struct stripe_c *sc,
 }
 
 /*
- * FIXME: Nasty function, only present because we can't link
- * against __moddi3 and __divdi3.
- *
- * returns a == b * n
- */
-static int multiple(sector_t a, sector_t b, sector_t *n)
-{
-	sector_t acc, prev, i;
-
-	*n = 0;
-	while (a >= b) {
-		for (acc = b, prev = 0, i = 1;
-		     acc <= a;
-		     prev = acc, acc <<= 1, i <<= 1)
-			;
-
-		a -= prev;
-		*n += i >> 1;
-	}
-
-	return a == 0;
-}
-
-/*
  * Construct a striped mapping.
  * <number of stripes> <chunk size (2^^n)> [<dev_path> <offset>]+
  */
@@ -126,7 +102,8 @@ static int stripe_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		return -EINVAL;
 	}
 
-	if (!multiple(ti->len, stripes, &width)) {
+	width = ti->len;
+	if (sector_div(width, stripes)) {
 		ti->error = "dm-stripe: Target length not divisable by "
 		    "number of stripes";
 		return -EINVAL;

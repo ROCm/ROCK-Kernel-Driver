@@ -63,7 +63,7 @@ static char *nodemgr_find_oui_name(int oui)
  */
 
 /* 
- * The nodemgr relies heavily on the Drive Model for device callbacks and
+ * The nodemgr relies heavily on the Driver Model for device callbacks and
  * driver/device mappings. The old nodemgr used to handle all this itself,
  * but now we are much simpler because of the LDM.
  */

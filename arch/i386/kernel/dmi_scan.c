@@ -444,13 +444,6 @@ static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
 	acpi_video_flags |= 2;
 	return 0;
 }
-
-static __init int reset_videobios_after_s3(struct dmi_blacklist *d)
-{
-	extern long acpi_video_flags;
-	acpi_video_flags |= 1;
-	return 0;
-}
 #endif
 
 /*

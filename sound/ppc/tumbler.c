@@ -27,7 +27,6 @@
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
-#include <linux/workqueue.h>
 #include <sound/core.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -93,9 +92,6 @@ typedef struct pmac_tumbler_t {
 	unsigned int mix_vol[VOL_IDX_LAST_MIX][2]; /* stereo volumes for tas3004 */
 	int drc_range;
 	int drc_enable;
-#ifdef CONFIG_PMAC_PBOOK
-	struct work_struct resume_workq;
-#endif
 } pmac_tumbler_t;
 
 
@@ -870,22 +866,20 @@ static void tumbler_reset_audio(pmac_t *chip)
 	pmac_tumbler_t *mix = chip->mixer_data;
 
 	write_audio_gpio(&mix->audio_reset, 0);
-	mdelay(200);
+	big_mdelay(200);
 	write_audio_gpio(&mix->audio_reset, 1);
-	mdelay(100);
+	big_mdelay(100);
 	write_audio_gpio(&mix->audio_reset, 0);
-	mdelay(100);
+	big_mdelay(100);
 }
 
 #ifdef CONFIG_PMAC_PBOOK
 /* resume mixer */
-/* we call the i2c transfer in a workqueue because it may need either schedule()
- * or completion from timer interrupts.
- */
-static void tumbler_resume_work(void *arg)
+static void tumbler_resume(pmac_t *chip)
 {
-	pmac_t *chip = (pmac_t *)arg;
 	pmac_tumbler_t *mix = chip->mixer_data;
+
+	snd_assert(mix, return);
 
 	tumbler_reset_audio(chip);
 	if (mix->i2c.client) {
@@ -909,16 +903,6 @@ static void tumbler_resume_work(void *arg)
 	tumbler_set_master_volume(mix);
 	if (chip->update_automute)
 		chip->update_automute(chip, 0);
-}
-
-static void tumbler_resume(pmac_t *chip)
-{
-	pmac_tumbler_t *mix = chip->mixer_data;
-	snd_assert(mix, return);
-	INIT_WORK(&mix->resume_workq, tumbler_resume_work, chip);
-	if (schedule_work(&mix->resume_workq))
-		return;
-	printk(KERN_ERR "ALSA tumbler: cannot schedule resume-workqueue.\n");
 }
 #endif
 

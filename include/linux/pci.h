@@ -419,6 +419,9 @@ struct pci_dev {
 	/* These fields are used by common fixups */
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
 	unsigned int	multifunction:1;/* Part of multi-function device */
+#ifdef CONFIG_PCI_NAMES
+	char		pretty_name[DEVICE_NAME_SIZE];	/* pretty name for users to see */
+#endif
 };
 
 #define pci_dev_g(n) list_entry(n, struct pci_dev, global_list)
@@ -670,10 +673,6 @@ extern struct pci_dev *isa_bridge;
 /* Include architecture-dependent settings and functions */
 
 #include <asm/pci.h>
-
-#ifdef pci_dma_error
-#define pci_dma_error(x) 0 
-#endif
 
 /*
  *  If the system does not have PCI, clearly these return errors.  Define

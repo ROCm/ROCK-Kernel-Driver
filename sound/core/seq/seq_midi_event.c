@@ -98,14 +98,15 @@ static struct status_event_list_t {
 };
 
 static int extra_decode_ctrl14(snd_midi_event_t *dev, unsigned char *buf, int len, snd_seq_event_t *ev);
+static int extra_decode_xrpn(snd_midi_event_t *dev, unsigned char *buf, int count, snd_seq_event_t *ev);
 
 static struct extra_event_list_t {
 	int event;
 	int (*decode)(snd_midi_event_t *dev, unsigned char *buf, int len, snd_seq_event_t *ev);
 } extra_event[] = {
 	{SNDRV_SEQ_EVENT_CONTROL14, extra_decode_ctrl14},
-	/*{SNDRV_SEQ_EVENT_NONREGPARAM, extra_decode_nrpn},*/
-	/*{SNDRV_SEQ_EVENT_REGPARAM, extra_decode_rpn},*/
+	{SNDRV_SEQ_EVENT_NONREGPARAM, extra_decode_xrpn},
+	{SNDRV_SEQ_EVENT_REGPARAM, extra_decode_xrpn},
 };
 
 /*
@@ -441,12 +442,12 @@ static int extra_decode_ctrl14(snd_midi_event_t *dev, unsigned char *buf, int co
 	unsigned char cmd;
 	int idx = 0;
 
-	if (ev->data.control.param < 32) {
+	cmd = MIDI_CMD_CONTROL|(ev->data.control.channel & 0x0f);
+	if (ev->data.control.param < 0x20) {
 		if (count < 4)
 			return -ENOMEM;
 		if (dev->nostat && count < 6)
 			return -ENOMEM;
-		cmd = MIDI_CMD_CONTROL|(ev->data.control.channel & 0x0f);
 		if (cmd != dev->lastcmd || dev->nostat) {
 			if (count < 5)
 				return -ENOMEM;
@@ -456,13 +457,11 @@ static int extra_decode_ctrl14(snd_midi_event_t *dev, unsigned char *buf, int co
 		buf[idx++] = (ev->data.control.value >> 7) & 0x7f;
 		if (dev->nostat)
 			buf[idx++] = cmd;
-		buf[idx++] = ev->data.control.param + 32;
+		buf[idx++] = ev->data.control.param + 0x20;
 		buf[idx++] = ev->data.control.value & 0x7f;
-		return idx;
 	} else {
 		if (count < 2)
 			return -ENOMEM;
-		cmd = MIDI_CMD_CONTROL|(ev->data.control.channel & 0x0f);
 		if (cmd != dev->lastcmd || dev->nostat) {
 			if (count < 3)
 				return -ENOMEM;
@@ -470,8 +469,48 @@ static int extra_decode_ctrl14(snd_midi_event_t *dev, unsigned char *buf, int co
 		}
 		buf[idx++] = ev->data.control.param & 0x7f;
 		buf[idx++] = ev->data.control.value & 0x7f;
-		return idx;
 	}
+	return idx;
+}
+
+/* decode reg/nonreg param */
+static int extra_decode_xrpn(snd_midi_event_t *dev, unsigned char *buf, int count, snd_seq_event_t *ev)
+{
+	unsigned char cmd;
+	char *cbytes;
+	static char cbytes_nrpn[4] = { MIDI_CTL_NONREG_PARM_NUM_MSB,
+				       MIDI_CTL_NONREG_PARM_NUM_LSB,
+				       MIDI_CTL_MSB_DATA_ENTRY,
+				       MIDI_CTL_LSB_DATA_ENTRY };
+	static char cbytes_rpn[4] =  { MIDI_CTL_REGIST_PARM_NUM_MSB,
+				       MIDI_CTL_REGIST_PARM_NUM_LSB,
+				       MIDI_CTL_MSB_DATA_ENTRY,
+				       MIDI_CTL_LSB_DATA_ENTRY };
+	unsigned char bytes[4];
+	int idx = 0, i;
+
+	if (count < 8)
+		return -ENOMEM;
+	if (dev->nostat && count < 12)
+		return -ENOMEM;
+	cmd = MIDI_CMD_CONTROL|(ev->data.control.channel & 0x0f);
+	bytes[0] = ev->data.control.param & 0x007f;
+	bytes[1] = (ev->data.control.param & 0x3f80) >> 7;
+	bytes[2] = ev->data.control.value & 0x007f;
+	bytes[3] = (ev->data.control.value & 0x3f80) >> 7;
+	if (cmd != dev->lastcmd && !dev->nostat) {
+		if (count < 9)
+			return -ENOMEM;
+		buf[idx++] = dev->lastcmd = cmd;
+	}
+	cbytes = ev->type == SNDRV_SEQ_EVENT_NONREGPARAM ? cbytes_nrpn : cbytes_rpn;
+	for (i = 0; i < 4; i++) {
+		if (dev->nostat)
+			buf[idx++] = dev->lastcmd = cmd;
+		buf[idx++] = cbytes[i];
+		buf[idx++] = bytes[i];
+	}
+	return idx;
 }
 
 /*

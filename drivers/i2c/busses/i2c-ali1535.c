@@ -206,12 +206,6 @@ exit_free:
 	return retval;
 }
 
-static void ali1535_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 static int ali1535_transaction(struct i2c_adapter *adap)
 {
 	int temp;
@@ -283,7 +277,7 @@ static int ali1535_transaction(struct i2c_adapter *adap)
 	/* We will always wait for a fraction of a second! */
 	timeout = 0;
 	do {
-		ali1535_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	} while (((temp & ALI1535_STS_BUSY) && !(temp & ALI1535_STS_IDLE))
 		 && (timeout++ < MAX_TIMEOUT));
@@ -357,7 +351,7 @@ static s32 ali1535_access(struct i2c_adapter *adap, u16 addr,
 	for (timeout = 0;
 	     (timeout < MAX_TIMEOUT) && !(temp & ALI1535_STS_IDLE);
 	     timeout++) {
-		ali1535_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	}
 	if (timeout >= MAX_TIMEOUT)
@@ -489,12 +483,10 @@ static struct i2c_adapter ali1535_adapter = {
 	.owner		= THIS_MODULE,
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_ALI1535,
 	.algo		= &smbus_algorithm,
-	.dev		= {
-		.name	= "unset",
-	}
+	.name		= "unset",
 };
 
-static struct pci_device_id ali1535_ids[] __devinitdata = {
+static struct pci_device_id ali1535_ids[] = {
 	{
 		.vendor =	PCI_VENDOR_ID_AL,
 		.device =	PCI_DEVICE_ID_AL_M7101,
@@ -515,7 +507,7 @@ static int __devinit ali1535_probe(struct pci_dev *dev, const struct pci_device_
 	/* set up the driverfs linkage to our parent device */
 	ali1535_adapter.dev.parent = &dev->dev;
 
-	snprintf(ali1535_adapter.dev.name, DEVICE_NAME_SIZE, 
+	snprintf(ali1535_adapter.name, DEVICE_NAME_SIZE, 
 		"SMBus ALI1535 adapter at %04x", ali1535_smba);
 	return i2c_add_adapter(&ali1535_adapter);
 }

@@ -659,7 +659,7 @@ snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void *buf, long len)
 {
 	soundfont_chorus_fx_t rec;
 	if (mode < SNDRV_EMU8000_CHORUS_PREDEFINED || mode >= SNDRV_EMU8000_CHORUS_NUMBERS) {
-		snd_printk(KERN_WARNING "illegal chorus mode %d for uploading\n", mode);
+		snd_printk(KERN_WARNING "invalid chorus mode %d for uploading\n", mode);
 		return -EINVAL;
 	}
 	if (len < (long)sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
@@ -787,7 +787,7 @@ snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void *buf, long len)
 	soundfont_reverb_fx_t rec;
 
 	if (mode < SNDRV_EMU8000_REVERB_PREDEFINED || mode >= SNDRV_EMU8000_REVERB_NUMBERS) {
-		snd_printk(KERN_WARNING "illegal reverb mode %d for uploading\n", mode);
+		snd_printk(KERN_WARNING "invalid reverb mode %d for uploading\n", mode);
 		return -EINVAL;
 	}
 	if (len < (long)sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
@@ -1138,7 +1138,7 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 		snd_emu8000_free(hw);
 		return err;
 	}
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (snd_seq_device_new(card, index, SNDRV_SEQ_DEV_ID_EMU8000,
 			       sizeof(emu8000_t*), &awe) >= 0) {
 		strcpy(awe->name, "EMU-8000");

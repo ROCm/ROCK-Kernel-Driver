@@ -164,14 +164,21 @@ static void x25_close(hdlc_device *hdlc)
 
 
 
-static void x25_rx(struct sk_buff *skb)
+static int x25_rx(struct sk_buff *skb)
 {
 	hdlc_device *hdlc = dev_to_hdlc(skb->dev);
 
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
+		hdlc->stats.rx_dropped++;
+		return NET_RX_DROP;
+	}
+
 	if (lapb_data_received(hdlc, skb) == LAPB_OK)
-		return;
+		return NET_RX_SUCCESS;
+
 	hdlc->stats.rx_errors++;
 	dev_kfree_skb_any(skb);
+	return NET_RX_DROP;
 }
 
 

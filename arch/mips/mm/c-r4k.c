@@ -16,21 +16,17 @@
 
 #include <asm/bcache.h>
 #include <asm/bootinfo.h>
+#include <asm/cacheops.h>
 #include <asm/cpu.h>
 #include <asm/io.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/r4kcache.h>
 #include <asm/system.h>
 #include <asm/mmu_context.h>
 #include <asm/war.h>
 
-/* Primary cache parameters. */
 static unsigned long icache_size, dcache_size, scache_size;
-unsigned long icache_way_size, dcache_way_size, scache_way_size;
-static unsigned long scache_size;
-
-#include <asm/cacheops.h>
-#include <asm/r4kcache.h>
 
 extern void andes_clear_page(void * page);
 extern void r4k_clear_page32_d16(void * page);
@@ -677,7 +673,7 @@ static void __init probe_pcache(void)
 	unsigned long config1;
 	unsigned int lsize;
 
-	switch (current_cpu_data.cputype) {
+	switch (c->cputype) {
 	case CPU_R4600:			/* QED style two way caches? */
 	case CPU_R4700:
 	case CPU_R5000:
@@ -724,6 +720,7 @@ static void __init probe_pcache(void)
 	case CPU_R4400PC:
 	case CPU_R4400SC:
 	case CPU_R4400MC:
+	case CPU_R4300:
 		icache_size = 1 << (12 + ((config & CONF_IC) >> 9));
 		c->icache.linesz = 16 << ((config & CONF_IB) >> 5);
 		c->icache.ways = 1;
@@ -846,8 +843,8 @@ static void __init probe_pcache(void)
 		panic("Improper R4000SC processor configuration detected");
 
 	/* compute a couple of other cache variables */
-	icache_way_size = icache_size / c->icache.ways;
-	dcache_way_size = dcache_size / c->dcache.ways;
+	c->icache.waysize = icache_size / c->icache.ways;
+	c->dcache.waysize = dcache_size / c->dcache.ways;
 
 	c->icache.sets = icache_size / (c->icache.linesz * c->icache.ways);
 	c->dcache.sets = dcache_size / (c->dcache.linesz * c->dcache.ways);
@@ -858,9 +855,8 @@ static void __init probe_pcache(void)
 	 * normally they'd suffer from aliases but magic in the hardware deals
 	 * with that for us so we don't need to take care ourselves.
 	 */
-	if (current_cpu_data.cputype != CPU_R10000 &&
-	    current_cpu_data.cputype != CPU_R12000)
-		if (dcache_way_size > PAGE_SIZE)
+	if (c->cputype != CPU_R10000 && c->cputype != CPU_R12000)
+		if (c->dcache.waysize > PAGE_SIZE)
 		        c->dcache.flags |= MIPS_CACHE_ALIASES;
 
 	if (config & 0x8)		/* VI bit */
@@ -945,7 +941,6 @@ static int __init probe_scache(void)
 	local_irq_restore(flags);
 	addr -= begin;
 
-	c = &current_cpu_data;
 	scache_size = addr;
 	c->scache.linesz = 16 << ((config & R4K_CONF_SB) >> 22);
 	c->scache.ways = 1;
@@ -988,17 +983,18 @@ static void __init setup_noscache_funcs(void)
 
 static void __init setup_scache_funcs(void)
 {
-	if (current_cpu_data.dcache.linesz > current_cpu_data.scache.linesz)
+	struct cpuinfo_mips *c = &current_cpu_data;
+
+	if (c->dcache.linesz > c->scache.linesz)
 		panic("Invalid primary cache configuration detected");
 
-	if (current_cpu_data.cputype == CPU_R10000 ||
-	    current_cpu_data.cputype == CPU_R12000) {
+	if (c->cputype == CPU_R10000 || c->cputype == CPU_R12000) {
 		_clear_page = andes_clear_page;
 		_copy_page = andes_copy_page;
 		return;
 	}
 
-	switch (current_cpu_data.scache.linesz) {
+	switch (c->scache.linesz) {
 	case 16:
 		_clear_page = r4k_clear_page_s16;
 		_copy_page = r4k_copy_page_s16;
@@ -1034,7 +1030,7 @@ static void __init setup_scache(void)
 	 * processors don't have a S-cache that would be relevant to the
 	 * Linux memory managment.
 	 */
-	switch (current_cpu_data.cputype) {
+	switch (c->cputype) {
 	case CPU_R4000PC:
 	case CPU_R4000SC:
 	case CPU_R4000MC:
@@ -1078,15 +1074,20 @@ static void __init setup_scache(void)
 		return;
 	}
 
-	if ((current_cpu_data.isa_level == MIPS_CPU_ISA_M32 ||
-	     current_cpu_data.isa_level == MIPS_CPU_ISA_M64) &&
-	    !(current_cpu_data.scache.flags & MIPS_CACHE_NOT_PRESENT))
+	if ((c->isa_level == MIPS_CPU_ISA_M32 ||
+	     c->isa_level == MIPS_CPU_ISA_M64) &&
+	    !(c->scache.flags & MIPS_CACHE_NOT_PRESENT))
 		panic("Dunno how to handle MIPS32 / MIPS64 second level cache");
+
+	/* compute a couple of other cache variables */
+	c->scache.waysize = scache_size / c->scache.ways;
+
+	c->scache.sets = scache_size / (c->scache.linesz * c->scache.ways);
 
 	printk("Unified secondary cache %ldkB %s, linesize %d bytes.\n",
 	       scache_size >> 10, way_string[c->scache.ways], c->scache.linesz);
 
-	current_cpu_data.options |= MIPS_CPU_SUBSET_CACHES;
+	c->options |= MIPS_CPU_SUBSET_CACHES;
         setup_scache_funcs();
 }
 
@@ -1117,6 +1118,7 @@ static inline void coherency_setup(void)
 void __init ld_mmu_r4xx0(void)
 {
 	extern char except_vec2_generic;
+	struct cpuinfo_mips *c = &current_cpu_data;
 
 	/* Default cache error handler for R4000 and R5000 family */
 	memcpy((void *)(KSEG0 + 0x100), &except_vec2_generic, 0x80);
@@ -1126,18 +1128,17 @@ void __init ld_mmu_r4xx0(void)
 	setup_scache();
 	coherency_setup();
 
-	if (current_cpu_data.dcache.sets *
-	    current_cpu_data.dcache.ways > PAGE_SIZE)
-	        current_cpu_data.dcache.flags |= MIPS_CACHE_ALIASES;
+	if (c->dcache.sets * c->dcache.ways > PAGE_SIZE)
+		c->dcache.flags |= MIPS_CACHE_ALIASES;
 
 	/*
 	 * Some MIPS32 and MIPS64 processors have physically indexed caches.
 	 * This code supports virtually indexed processors and will be
 	 * unnecessarily unefficient on physically indexed processors.
 	 */
-	shm_align_mask = max_t(unsigned long,
-	     current_cpu_data.dcache.sets * current_cpu_data.dcache.linesz - 1,
-	     PAGE_SIZE - 1);
+	shm_align_mask = max_t( unsigned long,
+				c->dcache.sets * c->dcache.linesz - 1,
+				PAGE_SIZE - 1);
 
 	flush_cache_all		= r4k_flush_cache_all;
 	__flush_cache_all	= r4k___flush_cache_all;

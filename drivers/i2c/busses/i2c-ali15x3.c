@@ -225,13 +225,6 @@ error:
 	return -ENODEV;
 }
 
-/* Internally used pause function */
-static void ali15x3_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 /* Another internally used function */
 static int ali15x3_transaction(struct i2c_adapter *adap)
 {
@@ -304,7 +297,7 @@ static int ali15x3_transaction(struct i2c_adapter *adap)
 	/* We will always wait for a fraction of a second! */
 	timeout = 0;
 	do {
-		ali15x3_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((!(temp & (ALI15X3_STS_ERR | ALI15X3_STS_DONE)))
 		 && (timeout++ < MAX_TIMEOUT));
@@ -361,7 +354,7 @@ static s32 ali15x3_access(struct i2c_adapter * adap, u16 addr,
 	for (timeout = 0;
 	     (timeout < MAX_TIMEOUT) && !(temp & ALI15X3_STS_IDLE);
 	     timeout++) {
-		ali15x3_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	}
 	if (timeout >= MAX_TIMEOUT) {
@@ -481,12 +474,10 @@ static struct i2c_adapter ali15x3_adapter = {
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_ALI15X3,
 	.class          = I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
-	.dev		= {
-		.name	= "unset",
-	},
+	.name		= "unset",
 };
 
-static struct pci_device_id ali15x3_ids[] __devinitdata = {
+static struct pci_device_id ali15x3_ids[] = {
 	{
 	.vendor =	PCI_VENDOR_ID_AL,
 	.device =	PCI_DEVICE_ID_AL_M7101,
@@ -507,7 +498,7 @@ static int __devinit ali15x3_probe(struct pci_dev *dev, const struct pci_device_
 	/* set up the driverfs linkage to our parent device */
 	ali15x3_adapter.dev.parent = &dev->dev;
 
-	snprintf(ali15x3_adapter.dev.name, DEVICE_NAME_SIZE,
+	snprintf(ali15x3_adapter.name, DEVICE_NAME_SIZE,
 		"SMBus ALI15X3 adapter at %04x", ali15x3_smba);
 	return i2c_add_adapter(&ali15x3_adapter);
 }
@@ -515,6 +506,7 @@ static int __devinit ali15x3_probe(struct pci_dev *dev, const struct pci_device_
 static void __devexit ali15x3_remove(struct pci_dev *dev)
 {
 	i2c_del_adapter(&ali15x3_adapter);
+	release_region(ali15x3_smba, ALI15X3_SMB_IOSIZE);
 }
 
 static struct pci_driver ali15x3_driver = {
@@ -533,7 +525,6 @@ static int __init i2c_ali15x3_init(void)
 static void __exit i2c_ali15x3_exit(void)
 {
 	pci_unregister_driver(&ali15x3_driver);
-	release_region(ali15x3_smba, ALI15X3_SMB_IOSIZE);
 }
 
 MODULE_AUTHOR ("Frodo Looijaard <frodol@dds.nl>, "
