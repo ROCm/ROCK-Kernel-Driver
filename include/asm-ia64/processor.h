@@ -915,13 +915,13 @@ ia64_tpa (__u64 addr)
 #define ARCH_HAS_SPINLOCK_PREFETCH
 #define PREFETCH_STRIDE 256
 
-extern inline void
+static inline void
 prefetch (const void *x)
 {
          __asm__ __volatile__ ("lfetch [%0]" : : "r"(x));
 }
 
-extern inline void
+static inline void
 prefetchw (const void *x)
 {
 	__asm__ __volatile__ ("lfetch.excl [%0]" : : "r"(x));
