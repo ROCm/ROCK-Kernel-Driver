@@ -145,10 +145,7 @@ static void __modify_IO_APIC_irq (unsigned int irq, unsigned long enable, unsign
 /* mask = 1 */
 static void __mask_IO_APIC_irq (unsigned int irq)
 {
-	struct irq_pin_list *entry = irq_2_pin + irq;
 	__modify_IO_APIC_irq(irq, 0x00010000, 0);
-	/* Is it needed? Or do others need it too? */
-	io_apic_sync(entry->apic);
 }
 
 /* mask = 0 */
