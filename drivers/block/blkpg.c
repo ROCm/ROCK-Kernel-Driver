@@ -305,6 +305,6 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			return 0;
 
 		default:
-			return -EINVAL;
+			return -ENOTTY;
 	}
 }

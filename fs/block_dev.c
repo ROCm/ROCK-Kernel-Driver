@@ -824,44 +824,9 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			unsigned long arg)
 {
 	struct block_device *bdev = inode->i_bdev;
-	int ret = -EINVAL;
-	switch (cmd) {
-	/*
-	 * deprecated, use the /proc/iosched interface instead
-	 */
-	case BLKELVGET:
-	case BLKELVSET:
-		ret = -ENOTTY;
-		break;
-	case BLKRAGET:
-	case BLKROGET:
-	case BLKBSZGET:
-	case BLKSSZGET:
-	case BLKFRAGET:
-	case BLKSECTGET:
-	case BLKRASET:
-	case BLKFRASET:
-	case BLKBSZSET:
-	case BLKPG:
-		ret = blk_ioctl(bdev, cmd, arg);
-		break;
-	case BLKRRPART:
-		ret = blkdev_reread_part(bdev);
-		break;
-	default:
-		if (bdev->bd_op->ioctl)
-			ret =bdev->bd_op->ioctl(inode, file, cmd, arg);
-		if (ret == -EINVAL) {
-			switch (cmd) {
-				case BLKGETSIZE:
-				case BLKGETSIZE64:
-				case BLKFLSBUF:
-				case BLKROSET:
-					ret = blk_ioctl(bdev,cmd,arg);
-					break;
-			}
-		}
-	}
+	int ret = blk_ioctl(bdev, cmd, arg);
+	if (ret == -ENOTTY && bdev->bd_op->ioctl)
+		ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
 	return ret;
 }
 
