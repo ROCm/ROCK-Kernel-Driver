@@ -90,6 +90,7 @@ static unsigned char ap_cs8427_codec_select(ice1712_t *ice)
 		tmp |= ICE1712_DELTA_1010LT_CCLK | ICE1712_DELTA_1010LT_CS_CS8427;
 		break;
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
+	case ICE1712_SUBDEVICE_DELTA410:
 		tmp |= ICE1712_DELTA_AP_CCLK | ICE1712_DELTA_AP_CS_CODEC;
 		tmp &= ~ICE1712_DELTA_AP_CS_DIGITAL;
 		break;
@@ -112,6 +113,7 @@ static void ap_cs8427_codec_deassert(ice1712_t *ice, unsigned char tmp)
 		tmp |= ICE1712_DELTA_1010LT_CS_NONE;
 		break;
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
+	case ICE1712_SUBDEVICE_DELTA410:
 		tmp |= ICE1712_DELTA_AP_CS_DIGITAL;
 		break;
 	case ICE1712_SUBDEVICE_VX442:

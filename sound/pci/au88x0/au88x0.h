@@ -17,7 +17,6 @@
 #ifndef __SOUND_AU88X0_H
 #define __SOUND_AU88X0_H
 
-#ifdef __KERNEL__
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -28,22 +27,6 @@
 #include <sound/mpu401.h>
 #include <sound/hwdep.h>
 #include <sound/ac97_codec.h>
-
-
-#ifndef	PCI_VENDOR_ID_AUREAL
-#define	PCI_VENDOR_ID_AUREAL 0x12eb
-#endif
-#ifndef	PCI_DEVICE_ID_AUREAL_VORTEX
-#define	PCI_DEVICE_ID_AUREAL_VORTEX 0x0001
-#endif
-#ifndef	PCI_DEVICE_ID_AUREAL_VORTEX2
-#define	PCI_DEVICE_ID_AUREAL_VORTEX2 0x0002
-#endif
-#ifndef	PCI_DEVICE_ID_AUREAL_ADVANTAGE
-#define	PCI_DEVICE_ID_AUREAL_ADVANTAGE 0x0003
-#endif
-
-#endif
 
 #ifndef CHIP_AU8820
 #include "au88x0_eq.h"
