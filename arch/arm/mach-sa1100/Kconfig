@@ -109,6 +109,14 @@ config SA1100_LART
 	  (also known as the LART).  See <http://www.lart.tudelft.nl/> for
 	  information on the LART.
 
+config SA1100_PLEB
+	bool "PLEB"
+	help
+	  Say Y here if you are using version 1 of the Portable Linux
+	  Embedded Board (also known as PLEB).
+	  See <http://www.disy.cse.unsw.edu.au/Hardware/PLEB/>
+	  for more information.
+
 config SA1100_SHANNON
 	bool "Shannon"
 	help

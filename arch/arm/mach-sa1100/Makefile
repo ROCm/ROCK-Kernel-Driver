@@ -35,6 +35,8 @@ obj-$(CONFIG_SA1100_JORNADA720)		+= jornada720.o
 obj-$(CONFIG_SA1100_LART)		+= lart.o
 led-$(CONFIG_SA1100_LART)		+= leds-lart.o
 
+obj-$(CONFIG_SA1100_PLEB)		+= pleb.o
+
 obj-$(CONFIG_SA1100_SHANNON)		+= shannon.o
 
 obj-$(CONFIG_SA1100_SIMPAD)		+= simpad.o
