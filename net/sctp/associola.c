@@ -52,7 +52,6 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/in.h>
 #include <net/ipv6.h>
