@@ -1144,6 +1144,7 @@ static struct usb_device_id ids[] = {
 
 static struct
 usb_driver scanner_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usbscanner",
 	.probe =	probe_scanner,
 	.disconnect =	disconnect_scanner,
