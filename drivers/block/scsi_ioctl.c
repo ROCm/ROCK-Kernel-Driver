@@ -178,6 +178,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_write(GPCMD_SEND_EVENT),
 		safe_for_write(GPCMD_SEND_KEY),
 		safe_for_write(GPCMD_SEND_OPC),
+		safe_for_write(GPCMD_SEND_CUE_SHEET),
 		safe_for_write(GPCMD_SET_SPEED),
 		safe_for_write(GPCMD_PREVENT_ALLOW_MEDIUM_REMOVAL),
 		safe_for_write(GPCMD_LOAD_UNLOAD),
