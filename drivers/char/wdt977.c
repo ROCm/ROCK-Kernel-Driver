@@ -39,7 +39,7 @@
 
 static	int timeout = DEFAULT_TIMEOUT*60;	/* TO in seconds from user */
 static	int timeoutM = DEFAULT_TIMEOUT;		/* timeout in minutes */
-static	int timer_alive;
+static	unsigned long timer_alive;
 static	int testmode;
 
 MODULE_PARM(timeout, "i");
