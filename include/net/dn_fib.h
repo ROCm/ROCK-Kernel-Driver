@@ -19,7 +19,6 @@ struct dn_kern_rta
         u32             *rta_flow;
         struct rta_cacheinfo *rta_ci;
 	struct rta_session *rta_sess;
-	u8		*rta_hoplimit;
 };
 
 struct dn_fib_res {

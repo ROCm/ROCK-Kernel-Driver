@@ -201,10 +201,9 @@ enum rtattr_type_t
 	RTA_FLOW,
 	RTA_CACHEINFO,
 	RTA_SESSION,
-	RTA_HOPLIMIT,
 };
 
-#define RTA_MAX RTA_HOPLIMIT
+#define RTA_MAX RTA_SESSION
 
 #define RTM_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct rtmsg))))
 #define RTM_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct rtmsg))
@@ -283,9 +282,11 @@ enum
 #define RTAX_ADVMSS RTAX_ADVMSS
 	RTAX_REORDERING,
 #define RTAX_REORDERING RTAX_REORDERING
+	RTAX_HOPLIMIT,
+#define RTAX_HOPLIMIT RTAX_HOPLIMIT
 };
 
-#define RTAX_MAX RTAX_REORDERING
+#define RTAX_MAX RTAX_HOPLIMIT
 
 struct rta_session
 {

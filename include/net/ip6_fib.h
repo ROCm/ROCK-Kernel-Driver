@@ -67,7 +67,6 @@ struct rt6_info
 	
 	u32				rt6i_flags;
 	u32				rt6i_metric;
-	u8				rt6i_hoplimit;
 	atomic_t			rt6i_ref;
 
 	struct rt6key			rt6i_dst;

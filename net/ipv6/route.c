@@ -108,6 +108,7 @@ struct rt6_info ip6_null_entry = {
 			.dev		= &loopback_dev,
 			.obsolete	= -1,
 			.error		= -ENETUNREACH,
+			.metrics[RTAX_HOPLIMIT-1] = 255,
 			.input		= ip6_pkt_discard,
 			.output		= ip6_pkt_discard,
 			.ops		= &ip6_dst_ops,
@@ -116,7 +117,6 @@ struct rt6_info ip6_null_entry = {
 	},
 	.rt6i_flags	= (RTF_REJECT | RTF_NONEXTHOP),
 	.rt6i_metric	= ~(u32) 0,
-	.rt6i_hoplimit	= 255,
 	.rt6i_ref	= ATOMIC_INIT(1),
 };
 
@@ -769,13 +769,6 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 		}
 	}
 
-	if (ipv6_addr_is_multicast(&rt->rt6i_dst.addr))
-		rt->rt6i_hoplimit = IPV6_DEFAULT_MCASTHOPS;
-	else if (rta && rta[RTA_HOPLIMIT-1])
-		memcpy(&rt->rt6i_hoplimit, RTA_DATA(rta[RTA_HOPLIMIT-1]), 1);
-	else
-		rt->rt6i_hoplimit = ipv6_get_hoplimit(dev);
-
 	rt->rt6i_flags = rtmsg->rtmsg_flags;
 
 install_route:
@@ -796,6 +789,16 @@ install_route:
 			attr = RTA_NEXT(attr, attrlen);
 		}
 	}
+
+	if (rt->u.dst.metrics[RTAX_HOPLIMIT-1] == 0) {
+		if (ipv6_addr_is_multicast(&rt->rt6i_dst.addr))
+			rt->u.dst.metrics[RTAX_HOPLIMIT-1] =
+				IPV6_DEFAULT_MCASTHOPS;
+		else
+			rt->u.dst.metrics[RTAX_HOPLIMIT-1] =
+				ipv6_get_hoplimit(dev);
+	}
+
 	if (!rt->u.dst.metrics[RTAX_MTU-1])
 		rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(dev);
 	if (!rt->u.dst.metrics[RTAX_ADVMSS-1])
@@ -964,7 +967,6 @@ source_ok:
 	nrt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&nrt->u.dst) - 60, ip6_rt_min_advmss);
 	if (nrt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
 		nrt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
-	nrt->rt6i_hoplimit = ipv6_get_hoplimit(neigh->dev);
 
 	if (rt6_ins(nrt, NULL, NULL))
 		goto out;
@@ -1080,7 +1082,6 @@ static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 		if (rt->u.dst.dev)
 			dev_hold(rt->u.dst.dev);
 		rt->u.dst.lastuse = jiffies;
-		rt->rt6i_hoplimit = ort->rt6i_hoplimit;
 		rt->rt6i_expires = 0;
 
 		ipv6_addr_copy(&rt->rt6i_gateway, &ort->rt6i_gateway);
@@ -1226,7 +1227,7 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
 		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
-	rt->rt6i_hoplimit = ipv6_get_hoplimit(rt->rt6i_dev);
+	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = ipv6_get_hoplimit(rt->rt6i_dev);
 	rt->u.dst.obsolete = -1;
 
 	rt->rt6i_flags = RTF_UP | RTF_NONEXTHOP;

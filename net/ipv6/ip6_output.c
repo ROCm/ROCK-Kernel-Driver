@@ -249,7 +249,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	if (np)
 		hlimit = np->hop_limit;
 	if (hlimit < 0)
-		hlimit = ((struct rt6_info*)dst)->rt6i_hoplimit;
+		hlimit = dst_metric(dst, RTAX_HOPLIMIT);
 
 	hdr->payload_len = htons(seg_len);
 	hdr->nexthdr = proto;
@@ -609,7 +609,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		else
 			hlimit = np->hop_limit;
 		if (hlimit < 0)
-			hlimit = ((struct rt6_info*)dst)->rt6i_hoplimit;
+			hlimit = dst_metric(dst, RTAX_HOPLIMIT);
 	}
 
 	jumbolen = 0;

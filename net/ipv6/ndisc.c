@@ -397,7 +397,7 @@ static inline void ndisc_rt_init(struct rt6_info *rt, struct net_device *dev,
 	rt->rt6i_expires  = 0;
 	rt->rt6i_flags    = RTF_LOCAL;
 	rt->rt6i_metric   = 0;
-	rt->rt6i_hoplimit = 255;
+	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
 	rt->u.dst.output  = ndisc_output;
 }
 
