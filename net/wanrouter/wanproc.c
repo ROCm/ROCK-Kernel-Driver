@@ -207,7 +207,7 @@ static struct file_operations status_fops = {
 
 static int wandev_show(struct seq_file *m, void *v)
 {
-	struct wan_device *wandev = v;
+	struct wan_device *wandev = m->private;
 
 	if (wandev->magic != ROUTER_MAGIC)
 		return 0;
