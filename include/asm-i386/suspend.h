@@ -6,11 +6,12 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 
-static inline void
+static inline int
 arch_prepare_suspend(void)
 {
 	if (!cpu_has_pse)
-		panic("pse required");
+		return -EPERM;
+	return 0;
 }
 
 /* image of the saved processor state */
@@ -37,8 +38,6 @@ struct saved_context {
 
 extern void save_processor_state(void);
 extern void restore_processor_state(void);
-
-extern int do_magic(int resume);
 
 #ifdef CONFIG_ACPI_SLEEP
 extern unsigned long saved_eip;

@@ -28,6 +28,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/notifier.h>
+#include <linux/suspend.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -2414,6 +2415,9 @@ static int migration_thread(void * data)
 	for (;;) {
 		struct list_head *head;
 		migration_req_t *req;
+
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 
 		spin_lock_irq(&rq->lock);
 		head = &rq->migration_queue;
