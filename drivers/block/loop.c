@@ -679,7 +679,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	get_file(file);
 
-	if (IS_RDONLY (inode) || is_read_only(to_kdev_t(lo_device->bd_dev))
+	if (IS_RDONLY (inode) || bdev_read_only(lo_device)
 	    || !(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 

@@ -1707,7 +1707,7 @@ static int journal_read(struct super_block *p_s_sb) {
     goto start_log_replay;
   }
 
-  if (continue_replay && is_read_only(p_s_sb->s_dev)) {
+  if (continue_replay && bdev_read_only(p_s_sb->s_bdev)) {
     printk("clm-2076: device is readonly, unable to replay log\n") ;
     return -1 ;
   }
@@ -1796,7 +1796,7 @@ start_log_replay:
     printk("reiserfs: replayed %d transactions in %lu seconds\n", replay_count, 
 	    CURRENT_TIME - start) ;
   }
-  if (!is_read_only(p_s_sb->s_dev) && 
+  if (!bdev_read_only(p_s_sb->s_bdev) && 
        _update_journal_header_block(p_s_sb, SB_JOURNAL(p_s_sb)->j_start, 
                                    SB_JOURNAL(p_s_sb)->j_last_flush_trans_id))
   {

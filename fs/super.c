@@ -367,7 +367,7 @@ int do_remount_sb(struct super_block *sb, int flags, void *data)
 {
 	int retval;
 	
-	if (!(flags & MS_RDONLY) && !kdev_none(sb->s_dev) && is_read_only(sb->s_dev))
+	if (!(flags & MS_RDONLY) && bdev_read_only(sb->s_bdev))
 		return -EACCES;
 		/*flags |= MS_RDONLY;*/
 	if (flags & MS_RDONLY)
@@ -485,7 +485,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		goto out;
 	check_disk_change(dev);
 	error = -EACCES;
-	if (!(flags & MS_RDONLY) && is_read_only(dev))
+	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
 		goto out1;
 	error = bd_claim(bdev, fs_type);
 	if (error)

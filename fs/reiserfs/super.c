@@ -1063,7 +1063,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     if (replay_only (s))
 	goto error;
 
-    if (is_read_only(s->s_dev) && !(s->s_flags & MS_RDONLY)) {
+    if (bdev_read_only(s->s_bdev) && !(s->s_flags & MS_RDONLY)) {
         printk("clm-7000: Detected readonly device, marking FS readonly\n") ;
 	s->s_flags |= MS_RDONLY ;
     }

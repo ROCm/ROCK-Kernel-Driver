@@ -1220,6 +1220,7 @@ extern int submit_bh(int, struct buffer_head *);
 struct bio;
 extern int submit_bio(int, struct bio *);
 extern int is_read_only(kdev_t);
+extern int bdev_read_only(struct block_device *);
 extern int set_blocksize(struct block_device *, int);
 extern int sb_set_blocksize(struct super_block *, int);
 extern int sb_min_blocksize(struct super_block *, int);

@@ -326,6 +326,7 @@ EXPORT_SYMBOL(tty_std_termios);
 EXPORT_SYMBOL(blk_size);
 EXPORT_SYMBOL(blk_dev);
 EXPORT_SYMBOL(is_read_only);
+EXPORT_SYMBOL(bdev_read_only);
 EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(bmap);
 EXPORT_SYMBOL(devfs_register_partitions);

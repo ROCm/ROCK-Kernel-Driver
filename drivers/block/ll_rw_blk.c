@@ -1196,6 +1196,11 @@ int is_read_only(kdev_t dev)
 	return ro_bits[major][minor >> 5] & (1 << (minor & 31));
 }
 
+int bdev_read_only(struct block_device *bdev)
+{
+	return bdev && is_read_only(to_kdev_t(bdev->bd_dev));
+}
+
 void set_device_ro(kdev_t dev,int flag)
 {
 	int minor,major;
@@ -1765,7 +1770,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		}
 	}
 
-	if ((rw & WRITE) && is_read_only(to_kdev_t(bhs[0]->b_bdev->bd_dev))) {
+	if ((rw & WRITE) && bdev_read_only(bhs[0]->b_bdev)) {
 		printk(KERN_NOTICE "Can't write to read-only device %s\n",
 		       bdevname(bhs[0]->b_bdev));
 		goto sorry;
