@@ -831,16 +831,27 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass
 extern struct pci_dev *isa_bridge;
 #endif
 
+struct msix_entry {
+	u16 	vector;	/* kernel uses to write allocated vector */
+	u16	entry;	/* driver uses to specify entry, OS writes */
+};
+
 #ifndef CONFIG_PCI_USE_VECTOR
 static inline void pci_scan_msi_device(struct pci_dev *dev) {}
 static inline int pci_enable_msi(struct pci_dev *dev) {return -1;}
+static inline void pci_disable_msi(struct pci_dev *dev) {}
+static inline int pci_enable_msix(struct pci_dev* dev,
+	struct msix_entry *entries, int nvec) {return -1;}
+static inline void pci_disable_msix(struct pci_dev *dev) {}
 static inline void msi_remove_pci_irq_vectors(struct pci_dev *dev) {}
 #else
 extern void pci_scan_msi_device(struct pci_dev *dev);
 extern int pci_enable_msi(struct pci_dev *dev);
+extern void pci_disable_msi(struct pci_dev *dev);
+extern int pci_enable_msix(struct pci_dev* dev,
+	struct msix_entry *entries, int nvec);
+extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
-extern int msi_alloc_vectors(struct pci_dev* dev, int *vector, int nvec);
-extern int msi_free_vectors(struct pci_dev* dev, int *vector, int nvec);
 #endif
 
 #endif /* CONFIG_PCI */
