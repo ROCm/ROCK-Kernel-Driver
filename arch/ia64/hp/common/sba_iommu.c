@@ -39,9 +39,7 @@
 
 #define DRIVER_NAME "SBA"
 
-#ifndef CONFIG_IA64_HP_PROTO
 #define ALLOW_IOV_BYPASS
-#endif
 #define ENABLE_MARK_CLEAN
 /*
 ** The number of debug flags is a clue - this code is fragile.
@@ -1252,10 +1250,6 @@ sba_ioc_init(struct sba_device *sba_dev, struct ioc *ioc, int ioc_num)
 	** Firmware programs the maximum IOV space size into the imask reg
 	*/
 	iova_space_size = ~(READ_REG(ioc->ioc_hpa + IOC_IMASK) & 0xFFFFFFFFUL) + 1;
-#ifdef CONFIG_IA64_HP_PROTO
-	if (!iova_space_size)
-		iova_space_size = GB(1);
-#endif
 
 	/*
 	** iov_order is always based on a 1GB IOVA space since we want to
@@ -1625,10 +1619,8 @@ void __init sba_init(void)
 	       device->slot_name, hpa);
 
 	if ((hw_rev & 0xFF) < 0x20) {
-		printk(KERN_INFO "%s WARNING rev 2.0 or greater will be required for IO MMU support in the future\n", DRIVER_NAME);
-#ifndef CONFIG_IA64_HP_PROTO
-		panic("%s: CONFIG_IA64_HP_PROTO MUST be enabled to support SBA rev less than 2.0", DRIVER_NAME);
-#endif
+		printk("%s: SBA rev less than 2.0 not supported", DRIVER_NAME);
+		return;
 	}
 
 	sba_dev = kmalloc(sizeof(struct sba_device), GFP_KERNEL);

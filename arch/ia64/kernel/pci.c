@@ -2,6 +2,11 @@
  * pci.c - Low-Level PCI Access in IA-64
  *
  * Derived from bios32.c of i386 tree.
+ *
+ * Copyright (C) 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *
+ * Note: Above list of copyright holders is incomplete...
  */
 #include <linux/config.h>
 
@@ -85,15 +90,15 @@ __pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 static int
 pci_sal_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return __pci_sal_read(0, bus->number, PCI_SLOT(devfn),
-			    PCI_FUNC(devfn), where, size, value);
+	return __pci_sal_read(0, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
+			      where, size, value);
 }
 
 static int
 pci_sal_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return __pci_sal_write(0, bus->number, PCI_SLOT(devfn),
-			     PCI_FUNC(devfn), where, size, value);
+	return __pci_sal_write(0, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
+			       where, size, value);
 }
 
 struct pci_ops pci_sal_ops = {
@@ -202,8 +207,8 @@ pcibios_fixup_pbus_ranges (struct pci_bus * bus, struct pbus_set_ranges_data * r
 {
 }
 
-int
-pcibios_enable_device (struct pci_dev *dev)
+static inline int
+pcibios_enable_resources (struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;
 	int idx;
@@ -215,6 +220,10 @@ pcibios_enable_device (struct pci_dev *dev)
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
 	for (idx=0; idx<6; idx++) {
+		/* Only set up the desired resources.  */
+		if (!(mask & (1 << idx)))
+			continue;
+
 		r = &dev->resource[idx];
 		if (!r->start && r->end) {
 			printk(KERN_ERR
@@ -233,9 +242,19 @@ pcibios_enable_device (struct pci_dev *dev)
 		printk("PCI: Enabling device %s (%04x -> %04x)\n", dev->slot_name, old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
+	return 0;
+}
+
+int
+pcibios_enable_device (struct pci_dev *dev, int mask)
+{
+	int ret;
+
+	ret = pcibios_enable_resources(dev, mask);
+	if (ret < 0)
+		return ret;
 
 	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, dev->slot_name);
-
 	return 0;
 }
 

@@ -90,15 +90,23 @@ ENTRY(ia64_execve)
 	br.ret.sptk.many rp
 END(ia64_execve)
 
+/*
+ * sys_clone2(u64 flags, u64 ustack_base, u64 ustack_size, u64 user_tid, u64 tls)
+ */
 GLOBAL_ENTRY(sys_clone2)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
-	alloc r16=ar.pfs,3,2,4,0
+	alloc r16=ar.pfs,5,2,5,0
 	DO_SAVE_SWITCH_STACK
+	adds r2=PT(R16)+IA64_SWITCH_STACK_SIZE+16,sp
 	mov loc0=rp
 	mov loc1=r16				// save ar.pfs across do_fork
 	.body
 	mov out1=in1
 	mov out3=in2
+	tbit.nz p6,p0=in0,CLONE_SETTLS_BIT
+	mov out4=in3				// valid only w/CLONE_SETTID and/or CLONE_CLEARTID
+	;;
+(p6)	st8 [r2]=in4				// store TLS in r13 (tp)
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
 	br.call.sptk.many rp=do_fork
@@ -115,15 +123,24 @@ GLOBAL_ENTRY(sys_clone2)
 	br.ret.sptk.many rp
 END(sys_clone2)
 
+/*
+ * sys_clone(u64 flags, u64 ustack_base, u64 user_tid, u64 tls)
+ *	Deprecated.  Use sys_clone2() instead.
+ */
 GLOBAL_ENTRY(sys_clone)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
-	alloc r16=ar.pfs,2,2,4,0
+	alloc r16=ar.pfs,4,2,5,0
 	DO_SAVE_SWITCH_STACK
+	adds r2=PT(R16)+IA64_SWITCH_STACK_SIZE+16,sp
 	mov loc0=rp
 	mov loc1=r16				// save ar.pfs across do_fork
 	.body
 	mov out1=in1
 	mov out3=16				// stacksize (compensates for 16-byte scratch area)
+	tbit.nz p6,p0=in0,CLONE_SETTLS_BIT
+	mov out4=in2				// out4 = user_tid (optional)
+	;;
+(p6)	st8 [r2]=in3				// store TLS in r13 (tp)
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
 	br.call.sptk.many rp=do_fork
@@ -521,7 +538,7 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
-	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
+	 * Called by ia64_switch_to() after do_fork()->copy_thread().  r8 contains the
 	 * address of the previously executing task.
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
@@ -872,7 +889,7 @@ END(invoke_schedule)
 #endif /* __GNUC__ < 3 */
 
 	/*
-	 * Setup stack and call ia64_do_signal.  Note that pSys and pNonSys need to
+	 * Setup stack and call do_notify_resume_user().  Note that pSys and pNonSys need to
 	 * be set up by the caller.  We declare 8 input registers so the system call
 	 * args get preserved, in case we need to restart a system call.
 	 */
@@ -900,7 +917,7 @@ ENTRY(notify_resume_user)
 	mov ar.unat=r9
 	mov ar.pfs=loc1
 	br.ret.sptk.many rp
-END(do_notify_resume_user)
+END(notify_resume_user)
 
 GLOBAL_ENTRY(sys_rt_sigsuspend)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
@@ -1224,10 +1241,10 @@ sys_call_table:
 	data8 sys_futex				// 1230
 	data8 sys_sched_setaffinity
 	data8 sys_sched_getaffinity
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1235
-	data8 ia64_ni_syscall
+	data8 sys_security
+	data8 sys_alloc_hugepages
+	data8 sys_free_hugepages		// 1235
+	data8 sys_exit_group
 	data8 ia64_ni_syscall
 	data8 sys_io_setup
 	data8 sys_io_destroy

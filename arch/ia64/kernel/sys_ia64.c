@@ -19,6 +19,12 @@
 #include <asm/shmparam.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_HUGETLB_PAGE
+# define SHMLBA_HPAGE		HPAGE_SIZE
+# define COLOR_HALIGN(addr)	(((addr) + SHMLBA_HPAGE - 1) & ~(SHMLBA_HPAGE - 1))
+# define TASK_HPAGE_BASE	((REGION_HPAGE << REGION_SHIFT) | HPAGE_SIZE)
+#endif
+
 unsigned long
 arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len,
 			unsigned long pgoff, unsigned long flags)
@@ -56,16 +62,14 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 }
 
 asmlinkage long
-ia64_getpriority (int which, int who, long arg2, long arg3, long arg4, long arg5, long arg6,
-		  long arg7, long stack)
+ia64_getpriority (int which, int who)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
 	extern long sys_getpriority (int, int);
 	long prio;
 
 	prio = sys_getpriority(which, who);
 	if (prio >= 0) {
-		regs->r8 = 0;	/* ensure negative priority is not mistaken as error code */
+		force_successful_syscall_return();
 		prio = 20 - prio;
 	}
 	return prio;
@@ -79,10 +83,8 @@ sys_getpagesize (void)
 }
 
 asmlinkage unsigned long
-ia64_shmat (int shmid, void *shmaddr, int shmflg, long arg3, long arg4, long arg5, long arg6,
-	    long arg7, long stack)
+ia64_shmat (int shmid, void *shmaddr, int shmflg)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long raddr;
 	int retval;
 
@@ -90,16 +92,14 @@ ia64_shmat (int shmid, void *shmaddr, int shmflg, long arg3, long arg4, long arg
 	if (retval < 0)
 		return retval;
 
-	regs->r8 = 0;	/* ensure negative addresses are not mistaken as an error code */
+	force_successful_syscall_return();
 	return raddr;
 }
 
 asmlinkage unsigned long
-ia64_brk (unsigned long brk, long arg1, long arg2, long arg3,
-	  long arg4, long arg5, long arg6, long arg7, long stack)
+ia64_brk (unsigned long brk)
 {
 	extern int vm_enough_memory (long pages);
-	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long rlim, retval, newbrk, oldbrk;
 	struct mm_struct *mm = current->mm;
 
@@ -145,7 +145,7 @@ set_brk:
 out:
 	retval = mm->brk;
 	up_write(&mm->mmap_sem);
-	regs->r8 = 0;		/* ensure large retval isn't mistaken as error code */
+	force_successful_syscall_return();
 	return retval;
 }
 
@@ -222,31 +222,97 @@ out:	if (file)
  * of) files that are larger than the address space of the CPU.
  */
 asmlinkage unsigned long
-sys_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, long pgoff,
-	   long arg6, long arg7, long stack)
+sys_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, long pgoff)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-
 	addr = do_mmap2(addr, len, prot, flags, fd, pgoff);
 	if (!IS_ERR((void *) addr))
-		regs->r8 = 0;	/* ensure large addresses are not mistaken as failures... */
+		force_successful_syscall_return();
 	return addr;
 }
 
 asmlinkage unsigned long
-sys_mmap (unsigned long addr, unsigned long len, int prot, int flags,
-	  int fd, long off, long arg6, long arg7, long stack)
+sys_mmap (unsigned long addr, unsigned long len, int prot, int flags, int fd, long off)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-
 	if ((off & ~PAGE_MASK) != 0)
 		return -EINVAL;
 
 	addr = do_mmap2(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
 	if (!IS_ERR((void *) addr))
-		regs->r8 = 0;	/* ensure large addresses are not mistaken as failures... */
+		force_successful_syscall_return();
 	return addr;
 }
+
+#ifdef CONFIG_HUGETLB_PAGE
+
+asmlinkage unsigned long
+sys_alloc_hugepages (int key, unsigned long addr, size_t len, int prot, int flag)
+{
+	struct mm_struct *mm = current->mm;
+	long retval;
+	extern int alloc_hugetlb_pages (int, unsigned long, unsigned long, int, int);
+
+	if ((key < 0) || (len & (HPAGE_SIZE - 1)))
+		return -EINVAL;
+
+	if (addr && ((REGION_NUMBER(addr) != REGION_HPAGE) || (addr & (HPAGE_SIZE - 1))))
+		addr = TASK_HPAGE_BASE;
+
+	if (!addr)
+		addr = TASK_HPAGE_BASE;
+	down_write(&mm->mmap_sem);
+	{
+		retval = arch_get_unmapped_area(NULL, COLOR_HALIGN(addr), len, 0, 0);
+		if (retval != -ENOMEM)
+			retval = alloc_hugetlb_pages(key, retval, len, prot, flag);
+	}
+	up_write(&mm->mmap_sem);
+
+	if (IS_ERR((void *) retval))
+		return retval;
+
+	force_successful_syscall_return();
+	return retval;
+}
+
+asmlinkage int
+sys_free_hugepages (unsigned long  addr)
+{
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
+	extern int free_hugepages(struct vm_area_struct *);
+	int retval;
+
+	vma = find_vma(mm, addr);
+	if (!vma || !is_vm_hugetlb_page(vma) || (vma->vm_start != addr))
+		return -EINVAL;
+
+	down_write(&mm->mmap_sem);
+	{
+		spin_lock(&mm->page_table_lock);
+		{
+			retval = free_hugepages(vma);
+		}
+		spin_unlock(&mm->page_table_lock);
+	}
+	up_write(&mm->mmap_sem);
+	return retval;
+}
+
+#else /* !CONFIG_HUGETLB_PAGE */
+
+asmlinkage unsigned long
+sys_alloc_hugepages (int key, size_t addr, unsigned long len, int prot, int flag)
+{
+	return -ENOSYS;
+}
+
+asmlinkage unsigned long
+sys_free_hugepages (unsigned long  addr)
+{
+	return -ENOSYS;
+}
+
+#endif /* !CONFIG_HUGETLB_PAGE */
 
 asmlinkage long
 sys_vm86 (long arg0, long arg1, long arg2, long arg3)
@@ -256,16 +322,14 @@ sys_vm86 (long arg0, long arg1, long arg2, long arg3)
 }
 
 asmlinkage unsigned long
-ia64_create_module (const char *name_user, size_t size, long arg2, long arg3,
-		    long arg4, long arg5, long arg6, long arg7, long stack)
+ia64_create_module (const char *name_user, size_t size)
 {
 	extern unsigned long sys_create_module (const char *, size_t);
-	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long   addr;
 
 	addr = sys_create_module (name_user, size);
 	if (!IS_ERR((void *) addr))
-		regs->r8 = 0;	/* ensure large addresses are not mistaken as failures... */
+		force_successful_syscall_return();
 	return addr;
 }
 

@@ -33,60 +33,73 @@ struct fake_pci_dev {
 
 static struct pci_ops *orig_pci_ops;
 
-#define HP_CFG_RD(sz, bits, name)						\
-static int hp_cfg_read##sz (struct pci_dev *dev, int where, u##bits *value)	\
-{										\
-	struct fake_pci_dev *fake_dev;						\
-	if (!(fake_dev = (struct fake_pci_dev *) dev->sysdata))			\
-		return orig_pci_ops->name(dev, where, value);			\
-										\
-	if (where == PCI_BASE_ADDRESS_0) {					\
-		if (fake_dev->sizing)						\
-			*value = ~(fake_dev->csr_size - 1);			\
-		else								\
-			*value = (fake_dev->csr_base &				\
-				    PCI_BASE_ADDRESS_MEM_MASK) |		\
-				PCI_BASE_ADDRESS_SPACE_MEMORY;			\
-		fake_dev->sizing = 0;						\
-		return PCIBIOS_SUCCESSFUL;					\
-	}									\
-	*value = read##sz(fake_dev->mapped_csrs + where);			\
-	if (where == PCI_COMMAND)						\
-		*value |= PCI_COMMAND_MEMORY; /* SBA omits this */		\
-	return PCIBIOS_SUCCESSFUL;						\
+struct fake_pci_dev *
+lookup_fake_dev (struct pci_bus *bus, unsigned int devfn)
+{
+	struct pci_dev *dev;
+	list_for_each_entry(dev, &bus->devices, bus_list)
+		if (dev->devfn == devfn)
+			return (struct fake_pci_dev *) dev->sysdata;
+	return NULL;
 }
 
-#define HP_CFG_WR(sz, bits, name)						\
-static int hp_cfg_write##sz (struct pci_dev *dev, int where, u##bits value)	\
-{										\
-	struct fake_pci_dev *fake_dev;						\
-										\
-	if (!(fake_dev = (struct fake_pci_dev *) dev->sysdata))			\
-		return orig_pci_ops->name(dev, where, value);			\
-										\
-	if (where == PCI_BASE_ADDRESS_0) {					\
-		if (value == (u##bits) ~0)					\
-			fake_dev->sizing = 1;					\
-		return PCIBIOS_SUCCESSFUL;					\
-	} else									\
-		write##sz(value, fake_dev->mapped_csrs + where);		\
-	return PCIBIOS_SUCCESSFUL;						\
+static int
+hp_cfg_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
+{
+	struct fake_pci_dev *fake_dev = lookup_fake_dev(bus, devfn);
+
+	if (!fake_dev)
+		return (*orig_pci_ops->read)(bus, devfn, where, size, value);
+
+	if (where == PCI_BASE_ADDRESS_0) {
+		if (fake_dev->sizing)
+			*value = ~(fake_dev->csr_size - 1);
+		else
+			*value = ((fake_dev->csr_base & PCI_BASE_ADDRESS_MEM_MASK)
+				  | PCI_BASE_ADDRESS_SPACE_MEMORY);
+		fake_dev->sizing = 0;
+		return PCIBIOS_SUCCESSFUL;
+	}
+	switch (size) {
+	      case 1: *value = readb(fake_dev->mapped_csrs + where); break;
+	      case 2: *value = readw(fake_dev->mapped_csrs + where); break;
+	      case 4: *value = readl(fake_dev->mapped_csrs + where); break;
+	      default:
+		printk(KERN_WARNING"hp_cfg_read: bad size = %d bytes", size);
+		break;
+	}
+	if (where == PCI_COMMAND)
+		*value |= PCI_COMMAND_MEMORY; /* SBA omits this */
+	return PCIBIOS_SUCCESSFUL;
 }
 
-HP_CFG_RD(b,  8, read_byte)
-HP_CFG_RD(w, 16, read_word)
-HP_CFG_RD(l, 32, read_dword)
-HP_CFG_WR(b,  8, write_byte)
-HP_CFG_WR(w, 16, write_word)
-HP_CFG_WR(l, 32, write_dword)
+static int
+hp_cfg_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
+{
+	struct fake_pci_dev *fake_dev = lookup_fake_dev(bus, devfn);
+
+	if (!fake_dev)
+		return (*orig_pci_ops->write)(bus, devfn, where, size, value);
+
+	if (where == PCI_BASE_ADDRESS_0) {
+		if (value == ((1UL << 8*size) - 1))
+			fake_dev->sizing = 1;
+		return PCIBIOS_SUCCESSFUL;
+	}
+	switch (size) {
+	      case 1: writeb(value, fake_dev->mapped_csrs + where); break;
+	      case 2: writew(value, fake_dev->mapped_csrs + where); break;
+	      case 4: writel(value, fake_dev->mapped_csrs + where); break;
+	      default:
+		printk(KERN_WARNING"hp_cfg_write: bad size = %d bytes", size);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops hp_pci_conf = {
-	hp_cfg_readb,
-	hp_cfg_readw,
-	hp_cfg_readl,
-	hp_cfg_writeb,
-	hp_cfg_writew,
-	hp_cfg_writel,
+	.read =		hp_cfg_read,
+	.write =	hp_cfg_write
 };
 
 static void
@@ -309,40 +322,8 @@ hpzx1_acpi_dev_init(void)
 	 * HWP0003: AGP LBA device
 	 */
 	acpi_get_devices("HWP0001", hpzx1_sba_probe, "HWP0001", NULL);
-#ifdef CONFIG_IA64_HP_PROTO
-	if (hpzx1_devices) {
-#endif
 	acpi_get_devices("HWP0002", hpzx1_lba_probe, "HWP0002 PCI LBA", NULL);
 	acpi_get_devices("HWP0003", hpzx1_lba_probe, "HWP0003 AGP LBA", NULL);
-
-#ifdef CONFIG_IA64_HP_PROTO
-	}
-
-#define ZX1_FUNC_ID_VALUE    (PCI_DEVICE_ID_HP_ZX1_SBA << 16) | PCI_VENDOR_ID_HP
-	/*
-	 * Early protos don't have bridges in the ACPI namespace, so
-	 * if we didn't find anything, add the things we know are
-	 * there.
-	 */
-	if (hpzx1_devices == 0) {
-		u64 hpa, csr_base;
-
-		csr_base = 0xfed00000UL;
-		hpa = (u64) ioremap(csr_base, 0x2000);
-		if (__raw_readl(hpa) == ZX1_FUNC_ID_VALUE) {
-			hpzx1_fake_pci_dev("HWP0001 SBA", 0, csr_base, 0x1000);
-			hpzx1_fake_pci_dev("HWP0001 IOC", 0, csr_base + 0x1000,
-					    0x1000);
-
-			csr_base = 0xfed24000UL;
-			iounmap(hpa);
-			hpa = (u64) ioremap(csr_base, 0x1000);
-			hpzx1_fake_pci_dev("HWP0003 AGP LBA", 0x40, csr_base,
-					    0x1000);
-		}
-		iounmap(hpa);
-	}
-#endif
 }
 
 extern void sba_init(void);
