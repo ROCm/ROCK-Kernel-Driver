@@ -175,8 +175,10 @@ static inline int scsi_status_is_good(int status)
 #define RESERVATION_CONFLICT 0x0c
 #define COMMAND_TERMINATED   0x11
 #define QUEUE_FULL           0x14
+#define ACA_ACTIVE           0x18
+#define TASK_ABORTED         0x20
 
-#define STATUS_MASK          0x3e
+#define STATUS_MASK          0xfe
 
 /*
  *  SENSE KEYS
@@ -354,7 +356,7 @@ struct scsi_lun {
  *      host_byte   = set by low-level driver to indicate status.
  *      driver_byte = set by mid-level.
  */
-#define status_byte(result) (((result) >> 1) & 0x1f)
+#define status_byte(result) (((result) >> 1) & 0x7f)
 #define msg_byte(result)    (((result) >> 8) & 0xff)
 #define host_byte(result)   (((result) >> 16) & 0xff)
 #define driver_byte(result) (((result) >> 24) & 0xff)
