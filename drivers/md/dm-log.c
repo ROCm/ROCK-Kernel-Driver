@@ -601,6 +601,9 @@ static region_t core_get_sync_count(struct dirty_log *log)
         return lc->sync_count;
 }
 
+#define EMIT(x...) sz += ((sz >= maxlen) ? \
+			0 : scnprintf(result + sz, maxlen - sz, x))
+
 #define	DMEMIT_SYNC \
 	if (lc->sync != DEFAULTSYNC) \
 		EMIT("%ssync ", lc->sync == NOSYNC ? "no" : "")
