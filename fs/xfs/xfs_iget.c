@@ -245,7 +245,6 @@ again:
 				cmn_err(CE_PANIC,
 			"xfs_iget_core: ambiguous vns: vp/0x%p, invp/0x%p",
 						inode_vp, vp);
-				BUG();
 			}
 
 			read_unlock(&ih->ih_lock);

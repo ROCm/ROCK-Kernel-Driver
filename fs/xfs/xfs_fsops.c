@@ -353,7 +353,7 @@ xfs_growfs_data_private(
 				  sectbb, 0, &bp);
 		if (error) {
 			xfs_fs_cmn_err(CE_WARN, mp,
-			"error %d reading secondary superblock for ag %d\n",
+			"error %d reading secondary superblock for ag %d",
 				error, agno);
 			break;
 		}
@@ -368,7 +368,7 @@ xfs_growfs_data_private(
 			continue;
 		} else {
 			xfs_fs_cmn_err(CE_WARN, mp,
-		"write error %d updating secondary superblock for ag %d\n",
+		"write error %d updating secondary superblock for ag %d",
 				error, agno);
 			break; /* no point in continuing */
 		}

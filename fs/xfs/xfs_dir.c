@@ -534,7 +534,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 		return 0;
 	}
 	if (INT_GET(dp->di_core.di_size, ARCH_CONVERT) < sizeof(sf->hdr)) {
-		xfs_fs_cmn_err(CE_WARN, mp, "Invalid shortform size: dp 0x%p\n",
+		xfs_fs_cmn_err(CE_WARN, mp, "Invalid shortform size: dp 0x%p",
 			dp);
 		return 1;
 	}
@@ -546,7 +546,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	count = sf->hdr.count;
 	if ((count < 0) || ((count * 10) > XFS_LITINO(mp))) {
 		xfs_fs_cmn_err(CE_WARN, mp,
-			"Invalid shortform count: dp 0x%p\n", dp);
+			"Invalid shortform count: dp 0x%p", dp);
 		return(1);
 	}
 
@@ -561,7 +561,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 		xfs_dir_ino_validate(mp, ino);
 		if (sfe->namelen >= XFS_LITINO(mp)) {
 			xfs_fs_cmn_err(CE_WARN, mp,
-				"Invalid shortform namelen: dp 0x%p\n", dp);
+				"Invalid shortform namelen: dp 0x%p", dp);
 			return 1;
 		}
 		namelen_sum += sfe->namelen;
@@ -569,7 +569,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	}
 	if (namelen_sum >= XFS_LITINO(mp)) {
 		xfs_fs_cmn_err(CE_WARN, mp,
-			"Invalid shortform namelen: dp 0x%p\n", dp);
+			"Invalid shortform namelen: dp 0x%p", dp);
 		return 1;
 	}
 

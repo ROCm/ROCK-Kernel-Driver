@@ -2064,7 +2064,7 @@ xlog_state_do_callback(
 		} while (first_iclog != iclog);
 		if (repeats && (repeats % 10) == 0) {
 			xfs_fs_cmn_err(CE_WARN, log->l_mp,
-				"xlog_state_do_callback: looping %d\n", repeats);
+				"xlog_state_do_callback: looping %d", repeats);
 		}
 	} while (!ioerrors && loopdidcallbacks);
 

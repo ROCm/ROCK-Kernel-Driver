@@ -225,7 +225,7 @@ xfs_start_flags(
 	    (ap->logbufs < XLOG_NUM_ICLOGS ||
 	     ap->logbufs > XLOG_MAX_ICLOGS)) {
 		cmn_err(CE_WARN, 
-			"XFS: invalid logbufs value: %d [not %d-%d]\n",
+			"XFS: invalid logbufs value: %d [not %d-%d]",
 			ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
 		return XFS_ERROR(EINVAL);
 	}
@@ -237,7 +237,7 @@ xfs_start_flags(
 	    ap->logbufsize != 128 * 1024 &&
 	    ap->logbufsize != 256 * 1024) {
 		cmn_err(CE_WARN,
-	"XFS: invalid logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
+	"XFS: invalid logbufsize: %d [not 16k,32k,64k,128k or 256k]",
 			ap->logbufsize);
 		return XFS_ERROR(EINVAL);
 	}

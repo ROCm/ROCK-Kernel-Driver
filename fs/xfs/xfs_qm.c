@@ -1039,14 +1039,14 @@ xfs_qm_unmount(
 		vp = XFS_ITOV(XFS_QI_UQIP(mp));
 		VN_RELE(vp);
 		if (vn_count(vp) > 1)
-			cmn_err(CE_WARN, "UQUOTA busy vp=0x%x count=%d\n",
+			cmn_err(CE_WARN, "UQUOTA busy vp=0x%x count=%d",
 				vp, vn_count(vp));
 	}
 	if (XFS_IS_GQUOTA_ON(mp)) {
 		vp = XFS_ITOV(XFS_QI_GQIP(mp));
 		VN_RELE(vp);
 		if (vn_count(vp) > 1)
-			cmn_err(CE_WARN, "GQUOTA busy vp=0x%x count=%d\n",
+			cmn_err(CE_WARN, "GQUOTA busy vp=0x%x count=%d",
 				vp, vn_count(vp));
 	}
 

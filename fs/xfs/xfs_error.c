@@ -89,7 +89,7 @@ xfs_error_test(int error_tag, int *fsidp, char *expression,
 	for (i = 0; i < XFS_NUM_INJECT_ERROR; i++)  {
 		if (xfs_etest[i] == error_tag && xfs_etest_fsid[i] == fsid) {
 			cmn_err(CE_WARN,
-	"Injecting error (%s) at file %s, line %d, on filesystem \"%s\"\n",
+	"Injecting error (%s) at file %s, line %d, on filesystem \"%s\"",
 				expression, file, line, xfs_etest_fsname[i]);
 			return 1;
 		}

@@ -472,7 +472,7 @@ shutdown_abort:
 	 */
 #if defined(DEBUG)
 	if (XFS_BUF_ISSTALE(bp) && XFS_BUF_ISDELAYWRITE(bp))
-		cmn_err(CE_NOTE, "about to pop assert, bp == 0x%x\n", bp);
+		cmn_err(CE_NOTE, "about to pop assert, bp == 0x%x", bp);
 #endif
 	ASSERT((XFS_BUF_BFLAGS(bp) & (XFS_B_STALE|XFS_B_DELWRI)) !=
 						(XFS_B_STALE|XFS_B_DELWRI));
