@@ -145,7 +145,7 @@ xlog_header_check_dump(xfs_mount_t *mp, xlog_rec_header_t *head)
     printk("xlog_header_check_dump:\n	 SB : uuid = ");
     for (b=0;b<16;b++) printk("%02x",((unsigned char *)&mp->m_sb.sb_uuid)[b]);
     printk(", fmt = %d\n",XLOG_FMT);
-    printk("	log: uuid = ");
+    printk("    log: uuid = ");
     for (b=0;b<16;b++) printk("%02x",((unsigned char *)&head->h_fs_uuid)[b]);
     printk(", fmt = %d\n", INT_GET(head->h_fmt, ARCH_CONVERT));
 }
