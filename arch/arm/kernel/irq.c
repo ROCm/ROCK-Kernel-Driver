@@ -29,6 +29,7 @@
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
+#include <linux/errno.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/boot/compressed/head-netwinder.S
+ *  linux/include/asm-arm/cacheflush.h
  *
  *  Copyright (C) 2000-2002 Russell King
  *
@@ -7,7 +7,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-		.section	".start", "ax"
+#ifndef _ASMARM_CACHEFLUSH_H
+#define _ASMARM_CACHEFLUSH_H
 
-		mov	r7, #5
-		mov	r8, #0
+#include <asm/proc/cache.h>
+
+#endif

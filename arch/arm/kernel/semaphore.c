@@ -13,6 +13,7 @@
  */
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/errno.h>
 
 #include <asm/semaphore.h>
 
