@@ -1738,10 +1738,6 @@ static int selinux_inode_permission(struct inode *inode, int mask,
 		return 0;
 	}
 
-	if (nd && nd->dentry)
-		return dentry_has_perm(current, nd->mnt, nd->dentry,
-				       file_mask_to_av(inode->i_mode, mask));
-
 	return inode_has_perm(current, inode,
 			       file_mask_to_av(inode->i_mode, mask), NULL, NULL);
 }
