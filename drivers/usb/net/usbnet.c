@@ -2482,12 +2482,14 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 		return usbnet_ethtool_ioctl (net, (void __user *)rq->ifr_data);
 
 #ifdef NEED_MII
+	{
 	struct usbnet *dev = (struct usbnet *)net->priv;
 
 	if (dev->mii.mdio_read != NULL && dev->mii.mdio_write != NULL)
 		return generic_mii_ioctl(&dev->mii,
 				(struct mii_ioctl_data *) &rq->ifr_data,
 				cmd, NULL);
+	}
 #endif
 	return -EOPNOTSUPP;
 }
