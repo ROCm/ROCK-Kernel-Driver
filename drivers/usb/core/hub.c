@@ -868,6 +868,9 @@ static void release_address(struct usb_device *udev)
  * Context: !in_interrupt ()
  *
  * Something got disconnected. Get rid of it, and all of its children.
+ * If *pdev is a normal device then the parent hub should be locked.
+ * If *pdev is a root hub then this routine will acquire the
+ * usb_bus_list_lock on behalf of the caller.
  *
  * Only hub drivers (including virtual root hub drivers for host
  * controllers) should ever call this.
@@ -877,20 +880,12 @@ static void release_address(struct usb_device *udev)
 void usb_disconnect(struct usb_device **pdev)
 {
 	struct usb_device	*udev = *pdev;
-	struct usb_bus		*bus;
-	struct usb_operations	*ops;
 	int			i;
 
 	if (!udev) {
 		pr_debug ("%s nodev\n", __FUNCTION__);
 		return;
 	}
-	bus = udev->bus;
-	if (!bus) {
-		pr_debug ("%s nobus\n", __FUNCTION__);
-		return;
-	}
-	ops = bus->op;
 
 	/* mark the device as inactive, so any further urb submissions for
 	 * this device will fail.
@@ -906,9 +901,8 @@ void usb_disconnect(struct usb_device **pdev)
 
 	/* Free up all the children before we remove this device */
 	for (i = 0; i < USB_MAXCHILDREN; i++) {
-		struct usb_device **child = udev->children + i;
-		if (*child)
-			usb_disconnect(child);
+		if (udev->children[i])
+			usb_disconnect(&udev->children[i]);
 	}
 
 	/* deallocate hcd/hardware state ... nuking all pending urbs and
@@ -987,21 +981,23 @@ static inline void show_string(struct usb_device *udev, char *id, int index)
 
 /*
  * usb_new_device - perform initial device setup (usbcore-internal)
- * @dev: newly addressed device (in ADDRESS state)
+ * @udev: newly addressed device (in ADDRESS state)
  *
  * This is called with devices which have been enumerated, but not yet
  * configured.  The device descriptor is available, but not descriptors
- * for any device configuration.  The caller owns dev->serialize, and
- * the device is not visible through sysfs or other filesystem code.
+ * for any device configuration.  The caller must have locked udev and
+ * either the parent hub (if udev is a normal device) or else the
+ * usb_bus_list_lock (if udev is a root hub).  The parent's pointer to
+ * udev has already been installed, but udev is not yet visible through
+ * sysfs or other filesystem code.
  *
  * Returns 0 for success (device is configured and listed, with its
- * interfaces, in sysfs); else a negative errno value.  On error, one
- * reference count to the device has been dropped.
+ * interfaces, in sysfs); else a negative errno value.
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
  * Only the hub driver should ever call this; root hub registration
- * uses it only indirectly.
+ * uses it indirectly.
  */
 int usb_new_device(struct usb_device *udev)
 {
@@ -1052,6 +1048,7 @@ int usb_new_device(struct usb_device *udev)
 		if (err) {
 			dev_err(&udev->dev, "can't set config #%d, error %d\n",
 					c, err);
+			usb_remove_sysfs_dev_files(udev);
 			device_del(&udev->dev);
 			goto fail;
 		}
@@ -1548,8 +1545,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 			udev->speed = USB_SPEED_LOW;
 		else
 			udev->speed = USB_SPEED_UNKNOWN;
-
-		down (&udev->serialize);
  
 		/* set the address */
 		choose_address(udev);
@@ -1610,9 +1605,19 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 				&& highspeed_hubs != 0)
 			check_highspeed (hub, udev, port);
 
-		/* Run it through the hoops (find a driver, etc) */
+		/* Store the parent's children[] pointer.  At this point
+		 * udev becomes globally accessible, although presumably
+		 * no one will look at it until hdev is unlocked.
+		 */
+		down (&udev->serialize);
 		hdev->children[port] = udev;
+
+		/* Run it through the hoops (find a driver, etc) */
 		status = usb_new_device(udev);
+		if (status)
+			hdev->children[port] = NULL;
+
+		up (&udev->serialize);
 		if (status)
 			goto loop;
 
@@ -1622,16 +1627,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 				"%dmA power budget left\n",
 				2 * status);
 
-		up (&udev->serialize);
 		return;
 
 loop:
-		hdev->children[port] = NULL;
 		hub_port_disable(hdev, port);
 		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
 		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
 		release_address(udev);
-		up (&udev->serialize);
 		usb_put_dev(udev);
 		if (status == -ENOTCONN)
 			break;

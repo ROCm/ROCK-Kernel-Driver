@@ -1579,11 +1579,13 @@ static void hcd_panic (void *_hcd)
 	unsigned		i;
 
 	/* hc's root hub is removed later removed in hcd->stop() */
+	down (&hub->serialize);
 	hub->state = USB_STATE_NOTATTACHED;
 	for (i = 0; i < hub->maxchild; i++) {
 		if (hub->children [i])
 			usb_disconnect (&hub->children [i]);
 	}
+	up (&hub->serialize);
 }
 
 /**
