@@ -264,12 +264,10 @@ fail:
 static int
 lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 {
-	unsigned vecnr;
-	int ret = 0;
+	struct bio_vec *bvec;
+	int i, ret = 0;
 
-	for (vecnr = 0; vecnr < bio->bi_vcnt; vecnr++) {
-		struct bio_vec *bvec = &bio->bi_io_vec[vecnr];
-
+	bio_for_each_segment(bvec, bio, i) {
 		ret = do_lo_send(lo, bvec, bsize, pos);
 		if (ret < 0)
 			break;
@@ -333,12 +331,10 @@ do_lo_receive(struct loop_device *lo,
 static int
 lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 {
-	unsigned vecnr;
-	int ret = 0;
+	struct bio_vec *bvec;
+	int i, ret = 0;
 
-	for (vecnr = 0; vecnr < bio->bi_vcnt; vecnr++) {
-		struct bio_vec *bvec = &bio->bi_io_vec[vecnr];
-
+	bio_for_each_segment(bvec, bio, i) {
 		ret = do_lo_receive(lo, bvec, bsize, pos);
 		if (ret < 0)
 			break;
