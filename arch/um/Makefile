@@ -22,13 +22,6 @@ ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
 
 GEN_HEADERS += $(ARCH_DIR)/include/task.h $(ARCH_DIR)/include/kern_constants.h
 
-# This target adds dependencies to "prepare". They are defined in the included
-# Makefiles (see Makefile-i386).
-
-.PHONY: sys_prepare
-sys_prepare:
-	@:
-
 MAKEFILE-$(CONFIG_MODE_TT) += Makefile-tt
 MAKEFILE-$(CONFIG_MODE_SKAS) += Makefile-skas
 
@@ -66,18 +59,14 @@ ifeq ($(CONFIG_MODE_SKAS), y)
 $(SYS_HEADERS) : $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h
 endif
 
-$(ARCH_DIR)/vmlinux.lds.S :
-	touch $@
-
-prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS)
-
-LDFLAGS_vmlinux = -r
+prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
+	$(ARCH_DIR)/kernel/vmlinux.lds.S
 
 # These aren't in Makefile-tt because they are needed in the !CONFIG_MODE_TT +
 # CONFIG_MODE_SKAS + CONFIG_STATIC_LINK case.
 
 LINK_TT = -static
-LD_SCRIPT_TT := uml.lds
+LD_SCRIPT_TT := uml.lds.S
 
 ifeq ($(CONFIG_STATIC_LINK),y)
   LINK-y += $(LINK_TT)
@@ -94,6 +83,12 @@ endif
 endif
 endif
 
+#We need to re-preprocess this when the symlink dest changes.
+#So we just touch it.
+$(ARCH_DIR)/kernel/vmlinux.lds.S:
+	ln -sf $(LD_SCRIPT-y) $@
+	touch $@
+
 CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
 CONFIG_KERNEL_STACK_ORDER ?= 2
 STACK_SIZE := $(shell echo $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
@@ -107,13 +102,14 @@ CPPFLAGS_vmlinux.lds = $(shell echo -U$(SUBARCH) \
 	-DELF_FORMAT=\"$(ELF_FORMAT)\" $(CPP_MODE_TT) \
 	-DKERNEL_STACK_SIZE=$(STACK_SIZE))
 
-export CPPFLAGS_$(LD_SCRIPT-y) = $(CPPFLAGS_vmlinux.lds) -P -C -Uum
-
-LD_SCRIPT-y := $(ARCH_DIR)/kernel/$(LD_SCRIPT-y)
-
-linux: vmlinux $(LD_SCRIPT-y)
-	$(CC) -Wl,-T,$(LD_SCRIPT-y) $(LINK-y) $(LINK_WRAPS) \
-		-o linux vmlinux -L/usr/lib -lutil
+CFLAGS_vmlinux = $(LINK-y) $(LINK_WRAPS)
+define cmd_vmlinux__
+	$(CC) $(CFLAGS_vmlinux) -o $@ \
+	-Wl,-T,$(vmlinux-lds) $(vmlinux-init) \
+	-Wl,--start-group $(vmlinux-main) -Wl,--end-group \
+	-L/usr/lib -lutil \
+	$(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) FORCE ,$^)
+endef
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
@@ -168,15 +164,9 @@ $(ARCH_DIR)/include/kern_constants.h : $(ARCH_DIR)/util/mk_constants
 	$(call filechk,gen_header)
 
 $(ARCH_DIR)/util/mk_task $(ARCH_DIR)/util/mk_constants : $(ARCH_DIR)/util \
-	sys_prepare FORCE ;
+	FORCE ;
 
-$(ARCH_DIR)/util: FORCE
+$(ARCH_DIR)/util: $(SYS_DIR)/sc.h FORCE
 	$(Q)$(MAKE) $(build)=$@
 
 export SUBARCH USER_CFLAGS OS
-
-all: linux
-
-define archhelp
-  echo  '* linux	- Binary kernel image (./linux)'
-endef
