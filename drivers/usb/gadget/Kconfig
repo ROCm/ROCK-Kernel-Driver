@@ -175,6 +175,41 @@ config USB_DUMMY_HCD
 	depends on USB_GADGET_DUMMY_HCD
 	default USB_GADGET
 
+config USB_GADGET_OMAP
+	boolean "OMAP USB Device Controller"
+	depends on ARCH_OMAP
+	select ISP1301_OMAP if MACH_OMAP_H2
+	help
+	   Many Texas Instruments OMAP processors have flexible full
+	   speed USB device controllers, with support for up to 30
+	   endpoints (plus endpoint zero).  This driver supports the
+	   controller in the OMAP 1611, and should work with controllers
+	   in other OMAP processors too, given minor tweaks.
+
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "omap_udc" and force all
+	   gadget drivers to also be dynamically linked.
+
+config USB_OMAP
+	tristate
+	depends on USB_GADGET_OMAP
+	default USB_GADGET
+
+config USB_OTG
+	boolean "OTG Support"
+	depends on USB_GADGET_OMAP && ARCH_OMAP_OTG && USB_OHCI_HCD
+	help
+	   The most notable feature of USB OTG is support for a
+	   "Dual-Role" device, which can act as either a device
+	   or a host.  The initial role choice can be changed
+	   later, when two dual-role devices talk to each other.
+
+	   Select this only if your OMAP board has a Mini-AB connector.
+
+config USB_OMAP_PROC
+	boolean "/proc/driver/udc file"
+	depends on USB_GADGET_OMAP
+
 endchoice
 
 config USB_GADGET_DUALSPEED
