@@ -110,7 +110,7 @@ gred_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	unsigned long	qave=0;	
 	int i=0;
 
-	if (!t->initd && skb_queue_len(&sch->q) < sch->dev->tx_queue_len) {
+	if (!t->initd && skb_queue_len(&sch->q) < (sch->dev->tx_queue_len ? : 1)) {
 		D2PRINTK("NO GRED Queues setup yet! Enqueued anyway\n");
 		goto do_enqueue;
 	}

@@ -141,10 +141,12 @@ static int fifo_init(struct Qdisc *sch, struct rtattr *opt)
 	struct fifo_sched_data *q = (void*)sch->data;
 
 	if (opt == NULL) {
+		unsigned int limit = sch->dev->tx_queue_len ? : 1;
+
 		if (sch->ops == &bfifo_qdisc_ops)
-			q->limit = sch->dev->tx_queue_len*sch->dev->mtu;
+			q->limit = limit*sch->dev->mtu;
 		else	
-			q->limit = sch->dev->tx_queue_len;
+			q->limit = limit;
 	} else {
 		struct tc_fifo_qopt *ctl = RTA_DATA(opt);
 		if (opt->rta_len < RTA_LENGTH(sizeof(*ctl)))
