@@ -170,9 +170,7 @@ static int __init obsolete_checksetup(char *line)
    still work even if initially too large, it will just take slightly longer */
 unsigned long loops_per_jiffy = (1<<12);
 
-#ifndef __ia64__
 EXPORT_SYMBOL(loops_per_jiffy);
-#endif
 
 /* This is the number of bits of precision for the loops_per_jiffy.  Each
    bit takes on average 1.5/HZ seconds.  This (like the original) is a little
