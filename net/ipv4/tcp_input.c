@@ -3847,6 +3847,9 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 		if(th->ack)
 			return 1;
 
+		if(th->rst)
+			goto discard;
+
 		if(th->syn) {
 			if(tp->af_specific->conn_request(sk, skb) < 0)
 				return 1;
