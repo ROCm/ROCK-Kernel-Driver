@@ -24,7 +24,6 @@
 #include <asm/sal.h>
 #include <asm/system.h>
 
-extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 extern unsigned long last_time_offset;
 
@@ -89,7 +88,7 @@ gettimeoffset (void)
 void
 do_settimeofday (struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	{
 		/*
 		 * This is revolting. We need to set "xtime" correctly. However, the value
@@ -112,21 +111,21 @@ do_settimeofday (struct timeval *tv)
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
 	}
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long flags, usec, sec, old;
+	unsigned long seq, usec, sec, old;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	{
+	do {
+		seq = read_seqbegin(&xtime_lock);
 		usec = gettimeoffset();
 
 		/*
-		 * Ensure time never goes backwards, even when ITC on different CPUs are
-		 * not perfectly synchronized.
+		 * Ensure time never goes backwards, even when ITC on 
+		 * different CPUs are not perfectly synchronized.
 		 */
 		do {
 			old = last_time_offset;
@@ -138,8 +137,8 @@ do_gettimeofday (struct timeval *tv)
 
 		sec = xtime.tv_sec;
 		usec += xtime.tv_nsec / 1000;
-	}
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqend(&xtime_lock, seq));
+
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -182,10 +181,10 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 * another CPU. We need to avoid to SMP race by acquiring the
 			 * xtime_lock.
 			 */
-			write_lock(&xtime_lock);
+			write_seqlock(&xtime_lock);
 			do_timer(regs);
 			local_cpu_data->itm_next = new_itm;
-			write_unlock(&xtime_lock);
+			write_sequnlock(&xtime_lock);
 		} else
 			local_cpu_data->itm_next = new_itm;
 

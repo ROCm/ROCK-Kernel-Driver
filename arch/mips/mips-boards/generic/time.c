@@ -34,6 +34,7 @@
 #include <asm/div64.h>
 
 #include <linux/mc146818rtc.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 
 #include <asm/mips-boards/generic.h>
@@ -45,7 +46,6 @@ unsigned long missed_heart_beats = 0;
 
 static unsigned long r4k_offset; /* Amount to increment compare reg each time */
 static unsigned long r4k_cur;    /* What counter should be at next timer irq */
-extern rwlock_t xtime_lock;
 
 #define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
 
@@ -133,7 +133,9 @@ static int set_rtc_mmss(unsigned long nowtime)
  */
 void mips_timer_interrupt(struct pt_regs *regs)
 {
+	unsigned long flags;
 	int irq = 7;
+	unsigned long seq;
 
 	if (r4k_offset == 0)
 		goto null;
@@ -149,18 +151,21 @@ void mips_timer_interrupt(struct pt_regs *regs)
  		 * within 500ms before the * next second starts, 
  		 * thus the following code.
  		 */
-		read_lock(&xtime_lock);
-		if ((time_status & STA_UNSYNC) == 0 
-		    && xtime.tv_sec > last_rtc_update + 660 
-		    && xtime.tv_usec >= 500000 - (tick >> 1) 
-		    && xtime.tv_usec <= 500000 + (tick >> 1))
-			if (set_rtc_mmss(xtime.tv_sec) == 0)
-				last_rtc_update = xtime.tv_sec;
-			else
-				/* do it again in 60 s */
-	    			last_rtc_update = xtime.tv_sec - 600; 
-		read_unlock(&xtime_lock);
 
+		do {
+			seq = read_seqbegin_irqsave(&xtime_lock, flags);
+
+			if ((time_status & STA_UNSYNC) == 0 
+			    && xtime.tv_sec > last_rtc_update + 660 
+			    && xtime.tv_usec >= 500000 - (tick >> 1) 
+			    && xtime.tv_usec <= 500000 + (tick >> 1))
+				if (set_rtc_mmss(xtime.tv_sec) == 0)
+					last_rtc_update = xtime.tv_sec;
+				else
+					/* do it again in 60 s */
+					last_rtc_update = xtime.tv_sec - 600; 
+		} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+		
 		if ((timer_tick_count++ % HZ) == 0) {
 		    mips_display_message(&display_string[display_count++]);
 		    if (display_count == MAX_DISPLAY_COUNT)
@@ -267,10 +272,10 @@ void __init time_init(void)
 	change_cp0_status(ST0_IM, ALLINTS);
 
 	/* Read time from the RTC chipset. */
-	write_lock_irqsave (&xtime_lock, flags);
+	write_seqlock_irqsave (&xtime_lock, flags);
 	xtime.tv_sec = get_mips_time();
 	xtime.tv_usec = 0;
-	write_unlock_irqrestore(&xtime_lock, flags);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 }
 
 /* This is for machines which generate the exact clock. */
@@ -363,20 +368,24 @@ static unsigned long do_fast_gettimeoffset(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned int flags;
+	unsigned long flags;
+	unsigned long seq;
 
-	read_lock_irqsave (&xtime_lock, flags);
-	*tv = xtime;
-	tv->tv_usec += do_fast_gettimeoffset();
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
 
-	/*
-	 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
-	 * is nonzero if the timer bottom half hasnt executed yet.
-	 */
-	if (jiffies - wall_jiffies)
-		tv->tv_usec += USECS_PER_JIFFY;
+		*tv = xtime;
+		tv->tv_usec += do_fast_gettimeoffset();
 
-	read_unlock_irqrestore (&xtime_lock, flags);
+		/*
+		 * xtime is atomically updated in timer_bh. 
+		 * jiffies - wall_jiffies
+		 * is nonzero if the timer bottom half hasnt executed yet.
+		 */
+		if (jiffies - wall_jiffies)
+			tv->tv_usec += USECS_PER_JIFFY;
+
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	if (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
@@ -386,7 +395,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq (&xtime_lock);
+	write_seqlock_irq (&xtime_lock);
 
 	/* This is revolting. We need to set the xtime.tv_usec correctly.
 	 * However, the value in this location is is value at the last tick.
@@ -406,5 +415,5 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq (&xtime_lock);
+	write_sequnlock_irq (&xtime_lock);
 }

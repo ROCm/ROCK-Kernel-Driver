@@ -11,6 +11,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
 #include <linux/spinlock.h>
@@ -22,8 +23,6 @@
 #include <asm/system.h>  
 
 #include <asm/baget/baget.h>
-
-extern rwlock_t xtime_lock;
 
 /* 
  *  To have precision clock, we need to fix available clock frequency
@@ -79,20 +78,21 @@ void __init time_init(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags;
+	unsigned long seq;
 
-	read_lock_irqsave (&xtime_lock, flags);
-	*tv = xtime;
-	read_unlock_irqrestore (&xtime_lock, flags);
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		*tv = xtime;
+	} while (read_seqretry(&xtime_lock, seq));
 }
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq (&xtime_lock);
+	write_seqlock_irq (&xtime_lock);
 	xtime = *tv;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq (&xtime_lock);
+	write_sequnlock_irq (&xtime_lock);
 }

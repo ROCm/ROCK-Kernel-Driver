@@ -20,6 +20,7 @@
 #include <linux/resource.h>
 #include <linux/times.h>
 #include <linux/utsname.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -2361,21 +2362,23 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 {
 	struct sysinfo val;
 	int err;
-	extern rwlock_t xtime_lock;
+	unsigned long seq;
 
 	/* We don't need a memset here because we copy the
 	 * struct to userspace once element at a time.
 	 */
 
-	read_lock_irq(&xtime_lock);
-	val.uptime = jiffies / HZ;
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		val.uptime = jiffies / HZ;
 
-	val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
-	val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
-	val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
 
-	val.procs = nr_threads;
-	read_unlock_irq(&xtime_lock);
+		val.procs = nr_threads;
+	} while (read_seqretry(&xtime_lock, seq));
+
 
 	si_meminfo(&val);
 	si_swapinfo(&val);

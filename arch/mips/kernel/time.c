@@ -37,7 +37,6 @@ u64 jiffies_64;
 /*
  * forward reference
  */
-extern rwlock_t xtime_lock;
 extern volatile unsigned long wall_jiffies;
 
 /*
@@ -63,19 +62,23 @@ int (*rtc_set_time)(unsigned long) = null_rtc_set_time;
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 
-	read_lock_irqsave (&xtime_lock, flags);
-	*tv = xtime;
-	tv->tv_usec += do_gettimeoffset();
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
 
-	/*
-	 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
-	 * is nonzero if the timer bottom half hasnt executed yet.
-	 */
-	if (jiffies - wall_jiffies)
-		tv->tv_usec += USECS_PER_JIFFY;
+		*tv = xtime;
+		tv->tv_usec += do_gettimeoffset();
 
-	read_unlock_irqrestore (&xtime_lock, flags);
+		/*
+		 * xtime is atomically updated in timer_bh. 
+		 * jiffies - wall_jiffies
+		 * is nonzero if the timer bottom half hasnt executed yet.
+		 */
+		if (jiffies - wall_jiffies)
+			tv->tv_usec += USECS_PER_JIFFY;
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+
 
 	if (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
@@ -85,7 +88,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq (&xtime_lock);
+	write_seqlock_irq (&xtime_lock);
 
 	/* This is revolting. We need to set the xtime.tv_usec
 	 * correctly. However, the value in this location is
@@ -105,7 +108,7 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq (&xtime_lock);
+	write_sequnlock_irq (&xtime_lock);
 }
 
 
@@ -291,6 +294,8 @@ unsigned long calibrate_div64_gettimeoffset(void)
  */
 void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	unsigned long seq;
+
 	if (mips_cpu.options & MIPS_CPU_COUNTER) {
 		unsigned int count;
 
@@ -340,19 +345,21 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * CMOS clock accordingly every ~11 minutes. rtc_set_time() has to be
 	 * called as close as possible to 500 ms before the new second starts.
 	 */
-	read_lock (&xtime_lock);
-	if ((time_status & STA_UNSYNC) == 0 &&
-	    xtime.tv_sec > last_rtc_update + 660 &&
-	    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
-	    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
-		if (rtc_set_time(xtime.tv_sec) == 0) {
-			last_rtc_update = xtime.tv_sec;
-		} else {
-			last_rtc_update = xtime.tv_sec - 600; 
-			/* do it again in 60 s */
+	do {
+		seq = read_seqbegin(&xtime_lock);
+	
+		if ((time_status & STA_UNSYNC) == 0 &&
+		    xtime.tv_sec > last_rtc_update + 660 &&
+		    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
+		    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+			if (rtc_set_time(xtime.tv_sec) == 0) {
+				last_rtc_update = xtime.tv_sec;
+			} else {
+				last_rtc_update = xtime.tv_sec - 600; 
+				/* do it again in 60 s */
+			}
 		}
-	}
-	read_unlock (&xtime_lock);
+	} while (read_seqretry(&xtime_lock, seq));
 
 	/*
 	 * If jiffies has overflowed in this timer_interrupt we must

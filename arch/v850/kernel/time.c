@@ -17,6 +17,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/profile.h>
 
@@ -107,8 +108,6 @@ static void timer_interrupt (int irq, void *dummy, struct pt_regs *regs)
 #endif /* 0 */
 }
 
-extern rwlock_t xtime_lock;
-
 /*
  * This version of gettimeofday has near microsecond resolution.
  */
@@ -120,21 +119,24 @@ void do_gettimeofday (struct timeval *tv)
 #endif
 	unsigned long flags;
 	unsigned long usec, sec;
+	unsigned long seq;
 
-	read_lock_irqsave (&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+
 #if 0
-	usec = mach_gettimeoffset ? mach_gettimeoffset () : 0;
+		usec = mach_gettimeoffset ? mach_gettimeoffset () : 0;
 #else
-	usec = 0;
+		usec = 0;
 #endif
 #if 0 /* DAVIDM later if possible */
-	lost = lost_ticks;
-	if (lost)
-		usec += lost * (1000000/HZ);
+		lost = lost_ticks;
+		if (lost)
+			usec += lost * (1000000/HZ);
 #endif
-	sec = xtime.tv_sec;
-	usec += xtime.tv_nsec / 1000;
-	read_unlock_irqrestore (&xtime_lock, flags);
+		sec = xtime.tv_sec;
+		usec += xtime.tv_nsec / 1000;
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -147,7 +149,7 @@ void do_gettimeofday (struct timeval *tv)
 
 void do_settimeofday (struct timeval *tv)
 {
-	write_lock_irq (&xtime_lock);
+	write_seqlock_irq (&xtime_lock);
 
 	/* This is revolting. We need to set the xtime.tv_nsec
 	 * correctly. However, the value in this location is
@@ -172,7 +174,7 @@ void do_settimeofday (struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq (&xtime_lock);
+	write_sequnlock_irq (&xtime_lock);
 }
 
 static int timer_dev_id;

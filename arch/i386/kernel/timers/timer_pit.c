@@ -76,7 +76,7 @@ static void delay_pit(unsigned long loops)
 static unsigned long get_offset_pit(void)
 {
 	int count;
-
+	unsigned long flags;
 	static int count_p = LATCH;    /* for the first call after boot */
 	static unsigned long jiffies_p = 0;
 
@@ -85,8 +85,7 @@ static unsigned long get_offset_pit(void)
 	 */
 	unsigned long jiffies_t;
 
-	/* gets recalled with irq locally disabled */
-	spin_lock(&i8253_lock);
+	spin_lock_irqsave(&i8253_lock, flags);
 	/* timer count may underflow right here */
 	outb_p(0x00, 0x43);	/* latch the count ASAP */
 
@@ -108,7 +107,7 @@ static unsigned long get_offset_pit(void)
                 count = LATCH - 1;
         }
 	
-	spin_unlock(&i8253_lock);
+	spin_unlock_irqrestore(&i8253_lock, flags);
 
 	/*
 	 * avoiding timer inconsistencies (they are rare, but they happen)...

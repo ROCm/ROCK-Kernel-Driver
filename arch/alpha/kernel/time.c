@@ -44,6 +44,7 @@
 #include <asm/hwrpb.h>
 
 #include <linux/mc146818rtc.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 
 #include "proto.h"
@@ -51,7 +52,6 @@
 
 u64 jiffies_64;
 
-extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;	/* kernel/timer.c */
 
 static int set_rtc_mmss(unsigned long);
@@ -106,7 +106,7 @@ void timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 		alpha_do_profile(regs->pc);
 #endif
 
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 
 	/*
 	 * Calculate how many ticks have passed since the last update,
@@ -138,7 +138,7 @@ void timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 		state.last_rtc_update = xtime.tv_sec - (tmp ? 600 : 0);
 	}
 
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 void
@@ -395,18 +395,20 @@ time_init(void)
 void
 do_gettimeofday(struct timeval *tv)
 {
-	unsigned long sec, usec, lost, flags;
+	unsigned long flags;
+	unsigned long sec, usec, lost, seq;
 	unsigned long delta_cycles, delta_usec, partial_tick;
 
-	read_lock_irqsave(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
 
-	delta_cycles = rpcc() - state.last_time;
-	sec = xtime.tv_sec;
-	usec = (xtime.tv_nsec / 1000);
-	partial_tick = state.partial_tick;
-	lost = jiffies - wall_jiffies;
+		delta_cycles = rpcc() - state.last_time;
+		sec = xtime.tv_sec;
+		usec = (xtime.tv_nsec / 1000);
+		partial_tick = state.partial_tick;
+		lost = jiffies - wall_jiffies;
 
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 #ifdef CONFIG_SMP
 	/* Until and unless we figure out how to get cpu cycle counters
@@ -448,7 +450,7 @@ do_settimeofday(struct timeval *tv)
 	unsigned long delta_usec;
 	long sec, usec;
 	
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 
 	/* The offset that is added into time in do_gettimeofday above
 	   must be subtracted out here to keep a coherent view of the
@@ -479,7 +481,7 @@ do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 

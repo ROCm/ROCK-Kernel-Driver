@@ -653,12 +653,6 @@ static int __init rd_load_image(char *from)
 	/*
 	 * OK, time to copy in the data
 	 */
-	buf = kmalloc(BLOCK_SIZE, GFP_KERNEL);
-	if (buf == 0) {
-		printk(KERN_ERR "RAMDISK: could not allocate buffer\n");
-		goto done;
-	}
-
 	if (sys_ioctl(in_fd, BLKGETSIZE, (unsigned long)&devblocks) < 0)
 		devblocks = 0;
 	else
@@ -669,6 +663,12 @@ static int __init rd_load_image(char *from)
 
 	if (devblocks == 0) {
 		printk(KERN_ERR "RAMDISK: could not determine device size\n");
+		goto done;
+	}
+
+	buf = kmalloc(BLOCK_SIZE, GFP_KERNEL);
+	if (buf == 0) {
+		printk(KERN_ERR "RAMDISK: could not allocate buffer\n");
 		goto done;
 	}
 

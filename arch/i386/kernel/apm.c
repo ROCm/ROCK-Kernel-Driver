@@ -215,6 +215,7 @@
 #include <linux/miscdevice.h>
 #include <linux/apm_bios.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/kernel.h>
@@ -227,7 +228,6 @@
 
 #include <linux/sysrq.h>
 
-extern rwlock_t xtime_lock;
 extern spinlock_t i8253_lock;
 extern unsigned long get_cmos_time(void);
 extern void machine_real_restart(unsigned char *, int);
@@ -1264,7 +1264,7 @@ static int suspend(int vetoable)
 		printk(KERN_CRIT "apm: suspend was vetoed, but suspending anyway.\n");
 	}
 	/* serialize with the timer interrupt */
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 
 	/* protect against access to timer chip registers */
 	spin_lock(&i8253_lock);
@@ -1276,7 +1276,7 @@ static int suspend(int vetoable)
 	ignore_normal_resume = 1;
 
 	spin_unlock(&i8253_lock);
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 
 	if (err == APM_NO_ERROR)
 		err = APM_SUCCESS;
@@ -1301,10 +1301,10 @@ static void standby(void)
 	int	err;
 
 	/* serialize with the timer interrupt */
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	/* If needed, notify drivers here */
 	get_time_diff();
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 
 	err = set_system_power_state(APM_STATE_STANDBY);
 	if ((err != APM_SUCCESS) && (err != APM_NO_ERROR))
@@ -1393,9 +1393,9 @@ static void check_events(void)
 			ignore_bounce = 1;
 			if ((event != APM_NORMAL_RESUME)
 			    || (ignore_normal_resume == 0)) {
-				write_lock_irq(&xtime_lock);
+				write_seqlock_irq(&xtime_lock);
 				set_time();
-				write_unlock_irq(&xtime_lock);
+				write_sequnlock_irq(&xtime_lock);
 				pm_send_all(PM_RESUME, (void *)0);
 				queue_event(event, NULL);
 			}
@@ -1410,9 +1410,9 @@ static void check_events(void)
 			break;
 
 		case APM_UPDATE_TIME:
-			write_lock_irq(&xtime_lock);
+			write_seqlock_irq(&xtime_lock);
 			set_time();
-			write_unlock_irq(&xtime_lock);
+			write_sequnlock_irq(&xtime_lock);
 			break;
 
 		case APM_CRITICAL_SUSPEND:
