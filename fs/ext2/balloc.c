@@ -178,6 +178,16 @@ static inline void release_blocks(struct super_block *sb, int count)
 	}
 }
 
+static inline void group_release_blocks(struct ext2_group_desc *desc,
+				    struct buffer_head *bh, int count)
+{
+	if (count) {
+		unsigned free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
+		desc->bg_free_blocks_count = cpu_to_le16(free_blocks + count);
+		mark_buffer_dirty(bh);
+	}
+}
+
 /* Free given blocks, update quota and i_blocks field */
 void ext2_free_blocks (struct inode * inode, unsigned long block,
 		       unsigned long count)
@@ -191,7 +201,7 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 	struct super_block * sb;
 	struct ext2_group_desc * gdp;
 	struct ext2_super_block * es;
-	unsigned freed = 0;
+	unsigned freed = 0, group_freed;
 
 	sb = inode->i_sb;
 	if (!sb) {
@@ -243,24 +253,24 @@ do_more:
 			    "Block = %lu, count = %lu",
 			    block, count);
 
-	for (i = 0; i < count; i++) {
+	for (i = 0, group_freed = 0; i < count; i++) {
 		if (!ext2_clear_bit (bit + i, bh->b_data))
 			ext2_error (sb, "ext2_free_blocks",
 				      "bit already cleared for block %lu",
 				      block + i);
 		else {
-			gdp->bg_free_blocks_count =
-				cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count)+1);
+			group_freed++;
 			freed++;
 		}
 	}
-	
-	mark_buffer_dirty(bh2);
+
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
 		ll_rw_block (WRITE, 1, &bh);
 		wait_on_buffer (bh);
 	}
+
+	group_release_blocks(gdp, bh2, group_freed);
 	if (overflow) {
 		block += count;
 		count = overflow;
