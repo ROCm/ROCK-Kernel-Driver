@@ -3511,7 +3511,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	snprintf(g->devfs_name, sizeof(g->devfs_name),
 			"%s/cd", drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
-	g->flags = GENHD_FL_CD;
+	g->flags = GENHD_FL_CD | GENHD_FL_REMOVABLE;
 	if (ide_cdrom_setup(drive)) {
 		struct cdrom_device_info *devinfo = &info->devinfo;
 		DRIVER(drive)->busy--;
