@@ -110,8 +110,7 @@ int kobject_register(struct kobject * kobj)
 	if (kobj) {
 		kobject_init(kobj);
 		error = kobject_add(kobj);
-		if (error)
-			kobject_cleanup(kobj);
+		WARN_ON(error);
 	} else
 		error = -EINVAL;
 	return error;
