@@ -755,7 +755,7 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 		dmas = MASK_22 | MASK_21 | MASK_20;
 	} else {
 		resource = RESOURCE_DMA1_HPS;
-		dmas = MASK_20;
+		dmas = MASK_22;
 	}
 	saa7146_res_free(fh, resource);
 
@@ -1110,6 +1110,9 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 				DEB_D(("overlay is active, but in another open\n"));
 					return -EAGAIN;
 				}
+		} else {
+			DEB_D(("overlay is not active\n"));
+			return 0;		
 			}
 			spin_lock_irqsave(&dev->slock,flags);
 			err = saa7146_stop_preview(fh);
