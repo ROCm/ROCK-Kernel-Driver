@@ -860,18 +860,9 @@ static int deregister_disk(int ctlr, int logvol)
 	/* invalidate the devices and deregister the disk */ 
 	max_p = 1 << gdev->minor_shift;
 	start = logvol << gdev->minor_shift;
+	wipe_partitions(mk_kdev(MAJOR_NR+ctlr, start));
 	for (i=max_p-1; i>=0; i--)
-	{
-		int minor = start+i;
-		kdev_t kdev = mk_kdev(MAJOR_NR+ctlr, minor);
-		// printk("invalidating( %d %d)\n", ctlr, minor);
-		invalidate_device(kdev, 1);
-		/* so open will now fail */
-		h->sizes[minor] = 0;
-		/* so it will no longer appear in /proc/partitions */ 
-		gdev->part[minor].start_sect = 0;
-		gdev->part[minor].nr_sects = 0;	
-	}
+		h->sizes[start + i] = 0;
 	/* check to see if it was the last disk */
 	if (logvol == h->highest_lun)
 	{
@@ -1314,13 +1305,7 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	max_p = 1 << gdev->minor_shift;
         start = logvol<< gdev->minor_shift;
 
-        for(i=max_p-1; i>=0; i--) {
-                int minor = start+i;
-		kdev = mk_kdev(MAJOR_NR + ctlr, minor);
-                invalidate_device(kdev, 1);
-                gdev->part[minor].start_sect = 0;
-                gdev->part[minor].nr_sects = 0;
-        }
+	wipe_partitions(MAJOR_NR + ctlr, start);
 
 	++hba[ctlr]->num_luns;
 	gdev->nr_real = hba[ctlr]->highest_lun + 1;

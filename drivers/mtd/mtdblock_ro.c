@@ -76,8 +76,6 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 	if (inode == NULL)
 		release_return(-ENODEV);
    
-	invalidate_device(inode->i_rdev, 1);
-
 	dev = minor(inode->i_rdev);
 	mtd = __get_mtd_device(NULL, dev);
 

@@ -970,8 +970,6 @@ static int nftl_release(struct inode *inode, struct file *fp)
 
 	DEBUG(MTD_DEBUG_LEVEL2, "NFTL_release\n");
 
-	invalidate_device(inode->i_rdev, 1);
-
 	if (thisNFTL->mtd->sync)
 		thisNFTL->mtd->sync(thisNFTL->mtd);
 	thisNFTL->usecount--;

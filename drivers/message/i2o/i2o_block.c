@@ -1050,13 +1050,7 @@ static int do_i2ob_revalidate(kdev_t dev, int maxu)
 		return -EBUSY;
 	}
 	
-	for( i = 15; i>=0 ; i--)
-	{
-		int m = minor+i;
-		invalidate_device(mk_kdev(MAJOR_NR, m), 1);
-		i2ob_gendisk.part[m].start_sect = 0;
-		i2ob_gendisk.part[m].nr_sects = 0;
-	}
+	wipe_partitions(mk_kdev(MAJOR_NR, minor), 1);
 
 	/*
 	 *	Do a physical check and then reconfigure
@@ -1815,7 +1809,6 @@ int i2o_block_init(void)
 	 *	Now fill in the boiler plate
 	 */
 	 
-	blk_size[MAJOR_NR] = i2ob_sizes;
 	blk_dev[MAJOR_NR].queue = i2ob_get_queue;
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), i2ob_request);

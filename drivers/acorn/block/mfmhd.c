@@ -1442,12 +1442,7 @@ static int mfm_reread_partitions(kdev_t dev)
 	maxp = 1 << mfm_gendisk.minor_shift;
 	start = target << mfm_gendisk.minor_shift;
 
-	for (i = maxp - 1; i >= 0; i--) {
-		int minor = start + i;
-		invalidate_device (mk_kdev(MAJOR_NR, minor), 1);
-		mfm_gendisk.part[minor].start_sect = 0;
-		mfm_gendisk.part[minor].nr_sects = 0;
-	}
+	wipe_partitions(mk_kdev(MAJOR_NR, start));
 
 	/* Divide by 2, since sectors are 2 times smaller than usual ;-) */
 

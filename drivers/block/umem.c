@@ -65,7 +65,7 @@
 #define MM_BLKSIZE 1024  /* 1k blocks */
 #define MM_HARDSECT 512  /* 512-byte hardware sectors */
 #define MM_SHIFT 6       /* max 64 partitions on 4 cards  */
-#define DEVICE_NR(device) (MINOR(device)>>MM_SHIFT)
+#define DEVICE_NR(device) (minor(device)>>MM_SHIFT)
 
 /*
  * Version Information
@@ -150,7 +150,6 @@ struct cardinfo {
 		unsigned long	last_change;
 	} battery[2];
 
-	atomic_t	 usage;
 	spinlock_t 	lock;
 	int		check_batteries;
 
@@ -818,7 +817,7 @@ static int mm_revalidate(kdev_t i_rdev)
 {
 	int i;
 
-	int card_number = DEVICE_NR(kdev_val(i_rdev));
+	int card_number = DEVICE_NR(i_rdev);
 	/* first partition, # of partitions */
 	int part1 = (card_number << MM_SHIFT) + 1;
 	int npart = (1 << MM_SHIFT) -1;
@@ -905,7 +904,7 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 */
 static int mm_check_change(kdev_t i_rdev)
 {
-	int card_number = DEVICE_NR(kdev_val(i_rdev));
+	int card_number = DEVICE_NR(i_rdev);
 /*  struct cardinfo *dev = cards + card_number; */
 	if (card_number >= num_cards) /* paranoid */
 		return 0;
@@ -920,18 +919,8 @@ static int mm_check_change(kdev_t i_rdev)
 */
 static int mm_open(struct inode *i, struct file *filp)
 {
-	int num;
-	struct cardinfo *card;
-
-	num = DEVICE_NR(kdev_val(i->i_rdev));
-	if (num >= num_cards)
+	if (DEVICE_NR(i->i_rdev) >= num_cards)
 		return -ENXIO;
-
-	card = cards + num;
-
-	atomic_inc(&card->usage);
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 /*
@@ -941,17 +930,6 @@ static int mm_open(struct inode *i, struct file *filp)
 */
 static int mm_do_release(struct inode *i, struct file *filp)
 {
-	int num;
-	struct cardinfo *card;
-
-	num = DEVICE_NR(kdev_val(i->i_rdev));
-
-	card = cards + num;
-
-	if (atomic_dec_and_test(&card->usage))
-		invalidate_device(i->i_rdev, 1);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 /*
@@ -1243,7 +1221,7 @@ static struct pci_driver mm_pci_driver = {
 
 static request_queue_t * mm_queue_proc(kdev_t dev)
 {
-	int c = DEVICE_NR(kdev_val(dev));
+	int c = DEVICE_NR(dev);
 
 	if (c < MM_MAXCARDS)
 		return &cards[c].queue;
@@ -1293,7 +1271,6 @@ int __init mm_init(void)
 	blk_dev[MAJOR_NR].queue = mm_queue_proc;
 	add_gendisk(&mm_gendisk);
 
-        blk_size[MAJOR_NR]      = mm_gendisk.sizes;
         for (i = 0; i < num_cards; i++) {
 		register_disk(&mm_gendisk, mk_kdev(MAJOR_NR, i<<MM_SHIFT), MM_SHIFT,
 			      &mm_fops, cards[i].mm_size << 1);
@@ -1324,9 +1301,6 @@ void __exit mm_cleanup(void)
 	pci_unregister_driver(&mm_pci_driver);
 
 	unregister_blkdev(MAJOR_NR, "umem");
-
-        for (i = 0; i < (num_cards << MM_SHIFT); i++)
-		invalidate_device (mk_kdev(MAJOR_NR,i), 1);
 
 	blk_size     [MAJOR_NR] = NULL;
 

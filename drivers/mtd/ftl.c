@@ -880,9 +880,6 @@ static release_t ftl_close(struct inode *inode, struct file *file)
     
     DEBUG(0, "ftl_cs: ftl_close(%d)\n", minor);
 
-    /* Flush all writes */
-    invalidate_device(inode->i_rdev, 1);
-
     /* Wait for any pending erase operations to complete */
     if (part->mtd->sync)
 	    part->mtd->sync(part->mtd);
