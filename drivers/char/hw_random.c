@@ -1,5 +1,5 @@
 /*
- 	Hardware driver for the Intel/AMD Random Number Generators (RNG)
+ 	Hardware driver for the Intel/AMD/Via Random Number Generators (RNG)
 	(c) Copyright 2003 Red Hat Inc <jgarzik@redhat.com>
  
  	derived from
@@ -34,6 +34,11 @@
 #include <linux/smp_lock.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
+
+#ifdef __i386__
+#include <asm/msr.h>
+#include <asm/cpufeature.h>
+#endif
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -88,6 +93,11 @@ static void __exit amd_cleanup(void);
 static unsigned int amd_data_present (void);
 static u32 amd_data_read (void);
 
+static int __init via_init(struct pci_dev *dev);
+static void __exit via_cleanup(void);
+static unsigned int via_data_present (void);
+static u32 via_data_read (void);
+
 struct rng_operations {
 	int (*init) (struct pci_dev *dev);
 	void (*cleanup) (void);
@@ -117,6 +127,7 @@ enum {
 	rng_hw_none,
 	rng_hw_intel,
 	rng_hw_amd,
+	rng_hw_via,
 };
 
 static struct rng_operations rng_vendor_ops[] __initdata = {
@@ -129,6 +140,9 @@ static struct rng_operations rng_vendor_ops[] __initdata = {
 
 	/* rng_hw_amd */
 	{ amd_init, amd_cleanup, amd_data_present, amd_data_read, 4 },
+
+	/* rng_hw_via */
+	{ via_init, via_cleanup, via_data_present, via_data_read, 1 },
 };
 
 /*
@@ -332,6 +346,127 @@ static void __exit amd_cleanup(void)
 
 /***********************************************************************
  *
+ * Via RNG operations
+ *
+ */
+
+enum {
+	VIA_STRFILT_CNT_SHIFT	= 16,
+	VIA_STRFILT_FAIL	= (1 << 15),
+	VIA_STRFILT_ENABLE	= (1 << 14),
+	VIA_RAWBITS_ENABLE	= (1 << 13),
+	VIA_RNG_ENABLE		= (1 << 6),
+	VIA_XSTORE_CNT_MASK	= 0x0F,
+
+	VIA_RNG_CHUNK_8		= 0x00,	/* 64 rand bits, 64 stored bits */
+	VIA_RNG_CHUNK_4		= 0x01,	/* 32 rand bits, 32 stored bits */
+	VIA_RNG_CHUNK_4_MASK	= 0xFFFFFFFF,
+	VIA_RNG_CHUNK_2		= 0x02,	/* 16 rand bits, 32 stored bits */
+	VIA_RNG_CHUNK_2_MASK	= 0xFFFF,
+	VIA_RNG_CHUNK_1		= 0x03,	/* 8 rand bits, 32 stored bits */
+	VIA_RNG_CHUNK_1_MASK	= 0xFF,
+};
+
+u32 via_rng_datum;
+
+/*
+ * Investigate using the 'rep' prefix to obtain 32 bits of random data
+ * in one insn.  The upside is potentially better performance.  The
+ * downside is that the instruction becomes no longer atomic.  Due to
+ * this, just like familiar issues with /dev/random itself, the worst
+ * case of a 'rep xstore' could potentially pause a cpu for an
+ * unreasonably long time.  In practice, this condition would likely
+ * only occur when the hardware is failing.  (or so we hope :))
+ *
+ * Another possible performance boost may come from simply buffering
+ * until we have 4 bytes, thus returning a u32 at a time,
+ * instead of the current u8-at-a-time.
+ */
+
+static inline u32 xstore(u32 *addr, u32 edx_in)
+{
+	u32 eax_out;
+
+	asm(".byte 0x0F,0xA7,0xC0 /* xstore %%edi (addr=%0) */"
+		:"=m"(*addr), "=a"(eax_out)
+		:"D"(addr), "d"(edx_in));
+
+	return eax_out;
+}
+
+static unsigned int via_data_present(void)
+{
+	u32 bytes_out;
+
+	/* We choose the recommended 1-byte-per-instruction RNG rate,
+	 * for greater randomness at the expense of speed.  Larger
+	 * values 2, 4, or 8 bytes-per-instruction yield greater
+	 * speed at lesser randomness.
+	 *
+	 * If you change this to another VIA_CHUNK_n, you must also
+	 * change the ->n_bytes values in rng_vendor_ops[] tables.
+	 * VIA_CHUNK_8 requires further code changes.
+	 *
+	 * A copy of MSR_VIA_RNG is placed in eax_out when xstore
+	 * completes.
+	 */
+	via_rng_datum = 0; /* paranoia, not really necessary */
+	bytes_out = xstore(&via_rng_datum, VIA_RNG_CHUNK_1) & VIA_XSTORE_CNT_MASK;
+	if (bytes_out == 0)
+		return 0;
+
+	return 1;
+}
+
+static u32 via_data_read(void)
+{
+	return via_rng_datum;
+}
+
+static int __init via_init(struct pci_dev *dev)
+{
+	u32 lo, hi, old_lo;
+
+	/* Control the RNG via MSR.  Tread lightly and pay very close
+	 * close attention to values written, as the reserved fields
+	 * are documented to be "undefined and unpredictable"; but it
+	 * does not say to write them as zero, so I make a guess that
+	 * we restore the values we find in the register.
+	 */
+	rdmsr(MSR_VIA_RNG, lo, hi);
+
+	old_lo = lo;
+	lo &= ~(0x7f << VIA_STRFILT_CNT_SHIFT);
+	lo &= ~VIA_XSTORE_CNT_MASK;
+	lo &= ~(VIA_STRFILT_ENABLE | VIA_STRFILT_FAIL | VIA_RAWBITS_ENABLE);
+	lo |= VIA_RNG_ENABLE;
+
+	if (lo != old_lo)
+		wrmsr(MSR_VIA_RNG, lo, hi);
+
+	/* perhaps-unnecessary sanity check; remove after testing if
+	   unneeded */
+	rdmsr(MSR_VIA_RNG, lo, hi);
+	if ((lo & VIA_RNG_ENABLE) == 0) {
+		printk(KERN_ERR PFX "cannot enable Via C3 RNG, aborting\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static void __exit via_cleanup(void)
+{
+	u32 lo, hi;
+
+	rdmsr(MSR_VIA_RNG, lo, hi);
+	lo &= ~VIA_RNG_ENABLE;
+	wrmsr(MSR_VIA_RNG, lo, hi);
+}
+
+
+/***********************************************************************
+ *
  * /dev/hwrandom character device handling (major 10, minor 183)
  *
  */
@@ -470,6 +605,15 @@ static int __init rng_init (void)
 			goto match;
 		}
 	}
+
+#ifdef __i386__
+	/* Probe for Via RNG */
+	if (cpu_has_xstore) {
+		rng_ops = &rng_vendor_ops[rng_hw_via];
+		pdev = NULL;
+		goto match;
+	}
+#endif
 
 	DPRINTK ("EXIT, returning -ENODEV\n");
 	return -ENODEV;

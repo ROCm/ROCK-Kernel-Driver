@@ -710,7 +710,7 @@ config NWFLASH
 	  If you're not sure, say N.
 
 config HW_RANDOM
-	tristate "Intel/AMD H/W Random Number Generator support"
+	tristate "Intel/AMD/Via H/W Random Number Generator support"
 	depends on (X86 || IA64) && PCI
 	---help---
 	  This driver provides kernel-side support for the Random Number
