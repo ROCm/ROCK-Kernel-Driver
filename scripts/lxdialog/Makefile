@@ -39,5 +39,5 @@ ncurses:
 		exit 1 ;\
 	fi
 
-clean:
-	rm -f core *.o *~ lxdialog
+mrproper:
+	@rm -f core $(host-progs) $(lxdialog-objs) ncurses

@@ -55,3 +55,9 @@ lxdialog:
 $(obj)/split-include $(obj)/docproc $(addprefix $(obj)/,$(tkparse-objs)) \
 $(obj)/conmakehash lxdialog: $(obj)/fixdep
 
+mrproper:
+	@echo 'Making mrproper (scripts)'
+	@rm -f $(tkparse-objs) $(obj)/kconfig.tk
+	@rm -f core $(host-progs)
+	@$(MAKE) -C lxdialog mrproper
+
