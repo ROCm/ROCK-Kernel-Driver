@@ -110,8 +110,8 @@ ifeq ($(skip-makefile),)
 # Make sure we're not wasting cpu-cycles doing locale handling, yet do make
 # sure error messages appear in the user-desired language
 ifdef LC_ALL
-	LANG := $(LC_ALL)
-	LC_ALL :=
+LANG := $(LC_ALL)
+LC_ALL :=
 endif
 LC_COLLATE := C
 LC_CTYPE := C
