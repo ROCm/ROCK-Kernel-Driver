@@ -1057,6 +1057,8 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 	int			size;
 	void			*buf = 0;
 	int			retval = 0;
+       struct usb_interface    *ifp = 0;
+       struct usb_driver       *driver = 0;
 
 	/* get input parameters and alloc buffer */
 	if (copy_from_user(&ctrl, (void *) arg, sizeof (ctrl)))
@@ -1074,33 +1076,41 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 		}
 	}
 
-	/* ioctl to device */
-	if (ctrl.ifno < 0) {
-		switch (ctrl.ioctl_code) {
-		/* access/release token for issuing control messages
-		 * ask a particular driver to bind/unbind, ... etc
-		 */
-		}
-		retval = -ENOSYS;
+       if (!ps->dev)
+               retval = -ENODEV;
+       else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
+               retval = -EINVAL;
+       else switch (ctrl.ioctl_code) {
 
-	/* ioctl to the driver which has claimed a given interface */
-	} else {
-		struct usb_interface	*ifp = 0;
-		if (!ps->dev)
-			retval = -ENODEV;
-		else if (ctrl.ifno >= ps->dev->actconfig->bNumInterfaces)
+       /* disconnect kernel driver from interface, leaving it unbound.  */
+       case USBDEVFS_DISCONNECT:
+               driver = ifp->driver;
+               if (driver) {
+                       down (&driver->serialize);
+                       dbg ("disconnect '%s' from dev %d interface %d",
+                               driver->name, ps->dev->devnum, ctrl.ifno);
+                       driver->disconnect (ps->dev, ifp->private_data);
+                       usb_driver_release_interface (driver, ifp);
+                       up (&driver->serialize);
+               } else
 			retval = -EINVAL;
+               break;
+
+       /* let kernel drivers try to (re)bind to the interface */
+       case USBDEVFS_CONNECT:
+               usb_find_interface_driver_for_ifnum (ps->dev, ctrl.ifno);
+               break;
+
+       /* talk directly to the interface's driver */
+       default:
+               driver = ifp->driver;
+               if (driver == 0 || driver->ioctl == 0)
+                       retval = -ENOSYS;
 		else {
-			if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
-				retval = -EINVAL;
-			else if (ifp->driver == 0 || ifp->driver->ioctl == 0)
-				retval = -ENOSYS;
-		}
-		if (retval == 0) {
 			if (ifp->driver->owner)
 				__MOD_INC_USE_COUNT(ifp->driver->owner);
 			/* ifno might usefully be passed ... */
-			retval = ifp->driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
+                       retval = driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
 			/* size = min_t(int, size, retval)? */
 			if (ifp->driver->owner)
 				__MOD_DEC_USE_COUNT(ifp->driver->owner);

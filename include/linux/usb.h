@@ -305,6 +305,7 @@ struct usb_qualifier_descriptor {
 } __attribute__ ((packed));
 
 /* helpers for driver access to descriptors */
+extern int usb_ifnum_to_ifpos(struct usb_device *dev, unsigned ifnum);
 extern struct usb_interface *
 	usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum);
 extern struct usb_endpoint_descriptor *
@@ -1052,6 +1053,7 @@ extern void usb_inc_dev_use(struct usb_device *);
 #define usb_dec_dev_use usb_free_dev
 
 /* used these for multi-interface device registration */
+extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
 extern void usb_driver_claim_interface(struct usb_driver *driver,
 			struct usb_interface *iface, void* priv);
 extern int usb_interface_claimed(struct usb_interface *iface);
