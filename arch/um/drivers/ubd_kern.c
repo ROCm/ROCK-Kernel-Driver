@@ -15,7 +15,6 @@
 #include "linux/blk.h"
 #include "linux/blkdev.h"
 #include "linux/hdreg.h"
-#include "linux/ide.h"
 #include "linux/init.h"
 #include "linux/devfs_fs_kernel.h"
 #include "linux/cdrom.h"
@@ -66,29 +65,44 @@ static struct block_device_operations ubd_blops = {
         revalidate:	ubd_revalidate,
 };
 
-static struct hd_struct	ubd_part[MAX_MINOR] = 
-	{ [ 0 ... MAX_MINOR - 1 ] = { 0, 0, 0 } };
-
 static request_queue_t *ubd_queue;
 
 static int fake_major = 0;
 
-#define INIT_GENDISK(maj, name, parts, shift, blops) \
+#define INIT_GENDISK(maj, index) \
 { \
-	major :		maj, \
-	major_name : 	name, \
-	minor_shift :	shift, \
-	part : 		parts, \
-	next : 		NULL, \
-	fops : 		blops, \
-	flags : 	0 \
+	.major =	maj, \
+	.major_name = 	"ubd", \
+	.minor_shift =	UBD_SHIFT, \
+	.first_minor =	index << UBD_SHIFT, \
+	.part =		NULL, \
+	.next =		NULL, \
+	.fops =		&ubd_blops, \
+	.flags = 	GENHD_FL_DRIVERFS \
 }
 
-static struct gendisk ubd_gendisk = INIT_GENDISK(MAJOR_NR, "ubd", ubd_part,
-						 UBD_SHIFT, &ubd_blops);
-static struct gendisk fake_gendisk = INIT_GENDISK(0, "ubd", ubd_part, 
-						  UBD_SHIFT, &ubd_blops);
+static struct gendisk ubd_gendisk[MAX_DEV] = {
+	INIT_GENDISK(MAJOR_NR, 0),
+	INIT_GENDISK(MAJOR_NR, 1),
+	INIT_GENDISK(MAJOR_NR, 2),
+	INIT_GENDISK(MAJOR_NR, 3),
+	INIT_GENDISK(MAJOR_NR, 4),
+	INIT_GENDISK(MAJOR_NR, 5),
+	INIT_GENDISK(MAJOR_NR, 6),
+	INIT_GENDISK(MAJOR_NR, 7)
+};
 
+static struct gendisk fake_gendisk[MAX_DEV] = {
+	INIT_GENDISK(0, 0),
+	INIT_GENDISK(0, 1),
+	INIT_GENDISK(0, 2),
+	INIT_GENDISK(0, 3),
+	INIT_GENDISK(0, 4),
+	INIT_GENDISK(0, 5),
+	INIT_GENDISK(0, 6),
+	INIT_GENDISK(0, 7)
+};
+ 
 #ifdef CONFIG_BLK_DEV_UBD_SYNC
 #define OPEN_FLAGS ((struct openflags) { r : 1, w : 1, s : 1, c : 0 })
 #else
@@ -220,11 +234,12 @@ static int ubd_setup_common(char *str, int *index_out)
 {
 	struct openflags flags = global_openflags;
 	char *backing_file;
-	int n;
+	int i, n;
 
 	if(index_out) *index_out = -1;
 	n = *str++;
 	if(n == '='){
+		static int fake_major_allowed = 1;
 		char *end;
 		int major;
 
@@ -238,8 +253,17 @@ static int ubd_setup_common(char *str, int *index_out)
 			       "ubd_setup : didn't parse major number\n");
 			return(1);
 		}
-		fake_gendisk.major = major;
+
+		if(!fake_major_allowed){
+			printk(KERN_ERR "Can't assign a fake major twice\n");
+			return(1);
+		}
+
+		for(i = 0; i < MAX_DEV; i++)
+			fake_gendisk[i].major = major;
 		fake_major = major;
+		fake_major_allowed = 0;
+
 		printk(KERN_INFO "Setting extra ubd major number to %d\n",
 		       major);
 		return(0);
@@ -315,9 +339,14 @@ __uml_help(ubd_setup,
 
 static int fakehd(char *str)
 {
+	int i;
+
 	printk(KERN_INFO 
 	       "fakehd : Changing ubd_gendisk.major_name to \"hd\".\n");
-	ubd_gendisk.major_name = "hd";
+
+	for(i = 0; i < MAX_DEV; i++)
+		ubd_gendisk[i].major_name = "hd";
+
 	return(1);
 }
 
@@ -401,13 +430,8 @@ static int ubd_add(int n)
 {
  	devfs_handle_t real, fake;
 	char name[sizeof("nnnnnn\0")], dev_name[sizeof("ubd0x")];
- 	int err;
 
 	if(ubd_dev[n].file == NULL) return(-1);
- 
- 	err = ubd_revalidate(mk_kdev(MAJOR_NR, n << UBD_SHIFT));
- 	if(err)
- 		return(err);
  
 	sprintf(name, "%d", n);
 	real = devfs_register(ubd_dir_handle, name, DEVFS_FL_REMOVABLE, 
@@ -427,9 +451,9 @@ static int ubd_add(int n)
  	if(real == NULL) return(-1);
  	ubd_dev[n].real = real;
  
-	if(!strcmp(ubd_gendisk.major_name, "ubd"))
-		sprintf(dev_name, "%s%d", ubd_gendisk.major_name, n);
-	else sprintf(dev_name, "%s%c", ubd_gendisk.major_name, 
+	if(!strcmp(ubd_gendisk[n].major_name, "ubd"))
+		sprintf(dev_name, "%s%d", ubd_gendisk[n].major_name, n);
+	else sprintf(dev_name, "%s%c", ubd_gendisk[n].major_name, 
 		     n + 'a');
 
 	make_ide_entries(dev_name);
@@ -510,7 +534,8 @@ int ubd_init(void)
 	INIT_QUEUE(ubd_queue, do_ubd_request, &ubd_lock);
 	INIT_ELV(ubd_queue, &ubd_queue->elevator);
 	INIT_HARDSECT(hardsect_size, MAJOR_NR, hardsect_sizes);
-        add_gendisk(&ubd_gendisk);
+	for(i = 0; i < MAX_DEV; i++)
+		add_disk(&ubd_gendisk[i]);
 	if(fake_major != 0){
 		char name[sizeof("ubd_nnn\0")];
 
@@ -523,9 +548,11 @@ int ubd_init(void)
 		}
 		blk_dev[fake_major].queue = ubd_get_queue;
 		INIT_HARDSECT(hardsect_size, fake_major, hardsect_sizes);
-                add_gendisk(&fake_gendisk);
+		for(i = 0; i < MAX_DEV; i++)
+			add_disk(&fake_gendisk[i]);
 	}
-	for(i=0;i<MAX_DEV;i++) ubd_add(i);
+	for(i = 0; i < MAX_DEV; i++) 
+		ubd_add(i);
 	return(0);
 }
 
@@ -647,9 +674,8 @@ static int ubd_open(struct inode *inode, struct file *filp)
 			       "errno = %d\n", n, dev->file, -err);
 			return(err);
 		}
-		err = ubd_file_size(dev, &dev->size);
+		err = ubd_revalidate(inode->i_rdev);
 		if(err) return(err);
-		ubd_part[offset].nr_sects = dev->size / hardsect_sizes[offset];
 	}
 	dev->count++;
 	if((filp->f_mode & FMODE_WRITE) && !dev->openflags.w){
@@ -667,10 +693,14 @@ static int ubd_release(struct inode * inode, struct file * file)
 	offset = n << UBD_SHIFT;
 	if(n > MAX_DEV)
 		return -ENODEV;
+
 	if(--ubd_dev[n].count == 0){
 		ubd_close(&ubd_dev[n]);
-		ubd_part[offset].nr_sects = 0;
+		del_gendisk(&ubd_gendisk[n]);
+		if(fake_major != 0)
+			del_gendisk(&fake_gendisk[n]);
 	}
+
 	return(0);
 }
 
@@ -741,7 +771,6 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 		return(1);
 	}
 
-        req->sector += ubd_part[min].start_sect;
         block = req->sector;
         nsect = req->current_nr_sectors;
 
@@ -816,15 +845,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		g.cylinders = dev->size / (128 * 32 * hardsect_sizes[min]);
 		g.start = 2;
 		return(copy_to_user(loc, &g, sizeof(g)) ? -EFAULT : 0);
-	case BLKGETSIZE:   /* Return device size */
-		if(!arg) return(-EINVAL);
-		err = verify_area(VERIFY_WRITE, (long *) arg, sizeof(long));
-		if(err)
-			return(err);
-		put_user(ubd_part[min].nr_sects, (long *) arg);
-		return(0);
-	case BLKRRPART: /* Re-read partition tables */
-		return(ubd_revalidate(inode->i_rdev));
 
 	case HDIO_SET_UNMASKINTR:
 		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
@@ -877,9 +897,9 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 static int ubd_revalidate(kdev_t rdev)
 {
-	int i, n, offset, err, pcount = 1 << UBD_SHIFT;
+	__u64 size;
+	int n, offset, err;
 	struct ubd *dev;
-	struct hd_struct *part;
 
 	n = minor(rdev) >> UBD_SHIFT;
 	offset = n << UBD_SHIFT;
@@ -887,45 +907,20 @@ static int ubd_revalidate(kdev_t rdev)
 	if(dev->is_dir) 
 		return(0);
 	
-	part = &ubd_part[offset];
-
-	/* clear all old partition counts */
-	for(i = 1; i < pcount; i++) {
-		part[i].start_sect = 0;
-		part[i].nr_sects = 0;
+	err = ubd_file_size(dev, &size);
+	if(err) {
+		ubd_close(dev);
+		return(err);
 	}
 
-	/* If it already has been opened we can check the partitions 
-	 * directly 
-	 */
-	if(dev->count){
-		part->start_sect = 0;
-		register_disk(&ubd_gendisk, mk_kdev(MAJOR_NR, offset), pcount, 
-			      &ubd_blops, part->nr_sects);
-	} 
-	else if(dev->file){
-		err = ubd_open_dev(dev);
-		if(err){
-			printk(KERN_ERR "unable to open %s for validation\n",
-			       dev->file);
-			return(err);
-		}
-
-		/* have to recompute sizes since we opened it */
-		err = ubd_file_size(dev, &dev->size);
-		if(err) {
-			ubd_close(dev);
-			return(err);
-		}
-		part->start_sect = 0;
-		part->nr_sects = dev->size / hardsect_sizes[offset];
-		register_disk(&ubd_gendisk, mk_kdev(MAJOR_NR, offset), pcount, 
-			      &ubd_blops, part->nr_sects);
-
-		/* we are done so close it */
-		ubd_close(dev);
-	} 
-	else return(-ENODEV);
+	if(size != dev->size){
+		set_capacity(&ubd_gendisk[n], size / hardsect_sizes[offset]);
+		if(fake_major != 0)
+			set_capacity(&fake_gendisk[n], 
+				     size / hardsect_sizes[offset]);
+		dev->size = size;
+	}
+	
 	return(0);
 }
 

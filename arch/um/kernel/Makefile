@@ -10,7 +10,6 @@ obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
 	umid.o user_util.o
 
 obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
-endif
 
 # user_syms.o not included here because Rules.make has its own ideas about
 # building anything in export-objs

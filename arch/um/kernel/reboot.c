@@ -15,7 +15,7 @@ static void kill_off_processes(void)
 	int me;
 
 	me = os_getpid();
-	for_each_task(p){
+	for_each_process(p){
 		if(p->thread.extern_pid != me) 
 			os_kill_process(p->thread.extern_pid);
 	}

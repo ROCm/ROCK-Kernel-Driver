@@ -223,6 +223,12 @@ extern syscall_handler_t sys_sendfile64;
 extern syscall_handler_t sys_futex;
 extern syscall_handler_t sys_sched_setaffinity;
 extern syscall_handler_t sys_sched_getaffinity;
+extern syscall_handler_t sys_io_setup;
+extern syscall_handler_t sys_io_destroy;
+extern syscall_handler_t sys_io_getevents;
+extern syscall_handler_t sys_io_submit;
+extern syscall_handler_t sys_io_cancel;
+extern syscall_handler_t sys_exit_group;
 
 #if CONFIG_NFSD
 #define NFSSERVCTL sys_nfsserctl
@@ -234,7 +240,7 @@ extern syscall_handler_t um_mount;
 extern syscall_handler_t um_time;
 extern syscall_handler_t um_stime;
 
-#define LAST_GENERIC_SYSCALL __NR_sched_getaffinity
+#define LAST_GENERIC_SYSCALL __NR_exit_group
 
 #if LAST_GENERIC_SYSCALL > LAST_ARCH_SYSCALL
 #define LAST_SYSCALL LAST_GENERIC_SYSCALL
@@ -465,6 +471,14 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_futex ] = sys_futex,
 	[ __NR_sched_setaffinity ] = sys_sched_setaffinity,
 	[ __NR_sched_getaffinity ] = sys_sched_getaffinity,
+	[ __NR_io_setup ] = sys_io_setup,
+	[ __NR_io_destroy ] = sys_io_destroy,
+	[ __NR_io_getevents ] = sys_io_getevents,
+	[ __NR_io_submit ] = sys_io_submit,
+	[ __NR_io_cancel ] = sys_io_cancel,
+	[ __NR_alloc_hugepages ] = sys_ni_syscall,
+	[ __NR_free_hugepages ] = sys_ni_syscall,
+	[ __NR_exit_group ] = sys_exit_group,
 
 	ARCH_SYSCALLS
 	[ LAST_SYSCALL + 1 ... NR_syscalls ] = 
