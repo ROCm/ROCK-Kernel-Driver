@@ -53,7 +53,8 @@ static __inline unsigned long apic_read(unsigned long reg)
 
 static __inline__ void apic_wait_icr_idle(void)
 {
-	do { } while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
+	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
+		cpu_relax();
 }
 
 int get_physical_broadcast(void);

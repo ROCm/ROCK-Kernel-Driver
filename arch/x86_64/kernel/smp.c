@@ -310,10 +310,10 @@ static void __smp_call_function (void (*func) (void *info), void *info,
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	while (atomic_read(&data.finished) != cpus)
-		barrier();
+		cpu_relax();
 }
 
 /*
