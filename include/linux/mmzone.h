@@ -22,7 +22,6 @@
 
 struct free_area {
 	struct list_head	free_list;
-	unsigned long		*map;
 	unsigned long		nr_free;
 };
 
