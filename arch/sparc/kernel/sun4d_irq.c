@@ -472,9 +472,9 @@ static void sun4d_load_profile_irq(int cpu, unsigned int limit)
 static void __init sun4d_init_timers(irqreturn_t (*counter_fn)(int, void *, struct pt_regs *))
 {
 	int irq;
-	extern struct prom_cpuinfo linux_cpus[NR_CPUS];
 	int cpu;
 	struct resource r;
+	int mid;
 
 	/* Map the User Timer registers. */
 	memset(&r, 0, sizeof(r));
@@ -502,9 +502,12 @@ static void __init sun4d_init_timers(irqreturn_t (*counter_fn)(int, void *, stru
 	
 	/* Enable user timer free run for CPU 0 in BW */
 	/* bw_set_ctrl(0, bw_get_ctrl(0) | BW_CTRL_USER_TIMER); */
-    
-	for(cpu = 0; cpu < linux_num_cpus; cpu++)
-		sun4d_load_profile_irq((linux_cpus[cpu].mid >> 3), 0);
+
+	cpu = 0;
+	while (!cpu_find_by_instance(cpu, NULL, &mid)) {
+		sun4d_load_profile_irq(mid >> 3, 0);
+		cpu++;
+	}
 		
 #ifdef CONFIG_SMP
 	{
