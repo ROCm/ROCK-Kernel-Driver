@@ -1279,7 +1279,7 @@ static int idedisk_cleanup(struct ata_device *drive)
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 	}
-	ret = ide_unregister_subdriver(drive);
+	ret = ata_unregister_device(drive);
 
 	/* FIXME: This is killing the kernel with BUG 185 at asm/spinlocks.h
 	 * horribly.  Check whatever we did REGISTER the device properly
@@ -1471,8 +1471,8 @@ static void idedisk_attach(struct ata_device *drive)
 	if (req[0] != '\0' && strcmp(req, "ide-disk"))
 		return;
 
-	if (ide_register_subdriver(drive, &idedisk_driver)) {
-		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
+	if (ata_register_device(drive, &idedisk_driver)) {
+		printk(KERN_ERR "%s: Failed to register the driver with ide.c\n", drive->name);
 		return;
 	}
 
