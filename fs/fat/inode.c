@@ -160,7 +160,6 @@ void fat_put_super(struct super_block *sb)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
 	fat_clusters_flush(sb);
-	fat_cache_inval_dev(sb);
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
 		sbi->nls_disk = NULL;
@@ -766,7 +765,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!parse_options(data, isvfat, &debug, &sbi->options))
 		goto out_fail;
 
-	fat_cache_init();
+	fat_cache_init(sb);
 	/* set up enough so that it can read an inode */
 	init_MUTEX(&sbi->fat_lock);
 

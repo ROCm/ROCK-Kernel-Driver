@@ -27,8 +27,6 @@ struct statfs;
 
 #define MSDOS_SUPER_MAGIC 0x4d44 /* MD */
 
-#define FAT_CACHE    8 /* FAT cache size */
-
 #define ATTR_NONE    0 /* no attribute bits */
 #define ATTR_RO      1  /* read-only */
 #define ATTR_HIDDEN  2  /* hidden */
@@ -204,14 +202,6 @@ static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
 	return container_of(inode, struct msdos_inode_info, vfs_inode);
 }
 
-struct fat_cache {
-	struct super_block *sb; /* fs in question.  NULL means unused */
-	int start_cluster; /* first cluster of the chain. */
-	int file_cluster; /* cluster number in the file. */
-	int disk_cluster; /* cluster number on disk. */
-	struct fat_cache *next; /* next cache entry */
-};
-
 static inline void fat16_towchar(wchar_t *dst, const __u8 *src, size_t len)
 {
 #ifdef __BIG_ENDIAN
@@ -242,12 +232,11 @@ static inline void fatwchar_to16(__u8 *dst, const wchar_t *src, size_t len)
 extern int fat_access(struct super_block *sb, int nr, int new_value);
 extern int __fat_access(struct super_block *sb, int nr, int new_value);
 extern int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys);
-extern void fat_cache_init(void);
+extern void fat_cache_init(struct super_block *sb);
 extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
 			     int *d_clu);
 extern void fat_cache_add(struct inode *inode, int f_clu, int d_clu);
 extern void fat_cache_inval_inode(struct inode *inode);
-extern void fat_cache_inval_dev(struct super_block *sb);
 extern int fat_free(struct inode *inode, int skip);
 
 /* fat/dir.c */
