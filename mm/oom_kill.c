@@ -41,7 +41,7 @@
  *    of least surprise ... (be careful when you change it)
  */
 
-static int badness(struct task_struct *p)
+int badness(struct task_struct *p)
 {
 	int points, cpu_time, run_time, s;
 
@@ -93,6 +93,20 @@ static int badness(struct task_struct *p)
 	 */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
 		points /= 4;
+
+	/* 
+	 * Adjust the score by oomkilladj.
+	 */
+	if (p->oomkilladj)
+		if (p->oomkilladj > 0)
+			points <<= p->oomkilladj;
+		else
+			points >>= -(p->oomkilladj);
+	/* 
+	 * One point for already having received a warning 
+	 */
+	points += p->rcvd_sigterm;
+		
 #ifdef DEBUG
 	printk(KERN_DEBUG "OOMkill: task %d (%s) got %d points\n",
 	p->pid, p->comm, points);
@@ -152,11 +166,13 @@ static void __oom_kill_task(task_t *p)
 	p->flags |= PF_MEMALLOC | PF_MEMDIE;
 
 	/* This process has hardware access, be more careful. */
-	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO)) {
+	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
 		force_sig(SIGTERM, p);
-	} else {
+	else if (p->rcvd_sigterm++)
 		force_sig(SIGKILL, p);
-	}
+	else
+		force_sig(SIGTERM, p);
+
 }
 
 static struct mm_struct *oom_kill_task(task_t *p)
