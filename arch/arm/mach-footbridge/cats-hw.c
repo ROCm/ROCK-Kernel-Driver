@@ -9,8 +9,14 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
+#include <asm/hardware/dec21285.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
+#include <asm/setup.h>
+
+#include <asm/mach/arch.h>
+
+#include "common.h"
 
 #define CFG_PORT	0x370
 #define INDEX_PORT	(CFG_PORT)
@@ -62,3 +68,27 @@ static int __init cats_hw_init(void)
 }
 
 __initcall(cats_hw_init);
+
+/*
+ * CATS uses soft-reboot by default, since
+ * hard reboots fail on early boards.
+ */
+static void __init
+fixup_cats(struct machine_desc *desc, struct tag *tags,
+	   char **cmdline, struct meminfo *mi)
+{
+	ORIG_VIDEO_LINES  = 25;
+	ORIG_VIDEO_POINTS = 16;
+	ORIG_Y = 24;
+}
+
+MACHINE_START(CATS, "Chalice-CATS")
+	MAINTAINER("Philip Blundell")
+	BOOT_MEM(0x00000000, DC21285_ARMCSR_BASE, 0xfe000000)
+	BOOT_PARAMS(0x00000100)
+	SOFT_REBOOT
+	FIXUP(fixup_cats)
+	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
+	.timer		= &isa_timer,
+MACHINE_END
