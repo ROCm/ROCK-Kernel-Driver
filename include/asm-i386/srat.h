@@ -32,8 +32,7 @@
 #endif
 
 #define MAX_NUMNODES		8
-extern void get_memcfg_from_srat(void);
+extern int get_memcfg_from_srat(void);
 extern unsigned long *get_zholes_size(int);
-#define get_memcfg_numa() get_memcfg_from_srat()
 
 #endif /* _ASM_SRAT_H_ */
