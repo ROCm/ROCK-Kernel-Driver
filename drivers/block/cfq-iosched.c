@@ -1724,11 +1724,16 @@ cfq_insert_request(request_queue_t *q, struct request *rq, int where)
 	}
 }
 
+static inline int cfq_pending_requests(struct cfq_data *cfqd)
+{
+	return list_empty(&cfqd->queue->queue_head) && !cfqd->busy_queues;
+}
+
 static int cfq_queue_empty(request_queue_t *q)
 {
 	struct cfq_data *cfqd = q->elevator->elevator_data;
 
-	return list_empty(&q->queue_head) && !cfqd->busy_queues;
+	return cfq_pending_requests(cfqd);
 }
 
 static void cfq_completed_request(request_queue_t *q, struct request *rq)
@@ -2049,7 +2054,7 @@ static void cfq_idle_slice_timer(unsigned long data)
 		 * only expire and reinvoke request handler, if there are
 		 * other queues with pending requests
 		 */
-		if (!cfqd->busy_queues) {
+		if (!cfq_pending_requests(cfqd)) {
 			cfqd->idle_slice_timer.expires = min(now + cfqd->cfq_slice_idle, cfqq->slice_end);
 			add_timer(&cfqd->idle_slice_timer);
 			goto out_cont;
@@ -2066,7 +2071,7 @@ static void cfq_idle_slice_timer(unsigned long data)
 expire:
 	cfq_slice_expired(cfqd, 0);
 out_kick:
-	if (cfqd->busy_queues)
+	if (cfq_pending_requests(cfqd))
 		kblockd_schedule_work(&cfqd->unplug_work);
 out_cont:
 	spin_unlock_irqrestore(cfqd->queue->queue_lock, flags);
