@@ -265,8 +265,6 @@ EXPORT_SYMBOL(blk_queue_make_request);
 void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
 {
 	unsigned long bounce_pfn = dma_addr >> PAGE_SHIFT;
-	unsigned long mb = dma_addr >> 20;
-	static request_queue_t *last_q;
 
 	/*
 	 * set appropriate bounce gfp mask -- unfortunately we don't have a
@@ -280,19 +278,7 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
 	} else
 		q->bounce_gfp = GFP_NOIO;
 
-	/*
-	 * keep this for debugging for now...
-	 */
-	if (dma_addr != BLK_BOUNCE_HIGH && q != last_q) {
-		printk("blk: queue %p, ", q);
-		if (dma_addr == BLK_BOUNCE_ANY)
-			printk("no I/O memory limit\n");
-		else
-			printk("I/O limit %luMb (mask 0x%Lx)\n", mb, (long long) dma_addr);
-	}
-
 	q->bounce_pfn = bounce_pfn;
-	last_q = q;
 }
 
 EXPORT_SYMBOL(blk_queue_bounce_limit);
