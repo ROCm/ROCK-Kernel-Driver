@@ -463,7 +463,8 @@ static inline int validate_sp(unsigned long sp, struct task_struct *p)
 
 	if (sp < stack_page + sizeof(struct thread_struct))
 		return 0;
-	if (sp >= stack_page + THREAD_SIZE)
+	/* stack frames are at least 64 bytes */
+	if (sp > stack_page + THREAD_SIZE - 64)
 		return 0;
 
 	return 1;
@@ -504,9 +505,10 @@ unsigned long get_wchan(struct task_struct *p)
 
 void show_stack(struct task_struct *p, unsigned long *_sp)
 {
-	unsigned long ip;
+	unsigned long ip, newsp, lr;
 	int count = 0;
 	unsigned long sp = (unsigned long)_sp;
+	int firstframe = 1;
 
 	if (sp == 0) {
 		if (p) {
@@ -517,17 +519,41 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		}
 	}
 
-	if (!validate_sp(sp, p))
-		return;
-
+	lr = 0;
 	printk("Call Trace:\n");
 	do {
-		sp = *(unsigned long *)sp;
 		if (!validate_sp(sp, p))
 			return;
-		ip = *(unsigned long *)(sp + 16);
-		printk("[%016lx] ", ip);
-		print_symbol("%s\n", ip);
+
+		_sp = (unsigned long *) sp;
+		newsp = _sp[0];
+		ip = _sp[2];
+		if (!firstframe || ip != lr) {
+			printk("[%016lx] ", ip);
+			print_symbol("%s", ip);
+			if (firstframe)
+				printk(" (unreliable)");
+			printk("\n");
+		}
+		firstframe = 0;
+
+		/*
+		 * See if this is an exception frame.
+		 * We look for the "regshere" marker in the current frame.
+		 */
+		if (sp <= (unsigned long) p->thread_info + THREAD_SIZE
+			+ sizeof(struct pt_regs) + 400
+		    && _sp[12] == 0x7265677368657265) {
+			struct pt_regs *regs = (struct pt_regs *)
+				(sp + STACK_FRAME_OVERHEAD);
+			printk("--- Exception: %lx", regs->trap);
+			print_symbol(" at %s\n", regs->nip);
+			lr = regs->link;
+			print_symbol("    LR = %s\n", lr);
+			firstframe = 1;
+		}
+
+		sp = newsp;
 	} while (count++ < kstack_depth_to_print);
 }
 
