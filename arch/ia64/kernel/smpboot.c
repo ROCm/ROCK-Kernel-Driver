@@ -506,6 +506,12 @@ smp_prepare_cpus (unsigned int max_cpus)
 	}
 }
 
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	set_bit(smp_processor_id(), &cpu_callin_map);
+}
+
 void
 smp_cpus_done (unsigned int dummy)
 {

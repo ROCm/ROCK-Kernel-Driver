@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>			/* For in_interrupt() */
 #include <linux/config.h>
 #include <linux/delay.h>
+#include <linux/smp.h>
 
 #include <asm/uaccess.h>
 
@@ -41,10 +42,6 @@
 #endif
 
 #define LOG_BUF_MASK	(LOG_BUF_LEN-1)
-
-#ifndef arch_consoles_callable
-#define arch_consoles_callable() (1)
-#endif
 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL 4 /* KERN_WARNING */
@@ -447,10 +444,12 @@ asmlinkage int printk(const char *fmt, ...)
 			log_level_unknown = 1;
 	}
 
-	if (!arch_consoles_callable()) {
+	if (!cpu_online(smp_processor_id())) {
 		/*
-		 * On some architectures, the consoles are not usable
-		 * on secondary CPUs early in the boot process.
+		 * Some console drivers may assume that per-cpu resources have
+		 * been allocated.  So don't allow them to be called by this
+		 * CPU until it is officially up.  We shouldn't be calling into
+		 * random console drivers on a CPU which doesn't exist yet..
 		 */
 		spin_unlock_irqrestore(&logbuf_lock, flags);
 		goto out;
@@ -638,7 +637,8 @@ void register_console(struct console * console)
 	}
 	if (console->flags & CON_PRINTBUFFER) {
 		/*
-		 * release_console_sem() will print out the buffered messages for us.
+		 * release_console_sem() will print out the buffered messages
+		 * for us.
 		 */
 		spin_lock_irqsave(&logbuf_lock, flags);
 		con_start = log_start;
