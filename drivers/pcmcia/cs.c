@@ -82,7 +82,7 @@
 #define OPTIONS PCI_OPT CB_OPT PM_OPT
 #endif
 
-static const char *release = "Linux Kernel Card Services " CS_RELEASE;
+static const char *release = "Linux Kernel Card Services";
 static const char *options = "options: " OPTIONS;
 
 /*====================================================================*/
@@ -90,8 +90,7 @@ static const char *options = "options: " OPTIONS;
 /* Module parameters */
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
-MODULE_DESCRIPTION("Linux Kernel Card Services " CS_RELEASE
-		   "\n  options:" OPTIONS);
+MODULE_DESCRIPTION("Linux Kernel Card Services\noptions:" OPTIONS);
 MODULE_LICENSE("Dual MPL/GPL");	  
 
 #define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
@@ -450,6 +449,7 @@ static void shutdown_socket(struct pcmcia_socket *s)
     s->state &= SOCKET_PRESENT|SOCKET_INUSE;
     s->socket = dead_socket;
     s->ops->init(s);
+    s->ops->set_socket(s, &s->socket);
     s->irq.AssignedIRQ = s->irq.Config = 0;
     s->lock_count = 0;
     destroy_cis_cache(s);
@@ -457,15 +457,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
 	kfree(s->fake_cis);
 	s->fake_cis = NULL;
     }
-    /* Should not the socket be forced quiet as well?  e.g. turn off Vcc */
-    /* Without these changes, the socket is left hot, even though card-services */
-    /* realizes that no card is in place. */
-    s->socket.flags &= ~SS_OUTPUT_ENA;
-    s->socket.Vpp = 0;
-    s->socket.Vcc = 0;
-    s->socket.io_irq = 0;
-    s->ops->set_socket(s, &s->socket);
-    /* */
 #ifdef CONFIG_CARDBUS
     cb_free(s);
 #endif
@@ -485,6 +476,14 @@ static void shutdown_socket(struct pcmcia_socket *s)
     }
     free_regions(&s->a_region);
     free_regions(&s->c_region);
+
+    {
+	int status;
+	skt->ops->get_status(skt, &status);
+	if (status & SS_POWERON) {
+		printk(KERN_ERR "PCMCIA: socket %p: *** DANGER *** unable to remove socket power\n", skt);
+	}
+    }
 } /* shutdown_socket */
 
 /*======================================================================
@@ -639,6 +638,12 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(cs_to_timeout(vcc_settle));
 
+	skt->ops->get_status(skt, &status);
+	if (!(status & SS_POWERON)) {
+		pcmcia_error(skt, "unable to apply power.\n");
+		return CS_BAD_TYPE;
+	}
+
 	return socket_reset(skt);
 }
 
@@ -698,6 +703,7 @@ static int socket_resume(struct pcmcia_socket *skt)
 
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
+	skt->ops->set_socket(skt, &skt->socket);
 
 	ret = socket_setup(skt, resume_delay);
 	if (ret == CS_SUCCESS) {
@@ -770,6 +776,7 @@ static int pccardd(void *__skt)
 
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
+	skt->ops->set_socket(skt, &skt->socket);
 
 	/* register with the device core */
 	ret = class_device_register(&skt->dev);
@@ -1338,7 +1345,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
     } else
 	c = CONFIG(handle);
     if ((c != NULL) && (c->state & CONFIG_LOCKED) &&
-	(c->IntType & INT_MEMORY_AND_IO)) {
+	(c->IntType & (INT_MEMORY_AND_IO | INT_ZOOMED_VIDEO))) {
 	u_char reg;
 	if (c->Present & PRESENT_PIN_REPLACE) {
 	    read_cis_mem(s, 1, (c->ConfigBase+CISREG_PRR)>>1, 1, &reg);
@@ -1749,6 +1756,8 @@ int pcmcia_request_configuration(client_handle_t handle,
     c->Attributes = req->Attributes;
     if (req->IntType & INT_MEMORY_AND_IO)
 	s->socket.flags |= SS_IOCARD;
+    if (req->IntType & INT_ZOOMED_VIDEO)
+	s->socket.flags |= SS_ZVCARD | SS_IOCARD;
     if (req->Attributes & CONF_ENABLE_DMA)
 	s->socket.flags |= SS_DMA_MODE;
     if (req->Attributes & CONF_ENABLE_SPKR)

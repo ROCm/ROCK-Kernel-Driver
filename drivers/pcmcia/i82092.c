@@ -426,7 +426,6 @@ static int i82092aa_init(struct pcmcia_socket *sock)
         enter("i82092aa_init");
                         
         mem.sys_stop = 0x0fff;
-        i82092aa_set_socket(sock, &dead_socket);
         for (i = 0; i < 2; i++) {
         	io.map = i;
                 i82092aa_set_io_map(sock, &io);

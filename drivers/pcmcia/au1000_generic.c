@@ -35,7 +35,6 @@
 #include <linux/timer.h>
 #include <linux/mm.h>
 #include <linux/proc_fs.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 
@@ -140,7 +139,7 @@ static int __init au1000_pcmcia_driver_init(void)
 	struct pcmcia_state state;
 	unsigned int i;
 
-	printk("\nAu1x00 PCMCIA (CS release %s)\n", CS_RELEASE);
+	printk("\nAu1x00 PCMCIA\n");
 
 #ifndef CONFIG_64BIT_PHYS_ADDR
 	printk(KERN_ERR "Au1x00 PCMCIA 36 bit IO support not enabled\n");

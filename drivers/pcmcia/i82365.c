@@ -1322,7 +1322,6 @@ static int pcic_init(struct pcmcia_socket *s)
 	pccard_mem_map mem = { 0, 0, 0, 0, 0, 0 };
 
 	mem.sys_stop = 0x1000;
-	pcic_set_socket(s, &dead_socket);
 	for (i = 0; i < 2; i++) {
 		io.map = i;
 		pcic_set_io_map(s, &io);
