@@ -993,6 +993,7 @@ SLB_NUM_ENTRIES = 64
 	li      r21,0
 	rldimi  r21,r20,12,0
 	ori     r20,r21,1024
+	ori	r20,r20,128    /* set class bit for kernel region */
 #ifndef CONFIG_PPC_ISERIES
 	ori	r20,r20,256    /* map kernel region with large ptes */
 #endif
