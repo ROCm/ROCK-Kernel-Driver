@@ -1493,6 +1493,9 @@ int ip6t_register_table(struct ip6t_table *table)
 	duprintf("table->private->number = %u\n",
 		 table->private->number);
 
+	/* save number of initial entries */
+	table->private->initial_entries = table->private->number;
+
 	table->lock = RW_LOCK_UNLOCKED;
 	list_prepend(&ip6t_tables, table);
 

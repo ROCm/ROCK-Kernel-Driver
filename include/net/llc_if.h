@@ -70,7 +70,6 @@ struct llc_addr {
 struct llc_prim_reset {
 	struct sock *sk;
 	u16	     link;
-	u8	     reason;		/* used only by indicate */
 };
 
  /* Sending data in conection-less mode */

@@ -211,7 +211,7 @@ check_udp(const struct iphdr *iph,
 
 	/* Bad checksum?  Don't print, just say it's unclean. */
 	/* FIXME: SRC ROUTE packets won't match checksum --RR */
-	if (!more_frags && !embedded
+	if (!more_frags && !embedded && udph->check
 	    && csum_tcpudp_magic(iph->saddr, iph->daddr, datalen, IPPROTO_UDP,
 				 csum_partial((char *)udph, datalen, 0)) != 0)
 		return 0;
