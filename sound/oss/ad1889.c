@@ -1011,36 +1011,45 @@ static int __devinit ad1889_probe(struct pci_dev *pcidev, const struct pci_devic
 	
         if (!(pci_resource_flags(pcidev, 0) & IORESOURCE_MEM)) {
 		printk(KERN_ERR DEVNAME ": memory region not assigned\n");
-		goto err_free_mem;
+		goto out1;
+	}
+
+	if (pci_request_region(pcidev, 0, DEVNAME)) {
+		printk(KERN_ERR DEVNAME ": unable to request memory region\n");
+		goto out1;
+	}
+
+	dev->regbase = ioremap_nocache(bar, AD_DSIOMEMSIZE);
+	if (!dev->regbase) {
+		printk(KERN_ERR DEVNAME ": unable to remap iomem\n");
+		goto out2;
 	}
 
 	if (request_irq(pcidev->irq, ad1889_interrupt, SA_SHIRQ, DEVNAME, dev) != 0) {
 		printk(KERN_ERR DEVNAME ": unable to request interrupt\n");
-		goto err_free_mem;
+		goto out3;
 	}
 
-	request_mem_region(bar, AD_DSIOMEMSIZE, DEVNAME);
-	dev->regbase = (unsigned long)ioremap_nocache(bar, AD_DSIOMEMSIZE);
-
-	printk(KERN_INFO DEVNAME ": %s at 0x%lx IRQ %d\n",
+	printk(KERN_INFO DEVNAME ": %s at %p IRQ %d\n",
 		(char *)ent->driver_data, dev->regbase, pcidev->irq);
 
 	if (ad1889_aclink_reset(pcidev) != 0)
-		goto err_free_mem;
+		goto out4;
 
 	/* register /dev/dsp */
 	if ((dev->dev_audio = register_sound_dsp(&ad1889_fops, -1)) < 0) {
 		printk(KERN_ERR DEVNAME ": cannot register /dev/dsp\n");
-		goto err_free_irq;
+		goto out4;
 	}
 
 	if ((err = ad1889_ac97_init(dev, 0)) != 0)
-		goto err_free_dsp;
+		goto out5;
 
+	/* XXX: cleanups */
 	if (((proc_root = proc_mkdir("driver/ad1889", NULL)) == NULL) ||
 	    create_proc_read_entry("ac97", S_IFREG|S_IRUGO, proc_root, ac97_read_proc, dev->ac97_codec) == NULL ||
 	    create_proc_read_entry("info", S_IFREG|S_IRUGO, proc_root, ad1889_read_proc, dev) == NULL) 
-		goto err_free_dsp;
+		goto out5;
 	
 	ad1889_initcfg(dev);
 
@@ -1050,13 +1059,15 @@ static int __devinit ad1889_probe(struct pci_dev *pcidev, const struct pci_devic
 
 	return 0;
 
-err_free_dsp:
+out5:
 	unregister_sound_dsp(dev->dev_audio);
-
-err_free_irq:
+out4:
 	free_irq(pcidev->irq, dev);
-
-err_free_mem:
+out3:
+	iounmap(dev->regbase);
+out2:
+	pci_release_region(pcidev, 0);
+out1:
 	ad1889_free_dev(dev);
 	pci_set_drvdata(pcidev, NULL);
 
@@ -1072,10 +1083,12 @@ static void __devexit ad1889_remove(struct pci_dev *pcidev)
 	unregister_sound_mixer(dev->ac97_codec->dev_mixer);
 	unregister_sound_dsp(dev->dev_audio);
 	free_irq(pcidev->irq, dev);
-	release_mem_region(dev->regbase, AD_DSIOMEMSIZE);
+	iounmap(dev->regbase);
+	pci_release_region(pcidev, 0);
 
 	/* any hw programming needed? */
 	ad1889_free_dev(dev);
+	pci_set_drvdata(pcidev, NULL);
 }
 
 MODULE_AUTHOR("Randolph Chung");
