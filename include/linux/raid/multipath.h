@@ -13,7 +13,6 @@ struct multipath_info {
 	 * State bits:
 	 */
 	int		operational;
-	int		spare;
 
 	int		used_slot;
 };
