@@ -2036,7 +2036,7 @@ modem_write_profile(atemu * m)
 	memcpy(m->pmsn, m->msn, ISDN_MSNLEN);
 	memcpy(m->plmsn, m->lmsn, ISDN_LMSNLEN);
 	if (dev->profd)
-		group_send_sig_info(SIGIO, SEND_SIG_PRIV, dev->profd);
+		kill_pg_info(SIGIO, SEND_SIG_PRIV, dev->profd->pgrp);
 }
 
 int
