@@ -1460,7 +1460,7 @@ do_sys32_shmat (int first, int second, int third, int version, void *uptr)
 
 	if (version == 1)
 		return err;
-	err = sys_shmat (first, uptr, second, &raddr);
+	err = do_shmat (first, uptr, second, &raddr);
 	if (err)
 		return err;
 	err = put_user (raddr, uaddr);

@@ -173,7 +173,7 @@ long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
 	unsigned long raddr;
 	int r;
 
-	r = sys_shmat(shmid, shmaddr, shmflag, &raddr);
+	r = do_shmat(shmid, shmaddr, shmflag, &raddr);
 	if (r < 0)
 		return r;
 	return raddr;

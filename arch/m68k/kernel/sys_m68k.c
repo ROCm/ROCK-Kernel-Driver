@@ -241,7 +241,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 			switch (version) {
 			default: {
 				ulong raddr;
-				ret = sys_shmat (first, (char *) ptr,
+				ret = do_shmat (first, (char *) ptr,
 						 second, &raddr);
 				if (ret)
 					return ret;

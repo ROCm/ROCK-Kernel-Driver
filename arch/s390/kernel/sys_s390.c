@@ -225,7 +225,7 @@ asmlinkage __SYS_RETTYPE sys_ipc (uint call, int first, int second,
                 
 	case SHMAT: {
 		ulong raddr;
-		ret = sys_shmat (first, (char *) ptr, second, &raddr);
+		ret = do_shmat (first, (char *) ptr, second, &raddr);
 		if (ret)
 			return ret;
 		return put_user (raddr, (ulong *) third);
