@@ -36,10 +36,7 @@
 static int sb_initialized;
 #endif
 
-static int kilroy_was_here;	/* Don't detect twice */
-static int mpu_initialized;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
-static int *opl3sa_osp;
 
 static unsigned char opl3sa_read(int addr)
 {
@@ -108,11 +105,8 @@ static int __init opl3sa_detect(void)
 
 static int __init probe_opl3sa_wss(struct address_info *hw_config)
 {
-	int ret;
 	unsigned char tmp = 0x24;	/* WSS enable */
 
-	if (check_region(0xf86, 2))	/* Control port is busy */
-		return 0;
 	/*
 	 * Check if the IO port returns valid signature. The original MS Sound
 	 * system returns 0x04 while some cards (OPL3-SA for example)
@@ -124,7 +118,6 @@ static int __init probe_opl3sa_wss(struct address_info *hw_config)
 		printk(KERN_ERR "OPL3-SA: MSS I/O port conflict (%x)\n", hw_config->io_base);
 		return 0;
 	}
-	opl3sa_osp = hw_config->osp;
 
 	if (!opl3sa_detect())
 	{
@@ -152,13 +145,8 @@ static int __init probe_opl3sa_wss(struct address_info *hw_config)
 	}
 
 	opl3sa_write(0x01, tmp);	/* WSS setup register */
-	kilroy_was_here = 1;
 
-	ret = probe_ms_sound(hw_config);
-	if (ret)
-		request_region(0xf86, 2, "OPL3-SA");
-
-	return ret;
+	return probe_ms_sound(hw_config);
 }
 
 static void __init attach_opl3sa_wss(struct address_info *hw_config)
@@ -183,14 +171,6 @@ static int __init probe_opl3sa_mpu(struct address_info *hw_config)
 		-1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4
 	};
 
-	if (!kilroy_was_here)
-		return 0;	/* OPL3-SA has not been detected earlier */
-
-	if (mpu_initialized)
-	{
-		DDB(printk("OPL3-SA: MPU mode already initialized\n"));
-		return 0;
-	}
 	if (hw_config->irq > 10)
 	{
 		printk(KERN_ERR "OPL3-SA: Bad MPU IRQ %d\n", hw_config->irq);
@@ -224,7 +204,6 @@ static int __init probe_opl3sa_mpu(struct address_info *hw_config)
 
 	opl3sa_write(0x03, conf);
 
-	mpu_initialized = 1;
 	hw_config->name = "OPL3-SA (MPU401)";
 
 	return probe_uart401(hw_config, THIS_MODULE);
@@ -294,8 +273,13 @@ static int __init init_opl3sa(void)
 	cfg_mpu.io_base = mpu_io;
 	cfg_mpu.irq = mpu_irq;
 
-	if (probe_opl3sa_wss(&cfg) == 0)
+	if (!request_region(0xf86, 2, "OPL3-SA"))/* Control port is busy */
+		return 0;
+
+	if (probe_opl3sa_wss(&cfg) == 0) {
+		release_region(0xf86, 2);
 		return -ENODEV;
+	}
 
 	found_mpu=probe_opl3sa_mpu(&cfg_mpu);
 
