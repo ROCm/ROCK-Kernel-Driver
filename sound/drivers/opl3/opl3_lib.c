@@ -440,9 +440,9 @@ int snd_opl3_create(snd_card_t * card,
 	default:
 		opl3->command = &snd_opl2_command;
 		if ((err = snd_opl3_detect(opl3)) < 0) {
-			snd_opl3_free(opl3);
 			snd_printd("OPL2/3 chip not detected at 0x%lx/0x%lx\n",
 				   opl3->l_port, opl3->r_port);
+			snd_opl3_free(opl3);
 			return err;
 		}
 		/* detect routine returns correct hardware type */
