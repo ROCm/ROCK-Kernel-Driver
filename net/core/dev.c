@@ -1670,7 +1670,7 @@ static void net_tx_action(struct softirq_action *h)
 }
 
 static __inline__ int deliver_skb(struct sk_buff *skb,
-				  struct packet_type *pt_prev, int last)
+				  struct packet_type *pt_prev)
 {
 	atomic_inc(&skb->users);
 	return pt_prev->func(skb, skb->dev, pt_prev);
@@ -1685,7 +1685,7 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 {
 	int ret = NET_RX_DROP;
 	if (pt_prev)
-		ret = deliver_skb(skb, pt_prev, 0);
+		ret = deliver_skb(skb, pt_prev);
 
 	return ret;
 }
@@ -1785,15 +1785,14 @@ int netif_receive_skb(struct sk_buff *skb)
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
 			if (pt_prev) 
-				ret = deliver_skb(skb, pt_prev, 0);
+				ret = deliver_skb(skb, pt_prev);
 			pt_prev = ptype;
 		}
 	}
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (pt_prev) {
-		atomic_inc(&skb->users);
-		ret = pt_prev->func(skb, skb->dev, pt_prev);
+		ret = deliver_skb(skb, pt_prev);
 		pt_prev = NULL; /* noone else should process this after*/
 	} else {
 		skb->tc_verd = SET_TC_OK2MUNGE(skb->tc_verd);
@@ -1820,7 +1819,7 @@ ncls:
 		if (ptype->type == type &&
 		    (!ptype->dev || ptype->dev == skb->dev)) {
 			if (pt_prev) 
-				ret = deliver_skb(skb, pt_prev, 0);
+				ret = deliver_skb(skb, pt_prev);
 			pt_prev = ptype;
 		}
 	}
