@@ -19,6 +19,9 @@
 #define DMERR(f, x...) printk(KERN_ERR DM_NAME ": " f "\n" , ## x)
 #define DMINFO(f, x...) printk(KERN_INFO DM_NAME ": " f "\n" , ## x)
 
+#define DMEMIT(x...) sz += ((sz >= maxlen) ? \
+			  0 : scnprintf(result + sz, maxlen - sz, x))
+
 /*
  * FIXME: I think this should be with the definition of sector_t
  * in types.h.

@@ -1185,32 +1185,29 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 	unsigned int m, sz = 0;
 	struct mirror_set *ms = (struct mirror_set *) ti->private;
 
-#define EMIT(x...) sz += ((sz >= maxlen) ? \
-			  0 : scnprintf(result + sz, maxlen - sz, x))
-
 	switch (type) {
 	case STATUSTYPE_INFO:
-		EMIT("%d ", ms->nr_mirrors);
+		DMEMIT("%d ", ms->nr_mirrors);
 
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			EMIT("%s ", buffer);
+			DMEMIT("%s ", buffer);
 		}
 
-		EMIT(SECTOR_FORMAT "/" SECTOR_FORMAT,
-		     ms->rh.log->type->get_sync_count(ms->rh.log),
-		     ms->nr_regions);
+		DMEMIT(SECTOR_FORMAT "/" SECTOR_FORMAT,
+		       ms->rh.log->type->get_sync_count(ms->rh.log),
+		       ms->nr_regions);
 		break;
 
 	case STATUSTYPE_TABLE:
-		EMIT("%s 1 " SECTOR_FORMAT " %d ",
-		     ms->rh.log->type->name, ms->rh.region_size,
-		     ms->nr_mirrors);
+		DMEMIT("%s 1 " SECTOR_FORMAT " %d ",
+		       ms->rh.log->type->name, ms->rh.region_size,
+		       ms->nr_mirrors);
 
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			EMIT("%s " SECTOR_FORMAT " ",
-			     buffer, ms->mirror[m].offset);
+			DMEMIT("%s " SECTOR_FORMAT " ",
+			       buffer, ms->mirror[m].offset);
 		}
 	}
 
