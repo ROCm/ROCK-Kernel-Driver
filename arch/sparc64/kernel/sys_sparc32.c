@@ -3965,6 +3965,27 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, __kernel_off_t32 *offset, s
 	return ret;
 }
 
+extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
+
+asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset, s32 count)
+{
+	mm_segment_t old_fs = get_fs();
+	int ret;
+	loff_t lof;
+	
+	if (offset && get_user(lof, offset))
+		return -EFAULT;
+		
+	set_fs(KERNEL_DS);
+	ret = sys_sendfile(out_fd, in_fd, offset ? &lof : NULL, count);
+	set_fs(old_fs);
+	
+	if (offset && put_user(lof, offset))
+		return -EFAULT;
+		
+	return ret;
+}
+
 /* Handle adjtimex compatability. */
 
 struct timex32 {
