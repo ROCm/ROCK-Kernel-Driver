@@ -1401,6 +1401,7 @@ config NFSD
 	depends on INET
 	select LOCKD
 	select SUNRPC
+	select EXPORTFS
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1474,7 +1475,6 @@ config LOCKD_V4
 
 config EXPORTFS
 	tristate
-	default NFSD
 
 config SUNRPC
 	tristate
