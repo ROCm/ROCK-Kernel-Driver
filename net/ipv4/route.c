@@ -226,11 +226,11 @@ static struct rtable *rt_cache_get_first(struct seq_file *seq)
 	struct rt_cache_iter_state *st = seq->private;
 
 	for (st->bucket = rt_hash_mask; st->bucket >= 0; --st->bucket) {
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		r = rt_hash_table[st->bucket].chain;
 		if (r)
 			break;
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 	}
 	return r;
 }
@@ -242,10 +242,10 @@ static struct rtable *rt_cache_get_next(struct seq_file *seq, struct rtable *r)
 	smp_read_barrier_depends();
 	r = r->u.rt_next;
 	while (!r) {
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 		if (--st->bucket < 0)
 			break;
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		r = rt_hash_table[st->bucket].chain;
 	}
 	return r;
@@ -281,7 +281,7 @@ static void *rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 static void rt_cache_seq_stop(struct seq_file *seq, void *v)
 {
 	if (v && v != SEQ_START_TOKEN)
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 }
 
 static int rt_cache_seq_show(struct seq_file *seq, void *v)
@@ -439,13 +439,13 @@ static struct file_operations rt_cpu_seq_fops = {
   
 static __inline__ void rt_free(struct rtable *rt)
 {
-	call_rcu(&rt->u.dst.rcu_head, dst_rcu_free);
+	call_rcu_bh(&rt->u.dst.rcu_head, dst_rcu_free);
 }
 
 static __inline__ void rt_drop(struct rtable *rt)
 {
 	ip_rt_put(rt);
-	call_rcu(&rt->u.dst.rcu_head, dst_rcu_free);
+	call_rcu_bh(&rt->u.dst.rcu_head, dst_rcu_free);
 }
 
 static __inline__ int rt_fast_clean(struct rtable *rth)
@@ -2231,7 +2231,7 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 
 	hash = rt_hash_code(flp->fl4_dst, flp->fl4_src ^ (flp->oif << 5), flp->fl4_tos);
 
-	rcu_read_lock();
+	rcu_read_lock_bh();
 	for (rth = rt_hash_table[hash].chain; rth; rth = rth->u.rt_next) {
 		smp_read_barrier_depends();
 		if (rth->fl.fl4_dst == flp->fl4_dst &&
@@ -2247,13 +2247,13 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
 			RT_CACHE_STAT_INC(out_hit);
-			rcu_read_unlock();
+			rcu_read_unlock_bh();
 			*rp = rth;
 			return 0;
 		}
 		RT_CACHE_STAT_INC(out_hlist_search);
 	}
-	rcu_read_unlock();
+	rcu_read_unlock_bh();
 
 	return ip_route_output_slow(rp, flp);
 }
@@ -2463,7 +2463,7 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 		if (h < s_h) continue;
 		if (h > s_h)
 			s_idx = 0;
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		for (rt = rt_hash_table[h].chain, idx = 0; rt;
 		     rt = rt->u.rt_next, idx++) {
 			smp_read_barrier_depends();
@@ -2474,12 +2474,12 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 					 cb->nlh->nlmsg_seq,
 					 RTM_NEWROUTE, 1) <= 0) {
 				dst_release(xchg(&skb->dst, NULL));
-				rcu_read_unlock();
+				rcu_read_unlock_bh();
 				goto done;
 			}
 			dst_release(xchg(&skb->dst, NULL));
 		}
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 	}
 
 done:

@@ -146,14 +146,14 @@ static __inline__ unsigned dn_hash(unsigned short src, unsigned short dst)
 
 static inline void dnrt_free(struct dn_route *rt)
 {
-	call_rcu(&rt->u.dst.rcu_head, dst_rcu_free);
+	call_rcu_bh(&rt->u.dst.rcu_head, dst_rcu_free);
 }
 
 static inline void dnrt_drop(struct dn_route *rt)
 {
 	if (rt)
 		dst_release(&rt->u.dst);
-	call_rcu(&rt->u.dst.rcu_head, dst_rcu_free);
+	call_rcu_bh(&rt->u.dst.rcu_head, dst_rcu_free);
 }
 
 static void dn_dst_check_expire(unsigned long dummy)
@@ -1174,9 +1174,9 @@ static int __dn_route_output_key(struct dst_entry **pprt, const struct flowi *fl
 	struct dn_route *rt = NULL;
 
 	if (!(flags & MSG_TRYHARD)) {
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		for(rt = dn_rt_hash_table[hash].chain; rt; rt = rt->u.rt_next) {
-			read_barrier_depends();
+			smp_read_barrier_depends();
 			if ((flp->fld_dst == rt->fl.fld_dst) &&
 			    (flp->fld_src == rt->fl.fld_src) &&
 #ifdef CONFIG_DECNET_ROUTE_FWMARK
@@ -1187,12 +1187,12 @@ static int __dn_route_output_key(struct dst_entry **pprt, const struct flowi *fl
 				rt->u.dst.lastuse = jiffies;
 				dst_hold(&rt->u.dst);
 				rt->u.dst.__use++;
-				rcu_read_unlock();
+				rcu_read_unlock_bh();
 				*pprt = &rt->u.dst;
 				return 0;
 			}
 		}
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 	}
 
 	return dn_route_output_slow(pprt, flp, flags);
@@ -1647,21 +1647,21 @@ int dn_cache_dump(struct sk_buff *skb, struct netlink_callback *cb)
 			continue;
 		if (h > s_h)
 			s_idx = 0;
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		for(rt = dn_rt_hash_table[h].chain, idx = 0; rt; rt = rt->u.rt_next, idx++) {
-			read_barrier_depends();
+			smp_read_barrier_depends();
 			if (idx < s_idx)
 				continue;
 			skb->dst = dst_clone(&rt->u.dst);
 			if (dn_rt_fill_info(skb, NETLINK_CB(cb->skb).pid,
 					cb->nlh->nlmsg_seq, RTM_NEWROUTE, 1) <= 0) {
 				dst_release(xchg(&skb->dst, NULL));
-				rcu_read_unlock();
+				rcu_read_unlock_bh();
 				goto done;
 			}
 			dst_release(xchg(&skb->dst, NULL));
 		}
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 	}
 
 done:
@@ -1681,7 +1681,7 @@ static struct dn_route *dn_rt_cache_get_first(struct seq_file *seq)
 	struct dn_rt_cache_iter_state *s = seq->private;
 
 	for(s->bucket = dn_rt_hash_mask; s->bucket >= 0; --s->bucket) {
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		rt = dn_rt_hash_table[s->bucket].chain;
 		if (rt)
 			break;
@@ -1697,10 +1697,10 @@ static struct dn_route *dn_rt_cache_get_next(struct seq_file *seq, struct dn_rou
 	smp_read_barrier_depends();
 	rt = rt->u.rt_next;
 	while(!rt) {
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 		if (--s->bucket < 0)
 			break;
-		rcu_read_lock();
+		rcu_read_lock_bh();
 		rt = dn_rt_hash_table[s->bucket].chain;
 	}
 	return rt;
@@ -1727,7 +1727,7 @@ static void *dn_rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 static void dn_rt_cache_seq_stop(struct seq_file *seq, void *v)
 {
 	if (v)
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 }
 
 static int dn_rt_cache_seq_show(struct seq_file *seq, void *v)
