@@ -221,7 +221,7 @@ static void sym_chip_reset (hcb_p np)
  */
 static void sym_soft_reset (hcb_p np)
 {
-	u_char istat;
+	u_char istat = 0;
 	int i;
 
 	if (!(np->features & FE_ISTAT1) || !(INB (nc_istat1) & SCRUN))

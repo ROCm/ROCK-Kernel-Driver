@@ -928,10 +928,8 @@ int __init init_nftl(void)
 	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.82 $, nftlmount.c %s\n", nftlmountrev);
 #endif
 
-	if (register_blkdev(MAJOR_NR, "nftl", &nftl_fops)) {
-		printk("unable to register NFTL block device on major %d\n", MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, "nftl"))
 		return -EBUSY;
-	}
 
 	blk_register_region(MKDEV(MAJOR_NR, 0), 256,
 			THIS_MODULE, nftl_probe, NULL, NULL);

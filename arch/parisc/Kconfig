@@ -18,10 +18,6 @@ config MMU
 	bool
 	default y
 
-config SWAP
-	bool
-	default y
-
 config STACK_GROWSUP
 	bool
 	default y

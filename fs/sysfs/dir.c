@@ -106,7 +106,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 		pr_debug(" done\n");
 		node = dentry->d_subdirs.next;
 	}
-
+	spin_unlock(&dcache_lock);
 	up(&dentry->d_inode->i_sem);
 	d_invalidate(dentry);
 	simple_rmdir(parent->d_inode,dentry);

@@ -19,14 +19,16 @@
 
 #include <asm/uaccess.h>
 
+#define MAX_RAW_MINORS	256
+
 struct raw_device_data {
 	struct block_device *binding;
 	int inuse;
 };
 
-static struct raw_device_data raw_devices[256];
+static struct raw_device_data raw_devices[MAX_RAW_MINORS];
 static DECLARE_MUTEX(raw_mutex);
-static struct file_operations raw_ctl_fops;
+static struct file_operations raw_ctl_fops;	     /* forward declaration */
 
 /*
  * Open/close code for raw IO.
@@ -85,11 +87,16 @@ static int raw_release(struct inode *inode, struct file *filp)
 {
 	const int minor= minor(inode->i_rdev);
 	struct block_device *bdev;
-	
+
 	down(&raw_mutex);
 	bdev = raw_devices[minor].binding;
 	raw_devices[minor].inuse--;
 	up(&raw_mutex);
+
+	/* Here  inode->i_mapping == bdev->bd_inode->i_mapping  */
+	inode->i_mapping = &inode->i_data;
+	inode->i_mapping->backing_dev_info = &default_backing_dev_info;
+	
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_RAW);
 	return 0;
@@ -130,11 +137,13 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			goto out;
 		
 		err = -EINVAL;
-		if (rq.raw_minor < 0 || rq.raw_minor > MINORMASK)
+		if (rq.raw_minor < 0 || rq.raw_minor >= MAX_RAW_MINORS)
 			goto out;
 		rawdev = &raw_devices[rq.raw_minor];
 
 		if (command == RAW_SETBIND) {
+			dev_t dev;
+
 			/*
 			 * This is like making block devices, so demand the
 			 * same capability
@@ -151,9 +160,10 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			 */
 
 			err = -EINVAL;
+			dev = MKDEV(rq.block_major, rq.block_minor);
 			if ((rq.block_major == 0 && rq.block_minor != 0) ||
-					rq.block_major > MAX_BLKDEV ||
-					rq.block_minor > MINORMASK)
+			    MAJOR(dev) != rq.block_major ||
+			    MINOR(dev) != rq.block_minor)
 				goto out;
 			
 			down(&raw_mutex);
@@ -170,10 +180,7 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 				/* unbind */
 				rawdev->binding = NULL;
 			} else {
-				kdev_t kdev;
-
-				kdev = mk_kdev(rq.block_major, rq.block_minor);
-				rawdev->binding = bdget(kdev_t_to_nr(kdev));
+				rawdev->binding = bdget(dev);
 				MOD_INC_USE_COUNT;
 			}
 			up(&raw_mutex);

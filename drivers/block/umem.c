@@ -1145,11 +1145,9 @@ int __init mm_init(void)
 	if (retval)
 		return -ENOMEM;
 
-	err = major_nr = register_blkdev(0, "umem", &mm_fops);
-	if (err < 0) {
-		printk(KERN_ERR "MM: Could not register block device\n");
+	err = major_nr = register_blkdev(0, "umem");
+	if (err < 0)
 		return -EIO;
-	}
 
 	for (i = 0; i < num_cards; i++) {
 		mm_gendisk[i] = alloc_disk(1 << MM_SHIFT);

@@ -95,11 +95,13 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i;
 	int num = 0;
 	struct irqaction *action;
+	unsigned long flags;
 
 	for (i = 0; i < ATLASINT_END; i++, num++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			continue;
+			goto unlock;
 		seq_printf(p, "%2d: %8d %c %s",
 			num, kstat_cpu(0).irqs[num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
@@ -110,6 +112,8 @@ int show_interrupts(struct seq_file *p, void *v)
 				action->name);
 		}
 		seq_puts(p, " [hw0]\n");
+unlock:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
 	return 0;
 }
@@ -239,6 +243,7 @@ void __init init_IRQ(void)
 		irq_desc[i].action	= 0;
 		irq_desc[i].depth	= 1;
 		irq_desc[i].handler	= &atlas_irq_type;
+		spin_lock_init(&irq_desc[i].lock);
 	}
 
 #ifdef CONFIG_REMOTE_DEBUG

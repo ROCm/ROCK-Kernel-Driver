@@ -72,11 +72,16 @@ static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset
 		return -EINVAL;
 	buf->count++;
 	dirent = buf->dirent;
-	put_user(ino, &dirent->d_ino);
-	put_user(offset, &dirent->d_offset);
-	put_user(namlen, &dirent->d_namlen);
-	copy_to_user(dirent->d_name, name, namlen);
-	put_user(0, dirent->d_name + namlen);
+	if (!access_ok(VERIFY_WRITE, (unsigned long)dirent,
+			(unsigned long)(dirent->d_name + namlen + 1) -
+				(unsigned long)dirent))
+		return -EFAULT;
+	if (	__put_user(ino, &dirent->d_ino) ||
+		__put_user(offset, &dirent->d_offset) ||
+		__put_user(namlen, &dirent->d_namlen) ||
+		__copy_to_user(dirent->d_name, name, namlen) ||
+		__put_user(0, dirent->d_name + namlen))
+		return -EFAULT;
 	return 0;
 }
 

@@ -1267,11 +1267,9 @@ static int mfm_do_init(unsigned char irqmask)
 	if (!request_region (mfm_addr, 10, "mfm"))
 		goto out1;
 
-	ret = register_blkdev(MAJOR_NR, "mfm", &mfm_fops);
-	if (ret) {
-		printk("mfm_init: unable to get major number %d\n", MAJOR_NR);
+	ret = register_blkdev(MAJOR_NR, "mfm");
+	if (ret)
 		goto out2;
-	}
 
 	/* Stuff for the assembler routines to get to */
 	hdc63463_baseaddress	= ioaddr(mfm_addr);

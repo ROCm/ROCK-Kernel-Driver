@@ -781,7 +781,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		if (!sbi->s_group_desc[i]) {
 			for (j = 0; j < i; j++)
 				brelse (sbi->s_group_desc[j]);
-			kfree(sbi->s_group_desc);
 			printk ("EXT2-fs: unable to read group descriptors\n");
 			goto failed_mount_group_desc;
 		}

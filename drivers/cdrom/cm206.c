@@ -1489,10 +1489,10 @@ int __init cm206_init(void)
 		goto out_probe;
 	}
 	printk(".\n");
-	if (register_blkdev(MAJOR_NR, "cm206", &cm206_bdops) != 0) {
-		printk(KERN_INFO "Cannot register for major %d!\n", MAJOR_NR);
+
+	if (register_blkdev(MAJOR_NR, "cm206"))
 		goto out_blkdev;
-	}
+
 	disk = alloc_disk(1);
 	if (!disk)
 		goto out_disk;

@@ -97,11 +97,13 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i;
 	struct irqaction *action;
+	unsigned long flags;
 
 	for (i = 0; i < 32; i++) {
+		local_irq_save(flags);
 		action = irq_action[i];
 		if (!action)
-			continue;
+			goto skip;
 		seq_printf(p, "%2d: %8d %c %s",
 				i, kstat_cpu(0).irqs[i],
 				(action->flags & SA_INTERRUPT) ? '+' : ' ',
@@ -112,6 +114,8 @@ int show_interrupts(struct seq_file *p, void *v)
 				action->name);
 		}
 		seq_putc(p, '\n');
+skip:
+		local_irq_restore(flags);
 	}
 	return 0;
 }

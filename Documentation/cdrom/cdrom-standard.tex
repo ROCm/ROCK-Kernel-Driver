@@ -758,11 +758,8 @@ merged back into \cdromh.
 \subsection{$Struct\ file_operations\ cdrom_fops$}
 
 The contents of this structure were described in section~\ref{cdrom.c}.
-As already stated, this structure should be used to register block
-devices with the kernel:
-$$
-register_blkdev(major, <name>, \&cdrom_fops);
-$$
+A pointer to this structure is assigned to the $fops$ field
+of the $struct gendisk$.
 
 \subsection{$Int\ register_cdrom( struct\ cdrom_device_info\ * cdi)$}
 

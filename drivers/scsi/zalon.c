@@ -151,7 +151,6 @@ int zalon7xx_detect(Scsi_Host_Template *tpnt)
 	return (hosts_used != 0);
 }
 
-#ifdef MODULE
 extern int ncr53c8xx_release(struct Scsi_Host *host);
 
 int zalon7xx_release(struct Scsi_Host *host)
@@ -160,4 +159,3 @@ int zalon7xx_release(struct Scsi_Host *host)
 	unregister_parisc_driver(&zalon_driver);
 	return 1;
 }
-#endif

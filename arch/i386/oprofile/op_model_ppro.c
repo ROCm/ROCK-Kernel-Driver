@@ -98,10 +98,17 @@ static int ppro_check_ctrs(unsigned int const cpu,
 		if (CTR_OVERFLOWED(low)) {
 			oprofile_add_sample(eip, is_kernel, i, cpu);
 			CTR_WRITE(reset_value[i], msrs, i);
-			return 1;
 		}
 	}
-	return 0;
+
+	/* We can't work out if we really handled an interrupt. We
+	 * might have caught a *second* counter just after overflowing
+	 * the interrupt for this counter then arrives
+	 * and we don't find a counter that's overflowed, so we
+	 * would return 0 and get dazed + confused. Instead we always
+	 * assume we found an overflow. This sucks.
+	 */
+	return 1;
 }
 
  
