@@ -34,6 +34,11 @@ struct sparc_isa_bridge {
 #define linux_prom_isa_ranges linux_prom_ebus_ranges
 	struct linux_prom_isa_ranges	isa_ranges[PROMREG_MAX];
 	int			num_isa_ranges;
+#define linux_prom_isa_intmap	linux_prom_ebus_intmap
+	struct linux_prom_isa_intmap	isa_intmap[PROMREG_MAX];
+	int			num_isa_intmap;
+#define linux_prom_isa_intmask	linux_prom_ebus_intmask
+	struct linux_prom_isa_intmap	isa_intmask;
 };
 
 extern struct sparc_isa_bridge	*isa_chain;
