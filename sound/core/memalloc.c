@@ -823,12 +823,12 @@ static struct prealloc_dev prealloc_devices[] __initdata = {
 
 static void __init preallocate_cards(void)
 {
-	struct pci_dev *pci;
+	struct pci_dev *pci = NULL;
 	int card;
 
 	card = 0;
 
-	pci_for_each_dev(pci) {
+	while ((pci = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci)) != NULL) {
 		struct prealloc_dev *dev;
 		if (card >= SNDRV_CARDS)
 			break;
