@@ -83,6 +83,7 @@ obj-$(CONFIG_JFFS_FS)		+= jffs/
 obj-$(CONFIG_JFFS2_FS)		+= jffs2/
 obj-$(CONFIG_AFFS_FS)		+= affs/
 obj-$(CONFIG_ROMFS_FS)		+= romfs/
+obj-$(CONFIG_SUBFS_FS)		+= subfs/
 obj-$(CONFIG_QNX4FS_FS)		+= qnx4/
 obj-$(CONFIG_AUTOFS_FS)		+= autofs/
 obj-$(CONFIG_AUTOFS4_FS)	+= autofs4/
