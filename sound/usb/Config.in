@@ -1,0 +1,9 @@
+# ALSA USB drivers
+
+mainmenu_option next_comment
+comment 'ALSA USB devices'
+
+dep_tristate 'USB Audio driver' CONFIG_SND_USB_AUDIO $CONFIG_SND
+dep_tristate 'USB MIDI driver' CONFIG_SND_USB_MIDI $CONFIG_SND $CONFIG_SND_SEQUENCER
+
+endmenu
