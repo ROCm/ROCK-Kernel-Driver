@@ -1182,7 +1182,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
  *	This function sends a simple control message to a specified endpoint
  *	and waits for the message to complete, or timeout.
  *	
- *	If successful, it returns 0, otherwise a negative error number.
+ *	If successful, it returns the number of bytes transferred, otherwise a negative error number.
  *
  *	Don't use this function from within an interrupt context, like a
  *	bottom half handler.  If you need an asynchronous message, or need to send
