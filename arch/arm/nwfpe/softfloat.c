@@ -29,8 +29,8 @@ this code that are retained.
 */
 
 #include "fpa11.h"
-#include "milieu.h"
-#include "softfloat.h"
+//#include "milieu.h"
+//#include "softfloat.h"
 
 /*
 -------------------------------------------------------------------------------
@@ -142,12 +142,14 @@ INLINE int16 extractFloat32Exp( float32 a )
 Returns the sign bit of the single-precision floating-point value `a'.
 -------------------------------------------------------------------------------
 */
+#if 0	/* in softfloat.h */
 INLINE flag extractFloat32Sign( float32 a )
 {
 
     return a>>31;
 
 }
+#endif
 
 /*
 -------------------------------------------------------------------------------
@@ -184,9 +186,9 @@ INLINE float32 packFloat32( flag zSign, int16 zExp, bits32 zSig )
 {
 #if 0
    float32 f;
-   __asm__("@ packFloat32;		\n\
-   	    mov %0, %1, asl #31;	\n\
-   	    orr %0, %2, asl #23;	\n\
+   __asm__("@ packFloat32				\n\
+   	    mov %0, %1, asl #31				\n\
+   	    orr %0, %2, asl #23				\n\
    	    orr %0, %3"
    	    : /* no outputs */
    	    : "g" (f), "g" (zSign), "g" (zExp), "g" (zSig)
@@ -321,12 +323,14 @@ INLINE int16 extractFloat64Exp( float64 a )
 Returns the sign bit of the double-precision floating-point value `a'.
 -------------------------------------------------------------------------------
 */
+#if 0	/* in softfloat.h */
 INLINE flag extractFloat64Sign( float64 a )
 {
 
     return a>>63;
 
 }
+#endif
 
 /*
 -------------------------------------------------------------------------------

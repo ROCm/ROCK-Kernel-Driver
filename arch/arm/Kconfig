@@ -628,6 +628,18 @@ config FPE_NWFPE
 	  You may say N here if you are going to load the Acorn FPEmulator
 	  early in the bootup.
 
+config FPE_NWFPE_XP
+	bool "Support extended precision"
+	depends on FPE_NWFPE
+	help
+	  Say Y to include 80-bit support in the kernel floating-point
+	  emulator.  Otherwise, only 32 and 64-bit support is compiled in.
+	  Note that gcc does not generate 80-bit operations by default,
+	  so in most cases this option only enlarges the size of the
+	  floating point emulator without any good reason.
+
+	  You almost surely want to say N here.
+
 config FPE_FASTFPE
 	tristate "FastFPE math emulation (EXPERIMENTAL)"
 	depends on !CPU_26 && !CPU_32v3 && EXPERIMENTAL
