@@ -237,7 +237,7 @@ nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh, struct nfs_fsinfo *f
 
 	error = server->rpc_ops->getroot(server, rootfh, fsinfo);
 	if (error < 0) {
-		printk(KERN_NOTICE "nfs_get_root: getattr error = %d\n", -error);
+		dprintk("nfs_get_root: getattr error = %d\n", -error);
 		return ERR_PTR(error);
 	}
 
@@ -262,6 +262,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	struct nfs_pathconf pathinfo = {
 			.fattr = &fattr,
 	};
+	int no_root_error = 0;
 
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", MAJOR(sb->s_dev), MINOR(sb->s_dev));
@@ -272,12 +273,15 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 
 	root_inode = nfs_get_root(sb, &server->fh, &fsinfo);
 	/* Did getting the root inode fail? */
-	if (IS_ERR(root_inode))
+	if (IS_ERR(root_inode)) {
+		no_root_error = PTR_ERR(root_inode);
 		goto out_no_root;
+	}
 	sb->s_root = d_alloc_root(root_inode);
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		no_root_error = -ENOMEM;
 		goto out_no_root;
-
+	}
 	sb->s_root->d_op = server->rpc_ops->dentry_ops;
 
 	/* Get some general file system info */
@@ -337,10 +341,10 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	return 0;
 	/* Yargs. It didn't work out. */
 out_no_root:
-	printk("nfs_read_super: get root inode failed\n");
+	dprintk("nfs_sb_init: get root inode failed: errno %d\n", -no_root_error);
 	if (!IS_ERR(root_inode))
 		iput(root_inode);
-	return -EINVAL;
+	return no_root_error;
 }
 
 /*
