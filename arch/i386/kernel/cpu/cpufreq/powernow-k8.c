@@ -1010,6 +1010,7 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 	/* min/max the cpu is capable of */
 	if (cpufreq_frequency_table_cpuinfo(pol, data->powernow_table)) {
 		printk(KERN_ERR PFX "invalid powernow_table\n");
+		powernow_k8_cpu_exit_acpi(data);
 		kfree(data->powernow_table);
 		kfree(data);
 		return -EINVAL;
@@ -1027,6 +1028,7 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 err_out:
 	set_cpus_allowed(current, oldmask);
 	schedule();
+	powernow_k8_cpu_exit_acpi(data);
 
 	kfree(data);
 	return -ENODEV;
