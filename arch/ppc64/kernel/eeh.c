@@ -406,18 +406,23 @@ EXPORT_SYMBOL(eeh_register_disable_func);
  */
 static void eeh_event_handler(void *dummy)
 {
-	struct list_head	*tmp, *n;
+	unsigned long flags;
 	struct eeh_event	*event;
 	unsigned long		log_event;
 	int			rc;
 
-	spin_lock(&eeh_eventlist_lock);
+	while (1) {
+		spin_lock_irqsave(&eeh_eventlist_lock, flags);
+		event = NULL;
+		if (!list_empty(&eeh_eventlist))
+		{
+			event = list_entry(&eeh_eventlist, struct eeh_event, list);
+			list_del(&event->list);
+		}
+		spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
+		if (NULL == event) break;
 
-	memset(slot_errbuf, 0, eeh_error_buf_size);
-
-	list_for_each_safe(tmp, n, &eeh_eventlist) {
-		event = list_entry(tmp, struct eeh_event, list);
-		rc = 1;
+		memset(slot_errbuf, 0, eeh_error_buf_size);
 
 		log_event = rtas_call(rtas_token("ibm,slot-error-detail"), 8, 1, NULL,
 				      event->dn->eeh_config_addr,
@@ -428,6 +433,7 @@ static void eeh_event_handler(void *dummy)
 		if (log_event)
 			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
 
+		rc = 1;
 		if (strcmp(event->dn->name, "ethernet") == 0) {
 			if (eeh_disable_slot != NULL)
 				rc = eeh_disable_slot(event->dev);
@@ -441,11 +447,8 @@ static void eeh_event_handler(void *dummy)
 				pci_name(event->dev), pci_pretty_name(event->dev));
 
 		pci_dev_put(event->dev);
-		list_del(&event->list);
 		kfree(event);
 	}
-
-	spin_unlock(&eeh_eventlist_lock);
 }
 
 /**
@@ -508,6 +511,7 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			BUID_LO(dn->phb->buid));
 
 	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
+		unsigned long flags;
 		struct eeh_event 	*event;
 
 		/* prevent repeated reports of this failure */
@@ -523,9 +527,10 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		event->dn = dn;
 		event->reset_state = rets[0];
 
-		spin_lock(&eeh_eventlist_lock);
+		/* We may or may not be called in an interrupt context */
+		spin_lock_irqsave(&eeh_eventlist_lock, flags);
 		list_add(&event->list, &eeh_eventlist);
-		spin_unlock(&eeh_eventlist_lock);
+		spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
 
 		schedule_work(&eeh_event_wq);
 	} else {
@@ -703,8 +708,11 @@ void __init eeh_init(void)
 		traverse_pci_devices(phb, early_enable_eeh, NULL, &info);
 	}
 
-	if (eeh_subsystem_enabled)
+	if (eeh_subsystem_enabled) {
 		printk(KERN_INFO "EEH: PCI Enhanced I/O Error Handling Enabled\n");
+	} else {
+		printk(KERN_WARNING "EEH: disabled PCI Enhanced I/O Error Handling\n");
+	}
 }
 
 /**
@@ -781,7 +789,7 @@ void eeh_remove_device(struct pci_dev *dev)
 EXPORT_SYMBOL(eeh_remove_device);
 
 /*
- * If EEH is implemented, find the PCI device using given phys addr
+ * If EEH is enabled, find the PCI device using given phys addr
  * and check to see if eeh failure checking is disabled.
  * Remap the addr (trivially) to the EEH region if EEH checking enabled.
  * For addresses not known to PCI the vaddr is simply returned unchanged.
@@ -844,10 +852,10 @@ static int proc_eeh_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_eeh_operations = {
-	.open		= proc_eeh_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+	.open    = proc_eeh_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
 };
 
 static int __init eeh_init_proc(void)
@@ -860,7 +868,7 @@ static int __init eeh_init_proc(void)
 			e->proc_fops = &proc_eeh_operations;
 	}
 
-        return 0;
+	return 0;
 }
 __initcall(eeh_init_proc);
 
