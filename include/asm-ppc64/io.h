@@ -107,7 +107,6 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 
 
 #define IO_SPACE_LIMIT ~(0UL)
-#define MEM_SPACE_LIMIT ~(0UL)
 
 
 #ifdef __KERNEL__
