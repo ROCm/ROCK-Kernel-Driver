@@ -243,11 +243,19 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		then we now have to set the mode if possible */
 		if ((cifs_sb->tcon->ses->capabilities & CAP_UNIX) &&
 			(oplock & CIFS_CREATE_ACTION))
-			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+					(__u64)current->euid,
+					(__u64)current->egid,
+					0 /* dev */,
+					cifs_sb->local_nls);
+			} else {
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
 					(__u64)-1,
 					(__u64)-1,
 					0 /* dev */,
 					cifs_sb->local_nls);
+			}
 		else {
 			/* BB implement via Windows security descriptors */
 			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
@@ -348,9 +356,16 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 		rc = -ENOMEM;
 	
 	if (full_path && (pTcon->ses->capabilities & CAP_UNIX)) {
-		rc = CIFSSMBUnixSetPerms(xid, pTcon,
-			full_path, mode, current->euid, current->egid,
-			device_number, cifs_sb->local_nls);
+		if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
+			rc = CIFSSMBUnixSetPerms(xid, pTcon, full_path,
+				mode,(__u64)current->euid,(__u64)current->egid,
+				device_number, cifs_sb->local_nls);
+		} else {
+			rc = CIFSSMBUnixSetPerms(xid, pTcon,
+				full_path, mode, (__u64)-1, (__u64)-1,
+				device_number, cifs_sb->local_nls);
+		}
+
 		if(!rc) {
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
 						inode->i_sb,xid);

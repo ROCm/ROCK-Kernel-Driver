@@ -128,10 +128,10 @@ extern int CIFSSMBQFSUnixInfo(const int xid, struct cifsTconInfo *tcon,
 			const struct nls_table *nls_codepage);
 
 extern int CIFSSMBSetTimes(const int xid, struct cifsTconInfo *tcon,
-			char *fileName, FILE_BASIC_INFO * data,
+			const char *fileName, const FILE_BASIC_INFO * data,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBSetEOF(const int xid, struct cifsTconInfo *tcon,
-			char *fileName, __u64 size,int setAllocationSizeFlag,
+			const char *fileName, __u64 size,int setAllocationSizeFlag,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon,
 			 __u64 size, __u16 fileHandle,__u32 opener_pid, int AllocSizeFlag);
@@ -213,31 +213,6 @@ extern int cifs_verify_signature(const struct smb_hdr *, const char * mac_key,
 extern int cifs_calculate_mac_key(char * key,const char * rn,const char * pass);
 extern void CalcNTLMv2_partial_mac_key(struct cifsSesInfo *, struct nls_table *);
 extern void CalcNTLMv2_response(const struct cifsSesInfo *,char * );
-
-extern int CIFSBuildServerList(int xid, char *serverBufferList,
-			int recordlength, int *entries,
-			int *totalEntries, int *topoChangedFlag);
-extern int CIFSSMBQueryShares(int xid, struct cifsTconInfo *tcon,
-			struct shareInfo *shareList, int bufferLen,
-			int *entries, int *totalEntries);
-extern int CIFSSMBQueryAlias(int xid, struct cifsTconInfo *tcon,
-			struct aliasInfo *aliasList, int bufferLen,
-			int *entries, int *totalEntries);
-extern int CIFSSMBAliasInfo(int xid, struct cifsTconInfo *tcon,
-			char *aliasName, char *serverName,
-			char *shareName, char *comment);
-extern int CIFSSMBGetShareInfo(int xid, struct cifsTconInfo *tcon,
-			char *share, char *comment);
-extern int CIFSSMBGetUserPerms(int xid, struct cifsTconInfo *tcon,
-			char *userName, char *searchName, int *perms);
-extern int CIFSSMBSync(int xid, struct cifsTconInfo *tcon, int netfid, int pid);
-
-extern int CIFSSMBSeek(int xid,
-			struct cifsTconInfo *tcon,
-			int netfid,
-			int pid,
-			int whence, unsigned long offset, long long *newoffset);
-
 extern int CIFSSMBCopy(int xid,
 			struct cifsTconInfo *source_tcon,
 			const char *fromName,
@@ -247,8 +222,15 @@ extern int CIFSSMBCopy(int xid,
 extern int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon, 
 			const int notify_subdirs,const __u16 netfid,__u32 filter,
 			const struct nls_table *nls_codepage);
-extern int CIFSSMBQAllEAs(const int xid, struct cifsTconInfo *tcon,
-		 const unsigned char *searchName,
-		 char * EAData, size_t size,
-		 const struct nls_table *nls_codepage);
+extern ssize_t CIFSSMBQAllEAs(const int xid, struct cifsTconInfo *tcon,
+			const unsigned char *searchName, char * EAData,
+			size_t bufsize, const struct nls_table *nls_codepage);
+extern ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
+		const unsigned char * searchName,const unsigned char * ea_name,
+		unsigned char * ea_value, size_t buf_size, 
+		const struct nls_table *nls_codepage);
+extern int CIFSSMBSetEA(const int xid, struct cifsTconInfo *tcon, 
+		const char *fileName, const char * ea_name, 
+		const void * ea_value, const __u16 ea_value_len, 
+		const struct nls_table *nls_codepage);
 #endif			/* _CIFSPROTO_H */

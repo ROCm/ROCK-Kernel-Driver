@@ -70,8 +70,6 @@ void SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
 void NTLMSSPOWFencrypt(unsigned char passwd[8],
 		       unsigned char *ntlmchalresp, unsigned char p24[24]);
 void SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24);
-int decode_pw_buffer(char in_buffer[516], char *new_pwrd,
-		     int new_pwrd_size, __u32 * new_pw_len);
 
 /*
    This implements the X/Open SMB password encryption

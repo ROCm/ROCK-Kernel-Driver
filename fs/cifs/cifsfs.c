@@ -192,15 +192,11 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 
 static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
-        struct cifs_sb_info *cifs_sb;
+	struct cifs_sb_info *cifs_sb;
 
-        cifs_sb = CIFS_SB(inode->i_sb);
+	cifs_sb = CIFS_SB(inode->i_sb);
 
-        if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
-		/* the server supports the Unix-like mode bits and does its
-		own permission checks, and therefore we do not allow the file
-		mode to be overriden on these mounts - so do not do perm
-		check on client side */
+	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NO_PERM) {
 		return 0;
 	} else /* file mode might have been restricted at mount time 
 		on the client (above and beyond ACL on servers) for  
