@@ -59,7 +59,6 @@
 #include <asm/page.h>
 #include <linux/sched.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>

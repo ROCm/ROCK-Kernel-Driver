@@ -102,7 +102,6 @@
 #include <linux/poll.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
-#include <linux/wrapper.h>
 #include <linux/gameport.h>
 #include <linux/wait.h>
 

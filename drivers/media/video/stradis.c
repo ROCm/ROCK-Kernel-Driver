@@ -39,7 +39,6 @@
 #include <linux/sched.h>
 #include <asm/types.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
 #include <linux/vmalloc.h>

@@ -39,7 +39,6 @@
 #include <linux/pagemap.h>
 #include <asm/io.h>
 #include <asm/semaphore.h>
-#include <linux/wrapper.h>
 
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>

@@ -33,7 +33,6 @@
 #include <linux/sched.h>
 #include <linux/list.h>
 #include <linux/slab.h>
-#include <linux/wrapper.h>
 #include <linux/usb.h>
 #include <linux/poll.h>
 #include <linux/sound.h>

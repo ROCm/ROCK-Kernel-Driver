@@ -195,7 +195,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/wrapper.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/interrupt.h>
