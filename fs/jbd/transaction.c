@@ -1100,6 +1100,22 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 		goto out;
 	
 	jbd_lock_bh_state(bh);
+
+	/*
+	 * fastpath, to avoid expensive locking.  If this buffer is already
+	 * on the running transaction's metadata list there is nothing to do.
+	 * Nobody can take it off again because there is a handle open.
+	 * I _think_ we're OK here with SMP barriers - a mistaken decision will
+	 * result in this test being false, so we go in and take the locks.
+	 */
+	if (jh->b_transaction == handle->h_transaction &&
+					jh->b_jlist == BJ_Metadata) {
+		JBUFFER_TRACE(jh, "fastpath");
+		J_ASSERT_JH(jh, jh->b_transaction ==
+					journal->j_running_transaction);
+		goto out_unlock_bh;
+	}
+
 	spin_lock(&journal->j_list_lock);
 	set_buffer_jbddirty(bh);
 
@@ -1120,7 +1136,7 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 		/* And this case is illegal: we can't reuse another
 		 * transaction's data buffer, ever. */
 		/* FIXME: writepage() should be journalled */
-		goto done_locked;
+		goto out_unlock_list;
 	}
 
 	/* That test should have eliminated the following case: */
@@ -1129,8 +1145,9 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	JBUFFER_TRACE(jh, "file as BJ_Metadata");
 	__journal_file_buffer(jh, handle->h_transaction, BJ_Metadata);
 
-done_locked:
+out_unlock_list:
 	spin_unlock(&journal->j_list_lock);
+out_unlock_bh:
 	jbd_unlock_bh_state(bh);
 out:
 	JBUFFER_TRACE(jh, "exit");
