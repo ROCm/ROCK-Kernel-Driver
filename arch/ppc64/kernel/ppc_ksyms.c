@@ -238,9 +238,6 @@ EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
 
-#ifndef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL_NOVERS(sys_ctrler); /* tibit */
-#endif
 #ifdef CONFIG_NVRAM
 EXPORT_SYMBOL(nvram_read_byte);
 EXPORT_SYMBOL(nvram_write_byte);
