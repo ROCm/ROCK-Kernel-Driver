@@ -211,17 +211,24 @@ hardware.
 	Yes		1	1	character received, marked as
 					TTY_PARITY
 
+	Other flags may be used (eg, xon/xoff characters) if your
+	hardware supports hardware "soft" flow control.
+
 	Locking: none.
 	Interrupts: caller dependent.
 	This call must not sleep
 
   pm(port,state,oldstate)
-	perform any power management related activities on the specified
-	port.  state indicates the new state (defined by ACPI D0-D3),
+	Perform any power management related activities on the specified
+	port.  State indicates the new state (defined by ACPI D0-D3),
 	oldstate indicates the previous state.  Essentially, D0 means
 	fully on, D3 means powered down.
 
 	This function should not be used to grab any resources.
+
+	This will be called when the port is initially opened and finally
+	closed, except when the port is also the system console.  This
+	will occur even if CONFIG_PM is not set.
 
 	Locking: none.
 	Interrupts: caller dependent.
