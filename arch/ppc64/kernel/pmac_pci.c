@@ -719,6 +719,17 @@ void __init pmac_pci_init(void)
 	/* Setup the linkage between OF nodes and PHBs */ 
 	pci_devs_phb_init();
 
+	/* Fixup the PCI<->OF mapping for U3 AGP due to bus renumbering. We
+	 * assume there is no P2P bridge on the AGP bus, which should be a
+	 * safe assumptions hopefully.
+	 */
+	if (u3_agp) {
+		struct device_node *np = u3_agp->arch_data;
+		np->busno = 0xf0;
+		for (np = np->child; np; np = np->sibling)
+			np->busno = 0xf0;
+	}
+
 	pmac_check_ht_link();
 
 	/* Tell pci.c to use the common resource allocation mecanism */
