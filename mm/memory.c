@@ -601,7 +601,6 @@ void zap_page_range(struct vm_area_struct *vma,
 
 	lru_add_drain();
 	spin_lock(&mm->page_table_lock);
-	flush_cache_range(vma, address, end);
 	tlb = tlb_gather_mmu(mm, 0);
 	unmap_vmas(&tlb, mm, vma, address, end, &nr_accounted);
 	tlb_finish_mmu(tlb, address, end);
