@@ -2517,54 +2517,15 @@ struct usbdevfs_ctrltransfer32 {
 
 static int do_usbdevfs_control(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-        struct usbdevfs_ctrltransfer kctrl;
-        struct usbdevfs_ctrltransfer32 __user *uctrl;
-        mm_segment_t old_fs;
+        struct usbdevfs_ctrltransfer32 __user *p32 = compat_ptr(arg);
+        struct usbdevfs_ctrltransfer __user *p;
         __u32 udata;
-        void __user *uptr;
-        void *kptr;
-        int err;
-
-        uctrl = compat_ptr(arg);
-
-        if (copy_from_user(&kctrl, uctrl,
-                           (sizeof(struct usbdevfs_ctrltransfer32) -
-                            sizeof(compat_caddr_t))))
-                return -EFAULT;
-
-        if (get_user(udata, &uctrl->data))
-                return -EFAULT;
-        uptr = compat_ptr(udata);
-        /* In usbdevice_fs, it limits the control buffer to a page,
-         * for simplicity so do we.
-         */
-        if (!uptr || kctrl.wLength > PAGE_SIZE)
-                return -EINVAL;
-
-        kptr = (void *)__get_free_page(GFP_KERNEL);
-
-        if ((kctrl.bRequestType & USB_DIR_IN) == 0) {
-                err = -EFAULT;
-                if (copy_from_user(kptr, uptr, kctrl.wLength))
-                        goto out;
-        }
-
-        kctrl.data = kptr;
-
-        old_fs = get_fs();
-        set_fs(KERNEL_DS);
-        err = sys_ioctl(fd, USBDEVFS_CONTROL, (unsigned long)&kctrl);
-        set_fs(old_fs);
-
-        if (err >= 0 &&
-            ((kctrl.bRequestType & USB_DIR_IN) != 0)) {
-                if (copy_to_user(uptr, kptr, kctrl.wLength))
-                        err = -EFAULT;
-        }
-
-out:
-        free_page((unsigned long) kptr);
-        return err;
+        p = compat_alloc_user_space(sizeof(*p));
+        if (copy_in_user(p, p32, (sizeof(*p32) - sizeof(compat_caddr_t))) ||
+            get_user(udata, &p32->data) ||
+	    put_user(compat_ptr(udata), &p->data))
+		return -EFAULT;
+        return sys_ioctl(fd, USBDEVFS_CONTROL, (unsigned long)p);
 }
 
 
@@ -2579,54 +2540,20 @@ struct usbdevfs_bulktransfer32 {
 
 static int do_usbdevfs_bulk(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-        struct usbdevfs_bulktransfer kbulk;
-        struct usbdevfs_bulktransfer32 __user *ubulk;
-        mm_segment_t old_fs;
-        __u32 udata;
-        void __user *uptr;
-        void *kptr;
-        int err;
+        struct usbdevfs_bulktransfer32 __user *p32 = compat_ptr(arg);
+        struct usbdevfs_bulktransfer __user *p;
+        compat_uint_t n;
+        compat_caddr_t addr;
 
-	ubulk = compat_ptr(arg);
+        p = compat_alloc_user_space(sizeof(*p));
 
-        if (get_user(kbulk.ep, &ubulk->ep) ||
-            get_user(kbulk.len, &ubulk->len) ||
-            get_user(kbulk.timeout, &ubulk->timeout) ||
-            get_user(udata, &ubulk->data))
+        if (get_user(n, &p32->ep) || put_user(n, &p->ep) ||
+            get_user(n, &p32->len) || put_user(n, &p->len) ||
+            get_user(n, &p32->timeout) || put_user(n, &p->timeout) ||
+            get_user(addr, &p32->data) || put_user(compat_ptr(addr), &p->data))
                 return -EFAULT;
 
-        uptr = compat_ptr(udata);
-
-        /* In usbdevice_fs, it limits the control buffer to a page,
-         * for simplicity so do we.
-         */
-        if (!uptr || kbulk.len > PAGE_SIZE)
-                return -EINVAL;
-
-        kptr = (void *) __get_free_page(GFP_KERNEL);
-
-        if ((kbulk.ep & 0x80) == 0) {
-                err = -EFAULT;
-	        if (copy_from_user(kptr, uptr, kbulk.len))
-                        goto out;
-        }
-
-        kbulk.data = kptr;
-
-	old_fs = get_fs();
-        set_fs(KERNEL_DS);
-        err = sys_ioctl(fd, USBDEVFS_BULK, (unsigned long) &kbulk);
-        set_fs(old_fs);
-
-        if (err >= 0 &&
-            ((kbulk.ep & 0x80) != 0)) {
-                if (copy_to_user(uptr, kptr, kbulk.len))
-                        err = -EFAULT;
-        }
-
-out:
-        free_page((unsigned long) kptr);
-        return err;
+        return sys_ioctl(fd, USBDEVFS_BULK, (unsigned long)p);
 }
 
 /* This needs more work before we can enable it.  Unfortunately
