@@ -437,7 +437,7 @@ static int isd200_transfer_partial( struct us_data *us,
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
                 US_DEBUGP("isd200_transfer_partial(): transfer aborted\n");
-		return ISD200_TRANSFER_ABORTED;
+		return ISD200_TRANSPORT_ABORTED;
 	}
 
         /* uh oh... we have an error code, so something went wrong. */
@@ -583,7 +583,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
     
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		return ISD200_TRANSFER_ABORTED;
+		return ISD200_TRANSPORT_ABORTED;
 	}
 
 	else if (result == -EPIPE) {
@@ -615,7 +615,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 				   &partial);
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		return ISD200_TRANSFER_ABORTED;
+		return ISD200_TRANSPORT_ABORTED;
 	}
 
         /* did the attempt to read the CSW fail? */
@@ -630,7 +630,7 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 
                 /* if the command was aborted, indicate that */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			return ISD200_TRANSFER_ABORTED;
+			return ISD200_TRANSPORT_ABORTED;
 		}
         
                 /* if it fails again, we need a reset and return an error*/
