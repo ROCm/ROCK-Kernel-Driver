@@ -968,7 +968,10 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	if (smp_ops->give_timebase)
 		smp_ops->give_timebase();
-	cpu_set(cpu, cpu_online_map);
+
+	while (cpu_is_offline(cpu))
+		cpu_relax();
+
 	return 0;
 }
 
@@ -1005,6 +1008,13 @@ int __devinit start_secondary(void *unused)
 	rtas_set_indicator(9005, default_distrib_server, 1);
 #endif
 #endif
+
+	/* Take call_lock. Otherwise smp_call_function can end up
+	 * not waiting for this cpu.
+	 */
+	spin_lock(&call_lock);
+	cpu_set(cpu, cpu_online_map);
+	spin_unlock(&call_lock);
 
 	local_irq_enable();
 
