@@ -228,10 +228,10 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 
 
-int register_hdlc_device(hdlc_device *hdlc)
+int register_hdlc_device(struct net_device *dev)
 {
 	int result;
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 
 	dev->get_stats = hdlc_get_stats;
 	dev->change_mtu = hdlc_change_mtu;
@@ -261,11 +261,11 @@ int register_hdlc_device(hdlc_device *hdlc)
 
 
 
-void unregister_hdlc_device(hdlc_device *hdlc)
+void unregister_hdlc_device(struct net_device *dev)
 {
 	rtnl_lock();
-	hdlc_proto_detach(hdlc);
-	unregister_netdevice(hdlc_to_dev(hdlc));
+	hdlc_proto_detach(dev_to_hdlc(dev));
+	unregister_netdevice(dev);
 	rtnl_unlock();
 }
 

@@ -534,7 +534,7 @@ static void wanxl_pci_remove_one(struct pci_dev *pdev)
 	for (i = 0; i < 4; i++)
 		if (card->ports[i]) {
 			struct net_device *dev = port_to_dev(card->ports[i]);
-			unregister_hdlc_device(dev_to_hdlc(dev));
+			unregister_hdlc_device(dev);
 		}
 
 	wanxl_reset(card);
@@ -715,7 +715,7 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 		dev->stop = wanxl_close;
 		hdlc->attach = wanxl_attach;
 		hdlc->xmit = wanxl_xmit;
-		if (register_hdlc_device(dev_to_hdlc(dev))) {
+		if (register_hdlc_device(dev)) {
 			printk(KERN_ERR "wanXL %s: unable to register hdlc"
 			       " device\n", card_name(pdev));
 			wanxl_pci_remove_one(pdev);

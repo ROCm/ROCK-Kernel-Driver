@@ -363,7 +363,7 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 	hdlc->xmit = sca_xmit;
 	card->settings.clock_type = CLOCK_EXT;
 
-	result = register_hdlc_device(hdlc);
+	result = register_hdlc_device(dev);
 	if (result) {
 		printk(KERN_WARNING "c101: unable to register hdlc device\n");
 		c101_destroy_card(card);
@@ -424,7 +424,7 @@ static void __exit c101_cleanup(void)
 	while (card) {
 		card_t *ptr = card;
 		card = card->next_card;
-		unregister_hdlc_device(dev_to_hdlc(port_to_dev(ptr)));
+		unregister_hdlc_device(port_to_dev(ptr));
 		c101_destroy_card(ptr);
 	}
 }

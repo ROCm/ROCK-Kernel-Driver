@@ -311,7 +311,7 @@ static void n2_destroy_card(card_t *card)
 	for (cnt = 0; cnt < 2; cnt++)
 		if (card->ports[cnt].card) {
 			struct net_device *dev = port_to_dev(&card->ports[cnt]);
-			unregister_hdlc_device(dev_to_hdlc(dev));
+			unregister_hdlc_device(dev);
 		}
 
 	if (card->irq)
@@ -459,7 +459,7 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 		hdlc->xmit = sca_xmit;
 		port->settings.clock_type = CLOCK_EXT;
 
-		if (register_hdlc_device(hdlc)) {
+		if (register_hdlc_device(dev)) {
 			printk(KERN_WARNING "n2: unable to register hdlc "
 			       "device\n");
 			n2_destroy_card(card);

@@ -1491,7 +1491,7 @@ fst_init_card ( struct fst_card_info *card )
                 hdlc->attach = fst_attach;
                 hdlc->xmit   = fst_start_xmit;
 
-                if (( err = register_hdlc_device(dev_to_hdlc(dev))) < 0 )
+                if (( err = register_hdlc_device(dev)) < 0 )
                 {
                         printk_err ("Cannot register HDLC device for port %d"
                                     " (errno %d)\n", i, -err );
@@ -1657,7 +1657,7 @@ fst_remove_one ( struct pci_dev *pdev )
         for ( i = 0 ; i < card->nports ; i++ )
         {
 		struct net_device *dev = port_to_dev(&card->ports[i]);
-                unregister_hdlc_device(dev_to_hdlc(dev));
+                unregister_hdlc_device(dev);
         }
 
         fst_disable_intr ( card );

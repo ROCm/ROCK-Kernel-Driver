@@ -3379,7 +3379,7 @@ static void cpc_init_card(pc300_t * card)
 		dev->change_mtu = cpc_change_mtu;
 		dev->do_ioctl = cpc_ioctl;
 
-		if (register_hdlc_device(hdlc) == 0) {
+		if (register_hdlc_device(dev) == 0) {
 			dev->priv = d;	/* We need 'priv', hdlc doesn't */
 			printk("%s: Cyclades-PC300/", dev->name);
 			switch (card->hw.type) {
@@ -3639,7 +3639,7 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 			   cpc_readw(card->hw.plxbase + card->hw.intctl_reg) & ~(0x0040));
 
 		for (i = 0; i < card->hw.nchan; i++) {
-			unregister_hdlc_device(dev_to_hdlc(card->chan[i].d.dev));
+			unregister_hdlc_device(card->chan[i].d.dev);
 		}
 		iounmap((void *) card->hw.plxbase);
 		iounmap((void *) card->hw.scabase);

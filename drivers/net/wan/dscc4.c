@@ -694,7 +694,7 @@ static void dscc4_free1(struct pci_dev *pdev)
 	root = ppriv->root;
 
 	for (i = 0; i < dev_per_card; i++)
-		unregister_hdlc_device(&root[i].hdlc);
+		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 
 	pci_set_drvdata(pdev, NULL);
 
@@ -910,7 +910,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		hdlc->xmit = dscc4_start_xmit;
 		hdlc->attach = dscc4_hdlc_attach;
 
-		ret = register_hdlc_device(hdlc);
+		ret = register_hdlc_device(d);
 		if (ret < 0) {
 			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
 			goto err_unregister;
@@ -922,7 +922,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 
 		ret = dscc4_init_ring(d);
 		if (ret < 0) {
-			unregister_hdlc_device(hdlc);
+			unregister_hdlc_device(d);
 			goto err_unregister;
 		}
 	}
@@ -937,7 +937,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 err_unregister:
 	while (--i >= 0) {
 		dscc4_release_ring(root + i);
-		unregister_hdlc_device(&root[i].hdlc);
+		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 	}
 	kfree(ppriv);
 err_free_dev:
