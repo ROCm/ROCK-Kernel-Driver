@@ -412,6 +412,7 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 #endif
 #ifdef CONFIG_NETFILTER
 	to->nfmark = from->nfmark;
+	to->nfcache = from->nfcache;
 	/* Connection association is same as pre-frag packet */
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
