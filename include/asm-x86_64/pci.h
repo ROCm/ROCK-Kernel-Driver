@@ -263,6 +263,10 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			       enum pci_mmap_state mmap_state, int write_combine);
 
+static inline void pcibios_add_platform_entries(struct pci_dev *dev)
+{
+}
+
 #endif /* __KERNEL__ */
 
 /* generic pci stuff */

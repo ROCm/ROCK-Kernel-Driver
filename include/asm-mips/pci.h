@@ -120,6 +120,10 @@ static inline void pci_dac_dma_sync_single(struct pci_dev *pdev,
 	dma_cache_wback_inv(addr, len);
 }
 
+static inline void pcibios_add_platform_entries(struct pci_dev *dev)
+{
+}
+
 #endif /* __KERNEL__ */
 
 /* implement the pci_ DMA API in terms of the generic device dma_ one */

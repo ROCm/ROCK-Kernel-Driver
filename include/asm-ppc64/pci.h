@@ -152,6 +152,8 @@ pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus);
 
 extern int pci_read_irq_line(struct pci_dev *dev);
 
+extern void pcibios_add_platform_entries(struct pci_dev *dev);
+
 #endif	/* __KERNEL__ */
 
 #endif /* __PPC64_PCI_H */

@@ -1626,6 +1626,7 @@ extern int __ide_dma_count(ide_drive_t *);
 extern int __ide_dma_verbose(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 extern int __ide_dma_queued_on(ide_drive_t *drive);
@@ -1634,12 +1635,11 @@ extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
 #endif
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
-#else
+#ifndef CONFIG_BLK_DEV_IDEDMA_PCI
 static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
-
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 extern int ide_hwif_request_regions(ide_hwif_t *hwif);
 extern void ide_hwif_release_regions(ide_hwif_t* hwif);
