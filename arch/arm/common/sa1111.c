@@ -418,6 +418,7 @@ static void sa1111_wake(struct sa1111 *sachip)
 
 	spin_lock_irqsave(&sachip->lock, flags);
 
+#if CONFIG_ARCH_SA1100
 	/*
 	 * First, set up the 3.6864MHz clock on GPIO 27 for the SA-1111:
 	 * (SA-1110 Developer's Manual, section 9.1.2.1)
@@ -425,6 +426,11 @@ static void sa1111_wake(struct sa1111 *sachip)
 	GAFR |= GPIO_32_768kHz;
 	GPDR |= GPIO_32_768kHz;
 	TUCR = TUCR_3_6864MHz;
+#elif CONFIG_ARCH_PXA
+	pxa_gpio_mode(GPIO11_3_6MHz_MD);
+#else
+#error missing clock setup
+#endif
 
 	/*
 	 * Turn VCO on, and disable PLL Bypass.
@@ -461,6 +467,8 @@ static void sa1111_wake(struct sa1111 *sachip)
 	spin_unlock_irqrestore(&sachip->lock, flags);
 }
 
+#ifdef CONFIG_ARCH_SA1100
+
 /*
  * Configure the SA1111 shared memory controller.
  */
@@ -475,6 +483,8 @@ sa1111_configure_smc(struct sa1111 *sachip, int sdram, unsigned int drac,
 
 	sa1111_writel(smcr, sachip->base + SA1111_SMCR);
 }
+
+#endif
 
 static void
 sa1111_init_one_child(struct sa1111 *sachip, struct sa1111_dev *sadev, unsigned int offset)
@@ -569,6 +579,7 @@ __sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
 	 */
 	sa1111_wake(sachip);
 
+#ifdef CONFIG_ARCH_SA1100
 	/*
 	 * The SDRAM configuration of the SA1110 and the SA1111 must
 	 * match.  This is very important to ensure that SA1111 accesses
@@ -592,6 +603,7 @@ __sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
 	 * Enable the SA1110 memory bus request and grant signals.
 	 */
 	sa1110_mb_enable();
+#endif
 
 	/*
 	 * The interrupt controller must be initialised before any

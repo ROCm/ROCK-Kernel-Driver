@@ -380,32 +380,12 @@ typedef void            (*ExcpHndlr) (void) ;
 /*
  * IrSR (Infrared Selection Register)
  */
-#define IrSR_OFFSET 0x20
+#define STISR_RXPL      (1 << 4)        /* Receive Data Polarity */
+#define STISR_TXPL      (1 << 3)        /* Transmit Data Polarity */
+#define STISR_XMODE     (1 << 2)        /* Transmit Pulse Width Select */
+#define STISR_RCVEIR    (1 << 1)        /* Receiver SIR Enable */
+#define STISR_XMITIR    (1 << 0)        /* Transmitter SIR Enable */
 
-#define IrSR_RXPL_NEG_IS_ZERO (1<<4)
-#define IrSR_RXPL_POS_IS_ZERO 0x0
-#define IrSR_TXPL_NEG_IS_ZERO (1<<3)
-#define IrSR_TXPL_POS_IS_ZERO 0x0
-#define IrSR_XMODE_PULSE_1_6  (1<<2)
-#define IrSR_XMODE_PULSE_3_16 0x0
-#define IrSR_RCVEIR_IR_MODE   (1<<1)
-#define IrSR_RCVEIR_UART_MODE 0x0
-#define IrSR_XMITIR_IR_MODE   (1<<0)
-#define IrSR_XMITIR_UART_MODE 0x0
-
-#define IrSR_IR_RECEIVE_ON (\
-                IrSR_RXPL_NEG_IS_ZERO | \
-                IrSR_TXPL_POS_IS_ZERO | \
-                IrSR_XMODE_PULSE_3_16 | \
-                IrSR_RCVEIR_IR_MODE   | \
-                IrSR_XMITIR_UART_MODE)
-
-#define IrSR_IR_TRANSMIT_ON (\
-                IrSR_RXPL_NEG_IS_ZERO | \
-                IrSR_TXPL_POS_IS_ZERO | \
-                IrSR_XMODE_PULSE_3_16 | \
-                IrSR_RCVEIR_UART_MODE | \
-                IrSR_XMITIR_IR_MODE)
 
 /*
  * I2C registers
@@ -417,53 +397,49 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ISR		__REG(0x40301698)  /* I2C Status Register - ISR */
 #define ISAR		__REG(0x403016A0)  /* I2C Slave Address Register - ISAR */
 
-/* ----- Control register bits ---------------------------------------- */
+#define ICR_START	(1 << 0)	   /* start bit */
+#define ICR_STOP	(1 << 1)	   /* stop bit */
+#define ICR_ACKNAK	(1 << 2)	   /* send ACK(0) or NAK(1) */
+#define ICR_TB		(1 << 3)	   /* transfer byte bit */
+#define ICR_MA		(1 << 4)	   /* master abort */
+#define ICR_SCLE	(1 << 5)	   /* master clock enable */
+#define ICR_IUE		(1 << 6)	   /* unit enable */
+#define ICR_GCD		(1 << 7)	   /* general call disable */
+#define ICR_ITEIE	(1 << 8)	   /* enable tx interrupts */
+#define ICR_IRFIE	(1 << 9)	   /* enable rx interrupts */
+#define ICR_BEIE	(1 << 10)	   /* enable bus error ints */
+#define ICR_SSDIE	(1 << 11)	   /* slave STOP detected int enable */
+#define ICR_ALDIE	(1 << 12)	   /* enable arbitration interrupt */
+#define ICR_SADIE	(1 << 13)	   /* slave address detected int enable */
+#define ICR_UR		(1 << 14)	   /* unit reset */
 
-#define ICR_START	0x1		/* start bit */
-#define ICR_STOP	0x2		/* stop bit */
-#define ICR_ACKNAK	0x4		/* send ACK(0) or NAK(1) */
-#define ICR_TB		0x8 		/* transfer byte bit */
-#define ICR_MA		0x10		/* master abort */
-#define ICR_SCLE	0x20		/* master clock enable */
-#define ICR_IUE		0x40		/* unit enable */
-#define ICR_GCD		0x80		/* general call disable */
-#define ICR_ITEIE	0x100		/* enable tx interrupts */
-#define ICR_IRFIE	0x200		/* enable rx interrupts */
-#define ICR_BEIE	0x400		/* enable bus error ints */
-#define ICR_SSDIE	0x800		/* slave STOP detected int enable */
-#define ICR_ALDIE	0x1000  	/* enable arbitration interrupt */
-#define ICR_SADIE	0x2000		/* slave address detected int enable */
-#define ICR_UR		0x4000		/* unit reset */
+#define ISR_RWM		(1 << 0)	   /* read/write mode */
+#define ISR_ACKNAK	(1 << 1)	   /* ack/nak status */
+#define ISR_UB		(1 << 2)	   /* unit busy */
+#define ISR_IBB		(1 << 3)	   /* bus busy */
+#define ISR_SSD		(1 << 4)	   /* slave stop detected */
+#define ISR_ALD		(1 << 5)	   /* arbitration loss detected */
+#define ISR_ITE		(1 << 6)	   /* tx buffer empty */
+#define ISR_IRF		(1 << 7)	   /* rx buffer full */
+#define ISR_GCAD	(1 << 8)	   /* general call address detected */
+#define ISR_SAD		(1 << 9)	   /* slave address detected */
+#define ISR_BED		(1 << 10)	   /* bus error no ACK/NAK */
 
-/* ----- Status register bits ----------------------------------------- */
-
-#define ISR_RWM         0x1		/* read/write mode */
-#define ISR_ACKNAK      0x2		/* ack/nak status */
-#define ISR_UB          0x4		/* unit busy */
-#define ISR_IBB         0x8		/* bus busy */
-#define ISR_SSD         0x10		/* slave stop detected */
-#define ISR_ALD         0x20		/* arbitration loss detected */
-#define ISR_ITE         0x40            /* tx buffer empty */
-#define ISR_IRF         0x80            /* rx buffer full */
-#define ISR_GCAD        0x100		/* general call address detected */
-#define ISR_SAD         0x200		/* slave address detected */
-#define ISR_BED         0x400           /* bus error no ACK/NAK */
 
 /*
  * Serial Audio Controller
  */
 
-
-/* FIXME the audio defines collide w/ the SA1111 defines.  I don't like these
- * short defines because there is too much chance of namespace collision */
-
-//#define SACR0		__REG(0x40400000)  /* Global Control Register */
-//#define SACR1		__REG(0x40400004)  /* Serial Audio I 2 S/MSB-Justified Control Register */
-//#define SASR0		__REG(0x4040000C)  /* Serial Audio I 2 S/MSB-Justified Interface and FIFO Status Register */
-//#define SAIMR		__REG(0x40400014)  /* Serial Audio Interrupt Mask Register */
-//#define SAICR		__REG(0x40400018)  /* Serial Audio Interrupt Clear Register */
-//#define SADIV		__REG(0x40400060)  /* Audio Clock Divider Register. */
-//#define SADR		__REG(0x40400080)  /* Serial Audio Data Register (TX and RX FIFO access Register). */
+/* FIXME: This clash with SA1111 defines */
+#ifndef CONFIG_SA1111
+#define SACR0		__REG(0x40400000)  /* Global Control Register */
+#define SACR1		__REG(0x40400004)  /* Serial Audio I 2 S/MSB-Justified Control Register */
+#define SASR0		__REG(0x4040000C)  /* Serial Audio I 2 S/MSB-Justified Interface and FIFO Status Register */
+#define SAIMR		__REG(0x40400014)  /* Serial Audio Interrupt Mask Register */
+#define SAICR		__REG(0x40400018)  /* Serial Audio Interrupt Clear Register */
+#define SADIV		__REG(0x40400060)  /* Audio Clock Divider Register. */
+#define SADR		__REG(0x40400080)  /* Serial Audio Data Register (TX and RX FIFO access Register). */
+#endif
 
 
 /*
@@ -713,6 +689,30 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ICDR		__REG(0x4080000c)  /* ICP Data Register */
 #define ICSR0		__REG(0x40800014)  /* ICP Status Register 0 */
 #define ICSR1		__REG(0x40800018)  /* ICP Status Register 1 */
+
+#define ICCR0_AME       (1 << 7)           /* Adress match enable */
+#define ICCR0_TIE       (1 << 6)           /* Transmit FIFO interrupt enable */
+#define ICCR0_RIE       (1 << 5)           /* Recieve FIFO interrupt enable */
+#define ICCR0_RXE       (1 << 4)           /* Receive enable */
+#define ICCR0_TXE       (1 << 3)           /* Transmit enable */
+#define ICCR0_TUS       (1 << 2)           /* Transmit FIFO underrun select */
+#define ICCR0_LBM       (1 << 1)           /* Loopback mode */
+#define ICCR0_ITR       (1 << 0)           /* IrDA transmission */
+
+#define ICSR0_FRE       (1 << 5)           /* Framing error */
+#define ICSR0_RFS       (1 << 4)           /* Receive FIFO service request */
+#define ICSR0_TFS       (1 << 3)           /* Transnit FIFO service request */
+#define ICSR0_RAB       (1 << 2)           /* Receiver abort */
+#define ICSR0_TUR       (1 << 1)           /* Trunsmit FIFO underun */
+#define ICSR0_EIF       (1 << 0)           /* End/Error in FIFO */
+
+#define ICSR1_ROR       (1 << 6)           /* Receiver FIFO underrun  */
+#define ICSR1_CRE       (1 << 5)           /* CRC error */
+#define ICSR1_EOF       (1 << 4)           /* End of frame */
+#define ICSR1_TNF       (1 << 3)           /* Transmit FIFO not full */
+#define ICSR1_RNE       (1 << 2)           /* Receive FIFO not empty */
+#define ICSR1_TBY       (1 << 1)           /* Tramsmiter busy flag */
+#define ICSR1_RSY       (1 << 0)           /* Recevier synchronized flag */
 
 
 /*
@@ -1171,18 +1171,104 @@ typedef void            (*ExcpHndlr) (void) ;
 #define LCCR0_BM	(1 << 20) 	/* Branch mask */
 #define LCCR0_OUM	(1 << 21)	/* Output FIFO underrun mask */
 
+#define LCCR1_PPL       Fld (10, 0)      /* Pixels Per Line - 1 */
+#define LCCR1_DisWdth(Pixel)            /* Display Width [1..800 pix.]  */ \
+                        (((Pixel) - 1) << FShft (LCCR1_PPL))
+
+#define LCCR1_HSW       Fld (6, 10)     /* Horizontal Synchronization     */
+#define LCCR1_HorSnchWdth(Tpix)         /* Horizontal Synchronization     */ \
+                                        /* pulse Width [1..64 Tpix]       */ \
+                        (((Tpix) - 1) << FShft (LCCR1_HSW))
+
+#define LCCR1_ELW       Fld (8, 16)     /* End-of-Line pixel clock Wait    */
+                                        /* count - 1 [Tpix]                */
+#define LCCR1_EndLnDel(Tpix)            /*  End-of-Line Delay              */ \
+                                        /*  [1..256 Tpix]                  */ \
+                        (((Tpix) - 1) << FShft (LCCR1_ELW))
+
+#define LCCR1_BLW       Fld (8, 24)     /* Beginning-of-Line pixel clock   */
+                                        /* Wait count - 1 [Tpix]           */
+#define LCCR1_BegLnDel(Tpix)            /*  Beginning-of-Line Delay        */ \
+                                        /*  [1..256 Tpix]                  */ \
+                        (((Tpix) - 1) << FShft (LCCR1_BLW))
+
+
+#define LCCR2_LPP       Fld (10, 0)     /* Line Per Panel - 1              */
+#define LCCR2_DisHght(Line)             /*  Display Height [1..1024 lines] */ \
+                        (((Line) - 1) << FShft (LCCR2_LPP))
+
+#define LCCR2_VSW       Fld (6, 10)     /* Vertical Synchronization pulse  */
+                                        /* Width - 1 [Tln] (L_FCLK)        */
+#define LCCR2_VrtSnchWdth(Tln)          /*  Vertical Synchronization pulse */ \
+                                        /*  Width [1..64 Tln]              */ \
+                        (((Tln) - 1) << FShft (LCCR2_VSW))
+
+#define LCCR2_EFW       Fld (8, 16)     /* End-of-Frame line clock Wait    */
+                                        /* count [Tln]                     */
+#define LCCR2_EndFrmDel(Tln)            /*  End-of-Frame Delay             */ \
+                                        /*  [0..255 Tln]                   */ \
+                        ((Tln) << FShft (LCCR2_EFW))
+
+#define LCCR2_BFW       Fld (8, 24)     /* Beginning-of-Frame line clock   */
+                                        /* Wait count [Tln]                */
+#define LCCR2_BegFrmDel(Tln)            /*  Beginning-of-Frame Delay       */ \
+                                        /*  [0..255 Tln]                   */ \
+                        ((Tln) << FShft (LCCR2_BFW))
+
+#if 0
 #define LCCR3_PCD	(0xff)		/* Pixel clock divisor */
 #define LCCR3_ACB	(0xff << 8)	/* AC Bias pin frequency */
 #define LCCR3_ACB_S	8
+#endif
+
 #define LCCR3_API	(0xf << 16)	/* AC Bias pin trasitions per interrupt */
 #define LCCR3_API_S	16
 #define LCCR3_VSP	(1 << 20)	/* vertical sync polarity */
 #define LCCR3_HSP	(1 << 21)	/* horizontal sync polarity */
 #define LCCR3_PCP	(1 << 22)	/* pixel clock polarity */
 #define LCCR3_OEP	(1 << 23)	/* output enable polarity */
+#if 0
 #define LCCR3_BPP	(7 << 24)	/* bits per pixel */
 #define LCCR3_BPP_S	24
+#endif
 #define LCCR3_DPC	(1 << 27)	/* double pixel clock mode */
+
+
+#define LCCR3_PCD       Fld (8, 0)      /* Pixel Clock Divisor */
+#define LCCR3_PixClkDiv(Div)            /* Pixel Clock Divisor */ \
+                        (((Div) << FShft (LCCR3_PCD)))
+
+
+#define LCCR3_BPP       Fld (3, 24)     /* Bit Per Pixel */
+#define LCCR3_Bpp(Bpp)                  /* Bit Per Pixel */ \
+                        (((Bpp) << FShft (LCCR3_BPP)))
+
+#define LCCR3_ACB       Fld (8, 8)      /* AC Bias */
+#define LCCR3_Acb(Acb)                  /* BAC Bias */ \
+                        (((Acb) << FShft (LCCR3_ACB)))
+
+#define LCCR3_HorSnchH  (LCCR3_HSP*0)   /*  Horizontal Synchronization     */
+                                        /*  pulse active High              */
+#define LCCR3_HorSnchL  (LCCR3_HSP*1)   /*  Horizontal Synchronization     */
+
+#define LCCR3_VrtSnchH  (LCCR3_VSP*0)   /*  Vertical Synchronization pulse */
+                                        /*  active High                    */
+#define LCCR3_VrtSnchL  (LCCR3_VSP*1)   /*  Vertical Synchronization pulse */
+                                        /*  active Low                     */
+
+#define LCSR_LDD	(1 << 0)	/* LCD Disable Done */
+#define LCSR_SOF	(1 << 1)	/* Start of frame */
+#define LCSR_BER	(1 << 2)	/* Bus error */
+#define LCSR_ABC	(1 << 3)	/* AC Bias count */
+#define LCSR_IUL	(1 << 4)	/* input FIFO underrun Lower panel */
+#define LCSR_IUU	(1 << 5)	/* input FIFO underrun Upper panel */
+#define LCSR_OU		(1 << 6)	/* output FIFO underrun */
+#define LCSR_QD		(1 << 7)	/* quick disable */
+#define LCSR_EOF	(1 << 8)	/* end of frame */
+#define LCSR_BS		(1 << 9)	/* branch status */
+#define LCSR_SINT	(1 << 10)	/* subsequent interrupt */
+
+#define LDCMD_PAL	(1 << 26)	/* instructs DMA to load palette buffer */
 
 #define LCSR_LDD	(1 << 0)	/* LCD Disable Done */
 #define LCSR_SOF	(1 << 1)	/* Start of frame */
