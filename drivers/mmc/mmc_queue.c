@@ -124,11 +124,12 @@ static void mmc_request(request_queue_t *q)
  */
 int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock)
 {
+	struct mmc_host *host = card->host;
 	u64 limit = BLK_BOUNCE_HIGH;
 	int ret;
 
-	if (card->host->dev->dma_mask && *card->host->dev->dma_mask)
-		limit = *card->host->dev->dma_mask;
+	if (host->dev->dma_mask && *host->dev->dma_mask)
+		limit = *host->dev->dma_mask;
 
 	mq->card = card;
 	mq->queue = blk_init_queue(mmc_request, lock);
@@ -137,6 +138,10 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 
 	blk_queue_prep_rq(mq->queue, mmc_prep_request);
 	blk_queue_bounce_limit(mq->queue, limit);
+	blk_queue_max_sectors(mq->queue, host->max_sectors);
+	blk_queue_max_phys_segments(mq->queue, host->max_phys_segs);
+	blk_queue_max_hw_segments(mq->queue, host->max_hw_segs);
+	blk_queue_max_segment_size(mq->queue, host->max_seg_size);
 
 	mq->queue->queuedata = mq;
 	mq->req = NULL;

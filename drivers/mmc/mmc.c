@@ -1,7 +1,7 @@
 /*
  *  linux/drivers/mmc/mmc.c
  *
- *  Copyright (C) 2003 Russell King, All Rights Reserved.
+ *  Copyright (C) 2003-2004 Russell King, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,6 +14,7 @@
 #include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/delay.h>
+#include <linux/pagemap.h>
 #include <linux/err.h>
 
 #include <linux/mmc/card.h>
@@ -212,7 +213,7 @@ int __mmc_claim_host(struct mmc_host *host, struct mmc_card *card)
 
 		cmd.opcode = MMC_SELECT_CARD;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R1;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 	}
@@ -430,7 +431,7 @@ static int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
 
 	cmd.opcode = MMC_SEND_OP_COND;
 	cmd.arg = ocr;
-	cmd.flags = MMC_RSP_SHORT;
+	cmd.flags = MMC_RSP_R3;
 
 	for (i = 100; i; i--) {
 		err = mmc_wait_for_cmd(host, &cmd, 0);
@@ -468,7 +469,7 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 		cmd.opcode = MMC_ALL_SEND_CID;
 		cmd.arg = 0;
-		cmd.flags = MMC_RSP_LONG | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R2;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err == MMC_ERR_TIMEOUT) {
@@ -497,7 +498,7 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 		cmd.opcode = MMC_SET_RELATIVE_ADDR;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R1;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE)
@@ -518,7 +519,7 @@ static void mmc_read_csds(struct mmc_host *host)
 
 		cmd.opcode = MMC_SEND_CSD;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_LONG | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R2;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE) {
@@ -566,7 +567,7 @@ static void mmc_check_cards(struct mmc_host *host)
 
 		cmd.opcode = MMC_SEND_STATUS;
 		cmd.arg = card->rca << 16;
-		cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		cmd.flags = MMC_RSP_R1;
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err == MMC_ERR_NONE)
@@ -715,14 +716,21 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	if (host) {
 		memset(host, 0, sizeof(struct mmc_host) + extra);
 
-		host->priv = host + 1;
-
 		spin_lock_init(&host->lock);
 		init_waitqueue_head(&host->wq);
 		INIT_LIST_HEAD(&host->cards);
 		INIT_WORK(&host->detect, mmc_rescan, host);
 
 		host->dev = dev;
+
+		/*
+		 * By default, hosts do not support SGIO or large requests.
+		 * They have to set these according to their abilities.
+		 */
+		host->max_hw_segs = 1;
+		host->max_phys_segs = 1;
+		host->max_sectors = 1 << (PAGE_CACHE_SHIFT - 9);
+		host->max_seg_size = PAGE_CACHE_SIZE;
 	}
 
 	return host;
