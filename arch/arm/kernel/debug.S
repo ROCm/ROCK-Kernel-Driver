@@ -465,13 +465,53 @@
 		beq	1001b
 		.endm
 
+#elif defined(CONFIG_ARCH_IXP4XX)
+
+                .macro  addruart,rx
+                mrc     p15, 0, \rx, c1, c0
+                tst     \rx, #1                 @ MMU enabled?
+                moveq   \rx, #0xc8000000
+                movne   \rx, #0xff000000
+                add     \rx,\rx,#3              @ Uart regs are at off set of 3 if
+						@ byte writes used - Big Endian.
+                .endm
+
+               .macro  senduart,rd,rx
+                strb    \rd, [\rx]
+                .endm
+
+                .macro  waituart,rd,rx
+1002:           ldrb    \rd, [\rx, #0x14]
+                and     \rd, \rd, #0x60		@ check THRE and TEMT bits
+                teq     \rd, #0x60
+                bne     1002b
+                .endm
+
+                .macro  busyuart,rd,rx
+                .endm
+
 #elif defined(CONFIG_ARCH_OMAP)
 
 #include <asm/arch/serial.h>
 
+#ifdef CONFIG_ARCH_OMAP730
+#define OMAP_SERIAL_REG_SHIFT	0
+#else
+#define OMAP_SERIAL_REG_SHIFT	2
+#endif
+		/* See also __create_page_tables in head.S */
 		.macro	addruart,rx
-		mov	\rx, #0xff000000
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #0xff000000	@ physical base address
+		movne	\rx, #0xfe000000	@ virtual base
 		orr	\rx, \rx, #0x00fb0000
+#ifdef CONFIG_OMAP_LL_DEBUG_UART3
+		orr	\rx, \rx, #0x00009000	@ UART 3
+#endif
+#if defined(CONFIG_OMAP_LL_DEBUG_UART2) || defined(CONFIG_OMAP_LL_DEBUG_UART3)
+		orr	\rx, \rx, #0x00000800	@ UART 2 & 3
+#endif
 		.endm
 
 		.macro	senduart,rd,rx
@@ -486,9 +526,6 @@
 		.endm
 
 		.macro	waituart,rd,rx
-1001:		ldrb	\rd, [\rx, #(0x6 << OMAP_SERIAL_REG_SHIFT)]
-		tst	\rd, #0x10
-		beq	1001b
 		.endm
 
 #elif defined(CONFIG_ARCH_S3C2410)
@@ -551,7 +588,7 @@
 		.endm
 
 #elif defined(CONFIG_ARCH_LH7A40X)
-	@ It isn't known if this will be appropriate for every 40x
+	@ It is not known if this will be appropriate for every 40x
 	@ board.
 
 		.macro  addruart,rx

@@ -111,6 +111,9 @@ config ARCH_INTEGRATOR
 config ARCH_IOP3XX
 	bool "IOP3xx-based"
 
+config ARCH_IXP4XX
+	bool "IXP4xx-based"
+
 config ARCH_L7200
 	bool "LinkUp-L7200"
 	help
@@ -170,6 +173,8 @@ source "arch/arm/mach-integrator/Kconfig"
 
 source "arch/arm/mach-iop3xx/Kconfig"
 
+source "arch/arm/mach-ixp4xx/Kconfig"
+
 source "arch/arm/mach-pxa/Kconfig"
 
 source "arch/arm/mach-sa1100/Kconfig"
@@ -222,7 +227,7 @@ config FORCE_MAX_ZONEORDER
 
 config DMABOUNCE
 	bool
-	depends on SA1111
+	depends on SA1111 || ARCH_IXP4XX
 	default y
 
 source arch/arm/mm/Kconfig
@@ -252,7 +257,7 @@ config DISCONTIGMEM
 # Now handle the bus types
 config PCI
 	bool "PCI support" if ARCH_INTEGRATOR_AP
-	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX
+	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -791,8 +796,8 @@ config DEBUG_S3C2410_PORT
 	  before it is used.
 
 config DEBUG_S3C2410_UART
-	int
 	depends on DEBUG_LL && ARCH_S3C2410
+	int "S3C2410 UART to use for low-level debug"
 	default "0"
 	help
 	  Choice for UART for kernel low-level using S3C2410 UARTS,

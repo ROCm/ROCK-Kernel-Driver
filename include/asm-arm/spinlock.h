@@ -89,7 +89,7 @@ static inline void _raw_write_lock(rwlock_t *rw)
 "	strexeq	%0, %2, [%1]\n"
 "	teq	%0, #0\n"
 "	bne	1b"
-	: "=r" (tmp)
+	: "=&r" (tmp)
 	: "r" (&rw->lock), "r" (0x80000000)
 	: "cc", "memory");
 }
@@ -151,7 +151,7 @@ static inline int _raw_write_trylock(rwlock_t *rw)
 "1:	ldrex	%0, [%1]\n"
 "	teq	%0, #0\n"
 "	strexeq	%0, %2, [%1]"
-	: "=r" (tmp)
+	: "=&r" (tmp)
 	: "r" (&rw->lock), "r" (0x80000000)
 	: "cc", "memory");
 

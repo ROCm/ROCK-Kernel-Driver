@@ -19,7 +19,7 @@
 
 #include "sa1111_generic.h"
 
-static int graphicsmaster_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int graphicsmaster_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
   int return_val=0;
 
@@ -36,7 +36,7 @@ static int graphicsmaster_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 }
 
 static int
-graphicsmaster_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+graphicsmaster_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 				       const socket_state_t *state)
 {
 	unsigned int pa_dwr_mask, pa_dwr_set;

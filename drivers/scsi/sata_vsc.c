@@ -175,7 +175,7 @@ irqreturn_t vsc_sata_interrupt (int irq, void *dev_instance, struct pt_regs *reg
 				struct ata_queued_cmd *qc;
 
 				qc = ata_qc_from_tag(ap, ap->active_tag);
-				if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
+				if (qc && (!(qc->tf.ctl & ATA_NIEN)))
 					handled += ata_host_intr(ap, qc);
 			}
 		}
@@ -213,6 +213,7 @@ static struct ata_port_operations vsc_sata_ops = {
 	.exec_command		= ata_exec_command_mmio,
 	.check_status		= ata_check_status_mmio,
 	.phy_reset		= sata_phy_reset,
+	.bmdma_setup            = ata_bmdma_setup_mmio,
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,

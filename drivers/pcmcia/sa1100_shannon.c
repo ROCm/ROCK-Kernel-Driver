@@ -21,7 +21,7 @@ static struct pcmcia_irqs irqs[] = {
 	{ 1, SHANNON_IRQ_GPIO_EJECT_1, "PCMCIA_CD_1" },
 };
 
-static int shannon_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int shannon_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	/* All those are inputs */
 	GPDR &= ~(SHANNON_GPIO_EJECT_0 | SHANNON_GPIO_EJECT_1 | 
@@ -31,16 +31,16 @@ static int shannon_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 
 	skt->irq = skt->nr ? SHANNON_IRQ_GPIO_RDY_1 : SHANNON_IRQ_GPIO_RDY_0;
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void shannon_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void shannon_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static void
-shannon_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+shannon_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			    struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR;
@@ -69,7 +69,7 @@ shannon_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
 }
 
 static int
-shannon_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+shannon_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 				const socket_state_t *state)
 {
 	switch (state->Vcc) {
@@ -93,14 +93,14 @@ shannon_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void shannon_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void shannon_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void shannon_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void shannon_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static struct pcmcia_low_level shannon_pcmcia_ops = {

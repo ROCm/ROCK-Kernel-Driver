@@ -1,13 +1,25 @@
 
-menu "Intel PXA250/210 Implementations"
+menu "Intel PXA2xx Implementations"
 
 config ARCH_LUBBOCK
 	bool "Intel DBPXA250 Development Platform"
 	depends on ARCH_PXA
+	select PXA25x
 
 config ARCH_PXA_IDP
 	bool "Accelent Xscale IDP"
 	depends on ARCH_PXA
+	select PXA25x
 
 endmenu
+
+config PXA25x
+	bool
+	help
+	  Select code specific to PXA21x/25x/26x variants
+
+config PXA27x
+	bool
+	help
+	  Select code specific to PXA27x variants
 

@@ -4,6 +4,8 @@
 
 # Common support (must be linked before board specific support)
 obj-y += generic.o irq.o dma.o
+obj-$(CONFIG_PXA25x) += pxa25x.o
+obj-$(CONFIG_PXA27x) += pxa27x.o
 
 # Specific board support
 obj-$(CONFIG_ARCH_LUBBOCK) += lubbock.o

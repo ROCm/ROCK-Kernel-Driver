@@ -36,24 +36,24 @@ static struct pcmcia_irqs irqs[] = {
 	{ 1, IRQ_GPIO_STORK_PCMCIA_B_CARD_DETECT, "PCMCIA_CD1" },
 };
 
-static int stork_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int stork_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	printk("in stork_pcmcia_init\n");
 
 	skt->irq = skt->nr ? IRQ_GPIO_STORK_PCMCIA_B_RDY
 			   : IRQ_GPIO_STORK_PCMCIA_A_RDY;
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void stork_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void stork_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
 	int i;
 
         printk("%s\n", __FUNCTION__);
 
         /* disable IRQs */
-        sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+        soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
   
         /* Disable CF bus: */
         storkClearLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
@@ -62,7 +62,7 @@ static void stork_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-stork_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+stork_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			  struct pcmcia_state *state)
 {
         unsigned long levels = GPLR;
@@ -95,7 +95,7 @@ stork_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
 }
 
 static int
-stork_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+stork_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 			      const socket_state_t *state)
 {
 	unsigned long flags;
@@ -156,16 +156,16 @@ stork_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
         return 0;
 }
 
-static void stork_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void stork_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
         storkSetLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
 
-        sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+        soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void stork_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void stork_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
 	/*
 	 * Hack!

@@ -106,6 +106,7 @@ static struct ata_port_operations svia_sata_ops = {
 
 	.phy_reset		= sata_phy_reset,
 
+	.bmdma_setup            = ata_bmdma_setup_pio,
 	.bmdma_start            = ata_bmdma_start_pio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,

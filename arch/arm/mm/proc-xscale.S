@@ -298,7 +298,7 @@ ENTRY(xscale_dma_inv_range)
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
@@ -315,7 +315,7 @@ ENTRY(xscale_dma_clean_range)
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
@@ -333,7 +333,7 @@ ENTRY(xscale_dma_flush_range)
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 ENTRY(xscale_cache_fns)
@@ -647,6 +647,11 @@ cpu_pxa210_name:
 	.asciz	"XScale-PXA210"
 	.size	cpu_pxa210_name, . - cpu_pxa210_name
 
+	.type	cpu_ixp42x_name, #object
+cpu_ixp42x_name:
+	.asciz	"XScale-IXP42x Family"
+	.size	cpu_ixp42x_name, . - cpu_ixp42x_name
+
 	.type	cpu_pxa255_name, #object
 cpu_pxa255_name:
 	.asciz	"XScale-PXA255"
@@ -724,6 +729,22 @@ __pxa210_proc_info:
 	.long	xscale_mc_user_fns
 	.long	xscale_cache_fns
 	.size	__pxa210_proc_info, . - __pxa210_proc_info
+
+	.type	__ixp42x_proc_info, #object
+__ixp42x_proc_info:
+	.long   0x690541c0
+	.long   0xffffffc0
+	.long   0x00000c0e
+	b       __xscale_setup
+	.long   cpu_arch_name
+	.long   cpu_elf_name
+	.long   HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+	.long   cpu_ixp42x_name
+	.long   xscale_processor_functions
+	.long	v4wbi_tlb_fns
+	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
+	.size   __ixp42x_proc_info, . - __ixp42x_proc_info                
 
 	.type	__pxa255_proc_info,#object
 __pxa255_proc_info:

@@ -40,7 +40,7 @@ struct cpu_context_save {
 
 /*
  * low level task data that entry.S needs immediate access to.
- * We assume cpu_context follows immedately after cpu_domain.
+ * __switch_to() assumes cpu_context follows immediately after cpu_domain.
  */
 struct thread_info {
 	unsigned long		flags;		/* low level flags */

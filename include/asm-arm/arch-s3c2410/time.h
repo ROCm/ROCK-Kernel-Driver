@@ -122,7 +122,7 @@ void __init time_init (void)
 	 *   of 11.25MHz, and a tcnt of 56250.
 	 */
 
-	if (machine_is_h1940()) {
+	if (machine_is_h1940() || machine_is_smdk2410() ) {
 		timer_ticks_usec = s3c2410_pclk / (1000*1000);
 		timer_ticks_usec /= 6;
 
