@@ -32,9 +32,9 @@ struct pci_vendor_info {
  * real memory.. Parse the same file multiple times
  * to get all the info.
  */
-#define VENDOR( vendor, name )		static const char __vendorstr_##vendor[] __initdata = name;
+#define VENDOR( vendor, name )		static char __vendorstr_##vendor[] __initdata = name;
 #define ENDVENDOR()
-#define DEVICE( vendor, device, name ) 	static const char __devicestr_##vendor##device[] __initdata = name;
+#define DEVICE( vendor, device, name ) 	static char __devicestr_##vendor##device[] __initdata = name;
 #include "devlist.h"
 
 
@@ -43,7 +43,7 @@ struct pci_vendor_info {
 #define DEVICE( vendor, device, name )	{ 0x##device, 0, __devicestr_##vendor##device },
 #include "devlist.h"
 
-static const struct pci_vendor_info __initdata pci_vendor_list[] = {
+static struct pci_vendor_info __initdata pci_vendor_list[] = {
 #define VENDOR( vendor, name )		{ 0x##vendor, sizeof(__devices_##vendor) / sizeof(struct pci_device_info), __vendorstr_##vendor, __devices_##vendor },
 #define ENDVENDOR()
 #define DEVICE( vendor, device, name )

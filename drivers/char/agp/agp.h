@@ -101,6 +101,7 @@ struct agp_bridge_data {
 	int num_aperture_sizes;
 	int num_of_masks;
 	int capndx;
+	int cant_use_aperture;
 
 	/* Links to driver specific functions */
 

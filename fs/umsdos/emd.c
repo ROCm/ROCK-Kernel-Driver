@@ -259,10 +259,10 @@ int umsdos_writeentry (struct dentry *parent, struct umsdos_info *info,
 		p->ctime = cpu_to_le32(entry->ctime);
 		p->rdev = cpu_to_le16(entry->rdev);
 		p->mode = cpu_to_le16(entry->mode);
-		memcpy(p->name,entry->name,
+		memcpy(p->spare,entry->spare,
 			(char *)(page_address(page) + PAGE_CACHE_SIZE) - p->spare);
 		memcpy(page_address(page2),
-				entry->spare+PAGE_CACHE_SIZE-offs,
+				((char*)entry)+PAGE_CACHE_SIZE-offs,
 				offs+info->recsize-PAGE_CACHE_SIZE);
 		ret = mapping->a_ops->commit_write(NULL,page2,0,
 					offs+info->recsize-PAGE_CACHE_SIZE);

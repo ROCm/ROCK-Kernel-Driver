@@ -316,6 +316,14 @@ drm_agp_head_t *DRM(agp_init)(void)
 
 		default:		head->chipset = "Unknown";       break;
 		}
+#if LINUX_VERSION_CODE <= 0x020408
+		head->cant_use_aperture = 0;
+		head->page_mask = ~(0xfff);
+#else
+		head->cant_use_aperture = head->agp_info.cant_use_aperture;
+		head->page_mask = head->agp_info.page_mask;
+#endif
+
 		DRM_INFO("AGP %d.%d on %s @ 0x%08lx %ZuMB\n",
 			 head->agp_info.version.major,
 			 head->agp_info.version.minor,

@@ -689,8 +689,8 @@ L:	linux1394-devel@lists.sourceforge.net
 S:	Orphan
 
 IEEE 1394 OHCI DRIVER
-P:	Sebastien Rougeaux
-M:	sebastien.rougeaux@anu.edu.au
+P:	Ben Collins
+M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
 S:	Maintained
 
@@ -902,9 +902,9 @@ S:      Maintained
 
 MIPS
 P:	Ralf Baechle
-M:	ralf@gnu.ai.mit.edu
-W:	http://lena.fnet.fr/
-L:	linux-mips@fnet.fr
+M:	ralf@gnu.org
+W:	http://oss.sgi.com/mips/mips-howto.html
+L:	linux-mips@oss.sgi.com
 S:	Maintained
 
 MISCELLANEOUS MCA-SUPPORT
@@ -1452,6 +1452,13 @@ M:	johannes@erdfelt.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+
+USB KAWASAKI LSI DRIVER
+P:      Brad Hards
+M:      bradh@frogmouth.net
+L:      linux-usb-users@lists.sourceforge.net
+L:      linux-usb-devel@lists.sourceforge.net
+S:      Maintained
 
 USB OHCI DRIVER
 P:	Roman Weissgaerber

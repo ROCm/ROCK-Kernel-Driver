@@ -25,6 +25,7 @@ obj-$(CONFIG_ATM_HORIZON) += horizon.o
 obj-$(CONFIG_ATM_AMBASSADOR) += ambassador.o
 obj-$(CONFIG_ATM_TCP) += atmtcp.o
 obj-$(CONFIG_ATM_IA) += iphase.o suni.o
+obj-$(CONFIG_ATM_FIRESTREAM) += firestream.o
 
 ifeq ($(CONFIG_ATM_FORE200E_PCA),y)
   FORE200E_FW_OBJS += fore200e_pca_fw.o

@@ -1,5 +1,4 @@
-/* $Id: graphics.c,v 1.22 2000/02/18 00:24:43 ralf Exp $
- *
+/*
  * gfx.c: support for SGI's /dev/graphics, /dev/opengl
  *
  * Author: Miguel de Icaza (miguel@nuclecu.unam.mx)
@@ -214,8 +213,7 @@ sgi_graphics_close (struct inode *inode, struct file *file)
 /* 
  * This is the core of the direct rendering engine.
  */
-
-unsigned long
+struct page *
 sgi_graphics_nopage (struct vm_area_struct *vma, unsigned long address, int
 		     no_share)
 {
@@ -250,7 +248,6 @@ sgi_graphics_nopage (struct vm_area_struct *vma, unsigned long address, int
 	pgd = pgd_offset(current->mm, address);
 	pmd = pmd_offset(pgd, address);
 	pte = pte_offset(pmd, address);
-	printk("page: %08lx\n", pte_page(*pte));
 	return pte_page(*pte);
 }
 

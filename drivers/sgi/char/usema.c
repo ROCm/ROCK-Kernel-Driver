@@ -20,8 +20,7 @@
  * usema(7m), usinit(3p), usnewsema(3p)
  * /usr/include/sys/usioctl.h 
  *
-*/
-
+ */
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/sched.h>
@@ -31,6 +30,7 @@
 #include <linux/string.h>
 #include <linux/dcache.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include "usema.h"
@@ -180,3 +180,5 @@ usema_init(void)
 	       SGI_USEMACLONE);
 	misc_register(&dev_usemaclone);
 }
+
+EXPORT_SYMBOL(usema_init);

@@ -65,6 +65,7 @@ obj-$(CONFIG_USB_OV511)		+= ov511.o
 obj-$(CONFIG_USB_SE401)		+= se401.o
 obj-$(CONFIG_USB_PEGASUS)	+= pegasus.o
 obj-$(CONFIG_USB_CATC)		+= catc.o
+obj-$(CONFIG_USB_KAWETH)        += kaweth.o
 obj-$(CONFIG_USB_RIO500)	+= rio500.o
 obj-$(CONFIG_USB_DSBR)		+= dsbr100.o
 obj-$(CONFIG_USB_MICROTEK)	+= microtek.o

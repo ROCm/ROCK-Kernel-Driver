@@ -145,14 +145,28 @@ extern int mga_warp_init( drm_mga_private_t *dev_priv );
 #define mga_flush_write_combine()	mb()
 
 
-#define MGA_BASE( reg )		((u32)(dev_priv->mmio->handle))
+#define MGA_BASE( reg )		((unsigned long)(dev_priv->mmio->handle))
 #define MGA_ADDR( reg )		(MGA_BASE(reg) + reg)
 
 #define MGA_DEREF( reg )	*(volatile u32 *)MGA_ADDR( reg )
+#define MGA_DEREF8( reg )	*(volatile u8 *)MGA_ADDR( reg )
+
+#ifdef __alpha__
+#define MGA_READ( reg )		(_MGA_READ((u32 *)MGA_ADDR(reg)))
+#define MGA_WRITE( reg, val )	do { wmb(); MGA_DEREF( reg ) = val; } while (0)
+#define MGA_WRITE8( reg, val )  do { wmb(); MGA_DEREF8( reg ) = val; } while (0)
+
+static inline u32 _MGA_READ(u32 *addr)
+{
+	mb();
+	return *(volatile u32 *)addr;
+}
+
+#else
 #define MGA_READ( reg )		MGA_DEREF( reg )
 #define MGA_WRITE( reg, val )	do { MGA_DEREF( reg ) = val; } while (0)
-#define MGA_DEREF8( reg )	*(volatile u8 *)MGA_ADDR( reg )
 #define MGA_WRITE8( reg, val )  do { MGA_DEREF8( reg ) = val; } while (0)
+#endif
 
 #define DWGREG0 	0x1c00
 #define DWGREG0_END 	0x1dff

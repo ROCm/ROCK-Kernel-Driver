@@ -1049,6 +1049,7 @@ void iput(struct inode *inode)
 
 			if (op && op->delete_inode) {
 				void (*delete)(struct inode *) = op->delete_inode;
+				DQUOT_INIT(inode);
 				/* s_op->delete_inode internally recalls clear_inode() */
 				delete(inode);
 			} else

@@ -1119,6 +1119,7 @@ static int do_swap_page(struct mm_struct * mm,
 			 */
 			return pte_same(*page_table, orig_pte) ? -1 : 1;
 		}
+		SetPageReferenced(page);
 	}
 
 	/*

@@ -47,12 +47,15 @@ void DRM(sg_cleanup)( drm_sg_mem_t *entry )
 
 	vfree( entry->virtual );
 
+	DRM(free)( entry->busaddr,
+		   entry->pages * sizeof(*entry->busaddr),
+		   DRM_MEM_PAGES );
 	DRM(free)( entry->pagelist,
-		  entry->pages * sizeof(*entry->pagelist),
-		  DRM_MEM_PAGES );
+		   entry->pages * sizeof(*entry->pagelist),
+		   DRM_MEM_PAGES );
 	DRM(free)( entry,
-		  sizeof(*entry),
-		  DRM_MEM_SGLISTS );
+		   sizeof(*entry),
+		   DRM_MEM_SGLISTS );
 }
 
 int DRM(sg_alloc)( struct inode *inode, struct file *filp,
@@ -93,16 +96,31 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 		DRM(free)( entry, sizeof(*entry), DRM_MEM_SGLISTS );
 		return -ENOMEM;
 	}
-	memset(entry->pagelist, 0, pages * sizeof(*entry->pagelist));
+
+	entry->busaddr = DRM(alloc)( pages * sizeof(*entry->busaddr),
+				     DRM_MEM_PAGES );
+	if ( !entry->busaddr ) {
+		DRM(free)( entry->pagelist,
+			   entry->pages * sizeof(*entry->pagelist),
+			   DRM_MEM_PAGES );
+		DRM(free)( entry,
+			   sizeof(*entry),
+			   DRM_MEM_SGLISTS );
+		return -ENOMEM;
+	}
+	memset( (void *)entry->busaddr, 0, pages * sizeof(*entry->busaddr) );
 
 	entry->virtual = vmalloc_32( pages << PAGE_SHIFT );
 	if ( !entry->virtual ) {
+		DRM(free)( entry->busaddr,
+			   entry->pages * sizeof(*entry->busaddr),
+			   DRM_MEM_PAGES );
 		DRM(free)( entry->pagelist,
-			  entry->pages * sizeof(*entry->pagelist),
-			  DRM_MEM_PAGES );
+			   entry->pages * sizeof(*entry->pagelist),
+			   DRM_MEM_PAGES );
 		DRM(free)( entry,
-			  sizeof(*entry),
-			  DRM_MEM_SGLISTS );
+			   sizeof(*entry),
+			   DRM_MEM_SGLISTS );
 		return -ENOMEM;
 	}
 

@@ -1,32 +1,30 @@
-/* $Id: ds1286.c,v 1.6 1999/10/09 00:01:31 ralf Exp $
+/*
+ * DS1286 Real Time Clock interface for Linux	
  *
- *	Real Time Clock interface for Linux	
- *
- *	Copyright (C) 1998, 1999 Ralf Baechle
+ * Copyright (C) 1998, 1999, 2000 Ralf Baechle
  *	
- *	Based on code written by Paul Gortmaker.
+ * Based on code written by Paul Gortmaker.
  *
- *	This driver allows use of the real time clock (built into
- *	nearly all computers) from user space. It exports the /dev/rtc
- *	interface supporting various ioctl() and also the /proc/rtc
- *	pseudo-file for status information.
+ * This driver allows use of the real time clock (built into nearly all
+ * computers) from user space. It exports the /dev/rtc interface supporting
+ * various ioctl() and also the /proc/rtc pseudo-file for status
+ * information.
  *
- *	The ioctls can be used to set the interrupt behaviour and
- *	generation rate from the RTC via IRQ 8. Then the /dev/rtc
- *	interface can be used to make use of these timer interrupts,
- *	be they interval or alarm based.
+ * The ioctls can be used to set the interrupt behaviour and generation rate
+ * from the RTC via IRQ 8. Then the /dev/rtc interface can be used to make
+ * use of these timer interrupts, be they interval or alarm based.
  *
- *	The /dev/rtc interface will block on reads until an interrupt
- *	has been received. If a RTC interrupt has already happened,
- *	it will output an unsigned long and then block. The output value
- *	contains the interrupt status in the low byte and the number of
- *	interrupts since the last read in the remaining high bytes. The 
- *	/dev/rtc interface can also be used with the select(2) call.
+ * The /dev/rtc interface will block on reads until an interrupt has been
+ * received. If a RTC interrupt has already happened, it will output an
+ * unsigned long and then block. The output value contains the interrupt
+ * status in the low byte and the number of interrupts since the last read
+ * in the remaining high bytes. The /dev/rtc interface can also be used with
+ * the select(2) call.
  *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -38,7 +36,6 @@
 #include <linux/poll.h>
 #include <linux/rtc.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
 
 #include <asm/ds1286.h>
 #include <asm/io.h>
@@ -81,19 +78,11 @@ static spinlock_t ds1286_lock = SPIN_LOCK_UNLOCKED;
 #define RTC_IS_OPEN		0x01	/* means /dev/rtc is in use	*/
 #define RTC_TIMER_ON		0x02	/* missed irq timer active	*/
 
-unsigned char ds1286_status = 0;	/* bitmapped status byte.	*/
-unsigned long ds1286_freq = 0;		/* Current periodic IRQ rate	*/
-unsigned long ds1286_irq_data = 0;	/* our output to the world	*/
+unsigned char ds1286_status;		/* bitmapped status byte.	*/
+unsigned long ds1286_freq;		/* Current periodic IRQ rate	*/
 
 unsigned char days_in_mo[] = 
 {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-/*
- *	A very tiny interrupt handler. It runs with SA_INTERRUPT set,
- *	so that there is no possibility of conflicting with the
- *	set_rtc_mmss() call that happens during some timer interrupts.
- *	(See ./arch/XXXX/kernel/time.c for the set_rtc_mmss() function.)
- */
 
 /*
  *	Now all the various file operations that we export.
@@ -102,37 +91,7 @@ unsigned char days_in_mo[] =
 static ssize_t ds1286_read(struct file *file, char *buf,
                            size_t count, loff_t *ppos)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	unsigned long data;
-	ssize_t retval;
-	
-	if (count < sizeof(unsigned long))
-		return -EINVAL;
-
-	add_wait_queue(&ds1286_wait, &wait);
-
-	current->state = TASK_INTERRUPTIBLE;
-		
-	while ((data = xchg(&ds1286_irq_data, 0)) == 0) {
-		if (file->f_flags & O_NONBLOCK) {
-			retval = -EAGAIN;
-			goto out;
-		}
-		if (signal_pending(current)) {
-			retval = -ERESTARTSYS;
-			goto out;
-		}
-		schedule();
-	}
-
-	retval = put_user(data, (unsigned long *)buf); 
-	if (!retval)
-		retval = sizeof(unsigned long); 
- out:
-	current->state = TASK_RUNNING;
-	remove_wait_queue(&ds1286_wait, &wait);
-
-	return retval;
+	return -EIO;
 }
 
 static int ds1286_ioctl(struct inode *inode, struct file *file,
@@ -338,27 +297,32 @@ static int ds1286_ioctl(struct inode *inode, struct file *file,
 
 static int ds1286_open(struct inode *inode, struct file *file)
 {
-	if(ds1286_status & RTC_IS_OPEN)
-		return -EBUSY;
+	spin_lock_irq(&ds1286_lock);
+
+	if (ds1286_status & RTC_IS_OPEN)
+		goto out_busy;
 
 	ds1286_status |= RTC_IS_OPEN;
-	ds1286_irq_data = 0;
+
+	spin_lock_irq(&ds1286_lock);
 	return 0;
+
+out_busy:
+	spin_lock_irq(&ds1286_lock);
+	return -EBUSY;
 }
 
 static int ds1286_release(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	ds1286_status &= ~RTC_IS_OPEN;
-	unlock_kernel();
+
 	return 0;
 }
 
 static unsigned int ds1286_poll(struct file *file, poll_table *wait)
 {
 	poll_wait(file, &ds1286_wait, wait);
-	if (ds1286_irq_data != 0)
-		return POLLIN | POLLRDNORM;
+
 	return 0;
 }
 
@@ -407,7 +371,7 @@ int get_ds1286_status(char *buf)
 
 	get_rtc_time(&tm);
 	hundredth = CMOS_READ(RTC_HUNDREDTH_SECOND);
-	hundredth = BCD_TO_BIN(hundredth);
+	BCD_TO_BIN(hundredth);
 
 	p += sprintf(p,
 	             "rtc_time\t: %02d:%02d:%02d.%02d\n"

@@ -295,6 +295,7 @@ struct reginit_item PHY_NTC_INIT[] __initdata = {
 
 
 static int fs_keystream = 0;
+static int fs_maxphy = 1;
 
 #ifdef DEBUG
 /* I didn't forget to set this to zero before shipping. Hit me with a stick 
@@ -308,6 +309,7 @@ static int fs_debug = 0;
 #ifdef DEBUG 
 MODULE_PARM(fs_debug, "i");
 #endif
+MODULE_PARM(fs_maxphy, "i");
 MODULE_PARM(loopback, "i");
 MODULE_PARM(num, "i");
 MODULE_PARM(fs_keystream, "i");
@@ -866,6 +868,7 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 	int bfp;
 	int to;
 	unsigned short tmc0;
+	int uaddr;
 
 	func_enter ();
 
@@ -907,6 +910,9 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 
 	txtp = &atm_vcc->qos.txtp;
 	rxtp = &atm_vcc->qos.rxtp;
+
+	/* XXX Use VPI? How many bits? Which bits? */
+	uaddr = atm_vcc->dev->number - dev->start_number;
 
 	if (!test_bit(ATM_VF_PARTIAL, &atm_vcc->flags)) {
 		if (IS_FS50(dev)) {
@@ -1012,7 +1018,7 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 		tc->TMC[2] = 0; /* Unused */
 		tc->TMC[3] = 0; /* Unused */
     
-		tc->spec = 0;    /* UTOPIA address, UDF, HEC: Unused -> 0 */
+		tc->spec = uaddr << 16;  /* UTOPIA address, UDF, HEC: Unused -> 0 */
 		tc->rtag[0] = 0; /* What should I do with routing tags??? 
 				    -- Not used -- AS -- Thanks -- REW*/
 		tc->rtag[1] = 0;
@@ -1081,7 +1087,7 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 			submit_command (dev, &dev->hp_txq, 
 					QE_CMD_REG_WR | QE_CMD_IMM_INQ,
 					0x80 + vcc->channo,
-					(vpi << 16) | vci, 0 ); /* XXX -- Use defines. */
+					(uaddr << 28) | (vpi << 16) | vci, 0 ); /* XXX -- Use defines. */
 		}
 		submit_command (dev, &dev->hp_txq, 
 				QE_CMD_RX_EN | QE_CMD_IMM_INQ | vcc->channo,
@@ -1772,8 +1778,10 @@ static int __init fs_init (struct fs_dev *dev)
 
 	if (IS_FS50 (dev)) {
 		write_fs (dev, RAS0, RAS0_DCD_XHLT);
-		dev->atm_dev->ci_range.vpi_bits = 12;
-		dev->atm_dev->ci_range.vci_bits = 16;
+		for (i=0;i<fs_maxphy;i++) {
+			dev->atm_dev[i]->ci_range.vpi_bits = 12;
+			dev->atm_dev[i]->ci_range.vci_bits = 16;
+		}
 		dev->nchannels = FS50_NR_CHANNELS;
 	} else {
 		write_fs (dev, RAS0, RAS0_DCD_XHLT 
@@ -1781,8 +1789,10 @@ static int __init fs_init (struct fs_dev *dev)
 			  | (((1 << FS155_VCI_BITS) - 1) * RAS0_VCSEL));
 		/* We can chose the split arbitarily. We might be able to 
 		   support more. Whatever. This should do for now. */
-		dev->atm_dev->ci_range.vpi_bits = FS155_VPI_BITS;
-		dev->atm_dev->ci_range.vci_bits = FS155_VCI_BITS;
+		for (i=0;i<fs_maxphy;i++) {
+			dev->atm_dev[i]->ci_range.vpi_bits = FS155_VPI_BITS;
+			dev->atm_dev[i]->ci_range.vci_bits = FS155_VCI_BITS;
+		}
     
 		/* Address bits we can't use should be compared to 0. */
 		write_fs (dev, RAC, 0);
@@ -1817,9 +1827,14 @@ static int __init fs_init (struct fs_dev *dev)
 	}
 	memset (dev->tx_inuse, 0, dev->nchannels / 8);
 
-	/* -- RAS1 : FS155 and 50 differ. Default (0) should be OK for both */
-	/* -- RAS2 : FS50 only: Default is OK. */
+	if (IS_FS50 (dev)) {
+		/* -- RAS1 : FS155 and 50 differ. Default (0) should be OK for FS155, FS50/multiphy needs the maxPHY set... */
+		write_fs (dev, RAS1, (fs_maxphy - 1) * RAS1_UTREG);
 
+		/* -- RAS2 : FS50 only: Default is OK. */
+		/* Enable selecting for Utopia address for multiphy configs. */
+		write_fs (dev, RAS2, RAS2_USEL);
+	}
 	/* DMAMODE, default should be OK. -- REW */
 	write_fs (dev, DMAMR, DMAMR_TX_MODE_FULL);
 
@@ -1888,7 +1903,8 @@ static int __init fs_init (struct fs_dev *dev)
 	add_timer (&dev->timer);
 #endif
 
-	dev->atm_dev->dev_data = dev;
+	for (i=0;i<fs_maxphy;i++)
+		dev->atm_dev[i]->dev_data = dev;
   
 	func_exit ();
 	return 0;
@@ -1897,9 +1913,9 @@ static int __init fs_init (struct fs_dev *dev)
 static int __init firestream_init_one (struct pci_dev *pci_dev,
 				       const struct pci_device_id *ent) 
 {
-	struct atm_dev *atm_dev;
 	struct fs_dev *fs_dev;
-	
+	int i;
+
 	if (pci_enable_device(pci_dev)) 
 		goto err_out;
 
@@ -1910,13 +1926,17 @@ static int __init firestream_init_one (struct pci_dev *pci_dev,
 		goto err_out;
 
 	memset (fs_dev, 0, sizeof (struct fs_dev));
-  
-	atm_dev = atm_dev_register("fs", &ops, -1, NULL);
-	if (!atm_dev)
-		goto err_out_free_fs_dev;
-  
+
+	for (i=0;i<fs_maxphy;i++) {
+		fs_dev->atm_dev[i] = atm_dev_register("fs", &ops, -1, NULL);
+		if (!fs_dev->atm_dev[i])
+			goto err_out_free_atm_dev;
+	}
+	/* XXX if another device is registering atm devices at the same time
+	   we get confusion.  */
+	fs_dev->start_number = fs_dev->atm_dev[0]->number;
+
 	fs_dev->pci_dev = pci_dev;
-	fs_dev->atm_dev = atm_dev;
 	fs_dev->flags = ent->driver_data;
 
 	if (fs_init(fs_dev))
@@ -1927,7 +1947,8 @@ static int __init firestream_init_one (struct pci_dev *pci_dev,
 	return 0;
 
  err_out_free_atm_dev:
-	atm_dev_deregister(atm_dev);
+	for (i--;i >= 0;i--)
+		atm_dev_deregister(fs_dev->atm_dev[i]);
  err_out_free_fs_dev:
 	kfree(fs_dev);
  err_out:
@@ -2002,7 +2023,9 @@ void __devexit firestream_remove_one (struct pci_dev *pdev)
 		free_irq (dev->irq, dev);
 		del_timer (&dev->timer);
 
-		atm_dev_deregister(dev->atm_dev);
+		for (i=0;i<fs_maxphy;i++)
+			atm_dev_deregister(dev->atm_dev[i]);
+
 		free_queue (dev, &dev->hp_txq);
 		free_queue (dev, &dev->lp_txq);
 		free_queue (dev, &dev->tx_relq);

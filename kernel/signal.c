@@ -242,16 +242,16 @@ printk("SIG dequeue (%s:%d): %d ", current->comm, current->pid,
 #endif
 
 	sig = next_signal(current, mask);
-	if (current->notifier) {
-		if (sigismember(current->notifier_mask, sig)) {
-			if (!(current->notifier)(current->notifier_data)) {
-				current->sigpending = 0;
-				return 0;
+	if (sig) {
+		if (current->notifier) {
+			if (sigismember(current->notifier_mask, sig)) {
+				if (!(current->notifier)(current->notifier_data)) {
+					current->sigpending = 0;
+					return 0;
+				}
 			}
 		}
-	}
 
-	if (sig) {
 		if (!collect_signal(sig, &current->pending, info))
 			sig = 0;
 				

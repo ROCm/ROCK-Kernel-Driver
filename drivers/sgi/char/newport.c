@@ -16,6 +16,8 @@
 
 struct newport_regs *npregs;
 
+EXPORT_SYMBOL(npregs);
+
 /* Kernel routines for supporting graphics context switching */
 
 void newport_save (void *y)

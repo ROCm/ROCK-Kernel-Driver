@@ -22,6 +22,7 @@
  */
 
 #include <linux/string.h>
+#include <linux/kernel.h>
 #include <asm/byteorder.h>
 
 #include "unistr.h"

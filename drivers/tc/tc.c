@@ -1,4 +1,4 @@
-/* $Id: tc.c,v 1.3 1999/10/09 00:01:32 ralf Exp $
+/*
  * tc-init: We assume the TURBOchannel to be up and running so
  * just probe for Modules and fill in the global data structure
  * tc_bus.
@@ -8,9 +8,7 @@
  * for more details.
  *
  * Copyright (c) Harald Koerfgen, 1998
- *
  */
-
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -23,14 +21,15 @@
 
 #include <asm/ptrace.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 
 #define TC_DEBUG
 
 slot_info tc_bus[MAX_SLOT];
-static int max_tcslot = 0;
-static tcinfo *info = (tcinfo *)0;
+static int max_tcslot;
+static tcinfo *info;
 
-unsigned long system_base = 0;
+unsigned long system_base;
 
 extern void (*dbe_board_handler)(struct pt_regs *regs);
 extern unsigned long *(*rex_slot_address)(int);
@@ -112,19 +111,19 @@ static void __init tc_probe(unsigned long startaddr, unsigned long size, int max
 	for (slot = 0; slot <= max_slot; slot++) {
 		module = (char *)(startaddr + slot * size);
 		offset = -1;
-		if (module[OLDCARD + PATTERN0] == 0x55 && module[OLDCARD + PATTERN1] == 0x00
-		  && module[OLDCARD + PATTERN2] == 0xaa && module[OLDCARD + PATTERN3] == 0xff)
+		if (module[OLDCARD + TC_PATTERN0] == 0x55 && module[OLDCARD + TC_PATTERN1] == 0x00
+		  && module[OLDCARD + TC_PATTERN2] == 0xaa && module[OLDCARD + TC_PATTERN3] == 0xff)
 			offset = OLDCARD;
-		if (module[PATTERN0] == 0x55 && module[PATTERN1] == 0x00
-		  && module[PATTERN2] == 0xaa && module[PATTERN3] == 0xff)
+		if (module[TC_PATTERN0] == 0x55 && module[TC_PATTERN1] == 0x00
+		  && module[TC_PATTERN2] == 0xaa && module[TC_PATTERN3] == 0xff)
 			offset = 0;
 
 		if (offset != -1) {
 			tc_bus[slot].base_addr = (unsigned long)module;
 			for(i = 0; i < 8; i++) {
-				tc_bus[slot].firmware[i] = module[FIRM_VER + offset + 4 * i];
-				tc_bus[slot].vendor[i] = module[VENDOR + offset + 4 * i];
-				tc_bus[slot].name[i] = module[MODULE + offset + 4 * i];
+				tc_bus[slot].firmware[i] = module[TC_FIRM_VER + offset + 4 * i];
+				tc_bus[slot].vendor[i] = module[TC_VENDOR + offset + 4 * i];
+				tc_bus[slot].name[i] = module[TC_MODULE + offset + 4 * i];
 			}
 			tc_bus[slot].firmware[8] = 0;
 			tc_bus[slot].vendor[8] = 0;
@@ -206,7 +205,7 @@ void __init tc_init(void)
 	if (TURBOCHANNEL && info->slot_size && slot0addr) {
 		printk("TURBOchannel rev. %1d at %2d.%1d MHz ", info->revision,
 			tc_clock / 10, tc_clock % 10);
-		printk("(%sparity)\n", info->parity ? "" : "no ");
+		printk("(with%s parity)\n", info->parity ? "" : "out");
 
 		slot_size = info->slot_size << 20;
 
@@ -235,3 +234,11 @@ void __init tc_init(void)
 		ioport_resource.end = KSEG2 - 1;
 	}
 }
+
+EXPORT_SYMBOL(search_tc_card);
+EXPORT_SYMBOL(claim_tc_card);
+EXPORT_SYMBOL(release_tc_card);
+EXPORT_SYMBOL(get_tc_base_addr);
+EXPORT_SYMBOL(get_tc_irq_nr);
+EXPORT_SYMBOL(get_tc_speed);
+

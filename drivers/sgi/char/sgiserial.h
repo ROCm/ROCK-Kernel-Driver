@@ -359,7 +359,7 @@ struct sgi_serial {
 #define	ZCOUNT		0x2	/* Zero count */
 #define	Tx_BUF_EMP	0x4	/* Tx Buffer empty */
 #define	DCD		0x8	/* DCD */
-#define	SYNC_HUNT	0x10	/* Sync/hunt */
+#define	SYNC		0x10	/* Sync/hunt */
 #define	CTS		0x20	/* CTS */
 #define	TxEOM		0x40	/* Tx underrun */
 #define	BRK_ABRT	0x80	/* Break/Abort */

@@ -5,6 +5,10 @@
  *
  * Copyright notice & release notes in file orinoco.c
  * 
+ * Note specific to airport stub:
+ * 
+ *  0.05 : first version of the new split driver
+ *  0.06 : fix possible hang on powerup, add sleep support
  */
 
 #include <linux/module.h>
@@ -25,9 +29,12 @@
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
 #include <linux/list.h>
+#include <linux/adb.h>
+#include <linux/pmu.h>
 
 #include <asm/prom.h>
 #include <asm/feature.h>
+#include <asm/irq.h>
 
 #include "hermes.h"
 #include "orinoco.h"
@@ -40,9 +47,17 @@ typedef struct dldwd_card {
 	struct device_node* node;
 	int irq_requested;
 	int ndev_registered;
+	int open;
 	/* Common structure (fully included), see orinoco.h */
 	struct dldwd_priv priv;
 } dldwd_card_t;
+
+#ifdef CONFIG_PMAC_PBOOK
+static int airport_sleep_notify(struct pmu_sleep_notifier *self, int when);
+static struct pmu_sleep_notifier airport_sleep_notifier = {
+	airport_sleep_notify, SLEEP_LEVEL_NET,
+};
+#endif
 
 /*
  * Function prototypes
@@ -69,24 +84,15 @@ static dldwd_priv_t *airport_dev;
 static int airport_init(struct net_device *dev)
 {
 	dldwd_priv_t *priv = dev->priv;
-	dldwd_card_t* card = (dldwd_card_t *)priv->card;
 	int rc;
 	
 	TRACE_ENTER(priv->ndev.name);
 
 	MOD_INC_USE_COUNT;
 
-	feature_set_airport_power(card->node, 1);
-	current->state = TASK_UNINTERRUPTIBLE;
-	schedule_timeout(HZ);
-
 	rc = dldwd_init(dev);
-	if (rc) {	
-		feature_set_airport_power(card->node, 0);
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ);
-	}
-	priv->hw_ready = 1;
+	if (!rc)
+		priv->hw_ready = 1;
 
 	MOD_DEC_USE_COUNT;
 
@@ -97,18 +103,20 @@ static int
 airport_open(struct net_device *dev)
 {
 	dldwd_priv_t *priv = dev->priv;
+	dldwd_card_t* card = (dldwd_card_t *)priv->card;
 	int rc;
 
 	TRACE_ENTER(priv->ndev.name);
 
-	netif_device_attach(dev);
 	rc = dldwd_reset(priv);
 	if (rc)
 		airport_stop(dev);
-	else
-		netif_start_queue(dev);
+	else {
+		card->open = 1;
+		netif_device_attach(dev);
+	}
 
-	TRACE_EXIT(priv->ndev.name);
+//	TRACE_EXIT(priv->ndev.name);
 
 	return rc;
 }
@@ -117,17 +125,65 @@ static int
 airport_stop(struct net_device *dev)
 {
 	dldwd_priv_t *priv = dev->priv;
+	dldwd_card_t* card = (dldwd_card_t *)priv->card;
 
 	TRACE_ENTER(priv->ndev.name);
 
 	netif_stop_queue(dev);
-
 	dldwd_shutdown(priv);
+	card->open = 0;
 
 	TRACE_EXIT(priv->ndev.name);
 
 	return 0;
 }
+
+#ifdef CONFIG_PMAC_PBOOK
+static int
+airport_sleep_notify(struct pmu_sleep_notifier *self, int when)
+{
+	dldwd_priv_t *priv;
+	struct net_device *ndev;
+	dldwd_card_t* card;
+	int rc;
+	
+	if (!airport_dev)
+		return PBOOK_SLEEP_OK;
+	priv = airport_dev;
+	ndev = &priv->ndev;
+	card = (dldwd_card_t *)priv->card;
+
+	switch (when) {
+	case PBOOK_SLEEP_REQUEST:
+		break;
+	case PBOOK_SLEEP_REJECT:
+		break;
+	case PBOOK_SLEEP_NOW:
+		printk(KERN_INFO "%s: Airport entering sleep mode\n", ndev->name);
+		netif_device_detach(ndev);
+		if (card->open)
+			dldwd_shutdown(priv);
+		disable_irq(ndev->irq);
+		feature_set_airport_power(card->node, 0);
+		priv->hw_ready = 0;
+		break;
+	case PBOOK_WAKE:
+		printk(KERN_INFO "%s: Airport waking up\n", ndev->name);
+		feature_set_airport_power(card->node, 1);
+		mdelay(200);
+		hermes_reset(&priv->hw);
+		priv->hw_ready = 1;		
+		rc = dldwd_reset(priv);
+		if (rc)
+			printk(KERN_ERR "airport: Error %d re-initing card !\n", rc);
+		else if (card->open)
+			netif_device_attach(ndev);
+		enable_irq(ndev->irq);
+		break;
+	}
+	return PBOOK_SLEEP_OK;
+}
+#endif /* CONFIG_PMAC_PBOOK */
 
 static dldwd_priv_t*
 airport_attach(struct device_node* of_node)
@@ -175,6 +231,14 @@ airport_attach(struct device_node* of_node)
 
 	hermes_struct_init(hw, ndev->base_addr);
 		
+	/* Power up card */
+	feature_set_airport_power(card->node, 1);
+	current->state = TASK_UNINTERRUPTIBLE;
+	schedule_timeout(HZ);
+
+	/* Reset it before we get the interrupt */
+	hermes_reset(hw);
+
 	if (request_irq(ndev->irq, dldwd_interrupt, 0, "Airport", (void *)priv)) {
 		printk(KERN_ERR "airport: Couldn't get IRQ %d\n", ndev->irq);
 		goto failed;
@@ -198,6 +262,9 @@ airport_attach(struct device_node* of_node)
 		printk(KERN_ERR "airport: Failed to create /proc node for %s\n",
 		       ndev->name);
 
+#ifdef CONFIG_PMAC_PBOOK
+	pmu_register_sleep_notifier(&airport_sleep_notifier);
+#endif
 	return priv;
 	
 failed:
@@ -219,6 +286,9 @@ airport_detach(dldwd_priv_t *priv)
 	/* Unregister proc entry */
 	dldwd_proc_dev_cleanup(priv);
 
+#ifdef CONFIG_PMAC_PBOOK
+	pmu_unregister_sleep_notifier(&airport_sleep_notifier);
+#endif
 	if (card->ndev_registered)
 		unregister_netdev(&priv->ndev);
 	card->ndev_registered = 0;
@@ -265,8 +335,6 @@ exit_airport(void)
 		airport_detach(airport_dev);
 	airport_dev = NULL;
 }
-
-MODULE_DESCRIPTION("Apple Airport driver");
 
 module_init(init_airport);
 module_exit(exit_airport);

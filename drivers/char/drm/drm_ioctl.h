@@ -98,7 +98,6 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 	}
 	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
 
-#ifdef __alpha__
 	do {
 		struct pci_dev *pci_dev;
                 int b, d, f;
@@ -114,10 +113,13 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
                 if (*p) break;
  
                 pci_dev = pci_find_slot(b, PCI_DEVFN(d,f));
-                if (pci_dev)
-                        dev->hose = pci_dev->sysdata;
-        } while(0);
+                if (pci_dev) {
+			dev->pdev = pci_dev;
+#ifdef __alpha__
+			dev->hose = pci_dev->sysdata;
 #endif
+		}
+        } while(0);
 
 	return 0;
 }

@@ -13,6 +13,9 @@
  * thorough pass to merge in the rest of the updates.
  * Better still, someone really ought to make it a common
  * code module for both platforms.   kevink@mips.com
+ *
+ * 20010616 - Klaus Naumann <spock@mgnet.de> : Make serial console work with
+ *                                             any speed - not only 9600
  */
 
 #include <linux/config.h> /* for CONFIG_REMOTE_DEBUG */
@@ -58,9 +61,9 @@ struct sgi_serial *zs_chain;  /* IRQ servicing chain */
 static int zilog_irq = SGI_SERIAL_IRQ;
 
 /* Console hooks... */
-static int zs_cons_chanout = 0;
-static int zs_cons_chanin = 0;
-struct sgi_serial *zs_consinfo = 0;
+static int zs_cons_chanout;
+static int zs_cons_chanin;
+struct sgi_serial *zs_consinfo;
 
 static unsigned char kgdb_regs[16] = {
 	0, 0, 0,                     /* write 0, 1, 2 */
@@ -97,6 +100,7 @@ static unsigned char zscons_regs[16] = {
 DECLARE_TASK_QUEUE(tq_serial);
 
 struct tty_driver serial_driver, callout_driver;
+struct console *sgisercon;
 static int serial_refcount;
 
 /* serial subtype definitions */
@@ -144,10 +148,10 @@ static inline int serial_paranoia_check(struct sgi_serial *info,
 					dev_t device, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
-	static const char *badmagic =
+	static const char *badmagic = KERN_WARNING
 		"Warning: bad magic number for serial struct (%d, %d) in %s\n";
-	static const char *badinfo =
-		"Warning: null sun_serial for (%d, %d) in %s\n";
+	static const char *badinfo = KERN_WARNING
+		"Warning: null sgi_serial for (%d, %d) in %s\n";
 
 	if (!info) {
 		printk(badinfo, MAJOR(device), MINOR(device), routine);
@@ -178,7 +182,8 @@ static int baud_table[] = {
  * interrupts are enabled. Therefore we have to check ioc_iocontrol before we
  * access it.
  */
-static inline unsigned char read_zsreg(struct sgi_zschannel *channel, unsigned char reg)
+static inline unsigned char read_zsreg(struct sgi_zschannel *channel,
+                                       unsigned char reg)
 {
 	unsigned char retval;
 	volatile unsigned char junk;
@@ -192,7 +197,8 @@ static inline unsigned char read_zsreg(struct sgi_zschannel *channel, unsigned c
 	return retval;
 }
 
-static inline void write_zsreg(struct sgi_zschannel *channel, unsigned char reg, unsigned char value)
+static inline void write_zsreg(struct sgi_zschannel *channel,
+                               unsigned char reg, unsigned char value)
 {
 	volatile unsigned char junk;
 
@@ -323,7 +329,7 @@ static void rs_start(struct tty_struct *tty)
  */
 static void batten_down_hatches(void)
 {
-	prom_imode();
+	ArcEnterInteractiveMode();
 #if 0
 	/* If we are doing kadb, we call the debugger
 	 * else we just drop into the boot monitor.
@@ -682,7 +688,7 @@ static int startup(struct sgi_serial * info)
 	save_flags(flags); cli();
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("starting up ttys%d (irq %d)...", info->line, info->irq);
+	printk("starting up ttys%d (irq %d)...\n", info->line, info->irq);
 #endif
 
 	/*
@@ -1302,6 +1308,59 @@ static int get_lsr_info(struct sgi_serial * info, unsigned int *value)
 	junk = ioc_icontrol->istat0;
 	sti();
 	return put_user(status,value);
+} 
+
+static int get_modem_info(struct sgi_serial * info, unsigned int *value)
+{
+	unsigned char status;
+	unsigned int result;
+
+	cli();
+	status = info->zs_channel->control;
+	udelay(2);
+	sti();
+	result =  ((info->curregs[5] & RTS) ? TIOCM_RTS : 0)
+		| ((info->curregs[5] & DTR) ? TIOCM_DTR : 0)
+		| ((status  & DCD) ? TIOCM_CAR : 0)
+		| ((status  & SYNC) ? TIOCM_DSR : 0)
+		| ((status  & CTS) ? TIOCM_CTS : 0);
+	if (put_user(result, value))
+		return -EFAULT;
+	return 0;
+}
+
+static int set_modem_info(struct sgi_serial * info, unsigned int cmd,
+			  unsigned int *value)
+{
+	unsigned int arg;
+
+	if (get_user(arg, value))
+		return -EFAULT;
+	switch (cmd) {
+	case TIOCMBIS: 
+		if (arg & TIOCM_RTS)
+			info->curregs[5] |= RTS;
+		if (arg & TIOCM_DTR)
+			info->curregs[5] |= DTR;
+		break;
+	case TIOCMBIC:
+		if (arg & TIOCM_RTS)
+			info->curregs[5] &= ~RTS;
+		if (arg & TIOCM_DTR)
+			info->curregs[5] &= ~DTR;
+		break;
+	case TIOCMSET:
+		info->curregs[5] = ((info->curregs[5] & ~(RTS | DTR))
+			     | ((arg & TIOCM_RTS) ? RTS : 0)
+			     | ((arg & TIOCM_DTR) ? DTR : 0));
+		break;
+	default:
+		return -EINVAL;
+	}
+	cli();
+	write_zsreg(info->zs_channel, 5, info->curregs[5]);
+	sti();
+	return 0;
 }
 
 /*
@@ -1322,11 +1381,10 @@ static void send_break(	struct sgi_serial * info, int duration)
 static int rs_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 {
-	int error;
-	struct sgi_serial * info = (struct sgi_serial *)tty->driver_data;
+	struct sgi_serial * info = (struct sgi_serial *) tty->driver_data;
 	int retval;
 
-	if (serial_paranoia_check(info, tty->device, "rs_ioctl"))
+	if (serial_paranoia_check(info, tty->device, "zs_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -1353,45 +1411,36 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 			send_break(info, arg ? arg*(HZ/10) : HZ/4);
 			return 0;
 		case TIOCGSOFTCAR:
-			error = verify_area(VERIFY_WRITE, (void *) arg,sizeof(long));
-			if (error)
-				return error;
-			put_user(C_CLOCAL(tty) ? 1 : 0,
-			         (unsigned long *) arg);
+			if (put_user(C_CLOCAL(tty) ? 1 : 0,
+				     (unsigned long *) arg))
+				return -EFAULT;
 			return 0;
 		case TIOCSSOFTCAR:
-			error = get_user(arg, (unsigned long *)arg);
-			if (error)
-				return error;
+			if (get_user(arg, (unsigned long *) arg))
+				return -EFAULT;
 			tty->termios->c_cflag =
 				((tty->termios->c_cflag & ~CLOCAL) |
 				 (arg ? CLOCAL : 0));
 			return 0;
+		case TIOCMGET:
+			return get_modem_info(info, (unsigned int *) arg);
+		case TIOCMBIS:
+		case TIOCMBIC:
+		case TIOCMSET:
+			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
-			error = verify_area(VERIFY_WRITE, (void *) arg,
-						sizeof(struct serial_struct));
-			if (error)
-				return error;
 			return get_serial_info(info,
 					       (struct serial_struct *) arg);
 		case TIOCSSERIAL:
 			return set_serial_info(info,
 					       (struct serial_struct *) arg);
 		case TIOCSERGETLSR: /* Get line status register */
-			error = verify_area(VERIFY_WRITE, (void *) arg,
-				sizeof(unsigned int));
-			if (error)
-				return error;
-			else
-			    return get_lsr_info(info, (unsigned int *) arg);
+			return get_lsr_info(info, (unsigned int *) arg);
 
 		case TIOCSERGSTRUCT:
-			error = verify_area(VERIFY_WRITE, (void *) arg,
-						sizeof(struct sgi_serial));
-			if (error)
-				return error;
-			copy_to_user((struct sun_serial *) arg,
-				    info, sizeof(struct sgi_serial));
+			if (copy_to_user((struct sgi_serial *) arg,
+				    info, sizeof(struct sgi_serial)))
+				return -EFAULT;
 			return 0;
 			
 		default:
@@ -1727,11 +1776,19 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 		change_speed(info);
 	}
 
+	/* If this is the serial console change the speed to 
+	 * the right value
+	 */
+	if (info->is_cons) {
+		info->tty->termios->c_cflag = sgisercon->cflag;
+		change_speed(info);		
+	}
+
 	info->session = current->session;
 	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("rs_open ttys%d successful...", info->line);
+	printk("rs_open ttys%d successful...\n", info->line);
 #endif
 	return 0;
 }
@@ -1748,13 +1805,10 @@ static inline struct sgi_zslayout *get_zs(int chip)
 {
 	extern struct hpc3_miscregs *hpc3mregs;
 
-	if(chip > 0) {
-		prom_printf("Wheee, bogus zs chip number requested.\n");
-		prom_getchar();
-		romvec->imode();
-	}
-	return (struct sgi_zslayout *) (&hpc3mregs->ser1cmd);
+	if (chip > 0)
+		panic("Wheee, bogus zs chip number requested.");
 
+	return (struct sgi_zslayout *) (&hpc3mregs->ser1cmd);
 }
 
 
@@ -1784,13 +1838,6 @@ rs_cons_check(struct sgi_serial *ss, int channel)
 	}
 	if(o && i)
 		io = 1;
-	if(ss->zs_baud != 9562) { /* Don't ask... */
-		prom_printf("BAD console baud rate %d\n", ss->zs_baud);
-		prom_getchar();
-		prom_imode();
-		panic("Console baud rate weirdness");
-	}
-
 
 	/* Set flag variable for this port so that it cannot be
 	 * opened for other uses by accident.
@@ -1798,7 +1845,7 @@ rs_cons_check(struct sgi_serial *ss, int channel)
 	ss->is_cons = 1;
 
 	if(io) {
-		if(!msg_printed) {
+		if (!msg_printed) {
 			printk("zs%d: console I/O\n", ((channel>>1)&1));
 			msg_printed = 1;
 		}
@@ -1806,7 +1853,6 @@ rs_cons_check(struct sgi_serial *ss, int channel)
 	} else {
 		printk("zs%d: console %s\n", ((channel>>1)&1),
 		       (i==1 ? "input" : (o==1 ? "output" : "WEIRD")));
-
 	}
 }
 
@@ -2002,7 +2048,6 @@ void
 rs_cons_hook(int chip, int out, int line)
 {
 	int channel;
-
 	
 	if(chip)
 		panic("rs_cons_hook called with chip not zero");
@@ -2087,11 +2132,11 @@ static kdev_t zs_console_device(struct console *con)
 static int __init zs_console_setup(struct console *con, char *options)
 {
 	struct sgi_serial *info;
-	int	baud = 9600;
+	int	baud;
 	int	bits = 8;
 	int	parity = 'n';
 	int	cflag = CREAD | HUPCL | CLOCAL;
-	char	*s;
+	char	*s, *dbaud;
 	int     i, brg;
     
 	if (options) {
@@ -2101,6 +2146,21 @@ static int __init zs_console_setup(struct console *con, char *options)
 			s++;
 		if (*s) parity = *s++;
 		if (*s) bits   = *s - '0';
+	}
+	else {
+		/* If the user doesn't set console=... try to read the
+		 * PROM variable - if this fails use 9600 baud and
+		 * inform the user about the problem
+		 */
+		dbaud = ArcGetEnvironmentVariable("dbaud");
+		if(dbaud) baud = simple_strtoul(dbaud, NULL, 10);
+		else {
+			/* Use prom_printf() to make sure that the user
+			 * is getting anything ...
+			 */
+			prom_printf("No dbaud set in PROM ?!? Using 9600.\n");
+			baud = 9600;
+		}
 	}
 
 	/*
@@ -2156,7 +2216,8 @@ static int __init zs_console_setup(struct console *con, char *options)
 	info = zs_soft + con->index;
 	info->is_cons = 1;
     
-	printk("Console: ttyS%d (Zilog8530)\n", info->line);
+	printk("Console: ttyS%d (Zilog8530), %d baud\n", 
+						info->line, baud);
 
 	i = con->cflag & CBAUD;
 	if (con->cflag & CBAUDEX) {
@@ -2195,6 +2256,8 @@ static int __init zs_console_setup(struct console *con, char *options)
 		zscons_regs[4] |= SB2;
 	else
 		zscons_regs[4] |= SB1;
+	
+	sgisercon = con;
 
 	brg = BPS_TO_BRG(baud, ZS_CLOCK / info->clk_divisor);
 	zscons_regs[12] = brg & 0xff;

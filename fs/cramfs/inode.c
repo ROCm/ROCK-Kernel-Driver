@@ -374,6 +374,7 @@ static int cramfs_readpage(struct file *file, struct page * page)
 {
 	struct inode *inode = page->mapping->host;
 	u32 maxblock, bytes_filled;
+	void *pgdata;
 
 	maxblock = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	bytes_filled = 0;
@@ -387,15 +388,18 @@ static int cramfs_readpage(struct file *file, struct page * page)
 			start_offset = *(u32 *) cramfs_read(sb, blkptr_offset-4, 4);
 		compr_len = (*(u32 *) cramfs_read(sb, blkptr_offset, 4)
 			     - start_offset);
+		pgdata = kmap(page);
 		if (compr_len == 0)
 			; /* hole */
 		else
-			bytes_filled = cramfs_uncompress_block(page_address(page),
+			bytes_filled = cramfs_uncompress_block(pgdata,
 				 PAGE_CACHE_SIZE,
 				 cramfs_read(sb, start_offset, compr_len),
 				 compr_len);
-	}
-	memset(page_address(page) + bytes_filled, 0, PAGE_CACHE_SIZE - bytes_filled);
+	} else
+		pgdata = kmap(page);
+	memset(pgdata + bytes_filled, 0, PAGE_CACHE_SIZE - bytes_filled);
+	kunmap(page);
 	flush_dcache_page(page);
 	SetPageUptodate(page);
 	UnlockPage(page);

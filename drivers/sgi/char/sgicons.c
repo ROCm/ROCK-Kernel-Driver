@@ -1,5 +1,4 @@
-/* $Id: sgicons.c,v 1.10 1998/08/25 09:18:58 ralf Exp $
- *
+/*
  * sgicons.c: Setting up and registering console I/O on the SGI.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
@@ -10,11 +9,9 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include "gconsole.h"
-
-/* To make psaux code cleaner */
-unsigned char aux_device_present = 0xaa;
 
 /* This is the system graphics console (the first adapter found) */
 struct console_ops *gconsole = 0;
@@ -35,6 +32,9 @@ disable_gconsole (void)
 		gconsole = 0;
 	}
 }
+
+EXPORT_SYMBOL(disable_gconsole);
+EXPORT_SYMBOL(enable_gconsole);
 
 void
 register_gconsole (struct console_ops *gc)

@@ -305,6 +305,9 @@ static int agp_return_size(void)
 
 void agp_copy_info(agp_kern_info * info)
 {
+	unsigned long page_mask = 0;
+	int i;
+
 	memset(info, 0, sizeof(agp_kern_info));
 	if (agp_bridge.type == NOT_SUPPORTED) {
 		info->chipset = agp_bridge.type;
@@ -319,6 +322,12 @@ void agp_copy_info(agp_kern_info * info)
 	info->aper_size = agp_return_size();
 	info->max_memory = agp_bridge.max_memory_agp;
 	info->current_memory = atomic_read(&agp_bridge.current_memory_agp);
+	info->cant_use_aperture = agp_bridge.cant_use_aperture;
+
+	for(i = 0; i < agp_bridge.num_of_masks; i++)
+		page_mask |= agp_bridge.mask_memory(page_mask, i);
+
+	info->page_mask = ~page_mask;
 }
 
 /* End - Routine to copy over information structure */
@@ -1083,6 +1092,7 @@ static int __init intel_i810_setup(struct pci_dev *i810_dev)
 	agp_bridge.free_by_type = intel_i810_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 }
@@ -1275,6 +1285,7 @@ static int __init intel_generic_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 	
@@ -1305,6 +1316,7 @@ static int __init intel_840_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 	
@@ -1335,6 +1347,7 @@ static int __init intel_850_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 	
@@ -1452,6 +1465,7 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 	
@@ -1563,6 +1577,7 @@ static int __init sis_generic_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 }
@@ -1938,6 +1953,7 @@ static int __init amd_irongate_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 	
@@ -2181,6 +2197,7 @@ static int __init ali_generic_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = ali_alloc_page;
 	agp_bridge.agp_destroy_page = ali_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	return 0;
 	
@@ -2766,6 +2783,7 @@ static int __init serverworks_setup (struct pci_dev *pdev)
 	agp_bridge.free_by_type = agp_generic_free_by_type;
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge.cant_use_aperture = 0;
 
 	pci_read_config_dword(agp_bridge.dev,
 			      SVWRKS_APSIZE,

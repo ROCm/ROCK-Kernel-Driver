@@ -72,6 +72,7 @@ typedef struct drm_r128_private {
 	int usec_timeout;
 	int is_pci;
 	unsigned long phys_pci_gart;
+	dma_addr_t bus_pci_gart;
 	unsigned long cce_buffers_offset;
 
 	atomic_t idle_count;

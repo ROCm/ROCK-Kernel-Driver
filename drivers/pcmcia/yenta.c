@@ -729,7 +729,7 @@ static void yenta_allocate_res(pci_socket_t *socket, int nr, unsigned type)
 	if (type & IORESOURCE_IO) {
 		align = 1024;
 		size = 256;
-		min = PCIBIOS_MIN_IO;
+		min = 0x4000;
 		max = 0xffff;
 	}
 		

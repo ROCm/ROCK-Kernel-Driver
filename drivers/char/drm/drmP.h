@@ -76,6 +76,17 @@
 #include <asm/pgalloc.h>
 #include "drm.h"
 
+/* page_to_bus for earlier kernels, not optimal in all cases */
+#ifndef page_to_bus
+#define page_to_bus(page)	((unsigned int)(virt_to_bus(page_address(page))))
+#endif
+
+/* We just use virt_to_bus for pci_map_single on older kernels */
+#if LINUX_VERSION_CODE < 0x020400
+#define pci_map_single(hwdev, ptr, size, direction)	virt_to_bus(ptr)
+#define pci_unmap_single(hwdev, dma_addr, size, direction)
+#endif
+
 /* DRM template customization defaults
  */
 #ifndef __HAVE_AGP
@@ -616,6 +627,8 @@ typedef struct drm_agp_head {
 	int                acquired;
 	unsigned long      base;
    	int 		   agp_mtrr;
+	int		   cant_use_aperture;
+	unsigned long	   page_mask;
 } drm_agp_head_t;
 #endif
 
@@ -624,6 +637,7 @@ typedef struct drm_sg_mem {
 	void            *virtual;
 	int             pages;
 	struct page     **pagelist;
+	dma_addr_t	*busaddr;
 } drm_sg_mem_t;
 
 typedef struct drm_sigdata {
@@ -714,6 +728,7 @@ typedef struct drm_device {
 #if __REALLY_HAVE_AGP
 	drm_agp_head_t    *agp;
 #endif
+	struct pci_dev *pdev;
 #ifdef __alpha__
 #if LINUX_VERSION_CODE < 0x020403
 	struct pci_controler *hose;
@@ -1018,8 +1033,12 @@ extern int            DRM(sg_free)(struct inode *inode, struct file *filp,
 #endif
 
                                /* ATI PCIGART support (ati_pcigart.h) */
-extern unsigned long  DRM(ati_pcigart_init)(drm_device_t *dev);
-extern int            DRM(ati_pcigart_cleanup)(unsigned long address);
+extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
+					    unsigned long *addr,
+					    dma_addr_t *bus_addr);
+extern int            DRM(ati_pcigart_cleanup)(drm_device_t *dev,
+					       unsigned long addr,
+					       dma_addr_t bus_addr);
 
 #endif /* __KERNEL__ */
 #endif

@@ -67,6 +67,7 @@ comment 'USB Controllers'
    dep_tristate '  PLUSB Prolific USB-Network driver (EXPERIMENTAL)' CONFIG_USB_PLUSB $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  USB ADMtek Pegasus-based ethernet device support (EXPERIMENTAL)' CONFIG_USB_PEGASUS $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  USB CATC NetMate-based Ethernet driver (EXPERIMENTAL)' CONFIG_USB_CATC $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB KLSI KL5USB101-based ethernet device support (EXPERIMENTAL)' CONFIG_USB_KAWETH $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  NetChip 1080-based USB Host-to-Host Link (EXPERIMENTAL)' CONFIG_USB_NET1080 $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
 
    comment 'USB port drivers'

@@ -89,6 +89,18 @@ struct dec_zschannel {
 	unsigned char curregs[NUM_ZSREGS];
 };
 
+struct dec_serial;
+
+struct zs_hook {
+	int (*init_channel)(struct dec_serial* info);
+	void (*init_info)(struct dec_serial* info);
+	void (*rx_char)(unsigned char ch, unsigned char stat);
+	int  (*poll_rx_char)(struct dec_serial* info);
+	int  (*poll_tx_char)(struct dec_serial* info,
+			     unsigned char ch);
+	unsigned cflags;
+};
+
 struct dec_serial {
 	struct dec_serial *zs_next;	/* For IRQ servicing chain */
 	struct dec_zschannel *zs_channel; /* Channel registers */
@@ -97,7 +109,7 @@ struct dec_serial {
 
 	char soft_carrier;  /* Use soft carrier on this channel */
 	char break_abort;   /* Is serial console in, so process brk/abrt */
-	char kgdb_channel;  /* Kgdb is running on this channel */
+	struct zs_hook *hook;  /* Hook on this channel */
 	char is_cons;       /* Is this our console. */
 	unsigned char tx_active; /* character is being xmitted */
 	unsigned char tx_stopped; /* output is suspended */

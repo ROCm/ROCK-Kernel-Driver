@@ -13,6 +13,8 @@
 
 #ifdef __KERNEL__
 
+#include <linux/kd.h>
+
 #define KEYBOARD_IRQ			1
 #define DISABLE_KBD_DURING_INTERRUPTS	0
 
@@ -31,7 +33,7 @@ extern unsigned char pckbd_sysrq_xlate[128];
 #define kbd_translate		pckbd_translate
 #define kbd_unexpected_up	pckbd_unexpected_up
 #define kbd_leds		pckbd_leds
-#define kbd_rate               pckbd_rate
+#define kbd_rate		pckbd_rate
 #define kbd_init_hw		pckbd_init_hw
 #define kbd_sysrq_xlate		pckbd_sysrq_xlate
 

@@ -85,6 +85,8 @@ typedef struct _agp_kern_info {
 	size_t aper_size;
 	int max_memory;		/* In pages */
 	int current_memory;
+	int cant_use_aperture;
+	unsigned long page_mask;
 } agp_kern_info;
 
 /* 

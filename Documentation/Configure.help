@@ -1746,6 +1746,36 @@ CONFIG_CPU_R3000
   similar) CPU, R4xx0 might be a safe bet.
   If the resulting Kernel does not work try to recompile with R3000.
 
+CPU type
+CONFIG_CPU_VR41XX
+  The options selects support for the NEC VR41xx series of processors.
+  Only choose this option if you have one of these processors as a
+  kernel built with this option will not run on any other type of
+  processor or vice versa.
+
+CPU feature configuration
+CONFIG_CPU_ADVANCED
+  Saying yes here allows you to select support for various features your
+  CPU may or may not have.  Most people should say N here.
+
+ll and sc instructions
+CONFIG_CPU_HAS_LLSC
+  Say Y here if your CPU has the ll and sc instructions.  Say Y here for
+  better performance, N if you don't know.  You must say Y here for
+  multiprocessor machines.
+
+lld and scd instructions
+CONFIG_CPU_HAS_LLDSCD
+  Say Y here if your CPU has the lld and scd instructions, the 64-bit
+  equivalents of ll and sc.  Say Y here for better performance, N if
+  you don't know.  You must say Y here for multiprocessor machines.
+
+Support for writebuffer flushing
+CONFIG_CPU_HAS_WB
+  Say N here for slightly better performance.  You must say Y here for
+  machines which require flushing of write buffers in software.  Saying
+  Y is the safe option; N may result in kernel malfunction and crashes.
+
 Support for large 64-bit configurations
 CONFIG_MIPS_INSANE_LARGE
   MIPS R10000 does support a 44 bit / 16TB address space as opposed to
@@ -11478,6 +11508,45 @@ CONFIG_USB_PEGASUS
   The module will be called pegasus.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
 
+CONFIG_USB_KAWETH
+  Say Y here if you want to use one of the following 10Mbps only
+  USB Ethernet adapters based on the KLSI KL5KUSB101B chipset:
+       3Com 3C19250
+       ADS USB-10BT
+       ATEN USB Ethernet
+       ASANTE USB To Ethernet Adapter
+       AOX Endpoints USB Ethernet
+       Correga K.K.
+       D-Link DSB-650C and DU-E10
+       Entrega / Portgear E45
+       I-O DATA USB-ET/T
+       Jaton USB Ethernet Device Adapter
+       Kingston Technology USB Ethernet Adapter
+       Linksys USB10T
+       Mobility USB-Ethernet Adapter
+        NetGear EA-101
+       Peracom Enet and Enet2
+       Portsmith Express Ethernet Adapter
+       Shark Pocket Adapter
+       SMC 2202USB
+       Sony Vaio port extender
+
+  This driver is likely to work with most 10Mbps only USB Ethernet
+  adapters, including some "no brand" devices. It does NOT work on
+  SmartBridges smartNIC or on Belkin F5U111 devices - you should use
+  the CATC NetMate driver for those. If you are not sure which one
+  you need, select both, and the correct one should be selected for
+  you.
+
+  This driver makes the adapter appear as a normal Ethernet interface,
+  typically on eth0, if it is the only ethernet device, or perhaps on
+  eth1, if you have a PCI or ISA ethernet card installed.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called kaweth.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 USB CATC NetMate-based Ethernet device support
 CONFIG_USB_CATC
   Say Y if you want to use one of the following 10Mbps USB Ethernet
@@ -15753,6 +15822,14 @@ CONFIG_REMOTE_DEBUG
   several megabytes and requires a machine with more than 16 MB,
   better 32 MB RAM to avoid excessive linking time. This is only
   useful for kernel hackers. If unsure, say N.
+
+Run uncached
+CONFIG_MIPS_UNCACHED
+  If you say Y here there kernel will disable all CPU caches.  This will
+  reduce the system's performance dramatically but can help finding
+  otherwise hard to track bugs.  It can also useful if you're doing
+  hardware debugging with a logic analyzer and need to see all traffic
+  on the bus.
 
 Magic System Request Key support
 CONFIG_MAGIC_SYSRQ
