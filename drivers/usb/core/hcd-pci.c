@@ -284,6 +284,11 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	dev_dbg (hcd->self.controller, "suspend D%d --> D%d\n",
 			dev->current_state, state);
 
+	if (pci_find_capability(dev, PCI_CAP_ID_PM)) {
+		dev_dbg(hcd->self.controller, "No PM capability\n");
+		return 0;
+	}
+
 	switch (hcd->state) {
 	case USB_STATE_HALT:
 		dev_dbg (hcd->self.controller, "halted; hcd not suspended\n");

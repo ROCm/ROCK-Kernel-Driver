@@ -252,14 +252,18 @@ static int ehci_hub_control (
 			/* force reset to complete */
 			writel (temp & ~PORT_RESET,
 					&ehci->regs->port_status [wIndex]);
-			do {
-				temp = readl (
-					&ehci->regs->port_status [wIndex]);
-				udelay (10);
-			} while (temp & PORT_RESET);
+			retval = handshake (
+					&ehci->regs->port_status [wIndex],
+					PORT_RESET, 0, 500);
+			if (retval != 0) {
+				ehci_err (ehci, "port %d reset error %d\n",
+					wIndex + 1, retval);
+				goto error;
+			}
 
 			/* see what we found out */
-			temp = check_reset_complete (ehci, wIndex, temp);
+			temp = check_reset_complete (ehci, wIndex,
+				readl (&ehci->regs->port_status [wIndex]));
 		}
 
 		// don't show wPortStatus if it's owned by a companion hc
