@@ -281,16 +281,21 @@ static void ohci_dump_td (char *label, struct td *td)
 			cbp ? (be + 1 - cbp) : 0);
 	} else {
 		unsigned	i;
-		dbg ("     info %08x CC=%x DI=%d START=%04x", tmp,
-			TD_CC_GET(tmp), /* FC, */
+		dbg ("     info %08x CC=%x FC=%d DI=%d SF=%04x", tmp,
+			TD_CC_GET(tmp),
+			(tmp >> 24) & 0x07,
 			(tmp & TD_DI) >> 21,
 			tmp & 0x0000ffff);
 		dbg ("     bp0 %08x be %08x",
 			le32_to_cpup (&td->hwCBP) & ~0x0fff,
 			le32_to_cpup (&td->hwBE));
 		for (i = 0; i < MAXPSW; i++) {
-			dbg ("       psw [%d] = %2x", i,
-				le16_to_cpu (td->hwPSW [i]));
+			u16	psw = le16_to_cpup (&td->hwPSW [i]);
+			int	cc = (psw >> 12) & 0x0f;
+			dbg ("       psw [%d] = %2x, CC=%x %s=%d", i,
+				psw, cc,
+				(cc >= 0x0e) ? "OFFSET" : "SIZE",
+				psw & 0x0fff);
 		}
 	}
 }

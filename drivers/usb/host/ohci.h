@@ -401,5 +401,5 @@ struct ohci_hcd {
 	struct usb_hcd		hcd;
 };
 
-#define hcd_to_ohci(hcd_ptr) list_entry(hcd_ptr, struct ohci_hcd, hcd)
+#define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
 

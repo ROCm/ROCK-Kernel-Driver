@@ -77,12 +77,12 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 	usb_hcd_giveback_urb (&ohci->hcd, urb);
 }
 
-static void td_submit_urb (struct urb *urb);
+static void td_submit_urb (struct ohci_hcd *ohci, struct urb *urb);
 
 /* Report interrupt transfer completion, maybe reissue */
-static void intr_resub (struct ohci_hcd *hc, struct urb *urb)
+static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 {
-	urb_priv_t	*urb_priv = urb->hcpriv;
+	struct urb_priv	*urb_priv = urb->hcpriv;
 	unsigned long	flags;
 
 // FIXME rewrite this resubmit path.  use pci_dma_sync_single()
@@ -120,7 +120,7 @@ static void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 	spin_unlock (&urb->lock);
 
 	spin_lock (&hc->lock);
-	td_submit_urb (urb);
+	td_submit_urb (hc, urb);
 	spin_unlock_irqrestore (&hc->lock, flags);
 }
 
@@ -518,12 +518,12 @@ static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 /* enqueue next TD for this URB (OHCI spec 5.2.8.2) */
 
 static void
-td_fill (struct ohci_hcd *ohci, unsigned int info,
+td_fill (unsigned int info,
 	dma_addr_t data, int len,
 	struct urb *urb, int index)
 {
 	struct td		*td, *td_pt;
-	urb_priv_t		*urb_priv = urb->hcpriv;
+	struct urb_priv		*urb_priv = urb->hcpriv;
 	int			is_iso = info & TD_ISO;
 
 	if (index >= urb_priv->length) {
@@ -582,28 +582,30 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 
 /*-------------------------------------------------------------------------*/
 
-/* prepare all TDs of a transfer */
-
-static void td_submit_urb (struct urb *urb)
-{ 
-	urb_priv_t	*urb_priv = urb->hcpriv;
-	struct ohci_hcd *ohci = hcd_to_ohci (urb->dev->bus->hcpriv);
+/* Prepare all TDs of a transfer, and queue them onto the ED.
+ * Caller guarantees HC is active.
+ * Usually the ED is already on the schedule, so TDs might be
+ * processed as soon as they're queued.
+ */
+static void td_submit_urb (
+	struct ohci_hcd	*ohci,
+	struct urb	*urb
+) {
+	struct urb_priv	*urb_priv = urb->hcpriv;
 	dma_addr_t	data;
 	int		data_len = urb->transfer_buffer_length;
-	int		cnt = 0; 
-	__u32		info = 0;
-  	unsigned int	toggle = 0;
+	int		cnt = 0;
+	u32		info = 0;
 	int		is_out = usb_pipeout (urb->pipe);
 
-	/* OHCI handles the DATA-toggles itself, we just use the
-	 * USB-toggle bits for resetting
+	/* OHCI handles the bulk/interrupt data toggles itself.  We just
+	 * use the device toggle bits for resetting, and rely on the fact
+	 * that resetting toggle is meaningless if the endpoint is active.
 	 */
-  	if (usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe), is_out)) {
-  		toggle = TD_T_TOGGLE;
-	} else {
-  		toggle = TD_T_DATA0;
+  	if (!usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe), is_out)) {
 		usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe),
 			is_out, 1);
+		urb_priv->ed->hwHeadP &= ~ED_C;
 	}
 
 	urb_priv->td_cnt = 0;
@@ -619,91 +621,88 @@ static void td_submit_urb (struct urb *urb)
 
 	/* NOTE:  TD_CC is set so we can tell which TDs the HC processed by
 	 * using TD_CC_GET, as well as by seeing them on the done list.
+	 * (CC = NotAccessed ... 0x0F, or 0x0E in PSWs for ISO.)
 	 */
-	switch (usb_pipetype (urb->pipe)) {
-		case PIPE_BULK:
-			info = is_out
-				? TD_CC | TD_DP_OUT
-				: TD_CC | TD_DP_IN ;
-			/* TDs _could_ transfer up to 8K each */
-			while (data_len > 4096) {		
-				td_fill (ohci,
-					info | (cnt? TD_T_TOGGLE:toggle),
-					data, 4096, urb, cnt);
-				data += 4096; data_len -= 4096; cnt++;
-			}
-			/* maybe avoid ED halt on final TD short read */
-			if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
-				info |= TD_R;
-			td_fill (ohci, info | (cnt ? TD_T_TOGGLE : toggle),
-				data, data_len, urb, cnt);
+	switch (urb_priv->ed->type) {
+
+	/* Bulk and interrupt are identical except for where in the schedule
+	 * their EDs live.
+	 */
+	// case PIPE_BULK:
+	// case PIPE_INTERRUPT:
+	default:
+		info = is_out
+			? TD_T_TOGGLE | TD_CC | TD_DP_OUT
+			: TD_T_TOGGLE | TD_CC | TD_DP_IN;
+		/* TDs _could_ transfer up to 8K each */
+		while (data_len > 4096) {
+			td_fill (info, data, 4096, urb, cnt);
+			data += 4096;
+			data_len -= 4096;
 			cnt++;
-			if ((urb->transfer_flags & USB_ZERO_PACKET)
-					&& cnt < urb_priv->length) {
-				td_fill (ohci, info | (cnt? TD_T_TOGGLE:toggle),
-					0, 0, urb, cnt);
-				cnt++;
-			}
-			/* start bulk list */
-			if (!ohci->sleeping) {
-				wmb ();
-				writel (OHCI_BLF, &ohci->regs->cmdstatus);
-			}
-			break;
+		}
+		/* maybe avoid ED halt on final TD short read */
+		if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+			info |= TD_R;
+		td_fill (info, data, data_len, urb, cnt);
+		cnt++;
+		if ((urb->transfer_flags & USB_ZERO_PACKET)
+				&& cnt < urb_priv->length) {
+			td_fill (info, 0, 0, urb, cnt);
+			cnt++;
+		}
+		/* maybe kickstart bulk list */
+		if (urb_priv->ed->type == PIPE_BULK) {
+			wmb ();
+			writel (OHCI_BLF, &ohci->regs->cmdstatus);
+		}
+		break;
 
-		case PIPE_INTERRUPT:
-			/* current policy:  only one TD per request.
-			 * otherwise identical to bulk, except for BLF
-			 */
-			info = TD_CC | toggle;
-			info |= is_out
-				?  TD_DP_OUT
-				:  TD_R | TD_DP_IN;
-			td_fill (ohci, info, data, data_len, urb, cnt++);
-			break;
+	/* control manages DATA0/DATA1 toggle per-request; SETUP resets it,
+	 * any DATA phase works normally, and the STATUS ack is special.
+	 */
+	case PIPE_CONTROL:
+		info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
+		td_fill (info,
+			pci_map_single (ohci->hcd.pdev,
+					urb->setup_packet, 8,
+					PCI_DMA_TODEVICE),
+			 8, urb, cnt++);
+		if (data_len > 0) {
+			info = TD_CC | TD_R | TD_T_DATA1;
+			info |= is_out ? TD_DP_OUT : TD_DP_IN;
+			/* NOTE:  mishandles transfers >8K, some >4K */
+			td_fill (info, data, data_len, urb, cnt++);
+		}
+		info = is_out
+			? TD_CC | TD_DP_IN | TD_T_DATA1
+			: TD_CC | TD_DP_OUT | TD_T_DATA1;
+		td_fill (info, data, 0, urb, cnt++);
+		/* maybe kickstart control list */
+		wmb ();
+		writel (OHCI_CLF, &ohci->regs->cmdstatus);
+		break;
 
-		case PIPE_CONTROL:
-			/* control requests don't use toggle state  */
-			info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
-			td_fill (ohci, info,
-				pci_map_single (ohci->hcd.pdev,
-						urb->setup_packet, 8,
-						PCI_DMA_TODEVICE),
-				 8, urb, cnt++); 
-			if (data_len > 0) {  
-				info = TD_CC | TD_R | TD_T_DATA1;
-				info |= is_out ? TD_DP_OUT : TD_DP_IN;
-				/* NOTE:  mishandles transfers >8K, some >4K */
-				td_fill (ohci, info, data, data_len,
-						urb, cnt++);  
-			} 
-			info = is_out
-				? TD_CC | TD_DP_IN | TD_T_DATA1
-				: TD_CC | TD_DP_OUT | TD_T_DATA1;
-			td_fill (ohci, info, data, 0, urb, cnt++);
-			/* start control list */
-			if (!ohci->sleeping) {
-				wmb ();
-				writel (OHCI_CLF, &ohci->regs->cmdstatus);
-			}
-			break;
+	/* ISO has no retransmit, so no toggle; and it uses special TDs.
+	 * Each TD could handle multiple consecutive frames (interval 1);
+	 * we could often reduce the number of TDs here.
+	 */
+	case PIPE_ISOCHRONOUS:
+		for (cnt = 0; cnt < urb->number_of_packets; cnt++) {
+			int	frame = urb->start_frame;
 
-		case PIPE_ISOCHRONOUS:
-			for (cnt = 0; cnt < urb->number_of_packets; cnt++) {
-				int	frame = urb->start_frame;
-
-				// FIXME scheduling should handle frame counter
-				// roll-around ... exotic case (and OHCI has
-				// a 2^16 iso range, vs other HCs max of 2^10)
-				frame += cnt * urb->interval;
-				frame &= 0xffff;
-				td_fill (ohci, TD_CC | TD_ISO | frame,
-				    data + urb->iso_frame_desc [cnt].offset, 
-				    urb->iso_frame_desc [cnt].length, urb, cnt); 
-			}
-			break;
-	} 
-	if (urb_priv->length != cnt) 
+			// FIXME scheduling should handle frame counter
+			// roll-around ... exotic case (and OHCI has
+			// a 2^16 iso range, vs other HCs max of 2^10)
+			frame += cnt * urb->interval;
+			frame &= 0xffff;
+			td_fill (TD_CC | TD_ISO | frame,
+				data + urb->iso_frame_desc [cnt].offset,
+				urb->iso_frame_desc [cnt].length, urb, cnt);
+		}
+		break;
+	}
+	if (urb_priv->length != cnt)
 		dbg ("TD LENGTH %d != CNT %d", urb_priv->length, cnt);
 }
 
@@ -724,8 +723,10 @@ static void td_done (struct urb *urb, struct td *td)
  		u16	tdPSW = le16_to_cpu (td->hwPSW [0]);
 		int	dlen = 0;
 
+		/* NOTE:  assumes FC in tdINFO == 0 (and MAXPSW == 1) */
+
  		cc = (tdPSW >> 12) & 0xF;
-		if (cc >= 0x0E)			/* hc didn't touch? */
+  		if (tdINFO & TD_CC)	/* hc didn't touch? */
 			return;
 
 		if (usb_pipeout (urb->pipe))

@@ -125,6 +125,12 @@
 
 #include "ohci.h"
 
+static inline void disable (struct ohci_hcd *ohci)
+{
+	ohci->disabled = 1;
+	ohci->hcd.state = USB_STATE_HALT;
+}
+
 #include "ohci-hub.c"
 #include "ohci-dbg.c"
 #include "ohci-mem.c"
@@ -158,12 +164,18 @@ static int ohci_urb_enqueue (
 		return -ENOMEM;
 
 	/* for the private part of the URB we need the number of TDs (size) */
-	switch (usb_pipetype (pipe)) {
+	switch (ed->type) {
 		case PIPE_CONTROL:
+			/* td_submit_urb() doesn't yet handle these */
+			if (urb->transfer_buffer_length > 4096)
+				return -EMSGSIZE;
+
 			/* 1 TD for setup, 1 for ACK, plus ... */
 			size = 2;
 			/* FALLTHROUGH */
-		case PIPE_BULK:
+		// case PIPE_INTERRUPT:
+		// case PIPE_BULK:
+		default:
 			/* one TD for every 4096 Bytes (can be upto 8K) */
 			size += urb->transfer_buffer_length / 4096;
 			/* ... and for any remaining bytes ... */
@@ -186,9 +198,6 @@ static int ohci_urb_enqueue (
   				urb->iso_frame_desc [i].actual_length = 0;
   				urb->iso_frame_desc [i].status = -EXDEV;
   			}
-			break;
-		case PIPE_INTERRUPT: /* one TD */
-			size = 1;
 			break;
 	}
 
@@ -242,9 +251,8 @@ static int ohci_urb_enqueue (
 				bustime = usb_check_bandwidth (urb->dev, urb);
 			}
 			if (bustime < 0) {
-				urb_free_priv (ohci, urb_priv);
-				spin_unlock_irqrestore (&ohci->lock, flags);
-				return bustime;
+				retval = bustime;
+				goto fail;
 			}
 			usb_claim_bandwidth (urb->dev, urb,
 				bustime, usb_pipeisoc (urb->pipe));
@@ -259,7 +267,7 @@ static int ohci_urb_enqueue (
 	/* fill the TDs and link them to the ed; and
 	 * enable that part of the schedule, if needed
 	 */
-	td_submit_urb (urb);
+	td_submit_urb (ohci, urb);
 
 fail:
 	if (retval)
@@ -513,7 +521,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	ohci->hcd.self.root_hub = udev = usb_alloc_dev (NULL, &ohci->hcd.self);
 	ohci->hcd.state = USB_STATE_READY;
 	if (!udev) {
-		ohci->disabled = 1;
+		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		writel (ohci->hc_control, &ohci->regs->control);
 		return -ENOMEM;
@@ -523,7 +531,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	udev->speed = USB_SPEED_FULL;
 	if (usb_register_root_hub (udev, ohci->parent_dev) != 0) {
 		usb_free_dev (udev); 
-		ohci->disabled = 1;
+		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		writel (ohci->hc_control, &ohci->regs->control);
 		return -ENODEV;
@@ -549,8 +557,8 @@ static void ohci_irq (struct usb_hcd *hcd)
 
 	/* cardbus/... hardware gone before remove() */
 	} else if ((ints = readl (&regs->intrstatus)) == ~(u32)0) {
-		ohci->disabled++;
-		err ("%s device removed!", hcd->self.bus_name);
+		disable (ohci);
+		dbg ("%s device removed!", hcd->self.bus_name);
 		return;
 
 	/* interrupt for some other device? */
@@ -562,7 +570,7 @@ static void ohci_irq (struct usb_hcd *hcd)
 	// dbg ("Interrupt: %x frame: %x", ints, le16_to_cpu (ohci->hcca->frame_no));
 
 	if (ints & OHCI_INTR_UE) {
-		ohci->disabled++;
+		disable (ohci);
 		err ("OHCI Unrecoverable Error, %s disabled", hcd->self.bus_name);
 		// e.g. due to PCI Master/Target Abort
 
