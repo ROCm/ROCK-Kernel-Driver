@@ -241,17 +241,6 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	drive->media = ide_disk;
 	printk("%s DISK drive\n", (drive->is_flash) ? "CFA" : "ATA" );
 	QUIRK_LIST(drive);
-
-	/* Initialize queue depth settings */
-	drive->queue_depth = 1;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
-	drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
-#else
-	drive->queue_depth = drive->id->queue_depth + 1;
-#endif
-	if (drive->queue_depth < 1 || drive->queue_depth > IDE_MAX_TAG)
-		drive->queue_depth = IDE_MAX_TAG;
-
 	return;
 
 err_misc:

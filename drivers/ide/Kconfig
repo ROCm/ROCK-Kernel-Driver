@@ -424,48 +424,6 @@ config BLK_DEV_IDEDMA_PCI
 
 if BLK_DEV_IDEDMA_PCI
 
-# TCQ is disabled for now
-config BLK_DEV_IDE_TCQ
-	bool "ATA tagged command queueing (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && n
-	help
-	  Support for tagged command queueing on ATA disk drives. This enables
-	  the IDE layer to have multiple in-flight requests on hardware that
-	  supports it. For now this includes the IBM Deskstar series drives,
-	  such as the 22GXP, 75GXP, 40GV, 60GXP, and 120GXP (ie any Deskstar made
-	  in the last couple of years), and at least some of the Western
-	  Digital drives in the Expert series (by nature of really being IBM
-	  drives).
-
-	  If you have such a drive, say Y here.
-
-config BLK_DEV_IDE_TCQ_DEFAULT
-	bool "TCQ on by default"
-	depends on BLK_DEV_IDE_TCQ
-	---help---
-	  Enable tagged command queueing unconditionally on drives that report
-	  support for it. Regardless of the chosen value here, tagging can be
-	  controlled at run time:
-
-	  echo "using_tcq:32" > /proc/ide/hdX/settings
-
-	  where any value between 1-32 selects chosen queue depth and enables
-	  TCQ, and 0 disables it. hdparm version 4.7 an above also support
-	  TCQ manipulations.
-
-	  Generally say Y here.
-
-config BLK_DEV_IDE_TCQ_DEPTH
-	int "Default queue depth"
-	depends on BLK_DEV_IDE_TCQ
-	default "8"
-	help
-	  Maximum size of commands to enable per-drive. Any value between 1
-	  and 32 is valid, with 32 being the maxium that the hardware supports.
-
-	  You probably just want the default of 32 here. If you enter an invalid
-	  number, the default value will be used.
-
 config BLK_DEV_IDEDMA_FORCED
 	bool "Force enable legacy 2.0.X HOSTS to use DMA"
 	help

@@ -690,7 +690,6 @@ typedef union {
 typedef enum {
 	ide_stopped,	/* no drive operation was started */
 	ide_started,	/* a drive operation was started, handler was set */
-	ide_released,	/* as ide_started, but bus also released */
 } ide_startstop_t;
 
 struct ide_driver_s;
@@ -724,7 +723,6 @@ typedef struct ide_drive_s {
 	u8	keep_settings;		/* restore settings after drive reset */
 	u8	autodma;		/* device can safely use dma on host */
 	u8	using_dma;		/* disk is using dma for read/write */
-	u8	using_tcq;		/* disk is using queueing */
 	u8	retry_pio;		/* retrying dma capable host in pio */
 	u8	state;			/* retry state */
 	u8	waiting_for_dma;	/* dma currently in progress */
@@ -782,7 +780,6 @@ typedef struct ide_drive_s {
 	u8	sect;		/* "real" sectors per track */
 	u8	bios_head;	/* BIOS/fdisk/LILO number of heads */
 	u8	bios_sect;	/* BIOS/fdisk/LILO sectors per track */
-	u8	queue_depth;	/* max queue depth */
 
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
@@ -1623,14 +1620,6 @@ extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-extern int __ide_dma_queued_on(ide_drive_t *drive);
-extern int __ide_dma_queued_off(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
-#endif
-
 #else
 static inline int __ide_dma_off(ide_drive_t *drive) { return 0; }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -1698,28 +1687,6 @@ extern struct semaphore ide_cfg_sem;
  */
 
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
-
-#define IDE_MAX_TAG	32
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-static inline int ata_pending_commands(ide_drive_t *drive)
-{
-	if (drive->using_tcq)
-		return blk_queue_tag_depth(drive->queue);
-
-	return 0;
-}
-
-static inline int ata_can_queue(ide_drive_t *drive)
-{
-	if (drive->using_tcq)
-		return blk_queue_tag_queue(drive->queue);
-
-	return 1;
-}
-#else
-#define ata_pending_commands(drive)	(0)
-#define ata_can_queue(drive)		(1)
-#endif
 
 extern struct bus_type ide_bus_type;
 

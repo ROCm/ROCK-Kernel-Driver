@@ -120,20 +120,6 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
-static int idedisk_start_tag(ide_drive_t *drive, struct request *rq)
-{
-	unsigned long flags;
-	int ret = 1;
-
-	spin_lock_irqsave(&ide_lock, flags);
-
-	if (ata_pending_commands(drive) < drive->queue_depth)
-		ret = blk_queue_start_tag(drive->queue, rq);
-
-	spin_unlock_irqrestore(&ide_lock, flags);
-	return ret;
-}
-
 #ifndef CONFIG_IDE_TASKFILE_IO
 
 /*
@@ -369,18 +355,10 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 
 			pr_debug("%s: LBA=0x%012llx\n", drive->name, block);
 
-			if (blk_rq_tagged(rq)) {
-				tasklets[0] = nsectors.b.low;
-				tasklets[1] = nsectors.b.high;
-				tasklets[2] = rq->tag << 3;
-				tasklets[3] = 0;
-			} else {
-				tasklets[0] = 0;
-				tasklets[1] = 0;
-				tasklets[2] = nsectors.b.low;
-				tasklets[3] = nsectors.b.high;
-			}
-
+			tasklets[0] = 0;
+			tasklets[1] = 0;
+			tasklets[2] = nsectors.b.low;
+			tasklets[3] = nsectors.b.high;
 			tasklets[4] = (task_ioreg_t) block;
 			tasklets[5] = (task_ioreg_t) (block>>8);
 			tasklets[6] = (task_ioreg_t) (block>>16);
@@ -411,14 +389,8 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 			hwif->OUTB(tasklets[6], IDE_HCYL_REG);
 			hwif->OUTB(0x00|drive->select.all,IDE_SELECT_REG);
 		} else {
-			if (blk_rq_tagged(rq)) {
-				hwif->OUTB(nsectors.b.low, IDE_FEATURE_REG);
-				hwif->OUTB(rq->tag << 3, IDE_NSECTOR_REG);
-			} else {
-				hwif->OUTB(0x00, IDE_FEATURE_REG);
-				hwif->OUTB(nsectors.b.low, IDE_NSECTOR_REG);
-			}
-
+			hwif->OUTB(0x00, IDE_FEATURE_REG);
+			hwif->OUTB(nsectors.b.low, IDE_NSECTOR_REG);
 			hwif->OUTB(block, IDE_SECTOR_REG);
 			hwif->OUTB(block>>=8, IDE_LCYL_REG);
 			hwif->OUTB(block>>=8, IDE_HCYL_REG);
@@ -434,23 +406,14 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 
 		pr_debug("%s: CHS=%u/%u/%u\n", drive->name, cyl, head, sect);
 
-		if (blk_rq_tagged(rq)) {
-			hwif->OUTB(nsectors.b.low, IDE_FEATURE_REG);
-			hwif->OUTB(rq->tag << 3, IDE_NSECTOR_REG);
-		} else {
-			hwif->OUTB(0x00, IDE_FEATURE_REG);
-			hwif->OUTB(nsectors.b.low, IDE_NSECTOR_REG);
-		}
+		hwif->OUTB(0x00, IDE_FEATURE_REG);
+		hwif->OUTB(nsectors.b.low, IDE_NSECTOR_REG);
 		hwif->OUTB(cyl, IDE_LCYL_REG);
 		hwif->OUTB(cyl>>8, IDE_HCYL_REG);
 		hwif->OUTB(head|drive->select.all,IDE_SELECT_REG);
 	}
 
 	if (rq_data_dir(rq) == READ) {
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		if (blk_rq_tagged(rq))
-			return __ide_dma_queued_read(drive);
-#endif
 		if (drive->using_dma && !hwif->ide_dma_read(drive))
 			return ide_started;
 
@@ -461,10 +424,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		return ide_started;
 	} else {
 		ide_startstop_t startstop;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		if (blk_rq_tagged(rq))
-			return __ide_dma_queued_write(drive);
-#endif
+
 		if (drive->using_dma && !(HWIF(drive)->ide_dma_write(drive)))
 			return ide_started;
 
@@ -534,8 +494,6 @@ static u8 get_command(ide_drive_t *drive, int cmd, ide_task_t *task)
 
 	if (cmd == READ) {
 		task->command_type = IDE_DRIVE_TASK_IN;
-		if (drive->using_tcq)
-			return lba48 ? WIN_READDMA_QUEUED_EXT : WIN_READDMA_QUEUED;
 		if (drive->using_dma)
 			return lba48 ? WIN_READDMA_EXT : WIN_READDMA;
 		if (drive->mult_count) {
@@ -546,8 +504,6 @@ static u8 get_command(ide_drive_t *drive, int cmd, ide_task_t *task)
 		return lba48 ? WIN_READ_EXT : WIN_READ;
 	} else {
 		task->command_type = IDE_DRIVE_TASK_RAW_WRITE;
-		if (drive->using_tcq)
-			return lba48 ? WIN_WRITEDMA_QUEUED_EXT : WIN_WRITEDMA_QUEUED;
 		if (drive->using_dma)
 			return lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 		if (drive->mult_count) {
@@ -579,12 +535,7 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 
 	sectors	= (rq->nr_sectors == 256) ? 0x00 : rq->nr_sectors;
 
-	if (blk_rq_tagged(rq)) {
-		args.tfRegister[IDE_FEATURE_OFFSET] = sectors;
-		args.tfRegister[IDE_NSECTOR_OFFSET] = rq->tag << 3;
-	} else
-		args.tfRegister[IDE_NSECTOR_OFFSET] = sectors;
-
+	args.tfRegister[IDE_NSECTOR_OFFSET]	= sectors;
 	args.tfRegister[IDE_SECTOR_OFFSET]	= sect;
 	args.tfRegister[IDE_LCYL_OFFSET]	= cyl;
 	args.tfRegister[IDE_HCYL_OFFSET]	= (cyl>>8);
@@ -608,12 +559,7 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 
 	sectors = (rq->nr_sectors == 256) ? 0x00 : rq->nr_sectors;
 
-	if (blk_rq_tagged(rq)) {
-		args.tfRegister[IDE_FEATURE_OFFSET] = sectors;
-		args.tfRegister[IDE_NSECTOR_OFFSET] = rq->tag << 3;
-	} else
-		args.tfRegister[IDE_NSECTOR_OFFSET] = sectors;
-
+	args.tfRegister[IDE_NSECTOR_OFFSET]	= sectors;
 	args.tfRegister[IDE_SECTOR_OFFSET]	= block;
 	args.tfRegister[IDE_LCYL_OFFSET]	= (block>>=8);
 	args.tfRegister[IDE_HCYL_OFFSET]	= (block>>=8);
@@ -643,16 +589,8 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 
 	sectors = (rq->nr_sectors == 65536) ? 0 : rq->nr_sectors;
 
-	if (blk_rq_tagged(rq)) {
-		args.tfRegister[IDE_FEATURE_OFFSET] = sectors;
-		args.tfRegister[IDE_NSECTOR_OFFSET] = rq->tag << 3;
-		args.hobRegister[IDE_FEATURE_OFFSET] = sectors >> 8;
-		args.hobRegister[IDE_NSECTOR_OFFSET] = 0;
-	} else {
-		args.tfRegister[IDE_NSECTOR_OFFSET] = sectors;
-		args.hobRegister[IDE_NSECTOR_OFFSET] = sectors >> 8;
-	}
-
+	args.tfRegister[IDE_NSECTOR_OFFSET]	= sectors;
+	args.hobRegister[IDE_NSECTOR_OFFSET]	= sectors >> 8;
 	args.tfRegister[IDE_SECTOR_OFFSET]	= block;	/* low lba */
 	args.tfRegister[IDE_LCYL_OFFSET]	= (block>>=8);	/* mid lba */
 	args.tfRegister[IDE_HCYL_OFFSET]	= (block>>=8);	/* hi  lba */
@@ -680,13 +618,6 @@ static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, s
 		blk_dump_rq_flags(rq, "ide_do_rw_disk - bad command");
 		ide_end_request(drive, 0, 0);
 		return ide_stopped;
-	}
-
-	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
-		if (!ata_pending_commands(drive))
-			BUG();
-
-		return ide_started;
 	}
 
 	pr_debug("%s: %sing: block=%llu, sectors=%lu, buffer=0x%08lx\n",
@@ -1356,34 +1287,6 @@ static int set_acoustic (ide_drive_t *drive, int arg)
 	return 0;
 }
 
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-static int set_using_tcq(ide_drive_t *drive, int arg)
-{
-	int ret;
-
-	if (!drive->driver)
-		return -EPERM;
-	if (arg == drive->queue_depth && drive->using_tcq)
-		return 0;
-
-	/*
-	 * set depth, but check also id for max supported depth
-	 */
-	drive->queue_depth = arg ? arg : 1;
-	if (drive->id) {
-		if (drive->queue_depth > drive->id->queue_depth + 1)
-			drive->queue_depth = drive->id->queue_depth + 1;
-	}
-
-	if (arg)
-		ret = __ide_dma_queued_on(drive);
-	else
-		ret = __ide_dma_queued_off(drive);
-
-	return ret ? -EIO : 0;
-}
-#endif
-
 /*
  * drive->addressing:
  *	0: 28-bit
@@ -1419,9 +1322,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"acoustic",		SETTING_RW,					HDIO_GET_ACOUSTIC,	HDIO_SET_ACOUSTIC,	TYPE_BYTE,	0,	254,				1,	1,	&drive->acoustic,		set_acoustic);
  	ide_add_setting(drive,	"failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->failures,		NULL);
  	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	ide_add_setting(drive,	"using_tcq",		SETTING_RW,					HDIO_GET_QDMA,		HDIO_SET_QDMA,		TYPE_BYTE,	0,	IDE_MAX_TAG,			1,		1,		&drive->using_tcq,		set_using_tcq);
-#endif
 }
 
 /*
@@ -1632,11 +1532,6 @@ static void idedisk_setup (ide_drive_t *drive)
 		drive->wcache = 1;
 
 	write_cache(drive, 1);
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-	if (drive->using_dma)
-		__ide_dma_queued_on(drive);
-#endif
 }
 
 static void ide_cacheflush_p(ide_drive_t *drive)
