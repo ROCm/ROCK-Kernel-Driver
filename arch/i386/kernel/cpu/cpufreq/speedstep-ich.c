@@ -311,16 +311,12 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	unsigned int speed;
 	cpumask_t cpus_allowed;
 
-
-	/* capability check */
-	if (policy->cpu != 0) /* FIXME: better support for SMT in cpufreq core. Up until then, it's better to register only one CPU */
-		return -ENODEV;
-
 	/* only run on CPU to be set, or on its sibling */
-	cpus_allowed = current->cpus_allowed;
 #ifdef CONFIG_SMP
 	policy->cpus = cpu_sibling_map[policy->cpu];
 #endif
+
+	cpus_allowed = current->cpus_allowed;
 	set_cpus_allowed(current, policy->cpus);
 
 	/* detect low and high frequency */
