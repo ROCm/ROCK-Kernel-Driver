@@ -2299,12 +2299,11 @@ static inline void end_request(struct request *req, int uptodate)
 		return;
 	add_blkdev_randomness(major(dev));
 	floppy_off(DEVICE_NR(dev));
+	blkdev_dequeue_request(req);
 	end_that_request_last(req);
 
 	/* Get the next request */
 	req = elv_next_request(QUEUE);
-	if (req)
-		blkdev_dequeue_request(req);
 	CURRENT = req;
 }
 
@@ -2939,7 +2938,6 @@ static void redo_fd_request(void)
 				unlock_fdc();
 				return;
 			}
-			blkdev_dequeue_request(req);
 			CURRENT = req;
 		}
 		if (major(CURRENT->rq_dev) != MAJOR_NR)
