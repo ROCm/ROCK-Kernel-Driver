@@ -5,6 +5,9 @@
  * 
  * Support for Apple GMAC and assorted PHYs by
  * Benjamin Herrenscmidt (benh@kernel.crashing.org)
+ *
+ * NAPI and NETPOLL support
+ * (C) 2004 by Eric Lemoine (eric.lemoine@gmail.com)
  * 
  * TODO: 
  *  - Get rid of all those nasty mdelay's and replace them
@@ -897,6 +900,16 @@ static irqreturn_t gem_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	return IRQ_HANDLED;
 }
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void gem_poll_controller(struct net_device *dev)
+{
+	/* gem_interrupt is safe to reentrance so no need
+	 * to disable_irq here.
+	 */
+	gem_interrupt(dev->irq, dev, NULL);
+}
+#endif
 
 static void gem_tx_timeout(struct net_device *dev)
 {
@@ -2934,6 +2947,9 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->change_mtu = gem_change_mtu;
 	dev->irq = pdev->irq;
 	dev->dma = 0;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+        dev->poll_controller = gem_poll_controller;
+#endif
 
 	if (register_netdev(dev)) {
 		printk(KERN_ERR PFX "Cannot register net device, "
