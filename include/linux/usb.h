@@ -278,6 +278,8 @@ extern void usb_put_dev(struct usb_device *dev);
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);
 
+extern struct usb_device *usb_find_device(u16 vendor_id, u16 product_id);
+
 /* for drivers using iso endpoints */
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 
