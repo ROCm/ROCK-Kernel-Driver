@@ -46,7 +46,7 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c-algo-ite.h>
-#include "i2c-ite.h"
+#include "i2c-algo-ite.h"
 
 #define	PM_DSR		IT8172_PCI_IO_BASE + IT_PM_DSR
 #define	PM_IBSR		IT8172_PCI_IO_BASE + IT_PM_DSR + 0x04 
