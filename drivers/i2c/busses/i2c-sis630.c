@@ -48,7 +48,7 @@
    Note: we assume there can only be one device, with one SMBus interface.
 */
 
-#define DEBUG
+/* #define DEBUG 1 */
 
 #include <linux/kernel.h>
 #include <linux/module.h>

@@ -55,7 +55,7 @@
  * Add adapter resets
  */
 
-#define DEBUG
+/* #define DEBUG 1 */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
