@@ -2042,7 +2042,7 @@ static int get_mem_for_virtual_node (struct tree_balance * tb)
 	    /* getting memory with GFP_KERNEL priority may involve
                balancing now (due to indirect_to_direct conversion on
                dcache shrinking). So, release path and collected
-               resourses here */
+               resources here */
 	    free_buffers_in_tb (tb);
 	    buf = reiserfs_kmalloc(size, GFP_NOFS, tb->tb_sb);
 	    if ( !buf ) {
