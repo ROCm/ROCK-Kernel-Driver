@@ -110,6 +110,7 @@ struct device_driver {
 
 	rwlock_t		lock;
 	atomic_t		refcount;
+	u32			present;
 
 	struct list_head	bus_list;
 	struct list_head	class_list;
@@ -127,16 +128,10 @@ struct device_driver {
 };
 
 
-
 extern int driver_register(struct device_driver * drv);
+extern void driver_unregister(struct device_driver * drv);
 
-static inline struct device_driver * get_driver(struct device_driver * drv)
-{
-	BUG_ON(!atomic_read(&drv->refcount));
-	atomic_inc(&drv->refcount);
-	return drv;
-}
-
+extern struct device_driver * get_driver(struct device_driver * drv);
 extern void put_driver(struct device_driver * drv);
 extern void remove_driver(struct device_driver * drv);
 
