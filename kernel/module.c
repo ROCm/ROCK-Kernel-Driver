@@ -1514,7 +1514,3 @@ static int __init symbols_init(void)
 }
 
 __initcall(symbols_init);
-
-/* Obsolete lvalue for broken code which asks about usage */
-int module_dummy_usage = 1;
-EXPORT_SYMBOL(module_dummy_usage);
