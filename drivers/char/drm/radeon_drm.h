@@ -430,7 +430,8 @@ typedef struct drm_radeon_init {
 	enum {
 		RADEON_INIT_CP    = 0x01,
 		RADEON_CLEANUP_CP = 0x02,
-		RADEON_INIT_R200_CP = 0x03
+		RADEON_INIT_R200_CP = 0x03,
+		RADEON_INIT_R300_CP = 0x04
 	} func;
 	unsigned long sarea_priv_offset;
 	int is_pci;
