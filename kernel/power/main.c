@@ -20,6 +20,9 @@ static DECLARE_MUTEX(pm_sem);
 
 static struct pm_ops * pm_ops = NULL;
 
+static u32 pm_disk_mode = PM_DISK_SHUTDOWN;
+
+
 /**
  *	pm_set_ops - Set the global power method table. 
  *	@ops:	Pointer to ops structure.
@@ -29,6 +32,8 @@ void pm_set_ops(struct pm_ops * ops)
 {
 	down(&pm_sem);
 	pm_ops = ops;
+	if (ops->pm_disk_mode && ops->pm_disk_mode < PM_DISK_MAX)
+		pm_disk_mode = ops->pm_disk_mode;
 	up(&pm_sem);
 }
 
@@ -224,6 +229,74 @@ static struct subsys_attribute _name##_attr = {	\
 	.store	= _name##_store,		\
 }
 
+
+static char * pm_disk_modes[] = {
+	[PM_DISK_FIRMWARE]	= "firmware",
+	[PM_DISK_PLATFORM]	= "platform",
+	[PM_DISK_SHUTDOWN]	= "shutdown",
+	[PM_DISK_REBOOT]	= "reboot",
+};
+
+/**
+ *	disk - Control suspend-to-disk mode
+ *
+ *	Suspend-to-disk can be handled in several ways. The greatest 
+ *	distinction is who writes memory to disk - the firmware or the OS.
+ *	If the firmware does it, we assume that it also handles suspending 
+ *	the system.
+ *	If the OS does it, then we have three options for putting the system
+ *	to sleep - using the platform driver (e.g. ACPI or other PM registers),
+ *	powering off the system or rebooting the system (for testing). 
+ *
+ *	The system will support either 'firmware' or 'platform', and that is
+ *	known a priori (and encoded in pm_ops). But, the user may choose
+ *	'shutdown' or 'reboot' as alternatives.
+ *
+ *	show() will display what the mode is currently set to. 
+ *	store() will accept one of
+ *
+ *	'firmware'
+ *	'platform'
+ *	'shutdown'
+ *	'reboot'
+ *
+ *	It will only change to 'firmware' or 'platform' if the system
+ *	supports it (as determined from pm_ops->pm_disk_mode).
+ */
+
+static ssize_t disk_show(struct subsystem * subsys, char * buf)
+{
+	return sprintf(buf,"%s\n",pm_disk_modes[pm_disk_mode]);
+}
+
+
+static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
+{
+	int i;
+	u32 mode = 0;
+
+	for (i = PM_DISK_FIRMWARE; i < PM_DISK_MAX; i++) {
+		if (!strcmp(buf,pm_disk_modes[i])) {
+			mode = i;
+			break;
+		}
+	}
+	if (mode) {
+		if (mode == PM_DISK_SHUTDOWN || mode == PM_DISK_REBOOT)
+			pm_disk_mode = mode;
+		else {
+			if (pm_ops && (mode == pm_ops->pm_disk_mode))
+				pm_disk_mode = mode;
+			else
+				return -EINVAL;
+		}
+		return n;
+	}
+	return -EINVAL;
+}
+
+power_attr(disk);
+
 /**
  *	state - control system power state.
  *
@@ -251,10 +324,6 @@ static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n
 	u32 state;
 	struct pm_state * s;
 	int error;
-	char * end = strchr(buf,'\n');
-	
-	if (end)
-		*end = '\0';
 
 	for (state = 0; state < PM_SUSPEND_MAX; state++) {
 		s = &pm_states[state];
@@ -272,6 +341,7 @@ power_attr(state);
 
 static struct attribute * g[] = {
 	&state_attr.attr,
+	&disk_attr.attr,
 	NULL,
 };
 

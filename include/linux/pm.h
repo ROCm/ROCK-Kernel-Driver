@@ -201,7 +201,17 @@ enum {
 	PM_SUSPEND_MAX,
 };
 
+enum {
+	PM_DISK_FIRMWARE = 1,
+	PM_DISK_PLATFORM,
+	PM_DISK_SHUTDOWN,
+	PM_DISK_REBOOT,
+	PM_DISK_MAX,
+};
+
+
 struct pm_ops {
+	u32	pm_disk_mode;
 	int (*prepare)(u32 state);
 	int (*enter)(u32 state);
 	int (*finish)(u32 state);
