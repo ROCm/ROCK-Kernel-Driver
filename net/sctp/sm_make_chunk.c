@@ -2482,6 +2482,8 @@ static int sctp_asconf_param_success(struct sctp_association *asoc,
 	union sctp_addr	addr;
 	struct sctp_bind_addr *bp = &asoc->base.bind_addr;
 	union sctp_addr_param *addr_param;
+	struct list_head *pos;
+	struct sctp_transport *transport;
 	int retval = 0;
 
 	addr_param = (union sctp_addr_param *)
@@ -2505,6 +2507,12 @@ static int sctp_asconf_param_success(struct sctp_association *asoc,
 		retval = sctp_del_bind_addr(bp, &addr);
 		sctp_write_unlock(&asoc->base.addr_lock);
 		sctp_local_bh_enable();
+		list_for_each(pos, &asoc->peer.transport_addr_list) {
+			transport = list_entry(pos, struct sctp_transport,
+						 transports);
+			sctp_transport_route(transport, NULL,
+					     sctp_sk(asoc->base.sk));
+		}
 		break;
 	default:
 		break;
