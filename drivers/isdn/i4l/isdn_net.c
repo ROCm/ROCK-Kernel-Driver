@@ -163,25 +163,6 @@ isdn_net_unreachable(struct net_device *dev, struct sk_buff *skb, char *reason)
 	dst_link_failure(skb);
 }
 
-/*
- * Handle status-messages from ISDN-interfacecard.
- * This function is called from within the main-status-dispatcher
- * isdn_status_callback, which itself is called from the low-level driver.
- * Return: 1 = Event handled, 0 = not for us or unknown Event.
- */
-int
-isdn_net_stat_callback(int idx, isdn_ctrl *c)
-{
-	isdn_net_dev *idev = isdn_slot_idev(idx);
-
-	if (!idev) {
-		HERE;
-		return 0;
-	}
-
-	return isdn_net_handle_event(idev, c->command, c);
-}
-
 static void
 isdn_net_log_skb(struct sk_buff *skb, isdn_net_dev *idev)
 {
@@ -510,7 +491,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 
                 /* check acceptable call types for DOV */
 		dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%#x, l.dstate=%d\n",
-			      idev->name, mlp->msn, mlp->flags, idev->dialstate);
+			      idev->name, mlp->msn, mlp->flags, idev->fi.state);
 
                 my_eaz = isdn_slot_map_eaz2msn(slot, mlp->msn);
                 if (si1 == 1) { /* it's a DOV call, check if we allow it */
@@ -768,4 +749,7 @@ isdn_net_init(void)
 #ifdef CONFIG_ISDN_PPP
 	register_isdn_netif(ISDN_NET_ENCAP_SYNCPPP,    &isdn_ppp_ops);
 #endif
+
+	isdn_net_lib_init();
 }
+

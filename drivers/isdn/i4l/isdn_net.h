@@ -34,6 +34,8 @@
 
 extern void isdn_net_init(void);
 extern void isdn_net_exit(void);
+extern void isdn_net_lib_init(void);
+extern void isdn_net_lib_exit(void);
 extern void isdn_net_hangup_all(void);
 extern int isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
 

@@ -12,6 +12,7 @@ obj-$(CONFIG_ISDN_PPP_BSDCOMP)		+= isdn_bsdcomp.o
 # Multipart objects.
 
 isdn-objs				:= isdn_net.o isdn_net_lib.o \
+					   isdn_fsm.o \
 					   isdn_ciscohdlck.o \
 					   isdn_tty.o isdn_v110.o \
 					   isdn_common.o \

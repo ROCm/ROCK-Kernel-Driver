@@ -16,6 +16,9 @@
 
 #include <linux/ioctl.h>
 
+// FIXME!!!
+#include <../drivers/isdn/i4l/isdn_fsm.h>
+
 #ifdef CONFIG_COBALT_MICRO_SERVER
 /* Save memory */
 #define ISDN_MAX_DRIVERS    2
@@ -367,8 +370,8 @@ typedef struct isdn_net_dev_s {
   int                    exclusive;    /* -1 if non excl./idx to excl chan */
 
   struct timer_list      dial_timer;   /* dial events timer                */
+  struct fsm_inst        fi;           /* call control state machine       */
   int                    dial_event;   /* event in case of timer expiry    */
-  int                    dialstate;    /* State for dialing                */
   int                    dial;         /* # of phone number just dialed    */
   int                    outgoing;     /* Flag: outgoing call              */
   int                    dialretry;    /* Counter for Dialout-retries      */
