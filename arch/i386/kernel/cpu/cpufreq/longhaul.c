@@ -82,6 +82,10 @@ static int longhaul_get_cpu_mult (void)
 		if (lo & (1<<27))
 			invalue+=16;
 	}
+	if (longhaul_version==4) {
+		if (lo & (1<<27))
+			invalue+=16;
+	}
 	return eblcr_table[invalue];
 }
 
@@ -158,6 +162,22 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		longhaul.bits.RevisionKey = 3;
 		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
+	case 4:
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
+		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
+		longhaul.bits.EnableSoftBusRatio = 1;
+		
+		longhaul.bits.RevisionKey = 0x0;
+		
+		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
+		__hlt();
+		
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		longhaul.bits.EnableSoftBusRatio = 0;
+		longhaul.bits.RevisionKey = 0xf;
+		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);		
+		break;
 	}
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
@@ -207,7 +227,7 @@ static int guess_fsb(int maxmult)
 static int __init longhaul_get_ranges (void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
-	unsigned long invalue;
+	unsigned long invalue,invalue2;
 	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
@@ -234,8 +254,6 @@ static int __init longhaul_get_ranges (void)
 	case 2:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
-		//TODO: Nehemiah may have borken MaxMHzBR.
-		// need to extrapolate from FSB.
 		invalue = longhaul.bits.MaxMHzBR;
 		if (longhaul.bits.MaxMHzBR4)
 			invalue += 16;
@@ -258,6 +276,38 @@ static int __init longhaul_get_ranges (void)
 				break;
 		}
 		break;
+		
+	case 4:
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		
+		//TODO: Nehemiah may have borken MaxMHzBR.
+		// need to extrapolate from FSB.
+		
+		invalue2 = longhaul.bits.MinMHzBR;
+		invalue = longhaul.bits.MaxMHzBR;
+		if (longhaul.bits.MaxMHzBR4) 
+			invalue += 16;
+		maxmult=multipliers[invalue];
+		
+		maxmult=longhaul_get_cpu_mult();
+		
+		printk(KERN_INFO PFX " invalue: %ld  maxmult: %d \n", invalue, maxmult);
+		printk(KERN_INFO PFX " invalue2: %ld \n", invalue2);
+		
+		minmult=50;
+		
+		switch (longhaul.bits.MaxMHzFSB) {
+		case 0x0:	fsb=133;
+				break;
+		case 0x1:	fsb=100;
+				break;
+		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
+			return -EINVAL;
+		case 0x3:	fsb=66;
+				break;
+		}
+		
+		break;	
 	}
 
 	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
@@ -430,12 +480,27 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 
 	case 9:
-		cpuname = "C3 'Nehemiah' [C5N]";
-		longhaul_version=2;
+		longhaul_version=4;
 		numscales=32;
-		memcpy (clock_ratio, nehemiah_clock_ratio, sizeof(nehemiah_clock_ratio));
-		memcpy (eblcr_table, nehemiah_eblcr, sizeof(nehemiah_eblcr));
+		switch (c->x86_mask) {
+		case 0 ... 1:
+			cpuname = "C3 'Nehemiah A' [C5N]";
+			memcpy (clock_ratio, nehemiah_a_clock_ratio, sizeof(nehemiah_a_clock_ratio));
+			memcpy (eblcr_table, nehemiah_a_eblcr, sizeof(nehemiah_a_eblcr));
+			break;
+		case 2 ... 4:
+			cpuname = "C3 'Nehemiah B' [C5N]";
+			memcpy (clock_ratio, nehemiah_b_clock_ratio, sizeof(nehemiah_b_clock_ratio));
+			memcpy (eblcr_table, nehemiah_b_eblcr, sizeof(nehemiah_b_eblcr));
+			break;
+		case 5 ... 15:
+			cpuname = "C3 'Nehemiah C' [C5N]";
+			memcpy (clock_ratio, nehemiah_c_clock_ratio, sizeof(nehemiah_c_clock_ratio));
+			memcpy (eblcr_table, nehemiah_c_eblcr, sizeof(nehemiah_c_eblcr));
+			break;
+		}
 		break;
+		
 
 	default:
 		cpuname = "Unknown";
