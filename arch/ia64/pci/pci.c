@@ -128,7 +128,8 @@ struct pci_raw_ops *raw_pci_ops = &pci_sal_ops;	/* default to SAL < 3.2 */
 static int __init
 pci_set_sal_ops (void)
 {
-	if (sal_version >= SAL_VERSION_CODE(3, 2)) {
+	if (sal_revision >= SAL_VERSION_CODE(3, 2)) {
+		printk("Using SAL 3.2 to access PCI config space\n");
 		raw_pci_ops = &pci_sal_ext_ops;
 	}
 	return 0;
