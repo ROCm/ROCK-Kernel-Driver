@@ -41,16 +41,19 @@
  * EF: compute checksum (?)
  */
 
+#include <linux/sched.h>
+#include <linux/errno.h>
+#include <linux/slab.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+
 #include "transport.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
 #include "sddr09.h"
 
-#include <linux/version.h>
-#include <linux/sched.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
 
 #define short_pack(lsb,msb) ( ((u16)(lsb)) | ( ((u16)(msb))<<8 ) )
 #define LSB_of(s) ((s)&0xFF)
@@ -1401,7 +1404,7 @@ sddr09_init(struct us_data *us) {
 /*
  * Transport for the Sandisk SDDR-09
  */
-int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
+int sddr09_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	static unsigned char sensekey = 0, sensecode = 0;
 	static unsigned char havefakesense = 0;
@@ -1581,13 +1584,13 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (srb->request_bufflen == 0)
 		return USB_STOR_TRANSPORT_GOOD;
 
-	if (srb->sc_data_direction == SCSI_DATA_WRITE ||
-	    srb->sc_data_direction == SCSI_DATA_READ) {
-		unsigned int pipe = (srb->sc_data_direction == SCSI_DATA_WRITE)
+	if (srb->sc_data_direction == DMA_TO_DEVICE ||
+	    srb->sc_data_direction == DMA_FROM_DEVICE) {
+		unsigned int pipe = (srb->sc_data_direction == DMA_TO_DEVICE)
 				? us->send_bulk_pipe : us->recv_bulk_pipe;
 
 		US_DEBUGP("SDDR09: %s %d bytes\n",
-			  (srb->sc_data_direction == SCSI_DATA_WRITE) ?
+			  (srb->sc_data_direction == DMA_TO_DEVICE) ?
 			  "sending" : "receiving",
 			  srb->request_bufflen);
 

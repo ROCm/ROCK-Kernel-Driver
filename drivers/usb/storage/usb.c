@@ -50,6 +50,11 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+
 #include "usb.h"
 #include "scsiglue.h"
 #include "transport.h"
@@ -322,7 +327,7 @@ static int usb_stor_control_thread(void * __us)
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
-		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
+		if (us->srb->sc_data_direction == DMA_BIDIRECTIONAL) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
 		}

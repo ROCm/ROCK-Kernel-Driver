@@ -29,6 +29,6 @@
 #ifndef _MICROTECH_DPCM_USB_H
 #define _MICROTECH_DPCM_USB_H
 
-extern int dpcm_transport(Scsi_Cmnd *srb, struct us_data *us);
+extern int dpcm_transport(struct scsi_cmnd *srb, struct us_data *us);
 
 #endif

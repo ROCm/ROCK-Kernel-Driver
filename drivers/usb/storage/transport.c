@@ -46,15 +46,20 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
+#include <linux/errno.h>
+#include <linux/slab.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+
 #include "transport.h"
 #include "protocol.h"
 #include "scsiglue.h"
 #include "usb.h"
 #include "debug.h"
 
-#include <linux/sched.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
 
 /***********************************************************************
  * Data transfer routines
@@ -522,7 +527,7 @@ int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
  * This is used by the protocol layers to actually send the message to
  * the device and receive the response.
  */
-void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
+void usb_stor_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	int need_auto_sense;
 	int result;
@@ -569,7 +574,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * can signal most data-in errors by stalling the bulk-in pipe.
 	 */
 	if ((us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) &&
-			srb->sc_data_direction != SCSI_DATA_READ) {
+			srb->sc_data_direction != DMA_FROM_DEVICE) {
 		US_DEBUGP("-- CB transport device requiring auto-sense\n");
 		need_auto_sense = 1;
 	}
@@ -629,7 +634,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		/* set the transfer direction */
 		old_sc_data_direction = srb->sc_data_direction;
-		srb->sc_data_direction = SCSI_DATA_READ;
+		srb->sc_data_direction = DMA_FROM_DEVICE;
 
 		/* use the new buffer we have */
 		old_request_buffer = srb->request_buffer;
@@ -749,7 +754,7 @@ void usb_stor_stop_transport(struct us_data *us)
  * Control/Bulk/Interrupt transport
  */
 
-int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
+int usb_stor_CBI_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	unsigned int transfer_length = srb->request_bufflen;
 	unsigned int pipe = 0;
@@ -778,7 +783,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* DATA STAGE */
 	/* transfer the data payload for this command, if one exists*/
 	if (transfer_length) {
-		pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+		pipe = srb->sc_data_direction == DMA_FROM_DEVICE ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
 		result = usb_stor_bulk_transfer_sg(us, pipe,
 					srb->request_buffer, transfer_length,
@@ -849,7 +854,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 /*
  * Control/Bulk transport
  */
-int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
+int usb_stor_CB_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	unsigned int transfer_length = srb->request_bufflen;
 	int result;
@@ -877,7 +882,7 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* DATA STAGE */
 	/* transfer the data payload for this command, if one exists*/
 	if (transfer_length) {
-		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+		unsigned int pipe = srb->sc_data_direction == DMA_FROM_DEVICE ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
 		result = usb_stor_bulk_transfer_sg(us, pipe,
 					srb->request_buffer, transfer_length,
@@ -939,7 +944,7 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	return -1;
 }
 
-int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
+int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	struct bulk_cb_wrap *bcb = (struct bulk_cb_wrap *) us->iobuf;
 	struct bulk_cs_wrap *bcs = (struct bulk_cs_wrap *) us->iobuf;
@@ -952,7 +957,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* set up the command wrapper */
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
 	bcb->DataTransferLength = cpu_to_le32(transfer_length);
-	bcb->Flags = srb->sc_data_direction == SCSI_DATA_READ ? 1 << 7 : 0;
+	bcb->Flags = srb->sc_data_direction == DMA_FROM_DEVICE ? 1 << 7 : 0;
 	bcb->Tag = srb->serial_number;
 	bcb->Lun = srb->device->lun;
 	if (us->flags & US_FL_SCM_MULT_TARG)
@@ -984,7 +989,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		udelay(100);
 
 	if (transfer_length) {
-		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+		unsigned int pipe = srb->sc_data_direction == DMA_FROM_DEVICE ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
 		result = usb_stor_bulk_transfer_sg(us, pipe,
 					srb->request_buffer, transfer_length,

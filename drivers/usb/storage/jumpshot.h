@@ -24,7 +24,7 @@
 #ifndef _USB_JUMPSHOT_H
 #define _USB_JUMPSHOT_H
 
-extern int jumpshot_transport(Scsi_Cmnd *srb, struct us_data *us);
+extern int jumpshot_transport(struct scsi_cmnd *srb, struct us_data *us);
 
 struct jumpshot_info {
    unsigned long   sectors;     // total sector count
