@@ -239,28 +239,28 @@ static inline int sx_paranoia_check(struct specialix_port const * port,
  */
 
 /* Get board number from pointer */
-extern inline int board_No (struct specialix_board * bp)
+static inline int board_No (struct specialix_board * bp)
 {
 	return bp - sx_board;
 }
 
 
 /* Get port number from pointer */
-extern inline int port_No (struct specialix_port const * port)
+static inline int port_No (struct specialix_port const * port)
 {
 	return SX_PORT(port - sx_port); 
 }
 
 
 /* Get pointer to board from pointer to port */
-extern inline struct specialix_board * port_Board(struct specialix_port const * port)
+static inline struct specialix_board * port_Board(struct specialix_port const * port)
 {
 	return &sx_board[SX_BOARD(port - sx_port)];
 }
 
 
 /* Input Byte from CL CD186x register */
-extern inline unsigned char sx_in(struct specialix_board  * bp, unsigned short reg)
+static inline unsigned char sx_in(struct specialix_board  * bp, unsigned short reg)
 {
 	bp->reg = reg | 0x80;
 	outb (reg | 0x80, bp->base + SX_ADDR_REG);
@@ -269,7 +269,7 @@ extern inline unsigned char sx_in(struct specialix_board  * bp, unsigned short r
 
 
 /* Output Byte to CL CD186x register */
-extern inline void sx_out(struct specialix_board  * bp, unsigned short reg,
+static inline void sx_out(struct specialix_board  * bp, unsigned short reg,
 			  unsigned char val)
 {
 	bp->reg = reg | 0x80;
@@ -279,7 +279,7 @@ extern inline void sx_out(struct specialix_board  * bp, unsigned short reg,
 
 
 /* Input Byte from CL CD186x register */
-extern inline unsigned char sx_in_off(struct specialix_board  * bp, unsigned short reg)
+static inline unsigned char sx_in_off(struct specialix_board  * bp, unsigned short reg)
 {
 	bp->reg = reg;
 	outb (reg, bp->base + SX_ADDR_REG);
@@ -288,7 +288,7 @@ extern inline unsigned char sx_in_off(struct specialix_board  * bp, unsigned sho
 
 
 /* Output Byte to CL CD186x register */
-extern inline void sx_out_off(struct specialix_board  * bp, unsigned short reg,
+static inline void sx_out_off(struct specialix_board  * bp, unsigned short reg,
 			  unsigned char val)
 {
 	bp->reg = reg;
@@ -298,7 +298,7 @@ extern inline void sx_out_off(struct specialix_board  * bp, unsigned short reg,
 
 
 /* Wait for Channel Command Register ready */
-extern inline void sx_wait_CCR(struct specialix_board  * bp)
+static inline void sx_wait_CCR(struct specialix_board  * bp)
 {
 	unsigned long delay;
 
@@ -311,7 +311,7 @@ extern inline void sx_wait_CCR(struct specialix_board  * bp)
 
 
 /* Wait for Channel Command Register ready */
-extern inline void sx_wait_CCR_off(struct specialix_board  * bp)
+static inline void sx_wait_CCR_off(struct specialix_board  * bp)
 {
 	unsigned long delay;
 
@@ -327,13 +327,13 @@ extern inline void sx_wait_CCR_off(struct specialix_board  * bp)
  *  specialix IO8+ IO range functions.
  */
 
-extern inline int sx_check_io_range(struct specialix_board * bp)
+static inline int sx_check_io_range(struct specialix_board * bp)
 {
 	return check_region (bp->base, SX_IO_SPACE);
 }
 
 
-extern inline void sx_request_io_range(struct specialix_board * bp)
+static inline void sx_request_io_range(struct specialix_board * bp)
 {
 	request_region(bp->base, 
 	               bp->flags&SX_BOARD_IS_PCI?SX_PCI_IO_SPACE:SX_IO_SPACE,
@@ -341,7 +341,7 @@ extern inline void sx_request_io_range(struct specialix_board * bp)
 }
 
 
-extern inline void sx_release_io_range(struct specialix_board * bp)
+static inline void sx_release_io_range(struct specialix_board * bp)
 {
 	release_region(bp->base, 
 	               bp->flags&SX_BOARD_IS_PCI?SX_PCI_IO_SPACE:SX_IO_SPACE);
@@ -351,7 +351,7 @@ extern inline void sx_release_io_range(struct specialix_board * bp)
 /* Must be called with enabled interrupts */
 /* Ugly. Very ugly. Don't use this for anything else than initialization 
    code */
-extern inline void sx_long_delay(unsigned long delay)
+static inline void sx_long_delay(unsigned long delay)
 {
 	unsigned long i;
 	
@@ -599,7 +599,7 @@ static int sx_probe(struct specialix_board *bp)
  *  Interrupt processing routines.
  * */
 
-extern inline void sx_mark_event(struct specialix_port * port, int event)
+static inline void sx_mark_event(struct specialix_port * port, int event)
 {
 	/* 
 	 * I'm not quite happy with current scheme all serial
@@ -616,7 +616,7 @@ extern inline void sx_mark_event(struct specialix_port * port, int event)
 }
 
 
-extern inline struct specialix_port * sx_get_port(struct specialix_board * bp,
+static inline struct specialix_port * sx_get_port(struct specialix_board * bp,
 					       unsigned char const * what)
 {
 	unsigned char channel;
@@ -635,7 +635,7 @@ extern inline struct specialix_port * sx_get_port(struct specialix_board * bp,
 }
 
 
-extern inline void sx_receive_exc(struct specialix_board * bp)
+static inline void sx_receive_exc(struct specialix_board * bp)
 {
 	struct specialix_port *port;
 	struct tty_struct *tty;
@@ -701,7 +701,7 @@ extern inline void sx_receive_exc(struct specialix_board * bp)
 }
 
 
-extern inline void sx_receive(struct specialix_board * bp)
+static inline void sx_receive(struct specialix_board * bp)
 {
 	struct specialix_port *port;
 	struct tty_struct *tty;
@@ -732,7 +732,7 @@ extern inline void sx_receive(struct specialix_board * bp)
 }
 
 
-extern inline void sx_transmit(struct specialix_board * bp)
+static inline void sx_transmit(struct specialix_board * bp)
 {
 	struct specialix_port *port;
 	struct tty_struct *tty;
@@ -802,7 +802,7 @@ extern inline void sx_transmit(struct specialix_board * bp)
 }
 
 
-extern inline void sx_check_modem(struct specialix_board * bp)
+static inline void sx_check_modem(struct specialix_board * bp)
 {
 	struct specialix_port *port;
 	struct tty_struct *tty;
@@ -962,7 +962,7 @@ void turn_ints_on (struct specialix_board *bp)
 
 
 /* Called with disabled interrupts */
-extern inline int sx_setup_board(struct specialix_board * bp)
+static inline int sx_setup_board(struct specialix_board * bp)
 {
 	int error;
 
@@ -986,7 +986,7 @@ extern inline int sx_setup_board(struct specialix_board * bp)
 
 
 /* Called with disabled interrupts */
-extern inline void sx_shutdown_board(struct specialix_board *bp)
+static inline void sx_shutdown_board(struct specialix_board *bp)
 {
 	if (!(bp->flags & SX_BOARD_ACTIVE))
 		return;
@@ -1867,7 +1867,7 @@ static int sx_set_modem_info(struct specialix_port * port, unsigned int cmd,
 }
 
 
-extern inline void sx_send_break(struct specialix_port * port, unsigned long length)
+static inline void sx_send_break(struct specialix_port * port, unsigned long length)
 {
 	struct specialix_board *bp = port_Board(port);
 	unsigned long flags;
@@ -1886,7 +1886,7 @@ extern inline void sx_send_break(struct specialix_port * port, unsigned long len
 }
 
 
-extern inline int sx_set_serial_info(struct specialix_port * port,
+static inline int sx_set_serial_info(struct specialix_port * port,
                                      struct serial_struct * newinfo)
 {
 	struct serial_struct tmp;
@@ -1942,7 +1942,7 @@ extern inline int sx_set_serial_info(struct specialix_port * port,
 }
 
 
-extern inline int sx_get_serial_info(struct specialix_port * port,
+static inline int sx_get_serial_info(struct specialix_port * port,
 				     struct serial_struct * retinfo)
 {
 	struct serial_struct tmp;
