@@ -151,65 +151,51 @@ void undo_irq(u_int Attributes, int irq)
 
 /*====================================================================*/
 
-static int adjust_irq(adjust_t *adj)
-{
-    int ret = CS_SUCCESS;
 #ifdef CONFIG_PCMCIA_PROBE
-    int irq;
-    irq_info_t *info;
-    
-    irq = adj->resource.irq.IRQ;
-    if ((irq < 0) || (irq > 15))
-	return CS_BAD_IRQ;
-    info = &irq_table[irq];
 
-    down(&rsrc_sem);
-    switch (adj->Action) {
-    case ADD_MANAGED_RESOURCE:
-	if (info->Attributes & RES_REMOVED)
-	    info->Attributes &= ~(RES_REMOVED|RES_ALLOCATED);
-	else
-	    if (adj->Attributes & RES_ALLOCATED) {
-		ret = CS_IN_USE;
-		break;
-	    }
-	if (adj->Attributes & RES_RESERVED)
-	    info->Attributes |= RES_RESERVED;
-	else
-	    info->Attributes &= ~RES_RESERVED;
-	break;
-    case REMOVE_MANAGED_RESOURCE:
-	if (info->Attributes & RES_REMOVED) {
-	    ret = 0;
-	    break;
-	}
-	if (info->Attributes & RES_ALLOCATED) {
-	    ret = CS_IN_USE;
-	    break;
-	}
-	info->Attributes |= RES_ALLOCATED|RES_REMOVED;
-	info->Attributes &= ~RES_RESERVED;
-	break;
-    default:
-	ret = CS_UNSUPPORTED_FUNCTION;
-	break;
-    }
-    up(&rsrc_sem);
-#endif
-    return ret;
+static int adjust_irq(struct pcmcia_socket *s, adjust_t *adj)
+{
+	int irq;
+	u32 mask;
+
+	irq = adj->resource.irq.IRQ;
+	if ((irq < 0) || (irq > 15))
+		return CS_BAD_IRQ;
+
+	if (adj->Action != REMOVE_MANAGED_RESOURCE)
+		return 0;
+
+	mask = 1 << irq;
+
+	if !(s->irq_mask & mask)
+		return 0;
+
+	s->irq_mask &= ~mask;
+
+	return 0;
 }
+
+#else
+
+static inline int adjust_irq(struct pcmcia_socket *s, adjust_t *adj) {
+	return CS_SUCCESS;
+}
+
+#endif
+
 
 int pcmcia_adjust_resource_info(adjust_t *adj)
 {
 	struct pcmcia_socket *s;
 	int ret = CS_UNSUPPORTED_FUNCTION;
 
-	if (adj->Resource == RES_IRQ)
-		return adjust_irq(adj);
-
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
-		if (s->resource_ops->adjust_resource)
+
+		if (adj->Resource == RES_IRQ)
+			ret = adjust_irq(s, adj);
+
+		else if (s->resource_ops->adjust_resource)
 			ret = s->resource_ops->adjust_resource(s, adj);
 	}
 	up_read(&pcmcia_socket_list_rwsem);
