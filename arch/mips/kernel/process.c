@@ -176,7 +176,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 		:"=r" (retval)
 		:"i" (__NR_clone), "i" (__NR_exit),
 		 "r" (arg), "r" (fn),
-		 "r" (flags | CLONE_VM)
+		 "r" (flags | CLONE_VM | CLONE_UNTRACED)
 		 /*
 		  * The called subroutine might have destroyed any of the
 		  * at, result, argument or temporary registers ...

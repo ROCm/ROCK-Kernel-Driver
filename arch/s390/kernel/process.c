@@ -123,7 +123,7 @@ void show_regs(struct pt_regs *regs)
 
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
-        int clone_arg = flags | CLONE_VM;
+        int clone_arg = flags | CLONE_VM | CLONE_UNTRACED;
         int retval;
 
         __asm__ __volatile__(

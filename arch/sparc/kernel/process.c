@@ -726,7 +726,7 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 			   /* Notreached by child. */
 			   "1: mov %%o0, %0\n\t" :
 			   "=r" (retval) :
-			   "i" (__NR_clone), "r" (flags | CLONE_VM),
+			   "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
 			   "i" (__NR_exit),  "r" (fn), "r" (arg) :
 			   "g1", "g2", "g3", "o0", "o1", "memory", "cc");
 	return retval;

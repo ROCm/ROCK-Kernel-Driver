@@ -396,7 +396,7 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	b	sys_exit					\n\
 1:	"
         : "=r" (__ret)
-        : "Ir" (flags), "I" (CLONE_VM), "r" (fn), "r" (arg)
+        : "Ir" (flags), "I" (CLONE_VM | CLONE_UNTRACED), "r" (fn), "r" (arg)
 	: "r0", "r1", "lr");
 	return __ret;
 }

@@ -57,5 +57,6 @@ OF (LTHREAD_DCCR, struct thread_struct, dccr)
 
 /* linux/sched.h values - doesn't have an #ifdef __ASSEMBLY__ for these.  */
 VAL (LCLONE_VM, CLONE_VM)
+VAL (LCLONE_UNTRACED, CLONE_UNTRACED)
 
 __asm__ (".endif");
