@@ -481,6 +481,13 @@ static inline u8 ata_wait_idle(struct ata_port *ap)
 	return status;
 }
 
+static inline void ata_qc_set_polling(struct ata_queued_cmd *qc)
+{
+	qc->flags |= ATA_QCFLAG_POLL;
+	qc->flags &= ~ATA_QCFLAG_DMA;
+	qc->tf.ctl |= ATA_NIEN;
+}
+
 static inline struct ata_queued_cmd *ata_qc_from_tag (struct ata_port *ap,
 						      unsigned int tag)
 {

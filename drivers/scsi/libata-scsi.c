@@ -912,9 +912,8 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 	if ((cmd->sc_data_direction == SCSI_DATA_NONE) ||
 	    ((qc->flags & ATA_QCFLAG_DMA) == 0)) {
-		qc->flags |= ATA_QCFLAG_POLL;
+		ata_qc_set_polling(qc);
 		qc->tf.protocol = ATA_PROT_ATAPI;
-		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
 		qc->tf.lbam = (8 * 1024) & 0xff;
 		qc->tf.lbah = (8 * 1024) >> 8;
 	} else {
