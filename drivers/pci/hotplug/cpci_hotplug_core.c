@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 #include "pci_hotplug.h"
 #include "cpci_hotplug.h"
 

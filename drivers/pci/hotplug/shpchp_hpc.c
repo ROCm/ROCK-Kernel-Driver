@@ -35,6 +35,7 @@
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <asm/system.h>
 #include "shpchp.h"
