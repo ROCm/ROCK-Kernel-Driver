@@ -263,7 +263,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 		if (dev->irq)
 			free_irq(dev->irq, dev);
 		
-		kfree(dev);
+		free_netdev(dev);
 	}
 
 	if (pccard_ioaddr)

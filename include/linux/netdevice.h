@@ -474,7 +474,14 @@ struct net_device
 	/* class/net/name entry */
 	struct class_device	class_dev;
 	struct net_device_stats* (*last_stats)(struct net_device *);
+	/* how much padding had been added by alloc_netdev() */
+	int padded;
 };
+
+static inline void *netdev_priv(struct net_device *dev)
+{
+	return (char *)dev + ((sizeof(struct net_device) + 31) & ~31);
+}
 
 #define SET_MODULE_OWNER(dev) do { } while (0)
 /* Set the sysfs physical device reference for the network logical device

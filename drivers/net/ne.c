@@ -194,18 +194,16 @@ static int __init do_ne_probe(struct net_device *dev)
 
 static void cleanup_card(struct net_device *dev)
 {
-	void *priv = dev->priv;
 	struct pnp_dev *idev = (struct pnp_dev *)ei_status.priv;
 	if (idev)
 		pnp_device_detach(idev);
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, NE_IO_EXTENT);
-	kfree(priv);
 }
 
 struct net_device * __init ne_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -213,8 +211,6 @@ struct net_device * __init ne_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_ne_probe(dev);
 	if (err)
@@ -464,20 +460,12 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 		goto err_out;
 	}
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev))
-	{
-        	printk (" unable to get memory for dev->priv.\n");
-        	ret = -ENOMEM;
-		goto err_out;
-	}
-
 	/* Snarf the interrupt now.  There's no point in waiting since we cannot
 	   share and the board will usually be enabled. */
 	ret = request_irq(dev->irq, ei_interrupt, 0, name, dev);
 	if (ret) {
 		printk (" unable to get IRQ %d (errno=%d).\n", dev->irq, ret);
-		goto err_out_kfree;
+		goto err_out;
 	}
 
 	dev->base_addr = ioaddr;
@@ -511,9 +499,6 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	NS8390_init(dev, 0);
 	return 0;
 
-err_out_kfree:
-	kfree(dev->priv);
-	dev->priv = NULL;
 err_out:
 	release_region(ioaddr, NE_IO_EXTENT);
 	return ret;
@@ -797,10 +782,9 @@ int init_module(void)
 	int this_dev, found = 0;
 
 	for (this_dev = 0; this_dev < MAX_NE_CARDS; this_dev++) {
-		struct net_device *dev = alloc_etherdev(0);
+		struct net_device *dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->mem_end = bad[this_dev];
 		dev->base_addr = io[this_dev];

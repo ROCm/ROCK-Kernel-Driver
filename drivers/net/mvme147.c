@@ -41,7 +41,7 @@
 struct m147lance_private {
 	struct lance_private lance;
 	void *base;
-	void *ram;
+	unsigned long ram;
 };
 
 /* function prototypes... This is easy because all the grot is in the
@@ -68,6 +68,7 @@ struct net_device * __init mvme147lance_probe(int unit)
 	struct m147lance_private *lp;
 	u_long *addr;
 	u_long address;
+	int err;
 
 	if (!MACH_IS_MVME147 || called)
 		return ERR_PTR(-ENODEV);
@@ -112,7 +113,7 @@ struct net_device * __init mvme147lance_probe(int unit)
 		dev->dev_addr[5]);
 
 	lp = (struct m147lance_private *)dev->priv;
-	lp->ram = (void *)__get_dma_pages(GFP_ATOMIC, 3);	/* 16K */
+	lp->ram = __get_dma_pages(GFP_ATOMIC, 3);	/* 16K */
 	if (!lp->ram)
 	{
 		printk("%s: No memory for LANCE buffers\n", dev->name);

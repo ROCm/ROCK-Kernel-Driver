@@ -202,22 +202,18 @@ int __init ultramca_probe(struct device *gen_dev)
 		return -ENXIO;
 
         /* Adapter found. */
-	dev  = alloc_etherdev(0);
+	dev  = alloc_ei_netdev();
 	if(!dev)
 		return -ENODEV;
 
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, gen_dev);
-
-	rc = register_netdev(dev);
-	if (rc)
-		goto err_free_netdev;
-
-	printk(KERN_INFO "%s: %s found in slot %d\n",
-	       dev->name, smc_mca_adapter_names[adapter], slot + 1);
-
 	mca_device_set_name(mca_dev, smc_mca_adapter_names[adapter]);
 	mca_device_set_claim(mca_dev, 1);
+
+	printk(KERN_INFO "smc_mca: %s found in slot %d\n",
+		       smc_mca_adapter_names[adapter], slot + 1);
+
 	ultra_found++;
 
 	dev->base_addr = ioaddr = mca_device_transform_ioport(mca_dev, tbase);
@@ -266,18 +262,18 @@ int __init ultramca_probe(struct device *gen_dev)
 	/* sanity check, shouldn't happen */
 	if (dev->mem_start == 0) {
 		rc = -ENODEV;
-		goto err_unregister_netdev;
+		goto err_unclaim;
 	}
 
 	if (!request_region(ioaddr, ULTRA_IO_EXTENT, dev->name)) {
 		rc = -ENODEV;
-		goto err_unregister_netdev;
+		goto err_unclaim;
 	}
 
 	reg4 = inb(ioaddr + 4) & 0x7f;
 	outb(reg4, ioaddr + 4);
 
-	printk(KERN_INFO "%s: Parameters: %#3x,", dev->name, ioaddr);
+	printk(KERN_INFO "smc_mca[%d]: Parameters: %#3x,", slot + 1, ioaddr);
 
 	for (i = 0; i < 6; i++)
 		printk(" %2.2X", dev->dev_addr[i] = inb(ioaddr + 8 + i));
@@ -299,14 +295,6 @@ int __init ultramca_probe(struct device *gen_dev)
 
 	outb(reg4, ioaddr + 4);
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields.
-	 */
-
-	rc = ethdev_init(dev);
-	if (rc) {
-		printk (", no memory for dev->priv.\n");
-		goto err_release_region;
-	}
 	gen_dev->driver_data = dev;
 
 	/* The 8390 isn't at the base address, so fake the offset
@@ -339,13 +327,16 @@ int __init ultramca_probe(struct device *gen_dev)
 
 	NS8390_init(dev, 0);
 
+	rc = register_netdev(dev);
+	if (rc)
+		goto err_release_region;
+
 	return 0;
 
 err_release_region:
 	release_region(ioaddr, ULTRA_IO_EXTENT);
-err_unregister_netdev:
-	unregister_netdev(dev);
-err_free_netdev:
+err_unclaim:
+	mca_device_set_claim(mca_dev, 0);
 	free_netdev(dev);
 	return rc;
 }
@@ -463,14 +454,14 @@ static int ultramca_remove(struct device *gen_dev)
 	struct mca_device *mca_dev = to_mca_device(gen_dev);
 	struct net_device *dev = (struct net_device *)gen_dev->driver_data;
 
-	if(dev && dev->priv) {
+	if (dev) {
 		/* NB: ultra_close_card() does free_irq */
 		int ioaddr = dev->base_addr - ULTRA_NIC_OFFSET;
 
+		unregister_netdev(dev);
 		mca_device_set_claim(mca_dev, 0);
 		release_region(ioaddr, ULTRA_IO_EXTENT);
-		unregister_netdev(dev);
-		kfree(dev->priv);
+		free_netdev(dev);
 	}
 	return 0;
 }

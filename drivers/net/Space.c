@@ -74,7 +74,7 @@ extern struct net_device *sonic_probe(int unit);
 extern struct net_device *SK_init(int unit);
 extern struct net_device *seeq8005_probe(int unit);
 extern struct net_device *smc_init(int unit);
-extern struct net_device *atarilance_probe(struct net_device *);
+extern struct net_device *atarilance_probe(int unit);
 extern struct net_device *sun3lance_probe(int unit);
 extern struct net_device *sun3_82586_probe(int unit);
 extern struct net_device *apne_probe(int unit);
@@ -86,7 +86,7 @@ extern struct net_device *bagetlance_probe(int unit);
 extern struct net_device *mvme147lance_probe(int unit);
 extern struct net_device *tc515_probe(int unit);
 extern struct net_device *lance_probe(int unit);
-extern struct net_device *mace_probe(struct net_device *dev);
+extern struct net_device *mace_probe(int unit);
 extern struct net_device *macsonic_probe(int unit);
 extern struct net_device *mac8390_probe(int unit);
 extern struct net_device *mac89x0_probe(int unit);
@@ -326,17 +326,17 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	probe_list2(unit, m68k_probes, base_addr == 0) &&
-	probe_list2(unit, mips_probes, base_addr == 0) &&
-	probe_list2(unit, eisa_probes, base_addr == 0) &&
-	probe_list2(unit, mca_probes, base_addr == 0) &&
-	probe_list2(unit, isa_probes, base_addr == 0) &&
-	probe_list2(unit, parport_probes, base_addr == 0);
+	(void)(	probe_list2(unit, m68k_probes, base_addr == 0) &&
+		probe_list2(unit, mips_probes, base_addr == 0) &&
+		probe_list2(unit, eisa_probes, base_addr == 0) &&
+		probe_list2(unit, mca_probes, base_addr == 0) &&
+		probe_list2(unit, isa_probes, base_addr == 0) &&
+		probe_list2(unit, parport_probes, base_addr == 0));
 }
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
-extern int ibmtr_probe(struct net_device *);
+extern int ibmtr_probe_card(struct net_device *);
 extern struct net_device *sk_isa_probe(int unit);
 extern struct net_device *proteon_probe(int unit);
 extern struct net_device *smctr_probe(int unit);
@@ -356,26 +356,19 @@ static struct devprobe2 tr_probes2[] __initdata = {
 
 static __init int trif_probe(int unit)
 {
-	struct net_device *dev;
 	int err = -ENODEV;
-	
-	dev = alloc_trdev(0);
+#ifdef CONFIG_IBMTR
+	struct net_device *dev = alloc_trdev(0);
 	if (!dev)
 		return -ENOMEM;
 
 	sprintf(dev->name, "tr%d", unit);
 	netdev_boot_setup_check(dev);
-	if (
-#ifdef CONFIG_IBMTR
-	    ibmtr_probe(dev) == 0  ||
-#endif
-	    0 ) 
-		err = register_netdev(dev);
-		
+	err = ibmtr_probe_card(dev);
 	if (err)
 		free_netdev(dev);
+#endif
 	return err;
-
 }
 
 static void __init trif_probe2(int unit)

@@ -276,11 +276,8 @@ static void tc589_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	tc589_release(link);
-	if (link->state & DEV_STALE_CONFIG)
-	    return;
-    }
     
     if (link->handle)
 	pcmcia_deregister_client(link->handle);
@@ -430,21 +427,11 @@ static void tc589_release(dev_link_t *link)
 {
     DEBUG(0, "3c589_release(0x%p)\n", link);
     
-    if (link->open) {
-	DEBUG(1, "3c589_cs: release postponed, '%s' still open\n",
-	      link->dev->dev_name);
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-    
     pcmcia_release_configuration(link->handle);
     pcmcia_release_io(link->handle, &link->io);
     pcmcia_release_irq(link->handle, &link->irq);
     
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_CONFIG)
-	    tc589_detach(link);
 }
 
 /*======================================================================
@@ -1073,8 +1060,6 @@ static int el3_close(struct net_device *dev)
     link->open--;
     netif_stop_queue(dev);
     del_timer_sync(&lp->media);
-    if (link->state & DEV_STALE_CONFIG)
-	     tc589_release(link);
     
     return 0;
 }

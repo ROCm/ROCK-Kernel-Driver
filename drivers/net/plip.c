@@ -277,18 +277,10 @@ inline static unsigned char read_status (struct net_device *dev)
    then calls us here.
 
    */
-static int
+static void
 plip_init_netdev(struct net_device *dev)
 {
 	struct net_local *nl = dev->priv;
-
-	printk(KERN_INFO "%s", version);
-	if (dev->irq != -1)
-		printk(KERN_INFO "%s: Parallel port at %#3lx, using IRQ %d.\n",
-		       dev->name, dev->base_addr, dev->irq);
-	else
-		printk(KERN_INFO "%s: Parallel port at %#3lx, not using IRQ.\n",
-		       dev->name, dev->base_addr);
 
 	/* Then, override parts of it */
 	dev->hard_start_xmit	 = plip_tx_packet;
@@ -323,8 +315,6 @@ plip_init_netdev(struct net_device *dev)
 		INIT_WORK(&nl->timer, (void (*)(void *))plip_timer_bh, dev);
 
 	spin_lock_init(&nl->lock);
-
-	return 0;
 }
 
 /* Bottom half handler for the delayed request.
@@ -1289,7 +1279,6 @@ static void plip_attach (struct parport *port)
 		}
 		
 		strcpy(dev->name, name);
-		dev->init = plip_init_netdev;
 
 		SET_MODULE_OWNER(dev);
 		dev->irq = port->irq;
@@ -1310,10 +1299,22 @@ static void plip_attach (struct parport *port)
 			return;
 		}
 
+		plip_init_netdev(dev);
+
 		if (register_netdev(dev)) {
 			printk(KERN_ERR "%s: network register failed\n", name);
 			goto err_parport_unregister;
 		}
+
+		printk(KERN_INFO "%s", version);
+		if (dev->irq != -1)
+			printk(KERN_INFO "%s: Parallel port at %#3lx, "
+					 "using IRQ %d.\n",
+				         dev->name, dev->base_addr, dev->irq);
+		else
+			printk(KERN_INFO "%s: Parallel port at %#3lx, "
+					 "not using IRQ.\n",
+					 dev->name, dev->base_addr);
 		dev_plip[unit++] = dev;
 	}
 	return;

@@ -140,15 +140,13 @@ static int  __init do_e2100_probe(struct net_device *dev)
 
 static void cleanup_card(struct net_device *dev)
 {
-	void *priv = dev->priv;
 	/* NB: e21_close() handles free_irq */
 	release_region(dev->base_addr, E21_IO_EXTENT);
-	kfree(priv);
 }
 
 struct net_device * __init e2100_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -156,8 +154,6 @@ struct net_device * __init e2100_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_e2100_probe(dev);
 	if (err)
@@ -212,13 +208,6 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 	for (i = 0; i < 6; i++)
 		printk(" %02X", station_addr[i]);
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (" unable to get memory for dev->priv.\n");
-		retval = -ENOMEM;
-		goto out;
-	}
-
 	if (dev->irq < 2) {
 		int irqlist[] = {15,11,10,12,5,9,3,4}, i;
 		for (i = 0; i < 8; i++)
@@ -228,8 +217,6 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 			}
 		if (i >= 8) {
 			printk(" unable to get IRQ %d.\n", dev->irq);
-			kfree(dev->priv);
-			dev->priv = NULL;
 			retval = -EAGAIN;
 			goto out;
 		}
@@ -443,10 +430,9 @@ init_module(void)
 			if (this_dev != 0) break; /* only autoprobe 1st one */
 			printk(KERN_NOTICE "e2100.c: Presently autoprobing (not recommended) for a single card.\n");
 		}
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		dev->mem_start = mem[this_dev];
