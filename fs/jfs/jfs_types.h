@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -34,9 +34,12 @@
 
 /*
  * transaction and lock id's
+ *
+ * Don't change these without carefully considering the impact on the
+ * size and alignment of all of the linelock variants
  */
-typedef uint tid_t;
-typedef uint lid_t;
+typedef u16 tid_t;
+typedef u16 lid_t;
 
 /*
  * Almost identical to Linux's timespec, but not quite

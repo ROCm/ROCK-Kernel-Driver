@@ -104,6 +104,7 @@ static int                                                             \
 FUNC ## _parse(char *options, char **resstr, char **otherstr)	       \
 {								       \
 	char *p;						       \
+	*resstr = NULL;                                                \
 								       \
 	if (!options)						       \
 		return 1;					       \
@@ -127,7 +128,7 @@ FUNC ## _parse(char *options, char **resstr, char **otherstr)	       \
 			return 0;				       \
 		}                                                      \
 	}                                                              \
-	return 1;                                                      \
+	return (*resstr != NULL);                                      \
 }
 
 #define MAGIC_WRITE(FUNC,CLSTYPEFUN)                                   \

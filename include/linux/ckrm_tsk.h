@@ -24,18 +24,11 @@
 
 #include <linux/ckrm_rc.h>
 
-#ifdef CONFIG_CKRM_RES_NUMTASKS
+typedef int (*get_ref_t) (void *, int);
+typedef void (*put_ref_t) (void *);
 
 extern int numtasks_get_ref(void *, int);
-extern int numtasks_get_ref_resid(void *, int, int);
 extern void numtasks_put_ref(void *);
-
-#else
-
-#define numtasks_get_ref(a, b)		1
-#define numtasks_get_ref_resid(a, b, c)		1
-#define numtasks_put_ref(a)
-
-#endif
+extern void ckrm_numtasks_register(get_ref_t, put_ref_t);
 
 #endif // _LINUX_CKRM_RES_H

@@ -125,15 +125,21 @@ __dump_save_other_cpus(void)
 
 		dump_send_ipi(dump_ipi_handler);
 		/*
-		 * may be we dont need to wait for NMI to be processed.
+		 * may be we dont need to wait for IPI to be processed.
 		 * just write out the header at the end of dumping, if
 		 * this IPI is not processed until then, there probably
 		 * is a problem and we just fail to capture state of
 		 * other cpus.
+		 * However, we will wait 10 secs for other CPUs to respond. 
+		 * If not, proceed the dump process even though we failed
+		 * to capture other CPU states. 
 		 */
-		while (atomic_read(&waiting_for_dump_ipi) > 0) {
+		i = 10000; /* wait max of 10 seconds */
+		while ((atomic_read(&waiting_for_dump_ipi) > 0) && (--i > 0)) {
 			cpu_relax();
-		}
+		} 
+		printk(KERN_ALERT "done waiting: %d cpus not responding\n",
+		       atomic_read(&waiting_for_dump_ipi));
 		dump_send_ipi(NULL);	/* clear handler */
 	}
 }

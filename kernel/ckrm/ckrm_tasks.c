@@ -30,6 +30,7 @@
 #include <linux/ckrm.h>
 #include <linux/ckrm_rc.h>
 #include <linux/ckrm_tc.h>
+#include <linux/ckrm_tsk.h>
 
 #define TOTAL_NUM_TASKS (131072) // 128 K
 #define NUMTASKS_DEBUG
@@ -116,8 +117,8 @@ numtasks_res_initcls(void *my_res)
 }
 #endif
 
-int
-numtasks_get_ref(void *arg, int force)
+static int
+numtasks_get_ref_local(void *arg, int force)
 {
 	int rc, resid = numtasks_rcbs.resid;
 	ckrm_numtasks_t *res;
@@ -142,7 +143,7 @@ numtasks_get_ref(void *arg, int force)
 			res->limit_failures++;
 			res->tot_limit_failures++;
 		} else if (res->parent != NULL) {
-			if ((rc = numtasks_get_ref(res->parent, force)) == 1) {
+			if ((rc = numtasks_get_ref_local(res->parent, force)) == 1) {
 				atomic_inc(&res->cnt_borrowed);
 				res->borrow_sucesses++;
 				res->tot_borrow_sucesses++;
@@ -177,8 +178,8 @@ numtasks_get_ref(void *arg, int force)
 	return rc;
 }
 
-void
-numtasks_put_ref(void *arg)
+static void
+numtasks_put_ref_local(void *arg)
 {
 	int resid = numtasks_rcbs.resid;
 	ckrm_numtasks_t *res;
@@ -194,7 +195,7 @@ numtasks_put_ref(void *arg)
 	atomic_dec(&res->cnt_cur_alloc);
 	if (atomic_read(&res->cnt_borrowed) > 0) {
 		atomic_dec(&res->cnt_borrowed);
-		numtasks_put_ref(res->parent);
+		numtasks_put_ref_local(res->parent);
 	}
 	return;
 }
@@ -218,6 +219,7 @@ numtasks_res_alloc(struct ckrm_core_class *core, struct ckrm_core_class *parent)
 			res->cnt_unused =  TOTAL_NUM_TASKS;
 			res->cnt_limit = TOTAL_NUM_TASKS;
 		}
+		try_module_get(THIS_MODULE);
 	} else {
 		printk(KERN_ERR "numtasks_res_alloc: failed GFP_ATOMIC alloc\n");
 	}
@@ -247,7 +249,7 @@ numtasks_res_free(void *my_res)
 		printk(KERN_ERR "numtasks_res_free: resource still alloc'd %p\n", res);
 		if ((borrowed = atomic_read(&res->cnt_borrowed)) > 0) {
 			for (i = 0; i < borrowed; i++) {
-				numtasks_put_ref(parres->core);
+				numtasks_put_ref_local(parres->core);
 			}
 		}
 	}
@@ -272,6 +274,7 @@ numtasks_res_free(void *my_res)
 
 	spin_unlock(&parres->cnt_lock);
 	kfree(res);
+	module_put(THIS_MODULE);
 	return;
 }
 /*
@@ -452,10 +455,10 @@ numtasks_change_resclass(void *task, void *old, void *new)
 			oldres = ckrm_get_res_class(old_core, numtasks_rcbs.resid,
 					ckrm_numtasks_t);
 		}
-		numtasks_put_ref(oldres->core);
+		numtasks_put_ref_local(oldres->core);
 	}
 	if (newres) {
-		(void) numtasks_get_ref(newres->core, 1);
+		(void) numtasks_get_ref_local(newres->core, 1);
 	}
 }
 
@@ -488,6 +491,11 @@ init_ckrm_numtasks_res(void)
 	if (resid == -1) {
 		resid = ckrm_register_res_ctlr(clstype,&numtasks_rcbs);
 		printk("........init_ckrm_numtasks_res -> %d\n",resid);
+		if (resid != -1) {
+			ckrm_numtasks_register(numtasks_get_ref_local,
+							numtasks_put_ref_local);
+			numtasks_rcbs.classtype = clstype;
+		}
 	}
 	return 0;
 }	
@@ -495,15 +503,15 @@ init_ckrm_numtasks_res(void)
 void __exit
 exit_ckrm_numtasks_res(void)
 {
+	if (numtasks_rcbs.resid != -1) {
+		ckrm_numtasks_register(NULL, NULL);
+	}
 	ckrm_unregister_res_ctlr(&numtasks_rcbs);
 	numtasks_rcbs.resid = -1;
 }
 
 module_init(init_ckrm_numtasks_res)
 module_exit(exit_ckrm_numtasks_res)
-
-EXPORT_SYMBOL(numtasks_get_ref);
-EXPORT_SYMBOL(numtasks_put_ref);
 
 MODULE_LICENSE("GPL");
 

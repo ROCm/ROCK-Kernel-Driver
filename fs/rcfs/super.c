@@ -72,7 +72,7 @@ rcfs_destroy_inode(struct inode *inode)
 	struct rcfs_inode_info *ri = RCFS_I(inode);
 
 	kfree(ri->name);
-	kmem_cache_free(rcfs_inode_cachep, RCFS_I(inode));
+	kmem_cache_free(rcfs_inode_cachep, ri);
 }
 
 static void 
@@ -267,6 +267,9 @@ static int __init init_rcfs_fs(void)
 
 	rcfs_fn = my_rcfs_fn ;
 	
+	// Due to tight coupling of this module with ckrm
+	// do not allow this module to be removed.
+	try_module_get(THIS_MODULE);
 	return ret;
 
 init_cache_err:

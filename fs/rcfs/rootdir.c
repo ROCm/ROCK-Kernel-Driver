@@ -132,11 +132,15 @@ EXPORT_SYMBOL(rcfs_mkroot);
 int 
 rcfs_rmroot(struct dentry *rootde)
 {
+	struct rcfs_inode_info *ri;
+
 	if (!rootde)
 		return -EINVAL;
 
 	rcfs_clear_magic(rootde);
-	kfree(RCFS_I(rootde->d_inode)->name);
+ 	ri = RCFS_I(rootde->d_inode);
+	kfree(ri->name);
+	ri->name = NULL;
 	rcfs_delete_internal(rootde);
 	return 0;
 }
@@ -173,6 +177,7 @@ rcfs_register_classtype(ckrm_classtype_t *clstype)
 	if ((rc = rcfs_create_magic(clstype->rootde, &mfdesc[1], 
 				    clstype->mfcount-1))) {
 		kfree(rootri->name);
+		rootri->name = NULL;
 		rcfs_delete_internal(clstype->rootde);
 		return rc;
 	}

@@ -83,6 +83,9 @@ ckrm_resctlr_lookup(struct ckrm_classtype *clstype, const char *resname)
 {
 	int resid = -1;
 	
+	if (!clstype || !resname) {
+		return NULL;
+	}
 	for (resid=0; resid < clstype->max_resid; resid++) { 
 		if (test_bit(resid, &clstype->bit_res_ctlrs)) {
 			struct ckrm_res_ctlr *rctrl = clstype->res_ctlrs[resid];
@@ -483,7 +486,6 @@ ckrm_free_res_class(struct ckrm_core_class *core, int resid)
 	 * Free a resource class only if the resource controller has
 	 * registered with core 
 	 */
-
 	if (core->res_class[resid]) {
 		ckrm_res_ctlr_t *rcbs;
 		struct ckrm_classtype *clstype = core->classtype;
@@ -494,10 +496,10 @@ ckrm_free_res_class(struct ckrm_core_class *core, int resid)
 		if (rcbs->res_free) {
 			(*rcbs->res_free)(core->res_class[resid]);
 			atomic_dec(&clstype->nr_resusers[resid]); // for inc in alloc
-			core->res_class[resid] = NULL;	
 		}
 		atomic_dec(&clstype->nr_resusers[resid]);
 	}
+	core->res_class[resid] = NULL;
 }
 
 
@@ -660,16 +662,26 @@ int
 ckrm_unregister_res_ctlr(struct ckrm_res_ctlr *rcbs)
 {	
 	struct ckrm_classtype *clstype = rcbs->classtype;
+	struct ckrm_core_class *core = NULL;
 	int resid = rcbs->resid;
 
-	if ((clstype == NULL) || (resid < 0))
+	if ((clstype == NULL) || (resid < 0)) {
 		return -EINVAL;
-	
-	if (atomic_read(&clstype->nr_resusers[resid]))
-		return -EBUSY;
+	}
 	
 	// FIXME: probably need to also call deregistration function
 
+	read_lock(&ckrm_class_lock);
+	// free up this resource from all the classes
+	list_for_each_entry(core, &clstype->classes, clslist) {
+		ckrm_free_res_class(core, resid);
+	}
+	read_unlock(&ckrm_class_lock);
+
+	if (atomic_read(&clstype->nr_resusers[resid])) {
+		return -EBUSY;
+	}
+	
 	spin_lock(&clstype->res_ctlrs_lock);
 	clstype->res_ctlrs[resid] = NULL;
 	clear_bit(resid, &clstype->bit_res_ctlrs);	

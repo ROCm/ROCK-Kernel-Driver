@@ -95,11 +95,13 @@ struct {
 
 static int nTxBlock = 512;	/* number of transaction blocks */
 module_param(nTxBlock, int, 0);
-MODULE_PARM_DESC(nTxBlock, "Number of transaction blocks (default = 512)");
+MODULE_PARM_DESC(nTxBlock,
+		 "Number of transaction blocks (default:512, max:65536)");
 
 static int nTxLock = 4096;	/* number of transaction locks */
 module_param(nTxLock, int, 0);
-MODULE_PARM_DESC(nTxLock, "Number of transaction locks (default = 4096)");
+MODULE_PARM_DESC(nTxLock,
+		 "Number of transaction locks (default:4096, max:65536)");
 
 struct tblock *TxBlock;	        /* transaction block table */
 static int TxLockLWM;		/* Low water mark for number of txLocks used */
@@ -249,6 +251,15 @@ int txInit(void)
 {
 	int k, size;
 
+	/* Verify tunable parameters */
+	if (nTxBlock < 16)
+		nTxBlock = 16;	/* No one should set it this low */
+	if (nTxBlock > 65536)
+		nTxBlock = 65536;
+	if (nTxLock < 256)
+		nTxLock = 256;	/* No one should set it this low */
+	if (nTxLock > 65536)
+		nTxLock = 65536;
 	/*
 	 * initialize transaction block (tblock) table
 	 *
