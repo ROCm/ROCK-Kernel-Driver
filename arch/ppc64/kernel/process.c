@@ -389,12 +389,8 @@ unsigned long get_wchan(struct task_struct *p)
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
-			/*
-			 * XXX we mask the upper 32 bits until procps
-			 * gets fixed.
-			 */
 			if (ip < first_sched || ip >= last_sched)
-				return (ip & 0xFFFFFFFF);
+				return ip;
 		}
 	} while (count++ < 16);
 	return 0;
@@ -412,7 +408,10 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 
 	if (sp == 0)
 		sp = p->thread.ksp;
-	printk("Call Trace:\n");
+	printk("Call Trace:");
+#ifdef CONFIG_KALLSYMS
+	printk("\n");
+#endif
 	do {
 		if (__get_user(sp, (unsigned long *)sp))
 			break;
@@ -422,9 +421,13 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 			break;
 		if (__get_user(ip, (unsigned long *)(sp + 16)))
 			break;
-		printk("[%016lx] ", ip);
+		printk("[<%016lx>] ", ip);
 		print_symbol("%s\n", ip);
 	} while (count++ < 32);
+#if !CONFIG_KALLSYMS
+	if (count > 0)
+		printk("\n");
+#endif
 }
 
 void dump_stack(void)
