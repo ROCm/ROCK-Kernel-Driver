@@ -1163,6 +1163,7 @@ void complete(struct completion *x)
 
 void wait_for_completion(struct completion *x)
 {
+	might_sleep();
 	spin_lock_irq(&x->wait.lock);
 	if (!x->done) {
 		DECLARE_WAITQUEUE(wait, current);
@@ -2158,7 +2159,7 @@ void __might_sleep(char *file, int line)
 		if (time_before(jiffies, prev_jiffy + HZ))
 			return;
 		prev_jiffy = jiffies;
-		printk("Sleeping function called from illegal"
+		printk(KERN_ERR "Debug: sleeping function called from illegal"
 				" context at %s:%d\n", file, line);
 		dump_stack();
 	}
