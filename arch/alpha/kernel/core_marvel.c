@@ -874,8 +874,6 @@ marvel_node_mem_size(int nid)
 #include <linux/slab.h>
 #include <linux/delay.h>
 
-#define MARVEL_AGP_APER_SIZE (64 * 1024 * 1024)
-
 struct marvel_agp_aperture {
 	struct pci_iommu_arena *arena;
 	long pg_start;
@@ -887,11 +885,14 @@ marvel_agp_setup(alpha_agp_info *agp)
 {
 	struct marvel_agp_aperture *aper;
 
+	if (!alpha_agpgart_size)
+		return -ENOMEM;
+
 	aper = kmalloc(sizeof(*aper), GFP_KERNEL);
 	if (aper == NULL) return -ENOMEM;
 
 	aper->arena = agp->hose->sg_pci;
-	aper->pg_count = MARVEL_AGP_APER_SIZE / PAGE_SIZE;
+	aper->pg_count = alpha_agpgart_size / PAGE_SIZE;
 	aper->pg_start = iommu_reserve(aper->arena, aper->pg_count,
 				       aper->pg_count - 1);
 

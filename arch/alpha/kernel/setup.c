@@ -89,6 +89,9 @@ int srmcons_output = 0;
 /* Enforce a memory size limit; useful for testing. By default, none. */
 unsigned long mem_size_limit = 0;
 
+/* Set AGP GART window size (0 means disabled). */
+unsigned long alpha_agpgart_size = DEFAULT_AGP_APER_SIZE;
+
 #ifdef CONFIG_ALPHA_GENERIC
 struct alpha_machine_vector alpha_mv;
 int alpha_using_srm;
@@ -575,6 +578,11 @@ setup_arch(char **cmdline_p)
 		}
 		if (strncmp(p, "srmcons", 7) == 0) {
 			srmcons_output = 1;
+			continue;
+		}
+		if (strncmp(p, "gartsize=", 9) == 0) {
+			alpha_agpgart_size =
+				get_mem_size_limit(p+9) << PAGE_SHIFT;
 			continue;
 		}
 	}
