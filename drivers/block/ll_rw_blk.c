@@ -1395,7 +1395,8 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (!atomic_dec_and_test(&q->refcnt))
 		return;
 
-	elevator_exit(q);
+	if (q->elevator)
+		elevator_exit(q->elevator);
 
 	del_timer_sync(&q->unplug_timer);
 	kblockd_flush();
@@ -1418,6 +1419,7 @@ static int blk_init_free_list(request_queue_t *q)
 	rl->count[READ] = rl->count[WRITE] = 0;
 	init_waitqueue_head(&rl->wait[READ]);
 	init_waitqueue_head(&rl->wait[WRITE]);
+	init_waitqueue_head(&rl->drain);
 
 	rl->rq_pool = mempool_create(BLKDEV_MIN_RQ, mempool_alloc_slab, mempool_free_slab, request_cachep);
 
@@ -1428,45 +1430,6 @@ static int blk_init_free_list(request_queue_t *q)
 }
 
 static int __make_request(request_queue_t *, struct bio *);
-
-static elevator_t *chosen_elevator =
-#if defined(CONFIG_IOSCHED_AS)
-	&iosched_as;
-#elif defined(CONFIG_IOSCHED_DEADLINE)
-	&iosched_deadline;
-#elif defined(CONFIG_IOSCHED_CFQ)
-	&iosched_cfq;
-#elif defined(CONFIG_IOSCHED_NOOP)
-	&elevator_noop;
-#else
-	NULL;
-#error "You must have at least 1 I/O scheduler selected"
-#endif
-
-#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE) || defined (CONFIG_IOSCHED_NOOP)
-static int __init elevator_setup(char *str)
-{
-#ifdef CONFIG_IOSCHED_DEADLINE
-	if (!strcmp(str, "deadline"))
-		chosen_elevator = &iosched_deadline;
-#endif
-#ifdef CONFIG_IOSCHED_AS
-	if (!strcmp(str, "as"))
-		chosen_elevator = &iosched_as;
-#endif
-#ifdef CONFIG_IOSCHED_CFQ
-	if (!strcmp(str, "cfq"))
-		chosen_elevator = &iosched_cfq;
-#endif
-#ifdef CONFIG_IOSCHED_NOOP
-	if (!strcmp(str, "noop"))
-		chosen_elevator = &elevator_noop;
-#endif
-	return 1;
-}
-
-__setup("elevator=", elevator_setup);
-#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE || CONFIG_IOSCHED_NOOP */
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
@@ -1520,20 +1483,13 @@ EXPORT_SYMBOL(blk_alloc_queue);
  **/
 request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 {
-	request_queue_t *q;
-	static int printed;
+	request_queue_t *q = blk_alloc_queue(GFP_KERNEL);
 
-	q = blk_alloc_queue(GFP_KERNEL);
 	if (!q)
 		return NULL;
 
 	if (blk_init_free_list(q))
 		goto out_init;
-
-	if (!printed) {
-		printed = 1;
-		printk("Using %s io scheduler\n", chosen_elevator->elevator_name);
-	}
 
 	q->request_fn		= rfn;
 	q->back_merge_fn       	= ll_back_merge_fn;
@@ -1555,7 +1511,7 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 	/*
 	 * all done
 	 */
-	if (!elevator_init(q, chosen_elevator))
+	if (!elevator_init(q, NULL))
 		return q;
 
 	blk_cleanup_queue(q);
@@ -1649,6 +1605,9 @@ static void freed_request(request_queue_t *q, int rw)
 		if (!waitqueue_active(&rl->wait[rw]))
 			blk_clear_queue_full(q, rw);
 	}
+	if (unlikely(waitqueue_active(&rl->drain)) &&
+	    !rl->count[READ] && !rl->count[WRITE])
+		wake_up(&rl->drain);
 }
 
 #define blkdev_free_rq(list) list_entry((list)->next, struct request, queuelist)
@@ -1660,6 +1619,9 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct request *rq = NULL;
 	struct request_list *rl = &q->rq;
 	struct io_context *ioc = get_io_context(gfp_mask);
+
+	if (unlikely(test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)))
+		return NULL;
 
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {
@@ -2506,6 +2468,70 @@ static inline void blk_partition_remap(struct bio *bio)
 	}
 }
 
+void blk_finish_queue_drain(request_queue_t *q)
+{
+	struct request_list *rl = &q->rq;
+
+	clear_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+	wake_up(&rl->wait[0]);
+	wake_up(&rl->wait[1]);
+	wake_up(&rl->drain);
+}
+
+/*
+ * We rely on the fact that only requests allocated through blk_alloc_request()
+ * have io scheduler private data structures associated with them. Any other
+ * type of request (allocated on stack or through kmalloc()) should not go
+ * to the io scheduler core, but be attached to the queue head instead.
+ */
+void blk_wait_queue_drained(request_queue_t *q)
+{
+	struct request_list *rl = &q->rq;
+	DEFINE_WAIT(wait);
+
+	spin_lock_irq(q->queue_lock);
+	set_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+
+	while (rl->count[READ] || rl->count[WRITE]) {
+		prepare_to_wait(&rl->drain, &wait, TASK_UNINTERRUPTIBLE);
+
+		if (rl->count[READ] || rl->count[WRITE]) {
+			__generic_unplug_device(q);
+			spin_unlock_irq(q->queue_lock);
+			io_schedule();
+			spin_lock_irq(q->queue_lock);
+		}
+
+		finish_wait(&rl->drain, &wait);
+	}
+
+	spin_unlock_irq(q->queue_lock);
+}
+
+/*
+ * block waiting for the io scheduler being started again.
+ */
+static inline void block_wait_queue_running(request_queue_t *q)
+{
+	DEFINE_WAIT(wait);
+
+	while (test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)) {
+		struct request_list *rl = &q->rq;
+
+		prepare_to_wait_exclusive(&rl->drain, &wait,
+				TASK_UNINTERRUPTIBLE);
+
+		/*
+		 * re-check the condition. avoids using prepare_to_wait()
+		 * in the fast path (queue is running)
+		 */
+		if (test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags))
+			io_schedule();
+
+		finish_wait(&rl->drain, &wait);
+	}
+}
+
 /**
  * generic_make_request: hand a buffer to its device driver for I/O
  * @bio:  The bio describing the location in memory and on the device.
@@ -2594,6 +2620,8 @@ end_io:
 
 		if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))
 			goto end_io;
+
+		block_wait_queue_running(q);
 
 		/*
 		 * If this device has partitions, remap block n
@@ -3018,6 +3046,7 @@ void kblockd_flush(void)
 {
 	flush_workqueue(kblockd_workqueue);
 }
+EXPORT_SYMBOL(kblockd_flush);
 
 int __init blk_dev_init(void)
 {
@@ -3036,6 +3065,7 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
+
 	return 0;
 }
 
@@ -3055,6 +3085,7 @@ void put_io_context(struct io_context *ioc)
 		kmem_cache_free(iocontext_cachep, ioc);
 	}
 }
+EXPORT_SYMBOL(put_io_context);
 
 /* Called by the exitting task */
 void exit_io_context(void)
@@ -3106,6 +3137,7 @@ struct io_context *get_io_context(int gfp_flags)
 	local_irq_restore(flags);
 	return ret;
 }
+EXPORT_SYMBOL(get_io_context);
 
 void copy_io_context(struct io_context **pdst, struct io_context **psrc)
 {
@@ -3119,6 +3151,7 @@ void copy_io_context(struct io_context **pdst, struct io_context **psrc)
 		*pdst = src;
 	}
 }
+EXPORT_SYMBOL(copy_io_context);
 
 void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 {
@@ -3127,7 +3160,7 @@ void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 	*ioc1 = *ioc2;
 	*ioc2 = temp;
 }
-
+EXPORT_SYMBOL(swap_io_context);
 
 /*
  * sysfs parts below
@@ -3285,11 +3318,18 @@ static struct queue_sysfs_entry queue_max_hw_sectors_entry = {
 	.show = queue_max_hw_sectors_show,
 };
 
+static struct queue_sysfs_entry queue_iosched_entry = {
+	.attr = {.name = "scheduler", .mode = S_IRUGO | S_IWUSR },
+	.show = elv_iosched_show,
+	.store = elv_iosched_store,
+};
+
 static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
 	&queue_max_hw_sectors_entry.attr,
 	&queue_max_sectors_entry.attr,
+	&queue_iosched_entry.attr,
 	NULL,
 };
 

@@ -246,7 +246,7 @@ out:
 
 static void cfq_remove_request(request_queue_t *q, struct request *rq)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_rq *crq = RQ_DATA(rq);
 
 	if (crq) {
@@ -267,7 +267,7 @@ static void cfq_remove_request(request_queue_t *q, struct request *rq)
 static int
 cfq_merge(request_queue_t *q, struct request **req, struct bio *bio)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct request *__rq;
 	int ret;
 
@@ -305,7 +305,7 @@ out_insert:
 
 static void cfq_merged_request(request_queue_t *q, struct request *req)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_rq *crq = RQ_DATA(req);
 
 	cfq_del_crq_hash(crq);
@@ -404,7 +404,7 @@ restart:
 
 static struct request *cfq_next_request(request_queue_t *q)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct request *rq;
 
 	if (!list_empty(cfqd->dispatch)) {
@@ -531,7 +531,7 @@ static void cfq_enqueue(struct cfq_data *cfqd, struct cfq_rq *crq)
 static void
 cfq_insert_request(request_queue_t *q, struct request *rq, int where)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_rq *crq = RQ_DATA(rq);
 
 	switch (where) {
@@ -562,7 +562,7 @@ cfq_insert_request(request_queue_t *q, struct request *rq, int where)
 
 static int cfq_queue_empty(request_queue_t *q)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 
 	if (list_empty(cfqd->dispatch) && list_empty(&cfqd->rr_list))
 		return 1;
@@ -596,7 +596,7 @@ cfq_latter_request(request_queue_t *q, struct request *rq)
 
 static int cfq_may_queue(request_queue_t *q, int rw)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_queue *cfqq;
 	int ret = 1;
 
@@ -621,7 +621,7 @@ out:
 
 static void cfq_put_request(request_queue_t *q, struct request *rq)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_rq *crq = RQ_DATA(rq);
 	struct request_list *rl;
 	int other_rw;
@@ -654,7 +654,7 @@ static void cfq_put_request(request_queue_t *q, struct request *rq)
 
 static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 {
-	struct cfq_data *cfqd = q->elevator.elevator_data;
+	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_queue *cfqq;
 	struct cfq_rq *crq;
 
@@ -679,7 +679,7 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 	return 1;
 }
 
-static void cfq_exit(request_queue_t *q, elevator_t *e)
+static void cfq_exit_queue(elevator_t *e)
 {
 	struct cfq_data *cfqd = e->elevator_data;
 
@@ -690,7 +690,7 @@ static void cfq_exit(request_queue_t *q, elevator_t *e)
 	kfree(cfqd);
 }
 
-static int cfq_init(request_queue_t *q, elevator_t *e)
+static int cfq_init_queue(request_queue_t *q, elevator_t *e)
 {
 	struct cfq_data *cfqd;
 	int i;
@@ -732,7 +732,6 @@ static int cfq_init(request_queue_t *q, elevator_t *e)
 
 	cfqd->cfq_queued = cfq_queued;
 	cfqd->cfq_quantum = cfq_quantum;
-
 	return 0;
 out_crqpool:
 	kfree(cfqd->cfq_hash);
@@ -743,29 +742,37 @@ out_crqhash:
 	return -ENOMEM;
 }
 
-static int __init cfq_slab_setup(void)
+static void cfq_slab_kill(void)
+{
+	if (crq_pool)
+		kmem_cache_destroy(crq_pool);
+	if (cfq_mpool)
+		mempool_destroy(cfq_mpool);
+	if (cfq_pool)
+		kmem_cache_destroy(cfq_pool);
+}
+
+static int cfq_slab_setup(void)
 {
 	crq_pool = kmem_cache_create("crq_pool", sizeof(struct cfq_rq), 0, 0,
 					NULL, NULL);
-
 	if (!crq_pool)
-		panic("cfq_iosched: can't init crq pool\n");
+		goto fail;
 
 	cfq_pool = kmem_cache_create("cfq_pool", sizeof(struct cfq_queue), 0, 0,
 					NULL, NULL);
-
 	if (!cfq_pool)
-		panic("cfq_iosched: can't init cfq pool\n");
+		goto fail;
 
 	cfq_mpool = mempool_create(64, mempool_alloc_slab, mempool_free_slab, cfq_pool);
-
 	if (!cfq_mpool)
-		panic("cfq_iosched: can't init cfq mpool\n");
+		goto fail;
 
 	return 0;
+fail:
+	cfq_slab_kill();
+	return -ENOMEM;
 }
-
-subsys_initcall(cfq_slab_setup);
 
 /*
  * sysfs parts below -->
@@ -868,23 +875,51 @@ struct kobj_type cfq_ktype = {
 	.default_attrs	= default_attrs,
 };
 
-elevator_t iosched_cfq = {
-	.elevator_name =		"cfq",
-	.elevator_ktype =		&cfq_ktype,
-	.elevator_merge_fn = 		cfq_merge,
-	.elevator_merged_fn =		cfq_merged_request,
-	.elevator_merge_req_fn =	cfq_merged_requests,
-	.elevator_next_req_fn =		cfq_next_request,
-	.elevator_add_req_fn =		cfq_insert_request,
-	.elevator_remove_req_fn =	cfq_remove_request,
-	.elevator_queue_empty_fn =	cfq_queue_empty,
-	.elevator_former_req_fn =	cfq_former_request,
-	.elevator_latter_req_fn =	cfq_latter_request,
-	.elevator_set_req_fn =		cfq_set_request,
-	.elevator_put_req_fn =		cfq_put_request,
-	.elevator_may_queue_fn =	cfq_may_queue,
-	.elevator_init_fn =		cfq_init,
-	.elevator_exit_fn =		cfq_exit,
+static struct elevator_type iosched_cfq = {
+	.ops = {
+		.elevator_merge_fn = 		cfq_merge,
+		.elevator_merged_fn =		cfq_merged_request,
+		.elevator_merge_req_fn =	cfq_merged_requests,
+		.elevator_next_req_fn =		cfq_next_request,
+		.elevator_add_req_fn =		cfq_insert_request,
+		.elevator_remove_req_fn =	cfq_remove_request,
+		.elevator_queue_empty_fn =	cfq_queue_empty,
+		.elevator_former_req_fn =	cfq_former_request,
+		.elevator_latter_req_fn =	cfq_latter_request,
+		.elevator_set_req_fn =		cfq_set_request,
+		.elevator_put_req_fn =		cfq_put_request,
+		.elevator_may_queue_fn =	cfq_may_queue,
+		.elevator_init_fn =		cfq_init_queue,
+		.elevator_exit_fn =		cfq_exit_queue,
+	},
+	.elevator_ktype = &cfq_ktype,
+	.elevator_name = "cfq",
+	.elevator_owner = THIS_MODULE,
 };
 
-EXPORT_SYMBOL(iosched_cfq);
+int cfq_init(void)
+{
+	int ret;
+
+	if (cfq_slab_setup())
+		return -ENOMEM;
+
+	ret = elv_register(&iosched_cfq);
+	if (ret)
+		cfq_slab_kill();
+
+	return ret;
+}
+
+void cfq_exit(void)
+{
+	cfq_slab_kill();
+	elv_unregister(&iosched_cfq);
+}
+
+module_init(cfq_init);
+module_exit(cfq_exit);
+
+MODULE_AUTHOR("Jens Axboe");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Completely Fair Queueing IO scheduler");

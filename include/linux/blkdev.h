@@ -19,8 +19,8 @@
 
 struct request_queue;
 typedef struct request_queue request_queue_t;
-struct elevator_s;
-typedef struct elevator_s elevator_t;
+struct elevator_queue;
+typedef struct elevator_queue elevator_t;
 struct request_pm_state;
 
 #define BLKDEV_MIN_RQ	4
@@ -80,6 +80,7 @@ struct request_list {
 	int count[2];
 	mempool_t *rq_pool;
 	wait_queue_head_t wait[2];
+	wait_queue_head_t drain;
 };
 
 #define BLK_MAX_CDB	16
@@ -279,7 +280,7 @@ struct request_queue
 	 */
 	struct list_head	queue_head;
 	struct request		*last_merge;
-	elevator_t		elevator;
+	elevator_t		*elevator;
 
 	/*
 	 * the queue request freelist, one for reads and one for writes
@@ -381,6 +382,7 @@ struct request_queue
 #define QUEUE_FLAG_REENTER	6	/* Re-entrancy avoidance */
 #define QUEUE_FLAG_PLUGGED	7	/* queue is plugged */
 #define QUEUE_FLAG_ORDERED	8	/* supports ordered writes */
+#define QUEUE_FLAG_DRAIN	9	/* draining queue for sched switch */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
@@ -617,6 +619,8 @@ extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(request_queue_t *);
 extern void __generic_unplug_device(request_queue_t *);
 extern long nr_blockdev_pages(void);
+extern void blk_wait_queue_drained(request_queue_t *);
+extern void blk_finish_queue_drain(request_queue_t *);
 
 int blk_get_queue(request_queue_t *);
 request_queue_t *blk_alloc_queue(int);
