@@ -162,48 +162,6 @@ void __init ixp2000_map_io(void)
 	iotable_init(ixp2000_small_io_desc, ARRAY_SIZE(ixp2000_small_io_desc));
 	iotable_init(ixp2000_large_io_desc, ARRAY_SIZE(ixp2000_large_io_desc));
 	early_serial_setup(&ixp2000_serial_port);
-
-#if defined(CONFIG_ARCH_IXDP2400) || defined (CONFIG_ARCH_IXDP2401)
-	/*
-	 * Fixup up page table entries to deal with IXP2400 errata
-	 * We first fix the small (page size) mappings and
-	 * then the large (section size) ones.
-	 */
-	if (machine_is_ixdp2400() | machine_is_ixdp2401()) {
-		pmd_t *pmdp;
-		pte_t *ptep;
-		u32 virt, virt_end;
-		int i;
-
-		for (i = 0; i < ARRAY_SIZE(ixp2000_small_io_desc); i++) {
-			virt = ixp2000_small_io_desc[i].virtual;
-			virt_end = virt + ixp2000_small_io_desc[i].length;
-
-			do {
-				pmdp = pmd_offset(pgd_offset_k(virt), virt);
-				ptep = pte_offset_kernel(pmdp, virt);
-			
-				set_pte(ptep, (pte_val(*ptep) | PTE_EXT_TEX(1) | L_PTE_BUFFERABLE));
-				virt += PAGE_SIZE;
-			} while (virt < virt_end);
-		}
-
-
-		for (i = 0; i < ARRAY_SIZE(ixp2000_large_io_desc); i++) {
-			virt = ixp2000_large_io_desc[i].virtual;
-			virt_end = virt + ixp2000_large_io_desc[i].length;
-
-			do {
-				pmdp = pmd_offset(pgd_offset_k(virt), virt);
-				set_pmd(pmdp, pmd_val(*pmdp) | (PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE));
-
-				virt += 0x100000;
-			} while (virt < virt_end);
-
-		}
-	}
-#endif
-
 }
 
 /*************************************************************************
