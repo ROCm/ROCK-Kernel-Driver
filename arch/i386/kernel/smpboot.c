@@ -1114,6 +1114,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			printk(KERN_WARNING "WARNING: %d siblings found for CPU%d, should be %d\n", siblings, cpu, smp_num_siblings);
 	}
 
+	if (nmi_watchdog == NMI_LOCAL_APIC)
+		check_nmi_watchdog();
+
 	smpboot_setup_io_apic();
 
 	setup_boot_APIC_clock();
