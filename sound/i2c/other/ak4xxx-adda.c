@@ -1,8 +1,8 @@
 /*
- *   ALSA driver for AK4524 / AK4528 / AK4529 / AK4355 / AK4381
+ *   ALSA driver for AK4524 / AK4528 / AK4529 / AK4355 / AK4358 / AK4381
  *   AD and DA converters
  *
- *	Copyright (c) 2000-2003 Jaroslav Kysela <perex@suse.cz>,
+ *	Copyright (c) 2000-2004 Jaroslav Kysela <perex@suse.cz>,
  *				Takashi Iwai <tiwai@suse.de>
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -84,6 +84,7 @@ void snd_akm4xxx_reset(akm4xxx_t *ak, int state)
 		/* FIXME: needed for ak4529? */
 		break;
 	case SND_AK4355:
+	case SND_AK4358:
 		if (state) {
 			snd_akm4xxx_write(ak, 0, 0x01, 0x02); /* reset and soft-mute */
 			return;
@@ -166,6 +167,24 @@ void snd_akm4xxx_init(akm4xxx_t *ak)
 		0x01, 0x01, /* 1: un-reset, unmute */
 		0xff, 0xff
 	};
+	static unsigned char inits_ak4358[] = {
+		0x01, 0x02, /* 1: reset and soft-mute */
+		0x00, 0x06, /* 0: mode3(i2s), disable auto-clock detect, disable DZF, sharp roll-off, RSTN#=0 */
+		0x02, 0x0e, /* 2: DA's power up, normal speed, RSTN#=0 */
+		// 0x02, 0x2e, /* quad speed */
+		0x03, 0x01, /* 3: de-emphasis off */
+		0x04, 0x00, /* 4: LOUT1 volume muted */
+		0x05, 0x00, /* 5: ROUT1 volume muted */
+		0x06, 0x00, /* 6: LOUT2 volume muted */
+		0x07, 0x00, /* 7: ROUT2 volume muted */
+		0x08, 0x00, /* 8: LOUT3 volume muted */
+		0x09, 0x00, /* 9: ROUT3 volume muted */
+		0x0b, 0x00, /* b: LOUT4 volume muted */
+		0x0c, 0x00, /* c: ROUT4 volume muted */
+		0x0a, 0x00, /* a: DATT speed=0, ignore DZF */
+		0x01, 0x01, /* 1: un-reset, unmute */
+		0xff, 0xff
+	};
 	static unsigned char inits_ak4381[] = {
 		0x00, 0x0c, /* 0: mode3(i2s), disable auto-clock detect */
 		0x01, 0x02, /* 1: de-emphasis off, normal speed, sharp roll-off, DZF off */
@@ -195,6 +214,10 @@ void snd_akm4xxx_init(akm4xxx_t *ak)
 		break;
 	case SND_AK4355:
 		inits = inits_ak4355;
+		num_chips = 1;
+		break;
+	case SND_AK4358:
+		inits = inits_ak4358;
 		num_chips = 1;
 		break;
 	case SND_AK4381:
@@ -370,6 +393,12 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 		case SND_AK4355:
 			ctl.private_value = AK_COMPOSE(0, idx + 4, 0, 255); /* register 4-9, chip #0 only */
 			break;
+		case SND_AK4358:
+			if (idx >= 6)
+				ctl.private_value = AK_COMPOSE(0, idx + 5, 0, 255); /* register 4-9, chip #0 only */
+			else
+				ctl.private_value = AK_COMPOSE(0, idx + 4, 0, 255); /* register 4-9, chip #0 only */
+			break;
 		case SND_AK4381:
 			ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 3, 0, 255); /* register 3 & 4 */
 			break;
@@ -407,7 +436,7 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 		if ((err = snd_ctl_add(ak->card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 			return err;
 	}
-	if (ak->type == SND_AK4355)
+	if (ak->type == SND_AK4355 || ak->type == SND_AK4358)
 		num_emphs = 1;
 	else
 		num_emphs = ak->num_dacs / 2;
@@ -432,6 +461,7 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 			break;
 		}
 		case SND_AK4355:
+		case SND_AK4358:
 			ctl.private_value = AK_COMPOSE(idx, 3, 0, 0);
 			break;
 		case SND_AK4381:

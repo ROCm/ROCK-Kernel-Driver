@@ -602,17 +602,13 @@ static int snd_pcm_status_user(snd_pcm_substream_t * substream, snd_pcm_status_t
 	return 0;
 }
 
-static int snd_pcm_channel_info(snd_pcm_substream_t * substream, snd_pcm_channel_info_t __user * _info)
+static int snd_pcm_channel_info(snd_pcm_substream_t * substream, snd_pcm_channel_info_t * info)
 {
-	snd_pcm_channel_info_t info;
 	snd_pcm_runtime_t *runtime;
-	int res;
 	unsigned int channel;
 	
 	snd_assert(substream != NULL, return -ENXIO);
-	if (copy_from_user(&info, _info, sizeof(info)))
-		return -EFAULT;
-	channel = info.channel;
+	channel = info->channel;
 	runtime = substream->runtime;
 	snd_pcm_stream_lock_irq(substream);
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN) {
@@ -622,9 +618,19 @@ static int snd_pcm_channel_info(snd_pcm_substream_t * substream, snd_pcm_channel
 	snd_pcm_stream_unlock_irq(substream);
 	if (channel >= runtime->channels)
 		return -EINVAL;
-	memset(&info, 0, sizeof(info));
-	info.channel = channel;
-	res = substream->ops->ioctl(substream, SNDRV_PCM_IOCTL1_CHANNEL_INFO, &info);
+	memset(info, 0, sizeof(*info));
+	info->channel = channel;
+	return substream->ops->ioctl(substream, SNDRV_PCM_IOCTL1_CHANNEL_INFO, info);
+}
+
+static int snd_pcm_channel_info_user(snd_pcm_substream_t * substream, snd_pcm_channel_info_t __user * _info)
+{
+	snd_pcm_channel_info_t info;
+	int res;
+	
+	if (copy_from_user(&info, _info, sizeof(info)))
+		return -EFAULT;
+	res = snd_pcm_channel_info(substream, &info);
 	if (res < 0)
 		return res;
 	if (copy_to_user(_info, &info, sizeof(info)))
@@ -2440,7 +2446,7 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 	case SNDRV_PCM_IOCTL_STATUS:
 		return snd_pcm_status_user(substream, arg);
 	case SNDRV_PCM_IOCTL_CHANNEL_INFO:
-		return snd_pcm_channel_info(substream, arg);
+		return snd_pcm_channel_info_user(substream, arg);
 	case SNDRV_PCM_IOCTL_PREPARE:
 		return snd_pcm_prepare(substream);
 	case SNDRV_PCM_IOCTL_RESET:

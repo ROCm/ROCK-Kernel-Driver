@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.15 2005/01/03 12:05:20 tiwai Exp $ */
+/* $Id: uda1341.c,v 1.12 2004/07/01 08:33:42 tiwai Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>

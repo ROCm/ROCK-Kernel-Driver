@@ -106,7 +106,7 @@
 #define AK4117_DIF_24L		(AK4117_DIF2)			/* STDO: 24-bit, left justified */
 #define AK4117_DIF_24I2S	(AK4117_DIF2|AK4117_DIF0)	/* STDO: I2S */
 
-/* AK4117_REG_INT0_MASK & AK4117_INT1_MASK */
+/* AK4117_REG_INT0_MASK & AK4117_REG_INT1_MASK */
 #define AK4117_MULK		(1<<7)	/* mask enable for UNLOCK bit */
 #define AK4117_MPAR		(1<<6)	/* mask enable for PAR bit */
 #define AK4117_MAUTO		(1<<5)	/* mask enable for AUTO bit */
@@ -181,8 +181,8 @@ struct ak4117 {
 
 int snd_ak4117_create(snd_card_t *card, ak4117_read_t *read, ak4117_write_t *write,
 		      unsigned char pgm[5], void *private_data, ak4117_t **r_ak4117);
-void snd_ak4117_reg_write(ak4117_t *chip, unsigned char reg, unsigned char mask, unsigned char val);
-void snd_ak4117_reinit(ak4117_t *chip);
+void snd_ak4117_reg_write(ak4117_t *ak4117, unsigned char reg, unsigned char mask, unsigned char val);
+void snd_ak4117_reinit(ak4117_t *ak4117);
 int snd_ak4117_build(ak4117_t *ak4117, snd_pcm_substream_t *capture_substream);
 int snd_ak4117_external_rate(ak4117_t *ak4117);
 int snd_ak4117_check_rate_and_errors(ak4117_t *ak4117, unsigned int flags);

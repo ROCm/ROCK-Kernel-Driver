@@ -1358,6 +1358,11 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_PUT_OUTPUT(A_EXTOUT_ADC_CAP_R, capture+1);
 #endif
 
+	/* EFX capture - capture the 16 EXTINs */
+	for (z = 0; z < 16; z++) {
+		A_OP(icode, &ptr, iACC3, A_FXBUS2(z), A_C_00000000, A_C_00000000, A_EXTIN(z));
+	}
+	
 	/*
 	 * ok, set up done..
 	 */
@@ -1929,6 +1934,24 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	
 	if (emu->fx8010.extout_mask & (1<<EXTOUT_MIC_CAP))
 		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_MIC_CAP), GPR(capture + 2), C_00000000, C_00000000);
+
+	/* EFX capture - capture the 16 EXTINS */
+	OP(icode, &ptr, iACC3, FXBUS2(14), C_00000000, C_00000000, EXTIN(0));
+	OP(icode, &ptr, iACC3, FXBUS2(15), C_00000000, C_00000000, EXTIN(1));
+	OP(icode, &ptr, iACC3, FXBUS2(0), C_00000000, C_00000000, EXTIN(2));
+	OP(icode, &ptr, iACC3, FXBUS2(3), C_00000000, C_00000000, EXTIN(3));
+	/* Dont connect anything to FXBUS2 1 and 2.  These are shared with 
+	 * Center/LFE on the SBLive 5.1.  The kX driver only changes the 
+	 * routing when it detects an SBLive 5.1.
+	 *
+	 * Since only 14 of the 16 EXTINs are used, this is not a big problem.  
+	 * We route AC97L and R to FX capture 14 and 15, SPDIF CD in to FX capture 
+	 * 0 and 3, then the rest of the EXTINs to the corresponding FX capture 
+	 * channel.
+	 */
+	for (z = 4; z < 14; z++) {
+		OP(icode, &ptr, iACC3, FXBUS2(z), C_00000000, C_00000000, EXTIN(z));
+	}
 
 	if (gpr > tmp) {
 		snd_BUG();

@@ -697,16 +697,10 @@ static int snd_gf1_pcm_playback_close(snd_pcm_substream_t * substream)
 	snd_gus_card_t *gus = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	gus_pcm_private_t *pcmp = runtime->private_data;
-	unsigned long jiffies_old;
+	
+	if (!wait_event_timeout(pcmp->sleep, (atomic_read(&pcmp->dma_count) <= 0), 2*HZ))
+		snd_printk("gf1 pcm - serious DMA problem\n");
 
-	jiffies_old = jiffies;
-	while (atomic_read(&pcmp->dma_count) > 0) {
-		interruptible_sleep_on_timeout(&pcmp->sleep, 1);
-		if ((signed long)(jiffies - jiffies_old) > 2*HZ) {
-			snd_printk("gf1 pcm - serious DMA problem\n");
-			break;
-		}
-	}
 	snd_gf1_dma_done(gus);	
 	return 0;
 }

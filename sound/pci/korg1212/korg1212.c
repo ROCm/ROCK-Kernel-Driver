@@ -51,7 +51,7 @@
 //#define K1212_LARGEALLOC		1
 
 // ----------------------------------------------------------------------------
-// the following enum defines the valid states of the Korg 1212 I/O card.
+// Valid states of the Korg 1212 I/O card.
 // ----------------------------------------------------------------------------
 typedef enum {
    K1212_STATE_NONEXISTENT,		// there is no card here
@@ -85,6 +85,8 @@ typedef enum {
    K1212_DB_ConfigureMiscMemory   = 6,    // tells card where other buffers are.
    K1212_DB_TriggerFromAdat       = 7,    // tells card to trigger from Adat at a specific
                                           //    timecode value.
+   K1212_DB_DMAERROR              = 0x80, // DMA Error - the PCI bus is congestioned.
+   K1212_DB_CARDSTOPPED           = 0x81, // Card has stopped by user request.
    K1212_DB_RebootCard            = 0xA0, // instructs the card to reboot.
    K1212_DB_BootFromDSPPage4      = 0xA4, // instructs the card to boot from the DSP microcode
                                           //    on page 4 (local page to card).
@@ -93,11 +95,9 @@ typedef enum {
    K1212_DB_StartDSPDownload      = 0xAF  // tells the card to download its DSP firmware.
 } korg1212_dbcnst_t;
 
-#define K1212_ISRCODE_DMAERROR      0x80
-#define K1212_ISRCODE_CARDSTOPPED   0x81
 
 // ----------------------------------------------------------------------------
-// The following enumeration defines return codes for DeviceIoControl() calls
+// The following enumeration defines return codes 
 // to the Korg 1212 I/O driver.
 // ----------------------------------------------------------------------------
 typedef enum {
@@ -116,11 +116,6 @@ typedef enum {
    K1212_CMDRET_NoAckFromCard,         // the card never acknowledged a command
    K1212_CMDRET_BadParams,             // bad parameters were provided by the caller
 
-   // --------------------------------------------------------------
-   // the following return errors are specific to the wave device
-   // driver interface.  These will not be encountered by users of
-   // the 32 bit DIOC interface (a.k.a. custom or native API).
-   // --------------------------------------------------------------
    K1212_CMDRET_BadDevice,             // the specified wave device was out of range
    K1212_CMDRET_BadFormat              // the specified wave format is unsupported
 } snd_korg1212rc;
@@ -400,9 +395,14 @@ struct _snd_korg1212 {
         u16 leftADCInSens;           // ADC left channel input sensitivity
         u16 rightADCInSens;          // ADC right channel input sensitivity
 
-	int opencnt;			// Open/Close count
-	int setcnt;			// SetupForPlay count
-	int playcnt;			// TriggerPlay count
+	int opencnt;		     // Open/Close count
+	int setcnt;		     // SetupForPlay count
+	int playcnt;		     // TriggerPlay count
+	int errorcnt;		     // Error Count
+	unsigned long totalerrorcnt; // Total Error Count
+
+	int dsp_is_loaded;
+	int dsp_stop_is_processed;
 
 };
 
@@ -622,9 +622,10 @@ static void snd_korg1212_SendStopAndWait(korg1212_t *korg1212)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&korg1212->lock, flags);
+	korg1212->dsp_stop_is_processed = 0;
 	snd_korg1212_SendStop(korg1212);
 	spin_unlock_irqrestore(&korg1212->lock, flags);
-	sleep_on_timeout(&korg1212->wait, (HZ * 3) / 2);
+	wait_event_timeout(korg1212->wait, korg1212->dsp_stop_is_processed, (HZ * 3) / 2);
 }
 
 /* timer callback for checking the ack of stop request */
@@ -636,6 +637,7 @@ static void snd_korg1212_timer_func(unsigned long data)
 	if (readl(&korg1212->sharedBufferPtr->cardCommand) == 0) {
 		/* ack'ed */
 		korg1212->stop_pending_cnt = 0;
+		korg1212->dsp_stop_is_processed = 1;
 		wake_up(&korg1212->wait);
 #if K1212_DEBUG_LEVEL > 1
 		K1212_DEBUG_PRINTK("K1212_DEBUG: Stop ack'ed [%s]\n", stateName[korg1212->cardState]);
@@ -648,6 +650,7 @@ static void snd_korg1212_timer_func(unsigned long data)
 		} else {
 			snd_printd("korg1212_timer_func timeout\n");
 			writel(0, &korg1212->sharedBufferPtr->cardCommand);
+			korg1212->dsp_stop_is_processed = 1;
 			wake_up(&korg1212->wait);
 #if K1212_DEBUG_LEVEL > 0
 			K1212_DEBUG_PRINTK("K1212_DEBUG: Stop timeout [%s]\n", stateName[korg1212->cardState]);
@@ -850,15 +853,12 @@ static int snd_korg1212_SetMonitorMode(korg1212_t *korg1212, MonitorModeSelector
 
 static inline int snd_korg1212_use_is_exclusive(korg1212_t *korg1212)
 {
-	unsigned long flags;
 	int ret = 1;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
 	if ((korg1212->playback_pid != korg1212->capture_pid) &&
 	    (korg1212->playback_pid >= 0) && (korg1212->capture_pid >= 0)) {
 		ret = 0;
 	}
-	spin_unlock_irqrestore(&korg1212->lock, flags);
 	return ret;
 }
 
@@ -1179,17 +1179,22 @@ static irqreturn_t snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs 
 #if K1212_DEBUG_LEVEL > 0
                         K1212_DEBUG_PRINTK("K1212_DEBUG: IRQ DNLD count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
-                        if (korg1212->cardState == K1212_STATE_DSP_IN_PROCESS)
+                        if (korg1212->cardState == K1212_STATE_DSP_IN_PROCESS) {
+				korg1212->dsp_is_loaded = 1;
 				wake_up(&korg1212->wait);
+			}
                         break;
 
                 // ------------------------------------------------------------------------
                 // an error occurred - stop the card
                 // ------------------------------------------------------------------------
-                case K1212_ISRCODE_DMAERROR:
+                case K1212_DB_DMAERROR:
 #if K1212_DEBUG_LEVEL > 1
                         K1212_DEBUG_PRINTK("K1212_DEBUG: IRQ DMAE count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
+			snd_printk(KERN_ERR "korg1212: DMA Error\n");	
+			korg1212->errorcnt++;
+			korg1212->totalerrorcnt++;
                         writel(0, &korg1212->sharedBufferPtr->cardCommand);
 			snd_korg1212_setCardState(korg1212, K1212_STATE_ERRORSTOP);
                         break;
@@ -1198,7 +1203,7 @@ static irqreturn_t snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs 
                 // the card has stopped by our request.  Clear the command word and signal
                 // the semaphore in case someone is waiting for this.
                 // ------------------------------------------------------------------------
-                case K1212_ISRCODE_CARDSTOPPED:
+                case K1212_DB_CARDSTOPPED:
 #if K1212_DEBUG_LEVEL > 1
                         K1212_DEBUG_PRINTK("K1212_DEBUG: IRQ CSTP count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
@@ -1267,7 +1272,9 @@ static int snd_korg1212_downloadDSPCode(korg1212_t *korg1212)
 	if (rc) K1212_DEBUG_PRINTK("K1212_DEBUG: Start DSP Download RC = %d [%s]\n", rc, stateName[korg1212->cardState]);
 #endif
 
-	if (! sleep_on_timeout(&korg1212->wait, HZ * CARD_BOOT_TIMEOUT))
+	korg1212->dsp_is_loaded = 0;
+	wait_event_timeout(korg1212->wait, korg1212->dsp_is_loaded, HZ * CARD_BOOT_TIMEOUT);
+	if (! korg1212->dsp_is_loaded )
 		return -EBUSY; /* timeout */
 
 	snd_korg1212_OnDSPDownloadComplete(korg1212);
@@ -1439,6 +1446,7 @@ static int snd_korg1212_playback_open(snd_pcm_substream_t *substream)
 	korg1212->playback_pid = current->pid;
         korg1212->periodsize = K1212_PERIODS;
 	korg1212->channels = K1212_CHANNELS;
+	korg1212->errorcnt = 0;
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
 
@@ -1457,7 +1465,7 @@ static int snd_korg1212_capture_open(snd_pcm_substream_t *substream)
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_capture_open [%s]\n", stateName[korg1212->cardState]);
 #endif
 
-        snd_pcm_set_sync(substream);    // ???
+        snd_pcm_set_sync(substream);
 
 	snd_korg1212_OpenCard(korg1212);
 
@@ -2118,6 +2126,7 @@ static void snd_korg1212_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *b
         snd_iprintf(buffer, "Idle mon. State: %d\n", korg1212->idleMonitorOn);
         snd_iprintf(buffer, "Cmd retry count: %d\n", korg1212->cmdRetryCount);
         snd_iprintf(buffer, "      Irq count: %ld\n", korg1212->irqcount);
+        snd_iprintf(buffer, "    Error count: %ld\n", korg1212->totalerrorcnt);
 }
 
 static void __devinit snd_korg1212_proc_init(korg1212_t *korg1212)
@@ -2235,6 +2244,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 	korg1212->opencnt = 0;
 	korg1212->playcnt = 0;
 	korg1212->setcnt = 0;
+	korg1212->totalerrorcnt = 0;
 	korg1212->playback_pid = -1;
 	korg1212->capture_pid = -1;
         snd_korg1212_setCardState(korg1212, K1212_STATE_UNINITIALIZED);
@@ -2273,7 +2283,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 #endif
 
         if ((korg1212->iobase = ioremap(korg1212->iomem, iomem_size)) == NULL) {
-		snd_printk(KERN_ERR "unable to remap memory region 0x%lx-0x%lx\n", korg1212->iomem,
+		snd_printk(KERN_ERR "korg1212: unable to remap memory region 0x%lx-0x%lx\n", korg1212->iomem,
                            korg1212->iomem + iomem_size - 1);
                 snd_korg1212_free(korg1212);
                 return -EBUSY;
@@ -2284,7 +2294,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
                           "korg1212", (void *) korg1212);
 
         if (err) {
-		snd_printk(KERN_ERR "unable to grab IRQ %d\n", pci->irq);
+		snd_printk(KERN_ERR "korg1212: unable to grab IRQ %d\n", pci->irq);
                 snd_korg1212_free(korg1212);
                 return -EBUSY;
         }
@@ -2332,7 +2342,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
 				sizeof(KorgSharedBuffer), &korg1212->dma_shared) < 0) {
-		snd_printk(KERN_ERR "can not allocate shared buffer memory (%Zd bytes)\n", sizeof(KorgSharedBuffer));
+		snd_printk(KERN_ERR "korg1212: can not allocate shared buffer memory (%Zd bytes)\n", sizeof(KorgSharedBuffer));
                 snd_korg1212_free(korg1212);
                 return -ENOMEM;
         }
@@ -2349,7 +2359,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
 				korg1212->DataBufsSize, &korg1212->dma_play) < 0) {
-		snd_printk(KERN_ERR "can not allocate play data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
+		snd_printk(KERN_ERR "korg1212: can not allocate play data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
                 snd_korg1212_free(korg1212);
                 return -ENOMEM;
         }
@@ -2363,7 +2373,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
 				korg1212->DataBufsSize, &korg1212->dma_rec) < 0) {
-		snd_printk(KERN_ERR "can not allocate record data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
+		snd_printk(KERN_ERR "korg1212: can not allocate record data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
                 snd_korg1212_free(korg1212);
                 return -ENOMEM;
         }
@@ -2395,7 +2405,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
 				korg1212->dspCodeSize, &korg1212->dma_dsp) < 0) {
-		snd_printk(KERN_ERR "can not allocate dsp code memory (%d bytes)\n", korg1212->dspCodeSize);
+		snd_printk(KERN_ERR "korg1212: can not allocate dsp code memory (%d bytes)\n", korg1212->dspCodeSize);
                 snd_korg1212_free(korg1212);
                 return -ENOMEM;
         }
@@ -2424,11 +2434,12 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
         if (snd_korg1212_downloadDSPCode(korg1212))
         	return -EBUSY;
 
-	printk(KERN_INFO "dspMemPhy       = %08x U[%08x]\n"
-               "PlayDataPhy     = %08x L[%08x]\n"
-               "RecDataPhy      = %08x L[%08x]\n"
-               "VolumeTablePhy  = %08x L[%08x]\n"
-               "RoutingTablePhy = %08x L[%08x]\n"
+	snd_printk(KERN_ERR 
+	       "korg1212: dspMemPhy = %08x U[%08x], "
+               "PlayDataPhy = %08x L[%08x]\n"
+	       "korg1212: RecDataPhy = %08x L[%08x], "
+               "VolumeTablePhy = %08x L[%08x]\n"
+               "korg1212: RoutingTablePhy = %08x L[%08x], "
                "AdatTimeCodePhy = %08x L[%08x]\n",
 	       (int)korg1212->dma_dsp.addr,    UpperWordSwap(korg1212->dma_dsp.addr),
                korg1212->PlayDataPhy,     LowerWordSwap(korg1212->PlayDataPhy),

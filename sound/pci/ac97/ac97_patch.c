@@ -392,9 +392,36 @@ int patch_sigmatel_stac9700(ac97_t * ac97)
 	return 0;
 }
 
+static int snd_ac97_stac9708_put_bias(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	int err;
+
+	down(&ac97->page_mutex);
+	snd_ac97_write(ac97, AC97_SIGMATEL_BIAS1, 0xabba);
+	err = snd_ac97_update_bits(ac97, AC97_SIGMATEL_BIAS2, 0x0010,
+				   (ucontrol->value.integer.value[0] & 1) << 4);
+	snd_ac97_write(ac97, AC97_SIGMATEL_BIAS1, 0);
+	up(&ac97->page_mutex);
+	return err;
+}
+
+static const snd_kcontrol_new_t snd_ac97_stac9708_bias_control = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Sigmatel Output Bias Switch",
+	.info = snd_ac97_info_volsw,
+	.get = snd_ac97_get_volsw,
+	.put = snd_ac97_stac9708_put_bias,
+	.private_value = AC97_SINGLE_VALUE(AC97_SIGMATEL_BIAS2, 4, 1, 0),
+};
+
 static int patch_sigmatel_stac9708_specific(ac97_t *ac97)
 {
+	int err;
+
 	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Sigmatel Surround Playback");
+	if ((err = patch_build_controls(ac97, &snd_ac97_stac9708_bias_control, 1)) < 0)
+		return err;
 	return patch_sigmatel_stac97xx_specific(ac97);
 }
 
@@ -1877,6 +1904,7 @@ static struct snd_ac97_build_ops patch_cm9739_ops = {
 int patch_cm9739(ac97_t * ac97)
 {
 	unsigned short val;
+	int spdif_in;
 
 	ac97->build_ops = &patch_cm9739_ops;
 
@@ -1888,13 +1916,22 @@ int patch_cm9739(ac97_t * ac97)
 	/* check spdif */
 	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
 	if (val & AC97_EA_SPCV) {
-		/* enable spdif in */
-		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
-				     snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) | 0x01);
+		/* Special exception for ASUS W1000/CMI9739. It does not have an SPDIF in. */
+		if (ac97->pci &&
+		    ac97->subsystem_vendor == 0x1043 &&
+		    ac97->subsystem_device == 0x1843)
+			spdif_in = 0;
+		else {
+			/* enable spdif in */
+			snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
+					     snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) | 0x01);
+			spdif_in = 1;
+		}
 		ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000; /* 48k only */
 	} else {
 		ac97->ext_id &= ~AC97_EI_SPDIF; /* disable extended-id */
 		ac97->rates[AC97_RATES_SPDIF] = 0;
+		spdif_in = 0;
 	}
 
 	/* set-up multi channel */
@@ -1909,22 +1946,13 @@ int patch_cm9739(ac97_t * ac97)
 	val = snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) & (1 << 4);
 	val |= (1 << 3);
 	val |= (1 << 13);
-	if (! (ac97->ext_id & AC97_EI_SPDIF))
+	if (! spdif_in)
 		val |= (1 << 14);
 	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, val);
 
 	/* FIXME: set up GPIO */
 	snd_ac97_write_cache(ac97, 0x70, 0x0100);
 	snd_ac97_write_cache(ac97, 0x72, 0x0020);
-	/* Special exception for ASUS W1000/CMI9739. It does not have an SPDIF in. */
-	if (ac97->pci &&
-	     ac97->subsystem_vendor == 0x1043 &&
-	     ac97->subsystem_device == 0x1843) {
-		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
-			snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) & ~0x01);
-		snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN,
-			snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) | (1 << 14));
-	}
 
 	return 0;
 }

@@ -121,7 +121,7 @@ static int __devinit snd_card_als100_pnp(int dev, struct snd_card_als100 *acard,
 		return -ENODEV;
 	}
 	acard->devmpu = pnp_request_card_device(card, id->devs[1].id, acard->dev);
-	acard->devopl = pnp_request_card_device(card, id->devs[2].id, acard->devmpu);
+	acard->devopl = pnp_request_card_device(card, id->devs[2].id, acard->dev);
 
 	pdev = acard->dev;
 

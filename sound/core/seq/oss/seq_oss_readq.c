@@ -24,6 +24,7 @@
 #include "seq_oss_event.h"
 #include <sound/seq_oss_legacy.h>
 #include "../seq_lock.h"
+#include <linux/wait.h>
 
 /*
  * constants
@@ -165,7 +166,9 @@ snd_seq_oss_readq_pick(seq_oss_readq_t *q, evrec_t *rec)
 void
 snd_seq_oss_readq_wait(seq_oss_readq_t *q)
 {
-	interruptible_sleep_on_timeout(&q->midi_sleep, q->pre_event_timeout);
+	wait_event_interruptible_timeout(q->midi_sleep,
+					 (q->qlen > 0 || q->head == q->tail),
+					 q->pre_event_timeout);
 }
 
 /*

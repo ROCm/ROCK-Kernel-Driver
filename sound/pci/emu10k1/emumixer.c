@@ -67,6 +67,91 @@ static int snd_emu10k1_spdif_get_mask(snd_kcontrol_t * kcontrol,
 	return 0;
 }
 
+static int snd_audigy_spdif_output_rate_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	static char *texts[] = {"44100", "48000", "96000"};
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 3;
+	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
+		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+
+static int snd_audigy_spdif_output_rate_get(snd_kcontrol_t * kcontrol,
+                                 snd_ctl_elem_value_t * ucontrol)
+{
+	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
+	unsigned int tmp;
+	unsigned long flags;
+	
+
+	spin_lock_irqsave(&emu->reg_lock, flags);
+	tmp = snd_emu10k1_ptr_read(emu, A_SPDIF_SAMPLERATE, 0);
+	switch (tmp & A_SPDIF_RATE_MASK) {
+	case A_SPDIF_44100:
+		ucontrol->value.enumerated.item[0] = 0;
+		break;
+	case A_SPDIF_48000:
+		ucontrol->value.enumerated.item[0] = 1;
+		break;
+	case A_SPDIF_96000:
+		ucontrol->value.enumerated.item[0] = 2;
+		break;
+	default:
+		ucontrol->value.enumerated.item[0] = 1;
+	}
+	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	return 0;
+}
+
+static int snd_audigy_spdif_output_rate_put(snd_kcontrol_t * kcontrol,
+                                 snd_ctl_elem_value_t * ucontrol)
+{
+	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
+	int change;
+	unsigned int reg, val, tmp;
+	unsigned long flags;
+
+	switch(ucontrol->value.enumerated.item[0]) {
+	case 0:
+		val = A_SPDIF_44100;
+		break;
+	case 1:
+		val = A_SPDIF_48000;
+		break;
+	case 2:
+		val = A_SPDIF_96000;
+		break;
+	default:
+		val = A_SPDIF_48000;
+		break;
+	}
+
+	
+	spin_lock_irqsave(&emu->reg_lock, flags);
+	reg = snd_emu10k1_ptr_read(emu, A_SPDIF_SAMPLERATE, 0);
+	tmp = reg & ~A_SPDIF_RATE_MASK;
+	tmp |= val;
+	if ((change = (tmp != reg)))
+		snd_emu10k1_ptr_write(emu, A_SPDIF_SAMPLERATE, 0, tmp);
+	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	return change;
+}
+
+static snd_kcontrol_new_t snd_audigy_spdif_output_rate =
+{
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "Audigy SPDIF Output Sample Rate",
+	.count =	1,
+	.info =         snd_audigy_spdif_output_rate_info,
+	.get =          snd_audigy_spdif_output_rate_get,
+	.put =          snd_audigy_spdif_output_rate_put
+};
+
 static int snd_emu10k1_spdif_put(snd_kcontrol_t * kcontrol,
                                  snd_ctl_elem_value_t * ucontrol)
 {
@@ -617,6 +702,10 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 
 	if (emu->audigy) {
 		if ((kctl = snd_ctl_new1(&snd_audigy_shared_spdif, emu)) == NULL)
+			return -ENOMEM;
+		if ((err = snd_ctl_add(card, kctl)))
+			return err;
+		if ((kctl = snd_ctl_new1(&snd_audigy_spdif_output_rate, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;

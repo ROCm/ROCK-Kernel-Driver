@@ -106,7 +106,7 @@ enum {
 #define VT1724_REG_I2C_BYTE_ADDR	0x11	/* byte */
 #define VT1724_REG_I2C_DATA		0x12	/* byte */
 #define VT1724_REG_I2C_CTRL		0x13	/* byte */
-#define   VT1724_I2C_EEPROM		0x80	/* EEPROM exists */
+#define   VT1724_I2C_EEPROM		0x80	/* 1 = EEPROM exists */
 #define   VT1724_I2C_BUSY		0x01	/* busy bit */
 
 #define VT1724_REG_GPIO_DATA	0x14	/* word */

@@ -1018,16 +1018,25 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 
 /* Mark of the Unicorn devices */
 {
-	/* thanks to Woodley Packard <sweaglesw@thibs.menloschool.org> */
+	/* thanks to Robert A. Lerche <ral 'at' msbit.com> */
 	USB_DEVICE(0x07fd, 0x0001),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "MOTU",
 		.product_name = "Fastlane",
-		.ifnum = 1,
-		.type = QUIRK_MIDI_FIXED_ENDPOINT,
-		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.out_cables = 0x0003,
-			.in_cables  = 0x0003
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 0,
+				.type = QUIRK_MIDI_MOTU
+			},
+			{
+				.ifnum = 1,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = -1
+			}
 		}
 	}
 },
@@ -1050,6 +1059,35 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 		.product_name = "PHASE 26",
 		.ifnum = 3,
 		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
+},
+
+/* Novation EMS devices */
+{
+	USB_DEVICE_VENDOR_SPEC(0x1235, 0x0001),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Novation",
+		.product_name = "ReMOTE Audio/XStation",
+		.ifnum = 4,
+		.type = QUIRK_MIDI_NOVATION
+	}
+},
+{
+	USB_DEVICE_VENDOR_SPEC(0x1235, 0x0002),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Novation",
+		.product_name = "Speedio",
+		.ifnum = 3,
+		.type = QUIRK_MIDI_NOVATION
+	}
+},
+{
+	USB_DEVICE_VENDOR_SPEC(0x1235, 0x4661),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Novation",
+		.product_name = "ReMOTE25",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_NOVATION
 	}
 },
 

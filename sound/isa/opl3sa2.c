@@ -787,7 +787,7 @@ static int __devinit snd_opl3sa2_pnp_detect(struct pnp_card_link *card,
         int res;
 
         for ( ; dev < SNDRV_CARDS; dev++) {
-                if (!enable[dev] && !isapnp[dev])
+                if (!enable[dev] || !isapnp[dev])
                         continue;
                 res = snd_opl3sa2_probe(dev, card, id);
                 if (res < 0)

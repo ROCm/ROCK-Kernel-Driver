@@ -27,6 +27,7 @@
 #include <sound/rawmidi.h>
 #include <sound/i2c.h>
 #include <sound/ak4xxx-adda.h>
+#include <sound/ak4114.h>
 #include <sound/pcm.h>
 
 
@@ -340,6 +341,7 @@ struct _snd_ice1712 {
 	akm4xxx_t *akm;
 	struct snd_ice1712_spdif spdif;
 
+	struct semaphore i2c_mutex;	/* I2C mutex for ICE1724 registers */
 	snd_i2c_bus_t *i2c;		/* I2C bus */
 	snd_i2c_device_t *cs8427;	/* CS8427 I2C device */
 	unsigned int cs8427_timeout;	/* CS8427 reset timeout in HZ/100 */
@@ -355,12 +357,13 @@ struct _snd_ice1712 {
 		unsigned int (*get_data)(ice1712_t *ice);
 		/* misc operators - move to another place? */
 		void (*set_pro_rate)(ice1712_t *ice, unsigned int rate);
+		void (*i2s_mclk_changed)(ice1712_t *ice);
 	} gpio;
 	struct semaphore gpio_mutex;
 
 	/* other board-specific data */
 	union {
-		/* additional i2c devices for EWS boards*/
+		/* additional i2c devices for EWS boards */
 		snd_i2c_device_t *i2cdevs[3];
 		/* AC97 register cache for Aureon */
 		struct aureon_spec {
@@ -375,6 +378,10 @@ struct _snd_ice1712 {
 			unsigned int config;
 			unsigned short boxconfig[4];
 		} hoontech;
+		struct {
+			ak4114_t *ak4114;
+			unsigned int analog: 1;
+		} juli;
 	} spec;
 
 };

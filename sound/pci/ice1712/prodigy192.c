@@ -36,12 +36,12 @@
 #include "prodigy192.h"
 #include "stac946x.h"
 
-static void stac9460_put(ice1712_t *ice, int reg, unsigned char val)
+static inline void stac9460_put(ice1712_t *ice, int reg, unsigned char val)
 {
 	snd_vt1724_write_i2c(ice, PRODIGY192_STAC9460_ADDR, reg, val);
 }
 
-static unsigned char stac9460_get(ice1712_t *ice, int reg)
+static inline unsigned char stac9460_get(ice1712_t *ice, int reg)
 {
 	return snd_vt1724_read_i2c(ice, PRODIGY192_STAC9460_ADDR, reg);
 }

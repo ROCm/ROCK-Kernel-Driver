@@ -853,10 +853,9 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
 
     port	- port number or -1 (disable)
     irq		- IRQ number or -1 (disable)
-    acpipnp	- ACPI PnP detection - 0 = disable, 1 = enable (default)
+    pnp		- PnP detection - 0 = disable, 1 = enable (default)
 
-    Module supports multiple devices (max 8) and ACPI PnP.  If PnP is not
-    used (or ACPI not enabled), port and irq must be specified.
+    Module supports multiple devices (max 8) and PnP.
     
   Module snd-mtpav
   ----------------

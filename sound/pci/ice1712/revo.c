@@ -33,6 +33,15 @@
 #include "envy24ht.h"
 #include "revo.h"
 
+static void revo_i2s_mclk_changed(ice1712_t *ice)
+{
+	/* assert PRST# to converters; MT05 bit 7 */
+	outb(inb(ICEMT1724(ice, AC97_CMD)) | 0x80, ICEMT1724(ice, AC97_CMD));
+	mdelay(5);
+	/* deassert PRST# */
+	outb(inb(ICEMT1724(ice, AC97_CMD)) & ~0x80, ICEMT1724(ice, AC97_CMD));
+}
+
 /*
  * change the rate of envy24HT, AK4355 and AK4381
  */
@@ -134,6 +143,8 @@ static int __devinit revo_init(ice1712_t *ice)
 		snd_BUG();
 		return -EINVAL;
 	}
+
+	ice->gpio.i2s_mclk_changed = revo_i2s_mclk_changed;
 
 	/* second stage of initialization, analog parts and others */
 	ak = ice->akm = kcalloc(2, sizeof(akm4xxx_t), GFP_KERNEL);

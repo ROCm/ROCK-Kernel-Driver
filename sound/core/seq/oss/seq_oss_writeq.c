@@ -26,6 +26,7 @@
 #include <sound/seq_oss_legacy.h>
 #include "../seq_lock.h"
 #include "../seq_clientmgr.h"
+#include <linux/wait.h>
 
 
 /*
@@ -91,7 +92,6 @@ snd_seq_oss_writeq_sync(seq_oss_writeq_t *q)
 {
 	seq_oss_devinfo_t *dp = q->dp;
 	abstime_t time;
-	unsigned long flags;
 
 	time = snd_seq_oss_timer_cur_tick(dp->timer);
 	if (q->sync_time >= time)
@@ -115,27 +115,13 @@ snd_seq_oss_writeq_sync(seq_oss_writeq_t *q)
 		snd_seq_kernel_client_enqueue_blocking(dp->cseq, &ev, NULL, 0, 0);
 	}
 
-	spin_lock_irqsave(&q->sync_lock, flags);
-	if (! q->sync_event_put) { /* echoback event has been received */
-		spin_unlock_irqrestore(&q->sync_lock, flags);
-		return 0;
-	}
-		
-	/* wait for echo event */
-	spin_unlock(&q->sync_lock);
-	interruptible_sleep_on_timeout(&q->sync_sleep, HZ);
-	spin_lock(&q->sync_lock);
-	if (signal_pending(current)) {
+	wait_event_interruptible_timeout(q->sync_sleep, ! q->sync_event_put, HZ);
+	if (signal_pending(current))
 		/* interrupted - return 0 to finish sync */
 		q->sync_event_put = 0;
-		spin_unlock_irqrestore(&q->sync_lock, flags);
+	if (! q->sync_event_put || q->sync_time >= time)
 		return 0;
-	}
-	spin_unlock_irqrestore(&q->sync_lock, flags);
-	if (q->sync_time >= time)
-		return 0;
-	else
-		return 1;
+	return 1;
 }
 
 /*

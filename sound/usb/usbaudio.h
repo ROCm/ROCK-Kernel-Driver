@@ -158,6 +158,8 @@ struct snd_usb_audio {
 #define QUIRK_AUDIO_EDIROL_UA700_UA25	7
 #define QUIRK_AUDIO_EDIROL_UA1000	8
 #define QUIRK_IGNORE_INTERFACE		9
+#define QUIRK_MIDI_NOVATION		10
+#define QUIRK_MIDI_MOTU			11
 
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
@@ -172,7 +174,10 @@ struct snd_usb_audio_quirk {
 
 /* data for QUIRK_MIDI_FIXED_ENDPOINT */
 struct snd_usb_midi_endpoint_info {
-	int8_t out_ep, in_ep;	/* ep number, 0 autodetect */
+	int8_t   out_ep;	/* ep number, 0 autodetect */
+	uint8_t  out_interval;	/* interval for interrupt endpoints */
+	int8_t   in_ep;	
+	uint8_t  in_interval;
 	uint16_t out_cables;	/* bitmask */
 	uint16_t in_cables;	/* bitmask */
 };
@@ -191,7 +196,9 @@ struct snd_usb_midi_endpoint_info {
 
 /* for QUIRK_AUDIO_EDIROL_UA700_UA25/UA1000, data is NULL */
 
-/* for QUIRK_IGNORE_INTERFACE, data is null */
+/* for QUIRK_IGNORE_INTERFACE, data is NULL */
+
+/* for QUIRK_MIDI_NOVATION and _MOTU, data is NULL */
 
 /*
  */

@@ -3670,7 +3670,7 @@ static irqreturn_t snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *reg
 			snd_hdsp_midi_input_read (&hdsp->midi[0]);
 		}
 	}
-	if (midi1 && midi1status) {
+	if (hdsp->io_type != Multiface && hdsp->io_type != H9632 && midi1 && midi1status) {
 		if (hdsp->use_midi_tasklet) {
 			/* we disable interrupts for this input until processing is done */
 			hdsp->control_register &= ~HDSP_Midi1InterruptEnable;
@@ -3678,7 +3678,7 @@ static irqreturn_t snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *reg
 			hdsp->midi[1].pending = 1;
 			schedule = 1;
 		} else {
-			snd_hdsp_midi_input_read (&hdsp->midi[0]);
+			snd_hdsp_midi_input_read (&hdsp->midi[1]);
 		}
 	}
 	if (hdsp->use_midi_tasklet && schedule)
@@ -4827,10 +4827,11 @@ static int snd_hdsp_create_alsa_devices(snd_card_t *card, hdsp_t *hdsp)
 		return err;
 	}
 
-
-	if ((err = snd_hdsp_create_midi(card, hdsp, 1)) < 0) {
-		snd_printk("Hammerfall-DSP: Error creating second midi interface\n");
-		return err;
+	if (hdsp->io_type == Digiface || hdsp->io_type == H9652) {
+		if ((err = snd_hdsp_create_midi(card, hdsp, 1)) < 0) {
+			snd_printk("Hammerfall-DSP: Error creating second midi interface\n");
+			return err;
+		}
 	}
 
 	if ((err = snd_hdsp_create_controls(card, hdsp)) < 0) {
@@ -4914,7 +4915,7 @@ static int __devinit hdsp_request_fw_loader(hdsp_t *hdsp)
 #ifdef SNDRV_BIG_ENDIAN
 	{
 		int i;
-		u32 *src = (void *)fw->data;
+		u32 *src = (u32*)fw->data;
 		for (i = 0; i < ARRAY_SIZE(hdsp->firmware_cache); i++, src++)
 			hdsp->firmware_cache[i] = ((*src & 0x000000ff) << 16) |
 				((*src & 0x0000ff00) << 8)  |
@@ -4967,6 +4968,8 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	hdsp->midi[1].input = NULL;
 	hdsp->midi[0].output = NULL;
 	hdsp->midi[1].output = NULL;
+	hdsp->midi[0].pending = 0;
+	hdsp->midi[1].pending = 0;
 	spin_lock_init(&hdsp->midi[0].lock);
 	spin_lock_init(&hdsp->midi[1].lock);
 	hdsp->iobase = NULL;

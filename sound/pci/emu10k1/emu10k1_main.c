@@ -205,6 +205,15 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 		/* Setup SRCMulti Input Audio Enable */
 		outl(0x7b0000, emu->port + 0x20);
 		outl(0xFF000000, emu->port + 0x24);
+
+		/* Setup SPDIF Out Audio Enable */
+		/* The Audigy 2 Value has a separate SPDIF out,
+		 * so no need for a mixer switch
+		 */
+		outl(0x7a0000, emu->port + 0x20);
+		outl(0xFF000000, emu->port + 0x24);
+		tmp = inl(emu->port + A_IOCFG) & ~0x8; /* Clear bit 3 */
+		outl(tmp, emu->port + A_IOCFG);
 	}
 
 

@@ -30,6 +30,7 @@
 #include <linux/wait.h>
 #include <linux/moduleparam.h>
 #include <linux/delay.h>
+#include <linux/wait.h>
 #include <sound/rawmidi.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -133,17 +134,14 @@ int snd_rawmidi_drain_output(snd_rawmidi_substream_t * substream)
 
 	err = 0;
 	runtime->drain = 1;
-	while (runtime->avail < runtime->buffer_size) {
-		timeout = interruptible_sleep_on_timeout(&runtime->sleep, 10 * HZ);
-		if (signal_pending(current)) {
-			err = -ERESTARTSYS;
-			break;
-		}
-		if (runtime->avail < runtime->buffer_size && !timeout) {
-			snd_printk(KERN_WARNING "rawmidi drain error (avail = %li, buffer_size = %li)\n", (long)runtime->avail, (long)runtime->buffer_size);
-			err = -EIO;
-			break;
-		}
+	timeout = wait_event_interruptible_timeout(runtime->sleep,
+				(runtime->avail >= runtime->buffer_size),
+				10*HZ);
+	if (signal_pending(current))
+		err = -ERESTARTSYS;
+	if (runtime->avail < runtime->buffer_size && !timeout) {
+		snd_printk(KERN_WARNING "rawmidi drain error (avail = %li, buffer_size = %li)\n", (long)runtime->avail, (long)runtime->buffer_size);
+		err = -EIO;
 	}
 	runtime->drain = 0;
 	if (err != -ERESTARTSYS) {

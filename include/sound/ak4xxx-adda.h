@@ -50,7 +50,8 @@ struct snd_akm4xxx {
 	/* template should fill the following fields */
 	unsigned int idx_offset;			/* control index offset */
 	enum {
-		SND_AK4524, SND_AK4528, SND_AK4529, SND_AK4355, SND_AK4381
+		SND_AK4524, SND_AK4528, SND_AK4529,
+		SND_AK4355, SND_AK4358, SND_AK4381
 	} type;
 	struct snd_ak4xxx_ops ops;
 };

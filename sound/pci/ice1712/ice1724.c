@@ -47,6 +47,8 @@
 #include "vt1720_mobo.h"
 #include "pontis.h"
 #include "prodigy192.h"
+#include "juli.h"
+#include "phase.h"
 
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -59,6 +61,8 @@ MODULE_SUPPORTED_DEVICE("{"
 	       VT1720_MOBO_DEVICE_DESC
 	       PONTIS_DEVICE_DESC
 	       PRODIGY192_DEVICE_DESC
+	       JULI_DEVICE_DESC
+	       PHASE_DEVICE_DESC
 		"{VIA,VT1720},"
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
@@ -401,22 +405,10 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 {
 	unsigned long flags;
 	unsigned char val, old;
-	unsigned int i;
+	unsigned int i, mclk_change;
 
 	if (rate > get_max_rate(ice))
 		return;
-
-	spin_lock_irqsave(&ice->reg_lock, flags);
-	if ((inb(ICEMT1724(ice, DMA_CONTROL)) & DMA_STARTS) || 
-	    (inb(ICEMT1724(ice, DMA_PAUSE)) & DMA_PAUSES)) {
-		/* running? we cannot change the rate now... */
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
-		return;
-	}
-	if (!force && is_pro_rate_locked(ice)) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
-		return;
-	}
 
 	switch (rate) {
 	case 8000: val = 6; break;
@@ -439,8 +431,21 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		val = 0;
 		break;
 	}
+
+	spin_lock_irqsave(&ice->reg_lock, flags);
+	if ((inb(ICEMT1724(ice, DMA_CONTROL)) & DMA_STARTS) || 
+	    (inb(ICEMT1724(ice, DMA_PAUSE)) & DMA_PAUSES)) {
+		/* running? we cannot change the rate now... */
+		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		return;
+	}
+	if (!force && is_pro_rate_locked(ice)) {
+		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		return;
+	}
+
 	old = inb(ICEMT1724(ice, RATE));
-	if (old != val)
+	if (force || old != val)
 		outb(val, ICEMT1724(ice, RATE));
 	else if (rate == ice->cur_rate) {
 		spin_unlock_irqrestore(&ice->reg_lock, flags);
@@ -450,6 +455,7 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 	ice->cur_rate = rate;
 
 	/* check MT02 */
+	mclk_change = 0;
 	if (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S) {
 		val = old = inb(ICEMT1724(ice, I2S_FORMAT));
 		if (rate > 96000)
@@ -458,25 +464,23 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 			val &= ~VT1724_MT_I2S_MCLK_128X; /* 256x MCLK */
 		if (val != old) {
 			outb(val, ICEMT1724(ice, I2S_FORMAT));
-			if (ice->eeprom.subvendor == VT1724_SUBDEVICE_REVOLUTION71) {
-				/* FIXME: is this revo only? */
-				/* assert PRST# to converters; MT05 bit 7 */
-				outb(inb(ICEMT1724(ice, AC97_CMD)) | 0x80, ICEMT1724(ice, AC97_CMD));
-				spin_unlock_irqrestore(&ice->reg_lock, flags);
-				mdelay(5);
-				spin_lock_irqsave(&ice->reg_lock, flags);
-				/* deassert PRST# */
-				outb(inb(ICEMT1724(ice, AC97_CMD)) & ~0x80, ICEMT1724(ice, AC97_CMD));
-			}
+			mclk_change = 1;
 		}
 	}
 	spin_unlock_irqrestore(&ice->reg_lock, flags);
+
+	if (mclk_change && ice->gpio.i2s_mclk_changed)
+		ice->gpio.i2s_mclk_changed(ice);
+	if (ice->gpio.set_pro_rate)
+		ice->gpio.set_pro_rate(ice, rate);
 
 	/* set up codecs */
 	for (i = 0; i < ice->akm_codecs; i++) {
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
 	}
+	if (ice->spdif.ops.setup_rate)
+		ice->spdif.ops.setup_rate(ice, rate);
 }
 
 static int snd_vt1724_pcm_hw_params(snd_pcm_substream_t * substream,
@@ -1866,6 +1870,8 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1720_mobo_cards,
 	snd_vt1720_pontis_cards,
 	snd_vt1724_prodigy192_cards,
+	snd_vt1724_juli_cards,
+	snd_vt1724_phase_cards,
 	NULL,
 };
 
@@ -1878,23 +1884,34 @@ static void wait_i2c_busy(ice1712_t *ice)
 	int t = 0x10000;
 	while ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_BUSY) && t--)
 		;
+	if (t == -1)
+		printk(KERN_ERR "ice1724: i2c busy timeout\n");
 }
 
 unsigned char snd_vt1724_read_i2c(ice1712_t *ice, unsigned char dev, unsigned char addr)
 {
+	unsigned char val;
+
+	down(&ice->i2c_mutex);
 	outb(addr, ICEREG1724(ice, I2C_BYTE_ADDR));
 	outb(dev & ~VT1724_I2C_WRITE, ICEREG1724(ice, I2C_DEV_ADDR));
 	wait_i2c_busy(ice);
-	return inb(ICEREG1724(ice, I2C_DATA));
+	val = inb(ICEREG1724(ice, I2C_DATA));
+	up(&ice->i2c_mutex);
+	//printk("i2c_read: [0x%x,0x%x] = 0x%x\n", dev, addr, val);
+	return val;
 }
 
 void snd_vt1724_write_i2c(ice1712_t *ice, unsigned char dev, unsigned char addr, unsigned char data)
 {
+	down(&ice->i2c_mutex);
 	wait_i2c_busy(ice);
+	//printk("i2c_write: [0x%x,0x%x] = 0x%x\n", dev, addr, data);
 	outb(addr, ICEREG1724(ice, I2C_BYTE_ADDR));
 	outb(data, ICEREG1724(ice, I2C_DATA));
 	outb(dev | VT1724_I2C_WRITE, ICEREG1724(ice, I2C_DEV_ADDR));
 	wait_i2c_busy(ice);
+	up(&ice->i2c_mutex);
 }
 
 static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice, const char *modelname)
@@ -1906,7 +1923,8 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice, const char *modelnam
 	if (! modelname || ! *modelname) {
 		ice->eeprom.subvendor = 0;
 		if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) != 0)
-			ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
+			ice->eeprom.subvendor =
+				(snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
 				(snd_vt1724_read_i2c(ice, dev, 0x01) << 8) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x02) << 16) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x03) << 24);
@@ -2114,6 +2132,7 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
 	init_MUTEX(&ice->open_mutex);
+	init_MUTEX(&ice->i2c_mutex);
 	ice->gpio.set_mask = snd_vt1724_set_gpio_mask;
 	ice->gpio.set_dir = snd_vt1724_set_gpio_dir;
 	ice->gpio.set_data = snd_vt1724_set_gpio_data;
