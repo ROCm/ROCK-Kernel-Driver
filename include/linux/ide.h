@@ -613,7 +613,6 @@ extern u8 ata_dump(struct ata_device *, struct request *, const char *);
 extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
 extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
-extern int ide_wait_noerr(struct ata_device *, byte, byte, unsigned long);
 
 /*
  * This routine is called from the partition-table code in genhd.c
