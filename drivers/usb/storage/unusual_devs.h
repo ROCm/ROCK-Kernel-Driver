@@ -78,6 +78,15 @@ UNUSUAL_DEV(  0x0402, 0x5621, 0x0103, 0x0103,
 		"USB/IDE Bridge (ATA/ATAPI)",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
+/*
+ * FSC BX600 have this USB floppy (bug #42892 olh@suse.de)
+ */
+UNUSUAL_DEV(  0x0409, 0x0040, 0x0000, 0xffff,
+		"NEC",
+		"NEC USB UF000x",
+		US_SC_UFI, US_PR_CBI, NULL,
+		US_FL_SINGLE_LUN ),
+
 /* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
  * Entry needed for flags: US_FL_FIX_INQUIRY because initial inquiry message
  * always fails and confuses drive.
