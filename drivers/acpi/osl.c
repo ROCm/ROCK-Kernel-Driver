@@ -34,7 +34,6 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
-#include <linux/init.h>
 #include <linux/initrd.h>
 #include <linux/workqueue.h>
 #include <linux/nmi.h>
@@ -42,7 +41,6 @@
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
-#include <linux/vmalloc.h>
 
 #include <linux/efi.h>
 
