@@ -80,7 +80,7 @@ show_pools (struct device *dev, char *buf, size_t count, loff_t off)
 
 	return count - size;
 }
-static DEVICE_ATTR (pools, "pools", S_IRUGO, show_pools, NULL);
+static DEVICE_ATTR (pools, S_IRUGO, show_pools, NULL);
 
 /**
  * pci_pool_create - Creates a pool of pci consistent memory blocks, for dma.
