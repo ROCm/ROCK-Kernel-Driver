@@ -1408,6 +1408,7 @@ ahc_dmamem_alloc(struct ahc_softc *ahc, bus_dma_tag_t dmat, void** vaddr,
 	if (ahc->dev_softc != NULL)
 		if (ahc_pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF)) {
 			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
+			kfree(map);
 			return (ENODEV);
 		}
 	*vaddr = pci_alloc_consistent(ahc->dev_softc,
@@ -1416,6 +1417,7 @@ ahc_dmamem_alloc(struct ahc_softc *ahc, bus_dma_tag_t dmat, void** vaddr,
 		if (ahc_pci_set_dma_mask(ahc->dev_softc,
 				     ahc->platform_data->hw_dma_mask)) {
 			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
+			kfree(map);
 			return (ENODEV);
 		}
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
