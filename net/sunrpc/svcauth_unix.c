@@ -335,8 +335,12 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 {
 	struct kvec	*argv = &rqstp->rq_arg.head[0];
 	struct kvec	*resv = &rqstp->rq_res.head[0];
+	struct svc_cred	*cred = &rqstp->rq_cred;
 	int		rv=0;
 	struct ip_map key, *ipm;
+
+	cred->cr_group_info = NULL;
+	rqstp->rq_client = NULL;
 
 	if (argv->iov_len < 3*4)
 		return SVC_GARBAGE;
@@ -353,22 +357,16 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 	}
 
 	/* Signal that mapping to nobody uid/gid is required */
-	rqstp->rq_cred.cr_uid = (uid_t) -1;
-	rqstp->rq_cred.cr_gid = (gid_t) -1;
-	rqstp->rq_cred.cr_group_info = groups_alloc(0);
-	if (rqstp->rq_cred.cr_group_info == NULL)
+	cred->cr_uid = (uid_t) -1;
+	cred->cr_gid = (gid_t) -1;
+	cred->cr_group_info = groups_alloc(0);
+	if (cred->cr_group_info == NULL)
 		return SVC_DROP; /* kmalloc failure - client must retry */
-
-	/* Put NULL verifier */
-	svc_putu32(resv, RPC_AUTH_NULL);
-	svc_putu32(resv, 0);
 
 	strcpy(key.m_class, rqstp->rq_server->sv_program->pg_class);
 	key.m_addr = rqstp->rq_addr.sin_addr;
 
 	ipm = ip_map_lookup(&key, 0);
-
-	rqstp->rq_client = NULL;
 
 	if (ipm)
 		switch (cache_check(&ip_map_cache, &ipm->h, &rqstp->rq_chandle)) {
@@ -388,10 +386,18 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 		}
 	else rv = SVC_DROP;
 
-	if (rqstp->rq_client == NULL && rqstp->rq_proc != 0)
-		*authp = rpc_autherr_badcred;
+	if (rv == SVC_OK && rqstp->rq_client == NULL && rqstp->rq_proc != 0)
+		goto badcred;
+
+	/* Put NULL verifier */
+	svc_putu32(resv, RPC_AUTH_NULL);
+	svc_putu32(resv, 0);
 
 	return rv;
+
+badcred:
+	*authp = rpc_autherr_badcred;
+	return SVC_DENIED;
 }
 
 static int
