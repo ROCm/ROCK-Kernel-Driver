@@ -451,24 +451,10 @@ static void tg3_phy_set_wirespeed(struct tg3 *tp)
 	tg3_writephy(tp, MII_TG3_AUX_CTRL, (val | (1 << 15) | (1 << 4)));
 }
 
-/* This will reset the tigon3 PHY if there is no valid
- * link unless the FORCE argument is non-zero.
- */
-static int tg3_phy_reset(struct tg3 *tp, int force)
+static int tg3_bmcr_reset(struct tg3 *tp)
 {
-	u32 phy_status, phy_control;
-	int err, limit;
-
-	err  = tg3_readphy(tp, MII_BMSR, &phy_status);
-	err |= tg3_readphy(tp, MII_BMSR, &phy_status);
-	if (err != 0)
-		return -EBUSY;
-
-	/* If we have link, and not forcing a reset, then nothing
-	 * to do.
-	 */
-	if ((phy_status & BMSR_LSTATUS) != 0 && (force == 0))
-		return 0;
+	u32 phy_control;
+	int limit, err;
 
 	/* OK, reset it, and poll the BMCR_RESET bit until it
 	 * clears or we time out.
@@ -486,12 +472,213 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 
 		if ((phy_control & BMCR_RESET) == 0) {
 			udelay(40);
-			goto out;
+			break;
 		}
 		udelay(10);
 	}
+	if (limit <= 0)
+		return -EBUSY;
 
-	return -EBUSY;
+	return 0;
+}
+
+static int tg3_wait_macro_done(struct tg3 *tp)
+{
+	int limit = 100;
+
+	while (limit--) {
+		u32 tmp32;
+
+		tg3_readphy(tp, 0x16, &tmp32);
+		if ((tmp32 & 0x1000) == 0)
+			break;
+	}
+	if (limit <= 0)
+		return -EBUSY;
+
+	return 0;
+}
+
+static int tg3_phy_write_and_check_testpat(struct tg3 *tp, int *resetp)
+{
+	static const u32 test_pat[4][6] = {
+	{ 0x00005555, 0x00000005, 0x00002aaa, 0x0000000a, 0x00003456, 0x00000003 },
+	{ 0x00002aaa, 0x0000000a, 0x00003333, 0x00000003, 0x0000789a, 0x00000005 },
+	{ 0x00005a5a, 0x00000005, 0x00002a6a, 0x0000000a, 0x00001bcd, 0x00000003 },
+	{ 0x00002a5a, 0x0000000a, 0x000033c3, 0x00000003, 0x00002ef1, 0x00000005 }
+	};
+	int chan;
+
+	for (chan = 0; chan < 4; chan++) {
+		int i;
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS,
+			     (chan * 0x2000) | 0x0200);
+		tg3_writephy(tp, 0x16, 0x0002);
+
+		for (i = 0; i < 6; i++)
+			tg3_writephy(tp, MII_TG3_DSP_RW_PORT,
+				     test_pat[chan][i]);
+
+		tg3_writephy(tp, 0x16, 0x0202);
+		if (tg3_wait_macro_done(tp)) {
+			*resetp = 1;
+			return -EBUSY;
+		}
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS,
+			     (chan * 0x2000) | 0x0200);
+		tg3_writephy(tp, 0x16, 0x0082);
+		if (tg3_wait_macro_done(tp)) {
+			*resetp = 1;
+			return -EBUSY;
+		}
+
+		tg3_writephy(tp, 0x16, 0x0802);
+		if (tg3_wait_macro_done(tp)) {
+			*resetp = 1;
+			return -EBUSY;
+		}
+
+		for (i = 0; i < 6; i += 2) {
+			u32 low, high;
+
+			tg3_readphy(tp, MII_TG3_DSP_RW_PORT, &low);
+			tg3_readphy(tp, MII_TG3_DSP_RW_PORT, &high);
+			if (tg3_wait_macro_done(tp)) {
+				*resetp = 1;
+				return -EBUSY;
+			}
+			low &= 0x7fff;
+			high &= 0x000f;
+			if (low != test_pat[chan][i] ||
+			    high != test_pat[chan][i+1]) {
+				tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x000b);
+				tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x4001);
+				tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x4005);
+
+				return -EBUSY;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int tg3_phy_reset_chanpat(struct tg3 *tp)
+{
+	int chan;
+
+	for (chan = 0; chan < 4; chan++) {
+		int i;
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS,
+			     (chan * 0x2000) | 0x0200);
+		tg3_writephy(tp, 0x16, 0x0002);
+		for (i = 0; i < 6; i++)
+			tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x000);
+		tg3_writephy(tp, 0x16, 0x0202);
+		if (tg3_wait_macro_done(tp))
+			return -EBUSY;
+	}
+
+	return 0;
+}
+
+static int tg3_phy_reset_5703_4_5(struct tg3 *tp)
+{
+	u32 reg32, phy9_orig;
+	int retries, do_phy_reset, err;
+
+	retries = 10;
+	do_phy_reset = 1;
+	do {
+		if (do_phy_reset) {
+			err = tg3_bmcr_reset(tp);
+			if (err)
+				return err;
+			do_phy_reset = 0;
+		}
+
+		/* Disable transmitter and interrupt.  */
+		tg3_readphy(tp, MII_TG3_EXT_CTRL, &reg32);
+		reg32 |= 0x3000;
+		tg3_writephy(tp, MII_TG3_EXT_CTRL, reg32);
+
+		/* Set full-duplex, 1000 mbps.  */
+		tg3_writephy(tp, MII_BMCR,
+			     BMCR_FULLDPLX | TG3_BMCR_SPEED1000);
+
+		/* Set to master mode.  */
+		tg3_readphy(tp, MII_TG3_CTRL, &phy9_orig);
+		tg3_writephy(tp, MII_TG3_CTRL,
+			     (MII_TG3_CTRL_AS_MASTER |
+			      MII_TG3_CTRL_ENABLE_AS_MASTER));
+
+		/* Enable SM_DSP_CLOCK and 6dB.  */
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
+
+		/* Block the PHY control access.  */
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8005);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x0800);
+
+		err = tg3_phy_write_and_check_testpat(tp, &do_phy_reset);
+		if (!err)
+			break;
+	} while (--retries);
+
+	err = tg3_phy_reset_chanpat(tp);
+	if (err)
+		return err;
+
+	tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8005);
+	tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x0000);
+
+	tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8200);
+	tg3_writephy(tp, 0x16, 0x0000);
+
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+
+	tg3_writephy(tp, MII_TG3_CTRL, phy9_orig);
+
+	tg3_readphy(tp, MII_TG3_EXT_CTRL, &reg32);
+	reg32 &= ~0x3000;
+	tg3_writephy(tp, MII_TG3_EXT_CTRL, reg32);
+
+	return err;
+}
+
+/* This will reset the tigon3 PHY if there is no valid
+ * link unless the FORCE argument is non-zero.
+ */
+static int tg3_phy_reset(struct tg3 *tp, int force)
+{
+	u32 phy_status;
+	int err;
+
+	err  = tg3_readphy(tp, MII_BMSR, &phy_status);
+	err |= tg3_readphy(tp, MII_BMSR, &phy_status);
+	if (err != 0)
+		return -EBUSY;
+
+	/* If we have link, and not forcing a reset, then nothing
+	 * to do.
+	 */
+	if ((phy_status & BMSR_LSTATUS) != 0 && (force == 0))
+		return 0;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5704 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		err = tg3_phy_reset_5703_4_5(tp);
+		if (err)
+			return err;
+		goto out;
+	}
+
+	err = tg3_bmcr_reset(tp);
+	if (err)
+		return err;
 
 out:
 	tg3_phy_set_wirespeed(tp);
