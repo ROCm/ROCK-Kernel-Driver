@@ -40,6 +40,11 @@ const unsigned char scsi_command_size[8] =
 
 #define BLK_DEFAULT_TIMEOUT	(60 * HZ)
 
+/* defined in ../scsi/scsi.h  ... should it be included? */
+#ifndef SCSI_SENSE_BUFFERSIZE
+#define SCSI_SENSE_BUFFERSIZE 64
+#endif
+
 int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
 {
 	DECLARE_COMPLETION(wait);
@@ -126,11 +131,11 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 		 struct sg_io_hdr *uptr)
 {
 	unsigned long uaddr, start_time;
-	int err, reading, writing, nr_sectors;
+	int reading, writing, nr_sectors;
 	struct sg_io_hdr hdr;
 	struct request *rq;
 	struct bio *bio;
-	char sense[24];
+	char sense[SCSI_SENSE_BUFFERSIZE];
 	void *buffer;
 
 	if (!access_ok(VERIFY_WRITE, uptr, sizeof(*uptr)))
@@ -265,26 +270,36 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 
 	start_time = jiffies;
 
-	/*
-	 * return -EIO if we didn't transfer all data, caller can look at
-	 * residual count to find out how much did succeed
+	/* ignore return value. All information is passed back to caller
+	 * (if he doesn't check that is his problem).
+	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
 	 */
-	err = blk_do_rq(q, bdev, rq);
-	if (rq->data_len > 0)
-		err = -EIO;
+	blk_do_rq(q, bdev, rq);
 	
 	if (bio) {
 		bio_unmap_user(bio, reading);
 		bio_put(bio);
 	}
 
-	hdr.status = rq->errors;
+	/* write to all output members */
+	hdr.status = rq->errors;	
+	hdr.masked_status = (hdr.status >> 1) & 0x1f;
+	hdr.msg_status = 0;
+	hdr.host_status = 0;
+	hdr.driver_status = 0;
+	hdr.info = 0;
+	if (hdr.masked_status || hdr.host_status || hdr.driver_status)
+		hdr.info |= SG_INFO_CHECK;
 	hdr.resid = rq->data_len;
 	hdr.duration = (jiffies - start_time) * (1000 / HZ);
+	hdr.sb_len_wr = 0;
 
 	if (rq->sense_len && hdr.sbp) {
-		if (!copy_to_user(hdr.sbp,rq->sense, rq->sense_len))
-			hdr.sb_len_wr = rq->sense_len;
+		int len = (hdr.mx_sb_len < rq->sense_len) ? 
+				hdr.mx_sb_len : rq->sense_len;
+
+		if (!copy_to_user(hdr.sbp, rq->sense, len))
+			hdr.sb_len_wr = len;
 	}
 
 	blk_put_request(rq);
@@ -297,8 +312,9 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 
 		kfree(buffer);
 	}
-
-	return err;
+	/* may not have succeeded, but output values written to control
+	 * structure (struct sg_io_hdr).  */
+	return 0;
 }
 
 #define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)

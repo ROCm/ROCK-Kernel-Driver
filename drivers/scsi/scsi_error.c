@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -40,20 +41,6 @@
 #include "hosts.h"
 
 #include <scsi/scsi_ioctl.h> /* grr */
-
-/*
- * We must always allow SHUTDOWN_SIGS.  Even if we are not a module,
- * the host drivers that we are using may be loaded as modules, and
- * when we unload these,  we need to ensure that the error handler thread
- * can be shut down.
- *
- * Note - when we unload a module, we send a SIGHUP.  We mustn't
- * enable SIGTERM, as this is how the init shuts things down when you
- * go to single-user mode.  For that matter, init also sends SIGKILL,
- * so we mustn't enable that one either.  We use SIGHUP instead.  Other
- * options would be SIGPWR, I suppose.
- */
-#define SHUTDOWN_SIGS	(sigmask(SIGHUP))
 
 #ifdef DEBUG
 #define SENSE_TIMEOUT SCSI_TIMEOUT
@@ -1589,12 +1576,10 @@ void scsi_error_handler(void *data)
 	int rtn;
 	DECLARE_MUTEX_LOCKED(sem);
 
-	/*
-	 * We only listen to signals if the HA was loaded as a module.
-	 * If the HA was compiled into the kernel, then we don't listen
-	 * to any signals.
-	 */
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
+	spin_lock_irq(&current->sig->siglock);
+	sigfillset(&current->blocked);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sig->siglock);
 
 	lock_kernel();
 
@@ -1618,9 +1603,9 @@ void scsi_error_handler(void *data)
 	/*
 	 * Wake up the thread that created us.
 	 */
-	SCSI_LOG_ERROR_RECOVERY(3, printk("Wake up parent \n"));
+	SCSI_LOG_ERROR_RECOVERY(3, printk("Wake up parent of scsi_eh_%d\n",shost->host_no));
 
-	up(shost->eh_notify);
+	complete(shost->eh_notify);
 
 	while (1) {
 		/*
@@ -1628,7 +1613,7 @@ void scsi_error_handler(void *data)
 		 * away and die.  This typically happens if the user is
 		 * trying to unload a module.
 		 */
-		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler sleeping\n"));
+		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler scsi_eh_%d sleeping\n",shost->host_no));
 
 		/*
 		 * Note - we always use down_interruptible with the semaphore
@@ -1640,10 +1625,10 @@ void scsi_error_handler(void *data)
 		 * semaphores isn't unreasonable.
 		 */
 		down_interruptible(&sem);
-		if (signal_pending(current))
+		if (shost->eh_kill)
 			break;
 
-		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler waking up\n"));
+		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler scsi_eh_%d waking up\n",shost->host_no));
 
 		shost->eh_active = 1;
 
@@ -1671,7 +1656,7 @@ void scsi_error_handler(void *data)
 
 	}
 
-	SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler exiting\n"));
+	SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler scsi_eh_%d exiting\n",shost->host_no));
 
 	/*
 	 * Make sure that nobody tries to wake us up again.
@@ -1691,13 +1676,9 @@ void scsi_error_handler(void *data)
 	/*
 	 * If anyone is waiting for us to exit (i.e. someone trying to unload
 	 * a driver), then wake up that process to let them know we are on
-	 * the way out the door.  This may be overkill - I *think* that we
-	 * could probably just unload the driver and send the signal, and when
-	 * the error handling thread wakes up that it would just exit without
-	 * needing to touch any memory associated with the driver itself.
+	 * the way out the door.
 	 */
-	if (shost->eh_notify != NULL)
-		up(shost->eh_notify);
+	complete_and_exit(shost->eh_notify, 0);
 }
 
 /**
