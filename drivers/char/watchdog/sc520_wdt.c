@@ -1,21 +1,21 @@
 /*
- *	AMD Elan SC520 processor Watchdog Timer driver for Linux 2.4.x
+ *	AMD Elan SC520 processor Watchdog Timer driver
  *
  *      Based on acquirewdt.c by Alan Cox,
- *           and sbc60xxwdt.c by Jakob Oestergaard <jakob@ostenfeld.dk>
- *     
+ *           and sbc60xxwdt.c by Jakob Oestergaard <jakob@unthought.net>
+ *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
- *	The authors do NOT admit liability nor provide warranty for 
- *	any of this software. This material is provided "AS-IS" in 
+ *
+ *	The authors do NOT admit liability nor provide warranty for
+ *	any of this software. This material is provided "AS-IS" in
  *      the hope that it may be useful for others.
  *
  *	(c) Copyright 2001    Scott Jennings <linuxdrivers@oro.net>
  *           9/27 - 2001      [Initial release]
- *	
+ *
  *	Additional fixes Alan Cox
  *	-	Fixed formatting
  *	-	Removed debug printks
@@ -24,20 +24,15 @@
  *	-	Used ioremap/writew/readw
  *	-	Added NOWAYOUT support
  *
- *  Theory of operation:
- *  A Watchdog Timer (WDT) is a hardware circuit that can 
- *  reset the computer system in case of a software fault.
- *  You probably knew that already.
- *
- *  Usually a userspace daemon will notify the kernel WDT driver
- *  via the /proc/watchdog special device file that userspace is
- *  still alive, at regular intervals.  When such a notification
- *  occurs, the driver will usually tell the hardware watchdog
- *  that everything is in order, and that the watchdog should wait
- *  for yet another little while to reset the system.
- *  If userspace fails (RAM error, kernel bug, whatever), the
- *  notifications cease to occur, and the hardware watchdog will
- *  reset the system (causing a reboot) after the timeout occurs.
+ *     4/12 - 2002 Changes by Rob Radez <rob@osinvestor.com>
+ *     -       Change comments
+ *     -       Eliminate fop_llseek
+ *     -       Change CONFIG_WATCHDOG_NOWAYOUT semantics
+ *     -       Add KERN_* tags to printks
+ *     09/8 - 2003 Changes by Wim Van Sebroeck <wim@iguana.be>
+ *     -       cleanup of trailing spaces
+ *     -       added extra printk's for startup problems
+ *     -       use module_param
  *
  *  This WDT driver is different from most other Linux WDT
  *  drivers in that the driver will ping the watchdog by itself,
@@ -95,6 +90,7 @@
 #define WDT_WRST_ENB 0x4000	/* [14] Watchdog Timer Reset Enable */
 
 #define OUR_NAME "sc520_wdt"
+#define PFX OUR_NAME ": "
 
 #define WRT_DOG(data) *wdtmrctl=data
 
@@ -123,9 +119,9 @@ static spinlock_t wdt_spinlock;
 static void wdt_timer_ping(unsigned long data)
 {
 	/* If we got a heartbeat pulse within the WDT_US_INTERVAL
-	 * we agree to ping the WDT 
+	 * we agree to ping the WDT
 	 */
-	if(time_before(jiffies, next_heartbeat)) 
+	if(time_before(jiffies, next_heartbeat))
 	{
 		/* Ping the WDT */
 		spin_lock(&wdt_spinlock);
@@ -137,11 +133,11 @@ static void wdt_timer_ping(unsigned long data)
 		timer.expires = jiffies + WDT_INTERVAL;
 		add_timer(&timer);
 	} else {
-		printk(OUR_NAME ": Heartbeat lost! Will not ping the watchdog\n");
+		printk(KERN_WARNING PFX "Heartbeat lost! Will not ping the watchdog\n");
 	}
 }
 
-/* 
+/*
  * Utility routines
  */
 
@@ -168,11 +164,11 @@ static void wdt_startup(void)
 	next_heartbeat = jiffies + WDT_HEARTBEAT;
 
 	/* Start the timer */
-	timer.expires = jiffies + WDT_INTERVAL;	
+	timer.expires = jiffies + WDT_INTERVAL;
 	add_timer(&timer);
 
 	wdt_config(WDT_ENB | WDT_WRST_ENB | TIMEOUT_EXPONENT);
-	printk(OUR_NAME ": Watchdog timer is now enabled.\n");  
+	printk(KERN_INFO PFX "Watchdog timer is now enabled.\n");
 }
 
 static void wdt_turnoff(void)
@@ -181,7 +177,7 @@ static void wdt_turnoff(void)
 		/* Stop the timer */
 		del_timer(&timer);
 		wdt_config(0);
-		printk(OUR_NAME ": Watchdog timer is now disabled...\n");
+		printk(KERN_INFO PFX "Watchdog timer is now disabled...\n");
 	}
 }
 
@@ -197,7 +193,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 		return -ESPIPE;
 
 	/* See if we got the magic character */
-	if(count) 
+	if(count)
 	{
 		size_t ofs;
 
@@ -223,7 +219,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 
 static int fop_open(struct inode * inode, struct file * file)
 {
-	switch(minor(inode->i_rdev)) 
+	switch(minor(inode->i_rdev))
 	{
 		case WATCHDOG_MINOR:
 			/* Just in case we're already talking to someone... */
@@ -242,13 +238,13 @@ static int fop_open(struct inode * inode, struct file * file)
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-	if(minor(inode->i_rdev) == WATCHDOG_MINOR) 
+	if(minor(inode->i_rdev) == WATCHDOG_MINOR)
 	{
 		if(wdt_expect_close)
 			wdt_turnoff();
 		else {
 			del_timer(&timer);
-			printk(OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
+			printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
 		}
 	}
 	clear_bit(0, &wdt_is_open);
@@ -262,9 +258,9 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	{
 		.options = WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "SC520"
+		.identity = "SC520",
 	};
-	
+
 	switch(cmd)
 	{
 		default:
@@ -283,13 +279,13 @@ static struct file_operations wdt_fops = {
 	.write		= fop_write,
 	.open		= fop_open,
 	.release	= fop_close,
-	.ioctl		= fop_ioctl
+	.ioctl		= fop_ioctl,
 };
 
 static struct miscdevice wdt_miscdev = {
 	.minor	= WATCHDOG_MINOR,
 	.name	= "watchdog",
-	.fops	= &wdt_fops
+	.fops	= &wdt_fops,
 };
 
 /*
@@ -299,21 +295,21 @@ static struct miscdevice wdt_miscdev = {
 static int wdt_notify_sys(struct notifier_block *this, unsigned long code,
 	void *unused)
 {
-	if(code==SYS_DOWN || code==SYS_HALT) 
+	if(code==SYS_DOWN || code==SYS_HALT)
 		wdt_turnoff();
 	return NOTIFY_DONE;
 }
- 
+
 /*
  *	The WDT needs to learn about soft shutdowns in order to
- *	turn the timebomb registers off. 
+ *	turn the timebomb registers off.
  */
- 
+
 static struct notifier_block wdt_notifier=
 {
 	.notifier_call = wdt_notify_sys,
 	.next = NULL,
-	.priority = 0
+	.priority = 0,
 };
 
 static void __exit sc520_wdt_unload(void)
@@ -339,21 +335,29 @@ static int __init sc520_wdt_init(void)
 
 	rc = misc_register(&wdt_miscdev);
 	if (rc)
+	{
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			wdt_miscdev.minor, rc);
 		goto err_out_region2;
+	}
 
 	rc = register_reboot_notifier(&wdt_notifier);
 	if (rc)
+	{
+		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			rc);
 		goto err_out_miscdev;
+	}
 
 	/* get the Base Address Register */
 	cbar = inl_p(0xfffc);
-	printk(OUR_NAME ": CBAR: 0x%08lx\n", cbar);
+	printk(KERN_INFO PFX "CBAR: 0x%08lx\n", cbar);
 	/* check if MMCR aliasing bit is set */
 	if (cbar & 0x80000000) {
-		printk(OUR_NAME ": MMCR Aliasing enabled.\n");
+		printk(KERN_INFO PFX "MMCR Aliasing enabled.\n");
 		wdtmrctl = (__u16 *)(cbar & 0x3fffffff);
 	} else {
-		printk(OUR_NAME "!!! WARNING !!!\n"
+		printk(KERN_INFO PFX "!!! WARNING !!!\n"
 		  "\t MMCR Aliasing found NOT enabled!\n"
 		  "\t Using default value of: %p\n"
 		  "\t This has not been tested!\n"
@@ -366,7 +370,7 @@ static int __init sc520_wdt_init(void)
 
 	wdtmrctl = (__u16 *)((char *)wdtmrctl + OFFS_WDTMRCTL);
 	wdtmrctl = ioremap((unsigned long)wdtmrctl, 2);
-	printk(KERN_INFO OUR_NAME ": WDT driver for SC520 initialised.\n");
+	printk(KERN_INFO PFX "WDT driver for SC520 initialised.\n");
 
 	return 0;
 
