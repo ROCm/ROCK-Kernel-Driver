@@ -211,7 +211,6 @@ enum Window4 {		/* Window 4: Xcvr/media bits. */
 
 struct el3_private {
 	dev_link_t link;
-	struct net_device dev;
 	dev_node_t node;
 	struct net_device_stats stats;
 	u16 advertising, partner;		/* NWay media advertisement */
@@ -291,13 +290,12 @@ static dev_link_t *tc574_attach(void)
 	flush_stale_links();
 
 	/* Create the PC card device object. */
-	lp = kmalloc(sizeof(*lp), GFP_KERNEL);
-	if (!lp)
+	dev = alloc_etherdev(sizeof(struct el3_private));
+	if (!dev)
 		return NULL;
-		
-	memset(lp, 0, sizeof(*lp));
-	link = &lp->link; dev = &lp->dev;
-	link->priv = dev->priv = link->irq.Instance = lp;
+	lp = dev->priv;
+	link = &lp->link;
+	link->priv = dev;
 	
 	init_timer(&link->release);
 	link->release.function = &tc574_release;
@@ -312,6 +310,7 @@ static dev_link_t *tc574_attach(void)
 		for (i = 0; i < 4; i++)
 			link->irq.IRQInfo2 |= 1 << irq_list[i];
 	link->irq.Handler = &el3_interrupt;
+	link->irq.Instance = dev;
 	link->conf.Attributes = CONF_ENABLE_IRQ;
 	link->conf.Vcc = 50;
 	link->conf.IntType = INT_MEMORY_AND_IO;
@@ -323,7 +322,6 @@ static dev_link_t *tc574_attach(void)
 	dev->get_stats = &el3_get_stats;
 	dev->do_ioctl = &el3_ioctl;
 	dev->set_multicast_list = &set_rx_mode;
-	ether_setup(dev);
 	dev->open = &el3_open;
 	dev->stop = &el3_close;
 #ifdef HAVE_TX_TIMEOUT
@@ -364,7 +362,7 @@ static dev_link_t *tc574_attach(void)
 
 static void tc574_detach(dev_link_t *link)
 {
-	struct el3_private *lp = link->priv;
+	struct net_device *dev = link->priv;
 	dev_link_t **linkp;
 
 	DEBUG(0, "3c574_detach(0x%p)\n", link);
@@ -390,8 +388,8 @@ static void tc574_detach(dev_link_t *link)
 	/* Unlink device structure, free bits */
 	*linkp = link->next;
 	if (link->dev)
-		unregister_netdev(&lp->dev);
-	kfree(lp);
+		unregister_netdev(dev);
+	kfree(dev);
 
 } /* tc574_detach */
 
@@ -407,8 +405,8 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 static void tc574_config(dev_link_t *link)
 {
 	client_handle_t handle = link->handle;
-	struct el3_private *lp = link->priv;
-	struct net_device *dev = &lp->dev;
+	struct net_device *dev = link->priv;
+	struct el3_private *lp = dev->priv;
 	tuple_t tuple;
 	cisparse_t parse;
 	unsigned short buf[32];
@@ -599,8 +597,7 @@ static int tc574_event(event_t event, int priority,
 					   event_callback_args_t *args)
 {
 	dev_link_t *link = args->client_data;
-	struct el3_private *lp = link->priv;
-	struct net_device *dev = &lp->dev;
+	struct net_device *dev = link->priv;
 
 	DEBUG(1, "3c574_event(0x%06x)\n", event);
 
@@ -856,7 +853,7 @@ static int el3_open(struct net_device *dev)
 	
 	tc574_reset(dev);
 	lp->media.function = &media_check;
-	lp->media.data = (unsigned long)lp;
+	lp->media.data = (unsigned long) dev;
 	lp->media.expires = jiffies + HZ;
 	add_timer(&lp->media);
 	
@@ -939,8 +936,8 @@ static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 /* The EL3 interrupt handler. */
 static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	struct el3_private *lp = dev_id;
-	struct net_device *dev = &lp->dev;
+	struct net_device *dev = (struct net_device *) dev_id;
+	struct el3_private *lp = dev->priv;
 	ioaddr_t ioaddr, status;
 	int work_budget = max_interrupt_work;
 	int handled = 0;
@@ -1032,8 +1029,8 @@ static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 */
 static void media_check(unsigned long arg)
 {
-	struct el3_private *lp = (struct el3_private *)arg;
-	struct net_device *dev = &lp->dev;
+	struct net_device *dev = (struct net_device *) arg;
+	struct el3_private *lp = dev->priv;
 	ioaddr_t ioaddr = dev->base_addr;
 	unsigned long flags;
 	unsigned short /* cable, */ media, partner;
