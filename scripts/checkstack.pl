@@ -13,7 +13,7 @@
 #	M68k port by Geert Uytterhoeven and Andreas Schwab
 #
 #	Usage:
-#	objdump -d vmlinux | stackcheck_ppc.pl [arch]
+#	objdump -d vmlinux | stackcheck.pl [arch]
 #
 #	TODO :	Port to all architectures (one regex per arch)
 
