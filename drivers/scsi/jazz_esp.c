@@ -52,6 +52,40 @@ static volatile unsigned char cmd_buffer[16];
 				 * via PIO.
 				 */
 
+int jazz_esp_detect(Scsi_Host_Template *tpnt);
+static int jazz_esp_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "jazz_esp",
+	.proc_info		= &esp_proc_info,
+	.name			= "ESP 100/100a/200",
+	.detect			= jazz_esp_detect,
+	.slave_alloc		= esp_slave_alloc,
+	.slave_destroy		= esp_slave_destroy,
+	.release		= jazz_esp_release,
+	.info			= esp_info,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+
+#include "scsi_module.c"
+
 /***************************************************************** Detection */
 static int jazz_esp_detect(struct scsi_host_template *tpnt)
 {
@@ -138,18 +172,6 @@ static int jazz_esp_detect(struct scsi_host_template *tpnt)
 	return esps_in_use;
     }
     return 0;
-}
-
-static int jazz_esp_release(struct Scsi_Host *shost)
-{
-	if (shost->irq)
-		free_irq(shost->irq, NULL);
-	if (shost->dma_channel != 0xff)
-		free_dma(shost->dma_channel);
-	if (shost->io_port && shost->n_io_port)
-		release_region(shost->io_port, shost->n_io_port);
-	scsi_unregister(shost);
-	return 0;
 }
 
 /************************************************************* DMA Functions */

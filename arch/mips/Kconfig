@@ -29,6 +29,10 @@ menu "Machine selection"
 
 config MACH_JAZZ
 	bool "Support for the Jazz family of machines"
+	select ARC
+	select ARC32
+	select GENERIC_ISA_DMA
+	select I8259
 	select ISA
 	help
 	 This a family of machines based on the MIPS R4030 chipset which was

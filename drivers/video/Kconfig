@@ -1053,6 +1053,13 @@ config FB_TX3912
 
 	  Say Y here to enable kernel support for the on-board framebuffer.
 
+config FB_G364
+	bool
+	depends on MIPS_MAGNUM_4000 || OLIVETTI_M700
+	help
+	  The G364 driver is the framebuffer used in MIPS Magnum 4000 and
+	  Olivetti M700-10 systems.
+
 config FB_68328
 	bool "Motorola 68328 native frame buffer support"
 	depends on (M68328 || M68EZ328 || M68VZ328)

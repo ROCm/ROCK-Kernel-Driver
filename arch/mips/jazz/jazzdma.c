@@ -29,7 +29,7 @@
 
 static unsigned long vdma_pagetable_start;
 
-static spinlock_t vdma_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(vdma_lock);
 
 /*
  * Debug stuff
