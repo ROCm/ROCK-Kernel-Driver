@@ -242,6 +242,9 @@ static int coda_mknod(struct inode *dir, struct dentry *de, int mode, dev_t rdev
 	if ( coda_hasmknod == 0 )
 		return -EIO;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	lock_kernel();
 	coda_vfs_stat.create++;
 

@@ -2010,14 +2010,13 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     inode->i_blksize = FAKE_BLOCK_SIZE;
     inode->i_op = &devfs_iops;
     inode->i_fop = &devfs_fops;
-    inode->i_rdev = NODEV;
     if ( S_ISCHR (de->mode) )
     {
-	inode->i_rdev = to_kdev_t(de->u.cdev.dev);
+	inode->i_rdev = de->u.cdev.dev;
     }
     else if ( S_ISBLK (de->mode) )
     {
-	inode->i_rdev = to_kdev_t(de->u.bdev.dev);
+	inode->i_rdev = de->u.bdev.dev;
 	if (bd_acquire (inode) != 0)
 		PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
     }
@@ -2494,8 +2493,8 @@ static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
     struct devfs_entry *parent, *de;
     struct inode *inode;
 
-    DPRINTK (DEBUG_I_MKNOD, "(%s): mode: 0%o  dev: %d\n",
-	     dentry->d_name.name, mode, rdev);
+    DPRINTK (DEBUG_I_MKNOD, "(%s): mode: 0%o  dev: %u:%u\n",
+	     dentry->d_name.name, mode, MAJOR(rdev), MINOR(rdev));
     parent = get_devfs_entry_from_vfs_inode (dir);
     if (parent == NULL) return -ENOENT;
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);

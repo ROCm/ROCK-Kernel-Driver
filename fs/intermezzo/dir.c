@@ -726,6 +726,9 @@ static int presto_mknod(struct inode * dir, struct dentry * dentry, int mode, de
         struct dentry *parent = dentry->d_parent;
         struct lento_vfs_context info;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
         ENTRY;
         error = presto_check_set_fsdata(dentry);
         if ( error ) {

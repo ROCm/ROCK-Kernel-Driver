@@ -4249,6 +4249,7 @@ static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 		return NULL;
 	if (((*part>>2) & 0x1f) >= NUMBER(floppy_type))
 		return NULL;
+	*part = 0;
 	return get_disk(disks[drive]);
 }
 

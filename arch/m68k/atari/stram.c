@@ -34,12 +34,6 @@
 
 #include <linux/swapops.h>
 
-#ifdef CONFIG_STRAM_SWAP
-#define MAJOR_NR    Z2RAM_MAJOR
-#define do_z2_request do_stram_request
-#define DEVICE_NR(device) (minor(device))
-#endif
-
 #undef DEBUG
 
 #ifdef DEBUG

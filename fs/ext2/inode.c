@@ -1127,7 +1127,7 @@ void ext2_read_inode (struct inode * inode)
 	} else {
 		inode->i_op = &ext2_special_inode_operations;
 		init_special_inode(inode, inode->i_mode,
-				   le32_to_cpu(raw_inode->i_block[0]));
+			   old_decode_dev(le32_to_cpu(raw_inode->i_block[0])));
 	}
 	brelse (bh);
 	ext2_set_inode_flags(inode);
@@ -1216,7 +1216,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 	
 	raw_inode->i_generation = cpu_to_le32(inode->i_generation);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		raw_inode->i_block[0] = cpu_to_le32(kdev_t_to_nr(inode->i_rdev));
+		raw_inode->i_block[0] = cpu_to_le32(old_encode_dev(inode->i_rdev));
 	else for (n = 0; n < EXT2_N_BLOCKS; n++)
 		raw_inode->i_block[n] = ei->i_data[n];
 	mark_buffer_dirty(bh);

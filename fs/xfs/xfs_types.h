@@ -210,6 +210,6 @@ typedef enum {
 #define XFS_MKDEV(major,minor) ((xfs_dev_t)(((major)<<XFS_DEV_BITSMINOR) \
 				    | (minor&XFS_DEV_MAXMIN)))
 
-#define XFS_DEV_TO_KDEVT(dev)	mk_kdev(XFS_DEV_MAJOR(dev),XFS_DEV_MINOR(dev))
+#define XFS_DEV_TO_KDEVT(dev)	MKDEV(XFS_DEV_MAJOR(dev),XFS_DEV_MINOR(dev))
 
 #endif	/* !__XFS_TYPES_H */

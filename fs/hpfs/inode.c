@@ -114,14 +114,14 @@ void hpfs_read_inode(struct inode *i)
 	if (hpfs_sb(i->i_sb)->sb_eas) {
 		if ((ea = hpfs_get_ea(i->i_sb, fnode, "UID", &ea_size))) {
 			if (ea_size == 2) {
-				i->i_uid = ea[0] + (ea[1] << 8);
+				i->i_uid = le16_to_cpu(*(u16*)ea);
 				hpfs_inode->i_ea_uid = 1;
 			}
 			kfree(ea);
 		}
 		if ((ea = hpfs_get_ea(i->i_sb, fnode, "GID", &ea_size))) {
 			if (ea_size == 2) {
-				i->i_gid = ea[0] + (ea[1] << 8);
+				i->i_gid = le16_to_cpu(*(u16*)ea);
 				hpfs_inode->i_ea_gid = 1;
 			}
 			kfree(ea);
@@ -141,7 +141,7 @@ void hpfs_read_inode(struct inode *i)
 			int rdev = 0;
 			umode_t mode = hpfs_sb(sb)->sb_mode;
 			if (ea_size == 2) {
-				mode = ea[0] + (ea[1] << 8);
+				mode = le16_to_cpu(*(u16*)ea);
 				hpfs_inode->i_ea_mode = 1;
 			}
 			kfree(ea);
@@ -149,7 +149,7 @@ void hpfs_read_inode(struct inode *i)
 			if (S_ISBLK(mode) || S_ISCHR(mode)) {
 				if ((ea = hpfs_get_ea(i->i_sb, fnode, "DEV", &ea_size))) {
 					if (ea_size == 4)
-						rdev = ea[0] + (ea[1] << 8) + (ea[2] << 16) + (ea[3] << 24);
+						rdev = le32_to_cpu(*(u32*)ea);
 					kfree(ea);
 				}
 			}
@@ -158,7 +158,8 @@ void hpfs_read_inode(struct inode *i)
 				i->i_nlink = 1;
 				i->i_size = 0;
 				i->i_blocks = 1;
-				init_special_inode(i, mode, rdev);
+				init_special_inode(i, mode,
+					old_decode_dev(rdev));
 				return;
 			}
 		}
@@ -201,17 +202,15 @@ void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
 		   we'd better not overwrite them */
 		hpfs_error(i->i_sb, "fnode %08x has some unknown HPFS386 stuctures", i->i_ino);
 	} else if (hpfs_sb(i->i_sb)->sb_eas >= 2) {
-		unsigned char ea[4];
+		u32 ea;
 		if ((i->i_uid != hpfs_sb(i->i_sb)->sb_uid) || hpfs_inode->i_ea_uid) {
-			ea[0] = i->i_uid & 0xff;
-			ea[1] = i->i_uid >> 8;
-			hpfs_set_ea(i, fnode, "UID", ea, 2);
+			ea = cpu_to_le32(i->i_uid);
+			hpfs_set_ea(i, fnode, "UID", (char*)&ea, 2);
 			hpfs_inode->i_ea_uid = 1;
 		}
 		if ((i->i_gid != hpfs_sb(i->i_sb)->sb_gid) || hpfs_inode->i_ea_gid) {
-			ea[0] = i->i_gid & 0xff;
-			ea[1] = i->i_gid >> 8;
-			hpfs_set_ea(i, fnode, "GID", ea, 2);
+			ea = cpu_to_le32(i->i_gid);
+			hpfs_set_ea(i, fnode, "GID", (char *)&ea, 2);
 			hpfs_inode->i_ea_gid = 1;
 		}
 		if (!S_ISLNK(i->i_mode))
@@ -219,18 +218,13 @@ void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
 			  | (S_ISDIR(i->i_mode) ? S_IFDIR : S_IFREG))
 			  && i->i_mode != ((hpfs_sb(i->i_sb)->sb_mode & ~(S_ISDIR(i->i_mode) ? 0222 : 0333))
 			  | (S_ISDIR(i->i_mode) ? S_IFDIR : S_IFREG))) || hpfs_inode->i_ea_mode) {
-				ea[0] = i->i_mode & 0xff;
-				ea[1] = i->i_mode >> 8;
-				hpfs_set_ea(i, fnode, "MODE", ea, 2);
+				ea = cpu_to_le32(i->i_mode);
+				hpfs_set_ea(i, fnode, "MODE", (char *)&ea, 2);
 				hpfs_inode->i_ea_mode = 1;
 			}
 		if (S_ISBLK(i->i_mode) || S_ISCHR(i->i_mode)) {
-			int d = kdev_t_to_nr(i->i_rdev);
-			ea[0] = d & 0xff;
-			ea[1] = (d >> 8) & 0xff;
-			ea[2] = (d >> 16) & 0xff;
-			ea[3] = d >> 24;
-			hpfs_set_ea(i, fnode, "DEV", ea, 4);
+			ea = cpu_to_le32(old_encode_dev(i->i_rdev));
+			hpfs_set_ea(i, fnode, "DEV", (char *)&ea, 4);
 		}
 	}
 }

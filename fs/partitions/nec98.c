@@ -73,10 +73,9 @@ int nec98_partition(struct parsed_partitions *state, struct block_device *bdev)
 	const struct nec98_partition *part;
 	unsigned char *data;
 	int sector_size = bdev_hardsect_size(bdev);
-	int major = MAJOR(bdev->bd_dev);
 
 	if (ioctl_by_bdev(bdev, HDIO_GETGEO, (unsigned long)&geo) != 0) {
-		printk(" unsupported disk (major = %u)\n", major);
+		printk(" unsupported disk (%s)\n", bdev->bd_disk->disk_name);
 		return 0;
 	}
 

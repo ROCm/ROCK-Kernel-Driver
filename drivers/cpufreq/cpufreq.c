@@ -109,13 +109,18 @@ static void cpufreq_cpu_put(struct cpufreq_policy *data)
 int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
 				struct cpufreq_governor **governor)
 {
-	if (!strnicmp(str_governor, "performance", CPUFREQ_NAME_LEN)) {
-		*policy = CPUFREQ_POLICY_PERFORMANCE;
-		return 0;
-	} else if (!strnicmp(str_governor, "powersave", CPUFREQ_NAME_LEN)) {
-		*policy = CPUFREQ_POLICY_POWERSAVE;
-		return 0;
-	} else 	{
+	if (!cpufreq_driver)
+		return -EINVAL;
+	if (cpufreq_driver->setpolicy) {
+		if (!strnicmp(str_governor, "performance", CPUFREQ_NAME_LEN)) {
+			*policy = CPUFREQ_POLICY_PERFORMANCE;
+			return 0;
+		} else if (!strnicmp(str_governor, "powersave", CPUFREQ_NAME_LEN)) {
+			*policy = CPUFREQ_POLICY_POWERSAVE;
+			return 0;
+		}
+		return -EINVAL;
+	} else {
 		struct cpufreq_governor *t;
 		down(&cpufreq_governor_sem);
 		if (!cpufreq_driver || !cpufreq_driver->target)
@@ -123,7 +128,6 @@ int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
 		list_for_each_entry(t, &cpufreq_governor_list, governor_list) {
 			if (!strnicmp(str_governor,t->name,CPUFREQ_NAME_LEN)) {
 				*governor = t;
-				*policy = CPUFREQ_POLICY_GOVERNOR;
 				up(&cpufreq_governor_sem);
 				return 0;
 			}
@@ -190,16 +194,13 @@ store_one(scaling_max_freq,max);
  */
 static ssize_t show_scaling_governor (struct cpufreq_policy * policy, char *buf)
 {
-	switch (policy->policy) {
-	case CPUFREQ_POLICY_POWERSAVE:
+	if(policy->policy == CPUFREQ_POLICY_POWERSAVE)
 		return sprintf(buf, "powersave\n");
-	case CPUFREQ_POLICY_PERFORMANCE:
+	else if (policy->policy == CPUFREQ_POLICY_PERFORMANCE)
 		return sprintf(buf, "performance\n");
-	case CPUFREQ_POLICY_GOVERNOR:
+	else if (policy->governor)
 		return snprintf(buf, CPUFREQ_NAME_LEN, "%s\n", policy->governor->name);
-	default:
-		return -EINVAL;
-	}
+	return -EINVAL;
 }
 
 
@@ -246,15 +247,15 @@ static ssize_t show_scaling_available_governors (struct cpufreq_policy * policy,
 	ssize_t i = 0;
 	struct cpufreq_governor *t;
 
-	i += sprintf(buf, "performance powersave");
-
-	if (!cpufreq_driver->target)
+	if (!cpufreq_driver->target) {
+		i += sprintf(buf, "performance powersave");
 		goto out;
+	}
 
 	list_for_each_entry(t, &cpufreq_governor_list, governor_list) {
 		if (i >= (ssize_t) ((PAGE_SIZE / sizeof(char)) - (CPUFREQ_NAME_LEN + 2)))
 			goto out;
-		i += snprintf(&buf[i], CPUFREQ_NAME_LEN, " %s", t->name);
+		i += snprintf(&buf[i], CPUFREQ_NAME_LEN, "%s ", t->name);
 	}
  out:
 	i += sprintf(&buf[i], "\n");
@@ -396,10 +397,12 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	cpufreq_cpu_data[cpu] = policy;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
-
+	policy->governor = NULL; /* to assure that the starting sequence is
+				  * run in cpufreq_set_policy */
 	up(&policy->lock);
 	
 	/* set default policy */
+	
 	ret = cpufreq_set_policy(&new_policy);
 	if (ret)
 		goto err_out_unregister;
@@ -492,6 +495,13 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	if (!cpu_policy)
 		return -EINVAL;
 
+	if (cpufreq_driver->resume)
+		ret = cpufreq_driver->resume(cpu_policy);
+	if (ret) {
+		printk(KERN_ERR "cpufreq: resume failed in ->resume step on CPU %u\n", cpu_policy->cpu);
+		goto out;
+	}
+
 	if (cpufreq_driver->setpolicy)
 		ret = cpufreq_driver->setpolicy(cpu_policy);
 	else
@@ -500,6 +510,12 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	 */
 		ret = cpufreq_driver->target(cpu_policy, cpu_policy->cur, CPUFREQ_RELATION_H);
 
+	if (ret) {
+		printk(KERN_ERR "cpufreq: resume failed in ->setpolicy/target step on CPU %u\n", cpu_policy->cpu);
+		goto out;
+	}
+
+ out:
 	cpufreq_cpu_put(cpu_policy);
 
 	return ret;
@@ -622,33 +638,18 @@ EXPORT_SYMBOL_GPL(cpufreq_driver_target);
 
 static int __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 {
-	int ret = 0;
+	int ret = -EINVAL;
 
-	switch (policy->policy) {
-	case CPUFREQ_POLICY_POWERSAVE: 
-		if ((event == CPUFREQ_GOV_LIMITS) || (event == CPUFREQ_GOV_START)) {
-			ret = __cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
-		}
-		break;
-	case CPUFREQ_POLICY_PERFORMANCE:
-		if ((event == CPUFREQ_GOV_LIMITS) || (event == CPUFREQ_GOV_START)) {
-			ret = __cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
-		}
-		break;
-	case CPUFREQ_POLICY_GOVERNOR:
-		ret = -EINVAL;
-		if (!try_module_get(policy->governor->owner))
-			break;
-		ret = policy->governor->governor(policy, event);
-		/* we keep one module reference alive for each CPU governed by this CPU */
-		if ((event != CPUFREQ_GOV_START) || ret)
-			module_put(policy->governor->owner);
-		if ((event == CPUFREQ_GOV_STOP) && !ret)
-			module_put(policy->governor->owner);
-		break;
-	default:
-		ret = -EINVAL;
-	}
+	if (!try_module_get(policy->governor->owner))
+		return -EINVAL;
+
+	ret = policy->governor->governor(policy, event);
+
+	/* we keep one module reference alive for each CPU governed by this CPU */
+	if ((event != CPUFREQ_GOV_START) || ret)
+		module_put(policy->governor->owner);
+	if ((event == CPUFREQ_GOV_STOP) && !ret)
+		module_put(policy->governor->owner);
 
 	return ret;
 }
@@ -679,11 +680,6 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 
 	if (!governor)
 		return -EINVAL;
-
-	if (!strnicmp(governor->name,"powersave",CPUFREQ_NAME_LEN))
-		return -EBUSY;
-	if (!strnicmp(governor->name,"performance",CPUFREQ_NAME_LEN))
-		return -EBUSY;
 
 	down(&cpufreq_governor_sem);
 	
@@ -808,23 +804,24 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 		data->policy = policy->policy;
 		ret = cpufreq_driver->setpolicy(policy);
 	} else {
-		if ((policy->policy != data->policy) || 
-		    ((policy->policy == CPUFREQ_POLICY_GOVERNOR) && (policy->governor != data->governor))) {
+		if (policy->governor != data->governor) {
 			/* save old, working values */
-			unsigned int old_pol = data->policy;
 			struct cpufreq_governor *old_gov = data->governor;
 
 			/* end old governor */
-			__cpufreq_governor(data, CPUFREQ_GOV_STOP);
+			if (data->governor)
+				__cpufreq_governor(data, CPUFREQ_GOV_STOP);
 
 			/* start new governor */
-			data->policy = policy->policy;
 			data->governor = policy->governor;
 			if (__cpufreq_governor(data, CPUFREQ_GOV_START)) {
 				/* new governor failed, so re-start old one */
-				data->policy = old_pol;
-				data->governor = old_gov;
-				__cpufreq_governor(data, CPUFREQ_GOV_START);
+				if (old_gov) {
+					data->governor = old_gov;
+					__cpufreq_governor(data, CPUFREQ_GOV_START);
+				}
+				ret = -EINVAL;
+				goto error_out;
 			}
 			/* might be a policy change, too, so fall through */
 		}

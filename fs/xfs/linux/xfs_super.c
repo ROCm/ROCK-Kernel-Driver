@@ -154,7 +154,7 @@ xfs_set_inodeops(
 	} else {
 		inode->i_op = &linvfs_file_inode_operations;
 		init_special_inode(inode, inode->i_mode,
-					kdev_t_to_nr(inode->i_rdev));
+					inode->i_rdev);
 	}
 }
 
@@ -171,7 +171,7 @@ xfs_revalidate_inode(
 	inode->i_uid	= ip->i_d.di_uid;
 	inode->i_gid	= ip->i_d.di_gid;
 	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
-		inode->i_rdev = NODEV;
+		inode->i_rdev = 0;
 	} else {
 		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
 		inode->i_rdev = XFS_DEV_TO_KDEVT(dev);

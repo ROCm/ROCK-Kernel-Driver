@@ -130,7 +130,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
 		inode->i_cdev = NULL;
-		inode->i_rdev = to_kdev_t(0);
+		inode->i_rdev = 0;
 		inode->i_security = NULL;
 		if (security_inode_alloc(inode)) {
 			if (inode->i_sb->s_op->destroy_inode)
@@ -1363,10 +1363,10 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 	inode->i_mode = mode;
 	if (S_ISCHR(mode)) {
 		inode->i_fop = &def_chr_fops;
-		inode->i_rdev = to_kdev_t(rdev);
+		inode->i_rdev = rdev;
 	} else if (S_ISBLK(mode)) {
 		inode->i_fop = &def_blk_fops;
-		inode->i_rdev = to_kdev_t(rdev);
+		inode->i_rdev = rdev;
 	} else if (S_ISFIFO(mode))
 		inode->i_fop = &def_fifo_fops;
 	else if (S_ISSOCK(mode))

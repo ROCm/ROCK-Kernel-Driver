@@ -12,6 +12,7 @@
  */
 
 #include <linux/errno.h>
+#include <linux/time.h>
 
 #include <asm/hardware.h>
 #include <asm/memory.h>
@@ -63,15 +64,11 @@ int pm_do_suspend(void)
 {
 	unsigned long sleep_save[SLEEP_SAVE_SIZE];
 	unsigned long checksum = 0;
+	unsigned long delta;
 	int i;
 
-	cli();
-	clf();
-
-	leds_event(led_stop);
-
 	/* preserve current time */
-	RCNR = xtime.tv_sec;
+	delta = xtime.tv_sec - RCNR;
 
 	/*
 	 * Temporary solution.  This won't be necessary once
@@ -184,15 +181,11 @@ int pm_do_suspend(void)
 	RESTORE(FFIER);
 
 	/* restore current time */
-	xtime.tv_sec = RCNR;
+	xtime.tv_sec = RCNR + delta;
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "*** made it back from resume\n");
 #endif
-
-	leds_event(led_start);
-
-	sti();
 
 	return 0;
 }

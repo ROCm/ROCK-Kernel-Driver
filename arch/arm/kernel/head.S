@@ -120,9 +120,9 @@ __turn_mmu_on:
 	orr	r0, r0, #2			@ ...........A.
 #endif
 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
-	mrc	p15, 0, r0, c1, c0, 0		@ read it back.
-	mov	r0, r0
-	mov	r0, r0
+	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
+	mov	r3, r3
+	mov	r3, r3
 	mov	pc, lr
 
 /*

@@ -677,6 +677,9 @@ static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, dev_t
 	int err;
 	struct fileIdentDesc cfi, *fi;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	lock_kernel();
 	err = -EIO;
 	inode = udf_new_inode(dir, mode, &err);

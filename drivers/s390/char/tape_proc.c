@@ -80,7 +80,7 @@ static int tape_proc_show(struct seq_file *m, void *v)
 
 static void *tape_proc_start(struct seq_file *m, loff_t *pos)
 {
-	if (*pos >= (1 << KDEV_MINOR_BITS) / TAPE_MINORS_PER_DEV)
+	if (*pos >= 256 / TAPE_MINORS_PER_DEV)
 		return NULL;
 	return (void *)((unsigned long) *pos + 1);
 }
