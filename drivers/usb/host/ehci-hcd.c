@@ -389,8 +389,29 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	temp = HCS_N_CC(ehci->hcs_params) * HCS_N_PCC(ehci->hcs_params);
 	temp &= 0x0f;
 	if (temp && HCS_N_PORTS(ehci->hcs_params) > temp) {
-		temp |= (ehci->hcs_params & ~0xf);
-		ehci->hcs_params = temp;
+		ehci_dbg (ehci, "bogus port configuration: "
+			"cc=%d x pcc=%d < ports=%d\n",
+			HCS_N_CC(ehci->hcs_params),
+			HCS_N_PCC(ehci->hcs_params),
+			HCS_N_PORTS(ehci->hcs_params));
+
+#ifdef	CONFIG_PCI
+		if (hcd->self.controller->bus == &pci_bus_type) {
+			struct pci_dev	*pdev;
+
+			pdev = to_pci_dev(hcd->self.controller);
+			switch (pdev->vendor) {
+			case 0x17a0:		/* GENESYS */
+				/* GL880S: should be PORTS=2 */
+				temp |= (ehci->hcs_params & ~0xf);
+				ehci->hcs_params = temp;
+				break;
+			case PCI_VENDOR_ID_NVIDIA:
+				/* NF4: should be PCC=10 */
+				break;
+			}
+		}
+#endif
 	}
 
 	/* force HC to halt state */

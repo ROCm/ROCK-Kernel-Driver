@@ -71,14 +71,16 @@ iommu_init(int iommund, struct sbus_bus *sbus)
 		prom_printf("Unable to allocate iommu structure\n");
 		prom_halt();
 	}
-	prom_getproperty(iommund, "reg", (void *) iommu_promregs,
-			 sizeof(iommu_promregs));
-	memset(&r, 0, sizeof(r));
-	r.flags = iommu_promregs[0].which_io;
-	r.start = iommu_promregs[0].phys_addr;
-	iommu->regs = (struct iommu_regs *)
-		sbus_ioremap(&r, 0, PAGE_SIZE * 3, "iommu_regs");
-	if(!iommu->regs) {
+	iommu->regs = NULL;
+	if (prom_getproperty(iommund, "reg", (void *) iommu_promregs,
+			 sizeof(iommu_promregs)) != -1) {
+		memset(&r, 0, sizeof(r));
+		r.flags = iommu_promregs[0].which_io;
+		r.start = iommu_promregs[0].phys_addr;
+		iommu->regs = (struct iommu_regs *)
+			sbus_ioremap(&r, 0, PAGE_SIZE * 3, "iommu_regs");
+	}
+	if (!iommu->regs) {
 		prom_printf("Cannot map IOMMU registers\n");
 		prom_halt();
 	}

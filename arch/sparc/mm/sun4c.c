@@ -511,7 +511,8 @@ void __init sun4c_probe_memerr_reg(void)
 		node = prom_searchsiblings(prom_root_node, "memory-error");
 		if (!node)
 			return;
-		prom_getproperty(node, "reg", (char *)regs, sizeof(regs));
+		if (prom_getproperty(node, "reg", (char *)regs, sizeof(regs)) <= 0)
+			return;
 		/* hmm I think regs[0].which_io is zero here anyways */
 		sun4c_memerr_reg = ioremap(regs[0].phys_addr, regs[0].reg_size);
 	}

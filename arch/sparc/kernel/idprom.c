@@ -53,13 +53,12 @@ static void __init display_system_type(unsigned char machtype)
 
 	for (i = 0; i < NUM_SUN_MACHINES; i++) {
 		if(Sun_Machines[i].id_machtype == machtype) {
-			if (machtype != (SM_SUN4M_OBP | 0x00))
+			if (machtype != (SM_SUN4M_OBP | 0x00) ||
+			    prom_getproperty(prom_root_node, "banner-name",
+					     sysname, sizeof(sysname)) <= 0)
 				printk("TYPE: %s\n", Sun_Machines[i].name);
-			else {
-				prom_getproperty(prom_root_node, "banner-name",
-						 sysname, sizeof(sysname));
+			else
 				printk("TYPE: %s\n", sysname);
-			}
 			return;
 		}
 	}

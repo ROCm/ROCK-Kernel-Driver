@@ -267,6 +267,7 @@ __acquires(ehci->lock)
 }
 
 static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
+static void unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
 static void intr_deschedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
 static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
@@ -430,7 +431,7 @@ halt:
 				intr_deschedule (ehci, qh);
 				(void) qh_schedule (ehci, qh);
 			} else
-				start_unlink_async (ehci, qh);
+				unlink_async (ehci, qh);
 			break;
 		/* otherwise, unlink already started */
 		}
