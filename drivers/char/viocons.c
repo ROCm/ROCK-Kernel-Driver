@@ -40,6 +40,8 @@
 #include <asm/ioctls.h>
 #include <linux/kd.h>
 #include <linux/tty.h>
+#include <linux/tty_flip.h>
+#include <linux/sysrq.h>
 
 #include <asm/iSeries/vio.h>
 
@@ -48,7 +50,8 @@
 #include <asm/iSeries/HvLpConfig.h>
 #include <asm/iSeries/HvCall.h>
 
-/* Check that the tty_driver_data actually points to our stuff
+/*
+ * Check that the tty_driver_data actually points to our stuff
  */
 #define VIOTTY_PARANOIA_CHECK 1
 #define VIOTTY_MAGIC (0x0DCB)
@@ -62,6 +65,15 @@ static u64 sndMsgSeq[VTTY_PORTS];
 static u64 sndMsgAck[VTTY_PORTS];
 
 static spinlock_t consolelock = SPIN_LOCK_UNLOCKED;
+static spinlock_t consoleloglock = SPIN_LOCK_UNLOCKED;
+
+#ifdef CONFIG_MAGIC_SYSRQ
+static int vio_sysrq_pressed;
+extern int sysrq_enabled;
+/* The following is how it is implemented on redhat systems
+ * extern struct sysrq_ctls_struct sysrq_ctls;
+ */
+#endif
 
 /*
  * The structure of the events that flow between us and OS/400.  You can't
@@ -76,6 +88,15 @@ struct viocharlpevent {
 	u8 len;
 	u8 data[VIOCHAR_MAX_DATA];
 };
+
+/*
+ * This is a place where we handle the distribution of memory
+ * for copy_from_user() calls.  We use VIO_MAX_SUBTYPES because it
+ * seems as good a number as any.  The buffer_available array is to
+ * help us determine which buffer to use.
+ */
+static struct viocharlpevent viocons_cfu_buffer[VIO_MAX_SUBTYPES];
+static atomic_t viocons_cfu_buffer_available[VIO_MAX_SUBTYPES];
 
 #define VIOCHAR_WINDOW		10
 #define VIOCHAR_HIGHWATERMARK	3
@@ -111,29 +132,56 @@ static struct overflow_buffer {
 	int overflowMessage;
 } overflow[VTTY_PORTS];
 
-static struct tty_driver viotty_driver;
-static struct tty_driver viottyS_driver;
+static void initDataEvent(struct viocharlpevent *viochar, HvLpIndex lp);
 
-static struct termios *viotty_termios[VTTY_PORTS];
-static struct termios *viottyS_termios[VTTY_PORTS];
-static struct termios *viotty_termios_locked[VTTY_PORTS];
-static struct termios *viottyS_termios_locked[VTTY_PORTS];
+static struct tty_driver *viotty_driver;
+static struct tty_driver *viottyS_driver;
 
 void hvlog(char *fmt, ...)
 {
 	int i;
-	static char buf[256];
+	unsigned long flags;
 	va_list args;
+	static char buf[256];
 
+	spin_lock_irqsave(&consoleloglock, flags);
 	va_start(args, fmt);
 	i = vsnprintf(buf, sizeof(buf) - 1, fmt, args);
 	va_end(args);
 	buf[i++] = '\r';
 	HvCall_writeLogBuffer(buf, i);
-
+	spin_unlock_irqrestore(&consoleloglock, flags);
 }
 
-/* Our port information.  We store a pointer to one entry in the
+void hvlogOutput(const char *buf, int count)
+{
+	unsigned long flags;
+	int begin;
+	int index;
+	char cr;
+
+	cr = '\r';
+	begin = 0;
+	spin_lock_irqsave(&consoleloglock, flags);
+	for (index = 0; index < count; index++) {
+		if (buf[index] == '\n') {
+			/*
+			 * Start right after the last '\n' or at the zeroth
+			 * array position and output the number of characters
+			 * including the newline.
+			 */
+			HvCall_writeLogBuffer(&buf[begin], index - begin + 1);
+			begin = index + 1;
+			HvCall_writeLogBuffer(&cr, 1);
+		}
+	}
+	if ((index - begin) > 0)
+		HvCall_writeLogBuffer(&buf[begin], index - begin);
+	spin_unlock_irqrestore(&consoleloglock, flags);
+}
+
+/*
+ * Our port information.  We store a pointer to one entry in the
  * tty_driver_data
  */
 static struct port_info_tag {
@@ -152,9 +200,9 @@ static inline int viotty_paranoia_check(struct port_info_tag *pi,
 					char *name, const char *routine)
 {
 #ifdef VIOTTY_PARANOIA_CHECK
-	static const char *badmagic = KERN_WARNING
+	static const char *badmagic = KERN_WARNING_VIO
 		"Warning: bad magic number for port_info struct (%s) in %s\n";
-	static const char *badinfo = KERN_WARNING
+	static const char *badinfo = KERN_WARNING_VIO
 		"Warning: null port_info for (%s) in %s\n";
 
 	if (!pi) {
@@ -170,134 +218,111 @@ static inline int viotty_paranoia_check(struct port_info_tag *pi,
 }
 
 /*
+ * This function should ONLY be called once from viocons_init2
+ */
+static void viocons_init_cfu_buffer(void)
+{
+	int i;
+
+	for (i = 1; i < VIO_MAX_SUBTYPES; i++)
+		atomic_set(&viocons_cfu_buffer_available[i], 1);
+}
+
+static struct viocharlpevent *viocons_get_cfu_buffer(void)
+{
+	int i;
+
+	/*
+	 * Grab the first available buffer.  It doesn't matter if we
+	 * are interrupted during this array traversal as long as we
+	 * get an available space.
+	 */
+	for (i = 0; i < VIO_MAX_SUBTYPES; i++)
+		if (atomic_dec_if_positive(&viocons_cfu_buffer_available[i])
+				== 0 )
+			return &viocons_cfu_buffer[i];
+	hvlog("\n\rviocons: viocons_get_cfu_buffer : no free buffers found");
+	return NULL;
+}
+
+static void viocons_free_cfu_buffer(struct viocharlpevent *buffer)
+{
+	int i;
+
+	i = buffer - &viocons_cfu_buffer[0];
+	if (i >= (sizeof(viocons_cfu_buffer) / sizeof(viocons_cfu_buffer[0]))) {
+		hvlog("\n\rviocons: viocons_free_cfu_buffer : buffer pointer not found in list.");
+		return;
+	}
+	if (atomic_read(&viocons_cfu_buffer_available[i]) != 0) {
+		hvlog("\n\rviocons: WARNING : returning unallocated cfu buffer.");
+		return;
+	}
+	atomic_set(&viocons_cfu_buffer_available[i], 1);
+}
+
+/*
  * Add data to our pending-send buffers.  
  *
  * NOTE: Don't use printk in here because it gets nastily recursive.
  * hvlog can be used to log to the hypervisor buffer
  */
-static int buffer_add(u8 port, const char *buf, size_t len, int userFlag)
+static int buffer_add(u8 port, const char *buf, size_t len)
 {
-	size_t bleft = len;
+	size_t bleft;
 	size_t curlen;
-	char *cbuf = (char *) buf;
+	const char *curbuf;
 	int nextbuf;
-	unsigned long flags;
 	struct overflow_buffer *pov = &overflow[port];
 
+	curbuf = buf;
+	bleft = len;
 	while (bleft > 0) {
-		/*
-		 * Addition 05/01/2003 by Ryan Arnold :  If we are going
-		 * to have to copy_from_user() and the current buffer is
-		 * already partially filled then we want to increment to
-		 * the next buffer and try to see if that one is
-		 * completely empty instead.  This is OK since, if
-		 * pov->curbuf is being used when we hit this it probably
-		 * means that it was filled last iteration or last time
-		 * this function was called.
-		 */
-		if (userFlag && (test_bit(pov->curbuf, &pov->used) != 0)) {
-			nextbuf = (pov->curbuf + 1) % NUM_BUF;
-			pov->curbuf = nextbuf;
-			/*
-			 * In the following case should the next buffer be
-			 * used then we don't want to add to it and we'll
-			 * kick out an error message to the hvlog.
-			 */
-			if (test_bit(pov->curbuf, &pov->used) != 0) {
-				hvlog("No overflow buffers available for copy_from_user().\n");
-				pov->bufferOverflow++;
-				pov->overflowMessage = 1;
-				return len - bleft;
-			}
-		}
-
 		/*
 		 * If there is no space left in the current buffer, we have
 		 * filled everything up, so return.  If we filled the previous
 		 * buffer we would already have moved to the next one.
-		 * If userFlag, then we'll never hit this code branch
-		 * unless the buffer is empty, at which point we'll step
-		 * over it.
 		 */
 		if (pov->bufferBytes[pov->curbuf] == OVERFLOW_SIZE) {
-			hvlog("No overflow buffer available for memcpy().\n",
-					pov->curbuf);
+			hvlog ("\n\rviocons: No overflow buffer available for memcpy().\n");
 			pov->bufferOverflow++;
 			pov->overflowMessage = 1;
-			return len - bleft;
+			break;
 		}
 
 		/*
-		 * See if this buffer has been allocated.  If not, allocate it
+		 * Turn on the "used" bit for this buffer.  If it's already on,
+		 * that's fine.
+		 */
+		set_bit(pov->curbuf, &pov->used);
+
+		/*
+		 * See if this buffer has been allocated.  If not, allocate it.
 		 */
 		if (pov->buffer[pov->curbuf] == NULL) {
 			pov->buffer[pov->curbuf] =
 			    kmalloc(OVERFLOW_SIZE, GFP_ATOMIC);
 			if (pov->buffer[pov->curbuf] == NULL) {
-				hvlog("kmalloc failed allocating space for buffer %d.\n",
-						pov->curbuf);
-				return len - bleft;
+				hvlog("\n\rviocons: kmalloc failed allocating spaces for buffer %d.",
+					pov->curbuf);
+				break;
 			}
 		}
 
-		/*
-		 * Addition 05/01/2003 by Ryan Arnold :  Copy the data
-		 * into the buffer.  Since we don't want to hold a
-		 * spinlock during a copy_from_user() operation we won't.
-		 * This also means that we can't copy into partially used
-		 * buffers because we may be interrupted between the
-		 * copy_from_user() invocation and the grab of the
-		 * spinlock by a call to send_buffers() which would throw
-		 * the bufferBytes field for pov->curbuf out of whack
-		 * resulting in the wrong data being output.  If we
-		 * aren'te executing copy_from_user() we can hold a
-		 * spinlock and execute memcpy() and protect the
-		 * bufferBytes[] updated, and used operation all at
-		 * once without fear of interrupt, meaning we can copy
-		 * into partially used buffers.
-		 */
-		if (userFlag) {
+		/* Figure out how much we can copy into this buffer. */
+		if (bleft < (OVERFLOW_SIZE - pov->bufferBytes[pov->curbuf]))
+			curlen = bleft;
+		else
 			curlen = OVERFLOW_SIZE - pov->bufferBytes[pov->curbuf];
-			if (curlen != OVERFLOW_SIZE) {
-				/*
-				 * This should never happen but if it does we
-				 * want to know about it.
-				 */
-				hvlog("During userFlag, curlen != OVERFLOW_SIZE.\n");
-			}
-			copy_from_user(pov->buffer[pov->curbuf] +
-				       pov->bufferBytes[pov->curbuf], cbuf,
-				       curlen);
-			spin_lock_irqsave(&consolelock, flags);
-		} else {
-			spin_lock_irqsave(&consolelock, flags);
-			/*
-			 * Figure out how much we can copy into this buffer.
-			 */
-			if (bleft <
-			    (OVERFLOW_SIZE - pov->bufferBytes[pov->curbuf]))
-				curlen = bleft;
-			else
-				curlen = OVERFLOW_SIZE -
-				    pov->bufferBytes[pov->curbuf];
 
-			memcpy(pov->buffer[pov->curbuf] +
-			       pov->bufferBytes[pov->curbuf], cbuf,
-			       curlen);
-		}
+		/* Copy the data into the buffer. */
+		memcpy(pov->buffer[pov->curbuf] +
+			pov->bufferBytes[pov->curbuf], curbuf,
+			curlen);
 
 		pov->bufferBytes[pov->curbuf] += curlen;
-		cbuf += curlen;
+		curbuf += curlen;
 		bleft -= curlen;
-
-		/*
-		 * Turn on the "used" bit for this buffer.  If it's
-		 * already on, that's fine.  It won't be on for userFlag
-		 * and needs to be set because an interrupt by
-		 * send_buffers() could have turned it off between our
-		 * copy_from_user() and spin_lock_irqsave() calls.
-		 */
-		set_bit(pov->curbuf, &pov->used);
 
 		/*
 		 * Now see if we've filled this buffer.  If not then
@@ -313,29 +338,8 @@ static int buffer_add(u8 port, const char *buf, size_t len, int userFlag)
 			if (test_bit(nextbuf, &pov->used) == 0)
 				pov->curbuf = nextbuf;
 		}
-		spin_unlock_irqrestore(&consolelock, flags);
 	}
-	return len;
-}
-
-/*
- * Initialize the common fields in a charLpEvent
- */
-static void initDataEvent(struct viocharlpevent *viochar, HvLpIndex lp)
-{
-	memset(viochar, 0, sizeof(struct viocharlpevent));
-
-	viochar->event.xFlags.xValid = 1;
-	viochar->event.xFlags.xFunction = HvLpEvent_Function_Int;
-	viochar->event.xFlags.xAckInd = HvLpEvent_AckInd_NoAck;
-	viochar->event.xFlags.xAckType = HvLpEvent_AckType_DeferredAck;
-	viochar->event.xType = HvLpEvent_Type_VirtualIo;
-	viochar->event.xSubtype = viomajorsubtype_chario | viochardata;
-	viochar->event.xSourceLp = HvLpConfig_getLpIndex();
-	viochar->event.xTargetLp = lp;
-	viochar->event.xSizeMinus1 = sizeof(struct viocharlpevent);
-	viochar->event.xSourceInstanceId = viopath_sourceinst(lp);
-	viochar->event.xTargetInstanceId = viopath_targetinst(lp);
+	return len - bleft;
 }
 
 /*
@@ -357,17 +361,15 @@ static void send_buffers(u8 port, HvLpIndex lp)
 	viochar = (struct viocharlpevent *)
 	    vio_get_event_buffer(viomajorsubtype_chario);
 
-	/*
-	 * Make sure we got a buffer
-	 */
+	/* Make sure we got a buffer */
 	if (viochar == NULL) {
-		hvlog("Yikes...can't get viochar buffer\n");
+		hvlog("\n\rviocons: Can't get viochar buffer in sendBuffers().");
 		spin_unlock_irqrestore(&consolelock, flags);
 		return;
 	}
 
 	if (pov->used == 0) {
-		hvlog("in sendbuffers, but no buffers used\n");
+		hvlog("\n\rviocons: in sendbuffers(), but no buffers used.\n");
 		vio_free_event_buffer(viomajorsubtype_chario, viochar);
 		spin_unlock_irqrestore(&consolelock, flags);
 		return;
@@ -423,7 +425,6 @@ static void send_buffers(u8 port, HvLpIndex lp)
 		nextbuf = (nextbuf + 1) % NUM_BUF;
 	}
 
-
 	/*
 	 * If we have emptied all the buffers, start at 0 again.
 	 * this will re-use any allocated buffers
@@ -451,74 +452,59 @@ static void send_buffers(u8 port, HvLpIndex lp)
 /*
  * Our internal writer.  Gets called both from the console device and
  * the tty device.  the tty pointer will be NULL if called from the console.
+ * Return total number of bytes "written".
  *
  * NOTE: Don't use printk in here because it gets nastily recursive.  hvlog
  * can be used to log to the hypervisor buffer
  */
-static int internal_write(struct tty_struct *tty, const char *buf,
-			  size_t len, int userFlag)
+static int internal_write(HvLpIndex lp, u8 port, const char *buf,
+			  size_t len, struct viocharlpevent *viochar)
 {
 	HvLpEvent_Rc hvrc;
-	size_t bleft = len;
+	size_t bleft;
 	size_t curlen;
-	const char *curbuf = buf;
-	struct viocharlpevent *viochar;
+	const char *curbuf;
 	unsigned long flags;
-	struct port_info_tag *pi = NULL;
-	HvLpIndex lp;
-	u8 port;
+	int copy_needed = (viochar == NULL);
 
 	/*
-	 * Changed 05/01/2003 by Ryan Arnold :  We spinlock so that
-	 * we can guarentee that the tty doesn't get changed on us
-	 * between when we fetch the driver data and when we paranoia
-	 * check.  It is unlikely that this will ever happen but
-	 * we'll do it anyway.
+	 * Write to the hvlog of inbound data are now done prior to
+	 * calling internal_write() since internal_write() is only called in
+	 * the event that an lp event path is active, which isn't the case for
+	 * logging attempts prior to console initialization.
 	 */
-	spin_lock_irqsave(&consolelock, flags);
-	if (tty) {
-		pi = (struct port_info_tag *) tty->driver_data;
-		if (!pi || viotty_paranoia_check(pi, tty->name,
-					"viotty_internal_write")) {
-			spin_unlock_irqrestore(&consolelock, flags);
-			return -ENODEV;
-		}
-		lp = pi->lp;
-		port = pi->port;
-	} else {
-		/*
-		 * If this is the console device, use the lp from the
-		 * first port entry
-		 */
-		port = 0;
-		lp = port_info[0].lp;
-	}
-	spin_unlock_irqrestore(&consolelock, flags);
-
-	/* Always put console output in the hypervisor console log */
-	if (port == 0)
-		HvCall_writeLogBuffer(buf, len);
 
 	/*
-	 * If the path to this LP is closed, don't bother doing anything
-	 * more. just dump the data on the floor
+	 * If there is already data queued for this port, send it prior to
+	 * attempting to send any new data.
 	 */
-	if (!viopath_isactive(lp))
-		return len;
-
-	/* If there is already data queued for this port, send it. */
 	if (overflow[port].used)
 		send_buffers(port, lp);
 
-	viochar = (struct viocharlpevent *)
-	    vio_get_event_buffer(viomajorsubtype_chario);
-	/* Make sure we got a buffer */
-	if (viochar == NULL) {
-		hvlog("Yikes...can't get viochar buffer\n");
-		return -1;
+	spin_lock_irqsave(&consolelock, flags);
+
+	/*
+	 * If the internal_write() was passed a pointer to a
+	 * viocharlpevent then we don't need to allocate a new one
+	 * (this is the case where we are internal_writing user space
+	 * data).  If we aren't writing user space data then we need
+	 * to get an event from viopath.
+	 */
+	if (copy_needed) {
+		/* This one is fetched from the viopath data structure */
+		viochar = (struct viocharlpevent *)
+			vio_get_event_buffer(viomajorsubtype_chario);
+		/* Make sure we got a buffer */
+		if (viochar == NULL) {
+			spin_unlock_irqrestore(&consolelock, flags);
+			hvlog("\n\rviocons: Can't get viochar buffer in internal_write().");
+			return -EAGAIN;
+		}
+		initDataEvent(viochar, lp);
 	}
 
-	initDataEvent(viochar, lp);
+	curbuf = buf;
+	bleft = len;
 
 	while ((bleft > 0) && (overflow[port].used == 0) &&
 	       ((sndMsgSeq[port] - sndMsgAck[port]) < VIOCHAR_WINDOW)) {
@@ -527,20 +513,21 @@ static int internal_write(struct tty_struct *tty, const char *buf,
 		else
 			curlen = bleft;
 
-		viochar->len = curlen;
 		viochar->event.xCorrelationToken = sndMsgSeq[port]++;
 
-		if (userFlag)
-			copy_from_user(viochar->data, curbuf, curlen);
-		else
+		if (copy_needed) {
 			memcpy(viochar->data, curbuf, curlen);
+			viochar->len = curlen;
+		}
 
 		viochar->event.xSizeMinus1 =
 		    offsetof(struct viocharlpevent, data) + curlen;
 
 		hvrc = HvCallEvent_signalLpEvent(&viochar->event);
 		if (hvrc) {
-			vio_free_event_buffer(viomajorsubtype_chario, viochar);
+			spin_unlock_irqrestore(&consolelock, flags);
+			if (copy_needed)
+				vio_free_event_buffer(viomajorsubtype_chario, viochar);
 
 			hvlog("viocons: error sending event! %d\n", (int)hvrc);
 			return len - bleft;
@@ -552,12 +539,66 @@ static int internal_write(struct tty_struct *tty, const char *buf,
 
 	/* If we didn't send it all, buffer as much of it as we can. */
 	if (bleft > 0)
-		bleft -= buffer_add(port, curbuf, bleft, userFlag);
-	vio_free_event_buffer(viomajorsubtype_chario, viochar);
+		bleft -= buffer_add(port, curbuf, bleft);
+	/*
+	 * Since we grabbed it from the viopath data structure, return it to the
+	 * data structure
+	 */
+	if (copy_needed)
+		vio_free_event_buffer(viomajorsubtype_chario, viochar);
+	spin_unlock_irqrestore(&consolelock, flags);
 
 	return len - bleft;
 }
 
+static int get_port_data(struct tty_struct *tty, HvLpIndex *lp, u8 *port)
+{
+	unsigned long flags;
+	struct port_info_tag *pi = NULL;
+
+	spin_lock_irqsave(&consolelock, flags);
+	if (tty) {
+		pi = (struct port_info_tag *)tty->driver_data;
+
+		if (!pi || viotty_paranoia_check(pi, tty->name,
+					     "get_port_data")) {
+			spin_unlock_irqrestore(&consolelock, flags);
+			return -ENODEV;
+		}
+
+		*lp = pi->lp;
+		*port = pi->port;
+	} else {
+		/*
+		 * If this is the console device, use the lp from
+		 * the first port entry
+		 */
+		*port = 0;
+		*lp = port_info[0].lp;
+	}
+	spin_unlock_irqrestore(&consolelock, flags);
+	return 0;
+}
+
+/*
+ * Initialize the common fields in a charLpEvent
+ */
+static void initDataEvent(struct viocharlpevent *viochar, HvLpIndex lp)
+{
+	memset(viochar, 0, sizeof(struct viocharlpevent));
+
+	viochar->event.xFlags.xValid = 1;
+	viochar->event.xFlags.xFunction = HvLpEvent_Function_Int;
+	viochar->event.xFlags.xAckInd = HvLpEvent_AckInd_NoAck;
+	viochar->event.xFlags.xAckType = HvLpEvent_AckType_DeferredAck;
+	viochar->event.xType = HvLpEvent_Type_VirtualIo;
+	viochar->event.xSubtype = viomajorsubtype_chario | viochardata;
+	viochar->event.xSourceLp = HvLpConfig_getLpIndex();
+	viochar->event.xTargetLp = lp;
+	viochar->event.xSizeMinus1 = sizeof(struct viocharlpevent);
+	viochar->event.xSourceInstanceId = viopath_sourceinst(lp);
+	viochar->event.xTargetInstanceId = viopath_targetinst(lp);
+}
 
 /*
  * console device write
@@ -565,69 +606,66 @@ static int internal_write(struct tty_struct *tty, const char *buf,
 static void viocons_write(struct console *co, const char *s, unsigned count)
 {
 	int index;
-	int foundcr;
-	int slicebegin;
-	int sliceend;
+	int begin;
+	HvLpIndex lp;
+	u8 port;
 
-	static const char nl = '\n';
 	static const char cr = '\r';
 
-	/*
-	 * This parser will ensure that all single instances of
-	 * either \n or \r are matched into carriage return/line feed
-	 * combinations.  It also allows for instances where there
-	 * already exist \n\r combinations as well as the reverse,
-	 * \r\n combinations.
+	/* Check port data first because the target LP might be valid but
+	 * simply not active, in which case we want to hvlog the output.
 	 */
-	foundcr = 0;
-	slicebegin = 0;
-	sliceend = 0;
+	if (get_port_data(NULL, &lp, &port)) {
+		hvlog("\n\rviocons_write: unable to get port data.");
+		return;
+	}
 
+	hvlogOutput(s, count);
+
+	if (!viopath_isactive(lp)) {
+		/*
+		 * This is a VERY noisy trace message in the case where the
+		 * path manager is not active or in the case where this
+		 * function is called prior to viocons initialization.  It is
+		 * being commented out for the sake of a clear trace buffer.
+		 */
+#if 0
+		 hvlog("\n\rviocons_write: path not active to lp %d", lp );
+#endif
+		return;
+	}
+
+	/* 
+	 * Any newline character found will cause a
+	 * carriage return character to be emitted as well. 
+	 */
+	begin = 0;
 	for (index = 0; index < count; index++) {
-		if (!foundcr && (s[index] == nl)) {
-			if ((sliceend > slicebegin) && (sliceend < count)) {
-				internal_write(NULL, &s[slicebegin],
-					       sliceend - slicebegin, 0);
-				slicebegin = sliceend;
-			}
-			internal_write(NULL, &cr, 1, 0);
+		if (s[index] == '\n') {
+			/* 
+			 * Newline found. Print everything up to and 
+			 * including the newline
+			 */
+			internal_write(lp, port, &s[begin], index - begin + 1,
+					NULL);
+			begin = index + 1;
+			/* Emit a carriage return as well */
+			internal_write(lp, port, &cr, 1, NULL);
 		}
-		if (foundcr && (s[index] != nl) && (index >= 2) &&
-				(s[index - 2] != nl)) {
-			internal_write(NULL, &s[slicebegin],
-					sliceend - slicebegin, 0);
-			slicebegin = sliceend;
-			internal_write(NULL, &nl, 1, 0);
-		}
-		sliceend++;
-		foundcr = (s[index] == cr);
 	}
 
-	internal_write(NULL, &s[slicebegin], sliceend - slicebegin, 0);
-
-	if (count > 1) {
-		if (foundcr && (s[count - 1] != nl))
-			internal_write(NULL, &nl, 1, 0);
-		else if ((s[count - 1] == nl) && (s[count - 2] != cr))
-			internal_write(NULL, &cr, 1, 0);
-	}
+	/* If any characters left to write, write them now */
+	if ((index - begin) > 0)
+		internal_write(lp, port, &s[begin], index - begin, NULL);
 }
 
 /*
- * Work out a the device associate with this console
+ * Work out the device associate with this console
  */
 static struct tty_driver *viocons_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &viotty_driver;
-}
-
-/*
- * Do console device setup
- */
-static int __init viocons_setup(struct console *co, char *options)
-{
-	return 0;
+	return viotty_driver;
 }
 
 /*
@@ -637,7 +675,6 @@ static struct console viocons = {
 	.name = "ttyS",
 	.write = viocons_write,
 	.device = viocons_device,
-	.setup = viocons_setup,
 	.flags = CON_PRINTBUFFER,
 	.index = -1,
 };
@@ -683,19 +720,16 @@ static void viotty_close(struct tty_struct *tty, struct file *filp)
 	struct port_info_tag *pi = NULL;
 
 	spin_lock_irqsave(&consolelock, flags);
-	pi = (struct port_info_tag *) tty->driver_data;
+	pi = (struct port_info_tag *)tty->driver_data;
 
 	if (!pi || viotty_paranoia_check(pi, tty->name, "viotty_close")) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		return;
 	}
-
 /*	if (atomic_read(&tty->count) == 1) { */
 	if (tty->count == 1)
 		pi->tty = NULL;
-
 	spin_unlock_irqrestore(&consolelock, flags);
-
 }
 
 /*
@@ -704,7 +738,76 @@ static void viotty_close(struct tty_struct *tty, struct file *filp)
 static int viotty_write(struct tty_struct *tty, int from_user,
 			const unsigned char *buf, int count)
 {
-	return internal_write(tty, buf, count, from_user);
+	int ret;
+	int total = 0;
+	HvLpIndex lp;
+	u8 port;
+
+	ret = get_port_data(tty, &lp, &port);
+	if (ret) {
+		hvlog("\n\rviotty_write: no port data.");
+		return -ENODEV;
+	}
+
+	if (port == 0)
+		hvlogOutput(buf, count);
+
+	/*
+	 * If the path to this LP is closed, don't bother doing anything more.
+	 * just dump the data on the floor and return count.  For some reason
+	 * some user level programs will attempt to probe available tty's and
+	 * they'll attempt a viotty_write on an invalid port which maps to an
+	 * invalid target lp.  If this is the case then ignore the
+	 * viotty_write call and, since the viopath isn't active to this
+	 * partition, return count.
+	 */
+	if (!viopath_isactive(lp)) {
+		/* Noisy trace.  Commented unless needed. */
+#if 0
+		 hvlog("\n\rviotty_write: viopath NOT active for lp %d.",lp);
+#endif
+		return count;
+	}
+
+	/*
+	 * If the viotty_write is invoked from user space we want to do the
+	 * copy_from_user() into an event buffer from the cfu buffer before
+	 * internal_write() is called because internal_write may need to buffer
+	 * data which will need to grab a spin_lock and we shouldn't
+	 * copy_from_user() while holding a spin_lock.  Should internal_write()
+	 * not need to buffer data then it'll just use the event we created here
+	 * rather than checking one out from vio_get_event_buffer().
+	 */
+	if (from_user) {
+		struct viocharlpevent *viochar;
+		int curlen;
+		const char *curbuf = buf;
+
+		viochar = viocons_get_cfu_buffer();
+		if (viochar == NULL)
+			return -EAGAIN;
+		initDataEvent(viochar, lp);
+		while (count > 0) {
+			if (count > VIOCHAR_MAX_DATA)
+				curlen = VIOCHAR_MAX_DATA;
+			else
+				curlen = count;
+			viochar->len = curlen;
+			ret = copy_from_user(viochar->data, curbuf, curlen);
+			if (ret)
+				break;
+			ret = internal_write(lp, port, viochar->data,
+					viochar->len, viochar);
+			total += ret;
+			if (ret != curlen)
+				break;
+			count -= curlen;
+			curbuf += curlen;
+		}
+		viocons_free_cfu_buffer(viochar);
+	} else
+		total = internal_write(lp, port, buf, count, NULL);
+	return total;
 }
 
 /*
@@ -712,7 +815,18 @@ static int viotty_write(struct tty_struct *tty, int from_user,
  */
 static void viotty_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	internal_write(tty, &ch, 1, 0);
+	HvLpIndex lp;
+	u8 port;
+
+	if (get_port_data(tty, &lp, &port))
+		return;
+
+	/* This will append '\r' as well if the char is '\n' */
+	if (port == 0)
+		hvlogOutput(&ch, 1);
+
+	if (viopath_isactive(lp))
+		internal_write(lp, port, &ch, 1, NULL);
 }
 
 /*
@@ -734,14 +848,12 @@ static int viotty_write_room(struct tty_struct *tty)
 
 	spin_lock_irqsave(&consolelock, flags);
 	pi = (struct port_info_tag *) tty->driver_data;
-	if (!pi || viotty_paranoia_check(pi, tty->name, "viotty_sendbuffers")) {
+	if (!pi || viotty_paranoia_check(pi, tty->name, "viotty_write_room")) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		return 0;
 	}
 
-	/*
-	 * If no buffers are used, return the max size.
-	 */
+	/* If no buffers are used, return the max size. */
 	if (overflow[pi->port].used == 0) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		return VIOCHAR_MAX_DATA * NUM_BUF;
@@ -783,7 +895,7 @@ static int viotty_ioctl(struct tty_struct *tty, struct file *file,
 	 */
 	case KDGETLED:
 	case KDGKBLED:
-		return put_user(0, (char *) arg);
+		return put_user(0, (char *)arg);
 
 	case KDSKBLED:
 		return 0;
@@ -801,7 +913,7 @@ static void viotty_unthrottle(struct tty_struct *tty)
 }
 
 static void viotty_set_termios(struct tty_struct *tty,
-			       struct termios *old_termios)
+		struct termios *old_termios)
 {
 }
 
@@ -839,22 +951,6 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 	u8 port = cevent->virtual_device;
 	int reject = 0;
 
-	/*
-	 * Change 05/01/2003 by Ryan Arnold:  The following two local
-	 * variables are being removed because they aren't actually
-	 * used once they are ste.  The porper action is to set the
-	 * parameter event's xRc and mSubTypeRc fields.  This fixes
-	 * the bug where a successfull open is returned to the client
-	 * even when the console is in use by another partition and
-	 * the open event actuall failed.  Since the event ptr was
-	 * being re0used we were always sending back the same
-	 * event->xRc and cevent->mSubTypeRc that we were getting
-	 * from the original event.
-	 *
-	 * u16 eventSubtypeRc;
-	 * u8 eventRc;
-	 */
-
 	if (event->xFlags.xFunction == HvLpEvent_Function_Ack) {
 		if (port >= VTTY_PORTS)
 			return;
@@ -864,24 +960,18 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 
 		if (event->xRc == HvLpEvent_Rc_Good) {
 			sndMsgSeq[port] = sndMsgAck[port] = 0;
+
 			/*
-			 * Changed 05/01/2003 by Ryan Arnold: this linve was
-			 * moved UP into this if block because, in its
-			 * previous position it prevent the primary partition
-			 * from EVER getting the console because of the order
-			 * of operations was such that the hosting partion
-			 * aws always accepted as the target LP regardless of
-			 * whether the event->xRc was good or not.  This
-			 * fix allows connections from the primary partition
-			 * but once one is connected from the primary
-			 * partition nothing short of a reboot of linux will
-			 * allow access from the hosting partition again
-			 * without a required iSeries fix.
+			 * This line allows connections from the primary
+			 * partition but once one is connected from the
+			 * primary partition nothing short of a reboot
+			 * of linux will allow access from the hosting
+			 * partition again without a required iSeries fix.
 			 */
 			port_info[port].lp = event->xTargetLp;
 		}
-		spin_unlock_irqrestore(&consolelock, flags);
 
+		spin_unlock_irqrestore(&consolelock, flags);
 		if (event->xRc != HvLpEvent_Rc_Good)
 			printk(KERN_WARNING_VIO
 			       "viocons: event->xRc != HvLpEvent_Rc_Good, event->xRc == (%d).\n",
@@ -892,13 +982,11 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 			up((struct semaphore *) semptr);
 		} else
 			printk(KERN_WARNING_VIO
-			       "console: wierd...got open ack without semaphore\n");
+			       "viocons: wierd...got open ack without semaphore\n");
 		return;
 	}
 
-	/*
-	 * This had better require an ack, otherwise complain
-	 */
+	/* This had better require an ack, otherwise complain */
 	if (event->xFlags.xAckInd != HvLpEvent_AckInd_DoAck) {
 		printk(KERN_WARNING_VIO
 		       "console: viocharopen without ack bit!\n");
@@ -910,14 +998,6 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 
 	/* Make sure this is a good virtual tty */
 	if (port >= VTTY_PORTS) {
-		/*
-		 * Change 05/01/2003 by Ryan Arnold: This is where
-		 * the local variable assignments were changed over
-		 * to re-assigning values to the original event data
-		 * members since we reuse the event.  This was also
-		 * change in the two other else if & else blocks
-		 * below.
-		 */
 		event->xRc = HvLpEvent_Rc_SubtypeError;
 		cevent->subtype_result_code = viorc_openRejected;
 		/*
@@ -945,16 +1025,28 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 	spin_unlock_irqrestore(&consolelock, flags);
 
 	if (reject == 1)
-		printk("viocons: console open rejected : bad virtual tty.\n");
+		printk(KERN_WARNING_VIO
+			"viocons: console open rejected : bad virtual tty.\n");
 	else if (reject == 2)
-		printk("viocons: console open rejected : console in exclusive use by another partition.\n");
+		printk(KERN_WARNING_VIO
+			"viocons: console open rejected : console in exclusive use by another partition.\n");
 
 	/* Return the acknowledgement */
 	HvCallEvent_ackLpEvent(event);
 }
 
 /*
- * Handle a close open charLpEvent.  Could be either interrupt or ack
+ * Handle a close charLpEvent.  This should ONLY be an Interrupt because the
+ * virtual console should never actually issue a close event to the hypervisor
+ * because the virtual console never goes away.  A close event coming from the
+ * hypervisor simply means that there are no client consoles connected to the
+ * virtual console.
+ *
+ * Regardless of the number of connections masqueraded on the other side of
+ * the hypervisor ONLY ONE close event should be called to accompany the ONE
+ * open event that is called.  The close event should ONLY be called when NO
+ * MORE connections (masqueraded or not) exist on the other side of the
+ * hypervisor.
  */
 static void vioHandleCloseEvent(struct HvLpEvent *event)
 {
@@ -963,8 +1055,10 @@ static void vioHandleCloseEvent(struct HvLpEvent *event)
 	u8 port = cevent->virtual_device;
 
 	if (event->xFlags.xFunction == HvLpEvent_Function_Int) {
-		if (port >= VTTY_PORTS)
+		if (port >= VTTY_PORTS) {
+			printk(KERN_WARNING_VIO "viocons: close message from invalid virtual device.\n");
 			return;
+		}
 
 		/* For closes, just mark the console partition invalid */
 		spin_lock_irqsave(&consolelock, flags);
@@ -987,9 +1081,7 @@ static void vioHandleCloseEvent(struct HvLpEvent *event)
 static void vioHandleConfig(struct HvLpEvent *event)
 {
 	struct viocharlpevent *cevent = (struct viocharlpevent *)event;
-	int len;
 
-	len = cevent->len;
 	HvCall_writeLogBuffer(cevent->data, cevent->len);
 
 	if (cevent->data[0] == 0x01)
@@ -999,7 +1091,6 @@ static void vioHandleConfig(struct HvLpEvent *event)
 		       cevent->data[3], cevent->data[4]);
 	else
 		printk(KERN_WARNING_VIO "console unknown config event\n");
-	return;
 }
 
 /*
@@ -1011,7 +1102,7 @@ static void vioHandleData(struct HvLpEvent *event)
 	unsigned long flags;
 	struct viocharlpevent *cevent = (struct viocharlpevent *)event;
 	struct port_info_tag *pi;
-	int len;
+	int index;
 	u8 port = cevent->virtual_device;
 
 	if (port >= VTTY_PORTS) {
@@ -1031,24 +1122,26 @@ static void vioHandleData(struct HvLpEvent *event)
 	if (port_info[port].lp != event->xSourceLp)
 		return;
 
-	tty = port_info[port].tty;
-
-	if (tty == NULL) {
-		printk(KERN_WARNING_VIO "no tty for virtual device %d\n", port);
-		return;
-	}
-
-	if (tty->magic != TTY_MAGIC) {
-		printk(KERN_WARNING_VIO "tty bad magic\n");
-		return;
-	}
-
 	/*
 	 * Hold the spinlock so that we don't take an interrupt that
 	 * changes tty between the time we fetch the port_info_tag
 	 * pointer and the time we paranoia check.
 	 */
 	spin_lock_irqsave(&consolelock, flags);
+
+	tty = port_info[port].tty;
+
+	if (tty == NULL) {
+		spin_unlock_irqrestore(&consolelock, flags);
+		printk(KERN_WARNING_VIO "no tty for virtual device %d\n", port);
+		return;
+	}
+
+	if (tty->magic != TTY_MAGIC) {
+		spin_unlock_irqrestore(&consolelock, flags);
+		printk(KERN_WARNING_VIO "tty bad magic\n");
+		return;
+	}
 
 	/*
 	 * Just to be paranoid, make sure the tty points back to this port
@@ -1060,29 +1153,58 @@ static void vioHandleData(struct HvLpEvent *event)
 	}
 	spin_unlock_irqrestore(&consolelock, flags);
 
-	len = cevent->len;
-	if (len == 0)
-		return;
-
 	/*
-	 * Don't log the user's input to the hypervisor log or their password
-	 * will appear on a hypervisor log display.
+	 * Change 07/21/2003 - Ryan Arnold: functionality added to
+	 * support sysrq utilizing ^O as the sysrq key.  The sysrq
+	 * functionality will only work if built into the kernel and
+	 * then only if sysrq is enabled through the proc filesystem.
 	 */
-
-	/* Don't copy more bytes than there is room for in the buffer */
-	if (tty->flip.count + len > TTY_FLIPBUF_SIZE) {
-		len = TTY_FLIPBUF_SIZE - tty->flip.count;
-		printk(KERN_WARNING_VIO "console input buffer overflow!\n");
+	for (index = 0; index < cevent->len; index++) {
+#ifdef CONFIG_MAGIC_SYSRQ
+		if (sysrq_enabled) {
+			/*
+			 * The following is how this is implemented on
+			 * redhat systems
+			 * if( sysrq_ctls.enabled ) {
+			 */
+			/* 0x0f is the ascii character for ^O */
+			if (cevent->data[index] == '\x0f') {
+				vio_sysrq_pressed = 1;
+				/*
+				 * continue because we don't want to add
+				 * the sysrq key into the data string.
+				 */
+				continue;
+			} else if (vio_sysrq_pressed) {
+				handle_sysrq(cevent->data[index], NULL, tty);
+				vio_sysrq_pressed = 0;
+				/*
+				 * continue because we don't want to add
+				 * the sysrq sequence into the data string.
+				 */
+				continue;
+			}
+		}
+#endif
+		/*
+		 * The sysrq sequence isn't included in this check if
+		 * sysrq is enabled and compiled into the kernel because
+		 * the sequence will never get inserted into the buffer.
+		 * Don't attempt to copy more data into the buffer than we
+		 * have room for because it would fail without indication.
+		 */
+		if ((tty->flip.count + 1) > TTY_FLIPBUF_SIZE) {
+			printk(KERN_WARNING_VIO
+					"console input buffer overflow!\n");
+			break;
+		}
+		tty_insert_flip_char(tty, cevent->data[index], TTY_NORMAL);
 	}
 
-	memcpy(tty->flip.char_buf_ptr, cevent->data, len);
-	memset(tty->flip.flag_buf_ptr, TTY_NORMAL, len);
-
-	/* Update the kernel buffer end */
-	tty->flip.count += len;
-	tty->flip.char_buf_ptr += len;
-	tty->flip.flag_buf_ptr += len;
-	tty_flip_buffer_push(tty);
+	/* if cevent->len == 0 then no data was added to the buffer and flip.count == 0 */
+	if (tty->flip.count)
+		/* The next call resets flip.count when the data is flushed. */
+		tty_flip_buffer_push(tty);
 }
 
 /*
@@ -1251,47 +1373,49 @@ int __init viocons_init2(void)
 
 static int viocons_init3(void)
 {
+#if 0
 	int ret = viocons_init2();
 
 	if (ret)
 		return ret;
+#endif
 
 	/* Initialize the tty_driver structure */
-	memset(&viotty_driver, 0, sizeof(struct tty_driver));
-	viotty_driver.magic = TTY_DRIVER_MAGIC;
-	viotty_driver.owner = THIS_MODULE;
-	viotty_driver.driver_name = "vioconsole";
-	viotty_driver.devfs_name = "vcs/";
-	viotty_driver.name = "tty";
-	viotty_driver.major = TTY_MAJOR;
-	viotty_driver.minor_start = 1;
-	viotty_driver.num = VTTY_PORTS;
-	viotty_driver.type = TTY_DRIVER_TYPE_CONSOLE;
-	viotty_driver.subtype = 1;
-	viotty_driver.init_termios = tty_std_termios;
-	viotty_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	viotty_driver.termios = viotty_termios;
-	viotty_driver.termios_locked = viotty_termios_locked;
-	tty_set_operations(&viotty_driver, &serial_ops);
+	viotty_driver = alloc_tty_driver(VTTY_PORTS);
+	viotty_driver->owner = THIS_MODULE;
+	viotty_driver->driver_name = "vioconsole";
+	viotty_driver->devfs_name = "vcs/";
+	viotty_driver->name = "tty";
+	viotty_driver->major = TTY_MAJOR;
+	viotty_driver->minor_start = 1;
+	viotty_driver->type = TTY_DRIVER_TYPE_CONSOLE;
+	viotty_driver->subtype = 1;
+	viotty_driver->init_termios = tty_std_termios;
+	viotty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+	tty_set_operations(viotty_driver, &serial_ops);
 
-	viottyS_driver = viotty_driver;
-	viottyS_driver.devfs_name = "tts/";
-	viottyS_driver.name = "ttyS";
-	viottyS_driver.major = TTY_MAJOR;
-	viottyS_driver.minor_start = VIOTTY_SERIAL_START;
-	viottyS_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	viottyS_driver.termios = viottyS_termios;
-	viottyS_driver.termios_locked = viottyS_termios_locked;
+	viottyS_driver = alloc_tty_driver(VTTY_PORTS);
+	viottyS_driver->owner = THIS_MODULE;
+	viottyS_driver->driver_name = "vioconsole";
+	viottyS_driver->devfs_name = "tts/";
+	viottyS_driver->name = "ttyS";
+	viottyS_driver->major = TTY_MAJOR;
+	viottyS_driver->minor_start = VIOTTY_SERIAL_START;
+	viottyS_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	viottyS_driver->subtype = 1;
+	viottyS_driver->init_termios = tty_std_termios;
+	viottyS_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+	tty_set_operations(viottyS_driver, &serial_ops);
 
-	if (tty_register_driver(&viotty_driver))
+	if (tty_register_driver(viotty_driver))
 		printk(KERN_WARNING_VIO "Couldn't register console driver\n");
 
-	if (tty_register_driver(&viottyS_driver))
+	if (tty_register_driver(viottyS_driver))
 		printk(KERN_WARNING_VIO "Couldn't register console S driver\n");
+#if 0
 	/* Now create the vcs and vcsa devfs entries so mingetty works */
-#if defined(CONFIG_DEVFS_FS)
 	{
-		struct tty_driver temp_driver = viotty_driver;
+		struct tty_driver temp_driver = *viotty_driver;
 		int i;
 
 		temp_driver.name = "vcs%d";
@@ -1315,6 +1439,9 @@ static int viocons_init3(void)
 					   0, i + temp_driver.minor_start);
 	}
 #endif
+
+	/* Fetch memory for the cfu buffer */
+	viocons_init_cfu_buffer();
 
 	return 0;
 }
