@@ -104,6 +104,7 @@ MODULE_PARM_SYNTAX(async_unlink, SNDRV_BOOLEAN_TRUE_DESC);
  */
 
 #define MAX_PACKS	10	
+#define MAX_PACKS_HS	(MAX_PACKS * 8)	/* in high speed mode */
 #define MAX_URBS	5	/* max. 20ms long packets */
 #define SYNC_URBS	2	/* always two urbs for sync */
 #define MIN_PACKS_URB	1	/* minimum 1 packet per urb */
@@ -161,8 +162,8 @@ struct snd_usb_substream {
 	unsigned int datapipe;   /* the data i/o pipe */
 	unsigned int syncpipe;   /* 1 - async out or adaptive in */
 	unsigned int syncinterval;  /* P for adaptive mode, 0 otherwise */
-	unsigned int freqn;      /* nominal sampling rate in USB format, i.e. fs/1000 in Q10.14 */
-	unsigned int freqm;      /* momentary sampling rate in USB format, i.e. fs/1000 in Q10.14 */
+	unsigned int freqn;      /* nominal sampling rate in fs/fps in Q16.16 format */
+	unsigned int freqm;      /* momentary sampling rate in fs/fps in Q16.16 format */
 	unsigned int freqmax;    /* maximum sampling rate, used for buffer management */
 	unsigned int phase;      /* phase accumulator */
 	unsigned int maxpacksize;	/* max packet size in bytes */
@@ -184,7 +185,7 @@ struct snd_usb_substream {
 	unsigned int nurbs;			/* # urbs */
 	snd_urb_ctx_t dataurb[MAX_URBS];	/* data urb table */
 	snd_urb_ctx_t syncurb[SYNC_URBS];	/* sync urb table */
-	char syncbuf[SYNC_URBS * MAX_PACKS * 3]; /* sync buffer; it's so small - let's get static */
+	char syncbuf[SYNC_URBS * MAX_PACKS * 4]; /* sync buffer; it's so small - let's get static */
 	char *tmpbuf;			/* temporary buffer for playback */
 
 	u64 formats;			/* format bitmasks (all or'ed) */
@@ -218,17 +219,38 @@ static snd_usb_audio_t *usb_chip[SNDRV_CARDS];
 
 
 /*
- * convert a sampling rate into USB format (fs/1000 in Q10.14)
- * this will overflow at approx 2MSPS
+ * convert a sampling rate into our full speed format (fs/1000 in Q16.16)
+ * this will overflow at approx 524 kHz
  */
-inline static unsigned get_usb_rate(unsigned int rate)
+inline static unsigned get_usb_full_speed_rate(unsigned int rate)
 {
-	return ((rate << 11) + 62) / 125;
+	return ((rate << 13) + 62) / 125;
+}
+
+/*
+ * convert a sampling rate into USB high speed format (fs/8000 in Q16.16)
+ * this will overflow at approx 4 MHz
+ */
+inline static unsigned get_usb_high_speed_rate(unsigned int rate)
+{
+	return ((rate << 10) + 62) / 125;
+}
+
+/* convert our full speed USB rate into sampling rate in Hz */
+inline static unsigned get_full_speed_hz(unsigned int usb_rate)
+{
+	return (usb_rate * 125 + (1 << 12)) >> 13;
+}
+
+/* convert our high speed USB rate into sampling rate in Hz */
+inline static unsigned get_high_speed_hz(unsigned int usb_rate)
+{
+	return (usb_rate * 125 + (1 << 9)) >> 10;
 }
 
 
 /*
- * prepare urb for capture sync pipe
+ * prepare urb for full speed capture sync pipe
  *
  * fill the length and offset of each urb descriptor.
  * the fixed 10.14 frequency is passed through the pipe.
@@ -243,14 +265,40 @@ static int prepare_capture_sync_urb(snd_usb_substream_t *subs,
 
 	urb->number_of_packets = ctx->packets;
 	urb->dev = ctx->subs->dev; /* we need to set this at each time */
-	for (i = offs = 0; i < urb->number_of_packets; i++, offs += 3, cp += 3) {
+	for (i = offs = 0; i < urb->number_of_packets; i++, offs += 4, cp += 4) {
 		urb->iso_frame_desc[i].length = 3;
+		urb->iso_frame_desc[i].offset = offs;
+		cp[0] = subs->freqn >> 2;
+		cp[1] = subs->freqn >> 10;
+		cp[2] = subs->freqn >> 18;
+	}
+	return 0;
+}
+
+/*
+ * prepare urb for high speed capture sync pipe
+ *
+ * fill the length and offset of each urb descriptor.
+ * the fixed 12.13 frequency is passed as 16.16 through the pipe.
+ */
+static int prepare_capture_sync_urb_hs(snd_usb_substream_t *subs,
+				       snd_pcm_runtime_t *runtime,
+				       struct urb *urb)
+{
+	unsigned char *cp = urb->transfer_buffer;
+	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
+	int i, offs;
+
+	urb->number_of_packets = ctx->packets;
+	urb->dev = ctx->subs->dev; /* we need to set this at each time */
+	for (i = offs = 0; i < urb->number_of_packets; i++, offs += 4, cp += 4) {
+		urb->iso_frame_desc[i].length = 4;
 		urb->iso_frame_desc[i].offset = offs;
 		cp[0] = subs->freqn;
 		cp[1] = subs->freqn >> 8;
 		cp[2] = subs->freqn >> 16;
+		cp[3] = subs->freqn >> 24;
 	}
-	urb->interval = 1;
 	return 0;
 }
 
@@ -301,7 +349,6 @@ static int prepare_capture_urb(snd_usb_substream_t *subs,
 	spin_unlock_irqrestore(&subs->lock, flags);
 	urb->transfer_buffer = ctx->buf;
 	urb->transfer_buffer_length = offs;
-	urb->interval = 1;
 #if 0 // for check
 	if (! urb->bandwidth) {
 		int bustime;
@@ -372,7 +419,7 @@ static int retire_capture_urb(snd_usb_substream_t *subs,
 
 
 /*
- * prepare urb for playback sync pipe
+ * prepare urb for full speed playback sync pipe
  *
  * set up the offset and length to receive the current frequency.
  */
@@ -386,16 +433,37 @@ static int prepare_playback_sync_urb(snd_usb_substream_t *subs,
 
 	urb->number_of_packets = ctx->packets;
 	urb->dev = ctx->subs->dev; /* we need to set this at each time */
-	for (i = offs = 0; i < urb->number_of_packets; i++, offs += 3) {
+	for (i = offs = 0; i < urb->number_of_packets; i++, offs += 4) {
 		urb->iso_frame_desc[i].length = 3;
 		urb->iso_frame_desc[i].offset = offs;
 	}
-	urb->interval = 1;
 	return 0;
 }
 
 /*
- * process after playback sync complete
+ * prepare urb for high speed playback sync pipe
+ *
+ * set up the offset and length to receive the current frequency.
+ */
+
+static int prepare_playback_sync_urb_hs(snd_usb_substream_t *subs,
+					snd_pcm_runtime_t *runtime,
+					struct urb *urb)
+{
+	int i, offs;
+	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
+
+	urb->number_of_packets = ctx->packets;
+	urb->dev = ctx->subs->dev; /* we need to set this at each time */
+	for (i = offs = 0; i < urb->number_of_packets; i++, offs += 4) {
+		urb->iso_frame_desc[i].length = 4;
+		urb->iso_frame_desc[i].offset = offs;
+	}
+	return 0;
+}
+
+/*
+ * process after full speed playback sync complete
  *
  * retrieve the current 10.14 frequency from pipe, and set it.
  * the value is referred in prepare_playback_urb().
@@ -410,11 +478,11 @@ static int retire_playback_sync_urb(snd_usb_substream_t *subs,
 	unsigned long flags;
 
 	found = 0;
-	for (i = 0; i < urb->number_of_packets; i++, cp += 3) {
+	for (i = 0; i < urb->number_of_packets; i++, cp += 4) {
 		if (urb->iso_frame_desc[i].status ||
 		    urb->iso_frame_desc[i].actual_length < 3)
 			continue;
-		f = combine_triple(cp);
+		f = combine_triple(cp) << 2;
 #if 0
 		if (f < subs->freqn - (subs->freqn>>3) || f > subs->freqmax) {
 			snd_printd(KERN_WARNING "requested frequency %d (%u,%03uHz) out of range (current nominal %d (%u,%03uHz))\n",
@@ -424,6 +492,37 @@ static int retire_playback_sync_urb(snd_usb_substream_t *subs,
 		}
 #endif
 		found = f;
+	}
+	if (found) {
+		spin_lock_irqsave(&subs->lock, flags);
+		subs->freqm = found;
+		spin_unlock_irqrestore(&subs->lock, flags);
+	}
+
+	return 0;
+}
+
+/*
+ * process after high speed playback sync complete
+ *
+ * retrieve the current 12.13 frequency from pipe, and set it.
+ * the value is referred in prepare_playback_urb().
+ */
+static int retire_playback_sync_urb_hs(snd_usb_substream_t *subs,
+				       snd_pcm_runtime_t *runtime,
+				       struct urb *urb)
+{
+	int i;
+	unsigned int found;
+	unsigned char *cp = urb->transfer_buffer;
+	unsigned long flags;
+
+	found = 0;
+	for (i = 0; i < urb->number_of_packets; i++, cp += 4) {
+		if (urb->iso_frame_desc[i].status ||
+		    urb->iso_frame_desc[i].actual_length < 4)
+			continue;
+		found = combine_quad(cp) & 0x0fffffff;
 	}
 	if (found) {
 		spin_lock_irqsave(&subs->lock, flags);
@@ -464,8 +563,8 @@ static int prepare_playback_urb(snd_usb_substream_t *subs,
 		if (subs->fill_max)
 			counts = subs->maxframesize; /* fixed */
 		else {
-			subs->phase = (subs->phase & 0x3fff) + subs->freqm;
-			counts = subs->phase >> 14;
+			subs->phase = (subs->phase & 0xffff) + subs->freqm;
+			counts = subs->phase >> 16;
 			if (counts > subs->maxframesize)
 				counts = subs->maxframesize;
 		}
@@ -515,7 +614,6 @@ static int prepare_playback_urb(snd_usb_substream_t *subs,
 	spin_unlock_irqrestore(&subs->lock, flags);
 	urb->transfer_buffer_length = offs * stride;
 	ctx->transfer = offs;
-	urb->interval = 1;
 
 	return 0;
 }
@@ -561,6 +659,21 @@ static struct snd_urb_ops audio_urb_ops[2] = {
 		.prepare =	prepare_capture_urb,
 		.retire =	retire_capture_urb,
 		.prepare_sync =	prepare_capture_sync_urb,
+		.retire_sync =	retire_capture_sync_urb,
+	},
+};
+
+static struct snd_urb_ops audio_urb_ops_high_speed[2] = {
+	{
+		.prepare =	prepare_playback_urb,
+		.retire =	retire_playback_urb,
+		.prepare_sync =	prepare_playback_sync_urb_hs,
+		.retire_sync =	retire_playback_sync_urb_hs,
+	},
+	{
+		.prepare =	prepare_capture_urb,
+		.retire =	retire_capture_urb,
+		.prepare_sync =	prepare_capture_sync_urb_hs,
 		.retire_sync =	retire_capture_sync_urb,
 	},
 };
@@ -822,15 +935,19 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 {
 	unsigned int maxsize, n, i;
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
-	unsigned int npacks[MAX_URBS], total_packs;
+	unsigned int npacks[MAX_URBS], urb_packs, total_packs;
 
-	/* calculate the frequency in 10.14 format */
-	subs->freqn = subs->freqm = get_usb_rate(rate);
+	/* calculate the frequency in 16.16 format */
+	if (subs->dev->speed == USB_SPEED_FULL)
+		subs->freqn = get_usb_full_speed_rate(rate);
+	else
+		subs->freqn = get_usb_high_speed_rate(rate);
+	subs->freqm = subs->freqn;
 	subs->freqmax = subs->freqn + (subs->freqn >> 2); /* max. allowed frequency */
 	subs->phase = 0;
 
 	/* calculate the max. size of packet */
-	maxsize = ((subs->freqmax + 0x3fff) * (frame_bits >> 3)) >> 14;
+	maxsize = ((subs->freqmax + 0xffff) * (frame_bits >> 3)) >> 16;
 	if (subs->maxpacksize && maxsize > subs->maxpacksize) {
 		//snd_printd(KERN_DEBUG "maxsize %d is greater than defined size %d\n",
 		//	   maxsize, subs->maxpacksize);
@@ -842,9 +959,14 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 	else
 		subs->curpacksize = maxsize;
 
+	if (subs->dev->speed == USB_SPEED_FULL)
+		urb_packs = nrpacks;
+	else
+		urb_packs = nrpacks * 8;
+
 	/* allocate a temporary buffer for playback */
 	if (is_playback) {
-		subs->tmpbuf = kmalloc(maxsize * nrpacks, GFP_KERNEL);
+		subs->tmpbuf = kmalloc(maxsize * urb_packs, GFP_KERNEL);
 		if (! subs->tmpbuf) {
 			snd_printk(KERN_ERR "cannot malloc tmpbuf\n");
 			return -ENOMEM;
@@ -855,16 +977,16 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 	total_packs = (period_bytes + maxsize - 1) / maxsize;
 	if (total_packs < 2 * MIN_PACKS_URB)
 		total_packs = 2 * MIN_PACKS_URB;
-	subs->nurbs = (total_packs + nrpacks - 1) / nrpacks;
+	subs->nurbs = (total_packs + urb_packs - 1) / urb_packs;
 	if (subs->nurbs > MAX_URBS) {
 		/* too much... */
 		subs->nurbs = MAX_URBS;
-		total_packs = MAX_URBS * nrpacks;
+		total_packs = MAX_URBS * urb_packs;
 	}
 	n = total_packs;
 	for (i = 0; i < subs->nurbs; i++) {
-		npacks[i] = n > nrpacks ? nrpacks : n;
-		n -= nrpacks;
+		npacks[i] = n > urb_packs ? urb_packs : n;
+		n -= urb_packs;
 	}
 	if (subs->nurbs <= 1) {
 		/* too little - we need at least two packets
@@ -913,6 +1035,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 		u->urb->pipe = subs->datapipe;
 		u->urb->transfer_flags = URB_ISO_ASAP;
 		u->urb->number_of_packets = u->packets;
+		u->urb->interval = 1;
 		u->urb->context = u;
 		u->urb->complete = snd_usb_complete_callback(snd_complete_urb);
 	}
@@ -929,12 +1052,13 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 				release_substream_urbs(subs, 0);
 				return -ENOMEM;
 			}
-			u->urb->transfer_buffer = subs->syncbuf + i * nrpacks * 3;
-			u->urb->transfer_buffer_length = nrpacks * 3;
+			u->urb->transfer_buffer = subs->syncbuf + i * nrpacks * 4;
+			u->urb->transfer_buffer_length = nrpacks * 4;
 			u->urb->dev = subs->dev;
 			u->urb->pipe = subs->syncpipe;
 			u->urb->transfer_flags = URB_ISO_ASAP;
 			u->urb->number_of_packets = u->packets;
+			u->urb->interval = subs->dev->speed == USB_SPEED_HIGH ? 8 : 1;
 			u->urb->context = u;
 			u->urb->complete = snd_usb_complete_callback(snd_complete_sync_urb);
 		}
@@ -1116,7 +1240,7 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 	else
 		subs->datapipe = usb_rcvisocpipe(dev, ep);
 	subs->syncpipe = subs->syncinterval = 0;
-	subs->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+	subs->maxpacksize = fmt->maxpacksize;
 	subs->fill_max = 0;
 
 	/* we need a sync pipe in async OUT or adaptive IN mode */
@@ -1836,11 +1960,10 @@ static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffe
 			snd_iprintf(buffer, "%d ", subs->dataurb[i].packets);
 		snd_iprintf(buffer, "]\n");
 		snd_iprintf(buffer, "    Packet Size = %d\n", subs->curpacksize);
-		snd_iprintf(buffer, "    Momentary freq = %d.%d Hz\n",
-			    (subs->freqm * 125) >> 11,
-			    (subs->freqm >> 10) * 625
-			    + (((subs->freqm & ((1 << 10) - 1)) * 625) >> 10)
-			    - 10 * ((subs->freqm * 125) >> 11));
+		snd_iprintf(buffer, "    Momentary freq = %u Hz\n",
+			    subs->dev->speed == USB_SPEED_FULL
+			    ? get_full_speed_hz(subs->freqm)
+			    : get_high_speed_hz(subs->freqm));
 	} else {
 		snd_iprintf(buffer, "  Status: Stop\n");
 	}
@@ -1890,7 +2013,10 @@ static void init_substream(snd_usb_stream_t *as, int stream, struct audioformat 
 	subs->stream = as;
 	subs->direction = stream;
 	subs->dev = as->chip->dev;
-	subs->ops = audio_urb_ops[stream];
+	if (subs->dev->speed == USB_SPEED_FULL)
+		subs->ops = audio_urb_ops[stream];
+	else
+		subs->ops = audio_urb_ops_high_speed[stream];
 	snd_pcm_lib_preallocate_pages(as->pcm->streams[stream].substream,
 				      SNDRV_DMA_TYPE_CONTINUOUS,
 				      snd_dma_continuous_data(GFP_KERNEL),
@@ -2351,6 +2477,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		fp->altset_idx = i;
 		fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
 		fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
+		/* FIXME: decode wMaxPacketSize of high bandwith endpoints */
 		fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
 		fp->attributes = csep[3];
 
@@ -2728,6 +2855,14 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 	};
 	
 	*rchip = NULL;
+
+	if (dev->speed != USB_SPEED_FULL &&
+	    dev->speed != USB_SPEED_HIGH) {
+		snd_printk(KERN_ERR "unknown device speed %d\n", dev->speed);
+		snd_usb_audio_free(chip);
+		return -ENXIO;
+	}
+
 	chip = snd_magic_kcalloc(snd_usb_audio_t, 0, GFP_KERNEL);
 	if (! chip)
 		return -ENOMEM;
@@ -2780,6 +2915,10 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 
 	if (len < sizeof(card->longname))
 		usb_make_path(dev, card->longname + len, sizeof(card->longname) - len);
+
+	strlcat(card->longname,
+		dev->speed == USB_SPEED_FULL ? ", full speed" : ", high speed",
+		sizeof(card->longname));
 
 	snd_usb_audio_create_proc(chip);
 
