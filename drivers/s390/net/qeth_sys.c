@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.19.2.6 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.19.2.7 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.19.2.6 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.19.2.7 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -1442,22 +1442,33 @@ qeth_driver_group_store(struct device_driver *ddrv, const char *buf,
 static DRIVER_ATTR(group, 0200, 0, qeth_driver_group_store);
 
 static ssize_t
-qeth_driver_snmp_register_show(struct device_driver *ddrv, char *buf)
-{
-	/* TODO */
-	return 0;
-}
-
-static ssize_t
-qeth_driver_snmp_register_store(struct device_driver *ddrv, const char *buf,
+qeth_driver_notifier_register_store(struct device_driver *ddrv, const char *buf,
 				size_t count)
 {
-	/* TODO */
+	int rc;
+	int signum;
+	char *tmp, *tmp2;
+
+	tmp = strsep((char **) &buf, "\n");
+	if (!strncmp(tmp, "unregister", 10)){
+		if ((rc = qeth_notifier_unregister(current)))
+			return rc;
+		return count;
+	}
+
+	signum = simple_strtoul(tmp, &tmp2, 10);
+	if ((signum < 0) || (signum > 32)){
+		PRINT_WARN("Signal number %d is out of range\n", signum);
+		return -EINVAL;
+	}
+	if ((rc = qeth_notifier_register(current, signum)))
+		return rc;
+
 	return count;
 }
 
-static DRIVER_ATTR(snmp_register, 0644, qeth_driver_snmp_register_show,
-		   qeth_driver_snmp_register_store);
+static DRIVER_ATTR(notifier_register, 0200, 0,
+		   qeth_driver_notifier_register_store);
 
 int
 qeth_create_driver_attributes(void)
@@ -1468,7 +1479,7 @@ qeth_create_driver_attributes(void)
 				     &driver_attr_group)))
 		return rc;
 	return driver_create_file(&qeth_ccwgroup_driver.driver,
-				  &driver_attr_snmp_register);
+				  &driver_attr_notifier_register);
 }
 
 void
@@ -1477,5 +1488,5 @@ qeth_remove_driver_attributes(void)
 	driver_remove_file(&qeth_ccwgroup_driver.driver,
 			&driver_attr_group);
 	driver_remove_file(&qeth_ccwgroup_driver.driver,
-			&driver_attr_snmp_register);
+			&driver_attr_notifier_register);
 }

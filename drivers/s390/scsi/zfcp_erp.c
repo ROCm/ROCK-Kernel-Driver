@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.49.2.3 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.49.2.4 $"
 
 #include "zfcp_ext.h"
 
@@ -126,37 +126,6 @@ static void zfcp_erp_memwait_handler(unsigned long);
 static void zfcp_erp_timeout_handler(unsigned long);
 static inline void zfcp_erp_timeout_init(struct zfcp_erp_action *);
 
-/*
- * function:	zfcp_erp_adapter_shutdown_all
- *
- * purpose:	recursively calls zfcp_erp_adapter_shutdown to stop all
- *              IO on each adapter, return all outstanding packets and 
- *              relinquish all IRQs
- *              Note: This function waits for completion of all shutdowns
- *
- * returns:     0 in all cases
- */
-int
-zfcp_erp_adapter_shutdown_all(void)
-{
-	int retval = 0;
-	unsigned long flags;
-	struct zfcp_adapter *adapter;
-
-	read_lock_irqsave(&zfcp_data.config_lock, flags);
-	list_for_each_entry(adapter, &zfcp_data.adapter_list_head, list)
-	    zfcp_erp_adapter_shutdown(adapter, 0);
-	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
-
-	/*
-	 * FIXME : need to take config_lock but cannot, since we schedule here.
-	 */
-	/* start all shutdowns first before any waiting to allow for concurreny */
-	list_for_each_entry(adapter, &zfcp_data.adapter_list_head, list)
-	    zfcp_erp_wait(adapter);
-
-	return retval;
-}
 
 /*
  * function:	zfcp_fsf_scsi_er_timeout_handler

@@ -50,7 +50,7 @@
 #  error "This kernel is too recent: not supported by this file"
 #endif
 
-#define VERSION_Z90MAIN_C "$Revision: 1.31 $"
+#define VERSION_Z90MAIN_C "$Revision: 1.31.2.1 $"
 
 static char z90cmain_version[] __initdata =
 	"z90main.o (" VERSION_Z90MAIN_C "/"
@@ -116,9 +116,15 @@ extern char z90chardware_version[];
 
 /**
  * Reader should run every READERTIME milliseconds
+ * With the 100Hz patch for s390, z90crypt can lock the system solid while
+ * under heavy load. We'll try to avoid that.
  */
 #ifndef READERTIME
+#if HZ > 1000
 #define READERTIME 2
+#else
+#define READERTIME 10
+#endif
 #endif
 
 /**
@@ -1392,9 +1398,8 @@ unbuild_caller(struct device *device_p, struct caller *caller_p)
 		return;
 	if (caller_p->caller_liste.next && caller_p->caller_liste.prev)
 		if (!list_empty(&caller_p->caller_liste)) {
-			list_del(&caller_p->caller_liste);
+			list_del_init(&caller_p->caller_liste);
 			device_p->dev_caller_count--;
-			INIT_LIST_HEAD(&caller_p->caller_liste);
 		}
 	memset(caller_p->caller_id, 0, sizeof(caller_p->caller_id));
 }
@@ -1612,14 +1617,14 @@ purge_work_element(struct work_element *we_p)
 	spin_lock_irq(&queuespinlock);
 	list_for_each(lptr, &request_list) {
 		if (lptr == &we_p->liste) {
-			list_del(lptr);
+			list_del_init(lptr);
 			requestq_count--;
 			break;
 		}
 	}
 	list_for_each(lptr, &pending_list) {
 		if (lptr == &we_p->liste) {
-			list_del(lptr);
+			list_del_init(lptr);
 			pendingq_count--;
 			break;
 		}
@@ -2281,15 +2286,18 @@ receive_from_crypto_device(int index, unsigned char *psmid, int *buff_len_p,
 			if (!memcmp(caller_p->caller_id, psmid,
 				    sizeof(caller_p->caller_id))) {
 				if (!list_empty(&caller_p->caller_liste)) {
-					list_del(ptr);
+					list_del_init(ptr);
 					dev_ptr->dev_caller_count--;
-					INIT_LIST_HEAD(&caller_p->caller_liste);
 					break;
 				}
 			}
 			caller_p = 0;
 		}
 		if (!caller_p) {
+			PRINTKW("Unable to locate PSMID %02X%02X%02X%02X%02X"
+				"%02X%02X%02X in device list\n",
+				psmid[0], psmid[1], psmid[2], psmid[3],
+				psmid[4], psmid[5], psmid[6], psmid[7]);
 			rv = REC_USER_GONE;
 			break;
 		}
@@ -2347,7 +2355,7 @@ helper_send_work(int index)
 		return;
 	requestq_count--;
 	rq_p = list_entry(request_list.next, struct work_element, liste);
-	list_del(&rq_p->liste);
+	list_del_init(&rq_p->liste);
 	rq_p->audit[1] |= FP_REMREQUEST;
 	if (rq_p->devtype == SHRT2DEVPTR(index)->dev_type) {
 		rq_p->devindex = SHRT2LONG(index);
@@ -2406,7 +2414,7 @@ helper_handle_work_element(int index, unsigned char psmid[8], int rc,
 	list_for_each_safe(lptr, tptr, &pending_list) {
 		pq_p = list_entry(lptr, struct work_element, liste);
 		if (!memcmp(pq_p->caller_id, psmid, sizeof(pq_p->caller_id))) {
-			list_del(lptr);
+			list_del_init(lptr);
 			pendingq_count--;
 			pq_p->audit[1] |= FP_NOTPENDING;
 			break;
@@ -2501,20 +2509,17 @@ z90crypt_schedule_reader_timer(void)
 static void
 z90crypt_reader_task(unsigned long ptr)
 {
-	int workavail, remaining, index, rc, buff_len;
+	int workavail, index, rc, buff_len;
 	unsigned char	psmid[8], *resp_addr;
 	static unsigned char buff[1024];
 
-	PDEBUG("jiffies %ld\n", jiffies);
-
 	/**
 	 * we use workavail = 2 to ensure 2 passes with nothing dequeued before
-	 * exiting the loop. If remaining == 0 after the loop, there is no work
-	 * remaining on the queues.
+	 * exiting the loop. If pendingq_count == 0 after the loop, there is no
+	 * work remaining on the queues.
 	 */
 	resp_addr = 0;
 	workavail = 2;
-	remaining = 0;
 	buff_len = 0;
 	while (workavail) {
 		workavail--;
@@ -2544,19 +2549,14 @@ z90crypt_reader_task(unsigned long ptr)
 			}
 
 			if (rc == REC_FATAL_ERROR)
-				remaining = 0;
-			else if (rc != REC_NO_RESPONSE)
-				remaining +=
-					SHRT2DEVPTR(index)->dev_caller_count;
+				PRINTKW("REC_FATAL_ERROR from device %d!\n",
+					SHRT2LONG(index));
 		}
 		spin_unlock_irq(&queuespinlock);
 	}
 
-	if (remaining) {
-		spin_lock_irq(&queuespinlock);
+	if (pendingq_count)
 		z90crypt_schedule_reader_timer();
-		spin_unlock_irq(&queuespinlock);
-	}
 }
 
 static inline void
@@ -2603,7 +2603,7 @@ helper_drain_queues(void)
 		pq_p->status[0] |= STAT_FAILED;
 		unbuild_caller(LONG2DEVPTR(pq_p->devindex),
 			       (struct caller *)pq_p->requestptr);
-		list_del(lptr);
+		list_del_init(lptr);
 		pendingq_count--;
 		pq_p->audit[1] |= FP_NOTPENDING;
 		pq_p->audit[1] |= FP_AWAKENING;
@@ -2615,7 +2615,7 @@ helper_drain_queues(void)
 		pq_p = list_entry(lptr, struct work_element, liste);
 		pq_p->retcode = -ENODEV;
 		pq_p->status[0] |= STAT_FAILED;
-		list_del(lptr);
+		list_del_init(lptr);
 		requestq_count--;
 		pq_p->audit[1] |= FP_REMREQUEST;
 		pq_p->audit[1] |= FP_AWAKENING;
@@ -2637,12 +2637,21 @@ helper_timeout_requests(void)
 		pq_p = list_entry(lptr, struct work_element, liste);
 		if (pq_p->requestsent >= timelimit)
 			break;
+		PRINTKW("Purging(PQ) PSMID %02X%02X%02X%02X%02X%02X%02X%02X\n",
+		       ((struct caller *)pq_p->requestptr)->caller_id[0],
+		       ((struct caller *)pq_p->requestptr)->caller_id[1],
+		       ((struct caller *)pq_p->requestptr)->caller_id[2],
+		       ((struct caller *)pq_p->requestptr)->caller_id[3],
+		       ((struct caller *)pq_p->requestptr)->caller_id[4],
+		       ((struct caller *)pq_p->requestptr)->caller_id[5],
+		       ((struct caller *)pq_p->requestptr)->caller_id[6],
+		       ((struct caller *)pq_p->requestptr)->caller_id[7]);
 		pq_p->retcode = -ETIMEOUT;
 		pq_p->status[0] |= STAT_FAILED;
 		/* get this off any caller queue it may be on */
 		unbuild_caller(LONG2DEVPTR(pq_p->devindex),
 			       (struct caller *) pq_p->requestptr);
-		list_del(lptr);
+		list_del_init(lptr);
 		pendingq_count--;
 		pq_p->audit[1] |= FP_TIMEDOUT;
 		pq_p->audit[1] |= FP_NOTPENDING;
@@ -2660,9 +2669,18 @@ helper_timeout_requests(void)
 			pq_p = list_entry(lptr, struct work_element, liste);
 			if (pq_p->requestsent >= timelimit)
 				break;
+		PRINTKW("Purging(RQ) PSMID %02X%02X%02X%02X%02X%02X%02X%02X\n",
+		       ((struct caller *)pq_p->requestptr)->caller_id[0],
+		       ((struct caller *)pq_p->requestptr)->caller_id[1],
+		       ((struct caller *)pq_p->requestptr)->caller_id[2],
+		       ((struct caller *)pq_p->requestptr)->caller_id[3],
+		       ((struct caller *)pq_p->requestptr)->caller_id[4],
+		       ((struct caller *)pq_p->requestptr)->caller_id[5],
+		       ((struct caller *)pq_p->requestptr)->caller_id[6],
+		       ((struct caller *)pq_p->requestptr)->caller_id[7]);
 			pq_p->retcode = -ETIMEOUT;
 			pq_p->status[0] |= STAT_FAILED;
-			list_del(lptr);
+			list_del_init(lptr);
 			requestq_count--;
 			pq_p->audit[1] |= FP_TIMEDOUT;
 			pq_p->audit[1] |= FP_REMREQUEST;
