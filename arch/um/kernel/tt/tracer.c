@@ -186,7 +186,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	unsigned long eip = 0;
 	int status, pid = 0, sig = 0, cont_type, tracing = 0, op = 0;
 	int last_index, proc_id = 0, n, err, old_tracing = 0, strace = 0;
-	int pt_syscall_parm, local_using_sysemu;
+	int pt_syscall_parm, local_using_sysemu = 0;
 
 	signal(SIGPIPE, SIG_IGN);
 	setup_tracer_winch();
@@ -307,9 +307,6 @@ int tracer(int (*init_proc)(void *), void *sp)
 			if ( tracing )
 				do_sigtrap(task);
 
-			local_using_sysemu = get_using_sysemu();
-			pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
-
 			switch(sig){
 			case SIGUSR1:
 				sig = 0;
@@ -392,6 +389,9 @@ int tracer(int (*init_proc)(void *), void *sp)
 				child_signal(pid, status);
 				continue;
 			}
+
+			local_using_sysemu = get_using_sysemu();
+			pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
 			if(tracing){
 				if(singlestepping(task))

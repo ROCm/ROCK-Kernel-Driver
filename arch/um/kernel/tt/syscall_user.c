@@ -48,7 +48,7 @@ void do_sigtrap(void *task)
 	UPT_SYSCALL_NR(TASK_REGS(task)) = -1;
 }
 
-int do_syscall(void *task, int pid, int local_using_sysemu)
+void do_syscall(void *task, int pid, int local_using_sysemu)
 {
 	unsigned long proc_regs[FRAME_SIZE];
 
@@ -62,14 +62,11 @@ int do_syscall(void *task, int pid, int local_using_sysemu)
 	   ((unsigned long *) PT_IP(proc_regs) <= &_etext))
 		tracer_panic("I'm tracing myself and I can't get out");
 
-	if(local_using_sysemu)
-		return(1);
-
+	/* syscall number -1 in sysemu skips syscall restarting in host */
 	if(ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, 
-		  __NR_getpid) < 0)
+		  local_using_sysemu ? -1 : __NR_getpid) < 0)
 		tracer_panic("do_syscall : Nullifying syscall failed, "
 			     "errno = %d", errno);
-	return(1);
 }
 
 /*
