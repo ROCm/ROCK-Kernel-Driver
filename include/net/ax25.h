@@ -226,6 +226,7 @@ extern void ax25_digi_invert(ax25_digi *, ax25_digi *);
 
 /* ax25_dev.c */
 extern ax25_dev *ax25_dev_list;
+extern spinlock_t ax25_dev_lock;
 extern ax25_dev *ax25_dev_ax25dev(struct net_device *);
 extern ax25_dev *ax25_addr_ax25dev(ax25_address *);
 extern void ax25_dev_device_up(struct net_device *);

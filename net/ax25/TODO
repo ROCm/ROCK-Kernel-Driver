@@ -9,7 +9,7 @@ af_ax25.c:ax25_connect:
                 return sock_error(sk);  /* Always set at this point */
         }
 
-Do the spinlocks ax25_list_lock, ax25_uid_lock, ax25_route_lock and
-protocol_list_lock really have to be interrupt safe?
+Do the spinlocks ax25_list_lock, ax25_uid_lock, ax25_route_lock,
+protocol_list_lock and ax25_dev_lock really have to be interrupt safe?
 
 What locking will be needed for linkfail_list and listen_list?
