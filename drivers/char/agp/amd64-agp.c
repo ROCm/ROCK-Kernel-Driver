@@ -252,15 +252,15 @@ static int __init aperture_valid(u64 aper, u32 size)
 	static int not_first_call; 
 	u32 pfn, c;
 	if (aper == 0) { 
-		printk(KERN_ERR "No aperture\n");
+		printk(KERN_ERR PFX "No aperture\n");
 		return 0; 
 	}
 	if (size < 32*1024*1024) {
-		printk(KERN_ERR "Aperture too small (%d MB)\n", size>>20);
+		printk(KERN_ERR PFX "Aperture too small (%d MB)\n", size>>20);
 		return 0;
 	}
 	if (aper + size > 0xffffffff) { 
-		printk(KERN_ERR "Aperture out of bounds\n"); 
+		printk(KERN_ERR PFX "Aperture out of bounds\n"); 
 		return 0;
 	} 
 	pfn = aper >> PAGE_SHIFT;
@@ -268,7 +268,7 @@ static int __init aperture_valid(u64 aper, u32 size)
 		if (!pfn_valid(pfn + c))
 			break;
 		if (!PageReserved(pfn_to_page(pfn + c))) { 
-			printk(KERN_ERR "Aperture pointing to RAM\n");
+			printk(KERN_ERR PFX "Aperture pointing to RAM\n");
 			return 0;
 		}
 	}
@@ -279,7 +279,7 @@ static int __init aperture_valid(u64 aper, u32 size)
 	   Maybe better to use pci_assign_resource/pci_enable_device instead trusting
 	   the bridges? */
 	if (!not_first_call && request_mem_region(aper, size, "aperture") < 0) { 
-		printk(KERN_ERR "Aperture conflicts with PCI mapping.\n"); 
+		printk(KERN_ERR PFX "Aperture conflicts with PCI mapping.\n"); 
 		return 0;
 	}
 
@@ -328,7 +328,7 @@ static __init int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp,
 	pci_read_config_dword(agp, 0x10, &aper_low);
 	pci_read_config_dword(agp, 0x14, &aper_hi);
 	aper = (aper_low & ~((1<<22)-1)) | ((u64)aper_hi << 32); 
-	printk(KERN_INFO "Aperture from AGP @ %Lx size %u MB\n", aper, 32 << order);
+	printk(KERN_INFO PFX "Aperture from AGP @ %Lx size %u MB\n", aper, 32 << order);
 	if (order < 0 || !aperture_valid(aper, (32*1024*1024)<<order))
 		return -1; 
 	
@@ -347,17 +347,17 @@ static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) 
 			!= NULL) {
 		if (fix_northbridge(loop_dev, pdev, cap_ptr) < 0) { 
-			printk("No usable aperture found.\n");
+			printk(KERN_INFO PFX "No usable aperture found.\n");
 #ifdef __x86_64__ 
 			/* should port this to i386 */
-			printk("Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
+			printk(KERN_INFO PFX "Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
 #endif 
 			return -1;  
 		}
 		hammers[i++] = loop_dev;
 		nr_garts = i;
 		if (i == MAX_HAMMER_GARTS) { 
-			printk(KERN_INFO "Too many northbridges for AGP\n");
+			printk(KERN_INFO PFX "Too many northbridges for AGP\n");
 			return -1;
 		}
 	}
@@ -498,11 +498,11 @@ int __init agp_amd64_init(void)
 	if (pci_module_init(&agp_amd64_pci_driver) > 0) { 
 		struct pci_dev *dev;
 		if (!agp_try_unsupported && !agp_try_unsupported_boot) { 
-			printk(KERN_INFO "No supported AGP bridge found.\n");
+			printk(KERN_INFO PFX "No supported AGP bridge found.\n");
 #ifdef MODULE			
-			printk(KERN_INFO "You can try agp_try_unsupported=1\n");
+			printk(KERN_INFO PFX "You can try agp_try_unsupported=1\n");
 #else
-			printk(KERN_INFO "You can boot with agp=try_unsupported\n");
+			printk(KERN_INFO PFX "You can boot with agp=try_unsupported\n");
 #endif			
 			return -ENODEV;
 		}
