@@ -1,4 +1,4 @@
-obj-y = bugs.o checksum.o extable.o fault.o ksyms.o ldt.o \
+obj-y = bugs.o checksum.o extable.o fault.o ksyms.o ldt.o module.o \
 	ptrace.o ptrace_user.o semaphore.o sigcontext.o syscalls.o sysrq.o
 
 obj-$(CONFIG_HIGHMEM) += highmem.o
@@ -6,30 +6,30 @@ obj-$(CONFIG_HIGHMEM) += highmem.o
 export-objs = ksyms.o
 
 USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
-USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/sys-i386/$(file))
 
-SYMLINKS = semaphore.c checksum.S extable.c highmem.c
+SYMLINKS = semaphore.c checksum.S extable.c highmem.c module.c
+
+semaphore.c-dir = kernel
+checksum.S-dir = lib
+extable.c-dir = mm
+highmem.c-dir = mm
+module.c-dir = kernel
+
+define make_link
+	-rm -f $1
+	ln -sf $(TOPDIR)/arch/i386/$($(notdir $1)-dir)/$(notdir $1) $1
+endef
 
 include $(TOPDIR)/Rules.make
+
+USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
 
-arch/um/sys-i386/checksum.S: 
-	-rm -f $@
-	-ln -s $(TOPDIR)/arch/i386/lib/$(notdir $@) $@
+$(foreach f,$(SYMLINKS),$(src)/$f): 
+	$(call make_link,$@)
 
-arch/um/sys-i386/semaphore.c:
-	-rm -f $@
-	-ln -s $(TOPDIR)/arch/i386/kernel/$(notdir $@) $@
-
-arch/um/sys-i386/extable.c:
-	-rm -f $@
-	-ln -s $(TOPDIR)/arch/i386/mm/$(notdir $@) $@
-
-arch/um/sys-i386/highmem.c:
-	-rm -f $@
-	-ln -s $(TOPDIR)/arch/i386/mm/$(notdir $@) $@
 clean:
 	$(MAKE) -C util clean
 
