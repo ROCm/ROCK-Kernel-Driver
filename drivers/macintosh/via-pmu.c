@@ -418,7 +418,7 @@ static int __init via_pmu_start(void)
 	}
 
 	if (pmu_kind == PMU_KEYLARGO_BASED && gpio_irq != -1) {
-		if (request_irq(gpio_irq, gpio1_interrupt, 0, "GPIO1/ADB", (void *)0))
+		if (request_irq(gpio_irq, gpio1_interrupt, 0, "GPIO1 ADB", (void *)0))
 			printk(KERN_ERR "pmu: can't get irq %d (GPIO1)\n", gpio_irq);
 		gpio_irq_enabled = 1;
 	}
