@@ -47,7 +47,7 @@
                     : <klee@crystal.cirrus.com>)
                     : Don't call netif_wake_queue() in net_send_packet()
                     : Fixed an out-of-mem bug in dma_rx()
-                    : Updated Documentation/cs89x0.txt
+                    : Updated Documentation/networking/cs89x0.txt
 
   Andrew Morton     : andrewm@uow.edu.au / Kernel 2.3.99-pre1
                     : Use skb_reserve to longword align IP header (two places)

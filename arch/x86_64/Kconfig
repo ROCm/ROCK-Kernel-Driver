@@ -314,7 +314,7 @@ config SOFTWARE_SUSPEND
 	  This option is close to getting stable. However there is still some
 	  absence of features.
 
-	  For more information take a look at Documentation/swsusp.txt.
+	  For more information take a look at Documentation/power/swsusp.txt.
 
 source "drivers/acpi/Kconfig"
 

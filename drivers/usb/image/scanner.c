@@ -282,7 +282,7 @@
  *      for common error messages rather than the maintainer.
  *
  * 0.4.7  11/28/2001
- *    - Fixed typo in Documentation/scanner.txt.  Thanks to
+ *    - Fixed typo in Documentation/usb/scanner.txt.  Thanks to
  *      Karel <karel.vervaeke@pandora.be> for pointing it out.
  *    - Added ID's for a Memorex 6136u. Thanks to Álvaro Gaspar de
  *      Valenzuela" <agaspard@utsi.edu>.
