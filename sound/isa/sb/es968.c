@@ -69,7 +69,7 @@ struct snd_card_es968 {
 	struct pnp_dev *dev;
 };
 
-static struct pnp_card_id snd_es968_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_es968_pnpids[] __devinitdata = {
 	{ .id = "ESS0968", .devs = { { "@@@0968" }, } },
 	{ .id = "", } /* end */
 };
@@ -92,10 +92,10 @@ static void snd_card_es968_interrupt(int irq, void *dev_id,
 
 static int __devinit snd_card_es968_isapnp(int dev, struct snd_card_es968 *acard,
 					struct pnp_card_link *card,
-					const struct pnp_card_id *id)
+					const struct pnp_card_device_id *id)
 {
 	struct pnp_dev *pdev;
-	struct pnp_resource_table * cfg = kmalloc(GFP_ATOMIC, sizeof(struct pnp_resource_table));
+	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
 	int err;
 	if (!cfg)
 		return -ENOMEM;
@@ -133,7 +133,7 @@ static int __devinit snd_card_es968_isapnp(int dev, struct snd_card_es968 *acard
 
 static int __init snd_card_es968_probe(int dev,
 					struct pnp_card_link *pcard,
-					const struct pnp_card_id *pid)
+					const struct pnp_card_device_id *pid)
 {
 	int error;
 	sb_t *chip;
@@ -188,7 +188,7 @@ static int __init snd_card_es968_probe(int dev,
 }
 
 static int __devinit snd_es968_pnp_detect(struct pnp_card_link *card,
-                                          const struct pnp_card_id *id)
+                                          const struct pnp_card_device_id *id)
 {
 	static int dev;
 	int res;

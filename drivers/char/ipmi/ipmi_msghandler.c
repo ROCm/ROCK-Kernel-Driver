@@ -1765,9 +1765,13 @@ static void ipmi_timeout(unsigned long data)
 }
 
 
+static atomic_t smi_msg_inuse_count = ATOMIC_INIT(0);
+static atomic_t recv_msg_inuse_count = ATOMIC_INIT(0);
+
 /* FIXME - convert these to slabs. */
 static void free_smi_msg(struct ipmi_smi_msg *msg)
 {
+	atomic_dec(&smi_msg_inuse_count);
 	kfree(msg);
 }
 
@@ -1775,13 +1779,16 @@ struct ipmi_smi_msg *ipmi_alloc_smi_msg(void)
 {
 	struct ipmi_smi_msg *rv;
 	rv = kmalloc(sizeof(struct ipmi_smi_msg), GFP_ATOMIC);
-	if (rv)
+	if (rv) {
 		rv->done = free_smi_msg;
+		atomic_inc(&smi_msg_inuse_count);
+	}
 	return rv;
 }
 
 static void free_recv_msg(struct ipmi_recv_msg *msg)
 {
+	atomic_dec(&recv_msg_inuse_count);
 	kfree(msg);
 }
 
@@ -1790,8 +1797,10 @@ struct ipmi_recv_msg *ipmi_alloc_recv_msg(void)
 	struct ipmi_recv_msg *rv;
 
 	rv = kmalloc(sizeof(struct ipmi_recv_msg), GFP_ATOMIC);
-	if (rv)
+	if (rv) {
 		rv->done = free_recv_msg;
+		atomic_inc(&recv_msg_inuse_count);
+	}
 	return rv;
 }
 
@@ -1924,6 +1933,8 @@ static __init int ipmi_init_msghandler(void)
 
 static __exit void cleanup_ipmi(void)
 {
+	int count;
+
 	if (!initialized)
 		return;
 
@@ -1940,6 +1951,16 @@ static __exit void cleanup_ipmi(void)
 	}
 
 	initialized = 0;
+
+	/* Check for buffer leaks. */
+	count = atomic_read(&smi_msg_inuse_count);
+	if (count != 0)
+		printk("ipmi_msghandler: SMI message count %d at exit\n",
+		       count);
+	count = atomic_read(&recv_msg_inuse_count);
+	if (count != 0)
+		printk("ipmi_msghandler: recv message count %d at exit\n",
+		       count);
 }
 module_exit(cleanup_ipmi);
 

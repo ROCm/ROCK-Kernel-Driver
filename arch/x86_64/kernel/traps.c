@@ -323,14 +323,13 @@ int die_owner = -1;
 
 void die(const char * str, struct pt_regs * regs, long err)
 {
-	int cpu;
-	struct die_args args = { regs, str, err };
 	static int die_counter;
+	int cpu;
 	console_verbose();
-	notifier_call_chain(&die_chain,  DIE_DIE, &args); 
 	bust_spinlocks(1);
 	handle_BUG(regs); 
-	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
+	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff, ++die_counter);
+	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	cpu = safe_smp_processor_id(); 
 	/* racy, but better than risking deadlock. */ 
 	local_irq_disable();
@@ -662,7 +661,7 @@ void math_error(void *rip)
 	 * C1 reg you need in case of a stack fault, 0x040 is the stack
 	 * fault bit.  We should only be taking one exception at a time,
 	 * so if this combination doesn't produce any single exception,
-	 * then we have a bad program that isn't syncronizing its FPU usage
+	 * then we have a bad program that isn't synchronizing its FPU usage
 	 * and it will suffer the consequences since we won't be able to
 	 * fully reproduce the context of the exception
 	 */

@@ -1,7 +1,7 @@
 /* 
  * Written 2000,2002 by Andi Kleen. 
  * 
- * Losely based on the sparc64 and IA64 32bit emulation loaders.
+ * Loosely based on the sparc64 and IA64 32bit emulation loaders.
  * This tricks binfmt_elf.c into loading 32bit binaries using lots 
  * of ugly preprocessor tricks. Talk about very very poor man's inheritance.
  */ 

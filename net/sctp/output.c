@@ -79,6 +79,7 @@ struct sctp_packet *sctp_packet_config(struct sctp_packet *packet,
 	packet->ecn_capable = ecn_capable;
 	packet->get_prepend_chunk = prepend_handler;
 	packet->has_cookie_echo = 0;
+	packet->has_sack = 0;
 	packet->ipfragok = 0;
 
 	/* We might need to call the prepend_handler right away.  */
@@ -100,6 +101,7 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 	packet->ecn_capable = 0;
 	packet->get_prepend_chunk = NULL;
 	packet->has_cookie_echo = 0;
+	packet->has_sack = 0;
 	packet->ipfragok = 0;
 	packet->malloced = 0;
 	sctp_packet_reset(packet);
@@ -155,6 +157,37 @@ sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *packet,
 	return retval;
 }
 
+/* Try to bundle a SACK with the packet. */
+static sctp_xmit_t sctp_packet_bundle_sack(struct sctp_packet *pkt,
+					   struct sctp_chunk *chunk)
+{
+	sctp_xmit_t retval = SCTP_XMIT_OK;
+
+	/* If sending DATA and haven't aleady bundled a SACK, try to
+	 * bundle one in to the packet.
+	 */
+	if (sctp_chunk_is_data(chunk) && !pkt->has_sack && 
+	    !pkt->has_cookie_echo) {
+		struct sctp_association *asoc;
+		asoc = pkt->transport->asoc;
+			
+		if (asoc->a_rwnd > asoc->rwnd) {
+			struct sctp_chunk *sack;
+			asoc->a_rwnd = asoc->rwnd;
+			sack = sctp_make_sack(asoc);
+			if (sack) {
+				struct timer_list *timer;
+				retval = sctp_packet_append_chunk(pkt, sack);
+				asoc->peer.sack_needed = 0;
+				timer = &asoc->timers[SCTP_EVENT_TIMEOUT_SACK];
+				if (timer_pending(timer) && del_timer(timer))
+					sctp_association_put(asoc);
+			}
+		}
+	}
+	return retval;
+}
+
 /* Append a chunk to the offered packet reporting back any inability to do
  * so.
  */
@@ -163,10 +196,16 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	__u16 chunk_len = WORD_ROUND(ntohs(chunk->chunk_hdr->length));
-	size_t psize = packet->size;
+	size_t psize;
 	size_t pmtu;
 	int too_big;
 
+	retval = sctp_packet_bundle_sack(packet, chunk);
+	psize = packet->size;
+
+	if (retval != SCTP_XMIT_OK)
+		goto finish;
+		
 	pmtu  = ((packet->transport->asoc) ?
 		 (packet->transport->asoc->pmtu) :
 		 (packet->transport->pmtu));
@@ -214,11 +253,14 @@ append:
 	 */
 	if (sctp_chunk_is_data(chunk)) {
 		retval = sctp_packet_append_data(packet, chunk);
+		/* Disallow SACK bundling after DATA. */
+		packet->has_sack = 1;
 		if (SCTP_XMIT_OK != retval)
 			goto finish;
-	} else if (SCTP_CID_COOKIE_ECHO == chunk->chunk_hdr->type) {
+	} else if (SCTP_CID_COOKIE_ECHO == chunk->chunk_hdr->type)
 		packet->has_cookie_echo = 1;
-	}
+	else if (SCTP_CID_SACK == chunk->chunk_hdr->type) 
+		packet->has_sack = 1;
 
 	/* It is OK to send this chunk.  */
 	__skb_queue_tail(&packet->chunks, (struct sk_buff *)chunk);

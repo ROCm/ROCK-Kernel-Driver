@@ -437,8 +437,6 @@ static __init int init_k8_gatt(agp_kern_info *info)
 	if (!gatt) 
 		panic("Cannot allocate GATT table"); 
 	memset(gatt, 0, gatt_size); 
-	change_page_attr(virt_to_page(gatt), gatt_size/PAGE_SIZE, PAGE_KERNEL_NOCACHE);
-	global_flush_tlb();
 	agp_gatt_table = gatt;
 	
 	for_all_nb(dev) { 
@@ -538,7 +536,8 @@ void __init pci_iommu_init(void)
 	iommu_gatt_base = agp_gatt_table + (iommu_start>>PAGE_SHIFT);
 	bad_dma_address = iommu_bus_base;
 
-	asm volatile("wbinvd" ::: "memory");
+	change_page_attr(virt_to_page(__va(iommu_start)), iommu_pages, PAGE_KERNEL); 
+	global_flush_tlb(); 
 } 
 
 /* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]]

@@ -290,13 +290,17 @@ fail_init:
  */
 void sctp_association_free(sctp_association_t *asoc)
 {
+	struct sock *sk = asoc->base.sk;
 	struct sctp_transport *transport;
-	sctp_endpoint_t *ep;
 	struct list_head *pos, *temp;
 	int i;
 
-	ep = asoc->ep;
 	list_del(&asoc->asocs);
+
+	/* Decrement the backlog value for a TCP-style listening socket. */
+	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
+	    (SCTP_SS_LISTENING == sk->state))
+		sk->ack_backlog--;
 
 	/* Mark as dead, so other users can know this structure is
 	 * going away.
@@ -421,8 +425,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	SCTP_DEBUG_PRINTK("sctp_assoc_add_peer:association %p PMTU set to "
 			  "%d\n", asoc, asoc->pmtu);
 
-	asoc->frag_point = asoc->pmtu;
-	asoc->frag_point -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
+	asoc->frag_point = sctp_frag_point(asoc->pmtu);
 
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
@@ -642,8 +645,6 @@ __u32 sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
 
 /* Compare two addresses to see if they match.  Wildcard addresses
  * only match themselves.
- *
- * FIXME: We do not match address scopes correctly.
  */
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 			const union sctp_addr *ss2)
@@ -651,38 +652,27 @@ int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 	struct sctp_af *af;
 
 	af = sctp_get_af_specific(ss1->sa.sa_family);
-	if (!af)
+	if (unlikely(!af))
 		return 0;
 
 	return af->cmp_addr(ss1, ss2);
 }
 
 /* Return an ecne chunk to get prepended to a packet.
- * Note:  We are sly and return a shared, prealloced chunk.
+ * Note:  We are sly and return a shared, prealloced chunk.  FIXME:
+ * No we don't, but we could/should.
  */
-sctp_chunk_t *sctp_get_ecne_prepend(sctp_association_t *asoc)
+sctp_chunk_t *sctp_get_ecne_prepend(struct sctp_association *asoc)
 {
-	sctp_chunk_t *chunk;
-	int need_ecne;
-	__u32 lowest_tsn;
+	struct sctp_chunk *chunk;
 
-	/* Can be called from task or bh.   Both need_ecne and
-	 * last_ecne_tsn are written during bh.
+	/* Send ECNE if needed.
+	 * Not being able to allocate a chunk here is not deadly.
 	 */
-	need_ecne = asoc->need_ecne;
-	lowest_tsn = asoc->last_ecne_tsn;
-
-	if (need_ecne) {
-		chunk = sctp_make_ecne(asoc, lowest_tsn);
-
-		/* ECNE is not mandatory to the flow.  Being unable to
-		 * alloc mem is not deadly.  We are just unable to help
-		 * out the network.  If we run out of memory, just return
-		 * NULL.
-		 */
-	} else {
+	if (asoc->need_ecne)
+		chunk = sctp_make_ecne(asoc, asoc->last_ecne_tsn);
+	else
 		chunk = NULL;
-	}
 
 	return chunk;
 }
@@ -832,11 +822,16 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 void sctp_assoc_migrate(sctp_association_t *assoc, struct sock *newsk)
 {
 	struct sctp_opt *newsp = sctp_sk(newsk);
+	struct sock *oldsk = assoc->base.sk;
 
 	/* Delete the association from the old endpoint's list of
 	 * associations.
 	 */
 	list_del(&assoc->asocs);
+
+	/* Decrement the backlog value for a TCP-style socket. */
+	if (SCTP_SOCKET_TCP == sctp_sk(oldsk)->type)
+		oldsk->ack_backlog--;
 
 	/* Release references to the old endpoint and the sock.  */
 	sctp_endpoint_put(assoc->ep);
@@ -986,8 +981,7 @@ void sctp_assoc_sync_pmtu(sctp_association_t *asoc)
 
 	if (pmtu) {
 		asoc->pmtu = pmtu;
-		asoc->frag_point = pmtu - (SCTP_IP_OVERHEAD +
-					   sizeof(sctp_data_chunk_t));
+		asoc->frag_point = sctp_frag_point(pmtu);
 	}
 
 	SCTP_DEBUG_PRINTK("%s: asoc:%p, pmtu:%d, frag_point:%d\n",
@@ -1001,9 +995,9 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 	case SCTP_STATE_ESTABLISHED:
 	case SCTP_STATE_SHUTDOWN_PENDING:
 	case SCTP_STATE_SHUTDOWN_RECEIVED:
-		if ((asoc->rwnd > asoc->a_rwnd) && 
+		if ((asoc->rwnd > asoc->a_rwnd) &&
 		    ((asoc->rwnd - asoc->a_rwnd) >=
-		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu))) 
+		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu)))
 			return 1;
 		break;
 	default:
@@ -1070,14 +1064,14 @@ void sctp_assoc_rwnd_decrease(sctp_association_t *asoc, int len)
 		asoc->rwnd = 0;
 	}
 	SCTP_DEBUG_PRINTK("%s: asoc %p rwnd decreased by %d to (%u, %u)\n",
-			  __FUNCTION__, asoc, len, asoc->rwnd, 
+			  __FUNCTION__, asoc, len, asoc->rwnd,
 			  asoc->rwnd_over);
 }
 
 /* Build the bind address list for the association based on info from the
  * local endpoint and the remote peer.
  */
-int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *asoc, int priority)
+int sctp_assoc_set_bind_addr_from_ep(struct sctp_association *asoc, int gfp)
 {
 	sctp_scope_t scope;
 	int flags;
@@ -1094,19 +1088,17 @@ int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *asoc, int priority)
 
 	return sctp_bind_addr_copy(&asoc->base.bind_addr,
 				   &asoc->ep->base.bind_addr,
-				   scope, priority, flags);
+				   scope, gfp, flags);
 }
 
 /* Build the association's bind address list from the cookie.  */
 int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *asoc,
-					 sctp_cookie_t *cookie, int priority)
+					 sctp_cookie_t *cookie, int gfp)
 {
 	int var_size2 = ntohs(cookie->peer_init->chunk_hdr.length);
 	int var_size3 = cookie->raw_addr_list_len;
-	__u8 *raw_addr_list = (__u8 *)cookie + sizeof(sctp_cookie_t) +
-				      var_size2;
+	__u8 *raw = (__u8 *)cookie + sizeof(sctp_cookie_t) + var_size2;
 
-	return sctp_raw_to_bind_addrs(&asoc->base.bind_addr, raw_addr_list,
-				      var_size3, asoc->ep->base.bind_addr.port,
-				      priority);
+	return sctp_raw_to_bind_addrs(&asoc->base.bind_addr, raw, var_size3,
+				      asoc->ep->base.bind_addr.port, gfp);
 }

@@ -465,7 +465,7 @@ static void send_sigio_to_task(struct task_struct *p,
 				break;
 		/* fall-through: fall back on the old plain SIGIO signal */
 		case 0:
-			send_sig(SIGIO, p, 1);
+			send_group_sig_info(SIGIO, SEND_SIG_PRIV, p);
 	}
 }
 
@@ -501,7 +501,7 @@ static void send_sigurg_to_task(struct task_struct *p,
                                 struct fown_struct *fown)
 {
 	if (sigio_perm(p, fown))
-		send_sig(SIGURG, p, 1);
+		send_group_sig_info(SIGURG, SEND_SIG_PRIV, p);
 }
 
 int send_sigurg(struct fown_struct *fown)

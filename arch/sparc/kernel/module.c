@@ -36,12 +36,31 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
-/* We don't need anything special. */
+/* Make generic code ignore STT_REGISTER dummy undefined symbols.  */
 int module_frob_arch_sections(Elf_Ehdr *hdr,
 			      Elf_Shdr *sechdrs,
 			      char *secstrings,
 			      struct module *mod)
 {
+	unsigned int symidx;
+	Elf32_Sym *sym;
+	const char *strtab;
+	int i;
+
+	for (symidx = 0; sechdrs[symidx].sh_type != SHT_SYMTAB; symidx++) {
+		if (symidx == hdr->e_shnum-1) {
+			printk("%s: no symtab found.\n", mod->name);
+			return -ENOEXEC;
+		}
+	}
+	sym = (Elf32_Sym *)sechdrs[symidx].sh_addr;
+	strtab = (char *)sechdrs[sechdrs[symidx].sh_link].sh_addr;
+
+	for (i = 1; i < sechdrs[symidx].sh_size / sizeof(Elf_Sym); i++) {
+		if (sym[i].st_shndx == SHN_UNDEF &&
+		    ELF32_ST_TYPE(sym[i].st_info) == STT_REGISTER)
+			sym[i].st_shndx = SHN_ABS;
+	}
 	return 0;
 }
 

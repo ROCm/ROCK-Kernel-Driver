@@ -451,7 +451,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	if (!r) { 
 		switch (c->x86) { 
 		case 15:
-			/* Should distingush Models here, but this is only
+			/* Should distinguish Models here, but this is only
 			   a fallback anyways. */
 			strcpy(c->x86_model_id, "Hammer");
 			break; 

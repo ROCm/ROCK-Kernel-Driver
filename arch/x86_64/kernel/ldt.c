@@ -154,7 +154,7 @@ static int read_ldt(void * ptr, unsigned long bytecount)
 
 static int read_default_ldt(void * ptr, unsigned long bytecount)
 {
-	/* Arbitary number */ 
+	/* Arbitrary number */ 
 	/* x86-64 default LDT is all zeros */
 	if (bytecount > 128) 
 		bytecount = 128; 	

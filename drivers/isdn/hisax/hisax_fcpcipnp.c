@@ -909,7 +909,7 @@ static struct pci_driver fcpci_driver = {
 #ifdef CONFIG_PNP_CARD
 
 static int __devinit fcpnp_probe(struct pnp_card *card,
-				 const struct pnp_card_id *card_id)
+				 const struct pnp_card_device_id *card_id)
 {
 	struct fritz_adapter *adapter;
 	struct pnp_dev *pnp_dev;
@@ -955,7 +955,7 @@ static void __devexit fcpnp_remove(struct pnp_card *pcard)
 	delete_adapter(adapter);
 }
 
-static struct pnp_card_id fcpnp_ids[] __devinitdata = {
+static struct pnp_card_device_id fcpnp_ids[] __devinitdata = {
 	{ .id          = "AVM0900", 
 	  .driver_data = (unsigned long) "Fritz!Card PnP",
 	  .devs        = { { "AVM0900" } },

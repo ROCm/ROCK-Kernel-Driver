@@ -632,8 +632,7 @@ int pnp_activate_dev(struct pnp_dev *dev)
 	if (!dev)
 		return -EINVAL;
 	if (dev->active) {
-		pnp_info("res: The PnP device '%s' is already active.", dev->dev.bus_id);
-		return -EBUSY;
+		return 0; /* the device is already active */
 	}
 	/* If this condition is true, advanced configuration failed, we need to get this device up and running
 	 * so we use the simple config engine which ignores cold conflicts, this of course may lead to new failures */
@@ -698,8 +697,7 @@ int pnp_disable_dev(struct pnp_dev *dev)
         if (!dev)
                 return -EINVAL;
 	if (!dev->active) {
-		pnp_info("res: The PnP device '%s' is already disabled.", dev->dev.bus_id);
-		return -EINVAL;
+		return 0; /* the device is already disabled */
 	}
 	if (dev->status != PNP_READY){
 		pnp_info("res: Disable failed becuase the PnP device '%s' is busy.", dev->dev.bus_id);

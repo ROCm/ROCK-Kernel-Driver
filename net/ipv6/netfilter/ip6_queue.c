@@ -26,7 +26,6 @@
 #include <linux/netfilter.h>
 #include <linux/netlink.h>
 #include <linux/spinlock.h>
-#include <linux/brlock.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <net/sock.h>
@@ -682,8 +681,7 @@ init_or_cleanup(int init)
 
 cleanup:
 	nf_unregister_queue_handler(PF_INET6);
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 	ipq_flush(NF_DROP);
 	
 cleanup_sysctl:

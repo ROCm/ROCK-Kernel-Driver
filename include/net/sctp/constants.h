@@ -138,12 +138,10 @@ typedef enum {
  */
 
 typedef union {
-
 	sctp_cid_t chunk;
 	sctp_event_timeout_t timeout;
 	sctp_event_other_t other;
 	sctp_event_primitive_t primitive;
-
 } sctp_subtype_t;
 
 #define SCTP_SUBTYPE_CONSTRUCTOR(_name, _type, _elt) \
@@ -421,9 +419,9 @@ typedef enum {
 
 /* Reasons to retransmit. */
 typedef enum {
-	SCTP_RETRANSMIT_T3_RTX,
-	SCTP_RETRANSMIT_FAST_RTX,
-	SCTP_RETRANSMIT_PMTU_DISCOVERY,
+	SCTP_RTXR_T3_RTX,
+	SCTP_RTXR_FAST_RTX,
+	SCTP_RTXR_PMTUD,
 } sctp_retransmit_reason_t;
 
 /* Reasons to lower cwnd. */

@@ -1,5 +1,5 @@
 /*
- *	Intel Multiprocessor Specificiation 1.1 and 1.4
+ *	Intel Multiprocessor Specification 1.1 and 1.4
  *	compliant MP-table parsing routines.
  *
  *	(c) 1995 Alan Cox, Building #3 <alan@redhat.com>
@@ -849,7 +849,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 	/* 
 	 * Use the default configuration for the IRQs 0-15.  These may be
-	 * overriden by (MADT) interrupt source override entries.
+	 * overridden by (MADT) interrupt source override entries.
 	 */
 	for (i = 0; i < 16; i++) {
 
