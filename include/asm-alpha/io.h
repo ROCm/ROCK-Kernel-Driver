@@ -378,10 +378,10 @@ extern void		___raw_writeq(u64 b, volatile void __iomem *addr);
 # define readq(a)	_readq(a)
 #endif
 
-#define readb_relaxed(addr) readb(addr)
-#define readw_relaxed(addr) readw(addr)
-#define readl_relaxed(addr) readl(addr)
-#define readq_relaxed(addr) readq(addr)
+#define readb_relaxed(addr) __raw_readb(addr)
+#define readw_relaxed(addr) __raw_readw(addr)
+#define readl_relaxed(addr) __raw_readl(addr)
+#define readq_relaxed(addr) __raw_readq(addr)
 
 #ifndef writeb
 # define writeb(v,a)	_writeb(v,a)
