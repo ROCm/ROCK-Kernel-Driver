@@ -796,7 +796,11 @@ static int powernowk8_verify(struct cpufreq_policy *pol)
 static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 {
 	struct powernow_k8_data *data;
+	cpumask_t oldmask = CPU_MASK_ALL;
 	int rc;
+
+	if (!check_supported_cpu(pol->cpu))
+		return -ENODEV;
 
 	data = kmalloc(sizeof(struct powernow_k8_data), GFP_KERNEL);
 	if (!data) {
@@ -812,13 +816,25 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 		kfree(data);
 		return -ENODEV;
 	}
-
-	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
-
+	if ((num_online_cpus() != 1) || (num_possible_cpus() != 1)) {
+		printk(KERN_INFO PFX "MP systems not supported by PSB BIOS structure\n");
+		kfree(data);
+		return 0;
+	}
 	rc = find_psb_table(data);
 	if (rc) {
 		kfree(data);
 		return -ENODEV;
+	}
+
+	/* only run on specific CPU from here on */
+	oldmask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(pol->cpu));
+	schedule();
+
+	if (smp_processor_id() != pol->cpu) {
+		printk(KERN_ERR "limiting to cpu %u failed\n", pol->cpu);
+		goto err_out;
 	}
 
 	if (pending_bit_stuck()) {
@@ -826,15 +842,23 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 		goto err_out;
 	}
 
+	if (query_current_values_with_pending_wait(data))
+		goto err_out;
+
+	fidvid_msr_init();
+
+	/* run on any CPU again */
+	set_cpus_allowed(current, oldmask);
+	schedule();
+
+	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
+
 	/* Take a crude guess here. 
-	 * That guess was in microseconds, so multply with 1000 */
+	 * That guess was in microseconds, so multiply with 1000 */
 	pol->cpuinfo.transition_latency = (((data->rvo + 8) * data->vstable * VST_UNITS_20US)
 	    + (3 * (1 << data->irt) * 10)) * 1000;
 
-	if (query_current_values_with_pending_wait(data))
-		return -EIO;
-
-	pol->cur = 1000 * find_freq_from_fid(data->currfid);
+	pol->cur = find_khz_freq_from_fid(data->currfid);
 	dprintk(KERN_DEBUG PFX "policy current frequency %d kHz\n", pol->cur);
 
 	/* min/max the cpu is capable of */
@@ -855,6 +879,9 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 	return 0;
 
 err_out:
+	set_cpus_allowed(current, oldmask);
+	schedule();
+
 	kfree(data);
 	return -ENODEV;
 }
