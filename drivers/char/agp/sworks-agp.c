@@ -1,29 +1,5 @@
 /*
- * AGPGART module version 0.99
- * Copyright (C) 1999 Jeff Hartmann
- * Copyright (C) 1999 Precision Insight, Inc.
- * Copyright (C) 1999 Xi Graphics, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
- * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * TODO: 
- * - Allocate more than order 0 pages to avoid too much linear map splitting.
+ * Serverworks AGPGART routines.
  */
 
 #include <linux/module.h>
@@ -31,6 +7,8 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
+
+static int agp_try_unsupported __initdata = 0;
 
 struct serverworks_page_map {
 	unsigned long *real;
@@ -182,8 +160,8 @@ static int serverworks_create_gatt_table(void)
 		return retval;
 	}
 
-	agp_bridge.gatt_table_real = page_dir.real;
-	agp_bridge.gatt_table = page_dir.remapped;
+	agp_bridge.gatt_table_real = (unsigned long *)page_dir.real;
+	agp_bridge.gatt_table = (unsigned long *)page_dir.remapped;
 	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
@@ -211,8 +189,8 @@ static int serverworks_free_gatt_table(void)
 {
 	struct serverworks_page_map page_dir;
    
-	page_dir.real = agp_bridge.gatt_table_real;
-	page_dir.remapped = agp_bridge.gatt_table;
+	page_dir.real = (unsigned long *)agp_bridge.gatt_table_real;
+	page_dir.remapped = (unsigned long *)agp_bridge.gatt_table;
 
 	serverworks_free_gatt_pages();
 	serverworks_free_page_map(&page_dir);
@@ -623,4 +601,92 @@ int __init serverworks_setup (struct pci_dev *pdev)
 
 	return 0;
 }
+
+
+static int __init agp_find_supported_device(struct pci_dev *dev)
+{
+	struct pci_dev *bridge_dev;
+	agp_bridge.dev = dev;
+
+	/* Everything is on func 1 here so we are hardcoding function one */
+	bridge_dev = pci_find_slot ((unsigned int)dev->bus->number, PCI_DEVFN(0, 1));
+	if(bridge_dev == NULL) {
+		printk(KERN_INFO PFX "agpgart: Detected a Serverworks "
+		       "Chipset, but could not find the secondary "
+		       "device.\n");
+		return -ENODEV;
+	}
+
+	switch (dev->device) {
+	case PCI_DEVICE_ID_SERVERWORKS_HE:
+		agp_bridge.type = SVWRKS_HE;
+		return serverworks_setup(bridge_dev);
+
+	case PCI_DEVICE_ID_SERVERWORKS_LE:
+	case 0x0007:
+		agp_bridge.type = SVWRKS_LE;
+		return serverworks_setup(bridge_dev);
+
+	default:
+		if(agp_try_unsupported) {
+			agp_bridge.type = SVWRKS_GENERIC;
+			return serverworks_setup(bridge_dev);
+		}
+		break;
+	}
+	return -ENODEV;
+}
+
+
+static int agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+{
+	if (agp_find_supported_device(dev) == 0) {
+		agp_register_driver(dev);
+		return 0;
+	}
+	return -ENODEV;	
+}
+
+static struct pci_device_id agp_serverworks_pci_table[] __initdata = {
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_SERVERWORKS,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, agp_serverworks_pci_table);
+
+static struct pci_driver agp_serverworks_pci_driver = {
+	.name		= "agpgart-serverworks",
+	.id_table	= agp_serverworks_pci_table,
+	.probe		= agp_serverworks_probe,
+};
+
+static int __init agp_serverworks_init(void)
+{
+	int ret_val;
+
+	ret_val = pci_module_init(&agp_serverworks_pci_driver);
+	if (ret_val)
+		agp_bridge.type = NOT_SUPPORTED;
+
+	return ret_val;
+}
+
+static void __exit agp_serverworks_cleanup(void)
+{
+	agp_unregister_driver();
+	pci_unregister_driver(&agp_serverworks_pci_driver);
+}
+
+module_init(agp_serverworks_init);
+module_exit(agp_serverworks_cleanup);
+
+MODULE_PARM(agp_try_unsupported, "1i");
+MODULE_LICENSE("GPL and additional rights");
 
