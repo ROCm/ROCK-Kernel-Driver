@@ -479,8 +479,6 @@ static int etrax_usb_submit_isoc_urb(struct urb *urb);
 static int etrax_usb_submit_urb(struct urb *urb, int mem_flags);
 static int etrax_usb_unlink_urb(struct urb *urb, int status);
 static int etrax_usb_get_frame_number(struct usb_device *usb_dev);
-static int etrax_usb_allocate_dev(struct usb_device *usb_dev);
-static int etrax_usb_deallocate_dev(struct usb_device *usb_dev);
 
 static irqreturn_t etrax_usb_tx_interrupt(int irq, void *vhc, struct pt_regs *regs);
 static irqreturn_t etrax_usb_rx_interrupt(int irq, void *vhc, struct pt_regs *regs);
@@ -512,8 +510,6 @@ static void etrax_usb_hc_cleanup(void);
 
 static struct usb_operations etrax_usb_device_operations =
 {
-	.allocate = etrax_usb_allocate_dev,
-	.deallocate = etrax_usb_deallocate_dev,
 	.get_frame_number = etrax_usb_get_frame_number,
 	.submit_urb = etrax_usb_submit_urb,
 	.unlink_urb = etrax_usb_unlink_urb,
@@ -1577,20 +1573,6 @@ static int etrax_usb_get_frame_number(struct usb_device *usb_dev)
 	DBFENTER;
 	DBFEXIT;
 	return (*R_USB_FM_NUMBER & 0x7ff);
-}
-
-static int etrax_usb_allocate_dev(struct usb_device *usb_dev)
-{
-	DBFENTER;
-	DBFEXIT;
-	return 0;
-}
-
-static int etrax_usb_deallocate_dev(struct usb_device *usb_dev)
-{
-	DBFENTER;
-	DBFEXIT;
-	return 0;
 }
 
 static irqreturn_t etrax_usb_tx_interrupt(int irq, void *vhc, struct pt_regs *regs)
@@ -4546,7 +4528,7 @@ static int __init etrax_usb_hc_init(void)
         usb_rh->speed = USB_SPEED_FULL;
         usb_rh->devnum = 1;
         hc->bus->devnum_next = 2;
-        usb_rh->epmaxpacketin[0] = usb_rh->epmaxpacketout[0] = 64;
+        usb_rh->ep0.desc.wMaxPacketSize = 64;
         usb_get_device_descriptor(usb_rh, USB_DT_DEVICE_SIZE);
 	usb_new_device(usb_rh);
 

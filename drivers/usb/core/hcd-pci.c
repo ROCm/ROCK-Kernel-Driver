@@ -124,7 +124,7 @@ clean_1:
 	// driver->reset(), later on, will transfer device from
 	// control by SMM/BIOS to control by Linux (if needed)
 
-	hcd = driver->hcd_alloc ();
+	hcd = usb_create_hcd (driver);
 	if (hcd == NULL){
 		dev_dbg (&dev->dev, "hcd alloc fail\n");
 		retval = -ENOMEM;
@@ -144,20 +144,16 @@ clean_2:
 	hcd->region = region;
 
 	pci_set_drvdata (dev, hcd);
-	hcd->driver = driver;
-	hcd->description = driver->description;
 	hcd->self.bus_name = pci_name(dev);
 #ifdef CONFIG_PCI_NAMES
 	hcd->product_desc = dev->pretty_name;
-#else
-	if (hcd->product_desc == NULL)
-		hcd->product_desc = "USB Host Controller";
 #endif
 	hcd->self.controller = &dev->dev;
 
 	if ((retval = hcd_buffer_create (hcd)) != 0) {
 clean_3:
-		kfree (hcd);
+		pci_set_drvdata (dev, NULL);
+		usb_put_hcd (hcd);
 		goto clean_2;
 	}
 
@@ -168,7 +164,6 @@ clean_3:
 		dev_err (hcd->self.controller, "can't reset\n");
 		goto clean_3;
 	}
-	hcd->state = USB_STATE_HALT;
 
 	pci_set_master (dev);
 #ifndef __sparc__
@@ -177,7 +172,7 @@ clean_3:
 	bufp = __irq_itoa(dev->irq);
 #endif
 	retval = request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ,
-				hcd->description, hcd);
+				hcd->driver->description, hcd);
 	if (retval != 0) {
 		dev_err (hcd->self.controller,
 				"request interrupt %s failed\n", bufp);
@@ -188,14 +183,6 @@ clean_3:
 	dev_info (hcd->self.controller, "irq %s, %s 0x%lx\n", bufp,
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
 		resource);
-
-	usb_bus_init (&hcd->self);
-	hcd->self.op = &usb_hcd_operations;
-	hcd->self.release = &usb_hcd_release;
-	hcd->self.hcpriv = (void *) hcd;
-	init_timer (&hcd->rh_timer);
-
-	INIT_LIST_HEAD (&hcd->dev_list);
 
 	usb_register_bus (&hcd->self);
 
@@ -411,7 +398,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 		pci_set_power_state (dev, 0);
 	dev->dev.power.power_state = 0;
 	retval = request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ,
-				hcd->description, hcd);
+				hcd->driver->description, hcd);
 	if (retval < 0) {
 		dev_err (hcd->self.controller,
 			"can't restore IRQ after resume!\n");

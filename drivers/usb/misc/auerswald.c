@@ -1123,16 +1123,16 @@ static void auerswald_int_free (pauerswald_t cp)
 static int auerswald_int_open (pauerswald_t cp)
 {
         int ret;
-	struct usb_endpoint_descriptor *ep;
+	struct usb_host_endpoint *ep;
 	int irqsize;
 	dbg ("auerswald_int_open");
 
-	ep = usb_epnum_to_ep_desc (cp->usbdev, USB_DIR_IN | AU_IRQENDP);
+	ep = cp->usbdev->ep_in[AU_IRQENDP];
 	if (!ep) {
 		ret = -EFAULT;
   		goto intoend;
     	}
-	irqsize = ep->wMaxPacketSize;
+	irqsize = ep->desc.wMaxPacketSize;
 	cp->irqsize = irqsize;
 
 	/* allocate the urb and data buffer */
@@ -1151,7 +1151,9 @@ static int auerswald_int_open (pauerswald_t cp)
                 }
         }
         /* setup urb */
-        usb_fill_int_urb (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
+        usb_fill_int_urb (cp->inturbp, cp->usbdev,
+			usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp,
+			irqsize, auerswald_int_complete, cp, ep->desc.bInterval);
         /* start the urb */
 	cp->inturbp->status = 0;	/* needed! */
 	ret = usb_submit_urb (cp->inturbp, GFP_KERNEL);

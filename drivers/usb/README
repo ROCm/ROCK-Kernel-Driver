@@ -1,14 +1,37 @@
+To understand all the Linux-USB framework, you'll use these resources:
+
+    * This source code.  This is necessarily an evolving work, and
+      includes kerneldoc that should help you get a current overview.
+      ("make pdfdocs", and then look at "usb.pdf" for host side and
+      "gadget.pdf" for peripheral side.)  Also, Documentation/usb has
+      more information.
+
+    * The USB 2.0 specification (from www.usb.org), with supplements
+      such as those for USB OTG and the various device classes.
+      The USB specification has a good overview chapter, and USB
+      peripherals conform to the widely known "Chapter 9".
+
+    * Chip specifications for USB controllers.  Examples include
+      host controllers (on PCs, servers, and more); peripheral
+      controllers (in devices with Linux firmware, like printers or
+      cell phones); and hard-wired peripherals like Ethernet adapters.
+
+    * Specifications for other protocols implemented by USB peripheral
+      functions.  Some are vendor-specific; others are vendor-neutral
+      but just standardized outside of the www.usb.org team.
+
 Here is a list of what each subdirectory here is, and what is contained in
 them.
 
 core/		- This is for the core USB host code, including the
-		  usbfs files.
+		  usbfs files and the hub class driver ("khubd").
 
-host/		- This is for all of the USB host drivers.  This
-		  includes UHCI, OHCI, EHCI, and any others that might
-		  be created in the future.
+host/		- This is for USB host controller drivers.  This
+		  includes UHCI, OHCI, EHCI, and others that might
+		  be used with more specialized "embedded" systems.
 
-gadget/		- This is for all of the USB device controller drivers. 
+gadget/		- This is for USB peripheral controller drivers and
+		  the various gadget drivers which talk to them.
 
 
 Individual USB driver directories.  A new driver should be added to the

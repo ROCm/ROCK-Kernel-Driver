@@ -265,7 +265,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 	max = usb_maxpacket (dev, pipe, is_out);
 	if (max <= 0) {
 		dev_dbg(&dev->dev,
-			"bogus endpoint ep%d%s in %s (bad maxpacket %d)",
+			"bogus endpoint ep%d%s in %s (bad maxpacket %d)\n",
 			usb_pipeendpoint (pipe), is_out ? "out" : "in",
 			__FUNCTION__, max);
 		return -EMSGSIZE;

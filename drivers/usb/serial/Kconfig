@@ -202,6 +202,19 @@ config USB_SERIAL_EDGEPORT_TI
 	  To compile this driver as a module, choose M here: the
 	  module will be called io_ti.
 
+config USB_SERIAL_GARMIN
+       tristate "Garmin GPS driver"
+       depends on USB_SERIAL
+       help
+         Say Y here if you want to connect to your Garmin GPS.
+         Should work with most Garmin GPS devices which have a native USB port.
+
+         See <http://sourceforge.net/projects/garmin-gps> for the latest
+         version of the driver.
+
+         To compile this driver as a module, choose M here: the
+         module will be called garmin_gps.
+
 config USB_SERIAL_IPW
         tristate "USB IPWireless (3G UMTS TDD) Driver (EXPERIMENTAL)"
 	depends on USB_SERIAL && EXPERIMENTAL
@@ -379,6 +392,16 @@ config USB_SERIAL_SAFE
 config USB_SERIAL_SAFE_PADDED
 	bool "USB Secure Encapsulated Driver - Padded"
 	depends on USB_SERIAL_SAFE
+
+config USB_SERIAL_TI
+	tristate "USB TI 3410/5052 Serial Driver"
+	depends on USB_SERIAL
+	help
+	  Say Y here if you want to use the TI USB 3410 or 5052
+	  serial devices.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ti_usb_3410_5052.
 
 config USB_SERIAL_CYBERJACK
 	tristate "USB REINER SCT cyberJack pinpad/e-com chipcard reader (EXPERIMENTAL)"

@@ -1255,7 +1255,9 @@ static struct urb *uhci_find_urb_ep(struct uhci_hcd *uhci, struct urb *urb)
 	return NULL;
 }
 
-static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
+static int uhci_urb_enqueue(struct usb_hcd *hcd,
+		struct usb_host_endpoint *ep,
+		struct urb *urb, int mem_flags)
 {
 	int ret;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
@@ -1889,7 +1891,7 @@ static int start_hc(struct uhci_hcd *uhci)
 	uhci->state_end = jiffies + HZ;
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
-        uhci->hcd.state = USB_STATE_RUNNING;
+        uhci_to_hcd(uhci)->state = USB_STATE_RUNNING;
 	return 0;
 }
 
@@ -2139,7 +2141,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	udev->speed = USB_SPEED_FULL;
 
-	if (hcd_register_root(udev, &uhci->hcd) != 0) {
+	if (hcd_register_root(udev, hcd) != 0) {
 		dev_err(uhci_dev(uhci), "unable to start root hub\n");
 		retval = -ENOMEM;
 		goto err_start_root_hub;
@@ -2262,62 +2264,18 @@ static int uhci_resume(struct usb_hcd *hcd)
 		if ((rc = start_hc(uhci)) != 0)
 			return rc;
 	}
-	uhci->hcd.state = USB_STATE_RUNNING;
+	hcd->state = USB_STATE_RUNNING;
 	return 0;
 }
 #endif
 
-static struct usb_hcd *uhci_hcd_alloc(void)
-{
-	struct uhci_hcd *uhci;
-
-	uhci = (struct uhci_hcd *)kmalloc(sizeof(*uhci), GFP_KERNEL);
-	if (!uhci)
-		return NULL;
-
-	memset(uhci, 0, sizeof(*uhci));
-	uhci->hcd.product_desc = "UHCI Host Controller";
-	return &uhci->hcd;
-}
-
-/* Are there any URBs for a particular device/endpoint on a given list? */
-static int urbs_for_ep_list(struct list_head *head,
-		struct hcd_dev *hdev, int ep)
-{
-	struct urb_priv *urbp;
-
-	list_for_each_entry(urbp, head, urb_list) {
-		struct urb *urb = urbp->urb;
-
-		if (hdev == urb->dev->hcpriv && ep ==
-				(usb_pipeendpoint(urb->pipe) |
-				 usb_pipein(urb->pipe)))
-			return 1;
-	}
-	return 0;
-}
-
-/* Are there any URBs for a particular device/endpoint? */
-static int urbs_for_ep(struct uhci_hcd *uhci, struct hcd_dev *hdev, int ep)
-{
-	int rc;
-
-	spin_lock_irq(&uhci->schedule_lock);
-	rc = (urbs_for_ep_list(&uhci->urb_list, hdev, ep) ||
-			urbs_for_ep_list(&uhci->complete_list, hdev, ep) ||
-			urbs_for_ep_list(&uhci->urb_remove_list, hdev, ep));
-	spin_unlock_irq(&uhci->schedule_lock);
-	return rc;
-}
-
 /* Wait until all the URBs for a particular device/endpoint are gone */
 static void uhci_hcd_endpoint_disable(struct usb_hcd *hcd,
-		struct hcd_dev *hdev, int endpoint)
+		struct usb_host_endpoint *ep)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
-	wait_event_interruptible(uhci->waitqh,
-			!urbs_for_ep(uhci, hdev, endpoint));
+	wait_event_interruptible(uhci->waitqh, list_empty(&ep->urb_list));
 }
 
 static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
@@ -2329,6 +2287,8 @@ static const char hcd_name[] = "uhci_hcd";
 
 static const struct hc_driver uhci_driver = {
 	.description =		hcd_name,
+	.product_desc =		"UHCI Host Controller",
+	.hcd_priv_size =	sizeof(struct uhci_hcd),
 
 	/* Generic hardware linkage */
 	.irq =			uhci_irq,
@@ -2342,8 +2302,6 @@ static const struct hc_driver uhci_driver = {
 	.resume =		uhci_resume,
 #endif
 	.stop =			uhci_stop,
-
-	.hcd_alloc =		uhci_hcd_alloc,
 
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,

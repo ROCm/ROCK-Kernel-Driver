@@ -65,7 +65,6 @@ obj-$(CONFIG_USB_LED)		+= misc/
 obj-$(CONFIG_USB_LEGOTOWER)	+= misc/
 obj-$(CONFIG_USB_RIO500)	+= misc/
 obj-$(CONFIG_USB_TEST)		+= misc/
-obj-$(CONFIG_USB_TIGL)		+= misc/
 obj-$(CONFIG_USB_USS720)	+= misc/
 obj-$(CONFIG_USB_PHIDGETSERVO)	+= misc/
 
