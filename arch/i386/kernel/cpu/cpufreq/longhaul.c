@@ -1,5 +1,5 @@
 /*
- *  (C) 2001-2003  Dave Jones. <davej@suse.de>
+ *  (C) 2001-2003  Dave Jones. <davej@codemonkey.org.uk>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
@@ -613,7 +613,7 @@ static int __init longhaul_init (void)
 	case 8:
 		return -ENODEV;
 	default:
-		printk (KERN_INFO PFX "Unknown VIA CPU. Contact davej@suse.de\n");
+		printk (KERN_INFO PFX "Unknown VIA CPU. Contact davej@codemonkey.org.uk\n");
 	}
 
 	return -ENODEV;
@@ -627,7 +627,7 @@ static void __exit longhaul_exit (void)
 
 MODULE_PARM (dont_scale_voltage, "i");
 
-MODULE_AUTHOR ("Dave Jones <davej@suse.de>");
+MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Longhaul driver for VIA Cyrix processors.");
 MODULE_LICENSE ("GPL");
 
