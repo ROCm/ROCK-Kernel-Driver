@@ -173,7 +173,7 @@ Returns the value of a usage in a hiddev_usage_ref structure. The
 usage to be retrieved can be specified as above, or the user can
 choose to fill in the report_type field and specify the report_id as
 HID_REPORT_ID_UNKNOWN. In this case, the hiddev_usage_ref will be
-filled in with the report and field infomation associated with this
+filled in with the report and field information associated with this
 usage if it is found. 
 
 HIDIOCSUSAGE - struct hiddev_usage_ref (write)

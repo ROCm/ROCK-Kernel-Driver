@@ -39,7 +39,7 @@ must ensure your user space applications make use of the correct device
 name. The classic example is the content of the /etc/inittab file where
 you might have a getty process started on ttyS0.  In this case:
 
-- replace occurences of ttyS0 with ttySA0, ttyS1 with ttySA1, etc.
+- replace occurrences of ttyS0 with ttySA0, ttyS1 with ttySA1, etc.
 
 - don't forget to add 'ttySA0', 'console', or the appropriate tty name
   in /etc/securetty for root to be allowed to login as well.

@@ -577,7 +577,7 @@ bata1-2.2.1	Feb 09 2001
 bata2-2.2.1	Feb 20 2001
 
 			o Bug fixes to the CHDLC device drivers.
-				The driver had compilation problmes under kernels
+				The driver had compilation problems under kernels
 				2.2.14 or lower.
 
 			o Bug fixes to the Setup installation script.

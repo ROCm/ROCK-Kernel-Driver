@@ -102,7 +102,7 @@ config CLOCK_AUTO
 	  really need to know, so you can select the AUTO option. On some
 	  boards you need to know the real clock frequency to determine other
 	  system timing (for example baud rate dividors, etc). Some processors
-	  have an internal PLL and you can seletc a frequency to set that too.
+	  have an internal PLL and you can select a frequency to run at.
 	  You need to know a little about the internals of your processor to
 	  set this. If in doubt choose the AUTO option.
 
@@ -675,11 +675,12 @@ config FULLDEBUG
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
 	help
-	  Enables console device to interprent special characters as
+	  Enables console device to interpret special characters as
 	  commands to dump state information.
 
 config HIGHPROFILE
 	bool "Use fast second timer for profiling"
+	depends on COLDFIRE
 	help
 	  Use a fast secondary clock to produce profiling information.
 
@@ -699,7 +700,7 @@ config BDM_DISABLE
 	bool "Disable BDM signals"
 	depends on (EXPERIMENTAL && COLDFIRE)
 	help
-	  Disable the CPU's BDM signals.
+	  Disable the ColdFire CPU's BDM signals.
 
 endmenu
 

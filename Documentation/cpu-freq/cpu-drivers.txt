@@ -35,7 +35,7 @@ Contents:
 
 So, you just got a brand-new CPU / chipset with datasheets and want to
 add cpufreq support for this CPU / chipset? Great. Here are some hints
-on what is neccessary:
+on what is necessary:
 
 
 1.1 Initialization
@@ -54,7 +54,7 @@ cpufreq_driver.name -		The name of this driver.
 cpufreq_driver.init -		A pointer to the per-CPU initialization 
 				function.
 
-cpufreq_driver.verify -		A pointer to a "verfication" funciton.
+cpufreq_driver.verify -		A pointer to a "verification" funciton.
 
 cpufreq_driver.setpolicy _or_ 
 cpufreq_driver.target -		See below on the differences.
@@ -72,7 +72,7 @@ cpufreq_driver.attr -		A pointer to a NULL-terminated list of
 --------------------------
 
 Whenever a new CPU is registered with the device model, or after the
-cpufreq driver registers itself, the per-CPU initialization fucntion 
+cpufreq driver registers itself, the per-CPU initialization function 
 cpufreq_driver.init is called. It takes a struct cpufreq_policy
 *policy as argument. What to do now?
 
@@ -94,7 +94,7 @@ policy->cur			The current operating frequency of
 				this CPU (if appropriate)
 policy->min, 
 policy->max, 
-policy->policy and, if neccessary,
+policy->policy and, if necessary,
 policy->governor		must contain the "default policy" for
 				this CPU. A few moments later,
 				cpufreq_driver.verify and either

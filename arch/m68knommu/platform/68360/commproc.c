@@ -71,7 +71,7 @@ static	void	cpm_interrupt(int irq, void * dev, struct pt_regs * regs);
 static	void	cpm_error_interrupt(void *);
 
 /* prototypes: */
-void cpm_install_handler(int vec, void (*handler)(void *), void *dev_id);
+void cpm_install_handler(int vec, void (*handler)(), void *dev_id);
 void m360_cpm_reset(void);
 
 
@@ -207,7 +207,7 @@ cpm_error_interrupt(void *dev)
 /* Install a CPM interrupt handler.
 */
 void
-cpm_install_handler(int vec, void (*handler)(void *), void *dev_id)
+cpm_install_handler(int vec, void (*handler)(), void *dev_id)
 {
 
 	request_irq(vec, handler, IRQ_FLG_LOCK, "timer", dev_id);

@@ -81,9 +81,13 @@ static struct
     }
 };
 
-static struct ipt_table packet_filter
-= { { NULL, NULL }, "filter", &initial_table.repl,
-    FILTER_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
+static struct ipt_table packet_filter = {
+	.name		= "filter",
+	.table		= &initial_table.repl,
+	.valid_hooks	= FILTER_VALID_HOOKS,
+	.lock		= RW_LOCK_UNLOCKED,
+	.me		= THIS_MODULE
+};
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
@@ -114,11 +118,25 @@ ipt_local_out_hook(unsigned int hook,
 	return ipt_do_table(pskb, hook, in, out, &packet_filter, NULL);
 }
 
-static struct nf_hook_ops ipt_ops[]
-= { { { NULL, NULL }, ipt_hook, PF_INET, NF_IP_LOCAL_IN, NF_IP_PRI_FILTER },
-    { { NULL, NULL }, ipt_hook, PF_INET, NF_IP_FORWARD, NF_IP_PRI_FILTER },
-    { { NULL, NULL }, ipt_local_out_hook, PF_INET, NF_IP_LOCAL_OUT,
-		NF_IP_PRI_FILTER }
+static struct nf_hook_ops ipt_ops[] = {
+	{
+		.hook		= ipt_hook,
+		.pf		= PF_INET,
+		.hooknum	= NF_IP_LOCAL_IN,
+		.priority	= NF_IP_PRI_FILTER,
+	},
+	{
+		.hook		= ipt_hook,
+		.pf		= PF_INET,
+		.hooknum	= NF_IP_FORWARD,
+		.priority	= NF_IP_PRI_FILTER,
+	},
+	{
+		.hook		= ipt_local_out_hook,
+		.pf		= PF_INET,
+		.hooknum	= NF_IP_LOCAL_OUT,
+		.priority	= NF_IP_PRI_FILTER,
+	},
 };
 
 /* Default to forward because I got too much mail already. */

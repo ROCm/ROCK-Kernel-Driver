@@ -34,7 +34,7 @@ foremost, it groups all the legacy devices under a common bus, and
 gives them a common parent if they don't already have one. 
 
 But, besides the organizational benefits, the platform bus can also
-accomodate firmware-based enumeration. 
+accommodate firmware-based enumeration. 
 
 
 Device Discovery

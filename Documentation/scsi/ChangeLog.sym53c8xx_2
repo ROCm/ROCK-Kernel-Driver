@@ -32,7 +32,7 @@ Wed Jan 24 21:00 2001 Gerard Roudier
 	  missing free of this memory on instance detach.
 	- Check against GPIO3 pulled low for HVD controllers (driver did 
 	  just the opposite).
-	  Misdetection of BUS mode was triggerred on module reload only, 
+	  Misdetection of BUS mode was triggered on module reload only, 
 	  since BIOS settings were trusted instead on first load.
 
 Wed Feb 7 21:00 2001 Gerard Roudier 
@@ -71,7 +71,7 @@ Tues Apr 10 21:00 2001 Gerard Roudier
 	  #LUN <= 7.
 	- Set busy_itl in LCB to 1 if the LCB is allocated and a 
 	  SCSI command is active. This is a simplification.
-	- In sym_hcb_free(), donnot scan the free_ccbq if no CCBs 
+	- In sym_hcb_free(), do not scan the free_ccbq if no CCBs 
 	  has been allocated. This fixes a panic if attach failed.
 	- Add DT/ST (double/simple transition) in the transfer 
 	  negotiation announce.

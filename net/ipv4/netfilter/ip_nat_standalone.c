@@ -225,18 +225,36 @@ ip_nat_local_fn(unsigned int hooknum,
 /* We must be after connection tracking and before packet filtering. */
 
 /* Before packet filtering, change destination */
-static struct nf_hook_ops ip_nat_in_ops
-= { { NULL, NULL }, ip_nat_fn, PF_INET, NF_IP_PRE_ROUTING, NF_IP_PRI_NAT_DST };
+static struct nf_hook_ops ip_nat_in_ops = {
+	.hook		= ip_nat_fn,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_PRE_ROUTING,
+	.priority	= NF_IP_PRI_NAT_DST,
+};
+
 /* After packet filtering, change source */
-static struct nf_hook_ops ip_nat_out_ops
-= { { NULL, NULL }, ip_nat_out, PF_INET, NF_IP_POST_ROUTING, NF_IP_PRI_NAT_SRC};
+static struct nf_hook_ops ip_nat_out_ops = {
+	.hook		= ip_nat_out,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_POST_ROUTING,
+	.priority	= NF_IP_PRI_NAT_SRC,
+};
+
 /* Before packet filtering, change destination */
-static struct nf_hook_ops ip_nat_local_out_ops
-= { { NULL, NULL }, ip_nat_local_fn, PF_INET, NF_IP_LOCAL_OUT, NF_IP_PRI_NAT_DST };
+static struct nf_hook_ops ip_nat_local_out_ops = {
+	.hook		= ip_nat_local_fn,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_OUT,
+	.priority	= NF_IP_PRI_NAT_DST,
+};
 
 #ifdef CONFIG_IP_NF_NAT_LOCAL
-static struct nf_hook_ops ip_nat_local_in_ops
-= { { NULL, NULL }, ip_nat_fn, PF_INET, NF_IP_LOCAL_IN, NF_IP_PRI_NAT_SRC };
+static struct nf_hook_ops ip_nat_local_in_ops = {
+	.hook		= ip_nat_fn,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_IN,
+	.priority	= NF_IP_PRI_NAT_SRC,
+};
 #endif
 
 /* Protocol registration. */

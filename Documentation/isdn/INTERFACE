@@ -735,7 +735,7 @@ Description of the Interface between Linklevel and Hardwarelevel
       driver      = driver-Id
       command     = ISDN_STAT_PROT
       arg         = The lower 8 Bits define the addressed protocol as defined
-                    in ISDN_PTYPE..., the upper bits are used to differenciate
+                    in ISDN_PTYPE..., the upper bits are used to differentiate
                     the protocol specific STAT.  
       
       para        = protocol and function specific. See isdnif.h for detail.

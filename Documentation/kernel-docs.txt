@@ -488,7 +488,7 @@
        memory allocation.
        Description: Article written for people wishing to make their data
        acquisition boards work on their GNU/Linux machines. Gives a basic
-       overview on writting drivers, from the naming of functions to
+       overview on writing drivers, from the naming of functions to
        interrupt handling.
        Notes: Two-parts article. Part II is at
        http://www.ednmag.com/ednmag/reg/2000/07062000/14df.htm

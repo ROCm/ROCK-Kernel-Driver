@@ -58,7 +58,8 @@ Intel mobile PIII [*] and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon
 National Semiconductors Geode GX
 Transmeta Crusoe
-varios processors on some ACPI 2.0-compatible systems [**]
+VIA Cyrix 3 / C3
+various processors on some ACPI 2.0-compatible systems [**]
 
 [*] only certain Intel mobile PIII processors are supported. If you
 know that you own a speedstep-capable processor, pass the option
@@ -81,9 +82,9 @@ UltraSPARC-III
 2. "Policy" / "Governor" ?
 ==========================
 
-Some CPU frequency scaling-capable processor switch between varios
+Some CPU frequency scaling-capable processor switch between various
 frequencies and operating voltages "on the fly" without any kernel or
-user involvement. This guarantuees very fast switching to a frequency
+user involvement. This guarantees very fast switching to a frequency
 which is high enough to serve the user's needs, but low enough to save
 power.
 
@@ -93,7 +94,7 @@ power.
 
 On these systems, all you can do is select the lower and upper
 frequency limit as well as whether you want more aggressive
-power-saving or more instantly avaialble processing power.
+power-saving or more instantly available processing power.
 
 
 2.2 Governor

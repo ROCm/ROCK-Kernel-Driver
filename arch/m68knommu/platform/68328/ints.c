@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
+#include <linux/errno.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>

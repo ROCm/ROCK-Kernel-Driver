@@ -80,6 +80,4 @@ struct flock {
 
 #define F_LINUX_SPECIFIC_BASE  1024
 
-#define flock64   flock
-
 #endif

@@ -539,7 +539,7 @@ X
 X		for PORTNO in $MINORS
 X		do
 X			if test ! -c /dev/ttyF$PORTNO ; then
-X				# We got the harware but no device - make it
+X				# We got the hardware but no device - make it
 X				mknod /dev/ttyF$PORTNO c $TTYMAJOR $PORTNO
 X			fi	
 X		done
@@ -552,7 +552,7 @@ X
 X		for PORTNO in $MINORS
 X		do
 X			if test ! -c /dev/cuf$PORTNO ; then
-X				# We got the harware but no device - make it
+X				# We got the hardware but no device - make it
 X				mknod /dev/cuf$PORTNO c $CUAMAJOR $PORTNO
 X			fi	
 X		done

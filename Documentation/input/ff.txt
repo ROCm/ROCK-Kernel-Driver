@@ -163,7 +163,7 @@ Control of playing is done with write(). Below is an example:
 ~~~~~~~~~~~~~~~~~~~~
 Not all devices have the same strength. Therefore, users should set a gain
 factor depending on how strong they want effects to be. This setting is
-persistent accross access to the driver, so you should not care about it if
+persistent across access to the driver, so you should not care about it if
 you are writing games, as another utility probably already set this for you.
 
 /* Set the gain of the device
@@ -200,7 +200,7 @@ A value of 0 means "no auto-center".
 Proceed as if you wanted to upload a new effect, except that instead of
 setting the id field to -1, you set it to the wanted effect id.
 Normally, the effect is not stopped and restarted. However, depending on the
-type of device, not all paramaters can be dynamically updated. For example,
+type of device, not all parameters can be dynamically updated. For example,
 the direction of an effect cannot be updated with iforce devices. In this
 case, the driver stops the effect, up-load it, and restart it.
 

@@ -69,7 +69,7 @@ type hugetlbfs:
 
 	mount none /mnt/huge -t hugetlbfs
 
-This commands mounts a (psuedo) filesystem of type hugetlbfs on the directory
+This command mounts a (pseudo) filesystem of type hugetlbfs on the directory
 /mnt/huge.  Any files created on /mnt/huge uses hugepages.  An example is
 given at the end of this document.
 

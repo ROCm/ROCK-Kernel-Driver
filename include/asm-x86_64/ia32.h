@@ -11,18 +11,6 @@
  * 32 bit structures for IA32 support.
  */
 
-struct ia32_flock64 {
-	short  l_type;
-	short  l_whence;
-	loff_t l_start;  /* unnatural alignment */
-	loff_t l_len;
-	pid_t  l_pid;
-} __attribute__((packed));
-
-#define F_GETLK64	12	/*  using 'struct flock64' */
-#define F_SETLK64	13
-#define F_SETLKW64	14
-
 #include <asm/sigcontext32.h>
 
 /* signal.h */

@@ -55,7 +55,7 @@ per file. It is noted that it may not be efficient to contain only
 value per file, so it is socially acceptable to express an array of
 values of the same type. 
 
-Mixing types, expressing mulitple lines of data, and doing fancy
+Mixing types, expressing multiple lines of data, and doing fancy
 formatting of data is heavily frowned upon. Doing these things may get
 you publically humiliated and your code rewritten without notice. 
 

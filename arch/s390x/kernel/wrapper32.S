@@ -227,12 +227,12 @@ sys32_ioctl_wrapper:
 	llgfr	%r4,%r4			# unsigned int
 	jg	sys32_ioctl		# branch to system call
 
-	.globl  sys32_fcntl_wrapper 
-sys32_fcntl_wrapper:
+	.globl  compat_sys_fcntl_wrapper 
+compat_sys_fcntl_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgfr	%r3,%r3			# unsigned int 
 	llgfr	%r4,%r4			# unsigned long
-	jg	sys32_fcntl		# branch to system call
+	jg	compat_sys_fcntl	# branch to system call
 
 	.globl  sys32_setpgid_wrapper 
 sys32_setpgid_wrapper:
@@ -1050,12 +1050,12 @@ sys32_getdents64_wrapper:
 	llgfr	%r4,%r4			# unsigned int
 	jg	sys_getdents64		# branch to system call
 
-	.globl  sys32_fcntl64_wrapper 
-sys32_fcntl64_wrapper:
+	.globl  compat_sys_fcntl64_wrapper 
+compat_sys_fcntl64_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgfr	%r3,%r3			# unsigned int 
 	llgfr	%r4,%r4			# unsigned long
-	jg	sys32_fcntl64		# branch to system call
+	jg	compat_sys_fcntl64	# branch to system call
 
 	.globl	sys32_stat64_wrapper
 sys32_stat64_wrapper:

@@ -85,7 +85,7 @@ There are two types of event register ACK mechanisms.
 	In this case your only choice is to move all to dev->poll()
 
 	II) Clear-on-write (COW)
-	 i) you clear the status by writting a 1 in the bit-location you want.
+	 i) you clear the status by writing a 1 in the bit-location you want.
 		These are the majority of the NICs and work the best with NAPI.
 		Put only receive events in dev->poll(); leave the rest in
 		the old interrupt handler.
@@ -200,7 +200,7 @@ dev->open = my_open;
 /* two new additions */
 /* first register my poll method */
 dev->poll = my_poll;
-/* next register my weight/quanta; can be overriden in /proc */
+/* next register my weight/quanta; can be overridden in /proc */
 dev->weight = 16;
 .
 .
@@ -346,10 +346,10 @@ discussed further below.
 netif_rx_schedule_prep() returns 1 if device is in running state and
 gets successfully added to the core poll list. If we get a zero value
 we can _almost_ assume are already added to the list (instead of not running. 
-Logic based on the fact that you shouldnt get interrupt if not running)
+Logic based on the fact that you shouldn't get interrupt if not running)
 We rectify this by disabling rx and rxnobuf interrupts.
 
-II) that receive_packets(dev) and make_rx_buffs_avail() may have dissapeared.
+II) that receive_packets(dev) and make_rx_buffs_avail() may have disappeared.
 These functionalities are still around actually......
 
 infact, receive_packets(dev) is very close to my_poll() and 
@@ -442,7 +442,7 @@ static void my_poll (struct net_device *dev, int *budget)
 	int rx_work_limit = dev->quota;
 
 /************************ end note note *********************************/		
-    do {  // outer beggining loop starts here
+    do {  // outer beginning loop starts here
 
 	clear_rx_status_register_bit();
 

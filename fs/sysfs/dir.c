@@ -98,7 +98,6 @@ void sysfs_remove_dir(struct kobject * kobj)
 			 * Unlink and unhash.
 			 */
 			spin_unlock(&dcache_lock);
-			d_delete(d);
 			simple_unlink(dentry->d_inode,d);
 			dput(d);
 			spin_lock(&dcache_lock);
@@ -108,16 +107,11 @@ void sysfs_remove_dir(struct kobject * kobj)
 	}
 	spin_unlock(&dcache_lock);
 	up(&dentry->d_inode->i_sem);
-	d_invalidate(dentry);
-	simple_rmdir(parent->d_inode,dentry);
 	d_delete(dentry);
+	simple_rmdir(parent->d_inode,dentry);
 
 	pr_debug(" o %s removing done (%d)\n",dentry->d_name.name,
 		 atomic_read(&dentry->d_count));
-	/**
-	 * Drop reference from initial sysfs_get_dentry().
-	 */
-	dput(dentry);
 
 	/**
 	 * Drop reference from dget() on entrance.

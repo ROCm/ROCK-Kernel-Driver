@@ -409,8 +409,7 @@ sys_call_table:
 	ENTRY_SAME(getpeername)
 	/* This one's a huge ugly mess */
 	ENTRY_DIFF(ioctl)
-	/* struct flock? */
-	ENTRY_DIFF(fcntl)		/* 55 */
+	ENTRY_COMP(fcntl)		/* 55 */
 	ENTRY_SAME(socketpair)
 	ENTRY_SAME(setpgid)
 	ENTRY_SAME(send)
@@ -589,7 +588,7 @@ sys_call_table:
 	ENTRY_OURS(truncate64)
 	ENTRY_OURS(ftruncate64)		/* 200 */
 	ENTRY_SAME(getdents64)
-	ENTRY_DIFF(fcntl64)
+	ENTRY_COMP(fcntl64)
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)		/* 205 */

@@ -2509,7 +2509,7 @@
   1100..88..  ssttoopp
 
   This puts the UML in a loop reading mconsole requests until a 'go'
-  mconsole command is recieved. This is very useful for making backups
+  mconsole command is received. This is very useful for making backups
   of UML filesystems, as the UML can be stopped, then synced via 'sysrq
   s', so that everything is written to the filesystem. You can then copy
   the filesystem and then send the UML 'go' via mconsole.

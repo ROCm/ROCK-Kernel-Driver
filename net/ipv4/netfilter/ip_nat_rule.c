@@ -101,9 +101,13 @@ static struct
     }
 };
 
-static struct ipt_table nat_table
-= { { NULL, NULL }, "nat", &nat_initial_table.repl,
-    NAT_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
+static struct ipt_table nat_table = {
+	.name		= "nat",
+	.table		= &nat_initial_table.repl,
+	.valid_hooks	= NAT_VALID_HOOKS,
+	.lock		= RW_LOCK_UNLOCKED,
+	.me		= THIS_MODULE,
+};
 
 /* Source NAT */
 static unsigned int ipt_snat_target(struct sk_buff **pskb,
@@ -270,10 +274,17 @@ int ip_nat_rule_find(struct sk_buff **pskb,
 	return ret;
 }
 
-static struct ipt_target ipt_snat_reg
-= { { NULL, NULL }, "SNAT", ipt_snat_target, ipt_snat_checkentry, NULL };
-static struct ipt_target ipt_dnat_reg
-= { { NULL, NULL }, "DNAT", ipt_dnat_target, ipt_dnat_checkentry, NULL };
+static struct ipt_target ipt_snat_reg = {
+	.name		= "SNAT",
+	.target		= ipt_snat_target,
+	.checkentry	= ipt_snat_checkentry,
+};
+
+static struct ipt_target ipt_dnat_reg = {
+	.name		= "DNAT",
+	.target		= ipt_dnat_target,
+	.checkentry	= ipt_dnat_checkentry,
+};
 
 int __init ip_nat_rule_init(void)
 {

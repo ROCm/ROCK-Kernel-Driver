@@ -304,7 +304,7 @@ options bond1 -o bonding1 miimon=100
 Configuring Multiple ARP Targets
 ================================
 
-While ARP monitoring can be done with just one target, it can be usefull
+While ARP monitoring can be done with just one target, it can be useful
 in a High Availability setup to have several targets to monitor. In the
 case of just one target,  the target itself may go down or have a problem
 making it unresponsive to ARP requests. Having an additional target (or

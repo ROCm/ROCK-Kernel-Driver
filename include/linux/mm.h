@@ -410,8 +410,6 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr);
 int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma);
-int remap_page_range(struct vm_area_struct *vma, unsigned long from,
-			unsigned long to, unsigned long size, pgprot_t prot);
 int zeromap_page_range(struct vm_area_struct *vma, unsigned long from,
 			unsigned long size, pgprot_t prot);
 
@@ -426,7 +424,6 @@ extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *
 extern int sys_remap_file_pages(unsigned long start, unsigned long size, unsigned long prot, unsigned long pgoff, unsigned long nonblock);
 
 
-extern struct page * follow_page(struct mm_struct *mm, unsigned long address, int write);
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);
 
@@ -539,10 +536,11 @@ __vma_unlink(struct mm_struct *mm, struct vm_area_struct *vma,
 static inline int
 can_vma_merge(struct vm_area_struct *vma, unsigned long vm_flags)
 {
+#ifdef CONFIG_MMU
 	if (!vma->vm_file && vma->vm_flags == vm_flags)
 		return 1;
-	else
-		return 0;
+#endif
+	return 0;
 }
 
 /* filemap.c */
@@ -596,10 +594,31 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
-extern struct page * vmalloc_to_page(void *addr);
 extern unsigned long get_page_cache_size(void);
 extern unsigned int nr_used_zone_pages(void);
 
+#ifdef CONFIG_MMU
+extern struct page * vmalloc_to_page(void *addr);
+extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
+		int write);
+extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
+		unsigned long to, unsigned long size, pgprot_t prot);
+#else
+static inline struct page * vmalloc_to_page(void *addr)
+{
+	return NULL;
+}
+static inline struct page * follow_page(struct mm_struct *mm,
+		unsigned long address, int write)
+{
+	return NULL;
+}
+static inline int remap_page_range(struct vm_area_struct *vma,
+		unsigned long from, unsigned long to,
+		unsigned long size, pgprot_t prot)
+{
+	return -EPERM;
+}
+#endif /* CONFIG_MMU */
 #endif /* __KERNEL__ */
-
-#endif
+#endif /* _LINUX_MM_H */

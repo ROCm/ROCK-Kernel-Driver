@@ -226,17 +226,34 @@ static unsigned int ip_conntrack_local(unsigned int hooknum,
 
 /* Connection tracking may drop packets, but never alters them, so
    make it the first hook. */
-static struct nf_hook_ops ip_conntrack_in_ops
-= { { NULL, NULL }, ip_conntrack_in, PF_INET, NF_IP_PRE_ROUTING,
-	NF_IP_PRI_CONNTRACK };
-static struct nf_hook_ops ip_conntrack_local_out_ops
-= { { NULL, NULL }, ip_conntrack_local, PF_INET, NF_IP_LOCAL_OUT,
-	NF_IP_PRI_CONNTRACK };
+static struct nf_hook_ops ip_conntrack_in_ops = {
+	.hook		= ip_conntrack_in,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_PRE_ROUTING,
+	.priority	= NF_IP_PRI_CONNTRACK,
+};
+
+static struct nf_hook_ops ip_conntrack_local_out_ops = {
+	.hook		= ip_conntrack_local,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_OUT,
+	.priority	= NF_IP_PRI_CONNTRACK,
+};
+
 /* Refragmenter; last chance. */
-static struct nf_hook_ops ip_conntrack_out_ops
-= { { NULL, NULL }, ip_refrag, PF_INET, NF_IP_POST_ROUTING, NF_IP_PRI_LAST };
-static struct nf_hook_ops ip_conntrack_local_in_ops
-= { { NULL, NULL }, ip_confirm, PF_INET, NF_IP_LOCAL_IN, NF_IP_PRI_LAST-1 };
+static struct nf_hook_ops ip_conntrack_out_ops = {
+	.hook		= ip_refrag,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_POST_ROUTING,
+	.priority	= NF_IP_PRI_LAST,
+};
+
+static struct nf_hook_ops ip_conntrack_local_in_ops = {
+	.hook		= ip_confirm,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_IN,
+	.priority	= NF_IP_PRI_LAST-1,
+};
 
 static int init_or_cleanup(int init)
 {
