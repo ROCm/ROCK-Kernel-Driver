@@ -126,8 +126,8 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
 #ifdef CONFIG_UNIX98_PTYS
-extern struct tty_driver ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
-extern struct tty_driver pts_driver;	/* Unix98 pty slaves;  for /dev/ptmx */
+extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
+extern struct tty_driver *pts_driver;	/* Unix98 pty slaves;  for /dev/ptmx */
 #endif
 
 extern void disable_early_printk(void);
@@ -1349,14 +1349,14 @@ retry_open:
 #ifdef CONFIG_UNIX98_PTYS
 		/* find a device that is not in use. */
 		retval = -1;
-		driver = &ptm_driver;
+		driver = ptm_driver;
 		for (index = 0; index < driver->num ; index++)
 			if (!init_dev(driver, index, &tty))
 				goto ptmx_found; /* ok! */
 		return -EIO; /* no free ptys */
 	ptmx_found:
 		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
-		devpts_pty_new(index, MKDEV(pts_driver.major, pts_driver.minor_start) + index);
+		devpts_pty_new(index, MKDEV(pts_driver->major, pts_driver->minor_start) + index);
 		noctty = 1;
 #else
 		return -ENODEV;
