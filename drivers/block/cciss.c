@@ -1983,7 +1983,7 @@ static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 
 	/* Is this interrupt for us? */
-	if ( h->access.intr_pending(h) == 0)
+	if (( h->access.intr_pending(h) == 0) || (h->interrupts_enabled == 0))
 		return IRQ_NONE;
 
 	/*
