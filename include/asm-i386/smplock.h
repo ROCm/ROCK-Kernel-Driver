@@ -15,6 +15,7 @@ extern spinlock_t kernel_flag;
 #else
 #ifdef CONFIG_PREEMPT
 #define kernel_locked()		preempt_get_count()
+#define global_irq_holder	0
 #else
 #define kernel_locked()		1
 #endif
