@@ -257,10 +257,6 @@ void __init do_init_bootmem(void)
 
 		for (i = 0; i < lmb.memory.cnt; i++) {
 			unsigned long physbase, size;
-			unsigned long type = lmb.memory.region[i].type;
-
-			if (type != LMB_MEMORY_AREA)
-				continue;
 
 			physbase = lmb.memory.region[i].physbase;
 			size = lmb.memory.region[i].size;
