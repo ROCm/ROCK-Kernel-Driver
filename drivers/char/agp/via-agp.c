@@ -96,6 +96,24 @@ static struct gatt_mask via_generic_masks[] =
 
 static int __init via_generic_setup (struct pci_dev *pdev)
 {
+	u8 reg;
+
+	/* Garg, there are KT400s with KT266 IDs. */
+	if (pdev->device == PCI_DEVICE_ID_VIA_8367_0) {
+		/* Is there a KT400 subsystem ? */
+		if (pdev->subsystem_device==PCI_DEVICE_ID_VIA_8377_0) {
+			pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
+
+			/* Check AGP compatability mode. */
+			if ((reg & (1<<1))==0) {
+				printk ("KT400 in AGP3.0 mode. Use via-kt400 driver\n");
+				return -ENODEV;
+			}
+
+			printk (KERN_INFO PFX "Found KT400 in disguise as a KT266.\n");
+		}
+	}
+
 	agp_bridge.masks = via_generic_masks;
 	agp_bridge.aperture_sizes = (void *) via_generic_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
