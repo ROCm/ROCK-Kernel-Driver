@@ -36,8 +36,8 @@ typedef struct _ntfs_inode ntfs_inode;
  * fields already provided in the VFS inode.
  */
 struct _ntfs_inode {
-	s64 initialized_size;	/* Copy from $DATA/$INDEX_ALLOCATION. */
-	s64 allocated_size;	/* Copy from $DATA/$INDEX_ALLOCATION. */
+	s64 initialized_size;	/* Copy from the attribute record. */
+	s64 allocated_size;	/* Copy from the attribute record. */
 	unsigned long state;	/* NTFS specific flags describing this inode.
 				   See ntfs_inode_state_bits below. */
 	unsigned long mft_no;	/* Number of the mft record / inode. */
@@ -244,6 +244,10 @@ extern void ntfs_dirty_inode(struct inode *vi);
 extern void ntfs_put_inode(struct inode *vi);
 
 extern int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt);
+
+extern void ntfs_truncate(struct inode *vi);
+
+extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
 
 #endif /* _LINUX_NTFS_FS_INODE_H */
 

@@ -38,6 +38,18 @@ ToDo:
 	  Note: As with mmap(2) based overwriting, resident files are only
 	  written into memory, and not written out to disk at present, so avoid
 	  writing to files smaller than about 1kiB.
+	- Implement ->truncate (fs/ntfs/inode.c::ntfs_truncate()) and
+	  ->setattr() (fs/ntfs/inode.c::ntfs_setattr()) inode operations for
+	  files with the purpose of intercepting and aborting all i_size
+	  changes which we do not support yet. ntfs_truncate() actually only
+	  emits a warning message but AFAICS our interception of i_size changes
+	  elsewhere means ntfs_truncate() never gets called for i_size changes.
+	  It is only called from generic_file_write() when we fail in
+	  ntfs_prepare_{,nonresident_}write() in order to discard any
+	  instantiated buffers beyond i_size. Thus i_size is not actually
+	  changed so our warning message is enough. Unfortunately it is not
+	  possible to easily determine if i_size is being changed or not hence
+	  we just emit an appropriately worded error message.
 
 2.0.25 - Small bug fixes and cleanups.
 

@@ -63,7 +63,10 @@ struct file_operations ntfs_file_ops = {
 	.open		= ntfs_file_open,	/* Open file. */
 };
 
-struct inode_operations ntfs_file_inode_ops = {};
+struct inode_operations ntfs_file_inode_ops = {
+	.truncate	= ntfs_truncate,
+	.setattr	= ntfs_setattr,
+};
 
 struct file_operations ntfs_empty_file_ops = {};
 

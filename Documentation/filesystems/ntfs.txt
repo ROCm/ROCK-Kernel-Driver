@@ -252,6 +252,7 @@ Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 	- Initial implementation of file overwriting. (Writes to resident files
 	  are not written out to disk yet, so avoid writing to files smaller
 	  than about 1kiB.)
+	- Intercept/abort changes in file size as they are not implemented yet.
 2.0.25:
 	- Minor bugfixes in error code paths and small cleanups.
 2.0.24:

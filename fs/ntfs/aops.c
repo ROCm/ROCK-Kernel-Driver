@@ -1523,8 +1523,10 @@ static int ntfs_commit_nonresident_write(struct page *page,
 	 * exceeds i_size case, so this will never trigger which is fine.
 	 */
 	if (pos > vi->i_size) {
-		vi->i_size = pos;
-		mark_inode_dirty(vi);
+		ntfs_error(vi->i_sb, "Writing beyond the existing file size is "
+				"not supported yet. Sorry.");
+		// vi->i_size = pos;
+		// mark_inode_dirty(vi);
 	}
 	ntfs_debug("Done.");
 	return 0;
