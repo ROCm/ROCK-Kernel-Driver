@@ -253,6 +253,7 @@ enum {
 	ATM_VF_HASSAP,		/* SAP has been set */
 	ATM_VF_CLOSE,		/* asynchronous close - treat like VF_RELEASED*/
 	ATM_VF_WAITING,		/* waiting for reply from sigd */
+	ATM_VF_IS_CLIP,		/* in use by CLIP protocol */
 };
 
 

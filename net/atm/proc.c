@@ -25,15 +25,13 @@
 #include <linux/atmarp.h>
 #include <linux/if_arp.h>
 #include <linux/init.h> /* for __init */
+#include <net/atmclip.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <asm/param.h> /* for HZ */
 #include "resources.h"
 #include "common.h" /* atm_proc_init prototype */
 #include "signaling.h" /* to get sigd - ugly too */
-
-#include <net/atmclip.h>
-#include "ipcommon.h"
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 #include "lec.h"
@@ -139,7 +137,6 @@ static void atmarp_info(struct seq_file *seq, struct net_device *dev,
 struct vcc_state {
 	struct sock *sk;
 	int family;
-	int clip_info;
 };
 
 static inline int compare_family(struct sock *sk, int family)
@@ -190,7 +187,6 @@ static int __vcc_seq_open(struct inode *inode, struct file *file,
 		goto out_kfree;
 
 	state->family = family;
-	state->clip_info = try_atm_clip_ops();
 
 	seq = file->private_data;
 	seq->private = state;
@@ -203,13 +199,6 @@ out_kfree:
 
 static int vcc_seq_release(struct inode *inode, struct file *file)
 {
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-	struct seq_file *seq = file->private_data;
-	struct vcc_state *state = seq->private;
-
-	if (state->clip_info)
-		module_put(atm_clip_ops->owner);
-#endif
 	return seq_release_private(inode, file);
 }
 
@@ -237,7 +226,7 @@ static void *vcc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	return v;
 }
 
-static void pvc_info(struct seq_file *seq, struct atm_vcc *vcc, int clip_info)
+static void pvc_info(struct seq_file *seq, struct atm_vcc *vcc)
 {
 	static const char *class_name[] = { "off","UBR","CBR","VBR","ABR" };
 	static const char *aal_name[] = {
@@ -252,8 +241,7 @@ static void pvc_info(struct seq_file *seq, struct atm_vcc *vcc, int clip_info)
 	    aal_name[vcc->qos.aal],vcc->qos.rxtp.min_pcr,
 	    class_name[vcc->qos.rxtp.traffic_class],vcc->qos.txtp.min_pcr,
 	    class_name[vcc->qos.txtp.traffic_class]);
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-	if (clip_info && (vcc->push == atm_clip_ops->clip_push)) {
+	if (test_bit(ATM_VF_IS_CLIP, &vcc->flags)) {
 		struct clip_vcc *clip_vcc = CLIP_VCC(vcc);
 		struct net_device *dev;
 
@@ -262,7 +250,6 @@ static void pvc_info(struct seq_file *seq, struct atm_vcc *vcc, int clip_info)
 		    dev ? dev->name : "none?");
 		seq_printf(seq, "%s", clip_vcc->encap ? "LLC/SNAP" : "None");
 	}
-#endif
 	seq_putc(seq, '\n');
 }
 
@@ -405,7 +392,7 @@ static int pvc_seq_show(struct seq_file *seq, void *v)
 		struct vcc_state *state = seq->private;
 		struct atm_vcc *vcc = atm_sk(state->sk);
 
-		pvc_info(seq, vcc, state->clip_info);
+		pvc_info(seq, vcc);
 	}
 	return 0;
 }

@@ -488,6 +488,7 @@ static int clip_mkip(struct atm_vcc *vcc,int timeout)
 	DPRINTK("mkip clip_vcc %p vcc %p\n",clip_vcc,vcc);
 	clip_vcc->vcc = vcc;
 	vcc->user_back = clip_vcc;
+	set_bit(ATM_VF_IS_CLIP, &vcc->flags);
 	clip_vcc->entry = NULL;
 	clip_vcc->xoff = 0;
 	clip_vcc->encap = 1;
