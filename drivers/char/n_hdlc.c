@@ -9,7 +9,7 @@
  *	Al Longyear <longyear@netcom.com>, Paul Mackerras <Paul.Mackerras@cs.anu.edu.au>
  *
  * Original release 01/11/99
- * $Id: n_hdlc.c,v 4.6 2003/04/21 19:14:07 paulkf Exp $
+ * $Id: n_hdlc.c,v 4.8 2003/05/06 21:18:51 paulkf Exp $
  *
  * This code is released under the GNU General Public License (GPL)
  *
@@ -78,7 +78,7 @@
  */
 
 #define HDLC_MAGIC 0x239e
-#define HDLC_VERSION "$Revision: 4.6 $"
+#define HDLC_VERSION "$Revision: 4.8 $"
 
 #include <linux/version.h>
 #include <linux/config.h>
@@ -214,6 +214,21 @@ static void n_hdlc_tty_wakeup (struct tty_struct *tty);
 
 /* Define this string only once for all macro invocations */
 static char szVersion[] = HDLC_VERSION;
+
+static struct tty_ldisc n_hdlc_ldisc = {
+	.owner		= THIS_MODULE,
+	.magic		= TTY_LDISC_MAGIC,
+	.name		= "hdlc",
+	.open		= n_hdlc_tty_open,
+	.close		= n_hdlc_tty_close,
+	.read		= n_hdlc_tty_read,
+	.write		= n_hdlc_tty_write,
+	.ioctl		= n_hdlc_tty_ioctl,
+	.poll		= n_hdlc_tty_poll,
+	.receive_buf	= n_hdlc_tty_receive,
+	.receive_room	= n_hdlc_tty_room,
+	.write_wakeup	= n_hdlc_tty_wakeup,
+};
 
 /* n_hdlc_release()
  *
@@ -968,25 +983,6 @@ static N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list)
 
 static int __init n_hdlc_init(void)
 {
-	static struct tty_ldisc	n_hdlc_ldisc = {
-		TTY_LDISC_MAGIC,    /* magic */
-		"hdlc",             /* name */
-		0,                  /* num */
-		0,                  /* flags */
-		n_hdlc_tty_open,    /* open */
-		n_hdlc_tty_close,   /* close */
-		0,                  /* flush_buffer */
-		0,                  /* chars_in_buffer */
-		n_hdlc_tty_read,    /* read */
-		n_hdlc_tty_write,   /* write */
-		n_hdlc_tty_ioctl,   /* ioctl */
-		0,                  /* set_termios */
-		n_hdlc_tty_poll,    /* poll */
-		n_hdlc_tty_receive, /* receive_buf */
-		n_hdlc_tty_room,    /* receive_room */
-		n_hdlc_tty_wakeup,  /* write_wakeup */
-		THIS_MODULE         /* owner */
-	};
 	int    status;
 
 	/* range check maxframe arg */
