@@ -466,16 +466,12 @@ int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
         int yoffset = var->yoffset;
         int err;
 
-        if (xoffset < 0 || yoffset < 0 ||
+        if (xoffset < 0 || yoffset < 0 || !info->fbops->fb_pan_display ||
             xoffset + info->var.xres > info->var.xres_virtual ||
             yoffset + info->var.yres > info->var.yres_virtual)
                 return -EINVAL;
-        if (info->fbops->fb_pan_display) {
-                if ((err = info->fbops->fb_pan_display(var, info)))
-                        return err;
-                else
-                        return -EINVAL;
-        }
+	if ((err = info->fbops->fb_pan_display(var, info)))
+		return err;
         info->var.xoffset = var->xoffset;
         info->var.yoffset = var->yoffset;
         if (var->vmode & FB_VMODE_YWRAP)
@@ -571,6 +567,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
 		fb_copy_cmap(&info->cmap, &cmap, 0);
+		return 0;
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
@@ -928,7 +925,8 @@ __setup("video=", video_setup);
 
 EXPORT_SYMBOL(register_framebuffer);
 EXPORT_SYMBOL(unregister_framebuffer);
-EXPORT_SYMBOL(registered_fb);
 EXPORT_SYMBOL(num_registered_fb);
+EXPORT_SYMBOL(registered_fb);
+EXPORT_SYMBOL(fb_blank);
 
 MODULE_LICENSE("GPL");

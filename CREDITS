@@ -2844,6 +2844,7 @@ S: 76131 Karlsruhe
 S: Germany
 
 N: James Simmons 
+E: jsimmons@infradead.org
 E: jsimmons@users.sf.net 
 D: Frame buffer device maintainer
 D: input layer developement 

@@ -291,7 +291,10 @@ void gen_set_disp(int con, struct fb_info *info)
 	struct display *display = fb_display + con;
 
 	display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
-	display->scrollmode = SCROLL_YNOMOVE;
+	if (info->var.accel_flags)
+		display->scrollmode = SCROLL_YNOMOVE;
+	else
+		display->scrollmode = SCROLL_YREDRAW;
 	fbcon_changevar(con);
 	return;
 }
@@ -2633,7 +2636,7 @@ static void __init fbcon_set_logo(struct fb_info *info, u8 *logo, int needs_logo
 	default:
 		for (i = 0; i < (LOGO_W * LOGO_H)/8; i++) 
 			for (j = 0; j < 8; j++) 
-				logo[i*2] = (linux_logo_bw[i] &  (7 - j)) ? 
+				logo[i*8 + j] = (linux_logo_bw[i] &  (7 - j)) ? 
 					((needs_logo == 1) ? 1 : 0) :
 					((needs_logo == 1) ? 0 : 1);
 				

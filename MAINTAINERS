@@ -644,7 +644,7 @@ S:	Supported
 
 FRAMEBUFFER LAYER
 P:	James Simmons, Geert Uytterhoeven	
-M:	jsimmons@users.sf.net, geert@linux-m68k.org	
+M:	jsimmons@infradead.org, geert@linux-m68k.org	
 L:	linux-fbdev-devel@lists.sourceforge.net	
 W:	http://www.linux-fbdev.org
 S:	Supported
