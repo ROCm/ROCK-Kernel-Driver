@@ -107,7 +107,7 @@ config MOUSE_AMIGA
 	  The module will be called amimouse.o. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
-config MOUSE_ACORN
+config MOUSE_RISCPC
 	tristate "Acorn RiscPC mouse"
 	depends on ARCH_ACORN && INPUT && INPUT_MOUSE
 	help
