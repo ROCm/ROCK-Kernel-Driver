@@ -82,6 +82,7 @@ void put_driver(struct device_driver * drv)
 int driver_register(struct device_driver * drv)
 {
 	INIT_LIST_HEAD(&drv->devices);
+	INIT_LIST_HEAD(&drv->class_list);
 	init_MUTEX_LOCKED(&drv->unload_sem);
 	return bus_add_driver(drv);
 }

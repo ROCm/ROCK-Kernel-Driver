@@ -1,5 +1,3 @@
-#undef DEBUG
-
 extern struct semaphore device_sem;
 extern struct semaphore devclass_sem;
 
