@@ -237,7 +237,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end,
 	const struct usb_interface *iface,
 	int setno)
 {
-	struct usb_interface_descriptor *desc = &intfc->altsetting[setno].desc;
+	const struct usb_interface_descriptor *desc = &intfc->altsetting[setno].desc;
 	char *driver_name = "";
 
 	if (start > end)
@@ -268,7 +268,7 @@ static char *usb_dump_interface(
 	const struct usb_interface *iface,
 	int setno
 ) {
-	struct usb_host_interface *desc = &intfc->altsetting[setno];
+	const struct usb_host_interface *desc = &intfc->altsetting[setno];
 	int i;
 
 	start = usb_dump_interface_descriptor(start, end, intfc, iface, setno);
