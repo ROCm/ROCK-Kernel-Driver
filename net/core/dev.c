@@ -2754,6 +2754,8 @@ void netdev_run_todo(void)
 
 		dev->next = NULL;
 
+		netdev_unregister_sysfs(dev);
+
 		netdev_wait_allrefs(dev);
 
 		BUG_ON(atomic_read(&dev->refcnt));
@@ -2841,8 +2843,6 @@ int unregister_netdevice(struct net_device *dev)
 	BUG_TRAP(!dev->master);
 
 	free_divert_blk(dev);
-
-	netdev_unregister_sysfs(dev);
 
 	spin_lock(&unregister_todo_lock);
 	dev->next = unregister_todo;
