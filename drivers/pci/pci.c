@@ -893,7 +893,7 @@ pci_generic_prep_mwi(struct pci_dev *dev)
 #endif /* !HAVE_ARCH_PCI_MWI */
 
 /**
- * pci_set_mwi - enables memory-write-validate PCI transaction
+ * pci_set_mwi - enables memory-write-invalidate PCI transaction
  * @dev: the PCI device for which MWI is enabled
  *
  * Enables the Memory-Write-Invalidate transaction in %PCI_COMMAND,
