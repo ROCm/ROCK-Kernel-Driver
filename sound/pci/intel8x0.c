@@ -2749,7 +2749,7 @@ module_exit(alsa_card_intel8x0_exit)
 
 #ifndef MODULE
 
-/* format is: snd-intel8x0=enable,index,id,ac97_clock */
+/* format is: snd-intel8x0=enable,index,id,ac97_clock,mpu_port */
 
 static int __init alsa_card_intel8x0_setup(char *str)
 {
@@ -2760,7 +2760,11 @@ static int __init alsa_card_intel8x0_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&ac97_clock[nr_dev]) == 2);
+	       get_option(&str,&ac97_clock[nr_dev]) == 2
+#ifdef SUPPORT_MIDI
+	       && get_option(&str,&mpu_port[nr_dev]) == 2
+#endif
+	       );
 	nr_dev++;
 	return 1;
 }
