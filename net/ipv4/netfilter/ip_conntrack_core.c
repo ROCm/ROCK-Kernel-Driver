@@ -571,7 +571,6 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	size_t hash;
 	struct ip_conntrack_expect *expected;
 	int i;
-	static unsigned int drop_next;
 
 	if (!ip_conntrack_hash_rnd_initted) {
 		get_random_bytes(&ip_conntrack_hash_rnd, 4);
@@ -580,15 +579,10 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 
 	hash = hash_conntrack(tuple);
 
-	if (ip_conntrack_max &&
-	    atomic_read(&ip_conntrack_count) >= ip_conntrack_max) {
-		/* Try dropping from random chain, or else from the
-                   chain about to put into (in case they're trying to
-                   bomb one hash chain). */
-		unsigned int next = (drop_next++)%ip_conntrack_htable_size;
-
-		if (!early_drop(&ip_conntrack_hash[next])
-		    && !early_drop(&ip_conntrack_hash[hash])) {
+	if (ip_conntrack_max
+	    && atomic_read(&ip_conntrack_count) >= ip_conntrack_max) {
+		/* Try dropping from this hash chain. */
+		if (!early_drop(&ip_conntrack_hash[hash])) {
 			if (net_ratelimit())
 				printk(KERN_WARNING
 				       "ip_conntrack: table full, dropping"
