@@ -39,6 +39,9 @@ SECTIONS
   __start___ksymtab = .;
   __ksymtab  : { *(__ksymtab) }
   __stop___ksymtab = .;
+  __start___gpl_ksymtab = .;
+  __gpl_ksymtab : { *(__gpl_ksymtab) }
+  __stop___gpl_ksymtab = .;
   __kstrtab  : { *(.kstrtab) }
   __start___kallsyms = .;	/* All kernel symbols */
   __kallsyms : { *(__kallsyms) }

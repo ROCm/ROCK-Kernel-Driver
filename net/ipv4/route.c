@@ -2672,11 +2672,13 @@ int __init ip_rt_init(void)
 					ip_rt_gc_interval;
 	add_timer(&rt_periodic_timer);
 
+#ifdef CONFIG_PROC_FS
 	if (rt_cache_proc_init())
 		goto out_enomem;
 	proc_net_create ("rt_cache_stat", 0, rt_cache_stat_get_info);
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("net/rt_acct", 0, 0, ip_rt_acct_read, NULL);
+#endif
 #endif
 	xfrm_init();
 out:

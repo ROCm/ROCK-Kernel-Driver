@@ -207,8 +207,8 @@
 #define STFAX_ESCAPE	5
 #define STFAX_SILDET	6
 
-extern int ISARVersion(struct IsdnCardState *cs, char *s);
 extern void isar_int_main(struct IsdnCardState *cs);
 extern void initisar(struct IsdnCardState *cs);
 extern void isar_fill_fifo(struct BCState *bcs);
 extern int isar_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic);
+extern int isar_setup(struct IsdnCardState *cs, struct bc_hw_ops *isar_ops);

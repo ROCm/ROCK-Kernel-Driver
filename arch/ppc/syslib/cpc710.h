@@ -61,6 +61,12 @@
 #define BARPP	0x000f8130
 #define PSBAR	0x000f8140
 #define PPBAR	0x000f8150
+#define BPMDLK	0x000f8200      /* Bottom of Peripheral Memory Space */
+#define TPMDLK	0x000f8210      /* Top of Peripheral Memory Space */
+#define BIODLK	0x000f8220      /* Bottom of Peripheral I/O Space */
+#define TIODLK	0x000f8230      /* Top of Perioheral I/O Space */
+#define DLKCTRL	0x000f8240      /* Deadlock control */
+#define DLKDEV	0x000f8250      /* Deadlock device */
 
 /* System standard configuration registers space */
 #define	DCR	0xff200000

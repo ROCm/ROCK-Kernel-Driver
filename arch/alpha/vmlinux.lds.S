@@ -32,6 +32,13 @@ SECTIONS
 	__stop___ksymtab = .;
   }
 
+  /* Kernel symbol table: GPL only */
+  __gpl_ksymtab ALIGN(8) : {
+	__start___gpl_ksymtab = .;
+	*(__gpl_ksymtab)
+	__stop___gpl_ksymtab = .;
+  }
+
   /* All kernel symbols */
   __kallsyms ALIGN(8) : {
 	__start___kallsyms = .;

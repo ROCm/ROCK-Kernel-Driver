@@ -208,6 +208,7 @@ static int __init ne_probe_isapnp(struct net_device *dev)
 			if (pnp_activate_dev(idev, NULL) < 0) {
 			      __again:
 			      	pnp_device_detach(idev);
+			      	continue;
 			}
 			/* if no io and irq, search for next */
 			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0))

@@ -14,10 +14,10 @@
 #define flush_cache_range(vma, start, end)	do { } while (0)
 #define flush_cache_page(vma, vmaddr)		do { } while (0)
 #define flush_page_to_ram(page)			do { } while (0)
+#define flush_icache_page(vma, page)		do { } while (0)
 
 extern void flush_dcache_page(struct page *page);
 extern void flush_icache_range(unsigned long, unsigned long);
-extern void flush_icache_page(struct vm_area_struct *vma, struct page *page);
 extern void flush_icache_user_range(struct vm_area_struct *vma,
 				    struct page *page, unsigned long addr,
 				    int len);

@@ -25,7 +25,7 @@ const u8 faxmodulation_s[] = "3,24,48,72,73,74,96,97,98,121,122,145,146";
 const u8 faxmodulation[] = {3,24,48,72,73,74,96,97,98,121,122,145,146}; 
 #define FAXMODCNT 13
 
-void isar_setup(struct IsdnCardState *cs);
+static void __isar_setup(struct IsdnCardState *cs);
 static void isar_pump_cmd(struct BCState *bcs, u8 cmd, u8 para);
 static inline void ll_deliver_faxstat(struct BCState *bcs, u8 status);
 static spinlock_t isar_lock = SPIN_LOCK_UNLOCKED;
@@ -165,7 +165,7 @@ waitrecmsg(struct IsdnCardState *cs, u8 *len,
 	return(1);
 }
 
-int
+static int
 ISARVersion(struct IsdnCardState *cs, char *s)
 {
 	int ver;
@@ -420,7 +420,7 @@ isar_load_firmware(struct IsdnCardState *cs, u8 *buf)
 		}
 	}
 	cs->debug = debug;
-	isar_setup(cs);
+	__isar_setup(cs);
 	ret = 0;
 reterror:
 	cs->debug = debug;
@@ -1531,7 +1531,7 @@ isar_pump_cmd(struct BCState *bcs, u8 cmd, u8 para)
 }
 
 void
-isar_setup(struct IsdnCardState *cs)
+__isar_setup(struct IsdnCardState *cs)
 {
 	u8 msg;
 	int i;
@@ -1753,4 +1753,11 @@ void __devinit
 initisar(struct IsdnCardState *cs)
 {
 	cs->bc_l1_ops = &isar_l1_ops;
+}
+
+int
+isar_setup(struct IsdnCardState *cs, struct bc_hw_ops *isar_ops)
+{
+	cs->bc_hw_ops = isar_ops;
+	return ISARVersion(cs, "HiSax:");
 }

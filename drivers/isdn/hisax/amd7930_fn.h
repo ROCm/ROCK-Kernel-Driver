@@ -18,5 +18,7 @@
 
 #define DBUSY_TIMER_VALUE 80
 
-extern void Amd7930_interrupt(struct IsdnCardState *cs, unsigned char irflags);
-extern void Amd7930_init(struct IsdnCardState *cs);
+void Amd7930_interrupt(struct IsdnCardState *cs, unsigned char irflags);
+void Amd7930_init(struct IsdnCardState *cs);
+int  amd7930_setup(struct IsdnCardState *cs, struct dc_hw_ops *amd7930_ops,
+		   void (*set_irq_mask)(struct IsdnCardState *, u8 val));

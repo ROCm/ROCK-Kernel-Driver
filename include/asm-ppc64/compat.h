@@ -64,4 +64,17 @@ struct compat_flock {
 	short		__unused;
 };
 
+struct compat_statfs {
+	int		f_type;
+	int		f_bsize;
+	int		f_blocks;
+	int		f_bfree;
+	int		f_bavail;
+	int		f_files;
+	int		f_ffree;
+	compat_fsid_t	f_fsid;
+	int		f_namelen;	/* SunOS ignores this field. */
+	int		f_spare[6];
+};
+
 #endif /* _ASM_PPC64_COMPAT_H */

@@ -92,6 +92,8 @@ struct exception_table_entry
 	unsigned long insn, fixup;
 };
 
+extern int fixup_exception(struct pt_regs *regs);
+
 /*
  * These are the main single-value transfer routines.  They automatically
  * use the right size if we just have the right pointer type.
