@@ -725,7 +725,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 		memset(skt, 0, sizeof(*skt));
 
-		skt->socket.ss_entry = &sa11xx_pcmcia_operations;
+		skt->socket.ops = &sa11xx_pcmcia_operations;
 		skt->socket.owner = ops->owner;
 		skt->socket.dev.dev = dev;
 
