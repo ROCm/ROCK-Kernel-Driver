@@ -295,7 +295,6 @@ struct old_linux32_dirent {
 #define IA32_TSS_OFFSET		(IA32_PAGE_OFFSET + PAGE_SIZE)
 #define IA32_LDT_OFFSET		(IA32_PAGE_OFFSET + 2*PAGE_SIZE)
 
-#define USE_ELF_CORE_DUMP
 #define ELF_EXEC_PAGESIZE	IA32_PAGE_SIZE
 
 /*
@@ -311,20 +310,6 @@ void ia64_elf32_init(struct pt_regs *regs);
 #define ELF_PLAT_INIT(_r, load_addr)	ia64_elf32_init(_r)
 
 #define elf_addr_t	u32
-
-/* ELF register definitions.  This is needed for core dump support.  */
-
-#define ELF_NGREG	128			/* XXX fix me */
-#define ELF_NFPREG	128			/* XXX fix me */
-
-typedef unsigned long elf_greg_t;
-typedef elf_greg_t elf_gregset_t[ELF_NGREG];
-
-typedef struct {
-	unsigned long w0;
-	unsigned long w1;
-} elf_fpreg_t;
-typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 
 /* This macro yields a bitmask that programs can use to figure out
    what instruction set this CPU supports.  */
@@ -471,6 +456,23 @@ extern void ia32_load_segment_descriptors (struct task_struct *task);
 	register double f6 asm ("f6"); \
 	asm volatile ("ldf.fill f6=[%2];; stfe [%1]=f6" : "=f"(f6): "r"(dst),  "r"(src) : "memory"); \
 	} while(0)
+
+struct user_regs_struct32 {
+	__u32 ebx, ecx, edx, esi, edi, ebp, eax;
+	unsigned short ds, __ds, es, __es;
+	unsigned short fs, __fs, gs, __gs;
+	__u32 orig_eax, eip;
+	unsigned short cs, __cs;
+	__u32 eflags, esp;
+	unsigned short ss, __ss;
+};
+
+/* Prototypes for use in elfcore32.h */
+int save_ia32_fpstate (struct task_struct *tsk,
+                       struct ia32_user_i387_struct *save);
+
+int save_ia32_fpxstate (struct task_struct *tsk,
+			struct ia32_user_fxsr_struct *save);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

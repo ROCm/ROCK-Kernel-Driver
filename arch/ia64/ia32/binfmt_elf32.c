@@ -19,6 +19,7 @@
 #include <asm/signal.h>
 
 #include "ia32priv.h"
+#include "elfcore32.h"
 
 #define CONFIG_BINFMT_ELF32
 
