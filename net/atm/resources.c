@@ -16,6 +16,7 @@
 #include <linux/kernel.h> /* for barrier */
 #include <linux/module.h>
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <net/sock.h>	 /* for struct sock */
 
 #include "common.h"
@@ -138,8 +139,7 @@ void atm_dev_deregister(struct atm_dev *dev)
 
         warning_time = jiffies;
         while (atomic_read(&dev->refcnt) != 1) {
-                current->state = TASK_INTERRUPTIBLE;
-                schedule_timeout(HZ / 4);
+                msleep(250);
                 if ((jiffies - warning_time) > 10 * HZ) {
                         printk(KERN_EMERG "atm_dev_deregister: waiting for "
                                "dev %d to become free. Usage count = %d\n",

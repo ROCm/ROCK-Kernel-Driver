@@ -2026,15 +2026,6 @@ extern void sk_init(void);
 
 void __init sock_init(void)
 {
-	int i;
-
-	/*
-	 *	Initialize all address (protocol) families. 
-	 */
-	 
-	for (i = 0; i < NPROTO; i++) 
-		net_families[i] = NULL;
-
 	/*
 	 *	Initialize sock SLAB cache.
 	 */

@@ -936,21 +936,14 @@ void ip_ct_refresh_acct(struct ip_conntrack *ct,
 	}
 }
 
-int ip_ct_no_defrag;
-
 /* Returns new sk_buff, or NULL */
 struct sk_buff *
-ip_ct_gather_frags(struct sk_buff *skb)
+ip_ct_gather_frags(struct sk_buff *skb, u_int32_t user)
 {
 	struct sock *sk = skb->sk;
 #ifdef CONFIG_NETFILTER_DEBUG
 	unsigned int olddebug = skb->nf_debug;
 #endif
-
-	if (unlikely(ip_ct_no_defrag)) {
-		kfree_skb(skb);
-		return NULL;
-	}
 
 	if (sk) {
 		sock_hold(sk);
@@ -958,7 +951,7 @@ ip_ct_gather_frags(struct sk_buff *skb)
 	}
 
 	local_bh_disable(); 
-	skb = ip_defrag(skb);
+	skb = ip_defrag(skb, user);
 	local_bh_enable();
 
 	if (!skb) {
