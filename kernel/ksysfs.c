@@ -25,7 +25,7 @@ static struct subsys_attribute _name##_attr = \
 #ifdef CONFIG_HOTPLUG
 static ssize_t hotplug_seqnum_show(struct subsystem *subsys, char *page)
 {
-	return sprintf(page, "%llu\n", hotplug_seqnum);
+	return sprintf(page, "%llu\n", (unsigned long long)hotplug_seqnum);
 }
 KERNEL_ATTR_RO(hotplug_seqnum);
 #endif
