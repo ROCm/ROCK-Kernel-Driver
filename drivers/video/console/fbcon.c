@@ -139,8 +139,6 @@ static int fbcon_set_origin(struct vc_data *);
 
 static int vbl_cursor_cnt;
 static int cursor_blink_rate;
-static int cursor_drawn;
-static int cursor_on;
 
 #define divides(a, b)	((!(a) || (b)%(a)) ? 0 : 1)
 
@@ -172,8 +170,6 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines);
  *  Internal routines
  */
 static void fbcon_set_display(struct vc_data *vc, int init, int logo);
-static void accel_cursor(struct vc_data *vc, struct fb_info *info, 
-			 struct fb_cursor *cursor, int yy);
 static __inline__ int real_y(struct display *p, int ypos);
 static __inline__ void updatescrollmode(struct display *p, struct vc_data *vc);
 static __inline__ void ywrap_up(struct vc_data *vc, int count);
@@ -195,32 +191,23 @@ static void fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 }
 #endif
 
-static void fb_callback(void *private)
+static void fb_flashcursor(void *private)
 {
 	struct fb_info *info = (struct fb_info *) private;
-	struct display *p = &fb_display[fg_console];
-	struct vc_data *vc = vc_cons[fg_console].d;
-	struct fb_cursor cursor;
 
-	if (!info || !cursor_on)
+	if (!info || !info->cursor.enable)
 		return;
-
-	if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
-		cursor.set = 0;
-
-		if (!cursor_drawn)
-			cursor.set = FB_CUR_SETCUR;
-		accel_cursor(vc, info, &cursor, real_y(p, vc->vc_y));
-		cursor_drawn ^= 1;
-		vbl_cursor_cnt = cursor_blink_rate; 
-	}
+	info->fbops->fb_cursor(info, &info->cursor);
 }
 
 static void fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
 	struct fb_info *info = dev_id;
 
-	schedule_work(&info->queue);	
+	if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
+		schedule_work(&info->queue);	
+		vbl_cursor_cnt = cursor_blink_rate; 
+	}
 }
 	
 static void cursor_timer_handler(unsigned long dev_addr);
@@ -594,7 +581,7 @@ static const char *fbcon_startup(void)
 	}
 
 	/* Initialize the work queue */
-	INIT_WORK(&info->queue, fb_callback, info);
+	INIT_WORK(&info->queue, fb_flashcursor, info);
 	
 	/* Setup default font */
 	vc->vc_font.data = font->data;
@@ -993,111 +980,18 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	accel_putcs(vc, info, s, count, real_y(p, ypos), xpos);
 }
 
-static void accel_cursor(struct vc_data *vc, struct fb_info *info,
-			 struct fb_cursor *cursor, int yy)
-{
-	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
-	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
-	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
-	static int fgcolor, bgcolor, shape, width, height;
-	static char mask[64], image[64], *dest;
-        char *font;
-        int c;
-
-        if (cursor->set & FB_CUR_SETCUR)
-                cursor->enable = 1;
-        else
-                cursor->enable = 0;
-
-	cursor->set = FB_CUR_SETPOS;
-
-	if (width != vc->vc_font.width || height != vc->vc_font.height) {
-                width = vc->vc_font.width;
-                height = vc->vc_font.height;
-                cursor->set |= FB_CUR_SETSIZE;
-        }
-
-        if ((vc->vc_cursor_type & 0x0f) != shape) {
-                shape = vc->vc_cursor_type & 0x0f;
-		cursor->set |= FB_CUR_SETSHAPE;
-        }
-
-        c = scr_readw((u16 *) vc->vc_pos);
-
-	if (fgcolor != (int) attr_fgcol(fgshift, c) ||
-            bgcolor != (int) attr_bgcol(bgshift, c)) {
-                fgcolor = (int) attr_fgcol(fgshift, c);
-                bgcolor = (int) attr_bgcol(bgshift, c);
-                cursor->set |= FB_CUR_SETCMAP;
-        }
-        c &= charmask;
-        font = vc->vc_font.data + (c * ((width + 7) / 8) * height);
-        if (font != dest) {
-                dest = font;
-                cursor->set |= FB_CUR_SETDEST;
-        }
-
-        if (cursor->set & FB_CUR_SETSIZE) {
-                memset(image, 0xff, 64);
-                cursor->set |= FB_CUR_SETSHAPE;
-        }
-
-	if (cursor->set & FB_CUR_SETSHAPE) {
-                int w, cur_height, size, i = 0;
-
-                w = (width + 7) / 8;
-
-                switch (shape) {
-                        case CUR_NONE:
-                                cur_height = 0;
-                                break;
-                        case CUR_UNDERLINE:
-                                cur_height = (height < 10) ? 1 : 2;
-                                break;
-                        case CUR_LOWER_THIRD:
-                                cur_height = height/3;
-                                break;
-                        case CUR_LOWER_HALF:
-                                cur_height = height/2;
-                                break;
-                        case CUR_TWO_THIRDS:
-                                cur_height = (height * 2)/3;
-                                break;
-                        case CUR_BLOCK:
-                        default:
-                                cur_height = height;
-                                break;
-                }
-	size = (height - cur_height) * w;
-                while (size--)
-                        mask[i++] = 0;
-                size = cur_height * w;
-                while (size--)
-                        mask[i++] = 0xff;
-        }
-
-        cursor->image.width = width;
-        cursor->image.height = height;
-        cursor->image.dx = vc->vc_x * width;
-        cursor->image.dy = yy * height;
-        cursor->image.depth = 1;
-        cursor->image.data = image;
-        cursor->image.bg_color = bgcolor;
-        cursor->image.fg_color = fgcolor;
-        cursor->mask = mask;
-        cursor->dest = dest;
-        cursor->rop = ROP_XOR;
-
-        if (info->fbops->fb_cursor)
-                info->fbops->fb_cursor(info, cursor);
-}
-	
 static void fbcon_cursor(struct vc_data *vc, int mode)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
+	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
+	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
+	int w = (vc->vc_font.width + 7) >> 3, c;
 	struct display *p = &fb_display[vc->vc_num];
+	int y = real_y(p, vc->vc_y);
 	struct fb_cursor cursor;
-	int y = vc->vc_y;
+	static char mask[64];
+	static int shape;
 
 	if (mode & CM_SOFTBACK) {
 		mode &= ~CM_SOFTBACK;
@@ -1110,30 +1004,91 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	} else if (softback_lines)
 		fbcon_set_origin(vc);
 
-	/* Avoid flickering if there's no real change. */
-	if ((mode == CM_ERASE) == !cursor_on)
-		return;
+ 	c = scr_readw((u16 *) vc->vc_pos);
 
-	cursor_on = 0;
-
+	cursor.image.data = vc->vc_font.data + ((c & charmask) * (w * vc->vc_font.height));
+	cursor.image.depth = 1;
+	
 	switch (mode) {
 	case CM_ERASE:
-		if (cursor_drawn) {
+		if (info->cursor.rop == ROP_XOR) {
 			cursor.set = 0;
-			accel_cursor(vc, info, &cursor,
-				     real_y(p, y));
+			cursor.image.dx = info->cursor.image.dx;
+			cursor.image.dy = info->cursor.image.dy;
+			cursor.image.width = info->cursor.image.width;
+			cursor.image.height = info->cursor.image.height;
+			cursor.image.fg_color = info->cursor.image.fg_color;
+			cursor.image.bg_color = info->cursor.image.bg_color;
+			cursor.mask = mask;
+			cursor.rop = ROP_COPY;
+
+			info->fbops->fb_cursor(info, &cursor);
 		}	
-		cursor_drawn = 0;
 		break;
 	case CM_MOVE:
 	case CM_DRAW:
-		if (cursor_drawn) {
-			cursor.set = FB_CUR_SETCUR;
-			accel_cursor(vc, info, &cursor, 
-				     real_y(p, y));
-		}	
+		cursor.set = FB_CUR_SETCUR;
+
+		if (info->cursor.image.fg_color != attr_fgcol(fgshift, c) ||
+	    	    info->cursor.image.bg_color != attr_bgcol(bgshift, c)) {
+			cursor.image.fg_color = attr_fgcol(fgshift, c);
+			cursor.image.bg_color = attr_bgcol(bgshift, c);
+			cursor.set |= FB_CUR_SETCMAP;
+		}
+		
+		if ((info->cursor.image.dx != (vc->vc_font.width * vc->vc_x)) ||
+		    (info->cursor.image.dy != (vc->vc_font.height * y))) {
+			cursor.image.dx = vc->vc_font.width * vc->vc_x;
+			cursor.image.dy = vc->vc_font.height * y;
+			cursor.set |= FB_CUR_SETPOS;
+		}			
+	
+		if (info->cursor.image.height != vc->vc_font.height ||
+		    info->cursor.image.width != vc->vc_font.width) {
+			cursor.image.height = vc->vc_font.height;
+			cursor.image.width = vc->vc_font.width;
+			cursor.set |= FB_CUR_SETSIZE;
+		}
+
+		if ((vc->vc_cursor_type & 0x0f) != shape) {
+			int cur_height, size, i = 0;
+
+			shape = vc->vc_cursor_type & 0x0f;
+			cursor.set |= FB_CUR_SETSHAPE;
+
+			switch (vc->vc_cursor_type & 0x0f) {
+			case CUR_NONE:
+				cur_height = 0;
+				break;
+			case CUR_UNDERLINE:
+				cur_height = (vc->vc_font.height < 10) ? 1 : 2;
+				break;
+			case CUR_LOWER_THIRD:
+				cur_height = vc->vc_font.height/3;
+				break;
+			case CUR_LOWER_HALF:
+				cur_height = vc->vc_font.height >> 1;
+				break;
+			case CUR_TWO_THIRDS:
+				cur_height = (vc->vc_font.height << 1)/3;
+				break;
+			case CUR_BLOCK:
+			default:
+				cur_height = vc->vc_font.height;
+				break;
+			}
+			size = (vc->vc_font.height - cur_height) * w;
+			while (size--)
+				mask[i++] = 0;
+			size = cur_height * w;
+			while (size--)
+				mask[i++] = 0xff;
+		}
+        	cursor.mask = mask;
+        	cursor.rop = ROP_XOR;
+
+		info->fbops->fb_cursor(info, &cursor);
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
-		cursor_on = 1;
 		break;
 	}
 }
@@ -1145,7 +1100,7 @@ static int scrollback_current = 0;
 int update_var(int con, struct fb_info *info)
 {
 	if (con == info->currcon) 
-		return fb_pan_display(&info->var, info);
+		return fb_pan_display(info, &info->var);
 	return 0;
 }
 
@@ -1648,16 +1603,16 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	if (x_diff < 0 || x_diff > fw ||
 	   (y_diff < 0 || y_diff > fh)) {
 		var.activate = FB_ACTIVATE_TEST;
-		err = fb_set_var(&var, info);
+		err = fb_set_var(info, &var);
 		if (err || width > var.xres/fw ||
 		    height > var.yres/fh)
 			return -EINVAL;
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
 		var.activate = FB_ACTIVATE_NOW;
-		fb_set_var(&var, info);
+		fb_set_var(info, &var);
 	}
 	p->vrows = var.yres_virtual/fh;
-	if(var.yres > (fh * (height + 1)))
+	if (var.yres > (fh * (height + 1)))
 		p->vrows -= (var.yres - (fh * height)) / fh;
 	return 0;
 }
@@ -1764,7 +1719,7 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 			update_screen(vc->vc_num);
 		return 0;
 	} else
-		return fb_blank(blank, info);
+		return fb_blank(info, blank);
 }
 
 static void fbcon_free_font(struct display *p)

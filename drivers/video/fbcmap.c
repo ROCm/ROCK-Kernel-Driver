@@ -154,11 +154,11 @@ void fb_dealloc_cmap(struct fb_cmap *cmap)
  *
  */
 
-void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
+int fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
 {
-    int size;
     int tooff = 0, fromoff = 0;
-
+    int size;
+    
     if (to->start > from->start)
 	fromoff = to->start-from->start;
     else
@@ -167,7 +167,7 @@ void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
     if (size > (int) (from->len - fromoff))
 	size = from->len-fromoff;
     if (size <= 0)
-	return;
+	return -EINVAL;
     size *= sizeof(u16);
     
     switch (fsfromto) {
@@ -179,20 +179,29 @@ void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
 	    memcpy(to->transp+tooff, from->transp+fromoff, size);
         break;
     case 1:
-	copy_from_user(to->red+tooff, from->red+fromoff, size);
-	copy_from_user(to->green+tooff, from->green+fromoff, size);
-	copy_from_user(to->blue+tooff, from->blue+fromoff, size);
+	if (copy_from_user(to->red+tooff, from->red+fromoff, size))
+		return -EFAULT;
+	if (copy_from_user(to->green+tooff, from->green+fromoff, size))
+		return -EFAULT;	
+	if (copy_from_user(to->blue+tooff, from->blue+fromoff, size))
+		return -EFAULT;
 	if (from->transp && to->transp)
-            copy_from_user(to->transp+tooff, from->transp+fromoff, size);
+            if (copy_from_user(to->transp+tooff, from->transp+fromoff, size))
+		    return -EFAULT;	
 	break;
     case 2:
-	copy_to_user(to->red+tooff, from->red+fromoff, size);
-	copy_to_user(to->green+tooff, from->green+fromoff, size);
-	copy_to_user(to->blue+tooff, from->blue+fromoff, size);
+	if (copy_to_user(to->red+tooff, from->red+fromoff, size))
+		return -EFAULT;
+	if (copy_to_user(to->green+tooff, from->green+fromoff, size))
+		return -EFAULT;
+	if (copy_to_user(to->blue+tooff, from->blue+fromoff, size))
+		return -EFAULT;
 	if (from->transp && to->transp)
-	    copy_to_user(to->transp+tooff, from->transp+fromoff, size);
+		if (copy_to_user(to->transp+tooff, from->transp+fromoff, size))
+			return -EFAULT;
 	break;
     }
+    return 0;
 }
 
 /**

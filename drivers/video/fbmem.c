@@ -665,7 +665,7 @@ int fb_prepare_logo(struct fb_info *info)
 	/* What depth we asked for might be different from what we get */
 	if (fb_logo.logo->type == LINUX_LOGO_CLUT224)
 		fb_logo.depth = 8;
-	else if (fb_logo.logo->type = LINUX_LOGO_VGA16)
+	else if (fb_logo.logo->type == LINUX_LOGO_VGA16)
 		fb_logo.depth = 4;
 	else
 		fb_logo.depth = 1;		
@@ -847,7 +847,49 @@ static void try_to_load(int fb)
 #endif /* CONFIG_KMOD */
 
 int
-fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
+{
+	struct fb_cursor cursor;
+	int err;
+	
+	if (copy_from_user(&cursor, sprite, sizeof(struct fb_cursor)))
+		return -EFAULT;
+
+	if (cursor.set & FB_CUR_SETCMAP) {
+		err = fb_copy_cmap(&cursor.image.cmap, &sprite->image.cmap, 1);
+		if (err)
+			return err;
+	}
+	
+	if (cursor.set & FB_CUR_SETSHAPE) {
+		int size = ((cursor.image.width + 7) >> 3) * cursor.image.height;		
+		if ((cursor.image.height != info->cursor.image.height) ||
+		    (cursor.image.width != info->cursor.image.width))
+			cursor.set |= FB_CUR_SETSIZE;
+		
+		cursor.image.data = kmalloc(size, GFP_KERNEL);
+		if (!cursor.image.data)
+			return -ENOMEM;
+		
+		cursor.mask = kmalloc(size, GFP_KERNEL);
+		if (!cursor.mask) {
+			kfree(cursor.image.data);
+			return -ENOMEM;
+		}
+		
+		if (copy_from_user(&cursor.image.data, sprite->image.data, size) ||
+		    copy_from_user(cursor.mask, sprite->mask, size)) { 
+			kfree(cursor.image.data);
+			kfree(cursor.mask);
+			return -EFAULT;
+		}
+	}
+	err = info->fbops->fb_cursor(info, &cursor);
+	return err;
+}
+
+int
+fb_pan_display(struct fb_info *info, struct fb_var_screeninfo *var)
 {
         int xoffset = var->xoffset;
         int yoffset = var->yoffset;
@@ -869,7 +911,7 @@ fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 }
 
 int
-fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
+fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 {
 	int err;
 
@@ -888,7 +930,7 @@ fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 			if (info->fbops->fb_set_par)
 				info->fbops->fb_set_par(info);
 
-			fb_pan_display(&info->var, info);
+			fb_pan_display(info, &info->var);
 
 			fb_set_cmap(&info->cmap, 1, info);
 		}
@@ -897,7 +939,7 @@ fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 }
 
 int
-fb_blank(int blank, struct fb_info *info)
+fb_blank(struct fb_info *info, int blank)
 {	
 	/* ??? Varible sized stack allocation.  */
 	u16 black[info->cmap.len];
@@ -931,7 +973,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_cmap cmap;
 	int i;
 	
-	if (! fb)
+	if (!fb)
 		return -ENODEV;
 	switch (cmd) {
 	case FBIOGET_VSCREENINFO:
@@ -940,7 +982,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		i = fb_set_var(&var, info);
+		i = fb_set_var(info, &var);
 		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
@@ -954,16 +996,17 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		fb_copy_cmap(&info->cmap, &cmap, 0);
-		return 0;
+		return (fb_copy_cmap(&info->cmap, &cmap, 0));
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		if ((i = fb_pan_display(&var, info)))
+		if ((i = fb_pan_display(info, &var)))
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
-		return i;
+		return 0;
+	case FBIO_CURSOR:
+		return (fb_cursor(info, (struct fb_cursor *) arg));
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
@@ -993,7 +1036,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return 0;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
-		return fb_blank(arg, info);
+		return fb_blank(info, arg);
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;
