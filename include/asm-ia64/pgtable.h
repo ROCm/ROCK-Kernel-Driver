@@ -469,8 +469,6 @@ extern void hugetlb_free_pgtables(struct mmu_gather *tlb,
 	struct vm_area_struct * prev, unsigned long start, unsigned long end);
 #endif
 
-typedef pte_t *pte_addr_t;
-
 /*
  * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
  * information.  However, we use this routine to take care of any (delayed) i-cache

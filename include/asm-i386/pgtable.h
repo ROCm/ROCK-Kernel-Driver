@@ -314,18 +314,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pte_unmap_nested(pte) do { } while (0)
 #endif
 
-#if defined(CONFIG_HIGHPTE) && defined(CONFIG_HIGHMEM4G)
-typedef u32 pte_addr_t;
-#endif
-
-#if defined(CONFIG_HIGHPTE) && defined(CONFIG_HIGHMEM64G)
-typedef u64 pte_addr_t;
-#endif
-
-#if !defined(CONFIG_HIGHPTE)
-typedef pte_t *pte_addr_t;
-#endif
-
 /*
  * The i386 doesn't have any external MMU info: the kernel page
  * tables contain all the necessary information.

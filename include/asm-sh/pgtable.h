@@ -274,8 +274,6 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
 
 #define pte_same(A,B)	(pte_val(A) == pte_val(B))
 
-typedef pte_t *pte_addr_t;
-
 #endif /* !__ASSEMBLY__ */
 
 #define kern_addr_valid(addr)	(1)

@@ -670,8 +670,6 @@ extern void kernel_set_cachemode (unsigned long address, unsigned long size,
  */
 #define pgtable_cache_init()	do { } while (0)
 
-typedef pte_t *pte_addr_t;
-
 extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
 
 #endif /* !__ASSEMBLY__ */
