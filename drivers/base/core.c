@@ -25,46 +25,6 @@ spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 #define to_dev(node) container_of(node,struct device,driver_list)
 
-}
-
-int driver_attach(struct device_driver * drv)
-{
-	return bus_for_each_dev(drv->bus,drv,do_driver_attach);
-}
-
-void driver_detach(struct device_driver * drv)
-{
-	struct list_head * node;
-	struct device * prev = NULL;
-
-	spin_lock(&device_lock);
-	list_for_each(node,&drv->devices) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			if (prev)
-				list_del_init(&prev->driver_list);
-			spin_unlock(&device_lock);
-			device_detach(dev);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
-		}
-	}
-	spin_unlock(&device_lock);
-}
-
-/**
- * device_register - register a device
- * @dev:	pointer to the device structure
- *
- * First, make sure that the device has a parent, create
- * a directory for it, then add it to the parent's list of
- * children.
- *
- * Maintains a global list of all devices, in depth-first ordering.
- * The head for that list is device_root.g_list.
- */
 int device_add(struct device *dev)
 {
 	int error;
