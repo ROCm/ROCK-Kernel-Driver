@@ -194,10 +194,8 @@ static int bt3c_write(unsigned int iobase, int fifo_size, __u8 *buf, int len)
 }
 
 
-static void bt3c_write_wakeup(bt3c_info_t *info, int from)
+static void bt3c_write_wakeup(bt3c_info_t *info)
 {
-	unsigned long flags;
-
 	if (!info) {
 		BT_ERR("Unknown device");
 		return;
@@ -205,8 +203,6 @@ static void bt3c_write_wakeup(bt3c_info_t *info, int from)
 
 	if (test_and_set_bit(XMIT_SENDING, &(info->tx_state)))
 		return;
-
-	spin_lock_irqsave(&(info->lock), flags);
 
 	do {
 		register unsigned int iobase = info->link.io.BasePort1;
@@ -234,8 +230,6 @@ static void bt3c_write_wakeup(bt3c_info_t *info, int from)
 		info->hdev->stat.byte_tx += len;
 
 	} while (0);
-
-	spin_unlock_irqrestore(&(info->lock), flags);
 }
 
 
@@ -391,7 +385,7 @@ static irqreturn_t bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 			if (stat & 0x0002) {
 				//BT_ERR("Ack (stat=0x%04x)", stat);
 				clear_bit(XMIT_SENDING, &(info->tx_state));
-				bt3c_write_wakeup(info, 1);
+				bt3c_write_wakeup(info);
 			}
 
 			bt3c_io_write(iobase, 0x7001, 0x0000);
@@ -444,6 +438,7 @@ static int bt3c_hci_send_frame(struct sk_buff *skb)
 {
 	bt3c_info_t *info;
 	struct hci_dev *hdev = (struct hci_dev *)(skb->dev);
+	unsigned long flags;
 
 	if (!hdev) {
 		BT_ERR("Frame for unknown HCI device (hdev=NULL)");
@@ -468,7 +463,11 @@ static int bt3c_hci_send_frame(struct sk_buff *skb)
 	memcpy(skb_push(skb, 1), &(skb->pkt_type), 1);
 	skb_queue_tail(&(info->txq), skb);
 
-	bt3c_write_wakeup(info, 0);
+	spin_lock_irqsave(&(info->lock), flags);
+
+	bt3c_write_wakeup(info);
+
+	spin_unlock_irqrestore(&(info->lock), flags);
 
 	return 0;
 }
