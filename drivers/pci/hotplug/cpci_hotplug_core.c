@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 #include "pci_hotplug.h"
 #include "cpci_hotplug.h"
 
@@ -513,11 +514,10 @@ event_thread(void *data)
 			break;
 		while(controller->ops->query_enum()) {
 			rc = check_slots();
-			if(rc > 0) {
+			if (rc > 0)
 				/* Give userspace a chance to handle extraction */
-				set_current_state(TASK_INTERRUPTIBLE);
-				schedule_timeout(HZ / 2);
-			} else if(rc < 0) {
+				msleep(500);
+			else if (rc < 0) {
 				dbg("%s - error checking slots", __FUNCTION__);
 				thread_finished = 1;
 				break;
@@ -568,11 +568,10 @@ poll_thread(void *data)
 
 		while(controller->ops->query_enum()) {
 			rc = check_slots();
-			if(rc > 0) {
+			if(rc > 0)
 				/* Give userspace a chance to handle extraction */
-				set_current_state(TASK_INTERRUPTIBLE);
-				schedule_timeout(HZ / 2);
-			} else if(rc < 0) {
+				msleep(500);
+			else if (rc < 0) {
 				dbg("%s - error checking slots", __FUNCTION__);
 				thread_finished = 1;
 				break;
@@ -595,8 +594,7 @@ poll_thread(void *data)
 			}
 		}
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ / 10);
+		msleep(100);
 	}
 	dbg("poll thread signals exit");
 	up(&thread_exit);

@@ -291,10 +291,7 @@ pci_set_power_state(struct pci_dev *dev, int state)
 	/* Mandatory power management transition delays */
 	/* see PCI PM 1.1 5.6.1 table 18 */
 	if(state == 3 || dev->current_state == 3)
-	{
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
-	}
+		msleep(10);
 	else if(state == 2 || dev->current_state == 2)
 		udelay(200);
 	dev->current_state = state;

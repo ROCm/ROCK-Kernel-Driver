@@ -35,6 +35,7 @@
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <asm/system.h>
 #include "shpchp.h"
@@ -300,8 +301,7 @@ static int shpc_write_cmd(struct slot *slot, u8 t_slot, u8 cmd)
 		if (!(cmd_status & 0x1))
 			break;
 		/*  Check every 0.1 sec for a total of 1 sec*/
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/10);
+		msleep(100);
 	}
 
 	cmd_status = readw(php_ctlr->creg + CMD_STATUS);
