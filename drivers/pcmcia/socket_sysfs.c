@@ -74,9 +74,29 @@ static ssize_t pccard_show_voltage(struct class_device *dev, char *buf)
 }
 static CLASS_DEVICE_ATTR(card_voltage, 0400, pccard_show_voltage, NULL);
 
+static ssize_t pccard_show_vpp(struct class_device *dev, char *buf)
+{
+	struct pcmcia_socket *s = to_socket(dev);
+	if (!(s->state & SOCKET_PRESENT))
+		return -ENODEV;
+	return sprintf(buf, "%d.%dV\n", s->socket.Vpp / 10, s->socket.Vpp % 10);
+}
+static CLASS_DEVICE_ATTR(card_vpp, 0400, pccard_show_vpp, NULL);
+
+static ssize_t pccard_show_vcc(struct class_device *dev, char *buf)
+{
+	struct pcmcia_socket *s = to_socket(dev);
+	if (!(s->state & SOCKET_PRESENT))
+		return -ENODEV;
+	return sprintf(buf, "%d.%dV\n", s->socket.Vcc / 10, s->socket.Vcc % 10);
+}
+static CLASS_DEVICE_ATTR(card_vcc, 0400, pccard_show_vcc, NULL);
+
 static struct class_device_attribute *pccard_socket_attributes[] = {
 	&class_device_attr_card_type,
 	&class_device_attr_card_voltage,
+	&class_device_attr_card_vpp,
+	&class_device_attr_card_vcc,
 	NULL,
 };
 
