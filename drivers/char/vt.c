@@ -3249,7 +3249,6 @@ EXPORT_SYMBOL(color_table);
 EXPORT_SYMBOL(default_red);
 EXPORT_SYMBOL(default_grn);
 EXPORT_SYMBOL(default_blu);
-EXPORT_SYMBOL(vc_cons_allocated);
 EXPORT_SYMBOL(update_region);
 EXPORT_SYMBOL(redraw_screen);
 EXPORT_SYMBOL(vc_resize);
