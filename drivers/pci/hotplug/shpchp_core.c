@@ -112,7 +112,7 @@ static int init_slots(struct controller *ctrl)
 	u8 number_of_slots;
 	u8 slot_device;
 	u32 slot_number, sun;
-	int result;
+	int result = -ENOMEM;
 
 	dbg("%s\n",__FUNCTION__);
 
@@ -123,30 +123,21 @@ static int init_slots(struct controller *ctrl)
 	while (number_of_slots) {
 		new_slot = (struct slot *) kmalloc(sizeof(struct slot), GFP_KERNEL);
 		if (!new_slot)
-			return -ENOMEM;
+			goto error;
 
 		memset(new_slot, 0, sizeof(struct slot));
 		new_slot->hotplug_slot = kmalloc (sizeof (struct hotplug_slot), GFP_KERNEL);
-		if (!new_slot->hotplug_slot) {
-			kfree (new_slot);
-			return -ENOMEM;
-		}
+		if (!new_slot->hotplug_slot)
+			goto error_slot;
 		memset(new_slot->hotplug_slot, 0, sizeof (struct hotplug_slot));
 
 		new_slot->hotplug_slot->info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
-		if (!new_slot->hotplug_slot->info) {
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
-			return -ENOMEM;
-		}
+		if (!new_slot->hotplug_slot->info)
+			goto error_hpslot;
 		memset(new_slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
 		new_slot->hotplug_slot->name = kmalloc (SLOT_NAME_SIZE, GFP_KERNEL);
-		if (!new_slot->hotplug_slot->name) {
-			kfree (new_slot->hotplug_slot->info);
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
-			return -ENOMEM;
-		}
+		if (!new_slot->hotplug_slot->name)
+			goto error_info;
 
 		new_slot->magic = SLOT_MAGIC;
 		new_slot->ctrl = ctrl;
@@ -154,20 +145,17 @@ static int init_slots(struct controller *ctrl)
 		new_slot->device = slot_device;
 		new_slot->hpc_ops = ctrl->hpc_ops;
 
-		if (shpchprm_get_physical_slot_number(ctrl, &sun, new_slot->bus, new_slot->device)) {
-			kfree (new_slot->hotplug_slot->info);
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
-			return -ENOMEM;
-		}
+		if (shpchprm_get_physical_slot_number(ctrl, &sun,
+					new_slot->bus, new_slot->device))
+			goto error_name;
 
 		new_slot->number = sun;
 		new_slot->hp_slot = slot_device - ctrl->slot_device_offset;
 
 		/* register this slot with the hotplug pci core */
 		new_slot->hotplug_slot->private = new_slot;
-		make_slot_name(new_slot->hotplug_slot->name, SLOT_NAME_SIZE, new_slot);
 		new_slot->hotplug_slot->release = &release_slot;
+		make_slot_name(new_slot->hotplug_slot->name, SLOT_NAME_SIZE, new_slot);
 		new_slot->hotplug_slot->ops = &shpchp_hotplug_slot_ops;
 
 		new_slot->hpc_ops->get_power_status(new_slot, &(new_slot->hotplug_slot->info->power_status));
@@ -180,11 +168,7 @@ static int init_slots(struct controller *ctrl)
 		result = pci_hp_register (new_slot->hotplug_slot);
 		if (result) {
 			err ("pci_hp_register failed with error %d\n", result);
-			kfree (new_slot->hotplug_slot->info);
-			kfree (new_slot->hotplug_slot->name);
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
-			return result;
+			goto error_name;
 		}
 
 		new_slot->next = ctrl->slot;
@@ -196,6 +180,17 @@ static int init_slots(struct controller *ctrl)
 	}
 
 	return 0;
+
+error_name:
+	kfree(new_slot->hotplug_slot->name);
+error_info:
+	kfree(new_slot->hotplug_slot->info);
+error_hpslot:
+	kfree(new_slot->hotplug_slot);
+error_slot:
+	kfree(new_slot);
+error:
+	return result;
 }
 
 static void cleanup_slots(const struct controller *ctrl)
