@@ -186,7 +186,6 @@
 #ifdef MODULE
    static char *ips = NULL;
    MODULE_PARM(ips, "s");
-   MODULE_LICENSE("GPL");
 #endif
 
 /*
@@ -6974,9 +6973,7 @@ static int ips_init_phase2( int index )
 }
 
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,9)
 MODULE_LICENSE("GPL");
-#endif
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.
