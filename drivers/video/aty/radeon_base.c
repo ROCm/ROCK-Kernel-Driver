@@ -1662,7 +1662,7 @@ int radeonfb_set_par(struct fb_info *info)
 		radeon_write_mode (rinfo, &newmode);
 		/* (re)initialize the engine */
 		if (!radeon_accel_disabled())
-			radeon_engine_init (rinfo);
+			radeonfb_engine_init (rinfo);
 	
 	}
 	/* Update fix */

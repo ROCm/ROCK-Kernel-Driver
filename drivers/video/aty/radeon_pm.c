@@ -862,7 +862,7 @@ int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 	if (!radeon_accel_disabled()) {
 		/* Make sure engine is reset */
 		radeon_engine_idle();
-		radeon_engine_reset(rinfo);
+		radeonfb_engine_reset(rinfo);
 		radeon_engine_idle();
 	}
 
