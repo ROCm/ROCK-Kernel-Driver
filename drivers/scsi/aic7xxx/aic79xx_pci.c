@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#61 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#63 $
  *
  * $FreeBSD$
  */
@@ -80,6 +80,7 @@ ahd_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 #define ID_AIC7902_B			0x801D9005FFFF9005ull
 #define ID_AIC7902_B_IROC		0x809D9005FFFF9005ull
 #define ID_AHA_39320			0x8010900500409005ull
+#define ID_AHA_39320A			0x8016900500409005ull
 #define ID_AHA_39320D			0x8011900500419005ull
 #define ID_AHA_39320D_B			0x801C900500419005ull
 #define ID_AHA_39320D_HP		0x8011900500AC0E11ull
@@ -135,6 +136,12 @@ struct ahd_pci_identity ahd_pci_ident_table [] =
 		ID_AHA_39320,
 		ID_ALL_MASK,
 		"Adaptec 39320 Ultra320 SCSI adapter",
+		ahd_aic7902_setup
+	},
+	{
+		ID_AHA_39320A,
+		ID_ALL_MASK,
+		"Adaptec 39320A Ultra320 SCSI adapter",
 		ahd_aic7902_setup
 	},
 	{
@@ -691,7 +698,7 @@ static const char *pci_status_source[] =
 
 static const char *split_status_strings[] =
 {
-	"%s: Received split response in %s.\n",
+	"%s: Received split response in %s.\n"
 	"%s: Received split completion error message in %s\n",
 	"%s: Receive overrun in %s\n",
 	"%s: Count not complete in %s\n",
