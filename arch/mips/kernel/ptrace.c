@@ -174,10 +174,10 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		case FPC_EIR: {	/* implementation / version register */
 			unsigned int flags;
 
-			__save_flags(flags);
+			local_save_flags(flags);
 			enable_cp1();
 			__asm__ __volatile__("cfc1\t%0,$0": "=r" (tmp));
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			break;
 		}
 		default:

@@ -20,6 +20,9 @@
  *		  and duplicating packets. Needs more testing.
  *
  * 99/01/03 MSch: upgraded to version 0.92 of the core driver, fixed.
+ * 
+ * 00/10/31 sammy@oh.verio.com: Updated driver for 2.4 kernels, fixed problems
+ *          on centris.
  */
 
 #include <linux/kernel.h>
@@ -46,6 +49,7 @@
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/mac_via.h>
+#include <asm/pgalloc.h>
 
 #include <linux/errno.h>
 
@@ -58,8 +62,20 @@
 
 #include "sonic.h"
 
+#define SONIC_READ(reg) \
+	nubus_readl(base_addr+(reg))
+#define SONIC_WRITE(reg,val) \
+	nubus_writel((val), base_addr+(reg))
+#define sonic_read(dev, reg) \
+	nubus_readl((dev)->base_addr+(reg))
+#define sonic_write(dev, reg, val) \
+	nubus_writel((val), (dev)->base_addr+(reg))
+
+
 static int sonic_debug;
 static int sonic_version_printed;
+
+static int reg_offset;
 
 extern int macsonic_probe(struct net_device* dev);
 extern int mac_onboard_sonic_probe(struct net_device* dev);
@@ -95,7 +111,7 @@ enum macsonic_type {
    resource directories */
 #define DAYNA_SONIC_MAC_ADDR	0xffe004
 
-#define SONIC_READ_PROM(addr) readb(prom_addr+addr)
+#define SONIC_READ_PROM(addr) nubus_readb(prom_addr+addr)
 
 int __init macsonic_probe(struct net_device* dev)
 {
@@ -125,35 +141,41 @@ static inline void bit_reverse_addr(unsigned char addr[6])
 
 int __init macsonic_init(struct net_device* dev)
 {
-	struct sonic_local* lp = (struct sonic_local *)dev->priv;
+	struct sonic_local* lp;
 	int i;
 
 	/* Allocate the entire chunk of memory for the descriptors.
            Note that this cannot cross a 64K boundary. */
 	for (i = 0; i < 20; i++) {
 		unsigned long desc_base, desc_top;
-		if ((lp->sonic_desc = 
-		     kmalloc(SIZEOF_SONIC_DESC
-			     * SONIC_BUS_SCALE(lp->dma_bitmode), GFP_KERNEL | GFP_DMA)) == NULL) {
+		if((lp = kmalloc(sizeof(struct sonic_local), GFP_KERNEL | GFP_DMA)) == NULL) {
 			printk(KERN_ERR "%s: couldn't allocate descriptor buffers\n", dev->name);
 			return -ENOMEM;
 		}
-		desc_base = (unsigned long) lp->sonic_desc;
-		desc_top = desc_base + SIZEOF_SONIC_DESC * SONIC_BUS_SCALE(lp->dma_bitmode);
+
+		desc_base = (unsigned long) lp;
+		desc_top = desc_base + sizeof(struct sonic_local);
 		if ((desc_top & 0xffff) >= (desc_base & 0xffff))
 			break;
 		/* Hmm. try again (FIXME: does this actually work?) */
-		kfree(lp->sonic_desc);
+		kfree(lp);
 		printk(KERN_DEBUG
 		       "%s: didn't get continguous chunk [%08lx - %08lx], trying again\n",
 		       dev->name, desc_base, desc_top);
 	}
 
-	if (lp->sonic_desc == NULL) {
+	if (lp == NULL) {
 		printk(KERN_ERR "%s: tried 20 times to allocate descriptor buffers, giving up.\n",
 		       dev->name);
 		return -ENOMEM;
 	}		       
+
+	dev->priv = lp;
+
+#if 0
+	/* this code is only here as a curiousity...   mainly, where the 
+	   fuck did SONIC_BUS_SCALE come from, and what was it supposed
+	   to do?  the normal allocation works great for 32 bit stuffs..  */
 
 	/* Now set up the pointers to point to the appropriate places */
 	lp->cda = lp->sonic_desc;
@@ -163,14 +185,23 @@ int __init macsonic_init(struct net_device* dev)
 	lp->rra = lp->rda + (SIZEOF_SONIC_RD * SONIC_NUM_RDS
 			     * SONIC_BUS_SCALE(lp->dma_bitmode));
 
+#endif
+	
+	memset(lp, 0, sizeof(struct sonic_local));
+
+	lp->cda_laddr = (unsigned int)&(lp->cda);
+	lp->tda_laddr = (unsigned int)lp->tda;
+	lp->rra_laddr = (unsigned int)lp->rra;
+	lp->rda_laddr = (unsigned int)lp->rda;
+
 	/* FIXME, maybe we should use skbs */
 	if ((lp->rba = (char *)
 	     kmalloc(SONIC_NUM_RRS * SONIC_RBSIZE, GFP_KERNEL | GFP_DMA)) == NULL) {
 		printk(KERN_ERR "%s: couldn't allocate receive buffers\n", dev->name);
-		kfree(lp->sonic_desc);
-		lp->sonic_desc = NULL;
 		return -ENOMEM;
 	}
+
+	lp->rba_laddr = (unsigned int)lp->rba;
 
 	{
 		int rs, ds;
@@ -178,9 +209,9 @@ int __init macsonic_init(struct net_device* dev)
 		/* almost always 12*4096, but let's not take chances */
 		rs = ((SONIC_NUM_RRS * SONIC_RBSIZE + 4095) / 4096) * 4096;
 		/* almost always under a page, but let's not take chances */
-		ds = ((SIZEOF_SONIC_DESC + 4095) / 4096) * 4096;
+		ds = ((sizeof(struct sonic_local) + 4095) / 4096) * 4096;
 		kernel_set_cachemode(lp->rba, rs, IOMAP_NOCACHE_SER);
-		kernel_set_cachemode(lp->sonic_desc, ds, IOMAP_NOCACHE_SER);
+		kernel_set_cachemode(lp, ds, IOMAP_NOCACHE_SER);
 	}
 	
 #if 0
@@ -275,8 +306,8 @@ int __init mac_onboard_sonic_probe(struct net_device* dev)
 {
 	/* Bwahahaha */
 	static int once_is_more_than_enough;
-	struct sonic_local* lp;
 	int i;
+	int dma_bitmode;
 	
 	if (once_is_more_than_enough)
 		return -ENODEV;
@@ -333,8 +364,13 @@ int __init mac_onboard_sonic_probe(struct net_device* dev)
 	if (dev == NULL)
 		return -ENOMEM;
 
-	lp = (struct sonic_local*) dev->priv;
-	memset(lp, 0, sizeof(struct sonic_local));
+	if(dev->priv) {
+		printk("%s: warning! sonic entering with priv already allocated!\n",
+		       dev->name);
+		printk("%s: discarding, will attempt to reallocate\n", dev->name);
+		dev->priv = NULL;
+	}
+
 	/* Danger!  My arms are flailing wildly!  You *must* set this
            before using sonic_read() */
 
@@ -356,8 +392,11 @@ int __init mac_onboard_sonic_probe(struct net_device* dev)
 
 	/* The PowerBook's SONIC is 16 bit always. */
 	if (macintosh_config->ident == MAC_MODEL_PB520) {
-		lp->reg_offset = 0;
-		lp->dma_bitmode = 0;
+		reg_offset = 0;
+		dma_bitmode = 0;
+	} else if (macintosh_config->ident == MAC_MODEL_C610) {
+		reg_offset = 0;
+		dma_bitmode = 1;
 	} else {
 		/* Some of the comm-slot cards are 16 bit.  But some
                    of them are not.  The 32-bit cards use offset 2 and
@@ -368,27 +407,41 @@ int __init mac_onboard_sonic_probe(struct net_device* dev)
 
 		/* Technically this is not necessary since we zeroed
                    it above */
-		lp->reg_offset = 0;
-		lp->dma_bitmode = 0;
+		reg_offset = 0;
+		dma_bitmode = 0;
 		sr = sonic_read(dev, SONIC_SR);
 		if (sr == 0 || sr == 0xffff) {
-			lp->reg_offset = 2;
+			reg_offset = 2;
 			/* 83932 is 0x0004, 83934 is 0x0100 or 0x0101 */
 			sr = sonic_read(dev, SONIC_SR);
-			lp->dma_bitmode = 1;
+			dma_bitmode = 1;
 			
 		}
 		printk(KERN_INFO
 		       "%s: revision 0x%04x, using %d bit DMA and register offset %d\n",
-		       dev->name, sr, lp->dma_bitmode?32:16, lp->reg_offset);
+		       dev->name, sr, dma_bitmode?32:16, reg_offset);
 	}
+	
 
+	/* this carries my sincere apologies -- by the time I got to updating
+	   the driver, support for "reg_offsets" appeares nowhere in the sonic
+	   code, going back for over a year.  Fortunately, my Mac does't seem
+	   to use whatever this was.
 
+	   If you know how this is supposed to be implemented, either fix it,
+	   or contact me (sammy@oh.verio.com) to explain what it is. --Sam */
+	   
+	if(reg_offset) {
+		printk("%s: register offset unsupported.  please fix this if you know what it is.\n", dev->name);
+		return -ENODEV;
+	}
+	
 	/* Software reset, then initialize control registers. */
 	sonic_write(dev, SONIC_CMD, SONIC_CR_RST);
 	sonic_write(dev, SONIC_DCR, SONIC_DCR_BMS |
 		    SONIC_DCR_RFT1 | SONIC_DCR_TFT0 | SONIC_DCR_EXBUS |
-		    (lp->dma_bitmode ? SONIC_DCR_DW : 0));
+		    (dma_bitmode ? SONIC_DCR_DW : 0));
+
 	/* This *must* be written back to in order to restore the
            extended programmable output bits */
 	sonic_write(dev, SONIC_DCR2, 0);
@@ -452,7 +505,7 @@ int __init mac_nubus_sonic_probe(struct net_device* dev)
 	u16 sonic_dcr;
 	int id;
 	int i;
-	int reg_offset, dma_bitmode;
+	int dma_bitmode;
 
 	/* Find the first SONIC that hasn't been initialized already */
 	while ((ndev = nubus_find_type(NUBUS_CAT_NETWORK,
@@ -538,8 +591,6 @@ int __init mac_nubus_sonic_probe(struct net_device* dev)
 	memset(lp, 0, sizeof(struct sonic_local));
 	/* Danger!  My arms are flailing wildly!  You *must* set this
            before using sonic_read() */
-	lp->reg_offset = reg_offset;
-	lp->dma_bitmode = dma_bitmode;
 	dev->base_addr = base_addr;
 	dev->irq = SLOT2IRQ(ndev->board->slot);
 
@@ -551,6 +602,11 @@ int __init mac_nubus_sonic_probe(struct net_device* dev)
 	       dev->name, ndev->board->name, ndev->board->slot);
 	printk(KERN_INFO "%s: revision 0x%04x, using %d bit DMA and register offset %d\n",
 	       dev->name, sonic_read(dev, SONIC_SR), dma_bitmode?32:16, reg_offset);
+
+	if(reg_offset) {
+		printk("%s: register offset unsupported.  please fix this if you know what it is.\n", dev->name);
+		return -ENODEV;
+	}
 
 	/* Software reset, then initialize control registers. */
 	sonic_write(dev, SONIC_CMD, SONIC_CR_RST);
@@ -614,6 +670,9 @@ cleanup_module(void)
 #define vdma_free(baz)
 #define sonic_chiptomem(bat) (bat)
 #define PHYSADDR(quux) (quux)
+
+#define sonic_request_irq       request_irq
+#define sonic_free_irq          free_irq
 
 #include "sonic.c"
 

@@ -416,7 +416,7 @@ acpi_processor_idle (void)
 	 * Interrupts must be disabled during bus mastering calculations and
 	 * for C2/C3 transitions.
 	 */
-	__cli();
+	local_irq_disable();
 
 	cx = &(pr->power.states[pr->power.state]);
 
@@ -461,7 +461,7 @@ acpi_processor_idle (void)
 		 *      issues (e.g. floppy DMA transfer overrun/underrun).
 		 */
 		if (pr->power.bm_activity & cx->demotion.threshold.bm) {
-			__sti();
+			local_irq_enable();
 			next_state = cx->demotion.state;
 			goto end;
 		}
@@ -497,7 +497,7 @@ acpi_processor_idle (void)
 		/* Get end time (ticks) */
 		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
 		/* Re-enable interrupts */
-		__sti();
+		local_irq_enable();
 		/* Compute time (ticks) that we were actually asleep */
 		sleep_ticks = ticks_elapsed(t1, t2) - cx->latency_ticks - C2_OVERHEAD;
 		break;
@@ -516,13 +516,13 @@ acpi_processor_idle (void)
 		/* Enable bus master arbitration */
 		acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_DO_NOT_LOCK);
 		/* Re-enable interrupts */
-		__sti();
+		local_irq_enable();
 		/* Compute time (ticks) that we were actually asleep */
 		sleep_ticks = ticks_elapsed(t1, t2) - cx->latency_ticks - C3_OVERHEAD;
 		break;
 
 	default:
-		__sti();
+		local_irq_enable();
 		return;
 	}
 
@@ -1170,7 +1170,7 @@ acpi_processor_get_throttling (
 
 	pr->throttling.state = 0;
 
-	__cli();
+	local_irq_disable();
 
 	duty_mask = pr->throttling.state_count - 1;
 
@@ -1192,7 +1192,7 @@ acpi_processor_get_throttling (
 
 	pr->throttling.state = state;
 
-	__sti();
+	local_irq_enable();
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 		"Throttling state is T%d (%d%% throttling applied)\n",
@@ -1225,7 +1225,7 @@ acpi_processor_set_throttling (
 	if (state == pr->throttling.state)
 		return_VALUE(0);
 
-	__cli();
+	local_irq_disable();
 
 	/*
 	 * Calculate the duty_value and duty_mask.
@@ -1267,7 +1267,7 @@ acpi_processor_set_throttling (
 
 	pr->throttling.state = state;
 
-	__sti();
+	local_irq_enable();
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 		"Throttling state set to T%d (%d%%)\n", state, 

@@ -7,7 +7,7 @@ export-objs		:= zorro.o
 obj-$(CONFIG_ZORRO)	+= zorro.o names.o
 obj-$(CONFIG_PROC_FS)	+= proc.o
 
-host-progs 		:= gen_devlist
+host-progs 		:= gen-devlist
 
 include $(TOPDIR)/Rules.make
 

@@ -253,7 +253,7 @@ void smp_reschedule_irq(void)
 /* Stopping processors. */
 void smp_stop_cpu_irq(void)
 {
-	__sti();
+	local_irq_enable();
 	while(1)
 		barrier();
 }

@@ -453,7 +453,7 @@ void __init smp_callin(void)
 		clear_local_APIC();
 	setup_local_APIC();
 
-	__sti();
+	local_irq_enable();
 
 #ifdef CONFIG_MTRR
 	/*

@@ -62,24 +62,22 @@ extern struct task_struct *_switch_to(struct task_struct *, struct task_struct *
 #endif
 
 /* interrupt control */
-#define __save_flags(x)	__asm__ __volatile__("ssm 0, %0" : "=r" (x) : : "memory")
-#define __restore_flags(x) __asm__ __volatile__("mtsm %0" : : "r" (x) : "memory")
-#define __cli()	__asm__ __volatile__("rsm %0,%%r0\n" : : "i" (PSW_I) : "memory" )
-#define __sti()	__asm__ __volatile__("ssm %0,%%r0\n" : : "i" (PSW_I) : "memory" )
+#define local_save_flags(x)	__asm__ __volatile__("ssm 0, %0" : "=r" (x) : : "memory")
+#define local_irq_restore(x)	__asm__ __volatile__("mtsm %0" : : "r" (x) : "memory")
+#define local_irq_disable()	__asm__ __volatile__("rsm %0,%%r0\n" : : "i" (PSW_I) : "memory" )
+#define local_irq_enable()	__asm__ __volatile__("ssm %0,%%r0\n" : : "i" (PSW_I) : "memory" )
 
 #define local_irq_save(x) \
 	__asm__ __volatile__("rsm %1,%0" : "=r" (x) :"i" (PSW_I) : "memory" )
 #define local_irq_restore(x) \
 	__asm__ __volatile__("mtsm %0" : : "r" (x) : "memory" )
-#define local_irq_disable() __cli()
-#define local_irq_enable()  __sti()
 
 #ifdef CONFIG_SMP
 #else
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
+#define cli() local_irq_disable()
+#define sti() local_irq_enable()
+#define save_flags(x) local_save_flags(x)
+#define restore_flags(x) local_irq_restore(x)
 #endif
 
 

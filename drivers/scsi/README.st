@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai M{kisara (email
 Kai.Makisara@metla.fi)
 
-Last modified: Tue Jun 18 18:13:50 2002 by makisara
+Last modified: Mon Jul 15 16:30:40 2002 by makisara
 
 
 BASICS
@@ -118,7 +118,6 @@ allowed if ST_BUFFER_WRITES is non-zero. Buffer allocation uses chunks of
 memory having sizes 2^n * (page size). Because of this the actual
 buffer size may be larger than the minimum allowable buffer size.
 
-
 Asynchronous writing. Writing the buffer contents to the tape is
 started and the write call returns immediately. The status is checked
 at the next tape operation.
@@ -163,12 +162,24 @@ is smaller than the number of segments used in phases 1 and 2,
 extending the buffer will always fail.
 
 
+EOM BEHAVIOUR WHEN WRITING
+
+When the end of medium early warning is encountered, the current write
+is finished and the number of bytes is returned. The next write
+returns -1 and errno is set to ENOSPC. To enable writing a trailer,
+the next write is allowed to proceed and, if successful, the number of
+bytes is returned. After this, -1 and the number of bytes are
+alternately returned until the physical end of medium (or some other
+error) is encountered.
+
+
 MODULE PARAMETERS
 
 The buffer size, write threshold, and the maximum number of allocated buffers
 are configurable when the driver is loaded as a module. The keywords are:
 
-buffer_kbs=xxx             the buffer size in kilobytes is set to xxx
+buffer_kbs=xxx             the buffer size for fixed block mode is set
+			   to xxx kilobytes
 write_threshold_kbs=xxx    the write threshold in kilobytes set to xxx
 max_buffers=xxx            the maximum number of tape buffer set to xxx
 max_sg_segs=xxx		   the maximum number of scatter/gather
@@ -188,17 +199,15 @@ a comma (no spaces allowed). A colon can be used instead of the equal
 mark. The definition is prepended by the string st=. Here is an
 example:
 
-	st=buffer_kbs:64,max_buffers:2
+	st=buffer_kbs:64,write_threhold_kbs:60
 
 The following syntax used by the old kernel versions is also supported:
 
-           st=aa[,bb[,cc[,dd]]]
+           st=aa[,bb[,dd]]
 
 where
-  aa is the buffer size in 1024 byte units
+  aa is the buffer size for fixed block mode in 1024 byte units
   bb is the write threshold in 1024 byte units
-  cc is the maximum number of tape buffers to allocate (the number of
-        buffers is bounded also by the number of drives detected)
   dd is the maximum number of scatter/gather segments
 
 
@@ -231,7 +240,9 @@ MTOFFL  Set device off line (often rewind plus eject).
 MTNOP   Do nothing except flush the buffers.
 MTRETEN Re-tension tape.
 MTEOM   Space to end of recorded data.
-MTERASE Erase tape.
+MTERASE Erase tape. If the argument is zero, the short erase command
+	is used. The long erase command is used with all other values
+	of the argument.
 MTSEEK	Seek to tape block count. Uses Tandberg-compatible seek (QFA)
         for SCSI-1 drives and SCSI-2 seek for SCSI-2 drives. The file and
 	block numbers in the status are not valid after a seek.

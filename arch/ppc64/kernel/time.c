@@ -53,7 +53,6 @@
 #include <asm/nvram.h>
 #include <asm/cache.h>
 #include <asm/machdep.h>
-#include <asm/init.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/HvCallXm.h>
 #endif
@@ -183,9 +182,9 @@ static __inline__ void timer_sync_xtime( unsigned long cur_tb )
 #ifdef CONFIG_PPC_ISERIES
 
 /* 
- * This function recalibrates the timebase based on the 49-bit time-of-day value in the Titan chip.
- * The Titan is much more accurate than the value returned by the service processor for the
- * timebase frequency.  
+ * This function recalibrates the timebase based on the 49-bit time-of-day
+ * value in the Titan chip.  The Titan is much more accurate than the value
+ * returned by the service processor for the timebase frequency.  
  */
 
 static void iSeries_tb_recal(void)
@@ -256,7 +255,7 @@ int timer_interrupt(struct pt_regs * regs)
 	unsigned long cpu = lpaca->xPacaIndex;
 	struct ItLpQueue * lpq;
 
-	irq_enter(cpu);
+	irq_enter();
 
 #ifndef CONFIG_PPC_ISERIES
 	if (!user_mode(regs))
@@ -270,7 +269,7 @@ int timer_interrupt(struct pt_regs * regs)
 #ifdef CONFIG_SMP
 		smp_local_timer_interrupt(regs);
 #endif
-		if (cpu == 0) {
+		if (cpu == boot_cpuid) {
 			write_lock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
@@ -292,7 +291,7 @@ int timer_interrupt(struct pt_regs * regs)
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs); 
 
-	irq_exit(cpu);
+	irq_exit();
 
 	if (softirq_pending(cpu))
 		do_softirq();
@@ -485,10 +484,10 @@ void __init time_init(void)
  * After adjtimex is called, adjust the conversion of tb ticks
  * to microseconds to keep do_gettimeofday synchronized 
  * with ntpd.
-
+ *
  * Use the time_adjust, time_freq and time_offset computed by adjtimex to 
  * adjust the frequency.
-*/
+ */
 
 /* #define DEBUG_PPC_ADJTIMEX 1 */
 
@@ -531,8 +530,11 @@ void ppc_adjtimex(void)
 		
 		/* Compute parts per million frequency adjustment to match time_adjust */
 		singleshot_ppm = tickadj * HZ;	
-		/* The adjustment should be tickadj*HZ to match the code in linux/kernel/timer.c, but
-		   experiments show that this is too large. 3/4 of tickadj*HZ seems about right */
+		/*
+		 * The adjustment should be tickadj*HZ to match the code in
+		 * linux/kernel/timer.c, but experiments show that this is too
+		 * large. 3/4 of tickadj*HZ seems about right
+		 */
 		singleshot_ppm -= singleshot_ppm / 4;
 		/* Use SHIFT_USEC to get it into the same units as time_freq */	
 		singleshot_ppm <<= SHIFT_USEC;

@@ -191,7 +191,9 @@ static int __init via_cuda_start(void)
     if (via == NULL)
 	return -ENODEV;
 
+#ifdef CONFIG_PPC
     request_OF_resource(vias, 0, NULL);
+#endif
 
     if (request_irq(CUDA_IRQ, cuda_interrupt, 0, "ADB", cuda_interrupt)) {
 	printk(KERN_ERR "cuda_init: can't get irq %d\n", CUDA_IRQ);
@@ -224,12 +226,19 @@ cuda_probe()
 static int __init
 cuda_init(void)
 {
+#ifdef CONFIG_PPC
     if (via == NULL)
 	return -ENODEV;
-#ifndef CONFIG_PPC
+    return 0;
+#else 
+    int err = cuda_init_via();
+    if (err) {
+	printk(KERN_ERR "cuda_init_via() failed\n");
+	return -ENODEV;
+    }
+
     return via_cuda_start();
 #endif
-    return 0;
 }
 #endif /* CONFIG_ADB */
 

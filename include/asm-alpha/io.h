@@ -31,7 +31,7 @@
 static inline void __set_hae(unsigned long new_hae)
 {
 	unsigned long flags;
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	alpha_mv.hae_cache = new_hae;
 	*alpha_mv.hae_register = new_hae;
@@ -39,7 +39,7 @@ static inline void __set_hae(unsigned long new_hae)
 	/* Re-read to make sure it was written.  */
 	new_hae = *alpha_mv.hae_register;
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void set_hae(unsigned long new_hae)

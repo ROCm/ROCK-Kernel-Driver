@@ -483,10 +483,12 @@
 #define	PVR_REV(pvr)  (((pvr) >>   0) & 0xFFFF)	/* Revison field */
 
 /* Processor Version Numbers */
+#define PV_NORTHSTAR	0x0033
 #define	PV_PULSAR	0x0034
 #define	PV_POWER4	0x0035
 #define	PV_ICESTAR	0x0036
 #define	PV_SSTAR	0x0037
+#define	PV_POWER4p	0x0038
 #define	PV_630        	0x0040
 #define	PV_630p	        0x0041
 
@@ -710,6 +712,18 @@ static inline void prefetchw(const void *x)
 }
 
 #define spin_lock_prefetch(x)	prefetchw(x)
+
+#define cpu_has_largepage()	(__is_processor(PV_POWER4) || \
+				 __is_processor(PV_POWER4p))
+
+#define cpu_has_slb()		(__is_processor(PV_POWER4) || \
+				 __is_processor(PV_POWER4p))
+
+#define cpu_has_tlbiel()	(__is_processor(PV_POWER4) || \
+				 __is_processor(PV_POWER4p))
+
+#define cpu_has_noexecute()	(__is_processor(PV_POWER4) || \
+				 __is_processor(PV_POWER4p))
 
 #endif /* ASSEMBLY */
 

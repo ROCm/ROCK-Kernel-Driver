@@ -140,30 +140,30 @@ extern void _do_write_unlock(rwlock_t *rw);
 
 #define _raw_read_lock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_read_lock(lock, "read_lock"); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #define _raw_read_unlock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_read_unlock(lock, "read_unlock"); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #define _raw_write_lock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_write_lock(lock, "write_lock"); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #define _raw_write_unlock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_write_unlock(lock); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #endif /* CONFIG_DEBUG_SPINLOCK */

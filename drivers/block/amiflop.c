@@ -71,6 +71,7 @@
 #include <linux/amifdreg.h>
 #include <linux/amifd.h>
 #include <linux/ioport.h>
+#include <linux/buffer_head.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>
@@ -1849,8 +1850,6 @@ int __init amiga_floppy_init(void)
 
 	/* init ms timer */
 	ciaa.crb = 8; /* one-shot, stop */
-
-	(void)do_floppy; /* avoid warning about unused variable */
 	return 0;
 }
 

@@ -58,7 +58,7 @@ static void indy_sc_wback_invalidate(unsigned long addr, unsigned long size)
 	first_line = SC_INDEX(addr);
 	last_line = SC_INDEX(addr + size - 1);
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	if (first_line <= last_line) {
 		indy_sc_wipe(first_line, last_line);
 		goto out;
@@ -67,7 +67,7 @@ static void indy_sc_wback_invalidate(unsigned long addr, unsigned long size)
 	indy_sc_wipe(first_line, SC_SIZE - SC_LINE);
 	indy_sc_wipe(0, last_line);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void inline indy_sc_enable(void)

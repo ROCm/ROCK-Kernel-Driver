@@ -152,8 +152,8 @@ static void adi_read_packet(struct adi_port *port)
 		s[i] = 0;
 	}
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 
 	gameport_trigger(gameport);
 	v = z = gameport_read(gameport);
@@ -172,7 +172,7 @@ static void adi_read_packet(struct adi_port *port)
 		}
 	} while (t[0] > 0 || t[1] > 0);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return;
 }

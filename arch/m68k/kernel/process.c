@@ -24,6 +24,7 @@
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/reboot.h>
+#include <linux/init_task.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -33,7 +34,7 @@
 #include <asm/pgtable.h>
 
 /*
- * Initial task structure. Make this a per-architecture thing,
+ * Initial task/thread structure. Make this a per-architecture thing,
  * because different architectures tend to have different
  * alignment requirements and potentially different initial
  * setup.
@@ -43,12 +44,32 @@ static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 
-union task_union init_task_union
-__attribute__((section("init_task"), aligned(THREAD_SIZE)))
-	= { task: INIT_TASK(init_task_union.task) };
+union thread_union init_thread_union
+__attribute__((section(".data.init_task"), aligned(THREAD_SIZE)))
+       = { INIT_THREAD_INFO(init_task) };
+
+/* initial task structure */
+struct task_struct init_task = INIT_TASK(init_task);
+
 
 asmlinkage void ret_from_fork(void);
 
+
+/*
+ * Return saved PC from a blocked thread
+ */
+unsigned long thread_saved_pc(struct task_struct *tsk)
+{
+	extern void scheduling_functions_start_here(void);
+	extern void scheduling_functions_end_here(void);
+	struct switch_stack *sw = (struct switch_stack *)tsk->thread.ksp;
+	/* Check whether the thread is blocked in resume() */
+	if (sw->retpc > (unsigned long)scheduling_functions_start_here &&
+	    sw->retpc < (unsigned long)scheduling_functions_end_here)
+		return ((unsigned long *)sw->a6)[1];
+	else
+		return sw->retpc;
+}
 
 /*
  * The idle loop on an m68k..
@@ -133,23 +154,26 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	register long retval __asm__ ("d0");
 	register long clone_arg __asm__ ("d1") = flags | CLONE_VM;
 
+	retval = __NR_clone;
 	__asm__ __volatile__
 	  ("clrl %%d2\n\t"
 	   "trap #0\n\t"		/* Linux/m68k system call */
 	   "tstl %0\n\t"		/* child or parent */
 	   "jne 1f\n\t"			/* parent - jump */
 	   "lea %%sp@(%c7),%6\n\t"	/* reload current */
+	   "movel %6@,%6\n\t"
 	   "movel %3,%%sp@-\n\t"	/* push argument */
 	   "jsr %4@\n\t"		/* call fn */
 	   "movel %0,%%d1\n\t"		/* pass exit value */
-	   "movel %2,%0\n\t"		/* exit */
+	   "movel %2,%%d0\n\t"		/* exit */
 	   "trap #0\n"
 	   "1:"
-	   : "=d" (retval)
-	   : "0" (__NR_clone), "i" (__NR_exit),
+	   : "+d" (retval)
+	   : "i" (__NR_clone), "i" (__NR_exit),
 	     "r" (arg), "a" (fn), "d" (clone_arg), "r" (current),
 	     "i" (-THREAD_SIZE)
-	   : "d0", "d2");
+	   : "d2");
+
 	pid = retval;
 	}
 
@@ -366,7 +390,7 @@ unsigned long get_wchan(struct task_struct *p)
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
 
-	stack_page = (unsigned long)p;
+	stack_page = (unsigned long)(p->thread_info);
 	fp = ((struct switch_stack *)p->thread.ksp)->a6;
 	do {
 		if (fp < stack_page+sizeof(struct task_struct) ||

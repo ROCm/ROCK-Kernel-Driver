@@ -18,7 +18,6 @@ struct naca_struct {
 	u64 xRamDiskSize;		/* In pages */
 	struct paca_struct *paca;	/* Ptr to an array of pacas */
 	u64 debug_switch;		/* Bits to control debug printing */
-	u16 processorCount;		/* # of physical processors */
 	u16 dCacheL1LineSize;		/* Line size of L1 DCache in bytes */
 	u16 dCacheL1LogLineSize;	/* Log-2 of DCache line size */
 	u16 dCacheL1LinesPerPage;	/* DCache lines per page */

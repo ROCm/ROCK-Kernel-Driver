@@ -22,6 +22,19 @@
 #include <asm/io.h>
 #ifndef CONFIG_AMIGA
 #include <asm/vga.h>
+#else
+/*
+ * FIXME
+ * Ugh, we don't have PCI space, so map readb() and friends to use Zorro space
+ * for MMIO accesses. This should make clgenfb work again on Amiga
+ */
+#define inb(port)	0
+#define inw(port)	0
+#define outb(port, val)	do { } while (0)
+#define outw(port, val)	do { } while (0)
+#define readb		z_readb
+#define writeb		z_writeb
+#define writew		z_writew
 #endif
 #include <asm/byteorder.h>
 

@@ -25,8 +25,6 @@
 int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
 void make_slbe(unsigned long esid, unsigned long vsid, int large);
 
-#define cpu_has_slb()	(__is_processor(PV_POWER4))
-
 /*
  * Build an entry for the base kernel segment and put it into
  * the segment table or SLB.  All other segment table or SLB
@@ -371,7 +369,7 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 		/* Force previous translations to complete. DRENG */
 		asm volatile("isync" : : : "memory");
 
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		if (get_paca()->stab_cache_pointer != 0xff && !STAB_PRESSURE) {
 			int i;
 			unsigned char *segments = get_paca()->xSegments;
@@ -417,7 +415,7 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 		}
 
 		get_paca()->stab_cache_pointer = 0;
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
 	if (ppc64_stab_preload)

@@ -298,14 +298,14 @@ EXPORT_SYMBOL(screen_info);
 
 EXPORT_SYMBOL(__delay);
 #ifndef INLINE_IRQS
-EXPORT_SYMBOL(__sti);
-EXPORT_SYMBOL(__sti_end);
-EXPORT_SYMBOL(__cli);
-EXPORT_SYMBOL(__cli_end);
-EXPORT_SYMBOL(__save_flags_ptr);
-EXPORT_SYMBOL(__save_flags_ptr_end);
-EXPORT_SYMBOL(__restore_flags);
-EXPORT_SYMBOL(__restore_flags_end);
+EXPORT_SYMBOL(local_irq_enable);
+EXPORT_SYMBOL(local_irq_enable_end);
+EXPORT_SYMBOL(local_irq_disable);
+EXPORT_SYMBOL(local_irq_disable_end);
+EXPORT_SYMBOL(local_save_flags_ptr);
+EXPORT_SYMBOL(local_save_flags_ptr_end);
+EXPORT_SYMBOL(local_irq_restore);
+EXPORT_SYMBOL(local_irq_restore_end);
 #endif
 EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(irq_desc);

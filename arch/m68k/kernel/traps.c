@@ -224,7 +224,7 @@ static inline void access_error060 (struct frame *fp)
 		unsigned long addr = fp->un.fmt4.effaddr;
 
 		if (fslw & MMU060_MA)
-			addr = (addr + 7) & -8;
+			addr = (addr + PAGE_SIZE - 1) & PAGE_MASK;
 
 		errorcode = 1;
 		if (fslw & MMU060_DESC_ERR) {
@@ -258,16 +258,12 @@ static inline unsigned long probe040(int iswrite, unsigned long addr, int wbs)
 
 	set_fs(MAKE_MM_SEG(wbs));
 
-	asm volatile (".chip 68040");
-
 	if (iswrite)
-		asm volatile ("ptestw (%0)" : : "a" (addr));
+		asm volatile (".chip 68040; ptestw (%0); .chip 68k" : : "a" (addr));
 	else
-		asm volatile ("ptestr (%0)" : : "a" (addr));
+		asm volatile (".chip 68040; ptestr (%0); .chip 68k" : : "a" (addr));
 
-	asm volatile ("movec %%mmusr,%0" : "=r" (mmusr));
-
-	asm volatile (".chip 68k");
+	asm volatile (".chip 68040; movec %%mmusr,%0; .chip 68k" : "=r" (mmusr));
 
 	set_fs(old_fs); 
 
@@ -455,6 +451,7 @@ extern inline void bus_error030 (struct frame *fp)
 	unsigned char buserr_type = sun3_get_buserr ();
 	unsigned long addr, errorcode;
 	unsigned short ssw = fp->un.fmtb.ssw;
+	extern unsigned long _sun3_map_test_start, _sun3_map_test_end;
 
 #if DEBUG
 	if (ssw & (FC | FB))
@@ -494,6 +491,13 @@ extern inline void bus_error030 (struct frame *fp)
 				printk ("Instruction fault at %#010lx\n",
 					fp->ptregs.pc);
 			if (ssw & DF) {
+				/* was this fault incurred testing bus mappings? */
+				if((fp->ptregs.pc >= (unsigned long)&_sun3_map_test_start) &&
+				   (fp->ptregs.pc <= (unsigned long)&_sun3_map_test_end)) {
+					send_fault_sig(&fp->ptregs);
+					return;
+				}
+
 				printk ("Data %s fault at %#010lx in %s (pc=%#lx)\n",
 					ssw & RW ? "read" : "write",
 					fp->un.fmtb.daddr,
@@ -820,8 +824,9 @@ extern struct module kernel_module;
 
 static inline int kernel_text_address(unsigned long addr)
 {
+#ifdef CONFIG_MODULES
 	struct module *mod;
-	int retval = 0;
+#endif
 	extern char _stext, _etext;
 
 	if (addr >= (unsigned long) &_stext &&
@@ -833,14 +838,12 @@ static inline int kernel_text_address(unsigned long addr)
 		/* mod_bound tests for addr being inside the vmalloc'ed
 		 * module area. Of course it'd be better to test only
 		 * for the .text subset... */
-		if (mod_bound(addr, 0, mod)) {
-			retval = 1;
-			break;
-		}
+		if (mod_bound(addr, 0, mod))
+			return 1;
 	}
 #endif
 
-	return retval;
+	return 0;
 }
 
 void show_trace(unsigned long *stack)

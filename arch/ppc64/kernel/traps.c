@@ -172,8 +172,9 @@ MachineCheckException(struct pt_regs *regs)
 	if (!user_mode(regs)) {
 		/* Attempt to recover if the interrupt is recoverable */
 		if (regs->msr & MSR_RI) {
-			if (__is_processor(PV_POWER4) &&
-			    power4_handle_mce(regs))
+			if ((__is_processor(PV_POWER4) ||
+			     __is_processor(PV_POWER4p)) &&
+			     power4_handle_mce(regs))
 				return;
 		}
 

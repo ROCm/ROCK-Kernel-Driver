@@ -14,6 +14,7 @@
 #include <linux/smp.h>
 #include <linux/mm.h>
 #include <linux/reboot.h>
+#include <linux/delay.h>
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>
@@ -123,11 +124,7 @@ static void mem_translate(void);
 static void mem_check(void);
 static void mem_find_real(void);
 static void mem_find_vsid(void);
-static void mem_check_pagetable_vsids (void);
 
-static void mem_map_check_slab(void);
-static void mem_map_lock_pages(void);
-static void mem_check_dup_rpn (void);
 static void debug_trace(void);
 
 extern int print_insn_big_powerpc(FILE *, unsigned long, unsigned long);
@@ -187,13 +184,6 @@ static int xmon_trace[NR_CPUS];
 extern inline void sync(void)
 {
 	asm volatile("sync; isync");
-}
-
-extern inline void __delay(unsigned int loops)
-{
-	if (loops != 0)
-		__asm__ __volatile__("mtctr %0; 1: bdnz 1b" : :
-				     "r" (loops) : "ctr");
 }
 
 /* (Ref: 64-bit PowerPC ELF ABI Spplement; Ian Lance Taylor, Zembu Labs).
@@ -440,11 +430,11 @@ void
 xmon_irq(int irq, void *d, struct pt_regs *regs)
 {
 	unsigned long flags;
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	printf("Keyboard interrupt\n");
 	xmon(regs);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 int
@@ -552,7 +542,7 @@ insert_bpts()
 		}
 	}
 
-	if (!__is_processor(PV_POWER4)) {
+	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
 		if (dabr.enabled)
 			set_dabr(dabr.address);
 		if (iabr.enabled)
@@ -569,7 +559,7 @@ remove_bpts()
 
 	if (naca->platform != PLATFORM_PSERIES)
 		return;
-	if (!__is_processor(PV_POWER4)) {
+	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
 		set_dabr(0);
 		set_iabr(0);
 	}
@@ -642,26 +632,14 @@ cmds(struct pt_regs *excp)
 			case 'c':
 				mem_check();
 				break;
-			case 'j':
-				mem_map_check_slab();
-				break;
 			case 'f':
 				mem_find_real();
 				break;
 			case 'e':
 				mem_find_vsid();
 				break;
-			case 'r':
-				mem_check_dup_rpn();
-				break;           
 			case 'i':
 				show_mem();
-				break;
-			case 'o':
-				mem_check_pagetable_vsids ();
-				break;
-			case 'q':
-				mem_map_lock_pages() ;
 				break;
 			default:
 				termch = cmd;
@@ -866,7 +844,7 @@ bpt_cmds(void)
 	cmd = inchar();
 	switch (cmd) {
 	case 'd':	/* bd - hardware data breakpoint */
-		if (__is_processor(PV_POWER4)) {
+		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
 			printf("Not implemented on POWER4\n");
 			break;
 		}
@@ -886,7 +864,7 @@ bpt_cmds(void)
 			dabr.address = (dabr.address & ~7) | mode;
 		break;
 	case 'i':	/* bi - hardware instr breakpoint */
-		if (__is_processor(PV_POWER4)) {
+		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
 			printf("Not implemented on POWER4\n");
 			break;
 		}
@@ -2456,249 +2434,6 @@ void mem_find_vsid()
 		}
 	}
 	printf("\nDone -------------------\n");
-}
-
-void mem_map_check_slab()
-{
-	int i, slab_count;
-
-	i = max_mapnr;
-	slab_count = 0;
-	
-	while (i-- > 0)  {
-		if (PageSlab(mem_map+i)){
-			printf(" slab entry - mem_map entry =%p  \n", mem_map+i);
-			slab_count ++;
-		}
-	}
-
-	printf(" count of pages for slab = %d \n", slab_count);
-}
-
-void mem_map_lock_pages()
-{
-	int i, lock_count;
-
-	i = max_mapnr;
-	lock_count = 0;
-	
-	while (i-- > 0)  {
-		if (PageLocked(mem_map+i)){
-			printf(" locked entry - mem_map entry =%p  \n", mem_map+i);
-			lock_count ++;
-		}
-	}
-
-	printf(" count of locked pages = %d \n", lock_count); 
-}
-
-void mem_check_dup_rpn ()
-{
-	unsigned long htab_size_bytes;
-	unsigned long htab_end;
-	unsigned long last_rpn;
-	HPTE *hpte1, *hpte2;
-	int dup_count;
-	struct task_struct *p;
-	unsigned long kernel_vsid_c0,kernel_vsid_c1,kernel_vsid_c2,kernel_vsid_c3;
-	unsigned long kernel_vsid_c4,kernel_vsid_c5,kernel_vsid_d,kernel_vsid_e;
-	unsigned long kernel_vsid_f;
-	unsigned long vsid0,vsid1,vsidB,vsid2;
-
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-	// last_rpn = (naca->physicalMemorySize-1) >> PAGE_SHIFT;
-	last_rpn = 0xfffff;
-
-	printf("\nHardware Page Table Check\n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-
-	for(hpte1 = htab_data.htab; hpte1 < (HPTE *)htab_end; hpte1++) {
-		if ( hpte1->dw0.dw0.v != 0 ) {
-			if ( hpte1->dw1.dw1.rpn <= last_rpn ) {
-				dup_count = 0;
-				for(hpte2 = hpte1+1; hpte2 < (HPTE *)htab_end; hpte2++) {
-					if ( hpte2->dw0.dw0.v != 0 ) {
-						if(hpte1->dw1.dw1.rpn == hpte2->dw1.dw1.rpn) {
-							dup_count++;
-						}
-					}
-				}
-				if(dup_count > 5) {
-					printf(" Duplicate rpn: %.13lx \n", (hpte1->dw1.dw1.rpn));
-					printf("    mem map array entry %p count = %d \n",
-					       (mem_map+(hpte1->dw1.dw1.rpn)), (mem_map+(hpte1->dw1.dw1.rpn))->count);
-					for(hpte2 = hpte1+1; hpte2 < (HPTE *)htab_end; hpte2++) {
-						if ( hpte2->dw0.dw0.v != 0 ) {
-							if(hpte1->dw1.dw1.rpn == hpte2->dw1.dw1.rpn) {
-								printf("   hpte2: %16.16lx  *hpte2: %16.16lx %16.16lx\n",
-								       hpte2, hpte2->dw0.dword0, hpte2->dw1.dword1);
-							}
-						}
-					}
-				}
-			} else {
-				printf(" Bogus rpn: %.13lx \n", (hpte1->dw1.dw1.rpn));
-				printf("   hpte: %16.16lx  *hpte: %16.16lx %16.16lx\n",
-				       hpte1, hpte1->dw0.dword0, hpte1->dw1.dword1);
-			}
-		}
-		if (xmon_interrupted())
-			return;
-	}                                                                     
-
-
-
-	// print the kernel vsids
-	kernel_vsid_c0 =  get_kernel_vsid(0xC000000000000000);
-	kernel_vsid_c1 =  get_kernel_vsid(0xC000000010000000);
-	kernel_vsid_c2 =  get_kernel_vsid(0xC000000020000000);
-	kernel_vsid_c3 =  get_kernel_vsid(0xC000000030000000);
-	kernel_vsid_c4 =  get_kernel_vsid(0xC000000040000000);
-	kernel_vsid_c5 =  get_kernel_vsid(0xC000000050000000);
-	kernel_vsid_d  =  get_kernel_vsid(0xD000000000000000);
-	kernel_vsid_e  =  get_kernel_vsid(0xE000000000000000);
-	kernel_vsid_f  =  get_kernel_vsid(0xF000000000000000);
-
-	printf(" kernel vsid -  seg c0  = %lx\n",  kernel_vsid_c0 );
-	printf(" kernel vsid -  seg c1  = %lx\n",  kernel_vsid_c1 );
-	printf(" kernel vsid -  seg c2  = %lx\n",  kernel_vsid_c2 );
-	printf(" kernel vsid -  seg c3  = %lx\n",  kernel_vsid_c3 );
-	printf(" kernel vsid -  seg c4  = %lx\n",  kernel_vsid_c4 );
-	printf(" kernel vsid -  seg c5  = %lx\n",  kernel_vsid_c5 );
-	printf(" kernel vsid -  seg d   = %lx\n",  kernel_vsid_d );
-	printf(" kernel vsid -  seg e   = %lx\n",  kernel_vsid_e );
-	printf(" kernel vsid -  seg f   = %lx\n",  kernel_vsid_f );
-
-
-  // print a list of valid vsids for the tasks
-	read_lock(&tasklist_lock);
-	for_each_task(p)
-		if(p->mm) {
-			struct mm_struct *mm = p->mm; 
-			printf(" task = %p  mm =  %lx  pgd   %lx\n", 
-			       p, mm, mm->pgd);
-			vsid0 = get_vsid( mm->context, 0 );
-			vsid1 = get_vsid( mm->context, 0x10000000 );
-			vsid2 = get_vsid( mm->context, 0x20000000 );
-			vsidB = get_vsid( mm->context, 0xB0000000 );
-			printf("            context = %lx  vsid seg 0  = %lx\n",  mm->context, vsid0 );
-			printf("                           vsid seg 1  = %lx\n",  vsid1 );
-			printf("                           vsid seg 2  = %lx\n",  vsid2 );
-			printf("                           vsid seg 2  = %lx\n",  vsidB );
-	  
-			printf("\n");
-		};
-	read_unlock(&tasklist_lock);
-
-	printf("\nDone -------------------\n");
-}
-
-
-
-void mem_check_pagetable_vsids ()
-{
-	unsigned long htab_size_bytes;
-	unsigned long htab_end;
-	unsigned long last_rpn;
-	struct task_struct *p;
-	unsigned long valid_table_count,invalid_table_count,bogus_rpn_count;
-	int found;
-	unsigned long user_address_table_count,kernel_page_table_count;
-	unsigned long pt_vsid;
-	HPTE *hpte1;
-
-
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-	// last_rpn = (naca->physicalMemorySize-1) >> PAGE_SHIFT;
-	last_rpn = 0xfffff;
-
-	printf("\nHardware Page Table Check\n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-	valid_table_count = 0;
-	invalid_table_count = 0;
-	bogus_rpn_count = 0;
-	user_address_table_count = 0;
-	kernel_page_table_count = 0;
-	for(hpte1 = htab_data.htab; hpte1 < (HPTE *)htab_end; hpte1++) {
-		if ( hpte1->dw0.dw0.v != 0 ) {
-			valid_table_count++;
-			if ( hpte1->dw1.dw1.rpn <= last_rpn ) {
-				pt_vsid =  (hpte1->dw0.dw0.avpn) >> 5;
-				if ((pt_vsid == get_kernel_vsid(0xC000000000000000)) |
-				    (pt_vsid == get_kernel_vsid(0xC000000010000000)) |
-				    (pt_vsid == get_kernel_vsid(0xC000000020000000)) |
-				    (pt_vsid == get_kernel_vsid(0xC000000030000000)) |
-				    (pt_vsid == get_kernel_vsid(0xC000000040000000)) |
-				    (pt_vsid == get_kernel_vsid(0xC000000050000000)) |
-				    (pt_vsid == get_kernel_vsid(0xD000000000000000)) |
-				    (pt_vsid == get_kernel_vsid(0xE000000000000000)) |
-				    (pt_vsid == get_kernel_vsid(0xF000000000000000)) ) {
-					kernel_page_table_count ++;
-				} else {
-					read_lock(&tasklist_lock);
-					found = 0;
-					for_each_task(p) {
-						if(p->mm && (found == 0)) {
-							struct mm_struct *mm = p->mm; 
-	     
-							if ((pt_vsid == get_vsid( mm->context, 0 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x10000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x20000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x30000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x40000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x50000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x60000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x70000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x80000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0x90000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0xA0000000 )) |
-							    (pt_vsid == get_vsid( mm->context, 0xB0000000 ))) {
-								user_address_table_count ++;
-								found = 1;
-							}
-						}
-					}
-					read_unlock(&tasklist_lock);
-					if (found == 0)
-					{
-						printf(" vsid not found vsid = %lx, hpte = %p  \n", 
-						       pt_vsid,hpte1);
-						printf("    rpn in entry = %lx \n", hpte1->dw1.dw1.rpn);
-						printf("    mem map address = %lx  \n", mem_map + (hpte1->dw1.dw1.rpn));
-           
-					} else //  found
-					{
-					}
-
-				}  // good rpn
-       
-			} else {
-				bogus_rpn_count ++;
-			}
-		} else {
-			invalid_table_count++;
-		}
-	}                                                                     
-
-
-	printf(" page table valid counts - valid entries = %lx  invalid entries =  %lx \n",
-	       valid_table_count, invalid_table_count);
-
-	printf("  bogus rpn entries ( probably io) = %lx \n", bogus_rpn_count);
-
- 
-  
-	printf(" page table counts - kernel entries = %lx  user entries =  %lx \n",
-	       kernel_page_table_count, user_address_table_count); 
-
-	printf("\nDone -------------------\n");
-
 }
 
 static void debug_trace(void) {

@@ -28,7 +28,6 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 #include <linux/init.h>
-/* #include <linux/openpic.h> */
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <linux/err.h>
@@ -40,7 +39,6 @@
 #include <asm/pgtable.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
-#include <asm/init.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
@@ -56,19 +54,17 @@
 
 int smp_threads_ready = 0;
 volatile int smp_commenced = 0;
-int smp_num_cpus = 1;
 int smp_tb_synchronized = 0;
 spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 unsigned long cache_decay_ticks;
 static int max_cpus __initdata = NR_CPUS;
 
-unsigned long cpu_online_map;
+/* initialised so it doesnt end up in bss */
+unsigned long cpu_online_map = 0;
+int boot_cpuid = 0;
+int ppc64_is_smp = 0;
 
 volatile unsigned long cpu_callin_map[NR_CPUS] = {0,};
-
-#define TB_SYNC_PASSES 4
-volatile unsigned long __initdata tb_sync_flag = 0;
-volatile unsigned long __initdata tb_offset = 0;
 
 extern unsigned char stab_array[];
 
@@ -104,7 +100,7 @@ void iSeries_smp_message_recv( struct pt_regs * regs )
 	int cpu = smp_processor_id();
 	int msg;
 
-	if ( smp_num_cpus < 2 )
+	if ( num_online_cpus() < 2 )
 		return;
 
 	for ( msg = 0; msg < 4; ++msg )
@@ -116,11 +112,16 @@ void iSeries_smp_message_recv( struct pt_regs * regs )
 static void smp_iSeries_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	int i;
-	for (i = 0; i < smp_num_cpus; ++i) {
-		if ( (target == MSG_ALL) || 
-                    (target == i) || 
-                    ((target == MSG_ALL_BUT_SELF) && (i != smp_processor_id())) ) {
-			set_bit( msg, &iSeries_smp_message[i] );
+
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (!cpu_online(i))
+			continue;
+
+		if ((target == MSG_ALL) || 
+		    (target == i) || 
+		    ((target == MSG_ALL_BUT_SELF) &&
+		     (i != smp_processor_id())) ) {
+			set_bit(msg, &iSeries_smp_message[i]);
 			HvCall_sendIPI(&(paca[i]));
 		}
 	}
@@ -141,7 +142,7 @@ static int smp_iSeries_numProcs(void)
 	return np;
 }
 
-static int smp_iSeries_probe(void)
+static void smp_iSeries_probe(void)
 {
 	unsigned i;
 	unsigned np;
@@ -151,13 +152,13 @@ static int smp_iSeries_probe(void)
 	for (i=0; i < MAX_PACAS; ++i) {
 		lpPaca = paca[i].xLpPacaPtr;
 		if ( lpPaca->xDynProcStatus < 2 ) {
+			paca[i].active = 1;
 			++np;
 			paca[i].next_jiffy_update_tb = paca[0].next_jiffy_update_tb;
 		}
 	}
-	
+
 	smp_tb_synchronized = 1;
-	return np;
 }
 
 static void smp_iSeries_kick_cpu(int nr)
@@ -197,8 +198,10 @@ void smp_init_iSeries(void)
 	ppc_md.smp_probe        = smp_iSeries_probe;
 	ppc_md.smp_kick_cpu     = smp_iSeries_kick_cpu;
 	ppc_md.smp_setup_cpu    = smp_iSeries_setup_cpu;
-
+#ifdef CONFIG_PPC_ISERIES
+#warning fix for iseries
 	naca->processorCount	= smp_iSeries_numProcs();
+#endif
 }
 
 
@@ -226,13 +229,10 @@ smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-static int
-smp_chrp_probe(void)
+static void smp_chrp_probe(void)
 {
-	if (naca->processorCount > 1)
+	if (ppc64_is_smp)
 		openpic_request_IPIs();
-
-	return naca->processorCount;
 }
 
 static void
@@ -259,14 +259,14 @@ smp_kick_cpu(int nr)
 
 extern struct gettimeofday_struct do_gtod;
 
-static void smp_space_timers( unsigned nr )
+static void smp_space_timers()
 {
-	unsigned long offset, i;
-	
-	offset = tb_ticks_per_jiffy / nr;
-	for ( i=1; i<nr; ++i ) {
-		paca[i].next_jiffy_update_tb = paca[i-1].next_jiffy_update_tb + offset;
-	}
+	int i;
+	unsigned long offset = tb_ticks_per_jiffy / NR_CPUS;
+
+	for (i = 1; i < NR_CPUS; ++i)
+		paca[i].next_jiffy_update_tb =
+			paca[i-1].next_jiffy_update_tb + offset;
 }
 
 static void
@@ -278,7 +278,7 @@ smp_chrp_setup_cpu(int cpu_nr)
 	if (naca->platform == PLATFORM_PSERIES_LPAR) {
 		/* timebases already synced under the hypervisor. */
 		paca[cpu_nr].next_jiffy_update_tb = tb_last_stamp = get_tb();
-		if (cpu_nr == 0) {
+		if (cpu_nr == boot_cpuid) {
 			do_gtod.tb_orig_stamp = tb_last_stamp;
 			/* Should update do_gtod.stamp_xsec.
 			 * For now we leave it which means the time can be some
@@ -287,9 +287,9 @@ smp_chrp_setup_cpu(int cpu_nr)
 		}
 		smp_tb_synchronized = 1;
 	} else {
-		if (cpu_nr == 0) {
+		if (cpu_nr == boot_cpuid) {
 			/* wait for all the others */
-			while (atomic_read(&ready) < smp_num_cpus)
+			while (atomic_read(&ready) < num_online_cpus())
 				barrier();
 			atomic_set(&ready, 1);
 			/* freeze the timebase */
@@ -297,9 +297,9 @@ smp_chrp_setup_cpu(int cpu_nr)
 			mb();
 			frozen = 1;
 			set_tb(0, 0);
-			paca[0].next_jiffy_update_tb = 0;
-			smp_space_timers(smp_num_cpus);
-			while (atomic_read(&ready) < smp_num_cpus)
+			paca[boot_cpuid].next_jiffy_update_tb = 0;
+			smp_space_timers();
+			while (atomic_read(&ready) < num_online_cpus())
 				barrier();
 			/* thaw the timebase again */
 			rtas_call(rtas_token("thaw-time-base"), 0, 1, NULL);
@@ -323,8 +323,8 @@ smp_chrp_setup_cpu(int cpu_nr)
 	if (OpenPIC_Addr) {
 		do_openpic_setup_cpu();
 	} else {
-	  if (cpu_nr > 0)
-	    xics_setup_cpu();
+		if (cpu_nr != boot_cpuid)
+			xics_setup_cpu();
 	}
 }
 
@@ -333,7 +333,10 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; ++i) {
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (!cpu_online(i))
+			continue;
+
 		if (target == MSG_ALL || target == i
 		    || (target == MSG_ALL_BUT_SELF
 			&& i != smp_processor_id())) {
@@ -344,10 +347,8 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-static int
-smp_xics_probe(void)
+static void smp_xics_probe(void)
 {
-	return naca->processorCount;
 }
 
 /* This is called very early */
@@ -427,7 +428,7 @@ void smp_send_xmon_break(int cpu)
 
 static void stop_this_cpu(void *dummy)
 {
-	__cli();
+	local_irq_disable();
 	while (1)
 		;
 }
@@ -435,7 +436,6 @@ static void stop_this_cpu(void *dummy)
 void smp_send_stop(void)
 {
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
-	smp_num_cpus = 1;
 }
 
 /*
@@ -473,7 +473,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 { 
 	struct call_data_struct data;
-	int ret = -1, cpus = smp_num_cpus-1;
+	int ret = -1, cpus = num_online_cpus()-1;
 	int timeout;
 
 	if (!cpus)
@@ -560,29 +560,23 @@ struct thread_struct *current_set[NR_CPUS] = {&init_thread_union, 0};
 
 void __init smp_boot_cpus(void)
 {
-	int i, cpu_nr;
+	int i, cpu_nr = 0;
 	struct task_struct *p;
 
 	printk("Entering SMP Mode...\n");
 
-	smp_num_cpus = 1;
-        smp_store_cpu_info(0);
-	cpu_online_map = 1UL;
+        smp_store_cpu_info(boot_cpuid);
+	cpu_callin_map[boot_cpuid] = 1;
 
-	/*
-	 * assume for now that the first cpu booted is
-	 * cpu 0, the master -- Cort
-	 */
-	cpu_callin_map[0] = 1;
 	/* XXX buggy - Anton */
 	current_thread_info()->cpu = 0;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		paca[i].prof_counter = 1;
 		paca[i].prof_multiplier = 1;
-		if(i != 0) {
+		if (i != boot_cpuid) {
 		        /*
-			 * Processor 0's segment table is statically 
+			 * the boot cpu segment table is statically 
 			 * initialized to real address 0x5000.  The
 			 * Other processor's tables are created and
 			 * initialized here.
@@ -595,35 +589,36 @@ void __init smp_boot_cpus(void)
 	}
 
 	/*
-	 * XXX very rough. On POWER4 we optimise tlb flushes for
-	 * tasks that only run on one cpu so we increase decay ticks.
+	 * XXX very rough. 
 	 */
-	if (__is_processor(PV_POWER4))
-		cache_decay_ticks = HZ/50;
-	else
-		cache_decay_ticks = HZ/100;
+	cache_decay_ticks = HZ/100;
 
-	/* Probe arch for CPUs */
-	cpu_nr = ppc_md.smp_probe();
+	ppc_md.smp_probe();
 
+	for (i = 0; i < NR_CPUS; i++) {
+		if (paca[i].active)
+			cpu_nr++;
+	}
 	printk("Probe found %d CPUs\n", cpu_nr);
 
-	/*
-	 * only check for cpus we know exist.  We keep the callin map
-	 * with cpus at the bottom -- Cort
-	 */
-	if (cpu_nr > max_cpus)
-		cpu_nr = max_cpus;
-
 #ifdef CONFIG_ISERIES
-	smp_space_timers( cpu_nr );
+	smp_space_timers();
 #endif
 
 	printk("Waiting for %d CPUs\n", cpu_nr-1);
 
-	for ( i = 1 ; i < cpu_nr; i++ ) {
+	for (i = 1 ; i < NR_CPUS; i++) {
 		int c;
 		struct pt_regs regs;
+
+		if (!paca[i].active)
+			continue;
+
+		if (i == boot_cpuid)
+			continue;
+
+		if (num_online_cpus() >= max_cpus)
+			break;
 
 		/* create a process for the processor */
 		/* we don't care about the values in regs since we'll
@@ -668,16 +663,15 @@ void __init smp_boot_cpus(void)
 		{
 			printk("Processor %d found.\n", i);
 			/* this sync's the decr's -- Cort */
-			smp_num_cpus++;
 		} else {
 			printk("Processor %d is stuck.\n", i);
 		}
 	}
 
-	/* Setup CPU 0 last (important) */
-	ppc_md.smp_setup_cpu(0);
-	
-	if (smp_num_cpus < 2) {
+	/* Setup boot cpu last (important) */
+	ppc_md.smp_setup_cpu(boot_cpuid);
+
+	if (num_online_cpus() < 2) {
 	        tb_last_stamp = get_tb();
 		smp_tb_synchronized = 1;
 	}
@@ -699,15 +693,16 @@ void __init smp_callin(void)
 
         smp_store_cpu_info(cpu);
 	set_dec(paca[cpu].default_decr);
-	cpu_callin_map[cpu] = 1;
 	set_bit(smp_processor_id(), &cpu_online_map);
+	smp_mb();
+	cpu_callin_map[cpu] = 1;
 
 	ppc_md.smp_setup_cpu(cpu);
 	
 	while(!smp_commenced) {
 		barrier();
 	}
-	__sti();
+	local_irq_enable();
 }
 
 /* intel needs this */
@@ -729,7 +724,7 @@ void __init smp_setup(char *str, int *ints)
 {
 }
 
-int __init setup_profiling_timer(unsigned int multiplier)
+int setup_profiling_timer(unsigned int multiplier)
 {
 	return 0;
 }

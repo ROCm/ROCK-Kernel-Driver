@@ -263,7 +263,6 @@ mainmenu_option next_comment
 comment 'General setup'
 
 bool 'High memory support' CONFIG_HIGHMEM
-dep_bool '  Support for PTEs in high memory' CONFIG_HIGHPTE $CONFIG_HIGHMEM
 bool 'Prompt for advanced kernel configuration options' CONFIG_ADVANCED_OPTIONS
 if [ "$CONFIG_ADVANCED_OPTIONS" = "y" ]; then
    if [ "$CONFIG_HIGHMEM" = "y" ]; then

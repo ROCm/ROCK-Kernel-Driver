@@ -18,13 +18,10 @@ extern spinlock_t kernel_flag;
 /*
  * Release global kernel lock and global interrupt lock
  */
-#define release_kernel_lock(task, cpu)		\
+#define release_kernel_lock(task)		\
 do {						\
-	if (unlikely(task->lock_depth >= 0)) {	\
+	if (unlikely(task->lock_depth >= 0))	\
 		spin_unlock(&kernel_flag);	\
-		if (global_irq_holder == (cpu))	\
-			BUG();			\
-	}					\
 } while (0)
 
 /*

@@ -258,8 +258,6 @@ int atari_scsi_release (struct Scsi_Host *);
 #define NCR_PRINT_STATUS(mask) \
 	((NDEBUG & (mask)) ? NCR5380_print_status(instance) : (void)0)
 
-#define NDEBUG_ANY	0xffffffff
-
 
 #endif /* ndef ASM */
 #endif /* ATARI_SCSI_H */

@@ -25,6 +25,7 @@
 #define _HVCALLSC_H
 
 #define HvCallBase		0x8000000000000000
+#define HvCallCc		0x8001000000000000
 #define HvCallCfg		0x8002000000000000
 #define HvCallEvent		0x8003000000000000
 #define HvCallHpt		0x8004000000000000

@@ -20,10 +20,16 @@
     ({ unsigned short __v = (*(volatile unsigned short *) (addr)); __v; })
 #define in_be32(addr) \
     ({ unsigned int __v = (*(volatile unsigned int *) (addr)); __v; })
+#define in_le16(addr) \
+    ({ unsigned short __v = le16_to_cpu(*(volatile unsigned short *) (addr)); __v; })
+#define in_le32(addr) \
+    ({ unsigned int __v = le32_to_cpu(*(volatile unsigned int *) (addr)); __v; })
 
 #define out_8(addr,b) (void)((*(volatile unsigned char *) (addr)) = (b))
-#define out_be16(addr,b) (void)((*(volatile unsigned short *) (addr)) = (b))
-#define out_be32(addr,b) (void)((*(volatile unsigned int *) (addr)) = (b))
+#define out_be16(addr,w) (void)((*(volatile unsigned short *) (addr)) = (w))
+#define out_be32(addr,l) (void)((*(volatile unsigned int *) (addr)) = (l))
+#define out_le16(addr,w) (void)((*(volatile unsigned short *) (addr)) = cpu_to_le16(w))
+#define out_le32(addr,l) (void)((*(volatile unsigned int *) (addr)) = cpu_to_le32(l))
 
 #define raw_inb in_8
 #define raw_inw in_be16

@@ -9,18 +9,10 @@
  */
 
 #include <linux/config.h>
-#include <linux/kdev_t.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/hw_irq.h>
 #include <asm/memory.h>
-
-/*
- * System defines.
- */
-#define KERNEL_START_PHYS	0x800000 
-#define KERNEL_START	        (PAGE_OFFSET+KERNEL_START_PHYS)
-#define START_ADDR	        (PAGE_OFFSET+KERNEL_START_PHYS+0x00000)
 
 /*
  * Memory barrier.
@@ -85,28 +77,21 @@ extern void (*xmon_fault_handler)(struct pt_regs *regs);
 extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);
-extern void hard_reset_now(void);
-extern void poweroff_now(void);
 extern int _get_PVR(void);
-extern long _get_L2CR(void);
-extern void _set_L2CR(unsigned long);
-extern void via_cuda_init(void);
-extern void pmac_nvram_init(void);
-extern void pmac_find_display(void);
 extern void giveup_fpu(struct task_struct *);
 extern void enable_kernel_fp(void);
-extern void giveup_altivec(struct task_struct *);
-extern void load_up_altivec(struct task_struct *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
 
-struct device_node;
-
 struct task_struct;
-#define prepare_to_switch()	do { } while(0)
-#define switch_to(prev,next) _switch_to((prev),(next))
-extern void _switch_to(struct task_struct *, struct task_struct *);
+extern void __switch_to(struct task_struct *, struct task_struct *);
+#define switch_to(prev, next, last) __switch_to((prev), (next))
+
+#define prepare_arch_schedule(prev)		do { } while(0)
+#define finish_arch_schedule(prev)		do { } while(0)
+#define prepare_arch_switch(rq)			do { } while(0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
 
 struct thread_struct;
 extern void _switch(struct thread_struct *prev, struct thread_struct *next);
@@ -116,29 +101,13 @@ extern void dump_regs(struct pt_regs *);
 
 #ifndef CONFIG_SMP
 
-#define cli()	__cli()
-#define sti()	__sti()
-#define save_flags(flags)	__save_flags(flags)
-#define restore_flags(flags)	__restore_flags(flags)
-#define save_and_cli(flags)	__save_and_cli(flags)
-
-#else /* CONFIG_SMP */
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long);
-#define cli() __global_cli()
-#define sti() __global_sti()
-#define save_flags(x) ((x)=__global_save_flags())
-#define restore_flags(x) __global_restore_flags(x)
+#define cli()	local_irq_disable()
+#define sti()	local_irq_enable()
+#define save_flags(flags)	local_save_flags(flags)
+#define restore_flags(flags)	local_irq_restore(flags)
+#define save_and_cli(flags)	local_irq_save(flags)
 
 #endif /* !CONFIG_SMP */
-
-#define local_irq_disable()		__cli()
-#define local_irq_enable()		__sti()
-#define local_irq_save(flags)		__save_and_cli(flags)
-#define local_irq_restore(flags)	__restore_flags(flags)
 
 static __inline__ int __is_processor(unsigned long pv)
 {

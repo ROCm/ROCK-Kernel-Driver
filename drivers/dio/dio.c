@@ -115,8 +115,14 @@ static struct dioboard *blist = NULL;
 static int __init dio_find_slow(int deviceid)
 {
 	/* Called to find a DIO device before the full bus scan has run.  Basically
-	   only used by the console driver.  */
+         * only used by the console driver.
+         * We don't do the primary+secondary ID encoding thing here. Maybe we should.
+         * (that would break the topcat detection, though. I need to think about
+         * the whole primary/secondary ID thing.)
+         */
 	int scode;
+        u_char prid;
+
 	for (scode = 0; scode < DIO_SCMAX; scode++)
 	{
 		void *va;
@@ -128,12 +134,23 @@ static int __init dio_find_slow(int deviceid)
                 if (!va || !hwreg_present(va + DIO_IDOFF))
                         continue;             /* no board present at that select code */
 
-		if (DIO_ID(va) == deviceid)
+                /* We aren't very likely to want to use this to get at the IHPIB,
+                 * but maybe it's returning the same ID as the card we do want...
+                 */
+                if (!DIO_ISIHPIB(scode))
+                        prid = DIO_ID(va);
+                else
+                        prid = DIO_ID_IHPIB;
+
+		if (prid == deviceid)
 			return scode;
 	}
 	return 0;
 }
 
+/* Aargh: we use 0 for an error return code, but select code 0 exists!
+ * FIXME (trivial, use -1, but requires changes to all the drivers :-< )
+ */
 int dio_find(int deviceid)
 {
 	if (blist) 
@@ -151,7 +168,7 @@ int dio_find(int deviceid)
 /* This is the function that scans the DIO space and works out what
  * hardware is actually present.
  */
-void __init dio_init(void)
+static int __init dio_init(void)
 {
         int scode;
         struct dioboard *b, *bprev = NULL;
@@ -193,10 +210,10 @@ void __init dio_init(void)
                 b->scode = scode;
                 b->ipl = DIO_IPL(va);
                 b->name = dio_getname(b->id);
-                printk("select code %3d: ID %02X", scode, prid);
+                printk("select code %3d: ipl %d: ID %02X", scode, b->ipl, prid);
                 if (DIO_NEEDSSECID(b->id))
                         printk(":%02X", secid);
-                printk(" %s\n", b->name);
+                printk(": %s\n", b->name);
                 
                 b->next = NULL;
 
@@ -206,6 +223,7 @@ void __init dio_init(void)
                         blist = b;
                 bprev = b;
         }
+	return 0;
 }
 
 subsys_initcall(dio_init);
@@ -224,9 +242,9 @@ void *dio_scodetoviraddr(int scode)
                 return 0;
         else if (DIO_SCINHOLE(scode))
                 return 0;
-        else if (scode == DIO_IHPIBSCODE) /* this should really be #ifdef CONFIG_IHPIB */
-                return (void*)DIO_IHPIBADDR;   /* or something similar... */
-        
+        else if (DIO_ISIHPIB(scode))
+                return (void*)DIO_IHPIBADDR;
+
         return (void*)(DIO_VIRADDRBASE + DIO_BASE + scode * 0x10000);
 }
 

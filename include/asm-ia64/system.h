@@ -169,12 +169,10 @@ do {										\
 
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")
 
-#define __cli()			local_irq_disable ()
-#define __save_flags(flags)	__asm__ __volatile__ ("mov %0=psr" : "=r" (flags) :: "memory")
-#define __save_and_cli(flags)	local_irq_save(flags)
-#define save_and_cli(flags)	__save_and_cli(flags)
-#define __sti()			local_irq_enable ()
-#define __restore_flags(flags)	local_irq_restore(flags)
+#define local_irq_disable()			local_irq_disable ()
+#define local_save_flags(flags)	__asm__ __volatile__ ("mov %0=psr" : "=r" (flags) :: "memory")
+#define local_irq_save(flags)	local_irq_save(flags)
+#define save_and_cli(flags)	local_irq_save(flags)
 
 #ifdef CONFIG_SMP
   extern void __global_cli (void);
@@ -186,10 +184,10 @@ do {										\
 # define save_flags(flags)	((flags) = __global_save_flags())
 # define restore_flags(flags)	__global_restore_flags(flags)
 #else /* !CONFIG_SMP */
-# define cli()			__cli()
-# define sti()			__sti()
-# define save_flags(flags)	__save_flags(flags)
-# define restore_flags(flags)	__restore_flags(flags)
+# define cli()			local_irq_disable()
+# define sti()			local_irq_enable()
+# define save_flags(flags)	local_save_flags(flags)
+# define restore_flags(flags)	local_irq_restore(flags)
 #endif /* !CONFIG_SMP */
 
 /*

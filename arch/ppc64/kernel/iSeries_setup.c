@@ -258,7 +258,7 @@ unsigned long iSeries_process_mainstore_vpd( struct MemoryBlock *mb_array, unsig
 {
 	unsigned long i;
 	unsigned long mem_blocks = 0;
-	if ( __is_processor( PV_POWER4 ) )
+	if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p))
 		mem_blocks = iSeries_process_Regatta_mainstore_vpd( mb_array, max_entries );
 	else
 		mem_blocks = iSeries_process_Condor_mainstore_vpd( mb_array, max_entries );

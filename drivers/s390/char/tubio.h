@@ -338,11 +338,11 @@ extern void fs3270_devfs_unregister(tub_t *);
 #define spin_trylock_irqsave(lock, flags) \
 ({ \
 	int success; \
-	__save_flags(flags); \
-	__cli(); \
+	local_save_flags(flags); \
+	local_irq_disable(); \
 	success = spin_trylock(lock); \
 	if (success == 0) \
-		__restore_flags(flags); \
+		local_irq_restore(flags); \
 	success; \
 })
 #endif /* if not spin_trylock_irqsave */

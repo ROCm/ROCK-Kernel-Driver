@@ -26,18 +26,18 @@ extern unsigned long __no_use_save_flags(void);
 extern void __no_use_set_lost(unsigned long);
 extern void __no_lpq_restore_flags(unsigned long);
 
-#define __cli()			__no_use_cli()
-#define __sti()			__no_use_sti()
-#define __save_flags(flags)	((flags) = __no_use_save_flags())
-#define __restore_flags(flags)	__no_use_restore_flags((unsigned long)flags)
-#define __save_and_cli(flags)	({__save_flags(flags);__cli();})
+#define local_irq_disable()			__no_use_cli()
+#define local_irq_enable()			__no_use_sti()
+#define local_save_flags(flags)	((flags) = __no_use_save_flags())
+#define local_irq_restore(flags)	__no_use_restore_flags((unsigned long)flags)
+#define local_irq_save(flags)	({local_save_flags(flags);local_irq_disable();})
 
 #else
 
-#define __save_flags(flags)	((flags) = mfmsr())
-#define __restore_flags(flags)	__mtmsrd((flags), 1)
+#define local_save_flags(flags)	((flags) = mfmsr())
+#define local_irq_restore(flags)	__mtmsrd((flags), 1)
 
-static inline void __cli(void)
+static inline void local_irq_disable(void)
 {
 	unsigned long msr;
 	msr = mfmsr();
@@ -45,7 +45,7 @@ static inline void __cli(void)
 	__asm__ __volatile__("": : :"memory");
 }
 
-static inline void __sti(void)
+static inline void local_irq_enable(void)
 {
 	unsigned long msr;
 	__asm__ __volatile__("": : :"memory");
@@ -62,7 +62,7 @@ static inline void __do_save_and_cli(unsigned long *flags)
 	__asm__ __volatile__("": : :"memory");
 }
 
-#define __save_and_cli(flags)          __do_save_and_cli(&flags)
+#define local_irq_save(flags)          __do_save_and_cli(&flags)
 
 #endif /* CONFIG_PPC_ISERIES */
 

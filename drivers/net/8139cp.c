@@ -926,13 +926,15 @@ static struct net_device_stats *cp_get_stats(struct net_device *dev)
 
 static void cp_stop_hw (struct cp_private *cp)
 {
+	struct net_device *dev = cp->dev;
+
 	cpw16(IntrMask, 0);
 	cpr16(IntrMask);
 	cpw8(Cmd, 0);
 	cpw16(CpCmd, 0);
 	cpr16(CpCmd);
 	cpw16(IntrStatus, ~(cpr16(IntrStatus)));
-	synchronize_irq();
+	synchronize_irq(dev->irq);
 	udelay(10);
 
 	cp->rx_tail = 0;

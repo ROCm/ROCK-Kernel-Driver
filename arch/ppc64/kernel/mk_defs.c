@@ -14,7 +14,6 @@
  */
 
 #include <stddef.h>
-#include <linux/config.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -48,7 +47,6 @@ main(void)
 	DEFINE(THREAD_SHIFT, THREAD_SHIFT);
 	DEFINE(THREAD_SIZE, THREAD_SIZE);
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
-	DEFINE(_TIF_32BIT, _TIF_32BIT);
 
 	/* task_struct->thread */
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
@@ -68,6 +66,7 @@ main(void)
         DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct naca_struct, iCacheL1LogLineSize));
         DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct naca_struct, iCacheL1LinesPerPage));
 	DEFINE(SLBSIZE, offsetof(struct naca_struct, slb_size));
+	DEFINE(PLATFORM, offsetof(struct naca_struct, platform));
 
 	/* paca */
         DEFINE(PACA_SIZE, sizeof(struct paca_struct));

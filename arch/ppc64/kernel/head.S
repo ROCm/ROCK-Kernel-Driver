@@ -37,6 +37,12 @@
 #endif
 
 /*
+ * hcall interface to pSeries LPAR
+ */
+#define HSC .long 0x44000022
+#define H_SET_ASR		0x30
+
+/*
  * We layout physical memory as follows:
  * 0x0000 - 0x00ff : Secondary processor spin code
  * 0x0100 - 0x2fff : pSeries Interrupt prologs
@@ -152,7 +158,7 @@ _GLOBAL(__secondary_hold)
  */
 
 /*
- * This is the start of the interrupt handlers for Pseries
+ * This is the start of the interrupt handlers for pSeries
  * This code runs with relocation off.
  */
 #define EX_SRR0		0
@@ -193,7 +199,7 @@ _GLOBAL(__secondary_hold)
 	rfid
 
 /*
- * This is the start of the interrupt handlers for i_series
+ * This is the start of the interrupt handlers for iSeries
  * This code runs with relocation on.
  */
 #define EXCEPTION_PROLOG_ISERIES(n)	                                      \
@@ -269,7 +275,7 @@ _GLOBAL(__secondary_hold)
 	SAVE_8GPRS(2, r1);              /* save r2 - r13 in stackframe */ \
 	SAVE_4GPRS(10, r1);                                               \
 	ld      r2,PACATOC(r20);	                                  \
-	ld      r13,PACACURRENT(r20)
+	mr	r13,r20
 
 /*
  * Note: code which follows this uses cr0.eq (set if from kernel),
@@ -427,8 +433,8 @@ __end_stab:
 
 	.globl SystemReset_Iseries
 SystemReset_Iseries:
-	mfspr	25,SPRG3		/* Get paca address */
-	lhz	r24,PACAPACAINDEX(r25)	/* Get processor # */
+	mfspr	r13,SPRG3		/* Get paca address */
+	lhz	r24,PACAPACAINDEX(r13)	/* Get processor # */
 	cmpi	0,r24,0			/* Are we processor 0? */
 	beq	.__start_initialization_iSeries	/* Start up the first processor */
 	mfspr	r4,CTRLF
@@ -439,7 +445,7 @@ SystemReset_Iseries:
 1:
 	HMT_LOW
 #ifdef CONFIG_SMP
-	lbz	r23,PACAPROCSTART(r25)	/* Test if this processor
+	lbz	r23,PACAPROCSTART(r13)	/* Test if this processor
 					 * should start */
 	sync
 	LOADADDR(r3,current_set)
@@ -469,7 +475,7 @@ iseries_secondary_smp_loop:
 #endif /* CONFIG_SMP */
 	li	r0,-1			/* r0=-1 indicates a Hypervisor call */
 	sc				/* Invoke the hypervisor via a system call */
-	mfspr	r25,SPRG3		/* Put r25 back ???? */
+	mfspr	r13,SPRG3		/* Put r13 back ???? */
 	b	1b			/* If SMP not configured, secondaries
 					 * loop forever */
 
@@ -575,7 +581,8 @@ stab_bolted_user_return:
 	bl	.do_stab_SI
 	b	1f
 
-2:	bl	.do_hash_page_DSI 	/* Try to handle as hpte fault */
+2:	li	r5,0x300
+	bl	.do_hash_page_DSI 	/* Try to handle as hpte fault */
 1:
 	ld      r4,_DAR(r1)
 	ld      r5,_DSISR(r1)
@@ -627,9 +634,8 @@ InstructionAccess_common:
 	bl	.do_stab_SI
 	b	1f
 
-2:	andis.	r0,r23,0x4000		/* no pte found? */
-	beq	1f			/* if so, try to put a PTE */
-	mr	r3,r22			/* into the hash table */
+2:	mr	r3,r22
+	li	r5,0x400
 	bl	.do_hash_page_ISI	/* Try to handle as hpte fault */
 1:
 	mr	r4,r22
@@ -660,7 +666,7 @@ InstructionAccessSLB_common:
 #else
 	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
 #endif
-	li	r6,0x380
+	li	r6,0x480
 	bl      .save_remaining_regs
 	bl      .do_page_fault
 	b       .ret_from_except
@@ -682,33 +688,41 @@ HardwareInterrupt_entry:
 	/*                                                                */
 	/*  The call to do_irq will preserve the value of r14 - r31       */
 	/*                                                                */
-	mfspr	r20,SPRG3 		    /* get paca                   */
-	lbz     r21,PACAHRDWINTCOUNT(r20)    /* get hardware interrupt cnt */
+/*
+ * XXX turn off interrupt stacks until the thread_info stuff is fixed.
+ * Otherwise we end up setting need_resched etc bits in the interrupt
+ *  stack and they never get seen when we return to the process stack - Anton
+ */
+#if 0
+	lbz     r21,PACAHRDWINTCOUNT(r13)    /* get hardware interrupt cnt */
 	cmpi    0,r21,1                     /*                            */
 	addi    r21,r21,1                   /* incr hardware interrupt cnt*/
-	stb     r21,PACAHRDWINTCOUNT(r20)   /*                            */
+	stb     r21,PACAHRDWINTCOUNT(r13)   /*                            */
 	bne     2f                          /*                            */
 
 	mr      r14,r1                      /* preserve current r1        */
-	ld      r1,PACAHRDWINTSTACK(r20)    /*                            */
+	ld      r1,PACAHRDWINTSTACK(r13)    /*                            */
 	std     r14,0(r1)                   /* set the back chain         */
 	bl      .do_IRQ
-	lbz     r22,PACAHRDWINTCOUNT(r20)   /* get hardware interrupt cnt */
+	lbz     r22,PACAHRDWINTCOUNT(r13)   /* get hardware interrupt cnt */
 	cmp     0,r22,r21                   /* debug test                 */
 	bne     3f
 	subi    r21,r21,1
-	stb     r21,PACAHRDWINTCOUNT(r20)   /*                            */
+	stb     r21,PACAHRDWINTCOUNT(r13)   /*                            */
 	mr      r1,r14                      /*                            */
 	b       .ret_from_except
+#endif
 
 2:
 	bl      .do_IRQ
 
-	lbz     r22,PACAHRDWINTCOUNT(r20)   /* get hardware interrupt cnt */
+#if 0
+	lbz     r22,PACAHRDWINTCOUNT(r13)   /* get hardware interrupt cnt */
 	cmp     0,r22,r21                   /* debug test                 */
 	bne     3f                          /*                            */
 	subi    r21,r21,1                   /* decr hardware interrupt cnt*/
-	stb     r21,PACAHRDWINTCOUNT(r20)   /*                            */
+	stb     r21,PACAHRDWINTCOUNT(r13)   /*                            */
+#endif
 
 	b       .ret_from_except
 
@@ -804,6 +818,7 @@ _GLOBAL(do_hash_page_DSI)
 	/*
 	 * r3 contains the faulting address
 	 * r4 contains the required access permissions
+	 * r5 contains the trap number
 	 *
 	 * at return r3 = 0 for success
 	 */
@@ -852,11 +867,13 @@ _GLOBAL(do_stab_bolted)
 	ld	r22,8(r21)	/* get SRR1 */
 	andi.	r22,r22,MSR_PR	/* check if from user */
 	bne+	stab_bolted_user_return  /* from user, send the error on up */
+#if 0
 	li	r3,0
 #ifdef CONFIG_XMON
 	bl	.xmon
 #endif
 1:	b	1b
+#endif
 2:
 	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
 	mfspr	r21,DAR
@@ -1021,7 +1038,18 @@ SLB_NUM_ENTRIES = 64
 #ifndef CONFIG_PPC_ISERIES
 	ori	r20,r20,256    /* map kernel region with large ptes */
 #endif
-	
+
+	/*
+	 * XXX we should handle this in the exception exit path in 2.5,
+	 * we need to make this path quick - Anton
+	 */
+	/* Invalidate the old entry */
+	slbmfee	r21,r22
+	lis	r23,-2049
+	ori	r23,r23,65535
+	and	r21,r21,r23
+	slbie	r21
+
 	/* Put together the esid portion of the entry. */
 	mfspr	r21,DAR        /* Get the new esid                     */
 	rldicl  r21,r21,36,28  /* Permits a full 36b of ESID           */
@@ -1099,30 +1127,33 @@ _GLOBAL(save_remaining_regs)
 	 * Indicate that r1 contains the kernel stack and
 	 * get the Kernel TOC and CURRENT pointers from the paca
 	 */
-	mfspr	r23,SPRG3		/* Get PACA */
-	std	r22,PACAKSAVE(r23)	/* r1 is now kernel sp */
-	ld	r2,PACATOC(r23)		/* Get Kernel TOC pointer */
+	std	r22,PACAKSAVE(r13)	/* r1 is now kernel sp */
+	ld	r2,PACATOC(r13)		/* Get Kernel TOC pointer */
 
 	/*
 	 * If from user state, update THREAD.regs
 	 */
 	beq	2f			/* Modify THREAD.regs if from user */
 	addi	r24,r1,STACK_FRAME_OVERHEAD
-	std	r24,THREAD+PT_REGS(r13)
+	ld	r22, PACACURRENT(r13)
+	std	r24,THREAD+PT_REGS(r22)
 2:
 	SET_REG_TO_CONST(r22, MSR_KERNEL)
 
 #ifdef DO_SOFT_DISABLE
-	stb	r20,PACAPROCENABLED(r23) /* possibly soft enable */
+#warning FIX ISERIES
+	stb	r20,PACAPROCENABLED(r13) /* possibly soft enable */
 	ori	r22,r22,MSR_EE		/* always hard enable */
 #else
 	rldimi	r22,r20,15,48		/* Insert desired EE value */
 #endif
 
-	mtmsrd  r22
+	mtmsrd  r22,1
 	blr
 
-
+/*
+ * Kernel profiling with soft disable on iSeries
+ */
 do_profile:
 	ld	r22,8(r21)		/* Get SRR1 */
 	andi.	r22,r22,MSR_PR		/* Test if in kernel */
@@ -1158,20 +1189,20 @@ _GLOBAL(pseries_secondary_smp_init)
 
 	/* Set up a paca value for this processor. */
 	LOADADDR(r24, paca) 		 /* Get base vaddr of paca array  */
-	mulli	r25,r3,PACA_SIZE	 /* Calculate vaddr of right paca */
-	add	r25,r25,r24              /* for this processor.           */
+	mulli	r13,r3,PACA_SIZE	 /* Calculate vaddr of right paca */
+	add	r13,r13,r24              /* for this processor.           */
 
-	mtspr	SPRG3,r25		 /* Save vaddr of paca in SPRG3   */
+	mtspr	SPRG3,r13		 /* Save vaddr of paca in SPRG3   */
 	mr	r24,r3			 /* __secondary_start needs cpu#  */
 
 1:
 	HMT_LOW
-	lbz	r23,PACAPROCSTART(r25)	 /* Test if this processor should */
+	lbz	r23,PACAPROCSTART(r13)	 /* Test if this processor should */
 					 /* start.                        */
 	sync
 
         /* Create a temp kernel stack for use before relocation is on.    */
-        mr      r1,r25
+        mr      r1,r13
         addi    r1,r1,PACAGUARD
         addi    r1,r1,0x1000
         subi    r1,r1,STACK_FRAME_OVERHEAD
@@ -1400,7 +1431,8 @@ _STATIC(load_up_fpu)
 #endif /* CONFIG_SMP */
 	/* enable use of FP after return */
 	ori	r23,r23,MSR_FP|MSR_FE0|MSR_FE1
-	addi	r5,r13,THREAD		/* Get THREAD */
+	ld	r4, PACACURRENT(r13)
+	addi	r5,r4,THREAD		/* Get THREAD */
 	lfd	fr0,THREAD_FPSCR-4(r5)
 	mtfsf	0xff,fr0
 	REST_32FPRS(0, r5)
@@ -1420,8 +1452,7 @@ _GLOBAL(KernelFP)
 	ori	r3,r3,MSR_FP
 	std	r3,_MSR(r1)		/* enable use of FP after return */
 	LOADADDR(r3,86f)
-	mfspr	r4,SPRG3		/* Get PACA */
-	ld	r4,PACACURRENT(r4)	/* current */
+	ld	r4,PACACURRENT(r13)	/* current */
 	ld	r5,_NIP(r1)
 	b	.ret_from_except
 86:	.string	"floating point used in kernel (task=%p, pc=%x)\n"
@@ -1470,7 +1501,7 @@ _GLOBAL(giveup_fpu)
  * On entry the following are set:
  *   r1    = stack pointer.  vaddr for iSeries, raddr (temp stack) for pSeries
  *   r24   = cpu# (in Linux terms)
- *   r25   = paca virtual address
+ *   r13   = paca virtual address
  *   SPRG3 = paca virtual address
  */
 _GLOBAL(__secondary_start)
@@ -1482,10 +1513,10 @@ _GLOBAL(__secondary_start)
 	addi    r2,r2,0x4000
 	addi    r2,r2,0x4000
 
-	std	r2,PACATOC(r25)
+	std	r2,PACATOC(r13)
 	li	r6,0
-	std	r6,PACAKSAVE(r25)
-	stb	r6,PACAPROCENABLED(r25)
+	std	r6,PACAKSAVE(r13)
+	stb	r6,PACAPROCENABLED(r13)
 
 #ifndef CONFIG_PPC_ISERIES
 	/* Initialize the page table pointer register. */
@@ -1494,11 +1525,8 @@ _GLOBAL(__secondary_start)
 	mtspr	SDR1,r6			/* set the htab location  */
 #endif
 	/* Initialize the first segment table (or SLB) entry                */
-	ld	r3,PACASTABVIRT(r25)    /* get addr of segment table        */
+	ld	r3,PACASTABVIRT(r13)    /* get addr of segment table        */
 	bl	.stab_initialize
-
-	/* load current into r13 */
-	ld	r13,PACACURRENT(r25)
 
 	/* Initialize the kernel stack.  Just a repeat for iSeries.         */
 	LOADADDR(r3,current_set)
@@ -1507,7 +1535,7 @@ _GLOBAL(__secondary_start)
 	addi	r1,r1,THREAD_SIZE
 	subi	r1,r1,STACK_FRAME_OVERHEAD
 
-	ld	r3,PACASTABREAL(r25)    /* get raddr of segment table       */
+	ld	r3,PACASTABREAL(r13)    /* get raddr of segment table       */
 	ori	r4,r3,1			/* turn on valid bit                */
 
 #ifdef CONFIG_PPC_ISERIES
@@ -1517,7 +1545,17 @@ _GLOBAL(__secondary_start)
 	ori	r3,r3,4			/* 0x8000000000000004 */
 	sc				/* HvCall_setASR */
 #else
+	/* set the ASR */
+	addi  r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi r3,PLATFORM_PSERIES_LPAR
+	bne   98f
+	li	r3,H_SET_ASR  /* hcall = H_SET_ASR */
+	HSC     			    /* Invoking hcall */
+	b     99f
+98:             /* This is not a hypervisor machine */
 	mtasr	r4			/* set the stab location            */
+99:
 #endif
 	li	r7,0
 	mtlr	r7
@@ -1640,23 +1678,49 @@ _STATIC(start_here_pSeries)
 
 	/* Get the pointer to the segment table which is used by           */
 	/* stab_initialize                                                 */
-	li	r27,0x4000
-	ld	r6,PACA(r27)            /* Get the base paca pointer       */
-	sub	r6,r6,r26		/* convert to physical addr         */
-	mtspr	SPRG3,r6		/* PPPBBB: Temp... -Peter */
-	ld	r3,PACASTABREAL(r6)
+	LOADADDR(r27, boot_cpuid)
+	sub	r27,r27,r26
+	lwz	r27,0(r27)
+
+	LOADADDR(r24, paca) 		 /* Get base vaddr of paca array  */
+	mulli	r13,r27,PACA_SIZE	 /* Calculate vaddr of right paca */
+	add	r13,r13,r24              /* for this processor.           */
+	sub	r13,r13,r26		/* convert to physical addr         */
+
+	mtspr	SPRG3,r13		/* PPPBBB: Temp... -Peter */
+	li	r3,0x5000
+	std	r3,PACASTABREAL(r13)
+	LOADADDR(r24, __start_stab)
+	std	r24,PACASTABVIRT(r13)
 	ori	r4,r3,1			/* turn on valid bit                */
+	
+	/* set the ASR */
+	addi  r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi r3,PLATFORM_PSERIES_LPAR
+	bne   98f
+	li	r3,H_SET_ASR  /* hcall = H_SET_ASR */
+	HSC     			    /* Invoking hcall */
+	b     99f
+98:                 /* This is not a hypervisor machine */
 	mtasr	r4			/* set the stab location            */
+99:
+	mfspr	r6,SPRG3
+	ld	r3,PACASTABREAL(r6)     /* restore r3 for stab_initialize */
 
 	/* Initialize an initial memory mapping and turn on relocation.   */
 	bl	.stab_initialize
 	bl	.htab_initialize
 
-	LOADADDR(r6,_SDR1)
+	addi  r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi r3,PLATFORM_PSERIES
+	bne    98f
+	LOADADDR(r6,_SDR1)		/* Only if NOT LPAR */
 	sub	r6,r6,r26
 	ld	r6,0(r6)		/* get the value of _SDR1 */
 	mtspr	SDR1,r6			/* set the htab location  */
-
+98: 
 	LOADADDR(r3,.start_here_common)
 	SET_REG_TO_CONST(r4, MSR_KERNEL)
 	mtspr	SRR0,r3
@@ -1705,18 +1769,21 @@ _STATIC(start_here_common)
 	addi	r8,r8,0x4000
 	std	r8,0(r9)		/* set the value of the naca ptr  */
 
-	LOADADDR(r4,naca)               /* Get naca ptr address           */
-	ld	r4,0(r4)                /* Get the location of the naca   */
-	ld	r4,PACA(r4)             /* Get the base paca pointer      */
-	mtspr	SPRG3,r4
+	LOADADDR(r26, boot_cpuid)
+	lwz	r26,0(r26)
+
+	LOADADDR(r24, paca) 		 /* Get base vaddr of paca array  */
+	mulli	r13,r26,PACA_SIZE	 /* Calculate vaddr of right paca */
+	add	r13,r13,r24              /* for this processor.           */
+	mtspr	SPRG3,r13
 
 	/* ptr to current */
-	LOADADDR(r13,init_task)
-	std	r13,PACACURRENT(r4)
+	LOADADDR(r4,init_task)
+	std	r4,PACACURRENT(r13)
 
-	std	r2,PACATOC(r4)
+	std	r2,PACATOC(r13)
 	li	r5,0
-	std	r0,PACAKSAVE(r4)
+	std	r0,PACAKSAVE(r13)
 
 	/* ptr to hardware interrupt stack for processor 0                */
 	LOADADDR(r3, hardware_int_paca0)
@@ -1725,10 +1792,10 @@ _STATIC(start_here_common)
 	subi    r5,r5,STACK_FRAME_OVERHEAD
 
 	add     r3,r3,r5
-	std     r3,PACAHRDWINTSTACK(r4)
+	std     r3,PACAHRDWINTSTACK(r13)
 
 	li      r3,0
-	stb     r3,PACAHRDWINTCOUNT(r4)
+	stb     r3,PACAHRDWINTCOUNT(r13)
 
 	/* Restore the parms passed in from the bootloader. */
 	mr	r3,r31
@@ -1742,6 +1809,7 @@ _STATIC(start_here_common)
 	/* Load up the kernel context */
 5:
 #ifdef DO_SOFT_DISABLE
+#warning FIX ISERIES
 	mfspr	r4,SPRG3
 	li	r5,0
 	stb	r5,PACAPROCENABLED(r4)	/* Soft Disabled */
@@ -1849,10 +1917,10 @@ ioremap_dir:
 hardware_int_paca0:
 	.space	8*4096
 
-/* 1 page segment table per cpu (max 48, cpu0 allocated at 0x5000) */
+/* 1 page segment table per cpu (max 48) */
 	.globl	stab_array
 stab_array:
-        .space	4096 * (48 - 1)
+        .space	4096 * 48
 	
 /*
  * This space gets a copy of optional info passed to us by the bootstrap

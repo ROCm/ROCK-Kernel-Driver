@@ -64,7 +64,8 @@ _GLOBAL(DoSyscall)
 #ifdef SHOW_SYSCALLS_TASK
 	LOADBASE(r31,show_syscalls_task)
 	ld	r31,show_syscalls_task@l(r31)
-	cmp	0,r13,r31
+	ld	r10,PACACURRENT(r13)
+	cmp	0,r10,r31
 	bne	1f
 #endif
 	LOADADDR(r3,7f)
@@ -78,7 +79,7 @@ _GLOBAL(DoSyscall)
 	LOADADDR(r3,77f)
 	ld	r4,GPR8(r1)
 	ld	r5,GPR9(r1)
-	mr	r6,r13
+	ld	r6, PACACURRENT(r13)
 	bl	.printk
 	ld	r0,GPR0(r1)
 	ld	r3,GPR3(r1)
@@ -129,7 +130,8 @@ _GLOBAL(ret_from_syscall_1)
 20:	std	r3,RESULT(r1)	/* Save result */
 #ifdef SHOW_SYSCALLS
 #ifdef SHOW_SYSCALLS_TASK
-	cmp	0,r13,r31
+	ld	r10, PACACURRENT(13)
+	cmp	0,r10,r31
 	bne	91f
 #endif
 	mr	r4,r3
@@ -289,9 +291,8 @@ _GLOBAL(_switch)
 	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
 
-	mfspr	r5,SPRG3	/* Get paca */
-	addi	r13,r4,-THREAD	/* Convert THREAD to 'current' */
-	std	r13,PACACURRENT(r5)	/* Set new 'current' */
+	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
+	std	r6,PACACURRENT(r13)	/* Set new 'current' */
 
 #ifdef CONFIG_PPC_ISERIES
 #error fixme
@@ -335,6 +336,7 @@ irq_recheck:
 	CHECKANYINT(r3,r4)
 	beq+	4f	/* skip do_IRQ if no interrupts */
 
+#warning FIX ISERIES
 	mfspr	r5,SPRG3
 	li	r3,0
 	stb	r3,PACAPROCENABLED(r5)	/* ensure we are disabled */
@@ -353,7 +355,7 @@ recheck:
 	li	r4,0
 	ori	r4,r4,MSR_EE|MSR_RI
 	andc	r10,r10,r4	/* clear MSR_EE and MSR_RI */
-	mtmsrd	r10		/* Update machine state */
+	mtmsrd	r10,1		/* Update machine state */
 
 #ifdef CONFIG_PPC_ISERIES
 #error fix iSeries soft disable
@@ -370,9 +372,15 @@ recheck:
 	bne	do_work
 
 	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
-	std	r0,THREAD+KSP(r13)	/* save kernel stack pointer */
-	mfspr   r4,SPRG3		/* current task's PACA */
-	std	r1,PACAKSAVE(r4)	/* save exception stack pointer */
+	ld	r4,PACACURRENT(r13)
+	std	r0,THREAD+KSP(r4)	/* save kernel stack pointer */
+	std	r1,PACAKSAVE(r13)	/* save exception stack pointer */
+
+	/*
+	 * r13 is our per cpu area, only restore it if we are returning to
+	 * userspace
+	 */
+	REST_GPR(13,r1)
 
 restore:
 	ld	r3,_CTR(r1)
@@ -389,29 +397,37 @@ restore:
 	stdcx.	r0,0,r1		/* to clear the reservation */
 
 #ifdef DO_SOFT_DISABLE
+	/* XXX do this in do_work, r13 isnt valid here */
 	ld	r0,SOFTE(r1)
 	stb	r0,PACAPROCENABLED(r13)
 #endif
 
 	ld	r0,_MSR(r1)
 	mtspr	SRR1,r0
+
 	ld	r2,_CCR(r1)
 	mtcrf	0xFF,r2
 	ld	r2,_NIP(r1)
 	mtspr	SRR0,r2
-	REST_GPR(13,r1)
+
 	ld	r0,GPR0(r1)
 	ld	r2,GPR2(r1)
 	ld	r3,GPR3(r1)
 	ld	r4,GPR4(r1)
 	ld	r1,GPR1(r1)
 
+	/*
+	 *  What if we took an exception and stole this segment, we may
+	 * fault on the above addresses and globber SRR0/1. Should check RI
+	 * bit and repeat - Anton
+	 */
 	rfid
 
+/* Note: this must change if we start using the  TIF_NOTIFY_RESUME bit */
 do_work:
 	/* Enable interrupts */
 	ori	r10,r10,MSR_EE|MSR_RI
-	mtmsrd	r10
+	mtmsrd	r10,1
 
 	andi.	r0,r3,_TIF_NEED_RESCHED
 	beq	1f
@@ -419,13 +435,10 @@ do_work:
 	b	recheck
 
 1:	andi.	r0,r3,_TIF_SIGPENDING
-	beq	2f
+	beq	recheck
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal
-	b	recheck
-
-2:	/* nobody uses the TIF_NOTIFY_RESUME bit yet */
 	b	recheck
 
 /*
@@ -446,7 +459,7 @@ _GLOBAL(enter_rtas)
 	 * RTAS might touch to the stack.  (r0, r3-r13 are caller saved)
    	 */
 	SAVE_GPR(2, r1)			/* Save the TOC */
-	SAVE_GPR(13, r1)		/* Save current */
+	SAVE_GPR(13, r1)		/* Save paca */
 	SAVE_8GPRS(14, r1)		/* Save the non-volatiles */
 	SAVE_10GPRS(22, r1)		/* ditto */
 
@@ -465,14 +478,13 @@ _GLOBAL(enter_rtas)
 	mfsrr1	r10
 	std	r10,_SRR1(r1)
 
-	/* Unfortunatly, the stack pointer and the MSR are also clobbered,
-	 * so they are saved in the PACA (SPRG3) which allows us to restore
+	/* Unfortunately, the stack pointer and the MSR are also clobbered,
+	 * so they are saved in the PACA which allows us to restore
 	 * our original state after RTAS returns.
          */
-	mfspr	r4,SPRG3		/* Get PACA */
-	std	r1,PACAR1(r4)
+	std	r1,PACAR1(r13)
 	mfmsr	r6
-        std	r6,PACASAVEDMSR(r4)
+        std	r6,PACASAVEDMSR(r13)
 
 	/* Setup our real return addr */	
 	SET_REG_TO_LABEL(r4,.rtas_return_loc)
@@ -516,13 +528,11 @@ _STATIC(rtas_return_loc)
 _STATIC(rtas_restore_regs)
 	/* relocation is on at this point */
 	REST_GPR(2, r1)			/* Restore the TOC */
-	REST_GPR(13, r1)		/* Restore current */
+	REST_GPR(13, r1)		/* Restore paca */
 	REST_8GPRS(14, r1)		/* Restore the non-volatiles */
 	REST_10GPRS(22, r1)		/* ditto */
 
-	/* put back current in r13 */
-        mfspr	r4,SPRG3
-	ld	r13,PACACURRENT(r4)
+	mfspr	r13,SPRG3
 
 	ld	r4,_CCR(r1)
 	mtcr	r4
@@ -555,7 +565,7 @@ _GLOBAL(enter_prom)
 	 * PROM might touch to the stack.  (r0, r3-r13 are caller saved)
    	 */
 	SAVE_8GPRS(2, r1)		/* Save the TOC & incoming param(s) */
-	SAVE_GPR(13, r1)		/* Save current */
+	SAVE_GPR(13, r1)		/* Save paca */
 	SAVE_8GPRS(14, r1)		/* Save the non-volatiles */
 	SAVE_10GPRS(22, r1)		/* ditto */
 
@@ -600,7 +610,7 @@ _GLOBAL(enter_prom)
         isync
 
 	REST_8GPRS(2, r1)		/* Restore the TOC & param(s) */
-	REST_GPR(13, r1)		/* Restore current */
+	REST_GPR(13, r1)		/* Restore paca */
 	REST_8GPRS(14, r1)		/* Restore the non-volatiles */
 	REST_10GPRS(22, r1)		/* ditto */
 	blrl				/* Entering PROM here... */
@@ -611,7 +621,7 @@ _GLOBAL(enter_prom)
         isync
 
 	REST_GPR(2, r1)			/* Restore the TOC */
-	REST_GPR(13, r1)		/* Restore current */
+	REST_GPR(13, r1)		/* Restore paca */
 	REST_8GPRS(14, r1)		/* Restore the non-volatiles */
 	REST_10GPRS(22, r1)		/* ditto */
 

@@ -108,6 +108,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       bool '  Sun3 framebuffer support' CONFIG_FB_SUN3
       if [ "$CONFIG_FB_SUN3" != "n" ]; then
          bool '    BWtwo support' CONFIG_FB_BWTWO
+         bool '    CGthree support' CONFIG_FB_CGTHREE
          bool '    CGsix (GX,TurboGX) support' CONFIG_FB_CGSIX
       fi
    fi

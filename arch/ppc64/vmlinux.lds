@@ -1,4 +1,4 @@
-OUTPUT_ARCH(powerpc)
+OUTPUT_ARCH(powerpc:common64)
 SEARCH_DIR(/lib); SEARCH_DIR(/usr/lib); SEARCH_DIR(/usr/local/lib); SEARCH_DIR(/usr/local/powerpc-any-elf/lib);
 /* Do we need any of these for elf?
    __DYNAMIC = 0;    */
@@ -116,19 +116,6 @@ SECTIONS
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
-
-  __chrp_begin = .;
-  .text.chrp : { *(.text.chrp) }
-  .data.chrp : { *(.data.chrp) }
-  . = ALIGN(4096);
-  __chrp_end = .;
-
-  . = ALIGN(4096);
-  __openfirmware_begin = .;
-  .text.openfirmware : { *(.text.openfirmware) }
-  .data.openfirmware : { *(.data.openfirmware) }
-  . = ALIGN(4096);
-  __openfirmware_end = .;
 
   __toc_start = .;
   .toc       :

@@ -171,11 +171,11 @@ _GLOBAL(__clear_user)
 	add	r4,r0,r4
 	subf	r6,r0,r6
 	srwi	r0,r4,2
+	andi.	r4,r4,3
 	mtctr	r0
-	bdz	6f
+	bdz	7f
 1:	stwu	r5,4(r6)
 	bdnz	1b
-6:	andi.	r4,r4,3
 	/* clear byte sized chunks */
 7:	cmpwi	0,r4,0
 	beqlr
@@ -184,14 +184,20 @@ _GLOBAL(__clear_user)
 8:	stbu	r5,1(r6)
 	bdnz	8b
 	blr
-99:	li	r3,-EFAULT
+90:	mr	r3,r4
+	blr
+91:	mfctr	r3
+	slwi	r3,r3,2
+	add	r3,r3,r4
+	blr
+92:	mfctr	r3
 	blr
 
 	.section __ex_table,"a"
 	.align	3
-	.llong	11b,99b
-	.llong	1b,99b
-	.llong	8b,99b
+	.llong	11b,90b
+	.llong	1b,91b
+	.llong	8b,92b
 	.text
 
 _GLOBAL(__strncpy_from_user)

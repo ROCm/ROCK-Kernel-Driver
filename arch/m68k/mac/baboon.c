@@ -19,8 +19,8 @@
 #include <asm/macints.h> 
 #include <asm/mac_baboon.h>
 
-/* #define DEBUG_BABOON /**/
-/* #define DEBUG_IRQS /**/
+/* #define DEBUG_BABOON */
+/* #define DEBUG_IRQS */
 
 int baboon_present,baboon_active;
 volatile struct baboon *baboon;

@@ -62,7 +62,7 @@ struct machdep_calls {
 					    int msg, 
 					    unsigned long data,
 					    int wait);
-	int		(*smp_probe)(void);
+	void		(*smp_probe)(void);
 	void		(*smp_kick_cpu)(int nr);
 	void		(*smp_setup_cpu)(int nr);
 

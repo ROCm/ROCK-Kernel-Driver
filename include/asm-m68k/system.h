@@ -7,7 +7,10 @@
 #include <asm/segment.h>
 #include <asm/entry.h>
 
-#define prepare_to_switch()	do { } while(0)
+#define prepare_arch_schedule(prev)		do { } while(0)
+#define finish_arch_schedule(prev)		do { } while(0)
+#define prepare_arch_switch(rq)			do { } while(0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
 
 /*
  * switch_to(n) should switch tasks to task ptr, first checking that
@@ -32,45 +35,39 @@
  * 02/17/96 - Jes Sorensen (jds@kom.auc.dk)
  *
  * Changed 96/09/19 by Andreas Schwab
- * pass prev in a0, next in a1, offset of tss in d1, and whether
- * the mm structures are shared in d2 (to avoid atc flushing).
+ * pass prev in a0, next in a1
  */
 asmlinkage void resume(void);
-#define switch_to(prev,next,last) { \
+#define switch_to(prev,next,last) do { \
   register void *_prev __asm__ ("a0") = (prev); \
   register void *_next __asm__ ("a1") = (next); \
-  register void *_last __asm__ ("d1"); \
   __asm__ __volatile__("jbsr resume" \
-		       : "=d" (_last) : "a" (_prev), "a" (_next) \
-		       : "d0", /* "d1", */ "d2", "d3", "d4", "d5", "a0", "a1"); \
-  (last) = _last; \
-}
+		       : : "a" (_prev), "a" (_next) \
+		       : "d0", "d1", "d2", "d3", "d4", "d5", "a0", "a1"); \
+} while (0)
 
 
 /* interrupt control.. */
 #if 0
-#define __sti() asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory")
+#define local_irq_enable() asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory")
 #else
 #include <asm/hardirq.h>
-#define __sti() ({							      \
+#define local_irq_enable() ({							      \
 	if (MACH_IS_Q40 || !local_irq_count(smp_processor_id()))              \
 		asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory");  \
 })
 #endif
-#define __cli() asm volatile ("oriw  #0x0700,%%sr": : : "memory")
-#define __save_flags(x) asm volatile ("movew %%sr,%0":"=d" (x) : : "memory")
-#define __restore_flags(x) asm volatile ("movew %0,%%sr": :"d" (x) : "memory")
+#define local_irq_disable() asm volatile ("oriw  #0x0700,%%sr": : : "memory")
+#define local_save_flags(x) asm volatile ("movew %%sr,%0":"=d" (x) : : "memory")
+#define local_irq_restore(x) asm volatile ("movew %0,%%sr": :"d" (x) : "memory")
 
 /* For spinlocks etc */
-#define local_irq_save(x)	({ __save_flags(x); __cli(); })
-#define local_irq_restore(x)	__restore_flags(x)
-#define local_irq_disable()	__cli()
-#define local_irq_enable()	__sti()
+#define local_irq_save(x)	({ local_save_flags(x); local_irq_disable(); })
 
-#define cli()			__cli()
-#define sti()			__sti()
-#define save_flags(x)		__save_flags(x)
-#define restore_flags(x)	__restore_flags(x)
+#define cli()			local_irq_disable()
+#define sti()			local_irq_enable()
+#define save_flags(x)		local_save_flags(x)
+#define restore_flags(x)	local_irq_restore(x)
 #define save_and_cli(flags)   do { save_flags(flags); cli(); } while(0)
 
 /*

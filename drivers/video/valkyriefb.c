@@ -7,6 +7,8 @@
  *  Vmode-switching changes and vmode 15/17 modifications created 29 August
  *  1998 by Barry K. Nathan <barryn@pobox.com>.
  *
+ *  Ported to m68k Macintosh by David Huggins-Daines <dhd@debian.org>
+ *
  *  Derived directly from:
  *
  *   controlfb.c -- frame buffer device for the PowerMac 'control' display
@@ -56,7 +58,12 @@
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <asm/io.h>
+#ifdef CONFIG_MAC
+#include <asm/bootinfo.h>
+#include <asm/macintosh.h>
+#else
 #include <asm/prom.h>
+#endif
 #include <asm/pgtable.h>
 
 #include <video/fbcon.h>
@@ -68,8 +75,15 @@
 
 static int can_soft_blank = 1;
 
+#ifdef CONFIG_MAC
+/* We don't yet have functions to read the PRAM... perhaps we can
+   adapt them from the PPC code? */
+static int default_vmode = VMODE_640_480_67;
+static int default_cmode = CMODE_8;
+#else
 static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
+#endif
 static char fontname[40] __initdata = { 0 };
 
 static int switching = 0;
@@ -113,7 +127,6 @@ struct fb_info_valkyrie {
 int valkyriefb_init(void);
 int valkyriefb_setup(char*);
 
-static void valkyrie_of_init(struct device_node *dp);
 static int valkyrie_get_fix(struct fb_fix_screeninfo *fix, int con,
 			 struct fb_info *info);
 static int valkyrie_get_var(struct fb_var_screeninfo *var, int con,
@@ -401,6 +414,7 @@ static void __init init_valkyrie(struct fb_info_valkyrie *p)
 	printk(KERN_INFO "Monitor sense value = 0x%x, ", p->sense);
 
 	/* Try to pick a video mode out of NVRAM if we have one. */
+#ifndef CONFIG_MAC
 	if (default_vmode == VMODE_NVRAM) {
 		default_vmode = nvram_read_byte(NV_VMODE);
 		if (default_vmode <= 0
@@ -408,12 +422,15 @@ static void __init init_valkyrie(struct fb_info_valkyrie *p)
 		 || !valkyrie_reg_init[default_vmode - 1])
 			default_vmode = VMODE_CHOOSE;
 	}
+#endif
 	if (default_vmode == VMODE_CHOOSE)
 		default_vmode = mac_map_monitor_sense(p->sense);
 	if (!valkyrie_reg_init[default_vmode - 1])
 		default_vmode = VMODE_640_480_67;
+#ifndef CONFIG_MAC
 	if (default_cmode == CMODE_NVRAM)
 		default_cmode = nvram_read_byte(NV_CMODE);
+#endif
 
 	/*
 	 * Reduce the pixel size if we don't have enough VRAM or bandwitdh.
@@ -488,48 +505,57 @@ static void valkyrie_set_par(const struct fb_par_valkyrie *par,
 
 int __init valkyriefb_init(void)
 {
+	struct fb_info_valkyrie	*p;
+	unsigned long frame_buffer_phys, cmap_regs_phys, flags;
+
+#ifdef CONFIG_MAC
+	if (!MACH_IS_MAC)
+		return 0;
+	if (!(mac_bi_data.id == MAC_MODEL_Q630
+	      /* I'm not sure about this one */
+	    || mac_bi_data.id == MAC_MODEL_P588))
+		return 0;
+
+	/* Hardcoded addresses... welcome to 68k Macintosh country :-) */
+	frame_buffer_phys = 0xf9000000;
+	cmap_regs_phys = 0x50f24000;
+	flags = IOMAP_NOCACHE_SER; /* IOMAP_WRITETHROUGH?? */
+#else /* ppc (!CONFIG_MAC) */
 	struct device_node *dp;
 
 	dp = find_devices("valkyrie");
-	if (dp != 0)
-		valkyrie_of_init(dp);
-	return 0;
-}
+	if (dp == 0)
+		return 0;
 
-static void __init valkyrie_of_init(struct device_node *dp)
-{
-	struct fb_info_valkyrie	*p;
-	unsigned long addr;
-	
 	if(dp->n_addrs != 1) {
 		printk(KERN_ERR "expecting 1 address for valkyrie (got %d)", dp->n_addrs);
-		return;
+		return 0;
 	}	
+
+	frame_buffer_phys = dp->addrs[0].address;
+	cmap_regs_phys = dp->addrs[0].address+0x304000;
+	flags = _PAGE_WRITETHRU;
+#endif /* ppc (!CONFIG_MAC) */
 
 	p = kmalloc(sizeof(*p), GFP_ATOMIC);
 	if (p == 0)
-		return;
+		return 0;
 	memset(p, 0, sizeof(*p));
 
 	/* Map in frame buffer and registers */
-	addr = dp->addrs[0].address;
-	if (!request_mem_region(addr, dp->addrs[0].size, "valkyriefb")) {
+	if (!request_mem_region(frame_buffer_phys, 0x100000, "valkyriefb")) {
 		kfree(p);
-		return;
+		return 0;
 	}
-	p->frame_buffer_phys  = addr;
-	p->frame_buffer  = __ioremap(addr, 0x100000, _PAGE_WRITETHRU);
-	p->cmap_regs_phys     = addr + 0x304000;
-	p->cmap_regs     = ioremap(p->cmap_regs_phys,4096);
-	p->valkyrie_regs_phys = addr + 0x30a000;
-	p->valkyrie_regs = ioremap(p->valkyrie_regs_phys, 4096);
-
-	/*
-	 * kps: As far as I know, all Valkyries have fixed usable VRAM.
-	 */
 	p->total_vram = 0x100000;
-
+	p->frame_buffer_phys  = frame_buffer_phys;
+	p->frame_buffer = __ioremap(frame_buffer_phys, p->total_vram, flags);
+	p->cmap_regs_phys = cmap_regs_phys;
+	p->cmap_regs = ioremap(p->cmap_regs_phys, 0x1000);
+	p->valkyrie_regs_phys = cmap_regs_phys+0x6000;
+	p->valkyrie_regs = ioremap(p->valkyrie_regs_phys, 0x1000);
 	init_valkyrie(p);
+	return 0;
 }
 
 /*

@@ -39,16 +39,27 @@ extern void smp_send_reschedule_all(void);
 
 #define NO_PROC_ID		0xFF            /* No processor magic marker */
 
-/* 1 to 1 mapping on PPC -- Cort */
-#define cpu_logical_map(cpu) (cpu)
-#define cpu_number_map(x) (x)
+#define cpu_online(cpu)	test_bit((cpu), &cpu_online_map)
+
+#define cpu_possible(cpu)	paca[cpu].active
+
+static inline int num_online_cpus(void)
+{
+	int i, nr = 0;
+
+	for (i = 0; i < NR_CPUS; i++)
+		nr += test_bit(i, &cpu_online_map);
+
+	return nr;
+}
+
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
-#define hard_smp_processor_id() (get_paca()->xHwProcNum)
-#define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)
 
-
+/* remove when the boot sequence gets rewritten to use hotplug interface */
+extern int boot_cpuid;
+extern int ppc64_is_smp;
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *

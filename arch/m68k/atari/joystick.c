@@ -22,8 +22,8 @@
 #define MAJOR_NR    JOYSTICK_MAJOR
 
 #define	ANALOG_JOY(n)	(!(n & 0x80))
-#define	DIGITAL_JOY(n)	(n & 0x80)
-#define	DEVICE_NR(n)	(MINOR(n) & 0x7f)
+#define	DIGITAL_JOY(n)	(minor(n) & 0x80)
+#define	DEVICE_NR(n)	(minor(n) & 0x7f)
 
 
 static struct joystick_status joystick[2];
@@ -120,11 +120,11 @@ static unsigned int joystick_poll(struct file *file, poll_table *wait)
 }
 
 struct file_operations atari_joystick_fops = {
-	read:		read_joystick,
-	write:		write_joystick,
-	poll:		joystick_poll,
-	open:		open_joystick,
-	release:	release_joystick,
+	.read =		read_joystick,
+	.write =	write_joystick,
+	.poll =		joystick_poll,
+	.open =		open_joystick,
+	.release =	release_joystick,
 };
 
 int __init atari_joystick_init(void)

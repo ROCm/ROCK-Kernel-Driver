@@ -10,6 +10,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/errno.h>
 
 /*
  * These two _must_ execute atomically wrt each other.

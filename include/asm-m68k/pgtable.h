@@ -6,6 +6,7 @@
 
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
+#include <linux/sched.h>
 #include <linux/threads.h>
 
 /*
@@ -88,20 +89,12 @@ extern unsigned long vmalloc_end;
 #endif /* CONFIG_SUN3 */
 
 /* zero page used for uninitialized stuff */
-extern unsigned long empty_zero_page;
+extern void *empty_zero_page;
 
 /*
- * BAD_PAGETABLE is used when we need a bogus page-table, while
- * BAD_PAGE is used for a bogus page.
- *
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
-extern pte_t __bad_page(void);
-extern pte_t * __bad_pagetable(void);
-
-#define BAD_PAGETABLE __bad_pagetable()
-#define BAD_PAGE __bad_page()
 #define ZERO_PAGE(vaddr)	(virt_to_page(empty_zero_page))
 
 /* number of bits that fit into a memory pointer */
@@ -184,5 +177,7 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
  * No page table caches to initialise
  */
 #define pgtable_cache_init()	do { } while (0)
+
+#define check_pgt_cache()	do { } while (0)
 
 #endif /* _M68K_PGTABLE_H */

@@ -66,6 +66,7 @@ _GLOBAL(get_sp)
 #ifdef CONFIG_PPC_ISERIES
 /* unsigned long __no_use_save_flags(void) */
 _GLOBAL(__no_use_save_flags)
+#warning FIX ISERIES
 	mfspr	r4,SPRG3
 	lbz	r3,PACAPROCENABLED(r4)
 	blr
@@ -78,6 +79,7 @@ _GLOBAL(__no_use_restore_flags)
  * sense anyway.
  *    -- Cort
  */
+#warning FIX ISERIES
 	mfspr	r6,SPRG3
 	lbz	r5,PACAPROCENABLED(r6)
 	 /* Check if things are setup the way we want _already_. */
@@ -99,6 +101,7 @@ _GLOBAL(__no_use_restore_flags)
 	blr
 
 _GLOBAL(__no_use_cli)
+#warning FIX ISERIES
 	mfspr	r5,SPRG3
 	lbz	r3,PACAPROCENABLED(r5)
 	li	r4,0
@@ -106,6 +109,7 @@ _GLOBAL(__no_use_cli)
 	blr			/* Done */
 
 _GLOBAL(__no_use_sti)
+#warning FIX ISERIES
 	mfspr	r6,SPRG3
 	li	r3,1
 	stb	r3,PACAPROCENABLED(r6)
