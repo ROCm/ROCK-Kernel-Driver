@@ -3337,18 +3337,16 @@ jffs_garbage_collect_thread(void *ptr)
 	int result = 0;
 	D1(int i = 1);
 
+	daemonize("jffs_gcd");
+
 	c->gc_task = current;
 
 	lock_kernel();
-	exit_mm(c->gc_task);
-
-	set_special_pids(1, 1);
 	init_completion(&c->gc_thread_comp); /* barrier */ 
 	spin_lock_irq(&current->sighand->siglock);
 	siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	strcpy(current->comm, "jffs_gcd");
 
 	D1(printk (KERN_NOTICE "jffs_garbage_collect_thread(): Starting infinite loop.\n"));
 
