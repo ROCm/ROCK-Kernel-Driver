@@ -261,9 +261,10 @@ chrp_progress(char *s, unsigned short hex)
 	struct device_node *root;
 	int width, *p;
 	char *os;
-	static int display_character,set_indicator;
+	static int display_character, set_indicator;
 	static int max_width;
 	static spinlock_t progress_lock = SPIN_LOCK_UNLOCKED;
+	static int pending_newline = 0;  /* did last write end with unprinted newline? */
 
 	if (!rtas.base)
 		return;
@@ -280,38 +281,77 @@ chrp_progress(char *s, unsigned short hex)
 		set_indicator = rtas_token("set-indicator");
 	}
 
-	spin_lock(&progress_lock);
-
-	if (display_character == RTAS_UNKNOWN_SERVICE) {
-		/* use hex display */
-		if (set_indicator == RTAS_UNKNOWN_SERVICE)
-		    goto chrp_progress_exit;
-		rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
-		goto chrp_progress_exit;
+	if(display_character == RTAS_UNKNOWN_SERVICE) {
+		/* use hex display if available */
+		if(set_indicator != RTAS_UNKNOWN_SERVICE)
+			rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
+		return;
 	}
 
-	rtas_call(display_character, 1, 1, NULL, '\r');
+	spin_lock(&progress_lock);
 
+	/* Last write ended with newline, but we didn't print it since
+	 * it would just clear the bottom line of output. Print it now
+	 * instead.
+	 *
+	 * If no newline is pending, print a CR to start output at the
+	 * beginning of the line.
+	 */
+	if(pending_newline) {
+		rtas_call(display_character, 1, 1, NULL, '\r');
+		rtas_call(display_character, 1, 1, NULL, '\n');
+		pending_newline = 0;
+	} else
+		rtas_call(display_character, 1, 1, NULL, '\r');
+ 
 	width = max_width;
 	os = s;
-	while ( *os )
-	{
-		if ( (*os == '\n') || (*os == '\r') )
+	while (*os) {
+		if(*os == '\n' || *os == '\r') {
+			/* Blank to end of line. */
+			while(width-- > 0)
+				rtas_call(display_character, 1, 1, NULL, ' ');
+ 
+			/* If newline is the last character, save it
+			 * until next call to avoid bumping up the
+			 * display output.
+			 */
+			if(*os == '\n' && !os[1]) {
+				pending_newline = 1;
+				spin_unlock(&progress_lock);
+				return;
+			}
+ 
+			/* RTAS wants CR-LF, not just LF */
+ 
+			if(*os == '\n') {
+				rtas_call(display_character, 1, 1, NULL, '\r');
+				rtas_call(display_character, 1, 1, NULL, '\n');
+			} else {
+				/* CR might be used to re-draw a line, so we'll
+				 * leave it alone and not add LF.
+				 */
+				rtas_call(display_character, 1, 1, NULL, *os);
+			}
+ 
 			width = max_width;
-		else
+		} else {
 			width--;
-		rtas_call(display_character, 1, 1, NULL, *os++ );
+			rtas_call(display_character, 1, 1, NULL, *os);
+		}
+ 
+		os++;
+ 
 		/* if we overwrite the screen length */
-		if ( width == 0 )
+		if ( width <= 0 )
 			while ( (*os != 0) && (*os != '\n') && (*os != '\r') )
 				os++;
 	}
-
+ 
 	/* Blank to end of line. */
 	while ( width-- > 0 )
 		rtas_call(display_character, 1, 1, NULL, ' ' );
 
-chrp_progress_exit:
 	spin_unlock(&progress_lock);
 }
 
