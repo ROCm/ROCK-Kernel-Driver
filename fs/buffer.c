@@ -1218,7 +1218,7 @@ void mark_buffer_dirty(struct buffer_head *bh)
 {
 	if (!buffer_uptodate(bh))
 		buffer_error();
-	if (!test_set_buffer_dirty(bh))
+	if (!buffer_dirty(bh) && !test_set_buffer_dirty(bh))
 		__set_page_dirty_nobuffers(bh->b_page);
 }
 
