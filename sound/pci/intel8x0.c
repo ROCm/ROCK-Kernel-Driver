@@ -813,10 +813,11 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 		if (status) {
 			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
-			status ^= igetdword(chip, chip->int_sta_reg);
+			if (chip->device_type != DEVICE_NFORCE)
+				status ^= igetdword(chip, chip->int_sta_reg);
 		}
 		spin_unlock(&chip->reg_lock);
-		if (status && err_count) {
+		if (chip->device_type != DEVICE_NFORCE && status && err_count) {
 			err_count--;
 			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
 				   status, chip->int_sta_mask);
