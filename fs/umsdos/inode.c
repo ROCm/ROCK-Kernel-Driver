@@ -55,7 +55,7 @@ void UMSDOS_put_super (struct super_block *sb)
 		saved_root = NULL;
 		pseudo_root = NULL;
 	}
-	msdos_put_super (sb);
+	fat_put_super (sb);
 }
 
 
