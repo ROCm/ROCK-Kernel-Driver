@@ -452,6 +452,29 @@ static inline void hci_inquiry_result_evt(struct hci_dev *hdev, struct sk_buff *
 	hci_dev_unlock(hdev);
 }
 
+/* Inquiry Result With RSSI */
+static inline void hci_inquiry_result_with_rssi_evt(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	struct inquiry_info_with_rssi *info = (struct inquiry_info_with_rssi *) (skb->data + 1);
+	int num_rsp = *((__u8 *) skb->data);
+
+	BT_DBG("%s num_rsp %d", hdev->name, num_rsp);
+
+	hci_dev_lock(hdev);
+	for (; num_rsp; num_rsp--) {
+		struct inquiry_info tmp;
+		bacpy(&tmp.bdaddr, &info->bdaddr);
+		tmp.pscan_rep_mode    = info->pscan_rep_mode;
+		tmp.pscan_period_mode = info->pscan_period_mode;
+		tmp.pscan_mode        = 0x00;
+		memcpy(tmp.dev_class, &info->dev_class, 3);
+		tmp.clock_offset      = info->clock_offset;
+		info++;
+		inquiry_cache_update(hdev, &tmp);
+	}
+	hci_dev_unlock(hdev);
+}
+
 /* Connect Request */
 static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
@@ -742,6 +765,10 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 
 	case HCI_EV_INQUIRY_RESULT:
 		hci_inquiry_result_evt(hdev, skb);
+		break;
+
+	case HCI_EV_INQUIRY_RESULT_WITH_RSSI:
+		hci_inquiry_result_with_rssi_evt(hdev, skb);
 		break;
 
 	case HCI_EV_CONN_REQUEST:
