@@ -241,7 +241,7 @@ static void delay_tsc(unsigned long loops)
 
 #define CALIBRATE_TIME	(5 * 1000020/HZ)
 
-static unsigned long __init calibrate_tsc(void)
+unsigned long __init calibrate_tsc(void)
 {
 	mach_prepare_counter();
 
