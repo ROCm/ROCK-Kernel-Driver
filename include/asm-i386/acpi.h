@@ -139,6 +139,12 @@ static inline void disable_ioapic_setup(void)
 
 #endif
 
+#ifdef CONFIG_ACPI_PCI
+extern int acpi_irq_balance_set(char *str);
+#else
+static inline int acpi_irq_balance_set(char *str) { return 0; }
+#endif
+
 #ifdef CONFIG_ACPI_SLEEP
 
 /* routines for saving/restoring kernel state */

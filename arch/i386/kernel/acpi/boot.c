@@ -541,6 +541,8 @@ acpi_boot_init (void)
 
 	acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
 
+	acpi_irq_balance_set(NULL);
+
 	acpi_ioapic = 1;
 
 #endif /* CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER */
