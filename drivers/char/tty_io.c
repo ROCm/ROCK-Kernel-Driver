@@ -1700,8 +1700,8 @@ tty_tiocmset(struct tty_struct *tty, struct file *file, unsigned int cmd,
 			break;
 		}
 
-		set &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
-		clear &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
+		set &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2|TIOCM_LOOP;
+		clear &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2|TIOCM_LOOP;
 
 		retval = tty->driver->tiocmset(tty, file, set, clear);
 	}
