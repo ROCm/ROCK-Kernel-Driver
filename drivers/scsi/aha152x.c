@@ -1761,7 +1761,7 @@ static void reset_ports(struct Scsi_Host *shpnt)
 int aha152x_host_reset(Scsi_Cmnd * SCpnt)
 {
 #if defined(AHA152X_DEBUG)
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 #endif
 
 	DPRINTK(debug_eh, DEBUG_LEAD "aha152x_host_reset(%p)\n", CMDINFO(SCpnt), SCpnt);
