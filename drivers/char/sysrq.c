@@ -98,6 +98,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
 static void sysrq_handle_reboot(int key, struct pt_regs *pt_regs,
 				struct tty_struct *tty) 
 {
+	local_irq_enable();
 	machine_restart(NULL);
 }
 
