@@ -328,7 +328,7 @@ acpi_ds_result_push (
 
 	state = walk_state->results;
 	if (!state) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No result stack frame\n"));
+		ACPI_REPORT_ERROR (("No result stack frame during push\n"));
 		return (AE_AML_INTERNAL);
 	}
 
