@@ -299,6 +299,8 @@ define cmd_vmlinux__
 endef
 
 #	set -e makes the rule exit immediately on error
+#	Final awk script makes sure per-cpu vars are in per-cpu section, as
+#	old gcc (eg egcs 2.92.11) ignores section attribute if uninitialized.
 
 define rule_vmlinux__
 	set -e
@@ -312,10 +314,21 @@ define rule_vmlinux__
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-define rule_vmlinux
+define rule_vmlinux_no_percpu
 	$(rule_vmlinux__)
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
+
+ifdef CONFIG_SMP
+define rule_vmlinux
+	$(rule_vmlinux_no_percpu)
+	$(AWK) -f scripts/per-cpu-check.awk < System.map
+endef
+else
+define rule_vmlinux
+	$(rule_vmlinux_no_percpu)
+endef
+endif
 
 LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 
