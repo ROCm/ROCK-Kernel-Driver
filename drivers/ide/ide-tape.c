@@ -3212,7 +3212,7 @@ static void idetape_wait_for_request (ide_drive_t *drive, struct request *rq)
 #endif /* IDETAPE_DEBUG_BUGS */
 	rq->waiting = &wait;
 	tape->waiting = &wait;
-	spin_unlock(&tape->spinlock);
+	spin_unlock_irq(&tape->spinlock);
 	wait_for_completion(&wait);
 	/* The stage and its struct request have been deallocated */
 	tape->waiting = NULL;
