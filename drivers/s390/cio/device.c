@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.115 $
+ *   $Revision: 1.117 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -26,6 +26,7 @@
 #include "cio.h"
 #include "css.h"
 #include "device.h"
+#include "ioasm.h"
 
 /******************* bus type handling ***********************/
 
@@ -499,20 +500,93 @@ ccw_device_register(struct ccw_device *cdev)
 	return ret;
 }
 
+static struct ccw_device *
+get_disc_ccwdev_by_devno(unsigned int devno, struct ccw_device *sibling)
+{
+	struct ccw_device *cdev;
+	struct list_head *entry;
+	struct device *dev;
+
+	if (!get_bus(&ccw_bus_type))
+		return NULL;
+	down_read(&ccw_bus_type.subsys.rwsem);
+	cdev = NULL;
+	list_for_each(entry, &ccw_bus_type.devices.list) {
+		dev = get_device(container_of(entry,
+					      struct device, bus_list));
+		if (!dev)
+			continue;
+		cdev = to_ccwdev(dev);
+		if ((cdev->private->state == DEV_STATE_DISCONNECTED) &&
+		    (cdev->private->devno == devno) &&
+		    (!strncmp(cdev->dev.bus_id, sibling->dev.bus_id, 4))) {
+			cdev->private->state = DEV_STATE_NOT_OPER;
+			break;
+		}
+		put_device(dev);
+		cdev = NULL;
+	}
+	up_read(&ccw_bus_type.subsys.rwsem);
+	put_bus(&ccw_bus_type);
+
+	return cdev;
+}
+
 void
 ccw_device_do_unreg_rereg(void *data)
 {
-	struct device *dev;
+	struct ccw_device *cdev;
+	struct subchannel *sch;
+	int need_rename;
 
-	dev = (struct device *)data;
-	device_remove_files(dev);
-	device_del(dev);
-	if (device_add(dev)) {
-		put_device(dev);
+	cdev = (struct ccw_device *)data;
+	sch = to_subchannel(cdev->dev.parent);
+	if (cdev->private->devno != sch->schib.pmcw.dev) {
+		/*
+		 * The device number has changed. This is usually only when
+		 * a device has been detached under VM and then re-appeared
+		 * on another subchannel because of a different attachment
+		 * order than before. Ideally, we should should just switch
+		 * subchannels, but unfortunately, this is not possible with
+		 * the current implementation.
+		 * Instead, we search for the old subchannel for this device
+		 * number and deregister so there are no collisions with the
+		 * newly registered ccw_device.
+		 * FIXME: Find another solution so the block layer doesn't
+		 *        get possibly sick...
+		 */
+		struct ccw_device *other_cdev;
+
+		need_rename = 1;
+		other_cdev = get_disc_ccwdev_by_devno(sch->schib.pmcw.dev,
+						      cdev);
+		if (other_cdev) {
+			struct subchannel *other_sch;
+
+			other_sch = to_subchannel(other_cdev->dev.parent);
+			if (get_device(&other_sch->dev)) {
+				stsch(other_sch->irq, &other_sch->schib);
+				if (other_sch->schib.pmcw.dnv) {
+					other_sch->schib.pmcw.intparm = 0;
+					cio_modify(other_sch);
+				}
+				device_unregister(&other_sch->dev);
+			}
+		}
+		cdev->private->devno = sch->schib.pmcw.dev;
+	} else
+		need_rename = 0;
+	device_remove_files(&cdev->dev);
+	device_del(&cdev->dev);
+	if (need_rename)
+		snprintf (cdev->dev.bus_id, BUS_ID_SIZE, "0.0.%04x",
+			  sch->schib.pmcw.dev);
+	if (device_add(&cdev->dev)) {
+		put_device(&cdev->dev);
 		return;
 	}
-	if (device_add_files(dev))
-		device_unregister(dev);
+	if (device_add_files(&cdev->dev))
+		device_unregister(&cdev->dev);
 }
 
 static void

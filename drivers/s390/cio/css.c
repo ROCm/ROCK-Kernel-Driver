@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.73 $
+ *   $Revision: 1.74 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -218,12 +218,21 @@ css_evaluate_subchannel(int irq, int slow)
 		 * We don't notify the driver since we have to throw the device
 		 * away in any case.
 		 */
-		device_unregister(&sch->dev);
-		/* Reset intparm to zeroes. */
-		sch->schib.pmcw.intparm = 0;
-		cio_modify(sch);
-		put_device(&sch->dev);
-		ret = css_probe_device(irq);
+		if (!disc) {
+			device_unregister(&sch->dev);
+			/* Reset intparm to zeroes. */
+			sch->schib.pmcw.intparm = 0;
+			cio_modify(sch);
+			put_device(&sch->dev);
+			ret = css_probe_device(irq);
+		} else {
+			/*
+			 * We can't immediately deregister the disconnected
+			 * device since it might block.
+			 */
+			device_trigger_reprobe(sch);
+			ret = 0;
+		}
 		break;
 	case CIO_OPER:
 		if (disc)

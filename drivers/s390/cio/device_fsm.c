@@ -152,14 +152,15 @@ ccw_device_handle_oper(struct ccw_device *cdev)
 	/*
 	 * Check if cu type and device type still match. If
 	 * not, it is certainly another device and we have to
-	 * de- and re-register.
+	 * de- and re-register. Also check here for non-matching devno.
 	 */
 	if (cdev->id.cu_type != cdev->private->senseid.cu_type ||
 	    cdev->id.cu_model != cdev->private->senseid.cu_model ||
 	    cdev->id.dev_type != cdev->private->senseid.dev_type ||
-	    cdev->id.dev_model != cdev->private->senseid.dev_model) {
+	    cdev->id.dev_model != cdev->private->senseid.dev_model ||
+	    cdev->private->devno != sch->schib.pmcw.dev) {
 		PREPARE_WORK(&cdev->private->kick_work,
-			     ccw_device_do_unreg_rereg, (void *)&cdev->dev);
+			     ccw_device_do_unreg_rereg, (void *)cdev);
 		queue_work(ccw_device_work, &cdev->private->kick_work);
 		return;
 	}
@@ -295,7 +296,7 @@ ccw_device_oper_notify(void *data)
 		sch->driver->notify(&sch->dev, CIO_OPER) : 0;
 	if (!ret)
 		/* Driver doesn't want device back. */
-		ccw_device_do_unreg_rereg((void *)&cdev->dev);
+		ccw_device_do_unreg_rereg((void *)cdev);
 	else
 		wake_up(&cdev->private->wait_q);
 }
@@ -476,6 +477,8 @@ ccw_device_verify_done(struct ccw_device *cdev, int err)
 {
 	cdev->private->flags.doverify = 0;
 	switch (err) {
+	case -EOPNOTSUPP: /* path grouping not supported, just set online. */
+		cdev->private->options.pgroup = 0;
 	case 0:
 		ccw_device_done(cdev, DEV_STATE_ONLINE);
 		break;
