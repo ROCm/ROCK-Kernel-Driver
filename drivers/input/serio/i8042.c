@@ -362,6 +362,7 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	unsigned char str, data = 0;
 	unsigned int dfl;
+	unsigned int aux_idx;
 	int ret;
 
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
@@ -378,44 +379,67 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		goto out;
 	}
 
-	dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
-	      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
+	if (i8042_mux_present && (str & I8042_STR_AUXDATA)) {
+		static unsigned long last_transmit;
+		static unsigned char last_str;
 
-	if (i8042_mux_values[0].exists && (str & I8042_STR_AUXDATA)) {
-
+		dfl = 0;
 		if (str & I8042_STR_MUXERR) {
+			dbg("MUX error, status is %02x, data is %02x", str, data);
 			switch (data) {
+				default:
+/*
+ * When MUXERR condition is signalled the data register can only contain
+ * 0xfd, 0xfe or 0xff if implementation follows the spec. Unfortunately
+ * it is not always the case. Some KBC just get confused which port the
+ * data came from and signal error leaving the data intact. They _do not_
+ * revert to legacy mode (actually I've never seen KBC reverting to legacy
+ * mode yet, when we see one we'll add proper handling).
+ * Anyway, we will assume that the data came from the same serio last byte
+ * was transmitted (if transmission happened not too long ago).
+ */
+					if (time_before(jiffies, last_transmit + HZ/10)) {
+						str = last_str;
+						break;
+					}
+					/* fall through - report timeout */
 				case 0xfd:
-				case 0xfe: dfl = SERIO_TIMEOUT; break;
-				case 0xff: dfl = SERIO_PARITY; break;
+				case 0xfe: dfl = SERIO_TIMEOUT; data = 0xfe; break;
+				case 0xff: dfl = SERIO_PARITY;  data = 0xfe; break;
 			}
-			data = 0xfe;
-		} else dfl = 0;
+		}
+
+		aux_idx = (str >> 6) & 3;
 
 		dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
-			data, (str >> 6), irq,
+			data, aux_idx, irq,
 			dfl & SERIO_PARITY ? ", bad parity" : "",
 			dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
-		serio_interrupt(i8042_mux_port[(str >> 6) & 3], data, dfl, regs);
+		if (likely(i8042_mux_values[aux_idx].exists))
+			serio_interrupt(i8042_mux_port[aux_idx], data, dfl, regs);
 
+		last_str = str;
+		last_transmit = jiffies;
 		goto irq_ret;
 	}
+
+	dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
+	      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
 	dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
 		data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq,
 		dfl & SERIO_PARITY ? ", bad parity" : "",
 		dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
-	if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
-		serio_interrupt(i8042_aux_port, data, dfl, regs);
-		goto irq_ret;
+
+	if (str & I8042_STR_AUXDATA) {
+		if (likely(i8042_aux_values.exists))
+			serio_interrupt(i8042_aux_port, data, dfl, regs);
+	} else {
+		if (likely(i8042_kbd_values.exists))
+			serio_interrupt(i8042_kbd_port, data, dfl, regs);
 	}
-
-	if (!i8042_kbd_values.exists)
-		goto irq_ret;
-
-	serio_interrupt(i8042_kbd_port, data, dfl, regs);
 
 irq_ret:
 	ret = 1;
