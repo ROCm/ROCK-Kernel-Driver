@@ -257,7 +257,7 @@ xfs_showargs(
 	};
 	struct proc_xfs_info	*xfs_infop;
 	struct xfs_mount	*mp = XFS_BHVTOM(bhv);
-	char b[BDEVNAME_SIZE];
+	char			b[BDEVNAME_SIZE];
 
 	for (xfs_infop = xfs_info; xfs_infop->flag; xfs_infop++) {
 		if (mp->m_flags & xfs_infop->flag)

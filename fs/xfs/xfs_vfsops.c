@@ -34,9 +34,7 @@
 
 #include <xfs.h>
 
-STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
-STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 
 int
 xfs_init(void)
@@ -485,59 +483,6 @@ xfs_mount(
 	return error;
 }
 
-/*
- * xfs_ibusy searches for a busy inode in the mounted file system.
- *
- * Return 0 if there are no active inodes otherwise return 1.
- */
-STATIC int
-xfs_ibusy(
-	xfs_mount_t	*mp)
-{
-	xfs_inode_t	*ip;
-	vnode_t		*vp;
-	int		busy;
-
-	busy = 0;
-
-	XFS_MOUNT_ILOCK(mp);
-
-	ip = mp->m_inodes;
-	if (ip == NULL) {
-		XFS_MOUNT_IUNLOCK(mp);
-		return busy;
-	}
-
-	do {
-		/* Skip markers inserted by xfs_sync */
-		if (ip->i_mount == NULL) {
-			ip = ip->i_mnext;
-			continue;
-		}
-
-		vp = XFS_ITOV_NULL(ip);
-
-		if (vp && vn_count(vp) != 0) {
-			if (xfs_ibusy_check(ip, vn_count(vp)) == 0) {
-				ip = ip->i_mnext;
-				continue;
-			}
-#ifdef DEBUG
-			cmn_err(CE_WARN, "%s: busy vp=0x%p ip=0x%p "
-					 "inum %Ld count=%d",
-				__FUNCTION__, vp, ip, ip->i_ino, vn_count(vp));
-#endif
-			busy++;
-		}
-		ip = ip->i_mnext;
-	} while ((ip != mp->m_inodes) && !busy);
-
-	XFS_MOUNT_IUNLOCK(mp);
-
-	return busy;
-}
-
-
 STATIC int
 xfs_unmount(
 	bhv_desc_t	*bdp,
@@ -570,16 +515,6 @@ xfs_unmount(
 		unmount_event_wanted = 1;
 		unmount_event_flags = (mp->m_dmevmask & (1<<DM_EVENT_UNMOUNT))?
 					0 : DM_FLAGS_UNWANTED;
-	}
-
-	/*
-	 * Make sure there are no active users.
-	 */
-	if (xfs_ibusy(mp)) {
-		error = XFS_ERROR(EBUSY);
-		cmn_err(CE_ALERT, "%s: xfs_ibusy failed -- error code %d",
-			__FUNCTION__, error);
-		goto out;
 	}
 
 	XFS_bflush(mp->m_ddev_targp);
