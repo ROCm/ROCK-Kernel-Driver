@@ -208,6 +208,7 @@ static kmem_cache_t *cifs_req_cachep;
 static kmem_cache_t *cifs_mid_cachep;
 kmem_cache_t *cifs_oplock_cachep;
 #ifdef CIFS_EXPERIMENTAL
+static kmem_cache_t *cifs_sm_req_cachep;
 mempool_t *cifs_sm_req_poolp;
 #endif /* CIFS_EXPERIMENTAL */
 mempool_t *cifs_req_poolp;
