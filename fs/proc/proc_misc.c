@@ -389,7 +389,7 @@ int show_stat(struct seq_file *p, void *v)
 		jiffies_to_clock_t(iowait),
 		jiffies_to_clock_t(irq),
 		jiffies_to_clock_t(softirq));
-	for_each_online_cpu(i) {
+	for_each_cpu(i) {
 		seq_printf(p, "cpu%d %u %u %u %u %u %u %u\n",
 			i,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.user),
@@ -424,7 +424,7 @@ int show_stat(struct seq_file *p, void *v)
 
 static int stat_open(struct inode *inode, struct file *file)
 {
-	unsigned size = 4096 * (1 + num_online_cpus() / 32);
+	unsigned size = 4096 * (1 + num_possible_cpus() / 32);
 	char *buf;
 	struct seq_file *m;
 	int res;
