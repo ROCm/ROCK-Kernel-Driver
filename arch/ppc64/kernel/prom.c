@@ -1023,6 +1023,7 @@ void __init early_init_devtree(void *params)
 	scan_flat_dt(early_init_dt_scan_memory, NULL);
 	lmb_analyze();
 	systemcfg->physicalMemorySize = lmb_phys_mem_size();
+	lmb_reserve(0, __pa(klimit));
 
 	DBG("Phys. mem: %lx\n", systemcfg->physicalMemorySize);
 

@@ -1606,11 +1606,6 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4, unsigned long
 	prom_debug("offset=0x%x\n", offset);
 
 	/*
-	 * Reserve kernel in reserve map
-	 */
-	reserve_mem(0, __pa(RELOC(klimit)));
-
-	/*
 	 * Check for an initrd
 	 */
 	prom_check_initrd(r3, r4);
