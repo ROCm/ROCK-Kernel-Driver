@@ -1528,13 +1528,16 @@ static int shmem_statfs(struct super_block *sb, struct kstatfs *buf)
 
 	buf->f_type = TMPFS_MAGIC;
 	buf->f_bsize = PAGE_CACHE_SIZE;
-	spin_lock(&sbinfo->stat_lock);
-	buf->f_blocks = sbinfo->max_blocks;
-	buf->f_bavail = buf->f_bfree = sbinfo->free_blocks;
-	buf->f_files = sbinfo->max_inodes;
-	buf->f_ffree = sbinfo->free_inodes;
-	spin_unlock(&sbinfo->stat_lock);
 	buf->f_namelen = NAME_MAX;
+	if (sbinfo) {
+		spin_lock(&sbinfo->stat_lock);
+		buf->f_blocks = sbinfo->max_blocks;
+		buf->f_bavail = buf->f_bfree = sbinfo->free_blocks;
+		buf->f_files = sbinfo->max_inodes;
+		buf->f_ffree = sbinfo->free_inodes;
+		spin_unlock(&sbinfo->stat_lock);
+	}
+	/* else leave those fields 0 like simple_statfs */
 	return 0;
 }
 
@@ -1591,13 +1594,15 @@ static int shmem_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 	 * but each new link needs a new dentry, pinning lowmem, and
 	 * tmpfs dentries cannot be pruned until they are unlinked.
 	 */
-	spin_lock(&sbinfo->stat_lock);
-	if (!sbinfo->free_inodes) {
+	if (sbinfo) {
+		spin_lock(&sbinfo->stat_lock);
+		if (!sbinfo->free_inodes) {
+			spin_unlock(&sbinfo->stat_lock);
+			return -ENOSPC;
+		}
+		sbinfo->free_inodes--;
 		spin_unlock(&sbinfo->stat_lock);
-		return -ENOSPC;
 	}
-	sbinfo->free_inodes--;
-	spin_unlock(&sbinfo->stat_lock);
 
 	dir->i_size += BOGO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -1614,9 +1619,11 @@ static int shmem_unlink(struct inode *dir, struct dentry *dentry)
 
 	if (inode->i_nlink > 1 && !S_ISDIR(inode->i_mode)) {
 		struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
-		spin_lock(&sbinfo->stat_lock);
-		sbinfo->free_inodes++;
-		spin_unlock(&sbinfo->stat_lock);
+		if (sbinfo) {
+			spin_lock(&sbinfo->stat_lock);
+			sbinfo->free_inodes++;
+			spin_unlock(&sbinfo->stat_lock);
+		}
 	}
 
 	dir->i_size -= BOGO_DIRENT_SIZE;
@@ -1827,11 +1834,21 @@ bad_val:
 static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 {
 	struct shmem_sb_info *sbinfo = SHMEM_SB(sb);
-	unsigned long max_blocks = sbinfo->max_blocks;
-	unsigned long max_inodes = sbinfo->max_inodes;
+	unsigned long max_blocks = 0;
+	unsigned long max_inodes = 0;
 
+	if (sbinfo) {
+		max_blocks = sbinfo->max_blocks;
+		max_inodes = sbinfo->max_inodes;
+	}
 	if (shmem_parse_options(data, NULL, NULL, NULL, &max_blocks, &max_inodes))
 		return -EINVAL;
+	/* Keep it simple: disallow limited <-> unlimited remount */
+	if ((max_blocks || max_inodes) == !sbinfo)
+		return -EINVAL;
+	/* But allow the pointless unlimited -> unlimited remount */
+	if (!sbinfo)
+		return 0;
 	return shmem_set_size(sbinfo, max_blocks, max_inodes);
 }
 #endif
@@ -1853,22 +1870,27 @@ static int shmem_fill_super(struct super_block *sb,
 	int err = -ENOMEM;
 
 #ifdef CONFIG_TMPFS
+	unsigned long blocks = 0;
+	unsigned long inodes = 0;
+
 	/*
 	 * Per default we only allow half of the physical ram per
 	 * tmpfs instance, limiting inodes to one per page of lowmem;
 	 * but the internal instance is left unlimited.
 	 */
 	if (!(sb->s_flags & MS_NOUSER)) {
-		struct shmem_sb_info *sbinfo;
-		unsigned long blocks = totalram_pages / 2;
-		unsigned long inodes = totalram_pages - totalhigh_pages;
+		blocks = totalram_pages / 2;
+		inodes = totalram_pages - totalhigh_pages;
 		if (inodes > blocks)
 			inodes = blocks;
 
 		if (shmem_parse_options(data, &mode,
 					&uid, &gid, &blocks, &inodes))
 			return -EINVAL;
+	}
 
+	if (blocks || inodes) {
+		struct shmem_sb_info *sbinfo;
 		sbinfo = kmalloc(sizeof(struct shmem_sb_info), GFP_KERNEL);
 		if (!sbinfo)
 			return -ENOMEM;

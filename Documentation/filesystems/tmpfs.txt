@@ -71,6 +71,12 @@ can be changed on remount.  The size parameter also accepts a suffix %
 to limit this tmpfs instance to that percentage of your physical RAM:
 the default, when neither size nor nr_blocks is specified, is size=50%
 
+If both nr_blocks (or size) and nr_inodes are set to 0, neither blocks
+nor inodes will be limited in that instance.  It is generally unwise to
+mount with such options, since it allows any user with write access to
+use up all the memory on the machine; but enhances the scalability of
+that instance in a system with many cpus making intensive use of it.
+
 
 To specify the initial root directory you can use the following mount
 options:
