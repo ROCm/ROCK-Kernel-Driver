@@ -434,13 +434,14 @@ __ip_conntrack_confirm(struct sk_buff *skb)
 		add_timer(&ct->timeout);
 		atomic_inc(&ct->ct_general.use);
 		set_bit(IPS_CONFIRMED_BIT, &ct->status);
-		WRITE_UNLOCK(&ip_conntrack_lock);
 		CONNTRACK_STAT_INC(insert);
+		WRITE_UNLOCK(&ip_conntrack_lock);
 		return NF_ACCEPT;
 	}
 
-	WRITE_UNLOCK(&ip_conntrack_lock);
 	CONNTRACK_STAT_INC(insert_failed);
+	WRITE_UNLOCK(&ip_conntrack_lock);
+
 	return NF_DROP;
 }
 
