@@ -49,7 +49,7 @@ static ssize_t do_write_mem(struct file * file, void *p, unsigned long realp,
 	ssize_t written;
 
 	written = 0;
-#if defined(__sparc__) || defined(__mc68000__)
+#if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 	/* we don't have page 0 mapped on sparc and m68k.. */
 	if (realp < PAGE_SIZE) {
 		unsigned long sz = PAGE_SIZE-realp;
@@ -86,7 +86,7 @@ static ssize_t read_mem(struct file * file, char * buf,
 	if (count > end_mem - p)
 		count = end_mem - p;
 	read = 0;
-#if defined(__sparc__) || defined(__mc68000__)
+#if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 	/* we don't have page 0 mapped on sparc and m68k.. */
 	if (p < PAGE_SIZE) {
 		unsigned long sz = PAGE_SIZE-p;
@@ -229,7 +229,7 @@ static ssize_t read_kmem(struct file *file, char *buf,
 		if (count > (unsigned long) high_memory - p)
 			read = (unsigned long) high_memory - p;
 
-#if defined(__sparc__) || defined(__mc68000__)
+#if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 		/* we don't have page 0 mapped on sparc and m68k.. */
 		if (p < PAGE_SIZE && read > 0) {
 			size_t tmp = PAGE_SIZE - p;
