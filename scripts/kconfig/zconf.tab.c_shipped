@@ -1406,6 +1406,7 @@ yyreduce:
   case 36:
 
     {
+	menu_add_symbol(P_SELECT, sym_lookup(yyvsp[-2].string, 0), yyvsp[-1].expr);
 	printd(DEBUG_PARSE, "%s:%d:select\n", zconf_curname(), zconf_lineno());
 ;}
     break;

@@ -133,17 +133,25 @@ struct property *sym_get_default_prop(struct symbol *sym)
 static void sym_calc_visibility(struct symbol *sym)
 {
 	struct property *prop;
-	tristate visible, oldvisible;
+	tristate tri;
 
 	/* any prompt visible? */
-	oldvisible = sym->visible;
-	visible = no;
+	tri = no;
 	for_all_prompts(sym, prop) {
 		prop->visible.tri = expr_calc_value(prop->visible.expr);
-		visible = E_OR(visible, prop->visible.tri);
+		tri = E_OR(tri, prop->visible.tri);
 	}
-	if (oldvisible != visible) {
-		sym->visible = visible;
+	if (sym->visible != tri) {
+		sym->visible = tri;
+		sym_set_changed(sym);
+	}
+	if (sym_is_choice_value(sym))
+		return;
+	tri = no;
+	if (sym->rev_dep.expr)
+		tri = expr_calc_value(sym->rev_dep.expr);
+	if (sym->rev_dep.tri != tri) {
+		sym->rev_dep.tri = tri;
 		sym_set_changed(sym);
 	}
 }
@@ -195,6 +203,7 @@ void sym_calc_value(struct symbol *sym)
 
 	if (sym->flags & SYMBOL_VALID)
 		return;
+	sym->flags |= SYMBOL_VALID;
 
 	oldval = sym->curr;
 
@@ -209,11 +218,10 @@ void sym_calc_value(struct symbol *sym)
 		newval = symbol_no.curr;
 		break;
 	default:
-		newval.val = sym->name;
-		newval.tri = no;
-		goto out;
+		sym->curr.val = sym->name;
+		sym->curr.tri = no;
+		return;
 	}
-	sym->flags |= SYMBOL_VALID;
 	if (!sym_is_choice_value(sym))
 		sym->flags &= ~SYMBOL_WRITE;
 
@@ -228,7 +236,7 @@ void sym_calc_value(struct symbol *sym)
 		if (sym_is_choice_value(sym) && sym->visible == yes) {
 			prop = sym_get_choice_prop(sym);
 			newval.tri = (prop_get_symbol(prop)->curr.val == sym) ? yes : no;
-		} else if (sym->visible != no) {
+		} else if (E_OR(sym->visible, sym->rev_dep.tri) != no) {
 			sym->flags |= SYMBOL_WRITE;
 			if (sym_has_value(sym))
 				newval.tri = sym->user.tri;
@@ -237,17 +245,19 @@ void sym_calc_value(struct symbol *sym)
 				if (prop)
 					newval.tri = expr_calc_value(prop->expr);
 			}
-			newval.tri = E_AND(newval.tri, sym->visible);
-			/* if the symbol is visible and not optionial,
-			 * possibly ignore old user choice. */
-			if (!sym_is_optional(sym) && newval.tri == no)
-				newval.tri = sym->visible;
+			newval.tri = E_OR(E_AND(newval.tri, sym->visible), sym->rev_dep.tri);
 		} else if (!sym_is_choice(sym)) {
 			prop = sym_get_default_prop(sym);
 			if (prop) {
 				sym->flags |= SYMBOL_WRITE;
 				newval.tri = expr_calc_value(prop->expr);
 			}
+		}
+		if (sym_get_type(sym) == S_BOOLEAN) {
+			if (newval.tri == mod)
+				newval.tri = yes;
+			if (sym->rev_dep.tri == mod)
+				sym->rev_dep.tri = yes;
 		}
 		break;
 	case S_STRING:
@@ -274,23 +284,6 @@ void sym_calc_value(struct symbol *sym)
 		;
 	}
 
-	switch (sym_get_type(sym)) {
-	case S_TRISTATE:
-		if (newval.tri != mod)
-			break;
-		sym_calc_value(modules_sym);
-		if (modules_sym->curr.tri == no)
-			newval.tri = yes;
-		break;
-	case S_BOOLEAN:
-		if (newval.tri == mod)
-			newval.tri = yes;
-		break;
-	default:
-		break;
-	}
-
-out:
 	sym->curr = newval;
 	if (sym_is_choice(sym) && newval.tri == yes)
 		sym->curr.val = sym_calc_choice(sym);
@@ -349,19 +342,13 @@ bool sym_tristate_within_range(struct symbol *sym, tristate val)
 	if (type != S_BOOLEAN && type != S_TRISTATE)
 		return false;
 
-	switch (val) {
-	case no:
-		if (sym_is_choice_value(sym) && sym->visible == yes)
-			return false;
-		return sym_is_optional(sym);
-	case mod:
-		if (sym_is_choice_value(sym) && sym->visible == yes)
-			return false;
-		return type == S_TRISTATE;
-	case yes:
-		return type == S_BOOLEAN || sym->visible == yes;
-	}
-	return false;
+	if (type == S_BOOLEAN && val == mod)
+		return false;
+	if (sym->visible <= sym->rev_dep.tri)
+		return false;
+	if (sym_is_choice_value(sym) && sym->visible == yes)
+		return val == yes;
+	return val >= sym->rev_dep.tri && val <= sym->visible;
 }
 
 bool sym_set_tristate_value(struct symbol *sym, tristate val)
@@ -534,15 +521,7 @@ const char *sym_get_string_value(struct symbol *sym)
 
 bool sym_is_changable(struct symbol *sym)
 {
-	if (sym->visible == no)
-		return false;
-	/* at least 'n' and 'y'/'m' is selectable */
-	if (sym_is_optional(sym))
-		return true;
-	/* no 'n', so 'y' and 'm' must be selectable */
-	if (sym_get_type(sym) == S_TRISTATE && sym->visible == yes)
-		return true;
-	return false;
+	return sym->visible > sym->rev_dep.tri;
 }
 
 struct symbol *sym_lookup(const char *name, int isconst)
@@ -663,7 +642,10 @@ const char *prop_get_type_name(enum prop_type type)
 		return "default";
 	case P_CHOICE:
 		return "choice";
-	default:
-		return "unknown";
+	case P_SELECT:
+		return "select";
+	case P_UNKNOWN:
+		break;
 	}
+	return "unknown";
 }

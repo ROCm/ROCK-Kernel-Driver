@@ -138,7 +138,7 @@ void menu_finalize(struct menu *parent)
 	struct menu *menu, *last_menu;
 	struct symbol *sym;
 	struct property *prop;
-	struct expr *parentdep, *basedep, *dep, *dep2;
+	struct expr *parentdep, *basedep, *dep, *dep2, **ep;
 
 	sym = parent->sym;
 	if (parent->list) {
@@ -177,6 +177,11 @@ void menu_finalize(struct menu *parent)
 				if (menu->sym && menu->sym->type != S_TRISTATE)
 					dep = expr_trans_bool(dep);
 				prop->visible.expr = dep;
+				if (prop->type == P_SELECT) {
+					struct symbol *es = prop_get_symbol(prop);
+					es->rev_dep.expr = expr_alloc_or(es->rev_dep.expr,
+							expr_alloc_and(expr_alloc_symbol(menu->sym), expr_copy(dep)));
+				}
 			}
 		}
 		for (menu = parent->list; menu; menu = menu->next)
@@ -216,12 +221,20 @@ void menu_finalize(struct menu *parent)
 	for (menu = parent->list; menu; menu = menu->next) {
 		if (sym && sym_is_choice(sym) && menu->sym) {
 			menu->sym->flags |= SYMBOL_CHOICEVAL;
+			for (prop = menu->sym->prop; prop; prop = prop->next) {
+				if (prop->type != P_DEFAULT)
+					continue;
+				fprintf(stderr, "%s:%d:warning: defaults for choice values not supported\n",
+					prop->file->name, prop->lineno);
+			}
 			current_entry = menu;
 			menu_set_type(sym->type);
 			menu_add_symbol(P_CHOICE, sym, NULL);
 			prop = sym_get_choice_prop(sym);
-			prop->expr = expr_alloc_one(E_CHOICE, prop->expr);
-			prop->expr->right.sym = menu->sym;
+			for (ep = &prop->expr; *ep; ep = &(*ep)->left.expr)
+				;
+			*ep = expr_alloc_one(E_CHOICE, NULL);
+			(*ep)->right.sym = menu->sym;
 		}
 		if (menu->list && (!menu->prompt || !menu->prompt->text)) {
 			for (last_menu = menu->list; ; last_menu = last_menu->next) {
@@ -234,20 +247,46 @@ void menu_finalize(struct menu *parent)
 			menu->list = NULL;
 		}
 	}
+
+	if (sym && !sym_is_optional(sym) && parent->prompt) {
+		sym->rev_dep.expr = expr_alloc_or(sym->rev_dep.expr,
+				expr_alloc_and(parent->prompt->visible.expr,
+					expr_alloc_symbol(&symbol_mod)));
+	}
 }
 
 bool menu_is_visible(struct menu *menu)
 {
+	struct menu *child;
+	struct symbol *sym;
 	tristate visible;
 
 	if (!menu->prompt)
 		return false;
-	if (menu->sym) {
-		sym_calc_value(menu->sym);
+	sym = menu->sym;
+	if (sym) {
+		sym_calc_value(sym);
 		visible = menu->prompt->visible.tri;
 	} else
 		visible = menu->prompt->visible.tri = expr_calc_value(menu->prompt->visible.expr);
-	return visible != no;
+
+	if (sym && sym_is_choice(sym)) {
+		for (child = menu->list; child; child = child->next)
+			if (menu_is_visible(child))
+				break;
+		if (!child)
+			return false;
+	}
+
+	if (visible != no)
+		return true;
+	if (!sym || sym_get_tristate_value(menu->sym) == no)
+		return false;
+
+	for (child = menu->list; child; child = child->next)
+		if (menu_is_visible(child))
+			return true;
+	return false;
 }
 
 const char *menu_get_prompt(struct menu *menu)

@@ -55,6 +55,13 @@ struct expr *expr_alloc_and(struct expr *e1, struct expr *e2)
 	return e2 ? expr_alloc_two(E_AND, e1, e2) : e1;
 }
 
+struct expr *expr_alloc_or(struct expr *e1, struct expr *e2)
+{
+	if (!e1)
+		return e2;
+	return e2 ? expr_alloc_two(E_OR, e1, e2) : e1;
+}
+
 struct expr *expr_copy(struct expr *org)
 {
 	struct expr *e;
@@ -158,9 +165,22 @@ static void __expr_eliminate_eq(enum expr_type type, struct expr **ep1, struct e
 
 void expr_eliminate_eq(struct expr **ep1, struct expr **ep2)
 {
-	if (!e1 || !e2 || e1->type != e2->type)
+	if (!e1 || !e2)
 		return;
-	__expr_eliminate_eq(e1->type, ep1, ep2);
+	switch (e1->type) {
+	case E_OR:
+	case E_AND:
+		__expr_eliminate_eq(e1->type, ep1, ep2);
+	default:
+		;
+	}
+	if (e1->type != e2->type) switch (e2->type) {
+	case E_OR:
+	case E_AND:
+		__expr_eliminate_eq(e2->type, ep1, ep2);
+	default:
+		;
+	}
 	e1 = expr_eliminate_yn(e1);
 	e2 = expr_eliminate_yn(e2);
 }
@@ -1017,11 +1037,11 @@ void expr_print(struct expr *e, void (*fn)(void *, const char *), void *data, in
 		expr_print(e->right.expr, fn, data, E_AND);
 		break;
 	case E_CHOICE:
-		if (e->left.expr) {
-			expr_print(e->left.expr, fn, data, E_CHOICE);
-			fn(data, " ^ ");
-		}
 		fn(data, e->right.sym->name);
+		if (e->left.expr) {
+			fn(data, " ^ ");
+			expr_print(e->left.expr, fn, data, E_CHOICE);
+		}
 		break;
 	default:
 	  {

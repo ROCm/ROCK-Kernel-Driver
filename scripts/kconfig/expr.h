@@ -73,6 +73,7 @@ struct symbol {
 	int flags;
 	struct property *prop;
 	struct expr *dep, *dep2;
+	struct expr_value rev_dep;
 };
 
 #define for_all_symbols(i, sym) for (i = 0; i < 257; i++) for (sym = symbol_hash[i]; sym; sym = sym->next) if (sym->type != S_OTHER)
@@ -97,7 +98,7 @@ struct symbol {
 #define SYMBOL_HASHMASK		0xff
 
 enum prop_type {
-	P_UNKNOWN, P_PROMPT, P_COMMENT, P_MENU, P_DEFAULT, P_CHOICE
+	P_UNKNOWN, P_PROMPT, P_COMMENT, P_MENU, P_DEFAULT, P_CHOICE, P_SELECT
 };
 
 struct property {
@@ -152,6 +153,7 @@ struct expr *expr_alloc_one(enum expr_type type, struct expr *ce);
 struct expr *expr_alloc_two(enum expr_type type, struct expr *e1, struct expr *e2);
 struct expr *expr_alloc_comp(enum expr_type type, struct symbol *s1, struct symbol *s2);
 struct expr *expr_alloc_and(struct expr *e1, struct expr *e2);
+struct expr *expr_alloc_or(struct expr *e1, struct expr *e2);
 struct expr *expr_copy(struct expr *org);
 void expr_free(struct expr *e);
 int expr_eq(struct expr *e1, struct expr *e2);

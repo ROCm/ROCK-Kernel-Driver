@@ -215,6 +215,7 @@ config_option: T_DEFAULT expr if_expr T_EOL
 
 config_option: T_SELECT T_WORD if_expr T_EOL
 {
+	menu_add_symbol(P_SELECT, sym_lookup($2, 0), $3);
 	printd(DEBUG_PARSE, "%s:%d:select\n", zconf_curname(), zconf_lineno());
 };
 
