@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#123 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#133 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -267,7 +267,7 @@ typedef struct timer_list ahc_timer_t;
 
 /***************************** Timer Facilities *******************************/
 #define ahc_timer_init init_timer
-#define ahc_timer_stop del_timer
+#define ahc_timer_stop del_timer_sync
 typedef void ahc_linux_callback_t (u_long);  
 static __inline void ahc_timer_reset(ahc_timer_t *timer, int usec,
 				     ahc_callback_t *func, void *arg);
@@ -299,7 +299,13 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.28"
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) || defined(SCSI_HAS_HOST_LOCK))
+#define AHC_SCSI_HAS_HOST_LOCK 1
+#else
+#define AHC_SCSI_HAS_HOST_LOCK 0
+#endif
+
+#define AIC7XXX_DRIVER_VERSION "6.2.32"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -703,7 +709,6 @@ ahc_lockinit(struct ahc_softc *ahc)
 static __inline void
 ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	*flags = 0;
 	spin_lock_irqsave(&ahc->platform_data->spin_lock, *flags);
 }
 
@@ -717,10 +722,13 @@ static __inline void
 ahc_midlayer_entrypoint_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
 	/*
-	 * In 2.5.X, the midlayer takes our lock just before
-	 * calling us, so avoid locking again.
+	 * In 2.5.X and some 2.4.X versions, the midlayer takes our
+	 * lock just before calling us, so we avoid locking again.
+	 * For other kernel versions, the io_request_lock is taken
+	 * just before our entry point is called.  In this case, we
+	 * trade the io_request_lock for our per-softc lock.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#if AHC_SCSI_HAS_HOST_LOCK == 0
 	ahc_lock(ahc, flags);
 #endif
 }
@@ -728,11 +736,7 @@ ahc_midlayer_entrypoint_lock(struct ahc_softc *ahc, unsigned long *flags)
 static __inline void
 ahc_midlayer_entrypoint_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	/*
-	 * In 2.5.X, the midlayer takes our lock just before
-	 * calling us and unlocks when we return, so let it do the unlock.
-	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#if AHC_SCSI_HAS_HOST_LOCK == 0
 	ahc_unlock(ahc, flags);
 #endif
 }
@@ -750,8 +754,7 @@ ahc_done_lockinit(struct ahc_softc *ahc)
 static __inline void
 ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	*flags = 0;
+#if AHC_SCSI_HAS_HOST_LOCK == 0
 	spin_lock_irqsave(&io_request_lock, *flags);
 #endif
 }
@@ -759,7 +762,7 @@ ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
 static __inline void
 ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#if AHC_SCSI_HAS_HOST_LOCK == 0
 	spin_unlock_irqrestore(&io_request_lock, *flags);
 #endif
 }
@@ -773,7 +776,6 @@ ahc_list_lockinit()
 static __inline void
 ahc_list_lock(unsigned long *flags)
 {
-	*flags = 0;
 	spin_lock_irqsave(&ahc_list_spinlock, *flags);
 }
 
@@ -793,7 +795,6 @@ ahc_lockinit(struct ahc_softc *ahc)
 static __inline void
 ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	*flags = 0;
 	save_flags(*flags);
 	cli();
 }
@@ -832,7 +833,6 @@ ahc_list_lockinit()
 static __inline void
 ahc_list_lock(unsigned long *flags)
 {
-	*flags = 0;
 	save_flags(*flags);
 	cli();
 }
@@ -907,7 +907,7 @@ int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
  */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only support under 2.1.92 and above"
+#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
 #endif
 #include <linux/bios32.h>
 #endif

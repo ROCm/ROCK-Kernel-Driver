@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#108 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#123 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -92,6 +92,7 @@
  * Compile in debugging code, but do not enable any printfs.
  */
 #define AHD_DEBUG 1
+#define AHD_DEBUG_OPTS 0
 #endif
 /* No debugging code. */
 #endif
@@ -254,7 +255,7 @@ typedef struct timer_list ahd_timer_t;
 
 /***************************** Timer Facilities *******************************/
 #define ahd_timer_init init_timer
-#define ahd_timer_stop del_timer
+#define ahd_timer_stop del_timer_sync
 typedef void ahd_linux_callback_t (u_long);  
 static __inline void ahd_timer_reset(ahd_timer_t *timer, u_int usec,
 				     ahd_callback_t *func, void *arg);
@@ -286,7 +287,13 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.0"
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) || defined(SCSI_HAS_HOST_LOCK))
+#define AHD_SCSI_HAS_HOST_LOCK 1
+#else
+#define AHD_SCSI_HAS_HOST_LOCK 0
+#endif
+
+#define AIC79XX_DRIVER_VERSION "1.3.6"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -487,7 +494,7 @@ struct ahd_linux_target {
  * Per-SCB OSM storage.
  */
 typedef enum {
-	AHD_UP_EH_SEMAPHORE = 0x1
+	AHD_SCB_UP_EH_SEM = 0x1
 } ahd_linux_scb_flags;
 
 struct scb_platform_data {
@@ -733,7 +740,6 @@ ahd_lockinit(struct ahd_softc *ahd)
 static __inline void
 ahd_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
-	*flags = 0;
 	spin_lock_irqsave(&ahd->platform_data->spin_lock, *flags);
 }
 
@@ -747,23 +753,24 @@ static __inline void
 ahd_midlayer_entrypoint_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	/*
-	 * In 2.5.X, the midlayer takes our lock just before
-	 * calling us, so avoid locking again.
+	 * In 2.5.X and some 2.4.X versions, the midlayer takes our
+	 * lock just before calling us, so we avoid locking again.
+	 * For other kernel versions, the io_request_lock is taken
+	 * just before our entry point is called.  In this case, we
+	 * trade the io_request_lock for our per-softc lock.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	ahd_lock(ahd, flags);
+#if AHD_SCSI_HAS_HOST_LOCK == 0
+	spin_unlock(&io_request_lock);
+	spin_lock(&ahd->platform_data->spin_lock);
 #endif
 }
 
 static __inline void
 ahd_midlayer_entrypoint_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
-	/*
-	 * In 2.5.X, the midlayer takes our lock just before
-	 * calling us and unlocks when we return, so let it do the unlock.
-	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	ahd_unlock(ahd, flags);
+#if AHD_SCSI_HAS_HOST_LOCK == 0
+	spin_unlock(&ahd->platform_data->spin_lock);
+	spin_lock(&io_request_lock);
 #endif
 }
 
@@ -780,17 +787,16 @@ ahd_done_lockinit(struct ahd_softc *ahd)
 static __inline void
 ahd_done_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	*flags = 0;
-	spin_lock_irqsave(&io_request_lock, *flags);
+#if AHD_SCSI_HAS_HOST_LOCK == 0
+	spin_lock(&io_request_lock);
 #endif
 }
 
 static __inline void
 ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_unlock_irqrestore(&io_request_lock, *flags);
+#if AHD_SCSI_HAS_HOST_LOCK == 0
+	spin_unlock(&io_request_lock);
 #endif
 }
 
@@ -803,7 +809,6 @@ ahd_list_lockinit()
 static __inline void
 ahd_list_lock(unsigned long *flags)
 {
-	*flags = 0;
 	spin_lock_irqsave(&ahd_list_spinlock, *flags);
 }
 
@@ -822,7 +827,6 @@ ahd_lockinit(struct ahd_softc *ahd)
 static __inline void
 ahd_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
-	*flags = 0;
 	save_flags(*flags);
 	cli();
 }
@@ -860,7 +864,6 @@ ahd_list_lockinit()
 static __inline void
 ahd_list_lock(unsigned long *flags)
 {
-	*flags = 0;
 	save_flags(*flags);
 	cli();
 }
@@ -947,7 +950,7 @@ void ahd_power_state_change(struct ahd_softc *ahd,
  */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only support under 2.1.92 and above"
+#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
 #endif
 #include <linux/bios32.h>
 #endif
