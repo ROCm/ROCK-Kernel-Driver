@@ -40,8 +40,6 @@
 #include <asm/io.h>
 #include <asm/machw.h>
 
-#include <video/fbcon.h>
-
 /* Common DAC base address for the LC, RBV, Valkyrie, and IIvx */
 #define DAC_BASE 0x50f24000
 
@@ -173,7 +171,6 @@ static struct fb_fix_screeninfo macfb_fix = {
 	.accel	= FB_ACCEL_NONE,
 };
 
-static struct display disp;
 static struct fb_info fb_info;
 static u32 pseudo_palette[17];
 static int inverse   = 0;
@@ -589,8 +586,6 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 static struct fb_ops macfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= macfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -952,21 +947,16 @@ void __init macfb_init(void)
 			break;
 		}
 
-	strcpy(fb_info.modename, macfb_fix.id);	
-	fb_info.changevar	= NULL;
 	fb_info.node		= NODEV;
 	fb_info.fbops		= &macfb_ops;
 	fb_info.var		= macfb_defined;
 	fb_info.fix		= macfb_fix;
 	fb_info.currcon		= -1;	
-	fb_info.disp		= &disp;
-	fb_info.switch_con	= gen_switch;
 	fb_info.updatevar	= gen_update_var;
 	fb_info.pseudo_palette	= pseudo_palette;
 	fb_info.flags		= FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, video_cmap_len, 0);
-	gen_set_disp(-1, &fb_info);
 	
 	if (register_framebuffer(&fb_info) < 0)
 		return;

@@ -18,6 +18,7 @@
 #endif
 
 extern struct display_switch fbcon_vga_planes;
+extern struct display_switch fbcon_vga8_planes;
 extern struct display_switch fbcon_ega_planes;
 extern void fbcon_vga_planes_setup(struct display *p);
 extern void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
