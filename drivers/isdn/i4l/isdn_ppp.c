@@ -1121,7 +1121,10 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 	struct ippp_struct *ipt,*ipts;
 	int slot;
 
-	mlp = netdev->priv;
+	ndev->trans_start = jiffies;
+
+	if (list_empty(&mlp->online))
+		return isdn_net_autodial(skb, ndev);
 
 	slot = idev->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
@@ -1135,6 +1138,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 	if (!(ipts->pppcfg & SC_ENABLE_IP)) {	/* PPP connected ? */
 		if (ipts->debug & 0x1)
 			printk(KERN_INFO "%s: IP frame delayed.\n", netdev->name);
+		netif_stop_queue(ndev);
 		return 1;
 	}
 
@@ -1155,6 +1159,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 	idev = isdn_net_get_locked_dev(mlp);
 	if (!idev) {
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", netdev->name);
+		netif_stop_queue(ndev);
 		return 1;
 	}
 	/* we have our lp locked from now on */

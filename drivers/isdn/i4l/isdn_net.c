@@ -913,9 +913,12 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 {
 	isdn_net_dev *idev, *sdev;
 	isdn_net_local *mlp = ndev->priv;
-	int retv = 0;
 
-	mlp = ndev->priv;
+	ndev->trans_start = jiffies;
+
+	if (list_empty(&mlp->online))
+		return isdn_net_autodial(skb, ndev);
+
 	/* For the other encaps the header has already been built */
 	if (mlp->p_encap == ISDN_NET_ENCAP_SYNCPPP) {
 		return isdn_ppp_xmit(skb, ndev);
@@ -923,6 +926,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	idev = isdn_net_get_locked_dev(mlp);
 	if (!idev) {
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", ndev->name);
+		netif_stop_queue(ndev);
 		return 1;
 	}
 	/* we have our idev locked from now on */
@@ -970,8 +974,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 		list_add_tail(&mlp->online, &idev->online);
 	}
 
-	return retv;
-
+	return 0;
 }
 
 static void
@@ -982,7 +985,7 @@ isdn_net_tx_timeout(struct net_device *dev)
 	netif_wake_queue(dev);
 }
 
-static int
+int
 isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev)
 {
 	isdn_net_local *mlp = ndev->priv;
@@ -1034,27 +1037,14 @@ isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev)
 static int
 isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	isdn_net_local *mlp = ndev->priv;
-	int retval;
-
 	if (mlp->p_encap == ISDN_NET_ENCAP_X25IFACE)
 		return isdn_x25_start_xmit(skb, ndev);
 		
-	/* auto-dialing xmit function */
-	isdn_dumppkt("S:", skb->data, skb->len, 40);
-	
-	if (list_empty(&mlp->online))
-		return isdn_net_autodial(skb, ndev);
-
-	/* Device is bound to an ISDN channel */ 
-	ndev->trans_start = jiffies;
-
 	/* ISDN connection is established, try sending */
-	retval = isdn_net_xmit(ndev, skb);
-	if (retval)
-		netif_stop_queue(ndev);
+	if (mlp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
+		return isdn_ppp_xmit(skb, ndev);
 
-	return retval;
+	return isdn_net_xmit(skb, ndev);
 }
 
 /*
