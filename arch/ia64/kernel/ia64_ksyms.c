@@ -34,13 +34,8 @@ EXPORT_SYMBOL(disable_irq_nosync);
 #include <linux/interrupt.h>
 EXPORT_SYMBOL(probe_irq_mask);
 
-#include <linux/in6.h>
 #include <asm/checksum.h>
-/* not coded yet?? EXPORT_SYMBOL(csum_ipv6_magic); */
-EXPORT_SYMBOL(csum_partial_copy_nocheck);
-EXPORT_SYMBOL(csum_tcpudp_magic);
-EXPORT_SYMBOL(ip_compute_csum);
-EXPORT_SYMBOL(ip_fast_csum);
+EXPORT_SYMBOL(ip_fast_csum);		/* hand-coded assembly */
 
 #include <asm/io.h>
 EXPORT_SYMBOL(__ia64_memcpy_fromio);
@@ -58,9 +53,11 @@ EXPORT_SYMBOL_NOVERS(__up);
 EXPORT_SYMBOL(clear_page);
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
+#include <linux/bootmem.h>
 #include <asm/pgtable.h>
 EXPORT_SYMBOL(vmalloc_end);
 EXPORT_SYMBOL(ia64_pfn_valid);
+EXPORT_SYMBOL(max_low_pfn);	/* defined by bootmem.c, but not exported by generic code */
 #endif
 
 #include <asm/processor.h>
