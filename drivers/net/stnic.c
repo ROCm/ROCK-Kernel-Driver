@@ -112,7 +112,7 @@ static int __init stnic_probe(void)
   if (!dev)
   	return -ENOMEM;
   SET_MODULE_OWNER(dev);
-  dev->probe = NULL;
+  dev->priv = NULL;
 
   /* Allocate dev->priv and fill in 8390 specific dev fields. */
   if (ethdev_init (dev))
