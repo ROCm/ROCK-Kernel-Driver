@@ -252,17 +252,15 @@ drivers-y	:= drivers/ sound/
 networks-y	:= net/
 libs-y		:= lib/
 
-CORE_FILES	:= kernel/built-in.o mm/built-in.o fs/built-in.o \
-		   ipc/built-in.o security/built-in.o
-SUBDIRS		+= kernel mm fs ipc security
-
 include arch/$(ARCH)/Makefile
+
+core-y		+= kernel/ mm/ fs/ ipc/ security/
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m)))
 INIT		+= $(patsubst %/, %/built-in.o, $(init-y))
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(core-y) $(core-m)))
-CORE_FILES	:= $(patsubst %/, %/built-in.o, $(core-y)) $(CORE_FILES)
+CORE_FILES	+= $(patsubst %/, %/built-in.o, $(core-y))
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(drivers-y) $(drivers-m)))
 DRIVERS		+= $(patsubst %/, %/built-in.o, $(drivers-y))
