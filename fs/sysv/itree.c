@@ -81,6 +81,9 @@ static inline u32 *block_end(struct buffer_head *bh)
 	return (u32*)((char*)bh->b_data + bh->b_size);
 }
 
+/*
+ * Requires read_lock(&pointers_lock) or write_lock(&pointers_lock)
+ */
 static Indirect *get_branch(struct inode *inode,
 			    int depth,
 			    int offsets[],
@@ -100,18 +103,15 @@ static Indirect *get_branch(struct inode *inode,
 		bh = sb_bread(sb, block);
 		if (!bh)
 			goto failure;
-		read_lock(&pointers_lock);
 		if (!verify_chain(chain, p))
 			goto changed;
 		add_chain(++p, bh, (u32*)bh->b_data + *++offsets);
-		read_unlock(&pointers_lock);
 		if (!p->key)
 			goto no_block;
 	}
 	return NULL;
 
 changed:
-	read_unlock(&pointers_lock);
 	brelse(bh);
 	*err = -EAGAIN;
 	goto no_block;
@@ -213,7 +213,9 @@ static int get_block(struct inode *inode, sector_t iblock, struct buffer_head *b
 		goto out;
 
 reread:
+	read_lock(&pointers_lock);
 	partial = get_branch(inode, depth, offsets, chain, &err);
+	read_unlock(&pointers_lock);
 
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
