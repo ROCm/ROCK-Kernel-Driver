@@ -49,12 +49,12 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * name,
 ssize_t cifs_listxattr(struct dentry * direntry, char * ea_data, size_t ea_size)
 {
 	ssize_t rc = -EOPNOTSUPP;
+#ifdef CONFIG_CIFS_XATTR
 	int xid;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct super_block * sb;
 	char * full_path;
-#ifdef CONFIG_CIFS_XATTR
 	if(direntry == NULL)
 		return -EIO;
 	if(direntry->d_inode)
