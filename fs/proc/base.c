@@ -32,6 +32,7 @@
 #include <linux/mount.h>
 #include <linux/security.h>
 #include <linux/ptrace.h>
+#include "internal.h"
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.
@@ -179,21 +180,6 @@ static struct pid_entry tid_attr_stuff[] = {
 
 #undef E
 
-static inline struct task_struct *proc_task(struct inode *inode)
-{
-	return PROC_I(inode)->task;
-}
-
-static inline int proc_type(struct inode *inode)
-{
-	return PROC_I(inode)->type;
-}
-
-int proc_tid_stat(struct task_struct*,char*);
-int proc_tgid_stat(struct task_struct*,char*);
-int proc_pid_status(struct task_struct*,char*);
-int proc_pid_statm(struct task_struct*,char*);
-
 static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
 {
 	struct task_struct *task = proc_task(inode);
@@ -216,33 +202,6 @@ static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsm
 		put_files_struct(files);
 	}
 	return -ENOENT;
-}
-
-static int proc_exe_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
-{
-	struct vm_area_struct * vma;
-	int result = -ENOENT;
-	struct task_struct *task = proc_task(inode);
-	struct mm_struct * mm = get_task_mm(task);
-
-	if (!mm)
-		goto out;
-	down_read(&mm->mmap_sem);
-	vma = mm->mmap;
-	while (vma) {
-		if ((vma->vm_flags & VM_EXECUTABLE) && 
-		    vma->vm_file) {
-			*mnt = mntget(vma->vm_file->f_vfsmnt);
-			*dentry = dget(vma->vm_file->f_dentry);
-			result = 0;
-			break;
-		}
-		vma = vma->vm_next;
-	}
-	up_read(&mm->mmap_sem);
-	mmput(mm);
-out:
-	return result;
 }
 
 static int proc_cwd_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)

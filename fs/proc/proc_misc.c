@@ -49,6 +49,7 @@
 #include <asm/io.h>
 #include <asm/tlb.h>
 #include <asm/div64.h>
+#include "internal.h"
 
 #define LOAD_INT(x) ((x) >> FSHIFT)
 #define LOAD_FRAC(x) LOAD_INT(((x) & (FIXED_1-1)) * 100)
@@ -95,41 +96,6 @@ static int loadavg_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
-struct vmalloc_info {
-	unsigned long used;
-	unsigned long largest_chunk;
-};
-
-static struct vmalloc_info get_vmalloc_info(void)
-{
-	unsigned long prev_end = VMALLOC_START;
-	struct vm_struct* vma;
-	struct vmalloc_info vmi;
-	vmi.used = 0;
-
-	read_lock(&vmlist_lock);
-
-	if(!vmlist)
-		vmi.largest_chunk = (VMALLOC_END-VMALLOC_START);
-	else
-		vmi.largest_chunk = 0;
-
-	for (vma = vmlist; vma; vma = vma->next) {
-		unsigned long free_area_size =
-			(unsigned long)vma->addr - prev_end;
-		vmi.used += vma->size;
-		if (vmi.largest_chunk < free_area_size )
-
-			vmi.largest_chunk = free_area_size;
-		prev_end = vma->size + (unsigned long)vma->addr;
-	}
-	if(VMALLOC_END-prev_end > vmi.largest_chunk)
-		vmi.largest_chunk = VMALLOC_END-prev_end;
-
-	read_unlock(&vmlist_lock);
-	return vmi;
-}
-
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -158,7 +124,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	unsigned long inactive;
 	unsigned long active;
 	unsigned long free;
-	unsigned long vmtot;
 	unsigned long committed;
 	unsigned long allowed;
 	struct vmalloc_info vmi;
@@ -176,10 +141,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	allowed = ((totalram_pages - hugetlb_total_pages())
 		* sysctl_overcommit_ratio / 100) + total_swap_pages;
 
-	vmtot = (VMALLOC_END-VMALLOC_START)>>10;
-	vmi = get_vmalloc_info();
-	vmi.used >>= 10;
-	vmi.largest_chunk >>= 10;
+	get_vmalloc_info(&vmi);
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -228,9 +190,9 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(allowed),
 		K(committed),
 		K(ps.nr_page_table_pages),
-		vmtot,
-		vmi.used,
-		vmi.largest_chunk
+		VMALLOC_TOTAL >> 10,
+		vmi.used >> 10,
+		vmi.largest_chunk >> 10
 		);
 
 		len += hugetlb_report_meminfo(page + len);
@@ -570,7 +532,7 @@ static struct file_operations proc_sysrq_trigger_operations = {
 
 struct proc_dir_entry *proc_root_kcore;
 
-static void create_seq_entry(char *name, mode_t mode, struct file_operations *f)
+void create_seq_entry(char *name, mode_t mode, struct file_operations *f)
 {
 	struct proc_dir_entry *entry;
 	entry = create_proc_entry(name, mode, NULL);
