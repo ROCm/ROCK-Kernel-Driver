@@ -62,7 +62,7 @@ typedef struct {
 
 static xpram_device_t xpram_devices[XPRAM_MAX_DEVS];
 static int xpram_sizes[XPRAM_MAX_DEVS];
-static struct gendisk xpram_disks[XPRAM_MAX_DEVS];
+static struct gendisk *xpram_disks[XPRAM_MAX_DEVS];
 static unsigned long xpram_pages;
 static int xpram_devs;
 static devfs_handle_t xpram_devfs_handle;
@@ -438,7 +438,14 @@ static int __init xpram_setup_blkdev(void)
 {
 	request_queue_t *q;
 	unsigned long offset;
-	int i, rc;
+	int i, rc = -ENOMEM;
+
+	for (i = 0; i < xpram_devs; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto out;
+		xpram_disks[i] = disk;
+	}
 
 	/*
 	 * Register xpram major.
@@ -446,7 +453,7 @@ static int __init xpram_setup_blkdev(void)
 	rc = register_blkdev(XPRAM_MAJOR, XPRAM_NAME, &xpram_devops);
 	if (rc < 0) {
 		PRINT_ERR("Can't get xpram major %d\n", XPRAM_MAJOR);
-		return rc;
+		goto out;
 	}
 
 	xpram_devfs_handle = devfs_mk_dir (NULL, "slram", NULL);
@@ -468,7 +475,7 @@ static int __init xpram_setup_blkdev(void)
 	 */
 	offset = 0;
 	for (i = 0; i < xpram_devs; i++) {
-		struct gendisk *disk = xpram_disks + i;
+		struct gendisk *disk = xpram_disks[i];
 		xpram_devices[i].size = xpram_sizes[i] / 4;
 		xpram_devices[i].offset = offset;
 		offset += xpram_devices[i].size;
@@ -482,6 +489,9 @@ static int __init xpram_setup_blkdev(void)
 	}
 
 	return 0;
+out:
+	while (i--)
+		put_disk(xpram_disks[i]);
 }
 
 /*
@@ -490,8 +500,10 @@ static int __init xpram_setup_blkdev(void)
 static void __exit xpram_exit(void)
 {
 	int i;
-	for (i = 0; i < xpram_devs; i++)
-		del_gendisk(xpram_disks + i);
+	for (i = 0; i < xpram_devs; i++) {
+		del_gendisk(xpram_disks[i]);
+		put_disk(xpram_disks[i]);
+	}
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_unregister(xpram_devfs_handle);
 	sys_device_unregister(&xpram_sys_device);
