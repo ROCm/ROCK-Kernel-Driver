@@ -176,8 +176,7 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 			}
 		}
 	}
-	if (waitqueue_active(&inode->i_wait))
-		wake_up(&inode->i_wait);
+	wake_up_inode(inode);
 }
 
 /*

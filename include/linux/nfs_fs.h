@@ -13,6 +13,7 @@
 #include <linux/in.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/wait.h>
 
 #include <linux/nfs_fs_sb.h>
 
@@ -158,6 +159,8 @@ struct nfs_inode {
 
 	/* Credentials for shared mmap */
 	struct rpc_cred		*mm_cred;
+
+	wait_queue_head_t	nfs_i_wait;
 
 	struct inode		vfs_inode;
 };
