@@ -204,7 +204,7 @@ static inline unsigned long hpt_hash(unsigned long vpn, int large)
 		page = vpn & 0xffff;
 	}
 
-	return (vsid & 0x7fffffffff) ^ page;
+	return (vsid & 0x7fffffffffUL) ^ page;
 }
 
 static inline void __tlbie(unsigned long va, int large)

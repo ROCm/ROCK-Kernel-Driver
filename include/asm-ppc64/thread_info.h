@@ -69,10 +69,6 @@ struct thread_info {
 #define get_thread_info(ti)	get_task_struct((ti)->task)
 #define put_thread_info(ti)	put_task_struct((ti)->task)
 
-#if THREAD_SIZE != (4*PAGE_SIZE)
-#error update vmlinux.lds and current_thread_info to match
-#endif
-
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {

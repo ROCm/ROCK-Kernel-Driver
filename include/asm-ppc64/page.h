@@ -12,18 +12,20 @@
 
 #include <linux/config.h>
 
+#ifdef __ASSEMBLY__
+  #define ASM_CONST(x) x
+#else
+  #define ASM_CONST(x) x##UL
+#endif
+
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	12
-#ifndef __ASSEMBLY__
-# define PAGE_SIZE	(1UL << PAGE_SHIFT)
-#else
-# define PAGE_SIZE	(1 << PAGE_SHIFT)
-#endif
+#define PAGE_SIZE	(ASM_CONST(1) << PAGE_SHIFT)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 #define PAGE_OFFSET_MASK (PAGE_SIZE-1)
 
 #define SID_SHIFT       28
-#define SID_MASK        0xfffffffff
+#define SID_MASK        0xfffffffffUL
 #define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)
 
 #ifdef CONFIG_HUGETLB_PAGE
@@ -196,11 +198,11 @@ extern int page_is_ram(unsigned long physaddr);
 /*       KERNELBASE is defined for performance reasons. */
 /*       When KERNELBASE moves, those macros may have   */
 /*             to change!                               */
-#define PAGE_OFFSET     0xC000000000000000
+#define PAGE_OFFSET     ASM_CONST(0xC000000000000000)
 #define KERNELBASE      PAGE_OFFSET
-#define VMALLOCBASE     0xD000000000000000
-#define IOREGIONBASE    0xE000000000000000
-#define EEHREGIONBASE   0xA000000000000000
+#define VMALLOCBASE     0xD000000000000000UL
+#define IOREGIONBASE    0xE000000000000000UL
+#define EEHREGIONBASE   0xA000000000000000UL
 
 #define IO_REGION_ID       (IOREGIONBASE>>REGION_SHIFT)
 #define EEH_REGION_ID      (EEHREGIONBASE>>REGION_SHIFT)

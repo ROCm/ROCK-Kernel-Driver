@@ -15,10 +15,10 @@
 
 #if BITS_PER_LONG == 32
 # define IDR_BITS 5
-# define IDR_FULL 0xffffffff
+# define IDR_FULL 0xfffffffful
 #elif BITS_PER_LONG == 64
 # define IDR_BITS 6
-# define IDR_FULL 0xffffffffffffffff
+# define IDR_FULL 0xfffffffffffffffful
 #else
 # error "BITS_PER_LONG is not 32 or 64"
 #endif
