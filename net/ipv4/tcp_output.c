@@ -1065,12 +1065,15 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 	if (packet_cnt) {
 		sk_stream_for_retrans_queue(skb, sk) {
 			__u8 sacked = TCP_SKB_CB(skb)->sacked;
-			int pkts = TCP_SKB_CB(skb)->tso_factor;
 
-			BUG_ON(!pkts);
-
-			if ((tcp_packets_in_flight(tp) + (pkts-1)) >=
-			    tp->snd_cwnd)
+			/* Assume this retransmit will generate
+			 * only one packet for congestion window
+			 * calculation purposes.  This works because
+			 * tcp_retransmit_skb() will chop up the
+			 * packet to be MSS sized and all the
+			 * packet counting works out.
+			 */
+			if (tcp_packets_in_flight(tp) >= tp->snd_cwnd)
 				return;
 
 			if (sacked&TCPCB_LOST) {
@@ -1117,15 +1120,16 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 	packet_cnt = 0;
 
 	sk_stream_for_retrans_queue(skb, sk) {
-		int pkts = TCP_SKB_CB(skb)->tso_factor;
-
-		BUG_ON(!pkts);
-
-		packet_cnt += pkts;
-		if (packet_cnt > tcp_get_pcount(&tp->fackets_out))
+		/* Similar to the retransmit loop above we
+		 * can pretend that the retransmitted SKB
+		 * we send out here will be composed of one
+		 * real MSS sized packet because tcp_retransmit_skb()
+		 * will fragment it if necessary.
+		 */
+		if (++packet_cnt > tcp_get_pcount(&tp->fackets_out))
 			break;
 
-		if ((tcp_packets_in_flight(tp) + (pkts-1)) >= tp->snd_cwnd)
+		if (tcp_packets_in_flight(tp) >= tp->snd_cwnd)
 			break;
 
 		if (TCP_SKB_CB(skb)->sacked & TCPCB_TAGBITS)
