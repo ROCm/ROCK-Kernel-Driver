@@ -486,6 +486,7 @@ islpci_reset_if(islpci_private *priv)
 		/* The software reset acknowledge needs about 220 msec here.
 		 * Be conservative and wait for up to one second. */
 	
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		remaining = schedule_timeout(HZ);
 
 		if(remaining > 0) {
@@ -496,14 +497,14 @@ islpci_reset_if(islpci_private *priv)
 		/* If we're here it's because our IRQ hasn't yet gone through. 
 		 * Retry a bit more...
 		 */
-		printk(KERN_ERR "%s: reset problem: no 'reset complete' IRQ seen\n",
+		printk(KERN_ERR "%s: no 'reset complete' IRQ seen - retrying\n",
 			priv->ndev->name);
 	}
 
 	finish_wait(&priv->reset_done, &wait);
 
 	if (result) {
-		printk(KERN_ERR "%s: islpci_reset_if: failure\n", priv->ndev->name);
+		printk(KERN_ERR "%s: interface reset failure\n", priv->ndev->name);
 		return result;
 	}
 

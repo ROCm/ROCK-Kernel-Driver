@@ -473,6 +473,7 @@ islpci_mgt_transaction(struct net_device *ndev,
 		int timeleft;
 		struct islpci_mgmtframe *frame;
 
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		timeleft = schedule_timeout(wait_cycle_jiffies);
 		frame = xchg(&priv->mgmt_received, NULL);
 		if (frame) {
