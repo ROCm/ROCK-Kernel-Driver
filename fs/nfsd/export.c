@@ -32,7 +32,6 @@
 typedef struct svc_client	svc_client;
 typedef struct svc_export	svc_export;
 
-static svc_export *	exp_find(svc_client *clp, kdev_t dev);
 static svc_export *	exp_parent(svc_client *clp, kdev_t dev,
 					struct dentry *dentry);
 static svc_export *	exp_child(svc_client *clp, kdev_t dev,
@@ -65,21 +64,6 @@ static int			hash_lock;
 static int			want_lock;
 static int			hash_count;
 static DECLARE_WAIT_QUEUE_HEAD(	hash_wait );
-
-
-/*
- * Find a client's export for a device.
- */
-static inline svc_export *
-exp_find(svc_client *clp, kdev_t dev)
-{
-	svc_export *	exp;
-
-	exp = clp->cl_export[EXPORT_HASH(dev)];
-	while (exp && !kdev_same(exp->ex_dev, dev))
-		exp = exp->ex_next;
-	return exp;
-}
 
 /*
  * Find the client's export entry matching xdev/xino.
