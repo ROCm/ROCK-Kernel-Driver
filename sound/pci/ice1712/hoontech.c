@@ -216,6 +216,73 @@ static int __devinit snd_ice1712_hoontech_init(ice1712_t *ice)
 	return 0;
 }
 
+/*
+ * AK4524 access
+ */
+
+/* start callback for STDSP24 with modified hardware */
+static void stdsp24_ak4524_lock(akm4xxx_t *ak, int chip)
+{
+	ice1712_t *ice = ak->private_data[0];
+	unsigned char tmp;
+	snd_ice1712_save_gpio_status(ice);
+	tmp =	ICE1712_STDSP24_SERIAL_DATA |
+		ICE1712_STDSP24_SERIAL_CLOCK |
+		ICE1712_STDSP24_AK4524_CS;
+	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION,
+			  ice->gpio.direction | tmp);
+	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ~tmp);
+}
+
+static int __devinit snd_ice1712_value_init(ice1712_t *ice)
+{
+	/* Hoontech STDSP24 with modified hardware */
+	static akm4xxx_t akm_stdsp24_mv __devinitdata = {
+		.num_adcs = 2,
+		.num_dacs = 2,
+		.type = SND_AK4524,
+		.ops = {
+			.lock = stdsp24_ak4524_lock
+		}
+	};
+
+	static struct snd_ak4xxx_private akm_stdsp24_mv_priv __devinitdata = {
+		.caddr = 2,
+		.cif = 1, /* CIF high */
+		.data_mask = ICE1712_STDSP24_SERIAL_DATA,
+		.clk_mask = ICE1712_STDSP24_SERIAL_CLOCK,
+		.cs_mask = ICE1712_STDSP24_AK4524_CS,
+		.cs_addr = ICE1712_STDSP24_AK4524_CS,
+		.cs_none = 0,
+		.add_flags = 0,
+	};
+
+	int err;
+	akm4xxx_t *ak;
+
+	/* set the analog DACs */
+	ice->num_total_dacs = 2;
+
+	/* set the analog ADCs */
+	ice->num_total_adcs = 2;
+	
+	/* analog section */
+	ak = ice->akm = kmalloc(sizeof(akm4xxx_t), GFP_KERNEL);
+	if (! ak)
+		return -ENOMEM;
+	ice->akm_codecs = 1;
+
+	err = snd_ice1712_akm4xxx_init(ak, &akm_stdsp24_mv, &akm_stdsp24_mv_priv, ice);
+	if (err < 0)
+		return err;
+
+	/* ak4524 controls */
+	err = snd_ice1712_akm4xxx_build_controls(ice);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
 
 static int __devinit snd_ice1712_ez8_init(ice1712_t *ice)
 {
@@ -235,6 +302,12 @@ struct snd_ice1712_card_info snd_ice1712_hoontech_cards[] __devinitdata = {
 		.name = "Hoontech SoundTrack Audio DSP24",
 		.model = "dsp24",
 		.chip_init = snd_ice1712_hoontech_init,
+	},
+	{
+		.subvendor = ICE1712_SUBDEVICE_STDSP24_VALUE,	/* a dummy id */
+		.name = "Hoontech SoundTrack Audio DSP24 Value",
+		.model = "dsp24_value",
+		.chip_init = snd_ice1712_value_init,
 	},
 	{
 		.subvendor = ICE1712_SUBDEVICE_STDSP24_MEDIA7_1,

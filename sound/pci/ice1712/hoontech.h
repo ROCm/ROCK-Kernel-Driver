@@ -31,6 +31,7 @@
 	"{Event Electronics,EZ8},"
 
 #define ICE1712_SUBDEVICE_STDSP24		0x12141217	/* Hoontech SoundTrack Audio DSP 24 */
+#define ICE1712_SUBDEVICE_STDSP24_VALUE		0x00010010	/* A dummy id for Hoontech SoundTrack Audio DSP 24 Value */
 #define ICE1712_SUBDEVICE_STDSP24_MEDIA7_1	0x16141217	/* Hoontech ST Audio DSP24 Media 7.1 */
 #define ICE1712_SUBDEVICE_EVENT_EZ8		0x00010001	/* A dummy id for EZ8 */
 
@@ -66,5 +67,11 @@ extern struct snd_ice1712_card_info snd_ice1712_hoontech_cards[];
 #define ICE1712_STDSP24_BOX_CHN4	(1<<3)	/* input channel 4 */
 #define ICE1712_STDSP24_BOX_MIDI1	(1<<8)
 #define ICE1712_STDSP24_BOX_MIDI2	(1<<9)
+
+/* Hoontech SoundTrack Audio DSP 24 Value definitions for modified hardware */
+
+#define ICE1712_STDSP24_AK4524_CS	0x03	/* AK4524 chip select; low = active */
+#define ICE1712_STDSP24_SERIAL_DATA	0x0c	/* ak4524 data */
+#define ICE1712_STDSP24_SERIAL_CLOCK	0x30	/* ak4524 clock */
 
 #endif /* __SOUND_HOONTECH_H */
