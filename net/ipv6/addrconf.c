@@ -484,7 +484,7 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	      int scope, unsigned flags)
 {
 	struct inet6_ifaddr *ifa = NULL;
-	struct rt6_info *rt;
+	struct rt6_info *rt = NULL;
 	int hash;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	int err = 0;
@@ -572,6 +572,10 @@ out:
 	if (unlikely(err == 0))
 		notifier_call_chain(&inet6addr_chain, NETDEV_UP, ifa);
 	else {
+		if (rt) {
+			dst_release(&rt->u.dst);
+			dst_free(&rt->u.dst);
+		}
 		kfree(ifa);
 		ifa = ERR_PTR(err);
 	}
