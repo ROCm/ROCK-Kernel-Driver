@@ -1812,8 +1812,7 @@ static void reiserfs_journal_commit_task_func(void *__ct) {
   struct reiserfs_journal_commit_task *ct = __ct;
   struct reiserfs_journal_list *jl ;
 
-  /* FIXMEL: is this needed? */
-  lock_kernel();
+  reiserfs_write_lock(ct->p_s_sb);
 
   jl = SB_JOURNAL_LIST(ct->p_s_sb) + ct->jindex ;
 
@@ -1824,7 +1823,7 @@ static void reiserfs_journal_commit_task_func(void *__ct) {
     kupdate_one_transaction(ct->p_s_sb, jl) ;
   }
   reiserfs_kfree(ct->self, sizeof(struct reiserfs_journal_commit_task), ct->p_s_sb) ;
-  unlock_kernel();
+  reiserfs_write_unlock(ct->p_s_sb);
 }
 
 static void setup_commit_task_arg(struct reiserfs_journal_commit_task *ct,

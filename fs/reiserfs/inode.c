@@ -490,7 +490,7 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 	return reiserfs_new_unf_blocknrs2(th, inode, allocated_block_nr, path, block);
     }
 #endif
-    return reiserfs_new_unf_blocknrs (th, allocated_block_nr, path, block);
+    return reiserfs_new_unf_blocknrs (th, inode, allocated_block_nr, path, block);
 }
 
 int reiserfs_get_block (struct inode * inode, sector_t block,
@@ -2113,11 +2113,11 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
 }
 
 struct address_space_operations reiserfs_address_space_operations = {
-    writepage: reiserfs_writepage,
-    readpage: reiserfs_readpage, 
-    releasepage: reiserfs_releasepage,
-    sync_page: block_sync_page,
-    prepare_write: reiserfs_prepare_write,
-    commit_write: reiserfs_commit_write,
-    bmap: reiserfs_aop_bmap
+    .writepage = reiserfs_writepage,
+    .readpage = reiserfs_readpage, 
+    .releasepage = reiserfs_releasepage,
+    .sync_page = block_sync_page,
+    .prepare_write = reiserfs_prepare_write,
+    .commit_write = reiserfs_commit_write,
+    .bmap = reiserfs_aop_bmap
 } ;

@@ -78,7 +78,7 @@ int reiserfs_version_in_proc( char *buffer, char **start, off_t offset,
 	struct super_block *sb;
 	char *format;
     
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	if ( REISERFS_SB(sb)->s_properties & (1 << REISERFS_3_6) ) {
@@ -136,7 +136,7 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *r;
 	int len = 0;
     
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -229,7 +229,7 @@ int reiserfs_per_level_in_proc( char *buffer, char **start, off_t offset,
 	int len = 0;
 	int level;
 	
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -308,7 +308,7 @@ int reiserfs_bitmap_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *r;
 	int len = 0;
     
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -352,7 +352,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 	int hash_code;
 	int len = 0;
     
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	sb_info = REISERFS_SB(sb);
@@ -409,7 +409,7 @@ int reiserfs_oidmap_in_proc( char *buffer, char **start, off_t offset,
 	int len = 0;
 	int exact;
     
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	sb_info = REISERFS_SB(sb);
@@ -461,7 +461,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 	struct journal_params *jp;	
 	int len = 0;
     
-	sb = procinfo_prologue((dev_t)data);
+	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -604,7 +604,7 @@ struct proc_dir_entry *reiserfs_proc_register( struct super_block *sb,
 {
 	return ( REISERFS_SB(sb)->procdir ) ? create_proc_read_entry
 		( name, 0, REISERFS_SB(sb)->procdir, func, 
-		  ( void * ) sb->s_bdev->bd_dev) : NULL;
+		  ( void * )(int) sb->s_bdev->bd_dev) : NULL;
 }
 
 void reiserfs_proc_unregister( struct super_block *sb, const char *name )
