@@ -59,12 +59,9 @@ void platform_device_unregister(struct platform_device * pdev)
 
 static int platform_match(struct device * dev, struct device_driver * drv)
 {
-	char name[BUS_ID_SIZE];
+	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
 
-	if (sscanf(dev->bus_id,"%s",name))
-		return (strcmp(name,drv->name) == 0);
-
-	return 0;
+	return (strncmp(pdev->name, drv->name, BUS_ID_SIZE) == 0);
 }
 
 struct bus_type platform_bus_type = {
