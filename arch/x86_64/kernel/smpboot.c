@@ -51,13 +51,10 @@
 #include <asm/kdebug.h>
 #include <asm/tlbflush.h>
 
-/* Bitmask of currently online CPUs */
-unsigned long cpu_online_map;
+extern int disable_apic;
 
-/* which CPU (physical APIC ID) maps to which logical CPU number */
-volatile int x86_apicid_to_cpu[NR_CPUS];
-/* which logical CPU number maps to which CPU (physical APIC ID) */
-volatile int x86_cpu_to_apicid[NR_CPUS];
+/* Bitmask of currently online CPUs */
+unsigned long cpu_online_map = 1;
 
 static volatile unsigned long cpu_callin_map;
 volatile unsigned long cpu_callout_map;
@@ -75,7 +72,6 @@ int smp_threads_ready;
 
 extern unsigned char trampoline_data [];
 extern unsigned char trampoline_end  [];
-static unsigned char *trampoline_base;
 
 /*
  * Currently trivial. Write the real->protected mode
@@ -85,25 +81,11 @@ static unsigned char *trampoline_base;
 
 static unsigned long __init setup_trampoline(void)
 {
+	void *tramp = __va(SMP_TRAMPOLINE_BASE); 
 	extern volatile __u32 tramp_gdt_ptr; 
 	tramp_gdt_ptr = __pa_symbol(&cpu_gdt_table); 
-	memcpy(trampoline_base, trampoline_data, trampoline_end - trampoline_data);
-	return virt_to_phys(trampoline_base);
-}
-
-/*
- * We are called very early to get the low memory for the
- * SMP bootup trampoline page.
- */
-void __init smp_alloc_memory(void)
-{
-	trampoline_base = (void *) alloc_bootmem_low_pages(PAGE_SIZE);
-	/*
-	 * Has to be in very low memory so we can execute
-	 * real-mode AP code.
-	 */
-	if (__pa(trampoline_base) >= 0x9F000)
-		BUG();
+	memcpy(tramp, trampoline_data, trampoline_end - trampoline_data);
+	return virt_to_phys(tramp);
 }
 
 /*
@@ -174,6 +156,7 @@ static void __init synchronize_tsc_bp (void)
 		 */
 		atomic_inc(&tsc_count_start);
 
+		sync_core();
 		rdtscll(tsc_values[smp_processor_id()]);
 		/*
 		 * We clear the TSC in the last loop:
@@ -245,6 +228,7 @@ static void __init synchronize_tsc_ap (void)
 		atomic_inc(&tsc_count_start);
 		while (atomic_read(&tsc_count_start) != num_booting_cpus()) mb();
 
+		sync_core();
 		rdtscll(tsc_values[smp_processor_id()]);
 		if (i == NR_LOOPS-1)
 			write_tsc(0, 0);
@@ -368,6 +352,9 @@ int __init start_secondary(void *unused)
 	 */
 	cpu_init();
 	smp_callin();
+
+	/* otherwise gcc will move up the smp_processor_id before the cpu_init */
+	barrier();
 
 	Dprintk("cpu %d: waiting for commence\n", smp_processor_id()); 
 	while (!test_bit(smp_processor_id(), &smp_commenced_mask))
@@ -620,8 +607,6 @@ static void __init do_boot_cpu (int apicid)
 	 */
 	init_idle(idle,cpu);
 
-	x86_cpu_to_apicid[cpu] = apicid;
-	x86_apicid_to_cpu[apicid] = cpu;
 	idle->thread.rip = (unsigned long)start_secondary;
 //	idle->thread.rsp = (unsigned long)idle->thread_info + THREAD_SIZE - 512;
 
@@ -713,8 +698,6 @@ static void __init do_boot_cpu (int apicid)
 		}
 	}
 	if (boot_error) {
-		x86_cpu_to_apicid[cpu] = -1;
-		x86_apicid_to_cpu[apicid] = -1;
 		clear_bit(cpu, &cpu_callout_map); /* was set here (do_boot_cpu()) */
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
@@ -777,22 +760,12 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	int apicid, cpu;
 
 	/*
-	 * Initialize the logical to physical CPU number mapping
-	 */
-
-	for (apicid = 0; apicid < NR_CPUS; apicid++) {
-		x86_apicid_to_cpu[apicid] = -1;
-	}
-
-	/*
 	 * Setup boot CPU information
 	 */
 	smp_store_cpu_info(0); /* Final full version of the data */
 	printk("CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
-	x86_apicid_to_cpu[boot_cpu_id] = 0;
-	x86_cpu_to_apicid[0] = boot_cpu_id;
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
 
@@ -837,6 +810,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		io_apic_irqs = 0;
 		cpu_online_map = phys_cpu_present_map = 1;
 		phys_cpu_present_map = 1;
+		disable_apic = 1;
 		return;
 	}
 
@@ -851,6 +825,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		io_apic_irqs = 0;
 		cpu_online_map = phys_cpu_present_map = 1;
 		phys_cpu_present_map = 1;
+		disable_apic = 1;
 		return;
 	}
 
@@ -878,13 +853,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			continue;
 
 		do_boot_cpu(apicid);
-
-		/*
-		 * Make sure we unmap all failed CPUs
-		 */
-		if ((x86_apicid_to_cpu[apicid] == -1) &&
-				(phys_cpu_present_map & (1 << apicid)))
-			printk("phys CPU #%d not responding - cannot use it.\n",apicid);
 	}
 
 	/*

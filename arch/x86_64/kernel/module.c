@@ -31,6 +31,11 @@
 
 #define DEBUGP(fmt...) 
  
+/* TODO this should be in vmlist, but we must fix get_vm_area first to 
+   handle out of bounds entries properly. 
+   Also need to fix /proc/kcore, /dev/kmem */
+static struct vm_struct *mod_vmlist;
+
 void module_free(struct module *mod, void *module_region)
 {
 	struct vm_struct **prevp, *map;
@@ -40,7 +45,7 @@ void module_free(struct module *mod, void *module_region)
 	if (!addr)
 		return;
 	write_lock(&vmlist_lock); 
-	for (prevp = &vmlist ; (map = *prevp) ; prevp = &map->next) {
+	for (prevp = &mod_vmlist ; (map = *prevp) ; prevp = &map->next) {
 		if ((unsigned long)map->addr == addr) {
 			*prevp = map->next;
 			write_unlock(&vmlist_lock); 
@@ -81,7 +86,7 @@ void *module_alloc(unsigned long size)
 
 	write_lock(&vmlist_lock);
 	addr = (void *) MODULES_VADDR;
-	for (p = &vmlist; (tmp = *p); p = &tmp->next) {
+	for (p = &mod_vmlist; (tmp = *p); p = &tmp->next) {
 		void *next; 
 		DEBUGP("vmlist %p %lu addr %p\n", tmp->addr, tmp->size, addr);
 		if (size + (unsigned long) addr + PAGE_SIZE < (unsigned long) tmp->addr)

@@ -121,7 +121,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	/* get the address */
 	__asm__("movq %%cr2,%0":"=r" (address));
 
-	if (page_fault_trace) 
+	if (likely(regs->eflags & X86_EFLAGS_IF))
+		local_irq_enable();
+
+	if (unlikely(page_fault_trace))
 		printk("pagefault rip:%lx rsp:%lx cs:%lu ss:%lu address %lx error %lx\n",
 		       regs->rip,regs->rsp,regs->cs,regs->ss,address,error_code); 
 
@@ -139,7 +142,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_atomic() || !mm)
+	if (unlikely(in_atomic() || !mm))
 		goto no_context;
 
  again:
@@ -148,7 +151,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
-	if (vma->vm_start <= address)
+	if (likely(vma->vm_start <= address))
 		goto good_area;
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
@@ -222,7 +225,8 @@ bad_area_nosemaphore:
 			return;
 		} 			
 #endif
-		printk("%s[%d] segfault at rip:%lx rsp:%lx adr:%lx err:%lx\n",
+		printk(KERN_INFO 
+		       "%s[%d] segfault at rip:%lx rsp:%lx adr:%lx err:%lx\n",
 		       tsk->comm, tsk->pid, regs->rip, regs->rsp, address, 
 		       error_code);
        

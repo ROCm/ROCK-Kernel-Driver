@@ -9,11 +9,8 @@
 
 #ifdef __KERNEL__
 
-#ifndef __ASSEMBLY__
-#include <asm/processor.h>
-#include <linux/config.h>
-#include <asm/pda.h>
-#endif
+#include <asm/page.h>
+#include <asm/types.h>
 
 /*
  * low level task data that entry.S needs immediate access to
@@ -21,6 +18,10 @@
  * - this struct shares the supervisor stack pages
  */
 #ifndef __ASSEMBLY__
+struct task_struct;
+struct exec_domain;
+#include <asm/mmsegment.h>
+
 struct thread_info {
 	struct task_struct	*task;		/* main task structure */
 	struct exec_domain	*exec_domain;	/* execution domain */
@@ -31,7 +32,6 @@ struct thread_info {
 	mm_segment_t		addr_limit;	
 	struct restart_block    restart_block;
 };
-
 #endif
 
 /*
@@ -55,27 +55,17 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
-/* how to get the thread information struct from C */
-
-#define THREAD_SIZE (2*PAGE_SIZE)
-
 static inline struct thread_info *current_thread_info(void)
 { 
 	struct thread_info *ti;
-	ti = (void *)read_pda(kernelstack) + PDA_STACKOFFSET - THREAD_SIZE;
-	return ti; 
-} 
-
-static inline struct thread_info *stack_thread_info(void)
-{
-	struct thread_info *ti;
-	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));
+	asm("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));
 	return ti;
 }
 
 /* thread information allocation */
-#define alloc_thread_info() ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
-#define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
+#define alloc_thread_info() \
+	((struct thread_info *) __get_free_pages(GFP_KERNEL,THREAD_ORDER))
+#define free_thread_info(ti) free_pages((unsigned long) (ti), THREAD_ORDER)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
@@ -84,7 +74,7 @@ static inline struct thread_info *stack_thread_info(void)
 /* how to get the thread information struct from ASM */
 /* only works on the process stack. otherwise get it via the PDA. */
 #define GET_THREAD_INFO(reg) \
-	movq $-8192, reg; \
+	movq $CURRENT_MASK, reg; \
 	andq %rsp, reg
 
 #endif

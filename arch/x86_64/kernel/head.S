@@ -72,8 +72,7 @@ startup_32:
 	/* Setup EFER (Extended Feature Enable Register) */
 	movl	$MSR_EFER, %ecx
 	rdmsr
-	/* Fool rdmsr and reset %eax to avoid dependences */
-	xorl	%eax, %eax
+
 	/* Enable Long Mode */
 	btsl	$_EFER_LME, %eax
 	/* Enable System Call */
@@ -112,7 +111,6 @@ reach_compatibility_mode:
 	jnz   second	
 	
 	/* Load new GDT with the 64bit segment using 32bit descriptor */
-	/* to avoid 32bit relocations we use fixed adresses here */
 	movl	$(pGDT32 - __START_KERNEL_map), %eax
 	lgdt	(%eax)
 
@@ -349,17 +347,14 @@ ENTRY(cpu_gdt_table)
 	.quad	0x00cffe000000ffff	/* __USER32_CS */
 	.quad	0x00cff2000000ffff	/* __USER_DS, __USER32_DS  */		
 	.quad	0x00affa000000ffff	/* __USER_CS */
-	.word	0xFFFF				# 4Gb - (0x100000*0x1000 = 4Gb)
-	.word	0				# base address = 0
-	.word	0x9A00				# code read/exec
-	.word	0x00CF				# granularity = 4096, 386
-						#  (+5th nibble of limit)
-					/* __KERNEL32_CS */
+	.quad	0x00cf9a000000ffff	/* __KERNEL32_CS */
 	.quad	0,0			/* TSS */
 	.quad	0			/* LDT */
 	.quad   0,0,0			/* three TLS descriptors */ 
-	.quad	0x00cff2000000ffff	/* dummy descriptor for long base */
-	.quad	0			/* pad to cache line boundary */
+	.quad	0			/* unused now */
+	.quad	0x00009a000000ffff	/* __KERNEL16_CS - 16bit PM for S3 wakeup. */
+					/* base must be patched for real base address. */
+	/* This should be a multiple of the cache line size */
 gdt_end:	
 	.globl gdt_end
 
