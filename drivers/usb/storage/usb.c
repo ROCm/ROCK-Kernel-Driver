@@ -101,6 +101,9 @@ MODULE_LICENSE("GPL");
 static unsigned int delay_use = 5;
 module_param(delay_use, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(delay_use, "seconds to delay before using a new device");
+unsigned int usb_genesys_transport_delay = 110;
+module_param(usb_genesys_transport_delay, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(usb_genesys_transport_delay, "udelay value in transport.c, only for vendor genesys, default == 110");
 
 
 static int storage_probe(struct usb_interface *iface,

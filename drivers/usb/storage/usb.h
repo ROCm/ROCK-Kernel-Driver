@@ -180,5 +180,6 @@ extern void fill_inquiry_response(struct us_data *us,
 
 /* Vendor ID list for devices that require special handling */
 #define USB_VENDOR_ID_GENESYS		0x05e3	/* Genesys Logic */
+extern unsigned int usb_genesys_transport_delay;
 
 #endif
