@@ -534,8 +534,7 @@ get_drv_by_nr(int di)
 	unsigned long flags;
 	struct isdn_driver *drv;
 	
-	if (di < 0)
-		return NULL;
+	BUG_ON(di < 0 || di >= ISDN_MAX_DRIVERS);
 
 	spin_lock_irqsave(&drivers_lock, flags);
 	drv = drivers[di];
@@ -1148,7 +1147,7 @@ get_slot_by_minor(int minor)
 	int di, ch;
 	struct isdn_driver *drv;
 
-	for (di = 0; di < ISDN_MAX_CHANNELS; di++) {
+	for (di = 0; di < ISDN_MAX_DRIVERS; di++) {
 		drv = get_drv_by_nr(di);
 		if (!drv)
 			continue;
