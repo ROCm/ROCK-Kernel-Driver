@@ -7,7 +7,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/major.h>
 #include <linux/fs.h>
@@ -33,7 +33,7 @@ fixup_adifcc(struct machine_desc *desc, struct param_struct *params,
 
 	setup_ramdisk( 1, 0, 0, 8192 );
 	setup_initrd( 0xc0800000, 3*1024*1024 );
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
 #endif
 }
 

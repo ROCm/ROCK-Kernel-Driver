@@ -24,7 +24,7 @@ fixup_sherman(struct machine_desc *desc, struct param_struct *params,
 	SET_BANK( 1, 0xc8000000, 64*1024*1024 );
 	mi->nr_banks = 2;
 
-	ROOT_DEV = MKDEV( 60, 2 );
+	ROOT_DEV = mk_kdev( 60, 2 );
 	setup_ramdisk( 1, 0, 0, 8192 );
 //	setup_initrd( 0xc0400000, 8*1024*1024 );
 }

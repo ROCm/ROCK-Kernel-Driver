@@ -30,7 +30,7 @@ static void __init
 fixup_anakin(struct machine_desc *desc, struct param_struct *unused,
              char **cmdline, struct meminfo *mi)
 {
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
 	setup_ramdisk(1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE);
 	setup_initrd(0xc0800000, 4 * 1024 * 1024);
 }

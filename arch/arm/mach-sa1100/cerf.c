@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-sa1100/cerf.c
  */
-
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
@@ -55,7 +55,7 @@ fixup_cerf(struct machine_desc *desc, struct param_struct *params,
 #error "Undefined memory size for Cerfboard."
 #endif
 
-//	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+//	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
 //	setup_ramdisk(1,  0, 0, 8192);
 //	// Save 2Meg for RAMDisk
 //	setup_initrd(0xc0500000, 3*1024*1024);

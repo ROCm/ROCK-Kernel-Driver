@@ -5,6 +5,7 @@
  *
  *  Extra MM routines for L7200 architecture
  */
+#include <linux/config.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -90,7 +91,7 @@ fixup_l7200(struct machine_desc *desc, struct param_struct *unused,
         mi->bank[0].size  = (32*1024*1024);
         mi->bank[0].node  = 0;
 
-        ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+        ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
         setup_ramdisk( 1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE);
         setup_initrd( __phys_to_virt(0xf1000000), 0x005dac7b);
 

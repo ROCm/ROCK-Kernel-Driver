@@ -9,7 +9,7 @@
  * published by the Free Software Foundation.
  *
  */
-
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/major.h>
 #include <linux/fs.h>
@@ -44,7 +44,7 @@ fixup_iq80310(struct machine_desc *desc, struct param_struct *params,
 #elif defined(CONFIG_BLK_DEV_INITRD)
 	setup_ramdisk( 1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE );
 	setup_initrd( 0xc0800000, 4*1024*1024 );
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0); /* /dev/ram */
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0); /* /dev/ram */
 #endif
 }
 
