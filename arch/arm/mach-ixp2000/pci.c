@@ -33,8 +33,6 @@
 
 #include <asm/mach/pci.h>
 
-extern int (*external_fault) (unsigned long, struct pt_regs *);
-
 static int pci_master_aborts = 0;
 
 static int clear_master_aborts(void);
