@@ -70,9 +70,10 @@ ENTRY(v4wb_clear_user_page)
 	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB
 	ldr	pc, [sp], #4
 
-	__INIT
+	__INITDATA
 
+	.type	v4wb_user_fns, #object
 ENTRY(v4wb_user_fns)
 	.long	v4wb_clear_user_page
 	.long	v4wb_copy_user_page
-
+	.size	v4wb_user_fns, . - v4wb_user_fns

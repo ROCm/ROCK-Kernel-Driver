@@ -67,7 +67,7 @@ ENTRY(v4wb_flush_kern_tlb_range)
 	blo	1b
 	mov	pc, lr
 
-	__INIT
+	__INITDATA
 
 	.type	v4wb_tlb_fns, #object
 ENTRY(v4wb_tlb_fns)
