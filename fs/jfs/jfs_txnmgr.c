@@ -70,6 +70,7 @@ static struct {
 	wait_queue_head_t freelockwait;	/* eventlist of free tlock */
 	wait_queue_head_t lowlockwait;	/* eventlist of ample tlocks */
 	int tlocksInUse;	/* Number of tlocks in use */
+	int TlocksLow;		/* Indicates low number of available tlocks */
 	spinlock_t LazyLock;	/* synchronize sync_queue & unlock_queue */
 /*	struct tblock *sync_queue; * Transactions waiting for data sync */
 	struct tblock *unlock_queue;	/* Txns waiting to be released */
@@ -79,6 +80,20 @@ static struct {
 					   that couldn't be sync'ed */
 } TxAnchor;
 
+#ifdef CONFIG_JFS_STATISTICS
+struct {
+	uint txBegin;
+	uint txBegin_barrier;
+	uint txBegin_lockslow;
+	uint txBegin_freetid;
+	uint txBeginAnon;
+	uint txBeginAnon_barrier;
+	uint txBeginAnon_lockslow;
+	uint txLockAlloc;
+	uint txLockAlloc_freelock;
+} TxStat;
+#endif
+
 static int nTxBlock = 512;	/* number of transaction blocks */
 struct tblock *TxBlock;	        /* transaction block table */
 
@@ -86,7 +101,6 @@ static int nTxLock = 4096;	/* number of transaction locks */
 static int TxLockLWM = 4096*.4;	/* Low water mark for number of txLocks used */
 static int TxLockHWM = 4096*.8;	/* High water mark for number of txLocks used */
 struct tlock *TxLock;           /* transaction lock table */
-static int TlocksLow = 0;	/* Indicates low number of available tlocks */
 
 
 /*
@@ -190,13 +204,18 @@ static lid_t txLockAlloc(void)
 {
 	lid_t lid;
 
+	INCREMENT(TxStat.txLockAlloc);
+	if (!TxAnchor.freelock) {
+		INCREMENT(TxStat.txLockAlloc_freelock);
+	}
+
 	while (!(lid = TxAnchor.freelock))
 		TXN_SLEEP(&TxAnchor.freelockwait);
 	TxAnchor.freelock = TxLock[lid].next;
 	HIGHWATERMARK(stattx.maxlid, lid);
-	if ((++TxAnchor.tlocksInUse > TxLockHWM) && (TlocksLow == 0)) {
+	if ((++TxAnchor.tlocksInUse > TxLockHWM) && (TxAnchor.TlocksLow == 0)) {
 		jEVENT(0,("txLockAlloc TlocksLow\n"));
-		TlocksLow = 1;
+		TxAnchor.TlocksLow = 1;
 		wake_up(&jfs_sync_thread_wait);
 	}
 
@@ -208,9 +227,9 @@ static void txLockFree(lid_t lid)
 	TxLock[lid].next = TxAnchor.freelock;
 	TxAnchor.freelock = lid;
 	TxAnchor.tlocksInUse--;
-	if (TlocksLow && (TxAnchor.tlocksInUse < TxLockLWM)) {
+	if (TxAnchor.TlocksLow && (TxAnchor.tlocksInUse < TxLockLWM)) {
 		jEVENT(0,("txLockFree TlocksLow no more\n"));
-		TlocksLow = 0;
+		TxAnchor.TlocksLow = 0;
 		TXN_WAKEUP(&TxAnchor.lowlockwait);
 	}
 	TXN_WAKEUP(&TxAnchor.freelockwait);
@@ -322,6 +341,8 @@ tid_t txBegin(struct super_block *sb, int flag)
 
 	TXN_LOCK();
 
+	INCREMENT(TxStat.txBegin);
+
       retry:
 	if (!(flag & COMMIT_FORCE)) {
 		/*
@@ -329,6 +350,7 @@ tid_t txBegin(struct super_block *sb, int flag)
 		 */
 		if (test_bit(log_SYNCBARRIER, &log->flag) ||
 		    test_bit(log_QUIESCE, &log->flag)) {
+			INCREMENT(TxStat.txBegin_barrier);
 			TXN_SLEEP(&log->syncwait);
 			goto retry;
 		}
@@ -339,7 +361,8 @@ tid_t txBegin(struct super_block *sb, int flag)
 		 * unless COMMIT_FORCE or COMMIT_INODE (which may ultimately
 		 * free tlocks)
 		 */
-		if (TlocksLow) {
+		if (TxAnchor.TlocksLow) {
+			INCREMENT(TxStat.txBegin_lockslow);
 			TXN_SLEEP(&TxAnchor.lowlockwait);
 			goto retry;
 		}
@@ -350,6 +373,7 @@ tid_t txBegin(struct super_block *sb, int flag)
 	 */
 	if ((t = TxAnchor.freetid) == 0) {
 		jFYI(1, ("txBegin: waiting for free tid\n"));
+		INCREMENT(TxStat.txBegin_freetid);
 		TXN_SLEEP(&TxAnchor.freewait);
 		goto retry;
 	}
@@ -359,6 +383,7 @@ tid_t txBegin(struct super_block *sb, int flag)
 	if ((tblk->next == 0) && (current != jfsCommitTask)) {
 		/* Save one tblk for jfsCommit thread */
 		jFYI(1, ("txBegin: waiting for free tid\n"));
+		INCREMENT(TxStat.txBegin_freetid);
 		TXN_SLEEP(&TxAnchor.freewait);
 		goto retry;
 	}
@@ -412,6 +437,7 @@ void txBeginAnon(struct super_block *sb)
 	log = JFS_SBI(sb)->log;
 
 	TXN_LOCK();
+	INCREMENT(TxStat.txBeginAnon);
 
       retry:
 	/*
@@ -419,6 +445,7 @@ void txBeginAnon(struct super_block *sb)
 	 */
 	if (test_bit(log_SYNCBARRIER, &log->flag) ||
 	    test_bit(log_QUIESCE, &log->flag)) {
+		INCREMENT(TxStat.txBeginAnon_barrier);
 		TXN_SLEEP(&log->syncwait);
 		goto retry;
 	}
@@ -426,7 +453,8 @@ void txBeginAnon(struct super_block *sb)
 	/*
 	 * Don't begin transaction if we're getting starved for tlocks
 	 */
-	if (TlocksLow) {
+	if (TxAnchor.TlocksLow) {
+		INCREMENT(TxStat.txBeginAnon_lockslow);
 		TXN_SLEEP(&TxAnchor.lowlockwait);
 		goto retry;
 	}
@@ -3006,7 +3034,7 @@ int jfs_sync(void *arg)
 		 * write each inode on the anonymous inode list
 		 */
 		TXN_LOCK();
-		while (TlocksLow && !list_empty(&TxAnchor.anon_list)) {
+		while (TxAnchor.TlocksLow && !list_empty(&TxAnchor.anon_list)) {
 			jfs_ip = list_entry(TxAnchor.anon_list.next,
 					    struct jfs_inode_info,
 					    anon_inode_list);
@@ -3097,6 +3125,7 @@ int jfs_txanchor_read(char *buffer, char **start, off_t offset, int length,
 		       "freelockwait = %s\n"
 		       "lowlockwait = %s\n"
 		       "tlocksInUse = %d\n"
+		       "TlocksLow = %d\n"
 		       "unlock_queue = 0x%p\n"
 		       "unlock_tail = 0x%p\n",
 		       TxAnchor.freetid,
@@ -3105,8 +3134,54 @@ int jfs_txanchor_read(char *buffer, char **start, off_t offset, int length,
 		       freelockwait,
 		       lowlockwait,
 		       TxAnchor.tlocksInUse,
+		       TxAnchor.TlocksLow,
 		       TxAnchor.unlock_queue,
 		       TxAnchor.unlock_tail);
+
+	begin = offset;
+	*start = buffer + begin;
+	len -= begin;
+
+	if (len > length)
+		len = length;
+	else
+		*eof = 1;
+
+	if (len < 0)
+		len = 0;
+
+	return len;
+}
+#endif
+
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_JFS_STATISTICS)
+int jfs_txstats_read(char *buffer, char **start, off_t offset, int length,
+		     int *eof, void *data)
+{
+	int len = 0;
+	off_t begin;
+
+	len += sprintf(buffer,
+		       "JFS TxStats\n"
+		       "===========\n"
+		       "calls to txBegin = %d\n"
+		       "txBegin blocked by sync barrier = %d\n"
+		       "txBegin blocked by tlocks low = %d\n"
+		       "txBegin blocked by no free tid = %d\n"
+		       "calls to txBeginAnon = %d\n"
+		       "txBeginAnon blocked by sync barrier = %d\n"
+		       "txBeginAnon blocked by tlocks low = %d\n"
+		       "calls to txLockAlloc = %d\n"
+		       "tLockAlloc blocked by no free lock = %d\n",
+		       TxStat.txBegin,
+		       TxStat.txBegin_barrier,
+		       TxStat.txBegin_lockslow,
+		       TxStat.txBegin_freetid,
+		       TxStat.txBeginAnon,
+		       TxStat.txBeginAnon_barrier,
+		       TxStat.txBeginAnon_lockslow,
+		       TxStat.txLockAlloc,
+		       TxStat.txLockAlloc_freelock);
 
 	begin = offset;
 	*start = buffer + begin;

@@ -197,6 +197,8 @@ struct lmStat {
 	uint commit;		/* # of commit */
 	uint pagedone;		/* # of page written */
 	uint submitted;		/* # of pages submitted */
+	uint full_page;		/* # of full pages submitted */
+	uint partial_page;	/* # of partial pages submitted */
 } lmStat;
 #endif
 
@@ -785,6 +787,7 @@ void lmGCwrite(struct jfs_log * log, int cant_write)
 			bp->l_ceor));
 		lbmWrite(log, bp, lbmWRITE | lbmRELEASE | lbmGC,
 			 cant_write);
+		INCREMENT(lmStat.full_page);
 	}
 	/* page is not yet full */
 	else {
@@ -794,6 +797,7 @@ void lmGCwrite(struct jfs_log * log, int cant_write)
 		       ("gc: tclsn:0x%x, bceor:0x%x\n", tblk->clsn,
 			bp->l_ceor));
 		lbmWrite(log, bp, lbmWRITE | lbmGC, cant_write);
+		INCREMENT(lmStat.partial_page);
 	}
 }
 
@@ -2312,10 +2316,14 @@ int jfs_lmstats_read(char *buffer, char **start, off_t offset, int length,
 		       "================\n"
 		       "commits = %d\n"
 		       "writes submitted = %d\n"
-		       "writes completed = %d\n",
+		       "writes completed = %d\n"
+		       "full pages submitted = %d\n"
+		       "partial pages submitted = %d\n",
 		       lmStat.commit,
 		       lmStat.submitted,
-		       lmStat.pagedone);
+		       lmStat.pagedone,
+		       lmStat.full_page,
+		       lmStat.partial_page);
 
 	begin = offset;
 	*start = buffer + begin;
