@@ -47,6 +47,7 @@
 #include <linux/seq_file.h>
 #include <linux/device.h>
 #include <linux/kmod.h>
+#include <linux/scatterlist.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -674,6 +675,31 @@ ide_startstop_t do_special (ide_drive_t *drive)
 
 EXPORT_SYMBOL(do_special);
 
+void ide_map_sg(ide_drive_t *drive, struct request *rq)
+{
+	ide_hwif_t *hwif = drive->hwif;
+	struct scatterlist *sg = hwif->sg_table;
+
+	if ((rq->flags & REQ_DRIVE_TASKFILE) == 0) {
+		hwif->sg_nents = blk_rq_map_sg(drive->queue, rq, sg);
+	} else {
+		sg_init_one(sg, rq->buffer, rq->nr_sectors * SECTOR_SIZE);
+		hwif->sg_nents = 1;
+	}
+}
+
+EXPORT_SYMBOL_GPL(ide_map_sg);
+
+void ide_init_sg_cmd(ide_drive_t *drive, struct request *rq)
+{
+	ide_hwif_t *hwif = drive->hwif;
+
+	hwif->nsect = hwif->nleft = rq->nr_sectors;
+	hwif->cursg = hwif->cursg_ofs = 0;
+}
+
+EXPORT_SYMBOL_GPL(ide_init_sg_cmd);
+
 /**
  *	execute_drive_command	-	issue special drive command
  *	@drive: the drive to issue th command on
@@ -696,6 +722,17 @@ ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
 			goto done;
 
 		hwif->data_phase = args->data_phase;
+
+		switch (hwif->data_phase) {
+		case TASKFILE_MULTI_OUT:
+		case TASKFILE_OUT:
+		case TASKFILE_MULTI_IN:
+		case TASKFILE_IN:
+			ide_init_sg_cmd(drive, rq);
+			ide_map_sg(drive, rq);
+		default:
+			break;
+		}
 
 		if (args->tf_out_flags.all != 0) 
 			return flagged_taskfile(drive, args);
