@@ -282,7 +282,7 @@ struct ip_vs_conn *ip_vs_conn_out_get
 void ip_vs_conn_put(struct ip_vs_conn *cp)
 {
 	/* reset it expire in its timeout */
-	mod_sltimer(&cp->timer, jiffies+cp->timeout);
+	mod_timer(&cp->timer, jiffies+cp->timeout);
 
 	__ip_vs_conn_put(cp);
 }
@@ -508,8 +508,7 @@ static void ip_vs_conn_expire(unsigned long data)
 	 */
 	if (likely(atomic_read(&cp->refcnt) == 1)) {
 		/* make sure that there is no timer on it now */
-		if (sltimer_pending(&cp->timer))
-			del_sltimer(&cp->timer);
+		del_timer_sync(&cp->timer);
 
 		/* does anybody control me? */
 		if (cp->control)
@@ -542,7 +541,7 @@ static void ip_vs_conn_expire(unsigned long data)
 void ip_vs_conn_expire_now(struct ip_vs_conn *cp)
 {
 	cp->timeout = 0;
-	mod_sltimer(&cp->timer, jiffies);
+	mod_timer(&cp->timer, jiffies);
 	__ip_vs_conn_put(cp);
 }
 
@@ -566,7 +565,7 @@ ip_vs_conn_new(int proto, __u32 caddr, __u16 cport, __u32 vaddr, __u16 vport,
 
 	memset(cp, 0, sizeof(*cp));
 	INIT_LIST_HEAD(&cp->c_list);
-	init_sltimer(&cp->timer);
+	init_timer(&cp->timer);
 	cp->timer.data     = (unsigned long)cp;
 	cp->timer.function = ip_vs_conn_expire;
 	cp->protocol	   = proto;

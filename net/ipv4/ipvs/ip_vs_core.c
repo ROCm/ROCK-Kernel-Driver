@@ -1092,7 +1092,6 @@ static int __init ip_vs_init(void)
 		goto cleanup_nothing;
 	}
 
-	ip_vs_sltimer_init();
 	ip_vs_protocol_init();
 
 	ret = ip_vs_app_init();
@@ -1144,7 +1143,6 @@ static int __init ip_vs_init(void)
 	ip_vs_app_cleanup();
   cleanup_protocol:
 	ip_vs_protocol_cleanup();
-	ip_vs_sltimer_cleanup();
 	ip_vs_control_cleanup();
   cleanup_nothing:
 	return ret;
@@ -1159,7 +1157,6 @@ static void __exit ip_vs_cleanup(void)
 	ip_vs_conn_cleanup();
 	ip_vs_app_cleanup();
 	ip_vs_protocol_cleanup();
-	ip_vs_sltimer_cleanup();
 	ip_vs_control_cleanup();
 	IP_VS_INFO("ipvs unloaded.\n");
 }

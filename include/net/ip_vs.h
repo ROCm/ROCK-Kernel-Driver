@@ -408,17 +408,6 @@ union ip_vs_tphdr {
 
 
 /*
- *	Slow timer for IPVS connections
- */
-struct sltimer_list {
-	struct list_head	list;
-	unsigned long		expires;
-	unsigned long		data;
-	void (*function)(unsigned long);
-};
-
-
-/*
  *	Delta sequence info structure
  *	Each ip_vs_conn has 2 (output AND input seq. changes).
  *      Only used in the VS/NAT.
@@ -535,7 +524,7 @@ struct ip_vs_conn {
 
 	/* counter and timer */
 	atomic_t		refcnt;		/* reference count */
-	struct sltimer_list	timer;		/* Expiration timer */
+	struct timer_list	timer;		/* Expiration timer */
 	volatile unsigned long	timeout;	/* timeout */
 
 	/* Flags and state transition */
@@ -938,27 +927,6 @@ extern void ip_vs_sync_conn(struct ip_vs_conn *cp);
 extern int ip_vs_new_estimator(struct ip_vs_stats *stats);
 extern void ip_vs_kill_estimator(struct ip_vs_stats *stats);
 extern void ip_vs_zero_estimator(struct ip_vs_stats *stats);
-
-
-/*
- *      Slow timer functions for IPVS
- *      (from ip_vs_timer.c)
- */
-extern void add_sltimer(struct sltimer_list *timer);
-extern int  del_sltimer(struct sltimer_list *timer);
-extern void mod_sltimer(struct sltimer_list *timer, unsigned long expires);
-extern void ip_vs_sltimer_init(void);
-extern void ip_vs_sltimer_cleanup(void);
-static inline void init_sltimer(struct sltimer_list *timer)
-{
-	timer->list.next = timer->list.prev = NULL;
-}
-
-static inline int sltimer_pending(const struct sltimer_list *timer)
-{
-	return timer->list.next != NULL;
-}
-
 
 /*
  *	Various IPVS packet transmitters (from ip_vs_xmit.c)
