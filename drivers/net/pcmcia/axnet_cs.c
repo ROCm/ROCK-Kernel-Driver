@@ -1322,7 +1322,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
     
 	return 0;
 }
-
+
 /**
  * ax_interrupt - handle the interrupts from an 8390
  * @irq: interrupt number
@@ -1853,7 +1853,7 @@ static int axdev_init(struct net_device *dev)
         
 	return 0;
 }
-
+
 /* This page of functions should be 8390 generic */
 /* Follow National Semi's recommendations for initializing the "NIC". */
 

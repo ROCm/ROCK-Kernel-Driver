@@ -2,7 +2,7 @@
   
     Cardbus device configuration
     
-    cardbus.c 1.63 1999/11/08 20:47:02
+    cardbus.c 1.87 2002/10/24 06:11:41
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -175,8 +175,8 @@ static int cb_setup_cis_mem(socket_info_t * s, struct pci_dev *dev, struct resou
     
 =====================================================================*/
 
-void read_cb_mem(socket_info_t * s, u_char fn, int space,
-		 u_int addr, u_int len, void *ptr)
+int read_cb_mem(socket_info_t * s, u_char fn, int space,
+		u_int addr, u_int len, void *ptr)
 {
 	struct pci_dev *dev;
 	struct resource *res;
@@ -194,7 +194,7 @@ void read_cb_mem(socket_info_t * s, u_char fn, int space,
 			goto fail;
 		for (; len; addr++, ptr++, len--)
 			pci_readb(dev, addr, (u_char *) ptr);
-		return;
+		return 0;
 	}
 
 	res = dev->resource + space - 1;
@@ -214,11 +214,11 @@ void read_cb_mem(socket_info_t * s, u_char fn, int space,
 		goto fail;
 
 	memcpy_fromio(ptr, s->cb_cis_virt + addr, len);
-	return;
+	return 0;
 
 fail:
 	memset(ptr, 0xff, len);
-	return;
+	return -1;
 }
 
 /*=====================================================================
