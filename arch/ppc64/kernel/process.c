@@ -332,8 +332,8 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
          * entry is the TOC value we need to use.
          */
 	set_fs(USER_DS);
-	__get_user(entry, (unsigned long *)fdptr);
-	__get_user(toc, (unsigned long *)fdptr+1);
+	__get_user(entry, (unsigned long __user *)fdptr);
+	__get_user(toc, (unsigned long __user *)fdptr+1);
 
 	/* Check whether the e_entry function descriptor entries
 	 * need to be relocated before we can use them.
@@ -386,7 +386,7 @@ int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
 	unsigned int val;
 
 	val = __unpack_fe01(tsk->thread.fpexc_mode);
-	return put_user(val, (unsigned int *) adr);
+	return put_user(val, (unsigned int __user *) adr);
 }
 
 int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
