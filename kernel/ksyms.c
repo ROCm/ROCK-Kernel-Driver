@@ -293,6 +293,7 @@ EXPORT_SYMBOL(get_sb_nodev);
 EXPORT_SYMBOL(get_sb_single);
 EXPORT_SYMBOL(kill_anon_super);
 EXPORT_SYMBOL(kill_litter_super);
+EXPORT_SYMBOL(generic_shutdown_super);
 EXPORT_SYMBOL(deactivate_super);
 EXPORT_SYMBOL(sget);
 EXPORT_SYMBOL(set_anon_super);
