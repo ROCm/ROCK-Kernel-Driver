@@ -249,7 +249,7 @@ int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 	};
 	DECLARE_WORK(work, __call_usermodehelper, &sub_info);
 
-	if (0 && !system_running)
+	if (0 && system_state != SYSTEM_RUNNING)
 		return -EBUSY;
 
 	if (path[0] == '\0')
