@@ -52,10 +52,6 @@ divisor		.req	r1
 result		.req	r2
 overdone        .req    r2
 curbit		.req	r3
-ip		.req	r12
-sp		.req	r13
-lr		.req	r14
-pc		.req	r15
 	
 ENTRY(__udivsi3)
 	cmp	divisor, #0
