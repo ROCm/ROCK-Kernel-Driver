@@ -422,8 +422,10 @@ rpc_put_mount(void)
 }
 
 static int
-rpc_lookup_path(char *path, struct nameidata *nd, int flags)
+rpc_lookup_parent(char *path, struct nameidata *nd)
 {
+	if (path[0] == '\0')
+		return -ENOENT;
 	if (rpc_get_mount()) {
 		printk(KERN_WARNING "%s: %s failed to mount "
 			       "pseudofilesystem \n", __FILE__, __FUNCTION__);
@@ -432,7 +434,7 @@ rpc_lookup_path(char *path, struct nameidata *nd, int flags)
 	nd->mnt = mntget(rpc_mount);
 	nd->dentry = dget(rpc_mount->mnt_root);
 	nd->last_type = LAST_ROOT;
-	nd->flags = flags;
+	nd->flags = LOOKUP_PARENT;
 
 	if (path_walk(path, nd)) {
 		printk(KERN_WARNING "%s: %s failed to find path %s\n",
@@ -594,7 +596,7 @@ rpc_lookup_negative(char *path, struct nameidata *nd)
 	struct inode *dir;
 	int error;
 
-	if ((error = rpc_lookup_path(path, nd, LOOKUP_PARENT)) != 0)
+	if ((error = rpc_lookup_parent(path, nd)) != 0)
 		return ERR_PTR(error);
 	dir = nd->dentry->d_inode;
 	down(&dir->i_sem);
@@ -656,7 +658,7 @@ rpc_rmdir(char *path)
 	struct inode *dir;
 	int error;
 
-	if ((error = rpc_lookup_path(path, &nd, LOOKUP_PARENT)) != 0)
+	if ((error = rpc_lookup_parent(path, &nd)) != 0)
 		return error;
 	dir = nd.dentry->d_inode;
 	down(&dir->i_sem);
@@ -716,7 +718,7 @@ rpc_unlink(char *path)
 	struct inode *dir;
 	int error;
 
-	if ((error = rpc_lookup_path(path, &nd, LOOKUP_PARENT)) != 0)
+	if ((error = rpc_lookup_parent(path, &nd)) != 0)
 		return error;
 	dir = nd.dentry->d_inode;
 	down(&dir->i_sem);
