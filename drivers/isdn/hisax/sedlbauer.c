@@ -560,10 +560,6 @@ setup_sedlbauer(struct IsdnCard *card)
 #endif
 /* Probe for Sedlbauer speed pci */
 #if CONFIG_PCI
-		if (!pci_present()) {
-			printk(KERN_ERR "Sedlbauer: no PCI bus present\n");
-			goto err;
-		}
 		if ((dev_sedl = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 				PCI_DEVICE_ID_TIGERJET_100, dev_sedl))) {
 			if (pci_enable_device(dev_sedl))
@@ -615,9 +611,6 @@ setup_sedlbauer(struct IsdnCard *card)
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout((10*HZ)/1000);
 		byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
-#else
-		printk(KERN_WARNING "Sedlbauer: NO_PCI_BIOS\n");
-		goto err;
 #endif /* CONFIG_PCI */
 	}	
 ready:	

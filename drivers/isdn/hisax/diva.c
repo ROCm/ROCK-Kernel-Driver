@@ -699,11 +699,6 @@ setup_diva(struct IsdnCard *card)
 		}
 #endif
 #if CONFIG_PCI
-		if (!pci_present()) {
-			printk(KERN_ERR "Diva: no PCI bus present\n");
-			return(0);
-		}
-
 		cs->subtyp = 0;
 		if ((dev_diva = pci_find_device(PCI_VENDOR_ID_EICON,
 			PCI_DEVICE_ID_EICON_DIVA20, dev_diva))) {
@@ -742,10 +737,6 @@ setup_diva(struct IsdnCard *card)
 			goto err;
 		}
 		cs->irq_flags |= SA_SHIRQ;
-#else
-		printk(KERN_WARNING "Diva: cfgreg 0 and NO_PCI_BIOS\n");
-		printk(KERN_WARNING "Diva: unable to config DIVA PCI\n");
-		return (0);
 #endif /* CONFIG_PCI */
 		if ((cs->subtyp == DIVA_IPAC_PCI) ||
 		    (cs->subtyp == DIVA_IPACX_PCI)   ) {

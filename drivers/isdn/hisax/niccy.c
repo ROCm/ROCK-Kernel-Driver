@@ -268,10 +268,6 @@ setup_niccy(struct IsdnCard *card)
 	} else {
 #if CONFIG_PCI
 		u_int pci_ioaddr;
-		if (!pci_present()) {
-			printk(KERN_ERR "Niccy: no PCI bus present\n");
-			return(0);
-		}
 		cs->subtyp = 0;
 		if ((niccy_dev = pci_find_device(PCI_VENDOR_ID_SATSAGEM,
 			PCI_DEVICE_ID_SATSAGEM_NICCY, niccy_dev))) {
@@ -308,10 +304,6 @@ setup_niccy(struct IsdnCard *card)
 			goto err;
 		if (!request_io(&cs->rs, cs->hw.niccy.cfg_reg, 0x40, "niccy pci"))
 			goto err;
-#else
-		printk(KERN_WARNING "Niccy: io0 0 and NO_PCI_BIOS\n");
-		printk(KERN_WARNING "Niccy: unable to config NICCY PCI\n");
-		return (0);
 #endif /* CONFIG_PCI */
 	}
 	printk(KERN_INFO

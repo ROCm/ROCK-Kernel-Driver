@@ -20,8 +20,6 @@
 #include <linux/pci.h>
 #include "bkm_ax.h"
 
-#if CONFIG_PCI
-
 #define	ATTEMPT_PCI_REMAPPING	/* Required for PLX rev 1 */
 
 extern const char *CardType[];
@@ -169,12 +167,9 @@ static u16  sub_vendor_id __initdata = 0;
 static u16  sub_sys_id __initdata = 0;
 static u8 pci_irq __initdata = 0;
 
-#endif /* CONFIG_PCI */
-
 int __init
 setup_sct_quadro(struct IsdnCard *card)
 {
-#if CONFIG_PCI
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u8 pci_rev_id;
@@ -200,10 +195,6 @@ setup_sct_quadro(struct IsdnCard *card)
 		(sub_vendor_id != PCI_VENDOR_ID_BERKOM)))
 		return (0);
 	if (cs->subtyp == SCT_1) {
-		if (!pci_present()) {
-			printk(KERN_ERR "bkm_a4t: no PCI bus present\n");
-			return (0);
-		}
 		while ((dev_a8 = pci_find_device(PCI_VENDOR_ID_PLX,
 			PCI_DEVICE_ID_PLX_9050, dev_a8))) {
 			
@@ -319,9 +310,6 @@ setup_sct_quadro(struct IsdnCard *card)
 		sct_quadro_subtypes[cs->subtyp],
 		ipac_read(cs, IPAC_ID));
 	return 1;
-#else
-	printk(KERN_ERR "HiSax: bkm_a8 only supported on PCI Systems\n");
-#endif /* CONFIG_PCI */
  err:
 	hisax_release_resources(cs);
 	return 0;

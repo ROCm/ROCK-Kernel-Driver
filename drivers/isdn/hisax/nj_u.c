@@ -123,8 +123,6 @@ setup_netjet_u(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-#if CONFIG_PCI
-#endif
 #ifdef __BIG_ENDIAN
 #error "not running on big endian machines now"
 #endif
@@ -133,14 +131,7 @@ setup_netjet_u(struct IsdnCard *card)
 	if (cs->typ != ISDN_CTYPE_NETJET_U)
 		return(0);
 
-#if CONFIG_PCI
-
-	for ( ;; )
-	{
-		if (!pci_present()) {
-			printk(KERN_ERR "Netjet: no PCI bus present\n");
-			return(0);
-		}
+	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
 			if (pci_enable_device(dev_netjet))
@@ -200,14 +191,6 @@ setup_netjet_u(struct IsdnCard *card)
                 }
                 break;
 	}
-#else
-
-	printk(KERN_WARNING "NETspider-U: NO_PCI_BIOS\n");
-	printk(KERN_WARNING "NETspider-U: unable to config NETspider-U PCI\n");
-	return (0);
-
-#endif /* CONFIG_PCI */
-
 	printk(KERN_INFO
 		"NETspider-U: PCI card configured at %#lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);

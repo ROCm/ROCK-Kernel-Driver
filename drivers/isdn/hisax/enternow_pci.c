@@ -283,7 +283,6 @@ setup_enternow_pci(struct IsdnCard *card)
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
-#if CONFIG_PCI
 #ifdef __BIG_ENDIAN
 #error "not running on big endian machines now"
 #endif
@@ -292,12 +291,7 @@ setup_enternow_pci(struct IsdnCard *card)
 	if (cs->typ != ISDN_CTYPE_ENTERNOW)
 		return(0);
 
-	for ( ;; )
-	{
-		if (!pci_present()) {
-			printk(KERN_ERR "enter:now PCI: no PCI bus present\n");
-			return(0);
-		}
+	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
 			if (pci_enable_device(dev_netjet))
@@ -350,14 +344,6 @@ setup_enternow_pci(struct IsdnCard *card)
 
 			   break;
 	}
-#else
-
-	printk(KERN_WARNING "enter:now PCI: NO_PCI_BIOS\n");
-	printk(KERN_WARNING "enter:now PCI: unable to config Formula-n enter:now ISDN PCI ab\n");
-	return (0);
-
-#endif /* CONFIG_PCI */
-
 	printk(KERN_INFO
 		"enter:now PCI: PCI card configured at 0x%lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);

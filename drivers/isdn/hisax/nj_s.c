@@ -128,14 +128,7 @@ setup_netjet_s(struct IsdnCard *card)
 	if (cs->typ != ISDN_CTYPE_NETJET_S)
 		return(0);
 
-#if CONFIG_PCI
-
-	for ( ;; )
-	{
-		if (!pci_present()) {
-			printk(KERN_ERR "Netjet: no PCI bus present\n");
-			return(0);
-		}
+	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
 			if (pci_enable_device(dev_netjet))
@@ -202,14 +195,6 @@ setup_netjet_s(struct IsdnCard *card)
                 }
                 break;
 	}
-#else
-
-	printk(KERN_WARNING "NETjet-S: NO_PCI_BIOS\n");
-	printk(KERN_WARNING "NETjet-S: unable to config NETJET-S PCI\n");
-	return (0);
-
-#endif /* CONFIG_PCI */
-
 	printk(KERN_INFO
 		"NETjet-S: PCI card configured at %#lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);

@@ -65,8 +65,6 @@ static const PCI_ENTRY id_list[] =
 };
 
 
-#if CONFIG_PCI
-
 /******************************************/
 /* free hardware resources used by driver */
 /******************************************/
@@ -1398,8 +1396,6 @@ static struct card_ops hfcpci_ops = {
 /* this variable is used as card index when more than one cards are present */
 static struct pci_dev *dev_hfcpci __initdata = NULL;
 
-#endif				/* CONFIG_PCI */
-
 int __init
 setup_hfcpci(struct IsdnCard *card)
 {
@@ -1410,7 +1406,6 @@ setup_hfcpci(struct IsdnCard *card)
 
 	strcpy(tmp, hfcpci_revision);
 	printk(KERN_INFO "HiSax: HFC-PCI driver Rev. %s\n", HiSax_getrev(tmp));
-#if CONFIG_PCI
 	cs->hw.hfcpci.int_s1 = 0;
 	cs->dc.hfcpci.ph_state = 0;
 	cs->hw.hfcpci.fifo = 255;
@@ -1489,8 +1484,4 @@ setup_hfcpci(struct IsdnCard *card)
  err:
 	hisax_release_resources(cs);
 	return 0;
-#else
-	printk(KERN_WARNING "HFC-PCI: NO_PCI_BIOS\n");
-	return (0);
-#endif				/* CONFIG_PCI */
 }

@@ -662,10 +662,6 @@ setup_avm_pcipnp(struct IsdnCard *card)
 		}
 #endif
 #if CONFIG_PCI
-		if (!pci_present()) {
-			printk(KERN_ERR "FritzPCI: no PCI bus present\n");
-			return(0);
-		}
 		if ((dev_avm = pci_find_device(PCI_VENDOR_ID_AVM,
 			PCI_DEVICE_ID_AVM_A1,  dev_avm))) {
 			cs->irq = dev_avm->irq;
@@ -686,9 +682,6 @@ setup_avm_pcipnp(struct IsdnCard *card)
 			return(0);
 		}
 		cs->irq_flags |= SA_SHIRQ;
-#else
-		printk(KERN_WARNING "FritzPCI: NO_PCI_BIOS\n");
-		return (0);
 #endif /* CONFIG_PCI */
 	}
 ready:

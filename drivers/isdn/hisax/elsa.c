@@ -973,10 +973,6 @@ setup_elsa(struct IsdnCard *card)
 		       cs->irq);
 	} else if (cs->typ == ISDN_CTYPE_ELSA_PCI) {
 #if CONFIG_PCI
-		if (!pci_present()) {
-			printk(KERN_ERR "Elsa: no PCI bus present\n");
-			return(0);
-		}
 		cs->subtyp = 0;
 		if ((dev_qs1000 = pci_find_device(PCI_VENDOR_ID_ELSA,
 			PCI_DEVICE_ID_ELSA_MICROLINK, dev_qs1000))) {
@@ -1025,10 +1021,6 @@ setup_elsa(struct IsdnCard *card)
 		       cs->hw.elsa.base,
 		       cs->hw.elsa.cfg,
 		       cs->irq);
-#else
-		printk(KERN_WARNING "Elsa: Elsa PCI and NO_PCI_BIOS\n");
-		printk(KERN_WARNING "Elsa: unable to config Elsa PCI\n");
-		return (0);
 #endif /* CONFIG_PCI */
 	} else 
 		return (0);

@@ -268,8 +268,6 @@ setup_bkm_a4t(struct IsdnCard *card)
 	char tmp[64];
 	u_int pci_memaddr = 0, found = 0;
 	I20_REGISTER_FILE *pI20_Regs;
-#if CONFIG_PCI
-#endif
 
 	strcpy(tmp, bkm_a4t_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
@@ -278,11 +276,6 @@ setup_bkm_a4t(struct IsdnCard *card)
 	} else
 		return (0);
 
-#if CONFIG_PCI
-	if (!pci_present()) {
-		printk(KERN_ERR "bkm_a4t: no PCI bus present\n");
-		return (0);
-	}
 	while ((dev_a4t = pci_find_device(PCI_VENDOR_ID_ZORAN,
 		PCI_DEVICE_ID_ZORAN_36120, dev_a4t))) {
 		u16 sub_sys;
@@ -307,7 +300,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 		printk(KERN_WARNING "HiSax: %s: No IRQ\n", CardType[card->typ]);
 		return (0);
 	}
-	cs->hw.ax.base = request_mmio(&cs->rs,pci_memaddr, 4096, "Telekom A4T");
+	cs->hw.ax.base = (unsigned long)request_mmio(&cs->rs,pci_memaddr, 4096, "Telekom A4T");
 	if (!cs->hw.ax.base) {
 		printk(KERN_WARNING "HiSax: %s: No Memory base address\n", CardType[card->typ]);
 		return (0);
@@ -325,11 +318,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 	cs->hw.ax.jade_adr = cs->hw.ax.base + PO_OFFSET;
 	cs->hw.ax.isac_ale = GCS_1;
 	cs->hw.ax.jade_ale = GCS_3;
-#else
-	printk(KERN_WARNING "HiSax: %s: NO_PCI_BIOS\n", CardType[card->typ]);
-	printk(KERN_WARNING "HiSax: %s: unable to configure\n", CardType[card->typ]);
-	return (0);
-#endif				/* CONFIG_PCI */
+
 	printk(KERN_INFO "HiSax: %s: Card configured at 0x%lX IRQ %d\n",
 	       CardType[card->typ], cs->hw.ax.base, cs->irq);
 
