@@ -196,7 +196,6 @@ static inline void eeh_memset_io(volatile void __iomem *addr, int c, unsigned lo
 static inline void eeh_memcpy_fromio(void *dest, const volatile void __iomem *src, unsigned long n) {
 	void *vsrc = (void __force *) src;
 	void *destsave = dest;
-	const volatile void __iomem *srcsave = src;
 	unsigned long nsave = n;
 
 	while(n && (!EEH_CHECK_ALIGN(vsrc, 4) || !EEH_CHECK_ALIGN(dest, 4))) {
@@ -227,7 +226,7 @@ static inline void eeh_memcpy_fromio(void *dest, const volatile void __iomem *sr
 	 */
 	if ((nsave >= 4) &&
 		(EEH_POSSIBLE_ERROR((*((u32 *) destsave+nsave-4)), u32))) {
-		eeh_check_failure(srcsave, (*((u32 *) destsave+nsave-4)));
+		eeh_check_failure(src, (*((u32 *) destsave+nsave-4)));
 	}
 }
 
