@@ -444,6 +444,8 @@ static inline int mthca_poll_one(struct mthca_dev *dev,
 		spin_lock(&(*cur_qp)->lock);
 	}
 
+	entry->qp_num = (*cur_qp)->qpn;
+
 	if (is_send) {
 		wq = &(*cur_qp)->sq;
 		wqe_index = ((be32_to_cpu(cqe->wqe) - (*cur_qp)->send_wqe_offset)

@@ -2025,6 +2025,7 @@ static void local_completions(void *data)
 			wc.slid = IB_LID_PERMISSIVE;
 			wc.sl = 0;
 			wc.dlid_path_bits = 0;
+			wc.qp_num = IB_QP0;
 			local->mad_priv->header.recv_wc.wc = &wc;
 			local->mad_priv->header.recv_wc.mad_len =
 						sizeof(struct ib_mad);

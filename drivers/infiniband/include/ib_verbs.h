@@ -352,6 +352,7 @@ struct ib_wc {
 	u32			vendor_err;
 	u32			byte_len;
 	__be32			imm_data;
+	u32			qp_num;
 	u32			src_qp;
 	int			wc_flags;
 	u16			pkey_index;
