@@ -750,6 +750,9 @@ static void __init quirk_sis_96x_compatible(struct pci_dev *dev)
 
 /*
  *  The main table of quirks.
+ *
+ *  Note: any hooks for hotpluggable devices in this table must _NOT_
+ *        be declared __init.
  */
 
 static struct pci_fixup pci_fixups[] __devinitdata = {
