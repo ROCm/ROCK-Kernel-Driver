@@ -652,7 +652,8 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 
 #define arch_set_page_uptodate(__page)					  \
 	do {								  \
-		asm volatile ("sske %0,%1" : : "d" (0),			  \
+		if (!PageUptodate(__page))				  \
+			asm volatile ("sske %0,%1" : : "d" (0),		  \
 			      "a" (__pa((__page-mem_map) << PAGE_SHIFT)));\
 	} while (0)
 
