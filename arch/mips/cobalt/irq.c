@@ -87,7 +87,7 @@ asmlinkage void cobalt_irq(struct pt_regs *regs)
 	}
 }
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	set_except_vector(0, cobalt_handle_int);
 

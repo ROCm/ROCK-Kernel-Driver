@@ -37,7 +37,7 @@ asmlinkage void sead_hw1_irqdispatch(struct pt_regs *regs)
 	do_IRQ(SEADINT_UART1, regs);
 }
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
         /*
          * Mask out all interrupt
@@ -47,6 +47,5 @@ void __init init_IRQ(void)
 	/* Now safe to set the exception vector. */
 	set_except_vector(0, mipsIRQ);
 
-	init_generic_irq();
 	mips_cpu_irq_init(0);
 }

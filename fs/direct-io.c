@@ -1147,11 +1147,23 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 
 /*
  * This is a library function for use by filesystem drivers.
+ * The locking rules are governed by the dio_lock_type parameter.
  *
- * For writes to S_ISREG files, we are called under i_sem and return with i_sem
- * held, even though it is internally dropped.
+ * DIO_NO_LOCKING (no locking, for raw block device access)
+ * For writes, i_sem is not held on entry; it is never taken.
  *
- * For writes to S_ISBLK files, i_sem is not held on entry; it is never taken.
+ * DIO_LOCKING (simple locking for regular files)
+ * For writes we are called under i_sem and return with i_sem held, even though
+ * it is internally dropped.
+ * For reads, i_sem is not held on entry, but it is taken and dropped before
+ * returning.
+ *
+ * DIO_OWN_LOCKING (filesystem provides synchronisation and handling of
+ *	uninitialised data, allowing parallel direct readers and writers)
+ * For writes we are called without i_sem, return without it, never touch it.
+ * For reads, i_sem is held on entry and will be released before returning.
+ *
+ * Additional i_alloc_sem locking requirements described inline below.
  */
 ssize_t
 __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
@@ -1168,6 +1180,7 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	ssize_t retval = -EINVAL;
 	loff_t end = offset;
 	struct dio *dio;
+	int reader_with_isem = (rw == READ && dio_lock_type == DIO_OWN_LOCKING);
 
 	if (bdev)
 		bdev_blkbits = blksize_bits(bdev_hardsect_size(bdev));
@@ -1200,12 +1213,14 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 		goto out;
 
 	/*
+	 * For block device access DIO_NO_LOCKING is used,
+	 *	neither readers nor writers do any locking at all
 	 * For regular files using DIO_LOCKING,
 	 *	readers need to grab i_sem and i_alloc_sem
 	 *	writers need to grab i_alloc_sem only (i_sem is already held)
 	 * For regular files using DIO_OWN_LOCKING,
-	 *	both readers and writers need to grab i_alloc_sem
-	 *	neither readers nor writers hold i_sem on entry (nor exit)
+	 *	readers need to grab i_alloc_sem only (i_sem is already held)
+	 *	writers need to grab i_alloc_sem only
 	 */
 	dio->lock_type = dio_lock_type;
 	if (dio_lock_type != DIO_NO_LOCKING) {
@@ -1213,20 +1228,25 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 			struct address_space *mapping;
 
 			mapping = iocb->ki_filp->f_mapping;
-			down(&inode->i_sem);
+			if (dio_lock_type != DIO_OWN_LOCKING) {
+				down(&inode->i_sem);
+				reader_with_isem = 1;
+			}
 			retval = filemap_write_and_wait(mapping);
 			if (retval) {
-				up(&inode->i_sem);
 				kfree(dio);
 				goto out;
 			}
 			down_read(&inode->i_alloc_sem);
-			if (dio_lock_type == DIO_OWN_LOCKING)
+			if (dio_lock_type == DIO_OWN_LOCKING) {
 				up(&inode->i_sem);
+				reader_with_isem = 0;
+			}
 		} else {
 			down_read(&inode->i_alloc_sem);
 		}
 	}
+
 	/*
 	 * For file extending writes updating i_size before data
 	 * writeouts complete can expose uninitialized blocks. So
@@ -1238,7 +1258,13 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 
 	retval = direct_io_worker(rw, iocb, inode, iov, offset,
 				nr_segs, blkbits, get_blocks, end_io, dio);
+
+	if (rw == READ && dio_lock_type == DIO_LOCKING)
+		reader_with_isem = 0;
+
 out:
+	if (reader_with_isem)
+		up(&inode->i_sem);
 	return retval;
 }
 EXPORT_SYMBOL(__blockdev_direct_IO);

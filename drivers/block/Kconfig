@@ -331,6 +331,14 @@ config BLK_DEV_RAM
 	  Most normal users won't need the RAM disk functionality, and can
 	  thus say N here.
 
+config BLK_DEV_RAM_COUNT
+	int "Default number of RAM disks" if BLK_DEV_RAM
+	default "16"
+	help
+	  The default value is 16 RAM disks. Change this if you know what
+	  are doing. If you boot from a filesystem that needs to be extracted
+	  in memory, you will need at least one RAM disk (e.g. root on cramfs).
+
 config BLK_DEV_RAM_SIZE
 	int "Default RAM disk size (kbytes)"
 	depends on BLK_DEV_RAM

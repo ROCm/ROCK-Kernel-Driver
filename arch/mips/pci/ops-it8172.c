@@ -7,6 +7,8 @@
  * Author: MontaVista Software, Inc.
  *         	ppopov@mvista.com or source@mvista.com
  *
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
+ *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
  *  Free Software Foundation;  either version 2 of the  License, or (at your
@@ -32,7 +34,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <asm/pci_channel.h>
 #include <asm/it8172/it8172.h>
 #include <asm/it8172/it8172_pci.h>
 

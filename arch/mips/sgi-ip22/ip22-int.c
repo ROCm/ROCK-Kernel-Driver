@@ -309,7 +309,7 @@ static struct irqaction map1_cascade = {
 
 extern void mips_cpu_irq_init(unsigned int irq_base);
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
 
@@ -371,7 +371,6 @@ void __init init_IRQ(void)
 
 	set_except_vector(0, indyIRQ);
 
-	init_generic_irq();
 	/* init CPU irqs */
 	mips_cpu_irq_init(SGINT_CPU);
 

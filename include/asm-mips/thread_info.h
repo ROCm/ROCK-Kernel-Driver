@@ -101,7 +101,7 @@ register struct thread_info *__current_thread_info __asm__("$28");
 
 #endif /* !__ASSEMBLY__ */
 
-#define PREEMPT_ACTIVE		0x4000000
+#define PREEMPT_ACTIVE		0x10000000
 
 /*
  * thread information flags

@@ -19,6 +19,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/linkage.h>
 #include <linux/mm.h>
 #include <linux/blkdev.h>
 #include <linux/bootmem.h>
@@ -55,36 +56,45 @@ int cfe_cons_handle;
 
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned long initrd_start, initrd_end;
-extern void * __rd_start, * __rd_end;
-#endif
-
-#ifdef CONFIG_SMP
-static int reboot_smp = 0;
 #endif
 
 #ifdef CONFIG_KGDB
 extern int kgdb_port;
 #endif
 
-static void cfe_linux_exit(void)
+static void ATTRIB_NORET cfe_linux_exit(void *arg)
 {
-#ifdef CONFIG_SMP
+	int warm = *(int *)arg;
+
 	if (smp_processor_id()) {
-		if (reboot_smp) {
-			/* Don't repeat the process from another CPU */
-			for (;;);
-		} else {
+		static int reboot_smp;
+
+		/* Don't repeat the process from another CPU */
+		if (!reboot_smp) {
 			/* Get CPU 0 to do the cfe_exit */
 			reboot_smp = 1;
-			smp_call_function((void *)_machine_restart, NULL, 1, 0);
-			for (;;);
+			smp_call_function(cfe_linux_exit, arg, 1, 0);
 		}
+	} else {
+		printk("Passing control back to CFE...\n");
+		cfe_exit(warm, 0);
+		printk("cfe_exit returned??\n");
 	}
-#endif
-	printk("passing control back to CFE\n");
-	cfe_exit(1, 0);
-	printk("cfe_exit returned??\n");
-	while(1);
+	while (1);
+}
+
+static void ATTRIB_NORET cfe_linux_restart(char *command)
+{
+	static const int zero;
+
+	cfe_linux_exit((void *)&zero);
+}
+
+static void ATTRIB_NORET cfe_linux_halt(void)
+{
+	static const int one = 1;
+
+	cfe_linux_exit((void *)&one);
 }
 
 static __init void prom_meminit(void)
@@ -96,17 +106,6 @@ static __init void prom_meminit(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	unsigned long initrd_pstart;
 	unsigned long initrd_pend;
-
-#ifdef CONFIG_EMBEDDED_RAMDISK
-	/* If we're using an embedded ramdisk, then __rd_start and __rd_end
-	   are defined by the linker to be on either side of the ramdisk
-	   area.  Otherwise, initrd_start should be defined by kernel command
-	   line arguments */
-	if (initrd_start == 0) {
-		initrd_start = (unsigned long)&__rd_start;
-		initrd_end = (unsigned long)&__rd_end;
-	}
-#endif
 
 	initrd_pstart = CPHYSADDR(initrd_start);
 	initrd_pend = CPHYSADDR(initrd_end);
@@ -247,9 +246,9 @@ void __init prom_init(void)
 	char *arg;
 #endif
 
-	_machine_restart   = (void (*)(char *))cfe_linux_exit;
-	_machine_halt      = cfe_linux_exit;
-	_machine_power_off = cfe_linux_exit;
+	_machine_restart   = cfe_linux_restart;
+	_machine_halt      = cfe_linux_halt;
+	_machine_power_off = cfe_linux_halt;
 
 	/*
 	 * Check if a loader was used; if NOT, the 4 arguments are

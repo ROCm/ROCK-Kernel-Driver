@@ -7,8 +7,8 @@
  * Copyright (C) 2000, 2002  Maciej W. Rozycki
  * Copyright (C) 1990, 1999 by Silicon Graphics, Inc.
  */
-#ifndef _ASM_MACH_SPACES_H
-#define _ASM_MACH_SPACES_H
+#ifndef _ASM_MACH_IP27_SPACES_H
+#define _ASM_MACH_IP27_SPACES_H
 
 /*
  * IP27 uses the R10000's uncached attribute feature.  Attribute 3 selects
@@ -31,4 +31,4 @@
 
 #define HIGHMEM_START		(~0UL)
 
-#endif /* _ASM_MACH_SPACES_H */
+#endif /* _ASM_MACH_IP27_SPACES_H */

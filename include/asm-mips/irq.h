@@ -22,14 +22,32 @@ static inline int irq_canonicalize(int irq)
 #define irq_canonicalize(irq) (irq)	/* Sane hardware, sane code ... */
 #endif
 
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
 struct pt_regs;
-extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
-extern void init_generic_irq(void);
+#ifdef CONFIG_PREEMPT
+
+extern asmlinkage unsigned int do_IRQ(unsigned int irq, struct pt_regs *regs);
+
+#else
+
+/*
+ * do_IRQ handles all normal device IRQ's (the special
+ * SMP cross-CPU interrupts have their own specific
+ * handlers).
+ *
+ * Ideally there should be away to get this into kernel/irq/handle.c to
+ * avoid the overhead of a call for just a tiny function ...
+ */
+#define do_IRQ(irq, regs)						\
+do {									\
+	irq_enter();							\
+	__do_IRQ((irq), (regs));					\
+	irq_exit();							\
+} while (0)
+
+#endif
+
+extern void arch_init_irq(void);
 
 struct irqaction;
 int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);

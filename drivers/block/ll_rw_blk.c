@@ -2584,6 +2584,20 @@ static inline void block_wait_queue_running(request_queue_t *q)
 	}
 }
 
+static void handle_bad_sector(struct bio *bio)
+{
+	char b[BDEVNAME_SIZE];
+
+	printk(KERN_INFO "attempt to access beyond end of device\n");
+	printk(KERN_INFO "%s: rw=%ld, want=%Lu, limit=%Lu\n",
+			bdevname(bio->bi_bdev, b),
+			bio->bi_rw,
+			(unsigned long long)bio->bi_sector + bio_sectors(bio),
+			(long long)(bio->bi_bdev->bd_inode->i_size >> 9));
+
+	set_bit(BIO_EOF, &bio->bi_flags);
+}
+
 /**
  * generic_make_request: hand a buffer to its device driver for I/O
  * @bio:  The bio describing the location in memory and on the device.
@@ -2620,21 +2634,13 @@ void generic_make_request(struct bio *bio)
 	if (maxsector) {
 		sector_t sector = bio->bi_sector;
 
-		if (maxsector < nr_sectors ||
-		    maxsector - nr_sectors < sector) {
-			char b[BDEVNAME_SIZE];
-			/* This may well happen - the kernel calls
-			 * bread() without checking the size of the
-			 * device, e.g., when mounting a device. */
-			printk(KERN_INFO
-			       "attempt to access beyond end of device\n");
-			printk(KERN_INFO "%s: rw=%ld, want=%Lu, limit=%Lu\n",
-			       bdevname(bio->bi_bdev, b),
-			       bio->bi_rw,
-			       (unsigned long long) sector + nr_sectors,
-			       (long long) maxsector);
-
-			set_bit(BIO_EOF, &bio->bi_flags);
+		if (maxsector < nr_sectors || maxsector - nr_sectors < sector) {
+			/*
+			 * This may well happen - the kernel calls bread()
+			 * without checking the size of the device, e.g., when
+			 * mounting a device.
+			 */
+			handle_bad_sector(bio);
 			goto end_io;
 		}
 	}

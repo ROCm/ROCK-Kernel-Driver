@@ -1876,7 +1876,7 @@ static int dvd_read_manufact(struct cdrom_device_info *cdi, dvd_struct *s)
 	s->manufact.len = buf[0] << 8 | buf[1];
 	if (s->manufact.len < 0 || s->manufact.len > 2048) {
 		cdinfo(CD_WARNING, "Received invalid manufacture info length"
-				   " (%d)\n", s->bca.len);
+				   " (%d)\n", s->manufact.len);
 		ret = -EIO;
 	} else {
 		memcpy(s->manufact.value, &buf[4], s->manufact.len);
