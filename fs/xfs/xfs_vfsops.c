@@ -1412,7 +1412,7 @@ xfs_syncsub(
 		ASSERT(ipointer_in == B_FALSE);
 		ip = ip->i_mnext;
 
-	} while (ip->i_mnext != mp->m_inodes);
+	} while (ip != mp->m_inodes);
 
 	XFS_MOUNT_IUNLOCK(mp);
 
