@@ -41,7 +41,7 @@
 
 static unsigned short normal_i2c[] = { I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { 0x18, 0x1a, 0x29, 0x2b,
-    0x4c, 0x4e, I2C_CLIENT_END };
+	0x4c, 0x4e, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
 static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
@@ -78,15 +78,12 @@ SENSORS_INSMOD_1(lm83);
 #define LM83_REG_W_TCRIT		0x5A
 
 /*
- * Conversions, initial values and various macros
+ * Conversions and various macros
  * The LM83 uses signed 8-bit values.
  */
 
 #define TEMP_FROM_REG(val)	((val > 127 ? val-256 : val) * 1000)
 #define TEMP_TO_REG(val)	((val < 0 ? val+256 : val) / 1000)
-
-#define LM83_INIT_HIGH		100
-#define LM83_INIT_CRIT		120
 
 static const u8 LM83_REG_R_TEMP[] = {
 	LM83_REG_R_LOCAL_TEMP,
@@ -114,9 +111,7 @@ static const u8 LM83_REG_W_HIGH[] = {
  */
 
 static int lm83_attach_adapter(struct i2c_adapter *adapter);
-static int lm83_detect(struct i2c_adapter *adapter, int address,
-    int kind);
-static void lm83_init_client(struct i2c_client *client);
+static int lm83_detect(struct i2c_adapter *adapter, int address, int kind);
 static int lm83_detach_client(struct i2c_client *client);
 static void lm83_update_client(struct i2c_client *client);
 
@@ -137,8 +132,7 @@ static struct i2c_driver lm83_driver = {
  * Client data (each client gets its own)
  */
 
-struct lm83_data
-{
+struct lm83_data {
 	struct semaphore update_lock;
 	char valid; /* zero until following fields are valid */
 	unsigned long last_updated; /* in jiffies */
@@ -233,8 +227,7 @@ static int lm83_attach_adapter(struct i2c_adapter *adapter)
  * The following function does more than just detection. If detection
  * succeeds, it also registers the new chip.
  */
-static int lm83_detect(struct i2c_adapter *adapter, int address,
-    int kind)
+static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	struct i2c_client *new_client;
 	struct lm83_data *data;
@@ -290,6 +283,7 @@ static int lm83_detect(struct i2c_adapter *adapter, int address,
 		    LM83_REG_R_MAN_ID);
 		chip_id = i2c_smbus_read_byte_data(new_client,
 		    LM83_REG_R_CHIP_ID);
+
 		if (man_id == 0x01) { /* National Semiconductor */
 			if (chip_id == 0x03) {
 				kind = lm83;
@@ -315,8 +309,10 @@ static int lm83_detect(struct i2c_adapter *adapter, int address,
 	if ((err = i2c_attach_client(new_client)))
 		goto exit_free;
 
-	/* Initialize the LM83 chip */
-	lm83_init_client(new_client);
+	/*
+	 * Initialize the LM83 chip
+	 * (Nothing to do for this one.)
+	 */
 
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_temp_input1);
@@ -336,17 +332,6 @@ exit_free:
 	kfree(new_client);
 exit:
 	return err;
-}
-
-static void lm83_init_client(struct i2c_client *client)
-{
-	int nr;
-
-	for (nr = 0; nr < 4; nr++)
-		i2c_smbus_write_byte_data(client, LM83_REG_W_HIGH[nr],
-	            TEMP_TO_REG(LM83_INIT_HIGH));
-	i2c_smbus_write_byte_data(client, LM83_REG_W_TCRIT,
-	    TEMP_TO_REG(LM83_INIT_CRIT));
 }
 
 static int lm83_detach_client(struct i2c_client *client)
@@ -373,6 +358,7 @@ static void lm83_update_client(struct i2c_client *client)
 	    (jiffies < data->last_updated) ||
 	    !data->valid) {
 		int nr;
+
 		dev_dbg(&client->dev, "Updating lm83 data.\n");
 		for (nr = 0; nr < 4 ; nr++) {
 			data->temp_input[nr] =
@@ -388,6 +374,7 @@ static void lm83_update_client(struct i2c_client *client)
 		    i2c_smbus_read_byte_data(client, LM83_REG_R_STATUS1)
 		    + (i2c_smbus_read_byte_data(client, LM83_REG_R_STATUS2)
 		    << 8);
+
 		data->last_updated = jiffies;
 		data->valid = 1;
 	}
