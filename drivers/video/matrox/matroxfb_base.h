@@ -423,6 +423,7 @@ struct matrox_bios {
 
 struct matrox_switch;
 struct matroxfb_driver;
+struct matroxfb_dh_fb_info;
 
 struct matrox_fb_info {
 	/* fb_info must be first */
@@ -441,7 +442,7 @@ struct matrox_fb_info {
 	struct pci_dev*		pcidev;
 
 	struct {
-	struct fb_info*		info;
+	struct matroxfb_dh_fb_info*		info;
 	struct rw_semaphore	lock;
 			      } crtc2;
 	struct {

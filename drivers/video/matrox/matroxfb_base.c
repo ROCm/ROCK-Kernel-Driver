@@ -1026,7 +1026,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 							struct matroxfb_dh_fb_info* crtc2;
 
 							down_read(&ACCESS_FBINFO(crtc2.lock));
-							crtc2 = (struct matroxfb_dh_fb_info*)ACCESS_FBINFO(crtc2.info);
+							crtc2 = ACCESS_FBINFO(crtc2.info);
 							if (crtc2)
 								crtc2->fbcon.switch_con(crtc2->fbcon.currcon, &crtc2->fbcon);
 							up_read(&ACCESS_FBINFO(crtc2.lock));

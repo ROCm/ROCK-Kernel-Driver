@@ -796,7 +796,7 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	}
 	down_write(&ACCESS_FBINFO(crtc2.lock));
 	oldcrtc2 = ACCESS_FBINFO(crtc2.info);
-	ACCESS_FBINFO(crtc2.info) = &m2info->fbcon;
+	ACCESS_FBINFO(crtc2.info) = m2info;
 	up_write(&ACCESS_FBINFO(crtc2.lock));
 	if (oldcrtc2) {
 		printk(KERN_ERR "matroxfb_crtc2: Internal consistency check failed: crtc2 already present: %p\n",
@@ -825,16 +825,16 @@ static void matroxfb_dh_deregisterfb(struct matroxfb_dh_fb_info* m2info) {
 #define minfo (m2info->primary_dev)
 	if (m2info->fbcon_registered) {
 		int id;
-		struct fb_info* crtc2;
+		struct matroxfb_dh_fb_info* crtc2;
 
 		down_write(&ACCESS_FBINFO(crtc2.lock));
 		crtc2 = ACCESS_FBINFO(crtc2.info);
-		if (crtc2 == &m2info->fbcon)
+		if (crtc2 == m2info)
 			ACCESS_FBINFO(crtc2.info) = NULL;
 		up_write(&ACCESS_FBINFO(crtc2.lock));
-		if (crtc2 != &m2info->fbcon) {
+		if (crtc2 != m2info) {
 			printk(KERN_ERR "matroxfb_crtc2: Internal consistency check failed: crtc2 mismatch at unload: %p != %p\n",
-				crtc2, &m2info->fbcon);
+				crtc2, m2info);
 			printk(KERN_ERR "matroxfb_crtc2: Expect kernel crash after module unload.\n");
 			return;
 		}
@@ -872,6 +872,7 @@ static void* matroxfb_crtc2_probe(struct matrox_fb_info* minfo) {
 
 static void matroxfb_crtc2_remove(struct matrox_fb_info* minfo, void* crtc2) {
 	matroxfb_dh_deregisterfb(crtc2);
+	kfree(crtc2);
 }
 
 static struct matroxfb_driver crtc2 = {
