@@ -1964,8 +1964,6 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 		case SIOCGIFDSTADDR:
 		case SIOCSIFDSTADDR:
 		case SIOCSIFFLAGS:
-		case SIOCADDDLCI:
-		case SIOCDELDLCI:
 			return inet_dgram_ops.ioctl(sock, cmd, arg);
 #endif
 

@@ -67,18 +67,9 @@
 #include <linux/poll.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/if_bridge.h>
-
-#ifdef CONFIG_NET_DIVERT
-#include <linux/divert.h>
-#endif /* CONFIG_NET_DIVERT */
 
 #ifdef CONFIG_INET
 #include <net/inet_common.h>
-#endif
-
-#ifdef CONFIG_DLCI
-extern int dlci_ioctl(unsigned int, void*);
 #endif
 
 #define CONFIG_SOCK_PACKET	1
@@ -1491,28 +1482,6 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 		case SIOCSIFHWBROADCAST:
 			return(dev_ioctl(cmd,(void *) arg));
 
-		case SIOCGIFBR:
-		case SIOCSIFBR:
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-#ifdef CONFIG_INET
-#ifdef CONFIG_KMOD
-			if (br_ioctl_hook == NULL)
-				request_module("bridge");
-#endif
-			if (br_ioctl_hook != NULL)
-				return br_ioctl_hook(arg);
-#endif
-#endif				
-			return -ENOPKG;
-
-		case SIOCGIFDIVERT:
-		case SIOCSIFDIVERT:
-#ifdef CONFIG_NET_DIVERT
-			return divert_ioctl(cmd, (struct divert_cf *) arg);
-#else
-			return -ENOPKG;
-#endif /* CONFIG_NET_DIVERT */
-			
 #ifdef CONFIG_INET
 		case SIOCADDRT:
 		case SIOCDELRT:
@@ -1528,8 +1497,6 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 		case SIOCGIFDSTADDR:
 		case SIOCSIFDSTADDR:
 		case SIOCSIFFLAGS:
-		case SIOCADDDLCI:
-		case SIOCDELDLCI:
 			return inet_dgram_ops.ioctl(sock, cmd, arg);
 #endif
 

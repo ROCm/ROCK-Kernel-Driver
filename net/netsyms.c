@@ -221,22 +221,19 @@ EXPORT_SYMBOL(destroy_EII_client);
 /* for 801q VLAN support */
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 EXPORT_SYMBOL(dev_change_flags);
-EXPORT_SYMBOL(vlan_ioctl_hook);
 #endif
+EXPORT_SYMBOL(vlan_ioctl_hook);
 
 EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
-#ifdef CONFIG_INET
+#endif
 EXPORT_SYMBOL(br_ioctl_hook);
-#endif
-#endif
 
 #ifdef CONFIG_NET_DIVERT
 EXPORT_SYMBOL(alloc_divert_blk);
 EXPORT_SYMBOL(free_divert_blk);
-EXPORT_SYMBOL(divert_ioctl);
 #endif /* CONFIG_NET_DIVERT */
 
 #ifdef CONFIG_INET

@@ -111,13 +111,6 @@
 #ifdef CONFIG_IP_MROUTE
 #include <linux/mroute.h>
 #endif
-#include <linux/if_bridge.h>
-#ifdef CONFIG_KMOD
-#include <linux/kmod.h>
-#endif
-#ifdef CONFIG_NET_DIVERT
-#include <linux/divert.h>
-#endif /* CONFIG_NET_DIVERT */
 
 struct linux_mib net_statistics[NR_CPUS * 2];
 
@@ -126,22 +119,6 @@ atomic_t inet_sock_nr;
 #endif
 
 extern void ip_mc_drop_socket(struct sock *sk);
-
-#ifdef CONFIG_DLCI
-extern int dlci_ioctl(unsigned int, void *);
-#endif
-
-#ifdef CONFIG_DLCI_MODULE
-int (*dlci_ioctl_hook)(unsigned int, void *);
-#endif
-
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-int (*br_ioctl_hook)(unsigned long);
-#endif
-
-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
-int (*vlan_ioctl_hook)(unsigned long arg);
-#endif
 
 /* Per protocol sock slabcache */
 kmem_cache_t *tcp_sk_cachep;
@@ -889,60 +866,6 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCGIFPFLAGS:
 		case SIOCSIFFLAGS:
 			err = devinet_ioctl(cmd, (void *)arg);
-			break;
-		case SIOCGIFBR:
-		case SIOCSIFBR:
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-#ifdef CONFIG_KMOD
-			if (!br_ioctl_hook)
-				request_module("bridge");
-#endif
-			if (br_ioctl_hook)
-				err = br_ioctl_hook(arg);
-			else
-#endif
-			err = -ENOPKG;
-			break;
-		case SIOCGIFVLAN:
-		case SIOCSIFVLAN:
-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
-#ifdef CONFIG_KMOD
-			if (!vlan_ioctl_hook)
-				request_module("8021q");
-#endif
-			if (vlan_ioctl_hook)
-				err = vlan_ioctl_hook(arg);
-			else
-#endif
-			err = -ENOPKG;
-			break;
-		case SIOCGIFDIVERT:
-		case SIOCSIFDIVERT:
-#ifdef CONFIG_NET_DIVERT
-			err = divert_ioctl(cmd, (struct divert_cf *)arg);
-#else
-			err = -ENOPKG;
-#endif	/* CONFIG_NET_DIVERT */
-			break;
-		case SIOCADDDLCI:
-		case SIOCDELDLCI:
-#ifdef CONFIG_DLCI
-			lock_kernel();
-			err = dlci_ioctl(cmd, (void *)arg);
-			unlock_kernel();
-			break;
-#elif CONFIG_DLCI_MODULE
-#ifdef CONFIG_KMOD
-			if (!dlci_ioctl_hook)
-				request_module("dlci");
-#endif
-			if (dlci_ioctl_hook) {
-				lock_kernel();
-				err = (*dlci_ioctl_hook)(cmd, (void *)arg);
-				unlock_kernel();
-			} else
-#endif
-			err = -ENOPKG;
 			break;
 		default:
 			if (!sk->prot->ioctl ||
