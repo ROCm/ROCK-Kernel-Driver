@@ -196,7 +196,7 @@ udelay:
 	/*  Change r4 to be the number of ticks using:	
 	 *	(nanoseconds + (timebase_period_ns - 1 )) / timebase_period_ns
 	 *  timebase_period_ns defaults to 60 (16.6MHz) */
-	lis	r5,timebase_period_ns@h
+	lis	r5,timebase_period_ns@ha
 	lwz	r5,timebase_period_ns@l(r5)
 	addi	r4,r4,r5
 	addi	r4,r4,-1
