@@ -935,6 +935,10 @@ static int insert_device(struct pnp_dev *dev, struct pnp_bios_node * node)
 		dev->capabilities |= PNP_REMOVABLE;
 	dev->protocol = &pnpbios_protocol;
 
+	/* clear out the damaged flags */
+	if (!dev->active)
+		pnp_init_resources(&dev->res);
+
 	pnp_add_device(dev);
 	pnpbios_interface_attach_device(node);
 
