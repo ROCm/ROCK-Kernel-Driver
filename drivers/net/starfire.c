@@ -339,7 +339,7 @@ do { \
 		intr_enable = readl(ioaddr + IntrEnable); \
 		intr_enable &= ~(IntrRxDone | IntrRxEmpty); \
 		writel(intr_enable, ioaddr + IntrEnable); \
-		readl(ioaddr + IntrEnable); \	/* flush PCI posting buffers */
+		readl(ioaddr + IntrEnable); /* flush PCI posting buffers */ \
 	} else { \
 		/* Paranoia check */ \
 		intr_enable = readl(ioaddr + IntrEnable); \

@@ -1,4 +1,4 @@
-/* 
+/*
  *  sym53c416.c
  *  Low-level SCSI driver for sym53c416 chip.
  *  Copyright (C) 1998 Lieven Willems (lw_linux@hotmail.com)
@@ -763,7 +763,7 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	int i;
 
 	/* Store base register as we can have more than one controller in the system */
-	base = SCpnt->host->io_port;
+	base = SCpnt->device->host->io_port;
 	current_command = SCpnt;                  /* set current command                */
 	current_command->scsi_done = done;        /* set ptr to done function           */
 	current_command->SCp.phase = command_ph;  /* currect phase is the command phase */
@@ -771,7 +771,7 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	current_command->SCp.Message = 0;
 
 	spin_lock_irqsave(&sym53c416_lock, flags);
-	outb(SCpnt->target, base + DEST_BUS_ID); /* Set scsi id target        */
+	outb(SCpnt->device->id, base + DEST_BUS_ID); /* Set scsi id target        */
 	outb(FLUSH_FIFO, base + COMMAND_REG);    /* Flush SCSI and PIO FIFO's */
 	/* Write SCSI command into the SCSI fifo */
 	for(i = 0; i < SCpnt->cmd_len; i++)
@@ -819,7 +819,7 @@ static int sym53c416_host_reset(Scsi_Cmnd *SCpnt)
 	int i;
 
 	/* printk("sym53c416_reset\n"); */
-	base = SCpnt->host->io_port;
+	base = SCpnt->device->host->io_port;
 	/* search scsi_id - fixme, we shouldnt need to iterate for this! */
 	for(i = 0; i < host_index && scsi_id != -1; i++)
 		if(hosts[i].base == base)

@@ -500,9 +500,9 @@ static inline void build_rx_desc(struct ns83820 *dev, u32 *desc, dma_addr_t link
 {
 	desc_addr_set(desc + DESC_LINK, link);
 	desc_addr_set(desc + DESC_BUFPTR, buf);
-	desc[DESC_EXTSTS] = extsts;
+	desc[DESC_EXTSTS] = cpu_to_le32(extsts);
 	mb();
-	desc[DESC_CMDSTS] = cmdsts;
+	desc[DESC_CMDSTS] = cpu_to_le32(cmdsts);
 }
 
 #define nr_rx_empty(dev) ((NR_RX_DESC-2 + dev->rx_info.next_rx - dev->rx_info.next_empty) % NR_RX_DESC)

@@ -1033,8 +1033,9 @@ static void bigmac_set_multicast(struct net_device *dev)
 	sbus_writel(tmp, bregs + BMAC_RXCFG);
 }
 
-static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec_sdev)
+static int __init bigmac_ether_init(struct sbus_dev *qec_sdev)
 {
+	struct net_device *dev;
 	static int version_printed;
 	struct bigmac *bp;
 	u8 bsizes, bsizes_more;
@@ -1048,9 +1049,6 @@ static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec
 
 	if (version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
-
-	if (!dev)
-		return -ENOMEM;
 
 	/* Report what we have found to the user. */
 	printk(KERN_INFO "%s: BigMAC 100baseT Ethernet ", dev->name);
@@ -1180,7 +1178,6 @@ static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec
 	/* Finish net device registration. */
 	dev->irq = bp->bigmac_sdev->irqs[0];
 	dev->dma = 0;
-	ether_setup(dev);
 
 	/* Put us into the list of instances attached for later driver
 	 * exit.
@@ -1235,7 +1232,6 @@ static int __init bigmac_match(struct sbus_dev *sdev)
 
 static int __init bigmac_probe(void)
 {
-	struct net_device *dev = NULL;
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev = 0;
 	static int called;
@@ -1249,12 +1245,9 @@ static int __init bigmac_probe(void)
 
 	for_each_sbus(sbus) {
 		for_each_sbusdev(sdev, sbus) {
-			if (cards)
-				dev = NULL;
-
 			if (bigmac_match(sdev)) {
 				cards++;
-				if ((v = bigmac_ether_init(dev, sdev)))
+				if ((v = bigmac_ether_init(sdev)))
 					return v;
 			}
 		}

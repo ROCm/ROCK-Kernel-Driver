@@ -131,18 +131,33 @@ config TMSPCI
 	  The module will be called tmspci. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
-config TMSISA
-	tristate "Generic TMS380 ISA support"
+config SKISA
+	tristate "SysKonnect TR4/16 ISA support"
 	depends on TR && TMS380TR!=n && ISA
 	help
-	  This tms380 module supports generic TMS380-based ISA cards.
+	  This tms380 module supports SysKonnect TR4/16 ISA cards.
 
 	  These cards are known to work:
 	  - SysKonnect TR4/16 ISA (SK-4190)
 
 	  This driver is available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tmsisa. If you want to compile it
+	  The module will be called skisa. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+config PROTEON
+	tristate "Proteon ISA support"
+	depends on TR && TMS380TR!=n && ISA
+	help
+	  This tms380 module supports Proteon ISA cards.
+
+	  These cards are known to work:
+	  - Proteon 1392
+	  - Proteon 1392 plus
+
+	  This driver is available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called proteon. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config ABYSS

@@ -252,6 +252,7 @@
 #include <linux/types.h>
 #include <linux/unistd.h>
 #include <linux/ctype.h>
+#include <linux/mca-legacy.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>

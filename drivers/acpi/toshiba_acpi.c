@@ -44,7 +44,7 @@
 #include <linux/seq_file.h>
 #include <linux/version.h>
 
-#include <acconfig.h>
+#include <acpi/acconfig.h>
 #define OLD_ACPI_INTERFACE (ACPI_CA_VERSION < 0x20020000)
 
 #if OLD_ACPI_INTERFACE

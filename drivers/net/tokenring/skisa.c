@@ -1,5 +1,5 @@
 /*
- *  tmsisa.c: A generic network driver for TMS380-based ISA token ring cards.
+ *  skisa.c: A network driver for SK-NET TMS380-based ISA token ring cards.
  *
  *  Based on tmspci written 1999 by Adam Fritzler
  *  
@@ -16,10 +16,18 @@
  *    AF        Adam Fritzler           mid@auk.cx
  *    JF	Jochen Friedrich	jochen@scram.de
  *
- *  TODO:
- *	1. Add support for Proteon TR ISA adapters (1392, 1392+)
+ *  Modification History:
+ *	14-Jan-01	JF	Created
+ *	28-Oct-02	JF	Fixed probe of card for static compilation.
+ *				Fixed module init to not make hotplug go wild.
+ *	09-Nov-02	JF	Fixed early bail out on out of memory
+ *				situations if multiple cards are found.
+ *				Cleaned up some unnecessary console SPAM.
+ *	09-Dec-02	JF	Fixed module reference counting.
+ *	02-Jan-03	JF	Renamed to skisa.c
+ *
  */
-static const char version[] = "tmsisa.c: v1.00 14/01/2001 by Jochen Friedrich\n";
+static const char version[] = "skisa.c: v1.03 09/12/2002 by Jochen Friedrich\n";
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -37,7 +45,7 @@ static const char version[] = "tmsisa.c: v1.00 14/01/2001 by Jochen Friedrich\n"
 
 #include "tms380tr.h"
 
-#define TMS_ISA_IO_EXTENT 32
+#define SK_ISA_IO_EXTENT 32
 
 /* A zero-terminated list of I/O addresses to be probed. */
 static unsigned int portlist[] __initdata = {
@@ -61,40 +69,40 @@ static int dmalist[] __initdata = {
 
 static char isa_cardname[] = "SK NET TR 4/16 ISA\0";
 
-int tms_isa_probe(struct net_device *dev);
-static int tms_isa_open(struct net_device *dev);
-static int tms_isa_close(struct net_device *dev);
-static void tms_isa_read_eeprom(struct net_device *dev);
-static unsigned short tms_isa_setnselout_pins(struct net_device *dev);
+int sk_isa_probe(struct net_device *dev);
+static int sk_isa_open(struct net_device *dev);
+static int sk_isa_close(struct net_device *dev);
+static void sk_isa_read_eeprom(struct net_device *dev);
+static unsigned short sk_isa_setnselout_pins(struct net_device *dev);
 
-static unsigned short tms_isa_sifreadb(struct net_device *dev, unsigned short reg)
+static unsigned short sk_isa_sifreadb(struct net_device *dev, unsigned short reg)
 {
 	return inb(dev->base_addr + reg);
 }
 
-static unsigned short tms_isa_sifreadw(struct net_device *dev, unsigned short reg)
+static unsigned short sk_isa_sifreadw(struct net_device *dev, unsigned short reg)
 {
 	return inw(dev->base_addr + reg);
 }
 
-static void tms_isa_sifwriteb(struct net_device *dev, unsigned short val, unsigned short reg)
+static void sk_isa_sifwriteb(struct net_device *dev, unsigned short val, unsigned short reg)
 {
 	outb(val, dev->base_addr + reg);
 }
 
-static void tms_isa_sifwritew(struct net_device *dev, unsigned short val, unsigned short reg)
+static void sk_isa_sifwritew(struct net_device *dev, unsigned short val, unsigned short reg)
 {
 	outw(val, dev->base_addr + reg);
 }
 
-struct tms_isa_card {
+struct sk_isa_card {
 	struct net_device *dev;
-	struct tms_isa_card *next;
+	struct sk_isa_card *next;
 };
 
-static struct tms_isa_card *tms_isa_card_list;
+static struct sk_isa_card *sk_isa_card_list;
 
-static int __init tms_isa_probe1(int ioaddr)
+static int __init sk_isa_probe1(int ioaddr)
 {
 	unsigned char old, chk1, chk2;
 
@@ -126,57 +134,89 @@ static int __init tms_isa_probe1(int ioaddr)
 	return (0);
 }
 
-int __init tms_isa_probe(struct net_device *dev)
+int __init sk_isa_probe(struct net_device *dev)
 {
         static int versionprinted;
 	struct net_local *tp;
-	int j;
-	struct tms_isa_card *card;
+	int i,j;
+	struct sk_isa_card *card;
 
-	if(check_region(dev->base_addr, TMS_ISA_IO_EXTENT))
-		return -1;
+	SET_MODULE_OWNER(dev);
+	if (!dev->base_addr)
+	{
+		for(i = 0; portlist[i]; i++)
+		{
+			if (!request_region(portlist[i], SK_ISA_IO_EXTENT, isa_cardname))
+				continue;
 
-	if(tms_isa_probe1(dev->base_addr))
-		return -1;
-   
-	if (versionprinted++ == 0)
-		printk("%s", version);
- 
+			if(sk_isa_probe1(portlist[i]))
+			{
+				release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
+				continue;
+			}
+
+			dev->base_addr = portlist[i];
+			break;
+		}
+		if(!dev->base_addr)
+			return -1;
+	}
+	else
+	{
+		if (!request_region(dev->base_addr, SK_ISA_IO_EXTENT, isa_cardname))
+			return -1;
+
+		if(sk_isa_probe1(dev->base_addr))
+		{
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
+			return -1;
+  		}
+	} 
+
 	/* At this point we have found a valid card. */
-    
-	if (!request_region(dev->base_addr, TMS_ISA_IO_EXTENT, isa_cardname))
+
+	if (versionprinted++ == 0)
+		printk(KERN_DEBUG "%s", version);
+
+#ifndef MODULE
+	dev = init_trdev(dev, 0);
+	if (!dev)
+	{
+		release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 		return -1;
+	}
+#endif
 
 	if (tmsdev_init(dev, ISA_MAX_ADDRESS, NULL))
        	{
-		release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+		release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 		return -1;
 	}
 
 	dev->base_addr &= ~3; 
 		
-	tms_isa_read_eeprom(dev);
+	sk_isa_read_eeprom(dev);
 
-	printk("%s:    Ring Station Address: ", dev->name);
+	printk(KERN_DEBUG "%s:    Ring Station Address: ", dev->name);
 	printk("%2.2x", dev->dev_addr[0]);
 	for (j = 1; j < 6; j++)
 		printk(":%2.2x", dev->dev_addr[j]);
 	printk("\n");
 		
 	tp = (struct net_local *)dev->priv;
-	tp->setnselout = tms_isa_setnselout_pins;
+	tp->setnselout = sk_isa_setnselout_pins;
 		
-	tp->sifreadb = tms_isa_sifreadb;
-	tp->sifreadw = tms_isa_sifreadw;
-	tp->sifwriteb = tms_isa_sifwriteb;
-	tp->sifwritew = tms_isa_sifwritew;
+	tp->sifreadb = sk_isa_sifreadb;
+	tp->sifreadw = sk_isa_sifreadw;
+	tp->sifwriteb = sk_isa_sifwriteb;
+	tp->sifwritew = sk_isa_sifwritew;
 	
 	memcpy(tp->ProductID, isa_cardname, PROD_ID_SIZE + 1);
 
 	tp->tmspriv = NULL;
 
-	dev->open = tms_isa_open;
-	dev->stop = tms_isa_close;
+	dev->open = sk_isa_open;
+	dev->stop = sk_isa_close;
 
 	if (dev->irq == 0)
 	{
@@ -190,8 +230,8 @@ int __init tms_isa_probe(struct net_device *dev)
 		
                 if(irqlist[j] == 0)
                 {
-                        printk("%s: AutoSelect no IRQ available\n", dev->name);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+                        printk(KERN_INFO "%s: AutoSelect no IRQ available\n", dev->name);
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			tmsdev_term(dev);
 			return -1;
 		}
@@ -203,18 +243,18 @@ int __init tms_isa_probe(struct net_device *dev)
 				break;
 		if (irqlist[j] == 0)
 		{
-			printk("%s: Illegal IRQ %d specified\n",
+			printk(KERN_INFO "%s: Illegal IRQ %d specified\n",
 				dev->name, dev->irq);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			tmsdev_term(dev);
 			return -1;
 		}
 		if (request_irq(dev->irq, tms380tr_interrupt, 0, 
 			isa_cardname, dev))
 		{
-                        printk("%s: Selected IRQ %d not available\n", 
+                        printk(KERN_INFO "%s: Selected IRQ %d not available\n", 
 				dev->name, dev->irq);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			tmsdev_term(dev);
 			return -1;
 		}
@@ -231,8 +271,8 @@ int __init tms_isa_probe(struct net_device *dev)
 
 		if(dmalist[j] == 0)
 		{
-			printk("%s: AutoSelect no DMA available\n", dev->name);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			printk(KERN_INFO "%s: AutoSelect no DMA available\n", dev->name);
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			free_irq(dev->irq, dev);
 			tmsdev_term(dev);
 			return -1;
@@ -245,47 +285,47 @@ int __init tms_isa_probe(struct net_device *dev)
 				break;
 		if (dmalist[j] == 0)
 		{
-                        printk("%s: Illegal DMA %d specified\n", 
+                        printk(KERN_INFO "%s: Illegal DMA %d specified\n", 
 				dev->name, dev->dma);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			free_irq(dev->irq, dev);
 			tmsdev_term(dev);
 			return -1;
 		}
 		if (request_dma(dev->dma, isa_cardname))
 		{
-                        printk("%s: Selected DMA %d not available\n", 
+                        printk(KERN_INFO "%s: Selected DMA %d not available\n", 
 				dev->name, dev->dma);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			free_irq(dev->irq, dev);
 			tmsdev_term(dev);
 			return -1;
 		}
 	}
 
-	printk("%s:    IO: %#4lx  IRQ: %d  DMA: %d\n",
+	printk(KERN_DEBUG "%s:    IO: %#4lx  IRQ: %d  DMA: %d\n",
 	       dev->name, dev->base_addr, dev->irq, dev->dma);
 		
 	if (register_trdev(dev) == 0) 
 	{
 		/* Enlist in the card list */
-		card = kmalloc(sizeof(struct tms_isa_card), GFP_KERNEL);
+		card = kmalloc(sizeof(struct sk_isa_card), GFP_KERNEL);
 		if (!card) {
 			unregister_trdev(dev);
-			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 			free_irq(dev->irq, dev);
 			free_dma(dev->dma);
 			tmsdev_term(dev);
 			return -1;
 		}
-		card->next = tms_isa_card_list;
-		tms_isa_card_list = card;
+		card->next = sk_isa_card_list;
+		sk_isa_card_list = card;
 		card->dev = dev;
 	} 
 	else 
 	{
-		printk("%s: register_trdev() returned non-zero.\n", dev->name);
-		release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+		printk("KERN_INFO %s: register_trdev() returned non-zero.\n", dev->name);
+		release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
 		free_irq(dev->irq, dev);
 		free_dma(dev->dma);
 		tmsdev_term(dev);
@@ -304,26 +344,26 @@ int __init tms_isa_probe(struct net_device *dev)
  * machine hard when this is called.  Luckily, its supported in a
  * separate driver.  --ASF
  */
-static void tms_isa_read_eeprom(struct net_device *dev)
+static void sk_isa_read_eeprom(struct net_device *dev)
 {
 	int i;
 	
 	/* Address: 0000:0000 */
-	tms_isa_sifwritew(dev, 0, SIFADX);
-	tms_isa_sifwritew(dev, 0, SIFADR);	
+	sk_isa_sifwritew(dev, 0, SIFADX);
+	sk_isa_sifwritew(dev, 0, SIFADR);	
 	
 	/* Read six byte MAC address data */
 	dev->addr_len = 6;
 	for(i = 0; i < 6; i++)
-		dev->dev_addr[i] = tms_isa_sifreadw(dev, SIFINC) >> 8;
+		dev->dev_addr[i] = sk_isa_sifreadw(dev, SIFINC) >> 8;
 }
 
-unsigned short tms_isa_setnselout_pins(struct net_device *dev)
+unsigned short sk_isa_setnselout_pins(struct net_device *dev)
 {
 	return 0;
 }
 
-static int tms_isa_open(struct net_device *dev)
+static int sk_isa_open(struct net_device *dev)
 {  
 	struct net_local *tp = (struct net_local *)dev->priv;
 	unsigned short val = 0;
@@ -345,21 +385,19 @@ static int tms_isa_open(struct net_device *dev)
 		val |= LINE_SPEED_BIT;
 	else
 		val &= ~LINE_SPEED_BIT;
-	oldval = tms_isa_sifreadb(dev, POSREG);
+	oldval = sk_isa_sifreadb(dev, POSREG);
 	/* Leave cycle bits alone */
 	oldval |= 0xf3;
 	val &= oldval;
-	tms_isa_sifwriteb(dev, val, POSREG);
+	sk_isa_sifwriteb(dev, val, POSREG);
 
 	tms380tr_open(dev);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
-static int tms_isa_close(struct net_device *dev)
+static int sk_isa_close(struct net_device *dev)
 {
 	tms380tr_close(dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -385,56 +423,61 @@ int init_module(void)
 	num = 0;
 	if (io[0]) 
 	{ /* Only probe addresses from command line */
+		dev = init_trdev(NULL, 0);
+		if (!dev)
+			return (-ENOMEM);
 		for (i = 0; i < ISATR_MAX_ADAPTERS; i++)
 	       	{
 			if (io[i] == 0)
 				continue;
-
-			dev = init_trdev(NULL, 0);
-			if (!dev)
-				return (-ENOMEM);
 		
 			dev->base_addr = io[i];
 			dev->irq       = irq[i];
 			dev->dma       = dma[i];
 
-			if (tms_isa_probe(dev))
+			if (!sk_isa_probe(dev))
 			{
-				unregister_netdev(dev);
-				kfree(dev);
-			}
-			else
 				num++;
+				dev = init_trdev(NULL, 0);
+				if (!dev)
+					goto partial;
+			}
 		}
+		unregister_netdev(dev);
+		kfree(dev);
 	}
        	else
        	{
+		dev = init_trdev(NULL, 0);
+		if (!dev)
+			return (-ENOMEM);
+
 		for(i = 0; portlist[i]; i++)
 		{
 			if (num >= ISATR_MAX_ADAPTERS)
 				continue;
-
-			dev = init_trdev(NULL, 0);
-			if (!dev)
-				return (-ENOMEM);
 		
 			dev->base_addr = portlist[i];
 			dev->irq       = irq[num];
 			dev->dma       = dma[num];
 
-			if (tms_isa_probe(dev))
+			if (!sk_isa_probe(dev))
 			{
-				unregister_netdev(dev);
-				kfree(dev);
-			}
-			else
 				num++;
+				dev = init_trdev(NULL, 0);
+				if (!dev)
+					goto partial;
+			}
 		}
+		unregister_netdev(dev);
+		kfree(dev);
 	}
-	printk(KERN_NOTICE "tmsisa.c: %d cards found.\n", num);
+partial:
+	printk(KERN_NOTICE "skisa.c: %d cards found.\n", num);
 	/* Probe for cards. */
 	if (num == 0) {
-		printk(KERN_NOTICE "tmsisa.c: No cards found.\n");
+		printk(KERN_NOTICE "skisa.c: No cards found.\n");
+		return (-ENODEV);
 	}
 	return (0);
 }
@@ -442,19 +485,19 @@ int init_module(void)
 void cleanup_module(void)
 {
 	struct net_device *dev;
-	struct tms_isa_card *this_card;
+	struct sk_isa_card *this_card;
 
-	while (tms_isa_card_list) {
-		dev = tms_isa_card_list->dev;
+	while (sk_isa_card_list) {
+		dev = sk_isa_card_list->dev;
 		
 		unregister_netdev(dev);
-		release_region(dev->base_addr, TMS_ISA_IO_EXTENT);
+		release_region(dev->base_addr, SK_ISA_IO_EXTENT);
 		free_irq(dev->irq, dev);
 		free_dma(dev->dma);
 		tmsdev_term(dev);
 		kfree(dev);
-		this_card = tms_isa_card_list;
-		tms_isa_card_list = this_card->next;
+		this_card = sk_isa_card_list;
+		sk_isa_card_list = this_card->next;
 		kfree(this_card);
 	}
 }
@@ -463,8 +506,8 @@ void cleanup_module(void)
 
 /*
  * Local variables:
- *  compile-command: "gcc -DMODVERSIONS  -DMODULE -D__KERNEL__ -Wall -Wstrict-prototypes -O6 -fomit-frame-pointer -I/usr/src/linux/drivers/net/tokenring/ -c tmsisa.c"
- *  alt-compile-command: "gcc -DMODULE -D__KERNEL__ -Wall -Wstrict-prototypes -O6 -fomit-frame-pointer -I/usr/src/linux/drivers/net/tokenring/ -c tmsisa.c"
+ *  compile-command: "gcc -DMODVERSIONS  -DMODULE -D__KERNEL__ -Wall -Wstrict-prototypes -O6 -fomit-frame-pointer -I/usr/src/linux/drivers/net/tokenring/ -c skisa.c"
+ *  alt-compile-command: "gcc -DMODULE -D__KERNEL__ -Wall -Wstrict-prototypes -O6 -fomit-frame-pointer -I/usr/src/linux/drivers/net/tokenring/ -c skisa.c"
  *  c-set-style "K&R"
  *  c-indent-level: 8
  *  c-basic-offset: 8

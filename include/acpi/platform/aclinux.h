@@ -28,6 +28,7 @@
 #define ACPI_OS_NAME                "Linux"
 
 #define ACPI_USE_SYSTEM_CLIBRARY
+#define ACPI_USE_DO_WHILE_0
 
 #ifdef __KERNEL__
 

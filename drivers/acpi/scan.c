@@ -295,15 +295,15 @@ static int acpi_driver_attach(struct acpi_driver * drv)
 	ACPI_FUNCTION_TRACE("acpi_driver_attach");
 
 	spin_lock(&acpi_device_lock);
-	list_for_each_safe(node,next,&acpi_device_list) {
-		struct acpi_device * dev = container_of(node,struct acpi_device,g_list);
+	list_for_each_safe(node, next, &acpi_device_list) {
+		struct acpi_device * dev = container_of(node, struct acpi_device, g_list);
 
 		if (dev->driver || !dev->status.present)
 			continue;
 		spin_unlock(&acpi_device_lock);
 
-		if (!acpi_bus_match(dev,drv)) {
-			if (!acpi_bus_driver_init(dev,drv)) {
+		if (!acpi_bus_match(dev, drv)) {
+			if (!acpi_bus_driver_init(dev, drv)) {
 				atomic_inc(&drv->references);
 				ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found driver [%s] for device [%s]\n",
 						  drv->name, dev->pnp.bus_id));

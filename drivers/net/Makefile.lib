@@ -33,6 +33,7 @@ obj-$(CONFIG_SUNGEM)		+= crc32.o
 obj-$(CONFIG_SUNLANCE)		+= crc32.o
 obj-$(CONFIG_SUNQE)		+= crc32.o
 obj-$(CONFIG_TULIP)		+= crc32.o
+obj-$(CONFIG_TYPHOON)		+= crc32.o
 obj-$(CONFIG_VIA_RHINE)		+= crc32.o
 obj-$(CONFIG_YELLOWFIN)		+= crc32.o
 obj-$(CONFIG_WINBOND_840)	+= crc32.o

@@ -90,6 +90,12 @@ M:	Philip.Blundell@pobox.com
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+3CR990 NETWORK DRIVER
+P:	David Dillow
+M:	dave@thedillows.org
+L:	linux-net@vger.kernel.org
+S:	Maintained
+
 53C700 AND 53C700-66 SCSI DRIVER
 P:	James E.J. Bottomley
 M:	James.Bottomley@HansenPartnership.com

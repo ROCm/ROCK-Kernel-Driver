@@ -1379,10 +1379,10 @@ cciss_scsi_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 
 	// Get the ptr to our adapter structure (hba[i]) out of cmd->host.
 	// We violate cmd->host privacy here.  (Is there another way?)
-	c = (ctlr_info_t **) &cmd->host->hostdata[0];	
+	c = (ctlr_info_t **) &cmd->device->host->hostdata[0];
 	ctlr = (*c)->ctlr;
 
-	rc = lookup_scsi3addr(ctlr, cmd->channel, cmd->target, cmd->lun, 
+	rc = lookup_scsi3addr(ctlr, cmd->device->channel, cmd->device->id, cmd->device->lun, 
 			scsi3addr);
 	if (rc != 0) {
 		/* the scsi nexus does not match any that we presented... */
