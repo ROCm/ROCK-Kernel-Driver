@@ -65,20 +65,24 @@ static inline void flush_tlb_all(void)
 
 static inline void flush_tlb_mm(struct mm_struct *mm)
 {
-	if (mm == current->mm)
+	if (mm == current->active_mm)
 		__flush_tlb();
 }
 
 static inline void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 {
-	if (vma->vm_mm == current->mm)
+	if (vma->vm_mm == current->active_mm) {
+		mm_segment_t old_fs = get_fs();
+		set_fs(USER_DS);
 		__flush_tlb_one(addr);
+		set_fs(old_fs);
+	}
 }
 
 static inline void flush_tlb_range(struct vm_area_struct *vma,
 				   unsigned long start, unsigned long end)
 {
-	if (vma->vm_mm == current->mm)
+	if (vma->vm_mm == current->active_mm)
 		__flush_tlb();
 }
 
