@@ -172,6 +172,7 @@ enum
 	NET_TR=14,
 	NET_DECNET=15,
 	NET_ECONET=16,
+	NET_SCTP=17, 
 };
 
 /* /proc/sys/kernel/random */
@@ -514,6 +515,21 @@ enum {
 	NET_DECNET_CONF_DEV_FORWARDING = 5,
 	NET_DECNET_CONF_DEV_BLKSIZE = 6,
 	NET_DECNET_CONF_DEV_STATE = 7
+};
+
+/* /proc/sys/net/sctp */
+enum {
+	NET_SCTP_RTO_INITIAL = 1,
+	NET_SCTP_RTO_MIN     = 2,
+	NET_SCTP_RTO_MAX     = 3,
+	NET_SCTP_RTO_ALPHA   = 4,
+	NET_SCTP_RTO_BETA    = 5,
+	NET_SCTP_VALID_COOKIE_LIFE       =  6,
+	NET_SCTP_ASSOCIATION_MAX_RETRANS =  7,
+	NET_SCTP_PATH_MAX_RETRANS        =  8,
+	NET_SCTP_MAX_INIT_RETRANSMITS    =  9,
+	NET_SCTP_HB_INTERVAL             = 10,
+	NET_SCTP_MAX_BURST               = 11,
 };
 
 /* CTL_PROC names: */
