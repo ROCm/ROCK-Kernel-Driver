@@ -1417,7 +1417,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 		up(&register_mutex);
 		return err;
 	}
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef SNDRV_OSS_INFO_DEV_AUDIO
 	rmidi->ossreg = 0;
 	if (rmidi->device == snd_midi_map[rmidi->card->number]) {
 		if (snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI,
@@ -1480,7 +1480,7 @@ static int snd_rawmidi_dev_unregister(snd_device_t *device)
 		snd_info_unregister(rmidi->proc_entry);
 		rmidi->proc_entry = NULL;
 	}
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef SNDRV_OSS_INFO_DEV_AUDIO
 	if (rmidi->ossreg) {
 		if (rmidi->device == snd_midi_map[rmidi->card->number]) {
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI, rmidi->card, 0);

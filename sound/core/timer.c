@@ -1356,7 +1356,7 @@ static int __init alsa_timer_init(void)
 	int err;
 	snd_info_entry_t *entry;
 
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef SNDRV_OSS_INFO_DEV_TIMERS
 	snd_oss_info_register(SNDRV_OSS_INFO_DEV_TIMERS, SNDRV_CARDS - 1, "system timer");
 #endif
 	if ((entry = snd_info_create_module_entry(THIS_MODULE, "timers", NULL)) != NULL) {
@@ -1391,7 +1391,7 @@ static void __exit alsa_timer_exit(void)
 		snd_info_unregister(snd_timer_proc_entry);
 		snd_timer_proc_entry = NULL;
 	}
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef SNDRV_OSS_INFO_DEV_TIMERS
 	snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_TIMERS, SNDRV_CARDS - 1);
 #endif
 }

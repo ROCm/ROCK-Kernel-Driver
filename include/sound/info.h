@@ -164,7 +164,7 @@ static inline int snd_info_card_unregister(snd_card_t * card) { return 0; }
 static inline int snd_info_register(snd_info_entry_t * entry) { return 0; }
 static inline int snd_info_unregister(snd_info_entry_t * entry) { return 0; }
 
-static inline struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode, struct proc_dir_entry *parent) { return 0; }
+static inline struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode, struct proc_dir_entry *parent) { return NULL; }
 static inline void snd_remove_proc_entry(struct proc_dir_entry *parent,
 					 struct proc_dir_entry *de) { ; }
 
@@ -174,7 +174,7 @@ static inline void snd_remove_proc_entry(struct proc_dir_entry *parent,
  * OSS info part
  */
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)
 
 #define SNDRV_OSS_INFO_DEV_AUDIO	0
 #define SNDRV_OSS_INFO_DEV_SYNTH	1
@@ -187,6 +187,6 @@ static inline void snd_remove_proc_entry(struct proc_dir_entry *parent,
 extern int snd_oss_info_register(int dev, int num, char *string);
 #define snd_oss_info_unregister(dev, num) snd_oss_info_register(dev, num, NULL)
 
-#endif /* CONFIG_SND_OSSEMUL */
+#endif /* CONFIG_SND_OSSEMUL && CONFIG_PROC_FS */
 
 #endif /* __SOUND_INFO_H */
