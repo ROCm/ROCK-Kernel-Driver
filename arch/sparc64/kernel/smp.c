@@ -1208,6 +1208,8 @@ static void __init smp_tune_scheduling(void)
 report:
 	/* Convert ticks/sticks to jiffies. */
 	cache_decay_ticks = cacheflush_time / timer_tick_offset;
+	if (cache_decay_ticks < 1)
+		cache_decay_ticks = 1;
 
 	printk("Using heuristic of %ld cycles, %ld ticks.\n",
 	       cacheflush_time, cache_decay_ticks);
