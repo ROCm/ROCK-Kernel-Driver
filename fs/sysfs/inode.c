@@ -162,7 +162,7 @@ subsys_attr_show(struct kobject * kobj, struct attribute * attr, char * page)
 	ssize_t ret = 0;
 
 	if (sattr->show)
-		ret = sattr->show(s,page,PAGE_SIZE,0);
+		ret = sattr->show(s,page);
 	return ret;
 }
 
@@ -174,7 +174,7 @@ subsys_attr_store(struct kobject * kobj, struct attribute * attr, const char * p
 	ssize_t ret = 0;
 
 	if (sattr->store)
-		ret = sattr->store(s,page,PAGE_SIZE,0);
+		ret = sattr->store(s,page);
 	return ret;
 }
 

@@ -165,8 +165,8 @@ static inline void subsys_put(struct subsystem * s)
 
 struct subsys_attribute {
 	struct attribute attr;
-	ssize_t (*show)(struct subsystem *, char *, size_t, loff_t);
-	ssize_t (*store)(struct subsystem *, const char *, size_t, loff_t); 
+	ssize_t (*show)(struct subsystem *, char *);
+	ssize_t (*store)(struct subsystem *, const char *); 
 };
 
 extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
