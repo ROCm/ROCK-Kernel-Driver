@@ -131,6 +131,7 @@ EXPORT_SYMBOL(fp_init);
 EXPORT_SYMBOL(__machine_arch_type);
 
 	/* networking */
+EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_nocheck);
 EXPORT_SYMBOL(__csum_ipv6_magic);
 

@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
  * Created by Arjan van de Ven <arjanv@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr_rtime.c,v 1.10 2003/05/11 10:47:13 dwmw2 Exp $
+ * $Id: compr_rtime.c,v 1.11 2003/10/04 08:33:06 dwmw2 Exp $
  *
  *
  * Very simple lz77-ish encoder.
