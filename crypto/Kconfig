@@ -16,6 +16,12 @@ config CRYPTO_HMAC
 	  HMAC: Keyed-Hashing for Message Authentication (RFC2104).
 	  This is required for IPSec.
 
+config CRYPTO_NULL
+	tristate "Null algorithms"
+	depends on CRYPTO
+	help
+	  These are 'Null' algorithms, used by IPsec, which do nothing.
+
 config CRYPTO_MD4
 	tristate "MD4 digest algorithm"
 	depends on CRYPTO

@@ -63,7 +63,7 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 	case CRYPTO_ALG_TYPE_DIGEST:
 		return crypto_init_digest_flags(tfm, flags);
 		
-	case CRYPTO_ALG_TYPE_COMP:
+	case CRYPTO_ALG_TYPE_COMPRESS:
 		return crypto_init_compress_flags(tfm, flags);
 	
 	default:
@@ -83,7 +83,7 @@ static int crypto_init_ops(struct crypto_tfm *tfm)
 	case CRYPTO_ALG_TYPE_DIGEST:
 		return crypto_init_digest_ops(tfm);
 		
-	case CRYPTO_ALG_TYPE_COMP:
+	case CRYPTO_ALG_TYPE_COMPRESS:
 		return crypto_init_compress_ops(tfm);
 	
 	default:
