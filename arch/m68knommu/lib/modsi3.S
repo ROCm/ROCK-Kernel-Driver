@@ -98,7 +98,7 @@ SYM (__modsi3):
 	jbsr	SYM (__divsi3)
 	addql	IMM (8), sp
 	movel	sp@(8), d1	/* d1 = divisor */
-#ifndef __mcf5200__
+#if !(defined(__mcf5200__) || defined(__mcoldfire__))
 	movel	d1, sp@-
 	movel	d0, sp@-
 	jbsr	SYM (__mulsi3)	/* d0 = (a/b)*b */
