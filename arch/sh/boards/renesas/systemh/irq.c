@@ -1,4 +1,4 @@
-/* 
+/*
  * linux/arch/sh/boards/systemh/irq.c
  *
  * Copyright (C) 2000  Kazumoto Kojima
@@ -45,7 +45,7 @@ static struct hw_interrupt_type systemh_irq_type = {
 };
 
 static unsigned int startup_systemh_irq(unsigned int irq)
-{ 
+{
 	enable_systemh_irq(irq);
 	return 0; /* never anything pending */
 }

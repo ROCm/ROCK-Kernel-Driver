@@ -9,5 +9,5 @@ obj-y	 := setup.o irq.o io.o
 # just abuse the hell out of kbuild, because we can..
 
 obj-$(CONFIG_PCI) += pci.o
-pci-y := ../se/7751/pci.o
+pci-y := ../../se/7751/pci.o
 

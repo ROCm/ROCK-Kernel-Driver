@@ -1,4 +1,4 @@
-/* 
+/*
  * linux/arch/sh/boards/systemh/setup.c
  *
  * Copyright (C) 2000  Kazumoto Kojima

@@ -1,4 +1,4 @@
-/* 
+/*
  * linux/arch/sh/boards/systemh/io.c
  *
  * Copyright (C) 2001  Ian da Silva, Jeremy Siegel
@@ -19,9 +19,9 @@
 
 /*
  * The 7751 SystemH Engine uses the built-in PCI controller (PCIC)
- * of the 7751 processor, and has a SuperIO accessible on its memory 
+ * of the 7751 processor, and has a SuperIO accessible on its memory
  * bus.
- */ 
+ */
 
 #define PCIIOBR		(volatile long *)PCI_REG(SH7751_PCIIOBR)
 #define PCIMBR          (volatile long *)PCI_REG(SH7751_PCIMBR)
@@ -30,7 +30,7 @@
 
 #define PCI_IOMAP(adr)	(PCI_IO_AREA + (adr & ~SH7751_PCIIOBR_MASK))
 #define ETHER_IOMAP(adr) (0xB3000000 + (adr)) /*map to 16bits access area
-                                                of smc lan chip*/ 
+                                                of smc lan chip*/
 
 #define maybebadio(name,port) \
   printk("bad PC-like io %s for port 0x%lx at 0x%08x\n", \
@@ -81,7 +81,7 @@ unsigned char sh7751systemh_inb(unsigned long port)
 	else if (port <= 0x3F1)
 		return *(volatile unsigned char *)ETHER_IOMAP(port);
 	else
-		return (*port2adr(port))&0xff; 
+		return (*port2adr(port))&0xff;
 }
 
 unsigned char sh7751systemh_inb_p(unsigned long port)
@@ -95,7 +95,7 @@ unsigned char sh7751systemh_inb_p(unsigned long port)
 	else if (port <= 0x3F1)
 		v = *(volatile unsigned char *)ETHER_IOMAP(port);
 	else
-		v = (*port2adr(port))&0xff; 
+		v = (*port2adr(port))&0xff;
 	delay();
 	return v;
 }
