@@ -102,7 +102,7 @@ void ata_to_sense_error(struct ata_queued_cmd *qc)
 	cmd->sense_buffer[7] = 14 - 8;	/* addnl. sense len. FIXME: correct? */
 
 	/* additional-sense-code[-qualifier] */
-	if ((qc->flags & ATA_QCFLAG_WRITE) == 0) {
+	if (cmd->sc_data_direction == SCSI_DATA_READ) {
 		cmd->sense_buffer[12] = 0x11; /* "unrecovered read error" */
 		cmd->sense_buffer[13] = 0x04;
 	} else {
@@ -179,17 +179,15 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 	tf->hob_lbal = 0;
 	tf->hob_lbam = 0;
 	tf->hob_lbah = 0;
+	tf->protocol = qc->dev->xfer_protocol;
 
 	if (scsicmd[0] == READ_10 || scsicmd[0] == READ_6 ||
 	    scsicmd[0] == READ_16) {
 		tf->command = qc->dev->read_cmd;
-		tf->protocol = qc->dev->r_protocol;
-		qc->flags &= ~ATA_QCFLAG_WRITE;
 		VPRINTK("reading\n");
 	} else {
 		tf->command = qc->dev->write_cmd;
-		tf->protocol = qc->dev->w_protocol;
-		qc->flags |= ATA_QCFLAG_WRITE;
+		tf->flags |= ATA_TFLAG_WRITE;
 		VPRINTK("writing\n");
 	}
 
@@ -886,7 +884,7 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
-		qc->flags |= ATA_QCFLAG_WRITE;
+		qc->tf.flags |= ATA_TFLAG_WRITE;
 		DPRINTK("direction: write\n");
 	}
 

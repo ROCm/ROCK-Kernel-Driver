@@ -444,8 +444,7 @@ static int ata_prot_to_cmd(int protocol, int lba48)
 	int rcmd = 0, wcmd = 0;
 
 	switch (protocol) {
-	case ATA_PROT_PIO_READ:
-	case ATA_PROT_PIO_WRITE:
+	case ATA_PROT_PIO:
 		if (lba48) {
 			rcmd = ATA_CMD_PIO_READ_EXT;
 			wcmd = ATA_CMD_PIO_WRITE_EXT;
@@ -455,8 +454,7 @@ static int ata_prot_to_cmd(int protocol, int lba48)
 		}
 		break;
 
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		if (lba48) {
 			rcmd = ATA_CMD_READ_EXT;
 			wcmd = ATA_CMD_WRITE_EXT;
@@ -479,13 +477,10 @@ static void ata_dev_set_protocol(struct ata_device *dev)
 	int lba48 = (dev->flags & ATA_DFLAG_LBA48);
 	int proto, cmd;
 
-	if (pio) {
-		proto = dev->r_protocol = ATA_PROT_PIO_READ;
-		dev->w_protocol = ATA_PROT_PIO_WRITE;
-	} else {
-		proto = dev->r_protocol = ATA_PROT_DMA_READ;
-		dev->w_protocol = ATA_PROT_DMA_WRITE;
-	}
+	if (pio)
+		proto = dev->xfer_protocol = ATA_PROT_PIO;
+	else
+		proto = dev->xfer_protocol = ATA_PROT_DMA;
 
 	cmd = ata_prot_to_cmd(proto, lba48);
 	if (cmd < 0)
@@ -899,7 +894,7 @@ static void ata_dev_identify(struct ata_port *ap, unsigned int device)
 retry:
 	ata_tf_init(ap, &tf, device);
 	tf.ctl |= ATA_NIEN;
-	tf.protocol = ATA_PROT_PIO_READ;
+	tf.protocol = ATA_PROT_PIO;
 
 	if (dev->class == ATA_DEV_ATA) {
 		tf.command = ATA_CMD_ID_ATA;
@@ -1803,7 +1798,7 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	sg_dma_address(sg) = dma_address;
 
 	DPRINTK("mapped buffer of %d bytes for %s\n", cmd->request_bufflen,
-		qc->flags & ATA_QCFLAG_WRITE ? "write" : "read");
+		qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
 
 	return 0;
 }
@@ -1904,8 +1899,7 @@ static void ata_pio_start (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 
-	assert((qc->tf.protocol == ATA_PROT_PIO_READ) ||
-	       (qc->tf.protocol == ATA_PROT_PIO_WRITE));
+	assert(qc->tf.protocol == ATA_PROT_PIO);
 
 	qc->flags |= ATA_QCFLAG_POLL;
 	qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
@@ -2025,12 +2019,12 @@ static void ata_pio_sector(struct ata_port *ap)
 		}
 
 	DPRINTK("data %s, drv_stat 0x%X\n",
-		qc->flags & ATA_QCFLAG_WRITE ? "write" : "read",
+		qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read",
 		status);
 
 	/* do the actual data transfer */
 	/* FIXME: mmio-ize */
-	if (qc->flags & ATA_QCFLAG_WRITE)
+	if (qc->tf.flags & ATA_TFLAG_WRITE)
 		outsl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
 	else
 		insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
@@ -2095,8 +2089,7 @@ void ata_eng_timeout(struct ata_port *ap)
 	qc->scsidone = scsi_finish_command;
 
 	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		if (ap->flags & ATA_FLAG_MMIO) {
 			void *mmio = (void *) ap->ioaddr.bmdma_addr;
 			host_stat = readb(mmio + ATA_DMA_STATUS);
@@ -2320,7 +2313,7 @@ err_out:
 void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	unsigned int rw = (qc->flags & ATA_QCFLAG_WRITE);
+	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
 	u8 host_stat, dmactl;
 	void *mmio = (void *) ap->ioaddr.bmdma_addr;
 
@@ -2369,7 +2362,7 @@ void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	unsigned int rw = (qc->flags & ATA_QCFLAG_WRITE);
+	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
 	u8 host_stat, dmactl;
 
 	/* load PRD table addr. */
@@ -2464,8 +2457,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	unsigned int handled = 0;
 
 	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		if (ap->flags & ATA_FLAG_MMIO) {
 			void *mmio = (void *) ap->ioaddr.bmdma_addr;
 			host_stat = readb(mmio + ATA_DMA_STATUS);

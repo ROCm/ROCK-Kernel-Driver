@@ -108,11 +108,11 @@ enum {
 	ATA_FLAG_SATA_RESET	= (1 << 7), /* use COMRESET */
 
 	/* struct ata_taskfile flags */
-	ATA_TFLAG_LBA48		= (1 << 0),
+	ATA_TFLAG_LBA48		= (1 << 0), /* enable 48-bit LBA and "HOB" */
 	ATA_TFLAG_ISADDR	= (1 << 1), /* enable r/w to nsect/lba regs */
 	ATA_TFLAG_DEVICE	= (1 << 2), /* enable r/w to device reg */
+	ATA_TFLAG_WRITE		= (1 << 3), /* data dir: host->dev==1 (write) */
 
-	ATA_QCFLAG_WRITE	= (1 << 0), /* read==0, write==1 */
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
 	ATA_QCFLAG_DMA		= (1 << 2), /* data delivered via DMA */
 	ATA_QCFLAG_ATAPI	= (1 << 3), /* is ATAPI packet command? */
@@ -295,8 +295,7 @@ struct ata_device {
 						 */
 
 	/* cache info about current transfer mode */
-	u8			r_protocol;	/* taskfile read protocol */
-	u8			w_protocol;	/* taskfile write protocol */
+	u8			xfer_protocol;	/* taskfile xfer protocol */
 	u8			read_cmd;	/* opcode to use on read */
 	u8			write_cmd;	/* opcode to use on write */
 };
