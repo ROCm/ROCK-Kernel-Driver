@@ -206,7 +206,7 @@ static DECLARE_WAIT_QUEUE_HEAD(ms_wait);
 
 /* Prevent "aliased" accesses. */
 static int fd_ref[4] = { 0,0,0,0 };
-static int fd_device[4] = { 0,0,0,0 };
+static kdev_t fd_device[4] = { NODEV, NODEV, NODEV, NODEV };
 
 /*
  * Current device number. Taken either from the block header or from the
@@ -1393,13 +1393,10 @@ static void redo_fd_request(void)
 		return;
 	}
 
-	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
+	if (major(CURRENT->rq_dev) != MAJOR_NR)
 		panic(DEVICE_NAME ": request list destroyed");
 
-	if (CURRENT->bh && !buffer_locked(CURRENT->bh))
-		panic(DEVICE_NAME ": block not locked");
-
-	device = MINOR(CURRENT_DEVICE);
+	device = minor(CURRENT_DEVICE);
 	if (device < 8) {
 		/* manual selection */
 		drive = device & 3;
@@ -1435,7 +1432,7 @@ static void redo_fd_request(void)
 		       "0x%08lx\n", track, sector, data);
 #endif
 
-		if ((CURRENT->cmd != READ) && (CURRENT->cmd != WRITE)) {
+		if ((rq_data_dir(CURRENT) != READ) && (rq_data_dir(CURRENT) != WRITE)) {
 			printk(KERN_WARNING "do_fd_request: unknown command\n");
 			end_request(0);
 			goto repeat;
@@ -1445,7 +1442,7 @@ static void redo_fd_request(void)
 			goto repeat;
 		}
 
-		switch (CURRENT->cmd) {
+		switch (rq_data_dir(CURRENT)) {
 		case READ:
 			memcpy(data, unit[drive].trackbuf + sector * 512, 512);
 			break;
@@ -1490,9 +1487,8 @@ static void do_fd_request(request_queue_t * q)
 static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
-	int drive = inode->i_rdev & 3;
+	int drive = minor(inode->i_rdev) & 3;
 	static struct floppy_struct getprm;
-	struct super_block * sb;
 
 	switch(cmd){
 	case HDIO_GETGEO:
@@ -1622,15 +1618,15 @@ static void fd_probe(int dev)
 static int floppy_open(struct inode *inode, struct file *filp)
 {
 	int drive;
-	int old_dev;
+	kdev_t old_dev;
 	int system;
 	unsigned long flags;
 
-	drive = MINOR(inode->i_rdev) & 3;
+	drive = minor(inode->i_rdev) & 3;
 	old_dev = fd_device[drive];
 
 	if (fd_ref[drive])
-		if (old_dev != inode->i_rdev)
+		if (!kdev_same(old_dev, inode->i_rdev))
 			return -EBUSY;
 
 	if (unit[drive].type->code == FD_NODRIVE)
@@ -1662,14 +1658,14 @@ static int floppy_open(struct inode *inode, struct file *filp)
 #endif
 	restore_flags(flags);
 
-	if (old_dev && old_dev != inode->i_rdev)
+	if (!kdev_same(old_dev, NODEV) && !kdev_same(old_dev, inode->i_rdev))
 		invalidate_buffers(old_dev);
 
-	system=(inode->i_rdev & 4)>>2;
+	system=(minor(inode->i_rdev) & 4)>>2;
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*
 		data_types[system].sects*unit[drive].type->sect_mult;
-	floppy_sizes[MINOR(inode->i_rdev)] = unit[drive].blocks >> 1;
+	floppy_sizes[minor(inode->i_rdev)] = unit[drive].blocks >> 1;
 
 	printk(KERN_INFO "fd%d: accessing %s-disk with %s-layout\n",drive,
 	       unit[drive].type->name, data_types[system].name);
@@ -1679,10 +1675,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode * inode, struct file * filp)
 {
-#ifdef DEBUG
-	struct super_block * sb;
-#endif
-	int drive = MINOR(inode->i_rdev) & 3;
+	int drive = minor(inode->i_rdev) & 3;
 
 	if (unit[drive].dirty == 1) {
 		del_timer (flush_track_timer + drive);
@@ -1708,11 +1701,11 @@ static int floppy_release(struct inode * inode, struct file * filp)
  */
 static int amiga_floppy_change(kdev_t dev)
 {
-	int drive = MINOR(dev) & 3;
+	int drive = minor(dev) & 3;
 	int changed;
 	static int first_time = 1;
 
-	if (MAJOR(dev) != MAJOR_NR) {
+	if (major(dev) != MAJOR_NR) {
 		printk(KERN_CRIT "floppy_change: not a floppy\n");
 		return 0;
 	}

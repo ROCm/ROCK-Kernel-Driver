@@ -349,7 +349,8 @@ DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld( ",cmd->target,cmd->cmnd[0],cmd->pid))
    if (cmd->use_sg) {
       cmd->SCp.buffer = (struct scatterlist *)cmd->buffer;
       cmd->SCp.buffers_residual = cmd->use_sg - 1;
-      cmd->SCp.ptr = (char *)cmd->SCp.buffer->address;
+      cmd->SCp.ptr = page_address(cmd->SCp.buffer->page)+
+		     cmd->SCp.buffer->offset;
       cmd->SCp.this_residual = cmd->SCp.buffer->length;
       }
    else {
@@ -692,7 +693,8 @@ unsigned long length;
       ++cmd->SCp.buffer;
       --cmd->SCp.buffers_residual;
       cmd->SCp.this_residual = cmd->SCp.buffer->length;
-      cmd->SCp.ptr = cmd->SCp.buffer->address;
+      cmd->SCp.ptr = page_address(cmd->SCp.buffer->page)+
+		     cmd->SCp.buffer->offset;
       }
 
    write_wd33c93(regs, WD_SYNCHRONOUS_TRANSFER,hostdata->sync_xfer[cmd->target]);

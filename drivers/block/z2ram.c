@@ -38,7 +38,7 @@
 #include <asm/bitops.h>
 #include <asm/amigahw.h>
 #include <asm/pgtable.h>
-#include <asm/io.h>
+
 #include <linux/zorro.h>
 
 
@@ -83,16 +83,16 @@ do_z2_request( request_queue_t * q )
 
 	if ( ( start + len ) > z2ram_size )
 	{
-	    printk( KERN_ERR DEVICE_NAME ": bad access: block=%ld, count=%ld\n",
+	    printk( KERN_ERR DEVICE_NAME ": bad access: block=%lu, count=%u\n",
 		CURRENT->sector,
 		CURRENT->current_nr_sectors);
 	    end_request( FALSE );
 	    continue;
 	}
 
-	if ( ( CURRENT->cmd != READ ) && ( CURRENT->cmd != WRITE ) )
+	if ( ( rq_data_dir(CURRENT) != READ ) && ( rq_data_dir(CURRENT) != WRITE ) )
 	{
-	    printk( KERN_ERR DEVICE_NAME ": bad command: %d\n", CURRENT->cmd );
+	    printk( KERN_ERR DEVICE_NAME ": bad command: %ld\n", rq_data_dir(CURRENT) );
 	    end_request( FALSE );
 	    continue;
 	}
@@ -106,7 +106,7 @@ do_z2_request( request_queue_t * q )
 
 	    addr += z2ram_map[ start >> Z2RAM_CHUNKSHIFT ];
 
-	    if ( CURRENT->cmd == READ )
+	    if ( rq_data_dir(CURRENT) == READ )
 		memcpy( CURRENT->buffer, (char *)addr, size );
 	    else
 		memcpy( (char *)addr, CURRENT->buffer, size );
@@ -208,7 +208,7 @@ z2_open( struct inode *inode, struct file *filp )
 						   _PAGE_WRITETHRU);
 
 #else
-		vaddr = (unsigned long)ioremap(paddr, size);
+		vaddr = (unsigned long)z_remap_nocache_nonser(paddr, size);
 #endif
 		z2ram_map = 
 			kmalloc((size/Z2RAM_CHUNKSIZE)*sizeof(z2ram_map[0]),
@@ -364,7 +364,7 @@ z2_init( void )
 	    }
     }    
    
-    blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &z2ram_lock);
+    blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_z2_request, &z2ram_lock);
     blk_size[ MAJOR_NR ] = z2_sizes;
 
     return 0;

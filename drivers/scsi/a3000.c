@@ -30,15 +30,14 @@ static void a3000_intr (int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned long flags;
 	unsigned int status = DMA(a3000_host)->ISTR;
-	struct Scsi_Host *dev = dummy;
-	
+
 	if (!(status & ISTR_INT_P))
 		return;
 	if (status & ISTR_INTS)
 	{
-		spin_lock_irqsave(dev->host_lock, flags);
+		spin_lock_irqsave(&a3000_host->host_lock, flags);
 		wd33c93_intr (a3000_host);
-		spin_unlock_irqrestore(dev->host_lock, flags);
+		spin_unlock_irqrestore(&a3000_host->host_lock, flags);
 	} else
 		printk("Non-serviced A3000 SCSI-interrupt? ISTR = %02x\n",
 		       status);
@@ -61,7 +60,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	HDATA(a3000_host)->dma_bounce_len = (cmd->SCp.this_residual + 511)
 	    & ~0x1ff;
 	HDATA(a3000_host)->dma_bounce_buffer =
-	    scsi_malloc (HDATA(a3000_host)->dma_bounce_len);
+	    kmalloc (HDATA(a3000_host)->dma_bounce_len, GFP_KERNEL);
 	
 	/* can't allocate memory; use PIO */
 	if (!HDATA(a3000_host)->dma_bounce_buffer) {
@@ -152,8 +151,7 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 		memcpy (SCpnt->SCp.ptr,
 			HDATA(instance)->dma_bounce_buffer,
 			SCpnt->SCp.this_residual);
-	    scsi_free (HDATA(instance)->dma_bounce_buffer,
-		       HDATA(instance)->dma_bounce_len);
+	    kfree (HDATA(instance)->dma_bounce_buffer);
 	    HDATA(instance)->dma_bounce_buffer = NULL;
 	    HDATA(instance)->dma_bounce_len = 0;
 	} else {
@@ -162,8 +160,7 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 			HDATA(instance)->dma_bounce_buffer,
 			SCpnt->request_bufflen);
 
-	    scsi_free (HDATA(instance)->dma_bounce_buffer,
-		       HDATA(instance)->dma_bounce_len);
+	    kfree (HDATA(instance)->dma_bounce_buffer);
 	    HDATA(instance)->dma_bounce_buffer = NULL;
 	    HDATA(instance)->dma_bounce_len = 0;
 	}
@@ -200,9 +197,7 @@ int __init a3000_detect(Scsi_Host_Template *tpnt)
     return 1;
 
 fail_irq:
-#ifdef MODULE
     wd33c93_release();
-#endif /* MODULE */
     scsi_unregister(a3000_host);
 fail_register:
     release_mem_region(0xDD0000, 256);
@@ -217,11 +212,11 @@ static Scsi_Host_Template driver_template = _A3000_SCSI;
 
 int __exit a3000_release(struct Scsi_Host *instance)
 {
-#ifdef MODULE
     wd33c93_release();
-#endif /* MODULE*/
     DMA(instance)->CNTR = 0;
     release_mem_region(0xDD0000, 256);
     free_irq(IRQ_AMIGA_PORTS, a3000_intr);
     return 1;
 }
+
+MODULE_LICENSE("GPL");

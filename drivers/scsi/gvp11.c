@@ -40,9 +40,9 @@ static void gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
 	if (!(status & GVP11_DMAC_INT_PENDING))
 	    continue;
 
-	spin_lock_irqsave(instance->host_lock, flags);
+	spin_lock_irqsave(&instance->host_lock, flags);
 	wd33c93_intr (instance);
-	spin_unlock_irqrestore(instance->host_lock, flags);
+	spin_unlock_irqrestore(&instance->host_lock, flags);
     }
 }
 
@@ -69,7 +69,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 
  	if( !scsi_alloc_out_of_range ) {
 	    HDATA(cmd->host)->dma_bounce_buffer =
-		scsi_malloc (HDATA(cmd->host)->dma_bounce_len);
+		kmalloc (HDATA(cmd->host)->dma_bounce_len, GFP_KERNEL);
 	    HDATA(cmd->host)->dma_buffer_pool = BUF_SCSI_ALLOCED;
 	}
 
@@ -93,8 +93,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	if (addr & HDATA(cmd->host)->dma_xfer_mask) {
 	    /* fall back to Chip RAM if address out of range */
 	    if( HDATA(cmd->host)->dma_buffer_pool == BUF_SCSI_ALLOCED) {
-		scsi_free (HDATA(cmd->host)->dma_bounce_buffer,
-			   HDATA(cmd->host)->dma_bounce_len);
+		kfree (HDATA(cmd->host)->dma_bounce_buffer);
 		scsi_alloc_out_of_range = 1;
 	    } else {
 		amiga_chip_free (HDATA(cmd->host)->dma_bounce_buffer);
@@ -164,8 +163,7 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 		    SCpnt->SCp.this_residual);
 	
 	if (HDATA(instance)->dma_buffer_pool == BUF_SCSI_ALLOCED)
-	    scsi_free (HDATA(instance)->dma_bounce_buffer,
-		       HDATA(instance)->dma_bounce_len);
+	    kfree (HDATA(instance)->dma_bounce_buffer);
 	else
 	    amiga_chip_free(HDATA(instance)->dma_bounce_buffer);
 	
