@@ -429,12 +429,12 @@ static int register_serial_portandirq(unsigned int port, int irq)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static struct file_operations mwave_fops = {
-	owner:THIS_MODULE,
-	read:mwave_read,
-	write:mwave_write,
-	ioctl:mwave_ioctl,
-	open:mwave_open,
-	release:mwave_close
+	.owner		= THIS_MODULE,
+	.read		= mwave_read,
+	.write		= mwave_write,
+	.ioctl		= mwave_ioctl,
+	.open		= mwave_open,
+	.release	= mwave_close
 };
 #else
 static struct file_operations mwave_fops = {

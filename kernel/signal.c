@@ -939,7 +939,8 @@ __send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	if (sig_ignored(p, sig))
 		goto out_unlock;
 
-	if (sig_kernel_specific(sig))
+	if (sig_kernel_specific(sig) ||
+		       ((p->ptrace & PT_PTRACED) && !sig_kernel_only(sig)))
 		goto out_send;
 
 	/* Does any of the threads unblock the signal? */

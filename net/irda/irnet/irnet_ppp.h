@@ -98,12 +98,12 @@ static int
 /* Filesystem callbacks (to call us) */
 static struct file_operations irnet_device_fops =
 {
-  read:		dev_irnet_read,
-  write:	dev_irnet_write,
-  poll:		dev_irnet_poll,
-  ioctl:	dev_irnet_ioctl,
-  open:		dev_irnet_open,
-  release:	dev_irnet_close
+	.read		= dev_irnet_read,
+	.write		= dev_irnet_write,
+	.poll		= dev_irnet_poll,
+	.ioctl		= dev_irnet_ioctl,
+	.open		= dev_irnet_open,
+	.release	= dev_irnet_close
   /* Also : llseek, readdir, mmap, flush, fsync, fasync, lock, readv, writev */
 };
 

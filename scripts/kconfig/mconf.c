@@ -111,6 +111,7 @@ static int cprint(const char *fmt, ...);
 static void init_wsize(void)
 {
 	struct winsize ws;
+	char *env;
 
 	if (ioctl(1, TIOCGWINSZ, &ws) == -1) {
 		rows = 24;
@@ -118,6 +119,20 @@ static void init_wsize(void)
 	} else {
 		rows = ws.ws_row;
 		cols = ws.ws_col;
+		if (!rows) {
+			env = getenv("LINES");
+			if (env)
+				rows = atoi(env);
+			if (!rows)
+				rows = 24;
+		}
+		if (!cols) {
+			env = getenv("COLUMNS");
+			if (env)
+				cols = atoi(env);
+			if (!cols)
+				cols = 80;
+		}
 	}
 
 	if (rows < 19 || cols < 80) {

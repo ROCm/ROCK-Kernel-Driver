@@ -168,7 +168,7 @@ asmlinkage int m68k_fork(struct pt_regs *regs)
 asmlinkage int m68k_vfork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -183,7 +183,7 @@ asmlinkage int m68k_clone(struct pt_regs *regs)
 	newsp = regs->d2;
 	if (!newsp)
 		newsp = rdusp();
-        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL);
+        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
         return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 

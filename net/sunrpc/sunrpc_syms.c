@@ -120,6 +120,8 @@ EXPORT_SYMBOL(xdr_encode_netobj);
 EXPORT_SYMBOL(xdr_encode_pages);
 EXPORT_SYMBOL(xdr_inline_pages);
 EXPORT_SYMBOL(xdr_shift_buf);
+EXPORT_SYMBOL(xdr_write_pages);
+EXPORT_SYMBOL(xdr_read_pages);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

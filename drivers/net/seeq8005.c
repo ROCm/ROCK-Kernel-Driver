@@ -707,7 +707,7 @@ inline void wait_for_buffer(struct net_device * dev)
 	
 #ifdef MODULE
 
-static struct net_device dev_seeq = { init: seeq8005_probe };
+static struct net_device dev_seeq = { .init = seeq8005_probe };
 static int io = 0x320;
 static int irq = 10;
 MODULE_LICENSE("GPL");

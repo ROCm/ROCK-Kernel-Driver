@@ -1098,15 +1098,20 @@ extern int bd_claim(struct block_device *, void *);
 extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
-/* fs/devices.c */
+/* fs/char_dev.c */
 extern int register_chrdev(unsigned int, const char *, struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
+
+/* fs/block_dev.c */
 extern const char *__bdevname(dev_t);
 extern inline const char *bdevname(struct block_device *bdev)
 {
 	return __bdevname(bdev->bd_dev);
 }
+extern struct block_device *open_bdev_excl(const char *, int, int, void *);
+extern void close_bdev_excl(struct block_device *, int);
+
 extern const char * cdevname(kdev_t);
 extern const char * kdevname(kdev_t);
 extern void init_special_inode(struct inode *, umode_t, dev_t);
@@ -1228,6 +1233,7 @@ extern int sb_set_blocksize(struct super_block *, int);
 extern int sb_min_blocksize(struct super_block *, int);
 
 extern int generic_file_mmap(struct file *, struct vm_area_struct *);
+extern int generic_file_readonly_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);

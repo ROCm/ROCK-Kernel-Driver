@@ -95,6 +95,7 @@ struct dma_rcv_ctx {
 	/* dma block descriptors */
         struct dma_cmd **prg_cpu;
         dma_addr_t *prg_bus;
+	struct pci_pool *prg_pool;
 
 	/* dma buffers */
         quadlet_t **buf_cpu;
@@ -120,6 +121,7 @@ struct dma_trm_ctx {
 	/* dma block descriptors */
         struct at_dma_prg **prg_cpu;
 	dma_addr_t *prg_bus;
+	struct pci_pool *prg_pool;
 
         unsigned int prg_ind;
         unsigned int sent_ind;
@@ -292,6 +294,9 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 #define OHCI1394_IsoRecvIntEventClear         0x0A4
 #define OHCI1394_IsoRecvIntMaskSet            0x0A8
 #define OHCI1394_IsoRecvIntMaskClear          0x0AC
+#define OHCI1394_InitialBandwidthAvailable    0x0B0
+#define OHCI1394_InitialChannelsAvailableHi   0x0B4
+#define OHCI1394_InitialChannelsAvailableLo   0x0B8
 #define OHCI1394_FairnessControl              0x0DC
 #define OHCI1394_LinkControlSet               0x0E0
 #define OHCI1394_LinkControlClear             0x0E4

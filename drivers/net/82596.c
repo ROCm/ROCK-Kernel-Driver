@@ -1525,7 +1525,7 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device dev_82596 = { init: i82596_probe };
+static struct net_device dev_82596 = { .init = i82596_probe };
 
 #ifdef ENABLE_APRICOT
 static int io = 0x300;

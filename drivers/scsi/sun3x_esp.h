@@ -21,19 +21,19 @@ extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 #define DMA_PORTS_P        (dregs->cond_reg & DMA_INT_ENAB)
 
 #define SCSI_SUN3X_ESP {                                        \
-		proc_name:      "esp",  			\
-		proc_info:      &esp_proc_info,			\
-		name:           "Sun ESP 100/100a/200",		\
-		detect:         sun3x_esp_detect,		\
-		info:           esp_info,			\
-		command:        esp_command,			\
-		queuecommand:   esp_queue,			\
-		abort:          esp_abort,			\
-		reset:          esp_reset,			\
-		can_queue:      7,				\
-		this_id:        7,				\
-		sg_tablesize:   SG_ALL,				\
-		cmd_per_lun:    1,				\
-		use_clustering: DISABLE_CLUSTERING, }
+		.proc_name      = "esp",  			\
+		.proc_info      = &esp_proc_info,			\
+		.name           = "Sun ESP 100/100a/200",		\
+		.detect         = sun3x_esp_detect,		\
+		.info           = esp_info,			\
+		.command        = esp_command,			\
+		.queuecommand   = esp_queue,			\
+		.abort          = esp_abort,			\
+		.reset          = esp_reset,			\
+		.can_queue      = 7,				\
+		.this_id        = 7,				\
+		.sg_tablesize   = SG_ALL,				\
+		.cmd_per_lun    = 1,				\
+		.use_clustering = DISABLE_CLUSTERING, }
 
 #endif /* !(_SUN3X_ESP_H) */

@@ -49,7 +49,7 @@ int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 
 static int __init register_memblk_type(void)
 {
-	driver_register(&memblk_driver);
-	return devclass_register(&memblk_devclass);
+	int error = devclass_register(&memblk_devclass);
+	return error ? error : driver_register(&memblk_driver);
 }
 postcore_initcall(register_memblk_type);

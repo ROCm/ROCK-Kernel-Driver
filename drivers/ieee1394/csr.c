@@ -28,7 +28,7 @@
 /* Module Parameters */
 /* this module parameter can be used to disable mapping of the FCP registers */
 MODULE_PARM(fcp,"i");
-MODULE_PARM_DESC(fcp, "FCP-registers");
+MODULE_PARM_DESC(fcp, "Map FCP registers (default = 1, disable = 0).");
 static int fcp = 1;
 
 static u16 csr_crc16(unsigned *data, int length)
@@ -54,8 +54,15 @@ static void host_reset(struct hpsb_host *host)
 
         host->csr.bus_manager_id = 0x3f;
         host->csr.bandwidth_available = 4915;
-        host->csr.channels_available_hi = ~0;
+	host->csr.channels_available_hi = 0xfffffffe;	/* pre-alloc ch 31 per 1394a-2000 */
         host->csr.channels_available_lo = ~0;
+	host->csr.broadcast_channel = 0x80000000 | 31;
+
+	if (host->is_irm) {
+		if (host->driver->hw_csr_reg) {
+			host->driver->hw_csr_reg(host, 2, 0xfffffffe, ~0);
+		}
+	}
 
         host->csr.node_ids = host->node_id << 16;
 
@@ -95,8 +102,15 @@ static void add_host(struct hpsb_host *host)
         host->csr.bus_time              = 0;
         host->csr.bus_manager_id        = 0x3f;
         host->csr.bandwidth_available   = 4915;
-        host->csr.channels_available_hi = ~0;
+	host->csr.channels_available_hi = 0xfffffffe;	/* pre-alloc ch 31 per 1394a-2000 */
         host->csr.channels_available_lo = ~0;
+	host->csr.broadcast_channel = 0x80000000 | 31;
+
+	if (host->is_irm) {
+		if (host->driver->hw_csr_reg) {
+			host->driver->hw_csr_reg(host, 2, 0xfffffffe, ~0);
+		}
+	}
 }
 
 int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom, 
@@ -268,6 +282,10 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
                 *(buf++) = cpu_to_be32(ret);
                 out;
 
+	case CSR_BROADCAST_CHANNEL:
+		*(buf++) = cpu_to_be32(host->csr.broadcast_channel);
+		out;
+
                 /* address gap to end - fall through to default */
         default:
                 return RCODE_ADDRESS_ERROR;
@@ -345,6 +363,12 @@ static int write_regs(struct hpsb_host *host, int nodeid, int destid,
                 /* these are not writable, only lockable */
                 return RCODE_TYPE_ERROR;
 
+	case CSR_BROADCAST_CHANNEL:
+		/* only the valid bit can be written */
+		host->csr.broadcast_channel = (host->csr.broadcast_channel & ~0x40000000)
+                        | (be32_to_cpu(*data) & 0x40000000);
+		out;
+
                 /* address gap to end - fall through */
         default:
                 return RCODE_ADDRESS_ERROR;
@@ -373,6 +397,18 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
         data = be32_to_cpu(data);
         arg = be32_to_cpu(arg);
 
+	/* Is somebody releasing the broadcast_channel on us? */
+	if (csraddr == CSR_CHANNELS_AVAILABLE_HI && (data & 0x1)) {
+		/* Note: this is may not be the right way to handle
+		 * the problem, so we should look into the proper way
+		 * eventually. */
+		HPSB_WARN("Node [" NODE_BUS_FMT "] wants to release "
+			  "broadcast channel 31.  Ignoring.",
+			  NODE_BUS_ARGS(nodeid));
+
+		data &= ~0x1;	/* keep broadcast channel allocated */
+	}
+
         if (host->driver->hw_csr_reg) {
                 quadlet_t old;
 
@@ -389,23 +425,84 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
         switch (csraddr) {
         case CSR_BUS_MANAGER_ID:
                 regptr = &host->csr.bus_manager_id;
+		*store = cpu_to_be32(*regptr);
+		if (*regptr == arg)
+			*regptr = data;
                 break;
 
         case CSR_BANDWIDTH_AVAILABLE:
+        {
+                quadlet_t bandwidth;
+                quadlet_t old;
+                quadlet_t new;
+
                 regptr = &host->csr.bandwidth_available;
-                break;
+                old = *regptr;
 
-        case CSR_CHANNELS_AVAILABLE_HI:
-                regptr = &host->csr.channels_available_hi;
-                break;
-
-        case CSR_CHANNELS_AVAILABLE_LO:
-                regptr = &host->csr.channels_available_lo;
+                /* bandwidth available algorithm adapted from IEEE 1394a-2000 spec */
+                if (arg > 0x1fff) {
+                        *store = cpu_to_be32(old);	/* change nothing */
+                        break;
+                }
+                data &= 0x1fff;
+                if (arg >= data) {
+                        /* allocate bandwidth */
+                        bandwidth = arg - data;
+                        if (old >= bandwidth) {
+                                new = old - bandwidth;
+                                *store = cpu_to_be32(arg);
+                                *regptr = new;
+                        } else {
+                                *store = cpu_to_be32(old);
+                        }
+                } else {
+                        /* deallocate bandwidth */
+                        bandwidth = data - arg;
+                        if (old + bandwidth < 0x2000) {
+                                new = old + bandwidth;
+                                *store = cpu_to_be32(arg);
+                                *regptr = new;
+                        } else {
+                                *store = cpu_to_be32(old);
+                        }
+                }
                 break;
         }
 
-        *store = cpu_to_be32(*regptr);
-        if (*regptr == arg) *regptr = data;
+        case CSR_CHANNELS_AVAILABLE_HI:
+        {
+                /* Lock algorithm for CHANNELS_AVAILABLE as recommended by 1394a-2000 */
+                quadlet_t affected_channels = arg ^ data;
+
+                regptr = &host->csr.channels_available_hi;
+
+                if ((arg & affected_channels) == (*regptr & affected_channels)) {
+                        *regptr ^= affected_channels;
+                        *store = cpu_to_be32(arg);
+                } else {
+                        *store = cpu_to_be32(*regptr);
+                }
+
+                break;
+        }
+
+        case CSR_CHANNELS_AVAILABLE_LO:
+        {
+                /* Lock algorithm for CHANNELS_AVAILABLE as recommended by 1394a-2000 */
+                quadlet_t affected_channels = arg ^ data;
+
+                regptr = &host->csr.channels_available_lo;
+
+                if ((arg & affected_channels) == (*regptr & affected_channels)) {
+                        *regptr ^= affected_channels;
+                        *store = cpu_to_be32(arg);
+                } else {
+                        *store = cpu_to_be32(*regptr);
+                }
+                break;
+        }
+        }
+
         spin_unlock_irqrestore(&host->csr.lock, flags);
 
         return RCODE_COMPLETE;
@@ -420,10 +517,7 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
         case CSR_SPLIT_TIMEOUT_LO:
         case CSR_CYCLE_TIME:
         case CSR_BUS_TIME:
-        case CSR_BUS_MANAGER_ID:
-        case CSR_BANDWIDTH_AVAILABLE:
-        case CSR_CHANNELS_AVAILABLE_HI:
-        case CSR_CHANNELS_AVAILABLE_LO:
+	case CSR_BROADCAST_CHANNEL:
                 return RCODE_TYPE_ERROR;
 
         case CSR_BUSY_TIMEOUT:
@@ -431,6 +525,97 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
         default:
                 return RCODE_ADDRESS_ERROR;
         }
+}
+
+static int lock64_regs(struct hpsb_host *host, int nodeid, octlet_t * store,
+		       u64 addr, octlet_t data, octlet_t arg, int extcode, u16 fl)
+{
+	int csraddr = addr - CSR_REGISTER_BASE;
+	unsigned long flags;
+
+	data = be64_to_cpu(data);
+	arg = be64_to_cpu(arg);
+
+	if (csraddr & 0x3)
+		return RCODE_TYPE_ERROR;
+
+	if (csraddr != CSR_CHANNELS_AVAILABLE
+	    || extcode != EXTCODE_COMPARE_SWAP)
+		goto unsupported_lock64req;
+
+	/* Is somebody releasing the broadcast_channel on us? */
+	if (csraddr == CSR_CHANNELS_AVAILABLE_HI && (data & 0x100000000ULL)) {
+		/* Note: this is may not be the right way to handle
+		 * the problem, so we should look into the proper way
+                 * eventually. */
+		HPSB_WARN("Node [" NODE_BUS_FMT "] wants to release "
+			  "broadcast channel 31.  Ignoring.",
+			  NODE_BUS_ARGS(nodeid));
+
+		data &= ~0x100000000ULL;	/* keep broadcast channel allocated */
+	}
+
+	if (host->driver->hw_csr_reg) {
+		quadlet_t data_hi, data_lo;
+		quadlet_t arg_hi, arg_lo;
+		quadlet_t old_hi, old_lo;
+
+		data_hi = data >> 32;
+		data_lo = data & 0xFFFFFFFF;
+		arg_hi = arg >> 32;
+		arg_lo = arg & 0xFFFFFFFF;
+
+		old_hi = host->driver->hw_csr_reg(host, (csraddr - CSR_BUS_MANAGER_ID) >> 2,
+                                                  data_hi, arg_hi);
+
+		old_lo = host->driver->hw_csr_reg(host, ((csraddr + 4) - CSR_BUS_MANAGER_ID) >> 2,
+                                                  data_lo, arg_lo);
+
+		*store = cpu_to_be64(((octlet_t)old_hi << 32) | old_lo);
+	} else {
+		octlet_t old;
+		octlet_t affected_channels = arg ^ data;
+
+		spin_lock_irqsave(&host->csr.lock, flags);
+
+		old = ((octlet_t)host->csr.channels_available_hi << 32) | host->csr.channels_available_lo;
+
+		if ((arg & affected_channels) == (old & affected_channels)) {
+			host->csr.channels_available_hi ^= (affected_channels >> 32);
+			host->csr.channels_available_lo ^= (affected_channels & 0xffffffff);
+			*store = cpu_to_be64(arg);
+		} else {
+			*store = cpu_to_be64(old);
+		}
+
+		spin_unlock_irqrestore(&host->csr.lock, flags);
+	}
+
+	/* Is somebody erroneously releasing the broadcast_channel on us? */
+	if (host->csr.channels_available_hi & 0x1)
+		host->csr.channels_available_hi &= ~0x1;
+
+	return RCODE_COMPLETE;
+
+ unsupported_lock64req:
+	switch (csraddr) {
+	case CSR_STATE_CLEAR:
+	case CSR_STATE_SET:
+	case CSR_RESET_START:
+	case CSR_NODE_IDS:
+	case CSR_SPLIT_TIMEOUT_HI:
+	case CSR_SPLIT_TIMEOUT_LO:
+	case CSR_CYCLE_TIME:
+	case CSR_BUS_TIME:
+	case CSR_BUS_MANAGER_ID:
+	case CSR_BROADCAST_CHANNEL:
+	case CSR_BUSY_TIMEOUT:
+	case CSR_BANDWIDTH_AVAILABLE:
+		return RCODE_TYPE_ERROR;
+
+	default:
+		return RCODE_ADDRESS_ERROR;
+	}
 }
 
 static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
@@ -474,6 +659,7 @@ static struct hpsb_address_ops reg_ops = {
         .read = read_regs,
         .write = write_regs,
         .lock = lock_regs,
+	.lock64 = lock64_regs,
 };
 
 static struct hpsb_highlevel *hl;

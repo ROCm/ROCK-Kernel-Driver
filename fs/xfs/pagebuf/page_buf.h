@@ -109,7 +109,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 	/* flags used only internally */
 	_PBF_LOCKABLE = (1 << 19), /* page_buf_t may be locked		   */
-	_PBF_PRIVATE_BH = (1 << 20), /* do not use public buffer heads	   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 21),
 				/* all pages in rage are mapped		   */
 	_PBF_ADDR_ALLOCATED = (1 << 22),
@@ -195,6 +194,10 @@ typedef int (*page_buf_bdstrat_t)(struct page_buf_s *);
 #define PB_PAGES	4
 
 typedef struct page_buf_s {
+	struct semaphore	pb_sema;	/* semaphore for lockables  */
+	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
+	atomic_t		pb_pin_count;	/* pin count		    */
+	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 	struct list_head	pb_list;
 	page_buf_flags_t	pb_flags;	/* status flags */
 	struct list_head	pb_hash_list;
@@ -221,6 +224,9 @@ typedef struct page_buf_s {
 	unsigned char		pb_hash_index;	/* hash table index	*/
 	struct page		**pb_pages;	/* array of page pointers */
 	struct page		*pb_page_array[PB_PAGES]; /* inline pages */
+#ifdef PAGEBUF_LOCK_TRACKING
+	int			pb_last_holder;
+#endif
 } page_buf_t;
 
 
@@ -243,14 +249,6 @@ extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_READ,		*/
 					/* PBF_ASYNC			*/	
-
-extern page_buf_t *pagebuf_lookup(
-		struct pb_target *,
-		struct inode *,
-		loff_t,			/* starting offset of range	*/
-		size_t,			/* length of range		*/
-		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/
-					/* PBF_FORCEIO, _PBF_LOCKABLE	*/
 
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with */
 					/*  no memory or disk address	*/
@@ -340,7 +338,7 @@ extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
 extern void pagebuf_iomove(		/* move data in/out of pagebuf	*/
 		page_buf_t *,		/* buffer to manipulate		*/
-		off_t,			/* starting buffer offset	*/
+		size_t,			/* starting buffer offset	*/
 		size_t,			/* length in buffer		*/
 		caddr_t,		/* data pointer			*/
 		page_buf_rw_t);		/* direction			*/
