@@ -439,11 +439,16 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 	return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 }
 
-static int
-icside_dma_common(ide_drive_t *drive, struct request *rq,
-		  unsigned int dma_mode)
+static int icside_dma_setup(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
+	struct request *rq = hwif->hwgroup->rq;
+	unsigned int dma_mode;
+
+	if (rq_data_dir(rq))
+		dma_mode = DMA_MODE_WRITE;
+	else
+		dma_mode = DMA_MODE_READ;
 
 	/*
 	 * We can not enable DMA on both channels.
@@ -484,12 +489,6 @@ static int icside_dma_read(ide_drive_t *drive)
 	struct request *rq = HWGROUP(drive)->rq;
 	task_ioreg_t cmd;
 
-	if (icside_dma_common(drive, rq, DMA_MODE_READ))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
-
 	BUG_ON(HWGROUP(drive)->handler != NULL);
 
 	/*
@@ -520,12 +519,6 @@ static int icside_dma_write(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	task_ioreg_t cmd;
-
-	if (icside_dma_common(drive, rq, DMA_MODE_WRITE))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
 
 	BUG_ON(HWGROUP(drive)->handler != NULL);
 
@@ -621,6 +614,7 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->ide_dma_off_quietly = icside_dma_off_quietly;
 	hwif->ide_dma_host_on	= icside_dma_host_on;
 	hwif->ide_dma_on	= icside_dma_on;
+	hwif->dma_setup		= icside_dma_setup;
 	hwif->ide_dma_read	= icside_dma_read;
 	hwif->ide_dma_write	= icside_dma_write;
 	hwif->ide_dma_begin	= icside_dma_begin;

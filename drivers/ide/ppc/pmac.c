@@ -1880,7 +1880,7 @@ pmac_ide_dma_check(ide_drive_t *drive)
  * a read on KeyLargo ATA/66 and mark us as waiting for DMA completion
  */
 static int __pmac
-pmac_ide_dma_start(ide_drive_t *drive, int reading)
+pmac_ide_dma_setup(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
@@ -1897,7 +1897,7 @@ pmac_ide_dma_start(ide_drive_t *drive, int reading)
 
 	/* Apple adds 60ns to wrDataSetup on reads */
 	if (ata4 && (pmif->timings[unit] & TR_66_UDMA_EN)) {
-		writel(pmif->timings[unit] + (reading ? 0x00800000UL : 0),
+		writel(pmif->timings[unit] + (!rq_data_dir(rq) ? 0x00800000UL : 0),
 			PMAC_IDE_REG(IDE_TIMING_CONFIG));
 		(void)readl(PMAC_IDE_REG(IDE_TIMING_CONFIG));
 	}
@@ -1916,12 +1916,6 @@ pmac_ide_dma_read(ide_drive_t *drive)
 	struct request *rq = HWGROUP(drive)->rq;
 	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command = WIN_NOP;
-
-	if (pmac_ide_dma_start(drive, 1))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
 
 	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
 	
@@ -1949,12 +1943,6 @@ pmac_ide_dma_write (ide_drive_t *drive)
 	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command = WIN_NOP;
 
-	if (pmac_ide_dma_start(drive, 0))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
-
 	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 	if (drive->vdma)
 		command = (lba48) ? WIN_WRITE_EXT: WIN_WRITE;
@@ -1980,8 +1968,6 @@ pmac_ide_dma_begin (ide_drive_t *drive)
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
 	volatile struct dbdma_regs __iomem *dma;
 
-	if (pmif == NULL)
-		return 1;
 	dma = pmif->dma_regs;
 
 	writel((RUN << 16) | RUN, &dma->control);
@@ -2143,6 +2129,7 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	hwif->ide_dma_on = &__ide_dma_on;
 	hwif->ide_dma_check = &pmac_ide_dma_check;
+	hwif->dma_setup = &pmac_ide_dma_setup;
 	hwif->ide_dma_read = &pmac_ide_dma_read;
 	hwif->ide_dma_write = &pmac_ide_dma_write;
 	hwif->ide_dma_begin = &pmac_ide_dma_begin;

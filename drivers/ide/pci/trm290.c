@@ -185,28 +185,7 @@ static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	struct request *rq	= HWGROUP(drive)->rq;
 //	ide_task_t *args	= rq->special;
 	task_ioreg_t command	= WIN_NOP;
-	unsigned int count, reading = 2, writing = 0;
 
-	reading = 0;
-	writing = 1;
-#ifdef TRM290_NO_DMA_WRITES
-	/* always use PIO for writes */
-	trm290_prepare_drive(drive, 0);	/* select PIO xfer */
-	return 1;
-#endif
-	if (!(count = ide_build_dmatable(drive, rq))) {
-		/* try PIO instead of DMA */
-		trm290_prepare_drive(drive, 0); /* select PIO xfer */
-		return 1;
-	}
-	/* select DMA xfer */
-	trm290_prepare_drive(drive, 1);
-	hwif->OUTL(hwif->dmatable_dma|reading|writing, hwif->dma_command);
-	drive->waiting_for_dma = 1;
-	/* start DMA */
-	hwif->OUTW((count * 2) - 1, hwif->dma_status);
-	if (drive->media != ide_disk)
-		return 0;
 	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
 		BUG();
 	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
@@ -236,21 +215,7 @@ static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
 	struct request *rq	= HWGROUP(drive)->rq;
 //	ide_task_t *args	= rq->special;
 	task_ioreg_t command	= WIN_NOP;
-	unsigned int count, reading = 2, writing = 0;
 
-	if (!(count = ide_build_dmatable(drive, rq))) {
-		/* try PIO instead of DMA */
-		trm290_prepare_drive(drive, 0); /* select PIO xfer */
-		return 1;
-	}
-	/* select DMA xfer */
-	trm290_prepare_drive(drive, 1);
-	hwif->OUTL(hwif->dmatable_dma|reading|writing, hwif->dma_command);
-	drive->waiting_for_dma = 1;
-	/* start DMA */
-	hwif->OUTW((count * 2) - 1, hwif->dma_status);
-	if (drive->media != ide_disk)
-		return 0;
 	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
 		BUG();
 	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
@@ -272,6 +237,36 @@ static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
 	return hwif->ide_dma_begin(drive);
+}
+
+static int trm290_ide_dma_setup(ide_drive_t *drive)
+{
+	ide_hwif_t *hwif = drive->hwif;
+	struct request *rq = hwif->hwgroup->rq;
+	unsigned int count, rw;
+
+	if (rq_data_dir(rq)) {
+#ifdef TRM290_NO_DMA_WRITES
+		/* always use PIO for writes */
+		trm290_prepare_drive(drive, 0);	/* select PIO xfer */
+		return 1;
+#endif
+		rw = 1;
+	} else
+		rw = 2;
+
+	if (!(count = ide_build_dmatable(drive, rq))) {
+		/* try PIO instead of DMA */
+		trm290_prepare_drive(drive, 0); /* select PIO xfer */
+		return 1;
+	}
+	/* select DMA xfer */
+	trm290_prepare_drive(drive, 1);
+	hwif->OUTL(hwif->dmatable_dma|rw, hwif->dma_command);
+	drive->waiting_for_dma = 1;
+	/* start DMA */
+	hwif->OUTW((count * 2) - 1, hwif->dma_status);
+	return 0;
 }
 
 static int trm290_ide_dma_begin (ide_drive_t *drive)
@@ -347,6 +342,7 @@ void __devinit init_hwif_trm290(ide_hwif_t *hwif)
 	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->channel ? 0x0080 : 0x0000), 3);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
+	hwif->dma_setup = &trm290_ide_dma_setup;
 	hwif->ide_dma_write = &trm290_ide_dma_write;
 	hwif->ide_dma_read = &trm290_ide_dma_read;
 	hwif->ide_dma_begin = &trm290_ide_dma_begin;

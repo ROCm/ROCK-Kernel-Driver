@@ -2135,12 +2135,8 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 				"reverting to PIO\n");
 		(void)__ide_dma_off(drive);
 	}
-	if (test_bit(PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
-		if (test_bit(PC_WRITING, &pc->flags))
-			dma_ok = !HWIF(drive)->ide_dma_write(drive);
-		else
-			dma_ok = !HWIF(drive)->ide_dma_read(drive);
-	}
+	if (test_bit(PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
+		dma_ok = !hwif->dma_setup(drive);
 
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);

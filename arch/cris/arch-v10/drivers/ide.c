@@ -282,6 +282,29 @@ static void tune_e100_ide(ide_drive_t *drive, byte pio)
 	}
 }
 
+static int e100_dma_setup(ide_drive_t *drive)
+{
+	struct request *rq = drive->hwif->hwgroup->rq;
+
+	if (rq_data_dir(rq)) {
+		e100_read_command = 0;
+
+		RESET_DMA(ATA_TX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
+		WAIT_DMA(ATA_TX_DMA_NBR);
+	} else {
+		e100_read_command = 1;
+
+		RESET_DMA(ATA_RX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
+		WAIT_DMA(ATA_RX_DMA_NBR);
+	}
+
+	/* set up the Etrax DMA descriptors */
+	if (e100_ide_build_dmatable(drive))
+		return 1;
+
+	return 0;
+}
+
 void __init
 init_e100_ide (void)
 {
@@ -303,6 +326,7 @@ init_e100_ide (void)
                 hwif->atapi_output_bytes = &e100_atapi_output_bytes;
                 hwif->ide_dma_check = &e100_dma_check;
                 hwif->ide_dma_end = &e100_dma_end;
+		hwif->dma_setup = &e100_dma_setup;
 		hwif->ide_dma_write = &e100_dma_write;
 		hwif->ide_dma_read = &e100_dma_read;
 		hwif->ide_dma_begin = &e100_dma_begin;
@@ -769,10 +793,6 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
  * sector address using CHS or LBA.  All that remains is to prepare for DMA
  * and then issue the actual read/write DMA/PIO command to the drive.
  *
- * For ATAPI devices, we just prepare for DMA and return. The caller should
- * then issue the packet command to the drive and call us again with
- * ide_dma_begin afterwards.
- *
  * Returns 0 if all went well.
  * Returns 1 if DMA read/write could not be started, in which case
  * the caller should revert to PIO for the current request.
@@ -792,14 +812,6 @@ static int e100_dma_end(ide_drive_t *drive)
 static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 {
 	if(reading) {
-
-		RESET_DMA(ATA_RX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
-		WAIT_DMA(ATA_RX_DMA_NBR);
-
-		/* set up the Etrax DMA descriptors */
-
-		if(e100_ide_build_dmatable (drive))
-			return 1;
 
 		if(!atapi) {
 			/* set the irq handler which will finish the request when DMA is done */
@@ -851,14 +863,6 @@ static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 	} else {
 		/* writing */
 
-		RESET_DMA(ATA_TX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
-		WAIT_DMA(ATA_TX_DMA_NBR);
-
-		/* set up the Etrax DMA descriptors */
-
-		if(e100_ide_build_dmatable (drive))
-			return 1;
-
 		if(!atapi) {
 			/* set the irq handler which will finish the request when DMA is done */
 
@@ -903,27 +907,11 @@ static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 
 static int e100_dma_write(ide_drive_t *drive)
 {
-	e100_read_command = 0;
-	/* ATAPI-devices (not disks) first call ide_dma_read/write to set the direction
-	 * then they call ide_dma_begin after they have issued the appropriate drive command
-	 * themselves to actually start the chipset DMA. so we just return here if we're
-	 * not a diskdrive.
-	 */
-	if (drive->media != ide_disk)
-                return 0;
 	return e100_start_dma(drive, 0, 0);
 }
 
 static int e100_dma_read(ide_drive_t *drive)
 {
-	e100_read_command = 1;
-	/* ATAPI-devices (not disks) first call ide_dma_read/write to set the direction
-	 * then they call ide_dma_begin after they have issued the appropriate drive command
-	 * themselves to actually start the chipset DMA. so we just return here if we're
-	 * not a diskdrive.
-	 */
-	if (drive->media != ide_disk)
-                return 0;
 	return e100_start_dma(drive, 0, 1);
 }
 
@@ -932,7 +920,7 @@ static int e100_dma_begin(ide_drive_t *drive)
 	/* begin DMA, used by ATAPI devices which want to issue the
 	 * appropriate IDE command themselves.
 	 *
-	 * they have already called ide_dma_read/write to set the
+	 * they have already called ->dma_setup to set the
 	 * static reading flag, now they call ide_dma_begin to do
 	 * the real stuff. we tell our code below not to issue
 	 * any IDE commands itself and jump into it.

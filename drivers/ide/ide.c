@@ -685,6 +685,7 @@ static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 	hwif->atapi_input_bytes		= tmp_hwif->atapi_input_bytes;
 	hwif->atapi_output_bytes	= tmp_hwif->atapi_output_bytes;
 
+	hwif->dma_setup			= tmp_hwif->dma_setup;
 	hwif->ide_dma_read		= tmp_hwif->ide_dma_read;
 	hwif->ide_dma_write		= tmp_hwif->ide_dma_write;
 	hwif->ide_dma_begin		= tmp_hwif->ide_dma_begin;

@@ -419,10 +419,19 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		hwif->OUTB(head|drive->select.all,IDE_SELECT_REG);
 	}
 
-	if (rq_data_dir(rq) == READ) {
-		if (dma && !hwif->ide_dma_read(drive))
+	if (dma) {
+		if (!hwif->dma_setup(drive)) {
+			if (rq_data_dir(rq)) {
+				hwif->ide_dma_write(drive);
+			} else {
+				hwif->ide_dma_read(drive);
+			}
 			return ide_started;
+		}
+		/* fallback to PIO */
+	}
 
+	if (rq_data_dir(rq) == READ) {
 		command = ((drive->mult_count) ?
 			   ((lba48) ? WIN_MULTREAD_EXT : WIN_MULTREAD) :
 			   ((lba48) ? WIN_READ_EXT : WIN_READ));
@@ -430,9 +439,6 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		return ide_started;
 	} else {
 		ide_startstop_t startstop;
-
-		if (dma && !hwif->ide_dma_write(drive))
-			return ide_started;
 
 		command = ((drive->mult_count) ?
 			   ((lba48) ? WIN_MULTWRITE_EXT : WIN_MULTWRITE) :

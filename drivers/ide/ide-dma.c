@@ -585,10 +585,8 @@ int __ide_dma_check (ide_drive_t *drive)
 EXPORT_SYMBOL(__ide_dma_check);
 
 /**
- *	ide_start_dma	-	begin a DMA phase
- *	@hwif: interface
+ *	ide_dma_setup	-	begin a DMA phase
  *	@drive: target device
- *	@reading: set if reading, clear if writing
  *
  *	Build an IDE DMA PRD (IDE speak for scatter gather table)
  *	and then set up the DMA transfer registers for a device
@@ -598,11 +596,18 @@ EXPORT_SYMBOL(__ide_dma_check);
  *	Returns 0 on success. If a PIO fallback is required then 1
  *	is returned. 
  */
- 
-int ide_start_dma(ide_hwif_t *hwif, ide_drive_t *drive, int reading)
+
+int ide_dma_setup(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	struct request *rq = HWGROUP(drive)->rq;
+	unsigned int reading;
 	u8 dma_stat;
+
+	if (rq_data_dir(rq))
+		reading = 0;
+	else
+		reading = 1 << 3;
 
 	/* fall back to pio! */
 	if (!ide_build_dmatable(drive, rq))
@@ -623,22 +628,14 @@ int ide_start_dma(ide_hwif_t *hwif, ide_drive_t *drive, int reading)
 	return 0;
 }
 
-EXPORT_SYMBOL(ide_start_dma);
+EXPORT_SYMBOL_GPL(ide_dma_setup);
 
-int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
+static int __ide_dma_read(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
-	unsigned int reading	= 1 << 3;
 	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
-
-	/* try pio */
-	if (ide_start_dma(hwif, drive, reading))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
 
 	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
 	
@@ -655,22 +652,12 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 	return hwif->ide_dma_begin(drive);
 }
 
-EXPORT_SYMBOL(__ide_dma_read);
-
-int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
+static int __ide_dma_write(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
-	unsigned int reading	= 0;
 	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
-
-	/* try PIO instead of DMA */
-	if (ide_start_dma(hwif, drive, reading))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
 
 	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 	if (drive->vdma)
@@ -686,8 +673,6 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 
 	return hwif->ide_dma_begin(drive);
 }
-
-EXPORT_SYMBOL(__ide_dma_write);
 
 int __ide_dma_begin (ide_drive_t *drive)
 {
@@ -1004,6 +989,8 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_host_on = &__ide_dma_host_on;
 	if (!hwif->ide_dma_check)
 		hwif->ide_dma_check = &__ide_dma_check;
+	if (!hwif->dma_setup)
+		hwif->dma_setup = &ide_dma_setup;
 	if (!hwif->ide_dma_read)
 		hwif->ide_dma_read = &__ide_dma_read;
 	if (!hwif->ide_dma_write)

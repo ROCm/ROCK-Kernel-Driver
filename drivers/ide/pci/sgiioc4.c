@@ -574,36 +574,36 @@ use_pio_instead:
 	return 0;		/* revert to PIO for this request */
 }
 
-static int
-sgiioc4_ide_dma_read(ide_drive_t * drive)
+static int sgiioc4_ide_dma_setup(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	unsigned int count = 0;
+	int ddir;
 
-	if (!(count = sgiioc4_build_dma_table(drive, rq, PCI_DMA_FROMDEVICE))) {
+	if (rq_data_dir(rq))
+		ddir = PCI_DMA_TODEVICE;
+	else
+		ddir = PCI_DMA_FROMDEVICE;
+
+	if (!(count = sgiioc4_build_dma_table(drive, rq, ddir))) {
 		/* try PIO instead of DMA */
 		return 1;
 	}
-	/* Writes FROM the IOC4 TO Main Memory */
-	sgiioc4_configure_for_dma(IOC4_DMA_WRITE, drive);
+
+	if (rq_data_dir(rq))
+		/* Writes TO the IOC4 FROM Main Memory */
+		ddir = IOC4_DMA_READ;
+	else
+		/* Writes FROM the IOC4 TO Main Memory */
+		ddir = IOC4_DMA_WRITE;
+
+	sgiioc4_configure_for_dma(ddir, drive);
 
 	return 0;
 }
 
-static int
-sgiioc4_ide_dma_write(ide_drive_t * drive)
+static int sgiioc4_ide_dma_dummy(ide_drive_t *drive)
 {
-	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int count = 0;
-
-	if (!(count = sgiioc4_build_dma_table(drive, rq, PCI_DMA_TODEVICE))) {
-		/* try PIO instead of DMA */
-		return 1;
-	}
-
-	sgiioc4_configure_for_dma(IOC4_DMA_READ, drive);
-	/* Writes TO the IOC4 FROM Main Memory */
-
 	return 0;
 }
 
@@ -629,8 +629,9 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->quirkproc = NULL;
 	hwif->busproc = NULL;
 
-	hwif->ide_dma_read = &sgiioc4_ide_dma_read;
-	hwif->ide_dma_write = &sgiioc4_ide_dma_write;
+	hwif->dma_setup = &sgiioc4_ide_dma_setup;
+	hwif->ide_dma_read = &sgiioc4_ide_dma_dummy;
+	hwif->ide_dma_write = &sgiioc4_ide_dma_dummy;
 	hwif->ide_dma_begin = &sgiioc4_ide_dma_begin;
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;
