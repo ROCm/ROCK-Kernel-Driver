@@ -253,8 +253,10 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 {
 	struct agp_bridge_data *bridge;
 	struct pci_dev *loop_dev;
+	u8 rev_id;
 	u8 cap_ptr;
 	int i = 0;
+	char *revstring="  ";
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 	if (!cap_ptr)
@@ -266,14 +268,38 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	if (!bridge)
 		return -ENOMEM;
 
+	/* Assume here we have an 8151. (Later this assumption will be fixed). */
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
+	switch (rev_id) {
+		case 0x01:	revstring="A0";
+				break;
+		case 0x02:	revstring="A1";
+				break;
+		case 0x11:	revstring="B0";
+				break;
+		case 0x12:	revstring="B1";
+				break;
+		case 0x13:	revstring="B2";
+				break;
+		default:	revstring="??";
+				break;
+	}
+	printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
+	/*
+	 * Work around errata.
+	 * Chips before B2 stepping incorrectly reporting v3.5
+	 */
+	if (rev_id < 0x13) {
+		bridge->major_version = 3;
+		bridge->minor_version = 0;
+	}
+
 	bridge->driver = &amd_8151_driver;
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(pdev,
-			bridge->capndx+PCI_AGP_STATUS,
-			&bridge->mode);
+	pci_read_config_dword(pdev, bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
 
 	/* cache pci_devs of northbridges. */
 	pci_for_each_dev(loop_dev) {
@@ -290,7 +316,7 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
- out_free:
+out_free:
 	agp_put_bridge(bridge);
 	return -ENOMEM;
 }
