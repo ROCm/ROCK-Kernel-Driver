@@ -126,7 +126,6 @@ int tpam_command(isdn_ctrl *c) {
  */
 static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 	tpam_dsp_ioctl tdl;
-	int ret;
 
 	dprintk("TurboPAM(tpam_command_ioctl_dspload): card=%d\n", card->id);
 
@@ -141,10 +140,9 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 		return -EPERM;
 
 	/* write the data in the board's memory */
-	ret = copy_from_user_to_pam(card, (void *)tdl.address, 
-				    (void *)arg + sizeof(tpam_dsp_ioctl), 
-				    tdl.data_len);
-	return 0;
+	return copy_from_user_to_pam(card, (void *)tdl.address, 
+				     (void *)arg + sizeof(tpam_dsp_ioctl), 
+				     tdl.data_len);
 }
 
 /*
@@ -158,7 +156,6 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
  */
 static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
 	tpam_dsp_ioctl tdl;
-	int ret;
 
 	dprintk("TurboPAM(tpam_command_ioctl_dspsave): card=%d\n", card->id);
 
@@ -171,9 +168,8 @@ static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
 		return -EPERM;
 
 	/* read the data from the board's memory */
-	ret = copy_from_pam_to_user(card, (void *)arg + sizeof(tpam_dsp_ioctl),
-				    (void *)tdl.address, tdl.data_len);
-	return ret;
+	return copy_from_pam_to_user(card, (void *)arg + sizeof(tpam_dsp_ioctl),
+				     (void *)tdl.address, tdl.data_len);
 }
 
 /*

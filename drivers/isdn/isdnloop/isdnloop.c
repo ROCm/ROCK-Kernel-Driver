@@ -986,9 +986,10 @@ isdnloop_writecmd(const u_char * buf, int len, int user, isdnloop_card * card)
 
 		if (count > 255)
 			count = 255;
-		if (user)
-			copy_from_user(msg, buf, count);
-		else
+		if (user) {
+			if (copy_from_user(msg, buf, count))
+				return -EFAULT;
+		} else
 			memcpy(msg, buf, count);
 		isdnloop_putmsg(card, '>');
 		for (p = msg; count > 0; count--, p++) {
@@ -1076,7 +1077,8 @@ isdnloop_start(isdnloop_card * card, isdnloop_sdef * sdefp)
 
 	if (card->flags & ISDNLOOP_FLAGS_RUNNING)
 		return -EBUSY;
-	copy_from_user((char *) &sdef, (char *) sdefp, sizeof(sdef));
+	if (copy_from_user((char *) &sdef, (char *) sdefp, sizeof(sdef)))
+		return -EFAULT;
 	save_flags(flags);
 	cli();
 	switch (sdef.ptype) {
@@ -1149,9 +1151,10 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 					return (isdnloop_start(card, (isdnloop_sdef *) a));
 					break;
 				case ISDNLOOP_IOCTL_ADDCARD:
-					if ((i = verify_area(VERIFY_READ, (void *) a, sizeof(isdnloop_cdef))))
-						return i;
-					copy_from_user((char *) &cdef, (char *) a, sizeof(cdef));
+					if (copy_from_user((char *)&cdef,
+							   (char *)a,
+							   sizeof(cdef)))
+						return -EFAULT;
 					return (isdnloop_addcard(cdef.id1));
 					break;
 				case ISDNLOOP_IOCTL_LEASEDCFG:

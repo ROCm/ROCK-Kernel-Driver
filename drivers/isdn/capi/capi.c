@@ -673,10 +673,9 @@ capi_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		skb_queue_head(&cdev->recvqueue, skb);
 		return -EMSGSIZE;
 	}
-	retval = copy_to_user(buf, skb->data, skb->len);
-	if (retval) {
+	if (copy_to_user(buf, skb->data, skb->len)) {
 		skb_queue_head(&cdev->recvqueue, skb);
-		return retval;
+		return -EFAULT;
 	}
 	copied = skb->len;
 
@@ -703,7 +702,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (!skb)
 		return -ENOMEM;
 
-	if ((retval = copy_from_user(skb_put(skb, count), buf, count))) {
+	if (copy_from_user(skb_put(skb, count), buf, count)) {
 		kfree_skb(skb);
 		return -EFAULT;
 	}
@@ -782,45 +781,36 @@ capi_ioctl(struct inode *inode, struct file *file,
 
 	case CAPI_GET_VERSION:
 		{
-			retval = copy_from_user((void *) &data.contr,
+			if (copy_from_user((void *) &data.contr,
 						(void *) arg,
-						sizeof(data.contr));
-			if (retval)
+						sizeof(data.contr)))
 				return -EFAULT;
 		        cdev->errcode = capi20_get_version(data.contr, &data.version);
 			if (cdev->errcode)
 				return -EIO;
-			retval = copy_to_user((void *) arg,
-					      (void *) &data.version,
-					      sizeof(data.version));
-			if (retval)
+			if (copy_to_user((void *)arg, (void *)&data.version,
+					 sizeof(data.version)))
 				return -EFAULT;
 		}
 		return 0;
 
 	case CAPI_GET_SERIAL:
 		{
-			retval = copy_from_user((void *) &data.contr,
-						(void *) arg,
-						sizeof(data.contr));
-			if (retval)
+			if (copy_from_user((void *)&data.contr, (void *)arg,
+					   sizeof(data.contr)))
 				return -EFAULT;
 			cdev->errcode = capi20_get_serial (data.contr, data.serial);
 			if (cdev->errcode)
 				return -EIO;
-			retval = copy_to_user((void *) arg,
-					      (void *) data.serial,
-					      sizeof(data.serial));
-			if (retval)
+			if (copy_to_user((void *)arg, (void *)data.serial,
+					 sizeof(data.serial)))
 				return -EFAULT;
 		}
 		return 0;
 	case CAPI_GET_PROFILE:
 		{
-			retval = copy_from_user((void *) &data.contr,
-						(void *) arg,
-						sizeof(data.contr));
-			if (retval)
+			if (copy_from_user((void *)&data.contr, (void *)arg,
+					   sizeof(data.contr)))
 				return -EFAULT;
 
 			if (data.contr == 0) {
@@ -848,18 +838,15 @@ capi_ioctl(struct inode *inode, struct file *file,
 
 	case CAPI_GET_MANUFACTURER:
 		{
-			retval = copy_from_user((void *) &data.contr,
-						(void *) arg,
-						sizeof(data.contr));
-			if (retval)
+			if (copy_from_user((void *)&data.contr, (void *)arg,
+					   sizeof(data.contr)))
 				return -EFAULT;
 			cdev->errcode = capi20_get_manufacturer(data.contr, data.manufacturer);
 			if (cdev->errcode)
 				return -EIO;
 
-			retval = copy_to_user((void *) arg, (void *) data.manufacturer,
-					      sizeof(data.manufacturer));
-			if (retval)
+			if (copy_to_user((void *)arg, (void *)data.manufacturer,
+					 sizeof(data.manufacturer)))
 				return -EFAULT;
 
 		}
@@ -868,10 +855,8 @@ capi_ioctl(struct inode *inode, struct file *file,
 		data.errcode = cdev->errcode;
 		cdev->errcode = CAPI_NOERROR;
 		if (arg) {
-			retval = copy_to_user((void *) arg,
-					      (void *) &data.errcode,
-					      sizeof(data.errcode));
-			if (retval)
+			if (copy_to_user((void *)arg, (void *)&data.errcode,
+					 sizeof(data.errcode)))
 				return -EFAULT;
 		}
 		return data.errcode;
@@ -886,9 +871,8 @@ capi_ioctl(struct inode *inode, struct file *file,
 			struct capi_manufacturer_cmd mcmd;
 			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
-			retval = copy_from_user((void *) &mcmd, (void *) arg,
-						sizeof(mcmd));
-			if (retval)
+			if (copy_from_user((void *)&mcmd, (void *)arg,
+					   sizeof(mcmd)))
 				return -EFAULT;
 			return capi20_manufacturer(mcmd.cmd, mcmd.data);
 		}
@@ -898,10 +882,8 @@ capi_ioctl(struct inode *inode, struct file *file,
 	case CAPI_CLR_FLAGS:
 		{
 			unsigned userflags;
-			retval = copy_from_user((void *) &userflags,
-						(void *) arg,
-						sizeof(userflags));
-			if (retval)
+			if (copy_from_user((void *)&userflags, (void *)arg,
+					   sizeof(userflags)))
 				return -EFAULT;
 			if (cmd == CAPI_SET_FLAGS)
 				cdev->userflags |= userflags;
@@ -911,13 +893,9 @@ capi_ioctl(struct inode *inode, struct file *file,
 		return 0;
 
 	case CAPI_GET_FLAGS:
-		{
-			retval = copy_to_user((void *) arg,
-					      (void *) &cdev->userflags,
-					      sizeof(cdev->userflags));
-			if (retval)
-				return -EFAULT;
-		}
+		if (copy_to_user((void *)arg, (void *)&cdev->userflags,
+				 sizeof(cdev->userflags)))
+			return -EFAULT;
 		return 0;
 
 	case CAPI_NCCI_OPENCOUNT:
@@ -928,10 +906,8 @@ capi_ioctl(struct inode *inode, struct file *file,
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 			unsigned ncci;
 			int count = 0;
-			retval = copy_from_user((void *) &ncci,
-						(void *) arg,
-						sizeof(ncci));
-			if (retval)
+			if (copy_from_user((void *)&ncci, (void *)arg,
+					   sizeof(ncci)))
 				return -EFAULT;
 			nccip = capincci_find(cdev, (u32) ncci);
 			if (!nccip)
@@ -951,10 +927,8 @@ capi_ioctl(struct inode *inode, struct file *file,
 			struct capincci *nccip;
 			struct capiminor *mp;
 			unsigned ncci;
-			retval = copy_from_user((void *) &ncci,
-						(void *) arg,
-						sizeof(ncci));
-			if (retval)
+			if (copy_from_user((void *)&ncci, (void *)arg,
+					   sizeof(ncci)))
 				return -EFAULT;
 			nccip = capincci_find(cdev, (u32) ncci);
 			if (!nccip || (mp = nccip->minorp) == 0)

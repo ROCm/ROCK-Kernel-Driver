@@ -319,7 +319,8 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 	memset (data, '0', packet_length);
 
 	if (from_user) {
-		copy_from_user (data, buf, count);
+		if (copy_from_user (data, buf, count))
+			return -EFAULT;
 	} else {
 		memcpy (data, buf, count);
 	}

@@ -1202,9 +1202,12 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 						   &(m->pluscount),
 						   &(m->lastplus),
 						   from_user);
-			if (from_user)
-				copy_from_user(&(info->xmit_buf[info->xmit_count]), buf, c);
-			else
+			if (from_user) {
+				if (copy_from_user(&(info->xmit_buf[info->xmit_count]), buf, c)) {
+					total = -EFAULT;
+					goto out;
+				}
+			} else
 				memcpy(&(info->xmit_buf[info->xmit_count]), buf, c);
 #ifdef CONFIG_ISDN_AUDIO
 			if (info->vonline) {
@@ -1284,6 +1287,7 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 		}
 		isdn_timer_ctrl(ISDN_TIMER_MODEMXMIT, 1);
 	}
+out:
 	if (from_user)
 		up(&info->write_sem);
 	return total;
@@ -2589,7 +2593,8 @@ isdn_tty_check_esc(const u_char * p, u_char plus, int count, int *pluscount,
 		*pluscount = 0;
 	}
 	if (from_user) {
-		copy_from_user(cbuf, p, count);
+		if (copy_from_user(cbuf, p, count))
+			return;
 		p = cbuf;
 	}
 	while (count > 0) {

@@ -389,7 +389,9 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 		dinfo.product = dev->descriptor.idProduct;
 		dinfo.version = dev->descriptor.bcdDevice;
 		dinfo.num_applications = hid->maxapplication;
-		return copy_to_user((void *) arg, &dinfo, sizeof(dinfo));
+		if (copy_to_user((void *) arg, &dinfo, sizeof(dinfo)))
+			return -EFAULT;
+		return 0;
 	}
 
 	case HIDIOCGFLAG:
@@ -480,7 +482,9 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 
 		rinfo.num_fields = report->maxfield;
 
-		return copy_to_user((void *) arg, &rinfo, sizeof(rinfo));
+		if (copy_to_user((void *) arg, &rinfo, sizeof(rinfo)))
+			return -EFAULT;
+		return 0;
 
 	case HIDIOCGFIELDINFO:
 	{
@@ -512,7 +516,9 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 		finfo.unit_exponent = field->unit_exponent;
 		finfo.unit = field->unit;
 
-		return copy_to_user((void *) arg, &finfo, sizeof(finfo));
+		if (copy_to_user((void *) arg, &finfo, sizeof(finfo)))
+			return -EFAULT;
+		return 0;
 	}
 
 	case HIDIOCGUCODE:
@@ -533,7 +539,9 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 
 		uref.usage_code = field->usage[uref.usage_index].hid;
 
-		return copy_to_user((void *) arg, &uref, sizeof(uref));
+		if (copy_to_user((void *) arg, &uref, sizeof(uref)))
+			return -EFAULT;
+		return 0;
 
 	case HIDIOCGUSAGE:
 	case HIDIOCSUSAGE:
@@ -564,7 +572,9 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 
 		if (cmd == HIDIOCGUSAGE) {
 			uref.value = field->value[uref.usage_index];
-			return copy_to_user((void *) arg, &uref, sizeof(uref));
+			if (copy_to_user((void *) arg, &uref, sizeof(uref)))
+				return -EFAULT;
+			return 0;
 		} else {
 			field->value[uref.usage_index] = uref.value;
 		}

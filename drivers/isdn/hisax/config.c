@@ -641,9 +641,10 @@ int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
 		count = cs->status_end - cs->status_read + 1;
 		if (count >= len)
 			count = len;
-		if (user)
-			copy_to_user(p, cs->status_read, count);
-		else
+		if (user) {
+			if (copy_to_user(p, cs->status_read, count))
+				return -EFAULT;
+		} else
 			memcpy(p, cs->status_read, count);
 		cs->status_read += count;
 		if (cs->status_read > cs->status_end)
@@ -655,9 +656,10 @@ int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
 				cnt = HISAX_STATUS_BUFSIZE;
 			else
 				cnt = count;
-			if (user)
-				copy_to_user(p, cs->status_read, cnt);
-			else
+			if (user) {
+				if (copy_to_user(p, cs->status_read, cnt))
+					return -EFAULT;
+			} else
 				memcpy(p, cs->status_read, cnt);
 			p += cnt;
 			cs->status_read += cnt % HISAX_STATUS_BUFSIZE;
