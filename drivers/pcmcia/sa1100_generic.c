@@ -155,7 +155,6 @@ sa1100_pcmcia_config_skt(struct sa1100_pcmcia_socket *skt, socket_state_t *state
 	conf.output  = state->flags & SS_OUTPUT_ENA ? 1 : 0;
 	conf.speaker = state->flags & SS_SPKR_ENA ? 1 : 0;
 	conf.reset   = state->flags & SS_RESET ? 1 : 0;
-	conf.irq     = state->io_irq != 0;
 
 	ret = skt->ops->configure_socket(skt->nr, &conf);
 	if (ret == 0) {
@@ -350,7 +349,7 @@ static void sa1100_pcmcia_poll_event(unsigned long dummy)
  * handling code performs scheduling operations which cannot be
  * executed from within an interrupt context.
  */
-static void sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
+void sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
   DEBUG(3, "%s(): servicing IRQ %d\n", __FUNCTION__, irq);
   schedule_work(&sa1100_pcmcia_task);
@@ -944,7 +943,6 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 	if (!ops->socket_get_timing)
 		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
-	pcmcia_init.handler = sa1100_pcmcia_interrupt;
 	pcmcia_init.socket_irq[0] = NO_IRQ;
 	pcmcia_init.socket_irq[1] = NO_IRQ;
 	ret = ops->init(&pcmcia_init);
@@ -973,6 +971,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 		skt->nr		= i;
 		skt->ops	= ops;
 		skt->irq	= pcmcia_init.socket_irq[i];
+		skt->irq_state	= 0;
 		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
 		skt->speed_attr = SA1100_PCMCIA_5V_MEM_ACCESS;
 		skt->speed_mem  = SA1100_PCMCIA_5V_MEM_ACCESS;

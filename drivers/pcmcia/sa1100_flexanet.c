@@ -41,17 +41,13 @@ static int flexanet_pcmcia_init(struct pcmcia_init *init)
   GPDR &= ~(GPIO_CF1_NCD | GPIO_CF1_BVD1 | GPIO_CF1_IRQ |
             GPIO_CF2_NCD | GPIO_CF2_BVD1 | GPIO_CF2_IRQ );
 
-  /* Set IRQ edge */
-  set_irq_type(IRQ_GPIO_CF1_IRQ, IRQT_FALLING);
-  set_irq_type(IRQ_GPIO_CF2_IRQ, IRQT_FALLING);
-
   /* Register the socket interrupts (not the card interrupts) */
   for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-    res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
+    res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt, SA_INTERRUPT,
 		      irqs[i].name, NULL);
     if (res < 0)
       break;
+    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
   }
 
   init->socket_irq[0] = IRQ_GPIO_CF1_IRQ;

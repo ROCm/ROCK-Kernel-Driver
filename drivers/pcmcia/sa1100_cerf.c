@@ -36,14 +36,12 @@ static int cerf_pcmcia_init(struct pcmcia_init *init)
 {
   int i, res;
 
-  set_irq_type(IRQ_GPIO_CF_IRQ, IRQT_FALLING);
-
   for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-    res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
+    res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt, SA_INTERRUPT,
 		      irqs[i].str, NULL);
     if (res)
       goto irq_err;
+    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
   }
 
   init->socket_irq[CERF_SOCKET] = IRQ_GPIO_CF_IRQ;

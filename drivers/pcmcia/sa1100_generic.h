@@ -18,7 +18,6 @@
 #define SA1100_PCMCIA_MAX_SOCK   (2)
 
 struct pcmcia_init {
-	void (*handler)(int irq, void *dev, struct pt_regs *regs);
 	int	socket_irq[SA1100_PCMCIA_MAX_SOCK];
 };
 
@@ -70,5 +69,6 @@ struct pcmcia_low_level {
 
 extern int sa1100_register_pcmcia(struct pcmcia_low_level *, struct device *);
 extern void sa1100_unregister_pcmcia(struct pcmcia_low_level *, struct device *);
+extern void sa1100_pcmcia_interrupt(int, void *, struct pt_regs *);
 
 #endif

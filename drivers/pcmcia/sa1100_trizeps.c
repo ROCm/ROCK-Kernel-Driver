@@ -40,15 +40,12 @@ static int trizeps_pcmcia_init(struct pcmcia_init *init)
 	GPDR &= ~((GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0))
 		    | (GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)));
 
-	/* Set transition detect */
-//	set_irq_type(SA1100_GPIO_TO_IRQ(GPIO_TRIZEPS_PCMCIA_CD0), IRQT_BOTHEDGE);
-	set_irq_type(TRIZEPS_IRQ_PCMCIA_IRQ0, IRQT_FALLING);
-
 	/* Register SOCKET interrupts */
 	/* WHY? */
-	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_NOEDGE);
-	res = request_irq( TRIZEPS_IRQ_PCMCIA_CD0, init->handler, SA_INTERRUPT, "PCMCIA_CD0", NULL );
+	res = request_irq(TRIZEPS_IRQ_PCMCIA_CD0, sa1100_pcmcia_interrupt,
+			  SA_INTERRUPT, "PCMCIA_CD0", NULL );
 	if( res < 0 ) goto irq_err;
+	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_NOEDGE);
 
 	//MECR = 0x00060006; // Initialised on trizeps init
 
@@ -146,24 +143,18 @@ static int trizeps_pcmcia_configure_socket(int sock, const struct pcmcia_configu
 	*/
 	local_irq_restore(flags);
 
-	if (configure->irq) {
-		enable_irq(TRIZEPS_IRQ_PCMCIA_CD0);
-		enable_irq(TRIZEPS_IRQ_PCMCIA_IRQ0);
-	} else {
-		disable_irq(TRIZEPS_IRQ_PCMCIA_IRQ0);
-		disable_irq(TRIZEPS_IRQ_PCMCIA_CD0);
-	}
-
 	return 0;
 }
 
 static int trizeps_pcmcia_socket_init(int sock)
 {
+	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_BOTHEDGE);
 	return 0;
 }
 
 static int trizeps_pcmcia_socket_suspend(int sock)
 {
+	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_NOEDGE);
 	return 0;
 }
 

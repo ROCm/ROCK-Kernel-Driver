@@ -46,16 +46,13 @@ static int stork_pcmcia_init(struct pcmcia_init *init)
 
 	printk("in stork_pcmcia_init\n");
 
-	/* Set transition detect */
-	set_irq_type(IRQ_GPIO_STORK_PCMCIA_A_RDY, IRQT_FALLING);
-	set_irq_type(IRQ_GPIO_STORK_PCMCIA_B_RDY, IRQT_FALLING);
 	init->socket_irq[0] = IRQ_GPIO_STORK_PCMCIA_A_RDY;
 	init->socket_irq[1] = IRQ_GPIO_STORK_PCMCIA_B_RDY;
 
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (res)
 			goto irq_err;
 		set_irq_type(irqs[i].irq, IRQT_NOEDGE);

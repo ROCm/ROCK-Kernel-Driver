@@ -30,17 +30,11 @@ static int h3600_pcmcia_init(struct pcmcia_init *init)
 	int i, res;
 
 	/*
-	 * Set transition detect
-	 */
-	set_irq_type(IRQ_GPIO_H3600_PCMCIA_IRQ0, IRQT_FALLING);
-	set_irq_type(IRQ_GPIO_H3600_PCMCIA_IRQ1, IRQT_FALLING);
-
-	/*
 	 * Register interrupts
 	 */
 	for (i = res = 0; i < ARRAY_SIZE(irqs); i++) {
-		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (res)
 			break;
 	}

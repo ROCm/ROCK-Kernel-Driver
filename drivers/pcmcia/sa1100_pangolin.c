@@ -37,7 +37,7 @@ static int pangolin_pcmcia_init(struct pcmcia_init *init){
   set_irq_type(IRQ_PCMCIA_IRQ, IRQT_FALLING);
 
   /* Register interrupts */
-  res = request_irq(IRQ_PCMCIA_CD, init->handler, SA_INTERRUPT,
+  res = request_irq(IRQ_PCMCIA_CD, sa1100_pcmcia_interrupt, SA_INTERRUPT,
 		    "PCMCIA_CD", NULL);
   if (res >= 0)
     /* There's only one slot, but it's "Slot 1": */
@@ -130,14 +130,14 @@ static int pangolin_pcmcia_configure_socket(int sock, const struct pcmcia_config
 static int pangolin_pcmcia_socket_init(int sock)
 {
   if (sock == 1)
-    set_irq_type(IRQ_PCmCIA_CD, IRQT_BOTHEDGE);
+    set_irq_type(IRQ_PCMCIA_CD, IRQT_BOTHEDGE);
   return 0;
 }
 
 static int pangolin_pcmcia_socket_suspend(int sock)
 {
   if (sock == 1)
-    set_irq_type(IRQ_PCmCIA_CD, IRQT_NOEDGE);
+    set_irq_type(IRQ_PCMCIA_CD, IRQT_NOEDGE);
   return 0;
 }
 

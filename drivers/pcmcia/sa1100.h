@@ -175,6 +175,8 @@ struct sa1100_pcmcia_socket {
    * Info from low level handler
    */
   unsigned int          irq;
+  unsigned int		irq_state;
+
   struct pcmcia_low_level *ops;
 };
 

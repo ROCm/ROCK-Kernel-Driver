@@ -34,16 +34,13 @@ static int shannon_pcmcia_init(struct pcmcia_init *init)
 	GAFR &= ~(SHANNON_GPIO_EJECT_0 | SHANNON_GPIO_EJECT_1 | 
 		  SHANNON_GPIO_RDY_0 | SHANNON_GPIO_RDY_1);
 
-	/* Set transition detect */
-	set_irq_type(SHANNON_IRQ_GPIO_RDY_0, IRQT_FALLING);
-	set_irq_type(SHANNON_IRQ_GPIO_RDY_1, IRQT_FALLING);
 	init->socket_irq[0] = SHANNON_IRQ_GPIO_RDY_0;
 	init->socket_irq[1] = SHANNON_IRQ_GPIO_RDY_1;
 
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (res)
 			goto irq_err;
 		set_irq_type(irqs[i].irq, IRQT_NOEDGE);

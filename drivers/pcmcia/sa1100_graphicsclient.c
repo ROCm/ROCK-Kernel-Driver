@@ -51,7 +51,7 @@ static int gcplus_pcmcia_init(struct pcmcia_init *init)
 
   /* Register interrupts */
   irq = S0_CD_IRQ;
-  res = request_irq(irq, init->handler, SA_INTERRUPT, "PCMCIA 0 CD", NULL);
+  res = request_irq(irq, sa1100_pcmcia_interrupt, SA_INTERRUPT, "PCMCIA 0 CD", NULL);
   if (res < 0) {
     printk(KERN_ERR "%s: request for IRQ%d failed (%d)\n",
 	   __FUNCTION__, irq, res);

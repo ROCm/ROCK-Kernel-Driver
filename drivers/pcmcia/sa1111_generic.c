@@ -44,8 +44,8 @@ int sa1111_pcmcia_init(struct pcmcia_init *init)
 		init->socket_irq[1] = IRQ_S1_READY_NINT;
 
 	for (i = ret = 0; i < ARRAY_SIZE(irqs); i++) {
-		ret = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		ret = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (ret)
 			break;
 		set_irq_type(irqs[i].irq, IRQT_FALLING);
@@ -154,11 +154,6 @@ int sa1111_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf
 	val = (val & ~(pse | flt | wait | rst)) | pccr_mask;
 	sa1111_writel(val, pcmcia->mapbase + SA1111_PCCR);
 	local_irq_restore(flags);
-
-	if (conf->irq)
-		enable_irq(irq);
-	else
-		disable_irq(irq);
 
 	return 0;
 }

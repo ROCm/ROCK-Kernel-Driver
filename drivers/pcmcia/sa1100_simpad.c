@@ -29,14 +29,12 @@ static int simpad_pcmcia_init(struct pcmcia_init *init){
 
   clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
 
-  /* Set transition detect */
-  set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );
-  set_irq_type( IRQ_GPIO_CF_IRQ, IRQT_FALLING );
   init->socket_irq[1] = IRQ_GPIO_CF_IRQ;
 
   /* Register interrupts */
   irq = IRQ_GPIO_CF_CD;
-  res = request_irq( irq, init->handler, SA_INTERRUPT, "CF_CD", NULL );
+  res = request_irq(irq, sa1100_pcmcia_interrupt, SA_INTERRUPT,
+		    "CF_CD", NULL );
   if( res < 0 ) goto irq_err;
 
   set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );

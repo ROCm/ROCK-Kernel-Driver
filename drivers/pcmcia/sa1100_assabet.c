@@ -33,16 +33,13 @@ static int assabet_pcmcia_init(struct pcmcia_init *init)
 {
 	int i, res;
 
-	/* Set transition detect */
-	set_irq_type(ASSABET_IRQ_GPIO_CF_IRQ, IRQT_FALLING);
-
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (res)
 			goto irq_err;
+		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
 	}
 
 	init->socket_irq[0] = NO_IRQ;
@@ -126,15 +123,6 @@ assabet_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configu
 		mask |= ASSABET_BCR_CF_RST;
 
 	ASSABET_BCR_frob(ASSABET_BCR_CF_RST | ASSABET_BCR_CF_PWR, mask);
-
-	/*
-	 * Handle suspend mode properly.  This prevents a
-	 * flood of IRQs from the CF device.
-	 */
-	if (configure->irq)
-		enable_irq(ASSABET_IRQ_GPIO_CF_IRQ);
-	else
-		disable_irq(ASSABET_IRQ_GPIO_CF_IRQ);
 
 	return 0;
 }
