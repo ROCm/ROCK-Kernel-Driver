@@ -1,13 +1,18 @@
 ToDo:
 	- Find and fix bugs.
-	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
-	  there are dragons lurking in the details, e.g. read_inode() currently
-	  does no checks for file size wrt s_maxbytes. So what happens when a
-	  user open()s a file with i_size > s_maxbytes? Should read_inode()
-	  truncate the visible i_size? Will the user just get -E2BIG (or
-	  whatever) on open()? Or will (s)he be able to open() but lseek() and
-	  read() will fail when s_maxbytes is reached? -> Investigate this.
 	- Enable NFS exporting of NTFS.
+
+2.0.21 - Check for, and refuse to work with too large files/directories/volumes.
+
+	- Limit volume size at mount time to 2TiB on architectures where
+	  unsigned long is 32-bits (fs/ntfs/super.c::parse_ntfs_boot_sector()).
+	  This is the most we can do without overflowing the 32-bit limit of
+	  the block device size imposed on us by sb_bread() and sb_getblk()
+	  for the time being.
+	- Limit file/directory size at open() time to 16TiB on architectures
+	  where unsigned long is 32-bits (fs/ntfs/file.c::ntfs_file_open() and
+	  fs/ntfs/dir.c::ntfs_dir_open()). This is the most we can do without
+	  overflowing the page cache page index.
 
 2.0.20 - Support non-resident directory index bitmaps, fix page leak in readdir.
 
