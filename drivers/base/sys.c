@@ -12,7 +12,8 @@
  * add themselves as children of the system bus.
  */
 
-#ifdef DEBUG_KOBJECT
+#include <linux/config.h>
+#ifdef CONFIG_DEBUG_KOBJECT
 #define DEBUG 1
 #else
 #undef DEBUG

@@ -10,7 +10,8 @@
  * about using the kobject interface.
  */
 
-#ifdef DEBUG_KOBJECT
+#include <linux/config.h>
+#ifdef CONFIG_DEBUG_KOBJECT
 #define DEBUG 1
 #else
 #undef DEBUG
