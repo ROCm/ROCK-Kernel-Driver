@@ -954,8 +954,6 @@ static int storage_probe(struct usb_interface *intf,
 	scsi_scan_host(us->host);
 
 	printk(KERN_DEBUG 
-	       "WARNING: USB Mass Storage data integrity not assured\n");
-	printk(KERN_DEBUG 
 	       "USB Mass Storage device found at %d\n", us->pusb_dev->devnum);
 	return 0;
 
