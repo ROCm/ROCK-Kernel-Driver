@@ -1297,30 +1297,23 @@ static int sd_attach(Scsi_Device * sdp)
 {
 	Scsi_Disk *sdkp;
 	int dsk_nr;
-	char diskname[6];
 	unsigned long iflags;
-	struct {
-		struct gendisk disk;
-		char name[5];
-	} *p;
 	struct gendisk *gd;
 
 	if ((NULL == sdp) ||
 	    ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD)))
 		return 0;
 
-	p = kmalloc(sizeof(*p), GFP_KERNEL);
-	if (!p)
+	gd = alloc_disk();
+	if (!gd)
 		return 1;
-	memset(p, 0, sizeof(*p));
-	gd = &p->disk;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 	if (sd_template.nr_dev >= sd_template.dev_max) {
 		sdp->attached--;
 		printk(KERN_ERR "sd_init: no more room for device\n");
-		kfree(p);
+		put_disk(gd);
 		return 1;
 	}
 
@@ -1340,7 +1333,7 @@ static int sd_attach(Scsi_Device * sdp)
 	if (dsk_nr >= sd_template.dev_max) {
 		/* panic("scsi_devices corrupt (sd)");  overkill */
 		printk(KERN_ERR "sd_init: sd_dsk_arr corrupted\n");
-		kfree(p);
+		put_disk(gd);
 		return 1;
 	}
 
@@ -1351,18 +1344,16 @@ static int sd_attach(Scsi_Device * sdp)
 	gd->minor_shift = 4;
 	gd->fops = &sd_fops;
 	if (dsk_nr > 26)
-		sprintf(p->name, "sd%c%c", 'a'+dsk_nr/26-1, 'a'+dsk_nr%26);
+		sprintf(gd->disk_name, "sd%c%c",'a'+dsk_nr/26-1,'a'+dsk_nr%26);
 	else
-		sprintf(p->name, "sd%c", 'a'+dsk_nr%26);
-	gd->major_name = p->name;
+		sprintf(gd->disk_name, "sd%c",'a'+dsk_nr%26);
         gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
         gd->driverfs_dev = &sdp->sdev_driverfs_dev;
         gd->flags |= GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
 	sd_disks[dsk_nr] = gd;
-	sd_dskname(dsk_nr, diskname);
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
 	       "id %d, lun %d\n", sdp->removable ? "removable " : "",
-	       diskname, sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
+	       gd->disk_name, sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
 	return 0;
 }
 
@@ -1422,7 +1413,7 @@ static void sd_detach(Scsi_Device * sdp)
 	sdp->attached--;
 	sd_template.dev_noticed--;
 	sd_template.nr_dev--;
-	kfree(sd_disks[dsk_nr]);
+	put_disk(sd_disks[dsk_nr]);
 	sd_disks[dsk_nr] = NULL;
 }
 

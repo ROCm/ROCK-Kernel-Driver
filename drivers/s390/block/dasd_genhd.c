@@ -34,7 +34,6 @@ struct major_info {
 	struct list_head list;
 	int major;
 	struct gendisk disks[DASD_PER_MAJOR];
-	char names[DASD_PER_MAJOR * 8];
 };
 
 /*
@@ -115,8 +114,7 @@ dasd_register_major(int major)
 	list_for_each(l, &dasd_major_info)
 		index += DASD_PER_MAJOR;
 	for (i = 0; i < DASD_PER_MAJOR; i++, index++) {
-		char *name = mi->names + i * 8;
-		mi->disks[i].major_name = name;
+		name = mi->disks[i].disk_name;
 		sprintf(name, "dasd");
 		name += 4;
 		if (index > 701)

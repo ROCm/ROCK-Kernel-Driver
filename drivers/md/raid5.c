@@ -1181,7 +1181,7 @@ static void handle_stripe(struct stripe_head *sh)
 				PRINTK("for %ld schedule op %ld on disc %d\n", sh->sector, bi->bi_rw, i);
 				atomic_inc(&sh->count);
 				bi->bi_sector = sh->sector;
-				bi->bi_flags = 0;
+				bi->bi_flags = 1 << BIO_UPTODATE;
 				bi->bi_vcnt = 1;	
 				bi->bi_idx = 0;
 				bi->bi_io_vec = &sh->dev[i].vec;

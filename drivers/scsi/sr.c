@@ -749,18 +749,17 @@ void sr_finish()
 		 * with loadable modules. */
 		if (cd->disk)
 			continue;
-		disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+		disk = alloc_disk();
 		if (!disk)
 			continue;
 		if (cd->disk) {
-			kfree(disk);
+			put_disk(disk);
 			continue;
 		}
-		memset(disk, 0, sizeof(struct gendisk));
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->minor_shift = 0;
-		disk->major_name = cd->cdi.name;
+		strcpy(disk->disk_name, cd->cdi.name);
 		disk->fops = &sr_bdops;
 		disk->flags = GENHD_FL_CD;
 		cd->disk = disk;
@@ -826,7 +825,7 @@ static void sr_detach(Scsi_Device * SDp)
 			 * We should be kind to our buffer cache, however.
 			 */
 			del_gendisk(cpnt->disk);
-			kfree(cpnt->disk);
+			put_disk(cpnt->disk);
 			cpnt->disk = NULL;
 
 			/*

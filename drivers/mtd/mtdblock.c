@@ -43,7 +43,6 @@ static struct mtdblk_dev {
 	unsigned int cache_size;
 	enum { STATE_EMPTY, STATE_CLEAN, STATE_DIRTY } cache_state;
 	struct gendisk disk;
-	char name[7];
 } *mtdblks[MAX_MTD_DEVICES];
 
 static spinlock_t mtdblks_lock;
@@ -319,8 +318,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	mtdblk->disk.first_minor = dev;
 	mtdblk->disk.minor_shift = 0;
 	mtdblk->disk.fops = &mtd_fops;
-	mtdblk->disk.major_name = mtdblk->name;
-	sprintf(mtdblk->name, "mtd%d", dev);
+	sprintf(mtdblk->disk.disk_name, "mtd%d", dev);
 
 	/* OK, we've created a new one. Add it to the list. */
 

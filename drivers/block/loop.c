@@ -84,7 +84,6 @@
 static int max_loop = 8;
 static struct loop_device *loop_dev;
 static struct gendisk *disks;
-static char *names;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
 /*
@@ -500,15 +499,13 @@ bio_transfer(struct loop_device *lo, struct bio *to_bio,
 static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 {
 	struct bio *new_bio = NULL;
-	struct loop_device *lo;
+	struct loop_device *lo = q->queuedata;
 	unsigned long IV;
 	int rw = bio_rw(old_bio);
-	int unit = minor(to_kdev_t(old_bio->bi_bdev->bd_dev));
 
-	if (unit >= max_loop)
+	if (!lo)
 		goto out;
 
-	lo = &loop_dev[unit];
 	spin_lock_irq(&lo->lo_lock);
 	if (lo->lo_state != Lo_bound)
 		goto inactive;
@@ -712,6 +709,29 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	set_blocksize(bdev, block_size(lo_device));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
+
+	/*
+	 * set queue make_request_fn, and add limits based on lower level
+	 * device
+	 */
+	blk_queue_make_request(&lo->lo_queue, loop_make_request);
+	blk_queue_bounce_limit(&lo->lo_queue, BLK_BOUNCE_HIGH);
+	lo->lo_queue.queuedata = lo;
+
+	/*
+	 * we remap to a block device, make sure we correctly stack limits
+	 */
+	if (S_ISBLK(inode->i_mode)) {
+		request_queue_t *q = bdev_get_queue(lo_device);
+
+		blk_queue_max_sectors(&lo->lo_queue, q->max_sectors);
+		blk_queue_max_phys_segments(&lo->lo_queue,q->max_phys_segments);
+		blk_queue_max_hw_segments(&lo->lo_queue, q->max_hw_segments);
+		blk_queue_max_segment_size(&lo->lo_queue, q->max_segment_size);
+		blk_queue_segment_boundary(&lo->lo_queue, q->seg_boundary_mask);
+		blk_queue_merge_bvec(&lo->lo_queue, q->merge_bvec_fn);
+	}
+
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 	down(&lo->lo_sem);
 
@@ -785,6 +805,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	lo->lo_offset = 0;
 	lo->lo_encrypt_key_size = 0;
 	lo->lo_flags = 0;
+	lo->lo_queue.queuedata = NULL;
 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
 	memset(lo->lo_name, 0, LO_NAME_SIZE);
 	invalidate_bdev(bdev, 0);
@@ -991,6 +1012,16 @@ int loop_unregister_transfer(int number)
 EXPORT_SYMBOL(loop_register_transfer);
 EXPORT_SYMBOL(loop_unregister_transfer);
 
+request_queue_t *loop_get_queue(kdev_t dev)
+{
+	int minor = minor(dev);
+
+	if (minor < max_loop)
+		return &loop_dev[minor].lo_queue;
+
+	return NULL;
+}
+
 int __init loop_init(void) 
 {
 	int	i;
@@ -1021,11 +1052,6 @@ int __init loop_init(void)
 	if (!disks)
 		goto out_mem;
 
-	names = kmalloc(max_loop * 8, GFP_KERNEL);
-
-	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), loop_make_request);
-	blk_queue_bounce_limit(BLK_DEFAULT_QUEUE(MAJOR_NR), BLK_BOUNCE_HIGH);
-
 	for (i = 0; i < max_loop; i++) {
 		struct loop_device *lo = &loop_dev[i];
 		struct gendisk *disk = disks + i;
@@ -1039,16 +1065,16 @@ int __init loop_init(void)
 		disk->major = LOOP_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &lo_fops;
-		sprintf(names + 8*i, "loop%d", i);
-		disk->major_name = names + 8 * i;
+		sprintf(disk->disk_name, "loop%d", i);
 		add_disk(disk);
 	}
+
+	blk_dev[LOOP_MAJOR].queue = loop_get_queue;
 
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
 out_mem:
-	kfree(names);
 	kfree(disks);
 	kfree(loop_dev);
 	printk(KERN_ERR "loop: ran out of memory\n");
@@ -1064,7 +1090,6 @@ void loop_exit(void)
 	if (unregister_blkdev(MAJOR_NR, "loop"))
 		printk(KERN_WARNING "loop: cannot unregister blkdev\n");
 
-	kfree(names);
 	kfree(disks);
 	kfree(loop_dev);
 }

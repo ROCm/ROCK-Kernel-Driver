@@ -82,8 +82,6 @@
 #define QDIO_CLEANUP_CLEAR_TIMEOUT 20000
 #define QDIO_CLEANUP_HALT_TIMEOUT 10000
 
-#define QDIO_BH AURORA_BH
-
 #define QDIO_IRQ_BUCKETS 256 /* heavy..., but does only use a few bytes, but
 			      be rather faster in cases of collisions
 			      (if there really is a collision, it is

@@ -78,7 +78,6 @@ int initrd_below_start_ok;
 
 static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
 static struct gendisk rd_disks[NUM_RAMDISKS];
-static char rd_names[NUM_RAMDISKS][5];
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
 
@@ -316,7 +315,7 @@ static struct gendisk initrd_disk = {
 	.first_minor = INITRD_MINOR,
 	.minor_shift = 0,
 	.fops = &rd_bd_op,	
-	.major_name = "initrd"
+	.disk_name = "initrd"
 };
 
 static ssize_t initrd_read(struct file *file, char *buf,
@@ -447,8 +446,7 @@ static int __init rd_init (void)
 		disk->first_minor = 0;
 		disk->minor_shift = 0;
 		disk->fops = &rd_bd_op;
-		sprintf(rd_names[i], "rd%d", i);
-		disk->major_name = rd_names[i];
+		sprintf(disk->disk_name, "rd%d", i);
 		set_capacity(disk, rd_size * 2);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "rd", NULL);

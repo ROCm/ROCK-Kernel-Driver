@@ -2002,7 +2002,7 @@ static struct gendisk optcd_disk = {
 	.first_minor = 0,
 	.minor_shift = 0,
 	.fops = &opt_fops,
-	.major_name = "optcd"
+	.disk_name = "optcd"
 };
 
 /* Test for presence of drive and initialize it. Called at boot time

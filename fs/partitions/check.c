@@ -96,17 +96,17 @@ char *disk_name(struct gendisk *hd, int part, char *buf)
 			if (pos >= 0)
 				return buf + pos;
 		}
-		sprintf(buf, "%s", hd->major_name);
+		sprintf(buf, "%s", hd->disk_name);
 	} else {
 		if (hd->part[part-1].de) {
 			pos = devfs_generate_path(hd->part[part-1].de, buf, 64);
 			if (pos >= 0)
 				return buf + pos;
 		}
-		if (isdigit(hd->major_name[strlen(hd->major_name)-1]))
-			sprintf(buf, "%sp%d", hd->major_name, part);
+		if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
+			sprintf(buf, "%sp%d", hd->disk_name, part);
 		else
-			sprintf(buf, "%s%d", hd->major_name, part);
+			sprintf(buf, "%s%d", hd->disk_name, part);
 	}
 	return buf;
 }
@@ -313,7 +313,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 		strncpy(dirname + pos, "../", 3);
 	} else {
 		/*  Unaware driver: construct "real" directory  */
-		sprintf(dirname, "../%s/disc%d", dev->major_name,
+		sprintf(dirname, "../%s/disc%d", dev->disk_name,
 			dev->first_minor >> dev->minor_shift);
 		dir = devfs_mk_dir(NULL, dirname + 3, NULL);
 	}
@@ -393,26 +393,10 @@ static void devfs_remove_partitions(struct gendisk *dev)
 #endif
 }
 
-/*
- * This function will re-read the partition tables for a given device,
- * and set things back up again.  There are some important caveats,
- * however.  You must ensure that no one is using the device, and no one
- * can start using the device while this function is being executed.
- *
- * Much of the cleanup from the old partition tables should have already been
- * done
- */
-
-void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
-	struct block_device_operations *ops, long size)
+/* Not exported, helper to add_disk(). */
+void register_disk(struct gendisk *disk)
 {
 	struct block_device *bdev;
-
-	if (!disk)
-		return;
-
-	set_capacity(disk, size);
-
 	if (disk->flags & GENHD_FL_CD)
 		devfs_create_cdrom(disk);
 
@@ -421,10 +405,10 @@ void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
 		return;
 
 	/* No such device (e.g., media were just removed) */
-	if (!size)
+	if (!get_capacity(disk))
 		return;
 
-	bdev = bdget(kdev_t_to_nr(dev));
+	bdev = bdget(MKDEV(disk->major, disk->first_minor));
 	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
 		return;
 	check_partition(disk, bdev);
@@ -569,6 +553,7 @@ char *partition_name(dev_t dev)
 	static char nomem [] = "<nomem>";
 	struct dev_name *dname;
 	struct list_head *tmp;
+	int part;
 
 	list_for_each(tmp, &device_names) {
 		dname = list_entry(tmp, struct dev_name, list);
@@ -583,10 +568,10 @@ char *partition_name(dev_t dev)
 	/*
 	 * ok, add this new device name to the list
 	 */
-	hd = get_gendisk(to_kdev_t(dev));
+	hd = get_gendisk(dev, &part);
 	dname->name = NULL;
 	if (hd)
-		dname->name = disk_name(hd, MINOR(dev)-hd->first_minor, dname->namebuf);
+		dname->name = disk_name(hd, part, dname->namebuf);
 	if (!dname->name) {
 		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
 		dname->name = dname->namebuf;

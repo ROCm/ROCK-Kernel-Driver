@@ -5835,7 +5835,7 @@ int __init sbpcd_init(void)
 		disk->first_minor = j;
 		disk->minor_shift = 0;
 		disk->fops = &sbpcd_bdops;
-		disk->major_name = sbpcd_infop->name;
+		strcpy(disk->disk_name, sbpcd_infop->name);
 		disk->flags = GENHD_FL_CD;
 		sprintf(nbuff, "c0t%d", p->drv_id);
 		disk->de = devfs_mk_dir(devfs_handle, nbuff, NULL);

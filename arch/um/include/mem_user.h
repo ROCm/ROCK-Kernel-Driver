@@ -34,6 +34,7 @@
 
 struct mem_region {
 	char *driver;
+	unsigned long start_pfn;
 	unsigned long start;
 	unsigned long len;
 	void *mem_map;
@@ -51,8 +52,8 @@ extern unsigned long task_size;
 extern int init_mem_user(void);
 extern int create_mem_file(unsigned long len);
 extern void setup_range(int fd, char *driver, unsigned long start,
-			unsigned long total, struct mem_region *region,
-			void *reserved);
+			unsigned long pfn, unsigned long total, int need_vm, 
+			struct mem_region *region, void *reserved);
 extern void map(unsigned long virt, unsigned long p, unsigned long len, 
 		int r, int w, int x);
 extern int unmap(void *addr, int len);
@@ -62,8 +63,6 @@ extern void setup_memory(void *entry);
 extern unsigned long find_iomem(char *driver, unsigned long *len_out);
 extern int init_maps(struct mem_region *region);
 extern int nregions(void);
-extern void setup_one_range(int n, int fd, char *driver, unsigned long start, 
-			    unsigned long len, struct mem_region *region);
 extern int reserve_vm(unsigned long start, unsigned long end, void *e);
 extern unsigned long get_vm(unsigned long len);
 extern void setup_physmem(unsigned long start, unsigned long usable,

@@ -102,7 +102,6 @@ static struct board_type products[] = {
 	{ 0x40580E11, "Smart Array 431",	&smart4_access },
 };
 
-static char *ida_names;
 static struct gendisk ida_gendisk[MAX_CTLR * NWD];
 
 static struct proc_dir_entry *proc_array;
@@ -313,13 +312,12 @@ void cleanup_module(void)
 		kfree(hba[i]->cmd_pool_bits);
 
 		for (j = 0; j < NWD; j++) {
-			if (ida_gendisk[i*NWD+j].major_name)
+			if (ida_gendisk[i*NWD+j].part)
 				del_gendisk(&ida_gendisk[i*NWD+j]);
 		}
 	}
 	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
-	kfree(ida_names);
 }
 #endif /* MODULE */
 
@@ -344,12 +342,6 @@ int __init cpqarray_init(void)
 	printk("Found %d controller(s)\n", nr_ctlr);
 
 	/* allocate space for disk structs */
-	ida_names = kmalloc(nr_ctlr*NWD*10, GFP_KERNEL);
-	if (!ida_names) {
-		printk( KERN_ERR "cpqarray: out of memory");
-		kfree(ida_names);
-		return(num_cntlrs_reg);
-	}
 	/* 
 	 * register block devices
 	 * Find disks and fill in structs
@@ -399,11 +391,6 @@ int __init cpqarray_init(void)
 			 *	init_module will fail, so clean up global 
 			 *	memory that clean_module would do.
 			*/	
-	
-			if (num_cntlrs_reg == 0) 
-			{
-				kfree(ida_names);
-			}
                 	return(num_cntlrs_reg);
 	
 		}
@@ -439,7 +426,7 @@ int __init cpqarray_init(void)
 		for(j=0; j<NWD; j++) {
 			struct gendisk *disk = ida_gendisk + i*NWD + j;
 			drv_info_t *drv = &hba[i]->drv[j];
-			sprintf(ida_names + (i*NWD+j)*10, "ida/c%dd%d", i, j);
+			sprintf(disk->disk_name, "ida/c%dd%d", i, j);
 			disk->major = MAJOR_NR + i;
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->minor_shift = NWD_SHIFT;
@@ -447,7 +434,6 @@ int __init cpqarray_init(void)
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
 				continue;
-			disk->major_name = ida_names + (i*NWD+j)*10;
 			(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->blk_size;
 			set_capacity(disk, drv->nr_blks);
 			add_disk(disk);
@@ -1449,10 +1435,8 @@ static int revalidate_allvol(kdev_t dev)
 	 */
 	for (i = 0; i < NWD; i++) {
 		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
-		if (!disk->major_name)
-			continue;
-		del_gendisk(disk);
-		disk->major_name = NULL;
+		if (disk->part)
+			del_gendisk(disk);
 	}
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
 
@@ -1471,7 +1455,6 @@ static int revalidate_allvol(kdev_t dev)
 		if (!drv->nr_blks)
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
-		disk->major_name = ida_names + (ctlr*NWD+i)*10;
 		set_capacity(disk, drv->nr_blks);
 		add_disk(disk);
 	}

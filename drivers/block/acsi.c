@@ -245,7 +245,6 @@ char 			*acsi_buffer;
 unsigned long 	phys_acsi_buffer;
 
 static int NDevices;
-static char acsi_names[MAX_DEV*4];
 static int access_count[MAX_DEV];
 
 static int				CurrentNReq;
@@ -1692,10 +1691,9 @@ static void acsi_geninit(void)
 					 
 	for( i = 0; i < NDevices; ++i ) {
 		struct gendisk *disk = acsi_gendisk + i;
-		sprintf(acsi_names + 4*i, "ad%c", 'a'+i);
+		sprintf(disk->disk_name, "ad%c", 'a'+i);
 		disk->major = MAJOR_NR;
 		disk->first_minor = i << 4;
-		disk->major_name = acsi_names + 4*i;
 		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
 		disk->fops = &acsi_fops;
 		set_capacity(disk, acsi_info[i].size);

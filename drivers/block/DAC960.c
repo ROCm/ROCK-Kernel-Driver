@@ -1930,16 +1930,10 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
-  char *names;
   RequestQueue_T *RequestQueue;
   int MinorNumber;
   int n;
 
-  names = kmalloc(9 * DAC960_MaxLogicalDrives, GFP_KERNEL);
-  if (!names) {
-      DAC960_Error("out of memory", Controller);
-      return false;
-  }
   /*
     Register the Block Device Major Number for this DAC960 Controller.
   */
@@ -1948,7 +1942,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
     {
       DAC960_Error("UNABLE TO ACQUIRE MAJOR NUMBER %d - DETACHING\n",
 		   Controller, MajorNumber);
-      kfree(names);
       return false;
     }
   /*
@@ -1967,10 +1960,9 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
 	struct gendisk *disk = &Controller->disks[n];
 	memset(disk, 0, sizeof(struct gendisk));
-	sprintf(names + 9 * n, "rd/c%dd%d", Controller->ControllerNumber, n);
+	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	disk->major = MajorNumber;
 	disk->first_minor = n << DAC960_MaxPartitionsBits;
-	disk->major_name = names + 9 * n;
 	disk->minor_shift = DAC960_MaxPartitionsBits;
 	disk->fops = &DAC960_BlockDeviceOperations;
    }
@@ -1990,10 +1982,8 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
   int disk;
-  for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
+  for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
 	  del_gendisk(&Controller->disks[disk]);
-	  kfree(Controller->disks[0].major_name);
-  }
   /*
     Unregister the Block Device Major Number for this DAC960 Controller.
   */

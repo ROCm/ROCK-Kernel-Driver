@@ -10,6 +10,7 @@
 #include "linux/sched.h"
 #include "asm/processor.h"
 #include "asm/page.h"
+#include "asm/fixmap.h"
 
 extern pgd_t swapper_pg_dir[1024];
 
@@ -62,12 +63,16 @@ extern unsigned long *empty_zero_page;
  */
 
 extern unsigned long high_physmem;
-extern unsigned long end_vm;
 
 #define VMALLOC_OFFSET	(__va_space)
 #define VMALLOC_START	(((unsigned long) high_physmem + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END	(end_vm)
+
+#if CONFIG_HIGHMEM
+# define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
+#else
+# define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
+#endif
 
 #define _PAGE_PRESENT	0x001
 #define _PAGE_NEWPAGE	0x002
@@ -183,15 +188,17 @@ static inline void pgd_clear(pgd_t * pgdp)	{ }
 
 extern struct page *pte_mem_map(pte_t pte);
 extern struct page *phys_mem_map(unsigned long phys);
+extern unsigned long phys_to_pfn(unsigned long p);
+extern unsigned long pfn_to_phys(unsigned long pfn);
 
 #define pte_page(x) pfn_to_page(pte_pfn(x))
 #define pte_address(x) (__va(pte_val(x) & PAGE_MASK))
 #define mk_phys(a, r) ((a) + (r << REGION_SHIFT))
 #define phys_addr(p) ((p) & ~REGION_MASK)
 #define phys_page(p) (phys_mem_map(p) + ((phys_addr(p)) >> PAGE_SHIFT))
-#define pte_pfn(x) ((unsigned long)(((x).pte_low >> PAGE_SHIFT)))
-#define pfn_pte(pfn, prot) __pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
-#define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#define pte_pfn(x) phys_to_pfn(pte_val(x))
+#define pfn_pte(pfn, prot) __pte(pfn_to_phys(pfn) | pgprot_val(prot))
+#define pfn_pmd(pfn, prot) __pmd(pfn_to_phys(pfn) | pgprot_val(prot))
 
 static inline pte_t pte_mknewprot(pte_t pte)
 {
@@ -333,6 +340,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define __pgd_offset(address) pgd_index(address)
 
 /* to find an entry in a page-table-directory */
 #define pgd_offset(mm, address) \
@@ -340,6 +348,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
+
+#define __pmd_offset(address) \
+		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 
 /* Find an entry in the second-level page table.. */
 static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)

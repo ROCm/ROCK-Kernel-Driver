@@ -528,7 +528,7 @@ unsigned long um_virt_to_phys(void *t, unsigned long addr)
 
 char *current_cmd(void)
 {
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_HIGHMEM)
 	return("(Unknown)");
 #else
 	unsigned long addr = um_virt_to_phys(current, current->mm->arg_start);

@@ -30,7 +30,6 @@ MODULE_PARM(debug, "i");
 #endif
 
 static struct gendisk mtd_disks[MAX_MTD_DEVICES];
-static char names names[MAX_MTD_DEVICES][11];
 
 static int mtdblock_open(struct inode *inode, struct file *file)
 {
@@ -233,8 +232,7 @@ int __init init_mtdblock(void)
 		struct gendisk *disk = mtd_disks + i;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
-		sprintf(names[i], "mtdblock%d", i);
-		disk->major_name = names[i];
+		sprintf(disk->disk_name, "mtdblock%d", i);
 		disk->fops = &mtd_fops;
 	}
 	return 0;
