@@ -1715,7 +1715,7 @@ wait_cons_dev (int irq)
 		 */
 		__ctl_store (cr6, 6, 6);
 		save_cr6 = cr6;
-		cr6 &= 0x01FFFFFF;
+		cr6 = 0x01000000;
 		__ctl_load (cr6, 6, 6);
 
 		do {
@@ -1855,47 +1855,39 @@ enable_cpu_sync_isc (int irq)
 
 	/* This one spins until it can get the sync_isc lock for irq# irq */
 
-	if ((irq <= highest_subchannel) && 
-	    (ioinfo[irq] != INVALID_STORAGE_AREA) &&
-	    (!ioinfo[irq]->st)) {
-		if (atomic_read (&sync_isc) != irq)
-			atomic_compare_and_swap_spin (-1, irq, &sync_isc);
-
-		sync_isc_cnt++;
-
-		if (sync_isc_cnt > 255) {	/* fixme : magic number */
-			panic ("Too many recursive calls to enable_sync_isc");
-
+	if (atomic_read (&sync_isc) != irq)
+		atomic_compare_and_swap_spin (-1, irq, &sync_isc);
+	
+	sync_isc_cnt++;
+	
+	if (sync_isc_cnt > 255) {	/* fixme : magic number */
+		panic ("Too many recursive calls to enable_sync_isc");
+		
+	}
+	/*
+	 * we only run the STSCH/MSCH path for the first enablement
+	 */
+	else if (sync_isc_cnt == 1) {
+		ioinfo[irq]->ui.flags.syncio = 1;
+		
+		ccode = stsch (irq, &(ioinfo[irq]->schib));
+		
+		if (!ccode) {
+			ioinfo[irq]->schib.pmcw.isc = 5;
+			rc = s390_set_isc5(irq, 0);
+			
+		} else {
+			rc = -ENODEV;	/* device is not-operational */
+			
 		}
-		/*
-		 * we only run the STSCH/MSCH path for the first enablement
-		 */
-		else if (sync_isc_cnt == 1) {
-			ioinfo[irq]->ui.flags.syncio = 1;
-
-			ccode = stsch (irq, &(ioinfo[irq]->schib));
-
-			if (!ccode) {
-				ioinfo[irq]->schib.pmcw.isc = 5;
-				rc = s390_set_isc5(irq, 0);
-
-			} else {
-				rc = -ENODEV;	/* device is not-operational */
-
-			}
-		}
-
-		if (rc) {	/* can only happen if stsch/msch fails */
-			sync_isc_cnt = 0;
-			atomic_set (&sync_isc, -1);
-		}
-	} else {
-
-		rc = -EINVAL;
-
+	}
+	
+	if (rc) {	/* can only happen if stsch/msch fails */
+		sync_isc_cnt = 0;
+		atomic_set (&sync_isc, -1);
 	}
 
-	return (rc);
+	return rc;
 }
 
 
@@ -1910,44 +1902,36 @@ disable_cpu_sync_isc (int irq)
 	sprintf (dbf_txt, "disisc%x", irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	if ((irq <= highest_subchannel) && 
-	    (ioinfo[irq] != INVALID_STORAGE_AREA) && 
-	    (!ioinfo[irq]->st)) {
-		/*
-		 * We disable if we're the top user only, as we may
-		 *  run recursively ... 
-		 * We must not decrease the count immediately; during
-		 *  msch() processing we may face another pending
-		 *  status we have to process recursively (sync).
-		 */
-
-		if (sync_isc_cnt == 1) {
-			ccode = stsch (irq, &(ioinfo[irq]->schib));
-
-			if (!ccode) {
-
-				ioinfo[irq]->schib.pmcw.isc = 3;
-				rc = s390_set_isc5(irq, 1);
-			} else {
-				rc = -ENODEV;
-			}
-				
-			ioinfo[irq]->ui.flags.syncio = 0;
-
-			sync_isc_cnt = 0;
-			atomic_set (&sync_isc, -1);
-
+	/*
+	 * We disable if we're the top user only, as we may
+	 *  run recursively ... 
+	 * We must not decrease the count immediately; during
+	 *  msch() processing we may face another pending
+	 *  status we have to process recursively (sync).
+	 */
+	
+	if (sync_isc_cnt == 1) {
+		ccode = stsch (irq, &(ioinfo[irq]->schib));
+		
+		if (!ccode) {
+			
+			ioinfo[irq]->schib.pmcw.isc = 3;
+			rc = s390_set_isc5(irq, 1);
 		} else {
-			sync_isc_cnt--;
-
+			rc = -ENODEV;
 		}
+		
+		ioinfo[irq]->ui.flags.syncio = 0;
+		
+		sync_isc_cnt = 0;
+		atomic_set (&sync_isc, -1);
+		
 	} else {
-
-		rc = -EINVAL;
-
+		sync_isc_cnt--;
+		
 	}
 
-	return (rc);
+	return rc;
 }
 
 EXPORT_SYMBOL (halt_IO);
