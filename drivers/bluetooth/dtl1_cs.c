@@ -66,7 +66,7 @@ MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
-MODULE_DESCRIPTION("BlueZ driver for Nokia Connectivity Card DTL-1");
+MODULE_DESCRIPTION("Bluetooth driver for Nokia Connectivity Card DTL-1");
 MODULE_LICENSE("GPL");
 
 
@@ -238,7 +238,7 @@ static void dtl1_receive(dtl1_info_t *info)
 
 		/* Allocate packet */
 		if (info->rx_skb == NULL)
-			if (!(info->rx_skb = bluez_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
+			if (!(info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
 				printk(KERN_WARNING "dtl1_cs: Can't allocate mem for new packet.\n");
 				info->rx_state = RECV_WAIT_NSH;
 				info->rx_count = NSHL;
@@ -433,7 +433,7 @@ static int dtl1_hci_send_frame(struct sk_buff *skb)
 	nsh.zero = 0;
 	nsh.len = skb->len;
 
-	s = bluez_skb_alloc(NSHL + skb->len + 1, GFP_ATOMIC);
+	s = bt_skb_alloc(NSHL + skb->len + 1, GFP_ATOMIC);
 	skb_reserve(s, NSHL);
 	memcpy(skb_put(s, skb->len), skb->data, skb->len);
 	if (skb->len & 0x0001)

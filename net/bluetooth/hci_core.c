@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ HCI Core.
+ * Bluetooth HCI Core.
  *
  * $Id: hci_core.c,v 1.6 2002/04/17 17:37:16 maxk Exp $
  */
@@ -53,7 +53,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
-#ifndef HCI_CORE_DEBUG
+#ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
@@ -168,7 +168,7 @@ static int __hci_request(struct hci_dev *hdev, void (*req)(struct hci_dev *hdev,
 
 	switch (hdev->req_status) {
 	case HCI_REQ_DONE:
-		err = -bterr(hdev->req_result);
+		err = -bt_err(hdev->req_result);
 		break;
 
 	case HCI_REQ_CANCELED:
@@ -877,7 +877,7 @@ int hci_recv_frame(struct sk_buff *skb)
 	BT_DBG("%s type %d len %d", hdev->name, skb->pkt_type, skb->len);
 
 	/* Incomming skb */
-	bluez_cb(skb)->incomming = 1;
+	bt_cb(skb)->incoming = 1;
 
 	/* Time stamp */
 	do_gettimeofday(&skb->stamp);
@@ -1001,7 +1001,7 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *p
 
 	BT_DBG("%s ogf 0x%x ocf 0x%x plen %d", hdev->name, ogf, ocf, plen);
 
-	if (!(skb = bluez_skb_alloc(len, GFP_ATOMIC))) {
+	if (!(skb = bt_skb_alloc(len, GFP_ATOMIC))) {
 		BT_ERR("%s Can't allocate memory for HCI command", hdev->name);
 		return -ENOMEM;
 	}
@@ -1250,7 +1250,7 @@ static void hci_tx_task(unsigned long arg)
 	read_unlock(&hci_task_lock);
 }
 
-/* ----- HCI RX task (incomming data proccessing) ----- */
+/* ----- HCI RX task (incoming data proccessing) ----- */
 
 /* ACL data packet */
 static inline void hci_acldata_packet(struct hci_dev *hdev, struct sk_buff *skb)
@@ -1405,16 +1405,4 @@ static void hci_cmd_task(unsigned long arg)
 			hci_sched_cmd(hdev);
 		}
 	}
-}
-
-/* ---- Initialization ---- */
-
-int hci_core_init(void)
-{
-	return 0;
-}
-
-int hci_core_cleanup(void)
-{
-	return 0;
 }

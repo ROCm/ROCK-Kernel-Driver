@@ -26,7 +26,7 @@
 */
 
 /*
- * RFCOMM core.
+ * Bluetooth RFCOMM core.
  *
  * $Id: core.c,v 1.42 2002/10/01 23:26:25 maxk Exp $
  */
@@ -53,7 +53,7 @@
 
 #define VERSION "0.3"
 
-#ifndef CONFIG_BLUEZ_RFCOMM_DEBUG
+#ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
 #define BT_DBG(D...)
 #endif
@@ -489,10 +489,10 @@ struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
 {
 	struct rfcomm_session *s;
 	struct list_head *p, *n;
-	struct bluez_sock *sk;
+	struct bt_sock *sk;
 	list_for_each_safe(p, n, &session_list) {
 		s = list_entry(p, struct rfcomm_session, list);
-		sk = bluez_sk(s->sock->sk); 
+		sk = bt_sk(s->sock->sk); 
 
 		if ((!bacmp(src, BDADDR_ANY) || !bacmp(&sk->src, src)) &&
 				!bacmp(&sk->dst, dst))
@@ -577,9 +577,9 @@ void rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *d
 {
 	struct sock *sk = s->sock->sk;
 	if (src)
-		bacpy(src, &bluez_sk(sk)->src);
+		bacpy(src, &bt_sk(sk)->src);
 	if (dst)
-		bacpy(dst, &bluez_sk(sk)->dst);
+		bacpy(dst, &bt_sk(sk)->dst);
 }
 
 /* ---- RFCOMM frame sending ---- */
@@ -1509,7 +1509,7 @@ static inline void rfcomm_accept_connection(struct rfcomm_session *s)
 
 	/* Fast check for a new connection.
 	 * Avoids unnesesary socket allocations. */
-	if (list_empty(&bluez_sk(sock->sk)->accept_q))
+	if (list_empty(&bt_sk(sock->sk)->accept_q))
 		return;
 
 	BT_DBG("session %p", s);
@@ -1727,7 +1727,7 @@ static int rfcomm_dlc_dump(char *buf)
 			d = list_entry(pp, struct rfcomm_dlc, list);
 
 			ptr += sprintf(ptr, "dlc %s %s %ld %d %d %d %d\n",
-				batostr(&bluez_sk(sk)->src), batostr(&bluez_sk(sk)->dst),
+				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
 				d->state, d->dlci, d->mtu, d->rx_credits, d->tx_credits);
 		}
 	}
@@ -1771,13 +1771,13 @@ int __init rfcomm_init(void)
 
 	rfcomm_init_sockets();
 
-#ifdef CONFIG_BLUEZ_RFCOMM_TTY
+#ifdef CONFIG_BT_RFCOMM_TTY
 	rfcomm_init_ttys();
 #endif
 
 	create_proc_read_entry("bluetooth/rfcomm", 0, 0, rfcomm_read_proc, NULL);
 
-	BT_INFO("BlueZ RFCOMM ver %s", VERSION);
+	BT_INFO("Bluetooth RFCOMM ver %s", VERSION);
 	BT_INFO("Copyright (C) 2002 Maxim Krasnyansky <maxk@qualcomm.com>");
 	BT_INFO("Copyright (C) 2002 Marcel Holtmann <marcel@holtmann.org>");
 	return 0;
@@ -1796,7 +1796,7 @@ void rfcomm_cleanup(void)
 
 	remove_proc_entry("bluetooth/rfcomm", NULL);
 
-#ifdef CONFIG_BLUEZ_RFCOMM_TTY
+#ifdef CONFIG_BT_RFCOMM_TTY
 	rfcomm_cleanup_ttys();
 #endif
 
@@ -1808,5 +1808,5 @@ module_init(rfcomm_init);
 module_exit(rfcomm_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
-MODULE_DESCRIPTION("BlueZ RFCOMM ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth RFCOMM ver " VERSION);
 MODULE_LICENSE("GPL");

@@ -57,7 +57,7 @@
 #include "hci_uart.h"
 #include "hci_bcsp.h"
 
-#ifndef HCI_UART_DEBUG
+#ifndef CONFIG_BT_HCIUART_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
@@ -176,7 +176,7 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 	u8  hdr[4], chan;
 	int rel, i;
 
-#ifdef CONFIG_BLUEZ_HCIUART_BCSP_TXCRC
+#ifdef CONFIG_BT_HCIUART_BCSP_TXCRC
 	u16 BCSP_CRC_INIT(bcsp_txmsg_crc);
 #endif
 
@@ -228,7 +228,7 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 		BT_DBG("Sending packet with seqno %u", bcsp->msgq_txseq);
 		bcsp->msgq_txseq = ++(bcsp->msgq_txseq) & 0x07;
 	}
-#ifdef  CONFIG_BLUEZ_HCIUART_BCSP_TXCRC
+#ifdef  CONFIG_BT_HCIUART_BCSP_TXCRC
 	hdr[0] |= 0x40;
 #endif
 
@@ -240,7 +240,7 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 	/* Put BCSP header */
 	for (i = 0; i < 4; i++) {
 		bcsp_slip_one_byte(nskb, hdr[i]);
-#ifdef  CONFIG_BLUEZ_HCIUART_BCSP_TXCRC
+#ifdef  CONFIG_BT_HCIUART_BCSP_TXCRC
 		bcsp_crc_update(&bcsp_txmsg_crc, hdr[i]);
 #endif
 	}
@@ -248,12 +248,12 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 	/* Put payload */
 	for (i = 0; i < len; i++) {
 		bcsp_slip_one_byte(nskb, data[i]);
-#ifdef  CONFIG_BLUEZ_HCIUART_BCSP_TXCRC
+#ifdef  CONFIG_BT_HCIUART_BCSP_TXCRC
 		bcsp_crc_update(&bcsp_txmsg_crc, data[i]);
 #endif
 	}
 
-#ifdef CONFIG_BLUEZ_HCIUART_BCSP_TXCRC
+#ifdef CONFIG_BT_HCIUART_BCSP_TXCRC
 	/* Put CRC */
 	bcsp_txmsg_crc = bcsp_crc_reverse(bcsp_txmsg_crc);
 	bcsp_slip_one_byte(nskb, (u8) ((bcsp_txmsg_crc >> 8) & 0x00ff));
@@ -611,7 +611,7 @@ static int bcsp_recv(struct hci_uart *hu, void *data, int count)
 				 * Allocate packet. Max len of a BCSP pkt= 
 				 * 0xFFF (payload) +4 (header) +2 (crc) */
 
-				bcsp->rx_skb = bluez_skb_alloc(0x1005, GFP_ATOMIC);
+				bcsp->rx_skb = bt_skb_alloc(0x1005, GFP_ATOMIC);
 				if (!bcsp->rx_skb) {
 					BT_ERR("Can't allocate mem for new packet");
 					bcsp->rx_state = BCSP_W4_PKT_DELIMITER;

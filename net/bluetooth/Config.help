@@ -1,5 +1,5 @@
 Bluetooth subsystem support
-CONFIG_BLUEZ
+CONFIG_BT
   Bluetooth is low-cost, low-power, short-range wireless technology.
   It was designed as a replacement for cables and other short-range
   technologies like IrDA.  Bluetooth operates in personal area range
@@ -25,7 +25,7 @@ CONFIG_BLUEZ
   If you want to compile Bluetooth Core as module (bluetooth.o) say M here.
 
 L2CAP protocol support
-CONFIG_BLUEZ_L2CAP
+CONFIG_BT_L2CAP
   L2CAP (Logical Link Control and Adaptation Protocol) provides
   connection oriented and connection-less data transport.  L2CAP
   support is required for most Bluetooth applications.
@@ -34,7 +34,7 @@ CONFIG_BLUEZ_L2CAP
   compile it as module (l2cap.o).
 
 SCO links support
-CONFIG_BLUEZ_SCO
+CONFIG_BT_SCO
   SCO link provides voice transport over Bluetooth. SCO support is
   required for voice applications like Headset and Audio.
 

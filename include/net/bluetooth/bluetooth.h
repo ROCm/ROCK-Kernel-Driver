@@ -40,7 +40,7 @@
 #endif
 
 /* Reserv for core and drivers use */
-#define BLUEZ_SKB_RESERVE       8
+#define BT_SKB_RESERVE       8
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -57,29 +57,12 @@
 #define SOL_SCO     17
 #define SOL_RFCOMM  18
 
-/* Debugging */
-#ifdef CONFIG_BLUEZ_DEBUG
-
-#define HCI_CORE_DEBUG		1
-#define HCI_SOCK_DEBUG		1
-#define HCI_UART_DEBUG		1
-#define HCI_USB_DEBUG		1
-//#define HCI_DATA_DUMP		1
-
-#define L2CAP_DEBUG		1
-#define SCO_DEBUG		1
-#define AF_BLUETOOTH_DEBUG	1
-
-#endif /* CONFIG_BLUEZ_DEBUG */
-
-extern void bluez_dump(char *pref, __u8 *buf, int count);
-
 #define BT_INFO(fmt, arg...) printk(KERN_INFO fmt "\n" , ## arg)
 #define BT_DBG(fmt, arg...)  printk(KERN_INFO "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 #define BT_ERR(fmt, arg...)  printk(KERN_ERR  "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 
 #ifdef HCI_DATA_DUMP
-#define BT_DMP(buf, len)    bluez_dump(__FUNCTION__, buf, len)
+#define BT_DMP(buf, len)    bt_dump(__FUNCTION__, buf, len)
 #else
 #define BT_DMP(D...)
 #endif
@@ -127,9 +110,9 @@ bdaddr_t *strtoba(char *str);
 
 /* Common socket structures and functions */
 
-#define bluez_sk(__sk) ((struct bluez_sock *) __sk)
+#define bt_sk(__sk) ((struct bt_sock *) __sk)
 
-struct bluez_sock {
+struct bt_sock {
 	struct sock sk;
 	bdaddr_t    src;
 	bdaddr_t    dst;
@@ -137,48 +120,48 @@ struct bluez_sock {
 	struct sock *parent;
 };
 
-struct bluez_sock_list {
+struct bt_sock_list {
 	struct sock *head;
 	rwlock_t     lock;
 };
 
-int  bluez_sock_register(int proto, struct net_proto_family *ops);
-int  bluez_sock_unregister(int proto);
-struct sock *bluez_sock_alloc(struct socket *sock, int proto, int pi_size, int prio);
-void bluez_sock_link(struct bluez_sock_list *l, struct sock *s);
-void bluez_sock_unlink(struct bluez_sock_list *l, struct sock *s);
-int  bluez_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm);
-uint bluez_sock_poll(struct file * file, struct socket *sock, poll_table *wait);
-int  bluez_sock_w4_connect(struct sock *sk, int flags);
+int  bt_sock_register(int proto, struct net_proto_family *ops);
+int  bt_sock_unregister(int proto);
+struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio);
+void bt_sock_link(struct bt_sock_list *l, struct sock *s);
+void bt_sock_unlink(struct bt_sock_list *l, struct sock *s);
+int  bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm);
+uint bt_sock_poll(struct file * file, struct socket *sock, poll_table *wait);
+int  bt_sock_w4_connect(struct sock *sk, int flags);
 
-void bluez_accept_enqueue(struct sock *parent, struct sock *sk);
-struct sock *bluez_accept_dequeue(struct sock *parent, struct socket *newsock);
+void bt_accept_enqueue(struct sock *parent, struct sock *sk);
+struct sock *bt_accept_dequeue(struct sock *parent, struct socket *newsock);
 
 /* Skb helpers */
-struct bluez_skb_cb {
-	int    incomming;
+struct bt_skb_cb {
+	int    incoming;
 };
-#define bluez_cb(skb)	((struct bluez_skb_cb *)(skb->cb)) 
+#define bt_cb(skb) ((struct bt_skb_cb *)(skb->cb)) 
 
-static inline struct sk_buff *bluez_skb_alloc(unsigned int len, int how)
+static inline struct sk_buff *bt_skb_alloc(unsigned int len, int how)
 {
 	struct sk_buff *skb;
 
-	if ((skb = alloc_skb(len + BLUEZ_SKB_RESERVE, how))) {
-		skb_reserve(skb, BLUEZ_SKB_RESERVE);
-		bluez_cb(skb)->incomming  = 0;
+	if ((skb = alloc_skb(len + BT_SKB_RESERVE, how))) {
+		skb_reserve(skb, BT_SKB_RESERVE);
+		bt_cb(skb)->incoming  = 0;
 	}
 	return skb;
 }
 
-static inline struct sk_buff *bluez_skb_send_alloc(struct sock *sk, unsigned long len, 
+static inline struct sk_buff *bt_skb_send_alloc(struct sock *sk, unsigned long len, 
 						       int nb, int *err)
 {
 	struct sk_buff *skb;
 
-	if ((skb = sock_alloc_send_skb(sk, len + BLUEZ_SKB_RESERVE, nb, err))) {
-		skb_reserve(skb, BLUEZ_SKB_RESERVE);
-		bluez_cb(skb)->incomming  = 0;
+	if ((skb = sock_alloc_send_skb(sk, len + BT_SKB_RESERVE, nb, err))) {
+		skb_reserve(skb, BT_SKB_RESERVE);
+		bt_cb(skb)->incoming  = 0;
 	}
 
 	return skb;
@@ -193,11 +176,8 @@ static inline int skb_frags_no(struct sk_buff *skb)
 	return n;
 }
 
-int hci_core_init(void);
-int hci_core_cleanup(void);
-int hci_sock_init(void);
-int hci_sock_cleanup(void);
+void bt_dump(char *pref, __u8 *buf, int count);
 
-int bterr(__u16 code);
+int  bt_err(__u16 code);
 
 #endif /* __BLUETOOTH_H */

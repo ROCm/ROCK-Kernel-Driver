@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ L2CAP core and sockets.
+ * Bluetooth L2CAP core and sockets.
  *
  * $Id: l2cap.c,v 1.15 2002/09/09 01:14:52 maxk Exp $
  */
@@ -57,14 +57,14 @@
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/l2cap.h>
 
-#ifndef L2CAP_DEBUG
+#ifndef CONFIG_BT_L2CAP_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
 
 static struct proto_ops l2cap_sock_ops;
 
-struct bluez_sock_list l2cap_sk_list = {
+struct bt_sock_list l2cap_sk_list = {
 	.lock = RW_LOCK_UNLOCKED
 };
 
@@ -188,8 +188,8 @@ static inline void l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk, stru
 
 int l2cap_connect(struct sock *sk)
 {
-	bdaddr_t *src = &bluez_sk(sk)->src;
-	bdaddr_t *dst = &bluez_sk(sk)->dst;
+	bdaddr_t *src = &bt_sk(sk)->src;
+	bdaddr_t *dst = &bt_sk(sk)->dst;
 	struct l2cap_conn *conn;
 	struct hci_conn   *hcon;
 	struct hci_dev    *hdev;
@@ -248,7 +248,7 @@ static struct sock *__l2cap_get_sock_by_addr(__u16 psm, bdaddr_t *src)
 	struct sock *sk;
 	for (sk = l2cap_sk_list.head; sk; sk = sk->next) {
 		if (l2cap_pi(sk)->psm == psm &&
-				!bacmp(&bluez_sk(sk)->src, src))
+				!bacmp(&bt_sk(sk)->src, src))
 			break;
 	}
 	return sk;
@@ -267,11 +267,11 @@ static struct sock *__l2cap_get_sock_by_psm(int state, __u16 psm, bdaddr_t *src)
 
 		if (l2cap_pi(sk)->psm == psm) {
 			/* Exact match. */
-			if (!bacmp(&bluez_sk(sk)->src, src))
+			if (!bacmp(&bt_sk(sk)->src, src))
 				break;
 
 			/* Closest match */
-			if (!bacmp(&bluez_sk(sk)->src, BDADDR_ANY))
+			if (!bacmp(&bt_sk(sk)->src, BDADDR_ANY))
 				sk1 = sk;
 		}
 	}
@@ -310,7 +310,7 @@ static void l2cap_sock_cleanup_listen(struct sock *parent)
 	BT_DBG("parent %p", parent);
 
 	/* Close not yet accepted channels */
-	while ((sk = bluez_accept_dequeue(parent, NULL)))
+	while ((sk = bt_accept_dequeue(parent, NULL)))
 		l2cap_sock_close(sk);
 
 	parent->state  = BT_CLOSED;
@@ -328,7 +328,7 @@ static void l2cap_sock_kill(struct sock *sk)
 	BT_DBG("sk %p state %d", sk, sk->state);
 
 	/* Kill poor orphan */
-	bluez_sock_unlink(&l2cap_sk_list, sk);
+	bt_sock_unlink(&l2cap_sk_list, sk);
 	sk->dead = 1;
 	sock_put(sk);
 }
@@ -409,7 +409,7 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 {
 	struct sock *sk;
 
-	sk = bluez_sock_alloc(sock, proto, sizeof(struct l2cap_pinfo), prio);
+	sk = bt_sock_alloc(sock, proto, sizeof(struct l2cap_pinfo), prio);
 	if (!sk)
 		return NULL;
 
@@ -421,7 +421,7 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 
 	l2cap_sock_init_timer(sk);
 
-	bluez_sock_link(&l2cap_sk_list, sk);
+	bt_sock_link(&l2cap_sk_list, sk);
 
 	MOD_INC_USE_COUNT;
 	return sk;
@@ -471,7 +471,7 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
 		err = -EADDRINUSE;
 	} else {
 		/* Save source address */
-		bacpy(&bluez_sk(sk)->src, &la->l2_bdaddr);
+		bacpy(&bt_sk(sk)->src, &la->l2_bdaddr);
 		l2cap_pi(sk)->psm = la->l2_psm;
 		sk->state = BT_BOUND;
 	}
@@ -524,14 +524,14 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
 	}
 
 	/* Set destination address and psm */
-	bacpy(&bluez_sk(sk)->dst, &la->l2_bdaddr);
+	bacpy(&bt_sk(sk)->dst, &la->l2_bdaddr);
 	l2cap_pi(sk)->psm = la->l2_psm;
 
 	if ((err = l2cap_connect(sk)))
 		goto done;
 
 wait:
-	err = bluez_sock_w4_connect(sk, flags);
+	err = bt_sock_w4_connect(sk, flags);
 
 done:
 	release_sock(sk);
@@ -586,7 +586,7 @@ int l2cap_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 
 	/* Wait for an incoming connection. (wake-one). */
 	add_wait_queue_exclusive(sk->sleep, &wait);
-	while (!(nsk = bluez_accept_dequeue(sk, newsock))) {
+	while (!(nsk = bt_accept_dequeue(sk, newsock))) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!timeo) {
 			err = -EAGAIN;
@@ -633,9 +633,9 @@ static int l2cap_sock_getname(struct socket *sock, struct sockaddr *addr, int *l
 	*len = sizeof(struct sockaddr_l2);
 
 	if (peer)
-		bacpy(&la->l2_bdaddr, &bluez_sk(sk)->dst);
+		bacpy(&la->l2_bdaddr, &bt_sk(sk)->dst);
 	else
-		bacpy(&la->l2_bdaddr, &bluez_sk(sk)->src);
+		bacpy(&la->l2_bdaddr, &bt_sk(sk)->src);
 
 	la->l2_psm = l2cap_pi(sk)->psm;
 	return 0;
@@ -892,7 +892,7 @@ static void __l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk, struct so
 	__l2cap_chan_link(l, sk);
 
 	if (parent)
-		bluez_accept_enqueue(parent, sk);
+		bt_accept_enqueue(parent, sk);
 }
 
 /* Delete channel. 
@@ -900,7 +900,7 @@ static void __l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk, struct so
 static void l2cap_chan_del(struct sock *sk, int err)
 {
 	struct l2cap_conn *conn = l2cap_pi(sk)->conn;
-	struct sock *parent = bluez_sk(sk)->parent;
+	struct sock *parent = bt_sk(sk)->parent;
 
 	l2cap_sock_clear_timer(sk);
 
@@ -954,7 +954,7 @@ static void l2cap_conn_ready(struct l2cap_conn *conn)
 
 static void l2cap_chan_ready(struct sock *sk)
 {
-	struct sock *parent = bluez_sk(sk)->parent;
+	struct sock *parent = bt_sk(sk)->parent;
 
 	BT_DBG("sk %p, parent %p", sk, parent);
 
@@ -1019,7 +1019,7 @@ static int l2cap_chan_send(struct sock *sk, struct msghdr *msg, int len)
 
 	count = MIN(conn->mtu - hlen, len);
 
-	skb = bluez_skb_send_alloc(sk, hlen + count,
+	skb = bt_skb_send_alloc(sk, hlen + count,
 			msg->msg_flags & MSG_DONTWAIT, &err);
 	if (!skb)
 		return err;
@@ -1045,7 +1045,7 @@ static int l2cap_chan_send(struct sock *sk, struct msghdr *msg, int len)
 	while (len) {
 		count = MIN(conn->mtu, len);
 
-		*frag = bluez_skb_send_alloc(sk, count, msg->msg_flags & MSG_DONTWAIT, &err);
+		*frag = bt_skb_send_alloc(sk, count, msg->msg_flags & MSG_DONTWAIT, &err);
 		if (!*frag)
 			goto fail;
 		
@@ -1105,7 +1105,7 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 	len = L2CAP_HDR_SIZE + L2CAP_CMD_HDR_SIZE + dlen;
 	count = MIN(conn->mtu, len);
 	
-	skb = bluez_skb_alloc(count, GFP_ATOMIC);
+	skb = bt_skb_alloc(count, GFP_ATOMIC);
 	if (!skb)
 		return NULL;
 
@@ -1131,7 +1131,7 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 	while (len) {
 		count = MIN(conn->mtu, len);
 
-		*frag = bluez_skb_alloc(count, GFP_ATOMIC);
+		*frag = bt_skb_alloc(count, GFP_ATOMIC);
 		if (!*frag)
 			goto fail;
 		
@@ -1374,8 +1374,8 @@ static inline int l2cap_connect_req(struct l2cap_conn *conn, l2cap_cmd_hdr *cmd,
 	hci_conn_hold(conn->hcon);
 
 	l2cap_sock_init(sk, parent);
-	bacpy(&bluez_sk(sk)->src, conn->src);
-	bacpy(&bluez_sk(sk)->dst, conn->dst);
+	bacpy(&bt_sk(sk)->src, conn->src);
+	bacpy(&bt_sk(sk)->dst, conn->dst);
 	l2cap_pi(sk)->psm  = psm;
 	l2cap_pi(sk)->dcid = scid;
 
@@ -1785,10 +1785,10 @@ static int l2cap_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, __u8 type)
 		if (sk->state != BT_LISTEN)
 			continue;
 
-		if (!bacmp(&bluez_sk(sk)->src, bdaddr)) {
+		if (!bacmp(&bt_sk(sk)->src, bdaddr)) {
 			lm1 |= (HCI_LM_ACCEPT | l2cap_pi(sk)->link_mode);
 			exact++;
-		} else if (!bacmp(&bluez_sk(sk)->src, BDADDR_ANY))
+		} else if (!bacmp(&bt_sk(sk)->src, BDADDR_ANY))
 			lm2 |= (HCI_LM_ACCEPT | l2cap_pi(sk)->link_mode);
 	}
 	read_unlock(&l2cap_sk_list.lock);
@@ -1810,7 +1810,7 @@ static int l2cap_connect_cfm(struct hci_conn *hcon, __u8 status)
 		if (conn)
 			l2cap_conn_ready(conn);
 	} else 
-		l2cap_conn_del(hcon, bterr(status));
+		l2cap_conn_del(hcon, bt_err(status));
 	
 	return 0;
 }
@@ -1822,7 +1822,7 @@ static int l2cap_disconn_ind(struct hci_conn *hcon, __u8 reason)
 	if (hcon->type != ACL_LINK)
 		return 0;
 
-	l2cap_conn_del(hcon, bterr(reason));
+	l2cap_conn_del(hcon, bt_err(reason));
 	return 0;
 }
 
@@ -1958,7 +1958,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, __u16 
 		}
 
 		/* Allocate skb for the complete frame (with header) */
-		if (!(conn->rx_skb = bluez_skb_alloc(len, GFP_ATOMIC)))
+		if (!(conn->rx_skb = bt_skb_alloc(len, GFP_ATOMIC)))
 			goto drop;
 
 		memcpy(skb_put(conn->rx_skb, skb->len), skb->data, skb->len);
@@ -1996,7 +1996,7 @@ drop:
 }
 
 /* ----- Proc fs support ------ */
-static int l2cap_sock_dump(char *buf, struct bluez_sock_list *list)
+static int l2cap_sock_dump(char *buf, struct bt_sock_list *list)
 {
 	struct l2cap_pinfo *pi;
 	struct sock *sk;
@@ -2007,7 +2007,7 @@ static int l2cap_sock_dump(char *buf, struct bluez_sock_list *list)
 	for (sk = list->head; sk; sk = sk->next) {
 		pi = l2cap_pi(sk);
 		ptr += sprintf(ptr, "%s %s %d %d 0x%4.4x 0x%4.4x %d %d 0x%x\n",
-				batostr(&bluez_sk(sk)->src), batostr(&bluez_sk(sk)->dst), 
+				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst), 
 				sk->state, pi->psm, pi->scid, pi->dcid, pi->imtu, pi->omtu,
 				pi->link_mode);
 	}
@@ -2051,8 +2051,8 @@ static struct proto_ops l2cap_sock_ops = {
 	.accept  =      l2cap_sock_accept,
 	.getname =      l2cap_sock_getname,
 	.sendmsg =      l2cap_sock_sendmsg,
-	.recvmsg =      bluez_sock_recvmsg,
-	.poll    =      bluez_sock_poll,
+	.recvmsg =      bt_sock_recvmsg,
+	.poll    =      bt_sock_poll,
 	.mmap    =      sock_no_mmap,
 	.socketpair =   sock_no_socketpair,
 	.ioctl      =   sock_no_ioctl,
@@ -2081,7 +2081,7 @@ int __init l2cap_init(void)
 {
 	int err;
 
-	if ((err = bluez_sock_register(BTPROTO_L2CAP, &l2cap_sock_family_ops))) {
+	if ((err = bt_sock_register(BTPROTO_L2CAP, &l2cap_sock_family_ops))) {
 		BT_ERR("Can't register L2CAP socket");
 		return err;
 	}
@@ -2093,7 +2093,7 @@ int __init l2cap_init(void)
 
 	create_proc_read_entry("bluetooth/l2cap", 0, 0, l2cap_read_proc, NULL);
 
-	BT_INFO("BlueZ L2CAP ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
+	BT_INFO("Bluetooth L2CAP ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
 	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 	return 0;
 }
@@ -2103,7 +2103,7 @@ void l2cap_cleanup(void)
 	remove_proc_entry("bluetooth/l2cap", NULL);
 
 	/* Unregister socket and protocol */
-	if (bluez_sock_unregister(BTPROTO_L2CAP))
+	if (bt_sock_unregister(BTPROTO_L2CAP))
 		BT_ERR("Can't unregister L2CAP socket");
 
 	if (hci_unregister_proto(&l2cap_hci_proto))
@@ -2114,5 +2114,5 @@ module_init(l2cap_init);
 module_exit(l2cap_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
-MODULE_DESCRIPTION("BlueZ L2CAP ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth L2CAP ver " VERSION);
 MODULE_LICENSE("GPL");
