@@ -258,65 +258,16 @@ static inline int sched_find_first_bit(const unsigned long *b)
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x) generic_hweight8(x)
 
-static inline int ext2_set_bit(int nr, volatile void * addr)
-{
-	unsigned long old, tmp, mask;
-	volatile unsigned char *ptr = addr;
-	ptr += nr >> 3;
+#define ext2_set_bit(nr, addr)		test_and_set_bit  ((nr) ^ 0x18, (addr))
+#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x18, (addr))
 
-	asm("0:						\n"
-	    "	setlos.p	#1,%3			\n"
-	    "	orcc		gr0,gr0,gr0,icc3	\n"	/* set ICC3.Z */
-	    "	sll%I4.p	%3,%4,%3		\n"
-	    "	ckeq		icc3,cc7		\n"
-	    "	ldub.p		%M0,%1			\n"	/* LDUB.P/ORCR must be atomic */
-	    "	orcr		cc7,cc7,cc3		\n"	/* set CC3 to true */
-	    "	or		%1,%3,%2		\n"
-	    "	cstb.p		%2,%M0		,cc3,#1	\n"
-	    "	corcc		gr29,gr29,gr0	,cc3,#1	\n"	/* clear ICC3.Z if store happens */
-	    "	beq		icc3,#0,0b		\n"
-	    : "+U"(*ptr), "=&r"(old), "=r"(tmp), "=&r"(mask)
-	    : "Ir"(nr & 7)
-	    : "memory", "cc7", "cc3", "icc3"
-	    );
-
-	return old & mask;
-}
-
-#define ext2_set_bit_atomic(lock,nr,addr) ext2_set_bit((nr), addr)
-
-static inline int ext2_clear_bit(int nr, volatile void * addr)
-{
-	unsigned long old, tmp, mask;
-	volatile unsigned char *ptr = addr;
-	ptr += nr >> 3;
-
-	asm("0:						\n"
-	    "	setlos.p	#1,%3			\n"
-	    "	orcc		gr0,gr0,gr0,icc3	\n"	/* set ICC3.Z */
-	    "	sll%I4.p	%3,%4,%3		\n"
-	    "	ckeq		icc3,cc7		\n"
-	    "	ldub.p		%M0,%1			\n"	/* LDUB.P/ORCR must be atomic */
-	    "	orcr		cc7,cc7,cc3		\n"	/* set CC3 to true */
-	    "	not		%3,%2			\n"
-	    "	and		%1,%2,%2		\n"
-	    "	cstb.p		%2,%M0		,cc3,#1	\n"
-	    "	corcc		gr29,gr29,gr0	,cc3,#1	\n"	/* clear ICC3.Z if store happens */
-	    "	beq		icc3,#0,0b		\n"
-	    : "+U"(*ptr), "=&r"(old), "=r"(tmp), "=&r"(mask)
-	    : "Ir"(nr & 7)
-	    : "memory", "cc7", "cc3", "icc3"
-	    );
-
-	return old & mask;
-}
-
-#define ext2_clear_bit_atomic(lock,nr,addr) ext2_clear_bit((nr), addr)
+#define ext2_set_bit_atomic(lock,nr,addr)	ext2_set_bit((nr), addr)
+#define ext2_clear_bit_atomic(lock,nr,addr)	ext2_clear_bit((nr), addr)
 
 static inline int ext2_test_bit(int nr, const volatile void * addr)
 {
-	int			mask;
-	const volatile unsigned char	*ADDR = (const unsigned char *) addr;
+	const volatile unsigned char *ADDR = (const unsigned char *) addr;
+	int mask;
 
 	ADDR += nr >> 3;
 	mask = 1 << (nr & 0x07);
@@ -379,11 +330,11 @@ found_middle:
 }
 
 /* Bitmap functions for the minix filesystem.  */
-#define minix_test_and_set_bit(nr,addr)		test_and_set_bit(nr,addr)
-#define minix_set_bit(nr,addr)			set_bit(nr,addr)
-#define minix_test_and_clear_bit(nr,addr)	test_and_clear_bit(nr,addr)
-#define minix_test_bit(nr,addr)			test_bit(nr,addr)
-#define minix_find_first_zero_bit(addr,size)	find_first_zero_bit(addr,size)
+#define minix_test_and_set_bit(nr,addr)		ext2_set_bit(nr,addr)
+#define minix_set_bit(nr,addr)			ext2_set_bit(nr,addr)
+#define minix_test_and_clear_bit(nr,addr)	ext2_clear_bit(nr,addr)
+#define minix_test_bit(nr,addr)			ext2_test_bit(nr,addr)
+#define minix_find_first_zero_bit(addr,size)	ext2_find_first_zero_bit(addr,size)
 
 #endif /* __KERNEL__ */
 
