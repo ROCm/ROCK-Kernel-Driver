@@ -30,8 +30,6 @@
 #define	NR_RAID1_BIOS 256
 
 static mdk_personality_t raid1_personality;
-static spinlock_t retry_list_lock = SPIN_LOCK_UNLOCKED;
-static LIST_HEAD(retry_list_head);
 
 static void unplug_slaves(mddev_t *mddev);
 
@@ -188,10 +186,11 @@ static void reschedule_retry(r1bio_t *r1_bio)
 {
 	unsigned long flags;
 	mddev_t *mddev = r1_bio->mddev;
+	conf_t *conf = mddev_to_conf(mddev);
 
-	spin_lock_irqsave(&retry_list_lock, flags);
-	list_add(&r1_bio->retry_list, &retry_list_head);
-	spin_unlock_irqrestore(&retry_list_lock, flags);
+	spin_lock_irqsave(&conf->device_lock, flags);
+	list_add(&r1_bio->retry_list, &conf->retry_list);
+	spin_unlock_irqrestore(&conf->device_lock, flags);
 
 	md_wakeup_thread(mddev->thread);
 }
@@ -904,11 +903,11 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 
 static void raid1d(mddev_t *mddev)
 {
-	struct list_head *head = &retry_list_head;
 	r1bio_t *r1_bio;
 	struct bio *bio;
 	unsigned long flags;
 	conf_t *conf = mddev_to_conf(mddev);
+	struct list_head *head = &conf->retry_list;
 	int unplug=0;
 	mdk_rdev_t *rdev;
 
@@ -917,12 +916,12 @@ static void raid1d(mddev_t *mddev)
 	
 	for (;;) {
 		char b[BDEVNAME_SIZE];
-		spin_lock_irqsave(&retry_list_lock, flags);
+		spin_lock_irqsave(&conf->device_lock, flags);
 		if (list_empty(head))
 			break;
 		r1_bio = list_entry(head->prev, r1bio_t, retry_list);
 		list_del(head->prev);
-		spin_unlock_irqrestore(&retry_list_lock, flags);
+		spin_unlock_irqrestore(&conf->device_lock, flags);
 
 		mddev = r1_bio->mddev;
 		conf = mddev_to_conf(mddev);
@@ -956,7 +955,7 @@ static void raid1d(mddev_t *mddev)
 			}
 		}
 	}
-	spin_unlock_irqrestore(&retry_list_lock, flags);
+	spin_unlock_irqrestore(&conf->device_lock, flags);
 	if (unplug)
 		unplug_slaves(mddev);
 }
@@ -1205,6 +1204,7 @@ static int run(mddev_t *mddev)
 	conf->raid_disks = mddev->raid_disks;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
+	INIT_LIST_HEAD(&conf->retry_list);
 	if (conf->working_disks == 1)
 		mddev->recovery_cp = MaxSector;
 

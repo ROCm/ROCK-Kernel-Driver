@@ -36,8 +36,6 @@
 
 
 static mdk_personality_t multipath_personality;
-static spinlock_t retry_list_lock = SPIN_LOCK_UNLOCKED;
-struct multipath_bh *multipath_retry_list = NULL, **multipath_retry_tail;
 
 
 static void *mp_pool_alloc(int gfp_flags, void *data)
@@ -82,14 +80,11 @@ static void multipath_reschedule_retry (struct multipath_bh *mp_bh)
 {
 	unsigned long flags;
 	mddev_t *mddev = mp_bh->mddev;
+	multipath_conf_t *conf = mddev_to_conf(mddev);
 
-	spin_lock_irqsave(&retry_list_lock, flags);
-	if (multipath_retry_list == NULL)
-		multipath_retry_tail = &multipath_retry_list;
-	*multipath_retry_tail = mp_bh;
-	multipath_retry_tail = &mp_bh->next_mp;
-	mp_bh->next_mp = NULL;
-	spin_unlock_irqrestore(&retry_list_lock, flags);
+	spin_lock_irqsave(&conf->device_lock, flags);
+	list_add(&mp_bh->retry_list, &conf->retry_list);
+	spin_unlock_irqrestore(&conf->device_lock, flags);
 	md_wakeup_thread(mddev->thread);
 }
 
@@ -382,18 +377,18 @@ static void multipathd (mddev_t *mddev)
 	struct bio *bio;
 	unsigned long flags;
 	multipath_conf_t *conf = mddev_to_conf(mddev);
+	struct list_head *head = &conf->retry_list;
 
 	md_check_recovery(mddev);
 	for (;;) {
 		char b[BDEVNAME_SIZE];
-		spin_lock_irqsave(&retry_list_lock, flags);
-		mp_bh = multipath_retry_list;
-		if (!mp_bh)
+		spin_lock_irqsave(&conf->device_lock, flags);
+		if (list_empty(head))
 			break;
-		multipath_retry_list = mp_bh->next_mp;
-		spin_unlock_irqrestore(&retry_list_lock, flags);
+		mp_bh = list_entry(head->prev, struct multipath_bh, retry_list);
+		list_del(head->prev);
+		spin_unlock_irqrestore(&conf->device_lock, flags);
 
-		mddev = mp_bh->mddev;
 		bio = &mp_bh->bio;
 		bio->bi_sector = mp_bh->master_bio->bi_sector;
 		
@@ -416,7 +411,7 @@ static void multipathd (mddev_t *mddev)
 			generic_make_request(bio);
 		}
 	}
-	spin_unlock_irqrestore(&retry_list_lock, flags);
+	spin_unlock_irqrestore(&conf->device_lock, flags);
 }
 
 static int multipath_run (mddev_t *mddev)
@@ -489,6 +484,7 @@ static int multipath_run (mddev_t *mddev)
 	mddev->sb_dirty = 1;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
+	INIT_LIST_HEAD(&conf->retry_list);
 
 	if (!conf->working_disks) {
 		printk(KERN_ERR "multipath: no operational IO paths for %s\n",
