@@ -1510,10 +1510,12 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 
 	status = nfserr_bad_stateid;
 
-	/* for new lock stateowners, check that the lock->v.new.open_stateid
-	 * refers to an open stateowner, and that the lockclid
-	 * (nfs4_lock->v.new.clientid) is the same as the
-	 * open_stateid->st_stateowner->so_client->clientid
+	/* for new lock stateowners:
+	 * check that the lock->v.new.open_stateid
+	 * refers to an open stateowner
+	 *
+	 * check that the lockclid (nfs4_lock->v.new.clientid) is the same
+	 * as the open_stateid->st_stateowner->so_client->clientid
 	 */
 	if (lockclid) {
 		struct nfs4_stateowner *sop = stp->st_stateowner;
@@ -2007,7 +2009,11 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 			printk("NFSD: nfsd4_lock: clientid is stale!\n");
 			goto out;
 		}
-		/* does the clientid in the lock owner own the open stateid? */
+
+		/* is the new lock seqid presented by the client zero? */
+		status = nfserr_bad_seqid;
+		if (lock->v.new.lock_seqid != 0)
+			goto out;
 
 		/* validate and update open stateid and open seqid */
 		status = nfs4_preprocess_seqid_op(current_fh, 
@@ -2026,15 +2032,15 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		strhashval = lock_ownerstr_hashval(fp->fi_inode, 
 				open_sop->so_client->cl_clientid.cl_id, 
 				lock->v.new.owner);
-
 		/* 
 		 * If we already have this lock owner, the client is in 
 		 * error (or our bookeeping is wrong!) 
 		 * for asking for a 'new lock'.
 		 */
 		status = nfserr_bad_stateid;
-		if (find_lockstateowner_str(strhashval, &lock->v.new.owner,
-					&lock->v.new.clientid, &lock_sop))
+		lock_sop = find_lockstateowner(&lock->v.new.owner,
+						&lock->v.new.clientid);
+		if (lock_sop)
 			goto out;
 		status = nfserr_resource;
 		if (!(lock->lk_stateowner = alloc_init_lock_stateowner(strhashval, open_sop->so_client, open_stp, lock)))
