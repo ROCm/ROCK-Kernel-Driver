@@ -439,13 +439,19 @@ e1000_check_options(struct e1000_adapter *adapter)
 		};
 
 		adapter->itr = InterruptThrottleRate[bd];
-		if(adapter->itr == 0) {
-			printk(KERN_INFO "%s turned off\n", opt.name);
-		} else if(adapter->itr == 1 || adapter->itr == -1) {
-			/* Dynamic mode */
+		switch(adapter->itr) {
+		case -1:
 			adapter->itr = 1;
-		} else {
+			break;
+		case 0:
+			printk(KERN_INFO "%s turned off\n", opt.name);
+			break;
+		case 1:
+			printk(KERN_INFO "%s set to dynamic mode\n", opt.name);
+			break;
+		default:
 			e1000_validate_option(&adapter->itr, &opt);
+			break;
 		}
 	}
 
