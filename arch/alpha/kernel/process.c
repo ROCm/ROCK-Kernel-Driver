@@ -245,11 +245,10 @@ release_thread(struct task_struct *dead_task)
  */
 int
 alpha_clone(unsigned long clone_flags, unsigned long usp,
-	    struct switch_stack * swstack)
+	    int *user_tid, struct switch_stack * swstack)
 {
 	struct task_struct *p;
 	struct pt_regs *u_regs = (struct pt_regs *) (swstack+1);
-	int *user_tid = (int *)u_regs->r19;
 
 	if (!usp)
 		usp = rdusp();
@@ -313,6 +312,10 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childti->pcb.usp = usp;
 	childti->pcb.ksp = (unsigned long) childstack;
 	childti->pcb.flags = 1;	/* set FEN, clear everything else */
+
+	/* Set a new TLS for the child thread?  Peek back into the
+	   syscall arguments that we saved on syscall entry.  */
+	childti->pcb.unique = (clone_flags & CLONE_SETTLS ? regs->r19 : 0);
 
 	return 0;
 }
