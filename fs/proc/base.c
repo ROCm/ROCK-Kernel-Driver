@@ -30,6 +30,7 @@
 #include <linux/smp_lock.h>
 #include <linux/kallsyms.h>
 #include <linux/mount.h>
+#include <linux/security.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.
@@ -420,7 +421,7 @@ static struct file_operations proc_info_file_operations = {
 };
 
 #define MAY_PTRACE(p) \
-(p==current||(p->parent==current&&(p->ptrace & PT_PTRACED)&&p->state==TASK_STOPPED&&security_ops->ptrace(current,p)==0))
+(p==current||(p->parent==current&&(p->ptrace & PT_PTRACED)&&p->state==TASK_STOPPED&&security_ptrace(current,p)==0))
 
 
 static int mem_open(struct inode* inode, struct file* file)

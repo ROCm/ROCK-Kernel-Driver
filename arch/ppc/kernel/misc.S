@@ -1279,7 +1279,7 @@ _GLOBAL(sys_call_table)
 	.long sys_futex
 	.long sys_sched_setaffinity
 	.long sys_sched_getaffinity
-	.long sys_security
+	.long sys_ni_syscall
 	.long sys_ni_syscall	/* 225 - reserved for Tux */
 	.long sys_sendfile64
 	.long sys_io_setup

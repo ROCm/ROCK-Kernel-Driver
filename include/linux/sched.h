@@ -539,9 +539,9 @@ static inline int sas_ss_flags(unsigned long sp)
 		: on_sig_stack(sp) ? SS_ONSTACK : 0);
 }
 
-/* capable prototype and code moved to security.[hc] */
-#include <linux/security.h>
-#if 0
+
+#ifndef CONFIG_SECURITY
+/* capable prototype and code are in security.[hc] if CONFIG_SECURITY */
 static inline int capable(int cap)
 {
 	if (cap_raised(current->cap_effective, cap)) {
@@ -550,7 +550,7 @@ static inline int capable(int cap)
 	}
 	return 0;
 }
-#endif	/* if 0 */
+#endif
 
 /*
  * Routines for handling mm_structs

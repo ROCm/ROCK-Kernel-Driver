@@ -231,7 +231,9 @@
 #define __NR_futex		238
 #define __NR_sched_setaffinity	239
 #define __NR_sched_getaffinity	240
-#define __NR_security		241	/* syscall for security modules */
+/*
+ * Number 241 is currently unused
+ */
 /*
  * Number 242 is reserved for tux
  */

@@ -1241,7 +1241,7 @@ sys_call_table:
 	data8 sys_futex				// 1230
 	data8 sys_sched_setaffinity
 	data8 sys_sched_getaffinity
-	data8 sys_security
+	data8 sys_ni_syscall
 	data8 sys_alloc_hugepages
 	data8 sys_free_hugepages		// 1235
 	data8 sys_exit_group

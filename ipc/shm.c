@@ -116,7 +116,7 @@ static void shm_destroy (struct shmid_kernel *shp)
 	if (!is_file_hugepages(shp->shm_file))
 		shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
-	security_ops->shm_free_security(shp);
+	security_shm_free(shp);
 	ipc_rcu_free(shp, sizeof(struct shmid_kernel));
 }
 
@@ -188,8 +188,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_flags = (shmflg & S_IRWXUGO);
 
 	shp->shm_perm.security = NULL;
-	error = security_ops->shm_alloc_security(shp);
-	if (error) {
+	if ((error = security_shm_alloc(shp))) {
 		ipc_rcu_free(shp, sizeof(*shp));
 		return error;
 	}
@@ -229,7 +228,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 no_id:
 	fput(file);
 no_file:
-	security_ops->shm_free_security(shp);
+	security_shm_free(shp);
 	ipc_rcu_free(shp, sizeof(*shp));
 	return error;
 }

@@ -228,7 +228,7 @@
 #define __NR_futex		221
 #define __NR_sched_setaffinity	222
 #define __NR_sched_getaffinity	223
-#define __NR_security		224
+/* 224 currently unused */
 #define __NR_tuxcall		225
 #define __NR_sendfile64		226
 #define __NR_io_setup		227
