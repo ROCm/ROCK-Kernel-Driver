@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/connect.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -272,7 +272,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				}
 
 				task_to_wake = NULL;
-				read_lock(&GlobalMid_Lock);
+				spin_lock(&GlobalMid_Lock);
 				list_for_each(tmp, &server->pending_mid_q) {
 					mid_entry = list_entry(tmp, struct
 							       mid_q_entry,
@@ -288,7 +288,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 						    MID_RESPONSE_RECEIVED;
 					}
 				}
-				read_unlock(&GlobalMid_Lock);
+				spin_unlock(&GlobalMid_Lock);
 				if (task_to_wake) {
 					smb_buffer = NULL;	/* will be freed by users thread after he is done */
 					wake_up_process(task_to_wake);
