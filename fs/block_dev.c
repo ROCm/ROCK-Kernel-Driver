@@ -567,6 +567,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	lock_kernel();
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (!disk) {
+		unlock_kernel();
 		bdput(bdev);
 		return ret;
 	}
@@ -757,7 +758,6 @@ struct address_space_operations def_blk_aops = {
 	.prepare_write	= blkdev_prepare_write,
 	.commit_write	= blkdev_commit_write,
 	.writepages	= generic_writepages,
-	.vm_writeback	= generic_vm_writeback,
 	.direct_IO	= blkdev_direct_IO,
 };
 

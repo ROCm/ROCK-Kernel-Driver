@@ -7,7 +7,6 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
@@ -16,20 +15,17 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/errno.h>
-#include <asm/system.h>
-#include <asm/io.h>
-#include <asm/pgtable.h>
-
 /* Used for the temporal inet entries and routing */
 #include <linux/socket.h>
 #include <linux/route.h>
-
 #include <linux/dio.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
+#include <asm/system.h>
+#include <asm/io.h>
+#include <asm/pgtable.h>
 #include <asm/mvme147hw.h>
 
 /* We have 16834 bytes of RAM for the init block and buffers. This places

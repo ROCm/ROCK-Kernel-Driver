@@ -36,7 +36,10 @@
 #include <linux/workqueue.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
+
 #include <asm/uaccess.h>
+
 #include "cpqphp.h"
 #include "cpqphp_nvram.h"
 #include "../../arch/i386/pci/pci.h"	/* horrible hack showing how processor dependant we are... */

@@ -16,6 +16,7 @@
 LDFLAGS		:= -m elf_s390
 OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
+LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
 
 CFLAGS += -pipe -fno-strength-reduce
 
@@ -28,18 +29,14 @@ libs-y				+= arch/s390/lib/
 
 all: image listing
 
-listing: vmlinux
-	@$(MAKEBOOT) listing
+makeboot = $(call descend,arch/$(ARCH)/boot,$(1))
+BOOTIMAGE= arch/$(ARCH)/boot/image
 
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-image: vmlinux 
-	@$(MAKEBOOT) image
-
-install: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=image install
+listing install image: vmlinux
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) $@)
 
 archclean:
+	+@$(call makeboot,clean)
 
 archmrproper:
 

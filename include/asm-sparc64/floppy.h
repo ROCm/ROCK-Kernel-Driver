@@ -540,16 +540,18 @@ static int __init ebus_fdthree_p(struct linux_ebus_device *edev)
 #ifdef ISA_FLOPPY_WORKS
 static unsigned long __init isa_floppy_init(void)
 {
-	struct isa_bridge *isa_br;
-	struct isa_device *isa_dev = NULL;
+	struct sparc_isa_bridge *isa_br;
+	struct sparc_isa_device *isa_dev = NULL;
 
 	for_each_isa(isa_br) {
 		for_each_isadev(isa_dev, isa_br) {
 			if (!strcmp(isa_dev->prom_name, "dma")) {
-				struct isa_device *child = isa_dev->child;
+				struct sparc_isa_device *child =
+					isa_dev->child;
 
 				while (child) {
-					if (!strcmp(child->prom_name, "floppy")) {
+					if (!strcmp(child->prom_name,
+						    "floppy")) {
 						isa_dev = child;
 						goto isa_done;
 					}

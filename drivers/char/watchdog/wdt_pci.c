@@ -34,28 +34,28 @@
  */
 
 #include <linux/config.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
-#define WDT_IS_PCI
-#include "wd501p.h"
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/smp_lock.h>
-
 #include <linux/pci.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
+#include <asm/system.h>
+
+#define WDT_IS_PCI
+#include "wd501p.h"
 
 #define PFX "wdt_pci: "
 
@@ -331,12 +331,12 @@ static ssize_t wdtpci_read(struct file *file, char *buf, size_t count, loff_t *p
 static int wdtpci_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
-	static struct watchdog_info ident=
-	{
-		WDIOF_OVERHEAT|WDIOF_POWERUNDER|WDIOF_POWEROVER
-			|WDIOF_EXTERN1|WDIOF_EXTERN2|WDIOF_FANFAULT,
-		1,
-		"WDT500/501PCI"
+	static struct watchdog_info ident = {
+		.options	  = WDIOF_OVERHEAT  | WDIOF_POWERUNDER |
+				    WDIOF_POWEROVER | WDIOF_EXTERN1 |
+				    WDIOF_EXTERN2   | WDIOF_FANFAULT,
+		.firmware_version = 1,
+		.identity	  = "WDT500/501PCI",
 	};
 	
 	ident.options&=WDT_OPTION_MASK;	/* Mask down to the card we have */
@@ -481,19 +481,17 @@ static struct file_operations wdtpci_fops = {
 	.release	= wdtpci_release,
 };
 
-static struct miscdevice wdtpci_miscdev=
-{
-	WATCHDOG_MINOR,
-	"watchdog",
-	&wdtpci_fops
+static struct miscdevice wdtpci_miscdev = {
+	.minor	= WATCHDOG_MINOR,
+	.name	= "watchdog",
+	.fops	= &wdtpci_fops,
 };
 
 #ifdef CONFIG_WDT_501
-static struct miscdevice temp_miscdev=
-{
-	TEMP_MINOR,
-	"temperature",
-	&wdtpci_fops
+static struct miscdevice temp_miscdev = {
+	.minor	= TEMP_MINOR,
+	.name	= "temperature",
+	.fops	= &wdtpci_fops,
 };
 #endif
 
@@ -502,11 +500,8 @@ static struct miscdevice temp_miscdev=
  *	turn the timebomb registers off. 
  */
  
-static struct notifier_block wdtpci_notifier=
-{
-	wdtpci_notify_sys,
-	NULL,
-	0
+static struct notifier_block wdtpci_notifier = {
+	.notifier_call = wdtpci_notify_sys,
 };
 
 
@@ -594,7 +589,12 @@ static void __devexit wdtpci_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_device_id wdtpci_pci_tbl[] __initdata = {
-	{ PCI_VENDOR_ID_ACCESSIO, PCI_DEVICE_ID_WDG_CSM, PCI_ANY_ID, PCI_ANY_ID, },
+	{
+		.vendor	   = PCI_VENDOR_ID_ACCESSIO,
+		.device	   = PCI_DEVICE_ID_WDG_CSM,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
 	{ 0, }, /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, wdtpci_pci_tbl);

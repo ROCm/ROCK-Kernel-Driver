@@ -46,6 +46,7 @@
 #include <linux/inetdevice.h>
 #include <linux/pkt_sched.h>
 #include <linux/init.h>
+
 #include <asm/uaccess.h>
 
 #include "comx.h"

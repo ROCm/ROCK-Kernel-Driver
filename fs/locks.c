@@ -297,11 +297,20 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 		return -EINVAL;
 	}
 
-	if (((start += l->l_start) < 0) || (l->l_len < 0))
-		return -EINVAL;
+	/* POSIX-1996 leaves the case l->l_len < 0 undefined;
+	   POSIX-2001 defines it. */
+	start += l->l_start;
 	end = start + l->l_len - 1;
+	if (l->l_len < 0) {
+		end = start - 1;
+		start += l->l_len;
+	}
+
+	if (start < 0)
+		return -EINVAL;
 	if (l->l_len > 0 && end < 0)
 		return -EOVERFLOW;
+
 	fl->fl_start = start;	/* we record the absolute position */
 	fl->fl_end = end;
 	if (l->l_len == 0)
@@ -994,16 +1003,16 @@ static void time_out_leases(struct inode *inode)
 }
 
 /**
- *	__get_lease	-	revoke all outstanding leases on file
+ *	__break_lease	-	revoke all outstanding leases on file
  *	@inode: the inode of the file to return
  *	@mode: the open mode (read or write)
  *
- *	get_lease (inlined for speed) has checked there already
+ *	break_lease (inlined for speed) has checked there already
  *	is a lease on this file.  Leases are broken on a call to open()
  *	or truncate().  This function can sleep unless you
  *	specified %O_NONBLOCK to your open().
  */
-int __get_lease(struct inode *inode, unsigned int mode)
+int __break_lease(struct inode *inode, unsigned int mode)
 {
 	int error = 0, future;
 	struct file_lock *new_fl, *flock;
@@ -1766,7 +1775,7 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 #else
 	/* kdevname is a broken interface.  but we expose it to userspace */
 	out += sprintf(out, "%d %s:%ld ", fl->fl_pid,
-			inode ? kdevname(to_kdev_t(inode->i_dev)) : "<none>",
+			inode ? kdevname(to_kdev_t(inode->i_sb->s_dev)) : "<none>",
 			inode ? inode->i_ino : 0);
 #endif
 	if (IS_POSIX(fl)) {

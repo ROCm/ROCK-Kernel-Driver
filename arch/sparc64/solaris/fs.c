@@ -19,6 +19,7 @@
 #include <linux/limits.h>
 #include <linux/resource.h>
 #include <linux/quotaops.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
@@ -92,12 +93,12 @@ static inline int putstat(struct sol_stat *ubuf, struct kstat *kbuf)
 	    __put_user (kbuf->gid, &ubuf->st_gid)		||
 	    __put_user (R4_DEV(kbuf->rdev), &ubuf->st_rdev)	||
 	    __put_user (kbuf->size, &ubuf->st_size)		||
-	    __put_user (kbuf->atime, &ubuf->st_atime.tv_sec)	||
-	    __put_user (0, &ubuf->st_atime.tv_nsec)		||
-	    __put_user (kbuf->mtime, &ubuf->st_mtime.tv_sec)	||
-	    __put_user (0, &ubuf->st_mtime.tv_nsec)		||
-	    __put_user (kbuf->ctime, &ubuf->st_ctime.tv_sec)	||
-	    __put_user (0, &ubuf->st_ctime.tv_nsec)		||
+	    __put_user (kbuf->atime.tv_sec, &ubuf->st_atime.tv_sec)	||
+	    __put_user (kbuf->atime.tv_nsec, &ubuf->st_atime.tv_nsec)	||
+	    __put_user (kbuf->mtime.tv_sec, &ubuf->st_mtime.tv_sec)	||
+	    __put_user (kbuf->mtime.tv_nsec, &ubuf->st_mtime.tv_nsec)	||
+	    __put_user (kbuf->ctime.tv_sec, &ubuf->st_ctime.tv_sec)	||
+	    __put_user (kbuf->ctime.tv_nsec, &ubuf->st_ctime.tv_nsec)	||
 	    __put_user (kbuf->blksize, &ubuf->st_blksize)	||
 	    __put_user (kbuf->blocks, &ubuf->st_blocks)	||
 	    __put_user (UFSMAGIC, (unsigned *)ubuf->st_fstype))
@@ -115,12 +116,12 @@ static inline int putstat64(struct sol_stat64 *ubuf, struct kstat *kbuf)
 	    __put_user (kbuf->gid, &ubuf->st_gid)		||
 	    __put_user (R4_DEV(kbuf->rdev), &ubuf->st_rdev)	||
 	    __put_user (kbuf->size, &ubuf->st_size)		||
-	    __put_user (kbuf->atime, &ubuf->st_atime.tv_sec)	||
-	    __put_user (0, &ubuf->st_atime.tv_nsec)		||
-	    __put_user (kbuf->mtime, &ubuf->st_mtime.tv_sec)	||
-	    __put_user (0, &ubuf->st_mtime.tv_nsec)		||
-	    __put_user (kbuf->ctime, &ubuf->st_ctime.tv_sec)	||
-	    __put_user (0, &ubuf->st_ctime.tv_nsec)		||
+	    __put_user (kbuf->atime.tv_sec, &ubuf->st_atime.tv_sec)	||
+	    __put_user (kbuf->atime.tv_nsec, &ubuf->st_atime.tv_nsec)	||
+	    __put_user (kbuf->mtime.tv_sec, &ubuf->st_mtime.tv_sec)	||
+	    __put_user (kbuf->mtime.tv_nsec, &ubuf->st_mtime.tv_nsec)	||
+	    __put_user (kbuf->ctime.tv_sec, &ubuf->st_ctime.tv_sec)	||
+	    __put_user (kbuf->ctime.tv_nsec, &ubuf->st_ctime.tv_nsec)	||
 	    __put_user (kbuf->blksize, &ubuf->st_blksize)	||
 	    __put_user (kbuf->blocks, &ubuf->st_blocks)	||
 	    __put_user (UFSMAGIC, (unsigned *)ubuf->st_fstype))

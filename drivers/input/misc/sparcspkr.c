@@ -133,7 +133,7 @@ static int isa_spkr_event(struct input_dev *dev, unsigned int type, unsigned int
 	return 0;
 }
 
-static int __init init_isa_beep(struct isa_device *isa_dev)
+static int __init init_isa_beep(struct sparc_isa_device *isa_dev)
 {
 	beep_iobase = isa_dev->resource.start;
 
@@ -155,8 +155,8 @@ static int __init sparcspkr_init(void)
 	struct linux_ebus *ebus;
 	struct linux_ebus_device *edev = NULL;
 #ifdef CONFIG_SPARC64
-	struct isa_bridge *isa_br;
-	struct isa_device *isa_dev;
+	struct sparc_isa_bridge *isa_br;
+	struct sparc_isa_device *isa_dev;
 #endif
 
 	for_each_ebus(ebus) {

@@ -226,7 +226,7 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	    && (fhp->fh_export->ex_flags & NFSEXP_FSID))
 		p = xdr_encode_hyper(p, (u64) fhp->fh_export->ex_fsid);
 	else
-		p = xdr_encode_hyper(p, (u64) inode->i_dev);
+		p = xdr_encode_hyper(p, (u64) inode->i_sb->s_dev);
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
 	time.tv_sec = fhp->fh_post_atime; 
 	time.tv_nsec = 0;
@@ -438,13 +438,52 @@ int
 nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_symlinkargs *args)
 {
+	int len;
+	int avail;
+	char *old, *new;
+	struct iovec *vec;
+
 	if (!(p = decode_fh(p, &args->ffh))
 	 || !(p = decode_filename(p, &args->fname, &args->flen))
 	 || !(p = decode_sattr3(p, &args->attrs))
-	 || !(p = decode_pathname(p, &args->tname, &args->tlen)))
+		)
+		return 0;
+	/* now decode the pathname, which might be larger than the first page.
+	 * As we have to check for nul's anyway, we copy it into a new page
+	 * This page appears in the rq_res.pages list, but as pages_len is always
+	 * 0, it won't get in the way
+	 */
+	svc_take_page(rqstp);
+	len = ntohl(*p++);
+	if (len <= 0 || len > NFS3_MAXPATHLEN)
+		return 0;
+	args->tname = new = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
+	args->tlen = len;
+	/* first copy and check from the first page */
+	old = (char*)p;
+	vec = &rqstp->rq_arg.head[0];
+	avail = vec->iov_len - (old - (char*)vec->iov_base);
+	while (len > 0 && *old && avail) {
+		*new++ = *old++;
+		len--;
+		avail--;
+	}
+	/* now copy next page if there is one */
+	if (len && !avail && rqstp->rq_arg.page_len) {
+		avail = rqstp->rq_arg.page_len;
+		if (avail > PAGE_SIZE) avail = PAGE_SIZE;
+		old = page_address(rqstp->rq_arg.pages[0]);
+	}
+	while (len > 0 && *old && avail) {
+		*new++ = *old++;
+		len--;
+		avail--;
+	}
+	*new = '\0';
+	if (len)
 		return 0;
 
-	return xdr_argsize_check(rqstp, p);
+	return 1;
 }
 
 int
@@ -721,7 +760,7 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 		p = resp->buffer;
 		*p++ = 0;		/* no more entries */
 		*p++ = htonl(resp->common.err == nfserr_eof);
-		rqstp->rq_res.page_len = ((unsigned long)p & ~PAGE_MASK);
+		rqstp->rq_res.page_len = (((unsigned long)p-1) & ~PAGE_MASK)+1;
 		return 1;
 	} else
 		return xdr_ressize_check(rqstp, p);

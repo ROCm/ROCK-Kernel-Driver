@@ -311,7 +311,7 @@ shmiq_nopage (struct vm_area_struct *vma, unsigned long address,
 }
 
 static struct vm_operations_struct qcntl_mmap = {
-	nopage:	shmiq_nopage,		/* our magic no-page fault handler */
+	.nopage	= shmiq_nopage,		/* our magic no-page fault handler */
 };
 
 static int
@@ -454,12 +454,12 @@ shmiq_qcntl_close (struct inode *inode, struct file *filp)
 
 static struct file_operations shmiq_fops =
 {
-	poll:		shmiq_qcntl_poll,
-	ioctl:		shmiq_qcntl_ioctl,
-	mmap:		shmiq_qcntl_mmap,
-	open:		shmiq_qcntl_open,
-	release:	shmiq_qcntl_close,
-	fasync:		shmiq_qcntl_fasync,
+	.poll		= shmiq_qcntl_poll,
+	.ioctl		= shmiq_qcntl_ioctl,
+	.mmap		= shmiq_qcntl_mmap,
+	.open		= shmiq_qcntl_open,
+	.release	= shmiq_qcntl_close,
+	.fasync		= shmiq_qcntl_fasync,
 };
 
 void

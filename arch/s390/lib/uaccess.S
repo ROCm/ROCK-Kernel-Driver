@@ -1,9 +1,9 @@
 /*
  *  arch/s390/lib/uaccess.S
- *    fixup routines for copy_{from|to}_user functions.
+ *    __copy_{from|to}_user functions.
  *
  *  s390
- *    Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ *    Copyright (C) 2000,2002 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Authors(s): Martin Schwidefsky (schwidefsky@de.ibm.com)
  *
  *  These functions have standard call interface
@@ -22,17 +22,23 @@ __copy_from_user_asm:
 1:	sacf	0
 	lr	%r2,%r5
 	br	%r14
-2:      sll	%r4,1
-        srl	%r4,1
-        lhi	%r3,-4096
-        sll	%r3,1
-        srl	%r3,1
-        n	%r3,__LC_TRANS_EXC_ADDR
-        sr	%r3,%r4
-        jm	1b
-	j	0b
+2:	lhi	%r1,-4096
+	lr	%r3,%r4
+	slr	%r3,%r1      # %r3 = %r4 + 4096
+	nr	%r3,%r1      # %r3 = (%r4 + 4096) & -4096
+	slr	%r3,%r4      # %r3 = #bytes to next user page boundary
+	clr	%r5,%r3      # copy crosses next page boundary ?
+	jnh	1b           # no, this page fauled
+	# The page after the current user page might have faulted.
+	# We cant't find out which page because the program check handler
+	# might have callled schedule, destroying all lowcore information.
+	# We retry with the shortened length.
+3:	mvcle	%r2,%r4,0
+	jo	3b
+	j	1b
         .section __ex_table,"a"
 	.long	0b,2b
+	.long	3b,1b
         .previous
 
         .align 4
@@ -46,17 +52,23 @@ __copy_to_user_asm:
 1:	sacf	0
 	lr	%r2,%r3
 	br	%r14
-2:      sll	%r4,1
-        srl	%r4,1
-        lhi	%r5,-4096
-        sll	%r5,1
-        srl	%r5,1
-        n	%r5,__LC_TRANS_EXC_ADDR
-        sr	%r5,%r4
-        jm	1b
-	j	0b
+2:	lhi	%r1,-4096
+	lr	%r5,%r4
+	slr	%r5,%r1      # %r5 = %r4 + 4096
+	nr	%r5,%r1      # %r5 = (%r4 + 4096) & -4096
+	slr	%r5,%r4      # %r5 = #bytes to next user page boundary
+	clr	%r3,%r5      # copy crosses next page boundary ?
+	jnh	1b           # no, the current page fauled
+	# The page after the current user page might have faulted.
+	# We cant't find out which page because the program check handler
+	# might have callled schedule, destroying all lowcore information.
+	# We retry with the shortened length.
+3:	mvcle	%r4,%r2,0
+	jo	3b
+	j	1b
         .section __ex_table,"a"
-	.long   0b,2b
+	.long	0b,2b
+	.long	3b,1b
         .previous
 
         .align 4
@@ -71,18 +83,26 @@ __clear_user_asm:
 0:	mvcle	%r4,%r2,0
 	jo	0b
 1:	sacf	0
-	lr	%r2,%r3
 	br	%r14
-2:      sll	%r4,1
-        srl	%r4,1
-        lhi	%r5,-4096
-        sll	%r5,1
-        srl	%r5,1
-        n	%r5,__LC_TRANS_EXC_ADDR
-        sr	%r5,%r4
-	jm	1b
-	j	0b
+2:	lr	%r2,%r5
+	lhi	%r1,-4096
+	slr	%r5,%r1      # %r5 = %r4 + 4096
+	nr	%r5,%r1      # %r5 = (%r4 + 4096) & -4096
+	slr	%r5,%r4      # %r5 = #bytes to next user page boundary
+	clr	%r2,%r5      # copy crosses next page boundary ?
+	jnh	1b           # no, the current page fauled
+	# The page after the current user page might have faulted.
+	# We cant't find out which page because the program check handler
+	# might have callled schedule, destroying all lowcore information.
+	# We retry with the shortened length.
+	slr	%r2,%r5
+3:	mvcle	%r4,%r2,0
+	jo	3b
+	j	1b
+4:	alr	%r2,%r5
+	j	1b
         .section __ex_table,"a"
-	.long   0b,2b
+	.long	0b,2b
+        .long	3b,4b
         .previous
 

@@ -58,15 +58,12 @@ static int linear_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio
 {
 	mddev_t *mddev = q->queuedata;
 	dev_info_t *dev0;
-	int maxsectors, bio_sectors = (bio->bi_size + biovec->bv_len) >> 9;
+	unsigned long maxsectors, bio_sectors = bio->bi_size >> 9;
 
 	dev0 = which_dev(mddev, bio->bi_sector);
 	maxsectors = (dev0->size << 1) - (bio->bi_sector - (dev0->offset<<1));
 
-	if (bio_sectors <= maxsectors)
-		return biovec->bv_len;
-
-	return (maxsectors << 9) - bio->bi_size;
+	return (maxsectors - bio_sectors) << 9;
 }
 
 static int linear_run (mddev_t *mddev)

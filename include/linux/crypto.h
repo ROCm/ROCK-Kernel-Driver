@@ -29,7 +29,7 @@
 #define CRYPTO_ALG_TYPE_MASK		0x000000ff
 #define CRYPTO_ALG_TYPE_CIPHER		0x00000001
 #define CRYPTO_ALG_TYPE_DIGEST		0x00000002
-#define CRYPTO_ALG_TYPE_COMP		0x00000004
+#define CRYPTO_ALG_TYPE_COMPRESS	0x00000004
 
 
 /*
@@ -144,6 +144,9 @@ struct digest_tfm {
 	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
 	                   unsigned int nsg, u8 *out);
+#ifdef CONFIG_CRYPTO_HMAC
+	void *dit_hmac_block;
+#endif
 };
 
 struct compress_tfm {
@@ -196,12 +199,7 @@ static inline const char *crypto_tfm_alg_name(struct crypto_tfm *tfm)
 
 static inline const char *crypto_tfm_alg_modname(struct crypto_tfm *tfm)
 {
-	struct crypto_alg *alg = tfm->__crt_alg;
-	
-	if (alg->cra_module)
-		return alg->cra_module->name;
-	else
-		return NULL;
+	return module_name(tfm->__crt_alg->cra_module);
 }
 
 static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)
@@ -211,16 +209,19 @@ static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)
 
 static inline unsigned int crypto_tfm_alg_min_keysize(struct crypto_tfm *tfm)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->__crt_alg->cra_cipher.cia_min_keysize;
 }
 
 static inline unsigned int crypto_tfm_alg_max_keysize(struct crypto_tfm *tfm)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->__crt_alg->cra_cipher.cia_max_keysize;
 }
 
 static inline unsigned int crypto_tfm_alg_ivsize(struct crypto_tfm *tfm)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->__crt_alg->cra_cipher.cia_ivsize;
 }
 
@@ -231,6 +232,7 @@ static inline unsigned int crypto_tfm_alg_blocksize(struct crypto_tfm *tfm)
 
 static inline unsigned int crypto_tfm_alg_digestsize(struct crypto_tfm *tfm)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	return tfm->__crt_alg->cra_digest.dia_digestsize;
 }
 
@@ -304,13 +306,13 @@ static inline void crypto_cipher_get_iv(struct crypto_tfm *tfm,
 
 static inline void crypto_comp_compress(struct crypto_tfm *tfm)
 {
-	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMP);
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMPRESS);
 	tfm->crt_compress.cot_compress(tfm);
 }
 
 static inline void crypto_comp_decompress(struct crypto_tfm *tfm) 
 {
-	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMP);
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMPRESS);
 	tfm->crt_compress.cot_decompress(tfm);
 }
 

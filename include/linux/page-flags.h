@@ -70,6 +70,7 @@
 #define PG_chainlock		15	/* lock bit for ->pte_chain */
 
 #define PG_direct		16	/* ->pte_chain points directly at pte */
+#define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
 
 /*
  * Global page accounting.  One instance per CPU.  Only unsigned longs are
@@ -232,6 +233,10 @@ extern void get_full_page_state(struct page_state *ret);
 #define TestSetPageDirect(page)	test_and_set_bit(PG_direct, &(page)->flags)
 #define ClearPageDirect(page)		clear_bit(PG_direct, &(page)->flags)
 #define TestClearPageDirect(page)	test_and_clear_bit(PG_direct, &(page)->flags)
+
+#define PageMappedToDisk(page)	test_bit(PG_mappedtodisk, &(page)->flags)
+#define SetPageMappedToDisk(page) set_bit(PG_mappedtodisk, &(page)->flags)
+#define ClearPageMappedToDisk(page) clear_bit(PG_mappedtodisk, &(page)->flags)
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,

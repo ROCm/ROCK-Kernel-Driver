@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/interrupt.h>
+#include <linux/kallsyms.h>
 #include <linux/init.h>
 
 #include <asm/system.h>

@@ -155,7 +155,6 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] =
 	"Enclosure        ",
 };
 
-static char * scsi_null_device_strs = "nullnullnullnull";
 static const char * const spaces = "                "; /* 16 of them */
 
 static unsigned scsi_default_dev_flags;
@@ -2199,8 +2198,8 @@ static int scsi_bus_match(struct device *scsi_driverfs_dev,
 }
 
 struct bus_type scsi_driverfs_bus_type = {
-        name: "scsi",
-        match: scsi_bus_match,
+        .name	= "scsi",
+        .match	= scsi_bus_match,
 };
 
 static int __init init_scsi(void)
@@ -2225,6 +2224,8 @@ static int __init init_scsi(void)
 			printk(KERN_ERR "SCSI: can't init sg mempool %s\n", sgp->name);
 	}
 
+	scsi_init_procfs();
+	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
 	scsi_host_init();
 	scsi_dev_info_list_init(scsi_dev_flags);
 	bus_register(&scsi_driverfs_bus_type);
@@ -2236,9 +2237,10 @@ static void __exit exit_scsi(void)
 {
 	int i;
 
+	bus_unregister(&scsi_driverfs_bus_type);
+	scsi_dev_info_list_delete();
 	devfs_unregister(scsi_devfs_handle);
 	scsi_exit_procfs();
-	scsi_dev_info_list_delete();
 
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
 		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
@@ -2251,95 +2253,3 @@ static void __exit exit_scsi(void)
 
 module_init(init_scsi);
 module_exit(exit_scsi);
-
-/*
- * Function:    scsi_get_host_dev()
- *
- * Purpose:     Create a Scsi_Device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     The Scsi_Device or NULL
- *
- * Notes:
- */
-Scsi_Device * scsi_get_host_dev(struct Scsi_Host * SHpnt)
-{
-        Scsi_Device * SDpnt;
-
-        /*
-         * Attach a single Scsi_Device to the Scsi_Host - this should
-         * be made to look like a "pseudo-device" that points to the
-         * HA itself.  For the moment, we include it at the head of
-         * the host_queue itself - I don't think we want to show this
-         * to the HA in select_queue_depths(), as this would probably confuse
-         * matters.
-         * Note - this device is not accessible from any high-level
-         * drivers (including generics), which is probably not
-         * optimal.  We can add hooks later to attach 
-         */
-        SDpnt = (Scsi_Device *) kmalloc(sizeof(Scsi_Device),
-                                        GFP_ATOMIC);
-        if(SDpnt == NULL)
-        	return NULL;
-        	
-        memset(SDpnt, 0, sizeof(Scsi_Device));
-	SDpnt->vendor = scsi_null_device_strs;
-	SDpnt->model = scsi_null_device_strs;
-	SDpnt->rev = scsi_null_device_strs;
-
-        SDpnt->host = SHpnt;
-        SDpnt->id = SHpnt->this_id;
-        SDpnt->type = -1;
-	SDpnt->new_queue_depth = 1;
-        
-	scsi_build_commandblocks(SDpnt);
-	if(SDpnt->current_queue_depth == 0) {
-		kfree(SDpnt);
-		return NULL;
-	}
-
-	scsi_initialize_queue(SDpnt, SHpnt);
-
-	SDpnt->online = TRUE;
-
-        /*
-         * Initialize the object that we will use to wait for command blocks.
-         */
-	init_waitqueue_head(&SDpnt->scpnt_wait);
-        return SDpnt;
-}
-
-/*
- * Function:    scsi_free_host_dev()
- *
- * Purpose:     Create a Scsi_Device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     Nothing
- *
- * Notes:
- */
-void scsi_free_host_dev(Scsi_Device * SDpnt)
-{
-        if( (unsigned char) SDpnt->id != (unsigned char) SDpnt->host->this_id )
-        {
-                panic("Attempt to delete wrong device\n");
-        }
-
-        blk_cleanup_queue(&SDpnt->request_queue);
-
-        /*
-         * We only have a single SCpnt attached to this device.  Free
-         * it now.
-         */
-	scsi_release_commandblocks(SDpnt);
-	if (SDpnt->inquiry)
-		kfree(SDpnt->inquiry);
-        kfree(SDpnt);
-}

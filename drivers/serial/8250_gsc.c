@@ -112,15 +112,15 @@ static struct parisc_device_id serial1_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, serial_tbl);
 
 static struct parisc_driver serial1_driver = {
-	name:		"Serial RS232",
-	id_table:	serial1_tbl,
-	probe:		serial_init_chip,
+	.name		= "Serial RS232",
+	.id_table	= serial1_tbl,
+	.probe		= serial_init_chip,
 };
 
 static struct parisc_driver serial_driver = {
-	name:		"Serial RS232",
-	id_table:	serial_tbl,
-	probe:		serial_init_chip,
+	.name		= "Serial RS232",
+	.id_table	= serial_tbl,
+	.probe		= serial_init_chip,
 };
 
 int __init probe_serial_gsc(void)

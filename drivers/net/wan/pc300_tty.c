@@ -42,20 +42,19 @@
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/if.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
 #include <linux/skbuff.h>
-
 /* TTY includes */
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/serial.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include "pc300.h"
 

@@ -1,3 +1,13 @@
+Version 0.60
+------------
+Fix oops in readpages caused by not setting address space operations in inode in 
+rare code path. 
+
+Version 0.59
+------------
+Includes support for deleting of open files and renaming over existing files (per POSIX
+requirement).  Add readlink support for Windows junction points (directory symlinks).
+
 Version 0.58
 ------------
 Changed read and write to go through pagecache. Added additional address space operations.

@@ -67,7 +67,7 @@ struct ext2_xattr_handler {
 extern int ext2_xattr_register(int, struct ext2_xattr_handler *);
 extern void ext2_xattr_unregister(int, struct ext2_xattr_handler *);
 
-extern int ext2_setxattr(struct dentry *, const char *, void *, size_t, int);
+extern int ext2_setxattr(struct dentry *, const char *, const void *, size_t, int);
 extern ssize_t ext2_getxattr(struct dentry *, const char *, void *, size_t);
 extern ssize_t ext2_listxattr(struct dentry *, char *, size_t);
 extern int ext2_removexattr(struct dentry *, const char *);

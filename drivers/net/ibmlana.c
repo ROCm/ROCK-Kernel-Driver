@@ -76,7 +76,6 @@ History:
 
 #include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -85,15 +84,14 @@ History:
 #include <linux/delay.h>
 #include <linux/time.h>
 #include <linux/mca.h>
-#include <asm/processor.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-
 #include <linux/module.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+
+#include <asm/processor.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
 
 #define _IBM_LANA_DRIVER_
 #include "ibmlana.h"

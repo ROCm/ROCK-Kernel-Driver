@@ -182,7 +182,7 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
 	int i;
 	struct resource *best = NULL;
 
-	for(i=0; i<4; i++) {
+	for(i = 0; i < PCI_BUS_NUM_RESOURCES; i++) {
 		struct resource *r = bus->resource[i];
 		if (!r)
 			continue;

@@ -1183,7 +1183,7 @@ int may_open(struct nameidata *nd, int acc_mode, int flag)
 	/*
 	 * Ensure there are no outstanding leases on the file.
 	 */
-	error = get_lease(inode, flag);
+	error = break_lease(inode, flag);
 	if (error)
 		return error;
 
@@ -1551,7 +1551,7 @@ static void d_unhash(struct dentry *dentry)
 		if (atomic_read(&dentry->d_count) != 2)
 			break;
 	case 2:
-		list_del_init(&dentry->d_hash);
+		__d_drop(dentry);
 	}
 	spin_unlock(&dcache_lock);
 }

@@ -26,12 +26,13 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -40,6 +41,8 @@
 #ifndef LINUX_2_2
 #include <linux/gameport.h>
 #endif
+
+#include <asm/io.h>
 
 #define chip_t trident_t
 

@@ -88,8 +88,8 @@ static ssize_t isapnp_proc_bus_read(struct file *file, char *buf, size_t nbytes,
 
 static struct file_operations isapnp_proc_bus_file_operations =
 {
-	llseek:		isapnp_proc_bus_lseek,
-	read:		isapnp_proc_bus_read,
+	.llseek		= isapnp_proc_bus_lseek,
+	.read		= isapnp_proc_bus_read,
 };
 
 static int isapnp_proc_attach_device(struct pnp_dev *dev)

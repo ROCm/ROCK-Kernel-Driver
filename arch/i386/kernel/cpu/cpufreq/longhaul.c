@@ -1,5 +1,5 @@
 /*
- *  $Id: longhaul.c,v 1.72 2002/09/29 23:43:10 db Exp $
+ *  $Id: longhaul.c,v 1.77 2002/10/31 21:17:40 db Exp $
  *
  *  (C) 2001  Dave Jones. <davej@suse.de>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
@@ -436,8 +436,10 @@ static void __init longhaul_get_ranges (void)
 	switch (longhaul) {
 	case 1:
 		/* Ugh, Longhaul v1 didn't have the min/max MSRs.
-		   Assume max = whatever we booted at. */
+		   Assume min=3.0x & max = whatever we booted at. */
+		minmult = 30;
 		maxmult = longhaul_get_cpu_mult();
+		minfsb = maxfsb = current_fsb;
 		break;
 
 	case 2 ... 3:
@@ -531,7 +533,7 @@ static inline unsigned int longhaul_statecount_fsb(struct cpufreq_policy *policy
 }
 
 
-static void longhaul_verify(struct cpufreq_policy *policy)
+static int longhaul_verify(struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i;
@@ -540,7 +542,7 @@ static void longhaul_verify(struct cpufreq_policy *policy)
 	unsigned int    newmax = -1;
 
 	if (!policy || !longhaul_driver)
-		return;
+		return -EINVAL;
 
 	policy->cpu = 0;
 	cpufreq_verify_within_limits(policy, lowest_speed, highest_speed);
@@ -552,7 +554,7 @@ static void longhaul_verify(struct cpufreq_policy *policy)
 		number_states = longhaul_statecount_fsb(policy, current_fsb);
 
 	if (number_states)
-		return;
+		return 0;
 
 	/* get frequency closest above current policy->max */
 	if (can_scale_fsb==1) {
@@ -579,10 +581,12 @@ static void longhaul_verify(struct cpufreq_policy *policy)
 	}
 
 	policy->max = newmax;
+
+	return 0;
 }
 
 
-static void longhaul_setpolicy (struct cpufreq_policy *policy)
+static int longhaul_setpolicy (struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i;
@@ -592,7 +596,7 @@ static void longhaul_setpolicy (struct cpufreq_policy *policy)
 	unsigned int    best_freq = -1;
 
 	if (!longhaul_driver)
-		return;
+		return -EINVAL;
 
 	if (policy->policy==CPUFREQ_POLICY_PERFORMANCE)
 		fsb_search_table = perf_fsb_table;
@@ -613,7 +617,7 @@ static void longhaul_setpolicy (struct cpufreq_policy *policy)
 	}
 
 	if (!number_states)
-		return;
+		return -EINVAL;
 	else if (number_states == 1) {
 		for(i=0; i<numscales; i++) {
 			if ((clock_ratio[i] != -1) &&
@@ -692,11 +696,11 @@ static void longhaul_setpolicy (struct cpufreq_policy *policy)
 		}
 		break;
 	default:
-		return;
+		return -EINVAL;
 	}
 
 	longhaul_setstate(new_clock_ratio, new_fsb);
-	return;
+	return 0;
 }
 
 
@@ -775,7 +779,7 @@ static int __init longhaul_init (void)
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq    = (unsigned int) lowest_speed;
+	driver->cpu_min_freq[0] = (unsigned int) lowest_speed;
 	driver->cpu_cur_freq[0] = currentspeed;
 #endif
 
@@ -788,15 +792,15 @@ static int __init longhaul_init (void)
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
 	driver->policy[0].max_cpu_freq = (unsigned int) highest_speed;
 
-	ret = cpufreq_register(driver);
+	longhaul_driver = driver;
 
+	ret = cpufreq_register(driver);
 	if (ret) {
+		longhaul_driver = NULL;
 		kfree(driver);
-		return ret;
 	}
 
-	longhaul_driver = driver;
-	return 0;
+	return ret;
 }
 
 

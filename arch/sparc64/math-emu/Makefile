@@ -4,6 +4,4 @@
 
 obj-y    := math.o
 
-EXTRA_CFLAGS = -I. -I$(TOPDIR)/include/math-emu -w
-
-include $(TOPDIR)/Rules.make
+EXTRA_CFLAGS = -I. -Iinclude/math-emu -w

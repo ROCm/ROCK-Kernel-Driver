@@ -154,7 +154,7 @@ chan_subch_read (struct file *file, char *user_buf, size_t user_len,
 }
 
 static struct file_operations chan_subch_file_ops = {
-	read:chan_subch_read, open:chan_subch_open, release:chan_subch_close,
+	.read = chan_subch_read, .open = chan_subch_open, .release = chan_subch_close,
 };
 
 static int
@@ -245,8 +245,8 @@ cio_irq_proc_read (struct file *file, char *user_buf, size_t user_len,
 }
 
 static struct file_operations cio_irq_proc_file_ops = {
-	read:cio_irq_proc_read, open:cio_irq_proc_open,
-	release:cio_irq_proc_close,
+	.read = cio_irq_proc_read, .open = cio_irq_proc_open,
+	.release = cio_irq_proc_close,
 };
 
 static int

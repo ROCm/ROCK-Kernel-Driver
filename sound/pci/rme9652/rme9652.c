@@ -21,11 +21,12 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -33,6 +34,9 @@
 #include <sound/asoundef.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+
+#include <asm/current.h>
+#include <asm/io.h>
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -311,8 +315,13 @@ extern void snd_hammerfall_free_buffer(struct pci_dev *, void *ptr);
 #endif
 
 static struct pci_device_id snd_rme9652_ids[] __devinitdata = {
-	{0x10ee, 0x3fc4, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0,},	/* RME Digi9652 */
-	{0,}
+	{
+		.vendor	   = 0x10ee,
+		.device	   = 0x3fc4,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},	/* RME Digi9652 */
+	{ 0, },
 };
 
 MODULE_DEVICE_TABLE(pci, snd_rme9652_ids);
@@ -2733,10 +2742,10 @@ static void __devexit snd_rme9652_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	.name ="RME Digi9652 (Hammerfall)",
+	.name	  = "RME Digi9652 (Hammerfall)",
 	.id_table = snd_rme9652_ids,
-	.probe = snd_rme9652_probe,
-	.remove = __devexit_p(snd_rme9652_remove),
+	.probe	  = snd_rme9652_probe,
+	.remove	  = __devexit_p(snd_rme9652_remove),
 };
 
 static int __init alsa_card_hammerfall_init(void)

@@ -87,7 +87,8 @@ PowerNow! K6:
 Transmeta Crusoe Longrun:
     Transmeta Crusoe processors:
 --------------------------------
-    Does not work with the 2.4. /proc/sys/cpu/ interface.
+    It is recommended to use the 2.6. /proc/cpufreq interface when
+    using this driver
 
 
 
@@ -283,15 +284,17 @@ entries:
 
 cpufreq_verify_t verify: This is a pointer to a function with the
 	following definition:
-	void verify_function (struct cpufreq_policy *policy).
+	int verify_function (struct cpufreq_policy *policy).
 	This function must verify the new policy is within the limits
 	supported by the CPU, and at least one supported CPU is within
 	this range. It may be useful to use cpufreq.h /
-	cpufreq_verify_within_limits for this.
+	cpufreq_verify_within_limits for this. If this is called with
+        CPUFREQ_ALL_CPUS, and there is no common subset of frequencies
+        for all CPUs, exit with an error.
 
 cpufreq_setpolicy_t setpolicy: This is a pointer to a function with
 	the following definition:
-	void setpolicy_function (struct cpufreq_policy *policy).
+	int setpolicy_function (struct cpufreq_policy *policy).
 	This function must set the CPU to the new policy. If it is a
 	"dumb" CPU which only allows fixed frequencies to be set, it
 	shall set it to the lowest within the limit for
@@ -302,30 +305,30 @@ cpufreq_setpolicy_t setpolicy: This is a pointer to a function with
 
 struct cpufreq_policy   *policy: This is an array of NR_CPUS struct
 	cpufreq_policies, containing the current policies set for these
-	CPUs. Note that policy[0].max_cpu_freq must contain the
-	absolute maximum CPU frequency supported by _all_ CPUs.
+	CPUs. Note that policy[cpu].max_cpu_freq must contain the
+	absolute maximum CPU frequency supported by the specified cpu.
 
 In case the driver is expected to run with the 2.4.-style API
 (/proc/sys/cpu/.../), two more values must be passed
 #ifdef CONFIG_CPU_FREQ_24_API
-	unsigned int            cpu_min_freq;
+	unsigned int            cpu_min_freq[NR_CPUS];
 	unsigned int            cpu_cur_freq[NR_CPUS];
 #endif
-	with cpu_min_freq being the minimum CPU frequency supported by
-	the CPUs; and the entries in cpu_cur_freq reflecting the
-	current speed of the appropriate CPU.
+	with cpu_min_freq[cpu] being the minimum CPU frequency
+	supported by the CPU; and the entries in cpu_cur_freq
+	reflecting the current speed of the appropriate CPU.
 
 Some Requirements to CPUFreq architecture drivers
 -------------------------------------------------
 * Only call cpufreq_register() when the ability to switch CPU
-  frequencies is _verified_ or can't be missing
+  frequencies is _verified_ or can't be missing. Also, all
+  other initialization must be done beofre this call, as
+  cpfureq_register calls the driver's verify and setpolicy code for
+  each CPU.
 * cpufreq_unregister() may only be called if cpufreq_register() has
   been successfully(!) called before.
 * kfree() the struct cpufreq_driver only after the call to 
   cpufreq_unregister(), unless cpufreq_register() failed.
-* Be aware that there is currently no error management in the
-  setpolicy() code in the CPUFreq core. So only call yourself a
-  cpufreq_driver if you are really a working cpufreq_driver!
 
 
 

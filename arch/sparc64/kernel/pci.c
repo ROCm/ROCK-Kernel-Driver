@@ -461,7 +461,7 @@ int pci_assign_resource(struct pci_dev *pdev, int resource)
 
 	if (err < 0) {
 		printk("PCI: Failed to allocate resource %d for %s\n",
-		       resource, pdev->name);
+		       resource, pdev->dev.name);
 	} else {
 		/* Update PCI config space. */
 		pbm->parent->base_address_update(pdev, resource);

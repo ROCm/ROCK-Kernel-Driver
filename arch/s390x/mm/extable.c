@@ -2,10 +2,8 @@
  *  arch/s390/mm/extable.c
  *
  *  S390 version
- *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
- *    Author(s): Hartmut Penner (hp@de.ibm.com)
  *
- *  Derived from "arch/i386/mm/extable.c"
+ *  identical to arch/i386/mm/extable.c
  */
 
 #include <linux/config.h>
@@ -42,24 +40,27 @@ extern spinlock_t modlist_lock;
 unsigned long
 search_exception_table(unsigned long addr)
 {
+	struct list_head *i;
 	unsigned long ret = 0;
-
+	
 #ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
 	ret = search_one_table(__start___ex_table, __stop___ex_table-1, addr);
 	return ret;
 #else
 	unsigned long flags;
-	/* The kernel is the last "module" -- no need to treat it special.  */
-	struct module *mp;
+	struct list_head *i;
 
+	/* The kernel is the last "module" -- no need to treat it special.  */
 	spin_lock_irqsave(&modlist_lock, flags);
-	for (mp = module_list; mp != NULL; mp = mp->next) {
-		if (mp->ex_table_start == NULL || !(mp->flags&(MOD_RUNNING|MOD_INITIALIZING)))
+	list_for_each(i, &extables) {
+		struct exception_table *ex
+			= list_entry(i, struct exception_table, list);
+		if (ex->num_entries == 0)
 			continue;
-		ret = search_one_table(mp->ex_table_start,
-				       mp->ex_table_end - 1, addr);
-		if (ret) 
+		ret = search_one_table(ex->entry,
+				       ex->entry + ex->num_entries - 1, addr);
+		if (ret)
 			break;
 	}
 	spin_unlock_irqrestore(&modlist_lock, flags);

@@ -116,6 +116,7 @@ EXPORT_SYMBOL(sock_sendmsg);
 EXPORT_SYMBOL(sock_recvmsg);
 EXPORT_SYMBOL(sk_alloc);
 EXPORT_SYMBOL(sk_free);
+EXPORT_SYMBOL(sk_send_sigurg);
 EXPORT_SYMBOL(sock_wake_async);
 EXPORT_SYMBOL(sock_alloc_send_skb);
 EXPORT_SYMBOL(sock_alloc_send_pskb);
@@ -283,6 +284,7 @@ extern int (*dlci_ioctl_hook)(unsigned int, void *);
 EXPORT_SYMBOL(dlci_ioctl_hook);
 #endif
 
+EXPORT_SYMBOL(km_waitq);
 EXPORT_SYMBOL(xfrm_cfg_sem);
 EXPORT_SYMBOL(xfrm_policy_alloc);
 EXPORT_SYMBOL(__xfrm_policy_destroy);

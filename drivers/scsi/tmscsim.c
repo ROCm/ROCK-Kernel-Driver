@@ -276,10 +276,10 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,99)
 static struct pci_device_id tmscsim_pci_tbl[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_AMD,
-		device: PCI_DEVICE_ID_AMD53C974,
-		subvendor: PCI_ANY_ID,
-		subdevice: PCI_ANY_ID,
+		.vendor		= PCI_VENDOR_ID_AMD,
+		.device		= PCI_DEVICE_ID_AMD53C974,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
 	},
 	{ }		/* Terminating entry */
 };

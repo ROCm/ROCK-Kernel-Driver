@@ -115,6 +115,7 @@ int swap_readpage(struct file *file, struct page *page)
 	struct bio *bio;
 	int ret = 0;
 
+	BUG_ON(!PageLocked(page));
 	ClearPageUptodate(page);
 	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
 	if (bio == NULL) {
@@ -127,23 +128,8 @@ int swap_readpage(struct file *file, struct page *page)
 out:
 	return ret;
 }
-/*
- * swapper_space doesn't have a real inode, so it gets a special vm_writeback()
- * so we don't need swap special cases in generic_vm_writeback().
- *
- * Swap pages are !PageLocked and PageWriteback while under writeout so that
- * memory allocators will throttle against them.
- */
-static int swap_vm_writeback(struct page *page, struct writeback_control *wbc)
-{
-	struct address_space *mapping = page->mapping;
-
-	unlock_page(page);
-	return generic_writepages(mapping, wbc);
-}
 
 struct address_space_operations swap_aops = {
-	.vm_writeback	= swap_vm_writeback,
 	.writepage	= swap_writepage,
 	.readpage	= swap_readpage,
 	.sync_page	= block_sync_page,

@@ -23,6 +23,8 @@
  * Please see Documentation/filesystems/sysfs.txt for more information.
  */
 
+#undef DEBUG 
+
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
@@ -87,7 +89,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 	return inode;
 }
 
-static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode *inode;
 	int error = 0;
@@ -133,24 +135,12 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	if (inode) {
 		int l = strlen(symname)+1;
 		error = page_symlink(inode, symname, l);
-		if (!error) {
+		if (!error)
 			d_instantiate(dentry, inode);
-			dget(dentry);
-		} else
+		else
 			iput(inode);
 	}
 	return error;
-}
-
-static int sysfs_unlink(struct inode *dir, struct dentry *dentry)
-{
-	struct inode *inode = dentry->d_inode;
-	down(&inode->i_sem);
-	dentry->d_inode->i_nlink--;
-	up(&inode->i_sem);
-	d_invalidate(dentry);
-	dput(dentry);
-	return 0;
 }
 
 /**
@@ -173,16 +163,10 @@ static ssize_t
 sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct sysfs_ops * ops = NULL;
-	struct kobject * kobj;
+	struct sysfs_ops * ops = file->private_data;
+	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	unsigned char *page;
 	ssize_t retval = 0;
-
-	kobj = file->f_dentry->d_parent->d_fsdata;
-	if (kobj && kobj->subsys)
-		ops = kobj->subsys->sysfs_ops;
-	if (!ops || !ops->show)
-		return 0;
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
@@ -234,16 +218,11 @@ static ssize_t
 sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct sysfs_ops * ops = NULL;
-	struct kobject * kobj;
+	struct sysfs_ops * ops = file->private_data;
+	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	ssize_t retval = 0;
 	char * page;
 
-	kobj = file->f_dentry->d_parent->d_fsdata;
-	if (kobj && kobj->subsys)
-		ops = kobj->subsys->sysfs_ops;
-	if (!ops || !ops->store)
-		return 0;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -275,19 +254,70 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	return retval;
 }
 
-static int sysfs_open_file(struct inode * inode, struct file * filp)
+static int check_perm(struct inode * inode, struct file * file)
 {
-	struct kobject * kobj;
+	struct kobject * kobj = kobject_get(file->f_dentry->d_parent->d_fsdata);
+	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct sysfs_ops * ops = NULL;
 	int error = 0;
 
-	kobj = filp->f_dentry->d_parent->d_fsdata;
-	if ((kobj = kobject_get(kobj))) {
-		struct attribute * attr = filp->f_dentry->d_fsdata;
-		if (!attr)
-			error = -EINVAL;
-	} else
-		error = -EINVAL;
+	if (!kobj || !attr)
+		goto Einval;
+	
+	if (kobj->subsys)
+		ops = kobj->subsys->sysfs_ops;
+
+	/* No sysfs operations, either from having no subsystem,
+	 * or the subsystem have no operations.
+	 */
+	if (!ops)
+		goto Eaccess;
+
+	/* File needs write support.
+	 * The inode's perms must say it's ok, 
+	 * and we must have a store method.
+	 */
+	if (file->f_mode & FMODE_WRITE) {
+
+		if (!(inode->i_mode & S_IWUGO))
+			goto Eperm;
+		if (!ops->store)
+			goto Eaccess;
+
+	}
+
+	/* File needs read support.
+	 * The inode's perms must say it's ok, and we there
+	 * must be a show method for it.
+	 */
+	if (file->f_mode & FMODE_READ) {
+		if (!(inode->i_mode & S_IRUGO))
+			goto Eperm;
+		if (!ops->show)
+			goto Eaccess;
+	}
+
+	/* No error? Great, store the ops in file->private_data
+	 * for easy access in the read/write functions.
+	 */
+	file->private_data = ops;
+	goto Done;
+
+ Einval:
+	error = -EINVAL;
+	goto Done;
+ Eaccess:
+	error = -EACCES;
+	goto Done;
+ Eperm:
+	error = -EPERM;
+ Done:
 	return error;
+}
+
+static int sysfs_open_file(struct inode * inode, struct file * filp)
+{
+	return check_perm(inode,filp);
 }
 
 static int sysfs_release(struct inode * inode, struct file * filp)
@@ -541,7 +571,8 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 		/* make sure dentry is really there */
 		if (victim->d_inode && 
 		    (victim->d_parent->d_inode == dir->d_inode)) {
-			sysfs_unlink(dir->d_inode,victim);
+			d_invalidate(victim);
+			simple_unlink(dir->d_inode,victim);
 		}
 	}
 	up(&dir->d_inode->i_sem);
@@ -599,18 +630,15 @@ void sysfs_remove_dir(struct kobject * kobj)
 	list_for_each_safe(node,next,&dentry->d_subdirs) {
 		struct dentry * d = list_entry(node,struct dentry,d_child);
 		/* make sure dentry is still there */
-		if (d->d_inode)
-			sysfs_unlink(dentry->d_inode,d);
+		if (d->d_inode) {
+			d_invalidate(d);
+			simple_unlink(dentry->d_inode,d);
+		}
 	}
 
-	d_invalidate(dentry);
-	if (simple_empty(dentry)) {
-		dentry->d_inode->i_nlink -= 2;
-		dentry->d_inode->i_flags |= S_DEAD;
-		parent->d_inode->i_nlink--;
-	}
 	up(&dentry->d_inode->i_sem);
-	dput(dentry);
+	d_invalidate(dentry);
+	simple_rmdir(parent->d_inode,dentry);
 
 	up(&parent->d_inode->i_sem);
 	dput(parent);
@@ -622,4 +650,3 @@ EXPORT_SYMBOL(sysfs_create_link);
 EXPORT_SYMBOL(sysfs_remove_link);
 EXPORT_SYMBOL(sysfs_create_dir);
 EXPORT_SYMBOL(sysfs_remove_dir);
-MODULE_LICENSE("GPL");

@@ -143,7 +143,7 @@ static int parse_options(struct super_block *s, char *data)
 
 /* --------------------------------------------------------------------- */
 
-static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
+static struct inode *usbfs_get_inode (struct super_block *sb, int mode, dev_t dev)
 {
 	struct inode *inode = new_inode(sb);
 
@@ -176,7 +176,7 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 
 /* SMP-safe */
 static int usbfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
-			int dev)
+			dev_t dev)
 {
 	struct inode *inode = usbfs_get_inode(dir->i_sb, mode, dev);
 	int error = -EPERM;
@@ -255,7 +255,7 @@ static void d_unhash(struct dentry *dentry)
 		if (atomic_read(&dentry->d_count) != 2)
 			break;
 	case 2:
-		list_del_init(&dentry->d_hash);
+		__d_drop(dentry);
 	}
 	spin_unlock(&dcache_lock);
 }

@@ -47,17 +47,9 @@ typedef struct {
 } imm_struct;
 
 #define IMM_EMPTY \
-{	dev:		NULL,		\
-	base:		-1,		\
-	base_hi:	0,		\
-	mode:		IMM_AUTODETECT,	\
-	host:		-1,		\
-	cur_cmd:	NULL,		\
-	jstart:		0,		\
-	failed:		0,		\
-	dp:		0,		\
-	rd:		0,		\
-	p_busy:		0		\
+{	.base		= -1,		\
+	.mode		= IMM_AUTODETECT,	\
+	.host		= -1,		\
 }
 
 #include "imm.h"

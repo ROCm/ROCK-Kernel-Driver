@@ -31,7 +31,7 @@ static int smb_rmdir(struct inode *, struct dentry *);
 static int smb_unlink(struct inode *, struct dentry *);
 static int smb_rename(struct inode *, struct dentry *,
 		      struct inode *, struct dentry *);
-static int smb_make_node(struct inode *,struct dentry *,int,int);
+static int smb_make_node(struct inode *,struct dentry *,int,dev_t);
 static int smb_link(struct dentry *, struct inode *, struct dentry *);
 
 struct file_operations smb_dir_operations =
@@ -641,7 +641,7 @@ out:
  * matches the connection credentials (and we don't know which those are ...)
  */
 static int
-smb_make_node(struct inode *dir, struct dentry *dentry, int mode, int dev)
+smb_make_node(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	int error;
 	struct iattr attr;

@@ -140,7 +140,6 @@ static inline __u32 div64_32(__u64 dividend, __u32 divisor)
  */
 static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 {
-	int cpu = smp_processor_id();
 	__u64 tmp;
 	__u32 ticks;
 

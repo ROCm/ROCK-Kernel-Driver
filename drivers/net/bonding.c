@@ -196,7 +196,6 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -207,25 +206,24 @@
 #include <linux/init.h>
 #include <linux/timer.h>
 #include <linux/socket.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
-#include <asm/uaccess.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
-
 #include <linux/if_bonding.h>
 #include <linux/smp.h>
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
 #include <linux/mii.h>
 #include <linux/ethtool.h>
+
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/dma.h>
+#include <asm/uaccess.h>
 
 
 /* monitor all links that often (in milliseconds). <=0 disables monitoring */

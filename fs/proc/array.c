@@ -484,8 +484,9 @@ static int proc_pid_maps_get_line (char *buf, struct vm_area_struct *map)
 	dev = 0;
 	ino = 0;
 	if (map->vm_file != NULL) {
-		dev = map->vm_file->f_dentry->d_inode->i_dev;
-		ino = map->vm_file->f_dentry->d_inode->i_ino;
+		struct inode *inode = map->vm_file->f_dentry->d_inode;
+		dev = inode->i_sb->s_dev;
+		ino = inode->i_ino;
 		line = d_path(map->vm_file->f_dentry,
 			      map->vm_file->f_vfsmnt,
 			      buf, PAGE_SIZE);

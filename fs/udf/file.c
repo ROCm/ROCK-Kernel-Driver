@@ -145,10 +145,7 @@ static ssize_t udf_file_write(struct file * file, const char * buf,
 	retval = generic_file_write(file, buf, count, ppos);
 
 	if (retval > 0)
-	{
-		UDF_I_UCTIME(inode) = UDF_I_UMTIME(inode) = CURRENT_UTIME;
 		mark_inode_dirty(inode);
-	}
 	return retval;
 }
 

@@ -2579,7 +2579,7 @@ static int dv1394_devfs_add_entry(struct video_card *video)
 
 static int dv1394_devfs_add_dir(char *name)
 {
-	if (!devfs_mk_dir(NULL, name, NULL))
+	if (!devfs_mk_dir(NULL, name, NULL)) {
 		printk(KERN_ERR "dv1394: unable to create /dev/%s\n", name);
 		return -ENOMEM;
 	}

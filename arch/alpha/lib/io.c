@@ -414,7 +414,7 @@ void _memcpy_fromio(void * to, unsigned long from, long count)
 	/* Optimize co-aligned transfers.  Everything else gets handled
 	   a byte at a time. */
 
-	if (count >= 8 && ((long)to & 7) == (from & 7)) {
+	if (count >= 8 && ((unsigned long)to & 7) == (from & 7)) {
 		count -= 8;
 		do {
 			*(u64 *)to = __raw_readq(from);
@@ -425,7 +425,7 @@ void _memcpy_fromio(void * to, unsigned long from, long count)
 		count += 8;
 	}
 
-	if (count >= 4 && ((long)to & 3) == (from & 3)) {
+	if (count >= 4 && ((unsigned long)to & 3) == (from & 3)) {
 		count -= 4;
 		do {
 			*(u32 *)to = __raw_readl(from);
@@ -436,7 +436,7 @@ void _memcpy_fromio(void * to, unsigned long from, long count)
 		count += 4;
 	}
 		
-	if (count >= 2 && ((long)to & 1) == (from & 1)) {
+	if (count >= 2 && ((unsigned long)to & 1) == (from & 1)) {
 		count -= 2;
 		do {
 			*(u16 *)to = __raw_readw(from);
@@ -465,7 +465,7 @@ void _memcpy_toio(unsigned long to, const void * from, long count)
 	   a byte at a time. */
 	/* FIXME -- align FROM.  */
 
-	if (count >= 8 && (to & 7) == ((long)from & 7)) {
+	if (count >= 8 && (to & 7) == ((unsigned long)from & 7)) {
 		count -= 8;
 		do {
 			__raw_writeq(*(const u64 *)from, to);
@@ -476,7 +476,7 @@ void _memcpy_toio(unsigned long to, const void * from, long count)
 		count += 8;
 	}
 
-	if (count >= 4 && (to & 3) == ((long)from & 3)) {
+	if (count >= 4 && (to & 3) == ((unsigned long)from & 3)) {
 		count -= 4;
 		do {
 			__raw_writel(*(const u32 *)from, to);
@@ -487,7 +487,7 @@ void _memcpy_toio(unsigned long to, const void * from, long count)
 		count += 4;
 	}
 		
-	if (count >= 2 && (to & 1) == ((long)from & 1)) {
+	if (count >= 2 && (to & 1) == ((unsigned long)from & 1)) {
 		count -= 2;
 		do {
 			__raw_writew(*(const u16 *)from, to);

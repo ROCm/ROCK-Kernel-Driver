@@ -234,6 +234,8 @@
 #define ATTR_NOT_CONTENT_INDEXED 0x2000
 #define ATTR_ENCRYPTED  0x4000
 #define ATTR_POSIX_SEMANTICS 0x01000000
+#define ATTR_BACKUP_SEMANTICS 0x02000000
+#define ATTR_DELETE_ON_CLOSE 0x04000000
 #define ATTR_SEQUENTIAL_SCAN 0x08000000
 #define ATTR_RANDOM_ACCESS   0x10000000
 #define ATTR_NO_BUFFERING    0x20000000
@@ -255,8 +257,12 @@
 #define FILE_OVERWRITE_IF 0x00000005
 
 /* CreateOptions */
-#define CREATE_NOT_FILE   0x00000001	/* if set, indicates must not be file */
-#define CREATE_NOT_DIR    0x00000040	/* if set, indicates must not be directory */
+#define CREATE_NOT_FILE		0x00000001	/* if set must not be file */
+#define CREATE_WRITE_THROUGH	0x00000002
+#define CREATE_NOT_DIR		0x00000040	/* if set must not be directory */
+#define CREATE_RANDOM_ACCESS	0x00000800
+#define CREATE_DELETE_ON_CLOSE	0x00001000
+#define OPEN_REPARSE_POINT	0x00200000
 
 /* ImpersonationLevel flags */
 #define SECURITY_ANONYMOUS      0
@@ -743,7 +749,10 @@ typedef struct smb_com_rename_req {
 	/* followed by NewFileName */
 } RENAME_REQ;
 
-#define CREATE_HARD_LINK 0x103
+#define CREATE_HARD_LINK		0x103
+#define MOVEFILE_COPY_ALLOWED		0x0002
+#define MOVEFILE_REPLACE_EXISTING	0x0001
+
 typedef struct smb_com_nt_rename_req {	/* A5 - also used for create hardlink */
 	struct smb_hdr hdr;	/* wct = 4 */
 	__u16 SearchAttributes;	/* target file attributes */
@@ -798,7 +807,7 @@ typedef struct smb_com_create_directory_rsp {
 	__u16 ByteCount;	/* bct = 0 */
 } CREATE_DIRECTORY_RSP;
 
-typedef struct smb_com_nt_transaction_ioctl_req {
+typedef struct smb_com_transaction_ioctl_req {
 	struct smb_hdr hdr;	/* wct = 23 */
 	__u8 MaxSetupCount;
 	__u16 Reserved;
@@ -810,13 +819,13 @@ typedef struct smb_com_nt_transaction_ioctl_req {
 	__u32 ParameterOffset;
 	__u32 DataCount;
 	__u32 DataOffset;
-	__u8 SetupCount;	/* four setup words follow subcommand */
+	__u8 SetupCount; /* four setup words follow subcommand */
 	/* SNIA spec incorrectly included spurious pad here */
-	__u16 SubCommand;	/* 2 = IOCTL/FSCTL */
+	__u16 SubCommand;/* 2 = IOCTL/FSCTL */
 	__u32 FunctionCode;
 	__u16 Fid;
-	__u8 IsFSCTLFlag;	/* 1 = File System Control, 0 = device control (IOCTL)    */
-	__u8 IsRootFlag;	/* 1 = apply command to root of share (must be DFS share) */
+	__u8 IsFsctl;    /* 1 = File System Control, 0 = device control (IOCTL)*/
+	__u8 IsRootFlag; /* 1 = apply command to root of share (must be DFS share)*/
 	__u16 ByteCount;
 	__u8 Pad[3];
 	__u8 Data[1];
@@ -838,6 +847,17 @@ typedef struct smb_com_transaction_ioctl_rsp {
 	__u16 ByteCount;
 	__u8 Pad[3];
 } TRANSACT_IOCTL_RSP;
+
+struct reparse_data {
+	__u32	ReparseTag;
+	__u16	ReparseDataLength;
+	__u16	Reserved;
+	__u16	AltNameOffset;
+	__u16	AltNameLen;
+	__u16	TargetNameOffset;
+	__u16	TargetNameLen;
+	char	LinkNamesBuf[1];
+};
 
 typedef union smb_com_transaction2 {
 	struct {
@@ -894,7 +914,7 @@ typedef union smb_com_transaction2 {
 #define SMB_QUERY_FILE_UNIX_BASIC    0x200
 #define SMB_QUERY_FILE_UNIX_LINK     0x201
 
-#define SMB_SET_FILE_BASIC_INFO		0x101
+#define SMB_SET_FILE_BASIC_INFO			0x101
 #define SMB_SET_FILE_DISPOSITION_INFO	0x102
 #define SMB_SET_FILE_ALLOCATION_INFO	0x103
 #define SMB_SET_FILE_END_OF_FILE_INFO	0x104
@@ -908,7 +928,7 @@ typedef union smb_com_transaction2 {
 /* Find File infolevels */
 #define SMB_FIND_FILE_DIRECTORY_INFO	  0x101
 #define SMB_FIND_FILE_FULL_DIRECTORY_INFO 0x102
-#define SMB_FIND_FILE_NAMES_INFO	  0x103
+#define SMB_FIND_FILE_NAMES_INFO		0x103
 #define SMB_FIND_FILE_BOTH_DIRECTORY_INFO 0x104
 #define SMB_FIND_FILE_UNIX                0x202
 

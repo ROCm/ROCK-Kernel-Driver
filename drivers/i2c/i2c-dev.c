@@ -69,13 +69,13 @@ static int i2cdev_command(struct i2c_client *client, unsigned int cmd,
                            void *arg);
 
 static struct file_operations i2cdev_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		i2cdev_read,
-	write:		i2cdev_write,
-	ioctl:		i2cdev_ioctl,
-	open:		i2cdev_open,
-	release:	i2cdev_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= i2cdev_read,
+	.write		= i2cdev_write,
+	.ioctl		= i2cdev_ioctl,
+	.open		= i2cdev_open,
+	.release	= i2cdev_release,
 };
 
 #define I2CDEV_ADAPS_MAX I2C_ADAP_MAX
@@ -86,24 +86,19 @@ static devfs_handle_t devfs_handle = NULL;
 #endif
 
 static struct i2c_driver i2cdev_driver = {
-	name:		"i2c-dev dummy driver",
-	id:		I2C_DRIVERID_I2CDEV,
-	flags:		I2C_DF_DUMMY,
-	attach_adapter:	i2cdev_attach_adapter,
-	detach_client:	i2cdev_detach_client,
-	command:	i2cdev_command,
-/*	inc_use:	NULL,
-	dec_use:	NULL, */
+	.name		= "i2c-dev dummy driver",
+	.id		= I2C_DRIVERID_I2CDEV,
+	.flags		= I2C_DF_DUMMY,
+	.attach_adapter	= i2cdev_attach_adapter,
+	.detach_client	= i2cdev_detach_client,
+	.command	= i2cdev_command,
 };
 
 static struct i2c_client i2cdev_client_template = {
-	name:		"I2C /dev entry",
-	id:		1,
-	flags:		0,
-	addr:		-1,
-/*	adapter:	NULL, */
-	driver:		&i2cdev_driver,
-/*	data:		NULL */
+	.name		= "I2C /dev entry",
+	.id		= 1,
+	.addr		= -1,
+	.driver		= &i2cdev_driver,
 };
 
 static int i2cdev_initialized;

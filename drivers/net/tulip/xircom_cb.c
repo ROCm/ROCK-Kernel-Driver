@@ -14,10 +14,8 @@
  * 	$Id: xircom_cb.c,v 1.33 2001/03/19 14:02:07 arjanv Exp $
  */
 
-
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -30,11 +28,10 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/ethtool.h>
+
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
-
-
 
 #ifdef DEBUG
 #define enter(x)   printk("Enter: %s, %s line %i\n",x,__FILE__,__LINE__)

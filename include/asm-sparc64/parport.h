@@ -80,12 +80,12 @@ static int ebus_ecpp_p(struct linux_ebus_device *edev)
 
 static int parport_isa_probe(int count)
 {
-	struct isa_bridge *isa_br;
-	struct isa_device *isa_dev;
+	struct sparc_isa_bridge *isa_br;
+	struct sparc_isa_device *isa_dev;
 
 	for_each_isa(isa_br) {
 		for_each_isadev(isa_dev, isa_br) {
-			struct isa_device *child;
+			struct sparc_isa_device *child;
 			unsigned long base;
 
 			if (strcmp(isa_dev->prom_name, "dma"))

@@ -22,6 +22,7 @@
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 
 #include <asm/byteorder.h>
 

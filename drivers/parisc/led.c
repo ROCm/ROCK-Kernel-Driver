@@ -531,7 +531,7 @@ DECLARE_TASKLET_DISABLED(led_tasklet, led_tasklet_func, 0);
 static int led_halt(struct notifier_block *, unsigned long, void *);
 
 static struct notifier_block led_notifier = {
-	notifier_call: led_halt,
+	.notifier_call = led_halt,
 };
 
 static int led_halt(struct notifier_block *nb, unsigned long event, void *buf) 

@@ -1,7 +1,9 @@
 /* 
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001 Stelian Pop <stelian.pop@fr.alcove.com>, Alcôve
+ * Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+ *
+ * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
  * Copyright (C) 2001 Michael Ashley <m.ashley@unsw.edu.au>
  *
@@ -85,6 +87,10 @@
 #define SONYPI_EVENT_JOGDIAL_VFAST_UP		47
 #define SONYPI_EVENT_JOGDIAL_VFAST_DOWN_PRESSED	48
 #define SONYPI_EVENT_JOGDIAL_VFAST_UP_PRESSED	49
+#define SONYPI_EVENT_ZOOM_PRESSED		50
+#define SONYPI_EVENT_THUMBPHRASE_PRESSED	51
+#define SONYPI_EVENT_MEYE_FACE			52
+#define SONYPI_EVENT_MEYE_OPPOSITE		53
 
 /* get/set brightness */
 #define SONYPI_IOCGBRT		_IOR('v', 0, __u8)

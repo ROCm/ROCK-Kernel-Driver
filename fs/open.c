@@ -131,7 +131,7 @@ static inline long do_sys_truncate(const char * path, loff_t length)
 	/*
 	 * Make sure that there are no leases.
 	 */
-	error = get_lease(inode, FMODE_WRITE);
+	error = break_lease(inode, FMODE_WRITE);
 	if (error)
 		goto dput_and_out;
 

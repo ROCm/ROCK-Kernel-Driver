@@ -391,6 +391,8 @@ static int parse_options (char * options,
 			set_opt (sbi->s_mount_opt, OLDALLOC);
 		else if (!strcmp (this_char, "orlov"))
 			clear_opt (sbi->s_mount_opt, OLDALLOC);
+		else if (!strcmp (this_char, "nobh"))
+			set_opt(sbi->s_mount_opt, NOBH);
 		/* Silently ignore the quota options */
 		else if (!strcmp (this_char, "grpquota")
 		         || !strcmp (this_char, "noquota")

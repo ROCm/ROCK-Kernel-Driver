@@ -283,12 +283,12 @@ DINO_PORT_OUT(w, 16, 2)
 DINO_PORT_OUT(l, 32, 0)
 
 struct pci_port_ops dino_port_ops = {
-	inb:	dino_in8,
-	inw:	dino_in16,
-	inl:	dino_in32,
-	outb:	dino_out8,
-	outw:	dino_out16,
-	outl:	dino_out32
+	.inb	= dino_in8,
+	.inw	= dino_in16,
+	.inl	= dino_in32,
+	.outb	= dino_out8,
+	.outw	= dino_out16,
+	.outl	= dino_out32
 };
 
 static void
@@ -368,10 +368,10 @@ dino_enable_irq(void *irq_dev, int irq)
 
 
 static struct irq_region_ops dino_irq_ops = {
-	disable_irq:	dino_mask_irq,	/* ??? */
-	enable_irq:	dino_enable_irq, 
-	mask_irq:	dino_mask_irq,
-	unmask_irq:	dino_unmask_irq
+	.disable_irq	= dino_mask_irq,	/* ??? */
+	.enable_irq	= dino_enable_irq, 
+	.mask_irq	= dino_mask_irq,
+	.unmask_irq	= dino_unmask_irq
 };
 
 

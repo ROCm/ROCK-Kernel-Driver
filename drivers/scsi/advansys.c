@@ -789,25 +789,23 @@
 #endif /* CONFIG_X86 && !CONFIG_ISA */
 
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
+#include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/blk.h>
+#include <linux/stat.h>
+#include <linux/spinlock.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/dma.h>
-#include <linux/blk.h>
-#include <linux/stat.h>
-#if ASC_LINUX_KERNEL24
-#include <linux/spinlock.h>
-#elif ASC_LINUX_KERNEL22
-#include <asm/spinlock.h>
-#endif
+
 #include "scsi.h"
 #include "hosts.h"
 #include "advansys.h"
@@ -5099,7 +5097,6 @@ advansys_detect(Scsi_Host_Template *tpnt)
                 ep->adapter_info[3] = asc_dvc_varp->cfg->adapter_info[3];
                 ep->adapter_info[4] = asc_dvc_varp->cfg->adapter_info[4];
                 ep->adapter_info[5] = asc_dvc_varp->cfg->adapter_info[5];
-                ep->adapter_info[6] = asc_dvc_varp->cfg->adapter_info[6];
 
                /*
                 * Modify board configuration.

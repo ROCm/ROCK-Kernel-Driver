@@ -113,13 +113,13 @@ chsc_get_sch_desc_irq(int irq)
 		*ssd_res = &chsc_area_ssd.response_block.response_block_data.ssd_res;
 
 	chsc_area_ssd = (chsc_area_t) {
-		request_block: {
-			command_code1: 0x0010,
-			command_code2: 0x0004,
-			request_block_data: {
-				ssd_req: {
-					f_sch: irq,
-					l_sch: irq,
+		.request_block = {
+			.command_code1 = 0x0010,
+			.command_code2 = 0x0004,
+			.request_block_data = {
+				.ssd_req = {
+					.f_sch = irq,
+					.l_sch = irq,
 				}
 			}
 		}
@@ -545,9 +545,9 @@ s390_process_css( void )
 	 * allocation or prove that this function does not have to be
 	 * reentrant! */
 	static chsc_area_t chsc_area_sei __attribute__ ((aligned(PAGE_SIZE))) = {
-		request_block: {
-			command_code1: 0x0010,
-			command_code2: 0x000e
+		.request_block = {
+			.command_code1 = 0x0010,
+			.command_code2 = 0x000e
 		}
 	};
 

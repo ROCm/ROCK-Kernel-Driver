@@ -67,7 +67,7 @@ int presto_i2m(struct inode *inode)
         CDEBUG(D_PSDEV, "\n");
         if ( !cache ) {
                 CERROR("PRESTO: BAD: cannot find cache for dev %d, ino %ld\n",
-                       inode->i_dev, inode->i_ino);
+                       inode->i_sb->s_dev, inode->i_ino);
                 EXIT;
                 return -1;
         }

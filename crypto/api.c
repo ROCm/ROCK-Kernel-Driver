@@ -63,7 +63,7 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 	case CRYPTO_ALG_TYPE_DIGEST:
 		return crypto_init_digest_flags(tfm, flags);
 		
-	case CRYPTO_ALG_TYPE_COMP:
+	case CRYPTO_ALG_TYPE_COMPRESS:
 		return crypto_init_compress_flags(tfm, flags);
 	
 	default:
@@ -74,19 +74,39 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 	return -EINVAL;
 }
 
-static void crypto_init_ops(struct crypto_tfm *tfm)
+static int crypto_init_ops(struct crypto_tfm *tfm)
 {
 	switch (crypto_tfm_alg_type(tfm)) {
 	case CRYPTO_ALG_TYPE_CIPHER:
-		crypto_init_cipher_ops(tfm);
+		return crypto_init_cipher_ops(tfm);
+		
+	case CRYPTO_ALG_TYPE_DIGEST:
+		return crypto_init_digest_ops(tfm);
+		
+	case CRYPTO_ALG_TYPE_COMPRESS:
+		return crypto_init_compress_ops(tfm);
+	
+	default:
+		break;
+	}
+	
+	BUG();
+	return -EINVAL;
+}
+
+static void crypto_exit_ops(struct crypto_tfm *tfm)
+{
+	switch (crypto_tfm_alg_type(tfm)) {
+	case CRYPTO_ALG_TYPE_CIPHER:
+		crypto_exit_cipher_ops(tfm);
 		break;
 		
 	case CRYPTO_ALG_TYPE_DIGEST:
-		crypto_init_digest_ops(tfm);
+		crypto_exit_digest_ops(tfm);
 		break;
 		
-	case CRYPTO_ALG_TYPE_COMP:
-		crypto_init_compress_ops(tfm);
+	case CRYPTO_ALG_TYPE_COMPRESS:
+		crypto_exit_compress_ops(tfm);
 		break;
 	
 	default:
@@ -109,7 +129,7 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 		goto out_put;
 
 	memset(tfm, 0, sizeof(*tfm));
-
+	
 	if (alg->cra_ctxsize) {
 		tfm->crt_ctx = kmalloc(alg->cra_ctxsize, GFP_KERNEL);
 		if (tfm->crt_ctx == NULL)
@@ -128,8 +148,11 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 	if (crypto_init_flags(tfm, flags))
 		goto out_free_work_block;
 		
-	crypto_init_ops(tfm);
-	
+	if (crypto_init_ops(tfm)) {
+		crypto_exit_ops(tfm);
+		goto out_free_ctx;
+	}
+
 	goto out;
 
 out_free_work_block:

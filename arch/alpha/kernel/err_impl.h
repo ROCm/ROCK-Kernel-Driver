@@ -133,7 +133,7 @@ struct el_subpacket_handler {
  */
 extern char *err_print_prefix;
 
-extern void mchk_dump_mem(void *, int, char **);
+extern void mchk_dump_mem(void *, size_t, char **);
 extern void mchk_dump_logout_frame(struct el_common *);
 extern void ev7_register_error_handlers(void);
 extern void ev7_machine_check(u64, u64, struct pt_regs *);

@@ -59,7 +59,7 @@ sgi_gfx_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigne
 }
 
 struct file_operations sgi_gfx_fops = {
-	ioctl:		sgi_gfx_ioctl,
+	.ioctl		= sgi_gfx_ioctl,
 };
  
 static struct miscdevice dev_gfx = {
@@ -167,8 +167,8 @@ sgi_keyb_open (struct inode *inode, struct file *file)
 }
 
 struct file_operations sgi_keyb_fops = {
-	ioctl:		sgi_keyb_ioctl,
-	open:		sgi_keyb_open,
+	.ioctl		= sgi_keyb_ioctl,
+	.open		= sgi_keyb_open,
 };
 
 static struct miscdevice dev_input_keyboard = {
@@ -296,9 +296,9 @@ sgi_mouse_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsig
 }
 
 struct file_operations sgi_mouse_fops = {
-	ioctl:		sgi_mouse_ioctl,
-	open:		sgi_mouse_open,
-	release:	sgi_mouse_close,
+	.ioctl		= sgi_mouse_ioctl,
+	.open		= sgi_mouse_open,
+	.release	= sgi_mouse_close,
 };
 
 /* /dev/input/mouse */

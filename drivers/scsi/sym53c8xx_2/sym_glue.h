@@ -82,6 +82,7 @@
 #include <linux/time.h>
 #include <linux/timer.h>
 #include <linux/stat.h>
+#include <linux/interrupt.h>
 
 #include <linux/blk.h>
 

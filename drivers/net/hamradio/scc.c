@@ -152,7 +152,6 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
@@ -162,27 +161,26 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
 #include <linux/socket.h>
 #include <linux/init.h>
-
 #include <linux/scc.h>
-#include "z8530.h"
+#include <linux/ctype.h>
+#include <linux/kernel.h>
+#include <linux/proc_fs.h>
 
 #include <net/ax25.h>
+
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 
-#include <linux/ctype.h>
-#include <linux/kernel.h>
-#include <linux/proc_fs.h>
+#include "z8530.h"
 
 static char banner[] __initdata = KERN_INFO "AX.25: Z8530 SCC driver version "VERSION".dl1bke\n";
 

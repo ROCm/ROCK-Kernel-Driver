@@ -6,8 +6,8 @@
 struct nfs_fattr {
 	unsigned short		valid;		/* which fields are valid */
 	__u64			pre_size;	/* pre_op_attr.size	  */
-	__u64			pre_mtime;	/* pre_op_attr.mtime	  */
-	__u64			pre_ctime;	/* pre_op_attr.ctime	  */
+	struct timespec		pre_mtime;	/* pre_op_attr.mtime	  */
+	struct timespec		pre_ctime;	/* pre_op_attr.ctime	  */
 	enum nfs_ftype		type;		/* always use NFSv2 types */
 	__u32			mode;
 	__u32			nlink;
@@ -32,9 +32,9 @@ struct nfs_fattr {
 		} nfs4;
 	} fsid_u;
 	__u64			fileid;
-	__u64			atime;
-	__u64			mtime;
-	__u64			ctime;
+	struct timespec		atime;
+	struct timespec		mtime;
+	struct timespec		ctime;
 	__u64			change_attr;	/* NFSv4 change attribute */
 	__u64			pre_change_attr;/* pre-op NFSv4 change attribute */
 	unsigned long		timestamp;
@@ -219,7 +219,7 @@ struct nfs3_sattrargs {
 	struct nfs_fh *		fh;
 	struct iattr *		sattr;
 	unsigned int		guard;
-	__u64			guardtime;
+	struct timespec		guardtime;
 };
 
 struct nfs3_diropargs {
@@ -398,6 +398,7 @@ struct nfs4_lookup {
 };
 
 struct nfs4_open {
+	struct nfs4_client *		op_client_state;  /* request */
 	u32				op_share_access;  /* request */
 	u32				op_opentype;      /* request */
 	u32				op_createmode;    /* request */
@@ -472,6 +473,7 @@ struct nfs4_setclientid {
 	char				sc_netid[4];	  /* request */
 	char				sc_uaddr[24];     /* request */
 	u32				sc_cb_ident;      /* request */
+	struct nfs4_client *		sc_state;	  /* response */
 };
 
 struct nfs4_write {
@@ -504,8 +506,10 @@ struct nfs4_op {
 		struct nfs4_readlink	readlink;
 		struct nfs4_remove	remove;
 		struct nfs4_rename	rename;
+		struct nfs4_client *	renew;
 		struct nfs4_setattr	setattr;
 		struct nfs4_setclientid	setclientid;
+		struct nfs4_client *	setclientid_confirm;
 		struct nfs4_write	write;
 	} u;
 };

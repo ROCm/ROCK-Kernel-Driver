@@ -118,8 +118,8 @@ struct nfs_inode {
 	 *	mtime != read_cache_mtime
 	 */
 	unsigned long		read_cache_jiffies;
-	__u64			read_cache_ctime;
-	__u64			read_cache_mtime;
+	struct timespec		read_cache_ctime;
+	struct timespec		read_cache_mtime;
 	__u64			read_cache_isize;
 	unsigned long		attrtimeo;
 	unsigned long		attrtimeo_timestamp;
@@ -415,20 +415,6 @@ nfs_fileid_to_ino_t(u64 fileid)
 		ino ^= fileid >> (sizeof(u64)-sizeof(ino_t)) * 8;
 	return ino;
 }
-
-static inline time_t
-nfs_time_to_secs(__u64 time)
-{
-	return (time_t)(time >> 32);
-}
-
-
-static inline u32
-nfs_time_to_nsecs(__u64 time)
-{
-	return time & 0xffffffff;
-}
-
 
 /* NFS root */
 

@@ -68,10 +68,8 @@ static int max_interrupt_work = 10;
 
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/mca.h>
 #include <linux/isapnp.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/errno.h>
@@ -81,6 +79,7 @@ static int max_interrupt_work = 10;
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/pm.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>	/* for udelay() */
 #include <linux/spinlock.h>
@@ -90,7 +89,6 @@ static int max_interrupt_work = 10;
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <linux/pm.h>
 
 static char versionA[] __initdata = DRV_NAME ".c:" DRV_VERSION " " DRV_RELDATE " becker@scyld.com\n";
 static char versionB[] __initdata = "http://www.scyld.com/network/3c509.html\n";

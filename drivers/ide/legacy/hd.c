@@ -26,9 +26,10 @@
 /* Uncomment the following if you want verbose error reports. */
 /* #define VERBOSE_ERRORS */
 
+#include <linux/blk.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -45,7 +46,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <linux/blk.h>
 
 #ifdef __arm__
 #undef  HD_IRQ

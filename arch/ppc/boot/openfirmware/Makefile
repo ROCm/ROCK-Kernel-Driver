@@ -10,12 +10,9 @@
 #	Merged 'chrp' and 'pmac' into 'openfirmware', and cleaned up the
 #	rules.
 
-EXTRA_TARGETS := start.o misc.o crt0.o coffcrt0.o coffmain.o chrpmain.o \
-		newworldmain.o common.o
+clean-files := note coffboot coffboot.initrd
 
 boot: zImage
-
-include $(TOPDIR)/Rules.make
 
 boot := arch/ppc/boot
 common := $(boot)/common
@@ -38,8 +35,6 @@ LIBS = lib/lib.a $(bootlib)/lib.a $(of1275)/lib.a $(common)/lib.a
 
 ADDNOTE := $(utils)/addnote
 MKNOTE := $(utils)/mknote
-SIZE := $(utils)/size
-OFFSET := $(utils)/offset
 HACKCOFF := $(utils)/hack-coff
 
 ifdef CONFIG_SMP
@@ -109,12 +104,12 @@ $(obj)/coffboot.initrd: $(COFFOBJS) $(obj)/image-initrd.o $(LIBS)
 	$(LD) -o $@ $(COFF_LD_ARGS) $^
 	$(OBJCOPY) $@ $@ -R .comment
 
-$(images)/vmlinux.coff: $(obj)/coffboot
+$(images)/vmlinux.coff: $(obj)/coffboot $(HACKCOFF)
 	$(OBJCOPY) $(OBJCOPY_ARGS) $(obj)/coffboot $@
 	$(HACKCOFF) $@
 	ln -sf vmlinux.coff $(images)/zImage.pmac
 
-$(images)/vmlinux.initrd.coff: $(obj)/coffboot.initrd
+$(images)/vmlinux.initrd.coff: $(obj)/coffboot.initrd $(HACKCOFF)
 	$(OBJCOPY) $(OBJCOPY_ARGS) $(obj)/coffboot.initrd $@
 	$(HACKCOFF) $@
 	ln -sf vmlinux.initrd.coff $(images)/zImage.initrd.pmac
@@ -139,11 +134,11 @@ $(images)/zImage.initrd.chrp: $(CHRPOBJS) $(obj)/image-initrd.o $(LIBS)
 	$(LD) $(CHRP_LD_ARGS) -o $@ $^
 	$(OBJCOPY) $@ $@ -R .comment
 
-$(images)/zImage.chrp-rs6k: $(images)/zImage.chrp
+$(images)/zImage.chrp-rs6k: $(images)/zImage.chrp $(ADDNOTE)
 	cp $(images)/zImage.chrp $@
 	$(ADDNOTE) $@
 
-$(images)/zImage.initrd.chrp-rs6k: $(images)/zImage.initrd.chrp
+$(images)/zImage.initrd.chrp-rs6k: $(images)/zImage.initrd.chrp $(ADDNOTE)
 	cp $(images)/zImage.initrd.chrp $@
 	$(ADDNOTE) $@
 
@@ -152,6 +147,3 @@ zImage: $(images)/vmlinux.coff $(images)/vmlinux.elf-pmac \
 
 zImage.initrd: $(images)/vmlinux.initrd.coff $(images)/vmlinux.initrd.elf-pmac\
 		$(images)/zImage.initrd.chrp $(images)/miboot.initrd.image
-
-clean:
-	rm -f $(obj)/note $(obj)/image.o $(obj)/coffboot $(obj)/coffboot.initrd

@@ -41,9 +41,9 @@
 #include <linux/delay.h>
 #include <linux/ethtool.h>
 #include <linux/compiler.h>
-#include <linux/sched.h>
 #include <linux/rtnetlink.h>
 #include <linux/crc32.h>
+
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>

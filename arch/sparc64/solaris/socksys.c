@@ -27,6 +27,8 @@
 #include <linux/in.h>
 #include <linux/devfs_fs_kernel.h>
 
+#include <net/sock.h>
+
 #include <asm/uaccess.h>
 #include <asm/termios.h>
 

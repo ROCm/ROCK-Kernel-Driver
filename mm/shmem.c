@@ -717,14 +717,6 @@ static int shmem_writepages(struct address_space *mapping, struct writeback_cont
 	return 0;
 }
 
-static int shmem_vm_writeback(struct page *page, struct writeback_control *wbc)
-{
-	clear_page_dirty(page);
-	if (shmem_writepage(page) < 0)
-		set_page_dirty(page);
-	return 0;
-}
-
 /*
  * shmem_getpage - either get the page from swap or allocate a new one
  *
@@ -1015,7 +1007,8 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
+static struct inode *
+shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 {
 	struct inode *inode;
 	struct shmem_inode_info *info;
@@ -1426,7 +1419,8 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 /*
  * File creation. Allocate an inode, and we're done..
  */
-static int shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int
+shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode *inode = shmem_get_inode(dir->i_sb, mode, dev);
 	int error = -ENOSPC;
@@ -1809,7 +1803,6 @@ static void destroy_inodecache(void)
 static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
 	.writepages	= shmem_writepages,
-	.vm_writeback	= shmem_vm_writeback,
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 #ifdef CONFIG_TMPFS
 	.readpage	= shmem_readpage,

@@ -50,9 +50,7 @@ static const char *version =
 
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -61,21 +59,20 @@ static const char *version =
 #include <linux/in.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-
 #include <linux/if_arp.h>
 #include <linux/if_ltalk.h>	/* For ltalk_setup() */
 #include <linux/delay.h>	/* For udelay() */
 #include <linux/atalk.h>
+
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/dma.h>
 
 #include "cops.h"		/* Our Stuff */
 #include "cops_ltdrv.h"		/* Firmware code for Tangent type cards. */

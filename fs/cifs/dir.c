@@ -141,7 +141,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 	/* BB add processing for setting the equivalent of mode - e.g. via CreateX with ACLs */
 
 	rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OVERWRITE_IF, GENERIC_ALL
-			 /* 0x20197 was used previously */ , mode,
+			 /* 0x20197 was used previously */ , CREATE_NOT_DIR,
 			 &fileHandle, &oplock, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("\ncifs_create returned 0x%x ", rc));
@@ -267,11 +267,6 @@ cifs_d_revalidate(struct dentry *direntry, int flags)
 /*	lock_kernel(); *//* surely we do not want to lock the kernel for a whole network round trip which could take seconds */
 
 	if (direntry->d_inode) {
-		cFYI(1,
-		     ("In cifs_d_revalidate, name = %s and inode = 0x%p with count %d with time %ld and dentry 0x%p with time %ld\n",
-		      direntry->d_name.name, direntry->d_inode,
-		      direntry->d_inode->i_count.counter,
-		      direntry->d_inode->i_atime, direntry, direntry->d_time));
 		if (cifs_revalidate(direntry)) {
 			/* unlock_kernel(); */
 			return 0;

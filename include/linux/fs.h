@@ -285,9 +285,6 @@ struct address_space_operations {
 	/* Write back some dirty pages from this mapping. */
 	int (*writepages)(struct address_space *, struct writeback_control *);
 
-	/* Perform a writeback as a memory-freeing operation. */
-	int (*vm_writeback)(struct page *, struct writeback_control *);
-
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
 
@@ -362,7 +359,6 @@ struct inode {
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
 	atomic_t		i_count;
-	dev_t			i_dev;
 	umode_t			i_mode;
 	unsigned int		i_nlink;
 	uid_t			i_uid;
@@ -578,7 +574,7 @@ extern int posix_lock_file(struct file *, struct file_lock *);
 extern void posix_block_lock(struct file_lock *, struct file_lock *);
 extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
-extern int __get_lease(struct inode *inode, unsigned int flags);
+extern int __break_lease(struct inode *inode, unsigned int flags);
 extern void lease_get_mtime(struct inode *, struct timespec *time);
 extern int lock_may_read(struct inode *, loff_t start, unsigned long count);
 extern int lock_may_write(struct inode *, loff_t start, unsigned long count);
@@ -773,7 +769,7 @@ struct inode_operations {
 	int (*symlink) (struct inode *,struct dentry *,const char *);
 	int (*mkdir) (struct inode *,struct dentry *,int);
 	int (*rmdir) (struct inode *,struct dentry *);
-	int (*mknod) (struct inode *,struct dentry *,int,int);
+	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
 	int (*readlink) (struct dentry *, char *,int);
@@ -782,7 +778,7 @@ struct inode_operations {
 	int (*permission) (struct inode *, int);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
-	int (*setxattr) (struct dentry *, const char *, void *, size_t, int);
+	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
 	int (*removexattr) (struct dentry *, const char *);
@@ -1052,10 +1048,10 @@ static inline int locks_verify_truncate(struct inode *inode,
 	return 0;
 }
 
-static inline int get_lease(struct inode *inode, unsigned int mode)
+static inline int break_lease(struct inode *inode, unsigned int mode)
 {
-	if (inode->i_flock && (inode->i_flock->fl_flags & FL_LEASE))
-		return __get_lease(inode, mode);
+	if (inode->i_flock)
+		return __break_lease(inode, mode);
 	return 0;
 }
 
@@ -1089,6 +1085,8 @@ extern int blkdev_open(struct inode *, struct file *);
 extern int blkdev_close(struct inode *, struct file *);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
+extern struct file_operations def_chr_fops;
+extern struct file_operations bad_sock_fops;
 extern struct file_operations def_fifo_fops;
 extern int ioctl_by_bdev(struct block_device *, unsigned, unsigned long);
 extern int blkdev_ioctl(struct inode *, struct file *, unsigned, unsigned long);
@@ -1109,7 +1107,7 @@ extern inline const char *bdevname(struct block_device *bdev)
 }
 extern const char * cdevname(kdev_t);
 extern const char * kdevname(kdev_t);
-extern void init_special_inode(struct inode *, umode_t, int);
+extern void init_special_inode(struct inode *, umode_t, dev_t);
 
 /* Invalid inode operations -- fs/bad_inode.c */
 extern void make_bad_inode(struct inode *);
@@ -1254,9 +1252,6 @@ extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);
 extern int generic_file_open(struct inode * inode, struct file * filp);
-
-extern int generic_vm_writeback(struct page *page,
-				struct writeback_control *wbc);
 
 static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 					read_descriptor_t * desc,

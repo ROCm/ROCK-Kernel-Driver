@@ -30,8 +30,10 @@
  *  look.
  */
 
-#include <linux/kernel.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
+#include <linux/kernel.h>
+#include <linux/mca.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/slab.h>
@@ -45,10 +47,8 @@
 #include "mca_53c9x.h"
 
 #include <asm/dma.h>
-#include <linux/mca.h>
 #include <asm/irq.h>
 #include <asm/mca_dma.h>
-
 #include <asm/pgtable.h>
 
 static int  dma_bytes_sent(struct NCR_ESP *, int);

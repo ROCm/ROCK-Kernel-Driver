@@ -154,7 +154,6 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/time.h>
@@ -166,6 +165,11 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/init.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/ip.h>
+#include <linux/delay.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
@@ -173,12 +177,6 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/io.h>
 #include <asm/unaligned.h>
 #include <asm/cache.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/ip.h>
-#include <linux/delay.h>
 
 static char version[] __initdata =
 KERN_INFO DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE "  Written by Donald Becker\n"

@@ -3,11 +3,13 @@
 #define _LINUX_INTERRUPT_H
 
 #include <linux/config.h>
+#include <linux/linkage.h>
 #include <linux/bitops.h>
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
 #include <asm/ptrace.h>
 #include <asm/softirq.h>
+#include <asm/system.h>
 
 struct irqaction {
 	void (*handler)(int, void *, struct pt_regs *);

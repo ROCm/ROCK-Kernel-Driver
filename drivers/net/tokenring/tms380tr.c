@@ -73,9 +73,7 @@ static const char version[] = "tms380tr.c: v1.08 14/01/2001 by Christoph Goos, A
 
 #include <linux/module.h>
 #include <linux/version.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -85,21 +83,21 @@ static const char version[] = "tms380tr.c: v1.08 14/01/2001 by Christoph Goos, A
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/time.h>
+#include <linux/errno.h>
+#include <linux/init.h>
+#include <linux/pci.h>
+#include <linux/delay.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/trdevice.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <linux/errno.h>
-#include <linux/init.h>
-#include <linux/pci.h>
-#include <linux/delay.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/trdevice.h>
 
 #include "tms380tr.h"		/* Our Stuff */
 #include "tms380tr_microcode.h"	/* TI microcode for COMMprocessor */

@@ -110,8 +110,8 @@ extern int init_netlink(void);
 extern struct sock *netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len));
 extern void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err);
 extern int netlink_unicast(struct sock *ssk, struct sk_buff *skb, __u32 pid, int nonblock);
-extern void netlink_broadcast(struct sock *ssk, struct sk_buff *skb, __u32 pid,
-			      __u32 group, int allocation);
+extern int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, __u32 pid,
+			     __u32 group, int allocation);
 extern void netlink_set_err(struct sock *ssk, __u32 pid, __u32 group, int code);
 extern int netlink_register_notifier(struct notifier_block *nb);
 extern int netlink_unregister_notifier(struct notifier_block *nb);

@@ -60,6 +60,20 @@ EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(overflowuid);
 EXPORT_SYMBOL(overflowgid);
 
+#ifdef CONFIG_S390_SUPPORT
+/*
+ * Dynamically add/remove 31 bit ioctl conversion functions.
+ */
+extern int register_ioctl32_conversion(unsigned int cmd,
+				       int (*handler)(unsigned int, 
+						      unsigned int,
+						      unsigned long,
+						      struct file *));
+int unregister_ioctl32_conversion(unsigned int cmd);
+EXPORT_SYMBOL(register_ioctl32_conversion);
+EXPORT_SYMBOL(unregister_ioctl32_conversion);
+#endif
+
 /*
  * misc.
  */

@@ -9,8 +9,8 @@ For questions or bug reports please contact sfrench@samba.org (sfrench@us.ibm.co
 
 Build instructions:
 ==================
-extract the kernel from http://www.cifs.bkbits.net/linux-2.5 or 
-http://www.cifs.bkbits.net/linux-2.4  
+Get the kernel source e.g. http://linux.bkbits.net/linux-2.5 or http://www.kernel.org 
+http://cifs.bkbits.net/linux-2.4  
 make menuconfig (or make xconfig)
 select cifs from within the network filesystem choices
 save and exit
@@ -57,7 +57,9 @@ Some administrators also change the "map archive" and the "create mask" paramete
 from their defaults. For more information on these see the manual pages 
 ("man smb.conf") on the Samba server system.  Note that the cifs vfs, unlike the
 smbfs vfs, does not read the smb.conf on the client system (the few optional settings
-are passed in on mount via -o parameters instead).
+are passed in on mount via -o parameters instead).  Note that Samba 2.2.7 or later
+includes a fix that allows the CIFS VFS to delete open files (required for strict
+POSIX compliance).  Windows Servers already supported this feature.
 
 Use instructions:
 ================
@@ -77,7 +79,7 @@ Servers must support the NTLM SMB dialect (which is the most recent, supported b
 and Windows NT, 2000 and XP and many other SMB/CIFS servers) and servers must support
 either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 1001/1002 support for
 "Netbios-Over-TCP/IP."  Neither of these is likely to be a problem as most servers
-support this.  IPv6 support is planned for the future.
+support this.  IPv6 support is planned for the future.  
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================

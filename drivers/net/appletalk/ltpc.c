@@ -208,7 +208,6 @@ static int dma;
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -217,24 +216,21 @@ static int dma;
 #include <linux/in.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/errno.h>
+#include <linux/init.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/if_arp.h>
+#include <linux/if_ltalk.h>
+#include <linux/delay.h>
+#include <linux/timer.h>
+#include <linux/atalk.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/io.h>
-#include <linux/errno.h>
-#include <linux/init.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-
-#include <linux/if_arp.h>
-#include <linux/if_ltalk.h>
-
-#include <linux/delay.h>
-#include <linux/timer.h>
-
-#include <linux/atalk.h>
 
 /* our stuff */
 #include "ltpc.h"

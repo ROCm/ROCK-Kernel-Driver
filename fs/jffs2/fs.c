@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.13 2002/07/02 22:48:24 dwmw2 Exp $
+ * $Id: fs.c,v 1.19 2002/11/12 09:53:40 dwmw2 Exp $
  *
  */
 
@@ -86,15 +86,15 @@ void jffs2_read_inode (struct inode *inode)
 		up(&f->sem);
 		return;
 	}
-	inode->i_mode = latest_node.mode;
-	inode->i_uid = latest_node.uid;
-	inode->i_gid = latest_node.gid;
-	inode->i_size = latest_node.isize;
-	inode->i_atime.tv_sec = latest_node.atime;
-	inode->i_mtime.tv_sec = latest_node.mtime;
-	inode->i_ctime.tv_sec = latest_node.ctime;
-	inode->i_atime.tv_nsec = 
-	inode->i_mtime.tv_nsec = 
+	inode->i_mode = je32_to_cpu(latest_node.mode);
+	inode->i_uid = je16_to_cpu(latest_node.uid);
+	inode->i_gid = je16_to_cpu(latest_node.gid);
+	inode->i_size = je32_to_cpu(latest_node.isize);
+	inode->i_atime.tv_sec = je32_to_cpu(latest_node.atime);
+	inode->i_mtime.tv_sec = je32_to_cpu(latest_node.mtime);
+	inode->i_ctime.tv_sec = je32_to_cpu(latest_node.ctime);
+	inode->i_atime.tv_nsec =
+	inode->i_mtime.tv_nsec =
 	inode->i_ctime.tv_nsec = 0;
 
 	inode->i_nlink = f->inocache->nlink;
@@ -192,19 +192,9 @@ void jffs2_write_super (struct super_block *sb)
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
-	D1(printk(KERN_DEBUG "jffs2_write_super(): flush_wbuf before gc-trigger\n"));
+	D1(printk(KERN_DEBUG "jffs2_write_super()\n"));
 	jffs2_garbage_collect_trigger(c);
 	jffs2_erase_pending_blocks(c);
-	jffs2_mark_erased_blocks(c);
-	/* Eep. If we lock this here, we deadlock with jffs2_reserve_space() when
-	 * it locks the alloc_sem and jffs2_do_reserve_space() waits for erases
-	 * to happen. I think the erases and/or the flush_wbuf want doing from
-	 *
-	 */
-	if (!down_trylock(&c->alloc_sem)) {
-		jffs2_flush_wbuf(c, 2);
-		up(&c->alloc_sem);
-	} // else it stays dirty. FIXME.
 }
 
 
@@ -232,16 +222,16 @@ struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_i
 
 	memset(ri, 0, sizeof(*ri));
 	/* Set OS-specific defaults for new inodes */
-	ri->uid = current->fsuid;
+	ri->uid = cpu_to_je16(current->fsuid);
 
 	if (dir_i->i_mode & S_ISGID) {
-		ri->gid = dir_i->i_gid;
+		ri->gid = cpu_to_je16(dir_i->i_gid);
 		if (S_ISDIR(mode))
-			ri->mode |= S_ISGID;
+			mode |= S_ISGID;
 	} else {
-		ri->gid = current->fsgid;
+		ri->gid = cpu_to_je16(current->fsgid);
 	}
-	ri->mode = mode;
+	ri->mode =  cpu_to_je32(mode);
 	ret = jffs2_do_new_inode (c, f, mode, ri);
 	if (ret) {
 		make_bad_inode(inode);
@@ -249,12 +239,14 @@ struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_i
 		return ERR_PTR(ret);
 	}
 	inode->i_nlink = 1;
-	inode->i_ino = ri->ino;
-	inode->i_mode = ri->mode;
-	inode->i_gid = ri->gid;
-	inode->i_uid = ri->uid;
-	inode->i_atime = inode->i_ctime = inode->i_mtime = 
-		ri->atime = ri->mtime = ri->ctime = get_seconds();
+	inode->i_ino = je32_to_cpu(ri->ino);
+	inode->i_mode = je32_to_cpu(ri->mode);
+	inode->i_gid = je16_to_cpu(ri->gid);
+	inode->i_uid = je16_to_cpu(ri->uid);
+	inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_sec = inode->i_ctime.tv_sec = inode->i_mtime.tv_sec = get_seconds();
+	ri->atime = ri->mtime = ri->ctime = cpu_to_je32(inode->i_mtime.tv_sec);
+
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = 0;
 	inode->i_size = 0;
@@ -305,9 +297,10 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 		if (!c->wbuf)
 			return -ENOMEM;
 
-		/* Initialize process for timed wbuf flush */
+		/* Initialise process for timed wbuf flush */
 		INIT_WORK(&c->wbuf_task,(void*) jffs2_wbuf_process, (void *)c);
-		/* Initialize timer for timed wbuf flush */
+
+		/* Initialise timer for timed wbuf flush */
 		init_timer(&c->wbuf_timer);
 		c->wbuf_timer.function = jffs2_wbuf_timeout;
 		c->wbuf_timer.data = (unsigned long) c;

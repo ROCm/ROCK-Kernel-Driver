@@ -166,7 +166,6 @@ void balance_dirty_pages(struct address_space *mapping)
 	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
 		pdflush_operation(background_writeout, 0);
 }
-EXPORT_SYMBOL_GPL(balance_dirty_pages);
 
 /**
  * balance_dirty_pages_ratelimited - balance dirty memory state
@@ -200,6 +199,7 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	}
 	put_cpu();
 }
+EXPORT_SYMBOL_GPL(balance_dirty_pages_ratelimited);
 
 /*
  * writeback at least _min_pages, and keep writing until the amount of dirty
@@ -389,71 +389,6 @@ static int __init page_writeback_init(void)
 	return 0;
 }
 module_init(page_writeback_init);
-
-/*
- * A library function, which implements the vm_writeback a_op.  It's fairly
- * lame at this time.  The idea is: the VM wants to liberate this page,
- * so we pass the page to the address_space and give the fs the opportunity
- * to write out lots of pages around this one.  It allows extent-based
- * filesytems to do intelligent things.  It lets delayed-allocate filesystems
- * perform better file layout.  It lets the address_space opportunistically
- * write back disk-contiguous pages which are in other zones.
- *
- * FIXME: the VM wants to start I/O against *this* page.  Because its zone
- * is under pressure.  But this function may start writeout against a
- * totally different set of pages.  Unlikely to be a huge problem, but if it
- * is, we could just writepage the page if it is still (PageDirty &&
- * !PageWriteback) (See below).
- *
- * Another option is to just reposition page->mapping->dirty_pages so we
- * *know* that the page will be written.  That will work fine, but seems
- * unpleasant.  (If the page is not for-sure on ->dirty_pages we're dead).
- * Plus it assumes that the address_space is performing writeback in
- * ->dirty_pages order.
- *
- * So.  The proper fix is to leave the page locked-and-dirty and to pass
- * it all the way down.
- */
-int generic_vm_writeback(struct page *page, struct writeback_control *wbc)
-{
-	struct inode *inode = page->mapping->host;
-
-	/*
-	 * We don't own this inode, and we don't want the address_space
-	 * vanishing while writeback is walking its pages.
-	 */
-	inode = igrab(inode);
-	unlock_page(page);
-
-	if (inode) {
-		do_writepages(inode->i_mapping, wbc);
-
-		/*
-		 * This iput() will internally call ext2_discard_prealloc(),
-		 * which is rather bogus.  But there is no other way of
-		 * dropping our ref to the inode.  However, there's no harm
-		 * in dropping the prealloc, because there probably isn't any.
-		 * Just a waste of cycles.
-		 */
-		iput(inode);
-#if 0
-		if (!PageWriteback(page) && PageDirty(page)) {
-			lock_page(page);
-			if (!PageWriteback(page)&&test_clear_page_dirty(page)) {
-				int ret;
-
-				ret = page->mapping->a_ops->writepage(page);
-				if (ret == -EAGAIN)
-					__set_page_dirty_nobuffers(page);
-			} else {
-				unlock_page(page);
-			}
-		}
-#endif
-	}
-	return 0;
-}
-EXPORT_SYMBOL(generic_vm_writeback);
 
 int do_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {

@@ -561,6 +561,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		if (rc < 0) {
 			cFYI(1, ("Error connecting to socket. %d\n", rc));
 			sock_release(*csocket);
+			*csocket = NULL;
 			return rc;
 		}
 	}
@@ -598,6 +599,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 			     ("Error connecting to socket (via ipv6). %d\n",
 			      rc));
 			sock_release(*csocket);
+			*csocket = NULL;
 			return rc;
 		}
 	}

@@ -1613,7 +1613,7 @@ acpi_processor_get_limit_info (
                                cpufreq interface
    -------------------------------------------------------------------------- */
 #ifdef CONFIG_ACPI_PROCESSOR_PERF
-static void
+static int
 acpi_cpufreq_setpolicy (
 	struct cpufreq_policy   *policy)
 {
@@ -1626,7 +1626,7 @@ acpi_cpufreq_setpolicy (
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_setpolicy");
 
 	if (!policy)
-		return_VOID;
+		return_VALUE(-EINVAL);
 
 	/* get a present, initialized CPU */
 	if (policy->cpu == CPUFREQ_ALL_CPUS)
@@ -1644,7 +1644,7 @@ acpi_cpufreq_setpolicy (
 		cpu = policy->cpu;
 		pr = processors[cpu];
 		if (!pr)
-			return_VOID;
+			return_VALUE(-EINVAL);
 	}
 
 	/* select appropriate P-State */
@@ -1686,11 +1686,11 @@ acpi_cpufreq_setpolicy (
 		result = acpi_processor_set_performance (pr, next_state);
 	}
 
-	return_VOID;
+	return_VALUE(0);
 }
 
 
-static void
+static int
 acpi_cpufreq_verify (
 	struct cpufreq_policy   *policy)
 {
@@ -1703,7 +1703,7 @@ acpi_cpufreq_verify (
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_verify");
 
 	if (!policy)
-		return_VOID;
+		return_VALUE(-EINVAL);
 
 	/* get a present, initialized CPU */
 	if (policy->cpu == CPUFREQ_ALL_CPUS)
@@ -1721,7 +1721,7 @@ acpi_cpufreq_verify (
 		cpu = policy->cpu;
 		pr = processors[cpu];
 		if (!pr)
-			return_VOID;
+			return_VALUE(-EINVAL);
 	}
 
 	/* first check if min and max are within valid limits */
@@ -1741,13 +1741,12 @@ acpi_cpufreq_verify (
 			next_larger_state = i;
 	}
 
-	if (number_states)
-		return_VOID;
+	if (!number_states) {
+		/* round up now */
+		policy->max = pr->performance.states[next_larger_state].core_frequency * 1000;
+	}
 
-	/* round up now */
-	policy->max = pr->performance.states[next_larger_state].core_frequency * 1000;
-
-	return_VOID;
+	return_VALUE(0);
 }
 
 static int
@@ -1807,9 +1806,10 @@ acpi_cpufreq_init (
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq    = pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000;
-	for (i=0;i<NR_CPUS;i++)
+	for (i=0;i<NR_CPUS;i++) {
 		driver->cpu_cur_freq[0] = pr->performance.states[current_state].core_frequency * 1000;
+		driver->cpu_min_freq[0] = pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000;
+	}
 #endif
 
 	driver->verify      = &acpi_cpufreq_verify;

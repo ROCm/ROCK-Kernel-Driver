@@ -970,8 +970,8 @@ void SMC37c669_display_device_info(
 static struct DEVICE_CONFIG {
     unsigned int port1;
     unsigned int port2;
-    unsigned int irq;
-    unsigned int drq;
+    int irq;
+    int drq;
 } local_config [NUM_FUNCS];
 
 /*
@@ -1097,11 +1097,11 @@ static struct DEVICE_CONFIG *SMC37c669_get_config(
 );
 
 static int SMC37c669_xlate_irq(
-    unsigned int irq 
+    int irq 
 );
 
 static int SMC37c669_xlate_drq(
-    unsigned int drq 
+    int drq 
 );
 
 static spinlock_t smc_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
@@ -2260,7 +2260,7 @@ static struct DEVICE_CONFIG * __init SMC37c669_get_config( unsigned int func )
 **
 **--
 */
-static int __init SMC37c669_xlate_irq ( unsigned int irq )
+static int __init SMC37c669_xlate_irq ( int irq )
 {
     int i, translated_irq = -1;
 
@@ -2312,7 +2312,7 @@ static int __init SMC37c669_xlate_irq ( unsigned int irq )
 **
 **--
 */
-static int __init SMC37c669_xlate_drq ( unsigned int drq )
+static int __init SMC37c669_xlate_drq ( int drq )
 {
     int i, translated_drq = -1;
 

@@ -29,7 +29,7 @@ typedef struct
 } sigp_info;
 
 extern volatile unsigned long cpu_online_map;
-extern unsigned long cpu_possible_map;
+extern volatile unsigned long cpu_possible_map;
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 

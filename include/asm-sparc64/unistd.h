@@ -181,7 +181,7 @@
 #define __NR_setdomainname      163 /* Common                                      */
 #define __NR_utrap_install	164 /* SYSV ABI/v9 required			   */
 #define __NR_quotactl           165 /* Common                                      */
-/* #define __NR_exportfs        166    SunOS Specific                              */
+#define __NR_set_tid_address    166 /* Linux specific, exportfs under SunOS        */
 #define __NR_mount              167 /* Common                                      */
 #define __NR_ustat              168 /* Common                                      */
 #define __NR_setxattr           169 /* SunOS: semsys                               */
@@ -208,9 +208,9 @@
 #define __NR_init_module        190 /* Linux Specific                              */
 #define __NR_personality        191 /* Linux Specific                              */
 #define __NR_remap_file_pages   192 /* Linux Specific                              */
-/* #define __NR_break           193    Linux Specific                              */
-/* #define __NR_lock            194    Linux Specific                              */
-/* #define __NR_mpx             195    Linux Specific                              */
+#define __NR_epoll_create       193 /* Linux Specific                              */
+#define __NR_epoll_ctl          194 /* Linux Specific                              */
+#define __NR_epoll_wait         195 /* Linux Specific                              */
 /* #define __NR_ulimit          196    Linux Specific                              */
 #define __NR_getppid            197 /* Linux Specific                              */
 #define __NR_sigaction          198 /* Linux Specific                              */

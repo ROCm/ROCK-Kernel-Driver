@@ -23,6 +23,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/highmem.h>
+#include <linux/kallsyms.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>

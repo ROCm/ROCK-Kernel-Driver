@@ -34,12 +34,12 @@ static void el_process_subpackets(struct el_subpacket *, int);
  * Generic
  */
 void
-mchk_dump_mem(void *data, int length, char **annotation)
+mchk_dump_mem(void *data, size_t length, char **annotation)
 {
 	unsigned long *ldata = data;
-	int i;
+	size_t i;
 	
-	for(i = 0; (i * sizeof(*ldata)) < length; i++) {
+	for (i = 0; (i * sizeof(*ldata)) < length; i++) {
 		if (annotation && !annotation[i]) 
 			annotation = NULL;
 		printk("%s    %08x: %016lx    %s\n",
@@ -624,7 +624,7 @@ el_process_subpackets(struct el_subpacket *header, int packet_count)
 	subpacket = (struct el_subpacket *)
 		((unsigned long)header + header->length);
 
-	for(i = 0; subpacket && i < packet_count; i++) {
+	for (i = 0; subpacket && i < packet_count; i++) {
 		printk("%sPROCESSING SUBPACKET %d\n", err_print_prefix, i);
 		subpacket = el_process_subpacket(subpacket);
 	}
@@ -636,7 +636,7 @@ el_process_subpacket_reg(struct el_subpacket *header)
 	struct el_subpacket *next = NULL;
 	struct el_subpacket_handler *h = subpacket_handler_list;
 
-	for(; h && h->class != header->class; h = h->next);
+	for (; h && h->class != header->class; h = h->next);
 	if (h) next = h->handler(header);
 
 	return next;
@@ -673,7 +673,7 @@ el_annotate_subpacket(struct el_subpacket *header)
 	struct el_subpacket_annotation *a;
 	char **annotation = NULL;
 
-	for(a = subpacket_annotation_list; a; a = a->next) {
+	for (a = subpacket_annotation_list; a; a = a->next) {
 		if (a->class == header->class &&
 		    a->type == header->type &&
 		    a->revision == header->revision) {
@@ -700,7 +700,7 @@ cdl_process_console_data_log(int cpu, struct percpu_struct *pcpu)
 	         "*** Error(s) were logged on a previous boot\n",
 	       err_print_prefix, cpu);
 	
-	for(err = 0; header && (header->class != EL_CLASS__TERMINATION); err++)
+	for (err = 0; header && (header->class != EL_CLASS__TERMINATION); err++)
 		header = el_process_subpacket(header);
 
 	/* let the console know it's ok to clear the error(s) at restart */
@@ -715,9 +715,9 @@ void __init
 cdl_check_console_data_log(void)
 {
 	struct percpu_struct *pcpu;
-	int cpu;
+	unsigned long cpu;
 
-	for(cpu = 0; cpu < hwrpb->nr_processors; cpu++) {
+	for (cpu = 0; cpu < hwrpb->nr_processors; cpu++) {
 		pcpu = (struct percpu_struct *)
 			((unsigned long)hwrpb + hwrpb->processor_offset 
 			 + cpu * hwrpb->processor_size);
@@ -734,7 +734,7 @@ cdl_register_subpacket_annotation(struct el_subpacket_annotation *new)
 
 	if (a == NULL) subpacket_annotation_list = new;
 	else {
-		for(; a->next != NULL; a = a->next) {
+		for (; a->next != NULL; a = a->next) {
 			if ((a->class == new->class && a->type == new->type) ||
 			    a == new) {
 				printk("Attempted to re-register "
@@ -756,7 +756,7 @@ cdl_register_subpacket_handler(struct el_subpacket_handler *new)
 
 	if (h == NULL) subpacket_handler_list = new;
 	else {
-		for(; h->next != NULL; h = h->next) {
+		for (; h->next != NULL; h = h->next) {
 			if (h->class == new->class || h == new) {
 				printk("Attempted to re-register "
 				       "subpacket handler\n");

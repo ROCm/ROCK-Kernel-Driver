@@ -378,7 +378,7 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	p->nr_sects = len;
 	devfs_register_partition(disk, part);
 	kobject_init(&p->kobj);
-	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->disk_name,part);
+	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
 	p->kobj.subsys = &part_subsys;
 	kobject_register(&p->kobj);

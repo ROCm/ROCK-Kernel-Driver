@@ -26,12 +26,13 @@
  */
 
 #include <linux/ptrace.h>
-#include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/ioport.h>
 #include <linux/soundmodem.h>
+
+#include <asm/io.h>
+#include <asm/dma.h>
+
 #include "sm.h"
 #include "smdma.h"
 

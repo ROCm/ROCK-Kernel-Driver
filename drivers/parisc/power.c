@@ -305,8 +305,8 @@ static int parisc_panic_event(struct notifier_block *this,
 }
 
 static struct notifier_block parisc_panic_block = {
-	notifier_call: parisc_panic_event,
-	priority: INT_MAX,
+	.notifier_call	= parisc_panic_event,
+	.priority	= INT_MAX,
 };
 
 

@@ -468,7 +468,6 @@ struct socket *sock_alloc(void)
 	if (!inode)
 		return NULL;
 
-	inode->i_dev = 0;
 	sock = SOCKET_I(inode);
 
 	inode->i_mode = S_IFSOCK|S_IRWXUGO;
@@ -490,6 +489,10 @@ static int sock_no_open(struct inode *irrelevant, struct file *dontcare)
 {
 	return -ENXIO;
 }
+
+struct file_operations bad_sock_fops = {
+	.open = sock_no_open,
+};
 
 /**
  *	sock_release	-	close a socket
@@ -726,8 +729,8 @@ int (*dlci_ioctl_hook)(unsigned int, void *);
  *	what to do with it - that's up to the protocol still.
  */
 
-int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-	   unsigned long arg)
+static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		      unsigned long arg)
 {
 	struct socket *sock;
 	int pid, err;

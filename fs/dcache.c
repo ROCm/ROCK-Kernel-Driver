@@ -137,7 +137,7 @@ repeat:
 			goto unhash_it;
 	}
 	/* Unreachable? Get rid of it */
-	if (list_empty(&dentry->d_hash))
+ 	if (d_unhashed(dentry))
 		goto kill_it;
 	list_add(&dentry->d_lru, &dentry_unused);
 	dentry_stat.nr_unused++;
@@ -146,7 +146,7 @@ repeat:
 	return;
 
 unhash_it:
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 
 kill_it: {
 		struct dentry *parent;
@@ -181,7 +181,7 @@ int d_invalidate(struct dentry * dentry)
 	 * If it's already been dropped, return OK.
 	 */
 	spin_lock(&dcache_lock);
-	if (list_empty(&dentry->d_hash)) {
+	if (d_unhashed(dentry)) {
 		spin_unlock(&dcache_lock);
 		return 0;
 	}
@@ -212,7 +212,7 @@ int d_invalidate(struct dentry * dentry)
 		}
 	}
 
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 	return 0;
 }
@@ -259,7 +259,7 @@ struct dentry * d_find_alias(struct inode *inode)
 		tmp = next;
 		next = tmp->next;
 		alias = list_entry(tmp, struct dentry, d_alias);
-		if (!list_empty(&alias->d_hash)) {
+ 		if (!d_unhashed(alias)) {
 			if (alias->d_flags & DCACHE_DISCONNECTED)
 				discon_alias = alias;
 			else {
@@ -308,7 +308,7 @@ static inline void prune_one_dentry(struct dentry * dentry)
 {
 	struct dentry * parent;
 
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 	list_del(&dentry->d_child);
 	dentry_stat.nr_dentry--;	/* For d_free, below */
 	dentry_iput(dentry);
@@ -997,7 +997,7 @@ void d_delete(struct dentry * dentry)
 void d_rehash(struct dentry * entry)
 {
 	struct list_head *list = d_hash(entry->d_parent, entry->d_name.hash);
-	if (!list_empty(&entry->d_hash)) BUG();
+	if (!d_unhashed(entry)) BUG();
 	spin_lock(&dcache_lock);
 	list_add(&entry->d_hash, list);
 	spin_unlock(&dcache_lock);
@@ -1065,11 +1065,10 @@ void d_move(struct dentry * dentry, struct dentry * target)
 
 	spin_lock(&dcache_lock);
 	/* Move the dentry to the target hash queue */
-	list_del(&dentry->d_hash);
-	list_add(&dentry->d_hash, &target->d_hash);
+	list_move(&dentry->d_hash, &target->d_hash);
 
 	/* Unhash the target: dput() will then get rid of it */
-	list_del_init(&target->d_hash);
+	__d_drop(target);
 
 	list_del(&dentry->d_child);
 	list_del(&target->d_child);
@@ -1121,7 +1120,7 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 
 	*--end = '\0';
 	buflen--;
-	if (!IS_ROOT(dentry) && list_empty(&dentry->d_hash)) {
+	if (!IS_ROOT(dentry) && d_unhashed(dentry)) {
 		buflen -= 10;
 		end -= 10;
 		memcpy(end, " (deleted)", 10);
@@ -1223,7 +1222,7 @@ asmlinkage long sys_getcwd(char *buf, unsigned long size)
 	error = -ENOENT;
 	/* Has the current directory has been unlinked? */
 	spin_lock(&dcache_lock);
-	if (pwd->d_parent == pwd || !list_empty(&pwd->d_hash)) {
+	if (pwd->d_parent == pwd || !d_unhashed(pwd)) {
 		unsigned long len;
 		char * cwd;
 

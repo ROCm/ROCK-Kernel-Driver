@@ -25,18 +25,22 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
 #include <sound/ymfpci.h>
 #include <sound/asoundef.h>
 #include <sound/mpu401.h>
+
+#include <asm/io.h>
 
 #define chip_t ymfpci_t
 

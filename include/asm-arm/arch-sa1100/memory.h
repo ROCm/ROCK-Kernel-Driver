@@ -12,14 +12,14 @@
 /*
  * Task size: 3GB
  */
-#define TASK_SIZE	(0xc0000000UL)
+#define TASK_SIZE	(0xbf000000UL)
 #define TASK_SIZE_26	(0x04000000UL)
 
 /*
  * This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE (TASK_SIZE / 3)
+#define TASK_UNMAPPED_BASE (0x40000000)
 
 /*
  * Page offset: 3GB

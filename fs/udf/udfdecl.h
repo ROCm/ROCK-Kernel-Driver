@@ -28,8 +28,6 @@
 #define UDF_NAME_LEN		255
 #define UDF_PATH_LEN		1023
 
-#define CURRENT_UTIME	(xtime.tv_nsec / 1000)
-
 #define udf_file_entry_alloc_offset(inode)\
 	(UDF_I_USE(inode) ?\
 		sizeof(struct unallocSpaceEntry) :\
@@ -185,6 +183,6 @@ extern uint16_t udf_crc(uint8_t *, uint32_t, uint16_t);
 
 /* udftime.c */
 extern time_t *udf_stamp_to_time(time_t *, long *, timestamp);
-extern timestamp *udf_time_to_stamp(timestamp *, time_t, long);
+extern timestamp *udf_time_to_stamp(timestamp *, struct timespec);
 
 #endif /* __UDF_DECL_H */

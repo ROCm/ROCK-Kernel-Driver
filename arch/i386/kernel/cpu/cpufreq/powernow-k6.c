@@ -1,5 +1,5 @@
 /*
- *  $Id: powernow-k6.c,v 1.33 2002/09/29 23:43:11 db Exp $
+ *  $Id: powernow-k6.c,v 1.36 2002/10/31 21:17:40 db Exp $
  *  This file was part of Powertweak Linux (http://powertweak.sf.net)
  *  and is shared with the Linux Kernel module.
  *
@@ -113,13 +113,13 @@ static void powernow_k6_set_state (unsigned int best_i)
  * Policy must be within lowest and highest possible CPU Frequency,
  * and at least one possible state must be within min and max.
  */
-static void powernow_k6_verify(struct cpufreq_policy *policy)
+static int powernow_k6_verify(struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i, j;
 
 	if (!policy || !busfreq)
-		return;
+		return -EINVAL;
 
 	policy->cpu = 0;
 	cpufreq_verify_within_limits(policy, (20 * busfreq),
@@ -131,7 +131,7 @@ static void powernow_k6_verify(struct cpufreq_policy *policy)
 			number_states++;
 
 	if (number_states)
-		return;
+		return 0;
 
 	/* no state is available within range -- find next larger state */
 
@@ -144,7 +144,7 @@ static void powernow_k6_verify(struct cpufreq_policy *policy)
 
 	policy->max = clock_ratio[j] * busfreq;
 
-	return;
+	return 0;
 }
 
 
@@ -154,13 +154,13 @@ static void powernow_k6_verify(struct cpufreq_policy *policy)
  *
  * sets a new CPUFreq policy
  */
-static void powernow_k6_setpolicy (struct cpufreq_policy *policy)
+static int powernow_k6_setpolicy (struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i, j=4;
 
 	if (!powernow_driver)
-		return;
+		return -EINVAL;
 
 	for (i=0; i<8; i++)
 		if ((policy->min <= (busfreq * clock_ratio[i])) &&
@@ -174,7 +174,7 @@ static void powernow_k6_setpolicy (struct cpufreq_policy *policy)
 		/* if only one state is within the limit borders, it
 		   is easily detected and set */
 		powernow_k6_set_state(j);
-		return;
+		return 0;
 	}
 
 	/* more than one state within limit */
@@ -196,14 +196,14 @@ static void powernow_k6_setpolicy (struct cpufreq_policy *policy)
 				j = i;
 		break;
 	default:
-		return;
+		return -EINVAL;
 	}
 
 	if (clock_ratio[i] > max_multiplier)
-		BUG();
+		return -EINVAL;
 
 	powernow_k6_set_state(j);
-	return;
+	return 0;
 }
 
 
@@ -242,7 +242,7 @@ static int __init powernow_k6_init(void)
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq     = busfreq * 20;
+	driver->cpu_min_freq[0]  = busfreq * 20;
 	driver->cpu_cur_freq[0]  = busfreq * max_multiplier;
 #endif
 
@@ -255,16 +255,16 @@ static int __init powernow_k6_init(void)
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
 	driver->policy[0].max_cpu_freq  = busfreq * max_multiplier;
 
+	powernow_driver = driver;
 
 	result = cpufreq_register(driver);
 	if (result) {
 		release_region (POWERNOW_IOPORT, 16);
+		powernow_driver = NULL;
 		kfree(driver);
-		return result;
 	}
-	powernow_driver = driver;
 
-	return 0;
+	return result;
 }
 
 

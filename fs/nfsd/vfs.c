@@ -259,7 +259,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 		 * If we are changing the size of the file, then
 		 * we need to break all leases.
 		 */
-		err = get_lease(inode, FMODE_WRITE);
+		err = break_lease(inode, FMODE_WRITE);
 		if (err)
 			goto out_nfserr;
 
@@ -453,7 +453,7 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	 * Check to see if there are any leases on this file.
 	 * This may block while leases are broken.
 	 */
-	err = get_lease(inode, (access & MAY_WRITE) ? FMODE_WRITE : 0);
+	err = break_lease(inode, (access & MAY_WRITE) ? FMODE_WRITE : 0);
 	if (err)
 		goto out_nfserr;
 
@@ -632,7 +632,7 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 #endif
 
 	/* Get readahead parameters */
-	ra = nfsd_get_raparms(inode->i_dev, inode->i_ino);
+	ra = nfsd_get_raparms(inode->i_sb->s_dev, inode->i_ino);
 	if (ra)
 		file.f_ra = ra->p_ra;
 
@@ -752,7 +752,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		 */
 		if (EX_WGATHER(exp)) {
 			if (atomic_read(&inode->i_writecount) > 1
-			    || (last_ino == inode->i_ino && last_dev == inode->i_dev)) {
+			    || (last_ino == inode->i_ino && last_dev == inode->i_sb->s_dev)) {
 				dprintk("nfsd: write defer %d\n", current->pid);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((HZ+99)/100);
@@ -769,7 +769,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 #endif
 		}
 		last_ino = inode->i_ino;
-		last_dev = inode->i_dev;
+		last_dev = inode->i_sb->s_dev;
 	}
 
 	dprintk("nfsd: write complete err=%d\n", err);

@@ -27,7 +27,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -35,11 +34,6 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
-#include <asm/io.h>
-#include <asm/system.h>
-#include <asm/byteorder.h>
-#include <asm/uaccess.h>
-
 #include <linux/netdevice.h>
 #include "../8390.h"
 
@@ -50,6 +44,11 @@
 #include <pcmcia/ciscode.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/cisreg.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/byteorder.h>
+#include <asm/uaccess.h>
 
 #define AXNET_CMD	0x00
 #define AXNET_DATAPORT	0x10	/* NatSemi-defined port window offset. */

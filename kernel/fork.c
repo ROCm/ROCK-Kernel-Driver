@@ -238,7 +238,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
 
-		retval = -ENOMEM;
 		if(mpnt->vm_flags & VM_DONTCOPY)
 			continue;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
@@ -283,7 +282,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			tmp->vm_ops->open(tmp);
 
 		if (retval)
-			goto fail_nomem;
+			goto fail;
 	}
 	retval = 0;
 	build_mmap_rb(mm);
@@ -293,6 +292,8 @@ out:
 	up_write(&oldmm->mmap_sem);
 	return retval;
 fail_nomem:
+	retval = -ENOMEM;
+  fail:
 	vm_unacct_memory(charge);
 	goto out;
 }
@@ -407,16 +408,16 @@ void mm_release(void)
 		tsk->vfork_done = NULL;
 		complete(vfork_done);
 	}
-	if (tsk->user_tid) {
-		int * user_tid = tsk->user_tid;
-		tsk->user_tid = NULL;
+	if (tsk->clear_child_tid) {
+		int * tidptr = tsk->clear_child_tid;
+		tsk->clear_child_tid = NULL;
 
 		/*
 		 * We dont check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
-		put_user(0, user_tid);
-		sys_futex((unsigned long)user_tid, FUTEX_WAKE, 1, NULL);
+		put_user(0, tidptr);
+		sys_futex((unsigned long)tidptr, FUTEX_WAKE, 1, NULL);
 	}
 }
 
@@ -679,9 +680,9 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 	p->flags = new_flags;
 }
 
-asmlinkage int sys_set_tid_address(int *user_tid)
+asmlinkage int sys_set_tid_address(int *tidptr)
 {
-	current->user_tid = user_tid;
+	current->clear_child_tid = tidptr;
 
 	return current->pid;
 }
@@ -698,7 +699,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size,
-			    int *user_tid)
+			    int *parent_tidptr,
+			    int *child_tidptr)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -765,6 +767,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		if (p->pid == -1)
 			goto bad_fork_cleanup;
 	}
+	retval = -EFAULT;
+	if (clone_flags & CLONE_PARENT_SETTID)
+		if (put_user(p->pid, parent_tidptr))
+			goto bad_fork_cleanup;
+
 	p->proc_dentry = NULL;
 
 	INIT_LIST_HEAD(&p->run_list);
@@ -822,19 +829,14 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
-	/*
-	 * Notify the child of the TID?
-	 */
-	retval = -EFAULT;
-	if (clone_flags & CLONE_SETTID)
-		if (put_user(p->pid, user_tid))
-			goto bad_fork_cleanup_namespace;
 
+	if (clone_flags & CLONE_CHILD_SETTID)
+		p->set_child_tid = child_tidptr;
 	/*
-	 * Does the userspace VM want the TID cleared on mm_release()?
+	 * Clear TID on mm_release()?
 	 */
-	if (clone_flags & CLONE_CLEARTID)
-		p->user_tid = user_tid;
+	if (clone_flags & CLONE_CHILD_CLEARTID)
+		p->clear_child_tid = child_tidptr;
 
 	/*
 	 * Syscall tracing should be turned off in the child regardless
@@ -1003,7 +1005,8 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size,
-			    int *user_tid)
+			    int *parent_tidptr,
+			    int *child_tidptr)
 {
 	struct task_struct *p;
 	int trace = 0;
@@ -1014,7 +1017,7 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			clone_flags |= CLONE_PTRACE;
 	}
 
-	p = copy_process(clone_flags, stack_start, regs, stack_size, user_tid);
+	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr);
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 

@@ -91,7 +91,7 @@ static void rpx_dec_use(struct i2c_adapter *adap)
 }
 
 static struct i2c_algo_8xx_data rpx_data = {
-	setisr: rpx_install_isr
+	.setisr = rpx_install_isr
 };
 
 

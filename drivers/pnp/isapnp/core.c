@@ -1055,10 +1055,10 @@ static int isapnp_disable_resources(struct pnp_dev *dev)
 }
 
 struct pnp_protocol isapnp_protocol = {
-	name:	"ISA Plug and Play",
-	get:	isapnp_get_resources,
-	set:	isapnp_set_resources,
-	disable:isapnp_disable_resources,
+	.name	= "ISA Plug and Play",
+	.get	= isapnp_get_resources,
+	.set	= isapnp_set_resources,
+	.disable = isapnp_disable_resources,
 };
 
 static inline int isapnp_init_device_tree(void)
