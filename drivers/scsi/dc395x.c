@@ -5364,7 +5364,7 @@ DC395x_initAdapter(struct Scsi_Host *host, u32 io_port, u8 irq, u16 index)
 	eeprom = &dc395x_trm_eepromBuf[index];
 	pTempACB = DC395x_pACB_start;
 	if (pTempACB != NULL) {
-		for (; (pTempACB != (struct AdapterCtlBlk *) -1);) {
+		while (pTempACB) {
 			if (pTempACB->IRQLevel == irq) {
 				used_irq = 1;
 				break;
@@ -5842,11 +5842,11 @@ DC395x_init(Scsi_Host_Template * host_template, u32 io_port, u8 irq,
 		if (!DC395x_pACB_start) {
 			DC395x_pACB_start = pACB;
 			DC395x_pACB_current = pACB;
-			pACB->pNextACB = (struct AdapterCtlBlk *) -1;
+			pACB->pNextACB = NULL;
 		} else {
 			DC395x_pACB_current->pNextACB = pACB;
 			DC395x_pACB_current = pACB;
-			pACB->pNextACB = (struct AdapterCtlBlk *) -1;
+			pACB->pNextACB = NULL;
 		}
 		/*DC395x_ACB_UNLOCK(pACB,acb_flags); */
 		return host;
@@ -6077,13 +6077,13 @@ DC395x_proc_info(char *buffer, char **start, off_t offset, int length,
 
 	pACB = DC395x_pACB_start;
 
-	while (pACB != (struct AdapterCtlBlk *) -1) {
+	while (pACB) {
 		shpnt = pACB->pScsiHost;
 		if (shpnt->host_no == hostno)
 			break;
 		pACB = pACB->pNextACB;
 	}
-	if (pACB == (struct AdapterCtlBlk *) -1)
+	if (!pACB)
 		return -ESRCH;
 
 	if (!shpnt)
@@ -6306,7 +6306,7 @@ static int DC395x_release(struct Scsi_Host *host)
 		 */
 		int irq_count;
 		for (irq_count = 0, pACB = DC395x_pACB_start;
-		     pACB != (struct AdapterCtlBlk *) -1;
+		     pACB;
 		     pACB = pACB->pNextACB) {
 			if (pACB->IRQLevel == host->irq)
 				++irq_count;
