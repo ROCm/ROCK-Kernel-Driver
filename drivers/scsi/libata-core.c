@@ -1086,6 +1086,11 @@ void sata_phy_reset(struct ata_port *ap)
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
 
+	if (ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT)) {
+		ata_port_disable(ap);
+		return;
+	}
+
 	ata_bus_reset(ap);
 }
 
@@ -1339,9 +1344,13 @@ void ata_bus_reset(struct ata_port *ap)
 		outb(ap->ctl, ioaddr->ctl_addr);
 
 	/* determine if device 0/1 are present */
-	dev0 = ata_dev_devchk(ap, 0);
-	if (slave_possible)
-		dev1 = ata_dev_devchk(ap, 1);
+	if (ap->flags & ATA_FLAG_SATA_RESET)
+		dev0 = 1;
+	else {
+		dev0 = ata_dev_devchk(ap, 0);
+		if (slave_possible)
+			dev1 = ata_dev_devchk(ap, 1);
+	}
 
 	if (dev0)
 		devmask |= (1 << 0);
