@@ -18,6 +18,7 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/mach/pci.h>
+#include <asm/mach-types.h>
 
 /*
  * The following macro is used to lookup irqs in a standard table
@@ -140,10 +141,19 @@ static void iq80310_preinit(void)
 	iop310_init();
 }
 
-struct hw_pci iq80310_pci __initdata = {
+static struct hw_pci iq80310_pci __initdata = {
 	swizzle:	pci_std_swizzle,
 	nr_controllers:	2,
 	setup:		iq80310_setup,
 	scan:		iop310_scan_bus,
 	preinit:	iq80310_preinit,
 };
+
+static int __init iq80310_pci_init(void)
+{
+	if (machine_is_iq80310())
+		pci_common_init(&iq80310_pci);
+	return 0;
+}
+
+subsys_initcall(iq80310_pci_init);

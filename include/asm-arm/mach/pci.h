@@ -12,27 +12,13 @@ struct pci_sys_data;
 struct pci_bus;
 
 struct hw_pci {
-	/* START OF OLD STUFF */
-	/* Initialise the hardware */
-	void		(*init)(void *);
-
-	/* Setup bus resources */
-	void		(*setup_resources)(struct resource **);
-
-	/* IRQ swizzle */
-	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
-
-	/* IRQ mapping */
-	int		(*map_irq)(struct pci_dev *dev, u8 slot, u8 pin);
-
-	/* END OF OLD STUFF */
-
-	/* NEW STUFF */
 	int		nr_controllers;
 	int		(*setup)(int nr, struct pci_sys_data *);
 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
 	void		(*preinit)(void);
 	void		(*postinit)(void);
+	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
+	int		(*map_irq)(struct pci_dev *dev, u8 slot, u8 pin);
 };
 
 /*
@@ -57,6 +43,11 @@ struct pci_sys_data {
 u8 pci_std_swizzle(struct pci_dev *dev, u8 *pinp);
 
 /*
+ * Call this with your hw_pci struct to initialise the PCI system.
+ */
+void pci_common_init(struct hw_pci *);
+
+/*
  * PCI controllers
  */
 extern int iop310_setup(int nr, struct pci_sys_data *);
@@ -70,7 +61,7 @@ extern void dc21285_postinit(void);
 
 extern int via82c505_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *via82c505_scan_bus(int nr, struct pci_sys_data *);
-extern void __init via82c505_init(void *sysdata);
+extern void via82c505_init(void *sysdata);
 
 extern int pci_v3_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *pci_v3_scan_bus(int nr, struct pci_sys_data *);
