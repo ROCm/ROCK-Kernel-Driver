@@ -67,6 +67,17 @@ void flush_hash_one_pte(pte_t *ptep)
 }
 
 /*
+ * Called by ptep_set_access_flags, must flush on CPUs for which the
+ * DSI handler can't just "fixup" the TLB on a write fault
+ */
+void flush_tlb_page_nohash(struct vm_area_struct *vma, unsigned long addr)
+{
+	if (Hash != 0)
+		return;
+	_tlbie(addr);
+}
+
+/*
  * Called at the end of a mmu_gather operation to make sure the
  * TLB flush is completely done.
  */
