@@ -233,7 +233,7 @@ static int ohci_urb_enqueue (
 	spin_lock (&urb->lock);
 	if (urb->status != -EINPROGRESS) {
 		spin_unlock (&urb->lock);
-
+		urb->hcpriv = urb_priv;
 		finish_urb (ohci, urb, 0);
 		retval = 0;
 		goto fail;

@@ -1073,10 +1073,12 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
   			finish_urb (ohci, urb, regs);
 
 		/* clean schedule:  unlink EDs that are no longer busy */
-		if (list_empty (&ed->td_list) && ed->state == ED_OPER)
-			start_ed_unlink (ohci, ed);
+		if (list_empty (&ed->td_list)) {
+			if (ed->state == ED_OPER)
+				start_ed_unlink (ohci, ed);
+
 		/* ... reenabling halted EDs only after fault cleanup */
-		else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
+		} else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
 			td = list_entry (ed->td_list.next, struct td, td_list);
 			if (!(td->hwINFO & TD_DONE)) {
 				ed->hwINFO &= ~ED_SKIP;
