@@ -77,9 +77,9 @@ void __init config_sun3x(void)
 	mach_gettimeoffset   = sun3x_gettimeoffset;
 	mach_reset           = sun3x_reboot;
 
-	mach_gettod          = sun3x_gettod;
 	mach_hwclk           = sun3x_hwclk;
-	mach_get_model       = sun3x_get_model;
+	mach_get_model       = sun3_get_model;
+	mach_get_hardware_list = sun3x_get_hardware_list;
 
 	sun3_intreg = (unsigned char *)SUN3X_INTREG;
 

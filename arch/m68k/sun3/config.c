@@ -146,12 +146,12 @@ void __init config_sun3(void)
         disable_irq  	     =  sun3_disable_irq;
 	mach_process_int     =  sun3_process_int;
         mach_get_irq_list    =  show_sun3_interrupts;
-        mach_gettod          =  sun3_gettod;	
         mach_reset           =  sun3_reboot;
 	mach_gettimeoffset   =  sun3_gettimeoffset;
 	mach_get_model	     =  sun3_get_model;
 	mach_hwclk           =  sun3_hwclk;
 	mach_halt	     =  sun3_halt;
+	mach_get_hardware_list = sun3_get_hardware_list;
 #if !defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_FB)
 	conswitchp 	     = &dummy_con;
 #endif

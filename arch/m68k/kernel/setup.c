@@ -84,8 +84,7 @@ int (*mach_get_irq_list) (struct seq_file *, void *) = NULL;
 void (*mach_process_int) (int, struct pt_regs *) = NULL;
 /* machine dependent timer functions */
 unsigned long (*mach_gettimeoffset) (void);
-void (*mach_gettod) (int*, int*, int*, int*, int*, int*);
-int (*mach_hwclk) (int, struct hwclk_time*) = NULL;
+int (*mach_hwclk) (int, struct rtc_time*) = NULL;
 int (*mach_set_clock_mmss) (unsigned long) = NULL;
 void (*mach_reset)( void );
 void (*mach_halt)( void ) = NULL;
@@ -518,15 +517,6 @@ void __init floppy_setup(char *str, int *ints)
 /* for "kbd-reset" cmdline param */
 void __init kbd_reset_setup(char *str, int *ints)
 {
-}
-
-void arch_gettod(int *year, int *mon, int *day, int *hour,
-		 int *min, int *sec)
-{
-	if (mach_gettod)
-		mach_gettod(year, mon, day, hour, min, sec);
-	else
-		*year = *mon = *day = *hour = *min = *sec = 0;
 }
 
 void check_bugs(void)

@@ -22,6 +22,7 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <linux/major.h>
+#include <linux/rtc.h>
 
 #include <asm/bootinfo.h>
 #include <asm/system.h>
@@ -46,9 +47,7 @@ extern void bvme6000_sched_init(void (*handler)(int, void *, struct pt_regs *));
 extern int  bvme6000_keyb_init(void);
 extern int  bvme6000_kbdrate (struct kbd_repeat *);
 extern unsigned long bvme6000_gettimeoffset (void);
-extern void bvme6000_gettod (int *year, int *mon, int *day, int *hour,
-                           int *min, int *sec);
-extern int bvme6000_hwclk (int, struct hwclk_time *);
+extern int bvme6000_hwclk (int, struct rtc_time *);
 extern int bvme6000_set_clock_mmss (unsigned long);
 extern void bvme6000_check_partition (struct gendisk *hd, unsigned int dev);
 extern void bvme6000_mksound( unsigned int count, unsigned int ticks );
@@ -138,7 +137,6 @@ void __init config_bvme6000(void)
     mach_kbdrate         = bvme6000_kbdrate;
     mach_init_IRQ        = bvme6000_init_IRQ;
     mach_gettimeoffset   = bvme6000_gettimeoffset;
-    mach_gettod  	 = bvme6000_gettod;
     mach_hwclk           = bvme6000_hwclk;
     mach_set_clock_mmss	 = bvme6000_set_clock_mmss;
 /*  mach_mksound         = bvme6000_mksound; */
@@ -181,8 +179,8 @@ void bvme6000_abort_int (int irq, void *dev_id, struct pt_regs *fp)
         unsigned long *old = (unsigned long *)0xf8000000;
 
         /* Wait for button release */
-	while (*config_reg_ptr & BVME_ABORT_STATUS)
-		;
+        while (*(volatile unsigned char *)BVME_LOCAL_IRQ_STAT & BVME_ABORT_STATUS)
+                ;
 
         *(new+4) = *(old+4);            /* Illegal instruction */
         *(new+9) = *(old+9);            /* Trace */
@@ -284,26 +282,6 @@ unsigned long bvme6000_gettimeoffset (void)
     return v;
 }
 
-extern void bvme6000_gettod (int *year, int *mon, int *day, int *hour,
-                           int *min, int *sec)
-{
-	volatile RtcPtr_t rtc = (RtcPtr_t)BVME_RTC_BASE;
-	unsigned char msr = rtc->msr & 0xc0;
-
-	rtc->msr = 0;		/* Ensure clock accessible */
-
-	do {	/* Loop until we get a reading with a stable seconds field */
-		*sec = bcd2bin (rtc->bcd_sec);
-		*min = bcd2bin (rtc->bcd_min);
-		*hour = bcd2bin (rtc->bcd_hr);
-		*day = bcd2bin (rtc->bcd_dom);
-		*mon = bcd2bin (rtc->bcd_mth);
-		*year = bcd2bin (rtc->bcd_year);
-	} while (bcd2bin (rtc->bcd_sec) != *sec);
-
-	rtc->msr = msr;
-}
-
 static unsigned char bcd2bin (unsigned char b)
 {
 	return ((b>>4)*10 + (b&15));
@@ -330,7 +308,7 @@ static unsigned char bin2bcd (unsigned char b)
  * };
  */
 
-int bvme6000_hwclk(int op, struct hwclk_time *t)
+int bvme6000_hwclk(int op, struct rtc_time *t)
 {
 	volatile RtcPtr_t rtc = (RtcPtr_t)BVME_RTC_BASE;
 	unsigned char msr = rtc->msr & 0xc0;
@@ -339,31 +317,31 @@ int bvme6000_hwclk(int op, struct hwclk_time *t)
 				 * are accessible */
 	if (op)
 	{	/* Write.... */
-		rtc->t0cr_rtmr = t->year%4;
+		rtc->t0cr_rtmr = t->tm_year%4;
 		rtc->bcd_tenms = 0;
-		rtc->bcd_sec = bin2bcd(t->sec);
-		rtc->bcd_min = bin2bcd(t->min);
-		rtc->bcd_hr  = bin2bcd(t->hour);
-		rtc->bcd_dom = bin2bcd(t->day);
-		rtc->bcd_mth = bin2bcd(t->mon + 1);
-		rtc->bcd_year = bin2bcd(t->year%100);
-		if (t->wday >= 0)
-			rtc->bcd_dow = bin2bcd(t->wday+1);
-		rtc->t0cr_rtmr = t->year%4 | 0x08;
+		rtc->bcd_sec = bin2bcd(t->tm_sec);
+		rtc->bcd_min = bin2bcd(t->tm_min);
+		rtc->bcd_hr  = bin2bcd(t->tm_hour);
+		rtc->bcd_dom = bin2bcd(t->tm_mday);
+		rtc->bcd_mth = bin2bcd(t->tm_mon + 1);
+		rtc->bcd_year = bin2bcd(t->tm_year%100);
+		if (t->tm_wday >= 0)
+			rtc->bcd_dow = bin2bcd(t->tm_wday+1);
+		rtc->t0cr_rtmr = t->tm_year%4 | 0x08;
 	}
 	else
 	{	/* Read....  */
 		do {
-			t->sec =  bcd2bin(rtc->bcd_sec);
-			t->min =  bcd2bin(rtc->bcd_min);
-			t->hour = bcd2bin(rtc->bcd_hr);
-			t->day =  bcd2bin(rtc->bcd_dom);
-			t->mon =  bcd2bin(rtc->bcd_mth)-1;
-			t->year = bcd2bin(rtc->bcd_year);
-			if (t->year < 70)
-				t->year += 100;
-			t->wday = bcd2bin(rtc->bcd_dow)-1;
-		} while (t->sec != bcd2bin(rtc->bcd_sec));
+			t->tm_sec  = bcd2bin(rtc->bcd_sec);
+			t->tm_min  = bcd2bin(rtc->bcd_min);
+			t->tm_hour = bcd2bin(rtc->bcd_hr);
+			t->tm_mday = bcd2bin(rtc->bcd_dom);
+			t->tm_mon  = bcd2bin(rtc->bcd_mth)-1;
+			t->tm_year = bcd2bin(rtc->bcd_year);
+			if (t->tm_year < 70)
+				t->tm_year += 100;
+			t->tm_wday = bcd2bin(rtc->bcd_dow)-1;
+		} while (t->tm_sec != bcd2bin(rtc->bcd_sec));
 	}
 
 	rtc->msr = msr;
@@ -419,55 +397,3 @@ int bvme6000_keyb_init (void)
 {
 	return 0;
 }
-
-/*-------------------  Serial console stuff ------------------------*/
-
-static void bvme_scc_write(struct console *co, const char *str, unsigned cnt);
-
-
-void bvme6000_init_console_port (struct console *co, int cflag)
-{
-        co->write = bvme_scc_write;
-}
-
-
-static void scc_delay (void)
-{
-        int n;
-	volatile int trash;
-
-        for (n = 0; n < 20; n++)
-		trash = n;
-}
-
-static void scc_write (char ch)
-{
-        volatile char *p = (volatile char *)BVME_SCC_A_ADDR;
-
-        do {
-                scc_delay();
-        }
-        while (!(*p & 4));
-        scc_delay();
-        *p = 8;
-        scc_delay();
-        *p = ch;
-}
-
-
-static void bvme_scc_write (struct console *co, const char *str, unsigned count)
-{
-        unsigned long   flags;
-
-        save_flags(flags);
-        cli();
-
-        while (count--)
-        {
-                if (*str == '\n')
-                        scc_write ('\r');
-                scc_write (*str++);
-        }
-        restore_flags(flags);
-}
-
