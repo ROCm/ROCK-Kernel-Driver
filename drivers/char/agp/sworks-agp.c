@@ -279,6 +279,7 @@ static int serverworks_configure(void)
 	cap_reg &= ~0x0007;
 	cap_reg |= 0x4;
 	writew(cap_reg, serverworks_private.registers+SVWRKS_COMMAND);
+	readw(serverworks_private.registers+SVWRKS_COMMAND);
 
 	pci_read_config_byte(serverworks_private.svrwrks_dev,SVWRKS_AGP_ENABLE, &enable_reg);
 	enable_reg |= 0x1; /* Agp Enable bit */
