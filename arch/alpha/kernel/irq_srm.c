@@ -49,13 +49,13 @@ srm_end_irq(unsigned int irq)
 
 /* Handle interrupts from the SRM, assuming no additional weirdness.  */
 static struct hw_interrupt_type srm_irq_type = {
-	typename:	"SRM",
-	startup:	srm_startup_irq,
-	shutdown:	srm_disable_irq,
-	enable:		srm_enable_irq,
-	disable:	srm_disable_irq,
-	ack:		srm_disable_irq,
-	end:		srm_end_irq,
+	.typename	= "SRM",
+	.startup	= srm_startup_irq,
+	.shutdown	= srm_disable_irq,
+	.enable		= srm_enable_irq,
+	.disable	= srm_disable_irq,
+	.ack		= srm_disable_irq,
+	.end		= srm_end_irq,
 };
 
 void __init

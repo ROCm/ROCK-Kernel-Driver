@@ -71,13 +71,13 @@ eb64p_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type eb64p_irq_type = {
-	typename:	"EB64P",
-	startup:	eb64p_startup_irq,
-	shutdown:	eb64p_disable_irq,
-	enable:		eb64p_enable_irq,
-	disable:	eb64p_disable_irq,
-	ack:		eb64p_disable_irq,
-	end:		eb64p_end_irq,
+	.typename	= "EB64P",
+	.startup	= eb64p_startup_irq,
+	.shutdown	= eb64p_disable_irq,
+	.enable		= eb64p_enable_irq,
+	.disable	= eb64p_disable_irq,
+	.ack		= eb64p_disable_irq,
+	.end		= eb64p_end_irq,
 };
 
 static void 
@@ -208,51 +208,51 @@ eb64p_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_EB64P)
 struct alpha_machine_vector eb64p_mv __initmv = {
-	vector_name:		"EB64+",
+	.vector_name		= "EB64+",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_APECS_IO,
 	DO_APECS_BUS,
-	machine_check:		apecs_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= apecs_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		32,
-	device_interrupt:	eb64p_device_interrupt,
+	.nr_irqs		= 32,
+	.device_interrupt	= eb64p_device_interrupt,
 
-	init_arch:		apecs_init_arch,
-	init_irq:		eb64p_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		eb64p_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= apecs_init_arch,
+	.init_irq		= eb64p_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= eb64p_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(eb64p)
 #endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_EB66)
 struct alpha_machine_vector eb66_mv __initmv = {
-	vector_name:		"EB66",
+	.vector_name		= "EB66",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_LCA_IO,
 	DO_LCA_BUS,
-	machine_check:		lca_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= lca_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		32,
-	device_interrupt:	eb64p_device_interrupt,
+	.nr_irqs		= 32,
+	.device_interrupt	= eb64p_device_interrupt,
 
-	init_arch:		lca_init_arch,
-	init_irq:		eb64p_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	pci_map_irq:		eb64p_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= lca_init_arch,
+	.init_irq		= eb64p_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.pci_map_irq		= eb64p_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(eb66)
 #endif
