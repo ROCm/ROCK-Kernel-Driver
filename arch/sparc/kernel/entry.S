@@ -359,11 +359,11 @@ maybe_smp4m_msg:
 	andcc	%o1, %o4, %g0
 	be,a	smp4m_ticker
 	 cmp	%l7, 14
-	cmp	%l7, 13
+	sethi	%hi(0x40000000), %o2
 	add	%o5, %o3, %o5
-	bne,a	1f
-	 sethi	%hi(0x40000000), %o2
-	sethi	%hi(0x20000000), %o2
+	andcc	%o1, %o2, %g0
+	be,a	1f
+	 sethi	%hi(0x20000000), %o2
 1:
 	st	%o2, [%o5 + 0x4]
 	WRITE_PAUSE
@@ -374,7 +374,8 @@ maybe_smp4m_msg:
 	WRITE_PAUSE
 	wr	%l4, PSR_ET, %psr
 	WRITE_PAUSE
-	cmp	%l7, 13
+	srl	%o2, (16+14), %o2
+	tst	%o2
 	bne	2f
 	 nop
 	call	C_LABEL(smp_reschedule_irq)
@@ -1245,9 +1246,8 @@ C_LABEL(sys_ptrace):
 	call	C_LABEL(do_ptrace)
 	 add	%sp, STACKFRAME_SZ, %o0
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
-	andcc	%l5, 0x02, %g0
+	ld	[%curptr + TI_FLAGS], %l5
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	be	1f
 	 nop
 
@@ -1296,9 +1296,8 @@ C_LABEL(sys_sigpause):
 	call	C_LABEL(do_sigpause)
 	 add	%sp, STACKFRAME_SZ, %o1
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
-	andcc	%l5, 0x02, %g0
+	ld	[%curptr + TI_FLAGS], %l5
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	be	1f
 	 nop
 
@@ -1315,9 +1314,8 @@ C_LABEL(sys_sigsuspend):
 	call	C_LABEL(do_sigsuspend)
 	 add	%sp, STACKFRAME_SZ, %o0
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
-	andcc	%l5, 0x02, %g0
+	ld	[%curptr + TI_FLAGS], %l5
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	be	1f
 	 nop
 
@@ -1335,9 +1333,8 @@ C_LABEL(sys_rt_sigsuspend):
 	call	C_LABEL(do_rt_sigsuspend)
 	 add	%sp, STACKFRAME_SZ, %o2
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
-	andcc	%l5, 0x02, %g0
+	ld	[%curptr + TI_FLAGS], %l5
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	be	1f
 	 nop
 
@@ -1354,9 +1351,8 @@ C_LABEL(sys_sigreturn):
 	call	C_LABEL(do_sigreturn)
 	 add	%sp, STACKFRAME_SZ, %o0
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
-	andcc	%l5, 0x02, %g0
+	ld	[%curptr + TI_FLAGS], %l5
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	be	1f
 	 nop
 
@@ -1375,9 +1371,8 @@ C_LABEL(sys_rt_sigreturn):
 	call	C_LABEL(do_rt_sigreturn)
 	 add	%sp, STACKFRAME_SZ, %o0
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
-	andcc	%l5, 0x02, %g0
+	ld	[%curptr + TI_FLAGS], %l5
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	be	1f
 	 nop
 
@@ -1511,10 +1506,9 @@ syscall_is_too_hard:
 	mov	%i1, %o1
 	mov	%i2, %o2
 
-	ld	[%curptr + TI_TASK], %l5
-	ld	[%l5 + AOFF_task_ptrace], %l5
+	ld	[%curptr + TI_FLAGS], %l5
 	mov	%i3, %o3
-	andcc	%l5, 0x02, %g0
+	andcc	%l5, _TIF_SYSCALL_TRACE, %g0
 	mov	%i4, %o4
 	bne	linux_syscall_trace
 	 mov	%i0, %l5
@@ -1526,13 +1520,12 @@ syscall_is_too_hard:
 
 	.globl	C_LABEL(ret_sys_call)
 C_LABEL(ret_sys_call):
-	ld	[%curptr + TI_TASK], %l6
-	ld	[%l6 + AOFF_task_ptrace], %l6
+	ld	[%curptr + TI_FLAGS], %l6
 	cmp	%o0, -ENOIOCTLCMD
 	ld	[%sp + STACKFRAME_SZ + PT_PSR], %g3
 	set	PSR_C, %g2
 	bgeu	1f
-	 andcc	%l6, 0x02, %l6	
+	 andcc	%l6, _TIF_SYSCALL_TRACE, %g0
 
 	/* System call success, clear Carry condition code. */
 	andn	%g3, %g2, %g3

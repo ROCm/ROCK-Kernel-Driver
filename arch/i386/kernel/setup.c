@@ -799,13 +799,13 @@ static void __init register_memory(unsigned long max_low_pfn)
 /* Use inline assembly to define this because the nops are defined 
    as inline assembly strings in the include files and we cannot 
    get them easily into strings. */
-asm("intelnops: " 
+asm("\t.data\nintelnops: " 
     GENERIC_NOP1 GENERIC_NOP2 GENERIC_NOP3 GENERIC_NOP4 GENERIC_NOP5 GENERIC_NOP6
     GENERIC_NOP7 GENERIC_NOP8); 
-asm("k8nops: " 
+asm("\t.data\nk8nops: " 
     K8_NOP1 K8_NOP2 K8_NOP3 K8_NOP4 K8_NOP5 K8_NOP6
     K8_NOP7 K8_NOP8); 
-asm("k7nops: " 
+asm("\t.data\nk7nops: " 
     K7_NOP1 K7_NOP2 K7_NOP3 K7_NOP4 K7_NOP5 K7_NOP6
     K7_NOP7 K7_NOP8); 
     

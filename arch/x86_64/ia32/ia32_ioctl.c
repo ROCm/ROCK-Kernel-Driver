@@ -671,12 +671,6 @@ out:
 	return err;
 }
 
-static __inline__ void *alloc_user_space(long len)
-{
-	struct pt_regs *regs = (void *)current->thread.rsp0 - sizeof(struct pt_regs); 
-	return (void *)regs->rsp - len; 
-}
-
 int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifreq *u_ifreq64;
@@ -692,7 +686,7 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 	data64 = (void *) A(data32);
 
-	u_ifreq64 = alloc_user_space(sizeof(*u_ifreq64));
+	u_ifreq64 = compat_alloc_user_space(sizeof(*u_ifreq64));
 
 	/* Don't check these user accesses, just let that get trapped
 	 * in the ioctl handler instead.
@@ -1573,7 +1567,7 @@ struct sock_fprog32 {
 static int ppp_sock_fprog_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct sock_fprog32 *u_fprog32 = (struct sock_fprog32 *) arg;
-	struct sock_fprog *u_fprog64 = alloc_user_space(sizeof(struct sock_fprog));
+	struct sock_fprog *u_fprog64 = compat_alloc_user_space(sizeof(struct sock_fprog));
 	void *fptr64;
 	u32 fptr32;
 	u16 flen;

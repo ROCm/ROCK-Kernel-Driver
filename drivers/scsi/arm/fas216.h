@@ -177,7 +177,6 @@ typedef enum {
 	PHASE_SELSTEPS,					/* selection with command steps		*/
 	PHASE_COMMAND,					/* command sent				*/
 	PHASE_MESSAGESENT,				/* selected, and we're sending cmd	*/
-	PHASE_RECONNECTED,				/* reconnected				*/
 	PHASE_DATAOUT,					/* data out to device			*/
 	PHASE_DATAIN,					/* data in from device			*/
 	PHASE_MSGIN,					/* message in from device		*/
@@ -243,12 +242,6 @@ typedef struct {
 		unsigned char	cfg[4];			/* configuration registers		*/
 		const char	*type;			/* chip type				*/
 		unsigned int	irq;			/* interrupt				*/
-
-		struct {
-			unsigned char	target;		/* reconnected target			*/
-			unsigned char	lun;		/* reconnected lun			*/
-			unsigned char	tag;		/* reconnected tag			*/
-		} reconnected;
 
 		Scsi_Pointer	SCp;			/* current commands data pointer	*/
 
@@ -368,7 +361,7 @@ extern void fas216_release (struct Scsi_Host *instance);
 
 extern int fas216_print_host(FAS216_Info *info, char *buffer);
 extern int fas216_print_stats(FAS216_Info *info, char *buffer);
-extern int fas216_print_device(FAS216_Info *info, Scsi_Device *scd, char *buffer);
+extern int fas216_print_devices(FAS216_Info *info, char *buffer);
 
 /* Function: int fas216_eh_abort(Scsi_Cmnd *SCpnt)
  * Purpose : abort this command

@@ -803,7 +803,7 @@ int __init ppp_init(void)
 				S_IFCHR|S_IRUSR|S_IWUSR, "ppp");
 	}
 
-	if (!err)
+	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
 	return err;
 }
@@ -2345,8 +2345,10 @@ static void ppp_shutdown_interface(struct ppp *ppp)
 	ppp_unlock(ppp);
 	if (dev) {
 		rtnl_lock();
-		dev_close(dev);
+
+		/* This will call dev_close() for us. */
 		unregister_netdevice(dev);
+
 		rtnl_unlock();
 	}
 	cardmap_set(&all_ppp_units, ppp->file.index, NULL);

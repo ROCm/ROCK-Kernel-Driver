@@ -1115,7 +1115,6 @@ int __init dm_interface_init(void)
 	       DM_DRIVER_EMAIL);
 	return 0;
 
-      failed:
 	if (misc_deregister(&_dm_misc) < 0)
 		DMERR("misc_deregister failed for control device");
 	dm_hash_exit();

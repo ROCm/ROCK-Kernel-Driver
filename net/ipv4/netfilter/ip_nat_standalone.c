@@ -380,5 +380,4 @@ EXPORT_SYMBOL(ip_nat_cheat_check);
 EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
 EXPORT_SYMBOL(ip_nat_mangle_udp_packet);
 EXPORT_SYMBOL(ip_nat_used_tuple);
-EXPORT_SYMBOL(skb_ip_make_writable);
 MODULE_LICENSE("GPL");

@@ -521,18 +521,6 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	set_tsk_thread_flag(t,TIF_SIGPENDING);
 
 	/*
-	 * If the task is running on a different CPU
-	 * force a reschedule on the other CPU to make
-	 * it notice the new signal quickly.
-	 *
-	 * The code below is a tad loose and might occasionally
-	 * kick the wrong CPU if we catch the process in the
-	 * process of changing - but no harm is done by that
-	 * other than doing an extra (lightweight) IPI interrupt.
-	 */
-	if (t->state == TASK_RUNNING)
-		kick_if_running(t);
-	/*
 	 * If resume is set, we want to wake it up in the TASK_STOPPED case.
 	 * We don't check for TASK_STOPPED because there is a race with it
 	 * executing another processor and just now entering stopped state.
@@ -543,7 +531,7 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	if (resume)
 		mask |= TASK_STOPPED;
 	if (t->state & mask) {
-		wake_up_process(t);
+		wake_up_process_kick(t);
 		return;
 	}
 }

@@ -298,4 +298,15 @@ extern void	ip_local_error(struct sock *sk, int err, u32 daddr, u16 dport,
 extern int ip_seq_release(struct inode *inode, struct file *file);
 extern int ipv4_proc_init(void);
 
+/* sysctl helpers - any sysctl which holds a value that ends up being
+ * fed into the routing cache should use these handlers.
+ */
+int ipv4_doint_and_flush(ctl_table *ctl, int write,
+			 struct file* filp, void *buffer,
+			 size_t *lenp);
+int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
+				  void *oldval, size_t *oldlenp,
+				  void *newval, size_t newlen, 
+				  void **context);
+
 #endif	/* _IP_H */

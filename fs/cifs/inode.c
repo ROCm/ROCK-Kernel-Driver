@@ -53,10 +53,6 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	/* dump_mem("\nUnixQPathInfo return data", &findData, sizeof(findData)); */
 	if (rc) {
 		if (rc == -EREMOTE) {
-/* rc = *//* CIFSGetDFSRefer(xid, pTcon->ses, search_path,
-	&referrals,
-	&num_referrals,
-	cifs_sb->local_nls); */
 			tmp_path =
 			    kmalloc(strnlen
 				    (pTcon->treeName,
@@ -180,11 +176,6 @@ cifs_get_inode_info(struct inode **pinode,
 	/* dump_mem("\nQPathInfo return data",&findData, sizeof(findData)); */
 	if (rc) {
 		if (rc == -EREMOTE) {
-			/* BB add call to new func rc = GetDFSReferral(); */
-/* rc = *//* CIFSGetDFSRefer(xid, pTcon->ses, search_path,
-	&referrals,
-	&num_referrals,
-	cifs_sb->local_nls); */
 			tmp_path =
 			    kmalloc(strnlen
 				    (pTcon->treeName,

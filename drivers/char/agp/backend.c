@@ -210,19 +210,6 @@ static void agp_backend_cleanup(struct agp_bridge_data *bridge)
 				phys_to_virt(bridge->scratch_page_real));
 }
 
-static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
-{
-	switch(rq) {
-		case PM_SUSPEND:
-			return agp_bridge->driver->suspend();
-		case PM_RESUME:
-			agp_bridge->driver->resume();
-			return 0;
-	}		
-	return 0;
-}
-
-
 static const drm_agp_t drm_agp = {
 	&agp_free_memory,
 	&agp_allocate_memory,
@@ -253,34 +240,39 @@ int agp_add_bridge(struct agp_bridge_data *bridge)
 	int error;
 
 	if (!bridge->dev) {
-		printk(KERN_DEBUG PFX "Erk, registering with no pci_dev!\n");
+		printk (KERN_DEBUG PFX "Erk, registering with no pci_dev!\n");
 		return -EINVAL;
 	}
 
 	if (agp_count) {
-		printk(KERN_DEBUG PFX
+		printk (KERN_INFO PFX
 		       "Only one agpgart device currently supported.\n");
 		return -ENODEV;
 	}
 
 	/* Grab reference on the chipset driver. */
-	if (!try_module_get(bridge->driver->owner))
+	if (!try_module_get(bridge->driver->owner)) {
+		printk (KERN_INFO PFX "Couldn't lock chipset driver.\n");
 		return -EINVAL;
+	}
 
 	bridge->type = SUPPORTED;
 
 	error = agp_backend_initialize(agp_bridge);
-	if (error)
+	if (error) {
+		printk (KERN_INFO PFX "agp_backend_initialize() failed.\n");
 		goto err_out;
+	}
 
 	error = agp_frontend_initialize();
-	if (error)
+	if (error) {
+		printk (KERN_INFO PFX "agp_frontend_initialize() failed.\n");
 		goto frontend_err;
+	}
 
 	/* FIXME: What to do with this? */
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
 
-	pm_register(PM_PCI_DEV, PM_PCI_ID(bridge->dev), agp_power);
 	agp_count++;
 	return 0;
 
@@ -297,7 +289,6 @@ EXPORT_SYMBOL_GPL(agp_add_bridge);
 void agp_remove_bridge(struct agp_bridge_data *bridge)
 {
 	bridge->type = NOT_SUPPORTED;
-	pm_unregister_all(agp_power);
 	agp_frontend_cleanup();
 	agp_backend_cleanup(bridge);
 	inter_module_unregister("drm_agp");

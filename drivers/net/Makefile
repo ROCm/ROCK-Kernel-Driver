@@ -24,7 +24,7 @@ obj-$(CONFIG_SUNLANCE) += sunlance.o
 obj-$(CONFIG_SUNQE) += sunqe.o
 obj-$(CONFIG_SUNBMAC) += sunbmac.o
 obj-$(CONFIG_MYRI_SBUS) += myri_sbus.o
-obj-$(CONFIG_SUNGEM) += sungem.o
+obj-$(CONFIG_SUNGEM) += sungem.o sungem_phy.o
 
 obj-$(CONFIG_MACE) += mace.o
 obj-$(CONFIG_BMAC) += bmac.o
@@ -77,7 +77,6 @@ obj-$(CONFIG_HP100) += hp100.o
 obj-$(CONFIG_SMC9194) += smc9194.o
 obj-$(CONFIG_FEC) += fec.o
 obj-$(CONFIG_68360_ENET) += 68360enet.o
-obj-$(CONFIG_ARM_AM79C961A) += am79c961a.o
 obj-$(CONFIG_ARM_ETHERH) += 8390.o
 obj-$(CONFIG_WD80x3) += wd.o 8390.o
 obj-$(CONFIG_EL2) += 3c503.o 8390.o
@@ -179,7 +178,7 @@ obj-$(CONFIG_AMD8111_ETH) += amd8111e.o
 # non-drivers/net drivers who want mii lib
 obj-$(CONFIG_PCMCIA_SMC91C92) += mii.o
 
-obj-$(CONFIG_ARCH_ACORN) += ../acorn/net/
+obj-$(CONFIG_ARM) += arm/
 obj-$(CONFIG_NET_FC) += fc/
 obj-$(CONFIG_DEV_APPLETALK) += appletalk/
 obj-$(CONFIG_TR) += tokenring/

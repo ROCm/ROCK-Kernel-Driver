@@ -20,7 +20,7 @@
  *	yoshfuji	: fix format of router-alert option
  *	YOSHIFUJI Hideaki @USAGI:
  *		Fixed source address for MLD message based on
- *		<draft-ietf-magma-mld-source-02.txt>.
+ *		<draft-ietf-magma-mld-source-05.txt>.
  *	YOSHIFUJI Hideaki @USAGI:
  *		- Ignore Queries for invalid addresses.
  *		- MLD for link-local addresses.
@@ -1227,7 +1227,7 @@ static struct sk_buff *mld_newpack(struct net_device *dev, int size)
 	}
 
 	if (ipv6_get_lladdr(dev, &addr_buf)) {
-		/* <draft-ietf-magma-mld-source-02.txt>:
+		/* <draft-ietf-magma-mld-source-05.txt>:
 		 * use unspecified address as the source address 
 		 * when a valid link-local address is not available.
 		 */
@@ -1559,7 +1559,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	}
 
 	if (ipv6_get_lladdr(dev, &addr_buf)) {
-		/* <draft-ietf-magma-mld-source-02.txt>:
+		/* <draft-ietf-magma-mld-source-05.txt>:
 		 * use unspecified address as the source address 
 		 * when a valid link-local address is not available.
 		 */

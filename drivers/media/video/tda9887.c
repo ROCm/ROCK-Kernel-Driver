@@ -293,8 +293,6 @@ static int tda9887_configure(struct tda9887 *t)
 	unsigned char *buf = NULL;
 	int rc;
 
-	printk("tda9887_configure\n");
-
 	if (t->radio) {
 		dprintk("tda9885/6/7: FM Radio mode\n");
 		buf = buf_fm_stereo;
@@ -358,11 +356,11 @@ static int tda9887_attach(struct i2c_adapter *adap, int addr, int kind)
                 return -ENOMEM;
 	memset(t,0,sizeof(*t));
 	t->client = client_template;
-        i2c_set_clientdata(&t->client, t);
 	t->pinnacle_id = -1;
+	t->tvnorm=VIDEO_MODE_PAL;
+        i2c_set_clientdata(&t->client, t);
         i2c_attach_client(&t->client);
         
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -379,7 +377,6 @@ static int tda9887_detach(struct i2c_client *client)
 
 	i2c_detach_client(client);
 	kfree(t);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -404,6 +401,7 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		int *i = arg;
 
 		t->pinnacle_id = *i;
+		tda9887_miro(t);
 		break;
 	}
 	/* --- v4l ioctls --- */

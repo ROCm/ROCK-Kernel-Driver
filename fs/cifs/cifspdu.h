@@ -1263,6 +1263,7 @@ typedef struct dfs_referral_level_3 {
 	__u16 ServerType;	/* 0x0001 = CIFS server */
 	__u16 ReferralFlags;	/* or proximity - not clear which since always set to zero - SNIA spec says 0x01 means strip off PathConsumed chars before submitting RequestFileName to remote node */
 	__u16 TimeToLive;
+	__u16 Proximity;
 	__u16 DfsPathOffset;
 	__u16 DfsAlternatePathOffset;
 	__u16 NetworkAddressOffset;

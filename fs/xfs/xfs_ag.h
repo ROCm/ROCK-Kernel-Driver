@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -185,9 +185,8 @@ xfs_agblock_t xfs_agfl_block(struct xfs_mount *mp);
 #endif
 #define XFS_AGFL_SIZE(mp)	((mp)->m_sb.sb_sectsize / sizeof(xfs_agblock_t))
 
-/* -- nathans TODO ... use of BBSIZE here - should be sector size -- */
 typedef struct xfs_agfl {
-	xfs_agblock_t	agfl_bno[BBSIZE/sizeof(xfs_agblock_t)];
+	xfs_agblock_t	agfl_bno[1];	/* actually XFS_AGFL_SIZE(mp) */
 } xfs_agfl_t;
 
 /*

@@ -4,6 +4,8 @@
  * Copyright (C) 2000 James Goodwin, Filanet Corporation (www.filanet.com)
  * jamesg@filanet.com (JSG)
  *
+ * Copyright (C) 2003 Ben Collins <bcollins@debian.org>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -30,228 +32,10 @@
  * You may access any attached SBP-2 storage devices as if they were SCSI
  * devices (e.g. mount /dev/sda1,  fdisk, mkfs, etc.).
  *
- *
- * Module Load Options:
- *
- * max_speed 		- Force max speed allowed 
- *			  (2 = 400mb, 1 = 200mb, 0 = 100mb. default = 2)
- * serialize_io		- Serialize all I/O coming down from the scsi drivers
- *			  (0 = deserialized, 1 = serialized, default = 0)
- * max_sectors, 	- Change max sectors per I/O supported (default = 255)
- * exclusive_login	- Set to zero if you'd like to allow multiple hosts the ability
- *			  to log in at the same time. Sbp2 device must support this,
- *			  and you must know what you're doing (default = 1)
- *
- * (e.g. insmod sbp2 sbp2.serialize_io = 1)
- *
- *
- * Current Support:
- *
- * The SBP-2 driver is still in an early state, but supports a variety of devices.
- * I have read/written many gigabytes of data from/to SBP-2 drives, and have seen 
- * performance of more than 25 MBytes/s on individual drives (limit of the media 
- * transfer rate).
- *
- *
- * Following are a sampling of devices that have been tested successfully:
- *
- *	- Western Digital IEEE-1394 hard drives
- *	- Maxtor IEEE-1394 hard drives
- *	- VST (SmartDisk) IEEE-1394 hard drives and Zip drives (several flavors)
- *	- LaCie IEEE-1394 hard drives (several flavors)
- *	- QPS IEEE-1394 CD-RW/DVD drives and hard drives
- *	- BusLink IEEE-1394 hard drives
- *	- Iomega IEEE-1394 Zip/Jazz/Peerless drives
- *	- ClubMac IEEE-1394 hard drives
- *	- FirePower IEEE-1394 hard drives
- *	- EzQuest IEEE-1394 hard drives and CD-RW drives
- *	- Castlewood/ADS IEEE-1394 ORB drives
- *	- Evergreen IEEE-1394 hard drives and CD-RW drives
- *	- Addonics IEEE-1394 CD-RW drives
- *	- Bellstor IEEE-1394 hard drives and CD-RW drives
- *	- APDrives IEEE-1394 hard drives
- *	- Fujitsu IEEE-1394 MO drives
- *	- Sony IEEE-1394 CD-RW drives
- *	- Epson IEEE-1394 scanners
- *	- ADS IEEE-1394 memory stick and compact flash readers 
- *	- SBP-2 bridge-based devices (LSI, Oxford Semiconductor, Indigita bridges)
- *	- Various other standard IEEE-1394 hard drives and enclosures
- *
- *
- * Performance Issues:
- *
- *	- Make sure you are "not" running fat/fat32 on your attached SBP-2 drives. You'll
- *	  get much better performance formatting the drive ext2 (but you will lose the
- *	  ability to easily move the drive between Windows/Linux).
- *
- *
  * Current Issues:
  *
  *	- Error Handling: SCSI aborts and bus reset requests are handled somewhat
  *	  but the code needs additional debugging.
- *
- *
- * History:
- *
- *	07/25/00 - Initial revision (JSG)
- *	08/11/00 - Following changes/bug fixes were made (JSG):
- *		   * Bug fix to SCSI procfs code (still needs to be synched with 2.4 kernel).
- *		   * Bug fix where request sense commands were actually sent on the bus.
- *		   * Changed bus reset/abort code to deal with devices that spin up quite
- *		     slowly (which result in SCSI time-outs).
- *		   * "More" properly pull information from device's config rom, for enumeration
- *		     of SBP-2 devices, and determining SBP-2 register offsets.
- *		   * Change Simplified Direct Access Device type to Direct Access Device type in
- *		     returned inquiry data, in order to make the SCSI stack happy.
- *		   * Modified driver to register with the SCSI stack "before" enumerating any attached
- *		     SBP-2 devices. This means that you'll have to use procfs scsi-add-device or 
- *		     some sort of script to discover new SBP-2 devices.
- *		   * Minor re-write of some code and other minor changes.
- *	08/28/00 - Following changes/bug fixes were made (JSG):
- *		   * Bug fixes to scatter/gather support (case of one s/g element)
- *		   * Updated direction table for scsi commands (mostly DVD commands)
- *		   * Retries when trying to detect SBP-2 devices (for slow devices)
- *		   * Slightly better error handling (previously none) when commands time-out.
- *		   * Misc. other bug fixes and code reorganization.
- *	09/13/00 - Following changes/bug fixes were made (JSG)
- *		   * Moved detection/enumeration code to a kernel thread which is woken up when IEEE-1394
- *		     bus resets occur.
- *		   * Added code to handle bus resets and hot-plugging while devices are mounted, but full
- *		     hot-plug support is not quite there yet.
- *		   * Now use speed map to determine speed and max payload sizes for ORBs
- *		   * Clean-up of code and reorganization 
- *	09/19/00 - Added better hot-plug support and other minor changes (JSG)
- *	10/15/00 - Fixes for latest 2.4.0 test kernel, minor fix for hot-plug race. (JSG)
- *	12/03/00 - Created pool of request packet structures for use in sending out sbp2 command
- *		   and agent reset requests. This removes the kmallocs/kfrees in the critical I/O paths,
- *		   and also deals with some subtle race conditions related to allocating and freeing
- *		   packets. (JSG)
- *      12/09/00 - Improved the sbp2 device detection by actually reading the root and unit 
- *		   directory (khk@khk.net)
- *	12/23/00 - Following changes/enhancements were made (JSG)
- *		   * Only do SCSI to RBC command conversion for Direct Access and Simplified
- *		     Direct Access Devices (this is pulled from the config rom root directory).
- *		     This is needed because doing the conversion for all device types broke the
- *		     Epson scanner. Still looking for a better way of determining when to convert
- *		     commands (for RBC devices). Thanks to khk for helping on this!
- *		   * Added ability to "emulate" physical dma support, for host adapters such as TILynx.
- *		   * Determine max payload and speed by also looking at the host adapter's max_rec field.
- *	01/19/01 - Added checks to sbp2 login and made the login time-out longer. Also fixed a compile 
- *		   problem for 2.4.0. (JSG)
- *	01/24/01 - Fixed problem when individual s/g elements are 64KB or larger. Needed to break
- *		   up these larger elements, since the sbp2 page table element size is only 16 bits. (JSG)
- *	01/29/01 - Minor byteswap fix for login response (used for reconnect and log out).
- *	03/07/01 - Following changes/enhancements were made (JSG)
- *		   * Changes to allow us to catch the initial scsi bus scan (for detecting sbp2
- *		     devices when first loading sbp2.o). To disable this, un-define 
- *		     SBP2_SUPPORT_INITIAL_BUS_SCAN.
- *		   * Temporary fix to deal with many sbp2 devices that do not support individual
- *		     transfers of greater than 128KB in size. 
- *		   * Mode sense conversion from 6 byte to 10 byte versions for CDRW/DVD devices. (Mark Burton)
- *		   * Define allowing support for goofy sbp2 devices that do not support mode
- *		     sense command at all, allowing them to be mounted rw (such as 1394 memory
- *		     stick and compact flash readers). Define SBP2_MODE_SENSE_WRITE_PROTECT_HACK
- *		     if you need this fix.
- *	03/29/01 - Major performance enhancements and misc. other changes. Thanks to Daniel Berlin for many of
- *		   changes and suggestions for change:
- *		   * Now use sbp2 doorbell and link commands on the fly (instead of serializing requests)
- *		   * Removed all bit fields in an attempt to run on PPC machines (still needs a little more work)
- *		   * Added large request break-up/linking support for sbp2 chipsets that do not support transfers 
- *		     greater than 128KB in size.
- *		   * Bumped up max commands per lun to two, and max total outstanding commands to eight.
- *	04/03/01 - Minor clean-up. Write orb pointer directly if no outstanding commands (saves one 1394 bus
- *		   transaction). Added module load options (bus scan, mode sense hack, max speed, serialize_io,
- *		   no_large_transfers). Better bus reset handling while I/O pending. Set serialize_io to 1 by 
- *		   default (debugging of deserialized I/O in progress).
- *	04/04/01 - Added workaround for PPC Pismo firewire chipset. See #define below. (Daniel Berlin)
- *	04/20/01 - Minor clean-up. Allocate more orb structures when running with sbp2 target chipsets with
- *		   128KB max transfer limit.
- *	06/16/01 - Converted DMA interfaces to pci_dma - Ben Collins
- *							 <bcollins@debian.org
- *	07/22/01 - Use NodeMngr to get info about the local host and
- *		   attached devices. Ben Collins
- *
- *      09/15/01 - Remove detection code, instead subscribe to the nodemgr
- *                 driver management interface.  This also removes the
- *                 initial bus scan stuff since the nodemgr calls
- *                 sbp2_probe for each sbp2 device already on the bus,
- *                 when we register our driver.  This change 
- *                 automtically adds hotplug support to the driver.
- *                                 Kristian Hogsberg <hogsberg@users.sf.net>
- *
- *      11/17/01 - Various bugfixes/cleanups:
- *                 * Remember to logout of device in sbp2_disconnect.
- *                 * If we fail to reconnect to a device after bus reset
- *                   remember to release unit directory, so the ieee1394
- *                   knows we no longer manage it.
- *                 * Unregister scsi hosts in sbp2_remove_host when a
- *                   hpsb_host goes away.
- *                 * Remove stupid hack in sbp2_remove_host.
- *                 * Switched to "manual" module initialization
- *                   (i.e. not scsi_module.c) and moved sbp2_cleanup
- *                   moved sbp2scsi_release to sbp2_module_ext.  The
- *                   release function is called once pr. registered
- *                   scsi host, but sbp2_cleanup should only be called
- *                   upon module unload.  Moved much initialization
- *                   from sbp2scsi_detect to sbp2_module_init.
- *                                 Kristian Hogsberg <hogsberg@users.sf.net>
- *	01/06/02 - Misc bug fixes/enhancements:	(JSG)
- *		   * Enable use_new_eh_code for scsi stuff.
- *		   * Do not write all ones for NULL ORB high/low fields, but
- *		     rather leave reserved areas zeroed (per SBP2 spec).
- *		   * Use newer scsi transfer direction passed down instead of our
- *		     direction table.
- *		   * Bumped login time-out to 20 seconds, as some devices are slow.
- *		   * Fixed a couple scsi unregister bugs on module unload
- *	01/13/02 - Fixed compatibility with certain SBP2 devices, such as Iomega
- *		   1394 devices (Peerless, Jazz). Also a bit of clean-up of the 
- *		   driver, thanks to H.J.Lu (hjl@lucon.org). Removed mode_sense_hack
- *		   module load option, as it's been fixed in the 2.4 scsi stack.
- *	02/10/02 - Added support for max_sectors, minor fix for inquiry command, make
- *		   up sbp2 device type from inquiry response data if not part of 
- *		   device's 1394 unit directory. (JSG)
- *	02/18/02 - Code clean-up and enhancements: (JSG)
- *		   * Finish cleaning out hacked code for dealing with broken sbp2 devices
- *		     which do not support requests of 128KB or greater. Now use 
- *		     max_sectors scsi host entry to limit transfer sizes.
- *		   * Change status fifo address from a single address to a set of addresses,
- *		     with each sbp2 device having its own status fifo address. This makes
- *		     it easier to match the status write to the sbp2 device instance.
- *		   * Minor change to use lun when logging into sbp2 devices. First step in
- *		     supporting multi-lun devices such as CD/DVD changer devices.
- *		   * Added a new module load option for setting max sectors. For use by folk
- *		     who'd like to bump up the max scsi transfer size supported.
- *		   * Enabled deserialized operation by default, allowing for better performance,
- *		     particularily when running with multiple sbp2 devices. For debugging,
- *		     you may enable serialization through use of the sbp2_serialize_io module
- *		     load option (e.g. insmod sbp2 sbp2_serialize_io=1).
- *	02/20/02 - Added a couple additional module load options. 
- *		   Needed to bump down max commands per lun because of the !%@&*^# QPS CDRW 
- *		   drive I have, which doesn't seem to get along with other sbp2 devices 
- *		   (or handle linked commands well).
- *	04/21/02 - Added some additional debug capabilities:
- *		   * Able to handle phys dma requests directly, if host controller has phys
- *		     dma disabled (e.g. insmod ohci1394 phys_dma=0). Undefine CONFIG_IEEE1394_SBP2_PHYS_DMA
- *		     if you'd like to disable sbp2 driver from registering for phys address range. 
- *		   * New packet dump debug define (CONFIG_IEEE1394_SBP2_PACKET_DUMP) which allows
- *		     dumping of all sbp2 related packets sent and received. Especially effective
- *		     when phys dma is disabled on ohci controller (e.g. insmod ohci1394 phys_dma=0).
- *		   * Added new sbp2 module load option (exclusive_login) for allowing
- *		     non-exclusive login to sbp2 device, for special multi-host applications.
- *	04/23/02 - Fix for Sony CD-ROM drives. Only send fetch agent reset to sbp2 device if it
- *		   returns the dead bit in status. Thanks to Chandan (chandan@toad.net) for this one.
- *	04/27/02 - Fix sbp2 login problem on SMP systems, enable real spinlocks by default. (JSG)
- *	06/09/02 - Don't force 36-byte SCSI inquiry, but leave in a define for badly behaved devices. (JSG)   
- *	02/04/03 - Fixed a SMP deadlock (don't hold sbp2_command_lock while calling sbp2scsi_complete_command).
- *		   Also save/restore irq flags in sbp2scsi_complete_command  - Sancho Dauskardt <sda@bdit.de>
- *	02/06/03 - Removed spinlock debugging; use kernel stuff instead (sda)
- *	02/10/03 - Adopt to new hot-plug aware SCSI inferface (hch@lst.de)
- *
- */
-
-
-/*
- * Includes
  */
 
 #include <linux/config.h>
@@ -295,7 +79,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 919 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 931 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -829,65 +613,81 @@ static int sbp2_probe(struct device *dev)
 	if (!hi)
 		return -ENODEV;
 
-	return sbp2_start_device(hi, ud);
+	return sbp2_start_ud(hi, ud);
 }
 
 static int sbp2_remove(struct device *dev)
 {
+	struct scsi_id_group *scsi_group;
+	struct list_head *lh, *next;
 	struct unit_directory *ud;
 	struct scsi_id_instance_data *scsi_id;
 
 	SBP2_DEBUG(__FUNCTION__);
 
 	ud = container_of(dev, struct unit_directory, device);
-	scsi_id = ud->device.driver_data;
+	scsi_group = ud->device.driver_data;
 	ud->device.driver_data = NULL;
 
-	if (scsi_id != NULL) {
-		sbp2_logout_device(scsi_id);
- 		sbp2_remove_device(scsi_id);
+	list_for_each_safe (lh, next, &scsi_group->scsi_id_list) {
+		scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
+
+		if (scsi_id != NULL) {
+			sbp2_logout_device(scsi_id);
+ 			sbp2_remove_device(scsi_id);
+		}
 	}
+
+	kfree(scsi_group);
 
 	return 0;
 }
 
 static void sbp2_update(struct unit_directory *ud)
 {
-	struct scsi_id_instance_data *scsi_id = ud->device.driver_data;
-	struct sbp2scsi_host_info *hi = scsi_id->hi;
+	struct sbp2scsi_host_info *hi;
+	struct scsi_id_group *scsi_group = ud->device.driver_data;
+	struct list_head *lh, *next;
+	struct scsi_id_instance_data *scsi_id;
 	unsigned long flags;
 
 	SBP2_DEBUG("sbp2_update");
 
-	if (sbp2_reconnect_device(scsi_id)) {
+	list_for_each_safe (lh, next, &scsi_group->scsi_id_list) {
+		scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
+
+		hi = scsi_id->hi;
+
+		if (sbp2_reconnect_device(scsi_id)) {
 		
-		/* 
-		 * Ok, reconnect has failed. Perhaps we didn't
-		 * reconnect fast enough. Try doing a regular login.
-		 */
-		if (sbp2_login_device(scsi_id)) {
-			/* Login failed too, just remove the device. */
-			SBP2_ERR("sbp2_reconnect_device failed!");
-			sbp2_remove_device(scsi_id);
-			return;
+			/* 
+			 * Ok, reconnect has failed. Perhaps we didn't
+			 * reconnect fast enough. Try doing a regular login.
+			 */
+			if (sbp2_login_device(scsi_id)) {
+				/* Login failed too, just remove the device. */
+				SBP2_ERR("sbp2_reconnect_device failed!");
+				sbp2_remove_device(scsi_id);
+				return;
+			}
 		}
-	}
 
-	/* Set max retries to something large on the device. */
-	sbp2_set_busy_timeout(scsi_id);
+		/* Set max retries to something large on the device. */
+		sbp2_set_busy_timeout(scsi_id);
 
-	/* Do a SBP-2 fetch agent reset. */
-	sbp2_agent_reset(scsi_id, 1);
+		/* Do a SBP-2 fetch agent reset. */
+		sbp2_agent_reset(scsi_id, 1);
 	
-	/* Get the max speed and packet size that we can use. */
-	sbp2_max_speed_and_size(scsi_id);
+		/* Get the max speed and packet size that we can use. */
+		sbp2_max_speed_and_size(scsi_id);
 
-	/* Complete any pending commands with busy (so they get
-	 * retried) and remove them from our queue
-	 */
-	spin_lock_irqsave(&hi->sbp2_command_lock, flags);
-	sbp2scsi_complete_all_commands(scsi_id, DID_BUS_BUSY);
-	spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
+		/* Complete any pending commands with busy (so they get
+		 * retried) and remove them from our queue
+		 */
+		spin_lock_irqsave(&hi->sbp2_command_lock, flags);
+		sbp2scsi_complete_all_commands(scsi_id, DID_BUS_BUSY);
+		spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
+	}
 }
 
 /* This functions is called by the sbp2_probe, for each new device. If the
@@ -955,31 +755,60 @@ static void sbp2_remove_host(struct hpsb_host *host)
 	}
 }
 
+static int sbp2_start_ud(struct sbp2scsi_host_info *hi, struct unit_directory *ud)
+{
+	struct scsi_id_instance_data *scsi_id;
+	struct scsi_id_group *scsi_group;
+	struct list_head *lh, *next;
+
+	SBP2_DEBUG("sbp2_start_ud");
+
+	scsi_group = kmalloc(sizeof(*scsi_group), GFP_KERNEL);
+	if (!scsi_group) {
+		SBP2_ERR ("Could not allocate memory for scsi_group");
+		return -ENOMEM;
+	}
+
+	INIT_LIST_HEAD(&scsi_group->scsi_id_list);
+	ud->device.driver_data = scsi_group;
+	sbp2_parse_unit_directory(scsi_group, ud);
+
+	list_for_each_safe (lh, next, &scsi_group->scsi_id_list) {
+		scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
+
+		scsi_id->ne = ud->ne;
+		scsi_id->hi = hi;
+		scsi_id->speed_code = SPEED_100;
+		scsi_id->max_payload_size = hpsb_speedto_maxrec[SPEED_100];
+		atomic_set(&scsi_id->sbp2_login_complete, 0);
+		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
+		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
+		scsi_id->sbp2_command_orb_lock = SPIN_LOCK_UNLOCKED;
+
+		sbp2_start_device(scsi_id);
+	}
+
+	/* Check to see if any of our devices survived the ordeal */
+	if (list_empty(&scsi_group->scsi_id_list)) {
+		kfree(scsi_group);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+
 /*
  * This function is where we first pull the node unique ids, and then
  * allocate memory and register a SBP-2 device.
  */
-static int sbp2_start_device(struct sbp2scsi_host_info *hi, struct unit_directory *ud)
+static int sbp2_start_device(struct scsi_id_instance_data *scsi_id)
 {
-	struct scsi_id_instance_data *scsi_id = NULL;
+	struct sbp2scsi_host_info *hi = scsi_id->hi;
 	struct scsi_device *sdev;
-	struct node_entry *ne;
 	int i;
 
 	SBP2_DEBUG("sbp2_start_device");
-	ne = ud->ne;
-
-	/*
-	 * This really is a "new" device plugged in. Let's allocate memory
-	 * for our scsi id instance data.
-	 */
-	scsi_id = (struct scsi_id_instance_data *)kmalloc(sizeof(struct scsi_id_instance_data),
-							  GFP_KERNEL);
-	if (!scsi_id)
-		goto alloc_fail_first;
-	memset(scsi_id, 0, sizeof(struct scsi_id_instance_data));
-
-	scsi_id->hi = hi;
 
 	/* Login FIFO DMA */
 	scsi_id->login_response =
@@ -1068,37 +897,14 @@ alloc_fail:
 		}
 
 		kfree(scsi_id);
-alloc_fail_first:
+
+		list_del(&scsi_id->list);
+
 		SBP2_ERR ("Could not allocate memory for scsi_id");
 
 		return -ENOMEM;
 	}
 	SBP2_DMA_ALLOC("consistent DMA region for login ORB");
-
-	/*
-	 * Initialize some of the fields in this structure
-	 */
-	scsi_id->ne = ne;
-	scsi_id->ud = ud;
-	scsi_id->speed_code = SPEED_100;
-	scsi_id->max_payload_size = hpsb_speedto_maxrec[SPEED_100];
-	ud->device.driver_data = scsi_id;
-
-	atomic_set(&scsi_id->sbp2_login_complete, 0);
-
-	/* 
-	 * Initialize structures needed for the command orb pool.
-	 */
-	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
-	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
-	scsi_id->sbp2_command_orb_lock = SPIN_LOCK_UNLOCKED;
-
-	/*
-	 * Make sure that we've gotten ahold of the sbp2 management agent
-	 * address. Also figure out the command set being used (SCSI or
-	 * RBC).
-	 */
-	sbp2_parse_unit_directory(scsi_id);
 
 	/*
 	 * Find an empty spot to stick our scsi id instance data. 
@@ -1235,6 +1041,8 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 
 	SBP2_DEBUG("SBP-2 device removed, SCSI ID = %d", scsi_id->id);
 
+	list_del(&scsi_id->list);
+
 	kfree(scsi_id);
 }
 
@@ -1311,6 +1119,8 @@ static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id)
 	scsi_id->query_logins_orb->lun_misc |= ORB_SET_NOTIFY(1);
 	if (scsi_id->sbp2_device_type_and_lun != SBP2_DEVICE_TYPE_LUN_UNINITIALIZED) {
 		scsi_id->query_logins_orb->lun_misc |= ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun);
+		SBP2_DEBUG("sbp2_query_logins: set lun to %d",
+			   ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun));
 	}
 	SBP2_DEBUG("sbp2_query_logins: lun_misc initialized");
 
@@ -1423,6 +1233,8 @@ static int sbp2_login_device(struct scsi_id_instance_data *scsi_id)
 	/* Set the lun if we were able to pull it from the device's unit directory */
 	if (scsi_id->sbp2_device_type_and_lun != SBP2_DEVICE_TYPE_LUN_UNINITIALIZED) {
 		scsi_id->login_orb->lun_misc |= ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun);
+		SBP2_DEBUG("sbp2_query_logins: set lun to %d",
+			   ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun));
 	}
 	SBP2_DEBUG("sbp2_login_device: lun_misc initialized");
 
@@ -1463,7 +1275,8 @@ static int sbp2_login_device(struct scsi_id_instance_data *scsi_id)
 
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
 
-	SBP2_DEBUG("sbp2_login_device: prepared to write");
+	SBP2_DEBUG("sbp2_login_device: prepared to write to %08x",
+		   (unsigned int)scsi_id->sbp2_management_agent_addr);
 	hpsb_node_write(scsi_id->ne, scsi_id->sbp2_management_agent_addr, data, 8);
 	SBP2_DEBUG("sbp2_login_device: written");
 
@@ -1694,50 +1507,50 @@ static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id)
  * directory. Used to determine things like sbp2 management agent offset,
  * and command set used (SCSI or RBC). 
  */
-static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
+static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
+				      struct unit_directory *ud)
 {
-	struct unit_directory *ud;
+	struct scsi_id_instance_data *scsi_id;
+	struct list_head *lh;
+	u64 management_agent_addr;
+	u32 command_set_spec_id, command_set, unit_characteristics,
+		firmware_revision, workarounds;
 	int i;
 
 	SBP2_DEBUG("sbp2_parse_unit_directory");
 
-	/* Initialize some fields, in case an entry does not exist */
-	scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
-	scsi_id->sbp2_management_agent_addr = 0x0;
-	scsi_id->sbp2_command_set_spec_id = 0x0;
-	scsi_id->sbp2_command_set = 0x0;
-	scsi_id->sbp2_unit_characteristics = 0x0;
-	scsi_id->sbp2_firmware_revision = 0x0;
-
-	ud = scsi_id->ud;
+	management_agent_addr = 0x0;
+	command_set_spec_id = 0x0;
+	command_set = 0x0;
+	unit_characteristics = 0x0;
+	firmware_revision = 0x0;
 
 	/* Handle different fields in the unit directory, based on keys */
 	for (i = 0; i < ud->length; i++) {
 		switch (CONFIG_ROM_KEY(ud->quadlets[i])) {
 		case SBP2_CSR_OFFSET_KEY:
 			/* Save off the management agent address */
-			scsi_id->sbp2_management_agent_addr =
+			management_agent_addr =
 				CSR_REGISTER_BASE + 
 				(CONFIG_ROM_VALUE(ud->quadlets[i]) << 2);
 
 			SBP2_DEBUG("sbp2_management_agent_addr = %x",
-				   (unsigned int) scsi_id->sbp2_management_agent_addr);
+				   (unsigned int) management_agent_addr);
 			break;
 
 		case SBP2_COMMAND_SET_SPEC_ID_KEY:
 			/* Command spec organization */
-			scsi_id->sbp2_command_set_spec_id
+			command_set_spec_id
 				= CONFIG_ROM_VALUE(ud->quadlets[i]);
 			SBP2_DEBUG("sbp2_command_set_spec_id = %x",
-				   (unsigned int) scsi_id->sbp2_command_set_spec_id);
+				   (unsigned int) command_set_spec_id);
 			break;
 
 		case SBP2_COMMAND_SET_KEY:
 			/* Command set used by sbp2 device */
-			scsi_id->sbp2_command_set
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			command_set = CONFIG_ROM_VALUE(ud->quadlets[i]);
 			SBP2_DEBUG("sbp2_command_set = %x",
-				   (unsigned int) scsi_id->sbp2_command_set);
+				   (unsigned int) command_set);
 			break;
 
 		case SBP2_UNIT_CHARACTERISTICS_KEY:
@@ -1745,10 +1558,10 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 			 * Unit characterisitcs (orb related stuff
 			 * that I'm not yet paying attention to)
 			 */
-			scsi_id->sbp2_unit_characteristics
+			unit_characteristics
 				= CONFIG_ROM_VALUE(ud->quadlets[i]);
 			SBP2_DEBUG("sbp2_unit_characteristics = %x",
-				   (unsigned int) scsi_id->sbp2_unit_characteristics);
+				   (unsigned int) unit_characteristics);
 			break;
 
 		case SBP2_DEVICE_TYPE_AND_LUN_KEY:
@@ -1756,21 +1569,29 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 			 * Device type and lun (used for
 			 * detemining type of sbp2 device)
 			 */
+			scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+			if (!scsi_id) {
+				SBP2_ERR("Out of memory adding scsi_id, not all LUN's will be added");
+				break;
+			}
+			memset(scsi_id, 0, sizeof(*scsi_id));
+
 			scsi_id->sbp2_device_type_and_lun
 				= CONFIG_ROM_VALUE(ud->quadlets[i]);
 			SBP2_DEBUG("sbp2_device_type_and_lun = %x",
 				   (unsigned int) scsi_id->sbp2_device_type_and_lun);
+			list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
 			break;
 
 		case SBP2_FIRMWARE_REVISION_KEY:
 			/* Firmware revision */
-			scsi_id->sbp2_firmware_revision
+			firmware_revision
 				= CONFIG_ROM_VALUE(ud->quadlets[i]);
 			if (force_inquiry_hack)
 				SBP2_INFO("sbp2_firmware_revision = %x",
-				   (unsigned int) scsi_id->sbp2_firmware_revision);
+				   (unsigned int) firmware_revision);
 			else	SBP2_DEBUG("sbp2_firmware_revision = %x",
-				   (unsigned int) scsi_id->sbp2_firmware_revision);
+				   (unsigned int) firmware_revision);
 			break;
 
 		default:
@@ -1780,7 +1601,7 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 
 	/* This is the start of our broken device checking. We try to hack
 	 * around oddities and known defects.  */
-	scsi_id->workarounds = 0x0;
+	workarounds = 0x0;
 
 	/* If the vendor id is 0xa0b8 (Symbios vendor id), then we have a
 	 * bridge with 128KB max transfer size limitation. For sanity, we
@@ -1791,27 +1612,53 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 	 * host gets initialized. That way we can down-force the
 	 * max_sectors to account for it. That is not currently
 	 * possible.  */
-	if ((scsi_id->sbp2_firmware_revision & 0xffff00) ==
+	if ((firmware_revision & 0xffff00) ==
 			SBP2_128KB_BROKEN_FIRMWARE &&
 			(max_sectors * 512) > (128*1024)) {
 		SBP2_WARN("Node " NODE_BUS_FMT ": Bridge only supports 128KB max transfer size.",
-				NODE_BUS_ARGS(scsi_id->ne->nodeid));
+				NODE_BUS_ARGS(ud->ne->nodeid));
 		SBP2_WARN("WARNING: Current max_sectors setting is larger than 128KB (%d sectors)!",
 				max_sectors);
-		scsi_id->workarounds |= SBP2_BREAKAGE_128K_MAX_TRANSFER;
+		workarounds |= SBP2_BREAKAGE_128K_MAX_TRANSFER;
 	}
 
 	/* Check for a blacklisted set of devices that require us to force
 	 * a 36 byte host inquiry. This can be overriden as a module param
 	 * (to force all hosts).  */
 	for (i = 0; i < NUM_BROKEN_INQUIRY_DEVS; i++) {
-		if ((scsi_id->sbp2_firmware_revision & 0xffff00) ==
+		if ((firmware_revision & 0xffff00) ==
 				sbp2_broken_inquiry_list[i]) {
 			SBP2_WARN("Node " NODE_BUS_FMT ": Using 36byte inquiry workaround",
-					NODE_BUS_ARGS(scsi_id->ne->nodeid));
-			scsi_id->workarounds |= SBP2_BREAKAGE_INQUIRY_HACK;
+					NODE_BUS_ARGS(ud->ne->nodeid));
+			workarounds |= SBP2_BREAKAGE_INQUIRY_HACK;
 			break; /* No need to continue. */
 		}
+	}
+
+	/* If our list is empty, add a base scsi_id (happens in a normal
+	 * case where there is no logical_unit_number entry */
+	if (list_empty(&scsi_group->scsi_id_list)) {
+		scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+		if (!scsi_id) {
+			SBP2_ERR("Out of memory adding scsi_id");
+			return;
+		}
+		memset(scsi_id, 0, sizeof(*scsi_id));
+
+		scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
+		list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
+	}
+
+	/* Update the generic fields in all the LUN's */
+	list_for_each (lh, &scsi_group->scsi_id_list) {
+		scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
+
+		scsi_id->sbp2_management_agent_addr = management_agent_addr;
+		scsi_id->sbp2_command_set_spec_id = command_set_spec_id;
+		scsi_id->sbp2_command_set = command_set;
+		scsi_id->sbp2_unit_characteristics = unit_characteristics;
+		scsi_id->sbp2_firmware_revision = firmware_revision;
+		scsi_id->workarounds = workarounds;
 	}
 }
 
@@ -3065,7 +2912,7 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 		return (length);
 }
 
-MODULE_AUTHOR("James Goodwin <jamesg@filanet.com>");
+MODULE_AUTHOR("Ben Collins <bcollins@debian.org>");
 MODULE_DESCRIPTION("IEEE-1394 SBP-2 protocol driver");
 MODULE_SUPPORTED_DEVICE(SBP2_DEVICE_NAME);
 MODULE_LICENSE("GPL");

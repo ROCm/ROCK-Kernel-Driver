@@ -81,15 +81,6 @@ MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>");
 MODULE_DESCRIPTION("Common code for the COMX synchronous serial adapters");
 MODULE_LICENSE("GPL");
 
-extern int comx_hw_comx_init(void);
-extern int comx_hw_locomx_init(void);
-extern int comx_hw_mixcom_init(void);
-extern int comx_proto_hdlc_init(void);
-extern int comx_proto_ppp_init(void);
-extern int comx_proto_syncppp_init(void);
-extern int comx_proto_lapb_init(void);
-extern int comx_proto_fr_init(void);
-
 static struct comx_hardware *comx_channels = NULL;
 static struct comx_protocol *comx_lines = NULL;
 
@@ -1078,11 +1069,7 @@ int comx_unregister_protocol(char *name)
 	return -1;
 }
 
-#ifdef MODULE
-#define comx_init init_module
-#endif
-
-int __init comx_init(void)
+static int __init comx_init(void)
 {
 	struct proc_dir_entry *new_file;
 
@@ -1115,42 +1102,18 @@ int __init comx_init(void)
 
 	printk(KERN_INFO "COMX: driver version %s (C) 1995-1999 ITConsult-Pro Co. <info@itc.hu>\n", 
 		VERSION);
-
-#ifndef MODULE
-#ifdef CONFIG_COMX_HW_COMX
-	comx_hw_comx_init();
-#endif
-#ifdef CONFIG_COMX_HW_LOCOMX
-	comx_hw_locomx_init();
-#endif
-#ifdef CONFIG_COMX_HW_MIXCOM
-	comx_hw_mixcom_init();
-#endif
-#ifdef CONFIG_COMX_PROTO_HDLC
-	comx_proto_hdlc_init();
-#endif
-#ifdef CONFIG_COMX_PROTO_PPP
-	comx_proto_ppp_init();
-#endif
-#ifdef CONFIG_COMX_PROTO_LAPB
-	comx_proto_lapb_init();
-#endif
-#ifdef CONFIG_COMX_PROTO_FR
-	comx_proto_fr_init();
-#endif
-#endif
-
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit comx_exit(void)
 {
 	remove_proc_entry(FILENAME_HARDWARELIST, comx_root_dir);
 	remove_proc_entry(FILENAME_PROTOCOLLIST, comx_root_dir);
 	remove_proc_entry(comx_root_dir->name, &proc_root);
 }
-#endif
+
+module_init(comx_init);
+module_exit(comx_exit);
 
 EXPORT_SYMBOL(comx_register_hardware);
 EXPORT_SYMBOL(comx_unregister_hardware);

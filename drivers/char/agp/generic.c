@@ -419,7 +419,35 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
 		*cmd &= ~AGPSTAT_FW;
 
-	/* Set speed. */
+	/*
+	 * Set speed.
+	 * Check for invalid speeds. This can happen when applications
+	 * written before the AGP 3.0 standard pass AGP2.x modes to AGP3 hardware
+	 */
+	if (*mode & AGPSTAT_MODE_3_0) {
+		/*
+		 * Caller hasn't a clue what its doing. We are in 3.0 mode,
+		 * have been passed a 3.0 mode, but with 2.x speed bits set.
+		 * AGP2.x 4x -> AGP3.0 4x.
+		 */
+		if (*mode & AGPSTAT2_4X) {
+			printk (KERN_INFO PFX "%s passes broken AGP3 flags (%x). Fixed.\n",
+						current->comm, *mode);
+			*mode &= ~AGPSTAT2_4X;
+			*mode |= AGPSTAT3_4X;
+		}
+	} else {
+		/*
+		 * The caller doesn't know what they are doing. We are in 3.0 mode,
+		 * but have been passed an AGP 2.x mode.
+		 * Convert AGP 1x,2x,4x -> AGP 3.0 4x.
+		 */
+		printk (KERN_INFO PFX "%s passes broken AGP2 flags (%x) in AGP3 mode. Fixed.\n",
+					current->comm, *mode);
+		*mode &= ~(AGPSTAT2_4X | AGPSTAT2_2X | AGPSTAT2_1X);
+		*mode |= AGPSTAT3_4X;
+	}
+
 	if (!((*cmd & AGPSTAT3_8X) && (*tmp & AGPSTAT3_8X) && (*mode & AGPSTAT3_8X)))
 		*cmd &= ~AGPSTAT3_8X;
 
@@ -428,9 +456,9 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 
 	/* Clear out unwanted bits. */
 	if (*cmd & AGPSTAT3_8X)
-		*cmd *= ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
+		*cmd = ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
 	if (*cmd & AGPSTAT3_4X)
-		*cmd *= ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
+		*cmd = ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
 }
 
 //FIXME: This doesn't smell right.
@@ -539,7 +567,7 @@ void agp_generic_enable(u32 mode)
 		if (agp3 & AGPSTAT_MODE_3_0) {
 			/* If we have 3.5, we can do the isoch stuff. */
 			if (agp_bridge->minor_version >= 5)
-				agp_3_5_enable(agp_bridge, mode);
+				agp_3_5_enable(agp_bridge);
 			agp_device_command(command, TRUE);
 			return;
 		} else {
@@ -670,20 +698,6 @@ int agp_generic_create_gatt_table(void)
 	return 0;
 }
 EXPORT_SYMBOL(agp_generic_create_gatt_table);
-
-int agp_generic_suspend(void)
-{
-	return 0;
-}
-EXPORT_SYMBOL(agp_generic_suspend);
-
-
-void agp_generic_resume(void)
-{
-	return;
-}
-EXPORT_SYMBOL(agp_generic_resume);
-
 
 int agp_generic_free_gatt_table(void)
 {
@@ -921,4 +935,14 @@ void global_cache_flush(void)
 #endif
 }
 EXPORT_SYMBOL(global_cache_flush);
+
+unsigned long agp_generic_mask_memory(unsigned long addr, int type)
+{
+	/* memory type is ignored in the generic routine */
+	if (agp_bridge->driver->masks)
+		return addr | agp_bridge->driver->masks[0].mask;
+	else
+		return addr;
+}
+EXPORT_SYMBOL(agp_generic_mask_memory);
 

@@ -4838,7 +4838,7 @@ static int airo_get_range(struct net_device *dev,
 	readCapabilityRid(local, &cap_rid);
 
 	dwrq->length = sizeof(struct iw_range);
-	memset(range, 0, sizeof(range));
+	memset(range, 0, sizeof(*range));
 	range->min_nwid = 0x0000;
 	range->max_nwid = 0x0000;
 	range->num_channels = 14;

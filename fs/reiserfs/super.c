@@ -532,6 +532,11 @@ static const arg_desc_t tails[] = {
     {NULL, 0}
 };
 
+int reiserfs_default_io_size = 128 * 1024; /* Default recommended I/O size is 128k.
+					      There might be broken applications that are
+					      confused by this. Use nolargeio mount option
+					      to get usual i/o size = PAGE_SIZE.
+					    */
 
 /* proceed only one option from a list *cur - string containing of mount options
    opts - array of options which are accepted
@@ -657,6 +662,7 @@ for old setups still work */
 		{"block-allocator", 'a', balloc, -1}, 
 		{"resize", 'r', 0, -1},
 		{"jdev", 'j', 0, -1},
+		{"nolargeio", 'w', 0, -1},
 		{NULL, 0, 0, -1}
     };
 	
@@ -686,6 +692,10 @@ for old setups still work */
 		printk ("reiserfs_parse_options: bad value %s\n", arg);
 		return 0;
 	    }
+	}
+
+	if ( c == 'w' ) {
+		reiserfs_default_io_size = PAGE_SIZE;
 	}
 
 	if (c == 'j') {
@@ -1318,6 +1328,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     reiserfs_proc_register( s, "oidmap", reiserfs_oidmap_in_proc );
     reiserfs_proc_register( s, "journal", reiserfs_journal_in_proc );
     init_waitqueue_head (&(sbi->s_wait));
+    sbi->bitmap_lock = SPIN_LOCK_UNLOCKED;
 
     return (0);
 

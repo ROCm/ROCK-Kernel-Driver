@@ -44,17 +44,6 @@
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
 
-/* XXX no ipv6 ipcomp specific */
-#define NIP6(addr) \
-	ntohs((addr).s6_addr16[0]),\
-	ntohs((addr).s6_addr16[1]),\
-	ntohs((addr).s6_addr16[2]),\
-	ntohs((addr).s6_addr16[3]),\
-	ntohs((addr).s6_addr16[4]),\
-	ntohs((addr).s6_addr16[5]),\
-	ntohs((addr).s6_addr16[6]),\
-	ntohs((addr).s6_addr16[7])
-
 static int ipcomp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	int err = 0;

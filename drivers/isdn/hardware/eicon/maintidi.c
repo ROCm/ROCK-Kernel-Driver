@@ -116,7 +116,7 @@ diva_strace_library_interface_t* DivaSTraceLibraryCreateInstance (int Adapter,
 	}
 
   pmem += sizeof(*pLib);
-	memset (pLib, 0x00, sizeof(pLib));
+	memset(pLib, 0x00, sizeof(*pLib));
 
 	pLib->Adapter  = Adapter;
 

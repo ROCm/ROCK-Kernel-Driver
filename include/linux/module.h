@@ -437,7 +437,6 @@ __attribute__((section(".gnu.linkonce.this_module"))) = {
 #endif /* MODULE */
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
-#define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
 /* BELOW HERE ALL THESE ARE OBSOLETE AND WILL VANISH */
 

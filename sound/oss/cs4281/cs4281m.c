@@ -1944,8 +1944,8 @@ static void clear_advance(void *buf, unsigned bsize, unsigned bptr,
 		len -= x;
 	}
 	CS_DBGOUT(CS_WAVE_WRITE, 4, printk(KERN_INFO
-		"cs4281: clear_advance(): memset %d at 0x%.8x for %d size \n",
-			(unsigned)c, (unsigned)((char *) buf) + bptr, len));
+		"cs4281: clear_advance(): memset %d at %p for %d size \n",
+			(unsigned)c, ((char *) buf) + bptr, len));
 	memset(((char *) buf) + bptr, c, len);
 }
 
@@ -1980,9 +1980,8 @@ static void cs4281_update_ptr(struct cs4281_state *s, int intflag)
 				wake_up(&s->dma_adc.wait);
 		}
 		CS_DBGOUT(CS_PARMS, 8, printk(KERN_INFO
-			"cs4281: cs4281_update_ptr(): s=0x%.8x hwptr=%d total_bytes=%d count=%d \n",
-				(unsigned)s, s->dma_adc.hwptr, 
-				s->dma_adc.total_bytes, s->dma_adc.count));
+			"cs4281: cs4281_update_ptr(): s=%p hwptr=%d total_bytes=%d count=%d \n",
+				s, s->dma_adc.hwptr, s->dma_adc.total_bytes, s->dma_adc.count));
 	}
 	// update DAC pointer 
 	//
@@ -2014,11 +2013,10 @@ static void cs4281_update_ptr(struct cs4281_state *s, int intflag)
 				// Continue to play silence until the _release.
 				//
 				CS_DBGOUT(CS_WAVE_WRITE, 6, printk(KERN_INFO
-					"cs4281: cs4281_update_ptr(): memset %d at 0x%.8x for %d size \n",
+					"cs4281: cs4281_update_ptr(): memset %d at %p for %d size \n",
 						(unsigned)(s->prop_dac.fmt & 
 						(AFMT_U8 | AFMT_U16_LE)) ? 0x80 : 0, 
-						(unsigned)s->dma_dac.rawbuf, 
-						s->dma_dac.dmasize));
+						s->dma_dac.rawbuf, s->dma_dac.dmasize));
 				memset(s->dma_dac.rawbuf,
 				       (s->prop_dac.
 					fmt & (AFMT_U8 | AFMT_U16_LE)) ?
@@ -2049,9 +2047,8 @@ static void cs4281_update_ptr(struct cs4281_state *s, int intflag)
 			}
 		}
 		CS_DBGOUT(CS_PARMS, 8, printk(KERN_INFO
-			"cs4281: cs4281_update_ptr(): s=0x%.8x hwptr=%d total_bytes=%d count=%d \n",
-				(unsigned) s, s->dma_dac.hwptr, 
-				s->dma_dac.total_bytes, s->dma_dac.count));
+			"cs4281: cs4281_update_ptr(): s=%p hwptr=%d total_bytes=%d count=%d \n",
+				s, s->dma_dac.hwptr, s->dma_dac.total_bytes, s->dma_dac.count));
 	}
 }
 
@@ -2182,8 +2179,7 @@ static int mixer_ioctl(struct cs4281_state *s, unsigned int cmd,
 
 	VALIDATE_STATE(s);
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO
-		 "cs4281: mixer_ioctl(): s=0x%.8x cmd=0x%.8x\n",
-			 (unsigned) s, cmd));
+		 "cs4281: mixer_ioctl(): s=%p cmd=0x%.8x\n", s, cmd));
 #if CSDEBUG
 	cs_printioctl(cmd);
 #endif
@@ -2748,9 +2744,8 @@ static void CopySamples(char *dst, char *src, int count, int iChannels,
 	CS_DBGOUT(CS_FUNCTION, 2,
 		  printk(KERN_INFO "cs4281: CopySamples()+ "));
 	CS_DBGOUT(CS_WAVE_READ, 8, printk(KERN_INFO
-		 " dst=0x%x src=0x%x count=%d iChannels=%d fmt=0x%x\n",
-			 (unsigned) dst, (unsigned) src, (unsigned) count,
-			 (unsigned) iChannels, (unsigned) fmt));
+		 " dst=%p src=%p count=%d iChannels=%d fmt=0x%x\n",
+			 dst, src, (unsigned) count, (unsigned) iChannels, (unsigned) fmt));
 
 	// Gershwin does format conversion in hardware so normally
 	// we don't do any host based coversion. The data formatter
@@ -2830,9 +2825,9 @@ static unsigned cs_copy_to_user(struct cs4281_state *s, void *dest,
 	void *src = hwsrc;	//default to the standard destination buffer addr
 
 	CS_DBGOUT(CS_FUNCTION, 6, printk(KERN_INFO
-		"cs_copy_to_user()+ fmt=0x%x fmt_o=0x%x cnt=%d dest=0x%.8x\n",
+		"cs_copy_to_user()+ fmt=0x%x fmt_o=0x%x cnt=%d dest=%p\n",
 			s->prop_adc.fmt, s->prop_adc.fmt_original,
-			(unsigned) cnt, (unsigned) dest));
+			(unsigned) cnt, dest));
 
 	if (cnt > s->dma_adc.dmasize) {
 		cnt = s->dma_adc.dmasize;
@@ -2877,7 +2872,7 @@ static ssize_t cs4281_read(struct file *file, char *buffer, size_t count,
 	unsigned copied = 0;
 
 	CS_DBGOUT(CS_FUNCTION | CS_WAVE_READ, 2,
-		  printk(KERN_INFO "cs4281: cs4281_read()+ %d \n", count));
+		  printk(KERN_INFO "cs4281: cs4281_read()+ %Zu \n", count));
 
 	VALIDATE_STATE(s);
 	if (ppos != &file->f_pos)
@@ -2900,7 +2895,7 @@ static ssize_t cs4281_read(struct file *file, char *buffer, size_t count,
 //
 	while (count > 0) {
 		CS_DBGOUT(CS_WAVE_READ, 8, printk(KERN_INFO
-			"_read() count>0 count=%d .count=%d .swptr=%d .hwptr=%d \n",
+			"_read() count>0 count=%Zu .count=%d .swptr=%d .hwptr=%d \n",
 				count, s->dma_adc.count,
 				s->dma_adc.swptr, s->dma_adc.hwptr));
 		spin_lock_irqsave(&s->lock, flags);
@@ -2957,11 +2952,10 @@ static ssize_t cs4281_read(struct file *file, char *buffer, size_t count,
 		// the "cnt" is the number of bytes to read.
 
 		CS_DBGOUT(CS_WAVE_READ, 2, printk(KERN_INFO
-			"_read() copy_to cnt=%d count=%d ", cnt, count));
+			"_read() copy_to cnt=%d count=%Zu ", cnt, count));
 		CS_DBGOUT(CS_WAVE_READ, 8, printk(KERN_INFO
-			 " .dmasize=%d .count=%d buffer=0x%.8x ret=%d\n",
-				 s->dma_adc.dmasize, s->dma_adc.count,
-				 (unsigned) buffer, ret));
+			 " .dmasize=%d .count=%d buffer=%p ret=%Zd\n",
+				 s->dma_adc.dmasize, s->dma_adc.count, buffer, ret));
 
 		if (cs_copy_to_user
 		    (s, buffer, s->dma_adc.rawbuf + swptr, cnt, &copied))
@@ -2977,7 +2971,7 @@ static ssize_t cs4281_read(struct file *file, char *buffer, size_t count,
 		start_adc(s);
 	}
 	CS_DBGOUT(CS_FUNCTION | CS_WAVE_READ, 2,
-		  printk(KERN_INFO "cs4281: cs4281_read()- %d\n", ret));
+		  printk(KERN_INFO "cs4281: cs4281_read()- %Zd\n", ret));
 	return ret;
 }
 
@@ -2993,7 +2987,7 @@ static ssize_t cs4281_write(struct file *file, const char *buffer,
 	int cnt;
 
 	CS_DBGOUT(CS_FUNCTION | CS_WAVE_WRITE, 2,
-		  printk(KERN_INFO "cs4281: cs4281_write()+ count=%d\n",
+		  printk(KERN_INFO "cs4281: cs4281_write()+ count=%Zu\n",
 			 count));
 	VALIDATE_STATE(s);
 
@@ -3049,7 +3043,7 @@ static ssize_t cs4281_write(struct file *file, const char *buffer,
 		start_dac(s);
 	}
 	CS_DBGOUT(CS_FUNCTION | CS_WAVE_WRITE, 2,
-		  printk(KERN_INFO "cs4281: cs4281_write()- %d\n", ret));
+		  printk(KERN_INFO "cs4281: cs4281_write()- %Zd\n", ret));
 	return ret;
 }
 
@@ -3170,8 +3164,7 @@ static int cs4281_ioctl(struct inode *inode, struct file *file,
 	int val, mapped, ret;
 
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO
-		 "cs4281: cs4281_ioctl(): file=0x%.8x cmd=0x%.8x\n",
-			 (unsigned) file, cmd));
+		 "cs4281: cs4281_ioctl(): file=%p cmd=0x%.8x\n", file, cmd));
 #if CSDEBUG
 	cs_printioctl(cmd);
 #endif
@@ -3601,8 +3594,8 @@ static int cs4281_release(struct inode *inode, struct file *file)
 	    (struct cs4281_state *) file->private_data;
 
 	CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 2, printk(KERN_INFO
-		 "cs4281: cs4281_release(): inode=0x%.8x file=0x%.8x f_mode=%d\n",
-			 (unsigned) inode, (unsigned) file, file->f_mode));
+		 "cs4281: cs4281_release(): inode=%p file=%p f_mode=%d\n",
+			 inode, file, file->f_mode));
 
 	VALIDATE_STATE(s);
 
@@ -3636,8 +3629,8 @@ static int cs4281_open(struct inode *inode, struct file *file)
 	struct list_head *entry;
 
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 2, printk(KERN_INFO
-		"cs4281: cs4281_open(): inode=0x%.8x file=0x%.8x f_mode=0x%x\n",
-			(unsigned) inode, (unsigned) file, file->f_mode));
+		"cs4281: cs4281_open(): inode=%p file=%p f_mode=0x%x\n",
+			inode, file, file->f_mode));
 
 	list_for_each(entry, &cs4281_devs)
 	{
@@ -4347,10 +4340,8 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 
 	CS_DBGOUT(CS_INIT, 2,
 		  printk(KERN_INFO
-			 "cs4281: probe() BA0=0x%.8x BA1=0x%.8x pBA0=0x%.8x pBA1=0x%.8x \n",
-			 (unsigned) temp1, (unsigned) temp2,
-			 (unsigned) s->pBA0, (unsigned) s->pBA1));
-
+			 "cs4281: probe() BA0=0x%.8x BA1=0x%.8x pBA0=%p pBA1=%p \n",
+			 (unsigned) temp1, (unsigned) temp2, s->pBA0, s->pBA1));
 	CS_DBGOUT(CS_INIT, 2,
 		  printk(KERN_INFO
 			 "cs4281: probe() pBA0phys=0x%.8x pBA1phys=0x%.8x\n",
@@ -4397,15 +4388,13 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 	if (pmdev)
 	{
 		CS_DBGOUT(CS_INIT | CS_PM, 4, printk(KERN_INFO
-			 "cs4281: probe() pm_register() succeeded (0x%x).\n",
-				(unsigned)pmdev));
+			 "cs4281: probe() pm_register() succeeded (%p).\n", pmdev));
 		pmdev->data = s;
 	}
 	else
 	{
 		CS_DBGOUT(CS_INIT | CS_PM | CS_ERROR, 0, printk(KERN_INFO
-			 "cs4281: probe() pm_register() failed (0x%x).\n",
-				(unsigned)pmdev));
+			 "cs4281: probe() pm_register() failed (%p).\n", pmdev));
 		s->pm.flags |= CS4281_PM_NOT_REGISTERED;
 	}
 #endif

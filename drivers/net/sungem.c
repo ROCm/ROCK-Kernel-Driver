@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.49 2002/01/23 15:40:45 davem Exp $
+/* $Id: sungem.c,v 1.44.2.22 2002/03/13 01:18:12 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001, 2002 David S. Miller (davem@redhat.com)
@@ -10,13 +10,8 @@
  *  - Get rid of all those nasty mdelay's and replace them
  * with schedule_timeout.
  *  - Implement WOL
- *  - Currently, forced Gb mode is only supported on bcm54xx
- *    PHY for which I use the SPD2 bit of the control register.
- *    On m1011 PHY, I can't force as I don't have the specs, but
- *    I can at least detect gigabit with autoneg.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -60,11 +55,19 @@
 #include <asm/pmac_feature.h>
 #endif
 
+#include "sungem_phy.h"
 #include "sungem.h"
+
+/* Stripping FCS is causing problems, disabled for now */
+#undef STRIP_FCS
 
 #define DEFAULT_MSG	(NETIF_MSG_DRV		| \
 			 NETIF_MSG_PROBE	| \
 			 NETIF_MSG_LINK)
+
+#define ADVERTISE_MASK	(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full | \
+			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full | \
+			 SUPPORTED_1000baseT_Half | SUPPORTED_1000baseT_Full)
 
 #define DRV_NAME	"sungem"
 #define DRV_VERSION	"0.97"
@@ -77,24 +80,6 @@ static char version[] __devinitdata =
 MODULE_AUTHOR(DRV_AUTHOR);
 MODULE_DESCRIPTION("Sun GEM Gbit ethernet driver");
 MODULE_LICENSE("GPL");
-
-MODULE_PARM(gem_debug, "i");
-MODULE_PARM_DESC(gem_debug, "bitmapped message enable number");
-MODULE_PARM(link_mode, "i");
-MODULE_PARM_DESC(link_mode, "default link mode");
-
-int gem_debug = -1;
-static int link_mode;
-
-static u16 link_modes[] __devinitdata = {
-	BMCR_ANENABLE,			/* 0 : autoneg */
-	0,				/* 1 : 10bt half duplex */
-	BMCR_SPEED100,			/* 2 : 100bt half duplex */
-	BMCR_SPD2, /* bcm54xx only */   /* 3 : 1000bt half duplex */
-	BMCR_FULLDPLX,			/* 4 : 10bt full duplex */
-	BMCR_SPEED100|BMCR_FULLDPLX,	/* 5 : 100bt full duplex */
-	BMCR_SPD2|BMCR_FULLDPLX		/* 6 : 1000bt full duplex */
-};
 
 #define GEM_MODULE_NAME	"gem"
 #define PFX GEM_MODULE_NAME ": "
@@ -116,12 +101,14 @@ static struct pci_device_id gem_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_UNI_N_GMACP,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_UNI_N_GMAC2,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{0, }
 };
 
 MODULE_DEVICE_TABLE(pci, gem_pci_tbl);
 
-static u16 __phy_read(struct gem *gp, int reg, int phy_addr)
+static u16 __phy_read(struct gem *gp, int phy_addr, int reg)
 {
 	u32 cmd;
 	int limit = 10000;
@@ -147,12 +134,18 @@ static u16 __phy_read(struct gem *gp, int reg, int phy_addr)
 	return cmd & MIF_FRAME_DATA;
 }
 
-static inline u16 phy_read(struct gem *gp, int reg)
+static inline int _phy_read(struct net_device *dev, int mii_id, int reg)
 {
-	return __phy_read(gp, reg, gp->mii_phy_addr);
+	struct gem *gp = dev->priv;
+	return __phy_read(gp, mii_id, reg);
 }
 
-static void __phy_write(struct gem *gp, int reg, u16 val, int phy_addr)
+static inline u16 phy_read(struct gem *gp, int reg)
+{
+	return __phy_read(gp, gp->mii_phy_addr, reg);
+}
+
+static void __phy_write(struct gem *gp, int phy_addr, int reg, u16 val)
 {
 	u32 cmd;
 	int limit = 10000;
@@ -174,9 +167,15 @@ static void __phy_write(struct gem *gp, int reg, u16 val, int phy_addr)
 	}
 }
 
+static inline void _phy_write(struct net_device *dev, int mii_id, int reg, int val)
+{
+	struct gem *gp = dev->priv;
+	__phy_write(gp, mii_id, reg, val & 0xffff);
+}
+
 static inline void phy_write(struct gem *gp, int reg, u16 val)
 {
-	__phy_write(gp, reg, val, gp->mii_phy_addr);
+	__phy_write(gp, gp->mii_phy_addr, reg, val);
 }
 
 static void gem_handle_mif_event(struct gem *gp, u32 reg_val, u32 changed_bits)
@@ -225,10 +224,11 @@ static int gem_pcs_interrupt(struct net_device *dev, struct gem *gp, u32 gem_sta
 	if (pcs_miistat & PCS_MIISTAT_LS) {
 		printk(KERN_INFO "%s: PCS link is now up.\n",
 		       dev->name);
+		netif_carrier_on(gp->dev);
 	} else {
 		printk(KERN_INFO "%s: PCS link is now down.\n",
 		       dev->name);
-
+		netif_carrier_off(gp->dev);
 		/* If this happens and the link timer is not running,
 		 * reset so we re-negotiate.
 		 */
@@ -1006,7 +1006,7 @@ static void gem_stop(struct gem *gp)
 	} while (val & (GREG_SWRST_TXRST | GREG_SWRST_RXRST));
 
 	if (limit <= 0)
-		printk(KERN_ERR "gem: SW reset is ghetto.\n");
+		printk(KERN_ERR "%s: SW reset is ghetto.\n", gp->dev->name);
 }
 
 /* Must be invoked under gp->lock. */
@@ -1033,103 +1033,89 @@ static void gem_start_dma(struct gem *gp)
 
 }
 
-/* Link modes of the BCM5400 PHY */
-static int phy_BCM5400_link_table[8][3] = {
-	{ 0, 0, 0 },	/* No link */
-	{ 0, 0, 0 },	/* 10BT Half Duplex */
-	{ 1, 0, 0 },	/* 10BT Full Duplex */
-	{ 0, 1, 0 },	/* 100BT Half Duplex */
-	{ 0, 1, 0 },	/* 100BT Half Duplex */
-	{ 1, 1, 0 },	/* 100BT Full Duplex*/
-	{ 1, 0, 1 },	/* 1000BT */
-	{ 1, 0, 1 },	/* 1000BT */
-};
 
 /* Must be invoked under gp->lock. */
+// XXX dbl check what that function should do when called on PCS PHY
 static void gem_begin_auto_negotiation(struct gem *gp, struct ethtool_cmd *ep)
 {
-	u16 ctl;
+	u32 advertise, features;
+	int autoneg;
+	int speed;
+	int duplex;
+
+	if (gp->phy_type != phy_mii_mdio0 &&
+     	    gp->phy_type != phy_mii_mdio1)
+     	    	goto non_mii;
+
+	/* Setup advertise */
+	if (found_mii_phy(gp))
+		features = gp->phy_mii.def->features;
+	else
+		features = 0;
+
+	advertise = features & ADVERTISE_MASK;
+	if (gp->phy_mii.advertising != 0)
+		advertise &= gp->phy_mii.advertising;
+
+	autoneg = gp->want_autoneg;
+	speed = gp->phy_mii.speed;
+	duplex = gp->phy_mii.duplex;
 	
 	/* Setup link parameters */
 	if (!ep)
 		goto start_aneg;
 	if (ep->autoneg == AUTONEG_ENABLE) {
-		/* TODO: parse ep->advertising */
-		gp->link_advertise |= (ADVERTISE_10HALF | ADVERTISE_10FULL);
-		gp->link_advertise |= (ADVERTISE_100HALF | ADVERTISE_100FULL);
-		/* Can I advertise gigabit here ? I'd need BCM PHY docs... */
-		gp->link_cntl = BMCR_ANENABLE;
+		advertise = ep->advertising;
+		autoneg = 1;
 	} else {
-		gp->link_cntl = 0;
-		if (ep->speed == SPEED_100)
-			gp->link_cntl |= BMCR_SPEED100;
-		else if (ep->speed == SPEED_1000 && gp->gigabit_capable)
-			/* Hrm... check if this is right... */
-			gp->link_cntl |= BMCR_SPD2;
-		if (ep->duplex == DUPLEX_FULL)
-			gp->link_cntl |= BMCR_FULLDPLX;
+		autoneg = 0;
+		speed = ep->speed;
+		duplex = ep->duplex;
 	}
 
 start_aneg:
-	if (!gp->hw_running)
+	/* Sanitize settings based on PHY capabilities */
+	if ((features & SUPPORTED_Autoneg) == 0)
+		autoneg = 0;
+	if (speed == SPEED_1000 &&
+	    !(features & (SUPPORTED_1000baseT_Half | SUPPORTED_1000baseT_Full)))
+		speed = SPEED_100;
+	if (speed == SPEED_100 &&
+	    !(features & (SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full)))
+		speed = SPEED_10;
+	if (duplex == DUPLEX_FULL &&
+	    !(features & (SUPPORTED_1000baseT_Full |
+	    		  SUPPORTED_100baseT_Full |
+	    		  SUPPORTED_10baseT_Full)))
+	    	duplex = DUPLEX_HALF;
+	if (speed == 0)
+		speed = SPEED_10;
+	
+	/* If HW is down, we don't try to actually setup the PHY, we
+	 * just store the settings
+	 */
+	if (!gp->hw_running) {
+		gp->phy_mii.autoneg = gp->want_autoneg = autoneg;
+		gp->phy_mii.speed = speed;
+		gp->phy_mii.duplex = duplex;
 		return;
+	}
 
 	/* Configure PHY & start aneg */
-	ctl = phy_read(gp, MII_BMCR);
-	ctl &= ~(BMCR_FULLDPLX|BMCR_SPEED100|BMCR_ANENABLE);
-	ctl |= gp->link_cntl;
-	if (ctl & BMCR_ANENABLE) {
-		ctl |= BMCR_ANRESTART;
+	gp->want_autoneg = autoneg;
+	if (autoneg) {
+		if (found_mii_phy(gp))
+			gp->phy_mii.def->ops->setup_aneg(&gp->phy_mii, advertise);
 		gp->lstate = link_aneg;
 	} else {
+		if (found_mii_phy(gp))
+			gp->phy_mii.def->ops->setup_forced(&gp->phy_mii, speed, duplex);
 		gp->lstate = link_force_ok;
 	}
-	phy_write(gp, MII_BMCR, ctl);
 
+non_mii:
 	gp->timer_ticks = 0;
 	mod_timer(&gp->link_timer, jiffies + ((12 * HZ) / 10));
-}
-
-/* Must be invoked under gp->lock. */
-static void gem_read_mii_link_mode(struct gem *gp, int *fd, int *spd, int *pause)
-{
-	u32 val;
-
-	*fd = 0;
-	*spd = 10;
-	*pause = 0;
-	
-	if (gp->phy_mod == phymod_bcm5400 ||
-	    gp->phy_mod == phymod_bcm5401 ||
-	    gp->phy_mod == phymod_bcm5411) {
-		int link_mode;	
-
-	    	val = phy_read(gp, MII_BCM5400_AUXSTATUS);
-		link_mode = ((val & MII_BCM5400_AUXSTATUS_LINKMODE_MASK) >>
-			     MII_BCM5400_AUXSTATUS_LINKMODE_SHIFT);
-		*fd = phy_BCM5400_link_table[link_mode][0];
-		*spd = phy_BCM5400_link_table[link_mode][2] ?
-			1000 :
-			(phy_BCM5400_link_table[link_mode][1] ? 100 : 10);
-		val = phy_read(gp, MII_LPA);
-		if (val & LPA_PAUSE)
-			*pause = 1;
-	} else {
-		val = phy_read(gp, MII_LPA);
-
-		if (val & (LPA_10FULL | LPA_100FULL))
-			*fd = 1;
-		if (val & (LPA_100FULL | LPA_100HALF))
-			*spd = 100;
-
-		if (gp->phy_mod == phymod_m1011) {
-			val = phy_read(gp, 0x0a);
-			if (val & 0xc00)
-				*spd = 1000;
-			if (val & 0x800)
-				*fd = 1;
-		}
-	}
 }
 
 /* A link-up condition has occurred, initialize and enable the
@@ -1137,32 +1123,28 @@ static void gem_read_mii_link_mode(struct gem *gp, int *fd, int *spd, int *pause
  *
  * Must be invoked under gp->lock.
  */
-static void gem_set_link_modes(struct gem *gp)
+static int gem_set_link_modes(struct gem *gp)
 {
 	u32 val;
 	int full_duplex, speed, pause;
 
 	full_duplex = 0;
-	speed = 10;
+	speed = SPEED_10;
 	pause = 0;
 
-	if (gp->phy_type == phy_mii_mdio0 ||
-	    gp->phy_type == phy_mii_mdio1) {
-		val = phy_read(gp, MII_BMCR);
-		if (val & BMCR_ANENABLE)
-			gem_read_mii_link_mode(gp, &full_duplex, &speed, &pause);
-		else {
-			if (val & BMCR_FULLDPLX)
-				full_duplex = 1;
-			if (val & BMCR_SPEED100)
-				speed = 100;
-		}
-	} else {
+	if (found_mii_phy(gp)) {
+	    	if (gp->phy_mii.def->ops->read_link(&gp->phy_mii))
+	    		return 1;
+		full_duplex = (gp->phy_mii.duplex == DUPLEX_FULL);
+		speed = gp->phy_mii.speed;
+		pause = gp->phy_mii.pause;
+	} else if (gp->phy_type == phy_serialink ||
+	    	   gp->phy_type == phy_serdes) {
 		u32 pcs_lpa = readl(gp->regs + PCS_MIILP);
 
 		if (pcs_lpa & PCS_MIIADV_FD)
 			full_duplex = 1;
-		speed = 1000;
+		speed = SPEED_1000;
 	}
 
 	if (netif_msg_link(gp))
@@ -1186,7 +1168,7 @@ static void gem_set_link_modes(struct gem *gp)
 		val |= MAC_XIFCFG_FLED;
 	}
 
-	if (speed == 1000)
+	if (speed == SPEED_1000)
 		val |= (MAC_XIFCFG_GMII);
 
 	writel(val, gp->regs + MAC_XIFCFG);
@@ -1194,7 +1176,7 @@ static void gem_set_link_modes(struct gem *gp)
 	/* If gigabit and half-duplex, enable carrier extension
 	 * mode.  Else, disable it.
 	 */
-	if (speed == 1000 && !full_duplex) {
+	if (speed == SPEED_1000 && !full_duplex) {
 		val = readl(gp->regs + MAC_TXCFG);
 		writel(val | MAC_TXCFG_TCE, gp->regs + MAC_TXCFG);
 
@@ -1242,50 +1224,51 @@ static void gem_set_link_modes(struct gem *gp)
 	writel(val, gp->regs + MAC_MCCFG);
 
 	gem_start_dma(gp);
+
+	return 0;
 }
 
 /* Must be invoked under gp->lock. */
 static int gem_mdio_link_not_up(struct gem *gp)
 {
-	u16 val;
-	
-	if (gp->lstate == link_force_ret) {
+	switch (gp->lstate) {
+	case link_force_ret:
 		if (netif_msg_link(gp))
 			printk(KERN_INFO "%s: Autoneg failed again, keeping"
 				" forced mode\n", gp->dev->name);
-		phy_write(gp, MII_BMCR, gp->link_fcntl);
+		gp->phy_mii.def->ops->setup_forced(&gp->phy_mii,
+			gp->last_forced_speed, DUPLEX_HALF);
 		gp->timer_ticks = 5;
 		gp->lstate = link_force_ok;
-	} else if (gp->lstate == link_aneg) {
-		val = phy_read(gp, MII_BMCR);
-
+		return 0;
+	case link_aneg:
 		if (netif_msg_link(gp))
 			printk(KERN_INFO "%s: switching to forced 100bt\n",
 				gp->dev->name);
 		/* Try forced modes. */
-		val &= ~(BMCR_ANRESTART | BMCR_ANENABLE);
-		val &= ~(BMCR_FULLDPLX);
-		val |= BMCR_SPEED100;
-		phy_write(gp, MII_BMCR, val);
+		gp->phy_mii.def->ops->setup_forced(&gp->phy_mii, SPEED_100,
+			DUPLEX_HALF);
 		gp->timer_ticks = 5;
 		gp->lstate = link_force_try;
-	} else {
+		return 0;
+	case link_force_try:
 		/* Downgrade from 100 to 10 Mbps if necessary.
 		 * If already at 10Mbps, warn user about the
 		 * situation every 10 ticks.
 		 */
-		val = phy_read(gp, MII_BMCR);
-		if (val & BMCR_SPEED100) {
-			val &= ~BMCR_SPEED100;
-			phy_write(gp, MII_BMCR, val);
+		if (gp->phy_mii.speed == SPEED_100) {
+			gp->phy_mii.def->ops->setup_forced(&gp->phy_mii, SPEED_10,
+				DUPLEX_HALF);
 			gp->timer_ticks = 5;
 			if (netif_msg_link(gp))
 				printk(KERN_INFO "%s: switching to forced 10bt\n",
 					gp->dev->name);
+			return 0;
 		} else
 			return 1;
+	default:
+		return 0;
 	}
-	return 0;
 }
 
 static void gem_init_rings(struct gem *);
@@ -1325,7 +1308,8 @@ static void gem_reset_task(void *data)
 static void gem_link_timer(unsigned long data)
 {
 	struct gem *gp = (struct gem *) data;
-
+	int restart_aneg = 0;
+		
 	if (!gp->hw_running)
 		return;
 
@@ -1337,62 +1321,8 @@ static void gem_link_timer(unsigned long data)
 	if (gp->reset_task_pending)
 		goto restart;
 	    	
-	if (gp->phy_type == phy_mii_mdio0 ||
-	    gp->phy_type == phy_mii_mdio1) {
-		u16 val = phy_read(gp, MII_BMSR);
-		u16 cntl = phy_read(gp, MII_BMCR);
-		int up;
-
-		/* When using autoneg, we really wait for ANEGCOMPLETE or we may
-		 * get a "transcient" incorrect link state
-		 */
-		if (cntl & BMCR_ANENABLE)
-			up = (val & (BMSR_ANEGCOMPLETE | BMSR_LSTATUS)) == (BMSR_ANEGCOMPLETE | BMSR_LSTATUS);
-		else
-			up = (val & BMSR_LSTATUS) != 0;
-		if (up) {
-			/* Ok, here we got a link. If we had it due to a forced
-			 * fallback, and we were configured for autoneg, we do
-			 * retry a short autoneg pass. If you know your hub is
-			 * broken, use ethtool ;)
-			 */
-			if (gp->lstate == link_force_try && (gp->link_cntl & BMCR_ANENABLE)) {
-				gp->lstate = link_force_ret;
-				gp->link_fcntl = phy_read(gp, MII_BMCR);
-				gp->timer_ticks = 5;
-				if (netif_msg_link(gp))
-					printk(KERN_INFO "%s: Got link after fallback, retrying"
-						" autoneg once...\n", gp->dev->name);
-				phy_write(gp, MII_BMCR,
-					  gp->link_fcntl | BMCR_ANENABLE | BMCR_ANRESTART);
-			} else if (gp->lstate != link_up) {
-				gp->lstate = link_up;
-				if (gp->opened)
-					gem_set_link_modes(gp);
-			}
-		} else {
-			int restart = 0;
-
-			/* If the link was previously up, we restart the
-			 * whole process
-			 */
-			if (gp->lstate == link_up) {
-				gp->lstate = link_down;
-				if (netif_msg_link(gp))
-					printk(KERN_INFO "%s: Link down\n",
-						gp->dev->name);
-				gp->reset_task_pending = 2;
-				schedule_work(&gp->reset_task);
-				restart = 1;
-			} else if (++gp->timer_ticks > 10)
-				restart = gem_mdio_link_not_up(gp);
-
-			if (restart) {
-				gem_begin_auto_negotiation(gp, NULL);
-				goto out_unlock;
-			}
-		}
-	} else {
+	if (gp->phy_type == phy_serialink ||
+	    gp->phy_type == phy_serdes) {
 		u32 val = readl(gp->regs + PCS_MIISTAT);
 
 		if (!(val & PCS_MIISTAT_LS))
@@ -1400,11 +1330,56 @@ static void gem_link_timer(unsigned long data)
 
 		if ((val & PCS_MIISTAT_LS) != 0) {
 			gp->lstate = link_up;
+			netif_carrier_on(gp->dev);
 			if (gp->opened)
-				gem_set_link_modes(gp);
+				(void)gem_set_link_modes(gp);
+		}
+		goto restart;
+	}
+	if (found_mii_phy(gp) && gp->phy_mii.def->ops->poll_link(&gp->phy_mii)) {
+		/* Ok, here we got a link. If we had it due to a forced
+		 * fallback, and we were configured for autoneg, we do
+		 * retry a short autoneg pass. If you know your hub is
+		 * broken, use ethtool ;)
+		 */
+		if (gp->lstate == link_force_try && gp->want_autoneg) {
+			gp->lstate = link_force_ret;
+			gp->last_forced_speed = gp->phy_mii.speed;
+			gp->timer_ticks = 5;
+			if (netif_msg_link(gp))
+				printk(KERN_INFO "%s: Got link after fallback, retrying"
+					" autoneg once...\n", gp->dev->name);
+			gp->phy_mii.def->ops->setup_aneg(&gp->phy_mii, gp->phy_mii.advertising);
+		} else if (gp->lstate != link_up) {
+			gp->lstate = link_up;
+			netif_carrier_on(gp->dev);
+			if (gp->opened && gem_set_link_modes(gp))
+				restart_aneg = 1;
+		}
+	} else {
+		/* If the link was previously up, we restart the
+		 * whole process
+		 */
+		if (gp->lstate == link_up) {
+			gp->lstate = link_down;
+			if (netif_msg_link(gp))
+				printk(KERN_INFO "%s: Link down\n",
+					gp->dev->name);
+			netif_carrier_off(gp->dev);
+			gp->reset_task_pending = 2;
+			schedule_work(&gp->reset_task);
+			restart_aneg = 1;
+		} else if (++gp->timer_ticks > 10) {
+			if (found_mii_phy(gp))
+				restart_aneg = gem_mdio_link_not_up(gp);
+			else
+				restart_aneg = 1;
 		}
 	}
-
+	if (restart_aneg) {
+		gem_begin_auto_negotiation(gp, NULL);
+		goto out_unlock;
+	}
 restart:
 	mod_timer(&gp->link_timer, jiffies + ((12 * HZ) / 10));
 out_unlock:
@@ -1507,150 +1482,10 @@ static void gem_init_rings(struct gem *gp)
 }
 
 /* Must be invoked under gp->lock. */
-static int gem_reset_one_mii_phy(struct gem *gp, int phy_addr)
-{
-	u16 val;
-	int limit = 10000;
-	
-	val = __phy_read(gp, MII_BMCR, phy_addr);
-	val &= ~BMCR_ISOLATE;
-	val |= BMCR_RESET;
-	__phy_write(gp, MII_BMCR, val, phy_addr);
-
-	udelay(100);
-
-	while (limit--) {
-		val = __phy_read(gp, MII_BMCR, phy_addr);
-		if ((val & BMCR_RESET) == 0)
-			break;
-		udelay(10);
-	}
-	if ((val & BMCR_ISOLATE) && limit > 0)
-		__phy_write(gp, MII_BMCR, val & ~BMCR_ISOLATE, phy_addr);
-	
-	return (limit <= 0);
-}
-
-/* Must be invoked under gp->lock. */
-static void gem_init_bcm5201_phy(struct gem *gp)
-{
-	u16 data;
-
-	data = phy_read(gp, MII_BCM5201_MULTIPHY);
-	data &= ~MII_BCM5201_MULTIPHY_SUPERISOLATE;
-	phy_write(gp, MII_BCM5201_MULTIPHY, data);
-}
-
-/* Must be invoked under gp->lock. */
-static void gem_init_bcm5400_phy(struct gem *gp)
-{
-	u16 data;
-
-	/* Configure for gigabit full duplex */
-	data = phy_read(gp, MII_BCM5400_AUXCONTROL);
-	data |= MII_BCM5400_AUXCONTROL_PWR10BASET;
-	phy_write(gp, MII_BCM5400_AUXCONTROL, data);
-	
-	data = phy_read(gp, MII_BCM5400_GB_CONTROL);
-	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
-	phy_write(gp, MII_BCM5400_GB_CONTROL, data);
-	
-	mdelay(10);
-
-	/* Reset and configure cascaded 10/100 PHY */
-	gem_reset_one_mii_phy(gp, 0x1f);
-	
-	data = __phy_read(gp, MII_BCM5201_MULTIPHY, 0x1f);
-	data |= MII_BCM5201_MULTIPHY_SERIALMODE;
-	__phy_write(gp, MII_BCM5201_MULTIPHY, data, 0x1f);
-
-	data = phy_read(gp, MII_BCM5400_AUXCONTROL);
-	data &= ~MII_BCM5400_AUXCONTROL_PWR10BASET;
-	phy_write(gp, MII_BCM5400_AUXCONTROL, data);
-}
-
-/* Must be invoked under gp->lock. */
-static void gem_init_bcm5401_phy(struct gem *gp)
-{
-	u16 data;
-	int rev;
-
-	rev = phy_read(gp, MII_PHYSID2) & 0x000f;
-	if (rev == 0 || rev == 3) {
-		/* Some revisions of 5401 appear to need this
-		 * initialisation sequence to disable, according
-		 * to OF, "tap power management"
-		 * 
-		 * WARNING ! OF and Darwin don't agree on the
-		 * register addresses. OF seem to interpret the
-		 * register numbers below as decimal
-		 *
-		 * Note: This should (and does) match tg3_init_5401phy_dsp
-		 *       in the tg3.c driver. -DaveM
-		 */
-		phy_write(gp, 0x18, 0x0c20);
-		phy_write(gp, 0x17, 0x0012);
-		phy_write(gp, 0x15, 0x1804);
-		phy_write(gp, 0x17, 0x0013);
-		phy_write(gp, 0x15, 0x1204);
-		phy_write(gp, 0x17, 0x8006);
-		phy_write(gp, 0x15, 0x0132);
-		phy_write(gp, 0x17, 0x8006);
-		phy_write(gp, 0x15, 0x0232);
-		phy_write(gp, 0x17, 0x201f);
-		phy_write(gp, 0x15, 0x0a20);
-	}
-	
-	/* Configure for gigabit full duplex */
-	data = phy_read(gp, MII_BCM5400_GB_CONTROL);
-	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
-	phy_write(gp, MII_BCM5400_GB_CONTROL, data);
-
-	mdelay(1);
-
-	/* Reset and configure cascaded 10/100 PHY */
-	gem_reset_one_mii_phy(gp, 0x1f);
-	
-	data = __phy_read(gp, MII_BCM5201_MULTIPHY, 0x1f);
-	data |= MII_BCM5201_MULTIPHY_SERIALMODE;
-	__phy_write(gp, MII_BCM5201_MULTIPHY, data, 0x1f);
-}
-
-/* Must be invoked under gp->lock. */
-static void gem_init_bcm5411_phy(struct gem *gp)
-{
-	u16 data;
-
-	/* Here's some more Apple black magic to setup
-	 * some voltage stuffs.
-	 */
-	phy_write(gp, 0x1c, 0x8c23);
-	phy_write(gp, 0x1c, 0x8ca3);
-	phy_write(gp, 0x1c, 0x8c23);
-
-	/* Here, Apple seems to want to reset it, do
-	 * it as well
-	 */
-	phy_write(gp, MII_BMCR, BMCR_RESET);
-
-	/* Start autoneg */
-	phy_write(gp, MII_BMCR,
-		  (BMCR_ANENABLE | BMCR_FULLDPLX |
-		   BMCR_ANRESTART | BMCR_SPD2));
-
-	data = phy_read(gp, MII_BCM5400_GB_CONTROL);
-	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
-	phy_write(gp, MII_BCM5400_GB_CONTROL, data);
-}
-
-/* Must be invoked under gp->lock. */
 static void gem_init_phy(struct gem *gp)
 {
 	u32 mifcfg;
-
-	if (!gp->wake_on_lan && gp->phy_mod == phymod_bcm5201)
-		phy_write(gp, MII_BCM5201_INTERRUPT, 0);
-
+	
 	/* Revert MIF CFG setting done on stop_phy */
 	mifcfg = readl(gp->regs + MIF_CFG);
 	mifcfg &= ~MIF_CFG_BBMODE;
@@ -1658,18 +1493,36 @@ static void gem_init_phy(struct gem *gp)
 	
 #ifdef CONFIG_ALL_PPC
 	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
-		int i;
+		int i, j;
 
+		/* Those delay sucks, the HW seem to love them though, I'll
+		 * serisouly consider breaking some locks here to be able
+		 * to schedule instead
+		 */
 		pmac_call_feature(PMAC_FTR_GMAC_PHY_RESET, gp->of_node, 0, 0);
-		for (i = 0; i < 32; i++) {
-			gp->mii_phy_addr = i;
-			if (phy_read(gp, MII_BMCR) != 0xffff)
+		mdelay(10);
+		for (j = 0; j < 3; j++) {
+			/* Some PHYs used by apple have problem getting back to us,
+			 * we _know_ it's actually at addr 0, that's a hack, but
+			 * it helps to do that reset now. I suspect some motherboards
+			 * don't wire the PHY reset line properly, thus the PHY doesn't
+			 * come back with the above pmac_call_feature.
+			 */
+			gp->mii_phy_addr = 0;
+			phy_write(gp, MII_BMCR, BMCR_RESET);
+			/* We should probably break some locks here and schedule... */
+			mdelay(10);
+			for (i = 0; i < 32; i++) {
+				gp->mii_phy_addr = i;
+				if (phy_read(gp, MII_BMCR) != 0xffff)
+					break;
+			}
+			if (i == 32) {
+				printk(KERN_WARNING "%s: GMAC PHY not responding !\n",
+				       gp->dev->name);
+				gp->mii_phy_addr = 0;
+			} else
 				break;
-		}
-		if (i == 32) {
-			printk(KERN_WARNING "%s: GMAC PHY not responding !\n",
-			       gp->dev->name);
-			return;
 		}
 	}
 #endif /* CONFIG_ALL_PPC */
@@ -1693,79 +1546,12 @@ static void gem_init_phy(struct gem *gp)
 
 	if (gp->phy_type == phy_mii_mdio0 ||
 	    gp->phy_type == phy_mii_mdio1) {
-		u32 phy_id;
-		u16 val;
-	
-		/* Take PHY out of isloate mode and reset it. */
-		gem_reset_one_mii_phy(gp, gp->mii_phy_addr);
+	    	// XXX check for errors
+		mii_phy_probe(&gp->phy_mii, gp->mii_phy_addr);
 
-		phy_id = (phy_read(gp, MII_PHYSID1) << 16 | phy_read(gp, MII_PHYSID2))
-			 	& 0xfffffff0;
-		printk(KERN_INFO "%s: MII PHY ID: %x ", gp->dev->name, phy_id);
-		switch(phy_id) {
-		case 0x406210:
-			gp->phy_mod = phymod_bcm5201;
-			gem_init_bcm5201_phy(gp);
-			printk("BCM 5201\n");
-			break;
-
-		case 0x4061e0:
-			printk("BCM 5221\n");
-			gp->phy_mod = phymod_bcm5221;
-			break;
-
-		case 0x206040:
-			printk("BCM 5400\n");
-			gp->phy_mod = phymod_bcm5400;
-			gem_init_bcm5400_phy(gp);
-			gp->gigabit_capable = 1;
-			break;
-
-		case 0x206050:
-			printk("BCM 5401\n");
-			gp->phy_mod = phymod_bcm5401;
-			gem_init_bcm5401_phy(gp);
-			gp->gigabit_capable = 1;
-			break;
-
-		case 0x206070:
-			printk("BCM 5411\n");
-			gp->phy_mod = phymod_bcm5411;
-			gem_init_bcm5411_phy(gp);
-			gp->gigabit_capable = 1;
-			break;
-		case 0x1410c60:
-			printk("M1011 (Marvel ?)\n");
-			gp->phy_mod = phymod_m1011;
-			gp->gigabit_capable = 1;
-			break;
-
-		case 0x18074c0:
-			printk("Lucent\n");
-			gp->phy_mod = phymod_generic;
-			break;
-
-		case 0x437420:
-			printk("Enable Semiconductor\n");
-			gp->phy_mod = phymod_generic;
-			break;
-
-		default:
-			printk("Unknown (Using generic mode)\n");
-			gp->phy_mod = phymod_generic;
-			break;
-		};
-
-		/* Init advertisement and enable autonegotiation. */
-		val = phy_read(gp, MII_BMCR);
-		val &= ~BMCR_ANENABLE;
-		phy_write(gp, MII_BMCR, val);
-		udelay(10);
-		
-		phy_write(gp, MII_ADVERTISE,
-			  phy_read(gp, MII_ADVERTISE) |
-			  (ADVERTISE_10HALF | ADVERTISE_10FULL |
-			   ADVERTISE_100HALF | ADVERTISE_100FULL));
+		/* Init PHY */
+		if (gp->phy_mii.def && gp->phy_mii.def->ops->init)
+			gp->phy_mii.def->ops->init(&gp->phy_mii);
 	} else {
 		u32 val;
 		int limit;
@@ -1822,13 +1608,7 @@ static void gem_init_phy(struct gem *gp)
 		else
 			val |= PCS_SCTRL_LOOP;
 		writel(val, gp->regs + PCS_SCTRL);
-		gp->gigabit_capable = 1;
 	}
-
-	/* BMCR_SPD2 is a broadcom 54xx specific thing afaik */
-	if (gp->phy_mod != phymod_bcm5400 && gp->phy_mod != phymod_bcm5401 &&
-	    gp->phy_mod != phymod_bcm5411)
-	    	gp->link_cntl &= ~BMCR_SPD2;
 }
 
 /* Must be invoked under gp->lock. */
@@ -1917,9 +1697,7 @@ static void gem_init_mac(struct gem *gp)
 {
 	unsigned char *e = &gp->dev->dev_addr[0];
 
-	if (gp->pdev->vendor == PCI_VENDOR_ID_SUN &&
-	    gp->pdev->device == PCI_DEVICE_ID_SUN_GEM)
-		writel(0x1bf0, gp->regs + MAC_SNDPAUSE);
+	writel(0x1bf0, gp->regs + MAC_SNDPAUSE);
 
 	writel(0x00, gp->regs + MAC_IPG0);
 	writel(0x08, gp->regs + MAC_IPG1);
@@ -1956,7 +1734,9 @@ static void gem_init_mac(struct gem *gp)
 	writel(0, gp->regs + MAC_AF0MSK);
 
 	gp->mac_rx_cfg = gem_setup_multicast(gp);
-
+#ifdef STRIP_FCS
+	gp->mac_rx_cfg |= MAC_RXCFG_SFCS;
+#endif
 	writel(0, gp->regs + MAC_NCOLL);
 	writel(0, gp->regs + MAC_FASUCC);
 	writel(0, gp->regs + MAC_ECOLL);
@@ -2132,12 +1912,15 @@ static void gem_init_hw(struct gem *gp, int restart_link)
 		/* Default aneg parameters */
 		gp->timer_ticks = 0;
 		gp->lstate = link_down;
+		netif_carrier_off(gp->dev);
 
 		/* Can I advertise gigabit here ? I'd need BCM PHY docs... */
 		gem_begin_auto_negotiation(gp, NULL);
 	} else {
-		if (gp->lstate == link_up)
+		if (gp->lstate == link_up) {
+			netif_carrier_on(gp->dev);
 			gem_set_link_modes(gp);
+		}
 	}
 }
 
@@ -2187,18 +1970,12 @@ static void gem_stop_phy(struct gem *gp)
 {
 	u32 mifcfg;
 
-	if (!gp->wake_on_lan && gp->phy_mod == phymod_bcm5201)
-		phy_write(gp, MII_BCM5201_INTERRUPT, 0);
-
 	/* Make sure we aren't polling PHY status change. We
 	 * don't currently use that feature though
 	 */
 	mifcfg = readl(gp->regs + MIF_CFG);
 	mifcfg &= ~MIF_CFG_POLL;
 	writel(mifcfg, gp->regs + MIF_CFG);
-
-	/* Here's a strange hack used by both MacOS 9 and X */
-	phy_write(gp, MII_LPA, phy_read(gp, MII_LPA));
 
 	if (gp->wake_on_lan) {
 		/* Setup wake-on-lan */
@@ -2213,21 +1990,12 @@ static void gem_stop_phy(struct gem *gp)
 		gem_stop(gp);
 		writel(MAC_TXRST_CMD, gp->regs + MAC_TXRST);
 		writel(MAC_RXRST_CMD, gp->regs + MAC_RXRST);
-		if (gp->phy_mod == phymod_bcm5400 || gp->phy_mod == phymod_bcm5401 ||
-		    gp->phy_mod == phymod_bcm5411) {
-#if 0 /* Commented out in Darwin... someone has those dawn docs ? */
-			phy_write(gp, MII_BMCR, BMCR_PDOWN);
-#endif
-		} else if (gp->phy_mod == phymod_bcm5201 || gp->phy_mod == phymod_bcm5221) {
-#if 0 /* Commented out in Darwin... someone has those dawn docs ? */
-			u16 val = phy_read(gp, MII_BCM5201_AUXMODE2)
-			phy_write(gp, MII_BCM5201_AUXMODE2,
-				  val & ~MII_BCM5201_AUXMODE2_LOWPOWER);
-#endif				
-			phy_write(gp, MII_BCM5201_MULTIPHY, MII_BCM5201_MULTIPHY_SUPERISOLATE);
-		} else if (gp->phy_mod == phymod_m1011)
-			phy_write(gp, MII_BMCR, BMCR_PDOWN);
+	}
 
+	if (found_mii_phy(gp) && gp->phy_mii.def->ops->suspend)
+		gp->phy_mii.def->ops->suspend(&gp->phy_mii, 0 /* wake on lan options */);
+
+	if (!gp->wake_on_lan) {
 		/* According to Apple, we must set the MDIO pins to this begnign
 		 * state or we may 1) eat more current, 2) damage some PHYs
 		 */
@@ -2529,7 +2297,11 @@ static void gem_set_multicast(struct net_device *dev)
 	netif_stop_queue(dev);
 
 	rxcfg = readl(gp->regs + MAC_RXCFG);
-	gp->mac_rx_cfg = rxcfg_new = gem_setup_multicast(gp);
+	rxcfg_new = gem_setup_multicast(gp);
+#ifdef STRIP_FCS
+	rxcfg_new |= MAC_RXCFG_SFCS;
+#endif
+	gp->mac_rx_cfg = rxcfg_new;
 	
 	writel(rxcfg & ~MAC_RXCFG_ENAB, gp->regs + MAC_RXCFG);
 	while (readl(gp->regs + MAC_RXCFG) & MAC_RXCFG_ENAB) {
@@ -2554,8 +2326,6 @@ static void gem_set_multicast(struct net_device *dev)
 static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 {
 	struct gem *gp = dev->priv;
-	u16 bmcr;
-	int full_duplex, speed, pause;
 	struct ethtool_cmd ecmd;
 
 	if (copy_from_user(&ecmd, ep_user, sizeof(ecmd)))
@@ -2578,41 +2348,36 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 	}
 
 	case ETHTOOL_GSET:
-		ecmd.supported =
+		if (gp->phy_type == phy_mii_mdio0 ||
+	     	    gp->phy_type == phy_mii_mdio1) {
+	     	    	if (gp->phy_mii.def)
+	     	    		ecmd.supported = gp->phy_mii.def->features;
+	     	    	else
+	     	    		ecmd.supported = SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full;
+
+			/* XXX hardcoded stuff for now */
+			ecmd.port = PORT_MII;
+			ecmd.transceiver = XCVR_EXTERNAL;
+			ecmd.phy_address = 0; /* XXX fixed PHYAD */
+
+			/* Return current PHY settings */
+			spin_lock_irq(&gp->lock);
+			ecmd.autoneg = gp->want_autoneg;
+			ecmd.speed = gp->phy_mii.speed;
+			ecmd.duplex = gp->phy_mii.duplex;			
+			ecmd.advertising = gp->phy_mii.advertising;
+			/* If we started with a forced mode, we don't have a default
+			 * advertise set, we need to return something sensible so
+			 * userland can re-enable autoneg properly */
+			if (ecmd.advertising == 0)
+				ecmd.advertising = ecmd.supported;
+			spin_unlock_irq(&gp->lock);
+		} else { // XXX PCS ?
+	     	    ecmd.supported =
 			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
-			 SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII);
-
-		if (gp->gigabit_capable)
-			ecmd.supported |=
-				(SUPPORTED_1000baseT_Half |
-				 SUPPORTED_1000baseT_Full);
-
-		/* XXX hardcoded stuff for now */
-		ecmd.port = PORT_MII;
-		ecmd.transceiver = XCVR_EXTERNAL;
-		ecmd.phy_address = 0; /* XXX fixed PHYAD */
-
-		/* Record PHY settings if HW is on. */
-		spin_lock_irq(&gp->lock);
-		if (gp->hw_running) {
-			bmcr = phy_read(gp, MII_BMCR);
-			gem_read_mii_link_mode(gp, &full_duplex, &speed, &pause);
-		} else
-			bmcr = 0;
-		spin_unlock_irq(&gp->lock);
-		if (bmcr & BMCR_ANENABLE) {
-			ecmd.autoneg = AUTONEG_ENABLE;
-			ecmd.speed = speed == 10 ? SPEED_10 : (speed == 1000 ? SPEED_1000 : SPEED_100);
-			ecmd.duplex = full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
-		} else {
-			ecmd.autoneg = AUTONEG_DISABLE;
-			ecmd.speed =
-				(bmcr & BMCR_SPEED100) ?
-				SPEED_100 : SPEED_10;
-			ecmd.duplex =
-				(bmcr & BMCR_FULLDPLX) ?
-				DUPLEX_FULL : DUPLEX_HALF;
+			 SUPPORTED_Autoneg);
+		    ecmd.advertising = ecmd.supported;
 		}
 		if (copy_to_user(ep_user, &ecmd, sizeof(ecmd)))
 			return -EFAULT;
@@ -2627,13 +2392,18 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 		    ecmd.autoneg != AUTONEG_DISABLE)
 			return -EINVAL;
 
+		if (ecmd.autoneg == AUTONEG_ENABLE &&
+		    ecmd.advertising == 0)
+		    	return -EINVAL;
+
 		if (ecmd.autoneg == AUTONEG_DISABLE &&
-		    ((ecmd.speed != SPEED_100 &&
+		    ((ecmd.speed != SPEED_1000 &&
+		      ecmd.speed != SPEED_100 &&
 		      ecmd.speed != SPEED_10) ||
 		     (ecmd.duplex != DUPLEX_HALF &&
 		      ecmd.duplex != DUPLEX_FULL)))
 			return -EINVAL;
-
+	      
 		/* Apply settings and restart link process. */
 		spin_lock_irq(&gp->lock);
 		gem_begin_auto_negotiation(gp, &ecmd);
@@ -2642,7 +2412,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 		return 0;
 
 	case ETHTOOL_NWAY_RST:
-		if ((gp->link_cntl & BMCR_ANENABLE) == 0)
+		if (!gp->want_autoneg)
 			return -EINVAL;
 
 		/* Restart link process. */
@@ -2746,15 +2516,21 @@ static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		/* Fallthrough... */
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-		data->val_out = __phy_read(gp, data->reg_num & 0x1f, data->phy_id & 0x1f);
-		rc = 0;
+		if (!gp->hw_running)
+			rc = -EIO;
+		else {
+			data->val_out = __phy_read(gp, data->phy_id & 0x1f, data->reg_num & 0x1f);
+			rc = 0;
+		}
 		break;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN)) {
+		if (!capable(CAP_NET_ADMIN))
 			rc = -EPERM;
-		} else {
-			__phy_write(gp, data->reg_num & 0x1f, data->val_in, data->phy_id & 0x1f);
+		else if (!gp->hw_running)
+			rc = -EIO;
+		else {
+			__phy_write(gp, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 			rc = 0;
 		}
 		break;
@@ -2856,8 +2632,7 @@ static int __devinit gem_get_device_address(struct gem *gp)
 		printk(KERN_ERR "%s: can't get mac-address\n", dev->name);
 		return -1;
 	}
-#warning MAX_ADDR_LEN is now 32 bytes instead of 8, please fix this as appropriate
-	memcpy(dev->dev_addr, addr, MAX_ADDR_LEN);
+	memcpy(dev->dev_addr, addr, 6);
 #else
 	get_gem_mac_nonobp(gp->pdev, gp->dev->dev_addr);
 #endif
@@ -2941,7 +2716,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->base_addr = (long) pdev;
 	gp->dev = dev;
 
-	gp->msg_enable = (gem_debug < 0 ? DEFAULT_MSG : gem_debug);
+	gp->msg_enable = DEFAULT_MSG;
 
 	spin_lock_init(&gp->lock);
 	init_MUTEX(&gp->pm_sem);
@@ -2957,13 +2732,9 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	INIT_WORK(&gp->pm_task, gem_pm_task, gp);
 	INIT_WORK(&gp->reset_task, gem_reset_task, gp);
 	
-	/* Default link parameters */
-	if (link_mode >= 0 && link_mode <= 6)
-		gp->link_cntl = link_modes[link_mode];
-	else
-		gp->link_cntl = BMCR_ANENABLE;
 	gp->lstate = link_down;
 	gp->timer_ticks = 0;
+	netif_carrier_off(dev);
 
 	gp->regs = (unsigned long) ioremap(gemreg_base, gemreg_len);
 	if (gp->regs == 0UL) {
@@ -2984,14 +2755,16 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	gem_stop(gp);
 	spin_unlock_irq(&gp->lock);
 
+	/* Fill up the mii_phy structure (even if we won't use it) */
+	gp->phy_mii.dev = dev;
+	gp->phy_mii.mdio_read = _phy_read;
+	gp->phy_mii.mdio_write = _phy_write;
+
+	/* By default, we start with autoneg */
+	gp->want_autoneg = 1;
+	
 	if (gem_check_invariants(gp))
 		goto err_out_iounmap;
-
-	spin_lock_irq(&gp->lock);
-	gp->hw_running = 1;
-	gem_init_phy(gp);
-	gem_begin_auto_negotiation(gp, NULL);
-	spin_unlock_irq(&gp->lock);
 
 	/* It is guaranteed that the returned buffer will be at least
 	 * PAGE_SIZE aligned.
@@ -3019,11 +2792,22 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 
 	printk(KERN_INFO "%s: Sun GEM (PCI) 10/100/1000BaseT Ethernet ",
 	       dev->name);
-
 	for (i = 0; i < 6; i++)
 		printk("%2.2x%c", dev->dev_addr[i],
 		       i == 5 ? ' ' : ':');
 	printk("\n");
+
+	/* Detect & init PHY, start autoneg */
+	spin_lock_irq(&gp->lock);
+	gp->hw_running = 1;
+	gem_init_phy(gp);
+	gem_begin_auto_negotiation(gp, NULL);
+	spin_unlock_irq(&gp->lock);
+
+	if (gp->phy_type == phy_mii_mdio0 ||
+     	    gp->phy_type == phy_mii_mdio1)
+		printk(KERN_INFO "%s: Found %s PHY\n", dev->name, 
+			gp->phy_mii.def ? gp->phy_mii.def->name : "no");
 
 	pci_set_drvdata(pdev, dev);
 

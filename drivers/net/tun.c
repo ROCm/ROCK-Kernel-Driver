@@ -379,7 +379,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		tun->owner = -1;
 		tun->dev.init = tun_net_init;
 		tun->dev.priv = tun;
-		tun->dev.owner = THIS_MODULE;
+		SET_MODULE_OWNER(&tun->dev);
 
 		err = -EINVAL;
 

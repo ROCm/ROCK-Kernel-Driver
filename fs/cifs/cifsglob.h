@@ -157,8 +157,8 @@ struct cifsSesInfo {
 	int capabilities;
 	char serverName[SERVER_NAME_LEN_WITH_NULL * 2];	/* BB make bigger for tcp names - will ipv6 and sctp addresses fit here?? */
 	char userName[MAX_USERNAME_SIZE + 1];
-    char domainName[MAX_USERNAME_SIZE + 1];
-    char password_with_pad[CIFS_ENCPWD_SIZE];
+	char domainName[MAX_USERNAME_SIZE + 1];
+	char password_with_pad[CIFS_ENCPWD_SIZE];
 };
 
 /*
@@ -204,7 +204,7 @@ struct cifsFileInfo {
 	__u16 netfid;		/* file id from remote */
 	/* BB add lock scope info here if needed */ ;
 	/* lock scope id (0 if none) */
-    	struct file * pfile; /* needed for writepage */
+	struct file * pfile; /* needed for writepage */
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
 	int emptyDir:1;
@@ -221,6 +221,7 @@ struct cifsInodeInfo {
 	struct list_head lockList;
 	/* BB add in lists for dirty pages - i.e. write caching info for oplock */
 	struct list_head openFileList;
+	int write_behind_rc;
 	__u32 cifsAttrs; /* e.g. DOS archive bit, sparse, compressed, system */
 	atomic_t inUse;	 /* num concurrent users (local openers cifs) of file*/
 	unsigned long time;	/* jiffies of last update/check of inode */

@@ -278,7 +278,8 @@ static int atm_do_connect_dev(struct atm_vcc *vcc,struct atm_dev *dev,int vpi,
 	    vcc->qos.txtp.min_pcr,vcc->qos.txtp.max_pcr,vcc->qos.txtp.max_sdu);
 	DPRINTK("  RX: %d, PCR %d..%d, SDU %d\n",vcc->qos.rxtp.traffic_class,
 	    vcc->qos.rxtp.min_pcr,vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu);
-	__module_get(dev->ops->owner);
+	if (!try_module_get(dev->ops->owner))
+		return -ENODEV;
 	if (dev->ops->open) {
 		error = dev->ops->open(vcc,vpi,vci);
 		if (error) {

@@ -722,6 +722,7 @@ static int if_init(struct net_device *dev)
 
         /* Set transmit buffer queue length */
         dev->tx_queue_len = 100;
+	SET_MODULE_OWNER(dev);
    
 	return 0;
 }

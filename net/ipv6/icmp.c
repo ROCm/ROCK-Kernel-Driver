@@ -557,22 +557,7 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 				    skb_checksum(skb, 0, skb->len, 0))) {
 			if (net_ratelimit())
 				printk(KERN_DEBUG "ICMPv6 checksum failed [%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x > %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x]\n",
-				       ntohs(saddr->s6_addr16[0]),
-				       ntohs(saddr->s6_addr16[1]),
-				       ntohs(saddr->s6_addr16[2]),
-				       ntohs(saddr->s6_addr16[3]),
-				       ntohs(saddr->s6_addr16[4]),
-				       ntohs(saddr->s6_addr16[5]),
-				       ntohs(saddr->s6_addr16[6]),
-				       ntohs(saddr->s6_addr16[7]),
-				       ntohs(daddr->s6_addr16[0]),
-				       ntohs(daddr->s6_addr16[1]),
-				       ntohs(daddr->s6_addr16[2]),
-				       ntohs(daddr->s6_addr16[3]),
-				       ntohs(daddr->s6_addr16[4]),
-				       ntohs(daddr->s6_addr16[5]),
-				       ntohs(daddr->s6_addr16[6]),
-				       ntohs(daddr->s6_addr16[7]));
+				       NIP6(*saddr), NIP6(*daddr));
 			goto discard_it;
 		}
 	}
@@ -737,11 +722,26 @@ static struct icmp6_err {
 	int err;
 	int fatal;
 } tab_unreach[] = {
-	{ ENETUNREACH,	0},	/* NOROUTE		*/
-	{ EACCES,	1},	/* ADM_PROHIBITED	*/
-	{ EHOSTUNREACH,	0},	/* Was NOT_NEIGHBOUR, now reserved */
-	{ EHOSTUNREACH,	0},	/* ADDR_UNREACH		*/
-	{ ECONNREFUSED,	1},	/* PORT_UNREACH		*/
+	{	/* NOROUTE */
+		.err	= ENETUNREACH,
+		.fatal	= 0,
+	},
+	{	/* ADM_PROHIBITED */
+		.err	= EACCES,
+		.fatal	= 1,
+	},
+	{	/* Was NOT_NEIGHBOUR, now reserved */
+		.err	= EHOSTUNREACH,
+		.fatal	= 0,
+	},
+	{	/* ADDR_UNREACH	*/
+		.err	= EHOSTUNREACH,
+		.fatal	= 0,
+	},
+	{	/* PORT_UNREACH	*/
+		.err	= ECONNREFUSED,
+		.fatal	= 1,
+	},
 };
 
 int icmpv6_err_convert(int type, int code, int *err)

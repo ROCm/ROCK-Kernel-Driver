@@ -613,12 +613,6 @@ router_solicitations - INTEGER
 	routers are present.
 	Default: 3
 
-icmp/*:
-ratelimit - INTEGER
-	Limit the maximal rates for sending ICMPv6 packets.
-	0 to disable any limiting, otherwise the maximal rate in jiffies(1)
-	Default: 100
-
 use_tempaddr - INTEGER
 	Preference for Privacy Extensions (RFC3041).
 	  <= 0 : disable Privacy Extensions
@@ -648,6 +642,12 @@ regen_max_retry - INTEGER
 	Number of attempts before give up attempting to generate
 	valid temporary addresses.
 	Default: 5
+
+icmp/*:
+ratelimit - INTEGER
+	Limit the maximal rates for sending ICMPv6 packets.
+	0 to disable any limiting, otherwise the maximal rate in jiffies(1)
+	Default: 100
 
 
 IPv6 Update by:

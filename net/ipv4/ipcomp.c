@@ -155,6 +155,7 @@ static int ipcomp_output(struct sk_buff *skb)
 		struct iphdr	iph;
 		char 		buf[60];
 	} tmp_iph;
+	int hdr_len = 0;
 
 	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
 		err = -EINVAL;
@@ -167,7 +168,11 @@ static int ipcomp_output(struct sk_buff *skb)
 		goto error;
 
 	/* Don't bother compressing */
-	if (skb->len < ipcd->threshold) {
+	if (!x->props.mode) {
+		iph = skb->nh.iph;
+		hdr_len = iph->ihl * 4;
+	}
+	if ((skb->len - hdr_len) < ipcd->threshold) {
 		if (x->props.mode) {
 			ipcomp_tunnel_encap(x, skb);
 			iph = skb->nh.iph;

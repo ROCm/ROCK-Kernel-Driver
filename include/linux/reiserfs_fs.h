@@ -1268,6 +1268,7 @@ struct path var = {ILLEGAL_PATH_ELEMENT_OFFSET, }
 
 /* Size of pointer to the unformatted node. */
 #define UNFM_P_SIZE (sizeof(unp_t))
+#define UNFM_P_SHIFT 2
 
 // in in-core inode key is stored on le form
 #define INODE_PKEY(inode) ((struct key *)(REISERFS_I(inode)->i_key))
@@ -1838,7 +1839,7 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 void padd_item (char * item, int total_length, int length);
 
 /* inode.c */
-
+void restart_transaction(struct reiserfs_transaction_handle *th, struct inode *inode, struct path *path);
 void reiserfs_read_locked_inode(struct inode * inode, struct reiserfs_iget_args *args) ;
 int reiserfs_find_actor(struct inode * inode, void *p) ;
 int reiserfs_init_locked_inode(struct inode * inode, void *p) ;
@@ -2111,6 +2112,7 @@ void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th);
 #endif
 void reiserfs_claim_blocks_to_be_allocated( struct super_block *sb, int blocks);
 void reiserfs_release_claimed_blocks( struct super_block *sb, int blocks);
+int reiserfs_can_fit_pages(struct super_block *sb);
 
 /* hashes.c */
 __u32 keyed_hash (const signed char *msg, int len);

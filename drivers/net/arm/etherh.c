@@ -51,7 +51,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "../../net/8390.h"
+#include "../8390.h"
 
 #define NET_DEBUG  0
 #define DEBUG_INIT 2

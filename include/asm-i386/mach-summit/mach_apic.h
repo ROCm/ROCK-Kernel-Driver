@@ -48,12 +48,20 @@ static inline unsigned long check_apicid_present(int bit)
 
 extern u8 bios_cpu_apicid[];
 
+static inline unsigned get_apic_id(unsigned long x) 
+{ 
+	return (((x)>>24)&0xFF);
+} 
+
+#define		GET_APIC_ID(x)	get_apic_id(x)
+
 static inline void init_apic_ldr(void)
 {
 	unsigned long val, id;
 
 	if (x86_summit)
-		id = xapic_phys_to_log_apicid(hard_smp_processor_id());
+		id = xapic_phys_to_log_apicid(
+			GET_APIC_ID(*(unsigned long *)(APIC_BASE+APIC_ID)));
 	else
 		id = 1UL << smp_processor_id();
 	apic_write_around(APIC_DFR, APIC_DFR_VALUE);
@@ -136,13 +144,6 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 }
 
 #define		APIC_ID_MASK		(0xFF<<24)
-
-static inline unsigned get_apic_id(unsigned long x) 
-{ 
-	return (((x)>>24)&0xFF);
-} 
-
-#define		GET_APIC_ID(x)	get_apic_id(x)
 
 static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 {

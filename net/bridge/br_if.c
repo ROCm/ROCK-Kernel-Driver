@@ -277,8 +277,7 @@ void __exit br_cleanup_bridges(void)
 	rtnl_lock();
 	for (dev = dev_base; dev; dev = nxt) {
 		nxt = dev->next;
-		if ((dev->priv_flags & IFF_EBRIDGE)
-		    && dev->owner == THIS_MODULE) {
+		if (dev->priv_flags & IFF_EBRIDGE) {
 			pr_debug("cleanup %s\n", dev->name);
 
 			del_ifs((struct net_bridge *) dev->priv);

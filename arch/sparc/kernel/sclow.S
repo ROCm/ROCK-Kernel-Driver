@@ -67,27 +67,6 @@ LABEL(sunosgdtsize):
 	mov	256, %i0
 	CC_AND_RETT
 
-	.globl	LABEL(sunossblock)
-LABEL(sunossblock):
-	LOAD_CURRENT(l4, l5)
-	ld	[%l4 + TI_TASK], %l4
-	set	-65793, %l5
-	and	%i0, %l5, %l5
-	ld	[%l4 + AOFF_task_blocked], %i0
-	or	%i0, %l5, %l5
-	st	%l5, [%l4 + AOFF_task_blocked]
-	CC_AND_RETT
-
-	.globl	LABEL(sunossmask)
-LABEL(sunossmask):
-	LOAD_CURRENT(l4, l5)
-	ld	[%l4 + TI_TASK], %l4
-	set	-65793, %l5
-	and	%i0, %l5, %l5
-	ld	[%l4 + AOFF_task_blocked], %i0
-	st	%l5, [%l4 + AOFF_task_blocked]
-	CC_AND_RETT
-
 	.globl	LABEL(getpagesize)
 LABEL(getpagesize):
 	set	PAGE_SIZE, %i0

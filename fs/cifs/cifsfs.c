@@ -209,8 +209,8 @@ cifs_destroy_inode(struct inode *inode)
 
 /*
  * cifs_show_options() is for displaying mount options in /proc/mounts.
- * It tries to avoid showing settings that were not changed from their
- * defaults.
+ * Not all settable options are displayed but most of the important
+ * ones are.
  */
 static int
 cifs_show_options(struct seq_file *s, struct vfsmount *m)
@@ -219,15 +219,19 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 
 	cifs_sb = CIFS_SB(m->mnt_sb);
 
-	if (cifs_sb)
+	if (cifs_sb) {
 		if (cifs_sb->tcon) {
-			seq_printf(s, ", TARGET: %s ", cifs_sb->tcon->treeName);
-			seq_printf(s, "FS TYPE: %s ",
-				   cifs_sb->tcon->nativeFileSystem);
+			seq_printf(s, ",unc=%s", cifs_sb->tcon->treeName);
 			if (cifs_sb->tcon->ses->userName)
-				seq_printf(s, " USER: %s ",
+				seq_printf(s, ",username=%s",
 					   cifs_sb->tcon->ses->userName);
+			if(cifs_sb->tcon->ses->domainName)
+				seq_printf(s, ",domain=%s",
+					cifs_sb->tcon->ses->domainName);
 		}
+		seq_printf(s, ",rsize=%d",cifs_sb->rsize);
+		seq_printf(s, ",wsize=%d",cifs_sb->wsize);
+	}
 	return 0;
 }
 
@@ -423,6 +427,7 @@ cifs_destroy_mids(void)
 static int cifs_oplock_thread(void * dummyarg)
 {
 	struct list_head * tmp;
+	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
 	struct file * pfile;
 	struct cifsTconInfo *pTcon;
@@ -438,9 +443,8 @@ static int cifs_oplock_thread(void * dummyarg)
 		/* BB add missing code */
 		cFYI(1,("oplock thread woken up - flush inode")); /* BB remove */
 		write_lock(&GlobalMid_Lock); 
-		list_for_each(tmp, &GlobalOplock_Q) {
-			oplock_item = list_entry(tmp, struct
-							       oplock_q_entry,
+		list_for_each_safe(tmp, tmp1, &GlobalOplock_Q) {
+			oplock_item = list_entry(tmp, struct oplock_q_entry,
 							       qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
@@ -449,6 +453,9 @@ static int cifs_oplock_thread(void * dummyarg)
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
 				rc = filemap_fdatawrite(pfile->f_dentry->d_inode->i_mapping);
+				if(rc)
+					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
+						= rc;
 				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
 				/* send oplock break */
 				write_lock(&GlobalMid_Lock);

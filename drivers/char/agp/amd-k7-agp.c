@@ -29,9 +29,9 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	int i;
 
 	page_map->real = (unsigned long *) __get_free_page(GFP_KERNEL);
-	if (page_map->real == NULL) {
+	if (page_map->real == NULL)
 		return -ENOMEM;
-	}
+
 	SetPageReserved(virt_to_page(page_map->real));
 	global_cache_flush();
 	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real), 
@@ -44,9 +44,8 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	}
 	global_cache_flush();
 
-	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
+	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
 		page_map->remapped[i] = agp_bridge->scratch_page;
-	}
 
 	return 0;
 }
@@ -65,12 +64,11 @@ static void amd_free_gatt_pages(void)
 	struct amd_page_map *entry;
 
 	tables = amd_irongate_private.gatt_pages;
-	for(i = 0; i < amd_irongate_private.num_tables; i++) {
+	for (i = 0; i < amd_irongate_private.num_tables; i++) {
 		entry = tables[i];
 		if (entry != NULL) {
-			if (entry->real != NULL) {
+			if (entry->real != NULL)
 				amd_free_page_map(entry);
-			}
 			kfree(entry);
 		}
 	}
@@ -87,25 +85,27 @@ static int amd_create_gatt_pages(int nr_tables)
 
 	tables = kmalloc((nr_tables + 1) * sizeof(struct amd_page_map *), 
 			 GFP_KERNEL);
-	if (tables == NULL) {
+	if (tables == NULL)
 		return -ENOMEM;
-	}
-	memset(tables, 0, sizeof(struct amd_page_map *) * (nr_tables + 1));
+
+	memset (tables, 0, sizeof(struct amd_page_map *) * (nr_tables + 1));
 	for (i = 0; i < nr_tables; i++) {
 		entry = kmalloc(sizeof(struct amd_page_map), GFP_KERNEL);
 		if (entry == NULL) {
 			retval = -ENOMEM;
 			break;
 		}
-		memset(entry, 0, sizeof(struct amd_page_map));
+		memset (entry, 0, sizeof(struct amd_page_map));
 		tables[i] = entry;
 		retval = amd_create_page_map(entry);
-		if (retval != 0) break;
+		if (retval != 0)
+			break;
 	}
 	amd_irongate_private.num_tables = nr_tables;
 	amd_irongate_private.gatt_pages = tables;
 
-	if (retval != 0) amd_free_gatt_pages();
+	if (retval != 0)
+		amd_free_gatt_pages();
 
 	return retval;
 }
@@ -132,9 +132,8 @@ static int amd_create_gatt_table(void)
 
 	value = A_SIZE_LVL2(agp_bridge->current_size);
 	retval = amd_create_page_map(&page_dir);
-	if (retval != 0) {
+	if (retval != 0)
 		return retval;
-	}
 
 	retval = amd_create_gatt_pages(value->num_entries / 1024);
 	if (retval != 0) {
@@ -156,7 +155,7 @@ static int amd_create_gatt_table(void)
 	agp_bridge->gart_bus_addr = addr;
 
 	/* Calculate the agp offset */
-	for(i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
+	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] =
 			virt_to_phys(amd_irongate_private.gatt_pages[i]->real);
 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] |= 0x00000001;
@@ -266,20 +265,12 @@ static void amd_irongate_cleanup(void)
  * entries.
  */
 
-static void amd_irongate_tlbflush(agp_memory * temp)
+static void amd_irongate_tlbflush(agp_memory *temp)
 {
 	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
 }
 
-static unsigned long amd_irongate_mask_memory(unsigned long addr, int type)
-{
-	/* Only type 0 is supported by the irongate */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
-static int amd_insert_memory(agp_memory * mem,
-			     off_t pg_start, int type)
+static int amd_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
 	unsigned long *cur_gatt;
@@ -287,12 +278,11 @@ static int amd_insert_memory(agp_memory * mem,
 
 	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
 
-	if (type != 0 || mem->type != 0) {
+	if (type != 0 || mem->type != 0)
 		return -EINVAL;
-	}
-	if ((pg_start + mem->page_count) > num_entries) {
+
+	if ((pg_start + mem->page_count) > num_entries)
 		return -EINVAL;
-	}
 
 	j = pg_start;
 	while (j < (pg_start + mem->page_count)) {
@@ -312,22 +302,21 @@ static int amd_insert_memory(agp_memory * mem,
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		cur_gatt[GET_GATT_OFF(addr)] =
-			amd_irongate_mask_memory(mem->memory[i], mem->type);
+			agp_generic_mask_memory(mem->memory[i], mem->type);
 	}
 	amd_irongate_tlbflush(mem);
 	return 0;
 }
 
-static int amd_remove_memory(agp_memory * mem, off_t pg_start,
-			     int type)
+static int amd_remove_memory(agp_memory *mem, off_t pg_start, int type)
 {
 	int i;
 	unsigned long *cur_gatt;
 	unsigned long addr;
 
-	if (type != 0 || mem->type != 0) {
+	if (type != 0 || mem->type != 0)
 		return -EINVAL;
-	}
+
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
@@ -352,12 +341,11 @@ static struct aper_size_info_lvl2 amd_irongate_sizes[7] =
 
 static struct gatt_mask amd_irongate_masks[] =
 {
-	{.mask = 0x00000001, .type = 0}
+	{.mask = 1, .type = 0}
 };
 
 struct agp_bridge_driver amd_irongate_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= amd_irongate_masks,
 	.aperture_sizes		= amd_irongate_sizes,
 	.size_type		= LVL2_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -365,7 +353,8 @@ struct agp_bridge_driver amd_irongate_driver = {
 	.fetch_size		= amd_irongate_fetch_size,
 	.cleanup		= amd_irongate_cleanup,
 	.tlb_flush		= amd_irongate_tlbflush,
-	.mask_memory		= amd_irongate_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= amd_irongate_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= amd_create_gatt_table,
@@ -376,8 +365,6 @@ struct agp_bridge_driver amd_irongate_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_device_ids amd_agp_device_ids[] __initdata =
@@ -469,7 +456,7 @@ static struct pci_device_id agp_amdk7_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_amdk7_pci_table);
 
-static struct __initdata pci_driver agp_amdk7_pci_driver = {
+static struct pci_driver agp_amdk7_pci_driver = {
 	.name		= "agpgart-amdk7",
 	.id_table	= agp_amdk7_pci_table,
 	.probe		= agp_amdk7_probe,

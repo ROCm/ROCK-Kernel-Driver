@@ -672,21 +672,6 @@ out:
 	return err;
 }
 
-static inline void *alloc_user_space(long len)
-{
-	struct pt_regs *regs = current->thread.regs;
-	unsigned long usp = regs->gpr[1];
-
-	/*
-	 * We cant access below the stack pointer in the 32bit ABI and
-	 * can access 288 bytes in the 64bit ABI
-	 */
-	if (!(test_thread_flag(TIF_32BIT)))
-		usp -= 288;
-
-	return (void *) (usp - len);
-}
-
 int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifreq *u_ifreq64;
@@ -702,7 +687,7 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 	data64 = A(data32);
 
-	u_ifreq64 = alloc_user_space(sizeof(*u_ifreq64));
+	u_ifreq64 = compat_alloc_user_space(sizeof(*u_ifreq64));
 
 	/* Don't check these user accesses, just let that get trapped
 	 * in the ioctl handler instead.

@@ -1625,15 +1625,18 @@ int
 CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 		const unsigned char *searchName,
 		unsigned char **targetUNCs,
-		int *number_of_UNC_in_array,
+		unsigned int *number_of_UNC_in_array,
 		const struct nls_table *nls_codepage)
 {
 /* TRANS2_GET_DFS_REFERRAL */
 	TRANSACTION2_GET_DFS_REFER_REQ *pSMB = NULL;
 	TRANSACTION2_GET_DFS_REFER_RSP *pSMBr = NULL;
+	struct dfs_referral_level_3 * referrals = NULL;
 	int rc = 0;
 	int bytes_returned;
 	int name_len;
+	unsigned int i;
+	char * temp;
 	*number_of_UNC_in_array = 0;
 	*targetUNCs = NULL;
 
@@ -1654,8 +1657,8 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	if (ses->capabilities & CAP_DFS) {
 		pSMB->hdr.Flags2 |= SMBFLG2_DFS;
 	}
-    if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-       pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (ses->capabilities & CAP_UNICODE) {
 		pSMB->hdr.Flags2 |= SMBFLG2_UNICODE;
@@ -1701,6 +1704,76 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 		cFYI(1, ("Send error in GetDFSRefer = %d", rc));
 	} else {		/* decode response */
 /* BB Add logic to parse referrals here */
+		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
+		pSMBr->DataCount = le16_to_cpu(pSMBr->DataCount);
+		cFYI(1,
+		     ("Decoding GetDFSRefer response.  BCC: %d  Offset %d",
+		      pSMBr->ByteCount, pSMBr->DataOffset));
+		if ((pSMBr->ByteCount < 17) || (pSMBr->DataOffset > 512))	/* BB also check enough total bytes returned */
+			rc = -EIO;	/* bad smb */
+		else {
+			referrals = 
+			    (struct dfs_referral_level_3 *) 
+					(8 /* sizeof start of data block */ +
+					pSMBr->DataOffset +
+					(char *) &pSMBr->hdr.Protocol); 
+			cFYI(1,("num_referrals: %d dfs flags: 0x%x ... \nfor referral one refer size: 0x%x srv type: 0x%x refer flags: 0x%x ttl: 0x%x",pSMBr->NumberOfReferrals,pSMBr->DFSFlags, referrals->ReferralSize,referrals->ServerType,referrals->ReferralFlags,referrals->TimeToLive));
+			/* BB This field is actually two bytes in from start of
+			   data block so we could do safety check that DataBlock
+			   begins at address of pSMBr->NumberOfReferrals */
+			*number_of_UNC_in_array = le16_to_cpu(pSMBr->NumberOfReferrals);
+
+			/* BB Fix below so can return more than one referral */
+			if(*number_of_UNC_in_array > 1)
+				*number_of_UNC_in_array = 1;
+
+			/* get the length of the strings describing refs */
+			name_len = 0;
+			for(i=0;i<*number_of_UNC_in_array;i++) {
+				/* make sure that DfsPathOffset not past end */
+				referrals->DfsPathOffset = le16_to_cpu(referrals->DfsPathOffset);
+				if(referrals->DfsPathOffset > pSMBr->DataCount) {
+					/* if invalid referral, stop here and do 
+					not try to copy any more */
+					*number_of_UNC_in_array = i;
+					break;
+				} 
+				temp = ((char *)referrals) + referrals->DfsPathOffset;
+
+				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
+					name_len += UniStrnlen((wchar_t *)temp,pSMBr->DataCount);
+				} else {
+					name_len += strnlen(temp,pSMBr->DataCount);
+				}
+				referrals++;
+				/* BB add check that referral pointer does not fall off end PDU */
+				
+			}
+			/* BB add check for name_len bigger than bcc */
+			*targetUNCs = 
+				kmalloc(name_len+1+ (*number_of_UNC_in_array),GFP_KERNEL);
+			/* copy the ref strings */
+			referrals =  
+			    (struct dfs_referral_level_3 *) 
+					(8 /* sizeof data hdr */ +
+					pSMBr->DataOffset + 
+					(char *) &pSMBr->hdr.Protocol);
+
+			for(i=0;i<*number_of_UNC_in_array;i++) {
+				temp = ((char *)referrals) + referrals->DfsPathOffset;
+				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
+					cifs_strfromUCS_le(*targetUNCs,
+						(wchar_t *) temp, name_len, nls_codepage);
+				} else {
+					strncpy(*targetUNCs,temp,name_len);
+				}
+				/*  BB update target_uncs pointers */
+				referrals++;
+			}
+			temp = *targetUNCs;
+			temp[name_len] = 0;
+		}
+
 	}
 	if (pSMB)
 		buf_release(pSMB);

@@ -108,7 +108,7 @@ struct rt6_info ip6_null_entry = {
 			.dev		= &loopback_dev,
 			.obsolete	= -1,
 			.error		= -ENETUNREACH,
-			.metrics[RTAX_HOPLIMIT-1] = 255,
+			.metrics	= { [RTAX_HOPLIMIT - 1] = 255, },
 			.input		= ip6_pkt_discard,
 			.output		= ip6_pkt_discard,
 			.ops		= &ip6_dst_ops,
@@ -121,9 +121,8 @@ struct rt6_info ip6_null_entry = {
 };
 
 struct fib6_node ip6_routing_table = {
-	NULL, NULL, NULL, NULL,
-	&ip6_null_entry,
-	0, RTN_ROOT|RTN_TL_ROOT|RTN_RTINFO, 0
+	.leaf		= &ip6_null_entry,
+	.fn_flags	= RTN_ROOT | RTN_TL_ROOT | RTN_RTINFO,
 };
 
 /* Protects all the ip6 fib */
@@ -174,7 +173,7 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 /*
  *	pointer to the last default router chosen. BH is disabled locally.
  */
-static struct rt6_info *rt6_dflt_pointer = NULL;
+static struct rt6_info *rt6_dflt_pointer;
 static spinlock_t rt6_dflt_lock = SPIN_LOCK_UNLOCKED;
 
 /* Default Router Selection (RFC 2461 6.3.6) */
@@ -559,7 +558,7 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 	}
 }
 
-static int ip6_dst_gc()
+static int ip6_dst_gc(void)
 {
 	static unsigned expire = 30*HZ;
 	static unsigned long last_gc;
@@ -913,7 +912,7 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 		goto out;
 
 	/*
-	 *	RFC 1970 specifies that redirects should only be
+	 *	RFC 2461 specifies that redirects should only be
 	 *	accepted if they come from the nexthop to the target.
 	 *	Due to the way default routers are chosen, this notion
 	 *	is a bit fuzzy and one might need to check all default

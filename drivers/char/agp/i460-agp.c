@@ -525,7 +525,6 @@ static unsigned long i460_mask_memory (unsigned long addr, int type)
 
 struct agp_bridge_driver intel_i460_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= i460_masks,
 	.aperture_sizes		= i460_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 3,
@@ -534,6 +533,7 @@ struct agp_bridge_driver intel_i460_driver = {
 	.cleanup		= i460_cleanup,
 	.tlb_flush		= i460_tlb_flush,
 	.mask_memory		= i460_mask_memory,
+	.masks			= i460_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= i460_create_gatt_table,
@@ -551,8 +551,6 @@ struct agp_bridge_driver intel_i460_driver = {
 #endif
 	.alloc_by_type		= agp_generic_alloc_by_type,
 	.free_by_type		= agp_generic_free_by_type,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 	.cant_use_aperture	= 1,
 };
 
@@ -600,7 +598,7 @@ static struct pci_device_id agp_intel_i460_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_intel_i460_pci_table);
 
-static struct __initdata pci_driver agp_intel_i460_pci_driver = {
+static struct pci_driver agp_intel_i460_pci_driver = {
 	.name		= "agpgart-intel-i460",
 	.id_table	= agp_intel_i460_pci_table,
 	.probe		= agp_intel_i460_probe,

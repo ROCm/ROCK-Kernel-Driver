@@ -160,7 +160,8 @@ ctl_table ipv4_table[] = {
  		.data		= &sysctl_ip_default_ttl,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec
+		.proc_handler	= &ipv4_doint_and_flush,
+		.strategy	= &ipv4_doint_and_flush_strategy,
 	},
         {
 		.ctl_name	= NET_IPV4_AUTOCONFIG,

@@ -217,11 +217,25 @@ xfs_blkdev_put(
 }
 
 void
-xfs_free_buftarg(
+xfs_flush_buftarg(
 	xfs_buftarg_t		*btp)
 {
 	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+}
+
+void
+xfs_free_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	xfs_flush_buftarg(btp);
 	kmem_free(btp, sizeof(*btp));
+}
+
+int
+xfs_readonly_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	return bdev_read_only(btp->pbr_bdev);
 }
 
 void
@@ -331,9 +345,10 @@ destroy_inodecache( void )
 }
 
 /*
- * We do not actually write the inode here, just mark the
- * super block dirty so that sync_supers calls us and
- * forces the flush.
+ * Attempt to flush the inode, this will actually fail
+ * if the inode is pinned, but we dirty the inode again
+ * at the point when it is unpinned after a log write,
+ * since this is when the inode itself becomes flushable. 
  */
 STATIC void
 linvfs_write_inode(
@@ -348,8 +363,6 @@ linvfs_write_inode(
 		if (sync)
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
-		if (error == EAGAIN)
-			inode->i_sb->s_dirt = 1;
 	}
 }
 
@@ -369,6 +382,61 @@ linvfs_clear_inode(
 	}
 }
 
+
+#define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
+
+STATIC int
+syncd(void *arg)
+{
+	vfs_t			*vfsp = (vfs_t *) arg;
+	int			error;
+
+	daemonize("xfs_syncd");
+
+	vfsp->vfs_sync_task = current;
+	wmb();
+	wake_up(&vfsp->vfs_wait_sync_task);
+
+	for (;;) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(xfs_params.sync_interval);
+		if (vfsp->vfs_flag & VFS_UMOUNT)
+			break;
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			continue;
+		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
+	}
+
+	vfsp->vfs_sync_task = NULL;
+	wmb();
+	wake_up(&vfsp->vfs_wait_sync_task);
+
+	return 0;
+}
+
+STATIC int
+linvfs_start_syncd(vfs_t *vfsp)
+{
+	int pid;
+
+	pid = kernel_thread(syncd, (void *) vfsp,
+			CLONE_VM | CLONE_FS | CLONE_FILES);
+	if (pid < 0)
+		return pid;
+	wait_event(vfsp->vfs_wait_sync_task, vfsp->vfs_sync_task);
+	return 0;
+}
+
+STATIC void
+linvfs_stop_syncd(vfs_t *vfsp)
+{
+	vfsp->vfs_flag |= VFS_UMOUNT;
+	wmb();
+
+	wake_up_process(vfsp->vfs_sync_task);
+	wait_event(vfsp->vfs_wait_sync_task, !vfsp->vfs_sync_task);
+}
+
 STATIC void
 linvfs_put_super(
 	struct super_block	*sb)
@@ -376,8 +444,9 @@ linvfs_put_super(
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
 
+	linvfs_stop_syncd(vfsp);
 	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_DELWRI, NULL, error);
-	if (error == 0)
+	if (!error)
 		VFS_UNMOUNT(vfsp, 0, NULL, error);
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
@@ -395,10 +464,13 @@ linvfs_write_super(
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
 
-	sb->s_dirt = 0;
-	if (sb->s_flags & MS_RDONLY)
+	if (sb->s_flags & MS_RDONLY) {
+		sb->s_dirt = 0; /* paranoia */
 		return;
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR, NULL, error);
+	}
+	/* Push the log and superblock a little */
+	VFS_SYNC(vfsp, SYNC_FSDATA, NULL, error);
+	sb->s_dirt = 0;
 }
 
 STATIC int
@@ -424,12 +496,8 @@ linvfs_remount(
 	int			error;
 
 	VFS_PARSEARGS(vfsp, options, args, 1, error);
-	if (error)
-		goto out;
-
-	VFS_MNTUPDATE(vfsp, flags, args, error);
-
-out:
+	if (!error)
+		VFS_MNTUPDATE(vfsp, flags, args, error);
 	kmem_free(args, sizeof(*args));
 	return error;
 }
@@ -438,11 +506,10 @@ STATIC void
 linvfs_freeze_fs(
 	struct super_block	*sb)
 {
-	vfs_t			*vfsp;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t			*vp;
 	int			error;
 
-	vfsp = LINVFS_GET_VFS(sb);
 	if (sb->s_flags & MS_RDONLY)
 		return;
 	VFS_ROOT(vfsp, &vp, error);
@@ -454,11 +521,10 @@ STATIC void
 linvfs_unfreeze_fs(
 	struct super_block	*sb)
 {
-	vfs_t			*vfsp;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t			*vp;
 	int			error;
 
-	vfsp = LINVFS_GET_VFS(sb);
 	VFS_ROOT(vfsp, &vp, error);
 	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_THAW, 0, error);
 	VN_RELE(vp);
@@ -652,7 +718,8 @@ linvfs_fill_super(
 		goto fail_vnrele;
 	if (is_bad_inode(sb->s_root->d_inode))
 		goto fail_vnrele;
-
+	if (linvfs_start_syncd(vfsp))
+		goto fail_vnrele;
 	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
 	kmem_free(args, sizeof(*args));

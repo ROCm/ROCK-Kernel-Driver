@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/buffer_head.h>
 #include <linux/kernel.h>
+#include <linux/pagemap.h>
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/reiserfs_fs_i.h>
 
@@ -733,7 +734,7 @@ static inline int allocate_without_wrapping_disk (reiserfs_blocknr_hint_t * hint
     int rest = amount_needed;
     int nr_allocated;
   
-    while (rest > 0) {
+    while (rest > 0 && start <= finish) {
 	nr_allocated = scan_bitmap (hint->th, &start, finish, 1,
 				    rest + prealloc_size, !hint->formatted_node,
 				    hint->block);
@@ -879,7 +880,9 @@ void reiserfs_claim_blocks_to_be_allocated(
     if ( !blocks )
 	return;
 
+    spin_lock(&REISERFS_SB(sb)->bitmap_lock);
     REISERFS_SB(sb)->reserved_blocks += blocks;
+    spin_unlock(&REISERFS_SB(sb)->bitmap_lock);
 }
 
 /* Unreserve @blocks amount of blocks in fs pointed by @sb */
@@ -896,6 +899,22 @@ void reiserfs_release_claimed_blocks(
     if ( !blocks )
 	return;
 
+    spin_lock(&REISERFS_SB(sb)->bitmap_lock);
     REISERFS_SB(sb)->reserved_blocks -= blocks;
+    spin_unlock(&REISERFS_SB(sb)->bitmap_lock);
     RFALSE( REISERFS_SB(sb)->reserved_blocks < 0, "amount of blocks reserved became zero?");
+}
+
+/* This function estimates how much pages we will be able to write to FS
+   used for reiserfs_file_write() purposes for now. */
+int reiserfs_can_fit_pages ( struct super_block *sb /* superblock of filesystem
+						       to estimate space */ )
+{
+	unsigned long space;
+
+	spin_lock(&REISERFS_SB(sb)->bitmap_lock);
+	space = (SB_FREE_BLOCKS(sb) - REISERFS_SB(sb)->reserved_blocks) >> ( PAGE_CACHE_SHIFT - sb->s_blocksize_bits);
+	spin_unlock(&REISERFS_SB(sb)->bitmap_lock);
+
+	return space;
 }

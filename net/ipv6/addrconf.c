@@ -1140,7 +1140,7 @@ regen:
 	 *
 	 *  - Reserved subnet anycast (RFC 2526)
 	 *	11111101 11....11 1xxxxxxx
-	 *  - ISATAP (draft-ietf-ngtrans-isatap-01.txt) 4.3
+	 *  - ISATAP (draft-ietf-ngtrans-isatap-13.txt) 5.1
 	 *	00-00-5E-FE-xx-xx-xx-xx
 	 *  - value 0
 	 *  - XXX: already assigned to an address on the device
@@ -2389,22 +2389,14 @@ static void inet6_ifa_notify(int event, struct inet6_ifaddr *ifa)
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_IFADDR, GFP_ATOMIC);
 }
 
-static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
-{
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-
-	{ inet6_rtm_newaddr,	NULL,			},
-	{ inet6_rtm_deladdr,	NULL,			},
-	{ NULL,			inet6_dump_ifaddr,	},
-	{ NULL,			NULL,			},
-
-	{ inet6_rtm_newroute,	NULL,			},
-	{ inet6_rtm_delroute,	NULL,			},
-	{ inet6_rtm_getroute,	inet6_dump_fib,		},
-	{ NULL,			NULL,			},
+static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
+	[RTM_NEWADDR - RTM_BASE] = { .doit	= inet6_rtm_newaddr, },
+	[RTM_DELADDR - RTM_BASE] = { .doit	= inet6_rtm_deladdr, },
+	[RTM_GETADDR - RTM_BASE] = { .dumpit	= inet6_dump_ifaddr, },
+	[RTM_NEWROUTE - RTM_BASE] = { .doit	= inet6_rtm_newroute, },
+	[RTM_DELROUTE - RTM_BASE] = { .doit	= inet6_rtm_delroute, },
+	[RTM_GETROUTE - RTM_BASE] = { .doit	= inet6_rtm_getroute,
+				      .dumpit	= inet6_dump_fib, },
 };
 
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)

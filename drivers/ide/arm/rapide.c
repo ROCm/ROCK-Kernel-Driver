@@ -20,8 +20,6 @@ rapide_probe(struct expansion_card *ec, const struct ecard_id *id)
 	hw_regs_t hw;
 	int i, ret;
 
-	ecard_claim(ec);
-
 	memset(&hw, 0, sizeof(hw));
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
@@ -49,7 +47,6 @@ rapide_probe(struct expansion_card *ec, const struct ecard_id *id)
 static void __devexit rapide_remove(struct expansion_card *ec)
 {
 	/* need to do more */
-	ecard_release(ec);
 }
 
 static struct ecard_id rapide_ids[] = {

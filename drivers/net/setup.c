@@ -16,7 +16,6 @@ extern int scc_enet_init(void);
 extern int fec_enet_init(void); 
 extern int sdla_setup(void); 
 extern int sdla_c_setup(void); 
-extern int comx_init(void);
 extern int lmc_setup(void);
 
 extern int madgemc_probe(void);
@@ -52,10 +51,6 @@ static struct net_probe pci_probes[] __initdata = {
 #if defined(CONFIG_FEC_ENET)
         {fec_enet_init, 0},
 #endif
-#if defined(CONFIG_COMX)
-	{comx_init, 0},
-#endif
-	 
 #if defined(CONFIG_LANMEDIA)
 	{lmc_setup, 0},
 #endif

@@ -300,7 +300,6 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 	      unsigned long p4, unsigned long p5, unsigned long p6,
 	      struct pt_regs *regs)
 {
-	struct task_struct *p;
 	unsigned long parent_tidptr = 0;
 	unsigned long child_tidptr = 0;
 
@@ -320,36 +319,29 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
+	return do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
 		    (int *)parent_tidptr, (int *)child_tidptr);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
 	     unsigned long p4, unsigned long p5, unsigned long p6,
 	     struct pt_regs *regs)
 {
-	struct task_struct *p;
-
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
 }
 
 int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
 	      unsigned long p4, unsigned long p5, unsigned long p6,
 	      struct pt_regs *regs)
 {
-	struct task_struct *p;
-
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0,
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0,
 	            NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,

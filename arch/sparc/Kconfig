@@ -1000,6 +1000,13 @@ config DEBUG_SPINLOCK_SLEEP
 	  If you say Y here, various routines which may sleep will become very
 	  noisy if they are called with a spinlock held.	
 
+config DEBUG_BUGVERBOSE
+	bool "Verbose BUG() reporting (adds 70K)"
+	help
+	  Say Y here to make BUG() panics output the file name and line number
+	  of the BUG call as well as the EIP and oops trace.  This aids
+	  debugging but costs about 70-100K of memory.
+
 endmenu
 
 source "security/Kconfig"

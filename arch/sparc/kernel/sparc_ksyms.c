@@ -53,6 +53,7 @@
 #endif
 #include <asm/a.out.h>
 #include <asm/io-unit.h>
+#include <asm/bug.h>
 
 extern spinlock_t rtc_lock;
 
@@ -311,6 +312,10 @@ EXPORT_SYMBOL_DOT(mul);
 EXPORT_SYMBOL_DOT(umul);
 EXPORT_SYMBOL_DOT(div);
 EXPORT_SYMBOL_DOT(udiv);
+
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+EXPORT_SYMBOL(do_BUG);
+#endif
 
 /* Sun Power Management Idle Handler */
 EXPORT_SYMBOL(pm_idle);

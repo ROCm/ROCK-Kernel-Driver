@@ -969,65 +969,6 @@ icmp_reply_translation(struct sk_buff **pskb,
 	return 0;
 }
 
-int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
-{
-	struct sk_buff *nskb;
-	unsigned int iplen;
-
-	if (writable_len > (*pskb)->len)
-		return 0;
-
-	/* Not exclusive use of packet?  Must copy. */
-	if (skb_shared(*pskb) || skb_cloned(*pskb))
-		goto copy_skb;
-
-	/* Alexey says IP hdr is always modifiable and linear, so ok. */
-	if (writable_len <= (*pskb)->nh.iph->ihl*4)
-		return 1;
-
-	iplen = writable_len - (*pskb)->nh.iph->ihl*4;
-
-	/* DaveM says protocol headers are also modifiable. */
-	switch ((*pskb)->nh.iph->protocol) {
-	case IPPROTO_TCP: {
-		struct tcphdr hdr;
-		if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4,
-				  &hdr, sizeof(hdr)) != 0)
-			goto copy_skb;
-		if (writable_len <= (*pskb)->nh.iph->ihl*4 + hdr.doff*4)
-			goto pull_skb;
-		goto copy_skb;
-	}
-	case IPPROTO_UDP:
-		if (writable_len<=(*pskb)->nh.iph->ihl*4+sizeof(struct udphdr))
-			goto pull_skb;
-		goto copy_skb;
-	case IPPROTO_ICMP:
-		if (writable_len
-		    <= (*pskb)->nh.iph->ihl*4 + sizeof(struct icmphdr))
-			goto pull_skb;
-		goto copy_skb;
-	/* Insert other cases here as desired */
-	}
-
-copy_skb:
-	nskb = skb_copy(*pskb, GFP_ATOMIC);
-	if (!nskb)
-		return 0;
-	BUG_ON(skb_is_nonlinear(nskb));
-
-	/* Rest of kernel will get very unhappy if we pass it a
-	   suddenly-orphaned skbuff */
-	if ((*pskb)->sk)
-		skb_set_owner_w(nskb, (*pskb)->sk);
-	kfree_skb(*pskb);
-	*pskb = nskb;
-	return 1;
-
-pull_skb:
-	return pskb_may_pull(*pskb, writable_len);
-}
-
 int __init ip_nat_init(void)
 {
 	size_t i;

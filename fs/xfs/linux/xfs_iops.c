@@ -152,8 +152,6 @@ linvfs_mknod(
 			ip->i_rdev = to_kdev_t(rdev);
 		validate_fields(dir);
 		d_instantiate(dentry, ip);
-		mark_inode_dirty_sync(ip);
-		mark_inode_dirty_sync(dir);
 	}
 
 	if (!error && have_default_acl) {
@@ -240,7 +238,6 @@ linvfs_link(
 		VN_HOLD(vp);
 		validate_fields(ip);
 		d_instantiate(dentry, ip);
-		mark_inode_dirty_sync(ip);
 	}
 	return -error;
 }
@@ -261,8 +258,6 @@ linvfs_unlink(
 	if (!error) {
 		validate_fields(dir);	/* For size only */
 		validate_fields(inode);
-		mark_inode_dirty_sync(inode);
-		mark_inode_dirty_sync(dir);
 	}
 
 	return -error;
@@ -296,8 +291,6 @@ linvfs_symlink(
 		d_instantiate(dentry, ip);
 		validate_fields(dir);
 		validate_fields(ip); /* size needs update */
-		mark_inode_dirty_sync(ip);
-		mark_inode_dirty_sync(dir);
 	}
 	return -error;
 }
@@ -315,8 +308,6 @@ linvfs_rmdir(
 	if (!error) {
 		validate_fields(inode);
 		validate_fields(dir);
-		mark_inode_dirty_sync(inode);
-		mark_inode_dirty_sync(dir);
 	}
 	return -error;
 }
@@ -346,7 +337,6 @@ linvfs_rename(
 	validate_fields(odir);
 	if (ndir != odir)
 		validate_fields(ndir);
-	mark_inode_dirty(ndir);
 	return 0;
 }
 
@@ -520,7 +510,6 @@ linvfs_setattr(
 
 	if (!error) {
 		vn_revalidate(vp);
-		mark_inode_dirty_sync(inode);
 	}
 	return error;
 }

@@ -29,7 +29,7 @@ config AGP_ALI
 	tristate "ALI chipset support"
 	depends on AGP && X86 && !X86_64
 	---help---
-	  This option gives you AGP support for the GLX component of the
+	  This option gives you AGP support for the GLX component of
 	  XFree86 4.x on the following ALi chipsets.  The supported chipsets
 	  include M1541, M1621, M1631, M1632, M1641,M1647,and M1651.
 	  For the ALi-chipset question, ALi suggests you refer to
@@ -47,25 +47,27 @@ config AGP_AMD
 	tristate "AMD Irongate, 761, and 762 chipset support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option gives you AGP support for the GLX component of the
+	  This option gives you AGP support for the GLX component of
 	  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
 config AGP_AMD_8151
-	tristate "AMD 8151 chipset support"
+	tristate "AMD Opteron/Athlon64 on-CPU GART support"
 	depends on AGP && X86
 	default GART_IOMMU
 	help
-	  Say Y here to support the AMD 8151 AGP bridge and the builtin
-	  GART on the AMD Athlon64/Opteron ("Hammer") CPUs.
+	  This option gives you AGP support for the GLX component of
+	  XFree86 4.x using the on-CPU AGP bridge of the AMD Athlon64/Opteron CPUs.
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N
 
 config AGP_INTEL
 	tristate "Intel 440LX/BX/GX, I8xx and E7x05 chipset support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option gives you AGP support for the GLX component of the
+	  This option gives you AGP support for the GLX component of
 	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860
 	  E7205 and E7505 chipsets and full support for the 810, 815, 830M, 845G,
 	  852GM, 855GM and 865G integrated graphics chipsets.
@@ -78,7 +80,7 @@ config AGP_NVIDIA
 	tristate "NVIDIA nForce/nForce2 chipset support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option gives you AGP support for the GLX component of the
+	  This option gives you AGP support for the GLX component of
 	  XFree86 4.x on the following NVIDIA chipsets.  The supported chipsets
 	  include nForce and nForce2
 
@@ -86,9 +88,8 @@ config AGP_SIS
 	tristate "SiS chipset support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option gives you AGP support for the GLX component of the "soon
-	  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
-	  chipsets.
+	  This option gives you AGP support for the GLX component of
+	  XFree86 4.x on Silicon Integrated Systems [SiS] chipsets.
 
 	  Note that 5591/5592 AGP chipsets are NOT supported.
 
@@ -106,7 +107,7 @@ config AGP_VIA
 	tristate "VIA chipset support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option gives you AGP support for the GLX component of the
+	  This option gives you AGP support for the GLX component of
 	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
@@ -130,4 +131,11 @@ config AGP_ALPHA_CORE
 	tristate "Alpha AGP support"
 	depends on AGP && (ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL)
 	default AGP
+
+config AGP_UNINORTH
+	tristate "Apple UniNorth AGP support"
+	depends on AGP && ALL_PPC
+	help
+	  This option gives you AGP support for Apple machines with a
+	  UniNorth bridge.
 

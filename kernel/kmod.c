@@ -264,22 +264,6 @@ out:
 	return sub_info.retval;
 }
 
-/*
- * This is for the serialisation of device probe() functions
- * against device open() functions
- */
-static DECLARE_MUTEX(dev_probe_sem);
-
-void dev_probe_lock(void)
-{
-	down(&dev_probe_sem);
-}
-
-void dev_probe_unlock(void)
-{
-	up(&dev_probe_sem);
-}
-
 EXPORT_SYMBOL(call_usermodehelper);
 
 #ifdef CONFIG_KMOD

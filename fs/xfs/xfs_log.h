@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -153,7 +153,6 @@ xfs_lsn_t xfs_log_done(struct xfs_mount *mp,
 int	  xfs_log_force(struct xfs_mount *mp,
 			xfs_lsn_t	 lsn,
 			uint		 flags);
-int	  xfs_log_init(void);
 int	  xfs_log_mount(struct xfs_mount *mp,
 			dev_t		 log_dev,
 			xfs_daddr_t		 start_block,

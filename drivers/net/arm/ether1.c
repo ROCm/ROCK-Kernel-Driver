@@ -450,6 +450,7 @@ ether1_init_for_open (struct net_device *dev)
 	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
 	int i, status, addr, next, next2;
 	int failures = 0;
+	unsigned long timeout;
 
 	outb (CTRL_RST|CTRL_ACK, REG_CONTROL);
 
@@ -515,19 +516,19 @@ ether1_init_for_open (struct net_device *dev)
 	outb (CTRL_CA, REG_CONTROL);
 
 	/* 586 should now unset iscp.busy */
-	i = jiffies + HZ/2;
+	timeout = jiffies + HZ/2;
 	while (ether1_inw (dev, ISCP_ADDR, iscp_t, iscp_busy, DISABLEIRQS) == 1) {
-		if (time_after(jiffies, i)) {
+		if (time_after(jiffies, timeout)) {
 			printk (KERN_WARNING "%s: can't initialise 82586: iscp is busy\n", dev->name);
 			return 1;
 		}
 	}
 
 	/* check status of commands that we issued */
-	i += HZ/10;
+	timeout += HZ/10;
 	while (((status = ether1_inw (dev, CFG_ADDR, cfg_t, cfg_status, DISABLEIRQS))
 			& STAT_COMPLETE) == 0) {
-		if (time_after(jiffies, i))
+		if (time_after(jiffies, timeout))
 			break;
 	}
 
@@ -541,10 +542,10 @@ ether1_init_for_open (struct net_device *dev)
 		failures += 1;
 	}
 
-	i += HZ/10;
+	timeout += HZ/10;
 	while (((status = ether1_inw (dev, SA_ADDR, sa_t, sa_status, DISABLEIRQS))
 			& STAT_COMPLETE) == 0) {
-		if (time_after(jiffies, i))
+		if (time_after(jiffies, timeout))
 			break;
 	}
 
@@ -558,10 +559,10 @@ ether1_init_for_open (struct net_device *dev)
 		failures += 1;
 	}
 
-	i += HZ/10;
+	timeout += HZ/10;
 	while (((status = ether1_inw (dev, MC_ADDR, mc_t, mc_status, DISABLEIRQS))
 			& STAT_COMPLETE) == 0) {
-		if (time_after(jiffies, i))
+		if (time_after(jiffies, timeout))
 			break;
 	}
 
@@ -575,10 +576,10 @@ ether1_init_for_open (struct net_device *dev)
 		failures += 1;
 	}
 
-	i += HZ;
+	timeout += HZ;
 	while (((status = ether1_inw (dev, TDR_ADDR, tdr_t, tdr_status, DISABLEIRQS))
 			& STAT_COMPLETE) == 0) {
-		if (time_after(jiffies, i))
+		if (time_after(jiffies, timeout))
 			break;
 	}
 

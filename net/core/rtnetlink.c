@@ -52,7 +52,7 @@
 
 DECLARE_MUTEX(rtnl_sem);
 
-void rtnl_lock(void)
+void rtnl_lock()
 {
 	rtnl_shlock();
 	rtnl_exlock();
@@ -62,6 +62,8 @@ void rtnl_unlock(void)
 {
 	rtnl_exunlock();
 	rtnl_shunlock();
+
+	netdev_run_todo();
 }
 
 int rtattr_parse(struct rtattr *tb[], int maxattr, struct rtattr *rta, int len)
@@ -500,6 +502,8 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 		}
 
 		up(&rtnl_sem);
+
+		netdev_run_todo();
 	} while (rtnl && rtnl->receive_queue.qlen);
 }
 
