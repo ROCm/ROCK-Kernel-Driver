@@ -208,6 +208,7 @@ typedef enum pcic_id {
 #define IS_UNKNOWN	0x0400
 #define IS_VG_PWR	0x0800
 #define IS_DF_PWR	0x1000
+#define IS_REGISTERED	0x2000
 #define IS_ALIVE	0x8000
 
 typedef struct pcic_t {
@@ -1403,12 +1404,10 @@ static int __init init_i82365(void)
 	    socket[i].socket.resource_ops = &pccard_nonstatic_ops;
 	    socket[i].socket.owner = THIS_MODULE;
 	    socket[i].number = i;
-	    ret = pcmcia_register_socket(&socket[i].socket);	    
-	    if (ret && i--) {
-		    for (; i>= 0; i--)
-			    pcmcia_unregister_socket(&socket[i].socket);
-		    break;
-	    }
+	    ret = pcmcia_register_socket(&socket[i].socket);
+	    if (!ret)
+		    socket[i].flags |= IS_REGISTERED;
+
 #if 0 /* driver model ordering issue */
 	   class_device_create_file(&socket[i].socket.dev,
 			   	    &class_device_attr_info);
@@ -1435,7 +1434,8 @@ static void __exit exit_i82365(void)
     int i;
 
     for (i = 0; i < sockets; i++) {
-	    pcmcia_unregister_socket(&socket[i].socket);
+	    if (socket[i].flags & IS_REGISTERED)
+		    pcmcia_unregister_socket(&socket[i].socket);
     }
     platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
