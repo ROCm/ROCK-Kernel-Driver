@@ -573,9 +573,6 @@ static int __init pci_intmap_match(struct pci_dev *pdev, unsigned int *interrupt
 	unsigned int hi, mid, lo, irq;
 	int i, num_intmap, map_slot;
 
-	if (pbm->num_pbm_intmap == 0)
-		return 0;
-
 	intmap = &pbm->pbm_intmap[0];
 	intmask = &pbm->pbm_intmask;
 	num_intmap = pbm->num_pbm_intmap;
@@ -673,20 +670,26 @@ static int __init pci_intmap_match(struct pci_dev *pdev, unsigned int *interrupt
 		}
 	}
 
-	/* Print it both to OBP console and kernel one so that if bootup
-	 * hangs here the user has the information to report.
+	/* We will run this code even if pbm->num_pbm_intmap is zero, just so
+	 * we can apply the slot mapping to the PROM interrupt property value.
+	 * So do not spit out these warnings in that case.
 	 */
-	prom_printf("pci_intmap_match: bus %02x, devfn %02x: ",
-		    pdev->bus->number, pdev->devfn);
-	prom_printf("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
-		    pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
-	prom_printf("Please email this information to davem@redhat.com\n");
+	if (num_intmap != 0) {
+		/* Print it both to OBP console and kernel one so that if bootup
+		 * hangs here the user has the information to report.
+		 */
+		prom_printf("pci_intmap_match: bus %02x, devfn %02x: ",
+			    pdev->bus->number, pdev->devfn);
+		prom_printf("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
+			    pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
+		prom_printf("Please email this information to davem@redhat.com\n");
 
-	printk("pci_intmap_match: bus %02x, devfn %02x: ",
-	       pdev->bus->number, pdev->devfn);
-	printk("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
-	       pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
-	printk("Please email this information to davem@redhat.com\n");
+		printk("pci_intmap_match: bus %02x, devfn %02x: ",
+		       pdev->bus->number, pdev->devfn);
+		printk("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
+		       pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
+		printk("Please email this information to davem@redhat.com\n");
+	}
 
 	return 0;
 }
