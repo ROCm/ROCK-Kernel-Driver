@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <sound/core.h>
+#include <linux/errno.h>
 
 int snd_device_new(snd_card_t *card, snd_device_type_t type,
 		   void *device_data, snd_device_ops_t *ops)
