@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -240,8 +240,7 @@ acpi_tb_get_required_tables (
 		if ((status != AE_OK) && (status != AE_TABLE_NOT_SUPPORTED)) {
 			ACPI_REPORT_WARNING (("%s, while getting table at %8.8X%8.8X\n",
 				acpi_format_exception (status),
-				ACPI_HIDWORD (address.pointer.value),
-				ACPI_LODWORD (address.pointer.value)));
+				ACPI_FORMAT_UINT64 (address.pointer.value)));
 		}
 	}
 

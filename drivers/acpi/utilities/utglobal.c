@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -358,7 +358,7 @@ struct acpi_fixed_event_info        acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVE
 	/* ACPI_EVENT_GLOBAL        */  {ACPI_BITREG_GLOBAL_LOCK_STATUS,    ACPI_BITREG_GLOBAL_LOCK_ENABLE,  ACPI_BITMASK_GLOBAL_LOCK_STATUS,    ACPI_BITMASK_GLOBAL_LOCK_ENABLE},
 	/* ACPI_EVENT_POWER_BUTTON  */  {ACPI_BITREG_POWER_BUTTON_STATUS,   ACPI_BITREG_POWER_BUTTON_ENABLE, ACPI_BITMASK_POWER_BUTTON_STATUS,   ACPI_BITMASK_POWER_BUTTON_ENABLE},
 	/* ACPI_EVENT_SLEEP_BUTTON  */  {ACPI_BITREG_SLEEP_BUTTON_STATUS,   ACPI_BITREG_SLEEP_BUTTON_ENABLE, ACPI_BITMASK_SLEEP_BUTTON_STATUS,   ACPI_BITMASK_SLEEP_BUTTON_ENABLE},
-	/* ACPI_EVENT_RTC           */  {ACPI_BITREG_RT_CLOCK_STATUS,       ACPI_BITREG_RT_CLOCK_ENABLE,     0,                                  0},
+	/* ACPI_EVENT_RTC           */  {ACPI_BITREG_RT_CLOCK_STATUS,       ACPI_BITREG_RT_CLOCK_ENABLE,     ACPI_BITMASK_RT_CLOCK_STATUS,       ACPI_BITMASK_RT_CLOCK_ENABLE},
 };
 
 /*****************************************************************************
@@ -531,6 +531,99 @@ acpi_ut_get_object_type_name (
 	}
 
 	return (acpi_ut_get_type_name (ACPI_GET_OBJECT_TYPE (obj_desc)));
+}
+
+
+/*****************************************************************************
+ *
+ * FUNCTION:    acpi_ut_get_node_name
+ *
+ * PARAMETERS:  Object               - A namespace node
+ *
+ * RETURN:      Pointer to a string
+ *
+ * DESCRIPTION: Validate the node and return the node's ACPI name.
+ *
+ ****************************************************************************/
+
+char *
+acpi_ut_get_node_name (
+	void                            *object)
+{
+	struct acpi_namespace_node      *node;
+
+
+	if (!object)
+	{
+		return ("NULL NODE");
+	}
+
+	node = (struct acpi_namespace_node *) object;
+
+	if (node->descriptor != ACPI_DESC_TYPE_NAMED)
+	{
+		return ("****");
+	}
+
+	if (!acpi_ut_valid_acpi_name (* (u32 *) node->name.ascii))
+	{
+		return ("----");
+	}
+
+	return (node->name.ascii);
+}
+
+
+/*****************************************************************************
+ *
+ * FUNCTION:    acpi_ut_get_descriptor_name
+ *
+ * PARAMETERS:  Object               - An ACPI object
+ *
+ * RETURN:      Pointer to a string
+ *
+ * DESCRIPTION: Validate object and return the descriptor type
+ *
+ ****************************************************************************/
+
+static const char                   *acpi_gbl_desc_type_names[] = /* printable names of descriptor types */
+{
+	/* 00 */ "Invalid",
+	/* 01 */ "Cached",
+	/* 02 */ "State-Generic",
+	/* 03 */ "State-Update",
+	/* 04 */ "State-Package",
+	/* 05 */ "State-Control",
+	/* 06 */ "State-root_parse_scope",
+	/* 07 */ "State-parse_scope",
+	/* 08 */ "State-walk_scope",
+	/* 09 */ "State-Result",
+	/* 10 */ "State-Notify",
+	/* 11 */ "State-Thread",
+	/* 12 */ "Walk",
+	/* 13 */ "Parser",
+	/* 14 */ "Operand",
+	/* 15 */ "Node"
+};
+
+
+char *
+acpi_ut_get_descriptor_name (
+	void                            *object)
+{
+
+	if (!object)
+	{
+		return ("NULL OBJECT");
+	}
+
+	if (ACPI_GET_DESCRIPTOR_TYPE (object) > ACPI_DESC_TYPE_MAX)
+	{
+		return ((char *) acpi_gbl_bad_type);
+	}
+
+	return ((char *) acpi_gbl_desc_type_names[ACPI_GET_DESCRIPTOR_TYPE (object)]);
+
 }
 
 

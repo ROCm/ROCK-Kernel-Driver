@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -173,7 +173,7 @@ acpi_install_address_space_handler (
 		 * The attached device object already exists.
 		 * Make sure the handler is not already installed.
 		 */
-		handler_obj = obj_desc->device.address_space;
+		handler_obj = obj_desc->device.handler;
 
 		/* Walk the handler list for this device */
 
@@ -240,7 +240,8 @@ acpi_install_address_space_handler (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 		"Installing address handler for region %s(%X) on Device %4.4s %p(%p)\n",
-		acpi_ut_get_region_name (space_id), space_id, node->name.ascii, node, obj_desc));
+		acpi_ut_get_region_name (space_id), space_id,
+		acpi_ut_get_node_name (node), node, obj_desc));
 
 	/*
 	 * Install the handler
@@ -267,13 +268,13 @@ acpi_install_address_space_handler (
 
 	/* Install at head of Device.address_space list */
 
-	handler_obj->address_space.next      = obj_desc->device.address_space;
+	handler_obj->address_space.next      = obj_desc->device.handler;
 
 	/*
 	 * The Device object is the first reference on the handler_obj.
 	 * Each region that uses the handler adds a reference.
 	 */
-	obj_desc->device.address_space = handler_obj;
+	obj_desc->device.handler = handler_obj;
 
 	/*
 	 * Walk the namespace finding all of the regions this
@@ -289,6 +290,17 @@ acpi_install_address_space_handler (
 	 */
 	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, device, ACPI_UINT32_MAX,
 			  ACPI_NS_WALK_UNLOCK, acpi_ev_install_handler,
+			  handler_obj, NULL);
+
+	/*
+	 * Now we can run the _REG methods for all Regions for this
+	 * space ID.  This is a separate walk in order to handle any
+	 * interdependencies between regions and _REG methods.  (i.e. handlers
+	 * must be installed for all regions of this Space ID before we
+	 * can run any _REG methods.
+	 */
+	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, device, ACPI_UINT32_MAX,
+			  ACPI_NS_WALK_UNLOCK, acpi_ev_reg_run,
 			  handler_obj, NULL);
 
 unlock_and_exit:
@@ -357,8 +369,8 @@ acpi_remove_address_space_handler (
 
 	/* Find the address handler the user requested */
 
-	handler_obj = obj_desc->device.address_space;
-	last_obj_ptr = &obj_desc->device.address_space;
+	handler_obj = obj_desc->device.handler;
+	last_obj_ptr = &obj_desc->device.handler;
 	while (handler_obj) {
 		/* We have a handler, see if user requested this one */
 

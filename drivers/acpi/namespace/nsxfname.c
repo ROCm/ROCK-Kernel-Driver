@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -199,7 +199,7 @@ acpi_get_name (
 
 	/* Just copy the ACPI name from the Node and zero terminate it */
 
-	ACPI_STRNCPY (buffer->pointer, node->name.ascii,
+	ACPI_STRNCPY (buffer->pointer, acpi_ut_get_node_name (node),
 			 ACPI_NAME_SIZE);
 	((char *) buffer->pointer) [ACPI_NAME_SIZE] = 0;
 	status = AE_OK;

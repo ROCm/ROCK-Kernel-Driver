@@ -1650,10 +1650,6 @@ static void __init setup_ioapic_ids_from_mpc(void)
 	unsigned char old_id;
 	unsigned long flags;
 
-	if (acpi_ioapic)
-		/* This gets done during IOAPIC enumeration for ACPI. */
-		return;
-
 	/*
 	 * This is broken; anything with a real cpu count has to
 	 * circumvent this idiocy regardless.
@@ -2286,12 +2282,14 @@ void __init setup_IO_APIC(void)
 	/*
 	 * Set up IO-APIC IRQ routing.
 	 */
-	setup_ioapic_ids_from_mpc();
+	if (!acpi_ioapic)
+		setup_ioapic_ids_from_mpc();
 	sync_Arb_IDs();
 	setup_IO_APIC_irqs();
 	init_IO_APIC_traps();
 	check_timer();
-	print_IO_APIC();
+	if (!acpi_ioapic)
+		print_IO_APIC();
 }
 
 /*

@@ -59,7 +59,7 @@ static struct dongle_driver tekram = {
 	.set_speed	= tekram_change_speed,
 };
 
-int __init tekram_sir_init(void)
+static int __init tekram_sir_init(void)
 {
 	if (tekram_delay < 1  ||  tekram_delay > 500)
 		tekram_delay = 200;
@@ -68,7 +68,7 @@ int __init tekram_sir_init(void)
 	return irda_register_dongle(&tekram);
 }
 
-void __exit tekram_sir_cleanup(void)
+static void __exit tekram_sir_cleanup(void)
 {
 	irda_unregister_dongle(&tekram);
 }

@@ -93,12 +93,12 @@ static struct dongle_driver act200l = {
 	.set_speed	= act200l_change_speed,
 };
 
-int __init act200l_init(void)
+static int __init act200l_init(void)
 {
 	return irda_register_dongle(&act200l);
 }
 
-void __exit act200l_cleanup(void)
+static void __exit act200l_cleanup(void)
 {
 	irda_unregister_dongle(&act200l);
 }

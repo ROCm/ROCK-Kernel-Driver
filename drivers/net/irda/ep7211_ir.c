@@ -97,7 +97,7 @@ static int ep7211_ir_reset(struct irda_task *task)
  *    Initialize EP7211 I/R module
  *
  */
-int __init ep7211_ir_init(void)
+static int __init ep7211_ir_init(void)
 {
 	return irda_device_register_dongle(&dongle);
 }

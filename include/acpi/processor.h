@@ -72,6 +72,8 @@ struct acpi_processor_performance {
 	int			platform_limit;
 	u16			control_register;
 	u16			status_register;
+	u8			control_register_bit_width;
+	u8			status_register_bit_width;
 	int			state_count;
 	struct acpi_processor_px states[ACPI_PROCESSOR_MAX_PERFORMANCE];
 	struct cpufreq_frequency_table freq_table[ACPI_PROCESSOR_MAX_PERFORMANCE];

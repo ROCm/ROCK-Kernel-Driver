@@ -951,6 +951,8 @@ void __init mp_parse_prt (void)
 			entry->irq);
 	}
 	
+	print_IO_APIC();
+
 	return;
 }
 

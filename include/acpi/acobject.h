@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -114,7 +114,7 @@
 #define ACPI_COMMON_NOTIFY_INFO \
 	union acpi_operand_object               *system_notify;     /* Handler for system notifies */\
 	union acpi_operand_object               *device_notify;     /* Handler for driver notifies */\
-	union acpi_operand_object               *address_space;     /* Handler for Address space */
+	union acpi_operand_object               *handler;           /* Handler for Address space */
 
 
 /******************************************************************************
@@ -214,7 +214,7 @@ struct acpi_object_region
 	ACPI_OBJECT_COMMON_HEADER
 
 	u8                                      space_id;
-	union acpi_operand_object               *address_space;     /* Handler for region access */
+	union acpi_operand_object               *handler;           /* Handler for region access */
 	struct acpi_namespace_node              *node;              /* containing object */
 	union acpi_operand_object               *next;
 	u32                                     length;
@@ -464,21 +464,22 @@ union acpi_operand_object
 
 /* Object descriptor types */
 
-#define ACPI_DESC_TYPE_CACHED           0x11        /* Used only when object is cached */
-#define ACPI_DESC_TYPE_STATE            0x20
-#define ACPI_DESC_TYPE_STATE_UPDATE     0x21
-#define ACPI_DESC_TYPE_STATE_PACKAGE    0x22
-#define ACPI_DESC_TYPE_STATE_CONTROL    0x23
-#define ACPI_DESC_TYPE_STATE_RPSCOPE    0x24
-#define ACPI_DESC_TYPE_STATE_PSCOPE     0x25
-#define ACPI_DESC_TYPE_STATE_WSCOPE     0x26
-#define ACPI_DESC_TYPE_STATE_RESULT     0x27
-#define ACPI_DESC_TYPE_STATE_NOTIFY     0x28
-#define ACPI_DESC_TYPE_STATE_THREAD     0x29
-#define ACPI_DESC_TYPE_WALK             0x44
-#define ACPI_DESC_TYPE_PARSER           0x66
-#define ACPI_DESC_TYPE_OPERAND          0x88
-#define ACPI_DESC_TYPE_NAMED            0xAA
+#define ACPI_DESC_TYPE_CACHED           0x01        /* Used only when object is cached */
+#define ACPI_DESC_TYPE_STATE            0x02
+#define ACPI_DESC_TYPE_STATE_UPDATE     0x03
+#define ACPI_DESC_TYPE_STATE_PACKAGE    0x04
+#define ACPI_DESC_TYPE_STATE_CONTROL    0x05
+#define ACPI_DESC_TYPE_STATE_RPSCOPE    0x06
+#define ACPI_DESC_TYPE_STATE_PSCOPE     0x07
+#define ACPI_DESC_TYPE_STATE_WSCOPE     0x08
+#define ACPI_DESC_TYPE_STATE_RESULT     0x09
+#define ACPI_DESC_TYPE_STATE_NOTIFY     0x0A
+#define ACPI_DESC_TYPE_STATE_THREAD     0x0B
+#define ACPI_DESC_TYPE_WALK             0x0C
+#define ACPI_DESC_TYPE_PARSER           0x0D
+#define ACPI_DESC_TYPE_OPERAND          0x0E
+#define ACPI_DESC_TYPE_NAMED            0x0F
+#define ACPI_DESC_TYPE_MAX              0x0F
 
 
 union acpi_descriptor

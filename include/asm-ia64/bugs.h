@@ -4,8 +4,10 @@
  * Needs:
  *	void check_bugs(void);
  *
- * Copyright (C) 1998, 1999, 2003 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Based on <asm-alpha/bugs.h>.
+ *
+ * Modified 1998, 1999, 2003
+ *	David Mosberger-Tang <davidm@hpl.hp.com>,  Hewlett-Packard Co.
  */
 #ifndef _ASM_IA64_BUGS_H
 #define _ASM_IA64_BUGS_H

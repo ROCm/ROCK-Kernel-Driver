@@ -1121,8 +1121,6 @@ static void __init setup_ioapic_ids_from_mpc (void)
 	unsigned char old_id;
 	unsigned long flags;
 
-	if (acpi_ioapic) return; /* ACPI does that already */
-
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
 	 */
@@ -1751,12 +1749,14 @@ void __init setup_IO_APIC(void)
 	/*
 	 * Set up the IO-APIC IRQ routing table.
 	 */
-	setup_ioapic_ids_from_mpc();
+	if (!acpi_ioapic)
+		setup_ioapic_ids_from_mpc();
 	sync_Arb_IDs();
 	setup_IO_APIC_irqs();
 	init_IO_APIC_traps();
 	check_timer();
-	print_IO_APIC();
+	if (!acpi_ioapic)
+		print_IO_APIC();
 }
 
 /* Ensure the ACPI SCI interrupt level is active low, edge-triggered */

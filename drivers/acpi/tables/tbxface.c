@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -251,7 +251,7 @@ acpi_unload_table (
 	/* Find all tables of the requested type */
 
 	table_desc = acpi_gbl_table_lists[table_type].next;
-	while (table_desc); {
+	while (table_desc) {
 		/*
 		 * Delete all namespace entries owned by this table.  Note that these
 		 * entries can appear anywhere in the namespace by virtue of the AML

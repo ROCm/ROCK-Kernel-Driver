@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -89,27 +89,27 @@ acpi_ex_dump_operand (
 
 	if (!obj_desc) {
 		/*
-		 * This usually indicates that something serious is wrong --
-		 * since most (if not all)
-		 * code that dumps the stack expects something to be there!
+		 * This usually indicates that something serious is wrong
 		 */
-		acpi_os_printf ("Null stack entry ptr\n");
+		acpi_os_printf ("Null Object Descriptor\n");
 		return;
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p NS Node: ", obj_desc));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p is a NS Node: ", obj_desc));
 		ACPI_DUMP_ENTRY (obj_desc, ACPI_LV_EXEC);
 		return;
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p is not a local object\n", obj_desc));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+				"%p is not a node or operand object: [%s]\n",
+				obj_desc, acpi_ut_get_descriptor_name (obj_desc)));
 		ACPI_DUMP_BUFFER (obj_desc, sizeof (union acpi_operand_object));
 		return;
 	}
 
-	/*  obj_desc is a valid object */
+	/* obj_desc is a valid object */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
 
@@ -151,11 +151,10 @@ acpi_ex_dump_operand (
 					 obj_desc->reference.offset);
 
 			if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
-				/* Value is a Number */
+				/* Value is an Integer */
 
 				acpi_os_printf (" value is [%8.8X%8.8x]",
-						 ACPI_HIDWORD(obj_desc->integer.value),
-						 ACPI_LODWORD(obj_desc->integer.value));
+						 ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 			}
 
 			acpi_os_printf ("\n");
@@ -169,11 +168,10 @@ acpi_ex_dump_operand (
 
 			if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 
-				/* Value is a Number */
+				/* Value is an Integer */
 
 				acpi_os_printf (" value is [%8.8X%8.8x]",
-						 ACPI_HIDWORD(obj_desc->integer.value),
-						 ACPI_LODWORD(obj_desc->integer.value));
+						 ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 			}
 
 			acpi_os_printf ("\n");
@@ -189,7 +187,7 @@ acpi_ex_dump_operand (
 
 		default:
 
-			/*  unknown opcode  */
+			/* Unknown opcode */
 
 			acpi_os_printf ("Unknown Reference opcode=%X\n",
 				obj_desc->reference.opcode);
@@ -229,8 +227,7 @@ acpi_ex_dump_operand (
 	case ACPI_TYPE_INTEGER:
 
 		acpi_os_printf ("Integer %8.8X%8.8X\n",
-				 ACPI_HIDWORD (obj_desc->integer.value),
-				 ACPI_LODWORD (obj_desc->integer.value));
+				 ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 		break;
 
 
@@ -271,8 +268,7 @@ acpi_ex_dump_operand (
 		}
 		else {
 			acpi_os_printf (" base %8.8X%8.8X Length %X\n",
-				ACPI_HIDWORD (obj_desc->region.address),
-				ACPI_LODWORD (obj_desc->region.address),
+				ACPI_FORMAT_UINT64 (obj_desc->region.address),
 				obj_desc->region.length);
 		}
 		break;
@@ -494,7 +490,7 @@ acpi_ex_out_address (
 	acpi_os_printf ("%20s : %p\n", title, value);
 #else
 	acpi_os_printf ("%20s : %8.8X%8.8X\n", title,
-			 ACPI_HIDWORD (value), ACPI_LODWORD (value));
+			 ACPI_FORMAT_UINT64 (value));
 #endif
 }
 
@@ -525,7 +521,7 @@ acpi_ex_dump_node (
 		}
 	}
 
-	acpi_os_printf ("%20s : %4.4s\n",     "Name", node->name.ascii);
+	acpi_os_printf ("%20s : %4.4s\n",     "Name", acpi_ut_get_node_name (node));
 	acpi_ex_out_string ("Type",           acpi_ut_get_type_name (node->type));
 	acpi_ex_out_integer ("Flags",         node->flags);
 	acpi_ex_out_integer ("Owner Id",      node->owner_id);
@@ -573,7 +569,8 @@ acpi_ex_dump_object_descriptor (
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
-		acpi_os_printf ("ex_dump_object_descriptor: %p is not a valid ACPI object\n", obj_desc);
+		acpi_os_printf ("ex_dump_object_descriptor: %p is not an ACPI operand object: [%s]\n",
+				obj_desc, acpi_ut_get_descriptor_name (obj_desc));
 		return_VOID;
 	}
 
@@ -589,8 +586,7 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_INTEGER:
 
 		acpi_os_printf ("%20s : %8.8X%8.8X\n", "Value",
-				  ACPI_HIDWORD (obj_desc->integer.value),
-				  ACPI_LODWORD (obj_desc->integer.value));
+				ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 		break;
 
 
@@ -635,7 +631,7 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_DEVICE:
 
-		acpi_ex_out_pointer ("address_space", obj_desc->device.address_space);
+		acpi_ex_out_pointer ("Handler",     obj_desc->device.handler);
 		acpi_ex_out_pointer ("system_notify", obj_desc->device.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->device.device_notify);
 		break;
@@ -673,7 +669,7 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("Flags",        obj_desc->region.flags);
 		acpi_ex_out_address ("Address",      obj_desc->region.address);
 		acpi_ex_out_integer ("Length",       obj_desc->region.length);
-		acpi_ex_out_pointer ("address_space", obj_desc->region.address_space);
+		acpi_ex_out_pointer ("Handler",      obj_desc->region.handler);
 		acpi_ex_out_pointer ("Next",         obj_desc->region.next);
 		break;
 
@@ -694,7 +690,7 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_address ("Address",      (acpi_physical_address) obj_desc->processor.address);
 		acpi_ex_out_pointer ("system_notify", obj_desc->processor.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->processor.device_notify);
-		acpi_ex_out_pointer ("address_space", obj_desc->processor.address_space);
+		acpi_ex_out_pointer ("Handler",      obj_desc->processor.handler);
 		break;
 
 
@@ -702,7 +698,7 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_pointer ("system_notify", obj_desc->thermal_zone.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->thermal_zone.device_notify);
-		acpi_ex_out_pointer ("address_space", obj_desc->thermal_zone.address_space);
+		acpi_ex_out_pointer ("Handler",      obj_desc->thermal_zone.handler);
 		break;
 
 

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -195,7 +195,8 @@ acpi_ev_queue_notify_request (
 		/* There is no per-device notify handler for this device */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"No notify handler for [%4.4s] node %p\n", node->name.ascii, node));
+			"No notify handler for [%4.4s] node %p\n",
+			acpi_ut_get_node_name (node), node));
 	}
 
 	return (status);

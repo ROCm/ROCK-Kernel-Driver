@@ -73,8 +73,8 @@ MODULE_DESCRIPTION(ACPI_HOTK_NAME);
 MODULE_LICENSE("GPL");
 
 
-static uid_t asus_uid = 0;
-static gid_t asus_gid = 0;
+static uid_t asus_uid;
+static gid_t asus_gid;
 MODULE_PARM(asus_uid, "i");
 MODULE_PARM_DESC(uid, "UID for entries in /proc/acpi/asus.\n");
 MODULE_PARM(asus_gid, "i");
@@ -192,14 +192,14 @@ static struct model_data model_conf[END_MODEL] = {
 };
 
 /* procdir we use */
-static struct proc_dir_entry *asus_proc_dir = NULL;
+static struct proc_dir_entry *asus_proc_dir;
 
 /*
  * This header is made available to allow proper configuration given model,
  * revision number , ... this info cannot go in struct asus_hotk because it is
  * available before the hotk
  */
-static struct acpi_table_header *asus_info = NULL;
+static struct acpi_table_header *asus_info;
 
 /*
  * The hotkey driver declaration

@@ -53,10 +53,6 @@
 
 #define ACPI_PCI_COMPONENT		0x00400000
 
-/* ACPI PCI Root Bridge (pci_root.c) */
-
-void acpi_pci_get_translations (struct acpi_pci_id* id, u64* mem_tra, u64* io_tra);
-
 /* ACPI PCI Interrupt Link (pci_link.c) */
 
 int acpi_pci_link_check (void);

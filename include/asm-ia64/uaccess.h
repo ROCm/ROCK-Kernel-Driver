@@ -26,6 +26,8 @@
  * associated and, if so, sets r8 to -EFAULT and clears r9 to 0 and
  * then resumes execution at the continuation point.
  *
+ * Based on <asm-alpha/uaccess.h>.
+ *
  * Copyright (C) 1998, 1999, 2001-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */

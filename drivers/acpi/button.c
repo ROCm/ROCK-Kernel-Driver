@@ -107,7 +107,7 @@ static struct file_operations acpi_button_state_fops = {
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-static struct proc_dir_entry	*acpi_button_dir = NULL;
+static struct proc_dir_entry	*acpi_button_dir;
 
 static int acpi_button_info_seq_show(struct seq_file *seq, void *offset)
 {

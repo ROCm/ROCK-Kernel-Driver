@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/apm_bios.h>
 #include <linux/slab.h>
+#include <asm/acpi.h>
 #include <asm/io.h>
 #include <linux/pm.h>
 #include <asm/system.h>
@@ -16,6 +17,7 @@ EXPORT_SYMBOL(dmi_broken);
 
 int is_sony_vaio_laptop;
 int is_unsafe_smbus;
+int es7000_plat = 0;
 
 struct dmi_header
 {
@@ -520,6 +522,7 @@ static __init int print_if_true(struct dmi_blacklist *d)
 }
 
 
+#ifdef	CONFIG_ACPI_BOOT
 extern int acpi_disabled, acpi_force;
 
 static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d) 
@@ -534,8 +537,6 @@ static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d)
 	return 0;
 } 
 
-
-#ifdef	CONFIG_ACPI_BOOT
 extern int acpi_ht;
 
 /*
@@ -558,10 +559,8 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 #ifdef	CONFIG_ACPI_PCI
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
 { 
-	extern __init void pci_disable_acpi(void) ;
-
 	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	pci_disable_acpi();
+	acpi_noirq_set();
 	return 0;
 } 
 #endif
@@ -1065,6 +1064,7 @@ static __init void dmi_check_blacklist(void)
 				printk(KERN_NOTICE "ACPI disabled because your bios is from %s and too old\n", s);
 				printk(KERN_NOTICE "You can enable it with acpi=force\n");
 				acpi_disabled = 1; 
+				acpi_ht = 0;
 			} 
 		}
 	}

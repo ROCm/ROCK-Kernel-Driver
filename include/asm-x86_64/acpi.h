@@ -100,25 +100,26 @@ __acpi_release_global_lock (unsigned int *lock)
         :"0"(n_hi), "1"(n_lo))
 
 
-#ifndef CONFIG_ACPI_BOOT
-#define acpi_lapic 0
-#define acpi_ioapic 0
-#else
-#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_ACPI_BOOT
 extern int acpi_lapic;
-#else
-#define acpi_lapic 0
-#endif
-#ifdef CONFIG_X86_IO_APIC
 extern int acpi_ioapic;
-#else
-#define acpi_ioapic 0
-#endif
+extern int acpi_noirq;
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
 
-#endif /*CONFIG_ACPI_BOOT*/
+#else	/* !CONFIG_ACPI_BOOT */
+#define acpi_lapic 0
+#define acpi_ioapic 0
+#endif /* !CONFIG_ACPI_BOOT */
+
+#ifdef CONFIG_ACPI_PCI
+static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
+extern int acpi_irq_balance_set(char *str);
+#else
+static inline void acpi_noirq_set(void) { }
+static inline int acpi_irq_balance_set(char *str) { return 0; }
+#endif
 
 #ifdef CONFIG_ACPI_SLEEP
 

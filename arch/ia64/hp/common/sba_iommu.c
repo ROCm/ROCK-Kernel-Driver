@@ -158,6 +158,10 @@
 #define IOC_TCNFG	0x318
 #define IOC_PDIR_BASE	0x320
 
+#define IOC_ROPE0_CFG	0x500
+#define   IOC_ROPE_AO	  0x10	/* Allow "Relaxed Ordering" */
+
+
 /* AGP GART driver looks for this */
 #define ZX1_SBA_IOMMU_COOKIE	0x0000badbadc0ffeeUL
 
@@ -1361,6 +1365,7 @@ ioc_iova_init(struct ioc *ioc)
 #ifdef FULL_VALID_PDIR
 	unsigned long index;
 #endif
+	unsigned int i;
 
 	/*
 	** Firmware programs the base and size of a "safe IOVA space"
@@ -1455,6 +1460,18 @@ ioc_iova_init(struct ioc *ioc)
 	/* Enable IOVA translation */
 	WRITE_REG(ioc->ibase | 1, ioc->ioc_hpa + IOC_IBASE);
 	READ_REG(ioc->ioc_hpa + IOC_IBASE);
+
+	/* Clear ROPE(N)_CONFIG AO bit.
+	** Disables "NT Ordering" (~= !"Relaxed Ordering")
+	** Overrides bit 1 in DMA Hint Sets.
+	** Improves netperf UDP_STREAM by ~10% for tg3 on bcm5701.
+	*/
+	for (i=0; i<(8*8); i+=8) {
+		unsigned long rope_config;
+		rope_config = READ_REG(ioc->ioc_hpa + IOC_ROPE0_CFG + i);
+		rope_config &= ~IOC_ROPE_AO;
+		WRITE_REG(rope_config, ioc->ioc_hpa + IOC_ROPE0_CFG + i);
+	}
 }
 
 static void __init

@@ -7,8 +7,10 @@
  * space pollution is not a major issue.  However, for interoperability, libraries still
  * need to be careful to avoid a name clashes.
  *
- * Copyright (C) 1998-2000, 2002 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Based on <asm-alpha/types.h>.
+ *
+ * Modified 1998-2000, 2002
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 #ifdef __ASSEMBLY__

@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -567,12 +567,12 @@ acpi_ds_store_object_to_local (
 	acpi_status                     status;
 	struct acpi_namespace_node      *node;
 	union acpi_operand_object       *current_obj_desc;
+	union acpi_operand_object       *new_obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ds_store_object_to_local");
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode=%d Idx=%d Obj=%p\n",
 		opcode, index, obj_desc));
-
 
 	/* Parameter validation */
 
@@ -592,6 +592,18 @@ acpi_ds_store_object_to_local (
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p already installed!\n",
 			obj_desc));
 		return_ACPI_STATUS (status);
+	}
+
+	/*
+	 * If the reference count on the object is more than one, we must
+	 * take a copy of the object before we store.
+	 */
+	new_obj_desc = obj_desc;
+	if (obj_desc->common.reference_count > 1) {
+		status = acpi_ut_copy_iobject_to_iobject (obj_desc, &new_obj_desc, walk_state);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/*
@@ -624,8 +636,8 @@ acpi_ds_store_object_to_local (
 			 * operand objects of type Reference.
 			 */
 			if (ACPI_GET_DESCRIPTOR_TYPE (current_obj_desc) != ACPI_DESC_TYPE_OPERAND) {
-				ACPI_REPORT_ERROR (("Invalid descriptor type while storing to method arg: %X\n",
-					current_obj_desc->common.type));
+				ACPI_REPORT_ERROR (("Invalid descriptor type while storing to method arg: [%s]\n",
+						acpi_ut_get_descriptor_name (current_obj_desc)));
 				return_ACPI_STATUS (AE_AML_INTERNAL);
 			}
 
@@ -636,15 +648,21 @@ acpi_ds_store_object_to_local (
 			if ((current_obj_desc->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
 				(current_obj_desc->reference.opcode == AML_REF_OF_OP)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-					"Arg (%p) is an obj_ref(Node), storing in node %p\n",
-					obj_desc, current_obj_desc));
+						"Arg (%p) is an obj_ref(Node), storing in node %p\n",
+						new_obj_desc, current_obj_desc));
 
 				/*
 				 * Store this object to the Node
 				 * (perform the indirect store)
 				 */
-				status = acpi_ex_store_object_to_node (obj_desc,
+				status = acpi_ex_store_object_to_node (new_obj_desc,
 						 current_obj_desc->reference.object, walk_state);
+
+				/* Remove local reference if we copied the object above */
+
+				if (new_obj_desc != obj_desc) {
+					acpi_ut_remove_reference (new_obj_desc);
+				}
 				return_ACPI_STATUS (status);
 			}
 		}
@@ -657,12 +675,18 @@ acpi_ds_store_object_to_local (
 	}
 
 	/*
-	 * Install the obj_stack descriptor (*obj_desc) into
+	 * Install the Obj descriptor (*new_obj_desc) into
 	 * the descriptor for the Arg or Local.
-	 * Install the new object in the stack entry
 	 * (increments the object reference count by one)
 	 */
-	status = acpi_ds_method_data_set_value (opcode, index, obj_desc, walk_state);
+	status = acpi_ds_method_data_set_value (opcode, index, new_obj_desc, walk_state);
+
+	/* Remove local reference if we copied the object above */
+
+	if (new_obj_desc != obj_desc) {
+		acpi_ut_remove_reference (new_obj_desc);
+	}
+
 	return_ACPI_STATUS (status);
 }
 

@@ -489,18 +489,35 @@ END(clone)
 	 * because some system calls (such as ia64_execve) directly
 	 * manipulate ar.pfs.
 	 */
-	.global ia64_strace_leave_kernel
-
 GLOBAL_ENTRY(ia64_trace_syscall)
 	PT_REGS_UNWIND_INFO(0)
-{	/*
-	 * Some versions of gas generate bad unwind info if the first instruction of a
-	 * procedure doesn't go into the first slot of a bundle.  This is a workaround.
+	/*
+	 * We need to preserve the scratch registers f6-f11 in case the system
+	 * call is sigreturn.
 	 */
-	nop.m 0
-	nop.i 0
+	adds r16=PT(F6)+16,sp
+	adds r17=PT(F7)+16,sp
+	;;
+ 	stf.spill [r16]=f6,32
+ 	stf.spill [r17]=f7,32
+	;;
+ 	stf.spill [r16]=f8,32
+ 	stf.spill [r17]=f9,32
+	;;
+ 	stf.spill [r16]=f10
+ 	stf.spill [r17]=f11
 	br.call.sptk.many rp=syscall_trace // give parent a chance to catch syscall args
-}
+	adds r16=PT(F6)+16,sp
+	adds r17=PT(F7)+16,sp
+	;;
+	ldf.fill f6=[r16],32
+	ldf.fill f7=[r17],32
+	;;
+	ldf.fill f8=[r16],32
+	ldf.fill f9=[r17],32
+	;;
+	ldf.fill f10=[r16]
+	ldf.fill f11=[r17]
 	// the syscall number may have changed, so re-load it and re-calculate the
 	// syscall entry-point:
 	adds r15=PT(R15)+16,sp			// r15 = &pt_regs.r15 (syscall #)
@@ -529,9 +546,8 @@ GLOBAL_ENTRY(ia64_trace_syscall)
 .strace_save_retval:
 .mem.offset 0,0; st8.spill [r2]=r8		// store return value in slot for r8
 .mem.offset 8,0; st8.spill [r3]=r10		// clear error indication in slot for r10
-ia64_strace_leave_kernel:
 	br.call.sptk.many rp=syscall_trace // give parent a chance to catch return value
-.rety:	br.cond.sptk ia64_leave_syscall
+.ret3:	br.cond.sptk ia64_leave_syscall
 
 strace_error:
 	ld8 r3=[r2]				// load pt_regs.r8
@@ -544,6 +560,23 @@ strace_error:
 (p6)	mov r8=r9
 	br.cond.sptk .strace_save_retval
 END(ia64_trace_syscall)
+
+	/*
+	 * When traced and returning from sigreturn, we invoke syscall_trace but then
+	 * go straight to ia64_leave_kernel rather than ia64_leave_syscall.
+	 */
+GLOBAL_ENTRY(ia64_strace_leave_kernel)
+	PT_REGS_UNWIND_INFO(0)
+{	/*
+	 * Some versions of gas generate bad unwind info if the first instruction of a
+	 * procedure doesn't go into the first slot of a bundle.  This is a workaround.
+	 */
+	nop.m 0
+	nop.i 0
+	br.call.sptk.many rp=syscall_trace // give parent a chance to catch return value
+}
+.ret4:	br.cond.sptk ia64_leave_kernel
+END(ia64_strace_leave_kernel)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
