@@ -5,7 +5,6 @@
 LDFLAGS		:=
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux	:= -e startup_32
-LDFLAGS_BLOB	:= --format binary --oformat elf32-m32r
 
 CFLAGS += -pipe -fno-schedule-insns
 CFLAGS_KERNEL += -mmodel=medium

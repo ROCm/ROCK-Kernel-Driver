@@ -38,7 +38,12 @@ allmodconfig: $(obj)/conf
 	$< -m arch/$(ARCH)/Kconfig
 
 defconfig: $(obj)/conf
+ifeq ($(KBUILD_DEFCONFIG),)
 	$< -d arch/$(ARCH)/Kconfig
+else
+	@echo *** Default configuration is based on '$(KBUILD_DEFCONFIG)'
+	$(Q)$< -D arch/$(ARCH)/configs/$(KBUILD_DEFCONFIG) arch/$(ARCH)/Kconfig
+endif
 
 %_defconfig: $(obj)/conf
 	$(Q)$< -D arch/$(ARCH)/configs/$@ arch/$(ARCH)/Kconfig
@@ -65,11 +70,9 @@ help:
 #         Based on GTK which needs to be installed to compile it
 # object files used by all kconfig flavours
 
-libkconfig-objs := zconf.tab.o
-
 hostprogs-y	:= conf mconf qconf gconf
-conf-objs	:= conf.o  libkconfig.so
-mconf-objs	:= mconf.o libkconfig.so
+conf-objs	:= conf.o  zconf.tab.o
+mconf-objs	:= mconf.o zconf.tab.o
 
 ifeq ($(MAKECMDGOALS),xconfig)
 	qconf-target := 1
@@ -88,7 +91,7 @@ ifeq ($(gconf-target),1)
 gconf-objs	:= gconf.o kconfig_load.o
 endif
 
-clean-files	:= libkconfig.so lkc_defs.h qconf.moc .tmp_qtcheck \
+clean-files	:= lkc_defs.h qconf.moc .tmp_qtcheck \
 		   .tmp_gtkcheck zconf.tab.c zconf.tab.h lex.zconf.c
 
 # generated files seem to need this to find local include files

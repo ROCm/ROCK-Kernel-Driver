@@ -28,7 +28,7 @@
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/info.h>
-#include <sound/version.h>
+#include <sound/utsname.h>
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <stdarg.h>
@@ -959,7 +959,7 @@ static snd_info_entry_t *snd_info_version_entry = NULL;
 
 static void snd_info_version_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	static char *kernel_version = UTS_RELEASE;
+	static char *kernel_version = system_utsname.release;
 
 	snd_iprintf(buffer,
 		    "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n"
