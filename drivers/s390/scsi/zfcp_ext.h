@@ -31,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.53 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.57 $"
 
 #include "zfcp_def.h"
 
@@ -50,15 +50,16 @@ extern void zfcp_sysfs_port_release(struct device *);
 extern void zfcp_sysfs_unit_release(struct device *);
 
 /**************************** CONFIGURATION  *********************************/
-extern struct zfcp_unit *zfcp_get_unit_by_lun(struct zfcp_port *,
-					      fcp_lun_t fcp_lun);
-extern struct zfcp_port *zfcp_get_port_by_wwpn(struct zfcp_adapter *,
-					       wwn_t wwpn);
+extern struct zfcp_unit *zfcp_get_unit_by_lun(struct zfcp_port *, fcp_lun_t);
+extern struct zfcp_port *zfcp_get_port_by_wwpn(struct zfcp_adapter *, wwn_t);
+extern struct zfcp_port *zfcp_get_port_by_did(struct zfcp_adapter *, u32);
+struct zfcp_adapter *zfcp_get_adapter_by_busid(char *);
 extern struct zfcp_adapter *zfcp_adapter_enqueue(struct ccw_device *);
 extern int    zfcp_adapter_debug_register(struct zfcp_adapter *);
 extern void   zfcp_adapter_dequeue(struct zfcp_adapter *);
 extern void   zfcp_adapter_debug_unregister(struct zfcp_adapter *);
-extern struct zfcp_port *zfcp_port_enqueue(struct zfcp_adapter *, wwn_t, u32);
+extern struct zfcp_port *zfcp_port_enqueue(struct zfcp_adapter *, wwn_t,
+					   u32, u32);
 extern void   zfcp_port_dequeue(struct zfcp_port *);
 extern struct zfcp_unit *zfcp_unit_enqueue(struct zfcp_port *, fcp_lun_t);
 extern void   zfcp_unit_dequeue(struct zfcp_unit *);
@@ -94,8 +95,11 @@ extern int  zfcp_fsf_open_unit(struct zfcp_erp_action *);
 extern int  zfcp_fsf_close_unit(struct zfcp_erp_action *);
 
 extern int  zfcp_fsf_exchange_config_data(struct zfcp_erp_action *);
+extern int  zfcp_fsf_exchange_port_data(struct zfcp_adapter *,
+					struct fsf_qtcb_bottom_port *);
 extern int  zfcp_fsf_control_file(struct zfcp_adapter *, struct zfcp_fsf_req **,
 				  u32, u32, struct zfcp_sg_list *);
+extern void zfcp_fsf_request_timeout_handler(unsigned long);
 extern void zfcp_fsf_scsi_er_timeout_handler(unsigned long);
 extern int  zfcp_fsf_req_dismiss_all(struct zfcp_adapter *);
 extern int  zfcp_fsf_status_read(struct zfcp_adapter *, int);
@@ -108,7 +112,7 @@ extern int  zfcp_fsf_req_wait_and_cleanup(struct zfcp_fsf_req *, int, u32 *);
 extern int  zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *,
 					   struct zfcp_unit *,
 					   struct scsi_cmnd *,
-					   int);
+					   struct timer_list*, int);
 extern int  zfcp_fsf_req_complete(struct zfcp_fsf_req *);
 extern void zfcp_fsf_incoming_els(struct zfcp_fsf_req *);
 extern void zfcp_fsf_req_cleanup(struct zfcp_fsf_req *);
@@ -134,10 +138,10 @@ extern char *zfcp_get_fcp_sns_info_ptr(struct fcp_rsp_iu *);
 extern void zfcp_fsf_start_scsi_er_timer(struct zfcp_adapter *);
 extern fcp_dl_t zfcp_get_fcp_dl(struct fcp_cmnd_iu *);
 
-extern int zfcp_scsi_command_async(struct zfcp_adapter *,struct zfcp_unit *unit,
-				   struct scsi_cmnd *scsi_cmnd);
-extern int zfcp_scsi_command_sync(struct zfcp_unit *unit,
-				  struct scsi_cmnd *scsi_cmnd);
+extern int zfcp_scsi_command_async(struct zfcp_adapter *,struct zfcp_unit *,
+				   struct scsi_cmnd *, struct timer_list *);
+extern int zfcp_scsi_command_sync(struct zfcp_unit *, struct scsi_cmnd *,
+				  struct timer_list *);
 extern struct scsi_transport_template *zfcp_transport_template;
 extern struct fc_function_template zfcp_transport_functions;
 

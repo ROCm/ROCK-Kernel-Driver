@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.83 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.91 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -43,6 +43,7 @@
 #include <linux/major.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/timer.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_cmnd.h>
@@ -72,12 +73,22 @@
 /* zfcp version number, it consists of major, minor, and patch-level number */
 #define ZFCP_VERSION		"4.1.3"
 
+/**
+ * zfcp_sg_to_address - determine kernel address from struct scatterlist
+ * @list: struct scatterlist
+ * Return: kernel address
+ */
 static inline void *
 zfcp_sg_to_address(struct scatterlist *list)
 {
 	return (void *) (page_address(list->page) + list->offset);
 }
 
+/**
+ * zfcp_address_to_sg - set up struct scatterlist from kernel address
+ * @address: kernel address
+ * @list: struct scatterlist
+ */
 static inline void
 zfcp_address_to_sg(void *address, struct scatterlist *list)
 {
@@ -146,6 +157,9 @@ typedef u32 scsi_lun_t;
 #define ZFCP_EXCHANGE_CONFIG_DATA_RETRIES	6
 #define ZFCP_EXCHANGE_CONFIG_DATA_SLEEP		50
 
+/* timeout value for "default timer" for fsf requests */
+#define ZFCP_FSF_REQUEST_TIMEOUT (60*HZ);
+
 /*************** FIBRE CHANNEL PROTOCOL SPECIFIC DEFINES ********************/
 
 typedef unsigned long long wwn_t;
@@ -158,7 +172,6 @@ typedef unsigned int       fcp_dl_t;
 
 /* timeout for name-server lookup (in seconds) */
 #define ZFCP_NS_GID_PN_TIMEOUT		10
-#define ZFCP_NS_GA_NXT_TIMEOUT		120
 
 /* largest SCSI command we can process */
 /* FCP-2 (FCP_CMND IU) allows up to (255-3+16) */
@@ -276,25 +289,11 @@ struct fcp_logo {
 #define R_A_TOV				10 /* seconds */
 #define ZFCP_ELS_TIMEOUT		(2 * R_A_TOV)
 
-#define ZFCP_LS_RJT			0x01
-#define ZFCP_LS_ACC			0x02
 #define ZFCP_LS_RTV			0x0E
 #define ZFCP_LS_RLS			0x0F
 #define ZFCP_LS_PDISC			0x50
 #define ZFCP_LS_ADISC			0x52
-#define ZFCP_LS_RSCN			0x61
-#define ZFCP_LS_RNID			0x78
-#define ZFCP_LS_RLIR			0x7A
 #define ZFCP_LS_RTV_E_D_TOV_FLAG	0x04000000
-
-/* LS_ACC Reason Codes */
-#define ZFCP_LS_RJT_INVALID_COMMAND_CODE	0x01
-#define ZFCP_LS_RJT_LOGICAL_ERROR		0x03
-#define ZFCP_LS_RJT_LOGICAL_BUSY		0x05
-#define ZFCP_LS_RJT_PROTOCOL_ERROR		0x07
-#define ZFCP_LS_RJT_UNABLE_TO_PERFORM		0x09
-#define ZFCP_LS_RJT_COMMAND_NOT_SUPPORTED	0x0B
-#define ZFCP_LS_RJT_VENDOR_UNIQUE_ERROR		0xFF
 
 struct zfcp_ls_rjt_par {
 	u8 action;
@@ -380,46 +379,6 @@ struct zfcp_ls_adisc_acc {
 	wwn_t		wwnn;
 	fc_id_t		nport_id;
 } __attribute__ ((packed));
-
-struct zfcp_ls_rnid {
-	u8		code;
-	u8		field[3];
-	u8		node_id_format;
-	u8		reserved[3];
-} __attribute__((packed));
-
-/* common identification data */
-struct zfcp_ls_rnid_common_id {
-	u64		n_port_name;
-	u64		node_name;
-} __attribute__((packed));
-
-/* general topology specific identification data */
-struct zfcp_ls_rnid_general_topology_id {
-	u8		vendor_unique[16];
-	u32		associated_type;
-	u32		physical_port_number;
-	u32		nr_attached_nodes;
-	u8		node_management;
-	u8		ip_version;
-	u16		port_number;
-	u8		ip_address[16];
-	u8		reserved[2];
-	u16		vendor_specific;
-} __attribute__((packed));
-
-struct zfcp_ls_rnid_acc {
-	u8		code;
-	u8		field[3];
-	u8		node_id_format;
-	u8		common_id_length;
-	u8		reserved;
-	u8		specific_id_length;
-	struct zfcp_ls_rnid_common_id
-			common_id;
-	struct zfcp_ls_rnid_general_topology_id
-			specific_id;
-} __attribute__((packed));
 
 struct zfcp_rc_entry {
 	u8 code;
@@ -533,23 +492,29 @@ struct zfcp_rc_entry {
 	       __LINE__ , ##args);
 
 #define ZFCP_LOG(level, fmt, args...) \
+do { \
 	if (ZFCP_LOG_CHECK(level)) \
-		_ZFCP_LOG(fmt , ##args)
+		_ZFCP_LOG(fmt, ##args); \
+} while (0)
 	
 #if ZFCP_LOG_LEVEL_LIMIT < ZFCP_LOG_LEVEL_NORMAL
 # define ZFCP_LOG_NORMAL(fmt, args...)
 #else
 # define ZFCP_LOG_NORMAL(fmt, args...) \
+do { \
 	if (ZFCP_LOG_CHECK(ZFCP_LOG_LEVEL_NORMAL)) \
-		printk(KERN_ERR ZFCP_NAME": " fmt , ##args);
+		printk(KERN_ERR ZFCP_NAME": " fmt, ##args); \
+} while (0)
 #endif
 
 #if ZFCP_LOG_LEVEL_LIMIT < ZFCP_LOG_LEVEL_INFO
 # define ZFCP_LOG_INFO(fmt, args...)
 #else
 # define ZFCP_LOG_INFO(fmt, args...) \
+do { \
 	if (ZFCP_LOG_CHECK(ZFCP_LOG_LEVEL_INFO)) \
-		printk(KERN_ERR ZFCP_NAME": " fmt , ##args);
+		printk(KERN_ERR ZFCP_NAME": " fmt, ##args); \
+} while (0)
 #endif
 
 #if ZFCP_LOG_LEVEL_LIMIT < ZFCP_LOG_LEVEL_DEBUG
@@ -571,8 +536,10 @@ struct zfcp_rc_entry {
 #else
 extern u32 flags_dump;
 # define ZFCP_LOG_FLAGS(level, fmt, args...) \
+do { \
 	if (level <= flags_dump) \
-		_ZFCP_LOG(fmt , ##args)
+		_ZFCP_LOG(fmt, ##args); \
+} while (0)
 #endif
 
 /*************** ADAPTER/PORT/UNIT AND FSF_REQ STATUS FLAGS ******************/
@@ -609,7 +576,12 @@ extern u32 flags_dump;
 		 ZFCP_STATUS_ADAPTER_REGISTERED)
 
 
-#define ZFCP_DID_NAMESERVER			0xFFFFFC
+/* FC-PH/FC-GS well-known address identifiers for generic services */
+#define ZFCP_DID_MANAGEMENT_SERVICE		0xFFFFFA
+#define ZFCP_DID_TIME_SERVICE			0xFFFFFB
+#define ZFCP_DID_DIRECTORY_SERVICE		0xFFFFFC
+#define ZFCP_DID_ALIAS_SERVICE			0xFFFFF8
+#define ZFCP_DID_KEY_DISTRIBUTION_SERVICE	0xFFFFF7
 
 /* remote port status */
 #define ZFCP_STATUS_PORT_PHYS_OPEN		0x00000001
@@ -619,7 +591,8 @@ extern u32 flags_dump;
 #define ZFCP_STATUS_PORT_NO_SCSI_ID		0x00000010
 #define ZFCP_STATUS_PORT_INVALID_WWPN		0x00000020
 
-#define ZFCP_STATUS_PORT_NAMESERVER \
+/* for ports with well known addresses */
+#define ZFCP_STATUS_PORT_WKA \
 		(ZFCP_STATUS_PORT_NO_WWPN | \
 		 ZFCP_STATUS_PORT_NO_SCSI_ID)
 
@@ -792,43 +765,29 @@ struct ct_iu_gid_pn_req {
 	wwn_t wwpn;
 } __attribute__ ((packed));
 
-/* nameserver request CT_IU -- for requests where
- * a port identifier is required */
-struct ct_iu_ga_nxt_req {
-	struct ct_hdr header;
-	fc_id_t d_id;
-} __attribute__ ((packed));
-
 /* FS_ACC IU and data unit for GID_PN nameserver request */
 struct ct_iu_gid_pn_resp {
 	struct ct_hdr header;
 	fc_id_t d_id;
 } __attribute__ ((packed));
 
-/* FS_ACC IU and data unit for GA_NXT nameserver request */
-struct ct_iu_ga_nxt_resp {
-	struct ct_hdr header;
-        u8 port_type;
-        u8 port_id[3];
-        u64 port_wwn;
-        u8 port_symbolic_name_length;
-        u8 port_symbolic_name[255];
-        u64 node_wwn;
-        u8 node_symbolic_name_length;
-        u8 node_symbolic_name[255];
-        u64 initial_process_associator;
-        u8 node_ip[16];
-        u32 cos;
-        u8 fc4_types[32];
-        u8 port_ip[16];
-        u64 fabric_wwn;
-        u8 reserved;
-        u8 hard_address[3];
-} __attribute__ ((packed));
-
 typedef void (*zfcp_send_ct_handler_t)(unsigned long);
 
-/* used to pass parameters to zfcp_send_ct() */
+/**
+ * struct zfcp_send_ct - used to pass parameters to function zfcp_fsf_send_ct
+ * @port: port where the request is sent to
+ * @req: scatter-gather list for request
+ * @resp: scatter-gather list for response
+ * @req_count: number of elements in request scatter-gather list
+ * @resp_count: number of elements in response scatter-gather list
+ * @handler: handler function (called for response to the request)
+ * @handler_data: data passed to handler function
+ * @pool: pointer to memory pool for ct request structure
+ * @timeout: FSF timeout for this request
+ * @timer: timer (e.g. for request initiated by erp)
+ * @completion: completion for synchronization purposes
+ * @status: used to pass error status to calling function
+ */
 struct zfcp_send_ct {
 	struct zfcp_port *port;
 	struct scatterlist *req;
@@ -837,7 +796,7 @@ struct zfcp_send_ct {
 	unsigned int resp_count;
 	zfcp_send_ct_handler_t handler;
 	unsigned long handler_data;
-	mempool_t *pool;		/* mempool for ct not for fsf_req */
+	mempool_t *pool;
 	int timeout;
 	struct timer_list *timer;
 	struct completion *completion;
@@ -856,8 +815,20 @@ struct zfcp_gid_pn_data {
 
 typedef void (*zfcp_send_els_handler_t)(unsigned long);
 
-/* used to pass parameters to zfcp_send_els() */
-/* ToDo merge send_ct() and send_els() and corresponding structs */
+/**
+ * struct zfcp_send_els - used to pass parameters to function zfcp_fsf_send_els
+ * @port: port where the request is sent to
+ * @req: scatter-gather list for request
+ * @resp: scatter-gather list for response
+ * @req_count: number of elements in request scatter-gather list
+ * @resp_count: number of elements in response scatter-gather list
+ * @handler: handler function (called for response to the request)
+ * @handler_data: data passed to handler function
+ * @timer: timer (e.g. for request initiated by erp)
+ * @completion: completion for synchronization purposes
+ * @ls_code: hex code of ELS command
+ * @status: used to pass error status to calling function
+ */
 struct zfcp_send_els {
 	struct zfcp_port *port;
 	struct scatterlist *req;
@@ -866,6 +837,7 @@ struct zfcp_send_els {
 	unsigned int resp_count;
 	zfcp_send_els_handler_t handler;
 	unsigned long handler_data;
+	struct timer_list *timer;
 	struct completion *completion;
 	int ls_code;
 	int status;
@@ -895,6 +867,7 @@ union zfcp_req_data {
 	struct zfcp_send_ct *send_ct;
 	struct zfcp_send_els *send_els;
 	struct zfcp_status_read 	  status_read;
+	struct fsf_qtcb_bottom_port *port_data;
 };
 
 struct zfcp_qdio_queue {
@@ -982,6 +955,7 @@ struct zfcp_adapter {
 	rwlock_t                cmd_dbf_lock;
 	struct zfcp_adapter_mempool	pool;      /* Adapter memory pools */
 	struct qdio_initialize  qdio_init_data;    /* for qdio_establish */
+	struct device           generic_services;  /* directory for WKA ports */
 };
 
 /*
@@ -1083,6 +1057,11 @@ struct zfcp_data {
 	fcp_lun_t               init_fcp_lun;
 };
 
+/**
+ * struct zfcp_sg_list - struct describing a scatter-gather list
+ * @sg: pointer to array of (struct scatterlist)
+ * @count: number of elements in scatter-gather list
+ */
 struct zfcp_sg_list {
 	struct scatterlist *sg;
 	unsigned int count;
