@@ -146,6 +146,7 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap_sel, notify_t *notify, __u8 pid)
 	ASSERT(notify != NULL, return NULL;);
 	ASSERT(irlmp != NULL, return NULL;);
 	ASSERT(irlmp->magic == LMP_MAGIC, return NULL;);
+	ASSERT(notify->instance != NULL, return NULL;);
 
 	/*  Does the client care which Source LSAP selector it gets?  */
 	if (slsap_sel == LSAP_ANY) {
@@ -178,7 +179,6 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap_sel, notify_t *notify, __u8 pid)
 
 	init_timer(&self->watchdog_timer);
 
-	ASSERT(notify->instance != NULL, return NULL;);
 	self->notify = *notify;
 
 	self->lsap_state = LSAP_DISCONNECTED;
