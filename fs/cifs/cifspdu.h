@@ -869,6 +869,52 @@ typedef struct smb_com_transaction_ioctl_rsp {
 	__u8 Pad[3];
 } TRANSACT_IOCTL_RSP;
 
+typedef struct smb_com_transaction_change_notify_req {
+        struct smb_hdr hdr;     /* wct = 23 */
+        __u8 MaxSetupCount;
+        __u16 Reserved;
+        __u32 TotalParameterCount;
+        __u32 TotalDataCount;
+        __u32 MaxParameterCount;
+        __u32 MaxDataCount;
+        __u32 ParameterCount;
+        __u32 ParameterOffset;
+        __u32 DataCount;
+        __u32 DataOffset;
+        __u8 SetupCount; /* four setup words follow subcommand */
+        /* SNIA spec incorrectly included spurious pad here */
+        __u16 SubCommand;/* 4 = Change Notify */
+	__u32 CompletionFilter;  /* operation to monitor */
+	__u16 Fid;
+	__u8 WatchTree;  /* 1 = Monitor subdirectories */
+	__u16 ByteCount;
+	__u8 Pad[3];
+	__u8 Data[1];
+} TRANSACT_CHANGE_NOTIFY_REQ;
+
+/* Completion Filter flags */
+#define FILE_NOTIFY_CHANGE_FILE_NAME    0x00000001
+#define FILE_NOTIFY_CHANGE_DIR_NAME     0x00000002
+#define FILE_NOTIFY_CHANGE_NAME         0x00000003
+#define FILE_NOTIFY_CHANGE_ATTRIBUTES   0x00000004
+#define FILE_NOTIFY_CHANGE_SIZE         0x00000008
+#define FILE_NOTIFY_CHANGE_LAST_WRITE   0x00000010
+#define FILE_NOTIFY_CHANGE_LAST_ACCESS  0x00000020
+#define FILE_NOTIFY_CHANGE_CREATION     0x00000040
+#define FILE_NOTIFY_CHANGE_EA           0x00000080
+#define FILE_NOTIFY_CHANGE_SECURITY     0x00000100
+#define FILE_NOTIFY_CHANGE_STREAM_NAME  0x00000200
+#define FILE_NOTIFY_CHANGE_STREAM_SIZE  0x00000400
+#define FILE_NOTIFY_CHANGE_STREAM_WRITE 0x00000800
+
+/* response contains array of the following structures */
+struct file_notify_information {
+	__u32 NextEntryOffset;
+	__u32 Action;
+	__u32 FileNameLength;
+	__u8  FileName[1];
+}; 
+
 struct reparse_data {
 	__u32	ReparseTag;
 	__u16	ReparseDataLength;
@@ -1420,6 +1466,9 @@ typedef struct {
 	__u16 MinorVersionNumber;
 	__u64 Capability;
 } FILE_SYSTEM_UNIX_INFO;	/* Unix extensions info, level 0x200 */
+/* Linux/Unix extensions capability flags */
+#define CIFS_UNIX_FCNTL_CAP             0x00000001 /* support for fcntl locks */
+#define CIFS_UNIX_POSIX_ACL_CAP         0x00000002
 
 /* DeviceType Flags */
 #define FILE_DEVICE_CD_ROM              0x00000002
