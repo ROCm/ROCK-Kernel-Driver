@@ -272,9 +272,19 @@ mem_hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 	memwritereg(cs->hw.diva.cfg_reg, offset + (hscx ? 0x40 : 0), value);
 }
 
+static void
+mem_hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+		*data++ = memreadreg(cs->hw.diva.cfg_reg, hscx ? 0x40 : 0);
+}
+
 static struct bc_hw_ops mem_hscx_ops = {
 	.read_reg   = mem_hscx_read,
 	.write_reg  = mem_hscx_write,
+	.read_fifo  = mem_hscx_read_fifo,
 };
 
 /* IO-Functions for IPACX type cards */
@@ -325,9 +335,19 @@ ipacx_bc_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
               (hscx ? IPACX_OFF_B2 : IPACX_OFF_B1), value);
 }
 
+static void
+ipacx_bc_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
+{
+	int i;
+
+	for (i = 0; i < len ; i++)
+		*data++ = ipacx_bc_read(cs, hscx, IPACX_RFIFOB);
+}
+
 static struct bc_hw_ops ipacx_bc_ops = {
 	.read_reg   = ipacx_bc_read,
 	.write_reg  = ipacx_bc_write,
+	.read_fifo  = ipacx_bc_read_fifo,
 };
 
 static void
@@ -433,41 +453,19 @@ MemwaitforXFW(struct IsdnCardState *cs, int hscx)
 }
 
 static inline void
-MemWriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u8 data)
+MemWriteHSCXCMDR(struct BCState *bcs, u8 data)
 {
-	unsigned long flags;
+	int hscx = bcs->hw.hscx.hscx;
 
-	spin_lock_irqsave(&diva_lock, flags);
-	MemwaitforCEC(cs, hscx);
-	mem_hscx_write(cs, hscx, HSCX_CMDR, data);
-	spin_unlock_irqrestore(&diva_lock, flags);
+	MemwaitforCEC(bcs->cs, hscx);
+	mem_hscx_write(bcs->cs, hscx, HSCX_CMDR, data);
 }
 
 static void
 Memhscx_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *p;
-	struct IsdnCardState *cs = bcs->cs;
-	int cnt;
-	
-	p = recv_empty_fifo_b(bcs, count);
-	if (!p) {
-		MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-		return;
-	}
-	cnt = count;
-	while (cnt--)
-		*p++ = memreadreg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0);
-	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "hscx_empty_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
+	recv_empty_fifo_b(bcs, count);
+	MemWriteHSCXCMDR(bcs, 0x80);
 }
 
 static void
@@ -486,7 +484,7 @@ Memhscx_fill_fifo(struct BCState *bcs)
 	while (count--)
 		memwritereg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0,
 			*p++);
-	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
+	MemWriteHSCXCMDR(bcs, more ? 0x8 : 0xa);
 }
 
 static struct bc_l1_ops mem_hscx_l1_ops = {
@@ -518,7 +516,7 @@ Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 			if (!(r & 0x20))
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "HSCX CRC error");
-			MemWriteHSCXCMDR(cs, hscx, 0x80);
+			MemWriteHSCXCMDR(bcs, 0x80);
 		} else {
 			count = mem_hscx_read(cs, hscx, HSCX_RBCL) & (
 				test_bit(HW_IPAC, &cs->HW_Flags)? 0x3f: 0x1f);
@@ -561,7 +559,7 @@ Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 static void
 Memhscx_reset_xmit(struct BCState *bcs)
 {
-	MemWriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
+	MemWriteHSCXCMDR(bcs, 0x01);
 }
 
 static inline void

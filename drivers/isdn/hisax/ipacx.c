@@ -503,29 +503,8 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 static void
 ipacx_bc_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *p, hscx;
-	struct IsdnCardState *cs = bcs->cs;
-	int cnt;
-
-	hscx = bcs->hw.hscx.hscx;
-
-	p = recv_empty_fifo_b(bcs, count);
-	if (!p) {
-		ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-		return;
-	}
-	cnt = count;
-	while (cnt--) *p++ = ipacx_bc_read_reg(bcs, IPACX_RFIFOB); 
+	recv_empty_fifo_b(bcs, count);
 	ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-  
-	p -= count;
-	if (cs->debug &L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "ipacx_empty_fifo() B-%d cnt %d", hscx, count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 //----------------------------------------------------------

@@ -9,7 +9,6 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  */
-static spinlock_t jade_irq_lock = SPIN_LOCK_UNLOCKED;
 
 static inline void
 waitforCEC(struct IsdnCardState *cs, int jade, int reg)
@@ -26,20 +25,17 @@ waitforCEC(struct IsdnCardState *cs, int jade, int reg)
 
 
 static inline void
-waitforXFW(struct IsdnCardState *cs, int jade)
+waitforXFW(struct BCState *bcs)
 {
-  	/* Does not work on older jade versions, don't care */
 }
 
 static inline void
-WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u8 data)
+WriteJADECMDR(struct BCState *bcs, int reg, u8 data)
 {
-	unsigned long flags;
+	int jade = bcs->hw.hscx.hscx;
 
-	spin_lock_irqsave(&jade_irq_lock, flags);
-	waitforCEC(cs, jade, reg);
-	jade_write_reg(cs, jade, reg, data);
-	spin_unlock_irqrestore(&jade_irq_lock, flags);
+	waitforCEC(bcs->cs, jade, reg);
+	jade_write_reg(bcs->cs, jade, reg, data);
 }
 
 
@@ -47,43 +43,24 @@ WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u8 data)
 static void
 jade_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *p;
-	struct IsdnCardState *cs = bcs->cs;
-
-	p = recv_empty_fifo_b(bcs, count);
-	if (!p) {
-		WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
-		return;
-	}
-	jade_read_fifo(bcs, p, count);
-	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
-
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "jade_empty_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
+	recv_empty_fifo_b(bcs, count);
+	WriteJADECMDR(bcs, jade_HDLC_RCMD, jadeRCMD_RMC);
 }
 
 static void
 jade_fill_fifo(struct BCState *bcs)
 {
-	struct IsdnCardState *cs = bcs->cs;
 	int more, count;
 	int fifo_size = 32;
-	int hscx = bcs->hw.hscx.hscx;
 	unsigned char *p;
 
 	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
 	if (!p)
 		return;
 
-	waitforXFW(cs, hscx);
+	waitforXFW(bcs);
 	jade_write_fifo(bcs, p, count);
-	WriteJADECMDR(cs, hscx, jade_HDLC_XCMD,
+	WriteJADECMDR(bcs, jade_HDLC_XCMD,
 		      more ? jadeXCMD_XF : (jadeXCMD_XF|jadeXCMD_XME));
 }
 
@@ -113,7 +90,7 @@ jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 			if (!(r & 0x20))
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "JADE %c CRC error", 'A'+jade);
-			WriteJADECMDR(cs, jade, jade_HDLC_RCMD, jadeRCMD_RMC);
+			WriteJADECMDR(bcs, jade_HDLC_RCMD, jadeRCMD_RMC);
 		} else {
 			count = jade_read_reg(cs, i_jade, jade_HDLC_RBCL) & 0x1F;
 			if (count == 0)
@@ -155,7 +132,7 @@ jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 static void
 reset_xmit(struct BCState *bcs)
 {
-	WriteJADECMDR(bcs->cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
+	WriteJADECMDR(bcs, jade_HDLC_XCMD, jadeXCMD_XRES);
 }
 
 void

@@ -175,6 +175,35 @@ WriteHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset, u8 value)
 	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
+static void
+hdlc_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
+{
+	u8 idx = hscx ? AVM_HDLC_2 : AVM_HDLC_1;
+	int i;
+
+	if (cs->subtyp == AVM_FRITZ_PCI) {
+		u32 *ptr = (u32 *) data;
+
+		outl(idx, cs->hw.avm.cfg_reg + 4);
+		for (i = 0; i < len; i += 4) {
+#ifdef __powerpc__
+#ifdef CONFIG_APUS
+			*ptr++ = in_le32((u32 *)(cs->hw.avm.isac +_IO_BASE));
+#else
+			*ptr++ = in_be32((u32 *)(cs->hw.avm.isac +_IO_BASE));
+#endif /* CONFIG_APUS */
+#else
+			*ptr++ = inl(cs->hw.avm.isac);
+#endif /* __powerpc__ */
+		}
+	} else {
+		outb(idx, cs->hw.avm.cfg_reg + 4);
+		for (i = 0; i < len; i++) {
+			*data++ = inb(cs->hw.avm.isac);
+		}
+	}
+}
+
 static inline
 struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 {
@@ -259,49 +288,7 @@ modehdlc(struct BCState *bcs, int mode, int bc)
 static inline void
 hdlc_empty_fifo(struct BCState *bcs, int count)
 {
-	register u_int *ptr;
-	u8 *p;
-	u8 idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
-	int cnt = 0;
-	struct IsdnCardState *cs = bcs->cs;
-
-	p = recv_empty_fifo_b(bcs, count);
-	if (!p) {
-		return;
-	}
-
-	ptr = (u_int *) p;
-	if (cs->subtyp == AVM_FRITZ_PCI) {
-		outl(idx, cs->hw.avm.cfg_reg + 4);
-		while (cnt < count) {
-#ifdef __powerpc__
-#ifdef CONFIG_APUS
-			*ptr++ = in_le32((unsigned *)(cs->hw.avm.isac +_IO_BASE));
-#else
-			*ptr++ = in_be32((unsigned *)(cs->hw.avm.isac +_IO_BASE));
-#endif /* CONFIG_APUS */
-#else
-			*ptr++ = inl(cs->hw.avm.isac);
-#endif /* __powerpc__ */
-			cnt += 4;
-		}
-	} else {
-		outb(idx, cs->hw.avm.cfg_reg + 4);
-		while (cnt < count) {
-			*p++ = inb(cs->hw.avm.isac);
-			cnt++;
-		}
-	}
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		if (cs->subtyp == AVM_FRITZ_PNP)
-			p = (u8 *) ptr;
-		t += sprintf(t, "hdlc_empty_fifo %c cnt %d",
-			     bcs->channel ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
+	recv_empty_fifo_b(bcs, count);
 }
 
 static void
@@ -540,6 +527,7 @@ int
 setstack_hdlc(struct PStack *st, struct BCState *bcs)
 {
 	bcs->channel = st->l1.bc;
+	bcs->hw.hscx.hscx = bcs->channel;
 	if (open_hdlcstate(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;
@@ -549,6 +537,10 @@ setstack_hdlc(struct PStack *st, struct BCState *bcs)
 	setstack_l1_B(st);
 	return (0);
 }
+
+static struct bc_hw_ops hdlc_hw_ops = {
+	.read_fifo  = hdlc_read_fifo,
+};
 
 void __init
 inithdlc(struct IsdnCardState *cs)
@@ -773,6 +765,7 @@ ready:
 		cs->irq, cs->hw.avm.cfg_reg);
 
 	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &hdlc_hw_ops;
 	cs->bc_l1_ops = &hdlc_l1_ops;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;

@@ -50,25 +50,8 @@ WriteHSCXCMDR(struct BCState *bcs, u8 data)
 static void
 hscx_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *p;
-	struct IsdnCardState *cs = bcs->cs;
-	
-	p = recv_empty_fifo_b(bcs, count);
-	if (!p) {
-		WriteHSCXCMDR(bcs, 0x80);
-		return;
-	}
-	hscx_read_fifo(bcs, p, count);
+	recv_empty_fifo_b(bcs, count);
 	WriteHSCXCMDR(bcs, 0x80);
-
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "hscx_empty_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 static void

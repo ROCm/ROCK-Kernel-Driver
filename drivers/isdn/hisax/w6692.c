@@ -81,6 +81,16 @@ w6692_bc_write_reg(struct IsdnCardState *cs, int bchan, u8 offset, u8 value)
 	outb(value, cs->hw.w6692.iobase + (bchan ? 0x40 : 0) + offset);
 }
 
+static void
+w6692_bc_read_fifo(struct IsdnCardState *cs, int bchan, u8 *data, int len)
+{
+	insb(cs->hw.w6692.iobase + W_B_RFIFO + (bchan ? 0x40:0), data, len);
+}
+
+static struct bc_hw_ops w6692_bc_hw_ops = {
+	.read_fifo  = w6692_bc_read_fifo,
+};
+
 static char *W6692Ver[] __initdata =
 {"W6692 V00", "W6692 V01", "W6692 V10",
  "W6692 V11"};
@@ -221,24 +231,8 @@ W6692_fill_fifo(struct IsdnCardState *cs)
 static void
 W6692B_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *p;
-	struct IsdnCardState *cs = bcs->cs;
-
-	p = recv_empty_fifo_b(bcs, count);
-	if (!p) {
-		w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
-		return;
-	}
-	READW6692BFIFO(cs, bcs->channel, p, count);
-	w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "W6692B_empty_fifo %c cnt %d",
-			     bcs->channel + '1', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
+	recv_empty_fifo_b(bcs, count);
+	w6692_bc_write_reg(bcs->cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
 }
 
 static void
@@ -859,6 +853,7 @@ setup_w6692(struct IsdnCard *card)
 	       id_list[cs->subtyp].card_name, cs->irq,
 	       cs->hw.w6692.iobase);
 
+	cs->bc_hw_ops = &w6692_bc_hw_ops;
 	cs->bc_l1_ops = &w6692_bc_l1_ops;
 	cs->DC_Send_Data = &W6692_fill_fifo;
 	cs->cardmsg = &w6692_card_msg;

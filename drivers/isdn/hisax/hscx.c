@@ -40,15 +40,6 @@ hscx_write(struct BCState *bcs, u8 addr, u8 val)
 }
 
 static inline void
-hscx_read_fifo(struct BCState *bcs, u8 *p, int len)
-{
-	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
-
-	cs->bc_hw_ops->read_fifo(cs, hscx, p, len);
-}
-
-static inline void
 hscx_write_fifo(struct BCState *bcs, u8 *p, int len)
 {
 	struct IsdnCardState *cs = bcs->cs;
