@@ -1,0 +1,24 @@
+#
+# Mouse driver configuration
+#
+
+bool 'Mice' CONFIG_INPUT_MOUSE
+
+dep_tristate '  PS/2 mouse' CONFIG_MOUSE_PS2 $CONFIG_INPUT $CONFIG_INPUT_MOUSE $CONFIG_SERIO
+dep_tristate '  Serial mouse' CONFIG_MOUSE_SERIAL $CONFIG_INPUT $CONFIG_INPUT_MOUSE $CONFIG_SERIO
+
+dep_tristate '  InPort/MS/ATIXL busmouse' CONFIG_MOUSE_INPORT $CONFIG_INPUT $CONFIG_INPUT_MOUSE $CONFIG_ISA
+if [ "$CONFIG_MOUSE_INPORT" != "n" ]; then
+   bool '  ATI XL variant' CONFIG_MOUSE_ATIXL
+fi
+dep_tristate '  Logitech busmouse' CONFIG_MOUSE_LOGIBM $CONFIG_INPUT $CONFIG_INPUT_MOUSE $CONFIG_ISA
+dep_tristate '  IBM PC110 touchpad' CONFIG_MOUSE_PC110PAD $CONFIG_INPUT $CONFIG_INPUT_MOUSE $CONFIG_ISA
+if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
+  dep_tristate '  Maple bus mouse' CONFIG_MOUSE_MAPLE $CONFIG_INPUT $CONFIG_INPUT_MOUSE $CONFIG_MAPLE
+fi
+if [ "$CONFIG_AMIGA" = "y" ]; then
+   dep_tristate '  Amiga mouse' CONFIG_MOUSE_AMIGA $CONFIG_INPUT $CONFIG_INPUT_MOUSE
+fi
+if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
+   dep_tristate '  Acorn RiscPC mouse' CONFIG_MOUSE_ACORN $CONFIG_INPUT $CONFIG_INPUT_MOUSE
+fi
