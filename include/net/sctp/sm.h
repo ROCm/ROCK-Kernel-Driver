@@ -269,6 +269,10 @@ struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
 				       struct sctp_chunk *asconf,
 				       int vparam_len);
 
+struct sctp_chunk *sctp_make_asconf_update_ip(struct sctp_association *,
+					      union sctp_addr *,
+					      struct sockaddr *,
+					      int, int);
 struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
 					     union sctp_addr *addr);
 

@@ -1085,6 +1085,10 @@ int sctp_add_bind_addr(struct sctp_bind_addr *, union sctp_addr *,
 int sctp_del_bind_addr(struct sctp_bind_addr *, union sctp_addr *);
 int sctp_bind_addr_match(struct sctp_bind_addr *, const union sctp_addr *,
 			 struct sctp_opt *);
+union sctp_addr *sctp_find_unmatch_addr(struct sctp_bind_addr	*bp,
+					const union sctp_addr	*addrs,
+					int			addrcnt,
+					struct sctp_opt		*opt);
 union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 					 int *addrs_len, int gfp);
 int sctp_raw_to_bind_addrs(struct sctp_bind_addr *bp, __u8 *raw, int len,

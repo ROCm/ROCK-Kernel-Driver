@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * Copyright (C) IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 Intel Corp.
@@ -2021,11 +2021,11 @@ struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
 	sctp_addiphdr_t asconf;
 	struct sctp_chunk *retval;
 	int length = sizeof(asconf) + vparam_len;
-	union sctp_params addrparam;
+	union sctp_addr_param addrparam;
 	int addrlen;
 	struct sctp_af *af = sctp_get_af_specific(addr->v4.sin_family);
 
-	addrlen = af->to_addr_param(addr, (union sctp_addr_param *)&addrparam);
+	addrlen = af->to_addr_param(addr, &addrparam);
 	if (!addrlen)
 		return NULL;
 	length += addrlen;
@@ -2042,6 +2042,83 @@ struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
 	retval->param_hdr.v =
 		sctp_addto_chunk(retval, addrlen, &addrparam);
 
+	return retval;
+}
+
+/* ADDIP
+ * 3.2.1 Add IP Address
+ * 	0                   1                   2                   3
+ * 	0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |        Type = 0xC001          |    Length = Variable          |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |               ASCONF-Request Correlation ID                   |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                       Address Parameter                       |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * 3.2.2 Delete IP Address
+ * 	0                   1                   2                   3
+ * 	0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |        Type = 0xC002          |    Length = Variable          |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |               ASCONF-Request Correlation ID                   |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                       Address Parameter                       |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ */
+struct sctp_chunk *sctp_make_asconf_update_ip(struct sctp_association *asoc,
+					      union sctp_addr	      *laddr,
+					      struct sockaddr	      *addrs,
+					      int		      addrcnt,
+					      int		      flags)
+{
+	sctp_addip_param_t	param;
+	struct sctp_chunk	*retval;
+	union sctp_addr_param	addr_param;
+	union sctp_addr		*addr;
+	void			*addr_buf;
+	struct sctp_af		*af;
+	int			paramlen = sizeof(param);
+	int			addr_param_len = 0;
+	int 			totallen = 0;
+	int 			i;
+
+	/* Get total length of all the address parameters. */
+	addr_buf = addrs;
+	for (i = 0; i < addrcnt; i++) {
+		addr = (union sctp_addr *)addr_buf;
+		af = sctp_get_af_specific(addr->v4.sin_family);
+		addr_param_len = af->to_addr_param(addr, &addr_param);
+
+		totallen += paramlen;
+		totallen += addr_param_len;
+
+		addr_buf += af->sockaddr_len;
+	}
+
+	/* Create an asconf chunk with the required length. */
+	retval = sctp_make_asconf(asoc, laddr, totallen);
+	if (!retval)
+		return NULL;
+
+	/* Add the address parameters to the asconf chunk. */
+	addr_buf = addrs;
+	for (i = 0; i < addrcnt; i++) {
+		addr = (union sctp_addr *)addr_buf;
+		af = sctp_get_af_specific(addr->v4.sin_family);
+		addr_param_len = af->to_addr_param(addr, &addr_param);
+		param.param_hdr.type = flags;
+		param.param_hdr.length = htons(paramlen + addr_param_len);
+		param.crr_id = htonl(i);
+
+		sctp_addto_chunk(retval, paramlen, &param);
+		sctp_addto_chunk(retval, addr_param_len, &addr_param);
+
+		addr_buf += af->sockaddr_len;
+	}
 	return retval;
 }
 
@@ -2065,11 +2142,11 @@ struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
 	sctp_addip_param_t	param;
 	struct sctp_chunk 	*retval;
 	int 			len = sizeof(param);
-	union sctp_params	addrparam;
+	union sctp_addr_param	addrparam;
 	int			addrlen;
 	struct sctp_af		*af = sctp_get_af_specific(addr->v4.sin_family);
 
-	addrlen = af->to_addr_param(addr, (union sctp_addr_param *)&addrparam);
+	addrlen = af->to_addr_param(addr, &addrparam);
 	if (!addrlen)
 		return NULL;
 	len += addrlen;
