@@ -5,10 +5,10 @@
 dep_tristate '  I-Force devices' CONFIG_JOYSTICK_IFORCE $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK
 
 if [ "$CONFIG_JOYSTICK_IFORCE" = "m" -o "$CONFIG_JOYSTICK_IFORCE" = "y" ]; then
-	if [ "$CONFIG_USB" != "n" ]; then
-		bool '    I-Force USB joysticks and wheels' CONFIG_JOYSTICK_IFORCE_USB
+	if [ "$CONFIG_JOYSTICK_IFORCE" = "m" -o "$CONFIG_USB" = "y" ]; then
+		dep_mbool '    I-Force USB joysticks and wheels' CONFIG_JOYSTICK_IFORCE_USB $CONFIG_USB
 	fi
-	if [ "$CONFIG_SERIO" != "n" ]; then
-		bool '    I-Force Serial joysticks and wheels' CONFIG_JOYSTICK_IFORCE_232
+	if [ "$CONFIG_JOYSTICK_IFORCE" = "m" -o "$CONFIG_SERIO" = "y" ]; then
+		dep_mbool '    I-Force Serial joysticks and wheels' CONFIG_JOYSTICK_IFORCE_232 $CONFIG_SERIO
 	fi
 fi
