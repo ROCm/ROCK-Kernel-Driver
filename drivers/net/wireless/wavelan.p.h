@@ -509,13 +509,9 @@ struct net_local
 
 #ifdef WIRELESS_EXT
   iw_stats	wstats;		/* Wireless-specific statistics */
-#endif
 
-#ifdef WIRELESS_SPY
-  int		spy_number;			/* number of addresses to spy */
-  mac_addr	spy_address[IW_MAX_SPY];	/* the addresses to spy */
-  iw_qual	spy_stat[IW_MAX_SPY];		/* statistics gathered */
-#endif	/* WIRELESS_SPY */
+  struct iw_spy_data	spy_data;
+#endif
 
 #ifdef HISTOGRAM
   int		his_number;		/* number of intervals */
