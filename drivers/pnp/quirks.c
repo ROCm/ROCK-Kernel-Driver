@@ -102,6 +102,28 @@ static void __init quirk_sb16audio_resources(struct pci_dev *dev)
 	return;
 }
 
+extern int isapnp_allow_dma0;
+static void __init quirk_opl3sax_resources(struct pci_dev *dev)
+{
+	/* This really isn't a device quirk but isapnp core code
+	 * doesn't allow a DMA channel of 0, afflicted card is an
+	 * OPL3Sax where x=4.
+	 */
+	struct isapnp_resources *res;
+	int max;
+	res = (struct isapnp_resources *)dev->sysdata;
+	max = res->dma->map;
+	for (res = res->alt; res; res = res->alt) {
+		if (res->dma->map > max)
+			max = res->dma->map;
+	}
+	if (max == 1 && isapnp_allow_dma0 == -1) {
+		printk(KERN_INFO "isapnp: opl3sa4 quirk: Allowing dma 0.\n");
+		isapnp_allow_dma0 = 1;
+	}
+	return;
+}
+
 /*
  *  ISAPnP Quirks
  *  Cards or devices that need some tweaking due to broken hardware
@@ -133,6 +155,8 @@ static struct isapnp_fixup isapnp_fixups[] __initdata = {
 		quirk_sb16audio_resources },
 	{ ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0045),
 		quirk_sb16audio_resources },
+	{ ISAPNP_VENDOR('Y','M','H'), ISAPNP_DEVICE(0x0021),
+		quirk_opl3sax_resources },
 	{ 0 }
 };
 

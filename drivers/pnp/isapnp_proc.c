@@ -950,6 +950,22 @@ static void isapnp_set_dmaresource(struct resource *res, int dma)
 	res->start = res->end = dma;
 	res->flags = IORESOURCE_DMA;
 }
+
+extern int isapnp_allow_dma0;
+static int isapnp_set_allow_dma0(char *line)
+{
+	int i;
+	char value[32];
+
+	isapnp_get_str(value, line, sizeof(value));
+	i = simple_strtoul(value, NULL, 0);
+	if (i < 0 || i > 1) {
+		printk("isapnp: wrong value %i for allow_dma0\n", i);
+		return 1;
+	}
+	isapnp_allow_dma0 = i;
+	return 0;
+}
  
 static int isapnp_set_dma(char *line)
 {
@@ -1036,6 +1052,8 @@ static int isapnp_decode_line(char *line)
 	char cmd[32];
 
 	line = isapnp_get_str(cmd, line, sizeof(cmd));
+	if (!strcmp(cmd, "allow_dma0"))
+		return isapnp_set_allow_dma0(line);
 	if (!strcmp(cmd, "card"))
 		return isapnp_set_card(line);
 	if (!strcmp(cmd, "csn"))

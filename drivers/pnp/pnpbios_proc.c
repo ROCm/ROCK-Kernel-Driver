@@ -218,7 +218,7 @@ int __init pnpbios_proc_init( void )
 	create_proc_read_entry("devices", 0, proc_pnp, proc_read_devices, NULL);
 	create_proc_read_entry("configuration_info", 0, proc_pnp, proc_read_pnpconfig, NULL);
 	create_proc_read_entry("escd_info", 0, proc_pnp, proc_read_escdinfo, NULL);
-	create_proc_read_entry("escd", 0, proc_pnp, proc_read_escd, NULL);
+	create_proc_read_entry("escd", S_IRUSR, proc_pnp, proc_read_escd, NULL);
 	create_proc_read_entry("legacy_device_resources", 0, proc_pnp, proc_read_legacyres, NULL);
 	
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
