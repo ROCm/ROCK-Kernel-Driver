@@ -35,6 +35,7 @@
  *
  * H8/300 Porting 2002/09/04 Yoshinori Sato
  */
+
 asmlinkage void resume(void);
 #define switch_to(prev,next,last) {                         \
   void *_last;						    \
@@ -52,7 +53,6 @@ asmlinkage void resume(void);
   (last) = _last; 					    \
 }
 
-#if defined(__H8300H__)
 #define __sti() asm volatile ("andc #0x7f,ccr")
 #define __cli() asm volatile ("orc  #0x80,ccr")
 
@@ -67,25 +67,6 @@ asmlinkage void resume(void);
 	unsigned long flags;		\
 	__save_flags(flags);	        \
 	((flags & 0x80) == 0x80);	\
-})
-
-#endif
-#if defined(__H8300S__)
-#define __sti() asm volatile ("andc #0xf8,exr")
-#define __cli() asm volatile ("orc  #0x07,exr")
-
-#define __save_flags(x) \
-       asm volatile ("stc exr,r0l\n\tmov.l er0,%0":"=r" (x) : : "er0")
-
-#define __restore_flags(x) \
-       asm volatile ("mov.l %0,er0\n\tldc r0l,exr": :"r" (x) : "er0")
-#endif
-
-#define	irqs_disabled()			\
-({					\
-	unsigned long flags;		\
-	__save_flags(flags);	        \
-	((flags & 0x07) == 0x07);	\
 })
 
 #define iret() __asm__ __volatile__ ("rte": : :"memory", "sp", "cc")
