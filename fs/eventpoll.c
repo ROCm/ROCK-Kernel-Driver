@@ -261,7 +261,7 @@ static int ep_send_events(struct eventpoll *ep, struct epitem **aepi, int nepi,
 			  struct epoll_event *events);
 static int ep_events_transfer(struct eventpoll *ep, struct epoll_event *events, int maxevents);
 static int ep_poll(struct eventpoll *ep, struct epoll_event *events, int maxevents,
-		   int timeout);
+		   long timeout);
 static int eventpollfs_delete_dentry(struct dentry *dentry);
 static struct inode *ep_eventpoll_inode(void);
 static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
@@ -446,7 +446,7 @@ void eventpoll_release(struct file *file)
  * file descriptors inside the epoll interface. It is the kernel part of
  * the userspace epoll_create(2).
  */
-asmlinkage int sys_epoll_create(int size)
+asmlinkage long sys_epoll_create(int size)
 {
 	int error, fd;
 	unsigned int hashbits;
@@ -492,7 +492,7 @@ eexit_1:
  * file that enable the insertion/removal/change of file descriptors inside
  * the interest set. It rapresents the kernel part of the user spcae epoll_ctl(2).
  */
-asmlinkage int sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
+asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 {
 	int error;
 	struct file *file, *tfile;
@@ -596,8 +596,8 @@ eexit_1:
  * Implement the event wait interface for the eventpoll file. It is the kernel
  * part of the user space epoll_wait(2).
  */
-asmlinkage int sys_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
-			      int timeout)
+asmlinkage long sys_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
+			       int timeout)
 {
 	int error;
 	struct file *file;
@@ -1420,7 +1420,7 @@ static int ep_events_transfer(struct eventpoll *ep, struct epoll_event *events, 
 
 
 static int ep_poll(struct eventpoll *ep, struct epoll_event *events, int maxevents,
-		   int timeout)
+		   long timeout)
 {
 	int res, eavail;
 	unsigned long flags;
@@ -1428,10 +1428,12 @@ static int ep_poll(struct eventpoll *ep, struct epoll_event *events, int maxeven
 	wait_queue_t wait;
 
 	/*
-	 * Calculate the timeout by checking for the "infinite" value ( -1 ).
-	 * The passed timeout is in milliseconds, that why (t * HZ) / 1000.
+	 * Calculate the timeout by checking for the "infinite" value ( -1 )
+	 * and the overflow condition. The passed timeout is in milliseconds,
+	 * that why (t * HZ) / 1000.
 	 */
-	jtimeout = timeout == -1 ? MAX_SCHEDULE_TIMEOUT: (timeout * HZ) / 1000;
+	jtimeout = timeout == -1 || timeout > (MAX_SCHEDULE_TIMEOUT - 1000) / HZ ?
+		MAX_SCHEDULE_TIMEOUT: (timeout * HZ + 999) / 1000;
 
 retry:
 	write_lock_irqsave(&ep->lock, flags);
