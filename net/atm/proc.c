@@ -262,7 +262,7 @@ static void *vcc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	return v;
 }
 
-static void pvc_info(struct atm_vcc *vcc, char *buf, int clip_info)
+static void pvc_info(struct seq_file *seq, struct atm_vcc *vcc, int clip_info)
 {
 	static const char *class_name[] = { "off","UBR","CBR","VBR","ABR" };
 	static const char *aal_name[] = {
@@ -270,9 +270,8 @@ static void pvc_info(struct atm_vcc *vcc, char *buf, int clip_info)
 		"???",	"5",	"???",	"???",	/*  4- 7 */
 		"???",	"???",	"???",	"???",	/*  8-11 */
 		"???",	"0",	"???",	"???"};	/* 12-15 */
-	int off;
 
-	off = sprintf(buf,"%3d %3d %5d %-3s %7d %-5s %7d %-6s",
+	seq_printf(seq, "%3d %3d %5d %-3s %7d %-5s %7d %-6s",
 	    vcc->dev->number,vcc->vpi,vcc->vci,
 	    vcc->qos.aal >= sizeof(aal_name)/sizeof(aal_name[0]) ? "err" :
 	    aal_name[vcc->qos.aal],vcc->qos.rxtp.min_pcr,
@@ -284,17 +283,13 @@ static void pvc_info(struct atm_vcc *vcc, char *buf, int clip_info)
 		struct net_device *dev;
 
 		dev = clip_vcc->entry ? clip_vcc->entry->neigh->dev : NULL;
-		off += sprintf(buf+off,"CLIP, Itf:%s, Encap:",
+		seq_printf(seq, "CLIP, Itf:%s, Encap:",
 		    dev ? dev->name : "none?");
-		if (clip_vcc->encap)
-			off += sprintf(buf+off,"LLC/SNAP");
-		else
-			off += sprintf(buf+off,"None");
+		seq_printf(seq, "%s", clip_vcc->encap ? "LLC/SNAP" : "None");
 	}
 #endif
-	strcpy(buf+off,"\n");
+	seq_putc(seq, '\n');
 }
-
 
 static const char *vcc_state(struct atm_vcc *vcc)
 {
@@ -437,48 +432,40 @@ static struct file_operations devices_seq_fops = {
 	.release	= seq_release,
 };
 
-/*
- * FIXME: it isn't safe to walk the VCC list without turning off interrupts.
- * What is really needed is some lock on the devices. Ditto for ATMARP.
- */
-
-static int atm_pvc_info(loff_t pos,char *buf)
+static int pvc_seq_show(struct seq_file *seq, void *v)
 {
-	struct hlist_node *node;
-	struct sock *s;
-	struct atm_vcc *vcc;
-	int left, clip_info = 0;
+	static char atm_pvc_banner[] = 
+		"Itf VPI VCI   AAL RX(PCR,Class) TX(PCR,Class)\n";
 
-	if (!pos) {
-		return sprintf(buf,"Itf VPI VCI   AAL RX(PCR,Class) "
-		    "TX(PCR,Class)\n");
+	if (v == (void *)1)
+		seq_puts(seq, atm_pvc_banner);
+	else {
+		struct vcc_state *state = seq->private;
+		struct atm_vcc *vcc = atm_sk(state->sk);
+
+		pvc_info(seq, vcc, state->clip_info);
 	}
-	left = pos-1;
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-	if (try_atm_clip_ops())
-		clip_info = 1;
-#endif
-	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		vcc = atm_sk(s);
-		if (vcc->sk->sk_family == PF_ATMPVC && vcc->dev && !left--) {
-			pvc_info(vcc,buf,clip_info);
-			read_unlock(&vcc_sklist_lock);
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-			if (clip_info)
-				module_put(atm_clip_ops->owner);
-#endif
-			return strlen(buf);
-		}
-	}
-	read_unlock(&vcc_sklist_lock);
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-	if (clip_info)
-		module_put(atm_clip_ops->owner);
-#endif
 	return 0;
 }
 
+static struct seq_operations pvc_seq_ops = {
+	.start	= vcc_seq_start,
+	.next	= vcc_seq_next,
+	.stop	= vcc_seq_stop,
+	.show	= pvc_seq_show,
+};
+
+static int pvc_seq_open(struct inode *inode, struct file *file)
+{
+	return __vcc_seq_open(inode, file, PF_ATMPVC, &pvc_seq_ops);
+}
+
+static struct file_operations pvc_seq_fops = {
+	.open		= pvc_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= vcc_seq_release,
+};
 
 static int atm_vc_info(loff_t pos,char *buf)
 {
@@ -782,7 +769,7 @@ int __init atm_proc_init(void)
 	if (!atm_proc_root)
 		return -ENOMEM;
 	CREATE_SEQ_ENTRY(devices);
-	CREATE_ENTRY(pvc);
+	CREATE_SEQ_ENTRY(pvc);
 	CREATE_ENTRY(svc);
 	CREATE_ENTRY(vc);
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
