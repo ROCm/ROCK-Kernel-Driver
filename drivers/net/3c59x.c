@@ -1493,7 +1493,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	dev->poll_controller = poll_vortex; 
 #endif
-	if (pdev && vp->enable_wol) {
+	if (pdev) {
 		vp->pm_state_valid = 1;
  		pci_save_state(VORTEX_PCI(vp));
  		acpi_set_WOL(dev);
@@ -1550,9 +1550,10 @@ vortex_up(struct net_device *dev)
 	unsigned int config;
 	int i;
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
+	if (VORTEX_PCI(vp)) {
 		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);	/* Go active */
 		pci_restore_state(VORTEX_PCI(vp));
+		pci_enable_device(VORTEX_PCI(vp));
 	}
 
 	/* Before initializing select the active media port. */
@@ -2708,7 +2709,7 @@ vortex_down(struct net_device *dev, int final_down)
 	if (vp->full_bus_master_tx)
 		outl(0, ioaddr + DownListPtr);
 
-	if (final_down && VORTEX_PCI(vp) && vp->enable_wol) {
+	if (final_down && VORTEX_PCI(vp)) {
 		pci_save_state(VORTEX_PCI(vp));
 		acpi_set_WOL(dev);
 	}
@@ -3133,15 +3134,17 @@ static void acpi_set_WOL(struct net_device *dev)
 	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
-	/* Power up on: 1==Downloaded Filter, 2==Magic Packets, 4==Link Status. */
-	EL3WINDOW(7);
-	outw(2, ioaddr + 0x0c);
-	/* The RxFilter must accept the WOL frames. */
-	outw(SetRxFilter|RxStation|RxMulticast|RxBroadcast, ioaddr + EL3_CMD);
-	outw(RxEnable, ioaddr + EL3_CMD);
+	if (vp->enable_wol) {
+		/* Power up on: 1==Downloaded Filter, 2==Magic Packets, 4==Link Status. */
+		EL3WINDOW(7);
+		outw(2, ioaddr + 0x0c);
+		/* The RxFilter must accept the WOL frames. */
+		outw(SetRxFilter|RxStation|RxMulticast|RxBroadcast, ioaddr + EL3_CMD);
+		outw(RxEnable, ioaddr + EL3_CMD);
 
+		pci_enable_wake(VORTEX_PCI(vp), 0, 1);
+	}
 	/* Change the power state to D3; RxEnable doesn't take effect. */
-	pci_enable_wake(VORTEX_PCI(vp), 0, 1);
 	pci_set_power_state(VORTEX_PCI(vp), PCI_D3hot);
 }
 
@@ -3164,7 +3167,7 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 	 */
 	unregister_netdev(dev);
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
+	if (VORTEX_PCI(vp)) {
 		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);	/* Go active */
 		if (vp->pm_state_valid)
 			pci_restore_state(VORTEX_PCI(vp));
