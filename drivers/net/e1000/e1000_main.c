@@ -474,9 +474,14 @@ e1000_probe(struct pci_dev *pdev,
 	}
 
 #ifdef NETIF_F_TSO
+#ifdef BROKEN_ON_NON_IA_ARCHS
+	/* Disbaled for now until root-cause is found for
+	 * hangs reported against non-IA archs.  TSO can be
+	 * enabled using ethtool -K eth<x> tso on */
 	if((adapter->hw.mac_type >= e1000_82544) &&
 	   (adapter->hw.mac_type != e1000_82547))
 		netdev->features |= NETIF_F_TSO;
+#endif
 #endif
 
 	if(pci_using_dac)
