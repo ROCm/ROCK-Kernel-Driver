@@ -232,6 +232,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	if (m->mpc_apicid > MAX_APICS) {
 		printk("Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
+		--num_processors;
 		return;
 	}
 	ver = m->mpc_apicver;
