@@ -212,6 +212,14 @@ config NET_ETHERNET
 	  kernel: saying N will just cause the configurator to skip all
 	  the questions about Ethernet network cards. If unsure, say N.
 
+config MII
+	tristate "generic Media Independent Interface device support"
+	depends on NET_ETHERNET
+	help
+	  Most ethernet controllers have MII transceiver either as an external
+	  or internal device.  It is safe to say Y or M here even if your
+	  ethernet card lack MII.
+
 config ARM_AM79C961A
 	bool "ARM EBSA110 AM79C961A support"
 	depends on NET_ETHERNET && ARM && ARCH_EBSA110

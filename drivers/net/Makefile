@@ -63,6 +63,7 @@ obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
 # end link order section
 #
 
+obj-$(CONFIG_MII) += mii.o
 obj-$(CONFIG_AIRONET4500) 	+= aironet4500_core.o
 obj-$(CONFIG_AIRONET4500_CS) 	+= aironet4500_core.o
 obj-$(CONFIG_AIRONET4500_NONCS)  += aironet4500_card.o
@@ -199,3 +200,6 @@ obj-$(CONFIG_NET_WIRELESS) += wireless/
 obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
+
+
+include $(TOPDIR)/drivers/usb/net/Makefile.mii
