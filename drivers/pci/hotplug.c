@@ -173,6 +173,24 @@ int pci_visit_dev (struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
 }
 EXPORT_SYMBOL(pci_visit_dev);
 
+static void pci_destroy_dev(struct pci_dev *dev)
+{
+	pci_proc_detach_device(dev);
+	device_unregister(&dev->dev);
+
+	/* Remove the device from the device lists, and prevent any further
+	 * list accesses from this device */
+	spin_lock(&pci_bus_lock);
+	list_del(&dev->bus_list);
+	list_del(&dev->global_list);
+	dev->bus_list.next = dev->bus_list.prev = NULL;
+	dev->global_list.next = dev->global_list.prev = NULL;
+	spin_unlock(&pci_bus_lock);
+
+	pci_free_resources(dev);
+	pci_put_dev(dev);
+}
+
 /**
  * pci_remove_device_safe - remove an unused hotplug device
  * @dev: the device to remove
@@ -186,11 +204,7 @@ int pci_remove_device_safe(struct pci_dev *dev)
 {
 	if (pci_dev_driver(dev))
 		return -EBUSY;
-	device_unregister(&dev->dev);
-	list_del(&dev->bus_list);
-	list_del(&dev->global_list);
-	pci_free_resources(dev);
-	pci_proc_detach_device(dev);
+	pci_destroy_dev(dev);
 	return 0;
 }
 EXPORT_SYMBOL(pci_remove_device_safe);
@@ -237,17 +251,15 @@ void pci_remove_bus_device(struct pci_dev *dev)
 		pci_remove_behind_bridge(dev);
 		pci_proc_detach_bus(b);
 
+		spin_lock(&pci_bus_lock);
 		list_del(&b->node);
+		spin_unlock(&pci_bus_lock);
+
 		kfree(b);
 		dev->subordinate = NULL;
 	}
 
-	device_unregister(&dev->dev);
-	list_del(&dev->bus_list);
-	list_del(&dev->global_list);
-	pci_free_resources(dev);
-	pci_proc_detach_device(dev);
-	pci_put_dev(dev);
+	pci_destroy_dev(dev);
 }
 
 /**
