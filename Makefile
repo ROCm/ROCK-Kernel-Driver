@@ -622,7 +622,7 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	make_with_config
 
 xconfig:
-	@$(call descend,scripts,kconfig.tk)
+	@$(call descend,scripts,scripts/kconfig.tk)
 	wish -f scripts/kconfig.tk
 
 menuconfig:
