@@ -84,6 +84,8 @@ EXPORT_SYMBOL(acpi_resource_to_address64);
 EXPORT_SYMBOL(acpi_enable_event);
 EXPORT_SYMBOL(acpi_disable_event);
 EXPORT_SYMBOL(acpi_clear_event);
+EXPORT_SYMBOL(acpi_set_gpe_type);
+EXPORT_SYMBOL(acpi_enable_gpe);
 EXPORT_SYMBOL(acpi_get_timer_duration);
 EXPORT_SYMBOL(acpi_get_timer);
 EXPORT_SYMBOL(acpi_get_sleep_type_data);
