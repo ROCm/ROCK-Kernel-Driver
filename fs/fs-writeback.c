@@ -123,12 +123,12 @@ static void write_inode(struct inode *inode, int sync)
  * Called under inode_lock.
  */
 static void
-__sync_single_inode(struct inode *inode, int wait,
-			struct writeback_control *wbc)
+__sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	unsigned dirty;
 	struct address_space *mapping = inode->i_mapping;
 	struct super_block *sb = inode->i_sb;
+	int wait = wbc->sync_mode == WB_SYNC_ALL;
 
 	BUG_ON(inode->i_state & I_LOCK);
 
@@ -182,7 +182,7 @@ __sync_single_inode(struct inode *inode, int wait,
  * Write out an inode's dirty pages.  Called under inode_lock.
  */
 static void
-__writeback_single_inode(struct inode *inode, int sync,
+__writeback_single_inode(struct inode *inode,
 			struct writeback_control *wbc)
 {
 	if (current_is_pdflush() && (inode->i_state & I_LOCK)) {
@@ -197,7 +197,7 @@ __writeback_single_inode(struct inode *inode, int sync,
 		iput(inode);
 		spin_lock(&inode_lock);
 	}
-	__sync_single_inode(inode, sync, wbc);
+	__sync_single_inode(inode, wbc);
 }
 
 /*
@@ -243,7 +243,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 						struct inode, i_list);
 		struct address_space *mapping = inode->i_mapping;
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
-		int really_sync;
 
 		if (bdi->memory_backed)
 			break;
@@ -276,10 +275,9 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		if (current_is_pdflush() && !writeback_acquire(bdi))
 			break;
 
-		really_sync = (wbc->sync_mode == WB_SYNC_ALL);
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
-		__writeback_single_inode(inode, really_sync, wbc);
+		__writeback_single_inode(inode, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
 			mapping->dirtied_when = jiffies|1;
 			list_move(&inode->i_list, &sb->s_dirty);
@@ -452,10 +450,11 @@ void write_inode_now(struct inode *inode, int sync)
 {
 	struct writeback_control wbc = {
 		.nr_to_write = LONG_MAX,
+		.sync_mode = WB_SYNC_ALL,
 	};
 
 	spin_lock(&inode_lock);
-	__writeback_single_inode(inode, sync, &wbc);
+	__writeback_single_inode(inode, &wbc);
 	spin_unlock(&inode_lock);
 	if (sync)
 		wait_on_inode(inode);
