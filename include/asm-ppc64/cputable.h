@@ -15,6 +15,8 @@
 #ifndef __ASM_PPC_CPUTABLE_H
 #define __ASM_PPC_CPUTABLE_H
 
+#include <linux/config.h>
+
 /* Exposed to userland CPU features - Must match ppc32 definitions */
 #define PPC_FEATURE_32			0x80000000
 #define PPC_FEATURE_64			0x40000000
@@ -133,9 +135,16 @@ extern firmware_feature_t firmware_features_table[];
 #define COMMON_USER_PPC64	(PPC_FEATURE_32 | PPC_FEATURE_64 | \
 			         PPC_FEATURE_HAS_FPU | PPC_FEATURE_HAS_MMU)
 
-#define CPU_FTR_PPCAS_ARCH_V2   (CPU_FTR_SLB | CPU_FTR_16M_PAGE | \
+#define CPU_FTR_PPCAS_ARCH_V2_BASE (CPU_FTR_SLB | \
                                  CPU_FTR_TLBIEL | CPU_FTR_NOEXECUTE | \
                                  CPU_FTR_NODSISRALIGN)
+
+/* iSeries doesn't support large pages */
+#ifdef CONFIG_PPC_ISERIES
+#define CPU_FTR_PPCAS_ARCH_V2	(CPU_FTR_PPCAS_ARCH_V2_BASE)
+#else
+#define CPU_FTR_PPCAS_ARCH_V2	(CPU_FTR_PPCAS_ARCH_V2_BASE | CPU_FTR_16M_PAGE)
+#endif
 
 #define COMMON_PPC64_FW	(0)
 #endif

@@ -431,7 +431,6 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 }
 
-
 #ifdef CONFIG_PPC_PSERIES
 static int __init set_preferred_console(void)
 {

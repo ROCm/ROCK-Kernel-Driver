@@ -21,6 +21,7 @@
  *		KDB v1.2
  */
 
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>
