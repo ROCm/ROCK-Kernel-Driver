@@ -376,7 +376,7 @@ static struct pci_driver maxiradio_driver = {
 	name:		"radio-maxiradio",
 	id_table:	maxiradio_pci_tbl,
 	probe:		maxiradio_init_one,
-	remove:		maxiradio_remove_one,
+	remove:		__devexit_p(maxiradio_remove_one),
 };
 
 int __init maxiradio_radio_init(void)

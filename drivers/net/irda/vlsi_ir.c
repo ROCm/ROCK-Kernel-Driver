@@ -1291,7 +1291,7 @@ static struct pci_driver vlsi_irda_driver = {
 	name:           drivername,
 	id_table:       vlsi_irda_table,
 	probe:          vlsi_irda_probe,
-	remove:         vlsi_irda_remove,
+	remove:         __devexit_p(vlsi_irda_remove),
 	suspend:        vlsi_irda_suspend,
 	resume:         vlsi_irda_resume,
 };

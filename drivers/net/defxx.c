@@ -3362,7 +3362,7 @@ MODULE_DEVICE_TABLE(pci, dfx_pci_tbl);
 static struct pci_driver dfx_driver = {
 	name:		"defxx",
 	probe:		dfx_init_one,
-	remove:		dfx_remove_one,
+	remove:		__devexit_p(dfx_remove_one),
 	id_table:	dfx_pci_tbl,
 };
 

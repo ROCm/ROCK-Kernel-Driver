@@ -1516,7 +1516,7 @@ static struct pci_driver ioc3_driver = {
 	name:		"ioc3-eth",
 	id_table:	ioc3_pci_tbl,
 	probe:		ioc3_probe,
-	remove:		ioc3_remove_one,
+	remove:		__devexit_p(ioc3_remove_one),
 };
 
 static int __init ioc3_init_module(void)

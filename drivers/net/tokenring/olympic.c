@@ -1705,7 +1705,7 @@ static struct pci_driver olympic_driver = {
 	name:		"olympic",
 	id_table:	olympic_pci_tbl,
 	probe:		olympic_probe,
-	remove:		olympic_remove_one
+	remove:		__devexit_p(olympic_remove_one)
 };
 
 static int __init olympic_pci_init(void) 

@@ -1481,7 +1481,7 @@ static struct pci_driver yellowfin_driver = {
 	name:		DRV_NAME,
 	id_table:	yellowfin_pci_tbl,
 	probe:		yellowfin_init_one,
-	remove:		yellowfin_remove_one,
+	remove:		__devexit_p(yellowfin_remove_one),
 };
 
 

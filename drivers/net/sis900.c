@@ -2081,7 +2081,7 @@ static struct pci_driver sis900_pci_driver = {
 	name:		SIS900_MODULE_NAME,
 	id_table:	sis900_pci_tbl,
 	probe:		sis900_probe,
-	remove:		sis900_remove,
+	remove:		__devexit_p(sis900_remove),
 };
 
 static int __init sis900_init_module(void)
