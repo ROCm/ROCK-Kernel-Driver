@@ -194,8 +194,7 @@ static struct reserve_window_node *search_reserve_window(struct rb_root *root,
 	if (!n)
 		return NULL;
 
-	while (n)
-	{
+	do {
 		rsv = rb_entry(n, struct reserve_window_node, rsv_node);
 
 		if (goal < rsv->rsv_start)
@@ -204,7 +203,7 @@ static struct reserve_window_node *search_reserve_window(struct rb_root *root,
 			n = n->rb_right;
 		else
 			return rsv;
-	}
+	} while (n);
 	/*
 	 * We've fallen off the end of the tree: the goal wasn't inside
 	 * any particular node.  OK, the previous node must be to one
