@@ -30,6 +30,11 @@
 #define TIMER_IPR_POS	 3
 #define TIMER_PRIORITY	 2
 
+#define TIMER1_IRQ	17
+#define TIMER1_IPR_ADDR	INTC_IPRA
+#define TIMER1_IPR_POS	 2
+#define TIMER1_PRIORITY	 4
+
 #define RTC_IRQ		22
 #define RTC_IPR_ADDR	INTC_IPRA
 #define RTC_IPR_POS	 0
@@ -154,7 +159,7 @@
 # define OFFCHIP_NR_IRQS 16
 #else
 # if defined(CONFIG_HD64461)
-#  define OFFCHIP_NR_IRQS 16
+#  define OFFCHIP_NR_IRQS 18
 # elif defined (CONFIG_SH_BIGSUR) /* must be before CONFIG_HD64465 */
 #  define OFFCHIP_NR_IRQS 48
 # elif defined(CONFIG_HD64465)

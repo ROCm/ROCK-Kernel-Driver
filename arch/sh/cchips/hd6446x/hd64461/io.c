@@ -1,5 +1,5 @@
 /*
- *	$Id: io.c,v 1.5 2004/02/01 19:46:04 lethal Exp $
+ *	$Id: io.c,v 1.6 2004/03/16 00:07:50 lethal Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Typical I/O routines for HD64461 system.
  */
@@ -7,6 +7,8 @@
 #include <linux/config.h>
 #include <asm/io.h>
 #include <asm/hd64461/hd64461.h>
+
+#define MEM_BASE (CONFIG_HD64461_IOBASE - HD64461_STBCR)
 
 static __inline__ unsigned long PORT2ADDR(unsigned long port)
 {
@@ -36,7 +38,9 @@ static __inline__ unsigned long PORT2ADDR(unsigned long port)
 #endif
 
 	/* ??? */
-	if (port < 0x10000) return 0xa0000000 + port;
+	if (port < 0xf000) return 0xa0000000 + port;
+	/* PCMCIA channel 0, I/O (0xba000000) */
+	if (port < 0x10000) return 0xba000000 + port - 0xf000;
 
 	/* HD64461 internal devices (0xb0000000) */
 	if (port < 0x20000) return CONFIG_HD64461_IOBASE + port - 0x10000;
@@ -140,3 +144,14 @@ void hd64461_outsl(unsigned long port, const void *buffer, unsigned long count)
 	const unsigned long *buf=buffer;
 	while(count--) *addr=*buf++;
 }
+
+unsigned short hd64461_readw(unsigned long addr)
+{
+	return *(volatile unsigned short*)(MEM_BASE+addr);
+}
+
+void hd64461_writew(unsigned short b, unsigned long addr)
+{
+	*(volatile unsigned short*)(MEM_BASE+addr) = b;
+}
+

@@ -37,5 +37,7 @@
 
 #define p3_cache_init()				do { } while (0)
 
+#define HAVE_ARCH_UNMAPPED_AREA
+
 #endif /* __ASM_CPU_SH3_CACHEFLUSH_H */
 

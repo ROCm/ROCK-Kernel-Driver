@@ -1,5 +1,5 @@
 /*
- *	$Id: maplemouse.c,v 1.1 2001/11/02 17:27:32 jsimmons Exp $
+ *	$Id: maplemouse.c,v 1.2 2004/03/22 01:18:15 lethal Exp $
  * 	SEGA Dreamcast mouse driver
  *	Based on drivers/usb/usbmouse.c
  */
@@ -74,22 +74,21 @@ static int dc_mouse_connect(struct maple_device *dev)
 	mouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_RIGHT) | BIT(BTN_MIDDLE);
 	mouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y) | BIT(REL_WHEEL);
 
+	init_input_dev(&mouse->dev);
+
 	mouse->dev.private = mouse;
 	mouse->dev.open = dc_mouse_open;
 	mouse->dev.close = dc_mouse_close;
 	mouse->dev.event = NULL;
 
 	mouse->dev.name = dev->product_name;
-	mouse->dev.idbus = BUS_MAPLE;
+	mouse->dev.id.bustype = BUS_MAPLE;
 	
 	input_register_device(&mouse->dev);
 
 	maple_getcond_callback(dev, dc_mouse_callback, 1, MAPLE_FUNC_MOUSE);
 
-	printk(KERN_INFO "input%d: mouse(0x%lx): %s\n",
-	       mouse->dev.number, data, mouse->dev.name);
-
-	MOD_INC_USE_COUNT;
+	printk(KERN_INFO "input: mouse(0x%lx): %s\n", data, mouse->dev.name);
 
 	return 0;
 }
@@ -100,10 +99,7 @@ static void dc_mouse_disconnect(struct maple_device *dev)
 	struct dc_mouse *mouse = dev->private_data;
 
 	input_unregister_device(&mouse->dev);
-
 	kfree(mouse);
-
-	MOD_DEC_USE_COUNT;
 }
 
 

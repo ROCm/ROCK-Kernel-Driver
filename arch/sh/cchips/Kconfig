@@ -1,7 +1,13 @@
+menu "Companion Chips"
+
 # A board must have defined HD6446X_SERIES in order to see these
+config HD6446X_SERIES
+	bool "HD6446x support"
+	default n
+
 choice
 	prompt "HD6446x options"
-	depends HD6446X_SERIES
+	depends on HD6446X_SERIES
 	default HD64461
 
 config HD64461
@@ -73,4 +79,5 @@ config HD64465_IRQ
 
 	  Do not change this unless you know what you are doing.
 
+endmenu
 

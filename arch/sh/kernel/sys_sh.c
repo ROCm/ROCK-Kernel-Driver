@@ -44,7 +44,7 @@ asmlinkage int sys_pipe(unsigned long r4, unsigned long r5,
 	return error;
 }
 
-#if defined(CONFIG_CPU_SH4)
+#if defined(HAVE_ARCH_UNMAPPED_AREA)
 /*
  * To avoid cache alias, we map the shard page with same color.
  */
@@ -53,7 +53,9 @@ asmlinkage int sys_pipe(unsigned long r4, unsigned long r5,
 unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	unsigned long len, unsigned long pgoff, unsigned long flags)
 {
+	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
+	unsigned long start_addr;
 
 	if (flags & MAP_FIXED) {
 		/* We do not accept a shared mapping if it would violate
@@ -66,20 +68,44 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	if (len > TASK_SIZE)
 		return -ENOMEM;
-	if (!addr)
-		addr = TASK_UNMAPPED_BASE;
 
-	if (flags & MAP_PRIVATE)
-		addr = PAGE_ALIGN(addr);
-	else
-		addr = COLOUR_ALIGN(addr);
-
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
-		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (TASK_SIZE - len < addr)
-			return -ENOMEM;
-		if (!vma || addr + len <= vma->vm_start)
+	if (addr) {
+		if (flags & MAP_PRIVATE)
+			addr = PAGE_ALIGN(addr);
+		else
+			addr = COLOUR_ALIGN(addr);
+		vma = find_vma(mm, addr);
+		if (TASK_SIZE - len >= addr &&
+		    (!vma || addr + len <= vma->vm_start))
 			return addr;
+	}
+	if (flags & MAP_PRIVATE)
+		addr = PAGE_ALIGN(mm->free_area_cache);
+	else
+		addr = COLOUR_ALIGN(mm->free_area_cache);
+	start_addr = addr;
+
+full_search:
+	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
+		if (TASK_SIZE - len < addr) {
+			/*
+			 * Start a new search - just in case we missed
+			 * some holes.
+			 */
+			if (start_addr != TASK_UNMAPPED_BASE) {
+				start_addr = addr = TASK_UNMAPPED_BASE;
+				goto full_search;
+			}
+			return -ENOMEM;
+		}
+		if (!vma || addr + len <= vma->vm_start) {
+			/*
+			 * Remember the place where we stopped the search:
+			 */
+			mm->free_area_cache = addr + len;
+			return addr;
+		}
 		addr = vma->vm_end;
 		if (!(flags & MAP_PRIVATE))
 			addr = COLOUR_ALIGN(addr);

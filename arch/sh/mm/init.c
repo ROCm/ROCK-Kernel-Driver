@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.18 2003/10/31 09:26:59 kkojima Exp $
+/* $Id: init.c,v 1.19 2004/02/21 04:42:16 kkojima Exp $
  *
  *  linux/arch/sh/mm/init.c
  *
@@ -174,6 +174,7 @@ void __init mem_init(void)
 	extern unsigned long empty_zero_page[1024];
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
+	extern unsigned long memory_start;
 
 #ifdef CONFIG_MMU
 	high_memory = (void *)__va(MAX_LOW_PFN * PAGE_SIZE);
@@ -183,7 +184,7 @@ void __init mem_init(void)
 	high_memory = (void *)(memory_end & PAGE_MASK);
 #endif
 
-	max_mapnr = num_physpages = MAP_NR(high_memory);
+	max_mapnr = num_physpages = MAP_NR(high_memory) - MAP_NR(memory_start);
 
 	/* clear the zero-page */
 	memset(empty_zero_page, 0, PAGE_SIZE);

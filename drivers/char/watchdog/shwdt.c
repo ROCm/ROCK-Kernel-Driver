@@ -412,7 +412,7 @@ static int __init sh_wdt_init(void)
 		return rc;
 	}
 
-	rc = misc_register(&sh_wdt_miscdev)
+	rc = misc_register(&sh_wdt_miscdev);
 	if (rc) {
 		printk(KERN_ERR PFX "Can't register miscdev on minor=%d (err=%d)\n",
 			sh_wdt_miscdev.minor, rc);

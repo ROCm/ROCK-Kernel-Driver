@@ -1,11 +1,23 @@
 #ifndef __ASM_SH_HD64461
 #define __ASM_SH_HD64461
 /*
- *	$Id: hd64461.h,v 1.4 2004/02/01 19:46:04 lethal Exp $
+ *	$Id: hd64461.h,v 1.5 2004/03/16 00:07:51 lethal Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Hitachi HD64461 companion chip support
  */
 #include <linux/config.h>
+
+/* Constants for PCMCIA mappings */
+#define HD64461_PCC_WINDOW	0x01000000
+
+#define HD64461_PCC0_BASE	0xb8000000	/* area 6 */
+#define HD64461_PCC0_ATTR	(HD64461_PCC0_BASE)
+#define HD64461_PCC0_COMM	(HD64461_PCC0_BASE+HD64461_PCC_WINDOW)
+#define HD64461_PCC0_IO		(HD64461_PCC0_BASE+2*HD64461_PCC_WINDOW)
+
+#define HD64461_PCC1_BASE	0xb4000000	/* area 5 */
+#define HD64461_PCC1_ATTR	(HD64461_PCC1_BASE)
+#define HD64461_PCC1_COMM	(HD64461_PCC1_BASE+HD64461_PCC_WINDOW)
 
 #define HD64461_STBCR	0x10000
 #define HD64461_STBCR_CKIO_STBY			0x2000
@@ -21,7 +33,7 @@
 #define HD64461_STBCR_STM0ST			0x0008
 #define HD64461_STBCR_STM1ST			0x0004
 #define HD64461_STBCR_SIRST				0x0002
-#define HD64461_STBCR_SURTSD			0x0001
+#define HD64461_STBCR_SURTST			0x0001
 
 #define HD64461_SYSCR	0x10002
 #define HD64461_SCPUCR	0x10004
@@ -77,16 +89,74 @@
 #define HD64461_BBTROPR		0x11068
 #define HD64461_BBTMDR		0x1106a
 
-#define HD64461_PCC0ISR         0x12000
-#define HD64461_PCC0GCR         0x12002
-#define HD64461_PCC0CSCR        0x12004
-#define HD64461_PCC0CSCIER      0x12006
-#define HD64461_PCC0SCR         0x12008
-#define HD64461_PCC1ISR         0x12010
-#define HD64461_PCC1GCR         0x12012
-#define HD64461_PCC1CSCR        0x12014
-#define HD64461_PCC1CSCIER      0x12016
-#define HD64461_PCC1SCR         0x12018
+/* PC Card Controller Registers */
+#define HD64461_PCC0ISR         0x12000 /* socket 0 interface status */
+#define HD64461_PCC0GCR         0x12002 /* socket 0 general control */
+#define HD64461_PCC0CSCR        0x12004 /* socket 0 card status change */
+#define HD64461_PCC0CSCIER      0x12006 /* socket 0 card status change interrupt enable */
+#define HD64461_PCC0SCR         0x12008 /* socket 0 software control */
+#define HD64461_PCC1ISR         0x12010 /* socket 1 interface status */
+#define HD64461_PCC1GCR         0x12012 /* socket 1 general control */
+#define HD64461_PCC1CSCR        0x12014 /* socket 1 card status change */
+#define HD64461_PCC1CSCIER      0x12016 /* socket 1 card status change interrupt enable */
+#define HD64461_PCC1SCR         0x12018 /* socket 1 software control */
+
+/* PCC Interface Status Register */
+#define HD64461_PCCISR_READY		0x80	/* card ready */
+#define HD64461_PCCISR_MWP		0x40	/* card write-protected */
+#define HD64461_PCCISR_VS2		0x20	/* voltage select pin 2 */
+#define HD64461_PCCISR_VS1		0x10	/* voltage select pin 1 */
+#define HD64461_PCCISR_CD2		0x08	/* card detect 2 */
+#define HD64461_PCCISR_CD1		0x04	/* card detect 1 */
+#define HD64461_PCCISR_BVD2		0x02	/* battery 1 */
+#define HD64461_PCCISR_BVD1		0x01	/* battery 1 */
+
+#define HD64461_PCCISR_PCD_MASK		0x0c    /* card detect */
+#define HD64461_PCCISR_BVD_MASK	0x03    /* battery voltage */
+#define HD64461_PCCISR_BVD_BATGOOD	0x03    /* battery good */
+#define HD64461_PCCISR_BVD_BATWARN	0x01    /* battery low warning */
+#define HD64461_PCCISR_BVD_BATDEAD1	0x02    /* battery dead */
+#define HD64461_PCCISR_BVD_BATDEAD2	0x00    /* battery dead */
+
+/* PCC General Control Register */
+#define HD64461_PCCGCR_DRVE		0x80    /* output drive */
+#define HD64461_PCCGCR_PCCR		0x40    /* PC card reset */
+#define HD64461_PCCGCR_PCCT		0x20    /* PC card type, 1=IO&mem, 0=mem */
+#define HD64461_PCCGCR_VCC0		0x10    /* voltage control pin VCC0SEL0 */
+#define HD64461_PCCGCR_PMMOD		0x08    /* memory mode */
+#define HD64461_PCCGCR_PA25		0x04    /* pin A25 */
+#define HD64461_PCCGCR_PA24		0x02    /* pin A24 */
+#define HD64461_PCCGCR_REG		0x01    /* pin PCC0REG# */
+
+/* PCC Card Status Change Register */
+#define HD64461_PCCCSCR_SCDI		0x80    /* sw card detect intr */
+#define HD64461_PCCCSCR_SRV1		0x40    /* reserved */
+#define HD64461_PCCCSCR_IREQ		0x20    /* IREQ intr req */
+#define HD64461_PCCCSCR_SC		0x10    /* STSCHG (status change) pin */
+#define HD64461_PCCCSCR_CDC		0x08    /* CD (card detect) change */
+#define HD64461_PCCCSCR_RC		0x04    /* READY change */
+#define HD64461_PCCCSCR_BW		0x02    /* battery warning change */
+#define HD64461_PCCCSCR_BD		0x01    /* battery dead change */
+
+/* PCC Card Status Change Interrupt Enable Register */
+#define HD64461_PCCCSCIER_CRE		0x80    /* change reset enable */
+#define HD64461_PCCCSCIER_IREQE_MASK   	0x60   /* IREQ enable */
+#define HD64461_PCCCSCIER_IREQE_DISABLED	0x00   /* IREQ disabled */
+#define HD64461_PCCCSCIER_IREQE_LEVEL  	0x20   /* IREQ level-triggered */
+#define HD64461_PCCCSCIER_IREQE_FALLING	0x40   /* IREQ falling-edge-trig */
+#define HD64461_PCCCSCIER_IREQE_RISING 	0x60   /* IREQ rising-edge-trig */
+
+#define HD64461_PCCCSCIER_SCE		0x10    /* status change enable */
+#define HD64461_PCCCSCIER_CDE		0x08    /* card detect change enable */
+#define HD64461_PCCCSCIER_RE		0x04    /* ready change enable */
+#define HD64461_PCCCSCIER_BWE		0x02    /* battery warn change enable */
+#define HD64461_PCCCSCIER_BDE		0x01    /* battery dead change enable*/
+
+/* PCC Software Control Register */
+#define HD64461_PCCSCR_VCC1		0x02	/* voltage control pin 1 */
+#define HD64461_PCCSCR_SWP		0x01    /* write protect */
+
+
 #define HD64461_P0OCR           0x1202a
 #define HD64461_P1OCR           0x1202c
 #define HD64461_PGCR            0x1202e
@@ -120,5 +190,14 @@
 
 #define HD64461_IRQBASE		OFFCHIP_IRQ_BASE
 #define HD64461_IRQ_NUM 	16
+
+#define HD64461_IRQ_UART    	(HD64461_IRQBASE+5)
+#define HD64461_IRQ_IRDA    	(HD64461_IRQBASE+6)
+#define HD64461_IRQ_TMU1   	(HD64461_IRQBASE+9)
+#define HD64461_IRQ_TMU0  	(HD64461_IRQBASE+10)
+#define HD64461_IRQ_GPIO    	(HD64461_IRQBASE+11)
+#define HD64461_IRQ_AFE     	(HD64461_IRQBASE+12)
+#define HD64461_IRQ_PCC1 	(HD64461_IRQBASE+13)
+#define HD64461_IRQ_PCC0 	(HD64461_IRQBASE+14)
 
 #endif

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.34 2004/01/13 05:52:11 kkojima Exp $
+/* $Id: entry.S,v 1.35 2004/02/21 14:45:47 lethal Exp $
  *
  *  linux/arch/sh/entry.S
  *
@@ -1129,9 +1129,6 @@ ENTRY(sys_call_table)
 	.long sys_utimes
  	.long sys_fadvise64_64_wrapper
 	.long sys_ni_syscall	/* Reserved for vserver */
-
-	.rept NR_syscalls-(.-sys_call_table)/4
-		.long sys_ni_syscall
-	.endr
+	.long sys_ni_syscall
 
 /* End of entry.S */

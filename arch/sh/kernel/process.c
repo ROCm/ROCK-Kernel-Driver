@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.25 2004/01/13 05:52:11 kkojima Exp $
+/* $Id: process.c,v 1.26 2004/02/06 14:14:14 kkojima Exp $
  *
  *  linux/arch/sh/kernel/process.c
  *
@@ -254,6 +254,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 		struct task_struct *p, struct pt_regs *regs)
 {
 	struct pt_regs *childregs;
+#if defined(CONFIG_CPU_SH4)
+	struct task_struct *tsk = current;
+
+	unlazy_fpu(tsk, regs);
+	p->thread.fpu = tsk->thread.fpu;
+	p->used_math = tsk->used_math;
+#endif
 
 	childregs = ((struct pt_regs *)
 		(THREAD_SIZE + (unsigned long) p->thread_info)
@@ -279,16 +286,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	p->thread.ubc_pc = 0;
 
-#if defined(CONFIG_CPU_SH4)
-	{
-		struct task_struct *tsk = current;
-
-		unlazy_fpu(tsk, regs);
-		p->thread.fpu = tsk->thread.fpu;
-		p->used_math = tsk->used_math;
-		clear_ti_thread_flag(p->thread_info, TIF_USEDFPU);
-	}
-#endif
 	return 0;
 }
 
