@@ -1789,7 +1789,7 @@ static __inline__ struct net_device *dev_get_idx(struct seq_file *seq,
 	struct net_device *dev;
 	loff_t i;
 
-	for (i = 0, dev = dev_base; dev && i < pos; dev = dev->next);
+	for (i = 0, dev = dev_base; dev && i < pos; ++i, dev = dev->next);
 
 	return i == pos ? dev : NULL;
 }
