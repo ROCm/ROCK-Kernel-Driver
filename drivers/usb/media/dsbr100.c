@@ -82,7 +82,7 @@ static void *usb_dsbr100_probe(struct usb_device *dev, unsigned int ifnum,
 			 const struct usb_device_id *id);
 static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr);
 static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
-			     unsigned int cmd, void *arg);
+			     unsigned int cmd, unsigned long arg);
 static int usb_dsbr100_open(struct inode *inode, struct file *file);
 static int usb_dsbr100_close(struct inode *inode, struct file *file);
 
@@ -103,7 +103,7 @@ static struct file_operations usb_dsbr100_fops = {
 	owner:		THIS_MODULE,
 	open:		usb_dsbr100_open,
 	release:       	usb_dsbr100_close,
-	ioctl:          video_generic_ioctl,
+	ioctl:          usb_dsbr100_ioctl,
 	llseek:         no_llseek,
 };
 static struct video_device usb_dsbr100_radio=
@@ -113,7 +113,6 @@ static struct video_device usb_dsbr100_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_AZTECH,
 	fops:           &usb_dsbr100_fops,
-	kernel_ioctl:  	usb_dsbr100_ioctl,
 };
 
 static int users = 0;
@@ -212,8 +211,8 @@ static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr)
 	unlock_kernel();
 }
 
-static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
-			     unsigned int cmd, void *arg)
+static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
+				unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	usb_dsbr100 *radio=dev->priv;
@@ -299,6 +298,11 @@ static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, usb_dsbr100_do_ioctl);
+}
 
 static int usb_dsbr100_open(struct inode *inode, struct file *file)
 {
