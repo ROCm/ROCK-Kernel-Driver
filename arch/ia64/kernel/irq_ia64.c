@@ -237,6 +237,7 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 				setup_irq(irq, action);
 		}
 }
+EXPORT_SYMBOL(register_percpu_irq);
 
 void __init
 init_IRQ (void)
