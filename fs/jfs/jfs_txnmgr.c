@@ -1747,7 +1747,10 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 
 		if (lwm == next)
 			goto out;
-		assert(lwm < next);
+		if (lwm > next) {
+			jfs_err("xtLog: lwm > next\n");
+			goto out;
+		}
 		tlck->flag |= tlckUPDATEMAP;
 		xadlock->flag = mlckALLOCXADLIST;
 		xadlock->count = next - lwm;
@@ -2624,6 +2627,7 @@ void txAbort(tid_t tid, int dirty)
 	lid_t lid, next;
 	struct metapage *mp;
 	struct tblock *tblk = tid_to_tblock(tid);
+	struct tlock *tlck;
 
 	jfs_warn("txAbort: tid:%d dirty:0x%x", tid, dirty);
 
@@ -2631,9 +2635,10 @@ void txAbort(tid_t tid, int dirty)
 	 * free tlocks of the transaction
 	 */
 	for (lid = tblk->next; lid; lid = next) {
-		next = lid_to_tlock(lid)->next;
-
-		mp = lid_to_tlock(lid)->mp;
+		tlck = lid_to_tlock(lid);
+		next = tlck->next;
+		mp = tlck->mp;
+		JFS_IP(tlck->ip)->xtlid = 0;
 
 		if (mp) {
 			mp->lid = 0;

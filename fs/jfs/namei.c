@@ -953,7 +953,7 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 	unchar *i_fastsymlink;
 	s64 xlen = 0;
 	int bmask = 0, xsize;
-	s64 xaddr;
+	s64 extent = 0, xaddr;
 	struct metapage *mp;
 	struct super_block *sb;
 	struct tblock *tblk;
@@ -1011,15 +1011,6 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 
 	ino = ip->i_ino;
 
-
-
-	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
-		jfs_err("jfs_symlink: dtInsert returned %d", rc);
-		/* discard ne inode */
-		goto out3;
-
-	}
-
 	/* fix symlink access permission
 	 * (dir_create() ANDs in the u.u_cmask, 
 	 * but symlinks really need to be 777 access)
@@ -1027,7 +1018,7 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 	ip->i_mode |= 0777;
 
 	/*
-	   *       write symbolic link target path name
+	 * write symbolic link target path name
 	 */
 	xtInitRoot(tid, ip);
 
@@ -1069,39 +1060,40 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 		sb = ip->i_sb;
 		bmask = JFS_SBI(sb)->bsize - 1;
 		xsize = (ssize + bmask) & ~bmask;
-		xaddr = 0;
+		extent = xaddr = 0;
 		xlen = xsize >> JFS_SBI(sb)->l2bsize;
-		if ((rc = xtInsert(tid, ip, 0, 0, xlen, &xaddr, 0)) == 0) {
-			ip->i_size = ssize - 1;
-			while (ssize) {
-				int copy_size = min(ssize, PSIZE);
-
-				mp = get_metapage(ip, xaddr, PSIZE, 1);
-
-				if (mp == NULL) {
-					dtDelete(tid, dip, &dname, &ino,
-						 JFS_REMOVE);
-					rc = -EIO;
-					goto out3;
-				}
-				memcpy(mp->data, name, copy_size);
-				flush_metapage(mp);
-#if 0
-				set_buffer_uptodate(bp);
-				mark_buffer_dirty(bp, 1);
-				if (IS_SYNC(dip))
-					sync_dirty_buffer(bp);
-				brelse(bp);
-#endif				/* 0 */
-				ssize -= copy_size;
-				xaddr += JFS_SBI(sb)->nbperpage;
-			}
-			ip->i_blocks = LBLK2PBLK(sb, xlen);
-		} else {
-			dtDelete(tid, dip, &dname, &ino, JFS_REMOVE);
+		if ((rc = xtInsert(tid, ip, 0, 0, xlen, &xaddr, 0))) {
+			txAbort(tid, 0);
 			rc = -ENOSPC;
 			goto out3;
 		}
+		ip->i_size = ssize - 1;
+		while (ssize) {
+			int copy_size = min(ssize, PSIZE);
+
+			mp = get_metapage(ip, xaddr, PSIZE, 1);
+
+			if (mp == NULL) {
+				dbFree(ip, extent, xlen);
+				rc = -EIO;
+				txAbort(tid, 0);
+				goto out3;
+			}
+			memcpy(mp->data, name, copy_size);
+			flush_metapage(mp);
+			ssize -= copy_size;
+			xaddr += JFS_SBI(sb)->nbperpage;
+		}
+		ip->i_blocks = LBLK2PBLK(sb, xlen);
+	}
+
+	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
+		jfs_err("jfs_symlink: dtInsert returned %d", rc);
+		if (xlen)
+			dbFree(ip, extent, xlen);
+		txAbort(tid, 0);
+		/* discard new inode */
+		goto out3;
 	}
 
 	insert_inode_hash(ip);
@@ -1109,23 +1101,11 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 
 	/*
 	 * commit update of parent directory and link object
-	 *
-	 * if extent allocation failed (ENOSPC),
-	 * the parent inode is committed regardless to avoid
-	 * backing out parent directory update (by dtInsert())
-	 * and subsequent dtDelete() which is harmless wrt 
-	 * integrity concern.  
-	 * the symlink inode will be freed by iput() at exit
-	 * as it has a zero link count (by dtDelete()) and 
-	 * no permanant resources. 
 	 */
 
 	iplist[0] = dip;
-	if (rc == 0) {
-		iplist[1] = ip;
-		rc = txCommit(tid, 2, &iplist[0], 0);
-	} else
-		rc = txCommit(tid, 1, &iplist[0], 0);
+	iplist[1] = ip;
+	rc = txCommit(tid, 2, &iplist[0], 0);
 
       out3:
 	txEnd(tid);
