@@ -380,7 +380,7 @@ struct thread_struct {
 /* virtual 86 mode info */
 	struct vm86_struct	* vm86_info;
 	unsigned long		screen_bitmap;
-	unsigned long		v86flags, v86mask, v86mode, saved_esp0;
+	unsigned long		v86flags, v86mask, saved_esp0;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
 };
@@ -392,7 +392,7 @@ struct thread_struct {
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
 	0, 0, 0,						\
 	{ { 0, }, },		/* 387 state */			\
-	0,0,0,0,0,0,						\
+	0,0,0,0,0,						\
 	NULL,			/* io permissions */		\
 }
 
