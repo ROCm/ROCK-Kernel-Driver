@@ -51,12 +51,6 @@
 
 #include <linux/slab.h>
 
-/*
- * kernel thread actions
- */
-
-#define US_ACT_COMMAND		1
-#define US_ACT_EXIT		5
 
 /***********************************************************************
  * Host functions 
@@ -204,7 +198,7 @@ static int device_reset( Scsi_Cmnd *srb )
 	US_DEBUGP("device_reset() called\n" );
 
 	/* if the device was removed, then we're already reset */
-	if (atomic_read(&us->sm_state) == US_STATE_DETACHED)
+	if (!test_bit(DEV_ATTACHED, &us->bitflags))
 		return SUCCESS;
 
 	scsi_unlock(srb->host);
@@ -235,7 +229,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	US_DEBUGP("bus_reset() called\n");
 
 	/* if the device has been removed, this worked */
-	if (atomic_read(&us->sm_state) == US_STATE_DETACHED) {
+	if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
 		US_DEBUGP("-- device removed already\n");
 		return SUCCESS;
 	}
@@ -337,8 +331,8 @@ static int proc_info (char *buffer, char **start, off_t offset, int length,
 
 	/* show the GUID of the device */
 	SPRINTF("         GUID: " GUID_FORMAT "\n", GUID_ARGS(us->guid));
-	SPRINTF("     Attached: %s\n", (atomic_read(&us->sm_state) ==
-			US_STATE_DETACHED) ? "Yes" : "No");
+	SPRINTF("     Attached: %s\n", (test_bit(DEV_ATTACHED, &us->bitflags)
+			? "Yes" : "No"));
 
 	/*
 	 * Calculate start of next buffer, and return value.

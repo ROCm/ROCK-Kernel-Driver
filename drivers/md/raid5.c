@@ -634,7 +634,6 @@ static void copy_data(int frombio, struct bio *bio,
 		else 
 			page_offset = (signed)(sector - bio->bi_sector) * -512;
 		bio_for_each_segment(bvl, bio, i) {
-			char *ba = __bio_kmap(bio, i);
 			int len = bio_iovec_idx(bio,i)->bv_len;
 			int clen;
 			int b_offset = 0;			
@@ -649,13 +648,16 @@ static void copy_data(int frombio, struct bio *bio,
 				clen = STRIPE_SIZE - page_offset;	
 			else clen = len;
 			
-			if (len > 0) {
+			if (clen > 0) {
+				char *ba = __bio_kmap(bio, i);
 				if (frombio)
 					memcpy(pa+page_offset, ba+b_offset, clen);
 				else
 					memcpy(ba+b_offset, pa+page_offset, clen);
-			}
-			__bio_kunmap(bio, i);
+				__bio_kunmap(bio, i);
+			}	
+			if (clen < len) /* hit end of page */
+				break;
 			page_offset +=  len;
 		}
 	}
@@ -810,6 +812,8 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	spin_unlock_irq(&conf->device_lock);
 	spin_unlock(&sh->lock);
 
+	PRINTK("added bi b#%lu to stripe s#%lu, disk %d.\n", bi->bi_sector, sh->sector, dd_idx);
+
 	if (forwrite) {
 		/* check if page is coverred */
 		sector_t sector = sh->dev[dd_idx].sector;
@@ -823,8 +827,6 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 		if (sector >= sh->dev[dd_idx].sector + STRIPE_SECTORS)
 			set_bit(R5_OVERWRITE, &sh->dev[dd_idx].flags);
 	}
-
-	PRINTK("added bi b#%lu to stripe s#%lu, disk %d.\n", bi->bi_sector, sh->sector, dd_idx);
 }
 
 
@@ -1036,7 +1038,7 @@ static void handle_stripe(struct stripe_head *sh)
 				    ) &&
 			    !test_bit(R5_UPTODATE, &dev->flags)) {
 				if (conf->disks[i].operational 
-/*				    && !(conf->resync_parity && i == sh->pd_idx) */
+/*				    && !(!mddev->insync && i == sh->pd_idx) */
 					)
 					rmw++;
 				else rmw += 2*disks;  /* cannot read it */
@@ -1226,14 +1228,15 @@ static inline void raid5_activate_delayed(raid5_conf_t *conf)
 }
 static void raid5_unplug_device(void *data)
 {
-	raid5_conf_t *conf = (raid5_conf_t *)data;
+	request_queue_t *q = data;
+	mddev_t *mddev = q->queuedata;
+	raid5_conf_t *conf = mddev_to_conf(mddev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&conf->device_lock, flags);
 
-	raid5_activate_delayed(conf);
-	
-	conf->plugged = 0;
+	if (blk_remove_plug(q))
+		raid5_activate_delayed(conf);
 	md_wakeup_thread(conf->thread);
 
 	spin_unlock_irqrestore(&conf->device_lock, flags);
@@ -1242,30 +1245,20 @@ static void raid5_unplug_device(void *data)
 static inline void raid5_plug_device(raid5_conf_t *conf)
 {
 	spin_lock_irq(&conf->device_lock);
-	if (list_empty(&conf->delayed_list))
-		if (!conf->plugged) {
-			conf->plugged = 1;
-			queue_task(&conf->plug_tq, &tq_disk);
-		}
+	blk_plug_device(&conf->mddev->queue);
 	spin_unlock_irq(&conf->device_lock);
 }
 
-static int make_request (mddev_t *mddev, int rw, struct bio * bi)
+static int make_request (request_queue_t *q, struct bio * bi)
 {
-	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
+	mddev_t *mddev = q->queuedata;
+	raid5_conf_t *conf = mddev_to_conf(mddev);
 	const unsigned int raid_disks = conf->raid_disks;
 	const unsigned int data_disks = raid_disks - 1;
 	unsigned int dd_idx, pd_idx;
 	sector_t new_sector;
 	sector_t logical_sector, last_sector;
-	int read_ahead = 0;
-
 	struct stripe_head *sh;
-
-	if (rw == READA) {
-		rw = READ;
-		read_ahead=1;
-	}
 
 	logical_sector = bi->bi_sector & ~(STRIPE_SECTORS-1);
 	last_sector = bi->bi_sector + (bi->bi_size>>9);
@@ -1281,10 +1274,10 @@ static int make_request (mddev_t *mddev, int rw, struct bio * bi)
 		PRINTK("raid5: make_request, sector %ul logical %ul\n", 
 		       new_sector, logical_sector);
 
-		sh = get_active_stripe(conf, new_sector, pd_idx, read_ahead);
+		sh = get_active_stripe(conf, new_sector, pd_idx, (bi->bi_rw&RWA_MASK));
 		if (sh) {
 
-			add_stripe_bio(sh, bi, dd_idx, rw);
+			add_stripe_bio(sh, bi, dd_idx, (bi->bi_rw&RW_MASK));
 
 			raid5_plug_device(conf);
 			handle_stripe(sh);
@@ -1310,6 +1303,10 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	unsigned long first_sector;
 	int raid_disks = conf->raid_disks;
 	int data_disks = raid_disks-1;
+
+	if (sector_nr >= mddev->sb->size <<1)
+		/* just being told to finish up .. nothing to do */
+		return 0;
 
 	first_sector = raid5_compute_sector(stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
@@ -1343,17 +1340,15 @@ static void raid5d (void *data)
 
 	handled = 0;
 
-	if (mddev->sb_dirty) {
-		mddev->sb_dirty = 0;
+	if (mddev->sb_dirty)
 		md_update_sb(mddev);
-	}
 	spin_lock_irq(&conf->device_lock);
 	while (1) {
 		struct list_head *first;
 
 		if (list_empty(&conf->handle_list) &&
 		    atomic_read(&conf->preread_active_stripes) < IO_THRESHOLD &&
-		    !conf->plugged &&
+		    !blk_queue_plugged(&mddev->queue) &&
 		    !list_empty(&conf->delayed_list))
 			raid5_activate_delayed(conf);
 
@@ -1382,31 +1377,6 @@ static void raid5d (void *data)
 	PRINTK("--- raid5d inactive\n");
 }
 
-/*
- * Private kernel thread for parity reconstruction after an unclean
- * shutdown. Reconstruction on spare drives in case of a failed drive
- * is done by the generic mdsyncd.
- */
-static void raid5syncd (void *data)
-{
-	raid5_conf_t *conf = data;
-	mddev_t *mddev = conf->mddev;
-
-	if (!conf->resync_parity)
-		return;
-	if (conf->resync_parity == 2)
-		return;
-	down(&mddev->recovery_sem);
-	if (md_do_sync(mddev,NULL)) {
-		up(&mddev->recovery_sem);
-		printk("raid5: resync aborted!\n");
-		return;
-	}
-	conf->resync_parity = 0;
-	up(&mddev->recovery_sem);
-	printk("raid5: resync finished.\n");
-}
-
 static int run (mddev_t *mddev)
 {
 	raid5_conf_t *conf;
@@ -1416,7 +1386,6 @@ static int run (mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct disk_info *disk;
 	struct list_head *tmp;
-	int start_recovery = 0;
 
 	MOD_INC_USE_COUNT;
 
@@ -1444,10 +1413,7 @@ static int run (mddev_t *mddev)
 	atomic_set(&conf->active_stripes, 0);
 	atomic_set(&conf->preread_active_stripes, 0);
 
-	conf->plugged = 0;
-	conf->plug_tq.sync = 0;
-	conf->plug_tq.routine = &raid5_unplug_device;
-	conf->plug_tq.data = conf;
+	mddev->queue.unplug_fn = raid5_unplug_device;
 
 	PRINTK("raid5: run(md%d) called.\n", mdidx(mddev));
 
@@ -1571,9 +1537,10 @@ static int run (mddev_t *mddev)
 		goto abort;
 	}
 
-	if (conf->working_disks != sb->raid_disks) {
-		printk(KERN_ALERT "raid5: md%d, not all disks are operational -- trying to recover array\n", mdidx(mddev));
-		start_recovery = 1;
+	if (conf->failed_disks == 1 &&
+	    !(sb->state & (1<<MD_SB_CLEAN))) {
+		printk(KERN_ERR "raid5: cannot start dirty degraded array for md%d\n", mdidx(mddev));
+		goto abort;
 	}
 
 	{
@@ -1587,10 +1554,11 @@ static int run (mddev_t *mddev)
 	}
 
 	memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
-		 conf->raid_disks * ((sizeof(struct buffer_head) + PAGE_SIZE))) / 1024;
+		 conf->raid_disks * ((sizeof(struct bio) + PAGE_SIZE))) / 1024;
 	if (grow_stripes(conf, conf->max_nr_stripes)) {
 		printk(KERN_ERR "raid5: couldn't allocate %dkB for buffers\n", memory);
 		shrink_stripes(conf);
+		md_unregister_thread(conf->thread);
 		goto abort;
 	} else
 		printk(KERN_INFO "raid5: allocated %dkB for md%d\n", memory, mdidx(mddev));
@@ -1615,23 +1583,6 @@ static int run (mddev_t *mddev)
 	else
 		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), sb->active_disks, sb->raid_disks, conf->algorithm);
 
-	if (!start_recovery && !(sb->state & (1 << MD_SB_CLEAN))) {
-		const char * name = "raid5syncd";
-
-		conf->resync_thread = md_register_thread(raid5syncd, conf,name);
-		if (!conf->resync_thread) {
-			printk(KERN_ERR "raid5: couldn't allocate thread for md%d\n", mdidx(mddev));
-			goto abort;
-		}
-
-		printk("raid5: raid set md%d not clean; reconstructing parity\n", mdidx(mddev));
-		conf->resync_parity = 1;
-		md_wakeup_thread(conf->resync_thread);
-	}
-
-	print_raid5_conf(conf);
-	if (start_recovery)
-		md_recover_arrays();
 	print_raid5_conf(conf);
 
 	/* Ok, everything is just fine now */
@@ -1650,48 +1601,12 @@ abort:
 	return -EIO;
 }
 
-static int stop_resync (mddev_t *mddev)
-{
-	raid5_conf_t *conf = mddev_to_conf(mddev);
-	mdk_thread_t *thread = conf->resync_thread;
-
-	if (thread) {
-		if (conf->resync_parity) {
-			conf->resync_parity = 2;
-			md_interrupt_thread(thread);
-			printk(KERN_INFO "raid5: parity resync was not fully finished, restarting next time.\n");
-			return 1;
-		}
-		return 0;
-	}
-	return 0;
-}
-
-static int restart_resync (mddev_t *mddev)
-{
-	raid5_conf_t *conf = mddev_to_conf(mddev);
-
-	if (conf->resync_parity) {
-		if (!conf->resync_thread) {
-			MD_BUG();
-			return 0;
-		}
-		printk("raid5: waking up raid5resync.\n");
-		conf->resync_parity = 1;
-		md_wakeup_thread(conf->resync_thread);
-		return 1;
-	} else
-		printk("raid5: no restart-resync needed.\n");
-	return 0;
-}
 
 
 static int stop (mddev_t *mddev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 
-	if (conf->resync_thread)
-		md_unregister_thread(conf->resync_thread);
 	md_unregister_thread(conf->thread);
 	shrink_stripes(conf);
 	free_pages((unsigned long) conf->stripe_hashtbl, HASH_PAGES_ORDER);
@@ -2066,8 +1981,6 @@ static mdk_personality_t raid5_personality=
 	status:		status,
 	error_handler:	error,
 	diskop:		diskop,
-	stop_resync:	stop_resync,
-	restart_resync:	restart_resync,
 	sync_request:	sync_request
 };
 
