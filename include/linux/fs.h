@@ -1131,7 +1131,8 @@ extern int fs_may_remount_ro(struct super_block *);
  */
 #define bio_data_dir(bio)	((bio)->bi_rw & 1)
 
-extern int check_disk_change(kdev_t);
+extern int check_disk_change(struct block_device *);
+extern int __check_disk_change(dev_t);
 extern int invalidate_inodes(struct super_block *);
 extern int invalidate_device(kdev_t, int);
 extern void invalidate_inode_pages(struct inode *);

@@ -501,7 +501,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	sdp->access_count++;
 
 	if (sdp->removable) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 
 		/*
 		 * If the drive is empty, just let the open fail.

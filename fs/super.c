@@ -502,7 +502,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	devfs_put_ops (de);   /*  Decrement module use count now we're safe  */
 	if (error)
 		goto out;
-	check_disk_change(dev);
+	check_disk_change(bdev);
 	error = -EACCES;
 	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
 		goto out1;

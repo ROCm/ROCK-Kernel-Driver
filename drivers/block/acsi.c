@@ -1156,7 +1156,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 #if 0
 		aip->changed = 1;	/* safety first */
 #endif
-		check_disk_change( inode->i_rdev );
+		check_disk_change( inode->i_bdev );
 		if (aip->changed)	/* revalidate was not successful (no medium) */
 			return -ENXIO;
 		acsi_prevent_removal(device, 1);
@@ -1164,7 +1164,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 	access_count[device]++;
 
 	if (filp && filp->f_mode) {
-		check_disk_change( inode->i_rdev );
+		check_disk_change( inode->i_bdev );
 		if (filp->f_mode & 2) {
 			if (aip->read_only) {
 				acsi_release( inode, filp );

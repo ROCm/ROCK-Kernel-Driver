@@ -498,34 +498,18 @@ int unregister_blkdev(unsigned int major, const char * name)
  * People changing diskettes in the middle of an operation deserve
  * to lose :-)
  */
-int check_disk_change(kdev_t dev)
+int check_disk_change(struct block_device *bdev)
 {
-	int i;
-	struct block_device_operations * bdops = NULL;
+	struct block_device_operations * bdops = bdev->bd_op;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
-	i = major(dev);
-	if (i < MAX_BLKDEV)
-		bdops = blkdevs[i].bdops;
-	if (bdops == NULL) {
-		devfs_handle_t de;
-
-		de = devfs_get_handle(NULL, NULL, i, minor(dev),
-				      DEVFS_SPECIAL_BLK, 0);
-		if (de) {
-			bdops = devfs_get_ops(de);
-			devfs_put_ops(de); /* We're running in owner module */
-			devfs_put(de);
-		}
-	}
-	if (bdops == NULL)
-		return 0;
 	if (bdops->check_media_change == NULL)
 		return 0;
 	if (!bdops->check_media_change(dev))
 		return 0;
 
 	printk(KERN_DEBUG "VFS: Disk change detected on device %s\n",
-		__bdevname(dev));
+		bdevname(bdev));
 
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
@@ -535,12 +519,25 @@ int check_disk_change(kdev_t dev)
 	return 1;
 }
 
+int __check_disk_change(dev_t dev)
+{
+	struct block_device *bdev = bdget(dev);
+	int res;
+	if (!bdev)
+		return 0;
+	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
+		return 0;
+	res = check_disk_change(bdev);
+	blkdev_put(bdev, BDEV_RAW);
+	return res;
+}
+
 static int do_open(struct block_device *bdev, struct inode *inode, struct file *file)
 {
 	int ret = -ENXIO;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct module *owner = NULL;
-	struct block_device_operations *ops, *current_ops;
+	struct block_device_operations *ops, *old;
 
 	lock_kernel();
 	ops = get_blkfops(major(dev));
@@ -551,12 +548,15 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	}
 
 	down(&bdev->bd_sem);
-	if (!bdev->bd_op)
-		current_ops = ops;
-	else
-		current_ops = bdev->bd_op;
-	if (!current_ops)
-		goto out;
+	old = bdev->bd_op;
+	if (!old) {
+		if (!ops)
+			goto out;
+		bdev->bd_op = ops;
+	} else {
+		if (owner)
+			__MOD_DEC_USE_COUNT(owner);
+	}
 	if (!bdev->bd_contains) {
 		unsigned minor = minor(dev);
 		struct gendisk *g = get_gendisk(dev);
@@ -578,8 +578,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 	}
 	if (bdev->bd_contains == bdev) {
-		if (current_ops->open) {
-			ret = current_ops->open(inode, file);
+		if (bdev->bd_op->open) {
+			ret = bdev->bd_op->open(inode, file);
 			if (ret)
 				goto out2;
 		}
@@ -588,10 +588,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		bdev->bd_contains->bd_part_count++;
 		up(&bdev->bd_contains->bd_part_sem);
 	}
-	if (!bdev->bd_op)
-		bdev->bd_op = ops;
-	else if (owner)
-		__MOD_DEC_USE_COUNT(owner);
 	if (!bdev->bd_openers) {
 		struct blk_dev_struct *p = blk_dev + major(dev);
 		struct gendisk *g = get_gendisk(dev);
@@ -644,8 +640,11 @@ out2:
 		}
 	}
 out1:
-	if (owner)
-		__MOD_DEC_USE_COUNT(owner);
+	if (!old) {
+		bdev->bd_op = NULL;
+		if (owner)
+			__MOD_DEC_USE_COUNT(owner);
+	}
 out:
 	up(&bdev->bd_sem);
 	unlock_kernel();

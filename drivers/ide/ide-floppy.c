@@ -1496,7 +1496,7 @@ static int idefloppy_open(struct inode *inode, struct file *filp, struct ata_dev
 			idefloppy_create_prevent_cmd (&pc, 1);
 			(void) idefloppy_queue_pc_tail (drive, &pc);
 		}
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 	}
 	else if (test_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags))
 	{

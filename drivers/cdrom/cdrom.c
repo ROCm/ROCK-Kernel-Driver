@@ -486,7 +486,7 @@ int cdrom_open(struct inode *ip, struct file *fp)
 	cdinfo(CD_OPEN, "Use count for \"/dev/%s\" now %d\n", cdi->name, cdi->use_count);
 	/* Do this on open.  Don't wait for mount, because they might
 	    not be mounting, but opening with O_NONBLOCK */
-	check_disk_change(dev);
+	check_disk_change(ip->i_bdev);
 	return ret;
 }
 

@@ -659,7 +659,7 @@ static int idedisk_open(struct inode *inode, struct file *__fp, struct ata_devic
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 
 		/*
 		 * Ignore the return code from door_lock, since the open() has

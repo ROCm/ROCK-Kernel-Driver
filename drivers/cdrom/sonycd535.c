@@ -1402,9 +1402,7 @@ cdu_open(struct inode *inode,
 		sony_inuse = 0;
 		return -EIO;
 	}
-	if (inode) {
-		check_disk_change(inode->i_rdev);
-	}
+	check_disk_change(inode->i_bdev);
 	sony_usage++;
 
 #ifdef LOCK_DOORS
