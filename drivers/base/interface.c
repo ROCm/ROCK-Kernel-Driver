@@ -19,15 +19,7 @@
  */
 static ssize_t device_read_status(struct device * dev, char * page, size_t count, loff_t off)
 {
-	char *str = page;
-
-	if (off)
-		return 0;
-
-	str += sprintf(str,"Name:       %s\n",dev->name);
-	str += sprintf(str,"Bus ID:     %s\n",dev->bus_id);
-
-	return (str - page);
+	return off ? 0 : sprintf(page,"%s\n",dev->bus_id);
 }
 
 /**
@@ -84,17 +76,21 @@ static struct driver_file_entry device_status_entry = {
 	store:		device_write_status,
 };
 
+static ssize_t device_read_name(struct device * dev, char * buf, size_t count, loff_t off)
+{
+	return off ? 0 : sprintf(buf,"%s\n",dev->name);
+}
+
+static struct driver_file_entry device_name_entry = {
+	name:	"name",
+	mode:	S_IRUGO,
+	show:	device_read_name,
+};
+
 static ssize_t
 device_read_power(struct device * dev, char * page, size_t count, loff_t off)
 {
-	char	* str = page;
-
-	if (off)
-		return 0;
-
-	str += sprintf(str,"State:      %d\n",dev->current_state);
-
-	return (str - page);
+	return off ? 0 : sprintf(page,"%d\n",dev->current_state);
 }
 
 static ssize_t
@@ -169,6 +165,7 @@ static struct driver_file_entry device_power_entry = {
 
 struct driver_file_entry * device_default_files[] = {
 	&device_status_entry,
+	&device_name_entry,
 	&device_power_entry,
 	NULL,
 };
