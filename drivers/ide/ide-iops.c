@@ -302,7 +302,7 @@ EXPORT_SYMBOL(QUIRK_LIST);
  * of the sector count register location, with interrupts disabled
  * to ensure that the reads all happen together.
  */
-void ata_vlb_sync (ide_drive_t *drive, ide_ioreg_t port)
+void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
 {
 	(void) HWIF(drive)->INB(port);
 	(void) HWIF(drive)->INB(port);
@@ -876,9 +876,9 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 //	while (HWGROUP(drive)->busy)
 //		ide_delay_50ms();
 
-#if !defined(CONFIG_DMA_NONPCI)
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
 	hwif->ide_dma_host_off(drive);
-#endif /* !(CONFIG_DMA_NONPCI) */
+#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
 
 	/*
 	 * Don't use ide_wait_cmd here - it will
@@ -944,12 +944,12 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 	drive->id->dma_mword &= ~0x0F00;
 	drive->id->dma_1word &= ~0x0F00;
 
-#if !defined(CONFIG_DMA_NONPCI)
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
 	if (speed >= XFER_SW_DMA_0)
 		hwif->ide_dma_host_on(drive);
 	else
-		hwif->ide_dma_off(drive);
-#endif /* !(CONFIG_DMA_NONPCI) */
+		hwif->ide_dma_off_quietly(drive);
+#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
 
 	switch(speed) {
 		case XFER_UDMA_7:   drive->id->dma_ultra |= 0x8080; break;
