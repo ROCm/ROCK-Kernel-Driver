@@ -217,6 +217,9 @@ extern void clock_was_set(void); // call when ever the clock is set
 extern int do_posix_clock_monotonic_gettime(struct timespec *tp);
 extern long do_nanosleep(struct timespec *t);
 extern long do_utimes(char __user * filename, struct timeval * times);
+struct itimerval;
+extern int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue);
+extern int do_getitimer(int which, struct itimerval *value);
 
 static inline void
 set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)
