@@ -308,7 +308,7 @@ void in6_dev_finish_destroy(struct inet6_dev *idev)
 		printk("Freeing alive inet6 device %p\n", idev);
 		return;
 	}
-	snmp6_unregister_dev(idev);
+	snmp6_free_dev(idev);
 	kfree(idev);
 }
 
@@ -338,6 +338,16 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		}
 		/* We refer to the device */
 		dev_hold(dev);
+
+		if (snmp6_alloc_dev(ndev) < 0) {
+			ADBG((KERN_WARNING
+				"%s(): cannot allocate memory for statistics; dev=%s.\n",
+				__FUNCTION__, dev->name));
+			neigh_parms_release(&nd_tbl, ndev->nd_parms);
+			ndev->dead = 1;
+			in6_dev_finish_destroy(ndev);
+			return NULL;
+		}
 
 		if (snmp6_register_dev(ndev) < 0) {
 			ADBG((KERN_WARNING
@@ -2013,6 +2023,10 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		dev->ip6_ptr = NULL;
 		idev->dead = 1;
 		write_unlock_bh(&addrconf_lock);
+
+		/* Step 1.5: remove snmp6 entry */
+		snmp6_unregister_dev(idev);
+
 	}
 
 	/* Step 2: clear hash table */
