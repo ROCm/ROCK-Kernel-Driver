@@ -2118,7 +2118,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				}
 			}
 			if (len) {
-#if 0 && WIRELESS_EXT > 15
+#if WIRELESS_EXT > 15
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
 				if (apriv->spy_data.spy_number > 0) {
 					char *sa;
