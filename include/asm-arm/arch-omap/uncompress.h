@@ -28,7 +28,7 @@
 #define omap_get_id() ((*(volatile unsigned int *)(0xfffed404)) >> 12) & ID_MASK
 
 static void
-puts(const char *s)
+putstr(const char *s)
 {
 	volatile u8 * uart = 0;
 	int shift = 0;

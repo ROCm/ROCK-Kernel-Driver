@@ -210,22 +210,11 @@ extern int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 extern void fib_select_multipath(const struct flowi *flp, struct fib_result *res);
 
 /* Exported by fib_semantics.c */
-extern int 		ip_fib_check_default(u32 gw, struct net_device *dev);
-extern void		fib_release_info(struct fib_info *);
-extern int		fib_semantic_match(int type, struct fib_info *,
-					   const struct flowi *, struct fib_result*);
-extern struct fib_info	*fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
-					 const struct nlmsghdr *, int *err);
-extern int fib_nh_match(struct rtmsg *r, struct nlmsghdr *, struct kern_rta *rta, struct fib_info *fi);
-extern int fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
-			 u8 tb_id, u8 type, u8 scope, void *dst, int dst_len, u8 tos,
-			 struct fib_info *fi);
+extern int ip_fib_check_default(u32 gw, struct net_device *dev);
 extern int fib_sync_down(u32 local, struct net_device *dev, int force);
 extern int fib_sync_up(struct net_device *dev);
 extern int fib_convert_rtentry(int cmd, struct nlmsghdr *nl, struct rtmsg *rtm,
 			       struct kern_rta *rta, struct rtentry *r);
-extern void fib_node_seq_show(struct seq_file *seq, int type, int dead,
-			      struct fib_info *fi, u32 prefix, u32 mask);
 extern u32  __fib_res_prefsrc(struct fib_result *res);
 
 /* Exported by fib_hash.c */

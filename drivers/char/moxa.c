@@ -618,8 +618,8 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+	tty_ldisc_flush(tty);
+			
 	tty->closing = 0;
 	ch->event = 0;
 	ch->tty = NULL;
@@ -693,9 +693,7 @@ static void moxa_flush_buffer(struct tty_struct *tty)
 	if (ch == NULL)
 		return;
 	MoxaPortFlushData(ch->port, 1);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup) (tty);
+	tty_wakeup(tty);
 	wake_up_interruptible(&tty->write_wait);
 }
 
@@ -954,9 +952,7 @@ static void moxa_poll(unsigned long ignored)
 				if (MoxaPortTxQueue(ch->port) <= WAKEUP_CHARS) {
 					if (!tp->stopped) {
 						ch->statusflags &= ~LOWWAIT;
-						if ((tp->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-						  tp->ldisc.write_wakeup)
-							(tp->ldisc.write_wakeup) (tp);
+						tty_wakeup(tty);
 						wake_up_interruptible(&tp->write_wait);
 					}
 				}
@@ -1123,9 +1119,7 @@ static void check_xmit_empty(unsigned long data)
 	if (ch->tty && (ch->statusflags & EMPTYWAIT)) {
 		if (MoxaPortTxQueue(ch->port) == 0) {
 			ch->statusflags &= ~EMPTYWAIT;
-			if ((ch->tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-			    ch->tty->ldisc.write_wakeup)
-				(ch->tty->ldisc.write_wakeup) (ch->tty);
+			tty_wakeup(tty);
 			wake_up_interruptible(&ch->tty->write_wait);
 			return;
 		}

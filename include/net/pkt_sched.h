@@ -80,6 +80,7 @@ struct Qdisc
 	int			padded;
 	struct Qdisc_ops	*ops;
 	u32			handle;
+	u32			parent;
 	atomic_t		refcnt;
 	struct sk_buff_head	q;
 	struct net_device	*dev;

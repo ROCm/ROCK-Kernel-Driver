@@ -555,17 +555,20 @@ static void tcp_event_data_recv(struct sock *sk, struct tcp_opt *tp, struct sk_b
 		tcp_grow_window(sk, tp, skb);
 }
 
-/* Set up a new TCP connection, depending on whether it should be
- * using Vegas or not.
- */    
-void tcp_vegas_init(struct tcp_opt *tp)
+/* When starting a new connection, pin down the current choice of 
+ * congestion algorithm.
+ */
+void tcp_ca_init(struct tcp_opt *tp)
 {
-	if (sysctl_tcp_vegas_cong_avoid) {
-		tp->vegas.do_vegas = 1;
+	if (sysctl_tcp_westwood) 
+		tp->adv_cong = TCP_WESTWOOD;
+	else if (sysctl_tcp_bic)
+		tp->adv_cong = TCP_BIC;
+	else if (sysctl_tcp_vegas_cong_avoid) {
+		tp->adv_cong = TCP_VEGAS;
 		tp->vegas.baseRTT = 0x7fffffff;
 		tcp_vegas_enable(tp);
-	} else 
-		tcp_vegas_disable(tp);
+	} 
 }
 
 /* Do RTT sampling needed for Vegas.
@@ -799,10 +802,10 @@ __u32 tcp_init_cwnd(struct tcp_opt *tp, struct dst_entry *dst)
 	__u32 cwnd = (dst ? dst_metric(dst, RTAX_INITCWND) : 0);
 
 	if (!cwnd) {
-		if (tp->mss_cache > 1460)
+		if (tp->mss_cache_std > 1460)
 			cwnd = 2;
 		else
-			cwnd = (tp->mss_cache > 1095) ? 3 : 4;
+			cwnd = (tp->mss_cache_std > 1095) ? 3 : 4;
 	}
 	return min_t(__u32, cwnd, tp->snd_cwnd_clamp);
 }
@@ -2039,7 +2042,7 @@ tcp_ack_update_rtt(struct tcp_opt *tp, int flag, s32 seq_rtt)
 static inline __u32 bictcp_cwnd(struct tcp_opt *tp)
 {
 	/* orignal Reno behaviour */
-	if (!sysctl_tcp_bic)
+	if (!tcp_is_bic(tp))
 		return tp->snd_cwnd;
 
 	if (tp->bictcp.last_cwnd == tp->snd_cwnd &&
@@ -2352,6 +2355,86 @@ static __inline__ void tcp_ack_packets_out(struct sock *sk, struct tcp_opt *tp)
 	}
 }
 
+/* There is one downside to this scheme.  Although we keep the
+ * ACK clock ticking, adjusting packet counters and advancing
+ * congestion window, we do not liberate socket send buffer
+ * space.
+ *
+ * Mucking with skb->truesize and sk->sk_wmem_alloc et al.
+ * then making a write space wakeup callback is a possible
+ * future enhancement.  WARNING: it is not trivial to make.
+ */
+static int tcp_tso_acked(struct tcp_opt *tp, struct sk_buff *skb,
+			 __u32 now, __s32 *seq_rtt)
+{
+	struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
+	__u32 mss = scb->tso_mss;
+	__u32 snd_una = tp->snd_una;
+	__u32 seq = scb->seq;
+	__u32 packets_acked = 0;
+	int acked = 0;
+
+	/* If we get here, the whole TSO packet has not been
+	 * acked.
+	 */
+	BUG_ON(!after(scb->end_seq, snd_una));
+
+	while (!after(seq + mss, snd_una)) {
+		packets_acked++;
+		seq += mss;
+	}
+
+	if (packets_acked) {
+		__u8 sacked = scb->sacked;
+
+		/* We adjust scb->seq but we do not pskb_pull() the
+		 * SKB.  We let tcp_retransmit_skb() handle this case
+		 * by checking skb->len against the data sequence span.
+		 * This way, we avoid the pskb_pull() work unless we
+		 * actually need to retransmit the SKB.
+		 */
+		scb->seq = seq;
+
+		acked |= FLAG_DATA_ACKED;
+		if (sacked) {
+			if (sacked & TCPCB_RETRANS) {
+				if (sacked & TCPCB_SACKED_RETRANS)
+					tcp_dec_pcount_explicit(&tp->retrans_out,
+								packets_acked);
+				acked |= FLAG_RETRANS_DATA_ACKED;
+				*seq_rtt = -1;
+			} else if (*seq_rtt < 0)
+				*seq_rtt = now - scb->when;
+			if (sacked & TCPCB_SACKED_ACKED)
+				tcp_dec_pcount_explicit(&tp->sacked_out,
+							packets_acked);
+			if (sacked & TCPCB_LOST)
+				tcp_dec_pcount_explicit(&tp->lost_out,
+							packets_acked);
+			if (sacked & TCPCB_URG) {
+				if (tp->urg_mode &&
+				    !before(scb->seq, tp->snd_up))
+					tp->urg_mode = 0;
+			}
+		} else if (*seq_rtt < 0)
+			*seq_rtt = now - scb->when;
+
+		if (tcp_get_pcount(&tp->fackets_out)) {
+			__u32 dval = min(tcp_get_pcount(&tp->fackets_out),
+					 packets_acked);
+			tcp_dec_pcount_explicit(&tp->fackets_out, dval);
+		}
+		tcp_dec_pcount_explicit(&tp->packets_out, packets_acked);
+		scb->tso_factor -= packets_acked;
+
+		BUG_ON(scb->tso_factor == 0);
+		BUG_ON(!before(scb->seq, scb->end_seq));
+	}
+
+	return acked;
+}
+
+
 /* Remove acknowledged frames from the retransmission queue. */
 static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 {
@@ -2370,8 +2453,12 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 		 * discard it as it's confirmed to have arrived at
 		 * the other end.
 		 */
-		if (after(scb->end_seq, tp->snd_una))
+		if (after(scb->end_seq, tp->snd_una)) {
+			if (scb->tso_factor > 1)
+				acked |= tcp_tso_acked(tp, skb,
+						       now, &seq_rtt);
 			break;
+		}
 
 		/* Initial outgoing SYN's get put onto the write_queue
 		 * just like anything else we transmit.  It is not
@@ -2617,18 +2704,16 @@ static void westwood_filter(struct sock *sk, __u32 delta)
  * WESTWOOD_RTT_MIN minimum bound since we could be on a LAN!
  */
 
-static inline __u32 westwood_update_rttmin(struct sock *sk)
+static inline __u32 westwood_update_rttmin(const struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	const struct tcp_opt *tp = tcp_sk(sk);
 	__u32 rttmin = tp->westwood.rtt_min;
 
-	if (tp->westwood.rtt == 0)
-		return(rttmin);
-
-	if (tp->westwood.rtt < tp->westwood.rtt_min || !rttmin)
+	if (tp->westwood.rtt != 0 &&
+	    (tp->westwood.rtt < tp->westwood.rtt_min || !rttmin))
 		rttmin = tp->westwood.rtt;
 
-	return(rttmin);
+	return rttmin;
 }
 
 /*
@@ -2636,11 +2721,11 @@ static inline __u32 westwood_update_rttmin(struct sock *sk)
  * Evaluate increases for dk. 
  */
 
-static inline __u32 westwood_acked(struct sock *sk)
+static inline __u32 westwood_acked(const struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	const struct tcp_opt *tp = tcp_sk(sk);
 
-	return ((tp->snd_una) - (tp->westwood.snd_una));
+	return tp->snd_una - tp->westwood.snd_una;
 }
 
 /*
@@ -2652,9 +2737,9 @@ static inline __u32 westwood_acked(struct sock *sk)
  * window, 1 if the sample has to be considered in the next window.
  */
 
-static int westwood_new_window(struct sock *sk)
+static int westwood_new_window(const struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	const struct tcp_opt *tp = tcp_sk(sk);
 	__u32 left_bound;
 	__u32 rtt;
 	int ret = 0;
@@ -2688,14 +2773,13 @@ static void __westwood_update_window(struct sock *sk, __u32 now)
 	struct tcp_opt *tp = tcp_sk(sk);
 	__u32 delta = now - tp->westwood.rtt_win_sx;
 
-        if (!delta)
-                return;
+        if (delta) {
+		if (tp->westwood.rtt)
+			westwood_filter(sk, delta);
 
-	if (tp->westwood.rtt)
-                westwood_filter(sk, delta);
-
-        tp->westwood.bk = 0;
-        tp->westwood.rtt_win_sx = tcp_time_stamp;
+		tp->westwood.bk = 0;
+		tp->westwood.rtt_win_sx = tcp_time_stamp;
+	}
 }
 
 
@@ -2739,7 +2823,7 @@ static void westwood_dupack_update(struct sock *sk)
 
 static inline int westwood_may_change_cumul(struct tcp_opt *tp)
 {
-	return ((tp->westwood.cumul_ack) > tp->mss_cache_std);
+	return (tp->westwood.cumul_ack > tp->mss_cache_std);
 }
 
 static inline void westwood_partial_update(struct tcp_opt *tp)
@@ -2760,7 +2844,7 @@ static inline void westwood_complete_update(struct tcp_opt *tp)
  * delayed or partial acks.
  */
 
-static __u32 westwood_acked_count(struct sock *sk)
+static inline __u32 westwood_acked_count(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
@@ -2774,7 +2858,7 @@ static __u32 westwood_acked_count(struct sock *sk)
 
         if (westwood_may_change_cumul(tp)) {
 		/* Partial or delayed ack */
-		if ((tp->westwood.accounted) >= (tp->westwood.cumul_ack))
+		if (tp->westwood.accounted >= tp->westwood.cumul_ack)
 			westwood_partial_update(tp);
 		else
 			westwood_complete_update(tp);

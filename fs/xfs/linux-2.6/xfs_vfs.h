@@ -36,6 +36,7 @@
 #include "xfs_fs.h"
 
 struct fid;
+struct vfs;
 struct cred;
 struct vnode;
 struct kstatfs;
@@ -45,14 +46,24 @@ struct xfs_mount_args;
 
 typedef struct kstatfs xfs_statfs_t;
 
+typedef struct vfs_sync_work {
+	struct list_head	w_list;
+	struct vfs		*w_vfs;
+	void			*w_data;	/* syncer routine argument */
+	void			(*w_syncer)(struct vfs *, void *);
+} vfs_sync_work_t;
+
 typedef struct vfs {
 	u_int			vfs_flag;	/* flags */
 	xfs_fsid_t		vfs_fsid;	/* file system ID */
 	xfs_fsid_t		*vfs_altfsid;	/* An ID fixed for life of FS */
 	bhv_head_t		vfs_bh;		/* head of vfs behavior chain */
-	struct super_block	*vfs_super;	/* Linux superblock structure */
-	struct task_struct	*vfs_sync_task;	/* xfssyncd process */
-	int 			vfs_sync_seq;	/* xfssyncd generation number */
+	struct super_block	*vfs_super;	/* generic superblock pointer */
+	struct task_struct	*vfs_sync_task;	/* generalised sync thread */
+	vfs_sync_work_t		vfs_sync_work;	/* work item for VFS_SYNC */
+	struct list_head	vfs_sync_list;	/* sync thread work item list */
+	spinlock_t		vfs_sync_lock;	/* work item list lock */
+	int 			vfs_sync_seq;	/* sync thread generation no. */
 	wait_queue_head_t	vfs_wait_single_sync_task;
 	wait_queue_head_t	vfs_wait_sync_task;
 } vfs_t;

@@ -419,7 +419,7 @@ static void __init setup_u3_ht(struct pci_controller* hose)
 	 * properties or figuring out the U3 address space decoding logic and
 	 * then read it's configuration register (if any).
 	 */
-	hose->io_base_phys = 0xf4000000 + 0x00400000;
+	hose->io_base_phys = 0xf4000000;
 	hose->io_base_virt = ioremap(hose->io_base_phys, 0x00400000);
 	isa_io_base = pci_io_base = (unsigned long) hose->io_base_virt;
 	hose->io_resource.name = np->full_name;
@@ -664,9 +664,7 @@ void __init pmac_pcibios_fixup(void)
 
 	pci_fix_bus_sysdata();
 
-#ifdef CONFIG_PMAC_DART
-	iommu_setup_pmac();
-#endif /* CONFIG_PMAC_DART */
+	iommu_setup_u3();
 
 }
 

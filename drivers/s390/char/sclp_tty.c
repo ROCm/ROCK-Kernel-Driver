@@ -277,10 +277,7 @@ sclp_ttybuf_callback(struct sclp_buffer *buffer, int rc)
 	wake_up(&sclp_tty_waitq);
 	/* check if the tty needs a wake up call */
 	if (sclp_tty != NULL) {
-		if ((sclp_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    sclp_tty->ldisc.write_wakeup)
-			(sclp_tty->ldisc.write_wakeup)(sclp_tty);
-		wake_up_interruptible(&sclp_tty->write_wait);
+		tty_wakeup(tty);
 	}
 }
 

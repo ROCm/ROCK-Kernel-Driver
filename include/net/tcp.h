@@ -961,7 +961,8 @@ extern void tcp_clear_xmit_timers(struct sock *);
 
 extern void tcp_delete_keepalive_timer (struct sock *);
 extern void tcp_reset_keepalive_timer (struct sock *, unsigned long);
-extern int tcp_sync_mss(struct sock *sk, u32 pmtu);
+extern unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu);
+extern unsigned int tcp_current_mss(struct sock *sk, int large);
 
 extern const char timer_bug_msg[];
 
@@ -1033,37 +1034,6 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 	default:
 		printk(timer_bug_msg);
 	};
-}
-
-/* Compute the current effective MSS, taking SACKs and IP options,
- * and even PMTU discovery events into account.
- *
- * LARGESEND note: !urg_mode is overkill, only frames up to snd_up
- * cannot be large. However, taking into account rare use of URG, this
- * is not a big flaw.
- */
-
-static inline unsigned int tcp_current_mss(struct sock *sk, int large)
-{
-	struct tcp_opt *tp = tcp_sk(sk);
-	struct dst_entry *dst = __sk_dst_get(sk);
-	int do_large, mss_now;
-
-	do_large = (large &&
-		    (sk->sk_route_caps & NETIF_F_TSO) &&
-		    !tp->urg_mode);
-	mss_now = do_large ? tp->mss_cache : tp->mss_cache_std;
-
-	if (dst) {
-		u32 mtu = dst_pmtu(dst);
-		if (mtu != tp->pmtu_cookie ||
-		    tp->ext2_header_len != dst->header_len)
-			mss_now = tcp_sync_mss(sk, mtu);
-	}
-	if (tp->eff_sacks)
-		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
-			    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
-	return mss_now;
 }
 
 /* Initialize RCV_MSS value.
@@ -1180,7 +1150,8 @@ struct tcp_skb_cb {
 
 	__u16		urg_ptr;	/* Valid w/URG flags is set.	*/
 	__u32		ack_seq;	/* Sequence number ACK'd	*/
-	__u32		tso_factor;
+	__u16		tso_factor;	/* If > 1, TSO frame		*/
+	__u16		tso_mss;	/* MSS that FACTOR's in terms of*/
 };
 
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
@@ -1271,6 +1242,13 @@ static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
 		tcp_get_pcount(&tp->retrans_out));
 }
 
+/*
+ * Which congestion algorithim is in use on the connection.
+ */
+#define tcp_is_vegas(__tp)	((__tp)->adv_cong == TCP_VEGAS)
+#define tcp_is_westwood(__tp)	((__tp)->adv_cong == TCP_WESTWOOD)
+#define tcp_is_bic(__tp)	((__tp)->adv_cong == TCP_BIC)
+
 /* Recalculate snd_ssthresh, we want to set it to:
  *
  * Reno:
@@ -1283,7 +1261,7 @@ static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
  */
 static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 {
-	if (sysctl_tcp_bic) {
+	if (tcp_is_bic(tp)) {
 		if (sysctl_tcp_bic_fast_convergence &&
 		    tp->snd_cwnd < tp->bictcp.last_max_cwnd)
 			tp->bictcp.last_max_cwnd
@@ -1302,11 +1280,6 @@ static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 
 /* Stop taking Vegas samples for now. */
 #define tcp_vegas_disable(__tp)	((__tp)->vegas.doing_vegas_now = 0)
-
-/* Is this TCP connection using Vegas (regardless of whether it is taking
- * Vegas measurements at the current time)?
- */
-#define tcp_is_vegas(__tp)	((__tp)->vegas.do_vegas)
     
 static inline void tcp_vegas_enable(struct tcp_opt *tp)
 {
@@ -1340,7 +1313,7 @@ static inline void tcp_vegas_enable(struct tcp_opt *tp)
 /* Should we be taking Vegas samples right now? */
 #define tcp_vegas_enabled(__tp)	((__tp)->vegas.doing_vegas_now)
 
-extern void tcp_vegas_init(struct tcp_opt *tp);
+extern void tcp_ca_init(struct tcp_opt *tp);
 
 static inline void tcp_set_ca_state(struct tcp_opt *tp, u8 ca_state)
 {
@@ -2024,7 +1997,7 @@ extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
 
 static inline void tcp_westwood_update_rtt(struct tcp_opt *tp, __u32 rtt_seq)
 {
-        if (sysctl_tcp_westwood)
+        if (tcp_is_westwood(tp))
                 tp->westwood.rtt = rtt_seq;
 }
 
@@ -2033,13 +2006,13 @@ void __tcp_westwood_slow_bw(struct sock *, struct sk_buff *);
 
 static inline void tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
 {
-        if (sysctl_tcp_westwood)
+        if (tcp_is_westwood(tcp_sk(sk)))
                 __tcp_westwood_fast_bw(sk, skb);
 }
 
 static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 {
-        if (sysctl_tcp_westwood)
+        if (tcp_is_westwood(tcp_sk(sk)))
                 __tcp_westwood_slow_bw(sk, skb);
 }
 
@@ -2052,14 +2025,14 @@ static inline __u32 __tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
 
 static inline __u32 tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
 {
-	return sysctl_tcp_westwood ? __tcp_westwood_bw_rttmin(tp) : 0;
+	return tcp_is_westwood(tp) ? __tcp_westwood_bw_rttmin(tp) : 0;
 }
 
 static inline int tcp_westwood_ssthresh(struct tcp_opt *tp)
 {
 	__u32 ssthresh = 0;
 
-	if (sysctl_tcp_westwood) {
+	if (tcp_is_westwood(tp)) {
 		ssthresh = __tcp_westwood_bw_rttmin(tp);
 		if (ssthresh)
 			tp->snd_ssthresh = ssthresh;  
@@ -2072,7 +2045,7 @@ static inline int tcp_westwood_cwnd(struct tcp_opt *tp)
 {
 	__u32 cwnd = 0;
 
-	if (sysctl_tcp_westwood) {
+	if (tcp_is_westwood(tp)) {
 		cwnd = __tcp_westwood_bw_rttmin(tp);
 		if (cwnd)
 			tp->snd_cwnd = cwnd;

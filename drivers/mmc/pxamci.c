@@ -33,6 +33,7 @@
 #include <asm/irq.h>
 #include <asm/sizes.h>
 
+#include <asm/arch/pxa-regs.h>
 #include <asm/arch/mmc.h>
 
 #include "pxamci.h"

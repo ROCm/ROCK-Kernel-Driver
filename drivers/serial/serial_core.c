@@ -107,15 +107,7 @@ static void uart_start(struct tty_struct *tty)
 static void uart_tasklet_action(unsigned long data)
 {
 	struct uart_state *state = (struct uart_state *)data;
-	struct tty_struct *tty;
-
-	tty = state->info->tty;
-	if (tty) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			tty->ldisc.write_wakeup(tty);
-		wake_up_interruptible(&tty->write_wait);
-	}
+	tty_wakeup(state->info->tty);
 }
 
 static inline void
@@ -581,10 +573,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 	spin_lock_irqsave(&port->lock, flags);
 	uart_circ_clear(&state->info->xmit);
 	spin_unlock_irqrestore(&port->lock, flags);
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -1216,7 +1205,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port;
-
+	
 	BUG_ON(!kernel_locked());
 
 	if (!state || !state->port)
@@ -1239,12 +1228,12 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 		 * one, we've got real problems, since it means the
 		 * serial port won't be shutdown.
 		 */
-		printk("uart_close: bad serial port count; tty->count is 1, "
+		printk(KERN_ERR "uart_close: bad serial port count; tty->count is 1, "
 		       "state->count is %d\n", state->count);
 		state->count = 1;
 	}
 	if (--state->count < 0) {
-		printk("rs_close: bad serial port count for %s: %d\n",
+		printk(KERN_ERR "uart_close: bad serial port count for %s: %d\n",
 		       tty->name, state->count);
 		state->count = 0;
 	}
@@ -1280,8 +1269,9 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 
 	uart_shutdown(state);
 	uart_flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+
+	tty_ldisc_flush(tty);	
+	
 	tty->closing = 0;
 	state->info->tty = NULL;
 

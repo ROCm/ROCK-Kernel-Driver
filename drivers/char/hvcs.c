@@ -425,10 +425,7 @@ static void hvcs_try_write(struct hvcs_struct *hvcsd)
 			 * a non-existent tty.
 			 */
 			if (tty) {
-				if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
-						&& tty->ldisc.write_wakeup)
-					(tty->ldisc.write_wakeup) (tty);
-				wake_up_interruptible(&tty->write_wait);
+				tty_wakeup(tty);
 			}
 		}
 	}

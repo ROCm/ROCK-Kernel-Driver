@@ -125,6 +125,7 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 	struct scatterlist *ysg;
 	struct scatterlist *usg;
 	struct scatterlist *vsg;
+	int topfield = (0 == yoffset);
 	int rc;
 
 	/* estimate risc mem: worst case is one write per page border +
@@ -153,13 +154,13 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 			chroma = 1;
 			break;
 		case 1:
-			if (!yoffset)
+			if (topfield)
 				chroma = (line & 1) == 0;
 			else
 				chroma = (line & 1) == 1;
 			break;
 		case 2:
-			if (!yoffset)
+			if (topfield)
 				chroma = (line & 3) == 0;
 			else
 				chroma = (line & 3) == 2;

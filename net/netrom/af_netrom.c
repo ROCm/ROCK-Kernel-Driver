@@ -801,7 +801,6 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 	remove_wait_queue(sk->sk_sleep, &wait);
 
 	newsk = skb->sk;
-	newsk->sk_pair = NULL;
 	newsk->sk_socket = newsock;
 	newsk->sk_sleep = &newsock->wait;
 
@@ -994,7 +993,6 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 	nr_make->vl        = 0;
 	nr_make->state     = NR_STATE_3;
 	sk->sk_ack_backlog++;
-	make->sk_pair = sk;
 
 	nr_insert_socket(make);
 

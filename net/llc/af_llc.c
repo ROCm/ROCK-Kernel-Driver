@@ -638,7 +638,6 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	newsk = skb->sk;
 	/* attach connection to a new socket. */
 	llc_ui_sk_init(newsock, newsk);
-	newsk->sk_pair		= NULL;
 	newsk->sk_zapped	= 0;
 	newsk->sk_state		= TCP_ESTABLISHED;
 	newsock->state		= SS_CONNECTED;

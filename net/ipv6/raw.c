@@ -973,10 +973,6 @@ static int rawv6_init_sk(struct sock *sk)
 	return(0);
 }
 
-struct ipv6_sk_offset raw_sock_offset = {
-	.offset = offsetof(struct raw6_sock, inet6),
-};
-
 struct proto rawv6_prot = {
 	.name =		"RAW",
 	.close =	rawv6_close,
@@ -994,7 +990,6 @@ struct proto rawv6_prot = {
 	.hash =		raw_v6_hash,
 	.unhash =	raw_v6_unhash,
 	.slab_obj_size = sizeof(struct raw6_sock),
-	.af_specific =	&raw_sock_offset,
 };
 
 #ifdef CONFIG_PROC_FS

@@ -435,10 +435,7 @@ static void do_softint(void *private)
 		return;
 #if 0
 	if (clear_bit(RS_EVENT_WRITE_WAKEUP, &info->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 #endif   
 }
@@ -858,10 +855,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 	cli();
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
 	sti();
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -1185,11 +1179,13 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+		
+	tty_ldisc_flush(tty);
 	tty->closing = 0;
 	info->event = 0;
 	info->tty = 0;
+#warning "This is not and has never been valid so fix it"	
+#if 0
 	if (tty->ldisc.num != ldiscs[N_TTY].num) {
 		if (tty->ldisc.close)
 			(tty->ldisc.close)(tty);
@@ -1198,6 +1194,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		if (tty->ldisc.open)
 			(tty->ldisc.open)(tty);
 	}
+#endif	
 	if (info->blocked_open) {
 		if (info->close_delay) {
 			current->state = TASK_INTERRUPTIBLE;

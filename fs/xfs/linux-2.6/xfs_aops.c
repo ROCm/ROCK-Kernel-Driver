@@ -550,19 +550,23 @@ enough:
 STATIC void
 xfs_submit_page(
 	struct page		*page,
+	struct writeback_control *wbc,
 	struct buffer_head	*bh_arr[],
-	int			cnt)
+	int			bh_count,
+	int			probed_page,
+	int			clear_dirty)
 {
 	struct buffer_head	*bh;
 	int			i;
 
 	BUG_ON(PageWriteback(page));
 	set_page_writeback(page);
-	clear_page_dirty(page);
+	if (clear_dirty)
+		clear_page_dirty(page);
 	unlock_page(page);
 
-	if (cnt) {
-		for (i = 0; i < cnt; i++) {
+	if (bh_count) {
+		for (i = 0; i < bh_count; i++) {
 			bh = bh_arr[i];
 			mark_buffer_async_write(bh);
 			if (buffer_unwritten(bh))
@@ -571,10 +575,15 @@ xfs_submit_page(
 			clear_buffer_dirty(bh);
 		}
 
-		for (i = 0; i < cnt; i++)
+		for (i = 0; i < bh_count; i++)
 			submit_bh(WRITE, bh_arr[i]);
-	} else
+
+		if (probed_page && clear_dirty)
+			wbc->nr_to_write--;	/* Wrote an "extra" page */
+	} else {
 		end_page_writeback(page);
+		wbc->pages_skipped++;	/* We didn't write this page */
+	}
 }
 
 /*
@@ -609,11 +618,13 @@ xfs_convert_page(
 	bh = head = page_buffers(page);
 	do {
 		offset = i << bbits;
+		if (offset >= end)
+			break;
 		if (!(PageUptodate(page) || buffer_uptodate(bh)))
 			continue;
 		if (buffer_mapped(bh) && all_bh &&
-		    !buffer_unwritten(bh) && !buffer_delay(bh)) {
-			if (startio && (offset < end)) {
+		    !(buffer_unwritten(bh) || buffer_delay(bh))) {
+			if (startio) {
 				lock_buffer(bh);
 				bh_arr[index++] = bh;
 			}
@@ -641,7 +652,7 @@ xfs_convert_page(
 				ASSERT(private);
 			}
 		}
-		if (startio && (offset < end)) {
+		if (startio) {
 			bh_arr[index++] = bh;
 		} else {
 			set_buffer_dirty(bh);
@@ -651,8 +662,7 @@ xfs_convert_page(
 	} while (i++, (bh = bh->b_this_page) != head);
 
 	if (startio) {
-		wbc->nr_to_write--;
-		xfs_submit_page(page, bh_arr, index);
+		xfs_submit_page(page, wbc, bh_arr, index, 1, index == i);
 	} else {
 		unlock_page(page);
 	}
@@ -864,7 +874,7 @@ xfs_page_state_convert(
 		SetPageUptodate(page);
 
 	if (startio)
-		xfs_submit_page(page, bh_arr, cnt);
+		xfs_submit_page(page, wbc, bh_arr, cnt, 0, 1);
 
 	if (iomp) {
 		tlast = (iomp->iomap_offset + iomp->iomap_bsize - 1) >>
@@ -1171,7 +1181,7 @@ linvfs_writepage(
 	return 0;
 
 out_fail:
-	set_page_dirty(page);
+	redirty_page_for_writepage(wbc, page);
 	unlock_page(page);
 	return 0;
 out_unlock:

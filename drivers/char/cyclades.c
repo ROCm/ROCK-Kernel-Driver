@@ -970,10 +970,7 @@ do_softint(void *private_)
 	wake_up_interruptible(&info->delta_msr_wait);
     }
     if (test_and_clear_bit(Cy_EVENT_WRITE_WAKEUP, &info->event)) {
-        if((tty->flags & (1<< TTY_DO_WRITE_WAKEUP))
-        && tty->ldisc.write_wakeup){
-            (tty->ldisc.write_wakeup)(tty);
-        }
+        tty_wakeup(tty);
         wake_up_interruptible(&tty->write_wait);
     }
 #ifdef Z_WAKE
@@ -2850,8 +2847,7 @@ cy_close(struct tty_struct *tty, struct file *filp)
     shutdown(info);
     if (tty->driver->flush_buffer)
         tty->driver->flush_buffer(tty);
-    if (tty->ldisc.flush_buffer)
-        tty->ldisc.flush_buffer(tty);
+    tty_ldisc_flush(tty);        
     CY_LOCK(info, flags);
 
     tty->closing = 0;
@@ -4554,10 +4550,8 @@ cy_flush_buffer(struct tty_struct *tty)
 	}
 	CY_UNLOCK(info, flags);
     }
+    tty_wakeup(tty);
     wake_up_interruptible(&tty->write_wait);
-    if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
-	&& tty->ldisc.write_wakeup)
-	    (tty->ldisc.write_wakeup)(tty);
 } /* cy_flush_buffer */
 
 

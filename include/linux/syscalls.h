@@ -114,6 +114,9 @@ asmlinkage long sys_getitimer(int which, struct itimerval __user *value);
 asmlinkage long sys_setitimer(int which,
 				struct itimerval __user *value,
 				struct itimerval __user *ovalue);
+asmlinkage long sys_timer_create(clockid_t which_clock,
+				 struct sigevent __user *timer_event_spec,
+				 timer_t __user * created_timer_id);
 asmlinkage long sys_timer_gettime(timer_t timer_id,
 				struct itimerspec __user *setting);
 asmlinkage long sys_timer_getoverrun(timer_t timer_id);

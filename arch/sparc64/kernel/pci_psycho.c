@@ -1076,17 +1076,17 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 	 * bits for each PBM.
 	 */
 	tmp = psycho_read(base + PSYCHO_PCIA_CTRL);
-	tmp |= (PSYCHO_PCICTRL_SBH_ERR |
-		PSYCHO_PCICTRL_SERR |
-		PSYCHO_PCICTRL_SBH_INT |
+	tmp |= (PSYCHO_PCICTRL_SERR |
+		PSYCHO_PCICTRL_SBH_ERR |
 		PSYCHO_PCICTRL_EEN);
+	tmp &= ~(PSYCHO_PCICTRL_SBH_INT);
 	psycho_write(base + PSYCHO_PCIA_CTRL, tmp);
 		     
 	tmp = psycho_read(base + PSYCHO_PCIB_CTRL);
-	tmp |= (PSYCHO_PCICTRL_SBH_ERR |
-		PSYCHO_PCICTRL_SERR |
-		PSYCHO_PCICTRL_SBH_INT |
+	tmp |= (PSYCHO_PCICTRL_SERR |
+		PSYCHO_PCICTRL_SBH_ERR |
 		PSYCHO_PCICTRL_EEN);
+	tmp &= ~(PSYCHO_PCICTRL_SBH_INT);
 	psycho_write(base + PSYCHO_PCIB_CTRL, tmp);
 }
 
