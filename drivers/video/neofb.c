@@ -493,7 +493,7 @@ static inline int neo2200_sync(struct fb_info *info)
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	int waitcycles;
 
-	while (par->neo2200->bltStat & 1)
+	while (readl(&par->neo2200->bltStat) & 1)
 		waitcycles++;
 	return 0;
 }
@@ -531,7 +531,7 @@ static inline void neo2200_accel_init(struct fb_info *info,
 				      struct fb_var_screeninfo *var)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
-	Neo2200 *neo2200 = par->neo2200;
+	Neo2200 __iomem *neo2200 = par->neo2200;
 	u32 bltMod, pitch;
 
 	neo2200_sync(info);
@@ -556,8 +556,8 @@ static inline void neo2200_accel_init(struct fb_info *info,
 		return;
 	}
 
-	neo2200->bltStat = bltMod << 16;
-	neo2200->pitch = (pitch << 16) | pitch;
+	writel(bltMod << 16, &neo2200->bltStat);
+	writel((pitch << 16) | pitch, &neo2200->pitch);
 }
 
 /* --------------------------------------------------------------------- */
@@ -1418,27 +1418,27 @@ neo2200_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	neo2200_wait_fifo(info, 4);
 
 	/* set blt control */
-	par->neo2200->bltCntl = NEO_BC3_FIFO_EN |
-	    NEO_BC0_SRC_IS_FG | NEO_BC3_SKIP_MAPPING |
-	    //               NEO_BC3_DST_XY_ADDR  |
-	    //               NEO_BC3_SRC_XY_ADDR  |
-	    rop;
+	writel(NEO_BC3_FIFO_EN |
+	       NEO_BC0_SRC_IS_FG | NEO_BC3_SKIP_MAPPING |
+	       //               NEO_BC3_DST_XY_ADDR  |
+	       //               NEO_BC3_SRC_XY_ADDR  |
+	       rop, &par->neo2200->bltCntl);
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
-		par->neo2200->fgColor = rect->color;
+		writel(rect->color, &par->neo2200->fgColor);
 		break;
 	case 16:
 	case 24:
-		par->neo2200->fgColor =
-		    ((u32 *) (info->pseudo_palette))[rect->color];
+		writel(((u32 *) (info->pseudo_palette))[rect->color],
+		       &par->neo2200->fgColor);
 		break;
 	}
 
-	par->neo2200->dstStart =
-	    dst * ((info->var.bits_per_pixel + 7) >> 3);
-	par->neo2200->xyExt =
-	    (rect->height << 16) | (rect->width & 0xffff);
+	writel(dst * ((info->var.bits_per_pixel + 7) >> 3),
+	       &par->neo2200->dstStart);
+	writel((rect->height << 16) | (rect->width & 0xffff),
+	       &par->neo2200->xyExt);
 }
 
 static void
@@ -1466,12 +1466,12 @@ neo2200_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	neo2200_wait_fifo(info, 4);
 
 	/* set blt control */
-	par->neo2200->bltCntl = bltCntl;
+	writel(bltCntl, &par->neo2200->bltCntl);
 
-	par->neo2200->srcStart = src;
-	par->neo2200->dstStart = dst;
-	par->neo2200->xyExt =
-	    (area->height << 16) | (area->width & 0xffff);
+	writel(src, &par->neo2200->srcStart);
+	writel(dst, &par->neo2200->dstStart);
+	writel((area->height << 16) | (area->width & 0xffff),
+	       &par->neo2200->xyExt);
 }
 
 static void
@@ -1481,7 +1481,7 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 	int s_pitch = (image->width * image->depth + 7) >> 3;
 	int scan_align = info->pixmap.scan_align - 1;
 	int buf_align = info->pixmap.buf_align - 1;
-	int bltCntl_flags, d_pitch, data_len;
+	int bltCntl_flags, d_pitch, data_len, i;
 
 	// The data is padded for the hardware
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
@@ -1509,32 +1509,32 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
-		par->neo2200->fgColor = image->fg_color;
-		par->neo2200->bgColor = image->bg_color;
+		writel(image->fg_color, &par->neo2200->fgColor);
+		writel(image->bg_color, &par->neo2200->bgColor);
 		break;
 	case 16:
 	case 24:
-		par->neo2200->fgColor =
-		    ((u32 *) (info->pseudo_palette))[image->fg_color];
-		par->neo2200->bgColor =
-		    ((u32 *) (info->pseudo_palette))[image->bg_color];
+		writel(((u32 *) (info->pseudo_palette))[image->fg_color],
+		       &par->neo2200->fgColor);
+		writel(((u32 *) (info->pseudo_palette))[image->bg_color],
+		       &par->neo2200->bgColor);
 		break;
 	}
 
-	par->neo2200->bltCntl = NEO_BC0_SYS_TO_VID |
+	writel(NEO_BC0_SYS_TO_VID |
 		NEO_BC3_SKIP_MAPPING | bltCntl_flags |
 		// NEO_BC3_DST_XY_ADDR |
-		0x0c0000;
+		0x0c0000, &par->neo2200->bltCntl);
 
-	par->neo2200->srcStart = 0;
+	writel(0, &par->neo2200->srcStart);
 //      par->neo2200->dstStart = (image->dy << 16) | (image->dx & 0xffff);
-	par->neo2200->dstStart =
-	    ((image->dx & 0xffff) * (info->var.bits_per_pixel >> 3) +
-	     image->dy * info->fix.line_length);
-	par->neo2200->xyExt =
-	    (image->height << 16) | (image->width & 0xffff);
+	writel(((image->dx & 0xffff) * (info->var.bits_per_pixel >> 3) +
+		image->dy * info->fix.line_length), &par->neo2200->dstStart);
+	writel((image->height << 16) | (image->width & 0xffff),
+	       &par->neo2200->xyExt);
 
-	memcpy(par->mmio_vbase + 0x100000, image->data, data_len);
+	for (i = 0; i < data_len; i++)
+		writeb(image->data[i], par->mmio_vbase + 0x100000);
 }
 
 static void
@@ -1765,7 +1765,7 @@ static int __devinit neo_map_video(struct fb_info *info,
 #endif
 
 	/* Clear framebuffer, it's all white in memory after boot */
-	memset(info->screen_base, 0, info->fix.smem_len);
+	memset_io(info->screen_base, 0, info->fix.smem_len);
 
 	/* Allocate Cursor drawing pad.
 	info->fix.smem_len -= PAGE_SIZE;
@@ -1946,7 +1946,7 @@ static int __devinit neo_init_hw(struct fb_info *info)
 		maxWidth = 1280;
 		maxHeight = 1024;	/* ???? */
 
-		par->neo2200 = (Neo2200 *) par->mmio_vbase;
+		par->neo2200 = (Neo2200 __iomem *) par->mmio_vbase;
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2230:
 		videoRam = 3008;
@@ -1957,7 +1957,7 @@ static int __devinit neo_init_hw(struct fb_info *info)
 		maxWidth = 1280;
 		maxHeight = 1024;	/* ???? */
 
-		par->neo2200 = (Neo2200 *) par->mmio_vbase;
+		par->neo2200 = (Neo2200 __iomem *) par->mmio_vbase;
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2360:
 		videoRam = 4096;
@@ -1968,7 +1968,7 @@ static int __devinit neo_init_hw(struct fb_info *info)
 		maxWidth = 1280;
 		maxHeight = 1024;	/* ???? */
 
-		par->neo2200 = (Neo2200 *) par->mmio_vbase;
+		par->neo2200 = (Neo2200 __iomem *) par->mmio_vbase;
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2380:
 		videoRam = 6144;
@@ -1979,7 +1979,7 @@ static int __devinit neo_init_hw(struct fb_info *info)
 		maxWidth = 1280;
 		maxHeight = 1024;	/* ???? */
 
-		par->neo2200 = (Neo2200 *) par->mmio_vbase;
+		par->neo2200 = (Neo2200 __iomem *) par->mmio_vbase;
 		break;
 	}
 /*
