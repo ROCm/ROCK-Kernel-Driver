@@ -1375,7 +1375,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	// hcd_monitor_hook(MONITOR_URB_SUBMIT, urb)
 	// It would catch submission paths for all urbs.
 
-	/* increment the reference count of the urb, as we now also control it. */
+	/* increment urb's reference count, we now control it. */
 	urb = usb_get_urb(urb);
 
 	/*
