@@ -247,6 +247,7 @@ void flush_thread(void)
 	struct task_struct *tsk = current;
 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
+	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
 	/*
 	 * Forget coprocessor state..
 	 */
