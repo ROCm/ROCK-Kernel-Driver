@@ -1630,7 +1630,8 @@ nextgroup:
 	return busiest;
 
 out_balanced:
-	if (busiest && idle != NOT_IDLE && max_load > SCHED_LOAD_SCALE) {
+	if (busiest && (idle == NEWLY_IDLE ||
+			(idle == IDLE && max_load > SCHED_LOAD_SCALE)) ) {
 		*imbalance = 1;
 		return busiest;
 	}
