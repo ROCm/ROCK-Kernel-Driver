@@ -61,8 +61,8 @@
 */
 
 #define DRV_NAME	"dmfe"
-#define DRV_VERSION	"1.36.3"
-#define DRV_RELDATE	"2001-11-06"
+#define DRV_VERSION	"1.36.4"
+#define DRV_RELDATE	"2002-01-17"
 
 #include <linux/module.h>
 
@@ -99,7 +99,6 @@
 #define PCI_DM9100_ID   0x91001282      /* Davicom DM9100 ID */
 #define PCI_DM9009_ID   0x90091282      /* Davicom DM9009 ID */
 
-#define DMFE_SUCC       0
 #define DM9102_IO_SIZE  0x80
 #define DM9102A_IO_SIZE 0x100
 #define TX_MAX_SEND_CNT 0x1             /* Maximum tx packet per time */
