@@ -32,6 +32,7 @@
  *						support.
  *	Yuji SEKIYA @USAGI		:	Don't assign a same IPv6
  *						address on a same interface.
+ *	YOSHIFUJI Hideaki @USAGI	:	ARCnet support
  */
 
 #include <linux/config.h>
@@ -44,6 +45,7 @@
 #include <linux/in6.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
+#include <linux/if_arcnet.h>
 #include <linux/route.h>
 #include <linux/inetdevice.h>
 #include <linux/init.h>
@@ -1061,6 +1063,13 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		eui[4] = 0xFE;
 		eui[0] ^= 2;
 		return 0;
+	case ARPHRD_ARCNET:
+		/* XXX: inherit EUI-64 fro mother interface -- yoshfuji */
+		if (dev->addr_len != ARCNET_ALEN)
+			return -1;
+		memset(eui, 0, 7);
+		eui[7] = *(u8*)dev->dev_addr;
+		return 0;
 	}
 	return -1;
 }
@@ -1732,7 +1741,8 @@ static void addrconf_dev_config(struct net_device *dev)
 
 	if ((dev->type != ARPHRD_ETHER) && 
 	    (dev->type != ARPHRD_FDDI) &&
-	    (dev->type != ARPHRD_IEEE802_TR)) {
+	    (dev->type != ARPHRD_IEEE802_TR) &&
+	    (dev->type != ARPHRD_ARCNET)) {
 		/* Alas, we support only Ethernet autoconfiguration. */
 		return;
 	}
@@ -2715,6 +2725,7 @@ void __init addrconf_init(void)
 		case ARPHRD_ETHER:
 		case ARPHRD_FDDI:
 		case ARPHRD_IEEE802_TR:	
+		case ARPHRD_ARCNET:
 			addrconf_dev_config(dev);
 			break;
 		default:;
