@@ -1,11 +1,12 @@
-/* thread_info.h: i386 low-level thread information
+#ifndef _ASM_M32R_THREAD_INFO_H
+#define _ASM_M32R_THREAD_INFO_H
+
+/* thread_info.h: m32r low-level thread information
  *
  * Copyright (C) 2002  David Howells (dhowells@redhat.com)
  * - Incorporating suggestions made by Linus Torvalds and Dave Miller
+ * Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
-
-#ifndef _ASM_THREAD_INFO_H
-#define _ASM_THREAD_INFO_H
 
 #ifdef __KERNEL__
 
@@ -30,7 +31,7 @@ struct thread_info {
 	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
 
 	mm_segment_t		addr_limit;	/* thread address space:
-					 	   0-0xBFFFFFFF for user-thead
+					 	   0-0xBFFFFFFF for user-thread
 						   0-0xFFFFFFFF for kernel-thread
 						*/
 	struct restart_block    restart_block;
@@ -77,22 +78,23 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
+#define THREAD_SIZE (2*PAGE_SIZE)
+
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {
 	struct thread_info *ti;
 
 	__asm__ __volatile__ (
-		"ldi	%0, #0xffffe000;	\n\t"
-		"and	%0, sp;			\n\t"
-		: "=r" (ti)
+		"ldi	%0, #%1			\n\t"
+		"and	%0, sp			\n\t"
+		: "=r" (ti) : "i" (~(THREAD_SIZE - 1))
 	);
 
 	return ti;
 }
 
 /* thread information allocation */
-#define THREAD_SIZE (2*PAGE_SIZE)
 #define alloc_thread_info(task) \
 	((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
 #define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
@@ -116,10 +118,12 @@ static inline unsigned int get_thread_fault_code(void)
 
 #else /* !__ASSEMBLY__ */
 
+#define THREAD_SIZE	8192
+
 /* how to get the thread information struct from ASM */
 #define GET_THREAD_INFO(reg)	GET_THREAD_INFO reg
 	.macro GET_THREAD_INFO reg
-	ldi	\reg, #0xffffe000
+	ldi	\reg, #-THREAD_SIZE
 	and	\reg, sp
 	.endm
 
@@ -162,4 +166,4 @@ static inline unsigned int get_thread_fault_code(void)
 
 #endif /* __KERNEL__ */
 
-#endif /* _ASM_THREAD_INFO_H */
+#endif /* _ASM_M32R_THREAD_INFO_H */
