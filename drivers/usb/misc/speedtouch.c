@@ -334,12 +334,11 @@ static void udsl_complete_receive (struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
+	tasklet_schedule (&instance->receive_tasklet);
 	/* may not be in_interrupt() */
 	spin_lock_irqsave (&instance->completed_receivers_lock, flags);
 	list_add_tail (&rcv->list, &instance->completed_receivers);
 	spin_unlock_irqrestore (&instance->completed_receivers_lock, flags);
-	PDEBUG ("udsl_complete_receive: scheduling tasklet\n");
-	tasklet_schedule (&instance->receive_tasklet);
 }
 
 static void udsl_process_receive (unsigned long data)
@@ -497,13 +496,12 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
+	tasklet_schedule (&instance->send_tasklet);
 	/* may not be in_interrupt() */
 	spin_lock_irqsave (&instance->send_lock, flags);
 	list_add (&snd->list, &instance->spare_senders);
 	list_add (&snd->buffer->list, &instance->spare_buffers);
 	spin_unlock_irqrestore (&instance->send_lock, flags);
-	PDEBUG ("udsl_complete_send: scheduling tasklet\n");
-	tasklet_schedule (&instance->send_tasklet);
 }
 
 static void udsl_process_send (unsigned long data)
