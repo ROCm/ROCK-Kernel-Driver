@@ -262,6 +262,12 @@ struct scsi_host_template {
 	unsigned short max_sectors;
 
 	/*
+	 * dma scatter gather segment boundary limit. a segment crossing this
+	 * boundary will be split in two.
+	 */
+	unsigned long dma_boundary;
+
+	/*
 	 * This specifies "machine infinity" for host templates which don't
 	 * limit the transfer size.  Note this limit represents an absolute
 	 * maximum, and may be over the transfer limits allowed for
@@ -306,8 +312,6 @@ struct scsi_host_template {
 	 */
 	unsigned emulated:1;
 
-	unsigned highmem_io:1;
-
 	/* 
 	 * True if the driver wishes to use the generic block layer
 	 * tag queueing functions
@@ -346,6 +350,16 @@ struct scsi_host_template {
 	 * module_init/module_exit.
 	 */
 	struct list_head legacy_hosts;
+};
+
+/*
+ * shost states
+ */
+enum {
+	SHOST_ADD,
+	SHOST_DEL,
+	SHOST_CANCEL,
+	SHOST_RECOVERY,
 };
 
 struct Scsi_Host {
@@ -412,8 +426,8 @@ struct Scsi_Host {
 	short cmd_per_lun;
 	short unsigned int sg_tablesize;
 	short unsigned int max_sectors;
+	unsigned long dma_boundary;
 
-	unsigned in_recovery:1;
 	unsigned unchecked_isa_dma:1;
 	unsigned use_clustering:1;
 	unsigned highmem_io:1;
@@ -448,6 +462,9 @@ struct Scsi_Host {
 	unsigned char n_io_port;
 	unsigned char dma_channel;
 	unsigned int  irq;
+	
+
+	unsigned long shost_state;
 
 	/* ldm bits */
 	struct device		shost_gendev;
@@ -478,8 +495,8 @@ struct Scsi_Host {
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
 extern int scsi_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_scan_host(struct Scsi_Host *);
-extern int scsi_remove_host(struct Scsi_Host *);
-extern void scsi_host_get(struct Scsi_Host *);
+extern void scsi_remove_host(struct Scsi_Host *);
+extern struct Scsi_Host *scsi_host_get(struct Scsi_Host *);
 extern void scsi_host_put(struct Scsi_Host *t);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 

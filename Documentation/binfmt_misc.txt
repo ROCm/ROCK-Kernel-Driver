@@ -11,6 +11,9 @@ at the beginning of the file with a magic byte sequence (masking out specified
 bits) you have supplied. Binfmt_misc can also recognise a filename extension
 aka '.com' or '.exe'.
 
+First you must mount binfmt_misc:
+	mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc 
+
 To actually register a new binary type, you have to set up a string looking like
 :name:type:offset:magic:mask:interpreter: (where you can choose the ':' upon
 your needs) and echo it to /proc/sys/fs/binfmt_misc/register.

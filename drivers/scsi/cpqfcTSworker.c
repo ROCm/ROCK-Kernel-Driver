@@ -30,6 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
+#include <linux/pci.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -1196,9 +1197,9 @@ void cpqfcTSTerminateExchange(
 	// have to terminate by SCSI target, NOT port_id.
         if( Exchanges->fcExchange[x_ID].Cmnd) // Cmnd in progress?
 	{	                 
-	  if( (Exchanges->fcExchange[x_ID].Cmnd->target == ScsiNexus->target)
+	  if( (Exchanges->fcExchange[x_ID].Cmnd->device->id == ScsiNexus->target)
 			&&
-            (Exchanges->fcExchange[x_ID].Cmnd->channel == ScsiNexus->channel)) 
+            (Exchanges->fcExchange[x_ID].Cmnd->device->channel == ScsiNexus->channel)) 
           {
             Exchanges->fcExchange[x_ID].status = TerminateStatus;
             cpqfcTSPutLinkQue( cpqfcHBAdata, BLS_ABTS, &x_ID ); // timed-out
@@ -2681,7 +2682,7 @@ static void SendLogins( CPQFCHBA *cpqfcHBAdata, __u32 *FabricPortIds )
 // D. Deming, 1994, pg 7-19 (ISBN 1-879936-08-9)
 static void ScsiReportLunsDone(Scsi_Cmnd *Cmnd)
 {
-  struct Scsi_Host *HostAdapter = Cmnd->host;
+  struct Scsi_Host *HostAdapter = Cmnd->device->host;
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
   FC_EXCHANGES *Exchanges = fcChip->Exchanges;
@@ -2887,11 +2888,11 @@ static void
 call_scsi_done(Scsi_Cmnd *Cmnd)
 {
 	CPQFCHBA *hba;
-	hba = (CPQFCHBA *) Cmnd->host->hostdata;
+	hba = (CPQFCHBA *) Cmnd->device->host->hostdata;
 	// Was this command a cpqfc passthru ioctl ?
-        if (Cmnd->sc_request != NULL && Cmnd->host != NULL && 
-		Cmnd->host->hostdata != NULL &&
-		is_private_data_of_cpqfc((CPQFCHBA *) Cmnd->host->hostdata,
+        if (Cmnd->sc_request != NULL && Cmnd->device->host != NULL && 
+		Cmnd->device->host->hostdata != NULL &&
+		is_private_data_of_cpqfc((CPQFCHBA *) Cmnd->device->host->hostdata,
 			Cmnd->sc_request->upper_private_data)) {
 		cpqfc_free_private_data(hba, 
 			Cmnd->sc_request->upper_private_data);	
@@ -2918,7 +2919,8 @@ static void IssueReportLunsCommand(
 {
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
   PFC_LOGGEDIN_PORT pLoggedInPort; 
-  Scsi_Cmnd *Cmnd;
+  struct scsi_cmnd *Cmnd = NULL;
+  struct scsi_device *ScsiDev = NULL;
   LONG x_ID;
   ULONG ulStatus;
   UCHAR *ucBuff;
@@ -2942,17 +2944,20 @@ static void IssueReportLunsCommand(
     if( !(pLoggedInPort->fcp_info & TARGET_FUNCTION) )
       goto Done;  // forget it - FC device not a "target"
 
-    // now use the port's Scsi Command buffer for the 
-    // Report Luns Command
  
-    Cmnd = &pLoggedInPort->ScsiCmnd; 
+    ScsiDev = scsi_get_host_dev (cpqfcHBAdata->HostAdapter);
+    if (!ScsiDev)
+      goto Done;
+    
+    Cmnd = scsi_get_command (ScsiDev, GFP_KERNEL);
+    if (!Cmnd) 
+      goto Done;
+
     ucBuff = pLoggedInPort->ReportLunsPayload;
     
-    memset( Cmnd, 0, sizeof(Scsi_Cmnd));
     memset( ucBuff, 0, REPORT_LUNS_PL);
     
     Cmnd->scsi_done = ScsiReportLunsDone;
-    Cmnd->host = cpqfcHBAdata->HostAdapter;
 
     Cmnd->request_buffer = pLoggedInPort->ReportLunsPayload; 
     Cmnd->request_bufflen = REPORT_LUNS_PL; 
@@ -2962,8 +2967,8 @@ static void IssueReportLunsCommand(
     Cmnd->cmnd[9] = (UCHAR)REPORT_LUNS_PL;
     Cmnd->cmd_len = 12;
 
-    Cmnd->channel = pLoggedInPort->ScsiNexus.channel;
-    Cmnd->target = pLoggedInPort->ScsiNexus.target;
+    Cmnd->device->channel = pLoggedInPort->ScsiNexus.channel;
+    Cmnd->device->id = pLoggedInPort->ScsiNexus.target;
 
 	    
     ulStatus = cpqfcTSBuildExchange(
@@ -3003,6 +3008,10 @@ static void IssueReportLunsCommand(
 
 Done:
 
+  if (Cmnd)
+    scsi_put_command (Cmnd);
+  if (ScsiDev) 
+    scsi_free_host_dev (ScsiDev);
 }
 
 
@@ -3361,22 +3370,22 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
     {
       // check Linux Scsi Cmnd for channel/target Nexus match
       // (all luns are accessed through matching "pLoggedInPort")
-      if( (pLoggedInPort->ScsiNexus.target == Cmnd->target)
+      if( (pLoggedInPort->ScsiNexus.target == Cmnd->device->id)
                 &&
-          (pLoggedInPort->ScsiNexus.channel == Cmnd->channel))
+          (pLoggedInPort->ScsiNexus.channel == Cmnd->device->channel))
       {
         // For "passthru" modes, the IOCTL caller is responsible
 	// for setting the FCP-LUN addressing
-	if (Cmnd->sc_request != NULL && Cmnd->host != NULL && 
-		Cmnd->host->hostdata != NULL &&
-		is_private_data_of_cpqfc((CPQFCHBA *) Cmnd->host->hostdata,
+	if (Cmnd->sc_request != NULL && Cmnd->device->host != NULL && 
+		Cmnd->device->host->hostdata != NULL &&
+		is_private_data_of_cpqfc((CPQFCHBA *) Cmnd->device->host->hostdata,
 			Cmnd->sc_request->upper_private_data)) { 
 		/* This is a passthru... */
 		cpqfc_passthru_private_t *pd;
 		pd = Cmnd->sc_request->upper_private_data;
         	Cmnd->SCp.phase = pd->bus;
 		// Cmnd->SCp.have_data_in = pd->pdrive;
-		Cmnd->SCp.have_data_in = Cmnd->lun;
+		Cmnd->SCp.have_data_in = Cmnd->device->lun;
 	} else {
 	  /* This is not a passthru... */
 	
@@ -3391,17 +3400,17 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
 	  // Report Luns command
           if( pLoggedInPort->ScsiNexus.LunMasking == 1) 
 	  {
-	    if (Cmnd->lun > sizeof(pLoggedInPort->ScsiNexus.lun))
+	    if (Cmnd->device->lun > sizeof(pLoggedInPort->ScsiNexus.lun))
 		return NULL;
             // we KNOW all the valid LUNs... 0xFF is invalid!
-            Cmnd->SCp.have_data_in = pLoggedInPort->ScsiNexus.lun[Cmnd->lun];
-	    if (pLoggedInPort->ScsiNexus.lun[Cmnd->lun] == 0xFF)
+            Cmnd->SCp.have_data_in = pLoggedInPort->ScsiNexus.lun[Cmnd->device->lun];
+	    if (pLoggedInPort->ScsiNexus.lun[Cmnd->device->lun] == 0xFF)
 		return NULL;
 	    // printk("xlating lun %d to 0x%02x\n", Cmnd->lun, 
             //	pLoggedInPort->ScsiNexus.lun[Cmnd->lun]);
 	  }
 	  else
-	    Cmnd->SCp.have_data_in = Cmnd->lun; // Linux & target luns match
+	    Cmnd->SCp.have_data_in = Cmnd->device->lun; // Linux & target luns match
 	}
 	break; // found it!
       }
@@ -3507,9 +3516,9 @@ static void UnblockScsiDevice( struct Scsi_Host *HostAdapter,
 
 
       // Are there any Q'd commands for this target?
-      if( (Cmnd->target == pLoggedInPort->ScsiNexus.target)
+      if( (Cmnd->device->id == pLoggedInPort->ScsiNexus.target)
 	       &&
-          (Cmnd->channel == pLoggedInPort->ScsiNexus.channel) )
+          (Cmnd->device->channel == pLoggedInPort->ScsiNexus.channel) )
       {
         Cmnd->result = (DID_SOFT_ERROR <<16); // force retry
         if( Cmnd->scsi_done == NULL) 

@@ -32,7 +32,7 @@
 #endif
 
 struct tun_struct {
-	char 			*name;
+	struct list_head        list;
 	unsigned long 		flags;
 	int			attached;
 	uid_t			owner;

@@ -844,9 +844,6 @@ int meth_init_module(void)
 		printk("meth: error %i registering device \"%s\"\n",
 		       result, meth_devs->name);
 	else device_present++;
-#ifndef METH_DEBUG
-	EXPORT_NO_SYMBOLS;
-#endif
 	
 	return device_present ? 0 : -ENODEV;
 }

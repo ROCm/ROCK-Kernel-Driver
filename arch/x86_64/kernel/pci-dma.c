@@ -9,8 +9,6 @@
 #include <linux/module.h>
 #include <asm/io.h>
 
-dma_addr_t bad_dma_address = -1UL; 
-
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scatter-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
@@ -34,16 +32,9 @@ int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	BUG_ON(direction == PCI_DMA_NONE);
  	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
-
 		BUG_ON(!s->page); 
-
 			s->dma_address = pci_map_page(hwdev, s->page, s->offset, 
 						      s->length, direction); 
-
-		if (unlikely(s->dma_address == bad_dma_address)) {
-	pci_unmap_sg(hwdev, sg, i, direction); 
-	return 0; 
-		}
 	}
 	return nents;
 }

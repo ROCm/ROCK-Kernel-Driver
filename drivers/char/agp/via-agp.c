@@ -9,9 +9,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
-
 static int via_fetch_size(void)
 {
 	int i;
@@ -123,6 +120,14 @@ static int via_configure_agp3(void)
 	/* attbase - aperture GATT base */
 	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_ATTBASE,
 		agp_bridge->gatt_bus_addr & 0xfffff000);
+
+	/* 1. Enable GTLB in RX90<7>, all AGP aperture access needs to fetch 
+	 *    translation table first.
+	 * 2. Enable AGP aperture in RX91<0>. This bit controls the enabling of the
+	 *    graphics AGP aperture for the AGP3.0 port.
+	 */
+	pci_read_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, temp | (3<<7));		
 	return 0;
 }
 
@@ -382,16 +387,9 @@ static int __init agp_via_probe(struct pci_dev *pdev,
 		}
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX 
-		    "Unsupported VIA chipset (device id: %04x),"
-		    " you might want to try agp_try_unsupported=1.\n",
+	printk(KERN_ERR PFX "Unsupported VIA chipset (device id: %04x)\n",
 		    pdev->device);
-		return -ENODEV;
-	}
-
-	printk(KERN_WARNING PFX "Trying generic VIA routines"
-	       " for device id: %04x\n", pdev->device);
+	return -ENODEV;
 
 found:
 	bridge = agp_alloc_bridge();
@@ -470,6 +468,5 @@ static void __exit agp_via_cleanup(void)
 module_init(agp_via_init);
 module_exit(agp_via_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");

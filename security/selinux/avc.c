@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
+#include <linux/init.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <linux/un.h>

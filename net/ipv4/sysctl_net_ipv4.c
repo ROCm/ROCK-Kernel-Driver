@@ -109,6 +109,7 @@ static int ipv4_sysctl_forward_strategy(ctl_table *table, int *name, int nlen,
 		}
 	}
 
+	*valp = new;
 	inet_forward_change();
 	return 1;
 }

@@ -13,9 +13,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
-
 static struct aper_size_info_fixed intel_i810_sizes[] =
 {
 	{64, 16384, 4},
@@ -1358,15 +1355,9 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 		name = "E7205";
 		break;
 	default:
-		if (!agp_try_unsupported) {
-			printk(KERN_ERR PFX
-			    "Unsupported Intel chipset (device id: %04x),"
-			    " you might want to try agp_try_unsupported=1.\n",
+		printk(KERN_ERR PFX "Unsupported Intel chipset (device id: %04x)\n",
 			    pdev->device);
-			return -ENODEV;
-		}
-		bridge->driver = &intel_generic_driver;
-		break;
+		return -ENODEV;
 	};
 
 	bridge->dev = pdev;
@@ -1485,6 +1476,5 @@ static void __exit agp_intel_cleanup(void)
 module_init(agp_intel_init);
 module_exit(agp_intel_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");

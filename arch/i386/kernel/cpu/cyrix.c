@@ -109,7 +109,6 @@ static void __init check_cx686_slop(struct cpuinfo_x86 *c)
 
 static void __init set_cx86_reorder(void)
 {
-#ifdef CONFIG_OOSTORE
 	u8 ccr3;
 
 	printk(KERN_INFO "Enable Memory access reorder on Cyrix/NSC processor.\n");
@@ -118,12 +117,9 @@ static void __init set_cx86_reorder(void)
 
 	/* Load/Store Serialize to mem access disable (=reorder it)  */
 	setCx86(CX86_PCR0, getCx86(CX86_PCR0) & ~0x80);
-#ifdef CONFIG_NOHIGHMEM
 	/* set load/store serialize from 1GB to 4GB */
 	ccr3 |= 0xe0;
-#endif
 	setCx86(CX86_CCR3, ccr3);
-#endif	
 }
 
 static void __init set_cx86_memwb(void)

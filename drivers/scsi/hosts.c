@@ -39,30 +39,35 @@
 
 static int scsi_host_next_hn;		/* host_no for next new host */
 
+
 /**
- * scsi_remove_host - check a scsi host for release and release
- * @shost:	a pointer to a scsi host to release
- *
- * Return value:
- * 	0 on Success / 1 on Failure
+ * scsi_host_cancel - cancel outstanding IO to this host
+ * @shost:	pointer to struct Scsi_Host
+ * recovery:	recovery requested to run.
  **/
-int scsi_remove_host(struct Scsi_Host *shost)
+void scsi_host_cancel(struct Scsi_Host *shost, int recovery)
 {
-	struct scsi_device *sdev;
+	unsigned long flags;
 
-	/*
-	 * FIXME Do ref counting.  We force all of the devices offline to
-	 * help prevent race conditions where other hosts/processors could
-	 * try and get in and queue a command.
-	 */
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
-		sdev->online = FALSE;
+	spin_lock_irqsave(shost->host_lock, flags);
+	set_bit(SHOST_CANCEL, &shost->shost_state);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+	device_for_each_child(&shost->shost_gendev, &recovery,
+			      scsi_device_cancel_cb);
+	wait_event(shost->host_wait, (!test_bit(SHOST_RECOVERY,
+						&shost->shost_state)));
+}
 
+/**
+ * scsi_remove_host - remove a scsi host
+ * @shost:	a pointer to a scsi host to remove
+ **/
+void scsi_remove_host(struct Scsi_Host *shost)
+{
+	scsi_host_cancel(shost, 0);
 	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
 	scsi_sysfs_remove_host(shost);
-
-	return 0;
 }
 
 /**
@@ -108,7 +113,7 @@ void scsi_free_shost(struct Scsi_Host *shost)
 		shost->eh_notify = NULL;
 	}
 
-	shost->hostt->present--;
+	scsi_proc_hostdir_rm(shost->hostt);
 	scsi_destroy_command_freelist(shost);
 	kfree(shost);
 }
@@ -182,7 +187,6 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->unchecked_isa_dma = sht->unchecked_isa_dma;
 	shost->use_clustering = sht->use_clustering;
 	shost->use_blk_tcq = sht->use_blk_tcq;
-	shost->highmem_io = sht->highmem_io;
 
 	if (sht->max_host_blocked)
 		shost->max_host_blocked = sht->max_host_blocked;
@@ -198,6 +202,14 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	else
 		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
 
+	/*
+	 * assume a 4GB boundary, if not set
+	 */
+	if (sht->dma_boundary)
+		shost->dma_boundary = sht->dma_boundary;
+	else
+		shost->dma_boundary = 0xffffffff;
+
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
 		goto fail;
@@ -209,7 +221,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	kernel_thread((int (*)(void *))scsi_error_handler, shost, 0);
 	wait_for_completion(&complete);
 	shost->eh_notify = NULL;
-	shost->hostt->present++;
+	scsi_proc_hostdir_add(shost->hostt);
 	return shost;
  fail:
 	kfree(shost);
@@ -249,21 +261,21 @@ struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
 {
 	struct class *class = class_get(&shost_class);
 	struct class_device *cdev;
-	struct Scsi_Host *shost = NULL, *p;
+	struct Scsi_Host *shost = ERR_PTR(-ENXIO), *p;
 
 	if (class) {
 		down_read(&class->subsys.rwsem);
 		list_for_each_entry(cdev, &class->children, node) {
 			p = class_to_shost(cdev);
 			if (p->host_no == hostnum) {
-				scsi_host_get(p);
-				shost = p;
+				shost = scsi_host_get(p);
 				break;
 			}
 		}
 		up_read(&class->subsys.rwsem);
 	}
 
+	class_put(&shost_class);
 	return shost;
 }
 
@@ -271,10 +283,12 @@ struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
  * *scsi_host_get - inc a Scsi_Host ref count
  * @shost:	Pointer to Scsi_Host to inc.
  **/
-void scsi_host_get(struct Scsi_Host *shost)
+struct Scsi_Host *scsi_host_get(struct Scsi_Host *shost)
 {
-	get_device(&shost->shost_gendev);
-	class_device_get(&shost->shost_classdev);
+	if (test_bit(SHOST_DEL, &shost->shost_state) ||
+		!get_device(&shost->shost_gendev))
+		return NULL;
+	return shost;
 }
 
 /**
@@ -283,6 +297,5 @@ void scsi_host_get(struct Scsi_Host *shost)
  **/
 void scsi_host_put(struct Scsi_Host *shost)
 {
-	class_device_put(&shost->shost_classdev);
 	put_device(&shost->shost_gendev);
 }

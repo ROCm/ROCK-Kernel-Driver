@@ -1940,12 +1940,12 @@ err_disable_pdev:
 }
 
 static struct pci_driver amd8111e_driver = {
-	name:		MODULE_NAME,
-	id_table:	amd8111e_pci_tbl,
-	probe:		amd8111e_probe_one,
-	remove:		__devexit_p(amd8111e_remove_one),
-	suspend:	amd8111e_suspend,
-	resume:		amd8111e_resume
+	.name		= MODULE_NAME,
+	.id_table	= amd8111e_pci_tbl,
+	.probe		= amd8111e_probe_one,
+	.remove		= __devexit_p(amd8111e_remove_one),
+	.suspend	= amd8111e_suspend,
+	.resume		= amd8111e_resume
 };
 
 static int __init amd8111e_init(void)

@@ -2873,8 +2873,8 @@ static struct file_operations bttv_fops =
 static struct video_device bttv_video_template =
 {
 	.name     = "UNSET",
-	type:     VID_TYPE_CAPTURE|VID_TYPE_TUNER|VID_TYPE_OVERLAY|
-	          VID_TYPE_CLIPPING|VID_TYPE_SCALES,
+	.type     = VID_TYPE_CAPTURE|VID_TYPE_TUNER|VID_TYPE_OVERLAY|
+	            VID_TYPE_CLIPPING|VID_TYPE_SCALES,
 	.hardware = VID_HARDWARE_BT848,
 	.fops     = &bttv_fops,
 	.minor    = -1,

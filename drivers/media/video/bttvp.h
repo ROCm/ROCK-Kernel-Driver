@@ -24,7 +24,7 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#include <linux/version.h>
+
 #define BTTV_VERSION_CODE KERNEL_VERSION(0,9,11)
 
 #include <linux/types.h>

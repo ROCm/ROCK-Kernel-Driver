@@ -47,6 +47,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	struct node nodes[MAXNODE];
 	int nodeid, i, nb; 
 	int found = 0;
+	int nmax; 
 
 	nb = find_northbridge(); 
 	if (nb < 0) 
@@ -54,22 +55,28 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 
 	printk(KERN_INFO "Scanning NUMA topology in Northbridge %d\n", nb); 
 
-	numnodes = (1 << ((read_pci_config(0, nb, 0, 0x60 ) >> 4) & 3)); 
-
-	printk(KERN_INFO "Assuming %d nodes\n", numnodes - 1); 
+	nmax = (1 << ((read_pci_config(0, nb, 0, 0x60 ) >> 4) & 3)); 
+	numnodes = nmax;
 
 	memset(&nodes,0,sizeof(nodes)); 
 	prevbase = 0;
-	for (i = 0; i < numnodes; i++) { 
+	for (i = 0; i < 8; i++) { 
 		unsigned long base,limit; 
 
 		base = read_pci_config(0, nb, 1, 0x40 + i*8);
 		limit = read_pci_config(0, nb, 1, 0x44 + i*8);
 
 		nodeid = limit & 3; 
+		if ((base & 3) == 0) { 
+			if (i < nmax) 
+				printk("Skipping disabled node %d\n", i); 
+			continue;
+		} 
+
 		if (!limit) { 
-			printk(KERN_ERR "Skipping node entry %d (base %lx)\n", i,			       base);
-			return -1;
+			printk(KERN_INFO "Skipping node entry %d (base %lx)\n", i,
+			       base);
+			continue;
 		}
 		if ((base >> 8) & 3 || (limit >> 8) & 3) {
 			printk(KERN_ERR "Node %d using interleaving mode %lx/%lx\n", 
@@ -77,7 +84,8 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 			return -1; 
 		}	
 		if ((1UL << nodeid) & nodes_present) { 
-			printk(KERN_INFO "Node %d already present. Skipping\n", nodeid);
+			printk(KERN_INFO "Node %d already present. Skipping\n", 
+			       nodeid);
 			continue;
 		}
 
@@ -104,7 +112,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 		if (limit < base) { 
 			printk(KERN_ERR "Node %d bogus settings %lx-%lx.\n",
 			       nodeid, base, limit); 			       
-			return -1;
+			continue;
 		} 
 		
 		/* Could sort here, but pun for now. Should not happen anyroads. */
@@ -135,11 +143,26 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	} 
 	printk(KERN_INFO "Using node hash shift of %d\n", memnode_shift); 
 
-	for (i = 0; i < numnodes; i++) { 
+	for (i = 0; i < MAXNODE; i++) { 
 		if (nodes[i].start != nodes[i].end)
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end); 
 	} 
 
+	/* There are unfortunately some poorly designed mainboards around
+	   that only connect memory to a single CPU. This breaks the 1:1 cpu->node
+	   mapping. To avoid this fill in the mapping for all possible
+	   CPUs, as the number of CPUs is not known yet. 
+	   We round robin the existing nodes. */
+	int rr = 0;
+	for (i = 0; i < MAXNODE; i++) {
+		if (nodes_present & (1UL<<i))
+			continue;
+		if ((nodes_present >> rr) == 0) 
+			rr = 0; 
+		rr = ffz(~nodes_present >> rr); 
+		node_data[i] = node_data[rr];
+		rr++; 
+	}
+
 	return 0;
 } 
-
