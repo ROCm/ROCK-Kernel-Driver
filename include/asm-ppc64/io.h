@@ -17,6 +17,12 @@
 #include <asm/memory.h>
 #include <asm/delay.h>
 
+#define __ide_mm_insw(p, a, c) _insw_ns((volatile u16 *)(p), (a), (c))
+#define __ide_mm_insl(p, a, c) _insl_ns((volatile u32 *)(p), (a), (c))
+#define __ide_mm_outsw(p, a, c) _outsw_ns((volatile u16 *)(p), (a), (c))
+#define __ide_mm_outsl(p, a, c) _outsl_ns((volatile u32 *)(p), (a), (c))
+
+
 #define SIO_CONFIG_RA	0x398
 #define SIO_CONFIG_RD	0x399
 
@@ -93,7 +99,7 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 #define inw_p(port)             inw(port)
 #define outw_p(val, port)       (udelay(1), outw((val), (port)))
 #define inl_p(port)             inl(port)
-#define outl_p(val, port)       (udelay(1), outl((val, (port)))
+#define outl_p(val, port)       (udelay(1), outl((val), (port)))
 
 /*
  * The *_ns versions below don't do byte-swapping.

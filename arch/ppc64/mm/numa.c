@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
+#include <linux/module.h>
 #include <asm/lmb.h>
 
 #if 1
@@ -306,6 +307,7 @@ void __init paging_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES];
 	int i, nid;
+	struct page *node_mem_map; 
 
 	for (i = 1; i < MAX_NR_ZONES; i++)
 		zones_size[i] = 0;
@@ -314,16 +316,24 @@ void __init paging_init(void)
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 
-		if (node_data[nid].node_spanned_pages == 0)
-			continue;
-
 		start_pfn = plat_node_bdata[nid].node_boot_start >> PAGE_SHIFT;
 		end_pfn = plat_node_bdata[nid].node_low_pfn;
 
 		zones_size[ZONE_DMA] = end_pfn - start_pfn;
 		dbg("free_area_init node %d %lx %lx\n", nid,
 				zones_size[ZONE_DMA], start_pfn);
-		free_area_init_node(nid, NODE_DATA(nid), NULL, zones_size,
-				    start_pfn, NULL);
+
+		/* 
+		 * Give this empty node a dummy struct page to avoid
+		 * us from trying to allocate a node local mem_map
+		 * in free_area_init_node (which will fail).
+		 */
+		if (!node_data[nid].node_spanned_pages)
+			node_mem_map = alloc_bootmem(sizeof(struct page));
+		else
+			node_mem_map = NULL;
+
+		free_area_init_node(nid, NODE_DATA(nid), node_mem_map,
+				    zones_size, start_pfn, NULL);
 	}
 }
