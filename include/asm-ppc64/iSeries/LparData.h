@@ -28,11 +28,11 @@
 #include <asm/page.h>
 #include <asm/abs_addr.h>
 
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/iSeries/ItLpNaca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpRegSave.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/HvReleaseData.h>
 #include <asm/iSeries/LparMap.h>
 #include <asm/iSeries/ItVpdAreas.h>
@@ -42,8 +42,6 @@
 #include <asm/page.h>
 
 extern struct LparMap	xLparMap;
-extern struct Naca	xNaca;
-extern struct Paca	xPaca[];
 extern struct HvReleaseData hvReleaseData;
 extern struct ItLpNaca	itLpNaca;
 extern struct ItIplParmsReal xItIplParmsReal;

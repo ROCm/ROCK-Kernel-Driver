@@ -3,7 +3,7 @@
 
 /*============================================================================
  *                                                         Header File Id
- * Name______________:	Paca.H
+ * Name______________:	paca.h
  *
  * Description_______:
  *
@@ -33,26 +33,26 @@
 #include	<asm/mmu.h>
 #include	<asm/processor.h>
 
-/* A Paca entry is required for each logical processor.  On systems
+/* A paca entry is required for each logical processor.  On systems
  * that support hardware multi-threading, this is equal to twice the
  * number of physical processors.  On LPAR systems, we are required
  * to have space for the maximum number of logical processors we
  * could ever possibly have.  Currently, we are limited to allocating
  * 24 processors to a partition which gives 48 logical processors on
- * an HMT box.  Therefore, we reserve this many Paca entries.
+ * an HMT box.  Therefore, we reserve this many paca entries.
  */
-#define maxProcessors 24
-#define maxPacas maxProcessors * 2
+#define MAX_PROCESSORS 24
+#define MAX_PACAS MAX_PROCESSORS * 2
 
-extern struct Paca   xPaca[];
-#define get_paca() ((struct Paca *)mfspr(SPRG3))
+extern struct paca_struct paca[];
+#define get_paca() ((struct paca_struct *)mfspr(SPRG3))
 
 /*============================================================================
- * Name_______:	Paca
+ * Name_______:	paca
  *
  * Description:
  *
- *	Defines the layout of the Paca.  
+ *	Defines the layout of the paca.  
  *
  *	This structure is not directly accessed by PLIC or the SP except
  *	for the first two pointers that point to the ItLpPaca area and the
@@ -62,8 +62,7 @@ extern struct Paca   xPaca[];
  *
  *============================================================================
  */
-struct Paca
-{
+struct paca_struct {
 /*=====================================================================================
  * CACHE_LINE_1 0x0000 - 0x007F
  *=====================================================================================

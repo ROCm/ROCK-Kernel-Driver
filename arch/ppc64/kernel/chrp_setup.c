@@ -57,7 +57,7 @@
 #include <asm/irq.h>
 #include <asm/keyboard.h>
 #include <asm/init.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/time.h>
 
 #include "local_irq.h"
@@ -67,7 +67,6 @@
 #include <asm/ppcdebug.h>
 
 extern volatile unsigned char *chrp_int_ack_special;
-extern struct Naca *naca;
 
 void chrp_setup_pci_ptrs(void);
 void chrp_progress(char *, unsigned short);

@@ -35,7 +35,7 @@
 #include <asm/iSeries/HvTypes.h>
 #endif
 
-#include <asm/Paca.h>
+#include <asm/paca.h>
 
 //-------------------------------------------------------------------
 // Constants
@@ -133,10 +133,9 @@ enum HvCall_VaryOffChunkRc
 //=====================================================================================
 static inline void		HvCall_setVirtualDecr(void)
 {
-	// Ignore any error return codes - most likely means that the target value for the
-	// LP has been increased and this vary off would bring us below the new target.
+	/* Ignore any error return codes - most likely means that the target value for the
+	 * LP has been increased and this vary off would bring us below the new target. */
 	HvCall0(HvCallBaseSetVirtualDecr);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 }
 //=====================================================================
 static inline void		HvCall_yieldProcessor(unsigned typeOfYield, u64 yieldParm)
@@ -147,21 +146,18 @@ static inline void		HvCall_yieldProcessor(unsigned typeOfYield, u64 yieldParm)
 static inline void		HvCall_setEnabledInterrupts(u64 enabledInterrupts)
 {
 	HvCall1(HvCallBaseSetEnabledInterrupts,enabledInterrupts);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 }
 
 //=====================================================================
 static inline void		HvCall_clearLogBuffer(HvLpIndex lpindex)
 {
 	HvCall1(HvCallBaseClearLogBuffer,lpindex);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 }
 
 //=====================================================================
 static inline u32  		HvCall_getLogBufferCodePage(HvLpIndex lpindex)
 {
 	u32 retVal = HvCall1(HvCallBaseGetLogBufferCodePage,lpindex);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retVal;
 }
 
@@ -169,7 +165,6 @@ static inline u32  		HvCall_getLogBufferCodePage(HvLpIndex lpindex)
 static inline int  		HvCall_getLogBufferFormat(HvLpIndex lpindex)
 {
 	int retVal = HvCall1(HvCallBaseGetLogBufferFormat,lpindex);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retVal;
 }
 
@@ -177,7 +172,6 @@ static inline int  		HvCall_getLogBufferFormat(HvLpIndex lpindex)
 static inline u32  		HvCall_getLogBufferLength(HvLpIndex lpindex)
 {
 	u32 retVal = HvCall1(HvCallBaseGetLogBufferLength,lpindex);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retVal;
 }
 
@@ -185,7 +179,6 @@ static inline u32  		HvCall_getLogBufferLength(HvLpIndex lpindex)
 static inline void  		HvCall_setLogBufferFormatAndCodepage(int format, u32 codePage)
 {
 	HvCall2(HvCallBaseSetLogBufferFormatAndCodePage,format, codePage);
-	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 }
 
 //=====================================================================
@@ -193,7 +186,7 @@ int HvCall_readLogBuffer(HvLpIndex lpindex, void *buffer, u64 bufLen);
 void HvCall_writeLogBuffer(const void *buffer, u64 bufLen);
 
 //=====================================================================
-static inline void		HvCall_sendIPI(struct Paca * targetPaca)
+static inline void		HvCall_sendIPI(struct paca_struct * targetPaca)
 {
 	HvCall1( HvCallBaseSendIPI, targetPaca->xPacaIndex );
 }

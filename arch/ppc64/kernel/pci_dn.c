@@ -36,7 +36,7 @@
 #include <asm/init.h>
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/pci_dma.h>
 
 #include "pci.h"

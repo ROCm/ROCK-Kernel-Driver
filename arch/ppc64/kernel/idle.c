@@ -68,7 +68,7 @@ static void yield_shared_processor(void)
 
 int cpu_idle(void)
 {
-	struct Paca *paca;
+	struct Paca *lpaca;
 	long oldval;
 	unsigned long CTRL;
 
@@ -78,11 +78,11 @@ int cpu_idle(void)
 	CTRL &= ~RUNLATCH;
 	mtspr(CTRLT, CTRL);
 
-	paca = get_paca();
+	lpaca = get_paca();
 
 	while (1) {
-		if (paca->xLpPaca.xSharedProc) {
-			if (ItLpQueue_isLpIntPending(paca->lpQueuePtr))
+		if (lpaca->xLpPaca.xSharedProc) {
+			if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
 				process_iSeries_events();
 			if (!need_resched())
 				yield_shared_processor();
@@ -94,7 +94,7 @@ int cpu_idle(void)
 
 				while (!need_resched()) {
 					HMT_medium();
-					if (ItLpQueue_isLpIntPending(paca->lpQueuePtr))
+					if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
 						process_iSeries_events();
 					HMT_low();
 				}

@@ -1,5 +1,4 @@
 /*
- * 
  * Common time prototypes and such for all ppc machines.
  *
  * Written by Cort Dougan (cort@cs.nmt.edu) to merge
@@ -19,7 +18,7 @@
 #include <linux/mc146818rtc.h>
 
 #include <asm/processor.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/HvCall.h>
 
 /* time.c */
@@ -74,22 +73,21 @@ static __inline__ unsigned int get_dec(void)
 
 static __inline__ void set_dec(int val)
 {
-    struct Paca * paca;
-    int cur_dec;
+	struct paca_struct *lpaca = get_paca();
+	int cur_dec;
 
-    paca = (struct Paca *)mfspr(SPRG3);
-    if ( paca->xLpPaca.xSharedProc ) {
-	paca->xLpPaca.xVirtualDecr = val;
-	cur_dec = get_dec();
-	if ( cur_dec > val )
-	    HvCall_setVirtualDecr();
-    }
-    else
-	mtspr(SPRN_DEC, val);
+	if ( lpaca->xLpPaca.xSharedProc ) {
+		lpaca->xLpPaca.xVirtualDecr = val;
+		cur_dec = get_dec();
+		if ( cur_dec > val )
+			HvCall_setVirtualDecr();
+	} else {
+		mtspr(SPRN_DEC, val);
+	}
 }
 
 extern __inline__ unsigned long tb_ticks_since(unsigned long tstamp) {
-    return get_tb() - tstamp;
+	return get_tb() - tstamp;
 }
 
 #define mulhwu(x,y) \

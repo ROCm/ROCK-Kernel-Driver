@@ -22,8 +22,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
-#include <asm/Naca.h>
-#include <asm/Paca.h>
+#include <asm/naca.h>
+#include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include "nonstdio.h"
 #include "privinst.h"
@@ -141,7 +141,6 @@ extern int xmon_read_poll(void);
 extern int setjmp(u_int *);
 extern void longjmp(u_int *, int);
 extern unsigned long _ASR;
-extern struct Naca *naca;
 
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 
@@ -1261,7 +1260,7 @@ super_regs()
 {
 	int i, cmd;
 	unsigned long val;
-	struct Paca*  ptrPaca = NULL;
+	struct paca_struct*  ptrPaca = NULL;
 	struct ItLpPaca*  ptrLpPaca = NULL;
 	struct ItLpRegSave*  ptrLpRegSave = NULL;
 
@@ -1283,7 +1282,7 @@ super_regs()
 
 		// Dump out relevant Paca data areas.
 		printf("Paca: \n");
-		ptrPaca = (struct Paca*)get_sprg3();
+		ptrPaca = get_paca();
     
 		printf("  Local Processor Control Area (LpPaca): \n");
 		ptrLpPaca = ptrPaca->xLpPacaPtr;

@@ -19,11 +19,10 @@
 #define WANT_PPCDBG_TAB /* Only defined here */
 #include <asm/ppcdebug.h>
 #include <asm/processor.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/uaccess.h>
 #include <asm/machdep.h>
 
-extern struct Naca *naca;
 extern int _machine;
 
 struct NS16550 {

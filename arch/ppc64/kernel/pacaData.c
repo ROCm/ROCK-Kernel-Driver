@@ -7,7 +7,7 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#define __KERNEL__ 1
+#define __KERNEL__
 #include <asm/types.h>
 #include <asm/page.h>
 #include <stddef.h>
@@ -17,8 +17,10 @@
 #include <asm/ptrace.h>
 
 #include <asm/iSeries/ItLpPaca.h>
-#include <asm/Paca.h>
+#include <asm/naca.h>
+#include <asm/paca.h>
 
+struct naca_struct *naca;
 
 /* The Paca is an array with one entry per processor.  Each contains an 
  * ItLpPaca, which contains the information shared between the 
@@ -32,8 +34,8 @@
  */
 #define PACAINITDATA(number,start,lpq,asrr,asrv) \
 {                                                                          \
-        xLpPacaPtr: &xPaca[number].xLpPaca,                                 \
-        xLpRegSavePtr: &xPaca[number].xRegSav,                              \
+        xLpPacaPtr: &paca[number].xLpPaca,                                 \
+        xLpRegSavePtr: &paca[number].xRegSav,                              \
         xPacaIndex: (number),           /* Paca Index        */             \
         default_decr: 0x00ff0000,       /* Initial Decr      */             \
         xStab_data: {                                                       \
@@ -59,10 +61,10 @@
                 xSize: sizeof(struct ItLpRegSave)                           \
         },                                                                  \
         exception_sp:                                                       \
-                (&xPaca[number].exception_stack[0]) - EXC_FRAME_SIZE,       \
+                (&paca[number].exception_stack[0]) - EXC_FRAME_SIZE,       \
 }
 
-struct Paca xPaca[maxPacas] __page_aligned = {
+struct paca_struct paca[MAX_PACAS] __page_aligned = {
 #ifdef CONFIG_PPC_ISERIES
 	PACAINITDATA( 0, 1, &xItLpQueue, 0, 0xc000000000005000),
 #else

@@ -31,7 +31,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/pci_dma.h>
 #include <linux/pci.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/tlbflush.h>
 
 /* Status return values */

@@ -47,6 +47,9 @@
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/iSeries_proc.h>
+#include <asm/iSeries/mf.h>
+#include <asm/iSeries/HvLpEvent.h>
+#include <asm/iSeries/HvLpConfig.h>
 #endif
 
 /* Tell string.h we don't want memcpy etc. as cpp defines */
@@ -150,6 +153,11 @@ EXPORT_SYMBOL(HvCall4);
 EXPORT_SYMBOL(HvCall5);
 EXPORT_SYMBOL(HvCall6);
 EXPORT_SYMBOL(HvCall7);
+EXPORT_SYMBOL(HvLpEvent_unregisterHandler);
+EXPORT_SYMBOL(HvLpEvent_registerHandler);
+EXPORT_SYMBOL(mf_allocateLpEvents);
+EXPORT_SYMBOL(mf_deallocateLpEvents);
+EXPORT_SYMBOL(HvLpConfig_getLpIndex_outline);
 #endif
 
 EXPORT_SYMBOL(_insb);

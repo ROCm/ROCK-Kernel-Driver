@@ -17,13 +17,11 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/smp.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/rtas.h>
 #include "i8259.h"
 #include "xics.h"
 #include <asm/ppcdebug.h>
-
-extern struct Naca *naca;
 
 void xics_enable_irq(u_int irq);
 void xics_disable_irq(u_int irq);

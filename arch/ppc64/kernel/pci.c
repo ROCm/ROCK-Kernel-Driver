@@ -30,7 +30,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/ppcdebug.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/pci_dma.h>
 #include <asm/machdep.h>
 #ifdef CONFIG_PPC_EEH
@@ -60,9 +60,6 @@ void        fixup_resources(struct pci_dev* dev);
 
 void   iSeries_pcibios_init(void);
 void   pSeries_pcibios_init(void);
-
-
-extern struct Naca *naca;
 
 int pci_assign_all_busses = 0;
 
@@ -584,7 +581,7 @@ int pcibios_enable_device(struct pci_dev *dev)
 	int idx;
 	struct resource *r;
 
-	PPCDBG(PPCDBG_BUSWALK,"PCI: "__FUNCTION__" for device %s \n",dev->slot_name);
+	PPCDBG(PPCDBG_BUSWALK,"PCI: %s for device %s \n",__FUNCTION__,dev->slot_name);
 	if (ppc_md.pcibios_enable_device_hook)
 		if (ppc_md.pcibios_enable_device_hook(dev, 0))
 			return -EINVAL;

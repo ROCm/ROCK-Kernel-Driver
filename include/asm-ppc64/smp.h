@@ -25,7 +25,7 @@
 
 #ifndef __ASSEMBLY__
 
-#include <asm/Paca.h>
+#include <asm/paca.h>
 
 extern unsigned long cpu_online_map;
 
@@ -46,7 +46,7 @@ extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 #define hard_smp_processor_id() (get_paca()->xHwProcNum)
-#define get_hard_smp_processor_id(CPU) (xPaca[(CPU)].xHwProcNum)
+#define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)
 
 
 

@@ -64,7 +64,7 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/bitops.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/pci.h>
 #include "open_pic.h"
 #include <asm/bootinfo.h>
@@ -169,7 +169,6 @@ char *of_stdout_device = 0;
 extern struct rtas_t rtas;
 extern unsigned long klimit;
 extern unsigned long embedded_sysmap_end;
-extern struct Naca *naca;
 extern struct lmb lmb;
 #ifdef CONFIG_MSCHUNKS
 extern struct msChunks msChunks;
@@ -339,7 +338,7 @@ prom_initialize_naca(unsigned long mem)
         unsigned long num_cpus = 0;
         unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
-        struct Naca *_naca = RELOC(naca);
+        struct naca_struct *_naca = RELOC(naca);
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_initialize_naca: start...\n"));
@@ -1043,8 +1042,8 @@ prom_hold_cpus(unsigned long mem)
         unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
         unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
         unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
-        struct Naca *_naca = RELOC(naca);
-	struct Paca *_xPaca = PTRRELOC(&xPaca[0]);
+        struct naca_struct *_naca = RELOC(naca);
+	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* Initially, we must have one active CPU. */
@@ -1237,8 +1236,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	char *p, *d;
  	unsigned long phys;
         u32 getprop_rval;
-        struct Naca   *_naca = RELOC(naca);
-	struct Paca *_xPaca = PTRRELOC(&xPaca[0]);
+        struct naca_struct   *_naca = RELOC(naca);
+	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* Default machine type. */

@@ -31,7 +31,7 @@
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
-#include <asm/Naca.h>
+#include <asm/naca.h>
 
 #define STRICT_MM_TYPECHECKS
 

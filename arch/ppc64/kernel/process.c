@@ -43,9 +43,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
-#include <asm/Naca.h>
-
-#include "ppc_defs.h"
 
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
 
@@ -300,7 +297,7 @@ out:
 
 void initialize_paca_hardware_interrupt_stack(void)
 {
-	extern struct Naca *naca;
+	extern struct naca_struct *naca;
 
 	int i;
 	unsigned long stack;
@@ -317,8 +314,8 @@ void initialize_paca_hardware_interrupt_stack(void)
 
 
 		/* Store the stack value in the PACA for the processor */
-		xPaca[i].xHrdIntStack = stack + (8*PAGE_SIZE) - STACK_FRAME_OVERHEAD;
-		xPaca[i].xHrdIntCount = 0;
+		paca[i].xHrdIntStack = stack + (8*PAGE_SIZE) - STACK_FRAME_OVERHEAD;
+		paca[i].xHrdIntCount = 0;
 
 	}
 
@@ -331,7 +328,7 @@ void initialize_paca_hardware_interrupt_stack(void)
 
 	for (i=0; i < naca->processorCount; i++) {
 		/* set page at the top of stack to be protected - prevent overflow */
-		end_of_stack = xPaca[i].xHrdIntStack - (8*PAGE_SIZE - STACK_FRAME_OVERHEAD);
+		end_of_stack = paca[i].xHrdIntStack - (8*PAGE_SIZE - STACK_FRAME_OVERHEAD);
 		ppc_md.hpte_updateboltedpp(PP_RXRX,end_of_stack);
 	}
 }

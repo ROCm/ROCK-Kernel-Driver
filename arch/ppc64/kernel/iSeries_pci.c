@@ -35,7 +35,7 @@
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/flight_recorder.h>
 #include <asm/pci_dma.h>
 
@@ -55,7 +55,6 @@ extern struct pci_controller** hose_tail;
 extern int    global_phb_number;
 extern int    panic_timeout;
 
-extern struct Naca *naca;
 extern struct device_node *allnodes;
 extern unsigned long phb_tce_table_init(struct pci_controller *phb);
 extern unsigned long iSeries_Base_Io_Memory;    

@@ -57,10 +57,8 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 #include <asm/tlb.h>
-#include <asm/Naca.h>
-#ifdef CONFIG_PPC_EEH
+#include <asm/naca.h>
 #include <asm/eeh.h>
-#endif
 
 #include <asm/ppcdebug.h>
 
@@ -85,7 +83,6 @@ extern struct _of_tce_table of_tce_table[];
 extern char _start[], _end[];
 extern char _stext[], etext[];
 extern struct task_struct *current_set[NR_CPUS];
-extern struct Naca *naca;
 
 void mm_init_ppc64(void);
 
@@ -458,7 +455,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
  * Do very early mm setup.
  */
 void __init mm_init_ppc64(void) {
-	struct Paca *paca;
+	struct paca_struct *lpaca;
 	unsigned long guard_page, index;
 
 	ppc_md.progress("MM:init", 0);
@@ -477,8 +474,8 @@ void __init mm_init_ppc64(void) {
 
 	/* Setup guard pages for the Paca's */
 	for (index = 0; index < NR_CPUS; index++) {
-		paca = &xPaca[index];
-		guard_page = ((unsigned long)paca) + 0x1000;
+		lpaca = &paca[index];
+		guard_page = ((unsigned long)lpaca) + 0x1000;
 		ppc_md.hpte_updateboltedpp(PP_RXRX, guard_page);
 	}
 

@@ -38,7 +38,7 @@
 #include <asm/init.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/system.h>
 #include <asm/pmc.h>
 #include <asm/machdep.h>
@@ -99,7 +99,7 @@ htab_initialize(void)
 	unsigned long pteg_count;
 	unsigned long mode_rw, mask;
 	unsigned long offset = reloc_offset();
-	struct Naca *_naca = RELOC(naca);
+	struct naca_struct *_naca = RELOC(naca);
 	HTAB *_htab_data = PTRRELOC(&htab_data);
 
 	/*

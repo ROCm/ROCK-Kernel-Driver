@@ -55,6 +55,7 @@
 #include <asm/ptrace.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/machdep.h>
+#include <asm/paca.h>
 
 #include "local_irq.h"
 
@@ -506,21 +507,21 @@ int do_IRQ(struct pt_regs *regs)
 	int cpu = smp_processor_id();
 	int irq, first = 1;
 #ifdef CONFIG_PPC_ISERIES
-	struct Paca *paca;
+	struct paca_struct *lpaca;
 	struct ItLpQueue *lpq;
 #endif
 
 	irq_enter(cpu);
 
 #ifdef CONFIG_PPC_ISERIES
-	paca = get_paca();
+	lpaca = get_paca();
 #ifdef CONFIG_SMP
-	if (paca->xLpPaca.xIntDword.xFields.xIpiCnt) {
-		paca->xLpPaca.xIntDword.xFields.xIpiCnt = 0;
+	if (lpaca->xLpPaca.xIntDword.xFields.xIpiCnt) {
+		lpaca->xLpPaca.xIntDword.xFields.xIpiCnt = 0;
 		iSeries_smp_message_recv(regs);
 	}
 #endif /* CONFIG_SMP */
-	lpq = paca->lpQueuePtr;
+	lpq = lpaca->lpQueuePtr;
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs);
 #else
@@ -544,8 +545,8 @@ int do_IRQ(struct pt_regs *regs)
         irq_exit(cpu);
 
 #ifdef CONFIG_PPC_ISERIES
-	if (paca->xLpPaca.xIntDword.xFields.xDecrInt) {
-		paca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
+		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
 		/* Signal a fake decrementer interrupt */
 		timer_interrupt(regs);
 	}
@@ -844,11 +845,11 @@ static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
 #ifdef CONFIG_PPC_ISERIES
 	{
 		unsigned i;
-		for (i=0; i<maxPacas; ++i) {
-			if ( xPaca[i].prof_buffer && (new_value & 1) )
-				xPaca[i].prof_enabled = 1;
+		for (i=0; i<MAX_PACAS; ++i) {
+			if ( paca[i].prof_buffer && (new_value & 1) )
+				paca[i].prof_enabled = 1;
 			else
-				xPaca[i].prof_enabled = 0;
+				paca[i].prof_enabled = 0;
 			new_value >>= 1;
 		}
 	}

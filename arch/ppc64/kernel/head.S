@@ -54,7 +54,7 @@
  *   SPRG0             reserved for hypervisor
  *   SPRG1             temp - used to save gpr
  *   SPRG2             temp - used to save gpr
- *   SPRG3             virt addr of Paca
+ *   SPRG3             virt addr of paca
  */
 
 /*
@@ -167,7 +167,7 @@ _GLOBAL(__secondary_hold)
 #define EXCEPTION_PROLOG_PSERIES(label)                                  \
 	mtspr   SPRG2,r20;              /* use SPRG2 as scratch reg   */ \
 	mtspr   SPRG1,r21;              /* save r21                   */ \
-	mfspr   r20,SPRG3;              /* get Paca virt addr         */ \
+	mfspr   r20,SPRG3;              /* get paca virt addr         */ \
 	ld      r21,PACAEXCSP(r20);     /* get exception stack ptr    */ \
 	addi    r21,r21,EXC_FRAME_SIZE; /* make exception frame       */ \
 	std	r22,EX_R22(r21);	/* Save r22 in exc. frame     */ \
@@ -195,7 +195,7 @@ _GLOBAL(__secondary_hold)
 #define EXCEPTION_PROLOG_ISERIES	\
 	mtspr	SPRG2,r20;		    /* use SPRG2 as scratch reg */\
 	mtspr   SPRG1,r21;                  /* save r21 */\
-	mfspr	r20,SPRG3;		    /* get Paca */\
+	mfspr	r20,SPRG3;		    /* get paca */\
 	ld      r21,PACAEXCSP(r20);         /* get exception stack ptr */\
 	addi    r21,r21,EXC_FRAME_SIZE;     /* make exception frame */\
 	std	r22,EX_R22(r21);	    /* save r22 on exception frame */\
@@ -344,19 +344,20 @@ __start_interupts:
 	STD_EXCEPTION_PSERIES( 0xf00, PerformanceMonitor )
 	STD_EXCEPTION_PSERIES( 0x1300, InstructionBreakpoint )
 
+	/* Space for the naca.  Architected to be located at real address
+	 * 0x4000.  Various tools rely on this location being fixed.
+	 * The first dword of the naca is required by iSeries LPAR to
+	 * point to itVpdAreas.  On pSeries native, this value is not used.
+	 */
 	. = 0x4000
 	.globl __end_interupts
 	.globl __start_naca
 __end_interupts:
 __start_naca:
-	/* Save space for naca.
-	 * The first dword of the Naca is required by iSeries LPAR to
-	 * point to itVpdAreas.  On pSeries native, this value is not used.
-	 */
 	.llong itVpdAreas
 	.llong 0x0
 	.llong 0x0
-	.llong xPaca
+	.llong paca
 
 	/*
 	 * Space for the initial segment table
@@ -421,7 +422,7 @@ __end_stab:
 
 	.globl SystemReset_Iseries
 SystemReset_Iseries:
-	mfspr	25,SPRG3		/* Get Paca address */
+	mfspr	25,SPRG3		/* Get paca address */
 	lhz	r24,PACAPACAINDEX(r25)	/* Get processor # */
 	cmpi	0,r24,0			/* Are we processor 0? */
 	beq	.__start_initialization_iSeries	/* Start up the first processor */
@@ -658,7 +659,7 @@ HardwareInterrupt_entry:
 	/*                                                                */
 	/*  The call to do_irq will preserve the value of r14 - r31       */
 	/*                                                                */
-	mfspr	r20,SPRG3 		    /* get Paca                   */
+	mfspr	r20,SPRG3 		    /* get paca                   */
 	lbz     r21,PACAHRDWINTCOUNT(r20)    /* get hardware interrupt cnt */
 	cmpi    0,r21,1                     /*                            */
 	addi    r21,r21,1                   /* incr hardware interrupt cnt*/
@@ -1073,7 +1074,7 @@ _GLOBAL(save_remaining_regs)
 
 	/*
 	 * Indicate that r1 contains the kernel stack and
-	 * get the Kernel TOC and CURRENT pointers from the Paca
+	 * get the Kernel TOC and CURRENT pointers from the paca
 	 */
 	mfspr	r23,SPRG3		/* Get PACA */
 	std	r22,PACAKSAVE(r23)	/* r1 is now kernel sp */
@@ -1132,12 +1133,12 @@ _GLOBAL(pseries_secondary_smp_init)
 	bl	.enable_64b_mode
 	isync
 
-	/* Set up a Paca value for this processor. */
-	LOADADDR(r24, xPaca) 		 /* Get base vaddr of Paca array  */
-	mulli	r25,r3,PACA_SIZE	 /* Calculate vaddr of right Paca */
+	/* Set up a paca value for this processor. */
+	LOADADDR(r24, paca) 		 /* Get base vaddr of paca array  */
+	mulli	r25,r3,PACA_SIZE	 /* Calculate vaddr of right paca */
 	add	r25,r25,r24              /* for this processor.           */
 
-	mtspr	SPRG3,r25		 /* Save vaddr of Paca in SPRG3   */
+	mtspr	SPRG3,r25		 /* Save vaddr of paca in SPRG3   */
 	mr	r24,r3			 /* __secondary_start needs cpu#  */
 
 1:
@@ -1177,7 +1178,7 @@ _GLOBAL(__start_initialization_iSeries)
 	std	r4,0(r9)		/* set the naca pointer */
 
 	/* Get the pointer to the segment table */
-	ld	r6,PACA(r4)             /* Get the base Paca pointer       */
+	ld	r6,PACA(r4)             /* Get the base paca pointer       */
 	ld	r4,PACASTABVIRT(r6)
 
 	bl      .iSeries_fixup_klimit
@@ -1439,15 +1440,15 @@ _GLOBAL(giveup_fpu)
 /*
  * This function is called after the master CPU has released the
  * secondary processors.  The execution environment is relocation off.
- * The Paca for this processor has the following fields initialized at
+ * The paca for this processor has the following fields initialized at
  * this point:
  *   1. Processor number
  *   2. Segment table pointer (virtual address)
  * On entry the following are set:
  *   r1    = stack pointer.  vaddr for iSeries, raddr (temp stack) for pSeries
  *   r24   = cpu# (in Linux terms)
- *   r25   = Paca virtual address
- *   SPRG3 = Paca virtual address
+ *   r25   = paca virtual address
+ *   SPRG3 = paca virtual address
  */
 _GLOBAL(__secondary_start)
 
@@ -1581,7 +1582,7 @@ _STATIC(start_here_pSeries)
 #ifdef CONFIG_SMP
 	/* All secondary cpus are now spinning on a common
 	 * spinloop, release them all now so they can start
-	 * to spin on their individual Paca spinloops.
+	 * to spin on their individual paca spinloops.
 	 * For non SMP kernels, the secondary cpus never
 	 * get out of the common spinloop.
 	 */
@@ -1617,7 +1618,7 @@ _STATIC(start_here_pSeries)
 	/* Get the pointer to the segment table which is used by           */
 	/* stab_initialize                                                 */
 	li	r27,0x4000
-	ld	r6,PACA(r27)            /* Get the base Paca pointer       */
+	ld	r6,PACA(r27)            /* Get the base paca pointer       */
 	sub	r6,r6,r26		/* convert to physical addr         */
 	mtspr	SPRG3,r6		/* PPPBBB: Temp... -Peter */
 	ld	r3,PACASTABREAL(r6)
@@ -1681,9 +1682,9 @@ _STATIC(start_here_common)
 	addi	r8,r8,0x4000
 	std	r8,0(r9)		/* set the value of the naca ptr  */
 
-	LOADADDR(r4,naca)               /* Get Naca ptr address           */
+	LOADADDR(r4,naca)               /* Get naca ptr address           */
 	ld	r4,0(r4)                /* Get the location of the naca   */
-	ld	r4,PACA(r4)             /* Get the base Paca pointer      */
+	ld	r4,PACA(r4)             /* Get the base paca pointer      */
 	mtspr	SPRG3,r4
 
 	/* ptr to current */
@@ -1828,7 +1829,7 @@ hardware_int_paca0:
 /* 1 page segment table per cpu (max 48, cpu0 allocated at 0x5000) */
 	.globl	stab_array
 stab_array:
-	.space	4096 * 47
+        .space	4096 * (48 - 1)
 	
 /*
  * This space gets a copy of optional info passed to us by the bootstrap

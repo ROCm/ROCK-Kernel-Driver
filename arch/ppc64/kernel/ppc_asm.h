@@ -13,7 +13,7 @@
 
 #include <linux/config.h>
 
-#include "ppc_asm.tmpl"
+#include <asm/ppc_asm.tmpl>
 #include "ppc_defs.h"
 
 /*

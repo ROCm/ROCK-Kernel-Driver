@@ -25,7 +25,7 @@
  */
 
 #include <asm/proc_fs.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvCallXm.h>
@@ -38,7 +38,7 @@
 #include <linux/spinlock.h>
 #include <asm/pmc.h>
 #include <asm/uaccess.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 
 
 static int proc_pmc_control_mode = 0;
@@ -49,9 +49,6 @@ static struct proc_dir_entry *proc_ppc64_pmc_system_root = NULL;
 static struct proc_dir_entry *proc_ppc64_pmc_cpu_root[NR_CPUS] = {NULL, };
 
 static spinlock_t proc_ppc64_lock;
-
-extern struct Naca *naca;
-
 int proc_ppc64_pmc_find_file(void *data);
 int proc_ppc64_pmc_read(char *page, char **start, off_t off,
 			int count, int *eof, char *buffer);
@@ -385,7 +382,7 @@ int proc_get_lpevents
 	len += sprintf( page+len, "\n  events processed by processor:\n" );
 	for (i=0; i<naca->processorCount; ++i) {
 		len += sprintf( page+len, "    CPU%02d  %10u\n",
-			i, xPaca[i].lpEvent_count );
+			i, paca[i].lpEvent_count );
 	}
 
 	return pmc_calc_metrics( page, start, off, count, eof, len );
@@ -587,7 +584,7 @@ static inline void proc_pmc_cpi(void)
 	proc_pmc_control_mode = PMC_CONTROL_CPI;
 	
 	/* Indicate to hypervisor that we are using the PMCs */
-	((struct Paca *)mfspr(SPRG3))->xLpPacaPtr->xPMCRegsInUse = 1;
+	get_paca()->xLpPacaPtr->xPMCRegsInUse = 1;
 
 	/* Freeze all counters */
 	mtspr( MMCR0, 0x80000000 );
@@ -638,7 +635,7 @@ static inline void proc_pmc_tlb(void)
 	proc_pmc_control_mode = PMC_CONTROL_TLB;
 	
 	/* Indicate to hypervisor that we are using the PMCs */
-	((struct Paca *)mfspr(SPRG3))->xLpPacaPtr->xPMCRegsInUse = 1;
+	get_paca()->xLpPacaPtr->xPMCRegsInUse = 1;
 
 	/* Freeze all counters */
 	mtspr( MMCR0, 0x80000000 );
@@ -688,9 +685,9 @@ int proc_pmc_set_mmcr0( struct file *file, const char *buffer, unsigned long cou
 	v = proc_pmc_conv_int( buffer, count );
 	v = v & ~0x04000000;	/* Don't allow interrupts for now */
 	if ( v & ~0x80000000 ) 	/* Inform hypervisor we are using PMCs */
-		((struct Paca *)mfspr(SPRG3))->xLpPacaPtr->xPMCRegsInUse = 1;
+		get_paca()->xLpPacaPtr->xPMCRegsInUse = 1;
 	else
-		((struct Paca *)mfspr(SPRG3))->xLpPacaPtr->xPMCRegsInUse = 0;
+		get_paca()->xLpPacaPtr->xPMCRegsInUse = 0;
 	mtspr( MMCR0, v );
 	
 	return count;	
