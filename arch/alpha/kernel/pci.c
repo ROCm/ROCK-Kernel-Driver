@@ -19,6 +19,7 @@
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/bootmem.h>
+#include <linux/cache.h>
 #include <asm/machvec.h>
 
 #include "proto.h"
@@ -121,8 +122,6 @@ struct pci_fixup pcibios_fixups[] __initdata = {
 	{ 0 }
 };
 
-#define MAX(val1, val2)		((val1) > (val2) ? (val1) : (val2))
-#define ALIGN(val,align)	(((val) + ((align) - 1)) & ~((align) - 1))
 #define KB			1024
 #define MB			(1024*KB)
 #define GB			(1024*MB)
@@ -169,7 +168,7 @@ pcibios_align_resource(void *data, struct resource *res,
 		 */
 
 		/* Align to multiple of size of minimum base.  */
-		alignto = MAX(0x1000, align);
+		alignto = max(0x1000UL, align);
 		start = ALIGN(start, alignto);
 		if (hose->sparse_mem_base && size <= 7 * 16*MB) {
 			if (((start / (16*MB)) & 0x7) == 0) {
@@ -187,8 +186,6 @@ pcibios_align_resource(void *data, struct resource *res,
 
 	res->start = start;
 }
-#undef MAX
-#undef ALIGN
 #undef KB
 #undef MB
 #undef GB
