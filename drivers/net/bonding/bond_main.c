@@ -428,6 +428,8 @@
  *	  Set version to 2.4.1.
  */
 
+//#define BONDING_DEBUG 1
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -471,11 +473,6 @@
 #include "bonding.h"
 #include "bond_3ad.h"
 #include "bond_alb.h"
-
-#define DRV_VERSION	"2.4.1"
-#define DRV_RELDATE	"September 15, 2003"
-#define DRV_NAME	"bonding"
-#define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
 
 static const char *version =
 DRV_NAME ".c:v" DRV_VERSION " (" DRV_RELDATE ")\n";
@@ -613,15 +610,6 @@ static void reselect_active_interface(struct bonding *bond);
 static struct slave *find_best_interface(struct bonding *bond);
 
 
-/* #define BONDING_DEBUG 1 */
-#ifdef BONDING_DEBUG
-#define dprintk(x...) printk(x...)
-#else /* BONDING_DEBUG */
-#define dprintk(x...) do {} while (0)
-#endif /* BONDING_DEBUG */
-
-/* several macros */
-
 static void arp_send_all(slave_t *slave)
 {	
 	int i; 
@@ -722,9 +710,9 @@ bond_detach_slave(bonding_t *bond, slave_t *slave)
 {
 	if ((bond == NULL) || (slave == NULL) ||
 	   ((void *)bond == (void *)slave)) {
-		printk(KERN_ERR
-			"bond_detach_slave(): trying to detach "
-			"slave %p from bond %p\n", bond, slave);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: trying to detach slave %p from bond %p\n",
+		       bond, slave);
 		return slave;
 	}
 
@@ -914,10 +902,7 @@ bond_check_dev_link(struct net_device *dev, int reporting)
 			if (etool.data == 1) {
 				return BMSR_LSTATUS;
 			} else { 
-#ifdef BONDING_DEBUG
-				printk(KERN_INFO 
-					":: SIOCETHTOOL shows link down \n");
-#endif
+				dprintk("SIOCETHTOOL shows link down\n");
 				return 0;
 			} 
 		}
@@ -1349,25 +1334,21 @@ static int bond_enslave(struct net_device *master_dev,
 	bond = (struct bonding *) master_dev->priv;
 
 	if (slave_dev->do_ioctl == NULL) {
-		printk(KERN_DEBUG
-			"Warning : no link monitoring support for %s\n",
-			slave_dev->name);
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning : no link monitoring support for %s\n",
+		       slave_dev->name);
 	}
 
 
 	/* bond must be initialized by bond_open() before enslaving */
 	if (!(master_dev->flags & IFF_UP)) {
-#ifdef BONDING_DEBUG
-		printk(KERN_CRIT "Error, master_dev is not up\n");
-#endif
+		dprintk("Error, master_dev is not up\n");
 		return -EPERM;
 	}
 
 	/* already enslaved */
 	if (master_dev->flags & IFF_SLAVE || slave_dev->flags & IFF_SLAVE) {
-#ifdef BONDING_DEBUG
-		printk(KERN_CRIT "Error, Device was already enslaved\n");
-#endif
+		dprintk("Error, Device was already enslaved\n");
 		return -EBUSY;
 	}
 
@@ -1376,19 +1357,19 @@ static int bond_enslave(struct net_device *master_dev,
 		 * slave interface to be closed.
 		 */
 		if ((slave_dev->flags & IFF_UP)) {
-#ifdef BONDING_DEBUG
-			printk(KERN_CRIT "Error, slave_dev is up\n");
-#endif
+			printk(KERN_ERR DRV_NAME
+			       ": Error: %s is up\n",
+			       slave_dev->name);
 			return -EPERM;
 		}
 
 		if (slave_dev->set_mac_address == NULL) {
-			printk(KERN_CRIT
-			       "The slave device you specified does not support"
-			       " setting the MAC address.\n");
-			printk(KERN_CRIT
-			       "Your kernel likely does not support slave"
-			       " devices.\n");
+			printk(KERN_ERR DRV_NAME
+			       ": Error: The slave device you specified does "
+			       "not support setting the MAC address.\n");
+			printk(KERN_ERR
+			       "Your kernel likely does not support slave "
+			       "devices.\n");
 
 			return -EOPNOTSUPP;
 		}
@@ -1397,18 +1378,19 @@ static int bond_enslave(struct net_device *master_dev,
 		 * slave interface to be open.
 		 */
 		if (!(slave_dev->flags & IFF_UP)) {
-#ifdef BONDING_DEBUG
-			printk(KERN_CRIT "Error, slave_dev is not running\n");
-#endif
+			printk(KERN_ERR DRV_NAME
+			       ": Error: %s is not running\n",
+			       slave_dev->name);
 			return -EINVAL;
 		}
 
 		if ((bond_mode == BOND_MODE_8023AD) ||
 		    (bond_mode == BOND_MODE_TLB) ||
 		    (bond_mode == BOND_MODE_ALB)) {
-			printk(KERN_ERR
-			       "bonding: Error: to use %s mode, you must "
-			       "upgrade ifenslave.\n", bond_mode_name());
+			printk(KERN_ERR DRV_NAME
+			       ": Error: to use %s mode, you must upgrade "
+			       "ifenslave.\n",
+			       bond_mode_name());
 			return -EOPNOTSUPP;
 		}
 	}
@@ -1439,9 +1421,7 @@ static int bond_enslave(struct net_device *master_dev,
 			addr.sa_family = slave_dev->type;
 			err = slave_dev->set_mac_address(slave_dev, &addr);
 			if (err) {
-#ifdef BONDING_DEBUG
-				printk(KERN_CRIT "Error %d calling set_mac_address\n", err);
-#endif
+				dprintk("Error %d calling set_mac_address\n", err);
 				goto err_free;
 			}
 		}
@@ -1449,18 +1429,14 @@ static int bond_enslave(struct net_device *master_dev,
 		/* open the slave since the application closed it */
 		err = dev_open(slave_dev);
 		if (err) {
-#ifdef BONDING_DEBUG
-			printk(KERN_CRIT "Openning slave %s failed\n", slave_dev->name);
-#endif
+			dprintk("Openning slave %s failed\n", slave_dev->name);
 			goto err_restore_mac;
 		}
 	}
 
 	err = netdev_set_master(slave_dev, master_dev);
 	if (err) {
-#ifdef BONDING_DEBUG
-		printk(KERN_CRIT "Error %d calling netdev_set_master\n", err);
-#endif
+		dprintk("Error %d calling netdev_set_master\n", err);
 		if (app_abi_ver < 1) {
 			goto err_free;
 		} else {
@@ -1529,21 +1505,21 @@ static int bond_enslave(struct net_device *master_dev,
 			 * supported); thus, we don't need to change
 			 * the messages for netif_carrier.
 			 */ 
-			printk(KERN_ERR
-				"bond_enslave(): MII and ETHTOOL support not "
-				"available for interface %s, and "
-				"arp_interval/arp_ip_target module parameters "
-		       		"not specified, thus bonding will not detect "
-				"link failures! see bonding.txt for details.\n",
-		       		slave_dev->name);
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: MII and ETHTOOL support not "
+			       "available for interface %s, and "
+			       "arp_interval/arp_ip_target module parameters "
+			       "not specified, thus bonding will not detect "
+			       "link failures! see bonding.txt for details.\n",
+			       slave_dev->name);
 		} else if (link_reporting == -1) {
-			/* unable  get link status using mii/ethtool */
-			printk(KERN_WARNING 
-			       "bond_enslave: can't get link status from "
+			/* unable get link status using mii/ethtool */
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: can't get link status from "
 			       "interface %s; the network driver associated "
-			       "with this interface does not support "
-			       "MII or ETHTOOL link status reporting, thus "
-			       "miimon has no effect on this interface.\n", 
+			       "with this interface does not support MII or "
+			       "ETHTOOL link status reporting, thus miimon "
+			       "has no effect on this interface.\n", 
 			       slave_dev->name);
 		}
 	}
@@ -1552,41 +1528,36 @@ static int bond_enslave(struct net_device *master_dev,
 	if ((miimon <= 0) ||
 	    (bond_check_dev_link(slave_dev, 0) == BMSR_LSTATUS)) {
 		if (updelay) {
-#ifdef BONDING_DEBUG
-			printk(KERN_CRIT "Initial state of slave_dev is "
-			       "BOND_LINK_BACK\n");
-#endif
+			dprintk("Initial state of slave_dev is "
+				"BOND_LINK_BACK\n");
 			new_slave->link  = BOND_LINK_BACK;
 			new_slave->delay = updelay;
 		}
 		else {
-#ifdef BONDING_DEBUG
-			printk(KERN_DEBUG "Initial state of slave_dev is "
+			dprintk("Initial state of slave_dev is "
 				"BOND_LINK_UP\n");
-#endif
 			new_slave->link  = BOND_LINK_UP;
 		}
 		new_slave->jiffies = jiffies;
 	}
 	else {
-#ifdef BONDING_DEBUG
-		printk(KERN_CRIT "Initial state of slave_dev is "
+		dprintk("Initial state of slave_dev is "
 			"BOND_LINK_DOWN\n");
-#endif
 		new_slave->link  = BOND_LINK_DOWN;
 	}
 
 	if (bond_update_speed_duplex(new_slave) &&
 	    (new_slave->link != BOND_LINK_DOWN)) {
 
-		printk(KERN_WARNING
-		       "bond_enslave(): failed to get speed/duplex from %s, "
-		       "speed forced to 100Mbps, duplex forced to Full.\n",
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: failed to get speed/duplex from %s, speed "
+		       "forced to 100Mbps, duplex forced to Full.\n",
 		       new_slave->dev->name);
 		if (bond_mode == BOND_MODE_8023AD) {
 			printk(KERN_WARNING
-			       "Operation of 802.3ad mode requires ETHTOOL support "
-			       "in base driver for proper aggregator selection.\n");
+			       "Operation of 802.3ad mode requires ETHTOOL "
+			       "support in base driver for proper aggregator "
+			       "selection.\n");
 		}
 	}
 
@@ -1601,17 +1572,13 @@ static int bond_enslave(struct net_device *master_dev,
 		if (((bond->current_slave == NULL)
 			|| (bond->current_slave->dev->flags & IFF_NOARP))
 			&& (new_slave->link != BOND_LINK_DOWN)) {
-#ifdef BONDING_DEBUG
-			printk(KERN_CRIT "This is the first active slave\n");
-#endif
+			dprintk("This is the first active slave\n");
 			/* first slave or no active slave yet, and this link
 			   is OK, so make this interface the active one */
 			change_active_interface(bond, new_slave);
 		}
 		else {
-#ifdef BONDING_DEBUG
-			printk(KERN_CRIT "This is just a backup slave\n");
-#endif
+			dprintk("This is just a backup slave\n");
 			bond_set_slave_inactive_flags(new_slave);
 		}
 		if (((struct in_device *)slave_dev->ip_ptr) != NULL) {
@@ -1666,9 +1633,7 @@ static int bond_enslave(struct net_device *master_dev,
 			}
 		}
 	} else {
-#ifdef BONDING_DEBUG
-		printk(KERN_CRIT "This slave is always active in trunk mode\n");
-#endif
+		dprintk("This slave is always active in trunk mode\n");
 		/* always active in trunk mode */
 		new_slave->state = BOND_STATE_ACTIVE;
 
@@ -1693,15 +1658,11 @@ static int bond_enslave(struct net_device *master_dev,
 		int ndx = 0;
 
 		for (ndx = 0; ndx < slave_dev->addr_len; ndx++) {
-#ifdef BONDING_DEBUG
-			printk(KERN_DEBUG
-			       "Checking ndx=%d of master_dev->dev_addr\n", ndx);
-#endif
+			dprintk("Checking ndx=%d of master_dev->dev_addr\n",
+				ndx);
 			if (master_dev->dev_addr[ndx] != 0) {
-#ifdef BONDING_DEBUG
-				printk(KERN_DEBUG
-				       "Found non-zero byte at ndx=%d\n", ndx);
-#endif
+				dprintk("Found non-zero byte at ndx=%d\n",
+					ndx);
 				break;
 			}
 		}
@@ -1710,20 +1671,19 @@ static int bond_enslave(struct net_device *master_dev,
 			 * We got all the way through the address and it was
 			 * all 0's.
 			 */
-#ifdef BONDING_DEBUG
-			printk(KERN_DEBUG "%s doesn't have a MAC address yet.  ",
-			       master_dev->name);
-			printk(KERN_DEBUG "Going to give assign it from %s.\n",
-			       slave_dev->name);
-#endif
+			dprintk("%s doesn't have a MAC address yet.  ",
+				master_dev->name);
+			dprintk("Going to give assign it from %s.\n",
+				slave_dev->name);
 			bond_sethwaddr(master_dev, slave_dev);
 		}
 	}
 
-	printk (KERN_INFO "%s: enslaving %s as a%s interface with a%s link.\n",
-		master_dev->name, slave_dev->name,
-		new_slave->state == BOND_STATE_ACTIVE ? "n active" : " backup",
-		new_slave->link != BOND_LINK_DOWN ? "n up" : " down");
+	printk(KERN_INFO DRV_NAME
+	       ": %s: enslaving %s as a%s interface with a%s link.\n",
+	       master_dev->name, slave_dev->name,
+	       new_slave->state == BOND_STATE_ACTIVE ? "n active" : " backup",
+	       new_slave->link != BOND_LINK_DOWN ? "n up" : " down");
 
 	/* enslave is successful */
 	return 0;
@@ -1888,11 +1848,11 @@ static void change_active_interface(struct bonding *bond, struct slave *new)
 	if (new) {
 		if (new->link == BOND_LINK_BACK) {
 			if (USES_PRIMARY(bond_mode)) {
-				printk (KERN_INFO
-					"%s: making interface %s the new "
-					"active one %d ms earlier.\n",
-					bond->device->name, new->dev->name,
-					(updelay - new->delay) * miimon);
+				printk(KERN_INFO DRV_NAME
+				       ": %s: making interface %s the new "
+				       "active one %d ms earlier.\n",
+				       bond->device->name, new->dev->name,
+				       (updelay - new->delay) * miimon);
 			}
 
 			new->delay = 0;
@@ -1909,9 +1869,10 @@ static void change_active_interface(struct bonding *bond, struct slave *new)
 			}
 		} else {
 			if (USES_PRIMARY(bond_mode)) {
-				printk (KERN_INFO
-					"%s: making interface %s the new active one.\n",
-					bond->device->name, new->dev->name);
+				printk(KERN_INFO DRV_NAME
+				       ": %s: making interface %s the new "
+				       "active one.\n",
+				       bond->device->name, new->dev->name);
 			}
 		}
 	}
@@ -1986,7 +1947,9 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 	/* master already enslaved, or slave not enslaved,
 	   or no slave for this master */
 	if ((master->flags & IFF_SLAVE) || !(slave->flags & IFF_SLAVE)) {
-		printk (KERN_DEBUG "%s: cannot release %s.\n", master->name, slave->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: %s: cannot release %s.\n",
+		       master->name, slave->name);
 		return -EINVAL;
 	}
 
@@ -2000,11 +1963,12 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 						 our_slave->perm_hwaddr,
 						 ETH_ALEN);
 			if (!mac_addr_differ && (bond->slave_cnt > 1)) {
-				printk(KERN_WARNING "WARNING: the permanent HWaddr of %s "
-				"- %02X:%02X:%02X:%02X:%02X:%02X - "
-				"is still in use by %s. Set the HWaddr "
-				"of %s to a different address "
-				"to avoid conflicts.\n",
+				printk(KERN_WARNING DRV_NAME
+				       ": Warning: the permanent HWaddr of %s "
+				       "- %02X:%02X:%02X:%02X:%02X:%02X - is "
+				       "still in use by %s. Set the HWaddr of "
+				       "%s to a different address to avoid "
+				       "conflicts.\n",
 				       slave->name,
 				       our_slave->perm_hwaddr[0],
 				       our_slave->perm_hwaddr[1],
@@ -2024,10 +1988,12 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 				bond_3ad_unbind_slave(our_slave);
 			}
 
-			printk (KERN_INFO "%s: releasing %s interface %s\n",
-				master->name,
-				(our_slave->state == BOND_STATE_ACTIVE) ? "active" : "backup",
-				slave->name);
+			printk(KERN_INFO DRV_NAME
+			       ": %s: releasing %s interface %s\n",
+			       master->name,
+			       (our_slave->state == BOND_STATE_ACTIVE)
+			       ? "active" : "backup",
+			       slave->name);
 
 			/* release the slave from its bond */
 			bond_detach_slave(bond, our_slave);
@@ -2042,9 +2008,10 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 			}
 
 			if (bond->current_slave == NULL) {
-				printk(KERN_INFO
-					"%s: now running without any active interface !\n",
-					master->name);
+				printk(KERN_INFO DRV_NAME
+				       ": %s: now running without any active "
+				       "interface !\n",
+				       master->name);
 			}
 
 			if ((bond_mode == BOND_MODE_TLB) ||
@@ -2064,7 +2031,9 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 	
 	if (our_slave == (slave_t *)bond) {
 		/* if we get here, it's because the device was not found */
-		printk (KERN_INFO "%s: %s not enslaved\n", master->name, slave->name);
+		printk(KERN_INFO DRV_NAME
+		       ": %s: %s not enslaved\n",
+		       master->name, slave->name);
 		return -EINVAL;
 	}
 
@@ -2226,7 +2195,9 @@ static int bond_release_all(struct net_device *master)
 	 */
 	memset(master->dev_addr, 0, master->addr_len);
 
-	printk (KERN_INFO "%s: released all slaves\n", master->name);
+	printk(KERN_INFO DRV_NAME
+	       ": %s: released all slaves\n",
+	       master->name);
 
 out:
 	write_unlock_bh(&bond->lock);
@@ -2277,19 +2248,20 @@ static void bond_mii_monitor(struct net_device *master)
 					slave->link_failure_count++;
 				}
 				if (downdelay > 0) {
-					printk (KERN_INFO
-						"%s: link status down for %sinterface "
-						"%s, disabling it in %d ms.\n",
-						master->name,
-						IS_UP(dev)
-						? ((bond_mode == BOND_MODE_ACTIVEBACKUP)
-						   ? ((slave == oldcurrent)
-						      ? "active " : "backup ")
-						   : "")
-						: "idle ",
-						dev->name,
-						downdelay * miimon);
-					}
+					printk(KERN_INFO DRV_NAME
+					       ": %s: link status down for %s "
+					       "interface %s, disabling it in "
+					       "%d ms.\n",
+					       master->name,
+					       IS_UP(dev)
+					       ? ((bond_mode == BOND_MODE_ACTIVEBACKUP)
+						  ? ((slave == oldcurrent)
+						     ? "active " : "backup ")
+						  : "")
+					       : "idle ",
+					       dev->name,
+					       downdelay * miimon);
+				}
 			}
 			/* no break ! fall through the BOND_LINK_FAIL test to
 			   ensure proper action to be taken
@@ -2308,11 +2280,12 @@ static void bond_mii_monitor(struct net_device *master)
 						bond_set_slave_inactive_flags(slave);
 					}
 
-					printk(KERN_INFO
-						"%s: link status definitely down "
-						"for interface %s, disabling it",
-						master->name,
-						dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: link status definitely "
+					       "down for interface %s, "
+					       "disabling it",
+					       master->name,
+					       dev->name);
 
 					/* notify ad that the link status has changed */
 					if (bond_mode == BOND_MODE_8023AD) {
@@ -2336,12 +2309,12 @@ static void bond_mii_monitor(struct net_device *master)
 				/* link up again */
 				slave->link  = BOND_LINK_UP;
 				slave->jiffies = jiffies;
-				printk(KERN_INFO
-					"%s: link status up again after %d ms "
-					"for interface %s.\n",
-					master->name,
-					(downdelay - slave->delay) * miimon,
-					dev->name);
+				printk(KERN_INFO DRV_NAME
+				       ": %s: link status up again after %d "
+				       "ms for interface %s.\n",
+				       master->name,
+				       (downdelay - slave->delay) * miimon,
+				       dev->name);
 			}
 			break;
 		case BOND_LINK_DOWN:	/* the link was down */
@@ -2355,12 +2328,13 @@ static void bond_mii_monitor(struct net_device *master)
 				if (updelay > 0) {
 					/* if updelay == 0, no need to
 					   advertise about a 0 ms delay */
-					printk (KERN_INFO
-						"%s: link status up for interface"
-						" %s, enabling it in %d ms.\n",
-						master->name,
-						dev->name,
-						updelay * miimon);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: link status up for "
+					       "interface %s, enabling it "
+					       "in %d ms.\n",
+					       master->name,
+					       dev->name,
+					       updelay * miimon);
 				}
 			}
 			/* no break ! fall through the BOND_LINK_BACK state in
@@ -2370,12 +2344,12 @@ static void bond_mii_monitor(struct net_device *master)
 			if (link_state != BMSR_LSTATUS) {
 				/* link down again */
 				slave->link  = BOND_LINK_DOWN;
-				printk(KERN_INFO
-					"%s: link status down again after %d ms "
-					"for interface %s.\n",
-					master->name,
-					(updelay - slave->delay) * miimon,
-					dev->name);
+				printk(KERN_INFO DRV_NAME
+				       ": %s: link status down again after %d "
+				       "ms for interface %s.\n",
+				       master->name,
+				       (updelay - slave->delay) * miimon,
+				       dev->name);
 			} else {
 				/* link stays up */
 				if (slave->delay == 0) {
@@ -2395,11 +2369,11 @@ static void bond_mii_monitor(struct net_device *master)
 						slave->state = BOND_STATE_BACKUP;
 					}
 
-					printk(KERN_INFO
-						"%s: link status definitely up "
-						"for interface %s.\n",
-						master->name,
-						dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: link status definitely "
+					       "up for interface %s.\n",
+					       master->name,
+					       dev->name);
 	
 					/* notify ad that the link status has changed */
 					if (bond_mode == BOND_MODE_8023AD) {
@@ -2440,9 +2414,10 @@ static void bond_mii_monitor(struct net_device *master)
 
 		reselect_active_interface(bond);
 		if (oldcurrent && !bond->current_slave) {
-			printk(KERN_INFO
-				"%s: now running without any active interface !\n",
-				master->name);
+			printk(KERN_INFO DRV_NAME
+			       ": %s: now running without any active "
+			       "interface !\n",
+			       master->name);
 		}
 
 		write_unlock(&bond->ptrlock);
@@ -2521,17 +2496,17 @@ static void loadbalance_arp_monitor(struct net_device *master)
 				 * is closed.
 				 */
 				if (oldcurrent == NULL) {
-					printk(KERN_INFO
-						"%s: link status definitely up "
-						"for interface %s, ",
-						master->name,
-						slave->dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: link status definitely "
+					       "up for interface %s, ",
+					       master->name,
+					       slave->dev->name);
 					do_failover = 1;
 				} else {
-					printk(KERN_INFO
-						"%s: interface %s is now up\n",
-						master->name,
-						slave->dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: interface %s is now up\n",
+					       master->name,
+					       slave->dev->name);
 				}
 			} 
 		} else {
@@ -2550,8 +2525,8 @@ static void loadbalance_arp_monitor(struct net_device *master)
 				if (slave->link_failure_count < UINT_MAX) {
 					slave->link_failure_count++;
 				}
-				printk(KERN_INFO
-				       "%s: interface %s is now down.\n",
+				printk(KERN_INFO DRV_NAME
+				       ": %s: interface %s is now down.\n",
 				       master->name,
 				       slave->dev->name);
 
@@ -2578,9 +2553,10 @@ static void loadbalance_arp_monitor(struct net_device *master)
 
 		reselect_active_interface(bond);
 		if (oldcurrent && !bond->current_slave) {
-			printk(KERN_INFO
-				"%s: now running without any active interface !\n",
-				master->name);
+			printk(KERN_INFO DRV_NAME
+			       ": %s: now running without any active "
+			       "interface !\n",
+			       master->name);
 		}
 
 		write_unlock(&bond->ptrlock);
@@ -2660,17 +2636,17 @@ static void activebackup_arp_monitor(struct net_device *master)
 				}
 
 				if (slave == bond->current_slave) {
-					printk(KERN_INFO
-						"%s: %s is up and now the "
-						"active interface\n",
-						master->name,
-						slave->dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: %s is up and now the "
+					       "active interface\n",
+					       master->name,
+					       slave->dev->name);
 				} else {
-					printk(KERN_INFO
-						"%s: backup interface %s is "
-						"now up\n",
-						master->name,
-						slave->dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: backup interface %s is "
+					       "now up\n",
+					       master->name,
+					       slave->dev->name);
 				}
 
 				write_unlock(&bond->ptrlock);
@@ -2697,10 +2673,10 @@ static void activebackup_arp_monitor(struct net_device *master)
 					slave->link_failure_count++;
 				}
 				bond_set_slave_inactive_flags(slave);
-				printk(KERN_INFO
-					"%s: backup interface %s is now down\n",
-					master->name,
-					slave->dev->name);
+				printk(KERN_INFO DRV_NAME
+				       ": %s: backup interface %s is now down\n",
+				       master->name,
+				       slave->dev->name);
 			} else {
 				read_unlock(&bond->ptrlock);
 			}
@@ -2731,8 +2707,9 @@ static void activebackup_arp_monitor(struct net_device *master)
 			if (slave->link_failure_count < UINT_MAX) {
 				slave->link_failure_count++;
 			}
-			printk(KERN_INFO "%s: link status down for "
-					 "active interface %s, disabling it",
+			printk(KERN_INFO DRV_NAME
+			       ": %s: link status down for active interface "
+			       "%s, disabling it",
 			       master->name,
 			       slave->dev->name);
 			write_lock(&bond->ptrlock);
@@ -2748,8 +2725,8 @@ static void activebackup_arp_monitor(struct net_device *master)
 			   (bond->primary_slave != slave) && 
 			   (bond->primary_slave->link == BOND_LINK_UP)) {
 			/* at this point, slave is the current_slave */
-			printk(KERN_INFO 
-			       "%s: changing from interface %s to primary "
+			printk(KERN_INFO DRV_NAME
+			       ": %s: changing from interface %s to primary "
 			       "interface %s\n",
 			       master->name, 
 			       slave->dev->name, 
@@ -2814,11 +2791,11 @@ static void activebackup_arp_monitor(struct net_device *master)
 					}
 
 					bond_set_slave_inactive_flags(slave);
-					printk(KERN_INFO
-						"%s: backup interface "
-						"%s is now down.\n",
-						master->name,
-						slave->dev->name);
+					printk(KERN_INFO DRV_NAME
+					       ": %s: backup interface %s is "
+					       "now down.\n",
+					       master->name,
+					       slave->dev->name);
 				}
 			} while ((slave = slave->next) != 
 					bond->current_arp_slave->next);
@@ -2831,11 +2808,9 @@ static void activebackup_arp_monitor(struct net_device *master)
 
 static int bond_sethwaddr(struct net_device *master, struct net_device *slave)
 {
-#ifdef BONDING_DEBUG
-	printk(KERN_CRIT "bond_sethwaddr: master=%x\n", (unsigned int)master);
-	printk(KERN_CRIT "bond_sethwaddr: slave=%x\n", (unsigned int)slave);
-	printk(KERN_CRIT "bond_sethwaddr: slave->addr_len=%d\n", slave->addr_len);
-#endif
+	dprintk("master=%p\n", master);
+	dprintk("slave=%p\n", slave);
+	dprintk("slave->addr_len=%d\n", slave->addr_len);
 	memcpy(master->dev_addr, slave->dev_addr, slave->addr_len);
 	return 0;
 }
@@ -2913,9 +2888,9 @@ static int bond_ethtool_ioctl(struct net_device *master_dev, struct ifreq *ifr)
 				new_abi_ver = simple_strtoul(info.fw_version,
 						             &endptr, 0);
 				if (*endptr) {
-					printk(KERN_ERR
-					       "bonding: Error: got invalid ABI"
-					       " version from application\n");
+					printk(KERN_ERR DRV_NAME
+					       ": Error: got invalid ABI "
+					       "version from application\n");
 
 					return -EINVAL;
 				}
@@ -2951,10 +2926,8 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 	int prev_abi_ver = orig_app_abi_ver;
 	int ret = 0;
 
-#ifdef BONDING_DEBUG
-	printk(KERN_INFO "bond_ioctl: master=%s, cmd=%d\n", 
+	dprintk("bond_ioctl: master=%s, cmd=%d\n", 
 		master_dev->name, cmd);
-#endif
 
 	switch (cmd) {
 	case SIOCETHTOOL:
@@ -3020,24 +2993,22 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 		orig_app_abi_ver = app_abi_ver;
 
 	} else if (orig_app_abi_ver != app_abi_ver) {
-		printk(KERN_ERR
-		       "bonding: Error: already using ifenslave ABI "
-		       "version %d; to upgrade ifenslave to version %d, "
-		       "you must first reload bonding.\n",
+		printk(KERN_ERR DRV_NAME
+		       ": Error: already using ifenslave ABI version %d; to "
+		       "upgrade ifenslave to version %d, you must first "
+		       "reload bonding.\n",
 		       orig_app_abi_ver, app_abi_ver);
 		return -EINVAL;
 	}
 
 	slave_dev = dev_get_by_name(ifr->ifr_slave);
 
-#ifdef BONDING_DEBUG
-	printk(KERN_INFO "slave_dev=%x: \n", (unsigned int)slave_dev);
-	printk(KERN_INFO "slave_dev->name=%s: \n", slave_dev->name);
-#endif
+	dprintk("slave_dev=%p: \n", slave_dev);
 
 	if (slave_dev == NULL) {
 		ret = -ENODEV;
 	} else {
+		dprintk("slave_dev->name=%s: \n", slave_dev->name);
 		switch (cmd) {
 		case BOND_ENSLAVE_OLD:
 		case SIOCBONDENSLAVE:		
@@ -3118,7 +3089,9 @@ static int bond_xmit_broadcast(struct sk_buff *skb, struct net_device *dev)
 			if (device_we_should_send_to) {
 				struct sk_buff *skb2;
 				if ((skb2 = skb_clone(skb, GFP_ATOMIC)) == NULL) {
-					printk(KERN_ERR "bond_xmit_broadcast: skb_clone() failed\n");
+					printk(KERN_ERR DRV_NAME
+					       ": Error: bond_xmit_broadcast(): "
+					       "skb_clone() failed\n");
 					continue;
 				}
 
@@ -3308,9 +3281,7 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	/* no suitable interface, frame not sent */
-#ifdef BONDING_DEBUG
-	printk(KERN_INFO "There was no suitable interface, so we don't transmit\n");
-#endif
+	dprintk("There was no suitable interface, so we don't transmit\n");
 	dev_kfree_skb(skb);
 	read_unlock(&bond->lock);
 	return 0;
@@ -3551,9 +3522,9 @@ static int bond_create_proc_info(struct bonding *bond)
 							 S_IRUGO, 
 							 bond_proc_dir);
 		if (bond->bond_proc_file == NULL) {
-			printk(KERN_WARNING
-			       "%s: Cannot create /proc/net/bonding/%s\n", 
-			       dev->name, dev->name);
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: Cannot create /proc/net/bonding/%s\n",
+			       dev->name);
 		} else {
 			bond->bond_proc_file->data = bond;
 			bond->bond_proc_file->proc_fops = &bond_info_fops;
@@ -3646,8 +3617,7 @@ bond_set_mac_address(struct net_device *dev, void *addr)
 	struct slave *slave;
 	int error;
 
-	dprintk(KERN_INFO "bond_set_mac_address %p %s\n", dev,
-	       dev->name);
+	dprintk("bond=%p, name=%s\n", bond, (bond_dev ? bond_dev->name : "None"));
 
 	if (!is_valid_ether_addr(sa->sa_data)) {
 		return -EADDRNOTAVAIL;
@@ -3655,12 +3625,10 @@ bond_set_mac_address(struct net_device *dev, void *addr)
 
 	for (slave = bond->prev; slave != (struct slave *)bond;
 	     slave = slave->prev) {
-		dprintk(KERN_INFO "bond_set_mac: slave %p %s\n", slave,
-			slave->dev->name);
+		dprintk("slave %p %s\n", slave, slave->dev->name);
 		if (slave->dev->set_mac_address == NULL) {
 			error = -EOPNOTSUPP;
-			dprintk(KERN_INFO "bond_set_mac EOPNOTSUPP %s\n",
-				slave->dev->name);
+			dprintk("EOPNOTSUPP %s\n", slave->dev->name);
 			goto unwind;
 		}
 
@@ -3672,8 +3640,7 @@ bond_set_mac_address(struct net_device *dev, void *addr)
 			 * breakage anyway until ARP finish
 			 * updating, so...
 			 */
-			dprintk(KERN_INFO "bond_set_mac err %d %s\n",
-				error, slave->dev->name);
+			dprintk("err %d %s\n", error, slave->dev->name);
 			goto unwind;
 		}
 	}
@@ -3692,9 +3659,8 @@ unwind:
 
 		tmp_error = slave->dev->set_mac_address(slave->dev, &tmp_sa);
 		if (tmp_error) {
-			dprintk(KERN_INFO "bond_set_mac_address: "
-				"unwind err %d dev %s\n",
-				tmp_error, slave->dev->name);
+			dprintk("unwind err %d dev %s\n", tmp_error,
+				slave->dev->name);
 		}
 	}
 
@@ -3711,10 +3677,12 @@ bond_change_mtu(struct net_device *dev, int newmtu)
 	slave_t *slave;
 	int error;
 
-	dprintk(KERN_INFO "CM: b %p nm %d\n", bond, newmtu);
+	dprintk("bond=%p, name=%s, new_mtu=%d\n", bond,
+		(bond_dev ? bond_dev->name : "None"), new_mtu);
+
 	for (slave = bond->prev; slave != (slave_t *)bond;
 	     slave = slave->prev) {
-		dprintk(KERN_INFO "CM: s %p s->p %p c_m %p\n", slave,
+		dprintk("s %p s->p %p c_m %p\n", slave,
 			slave->prev, slave->dev->change_mtu);
 		if (slave->dev->change_mtu) {
 			error = slave->dev->change_mtu(slave->dev, newmtu);
@@ -3732,8 +3700,7 @@ bond_change_mtu(struct net_device *dev, int newmtu)
 			 * means changing their mtu from timer context, which
 			 * is probably not a good idea.
 			 */
-			dprintk(KERN_INFO "bond_change_mtu err %d %s\n",
-			       error, slave->dev->name);
+			dprintk("err %d %s\n", error, slave->dev->name);
 			goto unwind;
 		}
 	}
@@ -3861,8 +3828,7 @@ static int bond_netdev_event(struct notifier_block *this, unsigned long event, v
 	unsigned short flags;
 	int res = NOTIFY_DONE;
 
-	dprintk(KERN_INFO "bond_netdev_event n_b %p ev %lx ptr %p\n",
-		this, event, ptr);
+	dprintk("n_b %p ev %lx ptr %p\n", this, event, ptr);
 
 	flags = event_dev->flags & (IFF_MASTER | IFF_SLAVE);
 	switch (flags) {
@@ -3926,9 +3892,8 @@ static int __init bond_init(struct net_device *dev)
 	struct bonding *bond;
 	int count;
 
-#ifdef BONDING_DEBUG
-	printk (KERN_INFO "Begin bond_init for %s\n", dev->name);
-#endif
+	dprintk("Begin bond_init for %s\n", dev->name);
+
 	bond = dev->priv;
 
 	/* initialize rwlocks */
@@ -3966,7 +3931,9 @@ static int __init bond_init(struct net_device *dev)
 		dev->set_mac_address = bond_alb_set_mac_address;
 		break;
 	default:
-		printk(KERN_ERR "Unknown bonding mode %d\n", bond_mode);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: Unknown bonding mode %d\n",
+		       bond_mode);
 		return -EINVAL;
 	}
 
@@ -3982,7 +3949,7 @@ static int __init bond_init(struct net_device *dev)
 	dev->accept_fastpath = bond_accept_fastpath;
 #endif
 
-	printk(KERN_INFO "%s registered with", dev->name);
+	printk(KERN_INFO DRV_NAME ": %s registered with", dev->name);
 	if (miimon > 0) {
 		printk(" MII link monitoring set to %d ms", miimon);
 		updelay /= miimon;
@@ -3992,12 +3959,12 @@ static int __init bond_init(struct net_device *dev)
 	}
 	printk(", in %s mode.\n", bond_mode_name());
 
-	printk(KERN_INFO "%s registered with", dev->name);
+	printk(KERN_INFO DRV_NAME ": %s registered with", dev->name);
 	if (arp_interval > 0) {
-		printk(" ARP monitoring set to %d ms with %d target(s):", 
-			arp_interval, arp_ip_count);
+		printk(" ARP monitoring set to %d ms with %d target(s):",
+		       arp_interval, arp_ip_count);
 		for (count=0 ; count<arp_ip_count ; count++)
-                        printk (" %s", arp_ip_target[count]);
+			printk(" %s", arp_ip_target[count]);
 		printk("\n");
 	} else {
 		printk("out ARP monitoring\n");
@@ -4057,8 +4024,8 @@ static int __init bonding_init(void)
 	if (mode) {
 		bond_mode = bond_parse_parm(mode, bond_mode_tbl);
 		if (bond_mode == -1) {
-			printk(KERN_WARNING
-			       "bonding_init(): Invalid bonding mode \"%s\"\n",
+			printk(KERN_ERR DRV_NAME
+			       ": Error: Invalid bonding mode \"%s\"\n",
 			       mode == NULL ? "NULL" : mode);
 			return -EINVAL;
 		}
@@ -4073,8 +4040,8 @@ static int __init bonding_init(void)
 	if (multicast) {
 		multicast_mode = bond_parse_parm(multicast, bond_mc_tbl);
 		if (multicast_mode == -1) {
-			printk(KERN_WARNING 
-		       "bonding_init(): Invalid multicast mode \"%s\"\n",
+			printk(KERN_ERR DRV_NAME
+			       ": Error: Invalid multicast mode \"%s\"\n",
 			       multicast == NULL ? "NULL" : multicast);
 			return -EINVAL;
 		}
@@ -4082,15 +4049,14 @@ static int __init bonding_init(void)
 
 	if (lacp_rate) {
 		if (bond_mode != BOND_MODE_8023AD) {
-			printk(KERN_WARNING
-			       "lacp_rate param is irrelevant in mode %s\n",
+			printk(KERN_INFO DRV_NAME
+			       ": lacp_rate param is irrelevant in mode %s\n",
 			       bond_mode_name());
 		} else {
 			lacp_fast = bond_parse_parm(lacp_rate, bond_lacp_tbl);
 			if (lacp_fast == -1) {
-				printk(KERN_WARNING
-			       	       "bonding_init(): Invalid lacp rate "
-				       "\"%s\"\n",
+				printk(KERN_ERR DRV_NAME
+				       ": Error: Invalid lacp rate \"%s\"\n",
 				       lacp_rate == NULL ? "NULL" : lacp_rate);
 
 				return -EINVAL;
@@ -4099,32 +4065,32 @@ static int __init bonding_init(void)
 	}
 
 	if (max_bonds < 1 || max_bonds > INT_MAX) {
-		printk(KERN_WARNING 
-		       "bonding_init(): max_bonds (%d) not in range %d-%d, "
-		       "so it was reset to BOND_DEFAULT_MAX_BONDS (%d)",
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: max_bonds (%d) not in range %d-%d, so it "
+		       "was reset to BOND_DEFAULT_MAX_BONDS (%d)",
 		       max_bonds, 1, INT_MAX, BOND_DEFAULT_MAX_BONDS);
 		max_bonds = BOND_DEFAULT_MAX_BONDS;
 	}
 
 	if (miimon < 0) {
-		printk(KERN_WARNING 
-		       "bonding_init(): miimon module parameter (%d), "
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: miimon module parameter (%d), "
 		       "not in range 0-%d, so it was reset to %d\n",
 		       miimon, INT_MAX, BOND_LINK_MON_INTERV);
 		miimon = BOND_LINK_MON_INTERV;
 	}
 
 	if (updelay < 0) {
-		printk(KERN_WARNING 
-		       "bonding_init(): updelay module parameter (%d), "
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: updelay module parameter (%d), "
 		       "not in range 0-%d, so it was reset to 0\n",
 		       updelay, INT_MAX);
 		updelay = 0;
 	}
 
 	if (downdelay < 0) {
-		printk(KERN_WARNING 
-		       "bonding_init(): downdelay module parameter (%d), "
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: downdelay module parameter (%d), "
 		       "not in range 0-%d, so it was reset to 0\n",
 		       downdelay, INT_MAX);
 		downdelay = 0;
@@ -4133,27 +4099,28 @@ static int __init bonding_init(void)
 	/* reset values for 802.3ad */
 	if (bond_mode == BOND_MODE_8023AD) {
 		if (arp_interval != 0) {
-			printk(KERN_WARNING "bonding_init(): ARP monitoring"
-			       "can't be used simultaneously with 802.3ad, "
-			       "disabling ARP monitoring\n");
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: ARP monitoring can't be used "
+			       "simultaneously with 802.3ad, disabling ARP "
+			       "monitoring\n");
 			arp_interval = 0;
 		}
 
 		if (miimon == 0) {
-			printk(KERN_ERR
-			       "bonding_init(): miimon must be specified, "
-			       "otherwise bonding will not detect link failure, "
-			       "speed and duplex which are essential "
-			       "for 802.3ad operation\n");
-			printk(KERN_ERR "Forcing miimon to 100msec\n");
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: miimon must be specified, "
+			       "otherwise bonding will not detect link "
+			       "failure, speed and duplex which are "
+			       "essential for 802.3ad operation\n");
+			printk(KERN_WARNING "Forcing miimon to 100msec\n");
 			miimon = 100;
 		}
 
 		if (multicast_mode != BOND_MULTICAST_ALL) {
-			printk(KERN_ERR
-			       "bonding_init(): Multicast mode must "
-			       "be set to ALL for 802.3ad\n");
-			printk(KERN_ERR "Forcing Multicast mode to ALL\n");
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: Multicast mode must be set to ALL "
+			       "for 802.3ad\n");
+			printk(KERN_WARNING "Forcing Multicast mode to ALL\n");
 			multicast_mode = BOND_MULTICAST_ALL;
 		}
 	}
@@ -4162,30 +4129,33 @@ static int __init bonding_init(void)
 	if ((bond_mode == BOND_MODE_TLB) ||
 	    (bond_mode == BOND_MODE_ALB)) {
 		if (miimon == 0) {
-			printk(KERN_ERR
-			       "bonding_init(): miimon must be specified, "
-			       "otherwise bonding will not detect link failure "
-			       "and link speed which are essential "
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: miimon must be specified, "
+			       "otherwise bonding will not detect link "
+			       "failure and link speed which are essential "
 			       "for TLB/ALB load balancing\n");
-			printk(KERN_ERR "Forcing miimon to 100msec\n");
+			printk(KERN_WARNING "Forcing miimon to 100msec\n");
 			miimon = 100;
 		}
 
 		if (multicast_mode != BOND_MULTICAST_ACTIVE) {
-			printk(KERN_ERR
-			       "bonding_init(): Multicast mode must "
-			       "be set to ACTIVE for TLB/ALB\n");
-			printk(KERN_ERR "Forcing Multicast mode to ACTIVE\n");
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: Multicast mode must be set to "
+			       "ACTIVE for TLB/ALB\n");
+			printk(KERN_WARNING "Forcing Multicast mode to "
+			       "ACTIVE\n");
 			multicast_mode = BOND_MULTICAST_ACTIVE;
 		}
 	}
 
 	if (bond_mode == BOND_MODE_ALB) {
-		printk(KERN_INFO
-		       "In ALB mode you might experience client disconnections"
-		       " upon reconnection of a link if the bonding module"
-		       " updelay parameter (%d msec) is incompatible with the"
-		       " forwarding delay time of the switch\n", updelay);
+		printk(KERN_NOTICE DRV_NAME
+		       ": In ALB mode you might experience client "
+		       "disconnections upon reconnection of a link if the "
+		       "bonding module updelay parameter (%d msec) is "
+		       "incompatible with the forwarding delay time of the "
+		       "switch\n",
+		       updelay);
 	}
 
 	if (miimon == 0) {
@@ -4193,21 +4163,21 @@ static int __init bonding_init(void)
 			/* just warn the user the up/down delay will have
 			 * no effect since miimon is zero...
 			 */
-			printk(KERN_WARNING 
-		               "bonding_init(): miimon module parameter not "
-			       "set and updelay (%d) or downdelay (%d) module "
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: miimon module parameter not set "
+			       "and updelay (%d) or downdelay (%d) module "
 			       "parameter is set; updelay and downdelay have "
 			       "no effect unless miimon is set\n",
-		               updelay, downdelay);
+			       updelay, downdelay);
 		}
 	} else {
 		/* don't allow arp monitoring */
 		if (arp_interval != 0) {
-			printk(KERN_WARNING 
-		               "bonding_init(): miimon (%d) and arp_interval "
-			       "(%d) can't be used simultaneously, "
-			       "disabling ARP monitoring\n",
-		               miimon, arp_interval);
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: miimon (%d) and arp_interval (%d) "
+			       "can't be used simultaneously, disabling ARP "
+			       "monitoring\n",
+			       miimon, arp_interval);
 			arp_interval = 0;
 		}
 
@@ -4215,29 +4185,28 @@ static int __init bonding_init(void)
 			/* updelay will be rounded in bond_init() when it
 			 * is divided by miimon, we just inform user here
 			 */
-			printk(KERN_WARNING 
-		               "bonding_init(): updelay (%d) is not a multiple "
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: updelay (%d) is not a multiple "
 			       "of miimon (%d), updelay rounded to %d ms\n",
-		               updelay, miimon, (updelay / miimon) * miimon);
+			       updelay, miimon, (updelay / miimon) * miimon);
 		}
 
 		if ((downdelay % miimon) != 0) {
 			/* downdelay will be rounded in bond_init() when it
 			 * is divided by miimon, we just inform user here
 			 */
-			printk(KERN_WARNING 
-		               "bonding_init(): downdelay (%d) is not a "
-			       "multiple of miimon (%d), downdelay rounded "
-			       "to %d ms\n",
-		               downdelay, miimon, 
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: downdelay (%d) is not a multiple "
+			       "of miimon (%d), downdelay rounded to %d ms\n",
+			       downdelay, miimon, 
 			       (downdelay / miimon) * miimon);
 		}
 	}
 
 	if (arp_interval < 0) {
-		printk(KERN_WARNING 
-		       "bonding_init(): arp_interval module parameter (%d), "
-		       "not in range 0-%d, so it was reset to %d\n",
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: arp_interval module parameter (%d) "
+		       ", not in range 0-%d, so it was reset to %d\n",
 		       arp_interval, INT_MAX, BOND_LINK_ARP_INTERV);
 		arp_interval = BOND_LINK_ARP_INTERV;
 	}
@@ -4248,12 +4217,11 @@ static int __init bonding_init(void)
 		/* not complete check, but should be good enough to
 		   catch mistakes */
 		if (!isdigit(arp_ip_target[arp_ip_count][0])) { 
-                        printk(KERN_WARNING
-                               "bonding_init(): bad arp_ip_target module "
-                               "parameter (%s), ARP monitoring will not be "
-                               "performed\n",
-                               arp_ip_target[arp_ip_count]);
-                        arp_interval = 0;
+			printk(KERN_WARNING DRV_NAME
+			       ": Warning: bad arp_ip_target module parameter "
+			       "(%s), ARP monitoring will not be performed\n",
+			       arp_ip_target[arp_ip_count]);
+			arp_interval = 0;
 		} else { 
 			u32 ip = in_aton(arp_ip_target[arp_ip_count]); 
 			arp_target[arp_ip_count] = ip;
@@ -4263,9 +4231,9 @@ static int __init bonding_init(void)
 
 	if ( (arp_interval > 0) && (arp_ip_count==0)) {
 		/* don't allow arping if no arp_ip_target given... */
-		printk(KERN_WARNING 
-		       "bonding_init(): arp_interval module parameter "
-		       "(%d) specified without providing an arp_ip_target "
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: arp_interval module parameter (%d) "
+		       "specified without providing an arp_ip_target "
 		       "parameter, arp_interval was reset to 0\n",
 		       arp_interval);
 		arp_interval = 0;
@@ -4275,20 +4243,20 @@ static int __init bonding_init(void)
 		/* miimon and arp_interval not set, we need one so things
 		 * work as expected, see bonding.txt for details
 		 */
-		printk(KERN_ERR 
-		       "bonding_init(): either miimon or "
-		       "arp_interval and arp_ip_target module parameters "
-		       "must be specified, otherwise bonding will not detect "
-		       "link failures! see bonding.txt for details.\n");
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: either miimon or arp_interval and "
+		       "arp_ip_target module parameters must be specified, "
+		       "otherwise bonding will not detect link failures! see "
+		       "bonding.txt for details.\n");
 	}
 
 	if ((primary != NULL) && !USES_PRIMARY(bond_mode)) {
 		/* currently, using a primary only makes sense
 		 * in active backup, TLB or ALB modes
 		 */
-		printk(KERN_WARNING 
-		       "bonding_init(): %s primary device specified but has "
-		       "no effect in %s mode\n",
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: %s primary device specified but has no "
+		       "effect in %s mode\n",
 		       primary, bond_mode_name());
 		primary = NULL;
 	}

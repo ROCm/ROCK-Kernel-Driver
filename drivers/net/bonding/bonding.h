@@ -32,18 +32,17 @@
 #include "bond_3ad.h"
 #include "bond_alb.h"
 
+#define DRV_VERSION	"2.4.1"
+#define DRV_RELDATE	"September 15, 2003"
+#define DRV_NAME	"bonding"
+#define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
+
 #ifdef BONDING_DEBUG
-
-// use this like so: BOND_PRINT_DBG(("foo = %d, bar = %d", foo, bar));
-#define BOND_PRINT_DBG(X)                                     \
-do {                                                          \
-	printk(KERN_DEBUG "%s (%d)", __FUNCTION__, __LINE__); \
-	printk X;                                             \
-	printk("\n");                                         \
-} while(0)
-
+#define dprintk(fmt, args...) \
+	printk(KERN_DEBUG     \
+	       DRV_NAME ": %s() %d: " fmt, __FUNCTION__, __LINE__ , ## args )
 #else
-#define BOND_PRINT_DBG(X)
+#define dprintk(fmt, args...)
 #endif /* BONDING_DEBUG */
 
 #define IS_UP(dev)  ((((dev)->flags & (IFF_UP)) == (IFF_UP)) && \

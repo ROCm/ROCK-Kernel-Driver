@@ -30,6 +30,8 @@
  *	  handling required for ALB/TLB.
  */
 
+//#define BONDING_DEBUG 1
+
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -212,8 +214,9 @@ tlb_initialize(struct bonding *bond)
 
 	_lock_tx_hashtbl(bond);
 	if (bond_info->tx_hashtbl != NULL) {
-		printk (KERN_ERR "%s: TLB hash table is not NULL\n",
-			bond->device->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: %s: TLB hash table is not NULL\n",
+		       bond->device->name);
 		_unlock_tx_hashtbl(bond);
 		return -1;
 	}
@@ -221,8 +224,9 @@ tlb_initialize(struct bonding *bond)
 	size = TLB_HASH_TABLE_SIZE * sizeof(struct tlb_client_info);
 	bond_info->tx_hashtbl = kmalloc(size, GFP_KERNEL);
 	if (bond_info->tx_hashtbl == NULL) {
-		printk (KERN_ERR "%s: Failed to allocate TLB hash table\n",
-			bond->device->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: %s: Failed to allocate TLB hash table\n",
+		       bond->device->name);
 		_unlock_tx_hashtbl(bond);
 		return -1;
 	}
@@ -306,8 +310,9 @@ tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
 
 	hash_table = bond_info->tx_hashtbl;
 	if (hash_table == NULL) {
-		printk (KERN_ERR "%s: TLB hash table is NULL\n",
-			bond->device->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: %s: TLB hash table is NULL\n",
+		       bond->device->name);
 		_unlock_tx_hashtbl(bond);
 		return NULL;
 	}
@@ -403,19 +408,19 @@ rlb_arp_recv(struct sk_buff *skb,
 	}
 
 	if (!arp) {
-		printk(KERN_ERR "Packet has no ARP data\n");
+		dprintk("Packet has no ARP data\n");
 		goto out;
 	}
 
 	if (skb->len < sizeof(struct arp_pkt)) {
-		printk(KERN_ERR "Packet is too small to be an ARP\n");
+		dprintk("Packet is too small to be an ARP\n");
 		goto out;
 	}
 
 	if (arp->op_code == htons(ARPOP_REPLY)) {
 		/* update rx hash table for this ARP */
 		rlb_update_entry_from_arp(bond, arp);
-		BOND_PRINT_DBG(("Server received an ARP Reply from client"));
+		dprintk("Server received an ARP Reply from client\n");
 	}
 
 	ret = NET_RX_SUCCESS;
@@ -653,8 +658,9 @@ rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 		client_info = &(bond_info->rx_hashtbl[hash_index]);
 
 		if (!client_info->slave) {
-			printk(KERN_ERR "Bonding: Error: found a client with no"
-			       " channel in the client's hash table\n");
+			printk(KERN_ERR DRV_NAME
+			       ": Error: found a client with no channel in "
+			       "the client's hash table\n");
 			continue;
 		}
 		/*update all clients using this src_ip, that are not assigned
@@ -776,7 +782,7 @@ rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		if (tx_slave) {
 			memcpy(arp->mac_src,tx_slave->dev->dev_addr, ETH_ALEN);
 		}
-		BOND_PRINT_DBG(("Server sent ARP Reply packet"));
+		dprintk("Server sent ARP Reply packet\n");
 	} else if (arp->op_code == __constant_htons(ARPOP_REQUEST)) {
 
 		/* Create an entry in the rx_hashtbl for this client as a
@@ -797,7 +803,7 @@ rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		 * updated with their assigned mac.
 		 */
 		rlb_req_update_subnet_clients(bond, arp->ip_src);
-		BOND_PRINT_DBG(("Server sent ARP Request packet"));
+		dprintk("Server sent ARP Request packet\n");
 	}
 
 	return tx_slave;
@@ -860,8 +866,9 @@ rlb_initialize(struct bonding *bond)
 
 	_lock_rx_hashtbl(bond);
 	if (bond_info->rx_hashtbl != NULL) {
-		printk (KERN_ERR "%s: RLB hash table is not NULL\n",
-			bond->device->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: %s: RLB hash table is not NULL\n",
+		       bond->device->name);
 		_unlock_rx_hashtbl(bond);
 		return -1;
 	}
@@ -869,8 +876,9 @@ rlb_initialize(struct bonding *bond)
 	size = RLB_HASH_TABLE_SIZE * sizeof(struct rlb_client_info);
 	bond_info->rx_hashtbl = kmalloc(size, GFP_KERNEL);
 	if (bond_info->rx_hashtbl == NULL) {
-		printk (KERN_ERR "%s: Failed to allocate"
-			" RLB hash table\n", bond->device->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: %s: Failed to allocate RLB hash table\n",
+		       bond->device->name);
 		_unlock_rx_hashtbl(bond);
 		return -1;
 	}
@@ -968,12 +976,12 @@ alb_set_slave_mac_addr(struct slave *slave, u8 addr[], int hw)
 	memcpy(s_addr.sa_data, addr, dev->addr_len);
 	s_addr.sa_family = dev->type;
 	if (dev->set_mac_address(dev, &s_addr)) {
-		printk(KERN_DEBUG "bonding: Error: alb_set_slave_mac_addr:"
-				  " dev->set_mac_address of dev %s failed!"
-				  " ALB mode requires that the base driver"
-				  " support setting the hw address also when"
-				  " the network device's interface is open\n",
-				  dev->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: dev->set_mac_address of dev %s failed! ALB "
+		       "mode requires that the base driver support setting "
+		       "the hw address also when the network device's "
+		       "interface is open\n",
+		       dev->name);
 		return -EOPNOTSUPP;
 	}
 	return 0;
@@ -1124,9 +1132,10 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 			/* a slave was found that is using the mac address
 			 * of the new slave
 			 */
-			printk(KERN_ERR "bonding: Warning: the hw address "
-			       "of slave %s is not unique - cannot enslave it!"
-			       , slave->dev->name);
+			printk(KERN_ERR DRV_NAME
+			       ": Error: the hw address of slave %s is not "
+			       "unique - cannot enslave it!",
+			       slave->dev->name);
 			return -EINVAL;
 		}
 		return 0;
@@ -1161,16 +1170,16 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 		alb_set_slave_mac_addr(slave, tmp_slave1->perm_hwaddr,
 				       bond->alb_info.rlb_enabled);
 
-		printk(KERN_WARNING "bonding: Warning: the hw address "
-		       "of slave %s is in use by the bond; "
-		       "giving it the hw address of %s\n",
+		printk(KERN_WARNING DRV_NAME
+		       ": Warning: the hw address of slave %s is in use by "
+		       "the bond; giving it the hw address of %s\n",
 		       slave->dev->name, tmp_slave1->dev->name);
 	} else {
-		printk(KERN_CRIT "bonding: Error: the hw address "
-		       "of slave %s is in use by the bond; "
-		       "couldn't find a slave with a free hw "
-		       "address to give it (this should not have "
-		       "happened)\n", slave->dev->name);
+		printk(KERN_ERR DRV_NAME
+		       ": Error: the hw address of slave %s is in use by the "
+		       "bond; couldn't find a slave with a free hw address to "
+		       "give it (this should not have happened)\n",
+		       slave->dev->name);
 		return -EFAULT;
 	}
 
