@@ -233,7 +233,7 @@ need_resched:
 #endif
 
 /* Points to after the "sysenter" instruction in the vsyscall page */
-#define SYSENTER_RETURN 0xffffe00a
+#define SYSENTER_RETURN 0xffffe010
 
 	# sysenter call handler stub
 	ALIGN
