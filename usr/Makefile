@@ -3,7 +3,7 @@ obj-y := initramfs_data.o
 
 host-progs  := gen_init_cpio
 
-clean-files := initramfs_data.cpio.gz
+clean-files := initramfs_data.cpio.gz initramfs_data.S
 
 $(src)/initramfs_data.S: $(obj)/initramfs_data.cpio.gz
 	echo "	.section .init.ramfs,\"a\"" > $(src)/initramfs_data.S
