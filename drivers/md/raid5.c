@@ -460,6 +460,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			sb->working_disks--;
 			sb->failed_disks++;
 			mddev->sb_dirty = 1;
+			mddev->degraded++;
 			conf->working_disks--;
 			conf->failed_disks++;
 			printk (KERN_ALERT
@@ -1500,7 +1501,7 @@ static int run (mddev_t *mddev)
 	/*
 	 * 0 for a fully functional array, 1 for a degraded array.
 	 */
-	conf->failed_disks = conf->raid_disks - conf->working_disks;
+	mddev->degraded = conf->failed_disks = conf->raid_disks - conf->working_disks;
 	conf->mddev = mddev;
 	conf->chunk_size = sb->chunk_size;
 	conf->level = sb->level;
@@ -1523,12 +1524,12 @@ static int run (mddev_t *mddev)
 		printk(KERN_ERR "raid5: unsupported parity algorithm %d for md%d\n", conf->algorithm, mdidx(mddev));
 		goto abort;
 	}
-	if (conf->failed_disks > 1) {
+	if (mddev->degraded > 1) {
 		printk(KERN_ERR "raid5: not enough operational devices for md%d (%d/%d failed)\n", mdidx(mddev), conf->failed_disks, conf->raid_disks);
 		goto abort;
 	}
 
-	if (conf->failed_disks == 1 &&
+	if (mddev->degraded == 1 &&
 	    !(sb->state & (1<<MD_SB_CLEAN))) {
 		printk(KERN_ERR "raid5: cannot start dirty degraded array for md%d\n", mdidx(mddev));
 		goto abort;
@@ -1783,6 +1784,7 @@ static int raid5_spare_active(mddev_t *mddev)
 	 * non-operational disk slot in the 'low' area of
 	 * the disk array.
 	 */
+	mddev->degraded--;
 	conf->failed_disks--;
 	conf->working_disks++;
 	conf->spare = NULL;

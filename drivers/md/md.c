@@ -3354,7 +3354,7 @@ void md_do_recovery(void *data)
 			wake_up(&resync_wait);
 		}
 
-		if (sb->active_disks < sb->raid_disks) {
+		if (mddev->degraded) {
 			mddev->spare = get_spare(mddev);
 			if (!mddev->spare)
 				printk(KERN_ERR "md%d: no spare disk to reconstruct array! "

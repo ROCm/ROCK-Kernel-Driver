@@ -581,8 +581,10 @@ static void mark_disk_bad(mddev_t *mddev, int failed)
 	mark_disk_faulty(sb->disks+mirror->number);
 	mark_disk_nonsync(sb->disks+mirror->number);
 	mark_disk_inactive(sb->disks+mirror->number);
-	if (!mirror->write_only)
+	if (!mirror->write_only) {
 		sb->active_disks--;
+		mddev->degraded++;
+	}
 	sb->working_disks--;
 	sb->failed_disks++;
 	mddev->sb_dirty = 1;
@@ -758,6 +760,7 @@ static int raid1_spare_active(mddev_t *mddev)
 	 */
 
 	conf->working_disks++;
+	mddev->degraded--;
 abort:
 	spin_unlock_irq(&conf->device_lock);
 
@@ -1338,6 +1341,7 @@ static int run(mddev_t *mddev)
 		goto out_free_conf;
 	}
 
+	mddev->degraded = 0;
 	for (i = 0; i < MD_SB_DISKS; i++) {
 
 		descriptor = sb->disks+i;
@@ -1355,6 +1359,8 @@ static int run(mddev_t *mddev)
 			disk->used_slot = 1;
 			disk->head_position = 0;
 		}
+		if (!disk->used_slot && disk_idk < conf->raid_disks)
+			mddev->degraded++;
 	}
 
 	/*

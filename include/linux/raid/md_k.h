@@ -192,6 +192,10 @@ struct mddev_s
 	atomic_t			active;
 	mdp_disk_t			*spare;
 
+	int				degraded;	/* whether md should consider
+							 * adding a spare
+							 */
+
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
 
