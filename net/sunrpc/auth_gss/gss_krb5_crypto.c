@@ -71,14 +71,13 @@ krb5_encrypt(
 
 	if (iv)
 		memcpy(local_iv, iv, crypto_tfm_alg_ivsize(tfm));
-	crypto_cipher_set_iv(tfm, local_iv, crypto_tfm_alg_ivsize(tfm));
 
 	memcpy(out, in, length);
 	sg[0].page = virt_to_page(out);
 	sg[0].offset = offset_in_page(out);
 	sg[0].length = length;
 
-	ret = crypto_cipher_encrypt(tfm, sg, sg, length);
+	ret = crypto_cipher_encrypt_iv(tfm, sg, sg, length, local_iv);
 
 out:
 	dprintk("gss_k5encrypt returns %d\n",ret);
@@ -110,14 +109,13 @@ krb5_decrypt(
 	}
 	if (iv)
 		memcpy(local_iv,iv, crypto_tfm_alg_ivsize(tfm));
-	crypto_cipher_set_iv(tfm, local_iv, crypto_tfm_alg_blocksize(tfm));
 
 	memcpy(out, in, length);
 	sg[0].page = virt_to_page(out);
 	sg[0].offset = offset_in_page(out);
 	sg[0].length = length;
 
-	ret = crypto_cipher_decrypt(tfm, sg, sg, length);
+	ret = crypto_cipher_decrypt_iv(tfm, sg, sg, length, local_iv);
 
 out:
 	dprintk("gss_k5decrypt returns %d\n",ret);
