@@ -10,6 +10,7 @@
 #include <linux/smp_lock.h>
 #include <linux/utsname.h>
 #include <linux/vmalloc.h>
+#include <linux/vfs.h>
 
 #include <asm/errno.h>
 #include <asm/pgalloc.h>

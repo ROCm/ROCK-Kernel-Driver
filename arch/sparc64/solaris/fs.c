@@ -20,6 +20,7 @@
 #include <linux/resource.h>
 #include <linux/quotaops.h>
 #include <linux/mount.h>
+#include <linux/vfs.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>

@@ -32,7 +32,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/mount.h>
 #include <linux/writeback.h>
-
+#include <linux/vfs.h>
 #include <asm/uaccess.h>
 
 /* This magic number is used in glibc for posix shared memory */

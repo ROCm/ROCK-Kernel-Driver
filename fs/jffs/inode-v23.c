@@ -48,6 +48,7 @@
 #include <linux/blkdev.h>
 #include <linux/quotaops.h>
 #include <linux/highmem.h>
+#include <linux/vfs.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>

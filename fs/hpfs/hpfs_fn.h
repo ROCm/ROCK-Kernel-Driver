@@ -162,6 +162,8 @@ static inline unsigned tstbits(unsigned *bmp, unsigned b, unsigned n)
 	return 0;
 }
 
+struct statfs;
+
 /* alloc.c */
 
 int hpfs_chk_sectors(struct super_block *, secno, int, char *);

@@ -11,7 +11,6 @@
 #include <linux/limits.h>
 #include <linux/wait.h>
 #include <linux/types.h>
-#include <linux/vfs.h>
 #include <linux/kdev_t.h>
 #include <linux/ioctl.h>
 #include <linux/list.h>
@@ -25,6 +24,7 @@ struct iovec;
 struct nameidata;
 struct pipe_inode_info;
 struct poll_table_struct;
+struct statfs;
 struct vm_area_struct;
 struct vfsmount;
 
