@@ -2525,6 +2525,9 @@ err_all:
 	if (!q)
 		goto err_all;
 
+	hba[i]->queue = q;
+	q->queuedata = hba[i];
+
 	/* Initialize the pdev driver private data. 
 		have it point to hba[i].  */
 	pci_set_drvdata(pdev, hba[i]);
@@ -2545,7 +2548,6 @@ err_all:
 
 	cciss_procinit(i);
 
-        q->queuedata = hba[i];
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 
 	/* This is a hardware imposed limit. */
