@@ -3020,33 +3020,34 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 				}
 			}
 		}		// End of base register loop
+		if (cpqhp_legacy_mode) {
+			// Figure out which interrupt pin this function uses
+			rc = pci_bus_read_config_byte (pci_bus, devfn, 
+				PCI_INTERRUPT_PIN, &temp_byte);
 
-#if !defined(CONFIG_X86_IO_APIC)
-		// Figure out which interrupt pin this function uses
-		rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_INTERRUPT_PIN, &temp_byte);
-
-		// If this function needs an interrupt and we are behind a bridge
-		// and the pin is tied to something that's alread mapped,
-		// set this one the same
-		if (temp_byte && resources->irqs && 
-		    (resources->irqs->valid_INT & 
-		     (0x01 << ((temp_byte + resources->irqs->barber_pole - 1) & 0x03)))) {
-			// We have to share with something already set up
-			IRQ = resources->irqs->interrupt[(temp_byte + resources->irqs->barber_pole - 1) & 0x03];
-		} else {
-			// Program IRQ based on card type
-			rc = pci_bus_read_config_byte (pci_bus, devfn, 0x0B, &class_code);
-
-			if (class_code == PCI_BASE_CLASS_STORAGE) {
-				IRQ = cpqhp_disk_irq;
+			// If this function needs an interrupt and we are behind a bridge
+			// and the pin is tied to something that's alread mapped,
+			// set this one the same
+			if (temp_byte && resources->irqs && 
+			    (resources->irqs->valid_INT & 
+			     (0x01 << ((temp_byte + resources->irqs->barber_pole - 1) & 0x03)))) {
+				// We have to share with something already set up
+				IRQ = resources->irqs->interrupt[(temp_byte + 
+					resources->irqs->barber_pole - 1) & 0x03];
 			} else {
-				IRQ = cpqhp_nic_irq;
-			}
-		}
+				// Program IRQ based on card type
+				rc = pci_bus_read_config_byte (pci_bus, devfn, 0x0B, &class_code);
 
-		// IRQ Line
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_INTERRUPT_LINE, IRQ);
-#endif
+				if (class_code == PCI_BASE_CLASS_STORAGE) {
+					IRQ = cpqhp_disk_irq;
+				} else {
+					IRQ = cpqhp_nic_irq;
+				}
+			}
+
+			// IRQ Line
+			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_INTERRUPT_LINE, IRQ);
+		}
 
 		if (!behind_bridge) {
 			rc = cpqhp_set_irq(func->bus, func->device, temp_byte + 0x09, IRQ);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -76,7 +76,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_ASYNC = (1 << 4),   /* initiator will not wait for completion  */
 	PBF_NONE = (1 << 5),    /* buffer not read at all                  */
 	PBF_DELWRI = (1 << 6),  /* buffer has dirty pages                  */
-	PBF_SYNC = (1 << 8),    /* force updates to disk                   */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
 	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
 	PBF_FS_DATAIOD = (1 << 12), /* schedule IO completion on fs datad  */
@@ -261,7 +260,7 @@ extern int pagebuf_iostart(		/* start I/O on a buffer	*/
 		page_buf_t *,		/* buffer to start		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_ASYNC,		*/
 					/* PBF_READ, PBF_WRITE,		*/
-					/* PBF_DELWRI, PBF_SYNC		*/
+					/* PBF_DELWRI			*/
 
 extern int pagebuf_iorequest(		/* start real I/O		*/
 		page_buf_t *);		/* buffer to convey to device	*/
@@ -356,7 +355,7 @@ extern void pagebuf_trace(
 
 #define XFS_BUF_BFLAGS(x)	((x)->pb_flags)
 #define XFS_BUF_ZEROFLAGS(x)	\
-	((x)->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_DELWRI))
+	((x)->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI))
 
 #define XFS_BUF_STALE(x)	((x)->pb_flags |= XFS_B_STALE)
 #define XFS_BUF_UNSTALE(x)	((x)->pb_flags &= ~XFS_B_STALE)
@@ -559,7 +558,6 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 	int	iowait = (pb->pb_flags & PBF_ASYNC) == 0;
 	int	error = 0;
 
-	pb->pb_flags |= PBF_SYNC;
 	if (!iowait)
 		pb->pb_flags |= PBF_RUN_QUEUES;
 

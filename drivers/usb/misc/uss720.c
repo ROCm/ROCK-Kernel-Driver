@@ -592,7 +592,6 @@ static int uss720_probe(struct usb_interface *intf,
 		goto probe_abort_port;
 	}
 #endif
-	parport_proc_register(pp);
 	parport_announce_port(pp);
 
 	usb_set_intfdata (intf, pp);
@@ -600,7 +599,7 @@ static int uss720_probe(struct usb_interface *intf,
 
 #if 0
 probe_abort_port:
-	parport_unregister_port(pp);
+	parport_put_port(pp);
 #endif
 probe_abort:
 	kfree(priv);
@@ -615,12 +614,12 @@ static void uss720_disconnect(struct usb_interface *intf)
 	usb_set_intfdata (intf, NULL);
 	if (pp) {
 		priv = pp->private_data;
+		parport_remove_port(pp);
 #if 0
 		usb_release_irq(usbdev, priv->irqhandle, priv->irqpipe);
 #endif
 		priv->usbdev = NULL;
-		parport_proc_unregister(pp);
-		parport_unregister_port(pp);
+		parport_put_port(pp);
 		kfree(priv);
 	}
 }

@@ -99,10 +99,7 @@ void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	memset(ret, 0, size);
 
 	/* Set up tces to cover the allocated range */
-	mapping = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL, NULL);
-
-	/* Make sure the update is visible to hardware. */
-	mb();
+	mapping = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
 
 	if (mapping == NO_TCE) {
 		free_pages((unsigned long)ret, order);
@@ -145,7 +142,6 @@ dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
 	dma_addr_t dma_handle = NO_TCE;
 	unsigned long uaddr;
 	unsigned int npages;
-	unsigned long handle = 0;
 
 	BUG_ON(direction == PCI_DMA_NONE);
 
@@ -156,7 +152,7 @@ dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
 	tbl = devnode_table(hwdev); 
 
 	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction, &handle);
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
 		if (dma_handle == NO_TCE) {
 			if (printk_ratelimit())  {
 				printk(KERN_INFO "iommu_alloc failed, tbl %p vaddr %p npages %d\n",
@@ -165,8 +161,6 @@ dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
 		} else 
 			dma_handle |= (uaddr & ~PAGE_MASK);
 	}
-
-	mb();
 
 	return dma_handle;
 }
@@ -194,7 +188,6 @@ int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelem
 	       int direction)
 {
 	struct iommu_table * tbl;
-	unsigned long handle;
 
 	BUG_ON(direction == PCI_DMA_NONE);
 
@@ -205,9 +198,7 @@ int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelem
 	if (!tbl)
 		return 0;
 
-	handle = 0;
-
-	return iommu_alloc_sg(tbl, sglist, nelems, direction, &handle);
+	return iommu_alloc_sg(tbl, &pdev->dev, sglist, nelems, direction);
 }
 
 void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
@@ -221,7 +212,7 @@ void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int ne
 	if (!tbl)
 		return;
 
-	iommu_free_sg(tbl, sglist, nelems, direction);
+	iommu_free_sg(tbl, sglist, nelems);
 }
 
 /* We support DMA to/from any memory page via the iommu */

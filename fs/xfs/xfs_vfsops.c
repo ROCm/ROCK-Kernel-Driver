@@ -791,8 +791,9 @@ xfs_statvfs(
 #if XFS_BIG_INUMS
 		if (!mp->m_inoadd)
 #endif
-			statp->f_files =
-			    min_t(sector_t, statp->f_files, mp->m_maxicount);
+			statp->f_files = min_t(typeof(statp->f_files),
+						statp->f_files,
+						mp->m_maxicount);
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
