@@ -28,6 +28,7 @@
  *	01-Oct-2004  BJD  Fixed mask bug in pullup() call
  *	01-Oct-2004  BJD  Added getirq() to turn pin into irqno
  *	04-Oct-2004  BJD  Added irq filter controls for GPIO
+ *	05-Nov-2004  BJD  EXPORT_SYMBOL() added for all code
  */
 
 
@@ -66,6 +67,8 @@ void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function)
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(s3c2410_gpio_cfgpin);
+
 unsigned int s3c2410_gpio_getcfg(unsigned int pin)
 {
 	unsigned long base = S3C2410_GPIO_BASE(pin);
@@ -79,6 +82,8 @@ unsigned int s3c2410_gpio_getcfg(unsigned int pin)
 
 	return __raw_readl(base) & mask;
 }
+
+EXPORT_SYMBOL(s3c2410_gpio_getcfg);
 
 void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
 {
@@ -100,6 +105,8 @@ void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(s3c2410_gpio_pullup);
+
 void s3c2410_gpio_setpin(unsigned int pin, unsigned int to)
 {
 	unsigned long base = S3C2410_GPIO_BASE(pin);
@@ -117,6 +124,8 @@ void s3c2410_gpio_setpin(unsigned int pin, unsigned int to)
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(s3c2410_gpio_setpin);
+
 unsigned int s3c2410_gpio_getpin(unsigned int pin)
 {
 	unsigned long base = S3C2410_GPIO_BASE(pin);
@@ -124,6 +133,8 @@ unsigned int s3c2410_gpio_getpin(unsigned int pin)
 
 	return __raw_readl(base + 0x04) & (1<< offs);
 }
+
+EXPORT_SYMBOL(s3c2410_gpio_getpin);
 
 unsigned int s3c2410_modify_misccr(unsigned int clear, unsigned int change)
 {
@@ -139,6 +150,8 @@ unsigned int s3c2410_modify_misccr(unsigned int clear, unsigned int change)
 
 	return misccr;
 }
+
+EXPORT_SYMBOL(s3c2410_modify_misccr);
 
 int s3c2410_gpio_getirq(unsigned int pin)
 {
@@ -156,6 +169,8 @@ int s3c2410_gpio_getirq(unsigned int pin)
 
 	return (pin - S3C2410_GPG0) + IRQ_EINT8;
 }
+
+EXPORT_SYMBOL(s3c2410_gpio_getirq);
 
 int s3c2410_gpio_irqfilter(unsigned int pin, unsigned int on,
 			   unsigned int config)
@@ -192,3 +207,5 @@ int s3c2410_gpio_irqfilter(unsigned int pin, unsigned int on,
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_gpio_irqfilter);
