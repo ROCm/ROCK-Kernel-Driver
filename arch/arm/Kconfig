@@ -135,15 +135,15 @@ config ARCH_SA1100
 config ARCH_SHARK
 	bool "Shark"
 
-config ARCH_OMAP
-	bool "TI OMAP"
-
 config ARCH_S3C2410
 	bool "Samsung S3C2410"
 	help
 	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
 	  BAST (http://www.simtec.co.uk/products/EB110ITX/), the IPAQ 1940 or
 	  the Samsung SMDK2410 development board (and derviatives).
+
+config ARCH_OMAP
+	bool "TI OMAP"
 
 endchoice
 
