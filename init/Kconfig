@@ -125,6 +125,13 @@ config FUTEX
 	  support for "fast userspace mutexes".  The resulting kernel may not
 	  run glibc-based applications correctly.
 
+config EPOLL
+	bool "Enable eventpoll support" if EMBEDDED
+	default y
+	help
+	  Disabling this option will cause the kernel to be built without
+	  support for epoll family of system calls.
+
 endmenu		# General setup
 
 

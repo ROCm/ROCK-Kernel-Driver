@@ -228,6 +228,9 @@ cond_syscall(sys_recvmsg)
 cond_syscall(sys_socketcall)
 cond_syscall(sys_futex)
 cond_syscall(compat_sys_futex)
+cond_syscall(sys_epoll_create)
+cond_syscall(sys_epoll_ctl)
+cond_syscall(sys_epoll_wait)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
