@@ -1521,7 +1521,7 @@ extern int simple_pin_fs(char *name, struct vfsmount **mount, int *count);
 extern void simple_release_fs(struct vfsmount **mount, int *count);
 
 extern int inode_change_ok(struct inode *, struct iattr *);
-extern int inode_setattr(struct inode *, struct iattr *);
+extern int __must_check inode_setattr(struct inode *, struct iattr *);
 
 extern void inode_update_time(struct inode *inode, int ctime_too);
 
