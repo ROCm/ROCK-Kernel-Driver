@@ -122,7 +122,6 @@ EXPORT_SYMBOL(free_divert_blk);
 
 #ifdef CONFIG_INET
 /* Internet layer registration */
-EXPORT_SYMBOL(inetdev_lock);
 EXPORT_SYMBOL(inet_add_protocol);
 EXPORT_SYMBOL(inet_del_protocol);
 EXPORT_SYMBOL(ip_route_output_key);
@@ -143,18 +142,12 @@ EXPORT_SYMBOL(ip_mc_dec_group);
 EXPORT_SYMBOL(ip_mc_join_group);
 EXPORT_SYMBOL(ip_finish_output);
 EXPORT_SYMBOL(inet_addr_type); 
-EXPORT_SYMBOL(inet_select_addr);
 EXPORT_SYMBOL(ip_dev_find);
-EXPORT_SYMBOL(inetdev_by_index);
-EXPORT_SYMBOL(in_dev_finish_destroy);
 EXPORT_SYMBOL(ip_defrag);
 EXPORT_SYMBOL(inet_peer_idlock);
 
 /* Route manipulation */
 EXPORT_SYMBOL(ip_rt_ioctl);
-EXPORT_SYMBOL(devinet_ioctl);
-EXPORT_SYMBOL(register_inetaddr_notifier);
-EXPORT_SYMBOL(unregister_inetaddr_notifier);
 
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
