@@ -257,10 +257,15 @@ static struct sk_buff *udsl_atm_alloc_tx (struct atm_vcc *vcc, unsigned int size
 	return NULL;
 }
 
-static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
+static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 {
 	struct udsl_instance_data *instance = atm_dev->dev_data;
 	int left = *pos;
+
+	if (!instance) {
+		PDEBUG ("NULL instance!\n");
+		return -ENODEV;
+	}
 
 	if (!left--)
 		return sprintf (page, "SpeedTouch USB %s-%s (%02x:%02x:%02x:%02x:%02x:%02x)\n",
@@ -302,8 +307,10 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 
 	PDEBUG ("udsl_atm_send called\n");
 
-	if (!dev_data)
+	if (!dev_data || !instance) {
+		PDEBUG ("NULL data!\n");
 		return -EINVAL;
+	}
 
 	switch (vcc->qos.aal) {
 	case ATM_AAL5:
@@ -403,6 +410,11 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 	PDEBUG ("udsl_atm_open called\n");
 
+	if (!instance) {
+		PDEBUG ("NULL instance!\n");
+		return -ENODEV;
+	}
+
 	/* at the moment only AAL5 support */
 	if (vcc->qos.aal != ATM_AAL5)
 		return -EINVAL;
@@ -440,6 +452,11 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
 
 	PDEBUG ("udsl_atm_close called\n");
+
+	if (!dev_data || !instance) {
+		PDEBUG ("NULL data!\n");
+		return;
+	}
 
 	/* freeing resources */
 	/* cancel all sends on this vcc */
@@ -832,7 +849,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		goto fail_atm;
 	}
 
-	instance->atm_dev->dev_data = instance;
 	instance->atm_dev->ci_range.vpi_bits = ATM_CI_MAX;
 	instance->atm_dev->ci_range.vci_bits = ATM_CI_MAX;
 	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
@@ -848,6 +864,10 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	PDEBUG ("MAC is %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	memcpy (instance->atm_dev->esi, mac, 6);
+
+	wmb ();
+
+	instance->atm_dev->dev_data = instance;
 
 	usb_set_intfdata (intf, instance);
 
