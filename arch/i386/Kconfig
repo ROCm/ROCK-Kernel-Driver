@@ -102,10 +102,10 @@ config X86_VISWS
 	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
 
 config X86_GENERICARCH
-       bool "Generic architecture (Summit, bigsmp, default)"
+       bool "Generic architecture (Summit, bigsmp, ES7000, default)"
        depends on SMP
        help
-          This option compiles in the Summit, bigsmp, default subarchitectures.
+          This option compiles in the Summit, bigsmp, ES7000, default subarchitectures.
 	  It is intended for a generic binary kernel.
 
 config X86_ES7000

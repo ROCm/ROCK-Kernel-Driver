@@ -3,14 +3,15 @@
 
 #include <asm/genapic.h>
 
-#define esr_disable (genapic->esr_disable)
+#define esr_disable (genapic->ESR_DISABLE)
 #define NO_BALANCE_IRQ (genapic->no_balance_irq)
 #define NO_IOAPIC_CHECK	(genapic->no_ioapic_check)
 #define APIC_BROADCAST_ID (genapic->apic_broadcast_id)
 #define INT_DELIVERY_MODE (genapic->int_delivery_mode)
 #define INT_DEST_MODE (genapic->int_dest_mode)
+#undef APIC_DEST_LOGICAL
+#define APIC_DEST_LOGICAL (genapic->apic_destination_logical)
 #define TARGET_CPUS	  (genapic->target_cpus())
-#define apic_id_registered (genapic->apic_id_registered)
 #define apic_id_registered (genapic->apic_id_registered)
 #define init_apic_ldr (genapic->init_apic_ldr)
 #define ioapic_phys_id_map (genapic->ioapic_phys_id_map)
