@@ -140,7 +140,7 @@ static void xfrm_timer_handler(unsigned long data)
 	}
 
 	if (warn)
-		km_warn_expired(x);
+		km_state_expired(x, 0);
 resched:
 	if (next != LONG_MAX &&
 	    !mod_timer(&x->timer, jiffies + make_jiffies(next)))
@@ -155,7 +155,7 @@ expired:
 		goto resched;
 	}
 	if (x->id.spi != 0)
-		km_expired(x);
+		km_state_expired(x, 1);
 	__xfrm_state_delete(x);
 
 out:
@@ -512,7 +512,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 
 	if (x->curlft.bytes >= x->lft.hard_byte_limit ||
 	    x->curlft.packets >= x->lft.hard_packet_limit) {
-		km_expired(x);
+		km_state_expired(x, 1);
 		if (!mod_timer(&x->timer, jiffies + XFRM_ACQ_EXPIRES*HZ))
 			xfrm_state_hold(x);
 		return -EINVAL;
@@ -521,7 +521,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 	if (!x->km.dying &&
 	    (x->curlft.bytes >= x->lft.soft_byte_limit ||
 	     x->curlft.packets >= x->lft.soft_packet_limit))
-		km_warn_expired(x);
+		km_state_expired(x, 0);
 	return 0;
 }
 
@@ -737,28 +737,22 @@ int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl)
 static struct list_head xfrm_km_list = LIST_HEAD_INIT(xfrm_km_list);
 static rwlock_t		xfrm_km_lock = RW_LOCK_UNLOCKED;
 
-void km_warn_expired(struct xfrm_state *x)
+void km_state_expired(struct xfrm_state *x, int hard)
 {
 	struct xfrm_mgr *km;
 
-	x->km.dying = 1;
-	read_lock(&xfrm_km_lock);
-	list_for_each_entry(km, &xfrm_km_list, list)
-		km->notify(x, 0);
-	read_unlock(&xfrm_km_lock);
-}
-
-void km_expired(struct xfrm_state *x)
-{
-	struct xfrm_mgr *km;
-
-	x->km.state = XFRM_STATE_EXPIRED;
+	if (hard)
+		x->km.state = XFRM_STATE_EXPIRED;
+	else
+		x->km.dying = 1;
 
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list)
-		km->notify(x, 1);
+		km->notify(x, hard);
 	read_unlock(&xfrm_km_lock);
-	wake_up(&km_waitq);
+
+	if (hard)
+		wake_up(&km_waitq);
 }
 
 int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
@@ -790,6 +784,20 @@ int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport)
 	}
 	read_unlock(&xfrm_km_lock);
 	return err;
+}
+
+void km_policy_expired(struct xfrm_policy *pol, int dir, int hard)
+{
+	struct xfrm_mgr *km;
+
+	read_lock(&xfrm_km_lock);
+	list_for_each_entry(km, &xfrm_km_list, list)
+		if (km->notify_policy)
+			km->notify_policy(pol, dir, hard);
+	read_unlock(&xfrm_km_lock);
+
+	if (hard)
+		wake_up(&km_waitq);
 }
 
 int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)

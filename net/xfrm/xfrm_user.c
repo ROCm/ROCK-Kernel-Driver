@@ -783,9 +783,7 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	if (xp == NULL)
 		return -ENOENT;
 
-	if (delete)
-		xfrm_policy_kill(xp);
-	else {
+	if (!delete) {
 		struct sk_buff *resp_skb;
 
 		resp_skb = xfrm_policy_netlink(skb, xp, p->dir, nlh->nlmsg_seq);
@@ -796,8 +794,9 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 					      NETLINK_CB(skb).pid,
 					      MSG_DONTWAIT);
 		}
-		xfrm_pol_put(xp);
 	}
+
+	xfrm_pol_put(xp);
 
 	return err;
 }
@@ -994,7 +993,7 @@ nlmsg_failure:
 	return -1;
 }
 
-static int xfrm_send_notify(struct xfrm_state *x, int hard)
+static int xfrm_send_state_notify(struct xfrm_state *x, int hard)
 {
 	struct sk_buff *skb;
 
@@ -1120,11 +1119,56 @@ struct xfrm_policy *xfrm_compile_policy(u16 family, int opt,
 	return xp;
 }
 
+static int build_polexpire(struct sk_buff *skb, struct xfrm_policy *xp,
+			   int dir, int hard)
+{
+	struct xfrm_user_polexpire *upe;
+	struct nlmsghdr *nlh;
+	unsigned char *b = skb->tail;
+
+	nlh = NLMSG_PUT(skb, 0, 0, XFRM_MSG_POLEXPIRE, sizeof(*upe));
+	upe = NLMSG_DATA(nlh);
+	nlh->nlmsg_flags = 0;
+
+	copy_to_user_policy(xp, &upe->pol, dir);
+	if (copy_to_user_tmpl(xp, skb) < 0)
+		goto nlmsg_failure;
+	upe->hard = !!hard;
+
+	nlh->nlmsg_len = skb->tail - b;
+	return skb->len;
+
+nlmsg_failure:
+	skb_trim(skb, b - skb->data);
+	return -1;
+}
+
+static int xfrm_send_policy_notify(struct xfrm_policy *xp, int dir, int hard)
+{
+	struct sk_buff *skb;
+	size_t len;
+
+	len = sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr;
+	len = RTA_ALIGN(RTA_LENGTH(len));
+	len += NLMSG_ALIGN(NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)));
+	skb = alloc_skb(len, GFP_ATOMIC);
+	if (skb == NULL)
+		return -ENOMEM;
+
+	if (build_polexpire(skb, xp, dir, hard) < 0)
+		BUG();
+
+	NETLINK_CB(skb).dst_groups = XFRMGRP_EXPIRE;
+
+	return netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_EXPIRE, GFP_ATOMIC);
+}
+
 static struct xfrm_mgr netlink_mgr = {
 	.id		= "netlink",
-	.notify		= xfrm_send_notify,
+	.notify		= xfrm_send_state_notify,
 	.acquire	= xfrm_send_acquire,
 	.compile_policy	= xfrm_compile_policy,
+	.notify_policy	= xfrm_send_policy_notify,
 };
 
 static int __init xfrm_user_init(void)

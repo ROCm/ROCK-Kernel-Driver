@@ -287,6 +287,8 @@ struct xfrm_policy
 	struct xfrm_tmpl       	xfrm_vec[XFRM_MAX_DEPTH];
 };
 
+#define XFRM_KM_TIMEOUT		30
+
 struct xfrm_mgr
 {
 	struct list_head	list;
@@ -295,6 +297,7 @@ struct xfrm_mgr
 	int			(*acquire)(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *xp, int dir);
 	struct xfrm_policy	*(*compile_policy)(u16 family, int opt, u8 *data, int len, int *dir);
 	int			(*new_mapping)(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport);
+	int			(*notify_policy)(struct xfrm_policy *x, int dir, int event);
 };
 
 extern int xfrm_register_km(struct xfrm_mgr *km);
@@ -635,16 +638,16 @@ static inline int xfrm_sk_clone_policy(struct sock *sk)
 	return 0;
 }
 
-extern void __xfrm_sk_free_policy(struct xfrm_policy *, int dir);
+extern void xfrm_policy_delete(struct xfrm_policy *pol, int dir);
 
 static inline void xfrm_sk_free_policy(struct sock *sk)
 {
 	if (unlikely(sk->sk_policy[0] != NULL)) {
-		__xfrm_sk_free_policy(sk->sk_policy[0], 0);
+		xfrm_policy_delete(sk->sk_policy[0], XFRM_POLICY_MAX);
 		sk->sk_policy[0] = NULL;
 	}
 	if (unlikely(sk->sk_policy[1] != NULL)) {
-		__xfrm_sk_free_policy(sk->sk_policy[1], 1);
+		xfrm_policy_delete(sk->sk_policy[1], XFRM_POLICY_MAX+1);
 		sk->sk_policy[1] = NULL;
 	}
 }
@@ -809,10 +812,10 @@ extern int xfrm_flush_bundles(struct xfrm_state *x);
 extern int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, unsigned short family);
 
 extern wait_queue_head_t km_waitq;
-extern void km_warn_expired(struct xfrm_state *x);
-extern void km_expired(struct xfrm_state *x);
+extern void km_state_expired(struct xfrm_state *x, int hard);
 extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
 extern int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport);
+extern void km_policy_expired(struct xfrm_policy *pol, int dir, int hard);
 
 extern void xfrm4_input_init(void);
 extern void xfrm6_input_init(void);
