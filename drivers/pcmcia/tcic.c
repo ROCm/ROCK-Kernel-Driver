@@ -806,44 +806,6 @@ static int tcic_set_socket(unsigned int lsock, socket_state_t *state)
   
 /*====================================================================*/
 
-static int tcic_get_io_map(unsigned int lsock, struct pccard_io_map *io)
-{
-    u_short psock = socket_table[lsock].psock;
-    u_short base, ioctl;
-    u_int addr;
-    
-    if (io->map > 1) return -EINVAL;
-    tcic_setw(TCIC_ADDR+2, TCIC_ADR2_INDREG | (psock << TCIC_SS_SHFT));
-    addr = TCIC_IWIN(psock, io->map);
-    tcic_setw(TCIC_ADDR, addr + TCIC_IBASE_X);
-    base = tcic_getw(TCIC_DATA);
-    tcic_setw(TCIC_ADDR, addr + TCIC_ICTL_X);
-    ioctl = tcic_getw(TCIC_DATA);
-
-    if (ioctl & TCIC_ICTL_TINY)
-	io->start = io->stop = base;
-    else {
-	io->start = base & (base-1);
-	io->stop = io->start + (base ^ (base-1));
-    }
-    io->speed = to_ns(ioctl & TCIC_ICTL_WSCNT_MASK);
-    io->flags  = (ioctl & TCIC_ICTL_ENA) ? MAP_ACTIVE : 0;
-    switch (ioctl & TCIC_ICTL_BW_MASK) {
-    case TCIC_ICTL_BW_DYN:
-	io->flags |= MAP_AUTOSZ; break;
-    case TCIC_ICTL_BW_16:
-	io->flags |= MAP_16BIT; break;
-    default:
-	break;
-    }
-    DEBUG(1, "tcic: GetIOMap(%d, %d) = %#2.2x, %d ns, "
-	  "%#4.4x-%#4.4x\n", lsock, io->map, io->flags,
-	  io->speed, io->start, io->stop);
-    return 0;
-} /* tcic_get_io_map */
-
-/*====================================================================*/
-
 static int tcic_set_io_map(unsigned int lsock, struct pccard_io_map *io)
 {
     u_short psock = socket_table[lsock].psock;
@@ -881,51 +843,6 @@ static int tcic_set_io_map(unsigned int lsock, struct pccard_io_map *io)
 
 /*====================================================================*/
 
-static int tcic_get_mem_map(unsigned int lsock, struct pccard_mem_map *mem)
-{
-    u_short psock = socket_table[lsock].psock;
-    u_short addr, ctl;
-    u_long base, mmap;
-    
-    if (mem->map > 3) return -EINVAL;
-    tcic_setw(TCIC_ADDR+2, TCIC_ADR2_INDREG | (psock << TCIC_SS_SHFT));
-    addr = TCIC_MWIN(psock, mem->map);
-    
-    tcic_setw(TCIC_ADDR, addr + TCIC_MBASE_X);
-    base = tcic_getw(TCIC_DATA);
-    if (base & TCIC_MBASE_4K_BIT) {
-	mem->sys_start = base & TCIC_MBASE_HA_MASK;
-	mem->sys_stop = mem->sys_start;
-    } else {
-	base &= TCIC_MBASE_HA_MASK;
-	mem->sys_start = (base & (base-1));
-	mem->sys_stop = mem->sys_start + (base ^ (base-1));
-    }
-    mem->sys_start = mem->sys_start << TCIC_MBASE_HA_SHFT;
-    mem->sys_stop = (mem->sys_stop << TCIC_MBASE_HA_SHFT) + 0x0fff;
-    
-    tcic_setw(TCIC_ADDR, addr + TCIC_MMAP_X);
-    mmap = tcic_getw(TCIC_DATA);
-    mem->flags = (mmap & TCIC_MMAP_REG) ? MAP_ATTRIB : 0;
-    mmap &= TCIC_MMAP_CA_MASK;
-    mem->card_start = mem->sys_start + (mmap << TCIC_MMAP_CA_SHFT);
-    mem->card_start &= 0x3ffffff;
-    
-    tcic_setw(TCIC_ADDR, addr + TCIC_MCTL_X);
-    ctl = tcic_getw(TCIC_DATA);
-    mem->flags |= (ctl & TCIC_MCTL_ENA) ? MAP_ACTIVE : 0;
-    mem->flags |= (ctl & TCIC_MCTL_B8) ? 0 : MAP_16BIT;
-    mem->flags |= (ctl & TCIC_MCTL_WP) ? MAP_WRPROT : 0;
-    mem->speed = to_ns(ctl & TCIC_MCTL_WSCNT_MASK);
-    
-    DEBUG(1, "tcic: GetMemMap(%d, %d) = %#2.2x, %d ns, "
-	  "%#5.5lx-%#5.5lx, %#5.5x\n", lsock, mem->map, mem->flags,
-	  mem->speed, mem->sys_start, mem->sys_stop, mem->card_start);
-    return 0;
-} /* tcic_get_mem_map */
-
-/*====================================================================*/
-  
 static int tcic_set_mem_map(unsigned int lsock, struct pccard_mem_map *mem)
 {
     u_short psock = socket_table[lsock].psock;
@@ -1007,9 +924,7 @@ static struct pccard_operations tcic_operations = {
 	.get_status	   = tcic_get_status,
 	.get_socket	   = tcic_get_socket,
 	.set_socket	   = tcic_set_socket,
-	.get_io_map	   = tcic_get_io_map,
 	.set_io_map	   = tcic_set_io_map,
-	.get_mem_map	   = tcic_get_mem_map,
 	.set_mem_map	   = tcic_set_mem_map,
 	.proc_setup	   = tcic_proc_setup,
 };

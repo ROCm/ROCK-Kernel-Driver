@@ -29,6 +29,9 @@ ifdef CONFIG_HOTPLUG_PCI_CPCI
 obj-y += setup-bus.o
 endif
 
+# Hotplug (eg, cardbus) now requires setup-bus
+obj-$(CONFIG_HOTPLUG) += setup-bus.o
+
 ifndef CONFIG_X86
 obj-y += syscall.o
 endif
