@@ -1058,10 +1058,12 @@ void sata_phy_reset(struct ata_port *ap)
 	u32 sstatus;
 	unsigned long timeout = jiffies + (HZ * 5);
 
-	scr_write(ap, SCR_CONTROL, 0x301);	/* issue phy wake/reset */
-	scr_read(ap, SCR_CONTROL);		/* dummy read; flush */
-	udelay(400);				/* FIXME: a guess */
-	scr_write(ap, SCR_CONTROL, 0x300);	/* issue phy wake/reset */
+	if (ap->flags & ATA_FLAG_SATA_RESET) {
+		scr_write(ap, SCR_CONTROL, 0x301); /* issue phy wake/reset */
+		scr_read(ap, SCR_STATUS);	/* dummy read; flush */
+		udelay(400);			/* FIXME: a guess */
+	}
+	scr_write(ap, SCR_CONTROL, 0x300);	/* issue phy wake/clear reset */
 
 	/* wait for phy to become ready, if necessary */
 	do {
@@ -1083,6 +1085,11 @@ void sata_phy_reset(struct ata_port *ap)
 
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
+
+	if (ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT)) {
+		ata_port_disable(ap);
+		return;
+	}
 
 	ata_bus_reset(ap);
 }
@@ -1337,9 +1344,13 @@ void ata_bus_reset(struct ata_port *ap)
 		outb(ap->ctl, ioaddr->ctl_addr);
 
 	/* determine if device 0/1 are present */
-	dev0 = ata_dev_devchk(ap, 0);
-	if (slave_possible)
-		dev1 = ata_dev_devchk(ap, 1);
+	if (ap->flags & ATA_FLAG_SATA_RESET)
+		dev0 = 1;
+	else {
+		dev0 = ata_dev_devchk(ap, 0);
+		if (slave_possible)
+			dev1 = ata_dev_devchk(ap, 1);
+	}
 
 	if (dev0)
 		devmask |= (1 << 0);
@@ -2569,7 +2580,8 @@ static int ata_thread (void *data)
 
 	printk(KERN_DEBUG "ata%u: thread exiting\n", ap->id);
 	ap->thr_pid = -1;
-        complete_and_exit (&ap->thr_exited, 0);
+	del_timer_sync(&ap->thr_timer);
+	complete_and_exit (&ap->thr_exited, 0);
 }
 
 /**
@@ -2664,6 +2676,26 @@ err_out:
 	goto out;
 }
 
+int ata_port_start (struct ata_port *ap)
+{
+	struct pci_dev *pdev = ap->host_set->pdev;
+
+	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
+	if (!ap->prd)
+		return -ENOMEM;
+	
+	DPRINTK("prd alloc, virt %p, dma %x\n", ap->prd, ap->prd_dma);
+
+	return 0;
+}
+
+void ata_port_stop (struct ata_port *ap)
+{
+	struct pci_dev *pdev = ap->host_set->pdev;
+
+	pci_free_consistent(pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+}
+
 /**
  *	ata_host_remove -
  *	@ap:
@@ -2683,7 +2715,7 @@ static void ata_host_remove(struct ata_port *ap, unsigned int do_unregister)
 
 	ata_thread_kill(ap);	/* FIXME: check return val */
 
-	pci_free_consistent(ap->host_set->pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+	ap->ops->port_stop(ap);
 }
 
 /**
@@ -2764,9 +2796,9 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 				      struct ata_host_set *host_set,
 				      unsigned int port_no)
 {
-	struct pci_dev *pdev = ent->pdev;
 	struct Scsi_Host *host;
 	struct ata_port *ap;
+	int rc;
 
 	DPRINTK("ENTER\n");
 	host = scsi_host_alloc(ent->sht, sizeof(struct ata_port));
@@ -2777,10 +2809,9 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 
 	ata_host_init(ap, host, host_set, ent, port_no);
 
-	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
-	if (!ap->prd)
+	rc = ap->ops->port_start(ap);
+	if (rc)
 		goto err_out;
-	DPRINTK("prd alloc, virt %p, dma %x\n", ap->prd, ap->prd_dma);
 
 	ap->thr_pid = kernel_thread(ata_thread, ap, CLONE_FS | CLONE_FILES);
 	if (ap->thr_pid < 0) {
@@ -2792,7 +2823,7 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 	return ap;
 
 err_out_free:
-	pci_free_consistent(ap->host_set->pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+	ap->ops->port_stop(ap);
 
 err_out:
 	scsi_host_put(host);
@@ -2828,6 +2859,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 	host_set->n_ports = ent->n_ports;
 	host_set->irq = ent->irq;
 	host_set->mmio_base = ent->mmio_base;
+	host_set->private_data = ent->private_data;
 
 	/* register each port bound to this device */
 	for (i = 0; i < ent->n_ports; i++) {
@@ -3170,6 +3202,8 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 	free_irq(host_set->irq, host_set);
 	if (host_set->mmio_base)
 		iounmap(host_set->mmio_base);
+	if (host_set->ports[0]->ops->host_stop)
+		host_set->ports[0]->ops->host_stop(host_set);
 
 	for (i = 0; i < host_set->n_ports; i++) {
 		Scsi_Host_Template *sht;
@@ -3274,6 +3308,8 @@ EXPORT_SYMBOL_GPL(ata_check_status_pio);
 EXPORT_SYMBOL_GPL(ata_check_status_mmio);
 EXPORT_SYMBOL_GPL(ata_exec_command_pio);
 EXPORT_SYMBOL_GPL(ata_exec_command_mmio);
+EXPORT_SYMBOL_GPL(ata_port_start);
+EXPORT_SYMBOL_GPL(ata_port_stop);
 EXPORT_SYMBOL_GPL(ata_interrupt);
 EXPORT_SYMBOL_GPL(ata_fill_sg);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);

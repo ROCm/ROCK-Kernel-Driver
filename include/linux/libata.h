@@ -207,6 +207,7 @@ struct ata_probe_ent {
 	unsigned int		irq_flags;
 	unsigned long		host_flags;
 	void			*mmio_base;
+	void			*private_data;
 };
 
 struct ata_host_set {
@@ -215,6 +216,7 @@ struct ata_host_set {
 	unsigned long		irq;
 	void			*mmio_base;
 	unsigned int		n_ports;
+	void			*private_data;
 	struct ata_port *	ports[0];
 };
 
@@ -264,6 +266,8 @@ struct ata_queued_cmd {
 	ata_qc_cb_t		callback;
 
 	struct semaphore	sem;
+
+	void			*private_data;
 };
 
 struct ata_host_stats {
@@ -333,6 +337,8 @@ struct ata_port {
 	struct semaphore	thr_sem;
 	struct timer_list	thr_timer;
 	unsigned long		thr_timeout;
+
+	void			*private_data;
 };
 
 struct ata_port_operations {
@@ -363,6 +369,11 @@ struct ata_port_operations {
 	u32 (*scr_read) (struct ata_port *ap, unsigned int sc_reg);
 	void (*scr_write) (struct ata_port *ap, unsigned int sc_reg,
 			   u32 val);
+
+	int (*port_start) (struct ata_port *ap);
+	void (*port_stop) (struct ata_port *ap);
+
+	void (*host_stop) (struct ata_host_set *host_set);
 };
 
 struct ata_port_info {
@@ -406,6 +417,8 @@ extern u8 ata_check_status_pio(struct ata_port *ap);
 extern u8 ata_check_status_mmio(struct ata_port *ap);
 extern void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
+extern int ata_port_start (struct ata_port *ap);
+extern void ata_port_stop (struct ata_port *ap);
 extern irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 extern void ata_fill_sg(struct ata_queued_cmd *qc);
 extern void ata_bmdma_start_mmio (struct ata_queued_cmd *qc);

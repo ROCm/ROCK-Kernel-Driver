@@ -235,6 +235,8 @@ static struct ata_port_operations k2_sata_ops = {
 	.irq_handler		= ata_interrupt,
 	.scr_read		= k2_sata_scr_read,
 	.scr_write		= k2_sata_scr_write,
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 

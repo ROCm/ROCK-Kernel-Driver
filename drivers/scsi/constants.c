@@ -915,15 +915,15 @@ scsi_show_extd_sense(unsigned char asc, unsigned char ascq) {
 
 /* Print sense information */
 static void
-print_sense_internal(const char * devclass, 
-		     const unsigned char * sense_buffer,
+print_sense_internal(const char *devclass, 
+		     const unsigned char *sense_buffer,
 		     struct request *req)
 {
 	int s, sense_class, valid, code, info;
-	const char * error = NULL;
+	const char *error = NULL;
 	unsigned char asc, ascq;
 	const char *sense_txt;
-	char *name = req->rq_disk ? req->rq_disk->disk_name : "?";
+	const char *name = req->rq_disk ? req->rq_disk->disk_name : devclass;
     
 	sense_class = (sense_buffer[0] >> 4) & 0x07;
 	code = sense_buffer[0] & 0xf;
@@ -966,11 +966,9 @@ print_sense_internal(const char * devclass,
 
 		sense_txt = scsi_sense_key_string(sense_buffer[2]);
 		if (sense_txt)
-			printk("%s%s: sense key %s\n",
-			       devclass, name, sense_txt);
+			printk("%s: sense key %s\n", name, sense_txt);
 		else
-			printk("%s%s: sense = %2x %2x\n",
-			       devclass, name,
+			printk("%s: sense = %2x %2x\n", name,
 			       sense_buffer[0], sense_buffer[2]);
 
 		asc = ascq = 0;
@@ -993,11 +991,9 @@ print_sense_internal(const char * devclass,
 
 		sense_txt = scsi_sense_key_string(sense_buffer[0]);
 		if (sense_txt)
-			printk("%s%s: old sense key %s\n",
-			       devclass, name, sense_txt);
+			printk("%s: old sense key %s\n", name, sense_txt);
 		else
-			printk("%s%s: sense = %2x %2x\n",
-			       devclass, name,
+			printk("%s: sense = %2x %2x\n", name,
 			       sense_buffer[0], sense_buffer[2]);
 
 		printk("Non-extended sense class %d code 0x%0x\n",

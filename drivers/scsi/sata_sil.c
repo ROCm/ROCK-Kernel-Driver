@@ -106,6 +106,8 @@ static struct ata_port_operations sil_ops = {
 	.irq_handler		= ata_interrupt,
 	.scr_read		= sil_scr_read,
 	.scr_write		= sil_scr_write,
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 static struct ata_port_info sil_port_info[] = {
