@@ -72,6 +72,8 @@ static int voltage_table[32];
 static unsigned int highest_speed, lowest_speed; /* kHz */
 static int longhaul_version;
 static struct cpufreq_frequency_table *longhaul_table;
+
+#ifdef CONFIG_CPU_FREQ_DEBUG
 static char speedbuffer[8];
 
 static char *print_speed(int speed)
@@ -86,6 +88,7 @@ static char *print_speed(int speed)
 
 	return speedbuffer;
 }
+#endif
 
 
 static unsigned int calc_speed(int mult)
