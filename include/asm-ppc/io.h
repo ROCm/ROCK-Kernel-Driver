@@ -4,9 +4,11 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/mm.h>
 
 #include <asm/page.h>
 #include <asm/byteorder.h>
+#include <asm/mmu.h>
 
 #define SIO_CONFIG_RA	0x398
 #define SIO_CONFIG_RD	0x399
@@ -22,7 +24,7 @@
 #define PREP_ISA_MEM_BASE 	0xc0000000
 #define PREP_PCI_DRAM_OFFSET 	0x80000000
 
-#if defined(CONFIG_40x)
+#if defined(CONFIG_4xx)
 #include <asm/ibm4xx.h>
 #elif defined(CONFIG_8xx)
 #include <asm/mpc8xx.h>
@@ -197,14 +199,17 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
  * Map in an area of physical address space, for accessing
  * I/O devices etc.
  */
-extern void *__ioremap(unsigned long address, unsigned long size,
+extern void *__ioremap(phys_addr_t address, unsigned long size,
 		       unsigned long flags);
-extern void *ioremap(unsigned long address, unsigned long size);
+extern void *ioremap(phys_addr_t address, unsigned long size);
+#ifdef CONFIG_44x
+extern void *ioremap64(unsigned long long address, unsigned long size);
+#endif
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
 extern void iounmap(void *addr);
 extern unsigned long iopa(unsigned long addr);
 extern unsigned long mm_ptov(unsigned long addr) __attribute__ ((const));
-extern void io_block_mapping(unsigned long virt, unsigned long phys,
+extern void io_block_mapping(unsigned long virt, phys_addr_t phys,
 			     unsigned int size, int flags);
 
 /*

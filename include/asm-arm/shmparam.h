@@ -1,8 +1,6 @@
 #ifndef _ASMARM_SHMPARAM_H
 #define _ASMARM_SHMPARAM_H
 
-#include <asm/proc/shmparam.h>
-
 /*
  * This should be the size of the virtually indexed cache/ways,
  * or page size, whichever is greater since the cache aliases

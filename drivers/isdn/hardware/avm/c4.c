@@ -189,7 +189,7 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 {
 	u32 val;
 	unsigned char *dp;
-	int left;
+	u_int left;
 	u32 loadoff = 0;
 
 	dp = t4file->data;
@@ -664,7 +664,7 @@ static irqreturn_t c4_handle_interrupt(avmcard *card)
 	u32 status = c4inmeml(card->mbase+DOORBELL);
 
 	if (status & DBELL_RESET_HOST) {
-		int i;
+		u_int i;
 		c4outmeml(card->mbase+PCI_OUT_INT_MASK, 0x0c);
 		if (card->nlogcontr == 0)
 			return IRQ_HANDLED;
@@ -791,7 +791,8 @@ static int c4_send_config(avmcard *card, capiloaddatapart * config)
 {
 	u8 val[4];
 	unsigned char *dp;
-	int left, retval;
+	u_int left;
+	int retval;
 	
 	if ((retval = queue_sendconfigword(card, 1)) != 0)
 		return retval;
@@ -880,7 +881,7 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
 {
 	avmcard *card = ((avmctrl_info *)(ctrl->driverdata))->card;
 	avmctrl_info *cinfo;
-	int i;
+	u_int i;
 
  	c4_reset(card);
 
@@ -896,7 +897,7 @@ static void c4_remove(struct pci_dev *pdev)
 {
 	avmcard *card = pci_get_drvdata(pdev);
 	avmctrl_info *cinfo;
-	int i;
+	u_int i;
 
  	c4_reset(card);
 

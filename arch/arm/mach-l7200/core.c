@@ -11,7 +11,6 @@
 
 #include <asm/hardware.h>
 #include <asm/page.h>
-#include <asm/proc/domain.h>
 
 #include <asm/mach/map.h>
 #include <asm/arch/hardware.h>

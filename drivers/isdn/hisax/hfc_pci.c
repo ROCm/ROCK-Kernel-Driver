@@ -487,8 +487,8 @@ main_rec_hfcpci(struct BCState *bcs)
 static void
 hfcpci_fill_dfifo(struct IsdnCardState *cs)
 {
-	int fcnt;
-	int count, new_z1, maxlen;
+	int fcnt, new_z1, maxlen;
+	u_int count;
 	dfifo_type *df;
 	u8 *src, *dst, new_f1;
 
@@ -533,7 +533,7 @@ hfcpci_fill_dfifo(struct IsdnCardState *cs)
 	src = cs->tx_skb->data;	/* source pointer */
 	dst = df->data + le16_to_cpu(df->za[df->f1 & D_FREG_MASK].z1);
 	maxlen = D_FIFO_SIZE - le16_to_cpu(df->za[df->f1 & D_FREG_MASK].z1);		/* end fifo */
-	if (maxlen > count)
+	if (maxlen > (int)count)
 		maxlen = count;	/* limit size */
 	memcpy(dst, src, maxlen);	/* first copy */
 
@@ -559,8 +559,8 @@ static void
 hfcpci_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int maxlen, fcnt;
-	int count, new_z1;
+	int maxlen, fcnt, new_z1;
+	u_int count;
 	bzfifo_type *bz;
 	u8 *bdata;
 	u8 new_f1, *src, *dst;
@@ -591,7 +591,7 @@ hfcpci_fill_fifo(struct BCState *bcs)
 		fcnt = B_FIFO_SIZE - fcnt;	/* remaining bytes to send */
 
 		while ((fcnt < 2 * HFCPCI_BTRANS_THRESHOLD) && (bcs->tx_skb)) {
-			if (bcs->tx_skb->len < B_FIFO_SIZE - fcnt) {
+			if ((int)bcs->tx_skb->len < (B_FIFO_SIZE - fcnt)) {
 				/* data is suitable for fifo */
 				count = bcs->tx_skb->len;
 
@@ -601,7 +601,7 @@ hfcpci_fill_fifo(struct BCState *bcs)
 				src = bcs->tx_skb->data;	/* source pointer */
 				dst = bdata + (le16_to_cpu(*z1t) - B_SUB_VAL);
 				maxlen = (B_FIFO_SIZE + B_SUB_VAL) - le16_to_cpu(*z1t);	/* end of fifo */
-				if (maxlen > count)
+				if (maxlen > (int)count)
 					maxlen = count;		/* limit size */
 				memcpy(dst, src, maxlen);	/* first copy */
 
@@ -661,7 +661,7 @@ hfcpci_fill_fifo(struct BCState *bcs)
 	src = bcs->tx_skb->data;	/* source pointer */
 	dst = bdata + (le16_to_cpu(bz->za[bz->f1].z1) - B_SUB_VAL);
 	maxlen = (B_FIFO_SIZE + B_SUB_VAL) - le16_to_cpu(bz->za[bz->f1].z1);		/* end fifo */
-	if (maxlen > count)
+	if (maxlen > (int)count)
 		maxlen = count;	/* limit size */
 	memcpy(dst, src, maxlen);	/* first copy */
 

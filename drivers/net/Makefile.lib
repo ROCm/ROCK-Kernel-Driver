@@ -5,6 +5,7 @@ obj-$(CONFIG_A2065)		+= crc32.o
 obj-$(CONFIG_ARM_AM79C961A)	+= crc32.o
 obj-$(CONFIG_AT1700)		+= crc32.o
 obj-$(CONFIG_ATP)		+= crc32.o
+obj-$(CONFIG_BMAC)		+= crc32.o
 obj-$(CONFIG_DE2104X)		+= crc32.o
 obj-$(CONFIG_DE4X5)		+= crc32.o
 obj-$(CONFIG_DECLANCE)		+= crc32.o

@@ -627,21 +627,25 @@ deadline_insert_request(request_queue_t *q, struct request *rq,
 	struct deadline_data *dd = q->elevator.elevator_data;
 	struct deadline_rq *drq = RQ_DATA(rq);
 
-	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
+	if (unlikely(rq->flags & (REQ_HARDBARRIER|REQ_SOFTBARRIER))) {
 		DL_INVALIDATE_HASH(dd);
 		q->last_merge = NULL;
 
-		while (deadline_dispatch_requests(dd))
-			;
+		if (insert_here != dd->dispatch) {
+			while (deadline_dispatch_requests(dd))
+				;
+		}
 
-		list_add_tail(&rq->queuelist, dd->dispatch);
-		return;
+		if (!insert_here)
+			insert_here = dd->dispatch->prev;
 	}
 
 	if (unlikely(!blk_fs_request(rq))) {
 		if (!insert_here)
-			insert_here = dd->dispatch->prev;
+			insert_here = dd->dispatch;
+	}
 
+	if (insert_here) {
 		list_add(&rq->queuelist, insert_here);
 		return;
 	}

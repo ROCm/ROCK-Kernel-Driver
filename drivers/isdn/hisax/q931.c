@@ -446,7 +446,7 @@ prcause(char *dest, u8 * p)
 {
 	u8 *end;
 	char *dp = dest;
-	int i, cause;
+	u_int i, cause;
 
 	end = p + p[1] + 1;
 	p += 2;
@@ -871,7 +871,8 @@ static int
 disptext_ni1(char *dest, u8 * p)
 {
 	char *dp = dest;
-	int l, tag, len, i;
+	int l, tag, len;
+	u_int i;
 
 	p++;
 	l = *p++ - 1;
@@ -1200,7 +1201,7 @@ dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir)
 	char *dp;
 	unsigned char pd, cr_l, cr, mt;
 	unsigned char sapi, tei, ftyp;
-	int i, cset = 0, cs_old = 0, cs_fest = 0;
+	u_int i, cset = 0, cs_old = 0, cs_fest = 0;
 	int size, finish = 0;
 
 	if (skb->len < 3)

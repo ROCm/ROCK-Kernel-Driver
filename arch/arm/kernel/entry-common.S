@@ -8,8 +8,11 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
-#include "entry-header.S"
+
 #include <asm/thread_info.h>
+#include <asm/ptrace.h>
+
+#include "entry-header.S"
 
 /* 
  * We rely on the fact that R0 is at the bottom of the stack (due to
