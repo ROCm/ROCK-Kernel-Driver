@@ -660,11 +660,25 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 			.el.len = 1,
 			.chan	= this->chan,
 		},
-		.bss_basic_rate_set	= {
-			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
+		.bss_basic_rset	= {
+			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+			.el.len = 2,
+			.data_rate_labels = {
+				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_1MBIT,
+				[1] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_2MBIT,
+			},
 		},
-		.operational_rate_set	= {
-			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
+		.operational_rset	= {
+			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+			.el.len = 2,
+			.data_rate_labels = {
+				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_1MBIT,
+				[1] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_2MBIT,
+			},
 		},
 		.ibss_pset		= {
 			.el.id	     = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,

@@ -203,6 +203,15 @@ enum wl3501_status {
 #define IW_REG_DOMAIN_MKK1	0x41	/* Channel 1-14		Japan  */
 #define IW_REG_DOMAIN_ISRAEL	0x50	/* Channel 3 - 9	Israel */
 
+#define IW_MGMT_RATE_LABEL_MANDATORY 128 /* MSB */
+
+enum iw_mgmt_rate_labels {
+	IW_MGMT_RATE_LABEL_1MBIT   = 2,
+	IW_MGMT_RATE_LABEL_2MBIT   = 4,
+	IW_MGMT_RATE_LABEL_5_5MBIT = 11,
+	IW_MGMT_RATE_LABEL_11MBIT  = 22,
+};
+
 enum iw_mgmt_info_element_ids {
 	IW_MGMT_INFO_ELEMENT_SSID,		  /* Service Set Identity */
 	IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
@@ -227,6 +236,17 @@ struct iw_mgmt_info_element {
 struct iw_mgmt_essid_pset {
 	struct iw_mgmt_info_element el;
 	u8 			    essid[IW_ESSID_MAX_SIZE];
+} __attribute__ ((packed));
+
+/*
+ * According to 802.11 Wireless Netowors, the definitive guide - O'Reilly
+ * Pg 75
+ */ 
+#define IW_DATA_RATE_MAX_LABELS 8
+
+struct iw_mgmt_data_rset {
+	struct iw_mgmt_info_element el;
+	u8 			    data_rate_labels[IW_DATA_RATE_MAX_LABELS];
 } __attribute__ ((packed));
 
 struct iw_mgmt_ds_pset {
@@ -294,8 +314,8 @@ struct wl3501_start_req {
 	u16			    probe_delay;
 	u16			    cap_info;
 	struct iw_mgmt_essid_pset   ssid;
-	u8			    bss_basic_rate_set[10];
-	u8			    operational_rate_set[10];
+	struct iw_mgmt_data_rset    bss_basic_rset;
+	struct iw_mgmt_data_rset    operational_rset;
 	struct iw_mgmt_cf_pset	    cf_pset;
 	struct iw_mgmt_ds_pset	    ds_pset;
 	struct iw_mgmt_ibss_pset    ibss_pset;
@@ -362,7 +382,7 @@ struct wl3501_join_req {
 	u16			    next_blk;
 	u8			    sig_id;
 	u8			    reserved;
-	u8			    operational_rate_set[10];
+	struct iw_mgmt_data_rset    operational_rset;
 	u16			    reserved2;
 	u16			    timeout;
 	u16			    probe_delay;
@@ -377,7 +397,7 @@ struct wl3501_join_req {
 	struct iw_mgmt_ds_pset	    ds_pset;
 	struct iw_mgmt_cf_pset	    cf_pset;
 	struct iw_mgmt_ibss_pset    ibss_pset;
-	u8			    bss_basic_rate_set[10];
+	struct iw_mgmt_data_rset    bss_basic_rset;
 };
 
 struct wl3501_join_confirm {
@@ -431,7 +451,7 @@ struct wl3501_scan_confirm {
 	struct iw_mgmt_ds_pset	    ds_pset;
 	struct iw_mgmt_cf_pset	    cf_pset;
 	struct iw_mgmt_ibss_pset    ibss_pset;
-	u8			    bss_basic_rate_set[10];
+	struct iw_mgmt_data_rset    bss_basic_rset;
 	u8			    rssi;
 };
 
