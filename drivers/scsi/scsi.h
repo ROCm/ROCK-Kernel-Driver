@@ -417,6 +417,8 @@ extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirecti
 extern volatile int in_scan_scsis;
 extern const unsigned char scsi_command_size[8];
 
+extern struct bus_type scsi_driverfs_bus_type;
+
 
 /*
  * These are the error handling functions defined in scsi_error.c
@@ -622,6 +624,7 @@ struct scsi_device {
 
 	// Flag to allow revalidate to succeed in sd_open
 	int allow_revalidate;
+	struct device sdev_driverfs_dev;
 };
 
 

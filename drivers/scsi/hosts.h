@@ -418,6 +418,11 @@ struct Scsi_Host
      */
     struct pci_dev *pci_dev;
 
+    /* 
+     * Support for driverfs filesystem
+     */
+    struct device host_driverfs_dev;
+
     /*
      * We should ensure that this is aligned, both for better performance
      * and also because some compilers (m68k) don't automatically force
@@ -478,6 +483,7 @@ static inline void scsi_set_pci_device(struct Scsi_Host *SHpnt,
                                        struct pci_dev *pdev)
 {
 	SHpnt->pci_dev = pdev;
+	SHpnt->host_driverfs_dev.parent=&pdev->dev;
 }
 
 
@@ -516,6 +522,7 @@ struct Scsi_Device_Template
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 
                                            Selects command for blkdevs */
+    struct device_driver scsi_driverfs_driver;
 };
 
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt);

@@ -1939,6 +1939,11 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 				}
 				printk(KERN_INFO "scsi%d : %s\n",		/* And print a little message */
 				       shpnt->host_no, name);
+				strncpy(shpnt->host_driverfs_dev.name,name,
+					DEVICE_NAME_SIZE-1);
+				sprintf(shpnt->host_driverfs_dev.bus_id,
+					"scsi%d",
+					shpnt->host_no);
 			}
 		}
 
@@ -1947,6 +1952,8 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 		 */
 		for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
 			if (shpnt->hostt == tpnt) {
+				/* first register parent with driverfs */
+				device_register(&shpnt->host_driverfs_dev);
 				scan_scsis(shpnt, 0, 0, 0, 0);
 				if (shpnt->select_queue_depths != NULL) {
 					(shpnt->select_queue_depths) (shpnt, shpnt->host_queue);
@@ -2101,6 +2108,7 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 				goto err_out;
 			}
 			devfs_unregister (SDpnt->de);
+			put_device(&SDpnt->sdev_driverfs_dev);
 		}
 	}
 
@@ -2151,6 +2159,7 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 		/* Remove the /proc/scsi directory entry */
 		sprintf(name,"%d",shpnt->host_no);
 		remove_proc_entry(name, tpnt->proc_dir);
+		put_device(&shpnt->host_driverfs_dev);
 		if (tpnt->release)
 			(*tpnt->release) (shpnt);
 		else {
@@ -2499,6 +2508,34 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index)
 	mempool_free(sgl, sgp->pool);
 }
 
+static int scsi_bus_match(struct device *scsi_driverfs_dev, 
+                          struct device_driver *scsi_driverfs_drv)
+{
+        char *p=0;
+
+        if (!strcmp("sd", scsi_driverfs_drv->name)) {
+                if ((p = strstr(scsi_driverfs_dev->bus_id, ":disc")) || 
+		    (p = strstr(scsi_driverfs_dev->bus_id, ":p"))) { 
+                        return 1;
+                }
+        } else if (!strcmp("sg", scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id, ":gen"))
+                        return 1;
+        } else if (!strcmp("sr",scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id,":cd"))
+                        return 1;
+        } else if (!strcmp("st",scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id,":mt"))
+                        return 1;
+        }
+        return 0;
+}
+
+struct bus_type scsi_driverfs_bus_type = {
+        name: "scsi",
+        match: scsi_bus_match,
+};
+
 static int __init init_scsi(void)
 {
 	struct proc_dir_entry *generic;
@@ -2544,6 +2581,8 @@ static int __init init_scsi(void)
         if (scsihosts)
 		printk(KERN_INFO "scsi: host order: %s\n", scsihosts);	
 	scsi_host_no_init (scsihosts);
+
+	bus_register(&scsi_driverfs_bus_type);
 	/*
 	 * This is where the processing takes place for most everything
 	 * when commands are completed.

@@ -335,6 +335,7 @@ EXPORT_SYMBOL(bdev_read_only);
 EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(bmap);
 EXPORT_SYMBOL(devfs_register_partitions);
+EXPORT_SYMBOL(driverfs_remove_partitions);
 EXPORT_SYMBOL(blkdev_open);
 EXPORT_SYMBOL(blkdev_get);
 EXPORT_SYMBOL(blkdev_put);
