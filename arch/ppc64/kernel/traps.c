@@ -230,7 +230,7 @@ static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 		info.si_errno = 0;
 		/* XXX something better for ECC error? */
 		info.si_code = BUS_ADRERR;
-		info.si_addr = (void *)regs->nip;
+		info.si_addr = (void __user *)regs->nip;
 		printk(KERN_ERR "MCE: uncorrectable ecc error for pid %d\n",
 		       current->pid);
 		_exception(SIGBUS, &info, regs);
@@ -300,7 +300,7 @@ InstructionBreakpointException(struct pt_regs *regs)
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_BRKPT;
-	info.si_addr = (void *)regs->nip;
+	info.si_addr = (void __user *)regs->nip;
 	_exception(SIGTRAP, &info, regs);
 }
 
@@ -338,7 +338,7 @@ static void parse_fpe(struct pt_regs *regs)
 
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
-	info.si_addr = (void *)regs->nip;
+	info.si_addr = (void __user *)regs->nip;
 	_exception(SIGFPE, &info, regs);
 }
 
@@ -407,7 +407,7 @@ ProgramCheckException(struct pt_regs *regs)
 		info.si_signo = SIGILL;
 		info.si_errno = 0;
 		info.si_code = ILL_PRVOPC;
-		info.si_addr = (void *)regs->nip;
+		info.si_addr = (void __user *)regs->nip;
 		_exception(SIGILL, &info, regs);
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
@@ -422,7 +422,7 @@ ProgramCheckException(struct pt_regs *regs)
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
-		info.si_addr = (void *)regs->nip;
+		info.si_addr = (void __user *)regs->nip;
 		_exception(SIGTRAP, &info, regs);
 	} else {
 		/* Illegal instruction */
@@ -430,7 +430,7 @@ ProgramCheckException(struct pt_regs *regs)
 		info.si_signo = SIGILL;
 		info.si_errno = 0;
 		info.si_code = ILL_ILLTRP;
-		info.si_addr = (void *)regs->nip;
+		info.si_addr = (void __user *)regs->nip;
 		_exception(SIGILL, &info, regs);
 	}
 }
@@ -476,7 +476,7 @@ SingleStepException(struct pt_regs *regs)
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_TRACE;
-	info.si_addr = (void *)regs->nip;
+	info.si_addr = (void __user *)regs->nip;
 	_exception(SIGTRAP, &info, regs);	
 }
 
@@ -524,7 +524,7 @@ AlignmentException(struct pt_regs *regs)
 			info.si_signo = SIGSEGV;
 			info.si_errno = 0;
 			info.si_code = SEGV_MAPERR;
-			info.si_addr = (void *)regs->dar;
+			info.si_addr = (void __user *)regs->dar;
 			force_sig_info(SIGSEGV, &info, current);
 		} else {
 			/* Search exception table */
@@ -537,7 +537,7 @@ AlignmentException(struct pt_regs *regs)
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRALN;
-	info.si_addr = (void *)regs->nip;
+	info.si_addr = (void __user *)regs->nip;
 	_exception(SIGBUS, &info, regs);	
 }
 
@@ -568,7 +568,7 @@ AltivecAssistException(struct pt_regs *regs)
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		info.si_code = SEGV_MAPERR;
-		info.si_addr = (void *) regs->nip;
+		info.si_addr = (void __user *) regs->nip;
 		force_sig_info(SIGSEGV, &info, current);
 	} else {
 		/* didn't recognize the instruction */
