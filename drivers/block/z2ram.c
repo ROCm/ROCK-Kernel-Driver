@@ -28,10 +28,10 @@
 #define DEVICE_NAME "Z2RAM"
 
 #include <linux/major.h>
-#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/blkdev.h>
 
 #include <asm/setup.h>
 #include <asm/bitops.h>
