@@ -425,7 +425,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 
 	dst = transport->dst;
 	if (!dst || dst->obsolete) {
-		sctp_transport_route(transport, NULL);
+		sctp_transport_route(transport, NULL, sctp_sk(sk));
 	}
 
 	nskb->dst = dst_clone(transport->dst);

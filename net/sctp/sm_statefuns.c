@@ -4314,7 +4314,8 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 	/* Cache a route for the transport with the chunk's destination as
 	 * the source address.
 	 */
-	sctp_transport_route(transport, (union sctp_addr *)&chunk->dest);
+	sctp_transport_route(transport, (union sctp_addr *)&chunk->dest,
+			     sctp_sk(sctp_get_ctl_sock()));
 
 	packet = sctp_packet_init(packet, transport, sport, dport);
 	packet = sctp_packet_config(packet, vtag, 0, NULL);
