@@ -360,8 +360,8 @@ int cpqhp_set_irq (u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num)
 	    __FUNCTION__, dev_num, bus_num, int_pin, irq_num);
 	rc = pcibios_set_irq_routing(&fakedev, int_pin - 0x0a, irq_num);
 	dbg("%s: rc %d\n", __FUNCTION__, rc);
-	if (rc)
-		return rc;
+	if (!rc)
+		return !rc;
 
 	// set the Edge Level Control Register (ELCR)
 	temp_word = inb(0x4d0);

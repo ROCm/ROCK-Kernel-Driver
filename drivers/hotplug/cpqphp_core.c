@@ -1110,6 +1110,9 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/*
 	 * Get IO, memory, and IRQ resources for new devices
 	 */
+	// The next line is required for cpqhp_find_available_resources
+	ctrl->interrupt = pdev->irq;
+
 	rc = cpqhp_find_available_resources(ctrl, cpqhp_rom_start);
 	ctrl->add_support = !rc;
 	if (rc) {
@@ -1138,7 +1141,6 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	writel(0xFFFFFFFFL, ctrl->hpc_reg + INT_MASK);
 
 	/* set up the interrupt */
-	ctrl->interrupt = pdev->irq;
 	dbg("HPC interrupt = %d \n", ctrl->interrupt);
 	if (request_irq(ctrl->interrupt,
 			(void (*)(int, void *, struct pt_regs *)) &cpqhp_ctrl_intr,
