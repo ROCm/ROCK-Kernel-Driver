@@ -984,7 +984,7 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		if (sreq->sr_magic == SCSI_REQ_MAGIC) {
 			cmd = scsi_get_command(sreq->sr_device, GFP_ATOMIC);
 			if (unlikely(!cmd))
-				return BLKPREP_DEFER;
+				goto defer;
 			scsi_init_cmd_from_req(cmd, sreq);
 		} else
 			cmd = req->special;
@@ -995,7 +995,7 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		if (!req->special) {
 			cmd = scsi_get_command(sdev, GFP_ATOMIC);
 			if (unlikely(!cmd))
-				return BLKPREP_DEFER;
+				goto defer;
 		} else
 			cmd = req->special;
 		
@@ -1060,6 +1060,14 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 	 */
 	req->flags |= REQ_DONTPREP;
 	return BLKPREP_OK;
+
+ defer:
+	/* If we defer, the elv_next_request() returns NULL, but the
+	 * queue must be restarted, so we plug here if no returning
+	 * command will automatically do that. */
+	if (sdev->device_busy == 0)
+		blk_plug_device(q);
+	return BLKPREP_DEFER;
 }
 
 /*
@@ -1164,16 +1172,8 @@ static void scsi_request_fn(request_queue_t *q)
 		 */
 		req = elv_next_request(q);
 
-		if (!req) {
-			/*
-			 * If the device is busy, a returning I/O will
-			 * restart the queue. Otherwise, we have to plug
-			 * the queue
-			 */
-			if (sdev->device_busy == 0)
-				blk_plug_device(q);
+		if (!req)
 			goto completed;
-		}
 
 		if (!scsi_dev_queue_ready(q, sdev))
 			goto completed;
