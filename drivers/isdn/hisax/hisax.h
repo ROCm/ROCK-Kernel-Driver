@@ -422,10 +422,11 @@ struct hfcB_hw {
 
 struct tiger_hw {
 	u_int *send;
-	u_int *s_irq;
+	dma_addr_t send_dma;
 	u_int *s_end;
 	u_int *sendp;
 	u_int *rec;
+	dma_addr_t rec_dma;
 	int free;
 	u_char *rcvbuf;
 	u_char *sendbuf;
@@ -660,6 +661,7 @@ struct njet_hw {
 	unsigned char irqmask0;
 	unsigned char irqstat0;
 	unsigned char last_is0;
+	struct pci_dev *pdev;
 };
 
 struct hfcPCI_hw {
@@ -683,8 +685,9 @@ struct hfcPCI_hw {
 	unsigned char pci_bus;
         unsigned char pci_device_fn;
         unsigned char *pci_io; /* start of PCI IO memory */
-        void *share_start; /* shared memory for Fifos start */
         void *fifos; /* FIFO memory */ 
+        dma_addr_t fifos_dma;
+        struct pci_dev* pdev;
         int last_bfifo_cnt[2]; /* marker saving last b-fifo frame count */
 	struct timer_list timer;
 };
