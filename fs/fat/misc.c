@@ -74,6 +74,7 @@ void fat_clusters_flush(struct super_block *sb)
 		       MSDOS_SB(sb)->fsinfo_sector);
 	} else {
 		fsinfo->free_clusters = CF_LE_L(MSDOS_SB(sb)->free_clusters);
+		fsinfo->next_cluster = CF_LE_L(MSDOS_SB(sb)->prev_free);
 		mark_buffer_dirty(bh);
 	}
 	brelse(bh);
@@ -130,19 +131,23 @@ int fat_add_cluster(struct inode *inode)
 		unlock_fat(sb);
 		return -ENOSPC;
 	}
-	limit = MSDOS_SB(sb)->clusters;
-	for (count = 0; count < limit; count++) {
-		nr = ((count + MSDOS_SB(sb)->prev_free) % limit) + 2;
+
+	limit = MSDOS_SB(sb)->clusters + 2;
+	nr = MSDOS_SB(sb)->prev_free + 1;
+	for (count = 0; count < MSDOS_SB(sb)->clusters; count++, nr++) {
+		nr = nr % limit;
+		if (nr < 2)
+			nr = 2;
 		if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
 			break;
 	}
-	if (count >= limit) {
+	if (count >= MSDOS_SB(sb)->clusters) {
 		MSDOS_SB(sb)->free_clusters = 0;
 		unlock_fat(sb);
 		return -ENOSPC;
 	}
-	
-	MSDOS_SB(sb)->prev_free = (count + MSDOS_SB(sb)->prev_free + 1) % limit;
+	MSDOS_SB(sb)->prev_free = nr;
+
 	fat_access(sb, nr, FAT_ENT_EOF);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
