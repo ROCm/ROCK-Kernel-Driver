@@ -16,7 +16,6 @@
 
 static const char *_name = DM_NAME;
 #define MAX_DEVICES (1 << KDEV_MINOR_BITS)
-#define SECTOR_SHIFT 9
 
 static int major = 0;
 static int _major = 0;

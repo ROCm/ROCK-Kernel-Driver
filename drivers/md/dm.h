@@ -29,6 +29,8 @@
 #define SECTOR_FORMAT "%lu"
 #endif
 
+#define SECTOR_SHIFT 9
+
 extern struct block_device_operations dm_blk_dops;
 
 /*
