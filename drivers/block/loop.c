@@ -155,20 +155,17 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 #define MAX_DISK_SIZE 1024*1024*1024
 
 static unsigned long
-compute_loop_size(struct loop_device *lo,
-		  struct dentry * lo_dentry, kdev_t lodev)
+compute_loop_size(struct loop_device *lo, struct dentry * lo_dentry)
 {
-	loff_t size = 0;
-
-	size = lo_dentry->d_inode->i_mapping->host->i_size;
+	loff_t size = lo_dentry->d_inode->i_mapping->host->i_size;
 	return (size - lo->lo_offset) >> BLOCK_SIZE_BITS;
 }
 
 static void figure_loop_size(struct loop_device *lo)
 {
 	loop_sizes[lo->lo_number] = compute_loop_size(lo,
-					lo->lo_backing_file->f_dentry,
-					lo->lo_device);
+					lo->lo_backing_file->f_dentry);
+					
 }
 
 static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
@@ -287,7 +284,7 @@ static int lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t
 
 static inline int loop_get_bs(struct loop_device *lo)
 {
-	return block_size(lo->lo_device);
+	return block_size(to_kdev_t(lo->lo_device->bd_dev));
 }
 
 static inline unsigned long loop_get_iv(struct loop_device *lo,
@@ -416,7 +413,7 @@ out_bh:
 	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
 	bio->bi_rw = rbh->bi_rw;
 	spin_lock_irq(&lo->lo_lock);
-	bio->bi_dev = lo->lo_device;
+	bio->bi_dev = to_kdev_t(lo->lo_device->bd_dev);
 	spin_unlock_irq(&lo->lo_lock);
 
 	return bio;
@@ -591,7 +588,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	struct file	*file;
 	struct inode	*inode;
 	kdev_t		dev = to_kdev_t(bdev->bd_dev);
-	kdev_t		lo_device;
+	struct block_device *lo_device;
 	int		lo_flags = 0;
 	int		error;
 
@@ -613,8 +610,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
 	if (S_ISBLK(inode->i_mode)) {
-		lo_device = inode->i_rdev;
-		if (inode->i_bdev == bdev) {
+		lo_device = inode->i_bdev;
+		if (lo_device == bdev) {
 			error = -EBUSY;
 			goto out;
 		}
@@ -630,7 +627,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		if (!aops->prepare_write || !aops->commit_write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
-		lo_device = inode->i_dev;
+		lo_device = inode->i_sb->s_bdev;
 		lo_flags |= LO_FLAGS_DO_BMAP;
 		error = 0;
 	} else
@@ -638,7 +635,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	get_file(file);
 
-	if (IS_RDONLY (inode) || is_read_only(lo_device)
+	if (IS_RDONLY (inode) || is_read_only(to_kdev_t(lo_device->bd_dev))
 	    || !(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
@@ -653,7 +650,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
-	set_blocksize(dev, block_size(lo_device));
+	set_blocksize(dev, block_size(to_kdev_t(lo_device->bd_dev)));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
@@ -724,7 +721,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	loop_release_xfer(lo);
 	lo->transfer = NULL;
 	lo->ioctl = NULL;
-	lo->lo_device = NODEV;
+	lo->lo_device = NULL;
 	lo->lo_encrypt_type = 0;
 	lo->lo_offset = 0;
 	lo->lo_encrypt_key_size = 0;
@@ -796,7 +793,7 @@ static int loop_get_status(struct loop_device *lo, struct loop_info *arg)
 	info.lo_number = lo->lo_number;
 	info.lo_device = kdev_t_to_nr(file->f_dentry->d_inode->i_dev);
 	info.lo_inode = file->f_dentry->d_inode->i_ino;
-	info.lo_rdevice = kdev_t_to_nr(lo->lo_device);
+	info.lo_rdevice = lo->lo_device->bd_dev;
 	info.lo_offset = lo->lo_offset;
 	info.lo_flags = lo->lo_flags;
 	strncpy(info.lo_name, lo->lo_name, LO_NAME_SIZE);

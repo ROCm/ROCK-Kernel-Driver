@@ -27,7 +27,6 @@ enum {
 struct loop_device {
 	int		lo_number;
 	int		lo_refcnt;
-	kdev_t		lo_device;
 	int		lo_offset;
 	int		lo_encrypt_type;
 	int		lo_encrypt_key_size;
@@ -43,6 +42,7 @@ struct loop_device {
 				 unsigned long arg); 
 
 	struct file *	lo_backing_file;
+	struct block_device *lo_device;
 	void		*key_data; 
 	char		key_reserved[48]; /* for use by the filter modules */
 
