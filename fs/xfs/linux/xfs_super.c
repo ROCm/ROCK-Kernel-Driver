@@ -217,11 +217,25 @@ xfs_blkdev_put(
 }
 
 void
-xfs_free_buftarg(
+xfs_flush_buftarg(
 	xfs_buftarg_t		*btp)
 {
 	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+}
+
+void
+xfs_free_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	xfs_flush_buftarg(btp);
 	kmem_free(btp, sizeof(*btp));
+}
+
+int
+xfs_readonly_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	return bdev_read_only(btp->pbr_bdev);
 }
 
 void
@@ -432,9 +446,8 @@ linvfs_put_super(
 
 	linvfs_stop_syncd(vfsp);
 	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_DELWRI, NULL, error);
-	if (error == 0) {
+	if (!error)
 		VFS_UNMOUNT(vfsp, 0, NULL, error);
-	}
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
 		printk("%s: vfsp/0x%p left dangling!\n", __FUNCTION__, vfsp);
@@ -483,12 +496,8 @@ linvfs_remount(
 	int			error;
 
 	VFS_PARSEARGS(vfsp, options, args, 1, error);
-	if (error)
-		goto out;
-
-	VFS_MNTUPDATE(vfsp, flags, args, error);
-
-out:
+	if (!error)
+		VFS_MNTUPDATE(vfsp, flags, args, error);
 	kmem_free(args, sizeof(*args));
 	return error;
 }
@@ -497,11 +506,10 @@ STATIC void
 linvfs_freeze_fs(
 	struct super_block	*sb)
 {
-	vfs_t			*vfsp;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t			*vp;
 	int			error;
 
-	vfsp = LINVFS_GET_VFS(sb);
 	if (sb->s_flags & MS_RDONLY)
 		return;
 	VFS_ROOT(vfsp, &vp, error);
@@ -513,11 +521,10 @@ STATIC void
 linvfs_unfreeze_fs(
 	struct super_block	*sb)
 {
-	vfs_t			*vfsp;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t			*vp;
 	int			error;
 
-	vfsp = LINVFS_GET_VFS(sb);
 	VFS_ROOT(vfsp, &vp, error);
 	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_THAW, 0, error);
 	VN_RELE(vp);
