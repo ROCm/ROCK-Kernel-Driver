@@ -185,7 +185,7 @@ adfs_adfs2unix_time(struct inode *inode)
 	unsigned int high, low;
 
 	if (ADFS_I(inode)->stamped == 0)
-		return CURRENT_TIME;
+		return get_seconds();
 
 	high = ADFS_I(inode)->loadaddr << 24;
 	low  = ADFS_I(inode)->execaddr;
