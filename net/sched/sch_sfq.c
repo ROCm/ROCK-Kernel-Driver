@@ -131,10 +131,6 @@ static __inline__ unsigned sfq_fold_hash(struct sfq_sched_data *q, u32 h, u32 h1
 	return h & 0x3FF;
 }
 
-#ifndef IPPROTO_ESP
-#define IPPROTO_ESP 50
-#endif
-
 static unsigned sfq_hash(struct sfq_sched_data *q, struct sk_buff *skb)
 {
 	u32 h, h2;
