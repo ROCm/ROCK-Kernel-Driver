@@ -933,7 +933,7 @@ static void tcp_v4_synq_add(struct sock *sk, struct open_request *req)
  * This routine does path mtu discovery as defined in RFC1191.
  */
 static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
-				     unsigned mtu)
+				     u32 mtu)
 {
 	struct dst_entry *dst;
 	struct inet_opt *inet = inet_sk(sk);
@@ -955,17 +955,19 @@ static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
 	if ((dst = __sk_dst_check(sk, 0)) == NULL)
 		return;
 
-	ip_rt_update_pmtu(dst, mtu);
+	dst->ops->update_pmtu(dst, mtu);
 
 	/* Something is about to be wrong... Remember soft error
 	 * for the case, if this connection will not able to recover.
 	 */
-	if (mtu < dst->pmtu && ip_dont_fragment(sk, dst))
+	if (mtu < dst_pmtu(dst) && ip_dont_fragment(sk, dst))
 		sk->err_soft = EMSGSIZE;
 
+	mtu = dst_pmtu(dst);
+
 	if (inet->pmtudisc != IP_PMTUDISC_DONT &&
-	    tp->pmtu_cookie > dst->pmtu) {
-		tcp_sync_mss(sk, dst->pmtu);
+	    tp->pmtu_cookie > mtu) {
+		tcp_sync_mss(sk, mtu);
 
 		/* Resend the TCP packet because it's
 		 * clear that the old packet has been
@@ -1523,7 +1525,7 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 			 (sysctl_max_syn_backlog - tcp_synq_len(sk) <
 			  (sysctl_max_syn_backlog >> 2)) &&
 			 (!peer || !peer->tcp_ts_stamp) &&
-			 (!dst || !dst->rtt)) {
+			 (!dst || !dst_metric(dst, RTAX_RTT))) {
 			/* Without syncookies last quarter of
 			 * backlog is filled with destinations,
 			 * proven to be alive.
@@ -1603,8 +1605,8 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newtp->ext_header_len += dst->header_len;
 	newinet->id = newtp->write_seq ^ jiffies;
 
-	tcp_sync_mss(newsk, dst->pmtu);
-	newtp->advmss = dst->advmss;
+	tcp_sync_mss(newsk, dst_pmtu(dst));
+	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);;
 	tcp_initialize_rcv_mss(newsk);
 
 	__tcp_v4_hash(newsk, 0);

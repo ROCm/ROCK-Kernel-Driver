@@ -519,9 +519,9 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (tiph->frag_off)
-		mtu = rt->u.dst.pmtu - sizeof(struct iphdr);
+		mtu = dst_pmtu(&rt->u.dst) - sizeof(struct iphdr);
 	else
-		mtu = skb->dst ? skb->dst->pmtu : dev->mtu;
+		mtu = skb->dst ? dst_pmtu(skb->dst) : dev->mtu;
 
 	if (mtu < 68) {
 		tunnel->stat.collisions++;
@@ -530,15 +530,9 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	if (mtu < IPV6_MIN_MTU)
 		mtu = IPV6_MIN_MTU;
-	if (skb->dst && mtu < skb->dst->pmtu) {
-		struct rt6_info *rt6 = (struct rt6_info*)skb->dst;
-		if (mtu < rt6->u.dst.pmtu) {
-			if (tunnel->parms.iph.daddr || rt6->rt6i_dst.plen == 128) {
-				rt6->rt6i_flags |= RTF_MODIFIED;
-				rt6->u.dst.pmtu = mtu;
-			}
-		}
-	}
+	if (tunnel->parms.iph.daddr && skb->dst)
+		skb->dst->ops->update_pmtu(skb->dst, mtu);
+
 	if (skb->len > mtu) {
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, dev);
 		ip_rt_put(rt);

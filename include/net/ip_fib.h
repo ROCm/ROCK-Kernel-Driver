@@ -67,7 +67,7 @@ struct fib_info
 	int			fib_protocol;
 	u32			fib_prefsrc;
 	u32			fib_priority;
-	unsigned		fib_metrics[RTAX_MAX];
+	u32			fib_metrics[RTAX_MAX];
 #define fib_mtu fib_metrics[RTAX_MTU-1]
 #define fib_window fib_metrics[RTAX_WINDOW-1]
 #define fib_rtt fib_metrics[RTAX_RTT-1]

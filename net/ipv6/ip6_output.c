@@ -191,6 +191,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	u8  proto = fl->proto;
 	int seg_len = skb->len;
 	int hlimit;
+	u32 mtu;
 
 	if (opt) {
 		int head_room;
@@ -237,14 +238,15 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	ipv6_addr_copy(&hdr->saddr, fl->nl_u.ip6_u.saddr);
 	ipv6_addr_copy(&hdr->daddr, first_hop);
 
-	if (skb->len <= dst->pmtu) {
+	mtu = dst_pmtu(dst);
+	if (skb->len <= mtu) {
 		IP6_INC_STATS(Ip6OutRequests);
 		return NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, ip6_maybe_reroute);
 	}
 
 	if (net_ratelimit())
 		printk(KERN_DEBUG "IPv6: sending pkt_too_big to self\n");
-	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, dst->pmtu, skb->dev);
+	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 	kfree_skb(skb);
 	return -EMSGSIZE;
 }
@@ -600,7 +602,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		}
 	}
 
-	mtu = dst->pmtu;
+	mtu = dst_pmtu(dst);
 	if (np->frag_size < mtu) {
 		if (np->frag_size)
 			mtu = np->frag_size;
@@ -796,10 +798,10 @@ int ip6_forward(struct sk_buff *skb)
 		goto error;
 	}
 
-	if (skb->len > dst->pmtu) {
+	if (skb->len > dst_pmtu(dst)) {
 		/* Again, force OUTPUT device used as source address */
 		skb->dev = dst->dev;
-		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, dst->pmtu, skb->dev);
+		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, dst_pmtu(dst), skb->dev);
 		IP6_INC_STATS_BH(Ip6InTooBigErrors);
 		kfree_skb(skb);
 		return -EMSGSIZE;

@@ -759,7 +759,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 			in6_dev->cnf.mtu6 = mtu;
 
 			if (rt)
-				rt->u.dst.pmtu = mtu;
+				rt->u.dst.metrics[RTAX_MTU-1] = mtu;
 
 			rt6_mtu_change(skb->dev, mtu);
 		}

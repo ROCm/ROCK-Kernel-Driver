@@ -9,6 +9,7 @@
 #define _NET_DST_H
 
 #include <linux/config.h>
+#include <linux/rtnetlink.h>
 #include <net/neighbour.h>
 
 /*
@@ -21,6 +22,13 @@
 #define DST_GC_MIN	(1*HZ)
 #define DST_GC_INC	(5*HZ)
 #define DST_GC_MAX	(120*HZ)
+
+/* Each dst_entry has reference count and sits in some parent list(s).
+ * When it is removed from parent list, it is "freed" (dst_free).
+ * After this it enters dead state (dst->obsolete > 0) and if its refcnt
+ * is zero, it can be destroyed immediately, otherwise it is added
+ * to gc list and garbage collector periodically checks the refcnt.
+ */
 
 struct sk_buff;
 
@@ -39,15 +47,8 @@ struct dst_entry
 
 	unsigned		header_len;	/* more space at head required */
 
-	unsigned		mxlock;
-	unsigned		pmtu;
-	unsigned		window;
-	unsigned		rtt;
-	unsigned		rttvar;
-	unsigned		ssthresh;
-	unsigned		cwnd;
-	unsigned		advmss;
-	unsigned		reordering;
+	u32			metrics[RTAX_MAX];
+	struct dst_entry	*path;
 
 	unsigned long		rate_last;	/* rate limiting for ICMP */
 	unsigned long		rate_tokens;
@@ -81,6 +82,8 @@ struct dst_ops
 	void			(*destroy)(struct dst_entry *);
 	struct dst_entry *	(*negative_advice)(struct dst_entry *);
 	void			(*link_failure)(struct sk_buff *);
+	void			(*update_pmtu)(struct dst_entry *dst, u32 mtu);
+	int			(*get_mss)(struct dst_entry *dst, u32 mtu);
 	int			entry_size;
 
 	atomic_t		entries;
@@ -88,6 +91,33 @@ struct dst_ops
 };
 
 #ifdef __KERNEL__
+
+static inline u32
+dst_metric(struct dst_entry *dst, int metric)
+{
+	return dst->metrics[metric-1];
+}
+
+static inline u32
+dst_path_metric(struct dst_entry *dst, int metric)
+{
+	return dst->path->metrics[metric-1];
+}
+
+static inline u32
+dst_pmtu(struct dst_entry *dst)
+{
+	u32 mtu = dst_path_metric(dst, RTAX_MTU);
+	/* Yes, _exactly_. This is paranoia. */
+	barrier();
+	return mtu;
+}
+
+static inline int
+dst_metric_locked(struct dst_entry *dst, int metric)
+{
+	return dst_metric(dst, RTAX_LOCK) & (1<<metric);
+}
 
 static inline void dst_hold(struct dst_entry * dst)
 {

@@ -1058,10 +1058,12 @@ static int dn_rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event, int
 	RTA_PUT(skb, RTA_SRC, 2, &rt->rt_saddr);
 	if (rt->u.dst.dev)
 		RTA_PUT(skb, RTA_OIF, sizeof(int), &rt->u.dst.dev->ifindex);
-	if (rt->u.dst.window)
-		RTA_PUT(skb, RTAX_WINDOW, sizeof(unsigned), &rt->u.dst.window);
-	if (rt->u.dst.rtt)
-		RTA_PUT(skb, RTAX_RTT, sizeof(unsigned), &rt->u.dst.rtt);
+	if (dst_metric(&rt->u.dst, RTAX_WINDOW))
+		RTA_PUT(skb, RTAX_WINDOW, sizeof(unsigned),
+			&rt->u.dst.metrics[RTAX_WINDOW - 1]);
+	if (dst_metric(&rt->u.dst, RTAX_RTT))
+		RTA_PUT(skb, RTAX_RTT, sizeof(unsigned),
+			&rt->u.dst.metrics[RTAX_RTT]);
 
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
@@ -1217,7 +1219,7 @@ static int decnet_cache_get_info(char *buffer, char **start, off_t offset, int l
 					dn_addr2asc(dn_ntohs(rt->rt_saddr), buf2),
 					atomic_read(&rt->u.dst.__refcnt),
 					rt->u.dst.__use,
-					(int)rt->u.dst.rtt
+					(int) dst_metric(&rt->u.dst, RTAX_RTT)
 					);
 
 

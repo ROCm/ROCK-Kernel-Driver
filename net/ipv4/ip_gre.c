@@ -773,13 +773,16 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	df = tiph->frag_off;
 	if (df)
-		mtu = rt->u.dst.pmtu - tunnel->hlen;
+		mtu = dst_pmtu(&rt->u.dst) - tunnel->hlen;
 	else
-		mtu = skb->dst ? skb->dst->pmtu : dev->mtu;
+		mtu = skb->dst ? dst_pmtu(skb->dst) : dev->mtu;
+
+	if (skb->dst)
+		skb->dst->ops->update_pmtu(skb->dst, mtu);
 
 	if (skb->protocol == htons(ETH_P_IP)) {
-		if (skb->dst && mtu < skb->dst->pmtu && mtu >= 68)
-			skb->dst->pmtu = mtu;
+		if (skb->dst)
+			skb->dst->ops->update_pmtu(skb->dst, mtu);
 
 		df |= (old_iph->frag_off&htons(IP_DF));
 
@@ -794,11 +797,11 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	else if (skb->protocol == htons(ETH_P_IPV6)) {
 		struct rt6_info *rt6 = (struct rt6_info*)skb->dst;
 
-		if (rt6 && mtu < rt6->u.dst.pmtu && mtu >= IPV6_MIN_MTU) {
+		if (rt6 && mtu < dst_pmtu(skb->dst) && mtu >= IPV6_MIN_MTU) {
 			if ((tunnel->parms.iph.daddr && !MULTICAST(tunnel->parms.iph.daddr)) ||
 			    rt6->rt6i_dst.plen == 128) {
 				rt6->rt6i_flags |= RTF_MODIFIED;
-				skb->dst->pmtu = mtu;
+				skb->dst->metrics[RTAX_MTU-1] = mtu;
 			}
 		}
 

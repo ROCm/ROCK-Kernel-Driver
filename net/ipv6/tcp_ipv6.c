@@ -805,8 +805,8 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 		if (dst->error) {
 			sk->err_soft = -dst->error;
-		} else if (tp->pmtu_cookie > dst->pmtu) {
-			tcp_sync_mss(sk, dst->pmtu);
+		} else if (tp->pmtu_cookie > dst_pmtu(dst)) {
+			tcp_sync_mss(sk, dst_pmtu(dst));
 			tcp_simple_retransmit(sk);
 		} /* else let the usual retransmit timer handle it */
 		dst_release(dst);
@@ -1416,8 +1416,8 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		newtp->ext_header_len = newnp->opt->opt_nflen +
 					newnp->opt->opt_flen;
 
-	tcp_sync_mss(newsk, dst->pmtu);
-	newtp->advmss = dst->advmss;
+	tcp_sync_mss(newsk, dst_pmtu(dst));
+	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(newsk);
 
 	newinet->daddr = newinet->saddr = newinet->rcv_saddr = LOOPBACK4_IPV6;

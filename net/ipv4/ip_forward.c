@@ -40,6 +40,9 @@
 #include <net/checksum.h>
 #include <linux/route.h>
 #include <net/route.h>
+#if 0
+#include <net/xfrm.h>
+#endif
 
 static inline int ip_forward_finish(struct sk_buff *skb)
 {
@@ -55,12 +58,14 @@ static inline int ip_forward_finish(struct sk_buff *skb)
 
 int ip_forward(struct sk_buff *skb)
 {
-	struct net_device *dev2;	/* Output device */
 	struct iphdr *iph;	/* Our header */
 	struct rtable *rt;	/* Route we use */
 	struct ip_options * opt	= &(IPCB(skb)->opt);
-	unsigned short mtu;
 
+#if 0
+	if (!xfrm_policy_check(XFRM_POLICY_FWD, skb))
+		goto drop;
+#endif
 	if (IPCB(skb)->opt.router_alert && ip_call_ra_chain(skb))
 		return NET_RX_SUCCESS;
 
@@ -76,22 +81,28 @@ int ip_forward(struct sk_buff *skb)
 	 */
 
 	iph = skb->nh.iph;
-	rt = (struct rtable*)skb->dst;
 
 	if (iph->ttl <= 1)
                 goto too_many_hops;
 
+#if 0
+	if (!xfrm_route_forward(skb))
+		goto drop;
+#endif
+
+	iph = skb->nh.iph;
+	rt = (struct rtable*)skb->dst;
+
 	if (opt->is_strictroute && rt->rt_dst != rt->rt_gateway)
-                goto sr_failed;
+		goto sr_failed;
 
-	/*
-	 *	Having picked a route we can now send the frame out
-	 *	after asking the firewall permission to do so.
-	 */
+	/* We are about to mangle packet. Copy it! */
+	if (skb_cow(skb, rt->u.dst.dev->hard_header_len+rt->u.dst.header_len))
+		goto drop;
+	iph = skb->nh.iph;
 
-	skb->priority = rt_tos2priority(iph->tos);
-	dev2 = rt->u.dst.dev;
-	mtu = rt->u.dst.pmtu;
+	/* Decrease ttl after skb cow done */
+	ip_decrease_ttl(iph);
 
 	/*
 	 *	We now generate an ICMP HOST REDIRECT giving the route
@@ -100,38 +111,10 @@ int ip_forward(struct sk_buff *skb)
 	if (rt->rt_flags&RTCF_DOREDIRECT && !opt->srr)
 		ip_rt_send_redirect(skb);
 
-	/* We are about to mangle packet. Copy it! */
-	if (skb_cow(skb, dev2->hard_header_len))
-		goto drop;
-	iph = skb->nh.iph;
+	skb->priority = rt_tos2priority(iph->tos);
 
-	/* Decrease ttl after skb cow done */
-	ip_decrease_ttl(iph);
-
-	/*
-	 * We now may allocate a new buffer, and copy the datagram into it.
-	 * If the indicated interface is up and running, kick it.
-	 */
-
-	if (skb->len > mtu && (ntohs(iph->frag_off) & IP_DF))
-		goto frag_needed;
-
-#ifdef CONFIG_IP_ROUTE_NAT
-	if (rt->rt_flags & RTCF_NAT) {
-		if (ip_do_nat(skb)) {
-			kfree_skb(skb);
-			return NET_RX_BAD;
-		}
-	}
-#endif
-
-	return NF_HOOK(PF_INET, NF_IP_FORWARD, skb, skb->dev, dev2,
+	return NF_HOOK(PF_INET, NF_IP_FORWARD, skb, skb->dev, rt->u.dst.dev,
 		       ip_forward_finish);
-
-frag_needed:
-	IP_INC_STATS_BH(IpFragFails);
-	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
-        goto drop;
 
 sr_failed:
         /*

@@ -175,7 +175,7 @@ int sctp_v6_get_dst_mtu(const sockaddr_storage_t *address)
 
 	dst = ip6_route_output(NULL, &fl);
 	if (dst) {
-		dst_mtu = dst->pmtu;
+		dst_mtu = dst_pmtu(dst);
 		SCTP_DEBUG_PRINTK("sctp_v6_get_dst_mtu: "
 				  "ip6_route_output: dev:%s pmtu:%d\n",
 				  dst->dev->name, dst_mtu);

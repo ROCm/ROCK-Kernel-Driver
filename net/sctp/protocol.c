@@ -268,7 +268,7 @@ int sctp_v4_get_dst_mtu(const sockaddr_storage_t *address)
 				  " failed, returning %d as dst_mtu\n",
 				  dst_mtu);
 	} else {
-		dst_mtu = rt->u.dst.pmtu;
+		dst_mtu = dst_pmtu(&rt->u.dst);
 		SCTP_DEBUG_PRINTK("sctp_v4_get_dst_mtu: "
 				  "ip_route_output_key: dev:%s pmtu:%d\n",
 				  rt->u.dst.dev->name, dst_mtu);

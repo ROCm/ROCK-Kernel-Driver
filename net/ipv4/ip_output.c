@@ -287,6 +287,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 	struct ip_options *opt = inet->opt;
 	struct rtable *rt;
 	struct iphdr *iph;
+	u32 mtu;
 
 	/* Skip all of this if the packet is already routed,
 	 * f.e. by something like SCTP.
@@ -352,12 +353,13 @@ packet_routed:
 		ip_options_build(skb, opt, inet->daddr, rt, 0);
 	}
 
-	if (skb->len > rt->u.dst.pmtu && (sk->route_caps&NETIF_F_TSO)) {
+	mtu = dst_pmtu(&rt->u.dst);
+	if (skb->len > mtu && (sk->route_caps&NETIF_F_TSO)) {
 		unsigned int hlen;
 
 		/* Hack zone: all this must be done by TCP. */
 		hlen = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
-		skb_shinfo(skb)->tso_size = rt->u.dst.pmtu - hlen;
+		skb_shinfo(skb)->tso_size = mtu - hlen;
 		skb_shinfo(skb)->tso_segs =
 			(skb->len - hlen + skb_shinfo(skb)->tso_size - 1)/
 				skb_shinfo(skb)->tso_size - 1;
@@ -436,7 +438,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 
 	if (unlikely(iph->frag_off & htons(IP_DF))) {
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
-			  htonl(rt->u.dst.pmtu));
+			  htonl(dst_pmtu(&rt->u.dst)));
 		kfree_skb(skb);
 		return -EMSGSIZE;
 	}
@@ -446,7 +448,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	 */
 
 	hlen = iph->ihl * 4;
-	mtu = rt->u.dst.pmtu - hlen;	/* Size of data space */
+	mtu = dst_pmtu(&rt->u.dst) - hlen;	/* Size of data space */
 
 	/* When frag_list is given, use it. First, check its validity:
 	 * some transformers could create wrong frag_list or break existing
@@ -747,7 +749,7 @@ int ip_append_data(struct sock *sk,
 			inet->cork.addr = ipc->addr;
 		}
 		dst_hold(&rt->u.dst);
-		inet->cork.fragsize = mtu = rt->u.dst.pmtu;
+		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.rt = rt;
 		inet->cork.length = 0;
 		inet->sndmsg_page = NULL;
@@ -834,7 +836,7 @@ alloc_new_skb:
 			 *	Find where to start putting bytes.
 			 */
 			data = skb_put(skb, fraglen);
-			skb->nh.raw = __skb_pull(skb, exthdrlen);
+			skb->nh.raw = data + exthdrlen;
 			data += fragheaderlen;
 			skb->h.raw = data + exthdrlen;
 
@@ -1063,6 +1065,9 @@ int ip_push_pending_frames(struct sock *sk)
 		goto out;
 	tail_skb = &(skb_shinfo(skb)->frag_list);
 
+	/* move skb->data to ip header from ext header */
+	if (skb->data < skb->nh.raw)
+		__skb_pull(skb, skb->nh.raw - skb->data);
 	while ((tmp_skb = __skb_dequeue(&sk->write_queue)) != NULL) {
 		__skb_pull(tmp_skb, skb->h.raw - skb->nh.raw);
 		*tail_skb = tmp_skb;

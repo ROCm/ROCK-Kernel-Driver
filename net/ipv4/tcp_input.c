@@ -526,25 +526,25 @@ void tcp_update_metrics(struct sock *sk)
 			 * Probably, no packets returned in time.
 			 * Reset our results.
 			 */
-			if (!(dst->mxlock&(1<<RTAX_RTT)))
-				dst->rtt = 0;
+			if (!(dst_metric_locked(dst, RTAX_RTT)))
+				dst->metrics[RTAX_RTT-1] = 0;
 			return;
 		}
 
-		m = dst->rtt - tp->srtt;
+		m = dst_metric(dst, RTAX_RTT) - tp->srtt;
 
 		/* If newly calculated rtt larger than stored one,
 		 * store new one. Otherwise, use EWMA. Remember,
 		 * rtt overestimation is always better than underestimation.
 		 */
-		if (!(dst->mxlock&(1<<RTAX_RTT))) {
+		if (!(dst_metric_locked(dst, RTAX_RTT))) {
 			if (m <= 0)
-				dst->rtt = tp->srtt;
+				dst->metrics[RTAX_RTT-1] = tp->srtt;
 			else
-				dst->rtt -= (m>>3);
+				dst->metrics[RTAX_RTT-1] -= (m>>3);
 		}
 
-		if (!(dst->mxlock&(1<<RTAX_RTTVAR))) {
+		if (!(dst_metric_locked(dst, RTAX_RTTVAR))) {
 			if (m < 0)
 				m = -m;
 
@@ -553,45 +553,46 @@ void tcp_update_metrics(struct sock *sk)
 			if (m < tp->mdev)
 				m = tp->mdev;
 
-			if (m >= dst->rttvar)
-				dst->rttvar = m;
+			if (m >= dst_metric(dst, RTAX_RTTVAR))
+				dst->metrics[RTAX_RTTVAR-1] = m;
 			else
-				dst->rttvar -= (dst->rttvar - m)>>2;
+				dst->metrics[RTAX_RTT-1] -=
+					(dst->metrics[RTAX_RTT-1] - m)>>2;
 		}
 
 		if (tp->snd_ssthresh >= 0xFFFF) {
 			/* Slow start still did not finish. */
-			if (dst->ssthresh &&
-			    !(dst->mxlock&(1<<RTAX_SSTHRESH)) &&
-			    (tp->snd_cwnd >> 1) > dst->ssthresh)
-				dst->ssthresh = tp->snd_cwnd >> 1;
-			if (!(dst->mxlock&(1<<RTAX_CWND)) &&
-			    tp->snd_cwnd > dst->cwnd)
-				dst->cwnd = tp->snd_cwnd;
+			if (dst_metric(dst, RTAX_SSTHRESH) &&
+			    !dst_metric_locked(dst, RTAX_SSTHRESH) &&
+			    (tp->snd_cwnd >> 1) > dst_metric(dst, RTAX_SSTHRESH))
+				dst->metrics[RTAX_SSTHRESH-1] = tp->snd_cwnd >> 1;
+			if (!dst_metric_locked(dst, RTAX_CWND) &&
+			    tp->snd_cwnd > dst_metric(dst, RTAX_CWND))
+				dst->metrics[RTAX_CWND-1] = tp->snd_cwnd;
 		} else if (tp->snd_cwnd > tp->snd_ssthresh &&
 			   tp->ca_state == TCP_CA_Open) {
 			/* Cong. avoidance phase, cwnd is reliable. */
-			if (!(dst->mxlock&(1<<RTAX_SSTHRESH)))
-				dst->ssthresh = max(tp->snd_cwnd >> 1,
-						    tp->snd_ssthresh);
-			if (!(dst->mxlock&(1<<RTAX_CWND)))
-				dst->cwnd = (dst->cwnd + tp->snd_cwnd) >> 1;
+			if (!dst_metric_locked(dst, RTAX_SSTHRESH))
+				dst->metrics[RTAX_SSTHRESH-1] =
+					max(tp->snd_cwnd >> 1, tp->snd_ssthresh);
+			if (!dst_metric_locked(dst, RTAX_CWND))
+				dst->metrics[RTAX_CWND-1] = (dst->metrics[RTAX_CWND-1] + tp->snd_cwnd) >> 1;
 		} else {
 			/* Else slow start did not finish, cwnd is non-sense,
 			   ssthresh may be also invalid.
 			 */
-			if (!(dst->mxlock&(1<<RTAX_CWND)))
-				dst->cwnd = (dst->cwnd + tp->snd_ssthresh) >> 1;
-			if (dst->ssthresh &&
-			    !(dst->mxlock&(1<<RTAX_SSTHRESH)) &&
-			    tp->snd_ssthresh > dst->ssthresh)
-				dst->ssthresh = tp->snd_ssthresh;
+			if (!dst_metric_locked(dst, RTAX_CWND))
+				dst->metrics[RTAX_CWND-1] = (dst->metrics[RTAX_CWND-1] + tp->snd_ssthresh) >> 1;
+			if (dst->metrics[RTAX_SSTHRESH-1] &&
+			    !dst_metric_locked(dst, RTAX_SSTHRESH) &&
+			    tp->snd_ssthresh > dst->metrics[RTAX_SSTHRESH-1])
+				dst->metrics[RTAX_SSTHRESH-1] = tp->snd_ssthresh;
 		}
 
-		if (!(dst->mxlock&(1<<RTAX_REORDERING))) {
-			if (dst->reordering < tp->reordering &&
+		if (!dst_metric_locked(dst, RTAX_REORDERING)) {
+			if (dst->metrics[RTAX_REORDERING-1] < tp->reordering &&
 			    tp->reordering != sysctl_tcp_reordering)
-				dst->reordering = tp->reordering;
+				dst->metrics[RTAX_REORDERING-1] = tp->reordering;
 		}
 	}
 }
@@ -630,22 +631,23 @@ static void tcp_init_metrics(struct sock *sk)
 
 	dst_confirm(dst);
 
-	if (dst->mxlock&(1<<RTAX_CWND))
-		tp->snd_cwnd_clamp = dst->cwnd;
-	if (dst->ssthresh) {
-		tp->snd_ssthresh = dst->ssthresh;
+	if (dst_metric_locked(dst, RTAX_CWND))
+		tp->snd_cwnd_clamp = dst_metric(dst, RTAX_CWND);
+	if (dst_metric(dst, RTAX_SSTHRESH)) {
+		tp->snd_ssthresh = dst_metric(dst, RTAX_SSTHRESH);
 		if (tp->snd_ssthresh > tp->snd_cwnd_clamp)
 			tp->snd_ssthresh = tp->snd_cwnd_clamp;
 	}
-	if (dst->reordering && tp->reordering != dst->reordering) {
+	if (dst_metric(dst, RTAX_REORDERING) &&
+	    tp->reordering != dst_metric(dst, RTAX_REORDERING)) {
 		tp->sack_ok &= ~2;
-		tp->reordering = dst->reordering;
+		tp->reordering = dst_metric(dst, RTAX_REORDERING);
 	}
 
-	if (dst->rtt == 0)
+	if (dst_metric(dst, RTAX_RTT) == 0)
 		goto reset;
 
-	if (!tp->srtt && dst->rtt < (TCP_TIMEOUT_INIT << 3))
+	if (!tp->srtt && dst_metric(dst, RTAX_RTT) < (TCP_TIMEOUT_INIT << 3))
 		goto reset;
 
 	/* Initial rtt is determined from SYN,SYN-ACK.
@@ -662,10 +664,10 @@ static void tcp_init_metrics(struct sock *sk)
 	 * to low value, and then abruptly stops to do it and starts to delay
 	 * ACKs, wait for troubles.
 	 */
-	if (dst->rtt > tp->srtt)
-		tp->srtt = dst->rtt;
-	if (dst->rttvar > tp->mdev) {
-		tp->mdev = dst->rttvar;
+	if (dst_metric(dst, RTAX_RTT) > tp->srtt)
+		tp->srtt = dst_metric(dst, RTAX_RTT);
+	if (dst_metric(dst, RTAX_RTTVAR) > tp->mdev) {
+		tp->mdev = dst_metric(dst, RTAX_RTTVAR);
 		tp->mdev_max = tp->rttvar = max(tp->mdev, TCP_RTO_MIN);
 	}
 	tcp_set_rto(tp);

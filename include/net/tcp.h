@@ -921,9 +921,11 @@ static __inline__ unsigned int tcp_current_mss(struct sock *sk, int large)
 	int mss_now = large && (sk->route_caps&NETIF_F_TSO) && !tp->urg_mode ?
 		tp->mss_cache : tp->mss_cache_std;
 
-	if (dst && dst->pmtu != tp->pmtu_cookie)
- 		mss_now = tcp_sync_mss(sk, dst->pmtu);
-
+	if (dst) {
+		u32 mtu = dst_pmtu(dst);
+		if (mtu != tp->pmtu_cookie)
+			mss_now = tcp_sync_mss(sk, mtu);
+	}
 	if (tp->eff_sacks)
 		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
 			    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
