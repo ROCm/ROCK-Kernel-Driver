@@ -144,6 +144,12 @@ struct page * vmalloc_to_page(void *addr)
 	return virt_to_page(addr);
 }
 
+unsigned long vmalloc_to_pfn(void *addr)
+{
+	return page_to_pfn(virt_to_page(addr));
+}
+
+
 long vread(char *buf, char *addr, unsigned long count)
 {
 	memcpy(buf, addr, count);

@@ -1805,6 +1805,16 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 
 EXPORT_SYMBOL(vmalloc_to_page);
 
+/*
+ * Map a vmalloc()-space virtual address to the physical page frame number.
+ */
+unsigned long vmalloc_to_pfn(void * vmalloc_addr)
+{
+	return page_to_pfn(vmalloc_to_page(vmalloc_addr));
+}
+
+EXPORT_SYMBOL(vmalloc_to_pfn);
+
 #if !defined(CONFIG_ARCH_GATE_AREA)
 
 #if defined(AT_SYSINFO_EHDR)

@@ -758,6 +758,7 @@ static inline unsigned long vma_pages(struct vm_area_struct *vma)
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
 extern struct page * vmalloc_to_page(void *addr);
+extern unsigned long vmalloc_to_pfn(void *addr);
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
