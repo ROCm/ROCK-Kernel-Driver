@@ -2758,6 +2758,10 @@ Your cooperation is appreciated.
 		 43 = /dev/ttySMX2		Motorola i.MX - port 2
 		 44 = /dev/ttyMM0		Marvell MPSC - port 0
 		 45 = /dev/ttyMM1		Marvell MPSC - port 1
+		 46 = /dev/ttyCPM0		PPC CPM (SCC or SMC) - port 0
+		    ...
+		 49 = /dev/ttyCPM5		PPC CPM (SCC or SMC) - port 5
+
 
 205 char	Low-density serial ports (alternate device)
 		  0 = /dev/culu0		Callout device for ttyLU0
@@ -2786,6 +2790,9 @@ Your cooperation is appreciated.
 		 41 = /dev/ttySMX0		Callout device for ttySMX0
 		 42 = /dev/ttySMX1		Callout device for ttySMX1
 		 43 = /dev/ttySMX2		Callout device for ttySMX2
+		 46 = /dev/cucpm0		Callout device for ttyCPM0
+		    ...
+		 49 = /dev/cucpm5		Callout device for ttyCPM5
 
 206 char	OnStream SC-x0 tape devices
 		  0 = /dev/osst0		First OnStream SCSI tape, mode 0
