@@ -2719,6 +2719,7 @@ Your cooperation is appreciated.
 		 32 = /dev/ttyDB0		DataBooster serial port 0
 		    ...
 		 39 = /dev/ttyDB7		DataBooster serial port 7
+		 40 = /dev/ttySG0		SGI Altix console port
 
 205 char	Low-density serial ports (alternate device)
 		  0 = /dev/culu0		Callout device for ttyLU0
@@ -2743,6 +2744,7 @@ Your cooperation is appreciated.
 		 32 = /dev/cudb0		Callout device for ttyDB0
 		    ...
 		 39 = /dev/cudb7		Callout device for ttyDB7
+		 40 = /dev/cusg0		Callout device for ttySG0
 
 206 char	OnStream SC-x0 tape devices
 		  0 = /dev/osst0		First OnStream SCSI tape, mode 0

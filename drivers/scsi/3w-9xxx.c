@@ -619,6 +619,7 @@ static int twa_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int
 	u32 current_time_ms;
 	TW_Device_Extension *tw_dev = twa_device_extension_list[iminor(inode)];
 	int retval = TW_IOCTL_ERROR_OS_EFAULT;
+	void __user *argp = (void __user *)arg;
 
 	/* Only let one of these through at a time */
 	if (down_interruptible(&tw_dev->ioctl_sem)) {
@@ -627,7 +628,7 @@ static int twa_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int
 	}
 
 	/* First copy down the driver command */
-	if (copy_from_user(&driver_command, (void *)arg, sizeof(TW_Ioctl_Driver_Command)))
+	if (copy_from_user(&driver_command, argp, sizeof(TW_Ioctl_Driver_Command)))
 		goto out2;
 
 	/* Check data buffer size */
@@ -649,7 +650,7 @@ static int twa_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int
 	tw_ioctl = (TW_Ioctl_Buf_Apache *)cpu_addr;
 
 	/* Now copy down the entire ioctl */
-	if (copy_from_user(tw_ioctl, (void *)arg, driver_command.buffer_length + sizeof(TW_Ioctl_Buf_Apache) - 1))
+	if (copy_from_user(tw_ioctl, argp, driver_command.buffer_length + sizeof(TW_Ioctl_Buf_Apache) - 1))
 		goto out3;
 
 	/* See which ioctl we are doing */
@@ -659,7 +660,7 @@ static int twa_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int
 		twa_get_request_id(tw_dev, &request_id);
 
 		/* Flag internal command */
-		tw_dev->srb[request_id] = 0;
+		tw_dev->srb[request_id] = NULL;
 
 		/* Flag chrdev ioctl */
 		tw_dev->chrdev_request_id = request_id;
@@ -844,7 +845,7 @@ static int twa_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int
 	}
 
 	/* Now copy the entire response to userspace */
-	if (copy_to_user((void *)arg, tw_ioctl, sizeof(TW_Ioctl_Buf_Apache) + driver_command.buffer_length - 1) == 0)
+	if (copy_to_user(argp, tw_ioctl, sizeof(TW_Ioctl_Buf_Apache) + driver_command.buffer_length - 1) == 0)
 		retval = 0;
 out3:
 	/* Now free ioctl buf memory */

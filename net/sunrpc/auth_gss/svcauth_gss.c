@@ -503,7 +503,7 @@ static inline u32 round_up_to_quad(u32 i)
 }
 
 static inline int
-svc_safe_getnetobj(struct iovec *argv, struct xdr_netobj *o)
+svc_safe_getnetobj(struct kvec *argv, struct xdr_netobj *o)
 {
 	int l;
 
@@ -520,7 +520,7 @@ svc_safe_getnetobj(struct iovec *argv, struct xdr_netobj *o)
 }
 
 static inline int
-svc_safe_putnetobj(struct iovec *resv, struct xdr_netobj *o)
+svc_safe_putnetobj(struct kvec *resv, struct xdr_netobj *o)
 {
 	u32 *p;
 
@@ -548,8 +548,8 @@ gss_verify_header(struct svc_rqst *rqstp, struct rsc *rsci,
 	struct xdr_buf		rpchdr;
 	struct xdr_netobj	checksum;
 	u32			flavor = 0;
-	struct iovec		*argv = &rqstp->rq_arg.head[0];
-	struct iovec		iov;
+	struct kvec		*argv = &rqstp->rq_arg.head[0];
+	struct kvec		iov;
 
 	/* data to compute the checksum over: */
 	iov.iov_base = rpcstart;
@@ -595,7 +595,7 @@ gss_write_verf(struct svc_rqst *rqstp, struct gss_ctx *ctx_id, u32 seq)
 	struct xdr_buf		verf_data;
 	struct xdr_netobj	mic;
 	u32			*p;
-	struct iovec		iov;
+	struct kvec		iov;
 
 	svc_putu32(rqstp->rq_res.head, htonl(RPC_AUTH_GSS));
 	xdr_seq = htonl(seq);
@@ -743,8 +743,8 @@ struct gss_svc_data {
 static int
 svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct iovec	*argv = &rqstp->rq_arg.head[0];
-	struct iovec	*resv = &rqstp->rq_res.head[0];
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
 	u32		crlen;
 	struct xdr_netobj tmpobj;
 	struct gss_svc_data *svcdata = rqstp->rq_auth_data;
@@ -952,7 +952,7 @@ svcauth_gss_release(struct svc_rqst *rqstp)
 	struct xdr_buf *resbuf = &rqstp->rq_res;
 	struct xdr_buf integ_buf;
 	struct xdr_netobj mic;
-	struct iovec *resv;
+	struct kvec *resv;
 	u32 *p;
 	int integ_offset, integ_len;
 	int stat = -EINVAL;

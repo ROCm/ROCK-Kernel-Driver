@@ -128,10 +128,10 @@ static inline void ip_tr_mc_map(u32 addr, char *buf)
 }
 
 struct ip_reply_arg {
-	struct iovec iov[1];   
-	u32 	     csum; 
-	int	     csumoffset; /* u16 offset of csum in iov[0].iov_base */
-				 /* -1 if not needed */ 
+	struct kvec iov[1];   
+	u32 	    csum; 
+	int	    csumoffset; /* u16 offset of csum in iov[0].iov_base */
+				/* -1 if not needed */ 
 }; 
 
 void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *arg,

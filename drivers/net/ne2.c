@@ -776,14 +776,12 @@ static int irq[MAX_NE_CARDS];
 static int bad[MAX_NE_CARDS];	/* 0xbad = bad sig or no reset ack */
 MODULE_LICENSE("GPL");
 
-#ifdef MODULE_PARM
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");
 MODULE_PARM(bad, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");
 MODULE_PARM_DESC(io, "(ignored)");
 MODULE_PARM_DESC(irq, "(ignored)");
 MODULE_PARM_DESC(bad, "(ignored)");
-#endif
 
 /* Module code fixed by David Weinehall */
 

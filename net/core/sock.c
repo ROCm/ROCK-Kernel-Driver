@@ -1065,30 +1065,12 @@ int sock_no_mmap(struct file *file, struct socket *sock, struct vm_area_struct *
 ssize_t sock_no_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
 {
 	ssize_t res;
-	struct msghdr msg;
-	struct iovec iov;
-	mm_segment_t old_fs;
-	char *kaddr;
-
-	kaddr = kmap(page);
-
-	msg.msg_name = NULL;
-	msg.msg_namelen = 0;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_flags = flags;
-
-	/* This cast is ok because of the "set_fs(KERNEL_DS)" */
-	iov.iov_base = (void __user *) (kaddr + offset);
+	struct msghdr msg = {.msg_flags = flags};
+	struct kvec iov;
+	char *kaddr = kmap(page);
+	iov.iov_base = kaddr + offset;
 	iov.iov_len = size;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	res = sock_sendmsg(sock, &msg, size);
-	set_fs(old_fs);
-
+	res = kernel_sendmsg(sock, &msg, &iov, 1, size);
 	kunmap(page);
 	return res;
 }

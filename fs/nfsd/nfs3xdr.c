@@ -340,7 +340,7 @@ nfs3svc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 	if (len > NFSSVC_MAXBLKSIZE)
 		len = NFSSVC_MAXBLKSIZE;
 
-	/* set up the iovec */
+	/* set up the kvec */
 	v=0;
 	while (len > 0) {
 		pn = rqstp->rq_resused;
@@ -430,7 +430,7 @@ nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 	int len;
 	int avail;
 	char *old, *new;
-	struct iovec *vec;
+	struct kvec *vec;
 
 	if (!(p = decode_fh(p, &args->ffh))
 	 || !(p = decode_filename(p, &args->fname, &args->flen))
