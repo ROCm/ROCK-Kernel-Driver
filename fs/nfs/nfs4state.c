@@ -43,6 +43,7 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_idmap.h>
 #include <linux/workqueue.h>
+#include <linux/bitops.h>
 
 #define OPENOWNER_POOL_SIZE	8
 
@@ -168,7 +169,7 @@ nfs4_put_client(struct nfs4_client *clp)
 	nfs4_free_client(clp);
 }
 
-static inline u32
+u32
 nfs4_alloc_lockowner_id(struct nfs4_client *clp)
 {
 	return clp->cl_lockowner_id ++;
@@ -304,8 +305,12 @@ nfs4_alloc_open_state(void)
 	state->state = 0;
 	state->nreaders = 0;
 	state->nwriters = 0;
+	state->flags = 0;
 	memset(state->stateid.data, 0, sizeof(state->stateid.data));
 	atomic_set(&state->count, 1);
+	INIT_LIST_HEAD(&state->lock_states);
+	init_MUTEX(&state->lock_sema);
+	rwlock_init(&state->state_lock);
 	return state;
 }
 
@@ -453,7 +458,7 @@ nfs4_close_state(struct nfs4_state *state, mode_t mode)
 		list_del_init(&state->inode_states);
 	spin_unlock(&inode->i_lock);
 	do {
-	 	newstate = 0;
+		newstate = 0;
 		if (state->state == 0)
 			break;
 		if (state->nreaders)
@@ -476,6 +481,171 @@ nfs4_close_state(struct nfs4_state *state, mode_t mode)
 	} while (!status);
 	up(&owner->so_sema);
 	nfs4_put_open_state(state);
+}
+
+/*
+ * Search the state->lock_states for an existing lock_owner
+ * that is compatible with current->files
+ */
+static struct nfs4_lock_state *
+__nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
+{
+	struct nfs4_lock_state *pos;
+	list_for_each_entry(pos, &state->lock_states, ls_locks) {
+		if (pos->ls_owner != fl_owner)
+			continue;
+		atomic_inc(&pos->ls_count);
+		return pos;
+	}
+	return NULL;
+}
+
+struct nfs4_lock_state *
+nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
+{
+	struct nfs4_lock_state *lsp;
+	read_lock(&state->state_lock);
+	lsp = __nfs4_find_lock_state(state, fl_owner);
+	read_unlock(&state->state_lock);
+	return lsp;
+}
+
+/*
+ * Return a compatible lock_state. If no initialized lock_state structure
+ * exists, return an uninitialized one.
+ *
+ * The caller must be holding state->lock_sema
+ */
+struct nfs4_lock_state *
+nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
+{
+	struct nfs4_lock_state *lsp;
+	struct nfs4_client *clp = state->owner->so_client;
+
+	lsp = kmalloc(sizeof(*lsp), GFP_KERNEL);
+	if (lsp == NULL)
+		return NULL;
+	lsp->ls_seqid = 0;	/* arbitrary */
+	lsp->ls_id = -1; 
+	memset(lsp->ls_stateid.data, 0, sizeof(lsp->ls_stateid.data));
+	atomic_set(&lsp->ls_count, 1);
+	lsp->ls_owner = fl_owner;
+	lsp->ls_parent = state;
+	INIT_LIST_HEAD(&lsp->ls_locks);
+	spin_lock(&clp->cl_lock);
+	lsp->ls_id = nfs4_alloc_lockowner_id(clp);
+	spin_unlock(&clp->cl_lock);
+	return lsp;
+}
+
+/*
+ * Byte-range lock aware utility to initialize the stateid of read/write
+ * requests.
+ */
+void
+nfs4_copy_stateid(nfs4_stateid *dst, struct nfs4_state *state, fl_owner_t fl_owner)
+{
+	if (test_bit(LK_STATE_IN_USE, &state->flags)) {
+		struct nfs4_lock_state *lsp;
+
+		lsp = nfs4_find_lock_state(state, fl_owner);
+		if (lsp) {
+			memcpy(dst, &lsp->ls_stateid, sizeof(*dst));
+			nfs4_put_lock_state(lsp);
+			return;
+		}
+	}
+	memcpy(dst, &state->stateid, sizeof(*dst));
+}
+
+/*
+* Called with state->lock_sema held.
+*/
+void
+nfs4_increment_lock_seqid(int status, struct nfs4_lock_state *lsp)
+{
+	if (status == NFS_OK || seqid_mutating_err(-status))
+		lsp->ls_seqid++;
+}
+
+/* 
+* Check to see if the request lock (type FL_UNLK) effects the fl lock.
+*
+* fl and request must have the same posix owner
+*
+* return: 
+* 0 -> fl not effected by request
+* 1 -> fl consumed by request
+*/
+
+static int
+nfs4_check_unlock(struct file_lock *fl, struct file_lock *request)
+{
+	if (fl->fl_start >= request->fl_start && fl->fl_end <= request->fl_end)
+		return 1;
+	return 0;
+}
+
+/*
+ * Post an initialized lock_state on the state->lock_states list.
+ */
+void
+nfs4_notify_setlk(struct inode *inode, struct file_lock *request, struct nfs4_lock_state *lsp)
+{
+	struct nfs4_state *state = lsp->ls_parent;
+
+	if (!list_empty(&lsp->ls_locks))
+		return;
+	write_lock(&state->state_lock);
+	list_add(&lsp->ls_locks, &state->lock_states);
+	set_bit(LK_STATE_IN_USE, &state->flags);
+	write_unlock(&state->state_lock);
+}
+
+/* 
+ * to decide to 'reap' lock state:
+ * 1) search i_flock for file_locks with fl.lock_state = to ls.
+ * 2) determine if unlock will consume found lock. 
+ * 	if so, reap
+ *
+ * 	else, don't reap.
+ *
+ */
+void
+nfs4_notify_unlck(struct inode *inode, struct file_lock *request, struct nfs4_lock_state *lsp)
+{
+	struct nfs4_state *state = lsp->ls_parent;
+	struct file_lock *fl;
+
+	for (fl = inode->i_flock; fl != NULL; fl = fl->fl_next) {
+		if (!(fl->fl_flags & FL_POSIX))
+			continue;
+		if (fl->fl_owner != lsp->ls_owner)
+			continue;
+		/* Exit if we find at least one lock which is not consumed */
+		if (nfs4_check_unlock(fl,request) == 0)
+			return;
+	}
+
+	write_lock(&state->state_lock);
+	list_del_init(&lsp->ls_locks);
+	if (list_empty(&state->lock_states))
+		clear_bit(LK_STATE_IN_USE, &state->flags);
+	write_unlock(&state->state_lock);
+}
+
+/*
+ * Release reference to lock_state, and free it if we see that
+ * it is no longer in use
+ */
+void
+nfs4_put_lock_state(struct nfs4_lock_state *lsp)
+{
+	if (!atomic_dec_and_test(&lsp->ls_count))
+		return;
+	if (!list_empty(&lsp->ls_locks))
+		return;
+	kfree(lsp);
 }
 
 /*

@@ -598,9 +598,7 @@ retry:
 			.fh             = &o_res.fh,
 			.seqid          = sp->so_seqid,
 		};
-		struct nfs_open_confirmres oc_res = {
-			.status         = 0,
-		};
+		struct nfs_open_confirmres oc_res;
 		struct 	rpc_message msg = {
 			.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_CONFIRM],
 			.rpc_argp       = &oc_arg,
@@ -692,7 +690,7 @@ retry:
         fattr->valid = 0;
 
 	if (state)
-		memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
+		nfs4_copy_stateid(&arg.stateid, state, 0);
         else
 		memcpy(&arg.stateid, &zero_stateid, sizeof(arg.stateid));
 
@@ -724,9 +722,7 @@ nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 	struct nfs_closeargs arg = {
 		.fh		= NFS_FH(inode),
 	};
-	struct nfs_closeres res = {
-		.status		= 0,
-	};
+	struct nfs_closeres res;
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_CLOSE],
 		.rpc_argp	= &arg,
@@ -758,9 +754,7 @@ nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode)
 		.seqid		= sp->so_seqid,
 		.share_access	= mode,
 	};
-	struct nfs_closeres res = {
-		.status		= 0,
-	};
+	struct nfs_closeres res;
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_OPEN_DOWNGRADE],
 		.rpc_argp	= &arg,
@@ -1085,7 +1079,7 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		memcpy(&rdata->args.stateid, &state->stateid, sizeof(rdata->args.stateid));
+		nfs4_copy_stateid(&rdata->args.stateid, state, rdata->lockowner);
 		msg.rpc_cred = state->owner->so_cred;
 	} else {
 		memcpy(&rdata->args.stateid, &zero_stateid, sizeof(rdata->args.stateid));
@@ -1127,7 +1121,7 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		memcpy(&wdata->args.stateid, &state->stateid, sizeof(wdata->args.stateid));
+		nfs4_copy_stateid(&wdata->args.stateid, state, wdata->lockowner);
 		msg.rpc_cred = state->owner->so_cred;
 	} else {
 		memcpy(&wdata->args.stateid, &zero_stateid, sizeof(wdata->args.stateid));
@@ -1163,7 +1157,7 @@ nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		memcpy(&cdata->args.stateid, &state->stateid, sizeof(cdata->args.stateid));
+		nfs4_copy_stateid(&cdata->args.stateid, state, cdata->lockowner);
 		msg.rpc_cred = state->owner->so_cred;
 	} else {
 		memcpy(&cdata->args.stateid, &zero_stateid, sizeof(cdata->args.stateid));
@@ -1513,7 +1507,7 @@ nfs4_restart_read(struct rpc_task *task)
 	rpc_restart_call(task);
 	req = nfs_list_entry(data->pages.next);
 	if (req->wb_state)
-		memcpy(&data->args.stateid, &req->wb_state->stateid, sizeof(data->args.stateid));
+		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
 	else
 		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 }
@@ -1564,8 +1558,9 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	data->res.eof     = 0;
 	data->timestamp   = jiffies;
 
+	data->lockowner = req->wb_lockowner;
 	if (req->wb_state)
-		memcpy(&data->args.stateid, &req->wb_state->stateid, sizeof(data->args.stateid));
+		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
 	else
 		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 
@@ -1605,7 +1600,7 @@ nfs4_restart_write(struct rpc_task *task)
 	rpc_restart_call(task);
 	req = nfs_list_entry(data->pages.next);
 	if (req->wb_state)
-		memcpy(&data->args.stateid, &req->wb_state->stateid, sizeof(data->args.stateid));
+		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
 	else
 		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 }
@@ -1661,8 +1656,9 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	data->res.verf    = &data->verf;
 	data->timestamp   = jiffies;
 
+	data->lockowner = req->wb_lockowner;
 	if (req->wb_state)
-		memcpy(&data->args.stateid, &req->wb_state->stateid, sizeof(data->args.stateid));
+		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
 	else
 		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 
@@ -1846,6 +1842,7 @@ nfs4_request_init(struct nfs_page *req, struct file *filp)
 	state = (struct nfs4_state *)filp->private_data;
 	req->wb_state = state;
 	req->wb_cred = get_rpccred(state->owner->so_cred);
+	req->wb_lockowner = current->files;
 }
 
 static int
@@ -1975,6 +1972,8 @@ nfs4_request_compatible(struct nfs_page *req, struct file *filp, struct page *pa
 	state = (struct nfs4_state *)filp->private_data;
 	if (req->wb_state != state)
 		return 0;
+	if (req->wb_lockowner != current->files)
+		return 0;
 	cred = state->owner->so_cred;
 	if (req->wb_cred != cred)
 		return 0;
@@ -2032,6 +2031,262 @@ nfs4_proc_setclientid_confirm(struct nfs4_client *clp)
 	return status;
 }
 
+#define NFS4_LOCK_MINTIMEOUT (1 * HZ)
+#define NFS4_LOCK_MAXTIMEOUT (30 * HZ)
+
+/* 
+ * sleep, with exponential backoff, and retry the LOCK operation. 
+ */
+static unsigned long
+nfs4_set_lock_task_retry(unsigned long timeout)
+{
+	current->state = TASK_INTERRUPTIBLE;
+	schedule_timeout(timeout);
+	timeout <<= 1;
+	if (timeout > NFS4_LOCK_MAXTIMEOUT)
+		return NFS4_LOCK_MAXTIMEOUT;
+	return timeout;
+}
+
+static inline int
+nfs4_lck_type(int cmd, struct file_lock *request)
+{
+	/* set lock type */
+	switch (request->fl_type) {
+		case F_RDLCK:
+			return IS_SETLKW(cmd) ? NFS4_READW_LT : NFS4_READ_LT;
+		case F_WRLCK:
+			return IS_SETLKW(cmd) ? NFS4_WRITEW_LT : NFS4_WRITE_LT;
+		case F_UNLCK:
+			return NFS4_WRITE_LT; 
+	}
+	BUG();
+}
+
+static inline uint64_t
+nfs4_lck_length(struct file_lock *request)
+{
+	if (request->fl_end == OFFSET_MAX)
+		return ~(uint64_t)0;
+	return request->fl_end - request->fl_start + 1;
+}
+
+int
+nfs4_proc_getlk(struct nfs4_state *state, int cmd, struct file_lock *request)
+{
+	struct inode *inode = state->inode;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_client *clp = server->nfs4_state;
+	struct nfs_lockargs arg = {
+		.fh = NFS_FH(inode),
+		.type = nfs4_lck_type(cmd, request),
+		.offset = request->fl_start,
+		.length = nfs4_lck_length(request),
+	};
+	struct nfs_lockres res = {
+		.server = server,
+	};
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_LOCKT],
+		.rpc_argp       = &arg,
+		.rpc_resp       = &res,
+		.rpc_cred	= state->owner->so_cred,
+	};
+	struct nfs_lowner nlo;
+	struct nfs4_lock_state *lsp;
+	int status;
+
+	nlo.clientid = clp->cl_clientid;
+	down(&state->lock_sema);
+	lsp = nfs4_find_lock_state(state, request->fl_owner);
+	if (lsp)
+		nlo.id = lsp->ls_id; 
+	else {
+		spin_lock(&clp->cl_lock);
+		nlo.id = nfs4_alloc_lockowner_id(clp);
+		spin_unlock(&clp->cl_lock);
+	}
+	arg.u.lockt = &nlo;
+	status = rpc_call_sync(server->client, &msg, 0);
+	if (!status) {
+		request->fl_type = F_UNLCK;
+	} else if (status == -NFS4ERR_DENIED) {
+		int64_t len, start, end;
+		start = res.u.denied.offset;
+		len = res.u.denied.length;
+		end = start + len - 1;
+		if (end < 0 || len == 0)
+			request->fl_end = OFFSET_MAX;
+		else
+			request->fl_end = (loff_t)end;
+		request->fl_start = (loff_t)start;
+		request->fl_type = F_WRLCK;
+		if (res.u.denied.type & 1)
+			request->fl_type = F_RDLCK;
+		request->fl_pid = 0;
+		status = 0;
+	}
+	if (lsp)
+		nfs4_put_lock_state(lsp);
+	up(&state->lock_sema);
+	return status;
+}
+
+int
+nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock *request)
+{
+	struct inode *inode = state->inode;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_lockargs arg = {
+		.fh = NFS_FH(inode),
+		.type = nfs4_lck_type(cmd, request),
+		.offset = request->fl_start,
+		.length = nfs4_lck_length(request),
+	};
+	struct nfs_lockres res = {
+		.server = server,
+	};
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_LOCKU],
+		.rpc_argp       = &arg,
+		.rpc_resp       = &res,
+		.rpc_cred	= state->owner->so_cred,
+	};
+	struct nfs4_lock_state *lsp;
+	struct nfs_locku_opargs luargs;
+	int status = 0;
+			
+	down(&state->lock_sema);
+	lsp = nfs4_find_lock_state(state, request->fl_owner);
+	if (!lsp)
+		goto out;
+	luargs.seqid = lsp->ls_seqid;
+	memcpy(&luargs.stateid, &lsp->ls_stateid, sizeof(luargs.stateid));
+	arg.u.locku = &luargs;
+	status = rpc_call_sync(server->client, &msg, 0);
+	nfs4_increment_lock_seqid(status, lsp);
+
+	if (status == 0) {
+		memcpy(&lsp->ls_stateid,  &res.u.stateid, 
+				sizeof(lsp->ls_stateid));
+		nfs4_notify_unlck(inode, request, lsp);
+	}
+	nfs4_put_lock_state(lsp);
+out:
+	up(&state->lock_sema);
+	return status;
+}
+
+static int
+nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
+{
+	struct inode *inode = state->inode;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_lock_state *lsp;
+	struct nfs_lockargs arg = {
+		.fh = NFS_FH(inode),
+		.type = nfs4_lck_type(cmd, request),
+		.offset = request->fl_start,
+		.length = nfs4_lck_length(request),
+	};
+	struct nfs_lockres res = {
+		.server = server,
+	};
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_LOCK],
+		.rpc_argp       = &arg,
+		.rpc_resp       = &res,
+		.rpc_cred	= state->owner->so_cred,
+	};
+	struct nfs_lock_opargs largs = {
+		.new_lock_owner = 0,
+	};
+	int status;
+
+	down(&state->lock_sema);
+	lsp = nfs4_find_lock_state(state, request->fl_owner);
+	if (lsp == NULL) {
+		struct nfs4_state_owner *owner = state->owner;
+		struct nfs_open_to_lock otl = {
+			.lock_owner.clientid = server->nfs4_state->cl_clientid,
+		};
+		status = -ENOMEM;
+		lsp = nfs4_alloc_lock_state(state, request->fl_owner);
+		if (!lsp)
+			goto out;
+		otl.lock_seqid = lsp->ls_seqid;
+		otl.lock_owner.id = lsp->ls_id;
+		memcpy(&otl.open_stateid, &state->stateid, sizeof(otl.open_stateid));
+		largs.u.open_lock = &otl;
+		largs.new_lock_owner = 1;
+		arg.u.lock = &largs;
+		down(&owner->so_sema);
+		otl.open_seqid = owner->so_seqid;
+		status = rpc_call_sync(server->client, &msg, 0);
+		/* increment open_owner seqid on success, and 
+		* seqid mutating errors */
+		nfs4_increment_seqid(status, owner);
+		up(&owner->so_sema);
+	} else {
+		struct nfs_exist_lock el = {
+			.seqid = lsp->ls_seqid,
+		};
+		memcpy(&el.stateid, &lsp->ls_stateid, sizeof(el.stateid));
+		largs.u.exist_lock = &el;
+		largs.new_lock_owner = 0;
+		arg.u.lock = &largs;
+		status = rpc_call_sync(server->client, &msg, 0);
+	}
+	/* increment seqid on success, and * seqid mutating errors*/
+	nfs4_increment_lock_seqid(status, lsp);
+	/* save the returned stateid. */
+	if (status == 0) {
+		memcpy(&lsp->ls_stateid, &res.u.stateid, sizeof(nfs4_stateid));
+		nfs4_notify_setlk(inode, request, lsp);
+	} else if (status == -NFS4ERR_DENIED)
+		status = -EAGAIN;
+	nfs4_put_lock_state(lsp);
+out:
+	up(&state->lock_sema);
+	return status;
+}
+
+static int
+nfs4_proc_lock(struct file *filp, int cmd, struct file_lock *request)
+{
+	struct nfs4_state *state;
+	unsigned long timeout = NFS4_LOCK_MINTIMEOUT;
+	int status;
+
+	/* verify open state */
+	state = (struct nfs4_state *)filp->private_data;
+	BUG_ON(!state);
+
+	if (request->fl_start < 0 || request->fl_end < 0)
+		return -EINVAL;
+
+	if (IS_GETLK(cmd))
+		return nfs4_proc_getlk(state, F_GETLK, request);
+
+	if (!(IS_SETLK(cmd) || IS_SETLKW(cmd)))
+		return -EINVAL;
+
+	if (request->fl_type == F_UNLCK)
+		return nfs4_proc_unlck(state, cmd, request);
+
+	do {
+		status = nfs4_proc_setlk(state, cmd, request);
+		if ((status != -EAGAIN) || IS_SETLK(cmd))
+			break;
+		timeout = nfs4_set_lock_task_retry(timeout);
+		status = -ERESTARTSYS;
+		if (signalled())
+			break;
+	} while(status < 0);
+
+	return status;
+}
+
 struct nfs_rpc_ops	nfs_v4_clientops = {
 	.version	= 4,			/* protocol version */
 	.dentry_ops	= &nfs4_dentry_operations,
@@ -2067,6 +2322,7 @@ struct nfs_rpc_ops	nfs_v4_clientops = {
 	.file_release   = nfs4_proc_file_release,
 	.request_init	= nfs4_request_init,
 	.request_compatible = nfs4_request_compatible,
+	.lock		= nfs4_proc_lock,
 };
 
 /*

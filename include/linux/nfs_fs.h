@@ -542,18 +542,42 @@ struct nfs4_state_owner {
 
 /*
  * struct nfs4_state maintains the client-side state for a given
- * (state_owner,inode) tuple.
+ * (state_owner,inode) tuple (OPEN) or state_owner (LOCK).
  *
+ * OPEN:
  * In order to know when to OPEN_DOWNGRADE or CLOSE the state on the server,
  * we need to know how many files are open for reading or writing on a
  * given inode. This information too is stored here.
+ *
+ * LOCK: one nfs4_state (LOCK) to hold the lock stateid nfs4_state(OPEN)
  */
+
+struct nfs4_lock_state {
+	struct list_head	ls_locks;	/* Other lock stateids */
+	fl_owner_t		ls_owner;	/* POSIX lock owner */
+	struct nfs4_state *	ls_parent;	/* Parent nfs4_state */
+	u32			ls_seqid;
+	u32			ls_id;
+	nfs4_stateid		ls_stateid;
+	atomic_t		ls_count;
+};
+
+/* bits for nfs4_state->flags */
+enum {
+	LK_STATE_IN_USE,
+};
+
 struct nfs4_state {
 	struct list_head open_states;	/* List of states for the same state_owner */
 	struct list_head inode_states;	/* List of states for the same inode */
+	struct list_head lock_states;	/* List of subservient lock stateids */
 
 	struct nfs4_state_owner *owner;	/* Pointer to the open owner */
 	struct inode *inode;		/* Pointer to the inode */
+
+	unsigned long flags;		/* Do we hold any locks? */
+	struct semaphore lock_sema;	/* Serializes file locking operations */
+	rwlock_t state_lock;		/* Protects the lock_states list */
 
 	nfs4_stateid stateid;
 
@@ -589,6 +613,8 @@ extern void init_nfsv4_state(struct nfs_server *);
 extern void destroy_nfsv4_state(struct nfs_server *);
 extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
+extern u32 nfs4_alloc_lockowner_id(struct nfs4_client *);
+
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
 extern void nfs4_put_state_owner(struct nfs4_state_owner *);
 extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
@@ -598,6 +624,15 @@ extern struct nfs4_state *nfs4_find_state(struct inode *, struct rpc_cred *, mod
 extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
 extern int nfs4_handle_error(struct nfs_server *, int);
 extern void nfs4_schedule_state_recovery(struct nfs4_client *);
+extern struct nfs4_lock_state *nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t);
+extern struct nfs4_lock_state *nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t);
+extern void nfs4_put_lock_state(struct nfs4_lock_state *state);
+extern void nfs4_increment_lock_seqid(int status, struct nfs4_lock_state *ls);
+extern void nfs4_notify_setlk(struct inode *, struct file_lock *, struct nfs4_lock_state *);
+extern void nfs4_notify_unlck(struct inode *, struct file_lock *, struct nfs4_lock_state *);
+extern void nfs4_copy_stateid(nfs4_stateid *, struct nfs4_state *, fl_owner_t);
+
+
 
 struct nfs4_mount_data;
 #else

@@ -109,7 +109,6 @@ struct nfs_openargs {
 };
 
 struct nfs_openres {
-	__u32                   status;
 	nfs4_stateid            stateid;
 	struct nfs_fh           fh;
 	struct nfs4_change_info * cinfo;
@@ -129,7 +128,6 @@ struct nfs_open_confirmargs {
 };
 
 struct nfs_open_confirmres {
-	__u32                   status;
 	nfs4_stateid            stateid;
 };
 
@@ -157,10 +155,68 @@ struct nfs_closeargs {
 };
 
 struct nfs_closeres {
-	__u32                   status;
+	nfs4_stateid            stateid;
+};
+/*
+ *  * Arguments to the lock,lockt, and locku call.
+ *   */
+struct nfs_lowner {
+	__u64           clientid;
+	u32                     id;
+};
+
+struct nfs_open_to_lock {
+	__u32                   open_seqid;
+	nfs4_stateid            open_stateid;
+	__u32                   lock_seqid;
+	struct nfs_lowner       lock_owner;
+};
+
+struct nfs_exist_lock {
+	nfs4_stateid            stateid;
+	__u32                   seqid;
+};
+
+struct nfs_lock_opargs {
+	__u32                   reclaim;
+	__u32                   new_lock_owner;
+	union {
+		struct nfs_open_to_lock *open_lock;
+		struct nfs_exist_lock   *exist_lock;
+	} u;
+};
+
+struct nfs_locku_opargs {
+	__u32                   seqid;
 	nfs4_stateid            stateid;
 };
 
+struct nfs_lockargs {
+	struct nfs_fh *         fh;
+	__u32                   type;
+	__u64                   offset; 
+	__u64                   length; 
+	union {
+		struct nfs_lock_opargs  *lock;    /* LOCK  */
+		struct nfs_lowner       *lockt;  /* LOCKT */
+		struct nfs_locku_opargs *locku;  /* LOCKU */
+	} u;
+};
+
+struct nfs_lock_denied {
+	__u64                   offset;
+	__u64                   length;
+	__u32                   type;
+	struct nfs_lowner   	owner;
+};
+
+struct nfs_lockres {
+	union {
+		nfs4_stateid            stateid;/* LOCK success, LOCKU */
+		struct nfs_lock_denied  denied; /* LOCK failed, LOCKT success */
+	} u;
+	struct nfs_server *     server;
+};
 
 /*
  * Arguments to the read call.
@@ -605,6 +661,7 @@ struct nfs_read_data {
 	struct rpc_task		task;
 	struct inode		*inode;
 	struct rpc_cred		*cred;
+	fl_owner_t		lockowner;
 	struct nfs_fattr	fattr;	/* fattr storage */
 	struct list_head	pages;	/* Coalesced read requests */
 	struct page		*pagevec[NFS_READ_MAXIOV];
@@ -620,6 +677,7 @@ struct nfs_write_data {
 	struct rpc_task		task;
 	struct inode		*inode;
 	struct rpc_cred		*cred;
+	fl_owner_t		lockowner;
 	struct nfs_fattr	fattr;
 	struct nfs_writeverf	verf;
 	struct list_head	pages;		/* Coalesced requests we wish to flush */
@@ -686,6 +744,7 @@ struct nfs_rpc_ops {
 	int	(*file_release) (struct inode *, struct file *);
 	void	(*request_init)(struct nfs_page *, struct file *);
 	int	(*request_compatible)(struct nfs_page *, struct file *, struct page *);
+	int	(*lock)(struct file *, int, struct file_lock *);
 };
 
 /*
