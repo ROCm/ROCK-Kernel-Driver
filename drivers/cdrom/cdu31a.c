@@ -3151,15 +3151,6 @@ static void scd_release(struct cdrom_device_info *cdi)
 	sony_usage--;
 }
 
-struct block_device_operations scd_bdops =
-{
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
-};
-
 static struct cdrom_device_ops scd_dops = {
 	.open			= scd_open,
 	.release		= scd_release,
@@ -3186,6 +3177,36 @@ static struct cdrom_device_info scd_info = {
 	.speed		= 2,
 	.capacity	= 1,
 	.name		= "cdu31a"
+};
+
+static int scd_block_open(struct inode *inode, struct file *file)
+{
+	return cdrom_open(&scd_info, inode, file);
+}
+
+static int scd_block_release(struct inode *inode, struct file *file)
+{
+	return cdrom_release(&scd_info, file);
+}
+
+static int scd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	return cdrom_ioctl(&scd_info, inode, cmd, arg);
+}
+
+static int scd_block_media_changed(struct gendisk *disk)
+{
+	return cdrom_media_changed(&scd_info);
+}
+
+struct block_device_operations scd_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= scd_block_open,
+	.release	= scd_block_release,
+	.ioctl		= scd_block_ioctl,
+	.media_changed	= scd_block_media_changed,
 };
 
 static struct gendisk *scd_gendisk;
@@ -3437,7 +3458,6 @@ int __init cdu31a_init(void)
 	init_timer(&cdu31a_abort_timer);
 	cdu31a_abort_timer.function = handle_abort_timeout;
 
-	scd_info.dev = mk_kdev(MAJOR_NR, 0);
 	scd_info.mask = deficiency;
 	scd_gendisk = disk;
 	if (register_cdrom(&scd_info))

@@ -1585,7 +1585,7 @@ static int __init sony535_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cdu535_request,
 			&sonycd535_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CDU535_BLOCK_SIZE);
-	sony_toc = kamlloc(sizeof(struct s535_sony_toc), GFP_KERNEL);
+	sony_toc = kmalloc(sizeof(struct s535_sony_toc), GFP_KERNEL);
 	err = -ENOMEM;
 	if (!sony_toc)
 		goto out2;

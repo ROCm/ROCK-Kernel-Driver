@@ -249,12 +249,37 @@ static int pcd_warned;		/* Have we logged a phase warning ? */
 
 /* kernel glue structures */
 
+static int pcd_block_open(struct inode *inode, struct file *file)
+{
+	struct pcd_unit *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(&cd->info, inode, file);
+}
+
+static int pcd_block_release(struct inode *inode, struct file *file)
+{
+	struct pcd_unit *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(&cd->info, file);
+}
+
+static int pcd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	struct pcd_unit *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(&cd->info, inode, cmd, arg);
+}
+
+static int pcd_block_media_changed(struct gendisk *disk)
+{
+	struct pcd_unit *cd = disk->private_data;
+	return cdrom_media_changed(&cd->info);
+}
+
 static struct block_device_operations pcd_bdops = {
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
+	.owner		= THIS_MODULE,
+	.open		= pcd_block_open,
+	.release	= pcd_block_release,
+	.ioctl		= pcd_block_ioctl,
+	.media_changed	= pcd_block_media_changed,
 };
 
 static struct cdrom_device_ops pcd_dops = {
@@ -297,7 +322,6 @@ static void pcd_init_units(void)
 		snprintf(cd->name, sizeof(cd->info.name), "%s%d", name, unit);
 		cd->info.ops = &pcd_dops;
 		cd->info.handle = cd;
-		cd->info.dev = mk_kdev(major, unit);
 		cd->info.speed = 0;
 		cd->info.capacity = 1;
 		cd->info.mask = 0;
@@ -937,6 +961,7 @@ static int __init pcd_init(void)
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
 			register_cdrom(&cd->info);
+			cd->disk->private_data = cd;
 			add_disk(cd->disk);
 		}
 	}

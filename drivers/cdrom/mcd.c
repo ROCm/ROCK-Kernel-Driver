@@ -192,15 +192,6 @@ int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
 int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
-struct block_device_operations mcd_bdops =
-{
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
-};
-
 static struct timer_list mcd_timer;
 
 static struct cdrom_device_ops mcd_dops = {
@@ -219,6 +210,36 @@ static struct cdrom_device_info mcd_info = {
 	.speed		= 2,
 	.capacity	= 1,
 	.name		= "mcd",
+};
+
+static int mcd_block_open(struct inode *inode, struct file *file)
+{
+	return cdrom_open(&mcd_info, inode, file);
+}
+
+static int mcd_block_release(struct inode *inode, struct file *file)
+{
+	return cdrom_release(&mcd_info, file);
+}
+
+static int mcd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	return cdrom_ioctl(&mcd_info, inode, cmd, arg);
+}
+
+static int mcd_block_media_changed(struct gendisk *disk)
+{
+	return cdrom_media_changed(&mcd_info);
+}
+
+static struct block_device_operations mcd_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= mcd_block_open,
+	.release	= mcd_block_release,
+	.ioctl		= mcd_block_ioctl,
+	.media_changed	= mcd_block_media_changed,
 };
 
 static struct gendisk *mcd_gendisk;
@@ -1128,7 +1149,6 @@ int __init mcd_init(void)
 	disk->fops = &mcd_bdops;
 	disk->flags = GENHD_FL_CD;
 	mcd_gendisk = disk;
-	mcd_info.dev = mk_kdev(MAJOR_NR, 0);
 
 	if (register_cdrom(&mcd_info) != 0) {
 		printk(KERN_ERR "mcd: Unable to register Mitsumi CD-ROM.\n");

@@ -220,13 +220,38 @@ struct s_drive_stuff {
 int mcdx_init(void);
 void do_mcdx_request(request_queue_t * q);
 
-struct block_device_operations mcdx_bdops =
+static int mcdx_block_open(struct inode *inode, struct file *file)
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(&p->info, inode, file);
+}
+
+static int mcdx_block_release(struct inode *inode, struct file *file)
+{
+	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(&p->info, file);
+}
+
+static int mcdx_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(&p->info, inode, cmd, arg);
+}
+
+static int mcdx_block_media_changed(struct gendisk *disk)
+{
+	struct s_drive_stuff *p = disk->private_data;
+	return cdrom_media_changed(&p->info);
+}
+
+static struct block_device_operations mcdx_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= mcdx_block_open,
+	.release	= mcdx_block_release,
+	.ioctl		= mcdx_block_ioctl,
+	.media_changed	= mcdx_block_media_changed,
 };
 
 
@@ -1218,7 +1243,6 @@ int __init mcdx_init_drive(int drive)
 	stuffp->info.capacity = 1;
 	stuffp->info.handle = stuffp;
 	sprintf(stuffp->info.name, "mcdx%d", drive);
-	stuffp->info.dev = mk_kdev(MAJOR_NR, drive);
 	disk->major = MAJOR_NR;
 	disk->first_minor = drive;
 	strcpy(disk->disk_name, stuffp->info.name);
@@ -1243,6 +1267,7 @@ int __init mcdx_init_drive(int drive)
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;
 	}
+	disk->private_data = stuffp;
 	add_disk(disk);
 	printk(msg);
 	return 0;

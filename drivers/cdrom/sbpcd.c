@@ -5351,13 +5351,38 @@ static int sbp_data(struct request *req)
 }
 /*==========================================================================*/
 
+static int sbpcd_block_open(struct inode *inode, struct file *file)
+{
+	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(p->sbpcd_infop, inode, file);
+}
+
+static int sbpcd_block_release(struct inode *inode, struct file *file)
+{
+	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(p->sbpcd_infop, file);
+}
+
+static int sbpcd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(p->sbpcd_infop, inode, cmd, arg);
+}
+
+static int sbpcd_block_media_changed(struct gendisk *disk)
+{
+	struct sbpcd_drive *p = disk->private_data;
+	return cdrom_media_changed(p->sbpcd_infop);
+}
+
 static struct block_device_operations sbpcd_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner		= THIS_MODULE,
+	.open		= sbpcd_block_open,
+	.release	= sbpcd_block_release,
+	.ioctl		= sbpcd_block_ioctl,
+	.media_changed	= sbpcd_block_media_changed,
 };
 /*==========================================================================*/
 /*
@@ -5828,7 +5853,6 @@ int __init sbpcd_init(void)
 		sbpcd_infop->speed = 2;
 		sbpcd_infop->capacity = 1;
 		sprintf(sbpcd_infop->name, "sbpcd%d", j);
-		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
 		sbpcd_infop->handle = p;
 		p->sbpcd_infop = sbpcd_infop;
 		disk = alloc_disk(1);
@@ -5844,6 +5868,7 @@ int __init sbpcd_init(void)
 		{
 			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
 		}
+		disk->private_data = p;
 		add_disk(disk);
 	}
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CD_FRAMESIZE);
@@ -5874,7 +5899,6 @@ void sbpcd_exit(void)
 		put_disk(D_S[j].disk);
 		vfree(D_S[j].sbp_buf);
 		if (D_S[j].sbp_audsiz>0) vfree(D_S[j].aud_buf);
-		devfs_unregister(D_S[j].disk.de);
 		if ((unregister_cdrom(D_S[j].sbpcd_infop) == -EINVAL))
 		{
 			msg(DBG_INF, "What's that: can't unregister info %s.\n", major_name);

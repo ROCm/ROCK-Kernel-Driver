@@ -386,13 +386,38 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	return 1;
 }
 
+static int sr_block_open(struct inode *inode, struct file *file)
+{
+	Scsi_CD *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(&cd->cdi, inode, file);
+}
+
+static int sr_block_release(struct inode *inode, struct file *file)
+{
+	Scsi_CD *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(&cd->cdi, file);
+}
+
+static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
+			  unsigned long arg)
+{
+	Scsi_CD *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(&cd->cdi, inode, cmd, arg);
+}
+
+static int sr_block_media_changed(struct gendisk *disk)
+{
+	Scsi_CD *cd = disk->private_data;
+	return cdrom_media_changed(&cd->cdi);
+}
+
 struct block_device_operations sr_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner		= THIS_MODULE,
+	.open		= sr_block_open,
+	.release	= sr_block_release,
+	.ioctl		= sr_block_ioctl,
+	.media_changed	= sr_block_media_changed,
 };
 
 static int sr_open(struct cdrom_device_info *cdi, int purpose)
@@ -757,7 +782,6 @@ void sr_finish()
 
 		cd->cdi.ops = &sr_dops;
 		cd->cdi.handle = cd;
-		cd->cdi.dev = mk_kdev(MAJOR_NR, i);
 		cd->cdi.mask = 0;
 		cd->cdi.capacity = 1;
 		/*
@@ -770,6 +794,7 @@ void sr_finish()
 		disk->driverfs_dev = &cd->device->sdev_driverfs_dev;
 		register_cdrom(&cd->cdi);
 		set_capacity(disk, cd->capacity);
+		disk->private_data = cd;
 		add_disk(disk);
 	}
 }

@@ -338,14 +338,11 @@ static struct cdrom_device_info *topCdromPtr;
 int register_cdrom(struct cdrom_device_info *cdi)
 {
 	static char banner_printed;
-	int major = major(cdi->dev);
         struct cdrom_device_ops *cdo = cdi->ops;
         int *change_capability = (int *)&cdo->capability; /* hack */
 
 	cdinfo(CD_OPEN, "entering register_cdrom\n"); 
 
-	if (major < 0 || major >= MAX_BLKDEV)
-		return -1;
 	if (cdo->open == NULL || cdo->release == NULL)
 		return -2;
 	if ( !banner_printed ) {
@@ -389,16 +386,11 @@ int register_cdrom(struct cdrom_device_info *cdi)
 int unregister_cdrom(struct cdrom_device_info *unreg)
 {
 	struct cdrom_device_info *cdi, *prev;
-	int major = major(unreg->dev);
-
 	cdinfo(CD_OPEN, "entering unregister_cdrom\n"); 
-
-	if (major < 0 || major >= MAX_BLKDEV)
-		return -1;
 
 	prev = NULL;
 	cdi = topCdromPtr;
-	while (cdi != NULL && !kdev_same(cdi->dev, unreg->dev)) {
+	while (cdi && cdi != unreg) {
 		prev = cdi;
 		cdi = cdi->next;
 	}
@@ -414,17 +406,6 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 	return 0;
 }
 
-static struct cdrom_device_info *cdrom_find_device(kdev_t dev)
-{
-	struct cdrom_device_info *cdi;
-
-	cdi = topCdromPtr;
-	while (cdi != NULL && !kdev_same(cdi->dev, dev))
-		cdi = cdi->next;
-
-	return cdi;
-}
-
 /* We use the open-option O_NONBLOCK to indicate that the
  * purpose of opening is only for subsequent ioctl() calls; no device
  * integrity checks are performed.
@@ -433,16 +414,11 @@ static struct cdrom_device_info *cdrom_find_device(kdev_t dev)
  * is in their own interest: device control becomes a lot easier
  * this way.
  */
-int cdrom_open(struct inode *ip, struct file *fp)
+int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 {
-	struct cdrom_device_info *cdi;
-	kdev_t dev = ip->i_rdev;
 	int ret;
 
 	cdinfo(CD_OPEN, "entering cdrom_open\n"); 
-	if ((cdi = cdrom_find_device(dev)) == NULL)
-		return -ENODEV;
-
 	/* if this was a O_NONBLOCK open and we should honor the flags,
 	 * do a quick open without drive/disc integrity checks. */
 	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS))
@@ -627,10 +603,8 @@ int check_for_audio_disc(struct cdrom_device_info * cdi,
 
 
 /* Admittedly, the logic below could be performed in a nicer way. */
-int cdrom_release(struct inode *ip, struct file *fp)
+int cdrom_release(struct cdrom_device_info *cdi, struct file *fp)
 {
-	kdev_t dev = ip->i_rdev;
-	struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int opened_for_data;
 
@@ -843,9 +817,8 @@ int media_changed(struct cdrom_device_info *cdi, int queue)
 	return ret;
 }
 
-int cdrom_media_changed(kdev_t dev)
+int cdrom_media_changed(struct cdrom_device_info *cdi)
 {
-	struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	/* This talks to the VFS, which doesn't like errors - just 1 or 0.  
 	 * Returning "0" is always safe (media hasn't been changed). Do that 
 	 * if the low-level cdrom driver dosn't support media changed. */ 
@@ -1457,11 +1430,9 @@ static int cdrom_read_block(struct cdrom_device_info *cdi,
  * these days. ATAPI / SCSI specific code now mainly resides in
  * mmc_ioct().
  */
-int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
-		       unsigned long arg)
+int cdrom_ioctl(struct cdrom_device_info *cdi, struct inode *ip,
+		unsigned int cmd, unsigned long arg)
 {
-	kdev_t dev = ip->i_rdev;
-	struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int ret;
 
@@ -1614,7 +1585,7 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		cdinfo(CD_DO_IOCTL, "entering CDROM_RESET\n");
 		if (!CDROM_CAN(CDC_RESET))
 			return -ENOSYS;
-		invalidate_buffers(dev);
+		invalidate_bdev(ip->i_bdev, 0);
 		return cdo->reset(cdi);
 		}
 

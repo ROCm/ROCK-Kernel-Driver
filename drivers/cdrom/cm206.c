@@ -770,15 +770,6 @@ void get_disc_status(void)
 	}
 }
 
-struct block_device_operations cm206_bdops =
-{
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
-};
-
 /* The new open. The real opening strategy is defined in cdrom.c. */
 
 static int cm206_open(struct cdrom_device_info *cdi, int purpose)
@@ -1357,6 +1348,36 @@ static struct cdrom_device_info cm206_info = {
 	.name		= "cm206",
 };
 
+static int cm206_block_open(struct inode *inode, struct file *file)
+{
+	return cdrom_open(&cm206_info, inode, file);
+}
+
+static int cm206_block_release(struct inode *inode, struct file *file)
+{
+	return cdrom_release(&cm206_info, file);
+}
+
+static int cm206_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	return cdrom_ioctl(&cm206_info, inode, cmd, arg);
+}
+
+static int cm206_block_media_changed(struct gendisk *disk)
+{
+	return cdrom_media_changed(&cm206_info);
+}
+
+static struct block_device_operations cm206_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= cm206_block_open,
+	.release	= cm206_block_release,
+	.ioctl		= cm206_block_ioctl,
+	.media_changed	= cm206_block_media_changed,
+};
+
 static struct gendisk *cm206_gendisk;
 
 /* This function probes for the adapter card. It returns the base
@@ -1479,7 +1500,6 @@ int __init cm206_init(void)
 	disk->fops = &cm206_bdops;
 	disk->flags = GENHD_FL_CD;
 	cm206_gendisk = disk;
-	cm206_info.dev = mk_kdev(MAJOR_NR, 0);
 	if (register_cdrom(&cm206_info) != 0) {
 		printk(KERN_INFO "Cannot register for cdrom %d!\n", MAJOR_NR);
 		goto out_cdrom;
