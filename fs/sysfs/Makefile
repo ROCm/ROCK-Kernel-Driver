@@ -2,6 +2,6 @@
 # Makefile for the sysfs virtual filesystem
 #
 
-export-objs	:= inode.o
+export-objs	:= file.o dir.o symlink.o
 
-obj-y		:= inode.o
+obj-y		:= inode.o file.o dir.o symlink.o mount.o
