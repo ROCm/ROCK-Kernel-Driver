@@ -187,7 +187,7 @@ void nr_kick(struct sock *sk)
 
 void nr_transmit_buffer(struct sock *sk, struct sk_buff *skb)
 {
-	nr_cb *nr = nr;
+	nr_cb *nr = nr_sk(sk);
 	unsigned char *dptr;
 
 	/*
