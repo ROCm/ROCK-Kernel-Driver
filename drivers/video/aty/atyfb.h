@@ -3,8 +3,6 @@
  */
 
 #include <linux/config.h>
-#include <video/fbcon.h>
-
     /*
      *  Elements of the hardware specific atyfb_par structure
      */
@@ -59,19 +57,9 @@ union aty_pll {
      */
 
 struct aty_cursor {
-	int enable;
-	int on;
-	int vbl_cnt;
-	int blink_rate;
-	u32 offset;
-	struct {
-		u16 x, y;
-	} pos, hot, size;
-	u32 color[2];
 	u8 bits[8][64];
 	u8 mask[8][64];
 	u8 *ram;
-	struct timer_list *timer;
 };
 
 struct atyfb_par {
@@ -93,8 +81,6 @@ struct atyfb_par {
 	u8 blitter_may_be_busy;
 #ifdef __sparc__
 	struct pci_mmap_map *mmap_map;
-	int consolecnt;
-	int vtconsole;
 	u8 mmaped;
 	int open;
 #endif
@@ -251,11 +237,9 @@ extern void aty_calc_pll_ct(const struct fb_info *info,
      */
 
 extern struct aty_cursor *aty_init_cursor(struct fb_info *info);
-extern void atyfb_cursor(struct display *p, int mode, int x, int y);
+extern int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 extern void aty_set_cursor_color(struct fb_info *info);
 extern void aty_set_cursor_shape(struct fb_info *info);
-extern int atyfb_set_font(struct display *d, int width, int height);
-
 
     /*
      *  Hardware acceleration
