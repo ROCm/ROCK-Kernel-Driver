@@ -192,7 +192,7 @@ static inline int
 nfsd4_restorefh(struct svc_fh *current_fh, struct svc_fh *save_fh)
 {
 	if (!save_fh->fh_dentry)
-		return nfserr_nofilehandle;
+		return nfserr_restorefh;
 
 	fh_dup2(current_fh, save_fh);
 	return nfs_ok;
@@ -336,8 +336,10 @@ static inline int
 nfsd4_link(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 	   struct svc_fh *save_fh, struct nfsd4_link *link)
 {
-	int status;
+	int status = nfserr_nofilehandle;
 
+	if (!save_fh->fh_dentry)
+		return status;
 	status = nfsd_link(rqstp, current_fh, link->li_name, link->li_namelen, save_fh);
 	if (!status)
 		set_change_info(&link->li_cinfo, current_fh);
@@ -458,8 +460,10 @@ static inline int
 nfsd4_rename(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 	     struct svc_fh *save_fh, struct nfsd4_rename *rename)
 {
-	int status;
+	int status = nfserr_nofilehandle;
 
+	if (!save_fh->fh_dentry)
+		return status;
 	status = nfsd_rename(rqstp, save_fh, rename->rn_sname,
 			     rename->rn_snamelen, current_fh,
 			     rename->rn_tname, rename->rn_tnamelen);
@@ -474,8 +478,12 @@ static inline int
 nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_setattr *setattr)
 {
 	struct nfs4_stateid *stp;
-	int status = nfs_ok;
+	int status = nfserr_nofilehandle;
 
+	if (!current_fh->fh_dentry)
+		goto out;
+
+	status = nfs_ok;
 	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
 
 		status = nfserr_bad_stateid;
@@ -679,6 +687,22 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			goto encode_op;
 		}
 
+		/* All operations except RENEW, SETCLIENTID, RESTOREFH
+		* SETCLIENTID_CONFIRM, PUTFH and PUTROOTFH
+		* require a valid current filehandle
+		*
+		* SETATTR NOFILEHANDLE error handled in nfsd4_setattr
+		* due to required returned bitmap argument
+		*/
+		if ((!current_fh.fh_dentry) &&
+		   !((op->opnum == OP_PUTFH) || (op->opnum == OP_PUTROOTFH) ||
+		   (op->opnum == OP_SETCLIENTID) ||
+		   (op->opnum == OP_SETCLIENTID_CONFIRM) ||
+		   (op->opnum == OP_RENEW) || (op->opnum == OP_RESTOREFH) ||
+		   (op->opnum == OP_SETATTR))) {
+			op->status = nfserr_nofilehandle;
+			goto encode_op;
+		}
 		switch (op->opnum) {
 		case OP_ACCESS:
 			op->status = nfsd4_access(rqstp, &current_fh, &op->u.access);

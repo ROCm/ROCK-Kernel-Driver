@@ -2226,8 +2226,14 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 
 	RESERVE_SPACE(8);
 	WRITE32(op->opnum);
-	statp = p++;                  /* to be backfilled at the end */
-	ADJUST_ARGS();
+	if ((op->opnum != OP_SETATTR) && (op->opnum != OP_LOCK) && (op->opnum != OP_LOCKT) && (op->opnum != OP_SETCLIENTID) && (op->status)) {
+		*p++ = op->status;
+		ADJUST_ARGS();
+		return;
+	} else {
+		statp = p++;        /* to be backfilled at the end */
+		ADJUST_ARGS();
+	}
 
 	switch (op->opnum) {
 	case OP_ACCESS:
