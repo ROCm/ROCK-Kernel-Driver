@@ -1560,7 +1560,7 @@ acpi_processor_get_info (
 	acpi_status		status = 0;
 	union acpi_object	object = {0};
 	struct acpi_buffer	buffer = {sizeof(union acpi_object), &object};
-	static int		cpu_count = 0;
+	static int		cpu_index = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_info");
 
@@ -1569,6 +1569,13 @@ acpi_processor_get_info (
 
 	if (num_online_cpus() > 1)
 		errata.smp = TRUE;
+
+	/*
+	 *  Extra Processor objects may be enumerated on MP systems with
+	 *  less than the max # of CPUs. They should be ignored.
+	 */
+	if ((cpu_index + 1) > num_online_cpus())
+		return_VALUE(-ENODEV);
 
 	acpi_processor_errata(pr);
 
@@ -1601,7 +1608,7 @@ acpi_processor_get_info (
 	 * TBD: Synch processor ID (via LAPIC/LSAPIC structures) on SMP.
 	 *	>>> 'acpi_get_processor_id(acpi_id, &id)' in arch/xxx/acpi.c
 	 */
-	pr->id = cpu_count++;
+	pr->id = cpu_index++;
 	pr->acpi_id = object.processor.proc_id;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id, 
@@ -1609,21 +1616,17 @@ acpi_processor_get_info (
 
 	if (!object.processor.pblk_address)
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "No PBLK (NULL address)\n"));
-	else if (object.processor.pblk_length < 4)
+	else if (object.processor.pblk_length != 6)
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid PBLK length [%d]\n",
 			object.processor.pblk_length));
 	else {
 		pr->throttling.address = object.processor.pblk_address;
 		pr->throttling.duty_offset = acpi_fadt.duty_offset;
 		pr->throttling.duty_width = acpi_fadt.duty_width;
-
-		if (object.processor.pblk_length >= 5)
-			pr->power.states[ACPI_STATE_C2].address =
-				object.processor.pblk_address + 4;
-
-		if (object.processor.pblk_length >= 6)
-			pr->power.states[ACPI_STATE_C3].address =
-				object.processor.pblk_address + 5;
+		pr->power.states[ACPI_STATE_C2].address =
+			object.processor.pblk_address + 4;
+		pr->power.states[ACPI_STATE_C3].address =
+			object.processor.pblk_address + 5;
 	}
 
 	acpi_processor_get_power_info(pr);
