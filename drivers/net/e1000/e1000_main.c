@@ -2413,30 +2413,40 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		e1000_setup_rctl(adapter);
 		e1000_set_multi(netdev);
 
+		/* turn on all-multi mode if wake on multicast is enabled */
 		if(adapter->wol & E1000_WUFC_MC) {
 			rctl = E1000_READ_REG(&adapter->hw, RCTL);
 			rctl |= E1000_RCTL_MPE;
 			E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 		}
 
-		if(adapter->hw.media_type == e1000_media_type_fiber) {
-			#define E1000_CTRL_ADVD3WUC 0x00100000
+		if(adapter->hw.mac_type >= e1000_82540) {
 			ctrl = E1000_READ_REG(&adapter->hw, CTRL);
-			ctrl |= E1000_CTRL_ADVD3WUC;
+			/* advertise wake from D3Cold */
+			#define E1000_CTRL_ADVD3WUC 0x00100000
+			/* phy power management enable */
+			#define E1000_CTRL_EN_PHY_PWR_MGMT 0x00200000
+			ctrl |= E1000_CTRL_ADVD3WUC |
+				E1000_CTRL_EN_PHY_PWR_MGMT;
 			E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
+		}
 
+		if(adapter->hw.media_type == e1000_media_type_fiber) {
+			/* keep the laser running in D3 */
 			ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
-        		ctrl_ext |= E1000_CTRL_EXT_SDP7_DATA;
+			ctrl_ext |= E1000_CTRL_EXT_SDP7_DATA;
 			E1000_WRITE_REG(&adapter->hw, CTRL_EXT, ctrl_ext);
 		}
 
-		E1000_WRITE_REG(&adapter->hw, WUC, 0);
+		E1000_WRITE_REG(&adapter->hw, WUC, E1000_WUC_PME_EN);
 		E1000_WRITE_REG(&adapter->hw, WUFC, adapter->wol);
 		pci_enable_wake(pdev, 3, 1);
+		pci_enable_wake(pdev, 4, 1); /* 4 == D3 cold */
 	} else {
 		E1000_WRITE_REG(&adapter->hw, WUC, 0);
 		E1000_WRITE_REG(&adapter->hw, WUFC, 0);
 		pci_enable_wake(pdev, 3, 0);
+		pci_enable_wake(pdev, 4, 0); /* 4 == D3 cold */
 	}
 
 	pci_save_state(pdev, adapter->pci_state);
@@ -2446,9 +2456,12 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
 			E1000_WRITE_REG(&adapter->hw, MANC, manc);
+			state = 0;
 		}
-	} else
-		pci_set_power_state(pdev, 3);
+	}
+
+	state = (state > 0) ? 3 : 0;
+	pci_set_power_state(pdev, state);
 
 	return 0;
 }
@@ -2463,10 +2476,11 @@ e1000_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, adapter->pci_state);
-	pci_enable_wake(pdev, 0, 0);
 
-	/* Clear the wakeup status bits */
+	pci_enable_wake(pdev, 3, 0);
+	pci_enable_wake(pdev, 4, 0); /* 4 == D3 cold */
 
+	e1000_reset(adapter);
 	E1000_WRITE_REG(&adapter->hw, WUS, ~0);
 
 	if(netif_running(netdev))
