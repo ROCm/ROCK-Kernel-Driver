@@ -1421,6 +1421,9 @@ static struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 
+	if (len < hdr->e_shoff + hdr->e_shnum * sizeof(Elf_Shdr))
+		goto truncated;
+
 	/* Convenience variables */
 	sechdrs = (void *)hdr + hdr->e_shoff;
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
@@ -1430,6 +1433,10 @@ static struct module *load_module(void __user *umod,
 	symindex = strindex = 0;
 
 	for (i = 1; i < hdr->e_shnum; i++) {
+		if (sechdrs[i].sh_type != SHT_NOBITS
+		    && len < sechdrs[i].sh_offset + sechdrs[i].sh_size)
+			goto truncated;
+
 		/* Mark all sections sh_addr with their address in the
 		   temporary image. */
 		sechdrs[i].sh_addr = (size_t)hdr + sechdrs[i].sh_offset;
@@ -1694,6 +1701,11 @@ static struct module *load_module(void __user *umod,
 	vfree(hdr);
 	if (err < 0) return ERR_PTR(err);
 	else return ptr;
+
+ truncated:
+	printk(KERN_ERR "Module len %lu truncated\n", len);
+	err = -ENOEXEC;
+	goto free_hdr;
 }
 
 /* This is where the real work happens */
