@@ -139,6 +139,22 @@ struct usb_hub_descriptor {
 	__u8  PortPwrCtrlMask[(USB_MAXCHILDREN + 1 + 7) / 8];
 } __attribute__ ((packed));
 
+
+/* port indicator status selectors, tables 11-7 and 11-25 */
+#define HUB_LED_AUTO	0
+#define HUB_LED_AMBER	1
+#define HUB_LED_GREEN	2
+#define HUB_LED_OFF	3
+
+enum hub_led_mode {
+	INDICATOR_AUTO = 0,
+	INDICATOR_CYCLE,
+	/* software blinks for attention:  software, hardware, reserved */
+	INDICATOR_GREEN_BLINK, INDICATOR_GREEN_BLINK_OFF,
+	INDICATOR_AMBER_BLINK, INDICATOR_AMBER_BLINK_OFF,
+	INDICATOR_ALT_BLINK, INDICATOR_ALT_BLINK_OFF
+} __attribute__ ((packed));
+
 struct usb_device;
 
 /*
@@ -192,6 +208,10 @@ struct usb_hub {
 	struct usb_hub_descriptor *descriptor;	/* class descriptor */
 	struct semaphore	khubd_sem;
 	struct usb_tt		tt;		/* Transaction Translator */
+
+	unsigned		has_indicators:1;
+	enum hub_led_mode	indicator[USB_MAXCHILDREN];
+	struct work_struct	leds;
 };
 
 #endif /* __LINUX_HUB_H */

@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/completion.h>
 #include <linux/sched.h>
 #include <linux/list.h>
@@ -45,6 +46,12 @@ static LIST_HEAD(hub_list);		/* List of all hubs (for cleanup) */
 static DECLARE_WAIT_QUEUE_HEAD(khubd_wait);
 static pid_t khubd_pid = 0;			/* PID of khubd */
 static DECLARE_COMPLETION(khubd_exited);
+
+/* cycle leds on hubs that aren't blinking for attention */
+static int blinkenlights = 0;
+module_param (blinkenlights, bool, S_IRUGO);
+MODULE_PARM_DESC (blinkenlights, "true to cycle leds on hubs");
+
 
 #ifdef	DEBUG
 static inline char *portspeed (int portstatus)
@@ -83,7 +90,6 @@ static int clear_hub_feature(struct usb_device *dev, int feature)
 
 /*
  * USB 2.0 spec Section 11.24.2.2
- * BUG: doesn't handle port indicator selector in high byte of wIndex
  */
 static int clear_port_feature(struct usb_device *dev, int port, int feature)
 {
@@ -93,12 +99,109 @@ static int clear_port_feature(struct usb_device *dev, int port, int feature)
 
 /*
  * USB 2.0 spec Section 11.24.2.13
- * BUG: doesn't handle port indicator selector in high byte of wIndex
  */
 static int set_port_feature(struct usb_device *dev, int port, int feature)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_SET_FEATURE, USB_RT_PORT, feature, port, NULL, 0, HZ);
+}
+
+/*
+ * USB 2.0 spec Section 11.24.2.7.1.10 and table 11-7
+ * for info about using port indicators
+ */
+static void set_port_led(
+	struct usb_device *dev,
+	struct usb_hub *hub,
+	int port,
+	int selector
+)
+{
+	int status = set_port_feature(dev, (selector << 8) | port,
+			USB_PORT_FEAT_INDICATOR);
+	if (status < 0)
+		dev_dbg (&hub->intf->dev,
+			"port %d indicator %s status %d\n",
+			port,
+			({ char *s; switch (selector) {
+			case HUB_LED_AMBER: s = "amber"; break;
+			case HUB_LED_GREEN: s = "green"; break;
+			case HUB_LED_OFF: s = "off"; break;
+			case HUB_LED_AUTO: s = "auto"; break;
+			default: s = "??"; break;
+			}; s; }),
+			status);
+}
+
+#define	LED_CYCLE_PERIOD	((2*HZ)/3)
+
+static void led_work (void *__hub)
+{
+	struct usb_hub		*hub = __hub;
+	struct usb_device	*dev = interface_to_usbdev (hub->intf);
+	unsigned		i;
+	unsigned		changed = 0;
+	int			cursor = -1;
+
+	if (dev->state != USB_STATE_CONFIGURED)
+		return;
+
+	for (i = 0; i < hub->descriptor->bNbrPorts; i++) {
+		unsigned	selector, mode;
+
+		/* 30%-50% duty cycle */
+
+		switch (hub->indicator[i]) {
+		/* cycle marker */
+		case INDICATOR_CYCLE:
+			cursor = i;
+			selector = HUB_LED_AUTO;
+			mode = INDICATOR_AUTO;
+			break;
+		/* blinking green = sw attention */
+		case INDICATOR_GREEN_BLINK:
+			selector = HUB_LED_GREEN;
+			mode = INDICATOR_GREEN_BLINK_OFF;
+			break;
+		case INDICATOR_GREEN_BLINK_OFF:
+			selector = HUB_LED_OFF;
+			mode = INDICATOR_GREEN_BLINK;
+			break;
+		/* blinking amber = hw attention */
+		case INDICATOR_AMBER_BLINK:
+			selector = HUB_LED_AMBER;
+			mode = INDICATOR_AMBER_BLINK_OFF;
+			break;
+		case INDICATOR_AMBER_BLINK_OFF:
+			selector = HUB_LED_OFF;
+			mode = INDICATOR_AMBER_BLINK;
+			break;
+		/* blink green/amber = reserved */
+		case INDICATOR_ALT_BLINK:
+			selector = HUB_LED_GREEN;
+			mode = INDICATOR_ALT_BLINK_OFF;
+			break;
+		case INDICATOR_ALT_BLINK_OFF:
+			selector = HUB_LED_AMBER;
+			mode = INDICATOR_ALT_BLINK;
+			break;
+		default:
+			continue;
+		}
+		if (selector != HUB_LED_AUTO)
+			changed = 1;
+		set_port_led(dev, hub, i + 1, selector);
+		hub->indicator[i] = mode;
+	}
+	if (!changed && blinkenlights) {
+		cursor++;
+		cursor %= hub->descriptor->bNbrPorts;
+		set_port_led(dev, hub, cursor + 1, HUB_LED_GREEN);
+		hub->indicator[cursor] = INDICATOR_CYCLE;
+		changed++;
+	}
+	if (changed)
+		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
 }
 
 /*
@@ -375,7 +478,7 @@ static int hub_configure(struct usb_hub *hub,
 			break;
 		case 0x02:
 		case 0x03:
-			dev_dbg(hub_dev, "unknown reserved power switching mode\n");
+			dev_dbg(hub_dev, "no power switching (usb 1.0)\n");
 			break;
 	}
 
@@ -434,9 +537,11 @@ static int hub_configure(struct usb_hub *hub,
 			break;
 	}
 
-	dev_dbg(hub_dev, "Port indicators are %s supported\n", 
-	    (hub->descriptor->wHubCharacteristics & HUB_CHAR_PORTIND)
-	    	? "" : "not");
+	/* probe() zeroes hub->indicator[] */
+	if (hub->descriptor->wHubCharacteristics & HUB_CHAR_PORTIND) {
+		hub->has_indicators = 1;
+		dev_dbg(hub_dev, "Port indicators are supported\n");
+	}
 
 	dev_dbg(hub_dev, "power on to power good time: %dms\n",
 		hub->descriptor->bPwrOn2PwrGood * 2);
@@ -449,12 +554,16 @@ static int hub_configure(struct usb_hub *hub,
 		goto fail;
 	}
 
+	/* FIXME implement per-port power budgeting;
+	 * enable it for bus-powered hubs.
+	 */
 	dev_dbg(hub_dev, "local power source is %s\n",
 		(hubstatus & HUB_STATUS_LOCAL_POWER)
 		? "lost (inactive)" : "good");
 
-	dev_dbg(hub_dev, "%sover-current condition exists\n",
-		(hubstatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
+	if ((hub->descriptor->wHubCharacteristics & HUB_CHAR_OCPM) == 0)
+		dev_dbg(hub_dev, "%sover-current condition exists\n",
+			(hubstatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
 
 	/* Start the interrupt endpoint */
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
@@ -483,6 +592,13 @@ static int hub_configure(struct usb_hub *hub,
 
 	/* Wake up khubd */
 	wake_up(&khubd_wait);
+
+	/* maybe start cycling the hub leds */
+	if (hub->has_indicators && blinkenlights) {
+		set_port_led(dev, hub, 1, HUB_LED_GREEN);
+		hub->indicator [0] = INDICATOR_CYCLE;
+		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
+	}
 
 	hub_power_on(hub);
 
@@ -518,7 +634,9 @@ static void hub_disconnect(struct usb_interface *intf)
 	up(&hub->khubd_sem);
 
 	/* assuming we used keventd, it must quiesce too */
-	if (hub->tt.hub)
+	if (hub->has_indicators)
+		cancel_delayed_work (&hub->leds);
+	if (hub->has_indicators || hub->tt.hub)
 		flush_scheduled_work ();
 
 	if (hub->urb) {
@@ -603,6 +721,7 @@ descriptor_error:
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->intf = intf;
 	init_MUTEX(&hub->khubd_sem);
+	INIT_WORK(&hub->leds, led_work, hub);
 
 	/* Record the new hub's existence */
 	spin_lock_irqsave(&hub_event_lock, flags);
