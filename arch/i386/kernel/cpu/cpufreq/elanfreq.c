@@ -250,6 +250,7 @@ static struct cpufreq_driver elanfreq_driver = {
 	.target 	= elanfreq_target,
 	.init		= elanfreq_cpu_init,
 	.name		= "elanfreq",
+	.owner		= THIS_MODULE,
 };
 
 

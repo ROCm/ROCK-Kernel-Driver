@@ -253,6 +253,7 @@ static struct cpufreq_driver longrun_driver = {
 	.setpolicy 	= longrun_set_policy,
 	.init		= longrun_cpu_init,
 	.name		= "longrun",
+	.owner		= THIS_MODULE,
 };
 
 
