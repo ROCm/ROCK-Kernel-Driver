@@ -24,6 +24,7 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/notifier.h>
 
 #include <asm/uaccess.h>
 
@@ -62,7 +63,8 @@ struct tvec_t_base_s {
 
 typedef struct tvec_t_base_s tvec_base_t;
 
-static tvec_base_t tvec_bases[NR_CPUS] __cacheline_aligned;
+/* Fake initialization */
+static DEFINE_PER_CPU(tvec_base_t, tvec_bases) = { SPIN_LOCK_UNLOCKED };
 
 /* Fake initialization needed to avoid compiler breakage */
 static DEFINE_PER_CPU(struct tasklet_struct, timer_tasklet) = { NULL };
@@ -122,7 +124,7 @@ static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
 void add_timer(timer_t *timer)
 {
 	int cpu = get_cpu();
-	tvec_base_t *base = tvec_bases + cpu;
+	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
   	unsigned long flags;
   
   	BUG_ON(timer_pending(timer) || !timer->function);
@@ -143,7 +145,7 @@ void add_timer(timer_t *timer)
  */
 void add_timer_on(struct timer_list *timer, int cpu)
 {
-	tvec_base_t *base = tvec_bases+ cpu;
+	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
   	unsigned long flags;
   
   	BUG_ON(timer_pending(timer) || !timer->function);
@@ -189,7 +191,7 @@ int mod_timer(timer_t *timer, unsigned long expires)
 		return 1;
 
 	local_irq_save(flags);
-	new_base = tvec_bases + smp_processor_id();
+	new_base = &per_cpu(tvec_bases, smp_processor_id());
 repeat:
 	old_base = timer->base;
 
@@ -285,15 +287,17 @@ repeat:
  */
 int del_timer_sync(timer_t *timer)
 {
-	tvec_base_t *base = tvec_bases;
+	tvec_base_t *base;
 	int i, ret = 0;
 
 del_again:
 	ret += del_timer(timer);
 
-	for (i = 0; i < NR_CPUS; i++, base++) {
+	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_online(i))
 			continue;
+
+		base = &per_cpu(tvec_bases, i);
 		if (base->running_timer == timer) {
 			while (base->running_timer == timer) {
 				cpu_relax();
@@ -731,7 +735,7 @@ unsigned long last_time_offset;
  */
 static void run_timer_tasklet(unsigned long data)
 {
-	tvec_base_t *base = tvec_bases + smp_processor_id();
+	tvec_base_t *base = &per_cpu(tvec_bases, smp_processor_id());
 
 	if ((long)(jiffies - base->timer_jiffies) >= 0)
 		__run_timers(base);
@@ -1086,23 +1090,46 @@ out:
 	return 0;
 }
 
+static void __devinit init_timers_cpu(int cpu)
+{
+	int j;
+	tvec_base_t *base;
+       
+	base = &per_cpu(tvec_bases, cpu);
+	spin_lock_init(&base->lock);
+	for (j = 0; j < TVN_SIZE; j++) {
+		INIT_LIST_HEAD(base->tv5.vec + j);
+		INIT_LIST_HEAD(base->tv4.vec + j);
+		INIT_LIST_HEAD(base->tv3.vec + j);
+		INIT_LIST_HEAD(base->tv2.vec + j);
+	}
+	for (j = 0; j < TVR_SIZE; j++)
+		INIT_LIST_HEAD(base->tv1.vec + j);
+	tasklet_init(&per_cpu(timer_tasklet, cpu), run_timer_tasklet, 0UL);
+}
+	
+static int __devinit timer_cpu_notify(struct notifier_block *self, 
+				unsigned long action, void *hcpu)
+{
+	long cpu = (long)hcpu;
+	switch(action) {
+	case CPU_UP_PREPARE:
+		init_timers_cpu(cpu);
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __devinitdata timers_nb = {
+	.notifier_call	= timer_cpu_notify,
+};
+
+
 void __init init_timers(void)
 {
-	int i, j;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		tvec_base_t *base;
-	       
-		base = tvec_bases + i;
-		spin_lock_init(&base->lock);
-		for (j = 0; j < TVN_SIZE; j++) {
-			INIT_LIST_HEAD(base->tv5.vec + j);
-			INIT_LIST_HEAD(base->tv4.vec + j);
-			INIT_LIST_HEAD(base->tv3.vec + j);
-			INIT_LIST_HEAD(base->tv2.vec + j);
-		}
-		for (j = 0; j < TVR_SIZE; j++)
-			INIT_LIST_HEAD(base->tv1.vec + j);
-		tasklet_init(&per_cpu(timer_tasklet, i), run_timer_tasklet, 0);
-	}
+	timer_cpu_notify(&timers_nb, (unsigned long)CPU_UP_PREPARE,
+				(void *)(long)smp_processor_id());
+	register_cpu_notifier(&timers_nb);
 }
