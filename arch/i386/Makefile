@@ -56,6 +56,10 @@ cflags-$(CONFIG_X86_ELAN)	+= -march=i486
 GCC_VERSION			:= $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
 cflags-$(CONFIG_REGPARM) 	+= $(shell if [ $(GCC_VERSION) -ge 0300 ] ; then echo "-mregparm=3"; fi ;)
 
+# Enable unit-at-a-time mode when possible. It shrinks the
+# kernel considerably.
+CFLAGS += $(call check_gcc,-funit-at-a-time,)
+
 CFLAGS += $(cflags-y)
 
 # Default subarch .c files
