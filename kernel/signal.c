@@ -96,7 +96,12 @@ int max_queued_signals = 1024;
 #define M_SIGEMT	0
 #endif
 
+#if SIGRTMIN > BITS_PER_LONG
+#define M(sig) (1ULL << (sig))
+#else
 #define M(sig) (1UL << (sig))
+#endif
+#define T(sig, mask) (M(sig) & mask)
 
 #define SIG_USER_SPECIFIC_MASK (\
 	M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    | \
@@ -130,9 +135,6 @@ int max_queued_signals = 1024;
         M(SIGQUIT)   |  M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   | \
         M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGBUS)    |  M(SIGSYS)    | \
         M(SIGXCPU)   |  M(SIGXFSZ)   |  M_SIGEMT                     )
-
-#define T(sig, mask) \
-	((1UL << (sig)) & mask)
 
 #define sig_user_specific(sig) \
 		(((sig) < SIGRTMIN)  && T(sig, SIG_USER_SPECIFIC_MASK))

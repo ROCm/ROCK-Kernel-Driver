@@ -15,8 +15,12 @@ CFLAGS	+= -fno-builtin -D__BOOTER__ -I$(TOPDIR)/arch/$(ARCH)/boot/include
 AFLAGS	+= -D__BOOTER__
 OBJCOPY_ARGS = -O elf32-powerpc
 
-subdir-y			:= simple
-subdir-$(CONFIG_ALL_PPC)	:= openfirmware prep
+bootdir-y			:= simple
+bootdir-$(CONFIG_ALL_PPC)	:= openfirmware prep
+
+# for cleaning...
+subdir-				:= images simple openfirmware prep \
+				   lib common of1275
 
 HOSTCFLAGS += -Iarch/$(ARCH)/boot/include
 
@@ -35,20 +39,15 @@ all-tools := addnote mknote hack-coff mkprep mkbugboot mktree
 
 host-progs			:= $(addprefix utils/,$(tools-y))
 
-include $(TOPDIR)/Rules.make
+zImage zImage.initrd znetboot znetboot.initrd: $(addprefix $(obj)/,$(bootdir-y))
 
-zImage zImage.initrd znetboot znetboot.initrd: $(subdir-y)
+.PHONY: FORCE
 
-simple openfirmware prep: lib common images
-openfirmware prep: of1275
+$(obj)/simple $(obj)/openfirmware $(obj)/prep: $(obj)/lib $(obj)/common $(obj)/images
+$(obj)/openfirmware $(obj)/prep: $(obj)/of1275
 
-lib common of1275 images: FORCE
-	+@$(call descend,$(obj)/$@,)
+$(obj)/lib $(obj)/common $(obj)/of1275 $(obj)/images: FORCE
+	+@$(call descend,$@,)
 
-openfirmware prep simple: FORCE
-	+@$(call descend,$(obj)/$@,$(MAKECMDGOALS))
-
-CLEAN_FILES += $(addprefix $(obj)/utils,$(all-tools))
-
-clean: FORCE
-	+@$(call descend,$(obj)/images,clean)
+$(obj)/openfirmware $(obj)/prep $(obj)/simple: FORCE
+	+@$(call descend,$@,$(MAKECMDGOALS))

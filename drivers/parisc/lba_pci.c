@@ -627,8 +627,8 @@ static int lba_cfg_write(struct pci_bus *bus, unsigned int devfn, int pos, int s
 
 
 static struct pci_ops lba_cfg_ops = {
-	read:	lba_cfg_read,
-	write:	lba_cfg_write,
+	.read =		lba_cfg_read,
+	.write =	lba_cfg_write,
 };
 
 
@@ -865,8 +865,8 @@ lba_fixup_bus(struct pci_bus *bus)
 
 
 struct pci_bios_ops lba_bios_ops = {
-	init:		lba_bios_init,
-	fixup_bus:	lba_fixup_bus,
+	.init =		lba_bios_init,
+	.fixup_bus =	lba_fixup_bus,
 };
 
 
@@ -943,12 +943,12 @@ LBA_PORT_OUT(32, 0)
 
 
 static struct pci_port_ops lba_astro_port_ops = {
-	inb:	lba_astro_in8,
-	inw:	lba_astro_in16,
-	inl:	lba_astro_in32,
-	outb:	lba_astro_out8,
-	outw:	lba_astro_out16,
-	outl:	lba_astro_out32
+	.inb =	lba_astro_in8,
+	.inw =	lba_astro_in16,
+	.inl =	lba_astro_in32,
+	.outb =	lba_astro_out8,
+	.outw =	lba_astro_out16,
+	.outl =	lba_astro_out32
 };
 
 
@@ -1003,12 +1003,12 @@ LBA_PORT_OUT(32, 0)
 
 
 static struct pci_port_ops lba_pat_port_ops = {
-	inb:	lba_pat_in8,
-	inw:	lba_pat_in16,
-	inl:	lba_pat_in32,
-	outb:	lba_pat_out8,
-	outw:	lba_pat_out16,
-	outl:	lba_pat_out32
+	.inb =	lba_pat_in8,
+	.inw =	lba_pat_in16,
+	.inl =	lba_pat_in32,
+	.outb =	lba_pat_out8,
+	.outw =	lba_pat_out16,
+	.outl =	lba_pat_out32
 };
 
 
@@ -1462,9 +1462,9 @@ static struct parisc_device_id lba_tbl[] = {
 };
 
 static struct parisc_driver lba_driver = {
-	name:		MODULE_NAME,
-	id_table:	lba_tbl,
-	probe:		lba_driver_callback
+	.name =		MODULE_NAME,
+	.id_table =	lba_tbl,
+	.probe =	lba_driver_callback
 };
 
 /*

@@ -1290,6 +1290,11 @@ _GLOBAL(sys_call_table)
 	.long sys_ni_syscall	/* reserved for alloc_hugepages */
 	.long sys_ni_syscall	/* reserved for free_hugepages */
 	.long sys_exit_group
+	.long sys_lookup_dcookie /* 235 */
+	.long sys_epoll_create
+	.long sys_epoll_ctl
+	.long sys_epoll_wait
+ 	.long sys_remap_file_pages
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

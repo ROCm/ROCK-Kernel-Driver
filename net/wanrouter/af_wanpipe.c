@@ -512,6 +512,7 @@ static struct sock *wanpipe_alloc_socket(void)
 
 	/* Use timer to send data to the driver. This will act
          * as a BH handler for sendmsg functions */
+	init_timer(&wan_opt->tx_timer);
 	wan_opt->tx_timer.data	   = (unsigned long)sk;
 	wan_opt->tx_timer.function = wanpipe_delayed_transmit;
 

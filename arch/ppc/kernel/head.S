@@ -358,9 +358,12 @@ MachineCheck:
 #ifdef CONFIG_ALL_PPC
 	mfspr	r4,SPRG2
 	cmpwi	cr1,r4,0
-	bne	cr1,machine_check_in_rtas
+	bne	cr1,1f
 #endif
 	EXC_XFER_STD(0x200, MachineCheckException)
+#ifdef CONFIG_ALL_PPC
+1:	b	machine_check_in_rtas
+#endif
 
 /* Data access exception. */
 	. = 0x300

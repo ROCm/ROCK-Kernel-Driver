@@ -51,6 +51,20 @@ SECTIONS
   .ctors     : { *(.ctors)   }
   .dtors     : { *(.dtors)   }
 
+  .fixup   : { *(.fixup) }
+
+  __start___ex_table = .;
+  __ex_table : { *(__ex_table) }
+  __stop___ex_table = .;
+
+  __start___ksymtab = .;	/* Kernel symbol table */
+  __ksymtab : { *(__ksymtab) }
+  __stop___ksymtab = .;
+
+  __start___kallsyms = .;     /* All kernel symbols */
+  __kallsyms : { *(__kallsyms) }
+  __stop___kallsyms = .;
+
   /* Read-write section, merged into data segment: */
   . = ALIGN(4096);
   .data    :
@@ -63,24 +77,12 @@ SECTIONS
     *(.dynamic)
     CONSTRUCTORS
   }
-  _edata  =  .;
-  PROVIDE (edata = .);
-
-  .fixup   : { *(.fixup) }
-  __start___ex_table = .;
-  __ex_table : { *(__ex_table) }
-  __stop___ex_table = .;
-
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___ftr_fixup = .;
-  __ftr_fixup : { *(__ftr_fixup) }
-  __stop___ftr_fixup = .;
 
   . = ALIGN(32);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+
+  _edata  =  .;
+  PROVIDE (edata = .);
 
   . = ALIGN(8192);
   .data.init_task : { *(.data.init_task) }
@@ -112,10 +114,21 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+
+  __start___ftr_fixup = .;
+  __ftr_fixup : { *(__ftr_fixup) }
+  __stop___ftr_fixup = .;
+
   . = ALIGN(32);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;
+
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
+
   . = ALIGN(4096);
   __init_end = .;
 
@@ -146,10 +159,6 @@ SECTIONS
   .openfirmware.data : { *(.openfirmware.data) }
   . = ALIGN(4096);
   __openfirmware_end = .;
-
-  __start___kallsyms = .;     /* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
 
   __bss_start = .;
   .bss       :

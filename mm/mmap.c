@@ -767,7 +767,7 @@ struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
 	return prev ? prev->vm_next : vma;
 }
 
-#ifdef ARCH_STACK_GROWSUP
+#ifdef CONFIG_STACK_GROWSUP
 /*
  * vma is the first one with address > vma->vm_end.  Have to extend vma.
  */

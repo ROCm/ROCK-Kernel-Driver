@@ -29,10 +29,9 @@
 #define MOUNT_UMNT		3
  */
 
-static int			nfs_gen_mount(struct sockaddr_in *,
-					      char *, struct nfs_fh *, int);
-static struct rpc_clnt *	mnt_create(char *, struct sockaddr_in *, int);
-extern struct rpc_program	mnt_program;
+static struct rpc_clnt *	mnt_create(char *, struct sockaddr_in *,
+								int, int);
+struct rpc_program		mnt_program;
 
 struct mnt_fhstatus {
 	unsigned int		status;
@@ -43,19 +42,8 @@ struct mnt_fhstatus {
  * Obtain an NFS file handle for the given host and path
  */
 int
-nfs_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh)
-{
-	return nfs_gen_mount(addr, path, fh, NFS_MNT_VERSION);
-}
-
-int
-nfs3_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh)
-{
-	return nfs_gen_mount(addr, path, fh, NFS_MNT3_VERSION);
-}
-
-static int
-nfs_gen_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh, int version)
+nfsroot_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh,
+		int version, int protocol)
 {
 	struct rpc_clnt		*mnt_clnt;
 	struct mnt_fhstatus	result = {
@@ -69,21 +57,22 @@ nfs_gen_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh, int versi
 			(unsigned)ntohl(addr->sin_addr.s_addr), path);
 
 	sprintf(hostname, "%u.%u.%u.%u", NIPQUAD(addr->sin_addr.s_addr));
-	if (!(mnt_clnt = mnt_create(hostname, addr, version)))
+	if (!(mnt_clnt = mnt_create(hostname, addr, version, protocol)))
 		return -EACCES;
 
-	call = (version == 3) ? MOUNTPROC3_MNT : MNTPROC_MNT;
+	call = (version == NFS_MNT3_VERSION) ? MOUNTPROC3_MNT : MNTPROC_MNT;
 	status = rpc_call(mnt_clnt, call, path, &result, 0);
 	return status < 0? status : (result.status? -EACCES : 0);
 }
 
 static struct rpc_clnt *
-mnt_create(char *hostname, struct sockaddr_in *srvaddr, int version)
+mnt_create(char *hostname, struct sockaddr_in *srvaddr, int version,
+		int protocol)
 {
 	struct rpc_xprt	*xprt;
 	struct rpc_clnt	*clnt;
 
-	if (!(xprt = xprt_create_proto(IPPROTO_UDP, srvaddr, NULL)))
+	if (!(xprt = xprt_create_proto(protocol, srvaddr, NULL)))
 		return NULL;
 
 	clnt = rpc_create_client(xprt, hostname,

@@ -9,6 +9,7 @@
 #include <asm/ptrace.h>
 #ifdef __KERNEL__
 #include <asm/processor.h>
+#include <asm/uaccess.h>
 #endif
 
 /*

@@ -5,10 +5,10 @@
  *
  * Derived from cryptoapi implementation, adapted for in-place
  * scatterlist interface.  Originally based on the public domain
- * implementation written by Steve Raid.
+ * implementation written by Steve Reid.
  *
  * Copyright (c) Alan Smithee.
- * Copyright (c) McDonald <andrew@mcdonald.org.uk>
+ * Copyright (c) Andrew McDonald <andrew@mcdonald.org.uk>
  * Copyright (c) Jean-Francois Dive <jef@linuxbe.org>
  *
  * This program is free software; you can redistribute it and/or modify it

@@ -179,10 +179,10 @@ c_stop (struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo
 };
 
 static void parisc_proc_mkdir(void)
@@ -216,24 +216,24 @@ static void parisc_proc_mkdir(void)
 }
 
 static struct resource central_bus = {
-	name:	"Central Bus",
-	start:	(unsigned long)0xfffffffffff80000,
-	end:    (unsigned long)0xfffffffffffaffff,
-	flags:	IORESOURCE_MEM,
+	.name	= "Central Bus",
+	.start	= (unsigned long)0xfffffffffff80000,
+	.end    = (unsigned long)0xfffffffffffaffff,
+	.flags	= IORESOURCE_MEM,
 };
 
 static struct resource local_broadcast = {
-	name:	"Local Broadcast",
-	start:	(unsigned long)0xfffffffffffb0000,
-	end:	(unsigned long)0xfffffffffffdffff,
-	flags:	IORESOURCE_MEM,
+	.name	= "Local Broadcast",
+	.start	= (unsigned long)0xfffffffffffb0000,
+	.end	= (unsigned long)0xfffffffffffdffff,
+	.flags	= IORESOURCE_MEM,
 };
 
 static struct resource global_broadcast = {
-	name:	"Global Broadcast",
-	start:	(unsigned long)0xfffffffffffe0000,
-	end:	(unsigned long)0xffffffffffffffff,
-	flags:	IORESOURCE_MEM,
+	.name	= "Global Broadcast",
+	.start	= (unsigned long)0xfffffffffffe0000,
+	.end	= (unsigned long)0xffffffffffffffff,
+	.flags	= IORESOURCE_MEM,
 };
 
 int __init parisc_init_resources(void)

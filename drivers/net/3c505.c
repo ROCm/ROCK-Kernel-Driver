@@ -274,9 +274,12 @@ static inline int get_status(unsigned int base_addr)
 
 static inline void set_hsf(struct net_device *dev, int hsf)
 {
-	cli();
+	elp_device *adapter = dev->priv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&adapter->lock, flags);
 	outb_control((HCR_VAL(dev) & ~HSF_PCB_MASK) | hsf, dev);
-	sti();
+	spin_unlock_irqrestore(&adapter->lock, flags);
 }
 
 static int start_receive(struct net_device *, pcb_struct *);
@@ -325,8 +328,7 @@ static inline void check_3c505_dma(struct net_device *dev)
 	if (adapter->dmaing && time_after(jiffies, adapter->current_dma.start_time + 10)) {
 		unsigned long flags, f;
 		printk("%s: DMA %s timed out, %d bytes left\n", dev->name, adapter->current_dma.direction ? "download" : "upload", get_dma_residue(dev->dma));
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&adapter->lock, flags);
 		adapter->dmaing = 0;
 		adapter->busy = 0;
 		
@@ -337,7 +339,7 @@ static inline void check_3c505_dma(struct net_device *dev)
 		if (adapter->rx_active)
 			adapter->rx_active--;
 		outb_control(adapter->hcr_val & ~(DMAE | TCEN | DIR), dev);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&adapter->lock, flags);
 	}
 }
 
@@ -405,6 +407,7 @@ static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 	int i;
 	int timeout;
 	elp_device *adapter = dev->priv;
+	unsigned long flags;
 
 	check_3c505_dma(dev);
 
@@ -428,7 +431,7 @@ static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 	if (send_pcb_slow(dev->base_addr, pcb->command))
 		goto abort;
 
-	cli();
+	spin_lock_irqsave(&adapter->lock, flags);
 
 	if (send_pcb_fast(dev->base_addr, pcb->length))
 		goto sti_abort;
@@ -442,7 +445,7 @@ static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 	outb_command(2 + pcb->length, dev->base_addr);
 
 	/* now wait for the acknowledgement */
-	sti();
+	spin_unlock_irqrestore(&adapter->lock, flags);
 
 	for (timeout = jiffies + 5*HZ/100; time_before(jiffies, timeout);) {
 		switch (GET_ASF(dev->base_addr)) {
@@ -463,7 +466,7 @@ static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 		printk("%s: timeout waiting for PCB acknowledge (status %02x)\n", dev->name, inb_status(dev->base_addr));
 
       sti_abort:
-	sti();
+	spin_unlock_irqrestore(&adapter->lock, flags);
       abort:
 	adapter->send_pcb_semaphore = 0;
 	return FALSE;
@@ -489,6 +492,7 @@ static int receive_pcb(struct net_device *dev, pcb_struct * pcb)
 	int total_length;
 	int stat;
 	int timeout;
+	unsigned long flags;
 
 	elp_device *adapter = dev->priv;
 
@@ -519,7 +523,7 @@ static int receive_pcb(struct net_device *dev, pcb_struct * pcb)
 		return FALSE;
 	}
 	/* read the data */
-	cli();
+	spin_lock_irqsave(&adapter->lock, flags);
 	i = 0;
 	do {
 		j = 0;
@@ -528,7 +532,7 @@ static int receive_pcb(struct net_device *dev, pcb_struct * pcb)
 		if (i > MAX_PCB_DATA)
 			INVALID_PCB_MSG(i);
 	} while ((stat & ASF_PCB_MASK) != ASF_PCB_END && j < 20000);
-	sti();
+	spin_unlock_irqrestore(&adapter->lock, flags);
 	if (j >= 20000) {
 		TIMEOUT_MSG(__LINE__);
 		return FALSE;

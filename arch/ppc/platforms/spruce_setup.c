@@ -57,7 +57,7 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 
-#include "cpc700.h"
+#include <syslib/cpc700.h>
 
 extern void spruce_init_IRQ(void);
 extern int spruce_get_irq(struct pt_regs *);
@@ -184,8 +184,6 @@ spruce_halt(void)
 {
 	spruce_restart(NULL);
 }
-
-extern int boot_mem_size;
 
 static void __init
 spruce_map_io(void)

@@ -106,6 +106,8 @@ static struct net_bridge *new_nb(char *name)
 	memset(br, 0, sizeof(*br));
 	dev = &br->dev;
 
+	init_timer(&br->tick);
+
 	strncpy(dev->name, name, IFNAMSIZ);
 	dev->priv = br;
 	ether_setup(dev);

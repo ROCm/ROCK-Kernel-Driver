@@ -1066,6 +1066,20 @@ config APRICOT
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
 	  called apricot.o.
 
+config B44
+	tristate "Broadcom 4400 ethernet support (EXPERIMENTAL)"
+	depends on NET_PCI && PCI && EXPERIMENTAL
+	help
+	  If you have a network (Ethernet) controller of this type, say Y and
+	  read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.  The module will be
+	  called b44.o.
+
 config CS89x0
 	tristate "CS89x0 support"
 	depends on NET_PCI && ISA

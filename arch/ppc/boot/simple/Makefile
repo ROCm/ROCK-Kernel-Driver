@@ -26,6 +26,12 @@
 
 boot: zImage
 
+boot				:= arch/ppc/boot
+common				:= $(boot)/common
+utils				:= $(boot)/utils
+bootlib				:= $(boot)/lib
+images				:= $(boot)/images
+
 # Normally, we use the 'misc.c' file for decompress_kernel and
 # whatnot.  Sometimes we need to override this however.
 MISC				:= misc.o
@@ -161,16 +167,8 @@ boot-$(CONFIG_8260)		+= m8260_tty.o
 boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
 
-boot				:= arch/ppc/boot
-common				:= $(boot)/common
-utils				:= $(boot)/utils
-bootlib				:= $(boot)/lib
-images				:= $(boot)/images
-
 EXTRA_TARGETS			:= $(boot-y)
 LIBS				:=  $(common)/lib.a $(bootlib)/lib.a
-
-include $(TOPDIR)/Rules.make
 
 OBJS				:= $(addprefix $(obj)/,$(boot-y))
 

@@ -139,7 +139,7 @@ void __init lasi_led_init(unsigned long lasi_hpa)
 	default:
 		datareg = lasi_hpa + 0x0000C000;
 		break;
-	} /* switch() */
+	}
 
 	register_led_driver(DISPLAY_MODEL_LASI, LED_CMD_REG_NONE, (char *)datareg);
 }
@@ -239,7 +239,7 @@ static struct parisc_device_id lasi_tbl[] = {
 };
 
 struct parisc_driver lasi_driver = {
-	name:		"Lasi",
-	id_table:	lasi_tbl,
-	probe:		lasi_init_chip,
+	.name =		"Lasi",
+	.id_table =	lasi_tbl,
+	.probe =	lasi_init_chip,
 };

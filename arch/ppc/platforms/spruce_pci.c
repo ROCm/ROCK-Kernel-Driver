@@ -41,7 +41,7 @@
 #include <asm/pci-bridge.h>
 #include <platforms/spruce.h>
 
-#include "cpc700.h"
+#include <syslib/cpc700.h>
 
 static inline int
 spruce_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)

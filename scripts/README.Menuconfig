@@ -1,7 +1,8 @@
 Menuconfig gives the Linux kernel configuration a long needed face
 lift.  Featuring text based color menus and dialogs, it does not
-require X Windows.  With this utility you can easily select a kernel
-option to modify without sifting through 100 other options.
+require X Windows (however, you need ncurses in order to use it).
+With this utility you can easily select a kernel option to modify
+without sifting through 100 other options.
 
 Overview
 --------
@@ -172,11 +173,17 @@ COMPATIBILITY ISSUE:
 ******** IMPORTANT, OPTIONAL ALTERNATE PERSONALITY AVAILABLE ********
 ********                                                     ********
 If you prefer to have all of the kernel options listed in a single
-menu, rather than the default multimenu hierarchy, you may edit the
-Menuconfig script and change the line "single_menu_mode="  to 
-"single_menu_mode=TRUE".
+menu, rather than the default multimenu hierarchy, run the menuconfig
+with MENUCONFIG_MODE environment variable set to single_menu. Example:
 
-This mode is not recommended unless you have a fairly fast machine.
+make menuconfig MENUCONFIG_MODE=single_menu
+
+<Enter> will then unroll the appropriate category, or enfold it if it
+is already unrolled.
+
+Note that this mode can eventually be a little more CPU expensive
+(especially with a larger number of unrolled categories) than the
+default mode.
 *********************************************************************
 
 

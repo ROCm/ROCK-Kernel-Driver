@@ -54,14 +54,14 @@ static void def_init_hw(void)
 static char def_sysrq_xlate[NR_KEYS];
 
 #define DEFAULT_KEYB_OPS \
-	setkeycode:	def_setkeycode,	\
-	getkeycode:	def_getkeycode, \
-	translate:	def_translate, \
-	unexpected_up:	def_unexpected_up, \
-	leds:		def_leds, \
-	init_hw:	def_init_hw, \
-	sysrq_key:	0xff, \
-	sysrq_xlate:	def_sysrq_xlate,
+	.setkeycode	= def_setkeycode,	\
+	.getkeycode	= def_getkeycode, \
+	.translate	= def_translate, \
+	.unexpected_up	= def_unexpected_up, \
+	.leds		= def_leds, \
+	.init_hw	= def_init_hw, \
+	.sysrq_key	= 0xff, \
+	.sysrq_xlate	= def_sysrq_xlate,
 
 static struct kbd_ops def_kbd_ops = {
 	DEFAULT_KEYB_OPS

@@ -362,6 +362,24 @@ static int mace_set_address(struct net_device *dev, void *addr)
     return 0;
 }
 
+static inline void mace_clean_rings(struct mace_data *mp)
+{
+    int i;
+
+    /* free some skb's */
+    for (i = 0; i < N_RX_RING; ++i) {
+	if (mp->rx_bufs[i] != 0) {
+	    dev_kfree_skb(mp->rx_bufs[i]);
+	    mp->rx_bufs[i] = 0;
+	}
+    }
+    for (i = mp->tx_empty; i != mp->tx_fill; ) {
+	dev_kfree_skb(mp->tx_bufs[i]);
+	if (++i >= N_TX_RING)
+	    i = 0;
+    }
+}
+
 static int mace_open(struct net_device *dev)
 {
     struct mace_data *mp = (struct mace_data *) dev->priv;
@@ -430,24 +448,6 @@ static int mace_open(struct net_device *dev)
     out_8(&mb->imr, RCVINT);
 
     return 0;
-}
-
-static inline void mace_clean_rings(struct mace_data *mp)
-{
-    int i;
-
-    /* free some skb's */
-    for (i = 0; i < N_RX_RING; ++i) {
-	if (mp->rx_bufs[i] != 0) {
-	    dev_kfree_skb(mp->rx_bufs[i]);
-	    mp->rx_bufs[i] = 0;
-	}
-    }
-    for (i = mp->tx_empty; i != mp->tx_fill; ) {
-	dev_kfree_skb(mp->tx_bufs[i]);
-	if (++i >= N_TX_RING)
-	    i = 0;
-    }
 }
 
 static int mace_close(struct net_device *dev)

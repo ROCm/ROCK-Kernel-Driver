@@ -31,6 +31,7 @@
 #include <linux/reboot.h>
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/hardware.h>
@@ -97,13 +98,13 @@ struct pdc_chassis_lcd_info_ret_block {
 static struct pdc_chassis_lcd_info_ret_block
 lcd_info __attribute__((aligned(8))) =
 {
-      model:		DISPLAY_MODEL_LCD,
-      lcd_width:	16,
-      lcd_cmd_reg_addr:	(char *) KITTYHAWK_LCD_CMD,
-      lcd_data_reg_addr:(char *) KITTYHAWK_LCD_DATA,
-      min_cmd_delay:	40,
-      reset_cmd1:	0x80,
-      reset_cmd2:	0xc0,
+	.model =		DISPLAY_MODEL_LCD,
+	.lcd_width =		16,
+	.lcd_cmd_reg_addr =	(char *) KITTYHAWK_LCD_CMD,
+	.lcd_data_reg_addr =	(char *) KITTYHAWK_LCD_DATA,
+	.min_cmd_delay =	40,
+	.reset_cmd1 =		0x80,
+	.reset_cmd2 =		0xc0,
 };
 
 
@@ -405,7 +406,7 @@ static void led_get_diskio_stats(int addvalue)
 	total = 0;
 	for (major = 0; major < DK_MAX_MAJOR; major++) {
 	    for (disk = 0; disk < DK_MAX_DISK; disk++)
-		total += kstat.dk_drive[major][disk];
+		total += dkstat.drive[major][disk];
 	}
 	total -= diskio_total_last;
 	

@@ -34,7 +34,7 @@
  */
 
 #include <linux/config.h>
-#include <platforms/ibmstb4.h>
+#include <platforms/4xx/ibmstb4.h>
 
 const struct NS16550* COM_PORTS[] =
 {

@@ -12,13 +12,10 @@
 # Rewritten by Cort Dougan and Paul Mackerras
 #
 
-# Be sure to change PAGE_OFFSET in include/asm-ppc/page.h to match
-ifdef CONFIG_KERNEL_START_BOOL
+# This must match PAGE_OFFSET in include/asm-ppc/page.h.
 KERNELLOAD	=$(CONFIG_KERNEL_START)
-else
-KERNELLOAD	=0xc0000000
-endif
 
+LDFLAGS_BLOB	:= --format binary --oformat elf32-powerpc
 LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
@@ -54,7 +51,7 @@ else
 endif
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
-				   arch/ppc/mm/ arch/ppc/lib/
+				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
 core-$(CONFIG_4xx)		+= arch/ppc/platforms/4xx/
 core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
 core-$(CONFIG_XMON)		+= arch/ppc/xmon/
@@ -67,6 +64,8 @@ drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
 makeboot = $(call descend,arch/ppc/boot,$(1))
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
+
+.PHONY: $(BOOT_TARGETS) clean archclean archmrproper
 
 AFLAGS_vmlinux.lds.o	:= -Upowerpc
 
@@ -81,7 +80,7 @@ $(BOOT_TARGETS): vmlinux
 	cp -f arch/ppc/configs/$(@:config=defconfig) .config
 
 archclean:
-	+@$(call makeboot,clean)
+	$(MAKE) -f scripts/Makefile.clean obj=arch/ppc/boot
 
 archmrproper:
 

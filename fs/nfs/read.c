@@ -256,11 +256,12 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
 {
 	struct nfs_read_data	*data = (struct nfs_read_data *) task->tk_calldata;
 	struct inode		*inode = data->inode;
+	struct nfs_fattr	*fattr = &data->fattr;
 
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, task->tk_status);
 
-	nfs_refresh_inode(inode, &data->fattr);
+	nfs_refresh_inode(inode, fattr);
 	while (!list_empty(&data->pages)) {
 		struct nfs_page *req = nfs_list_entry(data->pages.next);
 		struct page *page = req->wb_page;
@@ -269,13 +270,20 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
 		if (task->tk_status >= 0) {
 			if (count < PAGE_CACHE_SIZE) {
 				char *p = kmap(page);
-				memset(p + count, 0, PAGE_CACHE_SIZE - count);
+
+				if (count < req->wb_bytes)
+					memset(p + req->wb_offset + count, 0,
+							req->wb_bytes - count);
 				kunmap(page);
-				count = 0;
-				if (eof)
+
+				if (eof ||
+				    ((fattr->valid & NFS_ATTR_FATTR) &&
+				     ((req_offset(req) + req->wb_offset + count) >= fattr->size)))
 					SetPageUptodate(page);
 				else
-					SetPageError(page);
+					if (count < req->wb_bytes)
+						SetPageError(page);
+				count = 0;
 			} else {
 				count -= PAGE_CACHE_SIZE;
 				SetPageUptodate(page);

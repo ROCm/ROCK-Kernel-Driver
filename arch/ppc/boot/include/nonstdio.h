@@ -21,12 +21,9 @@ extern FILE *stdin, *stdout;
 
 extern int getc(void);
 extern int printf(const char *format, ...);
-extern int strlen(const char *s);
 extern int sprintf(char *str, const char *format, ...);
 extern int tstc(void);
 extern void exit(void);
-extern void *memcpy(void *dest, const void *src, int n);
-extern void *memmove(void *dest, const void *src, int n);
 extern void outb(int port, unsigned char val);
 extern void putc(const char c);
 extern void puthex(unsigned long val);
