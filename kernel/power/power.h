@@ -37,3 +37,10 @@ static inline int swsusp_free(void)
 	return 0;
 }
 #endif
+
+
+extern int freeze_processes(void);
+extern void thaw_processes(void);
+
+extern int pm_prepare_console(void);
+extern void pm_restore_console(void);

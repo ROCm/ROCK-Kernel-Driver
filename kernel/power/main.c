@@ -15,6 +15,8 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/pm.h>
+#include <linux/fs.h>
+
 
 #include "power.h"
 
@@ -29,6 +31,8 @@ static int have_swsusp = 1;
 #else
 static int have_swsusp = 0;
 #endif
+
+extern long sys_sync(void);
 
 
 /**
@@ -129,6 +133,25 @@ static int in_suspend __nosavedata = 0;
 
 
 /**
+ *	free_some_memory -  Try to free as much memory as possible
+ *
+ *	... but do not OOM-kill anyone
+ *
+ *	Notice: all userland should be stopped at this point, or 
+ *	livelock is possible.
+ */
+
+static void free_some_memory(void)
+{
+	printk("Freeing memory: ");
+	while (shrink_all_memory(10000))
+		printk(".");
+	printk("|\n");
+	blk_run_queues();
+}
+
+
+/**
  *	pm_suspend_disk - The granpappy of power management.
  *	
  *	If we're going through the firmware, then get it over with quickly.
@@ -197,6 +220,7 @@ static int suspend_prepare(u32 state)
 
 	pm_prepare_console();
 
+	sys_sync();
 	if (freeze_processes()) {
 		error = -EAGAIN;
 		goto Thaw;
@@ -206,6 +230,10 @@ static int suspend_prepare(u32 state)
 		if ((error = pm_ops->prepare(state)))
 			goto Thaw;
 	}
+
+	/* Free memory before shutting down devices. */
+	if (state == PM_SUSPEND_DISK)
+		free_some_memory();
 
 	if ((error = device_pm_suspend(state)))
 		goto Finish;
