@@ -773,7 +773,7 @@ u32 inet_select_addr(const struct net_device *dev, u32 dst, int scope)
 	rcu_read_lock();
 	in_dev = __in_dev_get(dev);
 	if (!in_dev)
-		goto out_unlock_inetdev;
+		goto no_in_dev;
 
 	for_primary_ifa(in_dev) {
 		if (ifa->ifa_scope > scope)
@@ -785,6 +785,7 @@ u32 inet_select_addr(const struct net_device *dev, u32 dst, int scope)
 		if (!addr)
 			addr = ifa->ifa_local;
 	} endfor_ifa(in_dev);
+no_in_dev:
 	rcu_read_unlock();
 
 	if (addr)
@@ -810,7 +811,6 @@ u32 inet_select_addr(const struct net_device *dev, u32 dst, int scope)
 	}
 out_unlock_both:
 	read_unlock(&dev_base_lock);
-out_unlock_inetdev:
 	rcu_read_unlock();
 out:
 	return addr;
