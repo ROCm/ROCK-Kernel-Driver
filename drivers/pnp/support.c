@@ -123,7 +123,7 @@ unsigned char * pnp_parse_current_resources(unsigned char * p, unsigned char * e
 		return NULL;
 
 	/* Blank the resource table values */
-	pnp_init_resources(res);
+	pnp_init_resource_table(res);
 
 	while ((char *)p < (char *)end) {
 
