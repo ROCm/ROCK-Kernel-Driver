@@ -1503,7 +1503,8 @@ static int carm_init_disks(struct carm_host *host)
 		}
 
 		port->disk = disk;
-		sprintf(disk->disk_name, DRV_NAME "/%u", (host->id * CARM_MAX_PORTS) + i);
+		sprintf(disk->disk_name, DRV_NAME "/%u",
+			(unsigned int) (host->id * CARM_MAX_PORTS) + i);
 		sprintf(disk->devfs_name, DRV_NAME "/%u_%u", host->id, i);
 		disk->major = host->major;
 		disk->first_minor = i * CARM_MINORS_PER_MAJOR;

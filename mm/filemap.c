@@ -1463,12 +1463,9 @@ err:
 	return NULL;
 }
 
-static int filemap_populate(struct vm_area_struct *vma,
-			unsigned long addr,
-			unsigned long len,
-			pgprot_t prot,
-			unsigned long pgoff,
-			int nonblock)
+int filemap_populate(struct vm_area_struct *vma, unsigned long addr,
+		unsigned long len, pgprot_t prot, unsigned long pgoff,
+		int nonblock)
 {
 	struct file *file = vma->vm_file;
 	struct address_space *mapping = file->f_mapping;
@@ -1528,6 +1525,7 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
 }
+EXPORT_SYMBOL(filemap_populate);
 
 /*
  * This is for filesystems which do not implement ->writepage.

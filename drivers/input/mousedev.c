@@ -467,10 +467,10 @@ static void mousedev_packet(struct mousedev_list *list, signed char *ps2_data)
 	}
 
 	if (!p->dx && !p->dy && !p->dz) {
-		if (list->tail != list->head)
-			list->tail = (list->tail + 1) % PACKET_QUEUE_LEN;
 		if (list->tail == list->head)
 			list->ready = 0;
+		else
+			list->tail = (list->tail + 1) % PACKET_QUEUE_LEN;
 	}
 
 	spin_unlock_irqrestore(&list->packet_lock, flags);

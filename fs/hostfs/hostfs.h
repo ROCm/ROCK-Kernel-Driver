@@ -16,8 +16,29 @@
 #define HOSTFS_ATTR_CTIME	64
 #define HOSTFS_ATTR_ATIME_SET	128
 #define HOSTFS_ATTR_MTIME_SET	256
+
+/* These two are unused by hostfs. */
 #define HOSTFS_ATTR_FORCE	512	/* Not a change, but a change it */
 #define HOSTFS_ATTR_ATTR_FLAG	1024
+
+/* If you are very careful, you'll notice that these two are missing:
+ *
+ * #define ATTR_KILL_SUID	2048
+ * #define ATTR_KILL_SGID	4096
+ *
+ * and this is because they were added in 2.5 development in this patch:
+ *
+ * http://linux.bkbits.net:8080/linux-2.5/
+ * cset@3caf4a12k4XgDzK7wyK-TGpSZ9u2Ww?nav=index.html
+ * |src/.|src/include|src/include/linux|related/include/linux/fs.h
+ *
+ * Actually, they are not needed by most ->setattr() methods - they are set by
+ * callers of notify_change() to notify that the setuid/setgid bits must be
+ * dropped.
+ * notify_change() will delete those flags, make sure attr->ia_valid & ATTR_MODE
+ * is on, and remove the appropriate bits from attr->ia_mode (attr is a
+ * "struct iattr *"). -BlaisorBlade
+ */
 
 struct hostfs_iattr {
 	unsigned int	ia_valid;

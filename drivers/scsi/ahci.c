@@ -250,6 +250,8 @@ static struct pci_device_id ahci_pci_tbl[] = {
 	  board_ahci }, /* ICH7R */
 	{ PCI_VENDOR_ID_INTEL, 0x27c3, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 	  board_ahci }, /* ICH7R */
+	{ PCI_VENDOR_ID_AL, 0x5288, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+	  board_ahci }, /* ULi M5288 */
 	{ }	/* terminate list */
 };
 

@@ -171,12 +171,13 @@ static void inline __read_unlock(rwlock_t *lock)
 	unsigned long tmp1, tmp2;
 
 	__asm__ __volatile__(
+"	membar	#StoreLoad | #LoadLoad\n"
 "1:	lduw	[%2], %0\n"
 "	sub	%0, 1, %1\n"
 "	cas	[%2], %0, %1\n"
 "	cmp	%0, %1\n"
 "	bne,pn	%%xcc, 1b\n"
-"	 membar	#StoreLoad | #StoreStore"
+"	 nop"
 	: "=&r" (tmp1), "=&r" (tmp2)
 	: "r" (lock)
 	: "memory");

@@ -758,7 +758,9 @@ extern void truncate_inode_pages_range(struct address_space *,
 				       loff_t lstart, loff_t lend);
 
 /* generic vm_area_ops exported for stackable file systems */
-struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
+extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
+extern int filemap_populate(struct vm_area_struct *, unsigned long,
+		unsigned long, pgprot_t, unsigned long, int);
 
 /* mm/page-writeback.c */
 int write_one_page(struct page *page, int wait);

@@ -35,7 +35,7 @@
 		     "thread_return:\n\t"					    \
 		     "movq %%gs:%P[pda_pcurrent],%%rsi\n\t"			  \
 		     "movq %P[thread_info](%%rsi),%%r8\n\t"			  \
-		     "btr  %[tif_fork],%P[ti_flags](%%r8)\n\t"			  \
+		     LOCK "btr  %[tif_fork],%P[ti_flags](%%r8)\n\t"		  \
 		     "movq %%rax,%%rdi\n\t" 					  \
 		     "jc   ret_from_fork\n\t"					  \
 		     RESTORE_CONTEXT						    \
