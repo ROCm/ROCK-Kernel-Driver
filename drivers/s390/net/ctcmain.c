@@ -3043,23 +3043,10 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 		privptr->channel[direction]->protocol = privptr->protocol;
 		privptr->channel[direction]->max_bufsize = CTC_BUFSIZE_DEFAULT;
 	}
+	/* sysfs magic */
+	SET_NETDEV_DEV(dev, &cgdev->dev);
+
 	if (ctc_netdev_register(dev) != 0) {
-		ctc_free_netdevice(dev, 1);
-		goto out;
-	}
-	/* Create symlinks. */
-	if (sysfs_create_link(&cgdev->dev.kobj, &dev->class_dev.kobj,
-			      dev->name)) {
-		ctc_netdev_unregister(dev);
-		dev->priv = 0;
-		ctc_free_netdevice(dev, 1);
-		goto out;
-	}
-	if (sysfs_create_link(&dev->class_dev.kobj, &cgdev->dev.kobj,
-			      cgdev->dev.bus_id)) {
-		sysfs_remove_link(&cgdev->dev.kobj, dev->name);
-		ctc_netdev_unregister(dev);
-		dev->priv = 0;
 		ctc_free_netdevice(dev, 1);
 		goto out;
 	}
@@ -3118,8 +3105,6 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 		channel_free(priv->channel[WRITE]);
 
 	if (ndev) {
-		sysfs_remove_link(&ndev->class_dev.kobj, cgdev->dev.bus_id);
-		sysfs_remove_link(&cgdev->dev.kobj, ndev->name);
 		ctc_netdev_unregister(ndev);
 		ndev->priv = NULL;
 		ctc_free_netdevice(ndev, 1);

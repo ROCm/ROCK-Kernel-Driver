@@ -6681,10 +6681,6 @@ qeth_remove_card(struct qeth_card *card, int method)
 						   hard_start_xmit */
 
 	if (atomic_read(&card->is_registered)) {
-		/* Remove sysfs symlinks. */
-		sysfs_remove_link(&card->gdev->dev.kobj, card->dev_name);
-		sysfs_remove_link(&card->dev->class_dev.kobj,
-				  CARD_BUS_ID(card));
 		QETH_DBF_TEXT2(0, trace, "unregdev");
 		qeth_unregister_netdev(card);
 		qeth_wait_nonbusy(QETH_REMOVE_WAIT_TIME);
@@ -10691,20 +10687,12 @@ qeth_activate(struct qeth_card *card)
 	/* this was previously done in chandev_initnetdevice */
 	snprintf(card->dev->name, 8, "%s%%d",
 		 qeth_get_dev_basename(card->type, card->link_type));
+	/* sysfs magic */
+	SET_NETDEV_DEV(card->dev, &card->gdev->dev);
+
 	if (qeth_init_netdev(card))
 		goto out_remove;
 
-	if (sysfs_create_link(&card->gdev->dev.kobj, &card->dev->class_dev.kobj,
-			      card->dev_name)) {
-		qeth_unregister_netdev(card);
-		goto out_remove;
-	}
-	if (sysfs_create_link(&card->dev->class_dev.kobj, &card->gdev->dev.kobj,
-			      CARD_BUS_ID(card))) {
-		sysfs_remove_link(&card->gdev->dev.kobj, card->dev_name);
-		qeth_unregister_netdev(card);
-		goto out_remove;
-	}
 	return 0;		/* success */
 
 out_remove:

@@ -802,6 +802,11 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 	adapter->scsi_host->unique_id = unique_id++;	/* FIXME */
 	adapter->scsi_host->max_cmd_len = ZFCP_MAX_SCSI_CMND_LENGTH;
 	/*
+	 * Reverse mapping of the host number to avoid race condition
+	 */
+	adapter->scsi_host_no = adapter->scsi_host->host_no;
+
+	/*
 	 * save a pointer to our own adapter data structure within
 	 * hostdata field of SCSI host data structure
 	 */
@@ -835,6 +840,7 @@ zfcp_adapter_scsi_unregister(struct zfcp_adapter *adapter)
 	scsi_remove_host(shost);
 	scsi_host_put(shost);
 	adapter->scsi_host = NULL;
+	adapter->scsi_host_no = 0;
 	atomic_clear_mask(ZFCP_STATUS_ADAPTER_REGISTERED, &adapter->status);
 
 	return;

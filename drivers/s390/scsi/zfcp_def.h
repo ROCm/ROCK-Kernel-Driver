@@ -957,6 +957,7 @@ struct zfcp_adapter {
         u8			serial_number[32]; /* of hardware */
 	struct Scsi_Host	*scsi_host;	   /* Pointer to mid-layer */
 
+	unsigned short          scsi_host_no;      /* Assigned host number */
 	unsigned char		name[9];
 	struct list_head	port_list_head;	   /* remote port list */
 	struct list_head        port_remove_lh;    /* head of ports to be
