@@ -90,7 +90,7 @@
 #include <linux/kdev_t.h>	/* needed for access to Scsi_Host struct */
 #include <linux/blkdev.h>
 #include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include <scsi/scsi_host.h>
 
 #define COPYRIGHT	"Copyright (c) 1999-2004 LSI Logic Corporation"
 #define MODULEAUTHOR	"Steven J. Ralston, Noah Romer, Pamela Delaney"

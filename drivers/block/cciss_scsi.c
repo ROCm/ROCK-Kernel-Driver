@@ -29,7 +29,7 @@
    physical nor logical disks are presented through the scsi layer. */
 
 #include "../scsi/scsi.h" 
-#include "../scsi/hosts.h" 
+#include <scsi/scsi_host.h> 
 #include <asm/atomic.h>
 #include <linux/timer.h>
 #include <linux/completion.h>
