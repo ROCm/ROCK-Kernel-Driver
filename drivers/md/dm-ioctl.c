@@ -545,7 +545,7 @@ static inline int get_mode(struct dm_ioctl *param)
 
 static int check_name(const char *name)
 {
-	if (strchr(name, '/')) {
+	if (name[0] == '/') {
 		DMWARN("invalid device name");
 		return -EINVAL;
 	}
