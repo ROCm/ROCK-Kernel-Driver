@@ -1067,6 +1067,8 @@ source_ok:
 	/* Reset pmtu, it may be better */
 	nrt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(neigh->dev);
 	nrt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&nrt->u.dst));
+	/* redirect routes expires in 10min */
+	nrt->rt6i_expires = jiffies + (HZ * 600);
 
 	if (rt6_ins(nrt, NULL, NULL))
 		goto out;
