@@ -2206,7 +2206,7 @@ case 48:
 YY_RULE_SETUP
 #line 164 "zconf.l"
 {
-		append_string(yytext+1, yyleng);
+		append_string(yytext+1, yyleng - 1);
 	}
 	YY_BREAK
 case 49:

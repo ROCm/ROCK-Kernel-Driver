@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -82,6 +83,7 @@ save_config_help[] =
 
 static char buf[4096], *bufptr = buf;
 static char input_buf[4096];
+static char filename[PATH_MAX+1] = ".config";
 static char *args[1024], **argptr = args;
 static int indent = 0;
 static struct termios ios_org;
@@ -661,7 +663,7 @@ static void conf_load(void)
 		cprint(load_config_text);
 		cprint("11");
 		cprint("55");
-		cprint("%s", conf_filename);
+		cprint("%s", filename);
 		stat = exec_conf();
 		switch(stat) {
 		case 0:
@@ -690,7 +692,7 @@ static void conf_save(void)
 		cprint(save_config_text);
 		cprint("11");
 		cprint("55");
-		cprint("%s", conf_filename);
+		cprint("%s", filename);
 		stat = exec_conf();
 		switch(stat) {
 		case 0:
