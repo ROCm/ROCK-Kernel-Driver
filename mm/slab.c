@@ -812,6 +812,7 @@ static inline void *kmem_getpages(kmem_cache_t *cachep, unsigned long flags)
 
 		if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
 			atomic_add(i, &slab_reclaim_pages);
+		add_page_state(nr_slab, i);
 		while (i--) {
 			SetPageSlab(page);
 			page++;
@@ -1608,7 +1609,6 @@ static int cache_grow (kmem_cache_t * cachep, int flags)
 	do {
 		SET_PAGE_CACHE(page, cachep);
 		SET_PAGE_SLAB(page, slabp);
-		inc_page_state(nr_slab);
 		page++;
 	} while (--i);
 
