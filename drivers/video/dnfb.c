@@ -119,36 +119,34 @@ static int dnfb_blank(int blank, struct fb_info *info);
 static void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
 
 static struct fb_ops dn_fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_blank:	dnfb_blank,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	dnfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_blank	= dnfb_blank,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= dnfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 struct fb_var_screeninfo dnfb_var __initdata = {
-	xres:		1280,
-	yres:		1024,
-	xres_virtual:	2048,
-	yres_virtual:	1024,
-	bits_per_pixel:	1,
-	height:		-1,
-	width:		-1,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.xres		1280,
+	.yres		1024,
+	.xres_virtual	2048,
+	.yres_virtual	1024,
+	.bits_per_pixel	1,
+	.height		-1,
+	.width		-1,
+	.vmode		FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo dnfb_fix __initdata = {
-	id:		"Apollo Mono",
-	smem_start:	(FRAME_BUFFER_START + IO_BASE),
-	smem_len:	FRAME_BUFFER_LEN,
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_MONO10,
-	line_length:	256,
+	.id		"Apollo Mono",
+	.smem_start	(FRAME_BUFFER_START + IO_BASE),
+	.smem_len	FRAME_BUFFER_LEN,
+	.type		FB_TYPE_PACKED_PIXELS,
+	.visual		FB_VISUAL_MONO10,
+	.line_length	256,
 };
 
 static int dnfb_blank(int blank, struct fb_info *info)

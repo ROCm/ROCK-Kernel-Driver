@@ -292,14 +292,14 @@ cyber2000_accel_clear_margins(struct vc_data *conp, struct display *display,
 }
 
 static struct display_switch fbcon_cyber_accel = {
-	setup:		cyber2000_accel_setup,
-	bmove:		cyber2000_accel_bmove,
-	clear:		cyber2000_accel_clear,
-	putc:		cyber2000_accel_putc,
-	putcs:		cyber2000_accel_putcs,
-	revc:		cyber2000_accel_revc,
-	clear_margins:	cyber2000_accel_clear_margins,
-	fontwidthmask:	FONTWIDTH(8)|FONTWIDTH(16)
+	.setup =	cyber2000_accel_setup,
+	.bmove =	cyber2000_accel_bmove,
+	.clear =	cyber2000_accel_clear,
+	.putc =		cyber2000_accel_putc,
+	.putcs =	cyber2000_accel_putcs,
+	.revc =		cyber2000_accel_revc,
+	.clear_margins =cyber2000_accel_clear_margins,
+	.fontwidthmask =FONTWIDTH(8)|FONTWIDTH(16)
 };
 
 /*
@@ -1109,15 +1109,13 @@ static int cyber2000fb_blank(int blank, struct fb_info *info)
 }
 
 static struct fb_ops cyber2000fb_ops = {
-	owner:		THIS_MODULE,
-	fb_set_var:	cyber2000fb_set_var,
-	fb_setcolreg:	cyber2000fb_setcolreg,
-	fb_pan_display:	cyber2000fb_pan_display,
-	fb_blank:	cyber2000fb_blank,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= cyber2000fb_set_var,
+	.fb_setcolreg	= cyber2000fb_setcolreg,
+	.fb_pan_display	= cyber2000fb_pan_display,
+	.fb_blank	= cyber2000fb_blank,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
 };
 
 /*
@@ -1208,18 +1206,18 @@ EXPORT_SYMBOL(cyber2000fb_get_fb_var);
  * 640x480, hsync 31.5kHz, vsync 60Hz
  */
 static struct fb_videomode __devinitdata cyber2000fb_default_mode = {
-	refresh:	60,
-	xres:		640,
-	yres:		480,
-	pixclock:	39722,
-	left_margin:	56,
-	right_margin:	16,
-	upper_margin:	34,
-	lower_margin:	9,
-	hsync_len:	88,
-	vsync_len:	2,
-	sync:		FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	vmode:		FB_VMODE_NONINTERLACED
+	.refresh =	60,
+	.xres =		640,
+	.yres =		480,
+	.pixclock =	39722,
+	.left_margin =	56,
+	.right_margin =	16,
+	.upper_margin =	34,
+	.lower_margin =	9,
+	.hsync_len =	88,
+	.vsync_len =	2,
+	.sync =		FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.vmode =	FB_VMODE_NONINTERLACED
 };
 
 static char igs_regs[] __devinitdata = {
@@ -1744,12 +1742,12 @@ static struct pci_device_id cyberpro_pci_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci,cyberpro_pci_table);
 
 static struct pci_driver cyberpro_driver = {
-	name:		"CyberPro",
-	probe:		cyberpro_pci_probe,
-	remove:		__devexit_p(cyberpro_pci_remove),
-	suspend:	cyberpro_pci_suspend,
-	resume:		cyberpro_pci_resume,
-	id_table:	cyberpro_pci_table
+	.name =		"CyberPro",
+	.probe =	cyberpro_pci_probe,
+	.remove =	__devexit_p(cyberpro_pci_remove),
+	.suspend =	cyberpro_pci_suspend,
+	.resume =	cyberpro_pci_resume,
+	.id_table =	cyberpro_pci_table
 };
 #endif
 

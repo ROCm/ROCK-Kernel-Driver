@@ -36,44 +36,44 @@ static u32 cfb8[16];
 static struct display disp;
 
 static struct fb_fix_screeninfo tx3912fb_fix __initdata = {
-	id:		"tx3912fb",
+	.id =		"tx3912fb",
 #ifdef CONFIG_NINO_16MB
-	smem_len:	(240 * 320),
+	.smem_len =	(240 * 320),
 #else
-	smem_len:	((240 * 320)/2),
+	.smem_len =	((240 * 320)/2),
 #endif
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_TRUECOLOR, 
-	xpanstep:	1,
-	ypanstep:	1,
-	ywrapstep:	1,
-	accel:		FB_ACCEL_NONE,
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_TRUECOLOR, 
+	.xpanstep =	1,
+	.ypanstep =	1,
+	.ywrapstep =	1,
+	.accel =	FB_ACCEL_NONE,
 };
 
 static struct fb_var_screeninfo tx3912fb_var = {
-	xres:		240,
-	yres:		320,
-	xres_virtual:	240,
-	yres_virtual:	320,
+	.xres =		240,
+	.yres =		320,
+	.xres_virtual =	240,
+	.yres_virtual =	320,
 #ifdef CONFIG_NINO_16MB
-	bits_per_pixel:	8,
-	red:		{ 5, 3, 0 },	/* RGB 332 */
-	green:		{ 2, 3, 0 },
-	blue:		{ 0, 2, 0 },
+	.bits_per_pixel =8,
+	.red =		{ 5, 3, 0 },	/* RGB 332 */
+	.green =	{ 2, 3, 0 },
+	.blue =		{ 0, 2, 0 },
 #else
-	bits_per_pixel:	4,
+	.bits_per_pixel =4,
 #endif
-	activate:	FB_ACTIVATE_NOW,
-	width:		-1,
-	height:		-1,
-	pixclock:	20000,
-	left_margin:	64,
-	right_margin:	64,
-	upper_margin:	32,
-	lower_margin:	32,
-	hsync_len:	64,
-	vsync_len:	2,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.activate =	FB_ACTIVATE_NOW,
+	.width =	-1,
+	.height =	-1,
+	.pixclock =	20000,
+	.left_margin =	64,
+	.right_margin =	64,
+	.upper_margin =	32,
+	.lower_margin =	32,
+	.hsync_len =	64,
+	.vsync_len =	2,
+	.vmode =	FB_VMODE_NONINTERLACED,
 };
 
 /*
@@ -95,16 +95,14 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green,
  * Frame buffer operations structure used by console driver
  */
 static struct fb_ops tx3912fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	tx3912fb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= tx3912fb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 static int tx3912fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)

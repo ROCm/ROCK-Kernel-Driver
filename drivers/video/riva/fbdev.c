@@ -266,32 +266,32 @@ static char *font = NULL;
 #endif
 
 static struct fb_var_screeninfo rivafb_default_var = {
-	xres:		640,
-	yres:		480,
-	xres_virtual:	640,
-	yres_virtual:	480,
-	xoffset:	0,
-	yoffset:	0,
-	bits_per_pixel:	8,
-	grayscale:	0,
-	red:		{0, 6, 0},
-	green:		{0, 6, 0},
-	blue:		{0, 6, 0},
-	transp:		{0, 0, 0},
-	nonstd:		0,
-	activate:	0,
-	height:		-1,
-	width:		-1,
-	accel_flags:	0,
-	pixclock:	39721,
-	left_margin:	40,
-	right_margin:	24,
-	upper_margin:	32,
-	lower_margin:	11,
-	hsync_len:	96,
-	vsync_len:	2,
-	sync:		0,
-	vmode:		FB_VMODE_NONINTERLACED
+	.xres =		640,
+	.yres =		480,
+	.xres_virtual =	640,
+	.yres_virtual =	480,
+	.xoffset =	0,
+	.yoffset =	0,
+	.bits_per_pixel =8,
+	.grayscale =	0,
+	.red =		{0, 6, 0},
+	.green =	{0, 6, 0},
+	.blue =		{0, 6, 0},
+	.transp =	{0, 0, 0},
+	.nonstd =	0,
+	.activate =	0,
+	.height =	-1,
+	.width =	-1,
+	.accel_flags =	0,
+	.pixclock =	39721,
+	.left_margin =	40,
+	.right_margin =	24,
+	.upper_margin =	32,
+	.lower_margin =	11,
+	.hsync_len =	96,
+	.vsync_len =	2,
+	.sync =		0,
+	.vmode =	FB_VMODE_NONINTERLACED
 };
 
 /* from GGI */
@@ -1744,17 +1744,17 @@ static int rivafb_blank(int blank, struct fb_info *info)
 
 /* kernel interface */
 static struct fb_ops riva_fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	rivafb_get_fix,
-	fb_get_var:	rivafb_get_var,
-	fb_set_var:	rivafb_set_var,
-	fb_get_cmap:	rivafb_get_cmap,
-	fb_set_cmap:	rivafb_set_cmap,
-	fb_setcolreg:	rivafb_setcolreg,
-	fb_pan_display:	rivafb_pan_display,
-	fb_blank:	rivafb_blank,
-	fb_ioctl:	rivafb_ioctl,
-	fb_rasterimg:	rivafb_rasterimg,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	rivafb_get_fix,
+	.fb_get_var =	rivafb_get_var,
+	.fb_set_var =	rivafb_set_var,
+	.fb_get_cmap =	rivafb_get_cmap,
+	.fb_set_cmap =	rivafb_set_cmap,
+	.fb_setcolreg =	rivafb_setcolreg,
+	.fb_pan_display =rivafb_pan_display,
+	.fb_blank =	rivafb_blank,
+	.fb_ioctl =	rivafb_ioctl,
+	.fb_rasterimg =	rivafb_rasterimg,
 };
 
 static int __devinit riva_init_disp_var(struct rivafb_info *rinfo)
@@ -2081,10 +2081,10 @@ int __init rivafb_setup(char *options)
 #endif /* !MODULE */
 
 static struct pci_driver rivafb_driver = {
-	name:		"rivafb",
-	id_table:	rivafb_pci_tbl,
-	probe:		rivafb_init_one,
-	remove:		__devexit_p(rivafb_remove_one),
+	.name =		"rivafb",
+	.id_table =	rivafb_pci_tbl,
+	.probe =	rivafb_init_one,
+	.remove =	__devexit_p(rivafb_remove_one),
 };
 
 

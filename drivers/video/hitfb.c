@@ -32,17 +32,17 @@
 #include <video/fbcon.h>
 
 static struct fb_var_screeninfo hitfb_var __initdata = {
-	activate:	FB_ACTIVATE_NOW,
-	height:		-1,
-	width:		-1,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.activate =	FB_ACTIVATE_NOW,
+	.height =	-1,
+	.width =	-1,
+	.vmode =	FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo hitfb_fix __initdata = {
-	id:		"Hitachi HD64461",
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_TRUECOLOR,
-	accel_flags:	FB_ACCEL_NONE,
+	.id =		"Hitachi HD64461",
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_TRUECOLOR,
+	.accel_flags =	FB_ACCEL_NONE,
 };
 
 static u16 pseudo_palette[17];
@@ -124,18 +124,16 @@ static int hitfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 static struct fb_ops hitfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_check_var:	hitfb_check_var,
-	fb_set_par:	hitfb_set_par,
-	fb_setcolreg:	hitfb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_check_var	= hitfb_check_var,
+	.fb_set_par	= hitfb_set_par,
+	.fb_setcolreg	= hitfb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 int __init hitfb_init(void)

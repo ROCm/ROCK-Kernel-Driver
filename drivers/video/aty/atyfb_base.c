@@ -134,11 +134,11 @@ struct pci_mmap_map {
 };
 
 static struct fb_fix_screeninfo atyfb_fix __initdata = {
-	id:		"ATY Mach64",
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_PSEUDOCOLOR,
-	xpanstep:	8,
-	ypanstep:	1,
+	.id		= "ATY Mach64",
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.visual		= FB_VISUAL_PSEUDOCOLOR,
+	.xpanstep	= 8,
+	.ypanstep	= 1,
 };
 
     /*
@@ -220,22 +220,22 @@ int atyfb_setup(char *);
 #endif
 
 static struct fb_ops atyfb_ops = {
-	owner:THIS_MODULE,
-	fb_open:atyfb_open,
-	fb_release:atyfb_release,
-	fb_get_fix:atyfb_get_fix,
-	fb_get_var:atyfb_get_var,
-	fb_set_var:atyfb_set_var,
-	fb_get_cmap:gen_get_cmap,
-	fb_set_cmap:gen_set_cmap,
-	fb_setcolreg:atyfb_setcolreg,
-	fb_pan_display:atyfb_pan_display,
-	fb_blank:atyfb_blank,
-	fb_ioctl:atyfb_ioctl,
+	.owner		= THIS_MODULE,
+	.fb_open	= atyfb_open,
+	.fb_release	= atyfb_release,
+	.fb_get_fix	= atyfb_get_fix,
+	.fb_get_var	= atyfb_get_var,
+	.fb_set_var	= atyfb_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= atyfb_setcolreg,
+	.fb_pan_display	= atyfb_pan_display,
+	.fb_blank	= atyfb_blank,
+	.fb_ioctl	= atyfb_ioctl,
 #ifdef __sparc__
-	fb_mmap:atyfb_mmap,
+	.fb_mmap	= atyfb_mmap,
 #endif
-	fb_rasterimg:atyfb_rasterimg,
+	.fb_rasterimg	= atyfb_rasterimg,
 };
 
 static char atyfb_name[16] = "ATY Mach64";
