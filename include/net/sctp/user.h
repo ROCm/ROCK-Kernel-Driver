@@ -485,6 +485,11 @@ struct sctp_paddrinfo {
 	__u32			spinfo_mtu;
 };
 
+/* Peer addresses's state. */
+enum sctp_spinfo_state {
+	SCTP_INACTIVE,
+	SCTP_ACTIVE,
+};
 
 /*
  * 7.1.1 Retransmission Timeout Parameters (SCTP_RTOINFO)
