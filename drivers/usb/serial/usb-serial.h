@@ -67,11 +67,40 @@
 /* parity check flag */
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 
-
+/**
+ * usb_serial_port: structure for the specific ports of a device.
+ * @magic: magic number for internal validity of this pointer.
+ * @serial: pointer back to the struct usb_serial owner of this port.
+ * @tty: pointer to the coresponding tty for this port.
+ * @number: the number of the port (the minor number).
+ * @interrupt_in_buffer: pointer to the interrupt in buffer for this port.
+ * @interrupt_in_urb: pointer to the interrupt in struct urb for this port.
+ * @interrupt_in_endpointAddress: endpoint address for the interrupt in pipe
+ *	for this port.
+ * @bulk_in_buffer: pointer to the bulk in buffer for this port.
+ * @read_urb: pointer to the bulk in struct urb for this port.
+ * @bulk_in_endpointAddress: endpoint address for the bulk in pipe for this
+ *	port.
+ * @bulk_out_buffer: pointer to the bulk out buffer for this port.
+ * @bulk_out_size: the size of the bulk_out_buffer, in bytes.
+ * @write_urb: pointer to the bulk out struct urb for this port.
+ * @bulk_out_endpointAddress: endpoint address for the bulk out pipe for this
+ *	port.
+ * @write_wait: a wait_queue_head_t used by the port.
+ * @tqueue: task queue for the line discipline waking up.
+ * @open_count: number of times this port has been opened.
+ * @sem: struct semaphore used to lock this structure.
+ * @private: place to put any driver specific information that is needed.  The
+ *	usb-serial driver is required to manage this data, the usb-serial core
+ *	will not touch this.
+ *
+ * This structure is used by the usb-serial core and drivers for the specific
+ * ports of a device.
+ */
 struct usb_serial_port {
 	int			magic;
-	struct usb_serial	*serial;	/* pointer back to the owner of this port */
-	struct tty_struct *	tty;		/* the coresponding tty for this port */
+	struct usb_serial	*serial;
+	struct tty_struct *	tty;
 	unsigned char		number;
 
 	unsigned char *		interrupt_in_buffer;
@@ -88,30 +117,44 @@ struct usb_serial_port {
 	__u8			bulk_out_endpointAddress;
 
 	wait_queue_head_t	write_wait;
-
-	struct tq_struct	tqueue;		/* task queue for line discipline waking up */
-	int			open_count;	/* number of times this port has been opened */
-	struct semaphore	sem;		/* locks this structure */
-	
-	void *			private;	/* data private to the specific port */
+	struct tq_struct	tqueue;
+	int			open_count;
+	struct semaphore	sem;
+	void *			private;
 };
 
+/**
+ * usb_serial - structure used by the usb-serial core for a device
+ * @magic: magic number for internal validity of this pointer.
+ * @dev: pointer to the struct usb_device for this device
+ * @type: pointer to the struct usb_serial_device_type for this device
+ * @interface: pointer to the struct usb_interface for this device
+ * @minor: the starting minor number for this device
+ * @num_ports: the number of ports this device has
+ * @num_interrupt_in: number of interrupt in endpoints we have
+ * @num_bulk_in: number of bulk in endpoints we have
+ * @num_bulk_out: number of bulk out endpoints we have
+ * @vendor: vendor id of this device
+ * @product: product id of this device
+ * @port: array of struct usb_serial_port structures for the different ports.
+ * @private: place to put any driver specific information that is needed.  The
+ *	usb-serial driver is required to manage this data, the usb-serial core
+ *	will not touch this.
+ */
 struct usb_serial {
 	int				magic;
 	struct usb_device *		dev;
-	struct usb_serial_device_type *	type;			/* the type of usb serial device this is */
-	struct usb_interface *		interface;		/* the interface for this device */
-	struct tty_driver *		tty_driver;		/* the tty_driver for this device */
-	unsigned char			minor;			/* the starting minor number for this device */
-	unsigned char			num_ports;		/* the number of ports this device has */
-	char				num_interrupt_in;	/* number of interrupt in endpoints we have */
-	char				num_bulk_in;		/* number of bulk in endpoints we have */
-	char				num_bulk_out;		/* number of bulk out endpoints we have */
-	__u16				vendor;			/* vendor id of this device */
-	__u16				product;		/* product id of this device */
+	struct usb_serial_device_type *	type;
+	struct usb_interface *		interface;
+	unsigned char			minor;
+	unsigned char			num_ports;
+	char				num_interrupt_in;
+	char				num_bulk_in;
+	char				num_bulk_out;
+	__u16				vendor;
+	__u16				product;
 	struct usb_serial_port		port[MAX_NUM_PORTS];
-
-	void *			private;		/* data private to the specific driver */
+	void *				private;
 };
 
 
