@@ -163,6 +163,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	unsigned long active;
 	unsigned long free;
 	unsigned long vmtot;
+	long cached;
 	struct vmalloc_info vmi;
 
 	get_page_state(&ps);
@@ -180,6 +181,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	vmi = get_vmalloc_info();
 	vmi.used >>= 10;
 	vmi.largest_chunk >>= 10;
+
+	cached = get_page_cache_size()-total_swapcache_pages-i.bufferram;
+	if (cached < 0)
+		cached = 0;
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -210,7 +215,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalram),
 		K(i.freeram),
 		K(i.bufferram),
-		K(get_page_cache_size()-total_swapcache_pages-i.bufferram),
+		K(cached),
 		K(total_swapcache_pages),
 		K(active),
 		K(inactive),
