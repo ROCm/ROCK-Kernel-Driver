@@ -47,6 +47,7 @@
 #include <linux/locks.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
