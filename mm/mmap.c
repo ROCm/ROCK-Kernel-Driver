@@ -1049,10 +1049,11 @@ static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
 }
 
 /*
- * Split a vma into two pieces at address 'addr', the original vma
- * will contain the first part, a new vma is allocated for the tail.
+ * Split a vma into two pieces at address 'addr', a new vma is allocated
+ * either for the first part or the the tail.
  */
-static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned long addr)
+int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
+	      unsigned long addr, int new_below)
 {
 	struct vm_area_struct *new;
 
@@ -1064,22 +1065,30 @@ static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned 
 		return -ENOMEM;
 
 	/* most fields are the same, copy all, and then fixup */
-	*new = *mpnt;
+	*new = *vma;
 
-	new->vm_start = addr;
-	new->vm_pgoff = mpnt->vm_pgoff + ((addr - mpnt->vm_start) >> PAGE_SHIFT);
+	if (new_below) {
+		new->vm_end = addr;
+		vma->vm_start = addr;
+		vma->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
+	} else {
+		vma->vm_end = addr;
+		new->vm_start = addr;
+		new->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
+	}
+
 	new->vm_raend = 0;
-	if (mpnt->vm_file)
-		get_file(mpnt->vm_file);
 
-	if (mpnt->vm_ops && mpnt->vm_ops->open)
-		mpnt->vm_ops->open(mpnt);
-	mpnt->vm_end = addr;	/* Truncate area */
+	if (new->vm_file)
+		get_file(new->vm_file);
+
+	if (new->vm_ops && new->vm_ops->open)
+		new->vm_ops->open(new);
 
 	spin_lock(&mm->page_table_lock);
-	lock_vma_mappings(mpnt);
+	lock_vma_mappings(vma);
 	__insert_vm_struct(mm, new);
-	unlock_vma_mappings(mpnt);
+	unlock_vma_mappings(vma);
 	spin_unlock(&mm->page_table_lock);
 
 	return 0;
@@ -1116,7 +1125,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * If we need to split any vma, do it now to save pain later.
 	 */
 	if (start > mpnt->vm_start) {
-		if (splitvma(mm, mpnt, start))
+		if (split_vma(mm, mpnt, start, 0))
 			return -ENOMEM;
 		prev = mpnt;
 		mpnt = mpnt->vm_next;
@@ -1125,7 +1134,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	/* Does it split the last one? */
 	last = find_vma(mm, end);
 	if (last && end > last->vm_start) {
-		if (splitvma(mm, last, end))
+		if (split_vma(mm, last, end, 0))
 			return -ENOMEM;
 	}
 

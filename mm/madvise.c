@@ -2,17 +2,37 @@
  *	linux/mm/madvise.c
  *
  * Copyright (C) 1999  Linus Torvalds
+ * Copyright (C) 2002  Christoph Hellwig
  */
 
-#include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>
-#include <linux/slab.h>
 
 
-static inline void setup_read_behavior(struct vm_area_struct * vma,
-				       int behavior)
+/*
+ * We can potentially split a vm area into separate
+ * areas, each area with its own behavior.
+ */
+static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
+			     unsigned long end, int behavior)
 {
+	struct mm_struct * mm = vma->vm_mm;
+	int error;
+
+	if (start != vma->vm_start) {
+		error = split_vma(mm, vma, start, 1);
+		if (error)
+			return -EAGAIN;
+	}
+
+	if (end != vma->vm_end) {
+		error = split_vma(mm, vma, end, 0);
+		if (error)
+			return -EAGAIN;
+	}
+
+	spin_lock(&mm->page_table_lock);
+	vma->vm_raend = 0;
 	VM_ClearReadHint(vma);
 
 	switch (behavior) {
@@ -25,131 +45,9 @@ static inline void setup_read_behavior(struct vm_area_struct * vma,
 	default:
 		break;
 	}
-}
-
-static long madvise_fixup_start(struct vm_area_struct * vma,
-				unsigned long end, int behavior)
-{
-	struct vm_area_struct * n;
-	struct mm_struct * mm = vma->vm_mm;
-
-	n = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL);
-	if (!n)
-		return -EAGAIN;
-	*n = *vma;
-	n->vm_end = end;
-	setup_read_behavior(n, behavior);
-	n->vm_raend = 0;
-	if (n->vm_file)
-		get_file(n->vm_file);
-	if (n->vm_ops && n->vm_ops->open)
-		n->vm_ops->open(n);
-	vma->vm_pgoff += (end - vma->vm_start) >> PAGE_SHIFT;
-	lock_vma_mappings(vma);
-	spin_lock(&mm->page_table_lock);
-	vma->vm_start = end;
-	__insert_vm_struct(mm, n);
 	spin_unlock(&mm->page_table_lock);
-	unlock_vma_mappings(vma);
+
 	return 0;
-}
-
-static long madvise_fixup_end(struct vm_area_struct * vma,
-			      unsigned long start, int behavior)
-{
-	struct vm_area_struct * n;
-	struct mm_struct * mm = vma->vm_mm;
-
-	n = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!n)
-		return -EAGAIN;
-	*n = *vma;
-	n->vm_start = start;
-	n->vm_pgoff += (n->vm_start - vma->vm_start) >> PAGE_SHIFT;
-	setup_read_behavior(n, behavior);
-	n->vm_raend = 0;
-	if (n->vm_file)
-		get_file(n->vm_file);
-	if (n->vm_ops && n->vm_ops->open)
-		n->vm_ops->open(n);
-	lock_vma_mappings(vma);
-	spin_lock(&mm->page_table_lock);
-	vma->vm_end = start;
-	__insert_vm_struct(mm, n);
-	spin_unlock(&mm->page_table_lock);
-	unlock_vma_mappings(vma);
-	return 0;
-}
-
-static long madvise_fixup_middle(struct vm_area_struct * vma, unsigned long start,
-				 unsigned long end, int behavior)
-{
-	struct vm_area_struct * left, * right;
-	struct mm_struct * mm = vma->vm_mm;
-
-	left = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!left)
-		return -EAGAIN;
-	right = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!right) {
-		kmem_cache_free(vm_area_cachep, left);
-		return -EAGAIN;
-	}
-	*left = *vma;
-	*right = *vma;
-	left->vm_end = start;
-	right->vm_start = end;
-	right->vm_pgoff += (right->vm_start - left->vm_start) >> PAGE_SHIFT;
-	left->vm_raend = 0;
-	right->vm_raend = 0;
-	if (vma->vm_file)
-		atomic_add(2, &vma->vm_file->f_count);
-
-	if (vma->vm_ops && vma->vm_ops->open) {
-		vma->vm_ops->open(left);
-		vma->vm_ops->open(right);
-	}
-	vma->vm_pgoff += (start - vma->vm_start) >> PAGE_SHIFT;
-	vma->vm_raend = 0;
-	lock_vma_mappings(vma);
-	spin_lock(&mm->page_table_lock);
-	vma->vm_start = start;
-	vma->vm_end = end;
-	setup_read_behavior(vma, behavior);
-	__insert_vm_struct(mm, left);
-	__insert_vm_struct(mm, right);
-	spin_unlock(&mm->page_table_lock);
-	unlock_vma_mappings(vma);
-	return 0;
-}
-
-/*
- * We can potentially split a vm area into separate
- * areas, each area with its own behavior.
- */
-static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
-			     unsigned long end, int behavior)
-{
-	int error = 0;
-
-	/* This caps the number of vma's this process can own */
-	if (vma->vm_mm->map_count > MAX_MAP_COUNT)
-		return -ENOMEM;
-
-	if (start == vma->vm_start) {
-		if (end == vma->vm_end) {
-			setup_read_behavior(vma, behavior);
-			vma->vm_raend = 0;
-		} else
-			error = madvise_fixup_start(vma, end, behavior);
-	} else {
-		if (end == vma->vm_end)
-			error = madvise_fixup_end(vma, start, behavior);
-		else
-			error = madvise_fixup_middle(vma, start, end, behavior);
-	}
-
-	return error;
 }
 
 /*
