@@ -671,7 +671,7 @@ call_timeout(struct rpc_task *task)
 		rpc_exit(task, -EIO);
 		return;
 	}
-	if (clnt->cl_chatty && !(task->tk_flags & RPC_CALL_MAJORSEEN)) {
+	if (clnt->cl_chatty && !(task->tk_flags & RPC_CALL_MAJORSEEN) && rpc_ntimeo(&clnt->cl_rtt) > 7) {
 		task->tk_flags |= RPC_CALL_MAJORSEEN;
 		if (req)
 			printk(KERN_NOTICE "%s: server %s not responding, still trying\n",

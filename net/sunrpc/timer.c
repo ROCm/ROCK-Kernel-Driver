@@ -22,6 +22,7 @@ rpc_init_rtt(struct rpc_rtt *rt, long timeo)
 		rt->srtt[i] = t;
 		rt->sdrtt[i] = RPC_RTO_INIT;
 	}
+	atomic_set(&rt->ntimeouts, 0);
 }
 
 void

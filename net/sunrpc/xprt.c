@@ -493,6 +493,8 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 			int timer = rpcproc_timer(clnt, task->tk_msg.rpc_proc);
 			if (timer)
 				rpc_update_rtt(&clnt->cl_rtt, timer, (long)jiffies - req->rq_xtime);
+		}
+		rpc_clear_timeo(&clnt->cl_rtt);
 	}
 
 #ifdef RPC_PROFILE
@@ -942,6 +944,7 @@ xprt_timer(struct rpc_task *task)
 	if (req->rq_received)
 		goto out;
 	req->rq_nresend++;
+	rpc_inc_timeo(&task->tk_client->cl_rtt);
 	xprt_adjust_cwnd(xprt, -ETIMEDOUT);
 
 	dprintk("RPC: %4d xprt_timer (%s request)\n",
