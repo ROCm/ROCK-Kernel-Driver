@@ -10,17 +10,25 @@
 
 #include <linux/suspend.h>
 #include <linux/kobject.h>
+#include <linux/reboot.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/pm.h>
 
+#include "power.h"
 
 static DECLARE_MUTEX(pm_sem);
 
 static struct pm_ops * pm_ops = NULL;
 
 static u32 pm_disk_mode = PM_DISK_SHUTDOWN;
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+static int have_swsusp = 1;
+#else
+static int have_swsusp = 0;
+#endif
 
 
 /**
@@ -89,10 +97,76 @@ static int pm_suspend_mem(void)
 	return error;
 }
 
-static int pm_suspend_disk(void)
+
+/**
+ *	power_down - Shut machine down for hibernate.
+ *	@mode:		Suspend-to-disk mode
+ *
+ *	Use the platform driver, if configured so, and return gracefully if it
+ *	fails. 
+ *	Otherwise, try to power off and reboot. If they fail, halt the machine,
+ *	there ain't no turning back.
+ */
+
+static int power_down(u32 mode)
 {
+	switch(mode) {
+	case PM_DISK_PLATFORM:
+		return pm_ops->enter(PM_SUSPEND_DISK);
+	case PM_DISK_SHUTDOWN:
+		machine_power_off();
+		break;
+	case PM_DISK_REBOOT:
+		machine_restart(NULL);
+		break;
+	}
+	machine_halt();
 	return 0;
 }
+
+
+static int in_suspend __nosavedata = 0;
+
+
+/**
+ *	pm_suspend_disk - The granpappy of power management.
+ *	
+ *	If we're going through the firmware, then get it over with quickly.
+ *
+ *	If not, then call swsusp to do it's thing, then figure out how
+ *	to power down the system.
+ */
+
+static int pm_suspend_disk(void)
+{
+	int error;
+
+	pr_debug("PM: Attempting to suspend to disk.\n");
+	if (pm_disk_mode == PM_DISK_FIRMWARE)
+		return pm_ops->enter(PM_SUSPEND_DISK);
+
+	if (!have_swsusp)
+		return -EPERM;
+
+	pr_debug("PM: snapshotting memory.\n");
+	in_suspend = 1;
+	if ((error = swsusp_save()))
+		goto Done;
+
+	if (in_suspend) {
+		pr_debug("PM: writing image.\n");
+		error = swsusp_write();
+		if (!error)
+			error = power_down(pm_disk_mode);
+		pr_debug("PM: Power down failed.\n");
+	} else
+		pr_debug("PM: Image restored successfully.\n");
+	swsusp_free();
+ Done:
+	return error;
+}
+
+
 
 #define decl_state(_name) \
 	{ .name = __stringify(_name), .fn = pm_suspend_##_name }
@@ -132,9 +206,17 @@ static int suspend_prepare(u32 state)
 		if ((error = pm_ops->prepare(state)))
 			goto Thaw;
 	}
+
+	if ((error = device_pm_suspend(state)))
+		goto Finish;
+
+	return 0;
  Done:
 	pm_restore_console();
 	return error;
+ Finish:
+	if (pm_ops && pm_ops->finish)
+		pm_ops->finish(state);
  Thaw:
 	thaw_processes();
 	goto Done;
@@ -151,6 +233,7 @@ static int suspend_prepare(u32 state)
 
 static void suspend_finish(u32 state)
 {
+	device_pm_resume();
 	if (pm_ops && pm_ops->finish)
 		pm_ops->finish(state);
 	thaw_processes();
@@ -183,16 +266,14 @@ static int enter_state(u32 state)
 		goto Unlock;
 	}
 
+	pr_debug("PM: Preparing system for suspend.\n");
 	if ((error = suspend_prepare(state)))
 		goto Unlock;
 
-	if ((error = device_pm_suspend(state)))
-		goto Finish;
-
+	pr_debug("PM: Entering state.\n");
 	error = s->fn();
 
-	device_pm_resume();
- Finish:
+	pr_debug("PM: Finishing up.\n");
 	suspend_finish(state);
  Unlock:
 	up(&pm_sem);
@@ -214,6 +295,50 @@ int pm_suspend(u32 state)
 		return enter_state(state);
 	return -EINVAL;
 }
+
+
+/**
+ *	pm_resume - Resume from a saved image.
+ *
+ *	Called as a late_initcall (so all devices are discovered and 
+ *	initialized), we call swsusp to see if we have a saved image or not.
+ *	If so, we quiesce devices, the restore the saved image. We will 
+ *	return above (in pm_suspend_disk() ) if everything goes well. 
+ *	Otherwise, we fail gracefully and return to the normally 
+ *	scheduled program.
+ *
+ */
+
+static int pm_resume(void)
+{
+	int error;
+
+	if (!have_swsusp)
+		return 0;
+
+	pr_debug("PM: Reading swsusp image.\n");
+
+	if ((error = swsusp_read()))
+		goto Done;
+
+	pr_debug("PM: Preparing system for restore.\n");
+
+	if ((error = suspend_prepare(PM_SUSPEND_DISK)))
+		goto Free;
+
+	pr_debug("PM: Restoring saved image.\n");
+	swsusp_restore();
+
+	pr_debug("PM: Restore failed, recovering.n");
+	suspend_finish(PM_SUSPEND_DISK);
+ Free:
+	swsusp_free();
+ Done:
+	pr_debug("PM: Resume from disk failed.\n");
+	return 0;
+}
+
+late_initcall(pm_resume);
 
 
 decl_subsys(power,NULL,NULL);
@@ -272,9 +397,11 @@ static ssize_t disk_show(struct subsystem * subsys, char * buf)
 
 static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
 {
+	int error = 0;
 	int i;
 	u32 mode = 0;
 
+	down(&pm_sem);
 	for (i = PM_DISK_FIRMWARE; i < PM_DISK_MAX; i++) {
 		if (!strcmp(buf,pm_disk_modes[i])) {
 			mode = i;
@@ -285,14 +412,19 @@ static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
 		if (mode == PM_DISK_SHUTDOWN || mode == PM_DISK_REBOOT)
 			pm_disk_mode = mode;
 		else {
-			if (pm_ops && (mode == pm_ops->pm_disk_mode))
+			if (pm_ops && pm_ops->enter && 
+			    (mode == pm_ops->pm_disk_mode))
 				pm_disk_mode = mode;
 			else
-				return -EINVAL;
+				error = -EINVAL;
 		}
-		return n;
-	}
-	return -EINVAL;
+	} else
+		error = -EINVAL;
+
+	pr_debug("PM: suspend-to-disk mode set to '%s'\n",
+		 pm_disk_modes[mode]);
+	up(&pm_sem);
+	return error ? error : n;
 }
 
 power_attr(disk);
