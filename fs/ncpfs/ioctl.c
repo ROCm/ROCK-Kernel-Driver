@@ -440,7 +440,7 @@ outrel:
 			oldprivatelen = server->priv.len;
 			server->auth.auth_type = user.auth_type;
 			server->auth.object_name_len = user.object_name_len;
-			server->auth.object_name = user.object_name;
+			server->auth.object_name = newname;
 			server->priv.len = 0;
 			server->priv.data = NULL;
 			/* leave critical section */
