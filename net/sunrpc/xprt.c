@@ -84,7 +84,7 @@
  */
 static void	xprt_request_init(struct rpc_task *, struct rpc_xprt *);
 static void	do_xprt_transmit(struct rpc_task *);
-static void	xprt_reserve_status(struct rpc_task *task);
+static inline void	do_xprt_reserve(struct rpc_task *);
 static void	xprt_disconnect(struct rpc_xprt *);
 static void	xprt_reconn_status(struct rpc_task *task);
 static struct socket *xprt_create_socket(int, struct rpc_timeout *);
@@ -1179,61 +1179,39 @@ do_xprt_transmit(struct rpc_task *task)
 /*
  * Reserve an RPC call slot.
  */
-int
+void
 xprt_reserve(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 
-	/* We already have an initialized request. */
-	if (task->tk_rqstp)
-		return 0;
-
-	spin_lock(&xprt->xprt_lock);
-	xprt_reserve_status(task);
-	if (task->tk_rqstp) {
-		task->tk_timeout = 0;
-	} else if (!task->tk_timeout) {
-		task->tk_status = -ENOBUFS;
-	} else {
-		dprintk("RPC:      xprt_reserve waiting on backlog\n");
-		task->tk_status = -EAGAIN;
-		rpc_sleep_on(&xprt->backlog, task, NULL, NULL);
+	task->tk_status = -EIO;
+	if (!xprt->shutdown) {
+		spin_lock(&xprt->xprt_lock);
+		do_xprt_reserve(task);
+		spin_unlock(&xprt->xprt_lock);
 	}
-	spin_unlock(&xprt->xprt_lock);
-	dprintk("RPC: %4d xprt_reserve returns %d\n",
-				task->tk_pid, task->tk_status);
-	return task->tk_status;
 }
 
-/*
- * Reservation callback
- */
-static void
-xprt_reserve_status(struct rpc_task *task)
+static inline void
+do_xprt_reserve(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
-	struct rpc_rqst	*req;
 
-	if (xprt->shutdown) {
-		task->tk_status = -EIO;
-	} else if (task->tk_status < 0) {
-		/* NOP */
-	} else if (task->tk_rqstp) {
-		/* We've already been given a request slot: NOP */
-	} else {
-		if (!(req = xprt->free))
-			goto out_nofree;
-		/* OK: There's room for us. Grab a free slot */
-		xprt->free     = req->rq_next;
-		req->rq_next   = NULL;
+	task->tk_status = 0;
+	if (task->tk_rqstp)
+		return;
+	if (xprt->free) {
+		struct rpc_rqst	*req = xprt->free;
+		xprt->free = req->rq_next;
+		req->rq_next = NULL;
 		task->tk_rqstp = req;
 		xprt_request_init(task, xprt);
+		return;
 	}
-
-	return;
-
-out_nofree:
+	dprintk("RPC:      waiting for request slot\n");
 	task->tk_status = -EAGAIN;
+	task->tk_timeout = 0;
+	rpc_sleep_on(&xprt->backlog, task, NULL, NULL);
 }
 
 /*
@@ -1249,7 +1227,6 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 		xid = CURRENT_TIME << 12;
 
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid, req, xid);
-	task->tk_status = 0;
 	req->rq_timeout = xprt->timeout;
 	req->rq_task	= task;
 	req->rq_xprt    = xprt;
@@ -1311,7 +1288,6 @@ xprt_set_timeout(struct rpc_timeout *to, unsigned int retr, unsigned long incr)
 	to->to_initval   = 
 	to->to_increment = incr;
 	to->to_maxval    = incr * retr;
-	to->to_resrvval  = incr * retr;
 	to->to_retries   = retr;
 	to->to_exponential = 0;
 }
@@ -1352,7 +1328,6 @@ xprt_setup(struct socket *sock, int proto,
 	if (to) {
 		xprt->timeout = *to;
 		xprt->timeout.to_current = to->to_initval;
-		xprt->timeout.to_resrvval = to->to_maxval << 1;
 	} else
 		xprt_default_timeout(&xprt->timeout, xprt->prot);
 
