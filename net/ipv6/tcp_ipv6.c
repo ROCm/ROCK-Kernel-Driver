@@ -1746,7 +1746,7 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 	return 0;
 }
 
-static int tcp_v6_xmit(struct sk_buff *skb)
+static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 {
 	struct sock *sk = skb->sk;
 	struct inet_opt *inet = inet_sk(sk);
