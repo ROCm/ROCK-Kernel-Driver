@@ -736,6 +736,6 @@ static unsigned char nvram_checksum(struct nvram_header *p)
 	return c_sum;
 }
 
-module_init(nvram_init);
+late_initcall(nvram_init);
 module_exit(nvram_cleanup);
 MODULE_LICENSE("GPL");

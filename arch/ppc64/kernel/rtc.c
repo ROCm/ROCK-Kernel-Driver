@@ -221,7 +221,7 @@ static void __exit rtc_exit (void)
 	misc_deregister(&rtc_dev);
 }
 
-module_init(rtc_init);
+late_initcall(rtc_init);
 module_exit(rtc_exit);
 
 /*
