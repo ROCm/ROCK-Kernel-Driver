@@ -927,6 +927,18 @@ static struct net_device *compaq_net_device;
 
 static int vortex_cards_found;
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void poll_vortex(struct net_device *dev)
+{
+	struct vortex_private *vp = (struct vortex_private *)dev->priv;
+	unsigned long flags;
+	local_save_flags(flags);
+	local_irq_disable();
+	(vp->full_bus_master_rx ? boomerang_interrupt:vortex_interrupt)(dev->irq,dev,NULL);
+	local_irq_restore(flags);
+} 
+#endif
+
 #ifdef CONFIG_PM
 
 static int vortex_suspend (struct pci_dev *pdev, u32 state)
@@ -1463,6 +1475,9 @@ static int __devinit vortex_probe1(struct device *gendev,
 	dev->set_multicast_list = set_rx_mode;
 	dev->tx_timeout = vortex_tx_timeout;
 	dev->watchdog_timeo = (watchdog * HZ) / 1000;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = poll_vortex; 
+#endif
 	if (pdev && vp->enable_wol) {
 		vp->pm_state_valid = 1;
  		pci_save_state(VORTEX_PCI(vp), vp->power_state);

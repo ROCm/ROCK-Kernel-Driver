@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
+#include <linux/module.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 
@@ -25,6 +26,7 @@
  */
 unsigned long max_low_pfn;
 unsigned long min_low_pfn;
+EXPORT_SYMBOL(min_low_pfn);
 unsigned long max_pfn;
 
 /* return the number of _pages_ that will be allocated for the boot bitmap */

@@ -131,6 +131,7 @@ enum
 	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
 	KERN_PTY=62,		/* dir: pty driver */
 	KERN_KDB=63,		/* int: kdb on/off */
+	KERN_DUMP=64,		/* directory: dump parameters */
 };
 
 

@@ -19,6 +19,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/cache.h>
 #include <linux/interrupt.h>
+#include <linux/dump.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
@@ -149,6 +150,13 @@ inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
 
+	if (vector == DUMP_VECTOR) {
+		/*
+		 * Setup DUMP IPI to be delivered as an NMI
+		 */
+		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+	}
+
 #ifdef	CONFIG_KDB
 	if (vector == KDB_VECTOR) {
 		/*
@@ -244,7 +252,13 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 				cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
 			}
 #endif	/* CONFIG_KDB */
-			
+		
+			if (vector == DUMP_VECTOR) {
+				/*
+				 * Setup DUMP IPI to be delivered as an NMI
+				 */
+				cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+			}	
 			/*
 			 * Send the IPI. The write to APIC_ICR fires this off.
 			 */
@@ -499,6 +513,11 @@ smp_kdb_stop(void)
 }
 #endif	/* CONFIG_KDB */
 
+void dump_send_ipi(void)
+{
+	send_IPI_allbutself(DUMP_VECTOR);
+}
+
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing
@@ -577,7 +596,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	return 0;
 }
 
-static void stop_this_cpu (void * dummy)
+void stop_this_cpu (void * dummy)
 {
 	/*
 	 * Remove this CPU:
@@ -638,4 +657,3 @@ asmlinkage void smp_call_function_interrupt(void)
 		atomic_inc(&call_data->finished);
 	}
 }
-

@@ -596,7 +596,7 @@ struct prio_array {
 struct runqueue {
 	spinlock_t lock;
 	unsigned long nr_running, nr_switches, expired_timestamp,
-			nr_uninterruptible, timestamp_last_tick;
+	              nr_uninterruptible, timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
@@ -610,6 +610,7 @@ struct runqueue {
 
 	atomic_t nr_iowait;
 };
+
 /*
  * The default (Linux) execution domain.
  */

@@ -102,3 +102,4 @@ zlilo: $(BOOTIMAGE)
 
 install: $(BOOTIMAGE)
 	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $< System.map "$(INSTALL_PATH)"
+	if [ -f init/kerntypes.o ]; then cp init/kerntypes.o $(INSTALL_PATH)/Kerntypes; fi

@@ -45,6 +45,10 @@
 #define cpu_to_node_mask(cpu) (cpu_online_map)
 #endif
 
+/* used to soft spin in sched while dump is in progress */
+unsigned long dump_oncpu;
+EXPORT_SYMBOL(dump_oncpu);
+
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
@@ -176,7 +180,6 @@ static inline unsigned int task_timeslice(task_t *p)
 {
 	return BASE_TIMESLICE(p);
 }
-
 
 DEFINE_PER_CPU(struct runqueue, runqueues);
 
@@ -1565,6 +1568,15 @@ asmlinkage void schedule(void)
 	unsigned long run_time;
 	int idx;
 
+ 	/*
+	 * If crash dump is in progress, this other cpu's
+	 * need to wait until it completes.
+	 * NB: this code is optimized away for kernels without
+	 * dumping enabled.
+	 */
+	if (unlikely(dump_oncpu))
+		goto dump_scheduling_disabled;
+
 	/*
 	 * Test if we are atomic.  Since do_exit() needs to call into
 	 * schedule() atomically, we ignore that path for now.
@@ -1683,6 +1695,16 @@ switch_tasks:
 	preempt_enable_no_resched();
 	if (test_thread_flag(TIF_NEED_RESCHED))
 		goto need_resched;
+
+	return;
+
+ dump_scheduling_disabled:
+	/* allow scheduling only if this is the dumping cpu */
+	if (dump_oncpu != smp_processor_id()+1) {
+		while (dump_oncpu)
+			cpu_relax();
+	}
+	return;
 }
 
 EXPORT_SYMBOL(schedule);

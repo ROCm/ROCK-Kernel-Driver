@@ -207,6 +207,9 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 	dev->base_addr = ioaddr + NIC_OFFSET;
 	dev->open = &hp_open;
 	dev->stop = &hp_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 
 	ei_status.name = name;
 	ei_status.word16 = wordmode;

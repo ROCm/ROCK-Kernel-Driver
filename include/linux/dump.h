@@ -24,34 +24,8 @@
 
 #include <linux/list.h>
 #include <linux/notifier.h>
-
-/*
- * Structure: __lkcdinfo
- * Function:  This structure contains information needed for the lkcdutils
- *            package (particularly lcrash) to determine what information is
- *            associated to this kernel, specifically.
- */
-struct __lkcdinfo {
-	int	arch;
-	int	ptrsz;
-	int	byte_order;
-	int	linux_release;
-	int	page_shift;
-	int	page_size;
-	u64	page_mask;
-	u64	page_offset;
-	int	stack_offset;
-};
-
-/*
- * We only need to include the rest of the file if one of the
- * dump devices are enabled.
- */
-#if defined(CONFIG_CRASH_BLOCKDEV) || defined(CONFIG_CRASH_BLOCKDEV_MODULE) \
-    || defined(CONFIG_CRASH_NETDEV) || defined(CONFIG_CRASH_NETDEV_MODULE) \
-    || defined(CONFIG_CRASH_MEMDEV) || defined(CONFIG_CRASH_MEMDEV_MODULE)
-
 #include <linux/dumpdev.h>
+#include <asm/ioctl.h>
 
 /* 
  * Predefine default DUMP_PAGE constants, asm header may override.
@@ -118,6 +92,7 @@ struct __lkcdinfo {
 /* dump flags - any dump-type specific flags -- add as necessary */
 #define DUMP_FLAGS_NONE		0x0	/* no flags are set for this dump   */
 #define DUMP_FLAGS_SOFTBOOT	0x2	/* 2 stage soft-boot based dump	    */
+#define DUMP_FLAGS_NONDISRUPT   0X1	/* non-disruptive dumping 	    */
 
 #define DUMP_FLAGS_TARGETMASK	0xf0000000 /* handle special case targets   */
 #define DUMP_FLAGS_DISKDUMP	0x80000000 /* dump to local disk 	    */
@@ -158,24 +133,26 @@ enum
 #define DUMP_DPC_PAGE_SIZE	(DUMP_PAGE_SIZE + 512)
 
 /* dump ioctl() control options */
-#define DIOSDUMPDEV		1	/* set the dump device              */
-#define DIOGDUMPDEV		2	/* get the dump device              */
-#define DIOSDUMPLEVEL		3	/* set the dump level               */
-#define DIOGDUMPLEVEL		4	/* get the dump level               */
-#define DIOSDUMPFLAGS		5	/* set the dump flag parameters     */
-#define DIOGDUMPFLAGS		6	/* get the dump flag parameters     */
-#define DIOSDUMPCOMPRESS	7	/* set the dump compress level      */
-#define DIOGDUMPCOMPRESS	8	/* get the dump compress level      */
+#define DIOSDUMPDEV     _IOW('p', 0xA0, unsigned int)  /* set the dump device              */
+#define DIOGDUMPDEV     _IOR('p', 0xA1, unsigned int)  /* get the dump device              */
+#define DIOSDUMPLEVEL   _IOW('p', 0xA2, unsigned int)  /* set the dump level               */
+#define DIOGDUMPLEVEL   _IOR('p', 0xA3, unsigned int)  /* get the dump level               */
+#define DIOSDUMPFLAGS   _IOW('p', 0xA4, unsigned int)  /* set the dump flag parameters     */
+#define DIOGDUMPFLAGS   _IOR('p', 0xA5, unsigned int)  /* get the dump flag parameters     */
+#define DIOSDUMPCOMPRESS _IOW('p', 0xA6, unsigned int) /* set the dump compress level      */
+#define DIOGDUMPCOMPRESS _IOR('p', 0xA7, unsigned int) /* get the dump compress level      */
 
 /* these ioctls are used only by netdump module */
-#define DIOSTARGETIP		9	/* set the target m/c's ip	    */
-#define DIOGTARGETIP		10	/* get the target m/c's ip	    */
-#define DIOSTARGETPORT		11	/* set the target m/c's port	    */
-#define DIOGTARGETPORT		12	/* get the target m/c's port	    */
-#define DIOSSOURCEPORT		13	/* set the source m/c's port	    */
-#define DIOGSOURCEPORT		14	/* get the source m/c's port	    */
-#define DIOSETHADDR		15	/* set ethernet address		    */
-#define DIOGETHADDR		16	/* get ethernet address		    */
+#define DIOSTARGETIP    _IOW('p', 0xA8, unsigned int)  /* set the target m/c's ip           */
+#define DIOGTARGETIP    _IOR('p', 0xA9, unsigned int)  /* get the target m/c's ip           */
+#define DIOSTARGETPORT  _IOW('p', 0xAA, unsigned int) /* set the target m/c's port          */
+#define DIOGTARGETPORT  _IOR('p', 0xAB, unsigned int) /* get the target m/c's port          */
+#define DIOSSOURCEPORT  _IOW('p', 0xAC, unsigned int) /* set the source m/c's port          */
+#define DIOGSOURCEPORT  _IOR('p', 0xAD, unsigned int) /* get the source m/c's port          */
+#define DIOSETHADDR     _IOW('p', 0xAE, unsigned int) /* set ethernet address      */
+#define DIOGETHADDR     _IOR('p', 0xAF, unsigned int) /* get ethernet address       */
+#define DIOGDUMPOKAY	_IOR('p', 0xB0, unsigned int) /* check if dump is configured      */
+#define DIOSDUMPTAKE    _IOW('p', 0xB1, unsigned int) /* Take a manual dump               */
 
 /*
  * Structure: __dump_header
@@ -268,6 +245,24 @@ struct __dump_page {
 	u32	dp_flags;
 } __attribute__((packed));
 
+/*
+ * Structure: __lkcdinfo
+ * Function:  This structure contains information needed for the lkcdutils
+ *            package (particularly lcrash) to determine what information is
+ *            associated to this kernel, specifically.
+ */
+struct __lkcdinfo {
+	int	arch;
+	int	ptrsz;
+	int	byte_order;
+	int	linux_release;
+	int	page_shift;
+	int	page_size;
+	u64	page_mask;
+	u64	page_offset;
+	int	stack_offset;
+};
+
 #ifdef __KERNEL__
 
 /*
@@ -359,7 +354,7 @@ extern void	__dump_cleanup(void);
 extern void	__dump_init(u64);
 extern void	__dump_save_regs(struct pt_regs *, const struct pt_regs *);
 extern int	__dump_configure_header(const struct pt_regs *);
-extern void	__dump_irq_enable(void);
+extern int	__dump_irq_enable(void);
 extern void	__dump_irq_restore(void);
 extern int	__dump_page_valid(unsigned long index);
 #ifdef CONFIG_SMP
@@ -368,13 +363,23 @@ extern void 	__dump_save_other_cpus(void);
 #define 	__dump_save_other_cpus()
 #endif
 
+extern int manual_handle_crashdump(void);
+
 /* to track all used (compound + zero order) pages */
 #define PageInuse(p)   (PageCompound(p) || page_count(p))
 
 #endif /* __KERNEL__ */
 
-#endif /* CONFIG_CRASH_XXXDEV */
+#else	/* !CONFIG_CRASH_DUMP */
 
-#endif	/* CONFIG_CRASH_DUMP */
+/* If not configured then make code disappear! */
+#define register_dump_watchdog(x) 	do { } while(0)
+#define unregister_dump_watchdog(x) 	do { } while(0)
+#define register_dump_notifier(x)	do { } while(0)
+#define unregister_dump_notifier(x)	do { } while(0)
+#define dump_in_progress() 		0
+#define dump(x, y)			do { } while(0)
+
+#endif	/* !CONFIG_CRASH_DUMP */
 
 #endif /* _DUMP_H */

@@ -25,6 +25,7 @@
 #include <linux/highmem.h>
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
+#include <linux/dump.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -287,6 +288,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	if (nl)
 		printk("\n");
 	show_registers(regs);
+	dump((char *)str, regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 #ifdef	CONFIG_KDB
