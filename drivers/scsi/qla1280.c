@@ -182,11 +182,7 @@ END OF TERMS AND CONDITIONS
     -   Initial Beta Release.  
 *****************************************************************************/
 
-#error Please convert me to Documentation/DMA-mapping.txt
-
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #define QLA1280_VERSION      " 3.00-Beta"
 
@@ -3983,10 +3979,11 @@ qla1280_64bit_start_scsi(scsi_qla_host_t *ha, srb_t *sp)
                     /* Load command entry data segments. */
                     for (cnt = 0; cnt < 2 && seg_cnt; cnt++, seg_cnt--)
                     {
-                        DEBUG(sprintf(debug_buff,"SG Segment ap=0x%p, len=0x%x\n\r",sg->address,sg->length));
+                    	unsigned long long address = page_to_phys(sg->page) + sg->offset;
+                        DEBUG(sprintf(debug_buff,"SG Segment ap=0x%ull, len=0x%x\n\r",address,sg->length));
                         DEBUG(qla1280_print(debug_buff));
-                        *dword_ptr++ = cpu_to_le32(VIRT_TO_BUS_LOW(sg->address));
-                        *dword_ptr++ = cpu_to_le32(VIRT_TO_BUS_HIGH(sg->address));
+                        *dword_ptr++ = cpu_to_le32(address);
+                        *dword_ptr++ = cpu_to_le32(address >> 32);
                         *dword_ptr++ = sg->length;
                         sg++;
                     }
@@ -4038,8 +4035,9 @@ qla1280_64bit_start_scsi(scsi_qla_host_t *ha, srb_t *sp)
                         /* Load continuation entry data segments. */
                         for (cnt = 0; cnt < 5 && seg_cnt; cnt++, seg_cnt--)
                         {
-                            *dword_ptr++ = cpu_to_le32(VIRT_TO_BUS_LOW(sg->address));
-                            *dword_ptr++ = cpu_to_le32(VIRT_TO_BUS_HIGH(sg->address));
+                            unsigned long long address = page_to_phys(sg->page) + sg->offset;
+                            *dword_ptr++ = cpu_to_le32(address);
+                            *dword_ptr++ = cpu_to_le32(address >> 32);
                             *dword_ptr++ = sg->length;
                             sg++;
                         }
@@ -4325,9 +4323,10 @@ qla1280_32bit_start_scsi(scsi_qla_host_t *ha, srb_t *sp)
                     /* Load command entry data segments. */
                     for (cnt = 0; cnt < 4 && seg_cnt; cnt++, seg_cnt--)
                     {
-                        *dword_ptr++ = (uint32_t) cpu_to_le32(VIRT_TO_BUS(sg->address));
+                    	unsigned long long address = page_to_phys(sg->page) + sg->offset;
+                        *dword_ptr++ = (uint32_t) cpu_to_le32(address);
                         *dword_ptr++ = sg->length;
-                        DEBUG(sprintf(debug_buff,"SG Segment ap=0x%p, len=0x%x\n\r",sg->address,sg->length));
+                        DEBUG(sprintf(debug_buff,"SG Segment ap=0x%ull, len=0x%x\n\r",address,sg->length));
                         DEBUG(qla1280_print(debug_buff));
                         sg++;
                     }
@@ -4368,7 +4367,8 @@ qla1280_32bit_start_scsi(scsi_qla_host_t *ha, srb_t *sp)
                         /* Load continuation entry data segments. */
                         for (cnt = 0; cnt < 7 && seg_cnt; cnt++, seg_cnt--)
                         {
-                            *dword_ptr++ = (u_int) cpu_to_le32(VIRT_TO_BUS(sg->address));
+                            unsigned long long address = page_to_phys(sg->page) + sg->offset;
+                            *dword_ptr++ = (u_int) cpu_to_le32(address);
                             *dword_ptr++ = sg->length;
                             sg++;
                         }

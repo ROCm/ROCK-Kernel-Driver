@@ -429,7 +429,8 @@ int shrink_dqcache_memory(int priority, unsigned int gfp_mask)
 	count = nr_free_dquots / priority;
 	prune_dqcache(count);
 	unlock_kernel();
-	return kmem_cache_shrink_nr(dquot_cachep);
+	kmem_cache_shrink(dquot_cachep);
+	return 0;
 }
 
 /* NOTE: If you change this function please check whether dqput_blocks() works right... */

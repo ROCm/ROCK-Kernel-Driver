@@ -135,9 +135,9 @@
 
 #include <asm/atomic.h>
 #include <linux/blk.h>
-#include "../scsi/scsi.h"
-#include "../scsi/hosts.h"
-#include "../scsi/sd.h"
+#include "../../scsi/scsi.h"
+#include "../../scsi/hosts.h"
+#include "../../scsi/sd.h"
 
 #include "microtek.h"
 

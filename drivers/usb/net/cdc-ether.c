@@ -27,7 +27,7 @@
 #include <linux/etherdevice.h>
 #include <linux/usb.h>
 #include <linux/module.h>
-#include "CDCEther.h"
+#include "cdc-ether.h"
 
 static const char *version = __FILE__ ": v0.98.5 22 Sep 2001 Brad Hards and another";
 

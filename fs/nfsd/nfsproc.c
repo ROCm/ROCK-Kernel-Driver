@@ -534,25 +534,30 @@ struct nfsd_void { int dummy; };
    cache,					\
    respsize,				       	\
  }
+
+#define ST 1		/* status */
+#define FH 8		/* filehandle */
+#define	AT 18		/* attributes */
+
 struct svc_procedure		nfsd_procedures2[18] = {
-  PROC(null,	 void,		void,		none,		RC_NOCACHE, 1),
-  PROC(getattr,	 fhandle,	attrstat,	fhandle,	RC_NOCACHE, 1+18),
-  PROC(setattr,  sattrargs,	attrstat,	fhandle,	RC_REPLBUFF, 1+18),
-  PROC(none,	 void,		void,		none,		RC_NOCACHE, 1),
-  PROC(lookup,	 diropargs,	diropres,	fhandle,	RC_NOCACHE, 1+8+18),
-  PROC(readlink, fhandle,	readlinkres,	none,		RC_NOCACHE, 1+1+256),
-  PROC(read,	 readargs,	readres,	fhandle,	RC_NOCACHE, 1+18+1+NFSSVC_MAXBLKSIZE),
-  PROC(none,	 void,		void,		none,		RC_NOCACHE, 1),
-  PROC(write,	 writeargs,	attrstat,	fhandle,	RC_REPLBUFF, 1+18),
-  PROC(create,	 createargs,	diropres,	fhandle,	RC_REPLBUFF, 1+8+18),
-  PROC(remove,	 diropargs,	void,		none,		RC_REPLSTAT, 1),
-  PROC(rename,	 renameargs,	void,		none,		RC_REPLSTAT, 1),
-  PROC(link,	 linkargs,	void,		none,		RC_REPLSTAT, 1),
-  PROC(symlink,	 symlinkargs,	void,		none,		RC_REPLSTAT, 1),
-  PROC(mkdir,	 createargs,	diropres,	fhandle,	RC_REPLBUFF, 1+8+18),
-  PROC(rmdir,	 diropargs,	void,		none,		RC_REPLSTAT, 1),
+  PROC(null,	 void,		void,		none,		RC_NOCACHE, ST),
+  PROC(getattr,	 fhandle,	attrstat,	fhandle,	RC_NOCACHE, ST+AT),
+  PROC(setattr,  sattrargs,	attrstat,	fhandle,	RC_REPLBUFF, ST+AT),
+  PROC(none,	 void,		void,		none,		RC_NOCACHE, ST),
+  PROC(lookup,	 diropargs,	diropres,	fhandle,	RC_NOCACHE, ST+FH+AT),
+  PROC(readlink, fhandle,	readlinkres,	none,		RC_NOCACHE, ST+1+256),
+  PROC(read,	 readargs,	readres,	fhandle,	RC_NOCACHE, ST+AT+1+NFSSVC_MAXBLKSIZE),
+  PROC(none,	 void,		void,		none,		RC_NOCACHE, ST),
+  PROC(write,	 writeargs,	attrstat,	fhandle,	RC_REPLBUFF, ST+AT),
+  PROC(create,	 createargs,	diropres,	fhandle,	RC_REPLBUFF, ST+FH+AT),
+  PROC(remove,	 diropargs,	void,		none,		RC_REPLSTAT, ST),
+  PROC(rename,	 renameargs,	void,		none,		RC_REPLSTAT, ST),
+  PROC(link,	 linkargs,	void,		none,		RC_REPLSTAT, ST),
+  PROC(symlink,	 symlinkargs,	void,		none,		RC_REPLSTAT, ST),
+  PROC(mkdir,	 createargs,	diropres,	fhandle,	RC_REPLBUFF, ST+FH+AT),
+  PROC(rmdir,	 diropargs,	void,		none,		RC_REPLSTAT, ST),
   PROC(readdir,	 readdirargs,	readdirres,	none,		RC_REPLBUFF, 0),
-  PROC(statfs,	 fhandle,	statfsres,	none,		RC_NOCACHE, 1+5),
+  PROC(statfs,	 fhandle,	statfsres,	none,		RC_NOCACHE, ST+5),
 };
 
 

@@ -546,6 +546,9 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 
 	dprintk("nfsd: fh_verify(%s)\n", SVCFH_fmt(fhp));
 
+	/* keep this filehandle for possible reference  when encoding attributes */
+	rqstp->rq_reffh = fh;
+
 	if (!fhp->fh_dentry) {
 		kdev_t xdev = NODEV;
 		ino_t xino = 0;

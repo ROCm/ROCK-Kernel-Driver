@@ -21,6 +21,8 @@ int inode_change_ok(struct inode *inode, struct iattr *attr)
 	int retval = -EPERM;
 	unsigned int ia_valid = attr->ia_valid;
 
+	lock_kernel();
+
 	/* If force is set do it anyway. */
 	if (ia_valid & ATTR_FORCE)
 		goto fine;
@@ -55,6 +57,7 @@ int inode_change_ok(struct inode *inode, struct iattr *attr)
 fine:
 	retval = 0;
 error:
+	unlock_kernel();
 	return retval;
 }
 
@@ -62,7 +65,8 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 {
 	unsigned int ia_valid = attr->ia_valid;
 	int error = 0;
-
+	
+	lock_kernel();
 	if (ia_valid & ATTR_SIZE) {
 		error = vmtruncate(inode, attr->ia_size);
 		if (error)
@@ -86,6 +90,7 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	}
 	mark_inode_dirty(inode);
 out:
+	unlock_kernel();
 	return error;
 }
 
@@ -127,7 +132,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (!(ia_valid & ATTR_MTIME_SET))
 		attr->ia_mtime = now;
 
-	lock_kernel();
+	down(&inode->i_sem);
 	if (inode->i_op && inode->i_op->setattr) 
 		error = inode->i_op->setattr(dentry, attr);
 	else {
@@ -140,7 +145,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 				error = inode_setattr(inode, attr);
 		}
 	}
-	unlock_kernel();
+	up(&inode->i_sem);
 	if (!error) {
 		unsigned long dn_mask = setattr_mask(ia_valid);
 		if (dn_mask)

@@ -1,0 +1,27 @@
+#
+# USB Input driver configuration
+#
+comment 'USB Human Interface Devices (HID)'
+dep_tristate '  USB Human Interface Device (full HID) support' CONFIG_USB_HID $CONFIG_USB
+if [ "$CONFIG_INPUT" = "n" ]; then
+   comment '    Input core support is needed for USB HID input layer or HIDBP support'
+fi
+dep_mbool '    HID input layer support' CONFIG_USB_HIDINPUT $CONFIG_INPUT $CONFIG_USB_HID
+dep_mbool '    /dev/hiddev raw HID device support' CONFIG_USB_HIDDEV $CONFIG_USB_HID
+
+if [ "$CONFIG_USB_HID" != "y" ]; then
+   dep_tristate '  USB HIDBP Keyboard (basic) support' CONFIG_USB_KBD $CONFIG_USB $CONFIG_INPUT
+   dep_tristate '  USB HIDBP Mouse (basic) support' CONFIG_USB_MOUSE $CONFIG_USB $CONFIG_INPUT
+fi
+
+dep_tristate '  Wacom Intuos/Graphire tablet support' CONFIG_USB_WACOM $CONFIG_USB $CONFIG_INPUT
+
+# Turn on CONFIG_USB_INPUT if any of the drivers are compiled into the kernel
+# to make our Makefile logic a bit simpler.
+if [ "$CONFIG_USB_HID" = "y" -o "$CONFIG_USB_KBD" = "y" -o "$CONFIG_USB_MOUSE" = "y" ]; then
+   define_bool CONFIG_USB_INPUT y
+fi
+if [ "$CONFIG_USB_WACOM" = "y" ]; then
+   define_bool CONFIG_USB_INPUT y
+fi
+   

@@ -1,0 +1,19 @@
+#
+# USB Imageing devices configuration
+#
+comment 'USB Imaging devices'
+dep_tristate '  USB Kodak DC-2xx Camera support' CONFIG_USB_DC2XX $CONFIG_USB
+dep_tristate '  USB Mustek MDC800 Digital Camera support (EXPERIMENTAL)' CONFIG_USB_MDC800 $CONFIG_USB $CONFIG_EXPERIMENTAL
+dep_tristate '  USB Scanner support' CONFIG_USB_SCANNER $CONFIG_USB
+dep_tristate '  Microtek X6USB scanner support' CONFIG_USB_MICROTEK $CONFIG_USB $CONFIG_SCSI
+dep_tristate '  HP53xx USB scanner support (EXPERIMENTAL)' CONFIG_USB_HPUSBSCSI $CONFIG_USB $CONFIG_SCSI $CONFIG_EXPERIMENTAL
+
+# Turn on CONFIG_USB_IMAGE if any of the drivers are compiled into the kernel to
+# make our Makefile logic a bit simpler
+if [ "$CONFIG_USB_DC2XX" = "y" -o "$CONFIG_USB_MDC800" = "y" ]; then
+   define_bool CONFIG_USB_IMAGE y
+fi
+if [ "$CONFIG_USB_SCANNER" = "y" -o "$CONFIG_USB_MICROTEK" = "y" -o "$CONFIG_USB_HPUSBSCSI" = "y" ]; then
+   define_bool CONFIG_USB_IMAGE y
+fi
+   

@@ -37,60 +37,6 @@ CONFIG_USB_LONG_TIMEOUT
   If you have an MGE Ellipse UPS, or you see timeouts in HID
   transactions, say Y; otherwise say N.
 
-CONFIG_USB_UHCI
-  The Universal Host Controller Interface is a standard by Intel for
-  accessing the USB hardware in the PC (which is also called the USB
-  host controller). If your USB host controller conforms to this
-  standard, you may want to say Y, but see below. All recent boards
-  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
-  i810, i820) conform to this standard. Also all VIA PCI chipsets
-  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
-  133).
-
-  Currently there exist two drivers for UHCI host controllers: this
-  one and the so-called JE driver, which you can get from
-  "UHCI alternate (JE) support", below. You need only one.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-uhci.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_UHCI_ALT
-  The Universal Host Controller Interface is a standard by Intel for
-  accessing the USB hardware in the PC (which is also called the USB
-  host controller). If your USB host controller conforms to this
-  standard, you may want to say Y, but see below. All recent boards
-  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
-  i810, i820) conform to this standard. Also all VIA PCI chipsets
-  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
-  133). If unsure, say Y.
-
-  Currently there exist two drivers for UHCI host controllers: this
-  so-called JE driver, and the one you get from "UHCI support", above.
-  You need only one.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called uhci.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_OHCI
-  The Open Host Controller Interface is a standard by
-  Compaq/Microsoft/National for accessing the USB PC hardware (also
-  called USB host controller). If your USB host controller conforms to
-  this standard, say Y. The USB host controllers on most non-Intel
-  architectures and on several x86 compatibles with non-Intel chipsets
-  -- like SiS (aktual 610, 610 and so on) or ALi (ALi IV, ALi V,
-  Aladdin Pro..) -- conform to this standard.
-
-  You may want to read <file:Documentation/usb/ohci.txt>.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-ohci.o. If you want to compile it
-  as a module, say M here and read <file:Documentation/modules.txt>.
-
 CONFIG_USB_HID
   Say Y here if you want full HID support to connect keyboards,
   mice, joysticks, graphic tablets, or any other HID based devices
@@ -445,32 +391,6 @@ CONFIG_USB_MDC800
   The module will be called mdc800.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_USB_STORAGE
-  Say Y here if you want to connect USB mass storage devices to your
-  computer's USB port.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-storage.o. If you want to compile it
-  as a module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_STORAGE_DEBUG
-  Say Y here in order to have the USB Mass Storage code generate
-  verbose debugging messages.
-
-CONFIG_USB_STORAGE_ISD200
-  Say Y here if you want to use USB Mass Store devices based
-  on the In-Systems Design ISD-200 USB/ATA bridge.
-
-  Some of the products that use this chip are:
-
-    - Archos Jukebox 6000
-    - ISD SmartCable for Storage
-    - Taiwan Skymaster CD530U/DEL-0241 IDE bridge
-    - Sony CRX10U CD-R/RW drive
-    - CyQ've CQ8060A CDRW drive
-    - Planex eXtreme Drive RX-25HU USB-IDE cable (not model RX-25U)
-
 CONFIG_USB_USS720
   This driver is for USB parallel port adapters that use the Lucent
   Technologies USS-720 chip. These cables are plugged into your USB
@@ -575,19 +495,6 @@ CONFIG_USB_USBNET
   inserted in and removed from the running kernel whenever you want).
   The module will be called usbnet.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_STORAGE_FREECOM
-  Support for the Freecom USB to IDE/ATAPI adaptor.
-  Freecom has a web page at <http://www.freecom.de/>.
-
-CONFIG_USB_STORAGE_DPCM
-  Say Y here to support the Microtech ZiO! CompactFlash/SmartMedia
-  reader, details at <http://www.microtechint.com/zio/index.html>.
-  This driver treats the flash card as a removable storage device.
-
-CONFIG_USB_STORAGE_SDDR09
-  Say Y here to include additional code to support the Sandisk SDDR-09
-  SmartMedia reader in the USB Mass Storage driver.
 
 CONFIG_USB_RIO500
   Say Y here if you want to connect a USB Rio500 mp3 player to your
