@@ -3,6 +3,11 @@
 #define _IP_CONNTRACK_PROTOCOL_H
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 
+/* length of buffer to which print_tuple/print_conntrack members are
+ * writing */
+
+#define IP_CT_PRINT_BUFLEN 100
+
 struct ip_conntrack_protocol
 {
 	/* Next pointer. */
