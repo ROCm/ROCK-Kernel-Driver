@@ -1390,6 +1390,23 @@ config SCSI_SYM53C416
 	  read <file:Documentation/modules.txt>. The module will be called
 	  sym53c416.
 
+config SCSI_DC395x
+	tristate "Tekram DC395(U/UW/F) and DC315(U) SCSI support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && PCI && SCSI
+	---help---
+	  This driver supports PCI SCSI host adapters based on the ASIC
+	  TRM-S1040 chip, e.g Tekram DC395(U/UW/F) and DC315(U) variants.
+
+	  This driver works, but is still in experimental status. So better
+	  have a bootable disk and a backup in case of emergency.
+
+	  Documentation can be found in <file:Documentation/scsi/dc395x.txt>.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called dc395x.
+
 config SCSI_DC390T
 	tristate "Tekram DC390(T) and Am53/79C974 SCSI support"
 	depends on PCI && SCSI
