@@ -867,7 +867,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	int				i, err;
 	struct urb			*urb;
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	p_priv = usb_get_serial_port_data(port);
 	d_details = s_priv->device_details;
 	
@@ -927,7 +927,7 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 		return;
 
 	dbg("%s", __FUNCTION__);
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	p_priv = usb_get_serial_port_data(port);
 	
 	p_priv->rts_state = 0;
@@ -1139,7 +1139,7 @@ static void keyspan_setup_urbs(struct usb_serial *serial)
 
 	dbg ("%s", __FUNCTION__);
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	d_details = s_priv->device_details;
 
 		/* Setup values for the various callback routines */
@@ -1375,7 +1375,7 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 
 	dbg ("%s reset=%d", __FUNCTION__, reset_port); 
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	p_priv = usb_get_serial_port_data(port);
 	d_details = s_priv->device_details;
 	device_port = port->number - port->serial->minor;
@@ -1530,7 +1530,7 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 
 	dbg ("%s", __FUNCTION__);
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	p_priv = usb_get_serial_port_data(port);
 	d_details = s_priv->device_details;
 	device_port = port->number - port->serial->minor;
@@ -1655,7 +1655,7 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 
 	dbg ("%s", __FUNCTION__);
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	p_priv = usb_get_serial_port_data(port);
 	d_details = s_priv->device_details;
 
@@ -1815,7 +1815,7 @@ static void keyspan_send_setup(struct usb_serial_port *port, int reset_port)
 
 	dbg ("%s", __FUNCTION__);
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 	d_details = s_priv->device_details;
 
 	switch (d_details->msg_format) {
@@ -1852,17 +1852,16 @@ static int keyspan_startup (struct usb_serial *serial)
 	}
 
 	/* Setup private data for serial driver */
-	serial->private = kmalloc(sizeof(struct keyspan_serial_private),
-				  GFP_KERNEL);
-	if (!serial->private) {
+	s_priv = kmalloc(sizeof(struct keyspan_serial_private), GFP_KERNEL);
+	if (!s_priv) {
 		dbg("%s - kmalloc for keyspan_serial_private failed.", __FUNCTION__);
-		return (1);
+		return -ENOMEM;
 	}
-	memset(serial->private, 0, sizeof(struct keyspan_serial_private));
+	memset(s_priv, 0, sizeof(struct keyspan_serial_private));
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
 	s_priv->device_details = d_details;
-		
+	usb_set_serial_data(serial, s_priv);
+
 	/* Now setup per port private data */
 	for (i = 0; i < serial->num_ports; i++) {
 		port = &serial->port[i];
@@ -1895,7 +1894,7 @@ static void keyspan_shutdown (struct usb_serial *serial)
 
 	dbg("%s", __FUNCTION__);
 
-	s_priv = (struct keyspan_serial_private *)(serial->private);
+	s_priv = usb_get_serial_data(serial);
 
 	/* Stop reading/writing urbs */
 	stop_urb(s_priv->instat_urb);
@@ -1932,7 +1931,7 @@ static void keyspan_shutdown (struct usb_serial *serial)
 	}
 
 	/*  dbg("Freeing serial->private."); */
-	kfree(serial->private);
+	kfree(s_priv);
 
 	/*  dbg("Freeing port->private."); */
 	/* Now free per port private data */

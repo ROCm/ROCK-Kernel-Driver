@@ -650,7 +650,7 @@ static int digi_write_oob_command( struct usb_serial_port *port,
 
 	int ret = 0;
 	int len;
-	struct usb_serial_port *oob_port = (struct usb_serial_port *)((struct digi_serial *)port->serial->private)->ds_oob_port;
+	struct usb_serial_port *oob_port = (struct usb_serial_port *)((struct digi_serial *)(usb_get_serial_data(port->serial)))->ds_oob_port;
 	struct digi_port *oob_priv = usb_get_serial_port_data(oob_port);
 	unsigned long flags = 0;
 
@@ -806,7 +806,7 @@ static int digi_set_modem_signals( struct usb_serial_port *port,
 
 	int ret;
 	struct digi_port *port_priv = usb_get_serial_port_data(port);
-	struct usb_serial_port *oob_port = (struct usb_serial_port *)((struct digi_serial *)port->serial->private)->ds_oob_port;
+	struct usb_serial_port *oob_port = (struct usb_serial_port *)((struct digi_serial *)(usb_get_serial_data(port->serial)))->ds_oob_port;
 	struct digi_port *oob_priv = usb_get_serial_port_data(oob_port);
 	unsigned char *data = oob_port->write_urb->transfer_buffer;
 	unsigned long flags = 0;
@@ -1353,6 +1353,7 @@ static void digi_write_bulk_callback( struct urb *urb, struct pt_regs *regs )
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial;
 	struct digi_port *priv;
+	struct digi_serial *serial_priv;
 	int ret = 0;
 
 
@@ -1365,14 +1366,13 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 		return;
 	}
 	serial = port->serial;
-	if( serial == NULL || serial->private == NULL ) {
+	if( serial == NULL || (serial_priv=usb_get_serial_data(serial)) == NULL ) {
 		err("%s: serial or serial->private is NULL, status=%d", __FUNCTION__, urb->status );
 		return;
 	}
 
 	/* handle oob callback */
-	if( priv->dp_port_num
-	== ((struct digi_serial *)(serial->private))->ds_oob_port_num ) {
+	if( priv->dp_port_num == serial_priv->ds_oob_port_num ) {
 		dbg( "digi_write_bulk_callback: oob callback" );
 		spin_lock( &priv->dp_port_lock );
 		priv->dp_write_urb_in_use = 0;
@@ -1641,7 +1641,7 @@ static int digi_startup_device( struct usb_serial *serial )
 {
 
 	int i,ret = 0;
-	struct digi_serial *serial_priv = (struct digi_serial *)serial->private;
+	struct digi_serial *serial_priv = usb_get_serial_data(serial);
 	struct usb_serial_port *port;
 
 
@@ -1723,8 +1723,7 @@ dbg( "digi_startup: TOP" );
 	}
 
 	/* allocate serial private structure */
-	serial_priv = serial->private =
-		(struct digi_serial *)kmalloc( sizeof(struct digi_serial),
+	serial_priv = (struct digi_serial *)kmalloc( sizeof(struct digi_serial),
 		GFP_KERNEL );
 	if( serial_priv == (struct digi_serial *)0 ) {
 		for( i=0; i<serial->type->num_ports+1; i++ )
@@ -1737,6 +1736,7 @@ dbg( "digi_startup: TOP" );
 	serial_priv->ds_oob_port_num = serial->type->num_ports;
 	serial_priv->ds_oob_port = &serial->port[serial_priv->ds_oob_port_num];
 	serial_priv->ds_device_started = 0;
+	usb_set_serial_data(serial, serial_priv);
 
 	return( 0 );
 
@@ -1761,8 +1761,7 @@ dbg( "digi_shutdown: TOP, in_interrupt()=%ld", in_interrupt() );
 	/* number of regular ports + 1 for the out-of-band port */
 	for( i=0; i<serial->type->num_ports+1; i++ )
 		kfree( usb_get_serial_port_data(&serial->port[i]) );
-	kfree( serial->private );
-
+	kfree( usb_get_serial_data(serial) );
 }
 
 
@@ -1771,6 +1770,7 @@ static void digi_read_bulk_callback( struct urb *urb, struct pt_regs *regs )
 
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct digi_port *priv;
+	struct digi_serial *serial_priv;
 	int ret;
 
 
@@ -1784,7 +1784,7 @@ dbg( "digi_read_bulk_callback: TOP" );
 	}
 	if( port->serial == NULL
 	|| serial_paranoia_check( port->serial, __FUNCTION__ )
-	|| port->serial->private == NULL ) {
+	|| (serial_priv=usb_get_serial_data(port->serial)) == NULL ) {
 		err("%s: serial is bad or serial->private is NULL, status=%d", __FUNCTION__, urb->status );
 		return;
 	}
@@ -1796,8 +1796,7 @@ dbg( "digi_read_bulk_callback: TOP" );
 	}
 
 	/* handle oob or inb callback, do not resubmit if error */
-	if( priv->dp_port_num
-	== ((struct digi_serial *)(port->serial->private))->ds_oob_port_num ) {
+	if( priv->dp_port_num == serial_priv->ds_oob_port_num ) {
 		if( digi_read_oob_callback( urb ) != 0 )
 			return;
 	} else {

@@ -1990,7 +1990,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	edge_serial = (struct edgeport_serial *)serial->private;
+	edge_serial = usb_get_serial_data(serial);
 	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
@@ -2595,7 +2595,7 @@ static int edge_startup (struct usb_serial *serial)
 	}
 	memset (edge_serial, 0, sizeof(struct edgeport_serial));
 	edge_serial->serial = serial;
-	serial->private = edge_serial;
+	usb_set_serial_data(serial, edge_serial);
 
 	status = TIDownloadFirmware (edge_serial);
 	if (status) {
@@ -2629,8 +2629,8 @@ static void edge_shutdown (struct usb_serial *serial)
 		kfree (usb_get_serial_port_data(&serial->port[i]));
 		usb_set_serial_port_data(&serial->port[i], NULL);
 	}
-	kfree (serial->private);
-	serial->private = NULL;
+	kfree (usb_get_serial_data(serial));
+	usb_set_serial_data(serial, NULL);
 }
 
 

@@ -932,7 +932,7 @@ static void edge_bulk_out_data_callback (struct urb *urb, struct pt_regs *regs)
 	edge_port->write_in_progress = FALSE;
 
 	// Check if more data needs to be sent
-	send_more_port_data((struct edgeport_serial *)(edge_port->port->serial->private), edge_port);
+	send_more_port_data((struct edgeport_serial *)(usb_get_serial_data(edge_port->port->serial)), edge_port);
 }
 
 
@@ -1019,7 +1019,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	/* see if we've set up our endpoint info yet (can't set it up in edge_startup
 	   as the structures were not set up at that time.) */
 	serial = port->serial;
-	edge_serial = (struct edgeport_serial *)serial->private;
+	edge_serial = usb_get_serial_data(serial);
 	if (edge_serial == NULL) {
 		return -ENODEV;
 	}
@@ -1247,7 +1247,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	edge_serial = (struct edgeport_serial *)serial->private;
+	edge_serial = usb_get_serial_data(serial);
 	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
@@ -1381,7 +1381,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 		usb_serial_debug_data (__FILE__, __FUNCTION__, copySize, data);
 	}
 
-	send_more_port_data((struct edgeport_serial *)port->serial->private, edge_port);
+	send_more_port_data((struct edgeport_serial *)usb_get_serial_data(port->serial), edge_port);
 
 	dbg("%s wrote %d byte(s) TxCredits %d, Fifo %d", __FUNCTION__, copySize, edge_port->txCredits, fifo->count);
 
@@ -2489,7 +2489,7 @@ static int send_iosp_ext_cmd (struct edgeport_port *edge_port, __u8 command, __u
  *****************************************************************************/
 static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer, int length)
 {
-	struct edgeport_serial *edge_serial = (struct edgeport_serial *)edge_port->port->serial->private;
+	struct edgeport_serial *edge_serial = usb_get_serial_data(edge_port->port->serial);
 	int status = 0;
 	struct urb *urb;
 	int timeout;
@@ -2979,7 +2979,7 @@ static int edge_startup (struct usb_serial *serial)
 	}
 	memset (edge_serial, 0, sizeof(struct edgeport_serial));
 	edge_serial->serial = serial;
-	serial->private = edge_serial;
+	usb_set_serial_data(serial, edge_serial);
 
 	/* get the name for the device from the device */
 	if ( (i = get_string(dev, dev->descriptor.iManufacturer, &edge_serial->name[0])) != 0) {
@@ -3031,7 +3031,7 @@ static int edge_startup (struct usb_serial *serial)
 		edge_port = kmalloc (sizeof(struct edgeport_port), GFP_KERNEL);
 		if (edge_port == NULL) {
 			dev_err(serial->dev->dev, "%s - Out of memory", __FUNCTION__);
-			serial->private = NULL;
+			usb_set_serial_data(serial, NULL);
 			kfree(edge_serial);
 			return -ENOMEM;
 		}
@@ -3060,8 +3060,8 @@ static void edge_shutdown (struct usb_serial *serial)
 		kfree (usb_get_serial_port_data(&serial->port[i]));
 		usb_set_serial_port_data(&serial->port[i],  NULL);
 	}
-	kfree (serial->private);
-	serial->private = NULL;
+	kfree (usb_get_serial_data(serial));
+	usb_set_serial_data(serial, NULL);
 }
 
 

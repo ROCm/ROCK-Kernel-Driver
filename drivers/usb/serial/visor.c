@@ -654,7 +654,7 @@ static int visor_probe (struct usb_serial *serial)
 			dev_info(*dev, "%s: port %d, is for %s use\n", serial->type->name,
 				 connection_info->connections[i].port, string);
 		/* save off our num_ports info so that we can use it in the calc_num_ports call */
-		serial->private = (void *)(long)num_ports;
+		usb_set_serial_data(serial, (void *)(long)num_ports);
 		}
 	}
 
@@ -697,12 +697,11 @@ static int visor_probe (struct usb_serial *serial)
 
 static int visor_calc_num_ports (struct usb_serial *serial)
 {
-	int num_ports = 0;
+	int num_ports = (int)(long)(usb_get_serial_data(serial));
 
-	if (serial->private) {
-		num_ports = (int)(long)serial->private;
-		serial->private = NULL;
-	}
+	if (num_ports)
+		usb_set_serial_data(serial, NULL);
+
 	return num_ports;
 }
 
