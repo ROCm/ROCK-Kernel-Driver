@@ -1945,7 +1945,7 @@ EXPORT_SYMBOL(unw_unwind);
 int
 unw_unwind_to_user (struct unw_frame_info *info)
 {
-	unsigned long ip;
+	unsigned long ip, sp;
 
 	while (unw_unwind(info) >= 0) {
 		if (unw_get_rp(info, &ip) < 0) {
@@ -1954,6 +1954,9 @@ unw_unwind_to_user (struct unw_frame_info *info)
 				   __FUNCTION__, ip);
 			return -1;
 		}
+		unw_get_sp(info, &sp);
+		if (sp >= (unsigned long)info->task + IA64_STK_OFFSET)
+			break;
 		if (ip < FIXADDR_USER_END)
 			return 0;
 	}
