@@ -36,7 +36,7 @@ void __init prom_init(void *cif_handler, void *cif_stack)
 	int ints[3];
 	int node;
 	int i = 0;
-	int bufferadj;
+	int bufadjust;
 
 	prom_vers = PROM_P1275;
 
