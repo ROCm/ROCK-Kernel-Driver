@@ -594,6 +594,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	hw->wait_autoneg_complete = FALSE;
 	hw->tbi_compatibility_en = TRUE;
+	hw->adaptive_ifs = TRUE;
 
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->tx_lock);
@@ -1266,6 +1267,7 @@ e1000_watchdog(unsigned long data)
 	}
 
 	e1000_update_stats(adapter);
+	e1000_update_adaptive(&adapter->hw);
 
 	/* Reset the timer */
 	mod_timer(&adapter->watchdog_timer, jiffies + 2 * HZ);
@@ -1587,7 +1589,6 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.ecol += E1000_READ_REG(hw, ECOL);
 	adapter->stats.mcc += E1000_READ_REG(hw, MCC);
 	adapter->stats.latecol += E1000_READ_REG(hw, LATECOL);
-	adapter->stats.colc += E1000_READ_REG(hw, COLC);
 	adapter->stats.dc += E1000_READ_REG(hw, DC);
 	adapter->stats.sec += E1000_READ_REG(hw, SEC);
 	adapter->stats.rlec += E1000_READ_REG(hw, RLEC);
@@ -1608,7 +1609,6 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.totl += E1000_READ_REG(hw, TOTL);
 	adapter->stats.toth += E1000_READ_REG(hw, TOTH);
 	adapter->stats.tpr += E1000_READ_REG(hw, TPR);
-	adapter->stats.tpt += E1000_READ_REG(hw, TPT);
 	adapter->stats.ptc64 += E1000_READ_REG(hw, PTC64);
 	adapter->stats.ptc127 += E1000_READ_REG(hw, PTC127);
 	adapter->stats.ptc255 += E1000_READ_REG(hw, PTC255);
@@ -1618,7 +1618,14 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.mptc += E1000_READ_REG(hw, MPTC);
 	adapter->stats.bptc += E1000_READ_REG(hw, BPTC);
 
-	if(adapter->hw.mac_type >= e1000_82543) {
+	/* used for adaptive IFS */
+
+	hw->tx_packet_delta = E1000_READ_REG(hw, TPT);
+	adapter->stats.tpt += hw->tx_packet_delta;
+	hw->collision_delta = E1000_READ_REG(hw, COLC);
+	adapter->stats.colc += hw->collision_delta;
+
+	if(hw->mac_type >= e1000_82543) {
 		adapter->stats.algnerrc += E1000_READ_REG(hw, ALGNERRC);
 		adapter->stats.rxerrc += E1000_READ_REG(hw, RXERRC);
 		adapter->stats.tncrs += E1000_READ_REG(hw, TNCRS);
