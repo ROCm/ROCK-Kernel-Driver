@@ -13,10 +13,7 @@
 
 #define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
 				       */
-#define DEVFS_FL_HIDE           0x001 /* Do not show entry in directory list */
 #define DEVFS_FL_AUTO_DEVNUM    0x002 /* Automatically generate device number
-				       */
-#define DEVFS_FL_AOPEN_NOTIFY   0x004 /* Asynchronously notify devfsd on open
 				       */
 #define DEVFS_FL_REMOVABLE      0x008 /* This is a removable media device    */
 #define DEVFS_FL_WAIT           0x010 /* Wait for devfsd to finish           */
@@ -58,8 +55,6 @@ extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 				    void *info);
 extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
 					int traverse_symlinks);
-extern int devfs_get_flags (devfs_handle_t de, unsigned int *flags);
-extern int devfs_set_flags (devfs_handle_t de, unsigned int flags);
 extern devfs_handle_t devfs_get_handle_from_inode (struct inode *inode);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
 extern void *devfs_get_ops (devfs_handle_t de);
@@ -135,14 +130,6 @@ static inline devfs_handle_t devfs_get_handle (devfs_handle_t dir,
 }
 static inline void devfs_remove(const char *fmt, ...)
 {
-}
-static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
-{
-    return 0;
-}
-static inline int devfs_set_flags (devfs_handle_t de, unsigned int flags)
-{
-    return 0;
 }
 static inline devfs_handle_t devfs_get_handle_from_inode (struct inode *inode)
 {

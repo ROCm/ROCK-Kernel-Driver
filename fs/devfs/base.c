@@ -703,8 +703,6 @@
 
 #define MODE_DIR (S_IFDIR | S_IWUSR | S_IRUGO | S_IXUGO)
 
-#define IS_HIDDEN(de) ( (de)->hide && !is_devfsd_or_child(fs_info) )
-
 #define DEBUG_NONE         0x0000000
 #define DEBUG_MODULE_LOAD  0x0000001
 #define DEBUG_REGISTER     0x0000002
@@ -783,10 +781,7 @@ struct fcb_type  /*  File, char, block type  */
 	struct device_type device;
     }
     u;
-    spinlock_t lock;            /*  Lock for changes                         */
-    unsigned char aopen_notify:1;
     unsigned char removable:1;  /*  Belongs in device_type, but save space   */
-    unsigned char open:1;       /*  Not entirely correct                     */
     unsigned char autogen:1;    /*  Belongs in device_type, but save space   */
 };
 
@@ -828,7 +823,6 @@ struct devfs_entry
     struct devfs_inode inode;
     umode_t mode;
     unsigned short namelen;      /*  I think 64k+ filenames are a way off... */
-    unsigned char hide:1;
     unsigned char vfs_deletable:1;/*  Whether the VFS may delete the entry   */
     char name[1];                /*  This is just a dummy: the allocated array
 				     is bigger. This is NULL-terminated      */
@@ -1015,8 +1009,6 @@ static struct devfs_entry *_devfs_alloc_entry (const char *name,
     memset (new, 0, sizeof *new + namelen);  /*  Will set '\0' on name  */
     new->mode = mode;
     if ( S_ISDIR (mode) ) rwlock_init (&new->u.dir.lock);
-    else if ( S_ISREG (mode) || S_ISCHR (mode) || S_ISBLK (mode) )
-	spin_lock_init (&new->u.fcb.lock);
     atomic_set (&new->refcount, 1);
     spin_lock (&counter_lock);
     new->inode.ino = inode_counter++;
@@ -1554,8 +1546,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 	de->inode.gid = 0;
     }
     de->u.fcb.ops = ops;
-    de->u.fcb.aopen_notify = (flags & DEVFS_FL_AOPEN_NOTIFY) ? TRUE : FALSE;
-    de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
     if (flags & DEVFS_FL_REMOVABLE) de->u.fcb.removable = TRUE;
     if ( ( err = _devfs_append_entry (dir, de, de->u.fcb.removable, NULL) )
 	 != 0 )
@@ -1688,7 +1678,6 @@ static int devfs_do_symlink (devfs_handle_t dir, const char *name,
 	return -ENOTDIR;
     }
     de->info = info;
-    de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
     de->u.symlink.linkname = newlink;
     de->u.symlink.length = linklength;
     if ( ( err = _devfs_append_entry (dir, de, FALSE, NULL) ) != 0 )
@@ -1825,54 +1814,6 @@ void devfs_remove(const char *fmt, ...)
 		devfs_put(de);
 	}
 }
-
-/**
- *	devfs_get_flags - Get the flags for a devfs entry.
- *	@de: The handle to the device entry.
- *	@flags: The flags are written here.
- *
- *	Returns 0 on success, else a negative error code.
- */
-
-int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
-{
-    unsigned int fl = 0;
-
-    if (de == NULL) return -EINVAL;
-    VERIFY_ENTRY (de);
-    if (de->hide) fl |= DEVFS_FL_HIDE;
-    if ( S_ISCHR (de->mode) || S_ISBLK (de->mode) || S_ISREG (de->mode) )
-    {
-	if (de->u.fcb.aopen_notify) fl |= DEVFS_FL_AOPEN_NOTIFY;
-	if (de->u.fcb.removable) fl |= DEVFS_FL_REMOVABLE;
-    }
-    *flags = fl;
-    return 0;
-}   /*  End Function devfs_get_flags  */
-
-
-/*
- *	devfs_set_flags - Set the flags for a devfs entry.
- *	@de: The handle to the device entry.
- *	@flags: The flags to set. Unset flags are cleared.
- *
- *	Returns 0 on success, else a negative error code.
- */
-
-int devfs_set_flags (devfs_handle_t de, unsigned int flags)
-{
-    if (de == NULL) return -EINVAL;
-    VERIFY_ENTRY (de);
-    DPRINTK (DEBUG_SET_FLAGS, "(%s): flags: %x\n", de->name, flags);
-    de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
-    if ( S_ISCHR (de->mode) || S_ISBLK (de->mode) || S_ISREG (de->mode) )
-    {
-	spin_lock (&de->u.fcb.lock);
-	de->u.fcb.aopen_notify = (flags & DEVFS_FL_AOPEN_NOTIFY) ? TRUE:FALSE;
-	spin_unlock (&de->u.fcb.lock);
-    }
-    return 0;
-}   /*  End Function devfs_set_flags  */
 
 /**
  *	devfs_get_handle_from_inode - Get the devfs handle for a VFS inode.
@@ -2176,8 +2117,6 @@ EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
 EXPORT_SYMBOL(devfs_remove);
-EXPORT_SYMBOL(devfs_get_flags);
-EXPORT_SYMBOL(devfs_set_flags);
 EXPORT_SYMBOL(devfs_get_handle_from_inode);
 EXPORT_SYMBOL(devfs_generate_path);
 EXPORT_SYMBOL(devfs_get_ops);
@@ -2498,23 +2437,19 @@ static int devfs_readdir (struct file *file, void *dirent, filldir_t filldir)
 	count = file->f_pos - 2;
 	read_lock (&parent->u.dir.lock);
 	for (de = parent->u.dir.first; de && (count > 0); de = de->next)
-	    if ( !IS_HIDDEN (de) ) --count;
+	    --count;
 	devfs_get (de);
 	read_unlock (&parent->u.dir.lock);
 	/*  Now add all remaining entries  */
 	while (de)
 	{
-	    if ( IS_HIDDEN (de) ) err = 0;
+	    err = (*filldir) (dirent, de->name, de->namelen,
+				file->f_pos, de->inode.ino, de->mode >> 12);
+	    if (err < 0) devfs_put (de);
 	    else
 	    {
-		err = (*filldir) (dirent, de->name, de->namelen,
-				  file->f_pos, de->inode.ino, de->mode >> 12);
-		if (err < 0) devfs_put (de);
-		else
-		{
-		    file->f_pos++;
-		    ++stored;
-		}
+	        file->f_pos++;
+	        ++stored;
 	    }
 	    if (err == -EINVAL) break;
 	    if (err < 0) return err;
@@ -2563,17 +2498,7 @@ static int devfs_open (struct inode *inode, struct file *file)
 	    else err = -ENODEV;
 	}
     }
-    if (err < 0) return err;
-    /*  Open was successful  */
-    spin_lock (&df->lock);
-    err = df->open;
-    if (!err) df->open = TRUE;  /*  Was not already open    */
-    spin_unlock (&df->lock);
-    if (err) return 0;          /*  Was already open        */
-    if ( df->aopen_notify && !is_devfsd_or_child (fs_info) )
-	devfsd_notify_de (de, DEVFSD_NOTIFY_ASYNC_OPEN, inode->i_mode,
-			  current->euid, current->egid, fs_info, 0);
-    return 0;
+    return err;
 }   /*  End Function devfs_open  */
 
 static struct file_operations devfs_fops =
@@ -2649,10 +2574,7 @@ static struct dentry_operations devfs_wait_dops =
 
 static int devfs_d_delete (struct dentry *dentry)
 {
-    int was_open;
     struct inode *inode = dentry->d_inode;
-    struct devfs_entry *de;
-    struct fs_info *fs_info;
 
     if (dentry->d_op == &devfs_wait_dops) dentry->d_op = &devfs_dops;
     /*  Unhash dentry if negative (has no inode)  */
@@ -2661,21 +2583,6 @@ static int devfs_d_delete (struct dentry *dentry)
 	DPRINTK (DEBUG_D_DELETE, "(%p): dropping negative dentry\n", dentry);
 	return 1;
     }
-    fs_info = inode->i_sb->s_fs_info;
-    de = get_devfs_entry_from_vfs_inode (inode);
-    DPRINTK (DEBUG_D_DELETE, "(%p): inode: %p  devfs_entry: %p\n",
-	     dentry, inode, de);
-    if (de == NULL) return 0;
-    if ( !S_ISCHR (de->mode) && !S_ISBLK (de->mode) && !S_ISREG (de->mode) )
-	return 0;
-    spin_lock (&de->u.fcb.lock);
-    was_open = de->u.fcb.open;
-    if (was_open) de->u.fcb.open = FALSE;
-    spin_unlock (&de->u.fcb.lock);
-    if (!was_open) return 0;
-    if (de->u.fcb.aopen_notify)
-	devfsd_notify_de (de, DEVFSD_NOTIFY_CLOSE, inode->i_mode,
-			  current->euid, current->egid, fs_info, 1);
     return 0;
 }   /*  End Function devfs_d_delete  */
 
