@@ -220,9 +220,9 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 
 	devfs_mk_cdev(MKDEV(DVB_MAJOR, nums2minor(adap->num, type, id)),
 			S_IFCHR | S_IRUSR | S_IWUSR,
-			"dvb/adapter%d%s%d", adap->num, dnames[type], id);
+			"dvb/adapter%d/%s%d", adap->num, dnames[type], id);
 
-	dprintk("DVB: register adapter%d%s%d @ minor: %i (0x%02x)\n",
+	dprintk("DVB: register adapter%d/%s%d @ minor: %i (0x%02x)\n",
 		adap->num, dnames[type], id, nums2minor(adap->num, type, id),
 		nums2minor(adap->num, type, id));
 
@@ -233,7 +233,7 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 void dvb_unregister_device(struct dvb_device *dvbdev)
 {
 	if (dvbdev) {
-		devfs_remove("dvb/adapter%d%s%d", dvbdev->adapter->num,
+		devfs_remove("dvb/adapter%d/%s%d", dvbdev->adapter->num,
 				dnames[dvbdev->type], dvbdev->id);
 		list_del(&dvbdev->list_head);
 		kfree(dvbdev);
