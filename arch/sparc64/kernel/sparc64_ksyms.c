@@ -145,6 +145,8 @@ EXPORT_SYMBOL(cpu_data);
 /* CPU online map and active count.  */
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(sparc64_num_cpus_online);
+EXPORT_SYMBOL(phys_cpu_present_map);
+EXPORT_SYMBOL(sparc64_num_cpus_possible);
 
 /* Spinlock debugging library, optional. */
 #ifdef CONFIG_DEBUG_SPINLOCK
