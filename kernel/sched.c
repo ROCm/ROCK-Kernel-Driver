@@ -4048,21 +4048,6 @@ int __init migration_init(void)
 }
 #endif
 
-/*
- * The 'big kernel lock'
- *
- * This spinlock is taken and released recursively by lock_kernel()
- * and unlock_kernel().  It is transparently dropped and reaquired
- * over schedule().  It is used to protect legacy code that hasn't
- * been migrated to a proper locking design yet.
- *
- * Don't use in new code.
- *
- * Note: spinlock debugging needs this even on !CONFIG_SMP.
- */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-EXPORT_SYMBOL(kernel_flag);
-
 #ifdef CONFIG_SMP
 /*
  * Attach the domain 'sd' to 'cpu' as its base domain.  Callers must

@@ -32,13 +32,13 @@
 #define LOCK_SECTION_END                        \
         ".previous\n\t"
 
+#define __lockfunc fastcall __attribute__((section(".spinlock.text")))
+
 /*
  * If CONFIG_SMP is set, pull in the _raw_* definitions
  */
 #ifdef CONFIG_SMP
 #include <asm/spinlock.h>
-
-#define __lockfunc fastcall __attribute__((section(".spinlock.text")))
 
 int __lockfunc _spin_trylock(spinlock_t *lock);
 int __lockfunc _write_trylock(rwlock_t *lock);

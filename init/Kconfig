@@ -50,6 +50,11 @@ config BROKEN_ON_SMP
 	depends on BROKEN || !SMP
 	default y
 
+config LOCK_KERNEL
+	bool
+	depends on SMP || PREEMPT
+	default y
+
 endmenu
 
 menu "General setup"
