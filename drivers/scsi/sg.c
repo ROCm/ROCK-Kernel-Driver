@@ -233,6 +233,9 @@ static int sg_last_dev(void);
 #endif
 
 static Sg_device **sg_dev_arr = NULL;
+static int sg_dev_noticed;
+static int sg_dev_max;
+static int sg_nr_dev;
 
 #define SZ_SG_HEADER sizeof(struct sg_header)
 #define SZ_SG_IO_HDR sizeof(sg_io_hdr_t)
@@ -1338,7 +1341,7 @@ static struct file_operations sg_fops = {
 static int
 sg_detect(Scsi_Device * scsidp)
 {
-	sg_template.dev_noticed++;
+	sg_dev_noticed++;
 	return 1;
 }
 
@@ -1394,9 +1397,9 @@ sg_attach(Scsi_Device * scsidp)
 	if (!disk)
 		return 1;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
-	if (sg_template.nr_dev >= sg_template.dev_max) {	/* try to resize */
+	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
-		int tmp_dev_max = sg_template.nr_dev + SG_DEV_ARR_LUMP;
+		int tmp_dev_max = sg_nr_dev + SG_DEV_ARR_LUMP;
 
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		tmp_da = (Sg_device **)vmalloc(
@@ -1411,14 +1414,14 @@ sg_attach(Scsi_Device * scsidp)
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
 		memset(tmp_da, 0, tmp_dev_max * sizeof (Sg_device *));
 		memcpy(tmp_da, sg_dev_arr,
-		       sg_template.dev_max * sizeof (Sg_device *));
+		       sg_dev_max * sizeof (Sg_device *));
 		vfree((char *) sg_dev_arr);
 		sg_dev_arr = tmp_da;
-		sg_template.dev_max = tmp_dev_max;
+		sg_dev_max = tmp_dev_max;
 	}
 
 find_empty_slot:
-	for (k = 0; k < sg_template.dev_max; k++)
+	for (k = 0; k < sg_dev_max; k++)
 		if (!sg_dev_arr[k])
 			break;
 	if (k > SG_MAX_DEVS_MASK) {
@@ -1434,7 +1437,7 @@ find_empty_slot:
 		put_disk(disk);
 		return 1;
 	}
-	if (k < sg_template.dev_max) {
+	if (k < sg_dev_max) {
 		if (NULL == sdp) {
 			write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 			sdp = (Sg_device *)vmalloc(sizeof(Sg_device));
@@ -1476,7 +1479,7 @@ find_empty_slot:
 	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
 	sdp->sg_driverfs_dev.bus = &scsi_driverfs_bus_type;
 
-	sg_template.nr_dev++;
+	sg_nr_dev++;
 	sg_dev_arr[k] = sdp;
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 
@@ -1519,7 +1522,7 @@ sg_detach(Scsi_Device * scsidp)
 		return;
 	delay = 0;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
-	for (k = 0; k < sg_template.dev_max; k++) {
+	for (k = 0; k < sg_dev_max; k++) {
 		sdp = sg_dev_arr[k];
 		if ((NULL == sdp) || (sdp->device != scsidp))
 			continue;	/* dirty but lowers nesting */
@@ -1557,8 +1560,8 @@ sg_detach(Scsi_Device * scsidp)
 			sg_dev_arr[k] = NULL;
 		}
 		scsidp->attached--;
-		sg_template.nr_dev--;
-		sg_template.dev_noticed--;	/* from <dan@lectra.fr> */
+		sg_nr_dev--;
+		sg_dev_noticed--;	/* from <dan@lectra.fr> */
 		break;
 	}
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -1621,7 +1624,7 @@ exit_sg(void)
 		vfree((char *) sg_dev_arr);
 		sg_dev_arr = NULL;
 	}
-	sg_template.dev_max = 0;
+	sg_dev_max = 0;
 }
 
 static int
@@ -2513,7 +2516,7 @@ sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
 		if (sdp->detached && (NULL == sdp->headfp)) {
 			int k, maxd;
 
-			maxd = sg_template.dev_max;
+			maxd = sg_dev_max;
 			for (k = 0; k < maxd; ++k) {
 				if (sdp == sg_dev_arr[k])
 					break;
@@ -2645,7 +2648,7 @@ sg_last_dev()
 	unsigned long iflags;
 
 	read_lock_irqsave(&sg_dev_arr_lock, iflags);
-	for (k = sg_template.dev_max - 1; k >= 0; --k)
+	for (k = sg_dev_max - 1; k >= 0; --k)
 		if (sg_dev_arr[k] && sg_dev_arr[k]->device)
 			break;
 	read_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -2661,7 +2664,7 @@ sg_get_dev(int dev)
 
 	if (sg_dev_arr && (dev >= 0)) {
 		read_lock_irqsave(&sg_dev_arr_lock, iflags);
-		if (dev < sg_template.dev_max)
+		if (dev < sg_dev_max)
 			sdp = sg_dev_arr[dev];
 		read_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 	}
@@ -2943,7 +2946,7 @@ sg_proc_debug_info(char *buffer, int *len, off_t * begin,
 	}
 	max_dev = sg_last_dev();
 	PRINT_PROC("dev_max(currently)=%d max_active_device=%d (origin 1)\n",
-		   sg_template.dev_max, max_dev);
+		   sg_dev_max, max_dev);
 	PRINT_PROC(" def_reserved_size=%d\n", sg_big_buff);
 	for (j = 0; j < max_dev; ++j) {
 		if ((sdp = sg_get_dev(j))) {
