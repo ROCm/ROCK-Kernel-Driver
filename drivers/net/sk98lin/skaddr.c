@@ -79,7 +79,7 @@ extern "C" {
 
 /* 64-bit hash values with all bits set. */
 
-SK_U16	OnesHash[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+static const SK_U16	OnesHash[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 
 /* local variables ************************************************************/
 
