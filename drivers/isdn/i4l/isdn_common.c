@@ -36,6 +36,8 @@ MODULE_LICENSE("GPL");
 isdn_dev *dev;
 
 static int isdn_command(isdn_ctrl *cmd);
+static void isdn_register_devfs(int);
+static void isdn_unregister_devfs(int);
 
 /* ====================================================================== */
 
@@ -458,17 +460,17 @@ static char *drv_st_str[] = {
 enum {
 	EV_DRV_STAT_RUN,
 	EV_DRV_STAT_STOP,
+	EV_DRV_STAT_UNLOAD,
 	EV_DRV_STAT_STAVAIL,
 	EV_DRV_STAT_ADDCH,
-	EV_DRV_STAT_CHANNEL,
 };
 
 static char *drv_ev_str[] = {
 	"EV_DRV_STAT_RUN",
 	"EV_DRV_STAT_STOP",
+	"EV_DRV_STAT_UNLOAD",
 	"EV_DRV_STAT_STAVAIL",
 	"EV_DRV_STAT_ADDCH",
-	"EV_DRV_STAT_CHANNEL",
 };
 
 #define DRV_FLAG_REJBUS  1
@@ -621,6 +623,43 @@ drv_stat_stop(struct fsm_inst *fi, int pr, void *arg)
 }
 
 static int
+drv_stat_unload(struct fsm_inst *fi, int pr, void *arg)
+{
+	struct isdn_driver *drv = fi->userdata;
+	isdn_ctrl *ctrl = arg;
+	int di = ctrl->driver;
+	int i;
+
+	while (drv->locks > 0) {
+		isdn_ctrl cmd;
+		cmd.driver = di;
+		cmd.arg = 0;
+		cmd.command = ISDN_CMD_UNLOCK;
+		isdn_command(&cmd);
+		drv->locks--;
+	}
+//			isdn_tty_stat_callback(i, c); FIXME?
+	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
+		if (slots[i].di == di) {
+			slots[i].di = -1;
+			slots[i].ch = -1;
+			slots[i].usage &= ~ISDN_USAGE_DISABLED;
+			isdn_unregister_devfs(i);
+		}
+	dev->channels -= drv->channels;
+	kfree(drv->rcverr);
+	kfree(drv->rcvcount);
+	for (i = 0; i < drv->channels; i++)
+		skb_queue_purge(&drv->rpqueue[i]);
+	kfree(drv->rpqueue);
+	drivers[di] = NULL;
+	set_global_features();
+	isdn_info_update();
+	kfree(drv);
+	return 0;
+}
+
+static int
 drv_stat_addch(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_driver *drv = fi->userdata;
@@ -647,6 +686,7 @@ static struct fsm_node drv_fn_tbl[] = {
 	{ ST_DRV_LOADED,  EV_DRV_STAT_RUN,     drv_stat_run     },
 	{ ST_DRV_LOADED,  EV_DRV_STAT_STAVAIL, drv_stat_stavail },
 	{ ST_DRV_LOADED,  EV_DRV_STAT_ADDCH,   drv_stat_addch   },
+	{ ST_DRV_LOADED,  EV_DRV_STAT_UNLOAD,  drv_stat_unload  },
 
 	{ ST_DRV_RUNNING, EV_DRV_STAT_STOP,    drv_stat_stop    },
 	{ ST_DRV_RUNNING, EV_DRV_STAT_STAVAIL, drv_stat_stavail },
@@ -746,8 +786,6 @@ static isdn_divert_if *divert_if; /* = NULL */
 #define divert_if ((isdn_divert_if *) NULL)
 #endif
 
-static void isdn_register_devfs(int);
-static void isdn_unregister_devfs(int);
 static int isdn_wildmat(char *s, char *p);
 
 void
@@ -1097,7 +1135,6 @@ static int
 isdn_status_callback(isdn_ctrl * c)
 {
 	int di;
-	unsigned long flags;
 	int i;
 
 	di = c->driver;
@@ -1109,6 +1146,8 @@ isdn_status_callback(isdn_ctrl * c)
 			return fsm_event(&drivers[di]->fi, EV_DRV_STAT_RUN, c);
 		case ISDN_STAT_STOP:
 			return fsm_event(&drivers[di]->fi, EV_DRV_STAT_STOP, c);
+		case ISDN_STAT_UNLOAD:
+			return fsm_event(&drivers[di]->fi, EV_DRV_STAT_UNLOAD, c);
 		case ISDN_STAT_ADDCH:
 			return fsm_event(&drivers[di]->fi, EV_DRV_STAT_ADDCH, c);
 		case ISDN_STAT_ICALL:
@@ -1268,37 +1307,6 @@ isdn_status_callback(isdn_ctrl * c)
 			restore_flags(flags);
 			break;
 #endif
-		case ISDN_STAT_UNLOAD:
-			while (drivers[di]->locks > 0) {
-				isdn_ctrl cmd;
-				cmd.driver = di;
-				cmd.arg = 0;
-				cmd.command = ISDN_CMD_UNLOCK;
-				isdn_command(&cmd);
-				drivers[di]->locks--;
-			}
-			save_flags(flags);
-			cli();
-//			isdn_tty_stat_callback(i, c); FIXME?
-			for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-				if (slots[i].di == di) {
-					slots[i].di = -1;
-					slots[i].ch = -1;
-					slots[i].usage &= ~ISDN_USAGE_DISABLED;
-					isdn_unregister_devfs(i);
-				}
-			dev->channels -= drivers[di]->channels;
-			kfree(drivers[di]->rcverr);
-			kfree(drivers[di]->rcvcount);
-			for (i = 0; i < drivers[di]->channels; i++)
-				skb_queue_purge(&drivers[di]->rpqueue[i]);
-			kfree(drivers[di]->rpqueue);
-			kfree(drivers[di]);
-			drivers[di] = NULL;
-			isdn_info_update();
-			set_global_features();
-			restore_flags(flags);
-			return 0;
 		case ISDN_STAT_L1ERR:
 			break;
 		case CAPI_PUT_MESSAGE:
