@@ -151,6 +151,9 @@ cheetah_generic_boot:
 	blu,pt	%xcc, 1b
 	 add	%l0, (1 << 3), %l0
 
+	/* BUG() if we get here... */
+	ta	0x5
+
 cheetah_got_tlbentry:
 	ldxa	[%l0] ASI_ITLB_DATA_ACCESS, %g0
 	ldxa	[%l0] ASI_ITLB_DATA_ACCESS, %g1
@@ -332,6 +335,9 @@ spitfire_create_mappings:
 	cmp	%l0, (63 << 3)
 	blu,pt	%xcc, 1b
 	 add	%l0, (1 << 3), %l0
+
+	/* BUG() if we get here... */
+	ta	0x5
 
 spitfire_got_tlbentry:
 	/* Nops here again, perhaps Cheetah/Blackbird are better behaved... */
