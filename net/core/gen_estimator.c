@@ -132,6 +132,21 @@ static void est_timer(unsigned long arg)
 	read_unlock(&est_lock);
 }
 
+/**
+ * gen_new_estimator - create a new rate estimator
+ * @bstats: basic statistics
+ * @rate_est: rate estimator statistics
+ * @stats_lock: statistics lock
+ * @opt: rate estimator configuration TLV
+ *
+ * Creates a new rate estimator with &bstats as source and &rate_est
+ * as destination. A new timer with the interval specified in the
+ * configuration TLV is created. Upon each interval, the latest statistics
+ * will be read from &bstats and the estimated rate will be stored in
+ * &rate_est with the statistics lock grabed during this period.
+ * 
+ * Returns 0 on success or a negative error code.
+ */
 int gen_new_estimator(struct gnet_stats_basic *bstats,
 	struct gnet_stats_rate_est *rate_est, spinlock_t *stats_lock, struct rtattr *opt)
 {
@@ -173,6 +188,14 @@ int gen_new_estimator(struct gnet_stats_basic *bstats,
 	return 0;
 }
 
+/**
+ * gen_kill_estimator - remove a rate estimator
+ * @bstats: basic statistics
+ * @rate_est: rate estimator statistics
+ *
+ * Removes the rate estimator specified by &bstats and &rate_est
+ * and deletes the timer.
+ */
 void gen_kill_estimator(struct gnet_stats_basic *bstats,
 	struct gnet_stats_rate_est *rate_est)
 {
@@ -200,6 +223,18 @@ void gen_kill_estimator(struct gnet_stats_basic *bstats,
 	}
 }
 
+/**
+ * gen_replace_estimator - replace rate estimator configruation
+ * @bstats: basic statistics
+ * @rate_est: rate estimator statistics
+ * @stats_lock: statistics lock
+ * @opt: rate estimator configuration TLV
+ *
+ * Replaces the configuration of a rate estimator by calling
+ * gen_kill_estimator() and gen_new_estimator().
+ * 
+ * Returns 0 on success or a negative error code.
+ */
 int
 gen_replace_estimator(struct gnet_stats_basic *bstats,
 	struct gnet_stats_rate_est *rate_est, spinlock_t *stats_lock,
