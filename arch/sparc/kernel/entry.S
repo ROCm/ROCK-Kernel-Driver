@@ -353,18 +353,12 @@ maybe_smp4m_msg:
 	GET_PROCESSOR4M_ID(o3)
 	set	sun4m_interrupts, %l5
 	ld	[%l5], %o5
-	sethi	%hi(0x60000000), %o4
+	sethi	%hi(0x40000000), %o2
 	sll	%o3, 12, %o3
 	ld	[%o5 + %o3], %o1
-	andcc	%o1, %o4, %g0
+	andcc	%o1, %o2, %g0
 	be,a	smp4m_ticker
 	 cmp	%l7, 14
-	sethi	%hi(0x40000000), %o2
-	add	%o5, %o3, %o5
-	andcc	%o1, %o2, %g0
-	be,a	1f
-	 sethi	%hi(0x20000000), %o2
-1:
 	st	%o2, [%o5 + 0x4]
 	WRITE_PAUSE
 	ld	[%o5], %g0
@@ -374,15 +368,9 @@ maybe_smp4m_msg:
 	WRITE_PAUSE
 	wr	%l4, PSR_ET, %psr
 	WRITE_PAUSE
-	srl	%o2, (16+14), %o2
-	tst	%o2
-	bne	2f
-	 nop
 	call	smp_reschedule_irq
-	 add	%o7, 8, %o7
-2:
-	call	smp_stop_cpu_irq
 	 nop
+
 	RESTORE_ALL
 
 	.align	4
