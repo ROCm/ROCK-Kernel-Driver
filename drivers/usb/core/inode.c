@@ -162,6 +162,9 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_op = &usbfs_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
+
+			/* directory inodes start off with i_nlink == 2 (for "." entry) */
+			inode->i_nlink++;
 			break;
 		}
 	}
