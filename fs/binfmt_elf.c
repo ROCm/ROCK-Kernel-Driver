@@ -1204,7 +1204,7 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	prstatus->pr_ppid = p->parent->pid;
 	prstatus->pr_pgrp = process_group(p);
 	prstatus->pr_sid = p->signal->session;
-	if (p->pid == p->tgid) {
+	if (thread_group_leader(p)) {
 		/*
 		 * This is the record for the group leader.  Add in the
 		 * cumulative times of previous dead threads.  This total

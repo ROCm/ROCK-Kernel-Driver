@@ -618,7 +618,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 * Account for the thread group leader hanging around:
 	 */
 	count = 2;
-	if (current->pid == current->tgid)
+	if (thread_group_leader(current))
 		count = 1;
 	while (atomic_read(&sig->count) > count) {
 		sig->group_exit_task = current;
@@ -637,7 +637,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 * do is to wait for the thread group leader to become inactive,
 	 * and to assume its PID:
 	 */
-	if (current->pid != current->tgid) {
+	if (!thread_group_leader(current)) {
 		struct task_struct *leader = current->group_leader, *parent;
 		struct dentry *proc_dentry1, *proc_dentry2;
 		unsigned long exit_state, ptrace;
@@ -747,7 +747,7 @@ no_thread_group:
 
 	if (!thread_group_empty(current))
 		BUG();
-	if (current->tgid != current->pid)
+	if (!thread_group_leader(current))
 		BUG();
 	return 0;
 }
