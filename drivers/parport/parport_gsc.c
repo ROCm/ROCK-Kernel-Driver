@@ -190,17 +190,6 @@ void parport_gsc_restore_state(struct parport *p, struct parport_state *s)
 	parport_writeb (s->u.pc.ctr, CONTROL (p));
 }
 
-void parport_gsc_inc_use_count(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-void parport_gsc_dec_use_count(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
-
 struct parport_operations parport_gsc_ops = 
 {
 	.write_data	= parport_gsc_write_data,
@@ -222,9 +211,6 @@ struct parport_operations parport_gsc_ops =
 	.save_state	= parport_gsc_save_state,
 	.restore_state	= parport_gsc_restore_state,
 
-	.inc_use_count	= parport_gsc_inc_use_count,
-	.dec_use_count	= parport_gsc_dec_use_count,
-
 	.epp_write_data	= parport_ieee1284_epp_write_data,
 	.epp_read_data	= parport_ieee1284_epp_read_data,
 	.epp_write_addr	= parport_ieee1284_epp_write_addr,
@@ -237,6 +223,8 @@ struct parport_operations parport_gsc_ops =
 	.compat_write_data 	= parport_ieee1284_write_compat,
 	.nibble_read_data	= parport_ieee1284_read_nibble,
 	.byte_read_data		= parport_ieee1284_read_byte,
+
+	.owner		= THIS_MODULE,
 };
 
 /* --- Mode detection ------------------------------------- */

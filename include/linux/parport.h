@@ -166,9 +166,6 @@ struct parport_operations {
 	void (*save_state)(struct parport *, struct parport_state *);
 	void (*restore_state)(struct parport *, struct parport_state *);
 
-	void (*inc_use_count)(void);
-	void (*dec_use_count)(void);
-
 	/* Block read/write */
 	size_t (*epp_write_data) (struct parport *port, const void *buf,
 				  size_t len, int flags);
@@ -192,6 +189,7 @@ struct parport_operations {
 				    size_t len, int flags);
 	size_t (*byte_read_data) (struct parport *port, void *buf,
 				  size_t len, int flags);
+	struct module *owner;
 };
 
 struct parport_device_info {
@@ -540,9 +538,6 @@ extern int parport_device_proc_register(struct pardevice *device);
 extern int parport_device_proc_unregister(struct pardevice *device);
 extern int parport_default_proc_register(void);
 extern int parport_default_proc_unregister(void);
-
-extern void dec_parport_count(void);
-extern void inc_parport_count(void);
 
 /* If PC hardware is the only type supported, we can optimise a bit.  */
 #if (defined(CONFIG_PARPORT_PC) || defined(CONFIG_PARPORT_PC_MODULE)) && !(defined(CONFIG_PARPORT_ARC) || defined(CONFIG_PARPORT_ARC_MODULE)) && !(defined(CONFIG_PARPORT_AMIGA) || defined(CONFIG_PARPORT_AMIGA_MODULE)) && !(defined(CONFIG_PARPORT_MFC3) || defined(CONFIG_PARPORT_MFC3_MODULE)) && !(defined(CONFIG_PARPORT_ATARI) || defined(CONFIG_PARPORT_ATARI_MODULE)) && !(defined(CONFIG_USB_USS720) || defined(CONFIG_USB_USS720_MODULE)) && !(defined(CONFIG_PARPORT_SUNBPP) || defined(CONFIG_PARPORT_SUNBPP_MODULE)) && !defined(CONFIG_PARPORT_OTHER)

@@ -249,56 +249,41 @@ static void parport_sunbpp_restore_state(struct parport *p, struct parport_state
 	parport_sunbpp_write_control(p, s->u.pc.ctr);
 }
 
-static void parport_sunbpp_inc_use_count(void)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void parport_sunbpp_dec_use_count(void)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
 static struct parport_operations parport_sunbpp_ops = 
 {
-	parport_sunbpp_write_data,
-	parport_sunbpp_read_data,
+	.write_data	= parport_sunbpp_write_data,
+	.read_data	= parport_sunbpp_read_data,
 
-	parport_sunbpp_write_control,
-	parport_sunbpp_read_control,
-	parport_sunbpp_frob_control,
+	.write_control	= parport_sunbpp_write_control,
+	.read_control	= parport_sunbpp_read_control,
+	.frob_control	= parport_sunbpp_frob_control,
 
-	parport_sunbpp_read_status,
+	.read_status	= parport_sunbpp_read_status,
 
-	parport_sunbpp_enable_irq,
-        parport_sunbpp_disable_irq,
+	.enable_irq	= parport_sunbpp_enable_irq,
+	.disable_irq	= parport_sunbpp_disable_irq,
 
-        parport_sunbpp_data_forward,
-        parport_sunbpp_data_reverse,
+	.data_forward	= parport_sunbpp_data_forward,
+	.data_reverse	= parport_sunbpp_data_reverse,
 
-        parport_sunbpp_init_state,
-        parport_sunbpp_save_state,
-        parport_sunbpp_restore_state,
+	.init_state	= parport_sunbpp_init_state,
+	.save_state	= parport_sunbpp_save_state,
+	.restore_state	= parport_sunbpp_restore_state,
 
-        parport_sunbpp_inc_use_count,
-        parport_sunbpp_dec_use_count,
+	.epp_write_data	= parport_ieee1284_epp_write_data,
+	.epp_read_data	= parport_ieee1284_epp_read_data,
+	.epp_write_addr	= parport_ieee1284_epp_write_addr,
+	.epp_read_addr	= parport_ieee1284_epp_read_addr,
 
-        parport_ieee1284_epp_write_data,
-        parport_ieee1284_epp_read_data,
-        parport_ieee1284_epp_write_addr,
-        parport_ieee1284_epp_read_addr,
+	.ecp_write_data	= parport_ieee1284_ecp_write_data,
+	.ecp_read_data	= parport_ieee1284_ecp_read_data,
+	.ecp_write_addr	= parport_ieee1284_ecp_write_addr,
 
-        parport_ieee1284_ecp_write_data,
-        parport_ieee1284_ecp_read_data,
-        parport_ieee1284_ecp_write_addr,
+	.compat_write_data	= parport_ieee1284_write_compat,
+	.nibble_read_data	= parport_ieee1284_read_nibble,
+	.byte_read_data		= parport_ieee1284_read_byte,
 
-        parport_ieee1284_write_compat,
-        parport_ieee1284_read_nibble,
-        parport_ieee1284_read_byte,
+	.owner		= THIS_MODULE,
 };
 
 static int __init init_one_port(struct sbus_dev *sdev)
