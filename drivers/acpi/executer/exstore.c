@@ -125,7 +125,7 @@ acpi_ex_store (
 
 	default:
 
-		/* Destination is not an Reference */
+		/* Destination is not a Reference object */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Destination is not a Reference or Constant object [%p]\n", dest_desc));
@@ -189,35 +189,38 @@ acpi_ex_store (
 		switch (ACPI_GET_OBJECT_TYPE (source_desc)) {
 		case ACPI_TYPE_INTEGER:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%8.8X%8.8X\n",
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "0x%8.8X%8.8X\n",
 					ACPI_FORMAT_UINT64 (source_desc->integer.value)));
 			break;
 
 
 		case ACPI_TYPE_BUFFER:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Length %.2X\n",
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Length 0x%.2X",
 					(u32) source_desc->buffer.length));
+			ACPI_DUMP_BUFFER (source_desc->buffer.pointer,
+				(source_desc->buffer.length < 32) ? source_desc->buffer.length : 32);
 			break;
 
 
 		case ACPI_TYPE_STRING:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%s\n", source_desc->string.pointer));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Length 0x%.2X, \"%s\"\n",
+					source_desc->string.length, source_desc->string.pointer));
 			break;
 
 
 		case ACPI_TYPE_PACKAGE:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Elements Ptr - %p\n",
-					source_desc->package.elements));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Size 0x%.2X Elements Ptr - %p\n",
+					source_desc->package.count, source_desc->package.elements));
 			break;
 
 
 		default:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Type %s %p\n",
-					acpi_ut_get_object_type_name (source_desc), source_desc));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%p\n",
+					source_desc));
 			break;
 		}
 
@@ -227,7 +230,7 @@ acpi_ex_store (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference opcode %X\n",
+		ACPI_REPORT_ERROR (("ex_store: Unknown Reference opcode %X\n",
 			ref_desc->reference.opcode));
 		ACPI_DUMP_ENTRY (ref_desc, ACPI_LV_ERROR);
 
@@ -263,6 +266,7 @@ acpi_ex_store_object_to_index (
 	union acpi_operand_object       *obj_desc;
 	union acpi_operand_object       *new_desc;
 	u8                              value = 0;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ex_store_object_to_index");
@@ -283,6 +287,7 @@ acpi_ex_store_object_to_index (
 		/*
 		 * The object at *(index_desc->Reference.Where) is the
 		 * element within the package that is to be modified.
+		 * The parent package object is at index_desc->Reference.Object
 		 */
 		obj_desc = *(index_desc->reference.where);
 
@@ -307,6 +312,12 @@ acpi_ex_store_object_to_index (
 			/* If same as the original source, add a reference */
 
 			if (new_desc == source_desc) {
+				acpi_ut_add_reference (new_desc);
+			}
+
+			/* Increment reference count by the ref count of the parent package -1 */
+
+			for (i = 1; i < ((union acpi_operand_object *) index_desc->reference.object)->common.reference_count; i++) {
 				acpi_ut_add_reference (new_desc);
 			}
 		}
