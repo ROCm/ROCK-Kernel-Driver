@@ -58,6 +58,8 @@ static transaction_t * get_transaction (journal_t * journal, int is_try)
 	transaction->t_tid = journal->j_transaction_sequence++;
 	transaction->t_expires = jiffies + journal->j_commit_interval;
 	INIT_LIST_HEAD(&transaction->t_jcb);
+	spin_lock_init(&transaction->t_handle_lock);
+	spin_lock_init(&transaction->t_jcb_lock);
 
 	/* Set up the commit timer for the new transaction. */
 	J_ASSERT (!journal->j_commit_timer_active);

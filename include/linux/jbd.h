@@ -178,7 +178,7 @@ typedef struct journal_superblock_s
 	__u32	s_blocksize;		/* journal device blocksize */
 	__u32	s_maxlen;		/* total blocks in journal file */
 	__u32	s_first;		/* first block of log information */
-	
+
 /* 0x0018 */
 	/* Dynamic information describing the current state of the log */
 	__u32	s_sequence;		/* first commit ID expected in log */
@@ -198,9 +198,9 @@ typedef struct journal_superblock_s
 
 /* 0x0040 */
 	__u32	s_nr_users;		/* Nr of filesystems sharing log */
-	
+
 	__u32	s_dynsuper;		/* Blocknr of dynamic superblock copy*/
-	
+
 /* 0x0048 */
 	__u32	s_max_transaction;	/* Limit of journal blocks per trans.*/
 	__u32	s_max_trans_data;	/* Limit of data blocks per trans. */
@@ -286,7 +286,7 @@ void buffer_assertion_failure(struct buffer_head *bh);
 
 enum jbd_state_bits {
 	BH_JBD			/* Has an attached ext3 journal_head */
-	  = BH_PrivateStart,	
+	  = BH_PrivateStart,
 	BH_JWrite,		/* Being written to log (@@@ DEBUGGING) */
 	BH_Freed,		/* Has been freed (truncated) */
 	BH_Revoked,		/* Has been revoked from the log */
@@ -296,6 +296,7 @@ enum jbd_state_bits {
 };
 
 BUFFER_FNS(JBD, jbd)
+BUFFER_FNS(JWrite, jwrite)
 BUFFER_FNS(JBDDirty, jbddirty)
 TAS_BUFFER_FNS(JBDDirty, jbddirty)
 BUFFER_FNS(Freed, freed)
@@ -341,7 +342,7 @@ static inline void jbd_unlock_bh_state(struct buffer_head *bh)
  *   See journal_callback_set for more information.
  **/
 struct journal_callback {
-	struct list_head jcb_list;
+	struct list_head jcb_list;		/* t_jcb_lock */
 	void (*jcb_func)(struct journal_callback *jcb, int error);
 	/* user data goes here */
 };
@@ -349,7 +350,8 @@ struct journal_callback {
 struct jbd_revoke_table_s;
 
 /**
- * struct handle_s - The handle_s type is the concrete type associated with handle_t.
+ * struct handle_s - The handle_s type is the concrete type associated with
+ *     handle_t.
  * @h_transaction: Which compound transaction is this update a part of?
  * @h_buffer_credits: Number of remaining buffers we are allowed to dirty.
  * @h_ref: Reference count on this handle
@@ -367,7 +369,7 @@ struct jbd_revoke_table_s;
 struct handle_s 
 {
 	/* Which compound transaction is this update a part of? */
-	transaction_t	      * h_transaction;
+	transaction_t		*h_transaction;
 
 	/* Number of remaining buffers we are allowed to dirty: */
 	int			h_buffer_credits;
@@ -379,13 +381,14 @@ struct handle_s
 	/* operations */
 	int			h_err;
 
-	/* List of application registered callbacks for this handle.
-	 * The function(s) will be called after the transaction that
-	 * this handle is part of has been committed to disk.
+	/*
+	 * List of application registered callbacks for this handle. The
+	 * function(s) will be called after the transaction that this handle is
+	 * part of has been committed to disk. [t_jcb_lock]
 	 */
 	struct list_head	h_jcb;
 
-	/* Flags */
+	/* Flags [no locking] */
 	unsigned int	h_sync:		1;	/* sync-on-close */
 	unsigned int	h_jdata:	1;	/* force data journaling */
 	unsigned int	h_aborted:	1;	/* fatal error on handle */
@@ -408,15 +411,42 @@ struct handle_s
  * flushed to home for finished transactions.
  */
 
+/*
+ * Lock ranking:
+ *
+ *    j_list_lock
+ *      ->jbd_lock_bh_journal_head()	(This is "innermost")
+ *
+ *    j_state_lock
+ *    ->jbd_lock_bh_state()
+ *
+ *    jbd_lock_bh_state()
+ *    ->j_list_lock
+ *
+ *    j_state_lock
+ *    ->t_handle_lock
+ *
+ *    j_state_lock
+ *    ->j_list_lock			(journal_unmap_buffer)
+ *
+ *    t_handle_lock
+ *    ->t_jcb_lock
+ */
+
 struct transaction_s 
 {
-	/* Pointer to the journal for this transaction. */
-	journal_t *		t_journal;
-	
-	/* Sequence number for this transaction */
+	/* Pointer to the journal for this transaction. [no locking] */
+	journal_t		*t_journal;
+
+	/* Sequence number for this transaction [no locking] */
 	tid_t			t_tid;
-	
-	/* Transaction's current state */
+
+	/*
+	 * Transaction's current state
+	 * [no locking - only kjournald alters this]
+	 * FIXME: needs barriers
+	 * KLUDGE: [use j_state_lock]
+	 */
 	enum {
 		T_RUNNING,
 		T_LOCKED,
@@ -426,87 +456,115 @@ struct transaction_s
 		T_FINISHED 
 	}			t_state;
 
-	/* Where in the log does this transaction's commit start? */
+	/*
+	 * Where in the log does this transaction's commit start? [no locking]
+	 */
 	unsigned long		t_log_start;
-	
-	/* Doubly-linked circular list of all inodes owned by this
-           transaction */	/* AKPM: unused */
-	struct inode *		t_ilist;
-	
-	/* Number of buffers on the t_buffers list */
+
+	/* Number of buffers on the t_buffers list [j_list_lock] */
 	int			t_nr_buffers;
-	
-	/* Doubly-linked circular list of all buffers reserved but not
-           yet modified by this transaction */
-	struct journal_head *	t_reserved_list;
-	
-	/* Doubly-linked circular list of all metadata buffers owned by this
-           transaction */
-	struct journal_head *	t_buffers;
-	
+
+	/*
+	 * Doubly-linked circular list of all buffers reserved but not yet
+	 * modified by this transaction [j_list_lock]
+	 */
+	struct journal_head	*t_reserved_list;
+
+	/*
+	 * Doubly-linked circular list of all metadata buffers owned by this
+	 * transaction [j_list_lock]
+	 */
+	struct journal_head	*t_buffers;
+
 	/*
 	 * Doubly-linked circular list of all data buffers still to be
-	 * flushed before this transaction can be committed.
-	 * Protected by journal_datalist_lock.
+	 * flushed before this transaction can be committed [j_list_lock]
 	 */
-	struct journal_head *	t_sync_datalist;
-	
-	/* Doubly-linked circular list of all forget buffers (superseded
-           buffers which we can un-checkpoint once this transaction
-           commits) */
-	struct journal_head *	t_forget;
-	
+	struct journal_head	*t_sync_datalist;
+
 	/*
-	 * Doubly-linked circular list of all buffers still to be
-	 * flushed before this transaction can be checkpointed.
+	 * Doubly-linked circular list of all forget buffers (superseded
+	 * buffers which we can un-checkpoint once this transaction commits)
+	 * [j_list_lock]
 	 */
-	/* Protected by journal_datalist_lock */
-	struct journal_head *	t_checkpoint_list;
-	
-	/* Doubly-linked circular list of temporary buffers currently
-           undergoing IO in the log */
-	struct journal_head *	t_iobuf_list;
-	
-	/* Doubly-linked circular list of metadata buffers being
-           shadowed by log IO.  The IO buffers on the iobuf list and the
-           shadow buffers on this list match each other one for one at
-           all times. */
-	struct journal_head *	t_shadow_list;
-	
-	/* Doubly-linked circular list of control buffers being written
-           to the log. */
-	struct journal_head *	t_log_list;
-	
-	/* Number of outstanding updates running on this transaction */
+	struct journal_head	*t_forget;
+
+	/*
+	 * Doubly-linked circular list of all buffers still to be flushed before
+	 * this transaction can be checkpointed. [j_list_lock]
+	 */
+	struct journal_head	*t_checkpoint_list;
+
+	/*
+	 * Doubly-linked circular list of temporary buffers currently undergoing
+	 * IO in the log [j_list_lock]
+	 */
+	struct journal_head	*t_iobuf_list;
+
+	/*
+	 * Doubly-linked circular list of metadata buffers being shadowed by log
+	 * IO.  The IO buffers on the iobuf list and the shadow buffers on this
+	 * list match each other one for one at all times. [j_list_lock]
+	 */
+	struct journal_head	*t_shadow_list;
+
+	/*
+	 * Doubly-linked circular list of control buffers being written to the
+	 * log. [j_list_lock]
+	 */
+	struct journal_head	*t_log_list;
+
+	/*
+	 * Protects info related to handles
+	 */
+	spinlock_t		t_handle_lock;
+
+	/*
+	 * Number of outstanding updates running on this transaction
+	 * [t_handle_lock]
+	 */
 	int			t_updates;
 
-	/* Number of buffers reserved for use by all handles in this
-	 * transaction handle but not yet modified. */
-	int			t_outstanding_credits;
-	
 	/*
-	 * Forward and backward links for the circular list of all
-	 * transactions awaiting checkpoint.
+	 * Number of buffers reserved for use by all handles in this transaction
+	 * handle but not yet modified. [t_handle_lock]
 	 */
-	/* Protected by journal_datalist_lock */
+	int			t_outstanding_credits;
+
+	/*
+	 * Forward and backward links for the circular list of all transactions
+	 * awaiting checkpoint. [j_list_lock]
+	 */
 	transaction_t		*t_cpnext, *t_cpprev;
 
-	/* When will the transaction expire (become due for commit), in
-	 * jiffies ? */
+	/*
+	 * When will the transaction expire (become due for commit), in jiffies?
+	 * [no locking]
+	 */
 	unsigned long		t_expires;
 
-	/* How many handles used this transaction? */
+	/*
+	 * How many handles used this transaction? [t_handle_lock]
+	 */
 	int t_handle_count;
 
-	/* List of registered callback functions for this transaction.
-	 * Called when the transaction is committed. */
+	/*
+	 * Protects the callback list
+	 */
+	spinlock_t		t_jcb_lock;
+	/*
+	 * List of registered callback functions for this transaction.
+	 * Called when the transaction is committed. [t_jcb_lock]
+	 */
 	struct list_head	t_jcb;
 };
 
 /**
- * struct journal_s - The journal_s type is the concrete type associated with journal_t.
+ * struct journal_s - The journal_s type is the concrete type associated with
+ *     journal_t.
  * @j_flags:  General journaling state flags
- * @j_errno:  Is there an outstanding uncleared error on the journal (from a prior abort)? 
+ * @j_errno:  Is there an outstanding uncleared error on the journal (from a
+ *     prior abort)? 
  * @j_sb_buffer: First part of superblock buffer
  * @j_superblock: Second part of superblock buffer
  * @j_format_version: Version of the superblock format
@@ -514,8 +572,10 @@ struct transaction_s
  * @j_barrier: The barrier lock itself
  * @j_running_transaction: The current running transaction..
  * @j_committing_transaction: the transaction we are pushing to disk
- * @j_checkpoint_transactions: a linked circular list of all transactions waiting for checkpointing
- * @j_wait_transaction_locked: Wait queue for waiting for a locked transaction to start committing, or for a barrier lock to be released
+ * @j_checkpoint_transactions: a linked circular list of all transactions
+ *  waiting for checkpointing
+ * @j_wait_transaction_locked: Wait queue for waiting for a locked transaction
+ *  to start committing, or for a barrier lock to be released
  * @j_wait_logspace: Wait queue for waiting for checkpointing to complete
  * @j_wait_done_commit: Wait queue for waiting for commit to complete 
  * @j_wait_checkpoint:  Wait queue to trigger checkpointing
@@ -524,79 +584,106 @@ struct transaction_s
  * @j_checkpoint_sem: Semaphore for locking against concurrent checkpoints
  * @j_sem: The main journal lock, used by lock_journal() 
  * @j_head: Journal head - identifies the first unused block in the journal
- * @j_tail: Journal tail - identifies the oldest still-used block in the journal.
+ * @j_tail: Journal tail - identifies the oldest still-used block in the
+ *  journal.
  * @j_free: Journal free - how many free blocks are there in the journal?
  * @j_first: The block number of the first usable block 
  * @j_last: The block number one beyond the last usable block
  * @j_dev: Device where we store the journal
  * @j_blocksize: blocksize for the location where we store the journal.
- * @j_blk_offset: starting block offset for into the device where we store the journal
- * @j_fs_dev: Device which holds the client fs.  For internal journal this will be equal to j_dev
+ * @j_blk_offset: starting block offset for into the device where we store the
+ *     journal
+ * @j_fs_dev: Device which holds the client fs.  For internal journal this will
+ *     be equal to j_dev
  * @j_maxlen: Total maximum capacity of the journal region on disk.
- * @j_inode: Optional inode where we store the journal.  If present, all  journal block numbers are mapped into this inode via bmap().
+ * @j_inode: Optional inode where we store the journal.  If present, all journal
+ *     block numbers are mapped into this inode via bmap().
  * @j_tail_sequence:  Sequence number of the oldest transaction in the log 
  * @j_transaction_sequence: Sequence number of the next transaction to grant
- * @j_commit_sequence: Sequence number of the most recently committed transaction
- * @j_commit_request: Sequence number of the most recent transaction wanting commit 
+ * @j_commit_sequence: Sequence number of the most recently committed
+ *  transaction
+ * @j_commit_request: Sequence number of the most recent transaction wanting
+ *     commit 
  * @j_uuid: Uuid of client object.
  * @j_task: Pointer to the current commit thread for this journal
- * @j_max_transaction_buffers:  Maximum number of metadata buffers to allow in a single compound commit transaction
- * @j_commit_interval: What is the maximum transaction lifetime before we begin a commit?
+ * @j_max_transaction_buffers:  Maximum number of metadata buffers to allow in a
+ *     single compound commit transaction
+ * @j_commit_interval: What is the maximum transaction lifetime before we begin
+ *  a commit?
  * @j_commit_timer:  The timer used to wakeup the commit thread
  * @j_commit_timer_active: Timer flag
  * @j_all_journals:  Link all journals together - system-wide 
- * @j_revoke: The revoke table - maintains the list of revoked blocks in the current transaction.
- **/
+ * @j_revoke: The revoke table - maintains the list of revoked blocks in the
+ *     current transaction.
+ */
 
 struct journal_s
 {
-	/* General journaling state flags */
+	/* General journaling state flags [j_state_lock] */
 	unsigned long		j_flags;
 
-	/* Is there an outstanding uncleared error on the journal (from */
-	/* a prior abort)? */
+	/*
+	 * Is there an outstanding uncleared error on the journal (from a prior
+	 * abort)? [j_state_lock]
+	 */
 	int			j_errno;
-	
+
 	/* The superblock buffer */
-	struct buffer_head *	j_sb_buffer;
-	journal_superblock_t *	j_superblock;
+	struct buffer_head	*j_sb_buffer;
+	journal_superblock_t	*j_superblock;
 
 	/* Version of the superblock format */
 	int			j_format_version;
 
-	/* Number of processes waiting to create a barrier lock */
+	/*
+	 * Protect the various scalars in the journal
+	 */
+	spinlock_t		j_state_lock;
+
+	/*
+	 * Number of processes waiting to create a barrier lock [j_state_lock]
+	 */
 	int			j_barrier_count;
-	
+
 	/* The barrier lock itself */
 	struct semaphore	j_barrier;
-	
-	/* Transactions: The current running transaction... */
-	transaction_t *		j_running_transaction;
-	
-	/* ... the transaction we are pushing to disk ... */
-	transaction_t *		j_committing_transaction;
-	
-	/* ... and a linked circular list of all transactions waiting */
-	/* for checkpointing. */
-	/* Protected by journal_datalist_lock */
-	transaction_t *		j_checkpoint_transactions;
 
-	/* Wait queue for waiting for a locked transaction to start */
-        /*  committing, or for a barrier lock to be released */
+	/*
+	 * Transactions: The current running transaction...
+	 * [j_state_lock] [caller holding open handle]
+	 */
+	transaction_t		*j_running_transaction;
+
+	/*
+	 * the transaction we are pushing to disk
+	 * [j_state_lock] [caller holding open handle]
+	 */
+	transaction_t		*j_committing_transaction;
+
+	/*
+	 * ... and a linked circular list of all transactions waiting for
+	 * checkpointing. [j_list_lock]
+	 */
+	transaction_t		*j_checkpoint_transactions;
+
+	/*
+	 * Wait queue for waiting for a locked transaction to start committing,
+	 * or for a barrier lock to be released
+	 */
 	wait_queue_head_t	j_wait_transaction_locked;
-	
+
 	/* Wait queue for waiting for checkpointing to complete */
 	wait_queue_head_t	j_wait_logspace;
-	
+
 	/* Wait queue for waiting for commit to complete */
 	wait_queue_head_t	j_wait_done_commit;
-	
+
 	/* Wait queue to trigger checkpointing */
 	wait_queue_head_t	j_wait_checkpoint;
-	
+
 	/* Wait queue to trigger commit */
 	wait_queue_head_t	j_wait_commit;
-	
+
 	/* Wait queue to wait for updates to complete */
 	wait_queue_head_t	j_wait_updates;
 
@@ -605,80 +692,121 @@ struct journal_s
 
 	/* The main journal lock, used by lock_journal() */
 	struct semaphore	j_sem;
-		
-	/* Journal head: identifies the first unused block in the journal. */
+
+	/*
+	 * Journal head: identifies the first unused block in the journal.
+	 * [j_state_lock]
+	 */
 	unsigned long		j_head;
-	
-	/* Journal tail: identifies the oldest still-used block in the */
-	/* journal. */
+
+	/*
+	 * Journal tail: identifies the oldest still-used block in the journal.
+	 * [j_state_lock]
+	 */
 	unsigned long		j_tail;
 
-	/* Journal free: how many free blocks are there in the journal? */
+	/*
+	 * Journal free: how many free blocks are there in the journal?
+	 * [j_state_lock]
+	 */
 	unsigned long		j_free;
 
-	/* Journal start and end: the block numbers of the first usable */
-	/* block and one beyond the last usable block in the journal.   */
-	unsigned long		j_first, j_last;
+	/*
+	 * Journal start and end: the block numbers of the first usable block
+	 * and one beyond the last usable block in the journal. [j_state_lock]
+	 */
+	unsigned long		j_first;
+	unsigned long		j_last;
 
-	/* Device, blocksize and starting block offset for the location */
-	/* where we store the journal. */
-	struct block_device *	j_dev;
+	/*
+	 * Device, blocksize and starting block offset for the location where we
+	 * store the journal.
+	 */
+	struct block_device	*j_dev;
 	int			j_blocksize;
 	unsigned int		j_blk_offset;
 
-	/* Device which holds the client fs.  For internal journal this */
-	/* will be equal to j_dev. */
-	struct block_device *	j_fs_dev;
+	/*
+	 * Device which holds the client fs.  For internal journal this will be
+	 * equal to j_dev.
+	 */
+	struct block_device	*j_fs_dev;
 
 	/* Total maximum capacity of the journal region on disk. */
 	unsigned int		j_maxlen;
 
+	/*
+	 * Protects the buffer lists and internal buffer state.
+	 */
+	spinlock_t		j_list_lock;
+
 	/* Optional inode where we store the journal.  If present, all */
 	/* journal block numbers are mapped into this inode via */
 	/* bmap(). */
-	struct inode *		j_inode;
+	struct inode		*j_inode;
 
-	/* Sequence number of the oldest transaction in the log */
+	/*
+	 * Sequence number of the oldest transaction in the log [j_state_lock]
+	 */
 	tid_t			j_tail_sequence;
-	/* Sequence number of the next transaction to grant */
+
+	/*
+	 * Sequence number of the next transaction to grant [j_state_lock]
+	 */
 	tid_t			j_transaction_sequence;
-	/* Sequence number of the most recently committed transaction */
+
+	/*
+	 * Sequence number of the most recently committed transaction
+	 * [j_state_lock].
+	 */
 	tid_t			j_commit_sequence;
-	/* Sequence number of the most recent transaction wanting commit */
+
+	/*
+	 * Sequence number of the most recent transaction wanting commit
+	 * [j_state_lock]
+	 */
 	tid_t			j_commit_request;
 
-	/* Journal uuid: identifies the object (filesystem, LVM volume   */
-	/* etc) backed by this journal.  This will eventually be         */
-	/* replaced by an array of uuids, allowing us to index multiple  */
-	/* devices within a single journal and to perform atomic updates */
-	/* across them.  */
-
+	/*
+	 * Journal uuid: identifies the object (filesystem, LVM volume etc)
+	 * backed by this journal.  This will eventually be replaced by an array
+	 * of uuids, allowing us to index multiple devices within a single
+	 * journal and to perform atomic updates across them.
+	 */
 	__u8			j_uuid[16];
 
 	/* Pointer to the current commit thread for this journal */
-	struct task_struct *	j_task;
+	struct task_struct	*j_task;
 
-	/* Maximum number of metadata buffers to allow in a single */
-	/* compound commit transaction */
+	/*
+	 * Maximum number of metadata buffers to allow in a single compound
+	 * commit transaction
+	 */
 	int			j_max_transaction_buffers;
 
-	/* What is the maximum transaction lifetime before we begin a */
-	/* commit? */
+	/*
+	 * What is the maximum transaction lifetime before we begin a commit?
+	 */
 	unsigned long		j_commit_interval;
 
 	/* The timer used to wakeup the commit thread: */
-	struct timer_list *	j_commit_timer;
-	int			j_commit_timer_active;
+	struct timer_list	*j_commit_timer;
+	int			j_commit_timer_active;	/* [j_state_lock] */
 
-	/* Link all journals together - system-wide */
+	/* Link all journals together - system-wide [lock_kernel] */
 	struct list_head	j_all_journals;
 
-	/* The revoke table: maintains the list of revoked blocks in the */
-        /*  current transaction. */
+	/*
+	 * The revoke table: maintains the list of revoked blocks in the
+	 * current transaction.  [j_revoke_lock]
+	 */
+	spinlock_t		j_revoke_lock;
 	struct jbd_revoke_table_s *j_revoke;
 
-	/* An opaque pointer to fs-private information.  ext3 puts its
-	 * superblock pointer here */
+	/*
+	 * An opaque pointer to fs-private information.  ext3 puts its
+	 * superblock pointer here
+	 */
 	void *j_private;
 };
 

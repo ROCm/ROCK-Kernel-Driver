@@ -576,7 +576,6 @@ void __journal_drop_transaction(journal_t *journal, transaction_t *transaction)
 			journal->j_checkpoint_transactions = NULL;
 	}
 
-	J_ASSERT (transaction->t_ilist == NULL);
 	J_ASSERT (transaction->t_buffers == NULL);
 	J_ASSERT (transaction->t_sync_datalist == NULL);
 	J_ASSERT (transaction->t_forget == NULL);

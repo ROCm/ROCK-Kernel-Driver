@@ -707,6 +707,9 @@ static journal_t * journal_init_common (void)
 	init_MUTEX(&journal->j_barrier);
 	init_MUTEX(&journal->j_checkpoint_sem);
 	init_MUTEX(&journal->j_sem);
+	spin_lock_init(&journal->j_revoke_lock);
+	spin_lock_init(&journal->j_list_lock);
+	spin_lock_init(&journal->j_state_lock);
 
 	journal->j_commit_interval = (HZ * 5);
 
