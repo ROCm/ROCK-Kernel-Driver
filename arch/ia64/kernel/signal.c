@@ -315,7 +315,7 @@ ia64_rt_sigreturn (struct sigscratch *scr)
 static long
 setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 {
-	unsigned long flags = 0, ifs, nat;
+	unsigned long flags = 0, ifs, cfm, nat;
 	long err;
 
 	ifs = scr->pt.cr_ifs;
@@ -325,7 +325,9 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	if ((ifs & (1UL << 63)) == 0) {
 		/* if cr_ifs isn't valid, we got here through a syscall */
 		flags |= IA64_SC_FLAG_IN_SYSCALL;
-	}
+		cfm = scr->ar_pfs & ((1UL << 38) - 1);
+	} else
+		cfm = ifs & ((1UL << 38) - 1);
 	ia64_flush_fph(current);
 	if ((current->thread.flags & IA64_THREAD_FPH_VALID)) {
 		flags |= IA64_SC_FLAG_FPH_VALID;
@@ -344,6 +346,7 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 
 	err |= __put_user(nat, &sc->sc_nat);
 	err |= PUT_SIGSET(mask, &sc->sc_mask);
+	err |= __put_user(cfm, &sc->sc_cfm);
 	err |= __put_user(scr->pt.cr_ipsr & IA64_PSR_UM, &sc->sc_um);
 	err |= __put_user(scr->pt.ar_rsc, &sc->sc_ar_rsc);
 	err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
@@ -422,6 +425,15 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	scr->pt.ar_fpsr = FPSR_DEFAULT;			/* reset fpsr for signal handler */
 	scr->pt.cr_iip = tramp_addr;
 	ia64_psr(&scr->pt)->ri = 0;			/* start executing in first slot */
+	/*
+	 * Force the interruption function mask to zero.  This has no effect when a
+	 * system-call got interrupted by a signal (since, in that case, scr->pt_cr_ifs is
+	 * ignored), but it has the desirable effect of making it possible to deliver a
+	 * signal with an incomplete register frame (which happens when a mandatory RSE
+	 * load faults).  Furthermore, it has no negative effect on the getting the user's
+	 * dirty partition preserved, because that's governed by scr->pt.loadrs.
+	 */
+	scr->pt.cr_ifs = (1UL << 63);
 
 	/*
 	 * Note: this affects only the NaT bits of the scratch regs (the ones saved in

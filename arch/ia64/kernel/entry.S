@@ -904,13 +904,14 @@ ENTRY(notify_resume_user)
 	mov r9=ar.unat
 	mov loc0=rp				// save return address
 	mov out0=0				// there is no "oldset"
-	adds out1=0,sp				// out1=&sigscratch
+	adds out1=8,sp				// out1=&sigscratch->ar_pfs
 (pSys)	mov out2=1				// out2==1 => we're in a syscall
 	;;
 (pNonSys) mov out2=0				// out2==0 => not a syscall
 	.fframe 16
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
+	st8 [out1]=loc1,-8			// save ar.pfs, out1=&sigscratch
 	.body
 	br.call.sptk.many rp=do_notify_resume_user
 .ret15:	.restore sp
@@ -931,11 +932,12 @@ GLOBAL_ENTRY(sys_rt_sigsuspend)
 	mov loc0=rp				// save return address
 	mov out0=in0				// mask
 	mov out1=in1				// sigsetsize
-	adds out2=0,sp				// out2=&sigscratch
+	adds out2=8,sp				// out2=&sigscratch->ar_pfs
 	;;
 	.fframe 16
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
+	st8 [out2]=loc1,-8			// save ar.pfs, out2=&sigscratch
 	.body
 	br.call.sptk.many rp=ia64_rt_sigsuspend
 .ret17:	.restore sp
