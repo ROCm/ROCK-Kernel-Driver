@@ -28,10 +28,23 @@
 
 #include "ixgb.h"
 
+/* Change Log
+ * 1.0.84 10/26/04
+ * - reset buffer_info->dma in Tx resource cleanup logic
+ * 1.0.83 10/12/04
+ * - sparse cleanup - shemminger@osdl.org
+ * - fix tx resource cleanup logic
+ */
+
 char ixgb_driver_name[] = "ixgb";
 char ixgb_driver_string[] = "Intel(R) PRO/10GbE Network Driver";
-char ixgb_driver_version[] = "1.0.66-k2";
-char ixgb_copyright[] = "Copyright (c) 2001-2004 Intel Corporation.";
+#ifndef CONFIG_IXGB_NAPI
+#define DRIVERNAPI
+#else
+#define DRIVERNAPI "-NAPI"
+#endif
+char ixgb_driver_version[] = "1.0.87-k2"DRIVERNAPI;
+char ixgb_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* ixgb_pci_tbl - PCI Device ID Table
  *
