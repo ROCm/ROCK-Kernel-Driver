@@ -951,7 +951,6 @@ xlog_find_tail(xlog_t		*log,
 		}
 	}
 
-#ifdef __KERNEL__
 	/*
 	 * Make sure that there are no blocks in front of the head
 	 * with the same cycle number as the head.  This can happen
@@ -971,11 +970,9 @@ xlog_find_tail(xlog_t		*log,
 	 * But... if the -device- itself is readonly, just skip this.
 	 * We can't recover this device anyway, so it won't matter.
 	 */
-
 	if (!xfs_readonly_buftarg(log->l_mp->m_logdev_targp)) {
 		error = xlog_clear_stale_blocks(log, tail_lsn);
 	}
-#endif
 
 bread_err:
 exit:
@@ -3285,36 +3282,44 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 }	/* xlog_recover_process_iunlinks */
 
 
-/*
- * Stamp cycle number in every block
- *
- * This routine is also called in xfs_log.c
- */
-/*ARGSUSED*/
-void
-xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
-{
-	int	i, j, k;
-	int	size = iclog->ic_offset + iclog->ic_roundoff;
-	xfs_caddr_t dp;
-	union ich {
-		xlog_rec_ext_header_t	hic_xheader;
-		char			hic_sector[XLOG_HEADER_SIZE];
-	} *xhdr;
-	uint	cycle_lsn;
-
 #ifdef DEBUG
-	uint	*up;
-	uint	chksum = 0;
+STATIC void
+xlog_pack_data_checksum(
+	xlog_t		*log,
+	xlog_in_core_t	*iclog,
+	int		size)
+{
+	int		i;
+	uint		*up;
+	uint		chksum = 0;
 
 	up = (uint *)iclog->ic_datap;
 	/* divide length by 4 to get # words */
-	for (i=0; i<size >> 2; i++) {
+	for (i = 0; i < (size >> 2); i++) {
 		chksum ^= INT_GET(*up, ARCH_CONVERT);
 		up++;
 	}
 	INT_SET(iclog->ic_header.h_chksum, ARCH_CONVERT, chksum);
-#endif /* DEBUG */
+}
+#else
+#define xlog_pack_data_checksum(log, iclog, size)
+#endif
+
+/*
+ * Stamp cycle number in every block
+ */
+void
+xlog_pack_data(
+	xlog_t			*log,
+	xlog_in_core_t		*iclog)
+{
+	int			i, j, k;
+	int			size = iclog->ic_offset + iclog->ic_roundoff;
+	uint			cycle_lsn;
+	xfs_caddr_t		dp;
+	xlog_in_core_2_t	*xhdr;
+
+	xlog_pack_data_checksum(log, iclog, size);
 
 	cycle_lsn = CYCLE_LSN_NOCONV(iclog->ic_header.h_lsn, ARCH_CONVERT);
 
@@ -3327,7 +3332,7 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 	}
 
 	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
-		xhdr = (union ich*)&iclog->ic_header;
+		xhdr = (xlog_in_core_2_t *)&iclog->ic_header;
 		for ( ; i < BTOBB(size); i++) {
 			j = i / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 			k = i % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
@@ -3340,45 +3345,18 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 			xhdr[i].hic_xheader.xh_cycle = cycle_lsn;
 		}
 	}
+}
 
-}	/* xlog_pack_data */
-
-
-/*ARGSUSED*/
+#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 STATIC void
-xlog_unpack_data(xlog_rec_header_t *rhead,
-		 xfs_caddr_t	   dp,
-		 xlog_t		   *log)
+xlog_unpack_data_checksum(
+	xlog_rec_header_t	*rhead,
+	xfs_caddr_t		dp,
+	xlog_t			*log)
 {
-	int i, j, k;
-	union ich {
-		xlog_rec_header_t	hic_header;
-		xlog_rec_ext_header_t	hic_xheader;
-		char			hic_sector[XLOG_HEADER_SIZE];
-	} *xhdr;
+	uint			*up = (uint *)dp;
+	uint			chksum = 0;
 
-#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
-	uint *up = (uint *)dp;
-	uint chksum = 0;
-#endif
-
-	for (i=0; i < BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT)) &&
-		  i < (XLOG_HEADER_CYCLE_SIZE / BBSIZE); i++) {
-		*(uint *)dp = *(uint *)&rhead->h_cycle_data[i];
-		dp += BBSIZE;
-	}
-
-	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
-		xhdr = (union ich*)rhead;
-		for ( ; i < BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT)); i++) {
-			j = i / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
-			k = i % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
-			*(uint *)dp = xhdr[j].hic_xheader.xh_cycle_data[k];
-			dp += BBSIZE;
-		}
-	}
-
-#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	/* divide length by 4 to get # words */
 	for (i=0; i < INT_GET(rhead->h_len, ARCH_CONVERT) >> 2; i++) {
 		chksum ^= INT_GET(*up, ARCH_CONVERT);
@@ -3399,9 +3377,38 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 		    log->l_flags |= XLOG_CHKSUM_MISMATCH;
 	    }
 	}
-#endif /* DEBUG && XFS_LOUD_RECOVERY */
-}	/* xlog_unpack_data */
+}
+#else
+#define xlog_unpack_data_checksum(rhead, dp, log)
+#endif
 
+STATIC void
+xlog_unpack_data(
+	xlog_rec_header_t	*rhead,
+	xfs_caddr_t		dp,
+	xlog_t			*log)
+{
+	int			i, j, k;
+	xlog_in_core_2_t	*xhdr;
+
+	for (i = 0; i < BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT)) &&
+		  i < (XLOG_HEADER_CYCLE_SIZE / BBSIZE); i++) {
+		*(uint *)dp = *(uint *)&rhead->h_cycle_data[i];
+		dp += BBSIZE;
+	}
+
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
+		xhdr = (xlog_in_core_2_t *)rhead;
+		for ( ; i < BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT)); i++) {
+			j = i / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
+			k = i % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
+			*(uint *)dp = xhdr[j].hic_xheader.xh_cycle_data[k];
+			dp += BBSIZE;
+		}
+	}
+
+	xlog_unpack_data_checksum(rhead, dp, log);
+}
 
 /*
  * Read the log from tail to head and process the log records found.
@@ -3807,11 +3814,6 @@ xlog_recover(xlog_t *log, int readonly)
 		return error;
 
 	if (tail_blk != head_blk) {
-#ifndef __KERNEL__
-		extern xfs_daddr_t HEAD_BLK, TAIL_BLK;
-		head_blk = HEAD_BLK;
-		tail_blk = TAIL_BLK;
-#endif
 		/* There used to be a comment here:
 		 *
 		 * disallow recovery on read-only mounts.  note -- mount
@@ -3823,30 +3825,16 @@ xlog_recover(xlog_t *log, int readonly)
 		 * under the vfs layer, so we can get away with it unless
 		 * the device itself is read-only, in which case we fail.
 		 */
-#ifdef __KERNEL__
 		if ((error = xfs_dev_is_read_only(log->l_mp,
 						"recovery required"))) {
 			return error;
 		}
-#else
-		if (readonly) {
-			return ENOSPC;
-		}
-#endif
 
-#ifdef __KERNEL__
-#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, MAJOR(log->l_dev),
 			MINOR(log->l_dev));
-#else
-		cmn_err(CE_NOTE,
-			"!Starting XFS recovery on filesystem: %s (dev: %d/%d)",
-			log->l_mp->m_fsname, MAJOR(log->l_dev),
-			MINOR(log->l_dev));
-#endif
-#endif
+
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
 	}
@@ -3886,23 +3874,16 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 			      (XFS_LOG_FORCE | XFS_LOG_SYNC));
 
 		if ( (mfsi_flags & XFS_MFSI_NOUNLINK) == 0 ) {
-
 			xlog_recover_process_iunlinks(log);
 		}
 
 		xlog_recover_check_summary(log);
 
-#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Ending XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, MAJOR(log->l_dev),
 			MINOR(log->l_dev));
-#else
-		cmn_err(CE_NOTE,
-			"!Ending XFS recovery on filesystem: %s (dev: %d/%d)",
-			log->l_mp->m_fsname, MAJOR(log->l_dev),
-			MINOR(log->l_dev));
-#endif
+
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
 		cmn_err(CE_DEBUG,

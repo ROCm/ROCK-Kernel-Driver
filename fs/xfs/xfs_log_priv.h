@@ -406,6 +406,7 @@ typedef struct xlog_rec_ext_header {
 	uint	  xh_cycle;	/* write cycle of log			: 4 */
 	uint	  xh_cycle_data[XLOG_HEADER_CYCLE_SIZE / BBSIZE]; /*	: 256 */
 } xlog_rec_ext_header_t;
+
 #ifdef __KERNEL__
 /*
  * - A log record header is 512 bytes.  There is plenty of room to grow the
@@ -444,12 +445,10 @@ typedef struct xlog_iclog_fields {
 	char			*ic_datap;	/* pointer to iclog data */
 } xlog_iclog_fields_t;
 
-typedef struct xlog_in_core2 {
-	union {
-		xlog_rec_header_t hic_header;
-		xlog_rec_ext_header_t hic_xheader;
-		char		  hic_sector[XLOG_HEADER_SIZE];
-	} ic_h;
+typedef union xlog_in_core2 {
+	xlog_rec_header_t	hic_header;
+	xlog_rec_ext_header_t	hic_xheader;
+	char			hic_sector[XLOG_HEADER_SIZE];
 } xlog_in_core_2_t;
 
 typedef struct xlog_in_core {
@@ -476,7 +475,7 @@ typedef struct xlog_in_core {
 #define	ic_bwritecnt	hic_fields.ic_bwritecnt
 #define	ic_state	hic_fields.ic_state
 #define ic_datap	hic_fields.ic_datap
-#define ic_header	hic_data->ic_h.hic_header
+#define ic_header	hic_data->hic_header
 
 /*
  * The reservation head lsn is not made up of a cycle number and block number.
