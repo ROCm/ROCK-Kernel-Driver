@@ -15,7 +15,7 @@
 #include <linux/stat.h>
 #include <linux/limits.h>
 
-extern struct driver_file_entry * device_default_files[];
+extern struct device_attribute * device_default_files[];
 
 /**
  * device_create_file - create a driverfs file for a device
@@ -24,7 +24,7 @@ extern struct driver_file_entry * device_default_files[];
  *
  * Allocate space for file entry, copy descriptor, and create.
  */
-int device_create_file(struct device * dev, struct driver_file_entry * entry)
+int device_create_file(struct device * dev, struct device_attribute * entry)
 {
 	int error = -EINVAL;
 
@@ -148,7 +148,7 @@ int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * p
 int device_make_dir(struct device * dev)
 {
 	struct driver_dir_entry * parent = NULL;
-	struct driver_file_entry * entry;
+	struct device_attribute * entry;
 	int error;
 	int i;
 

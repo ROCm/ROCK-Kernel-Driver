@@ -266,7 +266,7 @@ static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
  *
  * Userspace wants data from a file. It is up to the creator of the file to
  * provide that data.
- * There is a struct driver_file_entry embedded in file->private_data. We
+ * There is a struct device_attribute embedded in file->private_data. We
  * obtain that and check if the read callback is implemented. If so, we call
  * it, passing the data field of the file entry.
  * Said callback is responsible for filling the buffer and returning the number
@@ -275,14 +275,14 @@ static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
 static ssize_t
 driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	struct driver_file_entry * entry;
+	struct device_attribute * entry;
 	struct driver_dir_entry * dir;
 	unsigned char *page;
 	ssize_t retval = 0;
 	struct device * dev;
 
 	dir = file->f_dentry->d_parent->d_fsdata;
-	entry = (struct driver_file_entry *)file->f_dentry->d_fsdata;
+	entry = (struct device_attribute *)file->f_dentry->d_fsdata;
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
@@ -341,7 +341,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 static ssize_t
 driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	struct driver_file_entry * entry;
+	struct device_attribute * entry;
 	struct driver_dir_entry * dir;
 	struct device * dev;
 	ssize_t retval = 0;
@@ -349,7 +349,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 
 	dir = file->f_dentry->d_parent->d_fsdata;
 
-	entry = (struct driver_file_entry *)file->f_dentry->d_fsdata;
+	entry = (struct device_attribute *)file->f_dentry->d_fsdata;
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
@@ -618,7 +618,7 @@ driverfs_create_dir(struct driver_dir_entry * entry,
  * @parent:	directory to create it in
  */
 int
-driverfs_create_file(struct driver_file_entry * entry,
+driverfs_create_file(struct device_attribute * entry,
 		     struct driver_dir_entry * parent)
 {
 	struct dentry * dentry;

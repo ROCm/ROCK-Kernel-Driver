@@ -34,7 +34,7 @@ struct driver_dir_entry {
 
 struct device;
 
-struct driver_file_entry {
+struct device_attribute {
 	char			* name;
 	mode_t			mode;
 
@@ -49,7 +49,7 @@ extern void
 driverfs_remove_dir(struct driver_dir_entry * entry);
 
 extern int
-driverfs_create_file(struct driver_file_entry * entry,
+driverfs_create_file(struct device_attribute * entry,
 		     struct driver_dir_entry * parent);
 
 extern int 

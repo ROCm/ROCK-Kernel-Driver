@@ -14,7 +14,7 @@ static ssize_t device_read_name(struct device * dev, char * buf, size_t count, l
 	return off ? 0 : sprintf(buf,"%s\n",dev->name);
 }
 
-static struct driver_file_entry device_name_entry = {
+static struct device_attribute device_name_entry = {
 	name:	"name",
 	mode:	S_IRUGO,
 	show:	device_read_name,
@@ -89,14 +89,14 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 	return error < 0 ? error : count;
 }
 
-static struct driver_file_entry device_power_entry = {
+static struct device_attribute device_power_entry = {
 	name:		"power",
 	mode:		S_IWUSR | S_IRUGO,
 	show:		device_read_power,
 	store:		device_write_power,
 };
 
-struct driver_file_entry * device_default_files[] = {
+struct device_attribute * device_default_files[] = {
 	&device_name_entry,
 	&device_power_entry,
 	NULL,
