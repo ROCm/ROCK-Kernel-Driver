@@ -624,8 +624,10 @@ ifneq ($(KBUILD_SRC),)
 endif
 
 prepare0: prepare1 include/linux/version.h include/asm include/config/MARKER
+ifneq ($(KBUILD_MODULES),)
 	$(Q)rm -rf $(MODVERDIR)
-	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
+	$(Q)mkdir -p $(MODVERDIR)
+endif
 
 # All the preparing..
 prepare-all: prepare0 prepare
