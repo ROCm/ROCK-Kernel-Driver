@@ -21,7 +21,6 @@ static int __init pci_acpi_init(void)
 	if (!acpi_noirq) {
 		if (!acpi_pci_irq_init()) {
 			printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
-			printk(KERN_INFO "PCI: if you experience problems, try using option 'pci=noacpi' or even 'acpi=off'\n");
 			pcibios_scanned++;
 			pcibios_enable_irq = acpi_pci_irq_enable;
 		} else
