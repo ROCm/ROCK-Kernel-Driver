@@ -80,6 +80,8 @@ static struct pci_device_id piix_pci_tbl[] = {
 	 * and enhanced mode, with queueing and other fancy stuff.
 	 * This is distinguished by PCI class code.
 	 */
+	{ 0x8086, 0x2651, PCI_ANY_ID, PCI_ANY_ID,
+	  PCI_CLASS_STORAGE_IDE << 8, 0xffff00, ich5_sata },
 	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID,
 	  PCI_CLASS_STORAGE_IDE << 8, 0xffff00, ich5_sata },
 

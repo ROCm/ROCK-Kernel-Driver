@@ -75,7 +75,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 #ifdef CONFIG_SMP
 #define SWITCH_ENTER(prv) \
 	do {			\
-	if (test_tsk_thread_flag(prv, TIF_USEDFPU) { \
+	if (test_tsk_thread_flag(prv, TIF_USEDFPU)) { \
 		put_psr(get_psr() | PSR_EF); \
 		fpsave(&(prv)->thread.float_regs[0], &(prv)->thread.fsr, \
 		       &(prv)->thread.fpqueue[0], &(prv)->thread.fpqdepth); \

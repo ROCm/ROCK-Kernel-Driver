@@ -39,6 +39,7 @@ extern int sysctl_icmp_ratemask;
 
 /* From igmp.c */
 extern int sysctl_igmp_max_memberships;
+extern int sysctl_igmp_max_msf;
 
 /* From inetpeer.c */
 extern int inet_peer_threshold;
@@ -411,6 +412,14 @@ ctl_table ipv4_table[] = {
 	},
 
 #endif
+	{
+		.ctl_name	= NET_IPV4_IGMP_MAX_MSF,
+		.procname	= "igmp_max_msf",
+		.data		= &sysctl_igmp_max_msf,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 	{
 		.ctl_name	= NET_IPV4_INET_PEER_THRESHOLD,
 		.procname	= "inet_peer_threshold",

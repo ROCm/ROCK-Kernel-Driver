@@ -280,7 +280,6 @@ static int afs_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 
  error:
-	dput(root);
 	iput(inode);
 	afs_put_volume(as->volume);
 	kfree(as);

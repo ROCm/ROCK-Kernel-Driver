@@ -381,6 +381,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 		return -ENOSPC;
 	memset(sbi, 0, sizeof (struct jfs_sb_info));
 	sb->s_fs_info = sbi;
+	sbi->sb = sb;
 
 	/* initialize the mount flag and determine the default error handler */
 	flag = JFS_ERR_REMOUNT_RO;
