@@ -19,7 +19,7 @@
 BTFIXUPDEF_CALL(char *, __irq_itoa, unsigned int)
 #define __irq_itoa(irq) BTFIXUP_CALL(__irq_itoa)(irq)
 
-#define NR_IRQS    15
+#define NR_IRQS    16
 
 #define irq_cannonicalize(irq)	(irq)
 
