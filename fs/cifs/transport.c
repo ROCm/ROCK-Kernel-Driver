@@ -40,10 +40,9 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 
 /* BB add spinlock to protect midq for each session BB */
 	if (ses == NULL) {
-		cERROR(1, ("\nNull session passed in to AllocMidQEntry "));
+		cERROR(1, ("Null session passed in to AllocMidQEntry "));
 		return NULL;
 	}
-	temp = kmalloc(sizeof (struct mid_q_entry), GFP_KERNEL);
 	temp = (struct mid_q_entry *) kmem_cache_alloc(cifs_mid_cachep,
 						       SLAB_KERNEL);
 	if (temp == NULL)
@@ -53,21 +52,19 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		temp->mid = smb_buffer->Mid;	/* always LE */
 		temp->pid = current->pid;
 		temp->command = smb_buffer->Command;
-		cFYI(1, ("\nFor smb_command %d", temp->command));
+		cFYI(1, ("For smb_command %d", temp->command));
 		do_gettimeofday(&temp->when_sent);
 		temp->ses = ses;
 		temp->tsk = current;
 	}
-	if (ses->status == CifsGood) {
+	if (ses->server->tcpStatus == CifsGood) {
 		write_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
 		atomic_inc(&midCount);
 		temp->midState = MID_REQUEST_ALLOCATED;
 		write_unlock(&GlobalMid_Lock);
-	} else {		/* BB add reconnect code here BB */
-
-		cERROR(1,
-		       ("\nNeed to reconnect after session died to server\n"));
+	} else {		/* could add more reconnect code here BB */
+		cERROR(1,("Need to reconnect after session died to server"));
 		if (temp)
 			kmem_cache_free(cifs_mid_cachep, temp);
 		return NULL;
@@ -121,7 +118,7 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
         sign_smb(smb_buffer); */ /* BB enable when signing tested more */
 
 	smb_buffer->smb_buf_length = cpu_to_be32(smb_buffer->smb_buf_length);
-	cFYI(1, ("\nSending smb of length %d ", smb_buf_length));
+	cFYI(1, ("Sending smb of length %d ", smb_buf_length));
 	dump_smb(smb_buffer, smb_buf_length + 4);
 
 	temp_fs = get_fs();	/* we must turn off socket api parm checking */
@@ -132,7 +129,7 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 
 	if (rc < 0) {
 		cERROR(1,
-		       ("\nError %d sending data on socket to server.\n", rc));
+		       ("Error %d sending data on socket to server.", rc));
 	} else
 		rc = 0;
 
@@ -154,7 +151,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -EIO;	/* reconnect should be done, if possible, in AllocMidQEntry */
 	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
-		       ("\nIllegal length, greater than maximum frame, %d ",
+		       ("Illegal length, greater than maximum frame, %d ",
 			in_buf->smb_buf_length));
 		DeleteMidQEntry(midQ);
 		return -EIO;
@@ -163,27 +160,21 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
 		      (struct sockaddr *) &(ses->server->sockAddr));
 
-	if (long_op > 1)	/* writes past end of file can take a looooooong time */
+	if (long_op > 1) /* writes past end of file can take looooong time */
 		timeout = 300 * HZ;
 	else if (long_op == 1)
 		timeout = 60 * HZ;
 	else
 		timeout = 15 * HZ;
-	/* wait for 15 seconds or until woken up due to response arriving or due to 
-	   last connection to this server being unmounted */
-
-	/* timeout = interruptible_sleep_on_timeout(&ses->server->response_q,timeout); */
-	/* Replace above line with wait_event to get rid of sleep_on per lk guidelines */
+	/* wait for 15 seconds or until woken up due to response arriving or 
+	   due to last connection to this server being unmounted */
 
 	timeout = wait_event_interruptible_timeout(ses->server->response_q,
 				midQ->
 				midState & MID_RESPONSE_RECEIVED,
 				timeout);
-	cFYI(1,
-	     (" with timeout %ld and Out_buf: %p  midQ->resp_buf: %p ", timeout,
-	      out_buf, midQ->resp_buf));
 	if (signal_pending(current)) {
-		cERROR(1, (KERN_ERR "\nCIFS: caught signal"));
+		cERROR(1, ("CIFS: caught signal"));
 		DeleteMidQEntry(midQ);
 		return -EINTR;
 	} else {
@@ -198,11 +189,11 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
 	if (timeout == 0) {
 		cFYI(1,
-		     ("\nTimeout on receive. Assume response SMB is invalid.\n"));
+		     ("Timeout on receive. Assume response SMB is invalid."));
 		rc = -ETIMEDOUT;
 	} else if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
-		       ("\nFrame too large received.  Length: %d  Xid: %d\n",
+		       ("Frame too large received.  Length: %d  Xid: %d",
 			receive_len, xid));
 		rc = -EIO;
 	} else {		/* rcvd frame is ok */
@@ -215,7 +206,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			/* convert the length back to a form that we can use */
 
 			dump_smb(out_buf, 92);
-
 			out_buf->smb_buf_length =
 			    be32_to_cpu(out_buf->smb_buf_length);
 			if (out_buf->smb_buf_length > 12)

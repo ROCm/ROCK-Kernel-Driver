@@ -36,8 +36,8 @@ extern int smb_send(struct socket *, struct smb_hdr *,
 			unsigned int /* length */ , struct sockaddr *);
 extern unsigned int _GetXid(void);
 extern void _FreeXid(unsigned int);
-#define GetXid() (int)_GetXid(); cFYI(1,("\nCIFS VFS: in %s as Xid: %d with uid: %d",__FUNCTION__, xid,current->fsuid));
-#define FreeXid(curr_xid) {_FreeXid(curr_xid); cFYI(1,("\nCIFS VFS: leaving %s (xid = %d) rc = %d\n",__FUNCTION__,curr_xid,rc));}
+#define GetXid() (int)_GetXid(); cFYI(1,("CIFS VFS: in %s as Xid: %d with uid: %d",__FUNCTION__, xid,current->fsuid));
+#define FreeXid(curr_xid) {_FreeXid(curr_xid); cFYI(1,("CIFS VFS: leaving %s (xid = %d) rc = %d",__FUNCTION__,curr_xid,rc));}
 extern char *build_path_from_dentry(struct dentry *);
 extern char *build_wildcard_path_from_dentry(struct dentry *direntry);
 extern void renew_parental_timestamps(struct dentry *direntry);
@@ -72,28 +72,21 @@ extern int cifs_get_inode_info_unix(struct inode **pinode,
 			const unsigned char *search_path,
 			struct super_block *sb);
 
-extern int CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses,
-			char cryptokey[CIFS_CRYPTO_KEY_SIZE]);
+extern int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, 
+			struct nls_table * nls_info);
+extern int CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses);
 extern int CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
-			char *user, char *domain,
 			char *session_key, char *ntlm_session_key,
 			const struct nls_table *);
 extern int CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
-			char *user, char *domain,
-			char *SecurityBlob,
-			int SecurityBlobLength,
+			char *SecurityBlob,int SecurityBlobLength,
 			const struct nls_table *);
 extern int CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
-			struct cifsSesInfo *ses,
-			char *domain,
-			char *ntlm_session_key,
-			int  *ntlmv2_flag,
+			struct cifsSesInfo *ses, int  *ntlmv2_flag,
 			const struct nls_table *);
 extern int CIFSNTLMSSPAuthSessSetup(unsigned int xid,
-			struct cifsSesInfo *ses, char *user,
-			char *domain, char *ntlm_session_key,
-			char *lanman_session_key,
-			int ntlmv2_flag,
+			struct cifsSesInfo *ses, char *ntlm_session_key,
+			char *lanman_session_key,int ntlmv2_flag,
 			const struct nls_table *);
 
 extern int CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
@@ -202,7 +195,7 @@ extern int CIFSSMBClose(const int xid, const struct cifsTconInfo *tcon,
 
 extern int CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 			const int netfid, unsigned int count,
-			const __u64 lseek, unsigned int *nbytes, char *buf);
+			const __u64 lseek, unsigned int *nbytes, char **buf);
 extern int CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
 			const int netfid, const unsigned int count,
 			const __u64 lseek, unsigned int *nbytes,

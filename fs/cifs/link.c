@@ -88,7 +88,7 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 
 	xid = GetXid();
 	full_path = build_path_from_dentry(direntry);
-	cFYI(1, ("\nFull path: %s inode = 0x%p\n", full_path, inode));
+	cFYI(1, ("Full path: %s inode = 0x%p", full_path, inode));
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
@@ -136,8 +136,8 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
-	cFYI(1, ("\nFull path: %s ", full_path));
-	cFYI(1, (" symname is %s\n", symname));
+	cFYI(1, ("Full path: %s ", full_path));
+	cFYI(1, ("symname is %s", symname));
 
 	/* BB what if DFS and this volume is on different share? BB */
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
@@ -156,7 +156,7 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 
 		if (rc != 0) {
 			cFYI(1,
-			     ("\nCreate symlink worked but get_inode_info failed with rc = %d ",
+			     ("Create symlink worked but get_inode_info failed with rc = %d ",
 			      rc));
 		} else {
 			direntry->d_op = &cifs_dentry_ops;
@@ -188,7 +188,7 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	pTcon = cifs_sb->tcon;
 	full_path = build_path_from_dentry(direntry);
 	cFYI(1,
-	     ("\nFull path: %s inode = 0x%p pBuffer = 0x%p buflen = %d\n",
+	     ("Full path: %s inode = 0x%p pBuffer = 0x%p buflen = %d",
 	      full_path, inode, pBuffer, buflen));
 
 /* BB add read reparse point symlink code and Unix extensions symlink code here BB */
