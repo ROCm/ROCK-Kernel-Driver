@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/backing-dev.h>
 #include <linux/buffer_head.h>	/* block_sync_page() */
 
 #include <asm/pgtable.h>
@@ -25,20 +26,26 @@ static struct inode swapper_inode = {
 	.i_mapping	= &swapper_space,
 };
 
+static struct backing_dev_info swap_backing_dev_info = {
+	.ra_pages	= 0,	/* No readahead */
+	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+};
+
 extern struct address_space_operations swap_aops;
 
 struct address_space swapper_space = {
-	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
-	.page_lock	= RW_LOCK_UNLOCKED,
-	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
-	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
-	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
-	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
-	.host		= &swapper_inode,
-	.a_ops		= &swap_aops,
-	.i_shared_lock	= SPIN_LOCK_UNLOCKED,
-	.private_lock	= SPIN_LOCK_UNLOCKED,
-	.private_list	= LIST_HEAD_INIT(swapper_space.private_list),
+	.page_tree		= RADIX_TREE_INIT(GFP_ATOMIC),
+	.page_lock		= RW_LOCK_UNLOCKED,
+	.clean_pages		= LIST_HEAD_INIT(swapper_space.clean_pages),
+	.dirty_pages		= LIST_HEAD_INIT(swapper_space.dirty_pages),
+	.io_pages		= LIST_HEAD_INIT(swapper_space.io_pages),
+	.locked_pages		= LIST_HEAD_INIT(swapper_space.locked_pages),
+	.host			= &swapper_inode,
+	.a_ops			= &swap_aops,
+	.backing_dev_info	= &swap_backing_dev_info,
+	.i_shared_lock		= SPIN_LOCK_UNLOCKED,
+	.private_lock		= SPIN_LOCK_UNLOCKED,
+	.private_list		= LIST_HEAD_INIT(swapper_space.private_list),
 };
 
 #define INC_CACHE_INFO(x)	do { swap_cache_info.x++; } while (0)

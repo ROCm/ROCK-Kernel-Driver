@@ -350,7 +350,7 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 #if 0
 		if (!PageWriteback(page) && PageDirty(page)) {
 			lock_page(page);
-			if (!PageWriteback(page) && TestClearPageDirty(page)) {
+			if (!PageWriteback(page)&&test_clear_page_dirty(page)) {
 				int ret;
 
 				ret = page->mapping->a_ops->writepage(page);
@@ -395,7 +395,7 @@ int write_one_page(struct page *page, int wait)
 
 	write_lock(&mapping->page_lock);
 	list_del(&page->list);
-	if (TestClearPageDirty(page)) {
+	if (test_clear_page_dirty(page)) {
 		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
@@ -487,6 +487,8 @@ int __set_page_dirty_buffers(struct page *page)
 	if (!TestSetPageDirty(page)) {
 		write_lock(&mapping->page_lock);
 		if (page->mapping) {	/* Race with truncate? */
+			if (!mapping->backing_dev_info->memory_backed)
+				inc_page_state(nr_dirty);
 			list_del(&page->list);
 			list_add(&page->list, &mapping->dirty_pages);
 		}
@@ -523,6 +525,8 @@ int __set_page_dirty_nobuffers(struct page *page)
 		if (mapping) {
 			write_lock(&mapping->page_lock);
 			if (page->mapping) {	/* Race with truncate? */
+				if (!mapping->backing_dev_info->memory_backed)
+					inc_page_state(nr_dirty);
 				list_del(&page->list);
 				list_add(&page->list, &mapping->dirty_pages);
 			}
@@ -534,4 +538,18 @@ int __set_page_dirty_nobuffers(struct page *page)
 }
 EXPORT_SYMBOL(__set_page_dirty_nobuffers);
 
+/*
+ * Clear a page's dirty flag, while caring for dirty memory accounting. 
+ * Returns true if the page was previously dirty.
+ */
+int test_clear_page_dirty(struct page *page)
+{
+	if (TestClearPageDirty(page)) {
+		struct address_space *mapping = page->mapping;
 
+		if (mapping && !mapping->backing_dev_info->memory_backed)
+			dec_page_state(nr_dirty);
+		return 1;
+	}
+	return 0;
+}

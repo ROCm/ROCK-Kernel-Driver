@@ -571,7 +571,7 @@ mpage_writepages(struct address_space *mapping,
 			wait_on_page_writeback(page);
 
 		if (page->mapping && !PageWriteback(page) &&
-					TestClearPageDirty(page)) {
+					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page);
 			} else {

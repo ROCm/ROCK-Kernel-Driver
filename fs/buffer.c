@@ -2513,7 +2513,7 @@ int try_to_free_buffers(struct page *page)
 		 * This only applies in the rare case where try_to_free_buffers
 		 * succeeds but the page is not freed.
 		 */
-		ClearPageDirty(page);
+		clear_page_dirty(page);
 	}
 	spin_unlock(&mapping->private_lock);
 out:

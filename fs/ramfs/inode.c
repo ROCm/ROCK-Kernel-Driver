@@ -30,6 +30,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
+#include <linux/backing-dev.h>
 
 #include <asm/uaccess.h>
 
@@ -40,6 +41,11 @@ static struct super_operations ramfs_ops;
 static struct address_space_operations ramfs_aops;
 static struct file_operations ramfs_file_operations;
 static struct inode_operations ramfs_dir_inode_operations;
+
+static struct backing_dev_info ramfs_backing_dev_info = {
+	.ra_pages	= 0,	/* No readahead */
+	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+};
 
 /*
  * Read a page. Again trivial. If it didn't already exist
@@ -69,7 +75,7 @@ static int ramfs_prepare_write(struct file *file, struct page *page, unsigned of
 		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
-	SetPageDirty(page);
+	set_page_dirty(page);
 	return 0;
 }
 
@@ -95,6 +101,7 @@ struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
 		inode->i_mapping->a_ops = &ramfs_aops;
+		inode->i_mapping->backing_dev_info = &ramfs_backing_dev_info;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		switch (mode & S_IFMT) {
 		default:

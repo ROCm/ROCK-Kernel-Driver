@@ -29,6 +29,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/backing-dev.h>
 #include <linux/shmem_fs.h>
 
 #include <asm/uaccess.h>
@@ -55,6 +56,11 @@ static struct file_operations shmem_file_operations;
 static struct inode_operations shmem_inode_operations;
 static struct inode_operations shmem_dir_inode_operations;
 static struct vm_operations_struct shmem_vm_ops;
+
+static struct backing_dev_info shmem_backing_dev_info = {
+	.ra_pages	= 0,	/* No readahead */
+	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+};
 
 LIST_HEAD (shmem_inodes);
 static spinlock_t shmem_ilock = SPIN_LOCK_UNLOCKED;
@@ -789,6 +795,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
 		inode->i_mapping->a_ops = &shmem_aops;
+		inode->i_mapping->backing_dev_info = &shmem_backing_dev_info;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		info = SHMEM_I(inode);
 		spin_lock_init (&info->lock);
