@@ -363,4 +363,4 @@ static int __init pci_direct_init(void)
 	return 0;
 }
 
-subsys_initcall(pci_direct_init);
+arch_initcall(pci_direct_init);

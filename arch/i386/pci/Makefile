@@ -16,9 +16,9 @@ obj-y		+= fixup.o
 
 ifdef	CONFIG_ACPI_PCI
 obj-y		+= acpi.o
-else
-obj-y		+= legacy.o
 endif
+obj-y		+= legacy.o
+
 
 endif		# CONFIG_MULTIQUAD
 obj-y		+= irq.o common.o
