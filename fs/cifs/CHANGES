@@ -1,7 +1,8 @@
 Version 1.14
 ------------
 Fix incomplete listings of large directories on Samba servers when Unix
-extensions enabled.  Fix oops when smb_buffer can not be allocated
+extensions enabled.  Fix oops when smb_buffer can not be allocated. Fix
+rename deadlock when writing out dirty pages at same time.
 
 Version 1.13
 ------------

@@ -154,6 +154,8 @@ of the mount options. Credential files contain two lines
         password=your_password
 2) By specifying the password in the PASSWD environment variable (similarly
 the user name can be taken from the USER environment variable).
+3) By specifying the password in a file by name via PASSWD_FILE
+4) By specifying the password in a file by file descriptor via PASSWD_FD
 
 If no password is provided, mount.cifs will prompt for password entry
 
@@ -250,6 +252,17 @@ A partial list of the supported mount options follows:
 		mount helper will not prompt the user for a password
 		if guest is specified on the mount options.  If no
 		password is specified a null password will be used.
+
+The mount.cifs mount helper also accepts a few mount options before -o
+including:
+
+	-S      take password from stdin (equivalent to setting the environment
+		variable "PASSWD_FD=0"
+	-V      print mount.cifs version
+	-?      display simple usage information
+
+With recent 2.6 kernel versions of modutils, the version of the cifs kernel
+module can be displayed via modinfo.
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================
