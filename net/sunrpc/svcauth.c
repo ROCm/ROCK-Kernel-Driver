@@ -183,7 +183,7 @@ auth_domain_lookup(struct auth_domain *item, int set)
 	}
 	/* Didn't find anything */
 	if (!set)
-		goto out_noset;
+		goto out_nada;
 	auth_domain_cache.entries++;
 out_set:
 	set_bit(CACHE_HASHED, &item->h.flags);
@@ -193,6 +193,8 @@ out_set:
 	cache_fresh(&auth_domain_cache, &item->h, item->h.expiry_time);
 	cache_get(&item->h);
 	return item;
+out_nada:
+	tmp = NULL;
 out_noset:
 	read_unlock(&auth_domain_cache.hash_lock);
 	return tmp;
