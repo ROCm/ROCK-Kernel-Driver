@@ -54,22 +54,21 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 # Common rules
 #
 
+c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F)))
+
 %.s: %.c
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(CFLAGS_$@) -S $< -o $@
+	$(CC) $(c_flags) -S $< -o $@
 
 %.i: %.c
-	$(CPP) $(CFLAGS) $(EXTRA_CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(CFLAGS_$@) $< > $@
+	$(CPP) $(c_flags) $< > $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(CFLAGS_$@) -c -o $@ $<
+	$(CC) $(c_flags) -c -o $@ $<
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@))),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@))))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
 	    echo 'endif' \
 	) > $(dir $@)/.$(notdir $@).flags
-
-%.o: %.s
-	$(AS) $(AFLAGS) $(EXTRA_CFLAGS) -o $@ $<
 
 # Old makefiles define their own rules for compiling .S files,
 # but these standard rules are available for any Makefile that
@@ -77,13 +76,19 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 # the Makefiles to these standard rules.  -- rmk, mec
 ifdef USE_STANDARD_AS_RULE
 
+a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$@)
+
 %.s: %.S
-	$(CPP) $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$@) $< > $@
+	$(CPP) $(a_flags) $< > $@
 
 %.o: %.S
-	$(CC) $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$@) -c -o $@ $<
+	$(CC) $(a_flags) -c -o $@ $<
 
 endif
+
+# FIXME is anybody using this rule? Why does it have EXTRA_CFLAGS?
+%.o: %.s
+	$(AS) $(AFLAGS) $(EXTRA_CFLAGS) -o $@ $<
 
 %.lst: %.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -g -c -o $*.o $<
@@ -322,7 +327,7 @@ endif # CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 $(export-objs): $(TOPDIR)/include/linux/modversions.h
 $(export-objs): %.o: %.c
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(CFLAGS_$@) -DEXPORT_SYMTAB -c $(@:.o=.c)
+	$(CC) $(c_flags) -DEXPORT_SYMTAB -c -o $@ $<
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DEXPORT_SYMTAB)),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@) -DEXPORT_SYMTAB)))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
