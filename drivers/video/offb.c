@@ -397,7 +397,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	struct fb_fix_screeninfo *fix;
 	struct fb_var_screeninfo *var;
 	struct fb_info *info;
-	int i;
 
 	if (!request_mem_region(res_start, res_size, "offb"))
 		return;
@@ -412,14 +411,15 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 		return;
 	}
 
-	info =
-	    kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
-		    sizeof(u32) * 17, GFP_ATOMIC);
+	size = sizeof(struct fb_info) + sizeof(struct display) + sizeof(u32) * 17;
+
+	info = kmalloc(size, GFP_ATOMIC);
+	
 	if (info == 0) {
 		release_mem_region(res_start, res_size);
 		return;
 	}
-	memset(info, 0, sizeof(*info));
+	memset(info, 0, size);
 
 	fix = &info->fix;
 	var = &info->var;
@@ -463,7 +463,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 			unsigned long base = address & 0xff000000UL;
 			par->cmap_adr =
 			    ioremap(base + 0x7ff000, 0x1000) + 0xcc0;
-			par->cmap_data = info->cmap_adr + 1;
+			par->cmap_data = par->cmap_adr + 1;
 			par->cmap_type = cmap_m64;
 		} else if (device_is_compatible(dp, "pci1014,b7")) {
 			unsigned long regbase = dp->addrs[0].address;
@@ -553,7 +553,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	}
 
 	printk(KERN_INFO "fb%d: Open Firmware frame buffer device on %s\n",
-	       GET_FB_IDX(info->info.node), full_name);
+	       GET_FB_IDX(info->node), full_name);
 }
 
 MODULE_LICENSE("GPL");

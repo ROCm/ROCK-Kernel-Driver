@@ -206,7 +206,7 @@ static int encode_fix(struct fb_fix_screeninfo *fix,
 static void atyfb_set_dispsw(struct display *disp,
 			     struct fb_info *info);
 #ifdef CONFIG_PPC
-static int read_aty_sense(const struct fb_info *info);
+static int read_aty_sense(const struct atyfb_par *par);
 #endif
 
 
@@ -462,63 +462,62 @@ static char *aty_ct_ram[8] __initdata = {
      *  Apple monitor sense
      */
 
-static int __init read_aty_sense(const struct fb_info *info)
+static int __init read_aty_sense(const struct atyfb_par *par)
 {
 	int sense, i;
 
-	aty_st_le32(GP_IO, 0x31003100, info);	/* drive outputs high */
+	aty_st_le32(GP_IO, 0x31003100, par);	/* drive outputs high */
 	__delay(200);
-	aty_st_le32(GP_IO, 0, info);	/* turn off outputs */
+	aty_st_le32(GP_IO, 0, par);	/* turn off outputs */
 	__delay(2000);
-	i = aty_ld_le32(GP_IO, info);	/* get primary sense value */
+	i = aty_ld_le32(GP_IO, par);	/* get primary sense value */
 	sense = ((i & 0x3000) >> 3) | (i & 0x100);
 
 	/* drive each sense line low in turn and collect the other 2 */
-	aty_st_le32(GP_IO, 0x20000000, info);	/* drive A low */
+	aty_st_le32(GP_IO, 0x20000000, par);	/* drive A low */
 	__delay(2000);
-	i = aty_ld_le32(GP_IO, info);
+	i = aty_ld_le32(GP_IO, par);
 	sense |= ((i & 0x1000) >> 7) | ((i & 0x100) >> 4);
-	aty_st_le32(GP_IO, 0x20002000, info);	/* drive A high again */
+	aty_st_le32(GP_IO, 0x20002000, par);	/* drive A high again */
 	__delay(200);
 
-	aty_st_le32(GP_IO, 0x10000000, info);	/* drive B low */
+	aty_st_le32(GP_IO, 0x10000000, par);	/* drive B low */
 	__delay(2000);
-	i = aty_ld_le32(GP_IO, info);
+	i = aty_ld_le32(GP_IO, par);
 	sense |= ((i & 0x2000) >> 10) | ((i & 0x100) >> 6);
-	aty_st_le32(GP_IO, 0x10001000, info);	/* drive B high again */
+	aty_st_le32(GP_IO, 0x10001000, par);	/* drive B high again */
 	__delay(200);
 
-	aty_st_le32(GP_IO, 0x01000000, info);	/* drive C low */
+	aty_st_le32(GP_IO, 0x01000000, par);	/* drive C low */
 	__delay(2000);
-	sense |= (aty_ld_le32(GP_IO, info) & 0x3000) >> 12;
-	aty_st_le32(GP_IO, 0, info);	/* turn off outputs */
-
+	sense |= (aty_ld_le32(GP_IO, par) & 0x3000) >> 12;
+	aty_st_le32(GP_IO, 0, par);	/* turn off outputs */
 	return sense;
 }
 
 #endif				/* defined(CONFIG_PPC) */
 
 #if defined(CONFIG_PMAC_PBOOK) || defined(CONFIG_PMAC_BACKLIGHT)
-static void aty_st_lcd(int index, u32 val, const struct fb_info *info)
+static void aty_st_lcd(int index, u32 val, const struct atyfb_par *par)
 {
 	unsigned long temp;
 
 	/* write addr byte */
-	temp = aty_ld_le32(LCD_INDEX, info);
-	aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, info);
+	temp = aty_ld_le32(LCD_INDEX, par);
+	aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, par);
 	/* write the register value */
-	aty_st_le32(LCD_DATA, val, info);
+	aty_st_le32(LCD_DATA, val, par);
 }
 
-static u32 aty_ld_lcd(int index, const struct fb_info *info)
+static u32 aty_ld_lcd(int index, const struct atyfb_par *par)
 {
 	unsigned long temp;
 
 	/* write addr byte */
-	temp = aty_ld_le32(LCD_INDEX, info);
-	aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, info);
+	temp = aty_ld_le32(LCD_INDEX, par);
+	aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, par);
 	/* read the register value */
-	return aty_ld_le32(LCD_DATA, info);
+	return aty_ld_le32(LCD_DATA, par);
 }
 #endif				/* CONFIG_PMAC_PBOOK || CONFIG_PMAC_BACKLIGHT */
 
@@ -1439,16 +1438,16 @@ static struct {
 	u8 b[2][256];
 } atyfb_save;
 
-static void atyfb_save_palette(struct fb_info *info, int enter)
+static void atyfb_save_palette(struct atyfb_par *par, int enter)
 {
 	int i, tmp;
 
 	for (i = 0; i < 256; i++) {
-		tmp = aty_ld_8(DAC_CNTL, info) & 0xfc;
+		tmp = aty_ld_8(DAC_CNTL, par) & 0xfc;
 		if (M64_HAS(EXTRA_BRIGHT))
 			tmp |= 0x2;
-		aty_st_8(DAC_CNTL, tmp, info);
-		aty_st_8(DAC_MASK, 0xff, info);
+		aty_st_8(DAC_CNTL, tmp, par);
+		aty_st_8(DAC_MASK, 0xff, par);
 
 		writeb(i, &par->aty_cmap_regs->rindex);
 		atyfb_save.r[enter][i] = readb(&par->aty_cmap_regs->lut);
@@ -1477,9 +1476,10 @@ static void atyfb_palette(int enter)
 		    d->fb_info->fbops == &atyfb_ops &&
 		    d->fb_info->display_fg &&
 		    d->fb_info->display_fg->vc_num == i) {
-			atyfb_save_palette(d->fb_info, enter);
 			info = d->fb_info;
 			par = (struct atyfb_par *) info->par;
+			
+			atyfb_save_palette(par, enter);
 			if (enter) {
 				atyfb_save.yoffset = par->crtc.yoffset;
 				par->crtc.yoffset = 0;
@@ -1506,32 +1506,32 @@ static struct fb_info *first_display = NULL;
  * management registers. There's is some confusion about which
  * chipID is a Rage LT or LT pro :(
  */
-static int aty_power_mgmt_LT(int sleep, struct fb_info *info)
+static int aty_power_mgmt_LT(int sleep, struct atyfb_par *par)
 {
 	unsigned int pm;
 	int timeout;
 
-	pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+	pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 	pm = (pm & ~PWR_MGT_MODE_MASK) | PWR_MGT_MODE_REG;
-	aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
-	pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+	aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
+	pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 
 	timeout = 200000;
 	if (sleep) {
 		/* Sleep */
 		pm &= ~PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
+		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 		udelay(10);
 		pm &= ~(PWR_BLON | AUTO_PWR_UP);
 		pm |= SUSPEND_NOW;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
+		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 		udelay(10);
 		pm |= PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
+		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
 		do {
-			pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+			pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 			udelay(10);
 			if ((--timeout) == 0)
 				break;
@@ -1540,18 +1540,18 @@ static int aty_power_mgmt_LT(int sleep, struct fb_info *info)
 	} else {
 		/* Wakeup */
 		pm &= ~PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
+		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 		udelay(10);
 		pm |= (PWR_BLON | AUTO_PWR_UP);
 		pm &= ~SUSPEND_NOW;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
+		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 		udelay(10);
 		pm |= PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, info);
+		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
 		do {
-			pm = aty_ld_le32(POWER_MANAGEMENT_LG, info);
+			pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
 			udelay(10);
 			if ((--timeout) == 0)
 				break;
@@ -1562,32 +1562,32 @@ static int aty_power_mgmt_LT(int sleep, struct fb_info *info)
 	return timeout ? PBOOK_SLEEP_OK : PBOOK_SLEEP_REFUSE;
 }
 
-static int aty_power_mgmt_LTPro(int sleep, struct fb_info *info)
+static int aty_power_mgmt_LTPro(int sleep, struct atyfb_par *par)
 {
 	unsigned int pm;
 	int timeout;
 
-	pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+	pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 	pm = (pm & ~PWR_MGT_MODE_MASK) | PWR_MGT_MODE_REG;
-	aty_st_lcd(POWER_MANAGEMENT, pm, info);
-	pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+	aty_st_lcd(POWER_MANAGEMENT, pm, par);
+	pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 
 	timeout = 200;
 	if (sleep) {
 		/* Sleep */
 		pm &= ~PWR_MGT_ON;
-		aty_st_lcd(POWER_MANAGEMENT, pm, info);
-		pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
+		pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 		udelay(10);
 		pm &= ~(PWR_BLON | AUTO_PWR_UP);
 		pm |= SUSPEND_NOW;
-		aty_st_lcd(POWER_MANAGEMENT, pm, info);
-		pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
+		pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 		udelay(10);
 		pm |= PWR_MGT_ON;
-		aty_st_lcd(POWER_MANAGEMENT, pm, info);
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
 		do {
-			pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+			pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 			mdelay(1);
 			if ((--timeout) == 0)
 				break;
@@ -1596,18 +1596,18 @@ static int aty_power_mgmt_LTPro(int sleep, struct fb_info *info)
 	} else {
 		/* Wakeup */
 		pm &= ~PWR_MGT_ON;
-		aty_st_lcd(POWER_MANAGEMENT, pm, info);
-		pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
+		pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 		udelay(10);
 		pm &= ~SUSPEND_NOW;
 		pm |= (PWR_BLON | AUTO_PWR_UP);
-		aty_st_lcd(POWER_MANAGEMENT, pm, info);
-		pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
+		pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 		udelay(10);
 		pm |= PWR_MGT_ON;
-		aty_st_lcd(POWER_MANAGEMENT, pm, info);
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
 		do {
-			pm = aty_ld_lcd(POWER_MANAGEMENT, info);
+			pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 			mdelay(1);
 			if ((--timeout) == 0)
 				break;
@@ -1617,10 +1617,10 @@ static int aty_power_mgmt_LTPro(int sleep, struct fb_info *info)
 	return timeout ? PBOOK_SLEEP_OK : PBOOK_SLEEP_REFUSE;
 }
 
-static int aty_power_mgmt(int sleep, struct fb_info *info)
+static int aty_power_mgmt(int sleep, struct atyfb_par *par)
 {
-	return M64_HAS(LT_SLEEP) ? aty_power_mgmt_LT(sleep, info)
-	    : aty_power_mgmt_LTPro(sleep, info);
+	return M64_HAS(LT_SLEEP) ? aty_power_mgmt_LT(sleep, par)
+	    : aty_power_mgmt_LTPro(sleep, par);
 }
 
 /*
@@ -1635,7 +1635,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 	result = PBOOK_SLEEP_OK;
 
-	for (info = first_display; info != NULL; info = info->next) {
+	for (info = first_display; info != NULL; info = par->next) {
 		struct fb_fix_screeninfo fix;
 		int nb;
 
@@ -1659,7 +1659,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				wait_for_idle(par);
 			/* Stop accel engine (stop bus mastering) */
 			if (par->accel_flags & FB_ACCELF_TEXT)
-				aty_reset_engine(info);
+				aty_reset_engine(par);
 
 			/* Backup fb content */
 			if (par->save_framebuffer)
@@ -1670,11 +1670,11 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			atyfb_blank(VESA_POWERDOWN + 1, info);
 
 			/* Set chip to "suspend" mode */
-			result = aty_power_mgmt(1, info);
+			result = aty_power_mgmt(1, par);
 			break;
 		case PBOOK_WAKE:
 			/* Wakeup chip */
-			result = aty_power_mgmt(0, info);
+			result = aty_power_mgmt(0, par);
 
 			/* Restore fb content */
 			if (par->save_framebuffer) {
@@ -1684,7 +1684,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				par->save_framebuffer = 0;
 			}
 			/* Restore display */
-			atyfb_set_par(par->par, info);
+			atyfb_set_par(par, info);
 			atyfb_blank(0, info);
 			break;
 		}
@@ -1711,7 +1711,8 @@ static int backlight_conv[] = {
 static int aty_set_backlight_enable(int on, int level, void *data)
 {
 	struct fb_info *info = (struct fb_info *) data;
-	unsigned int reg = aty_ld_lcd(LCD_MISC_CNTL, info);
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	unsigned int reg = aty_ld_lcd(LCD_MISC_CNTL, par);
 
 	reg |= (BLMOD_EN | BIASMOD_EN);
 	if (on && level > BACKLIGHT_OFF) {
@@ -1721,8 +1722,7 @@ static int aty_set_backlight_enable(int on, int level, void *data)
 		reg &= ~BIAS_MOD_LEVEL_MASK;
 		reg |= (backlight_conv[0] << BIAS_MOD_LEVEL_SHIFT);
 	}
-	aty_st_lcd(LCD_MISC_CNTL, reg, info);
-
+	aty_st_lcd(LCD_MISC_CNTL, reg, par);
 	return 0;
 }
 
@@ -1784,7 +1784,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	if (!M64_HAS(INTEGRATED)) {
 		u32 stat0;
 		u8 dac_type, dac_subtype, clk_type;
-		stat0 = aty_ld_le32(CONFIG_STAT0, info);
+		stat0 = aty_ld_le32(CONFIG_STAT0, par);
 		par->bus_type = (stat0 >> 0) & 0x07;
 		par->ram_type = (stat0 >> 3) & 0x07;
 		ramname = aty_gx_ram[par->ram_type];
@@ -2093,7 +2093,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 					default_vmode = VMODE_800_600_60;
 				else
 					default_vmode = VMODE_640_480_67;
-				sense = read_aty_sense(info);
+				sense = read_aty_sense(par);
 				printk(KERN_INFO
 				       "atyfb: monitor sense=%x, mode %d\n",
 				       sense,
@@ -2150,7 +2150,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		return 0;
 	}
 #ifdef __sparc__
-	atyfb_save_palette(info, 0);
+	atyfb_save_palette(par, 0);
 #endif
 
 #ifdef CONFIG_FB_ATY_CT
@@ -2258,7 +2258,7 @@ int __init atyfb_init(void)
 			/*
 			 * Map memory-mapped registers.
 			 */
-			par->ati_regbase = addr + 0x7ffc00UL;
+			default_par->ati_regbase = addr + 0x7ffc00UL;
 			info->fix.mmio_start = addr + 0x7ffc00UL;
 
 			/*
@@ -2361,9 +2361,9 @@ int __init atyfb_init(void)
 				/*
 				 * Fix PROMs idea of MEM_CNTL settings...
 				 */
-				mem = aty_ld_le32(MEM_CNTL, info);
+				mem = aty_ld_le32(MEM_CNTL, default_par);
 				chip_id =
-				    aty_ld_le32(CONFIG_CHIP_ID, info);
+				    aty_ld_le32(CONFIG_CHIP_ID, defualt_par);
 				if (((chip_id & CFG_CHIP_TYPE) ==
 				     VT_CHIP_ID)
 				    && !((chip_id >> 24) & 1)) {
@@ -2383,13 +2383,11 @@ int __init atyfb_init(void)
 					default:
 						break;
 					}
-					if ((aty_ld_le32
-					     (CONFIG_STAT0,
-					      info) & 7) >= SDRAM)
+					if ((aty_ld_le32(CONFIG_STAT0, default_par) & 7) >= SDRAM)
 						mem &= ~(0x00700000);
 				}
 				mem &= ~(0xcf80e000);	/* Turn off all undocumented bits. */
-				aty_st_le32(MEM_CNTL, mem, info);
+				aty_st_le32(MEM_CNTL, mem, default_par);
 			}
 
 			/*
@@ -2452,10 +2450,10 @@ int __init atyfb_init(void)
 				/*
 				 * Read the PLL to figure actual Refresh Rate.
 				 */
-				clock_cntl = aty_ld_8(CLOCK_CNTL, info);
+				clock_cntl = aty_ld_8(CLOCK_CNTL, default_par);
 				/* printk("atyfb: CLOCK_CNTL: %02x\n", clock_cntl); */
 				for (i = 0; i < 16; i++)
-					pll_regs[i] = aty_ld_pll(i, info);
+					pll_regs[i] = aty_ld_pll(i, default_par);
 
 				/*
 				 * PLL Reference Divider M:
@@ -2555,21 +2553,21 @@ int __init atyfb_init(void)
 			/*
 			 * Add /dev/fb mmap values.
 			 */
-			par->mmap_map[0].voff = 0x8000000000000000UL;
-			par->mmap_map[0].poff =
+			default_par->mmap_map[0].voff = 0x8000000000000000UL;
+			default_par->mmap_map[0].poff =
 			    info->screen_base & PAGE_MASK;
-			par->mmap_map[0].size =
+			default_par->mmap_map[0].size =
 			    info->fix.smem_len;
-			par->mmap_map[0].prot_mask = _PAGE_CACHE;
-			par->mmap_map[0].prot_flag = _PAGE_E;
-			par->mmap_map[1].voff =
-			    par->mmap_map[0].voff +
+			default_par->mmap_map[0].prot_mask = _PAGE_CACHE;
+			default_par->mmap_map[0].prot_flag = _PAGE_E;
+			default_par->mmap_map[1].voff =
+			    default_par->mmap_map[0].voff +
 			    info->fix.smem_len;
-			par->mmap_map[1].poff =
-			    par->ati_regbase & PAGE_MASK;
-			par->mmap_map[1].size = PAGE_SIZE;
-			par->mmap_map[1].prot_mask = _PAGE_CACHE;
-			par->mmap_map[1].prot_flag = _PAGE_E;
+			default_par->mmap_map[1].poff =
+			    default_par->ati_regbase & PAGE_MASK;
+			default_par->mmap_map[1].size = PAGE_SIZE;
+			default_par->mmap_map[1].prot_mask = _PAGE_CACHE;
+			default_par->mmap_map[1].prot_flag = _PAGE_E;
 #endif				/* __sparc__ */
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -2577,7 +2575,7 @@ int __init atyfb_init(void)
 				pmu_register_sleep_notifier
 				    (&aty_sleep_notifier);
 			/* FIXME info->next = first_display; */
-			first_display = info;
+			default_par->next = first_display;
 #endif
 		}
 	}
@@ -2610,25 +2608,25 @@ int __init atyfb_init(void)
 		info->screen_base = (unsigned long)ioremap(phys_vmembase[m64_num],
 					 		   phys_size[m64_num]);	
 		info->fix.smem_start = info->screen_base;	/* Fake! */
-		par->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
+		default_par->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
 							  0x10000) + 0xFC00ul;
 		info->fix.mmio_start = par->ati_regbase; /* Fake! */
 
-		aty_st_le32(CLOCK_CNTL, 0x12345678, info);
-		clock_r = aty_ld_le32(CLOCK_CNTL, info);
+		aty_st_le32(CLOCK_CNTL, 0x12345678, default_par);
+		clock_r = aty_ld_le32(CLOCK_CNTL, default_par);
 
 		switch (clock_r & 0x003F) {
 		case 0x12:
-			par->clk_wr_offset = 3;	/*  */
+			default_par->clk_wr_offset = 3;	/*  */
 			break;
 		case 0x34:
-			par->clk_wr_offset = 2;	/* Medusa ST-IO ISA Adapter etc. */
+			default_par->clk_wr_offset = 2;	/* Medusa ST-IO ISA Adapter etc. */
 			break;
 		case 0x16:
-			par->clk_wr_offset = 1;	/*  */
+			default_par->clk_wr_offset = 1;	/*  */
 			break;
 		case 0x38:
-			par->clk_wr_offset = 0;	/* Panther 1 ISA Adapter (Gerald) */
+			default_par->clk_wr_offset = 0;	/* Panther 1 ISA Adapter (Gerald) */
 			break;
 		}
 

@@ -103,6 +103,7 @@ struct atyfb_par {
 	int open;
 #endif
 #ifdef CONFIG_PMAC_PBOOK
+	struct fb_info *next;
 	unsigned char *save_framebuffer;
 	unsigned long save_pll[64];
 #endif
@@ -286,7 +287,7 @@ extern void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
      *  Text console acceleration
      */
 
-extern const struct display_switch fbcon_aty8;
-extern const struct display_switch fbcon_aty16;
-extern const struct display_switch fbcon_aty24;
-extern const struct display_switch fbcon_aty32;
+extern struct display_switch fbcon_aty8;
+extern struct display_switch fbcon_aty16;
+extern struct display_switch fbcon_aty24;
+extern struct display_switch fbcon_aty32;

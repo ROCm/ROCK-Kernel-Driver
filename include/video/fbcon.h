@@ -73,7 +73,6 @@ struct display {
 #endif
 
     /* Filled in by the low-level console driver */
-
     struct vc_data *conp;           /* pointer to console data */
     struct fb_info *fb_info;        /* frame buffer for this console */
     int vrows;                      /* number of virtual rows */
