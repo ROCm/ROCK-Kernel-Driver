@@ -353,8 +353,13 @@ int sysfs_add_file(struct dentry * dir, struct attribute * attr)
 	down(&dir->d_inode->i_sem);
 	dentry = sysfs_get_dentry(dir,attr->name);
 	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)attr;
 		error = sysfs_create(dentry,(attr->mode & S_IALLUGO) | S_IFREG,init_file);
+		if (!error)
+			dentry->d_fsdata = (void *)attr;
+		else {
+			dput(dentry);
+			dentry = ERR_PTR(error);
+		}
 	} else
 		error = PTR_ERR(dentry);
 	up(&dir->d_inode->i_sem);

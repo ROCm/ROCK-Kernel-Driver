@@ -29,15 +29,13 @@ create_dir(struct kobject * k, struct dentry * p, char * n)
 	down(&p->d_inode->i_sem);
 	dentry = sysfs_get_dentry(p,n);
 	if (!IS_ERR(dentry)) {
-		int error;
-
-		dentry->d_fsdata = (void *)k;
-		error = sysfs_create(dentry,
-				     (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO),
-				     init_dir);
-		if (!error)
+		int error = sysfs_create(dentry,
+					 S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO,
+					 init_dir);
+		if (!error) {
+			dentry->d_fsdata = k;
 			p->d_inode->i_nlink++;
-		else {
+		} else {
 			dput(dentry);
 			dentry = ERR_PTR(error);
 		}
