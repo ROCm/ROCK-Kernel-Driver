@@ -44,26 +44,27 @@
 #define AGPGART_VERSION_MAJOR 0
 #define AGPGART_VERSION_MINOR 100
 
-struct agp_bridge_data agp_bridge = { .type = NOT_SUPPORTED };
+struct agp_bridge_data agp_bridge_dummy = { .type = NOT_SUPPORTED };
+struct agp_bridge_data *agp_bridge = &agp_bridge_dummy;
 
 int agp_backend_acquire(void)
 {
-	if (agp_bridge.type == NOT_SUPPORTED)
+	if (agp_bridge->type == NOT_SUPPORTED)
 		return -EINVAL;
 
-	if (atomic_read(&agp_bridge.agp_in_use) != 0)
+	if (atomic_read(&agp_bridge->agp_in_use) != 0)
 		return -EBUSY;
 
-	atomic_inc(&agp_bridge.agp_in_use);
+	atomic_inc(&agp_bridge->agp_in_use);
 	return 0;
 }
 
 void agp_backend_release(void)
 {
-	if (agp_bridge.type == NOT_SUPPORTED)
+	if (agp_bridge->type == NOT_SUPPORTED)
 		return;
 
-	atomic_dec(&agp_bridge.agp_in_use);
+	atomic_dec(&agp_bridge->agp_in_use);
 }
 
 struct agp_max_table {
@@ -114,38 +115,38 @@ static int agp_backend_initialize(struct pci_dev *dev)
 {
 	int size_value, rc, got_gatt=0, got_keylist=0;
 
-	agp_bridge.max_memory_agp = agp_find_max();
-	agp_bridge.version = &agp_current_version;
+	agp_bridge->max_memory_agp = agp_find_max();
+	agp_bridge->version = &agp_current_version;
 
-	if (agp_bridge.needs_scratch_page == TRUE) {
+	if (agp_bridge->needs_scratch_page == TRUE) {
 		void *addr;
-		addr = agp_bridge.agp_alloc_page();
+		addr = agp_bridge->agp_alloc_page();
 
 		if (addr == NULL) {
 			printk(KERN_ERR PFX "unable to get memory for scratch page.\n");
 			return -ENOMEM;
 		}
-		agp_bridge.scratch_page_real = virt_to_phys(addr);
-		agp_bridge.scratch_page =
-			agp_bridge.mask_memory(agp_bridge.scratch_page_real, 0);
+		agp_bridge->scratch_page_real = virt_to_phys(addr);
+		agp_bridge->scratch_page =
+			agp_bridge->mask_memory(agp_bridge->scratch_page_real, 0);
 	}
 
-	size_value = agp_bridge.fetch_size();
+	size_value = agp_bridge->fetch_size();
 
 	if (size_value == 0) {
 		printk(KERN_ERR PFX "unable to determine aperture size.\n");
 		rc = -EINVAL;
 		goto err_out;
 	}
-	if (agp_bridge.create_gatt_table()) {
+	if (agp_bridge->create_gatt_table()) {
 		printk(KERN_ERR PFX "unable to get memory for graphics translation table.\n");
 		rc = -ENOMEM;
 		goto err_out;
 	}
 	got_gatt = 1;
 	
-	agp_bridge.key_list = vmalloc(PAGE_SIZE * 4);
-	if (agp_bridge.key_list == NULL) {
+	agp_bridge->key_list = vmalloc(PAGE_SIZE * 4);
+	if (agp_bridge->key_list == NULL) {
 		printk(KERN_ERR PFX "error allocating memory for key lists.\n");
 		rc = -ENOMEM;
 		goto err_out;
@@ -153,27 +154,27 @@ static int agp_backend_initialize(struct pci_dev *dev)
 	got_keylist = 1;
 	
 	/* FIXME vmalloc'd memory not guaranteed contiguous */
-	memset(agp_bridge.key_list, 0, PAGE_SIZE * 4);
+	memset(agp_bridge->key_list, 0, PAGE_SIZE * 4);
 
-	if (agp_bridge.configure()) {
+	if (agp_bridge->configure()) {
 		printk(KERN_ERR PFX "error configuring host chipset.\n");
 		rc = -EINVAL;
 		goto err_out;
 	}
 
 	printk(KERN_INFO PFX "AGP aperture is %dM @ 0x%lx\n",
-	       size_value, agp_bridge.gart_bus_addr);
+	       size_value, agp_bridge->gart_bus_addr);
 
 	return 0;
 
 err_out:
-	if (agp_bridge.needs_scratch_page == TRUE) {
-		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page_real));
+	if (agp_bridge->needs_scratch_page == TRUE) {
+		agp_bridge->agp_destroy_page(phys_to_virt(agp_bridge->scratch_page_real));
 	}
 	if (got_gatt)
-		agp_bridge.free_gatt_table();
+		agp_bridge->free_gatt_table();
 	if (got_keylist)
-		vfree(agp_bridge.key_list);
+		vfree(agp_bridge->key_list);
 	return rc;
 }
 
@@ -181,16 +182,16 @@ err_out:
 /* cannot be __exit b/c as it could be called from __init code */
 static void agp_backend_cleanup(void)
 {
-	if (agp_bridge.cleanup != NULL)
-		agp_bridge.cleanup();
-	if (agp_bridge.free_gatt_table != NULL)
-		agp_bridge.free_gatt_table();
-	if (agp_bridge.key_list)
-		vfree(agp_bridge.key_list);
+	if (agp_bridge->cleanup != NULL)
+		agp_bridge->cleanup();
+	if (agp_bridge->free_gatt_table != NULL)
+		agp_bridge->free_gatt_table();
+	if (agp_bridge->key_list)
+		vfree(agp_bridge->key_list);
 
-	if ((agp_bridge.agp_destroy_page!=NULL) &&
-			(agp_bridge.needs_scratch_page == TRUE))
-		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page_real));
+	if ((agp_bridge->agp_destroy_page!=NULL) &&
+			(agp_bridge->needs_scratch_page == TRUE))
+		agp_bridge->agp_destroy_page(phys_to_virt(agp_bridge->scratch_page_real));
 }
 
 static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
@@ -198,9 +199,9 @@ static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
 	switch(rq)
 	{
 		case PM_SUSPEND:
-			return agp_bridge.suspend();
+			return agp_bridge->suspend();
 		case PM_RESUME:
-			agp_bridge.resume();
+			agp_bridge->resume();
 			return 0;
 	}		
 	return 0;
@@ -251,14 +252,14 @@ int agp_register_driver (struct agp_driver *drv)
 	/* FIXME: What to do with this? */
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
 
-	pm_register(PM_PCI_DEV, PM_PCI_ID(agp_bridge.dev), agp_power);
+	pm_register(PM_PCI_DEV, PM_PCI_ID(agp_bridge->dev), agp_power);
 	agp_count++;
 	return 0;
 
 frontend_err:
 	agp_backend_cleanup();
 err_out:
-	agp_bridge.type = NOT_SUPPORTED;
+	agp_bridge->type = NOT_SUPPORTED;
 	module_put(drv->owner);
 	drv->dev = NULL;
 	return ret_val;
@@ -269,7 +270,7 @@ int agp_unregister_driver(struct agp_driver *drv)
 	if (drv->dev==NULL)
 		return -ENODEV;
 
-	agp_bridge.type = NOT_SUPPORTED;
+	agp_bridge->type = NOT_SUPPORTED;
 	pm_unregister_all(agp_power);
 	agp_frontend_cleanup();
 	agp_backend_cleanup();
@@ -290,7 +291,7 @@ int __init agp_init(void)
 	already_initialised = 1;
 
 	memset(&agp_bridge, 0, sizeof(struct agp_bridge_data));
-	agp_bridge.type = NOT_SUPPORTED;
+	agp_bridge->type = NOT_SUPPORTED;
 
 	printk(KERN_INFO "Linux agpgart interface v%d.%d (c) Dave Jones\n",
 	       AGPGART_VERSION_MAJOR, AGPGART_VERSION_MINOR);

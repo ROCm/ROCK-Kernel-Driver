@@ -20,15 +20,15 @@ static int via_fetch_size(void)
 	u16 temp;
 	struct aper_size_info_16 *values;
 
-	values = A_SIZE_16(agp_bridge.aperture_sizes);
-	pci_read_config_word(agp_bridge.dev, VIA_AGP3_APSIZE, &temp);
+	values = A_SIZE_16(agp_bridge->aperture_sizes);
+	pci_read_config_word(agp_bridge->dev, VIA_AGP3_APSIZE, &temp);
 	temp &= 0xfff;
 
-	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
-			agp_bridge.previous_size =
-				agp_bridge.current_size = (void *) (values + i);
-			agp_bridge.aperture_size_idx = i;
+			agp_bridge->previous_size =
+				agp_bridge->current_size = (void *) (values + i);
+			agp_bridge->aperture_size_idx = i;
 			return values[i].size;
 		}
 	}
@@ -40,15 +40,15 @@ static int via_configure(void)
 	u32 temp;
 	struct aper_size_info_16 *current_size;
     
-	current_size = A_SIZE_16(agp_bridge.current_size);
+	current_size = A_SIZE_16(agp_bridge->current_size);
 
 	/* address to map too */
-	pci_read_config_dword(agp_bridge.dev, VIA_APBASE, &temp);
-	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
+	pci_read_config_dword(agp_bridge->dev, VIA_APBASE, &temp);
+	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
 	/* attbase - aperture GATT base */
-	pci_write_config_dword(agp_bridge.dev, VIA_AGP3_ATTBASE,
-		agp_bridge.gatt_bus_addr & 0xfffff000);
+	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_ATTBASE,
+		agp_bridge->gatt_bus_addr & 0xfffff000);
 	return 0;
 }
 
@@ -56,24 +56,24 @@ static void via_cleanup(void)
 {
 	struct aper_size_info_16 *previous_size;
 
-	previous_size = A_SIZE_16(agp_bridge.previous_size);
-	pci_write_config_byte(agp_bridge.dev, VIA_APSIZE, previous_size->size_value);
+	previous_size = A_SIZE_16(agp_bridge->previous_size);
+	pci_write_config_byte(agp_bridge->dev, VIA_APSIZE, previous_size->size_value);
 }
 
 static void via_tlbflush(agp_memory * mem)
 {
 	u32 temp;
 
-	pci_read_config_dword(agp_bridge.dev, VIA_AGP3_GARTCTRL, &temp);
-	pci_write_config_dword(agp_bridge.dev, VIA_AGP3_GARTCTRL, temp & ~(1<<7));
-	pci_write_config_dword(agp_bridge.dev, VIA_AGP3_GARTCTRL, temp);
+	pci_read_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, temp & ~(1<<7));
+	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, temp);
 }
 
 static unsigned long via_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
 
-	return addr | agp_bridge.masks[0].mask;
+	return addr | agp_bridge->masks[0].mask;
 }
 
 static struct aper_size_info_16 via_generic_sizes[11] =
@@ -123,36 +123,36 @@ static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id
 
 	printk (KERN_INFO PFX "Detected VIA KT400 AGP3 chipset\n");
 
-	agp_bridge.dev = dev;
-	agp_bridge.type = VIA_APOLLO_KT400_3;
-	agp_bridge.capndx = cap_ptr;
-	agp_bridge.masks = via_generic_masks;
-	agp_bridge.aperture_sizes = (void *) via_generic_sizes;
-	agp_bridge.size_type = U8_APER_SIZE;
-	agp_bridge.num_aperture_sizes = 7;
-	agp_bridge.dev_private_data = NULL;
-	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.agp_enable = via_kt400_enable;
-	agp_bridge.configure = via_configure;
-	agp_bridge.fetch_size = via_fetch_size;
-	agp_bridge.cleanup = via_cleanup;
-	agp_bridge.tlb_flush = via_tlbflush;
-	agp_bridge.mask_memory = via_mask_memory;
-	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge.insert_memory = agp_generic_insert_memory;
-	agp_bridge.remove_memory = agp_generic_remove_memory;
-	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
-	agp_bridge.cant_use_aperture = 0;
+	agp_bridge->dev = dev;
+	agp_bridge->type = VIA_APOLLO_KT400_3;
+	agp_bridge->capndx = cap_ptr;
+	agp_bridge->masks = via_generic_masks;
+	agp_bridge->aperture_sizes = (void *) via_generic_sizes;
+	agp_bridge->size_type = U8_APER_SIZE;
+	agp_bridge->num_aperture_sizes = 7;
+	agp_bridge->dev_private_data = NULL;
+	agp_bridge->needs_scratch_page = FALSE;
+	agp_bridge->agp_enable = via_kt400_enable;
+	agp_bridge->configure = via_configure;
+	agp_bridge->fetch_size = via_fetch_size;
+	agp_bridge->cleanup = via_cleanup;
+	agp_bridge->tlb_flush = via_tlbflush;
+	agp_bridge->mask_memory = via_mask_memory;
+	agp_bridge->cache_flush = global_cache_flush;
+	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
+	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
+	agp_bridge->insert_memory = agp_generic_insert_memory;
+	agp_bridge->remove_memory = agp_generic_remove_memory;
+	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
+	agp_bridge->free_by_type = agp_generic_free_by_type;
+	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge->suspend = agp_generic_suspend;
+	agp_bridge->resume = agp_generic_resume;
+	agp_bridge->cant_use_aperture = 0;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
+	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
 
 	via_kt400_agp_driver.dev = dev;
 	agp_register_driver(&via_kt400_agp_driver);
@@ -193,7 +193,7 @@ static int __init agp_via_init(void)
 
 	ret_val = pci_module_init(&agp_via_pci_driver);
 	if (ret_val)
-		agp_bridge.type = NOT_SUPPORTED;
+		agp_bridge->type = NOT_SUPPORTED;
 
 	return ret_val;
 }

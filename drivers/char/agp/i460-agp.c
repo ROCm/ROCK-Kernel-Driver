@@ -96,7 +96,7 @@ static int i460_fetch_size (void)
 	struct aper_size_info_8 *values;
 
 	/* Determine the GART page size */
-	pci_read_config_byte(agp_bridge.dev, INTEL_I460_GXBCTL, &temp);
+	pci_read_config_byte(agp_bridge->dev, INTEL_I460_GXBCTL, &temp);
 	i460.io_page_shift = (temp & I460_4M_PS) ? 22 : 12;
 	pr_debug("i460_fetch_size: io_page_shift=%d\n", i460.io_page_shift);
 
@@ -107,9 +107,9 @@ static int i460_fetch_size (void)
 		return 0;
 	}
 
-	values = A_SIZE_8(agp_bridge.aperture_sizes);
+	values = A_SIZE_8(agp_bridge->aperture_sizes);
 
-	pci_read_config_byte(agp_bridge.dev, INTEL_I460_AGPSIZ, &temp);
+	pci_read_config_byte(agp_bridge->dev, INTEL_I460_AGPSIZ, &temp);
 
 	/* Exit now if the IO drivers for the GART SRAMS are turned off */
 	if (temp & I460_SRAM_IO_DISABLE) {
@@ -130,7 +130,7 @@ static int i460_fetch_size (void)
 	else
 		i460.dynamic_apbase = INTEL_I460_APBASE;
 
-	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
 		/*
 		 * Dynamically calculate the proper num_entries and page_order values for
 		 * the define aperture sizes. Take care not to shift off the end of
@@ -140,11 +140,11 @@ static int i460_fetch_size (void)
 		values[i].page_order = log2((sizeof(u32)*values[i].num_entries) >> PAGE_SHIFT);
 	}
 
-	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
 		/* Neglect control bits when matching up size_value */
 		if ((temp & I460_AGPSIZ_MASK) == values[i].size_value) {
-			agp_bridge.previous_size = agp_bridge.current_size = (void *) (values + i);
-			agp_bridge.aperture_size_idx = i;
+			agp_bridge->previous_size = agp_bridge->current_size = (void *) (values + i);
+			agp_bridge->aperture_size_idx = i;
 			return values[i].size;
 		}
 	}
@@ -166,8 +166,8 @@ static void i460_write_agpsiz (u8 size_value)
 {
 	u8 temp;
 
-	pci_read_config_byte(agp_bridge.dev, INTEL_I460_AGPSIZ, &temp);
-	pci_write_config_byte(agp_bridge.dev, INTEL_I460_AGPSIZ,
+	pci_read_config_byte(agp_bridge->dev, INTEL_I460_AGPSIZ, &temp);
+	pci_write_config_byte(agp_bridge->dev, INTEL_I460_AGPSIZ,
 			      ((temp & ~I460_AGPSIZ_MASK) | size_value));
 }
 
@@ -175,7 +175,7 @@ static void i460_cleanup (void)
 {
 	struct aper_size_info_8 *previous_size;
 
-	previous_size = A_SIZE_8(agp_bridge.previous_size);
+	previous_size = A_SIZE_8(agp_bridge->previous_size);
 	i460_write_agpsiz(previous_size->size_value);
 
 	if (I460_IO_PAGE_SHIFT > PAGE_SHIFT)
@@ -194,7 +194,7 @@ static int i460_configure (void)
 
 	temp.large = 0;
 
-	current_size = A_SIZE_8(agp_bridge.current_size);
+	current_size = A_SIZE_8(agp_bridge->current_size);
 	i460_write_agpsiz(current_size->size_value);
 
 	/*
@@ -202,14 +202,14 @@ static int i460_configure (void)
 	 * This has to be done since the AGP aperture can be above 4GB on
 	 * 460 based systems.
 	 */
-	pci_read_config_dword(agp_bridge.dev, i460.dynamic_apbase, &(temp.small[0]));
-	pci_read_config_dword(agp_bridge.dev, i460.dynamic_apbase + 4, &(temp.small[1]));
+	pci_read_config_dword(agp_bridge->dev, i460.dynamic_apbase, &(temp.small[0]));
+	pci_read_config_dword(agp_bridge->dev, i460.dynamic_apbase + 4, &(temp.small[1]));
 
 	/* Clear BAR control bits */
-	agp_bridge.gart_bus_addr = temp.large & ~((1UL << 3) - 1);
+	agp_bridge->gart_bus_addr = temp.large & ~((1UL << 3) - 1);
 
-	pci_read_config_byte(agp_bridge.dev, INTEL_I460_GXBCTL, &scratch);
-	pci_write_config_byte(agp_bridge.dev, INTEL_I460_GXBCTL,
+	pci_read_config_byte(agp_bridge->dev, INTEL_I460_GXBCTL, &scratch);
+	pci_write_config_byte(agp_bridge->dev, INTEL_I460_GXBCTL,
 			      (scratch & 0x02) | I460_GXBCTL_OOG | I460_GXBCTL_BWC);
 
 	/*
@@ -234,16 +234,16 @@ static int i460_create_gatt_table (void)
 	/*
 	 * Load up the fixed address of the GART SRAMS which hold our GATT table.
 	 */
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 	page_order = A_SIZE_8(temp)->page_order;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	i460.gatt = ioremap(INTEL_I460_ATTBASE, PAGE_SIZE << page_order);
 
 	/* These are no good, the should be removed from the agp_bridge strucure... */
-	agp_bridge.gatt_table_real = NULL;
-	agp_bridge.gatt_table = NULL;
-	agp_bridge.gatt_bus_addr = 0;
+	agp_bridge->gatt_table_real = NULL;
+	agp_bridge->gatt_table = NULL;
+	agp_bridge->gatt_bus_addr = 0;
 
 	for (i = 0; i < num_entries; ++i)
 		WR_GATT(i, 0);
@@ -256,7 +256,7 @@ static int i460_free_gatt_table (void)
 	int num_entries, i;
 	void *temp;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 
 	num_entries = A_SIZE_8(temp)->num_entries;
 
@@ -284,7 +284,7 @@ static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, in
 
 	io_pg_start = I460_IOPAGES_PER_KPAGE * pg_start;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	if ((io_pg_start + I460_IOPAGES_PER_KPAGE * mem->page_count) > num_entries) {
@@ -306,7 +306,7 @@ static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, in
 	for (i = 0, j = io_pg_start; i < mem->page_count; i++) {
 		paddr = mem->memory[i];
 		for (k = 0; k < I460_IOPAGES_PER_KPAGE; k++, j++, paddr += io_page_size)
-			WR_GATT(j, agp_bridge.mask_memory(paddr, mem->type));
+			WR_GATT(j, agp_bridge->mask_memory(paddr, mem->type));
 	}
 	WR_FLUSH_GATT(j - 1);
 	return 0;
@@ -364,7 +364,7 @@ static int i460_alloc_large_page (struct lp_desc *lp)
 
 	lp->paddr = virt_to_phys(lpage);
 	lp->refcount = 0;
-	atomic_add(I460_KPAGES_PER_IOPAGE, &agp_bridge.current_memory_agp);
+	atomic_add(I460_KPAGES_PER_IOPAGE, &agp_bridge->current_memory_agp);
 	return 0;
 }
 
@@ -374,7 +374,7 @@ static void i460_free_large_page (struct lp_desc *lp)
 	lp->alloced_map = NULL;
 
 	free_pages((unsigned long) phys_to_virt(lp->paddr), I460_IO_PAGE_SHIFT - PAGE_SHIFT);
-	atomic_sub(I460_KPAGES_PER_IOPAGE, &agp_bridge.current_memory_agp);
+	atomic_sub(I460_KPAGES_PER_IOPAGE, &agp_bridge->current_memory_agp);
 }
 
 static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, int type)
@@ -383,7 +383,7 @@ static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 	struct lp_desc *start, *end, *lp;
 	void *temp;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	/* Figure out what pg_start means in terms of our large GART pages */
@@ -417,7 +417,7 @@ static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 			if (i460_alloc_large_page(lp) < 0)
 				return -ENOMEM;
 			pg = lp - i460.lp_desc;
-			WR_GATT(pg, agp_bridge.mask_memory(lp->paddr, 0));
+			WR_GATT(pg, agp_bridge->mask_memory(lp->paddr, 0));
 			WR_FLUSH_GATT(pg);
 		}
 
@@ -439,7 +439,7 @@ static int i460_remove_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 	struct lp_desc *start, *end, *lp;
 	void *temp;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	/* Figure out what pg_start means in terms of our large GART pages */
@@ -519,43 +519,43 @@ static void i460_destroy_page (void *page)
 static unsigned long i460_mask_memory (unsigned long addr, int type)
 {
 	/* Make sure the returned address is a valid GATT entry */
-	return (agp_bridge.masks[0].mask
+	return (agp_bridge->masks[0].mask
 		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12));
 }
 
 static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
 {
-	agp_bridge.masks = i460_masks;
-	agp_bridge.aperture_sizes = (void *) i460_sizes;
-	agp_bridge.size_type = U8_APER_SIZE;
-	agp_bridge.num_aperture_sizes = 3;
-	agp_bridge.dev_private_data = NULL;
-	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.configure = i460_configure;
-	agp_bridge.fetch_size = i460_fetch_size;
-	agp_bridge.cleanup = i460_cleanup;
-	agp_bridge.tlb_flush = i460_tlb_flush;
-	agp_bridge.mask_memory = i460_mask_memory;
-	agp_bridge.agp_enable = agp_generic_agp_enable;
-	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = i460_create_gatt_table;
-	agp_bridge.free_gatt_table = i460_free_gatt_table;
+	agp_bridge->masks = i460_masks;
+	agp_bridge->aperture_sizes = (void *) i460_sizes;
+	agp_bridge->size_type = U8_APER_SIZE;
+	agp_bridge->num_aperture_sizes = 3;
+	agp_bridge->dev_private_data = NULL;
+	agp_bridge->needs_scratch_page = FALSE;
+	agp_bridge->configure = i460_configure;
+	agp_bridge->fetch_size = i460_fetch_size;
+	agp_bridge->cleanup = i460_cleanup;
+	agp_bridge->tlb_flush = i460_tlb_flush;
+	agp_bridge->mask_memory = i460_mask_memory;
+	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->cache_flush = global_cache_flush;
+	agp_bridge->create_gatt_table = i460_create_gatt_table;
+	agp_bridge->free_gatt_table = i460_free_gatt_table;
 #if I460_LARGE_IO_PAGES
-	agp_bridge.insert_memory = i460_insert_memory;
-	agp_bridge.remove_memory = i460_remove_memory;
-	agp_bridge.agp_alloc_page = i460_alloc_page;
-	agp_bridge.agp_destroy_page = i460_destroy_page;
+	agp_bridge->insert_memory = i460_insert_memory;
+	agp_bridge->remove_memory = i460_remove_memory;
+	agp_bridge->agp_alloc_page = i460_alloc_page;
+	agp_bridge->agp_destroy_page = i460_destroy_page;
 #else
-	agp_bridge.insert_memory = i460_insert_memory_small_io_page;
-	agp_bridge.remove_memory = i460_remove_memory_small_io_page;
-	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge->insert_memory = i460_insert_memory_small_io_page;
+	agp_bridge->remove_memory = i460_remove_memory_small_io_page;
+	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
 #endif
-	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
-	agp_bridge.cant_use_aperture = 1;
+	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
+	agp_bridge->free_by_type = agp_generic_free_by_type;
+	agp_bridge->suspend = agp_generic_suspend;
+	agp_bridge->resume = agp_generic_resume;
+	agp_bridge->cant_use_aperture = 1;
 	return 0;
 }
 
@@ -571,8 +571,8 @@ static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_de
 	if (cap_ptr == 0)
 		return -ENODEV;
 
-	agp_bridge.dev = dev;
-	agp_bridge.capndx = cap_ptr;
+	agp_bridge->dev = dev;
+	agp_bridge->capndx = cap_ptr;
 	intel_i460_setup(dev);
 	i460_agp_driver.dev = dev;
 	agp_register_driver(&i460_agp_driver);
@@ -605,7 +605,7 @@ static int __init agp_intel_i460_init(void)
 
 	ret_val = pci_module_init(&agp_intel_i460_pci_driver);
 	if (ret_val)
-		agp_bridge.type = NOT_SUPPORTED;
+		agp_bridge->type = NOT_SUPPORTED;
 
 	return ret_val;
 }
