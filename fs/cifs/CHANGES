@@ -1,3 +1,25 @@
+Version 0.68
+------------
+Fix search handle leak on rewind.  Fix setuid and gid so that they are 
+reflected in the local inode immediately.  Cleanup of whitespace
+to make 2.4 and 2.5 versions more consistent.
+
+
+Version 0.67
+------------
+Fix signal sending so that captive thread (cifsd) exits on umount 
+(which was causing the warning in kmem_cache_free of the request buffers
+at rmmod time).  This had broken as a sideeffect of the recent global
+kernel change to daemonize.  Fix memory leak in readdir code which
+showed up in "ls -R" (and applications that did search rewinding).
+
+Version 0.66
+------------
+Reconnect tids and fids after session reconnection (still do not
+reconnect byte range locks though).  Fix problem caching
+lookup information for directory inodes, improving performance,
+especially in deep directory trees.  Fix various build warnings.
+
 Version 0.65
 ------------
 Finish fixes to commit write for caching/readahead consistency.  fsx 

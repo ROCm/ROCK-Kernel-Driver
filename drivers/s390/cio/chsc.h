@@ -95,7 +95,7 @@ struct ssd_area {
 struct channel_path {
 	int id;
 	int state;
-	struct sys_device sdev;
+	struct device dev;
 };
 
 extern struct channel_path *chps[];

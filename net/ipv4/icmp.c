@@ -223,56 +223,27 @@ struct icmp_control {
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
 
 /*
- *	The ICMP socket. This is the most convenient way to flow control
+ *	The ICMP socket(s). This is the most convenient way to flow control
  *	our ICMP output as well as maintain a clean interface throughout
  *	all layers. All Socketless IP sends will soon be gone.
+ *
+ *	On SMP we have one ICMP socket per-cpu.
  */
-struct socket *icmp_socket;
+static DEFINE_PER_CPU(struct socket *, __icmp_socket) = NULL;
+#define icmp_socket	per_cpu(__icmp_socket, smp_processor_id())
 
-/* ICMPv4 socket is only a bit non-reenterable (unlike ICMPv6,
-   which is strongly non-reenterable). A bit later it will be made
-   reenterable and the lock may be removed then.
- */
-
-static int icmp_xmit_holder = -1;
-
-static int icmp_xmit_lock_bh(void)
+static __inline__ void icmp_xmit_lock(void)
 {
-	int rc;
-	if (!spin_trylock(&icmp_socket->sk->lock.slock)) {
-		rc = -EAGAIN;
-		if (icmp_xmit_holder == smp_processor_id())
-			goto out;
-		spin_lock(&icmp_socket->sk->lock.slock);
-	}
-	rc = 0;
-	icmp_xmit_holder = smp_processor_id();
-out:
-	return rc;
-}
-
-static __inline__ int icmp_xmit_lock(void)
-{
-	int ret;
 	local_bh_disable();
-	ret = icmp_xmit_lock_bh();
-	if (ret)
-		local_bh_enable();
-	return ret;
+
+	if (unlikely(!spin_trylock(&icmp_socket->sk->lock.slock)))
+		BUG();
 }
 
-static void icmp_xmit_unlock_bh(void)
+static void icmp_xmit_unlock(void)
 {
-	icmp_xmit_holder = -1;
-	spin_unlock(&icmp_socket->sk->lock.slock);
+	spin_unlock_bh(&icmp_socket->sk->lock.slock);
 }
-
-static __inline__ void icmp_xmit_unlock(void)
-{
-	icmp_xmit_unlock_bh();
-	local_bh_enable();
-}
-
 
 /*
  *	Send an ICMP frame.
@@ -404,9 +375,10 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 	struct rtable *rt = (struct rtable *)skb->dst;
 	u32 daddr;
 
-	if (ip_options_echo(&icmp_param->replyopts, skb) ||
-	    icmp_xmit_lock_bh())
+	if (ip_options_echo(&icmp_param->replyopts, skb))
 		goto out;
+
+	icmp_xmit_lock();
 
 	icmp_param->data.icmph.checksum = 0;
 	icmp_out_count(icmp_param->data.icmph.type);
@@ -434,7 +406,7 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 		icmp_push_reply(icmp_param, &ipc, rt);
 	ip_rt_put(rt);
 out_unlock:
-	icmp_xmit_unlock_bh();
+	icmp_xmit_unlock();
 out:;
 }
 
@@ -519,8 +491,7 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 		}
 	}
 
-	if (icmp_xmit_lock())
-		goto out;
+	icmp_xmit_lock();
 
 	/*
 	 *	Construct source address and options.
@@ -1141,19 +1112,30 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 void __init icmp_init(struct net_proto_family *ops)
 {
 	struct inet_opt *inet;
-	int err = sock_create(PF_INET, SOCK_RAW, IPPROTO_ICMP, &icmp_socket);
+	int i;
 
-	if (err < 0)
-		panic("Failed to create the ICMP control socket.\n");
-	icmp_socket->sk->allocation = GFP_ATOMIC;
-	icmp_socket->sk->sndbuf	    = SK_WMEM_MAX * 2;
-	inet	       = inet_sk(icmp_socket->sk);
-	inet->ttl      = MAXTTL;
-	inet->pmtudisc = IP_PMTUDISC_DONT;
+	for (i = 0; i < NR_CPUS; i++) {
+		int err;
 
-	/* Unhash it so that IP input processing does not even
-	 * see it, we do not wish this socket to see incoming
-	 * packets.
-	 */
-	icmp_socket->sk->prot->unhash(icmp_socket->sk);
+		if (!cpu_possible(i))
+			continue;
+
+		err = sock_create(PF_INET, SOCK_RAW, IPPROTO_ICMP,
+				  &per_cpu(__icmp_socket, i));
+
+		if (err < 0)
+			panic("Failed to create the ICMP control socket.\n");
+
+		per_cpu(__icmp_socket, i)->sk->allocation = GFP_ATOMIC;
+		per_cpu(__icmp_socket, i)->sk->sndbuf = SK_WMEM_MAX * 2;
+		inet = inet_sk(per_cpu(__icmp_socket, i)->sk);
+		inet->ttl = MAXTTL;
+		inet->pmtudisc = IP_PMTUDISC_DONT;
+
+		/* Unhash it so that IP input processing does not even
+		 * see it, we do not wish this socket to see incoming
+		 * packets.
+		 */
+		per_cpu(__icmp_socket, i)->sk->prot->unhash(per_cpu(__icmp_socket, i)->sk);
+	}
 }

@@ -9,8 +9,9 @@
  * Copyright (C) 1995, 1996, 1997, 1998 Jakub Jelinek   (jj@ultra.linux.cz)
  */
 
-
 #define __ASMS390_ELF_H
+
+#include <linux/time.h>
 
 /*
  * These are used to set parameters in the core dumps.
@@ -38,7 +39,7 @@
 #define ELF_PLAT_INIT(_r) \
 	do { \
 	_r->gprs[14] = 0; \
-	current->thread.flags |= S390_FLAG_31BIT; \
+	set_thread_flag(TIF_31BIT); \
 	} while(0)
 
 #define USE_ELF_CORE_DUMP
@@ -49,9 +50,7 @@
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
-#define ELF_ET_DYN_BASE         ((TASK31_SIZE & 0x80000000) \
-                                ? TASK31_SIZE / 3 * 2 \
-                                : 2 * TASK31_SIZE / 3)     
+#define ELF_ET_DYN_BASE         (TASK31_SIZE / 3 * 2)
 
 /* Wow, the "main" arch needs arch dependent functions too.. :) */
 
@@ -86,7 +85,6 @@
 
 #define ELF_PLATFORM (NULL)
 
-#ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2)			\
 do {							\
 	if (ibcs2)                                      \
@@ -94,7 +92,6 @@ do {							\
 	else if (current->personality != PER_LINUX32)   \
 		set_personality(PER_LINUX);             \
 } while (0)
-#endif 
 
 #include "linux32.h"
 
@@ -186,6 +183,14 @@ MODULE_AUTHOR("Gerhard Tonn <ton@de.ibm.com>");
 #undef MODULE_DESCRIPTION
 #undef MODULE_AUTHOR
 
+#define jiffies_to_timeval jiffies_to_compat_timeval
+static __inline__ void
+jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
+{
+	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
+	value->tv_sec = jiffies / HZ;
+}
+
 #include "../../../fs/binfmt_elf.c"
 
 static unsigned long
@@ -193,14 +198,17 @@ elf_map32 (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 {
 	unsigned long map_addr;
 
-	if(!addr)
-		addr = 0x40000000;
+	if (!addr) 
+		addr = 0x40000000; 
+
+	if (prot & PROT_READ) 
+		prot |= PROT_EXEC; 
 
 	down_write(&current->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
-			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, type,
+			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr),
+			   prot, type,
 			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
 	up_write(&current->mm->mmap_sem);
 	return(map_addr);
 }
-

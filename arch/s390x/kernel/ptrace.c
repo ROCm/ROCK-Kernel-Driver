@@ -58,7 +58,7 @@ static void FixPerRegisters(struct task_struct *task)
 	if (per_info->single_step) {
 		per_info->control_regs.bits.starting_addr = 0;
 #ifdef CONFIG_S390_SUPPORT
-		if (current->thread.flags & S390_FLAG_31BIT)
+		if (test_thread_flag(TIF_31BIT))
 			per_info->control_regs.bits.ending_addr = 0x7fffffffUL;
 		else
 #endif
@@ -290,7 +290,7 @@ static int peek_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 	addr_t offset;
 	__u32 tmp;
 
-	if (!(child->thread.flags & S390_FLAG_31BIT) ||
+	if (!test_thread_flag(TIF_31BIT) ||
 	    (addr & 3) || addr > sizeof(struct user) - 3)
 		return -EIO;
 
@@ -349,9 +349,8 @@ static int poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 	per_struct32 *dummy_per32 = NULL;
 	addr_t offset;
 	__u32 tmp;
-	int ret;
 
-	if (!(child->thread.flags & S390_FLAG_31BIT) ||
+	if (!test_thread_flag(TIF_31BIT) ||
 	    (addr & 3) || addr > sizeof(struct user32) - 3)
 		return -EIO;
 
@@ -382,7 +381,7 @@ static int poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 		 */
 		if (addr == (addr_t) &dummy32->regs.fp_regs.fpc &&
 		    (tmp & ~FPC_VALID_MASK) != 0)
-			/* Invalid floating pointer control. */
+			/* Invalid floating point control. */
 			return -EINVAL;
 	        offset = addr - (addr_t) &dummy32->regs.fp_regs;
 		*(__u32 *)((addr_t) &child->thread.fp_regs + offset) = tmp;
@@ -542,7 +541,7 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 	/* Do requests that differ for 31/64 bit */
 	default:
 #ifdef CONFIG_S390_SUPPORT
-		if (current->thread.flags & S390_FLAG_31BIT)
+		if (test_thread_flag(TIF_31BIT))
 			return do_ptrace_emu31(child, request, addr, data);
 #endif
 		return do_ptrace_normal(child, request, addr, data);
@@ -598,11 +597,9 @@ asmlinkage void syscall_trace(void)
 		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
-	current->exit_code =
-		SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ? 0x80 : 0);
-	current->state = TASK_STOPPED;
-	notify_parent(current, SIGCHLD);
-	schedule();
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+				 ? 0x80 : 0));
+
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

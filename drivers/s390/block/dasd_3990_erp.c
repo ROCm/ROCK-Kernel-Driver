@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.19 $
+ * $Revision: 1.20 $
  *
  * History of changes:
  * 05/14/01 fixed PL030160GTO (BUG() in erp_action_5)
@@ -454,7 +454,7 @@ dasd_3990_erp_action_4(dasd_ccw_req_t * erp, char *sense)
 
 	} else {
 
-		if (sense[25] & 0x1D) {	/* state change pending */
+		if (sense[25] == 0x1D) {	/* state change pending */
 
 			DEV_MESSAGE(KERN_INFO, device, "%s",
 				    "waiting for state change pending " "int");
@@ -464,6 +464,10 @@ dasd_3990_erp_action_4(dasd_ccw_req_t * erp, char *sense)
 		} else {
 
 			/* no state change pending - retry */
+			DEV_MESSAGE (KERN_INFO, device, 
+				     "redriving request immediately, "
+				     "%d retries left", 
+				     erp->retries);
 			erp->status = DASD_CQR_QUEUED;
 		}
 	}
@@ -2273,27 +2277,41 @@ dasd_3990_erp_add_erp(dasd_ccw_req_t * cqr)
 {
 
 	dasd_device_t *device = cqr->device;
+	struct ccw1 *ccw;
 
 	/* allocate additional request block */
 	dasd_ccw_req_t *erp;
 
-	erp = dasd_alloc_erp_request((char *) &cqr->magic, 1, 0, cqr->device);
+	erp = dasd_alloc_erp_request((char *) &cqr->magic, 2, 0, cqr->device);
 	if (IS_ERR(erp)) {
-		DEV_MESSAGE(KERN_ERR, device, "%s",
-			    "Unable to allocate ERP request");
-		cqr->status = DASD_CQR_FAILED;
+                if (cqr->retries <= 0) {
+		        DEV_MESSAGE(KERN_ERR, device, "%s",
+				    "Unable to allocate ERP request");
+			cqr->status = DASD_CQR_FAILED;
+                        cqr->stopclk = get_clock ();
+		} else {
+                        DEV_MESSAGE (KERN_ERR, device,
+                                     "Unable to allocate ERP request "
+				     "(%i retries left)",
+                                     cqr->retries);
+			dasd_set_timer(device, (HZ << 3));
+                }
 		return cqr;
 	}
 
 	/* initialize request with default TIC to current ERP/CQR */
-	erp->cpaddr->cmd_code = CCW_CMD_TIC;
-	erp->cpaddr->cda = (long) (cqr->cpaddr);
+	ccw = erp->cpaddr;
+	ccw->cmd_code = CCW_CMD_NOOP;
+	ccw->flags = CCW_FLAG_CC;
+	ccw++;
+	ccw->cmd_code = CCW_CMD_TIC;
+	ccw->cda      = (long)(cqr->cpaddr);
 	erp->function = dasd_3990_erp_add_erp;
-	erp->refers = cqr;
-	erp->device = cqr->device;
-	erp->magic = cqr->magic;
-	erp->expires = 0;
-	erp->retries = 256;
+	erp->refers   = cqr;
+	erp->device   = cqr->device;
+	erp->magic    = cqr->magic;
+	erp->expires  = 0;
+	erp->retries  = 256;
 
 	erp->status = DASD_CQR_FILLED;
 
@@ -2362,7 +2380,7 @@ dasd_3990_erp_error_match(dasd_ccw_req_t * cqr1, dasd_ccw_req_t * cqr2)
 	}
 
 	/* check sense data; byte 0-2,25,27 */
-	if (!((strncmp(cqr1->dstat->ecw, cqr2->dstat->ecw, 3) == 0) &&
+	if (!((memcmp (cqr1->dstat->ecw, cqr2->dstat->ecw, 3) == 0) &&
 	      (cqr1->dstat->ecw[27] == cqr2->dstat->ecw[27]) &&
 	      (cqr1->dstat->ecw[25] == cqr2->dstat->ecw[25]))) {
 
@@ -2549,7 +2567,7 @@ dasd_3990_erp_handle_match_erp(dasd_ccw_req_t * erp_head, dasd_ccw_req_t * erp)
 
 	if (erp->retries > 0) {
 
-		char *sense = erp->dstat->ecw;
+		char *sense = erp->refers->dstat->ecw;
 
 		/* check for special retries */
 		if (erp->function == dasd_3990_erp_action_4) {
@@ -2680,35 +2698,9 @@ dasd_3990_erp_action(dasd_ccw_req_t * cqr)
 		dasd_log_ccw(erp, 1, cpa);
 
 	/* enqueue added ERP request */
-	if ((erp != cqr) && (erp->status == DASD_CQR_FILLED)) {
+	if (erp->status == DASD_CQR_FILLED) {
 		erp->status = DASD_CQR_QUEUED;
 		list_add(&erp->list, &device->ccw_queue);
-	} else {
-		if ((erp->status == DASD_CQR_FILLED) || (erp != cqr)) {
-			/* something strange happened - log the error and throw a BUG() */
-			DEV_MESSAGE(KERN_ERR, device, "%s",
-				    "Problems with ERP chain!!! BUG");
-
-			/* print current erp_chain */
-			DEV_MESSAGE(KERN_DEBUG, device, "%s",
-				    "ERP chain at END of ERP-ACTION");
-			{
-				dasd_ccw_req_t *temp_erp = NULL;
-				for (temp_erp = erp;
-				     temp_erp != NULL;
-				     temp_erp = temp_erp->refers) {
-
-					DEV_MESSAGE(KERN_DEBUG, device,
-						    "	   erp %p (function %p)"
-						    " refers to %p",
-						    temp_erp,
-						    temp_erp->function,
-						    temp_erp->refers);
-				}
-			}
-			BUG();
-		}
-
 	}
 
 	return erp;

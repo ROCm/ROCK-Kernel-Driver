@@ -469,7 +469,7 @@ test_and_change_bit_simple(int nr, volatile unsigned long *ptr)
  * This routine doesn't need to be atomic.
  */
 
-static inline int __test_bit(int nr, volatile unsigned long *ptr)
+static inline int __test_bit(int nr, const volatile unsigned long *ptr)
 {
 	unsigned long addr;
 	unsigned char ch;
@@ -480,7 +480,7 @@ static inline int __test_bit(int nr, volatile unsigned long *ptr)
 }
 
 static inline int 
-__constant_test_bit(int nr, volatile unsigned long * addr) {
+__constant_test_bit(int nr, const volatile unsigned long * addr) {
     return (((volatile char *) addr)[(nr>>3)^3] & (1<<(nr&7))) != 0;
 }
 

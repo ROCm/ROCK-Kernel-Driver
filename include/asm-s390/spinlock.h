@@ -122,4 +122,17 @@ typedef struct {
                      : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
 		     : "2", "3", "cc" )
 
+extern inline int _raw_write_trylock(rwlock_t *rw)
+{
+	unsigned int result, reg;
+	
+	__asm__ __volatile__("   lhi  %0,1\n"
+			     "   sll  %0,31\n"
+			     "   basr %1,0\n"
+			     "0: cs   %0,%1,0(%3)\n"
+			     : "=&d" (result), "=&d" (reg), "+m" (rw->lock)
+			     : "a" (&rw->lock) : "cc" );
+	return !result;
+}
+
 #endif /* __ASM_SPINLOCK_H */

@@ -62,8 +62,9 @@ ccw_device_path_notoper(struct ccw_device *cdev)
 	sch = to_subchannel(cdev->dev.parent);
 	stsch (sch->irq, &sch->schib);
 
-	CIO_MSG_EVENT(0, "cio_process_irq(%04X) - path(s) %02x are "
-		      "not operational ", sch->irq, sch->schib.pmcw.pnom);
+	CIO_MSG_EVENT(0, "%s(%04X) - path(s) %02x are "
+		      "not operational \n", __FUNCTION__, sch->irq,
+		      sch->schib.pmcw.pnom);
 
 	sch->lpm &= ~sch->schib.pmcw.pnom;
 	dev_fsm_event(cdev, DEV_EVENT_VERIFY);
@@ -289,7 +290,7 @@ ccw_device_do_sense(struct ccw_device *cdev, struct irb *irb)
 	sch = to_subchannel(cdev->dev.parent);
 
 	/* A sense is required, can we do it now ? */
-	if (irb->scsw.actl != 0)
+	if ((irb->scsw.actl  & (SCSW_ACTL_DEVACT | SCSW_ACTL_SCHACT)) != 0)
 		/*
 		 * we received an Unit Check but we have no final
 		 *  status yet, therefore we must delay the SENSE
@@ -348,7 +349,7 @@ int
 ccw_device_accumulate_and_sense(struct ccw_device *cdev, struct irb *irb)
 {
 	ccw_device_accumulate_irb(cdev, irb);
-	if (irb->scsw.actl != 0)
+	if ((irb->scsw.actl  & (SCSW_ACTL_DEVACT | SCSW_ACTL_SCHACT)) != 0)
 		return -EBUSY;
 	/* Check for basic sense. */
 	if (cdev->private->flags.dosense &&

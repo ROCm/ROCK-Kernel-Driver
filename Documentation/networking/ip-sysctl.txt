@@ -619,6 +619,37 @@ ratelimit - INTEGER
 	0 to disable any limiting, otherwise the maximal rate in jiffies(1)
 	Default: 100
 
+use_tempaddr - INTEGER
+	Preference for Privacy Extensions (RFC3041).
+	  <= 0 : disable Privacy Extensions
+	  == 1 : enable Privacy Extensions, but prefer public
+	         addresses over temporary addresses.
+	  >  1 : enable Privacy Extensions and prefer temporary
+	         addresses over public addresses.
+	Default:  0 (for most devices)
+		 -1 (for point-to-point devices and loopback devices)
+
+temp_valid_lft - INTEGER
+	valid lifetime (in seconds) for temporary addresses.
+	Default: 604800 (7 days)
+
+temp_prefered_lft - INTEGER
+	Preferred lifetime (in seconds) for temorary addresses.
+	Default: 86400 (1 day)
+
+max_desync_factor - INTEGER
+	Maximum value for DESYNC_FACTOR, which is a random value
+	that ensures that clients don't synchronize with each 
+	other and generage new addresses at exactly the same time.
+	value is in seconds.
+	Default: 600
+	
+regen_max_retry - INTEGER
+	Number of attempts before give up attempting to generate
+	valid temporary addresses.
+	Default: 5
+
+
 IPv6 Update by:
 Pekka Savola <pekkas@netcore.fi>
 YOSHIFUJI Hideaki / USAGI Project <yoshfuji@linux-ipv6.org>

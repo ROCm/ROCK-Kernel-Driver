@@ -8,7 +8,7 @@ menu "Token Ring devices (depends on LLC=y)"
 # So far, we only have PCI, ISA, and MCA token ring devices
 config TR
 	bool "Token Ring driver support"
-	depends on (PCI || ISA || MCA) && LLC=y
+	depends on (PCI || ISA || MCA || CCW) && LLC=y
 	help
 	  Token Ring is IBM's way of communication on a local network; the
 	  rest of the world uses Ethernet. To participate on a Token Ring

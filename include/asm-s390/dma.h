@@ -13,4 +13,6 @@
 
 #define MAX_DMA_ADDRESS         0x80000000
 
+#define free_dma(x)
+
 #endif /* _ASM_DMA_H */

@@ -112,7 +112,4 @@ extern struct resource * __request_region(struct resource *, unsigned long start
 extern int __deprecated __check_region(struct resource *, unsigned long, unsigned long);
 extern void __release_region(struct resource *, unsigned long, unsigned long);
 
-#define get_ioport_list(buf)	get_resource_list(&ioport_resource, buf, PAGE_SIZE)
-#define get_mem_list(buf)	get_resource_list(&iomem_resource, buf, PAGE_SIZE)
-
 #endif	/* _LINUX_IOPORT_H */

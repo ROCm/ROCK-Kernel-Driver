@@ -24,7 +24,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/errno.h>

@@ -25,6 +25,7 @@
 #include <linux/compatmac.h>
 #include <linux/init.h>
 #include <linux/console.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -151,7 +152,7 @@ extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
         struct vm_area_struct * vma;
         unsigned long address;
 	int user_address;
-        unsigned long fixup;
+	const struct exception_table_entry *fixup;
 	int si_code = SEGV_MAPERR;
 
         tsk = current;
@@ -267,8 +268,9 @@ bad_area:
 
 no_context:
         /* Are we prepared to handle this kernel fault?  */
-        if ((fixup = search_exception_table(regs->psw.addr)) != 0) {
-                regs->psw.addr = fixup;
+	fixup = search_exception_tables(regs->psw.addr & 0x7fffffff);
+	if (fixup) {
+		regs->psw.addr = fixup->fixup | PSW_ADDR_AMODE31;
                 return;
         }
 

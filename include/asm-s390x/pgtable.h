@@ -544,5 +544,7 @@ typedef pte_t *pte_addr_t;
  */
 #define pgtable_cache_init()	do { } while (0)
 
+#define HAVE_ARCH_UNMAPPED_AREA
+
 #endif /* _S390_PAGE_H */
 

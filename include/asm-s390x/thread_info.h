@@ -77,6 +77,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_USEDFPU		16	/* FPU was used by this task this quantum (SMP) */
 #define TIF_POLLING_NRFLAG	17	/* true if poll_idle() is polling 
 					   TIF_NEED_RESCHED */
+#define TIF_31BIT		18	/* 32bit process */ 
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
@@ -85,6 +86,7 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_RESTART_SVC	(1<<TIF_RESTART_SVC)
 #define _TIF_USEDFPU		(1<<TIF_USEDFPU)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
+#define _TIF_31BIT		(1<<TIF_31BIT)
 
 #endif /* __KERNEL__ */
 

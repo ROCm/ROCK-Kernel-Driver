@@ -54,7 +54,7 @@ unsigned int ntlmv2_support = 0;
 unsigned int sign_CIFS_PDUs = 0;
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
-		      char *);
+			char *);
 extern int cifs_umount(struct super_block *, struct cifs_sb_info *);
 void cifs_proc_init(void);
 void cifs_proc_clean(void);
@@ -178,8 +178,10 @@ cifs_alloc_inode(struct super_block *sb)
 	cifs_inode->cifsAttrs = 0x20;	/* default */
 	atomic_set(&cifs_inode->inUse, 0);
 	cifs_inode->time = 0;
-    if(oplockEnabled)
-	    cifs_inode->clientCanCacheAll = 1;
+	if(oplockEnabled) {
+		cifs_inode->clientCanCacheRead = 1;
+		cifs_inode->clientCanCacheAll = 1;
+	}
 	INIT_LIST_HEAD(&cifs_inode->openFileList);
 	return &cifs_inode->vfs_inode;
 }

@@ -1328,12 +1328,12 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 	err |= put_user(high2lowgid(stat->gid), &statbuf->st_gid);
 	err |= put_user(stat->rdev, &statbuf->st_rdev);
 	err |= put_user(stat->size, &statbuf->st_size);
-	err |= put_user(stat->atime, &statbuf->st_atime);
-	err |= put_user(0, &statbuf->__unused1);
-	err |= put_user(stat->mtime, &statbuf->st_mtime);
-	err |= put_user(0, &statbuf->__unused2);
-	err |= put_user(stat->ctime, &statbuf->st_ctime);
-	err |= put_user(0, &statbuf->__unused3);
+	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
+	err |= put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
+	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
+	err |= put_user(stat->mtime.tv_nsec, &statbuf->st_mtime_nsec);
+	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
+	err |= put_user(stat->ctime.tv_nsec, &statbuf->st_ctime_nsec);
 	err |= put_user(stat->blksize, &statbuf->st_blksize);
 	err |= put_user(stat->blocks, &statbuf->st_blocks);
 /* fixme
@@ -2700,8 +2700,7 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	int retval;
 	int i;
 
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
+	sched_balance_exec();
 
 	file = open_exec(filename);
 
@@ -2709,21 +2708,32 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	if (IS_ERR(file))
 		return retval;
 
+	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
+	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
+
 	bprm.file = file;
 	bprm.filename = filename;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-	if ((bprm.argc = count32(argv)) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
-	if ((bprm.envc = count32(envp)) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.envc;
-	}
+	bprm.mm = mm_alloc();
+	retval = -ENOMEM;
+	if (!bprm.mm)
+		goto out_file;
+
+	/* init_new_context is empty for s390x. */
+
+	bprm.argc = count32(argv);
+	if ((retval = bprm.argc) < 0)
+		goto out_mm;
+
+	bprm.envc = count32(envp);
+	if ((retval = bprm.envc) < 0)
+		goto out_mm;
+
+	retval = security_bprm_alloc(&bprm);
+	if (retval)
+		goto out;
 
 	retval = prepare_binprm(&bprm);
 	if (retval < 0)
@@ -2743,19 +2753,31 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 		goto out;
 
 	retval = search_binary_handler(&bprm, regs);
-	if (retval >= 0)
+	if (retval >= 0) {
 		/* execve success */
+		security_bprm_free(&bprm);
 		return retval;
+	}
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	allow_write_access(bprm.file);
-	if (bprm.file)
-		fput(bprm.file);
+	for (i=0 ; i<MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
 
-	for (i=0 ; i<MAX_ARG_PAGES ; i++)
-		if (bprm.page[i])
-			__free_page(bprm.page[i]);
+	if (bprm.security)
+		security_bprm_free(&bprm);
+
+out_mm:
+	mmdrop(bprm.mm);
+
+out_file:
+	if (bprm.file) {
+		allow_write_access(bprm.file);
+		fput(bprm.file);
+	}
 
 	return retval;
 }
@@ -2814,265 +2836,6 @@ struct module_info32 {
 	u32 size;
 	u32 flags;
 	s32 usecount;
-};
-
-/* Query various bits about modules.  */
-
-static inline long
-get_mod_name(const char *user_name, char **buf)
-{
-	unsigned long page;
-	long retval;
-
-	if ((unsigned long)user_name >= TASK_SIZE
-	    && !segment_eq(get_fs (), KERNEL_DS))
-		return -EFAULT;
-
-	page = __get_free_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
-
-	retval = strncpy_from_user((char *)page, user_name, PAGE_SIZE);
-	if (retval > 0) {
-		if (retval < PAGE_SIZE) {
-			*buf = (char *)page;
-			return retval;
-		}
-		retval = -ENAMETOOLONG;
-	} else if (!retval)
-		retval = -EINVAL;
-
-	free_page(page);
-	return retval;
-}
-
-static inline void
-put_mod_name(char *buf)
-{
-	free_page((unsigned long)buf);
-}
-
-static __inline__ struct module *find_module(const char *name)
-{
-	struct module *mod;
-
-	for (mod = module_list; mod ; mod = mod->next) {
-		if (mod->flags & MOD_DELETED)
-			continue;
-		if (!strcmp(mod->name, name))
-			break;
-	}
-
-	return mod;
-}
-
-static int
-qm_modules(char *buf, size_t bufsize, compat_size_t *ret)
-{
-	struct module *mod;
-	size_t nmod, space, len;
-
-	nmod = space = 0;
-
-	for (mod = module_list; mod->next != NULL; mod = mod->next, ++nmod) {
-		len = strlen(mod->name)+1;
-		if (len > bufsize)
-			goto calc_space_needed;
-		if (copy_to_user(buf, mod->name, len))
-			return -EFAULT;
-		buf += len;
-		bufsize -= len;
-		space += len;
-	}
-
-	if (put_user(nmod, ret))
-		return -EFAULT;
-	else
-		return 0;
-
-calc_space_needed:
-	space += len;
-	while ((mod = mod->next)->next != NULL)
-		space += strlen(mod->name)+1;
-
-	if (put_user(space, ret))
-		return -EFAULT;
-	else
-		return -ENOSPC;
-}
-
-static int
-qm_deps(struct module *mod, char *buf, size_t bufsize, compat_size_t *ret)
-{
-	size_t i, space, len;
-
-	if (mod->next == NULL)
-		return -EINVAL;
-	if (!MOD_CAN_QUERY(mod))
-		return put_user(0, ret);
-
-	space = 0;
-	for (i = 0; i < mod->ndeps; ++i) {
-		const char *dep_name = mod->deps[i].dep->name;
-
-		len = strlen(dep_name)+1;
-		if (len > bufsize)
-			goto calc_space_needed;
-		if (copy_to_user(buf, dep_name, len))
-			return -EFAULT;
-		buf += len;
-		bufsize -= len;
-		space += len;
-	}
-
-	return put_user(i, ret);
-
-calc_space_needed:
-	space += len;
-	while (++i < mod->ndeps)
-		space += strlen(mod->deps[i].dep->name)+1;
-
-	if (put_user(space, ret))
-		return -EFAULT;
-	else
-		return -ENOSPC;
-}
-
-static int
-qm_refs(struct module *mod, char *buf, size_t bufsize, compat_size_t *ret)
-{
-	size_t nrefs, space, len;
-	struct module_ref *ref;
-
-	if (mod->next == NULL)
-		return -EINVAL;
-	if (!MOD_CAN_QUERY(mod))
-		if (put_user(0, ret))
-			return -EFAULT;
-		else
-			return 0;
-
-	space = 0;
-	for (nrefs = 0, ref = mod->refs; ref ; ++nrefs, ref = ref->next_ref) {
-		const char *ref_name = ref->ref->name;
-
-		len = strlen(ref_name)+1;
-		if (len > bufsize)
-			goto calc_space_needed;
-		if (copy_to_user(buf, ref_name, len))
-			return -EFAULT;
-		buf += len;
-		bufsize -= len;
-		space += len;
-	}
-
-	if (put_user(nrefs, ret))
-		return -EFAULT;
-	else
-		return 0;
-
-calc_space_needed:
-	space += len;
-	while ((ref = ref->next_ref) != NULL)
-		space += strlen(ref->ref->name)+1;
-
-	if (put_user(space, ret))
-		return -EFAULT;
-	else
-		return -ENOSPC;
-}
-
-static inline int
-qm_symbols(struct module *mod, char *buf, size_t bufsize, compat_size_t *ret)
-{
-	size_t i, space, len;
-	struct module_symbol *s;
-	char *strings;
-	unsigned *vals;
-
-	if (!MOD_CAN_QUERY(mod))
-		if (put_user(0, ret))
-			return -EFAULT;
-		else
-			return 0;
-
-	space = mod->nsyms * 2*sizeof(u32);
-
-	i = len = 0;
-	s = mod->syms;
-
-	if (space > bufsize)
-		goto calc_space_needed;
-
-	if (!access_ok(VERIFY_WRITE, buf, space))
-		return -EFAULT;
-
-	bufsize -= space;
-	vals = (unsigned *)buf;
-	strings = buf+space;
-
-	for (; i < mod->nsyms ; ++i, ++s, vals += 2) {
-		len = strlen(s->name)+1;
-		if (len > bufsize)
-			goto calc_space_needed;
-
-		if (copy_to_user(strings, s->name, len)
-		    || __put_user(s->value, vals+0)
-		    || __put_user(space, vals+1))
-			return -EFAULT;
-
-		strings += len;
-		bufsize -= len;
-		space += len;
-	}
-
-	if (put_user(i, ret))
-		return -EFAULT;
-	else
-		return 0;
-
-calc_space_needed:
-	for (; i < mod->nsyms; ++i, ++s)
-		space += strlen(s->name)+1;
-
-	if (put_user(space, ret))
-		return -EFAULT;
-	else
-		return -ENOSPC;
-}
-
-static inline int
-qm_info(struct module *mod, char *buf, size_t bufsize, compat_size_t *ret)
-{
-	int error = 0;
-
-	if (mod->next == NULL)
-		return -EINVAL;
-
-	if (sizeof(struct module_info32) <= bufsize) {
-		struct module_info32 info;
-		info.addr = (unsigned long)mod;
-		info.size = mod->size;
-		info.flags = mod->flags;
-		info.usecount =
-			((mod_member_present(mod, can_unload)
-			  && mod->can_unload)
-			 ? -1 : atomic_read(&mod->uc.usecount));
-
-		if (copy_to_user(buf, &info, sizeof(struct module_info32)))
-			return -EFAULT;
-	} else
-		error = -ENOSPC;
-
-	if (put_user(sizeof(struct module_info32), ret))
-		return -EFAULT;
-
-	return error;
-}
-
-struct kernel_sym32 {
-	u32 value;
-	char name[60];
 };
 
 #else /* CONFIG_MODULES */
@@ -4068,4 +3831,22 @@ asmlinkage compat_ssize_t sys32_write(unsigned int fd, char * buf, size_t count)
 		return -EINVAL; 
 
 	return sys_write(fd, buf, count);
+}
+
+asmlinkage int sys32_clone(struct pt_regs regs)
+{
+        unsigned long clone_flags;
+        unsigned long newsp;
+	struct task_struct *p;
+	int *parent_tidptr, *child_tidptr;
+
+        clone_flags = regs.gprs[3] & 0xffffffffUL;
+        newsp = regs.orig_gpr2 & 0x7fffffffUL;
+	parent_tidptr = (int *) (regs.gprs[4] & 0x7fffffffUL);
+	child_tidptr = (int *) (regs.gprs[5] & 0x7fffffffUL);
+        if (!newsp)
+                newsp = regs.gprs[15];
+        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+		    parent_tidptr, child_tidptr);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }

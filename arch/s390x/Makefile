@@ -19,7 +19,7 @@ LDFLAGS_vmlinux := -e start
 MODFLAGS += -fpic -D__PIC__
 LDFLAGS_BLOB	:= --format binary --oformat elf64-s390
 
-CFLAGS += -pipe -fno-strength-reduce
+CFLAGS += -pipe -fno-strength-reduce -finline-limit=10000 -Wno-sign-compare
 
 head-y := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
 

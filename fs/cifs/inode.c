@@ -86,11 +86,8 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
-			cFYI(1, (" Alloc new inode %p ", *pinode));
 		}
 		inode = *pinode;
-/*        new_inode = iget(parent_dir_inode->i_sb, findData.IndexNumber); */
-        /* index number not reliable in response data */
 
 		cifsInfo = CIFS_I(inode);
 
@@ -215,7 +212,6 @@ cifs_get_inode_info(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
-			cFYI(1, (" Alloc new inode %p ", *pinode));
 		}
 
 		inode = *pinode;
@@ -457,8 +453,8 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	if (pTcon != cifs_sb_target->tcon) {    
 		return -EXDEV;	/* BB actually could be allowed if same server, but
                      different share. Might eventually add support for this */
-        FreeXid(xid);
-    }
+        	FreeXid(xid);
+	}
 
 	fromName = build_path_from_dentry(source_direntry);
 	toName = build_path_from_dentry(target_direntry);
@@ -494,20 +490,25 @@ cifs_revalidate(struct dentry *direntry)
 
 	full_path = build_path_from_dentry(direntry);
 	cFYI(1,
-	     (" full path: %s for inode 0x%p with count %d dentry: 0x%p d_time %ld at time %ld ",
+	     ("Revalidate full path: %s for inode 0x%p with count %d dentry: 0x%p d_time %ld at time %ld ",
 	      full_path, direntry->d_inode,
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
 
 	cifsInode = CIFS_I(direntry->d_inode);
-/* BB add check - do not need to revalidate oplocked files */
-	if ((time_before(jiffies, cifsInode->time + HZ))
-	    && (direntry->d_inode->i_nlink == 1)) {
-		cFYI(1, (" Do not need to revalidate "));
-		if (full_path)
-			kfree(full_path);
-		FreeXid(xid);
-		return rc;
+	/* BB add check - do not need to revalidate oplocked files */
+
+	if (time_before(jiffies, cifsInode->time + HZ)) {
+	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
+              (direntry->d_inode->i_nlink == 1)) {
+		    if (full_path)
+			    kfree(full_path);
+		    FreeXid(xid);
+		    return rc;
+        } else {
+            cFYI(1,("Have to revalidate file due to hardlinks"));
+        }
+            
 	}
 
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
@@ -660,7 +661,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 
 	if ((cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 	    && (attrs->ia_valid & (ATTR_MODE | ATTR_GID | ATTR_UID)))
-		CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode, uid, gid,
+		rc = CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode, uid, gid,
 				    cifs_sb->local_nls);
 	else {			/* BB to be implemented - via Windows security descriptors */
 		/* CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,uid,gid,cifs_sb->local_nls);*/
@@ -697,8 +698,9 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
 				     cifs_sb->local_nls);
 	}
-/*	cifsInode->time = 0; */ /* force revalidate to get attributes when needed */
 
+	/* do not  need local check to inode_check_ok since the server does that */
+	inode_setattr(direntry->d_inode, attrs);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);

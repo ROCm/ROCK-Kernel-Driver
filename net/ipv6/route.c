@@ -574,15 +574,17 @@ out:
    Remove it only when all the things will work!
  */
 
-static void ipv6_wash_prefix(struct in6_addr *pfx, int plen)
+static void ipv6_addr_prefix(struct in6_addr *pfx,
+			     const struct in6_addr *addr, int plen)
 {
 	int b = plen&0x7;
-	int o = (plen + 7)>>3;
+	int o = plen>>3;
 
+	memcpy(pfx->s6_addr, addr, o);
 	if (o < 16)
 		memset(pfx->s6_addr + o, 0, 16 - o);
 	if (b != 0)
-		pfx->s6_addr[plen>>3] &= (0xFF<<(8-b));
+		pfx->s6_addr[o] = addr->s6_addr[o]&(0xff00 >> b);
 }
 
 static int ipv6_get_mtu(struct net_device *dev)
@@ -655,16 +657,16 @@ int ip6_route_add(struct in6_rtmsg *rtmsg)
 			goto out;
 	}
 
-	ipv6_addr_copy(&rt->rt6i_dst.addr, &rtmsg->rtmsg_dst);
+	ipv6_addr_prefix(&rt->rt6i_dst.addr, 
+			 &rtmsg->rtmsg_dst, rtmsg->rtmsg_dst_len);
 	rt->rt6i_dst.plen = rtmsg->rtmsg_dst_len;
 	if (rt->rt6i_dst.plen == 128)
 	       rt->u.dst.flags = DST_HOST;
-	ipv6_wash_prefix(&rt->rt6i_dst.addr, rt->rt6i_dst.plen);
 
 #ifdef CONFIG_IPV6_SUBTREES
-	ipv6_addr_copy(&rt->rt6i_src.addr, &rtmsg->rtmsg_src);
+	ipv6_addr_prefix(&rt->rt6i_src.addr, 
+			 &rtmsg->rtmsg_src, rtmsg->rtmsg_src_len);
 	rt->rt6i_src.plen = rtmsg->rtmsg_src_len;
-	ipv6_wash_prefix(&rt->rt6i_src.addr, rt->rt6i_src.plen);
 #endif
 
 	rt->rt6i_metric = rtmsg->rtmsg_metric;

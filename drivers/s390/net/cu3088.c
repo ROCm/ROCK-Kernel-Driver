@@ -1,5 +1,5 @@
 /*
- * $Id: cu3088.c,v 1.22 2002/12/10 09:53:55 cohuck Exp $
+ * $Id: cu3088.c,v 1.26 2003/01/17 13:46:13 cohuck Exp $
  *
  * CTC / LCS ccw_device driver
  *
@@ -25,8 +25,6 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/device.h>
-#include <linux/slab.h>
 
 #include <asm/ccwdev.h>
 #include <asm/ccwgroup.h>
@@ -146,10 +144,8 @@ cu3088_init (void)
 	if (rc)
 		return rc;
 	rc = ccw_driver_register(&cu3088_driver);
-	if (rc) {
+	if (rc)
 		device_unregister(&cu3088_root_dev);
-		return rc;
-	}
 
 	return rc;
 }
@@ -168,5 +164,6 @@ MODULE_LICENSE("GPL");
 module_init(cu3088_init);
 module_exit(cu3088_exit);
 
+EXPORT_SYMBOL_GPL(cu3088_type);
 EXPORT_SYMBOL_GPL(register_cu3088_discipline);
 EXPORT_SYMBOL_GPL(unregister_cu3088_discipline);

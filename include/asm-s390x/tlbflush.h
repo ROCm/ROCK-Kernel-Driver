@@ -88,15 +88,17 @@ static inline void global_flush_tlb(void)
 
 static inline void __flush_tlb_mm(struct mm_struct * mm)
 {
+	preempt_disable();
 	if (mm->cpu_vm_mask != (1UL << smp_processor_id())) {
 		/* mm was active on more than one cpu. */
 		if (mm == current->active_mm &&
-		    atomic_read(&mm->mm_count) == 1)
+		    atomic_read(&mm->mm_users) == 1)
 			/* this cpu is the only one using the mm. */
 			mm->cpu_vm_mask = 1UL << smp_processor_id();
 		global_flush_tlb();
 	} else
 		local_flush_tlb();
+	preempt_enable();
 }
 
 static inline void flush_tlb(void)

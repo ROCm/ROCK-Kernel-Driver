@@ -141,6 +141,8 @@ ccw_device_sense_pgid_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	struct subchannel *sch;
 	struct irb *irb;
 	int ret;
+	int opm;
+	int i;
 
 	irb = (struct irb *) __LC_IRB;
 	/* Ignore unsolicited interrupts. */
@@ -154,6 +156,16 @@ ccw_device_sense_pgid_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	/* 0, -ETIME, -EOPNOTSUPP, -EAGAIN, -EACCES or -EUSERS */
 	case 0:			/* Sense Path Group ID successful. */
 		cdev->private->flags.pgid_supp = 1;
+		opm = sch->schib.pmcw.pim &
+			sch->schib.pmcw.pam &
+			sch->schib.pmcw.pom;
+		for (i=0;i<8;i++) {
+			if (opm == (0x80 << i)) {
+				/* Don't group single path devices. */
+				cdev->private->flags.pgid_supp = 0;
+				break;
+			}
+		}
 		if (cdev->private->pgid.inf.ps.state1 == SNID_STATE1_RESET)
 			memcpy(&cdev->private->pgid, &global_pgid,
 			       sizeof(struct pgid));

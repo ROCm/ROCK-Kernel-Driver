@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.71 $
+ * $Revision: 1.74 $
  *
  * History of changes (starts July 2000)
  * 11/09/00 complete redesign after code review
@@ -1656,17 +1656,20 @@ dasd_setup_blkdev(dasd_device_t * device)
 	device->request_queue = kmalloc(sizeof (request_queue_t), GFP_KERNEL);
 	if (device->request_queue == NULL)
 		return -ENOMEM;
+	memset(device->request_queue, 0, sizeof(request_queue_t));
 	device->request_queue->queuedata = device;
 	rc = blk_init_queue(device->request_queue, do_dasd_request,
 			    &device->request_queue_lock);
 	if (rc)
 		return rc;
+#if 0
 	elevator_exit(device->request_queue);
 	rc = elevator_init(device->request_queue, &elevator_noop);
 	if (rc) {
 		blk_cleanup_queue(device->request_queue);
 		return rc;
 	}
+#endif
 	blk_queue_hardsect_size(device->request_queue, device->bp_block);
 	max = device->discipline->max_blocks << device->s2b_shift;
 	blk_queue_max_sectors(device->request_queue, max);

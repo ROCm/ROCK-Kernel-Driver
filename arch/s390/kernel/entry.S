@@ -616,7 +616,8 @@ sys_call_table:
 	.long  sys_epoll_ctl		 /* 250 */
 	.long  sys_epoll_wait
 	.long  sys_set_tid_address
-	.rept  255-252
+	.long  sys_fadvise64
+	.rept  255-253
 	.long  sys_ni_syscall
 	.endr
 

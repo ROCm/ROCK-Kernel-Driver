@@ -21,7 +21,6 @@
  *	o	Return an optlen of the truncated length if need be
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/errno.h>

@@ -49,11 +49,11 @@ struct compat_stat {
 	u32		st_blksize;
 	u32		st_blocks;
 	u32		st_atime;
-	u32		__unused1;
+	u32		st_atime_nsec;
 	u32		st_mtime;
-	u32		__unused2;
+	u32		st_mtime_nsec;
 	u32		st_ctime;
-	u32		__unused3;
+	u32		st_ctime_nsec;
 	u32		__unused4;
 	u32		__unused5;
 };

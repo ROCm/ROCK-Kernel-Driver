@@ -42,9 +42,11 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
+	struct mm_struct *mm = current->mm;
 	int i;
 
 	stack_base = STACK_TOP - MAX_ARG_PAGES*PAGE_SIZE;
+	mm->arg_start = bprm->p + stack_base;
 
 	bprm->p += stack_base;
 	if (bprm->loader)
@@ -55,9 +57,14 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 	if (!mpnt) 
 		return -ENOMEM; 
 	
-	down_write(&current->mm->mmap_sem);
+	if (!vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+		kmem_cache_free(vm_area_cachep, mpnt);
+		return -ENOMEM;
+	}
+
+	down_write(&mm->mmap_sem);
 	{
-		mpnt->vm_mm = current->mm;
+		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = STACK_TOP;
 		mpnt->vm_page_prot = PAGE_COPY;
@@ -65,9 +72,10 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
+		INIT_LIST_HEAD(&mpnt->shared);
 		mpnt->vm_private_data = (void *) 0;
-		insert_vm_struct(current->mm, mpnt);
-		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+		insert_vm_struct(mm, mpnt);
+		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	} 
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
@@ -78,7 +86,7 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 		}
 		stack_base += PAGE_SIZE;
 	}
-	up_write(&current->mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	
 	return 0;
 }

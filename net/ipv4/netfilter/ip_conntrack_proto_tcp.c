@@ -1,4 +1,3 @@
-#define __NO_VERSION__
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/timer.h>

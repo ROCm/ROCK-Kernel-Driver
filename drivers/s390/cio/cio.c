@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.90 $
+ *   $Revision: 1.91 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -197,8 +197,7 @@ cio_start (struct subchannel *sch,	/* subchannel structure */
 	sch->orb.pfch = sch->options.prefetch == 0;
 	sch->orb.spnd = sch->options.suspend;
 	sch->orb.ssic = sch->options.suspend && sch->options.inter;
-	sch->orb.lpm = (lpm != 0) ? (lpm & sch->lpm) : sch->lpm;
-
+	sch->orb.lpm = (lpm != 0) ? lpm : sch->lpm;
 #ifdef CONFIG_ARCH_S390X
 	/*
 	 * for 64 bit we always support 64 bit IDAWs with 4k page size only

@@ -12,7 +12,6 @@
  * Copyright (C) 1995, 1996, 1997 Olaf Kirch <okir@monad.swb.de>
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/init.h>

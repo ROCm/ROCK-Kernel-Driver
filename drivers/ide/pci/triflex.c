@@ -49,6 +49,7 @@ static struct pci_dev *triflex_dev;
 static int triflex_get_info(char *buf, char **addr, off_t offset, int count)
 {
 	char *p = buf;
+	int len;
 
 	struct pci_dev *dev	= triflex_dev;
 	unsigned long bibma = pci_resource_start(dev, 4);
@@ -85,8 +86,11 @@ static int triflex_get_info(char *buf, char **addr, off_t offset, int count)
 
 	p += sprintf(p, "DMA\n");
 	p += sprintf(p, "PIO\n");
+
+	len = (p - buf) - offset;
+	*addr = buf + offset;
 	
-	return p-buf;
+	return len > count ? count : len;
 }
 
 static int triflex_tune_chipset(ide_drive_t *drive, u8 xferspeed)

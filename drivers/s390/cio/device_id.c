@@ -136,7 +136,7 @@ VM_virtual_device_info (__u16 devno, struct senseid *ps)
 	ccode = diag210 (&diag_data);
 	ps->reserved = 0xff;
 
-	/* Special case for bloddy osa devices. */
+	/* Special case for bloody osa devices. */
 	if (diag_data.vrdcvcla == 0x02 &&
 	    diag_data.vrdcvtyp == 0x20) {
 		ps->cu_type = 0x3088;
