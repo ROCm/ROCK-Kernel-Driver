@@ -150,8 +150,7 @@ nfs_async_unlink_release(struct rpc_task *task)
 
 /**
  * nfs_async_unlink - asynchronous unlinking of a file
- * @dir: directory in which the file resides.
- * @name: name of the file to unlink.
+ * @dentry: dentry to unlink
  */
 int
 nfs_async_unlink(struct dentry *dentry)
@@ -190,7 +189,7 @@ nfs_async_unlink(struct dentry *dentry)
 }
 
 /**
- * nfs_complete_remove - Initialize completion of the sillydelete
+ * nfs_complete_unlink - Initialize completion of the sillydelete
  * @dentry: dentry to delete
  *
  * Since we're most likely to be called by dentry_iput(), we
