@@ -53,6 +53,7 @@ struct thread_info {
 	__u32			cpu_domain;	/* cpu domain */
 	struct cpu_context_save	cpu_context;	/* cpu context */
 	__u8			used_cp[16];	/* thread used copro */
+	unsigned long		tp_value;
 	union fp_state		fpstate;
 	union vfp_state		vfpstate;
 	struct restart_block	restart_block;
