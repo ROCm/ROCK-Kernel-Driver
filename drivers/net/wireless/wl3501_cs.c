@@ -804,6 +804,7 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 				       &(this->bss_set[i].beacon_period),
 				       (char *)&(signal.beacon_period), 73);
 				this->bss_cnt++;
+				this->rssi = signal.rssi;
 			}
 		}
 	} else if (signal.status == WL3501_STATUS_TIMEOUT &&
@@ -1890,6 +1891,17 @@ static int wl3501_get_mode(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_get_sens(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+
+	wrqu->sens.value = this->rssi;
+	wrqu->sens.disabled = !wrqu->sens.value;
+	wrqu->sens.fixed = 1;
+	return 0;
+}
+
 static int wl3501_get_range(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
@@ -1908,6 +1920,28 @@ static int wl3501_get_range(struct net_device *dev,
 	range->throughput		= 2 * 1000 * 1000;     /* ~2 Mb/s */
 	/* FIXME: study the code to fill in more fields... */
 	return 0;
+}
+
+static int wl3501_set_wap(struct net_device *dev, struct iw_request_info *info,
+			  union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	static const unsigned char bcast[ETH_ALEN] =
+					{ 255, 255, 255, 255, 255, 255 };
+	int rc = -EINVAL;
+
+	/* FIXME: we support other ARPHRDs...*/
+	if (wrqu->ap_addr.sa_family != ARPHRD_ETHER)
+		goto out;
+	if (!memcmp(bcast, wrqu->ap_addr.sa_data, ETH_ALEN)) {
+		/* FIXME: rescan? */
+	} else {
+		memcpy(&this->bssid, wrqu->ap_addr.sa_data, ETH_ALEN);
+		/* FIXME: rescan? deassoc & scan? */
+	}
+	rc = 0;
+out:
+	return rc;
 }
 
 static int wl3501_get_wap(struct net_device *dev, struct iw_request_info *info,
@@ -1952,20 +1986,17 @@ static int wl3501_get_essid(struct net_device *dev,
 
 static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWNAME	- SIOCSIWCOMMIT] = wl3501_get_name,
-	//[SIOCSIWNWID	- SIOCSIWCOMMIT] = wl3501_set_nwid,
-	//[SIOCGIWNWID	- SIOCSIWCOMMIT] = wl3501_get_nwid,
 	//[SIOCSIWFREQ	- SIOCSIWCOMMIT] = wl3501_set_freq,
 	//[SIOCGIWFREQ	- SIOCSIWCOMMIT] = wl3501_get_freq,
 	[SIOCSIWMODE	- SIOCSIWCOMMIT] = wl3501_set_mode,
 	[SIOCGIWMODE	- SIOCSIWCOMMIT] = wl3501_get_mode,
-	//[SIOCSIWSENS	- SIOCSIWCOMMIT] = wl3501_set_sens,
-	//[SIOCGIWSENS	- SIOCSIWCOMMIT] = wl3501_get_sens,
+	[SIOCGIWSENS	- SIOCSIWCOMMIT] = wl3501_get_sens,
 	[SIOCGIWRANGE	- SIOCSIWCOMMIT] = wl3501_get_range,
-	//[SIOCSIWSPY	- SIOCSIWCOMMIT] = iw_handler_set_spy,
-	//[SIOCGIWSPY	- SIOCSIWCOMMIT] = iw_handler_get_spy,
+	[SIOCSIWSPY	- SIOCSIWCOMMIT] = iw_handler_set_spy,
+	[SIOCGIWSPY	- SIOCSIWCOMMIT] = iw_handler_get_spy,
 	[SIOCSIWTHRSPY	- SIOCSIWCOMMIT] = iw_handler_set_thrspy,
 	[SIOCGIWTHRSPY	- SIOCSIWCOMMIT] = iw_handler_get_thrspy,
-	//[SIOCSIWAP	- SIOCSIWCOMMIT] = wl3501_set_wap,
+	[SIOCSIWAP	- SIOCSIWCOMMIT] = wl3501_set_wap,
 	[SIOCGIWAP	- SIOCSIWCOMMIT] = wl3501_get_wap,
 	[SIOCSIWESSID	- SIOCSIWCOMMIT] = wl3501_set_essid,
 	[SIOCGIWESSID	- SIOCSIWCOMMIT] = wl3501_get_essid,
@@ -2291,9 +2322,8 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 		/* Fall through... */
 	case CS_EVENT_RESET_PHYSICAL:
 		if (link->state & DEV_CONFIG) {
-			if (link->open) {
+			if (link->open)
 				netif_stop_queue(dev);
-			}
 			CardServices(ReleaseConfiguration, link->handle);
 		}
 		break;
