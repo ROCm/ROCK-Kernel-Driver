@@ -774,7 +774,6 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 	adapter->scsi_host->max_channel = 0;
 	adapter->scsi_host->unique_id = unique_id++;	/* FIXME */
 	adapter->scsi_host->max_cmd_len = ZFCP_MAX_SCSI_CMND_LENGTH;
-	adapter->scsi_host->no_reportlun = 1;
 	/*
 	 * Reverse mapping of the host number to avoid race condition
 	 */

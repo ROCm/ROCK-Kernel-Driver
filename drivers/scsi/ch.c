@@ -1001,8 +1001,10 @@ static int ch_probe(struct device *dev)
 {
 	struct scsi_device *sd = to_scsi_device(dev);
 	scsi_changer *ch;
+	int pq = (sd->inquiry[0] >> 5) & 7;
 	
-	if (sd->type != TYPE_MEDIUM_CHANGER)
+	if (sd->type != TYPE_MEDIUM_CHANGER ||
+	    pq != SCSI_INQ_PQ_CON)
 		return -ENODEV;
     
 	ch = kmalloc(sizeof(*ch), GFP_KERNEL);

@@ -1383,10 +1383,13 @@ static int sd_probe(struct device *dev)
 	struct gendisk *gd;
 	u32 index;
 	int error, devno;
+	int pq = (sdp->inquiry[0] >> 5) & 7;
 
 	error = -ENODEV;
-	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
+	if (pq != SCSI_INQ_PQ_CON ||
+	    (sdp->type != TYPE_DISK && sdp->type != TYPE_MOD))
 		goto out;
+	
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));

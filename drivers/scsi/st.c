@@ -3736,10 +3736,12 @@ static int st_probe(struct device *dev)
 	ST_partstat *STps;
 	ST_buffer *buffer;
 	int i, j, mode, dev_num, error;
+	int pq = (SDp->inquiry[0] >> 5) & 7;
 	char *stp;
 	u64 bounce_limit;
 
-	if (SDp->type != TYPE_TAPE)
+	if (SDp->type != TYPE_TAPE ||
+	    pq != SCSI_INQ_PQ_CON)
 		return -ENODEV;
 	if ((stp = st_incompatible(SDp))) {
 		printk(KERN_INFO

@@ -459,12 +459,6 @@ struct Scsi_Host {
 	unsigned reverse_ordering:1;
 
 	/*
-	 * True for host adapters that dislike REPORT_LUN as they
-	 * use a different mapping of 8byte LUNs to (long) integers
-	 */
-	unsigned no_reportlun:1;
-
-	/*
 	 * Host has rejected a command because it was busy.
 	 */
 	unsigned int host_blocked;

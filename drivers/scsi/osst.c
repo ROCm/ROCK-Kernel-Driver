@@ -5433,8 +5433,11 @@ static int osst_probe(struct device *dev)
 	OSST_buffer    * buffer;
 	struct gendisk * drive;
 	int              i, mode, dev_num;
+	int 		 pq = (SDp->inquiry[0] >> 5) & 7;
 
-	if (SDp->type != TYPE_TAPE || !osst_supports(SDp))
+	if (SDp->type != TYPE_TAPE ||
+	    !osst_supports(SDp) ||
+	    pq != SCSI_INQ_PQ_CON)
 		return -ENODEV;
 
 	drive = alloc_disk(1);
