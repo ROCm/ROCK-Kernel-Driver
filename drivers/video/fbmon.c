@@ -51,6 +51,7 @@
 
 #define FBMON_FIX_HEADER 1
 
+#ifdef CONFIG_FB_MODE_HELPERS
 struct broken_edid {
 	u8  manufacturer[4];
 	u32 model;
@@ -1156,6 +1157,36 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 	
 	return 0;
 }
+#else
+int fb_parse_edid(unsigned char *edid, struct fb_var_screeninfo *var)
+{
+	return 1;
+}
+void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs)
+{
+	specs = NULL;
+}
+char *get_EDID_from_firmware(struct device *dev)
+{
+	return NULL;
+}
+struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
+{
+	return NULL;
+}
+void fb_destroy_modedb(struct fb_videomode *modedb)
+{
+}
+int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
+{
+	return 1;
+}
+int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
+		struct fb_info *info)
+{
+	return -EINVAL;
+}
+#endif /* CONFIG_FB_MODE_HELPERS */
 	
 /*
  * fb_validate_mode - validates var against monitor capabilities

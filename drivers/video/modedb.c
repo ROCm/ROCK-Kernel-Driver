@@ -39,7 +39,7 @@ const char *global_mode_option = NULL;
 
 #define DEFAULT_MODEDB_INDEX	0
 
-static const struct fb_videomode modedb[] = {
+static const __init struct fb_videomode modedb[] = {
     {
 	/* 640x400 @ 70 Hz, 31.5 kHz hsync */
 	NULL, 70, 640, 400, 39721, 40, 24, 39, 9, 96, 2,
@@ -251,6 +251,7 @@ static const struct fb_videomode modedb[] = {
     },
 };
 
+#ifdef CONFIG_FB_MODE_HELPERS
 const struct fb_videomode vesa_modes[] = {
 	/* 0 640x350-85 VESA */
 	{ NULL, 85, 640, 350, 31746,  96, 32, 60, 32, 64, 3,
@@ -374,6 +375,8 @@ const struct fb_videomode vesa_modes[] = {
 	{ NULL, 60, 1920, 1440, 3367, 352, 144, 56, 1, 224, 3,
 	  FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED, FB_MODE_IS_VESA },
 };
+EXPORT_SYMBOL(vesa_modes);
+#endif /* CONFIG_FB_MODE_HELPERS */
 
 static int my_atoi(const char *name)
 {
@@ -404,7 +407,7 @@ static int my_atoi(const char *name)
  */
 
 int fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
-		  const struct fb_videomode *mode, unsigned int bpp)
+		const struct fb_videomode *mode, unsigned int bpp)
 {
     int err = 0;
 
@@ -827,5 +830,4 @@ EXPORT_SYMBOL(fb_destroy_modelist);
 EXPORT_SYMBOL(fb_match_mode);
 EXPORT_SYMBOL(fb_find_best_mode);
 EXPORT_SYMBOL(fb_videomode_to_modelist);
-EXPORT_SYMBOL(vesa_modes);
 EXPORT_SYMBOL(fb_find_mode);
