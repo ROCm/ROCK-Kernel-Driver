@@ -1673,12 +1673,11 @@ static void start_io( ctlr_info_t *h)
 static inline void complete_buffers(struct bio *bio, int status)
 {
 	while (bio) {
-		int nsecs = bio_sectors(bio);
-
 		struct bio *xbh = bio->bi_next; 
+
 		bio->bi_next = NULL; 
-		blk_finished_io(nsecs);
-		bio_endio(bio, status, nsecs);
+		blk_finished_io(bio_sectors(bio));
+		bio_endio(bio, status);
 		bio = xbh;
 	}
 
